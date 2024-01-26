@@ -11,7 +11,6 @@ class SaveDataBulletFactory2D : public Resource{
     public:
         TypedArray<SaveDataBlockBullets2D> all_block_bullets;
 
-
         void set_all_block_bullets(const TypedArray<SaveDataBlockBullets2D> &new_all_block_bullets);
         TypedArray<SaveDataBlockBullets2D> get_all_block_bullets() const;
     protected:

@@ -15,7 +15,7 @@ BlockBullets2D::BlockBullets2D(){
 }
 
 BlockBullets2D::~BlockBullets2D(){
-    // This code will run on project startup, so avoid that
+    // For some reason the destructor runs on project start up by default, so avoid doing that
     if(Engine::get_singleton()->is_editor_hint()){
         return;
     }
@@ -121,6 +121,8 @@ void BlockBullets2D::spawn(const Ref<BlockBulletsData2D>& spawn_data, BulletFact
     set_up_life_time_timer(spawn_data->max_life_time, spawn_data->max_life_time);
     set_up_change_texture_timer(spawn_data->textures.size(), spawn_data->max_change_texture_time, spawn_data->max_change_texture_time);
     set_up_acceleration_timer(spawn_data->max_speed, spawn_data->acceleration, spawn_data->max_acceleration_time, spawn_data->max_acceleration_time);
+    
+    generate_multimesh();
     set_up_multimesh(size, spawn_data->mesh, spawn_data->texture_size);
 
     generate_area();
@@ -133,22 +135,25 @@ void BlockBullets2D::spawn(const Ref<BlockBulletsData2D>& spawn_data, BulletFact
     finalize_set_up(spawn_data->bullets_custom_data, spawn_data->textures, spawn_data->current_texture_index, spawn_data->material);
 }
 
-void BlockBullets2D::set_up_multimesh(int new_instance_count, const Ref<Mesh>& new_mesh, Vector2 new_texture_size){
+void BlockBullets2D::generate_multimesh(){
     multi = memnew(MultiMesh);
+    multi->set_use_colors(true);
+    set_multimesh(multi);
+}
 
+void BlockBullets2D::set_up_multimesh(int new_instance_count, const Ref<Mesh>& new_mesh, Vector2 new_texture_size){
     if(new_mesh.is_valid()){
         multi->set_mesh(new_mesh);
     }
     else{
+        // TODO maybe if the mesh to be generated has the size size as the previous one, then there is no need to generate a brand new one?
         Ref<QuadMesh> mesh = memnew(QuadMesh);
         mesh->set_size(new_texture_size);
         multi->set_mesh(mesh);
         texture_size = new_texture_size;
     }
     
-    multi->set_use_colors(true);
     multi->set_instance_count(new_instance_count);
-    set_multimesh(multi);
 }
 void BlockBullets2D::set_up_life_time_timer(float new_max_life_time, float new_current_life_time){
     max_life_time = new_max_life_time;
@@ -172,7 +177,6 @@ void BlockBullets2D::set_up_acceleration_timer(float new_max_speed, float new_ac
 }
 
 void BlockBullets2D::generate_area(){
-    //physics_server = PhysicsServer2D::get_singleton();
     area = physics_server->area_create();
 
     physics_server->area_set_area_monitor_callback(area, callable_mp(this, &BlockBullets2D::area_entered_func));
@@ -330,9 +334,9 @@ void BlockBullets2D::disable_bullet(int bullet_index){
 
 void BlockBullets2D::disable_multi_mesh(){
     set_visible(false); // very important to hide it, otherwise it will be rendering the transparent bullets when there is no need, which will tank performance
-    max_life_time=0; // again important, because this also plays a role as a "bullets disabled" boolean value, by using it I can determine which bullets are in the pool/disabled when saving data.
     set_physics_process(false);
     set_process(false);
+    current_life_time = 0; // this is how I differentiate between bullets that are in the pool and bullets that are still active
     factory->add_bullets_to_pool(this);
 }
 
@@ -355,7 +359,7 @@ Ref<SaveDataBlockBullets2D> BlockBullets2D::save(){
     }
     
     data->velocity = velocity;
-    data->current_position=current_position;
+    data->current_position=current_position; // TODO potentially useless?
     data->max_life_time = max_life_time;
     data->current_life_time = current_life_time; // todo check the timers if they are actually valid or not.
     data->size = size;
@@ -411,13 +415,13 @@ void BlockBullets2D::load(const Ref<SaveDataBlockBullets2D>& data, BulletFactory
     speed = data->speed;
     velocity = data->velocity;
 
-    set_global_position(data->current_position); // todo this in spawn as well also add factory too as param
-    
     size = data->transforms.size();
     
     set_up_life_time_timer(data->max_life_time, data->current_life_time);
     set_up_change_texture_timer(data->textures.size(), data->max_change_texture_time, data->current_change_texture_time);
     set_up_acceleration_timer(data->max_speed, data->acceleration, data->max_acceleration_time, data->current_acceleration_time);
+    
+    generate_multimesh();
     set_up_multimesh(size, data->mesh, data->texture_size);
 
     generate_area();
@@ -433,13 +437,31 @@ void BlockBullets2D::load(const Ref<SaveDataBlockBullets2D>& data, BulletFactory
 void BlockBullets2D::activate_multimesh(const Ref<BlockBulletsData2D>& data){
     set_global_position(Vector2(0,0));
     
+    // Set all bullet collision shapes to be active
+    for (int i = 0; i < size; i++)
+    {
+        bullets_enabled_status[i]=true;
+        physics_server->area_set_shape_disabled(area, i, false);
+    }
+
+    
+    block_rotation_radians=data->block_rotation_radians;
+    speed = data->speed;
+
+    velocity = Vector2(cos(block_rotation_radians), sin(block_rotation_radians)) * speed;
+    current_position = Vector2(0,0);
+
+
+    set_up_life_time_timer(data->max_life_time, data->max_life_time);
+    set_up_change_texture_timer(data->textures.size(), data->max_change_texture_time, data->max_change_texture_time);
+    set_up_acceleration_timer(data->max_speed, data->acceleration, data->max_acceleration_time, data->max_acceleration_time);
+    
+    set_up_multimesh(size, data->mesh, data->texture_size);
+
     set_up_area(factory->physics_space, data->collision_layer, data->collision_mask, data->monitorable);
     set_up_collision_shapes_for_area(data->collision_shape_size, data->transforms, data->texture_rotation_radians, data->collision_shape_offset);
-    
-    
-    
-    //TODO
-    UtilityFunctions::print("ACTIVATE BULLETS");
+    make_all_bullet_instances_visible();
+    finalize_set_up(data->bullets_custom_data, data->textures, data->current_texture_index, data->material);
 }
 
 void BlockBullets2D::_bind_methods(){

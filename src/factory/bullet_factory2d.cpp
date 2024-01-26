@@ -1,9 +1,6 @@
 #include "bullet_factory2d.hpp"
-//#include "godot_cpp/classes/physics_server2d.hpp"
 #include "godot_cpp/classes/world2d.hpp"
 
-//#include "godot_cpp/classes/node.hpp"
-//#include "godot_cpp/classes/node2d.hpp"
 #include "godot_cpp/variant/utility_functions.hpp"
 #include "../spawn-data/block_bullets_data2d.hpp"
 #include "../save-data/save_data_bullet_factory2d.hpp"
@@ -33,7 +30,6 @@ void BulletFactory2D::spawnBlockBullets2D(const Ref<BlockBulletsData2D> spawn_da
 
     BlockBullets2D* blk_instance = memnew(BlockBullets2D);
     blk_instance->spawn(spawn_data, this);
-    //blk_instance->queue_free();
 }
 
 Node* BulletFactory2D::get_bullets_container() const{
@@ -55,56 +51,39 @@ Ref<SaveDataBulletFactory2D> BulletFactory2D::save(){
     Ref<SaveDataBulletFactory2D> data = memnew(SaveDataBulletFactory2D);
 
     int amount_bullets = bullets_container->get_child_count();
-    data->all_block_bullets.resize(amount_bullets); // Todo need to contain the amount of block bullets to save/ a counter
-
+    
     for (int i = 0; i < amount_bullets ; i++)
     {
-
         BlockBullets2D* bullet_instance = dynamic_cast<BlockBullets2D*>(bullets_container->get_child(i));
-        
-        data->all_block_bullets[i] = bullet_instance->save();
+        // I only want to save bullets that are still active (I don't want to save bullets that are in the pool).
+        if(bullet_instance->current_life_time == 0){
+            continue;;
+        }
+        // Saves only the active bullets currently
+        data->all_block_bullets.push_back(bullet_instance->save());
     }
 
     return data;
 }
 void BulletFactory2D::load(Ref<SaveDataBulletFactory2D> new_data){
     emit_signal("loading_began");
-    //std::queue<BlockBullets2D*>& ptr = block_bullets_pool[8];
-
-    //block_bullets_pool.clear(); // destroy the queues, otherwise they will just hold invalid pointers, because all old bullets will be deleted
-
+    
     TypedArray<Node> allCurrentBullets(bullets_container->get_children());
     
-
-    // for (int i = 0; i < bullets_container->get_child_count(); i++)
-    // {
-    //     bullets_container->get_child(0)->set_physics_process(false);
-    //     bullets_container->get_child(0)->set_process(false);
-    //     bullets_container->get_child(0)->queue_free();
-    //     Object::cast_to<Node>(allCurrentBullets[i])->queue_free();
-    // }
-    
-
-    // BlockBullets2D* blk_instance = memnew(BlockBullets2D);
-    // add_child(blk_instance);
-    // blk_instance->queue_free(); // works?
-
-     int size = allCurrentBullets.size();
+    int size = allCurrentBullets.size();
     //Free all old bullets
     for (int i = 0; i < size; i++) {
         Node* curr_bullet = Object::cast_to<Node>(allCurrentBullets[i]); // (Node*)&allCurrentBullets[i]; 
 
         curr_bullet->set_physics_process(false);
         curr_bullet->set_process(false);
-        //bullets_container->remove_child(curr_bullet); // works
-        curr_bullet->queue_free(); // does NOT work
-        //curr_bullet->call_deferred("queue_free"); // also does NOT work
+        curr_bullet->queue_free(); 
     }
 
     block_bullets_pool.clear();
     
     // Load all new bullets
-    int amount_bullets =  new_data->all_block_bullets.size();
+    int amount_bullets = new_data->all_block_bullets.size();
     for (int i = 0; i < amount_bullets ; i++)
     {
         BlockBullets2D* blk_instance = memnew(BlockBullets2D);
@@ -133,9 +112,6 @@ BlockBullets2D* BulletFactory2D::remove_bullets_from_pool(int key){
     return bullets;
 }
 
-
-
-
 void BulletFactory2D::_bind_methods(){
     ClassDB::bind_method(D_METHOD("get_bullets_container"), &BulletFactory2D::get_bullets_container);
     ClassDB::bind_method(D_METHOD("set_bullets_container", "new_bullets_container"), &BulletFactory2D::set_bullets_container);
@@ -148,8 +124,6 @@ void BulletFactory2D::_bind_methods(){
 
     ClassDB::bind_method(D_METHOD("save"), &BulletFactory2D::save);
     ClassDB::bind_method(D_METHOD("load", "new_data"), &BulletFactory2D::load);
-
-
 
     ADD_SIGNAL(MethodInfo("area_entered", PropertyInfo(Variant::OBJECT, "area"), PropertyInfo(Variant::OBJECT, "custom_resource"), PropertyInfo(Variant::TRANSFORM2D, "bullet_last_transform")));
     ADD_SIGNAL(MethodInfo("body_entered", PropertyInfo(Variant::OBJECT, "body"), PropertyInfo(Variant::OBJECT, "custom_resource"), PropertyInfo(Variant::TRANSFORM2D, "bullet_last_transform")));
