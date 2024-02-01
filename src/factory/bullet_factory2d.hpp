@@ -11,6 +11,7 @@ class BlockBullets2D; // using forward declaration to avoid circular dependencie
 
 using namespace godot;
 
+// Creates bullets with different behaviour
 class BulletFactory2D:public Node2D{
     GDCLASS(BulletFactory2D, Node2D);
     public:

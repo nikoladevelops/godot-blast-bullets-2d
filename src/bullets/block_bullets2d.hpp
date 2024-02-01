@@ -1,5 +1,5 @@
-#ifndef BLOCK_BULLETS2D_HPP
-#define BLOCK_BULLETS2D_HPP
+#ifndef BLOCK_BULLETS2D
+#define BLOCK_BULLETS2D
 
 #include "godot_cpp/classes/multi_mesh_instance2d.hpp"
 #include "../spawn-data/block_bullets_data2d.hpp"
@@ -11,6 +11,7 @@ class BulletFactory2D;
 
 using namespace godot;
 
+// Bullets act as a block - same speed, same direction
 class BlockBullets2D:public MultiMeshInstance2D, public MultiMeshBullets2D{
     GDCLASS(BlockBullets2D, MultiMeshInstance2D);
     

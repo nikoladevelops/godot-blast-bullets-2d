@@ -12,6 +12,7 @@
 
 using namespace godot;
 
+// Provides easy debugging for the collision shapes of the bullets. When testing performance, disable the debugger, because it tanks performance.
 class BulletDebugger2D : public Node{
     GDCLASS(BulletDebugger2D, Node)
 
@@ -26,13 +27,13 @@ class BulletDebugger2D : public Node{
     BulletFactory2D* bullet_factory_ptr;
 
     // Determines whether the debugger is enabled or not.
-    bool is_enabled;
+    bool is_enabled = false;
     // Stores all multi mesh bullets' pointers, so that it can monitor their collision shapes.
     std::vector<BlockBullets2D*> bullets_multi_meshes;
     // Stores all spawned multi mesh's pointers for the visualization of the collision shapes.
     std::vector<MultiMeshInstance2D*> texture_multi_meshes;
 
-    PhysicsServer2D* physics_server;
+    //PhysicsServer2D* physics_server;
     public:
         void _ready();
         void _physics_process(float delta);

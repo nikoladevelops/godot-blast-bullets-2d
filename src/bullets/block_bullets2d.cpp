@@ -105,7 +105,6 @@ void BlockBullets2D::_physics_process(float delta){
 void BlockBullets2D::spawn(const Ref<BlockBulletsData2D>& spawn_data, BulletFactory2D* new_factory){
     factory = new_factory;
     factory->bullets_container->add_child(this);
-    UtilityFunctions::print(factory->bullets_container);
 
     set_global_position(Vector2(0,0));
 

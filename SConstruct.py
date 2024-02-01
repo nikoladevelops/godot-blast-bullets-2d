@@ -17,6 +17,6 @@ Glob("src/factory/*.cpp") +
 Glob("src/debugger/*.cpp"))
 
 if env['platform'] == 'windows':
-    libpath = '../libtest{}{}'.format(env['suffix'], env['SHLIBSUFFIX'])
+    libpath = '../blast_bullets_2d{}{}'.format(env['suffix'], env['SHLIBSUFFIX'])
     sharedlib = env.SharedLibrary(libpath, src)
     Default(sharedlib)

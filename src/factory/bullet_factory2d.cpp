@@ -11,10 +11,12 @@
 using namespace godot;
 
 void BulletFactory2D::_ready(){
-    if(Engine::get_singleton()->is_editor_hint() == false){
-        if(physics_space.is_valid() == false){
-            physics_space = get_world_2d()->get_space();
-        }
+    if(Engine::get_singleton()->is_editor_hint()){
+        return;
+    }
+    
+    if(physics_space.is_valid() == false){
+        physics_space = get_world_2d()->get_space();
     }
 }
 

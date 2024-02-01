@@ -29,7 +29,7 @@ using namespace godot;
 // bullets classes
 #include "bullets/block_bullets2d.hpp"
 
-void initialize_test_module(ModuleInitializationLevel p_level) {
+void initialize_blast_bullets_2d_module(ModuleInitializationLevel p_level) {
 	if (p_level != MODULE_INITIALIZATION_LEVEL_SCENE) {
 		return;
 	}
@@ -51,7 +51,7 @@ void initialize_test_module(ModuleInitializationLevel p_level) {
 	ClassDB::register_class<BlockBullets2D>();
 }
 
-void uninitialize_test_module(ModuleInitializationLevel p_level) {
+void uninitialize_blast_bullets_2d_module(ModuleInitializationLevel p_level) {
 	if (p_level != MODULE_INITIALIZATION_LEVEL_SCENE) {
 		return;
 	}
@@ -59,11 +59,11 @@ void uninitialize_test_module(ModuleInitializationLevel p_level) {
 
 extern "C" {
 // Initialization.
-GDExtensionBool GDE_EXPORT test_library_init(GDExtensionInterfaceGetProcAddress p_get_proc_address, GDExtensionClassLibraryPtr p_library, GDExtensionInitialization *r_initialization) {
+GDExtensionBool GDE_EXPORT blast_bullets_2d_library_init(GDExtensionInterfaceGetProcAddress p_get_proc_address, GDExtensionClassLibraryPtr p_library, GDExtensionInitialization *r_initialization) {
 	godot::GDExtensionBinding::InitObject init_obj(p_get_proc_address, p_library, r_initialization);
 
-	init_obj.register_initializer(initialize_test_module);
-	init_obj.register_terminator(uninitialize_test_module);
+	init_obj.register_initializer(initialize_blast_bullets_2d_module);
+	init_obj.register_terminator(uninitialize_blast_bullets_2d_module);
 	init_obj.set_minimum_library_initialization_level(MODULE_INITIALIZATION_LEVEL_SCENE);
 
 	return init_obj.init();

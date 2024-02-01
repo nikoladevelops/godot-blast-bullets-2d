@@ -7,38 +7,40 @@
 #include "godot_cpp/classes/window.hpp"
 #include "godot_cpp/classes/quad_mesh.hpp"
 
+#define physics_server PhysicsServer2D::get_singleton()
+
 using namespace godot;
 void BulletDebugger2D::_ready(){
-    if(Engine::get_singleton()->is_editor_hint() == false){
-        if(is_enabled == false){
-            set_physics_process(false);
-            set_process(false);
-            return;
-        }
-
-        if(bullets_container.is_empty()){
-            UtilityFunctions::print("You haven't provided the bullets_container for the debugger");
-            set_physics_process(false);
-            set_process(false);
-            return;
-        }
-
-        if(bullet_factory.is_empty()){
-            UtilityFunctions::print("You haven't provided the bullet_factory for the debugger");
-            set_physics_process(false);
-            set_process(false);
-            return;
-        }
-
-        // TODO maybe the bug is here 
-        physics_server = PhysicsServer2D::get_singleton();
-
-        bullet_factory_ptr=get_node<BulletFactory2D>(bullet_factory);
-        bullet_factory_ptr->connect("loading_began", callable_mp(this, &BulletDebugger2D::reset_debugger));
-
-        bullets_container_ptr = get_node<Node>(bullets_container); // TODO will change in the future
-        bullets_container_ptr->connect("child_entered_tree", callable_mp(this, &BulletDebugger2D::bullets_entered_container));
+    if(Engine::get_singleton()->is_editor_hint()){
+        return;
     }
+
+    if(is_enabled == false){
+        set_physics_process(false);
+        set_process(false);
+        return;
+    }
+    
+    if(bullets_container.is_empty()){
+        UtilityFunctions::print("You haven't provided the bullets_container for the debugger");
+        set_physics_process(false);
+        set_process(false);
+        return;
+    }
+
+    if(bullet_factory.is_empty()){
+        UtilityFunctions::print("You haven't provided the bullet_factory for the debugger");
+        set_physics_process(false);
+        set_process(false);
+        return;
+    }
+
+    bullet_factory_ptr=get_node<BulletFactory2D>(bullet_factory);
+    bullet_factory_ptr->connect("loading_began", callable_mp(this, &BulletDebugger2D::reset_debugger));
+
+    bullets_container_ptr = get_node<Node>(bullets_container); // TODO will change in the future
+    bullets_container_ptr->connect("child_entered_tree", callable_mp(this, &BulletDebugger2D::bullets_entered_container));
+    
 }
 
 void BulletDebugger2D::reset_debugger(){

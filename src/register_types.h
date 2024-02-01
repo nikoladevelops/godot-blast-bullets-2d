@@ -10,7 +10,7 @@
 
 using namespace godot;
 
-void initialize_test_module(ModuleInitializationLevel p_level);
-void uninitialize_test_module(ModuleInitializationLevel p_level);
+void initialize_blast_bullets_2d_module(ModuleInitializationLevel p_level);
+void uninitialize_blast_bullets_2d_module(ModuleInitializationLevel p_level);
 
 #endif // EXAMPLE_REGISTER_TYPES_H
