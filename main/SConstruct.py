@@ -16,7 +16,6 @@ Glob("src/save-data/*.cpp") +
 Glob("src/factory/*.cpp") + 
 Glob("src/debugger/*.cpp"))
 
-if env['platform'] == 'windows':
-    libpath = '../blast_bullets_2d{}{}'.format(env['suffix'], env['SHLIBSUFFIX'])
-    sharedlib = env.SharedLibrary(libpath, src)
-    Default(sharedlib)
+libpath = '../bin/lib_blast_bullets_2d{}{}'.format(env['suffix'], env['SHLIBSUFFIX'])
+sharedlib = env.SharedLibrary(libpath, src)
+Default(sharedlib)

@@ -1,0 +1,18 @@
+[configuration]
+
+entry_symbol = "blast_bullets_2d_library_init"
+compatibility_minimum = "4.1"
+
+[libraries]
+
+windows.debug.x86_64 = "res://addons/BlastBullets2D/bin/lib_blast_bullets_2d.windows.template_debug.x86_64.dll"
+windows.release.x86_64 = "res://addons/BlastBullets2D/bin/lib_blast_bullets_2d.windows.template_release.x86_64.dll"
+
+android.debug.arm64 = "res://addons/BlastBullets2D/bin/lib_blast_bullets_2d.android.template_debug.arm64.so"
+android.release.arm64 = "res://addons/BlastBullets2D/bin/lib_blast_bullets_2d.android.template_release.arm64.so"
+
+linux.debug.x86_64 = "res://addons/BlastBullets2D/bin/lib_blast_bullets_2d.linux.template_debug.x86_64.so"
+linux.release.x86_64 = "res://addons/BlastBullets2D/bin/lib_blast_bullets_2d.linux.template_release.x86_64.so"
+
+web.debug.wasm32 = "res://addons/BlastBullets2D/bin/lib_blast_bullets_2d.web.template_debug.wasm32.wasm"
+web.release.wasm32 = "res://addons/BlastBullets2D/bin/lib_blast_bullets_2d.web.template_release.wasm32.wasm"

@@ -33,7 +33,6 @@ class BulletDebugger2D : public Node{
     // Stores all spawned multi mesh's pointers for the visualization of the collision shapes.
     std::vector<MultiMeshInstance2D*> texture_multi_meshes;
 
-    //PhysicsServer2D* physics_server;
     public:
         void _ready();
         void _physics_process(float delta);
