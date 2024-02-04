@@ -6,6 +6,8 @@
 #include "godot_cpp/classes/canvas_item_material.hpp"
 #include "godot_cpp/classes/mesh.hpp"
 
+#include "../shared/bullet_rotation_data.hpp"
+
 using namespace godot;
 
 class BlockBulletsData2D : public Resource{
@@ -60,6 +62,10 @@ class BlockBulletsData2D : public Resource{
         // Custom mesh, if it isn't provided then a Quadmesh will be generated and it will use the texture_size. If you DO provide a mesh then you should handle the scaling of the bullets yourself using a shader for best quality.
         Ref<Mesh> mesh;
 
+        TypedArray<BulletRotationData> all_bullet_rotation_data;
+
+        // If set to false, it will also rotate the collision shapes
+        bool rotate_only_textures=true;
 
         // Setters and getters
         TypedArray<Texture2D> get_textures() const;
@@ -121,6 +127,12 @@ class BlockBulletsData2D : public Resource{
 
         Ref<Mesh> get_mesh() const;
         void set_mesh(const Ref<Mesh>& new_mesh);
+
+        TypedArray<BulletRotationData> get_all_bullet_rotation_data();
+        void set_all_bullet_rotation_data(const TypedArray<BulletRotationData>& new_data);
+
+        bool get_rotate_only_textures();
+        void set_rotate_only_textures(bool new_rotate_only_textures);
 
     protected:
         static void _bind_methods();

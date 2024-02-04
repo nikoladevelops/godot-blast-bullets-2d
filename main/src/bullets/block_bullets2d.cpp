@@ -100,6 +100,36 @@ void BlockBullets2D::_physics_process(float delta){
             }
         }
     }
+
+    // Handle Rotation
+    if(is_rotation_active){
+        for (int i = 0; i < size; i++)
+        {
+            if(use_only_first_rotation_data){
+                rotate_bullet(i, all_rotation_speed[0] * delta);
+                accelerate_bullet_rotation_speed(0);
+            }else{
+                if(all_is_rotation_enabled[i] == false){ // It means that the current bullet's data indicates that it should NOT be rotated, so skip it
+                    continue;
+                }
+                rotate_bullet(i, all_rotation_speed[i] * delta);
+                accelerate_bullet_rotation_speed(i);
+            }
+        }
+        
+    }
+}
+
+void BlockBullets2D::rotate_bullet(int multi_instance_id, float rotated_angle){
+    Transform2D rotated_transf = multi->get_instance_transform_2d(multi_instance_id).rotated_local(rotated_angle);
+    multi->set_instance_transform_2d(multi_instance_id, rotated_transf);
+}
+void BlockBullets2D::accelerate_bullet_rotation_speed(int multi_instance_id){
+    if(all_rotation_speed[multi_instance_id] == all_max_rotation_speed[multi_instance_id]){
+        return;
+    }
+    
+    all_rotation_speed[multi_instance_id] = std::min<float>(all_rotation_speed[multi_instance_id] + all_rotation_acceleration[multi_instance_id], all_max_rotation_speed[multi_instance_id]);
 }
 
 void BlockBullets2D::spawn(const Ref<BlockBulletsData2D>& spawn_data, BulletFactory2D* new_factory){
@@ -117,6 +147,9 @@ void BlockBullets2D::spawn(const Ref<BlockBulletsData2D>& spawn_data, BulletFact
 
     size = spawn_data->transforms.size(); // important, because some set_up methods use this
     
+
+    set_up_rotation(spawn_data->all_bullet_rotation_data);
+
     set_up_life_time_timer(spawn_data->max_life_time, spawn_data->max_life_time);
     set_up_change_texture_timer(spawn_data->textures.size(), spawn_data->max_change_texture_time, spawn_data->max_change_texture_time);
     set_up_acceleration_timer(spawn_data->max_speed, spawn_data->acceleration, spawn_data->max_acceleration_time, spawn_data->max_acceleration_time);
@@ -154,6 +187,41 @@ void BlockBullets2D::set_up_multimesh(int new_instance_count, const Ref<Mesh>& n
     
     multi->set_instance_count(new_instance_count);
 }
+
+void BlockBullets2D::set_up_rotation(TypedArray<BulletRotationData>& new_data){
+        int amount_of_rotation_data = new_data.size();
+        // If the amount of data that was provided is not a single one and also not the same amount as the bullets amount
+        // then rotation should be disabled/invalid.
+        // This is because I want the user to either provide a single BulletRotationData that will be used for every single bullet
+        // or BulletRotation data for each bullet that will allow each bullet to rotate differently. Only these 2 cases are valid.
+        
+        if(amount_of_rotation_data != size){
+            if(amount_of_rotation_data != 1){
+                is_rotation_active = false;
+                return;
+            }
+
+            use_only_first_rotation_data=true; // Important. Means only a single data was provided, so use it for every single bullet. If I don't have this variable then in _process I will be trying to access invalid vector indexes
+        }
+
+        is_rotation_active = true;  // Important, because it determines if we have rotation data to use
+        all_is_rotation_enabled.resize(amount_of_rotation_data);
+        all_rotation_speed.resize(amount_of_rotation_data);
+        all_max_rotation_speed.resize(amount_of_rotation_data);
+        all_rotation_acceleration.resize(amount_of_rotation_data);
+
+        for (int i = 0; i < amount_of_rotation_data; i++)
+        {
+            BulletRotationData& curr_bullet_data = *Object::cast_to<BulletRotationData>(new_data[i]); // Found out that if you have a TypedArray<>, trying to access an element with [] will give you Variant, so in order to cast it use Object::cast_to<>(), the normal reinterpret_cast and the C way of casting didn't work hmm
+
+            all_is_rotation_enabled[i] = curr_bullet_data.is_rotation_enabled;
+            all_rotation_speed[i] = curr_bullet_data.rotation_speed;
+            all_max_rotation_speed[i] = curr_bullet_data.max_rotation_speed;
+            all_rotation_acceleration[i] = curr_bullet_data.rotation_acceleration;
+
+        }
+}
+
 void BlockBullets2D::set_up_life_time_timer(float new_max_life_time, float new_current_life_time){
     max_life_time = new_max_life_time;
     current_life_time = new_current_life_time;
@@ -232,6 +300,7 @@ void BlockBullets2D::set_up_collision_shapes_for_area(
         texture_transf.set_rotation(texture_transf.get_rotation()+new_texture_rotation);
 
         multi->set_instance_transform_2d(i, texture_transf);
+        
         
         texture_rotation_radians = new_texture_rotation;
         collision_shape_offset = new_collision_shape_offset;

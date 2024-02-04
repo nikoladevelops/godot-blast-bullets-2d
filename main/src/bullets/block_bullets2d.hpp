@@ -6,6 +6,7 @@
 #include "godot_cpp/classes/physics_server2d.hpp"
 #include "../save-data/save_data_block_bullets2d.hpp"
 #include "./multi_mesh_bullets2d.hpp"
+#include "../shared/bullet_rotation_data.hpp"
 
 class BulletFactory2D;
 
@@ -46,7 +47,7 @@ class BlockBullets2D:public MultiMeshInstance2D, public MultiMeshBullets2D{
         // The user can pass any custom data they desire and have access to it in the area_entered and body_entered function callbacks
         Ref<Resource> bullets_custom_data;
 
-        // Texture related logic
+        // TEXTURE RELATED
 
         // Holds all textures
         TypedArray<Texture2D> textures;
@@ -60,7 +61,8 @@ class BlockBullets2D:public MultiMeshInstance2D, public MultiMeshBullets2D{
         // The factory by which the bullets were spawned.
         BulletFactory2D* factory;
 
-        // Speed related logic
+        // SPEED RELATED
+
         // The block rotation. The direction of the bullets is determined by it.
         float block_rotation_radians;
         // Max speed of all bullets
@@ -79,6 +81,25 @@ class BlockBullets2D:public MultiMeshInstance2D, public MultiMeshBullets2D{
         float texture_rotation_radians;
         // Same thing over here
         Vector2 texture_size = Vector2(0,0);
+
+        /// ROTATION RELATED
+
+        // SOA vs AOS, I picked SOA, because it offers better cache performance
+
+        std::vector<char> all_is_rotation_enabled; // I am using char instead of bool, because it offers better performance when trying to access it compared to a vector<bool> which packs the boolean values and uses bitwise operations internally (could've used a uint8_t too)
+        std::vector<float> all_rotation_speed;
+        std::vector<float> all_max_rotation_speed;
+        std::vector<float> all_rotation_acceleration;
+        
+        // If set to false it will also rotate the collision shapes
+        bool rotate_only_textures;
+        // Important. Determines if there was valid rotation data passed, if its true it means the rotation logic will work.
+        bool is_rotation_active;
+        // If true it means that only a single BulletRotationData was provided, so it will be used for each bullet. If false it means that we have BulletRotationData for each bullet. It is determined by the amount of BulletRotationData passed to spawn()
+        bool use_only_first_rotation_data=false;
+
+        std::vector<Transform2D> all_cached_instance_transforms;
+        ///
 
         void _ready();
         void _physics_process(float delta);
@@ -125,6 +146,7 @@ class BlockBullets2D:public MultiMeshInstance2D, public MultiMeshBullets2D{
         
         void generate_multimesh();
         void set_up_multimesh(int new_instance_count, const Ref<Mesh>& new_mesh, Vector2 new_texture_size);
+        void set_up_rotation(TypedArray<BulletRotationData>& new_data);
         void set_up_life_time_timer(float new_max_life_time, float new_current_life_time);
         void set_up_change_texture_timer(int new_amount_textures, float new_max_change_texture_time, float new_current_change_texture_time);
         void set_up_acceleration_timer(float new_max_speed, float new_acceleration, float new_max_acceleration_time, float new_current_acceleration_time);
@@ -134,6 +156,8 @@ class BlockBullets2D:public MultiMeshInstance2D, public MultiMeshBullets2D{
             int new_current_texture_index,
             const Ref<Material>& new_material
             );
+        void rotate_bullet(int multi_instance_id, float rotated_angle);
+        void accelerate_bullet_rotation_speed(int multi_instance_id);
         static void _bind_methods();
 };
 

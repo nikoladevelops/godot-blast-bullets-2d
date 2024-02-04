@@ -75,7 +75,7 @@ void BulletFactory2D::load(Ref<SaveDataBulletFactory2D> new_data){
     int size = allCurrentBullets.size();
     //Free all old bullets
     for (int i = 0; i < size; i++) {
-        Node* curr_bullet = Object::cast_to<Node>(allCurrentBullets[i]); // (Node*)&allCurrentBullets[i]; 
+        Node* curr_bullet = Object::cast_to<Node>(allCurrentBullets[i]);
 
         curr_bullet->set_physics_process(false);
         curr_bullet->set_process(false);

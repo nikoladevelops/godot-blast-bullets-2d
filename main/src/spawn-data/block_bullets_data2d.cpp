@@ -148,6 +148,25 @@ void BlockBulletsData2D::set_mesh(const Ref<Mesh>& new_mesh){
     mesh=new_mesh;
 }
 
+TypedArray<BulletRotationData> BlockBulletsData2D::get_all_bullet_rotation_data(){
+    return all_bullet_rotation_data;
+}
+void BlockBulletsData2D::set_all_bullet_rotation_data(const TypedArray<BulletRotationData>& new_bullet_rotation_data){
+    
+    all_bullet_rotation_data.resize(new_bullet_rotation_data.size());
+    for (int i = 0; i < new_bullet_rotation_data.size(); i++)
+    {
+        all_bullet_rotation_data[i] = new_bullet_rotation_data[i];
+    }
+}
+
+bool BlockBulletsData2D::get_rotate_only_textures(){
+    return rotate_only_textures;
+}
+void BlockBulletsData2D::set_rotate_only_textures(bool new_rotate_only_textures){
+    rotate_only_textures=new_rotate_only_textures;
+}
+
 void BlockBulletsData2D::_bind_methods() {
 ClassDB::bind_method(D_METHOD("get_textures"), &BlockBulletsData2D::get_textures);
 ClassDB::bind_method(D_METHOD("set_textures", "new_textures"), &BlockBulletsData2D::set_textures);
@@ -228,5 +247,13 @@ ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "material"), "set_material", "get_mat
 ClassDB::bind_method(D_METHOD("get_mesh"), &BlockBulletsData2D::get_mesh);
 ClassDB::bind_method(D_METHOD("set_mesh", "new_mesh"), &BlockBulletsData2D::set_mesh);
 ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "mesh"), "set_mesh", "get_mesh");
+
+ClassDB::bind_method(D_METHOD("get_all_bullet_rotation_data"), &BlockBulletsData2D::get_all_bullet_rotation_data);
+ClassDB::bind_method(D_METHOD("set_all_bullet_rotation_data", "new_data"), &BlockBulletsData2D::set_all_bullet_rotation_data);
+ADD_PROPERTY(PropertyInfo(Variant::ARRAY, "all_bullet_rotation_data"), "set_all_bullet_rotation_data", "get_all_bullet_rotation_data");
+
+ClassDB::bind_method(D_METHOD("get_rotate_only_textures"), &BlockBulletsData2D::get_rotate_only_textures);
+ClassDB::bind_method(D_METHOD("set_rotate_only_textures", "new_rotate_only_textures"), &BlockBulletsData2D::set_rotate_only_textures);
+ADD_PROPERTY(PropertyInfo(Variant::BOOL, "rotate_only_textures"), "set_rotate_only_textures", "get_rotate_only_textures");
 
 }
