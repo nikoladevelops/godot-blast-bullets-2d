@@ -123,6 +123,11 @@ void BlockBullets2D::_physics_process(float delta){
 void BlockBullets2D::rotate_bullet(int multi_instance_id, float rotated_angle){
     Transform2D rotated_transf = multi->get_instance_transform_2d(multi_instance_id).rotated_local(rotated_angle);
     multi->set_instance_transform_2d(multi_instance_id, rotated_transf);
+
+    if(rotate_only_textures == false){
+        Transform2D rotated_shape_transf = physics_server->area_get_shape_transform(area,multi_instance_id).rotated_local(rotated_angle);
+        physics_server->area_set_shape_transform(area, multi_instance_id, rotated_shape_transf);
+    }
 }
 void BlockBullets2D::accelerate_bullet_rotation_speed(int multi_instance_id){
     if(all_rotation_speed[multi_instance_id] == all_max_rotation_speed[multi_instance_id]){
@@ -148,7 +153,7 @@ void BlockBullets2D::spawn(const Ref<BlockBulletsData2D>& spawn_data, BulletFact
     size = spawn_data->transforms.size(); // important, because some set_up methods use this
     
 
-    set_up_rotation(spawn_data->all_bullet_rotation_data);
+    set_up_rotation(spawn_data->all_bullet_rotation_data, spawn_data->rotate_only_textures);
 
     set_up_life_time_timer(spawn_data->max_life_time, spawn_data->max_life_time);
     set_up_change_texture_timer(spawn_data->textures.size(), spawn_data->max_change_texture_time, spawn_data->max_change_texture_time);
@@ -188,7 +193,7 @@ void BlockBullets2D::set_up_multimesh(int new_instance_count, const Ref<Mesh>& n
     multi->set_instance_count(new_instance_count);
 }
 
-void BlockBullets2D::set_up_rotation(TypedArray<BulletRotationData>& new_data){
+void BlockBullets2D::set_up_rotation(TypedArray<BulletRotationData>& new_data, bool new_rotate_only_textures){
         int amount_of_rotation_data = new_data.size();
         // If the amount of data that was provided is not a single one and also not the same amount as the bullets amount
         // then rotation should be disabled/invalid.
@@ -203,7 +208,7 @@ void BlockBullets2D::set_up_rotation(TypedArray<BulletRotationData>& new_data){
 
             use_only_first_rotation_data=true; // Important. Means only a single data was provided, so use it for every single bullet. If I don't have this variable then in _process I will be trying to access invalid vector indexes
         }
-
+        rotate_only_textures=new_rotate_only_textures;
         is_rotation_active = true;  // Important, because it determines if we have rotation data to use
         all_is_rotation_enabled.resize(amount_of_rotation_data);
         all_rotation_speed.resize(amount_of_rotation_data);
@@ -218,7 +223,6 @@ void BlockBullets2D::set_up_rotation(TypedArray<BulletRotationData>& new_data){
             all_rotation_speed[i] = curr_bullet_data.rotation_speed;
             all_max_rotation_speed[i] = curr_bullet_data.max_rotation_speed;
             all_rotation_acceleration[i] = curr_bullet_data.rotation_acceleration;
-
         }
 }
 
@@ -472,6 +476,22 @@ Ref<SaveDataBlockBullets2D> BlockBullets2D::save(){
     data->material = get_material();
     data->mesh=multi->get_mesh();
 
+    // SAVE ROTATION DATA
+    if(is_rotation_active){
+        data->all_bullet_rotation_data.resize(all_rotation_speed.size());
+        for (int i = 0; i < all_rotation_speed.size(); i++)
+        {
+            Ref<BulletRotationData> bullet_data = memnew(BulletRotationData);
+            bullet_data->rotation_speed = all_rotation_speed[i];
+            bullet_data->max_rotation_speed = all_max_rotation_speed[i];
+            bullet_data->rotation_acceleration = all_rotation_acceleration[i];
+            bullet_data->is_rotation_enabled = all_is_rotation_enabled[i];
+
+            data->all_bullet_rotation_data[i] = bullet_data;
+        }
+        data->rotate_only_textures=rotate_only_textures;
+    }
+    
     return data;
 }
 
@@ -485,6 +505,8 @@ void BlockBullets2D::load(const Ref<SaveDataBlockBullets2D>& data, BulletFactory
 
     size = data->transforms.size();
     
+    set_up_rotation(data->all_bullet_rotation_data, data->rotate_only_textures);
+
     set_up_life_time_timer(data->max_life_time, data->current_life_time);
     set_up_change_texture_timer(data->textures.size(), data->max_change_texture_time, data->current_change_texture_time);
     set_up_acceleration_timer(data->max_speed, data->acceleration, data->max_acceleration_time, data->current_acceleration_time);
@@ -519,6 +541,7 @@ void BlockBullets2D::activate_multimesh(const Ref<BlockBulletsData2D>& data){
     velocity = Vector2(cos(block_rotation_radians), sin(block_rotation_radians)) * speed;
     current_position = Vector2(0,0);
 
+    set_up_rotation(data->all_bullet_rotation_data, data->rotate_only_textures);
 
     set_up_life_time_timer(data->max_life_time, data->max_life_time);
     set_up_change_texture_timer(data->textures.size(), data->max_change_texture_time, data->max_change_texture_time);

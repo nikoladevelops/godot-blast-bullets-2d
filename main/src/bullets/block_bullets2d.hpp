@@ -146,7 +146,7 @@ class BlockBullets2D:public MultiMeshInstance2D, public MultiMeshBullets2D{
         
         void generate_multimesh();
         void set_up_multimesh(int new_instance_count, const Ref<Mesh>& new_mesh, Vector2 new_texture_size);
-        void set_up_rotation(TypedArray<BulletRotationData>& new_data);
+        void set_up_rotation(TypedArray<BulletRotationData>& new_data, bool new_rotate_only_textures);
         void set_up_life_time_timer(float new_max_life_time, float new_current_life_time);
         void set_up_change_texture_timer(int new_amount_textures, float new_max_change_texture_time, float new_current_change_texture_time);
         void set_up_acceleration_timer(float new_max_speed, float new_acceleration, float new_max_acceleration_time, float new_current_acceleration_time);

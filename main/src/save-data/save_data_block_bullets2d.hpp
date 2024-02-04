@@ -5,6 +5,7 @@
 #include "godot_cpp/classes/texture2d.hpp"
 #include "godot_cpp/classes/material.hpp"
 #include "godot_cpp/classes/mesh.hpp"
+#include "../shared/bullet_rotation_data.hpp"
 
 using namespace godot;
 class SaveDataBlockBullets2D : public Resource{
@@ -47,6 +48,11 @@ class SaveDataBlockBullets2D : public Resource{
         bool monitorable;
         Ref<Material> material;
         Ref<Mesh> mesh;
+
+        TypedArray<BulletRotationData> all_bullet_rotation_data;
+
+        // If set to false, it will also rotate the collision shapes
+        bool rotate_only_textures=true;
 
         void set_transforms(TypedArray<Transform2D> new_transforms);
         TypedArray<Transform2D> get_transforms() const;
@@ -128,6 +134,13 @@ class SaveDataBlockBullets2D : public Resource{
 
         void set_mesh(Ref<Mesh> new_mesh);
         Ref<Mesh> get_mesh() const;
+
+        TypedArray<BulletRotationData> get_all_bullet_rotation_data();
+        void set_all_bullet_rotation_data(const TypedArray<BulletRotationData>& new_data);
+
+        bool get_rotate_only_textures();
+        void set_rotate_only_textures(bool new_rotate_only_textures);
+
     protected:
         static void _bind_methods();
 };
