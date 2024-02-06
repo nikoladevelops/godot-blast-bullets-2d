@@ -103,20 +103,23 @@ void BlockBullets2D::_physics_process(float delta){
 
     // Handle Rotation
     if(is_rotation_active){
-        for (int i = 0; i < size; i++)
-        {
-            if(use_only_first_rotation_data){
+        if(use_only_first_rotation_data){
+            accelerate_bullet_rotation_speed(0);
+            for (int i = 0; i < size; i++)
+            {
                 rotate_bullet(i, all_rotation_speed[0] * delta);
-                accelerate_bullet_rotation_speed(0);
-            }else{
+            }
+        }else{
+            for (int i = 0; i < size; i++)
+            {
                 if(all_is_rotation_enabled[i] == false){ // It means that the current bullet's data indicates that it should NOT be rotated, so skip it
                     continue;
                 }
+
                 rotate_bullet(i, all_rotation_speed[i] * delta);
                 accelerate_bullet_rotation_speed(i);
             }
         }
-        
     }
 }
 
