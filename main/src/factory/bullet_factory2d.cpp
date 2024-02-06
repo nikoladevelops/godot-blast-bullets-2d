@@ -31,6 +31,7 @@ void BulletFactory2D::spawnBlockBullets2D(const Ref<BlockBulletsData2D> spawn_da
 
 
     BlockBullets2D* blk_instance = memnew(BlockBullets2D);
+
     blk_instance->spawn(spawn_data, this);
 }
 
@@ -58,8 +59,8 @@ Ref<SaveDataBulletFactory2D> BulletFactory2D::save(){
     {
         BlockBullets2D* bullet_instance = dynamic_cast<BlockBullets2D*>(bullets_container->get_child(i));
         // I only want to save bullets that are still active (I don't want to save bullets that are in the pool).
-        if(bullet_instance->current_life_time == 0){
-            continue;;
+        if(bullet_instance->current_life_time == 0 || bullet_instance->is_visible() == false){
+            continue;
         }
         // Saves only the active bullets currently
         data->all_block_bullets.push_back(bullet_instance->save());
@@ -68,22 +69,6 @@ Ref<SaveDataBulletFactory2D> BulletFactory2D::save(){
     return data;
 }
 void BulletFactory2D::load(Ref<SaveDataBulletFactory2D> new_data){
-    emit_signal("loading_began");
-    
-    TypedArray<Node> allCurrentBullets(bullets_container->get_children());
-    
-    int size = allCurrentBullets.size();
-    //Free all old bullets
-    for (int i = 0; i < size; i++) {
-        Node* curr_bullet = Object::cast_to<Node>(allCurrentBullets[i]);
-
-        curr_bullet->set_physics_process(false);
-        curr_bullet->set_process(false);
-        curr_bullet->queue_free(); 
-    }
-
-    block_bullets_pool.clear();
-    
     // Load all new bullets
     int amount_bullets = new_data->all_block_bullets.size();
     for (int i = 0; i < amount_bullets ; i++)
@@ -99,6 +84,7 @@ void BulletFactory2D::add_bullets_to_pool(BlockBullets2D* new_bullets){
 
     block_bullets_pool[key].push(new_bullets);
 }
+
 BlockBullets2D* BulletFactory2D::remove_bullets_from_pool(int key){
     auto result = block_bullets_pool.find(key);
     // If the block_bullets_pool doesn't contain a queue with that key or if it does but the queue is empty (meaning no bullets) return a nullptr
@@ -114,6 +100,23 @@ BlockBullets2D* BulletFactory2D::remove_bullets_from_pool(int key){
     return bullets;
 }
 
+void BulletFactory2D::clear_all_bullets(){
+    emit_signal("bullets_got_cleared");
+    TypedArray<Node> allCurrentBullets = bullets_container->get_children();
+    
+    int size = allCurrentBullets.size();
+
+    for (int i = 0; i < size; i++) {
+        Node* curr_bullet = Object::cast_to<Node>(allCurrentBullets[i]);
+
+        if(curr_bullet != nullptr){
+            curr_bullet->queue_free();
+        }
+    }
+
+    block_bullets_pool.clear();
+}
+
 void BulletFactory2D::_bind_methods(){
     ClassDB::bind_method(D_METHOD("get_bullets_container"), &BulletFactory2D::get_bullets_container);
     ClassDB::bind_method(D_METHOD("set_bullets_container", "new_bullets_container"), &BulletFactory2D::set_bullets_container);
@@ -127,9 +130,10 @@ void BulletFactory2D::_bind_methods(){
     ClassDB::bind_method(D_METHOD("save"), &BulletFactory2D::save);
     ClassDB::bind_method(D_METHOD("load", "new_data"), &BulletFactory2D::load);
 
+    ClassDB::bind_method(D_METHOD("clear_all_bullets"), &BulletFactory2D::clear_all_bullets);
+
     ADD_SIGNAL(MethodInfo("area_entered", PropertyInfo(Variant::OBJECT, "area"), PropertyInfo(Variant::OBJECT, "custom_resource"), PropertyInfo(Variant::TRANSFORM2D, "bullet_last_transform")));
     ADD_SIGNAL(MethodInfo("body_entered", PropertyInfo(Variant::OBJECT, "body"), PropertyInfo(Variant::OBJECT, "custom_resource"), PropertyInfo(Variant::TRANSFORM2D, "bullet_last_transform")));
-
     // I need this signal so that the bullet debugger knows when to clear its vectors containing pointers as well as freeing the generated texture multimeshes
-    ADD_SIGNAL(MethodInfo("loading_began"));
+    ADD_SIGNAL(MethodInfo("bullets_got_cleared"));
 }

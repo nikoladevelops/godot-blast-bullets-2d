@@ -120,23 +120,6 @@ void BlockBullets2D::_physics_process(float delta){
     }
 }
 
-void BlockBullets2D::rotate_bullet(int multi_instance_id, float rotated_angle){
-    Transform2D rotated_transf = multi->get_instance_transform_2d(multi_instance_id).rotated_local(rotated_angle);
-    multi->set_instance_transform_2d(multi_instance_id, rotated_transf);
-
-    if(rotate_only_textures == false){
-        Transform2D rotated_shape_transf = physics_server->area_get_shape_transform(area,multi_instance_id).rotated_local(rotated_angle);
-        physics_server->area_set_shape_transform(area, multi_instance_id, rotated_shape_transf);
-    }
-}
-void BlockBullets2D::accelerate_bullet_rotation_speed(int multi_instance_id){
-    if(all_rotation_speed[multi_instance_id] == all_max_rotation_speed[multi_instance_id]){
-        return;
-    }
-    
-    all_rotation_speed[multi_instance_id] = std::min<float>(all_rotation_speed[multi_instance_id] + all_rotation_acceleration[multi_instance_id], all_max_rotation_speed[multi_instance_id]);
-}
-
 void BlockBullets2D::spawn(const Ref<BlockBulletsData2D>& spawn_data, BulletFactory2D* new_factory){
     factory = new_factory;
     factory->bullets_container->add_child(this);
@@ -152,7 +135,6 @@ void BlockBullets2D::spawn(const Ref<BlockBulletsData2D>& spawn_data, BulletFact
 
     size = spawn_data->transforms.size(); // important, because some set_up methods use this
     
-
     set_up_rotation(spawn_data->all_bullet_rotation_data, spawn_data->rotate_only_textures);
 
     set_up_life_time_timer(spawn_data->max_life_time, spawn_data->max_life_time);
@@ -165,11 +147,210 @@ void BlockBullets2D::spawn(const Ref<BlockBulletsData2D>& spawn_data, BulletFact
     generate_area();
     set_up_area(factory->physics_space, spawn_data->collision_layer, spawn_data->collision_mask, spawn_data->monitorable);
     
-    generate_collision_shapes_for_area();
-    set_up_collision_shapes_for_area(spawn_data->collision_shape_size, spawn_data->transforms, spawn_data->texture_rotation_radians, spawn_data->collision_shape_offset);
-    
     make_all_bullet_instances_visible();
+    generate_collision_shapes_for_area(); 
+    set_up_collision_shapes_for_area(spawn_data->collision_shape_size, spawn_data->transforms, spawn_data->texture_rotation_radians, spawn_data->collision_shape_offset);
+    enable_bullets_based_on_status();
+
     finalize_set_up(spawn_data->bullets_custom_data, spawn_data->textures, spawn_data->current_texture_index, spawn_data->material);
+}
+
+Ref<SaveDataBlockBullets2D> BlockBullets2D::save(){
+    set_physics_process(false);
+    set_process(false);
+
+    Ref<SaveDataBlockBullets2D> data = memnew(SaveDataBlockBullets2D);
+
+    data->transforms.resize(size);
+    for (int i = 0; i < size; i++)
+    {
+        // I am saving the original shape transform without the collision shape offset applied to it, this is so I can reuse my methods fully when loading and avoid complicating my code further
+        Transform2D transform_without_shape_offset = physics_server->area_get_shape_transform(area,i);
+
+        Vector2 rotated_offset;
+        rotated_offset.x = collision_shape_offset.x * Math::cos(block_rotation_radians) - collision_shape_offset.y * Math::sin(block_rotation_radians);
+        rotated_offset.y = collision_shape_offset.x * Math::sin(block_rotation_radians) + collision_shape_offset.y * Math::cos(block_rotation_radians);
+
+        transform_without_shape_offset.set_origin(transform_without_shape_offset.get_origin() - rotated_offset);
+
+        data->transforms[i] = transform_without_shape_offset;
+    }
+    
+    data->velocity = velocity;
+    data->current_position=current_position; // TODO potentially useless?
+    data->max_life_time = max_life_time;
+    data->current_life_time = current_life_time; // todo check the timers if they are actually valid or not.
+    data->size = size;
+
+    data->bullets_enabled_status.resize(size);
+    
+    for (int i = 0; i < size; i++)
+    {
+        data->bullets_enabled_status[i] = bullets_enabled_status[i];
+    }
+    
+    data->bullets_custom_data=bullets_custom_data;
+
+    int amount_textures = textures.size();
+    data->textures.resize(amount_textures);
+    for (int i = 0; i < amount_textures; i++)
+    {
+        data->textures[i] = textures[i];
+    }
+    data->texture_rotation_radians = texture_rotation_radians;
+    data->texture_size =  texture_size;
+    data->max_change_texture_time = max_change_texture_time;
+    data->current_change_texture_time = current_change_texture_time;
+
+    data->current_texture_index = current_texture_index;
+
+    data->block_rotation_radians = block_rotation_radians;
+    data->max_speed = max_speed;
+    data->speed = speed;
+    data->acceleration = acceleration;
+
+    data->max_acceleration_time = max_acceleration_time;
+    data->current_acceleration_time = current_acceleration_time;
+   
+    data->collision_layer = physics_server->area_get_collision_layer(area);
+    data->collision_mask = physics_server->area_get_collision_mask(area);
+    data->monitorable = monitorable;
+
+    RID shape = physics_server->area_get_shape(area,0);
+    data->collision_shape_size = (Vector2)(physics_server->shape_get_data(shape))*2; // again, because im using a rectangle, it will give me the half extents, meaning half the width and half the height, so the actual size that the user gave is actually the Vector2 the functon returns multiplied by 2. I am trying to recover the original data that the user entered, so that I can reuse the same exact functions, that's why im doing this.
+    data->collision_shape_offset = collision_shape_offset;
+    data->material = get_material();
+    data->mesh=multi->get_mesh();
+
+    // SAVE ROTATION DATA
+    if(is_rotation_active){
+        data->all_bullet_rotation_data.resize(all_rotation_speed.size());
+        for (int i = 0; i < all_rotation_speed.size(); i++)
+        {
+            Ref<BulletRotationData> bullet_data = memnew(BulletRotationData);
+            bullet_data->rotation_speed = all_rotation_speed[i];
+            bullet_data->max_rotation_speed = all_max_rotation_speed[i];
+            bullet_data->rotation_acceleration = all_rotation_acceleration[i];
+            bullet_data->is_rotation_enabled = all_is_rotation_enabled[i];
+
+            data->all_bullet_rotation_data[i] = bullet_data;
+        }
+        data->rotate_only_textures=rotate_only_textures;
+    }
+    
+    set_physics_process(true);
+    set_process(true);
+    return data;
+}
+
+void BlockBullets2D::load(const Ref<SaveDataBlockBullets2D>& data, BulletFactory2D* new_factory){
+    factory = new_factory;
+    factory->bullets_container->add_child(this);
+
+    block_rotation_radians = data->block_rotation_radians;
+    speed = data->speed;
+    velocity = data->velocity;
+
+    size = data->transforms.size();
+    
+    set_up_rotation(data->all_bullet_rotation_data, data->rotate_only_textures);
+
+    set_up_life_time_timer(data->max_life_time, data->current_life_time);
+    set_up_change_texture_timer(data->textures.size(), data->max_change_texture_time, data->current_change_texture_time);
+    set_up_acceleration_timer(data->max_speed, data->acceleration, data->max_acceleration_time, data->current_acceleration_time);
+    
+    generate_multimesh();
+    set_up_multimesh(size, data->mesh, data->texture_size);
+
+    generate_area();
+    set_up_area(factory->physics_space, data->collision_layer, data->collision_mask, data->monitorable);
+    
+    make_bullet_instances_visible(data->bullets_enabled_status);
+    generate_collision_shapes_for_area();
+    set_up_collision_shapes_for_area(data->collision_shape_size, data->transforms, data->texture_rotation_radians, data->collision_shape_offset);
+    enable_bullets_based_on_status();
+    
+    finalize_set_up(data->bullets_custom_data, data->textures, data->current_texture_index, data->material);
+}
+
+void BlockBullets2D::enable_bullets_based_on_status(){
+    for (int i = 0; i < size; i++)
+    {
+        physics_server->call_deferred("area_set_shape_disabled",area, i, bullets_enabled_status[i] == false);
+    }
+
+    physics_server->area_set_area_monitor_callback(area, callable_mp(this, &BlockBullets2D::area_entered_func));
+    physics_server->area_set_monitor_callback(area, callable_mp(this, &BlockBullets2D::body_entered_func));
+}
+
+void BlockBullets2D::disable_bullet(int bullet_index){
+    // I am doing this, because there is a chance that the bullet collides with more than 1 thing at the same exact time (if I didn't have this check then the active_bullets_counter would be set wrong).
+    if(bullets_enabled_status[bullet_index] == false){
+        return;
+    }
+
+    active_bullets_counter--;
+    multi->set_instance_color(bullet_index, Color(0,0,0,0));
+    
+    bullets_enabled_status[bullet_index] = false;
+    physics_server->call_deferred("area_set_shape_disabled", area, bullet_index, true);
+    
+
+    if(active_bullets_counter == 0){
+        disable_multi_mesh();
+    }
+}
+
+void BlockBullets2D::disable_multi_mesh(){
+    set_visible(false); // very important to hide it, otherwise it will be rendering the transparent bullets when there is no need, which will tank performance
+    set_physics_process(false);
+    set_process(false);
+    current_life_time = 0; // this is how I differentiate between bullets that are in the pool and bullets that are still active
+    
+    factory->add_bullets_to_pool(this);
+}
+
+void BlockBullets2D::activate_multimesh(const Ref<BlockBulletsData2D>& data){
+    set_global_position(Vector2(0,0));
+    
+    block_rotation_radians=data->block_rotation_radians;
+    speed = data->speed;
+
+    velocity = Vector2(cos(block_rotation_radians), sin(block_rotation_radians)) * speed;
+    current_position = Vector2(0,0);
+
+    set_up_rotation(data->all_bullet_rotation_data, data->rotate_only_textures);
+
+    set_up_life_time_timer(data->max_life_time, data->max_life_time);
+    set_up_change_texture_timer(data->textures.size(), data->max_change_texture_time, data->max_change_texture_time);
+    set_up_acceleration_timer(data->max_speed, data->acceleration, data->max_acceleration_time, data->max_acceleration_time);
+    
+    set_up_multimesh(size, data->mesh, data->texture_size);
+
+    set_up_area(factory->physics_space, data->collision_layer, data->collision_mask, data->monitorable);
+
+    set_up_collision_shapes_for_area(data->collision_shape_size, data->transforms, data->texture_rotation_radians, data->collision_shape_offset);
+    make_all_bullet_instances_visible();
+    enable_bullets_based_on_status();
+
+    finalize_set_up(data->bullets_custom_data, data->textures, data->current_texture_index, data->material);
+}
+
+void BlockBullets2D::rotate_bullet(int multi_instance_id, float rotated_angle){
+    Transform2D rotated_transf = multi->get_instance_transform_2d(multi_instance_id).rotated_local(rotated_angle);
+    multi->set_instance_transform_2d(multi_instance_id, rotated_transf);
+
+    if(rotate_only_textures == false){
+        Transform2D rotated_shape_transf = physics_server->area_get_shape_transform(area,multi_instance_id).rotated_local(rotated_angle);
+        physics_server->area_set_shape_transform(area, multi_instance_id, rotated_shape_transf);
+    }
+}
+void BlockBullets2D::accelerate_bullet_rotation_speed(int multi_instance_id){
+    if(all_rotation_speed[multi_instance_id] == all_max_rotation_speed[multi_instance_id]){
+        return;
+    }
+    
+    all_rotation_speed[multi_instance_id] = std::min<float>(all_rotation_speed[multi_instance_id] + all_rotation_acceleration[multi_instance_id], all_max_rotation_speed[multi_instance_id]);
 }
 
 void BlockBullets2D::generate_multimesh(){
@@ -249,9 +430,6 @@ void BlockBullets2D::set_up_acceleration_timer(float new_max_speed, float new_ac
 
 void BlockBullets2D::generate_area(){
     area = physics_server->area_create();
-
-    physics_server->area_set_area_monitor_callback(area, callable_mp(this, &BlockBullets2D::area_entered_func));
-    physics_server->area_set_monitor_callback(area, callable_mp(this, &BlockBullets2D::body_entered_func));
 }
 
 void BlockBullets2D::set_up_area(
@@ -273,6 +451,7 @@ void BlockBullets2D::generate_collision_shapes_for_area(){
     {
         RID shape = physics_server->rectangle_shape_create();
         physics_server->area_add_shape(area, shape);
+        physics_server->area_set_shape_disabled(area,i,true); // By default make it disabled
     }
 }
 
@@ -305,19 +484,19 @@ void BlockBullets2D::set_up_collision_shapes_for_area(
 
         multi->set_instance_transform_2d(i, texture_transf);
         
-        
         texture_rotation_radians = new_texture_rotation;
         collision_shape_offset = new_collision_shape_offset;
     }
 }
 
 void BlockBullets2D::make_all_bullet_instances_visible(){
-    bullets_enabled_status.resize(size,true);
+    bullets_enabled_status.resize(size);
     active_bullets_counter=size;
 
     for (int i = 0; i < size; i++)
     {
         multi->set_instance_color(i, Color(1,1,1,1));
+        bullets_enabled_status[i] = true;
     }
     
 }
@@ -325,13 +504,14 @@ void BlockBullets2D::make_bullet_instances_visible(const TypedArray<bool>& new_b
     bullets_enabled_status.resize(size);
     for (int i = 0; i < size; i++)
     {
-        if(new_bullets_enabled_status[i]){
+        if((bool)new_bullets_enabled_status[i] == true){
             multi->set_instance_color(i, Color(1,1,1,1));
-            bullets_enabled_status[i] = true;
             active_bullets_counter++;
+            bullets_enabled_status[i]=true;
+
         }else{
             multi->set_instance_color(i, Color(0,0,0,0));
-            bullets_enabled_status[i] = false;
+            bullets_enabled_status[i]=false;
         }
     } 
 }
@@ -386,178 +566,11 @@ void BlockBullets2D::body_entered_func(int status, RID entered_rid, uint64_t ent
     }
 }
 
-void BlockBullets2D::disable_bullet(int bullet_index){
-    // I am doing this, because there is a chance that the bullet collides with more than 1 thing at the same exact time (if I didn't have this check then the active_bullets_counter would be set wrong).
-    if(bullets_enabled_status[bullet_index] == false){
-        return;
-    }
-
-    active_bullets_counter--;
-    multi->set_instance_color(bullet_index, Color(0,0,0,0));
-    
-    bullets_enabled_status[bullet_index] = false;
-    physics_server->call_deferred("area_set_shape_disabled", area, bullet_index, true);
-    
-
-    if(active_bullets_counter == 0){
-        disable_multi_mesh();
-    }
-}
-
-void BlockBullets2D::disable_multi_mesh(){
-    set_visible(false); // very important to hide it, otherwise it will be rendering the transparent bullets when there is no need, which will tank performance
-    set_physics_process(false);
-    set_process(false);
-    current_life_time = 0; // this is how I differentiate between bullets that are in the pool and bullets that are still active
-    factory->add_bullets_to_pool(this);
-}
-
-Ref<SaveDataBlockBullets2D> BlockBullets2D::save(){
-    Ref<SaveDataBlockBullets2D> data = memnew(SaveDataBlockBullets2D);
-
-    data->transforms.resize(size);
-    for (int i = 0; i < size; i++)
-    {
-        // I am saving the original shape transform without the collision shape offset applied to it, this is so I can reuse my methods fully when loading and avoid complicating my code further
-        Transform2D transform_without_shape_offset = physics_server->area_get_shape_transform(area,i);
-
-        Vector2 rotated_offset;
-        rotated_offset.x = collision_shape_offset.x * Math::cos(block_rotation_radians) - collision_shape_offset.y * Math::sin(block_rotation_radians);
-        rotated_offset.y = collision_shape_offset.x * Math::sin(block_rotation_radians) + collision_shape_offset.y * Math::cos(block_rotation_radians);
-
-        transform_without_shape_offset.set_origin(transform_without_shape_offset.get_origin() - rotated_offset);
-
-        data->transforms[i] = transform_without_shape_offset;
-    }
-    
-    data->velocity = velocity;
-    data->current_position=current_position; // TODO potentially useless?
-    data->max_life_time = max_life_time;
-    data->current_life_time = current_life_time; // todo check the timers if they are actually valid or not.
-    data->size = size;
-
-    data->bullets_enabled_status.resize(size);
-    
-    for (int i = 0; i < size; i++)
-    {
-        data->bullets_enabled_status[i] = bullets_enabled_status[i] == true; // [] doesn't give me a boolean so I improvise
-    }
-    
-    data->bullets_custom_data=bullets_custom_data;
-
-    int amount_textures = textures.size();
-    data->textures.resize(amount_textures);
-    for (int i = 0; i < amount_textures; i++)
-    {
-        data->textures[i] = textures[i];
-    }
-    data->texture_rotation_radians = texture_rotation_radians;
-    data->texture_size =  texture_size;
-    data->max_change_texture_time = max_change_texture_time;
-    data->current_change_texture_time = current_change_texture_time;
-
-    data->current_texture_index = current_texture_index;
-
-    data->block_rotation_radians = block_rotation_radians;
-    data->max_speed = max_speed;
-    data->speed = speed;
-    data->acceleration = acceleration;
-
-    data->max_acceleration_time = max_acceleration_time;
-    data->current_acceleration_time = current_acceleration_time;
-   
-    data->collision_layer = physics_server->area_get_collision_layer(area);
-    data->collision_mask = physics_server->area_get_collision_mask(area);
-    data->monitorable = monitorable;
-
-    RID shape = physics_server->area_get_shape(area,0);
-    data->collision_shape_size = (Vector2)(physics_server->shape_get_data(shape))*2; // again, because im using a rectangle, it will give me the half extents, meaning half the width and half the height, so the actual size that the user gave is actually the Vector2 the functon returns multiplied by 2. I am trying to recover the original data that the user entered, so that I can reuse the same exact functions, that's why im doing this.
-    data->collision_shape_offset = collision_shape_offset;
-    data->material = get_material();
-    data->mesh=multi->get_mesh();
-
-    // SAVE ROTATION DATA
-    if(is_rotation_active){
-        data->all_bullet_rotation_data.resize(all_rotation_speed.size());
-        for (int i = 0; i < all_rotation_speed.size(); i++)
-        {
-            Ref<BulletRotationData> bullet_data = memnew(BulletRotationData);
-            bullet_data->rotation_speed = all_rotation_speed[i];
-            bullet_data->max_rotation_speed = all_max_rotation_speed[i];
-            bullet_data->rotation_acceleration = all_rotation_acceleration[i];
-            bullet_data->is_rotation_enabled = all_is_rotation_enabled[i];
-
-            data->all_bullet_rotation_data[i] = bullet_data;
-        }
-        data->rotate_only_textures=rotate_only_textures;
-    }
-    
-    return data;
-}
-
-void BlockBullets2D::load(const Ref<SaveDataBlockBullets2D>& data, BulletFactory2D* new_factory){
-    factory = new_factory;
-    factory->bullets_container->add_child(this);
-
-    block_rotation_radians = data->block_rotation_radians;
-    speed = data->speed;
-    velocity = data->velocity;
-
-    size = data->transforms.size();
-    
-    set_up_rotation(data->all_bullet_rotation_data, data->rotate_only_textures);
-
-    set_up_life_time_timer(data->max_life_time, data->current_life_time);
-    set_up_change_texture_timer(data->textures.size(), data->max_change_texture_time, data->current_change_texture_time);
-    set_up_acceleration_timer(data->max_speed, data->acceleration, data->max_acceleration_time, data->current_acceleration_time);
-    
-    generate_multimesh();
-    set_up_multimesh(size, data->mesh, data->texture_size);
-
-    generate_area();
-    set_up_area(factory->physics_space, data->collision_layer, data->collision_mask, data->monitorable);
-    
-    generate_collision_shapes_for_area();
-    set_up_collision_shapes_for_area(data->collision_shape_size, data->transforms, data->texture_rotation_radians, data->collision_shape_offset);
-    
-    make_bullet_instances_visible(data->bullets_enabled_status);
-    finalize_set_up(data->bullets_custom_data, data->textures, data->current_texture_index, data->material);
-}
-
-void BlockBullets2D::activate_multimesh(const Ref<BlockBulletsData2D>& data){
-    set_global_position(Vector2(0,0));
-    
-    // Set all bullet collision shapes to be active
-    for (int i = 0; i < size; i++)
-    {
-        bullets_enabled_status[i]=true;
-        physics_server->area_set_shape_disabled(area, i, false);
-    }
-
-    
-    block_rotation_radians=data->block_rotation_radians;
-    speed = data->speed;
-
-    velocity = Vector2(cos(block_rotation_radians), sin(block_rotation_radians)) * speed;
-    current_position = Vector2(0,0);
-
-    set_up_rotation(data->all_bullet_rotation_data, data->rotate_only_textures);
-
-    set_up_life_time_timer(data->max_life_time, data->max_life_time);
-    set_up_change_texture_timer(data->textures.size(), data->max_change_texture_time, data->max_change_texture_time);
-    set_up_acceleration_timer(data->max_speed, data->acceleration, data->max_acceleration_time, data->max_acceleration_time);
-    
-    set_up_multimesh(size, data->mesh, data->texture_size);
-
-    set_up_area(factory->physics_space, data->collision_layer, data->collision_mask, data->monitorable);
-    set_up_collision_shapes_for_area(data->collision_shape_size, data->transforms, data->texture_rotation_radians, data->collision_shape_offset);
-    make_all_bullet_instances_visible();
-    finalize_set_up(data->bullets_custom_data, data->textures, data->current_texture_index, data->material);
-}
-
 void BlockBullets2D::_bind_methods(){
     ClassDB::bind_method(D_METHOD("spawn", "spawn_data", "world_space"),&BlockBullets2D::spawn);
-    ClassDB::bind_method(D_METHOD("save"),&BlockBullets2D::save);
-
+    ClassDB::bind_method(D_METHOD("save"), &BlockBullets2D::save);
+    
+    ClassDB::bind_method(D_METHOD("activate_multimesh", "spawn_data"),&BlockBullets2D::activate_multimesh);
+    ClassDB::bind_method(D_METHOD("load", "data","world_space"),&BlockBullets2D::load);
     ADD_SIGNAL(MethodInfo("spawned"));
 }

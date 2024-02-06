@@ -36,7 +36,7 @@ void BulletDebugger2D::_ready(){
     }
 
     bullet_factory_ptr=get_node<BulletFactory2D>(bullet_factory);
-    bullet_factory_ptr->connect("loading_began", callable_mp(this, &BulletDebugger2D::reset_debugger));
+    bullet_factory_ptr->connect("bullets_got_cleared", callable_mp(this, &BulletDebugger2D::reset_debugger));
 
     bullets_container_ptr = get_node<Node>(bullets_container); // TODO will change in the future
     bullets_container_ptr->connect("child_entered_tree", callable_mp(this, &BulletDebugger2D::bullets_entered_container));
@@ -102,10 +102,7 @@ void BulletDebugger2D::generate_texture_multimesh(BlockBullets2D* new_bullets_mu
 void BulletDebugger2D::update_instance_transforms(
     MultiMeshInstance2D* texture_multi, 
     BlockBullets2D* bullets_multi){
-    if(bullets_multi == nullptr || bullets_multi->is_queued_for_deletion()){
-        UtilityFunctions::print("you are genius.");
-        return;
-    }
+    
     RID area = bullets_multi->area;
     Ref<MultiMesh> texture_inner_multi = texture_multi->get_multimesh();
     for (int i = 0; i < texture_multi->get_multimesh()->get_instance_count(); i++)

@@ -38,6 +38,9 @@ class BulletFactory2D:public Node2D{
         // Retrieves BlockBullets2D from pool
         BlockBullets2D* remove_bullets_from_pool(int key);
 
+        // Clears all bullets. 
+        void clear_all_bullets();
+
     protected:
         static void _bind_methods();
     private:

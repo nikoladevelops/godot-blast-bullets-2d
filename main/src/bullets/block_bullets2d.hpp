@@ -37,10 +37,9 @@ class BlockBullets2D:public MultiMeshInstance2D, public MultiMeshBullets2D{
 
         // Pointer to the multimesh instead of always calling the get method
         MultiMesh* multi;
-        // Just a pointer to the PhysicsServer2D
-        //PhysicsServer2D* physics_server = nullptr;
+        
         // Holds a boolean value for each bullet that indicates whether its active
-        std::vector<bool> bullets_enabled_status;
+        std::vector<char> bullets_enabled_status;
         // Counts all active bullets. If equal to size, every single bullet will be disabled.
         int active_bullets_counter=0;
 
@@ -141,15 +140,21 @@ class BlockBullets2D:public MultiMeshInstance2D, public MultiMeshBullets2D{
             );
         
         
+        // Makes all bullet instances visible and also populates bullets_enabled_status with true values only
         void make_all_bullet_instances_visible();
+        // Updates bullets_enabled_status with new values and makes certain instances visible/hidden depending on the new status values
         void make_bullet_instances_visible(const TypedArray<bool>& new_bullets_enabled_status);
         
+        // Depending on bullets_enabled_status enables/disables collision for each instance. It registers area's entered signals so all bullet data must be set before calling it.
+        void enable_bullets_based_on_status();
+
         void generate_multimesh();
         void set_up_multimesh(int new_instance_count, const Ref<Mesh>& new_mesh, Vector2 new_texture_size);
         void set_up_rotation(TypedArray<BulletRotationData>& new_data, bool new_rotate_only_textures);
         void set_up_life_time_timer(float new_max_life_time, float new_current_life_time);
         void set_up_change_texture_timer(int new_amount_textures, float new_max_change_texture_time, float new_current_change_texture_time);
         void set_up_acceleration_timer(float new_max_speed, float new_acceleration, float new_max_acceleration_time, float new_current_acceleration_time);
+        
         void finalize_set_up(
             const Ref<Resource>& new_bullets_custom_data,
             const TypedArray<Texture2D>& new_textures,
