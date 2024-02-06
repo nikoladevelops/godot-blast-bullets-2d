@@ -104,20 +104,30 @@ void BlockBullets2D::_physics_process(float delta){
     // Handle Rotation
     if(is_rotation_active){
         if(use_only_first_rotation_data){
-            accelerate_bullet_rotation_speed(0);
+            accelerate_bullet_rotation_speed(0); // acceleration should be applied once every frame for the SINGULAR rotation speed that all bullets share
             for (int i = 0; i < size; i++)
             {
+                // No point in rotating if the bullet has been disabled, performance will just be lost for deactivated bullets..
+                if(bullets_enabled_status[i] == false){
+                    continue;
+                }
+
                 rotate_bullet(i, all_rotation_speed[0] * delta);
             }
         }else{
             for (int i = 0; i < size; i++)
             {
-                if(all_is_rotation_enabled[i] == false){ // It means that the current bullet's data indicates that it should NOT be rotated, so skip it
+                // No point in rotating if the bullet has been disabled, performance will just be lost for deactivated bullets..
+                if(bullets_enabled_status[i] == false){
+                    continue;
+                }
+
+                if(all_is_rotation_enabled[i] == false){ // it means that the current bullet's data indicates that it should NOT be rotated, so skip it
                     continue;
                 }
 
                 rotate_bullet(i, all_rotation_speed[i] * delta);
-                accelerate_bullet_rotation_speed(i);
+                accelerate_bullet_rotation_speed(i); // each bullet has its own BulletRotationData (meaning INDIVIDUAL rotation_speed that has to be accelerated every frame)
             }
         }
     }
@@ -152,7 +162,7 @@ void BlockBullets2D::spawn(const Ref<BlockBulletsData2D>& spawn_data, BulletFact
     
     make_all_bullet_instances_visible();
     generate_collision_shapes_for_area(); 
-    set_up_collision_shapes_for_area(spawn_data->collision_shape_size, spawn_data->transforms, spawn_data->texture_rotation_radians, spawn_data->collision_shape_offset);
+    set_up_collision_shapes_for_area(spawn_data->collision_shape_size, spawn_data->transforms, spawn_data->texture_rotation_radians, spawn_data->collision_shape_offset, spawn_data->is_texture_rotation_permanent);
     enable_bullets_based_on_status();
 
     finalize_set_up(spawn_data->bullets_custom_data, spawn_data->textures, spawn_data->current_texture_index, spawn_data->material);
@@ -225,6 +235,9 @@ Ref<SaveDataBlockBullets2D> BlockBullets2D::save(){
     data->material = get_material();
     data->mesh=multi->get_mesh();
 
+    data->rotate_only_textures=rotate_only_textures;
+    data->is_texture_rotation_permanent=is_texture_rotation_permanent;
+
     // SAVE ROTATION DATA
     if(is_rotation_active){
         data->all_bullet_rotation_data.resize(all_rotation_speed.size());
@@ -270,7 +283,7 @@ void BlockBullets2D::load(const Ref<SaveDataBlockBullets2D>& data, BulletFactory
     
     make_bullet_instances_visible(data->bullets_enabled_status);
     generate_collision_shapes_for_area();
-    set_up_collision_shapes_for_area(data->collision_shape_size, data->transforms, data->texture_rotation_radians, data->collision_shape_offset);
+    set_up_collision_shapes_for_area(data->collision_shape_size, data->transforms, data->texture_rotation_radians, data->collision_shape_offset, data->is_texture_rotation_permanent);
     enable_bullets_based_on_status();
     
     finalize_set_up(data->bullets_custom_data, data->textures, data->current_texture_index, data->material);
@@ -332,7 +345,7 @@ void BlockBullets2D::activate_multimesh(const Ref<BlockBulletsData2D>& data){
 
     set_up_area(factory->physics_space, data->collision_layer, data->collision_mask, data->monitorable);
 
-    set_up_collision_shapes_for_area(data->collision_shape_size, data->transforms, data->texture_rotation_radians, data->collision_shape_offset);
+    set_up_collision_shapes_for_area(data->collision_shape_size, data->transforms, data->texture_rotation_radians, data->collision_shape_offset, data->is_texture_rotation_permanent);
     make_all_bullet_instances_visible();
     enable_bullets_based_on_status();
 
@@ -462,7 +475,8 @@ void BlockBullets2D::set_up_collision_shapes_for_area(
     Vector2 new_collision_shape_size,
     const TypedArray<Transform2D>& new_original_collision_shape_transforms, // make sure you are giving transforms that don't have collision offset applied, otherwise it will apply it twice
     float new_texture_rotation,
-    Vector2 new_collision_shape_offset
+    Vector2 new_collision_shape_offset,
+    bool new_is_texture_rotation_permanent
 ){
     for (int i = 0; i < size; i++)
     {
@@ -483,7 +497,16 @@ void BlockBullets2D::set_up_collision_shapes_for_area(
         // Texture rotation
         Transform2D texture_transf = new_original_collision_shape_transforms[i];
         // The transform is used for both the collision shape and the texture by default, in case the texture is not rotated correctly, the user can enter an additional texture rotation that will rotate the texture even more, but the collision shape's rotation won't change, so make sure to pass correct transform data.
-        texture_transf.set_rotation(texture_transf.get_rotation()+new_texture_rotation);
+        
+        if(new_is_texture_rotation_permanent){
+            // Same texture rotation no matter the rotation of the bullet's transform
+            texture_transf.set_rotation(new_texture_rotation);
+        }else{
+            // The rotation of the texture will be influenced by the rotation of the bullet transform
+            texture_transf.set_rotation(texture_transf.get_rotation()+new_texture_rotation);
+        }
+        is_texture_rotation_permanent=new_is_texture_rotation_permanent;
+
 
         multi->set_instance_transform_2d(i, texture_transf);
         

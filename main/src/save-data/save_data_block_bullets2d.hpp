@@ -54,6 +54,9 @@ class SaveDataBlockBullets2D : public Resource{
         // If set to false, it will also rotate the collision shapes
         bool rotate_only_textures=true;
 
+        // The default behaviour is for the texture of each bullet to be rotated according to the rotation of the bullet's transform + texture_rotation_radians. If for some reason you want only the texture_rotation_radians to be used, no matter how the transform is rotated then you need to set this to true.
+        bool is_texture_rotation_permanent=false;
+
         void set_transforms(TypedArray<Transform2D> new_transforms);
         TypedArray<Transform2D> get_transforms() const;
 
@@ -140,6 +143,9 @@ class SaveDataBlockBullets2D : public Resource{
 
         bool get_rotate_only_textures();
         void set_rotate_only_textures(bool new_rotate_only_textures);
+
+        bool get_is_texture_rotation_permanent();
+        void set_is_texture_rotation_permanent(bool new_is_texture_rotation_permanent);
 
     protected:
         static void _bind_methods();

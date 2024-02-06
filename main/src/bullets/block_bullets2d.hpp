@@ -97,6 +97,9 @@ class BlockBullets2D:public MultiMeshInstance2D, public MultiMeshBullets2D{
         // If true it means that only a single BulletRotationData was provided, so it will be used for each bullet. If false it means that we have BulletRotationData for each bullet. It is determined by the amount of BulletRotationData passed to spawn()
         bool use_only_first_rotation_data=false;
 
+        // The default behaviour is for the texture of each bullet to be rotated according to the rotation of the bullet's transform + texture_rotation_radians. If for some reason you want only the texture_rotation_radians to be used, no matter how the transform is rotated then you need to set this to true.
+        bool is_texture_rotation_permanent=false;
+
         std::vector<Transform2D> all_cached_instance_transforms;
         ///
 
@@ -136,7 +139,8 @@ class BlockBullets2D:public MultiMeshInstance2D, public MultiMeshBullets2D{
             Vector2 new_collision_shape_size,
             const TypedArray<Transform2D>& new_original_collision_shape_transforms, // make sure you are giving transforms that don't have collision offset applied, otherwise it will apply it twice
             float new_texture_rotation,
-            Vector2 new_collision_shape_offset
+            Vector2 new_collision_shape_offset,
+            bool new_is_texture_rotation_permanent
             );
         
         

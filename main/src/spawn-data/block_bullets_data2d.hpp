@@ -14,13 +14,13 @@ class BlockBulletsData2D : public Resource{
     GDCLASS(BlockBulletsData2D, Resource);
 
     public:
-        // All textures. If you give an array containing more than 1 texture then the change_texture_time will be used to periodically change the texture.
+        // All textures. If you give an array containing more than 1 texture then the change_texture_time will be used to periodically change the texture to the next one in the array.
         TypedArray<Texture2D> textures;
         // The texture size. Keep in mind that this will be used only if a mesh was NOT provided. 
         Vector2 texture_size = Vector2(32,32);
-        // The texture rotation in radians
+        // The texture rotation in radians. Change the value of this if you see that your texture is not rotated correctly. Example: If you want to rotate the texture 90 degrees more you would set the value to 90*PI/180
         float texture_rotation_radians=0.0f;
-        // Determines the starting texture.
+        // Determines the starting texture in the textures array.
         int current_texture_index=0;
         // Determines the rotation and position of each bullet. The array size determines the amount of projectiles to render.
         TypedArray<Transform2D> transforms;
@@ -44,7 +44,7 @@ class BlockBulletsData2D : public Resource{
         uint32_t collision_mask=0;
 
         // The collision shape is always a rectangle. This determines the width and height it has.
-        Vector2 collision_shape_size=Vector2(5,5);
+        Vector2 collision_shape_size = Vector2(5,5);
         // Determines the offset of the collision shape (the collision shape is by default at the center of the texture, but with this you are able to control it's position)
         Vector2 collision_shape_offset = Vector2(0,0);
 
@@ -62,10 +62,14 @@ class BlockBulletsData2D : public Resource{
         // Custom mesh, if it isn't provided then a Quadmesh will be generated and it will use the texture_size. If you DO provide a mesh then you should handle the scaling of the bullets yourself using a shader for best quality.
         Ref<Mesh> mesh;
 
+        // Stores BulletRotationData for each bullet. If you want the bullets to rotate, you HAVE to provide AT LEAST 1 BulletRotationData that will be used for every single bullet. If you want to have bullets that rotate differently then you need to provide the same amount of BulletRotationData as the .size() of the transforms (in other words for every bullet). If you provide less than .size() and not exactly 1 BulletRotationData, the bullets will not rotate and this data will be ignored. Note that BulletRotationData has a helper static method that you can use to generate random rotation data - BulletRotationData.generate_random_data()
         TypedArray<BulletRotationData> all_bullet_rotation_data;
 
-        // If set to false, it will also rotate the collision shapes
+        // If set to false, it will also rotate the collision shapes according to the BulletRotationData that was provided (it will decrease performance)
         bool rotate_only_textures=true;
+
+        // The default behaviour is for the texture of each bullet to be rotated according to the rotation of the bullet's transform + texture_rotation_radians. If for some reason you want only the texture_rotation_radians to be used, no matter how the transform is rotated then you need to set this to true.
+        bool is_texture_rotation_permanent=false;
 
         // Setters and getters
         TypedArray<Texture2D> get_textures() const;
@@ -134,6 +138,8 @@ class BlockBulletsData2D : public Resource{
         bool get_rotate_only_textures();
         void set_rotate_only_textures(bool new_rotate_only_textures);
 
+        bool get_is_texture_rotation_permanent();
+        void set_is_texture_rotation_permanent(bool new_is_texture_rotation_permanent);
     protected:
         static void _bind_methods();
 };

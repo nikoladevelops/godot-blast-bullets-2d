@@ -240,7 +240,12 @@ void SaveDataBlockBullets2D::set_rotate_only_textures(bool new_rotate_only_textu
     rotate_only_textures=new_rotate_only_textures;
 }
 
-
+bool SaveDataBlockBullets2D::get_is_texture_rotation_permanent(){
+    return is_texture_rotation_permanent;
+}
+void SaveDataBlockBullets2D::set_is_texture_rotation_permanent(bool new_is_texture_rotation_permanent){
+    is_texture_rotation_permanent=new_is_texture_rotation_permanent;
+}
 
 void SaveDataBlockBullets2D::_bind_methods(){
     ClassDB::bind_method(D_METHOD("set_transforms"), &SaveDataBlockBullets2D::set_transforms);
@@ -359,5 +364,7 @@ void SaveDataBlockBullets2D::_bind_methods(){
     ClassDB::bind_method(D_METHOD("set_rotate_only_textures", "new_rotate_only_textures"), &SaveDataBlockBullets2D::set_rotate_only_textures);
     ADD_PROPERTY(PropertyInfo(Variant::BOOL, "rotate_only_textures"), "set_rotate_only_textures", "get_rotate_only_textures");
 
-
+    ClassDB::bind_method(D_METHOD("get_is_texture_rotation_permanent"), &SaveDataBlockBullets2D::get_is_texture_rotation_permanent);
+    ClassDB::bind_method(D_METHOD("set_is_texture_rotation_permanent", "new_is_texture_rotation_permanent"), &SaveDataBlockBullets2D::set_is_texture_rotation_permanent);
+    ADD_PROPERTY(PropertyInfo(Variant::BOOL, "is_texture_rotation_permanent"), "set_is_texture_rotation_permanent", "get_is_texture_rotation_permanent");
 }
