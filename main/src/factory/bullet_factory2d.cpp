@@ -59,7 +59,7 @@ Ref<SaveDataBulletFactory2D> BulletFactory2D::save(){
     {
         BlockBullets2D* bullet_instance = dynamic_cast<BlockBullets2D*>(bullets_container->get_child(i));
         // I only want to save bullets that are still active (I don't want to save bullets that are in the pool).
-        if(bullet_instance->current_life_time == 0 || bullet_instance->is_visible() == false){
+        if(bullet_instance->is_visible() == false){
             continue;
         }
         // Saves only the active bullets currently

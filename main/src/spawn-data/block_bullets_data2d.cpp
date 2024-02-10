@@ -50,34 +50,6 @@ void BlockBulletsData2D::set_block_rotation_radians(float new_block_rotation_rad
     block_rotation_radians = new_block_rotation_radians;
 }
 
-float BlockBulletsData2D::get_speed() const {
-    return speed;
-}
-void BlockBulletsData2D::set_speed(float new_speed) {
-    speed = new_speed;
-}
-
-float BlockBulletsData2D::get_max_speed() const{
-    return max_speed;
-}
-void BlockBulletsData2D::set_max_speed(float new_max_speed){
-    max_speed=new_max_speed;
-}
-
-float BlockBulletsData2D::get_acceleration() const {
-    return acceleration;
-}
-void BlockBulletsData2D::set_acceleration(float new_acceleration) {
-    acceleration = new_acceleration;
-}
-
-float BlockBulletsData2D::get_max_acceleration_time() const{
-    return max_acceleration_time;
-}
-void BlockBulletsData2D::set_max_acceleration_time(float new_max_acceleration_time){
-    max_acceleration_time=new_max_acceleration_time;
-}
-
 float BlockBulletsData2D::get_max_change_texture_time() const {
     return max_change_texture_time;
 }
@@ -152,7 +124,6 @@ TypedArray<BulletRotationData> BlockBulletsData2D::get_all_bullet_rotation_data(
     return all_bullet_rotation_data;
 }
 void BlockBulletsData2D::set_all_bullet_rotation_data(const TypedArray<BulletRotationData>& new_bullet_rotation_data){
-    
     all_bullet_rotation_data.resize(new_bullet_rotation_data.size());
     for (int i = 0; i < new_bullet_rotation_data.size(); i++)
     {
@@ -172,6 +143,26 @@ bool BlockBulletsData2D::get_is_texture_rotation_permanent(){
 }
 void BlockBulletsData2D::set_is_texture_rotation_permanent(bool new_is_texture_rotation_permanent){
     is_texture_rotation_permanent=new_is_texture_rotation_permanent;
+}
+
+bool BlockBulletsData2D::get_use_block_rotation_radians(){
+    return use_block_rotation_radians;
+}
+void BlockBulletsData2D::set_use_block_rotation_radians(bool new_use_block_rotation_radians){
+    use_block_rotation_radians=new_use_block_rotation_radians;
+}
+
+TypedArray<BulletSpeedData> BlockBulletsData2D::get_all_bullet_speed_data(){
+    return all_bullet_speed_data;
+}
+void BlockBulletsData2D::set_all_bullet_speed_data(const TypedArray<BulletSpeedData>& new_data){
+    all_bullet_speed_data.resize(new_data.size());
+
+    for (int i = 0; i < new_data.size(); i++)
+    {
+        all_bullet_speed_data[i] = new_data[i];
+    }
+    
 }
 
 void BlockBulletsData2D::_bind_methods() {
@@ -198,22 +189,6 @@ ADD_PROPERTY(PropertyInfo(Variant::ARRAY, "transforms"), "set_transforms", "get_
 ClassDB::bind_method(D_METHOD("get_block_rotation_radians"), &BlockBulletsData2D::get_block_rotation_radians);
 ClassDB::bind_method(D_METHOD("set_block_rotation_radians", "new_block_rotation_radians"), &BlockBulletsData2D::set_block_rotation_radians);
 ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "block_rotation_radians"), "set_block_rotation_radians", "get_block_rotation_radians");
-
-ClassDB::bind_method(D_METHOD("get_speed"), &BlockBulletsData2D::get_speed);
-ClassDB::bind_method(D_METHOD("set_speed", "new_speed"), &BlockBulletsData2D::set_speed);
-ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "speed"), "set_speed", "get_speed");
-
-ClassDB::bind_method(D_METHOD("get_max_speed"), &BlockBulletsData2D::get_max_speed);
-ClassDB::bind_method(D_METHOD("set_max_speed", "new_max_speed"), &BlockBulletsData2D::set_max_speed);
-ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "max_speed"), "set_max_speed", "get_max_speed");
-
-ClassDB::bind_method(D_METHOD("get_acceleration"), &BlockBulletsData2D::get_acceleration);
-ClassDB::bind_method(D_METHOD("set_acceleration", "new_acceleration"), &BlockBulletsData2D::set_acceleration);
-ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "acceleration"), "set_acceleration", "get_acceleration");
-
-ClassDB::bind_method(D_METHOD("get_max_acceleration_time"), &BlockBulletsData2D::get_max_acceleration_time);
-ClassDB::bind_method(D_METHOD("set_max_acceleration_time", "new_max_acceleration_time"), &BlockBulletsData2D::set_max_acceleration_time);
-ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "max_acceleration_time"), "set_max_acceleration_time", "get_max_acceleration_time");
 
 ClassDB::bind_method(D_METHOD("get_max_change_texture_time"), &BlockBulletsData2D::get_max_change_texture_time);
 ClassDB::bind_method(D_METHOD("set_max_change_texture_time", "new_max_change_texture_time"), &BlockBulletsData2D::set_max_change_texture_time);
@@ -266,5 +241,13 @@ ADD_PROPERTY(PropertyInfo(Variant::BOOL, "rotate_only_textures"), "set_rotate_on
 ClassDB::bind_method(D_METHOD("get_is_texture_rotation_permanent"), &BlockBulletsData2D::get_is_texture_rotation_permanent);
 ClassDB::bind_method(D_METHOD("set_is_texture_rotation_permanent", "new_is_texture_rotation_permanent"), &BlockBulletsData2D::set_is_texture_rotation_permanent);
 ADD_PROPERTY(PropertyInfo(Variant::BOOL, "is_texture_rotation_permanent"), "set_is_texture_rotation_permanent", "get_is_texture_rotation_permanent");
+
+ClassDB::bind_method(D_METHOD("get_use_block_rotation_radians"), &BlockBulletsData2D::get_use_block_rotation_radians);
+ClassDB::bind_method(D_METHOD("set_use_block_rotation_radians", "new_use_block_rotation_radians"), &BlockBulletsData2D::set_use_block_rotation_radians);
+ADD_PROPERTY(PropertyInfo(Variant::BOOL, "use_block_rotation_radians"), "set_use_block_rotation_radians", "get_use_block_rotation_radians");
+
+ClassDB::bind_method(D_METHOD("get_all_bullet_speed_data"), &BlockBulletsData2D::get_all_bullet_speed_data);
+ClassDB::bind_method(D_METHOD("set_all_bullet_speed_data", "new_data"), &BlockBulletsData2D::set_all_bullet_speed_data);
+ADD_PROPERTY(PropertyInfo(Variant::ARRAY, "all_bullet_speed_data"), "set_all_bullet_speed_data", "get_all_bullet_speed_data");
 
 }

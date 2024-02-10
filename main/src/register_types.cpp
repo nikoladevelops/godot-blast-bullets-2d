@@ -15,6 +15,7 @@ using namespace godot;
 
 // shared
 #include "shared/bullet_rotation_data.hpp"
+#include "shared/bullet_speed_data.hpp"
 
 // save data classes
 #include "save-data/save_data_bullet_factory2d.hpp"
@@ -39,6 +40,7 @@ void initialize_blast_bullets_2d_module(ModuleInitializationLevel p_level) {
 
 	// shared
 	ClassDB::register_class<BulletRotationData>();
+	ClassDB::register_class<BulletSpeedData>();
 
 	// save data classes
 	ClassDB::register_class<SaveDataBulletFactory2D>();

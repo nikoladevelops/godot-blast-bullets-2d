@@ -2,7 +2,6 @@
 #define BULLET_ROTATION_DATA
 
 #include "godot_cpp/classes/resource.hpp"
-#include "godot_cpp/classes/random_number_generator.hpp"
 #include "godot_cpp/variant/typed_array.hpp"
 
 using namespace godot;
@@ -15,7 +14,7 @@ class BulletRotationData : public Resource{
         float max_rotation_speed;
         float rotation_acceleration;
 
-        // Generates an amount of BulletRotationInfo classes that have random data that varies between ranges. (for example rotation_speed of each will be a random number between rotation_speed_min and rotation_speed_max  (inclusive))
+        // Generates an amount of BulletRotationInfo classes that have random data that varies between ranges. (for example rotation_speed of each will be a random number between rotation_speed_min and rotation_speed_max (inclusive))
         static TypedArray<BulletRotationData> generate_random_data(
             int amount_to_generate,
             float rotation_speed_min,

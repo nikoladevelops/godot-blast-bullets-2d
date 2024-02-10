@@ -5,63 +5,78 @@
 #include "godot_cpp/classes/texture2d.hpp"
 #include "godot_cpp/classes/material.hpp"
 #include "godot_cpp/classes/mesh.hpp"
+
 #include "../shared/bullet_rotation_data.hpp"
+#include "../shared/bullet_speed_data.hpp"
 
 using namespace godot;
 class SaveDataBlockBullets2D : public Resource{
     GDCLASS(SaveDataBlockBullets2D, Resource);
     public:
-        TypedArray<Transform2D> transforms;
-        Vector2 velocity;
-        Vector2 current_position;
-
-        float max_life_time;
-        float current_life_time;
-
-        int size;
-        // Notice how I have a typed array here , not std::vector<bool>, this is so that im sure the values will be saved/loaded by ResourceSaver!
-        TypedArray<bool> bullets_enabled_status;
-
-        Ref<Resource> bullets_custom_data; // yes even custom data will be saved as long as you've put @export keywords
-
+        // TEXTURE RELATED
         TypedArray<Texture2D> textures;
+
         float texture_rotation_radians;
+
         Vector2 texture_size;
+
         float max_change_texture_time = 0.0f;
+
         float current_change_texture_time;
+
         int current_texture_index=0;
 
-        float block_rotation_radians;
-        float max_speed;
-        float speed;
-        float acceleration;
+        // The default behaviour is for the texture of each bullet to be rotated according to the rotation of the bullet's transform + texture_rotation_radians. If for some reason you want only the texture_rotation_radians to be used, no matter how the transform is rotated then you need to set this to true.
+        bool is_texture_rotation_permanent=false;
 
-        float max_acceleration_time = 0.0f;
-        float current_acceleration_time;
+        // BULLET MOVEMENT RELATED
+
+        TypedArray<Transform2D> transforms;
+
+        Vector2 current_position;
+
+        float block_rotation_radians;
+
+        bool use_block_rotation_radians=false;
+
+        TypedArray<BulletSpeedData> all_bullet_speed_data;
+
+        // BULLET ROTATION RELATED
+
+        TypedArray<BulletRotationData> all_bullet_rotation_data;
+
+        bool rotate_only_textures=true;
+
+        // COLLISION RELATED
 
         int collision_layer;
         int collision_mask;
 
         Vector2 collision_shape_size;
-        Vector2 collision_shape_offset; // todo
+        Vector2 collision_shape_offset;
+
+        TypedArray<bool> bullets_enabled_status;
 
         bool monitorable;
+
+        // OTHER
+
+        float max_life_time;
+
+        float current_life_time;
+
+        int size;
+
+        Ref<Resource> bullets_custom_data; // yes even custom data will be saved as long as you've put @export keywords
+    
         Ref<Material> material;
         Ref<Mesh> mesh;
 
-        TypedArray<BulletRotationData> all_bullet_rotation_data;
 
-        // If set to false, it will also rotate the collision shapes
-        bool rotate_only_textures=true;
-
-        // The default behaviour is for the texture of each bullet to be rotated according to the rotation of the bullet's transform + texture_rotation_radians. If for some reason you want only the texture_rotation_radians to be used, no matter how the transform is rotated then you need to set this to true.
-        bool is_texture_rotation_permanent=false;
+        // GETTERS AND SETTERS
 
         void set_transforms(TypedArray<Transform2D> new_transforms);
         TypedArray<Transform2D> get_transforms() const;
-
-        void set_velocity(Vector2 new_velocity);
-        Vector2 get_velocity() const;
 
         void set_current_position(Vector2 new_current_position);
         Vector2 get_current_position() const;
@@ -102,21 +117,6 @@ class SaveDataBlockBullets2D : public Resource{
         void set_block_rotation_radians(float new_block_rotation_radians);
         float get_block_rotation_radians() const;
 
-        void set_max_speed(float new_max_speed);
-        float get_max_speed() const;
-
-        void set_speed(float new_speed);
-        float get_speed() const;
-
-        void set_acceleration(float new_acceleration);
-        float get_acceleration() const;
-
-        void set_max_acceleration_time(float new_max_acceleration_time);
-        float get_max_acceleration_time() const;
-
-        void set_current_acceleration_time(float new_current_acceleration_time);
-        float get_current_acceleration_time() const;
-
         void set_collision_layer(int new_collision_layer);
         int get_collision_layer() const;
 
@@ -146,6 +146,13 @@ class SaveDataBlockBullets2D : public Resource{
 
         bool get_is_texture_rotation_permanent();
         void set_is_texture_rotation_permanent(bool new_is_texture_rotation_permanent);
+
+        bool get_use_block_rotation_radians();
+        void set_use_block_rotation_radians(bool new_use_block_rotation_radians);
+
+        TypedArray<BulletSpeedData> get_all_bullet_speed_data();
+        void set_all_bullet_speed_data(const TypedArray<BulletSpeedData>& new_data);
+
 
     protected:
         static void _bind_methods();

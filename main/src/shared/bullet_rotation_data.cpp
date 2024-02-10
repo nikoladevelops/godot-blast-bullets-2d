@@ -1,5 +1,6 @@
-#include "bullet_rotation_data.hpp"
+#include "./bullet_rotation_data.hpp"
 #include "godot_cpp/variant/dictionary.hpp"
+#include "godot_cpp/classes/random_number_generator.hpp"
 
 TypedArray<BulletRotationData> BulletRotationData::generate_random_data(
     int amount_to_generate,

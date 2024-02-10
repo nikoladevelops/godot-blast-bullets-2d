@@ -31,6 +31,8 @@ class BulletFactory2D:public Node2D{
         void set_physics_space(RID new_space_rid);
 
         Ref<SaveDataBulletFactory2D> save();
+
+        // You should consider calling this method using .call_deferred() to avoid crashes
         void load(Ref<SaveDataBulletFactory2D> new_data);
 
         // Adds BlockBullets2D to pool
@@ -38,7 +40,7 @@ class BulletFactory2D:public Node2D{
         // Retrieves BlockBullets2D from pool
         BlockBullets2D* remove_bullets_from_pool(int key);
 
-        // Clears all bullets. 
+        // Clears all bullets. You should consider calling this method using .call_deferred() to avoid crashes
         void clear_all_bullets();
 
     protected:
@@ -46,7 +48,6 @@ class BulletFactory2D:public Node2D{
     private:
         // The key corresponds to the amount of bullets a bullets multimesh has, meanwhile the value corresponds to a queue that holds all of those that have that amount of bullets. Example: If key is 5, that means it holds all deactivated BlockBullets2D that each have 5 bullets (5 collision shapes, 5 texture instances that are currently invisible).
         std::unordered_map<int,std::queue<BlockBullets2D*>> block_bullets_pool;
-
 };
 
 #endif
