@@ -166,7 +166,7 @@ void BlockBullets2D::spawn(const Ref<BlockBulletsData2D>& spawn_data, BulletFact
     
     make_all_bullet_instances_visible();
     generate_collision_shapes_for_area(); 
-    set_up_collision_shapes_for_area(
+    if(set_up_bullets(
         spawn_data->collision_shape_size,
         spawn_data->transforms,
         spawn_data->texture_rotation_radians,
@@ -175,7 +175,10 @@ void BlockBullets2D::spawn(const Ref<BlockBulletsData2D>& spawn_data, BulletFact
         spawn_data->all_bullet_speed_data,
         spawn_data->use_block_rotation_radians,
         spawn_data->block_rotation_radians
-        );
+        ) == false){
+            UtilityFunctions::print("ERROR, NO TRANSFORMS PROVIDED OR NO BULLET SPEED DATA PROVIDED");
+            return;
+        }
     enable_bullets_based_on_status();
 
     finalize_set_up(spawn_data->bullets_custom_data, spawn_data->textures, spawn_data->current_texture_index, spawn_data->material);
@@ -209,12 +212,21 @@ Ref<SaveDataBlockBullets2D> BlockBullets2D::save(){
     {
         // I am saving the original shape transform without the collision shape offset applied to it, this is so I can reuse my methods fully when loading and avoid complicating my code further
         Transform2D transform_without_shape_offset = all_cached_shape_transforms[i];
-
+        
         Vector2 rotated_offset;
-        rotated_offset.x = collision_shape_offset.x * Math::cos(block_rotation_radians) - collision_shape_offset.y * Math::sin(block_rotation_radians);
-        rotated_offset.y = collision_shape_offset.x * Math::sin(block_rotation_radians) + collision_shape_offset.y * Math::cos(block_rotation_radians);
+
+        float offset_rotation;
+        if(use_block_rotation_radians){
+            offset_rotation = block_rotation_radians;
+        }else{
+            offset_rotation = transform_without_shape_offset.get_rotation();
+        }
+
+        rotated_offset.x = collision_shape_offset.x * Math::cos(offset_rotation) - collision_shape_offset.y * Math::sin(offset_rotation);
+        rotated_offset.y = collision_shape_offset.x * Math::sin(offset_rotation) + collision_shape_offset.y * Math::cos(offset_rotation);
 
         transform_without_shape_offset.set_origin(transform_without_shape_offset.get_origin() - rotated_offset);
+        transform_without_shape_offset.set_rotation(atan2(all_cached_direction[i].y, all_cached_direction[i].x));
 
         data->transforms[i] = transform_without_shape_offset;
     }
@@ -305,7 +317,7 @@ void BlockBullets2D::load(const Ref<SaveDataBlockBullets2D>& data, BulletFactory
     make_bullet_instances_visible(data->bullets_enabled_status);
     generate_collision_shapes_for_area();
     
-    set_up_collision_shapes_for_area(
+    if(set_up_bullets(
         data->collision_shape_size,
         data->transforms,
         data->texture_rotation_radians,
@@ -314,7 +326,10 @@ void BlockBullets2D::load(const Ref<SaveDataBlockBullets2D>& data, BulletFactory
         data->all_bullet_speed_data,
         data->use_block_rotation_radians,
         data->block_rotation_radians
-        );
+        ) == false){
+            UtilityFunctions::print("ERROR, NO TRANSFORMS PROVIDED OR NO BULLET SPEED DATA PROVIDED");
+            return;
+        }
 
     enable_bullets_based_on_status();
     
@@ -367,7 +382,7 @@ void BlockBullets2D::activate_multimesh(const Ref<BlockBulletsData2D>& data){
 
     set_up_area(factory->physics_space, data->collision_layer, data->collision_mask, data->monitorable);
 
-    set_up_collision_shapes_for_area(
+    if(set_up_bullets(
         data->collision_shape_size,
         data->transforms,
         data->texture_rotation_radians,
@@ -376,7 +391,10 @@ void BlockBullets2D::activate_multimesh(const Ref<BlockBulletsData2D>& data){
         data->all_bullet_speed_data,
         data->use_block_rotation_radians,
         data->block_rotation_radians
-        );
+        ) == false){
+            UtilityFunctions::print("ERROR, NO TRANSFORMS PROVIDED OR NO BULLET SPEED DATA PROVIDED");
+            return;
+        }
 
     make_all_bullet_instances_visible();
     enable_bullets_based_on_status();
@@ -509,7 +527,7 @@ void BlockBullets2D::generate_collision_shapes_for_area(){
     }
 }
 
-void BlockBullets2D::set_up_collision_shapes_for_area(
+bool BlockBullets2D::set_up_bullets(
     Vector2 new_collision_shape_size,
     const TypedArray<Transform2D>& new_transforms, // make sure you are giving transforms that don't have collision offset applied, otherwise it will apply it twice
     float new_texture_rotation,
@@ -522,8 +540,8 @@ void BlockBullets2D::set_up_collision_shapes_for_area(
     int speed_data_size = size; // the size of the all_cached vectors
     int all_speed_data_size = new_speed_data.size(); // the amount of speed data provided
 
-    if(all_speed_data_size == 0){
-        // TODO return boolean flag
+    if(all_speed_data_size == 0 || size == 0){
+        return false;
     }
 
     // Case 1 - when the user forces for the bullets to be treated as a block that has the same BulletSpeedData - done by setting the use_block_rotation_radians to true. Only the first BulletSpeedData will be used
@@ -534,9 +552,11 @@ void BlockBullets2D::set_up_collision_shapes_for_area(
         block_rotation_radians = new_block_rotation_radians;
         speed_data_size = 1; // if use_block_rotation_radians it means we are going to store only a single cached data inside each cached array, so the size should be equal to 1, instead of being equal to the amount of bullets
         use_block_rotation_radians=true;
-        current_position = Vector2(0,0);
-        set_global_position(Vector2(0,0));
+    }else{
+        use_block_rotation_radians=false; // important because this set_up method gets reused by the activate_multimesh method, that means the default value of the boolean may not be FALSE by default when activating deactivated bullets (some of them may have been spawned with use_block_rotation_radians = true), so If I dont do this im risking of spawning bullets that should have their own direction BUT instead ARE FORCED to use the old use_block_rotation_radians of the deactivated multimesh
     }
+    current_position = Vector2(0,0);
+    set_global_position(Vector2(0,0));
 
     // Make space at once for all the data that will come in (reserving memory at once is more performant rather than using .push and letting the container resize itself/ constantly copy old items and place them inside new found memory that would fit all, this operation will happen when pushing an element exceeds the internal size.. no point in doing it when I know what size the vectors will be)
     all_cached_speed.resize(speed_data_size);
@@ -617,6 +637,8 @@ void BlockBullets2D::set_up_collision_shapes_for_area(
 
         all_cached_velocity[i] = all_cached_direction[i] * curr_speed_data->speed;
     }
+
+    return true;
 }
 
 void BlockBullets2D::make_all_bullet_instances_visible(){

@@ -156,7 +156,7 @@ class BlockBullets2D:public MultiMeshInstance2D, public MultiMeshBullets2D{
             bool new_monitorable
             );
         void generate_collision_shapes_for_area();
-        void set_up_collision_shapes_for_area(
+        bool set_up_bullets(
             Vector2 new_collision_shape_size,
             const TypedArray<Transform2D>& new_transforms, // make sure you are giving transforms that don't have collision offset applied, otherwise it will apply it twice
             float new_texture_rotation,
