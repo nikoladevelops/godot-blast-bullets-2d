@@ -88,6 +88,9 @@ class BlockBulletsData2D : public Resource{
         
 
         // GETTERS AND SETTERS
+
+        TypedArray<Transform2D> get_transforms() const;
+        void set_transforms(TypedArray<Transform2D> new_transforms);
         
         TypedArray<Texture2D> get_textures() const;
         void set_textures(const TypedArray<Texture2D>& new_textures);
@@ -100,9 +103,6 @@ class BlockBulletsData2D : public Resource{
 
         int get_current_texture_index() const;
         void set_current_texture_index(int new_current_texture_index);
-
-        TypedArray<Transform2D> get_transforms() const;
-        void set_transforms(const TypedArray<Transform2D>& new_transforms);
 
         float get_block_rotation_radians() const;
         void set_block_rotation_radians(float new_block_rotation_radians);

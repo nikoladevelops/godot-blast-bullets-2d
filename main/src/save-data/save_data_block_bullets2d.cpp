@@ -1,21 +1,6 @@
 #include "save_data_block_bullets2d.hpp"
 
 using namespace godot;
-void SaveDataBlockBullets2D::set_transforms(TypedArray<Transform2D> new_transforms) {
-    transforms = new_transforms;
-}
-
-TypedArray<Transform2D> SaveDataBlockBullets2D::get_transforms() const {
-    return transforms;
-}
-
-void SaveDataBlockBullets2D::set_current_position(Vector2 new_current_position) {
-    current_position = new_current_position;
-}
-
-Vector2 SaveDataBlockBullets2D::get_current_position() const {
-    return current_position;
-}
 
 void SaveDataBlockBullets2D::set_max_life_time(float new_max_life_time) {
     max_life_time = new_max_life_time;
@@ -67,14 +52,6 @@ void SaveDataBlockBullets2D::set_textures(TypedArray<Texture2D> new_textures) {
 
 TypedArray<Texture2D> SaveDataBlockBullets2D::get_textures() const {
     return textures;
-}
-
-void SaveDataBlockBullets2D::set_texture_rotation_radians(float new_texture_rotation_radians) {
-    texture_rotation_radians = new_texture_rotation_radians;
-}
-
-float SaveDataBlockBullets2D::get_texture_rotation_radians() const {
-    return texture_rotation_radians;
 }
 
 void SaveDataBlockBullets2D::set_texture_size(Vector2 new_texture_size) {
@@ -141,14 +118,6 @@ Vector2 SaveDataBlockBullets2D::get_collision_shape_size() const {
     return collision_shape_size;
 }
 
-void SaveDataBlockBullets2D::set_collision_shape_offset(Vector2 new_collision_shape_offset) {
-    collision_shape_offset = new_collision_shape_offset;
-}
-
-Vector2 SaveDataBlockBullets2D::get_collision_shape_offset() const {
-    return collision_shape_offset;
-}
-
 void SaveDataBlockBullets2D::set_monitorable(bool new_monitorable) {
     monitorable = new_monitorable;
 }
@@ -192,13 +161,6 @@ void SaveDataBlockBullets2D::set_rotate_only_textures(bool new_rotate_only_textu
     rotate_only_textures=new_rotate_only_textures;
 }
 
-bool SaveDataBlockBullets2D::get_is_texture_rotation_permanent(){
-    return is_texture_rotation_permanent;
-}
-void SaveDataBlockBullets2D::set_is_texture_rotation_permanent(bool new_is_texture_rotation_permanent){
-    is_texture_rotation_permanent=new_is_texture_rotation_permanent;
-}
-
 bool SaveDataBlockBullets2D::get_use_block_rotation_radians(){
     return use_block_rotation_radians;
 }
@@ -206,29 +168,82 @@ void SaveDataBlockBullets2D::set_use_block_rotation_radians(bool new_use_block_r
     use_block_rotation_radians=new_use_block_rotation_radians;
 }
 
-TypedArray<BulletSpeedData> SaveDataBlockBullets2D::get_all_bullet_speed_data(){
-    return all_bullet_speed_data;
-}
-void SaveDataBlockBullets2D::set_all_bullet_speed_data(const TypedArray<BulletSpeedData>& new_data){
-    all_bullet_speed_data.resize(new_data.size());
+// MOVEMENT RELATED
 
-    for (int i = 0; i < new_data.size(); i++)
-    {
-        all_bullet_speed_data[i] = new_data[i];
-    }
+TypedArray<Transform2D> SaveDataBlockBullets2D::get_all_cached_instance_transforms(){
+    return all_cached_instance_transforms;
+}
+void SaveDataBlockBullets2D::set_all_cached_instance_transforms(const TypedArray<Transform2D> new_data){
+    all_cached_instance_transforms=new_data;
     
 }
 
+TypedArray<Transform2D> SaveDataBlockBullets2D::get_all_cached_shape_transforms(){
+    return all_cached_shape_transforms;
+}
+void SaveDataBlockBullets2D::set_all_cached_shape_transforms(const TypedArray<Transform2D> new_data){
+    all_cached_shape_transforms=new_data;
+}
+
+TypedArray<Vector2> SaveDataBlockBullets2D::get_all_cached_instance_origin(){
+    return all_cached_instance_origin;
+}
+void SaveDataBlockBullets2D::set_all_cached_instance_origin(const TypedArray<Vector2> new_data){
+    all_cached_instance_origin=new_data;
+}
+
+TypedArray<Vector2> SaveDataBlockBullets2D::get_all_cached_shape_origin(){
+    return all_cached_shape_origin;
+}
+void SaveDataBlockBullets2D::set_all_cached_shape_origin(const TypedArray<Vector2> new_data){
+    all_cached_shape_origin=new_data;
+}
+
+TypedArray<Vector2> SaveDataBlockBullets2D::get_all_cached_velocity(){
+    return all_cached_velocity;
+}
+void SaveDataBlockBullets2D::set_all_cached_velocity(const TypedArray<Vector2> new_data){
+    all_cached_velocity=new_data;
+}
+
+TypedArray<Vector2> SaveDataBlockBullets2D::get_all_cached_direction(){
+    return all_cached_direction;
+}
+void SaveDataBlockBullets2D::set_all_cached_direction(const TypedArray<Vector2> new_data){
+    all_cached_direction=new_data;
+}
+
+// SPEED RELATED
+
+TypedArray<float> SaveDataBlockBullets2D::get_all_cached_speed(){
+    return all_cached_speed;
+}
+void SaveDataBlockBullets2D::set_all_cached_speed(const TypedArray<float> new_data){
+    all_cached_speed=new_data;
+}
+
+TypedArray<float> SaveDataBlockBullets2D::get_all_cached_max_speed(){
+    return all_cached_max_speed;
+}
+void SaveDataBlockBullets2D::set_all_cached_max_speed(const TypedArray<float> new_data){
+    all_cached_max_speed=new_data;
+}
+
+TypedArray<float> SaveDataBlockBullets2D::get_all_cached_acceleration(){
+    return all_cached_acceleration;
+}
+void SaveDataBlockBullets2D::set_all_cached_acceleration(const TypedArray<float> new_data){
+    all_cached_acceleration=new_data;
+}
+
+Vector2 SaveDataBlockBullets2D::get_multimesh_position(){
+    return multimesh_position;
+}
+void SaveDataBlockBullets2D::set_multimesh_position(Vector2 new_position){
+    multimesh_position=new_position;
+}
 
 void SaveDataBlockBullets2D::_bind_methods(){
-    ClassDB::bind_method(D_METHOD("set_transforms"), &SaveDataBlockBullets2D::set_transforms);
-    ClassDB::bind_method(D_METHOD("get_transforms"), &SaveDataBlockBullets2D::get_transforms);
-    ADD_PROPERTY(PropertyInfo(Variant::ARRAY, "transforms"), "set_transforms", "get_transforms");
-
-    ClassDB::bind_method(D_METHOD("set_current_position"), &SaveDataBlockBullets2D::set_current_position);
-    ClassDB::bind_method(D_METHOD("get_current_position"), &SaveDataBlockBullets2D::get_current_position);
-    ADD_PROPERTY(PropertyInfo(Variant::VECTOR2, "current_position"), "set_current_position", "get_current_position");
-
     ClassDB::bind_method(D_METHOD("set_max_life_time"), &SaveDataBlockBullets2D::set_max_life_time);
     ClassDB::bind_method(D_METHOD("get_max_life_time"), &SaveDataBlockBullets2D::get_max_life_time);
     ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "max_life_time"), "set_max_life_time", "get_max_life_time");
@@ -252,10 +267,6 @@ void SaveDataBlockBullets2D::_bind_methods(){
     ClassDB::bind_method(D_METHOD("set_textures"), &SaveDataBlockBullets2D::set_textures);
     ClassDB::bind_method(D_METHOD("get_textures"), &SaveDataBlockBullets2D::get_textures);
     ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "textures", PROPERTY_HINT_RESOURCE_TYPE, "Texture2D"), "set_textures", "get_textures");
-
-    ClassDB::bind_method(D_METHOD("set_texture_rotation_radians"), &SaveDataBlockBullets2D::set_texture_rotation_radians);
-    ClassDB::bind_method(D_METHOD("get_texture_rotation_radians"), &SaveDataBlockBullets2D::get_texture_rotation_radians);
-    ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "texture_rotation_radians"), "set_texture_rotation_radians", "get_texture_rotation_radians");
 
     ClassDB::bind_method(D_METHOD("set_texture_size"), &SaveDataBlockBullets2D::set_texture_size);
     ClassDB::bind_method(D_METHOD("get_texture_size"), &SaveDataBlockBullets2D::get_texture_size);
@@ -289,10 +300,6 @@ void SaveDataBlockBullets2D::_bind_methods(){
     ClassDB::bind_method(D_METHOD("get_collision_shape_size"), &SaveDataBlockBullets2D::get_collision_shape_size);
     ADD_PROPERTY(PropertyInfo(Variant::VECTOR2, "collision_shape_size"), "set_collision_shape_size", "get_collision_shape_size");
 
-    ClassDB::bind_method(D_METHOD("set_collision_shape_offset"), &SaveDataBlockBullets2D::set_collision_shape_offset);
-    ClassDB::bind_method(D_METHOD("get_collision_shape_offset"), &SaveDataBlockBullets2D::get_collision_shape_offset);
-    ADD_PROPERTY(PropertyInfo(Variant::VECTOR2, "collision_shape_offset"), "set_collision_shape_offset", "get_collision_shape_offset");
-
     ClassDB::bind_method(D_METHOD("set_monitorable"), &SaveDataBlockBullets2D::set_monitorable);
     ClassDB::bind_method(D_METHOD("get_monitorable"), &SaveDataBlockBullets2D::get_monitorable);
     ADD_PROPERTY(PropertyInfo(Variant::BOOL, "monitorable"), "set_monitorable", "get_monitorable");
@@ -313,15 +320,53 @@ void SaveDataBlockBullets2D::_bind_methods(){
     ClassDB::bind_method(D_METHOD("set_rotate_only_textures", "new_rotate_only_textures"), &SaveDataBlockBullets2D::set_rotate_only_textures);
     ADD_PROPERTY(PropertyInfo(Variant::BOOL, "rotate_only_textures"), "set_rotate_only_textures", "get_rotate_only_textures");
 
-    ClassDB::bind_method(D_METHOD("get_is_texture_rotation_permanent"), &SaveDataBlockBullets2D::get_is_texture_rotation_permanent);
-    ClassDB::bind_method(D_METHOD("set_is_texture_rotation_permanent", "new_is_texture_rotation_permanent"), &SaveDataBlockBullets2D::set_is_texture_rotation_permanent);
-    ADD_PROPERTY(PropertyInfo(Variant::BOOL, "is_texture_rotation_permanent"), "set_is_texture_rotation_permanent", "get_is_texture_rotation_permanent");
-
     ClassDB::bind_method(D_METHOD("get_use_block_rotation_radians"), &SaveDataBlockBullets2D::get_use_block_rotation_radians);
     ClassDB::bind_method(D_METHOD("set_use_block_rotation_radians", "new_use_block_rotation_radians"), &SaveDataBlockBullets2D::set_use_block_rotation_radians);
     ADD_PROPERTY(PropertyInfo(Variant::BOOL, "use_block_rotation_radians"), "set_use_block_rotation_radians", "get_use_block_rotation_radians");
 
-    ClassDB::bind_method(D_METHOD("get_all_bullet_speed_data"), &SaveDataBlockBullets2D::get_all_bullet_speed_data);
-    ClassDB::bind_method(D_METHOD("set_all_bullet_speed_data", "new_data"), &SaveDataBlockBullets2D::set_all_bullet_speed_data);
-    ADD_PROPERTY(PropertyInfo(Variant::ARRAY, "all_bullet_speed_data"), "set_all_bullet_speed_data", "get_all_bullet_speed_data");
+    ClassDB::bind_method(D_METHOD("get_multimesh_position"), &SaveDataBlockBullets2D::get_multimesh_position);
+    ClassDB::bind_method(D_METHOD("set_multimesh_position"), &SaveDataBlockBullets2D::set_multimesh_position);
+    ADD_PROPERTY(PropertyInfo(Variant::VECTOR2, "multimesh_position"), "set_multimesh_position", "get_multimesh_position");
+
+     // MOVEMENT RELATED
+
+    ClassDB::bind_method(D_METHOD("get_all_cached_instance_transforms"), &SaveDataBlockBullets2D::get_all_cached_instance_transforms);
+    ClassDB::bind_method(D_METHOD("set_all_cached_instance_transforms", "new_data"), &SaveDataBlockBullets2D::set_all_cached_instance_transforms);
+    ADD_PROPERTY(PropertyInfo(Variant::ARRAY, "all_cached_instance_transforms"), "set_all_cached_instance_transforms", "get_all_cached_instance_transforms");
+
+    ClassDB::bind_method(D_METHOD("get_all_cached_shape_transforms"), &SaveDataBlockBullets2D::get_all_cached_shape_transforms);
+    ClassDB::bind_method(D_METHOD("set_all_cached_shape_transforms", "new_data"), &SaveDataBlockBullets2D::set_all_cached_shape_transforms);
+    ADD_PROPERTY(PropertyInfo(Variant::ARRAY, "all_cached_shape_transforms"), "set_all_cached_shape_transforms", "get_all_cached_shape_transforms");
+
+    ClassDB::bind_method(D_METHOD("get_all_cached_instance_origin"), &SaveDataBlockBullets2D::get_all_cached_instance_origin);
+    ClassDB::bind_method(D_METHOD("set_all_cached_instance_origin", "new_data"), &SaveDataBlockBullets2D::set_all_cached_instance_origin);
+    ADD_PROPERTY(PropertyInfo(Variant::ARRAY, "all_cached_instance_origin"), "set_all_cached_instance_origin", "get_all_cached_instance_origin");
+
+    ClassDB::bind_method(D_METHOD("get_all_cached_shape_origin"), &SaveDataBlockBullets2D::get_all_cached_shape_origin);
+    ClassDB::bind_method(D_METHOD("set_all_cached_shape_origin", "new_data"), &SaveDataBlockBullets2D::set_all_cached_shape_origin);
+    ADD_PROPERTY(PropertyInfo(Variant::ARRAY, "all_cached_shape_origin"), "set_all_cached_shape_origin", "get_all_cached_shape_origin");
+
+    ClassDB::bind_method(D_METHOD("get_all_cached_velocity"), &SaveDataBlockBullets2D::get_all_cached_velocity);
+    ClassDB::bind_method(D_METHOD("set_all_cached_velocity", "new_data"), &SaveDataBlockBullets2D::set_all_cached_velocity);
+    ADD_PROPERTY(PropertyInfo(Variant::ARRAY, "all_cached_velocity"), "set_all_cached_velocity", "get_all_cached_velocity");
+
+    ClassDB::bind_method(D_METHOD("get_all_cached_direction"), &SaveDataBlockBullets2D::get_all_cached_direction);
+    ClassDB::bind_method(D_METHOD("set_all_cached_direction", "new_data"), &SaveDataBlockBullets2D::set_all_cached_direction);
+    ADD_PROPERTY(PropertyInfo(Variant::ARRAY, "all_cached_direction"), "set_all_cached_direction", "get_all_cached_direction");
+
+
+    // SPEED RELATED
+
+    ClassDB::bind_method(D_METHOD("get_all_cached_speed"), &SaveDataBlockBullets2D::get_all_cached_speed);
+    ClassDB::bind_method(D_METHOD("set_all_cached_speed", "new_data"), &SaveDataBlockBullets2D::set_all_cached_speed);
+    ADD_PROPERTY(PropertyInfo(Variant::ARRAY, "all_cached_speed"), "set_all_cached_speed", "get_all_cached_speed");
+
+    ClassDB::bind_method(D_METHOD("get_all_cached_max_speed"), &SaveDataBlockBullets2D::get_all_cached_max_speed);
+    ClassDB::bind_method(D_METHOD("set_all_cached_max_speed", "new_data"), &SaveDataBlockBullets2D::set_all_cached_max_speed);
+    ADD_PROPERTY(PropertyInfo(Variant::ARRAY, "all_cached_max_speed"), "set_all_cached_max_speed", "get_all_cached_max_speed");
+
+    ClassDB::bind_method(D_METHOD("get_all_cached_acceleration"), &SaveDataBlockBullets2D::get_all_cached_acceleration);
+    ClassDB::bind_method(D_METHOD("set_all_cached_acceleration", "new_data"), &SaveDataBlockBullets2D::set_all_cached_acceleration);
+    ADD_PROPERTY(PropertyInfo(Variant::ARRAY, "all_cached_acceleration"), "set_all_cached_acceleration", "get_all_cached_acceleration");
+
 }

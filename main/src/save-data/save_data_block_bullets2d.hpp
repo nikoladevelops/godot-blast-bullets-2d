@@ -16,8 +16,6 @@ class SaveDataBlockBullets2D : public Resource{
         // TEXTURE RELATED
         TypedArray<Texture2D> textures;
 
-        float texture_rotation_radians;
-
         Vector2 texture_size;
 
         float max_change_texture_time = 0.0f;
@@ -26,20 +24,35 @@ class SaveDataBlockBullets2D : public Resource{
 
         int current_texture_index=0;
 
-        // The default behaviour is for the texture of each bullet to be rotated according to the rotation of the bullet's transform + texture_rotation_radians. If for some reason you want only the texture_rotation_radians to be used, no matter how the transform is rotated then you need to set this to true.
-        bool is_texture_rotation_permanent=false;
+        // BULLET SPEED RELATED
+
+        TypedArray<float> all_cached_speed;
+        TypedArray<float> all_cached_max_speed;
+        TypedArray<float> all_cached_acceleration;
 
         // BULLET MOVEMENT RELATED
 
-        TypedArray<Transform2D> transforms;
+        // Holds all multimesh instance transforms. I am doing this so I don't have to call multi->get_instance_transform_2d() every frame
+        TypedArray<Transform2D> all_cached_instance_transforms;
+        
+        // Holds all collision shape transforms. I am doing this so I don't have to call physics_server->area_get_shape_transform() every frame
+        TypedArray<Transform2D> all_cached_shape_transforms;
 
-        Vector2 current_position;
+        // Holds all multimesh instance transform origin vectors. I am doing this so I don't have to call .get_origin() every frame
+        TypedArray<Vector2> all_cached_instance_origin;
+        
+        // Holds all collision shape transform origin vectors. I am doing this so I don't have to call .get_origin() every frame
+        TypedArray<Vector2> all_cached_shape_origin;
+
+        // Holds all calculated velocities for the bullets. I am doing this to avoid unnecessary calculations. If I know the direction -> calculate the velocity. Update the values only when the velocity changes, otherwise it's just unnecessary to always do Vector2(cos, sin) every frame..
+        TypedArray<Vector2> all_cached_velocity;
+
+        // Holds all cached directions of the bullets
+        TypedArray<Vector2> all_cached_direction;
 
         float block_rotation_radians;
 
         bool use_block_rotation_radians=false;
-
-        TypedArray<BulletSpeedData> all_bullet_speed_data;
 
         // BULLET ROTATION RELATED
 
@@ -53,13 +66,14 @@ class SaveDataBlockBullets2D : public Resource{
         int collision_mask;
 
         Vector2 collision_shape_size;
-        Vector2 collision_shape_offset;
 
         TypedArray<bool> bullets_enabled_status;
 
         bool monitorable;
 
         // OTHER
+
+        Vector2 multimesh_position;
 
         float max_life_time;
 
@@ -74,12 +88,6 @@ class SaveDataBlockBullets2D : public Resource{
 
 
         // GETTERS AND SETTERS
-
-        void set_transforms(TypedArray<Transform2D> new_transforms);
-        TypedArray<Transform2D> get_transforms() const;
-
-        void set_current_position(Vector2 new_current_position);
-        Vector2 get_current_position() const;
 
         void set_max_life_time(float new_max_life_time);
         float get_max_life_time() const;
@@ -98,9 +106,6 @@ class SaveDataBlockBullets2D : public Resource{
 
         void set_textures(TypedArray<Texture2D> new_textures);
         TypedArray<Texture2D> get_textures() const;
-
-        void set_texture_rotation_radians(float new_texture_rotation_radians);
-        float get_texture_rotation_radians() const;
 
         void set_texture_size(Vector2 new_texture_size);
         Vector2 get_texture_size() const;
@@ -126,9 +131,6 @@ class SaveDataBlockBullets2D : public Resource{
         void set_collision_shape_size(Vector2 new_collision_shape_size);
         Vector2 get_collision_shape_size() const;
 
-        void set_collision_shape_offset(Vector2 new_collision_shape_offset);
-        Vector2 get_collision_shape_offset() const;
-
         void set_monitorable(bool new_monitorable);
         bool get_monitorable() const;
 
@@ -144,15 +146,41 @@ class SaveDataBlockBullets2D : public Resource{
         bool get_rotate_only_textures();
         void set_rotate_only_textures(bool new_rotate_only_textures);
 
-        bool get_is_texture_rotation_permanent();
-        void set_is_texture_rotation_permanent(bool new_is_texture_rotation_permanent);
-
         bool get_use_block_rotation_radians();
         void set_use_block_rotation_radians(bool new_use_block_rotation_radians);
 
-        TypedArray<BulletSpeedData> get_all_bullet_speed_data();
-        void set_all_bullet_speed_data(const TypedArray<BulletSpeedData>& new_data);
+        // MOVEMENT RELATED
+        TypedArray<Transform2D> get_all_cached_instance_transforms();
+        void set_all_cached_instance_transforms(const TypedArray<Transform2D> new_data);
 
+        TypedArray<Transform2D> get_all_cached_shape_transforms();
+        void set_all_cached_shape_transforms(const TypedArray<Transform2D> new_data);
+        
+        TypedArray<Vector2> get_all_cached_instance_origin();
+        void set_all_cached_instance_origin(const TypedArray<Vector2> new_data);
+
+        TypedArray<Vector2> get_all_cached_shape_origin();
+        void set_all_cached_shape_origin(const TypedArray<Vector2> new_data);
+
+        TypedArray<Vector2> get_all_cached_velocity();
+        void set_all_cached_velocity(const TypedArray<Vector2> new_data);
+
+        TypedArray<Vector2> get_all_cached_direction();
+        void set_all_cached_direction(const TypedArray<Vector2> new_data);
+
+        // SPEED RELATED
+
+        TypedArray<float> get_all_cached_speed();
+        void set_all_cached_speed(const TypedArray<float> new_data);
+
+        TypedArray<float> get_all_cached_max_speed();
+        void set_all_cached_max_speed(const TypedArray<float> new_data);
+
+        TypedArray<float> get_all_cached_acceleration();
+        void set_all_cached_acceleration(const TypedArray<float> new_data);
+
+        Vector2 get_multimesh_position();
+        void set_multimesh_position(Vector2 new_position);
 
     protected:
         static void _bind_methods();

@@ -31,12 +31,6 @@ class BlockBullets2D:public MultiMeshInstance2D, public MultiMeshBullets2D{
 
         // Holds the current texture index (the index inside the array textures)
         int current_texture_index;
-
-        // The default behaviour is for the texture of each bullet to be rotated according to the rotation of the bullet's transform + texture_rotation_radians OR block_rotation_radians + texture_rotation_radians if use_block_rotation_radians is true. If for some reason you ONLY want the texture_rotation_radians to be used, then set this to true (basically all your textures will always be rotated in a specific angle, no matter in which direction they travel)
-        bool is_texture_rotation_permanent=false;
-
-        // The texure rotation in radians. Check is_texture_rotation_permanent for more info
-        float texture_rotation_radians;
         
         // This is the texture size of the bullets
         Vector2 texture_size = Vector2(0,0);
@@ -76,9 +70,6 @@ class BlockBullets2D:public MultiMeshInstance2D, public MultiMeshBullets2D{
         std::vector<Vector2> all_cached_direction;
 
         // COLLISION RELATED
-
-        // Collision shape offset from the center (by default the collision shape is at the center of the texture)
-        Vector2 collision_shape_offset = Vector2(0,0);
 
         // Saves whether the bullets can detect bodies or not
         bool monitorable;
@@ -156,7 +147,9 @@ class BlockBullets2D:public MultiMeshInstance2D, public MultiMeshBullets2D{
             bool new_monitorable
             );
         void generate_collision_shapes_for_area();
-        bool set_up_bullets(
+
+        // Called only when spawning/activating the bullets multimesh
+        bool set_up_bullets_state(
             Vector2 new_collision_shape_size,
             const TypedArray<Transform2D>& new_transforms, // make sure you are giving transforms that don't have collision offset applied, otherwise it will apply it twice
             float new_texture_rotation,
@@ -166,6 +159,9 @@ class BlockBullets2D:public MultiMeshInstance2D, public MultiMeshBullets2D{
             bool new_use_block_rotation_radians,
             float new_block_rotation_radians
             );
+            
+        // Called when loading data
+        void load_bullets_state(const Ref<SaveDataBlockBullets2D>& data);
 
         void generate_multimesh();
         void set_up_multimesh(int new_instance_count, const Ref<Mesh>& new_mesh, Vector2 new_texture_size);
@@ -195,7 +191,7 @@ class BlockBullets2D:public MultiMeshInstance2D, public MultiMeshBullets2D{
         // Accelerates an individual bullet's speed
         void accelerate_bullet_speed(int speed_data_id, float delta);
 
-        // Rotates a bullet's texture
+        // Rotates a bullet's texture (and also the physics shape if rotate_only_textures is false)
         void rotate_bullet(int multi_instance_id, float rotated_angle);
 
         // Accelerates a bullet's rotation speed

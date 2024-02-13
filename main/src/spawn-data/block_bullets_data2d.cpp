@@ -3,6 +3,15 @@
 
 using namespace godot;
 
+
+TypedArray<Transform2D> BlockBulletsData2D::get_transforms() const {
+    return transforms;
+}
+void BlockBulletsData2D::set_transforms(const TypedArray<Transform2D> new_transforms) {
+    transforms = new_transforms;
+}
+
+
 TypedArray<Texture2D> BlockBulletsData2D::get_textures() const {
     return textures;
 }
@@ -34,13 +43,6 @@ int BlockBulletsData2D::get_current_texture_index() const {
 }
 void BlockBulletsData2D::set_current_texture_index(int new_current_texture_index) {
     current_texture_index = new_current_texture_index;
-}
-
-TypedArray<Transform2D> BlockBulletsData2D::get_transforms() const {
-    return transforms;
-}
-void BlockBulletsData2D::set_transforms(const TypedArray<Transform2D>& new_transforms) {
-    transforms = new_transforms;
 }
 
 float BlockBulletsData2D::get_block_rotation_radians() const {
@@ -166,6 +168,10 @@ void BlockBulletsData2D::set_all_bullet_speed_data(const TypedArray<BulletSpeedD
 }
 
 void BlockBulletsData2D::_bind_methods() {
+ClassDB::bind_method(D_METHOD("set_transforms"), &BlockBulletsData2D::set_transforms);
+ClassDB::bind_method(D_METHOD("get_transforms"), &BlockBulletsData2D::get_transforms);
+ADD_PROPERTY(PropertyInfo(Variant::ARRAY, "transforms"), "set_transforms", "get_transforms");
+
 ClassDB::bind_method(D_METHOD("get_textures"), &BlockBulletsData2D::get_textures);
 ClassDB::bind_method(D_METHOD("set_textures", "new_textures"), &BlockBulletsData2D::set_textures);
 ADD_PROPERTY(PropertyInfo(Variant::ARRAY, "textures"), "set_textures", "get_textures");
@@ -181,10 +187,6 @@ ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "texture_rotation_radians"), "set_text
 ClassDB::bind_method(D_METHOD("get_current_texture_index"), &BlockBulletsData2D::get_current_texture_index);
 ClassDB::bind_method(D_METHOD("set_current_texture_index", "new_current_texture_index"), &BlockBulletsData2D::set_current_texture_index);
 ADD_PROPERTY(PropertyInfo(Variant::INT, "current_texture_index"), "set_current_texture_index", "get_current_texture_index");
-
-ClassDB::bind_method(D_METHOD("get_transforms"), &BlockBulletsData2D::get_transforms);
-ClassDB::bind_method(D_METHOD("set_transforms", "new_transforms"), &BlockBulletsData2D::set_transforms);
-ADD_PROPERTY(PropertyInfo(Variant::ARRAY, "transforms"), "set_transforms", "get_transforms");
 
 ClassDB::bind_method(D_METHOD("get_block_rotation_radians"), &BlockBulletsData2D::get_block_rotation_radians);
 ClassDB::bind_method(D_METHOD("set_block_rotation_radians", "new_block_rotation_radians"), &BlockBulletsData2D::set_block_rotation_radians);
