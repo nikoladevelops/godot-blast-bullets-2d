@@ -15,15 +15,12 @@ using namespace godot;
 class BulletFactory2D:public Node2D{
     GDCLASS(BulletFactory2D, Node2D);
     public:
-        std::vector<BlockBullets2D*> all_bullets;
-
         // The physics space where the bullets multimeshes are interacting with the world.
         RID physics_space;
         // Contains all bullet multi meshes. This is where the multimeshes get added as a child when calling a spawn method.
         Node* bullets_container;
         
         void _ready();
-        void _physics_process(float delta);
 
         // If I pass by const reference it would be a big problem if I am reusing the same resource data to spawn multiple block bullets, that's why I prefer to copy it
         void spawnBlockBullets2D(const Ref<BlockBulletsData2D> spawn_data);

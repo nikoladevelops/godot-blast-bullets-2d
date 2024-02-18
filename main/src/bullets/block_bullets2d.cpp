@@ -27,7 +27,11 @@ BlockBullets2D::~BlockBullets2D(){
     physics_server->free_rid(area);
 }
 
-void BlockBullets2D::move_bullets(float delta){
+void BlockBullets2D::_physics_process(float delta){
+    move_bullets(delta);
+}
+
+_ALWAYS_INLINE_ void BlockBullets2D::move_bullets(float delta){
     if(use_block_rotation_radians){
         Vector2 new_pos = current_position + all_cached_velocity[0] * delta;
         set_global_position(new_pos);
@@ -180,7 +184,6 @@ void BlockBullets2D::spawn(const Ref<BlockBulletsData2D>& spawn_data, BulletFact
 
 Ref<SaveDataBlockBullets2D> BlockBullets2D::save(){
     set_physics_process(false);
-    set_process(false);
 
     Ref<SaveDataBlockBullets2D> data = memnew(SaveDataBlockBullets2D);
 
@@ -305,7 +308,6 @@ Ref<SaveDataBlockBullets2D> BlockBullets2D::save(){
 
     
     set_physics_process(true);
-    set_process(true);
     return data;
 }
 
@@ -369,7 +371,6 @@ void BlockBullets2D::disable_bullet(int bullet_index){
 void BlockBullets2D::disable_multi_mesh(){
     set_visible(false); // very important to hide it, otherwise it will be rendering the transparent bullets when there is no need, which will tank performance
     set_physics_process(false);
-    set_process(false);
     current_life_time = 0.0f; //Important. This way I determine which bullets should not be saved/ are not yet set up correctly
     
     factory->add_bullets_to_pool(this);
@@ -401,6 +402,8 @@ void BlockBullets2D::activate_multimesh(const Ref<BlockBulletsData2D>& data){
 
     make_all_bullet_instances_visible();
     enable_bullets_based_on_status();
+
+    move_to_front(); // Makes sure that the current old multimesh is displayed on top of the newer ones (act as if its the oldest sibling to emulate the behaviour of spawning a brand new multimesh / if I dont do this then the multimesh's instances will be displayed behind the newer ones)
 
     finalize_set_up(data->bullets_custom_data, data->textures, data->current_texture_index, data->material);
 }
@@ -751,7 +754,6 @@ void BlockBullets2D::finalize_set_up(
     }
 
     set_physics_process(true);
-    set_process(true);
     set_visible(true);
 }
 

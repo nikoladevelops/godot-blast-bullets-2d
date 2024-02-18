@@ -111,6 +111,8 @@ class BlockBullets2D:public MultiMeshInstance2D, public MultiMeshBullets2D{
         // The current life time being processed
         float current_life_time=0.0f;
 
+
+        void _physics_process(float delta);
         // Contains the necessary logic to move the bullets that are inside the multimesh
         void move_bullets(float delta);
 
@@ -133,7 +135,6 @@ class BlockBullets2D:public MultiMeshInstance2D, public MultiMeshBullets2D{
         void body_entered_func(int status, RID entered_rid, uint64_t entered_instance_id, int entered_shape_index, int bullet_shape_index);
 
     protected:
-
         // BULLET STATE METHODS
         
         // Generate methods are called only when spawning/loading data

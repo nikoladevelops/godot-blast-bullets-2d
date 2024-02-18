@@ -24,21 +24,8 @@ void BulletFactory2D::_ready(){
     }
 }
 
-void BulletFactory2D::_physics_process(float delta){ 
-    for (int i = 0; i < all_bullets.size(); i++)
-    {
-        BlockBullets2D& curr_multimesh = *all_bullets[i];
-
-        // I only want to save bullets that are still active (I don't want to save bullets that are in the pool).
-        if(curr_multimesh.current_life_time == 0.0f){
-            continue;
-        }
-
-        curr_multimesh.move_bullets(delta);
-    }
-}
-
 void BulletFactory2D::spawnBlockBullets2D(const Ref<BlockBulletsData2D> spawn_data){
+    bullets_container->set_physics_process(false);
     int key = spawn_data->transforms.size();
     
     BlockBullets2D* bullets = remove_bullets_from_pool(key);
@@ -49,9 +36,7 @@ void BulletFactory2D::spawnBlockBullets2D(const Ref<BlockBulletsData2D> spawn_da
 
 
     BlockBullets2D* blk_instance = memnew(BlockBullets2D);
-
     blk_instance->spawn(spawn_data, this);
-
 }
 
 RID BulletFactory2D::get_physics_space() const{
