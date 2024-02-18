@@ -22,20 +22,12 @@ TypedArray<BulletRotationData> BulletRotationData::generate_random_data(
         bullet_data->rotation_speed = rand_gen->randf_range(rotation_speed_min, rotation_speed_max);
         bullet_data->max_rotation_speed = rand_gen->randf_range(max_rotation_speed_min, max_rotation_speed_max);
         bullet_data->rotation_acceleration = rand_gen->randf_range(rotation_acceleration_min, rotation_acceleration_max);
-        bullet_data->is_rotation_enabled=true;
         
         data[i] = bullet_data;
     }
     
     return data;
 };
-
-bool BulletRotationData::get_is_rotation_enabled(){
-    return is_rotation_enabled;
-}
-void BulletRotationData::set_is_rotation_enabled(bool new_is_rotation_enabled){
-    is_rotation_enabled=new_is_rotation_enabled;
-}
 
 float BulletRotationData::get_rotation_speed(){
     return rotation_speed;
@@ -60,10 +52,6 @@ void BulletRotationData::set_rotation_acceleration(float new_rotation_accelerati
 }
 
 void BulletRotationData::_bind_methods(){
-    ClassDB::bind_method(D_METHOD("set_is_rotation_enabled"), &BulletRotationData::set_is_rotation_enabled);
-    ClassDB::bind_method(D_METHOD("get_is_rotation_enabled"), &BulletRotationData::get_is_rotation_enabled);
-    ADD_PROPERTY(PropertyInfo(Variant::BOOL, "is_rotation_enabled"), "set_is_rotation_enabled", "get_is_rotation_enabled");
-
     ClassDB::bind_method(D_METHOD("set_rotation_speed"), &BulletRotationData::set_rotation_speed);
     ClassDB::bind_method(D_METHOD("get_rotation_speed"), &BulletRotationData::get_rotation_speed);
     ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "rotation_speed"), "set_rotation_speed", "get_rotation_speed");

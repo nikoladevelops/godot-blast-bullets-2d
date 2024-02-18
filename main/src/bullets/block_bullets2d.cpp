@@ -25,16 +25,9 @@ BlockBullets2D::~BlockBullets2D(){
         physics_server->free_rid(shape);
     }  
     physics_server->free_rid(area);
-    
 }
 
-void BlockBullets2D::_ready(){
-    set_physics_process(false);
-    set_process(false);
-    set_visible(false);
-}
-
-void BlockBullets2D::_physics_process(float delta){
+void BlockBullets2D::move_bullets(float delta){
     if(use_block_rotation_radians){
         Vector2 new_pos = current_position + all_cached_velocity[0] * delta;
         set_global_position(new_pos);
@@ -137,10 +130,6 @@ void BlockBullets2D::_physics_process(float delta){
                     continue;
                 }
 
-                if(all_is_rotation_enabled[i] == false){ // it means that the current bullet's data indicates that it should NOT be rotated, so skip it
-                    continue;
-                }
-
                 rotate_bullet(i, all_rotation_speed[i] * delta);
                 accelerate_bullet_rotation_speed(i, delta); // each bullet has its own BulletRotationData (meaning INDIVIDUAL rotation_speed that has to be accelerated every frame)
             }
@@ -150,8 +139,6 @@ void BlockBullets2D::_physics_process(float delta){
 
 void BlockBullets2D::spawn(const Ref<BlockBulletsData2D>& spawn_data, BulletFactory2D* new_factory){
     factory = new_factory;
-    factory->bullets_container->add_child(this);
-
     size = spawn_data->transforms.size(); // important, because some set_up methods use this
     
     set_up_rotation(spawn_data->all_bullet_rotation_data, spawn_data->rotate_only_textures);
@@ -167,6 +154,7 @@ void BlockBullets2D::spawn(const Ref<BlockBulletsData2D>& spawn_data, BulletFact
     
     make_all_bullet_instances_visible();
     generate_collision_shapes_for_area(); 
+    
     if(set_up_bullets_state(
         spawn_data->collision_shape_size,
         spawn_data->transforms,
@@ -183,6 +171,11 @@ void BlockBullets2D::spawn(const Ref<BlockBulletsData2D>& spawn_data, BulletFact
     enable_bullets_based_on_status();
 
     finalize_set_up(spawn_data->bullets_custom_data, spawn_data->textures, spawn_data->current_texture_index, spawn_data->material);
+
+    factory->bullets_container->add_child(this);
+    
+    factory->all_bullets.push_back(this);
+    emit_signal("spawned");
 }
 
 Ref<SaveDataBlockBullets2D> BlockBullets2D::save(){
@@ -279,7 +272,6 @@ Ref<SaveDataBlockBullets2D> BlockBullets2D::save(){
             bullet_data->rotation_speed = all_rotation_speed[i];
             bullet_data->max_rotation_speed = all_max_rotation_speed[i];
             bullet_data->rotation_acceleration = all_rotation_acceleration[i];
-            bullet_data->is_rotation_enabled = all_is_rotation_enabled[i];
 
             data->all_bullet_rotation_data[i] = bullet_data;
         }
@@ -308,7 +300,7 @@ Ref<SaveDataBlockBullets2D> BlockBullets2D::save(){
     data->bullets_enabled_status.resize(size);
     for (int i = 0; i < size; i++)
     {
-        data->bullets_enabled_status[i] = bullets_enabled_status[i];
+        data->bullets_enabled_status[i] = (bool)(bullets_enabled_status[i]);
     }
 
     
@@ -319,8 +311,6 @@ Ref<SaveDataBlockBullets2D> BlockBullets2D::save(){
 
 void BlockBullets2D::load(const Ref<SaveDataBlockBullets2D>& data, BulletFactory2D* new_factory){
     factory = new_factory;
-    factory->bullets_container->add_child(this);
-
     size = data->all_cached_instance_transforms.size();
     
     set_up_rotation(data->all_bullet_rotation_data, data->rotate_only_textures);
@@ -340,14 +330,18 @@ void BlockBullets2D::load(const Ref<SaveDataBlockBullets2D>& data, BulletFactory
     load_bullets_state(data);
 
     enable_bullets_based_on_status();
-    
+ 
     finalize_set_up(data->bullets_custom_data, data->textures, data->current_texture_index, data->material);
+
+    factory->bullets_container->add_child(this);
+    factory->all_bullets.push_back(this);
+    emit_signal("spawned");
 }
 
 void BlockBullets2D::enable_bullets_based_on_status(){
     for (int i = 0; i < size; i++)
     {
-        physics_server->call_deferred("area_set_shape_disabled",area, i, bullets_enabled_status[i] == false);
+        physics_server->call_deferred("area_set_shape_disabled", area, i, ((bool)bullets_enabled_status[i]) == false);
     }
 
     physics_server->area_set_area_monitor_callback(area, callable_mp(this, &BlockBullets2D::area_entered_func));
@@ -376,6 +370,7 @@ void BlockBullets2D::disable_multi_mesh(){
     set_visible(false); // very important to hide it, otherwise it will be rendering the transparent bullets when there is no need, which will tank performance
     set_physics_process(false);
     set_process(false);
+    current_life_time = 0.0f; //Important. This way I determine which bullets should not be saved/ are not yet set up correctly
     
     factory->add_bullets_to_pool(this);
 }
@@ -410,7 +405,7 @@ void BlockBullets2D::activate_multimesh(const Ref<BlockBulletsData2D>& data){
     finalize_set_up(data->bullets_custom_data, data->textures, data->current_texture_index, data->material);
 }
 
-void BlockBullets2D::accelerate_bullet_speed(int speed_data_id, float delta){
+_ALWAYS_INLINE_ void BlockBullets2D::accelerate_bullet_speed(int speed_data_id, float delta){
     float curr_bullet_speed = all_cached_speed[speed_data_id];
     float curr_max_bullet_speed = all_cached_max_speed[speed_data_id];
 
@@ -422,7 +417,7 @@ void BlockBullets2D::accelerate_bullet_speed(int speed_data_id, float delta){
     all_cached_velocity[speed_data_id] = all_cached_direction[speed_data_id] * all_cached_speed[speed_data_id];
 }
 
-void BlockBullets2D::rotate_bullet(int multi_instance_id, float rotated_angle){
+_ALWAYS_INLINE_ void BlockBullets2D::rotate_bullet(int multi_instance_id, float rotated_angle){
     Transform2D& rotated_transf = all_cached_instance_transforms[multi_instance_id];
     rotated_transf = rotated_transf.rotated_local(rotated_angle);
 
@@ -435,7 +430,8 @@ void BlockBullets2D::rotate_bullet(int multi_instance_id, float rotated_angle){
         physics_server->area_set_shape_transform(area, multi_instance_id, rotated_shape_transf);
     }
 }
-void BlockBullets2D::accelerate_bullet_rotation_speed(int multi_instance_id, float delta){
+
+_ALWAYS_INLINE_ void BlockBullets2D::accelerate_bullet_rotation_speed(int multi_instance_id, float delta){
     if(all_rotation_speed[multi_instance_id] == all_max_rotation_speed[multi_instance_id]){
         return;
     }
@@ -481,7 +477,6 @@ void BlockBullets2D::set_up_rotation(TypedArray<BulletRotationData>& new_data, b
         }
         rotate_only_textures=new_rotate_only_textures;
         is_rotation_active = true;  // Important, because it determines if we have rotation data to use
-        all_is_rotation_enabled.resize(amount_of_rotation_data);
         all_rotation_speed.resize(amount_of_rotation_data);
         all_max_rotation_speed.resize(amount_of_rotation_data);
         all_rotation_acceleration.resize(amount_of_rotation_data);
@@ -490,7 +485,6 @@ void BlockBullets2D::set_up_rotation(TypedArray<BulletRotationData>& new_data, b
         {
             BulletRotationData& curr_bullet_data = *Object::cast_to<BulletRotationData>(new_data[i]); // Found out that if you have a TypedArray<>, trying to access an element with [] will give you Variant, so in order to cast it use Object::cast_to<>(), the normal reinterpret_cast and the C way of casting didn't work hmm
 
-            all_is_rotation_enabled[i] = curr_bullet_data.is_rotation_enabled;
             all_rotation_speed[i] = curr_bullet_data.rotation_speed;
             all_max_rotation_speed[i] = curr_bullet_data.max_rotation_speed;
             all_rotation_acceleration[i] = curr_bullet_data.rotation_acceleration;
@@ -678,7 +672,6 @@ bool BlockBullets2D::set_up_bullets_state(
         all_cached_instance_origin[i] = data->all_cached_instance_origin[i];
         all_cached_shape_origin[i] = data->all_cached_shape_origin[i];
 
-
         RID shape_rid = physics_server->area_get_shape(area,i);
         physics_server->shape_set_data(shape_rid, data->collision_shape_size);
         physics_server->area_set_shape_transform(area, i, all_cached_shape_transforms[i]);
@@ -760,7 +753,6 @@ void BlockBullets2D::finalize_set_up(
     set_physics_process(true);
     set_process(true);
     set_visible(true);
-    emit_signal("spawned");
 }
 
 void BlockBullets2D::area_entered_func(int status, RID entered_rid, uint64_t entered_instance_id, int entered_shape_index, int bullet_shape_index){

@@ -16,8 +16,6 @@ using namespace godot;
 class BulletDebugger2D : public Node{
     GDCLASS(BulletDebugger2D, Node)
 
-    // The node path to the Node container for the bullets.
-    NodePath bullets_container;
     // A pointer to where the multi mesh bullets are stored in. This has to be refactored a lil bit
     Node* bullets_container_ptr;
 
@@ -36,9 +34,6 @@ class BulletDebugger2D : public Node{
     public:
         void _ready();
         void _physics_process(float delta);
-
-        NodePath get_bullets_container() const;
-        void set_bullets_container(const NodePath& new_bullets_container);
 
         NodePath get_bullet_factory() const;
         void set_bullet_factory(const NodePath& new_bullet_factory);

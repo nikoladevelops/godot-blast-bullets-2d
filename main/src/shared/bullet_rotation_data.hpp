@@ -9,7 +9,6 @@ class BulletRotationData : public Resource{
     GDCLASS(BulletRotationData, Resource);
 
     public:
-        bool is_rotation_enabled=false;
         float rotation_speed;
         float max_rotation_speed;
         float rotation_acceleration;
@@ -25,9 +24,6 @@ class BulletRotationData : public Resource{
             float rotation_acceleration_max
             );
         
-        bool get_is_rotation_enabled();
-        void set_is_rotation_enabled(bool new_is_rotation_enabled);
-
         float get_rotation_speed();
         void set_rotation_speed(float new_rotation_speed);
 

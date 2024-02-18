@@ -27,7 +27,12 @@ int SaveDataBlockBullets2D::get_size() const {
 }
 
 void SaveDataBlockBullets2D::set_bullets_enabled_status(TypedArray<bool> new_bullets_enabled_status) {
-    bullets_enabled_status = new_bullets_enabled_status;
+    int new_enabled_size = new_bullets_enabled_status.size();
+    bullets_enabled_status.resize(new_enabled_size);
+    for (int i = 0; i < new_enabled_size; i++)
+    {
+        bullets_enabled_status[i] = new_bullets_enabled_status[i];
+    }
 }
 
 TypedArray<bool> SaveDataBlockBullets2D::get_bullets_enabled_status() const {
@@ -146,7 +151,6 @@ TypedArray<BulletRotationData> SaveDataBlockBullets2D::get_all_bullet_rotation_d
     return all_bullet_rotation_data;
 }
 void SaveDataBlockBullets2D::set_all_bullet_rotation_data(const TypedArray<BulletRotationData>& new_bullet_rotation_data){
-    
     all_bullet_rotation_data.resize(new_bullet_rotation_data.size());
     for (int i = 0; i < new_bullet_rotation_data.size(); i++)
     {

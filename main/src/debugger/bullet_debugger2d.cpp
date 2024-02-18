@@ -21,12 +21,6 @@ void BulletDebugger2D::_ready(){
         return;
     }
     
-    if(bullets_container.is_empty()){
-        UtilityFunctions::print("You haven't provided the bullets_container for the debugger");
-        set_physics_process(false);
-        set_process(false);
-        return;
-    }
 
     if(bullet_factory.is_empty()){
         UtilityFunctions::print("You haven't provided the bullet_factory for the debugger");
@@ -38,7 +32,7 @@ void BulletDebugger2D::_ready(){
     bullet_factory_ptr=get_node<BulletFactory2D>(bullet_factory);
     bullet_factory_ptr->connect("bullets_got_cleared", callable_mp(this, &BulletDebugger2D::reset_debugger));
 
-    bullets_container_ptr = get_node<Node>(bullets_container); // TODO will change in the future
+    bullets_container_ptr = bullet_factory_ptr->bullets_container;
     bullets_container_ptr->connect("child_entered_tree", callable_mp(this, &BulletDebugger2D::bullets_entered_container));
     
 }
@@ -88,7 +82,7 @@ void BulletDebugger2D::generate_texture_multimesh(BlockBullets2D* new_bullets_mu
 
     for (int i = 0; i < instance_count; i++)
     {
-        multi->set_instance_color(i, Color(0,0,2,1));
+        multi->set_instance_color(i, Color(0,0,2,0.5));
         Transform2D transf = physics_server->area_get_shape_transform(area, i);
         multi->set_instance_transform_2d(i,transf);
     }
@@ -126,14 +120,6 @@ void BulletDebugger2D::set_bullet_factory(const NodePath& new_bullet_factory){
     bullet_factory=new_bullet_factory;
 }
 
-NodePath BulletDebugger2D::get_bullets_container() const{
-    return bullets_container;
-}
-
-void BulletDebugger2D::set_bullets_container(const NodePath& new_bullets_container){
-    bullets_container=new_bullets_container;
-}
-
 bool BulletDebugger2D::get_is_enabled(){
     return is_enabled;
 }
@@ -146,10 +132,6 @@ void BulletDebugger2D::_bind_methods(){
     ClassDB::bind_method(D_METHOD("get_is_enabled"), &BulletDebugger2D::get_is_enabled);
     ClassDB::bind_method(D_METHOD("set_is_enabled", "new_is_enabled"), &BulletDebugger2D::set_is_enabled);
     ADD_PROPERTY(PropertyInfo(Variant::BOOL, "is_enabled"), "set_is_enabled", "get_is_enabled");
-
-    ClassDB::bind_method(D_METHOD("get_bullets_container"), &BulletDebugger2D::get_bullets_container);
-    ClassDB::bind_method(D_METHOD("set_bullets_container", "new_bullets_container"), &BulletDebugger2D::set_bullets_container);
-    ADD_PROPERTY(PropertyInfo(Variant::NODE_PATH, "bullets_container"), "set_bullets_container", "get_bullets_container");
 
     ClassDB::bind_method(D_METHOD("get_bullet_factory"), &BulletDebugger2D::get_bullet_factory);
     ClassDB::bind_method(D_METHOD("set_bullet_factory", "new_bullet_factory"), &BulletDebugger2D::set_bullet_factory);

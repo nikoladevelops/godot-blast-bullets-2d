@@ -14,9 +14,27 @@ void BulletFactory2D::_ready(){
     if(Engine::get_singleton()->is_editor_hint()){
         return;
     }
-    
+    bullets_container = memnew(Node);
+    bullets_container->set_name("BulletsContainer");
+
+    add_child(bullets_container);
+
     if(physics_space.is_valid() == false){
         physics_space = get_world_2d()->get_space();
+    }
+}
+
+void BulletFactory2D::_physics_process(float delta){ 
+    for (int i = 0; i < all_bullets.size(); i++)
+    {
+        BlockBullets2D& curr_multimesh = *all_bullets[i];
+
+        // I only want to save bullets that are still active (I don't want to save bullets that are in the pool).
+        if(curr_multimesh.current_life_time == 0.0f){
+            continue;
+        }
+
+        curr_multimesh.move_bullets(delta);
     }
 }
 
@@ -33,14 +51,7 @@ void BulletFactory2D::spawnBlockBullets2D(const Ref<BlockBulletsData2D> spawn_da
     BlockBullets2D* blk_instance = memnew(BlockBullets2D);
 
     blk_instance->spawn(spawn_data, this);
-}
 
-Node* BulletFactory2D::get_bullets_container() const{
-    return bullets_container;
-}
-
-void BulletFactory2D::set_bullets_container(Node* new_bullets_container){
-    bullets_container = new_bullets_container;
 }
 
 RID BulletFactory2D::get_physics_space() const{
@@ -53,17 +64,18 @@ void BulletFactory2D::set_physics_space(RID new_space_rid){
 Ref<SaveDataBulletFactory2D> BulletFactory2D::save(){
     Ref<SaveDataBulletFactory2D> data = memnew(SaveDataBulletFactory2D);
 
-    int amount_bullets = bullets_container->get_child_count();
-    
-    for (int i = 0; i < amount_bullets ; i++)
+    TypedArray<BlockBullets2D> bullets = bullets_container->get_children();
+
+    for (int i = 0; i < bullets.size(); i++)
     {
-        BlockBullets2D* bullet_instance = dynamic_cast<BlockBullets2D*>(bullets_container->get_child(i));
+        BlockBullets2D& bullet_instance = *Object::cast_to<BlockBullets2D>(bullets[i]);
+
         // I only want to save bullets that are still active (I don't want to save bullets that are in the pool).
-        if(bullet_instance->is_visible() == false){
+        if(bullet_instance.current_life_time == 0.0f){
             continue;
         }
         // Saves only the active bullets currently
-        data->all_block_bullets.push_back(bullet_instance->save());
+        data->all_block_bullets.push_back(bullet_instance.save());
     }
 
     return data;
@@ -118,9 +130,6 @@ void BulletFactory2D::clear_all_bullets(){
 }
 
 void BulletFactory2D::_bind_methods(){
-    ClassDB::bind_method(D_METHOD("get_bullets_container"), &BulletFactory2D::get_bullets_container);
-    ClassDB::bind_method(D_METHOD("set_bullets_container", "new_bullets_container"), &BulletFactory2D::set_bullets_container);
-
     ClassDB::bind_method(D_METHOD("get_physics_space"), &BulletFactory2D::get_physics_space);
     ClassDB::bind_method(D_METHOD("set_physics_space", "new_physics_space"), &BulletFactory2D::set_physics_space);
     ADD_PROPERTY(PropertyInfo(Variant::RID, "physics_space"), "set_physics_space", "get_physics_space");

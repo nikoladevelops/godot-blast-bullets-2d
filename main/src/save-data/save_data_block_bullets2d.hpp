@@ -18,11 +18,11 @@ class SaveDataBlockBullets2D : public Resource{
 
         Vector2 texture_size;
 
-        float max_change_texture_time = 0.0f;
+        float max_change_texture_time;
 
         float current_change_texture_time;
 
-        int current_texture_index=0;
+        int current_texture_index;
 
         // BULLET SPEED RELATED
 
@@ -52,13 +52,13 @@ class SaveDataBlockBullets2D : public Resource{
 
         float block_rotation_radians;
 
-        bool use_block_rotation_radians=false;
+        bool use_block_rotation_radians;
 
         // BULLET ROTATION RELATED
 
         TypedArray<BulletRotationData> all_bullet_rotation_data;
 
-        bool rotate_only_textures=true;
+        bool rotate_only_textures;
 
         // COLLISION RELATED
 

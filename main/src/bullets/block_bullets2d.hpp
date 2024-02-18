@@ -84,7 +84,6 @@ class BlockBullets2D:public MultiMeshInstance2D, public MultiMeshBullets2D{
 
         // SOA vs AOS, I picked SOA, because it offers better cache performance
 
-        std::vector<char> all_is_rotation_enabled; // I am using char instead of bool, because it offers better performance when trying to access it compared to a vector<bool> which packs the boolean values and uses bitwise operations internally (could've used a uint8_t too)
         std::vector<float> all_rotation_speed;
         std::vector<float> all_max_rotation_speed;
         std::vector<float> all_rotation_acceleration;
@@ -110,11 +109,11 @@ class BlockBullets2D:public MultiMeshInstance2D, public MultiMeshBullets2D{
         // The life time of all bullets
         float max_life_time;
         // The current life time being processed
-        float current_life_time;
-        
+        float current_life_time=0.0f;
 
-        void _ready();
-        void _physics_process(float delta);
+        // Contains the necessary logic to move the bullets that are inside the multimesh
+        void move_bullets(float delta);
+
         // Used to spawn brand new bullets.
         void spawn(const Ref<BlockBulletsData2D>& spawn_data, BulletFactory2D* new_factory);
 
@@ -196,7 +195,7 @@ class BlockBullets2D:public MultiMeshInstance2D, public MultiMeshBullets2D{
 
         // Accelerates a bullet's rotation speed
         void accelerate_bullet_rotation_speed(int multi_instance_id, float delta);
-        
+
         static void _bind_methods();
 };
 
