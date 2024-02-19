@@ -42,11 +42,6 @@ void BulletDebugger2D::reset_debugger(){
     set_physics_process(true);
 }
 
-
-void BulletDebugger2D::bullets_entered_container(BlockBullets2D* new_bullets_multi_mesh){
-    new_bullets_multi_mesh->connect("ready", callable_mp(this, &BulletDebugger2D::generate_texture_multimesh)); 
-}
-
 void BulletDebugger2D::generate_texture_multimesh(BlockBullets2D* new_bullets_multi_mesh){
     bullets_multi_meshes.push_back(new_bullets_multi_mesh);
     // Set up a mesh
