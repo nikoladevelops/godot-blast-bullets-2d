@@ -4,7 +4,6 @@
 #include "godot_cpp/classes/node.hpp"
 #include "godot_cpp/classes/multi_mesh.hpp"
 #include "../bullets/multi_mesh_bullets2d.hpp"
-#include "godot_cpp/classes/physics_server2d.hpp"
 #include "godot_cpp/classes/multi_mesh_instance2d.hpp"
 #include "../bullets/block_bullets2d.hpp"
 #include "godot_cpp/classes/weak_ref.hpp"
@@ -37,8 +36,9 @@ class BulletDebugger2D : public Node{
         std::vector<MultiMeshInstance2D*> texture_multi_meshes;
 
 
-        // Executed when bullets entered the bullets container
-        void bullets_entered_container(Node* node);
+        // Executed when a bullets multimesh entered the bullets container
+        void bullets_entered_container(BlockBullets2D* new_bullets_multi_mesh);
+        // Executed when a bullets multimesh is properly set up (when the bullet multimesh's ready signal is emitted). The method generates another multimesh (texture multimesh) that would display the collision shapes of each bullet in the bullet multimesh
         void generate_texture_multimesh(BlockBullets2D* new_bullets_multi_mesh);
 
         void update_instance_transforms(MultiMeshInstance2D* texture_multi, BlockBullets2D* bullets_multi);

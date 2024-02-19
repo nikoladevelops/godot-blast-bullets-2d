@@ -177,7 +177,6 @@ void BlockBullets2D::spawn(const Ref<BlockBulletsData2D>& spawn_data, BulletFact
     finalize_set_up(spawn_data->bullets_custom_data, spawn_data->textures, spawn_data->current_texture_index, spawn_data->material);
 
     factory->bullets_container->add_child(this);
-    emit_signal("spawned");
 }
 
 Ref<SaveDataBlockBullets2D> BlockBullets2D::save(){
@@ -334,7 +333,6 @@ void BlockBullets2D::load(const Ref<SaveDataBlockBullets2D>& data, BulletFactory
     finalize_set_up(data->bullets_custom_data, data->textures, data->current_texture_index, data->material);
 
     factory->bullets_container->add_child(this);
-    emit_signal("spawned");
 }
 
 void BlockBullets2D::enable_bullets_based_on_status(){
@@ -777,5 +775,4 @@ void BlockBullets2D::_bind_methods(){
     
     ClassDB::bind_method(D_METHOD("activate_multimesh", "spawn_data"),&BlockBullets2D::activate_multimesh);
     ClassDB::bind_method(D_METHOD("load", "data","world_space"),&BlockBullets2D::load);
-    ADD_SIGNAL(MethodInfo("spawned"));
 }

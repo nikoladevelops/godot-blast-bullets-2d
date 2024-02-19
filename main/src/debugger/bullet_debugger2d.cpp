@@ -7,6 +7,8 @@
 #include "godot_cpp/classes/window.hpp"
 #include "godot_cpp/classes/quad_mesh.hpp"
 
+#include "godot_cpp/classes/physics_server2d.hpp"
+
 #define physics_server PhysicsServer2D::get_singleton()
 
 using namespace godot;
@@ -22,7 +24,9 @@ void BulletDebugger2D::_ready(){
     }
     
     bullets_container_ptr = bullet_factory_ptr->bullets_container;
-    bullets_container_ptr->connect("child_entered_tree", callable_mp(this, &BulletDebugger2D::bullets_entered_container));
+
+    // When a bullet multimesh gets added to the bullet container run generate_texture_multimesh
+    bullets_container_ptr->connect("child_entered_tree", callable_mp(this, &BulletDebugger2D::generate_texture_multimesh));
 }
 
 void BulletDebugger2D::reset_debugger(){
@@ -39,12 +43,10 @@ void BulletDebugger2D::reset_debugger(){
 }
 
 
-void BulletDebugger2D::bullets_entered_container(Node* node){
-    BlockBullets2D* new_bullets_multi_mesh = reinterpret_cast<BlockBullets2D*>(node);
-
-    new_bullets_multi_mesh->connect("spawned", callable_mp(this, &BulletDebugger2D::generate_texture_multimesh).bind(new_bullets_multi_mesh));
-    
+void BulletDebugger2D::bullets_entered_container(BlockBullets2D* new_bullets_multi_mesh){
+    new_bullets_multi_mesh->connect("ready", callable_mp(this, &BulletDebugger2D::generate_texture_multimesh)); 
 }
+
 void BulletDebugger2D::generate_texture_multimesh(BlockBullets2D* new_bullets_multi_mesh){
     bullets_multi_meshes.push_back(new_bullets_multi_mesh);
     // Set up a mesh
@@ -70,14 +72,14 @@ void BulletDebugger2D::generate_texture_multimesh(BlockBullets2D* new_bullets_mu
 
     for (int i = 0; i < instance_count; i++)
     {
-        multi->set_instance_color(i, Color(0,0,2,0.5));
-        Transform2D transf = physics_server->area_get_shape_transform(area, i);
+        multi->set_instance_color(i, Color(0,0,2,0.8));
+        Transform2D& transf = new_bullets_multi_mesh->all_cached_shape_transforms[i];
         multi->set_instance_transform_2d(i,transf);
     }
     
 
-    texture_multi_meshes.push_back(texture_multi_instance); // make sure to actually add it to the array that stores them
-    add_child(texture_multi_instance); // add it as a child, so that it is in the game
+    texture_multi_meshes.push_back(texture_multi_instance); // store it in the vector
+    add_child(texture_multi_instance); 
 }
 
 
@@ -85,11 +87,10 @@ void BulletDebugger2D::update_instance_transforms(
     MultiMeshInstance2D* texture_multi, 
     BlockBullets2D* bullets_multi){
     
-    RID area = bullets_multi->area;
     Ref<MultiMesh> texture_inner_multi = texture_multi->get_multimesh();
-    for (int i = 0; i < texture_multi->get_multimesh()->get_instance_count(); i++)
+    for (int i = 0; i < texture_inner_multi->get_instance_count(); i++)
     { 
-        Transform2D bullet_collision_shape_transf = physics_server->area_get_shape_transform(area,i);
+        Transform2D& bullet_collision_shape_transf = bullets_multi->all_cached_shape_transforms[i];
         texture_inner_multi->set_instance_transform_2d(i, bullet_collision_shape_transf);
     }
 }
