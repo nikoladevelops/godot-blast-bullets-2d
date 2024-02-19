@@ -16,41 +16,34 @@ using namespace godot;
 class BulletDebugger2D : public Node{
     GDCLASS(BulletDebugger2D, Node)
 
-    // A pointer to where the multi mesh bullets are stored in. This has to be refactored a lil bit
-    Node* bullets_container_ptr;
-
-    // The factory that the debugger is watching
-    NodePath bullet_factory;
-    // The pointer to the bullet factory
-    BulletFactory2D* bullet_factory_ptr;
-
-    // Determines whether the debugger is enabled or not.
-    bool is_enabled = false;
-    // Stores all multi mesh bullets' pointers, so that it can monitor their collision shapes.
-    std::vector<BlockBullets2D*> bullets_multi_meshes;
-    // Stores all spawned multi mesh's pointers for the visualization of the collision shapes.
-    std::vector<MultiMeshInstance2D*> texture_multi_meshes;
-
     public:
+        // The pointer to the bullet factory
+        BulletFactory2D* bullet_factory_ptr;
+
+        // Determines whether the debugger is enabled or not.
+        bool is_enabled = false;
+
         void _ready();
         void _physics_process(float delta);
-
-        NodePath get_bullet_factory() const;
-        void set_bullet_factory(const NodePath& new_bullet_factory);
-
-        bool get_is_enabled();
-        void set_is_enabled(bool new_is_enabled);
-
+        // Clears all bullet collision shapes
+        void reset_debugger();
     private:
+        // A pointer to where the multi mesh bullets are stored in. This has to be refactored a lil bit
+        Node* bullets_container_ptr;
+
+        // Stores all multi mesh bullets' pointers, so that it can monitor their collision shapes.
+        std::vector<BlockBullets2D*> bullets_multi_meshes;
+        // Stores all spawned multi mesh's pointers for the visualization of the collision shapes.
+        std::vector<MultiMeshInstance2D*> texture_multi_meshes;
+
+
         // Executed when bullets entered the bullets container
         void bullets_entered_container(Node* node);
         void generate_texture_multimesh(BlockBullets2D* new_bullets_multi_mesh);
 
         void update_instance_transforms(MultiMeshInstance2D* texture_multi, BlockBullets2D* bullets_multi);
-        void reset_debugger();
-
     protected:
-        static void _bind_methods();
+        static void _bind_methods(){};
 };
 
 

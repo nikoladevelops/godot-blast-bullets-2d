@@ -7,7 +7,9 @@
 #include "../save-data/save_data_bullet_factory2d.hpp"
 #include <queue>
 
-class BlockBullets2D; // using forward declaration to avoid circular dependencies
+// using forward declaration to avoid circular dependencies
+class BlockBullets2D;
+class BulletDebugger2D;
 
 using namespace godot;
 
@@ -19,6 +21,8 @@ class BulletFactory2D:public Node2D{
         RID physics_space;
         // Contains all bullet multi meshes. This is where the multimeshes get added as a child when calling a spawn method.
         Node* bullets_container;
+        // The bullet debugger. It is enabled only if is_debugger_enabled is set to true
+        BulletDebugger2D* debugger;
         
         void _ready();
 
@@ -28,9 +32,10 @@ class BulletFactory2D:public Node2D{
         RID get_physics_space() const;
         void set_physics_space(RID new_space_rid);
 
+        // Generates a Resource that contains every bullet's state
         Ref<SaveDataBulletFactory2D> save();
 
-        // You should consider calling this method using .call_deferred() to avoid crashes
+        // Loads bullets by using a Resource that contains every bullet's state. You should consider calling this method using .call_deferred() to avoid crashes
         void load(Ref<SaveDataBulletFactory2D> new_data);
 
         // Adds BlockBullets2D to pool
@@ -41,6 +46,11 @@ class BulletFactory2D:public Node2D{
         // Clears all bullets. You should consider calling this method using .call_deferred() to avoid crashes
         void clear_all_bullets();
 
+        // Determines whether the debugger is enabled or not.
+        bool is_debugger_enabled = false;
+        
+        bool get_is_debugger_enabled();
+        void set_is_debugger_enabled(bool new_is_enabled);
     protected:
         static void _bind_methods();
     private:

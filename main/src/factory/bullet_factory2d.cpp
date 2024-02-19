@@ -8,6 +8,8 @@
 #include "../bullets/block_bullets2d.hpp" 
 #include "godot_cpp/classes/engine.hpp"
 
+#include "../debugger/bullet_debugger2d.hpp"
+
 using namespace godot;
 
 void BulletFactory2D::_ready(){
@@ -18,6 +20,13 @@ void BulletFactory2D::_ready(){
     bullets_container->set_name("BulletsContainer");
 
     add_child(bullets_container);
+
+    if(is_debugger_enabled){
+        debugger=memnew(BulletDebugger2D);
+        debugger->is_enabled=true;
+        debugger->bullet_factory_ptr = this;
+        add_child(debugger);
+    }
 
     if(physics_space.is_valid() == false){
         physics_space = get_world_2d()->get_space();
@@ -98,7 +107,10 @@ BlockBullets2D* BulletFactory2D::remove_bullets_from_pool(int key){
 }
 
 void BulletFactory2D::clear_all_bullets(){
-    emit_signal("bullets_got_cleared");
+    // It's important to reset the debugger
+    if(debugger != nullptr){
+        debugger->reset_debugger();
+    }
     TypedArray<Node> allCurrentBullets = bullets_container->get_children();
     
     int size = allCurrentBullets.size();
@@ -114,11 +126,23 @@ void BulletFactory2D::clear_all_bullets(){
     block_bullets_pool.clear();
 }
 
+bool BulletFactory2D::get_is_debugger_enabled(){
+    return is_debugger_enabled;
+}
+
+void BulletFactory2D::set_is_debugger_enabled(bool new_is_enabled){
+    is_debugger_enabled=new_is_enabled;
+}
+
 void BulletFactory2D::_bind_methods(){
     ClassDB::bind_method(D_METHOD("get_physics_space"), &BulletFactory2D::get_physics_space);
     ClassDB::bind_method(D_METHOD("set_physics_space", "new_physics_space"), &BulletFactory2D::set_physics_space);
     ADD_PROPERTY(PropertyInfo(Variant::RID, "physics_space"), "set_physics_space", "get_physics_space");
 
+    ClassDB::bind_method(D_METHOD("get_is_debugger_enabled"), &BulletFactory2D::get_is_debugger_enabled);
+    ClassDB::bind_method(D_METHOD("set_is_debugger_enabled", "new_is_enabled"), &BulletFactory2D::set_is_debugger_enabled);
+    ADD_PROPERTY(PropertyInfo(Variant::BOOL, "is_debugger_enabled"), "set_is_debugger_enabled", "get_is_debugger_enabled");
+    
     ClassDB::bind_method(D_METHOD("spawnBlockBullets2D", "spawn_data"), &BulletFactory2D::spawnBlockBullets2D);
 
     ClassDB::bind_method(D_METHOD("save"), &BulletFactory2D::save);
@@ -128,6 +152,4 @@ void BulletFactory2D::_bind_methods(){
 
     ADD_SIGNAL(MethodInfo("area_entered", PropertyInfo(Variant::OBJECT, "area"), PropertyInfo(Variant::OBJECT, "custom_resource"), PropertyInfo(Variant::TRANSFORM2D, "bullet_last_transform")));
     ADD_SIGNAL(MethodInfo("body_entered", PropertyInfo(Variant::OBJECT, "body"), PropertyInfo(Variant::OBJECT, "custom_resource"), PropertyInfo(Variant::TRANSFORM2D, "bullet_last_transform")));
-    // I need this signal so that the bullet debugger knows when to clear its vectors containing pointers as well as freeing the generated texture multimeshes
-    ADD_SIGNAL(MethodInfo("bullets_got_cleared"));
 }

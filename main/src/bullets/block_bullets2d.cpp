@@ -177,8 +177,6 @@ void BlockBullets2D::spawn(const Ref<BlockBulletsData2D>& spawn_data, BulletFact
     finalize_set_up(spawn_data->bullets_custom_data, spawn_data->textures, spawn_data->current_texture_index, spawn_data->material);
 
     factory->bullets_container->add_child(this);
-    
-    factory->all_bullets.push_back(this);
     emit_signal("spawned");
 }
 
@@ -336,7 +334,6 @@ void BlockBullets2D::load(const Ref<SaveDataBlockBullets2D>& data, BulletFactory
     finalize_set_up(data->bullets_custom_data, data->textures, data->current_texture_index, data->material);
 
     factory->bullets_container->add_child(this);
-    factory->all_bullets.push_back(this);
     emit_signal("spawned");
 }
 
