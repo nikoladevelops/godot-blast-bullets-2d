@@ -134,6 +134,8 @@ class BlockBullets2D:public MultiMeshInstance2D, public MultiMeshBullets2D{
         void area_entered_func(int status, RID entered_rid, uint64_t entered_instance_id, int entered_shape_index, int bullet_shape_index);
         void body_entered_func(int status, RID entered_rid, uint64_t entered_instance_id, int entered_shape_index, int bullet_shape_index);
 
+        // Safely delete the bullet
+        void safe_delete();
     protected:
         // BULLET STATE METHODS
         

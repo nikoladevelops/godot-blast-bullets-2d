@@ -35,7 +35,7 @@ class BulletFactory2D:public Node2D{
         // Generates a Resource that contains every bullet's state
         Ref<SaveDataBulletFactory2D> save();
 
-        // Loads bullets by using a Resource that contains every bullet's state. You should consider calling this method using .call_deferred() to avoid crashes
+        // Loads bullets by using a Resource that contains every bullet's state
         void load(Ref<SaveDataBulletFactory2D> new_data);
 
         // Adds BlockBullets2D to pool
@@ -43,10 +43,10 @@ class BulletFactory2D:public Node2D{
         // Retrieves BlockBullets2D from pool
         BlockBullets2D* remove_bullets_from_pool(int key);
 
-        // Clears all bullets. You should consider calling this method using .call_deferred() to avoid crashes
+        // Clears all bullets. 
         void clear_all_bullets();
 
-        // Determines whether the debugger is enabled or not.
+        // Determines whether the debugger is enabled or not
         bool is_debugger_enabled = false;
         
         bool get_is_debugger_enabled();

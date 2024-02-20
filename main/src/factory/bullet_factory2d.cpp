@@ -116,10 +116,9 @@ void BulletFactory2D::clear_all_bullets(){
     int size = allCurrentBullets.size();
 
     for (int i = 0; i < size; i++) {
-        Node* curr_bullet = Object::cast_to<Node>(allCurrentBullets[i]);
-
+        BlockBullets2D* curr_bullet = Object::cast_to<BlockBullets2D>(allCurrentBullets[i]);
         if(curr_bullet != nullptr){
-            curr_bullet->queue_free();
+            curr_bullet->safe_delete();
         }
     }
 

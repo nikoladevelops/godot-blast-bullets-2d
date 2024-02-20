@@ -769,6 +769,12 @@ void BlockBullets2D::body_entered_func(int status, RID entered_rid, uint64_t ent
     }
 }
 
+void BlockBullets2D::safe_delete(){
+    physics_server->area_set_area_monitor_callback(area, Variant());
+    physics_server->area_set_monitor_callback(area, Variant());
+    queue_free();
+}
+
 void BlockBullets2D::_bind_methods(){
     ClassDB::bind_method(D_METHOD("spawn", "spawn_data", "world_space"),&BlockBullets2D::spawn);
     ClassDB::bind_method(D_METHOD("save"), &BlockBullets2D::save);
