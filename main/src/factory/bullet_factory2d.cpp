@@ -86,8 +86,6 @@ void BulletFactory2D::load(Ref<SaveDataBulletFactory2D> new_data){
 
 void BulletFactory2D::add_bullets_to_pool(BlockBullets2D* new_bullets){
     int key = new_bullets->size;
-    auto result = block_bullets_pool.find(key);
-
     block_bullets_pool[key].push(new_bullets);
 }
 
