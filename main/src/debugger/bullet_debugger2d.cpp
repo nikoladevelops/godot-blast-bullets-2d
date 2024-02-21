@@ -1,12 +1,7 @@
 #include "bullet_debugger2d.hpp"
-#include "../bullets/block_bullets2d.hpp"
-#include "godot_cpp/variant/utility_functions.hpp"
+
 #include "godot_cpp/classes/engine.hpp"
-
-#include "godot_cpp/classes/scene_tree.hpp"
-#include "godot_cpp/classes/window.hpp"
 #include "godot_cpp/classes/quad_mesh.hpp"
-
 #include "godot_cpp/classes/physics_server2d.hpp"
 
 #define physics_server PhysicsServer2D::get_singleton()
@@ -17,15 +12,7 @@ void BulletDebugger2D::_ready(){
         return;
     }
 
-    if(is_enabled == false){
-        set_physics_process(false);
-        set_process(false);
-        return;
-    }
-    
-    bullets_container_ptr = bullet_factory_ptr->bullets_container;
-
-    // When a bullet multimesh gets added to the bullet container run generate_texture_multimesh
+    // When a bullet multimesh gets added to the bullet container, run generate_texture_multimesh
     bullets_container_ptr->connect("child_entered_tree", callable_mp(this, &BulletDebugger2D::generate_texture_multimesh));
 }
 

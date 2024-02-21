@@ -20,9 +20,9 @@ class BulletFactory2D:public Node2D{
         // The physics space where the bullets multimeshes are interacting with the world.
         RID physics_space;
         // Contains all bullet multi meshes. This is where the multimeshes get added as a child when calling a spawn method.
-        Node* bullets_container;
+        Node* bullets_container = nullptr;
         // The bullet debugger. It is enabled only if is_debugger_enabled is set to true
-        BulletDebugger2D* debugger;
+        BulletDebugger2D* debugger = nullptr;
         
         void _ready();
 

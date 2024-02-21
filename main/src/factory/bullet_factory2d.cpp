@@ -16,6 +16,11 @@ void BulletFactory2D::_ready(){
     if(Engine::get_singleton()->is_editor_hint()){
         return;
     }
+
+    if(physics_space.is_valid() == false){
+        physics_space = get_world_2d()->get_space();
+    }
+
     bullets_container = memnew(Node);
     bullets_container->set_name("BulletsContainer");
 
@@ -23,18 +28,12 @@ void BulletFactory2D::_ready(){
 
     if(is_debugger_enabled){
         debugger=memnew(BulletDebugger2D);
-        debugger->is_enabled=true;
-        debugger->bullet_factory_ptr = this;
+        debugger->bullets_container_ptr = bullets_container;
         add_child(debugger);
-    }
-
-    if(physics_space.is_valid() == false){
-        physics_space = get_world_2d()->get_space();
     }
 }
 
 void BulletFactory2D::spawnBlockBullets2D(const Ref<BlockBulletsData2D> spawn_data){
-    bullets_container->set_physics_process(false);
     int key = spawn_data->transforms.size();
     
     BlockBullets2D* bullets = remove_bullets_from_pool(key);
@@ -71,7 +70,7 @@ Ref<SaveDataBulletFactory2D> BulletFactory2D::save(){
         // Saves only the active bullets currently
         data->all_block_bullets.push_back(bullet_instance.save());
     }
-
+    emit_signal("finished_saving");
     return data;
 }
 void BulletFactory2D::load(Ref<SaveDataBulletFactory2D> new_data){
@@ -82,6 +81,7 @@ void BulletFactory2D::load(Ref<SaveDataBulletFactory2D> new_data){
         BlockBullets2D* blk_instance = memnew(BlockBullets2D);
         blk_instance->load(new_data->all_block_bullets[i], this);
     }
+    emit_signal("finished_loading");
 }
 
 void BulletFactory2D::add_bullets_to_pool(BlockBullets2D* new_bullets){
@@ -123,6 +123,7 @@ void BulletFactory2D::clear_all_bullets(){
     }
 
     block_bullets_pool.clear();
+    emit_signal("finished_clearing");
 }
 
 bool BulletFactory2D::get_is_debugger_enabled(){
@@ -151,4 +152,8 @@ void BulletFactory2D::_bind_methods(){
 
     ADD_SIGNAL(MethodInfo("area_entered", PropertyInfo(Variant::OBJECT, "area"), PropertyInfo(Variant::OBJECT, "custom_resource"), PropertyInfo(Variant::TRANSFORM2D, "bullet_last_transform")));
     ADD_SIGNAL(MethodInfo("body_entered", PropertyInfo(Variant::OBJECT, "body"), PropertyInfo(Variant::OBJECT, "custom_resource"), PropertyInfo(Variant::TRANSFORM2D, "bullet_last_transform")));
+
+    ADD_SIGNAL(MethodInfo("finished_saving"));
+    ADD_SIGNAL(MethodInfo("finished_loading"));
+    ADD_SIGNAL(MethodInfo("finished_clearing"));
 }
