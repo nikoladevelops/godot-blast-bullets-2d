@@ -86,9 +86,10 @@ class BlockBulletsData2D : public Resource{
         // Custom mesh, if it isn't provided then a Quadmesh will be generated and it will use the texture_size. If you DO provide a mesh then you should handle the scaling of the bullets yourself using a shader for best quality.
         Ref<Mesh> mesh;
         
+        // Used to acquire a bitmask from an array of integer values. Useful when setting the collision layer and collision mask. Example: you want your bullets to be in collision layer 1,2,3,7, you would pass an array of these numbers and the value that gets returned is the value you need to set to the collision_layer. Pass ONLY POSITIVE NUMBERS (NEVER PASS NEGATIVE OR ZERO)
+        static int calculate_bitmask(const TypedArray<int>& numbers);
 
         // GETTERS AND SETTERS
-
         TypedArray<Transform2D> get_transforms() const;
         void set_transforms(TypedArray<Transform2D> new_transforms);
         

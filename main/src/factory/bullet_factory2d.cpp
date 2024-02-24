@@ -148,8 +148,8 @@ void BulletFactory2D::_bind_methods(){
 
     ClassDB::bind_method(D_METHOD("clear_all_bullets"), &BulletFactory2D::clear_all_bullets);
 
-    ADD_SIGNAL(MethodInfo("area_entered", PropertyInfo(Variant::OBJECT, "area"), PropertyInfo(Variant::OBJECT, "custom_resource"), PropertyInfo(Variant::TRANSFORM2D, "bullet_last_transform")));
-    ADD_SIGNAL(MethodInfo("body_entered", PropertyInfo(Variant::OBJECT, "body"), PropertyInfo(Variant::OBJECT, "custom_resource"), PropertyInfo(Variant::TRANSFORM2D, "bullet_last_transform")));
+    ADD_SIGNAL(MethodInfo("area_entered", PropertyInfo(Variant::OBJECT, "enemy_area"), PropertyInfo(Variant::OBJECT, "bullets_custom_data", PROPERTY_HINT_RESOURCE_TYPE, "Resource"), PropertyInfo(Variant::VECTOR2, "bullet_global_position")));
+    ADD_SIGNAL(MethodInfo("body_entered", PropertyInfo(Variant::OBJECT, "enemy_body"), PropertyInfo(Variant::OBJECT, "bullets_custom_data", PROPERTY_HINT_RESOURCE_TYPE, "Resource"), PropertyInfo(Variant::VECTOR2, "bullet_global_position")));
 
     ADD_SIGNAL(MethodInfo("finished_saving"));
     ADD_SIGNAL(MethodInfo("finished_loading"));

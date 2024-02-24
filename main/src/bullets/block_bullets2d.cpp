@@ -757,7 +757,7 @@ void BlockBullets2D::area_entered_func(int status, RID entered_rid, uint64_t ent
         Object* obj = ObjectDB::get_instance(entered_instance_id);
         disable_bullet(bullet_shape_index);
         // another option would be to emit a signal here, and then the factory to register a callback for it and then emit its own signal, but I felt that it would be slower and also very messy, I also thought of keeping pointers to outside functions, but again its messier. Best solution I feel like is just keeping a pointer to the factory itself, which also allows me to call pool methods.
-        factory->emit_signal("area_entered", obj, bullets_custom_data, multi->get_instance_transform_2d(bullet_shape_index));
+        factory->emit_signal("area_entered", obj, bullets_custom_data, all_cached_instance_transforms[bullet_shape_index].get_origin());
     }   
 }
 
@@ -765,7 +765,7 @@ void BlockBullets2D::body_entered_func(int status, RID entered_rid, uint64_t ent
     if(status == PhysicsServer2D::AREA_BODY_ADDED ){
         Object* obj = ObjectDB::get_instance(entered_instance_id);
         disable_bullet(bullet_shape_index);
-        factory->emit_signal("body_entered", obj, bullets_custom_data, multi->get_instance_transform_2d(bullet_shape_index));
+        factory->emit_signal("body_entered", obj, bullets_custom_data, all_cached_instance_transforms[bullet_shape_index].get_origin());
     }
 }
 
