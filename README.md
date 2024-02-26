@@ -5,7 +5,7 @@ The library comes pre-compiled for:
 - <b>Windows (x86_64, arm64)</b>
 - <b>Android (x86_64, arm64)</b>
 - <b>Linux (x86_64)</b>
-- <b>Web</b><br>
+- <b>Web</b>
 
 <b>BlastBullets2D</b> should work for <b>IOS</b> and <b>MacOS</b> too, but you have to compile the code yourself.
 
@@ -15,7 +15,7 @@ This means that you <b>DON'T NEED to know C++ at all</b> to use it! Everything i
 In short, use <b>BlastBullets2D</b> if you are looking for optimized bullets performance in <b>Godot</b> or if you want saving and loading of bullets' state. It is <b>EXTREMELY</b> more optimized compared to using an `Area2D` with an `AnimationPlayer`.
 
 <details>
-<summary><h3>Features</h3></summary>
+<summary><b>BlastBullets2D</b> Features</summary>
 
 - Efficient rendering by using `MultiMeshInstance2D`
 - Improved performance by using **object pooling**
@@ -77,7 +77,7 @@ The `transforms` property requires an array of `Transform2D`, where each entry d
 
 # Documentation
 <details>
-<summary><h3>BlockBulletsData2D</h3></summary>
+<summary>BlockBulletsData2D</summary>
 
 ### Texture Settings
 
@@ -133,7 +133,7 @@ extends Resource
 </details>
 
 <details>
-<summary><h3>BulletFactory2D</h3></summary>
+<summary>BulletFactory2D</summary>
   
 ### Properties
 
@@ -227,7 +227,7 @@ In short, use the `spawnBlockBullets2D()` with `BlockBulletsData2D` that has `tr
 </details>
 
 <details>
-  <summary><h3>Compilation instructions</h3></summary>
+  <summary>Compilation instructions</summary>
 
 1. Download source code with included <b>godot_cpp</b> submodule.
 
