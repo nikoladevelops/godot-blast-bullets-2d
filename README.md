@@ -115,7 +115,7 @@ Use the static method `BulletRotationData.generate_random_data()` to easily gene
 - `collision_mask`: Bitmask for collision mask. Use the static method `BlockBulletsData2D.calculate_bitmask()` to easily get a bitmask. <b>NEVER</b> set this to 0 or negative number.
 - `collision_shape_size`: Size of collision shape (rectangle). Default: `Vector2(5,5)`. If you want your collision shape to be bigger/smaller then change this.
 - `collision_shape_offset`: Offset of collision shape. If you want your collision shape to be positioned away from the center of the texture then change this.
-- `monitorable`: If `true`, enables body detection. I suggest you <b>DO NOT</b> use this. It will make it possible for your bullets to detect bodies, but it <b>DECREASES PERFORMANCE A LOT</b>. A good workaround is to always have an `Area2D` on your enemies, that has `monitorable` set to `true` and `monitoring` set to `false`. This `Area2D` will act as the place where bullets can hit.
+- `monitorable`: If `true`, enables `StaticBody2D` detection. I suggest you <b>DO NOT</b> use this. It will make it possible for your bullets to detect `StaticBody2D`, but it <b>DECREASES PERFORMANCE A LOT</b>. A good workaround is to always have an `Area2D` on your static bodies, that has `monitorable` set to `true` and `monitoring` set to `false`. This `Area2D` will act as the place where bullets can hit. Note that even though `monitorable` is set to `false` by default, the bullets will still be able to interact with `CharacterBody2D` and `RigidBody2D` bodies, the exception is only `StaticBody2D`, so follow my advice.
 - `bullets_custom_data`: Additional data for bullets. If you want your bullets to have damage or anything else specific then you do this -> Create a class script that extends Resource -> Put `@export` variables inside like damage/armor_damage or whatever else you need (the `@export` keyword is extremely important otherwise the data won't be saved!) -> Create a new instance of your class (example: MyCustomResource.new()) -> populate the properties -> pass it inside here. Congrats, now you can access your custom_data from the `area_entered` and `body_entered` function callbacks inside the `factory`!
 
 Example of a <b>Custom Resource</b> class:
@@ -205,7 +205,7 @@ Example of implemented callbacks that use `area_entered` and `body_entered`:
 ```
 func _on_bullet_factory_2d_area_entered(enemy_area, bullets_custom_data:Resource, bullet_global_position:Vector2):
   if bullets_custom_data is DamageData: # maybe you have bullets that have other bullets_custom_data types and you have individual logic for each?
-    var actualEnemy = enemy_area.get_parent() # if the Area2D was added just how I recommended to AVOID setting monitorable to true
+    var actualEnemy = enemy_area.get_parent() # if the Area2D was added just how I recommended to AVOID setting monitorable to true, you can get the parent of the area which will be the static body you want to damage
     #if (actualEnemy is CustomEnemyType)
     # apply bonus damage or don't apply magic damage or any other complex logic
     # maybe check if actualEnemy.immunityArray() contains bullets_custom_data.type or something like that, you can do pretty much anything
