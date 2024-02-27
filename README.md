@@ -1,4 +1,10 @@
-# Purpose
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/nikoladevelops/godot-blast-bullets-2d/main/blast_bullets_2d.png" alt="BlastBullets2D - Logo" width="200"/>
+</p>
+
+
+### Purpose
 <b>BlastBullets2D</b> is a library written in <b>C++</b> for [Godot Engine](https://godotengine.org) that makes spawning and moving a huge amount of bullets a very efficient operation. Not only performance is increased <b>SIGNIFICANTLY</b>, but you also get the functionality
 of <b>SAVING</b>/<b>LOADING</b> the bullets' state through easy to use `save()` and `load()` functions. 
 The library comes pre-compiled for:
@@ -7,7 +13,7 @@ The library comes pre-compiled for:
 - <b>Linux (x86_64)</b>
 - <b>Web</b>
 
-<b>BlastBullets2D</b> should work for <b>IOS</b> and <b>MacOS</b> too, but you have to compile the code yourself.
+<b>BlastBullets2D</b> should work for <b>IOS</b> and <b>macOS</b> too, but you have to compile the code yourself.
 
 The library is used inside your <b>Godot Engine</b> project just how you use any other <b>Node</b> and <b>Script</b>.
 This means that you <b>DON'T NEED to know C++ at all</b> to use it! Everything is done by writing code in <b>GDScript</b> that calls the custom <b>C++</b> functions. This is made possible through Godot's [GDExtension](https://docs.godotengine.org/en/stable/tutorials/scripting/gdextension/what_is_gdextension.html) technology.
@@ -48,7 +54,7 @@ git clone --recurse-submodules https://github.com/nikoladevelops/godot-blast-bul
 5. Close <b>Godot</b> and open the project again.
 
 # How to use
-1. Add a `BulletFactory2D` node to your scene tree. The BulletFactory's job is to spawn bullets <br> (I recommend making it into an [Autoload/Singleton](https://docs.godotengine.org/en/stable/tutorials/scripting/singletons_autoload.html) so you can spawn bullets from any script).
+1. Add a `BulletFactory2D` node to your scene tree. The BulletFactory's job is to spawn bullets <br> (I suggest creating an [Autoload/Singleton](https://docs.godotengine.org/en/stable/tutorials/scripting/singletons_autoload.html) so you can spawn bullets from any script).
 2. Create a script.
 3. Inside the script create a `BlockBulletsData2D` and set up its properties according to the documentation.
 Example:
@@ -296,13 +302,13 @@ scons platform=web target=template_debug
 scons platform=web target=template_release
 ```
 
-### For IOS and MacOS
+### For IOS and macOS
 Due to me not having these OS-es I can only give you short instructions on what to look for and which files you need to edit.
 
 First of all this whole library relies on <b>GDExtension</b> so it has a <b>.gdextension</b> file with path locations of the binaries it needs to load.
 See [godot_cpp's .gdextension file](https://github.com/godotengine/godot-cpp/blob/master/test/project/example.gdextension) vs [mine](https://github.com/nikoladevelops/godot-blast-bullets-2d/blob/main/.gdextension).
 Also notice how their <b>SConstruct</b> file differs from mine and add the missing logic: [theirs](https://github.com/godotengine/godot-cpp/blob/master/test/SConstruct) vs [mine](https://github.com/nikoladevelops/godot-blast-bullets-2d/blob/main/.gdextension).
-Research on which toolchain you need for <b>IOS</b> and for <b>MacOS</b>, download them and then run the same scons commands, but for your desired platform and other desired arguments.
+Research on which toolchain you need for <b>IOS</b> and for <b>macOS</b>, download them and then run the same scons commands, but for your desired platform and other desired arguments.
 See the official [GDExtension Documentation](https://docs.godotengine.org/en/stable/tutorials/scripting/gdextension/index.html) or search for some tutorials online. Sadly <b>GDExtenstion</b> is not well documented, so you might spend some time searching. I recommend joining <b>Godot's Discord Server</b> it has a <b>gdnative-gdextension channel</b> so you might find some help there.
   
 </details>
