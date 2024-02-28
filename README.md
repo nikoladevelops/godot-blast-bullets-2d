@@ -73,6 +73,7 @@ Example:
 ```
 factory.spawnBlockBullets2D(data)
 ```
+<b>You can view a [Demo Project](https://github.com/nikoladevelops/demo-project-blast-bullets-2d) to see how the library is used</b>
 
 # Simple set up explanation
 The mandatory properties that you need to set for `BlockBulletsData2D` are: `transforms` and `all_bullet_speed_data`.
