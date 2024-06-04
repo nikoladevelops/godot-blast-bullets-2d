@@ -42,7 +42,7 @@ In short, use <b>BlastBullets2D</b> if you are looking for optimized bullets per
 
 </details>
 
-# Install instructions
+# Install instructions (FOR GODOT 4.1 AND 4.2)
 1. Download zip and extract it. If however you plan on making changes and compiling the C++ code yourself in the future, then ensure that <b>godot_cpp</b> is also included by running this command:
 ```
 git clone --recurse-submodules https://github.com/nikoladevelops/godot-blast-bullets-2d.git
