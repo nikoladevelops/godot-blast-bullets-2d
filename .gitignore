@@ -3,3 +3,4 @@
 *.o
 .sconsign.dblite
 *.import
+/bin
