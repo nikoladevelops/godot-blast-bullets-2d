@@ -13,7 +13,7 @@
 using namespace godot;
 
 BlockBullets2D::~BlockBullets2D(){
-    // For some reason the destructor runs on project start up by default, so avoid doing that
+    //For some reason the destructor runs on project start up by default, so avoid doing that
     if(Engine::get_singleton()->is_editor_hint()){
         return;
     }
@@ -71,7 +71,7 @@ _ALWAYS_INLINE_ void BlockBullets2D::move_bullets(float delta){
             Vector2& curr_shape_origin = all_cached_shape_origin[i];
 
             curr_instance_origin += all_cached_velocity[i] * delta; 
-            curr_shape_origin += all_cached_velocity[i] *delta;
+            curr_shape_origin += all_cached_velocity[i] * delta;
 
             curr_instance_transf.set_origin(curr_instance_origin);
             curr_shape_transf.set_origin(curr_shape_origin);

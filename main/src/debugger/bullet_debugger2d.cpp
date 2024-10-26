@@ -8,10 +8,6 @@
 
 using namespace godot;
 void BulletDebugger2D::_ready(){
-    if(Engine::get_singleton()->is_editor_hint()){
-        return;
-    }
-
     // When a bullet multimesh gets added to the bullet container, run generate_texture_multimesh
     bullets_container_ptr->connect("child_entered_tree", callable_mp(this, &BulletDebugger2D::generate_texture_multimesh));
 }

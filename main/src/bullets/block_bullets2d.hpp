@@ -8,109 +8,20 @@
 #include "./multi_mesh_bullets2d.hpp"
 #include "../shared/bullet_rotation_data.hpp"
 
-class BulletFactory2D;
-
 using namespace godot;
 
-class BlockBullets2D:public MultiMeshInstance2D, public MultiMeshBullets2D{
-    GDCLASS(BlockBullets2D, MultiMeshInstance2D);
+class BlockBullets2D: public MultiMeshBullets2D{
+    GDCLASS(BlockBullets2D, MultiMeshBullets2D);
     
     public:
         ~BlockBullets2D();
 
-        // TEXTURE RELATED
-
-        // Holds all textures
-        TypedArray<Texture2D> textures;
-
-        // Time before the texture gets changed to the next one. If 0 it means that the timer is not active
-        float max_change_texture_time = 0.0f;
-
-        // The change texture time being processed now
-        float current_change_texture_time;
-
-        // Holds the current texture index (the index inside the array textures)
-        int current_texture_index;
-        
-        // This is the texture size of the bullets
-        Vector2 texture_size = Vector2(0,0);
-
-        // BULLET SPEED RELATED
-        std::vector<float> all_cached_speed;
-        std::vector<float> all_cached_max_speed;
-        std::vector<float> all_cached_acceleration;
-
-        // BULLET MOVEMENT RELATED
-
-        // It will be set to true automatically if only a single BulletSpeedData was provided OR if the amount of BulletSpeedData provided was not equal to transforms.size(). It basically means that all bullets will have the same speed/max_speed/acceleration, so an optimization where the multimesh itself will be moved is applied (bullets move as a block in the same direction which is determined by block_rotation_radians)
-        bool use_block_rotation_radians = false;
-
+        bool use_block_rotation_radians;
         // The block rotation. The direction of the bullets is determined by it. Only used if use_block_rotation_radians is set to true
         float block_rotation_radians;
 
-        // Cached multimesh instance position. Used only if use_block_rotation_radians is true
+        // Cached multimesh instance position.
         Vector2 current_position;
-
-        // Holds all multimesh instance transforms. I am doing this so I don't have to call multi->get_instance_transform_2d() every frame
-        std::vector<Transform2D> all_cached_instance_transforms;
-        
-        // Holds all collision shape transforms. I am doing this so I don't have to call physics_server->area_get_shape_transform() every frame
-        std::vector<Transform2D> all_cached_shape_transforms;
-
-        // Holds all multimesh instance transform origin vectors. I am doing this so I don't have to call .get_origin() every frame
-        std::vector<Vector2> all_cached_instance_origin;
-        
-        // Holds all collision shape transform origin vectors. I am doing this so I don't have to call .get_origin() every frame
-        std::vector<Vector2> all_cached_shape_origin;
-
-        // Holds all calculated velocities for the bullets. I am doing this to avoid unnecessary calculations. If I know the direction -> calculate the velocity. Update the values only when the velocity changes, otherwise it's just unnecessary to always do Vector2(cos, sin) every frame..
-        std::vector<Vector2> all_cached_velocity;
-
-        // Holds all cached directions of the bullets
-        std::vector<Vector2> all_cached_direction;
-
-        // COLLISION RELATED
-
-        // Saves whether the bullets can detect bodies or not
-        bool monitorable;
-
-        // Holds a boolean value for each bullet that indicates whether its active
-        std::vector<char> bullets_enabled_status;
-
-        // Counts all active bullets. If equal to size, every single bullet will be disabled.
-        int active_bullets_counter=0;
-
-        // ROTATION RELATED
-
-        // SOA vs AOS, I picked SOA, because it offers better cache performance
-
-        std::vector<float> all_rotation_speed;
-        std::vector<float> all_max_rotation_speed;
-        std::vector<float> all_rotation_acceleration;
-        
-        // If set to false it will also rotate the collision shapes
-        bool rotate_only_textures;
-        // Important. Determines if there was valid rotation data passed, if its true it means the rotation logic will work.
-        bool is_rotation_active;
-        // If true it means that only a single BulletRotationData was provided, so it will be used for each bullet. If false it means that we have BulletRotationData for each bullet. It is determined by the amount of BulletRotationData passed to spawn()
-        bool use_only_first_rotation_data=false;
-
-        // OTHER
-
-        // Pointer to the multimesh instead of always calling the get method
-        MultiMesh* multi;
-
-        // The factory by which the bullets were spawned.
-        BulletFactory2D* factory;
-
-        // The user can pass any custom data they desire and have access to it in the area_entered and body_entered function callbacks
-        Ref<Resource> bullets_custom_data;
-
-        // The life time of all bullets
-        float max_life_time;
-        // The current life time being processed
-        float current_life_time=0.0f;
-
 
         void _physics_process(float delta);
         // Contains the necessary logic to move the bullets that are inside the multimesh

@@ -1,12 +1,5 @@
-/* godot-cpp integration testing project.
- *
- * This is free and unencumbered software released into the public domain.
- */
-
 #include "register_types.h"
-
 #include <gdextension_interface.h>
-
 #include <godot_cpp/core/class_db.hpp>
 #include <godot_cpp/core/defs.hpp>
 #include <godot_cpp/godot.hpp>
@@ -31,7 +24,9 @@ using namespace godot;
 #include "spawn-data/block_bullets_data2d.hpp"
 
 // bullets classes
+#include "bullets/multi_mesh_bullets2d.hpp"
 #include "bullets/block_bullets2d.hpp"
+#include "bullets/normal_bullets2d.hpp"
 
 void initialize_blast_bullets_2d_module(ModuleInitializationLevel p_level) {
 	if (p_level != MODULE_INITIALIZATION_LEVEL_SCENE) {
@@ -39,24 +34,26 @@ void initialize_blast_bullets_2d_module(ModuleInitializationLevel p_level) {
 	}
 
 	// shared
-	ClassDB::register_class<BulletRotationData>();
-	ClassDB::register_class<BulletSpeedData>();
+	GDREGISTER_CLASS(BulletRotationData)
+	GDREGISTER_CLASS(BulletSpeedData)
 
 	// save data classes
-	ClassDB::register_class<SaveDataBulletFactory2D>();
-	ClassDB::register_class<SaveDataBlockBullets2D>();
+	GDREGISTER_CLASS(SaveDataBulletFactory2D)
+	GDREGISTER_CLASS(SaveDataBlockBullets2D)
 
 	// factory
-	ClassDB::register_class<BulletFactory2D>();
+	GDREGISTER_RUNTIME_CLASS(BulletFactory2D)
 
 	// debugger
-	ClassDB::register_class<BulletDebugger2D>();
+	GDREGISTER_RUNTIME_CLASS(BulletDebugger2D)
 
 	// spawn data classes
-	ClassDB::register_class<BlockBulletsData2D>();
+	GDREGISTER_CLASS(BlockBulletsData2D)
 	
 	// bullets classes
-	ClassDB::register_class<BlockBullets2D>();
+	GDREGISTER_RUNTIME_CLASS(MultiMeshBullets2D)
+	GDREGISTER_RUNTIME_CLASS(BlockBullets2D)
+	GDREGISTER_RUNTIME_CLASS(NormalBullets2D)
 }
 
 void uninitialize_blast_bullets_2d_module(ModuleInitializationLevel p_level) {
