@@ -6,11 +6,10 @@
 class NormalBullets2D : public MultiMeshBullets2D{
     GDCLASS(NormalBullets2D, MultiMeshBullets2D)
     
-    public:
     protected:
         static void _bind_methods();
-    private:
         void move_bullets(float delta) override;
+        void set_up_movement_data(TypedArray<BulletSpeedData>& new_data) override;
 };
 
 #endif

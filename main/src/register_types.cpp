@@ -52,6 +52,7 @@ void initialize_blast_bullets_2d_module(ModuleInitializationLevel p_level) {
 	
 	// bullets classes
 	GDREGISTER_RUNTIME_CLASS(MultiMeshBullets2D)
+	
 	GDREGISTER_RUNTIME_CLASS(BlockBullets2D)
 	GDREGISTER_RUNTIME_CLASS(NormalBullets2D)
 }

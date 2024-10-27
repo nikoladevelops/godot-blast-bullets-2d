@@ -56,19 +56,18 @@ void MultiMeshBullets2D::spawn(const Ref<BlockBulletsData2D>& spawn_data, Bullet
     make_all_bullet_instances_visible();
     generate_collision_shapes_for_area(); 
     
-    if(set_up_bullets_state(
+    set_up_multimesh_bullet_instances(
         spawn_data->collision_shape_size,
         spawn_data->transforms,
         spawn_data->texture_rotation_radians,
         spawn_data->collision_shape_offset,
-        spawn_data->is_texture_rotation_permanent,
-        spawn_data->all_bullet_speed_data,
-        spawn_data->use_block_rotation_radians,
-        spawn_data->block_rotation_radians
-        ) == false){
-            UtilityFunctions::print("ERROR, NO TRANSFORMS PROVIDED OR NO BULLET SPEED DATA PROVIDED");
-            return;
-        }
+        spawn_data->is_texture_rotation_permanent
+    );
+
+    custom_additional_spawn_logic(spawn_data);
+
+    set_up_movement_data(spawn_data->all_bullet_speed_data);
+
     enable_bullets_based_on_status();
 
     finalize_set_up(spawn_data->bullets_custom_data, spawn_data->textures, spawn_data->current_texture_index, spawn_data->material);
@@ -86,19 +85,17 @@ void MultiMeshBullets2D::activate_multimesh(const Ref<BlockBulletsData2D>& data)
 
     set_up_area(factory->physics_space, data->collision_layer, data->collision_mask, data->monitorable);
 
-    if(set_up_bullets_state(
+    set_up_multimesh_bullet_instances(
         data->collision_shape_size,
         data->transforms,
         data->texture_rotation_radians,
         data->collision_shape_offset,
-        data->is_texture_rotation_permanent,
-        data->all_bullet_speed_data,
-        data->use_block_rotation_radians,
-        data->block_rotation_radians
-        ) == false){
-            UtilityFunctions::print("ERROR, NO TRANSFORMS PROVIDED OR NO BULLET SPEED DATA PROVIDED");
-            return;
-        }
+        data->is_texture_rotation_permanent
+        );
+
+    custom_additional_activate_logic(data);
+    
+    set_up_movement_data(data->all_bullet_speed_data);
 
     make_all_bullet_instances_visible();
     enable_bullets_based_on_status();
@@ -113,7 +110,10 @@ void MultiMeshBullets2D::disable_multi_mesh(){
     set_physics_process(false);
     current_life_time = 0.0f; //Important. This way I determine which bullets should not be saved/ are not yet set up correctly
     
-    factory->add_bullets_to_pool(this); // TODO need to fix this
+    custom_additional_disable_logic();
+
+    // TODO will fix factory in future
+    //factory->add_bullets_to_pool(this); // TODO need to fix this
 }
 
 Ref<SaveDataBlockBullets2D> MultiMeshBullets2D::save(){
@@ -135,12 +135,6 @@ Ref<SaveDataBlockBullets2D> MultiMeshBullets2D::save(){
     data->current_texture_index = current_texture_index;
 
     // BULLET MOVEMENT RELATED
-    
-    data->use_block_rotation_radians=use_block_rotation_radians;
-    if(use_block_rotation_radians){
-        data->block_rotation_radians = block_rotation_radians;
-        data->multimesh_position = current_position;
-    }
 
     data->all_cached_instance_transforms.resize(size);
     for (int i = 0; i < size; i++)
@@ -240,7 +234,8 @@ Ref<SaveDataBlockBullets2D> MultiMeshBullets2D::save(){
         data->bullets_enabled_status[i] = (bool)(bullets_enabled_status[i]);
     }
 
-    
+    custom_additional_save_logic(data);
+
     set_physics_process(true); // TODO maybe do this only if the bullets were enabled previously?
     return data;
 }
@@ -261,13 +256,15 @@ void MultiMeshBullets2D::load(const Ref<SaveDataBlockBullets2D>& data, BulletFac
     generate_area();
     set_up_area(factory->physics_space, data->collision_layer, data->collision_mask, data->monitorable);
     
-    make_bullet_instances_visible(data->bullets_enabled_status);
+    custom_additional_load_logic(data);
+
+    update_bullet_instances_visible(data->bullets_enabled_status);
     generate_collision_shapes_for_area();
     
-    load_bullets_state(data);
+    load_bullet_instances(data);
 
     enable_bullets_based_on_status();
- 
+
     finalize_set_up(data->bullets_custom_data, data->textures, data->current_texture_index, data->material);
 
     factory->bullets_container->add_child(this);
@@ -363,50 +360,18 @@ void MultiMeshBullets2D::generate_collision_shapes_for_area(){
 }
 
 
-bool MultiMeshBullets2D::set_up_bullets_state(
+void MultiMeshBullets2D::set_up_multimesh_bullet_instances(
     Vector2 new_collision_shape_size,
     const TypedArray<Transform2D>& new_transforms, // make sure you are giving transforms that don't have collision offset applied, otherwise it will apply it twice
     float new_texture_rotation,
     Vector2 new_collision_shape_offset,
-    bool new_is_texture_rotation_permanent,
-    const TypedArray<BulletSpeedData>& new_speed_data,
-    bool new_use_block_rotation_radians,
-    float new_block_rotation_radians
+    bool new_is_texture_rotation_permanent
 ){
-    int speed_data_size = size; // the size of the all_cached vectors
-    int all_speed_data_size = new_speed_data.size(); // the amount of speed data provided
-
-    if(all_speed_data_size == 0 || size == 0){
-        return false;
-    }
-
-    // Case 1 - when the user forces for the bullets to be treated as a block that has the same BulletSpeedData - done by setting the use_block_rotation_radians to true. Only the first BulletSpeedData will be used
-    // Case 2 - when only a single BulletSpeedData was provided (this is literally like Case 1, but the user has forgotten to set the use_block_rotation_radians to true) - no point in saving copies of the same exact data in each cached vector index and doing the same exact calculations when they are the same... pointless and will reduce performance
-    // Case 3 - when the user has provided more than 1 BulletSpeedData, but the BulletSpeedData amount is not enough for all bullets (meaning some will have it others won't), in this case all bullets will again use ONLY the first BulletSpeedData and ignore the rest.. the user is REQUIRED to provide BulletSpeedData for each individual bullet if he wants them to have different speed/max_speed/acceleration
-    // Note: the && size !=1 part is to ensure that when the user is trying to spawn only a single bullet, the bullet will use the transform rotation by default and NOT the block_rotation_radians. Basically an edge case.
-    if(new_use_block_rotation_radians || (all_speed_data_size == 1 && size != 1) || (all_speed_data_size != size && size !=1)){
-        block_rotation_radians = new_block_rotation_radians;
-        speed_data_size = 1; // if use_block_rotation_radians it means we are going to store only a single cached data inside each cached array, so the size should be equal to 1, instead of being equal to the amount of bullets
-        use_block_rotation_radians=true;
-    }else{
-        use_block_rotation_radians=false; // important because this set_up method gets reused by the activate_multimesh method, that means the default value of the boolean may not be FALSE by default when activating deactivated bullets (some of them may have been spawned with use_block_rotation_radians = true), so If I dont do this im risking of spawning bullets that should have their own direction BUT instead ARE FORCED to use the old use_block_rotation_radians of the deactivated multimesh
-    }
-    current_position = Vector2(0,0);
-    set_global_position(Vector2(0,0));
-
-    // Make space at once for all the data that will come in (reserving memory at once is more performant rather than using .push and letting the container resize itself/ constantly copy old items and place them inside new found memory that would fit all, this operation will happen when pushing an element exceeds the internal size.. no point in doing it when I know what size the vectors will be)
-    all_cached_speed.resize(speed_data_size);
-    all_cached_max_speed.resize(speed_data_size);
-    all_cached_acceleration.resize(speed_data_size);
-
-    // Always caching these for every single bullet no matter the use_block_rotation_radians value
+    // Allocate memory for all these at once
     all_cached_instance_transforms.resize(size);
     all_cached_shape_transforms.resize(size);
     all_cached_shape_origin.resize(size);
     all_cached_instance_origin.resize(size);
-
-    all_cached_direction.resize(speed_data_size);
-    all_cached_velocity.resize(speed_data_size); // this is an exception, because if we have only a single direction and a single speed then there is no point of storing the SAME velocity calculation over and over again for each bullet
 
     for (int i = 0; i < size; i++)
     {
@@ -440,38 +405,14 @@ bool MultiMeshBullets2D::set_up_bullets_state(
 
         multi->set_instance_transform_2d(i, texture_transf);
 
-        // Cache movement related logic
+        // Cache bullet transforms and origin vectors
         all_cached_instance_transforms[i] = texture_transf;
         all_cached_shape_transforms[i] = shape_transf;
 
         all_cached_instance_origin[i] = texture_transf.get_origin();
         all_cached_shape_origin[i] = shape_transf.get_origin();
-
-        // If use_block_rotation_radians is true, that means we have only a single speed data to work with that is shared with all bullets, so there isn't really space in the cached arrays for other data (their size is set to 1), so skip the rest of the for loop
-        if(use_block_rotation_radians && i>0){
-            continue;
-        }
-
-        Ref<BulletSpeedData> curr_speed_data = new_speed_data[i];
-        all_cached_speed[i] = curr_speed_data->speed;
-        all_cached_max_speed[i] = curr_speed_data->max_speed;
-        all_cached_acceleration[i] = curr_speed_data->acceleration;
-
-        // If use_block_rotation_radians that means all bullets should move as a block in the same direction, and the direction is determined by block_rotation_radians NOT the first transform rotation
-        if(use_block_rotation_radians){
-            curr_bullet_rotation = block_rotation_radians;
-        }
-
-        // Calculate the direction
-        all_cached_direction[i] = Vector2(Math::cos(curr_bullet_rotation), Math::sin(curr_bullet_rotation));
-        
-        // Calculate the velocity
-        all_cached_velocity[i] = all_cached_direction[i] * all_cached_speed[i];
     }
-
-    return true;
 }
-
 
 void MultiMeshBullets2D::generate_multimesh(){
     multi = memnew(MultiMesh);
@@ -575,7 +516,7 @@ void MultiMeshBullets2D::finalize_set_up(
     set_visible(true);
 }
 
-void MultiMeshBullets2D::load_bullets_state(
+void MultiMeshBullets2D::load_bullet_instances(
     const Ref<SaveDataBlockBullets2D>& data
  ){
     int new_speed_data_size = data->all_cached_velocity.size();
@@ -601,7 +542,7 @@ void MultiMeshBullets2D::load_bullets_state(
         all_cached_velocity[i] = data->all_cached_velocity[i];
         all_cached_direction[i] = data->all_cached_direction[i];
     }
-    
+
     for (int i = 0; i < size; i++)
     {
         all_cached_instance_transforms[i] = data->all_cached_instance_transforms[i];
@@ -615,18 +556,7 @@ void MultiMeshBullets2D::load_bullets_state(
 
         multi->set_instance_transform_2d(i,all_cached_instance_transforms[i]);
     }
-
-    use_block_rotation_radians=data->use_block_rotation_radians;
-    if(use_block_rotation_radians){
-        block_rotation_radians=data->block_rotation_radians;
-        set_global_position(data->multimesh_position);
-        current_position=data->multimesh_position;
-    }else{
-        current_position = Vector2(0,0);
-        set_global_position(Vector2(0,0));
-    }
  }
-
 
 void MultiMeshBullets2D::make_all_bullet_instances_visible(){
     bullets_enabled_status.resize(size);
@@ -637,11 +567,9 @@ void MultiMeshBullets2D::make_all_bullet_instances_visible(){
         multi->set_instance_color(i, Color(1,1,1,1));
         bullets_enabled_status[i] = true;
     }
-    
 }
 
-
-void MultiMeshBullets2D::make_bullet_instances_visible(const TypedArray<bool>& new_bullets_enabled_status){
+void MultiMeshBullets2D::update_bullet_instances_visible(const TypedArray<bool>& new_bullets_enabled_status){
     bullets_enabled_status.resize(size);
     for (int i = 0; i < size; i++)
     {
@@ -667,7 +595,7 @@ void MultiMeshBullets2D::enable_bullets_based_on_status(){
     physics_server->area_set_monitor_callback(area, callable_mp(this, &MultiMeshBullets2D::body_entered_func));
 }
 
-_ALWAYS_INLINE_ void MultiMeshBullets2D::accelerate_bullet_speed(int speed_data_id, float delta){
+void MultiMeshBullets2D::accelerate_bullet_speed(int speed_data_id, float delta){
     float curr_bullet_speed = all_cached_speed[speed_data_id];
     float curr_max_bullet_speed = all_cached_max_speed[speed_data_id];
 
@@ -679,7 +607,7 @@ _ALWAYS_INLINE_ void MultiMeshBullets2D::accelerate_bullet_speed(int speed_data_
     all_cached_velocity[speed_data_id] = all_cached_direction[speed_data_id] * all_cached_speed[speed_data_id];
 }
 
-_ALWAYS_INLINE_ void MultiMeshBullets2D::rotate_bullet(int multi_instance_id, float rotated_angle){
+void MultiMeshBullets2D::rotate_bullet(int multi_instance_id, float rotated_angle){
     Transform2D& rotated_transf = all_cached_instance_transforms[multi_instance_id];
     rotated_transf = rotated_transf.rotated_local(rotated_angle);
 

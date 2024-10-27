@@ -18,8 +18,8 @@ class BulletFactory2D;
 class MultiMeshBullets2D: public MultiMeshInstance2D{
     GDCLASS(MultiMeshBullets2D, MultiMeshInstance2D)
 
-    public:
-        /// TEXTURE RELATED
+    public: // Only reason I am leaving everything public is because GDExtension is not perfect and setting things to protected causes issues with engine methods like _physics_process
+    /// TEXTURE RELATED
 
         // Holds all textures
         TypedArray<Texture2D> textures;
@@ -36,17 +36,17 @@ class MultiMeshBullets2D: public MultiMeshInstance2D{
         // This is the texture size of the bullets
         Vector2 texture_size = Vector2(0,0);
 
-        ///
+    ///
 
-        /// BULLET SPEED RELATED
+    /// BULLET SPEED RELATED
 
         PackedFloat32Array all_cached_speed;
         PackedFloat32Array all_cached_max_speed;
         PackedFloat32Array all_cached_acceleration;
 
-        ///
+    ///
 
-        /// CACHED CALCULATIONS FOR IMPROVED PERFORMANCE
+    /// CACHED CALCULATIONS FOR IMPROVED PERFORMANCE
         
         // Holds all multimesh instance transforms. I am doing this so I don't have to call multi->get_instance_transform_2d() every frame
         std::vector<Transform2D> all_cached_instance_transforms;
@@ -66,10 +66,10 @@ class MultiMeshBullets2D: public MultiMeshInstance2D{
         // Holds all cached directions of the bullets
         PackedVector2Array all_cached_direction;
 
-        ///
+    ///
 
         
-        /// COLLISION RELATED
+    /// COLLISION RELATED
 
         // The area that holds all collision shapes
         RID area;
@@ -83,9 +83,9 @@ class MultiMeshBullets2D: public MultiMeshInstance2D{
         // Counts all active bullets. If equal to size, every single bullet will be disabled
         int active_bullets_counter=0;
 
-        ///
+    ///
 
-        /// ROTATION RELATED
+    /// ROTATION RELATED
 
         // SOA vs AOS, I picked SOA, because it offers better cache performance
         PackedFloat32Array all_rotation_speed;
@@ -101,9 +101,9 @@ class MultiMeshBullets2D: public MultiMeshInstance2D{
         // If true it means that only a single BulletRotationData was provided, so it will be used for each bullet. If false it means that we have BulletRotationData for each bullet. It is determined by the amount of BulletRotationData passed to spawn()
         bool use_only_first_rotation_data=false;
 
-        ///
+    ///
 
-        /// OTHER
+    /// OTHER
 
         // The amount of bullets the multimesh has
         int size;
@@ -123,7 +123,10 @@ class MultiMeshBullets2D: public MultiMeshInstance2D{
         // The current life time being processed
         float current_life_time=0.0f;
 
-        ///
+    ///
+        virtual ~MultiMeshBullets2D();
+        
+        static void _bind_methods();
 
         // Used to spawn brand new bullets.
         void spawn(const Ref<BlockBulletsData2D>& spawn_data, BulletFactory2D* new_factory);
@@ -143,19 +146,28 @@ class MultiMeshBullets2D: public MultiMeshInstance2D{
         // Safely delete the multimesh
         void safe_delete();
 
+    /// METHODS RESPONSIBLE FOR VARIOUS BULLET FEATURES
 
-    protected:
-        virtual ~MultiMeshBullets2D();
+        // The physics process loop. Holds all logic that needs to be repeated every physics frame
+        void _physics_process(float delta);
 
-        static void _bind_methods();
+        // Reduces the lifetime of the multimesh so it can eventually get disabled entirely
+        void reduce_lifetime(float delta);
 
-        /// HELPER METHODS
+        // Changes the texture periodically
+        void change_texture_periodically(float delta);
+
+        // Handles the rotation of the bullets
+        void handle_bullet_rotation(float delta);
+    ///
+
+    /// HELPER METHODS
 
         // Makes all bullet instances visible and also populates bullets_enabled_status with true values only
         void make_all_bullet_instances_visible();
 
         // Updates bullets_enabled_status with new values and makes certain instances visible/hidden depending on the new status values
-        void make_bullet_instances_visible(const TypedArray<bool>& new_bullets_enabled_status);
+        void update_bullet_instances_visible(const TypedArray<bool>& new_bullets_enabled_status);
         
         // Depending on bullets_enabled_status enables/disables collision for each instance. It registers area's entered signals so all bullet data must be set before calling it
         void enable_bullets_based_on_status();
@@ -171,25 +183,7 @@ class MultiMeshBullets2D: public MultiMeshInstance2D{
 
         // Disables a single bullet
         void disable_bullet(int bullet_index);
-    ///
-    private:
-
-    /// METHODS RESPONSIBLE FOR VARIOUS BULLET FEATURES
-
-        // The physics process loop. Holds all logic that needs to be repeated every physics frame
-        void _physics_process(float delta);
-
-        // Reduces the lifetime of the multimesh so it can eventually get disabled entirely
-        void reduce_lifetime(float delta);
-
-        // Changes the texture periodically
-        void change_texture_periodically(float delta);
-
-        // Handles the rotation of the bullets
-        void handle_bullet_rotation(float delta);
-
-        // Holds bullet movement logic
-        virtual void move_bullets(float delta) = 0;
+        
     ///
 
     /// METHODS RESPONSIBLE FOR SETTING THE MULTIMESH IN CORRECT STATE
@@ -197,7 +191,6 @@ class MultiMeshBullets2D: public MultiMeshInstance2D{
         // Generate methods are called only when spawning/loading data
 
         void generate_area();
-
         void set_up_area(
             RID new_world_space,
             uint32_t new_collision_layer,
@@ -207,21 +200,19 @@ class MultiMeshBullets2D: public MultiMeshInstance2D{
 
         void generate_collision_shapes_for_area();
 
-        bool set_up_bullets_state(
+        void generate_multimesh();
+        void set_up_multimesh(int new_instance_count, const Ref<Mesh>& new_mesh, Vector2 new_texture_size);
+
+        void set_up_multimesh_bullet_instances(
             Vector2 new_collision_shape_size,
             const TypedArray<Transform2D>& new_transforms, // make sure you are giving transforms that don't have collision offset applied, otherwise it will apply it twice
             float new_texture_rotation,
             Vector2 new_collision_shape_offset,
-            bool new_is_texture_rotation_permanent,
-            const TypedArray<BulletSpeedData>& all_speed_data,
-            bool new_use_block_rotation_radians,
-            float new_block_rotation_radians
-            );
-        
-        void generate_multimesh();
-        void set_up_multimesh(int new_instance_count, const Ref<Mesh>& new_mesh, Vector2 new_texture_size);
+            bool new_is_texture_rotation_permanent
+        );
         
         void set_up_rotation(TypedArray<BulletRotationData>& new_data, bool new_rotate_only_textures);
+
         void set_up_life_time_timer(float new_max_life_time, float new_current_life_time);
         void set_up_change_texture_timer(int new_amount_textures, float new_max_change_texture_time, float new_current_change_texture_time);
         
@@ -233,14 +224,37 @@ class MultiMeshBullets2D: public MultiMeshInstance2D{
             const Ref<Material>& new_material
             );
 
-        // TODO better name for this one
-        void load_bullets_state(const Ref<SaveDataBlockBullets2D>& data);
+        void load_bullet_instances(const Ref<SaveDataBlockBullets2D>& data);
     ///
 
     /// COLLISION DETECTION METHODS
 
         void area_entered_func(int status, RID entered_rid, uint64_t entered_instance_id, int entered_shape_index, int bullet_shape_index);
         void body_entered_func(int status, RID entered_rid, uint64_t entered_instance_id, int entered_shape_index, int bullet_shape_index);
+    ///
+
+    /// METHODS THAT ARE SUPPOSED TO BE OVERRIDEN TO PROVIDE CUSTOM LOGIC
+
+        // Holds bullet movement logic
+        virtual void move_bullets(float delta){};
+
+        // Used to set up movement related data before move_bullets is executed. It's important to call this method only after all bullet instances have been set up with collision shapes (in case you are going to edit the execution order of methods)
+        virtual void set_up_movement_data(TypedArray<BulletSpeedData>& data){};
+
+        // Holds custom logic that runs before the spawn function finalizes
+        virtual void custom_additional_spawn_logic(const Ref<BlockBulletsData2D>& data){};
+
+        // Holds custom logic that runs before the save function finalizes
+        virtual void custom_additional_save_logic(Ref<SaveDataBlockBullets2D>& data){};
+
+        // Holds custom logic that runs before the load function finalizes
+        virtual void custom_additional_load_logic(const Ref<SaveDataBlockBullets2D>& data){};
+
+        // Holds custom logic that runs before activating this multimesh when retrieved from the object pool
+        virtual void custom_additional_activate_logic(const Ref<BlockBulletsData2D>& data){};
+
+        // Holds custom logic that runs before disabling and pushing this multimesh inside an object pool 
+        virtual void custom_additional_disable_logic(){};
     ///
 
 };
