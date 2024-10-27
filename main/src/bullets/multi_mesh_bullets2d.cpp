@@ -621,7 +621,7 @@ void MultiMeshBullets2D::rotate_bullet(int multi_instance_id, float rotated_angl
     }
 }
 
-_ALWAYS_INLINE_ void MultiMeshBullets2D::accelerate_bullet_rotation_speed(int multi_instance_id, float delta){
+void MultiMeshBullets2D::accelerate_bullet_rotation_speed(int multi_instance_id, float delta){
     if(all_rotation_speed[multi_instance_id] == all_max_rotation_speed[multi_instance_id]){
         return;
     }
