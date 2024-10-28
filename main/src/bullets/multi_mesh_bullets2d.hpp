@@ -125,7 +125,7 @@ class MultiMeshBullets2D: public MultiMeshInstance2D{
 
     ///
         virtual ~MultiMeshBullets2D();
-        
+
         static void _bind_methods();
 
         // Used to spawn brand new bullets.
@@ -148,17 +148,68 @@ class MultiMeshBullets2D: public MultiMeshInstance2D{
 
     /// METHODS RESPONSIBLE FOR VARIOUS BULLET FEATURES
 
-        // The physics process loop. Holds all logic that needs to be repeated every physics frame
-        void _physics_process(float delta);
-
         // Reduces the lifetime of the multimesh so it can eventually get disabled entirely
-        void reduce_lifetime(float delta);
+        _ALWAYS_INLINE_ void reduce_lifetime(float delta){
+            // Life time timer logic
+            current_life_time-=delta;
+            if(current_life_time <= 0){
+                // Disable still active bullets (I'm not checking for bullet status,because disable_bullet already has that logic so I would be doing double checks for no reason)
+                for (int i = 0; i < size; i++)
+                {
+                    disable_bullet(i);
+                }
+                return;
+            }
+        }
 
         // Changes the texture periodically
-        void change_texture_periodically(float delta);
+        _ALWAYS_INLINE_ void change_texture_periodically(float delta){
+            // The texture change timer is active only if more than 1 texture has been provided (and if that's the case then max_change_texture_time will never be 0)
+            if(max_change_texture_time != 0.0f){
+                current_change_texture_time-=delta;
+                if(current_change_texture_time <= 0.0f){
+                    if(current_texture_index + 1 < textures.size()){
+                        current_texture_index++;
+                    }
+                    else{
+                        current_texture_index=0;
+                    }
+
+                    set_texture(textures[current_texture_index]); // set new texture
+                    current_change_texture_time=max_change_texture_time; // reset timer
+                }
+            }
+        }
 
         // Handles the rotation of the bullets
-        void handle_bullet_rotation(float delta);
+        _ALWAYS_INLINE_ void handle_bullet_rotation(float delta){
+            if(is_rotation_active){
+                if(use_only_first_rotation_data){
+                    accelerate_bullet_rotation_speed(0, delta); // acceleration should be applied once every frame for the SINGULAR rotation speed that all bullets share
+                    float cache_speed = all_rotation_speed[0] * delta;
+                    for (int i = 0; i < size; i++)
+                    {
+                        // No point in rotating if the bullet has been disabled, performance will just be lost for deactivated bullets..
+                        if(bullets_enabled_status[i] == false){
+                            continue;
+                        }
+
+                        rotate_bullet(i, cache_speed);
+                    }
+                }else{
+                    for (int i = 0; i < size; i++)
+                    {
+                        // No point in rotating if the bullet has been disabled, performance will just be lost for deactivated bullets..
+                        if(bullets_enabled_status[i] == false){
+                            continue;
+                        }
+
+                        rotate_bullet(i, all_rotation_speed[i] * delta);
+                        accelerate_bullet_rotation_speed(i, delta); // each bullet has its own BulletRotationData (meaning INDIVIDUAL rotation_speed that has to be accelerated every frame)
+                    }
+                }
+            }
+        }
     ///
 
     /// HELPER METHODS
@@ -173,16 +224,62 @@ class MultiMeshBullets2D: public MultiMeshInstance2D{
         void enable_bullets_based_on_status();
 
         // Accelerates an individual bullet's speed
-        void accelerate_bullet_speed(int speed_data_id, float delta);
+        _ALWAYS_INLINE_ void accelerate_bullet_speed(int speed_data_id, float delta){
+            float curr_bullet_speed = all_cached_speed[speed_data_id];
+            float curr_max_bullet_speed = all_cached_max_speed[speed_data_id];
+
+            if(curr_bullet_speed == curr_max_bullet_speed){
+                return;
+            }
+
+            all_cached_speed[speed_data_id] = std::min<float>(curr_bullet_speed + all_cached_acceleration[speed_data_id] * delta, curr_max_bullet_speed);
+            all_cached_velocity[speed_data_id] = all_cached_direction[speed_data_id] * all_cached_speed[speed_data_id];
+        }
 
         // Rotates a bullet's texture (and also the physics shape if rotate_only_textures is false)
-        void rotate_bullet(int multi_instance_id, float rotated_angle);
+        _ALWAYS_INLINE_ void rotate_bullet(int multi_instance_id, float rotated_angle){
+            Transform2D& rotated_transf = all_cached_instance_transforms[multi_instance_id];
+            rotated_transf = rotated_transf.rotated_local(rotated_angle);
+
+            multi->set_instance_transform_2d(multi_instance_id, rotated_transf);
+
+            if(rotate_only_textures == false){
+                Transform2D& rotated_shape_transf = all_cached_shape_transforms[multi_instance_id];
+                rotated_shape_transf = rotated_shape_transf.rotated_local(rotated_angle);
+
+                physics_server->area_set_shape_transform(area, multi_instance_id, rotated_shape_transf);
+            }
+        }
 
         // Accelerates a bullet's rotation speed
-        void accelerate_bullet_rotation_speed(int multi_instance_id, float delta);
+        _ALWAYS_INLINE_ void accelerate_bullet_rotation_speed(int multi_instance_id, float delta){
+            if(all_rotation_speed[multi_instance_id] == all_max_rotation_speed[multi_instance_id]){
+                return;
+            }
+            
+            all_rotation_speed[multi_instance_id] = std::min<float>(all_rotation_speed[multi_instance_id] + (all_rotation_acceleration[multi_instance_id]*delta), all_max_rotation_speed[multi_instance_id]);
+        }
+
 
         // Disables a single bullet
-        void disable_bullet(int bullet_index);
+        _ALWAYS_INLINE_ void disable_bullet(int bullet_index){
+            // I am doing this, because there is a chance that the bullet collides with more than 1 thing at the same exact time (if I didn't have this check then the active_bullets_counter would be set wrong).
+            if(bullets_enabled_status[bullet_index] == false){
+                return;
+            }
+
+            active_bullets_counter--;
+            // TODO instead should set the Transform2D of the instance to 0 to avoid rendering
+            multi->set_instance_color(bullet_index, Color(0,0,0,0));
+            
+            bullets_enabled_status[bullet_index] = false;
+            physics_server->call_deferred("area_set_shape_disabled", area, bullet_index, true);
+            
+
+            if(active_bullets_counter == 0){
+                disable_multi_mesh();
+            }
+        }
         
     ///
 
@@ -234,9 +331,6 @@ class MultiMeshBullets2D: public MultiMeshInstance2D{
     ///
 
     /// METHODS THAT ARE SUPPOSED TO BE OVERRIDEN TO PROVIDE CUSTOM LOGIC
-
-        // Holds bullet movement logic
-        virtual void move_bullets(float delta){};
 
         // Used to set up movement related data before move_bullets is executed. It's important to call this method only after all bullet instances have been set up with collision shapes (in case you are going to edit the execution order of methods)
         virtual void set_up_movement_data(TypedArray<BulletSpeedData>& data){};

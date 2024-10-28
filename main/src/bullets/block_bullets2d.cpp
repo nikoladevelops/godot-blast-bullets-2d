@@ -8,6 +8,13 @@
 
 using namespace godot;
 
+void BlockBullets2D::_physics_process(float delta){
+    move_bullets(delta);
+    reduce_lifetime(delta);
+    change_texture_periodically(delta);
+    handle_bullet_rotation(delta);
+}
+
 void BlockBullets2D::move_bullets(float delta){
     Vector2 new_pos = current_position + all_cached_velocity[0] * delta;
     set_global_position(new_pos);

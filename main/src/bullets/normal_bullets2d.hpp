@@ -5,11 +5,14 @@
 
 class NormalBullets2D : public MultiMeshBullets2D{
     GDCLASS(NormalBullets2D, MultiMeshBullets2D)
-    
+    public:
+        // The physics process loop. Holds all logic that needs to be repeated every physics frame
+        void _physics_process(float delta);
     protected:
+
         static void _bind_methods();
-        void move_bullets(float delta) override;
-        void set_up_movement_data(TypedArray<BulletSpeedData>& new_data) override;
+        _ALWAYS_INLINE_ void move_bullets(float delta);
+        void set_up_movement_data(TypedArray<BulletSpeedData>& new_data) override final;
 };
 
 #endif

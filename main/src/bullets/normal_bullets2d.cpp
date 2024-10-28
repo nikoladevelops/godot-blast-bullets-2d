@@ -2,6 +2,15 @@
 
 #include <godot_cpp/variant/utility_functions.hpp>
 
+
+void NormalBullets2D::_physics_process(float delta){
+    move_bullets(delta);
+    reduce_lifetime(delta);
+    change_texture_periodically(delta);
+    handle_bullet_rotation(delta);
+}
+
+
 void NormalBullets2D::move_bullets(float delta){
     for (int i = 0; i < size; i++)
     {

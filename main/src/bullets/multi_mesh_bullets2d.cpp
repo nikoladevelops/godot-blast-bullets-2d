@@ -31,13 +31,6 @@ void MultiMeshBullets2D::_bind_methods(){
     ClassDB::bind_method(D_METHOD("load", "data","world_space"),&MultiMeshBullets2D::load);
 }
 
-void MultiMeshBullets2D::_physics_process(float delta){
-    move_bullets(delta);
-    reduce_lifetime(delta);
-    change_texture_periodically(delta);
-    handle_bullet_rotation(delta);
-}
-
 void MultiMeshBullets2D::spawn(const Ref<BlockBulletsData2D>& spawn_data, BulletFactory2D* new_factory){
     factory = new_factory;
     size = spawn_data->transforms.size(); // important, because some set_up methods use this
@@ -268,66 +261,6 @@ void MultiMeshBullets2D::load(const Ref<SaveDataBlockBullets2D>& data, BulletFac
     finalize_set_up(data->bullets_custom_data, data->textures, data->current_texture_index, data->material);
 
     factory->bullets_container->add_child(this);
-}
-
-void MultiMeshBullets2D::reduce_lifetime(float delta){
-    // Life time timer logic
-    current_life_time-=delta;
-    if(current_life_time <= 0){
-        // Disable still active bullets (I'm not checking for bullet status,because disable_bullet already has that logic so I would be doing double checks for no reason)
-        for (int i = 0; i < size; i++)
-        {
-            disable_bullet(i);
-        }
-        return;
-    }
-}
-
-void MultiMeshBullets2D::change_texture_periodically(float delta){
-    // The texture change timer is active only if more than 1 texture has been provided (and if that's the case then max_change_texture_time will never be 0)
-    if(max_change_texture_time != 0.0f){
-        current_change_texture_time-=delta;
-        if(current_change_texture_time <= 0.0f){
-            if(current_texture_index + 1 < textures.size()){
-                current_texture_index++;
-            }
-            else{
-                current_texture_index=0;
-            }
-
-            set_texture(textures[current_texture_index]); // set new texture
-            current_change_texture_time=max_change_texture_time; // reset timer
-        }
-    }
-}
-
-void MultiMeshBullets2D::handle_bullet_rotation(float delta){
-    if(is_rotation_active){
-        if(use_only_first_rotation_data){
-            accelerate_bullet_rotation_speed(0, delta); // acceleration should be applied once every frame for the SINGULAR rotation speed that all bullets share
-            float cache_speed = all_rotation_speed[0] * delta;
-            for (int i = 0; i < size; i++)
-            {
-                // No point in rotating if the bullet has been disabled, performance will just be lost for deactivated bullets..
-                if(bullets_enabled_status[i] == false){
-                    continue;
-                }
-
-                rotate_bullet(i, cache_speed);
-            }
-        }else{
-            for (int i = 0; i < size; i++)
-            {
-                // No point in rotating if the bullet has been disabled, performance will just be lost for deactivated bullets..
-                if(bullets_enabled_status[i] == false){
-                    continue;
-                }
-
-                rotate_bullet(i, all_rotation_speed[i] * delta);
-                accelerate_bullet_rotation_speed(i, delta); // each bullet has its own BulletRotationData (meaning INDIVIDUAL rotation_speed that has to be accelerated every frame)
-            }
-        }
-    }
 }
 
 void MultiMeshBullets2D::generate_area(){
@@ -593,59 +526,6 @@ void MultiMeshBullets2D::enable_bullets_based_on_status(){
 
     physics_server->area_set_area_monitor_callback(area, callable_mp(this, &MultiMeshBullets2D::area_entered_func));
     physics_server->area_set_monitor_callback(area, callable_mp(this, &MultiMeshBullets2D::body_entered_func));
-}
-
-void MultiMeshBullets2D::accelerate_bullet_speed(int speed_data_id, float delta){
-    float curr_bullet_speed = all_cached_speed[speed_data_id];
-    float curr_max_bullet_speed = all_cached_max_speed[speed_data_id];
-
-    if(curr_bullet_speed == curr_max_bullet_speed){
-        return;
-    }
-
-    all_cached_speed[speed_data_id] = std::min<float>(curr_bullet_speed + all_cached_acceleration[speed_data_id] * delta, curr_max_bullet_speed);
-    all_cached_velocity[speed_data_id] = all_cached_direction[speed_data_id] * all_cached_speed[speed_data_id];
-}
-
-void MultiMeshBullets2D::rotate_bullet(int multi_instance_id, float rotated_angle){
-    Transform2D& rotated_transf = all_cached_instance_transforms[multi_instance_id];
-    rotated_transf = rotated_transf.rotated_local(rotated_angle);
-
-    multi->set_instance_transform_2d(multi_instance_id, rotated_transf);
-
-    if(rotate_only_textures == false){
-        Transform2D& rotated_shape_transf = all_cached_shape_transforms[multi_instance_id];
-        rotated_shape_transf = rotated_shape_transf.rotated_local(rotated_angle);
-
-        physics_server->area_set_shape_transform(area, multi_instance_id, rotated_shape_transf);
-    }
-}
-
-void MultiMeshBullets2D::accelerate_bullet_rotation_speed(int multi_instance_id, float delta){
-    if(all_rotation_speed[multi_instance_id] == all_max_rotation_speed[multi_instance_id]){
-        return;
-    }
-    
-    all_rotation_speed[multi_instance_id] = std::min<float>(all_rotation_speed[multi_instance_id] + (all_rotation_acceleration[multi_instance_id]*delta), all_max_rotation_speed[multi_instance_id]);
-}
-
-void MultiMeshBullets2D::disable_bullet(int bullet_index){
-    // I am doing this, because there is a chance that the bullet collides with more than 1 thing at the same exact time (if I didn't have this check then the active_bullets_counter would be set wrong).
-    if(bullets_enabled_status[bullet_index] == false){
-        return;
-    }
-
-    active_bullets_counter--;
-    // TODO instead should set the Transform2D of the instance to 0 to avoid rendering
-    multi->set_instance_color(bullet_index, Color(0,0,0,0));
-    
-    bullets_enabled_status[bullet_index] = false;
-    physics_server->call_deferred("area_set_shape_disabled", area, bullet_index, true);
-    
-
-    if(active_bullets_counter == 0){
-        disable_multi_mesh();
-    }
 }
 
 void MultiMeshBullets2D::safe_delete(){
