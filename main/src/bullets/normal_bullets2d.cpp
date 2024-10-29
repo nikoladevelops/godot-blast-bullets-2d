@@ -10,7 +10,6 @@ void NormalBullets2D::_physics_process(float delta){
     handle_bullet_rotation(delta);
 }
 
-
 void NormalBullets2D::move_bullets(float delta){
     for (int i = 0; i < size; i++)
     {
@@ -71,8 +70,4 @@ void NormalBullets2D::set_up_movement_data(TypedArray<BulletSpeedData>& new_data
         // Calculate the velocity
         all_cached_velocity[i] = all_cached_direction[i] * all_cached_speed[i];
     }
-}
-
-void NormalBullets2D::_bind_methods(){
-
 }

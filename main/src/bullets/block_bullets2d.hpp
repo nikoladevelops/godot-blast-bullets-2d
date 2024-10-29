@@ -5,8 +5,8 @@
 
 using namespace godot;
 
-class BlockBullets2D: public MultiMeshBullets2D<BlockBullets2D>{
-    GDCLASS(BlockBullets2D, MultiMeshBullets2D);
+class BlockBullets2D: public MultiMeshBullets2D<BlockBullets2D, BlockBulletsData2D, SaveDataBlockBullets2D>{
+    GDCLASS(BlockBullets2D, MultiMeshInstance2D);
     
     public:
         // The block rotation. The direction of the bullets is determined by it. Only used if use_block_rotation_radians is set to true
@@ -18,7 +18,8 @@ class BlockBullets2D: public MultiMeshBullets2D<BlockBullets2D>{
         // The physics process loop. Holds all logic that needs to be repeated every physics frame
         void _physics_process(float delta);
     protected:
-        static void _bind_methods(){};
+        static void _bind_methods(){}
+
         _ALWAYS_INLINE_ void move_bullets(float delta);
         void set_up_movement_data(TypedArray<BulletSpeedData>& new_data) override final;
         virtual void custom_additional_spawn_logic(const Ref<BlockBulletsData2D>& data) override final;
