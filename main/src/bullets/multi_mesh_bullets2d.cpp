@@ -31,8 +31,9 @@ void MultiMeshBullets2D::_bind_methods(){
     ClassDB::bind_method(D_METHOD("load", "data","world_space"),&MultiMeshBullets2D::load);
 }
 
-void MultiMeshBullets2D::spawn(const Ref<BlockBulletsData2D>& spawn_data, BulletFactory2D* new_factory){
-    factory = new_factory;
+void MultiMeshBullets2D::spawn(const Ref<BlockBulletsData2D>& spawn_data, MultimeshObjectPool<BlockBullets2D>& pool){
+    bullets_pool = pool;
+
     size = spawn_data->transforms.size(); // important, because some set_up methods use this
     
     set_up_rotation(spawn_data->all_bullet_rotation_data, spawn_data->rotate_only_textures);
@@ -106,7 +107,7 @@ void MultiMeshBullets2D::disable_multi_mesh(){
     custom_additional_disable_logic();
 
     // TODO will fix factory in future
-    //factory->add_bullets_to_pool(this); // TODO need to fix this
+    bullets_pool.push(this); // TODO need to fix this
 }
 
 Ref<SaveDataBlockBullets2D> MultiMeshBullets2D::save(){
@@ -234,8 +235,8 @@ Ref<SaveDataBlockBullets2D> MultiMeshBullets2D::save(){
 }
 
 
-void MultiMeshBullets2D::load(const Ref<SaveDataBlockBullets2D>& data, BulletFactory2D* new_factory){
-    factory = new_factory;
+void MultiMeshBullets2D::load(const Ref<SaveDataBlockBullets2D>& data, MultimeshObjectPool<BlockBullets2D>& pool){
+    bullets_pool = pool;
     size = data->all_cached_instance_transforms.size();
     
     set_up_rotation(data->all_bullet_rotation_data, data->rotate_only_textures);

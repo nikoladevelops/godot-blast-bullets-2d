@@ -29,10 +29,10 @@ void BulletFactory2D::_ready(){
     }
 }
 
-void BulletFactory2D::spawnBlockBullets2D(const Ref<BlockBulletsData2D> spawn_data){
+void BulletFactory2D::spawnBlockBullets2D(const Ref<BlockBulletsData2D>& spawn_data){
     int key = spawn_data->transforms.size();
     
-    BlockBullets2D* bullets = remove_bullets_from_pool(key);
+    BlockBullets2D* bullets = block_bullets_pool.pop(key);
     if(bullets != nullptr){
         bullets->activate_multimesh(spawn_data);
         return;
@@ -40,7 +40,7 @@ void BulletFactory2D::spawnBlockBullets2D(const Ref<BlockBulletsData2D> spawn_da
 
 
     BlockBullets2D* blk_instance = memnew(BlockBullets2D);
-    blk_instance->spawn(spawn_data, this);
+    blk_instance->spawn(spawn_data, block_bullets_pool);
 }
 
 RID BulletFactory2D::get_physics_space() const{
@@ -75,29 +75,9 @@ void BulletFactory2D::load(Ref<SaveDataBulletFactory2D> new_data){
     for (int i = 0; i < amount_bullets ; i++)
     {
         BlockBullets2D* blk_instance = memnew(BlockBullets2D);
-        blk_instance->load(new_data->all_block_bullets[i], this);
+        blk_instance->load(new_data->all_block_bullets[i], block_bullets_pool);
     }
     emit_signal("finished_loading");
-}
-
-void BulletFactory2D::add_bullets_to_pool(BlockBullets2D* new_bullets){
-    int key = new_bullets->size;
-    block_bullets_pool[key].push(new_bullets);
-}
-
-BlockBullets2D* BulletFactory2D::remove_bullets_from_pool(int key){
-    auto result = block_bullets_pool.find(key);
-    // If the block_bullets_pool doesn't contain a queue with that key or if it does but the queue is empty (meaning no bullets) return a nullptr
-    if(result == block_bullets_pool.end() || result->second.size() == 0){
-        return nullptr;
-    }
-
-    // Get the first bullets in the queue
-    BlockBullets2D* bullets = result->second.front();
-    // Remove them from the queue
-    result->second.pop();
-
-    return bullets;
 }
 
 void BulletFactory2D::clear_all_bullets(){

@@ -5,7 +5,7 @@
 
 using namespace godot;
 
-class BlockBullets2D: public MultiMeshBullets2D{
+class BlockBullets2D: public MultiMeshBullets2D<BlockBullets2D>{
     GDCLASS(BlockBullets2D, MultiMeshBullets2D);
     
     public:
@@ -15,13 +15,9 @@ class BlockBullets2D: public MultiMeshBullets2D{
         // Cached multimesh instance position.
         Vector2 current_position;
 
-        
-        
         // The physics process loop. Holds all logic that needs to be repeated every physics frame
         void _physics_process(float delta);
     protected:
-
-
         static void _bind_methods(){};
         _ALWAYS_INLINE_ void move_bullets(float delta);
         void set_up_movement_data(TypedArray<BulletSpeedData>& new_data) override final;

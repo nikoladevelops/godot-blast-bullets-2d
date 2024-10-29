@@ -15,10 +15,15 @@ using namespace godot;
 
 class BulletFactory2D;
 
+template<typename PType>
 class MultiMeshBullets2D: public MultiMeshInstance2D{
     GDCLASS(MultiMeshBullets2D, MultiMeshInstance2D)
 
     public: // Only reason I am leaving everything public is because GDExtension is not perfect and setting things to protected causes issues with engine methods like _physics_process
+    /// OBJECT POOL
+        MultimeshObjectPool<BlockBullets2D>& bullets_pool; // It's a reference since the owner of it is another class that keeps it alive
+    ///
+
     /// TEXTURE RELATED
 
         // Holds all textures
@@ -129,13 +134,13 @@ class MultiMeshBullets2D: public MultiMeshInstance2D{
         static void _bind_methods();
 
         // Used to spawn brand new bullets.
-        void spawn(const Ref<BlockBulletsData2D>& spawn_data, BulletFactory2D* new_factory);
+        void spawn(const Ref<BlockBulletsData2D>& spawn_data, MultimeshObjectPool<PType>& pool);
         
         // Used to retrieve a resource representing the bullets' data, so that it can be saved to a file.
         Ref<SaveDataBlockBullets2D> save();
 
         // Used to load a resource. Should be used instead of spawn when trying to load data from a file.
-        void load(const Ref<SaveDataBlockBullets2D>& data, BulletFactory2D* new_factory);
+        void load(const Ref<SaveDataBlockBullets2D>& data, MultimeshObjectPool<PType>& pool);
 
         // Activates the multimesh
         void activate_multimesh(const Ref<BlockBulletsData2D>& new_bullets_data);

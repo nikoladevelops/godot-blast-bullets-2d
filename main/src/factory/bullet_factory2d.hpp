@@ -5,7 +5,7 @@
 #include "godot_cpp/classes/node2d.hpp"
 #include "../spawn-data/block_bullets_data2d.hpp"
 #include "../save-data/save_data_bullet_factory2d.hpp"
-#include <queue>
+#include "../shared/multimesh_object_pool.hpp"
 
 // using forward declaration to avoid circular dependencies
 class BlockBullets2D;
@@ -17,6 +17,8 @@ using namespace godot;
 class BulletFactory2D:public Node2D{
     GDCLASS(BulletFactory2D, Node2D);
     public:
+        MultimeshObjectPool<BlockBullets2D> block_bullets_pool;
+
         // The physics space where the bullets multimeshes are interacting with the world.
         RID physics_space;
         // Contains all bullet multi meshes. This is where the multimeshes get added as a child when calling a spawn method.
@@ -26,8 +28,7 @@ class BulletFactory2D:public Node2D{
         
         void _ready();
 
-        // If I pass by const reference it would be a big problem if I am reusing the same resource data to spawn multiple block bullets, that's why I prefer to copy it
-        void spawnBlockBullets2D(const Ref<BlockBulletsData2D> spawn_data);
+        void spawnBlockBullets2D(const Ref<BlockBulletsData2D>& spawn_data);
 
         RID get_physics_space() const;
         void set_physics_space(RID new_space_rid);
@@ -37,11 +38,6 @@ class BulletFactory2D:public Node2D{
 
         // Loads bullets by using a Resource that contains every bullet's state. Call this method using call_deffered to avoid crashes
         void load(Ref<SaveDataBulletFactory2D> new_data);
-
-        // Adds BlockBullets2D to pool
-        void add_bullets_to_pool(BlockBullets2D* new_bullets);
-        // Retrieves BlockBullets2D from pool
-        BlockBullets2D* remove_bullets_from_pool(int key);
 
         // Clears all bullets. Call this method using call_deffered to avoid crashes
         void clear_all_bullets();
@@ -53,9 +49,6 @@ class BulletFactory2D:public Node2D{
         void set_is_debugger_enabled(bool new_is_enabled);
     protected:
         static void _bind_methods();
-    private:
-        // The key corresponds to the amount of bullets a bullets multimesh has, meanwhile the value corresponds to a queue that holds all of those that have that amount of bullets. Example: If key is 5, that means it holds all deactivated BlockBullets2D that each have 5 bullets (5 collision shapes, 5 texture instances that are currently invisible).
-        std::unordered_map<int,std::queue<BlockBullets2D*>> block_bullets_pool;
 };
 
 #endif

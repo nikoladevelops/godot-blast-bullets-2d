@@ -3,7 +3,7 @@
 
 #include "multi_mesh_bullets2d.hpp"
 
-class NormalBullets2D : public MultiMeshBullets2D{
+class NormalBullets2D: public MultiMeshBullets2D<NormalBullets2D>{
     GDCLASS(NormalBullets2D, MultiMeshBullets2D)
     public:
         // The physics process loop. Holds all logic that needs to be repeated every physics frame
