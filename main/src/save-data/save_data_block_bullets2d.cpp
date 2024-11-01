@@ -2,6 +2,8 @@
 
 using namespace godot;
 
+namespace BlastBullets {
+
 void SaveDataBlockBullets2D::set_max_life_time(float new_max_life_time) {
     max_life_time = new_max_life_time;
 }
@@ -29,8 +31,7 @@ int SaveDataBlockBullets2D::get_size() const {
 void SaveDataBlockBullets2D::set_bullets_enabled_status(TypedArray<bool> new_bullets_enabled_status) {
     int new_enabled_size = new_bullets_enabled_status.size();
     bullets_enabled_status.resize(new_enabled_size);
-    for (int i = 0; i < new_enabled_size; i++)
-    {
+    for (int i = 0; i < new_enabled_size; i++) {
         bullets_enabled_status[i] = new_bullets_enabled_status[i];
     }
 }
@@ -38,7 +39,6 @@ void SaveDataBlockBullets2D::set_bullets_enabled_status(TypedArray<bool> new_bul
 TypedArray<bool> SaveDataBlockBullets2D::get_bullets_enabled_status() const {
     return bullets_enabled_status;
 }
-
 
 void SaveDataBlockBullets2D::set_bullets_custom_data(Ref<Resource> new_bullets_custom_data) {
     bullets_custom_data = new_bullets_custom_data;
@@ -49,8 +49,7 @@ Ref<Resource> SaveDataBlockBullets2D::get_bullets_custom_data() const {
 }
 
 void SaveDataBlockBullets2D::set_textures(TypedArray<Texture2D> new_textures) {
-    for (int i = 0; i < new_textures.size(); i++)
-    {
+    for (int i = 0; i < new_textures.size(); i++) {
         textures.push_back(new_textures[i]);
     }
 }
@@ -147,107 +146,105 @@ Ref<Mesh> SaveDataBlockBullets2D::get_mesh() const {
     return mesh;
 }
 
-TypedArray<BulletRotationData> SaveDataBlockBullets2D::get_all_bullet_rotation_data(){
+TypedArray<BulletRotationData> SaveDataBlockBullets2D::get_all_bullet_rotation_data() {
     return all_bullet_rotation_data;
 }
-void SaveDataBlockBullets2D::set_all_bullet_rotation_data(const TypedArray<BulletRotationData>& new_bullet_rotation_data){
+void SaveDataBlockBullets2D::set_all_bullet_rotation_data(const TypedArray<BulletRotationData> &new_bullet_rotation_data) {
     all_bullet_rotation_data.resize(new_bullet_rotation_data.size());
-    for (int i = 0; i < new_bullet_rotation_data.size(); i++)
-    {
+    for (int i = 0; i < new_bullet_rotation_data.size(); i++) {
         all_bullet_rotation_data[i] = new_bullet_rotation_data[i];
     }
 }
 
-bool SaveDataBlockBullets2D::get_rotate_only_textures(){
+bool SaveDataBlockBullets2D::get_rotate_only_textures() {
     return rotate_only_textures;
 }
-void SaveDataBlockBullets2D::set_rotate_only_textures(bool new_rotate_only_textures){
-    rotate_only_textures=new_rotate_only_textures;
+void SaveDataBlockBullets2D::set_rotate_only_textures(bool new_rotate_only_textures) {
+    rotate_only_textures = new_rotate_only_textures;
 }
 
-bool SaveDataBlockBullets2D::get_use_block_rotation_radians(){
+bool SaveDataBlockBullets2D::get_use_block_rotation_radians() {
     return use_block_rotation_radians;
 }
-void SaveDataBlockBullets2D::set_use_block_rotation_radians(bool new_use_block_rotation_radians){
-    use_block_rotation_radians=new_use_block_rotation_radians;
+void SaveDataBlockBullets2D::set_use_block_rotation_radians(bool new_use_block_rotation_radians) {
+    use_block_rotation_radians = new_use_block_rotation_radians;
 }
 
 // MOVEMENT RELATED
 
-TypedArray<Transform2D> SaveDataBlockBullets2D::get_all_cached_instance_transforms(){
+TypedArray<Transform2D> SaveDataBlockBullets2D::get_all_cached_instance_transforms() {
     return all_cached_instance_transforms;
 }
-void SaveDataBlockBullets2D::set_all_cached_instance_transforms(const TypedArray<Transform2D> new_data){
-    all_cached_instance_transforms=new_data;
-    
+void SaveDataBlockBullets2D::set_all_cached_instance_transforms(const TypedArray<Transform2D> new_data) {
+    all_cached_instance_transforms = new_data;
 }
 
-TypedArray<Transform2D> SaveDataBlockBullets2D::get_all_cached_shape_transforms(){
+TypedArray<Transform2D> SaveDataBlockBullets2D::get_all_cached_shape_transforms() {
     return all_cached_shape_transforms;
 }
-void SaveDataBlockBullets2D::set_all_cached_shape_transforms(const TypedArray<Transform2D> new_data){
-    all_cached_shape_transforms=new_data;
+void SaveDataBlockBullets2D::set_all_cached_shape_transforms(const TypedArray<Transform2D> new_data) {
+    all_cached_shape_transforms = new_data;
 }
 
-TypedArray<Vector2> SaveDataBlockBullets2D::get_all_cached_instance_origin(){
+TypedArray<Vector2> SaveDataBlockBullets2D::get_all_cached_instance_origin() {
     return all_cached_instance_origin;
 }
-void SaveDataBlockBullets2D::set_all_cached_instance_origin(const TypedArray<Vector2> new_data){
-    all_cached_instance_origin=new_data;
+void SaveDataBlockBullets2D::set_all_cached_instance_origin(const TypedArray<Vector2> new_data) {
+    all_cached_instance_origin = new_data;
 }
 
-TypedArray<Vector2> SaveDataBlockBullets2D::get_all_cached_shape_origin(){
+TypedArray<Vector2> SaveDataBlockBullets2D::get_all_cached_shape_origin() {
     return all_cached_shape_origin;
 }
-void SaveDataBlockBullets2D::set_all_cached_shape_origin(const TypedArray<Vector2> new_data){
-    all_cached_shape_origin=new_data;
+void SaveDataBlockBullets2D::set_all_cached_shape_origin(const TypedArray<Vector2> new_data) {
+    all_cached_shape_origin = new_data;
 }
 
-TypedArray<Vector2> SaveDataBlockBullets2D::get_all_cached_velocity(){
+TypedArray<Vector2> SaveDataBlockBullets2D::get_all_cached_velocity() {
     return all_cached_velocity;
 }
-void SaveDataBlockBullets2D::set_all_cached_velocity(const TypedArray<Vector2> new_data){
-    all_cached_velocity=new_data;
+void SaveDataBlockBullets2D::set_all_cached_velocity(const TypedArray<Vector2> new_data) {
+    all_cached_velocity = new_data;
 }
 
-TypedArray<Vector2> SaveDataBlockBullets2D::get_all_cached_direction(){
+TypedArray<Vector2> SaveDataBlockBullets2D::get_all_cached_direction() {
     return all_cached_direction;
 }
-void SaveDataBlockBullets2D::set_all_cached_direction(const TypedArray<Vector2> new_data){
-    all_cached_direction=new_data;
+void SaveDataBlockBullets2D::set_all_cached_direction(const TypedArray<Vector2> new_data) {
+    all_cached_direction = new_data;
 }
 
 // SPEED RELATED
 
-TypedArray<float> SaveDataBlockBullets2D::get_all_cached_speed(){
+TypedArray<float> SaveDataBlockBullets2D::get_all_cached_speed() {
     return all_cached_speed;
 }
-void SaveDataBlockBullets2D::set_all_cached_speed(const TypedArray<float> new_data){
-    all_cached_speed=new_data;
+void SaveDataBlockBullets2D::set_all_cached_speed(const TypedArray<float> new_data) {
+    all_cached_speed = new_data;
 }
 
-TypedArray<float> SaveDataBlockBullets2D::get_all_cached_max_speed(){
+TypedArray<float> SaveDataBlockBullets2D::get_all_cached_max_speed() {
     return all_cached_max_speed;
 }
-void SaveDataBlockBullets2D::set_all_cached_max_speed(const TypedArray<float> new_data){
-    all_cached_max_speed=new_data;
+void SaveDataBlockBullets2D::set_all_cached_max_speed(const TypedArray<float> new_data) {
+    all_cached_max_speed = new_data;
 }
 
-TypedArray<float> SaveDataBlockBullets2D::get_all_cached_acceleration(){
+TypedArray<float> SaveDataBlockBullets2D::get_all_cached_acceleration() {
     return all_cached_acceleration;
 }
-void SaveDataBlockBullets2D::set_all_cached_acceleration(const TypedArray<float> new_data){
-    all_cached_acceleration=new_data;
+void SaveDataBlockBullets2D::set_all_cached_acceleration(const TypedArray<float> new_data) {
+    all_cached_acceleration = new_data;
 }
 
-Vector2 SaveDataBlockBullets2D::get_multimesh_position(){
+Vector2 SaveDataBlockBullets2D::get_multimesh_position() {
     return multimesh_position;
 }
-void SaveDataBlockBullets2D::set_multimesh_position(Vector2 new_position){
-    multimesh_position=new_position;
+void SaveDataBlockBullets2D::set_multimesh_position(Vector2 new_position) {
+    multimesh_position = new_position;
 }
 
-void SaveDataBlockBullets2D::_bind_methods(){
+void SaveDataBlockBullets2D::_bind_methods() {
     ClassDB::bind_method(D_METHOD("set_max_life_time"), &SaveDataBlockBullets2D::set_max_life_time);
     ClassDB::bind_method(D_METHOD("get_max_life_time"), &SaveDataBlockBullets2D::get_max_life_time);
     ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "max_life_time"), "set_max_life_time", "get_max_life_time");
@@ -332,7 +329,7 @@ void SaveDataBlockBullets2D::_bind_methods(){
     ClassDB::bind_method(D_METHOD("set_multimesh_position"), &SaveDataBlockBullets2D::set_multimesh_position);
     ADD_PROPERTY(PropertyInfo(Variant::VECTOR2, "multimesh_position"), "set_multimesh_position", "get_multimesh_position");
 
-     // MOVEMENT RELATED
+    // MOVEMENT RELATED
 
     ClassDB::bind_method(D_METHOD("get_all_cached_instance_transforms"), &SaveDataBlockBullets2D::get_all_cached_instance_transforms);
     ClassDB::bind_method(D_METHOD("set_all_cached_instance_transforms", "new_data"), &SaveDataBlockBullets2D::set_all_cached_instance_transforms);
@@ -358,7 +355,6 @@ void SaveDataBlockBullets2D::_bind_methods(){
     ClassDB::bind_method(D_METHOD("set_all_cached_direction", "new_data"), &SaveDataBlockBullets2D::set_all_cached_direction);
     ADD_PROPERTY(PropertyInfo(Variant::ARRAY, "all_cached_direction"), "set_all_cached_direction", "get_all_cached_direction");
 
-
     // SPEED RELATED
 
     ClassDB::bind_method(D_METHOD("get_all_cached_speed"), &SaveDataBlockBullets2D::get_all_cached_speed);
@@ -372,5 +368,6 @@ void SaveDataBlockBullets2D::_bind_methods(){
     ClassDB::bind_method(D_METHOD("get_all_cached_acceleration"), &SaveDataBlockBullets2D::get_all_cached_acceleration);
     ClassDB::bind_method(D_METHOD("set_all_cached_acceleration", "new_data"), &SaveDataBlockBullets2D::set_all_cached_acceleration);
     ADD_PROPERTY(PropertyInfo(Variant::ARRAY, "all_cached_acceleration"), "set_all_cached_acceleration", "get_all_cached_acceleration");
+}
 
 }

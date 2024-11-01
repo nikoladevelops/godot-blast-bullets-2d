@@ -1,41 +1,27 @@
-#ifndef MULTIMESH_OBJECT_POOL
-#define MULTIMESH_OBJECT_POOL
+#ifndef MULTIMESH_OBJECT_POOL_HPP
+#define MULTIMESH_OBJECT_POOL_HPP
 
-#include <unordered_map>
+#include <godot_cpp/classes/node.hpp>
+#include <godot_cpp/classes/ref.hpp>
+#include <godot_cpp/core/class_db.hpp>
 #include <queue>
+#include <unordered_map>
 
-/// @brief This class is meant for object pooling of multimesh instance pointers
-/// @tparam T The type of multimesh instance pointers that the object pool will store
-template<typename T>
-class MultimeshObjectPool{
-    private:
-        // The key corresponds to the amount of bullets a bullets multimesh has, meanwhile the value corresponds to a queue that holds all of those that have that amount of bullets. Example: If key is 5, that means it holds all deactivated multimesh instances that each have 5 bullets (5 collision shapes, 5 texture instances that are currently invisible)
-        std::unordered_map<int,std::queue<T*>> pool;
-    public:
-        // Used to push a multimesh instance inside the object pool. It's very important to pass amount_bullets value that is equal to the amount of bullet instances the multimesh has, otherwise program will crash
-        void push(T* multimesh, int amount_bullets){;
-            pool[amount_bullets].push(multimesh);
-        }
-        // Used to retrieve a multimesh that has exactly that many bullets. Basically the method will give you a pointer to a multimesh with N amount of bullets that were already spawned in the world but currently invisible and disabled in the pool. In case no multimesh instance has been found, it will return nullptr.
-        T* pop(int amount_bullets){
-            auto result = pool.find(amount_bullets);
-            // If the pool doesn't contain a queue with that key or if it does but the queue is empty (meaning no bullets) return a nullptr
-            if(result == pool.end() || result->second.size() == 0){
-                return nullptr;
-            }
+namespace BlastBullets {
 
-            // Get the first multimesh pointer in the queue
-            T* found_multimesh = result->second.front();
+class MultiMeshBullets2D;
 
-            // Remove it from the queue
-            result->second.pop();
+class MultiMeshObjectPool {
+public:
+    // The key corresponds to the amount of bullets a bullets multimesh has, meanwhile the value corresponds to a queue that holds all of those that have that amount of bullets. Example: If key is 5, that means it holds all deactivated multimesh instances that each have 5 bullets (5 collision shapes, 5 texture instances that are currently invisible)
+    std::unordered_map<int, std::queue<MultiMeshBullets2D *>> pool;
 
-            return found_multimesh;
-        }
-
-        void clear(){
-            pool.clear();
-        };
+    // Used to push a multimesh instance inside the object pool. It's very important to pass amount_bullets value that is equal to the amount of bullet instances the multimesh has, otherwise program will crash
+    void push(MultiMeshBullets2D *multimesh, int amount_bullets);
+    // Used to retrieve a multimesh that has exactly that many bullets. Basically the method will give you a pointer to a multimesh with N amount of bullets that were already spawned in the world but currently invisible and disabled in the pool. In case no multimesh instance has been found, it will return nullptr.
+    MultiMeshBullets2D *pop(int amount_bullets);
+    // Used to clear all bullets that were saved inside the object pool
+    void clear();
 };
-
+}
 #endif

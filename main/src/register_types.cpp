@@ -4,8 +4,6 @@
 #include <godot_cpp/core/defs.hpp>
 #include <godot_cpp/godot.hpp>
 
-using namespace godot;
-
 // shared
 #include "shared/bullet_rotation_data.hpp"
 #include "shared/bullet_speed_data.hpp"
@@ -28,6 +26,10 @@ using namespace godot;
 #include "bullets/block_bullets2d.hpp"
 #include "bullets/normal_bullets2d.hpp"
 
+
+using namespace godot;
+using namespace BlastBullets;
+
 void initialize_blast_bullets_2d_module(ModuleInitializationLevel p_level) {
 	if (p_level != MODULE_INITIALIZATION_LEVEL_SCENE) {
 		return;
@@ -41,6 +43,7 @@ void initialize_blast_bullets_2d_module(ModuleInitializationLevel p_level) {
 	GDREGISTER_CLASS(SaveDataBulletFactory2D)
 	GDREGISTER_CLASS(SaveDataBlockBullets2D)
 
+
 	// factory
 	GDREGISTER_RUNTIME_CLASS(BulletFactory2D)
 
@@ -51,11 +54,8 @@ void initialize_blast_bullets_2d_module(ModuleInitializationLevel p_level) {
 	GDREGISTER_CLASS(BlockBulletsData2D)
 	
 	// bullets classes
-	// TODO a way to register templates
-	//GDREGISTER_INTERNAL_CLASS(MultiMeshBullets2D)
-	
+	GDREGISTER_RUNTIME_CLASS(MultiMeshBullets2D)
 	GDREGISTER_RUNTIME_CLASS(BlockBullets2D)
-	GDREGISTER_RUNTIME_CLASS(NormalBullets2D)
 }
 
 void uninitialize_blast_bullets_2d_module(ModuleInitializationLevel p_level) {

@@ -1,899 +1,359 @@
 #ifndef MULTI_MESH_BULLETS2D
 #define MULTI_MESH_BULLETS2D
 
-#include "godot_cpp/classes/multi_mesh_instance2d.hpp"
-#include "godot_cpp/classes/multi_mesh.hpp"
-#include "godot_cpp/classes/physics_server2d.hpp"
+#include "../save-data/save_data_block_bullets2d.hpp"
 #include "../shared/bullet_rotation_data.hpp"
 #include "../shared/bullet_speed_data.hpp"
 #include "../spawn-data/block_bullets_data2d.hpp"
-#include "../save-data/save_data_block_bullets2d.hpp"
-#include "../shared/multimesh_object_pool.hpp"
-#include "../factory/bullet_factory2d.hpp"
-#include "godot_cpp/variant/utility_functions.hpp"
 
-#define physics_server PhysicsServer2D::get_singleton()
+#include <godot_cpp/classes/engine.hpp>
+#include <godot_cpp/classes/mesh.hpp>
+#include <godot_cpp/classes/multi_mesh.hpp>
+#include <godot_cpp/classes/multi_mesh_instance2d.hpp>
+#include <godot_cpp/classes/physics_server2d.hpp>
+#include <godot_cpp/classes/quad_mesh.hpp>
+#include <godot_cpp/variant/utility_functions.hpp>
 
-using namespace godot;
+#define physics_server godot::PhysicsServer2D::get_singleton()
 
-//class BulletFactory2D; TODO remove this, it was because of circular dependencies, but maybe same problem will appear in child classes hmm
+namespace BlastBullets {
 
-/// @brief 
-/// @tparam PType Type of multimesh bullets that will be stored inside object pool
-/// @tparam SType Class used to spawn bullets from
-/// @tparam DType Data class used for saving and loading data
-template <typename PType, typename SType, typename DType>
-class MultiMeshBullets2D : public MultiMeshInstance2D
-{
-    GDCLASS(MultiMeshBullets2D<PType, SType, DType>, MultiMeshInstance2D)
+class BulletFactory2D;
+class MultiMeshObjectPool;
+
+// class BulletFactory2D; //TODO remove this, it was because of circular dependencies, but maybe same problem will appear in child classes hmm
+/// TODO In the future this class should become a template to make it more extendable and to no longer rely on run-time polymorphism. As of Godot 4.3-stable there are no macros that allow registering of templates (similar to GDCLASS)
+class MultiMeshBullets2D : public godot::MultiMeshInstance2D {
+    GDCLASS(MultiMeshBullets2D, godot::MultiMeshInstance2D)
 
     // Only reason I am leaving everything public is because GDExtension is not perfect and setting things to protected causes issues with engine methods like _physics_process
-    public:
-        const BulletFactory2D &factory;
-        const MultimeshObjectPool<PType> &bullets_pool; 
+public:
+    BulletFactory2D *bullet_factory;
+    MultiMeshObjectPool *bullets_pool;
 
-        /// TEXTURE RELATED
+    /// TEXTURE RELATED
 
-        // Holds all textures
-        TypedArray<Texture2D> textures;
+    // Holds all textures
+    godot::TypedArray<godot::Texture2D> textures;
 
-        // Time before the texture gets changed to the next one. If 0 it means that the timer is not active
-        float max_change_texture_time = 0.0f;
+    // Time before the texture gets changed to the next one. If 0 it means that the timer is not active
+    float max_change_texture_time = 0.0f;
 
-        // The change texture time being processed now
-        float current_change_texture_time;
+    // The change texture time being processed now
+    float current_change_texture_time;
 
-        // Holds the current texture index (the index inside the array textures)
-        int current_texture_index;
+    // Holds the current texture index (the index inside the array textures)
+    int current_texture_index;
 
-        // This is the texture size of the bullets
-        Vector2 texture_size = Vector2(0, 0);
+    // This is the texture size of the bullets
+    godot::Vector2 texture_size = godot::Vector2(0, 0);
 
-        ///
+    ///
 
-        /// BULLET SPEED RELATED
+    /// BULLET SPEED RELATED
 
-        PackedFloat32Array all_cached_speed;
-        PackedFloat32Array all_cached_max_speed;
-        PackedFloat32Array all_cached_acceleration;
+    godot::PackedFloat32Array all_cached_speed;
+    godot::PackedFloat32Array all_cached_max_speed;
+    godot::PackedFloat32Array all_cached_acceleration;
 
-        ///
+    ///
 
-        /// CACHED CALCULATIONS FOR IMPROVED PERFORMANCE
+    /// CACHED CALCULATIONS FOR IMPROVED PERFORMANCE
 
-        // Holds all multimesh instance transforms. I am doing this so I don't have to call multi->get_instance_transform_2d() every frame
-        std::vector<Transform2D> all_cached_instance_transforms;
+    // Holds all multimesh instance transforms. I am doing this so I don't have to call multi->get_instance_transform_2d() every frame
+    std::vector<godot::Transform2D> all_cached_instance_transforms;
 
-        // Holds all collision shape transforms. I am doing this so I don't have to call physics_server->area_get_shape_transform() every frame
-        std::vector<Transform2D> all_cached_shape_transforms;
+    // Holds all collision shape transforms. I am doing this so I don't have to call physics_server->area_get_shape_transform() every frame
+    std::vector<godot::Transform2D> all_cached_shape_transforms;
 
-        // Holds all multimesh instance transform origin vectors. I am doing this so I don't have to call .get_origin() every frame
-        PackedVector2Array all_cached_instance_origin;
+    // Holds all multimesh instance transform origin vectors. I am doing this so I don't have to call .get_origin() every frame
+    godot::PackedVector2Array all_cached_instance_origin;
 
-        // Holds all collision shape transform origin vectors. I am doing this so I don't have to call .get_origin() every frame
-        PackedVector2Array all_cached_shape_origin;
+    // Holds all collision shape transform origin vectors. I am doing this so I don't have to call .get_origin() every frame
+    godot::PackedVector2Array all_cached_shape_origin;
 
-        // Holds all calculated velocities for the bullets. I am doing this to avoid unnecessary calculations. If I know the direction -> calculate the velocity. Update the values only when the velocity changes, otherwise it's just unnecessary to always do Vector2(cos, sin) every frame..
-        PackedVector2Array all_cached_velocity;
+    // Holds all calculated velocities for the bullets. I am doing this to avoid unnecessary calculations. If I know the direction -> calculate the velocity. Update the values only when the velocity changes, otherwise it's just unnecessary to always do Vector2(cos, sin) every frame..
+    godot::PackedVector2Array all_cached_velocity;
 
-        // Holds all cached directions of the bullets
-        PackedVector2Array all_cached_direction;
+    // Holds all cached directions of the bullets
+    godot::PackedVector2Array all_cached_direction;
 
-        ///
+    ///
 
-        /// COLLISION RELATED
+    /// COLLISION RELATED
 
-        // The area that holds all collision shapes
-        RID area;
+    // The area that holds all collision shapes
+    godot::RID area;
 
-        // Saves whether the bullets can detect bodies or not
-        bool monitorable;
+    // Saves whether the bullets can detect bodies or not
+    bool monitorable;
 
-        // Holds a boolean value for each bullet that indicates whether its active
-        std::vector<char> bullets_enabled_status;
+    // Holds a boolean value for each bullet that indicates whether its active
+    std::vector<char> bullets_enabled_status;
 
-        // Counts all active bullets. If equal to size, every single bullet will be disabled
-        int active_bullets_counter = 0;
+    // Counts all active bullets. If equal to size, every single bullet will be disabled
+    int active_bullets_counter = 0;
 
-        ///
+    ///
 
-        /// ROTATION RELATED
+    /// ROTATION RELATED
 
-        // SOA vs AOS, I picked SOA, because it offers better cache performance
-        PackedFloat32Array all_rotation_speed;
-        PackedFloat32Array all_max_rotation_speed;
-        PackedFloat32Array all_rotation_acceleration;
+    // SOA vs AOS, I picked SOA, because it offers better cache performance
+    godot::PackedFloat32Array all_rotation_speed;
+    godot::PackedFloat32Array all_max_rotation_speed;
+    godot::PackedFloat32Array all_rotation_acceleration;
 
-        // If set to false it will also rotate the collision shapes
-        bool rotate_only_textures;
+    // If set to false it will also rotate the collision shapes
+    bool rotate_only_textures;
 
-        // Important. Determines if there was valid rotation data passed, if its true it means the rotation logic will work
-        bool is_rotation_active;
+    // Important. Determines if there was valid rotation data passed, if its true it means the rotation logic will work
+    bool is_rotation_active;
 
-        // If true it means that only a single BulletRotationData was provided, so it will be used for each bullet. If false it means that we have BulletRotationData for each bullet. It is determined by the amount of BulletRotationData passed to spawn()
-        bool use_only_first_rotation_data = false;
+    // If true it means that only a single BulletRotationData was provided, so it will be used for each bullet. If false it means that we have BulletRotationData for each bullet. It is determined by the amount of BulletRotationData passed to spawn()
+    bool use_only_first_rotation_data = false;
 
-        ///
+    ///
 
-        /// OTHER
+    /// OTHER
 
-        // The amount of bullets the multimesh has
-        int size;
+    // The amount of bullets the multimesh has
+    int size;
 
-        // Pointer to the multimesh instead of always calling the get method
-        MultiMesh *multi;
+    // Pointer to the multimesh instead of always calling the get method
+    godot::MultiMesh *multi;
 
-        // The user can pass any custom data they desire and have access to it in the area_entered and body_entered function callbacks
-        Ref<Resource> bullets_custom_data;
+    // The user can pass any custom data they desire and have access to it in the area_entered and body_entered function callbacks
+    godot::Ref<godot::Resource> bullets_custom_data;
 
-        // The life time of all bullets
-        float max_life_time;
+    // The life time of all bullets
+    float max_life_time;
 
-        // The current life time being processed
-        float current_life_time = 0.0f;
+    // The current life time being processed
+    float current_life_time = 0.0f;
 
-        ///
-        virtual ~MultiMeshBullets2D()
-        {
-            // For some reason the destructor runs on project start up by default, so avoid doing that
-            if (Engine::get_singleton()->is_editor_hint())
-            {
-                return;
+    ///
+    virtual ~MultiMeshBullets2D();
+
+    // Used to spawn brand new bullets.
+    void spawn(const godot::Ref<BlockBulletsData2D> &spawn_data, MultiMeshObjectPool *pool, BulletFactory2D *factory);
+
+    // Used to retrieve a resource representing the bullets' data, so that it can be saved to a file.
+    godot::Ref<SaveDataBlockBullets2D> save();
+
+    // Used to load a resource. Should be used instead of spawn when trying to load data from a file.
+    void load(const godot::Ref<SaveDataBlockBullets2D> &data, MultiMeshObjectPool *pool, BulletFactory2D *factory);
+
+    // Activates the multimesh
+    void activate_multimesh(const godot::Ref<BlockBulletsData2D> &data);
+
+    // Called when all bullets have been disabled
+    void disable_multi_mesh();
+
+    // Safely delete the multimesh
+    void safe_delete();
+
+    /// METHODS RESPONSIBLE FOR VARIOUS BULLET FEATURES
+
+    // Reduces the lifetime of the multimesh so it can eventually get disabled entirely
+    _ALWAYS_INLINE_ void reduce_lifetime(float delta) {
+        // Life time timer logic
+        current_life_time -= delta;
+        if (current_life_time <= 0) {
+            // Disable still active bullets (I'm not checking for bullet status,because disable_bullet already has that logic so I would be doing double checks for no reason)
+            for (int i = 0; i < size; i++) {
+                disable_bullet(i);
             }
-
-            // Avoid memory leaks if you've used the PhysicsServer2D to generate area and shapes
-            for (int i = 0; i < size; i++)
-            {
-                RID shape = physics_server->area_get_shape(area, 0);
-                physics_server->free_rid(shape);
-            }
-            physics_server->free_rid(area);
+            return;
         }
+    }
 
-        static void _bind_methods()
-        {
-            ClassDB::bind_method(D_METHOD("spawn", "spawn_data", "world_space"), &MultiMeshBullets2D::spawn);
-            ClassDB::bind_method(D_METHOD("save"), &MultiMeshBullets2D::save);
-
-            // TODO why am I exposing activate_multimesh outside CPP ?
-            ClassDB::bind_method(D_METHOD("activate_multimesh", "spawn_data"), &MultiMeshBullets2D::activate_multimesh);
-            ClassDB::bind_method(D_METHOD("load", "data", "world_space"), &MultiMeshBullets2D::load);
-        }
-
-        // Used to spawn brand new bullets.
-        void spawn(const Ref<SType> &spawn_data, const MultimeshObjectPool<PType> &pool, const BulletFactory2D &factory)
-        {
-            bullets_pool = pool;
-
-            size = spawn_data->transforms.size(); // important, because some set_up methods use this
-
-            set_up_rotation(spawn_data->all_bullet_rotation_data, spawn_data->rotate_only_textures);
-
-            set_up_life_time_timer(spawn_data->max_life_time, spawn_data->max_life_time);
-            set_up_change_texture_timer(spawn_data->textures.size(), spawn_data->max_change_texture_time, spawn_data->max_change_texture_time);
-
-            generate_multimesh();
-            set_up_multimesh(size, spawn_data->mesh, spawn_data->texture_size);
-
-            generate_area();
-            set_up_area(factory->physics_space, spawn_data->collision_layer, spawn_data->collision_mask, spawn_data->monitorable);
-
-            make_all_bullet_instances_visible();
-            generate_collision_shapes_for_area();
-
-            set_up_multimesh_bullet_instances(
-                spawn_data->collision_shape_size,
-                spawn_data->transforms,
-                spawn_data->texture_rotation_radians,
-                spawn_data->collision_shape_offset,
-                spawn_data->is_texture_rotation_permanent);
-
-            custom_additional_spawn_logic(spawn_data);
-
-            set_up_movement_data(spawn_data->all_bullet_speed_data);
-
-            enable_bullets_based_on_status();
-
-            finalize_set_up(spawn_data->bullets_custom_data, spawn_data->textures, spawn_data->current_texture_index, spawn_data->material);
-
-            factory->bullets_container->add_child(this);
-        }
-
-        // Used to retrieve a resource representing the bullets' data, so that it can be saved to a file.
-        Ref<DType> save()
-        {
-            set_physics_process(false);
-
-            Ref<DType> data = memnew(DType);
-
-            // TEXTURE RELATED
-
-            int amount_textures = textures.size();
-            data->textures.resize(amount_textures);
-            for (int i = 0; i < amount_textures; i++)
-            {
-                data->textures[i] = textures[i];
-            }
-            data->texture_size = texture_size;
-            data->max_change_texture_time = max_change_texture_time;
-            data->current_change_texture_time = current_change_texture_time;
-            data->current_texture_index = current_texture_index;
-
-            // BULLET MOVEMENT RELATED
-
-            data->all_cached_instance_transforms.resize(size);
-            for (int i = 0; i < size; i++)
-            {
-                data->all_cached_instance_transforms[i] = all_cached_instance_transforms[i];
-            }
-
-            data->all_cached_shape_transforms.resize(size);
-            for (int i = 0; i < size; i++)
-            {
-                data->all_cached_shape_transforms[i] = all_cached_shape_transforms[i];
-            }
-
-            data->all_cached_instance_origin.resize(size);
-            for (int i = 0; i < size; i++)
-            {
-                data->all_cached_instance_origin[i] = all_cached_instance_origin[i];
-            }
-
-            data->all_cached_shape_origin.resize(size);
-            for (int i = 0; i < size; i++)
-            {
-                data->all_cached_shape_origin[i] = all_cached_shape_origin[i];
-            }
-
-            int speed_data_size = all_cached_velocity.size();
-
-            data->all_cached_velocity.resize(speed_data_size);
-            for (int i = 0; i < speed_data_size; i++)
-            {
-                data->all_cached_velocity[i] = all_cached_velocity[i];
-            }
-
-            data->all_cached_direction.resize(speed_data_size);
-            for (int i = 0; i < speed_data_size; i++)
-            {
-                data->all_cached_direction[i] = all_cached_direction[i];
-            }
-
-            // BULLET SPEED RELATED
-
-            data->all_cached_speed.resize(speed_data_size);
-            for (int i = 0; i < speed_data_size; i++)
-            {
-                data->all_cached_speed[i] = all_cached_speed[i];
-            }
-
-            data->all_cached_max_speed.resize(speed_data_size);
-            for (int i = 0; i < speed_data_size; i++)
-            {
-                data->all_cached_max_speed[i] = all_cached_max_speed[i];
-            }
-
-            data->all_cached_acceleration.resize(speed_data_size);
-            for (int i = 0; i < speed_data_size; i++)
-            {
-                data->all_cached_acceleration[i] = all_cached_acceleration[i];
-            }
-
-            // BULLET ROTATION RELATED
-            if (is_rotation_active)
-            {
-                data->all_bullet_rotation_data.resize(all_rotation_speed.size());
-                for (int i = 0; i < all_rotation_speed.size(); i++)
-                {
-                    Ref<BulletRotationData> bullet_data = memnew(BulletRotationData);
-                    bullet_data->rotation_speed = all_rotation_speed[i];
-                    bullet_data->max_rotation_speed = all_max_rotation_speed[i];
-                    bullet_data->rotation_acceleration = all_rotation_acceleration[i];
-
-                    data->all_bullet_rotation_data[i] = bullet_data;
+    // Changes the texture periodically
+    _ALWAYS_INLINE_ void change_texture_periodically(float delta) {
+        // The texture change timer is active only if more than 1 texture has been provided (and if that's the case then max_change_texture_time will never be 0)
+        if (max_change_texture_time != 0.0f) {
+            current_change_texture_time -= delta;
+            if (current_change_texture_time <= 0.0f) {
+                if (current_texture_index + 1 < textures.size()) {
+                    current_texture_index++;
+                } else {
+                    current_texture_index = 0;
                 }
-                data->rotate_only_textures = rotate_only_textures;
-            }
 
-            // COLLISION RELATED
-
-            data->collision_layer = physics_server->area_get_collision_layer(area);
-            data->collision_mask = physics_server->area_get_collision_mask(area);
-            data->monitorable = monitorable;
-
-            RID shape = physics_server->area_get_shape(area, 0);
-            data->collision_shape_size = (Vector2)(physics_server->shape_get_data(shape));
-
-            // OTHER
-            data->max_life_time = max_life_time;
-            data->current_life_time = current_life_time;
-            data->size = size;
-
-            data->material = get_material();
-            data->mesh = multi->get_mesh();
-            data->bullets_custom_data = bullets_custom_data;
-
-            // Save the enabled status so you can determine which bullets were active/disabled
-            data->bullets_enabled_status.resize(size);
-            for (int i = 0; i < size; i++)
-            {
-                data->bullets_enabled_status[i] = (bool)(bullets_enabled_status[i]);
-            }
-
-            custom_additional_save_logic(data);
-
-            set_physics_process(true); // TODO maybe do this only if the bullets were enabled previously?
-            return data;
-        }
-
-        // Used to load a resource. Should be used instead of spawn when trying to load data from a file.
-        void load(const Ref<SType> &data, MultimeshObjectPool<PType> &pool, const BulletFactory2D &factory)
-        {
-            bullets_pool = pool;
-            size = data->all_cached_instance_transforms.size();
-
-            set_up_rotation(data->all_bullet_rotation_data, data->rotate_only_textures);
-
-            set_up_life_time_timer(data->max_life_time, data->current_life_time);
-            set_up_change_texture_timer(data->textures.size(), data->max_change_texture_time, data->current_change_texture_time);
-
-            generate_multimesh();
-            set_up_multimesh(size, data->mesh, data->texture_size);
-
-            generate_area();
-            set_up_area(factory->physics_space, data->collision_layer, data->collision_mask, data->monitorable);
-
-            custom_additional_load_logic(data);
-
-            update_bullet_instances_visible(data->bullets_enabled_status);
-            generate_collision_shapes_for_area();
-
-            load_bullet_instances(data);
-
-            enable_bullets_based_on_status();
-
-            finalize_set_up(data->bullets_custom_data, data->textures, data->current_texture_index, data->material);
-
-            factory->bullets_container->add_child(this);
-        }
-
-        // Activates the multimesh
-        void activate_multimesh(const Ref<SType> &new_bullets_data, const BulletFactory2D &factory)
-        {
-            set_up_rotation(data->all_bullet_rotation_data, data->rotate_only_textures);
-
-            set_up_life_time_timer(data->max_life_time, data->max_life_time);
-            set_up_change_texture_timer(data->textures.size(), data->max_change_texture_time, data->max_change_texture_time);
-
-            set_up_multimesh(size, data->mesh, data->texture_size);
-
-            set_up_area(factory.physics_space, data->collision_layer, data->collision_mask, data->monitorable);
-
-            set_up_multimesh_bullet_instances(
-                data->collision_shape_size,
-                data->transforms,
-                data->texture_rotation_radians,
-                data->collision_shape_offset,
-                data->is_texture_rotation_permanent);
-
-            custom_additional_activate_logic(new_bullets_data);
-
-            set_up_movement_data(data->all_bullet_speed_data);
-
-            make_all_bullet_instances_visible();
-            enable_bullets_based_on_status();
-
-            move_to_front(); // Makes sure that the current old multimesh is displayed on top of the newer ones (act as if its the oldest sibling to emulate the behaviour of spawning a brand new multimesh / if I dont do this then the multimesh's instances will be displayed behind the newer ones)
-
-            finalize_set_up(data->bullets_custom_data, data->textures, data->current_texture_index, data->material);
-        }
-
-        // Called when all bullets have been disabled
-        void disable_multi_mesh()
-        {
-            set_visible(false); // very important to hide it, otherwise it will be rendering the transparent bullets when there is no need, which will tank performance
-            set_physics_process(false);
-            current_life_time = 0.0f; // Important. This way I determine which bullets should not be saved/ are not yet set up correctly
-
-            custom_additional_disable_logic();
-
-            // TODO will fix factory in future
-            bullets_pool.push(this); // TODO need to fix this
-        }
-
-        // Safely delete the multimesh
-        void safe_delete()
-        {
-            physics_server->area_set_area_monitor_callback(area, Variant());
-            physics_server->area_set_monitor_callback(area, Variant());
-            queue_free();
-        }
-
-        /// METHODS RESPONSIBLE FOR VARIOUS BULLET FEATURES
-
-        // Reduces the lifetime of the multimesh so it can eventually get disabled entirely
-        _ALWAYS_INLINE_ void reduce_lifetime(float delta)
-        {
-            // Life time timer logic
-            current_life_time -= delta;
-            if (current_life_time <= 0)
-            {
-                // Disable still active bullets (I'm not checking for bullet status,because disable_bullet already has that logic so I would be doing double checks for no reason)
-                for (int i = 0; i < size; i++)
-                {
-                    disable_bullet(i);
-                }
-                return;
+                set_texture(textures[current_texture_index]);          // set new texture
+                current_change_texture_time = max_change_texture_time; // reset timer
             }
         }
+    }
 
-        // Changes the texture periodically
-        _ALWAYS_INLINE_ void change_texture_periodically(float delta)
-        {
-            // The texture change timer is active only if more than 1 texture has been provided (and if that's the case then max_change_texture_time will never be 0)
-            if (max_change_texture_time != 0.0f)
-            {
-                current_change_texture_time -= delta;
-                if (current_change_texture_time <= 0.0f)
-                {
-                    if (current_texture_index + 1 < textures.size())
-                    {
-                        current_texture_index++;
-                    }
-                    else
-                    {
-                        current_texture_index = 0;
+    // Handles the rotation of the bullets
+    _ALWAYS_INLINE_ void handle_bullet_rotation(float delta) {
+        if (is_rotation_active) {
+            if (use_only_first_rotation_data) {
+                accelerate_bullet_rotation_speed(0, delta); // acceleration should be applied once every frame for the SINGULAR rotation speed that all bullets share
+                float cache_speed = all_rotation_speed[0] * delta;
+                for (int i = 0; i < size; i++) {
+                    // No point in rotating if the bullet has been disabled, performance will just be lost for deactivated bullets..
+                    if (bullets_enabled_status[i] == false) {
+                        continue;
                     }
 
-                    set_texture(textures[current_texture_index]);          // set new texture
-                    current_change_texture_time = max_change_texture_time; // reset timer
+                    rotate_bullet(i, cache_speed);
                 }
-            }
-        }
-
-        // Handles the rotation of the bullets
-        _ALWAYS_INLINE_ void handle_bullet_rotation(float delta)
-        {
-            if (is_rotation_active)
-            {
-                if (use_only_first_rotation_data)
-                {
-                    accelerate_bullet_rotation_speed(0, delta); // acceleration should be applied once every frame for the SINGULAR rotation speed that all bullets share
-                    float cache_speed = all_rotation_speed[0] * delta;
-                    for (int i = 0; i < size; i++)
-                    {
-                        // No point in rotating if the bullet has been disabled, performance will just be lost for deactivated bullets..
-                        if (bullets_enabled_status[i] == false)
-                        {
-                            continue;
-                        }
-
-                        rotate_bullet(i, cache_speed);
+            } else {
+                for (int i = 0; i < size; i++) {
+                    // No point in rotating if the bullet has been disabled, performance will just be lost for deactivated bullets..
+                    if (bullets_enabled_status[i] == false) {
+                        continue;
                     }
-                }
-                else
-                {
-                    for (int i = 0; i < size; i++)
-                    {
-                        // No point in rotating if the bullet has been disabled, performance will just be lost for deactivated bullets..
-                        if (bullets_enabled_status[i] == false)
-                        {
-                            continue;
-                        }
 
-                        rotate_bullet(i, all_rotation_speed[i] * delta);
-                        accelerate_bullet_rotation_speed(i, delta); // each bullet has its own BulletRotationData (meaning INDIVIDUAL rotation_speed that has to be accelerated every frame)
-                    }
+                    rotate_bullet(i, all_rotation_speed[i] * delta);
+                    accelerate_bullet_rotation_speed(i, delta); // each bullet has its own BulletRotationData (meaning INDIVIDUAL rotation_speed that has to be accelerated every frame)
                 }
             }
         }
-        ///
+    }
+    ///
 
-        /// HELPER METHODS
+    /// HELPER METHODS
 
-        // Makes all bullet instances visible and also populates bullets_enabled_status with true values only
-        void make_all_bullet_instances_visible()
-        {
-            bullets_enabled_status.resize(size);
-            active_bullets_counter = size;
+    // Makes all bullet instances visible and also populates bullets_enabled_status with true values only
+    void make_all_bullet_instances_visible();
 
-            for (int i = 0; i < size; i++)
-            {
-                multi->set_instance_color(i, Color(1, 1, 1, 1));
-                bullets_enabled_status[i] = true;
-            }
+    // Updates bullets_enabled_status with new values and makes certain instances visible/hidden depending on the new status values
+    void update_bullet_instances_visible(const godot::TypedArray<bool> &new_bullets_enabled_status);
+
+    // Depending on bullets_enabled_status enables/disables collision for each instance. It registers area's entered signals so all bullet data must be set before calling it
+    void enable_bullets_based_on_status();
+
+    // Accelerates an individual bullet's speed
+    _ALWAYS_INLINE_ void accelerate_bullet_speed(int speed_data_id, float delta) {
+        float curr_bullet_speed = all_cached_speed[speed_data_id];
+        float curr_max_bullet_speed = all_cached_max_speed[speed_data_id];
+
+        if (curr_bullet_speed == curr_max_bullet_speed) {
+            return;
         }
 
-        // Updates bullets_enabled_status with new values and makes certain instances visible/hidden depending on the new status values
-        void update_bullet_instances_visible(const TypedArray<bool> &new_bullets_enabled_status)
-        {
-            bullets_enabled_status.resize(size);
-            for (int i = 0; i < size; i++)
-            {
-                if ((bool)new_bullets_enabled_status[i] == true)
-                {
-                    multi->set_instance_color(i, Color(1, 1, 1, 1));
-                    active_bullets_counter++;
-                    bullets_enabled_status[i] = true;
-                }
-                else
-                {
-                    multi->set_instance_color(i, Color(0, 0, 0, 0));
-                    bullets_enabled_status[i] = false;
-                }
-            }
+        all_cached_speed[speed_data_id] = std::min<float>(curr_bullet_speed + all_cached_acceleration[speed_data_id] * delta, curr_max_bullet_speed);
+        all_cached_velocity[speed_data_id] = all_cached_direction[speed_data_id] * all_cached_speed[speed_data_id];
+    }
+
+    // Rotates a bullet's texture (and also the physics shape if rotate_only_textures is false)
+    _ALWAYS_INLINE_ void rotate_bullet(int multi_instance_id, float rotated_angle) {
+        godot::Transform2D &rotated_transf = all_cached_instance_transforms[multi_instance_id];
+        rotated_transf = rotated_transf.rotated_local(rotated_angle);
+
+        multi->set_instance_transform_2d(multi_instance_id, rotated_transf);
+
+        if (rotate_only_textures == false) {
+            godot::Transform2D &rotated_shape_transf = all_cached_shape_transforms[multi_instance_id];
+            rotated_shape_transf = rotated_shape_transf.rotated_local(rotated_angle);
+
+            physics_server->area_set_shape_transform(area, multi_instance_id, rotated_shape_transf);
+        }
+    }
+
+    // Accelerates a bullet's rotation speed
+    _ALWAYS_INLINE_ void accelerate_bullet_rotation_speed(int multi_instance_id, float delta) {
+        if (all_rotation_speed[multi_instance_id] == all_max_rotation_speed[multi_instance_id]) {
+            return;
         }
 
-        // Depending on bullets_enabled_status enables/disables collision for each instance. It registers area's entered signals so all bullet data must be set before calling it
-        void enable_bullets_based_on_status()
-        {
-            for (int i = 0; i < size; i++)
-            {
-                physics_server->call_deferred("area_set_shape_disabled", area, i, ((bool)bullets_enabled_status[i]) == false);
-            }
+        all_rotation_speed[multi_instance_id] = std::min<float>(all_rotation_speed[multi_instance_id] + (all_rotation_acceleration[multi_instance_id] * delta), all_max_rotation_speed[multi_instance_id]);
+    }
 
-            physics_server->area_set_area_monitor_callback(area, callable_mp(this, &MultiMeshBullets2D::area_entered_func));
-            physics_server->area_set_monitor_callback(area, callable_mp(this, &MultiMeshBullets2D::body_entered_func));
+    // Disables a single bullet
+    _ALWAYS_INLINE_ void disable_bullet(int bullet_index) {
+        // I am doing this, because there is a chance that the bullet collides with more than 1 thing at the same exact time (if I didn't have this check then the active_bullets_counter would be set wrong).
+        if (bullets_enabled_status[bullet_index] == false) {
+            return;
         }
 
-        // Accelerates an individual bullet's speed
-        _ALWAYS_INLINE_ void accelerate_bullet_speed(int speed_data_id, float delta)
-        {
-            float curr_bullet_speed = all_cached_speed[speed_data_id];
-            float curr_max_bullet_speed = all_cached_max_speed[speed_data_id];
+        active_bullets_counter--;
+        // TODO instead should set the Transform2D of the instance to 0 to avoid rendering
+        multi->set_instance_color(bullet_index, godot::Color(0, 0, 0, 0));
 
-            if (curr_bullet_speed == curr_max_bullet_speed)
-            {
-                return;
-            }
+        bullets_enabled_status[bullet_index] = false;
+        physics_server->call_deferred("area_set_shape_disabled", area, bullet_index, true);
 
-            all_cached_speed[speed_data_id] = std::min<float>(curr_bullet_speed + all_cached_acceleration[speed_data_id] * delta, curr_max_bullet_speed);
-            all_cached_velocity[speed_data_id] = all_cached_direction[speed_data_id] * all_cached_speed[speed_data_id];
+        if (active_bullets_counter == 0) {
+            disable_multi_mesh();
         }
+    }
 
-        // Rotates a bullet's texture (and also the physics shape if rotate_only_textures is false)
-        _ALWAYS_INLINE_ void rotate_bullet(int multi_instance_id, float rotated_angle)
-        {
-            Transform2D &rotated_transf = all_cached_instance_transforms[multi_instance_id];
-            rotated_transf = rotated_transf.rotated_local(rotated_angle);
+    ///
 
-            multi->set_instance_transform_2d(multi_instance_id, rotated_transf);
+    /// METHODS RESPONSIBLE FOR SETTING THE MULTIMESH IN CORRECT STATE
 
-            if (rotate_only_textures == false)
-            {
-                Transform2D &rotated_shape_transf = all_cached_shape_transforms[multi_instance_id];
-                rotated_shape_transf = rotated_shape_transf.rotated_local(rotated_angle);
+    // Generate methods are called only when spawning/loading data
 
-                physics_server->area_set_shape_transform(area, multi_instance_id, rotated_shape_transf);
-            }
-        }
+    void generate_area();
 
-        // Accelerates a bullet's rotation speed
-        _ALWAYS_INLINE_ void accelerate_bullet_rotation_speed(int multi_instance_id, float delta)
-        {
-            if (all_rotation_speed[multi_instance_id] == all_max_rotation_speed[multi_instance_id])
-            {
-                return;
-            }
+    void set_up_area(
+        godot::RID new_world_space,
+        uint32_t new_collision_layer,
+        uint32_t new_collision_mask,
+        bool new_monitorable);
 
-            all_rotation_speed[multi_instance_id] = std::min<float>(all_rotation_speed[multi_instance_id] + (all_rotation_acceleration[multi_instance_id] * delta), all_max_rotation_speed[multi_instance_id]);
-        }
+    void generate_collision_shapes_for_area();
 
-        // Disables a single bullet
-        _ALWAYS_INLINE_ void disable_bullet(int bullet_index)
-        {
-            // I am doing this, because there is a chance that the bullet collides with more than 1 thing at the same exact time (if I didn't have this check then the active_bullets_counter would be set wrong).
-            if (bullets_enabled_status[bullet_index] == false)
-            {
-                return;
-            }
+    void generate_multimesh();
 
-            active_bullets_counter--;
-            // TODO instead should set the Transform2D of the instance to 0 to avoid rendering
-            multi->set_instance_color(bullet_index, Color(0, 0, 0, 0));
+    void set_up_multimesh(int new_instance_count, const godot::Ref<godot::Mesh> &new_mesh, godot::Vector2 new_texture_size);
 
-            bullets_enabled_status[bullet_index] = false;
-            physics_server->call_deferred("area_set_shape_disabled", area, bullet_index, true);
+    void set_up_multimesh_bullet_instances(
+        godot::Vector2 new_collision_shape_size,
+        const godot::TypedArray<godot::Transform2D> &new_transforms, // make sure you are giving transforms that don't have collision offset applied, otherwise it will apply it twice
+        float new_texture_rotation,
+        godot::Vector2 new_collision_shape_offset,
+        bool new_is_texture_rotation_permanent);
 
-            if (active_bullets_counter == 0)
-            {
-                disable_multi_mesh();
-            }
-        }
+    void set_up_rotation(godot::TypedArray<BulletRotationData> &new_data, bool new_rotate_only_textures);
 
-        ///
+    void set_up_life_time_timer(float new_max_life_time, float new_current_life_time);
 
-        /// METHODS RESPONSIBLE FOR SETTING THE MULTIMESH IN CORRECT STATE
+    void set_up_change_texture_timer(int new_amount_textures, float new_max_change_texture_time, float new_current_change_texture_time);
 
-        // Generate methods are called only when spawning/loading data
+    // Always called last
+    void finalize_set_up(
+        const godot::Ref<godot::Resource> &new_bullets_custom_data,
+        const godot::TypedArray<godot::Texture2D> &new_textures,
+        int new_current_texture_index,
+        const godot::Ref<godot::Material> &new_material);
 
-        void generate_area()
-        {
-            area = physics_server->area_create();
-        }
+    void load_bullet_instances(const godot::Ref<SaveDataBlockBullets2D> &data);
 
-        void set_up_area(
-            RID new_world_space,
-            uint32_t new_collision_layer,
-            uint32_t new_collision_mask,
-            bool new_monitorable)
-        {
-            physics_server->area_set_space(area, new_world_space);
-            physics_server->area_set_collision_layer(area, new_collision_layer);
-            physics_server->area_set_collision_mask(area, new_collision_mask);
-            physics_server->area_set_monitorable(area, new_monitorable);
+    ///
 
-            monitorable = new_monitorable;
-        }
+    /// COLLISION DETECTION METHODS
 
-        void generate_collision_shapes_for_area()
-        {
-            for (int i = 0; i < size; i++)
-            {
-                RID shape = physics_server->rectangle_shape_create();
-                physics_server->area_add_shape(area, shape);
-                physics_server->area_set_shape_disabled(area, i, true); // By default make it disabled
-            }
-        }
+    void area_entered_func(int status, godot::RID entered_rid, uint64_t entered_instance_id, int entered_shape_index, int bullet_shape_index);
+    void body_entered_func(int status, godot::RID entered_rid, uint64_t entered_instance_id, int entered_shape_index, int bullet_shape_index);
+    ///
 
-        void generate_multimesh()
-        {
-            multi = memnew(MultiMesh);
-            multi->set_use_colors(true);
-            set_multimesh(multi);
-        }
+    /// METHODS THAT ARE SUPPOSED TO BE OVERRIDEN TO PROVIDE CUSTOM LOGIC
 
-        void set_up_multimesh(int new_instance_count, const Ref<Mesh> &new_mesh, Vector2 new_texture_size)
-        {
-            if (new_mesh.is_valid())
-            {
-                multi->set_mesh(new_mesh);
-            }
-            else
-            {
-                // TODO maybe if the mesh to be generated has the size size as the previous one, then there is no need to generate a brand new one?
-                Ref<QuadMesh> mesh = memnew(QuadMesh);
-                mesh->set_size(new_texture_size);
-                multi->set_mesh(mesh);
-                texture_size = new_texture_size;
-            }
+    // Exposes methods that should be available in Godot engine
+    static void _bind_methods() {}
 
-            multi->set_instance_count(new_instance_count);
-        }
+    // Used to set up movement related data before move_bullets is executed. It's important to call this method only after all bullet instances have been set up with collision shapes (in case you are going to edit the execution order of methods)
+    virtual void set_up_movement_data(godot::TypedArray<BulletSpeedData> &data) {}
 
-        void set_up_multimesh_bullet_instances(
-            Vector2 new_collision_shape_size,
-            const TypedArray<Transform2D> &new_transforms, // make sure you are giving transforms that don't have collision offset applied, otherwise it will apply it twice
-            float new_texture_rotation,
-            Vector2 new_collision_shape_offset,
-            bool new_is_texture_rotation_permanent)
-        {
-            // Allocate memory for all these at once
-            all_cached_instance_transforms.resize(size);
-            all_cached_shape_transforms.resize(size);
-            all_cached_shape_origin.resize(size);
-            all_cached_instance_origin.resize(size);
+    // Holds custom logic that runs before the spawn function finalizes
+    virtual void custom_additional_spawn_logic(const godot::Ref<BlockBulletsData2D> &data) {}
 
-            for (int i = 0; i < size; i++)
-            {
-                RID shape = physics_server->area_get_shape(area, i);
-                physics_server->shape_set_data(shape, new_collision_shape_size / 2); // SHAPE_RECTANGLE: a Vector2 half_extents  (I'm deviding by 2 to get the actual size the user wants for the rectangle, the function wants half_extents, if it gets the size 32 for the x, that means only the half width is 32 so the other half will also be 32 meaning 64 total width if I give the user's 32 that he said, to avoid that im deviding by 2 so the size gets set correctly to 32)
-                // Collision shape offset
-                Transform2D shape_transf = new_transforms[i];
+    // Holds custom logic that runs before the save function finalizes
+    virtual void custom_additional_save_logic(const godot::Ref<SaveDataBlockBullets2D> &data) {}
 
-                // The rotation of each transform
-                float curr_bullet_rotation = shape_transf.get_rotation();
+    // Holds custom logic that runs before the load function finalizes
+    virtual void custom_additional_load_logic(const godot::Ref<SaveDataBlockBullets2D> &data) {}
 
-                // Rotate collision_shape_offset based on the direction of the bullets
-                Vector2 rotated_offset;
-                rotated_offset.x = new_collision_shape_offset.x * Math::cos(curr_bullet_rotation) - new_collision_shape_offset.y * Math::sin(curr_bullet_rotation);
-                rotated_offset.y = new_collision_shape_offset.x * Math::sin(curr_bullet_rotation) + new_collision_shape_offset.y * Math::cos(curr_bullet_rotation);
+    // Holds custom logic that runs before activating this multimesh when retrieved from the object pool
+    virtual void custom_additional_activate_logic(const godot::Ref<BlockBulletsData2D> &data) {}
 
-                shape_transf.set_origin(shape_transf.get_origin() + rotated_offset);
-
-                physics_server->area_set_shape_transform(area, i, shape_transf);
-
-                // Texture rotation
-                Transform2D texture_transf = new_transforms[i];
-                // The transform is used for both the collision shape and the texture by default, in case the texture is not rotated correctly, the user can enter an additional texture rotation that will rotate the texture even more, but the collision shape's rotation won't change, so make sure to pass correct transform data
-                if (new_is_texture_rotation_permanent)
-                {
-                    // Same texture rotation no matter the rotation of the bullet's transform
-                    texture_transf.set_rotation(new_texture_rotation);
-                }
-                else
-                {
-                    // The rotation of the texture will be influenced by the rotation of the bullet transform
-                    texture_transf.set_rotation(texture_transf.get_rotation() + new_texture_rotation);
-                }
-
-                multi->set_instance_transform_2d(i, texture_transf);
-
-                // Cache bullet transforms and origin vectors
-                all_cached_instance_transforms[i] = texture_transf;
-                all_cached_shape_transforms[i] = shape_transf;
-
-                all_cached_instance_origin[i] = texture_transf.get_origin();
-                all_cached_shape_origin[i] = shape_transf.get_origin();
-            }
-        }
-
-        void set_up_rotation(TypedArray<BulletRotationData> &new_data, bool new_rotate_only_textures)
-        {
-            int amount_of_rotation_data = new_data.size();
-            // If the amount of data that was provided is not a single one and also not the same amount as the bullets amount
-            // then rotation should be disabled/invalid.
-            // This is because I want the user to either provide a single BulletRotationData that will be used for every single bullet
-            // or BulletRotation data for each bullet that will allow each bullet to rotate differently. Only these 2 cases are valid.
-
-            if (amount_of_rotation_data != size)
-            {
-                if (amount_of_rotation_data != 1)
-                {
-                    is_rotation_active = false;
-                    return;
-                }
-
-                use_only_first_rotation_data = true; // Important. Means only a single data was provided, so use it for every single bullet. If I don't have this variable then in _process I will be trying to access invalid vector indexes
-            }
-            rotate_only_textures = new_rotate_only_textures;
-            is_rotation_active = true; // Important, because it determines if we have rotation data to use
-            all_rotation_speed.resize(amount_of_rotation_data);
-            all_max_rotation_speed.resize(amount_of_rotation_data);
-            all_rotation_acceleration.resize(amount_of_rotation_data);
-
-            for (int i = 0; i < amount_of_rotation_data; i++)
-            {
-                BulletRotationData &curr_bullet_data = *Object::cast_to<BulletRotationData>(new_data[i]); // Found out that if you have a TypedArray<>, trying to access an element with [] will give you Variant, so in order to cast it use Object::cast_to<>(), the normal reinterpret_cast and the C way of casting didn't work hmm
-
-                all_rotation_speed[i] = curr_bullet_data.rotation_speed;
-                all_max_rotation_speed[i] = curr_bullet_data.max_rotation_speed;
-                all_rotation_acceleration[i] = curr_bullet_data.rotation_acceleration;
-            }
-        }
-
-        void set_up_life_time_timer(float new_max_life_time, float new_current_life_time)
-        {
-            max_life_time = new_max_life_time;
-            current_life_time = new_current_life_time;
-        }
-
-        void set_up_change_texture_timer(int new_amount_textures, float new_max_change_texture_time, float new_current_change_texture_time)
-        {
-            if (new_amount_textures > 1)
-            { // the change texture timer will be active only if more than 1 texture was provided
-                max_change_texture_time = new_max_change_texture_time;
-                current_change_texture_time = new_current_change_texture_time;
-            }
-        }
-
-        // Always called last
-        void finalize_set_up(
-            const Ref<Resource> &new_bullets_custom_data,
-            const TypedArray<Texture2D> &new_textures,
-            int new_current_texture_index,
-            const Ref<Material> &new_material)
-        {
-            // Bullets custom data
-            if (new_bullets_custom_data.is_valid())
-            {                                                                   // make sure its valid before trying to duplicate it..
-                bullets_custom_data = new_bullets_custom_data->duplicate(true); // the reason im duplicating it, is for the user to not worry about editing the resource he already has in GDScript
-            }
-
-            // Texture logic
-            textures.resize(new_textures.size());
-            for (int i = 0; i < new_textures.size(); i++)
-            {
-                textures[i] = new_textures[i];
-            }
-
-            // Make sure the current_texture_index is valid
-            if (new_current_texture_index >= textures.size() || new_current_texture_index < 0)
-            {
-                new_current_texture_index = 0;
-            }
-            current_texture_index = new_current_texture_index; // remember the current index of the current texture
-
-            if (textures.size() > 0)
-            {                                                 // Also make sure that there are textures to set
-                set_texture(textures[current_texture_index]); // setting the current texture
-            }
-
-            // Material
-            if (new_material.is_valid())
-            {
-                set_material(new_material);
-            }
-
-            set_physics_process(true);
-            set_visible(true);
-        }
-
-        void load_bullet_instances(const Ref<DType> &data)
-        {
-            int new_speed_data_size = data->all_cached_velocity.size();
-
-            all_cached_speed.resize(new_speed_data_size);
-            all_cached_max_speed.resize(new_speed_data_size);
-            all_cached_acceleration.resize(new_speed_data_size);
-
-            all_cached_instance_transforms.resize(size);
-            all_cached_shape_transforms.resize(size);
-            all_cached_instance_origin.resize(size);
-            all_cached_shape_origin.resize(size);
-
-            all_cached_velocity.resize(new_speed_data_size);
-            all_cached_direction.resize(new_speed_data_size);
-
-            for (int i = 0; i < new_speed_data_size; i++)
-            {
-                all_cached_speed[i] = data->all_cached_speed[i];
-                all_cached_max_speed[i] = data->all_cached_max_speed[i];
-                all_cached_acceleration[i] = data->all_cached_acceleration[i];
-
-                all_cached_velocity[i] = data->all_cached_velocity[i];
-                all_cached_direction[i] = data->all_cached_direction[i];
-            }
-
-            for (int i = 0; i < size; i++)
-            {
-                all_cached_instance_transforms[i] = data->all_cached_instance_transforms[i];
-                all_cached_shape_transforms[i] = data->all_cached_shape_transforms[i];
-                all_cached_instance_origin[i] = data->all_cached_instance_origin[i];
-                all_cached_shape_origin[i] = data->all_cached_shape_origin[i];
-
-                RID shape_rid = physics_server->area_get_shape(area, i);
-                physics_server->shape_set_data(shape_rid, data->collision_shape_size);
-                physics_server->area_set_shape_transform(area, i, all_cached_shape_transforms[i]);
-
-                multi->set_instance_transform_2d(i, all_cached_instance_transforms[i]);
-            }
-        }
-
-        ///
-
-        /// COLLISION DETECTION METHODS
-
-        void area_entered_func(int status, RID entered_rid, uint64_t entered_instance_id, int entered_shape_index, int bullet_shape_index)
-        {
-            if (status == PhysicsServer2D::AREA_BODY_ADDED)
-            {
-                Object *obj = ObjectDB::get_instance(entered_instance_id);
-                disable_bullet(bullet_shape_index);
-                // another option would be to emit a signal here, and then the factory to register a callback for it and then emit its own signal, but I felt that it would be slower and also very messy, I also thought of keeping pointers to outside functions, but again its messier. Best solution I feel like is just keeping a pointer to the factory itself, which also allows me to call pool methods.
-                factory->emit_signal("area_entered", obj, bullets_custom_data, all_cached_instance_transforms[bullet_shape_index].get_origin());
-            }
-        }
-        void body_entered_func(int status, RID entered_rid, uint64_t entered_instance_id, int entered_shape_index, int bullet_shape_index)
-        {
-            if (status == PhysicsServer2D::AREA_BODY_ADDED)
-            {
-                Object *obj = ObjectDB::get_instance(entered_instance_id);
-                disable_bullet(bullet_shape_index);
-                factory->emit_signal("body_entered", obj, bullets_custom_data, all_cached_instance_transforms[bullet_shape_index].get_origin());
-            }
-        }
-        ///
-
-        /// METHODS THAT ARE SUPPOSED TO BE OVERRIDEN TO PROVIDE CUSTOM LOGIC
-
-        // Used to set up movement related data before move_bullets is executed. It's important to call this method only after all bullet instances have been set up with collision shapes (in case you are going to edit the execution order of methods)
-        virtual void set_up_movement_data(TypedArray<BulletSpeedData> &data) {}
-
-        // Holds custom logic that runs before the spawn function finalizes
-        virtual void custom_additional_spawn_logic(const Ref<SType> &data) {}
-
-        // Holds custom logic that runs before the save function finalizes
-        virtual void custom_additional_save_logic(Ref<DType> &data) {}
-
-        // Holds custom logic that runs before the load function finalizes
-        virtual void custom_additional_load_logic(const Ref<DType> &data) {}
-
-        // Holds custom logic that runs before activating this multimesh when retrieved from the object pool
-        virtual void custom_additional_activate_logic(const Ref<SType> &data) {}
-
-        // Holds custom logic that runs before disabling and pushing this multimesh inside an object pool
-        virtual void custom_additional_disable_logic() {}
-        ///
+    // Holds custom logic that runs before disabling and pushing this multimesh inside an object pool
+    virtual void custom_additional_disable_logic() {}
+    ///
 };
+}
 #endif

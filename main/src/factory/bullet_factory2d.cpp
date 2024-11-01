@@ -1,19 +1,20 @@
-#include "bullet_factory2d.hpp"
-#include "godot_cpp/classes/world2d.hpp"
-
-#include "godot_cpp/variant/utility_functions.hpp"
-#include "../spawn-data/block_bullets_data2d.hpp"
-#include "../save-data/save_data_bullet_factory2d.hpp"
-
-#include "../bullets/block_bullets2d.hpp" 
-#include "godot_cpp/classes/engine.hpp"
-
+#include "./bullet_factory2d.hpp"
+#include "../bullets/block_bullets2d.hpp"
 #include "../debugger/bullet_debugger2d.hpp"
+#include "../save-data/save_data_bullet_factory2d.hpp"
+#include "../shared/multimesh_object_pool.hpp"
+#include "../spawn-data/block_bullets_data2d.hpp"
+
+#include <godot_cpp/classes/engine.hpp>
+#include <godot_cpp/classes/world2d.hpp>
+#include <godot_cpp/variant/utility_functions.hpp>
 
 using namespace godot;
 
-void BulletFactory2D::_ready(){
-    if(physics_space.is_valid() == false){
+namespace BlastBullets {
+
+void BulletFactory2D::_ready() {
+    if (physics_space.is_valid() == false) {
         physics_space = get_world_2d()->get_space();
     }
 
@@ -22,45 +23,43 @@ void BulletFactory2D::_ready(){
 
     add_child(bullets_container);
 
-    if(is_debugger_enabled){
-        debugger=memnew(BulletDebugger2D);
+    if (is_debugger_enabled) {
+        debugger = memnew(BulletDebugger2D);
         debugger->bullets_container_ptr = bullets_container;
         add_child(debugger);
     }
 }
 
-void BulletFactory2D::spawnBlockBullets2D(const Ref<BlockBulletsData2D>& spawn_data){
-    int key = spawn_data->transforms.size();
-    
-    BlockBullets2D* bullets = block_bullets_pool.pop(key);
-    if(bullets != nullptr){
-        bullets->activate_multimesh(spawn_data);
-        return;
-    }
+void BulletFactory2D::spawnBlockBullets2D(Ref<BlockBulletsData2D> spawn_data) {
+    // int key = spawn_data->transforms.size();
 
+    // BlockBullets2D* bullets = dynamic_cast<BlockBullets2D*>(block_bullets_pool.pop(key));
+    // if(bullets != nullptr){
+    //     bullets->activate_multimesh(spawn_data);
+    //     return;
+    // }
 
-    BlockBullets2D* blk_instance = memnew(BlockBullets2D);
-    blk_instance->spawn(spawn_data, block_bullets_pool);
+    // BlockBullets2D* blk_instance = memnew(BlockBullets2D);
+    // blk_instance->spawn(spawn_data, &block_bullets_pool, this);
 }
 
-RID BulletFactory2D::get_physics_space() const{
+RID BulletFactory2D::get_physics_space() const {
     return physics_space;
 }
-void BulletFactory2D::set_physics_space(RID new_space_rid){
-    physics_space=new_space_rid;
+void BulletFactory2D::set_physics_space(RID new_space_rid) {
+    physics_space = new_space_rid;
 }
 
-Ref<SaveDataBulletFactory2D> BulletFactory2D::save(){
+Ref<SaveDataBulletFactory2D> BulletFactory2D::save() {
     Ref<SaveDataBulletFactory2D> data = memnew(SaveDataBulletFactory2D);
 
     TypedArray<BlockBullets2D> bullets = bullets_container->get_children();
 
-    for (int i = 0; i < bullets.size(); i++)
-    {
-        BlockBullets2D& bullet_instance = *Object::cast_to<BlockBullets2D>(bullets[i]);
+    for (int i = 0; i < bullets.size(); i++) {
+        BlockBullets2D &bullet_instance = *Object::cast_to<BlockBullets2D>(bullets[i]);
 
         // I only want to save bullets that are still active (I don't want to save bullets that are in the pool).
-        if(bullet_instance.current_life_time == 0.0f){
+        if (bullet_instance.current_life_time == 0.0f) {
             continue;
         }
         // Saves only the active bullets currently
@@ -69,46 +68,46 @@ Ref<SaveDataBulletFactory2D> BulletFactory2D::save(){
     emit_signal("finished_saving");
     return data;
 }
-void BulletFactory2D::load(Ref<SaveDataBulletFactory2D> new_data){
-    // Load all new bullets
-    int amount_bullets = new_data->all_block_bullets.size();
-    for (int i = 0; i < amount_bullets ; i++)
-    {
-        BlockBullets2D* blk_instance = memnew(BlockBullets2D);
-        blk_instance->load(new_data->all_block_bullets[i], block_bullets_pool);
-    }
-    emit_signal("finished_loading");
+void BulletFactory2D::load(Ref<SaveDataBulletFactory2D> new_data) {
+    // // Load all new bullets
+    // int amount_bullets = new_data->all_block_bullets.size();
+    // for (int i = 0; i < amount_bullets ; i++)
+    // {
+    //     BlockBullets2D* blk_instance = memnew(BlockBullets2D);
+    //     blk_instance->load(new_data->all_block_bullets[i], &block_bullets_pool, this);
+    // }
+    // emit_signal("finished_loading");
 }
 
-void BulletFactory2D::clear_all_bullets(){
-    // It's important to reset the debugger
-    if(debugger != nullptr){
-        debugger->reset_debugger();
-    }
-    TypedArray<Node> allCurrentBullets = bullets_container->get_children();
-    
-    int size = allCurrentBullets.size();
+void BulletFactory2D::clear_all_bullets() {
+    // // It's important to reset the debugger
+    // if(debugger != nullptr){
+    //     debugger->reset_debugger();
+    // }
+    // TypedArray<Node> allCurrentBullets = bullets_container->get_children();
 
-    for (int i = 0; i < size; i++) {
-        BlockBullets2D* curr_bullet = Object::cast_to<BlockBullets2D>(allCurrentBullets[i]);
-        if(curr_bullet != nullptr){
-            curr_bullet->safe_delete();
-        }
-    }
+    // int size = allCurrentBullets.size();
 
-    block_bullets_pool.clear();
-    emit_signal("finished_clearing");
+    // for (int i = 0; i < size; i++) {
+    //     BlockBullets2D* curr_bullet = Object::cast_to<BlockBullets2D>(allCurrentBullets[i]);
+    //     if(curr_bullet != nullptr){
+    //         curr_bullet->safe_delete();
+    //     }
+    // }
+
+    // block_bullets_pool.clear();
+    // emit_signal("finished_clearing");
 }
 
-bool BulletFactory2D::get_is_debugger_enabled(){
+bool BulletFactory2D::get_is_debugger_enabled() {
     return is_debugger_enabled;
 }
 
-void BulletFactory2D::set_is_debugger_enabled(bool new_is_enabled){
-    is_debugger_enabled=new_is_enabled;
+void BulletFactory2D::set_is_debugger_enabled(bool new_is_enabled) {
+    is_debugger_enabled = new_is_enabled;
 }
 
-void BulletFactory2D::_bind_methods(){
+void BulletFactory2D::_bind_methods() {
     ClassDB::bind_method(D_METHOD("get_physics_space"), &BulletFactory2D::get_physics_space);
     ClassDB::bind_method(D_METHOD("set_physics_space", "new_physics_space"), &BulletFactory2D::set_physics_space);
     ADD_PROPERTY(PropertyInfo(Variant::RID, "physics_space"), "set_physics_space", "get_physics_space");
@@ -116,7 +115,7 @@ void BulletFactory2D::_bind_methods(){
     ClassDB::bind_method(D_METHOD("get_is_debugger_enabled"), &BulletFactory2D::get_is_debugger_enabled);
     ClassDB::bind_method(D_METHOD("set_is_debugger_enabled", "new_is_enabled"), &BulletFactory2D::set_is_debugger_enabled);
     ADD_PROPERTY(PropertyInfo(Variant::BOOL, "is_debugger_enabled"), "set_is_debugger_enabled", "get_is_debugger_enabled");
-    
+
     ClassDB::bind_method(D_METHOD("spawnBlockBullets2D", "spawn_data"), &BulletFactory2D::spawnBlockBullets2D);
 
     ClassDB::bind_method(D_METHOD("save"), &BulletFactory2D::save);
@@ -130,4 +129,5 @@ void BulletFactory2D::_bind_methods(){
     ADD_SIGNAL(MethodInfo("finished_saving"));
     ADD_SIGNAL(MethodInfo("finished_loading"));
     ADD_SIGNAL(MethodInfo("finished_clearing"));
+}
 }
