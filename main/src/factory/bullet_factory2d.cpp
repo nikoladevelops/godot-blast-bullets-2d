@@ -31,16 +31,17 @@ void BulletFactory2D::_ready() {
 }
 
 void BulletFactory2D::spawnBlockBullets2D(Ref<BlockBulletsData2D> spawn_data) {
-    // int key = spawn_data->transforms.size();
+    int key = spawn_data->transforms.size();
 
-    // BlockBullets2D* bullets = dynamic_cast<BlockBullets2D*>(block_bullets_pool.pop(key));
-    // if(bullets != nullptr){
-    //     bullets->activate_multimesh(spawn_data);
-    //     return;
-    // }
+    BlockBullets2D* bullets = dynamic_cast<BlockBullets2D*>(block_bullets_pool.pop(key));
+    if(bullets != nullptr){
+        bullets->activate_multimesh(spawn_data);
+        return;
+    }
 
-    // BlockBullets2D* blk_instance = memnew(BlockBullets2D);
-    // blk_instance->spawn(spawn_data, &block_bullets_pool, this);
+    BlockBullets2D* blk_instance = memnew(BlockBullets2D);
+
+    blk_instance->spawn(spawn_data, &block_bullets_pool, this);
 }
 
 RID BulletFactory2D::get_physics_space() const {
@@ -69,34 +70,34 @@ Ref<SaveDataBulletFactory2D> BulletFactory2D::save() {
     return data;
 }
 void BulletFactory2D::load(Ref<SaveDataBulletFactory2D> new_data) {
-    // // Load all new bullets
-    // int amount_bullets = new_data->all_block_bullets.size();
-    // for (int i = 0; i < amount_bullets ; i++)
-    // {
-    //     BlockBullets2D* blk_instance = memnew(BlockBullets2D);
-    //     blk_instance->load(new_data->all_block_bullets[i], &block_bullets_pool, this);
-    // }
-    // emit_signal("finished_loading");
+    // Load all new bullets
+    int amount_bullets = new_data->all_block_bullets.size();
+    for (int i = 0; i < amount_bullets ; i++)
+    {
+        BlockBullets2D* blk_instance = memnew(BlockBullets2D);
+        blk_instance->load(new_data->all_block_bullets[i], &block_bullets_pool, this);
+    }
+    emit_signal("finished_loading");
 }
 
 void BulletFactory2D::clear_all_bullets() {
-    // // It's important to reset the debugger
-    // if(debugger != nullptr){
-    //     debugger->reset_debugger();
-    // }
-    // TypedArray<Node> allCurrentBullets = bullets_container->get_children();
+    // It's important to reset the debugger
+    if(debugger != nullptr){
+        debugger->reset_debugger();
+    }
+    TypedArray<Node> allCurrentBullets = bullets_container->get_children();
 
-    // int size = allCurrentBullets.size();
+    int size = allCurrentBullets.size();
 
-    // for (int i = 0; i < size; i++) {
-    //     BlockBullets2D* curr_bullet = Object::cast_to<BlockBullets2D>(allCurrentBullets[i]);
-    //     if(curr_bullet != nullptr){
-    //         curr_bullet->safe_delete();
-    //     }
-    // }
+    for (int i = 0; i < size; i++) {
+        BlockBullets2D* curr_bullet = Object::cast_to<BlockBullets2D>(allCurrentBullets[i]);
+        if(curr_bullet != nullptr){
+            curr_bullet->safe_delete();
+        }
+    }
 
-    // block_bullets_pool.clear();
-    // emit_signal("finished_clearing");
+    block_bullets_pool.clear();
+    emit_signal("finished_clearing");
 }
 
 bool BulletFactory2D::get_is_debugger_enabled() {

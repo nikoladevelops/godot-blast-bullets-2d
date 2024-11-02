@@ -1,13 +1,10 @@
 #ifndef BULLET_FACTORY2D
 #define BULLET_FACTORY2D
 
-// #include <godot_cpp/classes/ref.hpp>
-// #include <godot_cpp/variant/rid.hpp>
-#include <godot_cpp/classes/node.hpp>
-#include <godot_cpp/classes/node2d.hpp>
-
 #include "../shared/multimesh_object_pool.hpp"
 
+#include <godot_cpp/classes/node.hpp>
+#include <godot_cpp/classes/node2d.hpp>
 
 namespace BlastBullets {
 // Using forward declaration to avoid circular dependencies
@@ -20,7 +17,7 @@ class BulletFactory2D : public godot::Node2D {
     GDCLASS(BulletFactory2D, godot::Node2D);
 
 public:
-    // MultiMeshObjectPool block_bullets_pool;
+    MultiMeshObjectPool block_bullets_pool;
 
     // The physics space where the bullets multimeshes are interacting with the world.
     godot::RID physics_space;
