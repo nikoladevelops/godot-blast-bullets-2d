@@ -5,6 +5,7 @@
 
 namespace godot {
 class MultiMeshInstance2D;
+class PhysicsServer2D;
 }
 
 namespace BlastBullets {
@@ -18,6 +19,7 @@ class BulletDebugger2D : public godot::Node {
 public:
     // A pointer to where the multi mesh bullets are stored in.
     godot::Node *bullets_container_ptr;
+    godot::PhysicsServer2D *physics_server;
 
     void _ready();
     void _physics_process(float delta);

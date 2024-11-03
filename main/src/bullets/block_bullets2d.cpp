@@ -1,10 +1,9 @@
 #include "block_bullets2d.hpp"
+#include "../factory/bullet_factory2d.hpp"
 
+#include "godot_cpp/classes/engine.hpp"
 #include "godot_cpp/classes/quad_mesh.hpp"
 #include "godot_cpp/variant/utility_functions.hpp"
-
-#include "../factory/bullet_factory2d.hpp"
-#include "godot_cpp/classes/engine.hpp"
 
 using namespace godot;
 

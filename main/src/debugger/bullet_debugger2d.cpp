@@ -1,20 +1,18 @@
-#include <godot_cpp/classes/engine.hpp>
-#include <godot_cpp/classes/multi_mesh_instance2d.hpp>
-#include <godot_cpp/classes/physics_server2d.hpp>
-#include <godot_cpp/classes/quad_mesh.hpp>
-
 #include "../bullets/block_bullets2d.hpp"
 #include "bullet_debugger2d.hpp"
 
+#include <godot_cpp/classes/engine.hpp>
+#include <godot_cpp/classes/multi_mesh_instance2d.hpp>
+#include <godot_cpp/classes/quad_mesh.hpp>
+#include <godot_cpp/classes/physics_server2d.hpp>
 
 using namespace godot;
-
-#define physics_server godot::PhysicsServer2D::get_singleton()
 
 namespace BlastBullets {
 void BulletDebugger2D::_ready() {
     // When a bullet multimesh gets added to the bullet container, run generate_texture_multimesh
     bullets_container_ptr->connect("child_entered_tree", callable_mp(this, &BulletDebugger2D::generate_texture_multimesh));
+    physics_server = PhysicsServer2D::get_singleton();
 }
 
 void BulletDebugger2D::reset_debugger() {

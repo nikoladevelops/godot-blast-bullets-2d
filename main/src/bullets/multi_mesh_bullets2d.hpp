@@ -14,15 +14,11 @@
 #include <godot_cpp/classes/quad_mesh.hpp>
 #include <godot_cpp/variant/utility_functions.hpp>
 
-#define physics_server godot::PhysicsServer2D::get_singleton()
-
 namespace BlastBullets {
 
 class BulletFactory2D;
 class MultiMeshObjectPool;
 
-// class BulletFactory2D; //TODO remove this, it was because of circular dependencies, but maybe same problem will appear in child classes hmm
-/// TODO In the future this class should become a template to make it more extendable and to no longer rely on run-time polymorphism. As of Godot 4.3-stable there are no macros that allow registering of templates (similar to GDCLASS)
 class MultiMeshBullets2D : public godot::MultiMeshInstance2D {
     GDCLASS(MultiMeshBullets2D, godot::MultiMeshInstance2D)
 
@@ -30,6 +26,7 @@ class MultiMeshBullets2D : public godot::MultiMeshInstance2D {
 public:
     BulletFactory2D *bullet_factory;
     MultiMeshObjectPool *bullets_pool;
+    godot::PhysicsServer2D *physics_server;
 
     /// TEXTURE RELATED
 

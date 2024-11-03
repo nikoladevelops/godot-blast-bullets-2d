@@ -1,7 +1,9 @@
 #include "./multi_mesh_bullets2d.hpp"
-
 #include "../factory/bullet_factory2d.hpp"
 #include "../shared/multimesh_object_pool.hpp"
+
+#include <godot_cpp/classes/physics_server2d.hpp>
+
 
 using namespace godot;
 
@@ -25,6 +27,7 @@ MultiMeshBullets2D::~MultiMeshBullets2D() {
 void MultiMeshBullets2D::spawn(const Ref<BlockBulletsData2D> &spawn_data, MultiMeshObjectPool *pool, BulletFactory2D *factory) {
     bullets_pool = pool;
     bullet_factory = factory;
+    physics_server = PhysicsServer2D::get_singleton();
 
     size = spawn_data->transforms.size(); // important, because some set_up methods use this
 
@@ -177,6 +180,7 @@ Ref<SaveDataBlockBullets2D> MultiMeshBullets2D::save() {
 void MultiMeshBullets2D::load(const Ref<SaveDataBlockBullets2D> &data, MultiMeshObjectPool *pool, BulletFactory2D *factory) {
     bullets_pool = pool;
     bullet_factory = factory;
+    physics_server = PhysicsServer2D::get_singleton();
 
     size = data->all_cached_instance_transforms.size();
 
