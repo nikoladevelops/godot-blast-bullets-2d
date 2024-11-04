@@ -213,15 +213,6 @@ public:
 
     /// HELPER METHODS
 
-    // Makes all bullet instances visible and also populates bullets_enabled_status with true values only
-    void make_all_bullet_instances_visible();
-
-    // Updates bullets_enabled_status with new values and makes certain instances visible/hidden depending on the new status values
-    void update_bullet_instances_visible(const godot::TypedArray<bool> &new_bullets_enabled_status);
-
-    // Depending on bullets_enabled_status enables/disables collision for each instance. It registers area's entered signals so all bullet data must be set before calling it
-    void enable_bullets_based_on_status();
-
     // Accelerates an individual bullet's speed
     _ALWAYS_INLINE_ void accelerate_bullet_speed(int speed_data_id, float delta) {
         float curr_bullet_speed = all_cached_speed[speed_data_id];
@@ -267,12 +258,14 @@ public:
         }
 
         active_bullets_counter--;
-        // TODO instead should set the Transform2D of the instance to 0 to avoid rendering
-        multi->set_instance_color(bullet_index, godot::Color(0, 0, 0, 0));
 
         bullets_enabled_status[bullet_index] = false;
-        physics_server->call_deferred("area_set_shape_disabled", area, bullet_index, true);
 
+        godot::Transform2D zero_transform = godot::Transform2D().scaled(godot::Vector2(0, 0));
+
+        multi->set_instance_transform_2d(bullet_index, zero_transform); // Stops rendering the instance
+
+        physics_server->call_deferred("area_set_shape_disabled", area, bullet_index, true);
         if (active_bullets_counter == 0) {
             disable_multi_mesh();
         }
@@ -282,28 +275,35 @@ public:
 
     /// METHODS RESPONSIBLE FOR SETTING THE MULTIMESH IN CORRECT STATE
 
-    // Generate methods are called only when spawning/loading data
-
-    void generate_area();
-
-    void set_up_area(
-        godot::RID new_world_space,
-        uint32_t new_collision_layer,
-        uint32_t new_collision_mask,
-        bool new_monitorable);
-
-    void generate_collision_shapes_for_area();
-
     void generate_multimesh();
 
     void set_up_multimesh(int new_instance_count, const godot::Ref<godot::Mesh> &new_mesh, godot::Vector2 new_texture_size);
 
-    void set_up_multimesh_bullet_instances(
+    void spawn_bullet_instances(
         godot::Vector2 new_collision_shape_size,
-        const godot::TypedArray<godot::Transform2D> &new_transforms, // make sure you are giving transforms that don't have collision offset applied, otherwise it will apply it twice
+        const godot::TypedArray<godot::Transform2D> &new_transforms,
         float new_texture_rotation,
         godot::Vector2 new_collision_shape_offset,
-        bool new_is_texture_rotation_permanent);
+        bool new_is_texture_rotation_permanent,
+        bool new_monitorable,
+        godot::RID new_world_space,
+        uint32_t new_collision_layer,
+        uint32_t new_collision_mask
+        );
+    
+    void activate_bullet_instances(
+        godot::Vector2 new_collision_shape_size,
+        const godot::TypedArray<godot::Transform2D> &new_transforms,
+        float new_texture_rotation,
+        godot::Vector2 new_collision_shape_offset,
+        bool new_is_texture_rotation_permanent,
+        bool new_monitorable,
+        godot::RID new_world_space,
+        uint32_t new_collision_layer,
+        uint32_t new_collision_mask
+        );
+
+    void load_bullet_instances(const godot::Ref<SaveDataBlockBullets2D> &data);
 
     void set_up_rotation(godot::TypedArray<BulletRotationData> &new_data, bool new_rotate_only_textures);
 
@@ -318,8 +318,6 @@ public:
         int new_current_texture_index,
         const godot::Ref<godot::Material> &new_material);
 
-    void load_bullet_instances(const godot::Ref<SaveDataBlockBullets2D> &data);
-
     ///
 
     /// COLLISION DETECTION METHODS
@@ -331,7 +329,7 @@ public:
     /// METHODS THAT ARE SUPPOSED TO BE OVERRIDEN TO PROVIDE CUSTOM LOGIC
 
     // Exposes methods that should be available in Godot engine
-    static void _bind_methods() {}
+    static void _bind_methods(){};
 
     // Used to set up movement related data before move_bullets is executed. It's important to call this method only after all bullet instances have been set up with collision shapes (in case you are going to edit the execution order of methods)
     virtual void set_up_movement_data(godot::TypedArray<BulletSpeedData> &data) {}

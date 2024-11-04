@@ -30,7 +30,7 @@ void BulletFactory2D::_ready() {
     }
 }
 
-void BulletFactory2D::spawnBlockBullets2D(Ref<BlockBulletsData2D> spawn_data) {
+void BulletFactory2D::spawnBlockBullets2D(const Ref<BlockBulletsData2D> &spawn_data) {
     int key = spawn_data->transforms.size();
 
     BlockBullets2D* bullets = dynamic_cast<BlockBullets2D*>(block_bullets_pool.pop(key));
@@ -59,8 +59,8 @@ Ref<SaveDataBulletFactory2D> BulletFactory2D::save() {
     for (int i = 0; i < bullets.size(); i++) {
         BlockBullets2D &bullet_instance = *Object::cast_to<BlockBullets2D>(bullets[i]);
 
-        // I only want to save bullets that are still active (I don't want to save bullets that are in the pool).
-        if (bullet_instance.current_life_time == 0.0f) {
+        // I only want to save bullets that are still active (I don't want to save bullets that are in the pool)
+        if (bullet_instance.active_bullets_counter == 0) {
             continue;
         }
         // Saves only the active bullets currently
@@ -69,7 +69,7 @@ Ref<SaveDataBulletFactory2D> BulletFactory2D::save() {
     emit_signal("finished_saving");
     return data;
 }
-void BulletFactory2D::load(Ref<SaveDataBulletFactory2D> new_data) {
+void BulletFactory2D::load(const Ref<SaveDataBulletFactory2D> &new_data) {
     // Load all new bullets
     int amount_bullets = new_data->all_block_bullets.size();
     for (int i = 0; i < amount_bullets ; i++)

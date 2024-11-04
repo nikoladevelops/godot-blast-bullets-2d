@@ -28,7 +28,7 @@ public:
 
     void _ready();
 
-    void spawnBlockBullets2D(godot::Ref<BlockBulletsData2D> spawn_data);
+    void spawnBlockBullets2D(const godot::Ref<BlockBulletsData2D> &spawn_data);
 
     godot::RID get_physics_space() const;
     void set_physics_space(godot::RID new_space_rid);
@@ -37,7 +37,7 @@ public:
     godot::Ref<SaveDataBulletFactory2D> save();
 
     // Loads bullets by using a Resource that contains every bullet's state. Call this method using call_deffered to avoid crashes
-    void load(godot::Ref<SaveDataBulletFactory2D> new_data);
+    void load(const godot::Ref<SaveDataBulletFactory2D> &new_data);
 
     // Clears all bullets. Call this method using call_deffered to avoid crashes
     void clear_all_bullets();
