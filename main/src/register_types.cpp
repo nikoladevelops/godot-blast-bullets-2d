@@ -4,24 +4,28 @@
 #include <godot_cpp/core/defs.hpp>
 #include <godot_cpp/godot.hpp>
 
-// shared
+// Shared
 #include "shared/bullet_rotation_data.hpp"
 #include "shared/bullet_speed_data.hpp"
 
-// save data classes
+// Save data classes
 #include "save-data/save_data_bullet_factory2d.hpp"
+#include "save-data/save_data_multi_mesh_bullets2d.hpp"
+#include "save-data/save_data_normal_bullets2d.hpp"
 #include "save-data/save_data_block_bullets2d.hpp"
 
-// factory
+// Factory
 #include "factory/bullet_factory2d.hpp"
 
-// debugger
+// Debugger
 #include "debugger/bullet_debugger2d.hpp"
 
-// spawn data classes
+// Spawn data classes
+#include "spawn-data/multi_mesh_bullets_data2d.hpp"
+#include "spawn-data/normal_bullets_data2d.hpp"
 #include "spawn-data/block_bullets_data2d.hpp"
 
-// bullets classes
+// Bullets classes
 #include "bullets/multi_mesh_bullets2d.hpp"
 #include "bullets/block_bullets2d.hpp"
 #include "bullets/normal_bullets2d.hpp"
@@ -35,26 +39,30 @@ void initialize_blast_bullets_2d_module(ModuleInitializationLevel p_level) {
 		return;
 	}
 
-	// shared
+	// Shared
 	GDREGISTER_CLASS(BulletRotationData)
 	GDREGISTER_CLASS(BulletSpeedData)
 
-	// save data classes
+	// Save data classes
 	GDREGISTER_CLASS(SaveDataBulletFactory2D)
+	GDREGISTER_CLASS(SaveDataMultiMeshBullets2D)
+	GDREGISTER_CLASS(SaveDataNormalBullets2D)
 	GDREGISTER_CLASS(SaveDataBlockBullets2D)
 
-
-	// factory
+	// Factory
 	GDREGISTER_RUNTIME_CLASS(BulletFactory2D)
 
-	// debugger
+	// Debugger
 	GDREGISTER_RUNTIME_CLASS(BulletDebugger2D)
 
-	// spawn data classes
+	// Spawn data classes
+	GDREGISTER_CLASS(MultiMeshBulletsData2D)
+	GDREGISTER_CLASS(NormalBulletsData2D)
 	GDREGISTER_CLASS(BlockBulletsData2D)
 	
-	// bullets classes
+	// Bullets classes
 	GDREGISTER_RUNTIME_CLASS(MultiMeshBullets2D)
+	GDREGISTER_RUNTIME_CLASS(NormalBullets2D)
 	GDREGISTER_RUNTIME_CLASS(BlockBullets2D)
 }
 

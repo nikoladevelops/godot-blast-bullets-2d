@@ -1,5 +1,5 @@
-#ifndef BULLET_ROTATION_DATA
-#define BULLET_ROTATION_DATA
+#ifndef BULLET_ROTATION_DATA_HPP
+#define BULLET_ROTATION_DATA_HPP
 
 #include <godot_cpp/classes/resource.hpp>
 #include <godot_cpp/variant/typed_array.hpp>
@@ -7,7 +7,7 @@
 namespace BlastBullets {
     
 class BulletRotationData : public godot::Resource {
-    GDCLASS(BulletRotationData, godot::Resource);
+    GDCLASS(BulletRotationData, godot::Resource)
 
 public:
     float rotation_speed;

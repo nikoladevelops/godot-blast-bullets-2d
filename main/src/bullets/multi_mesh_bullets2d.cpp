@@ -24,7 +24,7 @@ MultiMeshBullets2D::~MultiMeshBullets2D() {
 }
 
 // Used to spawn brand new bullets.
-void MultiMeshBullets2D::spawn(const Ref<BlockBulletsData2D> &spawn_data, MultiMeshObjectPool *pool, BulletFactory2D *factory) {
+void MultiMeshBullets2D::spawn(const Ref<MultiMeshBulletsData2D> &spawn_data, MultiMeshObjectPool *pool, BulletFactory2D *factory, Node *bullets_container) {
     set_physics_process(false);
 
     bullets_pool = pool;
@@ -55,135 +55,132 @@ void MultiMeshBullets2D::spawn(const Ref<BlockBulletsData2D> &spawn_data, MultiM
 
     custom_additional_spawn_logic(spawn_data);
 
-    set_up_movement_data(spawn_data->all_bullet_speed_data);
-
     finalize_set_up(spawn_data->bullets_custom_data, spawn_data->textures, spawn_data->current_texture_index, spawn_data->material);
 
-    bullet_factory->bullets_container->add_child(this);
+    bullets_container->add_child(this);
 
     set_physics_process(true);
     set_visible(true);
 }
 
 // Used to retrieve a resource representing the bullets' data, so that it can be saved to a file.
-Ref<SaveDataBlockBullets2D> MultiMeshBullets2D::save() {
+Ref<SaveDataMultiMeshBullets2D> MultiMeshBullets2D::save(const Ref<SaveDataMultiMeshBullets2D>& empty_data) {
     set_physics_process(false);
-
-    Ref<SaveDataBlockBullets2D> data = memnew(SaveDataBlockBullets2D);
 
     // TEXTURE RELATED
 
     int amount_textures = textures.size();
-    data->textures.resize(amount_textures);
+    empty_data->textures.resize(amount_textures);
     for (int i = 0; i < amount_textures; i++) {
-        data->textures[i] = textures[i];
+        empty_data->textures[i] = textures[i];
     }
-    data->texture_size = texture_size;
-    data->max_change_texture_time = max_change_texture_time;
-    data->current_change_texture_time = current_change_texture_time;
-    data->current_texture_index = current_texture_index;
+    empty_data->texture_size = texture_size;
+    empty_data->max_change_texture_time = max_change_texture_time;
+    empty_data->current_change_texture_time = current_change_texture_time;
+    empty_data->current_texture_index = current_texture_index;
 
     // BULLET MOVEMENT RELATED
 
-    data->all_cached_instance_transforms.resize(size);
+    empty_data->all_cached_instance_transforms.resize(size);
     for (int i = 0; i < size; i++) {
-        data->all_cached_instance_transforms[i] = all_cached_instance_transforms[i];
+        empty_data->all_cached_instance_transforms[i] = all_cached_instance_transforms[i];
     }
 
-    data->all_cached_shape_transforms.resize(size);
+    empty_data->all_cached_shape_transforms.resize(size);
     for (int i = 0; i < size; i++) {
-        data->all_cached_shape_transforms[i] = all_cached_shape_transforms[i];
+        empty_data->all_cached_shape_transforms[i] = all_cached_shape_transforms[i];
     }
 
-    data->all_cached_instance_origin.resize(size);
+    empty_data->all_cached_instance_origin.resize(size);
     for (int i = 0; i < size; i++) {
-        data->all_cached_instance_origin[i] = all_cached_instance_origin[i];
+        empty_data->all_cached_instance_origin[i] = all_cached_instance_origin[i];
     }
 
-    data->all_cached_shape_origin.resize(size);
+    empty_data->all_cached_shape_origin.resize(size);
     for (int i = 0; i < size; i++) {
-        data->all_cached_shape_origin[i] = all_cached_shape_origin[i];
+        empty_data->all_cached_shape_origin[i] = all_cached_shape_origin[i];
     }
 
     int speed_data_size = all_cached_velocity.size();
 
-    data->all_cached_velocity.resize(speed_data_size);
+    empty_data->all_cached_velocity.resize(speed_data_size);
     for (int i = 0; i < speed_data_size; i++) {
-        data->all_cached_velocity[i] = all_cached_velocity[i];
+        empty_data->all_cached_velocity[i] = all_cached_velocity[i];
     }
 
-    data->all_cached_direction.resize(speed_data_size);
+    empty_data->all_cached_direction.resize(speed_data_size);
     for (int i = 0; i < speed_data_size; i++) {
-        data->all_cached_direction[i] = all_cached_direction[i];
+        empty_data->all_cached_direction[i] = all_cached_direction[i];
     }
 
     // BULLET SPEED RELATED
 
-    data->all_cached_speed.resize(speed_data_size);
+    empty_data->all_cached_speed.resize(speed_data_size);
     for (int i = 0; i < speed_data_size; i++) {
-        data->all_cached_speed[i] = all_cached_speed[i];
+        empty_data->all_cached_speed[i] = all_cached_speed[i];
     }
 
-    data->all_cached_max_speed.resize(speed_data_size);
+    empty_data->all_cached_max_speed.resize(speed_data_size);
     for (int i = 0; i < speed_data_size; i++) {
-        data->all_cached_max_speed[i] = all_cached_max_speed[i];
+        empty_data->all_cached_max_speed[i] = all_cached_max_speed[i];
     }
 
-    data->all_cached_acceleration.resize(speed_data_size);
+    empty_data->all_cached_acceleration.resize(speed_data_size);
     for (int i = 0; i < speed_data_size; i++) {
-        data->all_cached_acceleration[i] = all_cached_acceleration[i];
+        empty_data->all_cached_acceleration[i] = all_cached_acceleration[i];
     }
 
     // BULLET ROTATION RELATED
     if (is_rotation_active) {
-        data->all_bullet_rotation_data.resize(all_rotation_speed.size());
+        empty_data->all_bullet_rotation_data.resize(all_rotation_speed.size());
         for (int i = 0; i < all_rotation_speed.size(); i++) {
             Ref<BulletRotationData> bullet_data = memnew(BulletRotationData);
             bullet_data->rotation_speed = all_rotation_speed[i];
             bullet_data->max_rotation_speed = all_max_rotation_speed[i];
             bullet_data->rotation_acceleration = all_rotation_acceleration[i];
 
-            data->all_bullet_rotation_data[i] = bullet_data;
+            empty_data->all_bullet_rotation_data[i] = bullet_data;
         }
-        data->rotate_only_textures = rotate_only_textures;
+        empty_data->rotate_only_textures = rotate_only_textures;
     }
 
     // COLLISION RELATED
 
-    data->collision_layer = physics_server->area_get_collision_layer(area);
-    data->collision_mask = physics_server->area_get_collision_mask(area);
-    data->monitorable = monitorable;
+    empty_data->collision_layer = physics_server->area_get_collision_layer(area);
+    empty_data->collision_mask = physics_server->area_get_collision_mask(area);
+    empty_data->monitorable = monitorable;
 
     RID shape = physics_server->area_get_shape(area, 0);
-    data->collision_shape_size = (Vector2)(physics_server->shape_get_data(shape));
+    empty_data->collision_shape_size = (Vector2)(physics_server->shape_get_data(shape));
 
     // OTHER
-    data->max_life_time = max_life_time;
-    data->current_life_time = current_life_time;
-    data->size = size;
+    empty_data->max_life_time = max_life_time;
+    empty_data->current_life_time = current_life_time;
+    empty_data->size = size;
 
-    data->material = get_material();
-    data->mesh = multi->get_mesh();
-    data->bullets_custom_data = bullets_custom_data;
+    empty_data->material = get_material();
+    empty_data->mesh = multi->get_mesh();
+    empty_data->bullets_custom_data = bullets_custom_data;
 
     // Save the enabled status so you can determine which bullets were active/disabled
-    data->bullets_enabled_status.resize(size);
+    empty_data->bullets_enabled_status.resize(size);
     for (int i = 0; i < size; i++) {
-        data->bullets_enabled_status[i] = (bool)(bullets_enabled_status[i]);
+        empty_data->bullets_enabled_status[i] = (bool)(bullets_enabled_status[i]);
     }
 
-    custom_additional_save_logic(data);
+    custom_additional_save_logic(empty_data);
 
     set_physics_process(true); // TODO maybe do this only if the bullets were enabled previously?
-    return data;
+    return empty_data;
 }
 
 // Used to load a resource. Should be used instead of spawn when trying to load data from a file.
-void MultiMeshBullets2D::load(const Ref<SaveDataBlockBullets2D> &data, MultiMeshObjectPool *pool, BulletFactory2D *factory) {
+void MultiMeshBullets2D::load(const Ref<SaveDataMultiMeshBullets2D> &data, MultiMeshObjectPool *pool, BulletFactory2D *factory, Node *bullets_container) {
     set_physics_process(false);
     
     bullets_pool = pool;
     bullet_factory = factory;
+
     physics_server = PhysicsServer2D::get_singleton();
 
     size = data->all_cached_instance_transforms.size();
@@ -201,14 +198,14 @@ void MultiMeshBullets2D::load(const Ref<SaveDataBlockBullets2D> &data, MultiMesh
 
     finalize_set_up(data->bullets_custom_data, data->textures, data->current_texture_index, data->material);
 
-    bullet_factory->bullets_container->add_child(this);
+    bullets_container->add_child(this);
     
     set_physics_process(true);
     set_visible(true);
 }
 
 // Activates the multimesh
-void MultiMeshBullets2D::activate_multimesh(const Ref<BlockBulletsData2D> &data) {
+void MultiMeshBullets2D::activate_multimesh(const Ref<MultiMeshBulletsData2D> &data) {
     set_up_rotation(data->all_bullet_rotation_data, data->rotate_only_textures);
 
     set_up_life_time_timer(data->max_life_time, data->max_life_time);
@@ -229,8 +226,6 @@ void MultiMeshBullets2D::activate_multimesh(const Ref<BlockBulletsData2D> &data)
         );
 
     custom_additional_activate_logic(data);
-
-    set_up_movement_data(data->all_bullet_speed_data);
 
     move_to_front(); // Makes sure that the current old multimesh is displayed on top of the newer ones (act as if its the oldest sibling to emulate the behaviour of spawning a brand new multimesh / if I dont do this then the multimesh's instances will be displayed behind the newer ones)
 
@@ -494,7 +489,7 @@ void MultiMeshBullets2D::finalize_set_up(
     }
 }
 
-void MultiMeshBullets2D::load_bullet_instances(const Ref<SaveDataBlockBullets2D> &data) {
+void MultiMeshBullets2D::load_bullet_instances(const Ref<SaveDataMultiMeshBullets2D> &data) {
     int new_speed_data_size = data->all_cached_velocity.size();
 
     all_cached_speed.resize(new_speed_data_size);

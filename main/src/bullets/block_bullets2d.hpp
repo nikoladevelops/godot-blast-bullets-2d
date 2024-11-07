@@ -1,20 +1,19 @@
-#ifndef BLOCK_BULLETS2D
-#define BLOCK_BULLETS2D
+#ifndef BLOCK_BULLETS2D_HPP
+#define BLOCK_BULLETS2D_HPP
 
 #include "./multi_mesh_bullets2d.hpp"
 
 #include "../save-data/save_data_block_bullets2d.hpp"
 #include "../shared/bullet_rotation_data.hpp"
 #include "../shared/bullet_speed_data.hpp"
-#include "../spawn-data/block_bullets_data2d.hpp"
 
 namespace BlastBullets {
 
 class BlockBullets2D : public MultiMeshBullets2D {
-    GDCLASS(BlockBullets2D, MultiMeshBullets2D);
+    GDCLASS(BlockBullets2D, MultiMeshBullets2D)
 
 public:
-    // The block rotation. The direction of the bullets is determined by it. Only used if use_block_rotation_radians is set to true
+    // The block rotation. The direction of the bullets is determined by it.
     float block_rotation_radians;
 
     // Cached multimesh instance position.
@@ -49,11 +48,11 @@ protected:
 
         current_position = new_pos;
     }
-    void set_up_movement_data(godot::TypedArray<BulletSpeedData> &new_data) override final;
-    virtual void custom_additional_spawn_logic(const godot::Ref<BlockBulletsData2D> &data) override final;
-    void custom_additional_save_logic(const godot::Ref<SaveDataBlockBullets2D> &data) override final;
-    virtual void custom_additional_load_logic(const godot::Ref<SaveDataBlockBullets2D> &data) override final;
-    virtual void custom_additional_activate_logic(const godot::Ref<BlockBulletsData2D> &data) override final;
+    void set_up_movement_data(const godot::Ref<BulletSpeedData> &new_speed_data);
+    virtual void custom_additional_spawn_logic(const godot::Ref<MultiMeshBulletsData2D> &data) override final;
+    void custom_additional_save_logic(const godot::Ref<SaveDataMultiMeshBullets2D> &data) override final;
+    virtual void custom_additional_load_logic(const godot::Ref<SaveDataMultiMeshBullets2D> &data) override final;
+    virtual void custom_additional_activate_logic(const godot::Ref<MultiMeshBulletsData2D> &data) override final;
 };
 }
 #endif

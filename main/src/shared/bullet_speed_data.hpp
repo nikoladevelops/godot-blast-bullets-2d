@@ -1,5 +1,5 @@
-#ifndef BULLET_SPEED_DATA
-#define BULLET_SPEED_DATA
+#ifndef BULLET_SPEED_DATA_HPP
+#define BULLET_SPEED_DATA_HPP
 
 #include <godot_cpp/classes/resource.hpp>
 #include <godot_cpp/variant/typed_array.hpp>
@@ -7,7 +7,7 @@
 namespace BlastBullets {
 
 class BulletSpeedData : public godot::Resource {
-    GDCLASS(BulletSpeedData, godot::Resource);
+    GDCLASS(BulletSpeedData, godot::Resource)
 
 public:
     float speed;

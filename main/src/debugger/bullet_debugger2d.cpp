@@ -1,10 +1,10 @@
-#include "../bullets/block_bullets2d.hpp"
 #include "bullet_debugger2d.hpp"
+#include "../bullets/multi_mesh_bullets2d.hpp"
 
 #include <godot_cpp/classes/engine.hpp>
 #include <godot_cpp/classes/multi_mesh_instance2d.hpp>
-#include <godot_cpp/classes/quad_mesh.hpp>
 #include <godot_cpp/classes/physics_server2d.hpp>
+#include <godot_cpp/classes/quad_mesh.hpp>
 
 using namespace godot;
 
@@ -27,7 +27,7 @@ void BulletDebugger2D::reset_debugger() {
     set_physics_process(true);
 }
 
-void BulletDebugger2D::generate_texture_multimesh(BlockBullets2D *new_bullets_multi_mesh) {
+void BulletDebugger2D::generate_texture_multimesh(MultiMeshBullets2D *new_bullets_multi_mesh) {
     bullets_multi_meshes.push_back(new_bullets_multi_mesh);
     // Set up a mesh
     Ref<QuadMesh> mesh = memnew(QuadMesh);
@@ -62,7 +62,7 @@ void BulletDebugger2D::generate_texture_multimesh(BlockBullets2D *new_bullets_mu
 
 void BulletDebugger2D::update_instance_transforms(
     MultiMeshInstance2D *texture_multi,
-    BlockBullets2D *bullets_multi) {
+    MultiMeshBullets2D *bullets_multi) {
 
     Ref<MultiMesh> texture_inner_multi = texture_multi->get_multimesh();
     for (int i = 0; i < texture_inner_multi->get_instance_count(); i++) {

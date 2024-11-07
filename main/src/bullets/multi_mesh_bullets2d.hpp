@@ -1,10 +1,9 @@
-#ifndef MULTI_MESH_BULLETS2D
-#define MULTI_MESH_BULLETS2D
+#ifndef MULTI_MESH_BULLETS2D_HPP
+#define MULTI_MESH_BULLETS2D_HPP
 
-#include "../save-data/save_data_block_bullets2d.hpp"
+#include "../spawn-data/multi_mesh_bullets_data2d.hpp"
+#include "../save-data/save_data_multi_mesh_bullets2d.hpp"
 #include "../shared/bullet_rotation_data.hpp"
-#include "../shared/bullet_speed_data.hpp"
-#include "../spawn-data/block_bullets_data2d.hpp"
 
 #include <godot_cpp/classes/engine.hpp>
 #include <godot_cpp/classes/mesh.hpp>
@@ -96,6 +95,7 @@ public:
     /// ROTATION RELATED
 
     // SOA vs AOS, I picked SOA, because it offers better cache performance
+    
     godot::PackedFloat32Array all_rotation_speed;
     godot::PackedFloat32Array all_max_rotation_speed;
     godot::PackedFloat32Array all_rotation_acceleration;
@@ -122,7 +122,7 @@ public:
     // The user can pass any custom data they desire and have access to it in the area_entered and body_entered function callbacks
     godot::Ref<godot::Resource> bullets_custom_data;
 
-    // The life time of all bullets
+    // The max life time before the multimesh gets disabled
     float max_life_time;
 
     // The current life time being processed
@@ -131,22 +131,22 @@ public:
     ///
     virtual ~MultiMeshBullets2D();
 
-    // Used to spawn brand new bullets.
-    void spawn(const godot::Ref<BlockBulletsData2D> &spawn_data, MultiMeshObjectPool *pool, BulletFactory2D *factory);
+    // Used to spawn brand new bullets
+    void spawn(const godot::Ref<MultiMeshBulletsData2D> &spawn_data, MultiMeshObjectPool *pool, BulletFactory2D *factory, Node *bullets_container);
 
-    // Used to retrieve a resource representing the bullets' data, so that it can be saved to a file.
-    godot::Ref<SaveDataBlockBullets2D> save();
+    // Populates an empty data class instance with the current state of the bullets and returns it so it can be saved
+    godot::Ref<SaveDataMultiMeshBullets2D> save(const godot::Ref<SaveDataMultiMeshBullets2D>& empty_data);
 
-    // Used to load a resource. Should be used instead of spawn when trying to load data from a file.
-    void load(const godot::Ref<SaveDataBlockBullets2D> &data, MultiMeshObjectPool *pool, BulletFactory2D *factory);
+    // Used to load bullets from a SaveDataMultiMeshBullets2D resource
+    void load(const godot::Ref<SaveDataMultiMeshBullets2D> &data, MultiMeshObjectPool *pool, BulletFactory2D *factory, Node *bullets_container);
 
     // Activates the multimesh
-    void activate_multimesh(const godot::Ref<BlockBulletsData2D> &data);
+    void activate_multimesh(const godot::Ref<MultiMeshBulletsData2D> &data);
 
-    // Called when all bullets have been disabled
+    // Ensures the multimesh is fully disabled - no processing, no longer visible
     void disable_multi_mesh();
 
-    // Safely delete the multimesh
+    // Safely deletes itself
     void safe_delete();
 
     /// METHODS RESPONSIBLE FOR VARIOUS BULLET FEATURES
@@ -303,7 +303,7 @@ public:
         uint32_t new_collision_mask
         );
 
-    void load_bullet_instances(const godot::Ref<SaveDataBlockBullets2D> &data);
+    void load_bullet_instances(const godot::Ref<SaveDataMultiMeshBullets2D> &data);
 
     void set_up_rotation(godot::TypedArray<BulletRotationData> &new_data, bool new_rotate_only_textures);
 
@@ -331,20 +331,17 @@ public:
     // Exposes methods that should be available in Godot engine
     static void _bind_methods(){};
 
-    // Used to set up movement related data before move_bullets is executed. It's important to call this method only after all bullet instances have been set up with collision shapes (in case you are going to edit the execution order of methods)
-    virtual void set_up_movement_data(godot::TypedArray<BulletSpeedData> &data) {}
-
     // Holds custom logic that runs before the spawn function finalizes
-    virtual void custom_additional_spawn_logic(const godot::Ref<BlockBulletsData2D> &data) {}
+    virtual void custom_additional_spawn_logic(const godot::Ref<MultiMeshBulletsData2D> &data) {}
 
     // Holds custom logic that runs before the save function finalizes
-    virtual void custom_additional_save_logic(const godot::Ref<SaveDataBlockBullets2D> &data) {}
+    virtual void custom_additional_save_logic(const godot::Ref<SaveDataMultiMeshBullets2D> &data) {}
 
     // Holds custom logic that runs before the load function finalizes
-    virtual void custom_additional_load_logic(const godot::Ref<SaveDataBlockBullets2D> &data) {}
+    virtual void custom_additional_load_logic(const godot::Ref<SaveDataMultiMeshBullets2D> &data) {}
 
     // Holds custom logic that runs before activating this multimesh when retrieved from the object pool
-    virtual void custom_additional_activate_logic(const godot::Ref<BlockBulletsData2D> &data) {}
+    virtual void custom_additional_activate_logic(const godot::Ref<MultiMeshBulletsData2D> &data) {}
 
     // Holds custom logic that runs before disabling and pushing this multimesh inside an object pool
     virtual void custom_additional_disable_logic() {}
