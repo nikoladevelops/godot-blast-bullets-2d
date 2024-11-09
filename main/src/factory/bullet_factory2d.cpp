@@ -27,24 +27,27 @@ void BulletFactory2D::_ready() {
         physics_space = get_world_2d()->get_space();
     }
 
-    // Create BlockBulletsContainer Node and add it to the scene tree
+    // Create BlockBulletsContainer Node and add it as a child to factory
     block_bullets_container = memnew(Node);
     block_bullets_container->set_name("BlockBulletsContainer");
     add_child(block_bullets_container);
 
-    // Create NormalBulletsContainer Node and add it to the scene tree
+    // Create NormalBulletsContainer Node and add it as a child to factory
     normal_bullets_container = memnew(Node);
     normal_bullets_container->set_name("NormalBulletsContainer");
     add_child(normal_bullets_container);
 
-    // Configure and add debugger to the scene tree if enabled
+    // Configure debuggers if debugging is enabled
     if (is_debugger_enabled) {
-        debugger = memnew(BulletDebugger2D);
-        debugger->bullets_container_ptr = block_bullets_container;
-        // TODO configure method in bullet debugger
-        // TODO make debugger work for normal bullets as well
-        // TODO debugger->set_name("MultiMeshBulletDebugger");
-        add_child(debugger);
+        // Configure BlockBullets2D debugger and add it as a child to factory
+        block_bullets_debugger = memnew(BulletDebugger2D);
+        block_bullets_debugger->configure(block_bullets_container, "BlockBulletsDebugger");
+        add_child(block_bullets_debugger);
+
+        // Configure NormalBullets2D debugger and add it as a child to factory
+        normal_bullets_debugger = memnew(BulletDebugger2D);
+        normal_bullets_debugger->configure(normal_bullets_container, "NormalBulletsDebugger");
+        add_child(normal_bullets_debugger);
     }
 }
 
@@ -147,9 +150,10 @@ void BulletFactory2D::load(const Ref<SaveDataBulletFactory2D> &new_data) {
 }
 
 void BulletFactory2D::clear_all_bullets() {
-    // It's important to reset the debugger
-    if(debugger != nullptr){
-        debugger->reset_debugger();
+    // Reset all debuggers if they were enabled
+    if(is_debugger_enabled){
+        block_bullets_debugger->reset_debugger();
+        normal_bullets_debugger->reset_debugger();
     }
 
     // Clear all BlockBullets2D

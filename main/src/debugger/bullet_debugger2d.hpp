@@ -25,6 +25,8 @@ public:
     void _physics_process(float delta);
     // Clears all bullet collision shapes
     void reset_debugger();
+    // Configures the debugger so that it tracks all MultiMeshBullets2D collision shapes inside a specific bullets container
+    void configure(godot::Node* new_bullets_container, const godot::String& new_container_name);
 
 private:
     // Stores all multi mesh bullets' pointers, so that it can monitor their collision shapes

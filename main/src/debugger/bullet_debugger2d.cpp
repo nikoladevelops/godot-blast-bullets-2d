@@ -15,6 +15,11 @@ void BulletDebugger2D::_ready() {
     physics_server = PhysicsServer2D::get_singleton();
 }
 
+void BulletDebugger2D::configure(godot::Node* new_bullets_container, const godot::String& new_container_name){
+    bullets_container_ptr = new_bullets_container;
+    bullets_container_ptr->set_name(new_container_name);
+}
+
 void BulletDebugger2D::reset_debugger() {
     set_physics_process(false);
 

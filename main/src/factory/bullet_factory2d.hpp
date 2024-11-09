@@ -26,13 +26,16 @@ public:
     // The physics space where the bullets multimeshes are interacting with the world
     godot::RID physics_space;
 
-    // Contains all block bullet multimesh instances
+    // Contains all BlockBullets2D in the scene tree
     godot::Node *block_bullets_container = nullptr;
-    // Contains all normal bullet multimesh instances
+    // Contains all NormalBullets2D in the scene tree
     godot::Node *normal_bullets_container = nullptr;
 
-    // The bullet debugger. It is enabled only if is_debugger_enabled is set to true
-    BulletDebugger2D *debugger = nullptr;
+    // Debugs the collision shapes of all BlockBullets2D when enabled
+    BulletDebugger2D *block_bullets_debugger = nullptr;
+    // Debugs the collision shapes of all NormalBullets2D when enabled
+    BulletDebugger2D *normal_bullets_debugger = nullptr;
+
 
     void _ready();
 
