@@ -21,11 +21,13 @@ public:
     godot::Node *bullets_container_ptr;
     godot::PhysicsServer2D *physics_server;
 
+    godot::Color multi_mesh_color;
+
     void _physics_process(float delta);
     // Resets the debugger's state
     void reset_debugger();
     // Configures the debugger so that it tracks all MultiMeshBullets2D collision shapes inside a specific bullets container
-    void configure(godot::Node* new_bullets_container, const godot::String& new_debugger_name);
+    void configure(godot::Node* new_bullets_container, const godot::String& new_debugger_name, const godot::Color &new_multi_mesh_color);
 
     // Disables the debugger and clears all displayed collision textures
     void disable();

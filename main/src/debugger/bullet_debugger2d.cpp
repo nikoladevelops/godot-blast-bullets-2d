@@ -10,9 +10,10 @@ using namespace godot;
 
 namespace BlastBullets {
 
-void BulletDebugger2D::configure(godot::Node* new_bullets_container, const godot::String& new_debugger_name){
+void BulletDebugger2D::configure(godot::Node* new_bullets_container, const godot::String& new_debugger_name, const godot::Color &new_multi_mesh_color){
     physics_server = PhysicsServer2D::get_singleton();
     bullets_container_ptr = new_bullets_container;
+    multi_mesh_color = new_multi_mesh_color;
     
     // When a bullet multimesh gets added to the bullet container, run generate_texture_multimesh
     bullets_container_ptr->connect("child_entered_tree", callable_mp(this, &BulletDebugger2D::generate_texture_multimesh));
@@ -83,7 +84,7 @@ void BulletDebugger2D::generate_texture_multimesh(MultiMeshBullets2D *new_bullet
     RID area = new_bullets_multi_mesh->area;
 
     for (int i = 0; i < instance_count; i++) {
-        multi->set_instance_color(i, Color(0, 0, 2, 0.8));
+        multi->set_instance_color(i, multi_mesh_color);
         Transform2D &transf = new_bullets_multi_mesh->all_cached_shape_transforms[i];
         multi->set_instance_transform_2d(i, transf);
     }

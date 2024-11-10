@@ -53,11 +53,11 @@ void BulletFactory2D::_ready() {
 void BulletFactory2D::spawn_debuggers(){
     // Configure BlockBullets2D debugger and add it as a child to factory
     block_bullets_debugger = memnew(BulletDebugger2D);
-    block_bullets_debugger->configure(block_bullets_container, "BlockBulletsDebugger");
+    block_bullets_debugger->configure(block_bullets_container, "BlockBulletsDebugger", block_bullets_debugger_color);
 
     // Configure NormalBullets2D debugger and add it as a child to factory
     normal_bullets_debugger = memnew(BulletDebugger2D);
-    normal_bullets_debugger->configure(normal_bullets_container, "NormalBulletsDebugger");
+    normal_bullets_debugger->configure(normal_bullets_container, "NormalBulletsDebugger", normal_bullets_debugger_color);
 
     // Add the debuggers as children of the factory
     add_child(block_bullets_debugger);
@@ -200,7 +200,7 @@ void BulletFactory2D::clear_all_bullets() {
     emit_signal("finished_clearing");
 }
 
-bool BulletFactory2D::get_is_debugger_enabled() {
+bool BulletFactory2D::get_is_debugger_enabled() const{
     return is_debugger_enabled;
 }
 
@@ -236,6 +236,23 @@ void BulletFactory2D::set_is_debugger_enabled(bool new_is_enabled) {
 
 }
 
+
+Color BulletFactory2D::get_block_bullets_debugger_color() const{
+    return block_bullets_debugger_color;
+}
+void BulletFactory2D::set_block_bullets_debugger_color(const Color& new_color){
+    block_bullets_debugger_color = new_color;
+}
+
+Color BulletFactory2D::get_normal_bullets_debugger_color() const{
+    return normal_bullets_debugger_color;
+}
+void BulletFactory2D::set_normal_bullets_debugger_color(const Color& new_color){
+    normal_bullets_debugger_color = new_color;
+}
+
+
+
 void BulletFactory2D::_bind_methods() {
     ClassDB::bind_method(D_METHOD("get_physics_space"), &BulletFactory2D::get_physics_space);
     ClassDB::bind_method(D_METHOD("set_physics_space", "new_physics_space"), &BulletFactory2D::set_physics_space);
@@ -251,6 +268,15 @@ void BulletFactory2D::_bind_methods() {
     ClassDB::bind_method(D_METHOD("load", "new_data"), &BulletFactory2D::load);
 
     ClassDB::bind_method(D_METHOD("clear_all_bullets"), &BulletFactory2D::clear_all_bullets);
+
+    ClassDB::bind_method(D_METHOD("get_normal_bullets_debugger_color"), &BulletFactory2D::get_normal_bullets_debugger_color);
+    ClassDB::bind_method(D_METHOD("set_normal_bullets_debugger_color", "new_color"), &BulletFactory2D::set_normal_bullets_debugger_color);
+    ADD_PROPERTY(PropertyInfo(Variant::COLOR, "normal_bullets_debugger_color"), "set_normal_bullets_debugger_color", "get_normal_bullets_debugger_color");
+
+    ClassDB::bind_method(D_METHOD("get_block_bullets_debugger_color"), &BulletFactory2D::get_block_bullets_debugger_color);
+    ClassDB::bind_method(D_METHOD("set_block_bullets_debugger_color", "new_color"), &BulletFactory2D::set_block_bullets_debugger_color);
+    ADD_PROPERTY(PropertyInfo(Variant::COLOR, "block_bullets_debugger_color"), "set_block_bullets_debugger_color", "get_block_bullets_debugger_color");
+
 
     ADD_SIGNAL(MethodInfo("area_entered", PropertyInfo(Variant::OBJECT, "enemy_area"), PropertyInfo(Variant::OBJECT, "bullets_custom_data", PROPERTY_HINT_RESOURCE_TYPE, "Resource"), PropertyInfo(Variant::VECTOR2, "bullet_global_position")));
     ADD_SIGNAL(MethodInfo("body_entered", PropertyInfo(Variant::OBJECT, "enemy_body"), PropertyInfo(Variant::OBJECT, "bullets_custom_data", PROPERTY_HINT_RESOURCE_TYPE, "Resource"), PropertyInfo(Variant::VECTOR2, "bullet_global_position")));

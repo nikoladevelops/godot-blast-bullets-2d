@@ -38,6 +38,10 @@ public:
     // Debugs the collision shapes of all NormalBullets2D when enabled
     BulletDebugger2D *normal_bullets_debugger = nullptr;
 
+    // The color for the collision shapes of all BlockBullets2D
+    godot::Color block_bullets_debugger_color = godot::Color(0, 0, 2, 0.8);
+    // The color for the collision shapes of all NormalBullets2D
+    godot::Color normal_bullets_debugger_color = godot::Color(0, 0, 2, 0.8);
 
     void _ready();
 
@@ -62,8 +66,14 @@ public:
     // Determines whether the debugger should be created and added to the scene tree
     bool is_debugger_enabled;
 
-    bool get_is_debugger_enabled();
+    bool get_is_debugger_enabled() const;
     void set_is_debugger_enabled(bool new_is_enabled);
+
+    godot::Color get_block_bullets_debugger_color() const;
+    void set_block_bullets_debugger_color(const godot::Color& new_color);
+
+    godot::Color get_normal_bullets_debugger_color() const;
+    void set_normal_bullets_debugger_color(const godot::Color& new_color);
 
 protected:
     static void _bind_methods();
