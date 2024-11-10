@@ -9,15 +9,14 @@
 using namespace godot;
 
 namespace BlastBullets {
-void BulletDebugger2D::_ready() {
+
+void BulletDebugger2D::configure(godot::Node* new_bullets_container, const godot::String& new_debugger_name){
+    physics_server = PhysicsServer2D::get_singleton();
+    bullets_container_ptr = new_bullets_container;
+    
     // When a bullet multimesh gets added to the bullet container, run generate_texture_multimesh
     bullets_container_ptr->connect("child_entered_tree", callable_mp(this, &BulletDebugger2D::generate_texture_multimesh));
-    physics_server = PhysicsServer2D::get_singleton();
-}
-
-void BulletDebugger2D::configure(godot::Node* new_bullets_container, const godot::String& new_container_name){
-    bullets_container_ptr = new_bullets_container;
-    bullets_container_ptr->set_name(new_container_name);
+    set_name(new_debugger_name);
 }
 
 void BulletDebugger2D::reset_debugger() {
@@ -26,13 +25,41 @@ void BulletDebugger2D::reset_debugger() {
     for (int i = 0; i < texture_multi_meshes.size(); i++) {
         texture_multi_meshes[i]->queue_free();
     }
-    texture_multi_meshes.clear();
-    bullets_multi_meshes.clear();
+    texture_multi_meshes.resize(0);
+    bullets_multi_meshes.resize(0);
 
     set_physics_process(true);
 }
 
+void BulletDebugger2D::activate(){
+    set_physics_process(true); // very important to do this first, because of is_physics_processing() check in the generate texture multimesh method
+    // In case the bullets container already has multimesh bullets generate a texture multimesh for each
+    TypedArray<Node> already_spawned_multimeshes = bullets_container_ptr->get_children();
+    for (int i = 0; i < already_spawned_multimeshes.size(); i++)
+    {
+        MultiMeshBullets2D *bullet_instance = Object::cast_to<MultiMeshBullets2D>(already_spawned_multimeshes[i]);
+        generate_texture_multimesh(bullet_instance);
+    }
+}
+
+void BulletDebugger2D::disable(){
+    set_physics_process(false);
+
+    for (int i = 0; i < texture_multi_meshes.size(); i++) {
+        texture_multi_meshes[i]->queue_free();
+    }
+    texture_multi_meshes.clear();
+    bullets_multi_meshes.clear();
+    texture_multi_meshes.resize(0);
+    bullets_multi_meshes.resize(0);
+}
+
 void BulletDebugger2D::generate_texture_multimesh(MultiMeshBullets2D *new_bullets_multi_mesh) {
+    // In case the debugger was disabled, don't generate anything - this is needed because I have a signal that is registered with this method so it will run it even when physics processing is disabled (another way of protecting against this is just disconnecting the signal, but I chose this way)
+    if(is_physics_processing() == false){
+        return;
+    }
+
     bullets_multi_meshes.push_back(new_bullets_multi_mesh);
     // Set up a mesh
     Ref<QuadMesh> mesh = memnew(QuadMesh);

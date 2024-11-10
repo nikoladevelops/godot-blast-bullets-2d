@@ -21,12 +21,17 @@ public:
     godot::Node *bullets_container_ptr;
     godot::PhysicsServer2D *physics_server;
 
-    void _ready();
     void _physics_process(float delta);
-    // Clears all bullet collision shapes
+    // Resets the debugger's state
     void reset_debugger();
     // Configures the debugger so that it tracks all MultiMeshBullets2D collision shapes inside a specific bullets container
-    void configure(godot::Node* new_bullets_container, const godot::String& new_container_name);
+    void configure(godot::Node* new_bullets_container, const godot::String& new_debugger_name);
+
+    // Disables the debugger and clears all displayed collision textures
+    void disable();
+
+    // Activates the debugger and spawns all needed collision textures for the already spawned multimesh bullets
+    void activate();
 
 private:
     // Stores all multi mesh bullets' pointers, so that it can monitor their collision shapes

@@ -22,6 +22,11 @@ using namespace godot;
 namespace BlastBullets {
 
 void BulletFactory2D::_ready() {
+    // Ensure the code that is next will not be ran in the editor
+    if(Engine::get_singleton()->is_editor_hint()){
+        return;
+    }
+
     // Use default physics space if physics_space is invalid
     if (physics_space.is_valid() == false) {
         physics_space = get_world_2d()->get_space();
@@ -37,18 +42,26 @@ void BulletFactory2D::_ready() {
     normal_bullets_container->set_name("NormalBulletsContainer");
     add_child(normal_bullets_container);
 
-    // Configure debuggers if debugging is enabled
+    // Add the debuggers as a child to the factory, but only if debugging is enabled
     if (is_debugger_enabled) {
-        // Configure BlockBullets2D debugger and add it as a child to factory
-        block_bullets_debugger = memnew(BulletDebugger2D);
-        block_bullets_debugger->configure(block_bullets_container, "BlockBulletsDebugger");
-        add_child(block_bullets_debugger);
-
-        // Configure NormalBullets2D debugger and add it as a child to factory
-        normal_bullets_debugger = memnew(BulletDebugger2D);
-        normal_bullets_debugger->configure(normal_bullets_container, "NormalBulletsDebugger");
-        add_child(normal_bullets_debugger);
+        spawn_debuggers();
     }
+
+    is_ready = true;
+}
+
+void BulletFactory2D::spawn_debuggers(){
+    // Configure BlockBullets2D debugger and add it as a child to factory
+    block_bullets_debugger = memnew(BulletDebugger2D);
+    block_bullets_debugger->configure(block_bullets_container, "BlockBulletsDebugger");
+
+    // Configure NormalBullets2D debugger and add it as a child to factory
+    normal_bullets_debugger = memnew(BulletDebugger2D);
+    normal_bullets_debugger->configure(normal_bullets_container, "NormalBulletsDebugger");
+
+    // Add the debuggers as children of the factory
+    add_child(block_bullets_debugger);
+    add_child(normal_bullets_debugger);
 }
 
 void BulletFactory2D::spawn_block_bullets(const Ref<BlockBulletsData2D> &spawn_data) {
@@ -193,6 +206,34 @@ bool BulletFactory2D::get_is_debugger_enabled() {
 
 void BulletFactory2D::set_is_debugger_enabled(bool new_is_enabled) {
     is_debugger_enabled = new_is_enabled;
+
+    // Ensure the code that is next will never run in the editor and never run unless the factory is ready in the scene tree
+    if(Engine::get_singleton()->is_editor_hint() || is_ready == false){
+        return;
+    }
+
+    // If the user wants to enable the debuggers, but they dont exist, spawn them fully configured and also activate them so that if the bullets containers have any bullets, they get the corresponding debug texture shapes as well
+    if(is_debugger_enabled && block_bullets_debugger == nullptr){
+        spawn_debuggers();
+
+        block_bullets_debugger->activate();
+        normal_bullets_debugger->activate();
+       
+        return;
+    }
+
+    // If the user wants to enable the debuggers that were previously disabled at run time, just activate them
+    if(is_debugger_enabled){
+        block_bullets_debugger->activate();
+        normal_bullets_debugger->activate();
+    }   
+
+    // If the user wants to disable the debuggers
+    if(is_debugger_enabled == false){ // no need to check for nullptr since the debuggers 100% exist if we are doing this at run-time (to disable them, they have to be already enabled..)
+        block_bullets_debugger->disable();
+        normal_bullets_debugger->disable();
+    }
+
 }
 
 void BulletFactory2D::_bind_methods() {

@@ -18,6 +18,8 @@ class BulletFactory2D : public godot::Node2D {
     GDCLASS(BulletFactory2D, godot::Node2D)
 
 public:
+    // Whether the factory was spawned correctly and the ready function finished
+    bool is_ready=false;
     // Holds all disabled BlockBullets2D
     MultiMeshObjectPool block_bullets_pool;
     // Holds all disabled NormalBullets2D
@@ -54,8 +56,11 @@ public:
     // Clears all bullets. Call this method using call_deffered to avoid crashes
     void clear_all_bullets();
 
+    // Spawns fully configured debuggers as children of the factory
+    void spawn_debuggers();
+
     // Determines whether the debugger should be created and added to the scene tree
-    bool is_debugger_enabled = false;
+    bool is_debugger_enabled;
 
     bool get_is_debugger_enabled();
     void set_is_debugger_enabled(bool new_is_enabled);
