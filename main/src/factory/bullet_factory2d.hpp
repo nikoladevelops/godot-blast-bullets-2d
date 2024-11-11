@@ -10,7 +10,7 @@ namespace BlastBullets {
 // Using forward declaration to avoid circular dependencies
 class BlockBulletsData2D;
 class NormalBulletsData2D;
-class BulletDebugger2D;
+class MultiMeshBulletsDebugger2D;
 class SaveDataBulletFactory2D;
 
 // Creates bullets with different behaviour
@@ -34,9 +34,9 @@ public:
     godot::Node *normal_bullets_container = nullptr;
 
     // Debugs the collision shapes of all BlockBullets2D when enabled
-    BulletDebugger2D *block_bullets_debugger = nullptr;
+    MultiMeshBulletsDebugger2D *block_bullets_debugger = nullptr;
     // Debugs the collision shapes of all NormalBullets2D when enabled
-    BulletDebugger2D *normal_bullets_debugger = nullptr;
+    MultiMeshBulletsDebugger2D *normal_bullets_debugger = nullptr;
 
     // The color for the collision shapes of all BlockBullets2D
     godot::Color block_bullets_debugger_color = godot::Color(0, 0, 2, 0.8);

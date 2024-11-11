@@ -11,7 +11,7 @@
 #include "../save-data/save_data_multi_mesh_bullets2d.hpp"
 
 #include "../shared/multimesh_object_pool.hpp"
-#include "../debugger/bullet_debugger2d.hpp"
+#include "../debugger/multi_mesh_bullets_debugger2d.hpp"
 
 #include <godot_cpp/classes/engine.hpp>
 #include <godot_cpp/classes/world2d.hpp>
@@ -52,11 +52,11 @@ void BulletFactory2D::_ready() {
 
 void BulletFactory2D::spawn_debuggers(){
     // Configure BlockBullets2D debugger and add it as a child to factory
-    block_bullets_debugger = memnew(BulletDebugger2D);
+    block_bullets_debugger = memnew(MultiMeshBulletsDebugger2D);
     block_bullets_debugger->configure(block_bullets_container, "BlockBulletsDebugger", block_bullets_debugger_color);
 
     // Configure NormalBullets2D debugger and add it as a child to factory
-    normal_bullets_debugger = memnew(BulletDebugger2D);
+    normal_bullets_debugger = memnew(MultiMeshBulletsDebugger2D);
     normal_bullets_debugger->configure(normal_bullets_container, "NormalBulletsDebugger", normal_bullets_debugger_color);
 
     // Add the debuggers as children of the factory

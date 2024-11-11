@@ -18,7 +18,7 @@
 #include "factory/bullet_factory2d.hpp"
 
 // Debugger
-#include "debugger/bullet_debugger2d.hpp"
+#include "debugger/multi_mesh_bullets_debugger2d.hpp"
 
 // Spawn data classes
 #include "spawn-data/multi_mesh_bullets_data2d.hpp"
@@ -53,7 +53,7 @@ void initialize_blast_bullets_2d_module(ModuleInitializationLevel p_level) {
 	GDREGISTER_RUNTIME_CLASS(BulletFactory2D)
 
 	// Debugger
-	GDREGISTER_RUNTIME_CLASS(BulletDebugger2D)
+	GDREGISTER_RUNTIME_CLASS(MultiMeshBulletsDebugger2D)
 
 	// Spawn data classes
 	GDREGISTER_CLASS(MultiMeshBulletsData2D)

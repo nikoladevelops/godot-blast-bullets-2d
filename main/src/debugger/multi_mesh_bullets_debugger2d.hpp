@@ -1,5 +1,5 @@
-#ifndef BULLET_DEBUGGER2D_HPP
-#define BULLET_DEBUGGER2D_HPP
+#ifndef MULTI_MESH_BULLETS_DEBUGGER2D_HPP
+#define MULTI_MESH_BULLETS_DEBUGGER2D_HPP
 
 #include <godot_cpp/classes/node.hpp>
 
@@ -13,8 +13,8 @@ namespace BlastBullets {
 class MultiMeshBullets2D;
 
 // Provides easy debugging for the collision shapes of the bullets. When testing performance, disable the debugger, because it tanks performance
-class BulletDebugger2D : public godot::Node {
-    GDCLASS(BulletDebugger2D, godot::Node)
+class MultiMeshBulletsDebugger2D : public godot::Node {
+    GDCLASS(MultiMeshBulletsDebugger2D, godot::Node)
 
 public:
     // A pointer to where the multi mesh bullets are stored in.
