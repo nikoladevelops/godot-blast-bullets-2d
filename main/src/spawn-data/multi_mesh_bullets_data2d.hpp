@@ -30,7 +30,7 @@ public:
     // Determines the time before the multimesh changes its texture to the next one in the array of textures. Because of this, animation is possible.
     float max_change_texture_time = 0.3f;
 
-    // TODO
+    // Whether the rotation of the texture should never change depending on the direction the bullets move in
     bool is_texture_rotation_permanent = false;
 
     // BULLET MOVEMENT RELATED
@@ -73,6 +73,9 @@ public:
     godot::Ref<godot::Material> material;
     // Custom mesh, if it isn't provided then a Quadmesh will be generated and it will use the texture_size. If you DO provide a mesh then you should handle the scaling of the bullets yourself using a shader for best quality.
     godot::Ref<godot::Mesh> mesh;
+
+    // Used to acquire a bitmask from an array of integer values. Useful when setting the collision layer and collision mask. Example: you want your bullets to be in collision layer 1,2,3,7, you would pass an array of these numbers and the value that gets returned is the value you need to set to the collision_layer. Pass ONLY POSITIVE NUMBERS (NEVER PASS NEGATIVE OR ZERO)
+    static int calculate_bitmask(const godot::TypedArray<int> &numbers);
 
     // GETTERS AND SETTERS
     godot::TypedArray<godot::Transform2D> get_transforms() const;

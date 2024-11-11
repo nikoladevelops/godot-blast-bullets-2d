@@ -4,6 +4,17 @@ using namespace godot;
 
 namespace BlastBullets {
 
+int MultiMeshBulletsData2D::calculate_bitmask(const TypedArray<int> &numbers) {
+    int bitmask_value = 0;
+    for (int i = 0; i < numbers.size(); i++) {
+        // From the current number calculate which bit it corresponds to inside the bitmask (number 5 = 5th bit from right to left = 10000 in binary). This is the same as the formula 2 to the power of N-1. Example: if we have the number 4, then its 2 to the power of 4-1 -> this is equal to -> 2 to the power of 3 = 8  -> turn 8 into binary = 1000. I am doing exactly the same thing here by saying I have the number 1, shift it to the left by N-1 = 1000  (because the number one got shifted to the left by 3 positions, those 3 positions are now filled with zeros)
+        bitmask_value |= 1 << ((int)(numbers[i]) - 1); // this is the more inefficient way of doing the same thing: static_cast<int>(pow(2, (int)(numbers[i]) - 1));
+    }
+
+    return bitmask_value;
+}
+
+
 TypedArray<Transform2D> MultiMeshBulletsData2D::get_transforms() const {
     return transforms;
 }
@@ -211,5 +222,7 @@ void MultiMeshBulletsData2D::_bind_methods() {
     ClassDB::bind_method(D_METHOD("get_is_texture_rotation_permanent"), &MultiMeshBulletsData2D::get_is_texture_rotation_permanent);
     ClassDB::bind_method(D_METHOD("set_is_texture_rotation_permanent", "new_is_texture_rotation_permanent"), &MultiMeshBulletsData2D::set_is_texture_rotation_permanent);
     ADD_PROPERTY(PropertyInfo(Variant::BOOL, "is_texture_rotation_permanent"), "set_is_texture_rotation_permanent", "get_is_texture_rotation_permanent");
+
+    ClassDB::bind_static_method("MultiMeshBulletsData2D", D_METHOD("calculate_bitmask", "numbers"), &MultiMeshBulletsData2D::calculate_bitmask);
 }
 }

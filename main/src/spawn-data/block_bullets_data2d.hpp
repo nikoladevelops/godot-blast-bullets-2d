@@ -21,10 +21,6 @@ public:
     // The speed at which the block of bullets is moving
     godot::Ref<BulletSpeedData> block_speed;
 
-    // TODO do this automatically without the need of calling this function from outside
-    // Used to acquire a bitmask from an array of integer values. Useful when setting the collision layer and collision mask. Example: you want your bullets to be in collision layer 1,2,3,7, you would pass an array of these numbers and the value that gets returned is the value you need to set to the collision_layer. Pass ONLY POSITIVE NUMBERS (NEVER PASS NEGATIVE OR ZERO)
-    static int calculate_bitmask(const godot::TypedArray<int> &numbers);
-
     float get_block_rotation_radians() const;
     void set_block_rotation_radians(float new_block_rotation_radians);
 
