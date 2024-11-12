@@ -57,7 +57,7 @@ public:
     // Loads bullets by using a Resource that contains every bullet's state. Call this method using call_deffered to avoid crashes
     void load(const godot::Ref<SaveDataBulletFactory2D> &new_data);
 
-    // Clears all bullets. Call this method using call_deffered to avoid crashes
+    // Clears all bullets no matter if they are active/disabled. Call this method using call_deffered to avoid crashes
     void clear_all_bullets();
 
     // Spawns fully configured debuggers as children of the factory
@@ -65,6 +65,11 @@ public:
 
     // Determines whether the debugger should be created and added to the scene tree
     bool is_debugger_enabled;
+
+    // Clears every single object pool of every single bullet type
+    void clear_all_pools();
+
+    // Getters and setters
 
     bool get_is_debugger_enabled() const;
     void set_is_debugger_enabled(bool new_is_enabled);

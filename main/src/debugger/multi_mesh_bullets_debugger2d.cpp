@@ -104,8 +104,36 @@ void MultiMeshBulletsDebugger2D::update_instance_transforms(
     }
 }
 
+void MultiMeshBulletsDebugger2D::clear_only_disabled_multimeshes(){
+    set_physics_process(false);
+
+    int size = texture_multi_meshes.size();
+
+    // Need to create 2 brand new vectors containing only the valid active multimeshes.
+    std::vector<MultiMeshBullets2D *> active_bullet_multi_meshes;
+    std::vector<MultiMeshInstance2D *> active_texture_multi_meshes;
+
+    for (int i = 0; i < size; i++)
+    {
+        if(bullets_multi_meshes[i]->active_bullets_counter != 0){ // if the multimesh is active
+            // Push only active multimeshes to these vectors
+            active_bullet_multi_meshes.push_back(bullets_multi_meshes[i]);
+            active_texture_multi_meshes.push_back(texture_multi_meshes[i]);
+        }else{
+            texture_multi_meshes[i]->queue_free(); // free the texture multimesh that corresponds to the disabled bullet multimesh
+        }
+    }
+
+    bullets_multi_meshes = active_bullet_multi_meshes;
+    texture_multi_meshes = active_texture_multi_meshes;
+
+    set_physics_process(true);
+}
+
 void MultiMeshBulletsDebugger2D::_physics_process(float delta) {
-    for (int i = 0; i < texture_multi_meshes.size(); i++) {
+    int size = texture_multi_meshes.size();
+
+    for (int i = 0; i < size; i++) {
         update_instance_transforms(texture_multi_meshes[i], bullets_multi_meshes[i]);
     }
 }

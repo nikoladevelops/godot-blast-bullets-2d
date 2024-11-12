@@ -180,9 +180,6 @@ void BulletFactory2D::clear_all_bullets() {
         }
     }
 
-    block_bullets_pool.clear(); // Also empty out the pool since now that the bullet instances have been freed, it contains only invalid pointers
-    //
-
     // Clear all NormalBullets2D
     TypedArray<Node> all_normal_bullet_instances = normal_bullets_container->get_children();
 
@@ -194,10 +191,11 @@ void BulletFactory2D::clear_all_bullets() {
         }
     }
 
-    normal_bullets_pool.clear(); // Also empty out the pool since now that the bullet instances have been freed, it contains only invalid pointers
-    //
+    // Also empty out the object pools since now that the bullet instances have been freed, they contain only invalid pointers
+    block_bullets_pool.clear();
+    normal_bullets_pool.clear();
 
-    emit_signal("finished_clearing");
+    emit_signal("finished_clearing_all_bullets");
 }
 
 bool BulletFactory2D::get_is_debugger_enabled() const{
@@ -236,6 +234,16 @@ void BulletFactory2D::set_is_debugger_enabled(bool new_is_enabled) {
 
 }
 
+void BulletFactory2D::clear_all_pools(){
+    if(is_debugger_enabled){
+        // Clear the texture multimeshes representing the collision shapes of all disabled bullets (all bullets in the object pool)
+        block_bullets_debugger->clear_only_disabled_multimeshes();
+        normal_bullets_debugger->clear_only_disabled_multimeshes();
+    }
+
+    block_bullets_pool.clear();
+    normal_bullets_pool.clear();
+}
 
 Color BulletFactory2D::get_block_bullets_debugger_color() const{
     return block_bullets_debugger_color;
@@ -268,6 +276,7 @@ void BulletFactory2D::_bind_methods() {
     ClassDB::bind_method(D_METHOD("load", "new_data"), &BulletFactory2D::load);
 
     ClassDB::bind_method(D_METHOD("clear_all_bullets"), &BulletFactory2D::clear_all_bullets);
+    ClassDB::bind_method(D_METHOD("clear_all_pools"), &BulletFactory2D::clear_all_pools);
 
     ClassDB::bind_method(D_METHOD("get_normal_bullets_debugger_color"), &BulletFactory2D::get_normal_bullets_debugger_color);
     ClassDB::bind_method(D_METHOD("set_normal_bullets_debugger_color", "new_color"), &BulletFactory2D::set_normal_bullets_debugger_color);
@@ -283,6 +292,6 @@ void BulletFactory2D::_bind_methods() {
 
     ADD_SIGNAL(MethodInfo("finished_saving"));
     ADD_SIGNAL(MethodInfo("finished_loading"));
-    ADD_SIGNAL(MethodInfo("finished_clearing"));
+    ADD_SIGNAL(MethodInfo("finished_clearing_all_bullets"));
 }
 }

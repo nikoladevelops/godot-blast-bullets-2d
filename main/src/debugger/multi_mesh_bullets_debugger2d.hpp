@@ -26,6 +26,10 @@ public:
     void _physics_process(float delta);
     // Resets the debugger's state
     void reset_debugger();
+
+    // Clears only the multimeshes that track disabled bullets (in other words - clears only the debug shapes for the pooled bullets)
+    void clear_only_disabled_multimeshes();
+
     // Configures the debugger so that it tracks all MultiMeshBullets2D collision shapes inside a specific bullets container
     void configure(godot::Node* new_bullets_container, const godot::String& new_debugger_name, const godot::Color &new_multi_mesh_color);
 
