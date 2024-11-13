@@ -18,6 +18,11 @@ class BulletFactory2D : public godot::Node2D {
     GDCLASS(BulletFactory2D, godot::Node2D)
 
 public:
+    enum BulletType{
+        NORMAL_BULLETS,
+        BLOCK_BULLETS
+    };
+
     // Whether the factory was spawned correctly and the ready function finished
     bool is_ready=false;
     // Holds all disabled BlockBullets2D
@@ -44,12 +49,10 @@ public:
     godot::Color normal_bullets_debugger_color = godot::Color(0, 0, 2, 0.8);
 
     void _ready();
-
+    // Spawns NormalBullets2D when given a resource containing all needed data
     void spawn_normal_bullets(const godot::Ref<NormalBulletsData2D> &spawn_data);
+    // Spawns BlockBullets2D when given a resource containing all needed data
     void spawn_block_bullets(const godot::Ref<BlockBulletsData2D> &spawn_data);
-
-    godot::RID get_physics_space() const;
-    void set_physics_space(godot::RID new_space_rid);
 
     // Generates a Resource that contains every bullet's state
     godot::Ref<SaveDataBulletFactory2D> save();
@@ -71,6 +74,9 @@ public:
 
     // Getters and setters
 
+    godot::RID get_physics_space() const;
+    void set_physics_space(godot::RID new_space_rid);
+
     bool get_is_debugger_enabled() const;
     void set_is_debugger_enabled(bool new_is_enabled);
 
@@ -83,5 +89,10 @@ public:
 protected:
     static void _bind_methods();
 };
+
 }
+
+// Need this in order to expose the enum to Godot Engine
+VARIANT_ENUM_CAST(BlastBullets::BulletFactory2D::BulletType);
+
 #endif

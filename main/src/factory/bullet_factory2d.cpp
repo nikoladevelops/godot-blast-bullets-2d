@@ -293,5 +293,9 @@ void BulletFactory2D::_bind_methods() {
     ADD_SIGNAL(MethodInfo("finished_saving"));
     ADD_SIGNAL(MethodInfo("finished_loading"));
     ADD_SIGNAL(MethodInfo("finished_clearing_all_bullets"));
+
+    // Need this in order to expose the enum constants to Godot Engine
+    BIND_ENUM_CONSTANT(NORMAL_BULLETS);
+	BIND_ENUM_CONSTANT(BLOCK_BULLETS);
 }
 }
