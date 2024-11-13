@@ -18,7 +18,7 @@ class BulletFactory2D : public godot::Node2D {
     GDCLASS(BulletFactory2D, godot::Node2D)
 
 public:
-    enum BulletType{
+    enum MultiMeshBulletType{
         NORMAL_BULLETS,
         BLOCK_BULLETS
     };
@@ -30,7 +30,7 @@ public:
     // Holds all disabled NormalBullets2D
     MultiMeshObjectPool normal_bullets_pool;
 
-    // The physics space where the bullets multimeshes are interacting with the world
+    // The physics space where the bullet multimeshes are interacting with the world
     godot::RID physics_space;
 
     // Contains all BlockBullets2D in the scene tree
@@ -93,6 +93,6 @@ protected:
 }
 
 // Need this in order to expose the enum to Godot Engine
-VARIANT_ENUM_CAST(BlastBullets::BulletFactory2D::BulletType);
+VARIANT_ENUM_CAST(BlastBullets::BulletFactory2D::MultiMeshBulletType);
 
 #endif
