@@ -91,13 +91,6 @@ void BulletFactory2D::spawn_normal_bullets(const godot::Ref<NormalBulletsData2D>
     bullets_instance->spawn(spawn_data, &normal_bullets_pool, this, normal_bullets_container);
 }
 
-RID BulletFactory2D::get_physics_space() const {
-    return physics_space;
-}
-void BulletFactory2D::set_physics_space(RID new_space_rid) {
-    physics_space = new_space_rid;
-}
-
 Ref<SaveDataBulletFactory2D> BulletFactory2D::save() {
     Ref<SaveDataBulletFactory2D> data = memnew(SaveDataBulletFactory2D);
 
@@ -114,7 +107,7 @@ Ref<SaveDataBulletFactory2D> BulletFactory2D::save() {
 
         Ref<SaveDataBlockBullets2D> empty_data = memnew(SaveDataBlockBullets2D);
         
-        // Saves only the active bullets currently
+        // Saves only the active bullets
         data->all_block_bullets.push_back(bullet_instance.save(empty_data));
     }
     //
@@ -132,7 +125,7 @@ Ref<SaveDataBulletFactory2D> BulletFactory2D::save() {
 
         Ref<SaveDataNormalBullets2D> empty_data = memnew(SaveDataNormalBullets2D);
         
-        // Saves only the active bullets currently
+        // Saves only the active bullets
         data->all_normal_bullets.push_back(bullet_instance.save(empty_data));
     }
     //
@@ -162,7 +155,11 @@ void BulletFactory2D::load(const Ref<SaveDataBulletFactory2D> &new_data) {
     emit_signal("finished_loading");
 }
 
-void BulletFactory2D::clear_all_bullets() {
+void BulletFactory2D::free_all_bullets() {
+    // Empty out the object pools so they won't contain invalid pointers
+    block_bullets_pool.clear_bullet_pointers();
+    normal_bullets_pool.clear_bullet_pointers();
+
     // Reset all debuggers if they were enabled
     if(is_debugger_enabled){
         block_bullets_debugger->reset_debugger();
@@ -191,11 +188,69 @@ void BulletFactory2D::clear_all_bullets() {
         }
     }
 
-    // Also empty out the object pools since now that the bullet instances have been freed, they contain only invalid pointers
-    block_bullets_pool.clear();
-    normal_bullets_pool.clear();
+    // Notify the user that all bullets have been freed/deleted
+    emit_signal("finished_freeing_all_bullets");
+}
 
-    emit_signal("finished_clearing_all_bullets");
+void BulletFactory2D::free_all_pools(){
+    if(is_debugger_enabled){
+        // Free the texture multimeshes representing the collision shapes of all disabled bullets (all bullets in the object pool)
+        block_bullets_debugger->free_texture_multi_meshes_tracking_disabled_bullets();
+        normal_bullets_debugger->free_texture_multi_meshes_tracking_disabled_bullets();
+    }
+
+    // Free all multimesh bullets that are disabled (and we already know that all disabled bullets are always stored in the object pools so we accomplish this easily)
+    block_bullets_pool.free_all_bullets();
+    normal_bullets_pool.free_all_bullets();
+}
+
+void BulletFactory2D::free_multi_mesh_pool(MultiMeshBulletType bullet_multi_mesh_type, int amount_bullets){
+    if(is_debugger_enabled){
+        // Free the texture multimeshes representing the collision shapes of all disabled bullets that have exactly `amount_bullets` instances
+        switch (bullet_multi_mesh_type){
+            case BLOCK_BULLETS:
+                block_bullets_debugger->free_texture_multi_meshes_tracking_disabled_bullets(amount_bullets);
+                break;
+            case NORMAL_BULLETS:
+                normal_bullets_debugger->free_texture_multi_meshes_tracking_disabled_bullets(amount_bullets);
+                break;
+            default:
+                break;
+        }
+    }
+
+    // Free the actual multimesh bullet objects that are in the object pool and have exactly `amount_bullets` bullet instances each
+    switch (bullet_multi_mesh_type){
+        case BLOCK_BULLETS:
+            block_bullets_pool.free_specific_bullets(amount_bullets);
+            break;
+        case NORMAL_BULLETS:
+            normal_bullets_pool.free_specific_bullets(amount_bullets);
+            break;
+        default:
+            break;
+    }   
+}
+
+RID BulletFactory2D::get_physics_space() const {
+    return physics_space;
+}
+void BulletFactory2D::set_physics_space(RID new_space_rid) {
+    physics_space = new_space_rid;
+}
+
+Color BulletFactory2D::get_block_bullets_debugger_color() const{
+    return block_bullets_debugger_color;
+}
+void BulletFactory2D::set_block_bullets_debugger_color(const Color& new_color){
+    block_bullets_debugger_color = new_color;
+}
+
+Color BulletFactory2D::get_normal_bullets_debugger_color() const{
+    return normal_bullets_debugger_color;
+}
+void BulletFactory2D::set_normal_bullets_debugger_color(const Color& new_color){
+    normal_bullets_debugger_color = new_color;
 }
 
 bool BulletFactory2D::get_is_debugger_enabled() const{
@@ -234,32 +289,6 @@ void BulletFactory2D::set_is_debugger_enabled(bool new_is_enabled) {
 
 }
 
-void BulletFactory2D::clear_all_pools(){
-    if(is_debugger_enabled){
-        // Clear the texture multimeshes representing the collision shapes of all disabled bullets (all bullets in the object pool)
-        block_bullets_debugger->clear_only_disabled_multimeshes();
-        normal_bullets_debugger->clear_only_disabled_multimeshes();
-    }
-
-    block_bullets_pool.clear();
-    normal_bullets_pool.clear();
-}
-
-Color BulletFactory2D::get_block_bullets_debugger_color() const{
-    return block_bullets_debugger_color;
-}
-void BulletFactory2D::set_block_bullets_debugger_color(const Color& new_color){
-    block_bullets_debugger_color = new_color;
-}
-
-Color BulletFactory2D::get_normal_bullets_debugger_color() const{
-    return normal_bullets_debugger_color;
-}
-void BulletFactory2D::set_normal_bullets_debugger_color(const Color& new_color){
-    normal_bullets_debugger_color = new_color;
-}
-
-
 
 void BulletFactory2D::_bind_methods() {
     ClassDB::bind_method(D_METHOD("get_physics_space"), &BulletFactory2D::get_physics_space);
@@ -275,8 +304,9 @@ void BulletFactory2D::_bind_methods() {
     ClassDB::bind_method(D_METHOD("save"), &BulletFactory2D::save);
     ClassDB::bind_method(D_METHOD("load", "new_data"), &BulletFactory2D::load);
 
-    ClassDB::bind_method(D_METHOD("clear_all_bullets"), &BulletFactory2D::clear_all_bullets);
-    ClassDB::bind_method(D_METHOD("clear_all_pools"), &BulletFactory2D::clear_all_pools);
+    ClassDB::bind_method(D_METHOD("free_all_bullets"), &BulletFactory2D::free_all_bullets);
+    ClassDB::bind_method(D_METHOD("free_all_pools"), &BulletFactory2D::free_all_pools);
+    ClassDB::bind_method(D_METHOD("free_multi_mesh_pool", "bullet_multi_mesh_type", "amount_bullets"), &BulletFactory2D::free_multi_mesh_pool);
 
     ClassDB::bind_method(D_METHOD("get_normal_bullets_debugger_color"), &BulletFactory2D::get_normal_bullets_debugger_color);
     ClassDB::bind_method(D_METHOD("set_normal_bullets_debugger_color", "new_color"), &BulletFactory2D::set_normal_bullets_debugger_color);
@@ -292,7 +322,7 @@ void BulletFactory2D::_bind_methods() {
 
     ADD_SIGNAL(MethodInfo("finished_saving"));
     ADD_SIGNAL(MethodInfo("finished_loading"));
-    ADD_SIGNAL(MethodInfo("finished_clearing_all_bullets"));
+    ADD_SIGNAL(MethodInfo("finished_freeing_all_bullets"));
 
     // Need this in order to expose the enum constants to Godot Engine
     BIND_ENUM_CONSTANT(NORMAL_BULLETS);

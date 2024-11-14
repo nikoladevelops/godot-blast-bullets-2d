@@ -13,11 +13,12 @@ class NormalBulletsData2D;
 class MultiMeshBulletsDebugger2D;
 class SaveDataBulletFactory2D;
 
-// Creates bullets with different behaviour
+// Creates bullets with different behavior
 class BulletFactory2D : public godot::Node2D {
     GDCLASS(BulletFactory2D, godot::Node2D)
 
 public:
+    // The available multimesh bullet types that the factory can handle with ease (if you plan on adding more custom types, you would have to add extra code where you see MultiMeshBulletType being checked to ensure consistent behavior)
     enum MultiMeshBulletType{
         NORMAL_BULLETS,
         BLOCK_BULLETS
@@ -25,8 +26,10 @@ public:
 
     // Whether the factory was spawned correctly and the ready function finished
     bool is_ready=false;
+    
     // Holds all disabled BlockBullets2D
     MultiMeshObjectPool block_bullets_pool;
+
     // Holds all disabled NormalBullets2D
     MultiMeshObjectPool normal_bullets_pool;
 
@@ -35,22 +38,28 @@ public:
 
     // Contains all BlockBullets2D in the scene tree
     godot::Node *block_bullets_container = nullptr;
+
     // Contains all NormalBullets2D in the scene tree
     godot::Node *normal_bullets_container = nullptr;
 
     // Debugs the collision shapes of all BlockBullets2D when enabled
     MultiMeshBulletsDebugger2D *block_bullets_debugger = nullptr;
+
     // Debugs the collision shapes of all NormalBullets2D when enabled
     MultiMeshBulletsDebugger2D *normal_bullets_debugger = nullptr;
 
     // The color for the collision shapes of all BlockBullets2D
     godot::Color block_bullets_debugger_color = godot::Color(0, 0, 2, 0.8);
+
     // The color for the collision shapes of all NormalBullets2D
     godot::Color normal_bullets_debugger_color = godot::Color(0, 0, 2, 0.8);
 
+    // Ensures the correct initial state
     void _ready();
+
     // Spawns NormalBullets2D when given a resource containing all needed data
     void spawn_normal_bullets(const godot::Ref<NormalBulletsData2D> &spawn_data);
+
     // Spawns BlockBullets2D when given a resource containing all needed data
     void spawn_block_bullets(const godot::Ref<BlockBulletsData2D> &spawn_data);
 
@@ -60,20 +69,22 @@ public:
     // Loads bullets by using a Resource that contains every bullet's state. Call this method using call_deffered to avoid crashes
     void load(const godot::Ref<SaveDataBulletFactory2D> &new_data);
 
-    // Clears all bullets no matter if they are active/disabled. Call this method using call_deffered to avoid crashes
-    void clear_all_bullets();
-
     // Spawns fully configured debuggers as children of the factory
     void spawn_debuggers();
 
     // Determines whether the debugger should be created and added to the scene tree
     bool is_debugger_enabled;
 
-    // Clears every single object pool of every single bullet type
-    void clear_all_pools();
+    // Frees all bullets no matter if they are active/disabled. Call this method using call_deffered to avoid crashes
+    void free_all_bullets();
 
-    // Getters and setters
+    // Frees every single bullet that is inside the object pool
+    void free_all_pools();
 
+    // Frees multi mesh bullets inside the object pool, but only those that hold a specific amount of bullets
+    void free_multi_mesh_pool(MultiMeshBulletType bullet_multi_mesh_type, int amount_bullets);
+
+    // Getters and setters (these are needed in order to be exposed to Godot Engine)
     godot::RID get_physics_space() const;
     void set_physics_space(godot::RID new_space_rid);
 
@@ -87,6 +98,7 @@ public:
     void set_normal_bullets_debugger_color(const godot::Color& new_color);
 
 protected:
+    // Responsible for exposing C++ methods/properties to Godot Engine
     static void _bind_methods();
 };
 

@@ -28,8 +28,39 @@ MultiMeshBullets2D *MultiMeshObjectPool::pop(int amount_bullets) {
     return found_multimesh;
 }
 
-void MultiMeshObjectPool::clear() {
+void MultiMeshObjectPool::clear_bullet_pointers() {
     pool.clear();
+}
+
+void MultiMeshObjectPool::free_all_bullets(){
+    for (auto &[key, queue] : pool) { 
+        while (queue.empty() == false) {
+            queue.front()->safe_delete(); // free the bullet object
+            queue.pop(); // remove it from the queue
+        }
+    }
+    pool.clear();  // clear the map so it doesn't contain any empty queues
+}
+
+void MultiMeshObjectPool::free_specific_bullets(int amount_bullets){
+    // Try to find a queue that exists and holds multimeshes where each multimesh has `amount_bullets` instances
+    auto it = pool.find(amount_bullets);
+    
+    // If the queue doesn't exist or if the queue is empty, then it means there's no bullets to free
+    if(it == pool.end() || it->second.empty()){
+        return;
+    }
+
+    auto &queue = it->second;
+
+    // We know the queue contains at least 1 multimesh, so we use a do-while loop to ensure the operation happens at least once
+    do
+    {
+        queue.front()->safe_delete(); // free the bullet object
+        queue.pop(); // remove it from the queue
+    } while (queue.empty() == false);
+    
+    pool.erase(amount_bullets); // delete the queue itself since it's basically empty right now
 }
 
 } 
