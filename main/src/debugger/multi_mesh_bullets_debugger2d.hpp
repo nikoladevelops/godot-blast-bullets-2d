@@ -38,6 +38,9 @@ public:
     // Frees only the texture multimeshes that track currently disabled bullets, BUT only those that contain exactly `amount_bullets` instances. Note that this frees only debugger texuture multi_meshes but DOES NOT free the actual MultiMeshBullets2D objects
     void free_texture_multi_meshes_tracking_disabled_bullets(int amount_bullets);
 
+    // Changes the color of all texture multimeshes/ the color of the debug shapes
+    void change_texture_multimeshes_color(const godot::Color &new_multi_mesh_color);
+
     // Configures the debugger so that it tracks all MultiMeshBullets2D collision shapes inside a specific bullets container
     void configure(godot::Node* new_bullets_container, const godot::String& new_debugger_name, const godot::Color &new_multi_mesh_color);
 

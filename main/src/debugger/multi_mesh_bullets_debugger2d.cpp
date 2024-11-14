@@ -159,6 +159,25 @@ void MultiMeshBulletsDebugger2D::free_texture_multi_meshes_tracking_disabled_bul
     set_physics_process(true);
 }
 
+void MultiMeshBulletsDebugger2D::change_texture_multimeshes_color(const Color &new_multi_mesh_color){
+    multi_mesh_color = new_multi_mesh_color;
+    int amount_texture_multis = texture_multi_meshes.size();
+
+    // For each texture multi mesh
+    for (int i = 0; i < amount_texture_multis; i++)
+    {
+        Ref<MultiMesh> &multi = texture_multi_meshes[i]->get_multimesh();
+        int amount_bullet_instances = multi->get_instance_count();
+
+        // For each debug shape inside texture multi mesh
+        for (int j = 0; j < amount_bullet_instances; j++)
+        {
+            // Set its color to the new one
+            multi->set_instance_color(j, multi_mesh_color);
+        }
+    }
+}
+
 void MultiMeshBulletsDebugger2D::_physics_process(float delta) {
     int size = texture_multi_meshes.size();
 

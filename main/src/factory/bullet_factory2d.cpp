@@ -244,6 +244,15 @@ Color BulletFactory2D::get_block_bullets_debugger_color() const{
 }
 void BulletFactory2D::set_block_bullets_debugger_color(const Color& new_color){
     block_bullets_debugger_color = new_color;
+
+    // Ensure the code that is next will never run in the editor and never run unless the factory is ready in the scene tree
+    if(Engine::get_singleton()->is_editor_hint() || is_ready == false){
+        return;
+    }
+
+    if(block_bullets_debugger != nullptr){
+        block_bullets_debugger->change_texture_multimeshes_color(new_color);
+    }
 }
 
 Color BulletFactory2D::get_normal_bullets_debugger_color() const{
@@ -251,6 +260,15 @@ Color BulletFactory2D::get_normal_bullets_debugger_color() const{
 }
 void BulletFactory2D::set_normal_bullets_debugger_color(const Color& new_color){
     normal_bullets_debugger_color = new_color;
+
+    // Ensure the code that is next will never run in the editor and never run unless the factory is ready in the scene tree
+    if(Engine::get_singleton()->is_editor_hint() || is_ready == false){
+        return;
+    }
+
+    if(normal_bullets_debugger != nullptr){
+        normal_bullets_debugger->change_texture_multimeshes_color(new_color);
+    }
 }
 
 bool BulletFactory2D::get_is_debugger_enabled() const{
