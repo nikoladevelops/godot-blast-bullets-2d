@@ -194,9 +194,9 @@ void BulletFactory2D::free_all_bullets() {
 
 void BulletFactory2D::free_all_pools(){
     if(is_debugger_enabled){
-        // Free the texture multimeshes representing the collision shapes of all disabled bullets (all bullets in the object pool)
-        block_bullets_debugger->free_texture_multi_meshes_tracking_disabled_bullets();
-        normal_bullets_debugger->free_texture_multi_meshes_tracking_disabled_bullets();
+        // Free the debug multimeshes representing the collision shapes of all disabled bullets (all bullets in the object pool)
+        block_bullets_debugger->free_debug_multimeshes_tracking_disabled_bullets();
+        normal_bullets_debugger->free_debug_multimeshes_tracking_disabled_bullets();
     }
 
     // Free all multimesh bullets that are disabled (and we already know that all disabled bullets are always stored in the object pools so we accomplish this easily)
@@ -209,10 +209,10 @@ void BulletFactory2D::free_multi_mesh_pool(MultiMeshBulletType bullet_multi_mesh
         // Free the texture multimeshes representing the collision shapes of all disabled bullets that have exactly `amount_bullets` instances
         switch (bullet_multi_mesh_type){
             case BLOCK_BULLETS:
-                block_bullets_debugger->free_texture_multi_meshes_tracking_disabled_bullets(amount_bullets);
+                block_bullets_debugger->free_debug_multimeshes_tracking_disabled_bullets(amount_bullets);
                 break;
             case NORMAL_BULLETS:
-                normal_bullets_debugger->free_texture_multi_meshes_tracking_disabled_bullets(amount_bullets);
+                normal_bullets_debugger->free_debug_multimeshes_tracking_disabled_bullets(amount_bullets);
                 break;
             default:
                 break;
@@ -267,7 +267,7 @@ void BulletFactory2D::set_block_bullets_debugger_color(const Color& new_color){
     }
 
     if(block_bullets_debugger != nullptr){
-        block_bullets_debugger->change_texture_multimeshes_color(new_color);
+        block_bullets_debugger->change_debug_multimeshes_color(new_color);
     }
 }
 
@@ -283,7 +283,7 @@ void BulletFactory2D::set_normal_bullets_debugger_color(const Color& new_color){
     }
 
     if(normal_bullets_debugger != nullptr){
-        normal_bullets_debugger->change_texture_multimeshes_color(new_color);
+        normal_bullets_debugger->change_debug_multimeshes_color(new_color);
     }
 }
 

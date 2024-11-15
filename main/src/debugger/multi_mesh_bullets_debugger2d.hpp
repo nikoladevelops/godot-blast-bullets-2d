@@ -24,41 +24,41 @@ public:
     godot::PhysicsServer2D *physics_server;
 
     // The color of the collision shapes represented by the debug multimeshes
-    godot::Color multi_mesh_color;
+    godot::Color multimesh_color;
 
     // Handles movement of the debug shapes of each debug multimesh
     void _physics_process(float delta);
 
-    // Resets the debugger's state. Note that this frees all of the debugger's texuture multimeshes but DOES NOT free the actual MultiMeshBullets2D objects
+    // Resets the debugger's state. Note that this frees all of the debugger's debug multimeshes but DOES NOT free the actual MultiMeshBullets2D objects
     void reset_debugger();
 
-    // Frees only the debug multimeshes that track currently disabled bullets (in other words - frees only the debug shapes for the pooled bullets). Note that this frees only debugger texuture multi_meshes but DOES NOT free the actual MultiMeshBullets2D objects
-    void free_texture_multi_meshes_tracking_disabled_bullets();
+    // Frees only the debug multimeshes that track currently disabled bullets (in other words - frees only the debug shapes for the pooled bullets). Note that this frees only debugger debug multimeshes but DOES NOT free the actual MultiMeshBullets2D objects
+    void free_debug_multimeshes_tracking_disabled_bullets();
 
-    // Frees only the debug multimeshes that track currently disabled bullets, BUT only those that contain exactly `amount_bullets` instances. Note that this frees only debugger texuture multi_meshes but DOES NOT free the actual MultiMeshBullets2D objects
-    void free_texture_multi_meshes_tracking_disabled_bullets(int amount_bullets);
+    // Frees only the debug multimeshes that track currently disabled bullets, BUT only those that contain exactly `amount_bullets` instances. Note that this frees only debugger debug multimeshes but DOES NOT free the actual MultiMeshBullets2D objects
+    void free_debug_multimeshes_tracking_disabled_bullets(int amount_bullets);
 
     // Changes the color of all debug multimeshes/ the color of the debug shapes
-    void change_texture_multimeshes_color(const godot::Color &new_multi_mesh_color);
+    void change_debug_multimeshes_color(const godot::Color &new_multimesh_color);
 
     // Configures the debugger so that it tracks all MultiMeshBullets2D collision shapes inside a specific bullets container
-    void configure(godot::Node* new_bullets_container, const godot::String& new_debugger_name, const godot::Color &new_multi_mesh_color);
+    void configure(godot::Node* new_bullets_container, const godot::String& new_debugger_name, const godot::Color &new_multimesh_color);
 
-    // Disables the debugger and frees all displayed texure multimeshes. Note that this frees all of the debugger's texuture multi_meshes but DOES NOT free the actual MultiMeshBullets2D objects
+    // Disables the debugger and frees all debugger multimeshes. Note that this frees all of the debugger's debug multimeshes but DOES NOT free the actual MultiMeshBullets2D objects
     void disable();
 
-    // Activates the debugger and spawns all needed collision textures for the already spawned multimesh bullets
+    // Activates the debugger and spawns all needed debugger shapes
     void activate();
 
 private:
     // Stores pointers to the spawned bullet multimeshes
-    std::vector<MultiMeshBullets2D *> bullets_multi_meshes;
+    std::vector<MultiMeshBullets2D *> bullet_multimeshes;
 
     // Stores pointers to the spawned debug multimeshes
-    std::vector<godot::MultiMeshInstance2D *> texture_multi_meshes;
+    std::vector<godot::MultiMeshInstance2D *> debugger_multimeshes;
 
     // Runs when a block bullet has been added to the bullets_container. Note that the bullet that has been added as a new child HAS to be set up completely
-    void generate_texture_multimesh(MultiMeshBullets2D *new_bullets_multi_mesh);
+    void generate_debug_multimesh(MultiMeshBullets2D *new_bullets_multimesh);
 
     // Ensures that the quadmesh of the debug multimesh matches the size of the physics shape of the bullets multimesh bullets
     void ensure_quadmesh_matches_physics_shape_size(godot::MultiMeshInstance2D &debug_multimesh_instance, MultiMeshBullets2D &bullet_multimesh_instance);
