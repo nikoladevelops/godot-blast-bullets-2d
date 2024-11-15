@@ -75,6 +75,12 @@ public:
     // Determines whether the debugger should be created and added to the scene tree
     bool is_debugger_enabled;
 
+    // Populates the NormalBullets2D object pool with bullets ready to be retrieved
+    void populate_normal_bullets_pool(int amount_multimesh_instances, int amount_bullets_each_multimesh_holds);
+
+    // Populates the BlockBullets2D object pool with bullets ready to be retrieved
+    void populate_block_bullets_pool(int amount_multimesh_instances, int amount_bullets_each_multimesh_holds);
+
     // Frees all bullets no matter if they are active/disabled. Call this method using call_deffered to avoid crashes
     void free_all_bullets();
 

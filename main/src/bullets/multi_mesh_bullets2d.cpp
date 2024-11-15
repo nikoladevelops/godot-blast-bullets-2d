@@ -25,8 +25,6 @@ MultiMeshBullets2D::~MultiMeshBullets2D() {
 
 // Used to spawn brand new bullets.
 void MultiMeshBullets2D::spawn(const Ref<MultiMeshBulletsData2D> &spawn_data, MultiMeshObjectPool *pool, BulletFactory2D *factory, Node *bullets_container) {
-    set_physics_process(false);
-
     bullets_pool = pool;
     bullet_factory = factory;
     physics_server = PhysicsServer2D::get_singleton();
@@ -58,9 +56,6 @@ void MultiMeshBullets2D::spawn(const Ref<MultiMeshBulletsData2D> &spawn_data, Mu
     finalize_set_up(spawn_data->bullets_custom_data, spawn_data->textures, spawn_data->current_texture_index, spawn_data->material);
 
     bullets_container->add_child(this);
-
-    set_physics_process(true);
-    set_visible(true);
 }
 
 // Used to retrieve a resource representing the bullets' data, so that it can be saved to a file.
@@ -176,8 +171,6 @@ Ref<SaveDataMultiMeshBullets2D> MultiMeshBullets2D::save(const Ref<SaveDataMulti
 
 // Used to load a resource. Should be used instead of spawn when trying to load data from a file.
 void MultiMeshBullets2D::load(const Ref<SaveDataMultiMeshBullets2D> &data, MultiMeshObjectPool *pool, BulletFactory2D *factory, Node *bullets_container) {
-    set_physics_process(false);
-    
     bullets_pool = pool;
     bullet_factory = factory;
 
@@ -202,6 +195,49 @@ void MultiMeshBullets2D::load(const Ref<SaveDataMultiMeshBullets2D> &data, Multi
     
     set_physics_process(true);
     set_visible(true);
+}
+
+void MultiMeshBullets2D::spawn_as_disabled_multimesh(int amount_bullets, MultiMeshObjectPool *pool, BulletFactory2D *factory, Node *bullets_container){
+    set_visible(false);
+
+    active_bullets_counter = 0; // very important to do this since the debugger does rely on this to determine whether to move shapes or not
+    bullets_pool = pool;
+    bullet_factory = factory;
+    physics_server = PhysicsServer2D::get_singleton();
+
+    size = amount_bullets;
+
+    generate_multimesh();
+
+    multi->set_instance_count(size);
+
+    // Create the area that will hold collision shapes
+    area = physics_server->area_create();
+    for (int i = 0; i < size; i++) { // for every bullet/ for every instance
+        // Create collision shape
+        RID shape = physics_server->rectangle_shape_create();
+        // Attach it to the area
+        physics_server->area_add_shape(area, shape);
+    }
+
+    // Only reason this here exists is so that the debugger can continue to work properly without throwing a bunch of errors in the console if the shape has not been configured/ doesn't have a data
+    RID shape = physics_server->area_get_shape(area,0);
+    physics_server->shape_set_data(shape, Vector2(5,5));
+    //
+
+    bullets_enabled_status.reserve(size);
+    all_cached_instance_transforms.resize(size); // these ones should probably be with resize
+    all_cached_instance_origin.resize(size);
+
+    all_cached_shape_transforms.resize(size);
+    all_cached_shape_origin.resize(size);
+
+    // Just add the bullet multimesh to the bullet container
+    bullets_container->add_child(this);
+    set_physics_process(false); // if I set this before actually adding the multimesh instance to the scene tree, then the setting wont take effect
+    
+    // Push the bullet multimesh instance to the object pool, since it's ready to be activated
+    bullets_pool->push(this, amount_bullets);
 }
 
 // Activates the multimesh

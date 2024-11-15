@@ -62,19 +62,32 @@ void MultiMeshBulletsDebugger2D::generate_texture_multimesh(MultiMeshBullets2D *
         return;
     }
 
-    bullets_multi_meshes.push_back(new_bullets_multi_mesh);
-    // Set up a mesh
-    Ref<QuadMesh> mesh = memnew(QuadMesh);
 
-    RID shape = physics_server->area_get_shape(new_bullets_multi_mesh->area, 0);
-    Vector2 size = physics_server->shape_get_data(shape);
-    mesh->set_size(size * 2); // because I'm using rectangles as the collision shape, the function will give me the half extents of width/height so I need to multiply by 2 to get the actual size
+    // Get the physics rectangular shape of the first bullet inside bullet multimesh (basically gets it's collision shape)
+    RID first_bullet_shape = physics_server->area_get_shape(new_bullets_multi_mesh->area, 0);
 
-    // Set up the multimesh
+    // Get the size of the collision shape
+    Vector2 shape_size = physics_server->shape_get_data(first_bullet_shape);
+    
+    // The physics server in Godot creates shape sizes by half extents when dealing with RectangleShape and it also returns half extents every time you use shape_get_data or shape_set_data..
+    // Example: If the bullet physics rectangle shape was originally created using shape_set_data with argument Vector2(16,16) this would mean that Godot has created a shape with half the width being 16 and half the height being also 16, meaning we are dealing with a rectangle shape with the size Vector2(32,32)
+    // So because shape_get_data returns the half extents, I need to multiply it by 2 to get the actual size that the QuadMesh I'm trying to create will have (this is so I can use a QuadMesh to represent the actual bullet collision shape)
+    // This is because setting the QuadMesh size works with normal sizing settings - meaning it expects the ACTUAL SIZE and not THE HALF EXTENTS that we get from shape_get_data
+    // Note that I only know that shape_get_data returns half_extents because BlastBullets2D is hard coded to use only RectangleShape as the physics collision shape type for all bullets (everything is Rectangles basically)
+    // So if it changes it the future there is a lot of code including this one over here that would need more complex logic to deal with each different physics shape type
+
+    shape_size = shape_size*2; // now this represents the actual size that the QuadMesh will have
+
+    // Create QuadMesh that will match the size of the physics collision shape exactly
+    Ref<QuadMesh> new_mesh = memnew(QuadMesh);
+    new_mesh->set_size(shape_size);
+
+    // Create a multimesh
     Ref<MultiMesh> multi = memnew(MultiMesh);
-    multi->set_mesh(mesh);
 
+    multi->set_mesh(new_mesh);
     multi->set_use_colors(true);
+
     int instance_count = new_bullets_multi_mesh->size;
     multi->set_instance_count(instance_count);
 
@@ -90,18 +103,40 @@ void MultiMeshBulletsDebugger2D::generate_texture_multimesh(MultiMeshBullets2D *
         multi->set_instance_transform_2d(i, transf);
     }
 
-    texture_multi_meshes.push_back(texture_multi_instance); // store it in the vector
+    bullets_multi_meshes.push_back(new_bullets_multi_mesh);
+    texture_multi_meshes.push_back(texture_multi_instance);
+    
     add_child(texture_multi_instance);
 }
 
-void MultiMeshBulletsDebugger2D::update_instance_transforms(
-    MultiMeshInstance2D *texture_multi,
-    MultiMeshBullets2D *bullets_multi) {
+void MultiMeshBulletsDebugger2D::ensure_quadmesh_matches_physics_shape_size(MultiMeshInstance2D &debug_multimesh_instance, MultiMeshBullets2D &bullet_multimesh_instance){
+    Ref<MultiMesh> &debug_inner_multi = debug_multimesh_instance.get_multimesh();
+    Ref<Mesh> &debug_mesh = debug_inner_multi->get_mesh();
 
-    Ref<MultiMesh> texture_inner_multi = texture_multi->get_multimesh();
-    for (int i = 0; i < texture_inner_multi->get_instance_count(); i++) {
-        Transform2D &bullet_collision_shape_transf = bullets_multi->all_cached_shape_transforms[i];
-        texture_inner_multi->set_instance_transform_2d(i, bullet_collision_shape_transf);
+    // Get the physics rectangular shape of the first bullet inside bullet multimesh (basically gets it's collision shape)
+    RID first_bullet_shape = physics_server->area_get_shape(bullet_multimesh_instance.area, 0);
+
+    // Get the size of the collision shape
+    Vector2 shape_size = physics_server->shape_get_data(first_bullet_shape);
+    
+    shape_size = shape_size*2; // now this represents the actual size that the QuadMesh supposedly already has
+
+    // Cast the mesh ptr to a quadmesh ptr because we already know that the debugger uses QuadMeshes only
+    QuadMesh *quad_mesh_ptr = static_cast<QuadMesh *>(debug_mesh.ptr());
+
+    // If the physics shape size has changed inside the bullet multimesh, then the debug multimesh should also match the change
+    if(shape_size != quad_mesh_ptr->get_size()){
+        quad_mesh_ptr->set_size(shape_size);
+    }
+}
+
+void MultiMeshBulletsDebugger2D::update_debugger_shape_transforms(MultiMeshInstance2D &debug_multimesh_instance, MultiMeshBullets2D &bullet_multimesh_instance) {
+    Ref<MultiMesh> &debug_inner_multi = debug_multimesh_instance.get_multimesh();
+    int amount_debug_shapes = debug_inner_multi->get_instance_count();
+
+    for (int i = 0; i < amount_debug_shapes; i++) {
+        Transform2D &bullet_collision_shape_transf = bullet_multimesh_instance.all_cached_shape_transforms[i];
+        debug_inner_multi->set_instance_transform_2d(i, bullet_collision_shape_transf);
     }
 }
 
@@ -179,10 +214,24 @@ void MultiMeshBulletsDebugger2D::change_texture_multimeshes_color(const Color &n
 }
 
 void MultiMeshBulletsDebugger2D::_physics_process(float delta) {
-    int size = texture_multi_meshes.size();
+    int amount_debug_multimeshes = texture_multi_meshes.size();
 
-    for (int i = 0; i < size; i++) {
-        update_instance_transforms(texture_multi_meshes[i], bullets_multi_meshes[i]);
+    for (int i = 0; i < amount_debug_multimeshes; i++) {
+        
+        MultiMeshBullets2D &current_bulllets_multimesh_instance = *bullets_multi_meshes[i];
+
+        // If the bullets multimesh is disabled then there is no need to update the debug shapes so they match the physics shapes' transforms
+        if(current_bulllets_multimesh_instance.active_bullets_counter == 0){
+            continue;
+        }
+
+        MultiMeshInstance2D &current_debug_multimesh_instance = *texture_multi_meshes[i];
+
+        // Ensure the quadmesh is created and matches the physics collision shape size of the bullets
+        ensure_quadmesh_matches_physics_shape_size(current_debug_multimesh_instance, current_bulllets_multimesh_instance);
+        
+        // Move each debug shape to match the transform of the bullet multimesh's physics shape
+        update_debugger_shape_transforms(current_debug_multimesh_instance, current_bulllets_multimesh_instance);
     }
 }
 }

@@ -149,6 +149,9 @@ public:
     // Safely deletes itself
     void safe_delete();
 
+    // Spawns as a disabled invisible multimesh that is ready to be activated at any time. Method is used for object pooling, because it sets up all necessary things (like physics shapes for example) without needing additional spawn data (which would be overriden anyways by the activate function's logic)
+    void spawn_as_disabled_multimesh(int amount_bullets, MultiMeshObjectPool *pool, BulletFactory2D *factory, Node *bullets_container);
+
     /// METHODS RESPONSIBLE FOR VARIOUS BULLET FEATURES
 
     // Reduces the lifetime of the multimesh so it can eventually get disabled entirely

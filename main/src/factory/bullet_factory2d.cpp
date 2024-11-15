@@ -232,6 +232,22 @@ void BulletFactory2D::free_multi_mesh_pool(MultiMeshBulletType bullet_multi_mesh
     }   
 }
 
+void BulletFactory2D::populate_normal_bullets_pool(int amount_multimesh_instances, int amount_bullets_each_multimesh_holds){
+    for (int i = 0; i < amount_multimesh_instances; i++)
+    {
+        NormalBullets2D *multimesh_instance = memnew(NormalBullets2D);
+        multimesh_instance->spawn_as_disabled_multimesh(amount_bullets_each_multimesh_holds, &normal_bullets_pool, this, normal_bullets_container);
+    }
+}
+
+void BulletFactory2D::populate_block_bullets_pool(int amount_multimesh_instances, int amount_bullets_each_multimesh_holds){
+    for (int i = 0; i < amount_multimesh_instances; i++)
+    {
+        BlockBullets2D *multimesh_instance = memnew(BlockBullets2D);
+        multimesh_instance->spawn_as_disabled_multimesh(amount_bullets_each_multimesh_holds, &block_bullets_pool, this, block_bullets_container);
+    }
+}
+
 RID BulletFactory2D::get_physics_space() const {
     return physics_space;
 }
@@ -325,6 +341,9 @@ void BulletFactory2D::_bind_methods() {
     ClassDB::bind_method(D_METHOD("free_all_bullets"), &BulletFactory2D::free_all_bullets);
     ClassDB::bind_method(D_METHOD("free_all_pools"), &BulletFactory2D::free_all_pools);
     ClassDB::bind_method(D_METHOD("free_multi_mesh_pool", "bullet_multi_mesh_type", "amount_bullets"), &BulletFactory2D::free_multi_mesh_pool);
+    
+    ClassDB::bind_method(D_METHOD("populate_normal_bullets_pool", "amount_multimesh_instances", "amount_bullets_each_multimesh_holds"), &BulletFactory2D::populate_normal_bullets_pool);
+    ClassDB::bind_method(D_METHOD("populate_block_bullets_pool", "amount_multimesh_instances", "amount_bullets_each_multimesh_holds"), &BulletFactory2D::populate_block_bullets_pool);
 
     ClassDB::bind_method(D_METHOD("get_normal_bullets_debugger_color"), &BulletFactory2D::get_normal_bullets_debugger_color);
     ClassDB::bind_method(D_METHOD("set_normal_bullets_debugger_color", "new_color"), &BulletFactory2D::set_normal_bullets_debugger_color);
