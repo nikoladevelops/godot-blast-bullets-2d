@@ -1,7 +1,7 @@
 #ifndef BULLET_FACTORY2D_HPP
 #define BULLET_FACTORY2D_HPP
 
-#include "../shared/multimesh_object_pool.hpp"
+#include "../shared/multimesh_object_pool2d.hpp"
 
 #include <godot_cpp/classes/node.hpp>
 #include <godot_cpp/classes/node2d.hpp>

@@ -5,8 +5,8 @@
 #include <godot_cpp/godot.hpp>
 
 // Shared
-#include "shared/bullet_rotation_data.hpp"
-#include "shared/bullet_speed_data.hpp"
+#include "shared/bullet_rotation_data2d.hpp"
+#include "shared/bullet_speed_data2d.hpp"
 
 // Save data classes
 #include "save-data/save_data_bullet_factory2d.hpp"
@@ -40,8 +40,8 @@ void initialize_blast_bullets_2d_module(ModuleInitializationLevel p_level) {
 	}
 
 	// Shared
-	GDREGISTER_CLASS(BulletRotationData)
-	GDREGISTER_CLASS(BulletSpeedData)
+	GDREGISTER_CLASS(BulletRotationData2D)
+	GDREGISTER_CLASS(BulletSpeedData2D)
 
 	// Save data classes
 	GDREGISTER_CLASS(SaveDataBulletFactory2D)

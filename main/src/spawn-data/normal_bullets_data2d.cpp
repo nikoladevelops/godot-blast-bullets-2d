@@ -4,10 +4,10 @@ using namespace godot;
 
 namespace BlastBullets {
 
-TypedArray<BulletSpeedData> NormalBulletsData2D::get_all_bullet_speed_data() {
+TypedArray<BulletSpeedData2D> NormalBulletsData2D::get_all_bullet_speed_data() {
     return all_bullet_speed_data;
 }
-void NormalBulletsData2D::set_all_bullet_speed_data(const TypedArray<BulletSpeedData> &new_data) {
+void NormalBulletsData2D::set_all_bullet_speed_data(const TypedArray<BulletSpeedData2D> &new_data) {
     all_bullet_speed_data.resize(new_data.size());
 
     for (int i = 0; i < new_data.size(); i++) {

@@ -62,7 +62,7 @@ Example:
 var data:BlockBulletsData2D = BlockBulletsData2D.new()
 data.transforms = getNewMarkerTransforms() # a custom function that returns an array of transforms
 data.textures = allTextures # an array of preloaded textures
-var speed_data:Array[BulletSpeedData] = BulletSpeedData.generate_random_data(2, 100,200,250,250,500,1000);
+var speed_data:Array[BulletSpeedData2D] = BulletSpeedData2D.generate_random_data(2, 100,200,250,250,500,1000);
 data.all_bullet_speed_data=speed_data
 data.collision_layer = BlockBulletsData2D.calculate_bitmask([1])
 data.collision_mask = BlockBulletsData2D.calculate_bitmask([3])
@@ -78,9 +78,9 @@ factory.spawnBlockBullets2D(data)
 # Simple set up explanation
 The mandatory properties that you need to set for `BlockBulletsData2D` are: `transforms` and `all_bullet_speed_data`.
 
-The `transforms` property requires an array of `Transform2D`, where each entry determines the position and rotation of a bullet. The rotation of each transform determines the direction of the corresponding bullet, but only if the amount of transforms is the same amount of `BulletSpeedData` instances provided in `all_bullet_speed_data`.
+The `transforms` property requires an array of `Transform2D`, where each entry determines the position and rotation of a bullet. The rotation of each transform determines the direction of the corresponding bullet, but only if the amount of transforms is the same amount of `BulletSpeedData2D` instances provided in `all_bullet_speed_data`.
 
-`all_bullet_speed_data` expects an array of `BulletSpeedData`, each defining the properties `acceleration`, `speed`, and `max_speed`. You can create this array easily using the provided static method `BulletSpeedData.generate_random_data()`. Ensure that the number of `BulletSpeedData` instances matches the number of `Transform2D` entries to maintain individual bullet directions. Otherwise, all bullets will share the same direction determined by `data.block_rotation_radians`, moving as a block for better performance.
+`all_bullet_speed_data` expects an array of `BulletSpeedData2D`, each defining the properties `acceleration`, `speed`, and `max_speed`. You can create this array easily using the provided static method `BulletSpeedData2D.generate_random_data()`. Ensure that the number of `BulletSpeedData2D` instances matches the number of `Transform2D` entries to maintain individual bullet directions. Otherwise, all bullets will share the same direction determined by `data.block_rotation_radians`, moving as a block for better performance.
 
 # Documentation
 <details>
@@ -98,16 +98,16 @@ If for some reason you want the texture's rotation to never be affected then set
 
 ### Bullet Movement
 
-- `transforms`: Array determining rotation and position of each bullet. The rotation of each `Transform2D` determines the direction in which the corresponding bullet will travel <b>BUT ONLY</b> if `use_block_rotation_radians` is set to `false` <b>AND</b> if the amount of `BulletSpeedData` in `all_bullet_speed_data` is the same as the amount of `Transform2D` provided inside `transforms` (meaning you have `BulletSpeedData` for every bullet).
+- `transforms`: Array determining rotation and position of each bullet. The rotation of each `Transform2D` determines the direction in which the corresponding bullet will travel <b>BUT ONLY</b> if `use_block_rotation_radians` is set to `false` <b>AND</b> if the amount of `BulletSpeedData2D` in `all_bullet_speed_data` is the same as the amount of `Transform2D` provided inside `transforms` (meaning you have `BulletSpeedData2D` for every bullet).
 - `block_rotation_radians`: This is a rotation that determines the direction in which <b>ALL</b> bullets will travel as a block. It is used only when `use_block_rotation_radians` is set to `true`. Default: `0.0f`.
-- `use_block_rotation_radians`: If `true`, forces all bullets to move as a block and only the first `BulletSpeedData` inside `all_bullet_speed_data` is used. <b>SIGNIFICANTLY BOOSTS PERFORMANCE</b> but the bullets will be moving with the same speed/max_speed/acceleration, so they may not look as good. The direction in which <b>ALL</b> bullets will move is determined by `block_rotation_radians`. Default: `false`.
-- `all_bullet_speed_data`: Array providing speed data for each bullet. Use the static method `BulletSpeedData.generate_random_data()` to generate an array of `BulletSpeedData` easily.
+- `use_block_rotation_radians`: If `true`, forces all bullets to move as a block and only the first `BulletSpeedData2D` inside `all_bullet_speed_data` is used. <b>SIGNIFICANTLY BOOSTS PERFORMANCE</b> but the bullets will be moving with the same speed/max_speed/acceleration, so they may not look as good. The direction in which <b>ALL</b> bullets will move is determined by `block_rotation_radians`. Default: `false`.
+- `all_bullet_speed_data`: Array providing speed data for each bullet. Use the static method `BulletSpeedData2D.generate_random_data()` to generate an array of `BulletSpeedData2D` easily.
 
 ### Bullet Rotation
 
-- `all_bullet_rotation_data`: Optional array providing rotation data for each bullet. Populate this array with `BulletRotationData` if you want your bullets to spin.
-Give only a single `BulletRotationData` if you want <b>ALL</b> your bullets to spin with the same speed/max_speed/acceleration. You should give the same amount of `BulletRotationData` as the size of `transforms` array if you want each bullet to spin with individual speed/max_speed/acceleration.
-Use the static method `BulletRotationData.generate_random_data()` to easily generate `BulletRotationData`. If you don't provide at least 1 `BulletRotationData` <b>OR</b> if the amount of data is not the same as the amount of `Transform2D` inside `transforms` then all provided data will be ignored and your bullets <b>WILL NOT</b> rotate/spin.
+- `all_bullet_rotation_data`: Optional array providing rotation data for each bullet. Populate this array with `BulletRotationData2D` if you want your bullets to spin.
+Give only a single `BulletRotationData2D` if you want <b>ALL</b> your bullets to spin with the same speed/max_speed/acceleration. You should give the same amount of `BulletRotationData2D` as the size of `transforms` array if you want each bullet to spin with individual speed/max_speed/acceleration.
+Use the static method `BulletRotationData2D.generate_random_data()` to easily generate `BulletRotationData2D`. If you don't provide at least 1 `BulletRotationData2D` <b>OR</b> if the amount of data is not the same as the amount of `Transform2D` inside `transforms` then all provided data will be ignored and your bullets <b>WILL NOT</b> rotate/spin.
 - `rotate_only_textures`: By default only the textures are being rotated when `all_bullet_rotation_data` is populated. If for some reason you want the collision shapes to also rotate with the textures then set this to `false` (this will decrease performance). Default: `true`.
 
 ### Collision

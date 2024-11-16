@@ -1,5 +1,5 @@
-#ifndef MULTIMESH_OBJECT_POOL_HPP
-#define MULTIMESH_OBJECT_POOL_HPP
+#ifndef MULTIMESH_OBJECT_POOL2D_HPP
+#define MULTIMESH_OBJECT_POOL2D_HPP
 
 #include <godot_cpp/classes/node.hpp>
 #include <godot_cpp/classes/ref.hpp>

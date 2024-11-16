@@ -3,7 +3,7 @@
 
 #include "../spawn-data/multi_mesh_bullets_data2d.hpp"
 #include "../save-data/save_data_multi_mesh_bullets2d.hpp"
-#include "../shared/bullet_rotation_data.hpp"
+#include "../shared/bullet_rotation_data2d.hpp"
 
 #include <godot_cpp/classes/engine.hpp>
 #include <godot_cpp/classes/mesh.hpp>
@@ -106,7 +106,7 @@ public:
     // Important. Determines if there was valid rotation data passed, if its true it means the rotation logic will work
     bool is_rotation_active;
 
-    // If true it means that only a single BulletRotationData was provided, so it will be used for each bullet. If false it means that we have BulletRotationData for each bullet. It is determined by the amount of BulletRotationData passed to spawn()
+    // If true it means that only a single BulletRotationData2D was provided, so it will be used for each bullet. If false it means that we have BulletRotationData2D for each bullet. It is determined by the amount of BulletRotationData2D passed to spawn()
     bool use_only_first_rotation_data = false;
 
     ///
@@ -207,7 +207,7 @@ public:
                     }
 
                     rotate_bullet(i, all_rotation_speed[i] * delta);
-                    accelerate_bullet_rotation_speed(i, delta); // each bullet has its own BulletRotationData (meaning INDIVIDUAL rotation_speed that has to be accelerated every frame)
+                    accelerate_bullet_rotation_speed(i, delta); // each bullet has its own BulletRotationData2D (meaning INDIVIDUAL rotation_speed that has to be accelerated every frame)
                 }
             }
         }
@@ -308,7 +308,7 @@ public:
 
     void load_bullet_instances(const godot::Ref<SaveDataMultiMeshBullets2D> &data);
 
-    void set_up_rotation(godot::TypedArray<BulletRotationData> &new_data, bool new_rotate_only_textures);
+    void set_up_rotation(godot::TypedArray<BulletRotationData2D> &new_data, bool new_rotate_only_textures);
 
     void set_up_life_time_timer(float new_max_life_time, float new_current_life_time);
 

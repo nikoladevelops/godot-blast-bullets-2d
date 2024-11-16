@@ -13,10 +13,10 @@ void BlockBulletsData2D::set_block_rotation_radians(float new_block_rotation_rad
 }
 
 
-Ref<BulletSpeedData> BlockBulletsData2D::get_block_speed() const{
+Ref<BulletSpeedData2D> BlockBulletsData2D::get_block_speed() const{
     return block_speed;
 }
-void BlockBulletsData2D::set_block_speed(const godot::Ref<BulletSpeedData>& new_block_speed){
+void BlockBulletsData2D::set_block_speed(const godot::Ref<BulletSpeedData2D>& new_block_speed){
     block_speed = new_block_speed;
 }
 

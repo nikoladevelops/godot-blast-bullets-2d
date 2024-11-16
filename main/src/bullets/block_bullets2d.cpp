@@ -18,7 +18,7 @@ void BlockBullets2D::_physics_process(float delta) {
     handle_bullet_rotation(delta);
 }
 
-void BlockBullets2D::set_up_movement_data(const Ref<BulletSpeedData> &new_speed_data) {
+void BlockBullets2D::set_up_movement_data(const Ref<BulletSpeedData2D> &new_speed_data) {
     // Since the block bullets work by moving the whole multimesh in a single direction we basically work with a single speed data for every single bullet
     int speed_data_size = 1;
     

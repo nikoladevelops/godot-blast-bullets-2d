@@ -1,7 +1,7 @@
 #ifndef SAVE_DATA_MULTI_MESH_BULLETS_2D_HPP
 #define SAVE_DATA_MULTI_MESH_BULLETS_2D_HPP
 
-#include "../shared/bullet_rotation_data.hpp"
+#include "../shared/bullet_rotation_data2d.hpp"
 
 #include <godot_cpp/classes/material.hpp>
 #include <godot_cpp/classes/mesh.hpp>
@@ -44,7 +44,7 @@ public:
     // Holds all cached directions of the bullets
     godot::TypedArray<godot::Vector2> all_cached_direction;
 
-    godot::TypedArray<BulletRotationData> all_bullet_rotation_data;
+    godot::TypedArray<BulletRotationData2D> all_bullet_rotation_data;
 
     bool rotate_only_textures;
 
@@ -128,8 +128,8 @@ public:
     void set_mesh(godot::Ref<godot::Mesh> new_mesh);
     godot::Ref<godot::Mesh> get_mesh() const;
 
-    godot::TypedArray<BulletRotationData> get_all_bullet_rotation_data();
-    void set_all_bullet_rotation_data(const godot::TypedArray<BulletRotationData> &new_data);
+    godot::TypedArray<BulletRotationData2D> get_all_bullet_rotation_data();
+    void set_all_bullet_rotation_data(const godot::TypedArray<BulletRotationData2D> &new_data);
 
     bool get_rotate_only_textures();
     void set_rotate_only_textures(bool new_rotate_only_textures);

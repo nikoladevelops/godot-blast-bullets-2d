@@ -1,6 +1,6 @@
 #include "./multi_mesh_bullets2d.hpp"
 #include "../factory/bullet_factory2d.hpp"
-#include "../shared/multimesh_object_pool.hpp"
+#include "../shared/multimesh_object_pool2d.hpp"
 
 #include <godot_cpp/classes/physics_server2d.hpp>
 
@@ -129,7 +129,7 @@ Ref<SaveDataMultiMeshBullets2D> MultiMeshBullets2D::save(const Ref<SaveDataMulti
     if (is_rotation_active) {
         empty_data->all_bullet_rotation_data.resize(all_rotation_speed.size());
         for (int i = 0; i < all_rotation_speed.size(); i++) {
-            Ref<BulletRotationData> bullet_data = memnew(BulletRotationData);
+            Ref<BulletRotationData2D> bullet_data = memnew(BulletRotationData2D);
             bullet_data->rotation_speed = all_rotation_speed[i];
             bullet_data->max_rotation_speed = all_max_rotation_speed[i];
             bullet_data->rotation_acceleration = all_rotation_acceleration[i];
@@ -450,11 +450,11 @@ void MultiMeshBullets2D::activate_bullet_instances(
 
 
 
-void MultiMeshBullets2D::set_up_rotation(TypedArray<BulletRotationData> &new_data, bool new_rotate_only_textures) {
+void MultiMeshBullets2D::set_up_rotation(TypedArray<BulletRotationData2D> &new_data, bool new_rotate_only_textures) {
     int amount_of_rotation_data = new_data.size();
     // If the amount of data that was provided is not a single one and also not the same amount as the bullets amount
     // then rotation should be disabled/invalid.
-    // This is because I want the user to either provide a single BulletRotationData that will be used for every single bullet
+    // This is because I want the user to either provide a single BulletRotationData2D that will be used for every single bullet
     // or BulletRotation data for each bullet that will allow each bullet to rotate differently. Only these 2 cases are valid.
 
     if (amount_of_rotation_data != size) {
@@ -472,7 +472,7 @@ void MultiMeshBullets2D::set_up_rotation(TypedArray<BulletRotationData> &new_dat
     all_rotation_acceleration.resize(amount_of_rotation_data);
 
     for (int i = 0; i < amount_of_rotation_data; i++) {
-        BulletRotationData &curr_bullet_data = *Object::cast_to<BulletRotationData>(new_data[i]); // Found out that if you have a TypedArray<>, trying to access an element with [] will give you Variant, so in order to cast it use Object::cast_to<>(), the normal reinterpret_cast and the C way of casting didn't work hmm
+        BulletRotationData2D &curr_bullet_data = *Object::cast_to<BulletRotationData2D>(new_data[i]); // Found out that if you have a TypedArray<>, trying to access an element with [] will give you Variant, so in order to cast it use Object::cast_to<>(), the normal reinterpret_cast and the C way of casting didn't work hmm
 
         all_rotation_speed[i] = curr_bullet_data.rotation_speed;
         all_max_rotation_speed[i] = curr_bullet_data.max_rotation_speed;

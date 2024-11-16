@@ -138,10 +138,10 @@ Ref<Mesh> SaveDataMultiMeshBullets2D::get_mesh() const {
     return mesh;
 }
 
-TypedArray<BulletRotationData> SaveDataMultiMeshBullets2D::get_all_bullet_rotation_data() {
+TypedArray<BulletRotationData2D> SaveDataMultiMeshBullets2D::get_all_bullet_rotation_data() {
     return all_bullet_rotation_data;
 }
-void SaveDataMultiMeshBullets2D::set_all_bullet_rotation_data(const TypedArray<BulletRotationData> &new_bullet_rotation_data) {
+void SaveDataMultiMeshBullets2D::set_all_bullet_rotation_data(const TypedArray<BulletRotationData2D> &new_bullet_rotation_data) {
     all_bullet_rotation_data.resize(new_bullet_rotation_data.size());
     for (int i = 0; i < new_bullet_rotation_data.size(); i++) {
         all_bullet_rotation_data[i] = new_bullet_rotation_data[i];

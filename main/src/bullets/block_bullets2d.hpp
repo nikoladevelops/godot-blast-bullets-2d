@@ -4,8 +4,8 @@
 #include "./multi_mesh_bullets2d.hpp"
 
 #include "../save-data/save_data_block_bullets2d.hpp"
-#include "../shared/bullet_rotation_data.hpp"
-#include "../shared/bullet_speed_data.hpp"
+#include "../shared/bullet_rotation_data2d.hpp"
+#include "../shared/bullet_speed_data2d.hpp"
 
 namespace BlastBullets {
 
@@ -48,7 +48,7 @@ protected:
 
         current_position = new_pos;
     }
-    void set_up_movement_data(const godot::Ref<BulletSpeedData> &new_speed_data);
+    void set_up_movement_data(const godot::Ref<BulletSpeedData2D> &new_speed_data);
     virtual void custom_additional_spawn_logic(const godot::Ref<MultiMeshBulletsData2D> &data) override final;
     void custom_additional_save_logic(const godot::Ref<SaveDataMultiMeshBullets2D> &data) override final;
     virtual void custom_additional_load_logic(const godot::Ref<SaveDataMultiMeshBullets2D> &data) override final;

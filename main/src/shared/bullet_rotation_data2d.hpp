@@ -1,13 +1,13 @@
-#ifndef BULLET_ROTATION_DATA_HPP
-#define BULLET_ROTATION_DATA_HPP
+#ifndef BULLET_ROTATION_DATA2D_HPP
+#define BULLET_ROTATION_DATA2D_HPP
 
 #include <godot_cpp/classes/resource.hpp>
 #include <godot_cpp/variant/typed_array.hpp>
 
 namespace BlastBullets {
     
-class BulletRotationData : public godot::Resource {
-    GDCLASS(BulletRotationData, godot::Resource)
+class BulletRotationData2D : public godot::Resource {
+    GDCLASS(BulletRotationData2D, godot::Resource)
 
 public:
     float rotation_speed;
@@ -15,14 +15,14 @@ public:
     float rotation_acceleration;
 
     // Generates an amount of BulletRotationInfo classes that have random data that varies between ranges. (for example rotation_speed of each will be a random number between rotation_speed_min and rotation_speed_max (inclusive))
-    static godot::TypedArray<BulletRotationData> generate_random_data(
+    static godot::TypedArray<BulletRotationData2D> generate_random_data(
         int amount_to_generate,
-        float rotation_speed_min,
-        float rotation_speed_max,
-        float max_rotation_speed_min,
-        float max_rotation_speed_max,
-        float rotation_acceleration_min,
-        float rotation_acceleration_max);
+        float rotation_speed_MIN,
+        float rotation_speed_MAX,
+        float max_rotation_speed_MIN,
+        float max_rotation_speed_MAX,
+        float rotation_acceleration_MIN,
+        float rotation_acceleration_MAX);
 
     float get_rotation_speed();
     void set_rotation_speed(float new_rotation_speed);
@@ -36,5 +36,5 @@ public:
 protected:
     static void _bind_methods();
 };
-} // namespace BlastBullets
+}
 #endif

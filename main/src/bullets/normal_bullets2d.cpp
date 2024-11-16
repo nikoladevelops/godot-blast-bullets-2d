@@ -16,12 +16,12 @@ void NormalBullets2D::_physics_process(float delta) {
     handle_bullet_rotation(delta);
 }
 
-void NormalBullets2D::set_up_movement_data(const TypedArray<BulletSpeedData> &new_speed_data) {
+void NormalBullets2D::set_up_movement_data(const TypedArray<BulletSpeedData2D> &new_speed_data) {
 
     int speed_data_size = new_speed_data.size(); // the amount of speed data provided
 
     if (speed_data_size != size) {
-        UtilityFunctions::print("Error. When using NormalBullets2D you need to provide BulletSpeedData for every single bullet.");
+        UtilityFunctions::print("Error. When using NormalBullets2D you need to provide BulletSpeedData2D for every single bullet.");
         return;
     }
 
@@ -38,7 +38,7 @@ void NormalBullets2D::set_up_movement_data(const TypedArray<BulletSpeedData> &ne
         // The rotation of each transform
         float curr_bullet_rotation = all_cached_shape_transforms[i].get_rotation();
 
-        const Ref<BulletSpeedData> &curr_speed_data = new_speed_data[i];
+        const Ref<BulletSpeedData2D> &curr_speed_data = new_speed_data[i];
 
         all_cached_speed[i] = curr_speed_data->speed;
         all_cached_max_speed[i] = curr_speed_data->max_speed;

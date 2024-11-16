@@ -1,7 +1,7 @@
 #ifndef MULTI_MESH_BULLETS_DATA2D_HPP
 #define MULTI_MESH_BULLETS_DATA2D_HPP
 
-#include "../shared/bullet_rotation_data.hpp"
+#include "../shared/bullet_rotation_data2d.hpp"
 
 #include <godot_cpp/classes/canvas_item_material.hpp>
 #include <godot_cpp/classes/mesh.hpp>
@@ -40,10 +40,10 @@ public:
 
     // BULLET ROTATION RELATED
 
-    // Stores optional BulletRotationData for each bullet. If you want the bullets to rotate, you HAVE to provide AT LEAST 1 BulletRotationData that will be used for every single bullet. If you want to have bullets that rotate differently then you need to provide the same amount of BulletRotationData as the .size() of the transforms (in other words for every bullet). If you provide less than .size() only the first data will be used for all bullets. Note that BulletRotationData has a helper static method that you can use to generate random rotation data - BulletRotationData.generate_random_data()
-    godot::TypedArray<BlastBullets::BulletRotationData> all_bullet_rotation_data;
+    // Stores optional BulletRotationData2D for each bullet. If you want the bullets to rotate, you HAVE to provide AT LEAST 1 BulletRotationData2D that will be used for every single bullet. If you want to have bullets that rotate differently then you need to provide the same amount of BulletRotationData2D as the .size() of the transforms (in other words for every bullet). If you provide less than .size() only the first data will be used for all bullets. Note that BulletRotationData2D has a helper static method that you can use to generate random rotation data - BulletRotationData2D.generate_random_data()
+    godot::TypedArray<BlastBullets::BulletRotationData2D> all_bullet_rotation_data;
 
-    // If set to false, it will also rotate the collision shapes according to the BulletRotationData that was provided (it might decrease performance a little bit)
+    // If set to false, it will also rotate the collision shapes according to the BulletRotationData2D that was provided (it might decrease performance a little bit)
     bool rotate_only_textures = true;
 
     // COLLISION RELATED
@@ -123,8 +123,8 @@ public:
     godot::Ref<godot::Mesh> get_mesh() const;
     void set_mesh(const godot::Ref<godot::Mesh> &new_mesh);
 
-    godot::TypedArray<BlastBullets::BulletRotationData> get_all_bullet_rotation_data();
-    void set_all_bullet_rotation_data(const godot::TypedArray<BlastBullets::BulletRotationData> &new_data);
+    godot::TypedArray<BlastBullets::BulletRotationData2D> get_all_bullet_rotation_data();
+    void set_all_bullet_rotation_data(const godot::TypedArray<BlastBullets::BulletRotationData2D> &new_data);
 
     bool get_rotate_only_textures();
     void set_rotate_only_textures(bool new_rotate_only_textures);
