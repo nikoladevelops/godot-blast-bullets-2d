@@ -67,28 +67,28 @@ void BulletFactory2D::spawn_debuggers(){
 void BulletFactory2D::spawn_block_bullets(const Ref<BlockBulletsData2D> &spawn_data) {
     int key = spawn_data->transforms.size();
 
-    BlockBullets2D* bullets_instance = dynamic_cast<BlockBullets2D*>(block_bullets_pool.pop(key));
+    BlockBullets2D* bullets_instance = static_cast<BlockBullets2D*>(block_bullets_pool.pop(key));
     if(bullets_instance != nullptr){
-        bullets_instance->activate_multimesh(spawn_data);
+        bullets_instance->activate_multimesh(*spawn_data.ptr());
         return;
     }
 
     bullets_instance = memnew(BlockBullets2D);
 
-    bullets_instance->spawn(spawn_data, &block_bullets_pool, this, block_bullets_container);
+    bullets_instance->spawn(*spawn_data.ptr(), &block_bullets_pool, this, block_bullets_container);
 }
 
 void BulletFactory2D::spawn_normal_bullets(const godot::Ref<NormalBulletsData2D> &spawn_data){
     int key = spawn_data->transforms.size();
 
-    NormalBullets2D* bullets_instance = dynamic_cast<NormalBullets2D*>(normal_bullets_pool.pop(key));
+    NormalBullets2D* bullets_instance = static_cast<NormalBullets2D*>(normal_bullets_pool.pop(key));
     if(bullets_instance != nullptr){
-        bullets_instance->activate_multimesh(spawn_data);
+        bullets_instance->activate_multimesh(*spawn_data.ptr());
         return;
     }
 
     bullets_instance = memnew(NormalBullets2D);
-    bullets_instance->spawn(spawn_data, &normal_bullets_pool, this, normal_bullets_container);
+    bullets_instance->spawn(*spawn_data.ptr(), &normal_bullets_pool, this, normal_bullets_container);
 }
 
 Ref<SaveDataBulletFactory2D> BulletFactory2D::save() {
@@ -139,7 +139,10 @@ void BulletFactory2D::load(const Ref<SaveDataBulletFactory2D> &new_data) {
     for (int i = 0; i < amount_bullets ; i++)
     {
         BlockBullets2D* blk_instance = memnew(BlockBullets2D);
-        blk_instance->load(new_data->all_block_bullets[i], &block_bullets_pool, this, block_bullets_container);
+        
+        const Ref<SaveDataBlockBullets2D> &current_block_bullets_data = new_data->all_block_bullets[i];
+
+        blk_instance->load(*current_block_bullets_data.ptr(), &block_bullets_pool, this, block_bullets_container);
     }
     //
 
@@ -148,7 +151,10 @@ void BulletFactory2D::load(const Ref<SaveDataBulletFactory2D> &new_data) {
     for (int i = 0; i < amount_bullets ; i++)
     {
         NormalBullets2D* blk_instance = memnew(NormalBullets2D);
-        blk_instance->load(new_data->all_normal_bullets[i], &normal_bullets_pool, this, normal_bullets_container);
+
+        const Ref<SaveDataNormalBullets2D> &current_normal_bullets_data = new_data->all_normal_bullets[i];
+
+        blk_instance->load(*current_normal_bullets_data.ptr(), &normal_bullets_pool, this, normal_bullets_container);
     }
     //
 

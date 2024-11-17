@@ -52,22 +52,22 @@ void NormalBullets2D::set_up_movement_data(const TypedArray<BulletSpeedData2D> &
     }
 }
 
-void NormalBullets2D::custom_additional_spawn_logic(const Ref<MultiMeshBulletsData2D> &data) {
-    Ref<NormalBulletsData2D> normal_data = Object::cast_to<NormalBulletsData2D>(data.ptr());
+void NormalBullets2D::custom_additional_spawn_logic(const MultiMeshBulletsData2D &data) {
+    const NormalBulletsData2D &normal_data = static_cast<const NormalBulletsData2D&>(data);
 
-    set_up_movement_data(normal_data->all_bullet_speed_data);
+    set_up_movement_data(normal_data.all_bullet_speed_data);
 }
 
-void NormalBullets2D::custom_additional_save_logic(const Ref<SaveDataMultiMeshBullets2D> &data) {
+void NormalBullets2D::custom_additional_save_logic(SaveDataMultiMeshBullets2D &data) {
 }
 
-void NormalBullets2D::custom_additional_load_logic(const Ref<SaveDataMultiMeshBullets2D> &data) {
+void NormalBullets2D::custom_additional_load_logic(const SaveDataMultiMeshBullets2D &data) {
 }
 
-void NormalBullets2D::custom_additional_activate_logic(const Ref<MultiMeshBulletsData2D> &data) {
-    Ref<NormalBulletsData2D> normal_data = Object::cast_to<NormalBulletsData2D>(data.ptr());
-
-    set_up_movement_data(normal_data->all_bullet_speed_data);
+void NormalBullets2D::custom_additional_activate_logic(const MultiMeshBulletsData2D &data) {
+    const NormalBulletsData2D &normal_data = static_cast<const NormalBulletsData2D&>(data);
+    
+    set_up_movement_data(normal_data.all_bullet_speed_data);
 }
 
 }
