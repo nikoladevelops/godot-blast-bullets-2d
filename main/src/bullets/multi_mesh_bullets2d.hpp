@@ -48,9 +48,9 @@ public:
 
     /// BULLET SPEED RELATED
 
-    godot::PackedFloat32Array all_cached_speed;
-    godot::PackedFloat32Array all_cached_max_speed;
-    godot::PackedFloat32Array all_cached_acceleration;
+    std::vector<float> all_cached_speed;
+    std::vector<float> all_cached_max_speed;
+    std::vector<float> all_cached_acceleration;
 
     ///
 
@@ -63,16 +63,16 @@ public:
     std::vector<godot::Transform2D> all_cached_shape_transforms;
 
     // Holds all multimesh instance transform origin vectors. I am doing this so I don't have to call .get_origin() every frame
-    godot::PackedVector2Array all_cached_instance_origin;
+    std::vector<godot::Vector2> all_cached_instance_origin;
 
     // Holds all collision shape transform origin vectors. I am doing this so I don't have to call .get_origin() every frame
-    godot::PackedVector2Array all_cached_shape_origin;
+    std::vector<godot::Vector2> all_cached_shape_origin;
 
     // Holds all calculated velocities for the bullets. I am doing this to avoid unnecessary calculations. If I know the direction -> calculate the velocity. Update the values only when the velocity changes, otherwise it's just unnecessary to always do Vector2(cos, sin) every frame..
-    godot::PackedVector2Array all_cached_velocity;
+    std::vector<godot::Vector2> all_cached_velocity;
 
     // Holds all cached directions of the bullets
-    godot::PackedVector2Array all_cached_direction;
+    std::vector<godot::Vector2> all_cached_direction;
 
     ///
 
@@ -96,9 +96,9 @@ public:
 
     // SOA vs AOS, I picked SOA, because it offers better cache performance
     
-    godot::PackedFloat32Array all_rotation_speed;
-    godot::PackedFloat32Array all_max_rotation_speed;
-    godot::PackedFloat32Array all_rotation_acceleration;
+    std::vector<float> all_rotation_speed;
+    std::vector<float> all_max_rotation_speed;
+    std::vector<float> all_rotation_acceleration;
 
     // If set to false it will also rotate the collision shapes
     bool rotate_only_textures;
@@ -138,7 +138,7 @@ public:
     godot::Ref<SaveDataMultiMeshBullets2D> save(const godot::Ref<SaveDataMultiMeshBullets2D> &empty_data);
 
     // Used to load bullets from a SaveDataMultiMeshBullets2D resource
-    void load(const SaveDataMultiMeshBullets2D &data, MultiMeshObjectPool *pool, BulletFactory2D *factory, Node *bullets_container);
+    void load(const godot::Ref<SaveDataMultiMeshBullets2D> &data, MultiMeshObjectPool *pool, BulletFactory2D *factory, Node *bullets_container);
 
     // Activates the multimesh
     void activate_multimesh(const MultiMeshBulletsData2D &data);
@@ -264,7 +264,7 @@ public:
 
         bullets_enabled_status[bullet_index] = false;
 
-        godot::Transform2D zero_transform = godot::Transform2D().scaled(godot::Vector2(0, 0));
+        const godot::Transform2D &zero_transform = godot::Transform2D().scaled(godot::Vector2(0, 0));
 
         multi->set_instance_transform_2d(bullet_index, zero_transform); // Stops rendering the instance
 
@@ -282,33 +282,11 @@ public:
 
     void set_up_multimesh(int new_instance_count, const godot::Ref<godot::Mesh> &new_mesh, godot::Vector2 new_texture_size);
 
-    void spawn_bullet_instances(
-        godot::Vector2 new_collision_shape_size,
-        const godot::TypedArray<godot::Transform2D> &new_transforms,
-        float new_texture_rotation,
-        godot::Vector2 new_collision_shape_offset,
-        bool new_is_texture_rotation_permanent,
-        bool new_monitorable,
-        godot::RID new_world_space,
-        uint32_t new_collision_layer,
-        uint32_t new_collision_mask
-        );
+    void spawn_bullet_instances(const MultiMeshBulletsData2D &data);
     
-    void activate_bullet_instances(
-        godot::Vector2 new_collision_shape_size,
-        const godot::TypedArray<godot::Transform2D> &new_transforms,
-        float new_texture_rotation,
-        godot::Vector2 new_collision_shape_offset,
-        bool new_is_texture_rotation_permanent,
-        bool new_monitorable,
-        godot::RID new_world_space,
-        uint32_t new_collision_layer,
-        uint32_t new_collision_mask
-        );
+    void activate_bullet_instances(const MultiMeshBulletsData2D &data);
 
     void load_bullet_instances(const SaveDataMultiMeshBullets2D &data);
-
-    void set_up_rotation(const godot::TypedArray<BulletRotationData2D> &new_data, bool new_rotate_only_textures);
 
     void set_up_life_time_timer(float new_max_life_time, float new_current_life_time);
 

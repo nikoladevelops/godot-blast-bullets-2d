@@ -26,7 +26,7 @@ void MultiMeshBulletsDebugger2D::reset_debugger() {
     for (int i = 0; i < debugger_multimeshes.size(); i++) {
         debugger_multimeshes[i]->queue_free();
     }
-    debugger_multimeshes.resize(0);
+    debugger_multimeshes.resize(0); // using resize because I want the internal .size and .capacity both to be reset
     bullet_multimeshes.resize(0);
 
     set_physics_process(true);

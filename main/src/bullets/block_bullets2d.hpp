@@ -20,7 +20,12 @@ public:
     godot::Vector2 current_position;
 
     // The physics process loop. Holds all logic that needs to be repeated every physics frame
-    void _physics_process(float delta);
+    void BlockBullets2D::_physics_process(float delta) {
+        move_bullets(delta);
+        reduce_lifetime(delta);
+        change_texture_periodically(delta);
+        handle_bullet_rotation(delta);
+    }
 
 protected:
     static void _bind_methods() {}
@@ -49,6 +54,8 @@ protected:
         current_position = new_pos;
     }
     void set_up_movement_data(const BulletSpeedData2D &new_speed_data);
+    void activate_movement_data(const BulletSpeedData2D &new_speed_data);
+    
     virtual void custom_additional_spawn_logic(const MultiMeshBulletsData2D &data) override final;
     void custom_additional_save_logic(SaveDataMultiMeshBullets2D &data) override final;
     virtual void custom_additional_load_logic(const SaveDataMultiMeshBullets2D &data) override final;

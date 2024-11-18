@@ -142,7 +142,7 @@ void BulletFactory2D::load(const Ref<SaveDataBulletFactory2D> &new_data) {
         
         const Ref<SaveDataBlockBullets2D> &current_block_bullets_data = new_data->all_block_bullets[i];
 
-        blk_instance->load(*current_block_bullets_data.ptr(), &block_bullets_pool, this, block_bullets_container);
+        blk_instance->load(current_block_bullets_data, &block_bullets_pool, this, block_bullets_container);
     }
     //
 
@@ -154,7 +154,7 @@ void BulletFactory2D::load(const Ref<SaveDataBulletFactory2D> &new_data) {
 
         const Ref<SaveDataNormalBullets2D> &current_normal_bullets_data = new_data->all_normal_bullets[i];
 
-        blk_instance->load(*current_normal_bullets_data.ptr(), &normal_bullets_pool, this, normal_bullets_container);
+        blk_instance->load(current_normal_bullets_data, &normal_bullets_pool, this, normal_bullets_container);
     }
     //
 
