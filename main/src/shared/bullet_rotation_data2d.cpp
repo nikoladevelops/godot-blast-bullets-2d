@@ -5,7 +5,7 @@
 
 using namespace godot;
 
-namespace BlastBullets {
+namespace BlastBullets2D {
 
 TypedArray<BulletRotationData2D> BulletRotationData2D::generate_random_data(
     int amount_to_generate,
@@ -20,7 +20,7 @@ TypedArray<BulletRotationData2D> BulletRotationData2D::generate_random_data(
     TypedArray<BulletRotationData2D> data;
     data.resize(amount_to_generate);
 
-    for (int i = 0; i < amount_to_generate; i++) {
+    for (size_t i = 0; i < amount_to_generate; i++) {
         Ref<BulletRotationData2D> bullet_data = memnew(BulletRotationData2D);
         bullet_data->rotation_speed = rand_gen->randf_range(rotation_speed_MIN, rotation_speed_MAX);
         bullet_data->max_rotation_speed = rand_gen->randf_range(max_rotation_speed_MIN, max_rotation_speed_MAX);

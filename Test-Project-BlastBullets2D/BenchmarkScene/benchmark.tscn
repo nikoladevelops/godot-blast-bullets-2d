@@ -1,0 +1,263 @@
+[gd_scene load_steps=18 format=3 uid="uid://dpk5aw81fio42"]
+
+[ext_resource type="Script" uid="uid://bt7w5vkn7u1xt" path="res://BenchmarkScene/benchmark.gd" id="1_cfubd"]
+[ext_resource type="Texture2D" uid="uid://dxsqxrqgkkv50" path="res://icon.svg" id="3_1inld"]
+[ext_resource type="PackedScene" uid="uid://bv1i7q8bxfe2c" path="res://BenchmarkScene/player/player.tscn" id="3_hsp4v"]
+[ext_resource type="Texture2D" uid="uid://bqjpdc8cnc8pd" path="res://extremely_important_never_delete_or_it_will_explode.jpg" id="3_rfik0"]
+[ext_resource type="PackedScene" uid="uid://cud5bunpvk1hb" path="res://BenchmarkScene/benchmark_ui.tscn" id="4_wr2si"]
+[ext_resource type="PackedScene" uid="uid://cropisiqwmq6" path="res://shared/enemies/enemy_spawner/enemy_spawner.tscn" id="6_fj0yo"]
+[ext_resource type="Script" uid="uid://jssweshd8v73" path="res://BenchmarkScene/bullet_factory_2d.gd" id="7_6fsjh"]
+[ext_resource type="PackedScene" uid="uid://cjrcvxa7bnus" path="res://shared/enemies/enemy_turret/enemy_turret.tscn" id="7_n3lca"]
+[ext_resource type="PackedScene" uid="uid://3dxd6rfhxqym" path="res://shared/enemies/enemy_ship/enemy_ship.tscn" id="8_yyku6"]
+
+[sub_resource type="Gradient" id="Gradient_rfik0"]
+colors = PackedColorArray(0.215686, 0.215686, 0.215686, 1, 0.215686, 0.215686, 0.215686, 1)
+
+[sub_resource type="GradientTexture1D" id="GradientTexture1D_t5pnj"]
+gradient = SubResource("Gradient_rfik0")
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_860qe"]
+size = Vector2(592.125, 204.375)
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_qn5x5"]
+size = Vector2(683, 228.875)
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_0th2j"]
+size = Vector2(631, 293)
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_1d8s5"]
+size = Vector2(653.5, 250)
+
+[sub_resource type="Gradient" id="Gradient_1inld"]
+
+[sub_resource type="GradientTexture2D" id="GradientTexture2D_t5pnj"]
+gradient = SubResource("Gradient_1inld")
+
+[node name="BenchmarkScene" type="BulletAttachment2D"]
+script = ExtResource("1_cfubd")
+
+[node name="Sprite2D" type="Sprite2D" parent="."]
+z_index = -12
+scale = Vector2(438, 58805)
+texture = SubResource("GradientTexture1D_t5pnj")
+metadata/_edit_lock_ = true
+
+[node name="Level" type="Node" parent="."]
+
+[node name="Area2D" type="Area2D" parent="Level"]
+position = Vector2(1244, -196)
+collision_layer = 4
+collision_mask = 0
+monitoring = false
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Level/Area2D"]
+shape = SubResource("RectangleShape2D_860qe")
+
+[node name="Label" type="Label" parent="Level/Area2D"]
+offset_left = -76.0
+offset_top = -36.0
+offset_right = 84.0
+offset_bottom = 27.0
+theme_override_font_sizes/font_size = 45
+text = "Area2D"
+
+[node name="StaticBody2D" type="StaticBody2D" parent="Level"]
+position = Vector2(1284, 417)
+collision_layer = 4
+collision_mask = 0
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Level/StaticBody2D"]
+shape = SubResource("RectangleShape2D_qn5x5")
+
+[node name="Label" type="Label" parent="Level/StaticBody2D"]
+offset_left = -124.0
+offset_top = -49.0
+offset_right = 165.0
+offset_bottom = 14.0
+theme_override_font_sizes/font_size = 45
+text = "StaticBody2D"
+
+[node name="Label2" type="Label" parent="Level/StaticBody2D"]
+offset_left = -131.0
+offset_top = 11.0
+offset_right = 174.0
+offset_bottom = 53.0
+theme_override_font_sizes/font_size = 30
+text = "(enable monitorable)"
+
+[node name="CharacterBody2D" type="CharacterBody2D" parent="Level"]
+position = Vector2(-472, 459)
+collision_layer = 4
+collision_mask = 0
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Level/CharacterBody2D"]
+shape = SubResource("RectangleShape2D_0th2j")
+
+[node name="Label" type="Label" parent="Level/CharacterBody2D"]
+offset_left = -181.0
+offset_top = -39.0
+offset_right = 201.0
+offset_bottom = 24.0
+theme_override_font_sizes/font_size = 45
+text = "CharacterBody2D"
+
+[node name="RigidBody2D" type="RigidBody2D" parent="Level"]
+position = Vector2(-110, -404)
+collision_layer = 4
+collision_mask = 0
+gravity_scale = 0.0
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Level/RigidBody2D"]
+shape = SubResource("RectangleShape2D_1d8s5")
+
+[node name="Label" type="Label" parent="Level/RigidBody2D"]
+offset_left = -120.0
+offset_top = -33.0
+offset_right = 169.0
+offset_bottom = 30.0
+theme_override_font_sizes/font_size = 45
+text = "RigidBody2D"
+
+[node name="PointLight2D" type="PointLight2D" parent="Level"]
+position = Vector2(-1389, -136)
+energy = 4.56
+texture = SubResource("GradientTexture2D_t5pnj")
+texture_scale = 4.33
+
+[node name="Label" type="Label" parent="Level/PointLight2D"]
+offset_left = -68.0
+offset_top = -15.0
+offset_right = 73.0
+offset_bottom = 17.0
+theme_override_font_sizes/font_size = 23
+text = "Lighting Test"
+
+[node name="Icon" type="Sprite2D" parent="Level"]
+self_modulate = Color(0, 0, 0, 1)
+position = Vector2(-723.5, -407)
+scale = Vector2(1.55469, 1.60937)
+texture = ExtResource("3_1inld")
+
+[node name="Label" type="Label" parent="Level/Icon"]
+offset_left = -36.9849
+offset_top = -13.0485
+offset_right = 38.0151
+offset_bottom = 9.95146
+text = "Z Index: 0"
+
+[node name="Icon2" type="Sprite2D" parent="Level"]
+self_modulate = Color(0, 0, 0, 1)
+z_index = 1
+position = Vector2(-941, -407)
+scale = Vector2(1.55469, 1.60937)
+texture = ExtResource("3_1inld")
+
+[node name="Label" type="Label" parent="Level/Icon2"]
+offset_left = -36.9849
+offset_top = -13.0485
+offset_right = 38.0151
+offset_bottom = 9.95146
+text = "Z Index: 1"
+
+[node name="Icon3" type="Sprite2D" parent="Level"]
+self_modulate = Color(0, 0, 0, 1)
+z_index = 2
+position = Vector2(-1159, -407)
+scale = Vector2(1.55469, 1.60937)
+texture = ExtResource("3_1inld")
+
+[node name="Label" type="Label" parent="Level/Icon3"]
+offset_left = -36.9849
+offset_top = -13.0485
+offset_right = 38.0151
+offset_bottom = 9.95146
+text = "Z Index: 2"
+
+[node name="Icon4" type="Sprite2D" parent="Level"]
+self_modulate = Color(0, 0, 0, 1)
+z_index = 3
+position = Vector2(-1390, -407)
+scale = Vector2(1.55469, 1.60937)
+texture = ExtResource("3_1inld")
+
+[node name="Label" type="Label" parent="Level/Icon4"]
+offset_left = -36.9849
+offset_top = -13.0485
+offset_right = 38.0151
+offset_bottom = 9.95146
+text = "Z Index: 3"
+
+[node name="VBoxContainer" type="VBoxContainer" parent="Level"]
+offset_left = -208.0
+offset_top = -200.0
+offset_right = 1037.0
+offset_bottom = -3.0
+theme_override_constants/separation = 20
+alignment = 1
+
+[node name="HBoxContainer" type="HBoxContainer" parent="Level/VBoxContainer"]
+layout_mode = 2
+alignment = 1
+
+[node name="Label3" type="Label" parent="Level/VBoxContainer/HBoxContainer"]
+self_modulate = Color(1, 0.609689, 0.39526, 1)
+layout_mode = 2
+theme_override_font_sizes/font_size = 45
+text = "BlastBullets2D"
+horizontal_alignment = 1
+
+[node name="Label2" type="Label" parent="Level/VBoxContainer/HBoxContainer"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 45
+text = " made by "
+horizontal_alignment = 1
+
+[node name="Label4" type="Label" parent="Level/VBoxContainer/HBoxContainer"]
+self_modulate = Color(0.979674, 0.602475, 0.592113, 1)
+layout_mode = 2
+theme_override_font_sizes/font_size = 45
+text = "@realNikich"
+horizontal_alignment = 1
+
+[node name="Important" type="Sprite2D" parent="Level/VBoxContainer/HBoxContainer"]
+position = Vector2(1084, -9)
+scale = Vector2(0.5, 0.5)
+texture = ExtResource("3_rfik0")
+
+[node name="Label" type="Label" parent="Level/VBoxContainer"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 45
+text = "Use Mouse Scroll Wheel For Zoom In / Zoom Out"
+horizontal_alignment = 1
+
+[node name="Label2" type="Label" parent="Level/VBoxContainer"]
+modulate = Color(0.684884, 0.712312, 0.843999, 1)
+layout_mode = 2
+theme_override_font_sizes/font_size = 45
+text = "https://github.com/nikoladevelops/godot-blast-bullets-2d"
+horizontal_alignment = 1
+
+[node name="Player" parent="." instance=ExtResource("3_hsp4v")]
+position = Vector2(436, 158)
+
+[node name="EnemySpawnersContainer" type="Node" parent="."]
+
+[node name="EnemyShipSpawner" parent="EnemySpawnersContainer" instance=ExtResource("6_fj0yo")]
+position = Vector2(1743, -326)
+enemy_scn = ExtResource("8_yyku6")
+
+[node name="EnemyTurretSpawner" parent="EnemySpawnersContainer" instance=ExtResource("6_fj0yo")]
+position = Vector2(1743, -1425)
+enemy_scn = ExtResource("7_n3lca")
+
+[node name="UI" parent="." instance=ExtResource("4_wr2si")]
+
+[node name="BulletFactory2D" type="BulletFactory2D" parent="."]
+block_bullets_debugger_color = Color(0, 0.711976, 0.74061, 0.8)
+z_index = 100
+script = ExtResource("7_6fsjh")
+
+[node name="AllGodotArea2DBulletsContainer" type="Node" parent="."]
+
+[connection signal="area_entered" from="BulletFactory2D" to="BulletFactory2D" method="_on_area_entered"]
+[connection signal="body_entered" from="BulletFactory2D" to="BulletFactory2D" method="_on_body_entered"]

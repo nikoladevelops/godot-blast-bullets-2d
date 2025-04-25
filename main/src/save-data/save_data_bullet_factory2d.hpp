@@ -1,29 +1,28 @@
-#ifndef SAVE_DATA_BULLET_FACTORY2D_HPP
-#define SAVE_DATA_BULLET_FACTORY2D_HPP
+#pragma once
 
 #include "save_data_block_bullets2d.hpp"
-#include "save_data_normal_bullets2d.hpp"
+#include "save_data_directional_bullets2d.hpp"
 
 #include <godot_cpp/classes/resource.hpp>
 
-namespace BlastBullets {
+namespace BlastBullets2D {
+using namespace godot;
 
-class SaveDataBulletFactory2D : public godot::Resource {
-    GDCLASS(SaveDataBulletFactory2D, godot::Resource)
+class SaveDataBulletFactory2D : public Resource {
+    GDCLASS(SaveDataBulletFactory2D, Resource)
 
 public:
-    godot::TypedArray<SaveDataBlockBullets2D> all_block_bullets;
-    godot::TypedArray<SaveDataNormalBullets2D> all_normal_bullets;
+    TypedArray<SaveDataBlockBullets2D> all_block_bullets = TypedArray<SaveDataBlockBullets2D>();
+    TypedArray<SaveDataDirectionalBullets2D> all_directional_bullets = TypedArray<SaveDataDirectionalBullets2D>();
 
-    void set_all_block_bullets(const godot::TypedArray<SaveDataBlockBullets2D> &new_all_block_bullets);
-    godot::TypedArray<SaveDataBlockBullets2D> get_all_block_bullets() const;
+    void set_all_block_bullets(const TypedArray<SaveDataBlockBullets2D> &new_all_block_bullets);
+    TypedArray<SaveDataBlockBullets2D> get_all_block_bullets() const;
 
-    void set_all_normal_bullets(const godot::TypedArray<SaveDataNormalBullets2D> &new_all_normal_bullets);
-    godot::TypedArray<SaveDataNormalBullets2D> get_all_normal_bullets() const;
+    void set_all_directional_bullets(const TypedArray<SaveDataDirectionalBullets2D> &new_all_directional_bullets);
+    TypedArray<SaveDataDirectionalBullets2D> get_all_directional_bullets() const;
 
 protected:
     static void _bind_methods();
 };
 
 }
-#endif

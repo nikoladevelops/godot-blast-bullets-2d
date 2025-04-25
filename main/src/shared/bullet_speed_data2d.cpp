@@ -3,7 +3,7 @@
 #include <godot_cpp/classes/random_number_generator.hpp>
 
 using namespace godot;
-namespace BlastBullets {
+namespace BlastBullets2D {
 
 TypedArray<BulletSpeedData2D> BulletSpeedData2D::generate_random_data(
     int amount_to_generate,
@@ -18,7 +18,7 @@ TypedArray<BulletSpeedData2D> BulletSpeedData2D::generate_random_data(
     TypedArray<BulletSpeedData2D> data;
     data.resize(amount_to_generate);
 
-    for (int i = 0; i < amount_to_generate; i++) {
+    for (size_t i = 0; i < amount_to_generate; i++) {
         Ref<BulletSpeedData2D> bullet_data = memnew(BulletSpeedData2D);
         bullet_data->speed = rand_gen->randf_range(speed_MIN, speed_MAX);
         bullet_data->max_speed = rand_gen->randf_range(max_speed_MIN, max_speed_MAX);

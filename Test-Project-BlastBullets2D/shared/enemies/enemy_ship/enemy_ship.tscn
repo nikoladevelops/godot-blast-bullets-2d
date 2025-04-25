@@ -1,0 +1,93 @@
+[gd_scene load_steps=11 format=3 uid="uid://3dxd6rfhxqym"]
+
+[ext_resource type="Script" uid="uid://vmu7hbo17mwy" path="res://shared/enemies/enemy_ship/enemy_ship.gd" id="1_vp35s"]
+[ext_resource type="PackedScene" uid="uid://d17ruamw4uuqo" path="res://shared/components/health_bar_component/health_bar_component.tscn" id="2_eiqo5"]
+[ext_resource type="Texture2D" uid="uid://bdsdupca1ibhw" path="res://shared/art/enemy_ship/enemy_ship_idle.png" id="3_qmcsm"]
+[ext_resource type="Texture2D" uid="uid://dime8axs0b5qx" path="res://shared/art/enemy_ship/enemy_ship1.png" id="4_y57bp"]
+[ext_resource type="Texture2D" uid="uid://dvhnjj7wx3b5u" path="res://shared/art/enemy_ship/enemy_ship2.png" id="5_0uxn5"]
+[ext_resource type="Texture2D" uid="uid://cq5y75kkhpwg0" path="res://shared/art/enemy_ship/enemy_ship3.png" id="6_kh4be"]
+[ext_resource type="Texture2D" uid="uid://c32od4xymubg6" path="res://shared/art/enemy_ship/enemy_ship4.png" id="7_iuadr"]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_c1d14"]
+size = Vector2(116, 117)
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_kvg0p"]
+radius = 649.278
+
+[sub_resource type="SpriteFrames" id="SpriteFrames_wqqrr"]
+animations = [{
+"frames": [{
+"duration": 1.0,
+"texture": ExtResource("3_qmcsm")
+}],
+"loop": true,
+"name": &"idle",
+"speed": 5.0
+}, {
+"frames": [{
+"duration": 1.0,
+"texture": ExtResource("4_y57bp")
+}, {
+"duration": 1.0,
+"texture": ExtResource("5_0uxn5")
+}, {
+"duration": 1.0,
+"texture": ExtResource("6_kh4be")
+}, {
+"duration": 1.0,
+"texture": ExtResource("7_iuadr")
+}],
+"loop": true,
+"name": &"moving",
+"speed": 12.0
+}]
+
+[node name="EnemyShip" type="Area2D"]
+collision_layer = 4
+collision_mask = 0
+monitoring = false
+script = ExtResource("1_vp35s")
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="."]
+visible = false
+position = Vector2(-1, -0.5)
+shape = SubResource("RectangleShape2D_c1d14")
+
+[node name="FollowTargetRadiusArea2D" type="Area2D" parent="."]
+visible = false
+collision_layer = 4
+monitorable = false
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="FollowTargetRadiusArea2D"]
+shape = SubResource("CircleShape2D_kvg0p")
+
+[node name="HealthBar" parent="." instance=ExtResource("2_eiqo5")]
+offset_left = -49.0
+offset_top = -109.0
+offset_right = 51.0
+offset_bottom = -86.0
+
+[node name="AnimatedSprite2D" type="AnimatedSprite2D" parent="."]
+rotation = 1.5708
+scale = Vector2(5, 5)
+sprite_frames = SubResource("SpriteFrames_wqqrr")
+animation = &"idle"
+
+[node name="LeftMarker2D" type="Marker2D" parent="AnimatedSprite2D"]
+position = Vector2(-9, -17)
+rotation = -1.5708
+
+[node name="CenterMarker2D" type="Marker2D" parent="AnimatedSprite2D"]
+position = Vector2(0.199999, -22)
+rotation = -1.5708
+
+[node name="RightMarker2D" type="Marker2D" parent="AnimatedSprite2D"]
+position = Vector2(11, -19)
+rotation = -1.5708
+
+[node name="ShootTimer" type="Timer" parent="."]
+one_shot = true
+
+[connection signal="body_entered" from="FollowTargetRadiusArea2D" to="." method="_on_follow_target_radius_area_2d_body_entered"]
+[connection signal="body_exited" from="FollowTargetRadiusArea2D" to="." method="_on_follow_target_radius_area_2d_body_exited"]
+[connection signal="timeout" from="ShootTimer" to="." method="_on_shoot_timer_timeout"]

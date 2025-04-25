@@ -1,7 +1,6 @@
-#ifndef BLOCK_BULLETS_DATA2D_HPP
-#define BLOCK_BULLETS_DATA2D_HPP
+#pragma once
 
-#include "./multi_mesh_bullets_data2d.hpp"
+#include "./multimesh_bullets_data2d.hpp"
 #include "../shared/bullet_rotation_data2d.hpp"
 #include "../shared/bullet_speed_data2d.hpp"
 
@@ -9,7 +8,8 @@
 #include <godot_cpp/variant/typed_array.hpp>
 
 
-namespace BlastBullets {
+namespace BlastBullets2D {
+using namespace godot;
 
 class BlockBulletsData2D : public MultiMeshBulletsData2D {
     GDCLASS(BlockBulletsData2D, MultiMeshBulletsData2D)
@@ -19,17 +19,15 @@ public:
     float block_rotation_radians = 0.0f;
 
     // The speed at which the block of bullets is moving
-    godot::Ref<BulletSpeedData2D> block_speed;
+    Ref<BulletSpeedData2D> block_speed;
 
     float get_block_rotation_radians() const;
     void set_block_rotation_radians(float new_block_rotation_radians);
 
-    godot::Ref<BulletSpeedData2D> get_block_speed() const;
-    void set_block_speed(const godot::Ref<BulletSpeedData2D> &new_block_speed);
+    Ref<BulletSpeedData2D> get_block_speed() const;
+    void set_block_speed(const Ref<BulletSpeedData2D> &new_block_speed);
 
 protected:
     static void _bind_methods();
 };
 }
-
-#endif

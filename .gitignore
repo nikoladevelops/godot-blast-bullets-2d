@@ -1,6 +1,89 @@
+main/visual-studio-project/output/
+main/visual-studio-project/.vs/
+
+# SCons-specific ignores
+.sconsign.dblite
+.sconf_temp/
+*.sconsign
+*.scons
+SConstruct.cache
+config.log
+config.status
+*.pyc
+*.pyo
+__pycache__/
+
+# C++-specific ignores
+# Object files
+*.o
 *.obj
 *.os
-*.o
-.sconsign.dblite
-*.import
-/bin
+
+# Shared libraries
+*.so
+*.so.*
+*.dylib
+*.dll
+
+# Static libraries
+*.a
+*.lib
+
+# Executables (platform-specific)
+*.exe
+*.out
+*.app
+
+# Debug symbols and metadata
+*.pdb
+*.ilk
+*.idb
+*.map
+
+# Dependency files
+*.d
+*.dep
+
+# Build directories (common for C++ projects)
+build/
+bin/
+obj/
+dist/
+target/
+
+# Temporary files
+*.tmp
+*.bak
+*.swp
+*~
+
+# IDE/editor-specific (common in C++ development)
+*.vscode/
+*.idea/
+*.sublime-project
+*.sublime-workspace
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+Makefile
+*.cmake
+
+# Platform-specific ignores
+# Windows
+Thumbs.db
+*.suo
+*.user
+*.ncb
+*.aps
+*.VC.db
+*.VC.VC.opendb
+
+# macOS
+.DS_Store
+*.xcodeproj/
+*.xcworkspace/
+
+# Linux
+*.gcno
+*.gcda
+*.gcov

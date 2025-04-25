@@ -1,0 +1,34 @@
+[gd_scene load_steps=3 format=3 uid="uid://se7rk6o70d42"]
+
+[ext_resource type="Script" uid="uid://bkbwjdchhgjl1" path="res://shared/bullet_attachment_nodes/attached_particles.gd" id="1_yw1t4"]
+
+[sub_resource type="Gradient" id="Gradient_5wk0o"]
+interpolation_mode = 2
+offsets = PackedFloat32Array(0, 0.450382, 0.763359, 0.885496, 1)
+colors = PackedColorArray(1, 0, 0.25098, 0.901961, 1, 0.886275, 0.152941, 1, 1, 0.572549, 0.282353, 1, 0.419608, 0.0784314, 0.0352941, 1, 0.337255, 0, 0, 0.643137)
+
+[node name="AttachedParticles" type="BulletAttachment2D"]
+attachment_id = 12
+script = ExtResource("1_yw1t4")
+metadata/attachment_id = 1
+metadata/_edit_lock_ = true
+
+[node name="CPUParticles2D" type="CPUParticles2D" parent="."]
+modulate = Color(0.979591, 0.775513, 0, 1)
+amount = 12
+speed_scale = 1.3
+randomness = 0.08
+lifetime_randomness = 0.19
+emission_shape = 1
+emission_sphere_radius = 4.4
+direction = Vector2(-1, 0)
+gravity = Vector2(0, 0)
+initial_velocity_min = 156.83
+initial_velocity_max = 229.12
+angular_velocity_min = -156.14
+angular_velocity_max = 52.05
+scale_amount_min = 12.0
+scale_amount_max = 15.0
+color_ramp = SubResource("Gradient_5wk0o")
+
+[connection signal="finished" from="CPUParticles2D" to="." method="_on_cpu_particles_2d_finished"]

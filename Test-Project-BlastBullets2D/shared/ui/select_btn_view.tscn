@@ -1,0 +1,11 @@
+[gd_scene load_steps=2 format=3 uid="uid://cxelp27ipxssv"]
+
+[ext_resource type="Script" uid="uid://cs67whos5iyl6" path="res://shared/ui/select_btn_view.gd" id="1_xuhp7"]
+
+[node name="SelectBtnView" type="Control"]
+layout_mode = 3
+anchors_preset = 0
+offset_top = 81.0
+offset_right = 220.0
+offset_bottom = 81.0
+script = ExtResource("1_xuhp7")

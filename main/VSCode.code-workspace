@@ -1,0 +1,14 @@
+{
+	"folders": [
+		{
+			"path": "."
+		}
+	],
+	"settings": {
+		"files.associations": {
+			"*.ejs": "html",
+			"*.inc": "cpp",
+			"vector": "cpp"
+		}
+	}
+}

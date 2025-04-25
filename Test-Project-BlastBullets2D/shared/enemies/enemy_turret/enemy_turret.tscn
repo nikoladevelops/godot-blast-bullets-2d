@@ -1,0 +1,66 @@
+[gd_scene load_steps=8 format=3 uid="uid://cjrcvxa7bnus"]
+
+[ext_resource type="Script" uid="uid://dpcvrqqwn57li" path="res://shared/enemies/enemy_turret/enemy_turret.gd" id="1_3gihl"]
+[ext_resource type="Texture2D" uid="uid://cwp0gxby36cg6" path="res://shared/art/enemy_turret/enemy_turret_holder.png" id="1_me7l0"]
+[ext_resource type="Texture2D" uid="uid://c2rlnm8rihr33" path="res://shared/art/enemy_turret/enemy_turret.png" id="2_wqeu6"]
+[ext_resource type="PackedScene" uid="uid://d17ruamw4uuqo" path="res://shared/components/health_bar_component/health_bar_component.tscn" id="4_1br1k"]
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_hvh1d"]
+radius = 399.212
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_emo74"]
+radius = 41.0122
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_mpoao"]
+radius = 36.0
+
+[node name="EnemyTurret" type="Area2D"]
+collision_layer = 4
+collision_mask = 0
+monitoring = false
+script = ExtResource("1_3gihl")
+
+[node name="TurretBase" type="Sprite2D" parent="."]
+scale = Vector2(6, 6)
+texture = ExtResource("1_me7l0")
+
+[node name="TurretGun" type="Sprite2D" parent="."]
+rotation = -1.5708
+scale = Vector2(6, 6)
+texture = ExtResource("2_wqeu6")
+
+[node name="BulletMarker" type="Marker2D" parent="TurretGun"]
+position = Vector2(-1.33514e-05, 13.5)
+rotation = 1.5708
+
+[node name="DetectArea2D" type="Area2D" parent="."]
+visible = false
+collision_layer = 0
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="DetectArea2D"]
+shape = SubResource("CircleShape2D_hvh1d")
+
+[node name="ShootTimer" type="Timer" parent="."]
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="."]
+visible = false
+shape = SubResource("CircleShape2D_emo74")
+
+[node name="HealthBar" parent="." instance=ExtResource("4_1br1k")]
+offset_left = -48.0
+offset_top = -87.0
+offset_right = 52.0
+offset_bottom = -64.0
+
+[node name="StaticBody2D" type="StaticBody2D" parent="."]
+visible = false
+collision_layer = 4
+collision_mask = 0
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="StaticBody2D"]
+position = Vector2(0, -3)
+shape = SubResource("CircleShape2D_mpoao")
+
+[connection signal="body_entered" from="DetectArea2D" to="." method="_on_detect_area_2d_body_entered"]
+[connection signal="body_exited" from="DetectArea2D" to="." method="_on_detect_area_2d_body_exited"]
+[connection signal="timeout" from="ShootTimer" to="." method="_on_shoot_timer_timeout"]

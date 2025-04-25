@@ -1,0 +1,16 @@
+[gd_scene load_steps=4 format=3 uid="uid://331neay58a3r"]
+
+[ext_resource type="Script" uid="uid://cbte70d3pv4s6" path="res://shared/bullet_attachment_nodes/light_attachment.gd" id="1_cqoog"]
+[ext_resource type="Texture2D" uid="uid://ns0t5t3knsp4" path="res://shared/art/light/light_texture.png" id="2_qbtnj"]
+
+[sub_resource type="CanvasItemMaterial" id="CanvasItemMaterial_qbtnj"]
+blend_mode = 1
+
+[node name="LightAttachment" type="BulletAttachment2D"]
+z_index = 8
+script = ExtResource("1_cqoog")
+
+[node name="LightTexture" type="Sprite2D" parent="."]
+material = SubResource("CanvasItemMaterial_qbtnj")
+scale = Vector2(10, 10)
+texture = ExtResource("2_qbtnj")

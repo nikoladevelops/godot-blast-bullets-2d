@@ -6,33 +6,28 @@
 #include "godot_cpp/classes/quad_mesh.hpp"
 #include "godot_cpp/variant/utility_functions.hpp"
 
-
 using namespace godot;
 
-namespace BlastBullets {
+namespace BlastBullets2D {
 
 void BlockBullets2D::set_up_movement_data(const BulletSpeedData2D &new_speed_data) {
-    // Since the block bullets work by moving the whole multimesh in a single direction we basically work with a single speed data for every single bullet
-    int speed_data_size = 1;
-    
-    all_cached_speed.resize(speed_data_size, new_speed_data.speed);
-    all_cached_max_speed.resize(speed_data_size, new_speed_data.max_speed);
-    all_cached_acceleration.resize(speed_data_size, new_speed_data.acceleration);
+    // Ensure all old data is removed
+    if (all_cached_speed.size() > 0)
+    {
+        all_cached_speed.clear();
+        all_cached_max_speed.clear();
+        all_cached_acceleration.clear();
+        all_cached_direction.clear();
+        all_cached_velocity.clear();   
+    }
 
-    all_cached_direction.resize(speed_data_size, Vector2(Math::cos(block_rotation_radians), Math::sin(block_rotation_radians)));
-    all_cached_velocity.resize(speed_data_size, all_cached_direction[0] * all_cached_speed[0]);
-}
+    // BlockBullets work by moving with the same speed in the same direction
+    all_cached_speed.emplace_back(new_speed_data.speed);
+    all_cached_max_speed.emplace_back(new_speed_data.max_speed);
+    all_cached_acceleration.emplace_back(new_speed_data.acceleration);
 
-void BlockBullets2D::activate_movement_data(const BulletSpeedData2D &new_speed_data) {
-    // Since the block bullets work by moving the whole multimesh in a single direction we basically work with a single speed data for every single bullet
-    int speed_data_index = 0;
-    
-    all_cached_speed[speed_data_index] = new_speed_data.speed;
-    all_cached_max_speed[speed_data_index] = new_speed_data.max_speed;
-    all_cached_acceleration[speed_data_index] = new_speed_data.acceleration;
-
-    all_cached_direction[speed_data_index] = Vector2(Math::cos(block_rotation_radians), Math::sin(block_rotation_radians));
-    all_cached_velocity[speed_data_index] = all_cached_direction[0] * all_cached_speed[0];
+    all_cached_direction.emplace_back(Vector2(Math::cos(block_rotation_radians), Math::sin(block_rotation_radians)));
+    all_cached_velocity.emplace_back(all_cached_direction[0] * all_cached_speed[0]);
 }
 
 void BlockBullets2D::custom_additional_spawn_logic(const MultiMeshBulletsData2D &data) {
@@ -42,29 +37,22 @@ void BlockBullets2D::custom_additional_spawn_logic(const MultiMeshBulletsData2D 
     set_up_movement_data(*block_data.block_speed.ptr());
 }
 
+void BlockBullets2D::custom_additional_activate_logic(const MultiMeshBulletsData2D &data) {
+    const BlockBulletsData2D &block_data = static_cast<const BlockBulletsData2D&>(data);
+
+    block_rotation_radians = block_data.block_rotation_radians;
+    set_up_movement_data(*block_data.block_speed.ptr());
+}
+
 void BlockBullets2D::custom_additional_save_logic(SaveDataMultiMeshBullets2D &data) {
     SaveDataBlockBullets2D &block_data = static_cast<SaveDataBlockBullets2D&>(data);
     
     block_data.block_rotation_radians = block_rotation_radians;
-    block_data.multi_mesh_position = current_position;
 }
 
 void BlockBullets2D::custom_additional_load_logic(const SaveDataMultiMeshBullets2D &data) {
     const SaveDataBlockBullets2D &block_data = static_cast<const SaveDataBlockBullets2D&>(data);
 
-    current_position = block_data.multi_mesh_position;
     block_rotation_radians = block_data.block_rotation_radians;
-
-    set_global_position(current_position);
-}
-
-void BlockBullets2D::custom_additional_activate_logic(const MultiMeshBulletsData2D &data) {
-    const BlockBulletsData2D &block_data = static_cast<const BlockBulletsData2D&>(data);
-
-    current_position = Vector2(0, 0);
-    set_global_position(current_position);
-
-    block_rotation_radians = block_data.block_rotation_radians;
-    activate_movement_data(*block_data.block_speed.ptr());
 }
 }

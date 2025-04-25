@@ -1,21 +1,21 @@
-#ifndef BULLET_SPEED_DATA2D_HPP
-#define BULLET_SPEED_DATA2D_HPP
+#pragma once
 
 #include <godot_cpp/classes/resource.hpp>
 #include <godot_cpp/variant/typed_array.hpp>
 
-namespace BlastBullets {
+namespace BlastBullets2D {
+using namespace godot;
 
-class BulletSpeedData2D : public godot::Resource {
-    GDCLASS(BulletSpeedData2D, godot::Resource)
+class BulletSpeedData2D : public Resource {
+    GDCLASS(BulletSpeedData2D, Resource)
 
 public:
-    float speed;
-    float max_speed;
-    float acceleration;
+    float speed = 0;
+    float max_speed = 0;
+    float acceleration = 0;
 
     // Generates an amount of BulletSpeedData2D classes that have random data that varies between ranges. (for example speed of each will be a random number between speed_min and speed_max (inclusive))
-    static godot::TypedArray<BulletSpeedData2D> generate_random_data(
+    static TypedArray<BulletSpeedData2D> generate_random_data(
         int amount_to_generate,
         float speed_MIN,
         float speed_MAX,
@@ -37,4 +37,3 @@ protected:
     static void _bind_methods();
 };
 }
-#endif

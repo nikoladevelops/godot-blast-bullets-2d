@@ -1,0 +1,33 @@
+# Godot 4.4+ specific ignores
+.godot/
+.import/
+*.import
+export.cfg
+export_presets.cfg
+*.translation
+*.tscn.remap
+*.tres.remap
+*.godot
+*.pidb
+*.user
+*.userprefs
+
+# Mono/C# related (if using C# in Godot)
+*.mono/
+*.sln
+*.suo
+*.pdb
+*.csproj
+*.vs/
+
+# IDE/editor-specific
+*.vscode/
+*.idea/
+
+# Common temporary files
+*.tmp
+*.bak
+*.log
+
+# Addon-specific
+.addons/BlastBullets2D/bin/

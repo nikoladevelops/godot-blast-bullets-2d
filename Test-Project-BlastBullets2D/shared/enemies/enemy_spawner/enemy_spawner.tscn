@@ -1,0 +1,19 @@
+[gd_scene load_steps=2 format=3 uid="uid://cropisiqwmq6"]
+
+[ext_resource type="Script" uid="uid://dwsh7e3u4dgw2" path="res://shared/enemies/enemy_spawner/enemy_spawner.gd" id="1_b77es"]
+
+[node name="EnemySpawner" type="Node2D"]
+script = ExtResource("1_b77es")
+
+[node name="SpawnerAreaRect" type="ColorRect" parent="."]
+custom_minimum_size = Vector2(1000, 1000)
+offset_right = 100.0
+offset_bottom = 100.0
+mouse_filter = 2
+color = Color(0.446004, 0.671015, 0.711228, 0.211765)
+
+[node name="Timer" type="Timer" parent="."]
+
+[node name="EnemyContainer" type="Node" parent="."]
+
+[connection signal="timeout" from="Timer" to="." method="_on_timer_timeout"]

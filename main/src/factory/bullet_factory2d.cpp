@@ -1,25 +1,30 @@
 #include "./bullet_factory2d.hpp"
 
 #include "../bullets/block_bullets2d.hpp"
-#include "../bullets/normal_bullets2d.hpp"
+#include "../bullets/directional_bullets2d.hpp"
 
 #include "../spawn-data/block_bullets_data2d.hpp"
-#include "../spawn-data/normal_bullets_data2d.hpp"
+#include "../spawn-data/directional_bullets_data2d.hpp"
 
 #include "../save-data/save_data_bullet_factory2d.hpp"
 #include "../save-data/save_data_block_bullets2d.hpp"
-#include "../save-data/save_data_multi_mesh_bullets2d.hpp"
+#include "../save-data/save_data_multimesh_bullets2d.hpp"
 
 #include "../shared/multimesh_object_pool2d.hpp"
-#include "../debugger/multi_mesh_bullets_debugger2d.hpp"
+#include "../debugger/multimesh_bullets_debugger2d.hpp"
+#include "../shared/bullet_attachment2d.hpp"
 
 #include <godot_cpp/classes/engine.hpp>
+#include <godot_cpp/classes/physics_server2d.hpp>
 #include <godot_cpp/classes/world2d.hpp>
 #include <godot_cpp/variant/utility_functions.hpp>
+#include <godot_cpp/classes/scene_tree.hpp>
+
+#include <algorithm>
 
 using namespace godot;
 
-namespace BlastBullets {
+namespace BlastBullets2D {
 
 void BulletFactory2D::_ready() {
     // Ensure the code that is next will not be ran in the editor
@@ -32,227 +37,380 @@ void BulletFactory2D::_ready() {
         physics_space = get_world_2d()->get_space();
     }
 
-    // Create BlockBulletsContainer Node and add it as a child to factory
-    block_bullets_container = memnew(Node);
-    block_bullets_container->set_name("BlockBulletsContainer");
-    add_child(block_bullets_container);
+    add_bullet_containers();
+    add_bullet_attachment_container();
+    add_debuggers();
 
-    // Create NormalBulletsContainer Node and add it as a child to factory
-    normal_bullets_container = memnew(Node);
-    normal_bullets_container->set_name("NormalBulletsContainer");
-    add_child(normal_bullets_container);
+    block_bullets_debugger->set_debugger_color(block_bullets_debugger_color_cached_before_ready);
+    directional_bullets_debugger->set_debugger_color(directional_bullets_debugger_color_cached_before_ready);
+    
+    block_bullets_debugger->set_is_debugger_enabled(is_debugger_enabled_cached_before_ready);
+    directional_bullets_debugger->set_is_debugger_enabled(is_debugger_enabled_cached_before_ready);
 
-    // Add the debuggers as a child to the factory, but only if debugging is enabled
-    if (is_debugger_enabled) {
-        spawn_debuggers();
-    }
 
     is_ready = true;
 }
 
-void BulletFactory2D::spawn_debuggers(){
+void BulletFactory2D::add_bullet_containers(){
+    // Create BlockBulletsContainer Node and add it as a child to factory
+    block_bullets_container = memnew(Node);
+    block_bullets_container->set_name("BlockBulletsContainer");
+    add_child(block_bullets_container);
+    
+    // Create DirectionalBulletsContainer Node and add it as a child to factory
+    directional_bullets_container = memnew(Node);
+    directional_bullets_container->set_name("DirectionalBulletsContainer");
+    add_child(directional_bullets_container);
+}
+
+void BulletFactory2D::add_bullet_attachment_container(){
+    // Create BulletAttachmentContainer Node and add it as a child to factory
+    bullet_attachments_container = memnew(Node);
+    bullet_attachments_container->set_name("BulletAttachmentsContainer");
+    add_child(bullet_attachments_container);
+}
+
+void BulletFactory2D::add_debuggers(){
     // Configure BlockBullets2D debugger and add it as a child to factory
     block_bullets_debugger = memnew(MultiMeshBulletsDebugger2D);
-    block_bullets_debugger->configure(block_bullets_container, "BlockBulletsDebugger", block_bullets_debugger_color);
-
-    // Configure NormalBullets2D debugger and add it as a child to factory
-    normal_bullets_debugger = memnew(MultiMeshBulletsDebugger2D);
-    normal_bullets_debugger->configure(normal_bullets_container, "NormalBulletsDebugger", normal_bullets_debugger_color);
-
-    // Add the debuggers as children of the factory
+    block_bullets_debugger->configure(block_bullets_container, "BlockBulletsDebugger", block_bullets_debugger_color_cached_before_ready);
     add_child(block_bullets_debugger);
-    add_child(normal_bullets_debugger);
+
+    // Configure DirectionalBullets2D debugger and add it as a child to factory
+    directional_bullets_debugger = memnew(MultiMeshBulletsDebugger2D);
+    directional_bullets_debugger->configure(directional_bullets_container, "DirectionalBulletsDebugger", directional_bullets_debugger_color_cached_before_ready);
+    add_child(directional_bullets_debugger);
 }
+
+bool BulletFactory2D::get_is_factory_busy() const {
+    return is_factory_busy;
+}
+
+void BulletFactory2D::set_is_factory_busy(bool value) {
+    if (is_factory_busy == value) {
+        return;
+    }
+
+    set_process(!value);
+    set_physics_process(!value);
+    
+    is_factory_busy = value;
+}
+
+void BulletFactory2D::_physics_process(float delta){
+    handle_bullet_behavior<DirectionalBullets2D>(all_directional_bullets, delta);
+    handle_bullet_behavior<BlockBullets2D>(all_block_bullets, delta);
+}
+
 
 void BulletFactory2D::spawn_block_bullets(const Ref<BlockBulletsData2D> &spawn_data) {
-    int key = spawn_data->transforms.size();
-
-    BlockBullets2D* bullets_instance = static_cast<BlockBullets2D*>(block_bullets_pool.pop(key));
-    if(bullets_instance != nullptr){
-        bullets_instance->activate_multimesh(*spawn_data.ptr());
+    if(is_factory_busy){
+        UtilityFunctions::printerr("Error when trying to spawn bullets. BulletFactory2D is currently busy. Ignoring the request");
         return;
     }
 
-    bullets_instance = memnew(BlockBullets2D);
-
-    bullets_instance->spawn(*spawn_data.ptr(), &block_bullets_pool, this, block_bullets_container);
+    spawn_bullets_helper<BlockBullets2D, BlockBulletsData2D>(
+        all_block_bullets,
+        block_bullets_pool,
+        block_bullets_container,
+        spawn_data
+    );
 }
 
-void BulletFactory2D::spawn_normal_bullets(const godot::Ref<NormalBulletsData2D> &spawn_data){
-    int key = spawn_data->transforms.size();
-
-    NormalBullets2D* bullets_instance = static_cast<NormalBullets2D*>(normal_bullets_pool.pop(key));
-    if(bullets_instance != nullptr){
-        bullets_instance->activate_multimesh(*spawn_data.ptr());
+void BulletFactory2D::spawn_directional_bullets(const Ref<DirectionalBulletsData2D> &spawn_data){
+    if(is_factory_busy){
+        UtilityFunctions::printerr("Error when trying to spawn bullets. BulletFactory2D is currently busy. Ignoring the request");
         return;
     }
 
-    bullets_instance = memnew(NormalBullets2D);
-    bullets_instance->spawn(*spawn_data.ptr(), &normal_bullets_pool, this, normal_bullets_container);
+    spawn_bullets_helper<DirectionalBullets2D, DirectionalBulletsData2D>(
+        all_directional_bullets,
+        directional_bullets_pool,
+        directional_bullets_container,
+        spawn_data
+    );
 }
 
-Ref<SaveDataBulletFactory2D> BulletFactory2D::save() {
+void BulletFactory2D::save(bool enable_processing_after_finish) {
+    if (is_factory_busy) {
+        UtilityFunctions::printerr("Error when trying to save. BulletFactory2D is currently busy. Ignoring the request");
+        return;
+    }
+
+    set_is_factory_busy(true);
+
     Ref<SaveDataBulletFactory2D> data = memnew(SaveDataBulletFactory2D);
 
     // Save all BlockBullets2D
-    TypedArray<BlockBullets2D> block_bullets = block_bullets_container->get_children();
+    insert_save_data_from_bullets_into_array<BlockBullets2D, SaveDataBlockBullets2D>(
+        all_block_bullets,
+        data->all_block_bullets
+    );
 
-    for (int i = 0; i < block_bullets.size(); i++) {
-        BlockBullets2D &bullet_instance = *Object::cast_to<BlockBullets2D>(block_bullets[i]);
+    // Save all DirectionalBullets2D
+    insert_save_data_from_bullets_into_array<DirectionalBullets2D, SaveDataDirectionalBullets2D>(
+        all_directional_bullets,
+        data->all_directional_bullets
+    );
 
-        // I only want to save bullets that are still active (I don't want to save bullets that are in the pool)
-        if (bullet_instance.active_bullets_counter == 0) {
-            continue;
-        }
-
-        Ref<SaveDataBlockBullets2D> empty_data = memnew(SaveDataBlockBullets2D);
-        
-        // Saves only the active bullets
-        data->all_block_bullets.push_back(bullet_instance.save(empty_data));
+    if (enable_processing_after_finish)
+    {
+        set_is_factory_busy(false);
     }
-    //
 
-    // Save all NormalBullets2D
-    TypedArray<NormalBullets2D> normal_bullets = normal_bullets_container->get_children();
-
-    for (int i = 0; i < normal_bullets.size(); i++) {
-        NormalBullets2D &bullet_instance = *Object::cast_to<NormalBullets2D>(normal_bullets[i]);
-
-        // I only want to save bullets that are still active (I don't want to save bullets that are in the pool)
-        if (bullet_instance.active_bullets_counter == 0) {
-            continue;
-        }
-
-        Ref<SaveDataNormalBullets2D> empty_data = memnew(SaveDataNormalBullets2D);
-        
-        // Saves only the active bullets
-        data->all_normal_bullets.push_back(bullet_instance.save(empty_data));
-    }
-    //
-
-    emit_signal("finished_saving");
-    return data;
+    emit_signal("save_finished", data);
 }
-void BulletFactory2D::load(const Ref<SaveDataBulletFactory2D> &new_data) {
+
+void BulletFactory2D::load(const Ref<SaveDataBulletFactory2D> new_data, bool enable_processing_after_finish) {
+    if(!new_data.is_valid()){
+        UtilityFunctions::printerr("Error. Bullet data given to load method inside BulletFactory2D is invalid");
+        return;
+    }
+
+    if (is_factory_busy) {
+        UtilityFunctions::printerr("Error when trying to load data. BulletFactory2D is currently busy. Ignoring the request");
+        return;
+    }
+
+    set_is_factory_busy(true);
+
+    reset();
+
     // Load all BlockBullets2D
-    int amount_bullets = new_data->all_block_bullets.size();
-    for (int i = 0; i < amount_bullets ; i++)
+    load_data_into_new_bullets<BlockBullets2D, SaveDataBlockBullets2D>(
+        all_block_bullets,
+        block_bullets_pool,
+        block_bullets_container,
+        new_data->all_block_bullets
+    );
+
+    // Load all DirectionalBullets2D
+    load_data_into_new_bullets<DirectionalBullets2D, SaveDataDirectionalBullets2D>(
+        all_directional_bullets, 
+        directional_bullets_pool, 
+        directional_bullets_container, 
+        new_data->all_directional_bullets
+    );
+
+    if (enable_processing_after_finish)
     {
-        BlockBullets2D* blk_instance = memnew(BlockBullets2D);
-        
-        const Ref<SaveDataBlockBullets2D> &current_block_bullets_data = new_data->all_block_bullets[i];
-
-        blk_instance->load(current_block_bullets_data, &block_bullets_pool, this, block_bullets_container);
+        set_is_factory_busy(false);
     }
-    //
 
-    // Load all NormalBullets2D
-    amount_bullets = new_data->all_normal_bullets.size();
-    for (int i = 0; i < amount_bullets ; i++)
-    {
-        NormalBullets2D* blk_instance = memnew(NormalBullets2D);
-
-        const Ref<SaveDataNormalBullets2D> &current_normal_bullets_data = new_data->all_normal_bullets[i];
-
-        blk_instance->load(current_normal_bullets_data, &normal_bullets_pool, this, normal_bullets_container);
-    }
-    //
-
-    emit_signal("finished_loading");
+    emit_signal("load_finished");
 }
 
-void BulletFactory2D::free_all_bullets() {
-    // Empty out the object pools so they won't contain invalid pointers
-    block_bullets_pool.clear_bullet_pointers();
-    normal_bullets_pool.clear_bullet_pointers();
-
-    // Reset all debuggers if they were enabled
-    if(is_debugger_enabled){
-        block_bullets_debugger->reset_debugger();
-        normal_bullets_debugger->reset_debugger();
+void BulletFactory2D::reset(bool enable_processing_after_finish){
+    // When this method gets called it's mandatory that is_factory_busy is set to true (this is so all processing gets paused before freeing bullets etc.. I don't want any interference from other methods or stuff like the PhysicsServer)
+    // 1) If is_factory_busy is already true that means some other method handles that value, so we shouldn't mess with it (Example: the load method first resets the factory before trying to load new data to it)
+    // 2) If is_factory_busy is set to false, then reset() should handle setting it to ensure that any processing is paused (Example: this will happen if the user calls the reset() method himself since it's exposed to Godot Engine)
+    
+    bool have_to_enable_factory_again = false;
+    if (!is_factory_busy) 
+    {
+        set_is_factory_busy(true);
+        have_to_enable_factory_again = true;
     }
 
-    // Clear all BlockBullets2D
-    TypedArray<Node> all_block_bullet_instances = block_bullets_container->get_children();
+    // Check if debuggers are enabled
+    bool debugger_curr_enabled = get_is_debugger_enabled();
 
-    int size = all_block_bullet_instances.size();
-    for (int i = 0; i < size; i++) {
-        BlockBullets2D* curr_bullet = Object::cast_to<BlockBullets2D>(all_block_bullet_instances[i]);
-        if(curr_bullet != nullptr){
-            curr_bullet->safe_delete();
-        }
+    // If the debuggers are enabled, disable them completely
+    if (debugger_curr_enabled)
+    {
+        block_bullets_debugger->set_is_debugger_enabled(false);
+        directional_bullets_debugger->set_is_debugger_enabled(false);
     }
 
-    // Clear all NormalBullets2D
-    TypedArray<Node> all_normal_bullet_instances = normal_bullets_container->get_children();
+    // Free all DirectionalBullets2D, their attachments and the object pool
+    free_all_bullets_helper<DirectionalBullets2D>(all_directional_bullets, directional_bullets_pool, false);
 
-    size = all_normal_bullet_instances.size();
-    for (int i = 0; i < size; i++) {
-        NormalBullets2D* curr_bullet = Object::cast_to<NormalBullets2D>(all_normal_bullet_instances[i]);
-        if(curr_bullet != nullptr){
-            curr_bullet->safe_delete();
-        }
+    // Free all BlockBullets2D, their attachments and the object pool
+    free_all_bullets_helper<BlockBullets2D>(all_block_bullets, block_bullets_pool, false);
+
+    // Free all bullet attachments that are currently in the object pool
+    bullet_attachments_pool.free_all_bullet_attachments();
+    
+    // If the debuggers are supposed to be activated then re-activate them
+    if(debugger_curr_enabled){
+        block_bullets_debugger->set_is_debugger_enabled(true);
+        directional_bullets_debugger->set_is_debugger_enabled(true);
+    }
+
+    if (have_to_enable_factory_again && enable_processing_after_finish) {
+        set_is_factory_busy(false);
     }
 
     // Notify the user that all bullets have been freed/deleted
-    emit_signal("finished_freeing_all_bullets");
+    emit_signal("reset_finished");
 }
 
-void BulletFactory2D::free_all_pools(){
-    if(is_debugger_enabled){
-        // Free the debug multimeshes representing the collision shapes of all disabled bullets (all bullets in the object pool)
-        block_bullets_debugger->free_debug_multimeshes_tracking_disabled_bullets();
-        normal_bullets_debugger->free_debug_multimeshes_tracking_disabled_bullets();
+void BulletFactory2D::free_active_bullets(bool pool_attachments, bool enable_processing_after_finish){
+    if (is_factory_busy) {
+        UtilityFunctions::printerr("Error when trying to free active bullets. BulletFactory2D is currently busy. Ignoring the request");
+        return;
     }
 
-    // Free all multimesh bullets that are disabled (and we already know that all disabled bullets are always stored in the object pools so we accomplish this easily)
-    block_bullets_pool.free_all_bullets();
-    normal_bullets_pool.free_all_bullets();
-}
+    set_is_factory_busy(true);
 
-void BulletFactory2D::free_multi_mesh_pool(MultiMeshBulletType bullet_multi_mesh_type, int amount_bullets){
-    if(is_debugger_enabled){
-        // Free the texture multimeshes representing the collision shapes of all disabled bullets that have exactly `amount_bullets` instances
-        switch (bullet_multi_mesh_type){
-            case BLOCK_BULLETS:
-                block_bullets_debugger->free_debug_multimeshes_tracking_disabled_bullets(amount_bullets);
-                break;
-            case NORMAL_BULLETS:
-                normal_bullets_debugger->free_debug_multimeshes_tracking_disabled_bullets(amount_bullets);
-                break;
-            default:
-                break;
-        }
-    }
+    // Check if debuggers are enabled
+    bool debugger_curr_enabled = get_is_debugger_enabled();
 
-    // Free the actual multimesh bullet objects that are in the object pool and have exactly `amount_bullets` bullet instances each
-    switch (bullet_multi_mesh_type){
-        case BLOCK_BULLETS:
-            block_bullets_pool.free_specific_bullets(amount_bullets);
-            break;
-        case NORMAL_BULLETS:
-            normal_bullets_pool.free_specific_bullets(amount_bullets);
-            break;
-        default:
-            break;
-    }   
-}
-
-void BulletFactory2D::populate_normal_bullets_pool(int amount_multimesh_instances, int amount_bullets_each_multimesh_holds){
-    for (int i = 0; i < amount_multimesh_instances; i++)
+    // If the debuggers are enabled, disable them completely
+    if (debugger_curr_enabled)
     {
-        NormalBullets2D *multimesh_instance = memnew(NormalBullets2D);
-        multimesh_instance->spawn_as_disabled_multimesh(amount_bullets_each_multimesh_holds, &normal_bullets_pool, this, normal_bullets_container);
+        block_bullets_debugger->set_is_debugger_enabled(false);
+        directional_bullets_debugger->set_is_debugger_enabled(false);
+    }
+
+    // Free all ACTIVE DirectionalBullets2D, whether their attachments also get freed depends on pool_attachments value
+    free_only_active_bullets_helper<DirectionalBullets2D>(all_directional_bullets, directional_bullets_pool, pool_attachments);
+
+    // Free all ACTIVE BlockBullets2D, whether their attachments also get freed depends on pool_attachments value
+    free_only_active_bullets_helper<BlockBullets2D>(all_block_bullets, block_bullets_pool, pool_attachments);
+
+    // If the debuggers are supposed to be activated then re-activate them
+    if (debugger_curr_enabled) {
+        block_bullets_debugger->set_is_debugger_enabled(true);
+        directional_bullets_debugger->set_is_debugger_enabled(true);
+    }
+
+    if (enable_processing_after_finish)
+    {
+        set_is_factory_busy(false);
     }
 }
 
-void BulletFactory2D::populate_block_bullets_pool(int amount_multimesh_instances, int amount_bullets_each_multimesh_holds){
-    for (int i = 0; i < amount_multimesh_instances; i++)
+void BulletFactory2D::populate_bullets_pool(BulletType bullet_type, int amount_instances, int amount_bullets_per_instance){
+    if (amount_instances <= 0){
+        UtilityFunctions::printerr("Error. You can't populate the bullets pool with amount_instances <= 0");
+        return;
+    }
+
+    if (amount_bullets_per_instance <= 0) {
+        UtilityFunctions::printerr("Error. You can't populate the bullets pool with amount_bullets_per_instance <= 0");
+        return;
+    }
+
+    // I rely on bullet_type enum because Godot does not offer method overloading or generics and I don't want to pollute the API with a bunch of methods that are practically the same
+    
+    switch (bullet_type)
     {
-        BlockBullets2D *multimesh_instance = memnew(BlockBullets2D);
-        multimesh_instance->spawn_as_disabled_multimesh(amount_bullets_each_multimesh_holds, &block_bullets_pool, this, block_bullets_container);
+    case BulletFactory2D::DIRECTIONAL_BULLETS:
+        populate_bullets_pool_helper<DirectionalBullets2D>(
+            all_directional_bullets,
+            directional_bullets_pool,
+            directional_bullets_container,
+            amount_instances,
+            amount_bullets_per_instance
+        );
+        break;
+    case BulletFactory2D::BLOCK_BULLETS:
+        populate_bullets_pool_helper<BlockBullets2D>(
+            all_block_bullets,
+            block_bullets_pool,
+            block_bullets_container,
+            amount_instances,
+            amount_bullets_per_instance
+        );
+        break;
+    default:
+        UtilityFunctions::printerr("Unsupported type of bullet when calling populate_bullets_pool");
+        break;
     }
 }
+
+void BulletFactory2D::free_bullets_pool(BulletType bullet_type, int amount_bullets_per_instance, bool enable_processing_after_finish){
+    if (is_factory_busy) {
+        UtilityFunctions::printerr("Error when trying to free bullets pool. BulletFactory2D is currently busy. Ignoring the request");
+        return;
+    }
+
+    set_is_factory_busy(true);
+
+    bool debugger_curr_enabled = get_is_debugger_enabled();
+    
+    // If the debuggers are enabled, disable them completely
+    if (debugger_curr_enabled)
+    {
+        block_bullets_debugger->set_is_debugger_enabled(false);
+        directional_bullets_debugger->set_is_debugger_enabled(false);
+    }
+
+    switch (bullet_type)
+    {
+    case BulletFactory2D::DIRECTIONAL_BULLETS:
+        free_bullets_pool_helper<DirectionalBullets2D>(
+            all_directional_bullets,
+            directional_bullets_pool,
+            amount_bullets_per_instance,
+            false
+        );
+        break;
+    case BulletFactory2D::BLOCK_BULLETS:
+        free_bullets_pool_helper<BlockBullets2D>(
+            all_block_bullets,
+            block_bullets_pool,
+            amount_bullets_per_instance,
+            false
+        );
+        break;
+    default:
+        UtilityFunctions::printerr("Unsupported type of bullet when calling free_bullets_pool");
+        break;
+    }
+    
+    if (debugger_curr_enabled)
+    {
+        block_bullets_debugger->set_is_debugger_enabled(true);
+        directional_bullets_debugger->set_is_debugger_enabled(true);
+    }
+
+    if (enable_processing_after_finish)
+    {
+        set_is_factory_busy(false);
+    }
+}
+
+void BulletFactory2D::populate_attachments_pool(const Ref<PackedScene> bullet_attachment_scene, int amount_instances){
+    
+    if (amount_instances <= 0) {
+        UtilityFunctions::printerr("Error. You can't populate the attachments pool with amount_instances <= 0");
+        return;
+    }
+    
+    for (size_t i = 0; i < amount_instances; i++)
+    {
+        BulletAttachment2D *attachment = static_cast<BulletAttachment2D*>(bullet_attachment_scene->instantiate()); // You better pass a packed scene that contains an actual BulletAttachment2D node or this goes kaboom
+        attachment->call_on_bullet_spawn_as_disabled();
+        bullet_attachments_container->add_child(attachment);
+        bullet_attachments_pool.push(attachment);
+    }
+}
+
+void BulletFactory2D::free_attachments_pool(int attachment_id, bool enable_processing_after_finish){
+    if (is_factory_busy) {
+        UtilityFunctions::printerr("Error when trying to free bullets pool. BulletFactory2D is currently busy. Ignoring the request");
+        return;
+    }
+
+    set_is_factory_busy(true);
+
+    // Free all attachments no matter the attachment_id
+    if (attachment_id < 0) 
+    {
+        bullet_attachments_pool.free_all_bullet_attachments();
+    }
+    else { // Free only attachments in the pool with a specific attachment_id
+        bullet_attachments_pool.free_specific_bullet_attachments(attachment_id);
+    }
+
+    if (enable_processing_after_finish)
+    {
+        set_is_factory_busy(false);
+    }
+}
+
 
 RID BulletFactory2D::get_physics_space() const {
     return physics_space;
@@ -261,76 +419,195 @@ void BulletFactory2D::set_physics_space(RID new_space_rid) {
     physics_space = new_space_rid;
 }
 
-Color BulletFactory2D::get_block_bullets_debugger_color() const{
-    return block_bullets_debugger_color;
-}
-void BulletFactory2D::set_block_bullets_debugger_color(const Color& new_color){
-    block_bullets_debugger_color = new_color;
+Color BulletFactory2D::get_block_bullets_debugger_color() const {
+    if (!is_ready) {
+        return block_bullets_debugger_color_cached_before_ready;
+    }
 
-    // Ensure the code that is next will never run in the editor and never run unless the factory is ready in the scene tree
-    if(Engine::get_singleton()->is_editor_hint() || is_ready == false){
+    return block_bullets_debugger->get_debugger_color();
+}
+void BulletFactory2D::set_block_bullets_debugger_color(const Color& new_color) {
+    if (!is_ready) {
+        block_bullets_debugger_color_cached_before_ready = new_color;  // Note if you are wondering why I am doing this it's because I have exposed properties to the editor but these values can only be applied after the factory is added to the scene tree (when the game is ran) - Example: the debuggers do not exist yet in the editor.. so just cache any values related to them and apply them when they actually exist (this happens in _on_ready())
         return;
     }
 
-    if(block_bullets_debugger != nullptr){
-        block_bullets_debugger->change_debug_multimeshes_color(new_color);
+    block_bullets_debugger->set_debugger_color(new_color);
+}
+
+Color BulletFactory2D::get_directional_bullets_debugger_color() const {
+    if (!is_ready) {
+        return directional_bullets_debugger_color_cached_before_ready;
     }
-}
 
-Color BulletFactory2D::get_normal_bullets_debugger_color() const{
-    return normal_bullets_debugger_color;
+    return directional_bullets_debugger->get_debugger_color();
 }
-void BulletFactory2D::set_normal_bullets_debugger_color(const Color& new_color){
-    normal_bullets_debugger_color = new_color;
-
-    // Ensure the code that is next will never run in the editor and never run unless the factory is ready in the scene tree
-    if(Engine::get_singleton()->is_editor_hint() || is_ready == false){
+void BulletFactory2D::set_directional_bullets_debugger_color(const Color& new_color) {
+    if (!is_ready) {
+        directional_bullets_debugger_color_cached_before_ready = new_color;
         return;
     }
 
-    if(normal_bullets_debugger != nullptr){
-        normal_bullets_debugger->change_debug_multimeshes_color(new_color);
-    }
+    directional_bullets_debugger->set_debugger_color(new_color);
 }
 
-bool BulletFactory2D::get_is_debugger_enabled() const{
-    return is_debugger_enabled;
+bool BulletFactory2D::get_is_debugger_enabled() const {
+    if (!is_ready) {
+        return is_debugger_enabled_cached_before_ready;
+    }
+
+    return block_bullets_debugger->get_is_debugger_enabled() && directional_bullets_debugger->get_is_debugger_enabled();
 }
 
 void BulletFactory2D::set_is_debugger_enabled(bool new_is_enabled) {
-    is_debugger_enabled = new_is_enabled;
-
-    // Ensure the code that is next will never run in the editor and never run unless the factory is ready in the scene tree
-    if(Engine::get_singleton()->is_editor_hint() || is_ready == false){
+    if (!is_ready) {
+        is_debugger_enabled_cached_before_ready = new_is_enabled;
         return;
     }
 
-    // If the user wants to enable the debuggers, but they dont exist, spawn them fully configured and also activate them so that if the bullets containers have any bullets, they get the corresponding debug texture shapes as well
-    if(is_debugger_enabled && block_bullets_debugger == nullptr){
-        spawn_debuggers();
-
-        block_bullets_debugger->activate();
-        normal_bullets_debugger->activate();
-       
-        return;
-    }
-
-    // If the user wants to enable the debuggers that were previously disabled at run time, just activate them
-    if(is_debugger_enabled){
-        block_bullets_debugger->activate();
-        normal_bullets_debugger->activate();
-    }   
-
-    // If the user wants to disable the debuggers
-    if(is_debugger_enabled == false){ // no need to check for nullptr since the debuggers 100% exist if we are doing this at run-time (to disable them, they have to be already enabled..)
-        block_bullets_debugger->disable();
-        normal_bullets_debugger->disable();
-    }
-
+    directional_bullets_debugger->set_is_debugger_enabled(new_is_enabled);
+    block_bullets_debugger->set_is_debugger_enabled(new_is_enabled);
 }
 
+void BulletFactory2D::enable_bullet_processing() {
+    set_physics_process(true);
+    set_process(true);
+}
+
+void BulletFactory2D::disable_bullet_processing() {
+    set_physics_process(false);
+    set_process(false);
+}
+
+// Additional debug methods
+int BulletFactory2D::debug_get_total_bullets_amount(BulletType bullet_type)
+{
+    switch (bullet_type)
+    {
+    case BlastBullets2D::BulletFactory2D::DIRECTIONAL_BULLETS:
+        return all_directional_bullets.size();
+        break;
+    case BlastBullets2D::BulletFactory2D::BLOCK_BULLETS:
+        return all_block_bullets.size();
+        break;
+    default:
+        UtilityFunctions::printerr("Error when trying to get total bullets amount. BulletType you gave is not supported");
+        return -1;
+        break;
+    }
+}
+
+int BulletFactory2D::debug_get_active_bullets_amount(BulletType bullet_type)
+{
+    switch (bullet_type)
+    {
+    case BlastBullets2D::BulletFactory2D::DIRECTIONAL_BULLETS:
+        return std::count_if(all_directional_bullets.begin(), all_directional_bullets.end(), [](DirectionalBullets2D* b) {return b->is_active; });
+        break;
+    case BlastBullets2D::BulletFactory2D::BLOCK_BULLETS:
+        return std::count_if(all_block_bullets.begin(), all_block_bullets.end(), [](BlockBullets2D* b) {return b->is_active; });
+        break;
+    default:
+        UtilityFunctions::printerr("Error when trying to get active bullets amount. BulletType you gave is not supported");
+        return -1;
+        break;
+    }
+}
+
+int BulletFactory2D::debug_get_bullets_pool_amount(BulletType bullet_type)
+{
+    switch (bullet_type)
+    {
+    case BlastBullets2D::BulletFactory2D::DIRECTIONAL_BULLETS:
+        return directional_bullets_pool.get_total_amount_pooled();
+        break;
+    case BlastBullets2D::BulletFactory2D::BLOCK_BULLETS:
+        return block_bullets_pool.get_total_amount_pooled();
+        break;
+    default:
+        UtilityFunctions::printerr("Error when trying to get bullets pool amount. BulletType you gave is not supported");
+        return -1;
+        break;
+    }
+}
+
+Dictionary BulletFactory2D::debug_get_bullets_pool_info(BulletType bullet_type)
+{
+    Dictionary dict;
+    std::map<size_t, size_t> pool_info;
+
+    if (bullet_type == BulletType::DIRECTIONAL_BULLETS)
+    {
+        pool_info = directional_bullets_pool.get_pool_info();
+    }
+    else if (bullet_type == BulletType::BLOCK_BULLETS) {
+        pool_info = block_bullets_pool.get_pool_info();
+    }
+    else {
+        UtilityFunctions::printerr("Error when trying to get bullets pool info. BulletType you gave is not supported");
+    }
+    
+    for (const auto& [key, value] : pool_info) {
+        dict[Variant(key)] = Variant(value);
+    }
+
+    return dict;
+}
+
+int BulletFactory2D::debug_get_total_attachments_amount()
+{
+    return bullet_attachments_container->get_child_count();
+}
+
+int BulletFactory2D::debug_get_active_attachments_amount()
+{
+    size_t count_active_attachments = 0;
+
+    size_t directional_amount = all_directional_bullets.size();
+    for (size_t i = 0; i < directional_amount; i++)
+    {
+        DirectionalBullets2D* bullets = all_directional_bullets[i];
+
+        if (bullets->is_active)
+        {
+           count_active_attachments += bullets->get_amount_active_attachments();
+        }
+    }
+
+    size_t block_amount = all_block_bullets.size();
+    for (size_t i = 0; i < block_amount; i++)
+    {
+        BlockBullets2D* bullets = all_block_bullets[i];
+
+        if (bullets->is_active)
+        {
+            count_active_attachments += bullets->get_amount_active_attachments();
+        }
+    }
+
+    return count_active_attachments;
+}
+
+int BulletFactory2D::debug_get_attachments_pool_amount()
+{
+    return bullet_attachments_pool.get_total_amount_pooled();
+}
+
+Dictionary BulletFactory2D::debug_get_attachments_pool_info()
+{
+    std::map<size_t, size_t> pool_info = bullet_attachments_pool.get_pool_info();
+
+    Dictionary dict;
+    for (const auto& [key, value] : pool_info) {
+        dict[Variant(key)] = Variant(value);
+    }
+
+    return dict;
+}
 
 void BulletFactory2D::_bind_methods() {
+    ClassDB::bind_method(D_METHOD("get_is_factory_busy"), &BulletFactory2D::get_is_factory_busy);
+
     ClassDB::bind_method(D_METHOD("get_physics_space"), &BulletFactory2D::get_physics_space);
     ClassDB::bind_method(D_METHOD("set_physics_space", "new_physics_space"), &BulletFactory2D::set_physics_space);
 
@@ -339,36 +616,67 @@ void BulletFactory2D::_bind_methods() {
     ADD_PROPERTY(PropertyInfo(Variant::BOOL, "is_debugger_enabled"), "set_is_debugger_enabled", "get_is_debugger_enabled");
 
     ClassDB::bind_method(D_METHOD("spawn_block_bullets", "spawn_data"), &BulletFactory2D::spawn_block_bullets);
-    ClassDB::bind_method(D_METHOD("spawn_normal_bullets", "spawn_data"), &BulletFactory2D::spawn_normal_bullets);
+    ClassDB::bind_method(D_METHOD("spawn_directional_bullets", "spawn_data"), &BulletFactory2D::spawn_directional_bullets);
 
-    ClassDB::bind_method(D_METHOD("save"), &BulletFactory2D::save);
-    ClassDB::bind_method(D_METHOD("load", "new_data"), &BulletFactory2D::load);
+    ClassDB::bind_method(D_METHOD("save", "enable_processing_after_finish"), &BulletFactory2D::save, DEFVAL(true));
+    ClassDB::bind_method(D_METHOD("load", "new_data", "enable_processing_after_finish"), &BulletFactory2D::load, DEFVAL(true));
 
-    ClassDB::bind_method(D_METHOD("free_all_bullets"), &BulletFactory2D::free_all_bullets);
-    ClassDB::bind_method(D_METHOD("free_all_pools"), &BulletFactory2D::free_all_pools);
-    ClassDB::bind_method(D_METHOD("free_multi_mesh_pool", "bullet_multi_mesh_type", "amount_bullets"), &BulletFactory2D::free_multi_mesh_pool);
+    ClassDB::bind_method(D_METHOD("reset", "enable_processing_after_finish"), &BulletFactory2D::reset, DEFVAL(true));
     
-    ClassDB::bind_method(D_METHOD("populate_normal_bullets_pool", "amount_multimesh_instances", "amount_bullets_each_multimesh_holds"), &BulletFactory2D::populate_normal_bullets_pool);
-    ClassDB::bind_method(D_METHOD("populate_block_bullets_pool", "amount_multimesh_instances", "amount_bullets_each_multimesh_holds"), &BulletFactory2D::populate_block_bullets_pool);
-
-    ClassDB::bind_method(D_METHOD("get_normal_bullets_debugger_color"), &BulletFactory2D::get_normal_bullets_debugger_color);
-    ClassDB::bind_method(D_METHOD("set_normal_bullets_debugger_color", "new_color"), &BulletFactory2D::set_normal_bullets_debugger_color);
-    ADD_PROPERTY(PropertyInfo(Variant::COLOR, "normal_bullets_debugger_color"), "set_normal_bullets_debugger_color", "get_normal_bullets_debugger_color");
+    ClassDB::bind_method(D_METHOD("get_directional_bullets_debugger_color"), &BulletFactory2D::get_directional_bullets_debugger_color);
+    ClassDB::bind_method(D_METHOD("set_directional_bullets_debugger_color", "new_color"), &BulletFactory2D::set_directional_bullets_debugger_color);
+    ADD_PROPERTY(PropertyInfo(Variant::COLOR, "directional_bullets_debugger_color"), "set_directional_bullets_debugger_color", "get_directional_bullets_debugger_color");
 
     ClassDB::bind_method(D_METHOD("get_block_bullets_debugger_color"), &BulletFactory2D::get_block_bullets_debugger_color);
     ClassDB::bind_method(D_METHOD("set_block_bullets_debugger_color", "new_color"), &BulletFactory2D::set_block_bullets_debugger_color);
     ADD_PROPERTY(PropertyInfo(Variant::COLOR, "block_bullets_debugger_color"), "set_block_bullets_debugger_color", "get_block_bullets_debugger_color");
 
+    ClassDB::bind_method(D_METHOD("enable_bullet_processing"), &BulletFactory2D::enable_bullet_processing);
+    ClassDB::bind_method(D_METHOD("disable_bullet_processing"), &BulletFactory2D::disable_bullet_processing);
+
+    ClassDB::bind_method(D_METHOD("populate_bullets_pool", "bullet_type", "amount_instances", "amount_bullets_per_instance"), &BulletFactory2D::populate_bullets_pool);
+    ClassDB::bind_method(D_METHOD("free_bullets_pool", "bullet_type", "amount_bullets_per_instance", "enable_processing_after_finish"), &BulletFactory2D::free_bullets_pool, DEFVAL(0), DEFVAL(true));
+    
+    ClassDB::bind_method(D_METHOD("populate_attachments_pool", "bullet_attachment_scene", "amount_attachments"), &BulletFactory2D::populate_attachments_pool);
+    ClassDB::bind_method(D_METHOD("free_attachments_pool", "attachment_id", "enable_processing_after_finish"), &BulletFactory2D::free_attachments_pool, DEFVAL(-1), DEFVAL(true));
+
+    ClassDB::bind_method(D_METHOD("free_active_bullets", "pool_attachments", "enable_processing_after_finish"), &BulletFactory2D::free_active_bullets, DEFVAL(false), DEFVAL(true));
+
+    // Additional debug methods related
+
+    ClassDB::bind_method(D_METHOD("debug_get_total_bullets_amount", "bullet_type"), &BulletFactory2D::debug_get_total_bullets_amount);
+    ClassDB::bind_method(D_METHOD("debug_get_active_bullets_amount", "bullet_type"), &BulletFactory2D::debug_get_active_bullets_amount);
+    ClassDB::bind_method(D_METHOD("debug_get_bullets_pool_amount", "bullet_type"), &BulletFactory2D::debug_get_bullets_pool_amount);
+
+    ClassDB::bind_method(
+        D_METHOD("debug_get_bullets_pool_info", "bullet_type"),
+        &BulletFactory2D::debug_get_bullets_pool_info,
+        PropertyInfo(Variant::DICTIONARY, "", PROPERTY_HINT_DICTIONARY_TYPE, "int:int")
+    );
+
+    ClassDB::bind_method(D_METHOD("debug_get_total_attachments_amount"), &BulletFactory2D::debug_get_total_attachments_amount);
+    ClassDB::bind_method(D_METHOD("debug_get_active_attachments_amount"), &BulletFactory2D::debug_get_active_attachments_amount);
+    ClassDB::bind_method(D_METHOD("debug_get_attachments_pool_amount"), &BulletFactory2D::debug_get_attachments_pool_amount);
+
+    ClassDB::bind_method(
+        D_METHOD("debug_get_attachments_pool_info"),
+        &BulletFactory2D::debug_get_attachments_pool_info,
+        PropertyInfo(Variant::DICTIONARY, "", PROPERTY_HINT_DICTIONARY_TYPE, "int:int")
+    );
+
+
+    //
+
 
     ADD_SIGNAL(MethodInfo("area_entered", PropertyInfo(Variant::OBJECT, "enemy_area"), PropertyInfo(Variant::OBJECT, "bullets_custom_data", PROPERTY_HINT_RESOURCE_TYPE, "Resource"), PropertyInfo(Variant::VECTOR2, "bullet_global_position")));
     ADD_SIGNAL(MethodInfo("body_entered", PropertyInfo(Variant::OBJECT, "enemy_body"), PropertyInfo(Variant::OBJECT, "bullets_custom_data", PROPERTY_HINT_RESOURCE_TYPE, "Resource"), PropertyInfo(Variant::VECTOR2, "bullet_global_position")));
 
-    ADD_SIGNAL(MethodInfo("finished_saving"));
-    ADD_SIGNAL(MethodInfo("finished_loading"));
-    ADD_SIGNAL(MethodInfo("finished_freeing_all_bullets"));
+    ADD_SIGNAL(MethodInfo("save_finished", PropertyInfo(Variant::OBJECT, "data", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_DEFAULT, "SaveDataBulletFactory2D")));
+    ADD_SIGNAL(MethodInfo("load_finished"));
+    ADD_SIGNAL(MethodInfo("reset_finished"));
 
     // Need this in order to expose the enum constants to Godot Engine
-    BIND_ENUM_CONSTANT(NORMAL_BULLETS);
+    BIND_ENUM_CONSTANT(DIRECTIONAL_BULLETS);
 	BIND_ENUM_CONSTANT(BLOCK_BULLETS);
 }
 }

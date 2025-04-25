@@ -1,0 +1,49 @@
+[gd_scene load_steps=6 format=3 uid="uid://dgd3n4d8mqijn"]
+
+[ext_resource type="Script" uid="uid://bkqntefa4mrrh" path="res://shared/bullet_attachment_nodes/attached_particles_2.gd" id="1_kys1a"]
+
+[sub_resource type="CanvasTexture" id="CanvasTexture_kys1a"]
+
+[sub_resource type="Gradient" id="Gradient_mppls"]
+offsets = PackedFloat32Array(0, 0.348315, 0.678363, 0.812865, 0.912281, 1)
+colors = PackedColorArray(0.847059, 1, 0, 1, 0.845939, 6.257e-07, 0.450144, 1, 0.854864, 0.204794, 0.301104, 1, 0.860885, 0.34294, 0.200568, 1, 0.224066, 0.0892584, 0.0522027, 1, 0, 0, 0, 0.611765)
+
+[sub_resource type="GradientTexture1D" id="GradientTexture1D_qcgti"]
+gradient = SubResource("Gradient_mppls")
+
+[sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_c68b3"]
+particle_flag_rotate_y = true
+particle_flag_disable_z = true
+emission_shape = 1
+emission_sphere_radius = 4.4
+direction = Vector3(-1, 0, 0)
+spread = 34.812
+initial_velocity_min = 69.98
+initial_velocity_max = 219.19
+gravity = Vector3(0, 0, 0)
+linear_accel_min = 17.77
+linear_accel_max = 35.46
+scale_min = 1.25
+scale_max = 15.0
+scale_over_velocity_min = 767.54
+scale_over_velocity_max = 778.29
+color_ramp = SubResource("GradientTexture1D_qcgti")
+hue_variation_min = -2.23517e-08
+hue_variation_max = 0.21
+turbulence_noise_strength = 16.8
+turbulence_influence_min = 0.0
+turbulence_influence_max = 0.0
+turbulence_initial_displacement_min = -100.0
+turbulence_initial_displacement_max = 100.0
+
+[node name="AttachedParticles2" type="BulletAttachment2D"]
+script = ExtResource("1_kys1a")
+metadata/_edit_lock_ = true
+
+[node name="GPUParticles2D" type="GPUParticles2D" parent="."]
+modulate = Color(0.979591, 0.775513, 0, 1)
+amount = 12
+texture = SubResource("CanvasTexture_kys1a")
+speed_scale = 1.3
+randomness = 0.27
+process_material = SubResource("ParticleProcessMaterial_c68b3")
