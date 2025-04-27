@@ -199,6 +199,8 @@ protected:
     // This is the texture size of the bullets
     Vector2 texture_size = Vector2(0, 0);
 
+    float cache_texture_rotation_radians = 0.0f;
+
     ///
 
     /// BULLET SPEED RELATED
@@ -352,7 +354,7 @@ protected:
 
                 // Calculate the attachment's global transform
                 const Transform2D &attachment_global_transf = calculate_attachment_global_transf(bullet_global_transf);
-
+                
                 // Update the vector that contains attachment global transforms
                 attachment_transforms[bullet_index] = attachment_global_transf;
 
@@ -370,7 +372,14 @@ protected:
     }
 
     // Calculates the global transform of the bullet attachment. Note that this function relies on bullet_attachment_local_transform being set already
-    _ALWAYS_INLINE_ Transform2D calculate_attachment_global_transf(const Transform2D& original_data_transf) {
+    _ALWAYS_INLINE_ Transform2D calculate_attachment_global_transf(const Transform2D &original_data_transf) {
+        // If there was additional texture rotation applied, this should not affect the bullet attachments
+        if (cache_texture_rotation_radians != 0.0f)
+        {
+            // So just remove that rotation and then calculate the actual global transform of the bullet attachment
+            return original_data_transf.rotated_local(-cache_texture_rotation_radians) * bullet_attachment_local_transform;
+        }
+
         return original_data_transf * bullet_attachment_local_transform;
     }
 
@@ -479,7 +488,7 @@ private:
         return all_cached_shape_transforms;
     }
 
-    virtual bool get_skip_debugging() const override{
+    bool get_skip_debugging() const override{
         return !is_active; // Skip debugging for the multimesh if it's not active (meaning bullets have stopped moving so no need for the debugger to update transforms)
     }
 

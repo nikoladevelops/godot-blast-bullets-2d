@@ -135,6 +135,9 @@ void MultiMeshBullets2D::set_up_bullet_instances(const MultiMeshBulletsData2D &d
         all_cached_shape_transforms.reserve(amount_bullets);
         all_cached_shape_origin.reserve(amount_bullets);
     }
+
+    
+    cache_texture_rotation_radians = data.texture_rotation_radians;
     
     // An attachment_id will always be set but that does not mean it's valid. Always rely on is_bullet_attachment_provided
     cache_attachment_id = set_attachment_related_data(data.bullet_attachment_scene, data.bullet_attachment_offset);
@@ -150,7 +153,7 @@ void MultiMeshBullets2D::set_up_bullet_instances(const MultiMeshBulletsData2D &d
         Transform2D shape_transf = generate_collision_shape_transform_for_area(curr_data_transf, shape, data.collision_shape_size, data.collision_shape_offset, i);
         
         // Generates texture transform with correct rotation and sets it to the correct bullet on the multimesh
-        const Transform2D &texture_transf = generate_texture_transform(curr_data_transf, data.is_texture_rotation_permanent, data.texture_rotation_radians, i);
+        const Transform2D &texture_transf = generate_texture_transform(curr_data_transf, data.is_texture_rotation_permanent, cache_texture_rotation_radians, i);
         
         // Cache bullet transforms and origin vectors
         all_cached_instance_transforms.emplace_back(texture_transf);
@@ -160,7 +163,7 @@ void MultiMeshBullets2D::set_up_bullet_instances(const MultiMeshBulletsData2D &d
         all_cached_shape_origin.emplace_back(shape_transf.get_origin());
 
         if (is_bullet_attachment_provided) {
-            const Transform2D& attachment_transf = calculate_attachment_global_transf(curr_data_transf);
+            const Transform2D& attachment_transf = calculate_attachment_global_transf(texture_transf);
 
             bool is_successful = reuse_attachment_from_object_pool(attachment_pool, attachment_transf, cache_attachment_id);
 
