@@ -319,6 +319,14 @@ void SaveDataMultiMeshBullets2D::set_instance_shader_parameters(const Dictionary
     instance_shader_parameters = new_instance_shader_parameters;
 }
 
+float SaveDataMultiMeshBullets2D::get_cache_texture_rotation_radians() const{
+    return cache_texture_rotation_radians;
+}
+
+void SaveDataMultiMeshBullets2D::set_cache_texture_rotation_radians(float new_cache_texture_rotation_radians){
+    cache_texture_rotation_radians = new_cache_texture_rotation_radians;
+}
+
 
 void SaveDataMultiMeshBullets2D::_bind_methods() {
     ClassDB::bind_method(D_METHOD("set_max_life_time"), &SaveDataMultiMeshBullets2D::set_max_life_time);
@@ -492,6 +500,9 @@ void SaveDataMultiMeshBullets2D::_bind_methods() {
     ClassDB::bind_method(D_METHOD("set_instance_shader_parameters", "new_instance_shader_parameters"), &SaveDataMultiMeshBullets2D::set_instance_shader_parameters);
     ADD_PROPERTY(PropertyInfo(Variant::DICTIONARY, "instance_shader_parameters", PROPERTY_HINT_TYPE_STRING, "String:Variant"), "set_instance_shader_parameters", "get_instance_shader_parameters");
 
+    ClassDB::bind_method(D_METHOD("get_cache_texture_rotation_radians"), &SaveDataMultiMeshBullets2D::get_cache_texture_rotation_radians);
+    ClassDB::bind_method(D_METHOD("set_cache_texture_rotation_radians", "new_cache_texture_rotation_radians"), &SaveDataMultiMeshBullets2D::set_cache_texture_rotation_radians);
+    ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "cache_texture_rotation_radians"), "set_cache_texture_rotation_radians", "get_cache_texture_rotation_radians");
 
     
 }

@@ -136,7 +136,6 @@ void MultiMeshBullets2D::set_up_bullet_instances(const MultiMeshBulletsData2D &d
         all_cached_shape_origin.reserve(amount_bullets);
     }
 
-    
     cache_texture_rotation_radians = data.texture_rotation_radians;
     
     // An attachment_id will always be set but that does not mean it's valid. Always rely on is_bullet_attachment_provided
@@ -190,6 +189,7 @@ Ref<SaveDataMultiMeshBullets2D> MultiMeshBullets2D::save(const Ref<SaveDataMulti
     data_to_populate.max_change_texture_time = max_change_texture_time;
     data_to_populate.current_change_texture_time = current_change_texture_time;
     data_to_populate.current_texture_index = current_texture_index;
+    data_to_populate.cache_texture_rotation_radians = cache_texture_rotation_radians;
 
     data_to_populate.z_index = get_z_index();
     data_to_populate.light_mask = get_light_mask();
@@ -360,6 +360,7 @@ void MultiMeshBullets2D::load_bullet_instances(const SaveDataMultiMeshBullets2D 
     size_t new_speed_data_size = data.all_cached_velocity.size();
 
     active_bullets_counter = amount_bullets;
+    cache_texture_rotation_radians = data.cache_texture_rotation_radians;
     
     all_cached_speed.reserve(new_speed_data_size);
     all_cached_max_speed.reserve(new_speed_data_size);

@@ -30,6 +30,8 @@ public:
 
     int z_index = 0;
 
+    float cache_texture_rotation_radians = 0.0f;
+
     // BULLET MOVEMENT RELATED
 
     // Holds all multimesh instance transforms. I am doing this so I don't have to call multi->get_instance_transform_2d() every frame
@@ -228,6 +230,8 @@ public:
     Dictionary get_instance_shader_parameters() const;
     void set_instance_shader_parameters(const Dictionary& new_instance_shader_parameters);
 
+    float get_cache_texture_rotation_radians() const;
+    void set_cache_texture_rotation_radians(float new_cache_texture_rotation_radians);
 
     static void _bind_methods();
 };
