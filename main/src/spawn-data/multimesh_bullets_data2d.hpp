@@ -16,7 +16,7 @@ class MultiMeshBulletsData2D : public Resource {
 public:
     // TEXTURE RELATED
 
-    // All textures. If you give an array containing more than 1 texture then the max_change_texture_time will be used to periodically change the texture to the next one in the array.
+    // All textures. If you give an array containing more than 1 texture then the default_change_texture_time will be used to periodically change the texture to the next one in the array.
     TypedArray<Texture2D> textures;
 
     // The texture amount_bullets. Keep in mind that this will be used only if a mesh was NOT provided
@@ -29,7 +29,10 @@ public:
     int current_texture_index = 0;
 
     // Determines the time before the multimesh changes its texture to the next one in the array of textures. Because of this, animation is possible.
-    float max_change_texture_time = 0.3f;
+    float default_change_texture_time = 0.3f;
+
+    // Determines the time before the multimesh changes its texture to the next one in the array of textures. Each time saved in the array corresponds to each texture inside the textures array. If you do NOT provide any data here then default_change_texture_time will be used by default
+    TypedArray<float> change_texture_times;
 
     // Whether the rotation of the texture should never change depending on the direction the bullets move in
     bool is_texture_rotation_permanent = false;
@@ -115,8 +118,8 @@ public:
     int get_current_texture_index() const;
     void set_current_texture_index(int new_current_texture_index);
 
-    float get_max_change_texture_time() const;
-    void set_max_change_texture_time(float new_max_change_texture_time);
+    float get_default_change_texture_time() const;
+    void set_default_change_texture_time(float new_default_change_texture_time);
 
     uint32_t get_collision_layer() const;
     void set_collision_layer(uint32_t new_collision_layer);
@@ -147,8 +150,8 @@ public:
     Ref<Mesh> get_mesh() const;
     void set_mesh(const Ref<Mesh> &new_mesh);
 
-    TypedArray<BlastBullets2D::BulletRotationData2D> get_all_bullet_rotation_data() const;
-    void set_all_bullet_rotation_data(const TypedArray<BlastBullets2D::BulletRotationData2D> &new_data);
+    TypedArray<BulletRotationData2D> get_all_bullet_rotation_data() const;
+    void set_all_bullet_rotation_data(const TypedArray<BulletRotationData2D> &new_data);
 
     bool get_rotate_only_textures() const;
     void set_rotate_only_textures(bool new_rotate_only_textures);
@@ -175,6 +178,9 @@ public:
 
     Dictionary get_instance_shader_parameters() const;
     void set_instance_shader_parameters(const Dictionary &new_instance_shader_parameters);
+
+    TypedArray<float> get_change_texture_times() const;
+    void set_change_texture_times(const TypedArray<float> &new_change_texture_times);
 
 
     static void _bind_methods();

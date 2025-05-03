@@ -96,7 +96,7 @@ func set_up_block_bullets_data()->BlockBulletsData2D:
 	data.texture_size = Vector2(140,140)
 	data.collision_shape_size=Vector2(32,32)
 	data.collision_shape_offset=Vector2(0,0)
-	data.max_change_texture_time=0.09
+	data.default_change_texture_time=0.09
 	data.max_life_time = 2
 	data.all_bullet_rotation_data = bullet_rotation_data
 	data.bullet_attachment_offset = Vector2(-60,0)
@@ -108,6 +108,23 @@ func set_up_block_bullets_data()->BlockBulletsData2D:
 func set_up_directional_bullets_data()->DirectionalBulletsData2D:
 	var data:DirectionalBulletsData2D = DirectionalBulletsData2D.new()
 	data.textures = rocket_tectures
+	
+	# You can also define wait time for each texture like so as long as the amount of textures matches the amount of values in this array.
+	# Otherwise stick to using default_change_texture_time
+	#data.change_texture_times = [
+		#0.05,
+		#0.03,
+		#0.01,
+		#0.02,
+		#0.01,
+		#0.01,
+		#0.01,
+		#0.08,
+		#0.01,
+		#0.03
+	#]
+	
+	
 	data.all_bullet_speed_data = bullet_speed_data # for the directional bullets use every single bullet speed
 	
 	#data.collision_layer = DirectionalBulletsData2D.calculate_bitmask([2])
@@ -118,7 +135,7 @@ func set_up_directional_bullets_data()->DirectionalBulletsData2D:
 	data.texture_size = Vector2(140,140)
 	data.collision_shape_size=Vector2(32,32)
 	data.collision_shape_offset=Vector2(0,0)
-	data.max_change_texture_time=0.09
+	data.default_change_texture_time=0.09
 	data.max_life_time = 2
 	data.all_bullet_rotation_data = bullet_rotation_data
 	data.bullet_attachment_offset = Vector2(-60,0)
@@ -215,7 +232,6 @@ func generate_bullets_transforms(rows_per_column:int = 10 , alignment: Alignment
 
 # Determines which type of bullets to be spawned
 func spawn_bullets(player_rotation:float)->void:
-	
 	## All of this logic here is because the shaders I use take advantage of instance uniforms, so each time I spawn a brand new instance I actually want a different value for those shader params
 	if directional_bullets_data.material != null:
 		var material:ShaderMaterial = directional_bullets_data.material as ShaderMaterial

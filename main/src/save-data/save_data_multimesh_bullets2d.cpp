@@ -67,14 +67,6 @@ Vector2 SaveDataMultiMeshBullets2D::get_texture_size() const {
     return texture_size;
 }
 
-void SaveDataMultiMeshBullets2D::set_max_change_texture_time(float new_max_change_texture_time) {
-    max_change_texture_time = new_max_change_texture_time;
-}
-
-float SaveDataMultiMeshBullets2D::get_max_change_texture_time() const {
-    return max_change_texture_time;
-}
-
 void SaveDataMultiMeshBullets2D::set_current_change_texture_time(float new_current_change_texture_time) {
     current_change_texture_time = new_current_change_texture_time;
 }
@@ -327,6 +319,14 @@ void SaveDataMultiMeshBullets2D::set_cache_texture_rotation_radians(float new_ca
     cache_texture_rotation_radians = new_cache_texture_rotation_radians;
 }
 
+TypedArray<float> SaveDataMultiMeshBullets2D::get_change_texture_times() const {
+    return change_texture_times;
+}
+
+void SaveDataMultiMeshBullets2D::set_change_texture_times(const TypedArray<float>& new_change_texture_times) {
+    change_texture_times = new_change_texture_times;
+}
+
 
 void SaveDataMultiMeshBullets2D::_bind_methods() {
     ClassDB::bind_method(D_METHOD("set_max_life_time"), &SaveDataMultiMeshBullets2D::set_max_life_time);
@@ -356,10 +356,6 @@ void SaveDataMultiMeshBullets2D::_bind_methods() {
     ClassDB::bind_method(D_METHOD("set_texture_size"), &SaveDataMultiMeshBullets2D::set_texture_size);
     ClassDB::bind_method(D_METHOD("get_texture_size"), &SaveDataMultiMeshBullets2D::get_texture_size);
     ADD_PROPERTY(PropertyInfo(Variant::VECTOR2, "texture_size"), "set_texture_size", "get_texture_size");
-
-    ClassDB::bind_method(D_METHOD("set_max_change_texture_time"), &SaveDataMultiMeshBullets2D::set_max_change_texture_time);
-    ClassDB::bind_method(D_METHOD("get_max_change_texture_time"), &SaveDataMultiMeshBullets2D::get_max_change_texture_time);
-    ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "max_change_texture_time"), "set_max_change_texture_time", "get_max_change_texture_time");
 
     ClassDB::bind_method(D_METHOD("set_current_change_texture_time"), &SaveDataMultiMeshBullets2D::set_current_change_texture_time);
     ClassDB::bind_method(D_METHOD("get_current_change_texture_time"), &SaveDataMultiMeshBullets2D::get_current_change_texture_time);
@@ -503,6 +499,10 @@ void SaveDataMultiMeshBullets2D::_bind_methods() {
     ClassDB::bind_method(D_METHOD("get_cache_texture_rotation_radians"), &SaveDataMultiMeshBullets2D::get_cache_texture_rotation_radians);
     ClassDB::bind_method(D_METHOD("set_cache_texture_rotation_radians", "new_cache_texture_rotation_radians"), &SaveDataMultiMeshBullets2D::set_cache_texture_rotation_radians);
     ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "cache_texture_rotation_radians"), "set_cache_texture_rotation_radians", "get_cache_texture_rotation_radians");
+
+    ClassDB::bind_method(D_METHOD("get_change_texture_times"), &SaveDataMultiMeshBullets2D::get_change_texture_times);
+    ClassDB::bind_method(D_METHOD("set_change_texture_times"), &SaveDataMultiMeshBullets2D::set_change_texture_times);
+    ADD_PROPERTY(PropertyInfo(Variant::ARRAY, "change_texture_times"), "set_change_texture_times", "get_change_texture_times");
 
     
 }

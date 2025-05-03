@@ -22,8 +22,6 @@ public:
 
     Vector2 texture_size = Vector2(0, 0);
 
-    float max_change_texture_time = 0.0f;
-
     float current_change_texture_time = 0.0f;
 
     int current_texture_index = 0;
@@ -31,6 +29,8 @@ public:
     int z_index = 0;
 
     float cache_texture_rotation_radians = 0.0f;
+
+    TypedArray<float> change_texture_times;
 
     // BULLET MOVEMENT RELATED
 
@@ -132,9 +132,6 @@ public:
     void set_texture_size(Vector2 new_texture_size);
     Vector2 get_texture_size() const;
 
-    void set_max_change_texture_time(float new_max_change_texture_time);
-    float get_max_change_texture_time() const;
-
     void set_current_change_texture_time(float new_current_change_texture_time);
     float get_current_change_texture_time() const;
 
@@ -232,6 +229,9 @@ public:
 
     float get_cache_texture_rotation_radians() const;
     void set_cache_texture_rotation_radians(float new_cache_texture_rotation_radians);
+
+    TypedArray<float> get_change_texture_times() const;
+    void set_change_texture_times(const TypedArray<float>& new_change_texture_times);
 
     static void _bind_methods();
 };

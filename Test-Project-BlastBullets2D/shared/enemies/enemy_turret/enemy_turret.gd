@@ -36,7 +36,7 @@ func _ready() -> void:
 	
 	bullets_data.texture_size = Vector2(142,142)
 	bullets_data.collision_shape_size = Vector2(34,34)
-	bullets_data.max_change_texture_time = 0.09
+	bullets_data.default_change_texture_time = 0.09
 	
 	bullets_data.max_life_time = 2
 	

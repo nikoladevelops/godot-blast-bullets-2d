@@ -7,6 +7,7 @@
 #include <godot_cpp/variant/utility_functions.hpp>
 #include <godot_cpp/classes/shader_material.hpp>
 #include <godot_cpp/classes/random_number_generator.hpp>
+#include "multimesh_bullets2d.hpp"
 
 using namespace godot;
 
@@ -54,7 +55,11 @@ void MultiMeshBullets2D::spawn(const MultiMeshBulletsData2D &data, MultiMeshObje
     amount_bullets = data.transforms.size(); // important, because some set_up methods use this
 
     set_up_life_time_timer(data.max_life_time, data.max_life_time);
-    set_up_change_texture_timer(data.textures.size(), data.max_change_texture_time, data.max_change_texture_time);
+    set_up_change_texture_timer(
+        data.textures.size(),
+        data.default_change_texture_time,
+        data.change_texture_times
+    );
 
     generate_multimesh();
     set_up_multimesh(amount_bullets, data.mesh, data.texture_size);
@@ -86,7 +91,11 @@ void MultiMeshBullets2D::spawn(const MultiMeshBulletsData2D &data, MultiMeshObje
 // Activates the multimesh
 void MultiMeshBullets2D::activate_multimesh(const MultiMeshBulletsData2D &data) {
     set_up_life_time_timer(data.max_life_time, data.max_life_time);
-    set_up_change_texture_timer(data.textures.size(), data.max_change_texture_time, data.max_change_texture_time);
+    set_up_change_texture_timer(
+        data.textures.size(),
+        data.default_change_texture_time,
+        data.change_texture_times
+    );
 
     set_up_multimesh(amount_bullets, data.mesh, data.texture_size);
 
@@ -186,10 +195,10 @@ Ref<SaveDataMultiMeshBullets2D> MultiMeshBullets2D::save(const Ref<SaveDataMulti
         data_to_populate.textures.push_back(textures[i]);
     }
     data_to_populate.texture_size = texture_size;
-    data_to_populate.max_change_texture_time = max_change_texture_time;
     data_to_populate.current_change_texture_time = current_change_texture_time;
     data_to_populate.current_texture_index = current_texture_index;
     data_to_populate.cache_texture_rotation_radians = cache_texture_rotation_radians;
+    data_to_populate.change_texture_times = change_texture_times;
 
     data_to_populate.z_index = get_z_index();
     data_to_populate.light_mask = get_light_mask();
@@ -328,8 +337,10 @@ void MultiMeshBullets2D::load(const Ref<SaveDataMultiMeshBullets2D> &data_to_loa
     amount_bullets = data.all_cached_instance_transforms.size();
 
     set_up_life_time_timer(data.max_life_time, data.current_life_time);
-    set_up_change_texture_timer(data.textures.size(), data.max_change_texture_time, data.current_change_texture_time);
-
+    
+    change_texture_times = data.change_texture_times.duplicate();
+    current_change_texture_time = data.current_change_texture_time;
+    
     generate_multimesh();
     set_up_multimesh(amount_bullets, data.mesh, data.texture_size);
 
@@ -551,11 +562,24 @@ void MultiMeshBullets2D::set_up_life_time_timer(float new_max_life_time, float n
     current_life_time = new_current_life_time;
 }
 
-void MultiMeshBullets2D::set_up_change_texture_timer(size_t new_amount_textures, float new_max_change_texture_time, float new_current_change_texture_time) {
+void MultiMeshBullets2D::set_up_change_texture_timer(int64_t new_amount_textures, float new_default_change_texture_time, const TypedArray<float> &new_change_texture_times) {
     if (new_amount_textures > 1) { // the change texture timer will be active only if more than 1 texture was provided
-        max_change_texture_time = new_max_change_texture_time;
-        current_change_texture_time = new_current_change_texture_time;
+        change_texture_times.clear();
+        
+        int64_t amount_change_texture_times = new_change_texture_times.size();
+
+        // The change texture times will only be used if their amount is the same as the amount of textures currently present. Each time value corresponds to a texture
+        if(amount_change_texture_times > 0 && amount_change_texture_times == new_amount_textures){
+            change_texture_times = new_change_texture_times.duplicate();
+
+            current_change_texture_time = change_texture_times[0];
+        }else{
+            change_texture_times.append(new_default_change_texture_time);
+
+            current_change_texture_time = new_default_change_texture_time;
+        }
     }
+
 }
 
 // Always called last
@@ -575,10 +599,7 @@ void MultiMeshBullets2D::finalize_set_up(
     }
 
     // Texture logic
-    textures.resize(new_textures.size());
-    for (size_t i = 0; i < new_textures.size(); i++) {
-        textures[i] = new_textures[i];
-    }
+    textures = new_textures.duplicate();
 
     // Make sure the current_texture_index is valid
     if (new_current_texture_index >= textures.size() || new_current_texture_index < 0) {

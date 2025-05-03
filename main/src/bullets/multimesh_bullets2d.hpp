@@ -91,20 +91,36 @@ public:
 
     // Changes the texture periodically
     _ALWAYS_INLINE_ void change_texture_periodically(float delta) {
-        // The texture change timer is active only if more than 1 texture has been provided (and if that's the case then max_change_texture_time will never be 0)
-        if (max_change_texture_time != 0.0f) {
-            current_change_texture_time -= delta;
-            if (current_change_texture_time <= 0.0f) {
-                if (current_texture_index + 1 < textures.size()) {
-                    current_texture_index++;
-                } else {
-                    current_texture_index = 0;
-                }
+        int64_t textures_amount = textures.size();
+        
+        // No need to change textures if there is nothing to animate..
+        if (textures_amount <= 1)
+        {
+            return;
+        }
 
-                set_texture(textures[current_texture_index]);          // set new texture
-                current_change_texture_time = max_change_texture_time; // reset timer
+        // Keep reducing the current change texture time every frame
+        current_change_texture_time -= delta;
+
+        // When the current change texture time reaches 0, it's time to switch to the next texture
+        if (current_change_texture_time <= 0.0f) {
+            // Change the texture to the new one
+            if (current_texture_index + 1 < textures_amount) {
+                current_texture_index++;
+            } else { // Loop if you reach the end so you don't access invalid indexes
+                current_texture_index = 0;
+            }
+
+            set_texture(textures[current_texture_index]);
+
+            // If the user has provided same amount of change texture times as textures, it means he wants to have different wait time for each texture
+            if(change_texture_times.size() == textures_amount){
+                current_change_texture_time = change_texture_times[current_texture_index]; // use the next texture's time
+            }else{ // Otherwise just use the default change texture time again which is saved in index 0
+                current_change_texture_time = change_texture_times[0]; // use the default time
             }
         }
+        
     }
     ///
 
@@ -187,14 +203,14 @@ protected:
     // Holds all textures
     TypedArray<Texture2D> textures;
 
-    // Time before the texture gets changed to the next one. If 0 it means that the timer is not active
-    float max_change_texture_time = 0.0f;
+    // Holds all change texture times (each time corresponds to each texture)
+    TypedArray<float> change_texture_times;
 
     // The change texture time being processed now
     float current_change_texture_time;
 
     // Holds the current texture index (the index inside the array textures)
-    size_t current_texture_index;
+    size_t current_texture_index = 0;
 
     // This is the texture size of the bullets
     Vector2 texture_size = Vector2(0, 0);
@@ -455,7 +471,7 @@ private:
 
     void set_up_life_time_timer(float new_max_life_time, float new_current_life_time);
 
-    void set_up_change_texture_timer(size_t new_amount_textures, float new_max_change_texture_time, float new_current_change_texture_time);
+    void set_up_change_texture_timer(int64_t new_amount_textures, float new_default_change_texture_time, const TypedArray<float> &new_change_texture_times);
 
     // Always called last
     void finalize_set_up(

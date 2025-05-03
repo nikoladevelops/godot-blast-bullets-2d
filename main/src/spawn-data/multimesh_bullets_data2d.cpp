@@ -54,11 +54,11 @@ void MultiMeshBulletsData2D::set_current_texture_index(int new_current_texture_i
     current_texture_index = new_current_texture_index;
 }
 
-float MultiMeshBulletsData2D::get_max_change_texture_time() const {
-    return max_change_texture_time;
+float MultiMeshBulletsData2D::get_default_change_texture_time() const {
+    return default_change_texture_time;
 }
-void MultiMeshBulletsData2D::set_max_change_texture_time(float new_max_change_texture_time) {
-    max_change_texture_time = new_max_change_texture_time;
+void MultiMeshBulletsData2D::set_default_change_texture_time(float new_default_change_texture_time) {
+    default_change_texture_time = new_default_change_texture_time;
 }
 
 uint32_t MultiMeshBulletsData2D::get_collision_layer() const {
@@ -208,7 +208,7 @@ void MultiMeshBulletsData2D::set_visibility_layer(uint32_t new_visibility_layer)
     visibility_layer = new_visibility_layer;
 }
 
-void MultiMeshBulletsData2D::set_visibility_layer_from_array(const TypedArray<int>& numbers){
+void MultiMeshBulletsData2D::set_visibility_layer_from_array(const TypedArray<int> &numbers){
     int bitmask = calculate_bitmask(numbers);
     visibility_layer = bitmask;
 }
@@ -218,9 +218,17 @@ Dictionary MultiMeshBulletsData2D::get_instance_shader_parameters() const
     return instance_shader_parameters;
 }
 
-void MultiMeshBulletsData2D::set_instance_shader_parameters(const Dictionary& new_instance_shader_parameters)
+void MultiMeshBulletsData2D::set_instance_shader_parameters(const Dictionary &new_instance_shader_parameters)
 {
     instance_shader_parameters = new_instance_shader_parameters;
+}
+
+TypedArray<float> MultiMeshBulletsData2D::get_change_texture_times() const{
+    return change_texture_times;
+}
+
+void MultiMeshBulletsData2D::set_change_texture_times(const TypedArray<float> &new_change_texture_times){
+    change_texture_times = new_change_texture_times;
 }
 
 void MultiMeshBulletsData2D::_bind_methods() {
@@ -244,9 +252,9 @@ void MultiMeshBulletsData2D::_bind_methods() {
     ClassDB::bind_method(D_METHOD("set_current_texture_index", "new_current_texture_index"), &MultiMeshBulletsData2D::set_current_texture_index);
     ADD_PROPERTY(PropertyInfo(Variant::INT, "current_texture_index"), "set_current_texture_index", "get_current_texture_index");
 
-    ClassDB::bind_method(D_METHOD("get_max_change_texture_time"), &MultiMeshBulletsData2D::get_max_change_texture_time);
-    ClassDB::bind_method(D_METHOD("set_max_change_texture_time", "new_max_change_texture_time"), &MultiMeshBulletsData2D::set_max_change_texture_time);
-    ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "max_change_texture_time"), "set_max_change_texture_time", "get_max_change_texture_time");
+    ClassDB::bind_method(D_METHOD("get_default_change_texture_time"), &MultiMeshBulletsData2D::get_default_change_texture_time);
+    ClassDB::bind_method(D_METHOD("set_default_change_texture_time", "new_default_change_texture_time"), &MultiMeshBulletsData2D::set_default_change_texture_time);
+    ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "default_change_texture_time"), "set_default_change_texture_time", "get_default_change_texture_time");
 
     ClassDB::bind_method(D_METHOD("get_collision_layer"), &MultiMeshBulletsData2D::get_collision_layer);
     ClassDB::bind_method(D_METHOD("set_collision_layer", "new_collision_layer"), &MultiMeshBulletsData2D::set_collision_layer);
@@ -321,11 +329,14 @@ void MultiMeshBulletsData2D::_bind_methods() {
     ClassDB::bind_method(D_METHOD("set_collision_mask_from_array", "array_of_masks"), &MultiMeshBulletsData2D::set_collision_mask_from_array);
     ClassDB::bind_method(D_METHOD("set_light_mask_from_array", "array_of_light_masks"), &MultiMeshBulletsData2D::set_light_mask_from_array);
     ClassDB::bind_method(D_METHOD("set_visibility_layer_from_array", "array_of_visibility_layers"), &MultiMeshBulletsData2D::set_visibility_layer_from_array);
-    
 
     ClassDB::bind_method(D_METHOD("get_instance_shader_parameters"), &MultiMeshBulletsData2D::get_instance_shader_parameters);
     ClassDB::bind_method(D_METHOD("set_instance_shader_parameters", "new_instance_shader_parameters"), &MultiMeshBulletsData2D::set_instance_shader_parameters);
     ADD_PROPERTY(PropertyInfo(Variant::DICTIONARY, "instance_shader_parameters", PROPERTY_HINT_TYPE_STRING, "String:Variant"), "set_instance_shader_parameters", "get_instance_shader_parameters");
+
+    ClassDB::bind_method(D_METHOD("get_change_texture_times"), &MultiMeshBulletsData2D::get_change_texture_times);
+    ClassDB::bind_method(D_METHOD("set_change_texture_times"), &MultiMeshBulletsData2D::set_change_texture_times);
+    ADD_PROPERTY(PropertyInfo(Variant::ARRAY, "change_texture_times"), "set_change_texture_times", "get_change_texture_times");
 
     ClassDB::bind_static_method("MultiMeshBulletsData2D", D_METHOD("calculate_bitmask", "numbers"), &MultiMeshBulletsData2D::calculate_bitmask);
 }
