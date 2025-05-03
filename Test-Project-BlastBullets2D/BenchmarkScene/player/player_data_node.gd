@@ -29,12 +29,10 @@ var rocket_tectures:Array[Texture2D] = [
 	preload("res://shared/art/player_bullets/9.png"),
 	preload("res://shared/art/player_bullets/10.png")
 	]
+	
+# The default texture that can be used, instead of having animations
+var godot_texture:Texture2D = preload("res://icon.svg")
 
-# These textures are used as animation frames for the bullets. 
-# They are being iterated over again and again until the life time of the bullets is over.
-var godot_textures:Array[Texture2D] = [
-	preload("res://icon.svg")
-]
 
 # Holds data that is needed for factory.spawn_directional_bullets
 var directional_bullets_data:DirectionalBulletsData2D
@@ -333,8 +331,13 @@ func switch_bullet_texture(option_index:int)->void:
 		directional_bullets_data.textures = rocket_tectures;
 		block_bullets_data.textures = rocket_tectures;
 	elif option_index == 1:
-		directional_bullets_data.textures = godot_textures;
-		block_bullets_data.textures = godot_textures;
+		
+		# Always reset these to an empty array otherwise the default_texture property won't be used since the .textures array will be still populated
+		directional_bullets_data.textures = [];
+		block_bullets_data.textures = [];
+		
+		directional_bullets_data.default_texture = godot_texture
+		block_bullets_data.default_texture = godot_texture
 
 # Sets the is_texture_rotation_permanent property for the bullet that are going to be spawned -> Whether the texture should rotate depending on the direction or if it should stay the same
 func set_bullet_is_texture_rotation_permanent(is_permanent:bool)->void:

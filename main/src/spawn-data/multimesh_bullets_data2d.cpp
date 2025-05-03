@@ -231,6 +231,14 @@ void MultiMeshBulletsData2D::set_change_texture_times(const TypedArray<float> &n
     change_texture_times = new_change_texture_times;
 }
 
+Ref<Texture2D> MultiMeshBulletsData2D::get_default_texture() const{
+    return default_texture;
+}
+
+void MultiMeshBulletsData2D::set_default_texture(const Ref<Texture2D> &new_default_texture){
+    default_texture = new_default_texture;
+}
+
 void MultiMeshBulletsData2D::_bind_methods() {
     ClassDB::bind_method(D_METHOD("set_transforms"), &MultiMeshBulletsData2D::set_transforms);
     ClassDB::bind_method(D_METHOD("get_transforms"), &MultiMeshBulletsData2D::get_transforms);
@@ -337,6 +345,10 @@ void MultiMeshBulletsData2D::_bind_methods() {
     ClassDB::bind_method(D_METHOD("get_change_texture_times"), &MultiMeshBulletsData2D::get_change_texture_times);
     ClassDB::bind_method(D_METHOD("set_change_texture_times"), &MultiMeshBulletsData2D::set_change_texture_times);
     ADD_PROPERTY(PropertyInfo(Variant::ARRAY, "change_texture_times"), "set_change_texture_times", "get_change_texture_times");
+
+    ClassDB::bind_method(D_METHOD("get_default_texture"), &MultiMeshBulletsData2D::get_default_texture);
+    ClassDB::bind_method(D_METHOD("set_default_texture"), &MultiMeshBulletsData2D::set_default_texture);
+    ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "default_texture"), "set_default_texture", "get_default_texture");
 
     ClassDB::bind_static_method("MultiMeshBulletsData2D", D_METHOD("calculate_bitmask", "numbers"), &MultiMeshBulletsData2D::calculate_bitmask);
 }

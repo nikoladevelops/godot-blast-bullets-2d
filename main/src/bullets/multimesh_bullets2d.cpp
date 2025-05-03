@@ -74,6 +74,7 @@ void MultiMeshBullets2D::spawn(const MultiMeshBulletsData2D &data, MultiMeshObje
     finalize_set_up(
         data.bullets_custom_data,
         data.textures,
+        data.default_texture,
         data.current_texture_index,
         data.material,
         data.z_index,
@@ -109,6 +110,7 @@ void MultiMeshBullets2D::activate_multimesh(const MultiMeshBulletsData2D &data) 
     finalize_set_up(
         data.bullets_custom_data,
         data.textures,
+        data.default_texture,
         data.current_texture_index,
         data.material,
         data.z_index,
@@ -349,6 +351,7 @@ void MultiMeshBullets2D::load(const Ref<SaveDataMultiMeshBullets2D> &data_to_loa
     finalize_set_up(
         data.bullets_custom_data,
         data.textures,
+        nullptr, // I am always saving an array of textures anyways/ no default texture to retrieve, so its fine passing a nullptr here in order to use the method logic
         data.current_texture_index,
         data.material,
         data.z_index,
@@ -586,6 +589,7 @@ void MultiMeshBullets2D::set_up_change_texture_timer(int64_t new_amount_textures
 void MultiMeshBullets2D::finalize_set_up(
     const Ref<Resource> &new_bullets_custom_data,
     const TypedArray<Texture2D> &new_textures,
+    const Ref<Texture2D> &new_default_texture,
     size_t new_current_texture_index,
     const Ref<Material> &new_material,
     int new_z_index, 
@@ -598,17 +602,28 @@ void MultiMeshBullets2D::finalize_set_up(
         bullets_custom_data = new_bullets_custom_data; 
     }
 
+    textures.clear(); // Clear old textures data if any
     // Texture logic
-    textures = new_textures.duplicate();
+    if (new_textures.size() > 0)
+    {
+        textures = new_textures.duplicate();
 
-    // Make sure the current_texture_index is valid
-    if (new_current_texture_index >= textures.size() || new_current_texture_index < 0) {
-        new_current_texture_index = 0;
+        // Make sure the current_texture_index is valid
+        if (new_current_texture_index >= textures.size() || new_current_texture_index < 0) {
+            new_current_texture_index = 0;
+        }
+        current_texture_index = new_current_texture_index;
+
+        set_texture(textures[current_texture_index]);
     }
-    current_texture_index = new_current_texture_index; // remember the current index of the current texture
+    else if(new_default_texture != nullptr) {
+        textures.append(new_default_texture);
+        current_texture_index = 0;
 
-    if (textures.size() > 0) {                        // Also make sure that there are textures to set
-        set_texture(textures[current_texture_index]); // setting the current texture
+        set_texture(textures[current_texture_index]);
+    }
+    else {
+        UtilityFunctions::print("Error. You have not provided any textures as data. Ensure that you either provide an array of textures or a default texture that can be used");
     }
 
     if (new_material.is_valid()) {

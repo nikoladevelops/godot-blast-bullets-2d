@@ -477,6 +477,7 @@ private:
     void finalize_set_up(
         const Ref<Resource> &new_bullets_custom_data,
         const TypedArray<Texture2D> &new_textures,
+        const Ref<Texture2D>& new_default_texture,
         size_t new_current_texture_index,
         const Ref<Material> &new_material,
         int new_z_index,

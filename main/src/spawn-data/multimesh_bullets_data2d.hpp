@@ -19,6 +19,9 @@ public:
     // All textures. If you give an array containing more than 1 texture then the default_change_texture_time will be used to periodically change the texture to the next one in the array.
     TypedArray<Texture2D> textures;
 
+    // The default texture that is used if no textures were given inside the textures array
+    Ref<Texture2D> default_texture = nullptr;
+
     // The texture amount_bullets. Keep in mind that this will be used only if a mesh was NOT provided
     Vector2 texture_size = Vector2(32, 32);
 
@@ -181,6 +184,9 @@ public:
 
     TypedArray<float> get_change_texture_times() const;
     void set_change_texture_times(const TypedArray<float> &new_change_texture_times);
+
+    Ref<Texture2D> get_default_texture() const;
+    void set_default_texture(const Ref<Texture2D> &new_default_texture);
 
 
     static void _bind_methods();
