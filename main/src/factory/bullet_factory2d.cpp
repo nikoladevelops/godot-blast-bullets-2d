@@ -605,6 +605,132 @@ Dictionary BulletFactory2D::debug_get_attachments_pool_info()
     return dict;
 }
 
+TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_grid(
+    int transforms_amount,
+    Transform2D marker_transform,
+    int rows_per_column,
+    Alignment alignment,
+    float column_offset,
+    float row_offset,
+    bool rotate_grid_with_marker,
+    bool random_local_rotation,
+    bool random_global_rotation
+) {
+    // Initialize the array to hold the transforms
+    TypedArray<Transform2D> generated_transforms;
+    generated_transforms.resize(transforms_amount);
+
+    // Calculate the number of columns needed
+    int columns_amount = static_cast<int>(std::ceil(static_cast<float>(transforms_amount) / static_cast<float>(rows_per_column)));
+
+    // Calculate total grid dimensions
+    float total_width = (columns_amount - 1) * column_offset;
+    float total_height = (rows_per_column - 1) * row_offset;
+
+    // Default starting position (centered)
+    float x_start = -total_width / 2.0f;
+    if (columns_amount % 2 == 0) {
+        x_start += column_offset / 2.0f;
+    }
+    float y_start = -total_height / 2.0f;
+    if (rows_per_column % 2 == 0) {
+        y_start += row_offset / 2.0f;
+    }
+
+    // Adjust starting position based on alignment
+    switch (alignment) {
+    case Alignment::TOP_LEFT:
+        x_start = 0.0f;
+        y_start = 0.0f;
+        break;
+    case Alignment::TOP_CENTER:
+        x_start = -total_width / 2.0f;
+        if (columns_amount % 2 == 0) {
+            x_start += column_offset / 2.0f;
+        }
+        y_start = 0.0f;
+        break;
+    case Alignment::TOP_RIGHT:
+        x_start = -total_width;
+        y_start = 0.0f;
+        break;
+    case Alignment::CENTER_LEFT:
+        x_start = 0.0f;
+        break;
+    case Alignment::CENTER:
+        // Already centered by default
+        break;
+    case Alignment::CENTER_RIGHT:
+        x_start = -total_width;
+        break;
+    case Alignment::BOTTOM_LEFT:
+        x_start = 0.0f;
+        y_start = -total_height;
+        break;
+    case Alignment::BOTTOM_CENTER:
+        x_start = -total_width / 2.0f;
+        if (columns_amount % 2 == 0) {
+            x_start += column_offset / 2.0f;
+        }
+        y_start = -total_height;
+        break;
+    case Alignment::BOTTOM_RIGHT:
+        x_start = -total_width;
+        y_start = -total_height;
+        break;
+    }
+
+    // Counter for spawned transforms
+    int count_spawned = 0;
+
+    // Generate transforms in a grid pattern
+    for (int column = 0; column < columns_amount; ++column) {
+        for (int row = 0; row < rows_per_column; ++row) {
+            if (count_spawned >= transforms_amount) {
+                break;
+            }
+
+            // Calculate local offset for this grid position
+            float x = x_start + column * column_offset;
+            float y = y_start + row * row_offset;
+            Vector2 local_offset(x, y);
+
+            // Create the new transform
+            Transform2D new_transform;
+            if (rotate_grid_with_marker) {
+                // Rotate the offset with the marker's basis
+                Vector2 rotated_offset = marker_transform.basis_xform(local_offset);
+                new_transform = Transform2D(marker_transform.get_rotation(), marker_transform.get_origin() + rotated_offset);
+            }
+            else {
+                // Use the offset directly without rotation
+                Vector2 new_origin = marker_transform.get_origin() + local_offset;
+                new_transform = Transform2D(marker_transform.get_rotation(), new_origin);
+            }
+
+            // Apply random local rotation if enabled
+            if (random_local_rotation) {
+                float random_angle = UtilityFunctions::randf() * Math_TAU;
+                new_transform = Transform2D(new_transform.get_rotation() + random_angle, new_transform.get_origin());
+            }
+
+            // Apply random global rotation if enabled
+            if (random_global_rotation) {
+                float random_angle = UtilityFunctions::randf() * Math_TAU;
+                Transform2D rotation_transform(random_angle, godot::Vector2());
+                new_transform = rotation_transform * new_transform;
+            }
+
+            // Store the transform and increment the counter
+            generated_transforms[count_spawned] = new_transform;
+            count_spawned++;
+        }
+    }
+
+    return generated_transforms;
+}
+
+
 void BulletFactory2D::_bind_methods() {
     ClassDB::bind_method(D_METHOD("get_is_factory_busy"), &BulletFactory2D::get_is_factory_busy);
 
@@ -665,6 +791,30 @@ void BulletFactory2D::_bind_methods() {
     );
 
 
+
+    ClassDB::bind_static_method("BulletFactory2D",
+        D_METHOD("helper_generate_transforms_grid", 
+            "transforms_amount",
+            "marker_transform",
+            "rows_per_column",
+            "alignment",
+            "column_offset",
+            "row_offset",
+            "rotate_grid_with_marker",
+            "random_local_rotation",
+            "random_global_rotation"),
+        &BulletFactory2D::helper_generate_transforms_grid,
+        DEFVAL(10),
+        DEFVAL(3), // CENTER_LEFT
+        DEFVAL(150.0f),
+        DEFVAL(150.0f),
+        DEFVAL(true),
+        DEFVAL(false),
+        DEFVAL(false)
+    );
+
+
+
     //
 
 
@@ -676,7 +826,19 @@ void BulletFactory2D::_bind_methods() {
     ADD_SIGNAL(MethodInfo("reset_finished"));
 
     // Need this in order to expose the enum constants to Godot Engine
+    // For Bullet Type that is supported
     BIND_ENUM_CONSTANT(DIRECTIONAL_BULLETS);
 	BIND_ENUM_CONSTANT(BLOCK_BULLETS);
+
+    // For the grid alignment enum
+    BIND_ENUM_CONSTANT(TOP_LEFT);
+    BIND_ENUM_CONSTANT(TOP_CENTER);
+    BIND_ENUM_CONSTANT(TOP_RIGHT);
+    BIND_ENUM_CONSTANT(CENTER_LEFT);
+    BIND_ENUM_CONSTANT(CENTER);
+    BIND_ENUM_CONSTANT(CENTER_RIGHT);
+    BIND_ENUM_CONSTANT(BOTTOM_LEFT);
+    BIND_ENUM_CONSTANT(BOTTOM_CENTER);
+    BIND_ENUM_CONSTANT(BOTTOM_RIGHT);
 }
 }

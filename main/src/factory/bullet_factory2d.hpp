@@ -28,6 +28,19 @@ public:
         DIRECTIONAL_BULLETS,
         BLOCK_BULLETS
     };
+
+    // Enum class for grid alignment, mirroring GDScript's Alignment enum
+    enum Alignment {
+        TOP_LEFT,
+        TOP_CENTER,
+        TOP_RIGHT,
+        CENTER_LEFT,
+        CENTER,
+        CENTER_RIGHT,
+        BOTTOM_LEFT,
+        BOTTOM_CENTER,
+        BOTTOM_RIGHT
+    };
     
 
     // Whether the factory is currently busy doing something important and it can't handle any other requests
@@ -370,8 +383,27 @@ private:
             bullets->reduce_lifetime(delta);
         }
     }
+
+
+
+    // Exposed helper methods
+
+    // Generates a grid of 2D transforms positioned relative to marker_transform
+    static TypedArray<Transform2D> helper_generate_transforms_grid(
+        int transforms_amount,
+        Transform2D marker_transform,
+        int rows_per_column = 10,
+        Alignment alignment = Alignment::CENTER_LEFT,
+        float column_offset = 150.0f,
+        float row_offset = 150.0f,
+        bool rotate_grid_with_marker = true,
+        bool random_local_rotation = false,
+        bool random_global_rotation = false
+    );
+
 };
 }
 
 // Need this in order to expose the enum to Godot Engine
 VARIANT_ENUM_CAST(BlastBullets2D::BulletFactory2D::BulletType);
+VARIANT_ENUM_CAST(BlastBullets2D::BulletFactory2D::Alignment);

@@ -220,6 +220,7 @@ text = "@realNikich"
 horizontal_alignment = 1
 
 [node name="Important" type="Sprite2D" parent="Level/VBoxContainer/HBoxContainer"]
+z_index = -10
 position = Vector2(1084, -9)
 scale = Vector2(0.5, 0.5)
 texture = ExtResource("3_rfik0")
