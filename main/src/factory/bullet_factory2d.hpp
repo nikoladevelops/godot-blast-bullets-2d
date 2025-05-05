@@ -400,7 +400,6 @@ private:
         bool random_local_rotation = false,
         bool random_global_rotation = false
     );
-
 };
 }
 

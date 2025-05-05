@@ -37,6 +37,8 @@ extends CanvasLayer
 @onready var select_amount_multi_meshes_view:SelectBtnView = $ObjectPoolSettingsView/SelectAmountMultiMeshesBtnView
 # Whether the physics shapes get rotated when rotation data is provided
 @onready var rotate_physics_shapes_checkbox:CheckBox = $BulletSettingsView/VBoxContainer/VBoxContainer/RotatePhysicsShapesCheckBox
+# Will adjust the direction of the bullets based on their rotation data if they have any
+@onready var adjust_direction_based_on_rotation_checkbox:CheckBox = $BulletSettingsView/VBoxContainer/VBoxContainer/AdjustDirectionBasedOnRotationCheckBox
 
 # The save button used to save bullet data
 @onready var save_btn:Button = $TopRightContainer/SaveBtn
@@ -376,3 +378,8 @@ func _on_select_texture_size_btn_view_new_btn_selected(new_selected_btn: Button)
 func _on_select_z_index_btn_view_new_btn_selected(new_selected_btn: Button) -> void:
 	var new_z_index:int = new_selected_btn.text.to_int()
 	BENCHMARK_GLOBALS.PLAYER_DATA_NODE.set_bullets_z_index(new_z_index)
+
+
+func _on_adjust_direction_based_on_rotation_check_box_pressed() -> void:
+	var should_adjust_direction:bool = adjust_direction_based_on_rotation_checkbox.button_pressed
+	BENCHMARK_GLOBALS.PLAYER_DATA_NODE.set_adjust_direction_based_on_rotation(should_adjust_direction)

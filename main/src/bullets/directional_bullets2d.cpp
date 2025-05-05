@@ -59,18 +59,25 @@ void DirectionalBullets2D::custom_additional_spawn_logic(const MultiMeshBulletsD
     const DirectionalBulletsData2D &directional_data = static_cast<const DirectionalBulletsData2D&>(data);
 
     set_up_movement_data(directional_data.all_bullet_speed_data);
+
+    adjust_direction_based_on_rotation = directional_data.adjust_direction_based_on_rotation;
 }
 
 void DirectionalBullets2D::custom_additional_save_logic(SaveDataMultiMeshBullets2D &data) {
+    SaveDataDirectionalBullets2D& directional_save_data = static_cast<SaveDataDirectionalBullets2D&>(data);
+    directional_save_data.adjust_direction_based_on_rotation = adjust_direction_based_on_rotation;
 }
 
 void DirectionalBullets2D::custom_additional_load_logic(const SaveDataMultiMeshBullets2D &data) {
+    const SaveDataDirectionalBullets2D& directional_save_data = static_cast<const SaveDataDirectionalBullets2D&>(data);
+    adjust_direction_based_on_rotation = directional_save_data.adjust_direction_based_on_rotation;
 }
 
 void DirectionalBullets2D::custom_additional_activate_logic(const MultiMeshBulletsData2D &data) {
     const DirectionalBulletsData2D &directional_data = static_cast<const DirectionalBulletsData2D&>(data);
     
     set_up_movement_data(directional_data.all_bullet_speed_data);
-}
 
+    adjust_direction_based_on_rotation = directional_data.adjust_direction_based_on_rotation;
+}
 }

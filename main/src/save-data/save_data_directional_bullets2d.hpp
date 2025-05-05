@@ -9,6 +9,13 @@ using namespace godot;
         GDCLASS(SaveDataDirectionalBullets2D, SaveDataMultiMeshBullets2D)
         // Just in case if it needs additional properties in the future
     public:
+
+        bool adjust_direction_based_on_rotation = false;
+
+
+        bool get_adjust_direction_based_on_rotation() const;
+        void set_adjust_direction_based_on_rotation(bool new_adjust_direction_based_on_rotation);
+
         static void _bind_methods();
     };
 }

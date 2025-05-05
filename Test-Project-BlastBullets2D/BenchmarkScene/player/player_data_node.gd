@@ -458,3 +458,8 @@ func switch_material(option_index)->void:
 func set_bullets_z_index(new_z_index:int)->void:
 	block_bullets_data.z_index = new_z_index
 	directional_bullets_data.z_index = new_z_index
+	
+# Will make it so that directional bullets' direction gets adjusted based on the rotation data that they have
+func set_adjust_direction_based_on_rotation(should_adjust_direction:bool)->void:
+	directional_bullets_data.adjust_direction_based_on_rotation = should_adjust_direction
+	

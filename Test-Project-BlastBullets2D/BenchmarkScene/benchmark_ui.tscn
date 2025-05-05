@@ -445,6 +445,47 @@ grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
 
+[node name="ZIndexContainer" type="VBoxContainer" parent="BulletSettingsView"]
+custom_minimum_size = Vector2(57, 198)
+layout_mode = 1
+anchors_preset = 2
+anchor_top = 1.0
+anchor_bottom = 1.0
+offset_left = 360.0
+offset_top = -164.0
+offset_right = 417.0
+offset_bottom = 34.0
+grow_vertical = 0
+
+[node name="Label" type="Label" parent="BulletSettingsView/ZIndexContainer"]
+layout_mode = 2
+text = "Z Index"
+
+[node name="Z_INDEX_0" type="Button" parent="BulletSettingsView/ZIndexContainer"]
+layout_mode = 2
+focus_mode = 0
+text = "0"
+
+[node name="Z_INDEX_1" type="Button" parent="BulletSettingsView/ZIndexContainer"]
+layout_mode = 2
+focus_mode = 0
+text = "1"
+
+[node name="Z_INDEX_2" type="Button" parent="BulletSettingsView/ZIndexContainer"]
+layout_mode = 2
+focus_mode = 0
+text = "2"
+
+[node name="Z_INDEX_3" type="Button" parent="BulletSettingsView/ZIndexContainer"]
+layout_mode = 2
+focus_mode = 0
+text = "3"
+
+[node name="Z_INDEX_MINUS_5" type="Button" parent="BulletSettingsView/ZIndexContainer"]
+layout_mode = 2
+focus_mode = 0
+text = "-5"
+
 [node name="VBoxContainer" type="HBoxContainer" parent="BulletSettingsView"]
 layout_mode = 1
 offset_left = 401.0
@@ -499,42 +540,10 @@ layout_mode = 2
 focus_mode = 0
 text = "Rotate Physics Shapes"
 
-[node name="ZIndexContainer" type="HBoxContainer" parent="BulletSettingsView/VBoxContainer/VBoxContainer"]
-layout_mode = 2
-
-[node name="Label" type="Label" parent="BulletSettingsView/VBoxContainer/VBoxContainer/ZIndexContainer"]
-layout_mode = 2
-text = "Z Index"
-
-[node name="Z_INDEX_0" type="Button" parent="BulletSettingsView/VBoxContainer/VBoxContainer/ZIndexContainer"]
-custom_minimum_size = Vector2(40, 40)
+[node name="AdjustDirectionBasedOnRotationCheckBox" type="CheckBox" parent="BulletSettingsView/VBoxContainer/VBoxContainer"]
 layout_mode = 2
 focus_mode = 0
-text = "0"
-
-[node name="Z_INDEX_1" type="Button" parent="BulletSettingsView/VBoxContainer/VBoxContainer/ZIndexContainer"]
-custom_minimum_size = Vector2(40, 40)
-layout_mode = 2
-focus_mode = 0
-text = "1"
-
-[node name="Z_INDEX_2" type="Button" parent="BulletSettingsView/VBoxContainer/VBoxContainer/ZIndexContainer"]
-custom_minimum_size = Vector2(40, 40)
-layout_mode = 2
-focus_mode = 0
-text = "2"
-
-[node name="Z_INDEX_3" type="Button" parent="BulletSettingsView/VBoxContainer/VBoxContainer/ZIndexContainer"]
-custom_minimum_size = Vector2(40, 40)
-layout_mode = 2
-focus_mode = 0
-text = "3"
-
-[node name="Z_INDEX_MINUS_5" type="Button" parent="BulletSettingsView/VBoxContainer/VBoxContainer/ZIndexContainer"]
-custom_minimum_size = Vector2(40, 40)
-layout_mode = 2
-focus_mode = 0
-text = "-5"
+text = "Adjust Rotation Direction"
 
 [node name="VBoxContainer5" type="VBoxContainer" parent="BulletSettingsView"]
 layout_mode = 1
@@ -1014,7 +1023,7 @@ all_btns = [NodePath("../../BulletLifeTimeContainer/2"), NodePath("../../BulletL
 all_btns = [NodePath("../../TextureSizeContainer/140_140"), NodePath("../../TextureSizeContainer/200_200"), NodePath("../../TextureSizeContainer/320_320"), NodePath("../../TextureSizeContainer/64_64")]
 
 [node name="SelectZIndexBtnView" parent="BulletSettingsView/SelectViewsContainer" node_paths=PackedStringArray("all_btns") instance=ExtResource("3_cgqfs")]
-all_btns = [NodePath("../../VBoxContainer/VBoxContainer/ZIndexContainer/Z_INDEX_0"), NodePath("../../VBoxContainer/VBoxContainer/ZIndexContainer/Z_INDEX_1"), NodePath("../../VBoxContainer/VBoxContainer/ZIndexContainer/Z_INDEX_2"), NodePath("../../VBoxContainer/VBoxContainer/ZIndexContainer/Z_INDEX_3"), NodePath("../../VBoxContainer/VBoxContainer/ZIndexContainer/Z_INDEX_MINUS_5")]
+all_btns = [NodePath("../../ZIndexContainer/Z_INDEX_0"), NodePath("../../ZIndexContainer/Z_INDEX_1"), NodePath("../../ZIndexContainer/Z_INDEX_2"), NodePath("../../ZIndexContainer/Z_INDEX_3"), NodePath("../../ZIndexContainer/Z_INDEX_MINUS_5")]
 
 [node name="AlwaysVisibleView" type="Control" parent="."]
 layout_mode = 3
@@ -1291,6 +1300,7 @@ text = "Show Object Pool Settings"
 [connection signal="pressed" from="BulletSettingsView/VBoxContainer/BlockDebuggerVBoxContainer2/ShowBlockDebuggerColorPickerBtn" to="." method="_on_show_block_debugger_color_picker_btn_pressed"]
 [connection signal="pressed" from="BulletSettingsView/VBoxContainer/VBoxContainer/EnableDebuggerCheckBox" to="." method="_on_enable_debugger_check_box_pressed"]
 [connection signal="pressed" from="BulletSettingsView/VBoxContainer/VBoxContainer/RotatePhysicsShapesCheckBox" to="." method="_on_rotate_physics_shapes_check_box_pressed"]
+[connection signal="pressed" from="BulletSettingsView/VBoxContainer/VBoxContainer/AdjustDirectionBasedOnRotationCheckBox" to="." method="_on_adjust_direction_based_on_rotation_check_box_pressed"]
 [connection signal="pressed" from="BulletSettingsView/VBoxContainer2/ResetFactoryBtn" to="." method="_on_reset_factory_btn_pressed"]
 [connection signal="pressed" from="BulletSettingsView/VBoxContainer2/FreeActiveBulletsBtn" to="." method="_on_free_active_bullets_btn_pressed"]
 [connection signal="pressed" from="BulletSettingsView/VBoxContainer3/EnableMonitorableCheckBox" to="." method="_on_enable_monitorable_check_box_pressed"]

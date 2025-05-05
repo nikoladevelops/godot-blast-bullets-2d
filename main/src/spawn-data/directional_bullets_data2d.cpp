@@ -15,9 +15,21 @@ void DirectionalBulletsData2D::set_all_bullet_speed_data(const TypedArray<Bullet
     }
 }
 
+bool DirectionalBulletsData2D::get_adjust_direction_based_on_rotation() const{
+    return adjust_direction_based_on_rotation;
+}
+
+void DirectionalBulletsData2D::set_adjust_direction_based_on_rotation(bool new_adjust_direction_based_on_rotation){
+    adjust_direction_based_on_rotation = new_adjust_direction_based_on_rotation;
+}
+
 void DirectionalBulletsData2D::_bind_methods() {
     ClassDB::bind_method(D_METHOD("get_all_bullet_speed_data"), &DirectionalBulletsData2D::get_all_bullet_speed_data);
     ClassDB::bind_method(D_METHOD("set_all_bullet_speed_data", "new_data"), &DirectionalBulletsData2D::set_all_bullet_speed_data);
     ADD_PROPERTY(PropertyInfo(Variant::ARRAY, "all_bullet_speed_data"), "set_all_bullet_speed_data", "get_all_bullet_speed_data");
+
+    ClassDB::bind_method(D_METHOD("get_adjust_direction_based_on_rotation"), &DirectionalBulletsData2D::get_adjust_direction_based_on_rotation);
+    ClassDB::bind_method(D_METHOD("set_adjust_direction_based_on_rotation", "new_adjust_direction_based_on_rotation"), &DirectionalBulletsData2D::set_adjust_direction_based_on_rotation);
+    ADD_PROPERTY(PropertyInfo(Variant::BOOL, "adjust_direction_based_on_rotation"), "set_adjust_direction_based_on_rotation", "get_adjust_direction_based_on_rotation");
 }
 }
