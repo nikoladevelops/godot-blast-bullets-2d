@@ -128,6 +128,8 @@ void MultiMeshBullets2D::activate_multimesh(const MultiMeshBulletsData2D &data) 
 void MultiMeshBullets2D::set_up_bullet_instances(const MultiMeshBulletsData2D &data) {
     active_bullets_counter = amount_bullets;
 
+    is_life_time_over_signal_enabled = data.is_life_time_over_signal_enabled;
+
     bullets_enabled_status.assign(amount_bullets, true);
     set_up_area(data.collision_layer, data.collision_mask, data.monitorable, bullet_factory->physics_space);
      
@@ -298,6 +300,9 @@ Ref<SaveDataMultiMeshBullets2D> MultiMeshBullets2D::save(const Ref<SaveDataMulti
     }
         
     // OTHER
+
+    data_to_populate.is_life_time_over_signal_enabled = is_life_time_over_signal_enabled;
+
     data_to_populate.max_life_time = max_life_time;
     data_to_populate.current_life_time = current_life_time;
     data_to_populate.amount_bullets = amount_bullets;
@@ -375,7 +380,9 @@ void MultiMeshBullets2D::load_bullet_instances(const SaveDataMultiMeshBullets2D 
 
     active_bullets_counter = amount_bullets;
     cache_texture_rotation_radians = data.cache_texture_rotation_radians;
-    
+
+    is_life_time_over_signal_enabled = data.is_life_time_over_signal_enabled;
+
     all_cached_speed.reserve(new_speed_data_size);
     all_cached_max_speed.reserve(new_speed_data_size);
     all_cached_acceleration.reserve(new_speed_data_size);
@@ -836,14 +843,14 @@ void MultiMeshBullets2D::area_entered_func(int status, RID entered_rid, uint64_t
         Object *obj = ObjectDB::get_instance(entered_instance_id);
         call_deferred("disable_bullet", bullet_shape_index);
         // another option would be to emit a signal here, and then the factory to register a callback for it and then emit its own signal, but I felt that it would be slower and also very messy, I also thought of keeping pointers to outside functions, but again its messier. Best solution I feel like is just keeping a pointer to the factory itself, which also allows me to call pool methods.
-        bullet_factory->emit_signal("area_entered", obj, bullets_custom_data, all_cached_instance_transforms[bullet_shape_index].get_origin());
+        bullet_factory->emit_signal("area_entered", obj, bullets_custom_data, all_cached_instance_transforms[bullet_shape_index]);
     }
 }
 void MultiMeshBullets2D::body_entered_func(int status, RID entered_rid, uint64_t entered_instance_id, size_t entered_shape_index, size_t bullet_shape_index) {
     if (status == PhysicsServer2D::AREA_BODY_ADDED) {
         Object *obj = ObjectDB::get_instance(entered_instance_id);
         call_deferred("disable_bullet", bullet_shape_index);
-        bullet_factory->emit_signal("body_entered", obj, bullets_custom_data, all_cached_instance_transforms[bullet_shape_index].get_origin());
+        bullet_factory->emit_signal("body_entered", obj, bullets_custom_data, all_cached_instance_transforms[bullet_shape_index]);
     }
 }
 }

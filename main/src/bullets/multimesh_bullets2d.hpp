@@ -82,10 +82,38 @@ public:
         // Life time timer logic
         current_life_time -= delta;
         if (current_life_time <= 0) {
-            // Disable still active bullets (I'm not checking for bullet status,because disable_bullet already has that logic so I would be doing double checks for no reason)
-            for (size_t i = 0; i < amount_bullets; i++) {
-                call_deferred("disable_bullet", i);
+
+            // If the user wants to track when the life time is over we need to collect some additional info about the multimesh
+            if (is_life_time_over_signal_enabled)
+            {
+                // Will hold all transforms of bullets that have not yet hit anything / the ones we are forced to disable due to life time being over
+                TypedArray<Transform2D> transfs;
+
+                for (size_t i = 0; i < amount_bullets; i++) {
+
+                    // If the status is active it means that the bullet hasn't hit anything yet, so we need to disable it ourselves
+                    if (bullets_enabled_status[i])
+                    {
+                        call_deferred("disable_bullet", i); // disable it
+                        transfs.push_back(all_cached_instance_transforms[i]); // store the transform of the disabled bullet
+                    }
+                }
+
+                // Emit a signal and pass all the transforms of bullets that were forcefully disabled / the ones that were disabled due to life time being over (NOT because they hit a collision shape/body)
+                bullet_factory->emit_signal("life_time_over", bullets_custom_data, transfs);
+
             }
+            else {
+                // If we do not wish to emit the life_time_over signal, just disable the bullet and don't worry about having to pass additional data to the user
+                for (size_t i = 0; i < amount_bullets; i++) {
+                    // There is already a bullet status check inside the function so it's fine
+                    call_deferred("disable_bullet", i); 
+                }
+
+            }
+
+
+            
         }
     }
 
@@ -191,6 +219,9 @@ protected:
 
     // The max life time before the multimesh gets disabled
     float max_life_time = 0.0f;
+
+    // Whether the life_time_over signal will be emitted when the life time of the bullets is over. Tracked by BulletFactory2D
+    bool is_life_time_over_signal_enabled = false;
 
     // The current life time being processed
     float current_life_time = 0.0f;

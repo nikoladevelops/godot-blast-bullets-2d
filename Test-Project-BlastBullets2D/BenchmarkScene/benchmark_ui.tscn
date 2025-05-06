@@ -543,7 +543,7 @@ text = "Rotate Physics Shapes"
 [node name="AdjustDirectionBasedOnRotationCheckBox" type="CheckBox" parent="BulletSettingsView/VBoxContainer/VBoxContainer"]
 layout_mode = 2
 focus_mode = 0
-text = "Adjust Rotation Direction"
+text = "Adjust Direction Based On Rotation"
 
 [node name="VBoxContainer5" type="VBoxContainer" parent="BulletSettingsView"]
 layout_mode = 1

@@ -262,3 +262,4 @@ script = ExtResource("7_6fsjh")
 
 [connection signal="area_entered" from="BulletFactory2D" to="BulletFactory2D" method="_on_area_entered"]
 [connection signal="body_entered" from="BulletFactory2D" to="BulletFactory2D" method="_on_body_entered"]
+[connection signal="life_time_over" from="BulletFactory2D" to="BulletFactory2D" method="_on_life_time_over"]

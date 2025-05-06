@@ -138,6 +138,7 @@ func set_up_directional_bullets_data()->DirectionalBulletsData2D:
 	data.all_bullet_rotation_data = bullet_rotation_data
 	data.bullet_attachment_offset = Vector2(-60,0)
 	data.bullets_custom_data = damage_data
+	#data.is_life_time_over_signal_enabled = true # If you want to track when the life time is over and receive a signal inside BulletFactory2D
 	
 	return data
 

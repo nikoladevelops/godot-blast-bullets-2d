@@ -239,6 +239,14 @@ void MultiMeshBulletsData2D::set_default_texture(const Ref<Texture2D> &new_defau
     default_texture = new_default_texture;
 }
 
+bool MultiMeshBulletsData2D::get_is_life_time_over_signal_enabled() const{
+    return is_life_time_over_signal_enabled;
+}
+
+void MultiMeshBulletsData2D::set_is_life_time_over_signal_enabled(bool new_is_life_time_over_signal_enabled){
+    is_life_time_over_signal_enabled = new_is_life_time_over_signal_enabled;
+}
+
 void MultiMeshBulletsData2D::_bind_methods() {
     ClassDB::bind_method(D_METHOD("set_transforms"), &MultiMeshBulletsData2D::set_transforms);
     ClassDB::bind_method(D_METHOD("get_transforms"), &MultiMeshBulletsData2D::get_transforms);
@@ -349,6 +357,10 @@ void MultiMeshBulletsData2D::_bind_methods() {
     ClassDB::bind_method(D_METHOD("get_default_texture"), &MultiMeshBulletsData2D::get_default_texture);
     ClassDB::bind_method(D_METHOD("set_default_texture"), &MultiMeshBulletsData2D::set_default_texture);
     ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "default_texture"), "set_default_texture", "get_default_texture");
+
+    ClassDB::bind_method(D_METHOD("get_is_life_time_over_signal_enabled"), &MultiMeshBulletsData2D::get_is_life_time_over_signal_enabled);
+    ClassDB::bind_method(D_METHOD("set_is_life_time_over_signal_enabled"), &MultiMeshBulletsData2D::set_is_life_time_over_signal_enabled);
+    ADD_PROPERTY(PropertyInfo(Variant::BOOL, "is_life_time_over_signal_enabled"), "set_is_life_time_over_signal_enabled", "get_is_life_time_over_signal_enabled");
 
     ClassDB::bind_static_method("MultiMeshBulletsData2D", D_METHOD("calculate_bitmask", "numbers"), &MultiMeshBulletsData2D::calculate_bitmask);
 }

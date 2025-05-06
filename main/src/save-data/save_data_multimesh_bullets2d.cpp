@@ -328,6 +328,15 @@ void SaveDataMultiMeshBullets2D::set_change_texture_times(const TypedArray<float
 }
 
 
+bool SaveDataMultiMeshBullets2D::get_is_life_time_over_signal_enabled() const {
+    return is_life_time_over_signal_enabled;
+}
+
+void SaveDataMultiMeshBullets2D::set_is_life_time_over_signal_enabled(bool new_is_life_time_over_signal_enabled) {
+    is_life_time_over_signal_enabled = new_is_life_time_over_signal_enabled;
+}
+
+
 void SaveDataMultiMeshBullets2D::_bind_methods() {
     ClassDB::bind_method(D_METHOD("set_max_life_time"), &SaveDataMultiMeshBullets2D::set_max_life_time);
     ClassDB::bind_method(D_METHOD("get_max_life_time"), &SaveDataMultiMeshBullets2D::get_max_life_time);
@@ -503,6 +512,11 @@ void SaveDataMultiMeshBullets2D::_bind_methods() {
     ClassDB::bind_method(D_METHOD("get_change_texture_times"), &SaveDataMultiMeshBullets2D::get_change_texture_times);
     ClassDB::bind_method(D_METHOD("set_change_texture_times"), &SaveDataMultiMeshBullets2D::set_change_texture_times);
     ADD_PROPERTY(PropertyInfo(Variant::ARRAY, "change_texture_times"), "set_change_texture_times", "get_change_texture_times");
+
+
+    ClassDB::bind_method(D_METHOD("get_is_life_time_over_signal_enabled"), &SaveDataMultiMeshBullets2D::get_is_life_time_over_signal_enabled);
+    ClassDB::bind_method(D_METHOD("set_is_life_time_over_signal_enabled"), &SaveDataMultiMeshBullets2D::set_is_life_time_over_signal_enabled);
+    ADD_PROPERTY(PropertyInfo(Variant::BOOL, "is_life_time_over_signal_enabled"), "set_is_life_time_over_signal_enabled", "get_is_life_time_over_signal_enabled");
 
     
 }

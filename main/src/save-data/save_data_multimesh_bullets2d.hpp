@@ -98,6 +98,8 @@ public:
 
     float max_life_time = 0.0f;
 
+    bool is_life_time_over_signal_enabled = false;
+
     float current_life_time = 0.0f;
 
     int amount_bullets = 0;
@@ -232,6 +234,10 @@ public:
 
     TypedArray<float> get_change_texture_times() const;
     void set_change_texture_times(const TypedArray<float>& new_change_texture_times);
+
+    bool get_is_life_time_over_signal_enabled() const;
+    void set_is_life_time_over_signal_enabled(bool new_is_life_time_over_signal_enabled);
+
 
     static void _bind_methods();
 };

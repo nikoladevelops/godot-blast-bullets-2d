@@ -86,6 +86,9 @@ public:
     // How long will the bullets last, before being disabled. Depending on whether the bullets pool has reached its limit, it will either add the bullets to the pool or it will queue_free them.
     float max_life_time = 2.0f;
 
+    // Whether the life_time_over signal will be emitted when the life time of the bullets is over. Tracked by BulletFactory2D
+    bool is_life_time_over_signal_enabled = false;
+
     // You can assign a custom material that uses a shader. Note that you may also want to provide a custom mesh as well, but if you do so, then the texture_size property won't be used, instead handle scaling in the shader as well.
     Ref<Material> material;
 
@@ -187,6 +190,9 @@ public:
 
     Ref<Texture2D> get_default_texture() const;
     void set_default_texture(const Ref<Texture2D> &new_default_texture);
+
+    bool get_is_life_time_over_signal_enabled() const;
+    void set_is_life_time_over_signal_enabled(bool new_is_life_time_over_signal_enabled);
 
 
     static void _bind_methods();
