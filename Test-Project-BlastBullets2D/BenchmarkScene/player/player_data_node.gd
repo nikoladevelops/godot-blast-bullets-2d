@@ -410,6 +410,8 @@ func get_attachment_scn_based_on_attachment_id(chosen_attachment_id)->PackedScen
 			attachment_to_return = cpu_particles_scn
 		2:
 			attachment_to_return = gpu_particles_scn
+		3:
+			attachment_to_return = light_attachment_scn
 			
 	return attachment_to_return
 

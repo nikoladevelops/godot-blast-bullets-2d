@@ -344,7 +344,7 @@ focus_mode = 0
 theme = ExtResource("3_vd08o")
 text = "Attachment Id: IdGoesHere"
 script = ExtResource("7_gbr8l")
-text_options = Array[String](["Attachment Id: 1", "Attachment Id: 2"])
+text_options = Array[String](["Attachment Id: 1", "Attachment Id: 2", "Attachment Id: 3"])
 metadata/_custom_type_script = "uid://b7wucn8wglgth"
 
 [node name="Label" type="Label" parent="ObjectPoolSettingsView/AttachmentPoolRelated/VBoxContainer"]
@@ -393,13 +393,12 @@ focus_mode = 0
 text = "100"
 
 [node name="PopulateAttachmentsPoolBtn" type="Button" parent="ObjectPoolSettingsView/AttachmentPoolRelated/VBoxContainer"]
-custom_minimum_size = Vector2(200, 69)
 layout_mode = 2
 size_flags_vertical = 8
 focus_mode = 0
 theme = ExtResource("3_vd08o")
 text = "Populate Attachment Pool
-(with Y amount attachments)"
+(with Y amount )"
 autowrap_mode = 2
 
 [node name="VBoxContainer2" type="HBoxContainer" parent="ObjectPoolSettingsView/AttachmentPoolRelated"]
