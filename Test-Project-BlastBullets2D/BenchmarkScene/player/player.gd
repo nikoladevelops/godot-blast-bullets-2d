@@ -67,7 +67,7 @@ func _unhandled_input(event)->void:
 		camera.zoom.x = clampf(camera.zoom.x / zoom_factor, min_zoom_value, max_zoom_value)
 		camera.zoom.y = clampf(camera.zoom.y / zoom_factor, min_zoom_value, max_zoom_value)
 		
-func _physics_process(_delta)->void:
+func _process(_delta)->void:
 	velocity = get_direction() * movement_speed
 	if velocity != Vector2.ZERO:
 		animated_sprite.play("moving")

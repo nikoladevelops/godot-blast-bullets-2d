@@ -77,6 +77,45 @@ public:
 
     /// METHODS RESPONSIBLE FOR VARIOUS BULLET FEATURES
 
+    // Use this method when you want to use physics interpolation - smooth rendering of textures despite physics ticks per second
+    _ALWAYS_INLINE_ void interpolate_bullet_visuals() {
+        float fraction = Engine::get_singleton()->get_physics_interpolation_fraction();
+
+        for (size_t i = 0; i < amount_bullets; i++) {
+            if (bullets_enabled_status[i] == false) {
+                continue;
+            }
+
+
+            // Apply interpolated transform for the bullet
+            const Transform2D &interpolated_bullet_texture_transf = get_interpolated_transform(all_cached_instance_transforms[i], all_previous_instance_transf[i], fraction);
+            multi->set_instance_transform_2d(i, interpolated_bullet_texture_transf);
+
+            if (!is_bullet_attachment_provided) {
+                continue;
+            }
+
+            // Apply interpolated transform for the attachment
+            const Transform2D &interpolated_attachment_transf = get_interpolated_transform(attachment_transforms[i], all_previous_attachment_transf[i], fraction);
+            bullet_attachments[i]->set_global_transform(interpolated_attachment_transf);
+        }
+    }
+
+    _ALWAYS_INLINE_ Transform2D get_interpolated_transform(const Transform2D &curr_transf, const Transform2D &prev_transf, float fraction) {
+        // Interpolate position
+        Vector2 prev_pos = prev_transf.get_origin();
+        Vector2 curr_pos = curr_transf.get_origin();
+        Vector2 interpolated_pos = prev_pos.lerp(curr_pos, fraction);
+
+        // Interpolate rotation
+        float prev_rot = prev_transf.get_rotation();
+        float curr_rot = curr_transf.get_rotation();
+        float interpolated_rot = godot::Math::lerp_angle(prev_rot, curr_rot, fraction);
+
+        // Apply interpolated transform
+        return Transform2D(interpolated_rot, interpolated_pos);
+    }
+
     // Reduces the lifetime of the multimesh so it can eventually get disabled entirely
     _ALWAYS_INLINE_ void reduce_lifetime(float delta) {
         // Life time timer logic
@@ -151,6 +190,8 @@ public:
         
     }
     ///
+
+    void set_physics_interpolation_related_data();
 
 protected:
     // Counts all active bullets
@@ -280,6 +321,16 @@ protected:
 
     ///
 
+    // PHYSICS INTERPOLATION RELATED
+    
+    // Stores previous bullets transforms for interpolation
+    std::vector<Transform2D> all_previous_instance_transf;
+
+    // Stores previous attachment transforms for interpolation
+    std::vector<Transform2D> all_previous_attachment_transf;
+
+    //
+
     /// COLLISION RELATED
 
     // The area that holds all collision shapes
@@ -395,27 +446,30 @@ protected:
 
     // Moves a single bullet attachment
     _ALWAYS_INLINE_ void move_bullet_attachment(const Vector2 &translate_by, size_t bullet_index, float rotation_angle) {
-        if (is_bullet_attachment_provided) {
-            if (cache_stick_relative_to_bullet) {
-                const Transform2D& bullet_global_transf = all_cached_instance_transforms[bullet_index];
-
-                // Calculate the attachment's global transform
-                const Transform2D &attachment_global_transf = calculate_attachment_global_transf(bullet_global_transf);
-                
-                // Update the vector that contains attachment global transforms
-                attachment_transforms[bullet_index] = attachment_global_transf;
-
-                // Apply the global transform to the attachment
-                bullet_attachments[bullet_index]->set_global_transform(attachment_global_transf);
-            }
-            else {
-                Transform2D &attachment_global_transf = attachment_transforms[bullet_index];
-                
-                bullet_attachments[bullet_index]->global_translate(translate_by);
-
-                attachment_global_transf = bullet_attachments[bullet_index]->get_global_transform();
-            }
+        if (!is_bullet_attachment_provided) {
+            return;
         }
+
+        bool is_using_physics_interpolation = bullet_factory->use_physics_interpolation;
+
+        Transform2D new_attachment_transf;
+        if (cache_stick_relative_to_bullet) {
+            const Transform2D &bullet_global_transf = all_cached_instance_transforms[bullet_index];
+            new_attachment_transf = calculate_attachment_global_transf(bullet_global_transf);
+        }
+        else {
+            new_attachment_transf = attachment_transforms[bullet_index];
+            new_attachment_transf = new_attachment_transf.translated(translate_by);
+        }
+
+        // Store the new transform as the current one
+        attachment_transforms[bullet_index] = new_attachment_transf;
+
+        // Apply immediately only if not using interpolation
+        if (!is_using_physics_interpolation) {
+            bullet_attachments[bullet_index]->set_global_transform(new_attachment_transf);
+        }
+        
     }
 
     // Calculates the global transform of the bullet attachment. Note that this function relies on bullet_attachment_local_transform being set already
@@ -466,6 +520,7 @@ private:
     void set_bullet_attachment(const Ref<PackedScene> &attachment_scene);
 
     //
+    
     
     // Ensures the multimesh is fully disabled - no processing, no longer visible
     void disable_multimesh();

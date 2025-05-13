@@ -19,6 +19,17 @@ _ALWAYS_INLINE_ void move_bullets(float delta) {
         cache_first_rotation_result = all_rotation_speed[0] * delta;
     }
 
+    bool is_using_physics_interpolation = bullet_factory->use_physics_interpolation;
+
+    // If using interpolation, store current transforms as previous ones
+    if (is_using_physics_interpolation) {
+        all_previous_instance_transf = all_cached_instance_transforms;
+        if (is_bullet_attachment_provided)
+        {
+            all_previous_attachment_transf = attachment_transforms;
+        }
+    }
+
     for (size_t i = 0; i < amount_bullets; i++) {
         if (bullets_enabled_status[i] == false) {
             continue;
@@ -55,7 +66,6 @@ _ALWAYS_INLINE_ void move_bullets(float delta) {
             }
         }
 
-
         // Update position with the new velocity
         Vector2 cache_velocity_calc = all_cached_velocity[i] * delta;
         curr_instance_origin += cache_velocity_calc;
@@ -65,8 +75,13 @@ _ALWAYS_INLINE_ void move_bullets(float delta) {
         curr_instance_transf.set_origin(curr_instance_origin);
         curr_shape_transf.set_origin(curr_shape_origin);
         
-        multi->set_instance_transform_2d(i, curr_instance_transf);
         physics_server->area_set_shape_transform(area, i, curr_shape_transf);
+
+        // If we are not using physics interpolation then just render the texture in the current physics frame
+        if (!is_using_physics_interpolation)
+        {
+            multi->set_instance_transform_2d(i, curr_instance_transf);
+        }
 
         move_bullet_attachment(cache_velocity_calc, i, rotation_angle);
 

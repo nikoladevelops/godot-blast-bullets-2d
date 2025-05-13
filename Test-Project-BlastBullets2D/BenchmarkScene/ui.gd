@@ -5,12 +5,25 @@ extends CanvasLayer
 @export var default_player_health:float
 # The player health bar
 @onready var player_health_bar:HealthBarComponent = $AlwaysVisibleView/HealthBar
+
+## Bullet Settings Related
 # Displays all object pool related settings
 @onready var object_pool_settings_view:Control = $ObjectPoolSettingsView
 # Displays all bullet related settings
 @onready var bullet_settings_view:Control = $BulletSettingsView
-# Switches the currently displayed view
-@onready var switch_view_btn:Button = $AlwaysVisibleView/SwitchViewBtn
+# Displays more settings for the bullets
+@onready var more_settings_view:Control = $MoreSettingsView
+# Displays settings only related to godot area2ds'
+@onready var godot_area2d_bullets_view:Control = $GodotArea2DBulletsView
+
+@onready var bullet_settings_btn:Button = $AlwaysVisibleView/SettingsUIManagerVBoxContainer/BulletSettingsBtn
+@onready var object_pool_settings_btn:Button = $AlwaysVisibleView/SettingsUIManagerVBoxContainer/ObjectPoolSettingsBtn
+@onready var more_settings_btn:Button = $AlwaysVisibleView/SettingsUIManagerVBoxContainer/MoreSettingsBtn
+
+# Saves the last view the user switched to
+@onready var last_visible_ui_setting_view:Control = $BulletSettingsView
+##
+
 # The label that displays the current fps
 @onready var current_fps_label:Label = $TopRightContainer/CurrentFPS
 # The label that displays the lowest recorded fps
@@ -21,6 +34,8 @@ extends CanvasLayer
 @onready var enable_monitorable_checkbox:CheckBox = $BulletSettingsView/VBoxContainer3/EnableMonitorableCheckBox
 # If you check this checkbox then the debugger will be enabled and you will be able to see the movement of the collision shapes of the bullets
 @onready var enable_debugger_checkbox:CheckBox = $BulletSettingsView/VBoxContainer/VBoxContainer/EnableDebuggerCheckBox
+
+## Color Picker
 # Responsible for picking a color for the block bullets debugger
 @onready var block_debugger_color_picker:ColorPicker = $BlockDebuggerColorPicker
 # Responsible for picking a color for the directional bullets debugger
@@ -29,6 +44,11 @@ extends CanvasLayer
 @onready var show_block_debugger_color_picker_btn:Button = $BulletSettingsView/VBoxContainer/BlockDebuggerVBoxContainer2/ShowBlockDebuggerColorPickerBtn
 # Responsible for showing/hiding the directional debugger color picker
 @onready var show_directional_debugger_color_picker_btn:Button = $BulletSettingsView/VBoxContainer/DirectionalDebuggerVBoxContainer/ShowDirectionalDebuggerColorPickerBtn
+# Responsible for closing the currently shown color picker
+@onready var close_color_picker_btn:Button = $CloseCurrentColorPickerBtn
+var last_selected_color_picker:ColorPicker = null
+##
+
 # If you check this checkbox then the bullets will always keep their texture rotation, no matter the direction they travel in
 @onready var is_texture_rotation_permanent_checkbox:CheckBox = $BulletSettingsView/VBoxContainer3/IsTextureRotationPermanentCheckBox
 # The view that holds all buttons responsible for setting the amount of bullets the player spawns when shooting
@@ -76,8 +96,18 @@ extends CanvasLayer
 # Attachment pooling related
 @onready var switch_bullet_attachment_id_btn:SwitchButton = $ObjectPoolSettingsView/AttachmentPoolRelated/VBoxContainer/SwitchBulletAttachmentIdBtn
 @onready var select_amount_attachments_btn_view:SelectBtnView =$ObjectPoolSettingsView/AttachmentPoolRelated/SelectAmountAttachmentsBtnView
-
 #
+
+# Change UI Settings View
+@onready var change_settings_ui_select_btn_view:SelectBtnView = $AlwaysVisibleView/ChangeSettingsUISelectBtnView
+#
+
+## More Settings
+# Responsible for setting physics interpolation ON/OFF (both the engine setting and the BulletFactory2D setting)
+@onready var physics_interpolation_check_box:CheckBox = $MoreSettingsView/HBoxContainer/PhysicsInterpolationCheckBox
+# Responsible for setting VSync ON/OFF
+@onready var enable_v_sync_check_box:CheckBox = $MoreSettingsView/HBoxContainer/VSyncCheckBox
+##
 
 # Whether the attachments should go to the object pool after freeing all active bullets in the factory
 var should_pool_attachments_after_free_active_bullets:bool = false
@@ -149,22 +179,50 @@ func _on_track_fps_button_pressed()->void:
 func _on_enable_debugger_check_box_pressed() -> void:
 	BENCHMARK_GLOBALS.FACTORY.is_debugger_enabled = enable_debugger_checkbox.button_pressed
 
+func _on_close_current_color_picker_btn_pressed() -> void:
+	set_color_picker_visible(last_selected_color_picker, false)
+
+# Changes a color picker's visibility by ensuring that it's the only one currently on screen if should_be_visible is set to true
+func set_color_picker_visible(chosen_color_picker:ColorPicker, should_be_visible:bool)->void:
+	if chosen_color_picker == null:
+		return
+	
+	# Reset visibility
+	directional_debugger_color_picker.visible = false
+	block_debugger_color_picker.visible = false
+	
+	# Disable/enable show buttons based on whether the chosen color picker should be visible or not
+	show_directional_debugger_color_picker_btn.disabled = should_be_visible
+	show_block_debugger_color_picker_btn.disabled = should_be_visible
+	
+	# Change visibility of the chosen one
+	chosen_color_picker.visible = should_be_visible
+	
+	# Hide / show the close button
+	close_color_picker_btn.visible = should_be_visible
+	
+	
 func _on_show_directional_debugger_color_picker_btn_pressed() -> void:
-	directional_debugger_color_picker.visible = !directional_debugger_color_picker.visible
-	show_block_debugger_color_picker_btn.disabled = !show_block_debugger_color_picker_btn.disabled 
+	set_color_picker_visible(directional_debugger_color_picker, true)
+	last_selected_color_picker = directional_debugger_color_picker
 
 func _on_show_block_debugger_color_picker_btn_pressed() -> void:
-	block_debugger_color_picker.visible = !block_debugger_color_picker.visible
-	show_directional_debugger_color_picker_btn.disabled = !show_directional_debugger_color_picker_btn.disabled
-
+	set_color_picker_visible(block_debugger_color_picker, true)
+	last_selected_color_picker = block_debugger_color_picker
 
 func change_directional_debugger_btn_color(color:Color)->void:
 	var stylebox:StyleBoxFlat = show_directional_debugger_color_picker_btn.get_theme_stylebox("normal")
 	stylebox.bg_color = color
+	
+	show_directional_debugger_color_picker_btn.add_theme_stylebox_override("disabled", stylebox)
+	
 
 func change_block_debugger_btn_color(color:Color)->void:
 	var stylebox:StyleBoxFlat = show_block_debugger_color_picker_btn.get_theme_stylebox("normal")
 	stylebox.bg_color = color
+	
+	show_block_debugger_color_picker_btn.add_theme_stylebox_override("disabled", stylebox)
+	
 
 
 func _on_block_debugger_color_picker_color_changed(color: Color) -> void:
@@ -180,15 +238,6 @@ func _on_enable_monitorable_check_box_pressed() -> void:
 
 func _on_is_texture_rotation_permanent_check_box_pressed() -> void:
 	BENCHMARK_GLOBALS.PLAYER_DATA_NODE.set_bullet_is_texture_rotation_permanent(is_texture_rotation_permanent_checkbox.button_pressed)
-
-func _on_switch_view_btn_pressed() -> void:
-	if bullet_settings_view.visible:
-		switch_view_btn.text = "Show Bullet Settings"
-	else:
-		switch_view_btn.text = "Show Object Pool Settings"
-		
-	object_pool_settings_view.visible = !object_pool_settings_view.visible	
-	bullet_settings_view.visible = !bullet_settings_view.visible
 
 func _on_fill_up_player_health_btn_pressed() -> void:
 	BENCHMARK_GLOBALS.PLAYER_HEALTH_BAR.health = BENCHMARK_GLOBALS.PLAYER_HEALTH_BAR.max_value
@@ -280,11 +329,48 @@ func _on_select_bullet_type_view_new_btn_selected(new_selected_btn: Button) -> v
 	match new_selected_btn:
 		directional_bullets_btn:
 			BENCHMARK_GLOBALS.BULLET_TYPE_TO_SPAWN = BENCHMARK_GLOBALS.BulletType.MultiMeshDirectional
+			
+			set_blast_bullets2d_ui_settings_visible(last_visible_ui_setting_view)
 		block_bullets_btn:
 			BENCHMARK_GLOBALS.BULLET_TYPE_TO_SPAWN = BENCHMARK_GLOBALS.BulletType.MultiMeshBlock
+			
+			set_blast_bullets2d_ui_settings_visible(last_visible_ui_setting_view)
 		godot_area2d_bullets_btn:
 			BENCHMARK_GLOBALS.BULLET_TYPE_TO_SPAWN = BENCHMARK_GLOBALS.BulletType.GodotArea2D
+			
+			set_blast_bullets2d_ui_settings_visible(null)
 
+## If you pass null, it will hide all blast bullets 2d related settings
+## If you pass a settings view then it will make that view visible while hiding the rest
+func set_blast_bullets2d_ui_settings_visible(view_to_open:Control)->void:
+	## Hide all setting views
+	bullet_settings_view.visible = false
+	object_pool_settings_view.visible = false
+	more_settings_view.visible = false
+	godot_area2d_bullets_view.visible = false
+	
+	## Hide last selected color picker just in case
+	set_color_picker_visible(last_selected_color_picker, false)
+	
+	## If the view_to_open is null it means the user wants to hide ALL bullet settings from the UI
+	if view_to_open == null:
+		## So hide all buttons that are meant for switching between settings
+		bullet_settings_btn.visible = false
+		object_pool_settings_btn.visible = false
+		more_settings_btn.visible = false
+		
+		# Show the godot area2d bullets view instead to display a messsage to the user
+		godot_area2d_bullets_view.visible = true
+		return
+	
+	## Otherwise ensure the buttons that are meant for switching between settings are actually visible
+	bullet_settings_btn.visible = true
+	object_pool_settings_btn.visible = true
+	more_settings_btn.visible = true
+	godot_area2d_bullets_view.visible = false # Always hide this
+	
+	## Show the view you want to switch to
+	view_to_open.visible = true
 
 func _on_select_collision_shape_size_view_new_btn_selected(new_selected_btn: Button) -> void:
 	var split_str:PackedStringArray = new_selected_btn.text.split(';');
@@ -383,3 +469,51 @@ func _on_select_z_index_btn_view_new_btn_selected(new_selected_btn: Button) -> v
 func _on_adjust_direction_based_on_rotation_check_box_pressed() -> void:
 	var should_adjust_direction:bool = adjust_direction_based_on_rotation_checkbox.button_pressed
 	BENCHMARK_GLOBALS.PLAYER_DATA_NODE.set_adjust_direction_based_on_rotation(should_adjust_direction)
+
+
+func _on_change_settings_ui_select_btn_view_new_btn_selected(new_selected_btn: Button) -> void:
+	if last_selected_color_picker != null:
+		set_color_picker_visible(last_selected_color_picker, false)
+	
+	match change_settings_ui_select_btn_view.selected_btn_index:
+		0:
+			bullet_settings_view.visible = true
+			object_pool_settings_view.visible = false
+			more_settings_view.visible = false
+			
+			last_visible_ui_setting_view = bullet_settings_view
+		1:
+			bullet_settings_view.visible = false
+			object_pool_settings_view.visible = true
+			more_settings_view.visible = false
+			
+			last_visible_ui_setting_view = object_pool_settings_view
+		2:
+			bullet_settings_view.visible = false
+			object_pool_settings_view.visible = false
+			more_settings_view.visible = true
+			
+			last_visible_ui_setting_view = more_settings_view
+
+
+func _on_select_physics_ticks_btn_view_new_btn_selected(new_selected_btn: Button) -> void:
+	var ticks_per_second:int = new_selected_btn.text.to_int()
+	Engine.physics_ticks_per_second = ticks_per_second
+
+
+func _on_physics_interpolation_check_box_pressed() -> void:
+	if physics_interpolation_check_box.button_pressed:
+		get_tree().physics_interpolation = true # This is the engine's own implementation
+		Engine.physics_jitter_fix = 0
+		BENCHMARK_GLOBALS.FACTORY.set_use_physics_interpolation_runtime(true) # This is for the bullets
+	else:
+		get_tree().physics_interpolation = false
+		Engine.physics_jitter_fix = 0.5
+		BENCHMARK_GLOBALS.FACTORY.set_use_physics_interpolation_runtime(false)
+
+
+func _on_v_sync_check_box_pressed() -> void:
+	if enable_v_sync_check_box.button_pressed:
+		DisplayServer.window_set_vsync_mode(DisplayServer.VSYNC_ENABLED)
+	else:
+		DisplayServer.window_set_vsync_mode(DisplayServer.VSYNC_DISABLED)

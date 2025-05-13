@@ -37,6 +37,7 @@ turbulence_initial_displacement_min = -100.0
 turbulence_initial_displacement_max = 100.0
 
 [node name="AttachedParticles2" type="BulletAttachment2D"]
+z_index = 3
 script = ExtResource("1_kys1a")
 metadata/_edit_lock_ = true
 

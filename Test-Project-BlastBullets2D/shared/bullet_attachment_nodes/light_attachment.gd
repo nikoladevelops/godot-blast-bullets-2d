@@ -55,7 +55,8 @@ func on_bullet_save() -> Resource:
 ## Same resource we just saved will get passed here, so cast it and use the data you've saved
 func on_bullet_load(custom_data_to_load: Resource) -> void:
 	var data:LightAttachmentData = custom_data_to_load as LightAttachmentData
-	current_color = data.current_color
-	curr_time = data.current_time
-	
-	modulate = current_color
+	if data != null:
+		current_color = data.current_color
+		curr_time = data.current_time
+		
+		modulate = current_color

@@ -47,8 +47,49 @@ void BulletFactory2D::_ready() {
     block_bullets_debugger->set_is_debugger_enabled(is_debugger_enabled_cached_before_ready);
     directional_bullets_debugger->set_is_debugger_enabled(is_debugger_enabled_cached_before_ready);
 
+    use_physics_interpolation = use_physics_interpolation_cached_before_ready;
 
     is_ready = true;
+}
+
+bool BulletFactory2D::get_use_physics_interpolation() const{
+    if (!is_ready){
+        return use_physics_interpolation_cached_before_ready;
+    }
+
+    return use_physics_interpolation;
+}
+
+void BulletFactory2D::set_use_physics_interpolation_runtime(bool new_use_physics_interpolation, bool enable_processing_after_finish) {
+    set_is_factory_busy(true);
+
+    use_physics_interpolation = new_use_physics_interpolation;
+
+    // If physics interpolation is about to be set to TRUE, then populate all needed data so that bullets work correctly
+    // I'm basically making it possible for this option to be turned on during runtime
+    if (use_physics_interpolation){
+        size_t amount_bullets = all_directional_bullets.size();
+        for (size_t i = 0; i < amount_bullets; i++)
+        {
+            DirectionalBullets2D*& bullets_multi = all_directional_bullets[i];
+            bullets_multi->set_physics_interpolation_related_data();
+        }
+
+        amount_bullets = all_block_bullets.size();
+        for (size_t i = 0; i < amount_bullets; i++)
+        {
+            BlockBullets2D*& bullets_multi = all_block_bullets[i];
+            bullets_multi->set_physics_interpolation_related_data();
+        }
+    }
+
+    if (enable_processing_after_finish){
+        set_is_factory_busy(false);
+    }
+}
+
+void BulletFactory2D::set_use_physics_interpolation_editor(bool new_use_physics_interpolation){
+    use_physics_interpolation_cached_before_ready = new_use_physics_interpolation;
 }
 
 void BulletFactory2D::add_bullet_containers(){
@@ -100,6 +141,16 @@ void BulletFactory2D::set_is_factory_busy(bool value) {
 void BulletFactory2D::_physics_process(float delta){
     handle_bullet_behavior<DirectionalBullets2D>(all_directional_bullets, delta);
     handle_bullet_behavior<BlockBullets2D>(all_block_bullets, delta);
+}
+
+
+void BulletFactory2D::_process(float delta){
+    if (!use_physics_interpolation){
+        return;
+    }
+
+    handle_bullet_rendering_interpolation<DirectionalBullets2D>(all_directional_bullets);
+    handle_bullet_rendering_interpolation<BlockBullets2D>(all_block_bullets);
 }
 
 
@@ -382,6 +433,8 @@ void BulletFactory2D::populate_attachments_pool(const Ref<PackedScene> bullet_at
     for (size_t i = 0; i < amount_instances; i++)
     {
         BulletAttachment2D *attachment = static_cast<BulletAttachment2D*>(bullet_attachment_scene->instantiate()); // You better pass a packed scene that contains an actual BulletAttachment2D node or this goes kaboom
+        attachment->set_physics_interpolation_mode(Node::PHYSICS_INTERPOLATION_MODE_OFF); // I have custom physics interpolation logic, so disable the Godot one
+        
         attachment->call_on_bullet_spawn_as_disabled();
         bullet_attachments_container->add_child(attachment);
         bullet_attachments_pool.push(attachment);
@@ -741,6 +794,12 @@ void BulletFactory2D::_bind_methods() {
     ClassDB::bind_method(D_METHOD("set_is_debugger_enabled", "new_is_enabled"), &BulletFactory2D::set_is_debugger_enabled);
     ADD_PROPERTY(PropertyInfo(Variant::BOOL, "is_debugger_enabled"), "set_is_debugger_enabled", "get_is_debugger_enabled");
 
+    ClassDB::bind_method(D_METHOD("get_use_physics_interpolation"), &BulletFactory2D::get_use_physics_interpolation);
+    ClassDB::bind_method(D_METHOD("set_use_physics_interpolation_editor", "enable"), &BulletFactory2D::set_use_physics_interpolation_editor);
+    ClassDB::bind_method(D_METHOD("set_use_physics_interpolation_runtime", "enable", "enable_processing_after_finish"), &BulletFactory2D::set_use_physics_interpolation_runtime, DEFVAL(true));
+
+    ADD_PROPERTY(PropertyInfo(Variant::BOOL, "use_physics_interpolation"), "set_use_physics_interpolation_editor", "get_use_physics_interpolation");
+
     ClassDB::bind_method(D_METHOD("spawn_block_bullets", "spawn_data"), &BulletFactory2D::spawn_block_bullets);
     ClassDB::bind_method(D_METHOD("spawn_directional_bullets", "spawn_data"), &BulletFactory2D::spawn_directional_bullets);
 
@@ -789,8 +848,6 @@ void BulletFactory2D::_bind_methods() {
         &BulletFactory2D::debug_get_attachments_pool_info,
         PropertyInfo(Variant::DICTIONARY, "", PROPERTY_HINT_DICTIONARY_TYPE, "int:int")
     );
-
-
 
     ClassDB::bind_static_method("BulletFactory2D",
         D_METHOD("helper_generate_transforms_grid", 

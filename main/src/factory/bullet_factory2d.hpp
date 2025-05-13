@@ -29,7 +29,7 @@ public:
         BLOCK_BULLETS
     };
 
-    // Enum class for grid alignment, mirroring GDScript's Alignment enum
+    // Enum class for grid alignment
     enum Alignment {
         TOP_LEFT,
         TOP_CENTER,
@@ -51,6 +51,8 @@ public:
 
     // Moves all bullets / handles bullet behavior
     void _physics_process(float delta);
+
+    void _process(float delta);
 
     // Spawns DirectionalBullets2D when given a resource containing all needed data
     void spawn_directional_bullets(const Ref<DirectionalBulletsData2D> &spawn_data);
@@ -103,6 +105,13 @@ public:
     
 
     //
+
+    // PHYSICS INTERPOLATION
+    
+    // Toggle physics interpolation on/off
+    bool use_physics_interpolation = false;
+
+    //
     
     // OTHER
     
@@ -110,6 +119,7 @@ public:
     RID physics_space;
     RID get_physics_space() const;
     void set_physics_space(RID new_space_rid);
+
 
     //
 
@@ -206,6 +216,17 @@ private:
     Color block_bullets_debugger_color_cached_before_ready = Color(0, 0, 2, 0.8);
     Color get_block_bullets_debugger_color() const;
     void set_block_bullets_debugger_color(const Color& new_color);
+
+    //
+
+    // PHYSICS INTERPOLATION RELATED
+    
+    // Cache the setting before the factory is ready in the scene tree. / Whenever you see something similar, just know I am doing this to avoid bugs with the editor - keeps state consistent
+    bool use_physics_interpolation_cached_before_ready = false;
+
+    bool get_use_physics_interpolation() const;
+    void set_use_physics_interpolation_runtime(bool new_use_physics_interpolation, bool enable_processing_after_finish=true);
+    void set_use_physics_interpolation_editor(bool new_use_physics_interpolation);
 
     //
 
@@ -381,6 +402,19 @@ private:
             bullets->move_bullets(delta);
             bullets->change_texture_periodically(delta);
             bullets->reduce_lifetime(delta);
+        }
+    }
+
+    // Handles rendering in the case that physics interpolation was enabled
+    template<typename TBullet>
+    void handle_bullet_rendering_interpolation(std::vector<TBullet*>& bullets_vec) {
+        for (auto bullets : bullets_vec)
+        {
+            if (!bullets->is_active) {
+                continue;
+            }
+
+            bullets->interpolate_bullet_visuals();
         }
     }
 

@@ -255,7 +255,6 @@ enemy_scn = ExtResource("7_n3lca")
 
 [node name="BulletFactory2D" type="BulletFactory2D" parent="."]
 block_bullets_debugger_color = Color(0, 0.711976, 0.74061, 0.8)
-z_index = 100
 script = ExtResource("7_6fsjh")
 
 [node name="AllGodotArea2DBulletsContainer" type="Node" parent="."]

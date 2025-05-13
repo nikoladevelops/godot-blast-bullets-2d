@@ -132,7 +132,8 @@ void MultiMeshBullets2D::set_up_bullet_instances(const MultiMeshBulletsData2D &d
 
     bullets_enabled_status.assign(amount_bullets, true);
     set_up_area(data.collision_layer, data.collision_mask, data.monitorable, bullet_factory->physics_space);
-     
+    
+   
     if(all_cached_instance_transforms.size() != 0){
         // If there was old data then we are currently trying to activate a bullets multimesh, so clear everything that is old
         // Note: We never really resize any of these vectors, so capacity always stays the same and the object pooling logic also ensures of this, so no need to reserve different amount of space since it's always going to be the original capacity value/ no memory reallocations
@@ -151,10 +152,19 @@ void MultiMeshBullets2D::set_up_bullet_instances(const MultiMeshBulletsData2D &d
 
     cache_texture_rotation_radians = data.texture_rotation_radians;
     
-    // An attachment_id will always be set but that does not mean it's valid. Always rely on is_bullet_attachment_provided
+    // An attachment_id will always be set but that does not mean it's valid. Always rely on is_bullet_attachment_provided which is being set by calling this function
     cache_attachment_id = set_attachment_related_data(data.bullet_attachment_scene, data.bullet_attachment_offset);
     
     BulletAttachmentObjectPool2D& attachment_pool = bullet_factory->bullet_attachments_pool;
+
+    bool is_physics_interpolation_currently_enabled = bullet_factory->use_physics_interpolation;
+
+    if (is_physics_interpolation_currently_enabled && is_bullet_attachment_provided)
+    {
+        // Delete all old attachment transforms / related to physics interpolation
+        all_previous_attachment_transf.clear();
+        all_previous_attachment_transf.reserve(amount_bullets);
+    }
 
     for (size_t i = 0; i < amount_bullets; i++) {
         RID shape = physics_shapes[i];
@@ -183,7 +193,17 @@ void MultiMeshBullets2D::set_up_bullet_instances(const MultiMeshBulletsData2D &d
             {
                 create_new_bullet_attachment(attachment_transf);
             }
+
+            if (is_physics_interpolation_currently_enabled)
+            {
+                all_previous_attachment_transf.emplace_back(attachment_transf);
+            }
         }
+    }
+
+    if (is_physics_interpolation_currently_enabled)
+    {
+        all_previous_instance_transf = all_cached_instance_transforms;
     }
 
 }
@@ -468,6 +488,8 @@ void MultiMeshBullets2D::load_bullet_instances(const SaveDataMultiMeshBullets2D 
 
 
             BulletAttachment2D* attachment = static_cast<BulletAttachment2D*>(bullet_attachment_scene->instantiate());
+            attachment->set_physics_interpolation_mode(Node::PHYSICS_INTERPOLATION_MODE_OFF);
+
             attachment->attachment_id = cache_attachment_id;
             attachment->stick_relative_to_bullet = cache_stick_relative_to_bullet;
 
@@ -494,6 +516,13 @@ void MultiMeshBullets2D::load_bullet_instances(const SaveDataMultiMeshBullets2D 
 
     // LOAD ROTATION DATA
     set_rotation_data(data.all_bullet_rotation_data, data.rotate_only_textures);
+
+    // If using physics interpolation, ensure that vectors are filled with data
+    if (bullet_factory->use_physics_interpolation)
+    {
+        all_previous_instance_transf = all_cached_instance_transforms;
+        all_previous_attachment_transf = attachment_transforms;
+    }
 }
 
 
@@ -537,6 +566,12 @@ void MultiMeshBullets2D::set_bullet_attachment(const Ref<PackedScene>& attachmen
     }
 }
 
+
+void MultiMeshBullets2D::set_physics_interpolation_related_data(){
+    // If we want to enable physics interpolation we need to ensure that we are populating the data structures that hold previous Transform2D data
+    all_previous_instance_transf = all_cached_instance_transforms;
+    all_previous_attachment_transf = attachment_transforms;
+}
 
 // Called when all bullets have been disabled
 void MultiMeshBullets2D::disable_multimesh() {
@@ -749,6 +784,9 @@ size_t MultiMeshBullets2D::set_attachment_related_data(const Ref<PackedScene> &n
 
 void MultiMeshBullets2D::create_new_bullet_attachment(const Transform2D &attachment_global_transf){
     BulletAttachment2D* attachment = static_cast<BulletAttachment2D*>(bullet_attachment_scene->instantiate());
+    attachment->set_physics_interpolation_mode(Node::PHYSICS_INTERPOLATION_MODE_OFF); // I have custom physics interpolation logic, so disable the Godot one
+   
+
     attachment->set_global_transform(attachment_global_transf);
     attachment->call_on_bullet_spawn(); // call GDScript custom virtual method to ensure the proper state before adding to the scene tree
     
@@ -763,10 +801,13 @@ bool MultiMeshBullets2D::reuse_attachment_from_object_pool(BulletAttachmentObjec
     BulletAttachment2D* attachment = pool.pop(attachment_id);
 
     if (attachment != nullptr) {
+
         attachment->set_global_transform(attachment_global_transf);
 
         attachment_transforms.emplace_back(attachment_global_transf);
         bullet_attachments.emplace_back(attachment);
+
+        attachment->reset_physics_interpolation(); // This is needed for some attachments - CPU Particles for example
 
         attachment->call_on_bullet_activate(); // call GDScript custom virtual method to ensure proper activation/state reset of the bullet attachment you are about to re-use
         return true;

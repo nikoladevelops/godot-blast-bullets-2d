@@ -1,4 +1,4 @@
-[gd_scene load_steps=12 format=3 uid="uid://cud5bunpvk1hb"]
+[gd_scene load_steps=18 format=3 uid="uid://cud5bunpvk1hb"]
 
 [ext_resource type="Script" uid="uid://cj7yt22hrpu8v" path="res://BenchmarkScene/ui.gd" id="1_lkveq"]
 [ext_resource type="Theme" uid="uid://cqmgct2nhqx0e" path="res://shared/ui/btn_disabled_theme.tres" id="2_e8asd"]
@@ -9,6 +9,18 @@
 [ext_resource type="PackedScene" uid="uid://bmmgv82lf5hy2" path="res://shared/ui/custom_label.tscn" id="5_i53y2"]
 [ext_resource type="Script" uid="uid://b7wucn8wglgth" path="res://shared/ui/switch_button.gd" id="7_gbr8l"]
 [ext_resource type="Script" uid="uid://cs67whos5iyl6" path="res://shared/ui/select_btn_view.gd" id="8_44pmw"]
+[ext_resource type="Theme" uid="uid://dwqt78wi7igiw" path="res://shared/ui/chosen_bullet_setting_theme.tres" id="10_520nk"]
+[ext_resource type="Theme" uid="uid://cy4gbtdvhi65p" path="res://shared/ui/not_chosen_bullet_setting_theme.tres" id="11_ptpx1"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_ptpx1"]
+
+[sub_resource type="Theme" id="Theme_ptpx1"]
+Button/styles/disabled = SubResource("StyleBoxFlat_ptpx1")
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_vfxln"]
+
+[sub_resource type="Theme" id="Theme_vfxln"]
+Button/styles/disabled = SubResource("StyleBoxFlat_vfxln")
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_5up31"]
 
@@ -20,6 +32,7 @@ default_player_health = 100.0
 
 [node name="BlockDebuggerColorPicker" type="ColorPicker" parent="."]
 visible = false
+z_index = 5
 anchors_preset = 8
 anchor_left = 0.5
 anchor_top = 0.5
@@ -34,9 +47,11 @@ grow_vertical = 2
 scale = Vector2(0.7, 0.7)
 size_flags_horizontal = 4
 mouse_filter = 0
+theme = SubResource("Theme_ptpx1")
 
 [node name="DirectionalDebuggerColorPicker" type="ColorPicker" parent="."]
 visible = false
+z_index = 5
 anchors_preset = 8
 anchor_left = 0.5
 anchor_top = 0.5
@@ -51,6 +66,24 @@ grow_vertical = 2
 scale = Vector2(0.7, 0.7)
 size_flags_horizontal = 4
 mouse_filter = 0
+theme = SubResource("Theme_vfxln")
+
+[node name="CloseCurrentColorPickerBtn" type="Button" parent="."]
+visible = false
+z_index = 5
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = 118.0
+offset_top = -12.0
+offset_right = 265.0
+offset_bottom = 19.0
+grow_horizontal = 2
+grow_vertical = 2
+focus_mode = 0
+text = "Close Color Picker"
 
 [node name="TopRightContainer" type="VBoxContainer" parent="."]
 custom_minimum_size = Vector2(200, 0)
@@ -1024,6 +1057,93 @@ all_btns = [NodePath("../../TextureSizeContainer/140_140"), NodePath("../../Text
 [node name="SelectZIndexBtnView" parent="BulletSettingsView/SelectViewsContainer" node_paths=PackedStringArray("all_btns") instance=ExtResource("3_cgqfs")]
 all_btns = [NodePath("../../ZIndexContainer/Z_INDEX_0"), NodePath("../../ZIndexContainer/Z_INDEX_1"), NodePath("../../ZIndexContainer/Z_INDEX_2"), NodePath("../../ZIndexContainer/Z_INDEX_3"), NodePath("../../ZIndexContainer/Z_INDEX_MINUS_5")]
 
+[node name="MoreSettingsView" type="Control" parent="."]
+visible = false
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="HBoxContainer" type="HBoxContainer" parent="MoreSettingsView"]
+layout_mode = 1
+offset_right = 705.0
+offset_bottom = 40.0
+
+[node name="PhysicsTickVBoxContainer" type="HBoxContainer" parent="MoreSettingsView/HBoxContainer"]
+layout_mode = 2
+
+[node name="Label" type="Label" parent="MoreSettingsView/HBoxContainer/PhysicsTickVBoxContainer"]
+layout_mode = 2
+text = "Physics Ticks per Second"
+
+[node name="60" type="Button" parent="MoreSettingsView/HBoxContainer/PhysicsTickVBoxContainer"]
+custom_minimum_size = Vector2(40, 40)
+layout_mode = 2
+focus_mode = 0
+text = "60"
+
+[node name="40" type="Button" parent="MoreSettingsView/HBoxContainer/PhysicsTickVBoxContainer"]
+custom_minimum_size = Vector2(40, 40)
+layout_mode = 2
+focus_mode = 0
+text = "40"
+
+[node name="25" type="Button" parent="MoreSettingsView/HBoxContainer/PhysicsTickVBoxContainer"]
+custom_minimum_size = Vector2(40, 40)
+layout_mode = 2
+focus_mode = 0
+text = "25"
+
+[node name="15" type="Button" parent="MoreSettingsView/HBoxContainer/PhysicsTickVBoxContainer"]
+custom_minimum_size = Vector2(40, 40)
+layout_mode = 2
+focus_mode = 0
+text = "15"
+
+[node name="120" type="Button" parent="MoreSettingsView/HBoxContainer/PhysicsTickVBoxContainer"]
+custom_minimum_size = Vector2(40, 40)
+layout_mode = 2
+focus_mode = 0
+text = "120"
+
+[node name="PhysicsInterpolationCheckBox" type="CheckBox" parent="MoreSettingsView/HBoxContainer"]
+layout_mode = 2
+focus_mode = 0
+text = "Enable Physics Interpolation"
+
+[node name="VSyncCheckBox" type="CheckBox" parent="MoreSettingsView/HBoxContainer"]
+layout_mode = 2
+focus_mode = 0
+text = "Enable VSync"
+
+[node name="SelectPhysicsTicksBtnView" parent="MoreSettingsView" node_paths=PackedStringArray("all_btns") instance=ExtResource("3_cgqfs")]
+visible = false
+all_btns = [NodePath("../HBoxContainer/PhysicsTickVBoxContainer/60"), NodePath("../HBoxContainer/PhysicsTickVBoxContainer/40"), NodePath("../HBoxContainer/PhysicsTickVBoxContainer/25"), NodePath("../HBoxContainer/PhysicsTickVBoxContainer/15"), NodePath("../HBoxContainer/PhysicsTickVBoxContainer/120")]
+
+[node name="GodotArea2DBulletsView" type="Control" parent="."]
+visible = false
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="Label" type="Label" parent="GodotArea2DBulletsView"]
+layout_mode = 1
+anchors_preset = 5
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -20.0
+offset_right = 20.0
+offset_bottom = 23.0
+grow_horizontal = 2
+text = "Godot Area2D bullets do NOT support BlastBullets2D plugin features"
+
 [node name="AlwaysVisibleView" type="Control" parent="."]
 layout_mode = 3
 anchors_preset = 15
@@ -1039,10 +1159,10 @@ layout_mode = 1
 anchors_preset = 2
 anchor_top = 1.0
 anchor_bottom = 1.0
-offset_left = 23.0
-offset_top = -176.0
-offset_right = 223.0
-offset_bottom = -146.0
+offset_left = 20.0
+offset_top = -146.0
+offset_right = 220.0
+offset_bottom = -116.0
 grow_vertical = 0
 
 [node name="FillUpPlayerHealthBtn" type="Button" parent="AlwaysVisibleView"]
@@ -1050,10 +1170,10 @@ layout_mode = 1
 anchors_preset = 2
 anchor_top = 1.0
 anchor_bottom = 1.0
-offset_left = 233.0
-offset_top = -177.0
-offset_right = 276.0
-offset_bottom = -146.0
+offset_left = 228.0
+offset_top = -146.0
+offset_right = 271.0
+offset_bottom = -115.0
 grow_vertical = 0
 focus_mode = 0
 text = "Heal"
@@ -1085,9 +1205,9 @@ anchors_preset = 2
 anchor_top = 1.0
 anchor_bottom = 1.0
 offset_left = 6.0
-offset_top = -126.0
+offset_top = -118.0
 offset_right = 354.0
-offset_bottom = -68.0
+offset_bottom = -60.0
 grow_vertical = 0
 alignment = 1
 
@@ -1235,9 +1355,9 @@ text = "1000
 [node name="BulletTypeContainer" type="VBoxContainer" parent="AlwaysVisibleView"]
 layout_mode = 1
 offset_left = 18.0
-offset_top = 294.0
+offset_top = 283.0
 offset_right = 246.0
-offset_bottom = 422.0
+offset_bottom = 411.0
 size_flags_vertical = 8
 
 [node name="Label" type="Label" parent="AlwaysVisibleView/BulletTypeContainer"]
@@ -1272,17 +1392,45 @@ offset_right = 262.0
 offset_bottom = 528.0
 all_btns = [NodePath("../BulletTypeContainer/DirectionalBtn"), NodePath("../BulletTypeContainer/BlockBulletsBtn"), NodePath("../BulletTypeContainer/GodotArea2DBulletsBtn")]
 
-[node name="SwitchViewBtn" type="Button" parent="AlwaysVisibleView"]
+[node name="SettingsUIManagerVBoxContainer" type="VBoxContainer" parent="AlwaysVisibleView"]
 layout_mode = 1
-offset_left = 22.0
-offset_top = 429.0
-offset_right = 242.0
-offset_bottom = 460.0
+anchors_preset = 2
+anchor_top = 1.0
+anchor_bottom = 1.0
+offset_left = 19.0
+offset_top = -231.0
+offset_right = 228.0
+offset_bottom = -130.0
+grow_vertical = 0
+
+[node name="BulletSettingsBtn" type="Button" parent="AlwaysVisibleView/SettingsUIManagerVBoxContainer"]
+layout_mode = 2
 focus_mode = 0
-text = "Show Object Pool Settings"
+text = "Bullet Settings"
+
+[node name="ObjectPoolSettingsBtn" type="Button" parent="AlwaysVisibleView/SettingsUIManagerVBoxContainer"]
+layout_mode = 2
+focus_mode = 0
+text = "Object Pool Settings"
+
+[node name="MoreSettingsBtn" type="Button" parent="AlwaysVisibleView/SettingsUIManagerVBoxContainer"]
+layout_mode = 2
+focus_mode = 0
+text = "More Settings"
+
+[node name="ChangeSettingsUISelectBtnView" type="Control" parent="AlwaysVisibleView" node_paths=PackedStringArray("all_btns")]
+anchors_preset = 0
+offset_right = 40.0
+offset_bottom = 40.0
+script = ExtResource("8_44pmw")
+all_btns = [NodePath("../SettingsUIManagerVBoxContainer/BulletSettingsBtn"), NodePath("../SettingsUIManagerVBoxContainer/ObjectPoolSettingsBtn"), NodePath("../SettingsUIManagerVBoxContainer/MoreSettingsBtn")]
+selected_btn_theme = ExtResource("10_520nk")
+disabled_btn_theme = ExtResource("11_ptpx1")
+metadata/_custom_type_script = "uid://cs67whos5iyl6"
 
 [connection signal="color_changed" from="BlockDebuggerColorPicker" to="." method="_on_block_debugger_color_picker_color_changed"]
 [connection signal="color_changed" from="DirectionalDebuggerColorPicker" to="." method="_on_directional_debugger_color_picker_color_changed"]
+[connection signal="pressed" from="CloseCurrentColorPickerBtn" to="." method="_on_close_current_color_picker_btn_pressed"]
 [connection signal="pressed" from="TopRightContainer/TrackFPSBtn" to="." method="_on_track_fps_button_pressed"]
 [connection signal="pressed" from="TopRightContainer/SaveBtn" to="." method="_on_save_btn_pressed"]
 [connection signal="pressed" from="TopRightContainer/LoadBtn" to="." method="_on_load_btn_pressed"]
@@ -1314,8 +1462,11 @@ text = "Show Object Pool Settings"
 [connection signal="new_btn_selected" from="BulletSettingsView/SelectViewsContainer/SelectBulletLifetimeView" to="." method="_on_select_bullet_lifetime_view_new_btn_selected"]
 [connection signal="new_btn_selected" from="BulletSettingsView/SelectViewsContainer/SelectTextureSizeBtnView" to="." method="_on_select_texture_size_btn_view_new_btn_selected"]
 [connection signal="new_btn_selected" from="BulletSettingsView/SelectViewsContainer/SelectZIndexBtnView" to="." method="_on_select_z_index_btn_view_new_btn_selected"]
+[connection signal="pressed" from="MoreSettingsView/HBoxContainer/PhysicsInterpolationCheckBox" to="." method="_on_physics_interpolation_check_box_pressed"]
+[connection signal="pressed" from="MoreSettingsView/HBoxContainer/VSyncCheckBox" to="." method="_on_v_sync_check_box_pressed"]
+[connection signal="new_btn_selected" from="MoreSettingsView/SelectPhysicsTicksBtnView" to="." method="_on_select_physics_ticks_btn_view_new_btn_selected"]
 [connection signal="pressed" from="AlwaysVisibleView/FillUpPlayerHealthBtn" to="." method="_on_fill_up_player_health_btn_pressed"]
 [connection signal="new_btn_selected" from="AlwaysVisibleView/SelectFireTimerBtnView" to="." method="_on_select_fire_timer_btn_view_new_btn_selected"]
 [connection signal="new_btn_selected" from="AlwaysVisibleView/SelectAmountBulletsBtnView" to="." method="_on_select_amount_bullets_btn_view_new_btn_selected"]
 [connection signal="new_btn_selected" from="AlwaysVisibleView/SelectBulletTypeView" to="." method="_on_select_bullet_type_view_new_btn_selected"]
-[connection signal="pressed" from="AlwaysVisibleView/SwitchViewBtn" to="." method="_on_switch_view_btn_pressed"]
+[connection signal="new_btn_selected" from="AlwaysVisibleView/ChangeSettingsUISelectBtnView" to="." method="_on_change_settings_ui_select_btn_view_new_btn_selected"]

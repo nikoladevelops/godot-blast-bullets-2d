@@ -13,10 +13,13 @@ func on_bullet_spawn_as_disabled() -> void:
 	visible = false
 
 func on_bullet_disable() -> void:
-	CPUParticles.one_shot = true # instead of doing CPUParticles.emitting=false, this is so I can take advantage of the finished_emitting signal
+	visible = false
+	set_process(false)
+	set_physics_process(false)
 
 func on_bullet_activate() -> void:
 	CPUParticles.one_shot = false
+	
 	CPUParticles.restart()
 	
 	set_process(true)
@@ -29,7 +32,3 @@ func on_bullet_save() -> Resource:
 func on_bullet_load(custom_data_to_load: Resource) -> void:
 	pass
 	
-func _on_cpu_particles_2d_finished() -> void:
-	visible = false
-	set_process(false)
-	set_physics_process(false)
