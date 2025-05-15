@@ -23,5 +23,5 @@ func take_damage(dmg_amount:int)->void:
 		die()
 
 # Sets a brand new collision mask based on the integers passed / Should be overriden in child to provide correct implementation based on bullet type
-func set_bullet_collision_mask(arr:Array[int])->void:
+func set_bullet_collision_mask(_arr:Array[int])->void:
 	pass

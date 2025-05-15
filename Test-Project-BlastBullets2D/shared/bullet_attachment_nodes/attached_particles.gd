@@ -29,6 +29,6 @@ func on_bullet_activate() -> void:
 func on_bullet_save() -> Resource:
 	return null
 
-func on_bullet_load(custom_data_to_load: Resource) -> void:
+func on_bullet_load(_custom_data_to_load: Resource) -> void:
 	pass
 	

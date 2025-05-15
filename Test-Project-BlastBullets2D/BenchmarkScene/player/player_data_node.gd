@@ -63,6 +63,17 @@ var bullets_amount:int
 
 var cached_transforms:Array[Transform2D]
 
+## Bullet Grid related
+var rows_per_column:int = 10
+var grid_alignment:BulletFactory2D.Alignment = BulletFactory2D.Alignment.CENTER_LEFT
+var col_offset:float = 150
+var row_offset:float = 150
+
+var rotate_grid_with_marker:bool = true
+var random_local_rotation:bool = false
+var random_global_rotation:bool = false
+##
+
 # Sets up everything so that the PlayerDataNode can be used, basically acts like an additional constructor that has to be called
 func set_up(new_bullet_marker:Marker2D) -> void:
 	bullet_marker = new_bullet_marker
@@ -226,8 +237,6 @@ func set_up_directional_bullets_data()->DirectionalBulletsData2D:
 #
 	#return generated_transforms
 
-
-
 # Determines which type of bullets to be spawned
 func spawn_bullets(player_rotation:float)->void:
 	## All of this logic here is because the shaders I use take advantage of instance uniforms, so each time I spawn a brand new instance I actually want a different value for those shader params
@@ -253,18 +262,18 @@ func spawn_bullets(player_rotation:float)->void:
 # Spawns MultiMeshDirectional bullets
 func spawn_multi_mesh_directional_bullets()->void:
 	if bullets_amount < 10:
-		directional_bullets_data.transforms = BulletFactory2D.helper_generate_transforms_grid(bullets_amount, bullet_marker.get_global_transform(), bullets_amount)
+		directional_bullets_data.transforms = BulletFactory2D.helper_generate_transforms_grid(bullets_amount, bullet_marker.get_global_transform(), bullets_amount, grid_alignment, col_offset, row_offset, rotate_grid_with_marker, random_local_rotation, random_global_rotation)
 	else:
-		directional_bullets_data.transforms = BulletFactory2D.helper_generate_transforms_grid(bullets_amount, bullet_marker.get_global_transform(), 10)
+		directional_bullets_data.transforms = BulletFactory2D.helper_generate_transforms_grid(bullets_amount, bullet_marker.get_global_transform(), rows_per_column, grid_alignment, col_offset, row_offset, rotate_grid_with_marker, random_local_rotation, random_global_rotation)
 	
 	BENCHMARK_GLOBALS.FACTORY.spawn_directional_bullets(directional_bullets_data)
 	
 # Spawns MultiMeshBlock bullets
 func spawn_multi_mesh_block_bullets(player_rotation:float)->void:
 	if bullets_amount < 10:
-		block_bullets_data.transforms = BulletFactory2D.helper_generate_transforms_grid(bullets_amount, bullet_marker.get_global_transform(), bullets_amount)
+		block_bullets_data.transforms = BulletFactory2D.helper_generate_transforms_grid(bullets_amount, bullet_marker.get_global_transform(), bullets_amount, grid_alignment, col_offset, row_offset, rotate_grid_with_marker, random_local_rotation, random_global_rotation)
 	else:
-		block_bullets_data.transforms = BulletFactory2D.helper_generate_transforms_grid(bullets_amount, bullet_marker.get_global_transform(), 10)
+		block_bullets_data.transforms = BulletFactory2D.helper_generate_transforms_grid(bullets_amount, bullet_marker.get_global_transform(), rows_per_column, grid_alignment, col_offset, row_offset, rotate_grid_with_marker, random_local_rotation, random_global_rotation)
 	
 	
 	block_bullets_data.block_rotation_radians=player_rotation # I want the block of bullets to be rotated the same way that the player is rotated
@@ -275,9 +284,9 @@ func spawn_godot_area2d_bullets(player_rotation:float)->void:
 	var transforms:Array[Transform2D]
 	
 	if bullets_amount < 10:
-		transforms = BulletFactory2D.helper_generate_transforms_grid(bullets_amount, bullet_marker.get_global_transform(), bullets_amount)
+		transforms = BulletFactory2D.helper_generate_transforms_grid(bullets_amount, bullet_marker.get_global_transform(), bullets_amount, grid_alignment, col_offset, row_offset, rotate_grid_with_marker, random_local_rotation, random_global_rotation)
 	else:
-		transforms = BulletFactory2D.helper_generate_transforms_grid(bullets_amount, bullet_marker.get_global_transform(), 10)
+		transforms = BulletFactory2D.helper_generate_transforms_grid(bullets_amount, bullet_marker.get_global_transform(), rows_per_column, grid_alignment, col_offset, row_offset, rotate_grid_with_marker, random_local_rotation, random_global_rotation)
 	
 	var bullet_scale:Vector2 = Vector2(5,5)
 	var bullet_direction:Vector2 = Vector2(1, 0).rotated(player_rotation)
@@ -461,8 +470,31 @@ func switch_material(option_index)->void:
 func set_bullets_z_index(new_z_index:int)->void:
 	block_bullets_data.z_index = new_z_index
 	directional_bullets_data.z_index = new_z_index
-	
+
+## Grid Related
 # Will make it so that directional bullets' direction gets adjusted based on the rotation data that they have
 func set_adjust_direction_based_on_rotation(should_adjust_direction:bool)->void:
 	directional_bullets_data.adjust_direction_based_on_rotation = should_adjust_direction
 	
+func set_grid_rows_per_column(new_rows_per_column:int)->void:
+	rows_per_column = new_rows_per_column
+
+func set_grid_alignment(new_alignment:BulletFactory2D.Alignment)->void:
+	grid_alignment = new_alignment
+
+
+func set_grid_column_offset(new_col_offset:float)->void:
+	col_offset = new_col_offset
+
+func set_grid_row_offset(new_row_offset:float)->void:
+	row_offset = new_row_offset
+
+func set_rotate_grid_with_marker(enable:bool)->void:
+	rotate_grid_with_marker = enable
+	
+func set_grid_random_local_rotation(enable:bool)->void:
+	random_local_rotation = enable
+
+func set_grid_random_global_rotation(enable:bool)->void:
+	random_global_rotation = enable
+##

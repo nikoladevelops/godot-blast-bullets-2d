@@ -1123,6 +1123,204 @@ text = "Enable VSync"
 visible = false
 all_btns = [NodePath("../HBoxContainer/PhysicsTickVBoxContainer/60"), NodePath("../HBoxContainer/PhysicsTickVBoxContainer/40"), NodePath("../HBoxContainer/PhysicsTickVBoxContainer/25"), NodePath("../HBoxContainer/PhysicsTickVBoxContainer/15"), NodePath("../HBoxContainer/PhysicsTickVBoxContainer/120")]
 
+[node name="VBoxContainer" type="VBoxContainer" parent="MoreSettingsView"]
+layout_mode = 1
+anchors_preset = 3
+anchor_left = 1.0
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -617.0
+offset_top = -199.0
+offset_right = -261.0
+grow_horizontal = 0
+grow_vertical = 0
+
+[node name="Label" type="Label" parent="MoreSettingsView/VBoxContainer"]
+layout_mode = 2
+text = "Bullet Grid Options"
+horizontal_alignment = 1
+
+[node name="RowsPerColumnHBoxContainer" type="HBoxContainer" parent="MoreSettingsView/VBoxContainer"]
+layout_mode = 2
+
+[node name="Label" type="Label" parent="MoreSettingsView/VBoxContainer/RowsPerColumnHBoxContainer"]
+layout_mode = 2
+text = "Rows per Column"
+
+[node name="10rows" type="Button" parent="MoreSettingsView/VBoxContainer/RowsPerColumnHBoxContainer"]
+custom_minimum_size = Vector2(40, 40)
+layout_mode = 2
+focus_mode = 0
+text = "10"
+
+[node name="15rows" type="Button" parent="MoreSettingsView/VBoxContainer/RowsPerColumnHBoxContainer"]
+custom_minimum_size = Vector2(40, 40)
+layout_mode = 2
+focus_mode = 0
+text = "15"
+
+[node name="25rows" type="Button" parent="MoreSettingsView/VBoxContainer/RowsPerColumnHBoxContainer"]
+custom_minimum_size = Vector2(40, 40)
+layout_mode = 2
+focus_mode = 0
+text = "25"
+
+[node name="5rows" type="Button" parent="MoreSettingsView/VBoxContainer/RowsPerColumnHBoxContainer"]
+custom_minimum_size = Vector2(40, 40)
+layout_mode = 2
+focus_mode = 0
+text = "5"
+
+[node name="50rows" type="Button" parent="MoreSettingsView/VBoxContainer/RowsPerColumnHBoxContainer"]
+custom_minimum_size = Vector2(40, 40)
+layout_mode = 2
+focus_mode = 0
+text = "50"
+
+[node name="AlignmentOptionsHBoxContainer" type="HBoxContainer" parent="MoreSettingsView/VBoxContainer"]
+layout_mode = 2
+
+[node name="Label" type="Label" parent="MoreSettingsView/VBoxContainer/AlignmentOptionsHBoxContainer"]
+layout_mode = 2
+text = "Alignment"
+
+[node name="CenterLeftAlignmentBtn" type="Button" parent="MoreSettingsView/VBoxContainer/AlignmentOptionsHBoxContainer"]
+custom_minimum_size = Vector2(40, 40)
+layout_mode = 2
+focus_mode = 0
+text = "CenterLeft"
+
+[node name="TopLeftAlignmentBtn" type="Button" parent="MoreSettingsView/VBoxContainer/AlignmentOptionsHBoxContainer"]
+custom_minimum_size = Vector2(40, 40)
+layout_mode = 2
+focus_mode = 0
+text = "TopLeft"
+
+[node name="BottomLeftAlignmentBtn" type="Button" parent="MoreSettingsView/VBoxContainer/AlignmentOptionsHBoxContainer"]
+custom_minimum_size = Vector2(40, 40)
+layout_mode = 2
+focus_mode = 0
+text = "BottomLeft"
+
+[node name="ColumnOffsetHBoxContainer" type="HBoxContainer" parent="MoreSettingsView/VBoxContainer"]
+layout_mode = 2
+
+[node name="Label" type="Label" parent="MoreSettingsView/VBoxContainer/ColumnOffsetHBoxContainer"]
+layout_mode = 2
+text = "Column Offset"
+
+[node name="150col-offset" type="Button" parent="MoreSettingsView/VBoxContainer/ColumnOffsetHBoxContainer"]
+custom_minimum_size = Vector2(40, 40)
+layout_mode = 2
+focus_mode = 0
+text = "150"
+
+[node name="250col-offset" type="Button" parent="MoreSettingsView/VBoxContainer/ColumnOffsetHBoxContainer"]
+custom_minimum_size = Vector2(40, 40)
+layout_mode = 2
+focus_mode = 0
+text = "250"
+
+[node name="350col-offset" type="Button" parent="MoreSettingsView/VBoxContainer/ColumnOffsetHBoxContainer"]
+custom_minimum_size = Vector2(40, 40)
+layout_mode = 2
+focus_mode = 0
+text = "350"
+
+[node name="500col-offset" type="Button" parent="MoreSettingsView/VBoxContainer/ColumnOffsetHBoxContainer"]
+custom_minimum_size = Vector2(40, 40)
+layout_mode = 2
+focus_mode = 0
+text = "500"
+
+[node name="50col-offset" type="Button" parent="MoreSettingsView/VBoxContainer/ColumnOffsetHBoxContainer"]
+custom_minimum_size = Vector2(40, 40)
+layout_mode = 2
+focus_mode = 0
+text = "50"
+
+[node name="RowOffsetHBoxContainer2" type="HBoxContainer" parent="MoreSettingsView/VBoxContainer"]
+layout_mode = 2
+
+[node name="Label" type="Label" parent="MoreSettingsView/VBoxContainer/RowOffsetHBoxContainer2"]
+layout_mode = 2
+text = "Row Offset"
+
+[node name="150row-offset" type="Button" parent="MoreSettingsView/VBoxContainer/RowOffsetHBoxContainer2"]
+custom_minimum_size = Vector2(40, 40)
+layout_mode = 2
+focus_mode = 0
+text = "150"
+
+[node name="250row-offset" type="Button" parent="MoreSettingsView/VBoxContainer/RowOffsetHBoxContainer2"]
+custom_minimum_size = Vector2(40, 40)
+layout_mode = 2
+focus_mode = 0
+text = "250"
+
+[node name="350row-offset" type="Button" parent="MoreSettingsView/VBoxContainer/RowOffsetHBoxContainer2"]
+custom_minimum_size = Vector2(40, 40)
+layout_mode = 2
+focus_mode = 0
+text = "350"
+
+[node name="500row-offset" type="Button" parent="MoreSettingsView/VBoxContainer/RowOffsetHBoxContainer2"]
+custom_minimum_size = Vector2(40, 40)
+layout_mode = 2
+focus_mode = 0
+text = "500"
+
+[node name="50row-offset" type="Button" parent="MoreSettingsView/VBoxContainer/RowOffsetHBoxContainer2"]
+custom_minimum_size = Vector2(40, 40)
+layout_mode = 2
+focus_mode = 0
+text = "50"
+
+[node name="VBoxContainer2" type="VBoxContainer" parent="MoreSettingsView"]
+layout_mode = 1
+anchors_preset = 3
+anchor_left = 1.0
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -247.0
+offset_top = -40.0
+grow_horizontal = 0
+grow_vertical = 0
+
+[node name="RotateGridWithMarkerCheckBox" type="CheckBox" parent="MoreSettingsView/VBoxContainer2"]
+layout_mode = 2
+focus_mode = 0
+button_pressed = true
+text = "Rotate Grid With Marker"
+
+[node name="RandomLocalRotationCheckBox" type="CheckBox" parent="MoreSettingsView/VBoxContainer2"]
+layout_mode = 2
+focus_mode = 0
+text = "Random Local Rotation"
+
+[node name="RandomGlobalRotationCheckBox" type="CheckBox" parent="MoreSettingsView/VBoxContainer2"]
+layout_mode = 2
+focus_mode = 0
+text = "Random Global Rotation"
+
+[node name="SelectRowsPerColumnBtnView" parent="MoreSettingsView" node_paths=PackedStringArray("all_btns") instance=ExtResource("3_cgqfs")]
+visible = false
+all_btns = [NodePath("../VBoxContainer/RowsPerColumnHBoxContainer/10rows"), NodePath("../VBoxContainer/RowsPerColumnHBoxContainer/15rows"), NodePath("../VBoxContainer/RowsPerColumnHBoxContainer/25rows"), NodePath("../VBoxContainer/RowsPerColumnHBoxContainer/5rows"), NodePath("../VBoxContainer/RowsPerColumnHBoxContainer/50rows")]
+
+[node name="SelectGridAlignmentBtnView" parent="MoreSettingsView" node_paths=PackedStringArray("all_btns") instance=ExtResource("3_cgqfs")]
+visible = false
+all_btns = [NodePath("../VBoxContainer/AlignmentOptionsHBoxContainer/CenterLeftAlignmentBtn"), NodePath("../VBoxContainer/AlignmentOptionsHBoxContainer/TopLeftAlignmentBtn"), NodePath("../VBoxContainer/AlignmentOptionsHBoxContainer/BottomLeftAlignmentBtn")]
+
+[node name="SelectColumnOffsetBtnView" parent="MoreSettingsView" node_paths=PackedStringArray("all_btns") instance=ExtResource("3_cgqfs")]
+visible = false
+all_btns = [NodePath("../VBoxContainer/ColumnOffsetHBoxContainer/150col-offset"), NodePath("../VBoxContainer/ColumnOffsetHBoxContainer/250col-offset"), NodePath("../VBoxContainer/ColumnOffsetHBoxContainer/350col-offset"), NodePath("../VBoxContainer/ColumnOffsetHBoxContainer/500col-offset"), NodePath("../VBoxContainer/ColumnOffsetHBoxContainer/50col-offset")]
+
+[node name="SelectRowOffsetBtnView" parent="MoreSettingsView" node_paths=PackedStringArray("all_btns") instance=ExtResource("3_cgqfs")]
+visible = false
+all_btns = [NodePath("../VBoxContainer/RowOffsetHBoxContainer2/150row-offset"), NodePath("../VBoxContainer/RowOffsetHBoxContainer2/250row-offset"), NodePath("../VBoxContainer/RowOffsetHBoxContainer2/350row-offset"), NodePath("../VBoxContainer/RowOffsetHBoxContainer2/500row-offset"), NodePath("../VBoxContainer/RowOffsetHBoxContainer2/50row-offset")]
+
 [node name="GodotArea2DBulletsView" type="Control" parent="."]
 visible = false
 layout_mode = 3
@@ -1465,6 +1663,13 @@ metadata/_custom_type_script = "uid://cs67whos5iyl6"
 [connection signal="pressed" from="MoreSettingsView/HBoxContainer/PhysicsInterpolationCheckBox" to="." method="_on_physics_interpolation_check_box_pressed"]
 [connection signal="pressed" from="MoreSettingsView/HBoxContainer/VSyncCheckBox" to="." method="_on_v_sync_check_box_pressed"]
 [connection signal="new_btn_selected" from="MoreSettingsView/SelectPhysicsTicksBtnView" to="." method="_on_select_physics_ticks_btn_view_new_btn_selected"]
+[connection signal="pressed" from="MoreSettingsView/VBoxContainer2/RotateGridWithMarkerCheckBox" to="." method="_on_rotate_grid_with_marker_check_box_pressed"]
+[connection signal="pressed" from="MoreSettingsView/VBoxContainer2/RandomLocalRotationCheckBox" to="." method="_on_random_local_rotation_check_box_pressed"]
+[connection signal="pressed" from="MoreSettingsView/VBoxContainer2/RandomGlobalRotationCheckBox" to="." method="_on_random_global_rotation_check_box_pressed"]
+[connection signal="new_btn_selected" from="MoreSettingsView/SelectRowsPerColumnBtnView" to="." method="_on_select_rows_per_column_btn_view_new_btn_selected"]
+[connection signal="new_btn_selected" from="MoreSettingsView/SelectGridAlignmentBtnView" to="." method="_on_select_grid_alignment_btn_view_new_btn_selected"]
+[connection signal="new_btn_selected" from="MoreSettingsView/SelectColumnOffsetBtnView" to="." method="_on_select_column_offset_btn_view_new_btn_selected"]
+[connection signal="new_btn_selected" from="MoreSettingsView/SelectRowOffsetBtnView" to="." method="_on_select_row_offset_btn_view_new_btn_selected"]
 [connection signal="pressed" from="AlwaysVisibleView/FillUpPlayerHealthBtn" to="." method="_on_fill_up_player_health_btn_pressed"]
 [connection signal="new_btn_selected" from="AlwaysVisibleView/SelectFireTimerBtnView" to="." method="_on_select_fire_timer_btn_view_new_btn_selected"]
 [connection signal="new_btn_selected" from="AlwaysVisibleView/SelectAmountBulletsBtnView" to="." method="_on_select_amount_bullets_btn_view_new_btn_selected"]

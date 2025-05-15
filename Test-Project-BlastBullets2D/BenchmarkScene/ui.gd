@@ -107,6 +107,12 @@ var last_selected_color_picker:ColorPicker = null
 @onready var physics_interpolation_check_box:CheckBox = $MoreSettingsView/HBoxContainer/PhysicsInterpolationCheckBox
 # Responsible for setting VSync ON/OFF
 @onready var enable_v_sync_check_box:CheckBox = $MoreSettingsView/HBoxContainer/VSyncCheckBox
+# Responsible for setting whether the grid should rotate with the marker
+@onready var rotate_grid_with_marker_check_box:CheckBox = $MoreSettingsView/VBoxContainer2/RotateGridWithMarkerCheckBox
+# Responsible for setting random local rotation when spawning bullets
+@onready var random_local_rotation_check_box:CheckBox = $MoreSettingsView/VBoxContainer2/RandomLocalRotationCheckBox
+# Responsible for setting random global rotation when spawning bullets
+@onready var random_global_rotation_check_box:CheckBox = $MoreSettingsView/VBoxContainer2/RandomGlobalRotationCheckBox
 ##
 
 # Whether the attachments should go to the object pool after freeing all active bullets in the factory
@@ -471,7 +477,7 @@ func _on_adjust_direction_based_on_rotation_check_box_pressed() -> void:
 	BENCHMARK_GLOBALS.PLAYER_DATA_NODE.set_adjust_direction_based_on_rotation(should_adjust_direction)
 
 
-func _on_change_settings_ui_select_btn_view_new_btn_selected(new_selected_btn: Button) -> void:
+func _on_change_settings_ui_select_btn_view_new_btn_selected(_new_selected_btn: Button) -> void:
 	if last_selected_color_picker != null:
 		set_color_picker_visible(last_selected_color_picker, false)
 	
@@ -496,6 +502,8 @@ func _on_change_settings_ui_select_btn_view_new_btn_selected(new_selected_btn: B
 			last_visible_ui_setting_view = more_settings_view
 
 
+## MORE SETTINGS VIEW RELATED
+
 func _on_select_physics_ticks_btn_view_new_btn_selected(new_selected_btn: Button) -> void:
 	var ticks_per_second:int = new_selected_btn.text.to_int()
 	Engine.physics_ticks_per_second = ticks_per_second
@@ -517,3 +525,46 @@ func _on_v_sync_check_box_pressed() -> void:
 		DisplayServer.window_set_vsync_mode(DisplayServer.VSYNC_ENABLED)
 	else:
 		DisplayServer.window_set_vsync_mode(DisplayServer.VSYNC_DISABLED)
+
+
+func _on_select_rows_per_column_btn_view_new_btn_selected(new_selected_btn: Button) -> void:
+	var new_rows_per_column:int = new_selected_btn.text.to_int()
+	BENCHMARK_GLOBALS.PLAYER_DATA_NODE.set_grid_rows_per_column(new_rows_per_column)
+
+
+func _on_select_grid_alignment_btn_view_new_btn_selected(new_selected_btn: Button) -> void:
+	var new_alignment:BulletFactory2D.Alignment
+	match new_selected_btn.text:
+		"CenterLeft":
+			new_alignment = BulletFactory2D.Alignment.CENTER_LEFT
+		"Topleft":
+			new_alignment = BulletFactory2D.Alignment.TOP_LEFT
+		"BottomLeft":
+			new_alignment = BulletFactory2D.Alignment.BOTTOM_LEFT
+			
+	BENCHMARK_GLOBALS.PLAYER_DATA_NODE.set_grid_alignment(new_alignment)
+
+
+func _on_select_column_offset_btn_view_new_btn_selected(new_selected_btn: Button) -> void:
+	var new_col_offset:float = new_selected_btn.text.to_float()
+	BENCHMARK_GLOBALS.PLAYER_DATA_NODE.set_grid_column_offset(new_col_offset)
+
+
+func _on_select_row_offset_btn_view_new_btn_selected(new_selected_btn: Button) -> void:
+	var new_row_offset:float = new_selected_btn.text.to_float()
+	BENCHMARK_GLOBALS.PLAYER_DATA_NODE.set_grid_row_offset(new_row_offset)
+
+
+func _on_rotate_grid_with_marker_check_box_pressed() -> void:
+	var new_rotate_grid_with_marker:bool = rotate_grid_with_marker_check_box.button_pressed
+	BENCHMARK_GLOBALS.PLAYER_DATA_NODE.set_rotate_grid_with_marker(new_rotate_grid_with_marker)
+
+
+func _on_random_local_rotation_check_box_pressed() -> void:
+	var should_use_random_local_rotation:bool = random_local_rotation_check_box.button_pressed
+	BENCHMARK_GLOBALS.PLAYER_DATA_NODE.set_grid_random_local_rotation(should_use_random_local_rotation)
+
+
+func _on_random_global_rotation_check_box_pressed() -> void:
+	var should_use_random_global_rotation:bool = random_global_rotation_check_box.button_pressed
+	BENCHMARK_GLOBALS.PLAYER_DATA_NODE.set_grid_random_global_rotation(should_use_random_global_rotation)

@@ -31,7 +31,7 @@ func _on_body_entered(enemy_body: Object, bullets_custom_data: Resource, _bullet
 	#print("Bullet just collided with a body")
 
 # This function will only be executed if the bullets_data has the is_life_time_over_signal_enabled property set to TRUE
-func _on_life_time_over(bullets_custom_data: Resource, all_bullet_global_transforms: Array) -> void:
+func _on_life_time_over(_bullets_custom_data: Resource, _all_bullet_global_transforms: Array) -> void:
 	pass
 	# Just a small example that you can spawn particles or other things in the same exact position where the bullet got disabled (its life time got to 0)
 	#for t in all_bullet_global_transforms:
