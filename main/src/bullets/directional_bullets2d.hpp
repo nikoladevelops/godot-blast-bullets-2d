@@ -13,9 +13,10 @@ class DirectionalBullets2D : public MultiMeshBullets2D {
 public:
 _ALWAYS_INLINE_ void move_bullets(float delta) {
     float cache_first_rotation_result = 0.0f;
+    bool max_rotation_speed_reached = false;
     // Accelerate only the first bullet rotation speed
     if(is_rotation_active && use_only_first_rotation_data){
-        accelerate_bullet_rotation_speed(0, delta); // accelerate only the first one once
+        max_rotation_speed_reached = accelerate_bullet_rotation_speed(0, delta); // accelerate only the first one once
         cache_first_rotation_result = all_rotation_speed[0] * delta;
     }
 
@@ -45,16 +46,25 @@ _ALWAYS_INLINE_ void move_bullets(float delta) {
         float rotation_angle = 0.0f;
         if(is_rotation_active){
             if(!use_only_first_rotation_data){
-                accelerate_bullet_rotation_speed(i, delta);
+                max_rotation_speed_reached = accelerate_bullet_rotation_speed(i, delta);
                 rotation_angle = all_rotation_speed[i] * delta;
             }else{
                 rotation_angle = cache_first_rotation_result;
             }
             
-            rotate_transform_locally(curr_instance_transf, rotation_angle);
+            // If max rotation speed has been reached and the setting stop_rotation_when_max_reached has been set then rotation should be stopped
+            if (max_rotation_speed_reached && stop_rotation_when_max_reached){
+                // Don't rotate
+            }
+            else {
+                // In all other cases rotation should continue
+
+                rotate_transform_locally(curr_instance_transf, rotation_angle);
             
-            if(!rotate_only_textures){
-                rotate_transform_locally(curr_shape_transf, rotation_angle);
+                if(!rotate_only_textures){
+                    rotate_transform_locally(curr_shape_transf, rotation_angle);
+                }   
+
             }
 
             if (adjust_direction_based_on_rotation)
@@ -70,7 +80,6 @@ _ALWAYS_INLINE_ void move_bullets(float delta) {
         Vector2 cache_velocity_calc = all_cached_velocity[i] * delta;
         curr_instance_origin += cache_velocity_calc;
         curr_shape_origin += cache_velocity_calc;
-
 
         curr_instance_transf.set_origin(curr_instance_origin);
         curr_shape_transf.set_origin(curr_shape_origin);

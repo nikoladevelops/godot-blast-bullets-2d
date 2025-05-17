@@ -56,6 +56,8 @@ public:
 
     bool rotate_only_textures = false;
 
+    bool stop_rotation_when_max_reached = false;
+
     // BULLET SPEED RELATED
 
     TypedArray<float> all_cached_speed = TypedArray<float>();
@@ -238,6 +240,8 @@ public:
     bool get_is_life_time_over_signal_enabled() const;
     void set_is_life_time_over_signal_enabled(bool new_is_life_time_over_signal_enabled);
 
+    bool get_stop_rotation_when_max_reached() const;
+    void set_stop_rotation_when_max_reached(bool new_stop_rotation_when_max_reached);
 
     static void _bind_methods();
 };

@@ -70,17 +70,17 @@ collision_mask = 0
 shape = SubResource("RectangleShape2D_qn5x5")
 
 [node name="Label" type="Label" parent="Level/StaticBody2D"]
-offset_left = -124.0
+offset_left = -147.0
 offset_top = -49.0
-offset_right = 165.0
+offset_right = 142.0
 offset_bottom = 14.0
 theme_override_font_sizes/font_size = 45
 text = "StaticBody2D"
 
 [node name="Label2" type="Label" parent="Level/StaticBody2D"]
-offset_left = -131.0
+offset_left = -154.0
 offset_top = 11.0
-offset_right = 174.0
+offset_right = 151.0
 offset_bottom = 53.0
 theme_override_font_sizes/font_size = 30
 text = "(enable monitorable)"

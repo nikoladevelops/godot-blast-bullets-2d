@@ -309,7 +309,7 @@ func generate_bullet_rotation_data(option_index:int)->void:
 		0:
 			bullet_rotation_data = []
 		1:
-			bullet_rotation_data = BulletRotationData2D.generate_random_data(bullets_amount, -2.5, 5.5, -2, 3, -0.5, 0.5)
+			bullet_rotation_data = BulletRotationData2D.generate_random_data(bullets_amount, 2.5, 8.5, 13, 23, 8, 12)
 		2:
 			bullet_rotation_data = BulletRotationData2D.generate_random_data(bullets_amount, 5.5, 10, 12, 15, 1, 2.5)
 		3:
@@ -493,4 +493,9 @@ func set_rotate_grid_with_marker(enable:bool)->void:
 	
 func set_grid_random_local_rotation(enable:bool)->void:
 	random_local_rotation = enable
+	
+func set_stop_rotation_when_max_reached(enable:bool)->void:
+	block_bullets_data.stop_rotation_when_max_reached = enable
+	directional_bullets_data.stop_rotation_when_max_reached = enable
+	
 ##

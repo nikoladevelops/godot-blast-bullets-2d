@@ -133,6 +133,7 @@ void MultiMeshBullets2D::set_up_bullet_instances(const MultiMeshBulletsData2D &d
     bullets_enabled_status.assign(amount_bullets, true);
     set_up_area(data.collision_layer, data.collision_mask, data.monitorable, bullet_factory->physics_space);
     
+    stop_rotation_when_max_reached = data.stop_rotation_when_max_reached;
    
     if(all_cached_instance_transforms.size() != 0){
         // If there was old data then we are currently trying to activate a bullets multimesh, so clear everything that is old
@@ -280,6 +281,7 @@ Ref<SaveDataMultiMeshBullets2D> MultiMeshBullets2D::save(const Ref<SaveDataMulti
             data_to_populate.all_bullet_rotation_data.push_back(bullet_data);
         }
         data_to_populate.rotate_only_textures = rotate_only_textures;
+        data_to_populate.stop_rotation_when_max_reached = stop_rotation_when_max_reached;
     }
 
     // COLLISION RELATED
@@ -402,6 +404,8 @@ void MultiMeshBullets2D::load_bullet_instances(const SaveDataMultiMeshBullets2D 
     cache_texture_rotation_radians = data.cache_texture_rotation_radians;
 
     is_life_time_over_signal_enabled = data.is_life_time_over_signal_enabled;
+
+    stop_rotation_when_max_reached = data.stop_rotation_when_max_reached;
 
     all_cached_speed.reserve(new_speed_data_size);
     all_cached_max_speed.reserve(new_speed_data_size);

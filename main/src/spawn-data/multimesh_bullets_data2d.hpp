@@ -56,6 +56,9 @@ public:
     // If set to false, it will also rotate the collision shapes according to the BulletRotationData2D that was provided (it might decrease performance a little bit)
     bool rotate_only_textures = true;
 
+    // If set to true, it will stop the rotation when the max rotation speed is reached
+    bool stop_rotation_when_max_reached = false;
+
     // COLLISION RELATED
 
     // The collision layer that all bullets share. Note: pass a bitmask, it's not just a simple int. Use the calculate_bitmask function.
@@ -193,6 +196,9 @@ public:
 
     bool get_is_life_time_over_signal_enabled() const;
     void set_is_life_time_over_signal_enabled(bool new_is_life_time_over_signal_enabled);
+
+    bool get_stop_rotation_when_max_reached() const;
+    void set_stop_rotation_when_max_reached(bool new_stop_rotation_when_max_reached);
 
 
     static void _bind_methods();

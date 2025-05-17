@@ -34,6 +34,8 @@ extends CanvasLayer
 @onready var enable_monitorable_checkbox:CheckBox = $BulletSettingsView/VBoxContainer3/EnableMonitorableCheckBox
 # If you check this checkbox then the debugger will be enabled and you will be able to see the movement of the collision shapes of the bullets
 @onready var enable_debugger_checkbox:CheckBox = $BulletSettingsView/VBoxContainer/VBoxContainer/EnableDebuggerCheckBox
+# Whether the rotation of the bullets should be stopped when the max rotation has been reached
+@onready var stop_rotation_when_max_reached_checkbox:CheckBox = $BulletSettingsView/VBoxContainer/VBoxContainer/StopRotationWhenMaxReachedCheckBox
 
 ## Color Picker
 # Responsible for picking a color for the block bullets debugger
@@ -561,3 +563,7 @@ func _on_rotate_grid_with_marker_check_box_pressed() -> void:
 func _on_random_local_rotation_check_box_pressed() -> void:
 	var should_use_random_local_rotation:bool = random_local_rotation_check_box.button_pressed
 	BENCHMARK_GLOBALS.PLAYER_DATA_NODE.set_grid_random_local_rotation(should_use_random_local_rotation)
+
+func _on_stop_rotation_when_max_reached_check_box_pressed() -> void:
+	var should_stop_rotation_when_max_reached:bool = stop_rotation_when_max_reached_checkbox.button_pressed
+	BENCHMARK_GLOBALS.PLAYER_DATA_NODE.set_stop_rotation_when_max_reached(should_stop_rotation_when_max_reached)

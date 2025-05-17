@@ -577,6 +577,11 @@ layout_mode = 2
 focus_mode = 0
 text = "Adjust Direction Based On Rotation"
 
+[node name="StopRotationWhenMaxReachedCheckBox" type="CheckBox" parent="BulletSettingsView/VBoxContainer/VBoxContainer"]
+layout_mode = 2
+focus_mode = 0
+text = "Stop Rotation When Max Reached"
+
 [node name="VBoxContainer5" type="VBoxContainer" parent="BulletSettingsView"]
 layout_mode = 1
 anchors_preset = 3
@@ -1641,6 +1646,7 @@ metadata/_custom_type_script = "uid://cs67whos5iyl6"
 [connection signal="pressed" from="BulletSettingsView/VBoxContainer/VBoxContainer/EnableDebuggerCheckBox" to="." method="_on_enable_debugger_check_box_pressed"]
 [connection signal="pressed" from="BulletSettingsView/VBoxContainer/VBoxContainer/RotatePhysicsShapesCheckBox" to="." method="_on_rotate_physics_shapes_check_box_pressed"]
 [connection signal="pressed" from="BulletSettingsView/VBoxContainer/VBoxContainer/AdjustDirectionBasedOnRotationCheckBox" to="." method="_on_adjust_direction_based_on_rotation_check_box_pressed"]
+[connection signal="pressed" from="BulletSettingsView/VBoxContainer/VBoxContainer/StopRotationWhenMaxReachedCheckBox" to="." method="_on_stop_rotation_when_max_reached_check_box_pressed"]
 [connection signal="pressed" from="BulletSettingsView/VBoxContainer2/ResetFactoryBtn" to="." method="_on_reset_factory_btn_pressed"]
 [connection signal="pressed" from="BulletSettingsView/VBoxContainer2/FreeActiveBulletsBtn" to="." method="_on_free_active_bullets_btn_pressed"]
 [connection signal="pressed" from="BulletSettingsView/VBoxContainer3/EnableMonitorableCheckBox" to="." method="_on_enable_monitorable_check_box_pressed"]

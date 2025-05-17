@@ -247,6 +247,14 @@ void MultiMeshBulletsData2D::set_is_life_time_over_signal_enabled(bool new_is_li
     is_life_time_over_signal_enabled = new_is_life_time_over_signal_enabled;
 }
 
+bool MultiMeshBulletsData2D::get_stop_rotation_when_max_reached() const{
+    return stop_rotation_when_max_reached;
+}
+
+void MultiMeshBulletsData2D::set_stop_rotation_when_max_reached(bool new_stop_rotation_when_max_reached){
+    stop_rotation_when_max_reached = new_stop_rotation_when_max_reached;
+}
+
 void MultiMeshBulletsData2D::_bind_methods() {
     ClassDB::bind_method(D_METHOD("set_transforms"), &MultiMeshBulletsData2D::set_transforms);
     ClassDB::bind_method(D_METHOD("get_transforms"), &MultiMeshBulletsData2D::get_transforms);
@@ -361,6 +369,10 @@ void MultiMeshBulletsData2D::_bind_methods() {
     ClassDB::bind_method(D_METHOD("get_is_life_time_over_signal_enabled"), &MultiMeshBulletsData2D::get_is_life_time_over_signal_enabled);
     ClassDB::bind_method(D_METHOD("set_is_life_time_over_signal_enabled"), &MultiMeshBulletsData2D::set_is_life_time_over_signal_enabled);
     ADD_PROPERTY(PropertyInfo(Variant::BOOL, "is_life_time_over_signal_enabled"), "set_is_life_time_over_signal_enabled", "get_is_life_time_over_signal_enabled");
+
+    ClassDB::bind_method(D_METHOD("get_stop_rotation_when_max_reached"), &MultiMeshBulletsData2D::get_stop_rotation_when_max_reached);
+    ClassDB::bind_method(D_METHOD("set_stop_rotation_when_max_reached"), &MultiMeshBulletsData2D::set_stop_rotation_when_max_reached);
+    ADD_PROPERTY(PropertyInfo(Variant::BOOL, "stop_rotation_when_max_reached"), "set_stop_rotation_when_max_reached", "get_stop_rotation_when_max_reached");
 
     ClassDB::bind_static_method("MultiMeshBulletsData2D", D_METHOD("calculate_bitmask", "numbers"), &MultiMeshBulletsData2D::calculate_bitmask);
 }

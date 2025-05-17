@@ -223,6 +223,9 @@ protected:
     // If true it means that only a single BulletRotationData2D was provided, so it will be used for each bullet. If false it means that we have BulletRotationData2D for each bullet. It is determined by the amount of BulletRotationData2D passed to spawn()
     bool use_only_first_rotation_data = false;
 
+    // If set to true, it will stop the rotation when the max rotation speed is reached
+    bool stop_rotation_when_max_reached = false;
+
     ///
 
     /// BULLET ATTACHMENT RELATED
@@ -385,17 +388,18 @@ protected:
         // The origin (columns[2]) remains unchanged
     }
 
-    // Accelerates a bullet's rotation speed
-    _ALWAYS_INLINE_ void accelerate_bullet_rotation_speed(size_t bullet_index, float delta) {
+    // Accelerates a bullet's rotation speed, returns whether the max speed has been reached or not
+    _ALWAYS_INLINE_ bool accelerate_bullet_rotation_speed(size_t bullet_index, float delta) {
         float &cache_rotation_speed = all_rotation_speed[bullet_index];
         float cache_max_rotation_speed = all_max_rotation_speed[bullet_index];
 
         if (cache_rotation_speed == cache_max_rotation_speed) {
-            return;
+            return true;
         }
 
         float acceleration = all_rotation_acceleration[bullet_index] * delta;
         cache_rotation_speed = std::min<float>(cache_rotation_speed + acceleration, cache_max_rotation_speed);
+        return false;
     }
 
     // Disables a single bullet. Always call this method using call_deferred or you will face weird synch issues
