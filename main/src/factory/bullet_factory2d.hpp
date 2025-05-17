@@ -431,8 +431,7 @@ private:
         float column_offset = 150.0f,
         float row_offset = 150.0f,
         bool rotate_grid_with_marker = true,
-        bool random_local_rotation = false,
-        bool random_global_rotation = false
+        bool random_local_rotation = false
     );
 };
 }

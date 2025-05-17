@@ -1300,11 +1300,6 @@ layout_mode = 2
 focus_mode = 0
 text = "Random Local Rotation"
 
-[node name="RandomGlobalRotationCheckBox" type="CheckBox" parent="MoreSettingsView/VBoxContainer2"]
-layout_mode = 2
-focus_mode = 0
-text = "Random Global Rotation"
-
 [node name="SelectRowsPerColumnBtnView" parent="MoreSettingsView" node_paths=PackedStringArray("all_btns") instance=ExtResource("3_cgqfs")]
 visible = false
 all_btns = [NodePath("../VBoxContainer/RowsPerColumnHBoxContainer/10rows"), NodePath("../VBoxContainer/RowsPerColumnHBoxContainer/15rows"), NodePath("../VBoxContainer/RowsPerColumnHBoxContainer/25rows"), NodePath("../VBoxContainer/RowsPerColumnHBoxContainer/5rows"), NodePath("../VBoxContainer/RowsPerColumnHBoxContainer/50rows")]
@@ -1665,7 +1660,6 @@ metadata/_custom_type_script = "uid://cs67whos5iyl6"
 [connection signal="new_btn_selected" from="MoreSettingsView/SelectPhysicsTicksBtnView" to="." method="_on_select_physics_ticks_btn_view_new_btn_selected"]
 [connection signal="pressed" from="MoreSettingsView/VBoxContainer2/RotateGridWithMarkerCheckBox" to="." method="_on_rotate_grid_with_marker_check_box_pressed"]
 [connection signal="pressed" from="MoreSettingsView/VBoxContainer2/RandomLocalRotationCheckBox" to="." method="_on_random_local_rotation_check_box_pressed"]
-[connection signal="pressed" from="MoreSettingsView/VBoxContainer2/RandomGlobalRotationCheckBox" to="." method="_on_random_global_rotation_check_box_pressed"]
 [connection signal="new_btn_selected" from="MoreSettingsView/SelectRowsPerColumnBtnView" to="." method="_on_select_rows_per_column_btn_view_new_btn_selected"]
 [connection signal="new_btn_selected" from="MoreSettingsView/SelectGridAlignmentBtnView" to="." method="_on_select_grid_alignment_btn_view_new_btn_selected"]
 [connection signal="new_btn_selected" from="MoreSettingsView/SelectColumnOffsetBtnView" to="." method="_on_select_column_offset_btn_view_new_btn_selected"]

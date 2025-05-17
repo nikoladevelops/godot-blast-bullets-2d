@@ -666,8 +666,7 @@ TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_grid(
     float column_offset,
     float row_offset,
     bool rotate_grid_with_marker,
-    bool random_local_rotation,
-    bool random_global_rotation
+    bool random_local_rotation
 ) {
     // Initialize the array to hold the transforms
     TypedArray<Transform2D> generated_transforms;
@@ -767,12 +766,6 @@ TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_grid(
                 new_transform = Transform2D(new_transform.get_rotation() + random_angle, new_transform.get_origin());
             }
 
-            // Apply random global rotation if enabled
-            if (random_global_rotation) {
-                float random_angle = UtilityFunctions::randf() * Math_TAU;
-                Transform2D rotation_transform(random_angle, godot::Vector2());
-                new_transform = rotation_transform * new_transform;
-            }
 
             // Store the transform and increment the counter
             generated_transforms[count_spawned] = new_transform;
@@ -858,15 +851,13 @@ void BulletFactory2D::_bind_methods() {
             "column_offset",
             "row_offset",
             "rotate_grid_with_marker",
-            "random_local_rotation",
-            "random_global_rotation"),
+            "random_local_rotation"),
         &BulletFactory2D::helper_generate_transforms_grid,
         DEFVAL(10),
         DEFVAL(3), // CENTER_LEFT
         DEFVAL(150.0f),
         DEFVAL(150.0f),
         DEFVAL(true),
-        DEFVAL(false),
         DEFVAL(false)
     );
 

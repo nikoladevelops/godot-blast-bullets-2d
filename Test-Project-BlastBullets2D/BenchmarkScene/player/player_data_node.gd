@@ -71,7 +71,6 @@ var row_offset:float = 150
 
 var rotate_grid_with_marker:bool = true
 var random_local_rotation:bool = false
-var random_global_rotation:bool = false
 ##
 
 # Sets up everything so that the PlayerDataNode can be used, basically acts like an additional constructor that has to be called
@@ -262,18 +261,18 @@ func spawn_bullets(player_rotation:float)->void:
 # Spawns MultiMeshDirectional bullets
 func spawn_multi_mesh_directional_bullets()->void:
 	if bullets_amount < 10:
-		directional_bullets_data.transforms = BulletFactory2D.helper_generate_transforms_grid(bullets_amount, bullet_marker.get_global_transform(), bullets_amount, grid_alignment, col_offset, row_offset, rotate_grid_with_marker, random_local_rotation, random_global_rotation)
+		directional_bullets_data.transforms = BulletFactory2D.helper_generate_transforms_grid(bullets_amount, bullet_marker.get_global_transform(), bullets_amount, grid_alignment, col_offset, row_offset, rotate_grid_with_marker, random_local_rotation)
 	else:
-		directional_bullets_data.transforms = BulletFactory2D.helper_generate_transforms_grid(bullets_amount, bullet_marker.get_global_transform(), rows_per_column, grid_alignment, col_offset, row_offset, rotate_grid_with_marker, random_local_rotation, random_global_rotation)
+		directional_bullets_data.transforms = BulletFactory2D.helper_generate_transforms_grid(bullets_amount, bullet_marker.get_global_transform(), rows_per_column, grid_alignment, col_offset, row_offset, rotate_grid_with_marker, random_local_rotation)
 	
 	BENCHMARK_GLOBALS.FACTORY.spawn_directional_bullets(directional_bullets_data)
 	
 # Spawns MultiMeshBlock bullets
 func spawn_multi_mesh_block_bullets(player_rotation:float)->void:
 	if bullets_amount < 10:
-		block_bullets_data.transforms = BulletFactory2D.helper_generate_transforms_grid(bullets_amount, bullet_marker.get_global_transform(), bullets_amount, grid_alignment, col_offset, row_offset, rotate_grid_with_marker, random_local_rotation, random_global_rotation)
+		block_bullets_data.transforms = BulletFactory2D.helper_generate_transforms_grid(bullets_amount, bullet_marker.get_global_transform(), bullets_amount, grid_alignment, col_offset, row_offset, rotate_grid_with_marker, random_local_rotation)
 	else:
-		block_bullets_data.transforms = BulletFactory2D.helper_generate_transforms_grid(bullets_amount, bullet_marker.get_global_transform(), rows_per_column, grid_alignment, col_offset, row_offset, rotate_grid_with_marker, random_local_rotation, random_global_rotation)
+		block_bullets_data.transforms = BulletFactory2D.helper_generate_transforms_grid(bullets_amount, bullet_marker.get_global_transform(), rows_per_column, grid_alignment, col_offset, row_offset, rotate_grid_with_marker, random_local_rotation)
 	
 	
 	block_bullets_data.block_rotation_radians=player_rotation # I want the block of bullets to be rotated the same way that the player is rotated
@@ -284,9 +283,9 @@ func spawn_godot_area2d_bullets(player_rotation:float)->void:
 	var transforms:Array[Transform2D]
 	
 	if bullets_amount < 10:
-		transforms = BulletFactory2D.helper_generate_transforms_grid(bullets_amount, bullet_marker.get_global_transform(), bullets_amount, grid_alignment, col_offset, row_offset, rotate_grid_with_marker, random_local_rotation, random_global_rotation)
+		transforms = BulletFactory2D.helper_generate_transforms_grid(bullets_amount, bullet_marker.get_global_transform(), bullets_amount, grid_alignment, col_offset, row_offset, rotate_grid_with_marker, random_local_rotation)
 	else:
-		transforms = BulletFactory2D.helper_generate_transforms_grid(bullets_amount, bullet_marker.get_global_transform(), rows_per_column, grid_alignment, col_offset, row_offset, rotate_grid_with_marker, random_local_rotation, random_global_rotation)
+		transforms = BulletFactory2D.helper_generate_transforms_grid(bullets_amount, bullet_marker.get_global_transform(), rows_per_column, grid_alignment, col_offset, row_offset, rotate_grid_with_marker, random_local_rotation)
 	
 	var bullet_scale:Vector2 = Vector2(5,5)
 	var bullet_direction:Vector2 = Vector2(1, 0).rotated(player_rotation)
@@ -494,7 +493,4 @@ func set_rotate_grid_with_marker(enable:bool)->void:
 	
 func set_grid_random_local_rotation(enable:bool)->void:
 	random_local_rotation = enable
-
-func set_grid_random_global_rotation(enable:bool)->void:
-	random_global_rotation = enable
 ##

@@ -111,8 +111,6 @@ var last_selected_color_picker:ColorPicker = null
 @onready var rotate_grid_with_marker_check_box:CheckBox = $MoreSettingsView/VBoxContainer2/RotateGridWithMarkerCheckBox
 # Responsible for setting random local rotation when spawning bullets
 @onready var random_local_rotation_check_box:CheckBox = $MoreSettingsView/VBoxContainer2/RandomLocalRotationCheckBox
-# Responsible for setting random global rotation when spawning bullets
-@onready var random_global_rotation_check_box:CheckBox = $MoreSettingsView/VBoxContainer2/RandomGlobalRotationCheckBox
 ##
 
 # Whether the attachments should go to the object pool after freeing all active bullets in the factory
@@ -563,8 +561,3 @@ func _on_rotate_grid_with_marker_check_box_pressed() -> void:
 func _on_random_local_rotation_check_box_pressed() -> void:
 	var should_use_random_local_rotation:bool = random_local_rotation_check_box.button_pressed
 	BENCHMARK_GLOBALS.PLAYER_DATA_NODE.set_grid_random_local_rotation(should_use_random_local_rotation)
-
-
-func _on_random_global_rotation_check_box_pressed() -> void:
-	var should_use_random_global_rotation:bool = random_global_rotation_check_box.button_pressed
-	BENCHMARK_GLOBALS.PLAYER_DATA_NODE.set_grid_random_global_rotation(should_use_random_global_rotation)

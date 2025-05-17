@@ -1,4 +1,4 @@
 GODOT_PATH=B:\GodotEngine
-GODOT_EXECUTABLE=Godot_v4.4-stable_win64.exe
+GODOT_EXECUTABLE=Godot_v4.4.1-stable_win64.exe
 PROJECT_PATH=C:\Users\Admin\Desktop\bullets plugin\godot-blast-bullets-2d\Test-Project-BlastBullets2D
 DEBUGGER_PATH=C:\Windows\System32\vsjitdebugger.exe
