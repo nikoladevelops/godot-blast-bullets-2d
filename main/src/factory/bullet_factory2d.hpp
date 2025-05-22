@@ -61,22 +61,16 @@ public:
     void spawn_block_bullets(const Ref<BlockBulletsData2D> &spawn_data);
 
     // Generates a Resource that contains every bullet's state
-    void save(bool enable_processing_after_finish = true);
+    void save();
 
     // Loads bullets by using a Resource that contains every bullet's state
-    void load(const Ref<SaveDataBulletFactory2D> new_data, bool enable_processing_after_finish = true);
+    void load(const Ref<SaveDataBulletFactory2D> new_data);
 
     // Resets the factory - frees everything (object pools, spawned bullets, spawned attachments - all get deleted from memory)
-    void reset(bool enable_processing_after_finish = true);
-
-    // Helper method to enable bullet processing
-    void enable_bullet_processing();
-
-    // Helper method to disable bullet processing
-    void disable_bullet_processing();
+    void reset();
 
     // Frees all active bullets along with all attachments that they currently have. If pool_attachments is true, the attachments will go to an object pool, otherwise they will also be freed
-    void free_active_bullets(bool pool_attachments = false, bool enable_processing_after_finish = true);
+    void free_active_bullets(bool pool_attachments = false);
 
     // OBJECT POOLING RELATED
 
@@ -84,13 +78,13 @@ public:
     void populate_bullets_pool(BulletType bullet_type, int amount_instances, int amount_bullets_per_instance);
 
     // By default completely frees an object pool of a particular bullet type. You also have the option of freeing only the instances that each have a particular amount_bullets_per_instance if you provide a value that is bigger than 0
-    void free_bullets_pool(BulletType bullet_type, int amount_bullets_per_instance=0, bool enable_processing_after_finish = true);
+    void free_bullets_pool(BulletType bullet_type, int amount_bullets_per_instance=0);
 
     // Populates the bullet attachments pool. The packed scene has to contain a BulletAttachment2D
     void populate_attachments_pool(const Ref<PackedScene> bullet_attachment_scene, int amount_instances);
 
     // By default completely frees the bullet attachments pool. You also have the option of freeing only the attachments with a particular attachment_id if you provide a value that is not a negative number
-    void free_attachments_pool(int attachment_id=-1, bool enable_processing_after_finish = true);
+    void free_attachments_pool(int attachment_id=-1);
 
     //
 
@@ -147,10 +141,16 @@ private:
     // Whether the factory was spawned correctly and the ready function finished. Used in order to avoid bugs related to editor executing getters/setters that should only be executed during runtime / gameplay. If a getter/setter is executed when in editor then those values get cached in different variables and finally get applied in _ready()
     bool is_ready = false;
 
-    // Whether the factory is currently busy saving/loading/resetting etc.. and all bullets need to not move. Note always use the setter when trying to change this value.
+    // Whether the factory is currently busy saving/loading/resetting etc.. and no other functions should be executed during this time
     bool is_factory_busy = false;
 
-    void set_is_factory_busy(bool value);
+    // Whether bullets are currently paused and should NOT move. Always use this instead of set_processing/ set_physics_processing.
+    bool is_factory_processing_bullets = true;
+
+    bool get_is_factory_processing_bullets() const;
+    void set_is_factory_processing_bullets(bool is_processing_enabled);
+
+    void reset_factory_state();
 
     // BULLETS RELATED
 
@@ -225,7 +225,7 @@ private:
     bool use_physics_interpolation_cached_before_ready = false;
 
     bool get_use_physics_interpolation() const;
-    void set_use_physics_interpolation_runtime(bool new_use_physics_interpolation, bool enable_processing_after_finish=true);
+    void set_use_physics_interpolation_runtime(bool new_use_physics_interpolation);
     void set_use_physics_interpolation_editor(bool new_use_physics_interpolation);
 
     //

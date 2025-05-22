@@ -151,9 +151,9 @@ func _ready() -> void:
 	disable_or_enable_factory_btn.switch_btn_pressed.connect(func(_option:String, option_index:int):
 		match option_index:
 			0:
-				BENCHMARK_GLOBALS.FACTORY.enable_bullet_processing()
+				BENCHMARK_GLOBALS.FACTORY.is_factory_processing_bullets = true
 			1:
-				BENCHMARK_GLOBALS.FACTORY.disable_bullet_processing()
+				BENCHMARK_GLOBALS.FACTORY.is_factory_processing_bullets = false
 	)
 	
 	switch_material_btn.switch_btn_pressed.connect(func(_option:String, option_index:int):
@@ -418,9 +418,6 @@ func _on_select_bullet_lifetime_view_new_btn_selected(new_selected_btn: Button) 
 
 func _on_reset_factory_btn_pressed() -> void:
 	BENCHMARK_GLOBALS.FACTORY.reset()
-	
-	disable_or_enable_factory_btn.switch_to_option_index(0)
-	
 
 func _on_free_active_bullets_btn_pressed() -> void:
 	BENCHMARK_GLOBALS.FACTORY.free_active_bullets(should_pool_attachments_after_free_active_bullets)
@@ -428,8 +425,6 @@ func _on_free_active_bullets_btn_pressed() -> void:
 	# Also free all Godot Area2D bullets
 	for child in BENCHMARK_GLOBALS.ALL_GODOT_AREA2D_BULLETS_CONTAINER.get_children():
 		child.queue_free()
-	
-	disable_or_enable_factory_btn.switch_to_option_index(0)
 
 
 func _on_pool_attachments_after_free_check_box_pressed() -> void:
@@ -439,12 +434,9 @@ func _on_pool_attachments_after_free_check_box_pressed() -> void:
 func _on_free_specific_attachment_pool_btn_pressed() -> void:
 	var attachment_id:int = switch_bullet_attachment_id_btn.current_selected_option_index+1 # because id 1 is the first attachment and id 2 is the second attachment but ordering of the options starts from 0 so all indexes are behind with -1
 	BENCHMARK_GLOBALS.FACTORY.free_attachments_pool(attachment_id)
-	
-	disable_or_enable_factory_btn.switch_to_option_index(0)
 
 func _on_free_all_attachment_pools_btn_pressed() -> void:
-	BENCHMARK_GLOBALS.FACTORY.free_attachments_pool()
-	disable_or_enable_factory_btn.switch_to_option_index(0)
+	BENCHMARK_GLOBALS.FACTORY.free_attachments_pool(-1)
 
 func _on_populate_attachments_pool_btn_pressed() -> void:
 	var attachment_id:int = switch_bullet_attachment_id_btn.current_selected_option_index+1 # because id 1 is the first attachment and id 2 is the second attachment but ordering of the options starts from 0 so all indexes are behind with -1

@@ -60,8 +60,17 @@ bool BulletFactory2D::get_use_physics_interpolation() const{
     return use_physics_interpolation;
 }
 
-void BulletFactory2D::set_use_physics_interpolation_runtime(bool new_use_physics_interpolation, bool enable_processing_after_finish) {
-    set_is_factory_busy(true);
+void BulletFactory2D::set_use_physics_interpolation_runtime(bool new_use_physics_interpolation) {
+    if (is_factory_busy) {
+        UtilityFunctions::printerr("Error when trying to set physics interpolation. BulletFactory2D is currently busy. Ignoring the request");
+        return;
+    }
+
+    is_factory_busy = true;
+
+    bool enable_processing_after_finish = is_factory_processing_bullets;
+
+    set_is_factory_processing_bullets(false);
 
     use_physics_interpolation = new_use_physics_interpolation;
 
@@ -83,8 +92,9 @@ void BulletFactory2D::set_use_physics_interpolation_runtime(bool new_use_physics
         }
     }
 
+    is_factory_busy = false;
     if (enable_processing_after_finish){
-        set_is_factory_busy(false);
+        set_is_factory_processing_bullets(true);
     }
 }
 
@@ -127,15 +137,22 @@ bool BulletFactory2D::get_is_factory_busy() const {
     return is_factory_busy;
 }
 
-void BulletFactory2D::set_is_factory_busy(bool value) {
-    if (is_factory_busy == value) {
+bool BulletFactory2D::get_is_factory_processing_bullets() const{
+    return is_factory_processing_bullets;
+}
+
+void BulletFactory2D::set_is_factory_processing_bullets(bool is_processing_enabled){
+    // When trying to set processing to enabled but the factory is currently busy, then something went wrong
+    // The only time you can call this method is if all tasks were completed and the factory is free to do its work
+    if (is_processing_enabled && is_factory_busy){
+        UtilityFunctions::printerr("Error when trying to call set_is_factory_processing_bullets. BulletFactory2D is currently busy. Ignoring the request");
         return;
     }
 
-    set_process(!value);
-    set_physics_process(!value);
-    
-    is_factory_busy = value;
+    is_factory_processing_bullets = is_processing_enabled;
+
+    set_physics_process(is_processing_enabled);
+    set_process(is_processing_enabled);
 }
 
 void BulletFactory2D::_physics_process(float delta){
@@ -182,13 +199,17 @@ void BulletFactory2D::spawn_directional_bullets(const Ref<DirectionalBulletsData
     );
 }
 
-void BulletFactory2D::save(bool enable_processing_after_finish) {
+void BulletFactory2D::save() {
     if (is_factory_busy) {
         UtilityFunctions::printerr("Error when trying to save. BulletFactory2D is currently busy. Ignoring the request");
         return;
     }
 
-    set_is_factory_busy(true);
+    is_factory_busy = true;
+
+    bool enable_processing_after_finish = is_factory_processing_bullets;
+
+    set_is_factory_processing_bullets(false);
 
     Ref<SaveDataBulletFactory2D> data = memnew(SaveDataBulletFactory2D);
 
@@ -204,15 +225,15 @@ void BulletFactory2D::save(bool enable_processing_after_finish) {
         data->all_directional_bullets
     );
 
-    if (enable_processing_after_finish)
-    {
-        set_is_factory_busy(false);
+    is_factory_busy = false;
+    if (enable_processing_after_finish){
+        set_is_factory_processing_bullets(true);
     }
 
     emit_signal("save_finished", data);
 }
 
-void BulletFactory2D::load(const Ref<SaveDataBulletFactory2D> new_data, bool enable_processing_after_finish) {
+void BulletFactory2D::load(const Ref<SaveDataBulletFactory2D> new_data) {
     if(!new_data.is_valid()){
         UtilityFunctions::printerr("Error. Bullet data given to load method inside BulletFactory2D is invalid");
         return;
@@ -223,9 +244,13 @@ void BulletFactory2D::load(const Ref<SaveDataBulletFactory2D> new_data, bool ena
         return;
     }
 
-    set_is_factory_busy(true);
+    is_factory_busy = true;
 
-    reset();
+    bool enable_processing_after_finish = is_factory_processing_bullets;
+
+    set_is_factory_processing_bullets(false);
+
+    reset_factory_state();
 
     // Load all BlockBullets2D
     load_data_into_new_bullets<BlockBullets2D, SaveDataBlockBullets2D>(
@@ -243,26 +268,17 @@ void BulletFactory2D::load(const Ref<SaveDataBulletFactory2D> new_data, bool ena
         new_data->all_directional_bullets
     );
 
+    is_factory_busy = false;
     if (enable_processing_after_finish)
     {
-        set_is_factory_busy(false);
+        set_is_factory_processing_bullets(true);
     }
 
     emit_signal("load_finished");
 }
 
-void BulletFactory2D::reset(bool enable_processing_after_finish){
-    // When this method gets called it's mandatory that is_factory_busy is set to true (this is so all processing gets paused before freeing bullets etc.. I don't want any interference from other methods or stuff like the PhysicsServer)
-    // 1) If is_factory_busy is already true that means some other method handles that value, so we shouldn't mess with it (Example: the load method first resets the factory before trying to load new data to it)
-    // 2) If is_factory_busy is set to false, then reset() should handle setting it to ensure that any processing is paused (Example: this will happen if the user calls the reset() method himself since it's exposed to Godot Engine)
-    
-    bool have_to_enable_factory_again = false;
-    if (!is_factory_busy) 
-    {
-        set_is_factory_busy(true);
-        have_to_enable_factory_again = true;
-    }
 
+void BulletFactory2D::reset_factory_state(){
     // Check if debuggers are enabled
     bool debugger_curr_enabled = get_is_debugger_enabled();
 
@@ -281,28 +297,48 @@ void BulletFactory2D::reset(bool enable_processing_after_finish){
 
     // Free all bullet attachments that are currently in the object pool
     bullet_attachments_pool.free_all_bullet_attachments();
-    
+
     // If the debuggers are supposed to be activated then re-activate them
-    if(debugger_curr_enabled){
+    if (debugger_curr_enabled) {
         block_bullets_debugger->set_is_debugger_enabled(true);
         directional_bullets_debugger->set_is_debugger_enabled(true);
     }
+}
 
-    if (have_to_enable_factory_again && enable_processing_after_finish) {
-        set_is_factory_busy(false);
+void BulletFactory2D::reset(){
+    if (is_factory_busy) {
+        UtilityFunctions::printerr("Error when trying to call reset(). BulletFactory2D is currently busy. Ignoring the request");
+        return;
+    }
+
+    is_factory_busy = true;
+
+    bool enable_processing_after_finish = is_factory_processing_bullets;
+
+    set_is_factory_processing_bullets(false);
+
+    reset_factory_state();
+
+    is_factory_busy = false;
+    if (enable_processing_after_finish) {
+        set_is_factory_processing_bullets(true);
     }
 
     // Notify the user that all bullets have been freed/deleted
     emit_signal("reset_finished");
 }
 
-void BulletFactory2D::free_active_bullets(bool pool_attachments, bool enable_processing_after_finish){
+void BulletFactory2D::free_active_bullets(bool pool_attachments){
     if (is_factory_busy) {
         UtilityFunctions::printerr("Error when trying to free active bullets. BulletFactory2D is currently busy. Ignoring the request");
         return;
     }
 
-    set_is_factory_busy(true);
+    is_factory_busy = true;
+
+    bool enable_processing_after_finish = is_factory_processing_bullets;
+
+    set_is_factory_processing_bullets(false);
 
     // Check if debuggers are enabled
     bool debugger_curr_enabled = get_is_debugger_enabled();
@@ -326,9 +362,9 @@ void BulletFactory2D::free_active_bullets(bool pool_attachments, bool enable_pro
         directional_bullets_debugger->set_is_debugger_enabled(true);
     }
 
-    if (enable_processing_after_finish)
-    {
-        set_is_factory_busy(false);
+    is_factory_busy = false;
+    if (enable_processing_after_finish){
+        set_is_factory_processing_bullets(true);
     }
 }
 
@@ -371,13 +407,17 @@ void BulletFactory2D::populate_bullets_pool(BulletType bullet_type, int amount_i
     }
 }
 
-void BulletFactory2D::free_bullets_pool(BulletType bullet_type, int amount_bullets_per_instance, bool enable_processing_after_finish){
+void BulletFactory2D::free_bullets_pool(BulletType bullet_type, int amount_bullets_per_instance){
     if (is_factory_busy) {
         UtilityFunctions::printerr("Error when trying to free bullets pool. BulletFactory2D is currently busy. Ignoring the request");
         return;
     }
 
-    set_is_factory_busy(true);
+    is_factory_busy = true;
+
+    bool enable_processing_after_finish = is_factory_processing_bullets;
+
+    set_is_factory_processing_bullets(false);
 
     bool debugger_curr_enabled = get_is_debugger_enabled();
     
@@ -417,9 +457,10 @@ void BulletFactory2D::free_bullets_pool(BulletType bullet_type, int amount_bulle
         directional_bullets_debugger->set_is_debugger_enabled(true);
     }
 
+    is_factory_busy = false;
     if (enable_processing_after_finish)
     {
-        set_is_factory_busy(false);
+        set_is_factory_processing_bullets(true);
     }
 }
 
@@ -441,13 +482,17 @@ void BulletFactory2D::populate_attachments_pool(const Ref<PackedScene> bullet_at
     }
 }
 
-void BulletFactory2D::free_attachments_pool(int attachment_id, bool enable_processing_after_finish){
+void BulletFactory2D::free_attachments_pool(int attachment_id){
     if (is_factory_busy) {
         UtilityFunctions::printerr("Error when trying to free bullets pool. BulletFactory2D is currently busy. Ignoring the request");
         return;
     }
 
-    set_is_factory_busy(true);
+    is_factory_busy = true;
+
+    bool enable_processing_after_finish = is_factory_processing_bullets;
+
+    set_is_factory_processing_bullets(false);
 
     // Free all attachments no matter the attachment_id
     if (attachment_id < 0) 
@@ -458,9 +503,10 @@ void BulletFactory2D::free_attachments_pool(int attachment_id, bool enable_proce
         bullet_attachments_pool.free_specific_bullet_attachments(attachment_id);
     }
 
+    is_factory_busy = false;
     if (enable_processing_after_finish)
     {
-        set_is_factory_busy(false);
+        set_is_factory_processing_bullets(true);
     }
 }
 
@@ -520,16 +566,6 @@ void BulletFactory2D::set_is_debugger_enabled(bool new_is_enabled) {
 
     directional_bullets_debugger->set_is_debugger_enabled(new_is_enabled);
     block_bullets_debugger->set_is_debugger_enabled(new_is_enabled);
-}
-
-void BulletFactory2D::enable_bullet_processing() {
-    set_physics_process(true);
-    set_process(true);
-}
-
-void BulletFactory2D::disable_bullet_processing() {
-    set_physics_process(false);
-    set_process(false);
 }
 
 // Additional debug methods
@@ -787,19 +823,23 @@ void BulletFactory2D::_bind_methods() {
     ClassDB::bind_method(D_METHOD("set_is_debugger_enabled", "new_is_enabled"), &BulletFactory2D::set_is_debugger_enabled);
     ADD_PROPERTY(PropertyInfo(Variant::BOOL, "is_debugger_enabled"), "set_is_debugger_enabled", "get_is_debugger_enabled");
 
+    ClassDB::bind_method(D_METHOD("get_is_factory_processing_bullets"), &BulletFactory2D::get_is_factory_processing_bullets);
+    ClassDB::bind_method(D_METHOD("set_is_factory_processing_bullets", "is_processing_enabled"), &BulletFactory2D::set_is_factory_processing_bullets);
+    ADD_PROPERTY(PropertyInfo(Variant::BOOL, "is_factory_processing_bullets"), "set_is_factory_processing_bullets", "get_is_factory_processing_bullets");
+
     ClassDB::bind_method(D_METHOD("get_use_physics_interpolation"), &BulletFactory2D::get_use_physics_interpolation);
     ClassDB::bind_method(D_METHOD("set_use_physics_interpolation_editor", "enable"), &BulletFactory2D::set_use_physics_interpolation_editor);
-    ClassDB::bind_method(D_METHOD("set_use_physics_interpolation_runtime", "enable", "enable_processing_after_finish"), &BulletFactory2D::set_use_physics_interpolation_runtime, DEFVAL(true));
+    ClassDB::bind_method(D_METHOD("set_use_physics_interpolation_runtime", "enable"), &BulletFactory2D::set_use_physics_interpolation_runtime);
 
     ADD_PROPERTY(PropertyInfo(Variant::BOOL, "use_physics_interpolation"), "set_use_physics_interpolation_editor", "get_use_physics_interpolation");
 
     ClassDB::bind_method(D_METHOD("spawn_block_bullets", "spawn_data"), &BulletFactory2D::spawn_block_bullets);
     ClassDB::bind_method(D_METHOD("spawn_directional_bullets", "spawn_data"), &BulletFactory2D::spawn_directional_bullets);
 
-    ClassDB::bind_method(D_METHOD("save", "enable_processing_after_finish"), &BulletFactory2D::save, DEFVAL(true));
-    ClassDB::bind_method(D_METHOD("load", "new_data", "enable_processing_after_finish"), &BulletFactory2D::load, DEFVAL(true));
+    ClassDB::bind_method(D_METHOD("save"), &BulletFactory2D::save);
+    ClassDB::bind_method(D_METHOD("load", "new_data"), &BulletFactory2D::load);
 
-    ClassDB::bind_method(D_METHOD("reset", "enable_processing_after_finish"), &BulletFactory2D::reset, DEFVAL(true));
+    ClassDB::bind_method(D_METHOD("reset"), &BulletFactory2D::reset);
     
     ClassDB::bind_method(D_METHOD("get_directional_bullets_debugger_color"), &BulletFactory2D::get_directional_bullets_debugger_color);
     ClassDB::bind_method(D_METHOD("set_directional_bullets_debugger_color", "new_color"), &BulletFactory2D::set_directional_bullets_debugger_color);
@@ -809,16 +849,13 @@ void BulletFactory2D::_bind_methods() {
     ClassDB::bind_method(D_METHOD("set_block_bullets_debugger_color", "new_color"), &BulletFactory2D::set_block_bullets_debugger_color);
     ADD_PROPERTY(PropertyInfo(Variant::COLOR, "block_bullets_debugger_color"), "set_block_bullets_debugger_color", "get_block_bullets_debugger_color");
 
-    ClassDB::bind_method(D_METHOD("enable_bullet_processing"), &BulletFactory2D::enable_bullet_processing);
-    ClassDB::bind_method(D_METHOD("disable_bullet_processing"), &BulletFactory2D::disable_bullet_processing);
-
     ClassDB::bind_method(D_METHOD("populate_bullets_pool", "bullet_type", "amount_instances", "amount_bullets_per_instance"), &BulletFactory2D::populate_bullets_pool);
-    ClassDB::bind_method(D_METHOD("free_bullets_pool", "bullet_type", "amount_bullets_per_instance", "enable_processing_after_finish"), &BulletFactory2D::free_bullets_pool, DEFVAL(0), DEFVAL(true));
+    ClassDB::bind_method(D_METHOD("free_bullets_pool", "bullet_type", "amount_bullets_per_instance"), &BulletFactory2D::free_bullets_pool, DEFVAL(0));
     
     ClassDB::bind_method(D_METHOD("populate_attachments_pool", "bullet_attachment_scene", "amount_attachments"), &BulletFactory2D::populate_attachments_pool);
-    ClassDB::bind_method(D_METHOD("free_attachments_pool", "attachment_id", "enable_processing_after_finish"), &BulletFactory2D::free_attachments_pool, DEFVAL(-1), DEFVAL(true));
+    ClassDB::bind_method(D_METHOD("free_attachments_pool", "attachment_id"), &BulletFactory2D::free_attachments_pool, DEFVAL(-1));
 
-    ClassDB::bind_method(D_METHOD("free_active_bullets", "pool_attachments", "enable_processing_after_finish"), &BulletFactory2D::free_active_bullets, DEFVAL(false), DEFVAL(true));
+    ClassDB::bind_method(D_METHOD("free_active_bullets", "pool_attachments"), &BulletFactory2D::free_active_bullets, DEFVAL(false));
 
     // Additional debug methods related
 
