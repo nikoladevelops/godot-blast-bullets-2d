@@ -58,7 +58,6 @@ target/
 *~
 
 # IDE/editor-specific (common in C++ development)
-*.vscode/
 *.idea/
 *.sublime-project
 *.sublime-workspace
