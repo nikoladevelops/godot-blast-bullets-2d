@@ -123,10 +123,9 @@ In conclusion, **BlastBullets2D is ideal for top-down shooters and arcade-style 
 #### BlastBullets2D targets <b>Godot Engine 4.4.1</b>. As long as there are no breaking changes to GDExtension in the future, then it should work for all future 4.4.x Godot releases.
 
 1. Go in [Releases](https://github.com/nikoladevelops/godot-blast-bullets-2d/releases) and on the latest release click and download <b>BlastBullets2D.zip</b>.
-2. Extract the zip and you will get a single folder. Ensure the folder's name is `BlastBullets2D` - this is important.
+2. Extract the zip and you will get a single folder `addons` and in that folder is the plugin folder `BlastBullets2D`.
 3. Open your <b>Godot</b> game project.
-4. Create a folder and name it `addons`.
-5. Cut the folder named `BlastBullets2D` that you extracted from the zip and paste it inside the new `addons` folder.
+4. Cut the folder named `addons` and place it in your project. As long as `BlastBullets2D` is inside the `addons` folder and the names of the folders are correct everything will work as expected.
 6. Close <b>Godot</b> and open the project again.
 
 The compiled plugin files have been loaded and you are ready to begin coding!
