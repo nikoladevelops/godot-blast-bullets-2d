@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="SaveDataBlockBullets2D" inherits="SaveDataMultiMeshBullets2D" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/godotengine/godot/master/doc/class.xsd">
+	<brief_description>
+		Contains the state of a single [BlockBullets2D] instance.
+	</brief_description>
+	<description>
+	</description>
+	<tutorials>
+	</tutorials>
+	<members>
+		<member name="block_rotation_radians" type="float" setter="set_block_rotation_radians" getter="get_block_rotation_radians" default="0.0">
+		</member>
+	</members>
+</class>

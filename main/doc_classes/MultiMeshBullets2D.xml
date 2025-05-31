@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="MultiMeshBullets2D" inherits="MultiMeshInstance2D" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/godotengine/godot/master/doc/class.xsd">
+	<brief_description>
+		This class is only meant to be inherited by other C++ classes. Never use this by its own. Always use the [BulletFactory2D], that's the only proper way.
+	</brief_description>
+	<description>
+	</description>
+	<tutorials>
+	</tutorials>
+	<methods>
+		<method name="disable_bullet">
+			<return type="void" />
+			<param index="0" name="bullet_index" type="int" />
+			<description>
+				The only reason this is exposed is to make it possible to be called using [code]call_deferred()[/code]. You shouldn't touch this.
+			</description>
+		</method>
+	</methods>
+</class>

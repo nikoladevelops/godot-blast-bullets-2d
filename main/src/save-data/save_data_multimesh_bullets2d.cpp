@@ -32,7 +32,7 @@ int SaveDataMultiMeshBullets2D::get_size() const {
 void SaveDataMultiMeshBullets2D::set_bullets_enabled_status(TypedArray<bool> new_bullets_enabled_status) {
     int new_enabled_size = new_bullets_enabled_status.size();
     bullets_enabled_status.resize(new_enabled_size);
-    for (size_t i = 0; i < new_enabled_size; i++) {
+    for (int i = 0; i < new_enabled_size; i++) {
         bullets_enabled_status[i] = new_bullets_enabled_status[i];
     }
 }
@@ -50,7 +50,7 @@ Ref<Resource> SaveDataMultiMeshBullets2D::get_bullets_custom_data() const {
 }
 
 void SaveDataMultiMeshBullets2D::set_textures(TypedArray<Texture2D> new_textures) {
-    for (size_t i = 0; i < new_textures.size(); i++) {
+    for (int i = 0; i < new_textures.size(); i++) {
         textures.push_back(new_textures[i]);
     }
 }
@@ -135,7 +135,7 @@ TypedArray<BulletRotationData2D> SaveDataMultiMeshBullets2D::get_all_bullet_rota
     return all_bullet_rotation_data;
 }
 void SaveDataMultiMeshBullets2D::set_all_bullet_rotation_data(const TypedArray<BulletRotationData2D> &new_bullet_rotation_data) {
-    for (size_t i = 0; i < new_bullet_rotation_data.size(); i++) {
+    for (int i = 0; i < new_bullet_rotation_data.size(); i++) {
         all_bullet_rotation_data.push_back(new_bullet_rotation_data[i]);
     }
 }
@@ -285,19 +285,19 @@ void SaveDataMultiMeshBullets2D::set_z_index(int new_z_index) {
 }
 
 
-uint32_t SaveDataMultiMeshBullets2D::get_light_mask() const {
+int SaveDataMultiMeshBullets2D::get_light_mask() const {
     return light_mask;
 }
 
-void SaveDataMultiMeshBullets2D::set_light_mask(uint32_t new_light_mask) {
+void SaveDataMultiMeshBullets2D::set_light_mask(int new_light_mask) {
     light_mask = new_light_mask;
 }
 
-uint32_t SaveDataMultiMeshBullets2D::get_visibility_layer() const {
+int SaveDataMultiMeshBullets2D::get_visibility_layer() const {
     return visibility_layer;
 }
 
-void SaveDataMultiMeshBullets2D::set_visibility_layer(uint32_t new_visibility_layer) {
+void SaveDataMultiMeshBullets2D::set_visibility_layer(int new_visibility_layer) {
     visibility_layer = new_visibility_layer;
 }
 

@@ -55,13 +55,13 @@ Color MultiMeshBulletsDebugger2D::get_debugger_color() const{
 void MultiMeshBulletsDebugger2D::enable(){
     // In case the container to debug already has things to debug
     TypedArray<Node> already_spawned_debugger_data_providers = container_to_debug->get_children();
-    size_t amount_already_spawned = already_spawned_debugger_data_providers.size();
+    int amount_already_spawned = already_spawned_debugger_data_providers.size();
 
     if(amount_already_spawned > 0){
         debug_data_providers.reserve(amount_already_spawned);
         debugger_multimeshes.reserve(amount_already_spawned);
         
-        for (size_t i = 0; i < amount_already_spawned; i++)
+        for (int i = 0; i < amount_already_spawned; i++)
         {
             // I first need to extract the actual node from the typed array, since it saves it as a Variant
             Node* node = Object::cast_to<Node>(already_spawned_debugger_data_providers[i]);
@@ -86,7 +86,7 @@ void MultiMeshBulletsDebugger2D::disable(){
     container_to_debug->disconnect("child_entered_tree", callable_mp(this, &MultiMeshBulletsDebugger2D::generate_debug_multimesh));
     // Note: If you ever see a "trying to disconnect a signal that wasn't actually connected before" type of error message in the godot console, it means that your object state is not valid. Ensure you always initialize variables that you may access for the first time (variables accessed without actually calling the setter first = accessing undefined value = undefined behavior)..
 
-    for (size_t i = 0; i < debugger_multimeshes.size(); i++) {
+    for (int i = 0; i < debugger_multimeshes.size(); i++) {
         memdelete(debugger_multimeshes[i]); // basically a forceful freeing instead of the usual queue_free, should be safe as long as those multimeshes don't do anything additional that is related to physics_process
     }
 
@@ -136,7 +136,7 @@ void MultiMeshBulletsDebugger2D::generate_debug_multimesh(Node *node_entered_con
     multi->set_instance_count(instance_count);
 
     // For each multimesh instance that will be rendered set its color as well as global transform
-    for (size_t i = 0; i < instance_count; i++) {
+    for (int i = 0; i < instance_count; i++) {
         multi->set_instance_color(i, debugger_color);
         
         const Transform2D &transf = all_collision_shape_transforms_for_debugging[i];
@@ -182,7 +182,7 @@ void MultiMeshBulletsDebugger2D::update_debug_multimesh_transforms_to_match_data
     const std::vector<Transform2D> &collision_shape_transforms_for_debugging = debugger_data_provider.get_all_collision_shape_transforms_for_debugging();
 
     // Set each quadmesh instance's transform to match the collision shape's transform
-    for (size_t i = 0; i < amount_quadmeshes; i++) {
+    for (int i = 0; i < amount_quadmeshes; i++) {
         const Transform2D &collision_shape_transf = collision_shape_transforms_for_debugging[i];
         multi->set_instance_transform_2d(i, collision_shape_transf);
     }
@@ -192,13 +192,13 @@ void MultiMeshBulletsDebugger2D::change_debug_multimeshes_color(const Color &new
     int amount_debug_multimeshes = debugger_multimeshes.size();
 
     // For each debug multimesh
-    for (size_t i = 0; i < amount_debug_multimeshes; i++)
+    for (int i = 0; i < amount_debug_multimeshes; i++)
     {
         Ref<MultiMesh> multi = debugger_multimeshes[i]->get_multimesh();
         int amount_quadmeshes = multi->get_instance_count();
 
         // For each quadmesh inside the multimesh
-        for (size_t j = 0; j < amount_quadmeshes; j++)
+        for (int j = 0; j < amount_quadmeshes; j++)
         {
             // Set its color to the new one
             multi->set_instance_color(j, debugger_color);
@@ -210,7 +210,7 @@ void MultiMeshBulletsDebugger2D::_physics_process(float delta) {
     int amount_debug_multimeshes = debugger_multimeshes.size();
 
     // For each debug multimesh
-    for (size_t i = 0; i < amount_debug_multimeshes; i++) {
+    for (int i = 0; i < amount_debug_multimeshes; i++) {
         
         IDebuggerDataProvider2D &current_debug_data_provider = *debug_data_providers[i];
 

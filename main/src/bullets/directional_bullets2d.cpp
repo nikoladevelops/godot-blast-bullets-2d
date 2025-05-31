@@ -38,7 +38,7 @@ void DirectionalBullets2D::set_up_movement_data(const TypedArray<BulletSpeedData
         }
     }
 
-    for (size_t i = 0; i < speed_data_size; i++) {
+    for (int i = 0; i < speed_data_size; i++) {
         // The rotation of each transform
         float curr_bullet_rotation = all_cached_shape_transforms[i].get_rotation(); // Note: I am using the shape transforms, since the instance transforms might be rotated to account for bullet texture rotation
 

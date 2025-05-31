@@ -41,7 +41,7 @@ public:
 
         Vector2 cache_velocity_calc = all_cached_velocity[0] * delta;
 
-        for (size_t i = 0; i < amount_bullets; i++) {
+        for (int i = 0; i < amount_bullets; i++) {
             if (bullets_enabled_status[i] == false) {
                 continue;
             }

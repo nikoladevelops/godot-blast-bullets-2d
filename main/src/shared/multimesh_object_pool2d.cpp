@@ -8,11 +8,11 @@ using namespace godot;
 
 namespace BlastBullets2D {
 
-void MultiMeshObjectPool::push(MultiMeshBullets2D *multimesh, size_t amount_bullets) {
+void MultiMeshObjectPool::push(MultiMeshBullets2D *multimesh, int amount_bullets) {
     pool[amount_bullets].push(multimesh);
 }
 
-MultiMeshBullets2D *MultiMeshObjectPool::pop(size_t amount_bullets) {
+MultiMeshBullets2D *MultiMeshObjectPool::pop(int amount_bullets) {
     auto result = pool.find(amount_bullets);
     // If the pool doesn't contain a queue with that key or if it does but the queue is empty (meaning no bullets) return a nullptr
     if (result == pool.end() || result->second.size() == 0) {
@@ -42,7 +42,7 @@ void MultiMeshObjectPool::free_all_bullets(bool pool_attachments){
     pool.clear();  // clear the map so it doesn't contain any empty queues
 }
 
-void MultiMeshObjectPool::free_specific_bullets(size_t amount_bullets, bool pool_attachments){
+void MultiMeshObjectPool::free_specific_bullets(int amount_bullets, bool pool_attachments){
     // Try to find a queue that exists and holds multimeshes where each multimesh has `amount_bullets` instances
     auto it = pool.find(amount_bullets);
     
@@ -63,29 +63,29 @@ void MultiMeshObjectPool::free_specific_bullets(size_t amount_bullets, bool pool
     pool.erase(amount_bullets); // delete the queue itself since it's basically empty right now
 }
 
-size_t MultiMeshObjectPool::get_total_amount_pooled()
+int MultiMeshObjectPool::get_total_amount_pooled()
 {
-    size_t total_amount_pooled = 0;
+    int total_amount_pooled = 0;
 
     for (auto& [key, queue] : pool) {
         if (!queue.empty())
         {
-            total_amount_pooled += queue.size();
+            total_amount_pooled += static_cast<int>(queue.size());
         }
     }
 
     return total_amount_pooled;
 }
 
-std::map<size_t, size_t> MultiMeshObjectPool::get_pool_info()
+std::map<int, int> MultiMeshObjectPool::get_pool_info()
 {
-    std::map<size_t, size_t> result;
+    std::map<int, int> result;
 
     for (auto& [key, queue] : pool) {
         if (!queue.empty())
         {
             // Bullets per each multimesh as the KEY and the amount of multimeshes as the VALUE
-            result.emplace(key, queue.size());
+            result.emplace(key, static_cast<int>(queue.size()));
         }
     }
 

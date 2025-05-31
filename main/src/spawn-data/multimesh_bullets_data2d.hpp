@@ -62,10 +62,10 @@ public:
     // COLLISION RELATED
 
     // The collision layer that all bullets share. Note: pass a bitmask, it's not just a simple int. Use the calculate_bitmask function.
-    uint32_t collision_layer = 1;
+    int collision_layer = 1;
 
     // The collision mask that all bullets share. Note: pass a bitmask, it's not just a simple int. Use the calculate_bitmask function.
-    uint32_t collision_mask = 1;
+    int collision_mask = 1;
 
     // The collision shape is always a rectangle. This determines the width and height it has.
     Vector2 collision_shape_size = Vector2(5, 5);
@@ -81,10 +81,10 @@ public:
     // OTHER
 
     // Light mask. Note: pass a bitmask, it's not just a simple int. Use the calculate_bitmask function.
-    uint32_t light_mask = 1;
+    int light_mask = 1;
 
     // Visibility layer. Note: pass a bitmask, it's not just a simple int. Use the calculate_bitmask function.
-    uint32_t visibility_layer = 1;
+    int visibility_layer = 1;
 
     // How long will the bullets last, before being disabled. Depending on whether the bullets pool has reached its limit, it will either add the bullets to the pool or it will queue_free them.
     float max_life_time = 2.0f;
@@ -130,12 +130,12 @@ public:
     float get_default_change_texture_time() const;
     void set_default_change_texture_time(float new_default_change_texture_time);
 
-    uint32_t get_collision_layer() const;
-    void set_collision_layer(uint32_t new_collision_layer);
+    int get_collision_layer() const;
+    void set_collision_layer(int new_collision_layer);
     void set_collision_layer_from_array(const TypedArray<int> &numbers);
 
-    uint32_t get_collision_mask() const;
-    void set_collision_mask(uint32_t new_collision_mask);
+    int get_collision_mask() const;
+    void set_collision_mask(int new_collision_mask);
     void set_collision_mask_from_array(const TypedArray<int> &numbers);
 
     Vector2 get_collision_shape_size() const;
@@ -177,12 +177,12 @@ public:
     int get_z_index() const;
     void set_z_index(int new_z_index);
 
-    uint32_t get_light_mask() const;
-    void set_light_mask(uint32_t new_light_mask);
+    int get_light_mask() const;
+    void set_light_mask(int new_light_mask);
     void set_light_mask_from_array(const TypedArray<int> &numbers);
 
-    uint32_t get_visibility_layer() const;
-    void set_visibility_layer(uint32_t new_visibility_layer);
+    int get_visibility_layer() const;
+    void set_visibility_layer(int new_visibility_layer);
     void set_visibility_layer_from_array(const TypedArray<int> &numbers);
 
     Dictionary get_instance_shader_parameters() const;

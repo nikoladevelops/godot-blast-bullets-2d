@@ -9,7 +9,7 @@ void BulletAttachmentObjectPool2D::push(BulletAttachment2D* bullet_attachment){
     pool[bullet_attachment->attachment_id].push(bullet_attachment);
 }
 
-BulletAttachment2D* BulletAttachmentObjectPool2D::pop(size_t attachment_id){
+BulletAttachment2D* BulletAttachmentObjectPool2D::pop(int attachment_id){
     auto result = pool.find(attachment_id);
 
     // If the pool doesn't contain a queue with that key or if it does but the queue is empty return a nullptr
@@ -37,7 +37,7 @@ void BulletAttachmentObjectPool2D::free_all_bullet_attachments(){
     pool.clear();
 }
 
-void BulletAttachmentObjectPool2D::free_specific_bullet_attachments(size_t attachment_id){
+void BulletAttachmentObjectPool2D::free_specific_bullet_attachments(int attachment_id){
     // Try to find a queue that exists and holds bullet attachments with a specific attachment_id
     auto it = pool.find(attachment_id);
     
@@ -58,24 +58,24 @@ void BulletAttachmentObjectPool2D::free_specific_bullet_attachments(size_t attac
     pool.erase(attachment_id); // delete the queue itself since it's basically empty right now
 }
 
-size_t BulletAttachmentObjectPool2D::get_total_amount_pooled()
+int BulletAttachmentObjectPool2D::get_total_amount_pooled()
 {
-    size_t amount_attachments = 0;
+    int amount_attachments = 0;
     for (auto& [attachment_id, queue] : pool) {
-        amount_attachments += queue.size();
+        amount_attachments += static_cast<int>(queue.size());
     }
 
     return amount_attachments;
 }
 
-std::map<size_t, size_t> BulletAttachmentObjectPool2D::get_pool_info()
+std::map<int, int> BulletAttachmentObjectPool2D::get_pool_info()
 {
-    std::map<size_t, size_t> pool_info;
+    std::map<int, int> pool_info;
 
     for (auto& [attachment_id, queue] : pool) {
         if (!queue.empty())
         {
-            pool_info.emplace(attachment_id, queue.size());
+            pool_info.emplace(attachment_id, static_cast<int>(queue.size()));
         }
     }
 

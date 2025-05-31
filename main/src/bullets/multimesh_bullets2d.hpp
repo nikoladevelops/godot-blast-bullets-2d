@@ -33,10 +33,10 @@ public:
     bool is_active = false; 
 
     // Gets the total amount of bullets that the multimesh always holds
-    size_t get_amount_bullets() const { return amount_bullets; };
+    int get_amount_bullets() const { return amount_bullets; };
 
     // Gets the total amount of attachments that are active
-    size_t get_amount_active_attachments() const;
+    int get_amount_active_attachments() const;
 
     // Used to spawn brand new bullets that are active in the scene tree
     void spawn(const MultiMeshBulletsData2D &spawn_data, MultiMeshObjectPool *pool, BulletFactory2D *factory, Node *bullets_container);
@@ -51,12 +51,12 @@ public:
     void load(const Ref<SaveDataMultiMeshBullets2D> &data, MultiMeshObjectPool *pool, BulletFactory2D *factory, Node *bullets_container);
 
     // Spawns as a disabled invisible multimesh that is ready to be activated at any time. Method is used for object pooling, because it sets up all necessary things (like physics shapes for example) without needing additional spawn data (which would be overriden anyways by the activate function's logic)
-    void spawn_as_disabled_multimesh(size_t amount_bullets, MultiMeshObjectPool *pool, BulletFactory2D *factory, Node *bullets_container);
+    void spawn_as_disabled_multimesh(int amount_bullets, MultiMeshObjectPool *pool, BulletFactory2D *factory, Node *bullets_container);
     
     // Unsafe delete - only call this if all types of bullet processing have been disabled and all dangling pointers cleared, otherwise you will face weird issues/crashes
     void force_delete(bool pool_attachments) { 
         // Disable the area's shapes (ALL OF THEM no matter their bullets_enabled_status)
-        for (size_t i = 0; i < amount_bullets; i++) {
+        for (int i = 0; i < amount_bullets; i++) {
             physics_server->area_set_shape_disabled(area, i, true);
         }
 
@@ -65,7 +65,7 @@ public:
        
         if (is_bullet_attachment_provided)
         {
-            for (size_t i = 0; i < amount_bullets; i++)
+            for (int i = 0; i < amount_bullets; i++)
             {
                 disable_attachment(i, pool_attachments);
             }
@@ -81,7 +81,7 @@ public:
     _ALWAYS_INLINE_ void interpolate_bullet_visuals() {
         float fraction = Engine::get_singleton()->get_physics_interpolation_fraction();
 
-        for (size_t i = 0; i < amount_bullets; i++) {
+        for (int i = 0; i < amount_bullets; i++) {
             if (bullets_enabled_status[i] == false) {
                 continue;
             }
@@ -128,7 +128,7 @@ public:
                 // Will hold all transforms of bullets that have not yet hit anything / the ones we are forced to disable due to life time being over
                 TypedArray<Transform2D> transfs;
 
-                for (size_t i = 0; i < amount_bullets; i++) {
+                for (int i = 0; i < amount_bullets; i++) {
 
                     // If the status is active it means that the bullet hasn't hit anything yet, so we need to disable it ourselves
                     if (bullets_enabled_status[i])
@@ -144,7 +144,7 @@ public:
             }
             else {
                 // If we do not wish to emit the life_time_over signal, just disable the bullet and don't worry about having to pass additional data to the user
-                for (size_t i = 0; i < amount_bullets; i++) {
+                for (int i = 0; i < amount_bullets; i++) {
                     // There is already a bullet status check inside the function so it's fine
                     call_deferred("disable_bullet", i); 
                 }
@@ -195,7 +195,7 @@ public:
 
 protected:
     // Counts all active bullets
-    size_t active_bullets_counter = 0;
+    int active_bullets_counter = 0;
 
     BulletFactory2D *bullet_factory = nullptr;
     MultiMeshObjectPool *bullets_pool = nullptr;
@@ -204,7 +204,7 @@ protected:
     std::vector<RID> physics_shapes;
 
     // This is used to effectively hide a single bullet instance from being rendered by the multimesh
-    const Transform2D &zero_transform = Transform2D().scaled(Vector2(0, 0));
+    const Transform2D zero_transform = Transform2D().scaled(Vector2(0, 0));
 
     ///
 
@@ -253,7 +253,7 @@ protected:
     /// OTHER
 
     // The amount of bullets the multimesh has
-    size_t amount_bullets = 0;
+    int amount_bullets = 0;
 
     // Pointer to the multimesh instead of always calling the get method
     MultiMesh *multi = nullptr;
@@ -285,7 +285,7 @@ protected:
     float current_change_texture_time;
 
     // Holds the current texture index (the index inside the array textures)
-    size_t current_texture_index = 0;
+    int current_texture_index = 0;
 
     // This is the texture size of the bullets
     Vector2 texture_size = Vector2(0, 0);
@@ -343,7 +343,7 @@ protected:
     bool monitorable = false;
 
     // Holds a boolean value for each bullet that indicates whether its active
-    std::vector<uint8_t> bullets_enabled_status;
+    std::vector<int8_t> bullets_enabled_status;
 
     //
 
@@ -352,7 +352,7 @@ protected:
     // Note: If you wish to debug these functions with the debugger, remove the _ALWAYS_INLINE_ temporarily
 
     // Accelerates an individual bullet's speed
-    _ALWAYS_INLINE_ void accelerate_bullet_speed(size_t speed_data_index, float delta) {
+    _ALWAYS_INLINE_ void accelerate_bullet_speed(int speed_data_index, float delta) {
         float &curr_bullet_speed = all_cached_speed[speed_data_index];
         float curr_max_bullet_speed = all_cached_max_speed[speed_data_index];
 
@@ -389,7 +389,7 @@ protected:
     }
 
     // Accelerates a bullet's rotation speed, returns whether the max speed has been reached or not
-    _ALWAYS_INLINE_ bool accelerate_bullet_rotation_speed(size_t bullet_index, float delta) {
+    _ALWAYS_INLINE_ bool accelerate_bullet_rotation_speed(int bullet_index, float delta) {
         float &cache_rotation_speed = all_rotation_speed[bullet_index];
         float cache_max_rotation_speed = all_max_rotation_speed[bullet_index];
 
@@ -403,8 +403,8 @@ protected:
     }
 
     // Disables a single bullet. Always call this method using call_deferred or you will face weird synch issues
-    _ALWAYS_INLINE_ void disable_bullet(size_t bullet_index) {
-        uint8_t &curr_bullet_status = bullets_enabled_status[bullet_index];
+    _ALWAYS_INLINE_ void disable_bullet(int bullet_index) {
+        int8_t &curr_bullet_status = bullets_enabled_status[bullet_index];
 
         // I am doing this, because there is a chance that the bullet collides with more than 1 thing at the same exact time (if I didn't have this check then the active_bullets_counter would be set wrong)
         if (curr_bullet_status == false) {
@@ -430,7 +430,7 @@ protected:
     }
 
     // Disables a single bullet attachment by either putting it in an object pool or completely freeing it
-    _ALWAYS_INLINE_ void disable_attachment(size_t bullet_index, bool should_pool_attachment = true) {
+    _ALWAYS_INLINE_ void disable_attachment(int bullet_index, bool should_pool_attachment = true) {
         BulletAttachment2D*& attachment_ptr = bullet_attachments[bullet_index];
 
         if (attachment_ptr == nullptr) {
@@ -449,7 +449,7 @@ protected:
     }
 
     // Moves a single bullet attachment
-    _ALWAYS_INLINE_ void move_bullet_attachment(const Vector2 &translate_by, size_t bullet_index, float rotation_angle) {
+    _ALWAYS_INLINE_ void move_bullet_attachment(const Vector2 &translate_by, int bullet_index, float rotation_angle) {
         if (!is_bullet_attachment_provided) {
             return;
         }
@@ -515,10 +515,10 @@ private:
     // BULLET ATTACHMENTS RELATED
     
     // The current attachment's id
-    size_t cache_attachment_id = 0;
+    int cache_attachment_id = 0;
 
     // Acquires data from the bullet attachment scene and gives it to the arguments passed by reference - acquires attachment_id and attachment_rotation
-    size_t set_attachment_related_data(const Ref<PackedScene> &new_bullet_attachment_scene, const Vector2 &bullet_attachment_offset);
+    int set_attachment_related_data(const Ref<PackedScene> &new_bullet_attachment_scene, const Vector2 &bullet_attachment_offset);
 
     // Changes the value of is_bullet_attachment_provided and bullet_attachment_scene appropriately
     void set_bullet_attachment(const Ref<PackedScene> &attachment_scene);
@@ -536,24 +536,24 @@ private:
     void create_new_bullet_attachment(const Transform2D &attachment_global_transf);
 
     // Tries to find and reuse a bullet attachment from the object pool. If successful returns true 
-    bool reuse_attachment_from_object_pool(BulletAttachmentObjectPool2D& pool, const Transform2D &attachment_global_transf, size_t attachment_id);
+    bool reuse_attachment_from_object_pool(BulletAttachmentObjectPool2D& pool, const Transform2D &attachment_global_transf, int attachment_id);
 
     // Generates texture transform with correct rotation and sets it to the correct bullet on the multimesh
-    Transform2D generate_texture_transform(Transform2D transf, bool is_texture_rotation_permanent, float texture_rotation_radians, size_t bullet_index);
+    Transform2D generate_texture_transform(Transform2D transf, bool is_texture_rotation_permanent, float texture_rotation_radians, int bullet_index);
     
     // Generates a collision shape transform for a particular bullet and attaches it to the area
-    Transform2D generate_collision_shape_transform_for_area(Transform2D transf, const RID &shape, const Vector2 &collision_shape_size, const Vector2 &collision_shape_offset, size_t bullet_index);
+    Transform2D generate_collision_shape_transform_for_area(Transform2D transf, const RID &shape, const Vector2 &collision_shape_size, const Vector2 &collision_shape_offset, int bullet_index);
 
     // Sets up the area correctly with collision related data
-    void set_up_area(const uint32_t collision_layer, const uint32_t collision_mask, bool new_monitorable, const RID &physics_space);
+    void set_up_area(const int collision_layer, const int collision_mask, bool new_monitorable, const RID &physics_space);
 
-    void generate_physics_shapes_for_area(size_t amount);
+    void generate_physics_shapes_for_area(int amount);
 
     void set_all_physics_shapes_enabled_for_area(bool enable);
 
     void generate_multimesh();
 
-    void set_up_multimesh(size_t new_instance_count, const Ref<Mesh> &new_mesh, Vector2 new_texture_size);
+    void set_up_multimesh(int new_instance_count, const Ref<Mesh> &new_mesh, Vector2 new_texture_size);
 
     void set_up_bullet_instances(const MultiMeshBulletsData2D &data);
     
@@ -568,11 +568,11 @@ private:
         const Ref<Resource> &new_bullets_custom_data,
         const TypedArray<Texture2D> &new_textures,
         const Ref<Texture2D>& new_default_texture,
-        size_t new_current_texture_index,
+        int new_current_texture_index,
         const Ref<Material> &new_material,
         int new_z_index,
-        uint32_t new_light_mask,
-        uint32_t new_visibility_layer,
+        int new_light_mask,
+        int new_visibility_layer,
         const Dictionary &new_instance_shader_parameters
     );
 
@@ -580,8 +580,8 @@ private:
 
     /// COLLISION DETECTION METHODS
 
-    void area_entered_func(int status, RID entered_rid, uint64_t entered_instance_id, size_t entered_shape_index, size_t bullet_shape_index);
-    void body_entered_func(int status, RID entered_rid, uint64_t entered_instance_id, size_t entered_shape_index, size_t bullet_shape_index);
+    void area_entered_func(int status, RID entered_rid, int64_t entered_instance_id, int entered_shape_index, int bullet_shape_index);
+    void body_entered_func(int status, RID entered_rid, int64_t entered_instance_id, int entered_shape_index, int bullet_shape_index);
 
     ///
 

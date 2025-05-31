@@ -94,9 +94,9 @@ public:
 
     // OTHER
     
-    uint32_t light_mask = 1;
+    int light_mask = 1;
 
-    uint32_t visibility_layer = 1;
+    int visibility_layer = 1;
 
     float max_life_time = 0.0f;
 
@@ -222,11 +222,11 @@ public:
     int get_z_index() const;
     void set_z_index(int new_z_index);
 
-    uint32_t get_light_mask() const;
-    void set_light_mask(uint32_t new_light_mask);
+    int get_light_mask() const;
+    void set_light_mask(int new_light_mask);
 
-    uint32_t get_visibility_layer() const;
-    void set_visibility_layer(uint32_t new_visibility_layer);
+    int get_visibility_layer() const;
+    void set_visibility_layer(int new_visibility_layer);
 
     Dictionary get_instance_shader_parameters() const;
     void set_instance_shader_parameters(const Dictionary& new_instance_shader_parameters);

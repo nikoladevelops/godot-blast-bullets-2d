@@ -481,7 +481,6 @@ func set_grid_rows_per_column(new_rows_per_column:int)->void:
 func set_grid_alignment(new_alignment:BulletFactory2D.Alignment)->void:
 	grid_alignment = new_alignment
 
-
 func set_grid_column_offset(new_col_offset:float)->void:
 	col_offset = new_col_offset
 

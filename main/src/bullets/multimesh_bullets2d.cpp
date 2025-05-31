@@ -28,13 +28,13 @@ MultiMeshBullets2D::~MultiMeshBullets2D() {
     physics_server->free_rid(area);
 }
 
-size_t MultiMeshBullets2D::get_amount_active_attachments() const
+int MultiMeshBullets2D::get_amount_active_attachments() const
 {
-    size_t amount_active_attachments = 0;
+    int amount_active_attachments = 0;
 
     if (is_bullet_attachment_provided)
     {
-        for (size_t i = 0; i < amount_bullets; i++)
+        for (int i = 0; i < amount_bullets; i++)
         {
             if (bullet_attachments[i] != nullptr)
             {
@@ -167,7 +167,7 @@ void MultiMeshBullets2D::set_up_bullet_instances(const MultiMeshBulletsData2D &d
         all_previous_attachment_transf.reserve(amount_bullets);
     }
 
-    for (size_t i = 0; i < amount_bullets; i++) {
+    for (int i = 0; i < amount_bullets; i++) {
         RID shape = physics_shapes[i];
 
         const Transform2D &curr_data_transf = data.transforms[i];
@@ -231,48 +231,48 @@ Ref<SaveDataMultiMeshBullets2D> MultiMeshBullets2D::save(const Ref<SaveDataMulti
 
     // BULLET MOVEMENT RELATED
 
-    for (size_t i = 0; i < amount_bullets; i++) {
+    for (int i = 0; i < amount_bullets; i++) {
         data_to_populate.all_cached_instance_transforms.push_back(all_cached_instance_transforms[i]);
     }
 
-    for (size_t i = 0; i < amount_bullets; i++) {
+    for (int i = 0; i < amount_bullets; i++) {
         data_to_populate.all_cached_shape_transforms.push_back(all_cached_shape_transforms[i]);
     }
 
-    for (size_t i = 0; i < amount_bullets; i++) {
+    for (int i = 0; i < amount_bullets; i++) {
         data_to_populate.all_cached_instance_origin.push_back(all_cached_instance_origin[i]);
     }
 
-    for (size_t i = 0; i < amount_bullets; i++) {
+    for (int i = 0; i < amount_bullets; i++) {
         data_to_populate.all_cached_shape_origin.push_back(all_cached_shape_origin[i]);
     }
 
-    size_t speed_data_size = all_cached_velocity.size();
-    for (size_t i = 0; i < speed_data_size; i++) {
+    int speed_data_size = all_cached_velocity.size();
+    for (int i = 0; i < speed_data_size; i++) {
         data_to_populate.all_cached_velocity.push_back(all_cached_velocity[i]);
     }
 
-    for (size_t i = 0; i < speed_data_size; i++) {
+    for (int i = 0; i < speed_data_size; i++) {
         data_to_populate.all_cached_direction.push_back(all_cached_direction[i]);
     }
 
     // BULLET SPEED RELATED
 
-    for (size_t i = 0; i < speed_data_size; i++) {
+    for (int i = 0; i < speed_data_size; i++) {
         data_to_populate.all_cached_speed.push_back(all_cached_speed[i]);
     }
 
-    for (size_t i = 0; i < speed_data_size; i++) {
+    for (int i = 0; i < speed_data_size; i++) {
         data_to_populate.all_cached_max_speed.push_back(all_cached_max_speed[i]);
     }
 
-    for (size_t i = 0; i < speed_data_size; i++) {
+    for (int i = 0; i < speed_data_size; i++) {
         data_to_populate.all_cached_acceleration.push_back(all_cached_acceleration[i]);
     }
 
     // BULLET ROTATION RELATED
     if (is_rotation_active) {
-        for (size_t i = 0; i < all_rotation_speed.size(); i++) {
+        for (int i = 0; i < all_rotation_speed.size(); i++) {
             Ref<BulletRotationData2D> bullet_data = memnew(BulletRotationData2D);
             bullet_data->rotation_speed = all_rotation_speed[i];
             bullet_data->max_rotation_speed = all_max_rotation_speed[i];
@@ -306,7 +306,7 @@ Ref<SaveDataMultiMeshBullets2D> MultiMeshBullets2D::save(const Ref<SaveDataMulti
         TypedArray<Resource> &custom_data_to_save = data_to_populate.bullet_attachments_custom_data;
         TypedArray<Transform2D> &transf_data_to_save = data_to_populate.attachment_transforms;
 
-        for (size_t i = 0; i < amount_bullets; i++) {
+        for (int i = 0; i < amount_bullets; i++) {
             BulletAttachment2D* attachment = bullet_attachments[i];
 
             // Note that only data for active bullet attachments is being saved, so you should account for that in the load method. Basically there is no useless data being saved, but this requires you to pay attention to valid indexes
@@ -344,7 +344,7 @@ Ref<SaveDataMultiMeshBullets2D> MultiMeshBullets2D::save(const Ref<SaveDataMulti
     data_to_populate.bullets_custom_data = bullets_custom_data;
 
     // Save the enabled status so you can determine which bullets were active/disabled
-    for (size_t i = 0; i < amount_bullets; i++) {
+    for (int i = 0; i < amount_bullets; i++) {
         data_to_populate.bullets_enabled_status.push_back(static_cast<bool>(bullets_enabled_status[i]));
     }
 
@@ -398,7 +398,7 @@ void MultiMeshBullets2D::load(const Ref<SaveDataMultiMeshBullets2D> &data_to_loa
 
 
 void MultiMeshBullets2D::load_bullet_instances(const SaveDataMultiMeshBullets2D &data) {
-    size_t new_speed_data_size = data.all_cached_velocity.size();
+    int new_speed_data_size = data.all_cached_velocity.size();
 
     active_bullets_counter = amount_bullets;
     cache_texture_rotation_radians = data.cache_texture_rotation_radians;
@@ -420,18 +420,18 @@ void MultiMeshBullets2D::load_bullet_instances(const SaveDataMultiMeshBullets2D 
 
     bullets_enabled_status.reserve(amount_bullets);
 
-    for (size_t i = 0; i < new_speed_data_size; i++) {
+    for (int i = 0; i < new_speed_data_size; i++) {
         all_cached_speed.push_back(data.all_cached_speed[i]);
         all_cached_max_speed.push_back(data.all_cached_max_speed[i]);
         all_cached_acceleration.push_back(data.all_cached_acceleration[i]);
     }
 
-    for (size_t i = 0; i < new_speed_data_size; i++)
+    for (int i = 0; i < new_speed_data_size; i++)
     {
         all_cached_velocity.push_back(data.all_cached_velocity[i]);
     }
 
-    for (size_t i = 0; i < new_speed_data_size; i++)
+    for (int i = 0; i < new_speed_data_size; i++)
     {
         all_cached_direction.push_back(data.all_cached_direction[i]);
     }
@@ -453,14 +453,14 @@ void MultiMeshBullets2D::load_bullet_instances(const SaveDataMultiMeshBullets2D 
         attachment_transforms.reserve(amount_bullets);
     }
 
-    size_t count_attachments = 0;
-    for (size_t i = 0; i < amount_bullets; i++) {
+    int count_attachments = 0;
+    for (int i = 0; i < amount_bullets; i++) {
         all_cached_instance_transforms.push_back(data.all_cached_instance_transforms[i]);
         all_cached_instance_origin.push_back(data.all_cached_instance_origin[i]);
         all_cached_shape_transforms.push_back(data.all_cached_shape_transforms[i]);
         all_cached_shape_origin.push_back(data.all_cached_shape_origin[i]);
 
-        bool is_bullet_enabled = static_cast<uint8_t>(data.bullets_enabled_status[i]);
+        bool is_bullet_enabled = static_cast<int8_t>(data.bullets_enabled_status[i]);
         bullets_enabled_status.push_back(is_bullet_enabled);
 
         RID shape_rid = physics_shapes[i];
@@ -530,7 +530,7 @@ void MultiMeshBullets2D::load_bullet_instances(const SaveDataMultiMeshBullets2D 
 }
 
 
-void MultiMeshBullets2D::spawn_as_disabled_multimesh(size_t new_amount_bullets, MultiMeshObjectPool *pool, BulletFactory2D *factory, Node *bullets_container){
+void MultiMeshBullets2D::spawn_as_disabled_multimesh(int new_amount_bullets, MultiMeshObjectPool *pool, BulletFactory2D *factory, Node *bullets_container){
     set_visible(false);
 
     bullets_pool = pool;
@@ -593,7 +593,7 @@ void MultiMeshBullets2D::generate_multimesh() {
     set_multimesh(multi);
 }
 
-void MultiMeshBullets2D::set_up_multimesh(size_t new_instance_count, const Ref<Mesh> &new_mesh, Vector2 new_texture_size) {
+void MultiMeshBullets2D::set_up_multimesh(int new_instance_count, const Ref<Mesh> &new_mesh, Vector2 new_texture_size) {
     if (new_mesh.is_valid()) {
         multi->set_mesh(new_mesh);
     } else {
@@ -636,11 +636,11 @@ void MultiMeshBullets2D::finalize_set_up(
     const Ref<Resource> &new_bullets_custom_data,
     const TypedArray<Texture2D> &new_textures,
     const Ref<Texture2D> &new_default_texture,
-    size_t new_current_texture_index,
+    int new_current_texture_index,
     const Ref<Material> &new_material,
     int new_z_index, 
-    uint32_t new_light_mask,
-    uint32_t new_visibility_layer,
+    int new_light_mask,
+    int new_visibility_layer,
     const Dictionary& new_instance_shader_parameters
 ) {
     // Bullets custom data
@@ -709,7 +709,7 @@ void MultiMeshBullets2D::finalize_set_up(
 
 
 void MultiMeshBullets2D::set_rotation_data(const TypedArray<BulletRotationData2D> &rotation_data, bool new_rotate_only_textures){
-    size_t amount_rotation_data = rotation_data.size();
+    int amount_rotation_data = rotation_data.size();
     
     // If the amount of rotation data is:
     // 0 -> rotation is disabled
@@ -743,7 +743,7 @@ void MultiMeshBullets2D::set_rotation_data(const TypedArray<BulletRotationData2D
     }
 
     // Add newest data
-    for (size_t i = 0; i < amount_rotation_data; i++) {
+    for (int i = 0; i < amount_rotation_data; i++) {
         BulletRotationData2D &curr_bullet_data = *Object::cast_to<BulletRotationData2D>(rotation_data[i]);
 
         all_rotation_speed.emplace_back(curr_bullet_data.rotation_speed);
@@ -752,7 +752,7 @@ void MultiMeshBullets2D::set_rotation_data(const TypedArray<BulletRotationData2D
     }
 }
 
-size_t MultiMeshBullets2D::set_attachment_related_data(const Ref<PackedScene> &new_bullet_attachment_scene, const Vector2 &bullet_attachment_offset){
+int MultiMeshBullets2D::set_attachment_related_data(const Ref<PackedScene> &new_bullet_attachment_scene, const Vector2 &bullet_attachment_offset){
     set_bullet_attachment(new_bullet_attachment_scene);
 
     // If an attachment was not provided, then there is no point to continue
@@ -780,7 +780,7 @@ size_t MultiMeshBullets2D::set_attachment_related_data(const Ref<PackedScene> &n
     bullet_attachment_local_transform.set_rotation(first_ever_attachment->get_rotation());
     
 
-    size_t attachment_id = first_ever_attachment->attachment_id;
+    int attachment_id = first_ever_attachment->attachment_id;
     memdelete(first_ever_attachment); // I don't really need it anymore, so delete it
 
     return attachment_id;
@@ -800,7 +800,7 @@ void MultiMeshBullets2D::create_new_bullet_attachment(const Transform2D &attachm
     bullet_attachments.emplace_back(attachment);
 }
 
-bool MultiMeshBullets2D::reuse_attachment_from_object_pool(BulletAttachmentObjectPool2D& pool, const Transform2D& attachment_global_transf, size_t attachment_id){
+bool MultiMeshBullets2D::reuse_attachment_from_object_pool(BulletAttachmentObjectPool2D& pool, const Transform2D& attachment_global_transf, int attachment_id){
     // First check the bullet attachment object pool, if you can re-activate an already existing bullet attachment
     BulletAttachment2D* attachment = pool.pop(attachment_id);
 
@@ -820,7 +820,7 @@ bool MultiMeshBullets2D::reuse_attachment_from_object_pool(BulletAttachmentObjec
 
 }
 
-Transform2D MultiMeshBullets2D::generate_texture_transform(Transform2D transf, bool is_texture_rotation_permanent, float texture_rotation_radians, size_t bullet_index){
+Transform2D MultiMeshBullets2D::generate_texture_transform(Transform2D transf, bool is_texture_rotation_permanent, float texture_rotation_radians, int bullet_index){
     if (is_texture_rotation_permanent) {
         // Same texture rotation no matter the rotation of the bullet's transform
         transf.set_rotation(texture_rotation_radians);
@@ -835,7 +835,7 @@ Transform2D MultiMeshBullets2D::generate_texture_transform(Transform2D transf, b
 }
 
 
-void MultiMeshBullets2D::set_up_area(const uint32_t collision_layer, const uint32_t collision_mask, bool new_monitorable, const RID &physics_space){
+void MultiMeshBullets2D::set_up_area(const int collision_layer, const int collision_mask, bool new_monitorable, const RID &physics_space){
     monitorable = new_monitorable;
     physics_server->area_set_space(area, bullet_factory->physics_space);
     physics_server->area_set_monitorable(area, monitorable);
@@ -846,7 +846,7 @@ void MultiMeshBullets2D::set_up_area(const uint32_t collision_layer, const uint3
 
 }
 
-Transform2D MultiMeshBullets2D::generate_collision_shape_transform_for_area(Transform2D transf, const RID &shape, const Vector2 &collision_shape_size, const Vector2 &collision_shape_offset, size_t bullet_index){
+Transform2D MultiMeshBullets2D::generate_collision_shape_transform_for_area(Transform2D transf, const RID &shape, const Vector2 &collision_shape_size, const Vector2 &collision_shape_offset, int bullet_index){
     // The rotation of each transform
     float curr_bullet_rotation = transf.get_rotation();
 
@@ -864,9 +864,9 @@ Transform2D MultiMeshBullets2D::generate_collision_shape_transform_for_area(Tran
     return transf;
 }
 
-void MultiMeshBullets2D::generate_physics_shapes_for_area(size_t amount){
+void MultiMeshBullets2D::generate_physics_shapes_for_area(int amount){
     physics_shapes.reserve(amount);
-    for (size_t i = 0; i < amount; i++)
+    for (int i = 0; i < amount; i++)
     {
         RID shape = physics_server->rectangle_shape_create();
         physics_server->area_add_shape(area, shape);
@@ -875,7 +875,7 @@ void MultiMeshBullets2D::generate_physics_shapes_for_area(size_t amount){
 }
 
 void MultiMeshBullets2D::set_all_physics_shapes_enabled_for_area(bool enable){
-    for (size_t i = 0; i < amount_bullets; i++)
+    for (int i = 0; i < amount_bullets; i++)
     {
         physics_server->area_set_shape_disabled(area, i, !enable);
     }
@@ -883,7 +883,7 @@ void MultiMeshBullets2D::set_all_physics_shapes_enabled_for_area(bool enable){
 
 /// COLLISION DETECTION METHODS
 
-void MultiMeshBullets2D::area_entered_func(int status, RID entered_rid, uint64_t entered_instance_id, size_t entered_shape_index, size_t bullet_shape_index) {
+void MultiMeshBullets2D::area_entered_func(int status, RID entered_rid, int64_t entered_instance_id, int entered_shape_index, int bullet_shape_index) {
     if (status == PhysicsServer2D::AREA_BODY_ADDED) {
         Object *obj = ObjectDB::get_instance(entered_instance_id);
         call_deferred("disable_bullet", bullet_shape_index);
@@ -891,7 +891,7 @@ void MultiMeshBullets2D::area_entered_func(int status, RID entered_rid, uint64_t
         bullet_factory->emit_signal("area_entered", obj, bullets_custom_data, all_cached_instance_transforms[bullet_shape_index]);
     }
 }
-void MultiMeshBullets2D::body_entered_func(int status, RID entered_rid, uint64_t entered_instance_id, size_t entered_shape_index, size_t bullet_shape_index) {
+void MultiMeshBullets2D::body_entered_func(int status, RID entered_rid, int64_t entered_instance_id, int entered_shape_index, int bullet_shape_index) {
     if (status == PhysicsServer2D::AREA_BODY_ADDED) {
         Object *obj = ObjectDB::get_instance(entered_instance_id);
         call_deferred("disable_bullet", bullet_shape_index);

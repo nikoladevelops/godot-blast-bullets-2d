@@ -10,7 +10,7 @@ TypedArray<BulletSpeedData2D> DirectionalBulletsData2D::get_all_bullet_speed_dat
 void DirectionalBulletsData2D::set_all_bullet_speed_data(const TypedArray<BulletSpeedData2D> &new_data) {
     all_bullet_speed_data.resize(new_data.size());
 
-    for (size_t i = 0; i < new_data.size(); i++) {
+    for (int i = 0; i < new_data.size(); i++) {
         all_bullet_speed_data[i] = new_data[i];
     }
 }

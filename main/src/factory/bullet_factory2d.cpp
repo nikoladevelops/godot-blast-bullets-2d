@@ -77,15 +77,15 @@ void BulletFactory2D::set_use_physics_interpolation_runtime(bool new_use_physics
     // If physics interpolation is about to be set to TRUE, then populate all needed data so that bullets work correctly
     // I'm basically making it possible for this option to be turned on during runtime
     if (use_physics_interpolation){
-        size_t amount_bullets = all_directional_bullets.size();
-        for (size_t i = 0; i < amount_bullets; i++)
+        int amount_bullets = static_cast<int>(all_directional_bullets.size());
+        for (int i = 0; i < amount_bullets; i++)
         {
             DirectionalBullets2D*& bullets_multi = all_directional_bullets[i];
             bullets_multi->set_physics_interpolation_related_data();
         }
 
-        amount_bullets = all_block_bullets.size();
-        for (size_t i = 0; i < amount_bullets; i++)
+        amount_bullets = static_cast<int>(all_block_bullets.size());
+        for (int i = 0; i < amount_bullets; i++)
         {
             BlockBullets2D*& bullets_multi = all_block_bullets[i];
             bullets_multi->set_physics_interpolation_related_data();
@@ -471,7 +471,7 @@ void BulletFactory2D::populate_attachments_pool(const Ref<PackedScene> bullet_at
         return;
     }
     
-    for (size_t i = 0; i < amount_instances; i++)
+    for (int i = 0; i < amount_instances; i++)
     {
         BulletAttachment2D *attachment = static_cast<BulletAttachment2D*>(bullet_attachment_scene->instantiate()); // You better pass a packed scene that contains an actual BulletAttachment2D node or this goes kaboom
         attachment->set_physics_interpolation_mode(Node::PHYSICS_INTERPOLATION_MODE_OFF); // I have custom physics interpolation logic, so disable the Godot one
@@ -574,10 +574,10 @@ int BulletFactory2D::debug_get_total_bullets_amount(BulletType bullet_type)
     switch (bullet_type)
     {
     case BlastBullets2D::BulletFactory2D::DIRECTIONAL_BULLETS:
-        return all_directional_bullets.size();
+        return static_cast<int>(all_directional_bullets.size());
         break;
     case BlastBullets2D::BulletFactory2D::BLOCK_BULLETS:
-        return all_block_bullets.size();
+        return static_cast<int>(all_block_bullets.size());
         break;
     default:
         UtilityFunctions::printerr("Error when trying to get total bullets amount. BulletType you gave is not supported");
@@ -623,7 +623,7 @@ int BulletFactory2D::debug_get_bullets_pool_amount(BulletType bullet_type)
 Dictionary BulletFactory2D::debug_get_bullets_pool_info(BulletType bullet_type)
 {
     Dictionary dict;
-    std::map<size_t, size_t> pool_info;
+    std::map<int, int> pool_info;
 
     if (bullet_type == BulletType::DIRECTIONAL_BULLETS)
     {
@@ -650,10 +650,10 @@ int BulletFactory2D::debug_get_total_attachments_amount()
 
 int BulletFactory2D::debug_get_active_attachments_amount()
 {
-    size_t count_active_attachments = 0;
+    int count_active_attachments = 0;
 
-    size_t directional_amount = all_directional_bullets.size();
-    for (size_t i = 0; i < directional_amount; i++)
+    int directional_amount = static_cast<int>(all_directional_bullets.size());
+    for (int i = 0; i < directional_amount; i++)
     {
         DirectionalBullets2D* bullets = all_directional_bullets[i];
 
@@ -663,8 +663,8 @@ int BulletFactory2D::debug_get_active_attachments_amount()
         }
     }
 
-    size_t block_amount = all_block_bullets.size();
-    for (size_t i = 0; i < block_amount; i++)
+    int block_amount = static_cast<int>(all_block_bullets.size());
+    for (int i = 0; i < block_amount; i++)
     {
         BlockBullets2D* bullets = all_block_bullets[i];
 
@@ -684,7 +684,7 @@ int BulletFactory2D::debug_get_attachments_pool_amount()
 
 Dictionary BulletFactory2D::debug_get_attachments_pool_info()
 {
-    std::map<size_t, size_t> pool_info = bullet_attachments_pool.get_pool_info();
+    std::map<int, int> pool_info = bullet_attachments_pool.get_pool_info();
 
     Dictionary dict;
     for (const auto& [key, value] : pool_info) {
@@ -865,8 +865,7 @@ void BulletFactory2D::_bind_methods() {
 
     ClassDB::bind_method(
         D_METHOD("debug_get_bullets_pool_info", "bullet_type"),
-        &BulletFactory2D::debug_get_bullets_pool_info,
-        PropertyInfo(Variant::DICTIONARY, "", PROPERTY_HINT_DICTIONARY_TYPE, "int:int")
+        &BulletFactory2D::debug_get_bullets_pool_info
     );
 
     ClassDB::bind_method(D_METHOD("debug_get_total_attachments_amount"), &BulletFactory2D::debug_get_total_attachments_amount);
@@ -875,8 +874,7 @@ void BulletFactory2D::_bind_methods() {
 
     ClassDB::bind_method(
         D_METHOD("debug_get_attachments_pool_info"),
-        &BulletFactory2D::debug_get_attachments_pool_info,
-        PropertyInfo(Variant::DICTIONARY, "", PROPERTY_HINT_DICTIONARY_TYPE, "int:int")
+        &BulletFactory2D::debug_get_attachments_pool_info
     );
 
     ClassDB::bind_static_method("BulletFactory2D",

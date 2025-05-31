@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="BulletRotationData2D" inherits="Resource" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/godotengine/godot/master/doc/class.xsd">
+	<brief_description>
+		Contains bullet rotation data.
+	</brief_description>
+	<description>
+	</description>
+	<tutorials>
+	</tutorials>
+	<methods>
+		<method name="generate_random_data" qualifiers="static">
+			<return type="BulletRotationData2D[]" />
+			<param index="0" name="amount_to_generate" type="int" />
+			<param index="1" name="rotation_speed_MIN" type="float" />
+			<param index="2" name="rotation_speed_MAX" type="float" />
+			<param index="3" name="max_rotation_speed_MIN" type="float" />
+			<param index="4" name="max_rotation_speed_MAX" type="float" />
+			<param index="5" name="rotation_acceleration_MIN" type="float" />
+			<param index="6" name="rotation_acceleration_MAX" type="float" />
+			<description>
+				Generates random rotation data.
+			</description>
+		</method>
+	</methods>
+	<members>
+		<member name="max_rotation_speed" type="float" setter="set_max_rotation_speed" getter="get_max_rotation_speed" default="0.0">
+			The maximum rotation speed that the bullets can have.
+		</member>
+		<member name="rotation_acceleration" type="float" setter="set_rotation_acceleration" getter="get_rotation_acceleration" default="0.0">
+			The amount by which the rotation speeds up every frame until reaching max_rotation_speed.
+		</member>
+		<member name="rotation_speed" type="float" setter="set_rotation_speed" getter="get_rotation_speed" default="0.0">
+			The actual current rotation speed.
+		</member>
+	</members>
+</class>

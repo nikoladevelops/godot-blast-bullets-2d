@@ -31,7 +31,7 @@ _ALWAYS_INLINE_ void move_bullets(float delta) {
         }
     }
 
-    for (size_t i = 0; i < amount_bullets; i++) {
+    for (int i = 0; i < amount_bullets; i++) {
         if (bullets_enabled_status[i] == false) {
             continue;
         }

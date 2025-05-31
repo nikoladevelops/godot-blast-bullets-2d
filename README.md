@@ -1,4 +1,7 @@
 
+
+CURRENTLY UPDATING PLUGIN, README NEEDS TO BE EDITED
+===========================
 <p align="center">
   <img src="https://raw.githubusercontent.com/nikoladevelops/godot-blast-bullets-2d/main/blast_bullets_2d.png" alt="BlastBullets2D - Logo" width="200"/>
 </p>

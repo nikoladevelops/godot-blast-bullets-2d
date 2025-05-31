@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="BlockBulletsData2D" inherits="MultiMeshBulletsData2D" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/godotengine/godot/master/doc/class.xsd">
+	<brief_description>
+		Contains spawn data for the [BlockBullets2D].
+	</brief_description>
+	<description>
+		Ensure that the [member MultiMeshBulletsData2D.transforms] property is set or your game will crash.
+	Check [MultiMeshBulletsData2D]'s documentation for the rest of the properties.
+	</description>
+	<tutorials>
+	</tutorials>
+	<members>
+		<member name="block_rotation_radians" type="float" setter="set_block_rotation_radians" getter="get_block_rotation_radians" default="0.0">
+			Determines the direction in which the block of bullets travels.
+		</member>
+		<member name="block_speed" type="BulletSpeedData2D" setter="set_block_speed" getter="get_block_speed">
+			This is the speed data that the block of bullets uses.
+		</member>
+	</members>
+</class>

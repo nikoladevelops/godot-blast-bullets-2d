@@ -6,7 +6,7 @@ namespace BlastBullets2D {
 
 int MultiMeshBulletsData2D::calculate_bitmask(const TypedArray<int> &numbers) {
     int bitmask_value = 0;
-    for (size_t i = 0; i < numbers.size(); i++) {
+    for (int i = 0; i < numbers.size(); i++) {
         // From the current number calculate which bit it corresponds to inside the bitmask (number 5 = 5th bit from right to left = 10000 in binary). This is the same as the formula 2 to the power of N-1. Example: if we have the number 4, then its 2 to the power of 4-1 -> this is equal to -> 2 to the power of 3 = 8  -> turn 8 into binary = 1000. I am doing exactly the same thing here by saying I have the number 1, shift it to the left by N-1 = 1000  (because the number one got shifted to the left by 3 positions, those 3 positions are now filled with zeros)
         bitmask_value |= 1 << ((int)(numbers[i]) - 1); // this is the more inefficient way of doing the same thing: static_cast<int>(pow(2, (int)(numbers[i]) - 1));
     }
@@ -28,7 +28,7 @@ TypedArray<Texture2D> MultiMeshBulletsData2D::get_textures() const {
 
 void MultiMeshBulletsData2D::set_textures(const TypedArray<Texture2D> &new_textures) {
     textures.resize(new_textures.size());
-    for (size_t i = 0; i < new_textures.size(); i++) {
+    for (int i = 0; i < new_textures.size(); i++) {
         textures[i] = new_textures[i];
     }
 }
@@ -61,10 +61,10 @@ void MultiMeshBulletsData2D::set_default_change_texture_time(float new_default_c
     default_change_texture_time = new_default_change_texture_time;
 }
 
-uint32_t MultiMeshBulletsData2D::get_collision_layer() const {
+int MultiMeshBulletsData2D::get_collision_layer() const {
     return collision_layer;
 }
-void MultiMeshBulletsData2D::set_collision_layer(uint32_t new_collision_layer) {
+void MultiMeshBulletsData2D::set_collision_layer(int new_collision_layer) {
     collision_layer = new_collision_layer;
 }
 
@@ -74,10 +74,10 @@ void MultiMeshBulletsData2D::set_collision_layer_from_array(const TypedArray<int
     collision_layer = bitmask;
 }
 
-uint32_t MultiMeshBulletsData2D::get_collision_mask() const {
+int MultiMeshBulletsData2D::get_collision_mask() const {
     return collision_mask;
 }
-void MultiMeshBulletsData2D::set_collision_mask(uint32_t new_collision_mask) {
+void MultiMeshBulletsData2D::set_collision_mask(int new_collision_mask) {
     collision_mask = new_collision_mask;
 }
 
@@ -141,7 +141,7 @@ TypedArray<BulletRotationData2D> MultiMeshBulletsData2D::get_all_bullet_rotation
 }
 void MultiMeshBulletsData2D::set_all_bullet_rotation_data(const TypedArray<BulletRotationData2D> &new_bullet_rotation_data) {
     all_bullet_rotation_data.resize(new_bullet_rotation_data.size());
-    for (size_t i = 0; i < new_bullet_rotation_data.size(); i++) {
+    for (int i = 0; i < new_bullet_rotation_data.size(); i++) {
         all_bullet_rotation_data[i] = new_bullet_rotation_data[i];
     }
 }
@@ -186,11 +186,11 @@ void MultiMeshBulletsData2D::set_z_index(int new_z_index){
     z_index = new_z_index;
 }
 
-uint32_t MultiMeshBulletsData2D::get_light_mask() const{
+int MultiMeshBulletsData2D::get_light_mask() const{
     return light_mask;
 }
 
-void MultiMeshBulletsData2D::set_light_mask(uint32_t new_light_mask){
+void MultiMeshBulletsData2D::set_light_mask(int new_light_mask){
     light_mask = new_light_mask;
 }
 
@@ -200,11 +200,11 @@ void MultiMeshBulletsData2D::set_light_mask_from_array(const TypedArray<int>& nu
 }
 
 
-uint32_t MultiMeshBulletsData2D::get_visibility_layer() const{
+int MultiMeshBulletsData2D::get_visibility_layer() const{
     return visibility_layer;
 }
 
-void MultiMeshBulletsData2D::set_visibility_layer(uint32_t new_visibility_layer){
+void MultiMeshBulletsData2D::set_visibility_layer(int new_visibility_layer){
     visibility_layer = new_visibility_layer;
 }
 
