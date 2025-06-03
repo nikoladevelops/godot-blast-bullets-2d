@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="showcase/logo.svg" alt="BlastBullets2D - Logo" width="500"/>
+  <img src="showcase/logo-big.jpg" alt="BlastBullets2D - Logo" width="500"/>
 </p>
 
 ## 🚀 Purpose
