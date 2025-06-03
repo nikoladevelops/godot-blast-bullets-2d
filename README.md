@@ -38,7 +38,7 @@ https://youtu.be/SeyD1YVIZss?si=oNXiFWNMiCd7JcZw
 <summary><b>✨ What's New In Version 2.0</b></summary>
 
 - **Physics Interpolation**  
-  Bullets will always appear smooth when this option is enabled, regardless of the device's physics tick rate or frame rate.
+  Bullets will always appear smooth when this option is enabled, regardless of the device's physics tick rate or refresh rate (perfect for monitors above 60Hz).
 
 - **Bullet Attachments**  
   You can now attach particles, sprites, or any other nodes to bullets. These attachments move with the bullet and have their state saved and loaded automatically.
