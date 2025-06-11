@@ -123,18 +123,30 @@ In conclusion, **BlastBullets2D is ideal for top-down shooters and arcade-style 
 #### BlastBullets2D targets <b>Godot Engine 4.4.1</b>. As long as there are no breaking changes to GDExtension in the future, then it should work for all future 4.4.x Godot releases.
 
 1. Go in [Releases](https://github.com/nikoladevelops/godot-blast-bullets-2d/releases) and on the latest release click and download <b>BlastBullets2D.zip</b>.
+
+Note: <b>BlastBullets2D</b> is also available in: [Godot Asset Library](https://godotengine.org/asset-library/asset/2632) and [Itch.io](https://realnikich.itch.io/blastbullets2d).
+
 2. Extract the zip and you will get a single folder `addons` and in that folder is the plugin folder `BlastBullets2D`.
 3. Open your <b>Godot</b> game project.
 4. Cut the folder named `addons` and place it in your project. As long as `BlastBullets2D` is inside the `addons` folder and the names of the folders are correct everything will work as expected.
 6. Close <b>Godot</b> and open the project again.
 
+
 The compiled plugin files have been loaded and you are ready to begin coding!
 
-All functions and properties have been documented <b>INSIDE THE EDITOR</b>, so it will be extremely easy for you to take full advantage of all features :)
+All functions and properties have been documented <b>INSIDE THE EDITOR</b>, so it will be extremely easy for you to take full advantage of all features.
 
 If you want to benchmark/compare performance of `BlastBullets2D` bullets to `Area2D` bullets you can download the second zip file <b>TestProject.zip</b> that contains the test project showcased in the gif and in the videos on my [Youtube Channel](https://www.youtube.com/@realnikich). I will post some tutorials there so make sure you subscribe.
 
- If you like the plugin then make sure you give it a star [here on GitHub](https://github.com/nikoladevelops/godot-blast-bullets-2d). You can also support me on [Patreon](https://www.patreon.com/realnikich) if you want me to update it more frequently. This will also allow me to focus on making even cooler plugins (they will all be free and open source just like `BlastBullets2D`). If you plan on using the plugin for your game or you have any questions, you can always messsage me or make a [tweet tagging me on X](https://x.com/realNikich) (I would love to see someone actually using it even if you are just playing around with it, tell me how you feel about it!). Discord user is `nixun`, you might see me in some Godot servers so say hello :)
+If you like the plugin then make sure you give it a star [here on GitHub](https://github.com/nikoladevelops/godot-blast-bullets-2d).
+
+Support me on [Patreon](https://www.patreon.com/realnikich), if you want me to create more <b>free and open source plugins</b> like this one!
+
+If you plan on using the plugin for your game or you have any questions, you can always messsage me or make a [tweet tagging me on X](https://x.com/realNikich).
+
+Discord username is `nixun`, you might see me in Godot related channels.
+
+I would love to see developers using my plugin even if you are just playing around with it, tell me how you feel about it!
 
 ---
 ## How To Use
@@ -146,10 +158,46 @@ That's all! You just have to ensure that you are setting the data resource class
 
 Here is how the basic setup goes:
 1. Add a `BulletFactory2D` node to your scene tree. The BulletFactory's job is to spawn bullets and manage plugin related options (debugger, physics interpolations and so on..).
-2. Attach a script to it and make it into [Autoload/Singleton](https://docs.godotengine.org/en/stable/tutorials/scripting/singletons_autoload.html).
+2. Attach a script to the factory. The `BulletFactory2D` node has the signals `area_entered`, `body_entered` and `life_time_over`. You should handle them in your script and write custom logic for your game.
+
+You should probably keep a reference to the factory globally, so you can access it in any other script(enemies/player). There's two ways of doing this.
+
+The first way would be to create an [Autoload/Singleton](https://docs.godotengine.org/en/stable/tutorials/scripting/singletons_autoload.html) where you keep the factory as a variable.
+
+The second way would be to create a class with a static variable that keeps the reference of the factory. I personally prefer using this way.
+
+Example:
+
+```
+# globals.gd - script for global variables
+
+class_name GLOBALS
+
+static var BULLET_FACTORY:BulletFactory2D
+
+```
+
+Then inside your main level script, you need to save the reference of your factory inside the `BULLET_FACTORY` static variable like so:
+```
+# main.gd - script of the main scene, where the factory is located
+
+extends Node
+
+func _ready():
+	GLOBALS.BULLET_FACTORY = $BulletFactory2D # save a reference to the factory
+
+```
+
+Now the factory can be accessed through any script by doing this
+```
+# myscript.gd - script where you need to spawn bullets (enemy/player)
+
+func spawn_bullets()->void:
+	GLOBALS.BULLET_FACTORY.spawn_directional_bullets(bullets_data)
+```
+
 3. Use the `BulletFactory2D`'s functions to spawn bullets in any other script. You can use either `spawn_directional_bullets()` or `spawn_block_bullets()`.
-4. The `BulletFactory2D` node has the signals `area_entered`, `body_entered` and `life_time_over`. You should handle them in your script and write custom logic for your game.
-5. To save the bullet state you can call the `save()` and `load()` functions of your `BulletFactory2D` node and then handle the signals `save_finished` and `load_finished`.
+4. To save the bullet state you can call the `save()` and `load()` functions of your `BulletFactory2D` node and then handle the signals `save_finished` and `load_finished`.
 
 To handle the collisions properly and apply damage to enemies/player or any other custom data, you have to deal with [`Custom Resources`](https://docs.godotengine.org/en/stable/tutorials/scripting/resources.html). Inside the data resource class you've chosen (either `DirectionalBulletsData2D` or `BlockBulletsData2D`) you should attach a custom resource with properties such as `damage` - this is done by setting the `bullets_custom_data` property to your custom resource class. The same knowledge is needed when you are trying to save/load data. If you are not familiar with this concept or how to implement all of that then I suggest watching my [Godot Custom Resources For Beginners Tutorial](https://youtu.be/fdRJqnOrz98?si=gstLFNWaCcrENnjJ).
 
