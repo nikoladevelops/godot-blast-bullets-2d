@@ -30,6 +30,9 @@ The plugin comes precompiled for the following platforms:
 
 If you're developing a bullet-hell shooter or any game that involves a high number of 2D bullets, **BlastBullets2D** provides a powerful and easy-to-use solution that delivers outstanding performance inside Godot Engine.
 
+Video introduction of the plugin
+https://www.youtube.com/watch?v=eMvR3UWXtH0
+
 Video showing some of the features of the plugin
 https://youtu.be/SeyD1YVIZss?si=oNXiFWNMiCd7JcZw
 
