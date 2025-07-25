@@ -7,7 +7,6 @@ export_presets.cfg
 *.translation
 *.tscn.remap
 *.tres.remap
-*.godot
 *.pidb
 *.user
 *.userprefs
