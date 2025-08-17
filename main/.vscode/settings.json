@@ -1,5 +1,0 @@
-{
-    "cmake.ignoreCMakeListsMissing": true,
-    "GODOT_PATH": "B:/GodotEngine/Godot_v4.4.1-stable_win64.exe",
-    "GDB_PATH":"C:/MinGW/bin/gdb.exe"
-}

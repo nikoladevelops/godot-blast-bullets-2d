@@ -1,0 +1,60 @@
+[configuration]
+entry_symbol = "blastbullets2d_init"
+compatibility_minimum = "4.4"
+
+[libraries]
+; Relative paths ensure that our GDExtension can be placed anywhere in the project directory.
+macos.debug = "./bin/macos/libblastbullets2d.macos.template_debug.single.framework"
+macos.release = "./bin/macos/libblastbullets2d.macos.template_release.single.framework"
+
+
+ios.debug = "./bin/ios/libblastbullets2d.ios.template_debug.single.xcframework"
+ios.release = "./bin/ios/libblastbullets2d.ios.template_release.single.xcframework"
+
+
+windows.debug.x86_32 = "./bin/windows/blastbullets2d.windows.template_debug.x86_32.single.dll"
+windows.release.x86_32 = "./bin/windows/blastbullets2d.windows.template_release.x86_32.single.dll"
+
+windows.debug.x86_64 = "./bin/windows/blastbullets2d.windows.template_debug.x86_64.single.dll"
+windows.release.x86_64 = "./bin/windows/blastbullets2d.windows.template_release.x86_64.single.dll"
+
+windows.debug.arm64 = "./bin/windows/blastbullets2d.windows.template_debug.arm64.single.dll"
+windows.release.arm64 = "./bin/windows/blastbullets2d.windows.template_release.arm64.single.dll"
+
+
+linux.debug.x86_32 = "./bin/linux/libblastbullets2d.linux.template_debug.x86_32.single.so"
+linux.release.x86_32 = "./bin/linux/libblastbullets2d.linux.template_release.x86_32.single.so"
+
+linux.debug.x86_64 = "./bin/linux/libblastbullets2d.linux.template_debug.x86_64.single.so"
+linux.release.x86_64 = "./bin/linux/libblastbullets2d.linux.template_release.x86_64.single.so"
+
+linux.debug.arm32 = "./bin/linux/libblastbullets2d.linux.template_debug.arm32.single.so"
+linux.release.arm32 = "./bin/linux/libblastbullets2d.linux.template_release.arm32.single.so"
+
+linux.debug.arm64 = "./bin/linux/libblastbullets2d.linux.template_debug.arm64.single.so"
+linux.release.arm64 = "./bin/linux/libblastbullets2d.linux.template_release.arm64.single.so"
+
+
+android.debug.x86_64 = "./bin/android/libblastbullets2d.android.template_debug.x86_64.single.so"
+android.release.x86_64 = "./bin/android/libblastbullets2d.android.template_release.x86_64.single.so"
+
+android.debug.arm64 = "./bin/android/libblastbullets2d.android.template_debug.arm64.single.so"
+android.release.arm64 = "./bin/android/libblastbullets2d.android.template_release.arm64.single.so"
+
+android.debug.arm32 = "./bin/android/libblastbullets2d.android.template_debug.arm32.single.so"
+android.release.arm32 = "./bin/android/libblastbullets2d.android.template_release.arm32.single.so"
+
+
+web.debug.threads.wasm32 = "./bin/web/libblastbullets2d.web.template_debug.wasm32.threads.single.wasm"
+web.release.threads.wasm32 = "./bin/web/libblastbullets2d.web.template_release.wasm32.threads.single.wasm"
+
+web.debug.wasm32 = "./bin/web/libblastbullets2d.web.template_debug.wasm32.single.wasm"
+web.release.wasm32 = "./bin/web/libblastbullets2d.web.template_release.wasm32.single.wasm"
+
+[dependencies]
+ios.debug = {
+  "./bin/ios/libblastbullets2d.ios.template_debug.single.xcframework": ""
+}
+ios.release = {
+  "./bin/ios/libblastbullets2d.ios.template_release.single.xcframework": ""
+}

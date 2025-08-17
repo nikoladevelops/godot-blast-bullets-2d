@@ -1,0 +1,24 @@
+{
+    "_": "Auto-generated custom build profile based on detected classes from #include directives (including inheritance dependencies).",
+    "type": "feature_profile",
+    "enabled_classes": [
+        "CanvasItemMaterial",
+        "Engine",
+        "MainLoop",
+        "Material",
+        "Mesh",
+        "MultiMesh",
+        "Node",
+        "Object",
+        "PackedScene",
+        "PlaneMesh",
+        "PrimitiveMesh",
+        "QuadMesh",
+        "RandomNumberGenerator",
+        "RefCounted",
+        "Resource",
+        "SceneState",
+        "SceneTree",
+        "ShaderMaterial"
+    ]
+}

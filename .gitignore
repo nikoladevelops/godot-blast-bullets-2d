@@ -1,88 +1,163 @@
-main/visual-studio-project/output/
-main/visual-studio-project/.vs/
+# Godot auto generated files
+*.gen.*
+.godot/
 
-# SCons-specific ignores
-.sconsign.dblite
-.sconf_temp/
-*.sconsign
-*.scons
-SConstruct.cache
-config.log
-config.status
-*.pyc
-*.pyo
-__pycache__/
+# Ignore the top-level bin folder
+/bin/
 
-# C++-specific ignores
-# Object files
+# Ignore all bin folders inside test_project
+/test_project/**/bin/
+
+# Ignore custom.py
+custom.py
+
+# Ignore generated compile_commands.json
+compile_commands.json
+
+# Ignore files generated for documentation
+/gen/
+
+# Binaries
 *.o
-*.obj
 *.os
-
-# Shared libraries
 *.so
-*.so.*
-*.dylib
-*.dll
-
-# Static libraries
-*.a
-*.lib
-
-# Executables (platform-specific)
-*.exe
-*.out
-*.app
-
-# Debug symbols and metadata
+*.obj
+*.bc
+*.pyc
+*.dblite
 *.pdb
-*.ilk
+*.lib
+*.config
+*.creator
+*.creator.user
+*.files
+*.includes
 *.idb
-*.map
+*.exp
 
-# Dependency files
-*.d
-*.dep
+# Additional binaries
+*.a              # Static libraries (Linux/macOS)
+*.la             # libtool archives
+*.lo             # libtool objects
+*.dll            # Windows dynamic libraries
+*.dylib          # macOS dynamic libraries
+*.exe            # Windows executables
+*.out            # Common output file
+*.app            # macOS applications
+*.bin            # Raw binaries
+*.elf            # Executable and Linkable Format
+*.hex            # Intel HEX files (embedded)
+*.map            # Linker map files
+*.wasm           # WebAssembly modules
+*.mod            # Fortran/C++ modules
+*.sav            # Saved states (e.g., from emulators or tools)
+*.d              # Dependency files (e.g., from `-MD` in GCC)
 
-# Build directories (common for C++ projects)
-build/
-bin/
-obj/
-dist/
-target/
+# Other stuff
+*.log
 
-# Temporary files
-*.tmp
-*.bak
-*.swp
-*~
+# VS Code
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
 
-# IDE/editor-specific (common in C++ development)
-*.idea/
-*.sublime-project
+# macOS Finder
+.DS_Store
+
+# JetBrains CLion / IntelliJ / Rider
+.idea/
+*.iml
+*.ipr
+*.iws
+cmake-build-*/
+
+# KDevelop
+.kdev4/
+.kdevduchain/
+.kdev_include_paths
+.kdevses
+
+# Zed Editor
+.zed/
+
+# Sublime Text
 *.sublime-workspace
-CMakeFiles/
+*.sublime-project
+
+# Visual Studio (Community/Pro/Enterprise)
+*.sln
+*.suo
+*.vcxproj
+*.vcxproj.filters
+*.vcxproj.user
+*.ncb
+*.sdf
+*.opensdf
+*.vc.db
+*.ipch
+*.obj
+*.log
+*.tlog/
+*.idb
+*.pch
+*.pdb
+*.res
+*.exp
+*.dll
+*.lib
+Debug/
+Release/
+x64/
+*.vspscc
+*.vssscc
+*.user
+*.cache/
+.vs/
+
+# Visual Studio Code CodeSpaces
+.code-workspace
+
+# CMake
 CMakeCache.txt
+CMakeFiles/
+CMakeUserPresets.json
 cmake_install.cmake
 Makefile
+CTestTestfile.cmake
 *.cmake
 
-# Platform-specific ignores
-# Windows
-Thumbs.db
-*.suo
-*.user
-*.ncb
-*.aps
-*.VC.db
-*.VC.VC.opendb
+# Code::Blocks
+*.depend
+*.layout
+*.cbp
+*.workspace
 
-# macOS
-.DS_Store
-*.xcodeproj/
-*.xcworkspace/
+# Eclipse CDT
+.project
+.cproject
+.settings/
 
-# Linux
-*.gcno
-*.gcda
-*.gcov
+# NetBeans
+nbproject/private/
+build/
+nbbuild/
+dist/
+nbdist/
+.nb-gradle/
+
+# Qt Creator
+*.pro.user*
+*.qbs.user*
+*.pro.user
+*.qmake.stash
+*.autosave
+
+# Other backup/temp/editor junk
+*.bak
+*.tmp
+*~
+*.swp
+*.swo
+*.orig
+*.old
+*.log

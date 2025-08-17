@@ -1,0 +1,3 @@
+BlastBullets2D
+4.4
+GODOT_ENGINE_PATH_GOES_HERE
