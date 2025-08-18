@@ -127,31 +127,20 @@ In conclusion, **BlastBullets2D is ideal for top-down shooters and arcade-style 
 ## How To Install
 #### BlastBullets2D targets <b>Godot Engine 4.4.1</b>. As long as there are no breaking changes to GDExtension in the future, then it should work for all future 4.4.x Godot releases.
 
-1. Go in [Releases](https://github.com/nikoladevelops/godot-blast-bullets-2d/releases) and on the latest release click and download <b>BlastBullets2D.zip</b>.
+1. Go in [Releases](https://github.com/nikoladevelops/godot-blast-bullets-2d/releases) and on the latest release click and download `blastbullets2d.zip`
 
 Note: <b>BlastBullets2D</b> is also available in: [Godot Asset Library](https://godotengine.org/asset-library/asset/2632) and [Itch.io](https://realnikich.itch.io/blastbullets2d).
 
-2. Extract the zip and you will get a single folder `addons` and in that folder is the plugin folder `BlastBullets2D`.
-3. Open your <b>Godot</b> game project.
-4. Cut the folder named `addons` and place it in your project. As long as `BlastBullets2D` is inside the `addons` folder and the names of the folders are correct everything will work as expected.
-6. Close <b>Godot</b> and open the project again.
+2. Extract the zip and you will get a single folder `blastbullets2d`
+3. Open your <b>Godot</b> game project and paste the folder inside. No matter if you place it inside an `addons` folder or the root of the project, the plugin will still work
+
 
 
 The compiled plugin files have been loaded and you are ready to begin coding!
 
 All functions and properties have been documented <b>INSIDE THE EDITOR</b>, so it will be extremely easy for you to take full advantage of all features.
 
-If you want to benchmark/compare performance of `BlastBullets2D` bullets to `Area2D` bullets you can download the second zip file <b>TestProject.zip</b> that contains the test project showcased in the gif and in the videos on my [Youtube Channel](https://www.youtube.com/@realnikich). I will post some tutorials there so make sure you subscribe.
-
-If you like the plugin then make sure you give it a star [here on GitHub](https://github.com/nikoladevelops/godot-blast-bullets-2d).
-
-Support me on [Patreon](https://www.patreon.com/realnikich), if you want me to create more <b>free and open source plugins</b> like this one!
-
-If you plan on using the plugin for your game or you have any questions, you can always messsage me or make a [tweet tagging me on X](https://x.com/realNikich).
-
-Discord username is `nixun`, you might see me in Godot related channels.
-
-I would love to see developers using my plugin even if you are just playing around with it, tell me how you feel about it!
+If you want to benchmark/compare performance of `BlastBullets2D` bullets to `Area2D` bullets you can download the second zip file `test_project.zip` that contains the test project showcased in the gif and in the videos on my [Youtube Channel](https://www.youtube.com/@realnikich). I will post some tutorials there so make sure you subscribe
 
 ---
 ## How To Use
@@ -612,11 +601,6 @@ scons platform=web target=template_release lto=full
 ```
 
 #### For IOS and macOS
-Due to me not having these OS-es I can only give you short instructions on what to look for and which files you need to edit.
-
-First of all this whole library relies on <b>GDExtension</b> so it has a <b>.gdextension</b> file with path locations of the binaries it needs to load.
-See [godot_cpp's .gdextension file](https://github.com/godotengine/godot-cpp/blob/master/test/project/example.gdextension) vs [mine](https://github.com/nikoladevelops/godot-blast-bullets-2d/blob/main/Test-Project-BlastBullets2D/addons/BlastBullets2D/.gdextension).
-Also notice how their <b>SConstruct</b> file differs from mine and add the missing logic: [theirs](https://github.com/godotengine/godot-cpp/blob/master/test/SConstruct) vs [mine](https://github.com/nikoladevelops/godot-blast-bullets-2d/blob/main/main/SConstruct.py).
 Research on which toolchain you need for <b>IOS</b> and for <b>macOS</b>, download them and then run the same scons commands, but for your desired platform and other desired arguments.
 See the official [GDExtension Documentation](https://docs.godotengine.org/en/stable/tutorials/scripting/gdextension/index.html) or search for some tutorials online. Sadly <b>GDExtenstion</b> is not well documented, so you might spend some time searching. I recommend joining <b>Godot's Discord Server</b> it has a <b>gdnative-gdextension channel</b> so you might find some help there.
   
@@ -624,7 +608,11 @@ See the official [GDExtension Documentation](https://docs.godotengine.org/en/sta
 
 ---
 
-## Support The Creation Of More Plugins
-If you want to make it possible for me to make more free and open source Godot plugins like <b>BlastBullets2D</b> as well as tutorials and random videos you can support me on [Patreon](https://www.patreon.com/realnikich).
+## Support
+If you wish to support me you can do so here - https://ko-fi.com/realnikich or https://patreon.com/realnikich
 
-Enjoy the plugin!
+If you find this plugin useful:
+- <b>Leave a Star on the repository</b>
+- Expect tutorials on my YouTube channel - https://www.youtube.com/@realnikich
+- [Follow me on X (Twitter)](https://x.com/realNikich)
+- [Follow me on Bluesky](https://bsky.app/profile/realnikich.bsky.social)
