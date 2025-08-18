@@ -97,7 +97,7 @@ def read_dont_touch_file():
             lines = file.readlines()
             if len(lines) < 2:
                 raise ValueError
-            plugin_name = lines[0].strip()
+            plugin_name = lines[0].strip().lower()
             version = lines[1].strip()
             return plugin_name, version
     except Exception:

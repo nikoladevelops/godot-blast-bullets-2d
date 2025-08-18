@@ -27,7 +27,7 @@ def sanitize_and_validate_filename(name: str) -> str | None:
         return None
     if cleaned.endswith(".") or cleaned.endswith(" "):
         return None
-    return cleaned
+    return cleaned.lower()
 
 def get_old_plugin_name():
     file_path = os.path.join(PARENT_DIR, "dont_touch.txt")
@@ -35,7 +35,7 @@ def get_old_plugin_name():
         lines = f.readlines()
     if not lines:
         raise ValueError("dont_touch.txt is empty.")
-    return lines[0].strip()
+    return lines[0].strip().lower()
 
 def verify_paths_exist(paths):
     missing = [p for p in paths if not os.path.exists(p)]
