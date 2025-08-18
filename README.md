@@ -11,12 +11,14 @@ Compared to standard methods like using `Area2D` with `AnimationPlayer`, **Blast
 If you're searching for a **Godot optimized bullets plugin**, **BlastBullets2D** is built exactly for that purpose.
 
 The plugin comes precompiled for the following platforms:
-- **Windows** (x86_64 and ARM64)
-- **Android** (x86_64 and ARM64)
-- **Linux** (x86_64)
+- **Windows**
+- **macOS**
+- **Linux**
+- **Android**
+- **iOS**
 - **Web**
 
-⚠️ **BlastBullets2D should work for iOS and macOS as well, but you need to compile the code yourself**
+✅ **BlastBullets2D is fully cross platform now, because it uses the [godot-plus-plus template](https://github.com/nikoladevelops/godot-plus-plus)**. If you also want to write C++ code in Godot or you have some old GDExtension plugins you want to update, I suggest checking it out
 
 **BlastBullets2D** integrates seamlessly into your Godot project. You do not need any knowledge of C++ to use it. Everything is controlled through **GDScript**, made possible by Godot’s [GDExtension](https://docs.godotengine.org/en/stable/tutorials/scripting/gdextension/what_is_gdextension.html) system.
 
@@ -522,6 +524,12 @@ func _on_factory_save_finished(factory_data:SaveDataBulletFactory2D):
 
 ---
 ## How To Compile
+
+The easy way is to just fork the plugin, then go inside the GitHub Actions tab, and run the workflow for `full_plugin_compilation`, instead of `debug`. This easy process is due to using [godot-plus-plus template](https://github.com/nikoladevelops/godot-plus-plus) - allows for cross platform easy workflow when making Godot C++ GDExtension plugins
+
+#
+The hard way - doing it locally on your own devices
+
 If you want to modify the C++ code and add custom logic or fix issues: 
 
 1. Install [Python](https://www.python.org/downloads/).
