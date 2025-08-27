@@ -17,6 +17,9 @@ compile_commands.json
 # Ignore files generated for documentation
 /gen/
 
+# Ignore inner license files (could be added when testing full_plugin_compilation zip)
+test_project/**/LICENSE*
+
 # Binaries
 *.o
 *.os
