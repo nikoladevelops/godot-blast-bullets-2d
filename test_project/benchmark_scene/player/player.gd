@@ -79,7 +79,7 @@ func _process(_delta)->void:
 		allowed_to_shoot=false
 		fire_timer.start()
 
-func _physics_process(delta: float) -> void:
+func _physics_process(_delta: float) -> void:
 	velocity = get_direction() * movement_speed
 	move_and_slide()
 	look_at(get_global_mouse_position())
