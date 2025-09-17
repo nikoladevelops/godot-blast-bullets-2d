@@ -48,9 +48,9 @@
 		<member name="all_bullet_rotation_data" type="BulletRotationData2D[]" setter="set_all_bullet_rotation_data" getter="get_all_bullet_rotation_data" default="[]">
 			Provide [BulletRotationData2D] if you want your bullets to rotate.
 
-		Note: If you want each bullet to have it's own rotation data then make sure that the amount of rotation data you provide is the same amount of data inside the [member transforms] property.
-		    	Note: If the rotation data is less than the amount of [Transform2D] saved in the [member transforms] property, then only the first bullet rotation data will be shared for all bullets.
-		Note: [BulletRotationData2D] has a helper static method that you can use to generate random rotation data - [method BulletRotationData2D.generate_random_data].
+			Note: If you want each bullet to have it's own rotation data then make sure that the amount of rotation data you provide is the same amount of data inside the [member transforms] property.
+			    	Note: If the rotation data is less than the amount of [Transform2D] saved in the [member transforms] property, then only the first bullet rotation data will be shared for all bullets.
+			Note: [BulletRotationData2D] has a helper static method that you can use to generate random rotation data - [method BulletRotationData2D.generate_random_data].
 		</member>
 		<member name="bullet_attachment_offset" type="Vector2" setter="set_bullet_attachment_offset" getter="get_bullet_attachment_offset" default="Vector2(0, 0)">
 			Determines the attachment's offset calculated from the center of the bullet's texture.
@@ -58,41 +58,41 @@
 		<member name="bullet_attachment_scene" type="PackedScene" setter="set_bullet_attachment_scene" getter="get_bullet_attachment_scene">
 			If you want to have particles, other sprites or anything that moves along with the bullet, that also needs to be saved, then this is the place where you provide that attachment as a [PackedScene].
 
-		Check out the [BulletAttachment2D] documentation on how to implement that.
-		Note: If you provide a scene that is not a [BulletAttachment2D], then your game will crash.
+			Check out the [BulletAttachment2D] documentation on how to implement that.
+			Note: If you provide a scene that is not a [BulletAttachment2D], then your game will crash.
 		</member>
 		<member name="bullets_custom_data" type="Resource" setter="set_bullets_custom_data" getter="get_bullets_custom_data">
 			If you want your bullets to have damage or any other data specific to this type of bullets then you have to provide a custom resource that holds all of these properties.
 
-		[url=https://www.youtube.com/watch?v=fdRJqnOrz98&amp;t=63s]YouTube Tutorial On Custom Resources[/url]
+			[url=https://www.youtube.com/watch?v=fdRJqnOrz98&amp;t=63s]YouTube Tutorial On Custom Resources[/url]
 		</member>
 		<member name="change_texture_times" type="float[]" setter="set_change_texture_times" getter="get_change_texture_times" default="[]">
 			Each value in the array is used to animate each texture for that specific amount of time.
 
-		Note: If you want all your textures to share the same change texture time, then use [member default_change_texture_time] instead.
-		Note: If the amount of values provided to [member change_texture_times] does not match the amount of textures that were provided for the bullets, then [member default_change_texture_time] will be the property that is used for animation.
+			Note: If you want all your textures to share the same change texture time, then use [member default_change_texture_time] instead.
+			Note: If the amount of values provided to [member change_texture_times] does not match the amount of textures that were provided for the bullets, then [member default_change_texture_time] will be the property that is used for animation.
 		</member>
 		<member name="collision_layer" type="int" setter="set_collision_layer" getter="get_collision_layer" default="1">
 			The bitmask for the collision layer.
 
-		Note: Needs to be set to a bitmask, so use [method calculate_bitmask].
-		Note: It may be better to just use the [method set_collision_layer_from_array] function.
+			Note: Needs to be set to a bitmask, so use [method calculate_bitmask].
+			Note: It may be better to just use the [method set_collision_layer_from_array] function.
 		</member>
 		<member name="collision_mask" type="int" setter="set_collision_mask" getter="get_collision_mask" default="1">
 			The bitmask for the collision mask.
 
-		Note: Needs to be set to a bitmask, so use [method calculate_bitmask].
-		Note: It may be better to just use the [method set_collision_mask_from_array] function.
+			Note: Needs to be set to a bitmask, so use [method calculate_bitmask].
+			Note: It may be better to just use the [method set_collision_mask_from_array] function.
 		</member>
 		<member name="collision_shape_offset" type="Vector2" setter="set_collision_shape_offset" getter="get_collision_shape_offset" default="Vector2(0, 0)">
 			The offset for the collision shape calculated from the center of the bullet texture.
 
-		Note: You can enable the [BulletFactory2D]'s debugger to make collision shapes visible.
+			Note: You can enable the [BulletFactory2D]'s debugger to make collision shapes visible.
 		</member>
 		<member name="collision_shape_size" type="Vector2" setter="set_collision_shape_size" getter="get_collision_shape_size" default="Vector2(5, 5)">
 			The size of the collision shape.
 
-		Note: You can enable the [BulletFactory2D]'s debugger to make collision shapes visible.
+			Note: You can enable the [BulletFactory2D]'s debugger to make collision shapes visible.
 		</member>
 		<member name="current_texture_index" type="int" setter="set_current_texture_index" getter="get_current_texture_index" default="0">
 			If you have provided an array of textures, you can set which texture is the one you begin from before animation starts.
@@ -100,22 +100,22 @@
 		<member name="default_change_texture_time" type="float" setter="set_default_change_texture_time" getter="get_default_change_texture_time" default="0.3">
 			This is the default time used for animating the textures.
 
-		Note: If you want each texture to have a different animation time then check out the [member change_texture_times] property.
+			Note: If you want each texture to have a different animation time then check out the [member change_texture_times] property.
 		</member>
 		<member name="default_texture" type="Texture2D" setter="set_default_texture" getter="get_default_texture">
 			This is the [Texture2D] that is used for the bullets.
 
-		Note: If you want animation, then you should use the [member textures] property instead.
+			Note: If you want animation, then you should use the [member textures] property instead.
 		</member>
 		<member name="instance_shader_parameters" type="Dictionary" setter="set_instance_shader_parameters" getter="get_instance_shader_parameters" default="{}">
 			If you are using shaders with instance uniform variables, then you can pass a [Dictionary] containing them here.
-		[b]KEY[/b] is the name of the shader parameter and the [b]VALUE[/b] is obviously the value you set it to.
+			[b]KEY[/b] is the name of the shader parameter and the [b]VALUE[/b] is obviously the value you set it to.
 
-		Note: Ensure that the [b]VALUE[/b] is of the same type as your shader instance uniform variable.
+			Note: Ensure that the [b]VALUE[/b] is of the same type as your shader instance uniform variable.
 		</member>
 		<member name="is_life_time_over_signal_enabled" type="bool" setter="set_is_life_time_over_signal_enabled" getter="get_is_life_time_over_signal_enabled" default="false">
 			If this is enabled then when the lifetime of the bullets is over, the signal [signal BulletFactory2D.life_time_over] will be emitted by the [BulletFactory2D].
-		This is helpful when you want to spawn visual effects at that time (explosion, particles, anything really..).
+			This is helpful when you want to spawn visual effects at that time (explosion, particles, anything really..).
 		</member>
 		<member name="is_texture_rotation_permanent" type="bool" setter="set_is_texture_rotation_permanent" getter="get_is_texture_rotation_permanent" default="false">
 			By default the texture is always rotated to match the bullet's transform rotation. This property disables that behavior and ensures that the bullet is always spawned rotated based on [member texture_rotation_radians] only.
@@ -123,8 +123,8 @@
 		<member name="light_mask" type="int" setter="set_light_mask" getter="get_light_mask" default="1">
 			The bitmask for the light mask.
 
-		Note: Needs to be set to a bitmask, so use [method calculate_bitmask].
-		Note: It may be better to just use the [method set_light_mask_from_array] function.
+			Note: Needs to be set to a bitmask, so use [method calculate_bitmask].
+			Note: It may be better to just use the [method set_light_mask_from_array] function.
 		</member>
 		<member name="material" type="Material" setter="set_material" getter="get_material">
 			Feel free to set a [CanvasItemMaterial] or [ShaderMaterial].
@@ -138,12 +138,12 @@
 		<member name="monitorable" type="bool" setter="set_monitorable" getter="get_monitorable" default="false">
 			If you want static bodies to be hit by the bullets, you have to set [member monitorable] to true.
 
-		Note: This is at the cost of performance, so a better workaround is to attach an [Area2D] to those static bodies and detect that instead.
+			Note: This is at the cost of performance, so a better workaround is to attach an [Area2D] to those static bodies and detect that instead.
 		</member>
 		<member name="rotate_only_textures" type="bool" setter="set_rotate_only_textures" getter="get_rotate_only_textures" default="true">
 			If you set this to [code]false[/code], then the collision shapes will also rotate along with the bullet's texture.
 
-		Note: You can enable the [BulletFactory2D]'s debugger to make collision shapes visible.
+			Note: You can enable the [BulletFactory2D]'s debugger to make collision shapes visible.
 		</member>
 		<member name="stop_rotation_when_max_reached" type="bool" setter="set_stop_rotation_when_max_reached" getter="get_stop_rotation_when_max_reached" default="false">
 			Set this to true if you want for the bullets to stop rotating when they reach the maximum rotation speed.
@@ -157,20 +157,20 @@
 		<member name="textures" type="Texture2D[]" setter="set_textures" getter="get_textures" default="[]">
 			Populate this array with textures if you want animation for the bullets.
 
-		Note: If you want only a single texture without any animation, then use [member default_texture] instead.
+			Note: If you want only a single texture without any animation, then use [member default_texture] instead.
 		</member>
 		<member name="transforms" type="Transform2D[]" setter="set_transforms" getter="get_transforms" default="[]">
 			[b]MANDATORY[/b]
-		Determines the transforms of the bullets.
+			Determines the transforms of the bullets.
 
-		Note: It's best to just have some [Marker2D] nodes in your scene tree and retrieve their global transforms over and over when you need to spawn bullets.
-		Note: There is a helper static function that can generate a grid pattern of [Transform2D] that you can use: [method BulletFactory2D.helper_generate_transforms_grid]. You might want to implement your own custom pattern generation logic in C++ for maximum performance.
+			Note: It's best to just have some [Marker2D] nodes in your scene tree and retrieve their global transforms over and over when you need to spawn bullets.
+			Note: There is a helper static function that can generate a grid pattern of [Transform2D] that you can use: [method BulletFactory2D.helper_generate_transforms_grid]. You might want to implement your own custom pattern generation logic in C++ for maximum performance.
 		</member>
 		<member name="visibility_layer" type="int" setter="set_visibility_layer" getter="get_visibility_layer" default="1">
 			The bitmask for the visibility layer.
 
-		Note: Needs to be set to a bitmask, so use [method calculate_bitmask].
-		Note: It may be better to just use the [method set_visibility_layer_from_array] function.
+			Note: Needs to be set to a bitmask, so use [method calculate_bitmask].
+			Note: It may be better to just use the [method set_visibility_layer_from_array] function.
 		</member>
 		<member name="z_index" type="int" setter="set_z_index" getter="get_z_index" default="0">
 			The z index of the bullets.

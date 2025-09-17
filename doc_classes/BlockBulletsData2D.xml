@@ -5,7 +5,7 @@
 	</brief_description>
 	<description>
 		Ensure that the [member MultiMeshBulletsData2D.transforms] property is set or your game will crash.
-	Check [MultiMeshBulletsData2D]'s documentation for the rest of the properties.
+		Check [MultiMeshBulletsData2D]'s documentation for the rest of the properties.
 	</description>
 	<tutorials>
 	</tutorials>

@@ -57,7 +57,7 @@ public:
     void _process(float delta);
 
     // Spawns DirectionalBullets2D when given a resource containing all needed data
-    void spawn_directional_bullets(const Ref<DirectionalBulletsData2D> &spawn_data);
+    DirectionalBullets2D *spawn_directional_bullets(const Ref<DirectionalBulletsData2D> &spawn_data);
 
     // Spawns BlockBullets2D when given a resource containing all needed data
     void spawn_block_bullets(const Ref<BlockBulletsData2D> &spawn_data);
@@ -377,18 +377,22 @@ private:
 
     // Spawns bullets by either creating a brand new TBullet or retrieving one from the object pool
     template<typename TBullet, typename TBulletSpawnData>
-    void spawn_bullets_helper(std::vector<TBullet*> &bullets_vec, MultiMeshObjectPool &bullets_pool, Node *bullets_container, const Ref<TBulletSpawnData> &spawn_data) {
+    TBullet *spawn_bullets_helper(std::vector<TBullet*> &bullets_vec, MultiMeshObjectPool &bullets_pool, Node *bullets_container, const Ref<TBulletSpawnData> &spawn_data) {
         int key = spawn_data->transforms.size();
 
+        // Try to get a TBullet from the pool first
         TBullet *bullets = static_cast<TBullet*>(bullets_pool.pop(key));
         if (bullets != nullptr) {
             bullets->activate_multimesh(*spawn_data.ptr());
-            return;
+            return bullets;
         }
 
+        // If there was no TBullet in the pool, create a brand new one and spawn it
         bullets = memnew(TBullet);
         bullets->spawn(*spawn_data.ptr(), &bullets_pool, this, bullets_container);
         bullets_vec.emplace_back(bullets);
+
+        return bullets;
     }
 
     // Handles movement and other behaviors of the bullets. 

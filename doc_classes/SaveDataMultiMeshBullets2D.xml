@@ -2,7 +2,7 @@
 <class name="SaveDataMultiMeshBullets2D" inherits="Resource" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/godotengine/godot/master/doc/class.xsd">
 	<brief_description>
 		Contains the state of a [MultiMeshBullets2D].
-	This resource should be inherited.
+		This resource should be inherited.
 	</brief_description>
 	<description>
 	</description>

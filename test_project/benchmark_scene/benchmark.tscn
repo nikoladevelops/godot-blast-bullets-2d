@@ -1,4 +1,4 @@
-[gd_scene load_steps=18 format=3 uid="uid://dpk5aw81fio42"]
+[gd_scene load_steps=19 format=3 uid="uid://dpk5aw81fio42"]
 
 [ext_resource type="Script" uid="uid://bt7w5vkn7u1xt" path="res://benchmark_scene/benchmark.gd" id="1_cfubd"]
 [ext_resource type="Texture2D" uid="uid://dxsqxrqgkkv50" path="res://icon.svg" id="3_1inld"]
@@ -9,6 +9,7 @@
 [ext_resource type="Script" uid="uid://jssweshd8v73" path="res://benchmark_scene/bullet_factory_2d.gd" id="7_6fsjh"]
 [ext_resource type="PackedScene" uid="uid://cjrcvxa7bnus" path="res://shared/enemies/enemy_turret/enemy_turret.tscn" id="7_n3lca"]
 [ext_resource type="PackedScene" uid="uid://3dxd6rfhxqym" path="res://shared/enemies/enemy_ship/enemy_ship.tscn" id="8_yyku6"]
+[ext_resource type="PackedScene" uid="uid://bqi8tdtf1dh4n" path="res://shared/moving_target.tscn" id="10_nkrfg"]
 
 [sub_resource type="Gradient" id="Gradient_rfik0"]
 colors = PackedColorArray(0.215686, 0.215686, 0.215686, 1, 0.215686, 0.215686, 0.215686, 1)
@@ -258,6 +259,18 @@ block_bullets_debugger_color = Color(0, 0.711976, 0.74061, 0.8)
 script = ExtResource("7_6fsjh")
 
 [node name="AllGodotArea2DBulletsContainer" type="Node" parent="."]
+
+[node name="BulletHellRelated" type="Node" parent="."]
+
+[node name="Icon" parent="BulletHellRelated" instance=ExtResource("10_nkrfg")]
+position = Vector2(-63, -798)
+speed = 450
+range_x = 500
+
+[node name="Icon2" parent="BulletHellRelated" instance=ExtResource("10_nkrfg")]
+position = Vector2(-63, -1036)
+range_x = 300
+direction = -1
 
 [connection signal="area_entered" from="BulletFactory2D" to="BulletFactory2D" method="_on_area_entered"]
 [connection signal="body_entered" from="BulletFactory2D" to="BulletFactory2D" method="_on_body_entered"]

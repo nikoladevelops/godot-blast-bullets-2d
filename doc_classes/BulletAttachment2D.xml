@@ -5,12 +5,12 @@
 	</brief_description>
 	<description>
 		In order for attachments to work correctly they need a unique [member attachment_id] positive value.
-	The way you use attachments is the following:
-	1. Create a new scene that has a parent node of [BulletAttachment2D].
-	2. Add any other nodes to the scene or logic to it - whatever the bullets are going to be carrying as they move.
-	3. Set the [member attachment_id] inside [method on_bullet_spawn] and [method on_bullet_spawn_as_disabled] functions.
-	4. Configure any other custom logic in the rest of the functions (read the rest of the documentation carefully, you need to override the virtual functions to execute custom logic).
-	5. Set this attachment to a spawn data ([BlockBulletsData2D] or [DirectionalBulletsData2D]) by using [member MultimeshBulletsData2D.bullet_attachment_scene] property and use one of [BulletFactory2D]'s spawn functions to spawn the actual bullets.
+		The way you use attachments is the following:
+		1. Create a new scene that has a parent node of [BulletAttachment2D].
+		2. Add any other nodes to the scene or logic to it - whatever the bullets are going to be carrying as they move.
+		3. Set the [member attachment_id] inside [method on_bullet_spawn] and [method on_bullet_spawn_as_disabled] functions.
+		4. Configure any other custom logic in the rest of the functions (read the rest of the documentation carefully, you need to override the virtual functions to execute custom logic).
+		5. Set this attachment to a spawn data ([BlockBulletsData2D] or [DirectionalBulletsData2D]) by using [member MultimeshBulletsData2D.bullet_attachment_scene] property and use one of [BulletFactory2D]'s spawn functions to spawn the actual bullets.
 	</description>
 	<tutorials>
 	</tutorials>
@@ -20,7 +20,7 @@
 			<description>
 				Executed when the attachment is activated again from the object pool. You should provide activation logic - attachment gets visible/enabled etc..
 
-			Note: This function gets executed over and over again since attachment object pooling is used.
+				Note: This function gets executed over and over again since attachment object pooling is used.
 			</description>
 		</method>
 		<method name="on_bullet_disable" qualifiers="virtual">
@@ -28,7 +28,7 @@
 			<description>
 				Executed when the attachment is disabled before it goes to the object pool. You should provide disable logic - attachment gets invisible/disables specific functionality or children etc...
 
-			Note: This function gets executed over and over again since attachment object pooling is used.
+				Note: This function gets executed over and over again since attachment object pooling is used.
 			</description>
 		</method>
 		<method name="on_bullet_load" qualifiers="virtual">
@@ -36,45 +36,45 @@
 			<param index="0" name="custom_data_to_load" type="Resource" />
 			<description>
 				Executed when the attachment is being loaded from a save data resource. The [code]custom_data_to_load[/code] is the same data that has been saved from [method on_bullet_save] function.
-			This is the place where you should load all the data that you had saved previously - cast the class back to your custom resource type and access the properties you need.
+				This is the place where you should load all the data that you had saved previously - cast the class back to your custom resource type and access the properties you need.
 
-			Note: Always check if [code]custom_data_to_load[/code] is [code]null[/code] or not or you may experience crashes in some cases.
-			Note: The [BulletAttachment2D] is not yet in the scene tree when this method is executed, so don't call functions that depend on already configured children etc.. instead use [code]_ready[/code]. Just save state specific logic in variables and then later in [code]_ready[/code] handle that.
+				Note: Always check if [code]custom_data_to_load[/code] is [code]null[/code] or not or you may experience crashes in some cases.
+				Note: The [BulletAttachment2D] is not yet in the scene tree when this method is executed, so don't call functions that depend on already configured children etc.. instead use [code]_ready[/code]. Just save state specific logic in variables and then later in [code]_ready[/code] handle that.
 			</description>
 		</method>
 		<method name="on_bullet_save" qualifiers="virtual">
 			<return type="Resource" />
 			<description>
 				Executed when the attachment is being saved.
-			Create a brand new custom resource, populate it with data and then return it from this function.
-			[url=https://www.youtube.com/watch?v=fdRJqnOrz98&amp;t=4s]YouTube Tutorial On Custom Resources For Beginners[/url]
-			Next up you are going to handle the loading of all that data inside the [method on_bullet_load] function.
+				Create a brand new custom resource, populate it with data and then return it from this function.
+				[url=https://www.youtube.com/watch?v=fdRJqnOrz98&amp;t=4s]YouTube Tutorial On Custom Resources For Beginners[/url]
+				Next up you are going to handle the loading of all that data inside the [method on_bullet_load] function.
 			</description>
 		</method>
 		<method name="on_bullet_spawn" qualifiers="virtual">
 			<return type="void" />
 			<description>
 				Executed before the attachment gets added to the scene tree.
-			This is the place where you should set a unique positive value for the [member attachment_id] property. The object pooling logic depends on it.
+				This is the place where you should set a unique positive value for the [member attachment_id] property. The object pooling logic depends on it.
 
-			Note: The [BulletAttachment2D] is not yet in the scene tree when this method is executed, so don't call functions that depend on already configured children etc.. instead use [code]_ready[/code]. Just save state specific logic in variables and then later in [code]_ready[/code] handle that.
+				Note: The [BulletAttachment2D] is not yet in the scene tree when this method is executed, so don't call functions that depend on already configured children etc.. instead use [code]_ready[/code]. Just save state specific logic in variables and then later in [code]_ready[/code] handle that.
 			</description>
 		</method>
 		<method name="on_bullet_spawn_as_disabled" qualifiers="virtual">
 			<return type="void" />
 			<description>
 				This is a special case function. The [BulletFactory2D] uses it when it populates the attachment object pool. 
-			You are required to set the same [member attachment_id] that you did in the [method on_bullet_spawn] function.
-			Ensure the attachment is in disabled state (example: attachment should be invisible when you are populating the object pool... in the same state as in the [method on_bullet_disable] function).
+				You are required to set the same [member attachment_id] that you did in the [method on_bullet_spawn] function.
+				Ensure the attachment is in disabled state (example: attachment should be invisible when you are populating the object pool... in the same state as in the [method on_bullet_disable] function).
 
-			Note: The [BulletAttachment2D] is not yet in the scene tree when this method is executed, so don't call functions that depend on already configured children etc.. instead use [code]_ready[/code]. Just save state specific logic in variables and then later in [code]_ready[/code] handle that.
+				Note: The [BulletAttachment2D] is not yet in the scene tree when this method is executed, so don't call functions that depend on already configured children etc.. instead use [code]_ready[/code]. Just save state specific logic in variables and then later in [code]_ready[/code] handle that.
 			</description>
 		</method>
 	</methods>
 	<members>
 		<member name="attachment_id" type="int" setter="set_attachment_id" getter="get_attachment_id" default="0">
 			The object pooling logic depends on this value. Make sure that no other [BulletAttachment2D] has the same [member attachment_id]. 
-		Also ensure that the value is positive and that you are setting it in the [method on_bullet_spawn] and [method on_bullet_spawn_as_disabled] functions.
+			Also ensure that the value is positive and that you are setting it in the [method on_bullet_spawn] and [method on_bullet_spawn_as_disabled] functions.
 		</member>
 		<member name="stick_relative_to_bullet" type="bool" setter="set_stick_relative_to_bullet" getter="get_stick_relative_to_bullet" default="true">
 			Determines whether the attachment should "stick" to the bullets or not. If set to [code]false[/code], then the attachments won't rotate along with the bullets.

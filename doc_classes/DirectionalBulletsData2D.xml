@@ -5,7 +5,7 @@
 	</brief_description>
 	<description>
 		Ensure that the [member MultiMeshBulletsData2D.transforms] and [member all_bullet_speed_data] are set or your game will crash.
-	Check [MultiMeshBulletsData2D]'s documentation for the rest of the properties.
+		Check [MultiMeshBulletsData2D]'s documentation for the rest of the properties.
 	</description>
 	<tutorials>
 	</tutorials>
@@ -15,8 +15,8 @@
 		</member>
 		<member name="all_bullet_speed_data" type="BulletSpeedData2D[]" setter="set_all_bullet_speed_data" getter="get_all_bullet_speed_data" default="[]">
 			[b]MANDATORY[/b]
-		You need to provide [BulletSpeedData2D] for every single bullet - meaning that it should contain the same amount of data as the [member MultiMeshBulletsData2D.transforms] property or your game will crash.
-		Note: [BulletSpeedData2D] has a helper static method that you can use to generate random speed data - [method BulletSpeedData2D.generate_random_data()].
+			You need to provide [BulletSpeedData2D] for every single bullet - meaning that it should contain the same amount of data as the [member MultiMeshBulletsData2D.transforms] property or your game will crash.
+			Note: [BulletSpeedData2D] has a helper static method that you can use to generate random speed data - [method BulletSpeedData2D.generate_random_data()].
 		</member>
 	</members>
 </class>

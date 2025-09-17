@@ -185,13 +185,13 @@ void BulletFactory2D::spawn_block_bullets(const Ref<BlockBulletsData2D> &spawn_d
     );
 }
 
-void BulletFactory2D::spawn_directional_bullets(const Ref<DirectionalBulletsData2D> &spawn_data){
+DirectionalBullets2D *BulletFactory2D::spawn_directional_bullets(const Ref<DirectionalBulletsData2D> &spawn_data){
     if(is_factory_busy){
         UtilityFunctions::printerr("Error when trying to spawn bullets. BulletFactory2D is currently busy. Ignoring the request");
-        return;
+        return nullptr;
     }
 
-    spawn_bullets_helper<DirectionalBullets2D, DirectionalBulletsData2D>(
+    return spawn_bullets_helper<DirectionalBullets2D, DirectionalBulletsData2D>(
         all_directional_bullets,
         directional_bullets_pool,
         directional_bullets_container,

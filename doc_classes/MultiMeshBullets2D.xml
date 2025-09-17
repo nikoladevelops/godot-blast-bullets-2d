@@ -12,8 +12,44 @@
 			<return type="void" />
 			<param index="0" name="bullet_index" type="int" />
 			<description>
-				The only reason this is exposed is to make it possible to be called using [code]call_deferred()[/code]. You shouldn't touch this.
+				Disable a specific bullet from the multimesh
+				Always call using call_deferred() to avoid issues
+			</description>
+		</method>
+		<method name="get_all_bullets_status">
+			<return type="bool[]" />
+			<description>
+				Get the status of all bullets inside the multimesh - whether they are enabled (active and visible on screen) or disabled (inactive and invisible)
+			</description>
+		</method>
+		<method name="get_amount_bullets" qualifiers="const">
+			<return type="int" />
+			<description>
+				Get the amount of bullets inside the multimesh
+			</description>
+		</method>
+		<method name="is_bullet_status_enabled">
+			<return type="bool" />
+			<param index="0" name="bullet_index" type="int" />
+			<description>
+				Check the status of a specific bullet - whether it is enabled (active and visible on screen) or disabled (inactive and invisible)
+			</description>
+		</method>
+		<method name="push_multimesh_to_object_pool">
+			<return type="void" />
+			<description>
+				Push the entire multimesh to the object pool.
+
+				If there are still moving bullets inside the multimesh, they will be disabled first before pushing to the object pool
+				
+				<b>Warning:</b>
+				Always call using call_deferred() to avoid issues
 			</description>
 		</method>
 	</methods>
+	<members>
+		<member name="bullets_custom_data" type="Resource" setter="set_bullets_custom_data" getter="get_bullets_custom_data">
+			You can edit the custom bullets data that the bullets multimesh was spawned with
+		</member>
+	</members>
 </class>

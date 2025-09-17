@@ -2,6 +2,8 @@
 
 #include "../save-data/save_data_directional_bullets2d.hpp"
 #include "../spawn-data/directional_bullets_data2d.hpp"
+#include <algorithm>
+#include <cstddef>
 #include <godot_cpp/variant/transform2d.hpp>
 #include <godot_cpp/variant/utility_functions.hpp>
 
@@ -61,16 +63,31 @@ void DirectionalBullets2D::custom_additional_spawn_logic(const MultiMeshBulletsD
     set_up_movement_data(directional_data.all_bullet_speed_data);
 
     adjust_direction_based_on_rotation = directional_data.adjust_direction_based_on_rotation;
+
+    // Homing behavior related //
+
+    // Each bullet can have its own homing target
+    bullet_homing_targets.resize(amount_bullets, nullptr);
+    bullet_homing_target_instance_ids.resize(amount_bullets, 0);
+
+    //
 }
 
 void DirectionalBullets2D::custom_additional_save_logic(SaveDataMultiMeshBullets2D &data) {
     SaveDataDirectionalBullets2D& directional_save_data = static_cast<SaveDataDirectionalBullets2D&>(data);
     directional_save_data.adjust_direction_based_on_rotation = adjust_direction_based_on_rotation;
+
+    // TODO saving of homing behavior
 }
 
 void DirectionalBullets2D::custom_additional_load_logic(const SaveDataMultiMeshBullets2D &data) {
     const SaveDataDirectionalBullets2D& directional_save_data = static_cast<const SaveDataDirectionalBullets2D&>(data);
     adjust_direction_based_on_rotation = directional_save_data.adjust_direction_based_on_rotation;
+
+    // TODO loading of homing behavior
+
+    // Each bullet can have its own homing target
+    bullet_homing_targets.resize(amount_bullets, nullptr);
 }
 
 void DirectionalBullets2D::custom_additional_activate_logic(const MultiMeshBulletsData2D &data) {
@@ -79,5 +96,21 @@ void DirectionalBullets2D::custom_additional_activate_logic(const MultiMeshBulle
     set_up_movement_data(directional_data.all_bullet_speed_data);
 
     adjust_direction_based_on_rotation = directional_data.adjust_direction_based_on_rotation;
+
+    // Homing behavior related //
+
+    // When activating a multimesh bullet, all homing targets are cleared and the size stays the same since each bullet can have its own homing target
+    // and also when re-using multimeshes from object pool we never change amount_bullets so we can take advantage of that and use the same memory
+    std::fill(bullet_homing_targets.begin(), bullet_homing_targets.end(), nullptr);
+    std::fill(bullet_homing_target_instance_ids.begin(), bullet_homing_target_instance_ids.end(), 0);
+
+    homing_update_interval = 0.0f;
+    homing_update_timer = 0.0f;
+    homing_smoothing = 0.0f;
+
+    
+
+    //
+
 }
 }

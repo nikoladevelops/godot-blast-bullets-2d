@@ -33,7 +33,6 @@ var rocket_tectures:Array[Texture2D] = [
 # The default texture that can be used, instead of having animations
 var godot_texture:Texture2D = preload("res://icon.svg")
 
-
 # Holds data that is needed for factory.spawn_directional_bullets
 var directional_bullets_data:DirectionalBulletsData2D
 
@@ -265,7 +264,47 @@ func spawn_multi_mesh_directional_bullets()->void:
 	else:
 		directional_bullets_data.transforms = BulletFactory2D.helper_generate_transforms_grid(bullets_amount, bullet_marker.get_global_transform(), rows_per_column, grid_alignment, col_offset, row_offset, rotate_grid_with_marker, random_local_rotation)
 	
-	BENCHMARK_GLOBALS.FACTORY.spawn_directional_bullets(directional_bullets_data)
+	var dir_bullets:DirectionalBullets2D = BENCHMARK_GLOBALS.FACTORY.spawn_directional_bullets(directional_bullets_data)
+	dir_bullets.homing_smoothing = 0
+	dir_bullets.homing_update_interval = 0
+	
+	get_tree().create_timer(0.5).timeout.connect(func():
+		for bullet in dir_bullets.get_amount_bullets():
+			dir_bullets.set_bullet_homing_target(bullet, get_parent())
+	)
+		
+	get_tree().create_timer(1).timeout.connect(func():
+		for bullet in dir_bullets.get_amount_bullets():
+			dir_bullets.set_bullet_homing_target(bullet, BENCHMARK_GLOBALS.ALL_ENEMY_SPAWNERS[0].enemy_container.get_child(0))
+	)
+	
+	get_tree().create_timer(1.5).timeout.connect(func():
+		for bullet in dir_bullets.get_amount_bullets():
+			dir_bullets.set_bullet_homing_target(bullet, get_parent())
+	)
+	
+	get_tree().create_timer(2).timeout.connect(func():
+		for bullet in dir_bullets.get_amount_bullets():
+			dir_bullets.stop_bullet_homing(bullet)
+	)
+	
+	
+	# TODO things to be exposed from Multimesh bullets
+	#var amount_bullets:int = dir_bullets.get_amount_bullets()
+	
+	#dir_bullets.is_bullet_status_enabled(0)
+	
+	#dir_bullets.push_multimesh_to_object_pool()
+	
+	
+	# TODO
+	#dir_bullets.set_bullet_transform2d()
+	#dir_bullets.get_bullet_transform2d()
+	
+	#dir_bullets.set_bullet_global_position()
+	#dir_bullets.get_bullet_global_position()
+	
+	
 	
 # Spawns MultiMeshBlock bullets
 func spawn_multi_mesh_block_bullets(player_rotation:float)->void:

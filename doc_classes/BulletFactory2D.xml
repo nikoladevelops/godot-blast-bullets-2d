@@ -5,23 +5,23 @@
 	</brief_description>
 	<description>
 		You should have a single [b]BulletFactory2D[/b] node inside your scene. The factory does all the work in spawning bullets and configuring other plugin related options (save/load state, object pooling, physics interpolation, debugger etc..).
-	Keep a reference to your [b]BulletFactory2D[/b] node throughout the lifetime of your game and call the functions you need.
+		Keep a reference to your [b]BulletFactory2D[/b] node throughout the lifetime of your game and call the functions you need.
 
-	Note: To handle collisions register the [signal area_entered] and [signal body_entered] signals. You also have the option of tracking when the bullets' lifetime is over by registering the signal [signal life_time_over], but this is only enabled if the [MultiMeshBulletsData2D] you pass to the spawn functions has the [member MultiMeshBulletsData2D.is_life_time_over_signal_enabled] property set to true.
-	Note: You can attach a script to the node, but never override Godot functions like [code]_ready[/code].
-	Note: Never use [code]set_process[/code]/[code]set_physics_process[/code], always use [member is_factory_processing_bullets] to determine whether the plugin is paused or not (bullets stop moving). 
-	Note: Object pooling is automatic, bullets are [b]never destroyed[/b] by default, but you do have the option of freeing the object pools whenever you want.
-	Note: Never use [code]queue_free[/code] on already spawned bullets or your game will crash. The plugin has its own bullet tracking logic.
+		Note: To handle collisions register the [signal area_entered] and [signal body_entered] signals. You also have the option of tracking when the bullets' lifetime is over by registering the signal [signal life_time_over], but this is only enabled if the [MultiMeshBulletsData2D] you pass to the spawn functions has the [member MultiMeshBulletsData2D.is_life_time_over_signal_enabled] property set to true.
+		Note: You can attach a script to the node, but never override Godot functions like [code]_ready[/code].
+		Note: Never use [code]set_process[/code]/[code]set_physics_process[/code], always use [member is_factory_processing_bullets] to determine whether the plugin is paused or not (bullets stop moving). 
+		Note: Object pooling is automatic, bullets are [b]never destroyed[/b] by default, but you do have the option of freeing the object pools whenever you want.
+		Note: Never use [code]queue_free[/code] on already spawned bullets or your game will crash. The plugin has its own bullet tracking logic.
 
-	The way you use the factory is the following:
-	1. Add [b]BulletFactory2D[/b] to the scene tree and save this reference in a variable so that you can access it in every script you want (autoload or a static variable).
-	2. Use the spawn functions to spawn bullets (You will have to set up [MultiMeshBulletsData2D] properly (pick [BlockBulletsData2D] or [DirectionalBulletsData2D]). You might get an instant crash if you are missing mandatory properties, so be aware of that).
-	3. Optionally use any of the other functions that the [b]BulletFactory2D[/b] provides.
+		The way you use the factory is the following:
+		1. Add [b]BulletFactory2D[/b] to the scene tree and save this reference in a variable so that you can access it in every script you want (autoload or a static variable).
+		2. Use the spawn functions to spawn bullets (You will have to set up [MultiMeshBulletsData2D] properly (pick [BlockBulletsData2D] or [DirectionalBulletsData2D]). You might get an instant crash if you are missing mandatory properties, so be aware of that).
+		3. Optionally use any of the other functions that the [b]BulletFactory2D[/b] provides.
 
-	[b]This plugin is completely free and created by [url=https://x.com/realNikich]realNikich[/url][/b]
-	[url=https://github.com/nikoladevelops/godot-blast-bullets-2d]Official Repository Of BlastBullets2D[/url]
-	[url=https://www.youtube.com/@realnikich]YouTube Channel[/url]
-	[url=https://www.patreon.com/realnikich]Support My Work[/url]
+		[b]This plugin is completely free and created by [url=https://x.com/realNikich]realNikich[/url][/b]
+		[url=https://github.com/nikoladevelops/godot-blast-bullets-2d]Official Repository Of BlastBullets2D[/url]
+		[url=https://www.youtube.com/@realnikich]YouTube Channel[/url]
+		[url=https://www.patreon.com/realnikich]Support My Work[/url]
 	</description>
 	<tutorials>
 	</tutorials>
@@ -60,7 +60,7 @@
 		</method>
 		<method name="debug_get_bullets_pool_info">
 			<return type="Dictionary" />
-			<param index="0" name="bullet_type" type="int" enum="BulletFactory2D.BulletType"/>
+			<param index="0" name="bullet_type" type="int" enum="BulletFactory2D.BulletType" />
 			<description>
 				Get the whole information about the bullet multimeshes object pool of a specific type. Returns a [Dictionary] containing [b]amount bullets in the multimesh as the KEY[/b] and the [b]amount of multimeshes that contain exactly that amount as the VALUE[/b].
 			</description>
@@ -154,7 +154,7 @@
 			<return type="void" />
 			<description>
 				Resets the factory - free everything (object pools, spawned bullets, spawned attachments - all get deleted from memory).
-			Emits the [signal reset_finished] signal when complete.
+				Emits the [signal reset_finished] signal when complete.
 			</description>
 		</method>
 		<method name="save">
@@ -182,13 +182,15 @@
 			<param index="0" name="spawn_data" type="BlockBulletsData2D" />
 			<description>
 				Spawns [BlockBullets2D] - bullets that act as a block that travels in a single direction.
+				These bullets can NOT be controlled individually, but they are more efficient performance wise.
 			</description>
 		</method>
 		<method name="spawn_directional_bullets">
-			<return type="void" />
+			<return type="DirectionalBullets2D" />
 			<param index="0" name="spawn_data" type="DirectionalBulletsData2D" />
 			<description>
 				Spawns [DirectionalBullets2D] - bullets that have individual directions determined by the rotation of their transforms.
+				These bullets can be controlled individually and are preffered for Bullet Hell games or games that require a lot of bullet control.
 			</description>
 		</method>
 	</methods>
@@ -208,7 +210,7 @@
 		<member name="use_physics_interpolation" type="bool" setter="set_use_physics_interpolation_editor" getter="get_use_physics_interpolation" default="false">
 			Determines whether physics interpolation is enabled or not. The setter is for the editor only.
 
-		Instead always use [method set_use_physics_interpolation_runtime] if you are doing changes during runtime.
+			Instead always use [method set_use_physics_interpolation_runtime] if you are doing changes during runtime.
 		</member>
 	</members>
 	<signals>
@@ -227,7 +229,7 @@
 			<description>
 				Emited when a bullet enters a physics body.
 
-			Note: Static bodies can be detected by the bullets, but only if you set the [MultiMeshBulletsData2D]'s [member MultiMeshBulletsData2D.monitorable] property to [code]true[/code] when spawning bullets - this is at the cost of performance of course, so it's better to stick with [Area2D] or other types of bodies for enemies/buildings etc and leave the [member MultiMeshBulletsData2D.monitorable] property to be false.
+				Note: Static bodies can be detected by the bullets, but only if you set the [MultiMeshBulletsData2D]'s [member MultiMeshBulletsData2D.monitorable] property to [code]true[/code] when spawning bullets - this is at the cost of performance of course, so it's better to stick with [Area2D] or other types of bodies for enemies/buildings etc and leave the [member MultiMeshBulletsData2D.monitorable] property to be false.
 			</description>
 		</signal>
 		<signal name="life_time_over">

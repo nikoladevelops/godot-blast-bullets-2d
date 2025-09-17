@@ -7,4 +7,19 @@
 	</description>
 	<tutorials>
 	</tutorials>
+	<methods>
+		<method name="set_bullet_homing_target">
+			<return type="void" />
+			<param index="0" name="bullet_index" type="int" />
+			<param index="1" name="new_homing_target" type="Node2D" />
+			<description>
+			</description>
+		</method>
+		<method name="stop_bullet_homing">
+			<return type="void" />
+			<param index="0" name="bullet_index" type="int" />
+			<description>
+			</description>
+		</method>
+	</methods>
 </class>

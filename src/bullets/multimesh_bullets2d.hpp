@@ -7,7 +7,14 @@
 #include "../shared/bullet_attachment_object_pool2d.hpp"
 #include "../factory/bullet_factory2d.hpp"
 #include "../debugger/idebugger_data_provider2d.hpp"
+#include "godot_cpp/core/class_db.hpp"
+#include "godot_cpp/core/defs.hpp"
+#include "godot_cpp/core/object.hpp"
+#include "godot_cpp/core/property_info.hpp"
+#include "godot_cpp/variant/typed_array.hpp"
+#include "godot_cpp/variant/variant.hpp"
 
+#include <cstdint>
 #include <godot_cpp/classes/engine.hpp>
 #include <godot_cpp/classes/mesh.hpp>
 #include <godot_cpp/classes/multi_mesh.hpp>
@@ -16,6 +23,7 @@
 #include <godot_cpp/classes/quad_mesh.hpp>
 #include <godot_cpp/variant/utility_functions.hpp>
 #include <godot_cpp/classes/packed_scene.hpp>
+#include <vector>
 
 namespace BlastBullets2D {
 using namespace godot;
@@ -33,7 +41,7 @@ public:
     bool is_active = false; 
 
     // Gets the total amount of bullets that the multimesh always holds
-    int get_amount_bullets() const { return amount_bullets; };
+    _ALWAYS_INLINE_ int get_amount_bullets() const { return amount_bullets; };
 
     // Gets the total amount of attachments that are active
     int get_amount_active_attachments() const;
@@ -190,6 +198,44 @@ public:
         
     }
     ///
+
+    _ALWAYS_INLINE_ TypedArray<bool> get_all_bullets_status(){
+        TypedArray<bool> status_array;
+        status_array.resize(amount_bullets);
+
+        int index = 0;
+        for (const bool &status : bullets_enabled_status) {
+            status_array[index] = status;
+
+            index++;
+        }
+        return status_array;
+    }
+
+    _ALWAYS_INLINE_ bool is_bullet_status_enabled(int bullet_index){
+        if(bullet_index < 0 || bullet_index >= amount_bullets){
+            UtilityFunctions::printerr("Bullet index out of bounds in is_bullet_status_enabled");
+            return false;
+        }
+
+        return bullets_enabled_status[bullet_index];
+    }
+
+    _ALWAYS_INLINE_ Ref<Resource> get_bullets_custom_data() const {
+        return bullets_custom_data;
+    }
+
+    _ALWAYS_INLINE_ void set_bullets_custom_data(const Ref<Resource> &new_custom_data){
+        bullets_custom_data = new_custom_data;
+    }
+
+    _ALWAYS_INLINE_ void push_multimesh_to_object_pool(){
+        // TODO if some bullets werent already disabled then calling this method should disable them first and then push everything to the object pool
+
+
+        UtilityFunctions::print("Pushing multimesh to object pool not yet implemented");
+    }
+
 
     void set_physics_interpolation_related_data();
 
@@ -493,6 +539,32 @@ protected:
     // Exposes methods that should be available in Godot engine
     static void _bind_methods(){
         ClassDB::bind_method(D_METHOD("disable_bullet", "bullet_index"), &MultiMeshBullets2D::disable_bullet);
+
+        ClassDB::bind_method(D_METHOD("get_amount_bullets"), &MultiMeshBullets2D::get_amount_bullets);
+
+        ClassDB::bind_method(D_METHOD("get_all_bullets_status"), &MultiMeshBullets2D::get_all_bullets_status);
+        ClassDB::bind_method(D_METHOD("is_bullet_status_enabled", "bullet_index"), &MultiMeshBullets2D::is_bullet_status_enabled);
+
+        ClassDB::bind_method(D_METHOD("get_bullets_custom_data"), &MultiMeshBullets2D::get_bullets_custom_data);
+        ClassDB::bind_method(D_METHOD("set_bullets_custom_data", "new_custom_data"), &MultiMeshBullets2D::set_bullets_custom_data);
+        
+        ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "bullets_custom_data"), "set_bullets_custom_data", "get_bullets_custom_data");
+
+        // TODO should be transferred to directional bullets as well
+        ClassDB::bind_method(D_METHOD("push_multimesh_to_object_pool"), &MultiMeshBullets2D::push_multimesh_to_object_pool);
+
+        // todo HELPER methods
+        // Check is multimesh disabled currently
+        // Check is multimesh inside object pool currently
+
+        // TODO teleport methods - setting transform2d etc
+        
+        // TODO set individual bullet direction
+        // TODO get individual bullet direction
+
+
+
+
     };
 
     // Holds custom logic that runs before the spawn function finalizes. Note that the multimesh is not yet added to the scene tree here
