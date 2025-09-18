@@ -2,6 +2,7 @@
 
 #include "../save-data/save_data_directional_bullets2d.hpp"
 #include "../spawn-data/directional_bullets_data2d.hpp"
+#include "godot_cpp/variant/vector2.hpp"
 #include <algorithm>
 #include <cstddef>
 #include <godot_cpp/variant/transform2d.hpp>
@@ -70,6 +71,8 @@ void DirectionalBullets2D::custom_additional_spawn_logic(const MultiMeshBulletsD
     bullet_homing_targets.resize(amount_bullets, nullptr);
     bullet_homing_target_instance_ids.resize(amount_bullets, 0);
     all_cached_homing_direction.resize(amount_bullets, Vector2(0, 0));
+	bullet_last_known_homing_target_pos.resize(amount_bullets, Vector2());
+
 
     //
 }
@@ -91,6 +94,9 @@ void DirectionalBullets2D::custom_additional_load_logic(const SaveDataMultiMeshB
 
     // Each bullet can have its own homing target
     bullet_homing_targets.resize(amount_bullets, nullptr);
+    bullet_homing_target_instance_ids.resize(amount_bullets, 0);
+    all_cached_homing_direction.resize(amount_bullets, Vector2(0, 0));
+	bullet_last_known_homing_target_pos.resize(amount_bullets, Vector2());
 }
 
 void DirectionalBullets2D::custom_additional_activate_logic(const MultiMeshBulletsData2D &data) {
@@ -106,13 +112,16 @@ void DirectionalBullets2D::custom_additional_activate_logic(const MultiMeshBulle
     // and also when re-using multimeshes from object pool we never change amount_bullets so we can take advantage of that and use the same memory
     std::fill(bullet_homing_targets.begin(), bullet_homing_targets.end(), nullptr);
     std::fill(bullet_homing_target_instance_ids.begin(), bullet_homing_target_instance_ids.end(), 0);
-    //std::fill(all_cached_homing_direction.begin(), all_cached_homing_direction.end(), Vector2(0, 0));  // No need since we are editing them when needed
+    std::fill(all_cached_homing_direction.begin(), all_cached_homing_direction.end(), Vector2(0, 0));
+    std::fill(bullet_last_known_homing_target_pos.begin(), bullet_last_known_homing_target_pos.end(), Vector2(0,0));
 
     homing_update_interval = 0.0f;
     homing_update_timer = 0.0f;
     homing_smoothing = 0.0f;
     homing_take_control_of_texture_rotation = false;
 
+
+    
     
 
     //

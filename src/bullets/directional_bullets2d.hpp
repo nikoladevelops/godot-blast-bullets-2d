@@ -2,6 +2,7 @@
 
 #include "../shared/bullet_speed_data2d.hpp"
 #include "godot_cpp/classes/object.hpp"
+#include "godot_cpp/core/class_db.hpp"
 #include "godot_cpp/core/defs.hpp"
 #include "godot_cpp/core/math.hpp"
 #include "godot_cpp/variant/vector2.hpp"
@@ -17,18 +18,10 @@ using namespace godot;
 
 class DirectionalBullets2D : public MultiMeshBullets2D {
 	GDCLASS(DirectionalBullets2D, MultiMeshBullets2D)
+
 public:
 	_ALWAYS_INLINE_ void move_bullets(float delta) {
-		// Cache first-rotation result for single-rotation mode
-		float cache_first_rotation_result = 0.0f;
-		bool max_rotation_speed_reached = false;
-		if (is_rotation_active && use_only_first_rotation_data) {
-			max_rotation_speed_reached = accelerate_bullet_rotation_speed(0, delta);
-			cache_first_rotation_result = all_rotation_speed[0] * delta;
-		}
-
-		// Snapshot previous transforms for interpolation (only once per step)
-		bool using_physics_interpolation = bullet_factory->use_physics_interpolation;
+		const bool using_physics_interpolation = bullet_factory->use_physics_interpolation;
 		if (using_physics_interpolation) {
 			all_previous_instance_transf = all_cached_instance_transforms;
 			if (is_bullet_attachment_provided) {
@@ -36,184 +29,194 @@ public:
 			}
 		}
 
-		// Tick homing timer - this only controls sampling rate of the target position
 		homing_update_timer -= delta;
-		bool homing_update_interval_reached = homing_update_timer <= 0.0f;
+		const bool homing_update_interval_reached = homing_update_timer <= 0.0f;
+		const bool have_last_target_pos = ((int)bullet_last_known_homing_target_pos.size() == amount_bullets);
 
-		// Localize config values for speed
-		const float local_smoothing = homing_smoothing;
-		const float local_rotation_radius = homing_rotation_radius;
-		const float local_distance_threshold = homing_teleport_distance_threshold;
-		const float local_angle_threshold = homing_teleport_angle_threshold;
-		const float PI = 3.14159265358979323846f;
-
-		const bool have_last_target_pos = (int)bullet_last_known_homing_target_pos.size() == amount_bullets;
-
-		for (int i = 0; i < amount_bullets; ++i) {
+		for (int i = 0; i < amount_bullets; i++) {
 			if (!bullets_enabled_status[i]) {
 				continue;
 			}
 
-			Transform2D &curr_instance_transf = all_cached_instance_transforms[i];
-			Transform2D &curr_shape_transf = all_cached_shape_transforms[i];
-			Vector2 &curr_instance_origin = all_cached_instance_origin[i];
-			Vector2 &curr_shape_origin = all_cached_shape_origin[i];
+			float rotation_angle = update_rotation(i, delta);
+			update_homing(i, delta, homing_update_interval_reached, have_last_target_pos);
+			update_position(i, delta);
+			update_collision_shape(i);
+			update_attachment_and_speed(i, delta, rotation_angle);
 
-			// Previous transform for this bullet (snapshot from array)
-			Transform2D prev_instance_transf;
-			if (using_physics_interpolation) {
-				prev_instance_transf = all_previous_instance_transf[i];
+
+			// If physics interpolation is disabled then just render it inside physics process
+			if(!bullet_factory->use_physics_interpolation){
+				multi->set_instance_transform_2d(i, all_cached_instance_transforms[i]);
 			}
-
-			const Node2D *const homing_target = bullet_homing_targets[i];
-
-			// Rotation when not controlled by homing
-			float rotation_angle = 0.0f;
-			if (is_rotation_active && (homing_target == nullptr || !homing_take_control_of_texture_rotation)) {
-				if (!use_only_first_rotation_data) {
-					max_rotation_speed_reached = accelerate_bullet_rotation_speed(i, delta);
-					rotation_angle = all_rotation_speed[i] * delta;
-				} else {
-					rotation_angle = cache_first_rotation_result;
-				}
-
-				if (!(max_rotation_speed_reached && stop_rotation_when_max_reached)) {
-					rotate_transform_locally(curr_instance_transf, rotation_angle);
-				}
-
-				if (adjust_direction_based_on_rotation) {
-					Vector2 &current_direction = all_cached_direction[i];
-					current_direction = curr_instance_transf[0].normalized();
-					float current_speed = all_cached_velocity[i].length();
-					all_cached_velocity[i] = current_direction * current_speed;
-				}
-			}
-
-			// Homing: refresh target direction only on interval, but steer every frame
-			if (UtilityFunctions::is_instance_id_valid(bullet_homing_target_instance_ids[i]) && homing_target != nullptr) {
-				if (homing_update_interval_reached) {
-					const Vector2 target_pos = homing_target->get_global_position();
-					set_homing_bullet_direction_towards_target(i, target_pos);
-					if (have_last_target_pos) {
-						bullet_last_known_homing_target_pos[i] = target_pos;
-					}
-				}
-
-				Vector2 &velo = all_cached_velocity[i];
-				float speed = velo.length();
-				if (speed > 0.0f) {
-					Vector2 current_dir = velo.normalized();
-					const Vector2 &target_dir = all_cached_homing_direction[i];
-
-					// ignore invalid cached target direction
-					if (target_dir.length_squared() > 0.0f) {
-						// instant homing (snap) when smoothing <= 0
-						if (local_smoothing <= 0.0f) {
-							velo = target_dir * speed;
-							all_cached_direction[i] = target_dir;
-
-							if (homing_take_control_of_texture_rotation) {
-								float new_rotation = target_dir.angle();
-								// rotate by the delta to reach exact requested rotation
-								float delta_rot = new_rotation + cache_texture_rotation_radians - curr_instance_transf.get_rotation();
-								rotate_transform_locally(curr_instance_transf, delta_rot);
-							}
-						} else {
-							// smoothed homing interpreted as max angular speed (radians/sec)
-							float angle_diff = current_dir.angle_to(target_dir);
-							float max_turn = local_smoothing * delta;
-
-							// optionally scale turning speed when inside a radius
-							if (local_rotation_radius > 0.0f && have_last_target_pos) {
-								float dist = (bullet_last_known_homing_target_pos[i] - curr_instance_origin).length();
-								float t = 1.0f - Math::clamp(dist / local_rotation_radius, 0.0f, 1.0f);
-								// linear interpolation between 1.0 and radius_multiplier
-								float radius_mult = 1.0f + (homing_rotation_radius_speed_multiplier - 1.0f) * t;
-								max_turn *= radius_mult;
-							}
-
-							float turn = Math::clamp(angle_diff, -max_turn, max_turn);
-
-							// apply incremental rotation to velocity and optionally to visual rotation
-							Vector2 new_dir = current_dir.rotated(turn);
-							velo = new_dir * speed;
-							all_cached_direction[i] = new_dir;
-
-							if (homing_take_control_of_texture_rotation) {
-								rotate_transform_locally(curr_instance_transf, turn);
-							}
-						}
-					}
-				} else {
-					// disable homing if bullet has no speed to avoid undefined behavior
-					bullet_homing_targets[i] = nullptr;
-					bullet_homing_target_instance_ids[i] = 0;
-				}
-			} else {
-				// If the instance id is invalid, clear any dangling pointers/ids
-				if (!UtilityFunctions::is_instance_id_valid(bullet_homing_target_instance_ids[i])) {
-					bullet_homing_targets[i] = nullptr;
-					bullet_homing_target_instance_ids[i] = 0;
-				}
-			}
-
-			// update position using current velocity
-			Vector2 cache_velocity_calc = all_cached_velocity[i] * delta;
-			curr_instance_origin += cache_velocity_calc;
-			curr_shape_origin += cache_velocity_calc;
-
-			curr_instance_transf.set_origin(curr_instance_origin);
-
-			// rebuild collision-shape transform from instance transform + rotated offset
-			curr_shape_transf = curr_instance_transf;
-			Vector2 rotated_offset = cache_collision_shape_offset.rotated(curr_instance_transf.get_rotation());
-			curr_shape_transf.set_origin(curr_instance_origin + rotated_offset);
-
-			// interpolation safety: avoid sweeping across huge jumps by resetting previous transform per-bullet
-			if (using_physics_interpolation) {
-				float translation_delta = (curr_instance_transf.get_origin() - prev_instance_transf.get_origin()).length();
-				if (translation_delta > local_distance_threshold) {
-					all_previous_instance_transf[i] = curr_instance_transf;
-					if (is_bullet_attachment_provided) {
-						all_previous_attachment_transf[i] = attachment_transforms[i];
-					}
-				} else {
-					float prev_rot = prev_instance_transf.get_rotation();
-					float curr_rot = curr_instance_transf.get_rotation();
-					float rot_delta = curr_rot - prev_rot;
-					while (rot_delta <= -PI) rot_delta += 2.0f * PI;
-					while (rot_delta > PI) rot_delta -= 2.0f * PI;
-					if (std::fabs(rot_delta) > local_angle_threshold) {
-						all_previous_instance_transf[i] = curr_instance_transf;
-						if (is_bullet_attachment_provided) {
-							all_previous_attachment_transf[i] = attachment_transforms[i];
-						}
-					}
-				}
-			}
-
-			// update physics server with the shape transform
-			physics_server->area_set_shape_transform(area, i, curr_shape_transf);
-
-			// render immediately when interpolation is disabled
-			if (!using_physics_interpolation) {
-				multi->set_instance_transform_2d(i, curr_instance_transf);
-			}
-
-			// attachments and speed updates
-			move_bullet_attachment(cache_velocity_calc, i, rotation_angle);
-			accelerate_bullet_speed(i, delta);
 		}
 
-		// reset homing timer when we sampled
 		if (homing_update_interval_reached) {
 			homing_update_timer = homing_update_interval;
+		}
+
+	}
+
+	// Teleport a given bullet to a new global position while preserving interpolation correctness.
+	_ALWAYS_INLINE_ void teleport_bullet(int bullet_index, const Vector2 &new_global_pos, bool keep_velocity = true) {
+		if (bullet_index < 0 || bullet_index >= amount_bullets) {
+			UtilityFunctions::printerr("Bullet index out of bounds in teleport_bullet");
+			return;
+		}
+
+		all_cached_instance_origin[bullet_index] = new_global_pos;
+		all_cached_instance_transforms[bullet_index].set_origin(new_global_pos);
+
+		Transform2D shape_t = all_cached_instance_transforms[bullet_index];
+		Vector2 rotated_offset = cache_collision_shape_offset.rotated(shape_t.get_rotation());
+		shape_t.set_origin(new_global_pos + rotated_offset);
+		physics_server->area_set_shape_transform(area, bullet_index, shape_t);
+
+		if (!keep_velocity) {
+			all_cached_velocity[bullet_index] = Vector2(0, 0);
+			all_cached_speed[bullet_index] = 0.0f;
+		}
+
+		if (bullet_factory && bullet_factory->use_physics_interpolation) {
+			if ((int)all_previous_instance_transf.size() == amount_bullets) {
+				all_previous_instance_transf[bullet_index] = all_cached_instance_transforms[bullet_index];
+			}
+			if (is_bullet_attachment_provided && (int)all_previous_attachment_transf.size() == amount_bullets) {
+				all_previous_attachment_transf[bullet_index] = attachment_transforms[bullet_index];
+			}
+		}
+
+		if (UtilityFunctions::is_instance_id_valid(bullet_homing_target_instance_ids[bullet_index]) && bullet_homing_targets[bullet_index]) {
+			const Vector2 target_pos = bullet_homing_targets[bullet_index]->get_global_position();
+			set_homing_bullet_direction_towards_target(bullet_index, target_pos);
+			if ((int)bullet_last_known_homing_target_pos.size() == amount_bullets) {
+				bullet_last_known_homing_target_pos[bullet_index] = target_pos;
+			}
+		}
+
+		if (!(bullet_factory && bullet_factory->use_physics_interpolation)) {
+			multi->set_instance_transform_2d(bullet_index, all_cached_instance_transforms[bullet_index]);
 		}
 	}
 
 protected:
 	bool adjust_direction_based_on_rotation = false;
 
+	_ALWAYS_INLINE_ float update_rotation(int i, float delta) {
+		if (!is_rotation_active) {
+			return 0.0f;
+		}
+		if (i >= (int)all_rotation_speed.size()) {
+			return 0.0f;
+		}
+
+		float rotation_angle = 0.0f;
+		bool max_rotation_speed_reached = accelerate_bullet_rotation_speed(i, delta);
+		rotation_angle = all_rotation_speed[i] * delta;
+
+		if (!(max_rotation_speed_reached && stop_rotation_when_max_reached)) {
+			rotate_transform_locally(all_cached_instance_transforms[i], rotation_angle);
+		}
+
+		if (adjust_direction_based_on_rotation) {
+			Vector2 &current_direction = all_cached_direction[i];
+			current_direction = all_cached_instance_transforms[i][0].normalized();
+			float current_speed = all_cached_velocity[i].length();
+			all_cached_velocity[i] = current_direction * current_speed;
+		}
+
+		return rotation_angle;
+	}
+
+	_ALWAYS_INLINE_ void update_homing(int i, float delta, bool interval_reached, bool have_last_target_pos) {
+		if (i >= (int)bullet_homing_targets.size()) {
+			return;
+		}
+		Node2D *homing_target = bullet_homing_targets[i];
+
+		if (!UtilityFunctions::is_instance_id_valid(bullet_homing_target_instance_ids[i]) || homing_target == nullptr) {
+			bullet_homing_targets[i] = nullptr;
+			bullet_homing_target_instance_ids[i] = 0;
+			return;
+		}
+
+		if (interval_reached) {
+			const Vector2 target_pos = homing_target->get_global_position();
+			set_homing_bullet_direction_towards_target(i, target_pos);
+			if (have_last_target_pos) {
+				bullet_last_known_homing_target_pos[i] = target_pos;
+			}
+		}
+
+		Vector2 &velo = all_cached_velocity[i];
+		float speed = velo.length();
+		if (speed <= 0.0f) {
+			return;
+		}
+
+		Vector2 current_dir = velo.normalized();
+		const Vector2 &target_dir = all_cached_homing_direction[i];
+		if (target_dir.length_squared() == 0.0f) {
+			return;
+		}
+
+		if (homing_smoothing <= 0.0f) {
+			velo = target_dir * speed;
+			all_cached_direction[i] = target_dir;
+
+			if (homing_take_control_of_texture_rotation) {
+				float new_rotation = target_dir.angle();
+				float delta_rot = new_rotation + cache_texture_rotation_radians - all_cached_instance_transforms[i].get_rotation();
+				normalize_angle(delta_rot);
+				rotate_transform_locally(all_cached_instance_transforms[i], delta_rot);
+			}
+		} else {
+			float angle_diff = current_dir.angle_to(target_dir);
+			float max_turn = homing_smoothing * delta;
+			if (max_turn < 0.0f) {
+				max_turn = 0.0f;
+			}
+
+			float turn = Math::clamp(angle_diff, -max_turn, max_turn);
+			Vector2 new_dir = current_dir.rotated(turn);
+
+			velo = new_dir * speed;
+			all_cached_direction[i] = new_dir;
+
+			if (homing_take_control_of_texture_rotation) {
+				float desired_rot = new_dir.angle();
+				float delta_rot = desired_rot + cache_texture_rotation_radians - all_cached_instance_transforms[i].get_rotation();
+				normalize_angle(delta_rot);
+				rotate_transform_locally(all_cached_instance_transforms[i], delta_rot);
+			}
+		}
+	}
+
+	_ALWAYS_INLINE_ void update_position(int i, float delta) {
+		Vector2 cache_velocity_calc = all_cached_velocity[i] * delta;
+		all_cached_instance_origin[i] += cache_velocity_calc;
+		all_cached_shape_origin[i] += cache_velocity_calc;
+		all_cached_instance_transforms[i].set_origin(all_cached_instance_origin[i]);
+	}
+
+	_ALWAYS_INLINE_ void update_collision_shape(int i) {
+		all_cached_shape_transforms[i] = all_cached_instance_transforms[i];
+		Vector2 rotated_offset = cache_collision_shape_offset.rotated(all_cached_instance_transforms[i].get_rotation());
+		all_cached_shape_transforms[i].set_origin(all_cached_instance_origin[i] + rotated_offset);
+		physics_server->area_set_shape_transform(area, i, all_cached_shape_transforms[i]);
+	}
+
+	_ALWAYS_INLINE_ void update_attachment_and_speed(int i, float delta, float rotation_angle) {
+		Vector2 velocity_delta = all_cached_velocity[i] * delta;
+		move_bullet_attachment(velocity_delta, i, rotation_angle);
+		accelerate_bullet_speed(i, delta);
+	}
+
+	_ALWAYS_INLINE_ void normalize_angle(float &angle) {
+		angle = Math::wrapf(angle, -Math_PI, Math_PI);
+	}
+
+protected:
 	static void _bind_methods() {
 		ClassDB::bind_method(D_METHOD("set_bullet_homing_target", "bullet_index", "new_homing_target"), &DirectionalBullets2D::set_bullet_homing_target);
 		ClassDB::bind_method(D_METHOD("stop_bullet_homing", "bullet_index"), &DirectionalBullets2D::stop_bullet_homing);
@@ -230,17 +233,7 @@ protected:
 		ClassDB::bind_method(D_METHOD("set_homing_take_control_of_texture_rotation", "value"), &DirectionalBullets2D::set_homing_take_control_of_texture_rotation);
 		ADD_PROPERTY(PropertyInfo(Variant::BOOL, "homing_take_control_of_texture_rotation"), "set_homing_take_control_of_texture_rotation", "get_homing_take_control_of_texture_rotation");
 
-		ClassDB::bind_method(D_METHOD("get_homing_rotation_radius"), &DirectionalBullets2D::get_homing_rotation_radius);
-		ClassDB::bind_method(D_METHOD("set_homing_rotation_radius", "value"), &DirectionalBullets2D::set_homing_rotation_radius);
-		ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "homing_rotation_radius"), "set_homing_rotation_radius", "get_homing_rotation_radius");
-
-		ClassDB::bind_method(D_METHOD("get_homing_teleport_distance_threshold"), &DirectionalBullets2D::get_homing_teleport_distance_threshold);
-		ClassDB::bind_method(D_METHOD("set_homing_teleport_distance_threshold", "value"), &DirectionalBullets2D::set_homing_teleport_distance_threshold);
-		ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "homing_teleport_distance_threshold"), "set_homing_teleport_distance_threshold", "get_homing_teleport_distance_threshold");
-
-		ClassDB::bind_method(D_METHOD("get_homing_teleport_angle_threshold"), &DirectionalBullets2D::get_homing_teleport_angle_threshold);
-		ClassDB::bind_method(D_METHOD("set_homing_teleport_angle_threshold", "value"), &DirectionalBullets2D::set_homing_teleport_angle_threshold);
-		ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "homing_teleport_angle_threshold"), "set_homing_teleport_angle_threshold", "get_homing_teleport_angle_threshold");
+		ClassDB::bind_method(D_METHOD("teleport_bullet", "bullet_index", "new_global_pos", "keep_velocity"), &DirectionalBullets2D::teleport_bullet, DEFVAL(true));
 	}
 
 	void set_up_movement_data(const TypedArray<BulletSpeedData2D> &new_speed_data);
@@ -256,11 +249,9 @@ public:
 			UtilityFunctions::printerr("Bullet index out of bounds in set_bullet_homing_target");
 			return;
 		}
-
 		if (!bullets_enabled_status[bullet_index]) {
 			return;
 		}
-
 		if (new_homing_target == nullptr) {
 			stop_bullet_homing(bullet_index);
 			return;
@@ -272,8 +263,20 @@ public:
 		const Vector2 target_pos = new_homing_target->get_global_position();
 		set_homing_bullet_direction_towards_target(bullet_index, target_pos);
 
-		if ((int)bullet_last_known_homing_target_pos.size() == amount_bullets) {
-			bullet_last_known_homing_target_pos[bullet_index] = target_pos;
+		if (homing_take_control_of_texture_rotation) {
+			float new_rotation = all_cached_homing_direction[bullet_index].angle();
+			float delta_rot = new_rotation + cache_texture_rotation_radians - all_cached_instance_transforms[bullet_index].get_rotation();
+			normalize_angle(delta_rot);
+			rotate_transform_locally(all_cached_instance_transforms[bullet_index], delta_rot);
+
+			if (bullet_factory && bullet_factory->use_physics_interpolation) {
+				if ((int)all_previous_instance_transf.size() == amount_bullets) {
+					all_previous_instance_transf[bullet_index] = all_cached_instance_transforms[bullet_index];
+				}
+				if (is_bullet_attachment_provided && (int)all_previous_attachment_transf.size() == amount_bullets) {
+					all_previous_attachment_transf[bullet_index] = attachment_transforms[bullet_index];
+				}
+			}
 		}
 	}
 
@@ -282,13 +285,9 @@ public:
 			UtilityFunctions::printerr("Bullet index out of bounds in stop_bullet_homing");
 			return;
 		}
-
 		bullet_homing_targets[bullet_index] = nullptr;
 		bullet_homing_target_instance_ids[bullet_index] = 0;
 		all_cached_homing_direction[bullet_index] = Vector2(0, 0);
-		if ((int)bullet_last_known_homing_target_pos.size() == amount_bullets) {
-			bullet_last_known_homing_target_pos[bullet_index] = Vector2(0, 0);
-		}
 	}
 
 	float get_homing_smoothing() const {
@@ -297,14 +296,12 @@ public:
 	void set_homing_smoothing(float value) {
 		homing_smoothing = value;
 	}
-
 	float get_homing_update_interval() const {
 		return homing_update_interval;
 	}
 	void set_homing_update_interval(float value) {
 		homing_update_interval = value;
 	}
-
 	bool get_homing_take_control_of_texture_rotation() const {
 		return homing_take_control_of_texture_rotation;
 	}
@@ -312,47 +309,26 @@ public:
 		homing_take_control_of_texture_rotation = value;
 	}
 
-	float get_homing_rotation_radius() const { return homing_rotation_radius; }
-	void set_homing_rotation_radius(float v) { homing_rotation_radius = v; }
-
-	float get_homing_teleport_distance_threshold() const { return homing_teleport_distance_threshold; }
-	void set_homing_teleport_distance_threshold(float v) { homing_teleport_distance_threshold = v; }
-
-	float get_homing_teleport_angle_threshold() const { return homing_teleport_angle_threshold; }
-	void set_homing_teleport_angle_threshold(float v) { homing_teleport_angle_threshold = v; }
-
 private:
-	// Controls how often we refresh the sampled target position (seconds)
 	float homing_update_interval = 0.0f;
 	float homing_update_timer = 0.0f;
 
-	// When <= 0 => instant homing. When > 0 => maximum angular velocity in radians/second.
 	float homing_smoothing = 0.0f;
-
 	bool homing_take_control_of_texture_rotation = false;
 
-	// optional radius to improve turn aggressiveness near target
-	float homing_rotation_radius = 0.0f;
-	float homing_rotation_radius_speed_multiplier = 1.0f;
-
-	// thresholds for deciding if a change is effectively a teleport (used to keep interpolation looking good)
-	float homing_teleport_distance_threshold = 2048.0f;
-	float homing_teleport_angle_threshold = 3.14159265358979323846f;
-
-	// optional per-bullet cached target positions
-	std::vector<Vector2> bullet_last_known_homing_target_pos;
-
-	// homing targets & cached directions
 	std::vector<Node2D *> bullet_homing_targets;
 	std::vector<uint64_t> bullet_homing_target_instance_ids;
 	std::vector<Vector2> all_cached_homing_direction;
+	std::vector<Vector2> bullet_last_known_homing_target_pos;
 
 	_ALWAYS_INLINE_ void set_homing_bullet_direction_towards_target(int bullet_index, const Vector2 &target_global_position) {
+		if (bullet_index < 0 || bullet_index >= amount_bullets) {
+			return;
+		}
+
 		Vector2 diff = target_global_position - all_cached_instance_origin[bullet_index];
 		if (diff.length_squared() > 0.0f) {
 			all_cached_homing_direction[bullet_index] = diff.normalized();
-		} else {
-			// if target coincides with bullet origin, leave previous cached direction unchanged
 		}
 		if ((int)bullet_last_known_homing_target_pos.size() == amount_bullets) {
 			bullet_last_known_homing_target_pos[bullet_index] = target_global_position;
