@@ -134,6 +134,8 @@ void MultiMeshBullets2D::set_up_bullet_instances(const MultiMeshBulletsData2D &d
     set_up_area(data.collision_layer, data.collision_mask, data.monitorable, bullet_factory->physics_space);
     
     stop_rotation_when_max_reached = data.stop_rotation_when_max_reached;
+
+    cache_collision_shape_offset = data.collision_shape_offset;
    
     if(all_cached_instance_transforms.size() != 0){
         // If there was old data then we are currently trying to activate a bullets multimesh, so clear everything that is old
@@ -351,6 +353,8 @@ Ref<SaveDataMultiMeshBullets2D> MultiMeshBullets2D::save(const Ref<SaveDataMulti
 
     custom_additional_save_logic(data_to_populate);
 
+    // TODO save cache_collision_shape_offset = data.collision_shape_offset;
+
     return empty_data;
 }
 
@@ -394,6 +398,8 @@ void MultiMeshBullets2D::load(const Ref<SaveDataMultiMeshBullets2D> &data_to_loa
     if(active_bullets_counter > 0){
         is_active = true;
     }
+
+    // TODO load cache_collision_shape_offset = data.collision_shape_offset;
 }
 
 

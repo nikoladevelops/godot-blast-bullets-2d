@@ -69,6 +69,7 @@ void DirectionalBullets2D::custom_additional_spawn_logic(const MultiMeshBulletsD
     // Each bullet can have its own homing target
     bullet_homing_targets.resize(amount_bullets, nullptr);
     bullet_homing_target_instance_ids.resize(amount_bullets, 0);
+    all_cached_homing_direction.resize(amount_bullets, Vector2(0, 0));
 
     //
 }
@@ -78,6 +79,7 @@ void DirectionalBullets2D::custom_additional_save_logic(SaveDataMultiMeshBullets
     directional_save_data.adjust_direction_based_on_rotation = adjust_direction_based_on_rotation;
 
     // TODO saving of homing behavior
+    // TODO all_cached_homing_direction
 }
 
 void DirectionalBullets2D::custom_additional_load_logic(const SaveDataMultiMeshBullets2D &data) {
@@ -85,6 +87,7 @@ void DirectionalBullets2D::custom_additional_load_logic(const SaveDataMultiMeshB
     adjust_direction_based_on_rotation = directional_save_data.adjust_direction_based_on_rotation;
 
     // TODO loading of homing behavior
+    // TODO all_cached_homing_direction
 
     // Each bullet can have its own homing target
     bullet_homing_targets.resize(amount_bullets, nullptr);
@@ -103,10 +106,12 @@ void DirectionalBullets2D::custom_additional_activate_logic(const MultiMeshBulle
     // and also when re-using multimeshes from object pool we never change amount_bullets so we can take advantage of that and use the same memory
     std::fill(bullet_homing_targets.begin(), bullet_homing_targets.end(), nullptr);
     std::fill(bullet_homing_target_instance_ids.begin(), bullet_homing_target_instance_ids.end(), 0);
+    //std::fill(all_cached_homing_direction.begin(), all_cached_homing_direction.end(), Vector2(0, 0));  // No need since we are editing them when needed
 
     homing_update_interval = 0.0f;
     homing_update_timer = 0.0f;
     homing_smoothing = 0.0f;
+    homing_take_control_of_texture_rotation = false;
 
     
 

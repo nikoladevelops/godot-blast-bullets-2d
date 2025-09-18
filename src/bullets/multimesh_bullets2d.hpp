@@ -338,6 +338,8 @@ protected:
 
     float cache_texture_rotation_radians = 0.0f;
 
+    Vector2 cache_collision_shape_offset = Vector2(0, 0);
+
     ///
 
     /// BULLET SPEED RELATED

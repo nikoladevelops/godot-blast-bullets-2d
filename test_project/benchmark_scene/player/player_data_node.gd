@@ -265,24 +265,35 @@ func spawn_multi_mesh_directional_bullets()->void:
 		directional_bullets_data.transforms = BulletFactory2D.helper_generate_transforms_grid(bullets_amount, bullet_marker.get_global_transform(), rows_per_column, grid_alignment, col_offset, row_offset, rotate_grid_with_marker, random_local_rotation)
 	
 	var dir_bullets:DirectionalBullets2D = BENCHMARK_GLOBALS.FACTORY.spawn_directional_bullets(directional_bullets_data)
-	dir_bullets.homing_smoothing = 0
-	dir_bullets.homing_update_interval = 0
+	dir_bullets.homing_smoothing = 15# Set from 0 to 20 or even bigger (but you might have issues with interpolation)
+	dir_bullets.homing_update_interval = 0.5# Set an update timer - keep it low for smooth updates
+	dir_bullets.homing_take_control_of_texture_rotation = true
 	
+	#dir_bullets.homing_rotation_radius = 15
+	#dir_bullets.
+	#dir_bullets.set_bullet_homing_target(bullet_index, NodeGoesHere)
+	#dir_bullets.stop_bullet_homing(bullet_index)
+	#
+	#for bullet in dir_bullets.get_amount_bullets():
+		#dir_bullets.set_bullet_homing_target(bullet, get_parent())
+		
+		
 	get_tree().create_timer(0.5).timeout.connect(func():
 		for bullet in dir_bullets.get_amount_bullets():
 			dir_bullets.set_bullet_homing_target(bullet, get_parent())
 	)
-		
+	
+		#
 	get_tree().create_timer(1).timeout.connect(func():
 		for bullet in dir_bullets.get_amount_bullets():
 			dir_bullets.set_bullet_homing_target(bullet, BENCHMARK_GLOBALS.ALL_ENEMY_SPAWNERS[0].enemy_container.get_child(0))
 	)
-	
+	#
 	get_tree().create_timer(1.5).timeout.connect(func():
 		for bullet in dir_bullets.get_amount_bullets():
 			dir_bullets.set_bullet_homing_target(bullet, get_parent())
 	)
-	
+	#
 	get_tree().create_timer(2).timeout.connect(func():
 		for bullet in dir_bullets.get_amount_bullets():
 			dir_bullets.stop_bullet_homing(bullet)
