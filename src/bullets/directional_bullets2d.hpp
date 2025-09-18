@@ -8,10 +8,10 @@
 #include "godot_cpp/variant/vector2.hpp"
 #include "multimesh_bullets2d.hpp"
 
+#include <algorithm>
+#include <cmath>
 #include <cstdint>
 #include <vector>
-#include <cmath>
-#include <algorithm>
 
 namespace BlastBullets2D {
 using namespace godot;
@@ -44,9 +44,8 @@ public:
 			update_collision_shape(i);
 			update_attachment_and_speed(i, delta, rotation_angle);
 
-
 			// If physics interpolation is disabled then just render it inside physics process
-			if(!bullet_factory->use_physics_interpolation){
+			if (!bullet_factory->use_physics_interpolation) {
 				multi->set_instance_transform_2d(i, all_cached_instance_transforms[i]);
 			}
 		}
@@ -54,15 +53,20 @@ public:
 		if (homing_update_interval_reached) {
 			homing_update_timer = homing_update_interval;
 		}
-
 	}
 
 	// Teleport a given bullet to a new global position while preserving interpolation correctness.
-	_ALWAYS_INLINE_ void teleport_bullet(int bullet_index, const Vector2 &new_global_pos, bool keep_velocity = true) {
+	_ALWAYS_INLINE_ void teleport_bullet(int bullet_index, const Vector2 &new_global_pos) {
 		if (bullet_index < 0 || bullet_index >= amount_bullets) {
 			UtilityFunctions::printerr("Bullet index out of bounds in teleport_bullet");
 			return;
 		}
+
+		if (!bullets_enabled_status[bullet_index]) {
+			return;
+		}
+
+		temporary_disable_bullet(bullet_index);
 
 		all_cached_instance_origin[bullet_index] = new_global_pos;
 		all_cached_instance_transforms[bullet_index].set_origin(new_global_pos);
@@ -72,16 +76,10 @@ public:
 		shape_t.set_origin(new_global_pos + rotated_offset);
 		physics_server->area_set_shape_transform(area, bullet_index, shape_t);
 
-		if (!keep_velocity) {
-			all_cached_velocity[bullet_index] = Vector2(0, 0);
-			all_cached_speed[bullet_index] = 0.0f;
-		}
-
-		if (bullet_factory && bullet_factory->use_physics_interpolation) {
-			if ((int)all_previous_instance_transf.size() == amount_bullets) {
-				all_previous_instance_transf[bullet_index] = all_cached_instance_transforms[bullet_index];
-			}
-			if (is_bullet_attachment_provided && (int)all_previous_attachment_transf.size() == amount_bullets) {
+		if (bullet_factory->use_physics_interpolation) {
+			all_previous_instance_transf[bullet_index] = all_cached_instance_transforms[bullet_index];
+			
+			if (is_bullet_attachment_provided) {
 				all_previous_attachment_transf[bullet_index] = attachment_transforms[bullet_index];
 			}
 		}
@@ -89,14 +87,30 @@ public:
 		if (UtilityFunctions::is_instance_id_valid(bullet_homing_target_instance_ids[bullet_index]) && bullet_homing_targets[bullet_index]) {
 			const Vector2 target_pos = bullet_homing_targets[bullet_index]->get_global_position();
 			set_homing_bullet_direction_towards_target(bullet_index, target_pos);
+
+			float speed = all_cached_velocity[bullet_index].length();
+			if (speed <= 0.0f){
+				speed = all_cached_speed[bullet_index];
+			}
+
+			all_cached_velocity[bullet_index] = all_cached_homing_direction[bullet_index] * speed;
+
+			// Immediately rotate the bullet transform to face the target
+			if (homing_take_control_of_texture_rotation) {
+				float new_rotation = all_cached_homing_direction[bullet_index].angle();
+				float delta_rot = new_rotation + cache_texture_rotation_radians - all_cached_instance_transforms[bullet_index].get_rotation();
+				normalize_angle(delta_rot);
+				rotate_transform_locally(all_cached_instance_transforms[bullet_index], delta_rot);
+			}
+
 			if ((int)bullet_last_known_homing_target_pos.size() == amount_bullets) {
 				bullet_last_known_homing_target_pos[bullet_index] = target_pos;
 			}
+
+			// TODO fix physics interpolation when teleporting.. and extract an inline function helper for disabling interpolation in a frame
 		}
 
-		if (!(bullet_factory && bullet_factory->use_physics_interpolation)) {
-			multi->set_instance_transform_2d(bullet_index, all_cached_instance_transforms[bullet_index]);
-		}
+		temporary_enable_bullet(bullet_index);
 	}
 
 protected:
@@ -233,7 +247,7 @@ protected:
 		ClassDB::bind_method(D_METHOD("set_homing_take_control_of_texture_rotation", "value"), &DirectionalBullets2D::set_homing_take_control_of_texture_rotation);
 		ADD_PROPERTY(PropertyInfo(Variant::BOOL, "homing_take_control_of_texture_rotation"), "set_homing_take_control_of_texture_rotation", "get_homing_take_control_of_texture_rotation");
 
-		ClassDB::bind_method(D_METHOD("teleport_bullet", "bullet_index", "new_global_pos", "keep_velocity"), &DirectionalBullets2D::teleport_bullet, DEFVAL(true));
+		ClassDB::bind_method(D_METHOD("teleport_bullet", "bullet_index", "new_global_pos"), &DirectionalBullets2D::teleport_bullet);
 	}
 
 	void set_up_movement_data(const TypedArray<BulletSpeedData2D> &new_speed_data);
@@ -269,11 +283,10 @@ public:
 			normalize_angle(delta_rot);
 			rotate_transform_locally(all_cached_instance_transforms[bullet_index], delta_rot);
 
-			if (bullet_factory && bullet_factory->use_physics_interpolation) {
-				if ((int)all_previous_instance_transf.size() == amount_bullets) {
-					all_previous_instance_transf[bullet_index] = all_cached_instance_transforms[bullet_index];
-				}
-				if (is_bullet_attachment_provided && (int)all_previous_attachment_transf.size() == amount_bullets) {
+			if (bullet_factory->use_physics_interpolation) {
+				all_previous_instance_transf[bullet_index] = all_cached_instance_transforms[bullet_index];
+
+				if (is_bullet_attachment_provided) {
 					all_previous_attachment_transf[bullet_index] = attachment_transforms[bullet_index];
 				}
 			}
