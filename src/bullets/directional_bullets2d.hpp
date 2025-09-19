@@ -76,14 +76,6 @@ public:
 		shape_t.set_origin(new_global_pos + rotated_offset);
 		physics_server->area_set_shape_transform(area, bullet_index, shape_t);
 
-		if (bullet_factory->use_physics_interpolation) {
-			all_previous_instance_transf[bullet_index] = all_cached_instance_transforms[bullet_index];
-			
-			if (is_bullet_attachment_provided) {
-				all_previous_attachment_transf[bullet_index] = attachment_transforms[bullet_index];
-			}
-		}
-
 		if (UtilityFunctions::is_instance_id_valid(bullet_homing_target_instance_ids[bullet_index]) && bullet_homing_targets[bullet_index]) {
 			const Vector2 target_pos = bullet_homing_targets[bullet_index]->get_global_position();
 			set_homing_bullet_direction_towards_target(bullet_index, target_pos);
@@ -106,8 +98,15 @@ public:
 			if ((int)bullet_last_known_homing_target_pos.size() == amount_bullets) {
 				bullet_last_known_homing_target_pos[bullet_index] = target_pos;
 			}
+		}
 
-			// TODO fix physics interpolation when teleporting.. and extract an inline function helper for disabling interpolation in a frame
+		// Now set previous to match the FINAL current state (after position, rotation, and attachment updates)
+		if (bullet_factory->use_physics_interpolation) {
+			all_previous_instance_transf[bullet_index] = all_cached_instance_transforms[bullet_index];
+			
+			if (is_bullet_attachment_provided) {
+				all_previous_attachment_transf[bullet_index] = attachment_transforms[bullet_index];
+			}
 		}
 
 		temporary_enable_bullet(bullet_index);
