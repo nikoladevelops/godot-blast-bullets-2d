@@ -265,9 +265,9 @@ func spawn_multi_mesh_directional_bullets()->void:
 		directional_bullets_data.transforms = BulletFactory2D.helper_generate_transforms_grid(bullets_amount, bullet_marker.get_global_transform(), rows_per_column, grid_alignment, col_offset, row_offset, rotate_grid_with_marker, random_local_rotation)
 	
 	var dir_bullets:DirectionalBullets2D = BENCHMARK_GLOBALS.FACTORY.spawn_directional_bullets(directional_bullets_data)
-	dir_bullets.homing_smoothing = 0 # Set from 0 to 20 or even bigger (but you might have issues with interpolation)
-	#dir_bullets.homing_update_interval = 0.1# Set an update timer - keep it low for smooth updates
-	dir_bullets.homing_take_control_of_texture_rotation = true
+	dir_bullets.homing_smoothing = 15 # Set from 0 to 20 or even bigger (but you might have issues with interpolation)
+	#dir_bullets.homing_update_interval = 0.02# Set an update timer - keep it low for smooth updates
+	dir_bullets.homing_take_control_of_texture_rotation = true # TODO test when its false..
 	
 	##dir_bullets.telepo
 	#
@@ -279,21 +279,35 @@ func spawn_multi_mesh_directional_bullets()->void:
 	##for bullet in dir_bullets.get_amount_bullets():
 		##dir_bullets.set_bullet_homing_target(bullet, get_parent())
 		#
-		#
-	get_tree().create_timer(0.5).timeout.connect(func():
+		##
+	get_tree().create_timer(1).timeout.connect(func():
 		for bullet in dir_bullets.get_amount_bullets():
-			dir_bullets.set_bullet_homing_target(bullet, get_parent())
+			
+			var enemy_container:Node = BENCHMARK_GLOBALS.ALL_ENEMY_SPAWNERS[0].enemy_container
+			
+			#var has_enemies_inside:bool = enemy_container.get_child_count() > 0
+			
+			#if has_enemies_inside:
+			for enemy:Node2D in enemy_container.get_children():
+				var success:bool = dir_bullets.bullet_homing_push_node2d_target(bullet, enemy)
+				print(success)
+					#if enemy:
+			
+			
+			dir_bullets.bullet_homing_push_node2d_target(bullet, get_parent())
+			
+			#dir_bullets.bullet_homing_push_node2d_target(bullet, get_parent())
 		
 		#dir_bullets.teleport_bullet(0, Vector2(0,0))
-		dir_bullets.call_deferred("teleport_bullet",0, Vector2(0,0)) #dir_bullets.teleport_bullet(0, Vector2(0,0))
-		
+		#dir_bullets.call_deferred("teleport_bullet",0, Vector2(0,0)) #dir_bullets.teleport_bullet(0, Vector2(0,0))
 		#dir_bullets.teleport_bullet(0, Vector2(0,0), false)
 	)
 	#
 		##
 	#get_tree().create_timer(1).timeout.connect(func():
 		#for bullet in dir_bullets.get_amount_bullets():
-			#dir_bullets.set_bullet_homing_target(bullet, BENCHMARK_GLOBALS.ALL_ENEMY_SPAWNERS[0].enemy_container.get_child(0))
+			#dir_bullets.bullet_homing_push_node2d_target(bullet, get_parent())
+			##dir_bullets.bullet_homing_push_node2d_target(bullet, BENCHMARK_GLOBALS.ALL_ENEMY_SPAWNERS[0].enemy_container.get_child(0))
 	#)
 	###
 	#get_tree().create_timer(1.5).timeout.connect(func():
@@ -301,10 +315,10 @@ func spawn_multi_mesh_directional_bullets()->void:
 			#dir_bullets.set_bullet_homing_target(bullet, get_parent())
 	#)
 	##
-	get_tree().create_timer(2).timeout.connect(func():
-		for bullet in dir_bullets.get_amount_bullets():
-			dir_bullets.stop_bullet_homing(bullet)
-	)
+	#get_tree().create_timer(2).timeout.connect(func():
+		#for bullet in dir_bullets.get_amount_bullets():
+			#dir_bullets.bullet_homing_clear_all_targets(bullet)
+	#)
 	#
 	
 	# TODO things to be exposed from Multimesh bullets
