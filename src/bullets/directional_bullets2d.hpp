@@ -6,6 +6,7 @@
 #include "godot_cpp/core/class_db.hpp"
 #include "godot_cpp/core/defs.hpp"
 #include "godot_cpp/core/math.hpp"
+#include "godot_cpp/variant/callable.hpp"
 #include "godot_cpp/variant/utility_functions.hpp"
 #include "godot_cpp/variant/vector2.hpp"
 #include "multimesh_bullets2d.hpp"
@@ -23,7 +24,7 @@ class DirectionalBullets2D : public MultiMeshBullets2D {
 	GDCLASS(DirectionalBullets2D, MultiMeshBullets2D)
 
 public:
-	_ALWAYS_INLINE_ void move_bullets(float delta) {
+	_ALWAYS_INLINE_ void move_bullets(double delta) {
 		const bool using_physics_interpolation = bullet_factory->use_physics_interpolation;
 		if (using_physics_interpolation) {
 			all_previous_instance_transf = all_cached_instance_transforms;
@@ -42,7 +43,7 @@ public:
 				continue;
 			}
 
-			float rotation_angle = update_rotation(i, delta);
+			real_t rotation_angle = update_rotation(i, delta);
 			update_homing(i, delta, homing_update_interval_reached, have_last_target_pos);
 			update_position(i, delta);
 			update_collision_shape(i);
@@ -53,6 +54,8 @@ public:
 				multi->set_instance_transform_2d(i, all_cached_instance_transforms[i]);
 			}
 		}
+
+		run_multimesh_custom_timers(delta);
 
 		if (homing_update_interval_reached) {
 			homing_update_timer = homing_update_interval;
@@ -99,7 +102,7 @@ public:
 						const Vector2 target_pos = homing_target->get_global_position();
 						set_homing_bullet_direction_towards_target(bullet_index, target_pos);
 
-						float speed = all_cached_velocity[bullet_index].length();
+						real_t speed = all_cached_velocity[bullet_index].length();
 						if (speed <= 0.0f) {
 							speed = all_cached_speed[bullet_index];
 						}
@@ -108,8 +111,8 @@ public:
 
 						// Immediately rotate the bullet transform to face the target
 						if (homing_take_control_of_texture_rotation) {
-							float new_rotation = all_cached_homing_direction[bullet_index].angle();
-							float delta_rot = new_rotation + cache_texture_rotation_radians - all_cached_instance_transforms[bullet_index].get_rotation();
+							real_t new_rotation = all_cached_homing_direction[bullet_index].angle();
+							real_t delta_rot = new_rotation + cache_texture_rotation_radians - all_cached_instance_transforms[bullet_index].get_rotation();
 							normalize_angle(delta_rot);
 							rotate_transform_locally(all_cached_instance_transforms[bullet_index], delta_rot);
 						}
@@ -138,7 +141,7 @@ public:
 protected:
 	bool adjust_direction_based_on_rotation = false;
 
-	_ALWAYS_INLINE_ float update_rotation(int i, float delta) {
+	_ALWAYS_INLINE_ real_t update_rotation(int i, double delta) {
 		if (!is_rotation_active) {
 			return 0.0f;
 		}
@@ -146,7 +149,7 @@ protected:
 			return 0.0f;
 		}
 
-		float rotation_angle = 0.0f;
+		real_t rotation_angle = 0.0f;
 		bool max_rotation_speed_reached = accelerate_bullet_rotation_speed(i, delta);
 		rotation_angle = all_rotation_speed[i] * delta;
 
@@ -157,16 +160,16 @@ protected:
 		if (adjust_direction_based_on_rotation) {
 			Vector2 &current_direction = all_cached_direction[i];
 			current_direction = all_cached_instance_transforms[i][0].normalized();
-			float current_speed = all_cached_velocity[i].length();
+			real_t current_speed = all_cached_velocity[i].length();
 			all_cached_velocity[i] = current_direction * current_speed;
 		}
 
 		return rotation_angle;
 	}
 
-	_ALWAYS_INLINE_ void update_homing(int bullet_index, float delta, bool interval_reached, bool have_last_target_pos) {
+	_ALWAYS_INLINE_ void update_homing(int bullet_index, double delta, bool interval_reached, bool have_last_target_pos) {
 		std::deque<HomingTarget> &queue_of_targets = all_bullet_homing_targets[bullet_index];
-		
+
 		// If there are no homing targets, skip all this logic
 		if (queue_of_targets.empty()) {
 			return;
@@ -203,7 +206,7 @@ protected:
 				}
 
 				Vector2 &velo = all_cached_velocity[bullet_index];
-				float speed = velo.length();
+				real_t speed = velo.length();
 				if (speed <= 0.0f) {
 					return;
 				}
@@ -220,27 +223,27 @@ protected:
 					all_cached_direction[bullet_index] = target_dir;
 
 					if (homing_take_control_of_texture_rotation) {
-						float new_rotation = target_dir.angle();
-						float delta_rot = new_rotation + cache_texture_rotation_radians - all_cached_instance_transforms[bullet_index].get_rotation();
+						real_t new_rotation = target_dir.angle();
+						real_t delta_rot = new_rotation + cache_texture_rotation_radians - all_cached_instance_transforms[bullet_index].get_rotation();
 						normalize_angle(delta_rot);
 						rotate_transform_locally(all_cached_instance_transforms[bullet_index], delta_rot);
 					}
 				} else { // If smoothing value was applied the rotation should be gradual / smoothing effect applied
-					float angle_diff = current_dir.angle_to(target_dir);
-					float max_turn = homing_smoothing * delta;
+					real_t angle_diff = current_dir.angle_to(target_dir);
+					real_t max_turn = homing_smoothing * delta;
 					if (max_turn < 0.0f) {
 						max_turn = 0.0f;
 					}
 
-					float turn = Math::clamp(angle_diff, -max_turn, max_turn);
+					real_t turn = Math::clamp(angle_diff, -max_turn, max_turn);
 					Vector2 new_dir = current_dir.rotated(turn);
 
 					velo = new_dir * speed;
 					all_cached_direction[bullet_index] = new_dir;
 
 					if (homing_take_control_of_texture_rotation) {
-						float desired_rot = new_dir.angle();
-						float delta_rot = desired_rot + cache_texture_rotation_radians - all_cached_instance_transforms[bullet_index].get_rotation();
+						real_t desired_rot = new_dir.angle();
+						real_t delta_rot = desired_rot + cache_texture_rotation_radians - all_cached_instance_transforms[bullet_index].get_rotation();
 						normalize_angle(delta_rot);
 						rotate_transform_locally(all_cached_instance_transforms[bullet_index], delta_rot);
 					}
@@ -249,7 +252,7 @@ protected:
 		}
 	}
 
-	_ALWAYS_INLINE_ void update_position(int i, float delta) {
+	_ALWAYS_INLINE_ void update_position(int i, double delta) {
 		Vector2 cache_velocity_calc = all_cached_velocity[i] * delta;
 		all_cached_instance_origin[i] += cache_velocity_calc;
 		all_cached_shape_origin[i] += cache_velocity_calc;
@@ -263,13 +266,13 @@ protected:
 		physics_server->area_set_shape_transform(area, i, all_cached_shape_transforms[i]);
 	}
 
-	_ALWAYS_INLINE_ void update_attachment_and_speed(int i, float delta, float rotation_angle) {
+	_ALWAYS_INLINE_ void update_attachment_and_speed(int i, double delta, real_t rotation_angle) {
 		Vector2 velocity_delta = all_cached_velocity[i] * delta;
 		move_bullet_attachment(velocity_delta, i, rotation_angle);
 		accelerate_bullet_speed(i, delta);
 	}
 
-	_ALWAYS_INLINE_ void normalize_angle(float &angle) {
+	_ALWAYS_INLINE_ void normalize_angle(real_t &angle) {
 		angle = Math::wrapf(angle, -Math_PI, Math_PI);
 	}
 
@@ -291,6 +294,10 @@ protected:
 		ADD_PROPERTY(PropertyInfo(Variant::BOOL, "homing_take_control_of_texture_rotation"), "set_homing_take_control_of_texture_rotation", "get_homing_take_control_of_texture_rotation");
 
 		ClassDB::bind_method(D_METHOD("teleport_bullet", "bullet_index", "new_global_pos"), &DirectionalBullets2D::teleport_bullet);
+
+		ClassDB::bind_method(D_METHOD("multimesh_attach_time_based_function", "time", "callable", "repeat"), &DirectionalBullets2D::multimesh_attach_time_based_function, DEFVAL(false));
+		ClassDB::bind_method(D_METHOD("multimesh_detach_time_based_function", "callable"), &DirectionalBullets2D::multimesh_detach_time_based_function);
+		ClassDB::bind_method(D_METHOD("multimesh_detach_all_time_based_functions"), &DirectionalBullets2D::multimesh_detach_all_time_based_functions);
 	}
 
 	void set_up_movement_data(const TypedArray<BulletSpeedData2D> &new_speed_data);
@@ -326,13 +333,12 @@ public:
 		set_homing_bullet_direction_towards_target(bullet_index, target_pos);
 
 		if (homing_take_control_of_texture_rotation) {
-			float new_rotation = all_cached_homing_direction[bullet_index].angle();
-			float delta_rot = new_rotation + cache_texture_rotation_radians - all_cached_instance_transforms[bullet_index].get_rotation();
+			real_t new_rotation = all_cached_homing_direction[bullet_index].angle();
+			real_t delta_rot = new_rotation + cache_texture_rotation_radians - all_cached_instance_transforms[bullet_index].get_rotation();
 			normalize_angle(delta_rot);
 			rotate_transform_locally(all_cached_instance_transforms[bullet_index], delta_rot);
-
 		}
-		
+
 		if (bullet_factory->use_physics_interpolation) {
 			all_previous_instance_transf[bullet_index] = all_cached_instance_transforms[bullet_index];
 
@@ -340,7 +346,7 @@ public:
 				all_previous_attachment_transf[bullet_index] = attachment_transforms[bullet_index];
 			}
 		}
-		
+
 		// Create a node2d homing target and push it at the end of the queue
 		HomingTarget node2d_target_data(new_homing_target, homing_target_instance_id);
 		all_bullet_homing_targets[bullet_index].push_back(node2d_target_data);
@@ -349,7 +355,6 @@ public:
 	}
 
 	// TODO a pause homing method - pause homing temporarily even if there are targets
-	// TODO a bullet_homing_clear_all_targets method - clears all targets
 
 	_ALWAYS_INLINE_ void bullet_homing_clear_all_targets(int bullet_index) {
 		if (bullet_index < 0 || bullet_index >= amount_bullets) {
@@ -363,16 +368,16 @@ public:
 		all_cached_homing_direction[bullet_index] = Vector2(0, 0);
 	}
 
-	float get_homing_smoothing() const {
+	real_t get_homing_smoothing() const {
 		return homing_smoothing;
 	}
-	void set_homing_smoothing(float value) {
+	void set_homing_smoothing(real_t value) {
 		homing_smoothing = value;
 	}
-	float get_homing_update_interval() const {
+	real_t get_homing_update_interval() const {
 		return homing_update_interval;
 	}
-	void set_homing_update_interval(float value) {
+	void set_homing_update_interval(real_t value) {
 		homing_update_interval = value;
 	}
 	bool get_homing_take_control_of_texture_rotation() const {
@@ -396,34 +401,100 @@ private:
 	struct HomingTarget {
 		enum Type {
 			GlobalPositionTarget,
-			Node2DTarget
-		};
-
-		// The actual type that the union holds
-		Type type;
+			Node2DTarget 
+		} type;
 
 		union {
 			godot::Vector2 global_position_target;
 			Node2DTargetData node2d_target_data;
 		};
 
-		HomingTarget(Vector2 pos) :
-				type(GlobalPositionTarget), global_position_target(pos) {}
-
-		HomingTarget(Node2D *node, uint64_t valid_instance_id) :
-				type(Node2DTarget), node2d_target_data(node, valid_instance_id) {
-		}
+		HomingTarget(Vector2 pos) : type(GlobalPositionTarget), global_position_target(pos) {}
+        HomingTarget(Node2D *node, uint64_t id) : type(Node2DTarget), node2d_target_data(node, id) {}
 	};
+
+	// Timer logic
+	struct CustomTimer {
+		godot::Callable _callback;
+		double _current_time;
+		double _initial_time;
+		bool _repeating;
+
+		CustomTimer(const godot::Callable &callback, double initial_time, bool repeating) :
+				_callback(callback), _current_time(initial_time), _initial_time(initial_time), _repeating(repeating) {};
+	};
+
+	_ALWAYS_INLINE_ void multimesh_attach_time_based_function(double time, const Callable &callable, bool repeat = false) {
+		call_deferred("_do_attach_time_based_function", time, callable, repeat);
+	}
+
+	_ALWAYS_INLINE_ void _do_attach_time_based_function(double time, const Callable &callable, bool repeat) {
+		if (time <= 0.0f) {
+			UtilityFunctions::printerr("When calling multimesh_attach_time_based_function(), you need to provide a time value that is above 0");
+			return;
+		}
+
+		if (!callable.is_valid()) {
+			UtilityFunctions::printerr("Invalid callable was passed to multimesh_attach_time_based_function()");
+			return;
+		}
+
+		multimesh_custom_timers.emplace_back(callable, time, repeat);
+	}
+
+	_ALWAYS_INLINE_ void multimesh_detach_time_based_function(const Callable &callable) {
+		call_deferred("_do_detach_time_based_function", callable);
+	}
+
+	_ALWAYS_INLINE_ void _do_detach_time_based_function(const Callable &callable) {
+		for (auto it = multimesh_custom_timers.begin(); it != multimesh_custom_timers.end();) {
+			if (it->_callback == callable) {
+				it = multimesh_custom_timers.erase(it); // Order-preserving
+			} else {
+				++it;
+			}
+		}
+	}
+
+	_ALWAYS_INLINE_ void multimesh_detach_all_time_based_functions() {
+		call_deferred("_do_detach_all_time_based_functions");
+	}
+
+	_ALWAYS_INLINE_ void _do_detach_all_time_based_functions() {
+		multimesh_custom_timers.clear();
+	}
+
+	_ALWAYS_INLINE_ void run_multimesh_custom_timers(double delta) {
+		for (auto it = multimesh_custom_timers.begin(); it != multimesh_custom_timers.end();) {
+			it->_current_time -= delta;
+			if (it->_current_time <= 0.0f) {
+				it->_callback.call_deferred(); // Always deferred, non-blocking
+				if (it->_repeating) {
+					it->_current_time = it->_initial_time;
+					++it;
+				} else {
+					it = multimesh_custom_timers.erase(it);
+				}
+			} else {
+				++it;
+			}
+		}
+	}
+
+	////
 
 	// Stores a queue of targets per each bullet - each bullet can track several targets going from one to the other etc..
 	std::vector<std::deque<HomingTarget>> all_bullet_homing_targets;
 	std::vector<Vector2> all_cached_homing_direction;
 	std::vector<Vector2> bullet_last_known_homing_target_pos;
 
-	float homing_update_interval = 0.0f;
-	float homing_update_timer = 0.0f;
+	// Stores a bunch of timers for the multimesh that should execute
+	std::vector<CustomTimer> multimesh_custom_timers;
 
-	float homing_smoothing = 0.0f;
+	double homing_update_interval = 0.0f;
+	double homing_update_timer = 0.0f;
+
+	real_t homing_smoothing = 0.0f;
 	bool homing_take_control_of_texture_rotation = false;
 
 	_ALWAYS_INLINE_ void set_homing_bullet_direction_towards_target(int bullet_index, const Vector2 &target_global_position) {
@@ -440,7 +511,7 @@ private:
 		}
 	}
 
-	_ALWAYS_INLINE_ bool is_bullet_homing_target_valid(const Node *const target, const uint64_t cached_instance_id){
+	_ALWAYS_INLINE_ bool is_bullet_homing_target_valid(const Node *const target, const uint64_t cached_instance_id) {
 		return target != nullptr && UtilityFunctions::is_instance_id_valid(cached_instance_id);
 	};
 };

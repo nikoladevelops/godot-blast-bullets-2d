@@ -41,7 +41,7 @@ void DirectionalBullets2D::set_up_movement_data(const TypedArray<BulletSpeedData
 
 	for (int i = 0; i < speed_data_size; i++) {
 		// The rotation of each transform
-		float curr_bullet_rotation = all_cached_shape_transforms[i].get_rotation(); // Note: I am using the shape transforms, since the instance transforms might be rotated to account for bullet texture rotation
+		real_t curr_bullet_rotation = all_cached_shape_transforms[i].get_rotation(); // Note: I am using the shape transforms, since the instance transforms might be rotated to account for bullet texture rotation
 
 		const Ref<BulletSpeedData2D> &curr_speed_data = new_speed_data[i];
 		all_cached_speed.emplace_back(curr_speed_data->speed);
@@ -101,12 +101,12 @@ void DirectionalBullets2D::custom_additional_activate_logic(const MultiMeshBulle
 	adjust_direction_based_on_rotation = directional_data.adjust_direction_based_on_rotation;
 
 	// Homing behavior related //
-	
+
+	multimesh_custom_timers.clear(); // Clear all old timers
 	all_bullet_homing_targets.clear(); // ensure all old homing targets are cleared
 
 	std::fill(all_cached_homing_direction.begin(), all_cached_homing_direction.end(), Vector2(0, 0));
 	std::fill(bullet_last_known_homing_target_pos.begin(), bullet_last_known_homing_target_pos.end(), Vector2(0, 0));
-
 
 	homing_update_interval = 0.0f;
 	homing_update_timer = 0.0f;

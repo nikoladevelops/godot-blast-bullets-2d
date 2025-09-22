@@ -290,11 +290,12 @@ func spawn_multi_mesh_directional_bullets()->void:
 			#if has_enemies_inside:
 			for enemy:Node2D in enemy_container.get_children():
 				var success:bool = dir_bullets.bullet_homing_push_node2d_target(bullet, enemy)
-				print(success)
+				#print(success)
 					#if enemy:
 			
 			
 			dir_bullets.bullet_homing_push_node2d_target(bullet, get_parent())
+			
 			
 			#dir_bullets.bullet_homing_push_node2d_target(bullet, get_parent())
 		
