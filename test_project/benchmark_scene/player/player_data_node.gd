@@ -265,10 +265,12 @@ func spawn_multi_mesh_directional_bullets()->void:
 		directional_bullets_data.transforms = BulletFactory2D.helper_generate_transforms_grid(bullets_amount, bullet_marker.get_global_transform(), rows_per_column, grid_alignment, col_offset, row_offset, rotate_grid_with_marker, random_local_rotation)
 	
 	var dir_bullets:DirectionalBullets2D = BENCHMARK_GLOBALS.FACTORY.spawn_directional_bullets(directional_bullets_data)
-	dir_bullets.homing_smoothing = 0 # Set from 0 to 20 or even bigger (but you might have issues with interpolation)
+	dir_bullets.homing_smoothing = 15 # Set from 0 to 20 or even bigger (but you might have issues with interpolation)
 	#dir_bullets.homing_update_interval = 0.02# Set an update timer - keep it low for smooth updates
-	dir_bullets.homing_take_control_of_texture_rotation = true # TODO test when its false..
-	dir_bullets.multimesh_set_bullets_homing_target(get_parent())
+	dir_bullets.homing_take_control_of_texture_rotation = true
+	dir_bullets.bullet_homing_push_back_node2d_target(0, get_parent())
+	
+	#dir_bullets.all_bu
 	##dir_bullets.telepo
 	#
 	##dir_bullets.homing_rotation_radius = 15
@@ -280,13 +282,15 @@ func spawn_multi_mesh_directional_bullets()->void:
 		##dir_bullets.set_bullet_homing_target(bullet, get_parent())
 		#
 		##
-	get_tree().create_timer(0.5).timeout.connect(func():
-		for bullet in dir_bullets.get_amount_bullets():
-			var push_success:bool = dir_bullets.bullet_homing_push_back_global_position_target(bullet, Vector2(0,0))
-			#print(push_success)
-			
-			dir_bullets.bullet_homing_pop_front_target(bullet)
-	)
+		
+		# TODO fix this
+	#get_tree().create_timer(0.5).timeout.connect(func():
+		#for bullet in dir_bullets.get_amount_bullets():
+			#var push_success:bool = dir_bullets.bullet_homing_push_back_global_position_target(bullet, Vector2(0,0))
+			##print(push_success)
+			#
+			#dir_bullets.bullet_homing_pop_front_target(bullet)
+	#)
 	
 	get_tree().create_timer(1).timeout.connect(func():
 		dir_bullets.teleport_bullet(0, Vector2(550,510))
