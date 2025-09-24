@@ -268,9 +268,15 @@ protected:
 
 		ClassDB::bind_method(D_METHOD("teleport_bullet", "bullet_index", "new_global_pos"), &DirectionalBullets2D::teleport_bullet);
 
-		ClassDB::bind_method(D_METHOD("multimesh_attach_time_based_function", "time", "callable", "repeat"), &DirectionalBullets2D::multimesh_attach_time_based_function, DEFVAL(false));
-		ClassDB::bind_method(D_METHOD("multimesh_detach_time_based_function", "callable"), &DirectionalBullets2D::multimesh_detach_time_based_function);
-		ClassDB::bind_method(D_METHOD("multimesh_detach_all_time_based_functions"), &DirectionalBullets2D::multimesh_detach_all_time_based_functions);
+		// Time based functions
+		ClassDB::bind_method(D_METHOD("all_bullets_attach_time_based_function", "time", "callable", "repeat"), &DirectionalBullets2D::all_bullets_attach_time_based_function, DEFVAL(false));
+		ClassDB::bind_method(D_METHOD("_do_attach_time_based_function", "time", "callable", "repeat"), &DirectionalBullets2D::_do_attach_time_based_function);
+		
+		ClassDB::bind_method(D_METHOD("all_bullets_detach_time_based_function", "callable"), &DirectionalBullets2D::all_bullets_detach_time_based_function);
+		ClassDB::bind_method(D_METHOD("_do_detach_time_based_function", "callable"), &DirectionalBullets2D::_do_detach_time_based_function);
+
+		ClassDB::bind_method(D_METHOD("all_bullets_detach_all_time_based_functions"), &DirectionalBullets2D::all_bullets_detach_all_time_based_functions);
+		ClassDB::bind_method(D_METHOD("_do_detach_all_time_based_functions"), &DirectionalBullets2D::_do_detach_all_time_based_functions);
 
 		BIND_ENUM_CONSTANT(GlobalPositionTarget);
 		BIND_ENUM_CONSTANT(Node2DTarget);
@@ -682,7 +688,7 @@ private:
 				_callback(callback), _current_time(initial_time), _initial_time(initial_time), _repeating(repeating) {};
 	};
 
-	_ALWAYS_INLINE_ void multimesh_attach_time_based_function(double time, const Callable &callable, bool repeat = false) {
+	_ALWAYS_INLINE_ void all_bullets_attach_time_based_function(double time, const Callable &callable, bool repeat = false) {
 		call_deferred("_do_attach_time_based_function", time, callable, repeat);
 	}
 
@@ -700,7 +706,7 @@ private:
 		multimesh_custom_timers.emplace_back(callable, time, repeat);
 	}
 
-	_ALWAYS_INLINE_ void multimesh_detach_time_based_function(const Callable &callable) {
+	_ALWAYS_INLINE_ void all_bullets_detach_time_based_function(const Callable &callable) {
 		call_deferred("_do_detach_time_based_function", callable);
 	}
 
@@ -714,7 +720,7 @@ private:
 		}
 	}
 
-	_ALWAYS_INLINE_ void multimesh_detach_all_time_based_functions() {
+	_ALWAYS_INLINE_ void all_bullets_detach_all_time_based_functions() {
 		call_deferred("_do_detach_all_time_based_functions");
 	}
 

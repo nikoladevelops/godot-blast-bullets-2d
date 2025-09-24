@@ -257,6 +257,10 @@ func spawn_bullets(player_rotation:float)->void:
 		BENCHMARK_GLOBALS.BulletType.GodotArea2D:
 			spawn_godot_area2d_bullets(player_rotation)
 
+
+func idk():
+	print("idk")
+	
 # Spawns MultiMeshDirectional bullets
 func spawn_multi_mesh_directional_bullets()->void:
 	if bullets_amount < 10:
@@ -264,89 +268,44 @@ func spawn_multi_mesh_directional_bullets()->void:
 	else:
 		directional_bullets_data.transforms = BulletFactory2D.helper_generate_transforms_grid(bullets_amount, bullet_marker.get_global_transform(), rows_per_column, grid_alignment, col_offset, row_offset, rotate_grid_with_marker, random_local_rotation)
 	
-	var dir_bullets:DirectionalBullets2D = BENCHMARK_GLOBALS.FACTORY.spawn_directional_bullets(directional_bullets_data)
+	var dir_bullets:DirectionalBullets2D = BENCHMARK_GLOBALS.FACTORY.spawn_controllable_directional_bullets(directional_bullets_data)
 	dir_bullets.homing_smoothing = 15 # Set from 0 to 20 or even bigger (but you might have issues with interpolation)
 	#dir_bullets.homing_update_interval = 0.02# Set an update timer - keep it low for smooth updates
 	dir_bullets.homing_take_control_of_texture_rotation = true
+	
+	
 	dir_bullets.bullet_homing_push_back_node2d_target(0, get_parent())
 	
-	#dir_bullets.all_bu
-	##dir_bullets.telepo
-	#
-	##dir_bullets.homing_rotation_radius = 15
-	##dir_bullets.
-	##dir_bullets.set_bullet_homing_target(bullet_index, NodeGoesHere)
-	##dir_bullets.stop_bullet_homing(bullet_index)
-	##
-	##for bullet in dir_bullets.get_amount_bullets():
-		##dir_bullets.set_bullet_homing_target(bullet, get_parent())
-		#
-		##
-		
-		# TODO fix this
-	#get_tree().create_timer(0.5).timeout.connect(func():
+	var test:Callable = func(): print("test")
+	
+	dir_bullets.all_bullets_attach_time_based_function(0.2, idk, true)
+	
+	dir_bullets.all_bullets_attach_time_based_function(1.1, func(): 
+		dir_bullets.all_bullets_detach_time_based_function(idk)
+		, false)
+	
+	
+	#dir_bullets.all_bullets_attach_time_based_function(1, func():
 		#for bullet in dir_bullets.get_amount_bullets():
 			#var push_success:bool = dir_bullets.bullet_homing_push_back_global_position_target(bullet, Vector2(0,0))
-			##print(push_success)
-			#
-			#dir_bullets.bullet_homing_pop_front_target(bullet)
-	#)
-	
-	get_tree().create_timer(1).timeout.connect(func():
-		dir_bullets.teleport_bullet(0, Vector2(550,510))
-		for bullet in dir_bullets.get_amount_bullets():
-			var enemy_container:Node = BENCHMARK_GLOBALS.ALL_ENEMY_SPAWNERS[0].enemy_container
-			
-			
-			for enemy:Node2D in enemy_container.get_children():
-				var success:bool = dir_bullets.bullet_homing_push_back_node2d_target(bullet, enemy)
-				#var success:bool = dir_bullets.bullet_homing_push_global_position_target(bullet, Vector2(0,0))
-				#print(success)
-					#if enemy:
-				
-				
-					
-				dir_bullets.bullet_homing_push_back_node2d_target(bullet, get_parent())
-				
-				
-				#dir_bullets.bullet_homing_push_node2d_target(bullet, get_parent())
-			
-			#dir_bullets.teleport_bullet(0, Vector2(0,0))
-			#dir_bullets.call_deferred("teleport_bullet",0, Vector2(0,0)) #dir_bullets.teleport_bullet(0, Vector2(0,0))
-			#dir_bullets.teleport_bullet(0, Vector2(0,0), false)
-	)
-	
-	
-	get_tree().create_timer(1).timeout.connect(func():
-		for bullet in dir_bullets.get_amount_bullets():
-			
-			if dir_bullets.get_bullet_homing_current_target_type(bullet) == DirectionalBullets2D.HomingType.Node2DTarget:
-				var result:Node2D = dir_bullets.bullet_homing_pop_front_target(bullet)
-				print(result)
-			elif dir_bullets.get_bullet_homing_current_target_type(bullet) == DirectionalBullets2D.HomingType.GlobalPositionTarget:
-				var result:Vector2 = dir_bullets.bullet_homing_pop_front_target(bullet)
-				print(result)
-			else:
-				print("Bullet is not tracking any targets currently")
-		)
+		#,false)
+		#
+	#dir_bullets.all_bullets_attach_time_based_function(1.5, func():
+		#for bullet in dir_bullets.get_amount_bullets():
+			#if dir_bullets.get_bullet_homing_current_target_type(bullet) == DirectionalBullets2D.HomingType.Node2DTarget:
+				#var result:Node2D = dir_bullets.bullet_homing_pop_front_target(bullet)
+				#print(result)
+			#elif dir_bullets.get_bullet_homing_current_target_type(bullet) == DirectionalBullets2D.HomingType.GlobalPositionTarget:
+				#var result:Vector2 = dir_bullets.bullet_homing_pop_front_target(bullet)
+				#print(result)
+			#else:
+				#print("Bullet is not tracking any targets currently")
+			#,false)
 	#
-		##
-	#get_tree().create_timer(1).timeout.connect(func():
+	#dir_bullets.all_bullets_attach_time_based_function(2, func():
 		#for bullet in dir_bullets.get_amount_bullets():
-			#dir_bullets.bullet_homing_push_node2d_target(bullet, get_parent())
-			##dir_bullets.bullet_homing_push_node2d_target(bullet, BENCHMARK_GLOBALS.ALL_ENEMY_SPAWNERS[0].enemy_container.get_child(0))
-	#)
-	###
-	#get_tree().create_timer(1.5).timeout.connect(func():
-		#for bullet in dir_bullets.get_amount_bullets():
-			#dir_bullets.set_bullet_homing_target(bullet, get_parent())
-	#)
-	##
-	#get_tree().create_timer(2).timeout.connect(func():
-		#for bullet in dir_bullets.get_amount_bullets():
-			#dir_bullets.bullet_homing_clear_all_targets(bullet)
-	#)
-	#
+			#var push_success:bool = dir_bullets.bullet_homing_push_back_node2d_target(bullet, get_parent())
+		#,false)
 	
 	# TODO things to be exposed from Multimesh bullets
 	#var amount_bullets:int = dir_bullets.get_amount_bullets()

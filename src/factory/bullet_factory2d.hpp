@@ -56,10 +56,13 @@ public:
 	virtual void _process(double delta) override;
 
 	// Spawns DirectionalBullets2D when given a resource containing all needed data
-	DirectionalBullets2D *spawn_directional_bullets(const Ref<DirectionalBulletsData2D> &spawn_data);
+	void spawn_directional_bullets(const Ref<DirectionalBulletsData2D> &spawn_data);
 
 	// Spawns BlockBullets2D when given a resource containing all needed data
 	void spawn_block_bullets(const Ref<BlockBulletsData2D> &spawn_data);
+
+	// Spawns DirectionalBullets2D when given a resource containing all needed data. These bullets should be controlled by the user
+	DirectionalBullets2D *spawn_controllable_directional_bullets(const Ref<DirectionalBulletsData2D> &spawn_data);
 
 	// Generates a Resource that contains every bullet's state
 	void save();
