@@ -12,6 +12,8 @@
 #include "godot_cpp/core/math.hpp"
 #include "godot_cpp/core/object.hpp"
 #include "godot_cpp/core/property_info.hpp"
+#include "godot_cpp/variant/callable.hpp"
+#include "godot_cpp/variant/callable_method_pointer.hpp"
 #include "godot_cpp/variant/typed_array.hpp"
 #include "godot_cpp/variant/variant.hpp"
 
@@ -539,6 +541,18 @@ protected:
 		ClassDB::bind_method(D_METHOD("get_bullets_custom_data"), &MultiMeshBullets2D::get_bullets_custom_data);
 		ClassDB::bind_method(D_METHOD("set_bullets_custom_data", "new_custom_data"), &MultiMeshBullets2D::set_bullets_custom_data);
 
+		// Time based functions
+		ClassDB::bind_method(D_METHOD("multimesh_attach_time_based_function", "time", "callable", "repeat"), &MultiMeshBullets2D::multimesh_attach_time_based_function, DEFVAL(false));
+		ClassDB::bind_method(D_METHOD("_do_attach_time_based_function", "time", "callable", "repeat", "cached_multimesh_bullets_unique_id"), &MultiMeshBullets2D::_do_attach_time_based_function);
+
+		ClassDB::bind_method(D_METHOD("multimesh_detach_time_based_function", "callable"), &MultiMeshBullets2D::multimesh_detach_time_based_function);
+		ClassDB::bind_method(D_METHOD("_do_detach_time_based_function", "callable"), &MultiMeshBullets2D::_do_detach_time_based_function);
+
+		ClassDB::bind_method(D_METHOD("multimesh_detach_all_time_based_functions"), &MultiMeshBullets2D::multimesh_detach_all_time_based_functions);
+		ClassDB::bind_method(D_METHOD("_do_detach_all_time_based_functions"), &MultiMeshBullets2D::_do_detach_all_time_based_functions);
+
+		ClassDB::bind_method(D_METHOD("_do_execute_stored_callable_safely", "_callback", "_cached_multimesh_bullets_unique_id", "multimesh_bullets_unique_id"), &MultiMeshBullets2D::_do_execute_stored_callable_safely);
+
 		ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "bullets_custom_data"), "set_bullets_custom_data", "get_bullets_custom_data");
 	};
 
@@ -643,6 +657,103 @@ private:
 		return !is_active; // Skip debugging for the multimesh if it's not active (meaning bullets have stopped moving so no need for the debugger to update transforms)
 	}
 
-	///
+public:
+	// This will change on spawn and on activation/re-use of the multimesh. By caching this value you can easily determine whether you are dealing with the same "instance" or whether you just re-used it from the pool, so it should become a "different" instance
+	uint64_t multimesh_bullets_unique_id = 0;
+
+	static uint64_t generate_unique_id() {
+		static std::atomic<uint64_t> counter{ 1 }; // 0 reserved for "invalid"
+		return counter.fetch_add(1, std::memory_order_relaxed);
+	}
+
+	// Timer logic
+	struct CustomTimer {
+		godot::Callable _callback;
+		double _current_time;
+		double _initial_time;
+		bool _repeating;
+		uint64_t _cached_multimesh_bullets_unique_id;
+
+		CustomTimer(const godot::Callable &callback, double initial_time, bool repeating, uint64_t _multimesh_bullets_unique_id) :
+				_callback(callback), _current_time(initial_time), _initial_time(initial_time), _repeating(repeating), _cached_multimesh_bullets_unique_id(_multimesh_bullets_unique_id) {};
+	};
+
+	void execute_stored_callable_safely(const Callable& _callback, uint64_t _cached_multimesh_bullets_unique_id, uint64_t multimesh_bullets_unique_id) {
+		call_deferred("_do_execute_stored_callable_safely", _callback, _cached_multimesh_bullets_unique_id, multimesh_bullets_unique_id); // call deffered for safety
+	}
+
+	void _do_execute_stored_callable_safely(const Callable& _callback, uint64_t _cached_multimesh_bullets_unique_id, uint64_t multimesh_bullets_unique_id) {
+		// Prevents executing callables if the multimesh was re-used from the object pool - very nasty bug
+		if (_cached_multimesh_bullets_unique_id != multimesh_bullets_unique_id) {
+			return;
+		}
+
+		_callback.call();
+	}
+
+	_ALWAYS_INLINE_ void multimesh_attach_time_based_function(double time, const Callable &callable, bool repeat = false) {
+		call_deferred("_do_attach_time_based_function", time, callable, repeat, multimesh_bullets_unique_id);
+	}
+
+	_ALWAYS_INLINE_ void _do_attach_time_based_function(double time, const Callable &callable, bool repeat, uint64_t cached_multimesh_bullets_unique_id) {
+		if (time <= 0.0f) {
+			UtilityFunctions::printerr("When calling multimesh_attach_time_based_function(), you need to provide a time value that is above 0");
+			return;
+		}
+
+		if (!callable.is_valid()) {
+			UtilityFunctions::printerr("Invalid callable was passed to multimesh_attach_time_based_function()");
+			return;
+		}
+		
+		if (cached_multimesh_bullets_unique_id != multimesh_bullets_unique_id) {
+			return;
+		}
+
+		multimesh_custom_timers.emplace_back(callable, time, repeat, cached_multimesh_bullets_unique_id);
+	}
+
+	_ALWAYS_INLINE_ void multimesh_detach_time_based_function(const Callable &callable) {
+		call_deferred("_do_detach_time_based_function", callable);
+	}
+
+	_ALWAYS_INLINE_ void _do_detach_time_based_function(const Callable &callable) {
+		for (auto it = multimesh_custom_timers.begin(); it != multimesh_custom_timers.end();) {
+			if (it->_callback == callable) {
+				it = multimesh_custom_timers.erase(it); // Order-preserving
+			} else {
+				++it;
+			}
+		}
+	}
+
+	_ALWAYS_INLINE_ void multimesh_detach_all_time_based_functions() {
+		call_deferred("_do_detach_all_time_based_functions");
+	}
+
+	_ALWAYS_INLINE_ void _do_detach_all_time_based_functions() {
+		multimesh_custom_timers.clear();
+	}
+
+	_ALWAYS_INLINE_ void run_multimesh_custom_timers(double delta) {
+		for (auto it = multimesh_custom_timers.begin(); it != multimesh_custom_timers.end();) {
+			it->_current_time -= delta;
+			if (it->_current_time <= 0.0f) {
+				execute_stored_callable_safely(it->_callback,it->_cached_multimesh_bullets_unique_id, multimesh_bullets_unique_id);
+
+				if (it->_repeating) {
+					it->_current_time = it->_initial_time;
+					++it;
+				} else {
+					it = multimesh_custom_timers.erase(it);
+				}
+			} else {
+				++it;
+			}
+		}
+	}
+
+	// Stores a bunch of timers for the multimesh that should execute
+	std::vector<CustomTimer> multimesh_custom_timers;
 };
 } //namespace BlastBullets2D

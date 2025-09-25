@@ -272,6 +272,13 @@ position = Vector2(-63, -1036)
 range_x = 300
 direction = -1
 
+[node name="StationaryTarget" parent="BulletHellRelated" instance=ExtResource("10_nkrfg")]
+position = Vector2(-466, -1343)
+speed = 0
+range_x = 300
+direction = -1
+switch_direction_when_reaching_range_x = false
+
 [connection signal="area_entered" from="BulletFactory2D" to="BulletFactory2D" method="_on_area_entered"]
 [connection signal="body_entered" from="BulletFactory2D" to="BulletFactory2D" method="_on_body_entered"]
 [connection signal="life_time_over" from="BulletFactory2D" to="BulletFactory2D" method="_on_life_time_over"]

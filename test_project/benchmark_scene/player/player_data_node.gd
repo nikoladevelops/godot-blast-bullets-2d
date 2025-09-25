@@ -260,7 +260,8 @@ func spawn_bullets(player_rotation:float)->void:
 
 func idk():
 	print("idk")
-	
+
+
 # Spawns MultiMeshDirectional bullets
 func spawn_multi_mesh_directional_bullets()->void:
 	if bullets_amount < 10:
@@ -269,26 +270,31 @@ func spawn_multi_mesh_directional_bullets()->void:
 		directional_bullets_data.transforms = BulletFactory2D.helper_generate_transforms_grid(bullets_amount, bullet_marker.get_global_transform(), rows_per_column, grid_alignment, col_offset, row_offset, rotate_grid_with_marker, random_local_rotation)
 	
 	var dir_bullets:DirectionalBullets2D = BENCHMARK_GLOBALS.FACTORY.spawn_controllable_directional_bullets(directional_bullets_data)
-	dir_bullets.homing_smoothing = 15 # Set from 0 to 20 or even bigger (but you might have issues with interpolation)
+	dir_bullets.homing_smoothing = 0 # Set from 0 to 20 or even bigger (but you might have issues with interpolation)
 	#dir_bullets.homing_update_interval = 0.02# Set an update timer - keep it low for smooth updates
-	dir_bullets.homing_take_control_of_texture_rotation = true
+	dir_bullets.homing_take_control_of_texture_rotation = false
 	
-	
-	dir_bullets.bullet_homing_push_back_node2d_target(0, get_parent())
-	
-	var test:Callable = func(): print("test")
-	
-	dir_bullets.all_bullets_attach_time_based_function(0.2, idk, true)
-	
-	dir_bullets.all_bullets_attach_time_based_function(1.1, func(): 
-		dir_bullets.all_bullets_detach_time_based_function(idk)
-		, false)
+	#dir_bullets.bullet_homing_push_back_node2d_target(0, get_parent())
+	#
+	#var test:Callable = func(): print("test")
+	#
+	#dir_bullets.all_bullets_attach_time_based_function(0.2, test, true)
+	#dir_bullets.all_bullets_attach_time_based_function(0.3, test, true)
+	#
+	#dir_bullets.all_bullets_attach_time_based_function(1.1, func(): 
+		#dir_bullets.all_bullets_detach_time_based_function(test)
+		#, false)
 	
 	
 	#dir_bullets.all_bullets_attach_time_based_function(1, func():
 		#for bullet in dir_bullets.get_amount_bullets():
 			#var push_success:bool = dir_bullets.bullet_homing_push_back_global_position_target(bullet, Vector2(0,0))
 		#,false)
+		#
+	dir_bullets.multimesh_attach_time_based_function(1, func():
+		for bullet in dir_bullets.get_amount_bullets():
+			var push_success:bool = dir_bullets.bullet_homing_push_back_node2d_target(bullet, BENCHMARK_GLOBALS.STATIONARY_TARGET)
+		,false)
 		#
 	#dir_bullets.all_bullets_attach_time_based_function(1.5, func():
 		#for bullet in dir_bullets.get_amount_bullets():
@@ -302,18 +308,17 @@ func spawn_multi_mesh_directional_bullets()->void:
 				#print("Bullet is not tracking any targets currently")
 			#,false)
 	#
-	#dir_bullets.all_bullets_attach_time_based_function(2, func():
+	#dir_bullets.all_bullets_attach_time_based_function(1.8, func():
 		#for bullet in dir_bullets.get_amount_bullets():
 			#var push_success:bool = dir_bullets.bullet_homing_push_back_node2d_target(bullet, get_parent())
 		#,false)
-	
+	#
 	# TODO things to be exposed from Multimesh bullets
 	#var amount_bullets:int = dir_bullets.get_amount_bullets()
 	
 	#dir_bullets.is_bullet_status_enabled(0)
 	
 	#dir_bullets.push_multimesh_to_object_pool()
-	
 	
 	# TODO
 	#dir_bullets.set_bullet_transform2d()

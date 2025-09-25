@@ -21,6 +21,7 @@ func _ready() -> void:
 	BENCHMARK_GLOBALS.UI = $UI
 	BENCHMARK_GLOBALS.PLAYER_HEALTH_BAR = $UI/AlwaysVisibleView/HealthBar
 	BENCHMARK_GLOBALS.ALL_GODOT_AREA2D_BULLETS_CONTAINER = $AllGodotArea2DBulletsContainer
+	BENCHMARK_GLOBALS.STATIONARY_TARGET = $BulletHellRelated/StationaryTarget
 	
 	# Make sure to set the actual debugger colors to the UI buttons
 	var initial_block_debugger_color:Color = BENCHMARK_GLOBALS.FACTORY.block_bullets_debugger_color

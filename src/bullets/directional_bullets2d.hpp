@@ -8,6 +8,7 @@
 #include "godot_cpp/core/class_db.hpp"
 #include "godot_cpp/core/defs.hpp"
 #include "godot_cpp/core/math.hpp"
+#include "godot_cpp/core/print_string.hpp"
 #include "godot_cpp/variant/callable.hpp"
 #include "godot_cpp/variant/typed_array.hpp"
 #include "godot_cpp/variant/utility_functions.hpp"
@@ -268,16 +269,6 @@ protected:
 
 		ClassDB::bind_method(D_METHOD("teleport_bullet", "bullet_index", "new_global_pos"), &DirectionalBullets2D::teleport_bullet);
 
-		// Time based functions
-		ClassDB::bind_method(D_METHOD("all_bullets_attach_time_based_function", "time", "callable", "repeat"), &DirectionalBullets2D::all_bullets_attach_time_based_function, DEFVAL(false));
-		ClassDB::bind_method(D_METHOD("_do_attach_time_based_function", "time", "callable", "repeat"), &DirectionalBullets2D::_do_attach_time_based_function);
-		
-		ClassDB::bind_method(D_METHOD("all_bullets_detach_time_based_function", "callable"), &DirectionalBullets2D::all_bullets_detach_time_based_function);
-		ClassDB::bind_method(D_METHOD("_do_detach_time_based_function", "callable"), &DirectionalBullets2D::_do_detach_time_based_function);
-
-		ClassDB::bind_method(D_METHOD("all_bullets_detach_all_time_based_functions"), &DirectionalBullets2D::all_bullets_detach_all_time_based_functions);
-		ClassDB::bind_method(D_METHOD("_do_detach_all_time_based_functions"), &DirectionalBullets2D::_do_detach_all_time_based_functions);
-
 		BIND_ENUM_CONSTANT(GlobalPositionTarget);
 		BIND_ENUM_CONSTANT(Node2DTarget);
 		BIND_ENUM_CONSTANT(NotHoming);
@@ -293,12 +284,12 @@ protected:
 public:
 	// Updates homing behavior for a bullet, adjusting its direction towards the target
 	_ALWAYS_INLINE_ void update_homing(int bullet_index, double delta, bool interval_reached) {
-		std::deque<HomingTarget> &queue_of_targets = all_bullet_homing_targets[bullet_index];
-
-		if (queue_of_targets.empty()) {
+		
+		if (!is_bullet_homing(bullet_index)) {
 			return;
 		}
-
+		
+		std::deque<HomingTarget> &queue_of_targets = all_bullet_homing_targets[bullet_index];
 		HomingTarget current_bullet_target = queue_of_targets.front();
 		Vector2 target_pos;
 
@@ -677,83 +668,10 @@ public:
 	}
 
 private:
-	// Timer logic
-	struct CustomTimer {
-		godot::Callable _callback;
-		double _current_time;
-		double _initial_time;
-		bool _repeating;
-
-		CustomTimer(const godot::Callable &callback, double initial_time, bool repeating) :
-				_callback(callback), _current_time(initial_time), _initial_time(initial_time), _repeating(repeating) {};
-	};
-
-	_ALWAYS_INLINE_ void all_bullets_attach_time_based_function(double time, const Callable &callable, bool repeat = false) {
-		call_deferred("_do_attach_time_based_function", time, callable, repeat);
-	}
-
-	_ALWAYS_INLINE_ void _do_attach_time_based_function(double time, const Callable &callable, bool repeat) {
-		if (time <= 0.0f) {
-			UtilityFunctions::printerr("When calling multimesh_attach_time_based_function(), you need to provide a time value that is above 0");
-			return;
-		}
-
-		if (!callable.is_valid()) {
-			UtilityFunctions::printerr("Invalid callable was passed to multimesh_attach_time_based_function()");
-			return;
-		}
-
-		multimesh_custom_timers.emplace_back(callable, time, repeat);
-	}
-
-	_ALWAYS_INLINE_ void all_bullets_detach_time_based_function(const Callable &callable) {
-		call_deferred("_do_detach_time_based_function", callable);
-	}
-
-	_ALWAYS_INLINE_ void _do_detach_time_based_function(const Callable &callable) {
-		for (auto it = multimesh_custom_timers.begin(); it != multimesh_custom_timers.end();) {
-			if (it->_callback == callable) {
-				it = multimesh_custom_timers.erase(it); // Order-preserving
-			} else {
-				++it;
-			}
-		}
-	}
-
-	_ALWAYS_INLINE_ void all_bullets_detach_all_time_based_functions() {
-		call_deferred("_do_detach_all_time_based_functions");
-	}
-
-	_ALWAYS_INLINE_ void _do_detach_all_time_based_functions() {
-		multimesh_custom_timers.clear();
-	}
-
-	_ALWAYS_INLINE_ void run_multimesh_custom_timers(double delta) {
-		for (auto it = multimesh_custom_timers.begin(); it != multimesh_custom_timers.end();) {
-			it->_current_time -= delta;
-			if (it->_current_time <= 0.0f) {
-				it->_callback.call_deferred(); // Always deferred, non-blocking
-				if (it->_repeating) {
-					it->_current_time = it->_initial_time;
-					++it;
-				} else {
-					it = multimesh_custom_timers.erase(it);
-				}
-			} else {
-				++it;
-			}
-		}
-	}
-
-	////
-
 	// Stores a queue of targets per each bullet - each bullet can track several targets going from one to the other etc..
 	std::vector<std::deque<HomingTarget>> all_bullet_homing_targets;
 	std::vector<Vector2> all_cached_homing_direction;
 	std::vector<Vector2> bullet_last_known_homing_target_pos;
-
-	// Stores a bunch of timers for the multimesh that should execute
-	std::vector<CustomTimer> multimesh_custom_timers;
 
 	double homing_update_interval = 0.0f;
 	double homing_update_timer = 0.0f;

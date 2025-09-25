@@ -2,6 +2,7 @@
 #include "../factory/bullet_factory2d.hpp"
 #include "../shared/multimesh_object_pool2d.hpp"
 
+#include "godot_cpp/core/print_string.hpp"
 #include "multimesh_bullets2d.hpp"
 #include <godot_cpp/classes/physics_server2d.hpp>
 #include <godot_cpp/classes/random_number_generator.hpp>
@@ -47,6 +48,7 @@ void MultiMeshBullets2D::spawn(const MultiMeshBulletsData2D &data, MultiMeshObje
 	bullet_factory = factory;
 	physics_server = PhysicsServer2D::get_singleton();
 
+	multimesh_bullets_unique_id = generate_unique_id();
 	amount_bullets = data.transforms.size(); // important, because some set_up methods use this
 
 	set_up_life_time_timer(data.max_life_time, data.max_life_time);
@@ -345,6 +347,8 @@ Ref<SaveDataMultiMeshBullets2D> MultiMeshBullets2D::save(const Ref<SaveDataMulti
 void MultiMeshBullets2D::load(const Ref<SaveDataMultiMeshBullets2D> &data_to_load, MultiMeshObjectPool *pool, BulletFactory2D *factory, Node *bullets_container) {
 	const SaveDataMultiMeshBullets2D &data = *data_to_load.ptr();
 
+	multimesh_bullets_unique_id = generate_unique_id();
+	
 	bullets_pool = pool;
 	bullet_factory = factory;
 
@@ -552,6 +556,9 @@ void MultiMeshBullets2D::set_physics_interpolation_related_data() {
 
 // Called when all bullets have been disabled
 void MultiMeshBullets2D::disable_multimesh() {
+	multimesh_bullets_unique_id = generate_unique_id();
+	multimesh_custom_timers.clear();
+	
 	is_active = false;
 	set_visible(false); // Hide the multimesh node itself
 

@@ -100,10 +100,8 @@ void DirectionalBullets2D::custom_additional_activate_logic(const MultiMeshBulle
 
 	adjust_direction_based_on_rotation = directional_data.adjust_direction_based_on_rotation;
 
-	// Homing behavior related //
-
-	multimesh_custom_timers.clear(); // Clear all old timers
-	all_bullet_homing_targets.clear(); // ensure all old homing targets are cleared
+	// ensure all old homing targets are cleared
+	all_bullet_homing_targets.clear();
 
 	std::fill(all_cached_homing_direction.begin(), all_cached_homing_direction.end(), Vector2(0, 0));
 	std::fill(bullet_last_known_homing_target_pos.begin(), bullet_last_known_homing_target_pos.end(), Vector2(0, 0));

@@ -40,3 +40,6 @@ static var ALL_ENEMY_SPAWNERS:Array[EnemySpawner]
 
 # Contains all spawned area2d bullets
 static var ALL_GODOT_AREA2D_BULLETS_CONTAINER:Node
+
+# A stationary target used for homing bullets tests
+static var STATIONARY_TARGET:Node2D
