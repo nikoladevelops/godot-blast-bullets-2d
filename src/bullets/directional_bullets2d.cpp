@@ -95,13 +95,17 @@ void DirectionalBullets2D::custom_additional_load_logic(const SaveDataMultiMeshB
 
 void DirectionalBullets2D::custom_additional_activate_logic(const MultiMeshBulletsData2D &data) {
 	const DirectionalBulletsData2D &directional_data = static_cast<const DirectionalBulletsData2D &>(data);
+	
+	multimesh_bullets_unique_id = generate_unique_id();
+	multimesh_custom_timers.clear();
 
 	set_up_movement_data(directional_data.all_bullet_speed_data);
 
 	adjust_direction_based_on_rotation = directional_data.adjust_direction_based_on_rotation;
-
-	// ensure all old homing targets are cleared
-	all_bullet_homing_targets.clear();
+	// Ensure all old homing targets are cleared. Do NOT clear the vector ever.
+	for (auto &queue : all_bullet_homing_targets) {
+		queue.clear();
+	}
 
 	std::fill(all_cached_homing_direction.begin(), all_cached_homing_direction.end(), Vector2(0, 0));
 	std::fill(bullet_last_known_homing_target_pos.begin(), bullet_last_known_homing_target_pos.end(), Vector2(0, 0));
