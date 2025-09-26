@@ -276,9 +276,9 @@ func spawn_multi_mesh_directional_bullets()->void:
 	
 	
 	dir_bullets.multimesh_attach_time_based_function(1, func():
-		#dir_bullets.teleport_bullet(0, Vector2(0,0))
+		dir_bullets.teleport_bullet(0, Vector2(0,0))
 		for bullet in dir_bullets.get_amount_bullets():
-			#dir_bullets.teleport_bullet(0, Vector2(0,0))
+			dir_bullets.teleport_bullet(0, Vector2(0,0))
 			dir_bullets.bullet_homing_push_back_global_position_target(bullet, BENCHMARK_GLOBALS.STATIONARY_TARGET.global_position)   #.bullet_homing_push_back_node2d_target(bullet, BENCHMARK_GLOBALS.STATIONARY_TARGET)
 	,false)
 	
@@ -291,7 +291,7 @@ func spawn_multi_mesh_directional_bullets()->void:
 			#dir_bullets.bullet_homing_pop_front_target(bullet)
 			# target1, global_pos, target2,        target2 is popped/ target1 is popped and we are left with global_pos
 	,false)
-	
+	#
 	dir_bullets.multimesh_attach_time_based_function(2, func():
 		#dir_bullets.teleport_bullet(0, Vector2(0,0))
 		for bullet in dir_bullets.get_amount_bullets():
