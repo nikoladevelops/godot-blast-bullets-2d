@@ -69,9 +69,8 @@ public:
 			}
 		}
 
-		// TODO this should not happen for global position homing targets since they don't track the change in position etc.. maybe a bool variable?
-		homing_update_timer -= delta;
-		const bool homing_update_interval_reached = homing_update_timer <= 0.0f;
+		homing_update_timer -= delta; // It's useless when tracking a global_position instead of a node2d, but it will ensure that teleporting works without any weird issues
+		const bool homing_update_interval_reached = homing_update_timer <= 0.0;
 
 		// For every bullet, modify it's properties and behavior
 		for (int i = 0; i < amount_bullets; ++i) {
@@ -147,25 +146,6 @@ public:
 				case HomingType::NotHoming: // this should not happen
 					break;
 			}
-
-			// Update direction and velocity towards the target
-			set_homing_bullet_direction_towards_target(bullet_index, target_pos);
-
-			real_t speed = all_cached_velocity[bullet_index].length();
-			if (speed <= 0.0) {
-				speed = all_cached_speed[bullet_index];
-			}
-			all_cached_velocity[bullet_index] = all_cached_homing_direction[bullet_index] * speed;
-
-			// Rotate bullet to face the target if enabled
-			if (homing_take_control_of_texture_rotation) {
-				real_t new_rotation = all_cached_homing_direction[bullet_index].angle();
-				real_t delta_rot = new_rotation + cache_texture_rotation_radians - all_cached_instance_transforms[bullet_index].get_rotation();
-				normalize_angle(delta_rot);
-				rotate_transform_locally(all_cached_instance_transforms[bullet_index], delta_rot);
-			}
-
-			bullet_last_known_homing_target_pos[bullet_index] = target_pos;
 		}
 
 		// Update interpolation data to prevent glitches
@@ -184,13 +164,13 @@ protected:
 
 	_ALWAYS_INLINE_ real_t update_rotation(int i, double delta) {
 		if (!is_rotation_active) {
-			return 0.0f;
+			return 0.0;
 		}
 		if (i >= (int)all_rotation_speed.size()) {
-			return 0.0f;
+			return 0.0;
 		}
 
-		real_t rotation_angle = 0.0f;
+		real_t rotation_angle = 0.0;
 		bool max_rotation_speed_reached = accelerate_bullet_rotation_speed(i, delta);
 		rotation_angle = all_rotation_speed[i] * delta;
 
@@ -235,9 +215,14 @@ protected:
 protected:
 	static void _bind_methods() {
 		ClassDB::bind_method(D_METHOD("bullet_homing_push_back_node2d_target", "bullet_index", "new_homing_target"), &DirectionalBullets2D::bullet_homing_push_back_node2d_target);
+		ClassDB::bind_method(D_METHOD("bullet_homing_push_front_node2d_target", "bullet_index", "new_homing_target"), &DirectionalBullets2D::bullet_homing_push_front_node2d_target);
+
 		ClassDB::bind_method(D_METHOD("bullet_homing_push_back_global_position_target", "bullet_index", "global_position"), &DirectionalBullets2D::bullet_homing_push_back_global_position_target);
+		ClassDB::bind_method(D_METHOD("bullet_homing_push_front_global_position_target", "bullet_index", "global_position"), &DirectionalBullets2D::bullet_homing_push_front_global_position_target);
+
 		ClassDB::bind_method(D_METHOD("bullet_clear_homing_targets", "bullet_index"), &DirectionalBullets2D::bullet_clear_homing_targets);
 
+		ClassDB::bind_method(D_METHOD("bullet_homing_pop_back_target", "bullet_index"), &DirectionalBullets2D::bullet_homing_pop_back_target);
 		ClassDB::bind_method(D_METHOD("bullet_homing_pop_front_target", "bullet_index"), &DirectionalBullets2D::bullet_homing_pop_front_target);
 		ClassDB::bind_method(D_METHOD("get_bullet_homing_targets_amount", "bullet_index"), &DirectionalBullets2D::get_bullet_homing_targets_amount);
 		ClassDB::bind_method(D_METHOD("is_bullet_homing", "bullet_index"), &DirectionalBullets2D::is_bullet_homing);
@@ -250,10 +235,13 @@ protected:
 		// Batch methods
 		ClassDB::bind_method(D_METHOD("all_bullets_clear_homing_targets", "bullet_index_start", "bullet_index_end_inclusive"), &DirectionalBullets2D::all_bullets_clear_homing_targets, DEFVAL(0), DEFVAL(-1));
 		ClassDB::bind_method(D_METHOD("all_bullets_push_back_homing_target", "node_or_global_position", "bullet_index_start", "bullet_index_end_inclusive"), &DirectionalBullets2D::all_bullets_push_back_homing_target, DEFVAL(0), DEFVAL(-1));
-		ClassDB::bind_method(D_METHOD("all_bullets_replace_homing_targets_with_new_target", "node_or_global_position", "bullet_index_start", "bullet_index_end_inclusive"), &DirectionalBullets2D::all_bullets_replace_homing_targets_with_new_target, DEFVAL(0), DEFVAL(-1));
+		ClassDB::bind_method(D_METHOD("all_bullets_push_front_homing_target", "node_or_global_position", "bullet_index_start", "bullet_index_end_inclusive"), &DirectionalBullets2D::all_bullets_push_front_homing_target, DEFVAL(0), DEFVAL(-1));
+		
 		ClassDB::bind_method(D_METHOD("all_bullets_push_back_homing_targets_array", "node2ds_or_global_positions_array", "bullet_index_start", "bullet_index_end_inclusive"), &DirectionalBullets2D::all_bullets_push_back_homing_targets_array, DEFVAL(0), DEFVAL(-1));
+		ClassDB::bind_method(D_METHOD("all_bullets_push_front_homing_targets_array", "node2ds_or_global_positions_array", "bullet_index_start", "bullet_index_end_inclusive"), &DirectionalBullets2D::all_bullets_push_front_homing_targets_array, DEFVAL(0), DEFVAL(-1));
+		
+		ClassDB::bind_method(D_METHOD("all_bullets_replace_homing_targets_with_new_target", "node_or_global_position", "bullet_index_start", "bullet_index_end_inclusive"), &DirectionalBullets2D::all_bullets_replace_homing_targets_with_new_target, DEFVAL(0), DEFVAL(-1));
 		ClassDB::bind_method(D_METHOD("all_bullets_replace_homing_targets_with_new_target_array", "node2ds_or_global_positions_array", "bullet_index_start", "bullet_index_end_inclusive"), &DirectionalBullets2D::all_bullets_replace_homing_targets_with_new_target_array, DEFVAL(0), DEFVAL(-1));
-
 
 		ClassDB::bind_method(D_METHOD("get_homing_smoothing"), &DirectionalBullets2D::get_homing_smoothing);
 		ClassDB::bind_method(D_METHOD("set_homing_smoothing", "value"), &DirectionalBullets2D::set_homing_smoothing);
@@ -282,18 +270,67 @@ protected:
 	virtual void custom_additional_activate_logic(const MultiMeshBulletsData2D &data) override final;
 
 public:
-	// Updates homing behavior for a bullet, adjusting its direction towards the target
+	_ALWAYS_INLINE_ void apply_homing_physics(int bullet_index, double delta) {
+		if (bullet_index < 0 || bullet_index >= amount_bullets) {
+			return;
+		}
+
+		Vector2 &velo = all_cached_velocity[bullet_index];
+		real_t speed = velo.length();
+		if (speed <= 0.0) {
+			return;
+		}
+
+		Vector2 current_dir = velo.normalized();
+		const Vector2 &target_dir = all_cached_homing_direction[bullet_index];
+		if (target_dir.length_squared() <= 0.0) {
+			return;
+		}
+
+		if (homing_smoothing <= 0.0) {
+			velo = target_dir * speed;
+			all_cached_direction[bullet_index] = target_dir;
+
+			if (homing_take_control_of_texture_rotation) {
+				real_t new_rotation = target_dir.angle();
+				real_t delta_rot = new_rotation + cache_texture_rotation_radians - all_cached_instance_transforms[bullet_index].get_rotation();
+				normalize_angle(delta_rot);
+				rotate_transform_locally(all_cached_instance_transforms[bullet_index], delta_rot);
+			}
+		} else {
+			real_t cross = current_dir.x * target_dir.y - current_dir.y * target_dir.x;
+			real_t dot = current_dir.dot(target_dir);
+			real_t angle_diff = Math::atan2(cross, dot);
+
+			real_t max_turn = homing_smoothing * static_cast<real_t>(delta);
+			if (max_turn < 0.0) {
+				max_turn = 0.0;
+			}
+
+			real_t turn = Math::clamp(angle_diff, -max_turn, max_turn);
+			Vector2 new_dir = current_dir.rotated(turn).normalized();
+
+			velo = new_dir * speed;
+			all_cached_direction[bullet_index] = new_dir;
+
+			if (homing_take_control_of_texture_rotation) {
+				real_t desired_rot = new_dir.angle();
+				real_t delta_rot = desired_rot + cache_texture_rotation_radians - all_cached_instance_transforms[bullet_index].get_rotation();
+				normalize_angle(delta_rot);
+				rotate_transform_locally(all_cached_instance_transforms[bullet_index], delta_rot);
+			}
+		}
+	}
+
 	_ALWAYS_INLINE_ void update_homing(int bullet_index, double delta, bool interval_reached) {
-		
 		if (!is_bullet_homing(bullet_index)) {
 			return;
 		}
-		
+
 		std::deque<HomingTarget> &queue_of_targets = all_bullet_homing_targets[bullet_index];
 		HomingTarget current_bullet_target = queue_of_targets.front();
 		Vector2 target_pos;
 
-		// Determine target position based on type
 		switch (current_bullet_target.type) {
 			case HomingType::GlobalPositionTarget: {
 				target_pos = current_bullet_target.global_position_target;
@@ -309,68 +346,23 @@ public:
 					return;
 				}
 				target_pos = homing_target->get_global_position();
-
-				
 				break;
 			}
 			case HomingType::NotHoming:
-			return;
+				return;
 		}
 
 		// Update direction towards target when interval is reached
 		if (interval_reached) {
 			set_homing_bullet_direction_towards_target(bullet_index, target_pos);
-			bullet_last_known_homing_target_pos[bullet_index] = target_pos;
 		}
 
-		Vector2 &velo = all_cached_velocity[bullet_index];
-		real_t speed = velo.length();
-		if (speed <= 0.0) {
-			return;
-		}
-
-		Vector2 current_dir = velo.normalized();
-		const Vector2 &target_dir = all_cached_homing_direction[bullet_index];
-		if (target_dir.length_squared() <= 0.0) {
-			return;
-		}
-
-		// Apply smoothing or instant rotation
-		if (homing_smoothing <= 0.0) {
-			velo = target_dir * speed;
-			all_cached_direction[bullet_index] = target_dir;
-
-			if (homing_take_control_of_texture_rotation) {
-				real_t new_rotation = target_dir.angle();
-				real_t delta_rot = new_rotation + cache_texture_rotation_radians - all_cached_instance_transforms[bullet_index].get_rotation();
-				normalize_angle(delta_rot);
-				rotate_transform_locally(all_cached_instance_transforms[bullet_index], delta_rot);
-			}
-		} else {
-			real_t angle_diff = current_dir.angle_to(target_dir);
-			real_t max_turn = homing_smoothing * static_cast<real_t>(delta);
-			if (max_turn < 0.0) {
-				max_turn = 0.0;
-			}
-
-			real_t turn = Math::clamp(angle_diff, -max_turn, max_turn);
-			Vector2 new_dir = current_dir.rotated(turn);
-
-			velo = new_dir * speed;
-			all_cached_direction[bullet_index] = new_dir;
-
-			if (homing_take_control_of_texture_rotation) {
-				real_t desired_rot = new_dir.angle();
-				real_t delta_rot = desired_rot + cache_texture_rotation_radians - all_cached_instance_transforms[bullet_index].get_rotation();
-				normalize_angle(delta_rot);
-				rotate_transform_locally(all_cached_instance_transforms[bullet_index], delta_rot);
-			}
-		}
+		apply_homing_physics(bullet_index, delta);
 	}
 
 	_ALWAYS_INLINE_ bool bullet_homing_push_back_node2d_target(int bullet_index, Node2D *new_homing_target) {
 		if (bullet_index < 0 || bullet_index >= amount_bullets) {
-			UtilityFunctions::printerr("Bullet index out of bounds in push_homing_node2d_target");
+			UtilityFunctions::printerr("Bullet index out of bounds in bullet_homing_push_back_node2d_target");
 			return false;
 		}
 
@@ -385,34 +377,34 @@ public:
 
 		uint64_t homing_target_instance_id = new_homing_target->get_instance_id();
 
-		const Vector2 target_pos = new_homing_target->get_global_position();
-		set_homing_bullet_direction_towards_target(bullet_index, target_pos);
-
-		if (homing_take_control_of_texture_rotation) {
-			real_t new_rotation = all_cached_homing_direction[bullet_index].angle();
-			real_t delta_rot = new_rotation + cache_texture_rotation_radians - all_cached_instance_transforms[bullet_index].get_rotation();
-			normalize_angle(delta_rot);
-			rotate_transform_locally(all_cached_instance_transforms[bullet_index], delta_rot);
-		}
-
-		if (bullet_factory->use_physics_interpolation) {
-			all_previous_instance_transf[bullet_index] = all_cached_instance_transforms[bullet_index];
-
-			if (is_bullet_attachment_provided) {
-				all_previous_attachment_transf[bullet_index] = attachment_transforms[bullet_index];
-			}
-		}
-
 		// Create a node2d homing target and push it at the end of the queue
-		HomingTarget node2d_target_data(new_homing_target, homing_target_instance_id);
-		all_bullet_homing_targets[bullet_index].push_back(node2d_target_data);
+		all_bullet_homing_targets[bullet_index].emplace_back(new_homing_target, homing_target_instance_id);
 
+		return true;
+	}
+
+	_ALWAYS_INLINE_ bool bullet_homing_push_front_node2d_target(int bullet_index, Node2D *new_homing_target) {
+		if (bullet_index < 0 || bullet_index >= amount_bullets) {
+			UtilityFunctions::printerr("Bullet index out of bounds in bullet_homing_push_front_node2d_target");
+			return false;
+		}
+		if (!bullets_enabled_status[bullet_index]) {
+			return false;
+		}
+		if (new_homing_target == nullptr) {
+			return false;
+		}
+
+		uint64_t homing_target_instance_id = new_homing_target->get_instance_id();
+
+		// Create a node2d homing target and push it to the front of the queue
+		all_bullet_homing_targets[bullet_index].emplace_front(new_homing_target, homing_target_instance_id);
 		return true;
 	}
 
 	_ALWAYS_INLINE_ bool bullet_homing_push_back_global_position_target(int bullet_index, const Vector2 &global_position) {
 		if (bullet_index < 0 || bullet_index >= amount_bullets) {
-			UtilityFunctions::printerr("Bullet index out of bounds in bullet_homing_push_global_position_target");
+			UtilityFunctions::printerr("Bullet index out of bounds in bullet_homing_push_back_global_position_target");
 			return false;
 		}
 
@@ -420,24 +412,22 @@ public:
 			return false;
 		}
 
-		set_homing_bullet_direction_towards_target(bullet_index, global_position);
+		all_bullet_homing_targets[bullet_index].emplace_back(global_position);
 
-		if (homing_take_control_of_texture_rotation) {
-			real_t new_rotation = all_cached_homing_direction[bullet_index].angle();
-			real_t delta_rot = new_rotation + cache_texture_rotation_radians - all_cached_instance_transforms[bullet_index].get_rotation();
-			normalize_angle(delta_rot);
-			rotate_transform_locally(all_cached_instance_transforms[bullet_index], delta_rot);
+		return true;
+	}
+
+	_ALWAYS_INLINE_ bool bullet_homing_push_front_global_position_target(int bullet_index, const Vector2 &global_position) {
+		if (bullet_index < 0 || bullet_index >= amount_bullets) {
+			UtilityFunctions::printerr("Bullet index out of bounds in bullet_homing_push_front_global_position_target");
+			return false;
 		}
 
-		if (bullet_factory->use_physics_interpolation) {
-			all_previous_instance_transf[bullet_index] = all_cached_instance_transforms[bullet_index];
-			if (is_bullet_attachment_provided) {
-				all_previous_attachment_transf[bullet_index] = attachment_transforms[bullet_index];
-			}
+		if (!bullets_enabled_status[bullet_index]) {
+			return false;
 		}
 
-		all_bullet_homing_targets[bullet_index].push_back(HomingTarget(global_position));
-		bullet_last_known_homing_target_pos[bullet_index] = global_position;
+		all_bullet_homing_targets[bullet_index].emplace_front(global_position);
 
 		return true;
 	}
@@ -449,6 +439,28 @@ public:
 
 		HomingTarget curr_target = all_bullet_homing_targets[bullet_index].front();
 		all_bullet_homing_targets[bullet_index].pop_front();
+
+		switch (curr_target.type) {
+			case GlobalPositionTarget:
+				return curr_target.global_position_target;
+			case Node2DTarget:
+				if (!UtilityFunctions::is_instance_id_valid(curr_target.node2d_target_data.cached_valid_instance_id)) {
+					return nullptr;
+				}
+				return curr_target.node2d_target_data.target;
+			case NotHoming:
+				return nullptr;
+		}
+		return nullptr;
+	}
+
+	_ALWAYS_INLINE_ Variant bullet_homing_pop_back_target(int bullet_index) {
+		if (!is_bullet_homing(bullet_index)) {
+			return nullptr;
+		}
+
+		HomingTarget curr_target = all_bullet_homing_targets[bullet_index].front();
+		all_bullet_homing_targets[bullet_index].pop_back();
 
 		switch (curr_target.type) {
 			case GlobalPositionTarget:
@@ -601,7 +613,7 @@ public:
 
 				bullet_homing_push_back_node2d_target(i, node);
 			}
-		} else { // Otherwise if it turns out to be something else, it's probably a Vector2 (hopefully the user doesn't pass something he shouldn't)
+		} else if (node_or_global_position.get_type() == Variant::VECTOR2) { // If it's a Vector2
 			Vector2 global_pos = node_or_global_position;
 
 			HomingTarget target(global_pos);
@@ -618,6 +630,39 @@ public:
 		}
 	}
 
+	_ALWAYS_INLINE_ void all_bullets_push_front_homing_target(const Variant &node_or_global_position, int bullet_index_start = 0, int bullet_index_end_inclusive = -1) {
+		ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_push_front_homing_target");
+
+		// Check if its actually a node2d homing target
+		Node2D *node = Object::cast_to<Node2D>(node_or_global_position);
+
+		// If it is a node2d
+		if (node != nullptr) {
+			for (int i = bullet_index_start; i <= bullet_index_end_inclusive; ++i) {
+				// If the bullet is disabled there is no point in editing its target queue so skip it and go to the next
+				if (!bullets_enabled_status[i]) {
+					continue;
+				}
+
+				bullet_homing_push_front_node2d_target(i, node);
+			}
+		} else if (node_or_global_position.get_type() == Variant::VECTOR2) { // If it's a Vector2
+			Vector2 global_pos = node_or_global_position;
+
+			HomingTarget target(global_pos);
+
+			for (int i = bullet_index_start; i <= bullet_index_end_inclusive; ++i) {
+				// If the bullet is disabled there is no point in editing its target queue so skip it and go to the next bullet
+				if (!bullets_enabled_status[i]) {
+					continue;
+				}
+
+				// For the current queue of a particular active bullet, just push the new target
+				bullet_homing_push_front_global_position_target(i, global_pos);
+			}
+		}
+	}
+
 	_ALWAYS_INLINE_ void all_bullets_push_back_homing_targets_array(const Array &node2ds_or_global_positions_array, int bullet_index_start = 0, int bullet_index_end_inclusive = -1) {
 		ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_push_back_homing_targets_array");
 
@@ -625,6 +670,16 @@ public:
 		for (const Variant &curr_node_or_global_pos : node2ds_or_global_positions_array) {
 			// Push it in each queue of each bullet (in the valid range of course)
 			all_bullets_push_back_homing_target(curr_node_or_global_pos, bullet_index_start, bullet_index_end_inclusive);
+		}
+	}
+
+	_ALWAYS_INLINE_ void all_bullets_push_front_homing_targets_array(const Array &node2ds_or_global_positions_array, int bullet_index_start = 0, int bullet_index_end_inclusive = -1) {
+		ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_push_front_homing_targets_array");
+
+		// For every target that was given
+		for (const Variant &curr_node_or_global_pos : node2ds_or_global_positions_array) {
+			// Push it in each queue of each bullet (in the valid range of course)
+			all_bullets_push_front_homing_target(curr_node_or_global_pos, bullet_index_start, bullet_index_end_inclusive);
 		}
 	}
 
@@ -671,12 +726,11 @@ private:
 	// Stores a queue of targets per each bullet - each bullet can track several targets going from one to the other etc..
 	std::vector<std::deque<HomingTarget>> all_bullet_homing_targets;
 	std::vector<Vector2> all_cached_homing_direction;
-	std::vector<Vector2> bullet_last_known_homing_target_pos;
 
-	double homing_update_interval = 0.0f;
-	double homing_update_timer = 0.0f;
+	double homing_update_interval = 0.0;
+	double homing_update_timer = 0.0;
 
-	real_t homing_smoothing = 0.0f;
+	real_t homing_smoothing = 0.0;
 	bool homing_take_control_of_texture_rotation = false;
 
 	_ALWAYS_INLINE_ void set_homing_bullet_direction_towards_target(int bullet_index, const Vector2 &target_global_position) {
@@ -685,10 +739,9 @@ private:
 		}
 
 		Vector2 diff = target_global_position - all_cached_instance_origin[bullet_index];
-		if (diff.length_squared() > 0.0f) {
+		if (diff.length_squared() > 0.0) {
 			all_cached_homing_direction[bullet_index] = diff.normalized();
 		}
-		bullet_last_known_homing_target_pos[bullet_index] = target_global_position;
 	}
 
 	_ALWAYS_INLINE_ bool is_bullet_homing_target_valid(const Node *const target, const uint64_t cached_instance_id) {
