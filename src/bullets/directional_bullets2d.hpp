@@ -103,8 +103,6 @@ public:
 			return;
 		}
 
-		
-
 		if (!bullets_enabled_status[bullet_index]) {
 			return;
 		}
@@ -204,6 +202,10 @@ protected:
 		ClassDB::bind_method(D_METHOD("is_bullet_homing_node2d_target_valid", "bullet_index"), &DirectionalBullets2D::is_bullet_homing_node2d_target_valid);
 		ClassDB::bind_method(D_METHOD("get_bullet_current_homing_target", "bullet_index"), &DirectionalBullets2D::get_bullet_current_homing_target);
 
+		ClassDB::bind_method(D_METHOD("get_are_bullets_homing_towards_mouse_global_position"), &DirectionalBullets2D::get_are_bullets_homing_towards_mouse_global_position);
+		ClassDB::bind_method(D_METHOD("set_are_bullets_homing_towards_mouse_global_position", "value"), &DirectionalBullets2D::set_are_bullets_homing_towards_mouse_global_position);
+		ADD_PROPERTY(PropertyInfo(Variant::BOOL, "are_bullets_homing_towards_mouse_global_position"), "set_are_bullets_homing_towards_mouse_global_position", "get_are_bullets_homing_towards_mouse_global_position");
+
 		// Batch methods
 		ClassDB::bind_method(D_METHOD("all_bullets_clear_homing_targets", "bullet_index_start", "bullet_index_end_inclusive"), &DirectionalBullets2D::all_bullets_clear_homing_targets, DEFVAL(0), DEFVAL(-1));
 		ClassDB::bind_method(D_METHOD("all_bullets_push_back_homing_target", "node_or_global_position", "bullet_index_start", "bullet_index_end_inclusive"), &DirectionalBullets2D::all_bullets_push_back_homing_target, DEFVAL(0), DEFVAL(-1));
@@ -291,40 +293,43 @@ public:
 	}
 
 	_ALWAYS_INLINE_ void update_homing(int bullet_index, double delta, bool interval_reached) {
-		if (!is_bullet_homing(bullet_index)) {
+		if (!is_bullet_homing(bullet_index) && !are_bullets_homing_towards_mouse_global_position) {
 			return;
 		}
 
-		std::deque<HomingTarget> &queue_of_targets = all_bullet_homing_targets[bullet_index];
-		HomingTarget current_bullet_target = queue_of_targets.front();
-		Vector2 target_pos;
+		// If we are not tracking the mouse and the interval was reached then handle normal homing behavior
+		if (!are_bullets_homing_towards_mouse_global_position && interval_reached) {
+			Vector2 target_pos;
+			std::deque<HomingTarget> &queue_of_targets = all_bullet_homing_targets[bullet_index];
+			HomingTarget current_bullet_target = queue_of_targets.front();
 
-		switch (current_bullet_target.type) {
-			case HomingType::GlobalPositionTarget: {
-				target_pos = current_bullet_target.global_position_target;
-				break;
-			}
-			case HomingType::Node2DTarget: {
-				Node2DTargetData &target_data = current_bullet_target.node2d_target_data;
-				Node2D *homing_target = target_data.target;
-				uint64_t cached_valid_instance_id = target_data.cached_valid_instance_id;
-
-				if (!is_bullet_homing_target_valid(homing_target, cached_valid_instance_id)) {
-					queue_of_targets.pop_front();
-					return;
+			switch (current_bullet_target.type) {
+				case HomingType::GlobalPositionTarget: {
+					target_pos = current_bullet_target.global_position_target;
+					break;
 				}
-				target_pos = homing_target->get_global_position();
-				break;
+				case HomingType::Node2DTarget: {
+					Node2DTargetData &target_data = current_bullet_target.node2d_target_data;
+					Node2D *homing_target = target_data.target;
+					uint64_t cached_valid_instance_id = target_data.cached_valid_instance_id;
+
+					if (!is_bullet_homing_target_valid(homing_target, cached_valid_instance_id)) {
+						queue_of_targets.pop_front();
+						return;
+					}
+					target_pos = homing_target->get_global_position();
+					break;
+				}
+				case HomingType::NotHoming:
+					return;
 			}
-			case HomingType::NotHoming:
-				return;
-		}
 
-		// Update direction towards target when interval is reached
-		if (interval_reached) {
 			set_homing_bullet_direction_towards_target(bullet_index, target_pos);
+		} else if (are_bullets_homing_towards_mouse_global_position && interval_reached) { // If we are indeed tracking the mouse, then this ovverides the normal homing behavior
+			set_homing_bullet_direction_towards_target(bullet_index, get_global_mouse_position());
 		}
 
+		// We apply any sort of rotation/smoothing no matter what
 		apply_homing_physics(bullet_index, delta);
 	}
 
@@ -490,7 +495,7 @@ public:
 		}
 	}
 
-	_ALWAYS_INLINE_ bool validate_bullet_index(int bullet_index, const String& function_name) const{
+	_ALWAYS_INLINE_ bool validate_bullet_index(int bullet_index, const String &function_name) const {
 		if (bullet_index >= amount_bullets || bullet_index < 0) {
 			UtilityFunctions::printerr("Invalid bullet index was entered when calling", function_name);
 			return false;
@@ -632,7 +637,7 @@ public:
 				// For the current queue of a particular active bullet, just push the new target
 				bullet_homing_push_front_global_position_target(i, global_pos);
 			}
-		}else {
+		} else {
 			UtilityFunctions::printerr("Invalid homing target type passed to all_bullets_push_front_homing_target (expected Node2D or Vector2)");
 		}
 	}
@@ -695,6 +700,12 @@ public:
 	void set_homing_take_control_of_texture_rotation(bool value) {
 		homing_take_control_of_texture_rotation = value;
 	}
+	bool get_are_bullets_homing_towards_mouse_global_position() const {
+		return are_bullets_homing_towards_mouse_global_position;
+	}
+	void set_are_bullets_homing_towards_mouse_global_position(bool value) {
+		are_bullets_homing_towards_mouse_global_position = value;
+	}
 
 private:
 	// Stores a queue of targets per each bullet - each bullet can track several targets going from one to the other etc..
@@ -706,6 +717,8 @@ private:
 
 	real_t homing_smoothing = 0.0;
 	bool homing_take_control_of_texture_rotation = false;
+
+	bool are_bullets_homing_towards_mouse_global_position = false;
 
 	_ALWAYS_INLINE_ void set_homing_bullet_direction_towards_target(int bullet_index, const Vector2 &target_global_position) {
 		if (bullet_index < 0 || bullet_index >= amount_bullets) {

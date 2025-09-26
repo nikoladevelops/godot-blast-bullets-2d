@@ -275,6 +275,8 @@ func spawn_multi_mesh_directional_bullets()->void:
 	dir_bullets.homing_take_control_of_texture_rotation = true
 	
 	
+	#dir_bullets.are_bullets_homing_towards_mouse_global_position = true
+	
 	dir_bullets.multimesh_attach_time_based_function(1, func():
 		dir_bullets.teleport_bullet(0, Vector2(0,0))
 		for bullet in dir_bullets.get_amount_bullets():
