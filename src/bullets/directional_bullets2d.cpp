@@ -68,7 +68,6 @@ void DirectionalBullets2D::custom_additional_spawn_logic(const MultiMeshBulletsD
 	// Each bullet can have its own homing target
 	all_bullet_homing_targets.resize(amount_bullets); // Create a vector that contains an empty queue for each bullet index
 	all_cached_homing_direction.resize(amount_bullets, Vector2(0, 0));
-
 	//
 }
 
@@ -93,7 +92,7 @@ void DirectionalBullets2D::custom_additional_load_logic(const SaveDataMultiMeshB
 
 void DirectionalBullets2D::custom_additional_activate_logic(const MultiMeshBulletsData2D &data) {
 	const DirectionalBulletsData2D &directional_data = static_cast<const DirectionalBulletsData2D &>(data);
-	
+
 	multimesh_bullets_unique_id = generate_unique_id();
 	multimesh_custom_timers.clear();
 
