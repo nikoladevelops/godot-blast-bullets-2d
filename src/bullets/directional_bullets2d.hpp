@@ -59,6 +59,12 @@ public:
 				type(Node2DTarget), node2d_target_data(node, id) {}
 	};
 
+	enum HomingBoundaryBehavior {
+		StopAtBoundary = 0,
+		OrbitLeft,
+		OrbitRight
+	};
+
 protected:
 	// Configuration flags
 	bool adjust_direction_based_on_rotation = false;
@@ -70,6 +76,8 @@ protected:
 	double homing_update_timer = 0.0;
 	real_t homing_smoothing = 0.0;
 	real_t homing_distance_radius_away_from_target = 0.0f;
+
+	HomingBoundaryBehavior homing_distance_radius_away_from_target_boundary_behavior = StopAtBoundary;
 
 	// Bullet state data
 	std::vector<std::deque<HomingTarget>> all_bullet_homing_targets;
@@ -205,104 +213,85 @@ protected:
 
 	// Applies homing physics to move bullet toward the desired position
 	_ALWAYS_INLINE_ void apply_homing_physics(int bullet_index, real_t delta) {
-		if (!validate_bullet_index(bullet_index, "apply_homing_physics")) {
+		if (!validate_bullet_index(bullet_index, "apply_homing_physics"))
 			return;
-		}
 
-		// get current bullet state
-		Vector2 bullet_pos = all_cached_instance_origin[bullet_index];
-		Vector2 homing_dir = all_cached_homing_direction[bullet_index];
+		Vector2 &bullet_pos = all_cached_instance_origin[bullet_index];
+		Vector2 &homing_dir = all_cached_homing_direction[bullet_index];
+		Vector2 &velocity = all_cached_velocity[bullet_index];
+		Vector2 &direction = all_cached_direction[bullet_index];
 		real_t speed = all_cached_speed[bullet_index];
 
-		// nothing to do if homing direction is zero or speed is zero
 		if (homing_dir == Vector2(0, 0) || speed <= 0.0f) {
+			bullet_pos += velocity * delta;
 			return;
 		}
 
-		// determine the current true desired point (same logic as the setter)
 		Vector2 target_pos;
 		if (!get_target_position(bullet_index, target_pos)) {
-			// no valid target: keep current behavior (do not change)
-			all_cached_instance_origin[bullet_index] += all_cached_velocity[bullet_index] * delta;
+			bullet_pos += velocity * delta;
 			return;
 		}
 
 		Vector2 to_target = target_pos - bullet_pos;
-		real_t to_target_len = to_target.length();
-		// if target and bullet coincide, nothing sensible to do
-		if (to_target_len <= 0.0f) {
+		real_t dist_to_target = to_target.length();
+		if (dist_to_target <= 0.0f)
 			return;
-		}
-		Vector2 to_target_dir = to_target / to_target_len;
 
-		// desired point on the circle (if radius==0 this is target_pos)
+		Vector2 to_target_dir = to_target / dist_to_target;
 		Vector2 desired_pos = target_pos;
+
+		// Maintain radius if configured
 		if (homing_distance_radius_away_from_target > 0.0f) {
-			desired_pos = target_pos - to_target_dir * homing_distance_radius_away_from_target;
+			desired_pos -= to_target_dir * homing_distance_radius_away_from_target;
 		}
 
-		// how far is bullet from desired_pos
 		Vector2 to_desired = desired_pos - bullet_pos;
 		real_t rem_dist = to_desired.length();
+		Vector2 target_dir = (rem_dist > 0.0f) ? to_desired / rem_dist : Vector2(0, 0);
 
-		// If already essentially at desired point, clear homing and do nothing
-		const real_t EPS = 1e-6;
-		if (rem_dist <= EPS) {
-			all_cached_homing_direction[bullet_index] = Vector2(0, 0);
-			all_cached_velocity[bullet_index] = Vector2(0, 0);
-			return;
-		}
-
-		// maximum movement this frame
 		real_t max_move = speed * delta;
 
-		// If the remaining distance is less than can move this frame, move exactly to desired_pos (no teleport),
-		// then clear homing so we don't oscillate. This moves by a small remainder only.
+		// If within reach this frame
 		if (rem_dist <= max_move) {
-			all_cached_instance_origin[bullet_index] += to_desired; // move exactly remaining distance
-			all_cached_velocity[bullet_index] = Vector2(0, 0); // stop (change this if you want inertia)
-			all_cached_direction[bullet_index] = Vector2(0, 0);
-			all_cached_homing_direction[bullet_index] = Vector2(0, 0);
+			bullet_pos = desired_pos;
+
+			switch (homing_distance_radius_away_from_target_boundary_behavior) {
+				case StopAtBoundary:
+					homing_dir = Vector2(0, 0);
+					velocity = Vector2(0, 0);
+					direction = Vector2(0, 0);
+					break;
+				case OrbitLeft:
+				case OrbitRight: {
+					homing_dir = Vector2(0, 0);
+					real_t angle = (homing_distance_radius_away_from_target_boundary_behavior == OrbitLeft) ? +Math_PI / 2 : -Math_PI / 2;
+					Vector2 tangent = to_target_dir.rotated(angle).normalized();
+					velocity = tangent * speed;
+					direction = tangent;
+					break;
+				}
+			}
 			return;
 		}
 
-		// Otherwise we still have to move toward desired_pos this frame.
-		// Compute the target (unit) direction toward desired_pos.
-		Vector2 target_dir = to_desired / rem_dist;
-
-		// If no smoothing, just set velocity directly toward target_dir
+		// Normal homing motion
 		if (homing_smoothing <= 0.0f) {
-			all_cached_velocity[bullet_index] = target_dir * speed;
-			all_cached_direction[bullet_index] = target_dir;
-			all_cached_instance_origin[bullet_index] += all_cached_velocity[bullet_index] * delta;
-			return;
-		}
-
-		// Smoothing: rotate current velocity direction toward target_dir by at most max_turn
-		Vector2 current_vel = all_cached_velocity[bullet_index];
-		// if current vel is zero, initialize it pointing at target_dir
-		Vector2 current_dir;
-		if (current_vel.length_squared() <= 0.0f) {
-			current_dir = target_dir;
+			velocity = target_dir * speed;
+			direction = target_dir;
 		} else {
-			current_dir = current_vel.normalized();
+			Vector2 current_dir = (velocity.length_squared() <= 0.0f) ? target_dir : velocity.normalized();
+			real_t max_turn = homing_smoothing * delta;
+			real_t cross = current_dir.x * target_dir.y - current_dir.y * target_dir.x;
+			real_t dot = current_dir.dot(target_dir);
+			real_t angle_diff = Math::atan2(cross, dot);
+			real_t turn = Math::clamp(angle_diff, -max_turn, max_turn);
+			current_dir = current_dir.rotated(turn).normalized();
+			velocity = current_dir * speed;
+			direction = current_dir;
 		}
 
-		real_t max_turn = homing_smoothing * delta;
-		if (max_turn < 0.0f) {
-			max_turn = 0.0f;
-		}
-
-		real_t cross = current_dir.x * target_dir.y - current_dir.y * target_dir.x;
-		real_t dot = current_dir.dot(target_dir);
-		real_t angle_diff = Math::atan2(cross, dot);
-		real_t turn = Math::clamp(angle_diff, -max_turn, max_turn);
-
-		Vector2 new_dir = current_dir.rotated(turn).normalized();
-
-		all_cached_velocity[bullet_index] = new_dir * speed;
-		all_cached_direction[bullet_index] = new_dir;
-		all_cached_instance_origin[bullet_index] += all_cached_velocity[bullet_index] * delta;
+		bullet_pos += velocity * delta;
 	}
 
 	// Sets the homing direction towards the target
@@ -680,7 +669,8 @@ public:
 	void set_are_bullets_homing_towards_mouse_global_position(bool value) { are_bullets_homing_towards_mouse_global_position = value; }
 	real_t get_homing_distance_radius_away_from_target() const { return homing_distance_radius_away_from_target; }
 	void set_homing_distance_radius_away_from_target(real_t value) { homing_distance_radius_away_from_target = value; }
-
+	HomingBoundaryBehavior get_homing_distance_radius_away_from_target_boundary_behavior() const { return homing_distance_radius_away_from_target_boundary_behavior; }
+	void set_homing_distance_radius_away_from_target_boundary_behavior(HomingBoundaryBehavior value) { homing_distance_radius_away_from_target_boundary_behavior = value; }
 	// Virtual methods
 	void set_up_movement_data(const TypedArray<BulletSpeedData2D> &new_speed_data);
 	virtual void custom_additional_spawn_logic(const MultiMeshBulletsData2D &data) override final;
@@ -721,6 +711,10 @@ protected:
 		ClassDB::bind_method(D_METHOD("all_bullets_replace_homing_targets_with_new_target", "node_or_global_position", "bullet_index_start", "bullet_index_end_inclusive"), &DirectionalBullets2D::all_bullets_replace_homing_targets_with_new_target, DEFVAL(0), DEFVAL(-1));
 		ClassDB::bind_method(D_METHOD("all_bullets_replace_homing_targets_with_new_target_array", "node2ds_or_global_positions_array", "bullet_index_start", "bullet_index_end_inclusive"), &DirectionalBullets2D::all_bullets_replace_homing_targets_with_new_target_array, DEFVAL(0), DEFVAL(-1));
 
+		ClassDB::bind_method(D_METHOD("get_homing_distance_radius_away_from_target_boundary_behavior"), &DirectionalBullets2D::get_homing_distance_radius_away_from_target_boundary_behavior);
+		ClassDB::bind_method(D_METHOD("set_homing_distance_radius_away_from_target_boundary_behavior", "value"), &DirectionalBullets2D::set_homing_distance_radius_away_from_target_boundary_behavior);
+		ADD_PROPERTY(PropertyInfo(Variant::INT, "homing_distance_radius_away_from_target_boundary_behavior"), "set_homing_distance_radius_away_from_target_boundary_behavior", "get_homing_distance_radius_away_from_target_boundary_behavior");
+
 		ADD_PROPERTY(PropertyInfo(Variant::BOOL, "are_bullets_homing_towards_mouse_global_position"), "set_are_bullets_homing_towards_mouse_global_position", "get_are_bullets_homing_towards_mouse_global_position");
 		ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "homing_smoothing"), "set_homing_smoothing", "get_homing_smoothing");
 		ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "homing_update_interval"), "set_homing_update_interval", "get_homing_update_interval");
@@ -730,9 +724,14 @@ protected:
 		BIND_ENUM_CONSTANT(GlobalPositionTarget);
 		BIND_ENUM_CONSTANT(Node2DTarget);
 		BIND_ENUM_CONSTANT(NotHoming);
+
+		BIND_ENUM_CONSTANT(StopAtBoundary);
+		BIND_ENUM_CONSTANT(OrbitLeft);
+		BIND_ENUM_CONSTANT(OrbitRight);
 	}
 };
 
 } // namespace BlastBullets2D
 
 VARIANT_ENUM_CAST(BlastBullets2D::DirectionalBullets2D::HomingType);
+VARIANT_ENUM_CAST(BlastBullets2D::DirectionalBullets2D::HomingBoundaryBehavior);
