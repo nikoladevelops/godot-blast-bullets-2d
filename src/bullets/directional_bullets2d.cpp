@@ -106,9 +106,14 @@ void DirectionalBullets2D::custom_additional_activate_logic(const MultiMeshBulle
 
 	std::fill(all_cached_homing_direction.begin(), all_cached_homing_direction.end(), Vector2(0, 0));
 
-	homing_update_interval = 0.0f;
-	homing_update_timer = 0.0f;
-	homing_smoothing = 0.0f;
+	homing_update_interval = 0.0;
+	homing_update_timer = 0.0;
+	homing_smoothing = 0.0;
 	homing_take_control_of_texture_rotation = false;
+
+	homing_boundary_behavior = BoundaryDontMove;
+	homing_boundary_facing_direction = FaceTarget;
+	homing_boundary_distance_away_from_target = 0.0;
+
 }
 } //namespace BlastBullets2D
