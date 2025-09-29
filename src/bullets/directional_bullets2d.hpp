@@ -77,6 +77,8 @@ protected:
 	bool homing_take_control_of_texture_rotation = false;
 	bool are_bullets_homing_towards_mouse_global_position = false;
 
+	Vector2 cached_mouse_global_position{0,0};
+
 	// Homing parameters
 	double homing_update_interval = 0.0;
 	double homing_update_timer = 0.0;
@@ -124,10 +126,10 @@ protected:
 		return false;
 	}
 
-	// Gets the current target position for a bullet
+	// Checks whether the bullet is homing a valid target and updates the target_pos with the proper global_position of the target
 	_ALWAYS_INLINE_ bool get_target_position(int bullet_index, Vector2 &target_pos) const {
 		if (are_bullets_homing_towards_mouse_global_position) {
-			target_pos = get_global_mouse_position();
+			target_pos = cached_mouse_global_position;
 			return true;
 		}
 
@@ -399,6 +401,11 @@ public:
 		update_physics_interpolation();
 		bool homing_interval_reached = update_homing_timer(delta);
 
+		// Cache the global mouse position for performance reasons (otherwise I would be fetching it per bullet when it doesn't even change..)
+		if (homing_interval_reached && are_bullets_homing_towards_mouse_global_position) {
+			cached_mouse_global_position = get_global_mouse_position();
+		}
+
 		for (int i = 0; i < amount_bullets; ++i) {
 			if (!bullets_enabled_status[i]) {
 				continue;
@@ -425,17 +432,9 @@ public:
 		}
 
 		Vector2 target_pos;
-		if (!get_target_position(bullet_index, target_pos)) {
-			if (interval_reached && !all_bullet_homing_targets[bullet_index].empty()) {
-				all_bullet_homing_targets[bullet_index].pop_front();
-				all_cached_homing_direction[bullet_index] = Vector2(0, 0);
-			}
-			return;
-		}
-
-		bool is_moving_target = are_bullets_homing_towards_mouse_global_position ||
-				get_bullet_homing_current_target_type(bullet_index) == HomingType::Node2DTarget;
-		if (interval_reached || is_moving_target) {
+		get_target_position(bullet_index, target_pos);
+		
+		if (interval_reached) {
 			set_homing_bullet_direction_towards_target(bullet_index, target_pos);
 		}
 
