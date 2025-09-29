@@ -276,7 +276,7 @@ func spawn_multi_mesh_directional_bullets()->void:
 	dir_bullets.homing_boundary_distance_away_from_target = 500;
 	dir_bullets.homing_boundary_behavior = DirectionalBullets2D.BoundaryOrbitRight
 	dir_bullets.homing_boundary_facing_direction = DirectionalBullets2D.FaceOppositeTarget
-	#dir_bullets.are_bullets_homing_towards_mouse_global_position = true
+	dir_bullets.are_bullets_homing_towards_mouse_global_position = true
 	
 	dir_bullets.multimesh_attach_time_based_function(1, func():
 		#dir_bullets.teleport_bullet(0, Vector2(0,0))
@@ -488,6 +488,13 @@ func set_bullet_texture_rotation(degrees:int)->void:
 
 # Changes the bullet's lifetime
 func set_bullet_lifetime(new_lifetime:float)->void:
+	if new_lifetime <= 0:
+		block_bullets_data.is_life_time_infinite = true
+		directional_bullets_data.is_life_time_infinite = true
+	else:
+		block_bullets_data.is_life_time_infinite = false
+		directional_bullets_data.is_life_time_infinite = false
+
 	block_bullets_data.max_life_time = new_lifetime
 	directional_bullets_data.max_life_time = new_lifetime
 

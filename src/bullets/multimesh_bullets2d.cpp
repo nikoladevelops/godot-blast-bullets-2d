@@ -123,6 +123,8 @@ void MultiMeshBullets2D::set_up_bullet_instances(const MultiMeshBulletsData2D &d
 
 	is_life_time_over_signal_enabled = data.is_life_time_over_signal_enabled;
 
+	is_life_time_infinite = data.is_life_time_infinite;
+
 	bullets_enabled_status.assign(amount_bullets, true);
 	set_up_area(data.collision_layer, data.collision_mask, data.monitorable, bullet_factory->physics_space);
 
@@ -313,6 +315,8 @@ Ref<SaveDataMultiMeshBullets2D> MultiMeshBullets2D::save(const Ref<SaveDataMulti
 
 	data_to_populate.is_life_time_over_signal_enabled = is_life_time_over_signal_enabled;
 
+	data_to_populate.is_life_time_infinite = is_life_time_infinite;
+
 	data_to_populate.max_life_time = max_life_time;
 	data_to_populate.current_life_time = current_life_time;
 	data_to_populate.amount_bullets = amount_bullets;
@@ -395,6 +399,8 @@ void MultiMeshBullets2D::load_bullet_instances(const SaveDataMultiMeshBullets2D 
 	cache_texture_rotation_radians = data.cache_texture_rotation_radians;
 
 	is_life_time_over_signal_enabled = data.is_life_time_over_signal_enabled;
+
+	is_life_time_infinite = data.is_life_time_infinite;
 
 	stop_rotation_when_max_reached = data.stop_rotation_when_max_reached;
 

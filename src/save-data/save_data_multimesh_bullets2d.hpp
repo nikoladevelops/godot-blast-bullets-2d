@@ -8,7 +8,6 @@
 #include <godot_cpp/classes/resource.hpp>
 #include <godot_cpp/classes/texture2d.hpp>
 
-
 namespace BlastBullets2D {
 using namespace godot;
 
@@ -105,6 +104,8 @@ public:
 
 	double current_life_time = 0.0f;
 
+	bool is_life_time_infinite = false;
+
 	int amount_bullets = 0;
 
 	Ref<Resource> bullets_custom_data = nullptr;
@@ -115,6 +116,9 @@ public:
 	Dictionary instance_shader_parameters;
 
 	// GETTERS AND SETTERS
+
+	bool get_is_life_time_infinite() const { return is_life_time_infinite; }
+	void set_is_life_time_infinite(bool value) { is_life_time_infinite = value; }
 
 	void set_max_life_time(double new_max_life_time);
 	double get_max_life_time() const;

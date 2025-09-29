@@ -517,6 +517,10 @@ void SaveDataMultiMeshBullets2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_is_life_time_over_signal_enabled"), &SaveDataMultiMeshBullets2D::set_is_life_time_over_signal_enabled);
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "is_life_time_over_signal_enabled"), "set_is_life_time_over_signal_enabled", "get_is_life_time_over_signal_enabled");
 
+	ClassDB::bind_method(D_METHOD("get_is_life_time_infinite"), &SaveDataMultiMeshBullets2D::get_is_life_time_infinite);
+	ClassDB::bind_method(D_METHOD("set_is_life_time_infinite", "value"), &SaveDataMultiMeshBullets2D::set_is_life_time_infinite);
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "is_life_time_infinite"), "set_is_life_time_infinite", "get_is_life_time_infinite");
+
 	ClassDB::bind_method(D_METHOD("get_stop_rotation_when_max_reached"), &SaveDataMultiMeshBullets2D::get_stop_rotation_when_max_reached);
 	ClassDB::bind_method(D_METHOD("set_stop_rotation_when_max_reached"), &SaveDataMultiMeshBullets2D::set_stop_rotation_when_max_reached);
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "stop_rotation_when_max_reached"), "set_stop_rotation_when_max_reached", "get_stop_rotation_when_max_reached");

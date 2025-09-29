@@ -411,7 +411,9 @@ func _on_select_texture_rotation_view_new_btn_selected(new_selected_btn: Button)
 
 
 func _on_select_bullet_lifetime_view_new_btn_selected(new_selected_btn: Button) -> void:
-	var new_life_time:float = new_selected_btn.text.to_float()
+	var new_life_time:float = 0
+	if new_selected_btn.text != "Infinite":
+		new_life_time = new_selected_btn.text.to_float()
 
 	BENCHMARK_GLOBALS.PLAYER_DATA_NODE.set_bullet_lifetime(new_life_time)
 

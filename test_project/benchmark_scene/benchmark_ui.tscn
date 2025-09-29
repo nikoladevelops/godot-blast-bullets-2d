@@ -994,6 +994,12 @@ layout_mode = 2
 focus_mode = 0
 text = "5"
 
+[node name="Infinite" type="Button" parent="BulletSettingsView/BulletLifeTimeContainer"]
+custom_minimum_size = Vector2(40, 40)
+layout_mode = 2
+focus_mode = 0
+text = "Infinite"
+
 [node name="TextureSizeContainer" type="HBoxContainer" parent="BulletSettingsView"]
 layout_mode = 0
 offset_left = 3.0
@@ -1054,7 +1060,7 @@ all_btns = [NodePath("../../AttachmentOffsetContainer/-60_0"), NodePath("../../A
 all_btns = [NodePath("../../TextureRotationContainer/0"), NodePath("../../TextureRotationContainer/90"), NodePath("../../TextureRotationContainer/180"), NodePath("../../TextureRotationContainer/-90")]
 
 [node name="SelectBulletLifetimeView" parent="BulletSettingsView/SelectViewsContainer" node_paths=PackedStringArray("all_btns") instance=ExtResource("3_cgqfs")]
-all_btns = [NodePath("../../BulletLifeTimeContainer/2"), NodePath("../../BulletLifeTimeContainer/0_5"), NodePath("../../BulletLifeTimeContainer/0_2"), NodePath("../../BulletLifeTimeContainer/5")]
+all_btns = [NodePath("../../BulletLifeTimeContainer/2"), NodePath("../../BulletLifeTimeContainer/0_5"), NodePath("../../BulletLifeTimeContainer/0_2"), NodePath("../../BulletLifeTimeContainer/5"), NodePath("../../BulletLifeTimeContainer/Infinite")]
 
 [node name="SelectTextureSizeBtnView" parent="BulletSettingsView/SelectViewsContainer" node_paths=PackedStringArray("all_btns") instance=ExtResource("3_cgqfs")]
 all_btns = [NodePath("../../TextureSizeContainer/140_140"), NodePath("../../TextureSizeContainer/200_200"), NodePath("../../TextureSizeContainer/320_320"), NodePath("../../TextureSizeContainer/64_64")]

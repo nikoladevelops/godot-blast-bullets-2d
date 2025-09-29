@@ -125,6 +125,11 @@ public:
 
 	// Reduces the lifetime of the multimesh so it can eventually get disabled entirely
 	_ALWAYS_INLINE_ void reduce_lifetime(double delta) {
+		// If the lifetime is infinite there is no lifetime timer
+		if (is_life_time_infinite) {
+			return;
+		}
+
 		// Life time timer logic
 		current_life_time -= delta;
 		if (current_life_time <= 0) {
@@ -295,6 +300,9 @@ protected:
 
 	// The current life time being processed
 	double current_life_time = 0.0f;
+
+	// Whether the lifetime is infinite - will ignore any lifetime timers
+	bool is_life_time_infinite = false;
 
 	// If a ShaderMaterial was provided and it has instance shader parameters, then they should get cached here
 	Dictionary instance_shader_parameters;
@@ -541,6 +549,10 @@ protected:
 		ClassDB::bind_method(D_METHOD("get_bullets_custom_data"), &MultiMeshBullets2D::get_bullets_custom_data);
 		ClassDB::bind_method(D_METHOD("set_bullets_custom_data", "new_custom_data"), &MultiMeshBullets2D::set_bullets_custom_data);
 
+		ClassDB::bind_method(D_METHOD("get_is_life_time_infinite"), &MultiMeshBullets2D::get_is_life_time_infinite);
+		ClassDB::bind_method(D_METHOD("set_is_life_time_infinite", "value"), &MultiMeshBullets2D::set_is_life_time_infinite);
+		ADD_PROPERTY(PropertyInfo(Variant::BOOL, "is_life_time_infinite"), "set_is_life_time_infinite", "get_is_life_time_infinite");
+
 		// Time based functions
 		ClassDB::bind_method(D_METHOD("multimesh_attach_time_based_function", "time", "callable", "repeat"), &MultiMeshBullets2D::multimesh_attach_time_based_function, DEFVAL(false));
 		ClassDB::bind_method(D_METHOD("_do_attach_time_based_function", "time", "callable", "repeat", "cached_multimesh_bullets_unique_id"), &MultiMeshBullets2D::_do_attach_time_based_function);
@@ -555,6 +567,15 @@ protected:
 
 		ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "bullets_custom_data"), "set_bullets_custom_data", "get_bullets_custom_data");
 	};
+
+	bool get_is_life_time_infinite() const { return is_life_time_infinite; }
+	void set_is_life_time_infinite(bool value) {
+		// If we are about to set the lifetime as not infinite, make sure to reset the timer to start over from max_life_time
+		if (value) {
+			current_life_time = max_life_time;
+		}
+		is_life_time_infinite = value;
+	}
 
 	// Holds custom logic that runs before the spawn function finalizes. Note that the multimesh is not yet added to the scene tree here
 	virtual void custom_additional_spawn_logic(const MultiMeshBulletsData2D &data) {}
@@ -678,11 +699,11 @@ public:
 				_callback(callback), _current_time(initial_time), _initial_time(initial_time), _repeating(repeating), _cached_multimesh_bullets_unique_id(_multimesh_bullets_unique_id) {};
 	};
 
-	void execute_stored_callable_safely(const Callable& _callback, uint64_t _cached_multimesh_bullets_unique_id, uint64_t multimesh_bullets_unique_id) {
+	void execute_stored_callable_safely(const Callable &_callback, uint64_t _cached_multimesh_bullets_unique_id, uint64_t multimesh_bullets_unique_id) {
 		call_deferred("_do_execute_stored_callable_safely", _callback, _cached_multimesh_bullets_unique_id, multimesh_bullets_unique_id); // call deffered for safety
 	}
 
-	void _do_execute_stored_callable_safely(const Callable& _callback, uint64_t _cached_multimesh_bullets_unique_id, uint64_t multimesh_bullets_unique_id) {
+	void _do_execute_stored_callable_safely(const Callable &_callback, uint64_t _cached_multimesh_bullets_unique_id, uint64_t multimesh_bullets_unique_id) {
 		// Prevents executing callables if the multimesh was re-used from the object pool - very nasty bug
 		if (_cached_multimesh_bullets_unique_id != multimesh_bullets_unique_id) {
 			return;
@@ -705,7 +726,7 @@ public:
 			UtilityFunctions::printerr("Invalid callable was passed to multimesh_attach_time_based_function()");
 			return;
 		}
-		
+
 		if (cached_multimesh_bullets_unique_id != multimesh_bullets_unique_id) {
 			return;
 		}
@@ -739,7 +760,7 @@ public:
 		for (auto it = multimesh_custom_timers.begin(); it != multimesh_custom_timers.end();) {
 			it->_current_time -= delta;
 			if (it->_current_time <= 0.0f) {
-				execute_stored_callable_safely(it->_callback,it->_cached_multimesh_bullets_unique_id, multimesh_bullets_unique_id);
+				execute_stored_callable_safely(it->_callback, it->_cached_multimesh_bullets_unique_id, multimesh_bullets_unique_id);
 
 				if (it->_repeating) {
 					it->_current_time = it->_initial_time;

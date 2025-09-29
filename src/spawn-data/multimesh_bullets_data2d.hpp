@@ -8,7 +8,6 @@
 #include <godot_cpp/classes/resource.hpp>
 #include <godot_cpp/classes/texture2d.hpp>
 
-
 namespace BlastBullets2D {
 using namespace godot;
 
@@ -93,6 +92,9 @@ public:
 	// Whether the life_time_over signal will be emitted when the life time of the bullets is over. Tracked by BulletFactory2D
 	bool is_life_time_over_signal_enabled = false;
 
+	// Whether the lifetime is infinite
+	bool is_life_time_infinite = false;
+
 	// You can assign a custom material that uses a shader. Note that you may also want to provide a custom mesh as well, but if you do so, then the texture_size property won't be used, instead handle scaling in the shader as well.
 	Ref<Material> material;
 
@@ -112,6 +114,10 @@ public:
 	static int calculate_bitmask(const TypedArray<int> &numbers);
 
 	// GETTERS AND SETTERS
+
+	bool get_is_life_time_infinite() const { return is_life_time_infinite; }
+	void set_is_life_time_infinite(bool value) { is_life_time_infinite = value; }
+
 	TypedArray<Transform2D> get_transforms() const;
 	void set_transforms(TypedArray<Transform2D> new_transforms);
 
