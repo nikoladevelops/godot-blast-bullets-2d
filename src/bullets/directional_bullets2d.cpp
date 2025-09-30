@@ -2,6 +2,8 @@
 
 #include "../save-data/save_data_directional_bullets2d.hpp"
 #include "../spawn-data/directional_bullets_data2d.hpp"
+#include "godot_cpp/variant/dictionary.hpp"
+#include "godot_cpp/variant/typed_array.hpp"
 #include "godot_cpp/variant/vector2.hpp"
 #include <algorithm>
 #include <cstddef>
@@ -92,6 +94,16 @@ void DirectionalBullets2D::custom_additional_load_logic(const SaveDataMultiMeshB
 
 void DirectionalBullets2D::custom_additional_activate_logic(const MultiMeshBulletsData2D &data) {
 	const DirectionalBulletsData2D &directional_data = static_cast<const DirectionalBulletsData2D &>(data);
+
+	// Get the list of connections for the signal
+    TypedArray<Dictionary> connections = get_signal_connection_list("on_bullet_homing_target_reached");
+    
+    // Iterate through all connections and disconnect them
+    for (int i = 0; i < connections.size(); i++) {
+        Dictionary connection = connections[i];
+        Callable callable = connection["callable"];
+        disconnect("on_bullet_homing_target_reached", callable);
+    }
 
 	multimesh_bullets_unique_id = generate_unique_id();
 	multimesh_custom_timers.clear();

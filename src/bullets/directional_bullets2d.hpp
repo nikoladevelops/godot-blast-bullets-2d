@@ -49,6 +49,8 @@ public:
 	// Represents a homing target, either a global position or a Node2D
 	struct HomingTarget {
 		HomingType type = HomingType::NotHoming;
+		bool has_bullet_reached_target = false;
+
 		union {
 			Vector2 global_position_target;
 			Node2DTargetData node2d_target_data;
@@ -355,17 +357,23 @@ protected:
 		bullet_pos += velocity * delta;
 
 		if (rem_dist <= distance_from_target_before_considering_as_reached) {
-			// First check if the homing target is valid
-			Variant current_target = get_bullet_current_homing_target(bullet_index);
-			if (current_target) {
-				HomingType type = get_bullet_homing_current_target_type(bullet_index);
+			HomingTarget &target = all_bullet_homing_targets[bullet_index].front();
 
-				switch (type) {
+			// Ensure that the signal is emitted only ONCE when the target is reached by the bullet
+			if (!target.has_bullet_reached_target) {
+				target.has_bullet_reached_target = true;
+				switch (target.type) {
 					case GlobalPositionTarget:
 						emit_signal("on_bullet_homing_target_reached", this, bullet_index, nullptr, target_pos);
 						break;
 					case Node2DTarget:
-						emit_signal("on_bullet_homing_target_reached", this, bullet_index, current_target, target_pos);
+						// In case the target instance is freed - will still emit the signal, but with a nullptr as the target
+						if (!UtilityFunctions::is_instance_id_valid(target.node2d_target_data.cached_valid_instance_id)) {
+							emit_signal("on_bullet_homing_target_reached", this, bullet_index, nullptr, target_pos);
+							break;
+						}
+
+						emit_signal("on_bullet_homing_target_reached", this, bullet_index, target.node2d_target_data.target, target_pos);
 						break;
 					case NotHoming:
 						break;
