@@ -273,33 +273,40 @@ func spawn_multi_mesh_directional_bullets()->void:
 	dir_bullets.homing_smoothing = 10# Set from 0 to 20 or even bigger (but you might have issues with interpolation)
 	dir_bullets.homing_update_interval = 0.02# Set an update timer - keep it low for smooth updates
 	dir_bullets.homing_take_control_of_texture_rotation = true
-	dir_bullets.homing_boundary_distance_away_from_target = 500;
-	dir_bullets.homing_boundary_behavior = DirectionalBullets2D.BoundaryOrbitRight
-	dir_bullets.homing_boundary_facing_direction = DirectionalBullets2D.FaceOppositeTarget
-	dir_bullets.are_bullets_homing_towards_mouse_global_position = true
-	
+	#dir_bullets.homing_boundary_distance_away_from_target = 500;
+	#dir_bullets.homing_boundary_behavior = DirectionalBullets2D.BoundaryOrbitRight
+	#dir_bullets.homing_boundary_facing_direction = DirectionalBullets2D.FaceOppositeTarget
+	#dir_bullets.are_bullets_homing_towards_mouse_global_position = true
+	dir_bullets.distance_from_target_before_considering_as_reached = 500
+	dir_bullets.on_bullet_homing_target_reached.connect(func(multimesh:DirectionalBullets2D, bullet_index:int, target: Node2D, target_global_position:Vector2):
+		#var res:bool = dir_bullets.is_bullet_homing_node2d_target_valid(bullet_index)
+		print("reached")
+		
+		multimesh.bullet_homing_pop_front_target(bullet_index)
+		)
+		
 	dir_bullets.multimesh_attach_time_based_function(1, func():
 		#dir_bullets.teleport_bullet(0, Vector2(0,0))
 		for bullet in dir_bullets.get_amount_bullets():
 			#dir_bullets.teleport_bullet(0, Vector2(0,0))
-			#dir_bullets.bullet_homing_push_back_global_position_target(bullet, BENCHMARK_GLOBALS.STATIONARY_TARGET.global_position)   #.bullet_homing_push_back_node2d_target(bullet, BENCHMARK_GLOBALS.STATIONARY_TARGET)
-			dir_bullets.bullet_homing_push_back_node2d_target(bullet, BENCHMARK_GLOBALS.STATIONARY_TARGET)
+			dir_bullets.bullet_homing_push_back_global_position_target(bullet, BENCHMARK_GLOBALS.STATIONARY_TARGET.global_position)   #.bullet_homing_push_back_node2d_target(bullet, BENCHMARK_GLOBALS.STATIONARY_TARGET)
+			#dir_bullets.bullet_homing_push_back_node2d_target(bullet, BENCHMARK_GLOBALS.STATIONARY_TARGET)
 			#dir_bullets.bullet_homing_push_back_node2d_target(bullet, BENCHMARK_GLOBALS.MOVING_TARGET_TWO)
 			
 	,false)
 	
-	dir_bullets.multimesh_attach_time_based_function(2, func():
-		dir_bullets.homing_boundary_distance_away_from_target = 250;
-		dir_bullets.homing_boundary_behavior = DirectionalBullets2D.BoundaryOrbitRight
-		dir_bullets.homing_boundary_facing_direction = DirectionalBullets2D.FaceOrbitingDirection
-		,false)
-		
-	dir_bullets.multimesh_attach_time_based_function(3, func():
-		for bullet in dir_bullets.get_amount_bullets():
-			dir_bullets.bullet_homing_push_front_node2d_target(bullet, BENCHMARK_GLOBALS.MOVING_TARGET_TWO)
-		
-		dir_bullets.homing_boundary_distance_away_from_target = 700;
-		,false)
+	#dir_bullets.multimesh_attach_time_based_function(2, func():
+		#dir_bullets.homing_boundary_distance_away_from_target = 250;
+		#dir_bullets.homing_boundary_behavior = DirectionalBullets2D.BoundaryOrbitRight
+		#dir_bullets.homing_boundary_facing_direction = DirectionalBullets2D.FaceOrbitingDirection
+		#,false)
+		#
+	#dir_bullets.multimesh_attach_time_based_function(3, func():
+		#for bullet in dir_bullets.get_amount_bullets():
+			#dir_bullets.bullet_homing_push_front_node2d_target(bullet, BENCHMARK_GLOBALS.MOVING_TARGET_TWO)
+		#
+		#dir_bullets.homing_boundary_distance_away_from_target = 700;
+		#,false)
 	#
 	#dir_bullets.multimesh_attach_time_based_function(1.5, func():
 		##dir_bullets.teleport_bullet(0, Vector2(0,0))

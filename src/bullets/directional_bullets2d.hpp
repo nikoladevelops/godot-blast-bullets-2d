@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../shared/bullet_speed_data2d.hpp"
+#include "godot_cpp/classes/global_constants.hpp"
 #include "godot_cpp/classes/node2d.hpp"
 #include "godot_cpp/classes/object.hpp"
 #include "godot_cpp/classes/ref_counted.hpp"
@@ -77,13 +78,16 @@ protected:
 	bool homing_take_control_of_texture_rotation = false;
 	bool are_bullets_homing_towards_mouse_global_position = false;
 
-	Vector2 cached_mouse_global_position{0,0};
+	Vector2 cached_mouse_global_position{ 0, 0 };
 
 	// Homing parameters
 	double homing_update_interval = 0.0;
 	double homing_update_timer = 0.0;
 	real_t homing_smoothing = 0.0;
 	real_t homing_boundary_distance_away_from_target = 0.0;
+
+	// Minimum distance (in pixels) from the homing target at which the bullet is considered to have reached it. Once within this distance, the on_bullet_homing_target_reached signal is emitted
+	real_t distance_from_target_before_considering_as_reached = 8.0;
 
 	HomingBoundaryBehavior homing_boundary_behavior = BoundaryDontMove;
 	HomingBoundaryFacingDirection homing_boundary_facing_direction = FaceTarget;
@@ -349,6 +353,25 @@ protected:
 		}
 
 		bullet_pos += velocity * delta;
+
+		if (rem_dist <= distance_from_target_before_considering_as_reached) {
+			// First check if the homing target is valid
+			Variant current_target = get_bullet_current_homing_target(bullet_index);
+			if (current_target) {
+				HomingType type = get_bullet_homing_current_target_type(bullet_index);
+
+				switch (type) {
+					case GlobalPositionTarget:
+						emit_signal("on_bullet_homing_target_reached", this, bullet_index, nullptr, target_pos);
+						break;
+					case Node2DTarget:
+						emit_signal("on_bullet_homing_target_reached", this, bullet_index, current_target, target_pos);
+						break;
+					case NotHoming:
+						break;
+				}
+			}
+		}
 	}
 
 	// Sets the homing direction towards the target
@@ -433,7 +456,7 @@ public:
 
 		Vector2 target_pos;
 		get_target_position(bullet_index, target_pos);
-		
+
 		if (interval_reached) {
 			set_homing_bullet_direction_towards_target(bullet_index, target_pos);
 		}
@@ -728,6 +751,13 @@ public:
 	HomingBoundaryFacingDirection get_homing_boundary_facing_direction() const { return homing_boundary_facing_direction; }
 	void set_homing_boundary_facing_direction(HomingBoundaryFacingDirection value) { homing_boundary_facing_direction = value; }
 
+	real_t get_distance_from_target_before_considering_as_reached() const {
+		return distance_from_target_before_considering_as_reached;
+	}
+	void set_distance_from_target_before_considering_as_reached(real_t value) {
+		distance_from_target_before_considering_as_reached = value;
+	}
+
 	// Virtual methods
 	void set_up_movement_data(const TypedArray<BulletSpeedData2D> &new_speed_data);
 	virtual void custom_additional_spawn_logic(const MultiMeshBulletsData2D &data) override final;
@@ -768,6 +798,10 @@ protected:
 		ClassDB::bind_method(D_METHOD("all_bullets_replace_homing_targets_with_new_target", "node_or_global_position", "bullet_index_start", "bullet_index_end_inclusive"), &DirectionalBullets2D::all_bullets_replace_homing_targets_with_new_target, DEFVAL(0), DEFVAL(-1));
 		ClassDB::bind_method(D_METHOD("all_bullets_replace_homing_targets_with_new_target_array", "node2ds_or_global_positions_array", "bullet_index_start", "bullet_index_end_inclusive"), &DirectionalBullets2D::all_bullets_replace_homing_targets_with_new_target_array, DEFVAL(0), DEFVAL(-1));
 
+		ClassDB::bind_method(D_METHOD("get_distance_from_target_before_considering_as_reached"), &DirectionalBullets2D::get_distance_from_target_before_considering_as_reached);
+		ClassDB::bind_method(D_METHOD("set_distance_from_target_before_considering_as_reached", "value"), &DirectionalBullets2D::set_distance_from_target_before_considering_as_reached);
+		ADD_PROPERTY(PropertyInfo(Variant::INT, "distance_from_target_before_considering_as_reached"), "set_distance_from_target_before_considering_as_reached", "get_distance_from_target_before_considering_as_reached");
+
 		ClassDB::bind_method(D_METHOD("get_homing_boundary_behavior"), &DirectionalBullets2D::get_homing_boundary_behavior);
 		ClassDB::bind_method(D_METHOD("set_homing_boundary_behavior", "value"), &DirectionalBullets2D::set_homing_boundary_behavior);
 		ADD_PROPERTY(PropertyInfo(Variant::INT, "homing_boundary_behavior"), "set_homing_boundary_behavior", "get_homing_boundary_behavior");
@@ -793,6 +827,12 @@ protected:
 		BIND_ENUM_CONSTANT(FaceTarget);
 		BIND_ENUM_CONSTANT(FaceOppositeTarget);
 		BIND_ENUM_CONSTANT(FaceOrbitingDirection);
+
+		ADD_SIGNAL(MethodInfo("on_bullet_homing_target_reached",
+				PropertyInfo(Variant::OBJECT, "multimesh_instance", PROPERTY_HINT_RESOURCE_TYPE, "DirectionalBullets2D"),
+				PropertyInfo(Variant::INT, "bullet_index"),
+				PropertyInfo(Variant::OBJECT, "target", PROPERTY_HINT_RESOURCE_TYPE, "Node2D"),
+				PropertyInfo(Variant::VECTOR2, "target_global_position")));
 	}
 };
 

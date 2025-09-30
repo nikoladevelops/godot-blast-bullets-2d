@@ -115,5 +115,7 @@ void DirectionalBullets2D::custom_additional_activate_logic(const MultiMeshBulle
 	homing_boundary_facing_direction = FaceTarget;
 	homing_boundary_distance_away_from_target = 0.0;
 
+	distance_from_target_before_considering_as_reached = 8.0;
+
 }
 } //namespace BlastBullets2D
