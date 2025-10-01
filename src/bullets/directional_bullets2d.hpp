@@ -56,6 +56,10 @@ public:
 			Node2DTargetData node2d_target_data;
 		};
 
+		HomingTarget() :
+				type(NotHoming), has_bullet_reached_target(false) {
+			global_position_target = Vector2(0, 0); // Safe fallback
+		}
 		HomingTarget(Vector2 pos) :
 				type(GlobalPositionTarget), global_position_target(pos) {}
 		HomingTarget(Node2D *node, uint64_t id) :
@@ -90,7 +94,7 @@ protected:
 	real_t homing_boundary_distance_away_from_target = 0.0;
 
 	// Minimum distance (in pixels) from the homing target at which the bullet is considered to have reached it. Once within this distance, the bullet_homing_target_reached signal is emitted
-	real_t distance_from_target_before_considering_as_reached = 8.0;
+	real_t distance_from_target_before_considering_as_reached = 5.0;
 
 	HomingBoundaryBehavior homing_boundary_behavior = BoundaryDontMove;
 	HomingBoundaryFacingDirection homing_boundary_facing_direction = FaceTarget;
@@ -176,7 +180,9 @@ protected:
 
 		bool at_boundary = false;
 		if (homing_boundary_distance_away_from_target > 0.0) {
-			if (Math::abs(dist_to_target - homing_boundary_distance_away_from_target) < 1.0f) { // Increased tolerance
+			real_t tolerance = 2.0f + all_cached_speed[bullet_index] * max_turn; // max_turn is delta-based
+
+			if (Math::abs(dist_to_target - homing_boundary_distance_away_from_target) < tolerance) {
 				at_boundary = true;
 			}
 		}
@@ -275,13 +281,11 @@ protected:
 		real_t speed = all_cached_speed[bullet_index];
 
 		if (homing_dir == Vector2(0, 0) || speed <= 0.0) {
-			bullet_pos += velocity * delta;
 			return;
 		}
 
 		Vector2 target_pos;
 		if (!get_target_position(bullet_index, target_pos)) {
-			bullet_pos += velocity * delta;
 			return;
 		}
 
@@ -355,9 +359,17 @@ protected:
 			}
 		}
 
-		bullet_pos += velocity * delta;
+		// Reached check: Post-move, direct to actual target (ignores boundary offset)
+		Vector2 post_to_target = target_pos - bullet_pos;
+		real_t post_dist_to_target = post_to_target.length();
+		real_t threshold_sq = distance_from_target_before_considering_as_reached * distance_from_target_before_considering_as_reached;
+		if (post_dist_to_target * post_dist_to_target <= threshold_sq) { // Use squared for perf/precision
 
-		if (rem_dist <= distance_from_target_before_considering_as_reached) {
+			// TODO maybe implement this per bullet so it doesn't crash
+			if (are_bullets_homing_towards_mouse_global_position) {
+				return;
+			}
+
 			HomingTarget &target = all_bullet_homing_targets[bullet_index].front();
 
 			// Ensure that the signal is emitted only ONCE when the target is reached by the bullet
@@ -450,7 +462,9 @@ public:
 
 			real_t rotation_angle = update_rotation(i, delta);
 			update_homing(i, delta, homing_interval_reached);
+
 			update_position(i, delta);
+
 			update_collision_shape(i);
 			update_attachment_and_speed(i, delta, rotation_angle);
 
@@ -585,7 +599,7 @@ public:
 		if (all_bullet_homing_targets[bullet_index].empty()) {
 			return nullptr;
 		}
-		
+
 		HomingTarget target = all_bullet_homing_targets[bullet_index].back();
 		all_bullet_homing_targets[bullet_index].pop_back();
 
@@ -824,7 +838,7 @@ protected:
 
 		ClassDB::bind_method(D_METHOD("get_distance_from_target_before_considering_as_reached"), &DirectionalBullets2D::get_distance_from_target_before_considering_as_reached);
 		ClassDB::bind_method(D_METHOD("set_distance_from_target_before_considering_as_reached", "value"), &DirectionalBullets2D::set_distance_from_target_before_considering_as_reached);
-		ADD_PROPERTY(PropertyInfo(Variant::INT, "distance_from_target_before_considering_as_reached"), "set_distance_from_target_before_considering_as_reached", "get_distance_from_target_before_considering_as_reached");
+		ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "distance_from_target_before_considering_as_reached"), "set_distance_from_target_before_considering_as_reached", "get_distance_from_target_before_considering_as_reached");
 
 		ClassDB::bind_method(D_METHOD("get_homing_boundary_behavior"), &DirectionalBullets2D::get_homing_boundary_behavior);
 		ClassDB::bind_method(D_METHOD("set_homing_boundary_behavior", "value"), &DirectionalBullets2D::set_homing_boundary_behavior);
@@ -836,7 +850,7 @@ protected:
 
 		ClassDB::bind_method(D_METHOD("get_bullet_homing_auto_pop_after_target_reached"), &DirectionalBullets2D::get_bullet_homing_auto_pop_after_target_reached);
 		ClassDB::bind_method(D_METHOD("set_bullet_homing_auto_pop_after_target_reached", "value"), &DirectionalBullets2D::set_bullet_homing_auto_pop_after_target_reached);
-		ADD_PROPERTY(PropertyInfo(Variant::INT, "bullet_homing_auto_pop_after_target_reached"), "set_bullet_homing_auto_pop_after_target_reached", "get_bullet_homing_auto_pop_after_target_reached");
+		ADD_PROPERTY(PropertyInfo(Variant::BOOL, "bullet_homing_auto_pop_after_target_reached"), "set_bullet_homing_auto_pop_after_target_reached", "get_bullet_homing_auto_pop_after_target_reached");
 
 		ADD_PROPERTY(PropertyInfo(Variant::BOOL, "are_bullets_homing_towards_mouse_global_position"), "set_are_bullets_homing_towards_mouse_global_position", "get_are_bullets_homing_towards_mouse_global_position");
 		ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "homing_smoothing"), "set_homing_smoothing", "get_homing_smoothing");
