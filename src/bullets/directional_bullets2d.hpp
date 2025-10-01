@@ -364,16 +364,16 @@ protected:
 				target.has_bullet_reached_target = true;
 				switch (target.type) {
 					case GlobalPositionTarget:
-						emit_signal("on_bullet_homing_target_reached", this, bullet_index, nullptr, target_pos);
+						call_deferred("emit_signal", "on_bullet_homing_target_reached", this, bullet_index, nullptr, target_pos);
 						break;
 					case Node2DTarget:
 						// In case the target instance is freed - will still emit the signal, but with a nullptr as the target
 						if (!UtilityFunctions::is_instance_id_valid(target.node2d_target_data.cached_valid_instance_id)) {
-							emit_signal("on_bullet_homing_target_reached", this, bullet_index, nullptr, target_pos);
+							call_deferred("emit_signal", "on_bullet_homing_target_reached", this, bullet_index, nullptr, target_pos);
 							break;
 						}
 
-						emit_signal("on_bullet_homing_target_reached", this, bullet_index, target.node2d_target_data.target, target_pos);
+						call_deferred("emit_signal", "on_bullet_homing_target_reached", this, bullet_index, target.node2d_target_data.target, target_pos);
 						break;
 					case NotHoming:
 						break;

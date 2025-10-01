@@ -280,8 +280,6 @@ func spawn_multi_mesh_directional_bullets()->void:
 	dir_bullets.distance_from_target_before_considering_as_reached = 500
 	dir_bullets.on_bullet_homing_target_reached.connect(func(multimesh:DirectionalBullets2D, bullet_index:int, target: Node2D, target_global_position:Vector2):
 		#var res:bool = dir_bullets.is_bullet_homing_node2d_target_valid(bullet_index)
-		print("reached")
-		
 		multimesh.bullet_homing_pop_front_target(bullet_index)
 		)
 		
