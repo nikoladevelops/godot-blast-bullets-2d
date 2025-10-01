@@ -278,9 +278,11 @@ func spawn_multi_mesh_directional_bullets()->void:
 	#dir_bullets.homing_boundary_facing_direction = DirectionalBullets2D.FaceOppositeTarget
 	#dir_bullets.are_bullets_homing_towards_mouse_global_position = true
 	dir_bullets.distance_from_target_before_considering_as_reached = 500
-	dir_bullets.on_bullet_homing_target_reached.connect(func(multimesh:DirectionalBullets2D, bullet_index:int, target: Node2D, target_global_position:Vector2):
+	dir_bullets.bullet_homing_auto_pop_after_target_reached = false
+	dir_bullets.bullet_homing_target_reached.connect(func(multimesh:DirectionalBullets2D, bullet_index:int, target: Node2D, target_global_position:Vector2):
+		print("reached target: ", target_global_position)
 		#var res:bool = dir_bullets.is_bullet_homing_node2d_target_valid(bullet_index)
-		multimesh.bullet_homing_pop_front_target(bullet_index)
+		#multimesh.bullet_homing_pop_front_target(bullet_index)
 		)
 		
 	dir_bullets.multimesh_attach_time_based_function(1, func():

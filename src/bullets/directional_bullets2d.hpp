@@ -79,6 +79,7 @@ protected:
 	bool adjust_direction_based_on_rotation = false;
 	bool homing_take_control_of_texture_rotation = false;
 	bool are_bullets_homing_towards_mouse_global_position = false;
+	bool bullet_homing_auto_pop_after_target_reached = false;
 
 	Vector2 cached_mouse_global_position{ 0, 0 };
 
@@ -88,7 +89,7 @@ protected:
 	real_t homing_smoothing = 0.0;
 	real_t homing_boundary_distance_away_from_target = 0.0;
 
-	// Minimum distance (in pixels) from the homing target at which the bullet is considered to have reached it. Once within this distance, the on_bullet_homing_target_reached signal is emitted
+	// Minimum distance (in pixels) from the homing target at which the bullet is considered to have reached it. Once within this distance, the bullet_homing_target_reached signal is emitted
 	real_t distance_from_target_before_considering_as_reached = 8.0;
 
 	HomingBoundaryBehavior homing_boundary_behavior = BoundaryDontMove;
@@ -364,19 +365,24 @@ protected:
 				target.has_bullet_reached_target = true;
 				switch (target.type) {
 					case GlobalPositionTarget:
-						call_deferred("emit_signal", "on_bullet_homing_target_reached", this, bullet_index, nullptr, target_pos);
+						call_deferred("emit_signal", "bullet_homing_target_reached", this, bullet_index, nullptr, target_pos);
 						break;
 					case Node2DTarget:
 						// In case the target instance is freed - will still emit the signal, but with a nullptr as the target
 						if (!UtilityFunctions::is_instance_id_valid(target.node2d_target_data.cached_valid_instance_id)) {
-							call_deferred("emit_signal", "on_bullet_homing_target_reached", this, bullet_index, nullptr, target_pos);
+							call_deferred("emit_signal", "bullet_homing_target_reached", this, bullet_index, nullptr, target_pos);
 							break;
 						}
 
-						call_deferred("emit_signal", "on_bullet_homing_target_reached", this, bullet_index, target.node2d_target_data.target, target_pos);
+						call_deferred("emit_signal", "bullet_homing_target_reached", this, bullet_index, target.node2d_target_data.target, target_pos);
 						break;
 					case NotHoming:
 						break;
+				}
+
+				// Pop the front target automatically if that's what the user wants
+				if (bullet_homing_auto_pop_after_target_reached) {
+					call_deferred("bullet_homing_pop_front_target", bullet_index);
 				}
 			}
 		}
@@ -547,6 +553,10 @@ public:
 			return nullptr;
 		}
 
+		if (all_bullet_homing_targets[bullet_index].empty()) {
+			return nullptr;
+		}
+
 		HomingTarget target = all_bullet_homing_targets[bullet_index].front();
 		all_bullet_homing_targets[bullet_index].pop_front();
 
@@ -572,6 +582,10 @@ public:
 			return nullptr;
 		}
 
+		if (all_bullet_homing_targets[bullet_index].empty()) {
+			return nullptr;
+		}
+		
 		HomingTarget target = all_bullet_homing_targets[bullet_index].back();
 		all_bullet_homing_targets[bullet_index].pop_back();
 
@@ -758,6 +772,8 @@ public:
 	void set_homing_boundary_behavior(HomingBoundaryBehavior value) { homing_boundary_behavior = value; }
 	HomingBoundaryFacingDirection get_homing_boundary_facing_direction() const { return homing_boundary_facing_direction; }
 	void set_homing_boundary_facing_direction(HomingBoundaryFacingDirection value) { homing_boundary_facing_direction = value; }
+	bool get_bullet_homing_auto_pop_after_target_reached() const { return bullet_homing_auto_pop_after_target_reached; }
+	void set_bullet_homing_auto_pop_after_target_reached(bool value) { bullet_homing_auto_pop_after_target_reached = value; }
 
 	real_t get_distance_from_target_before_considering_as_reached() const {
 		return distance_from_target_before_considering_as_reached;
@@ -818,6 +834,10 @@ protected:
 		ClassDB::bind_method(D_METHOD("set_homing_boundary_facing_direction", "value"), &DirectionalBullets2D::set_homing_boundary_facing_direction);
 		ADD_PROPERTY(PropertyInfo(Variant::INT, "homing_boundary_facing_direction"), "set_homing_boundary_facing_direction", "get_homing_boundary_facing_direction");
 
+		ClassDB::bind_method(D_METHOD("get_bullet_homing_auto_pop_after_target_reached"), &DirectionalBullets2D::get_bullet_homing_auto_pop_after_target_reached);
+		ClassDB::bind_method(D_METHOD("set_bullet_homing_auto_pop_after_target_reached", "value"), &DirectionalBullets2D::set_bullet_homing_auto_pop_after_target_reached);
+		ADD_PROPERTY(PropertyInfo(Variant::INT, "bullet_homing_auto_pop_after_target_reached"), "set_bullet_homing_auto_pop_after_target_reached", "get_bullet_homing_auto_pop_after_target_reached");
+
 		ADD_PROPERTY(PropertyInfo(Variant::BOOL, "are_bullets_homing_towards_mouse_global_position"), "set_are_bullets_homing_towards_mouse_global_position", "get_are_bullets_homing_towards_mouse_global_position");
 		ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "homing_smoothing"), "set_homing_smoothing", "get_homing_smoothing");
 		ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "homing_update_interval"), "set_homing_update_interval", "get_homing_update_interval");
@@ -836,7 +856,7 @@ protected:
 		BIND_ENUM_CONSTANT(FaceOppositeTarget);
 		BIND_ENUM_CONSTANT(FaceOrbitingDirection);
 
-		ADD_SIGNAL(MethodInfo("on_bullet_homing_target_reached",
+		ADD_SIGNAL(MethodInfo("bullet_homing_target_reached",
 				PropertyInfo(Variant::OBJECT, "multimesh_instance", PROPERTY_HINT_RESOURCE_TYPE, "DirectionalBullets2D"),
 				PropertyInfo(Variant::INT, "bullet_index"),
 				PropertyInfo(Variant::OBJECT, "target", PROPERTY_HINT_RESOURCE_TYPE, "Node2D"),

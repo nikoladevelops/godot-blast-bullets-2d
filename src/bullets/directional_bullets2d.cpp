@@ -96,13 +96,13 @@ void DirectionalBullets2D::custom_additional_activate_logic(const MultiMeshBulle
 	const DirectionalBulletsData2D &directional_data = static_cast<const DirectionalBulletsData2D &>(data);
 
 	// Get the list of connections for the signal
-    TypedArray<Dictionary> connections = get_signal_connection_list("on_bullet_homing_target_reached");
+    TypedArray<Dictionary> connections = get_signal_connection_list("bullet_homing_target_reached");
     
     // Iterate through all connections and disconnect them
     for (int i = 0; i < connections.size(); i++) {
         Dictionary connection = connections[i];
         Callable callable = connection["callable"];
-        disconnect("on_bullet_homing_target_reached", callable);
+        disconnect("bullet_homing_target_reached", callable);
     }
 
 	multimesh_bullets_unique_id = generate_unique_id();
@@ -128,6 +128,11 @@ void DirectionalBullets2D::custom_additional_activate_logic(const MultiMeshBulle
 	homing_boundary_distance_away_from_target = 0.0;
 
 	distance_from_target_before_considering_as_reached = 8.0;
+	are_bullets_homing_towards_mouse_global_position = false;
+	bullet_homing_auto_pop_after_target_reached = false;
+
+
+	
 
 }
 } //namespace BlastBullets2D

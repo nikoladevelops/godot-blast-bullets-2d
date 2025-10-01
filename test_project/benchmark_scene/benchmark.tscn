@@ -263,16 +263,19 @@ script = ExtResource("7_6fsjh")
 [node name="BulletHellRelated" type="Node" parent="."]
 
 [node name="MovingTargetTwo" parent="BulletHellRelated" instance=ExtResource("10_nkrfg")]
+z_index = -1
 position = Vector2(-141, -1858)
 speed = 450
 range_x = 500
 
 [node name="MovingTargetOne" parent="BulletHellRelated" instance=ExtResource("10_nkrfg")]
+z_index = -1
 position = Vector2(-636, -1491)
 range_x = 300
 direction = -1
 
 [node name="StationaryTarget" parent="BulletHellRelated" instance=ExtResource("10_nkrfg")]
+z_index = -1
 position = Vector2(517, -1150)
 speed = 0
 range_x = 300
