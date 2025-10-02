@@ -32,9 +32,10 @@ class DirectionalBullets2D : public MultiMeshBullets2D {
 
 public:
 	enum HomingType {
+		NotHoming,
 		GlobalPositionTarget,
 		Node2DTarget,
-		NotHoming
+		MousePositionTarget
 	};
 
 	// Stores a Node2D target and its instance ID for validation
@@ -60,6 +61,7 @@ public:
 				type(NotHoming), has_bullet_reached_target(false) {
 			global_position_target = Vector2(0, 0); // Safe fallback
 		}
+
 		HomingTarget(Vector2 pos) :
 				type(GlobalPositionTarget), global_position_target(pos) {}
 		HomingTarget(Node2D *node, uint64_t id) :
@@ -139,14 +141,15 @@ protected:
 		return false;
 	}
 
-	// Checks whether the bullet is homing a valid target and updates the target_pos with the proper global_position of the target
+	// Checks whether the bullet is homing a valid target and updates the target_pos with the proper global_position of the target. If the target is invalid node2d it will pop it.
 	_ALWAYS_INLINE_ bool get_homing_target_global_position(int bullet_index, Vector2 &target_pos) const {
 		if (are_bullets_homing_towards_mouse_global_position) {
 			target_pos = cached_mouse_global_position;
 			return true;
 		}
 
-		const auto &queue = all_bullet_homing_targets[bullet_index];
+		auto &queue = all_bullet_homing_targets[bullet_index];
+
 		if (queue.empty()) {
 			return false;
 		}
@@ -154,7 +157,7 @@ protected:
 		// Prefer cache for performance
 		target_pos = cached_bullet_homing_deque_front_target_global_positions[bullet_index];
 
-		const HomingTarget &target = queue.front();
+		auto &target = queue.front();
 		if (target.type == HomingType::Node2DTarget &&
 				!is_bullet_homing_target_valid(target.node2d_target_data.target, target.node2d_target_data.cached_valid_instance_id)) {
 			return false;
@@ -220,7 +223,6 @@ protected:
 	}
 
 public:
-public:
 	// Updates all bullets' positions, rotations, and homing
 	_ALWAYS_INLINE_ void move_bullets(double delta) {
 		update_physics_interpolation();
@@ -250,6 +252,34 @@ public:
 		}
 
 		run_multimesh_custom_timers(delta);
+	}
+
+	_ALWAYS_INLINE_ void bullet_homing_trim_front_invalid_targets(int bullet_index) {
+		auto &queue = all_bullet_homing_targets[bullet_index];
+
+		while (!queue.empty()) {
+			HomingTarget &target = queue.front();
+
+			switch (target.type) {
+				case NotHoming:
+				case GlobalPositionTarget:
+				case MousePositionTarget:
+					return; // valid, stop trimming
+
+				case Node2DTarget:
+					if (!UtilityFunctions::is_instance_id_valid(target.node2d_target_data.cached_valid_instance_id)) {
+						bullet_homing_pop_front_target(bullet_index);
+						continue;
+					}
+
+					// As soon as you find an instance that is valid, stop looping
+					return;
+				default:
+					UtilityFunctions::push_error(
+							"Unsupported HomingTarget type in bullet_homing_trim_front_invalid_targets");
+					return;
+			}
+		}
 	}
 
 	_ALWAYS_INLINE_ void try_to_emit_bullet_homing_target_reached_signal(int bullet_index, const Vector2 &bullet_pos, const Vector2 &target_pos) {
@@ -335,6 +365,8 @@ public:
 		if (cached_speed <= 0.0f) { // Early zero-speed exit
 			return;
 		}
+
+		bullet_homing_trim_front_invalid_targets(bullet_index);
 
 		Vector2 target_pos;
 		if (!get_homing_target_global_position(bullet_index, target_pos)) {
@@ -497,7 +529,7 @@ public:
 		HomingTarget target = bullet_queue.front();
 		bullet_queue.pop_front();
 
-		if (queue_size > 0) {
+		if (queue_size > 1) { // If the old size was bigger than 1 it means there is an element that will now be the front of the queue
 			HomingTarget next_target = bullet_queue.front();
 
 			switch (next_target.type) {
@@ -505,7 +537,10 @@ public:
 					cached_bullet_homing_deque_front_target_global_positions[bullet_index] = next_target.global_position_target;
 					break;
 				case Node2DTarget:
-					cached_bullet_homing_deque_front_target_global_positions[bullet_index] = next_target.node2d_target_data.target->get_global_position();
+					if (UtilityFunctions::is_instance_id_valid(target.node2d_target_data.cached_valid_instance_id)) {
+						cached_bullet_homing_deque_front_target_global_positions[bullet_index] = next_target.node2d_target_data.target->get_global_position();
+					}
+					// If its not valid no need to edit cache since it wont be used either way..
 					break;
 				case NotHoming:
 					break;

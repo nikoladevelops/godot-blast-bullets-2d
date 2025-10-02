@@ -281,11 +281,19 @@ func spawn_multi_mesh_directional_bullets()->void:
 		print("reached target: ", target_global_position)
 		)
 		
+	#dir_bullets.multimesh_attach_time_based_function(1, func():
+		#for bullet in dir_bullets.get_amount_bullets():
+			#dir_bullets.bullet_homing_push_back_global_position_target(bullet, BENCHMARK_GLOBALS.STATIONARY_TARGET.global_position)   #.bullet_homing_push_back_node2d_target(bullet, BENCHMARK_GLOBALS.STATIONARY_TARGET)
+			#dir_bullets.bullet_homing_push_back_node2d_target(bullet, BENCHMARK_GLOBALS.MOVING_TARGET_TWO)
+			#dir_bullets.bullet_homing_push_back_node2d_target(bullet, BENCHMARK_GLOBALS.MOVING_TARGET_ONE)
+	#,false)
+	
+	
 	dir_bullets.multimesh_attach_time_based_function(1, func():
-		for bullet in dir_bullets.get_amount_bullets():
-			dir_bullets.bullet_homing_push_back_global_position_target(bullet, BENCHMARK_GLOBALS.STATIONARY_TARGET.global_position)   #.bullet_homing_push_back_node2d_target(bullet, BENCHMARK_GLOBALS.STATIONARY_TARGET)
-			dir_bullets.bullet_homing_push_back_node2d_target(bullet, BENCHMARK_GLOBALS.MOVING_TARGET_TWO)
-			dir_bullets.bullet_homing_push_back_node2d_target(bullet, BENCHMARK_GLOBALS.MOVING_TARGET_ONE)
+		for enemy in BENCHMARK_GLOBALS.ALL_ENEMY_SPAWNERS[0].enemy_container.get_children():
+			for bullet in dir_bullets.get_amount_bullets():
+				dir_bullets.bullet_homing_push_back_node2d_target(bullet, enemy)
+			
 	,false)
 	
 	#dir_bullets.multimesh_attach_time_based_function(2, func():
