@@ -270,19 +270,10 @@ func spawn_multi_mesh_directional_bullets()->void:
 		directional_bullets_data.transforms = BulletFactory2D.helper_generate_transforms_grid(bullets_amount, bullet_marker.get_global_transform(), rows_per_column, grid_alignment, col_offset, row_offset, rotate_grid_with_marker, random_local_rotation)
 	
 	var dir_bullets:DirectionalBullets2D = BENCHMARK_GLOBALS.FACTORY.spawn_controllable_directional_bullets(directional_bullets_data)
-	dir_bullets.homing_smoothing = 10.0# Set from 0 to 20 or even bigger (but you might have issues with interpolation)
+	dir_bullets.homing_smoothing = 20.0# Set from 0 to 20 or even bigger (but you might have issues with interpolation)
 	dir_bullets.homing_update_interval = 0.02# Set an update timer - keep it low for smooth updates
 	dir_bullets.homing_take_control_of_texture_rotation = true
-	#dir_bullets.homing_boundary_distance_away_from_target = 500;
-	
-	dir_bullets.homing_boundary_behavior = DirectionalBullets2D.BoundaryDontMove
-	#dir_bullets.homing_boundary_facing_direction = DirectionalBullets2D.FaceOppositeTarget
-	
-	
-	#dir_bullets.are_bullets_homing_towards_mouse_global_position = true
-	
-	
-	#dir_bullets.distance_from_target_before_considering_as_reached = 10
+	dir_bullets.distance_from_target_before_considering_as_reached = 30
 	
 	dir_bullets.bullet_homing_auto_pop_after_target_reached = true
 	
