@@ -143,29 +143,31 @@ protected:
 
 	// Checks whether the bullet is homing a valid target and updates the target_pos with the proper global_position of the target. If the target is invalid node2d it will pop it.
 	_ALWAYS_INLINE_ bool get_homing_target_global_position(int bullet_index, Vector2 &target_pos) const {
-		if (are_bullets_homing_towards_mouse_global_position) {
-			target_pos = cached_mouse_global_position;
-			return true;
-		}
-
 		auto &queue = all_bullet_homing_targets[bullet_index];
 
 		if (queue.empty()) {
 			return false;
 		}
 
+		auto &target = queue.front();
+
+		switch (target.type) {
+			case NotHoming:
+				return false;
+			case GlobalPositionTarget:
+				break;
+			case Node2DTarget: {
+				if (!is_bullet_homing_target_valid(target.node2d_target_data.target, target.node2d_target_data.cached_valid_instance_id)) {
+					return false;
+				}
+				break;
+			}
+			case MousePositionTarget:
+				break;
+		}
+
 		// Prefer cache for performance
 		target_pos = cached_bullet_homing_deque_front_target_global_positions[bullet_index];
-
-		auto &target = queue.front();
-		if (target.type == HomingType::Node2DTarget &&
-				!is_bullet_homing_target_valid(target.node2d_target_data.target, target.node2d_target_data.cached_valid_instance_id)) {
-			return false;
-		}
-
-		if (target.type == HomingType::NotHoming) {
-			return false;
-		}
 
 		return true;
 	}
@@ -266,14 +268,16 @@ public:
 				case MousePositionTarget:
 					return; // valid, stop trimming
 
-				case Node2DTarget:
-					if (!UtilityFunctions::is_instance_id_valid(target.node2d_target_data.cached_valid_instance_id)) {
+				case Node2DTarget: {
+					auto &target_data = target.node2d_target_data;
+
+					if (!is_bullet_homing_target_valid(target_data.target, target_data.cached_valid_instance_id)) {
 						bullet_homing_pop_front_target(bullet_index);
 						continue;
 					}
-
 					// As soon as you find an instance that is valid, stop looping
 					return;
+				}
 				default:
 					UtilityFunctions::push_error(
 							"Unsupported HomingTarget type in bullet_homing_trim_front_invalid_targets");
@@ -303,15 +307,18 @@ public:
 					case GlobalPositionTarget:
 						call_deferred("emit_signal", "bullet_homing_target_reached", this, bullet_index, nullptr, target_pos);
 						break;
-					case Node2DTarget:
+					case Node2DTarget: {
+						auto &target_data = target.node2d_target_data;
+
 						// In case the target instance is freed - will still emit the signal, but with a nullptr as the target
-						if (!UtilityFunctions::is_instance_id_valid(target.node2d_target_data.cached_valid_instance_id)) {
+						if (!is_bullet_homing_target_valid(target_data.target, target_data.cached_valid_instance_id)) {
 							call_deferred("emit_signal", "bullet_homing_target_reached", this, bullet_index, nullptr, target_pos);
 							break;
 						}
 
-						call_deferred("emit_signal", "bullet_homing_target_reached", this, bullet_index, target.node2d_target_data.target, target_pos);
+						call_deferred("emit_signal", "bullet_homing_target_reached", this, bullet_index, target_data.target, target_pos);
 						break;
+					}
 					case NotHoming:
 						break;
 				}
@@ -536,12 +543,17 @@ public:
 				case GlobalPositionTarget:
 					cached_bullet_homing_deque_front_target_global_positions[bullet_index] = next_target.global_position_target;
 					break;
-				case Node2DTarget:
-					if (UtilityFunctions::is_instance_id_valid(target.node2d_target_data.cached_valid_instance_id)) {
-						cached_bullet_homing_deque_front_target_global_positions[bullet_index] = next_target.node2d_target_data.target->get_global_position();
-					}
+				case Node2DTarget: {
+					auto &next_target_data = next_target.node2d_target_data;
+
 					// If its not valid no need to edit cache since it wont be used either way..
+					if (!is_bullet_homing_target_valid(next_target_data.target, next_target_data.cached_valid_instance_id)) {
+						break;
+					}
+
+					cached_bullet_homing_deque_front_target_global_positions[bullet_index] = next_target_data.target->get_global_position();
 					break;
+				}
 				case NotHoming:
 					break;
 			}
@@ -552,10 +564,13 @@ public:
 				return target.global_position_target;
 			}
 			case Node2DTarget: {
-				if (UtilityFunctions::is_instance_id_valid(target.node2d_target_data.cached_valid_instance_id)) {
-					return target.node2d_target_data.target;
+				auto &target_data = target.node2d_target_data;
+
+				if (!is_bullet_homing_target_valid(target_data.target, target_data.cached_valid_instance_id)) {
+					return nullptr;
 				}
-				return nullptr;
+
+				return target_data.target;
 			}
 			case NotHoming: {
 				return nullptr;
@@ -585,10 +600,13 @@ public:
 				return target.global_position_target;
 			}
 			case Node2DTarget: {
-				if (UtilityFunctions::is_instance_id_valid(target.node2d_target_data.cached_valid_instance_id)) {
-					return target.node2d_target_data.target;
+				auto &target_data = target.node2d_target_data;
+
+				if (!is_bullet_homing_target_valid(target_data.target, target_data.cached_valid_instance_id)) {
+					return nullptr;
 				}
-				return nullptr;
+
+				return target_data.target;
 			}
 			case NotHoming: {
 				return nullptr;
@@ -638,6 +656,7 @@ public:
 		if (!validate_bullet_index(bullet_index, "is_bullet_homing")) {
 			return false;
 		}
+		// Beware it doesn't check the NotHoming type, so you better use it on a container that holds only "valid" homing targets
 		return get_bullet_homing_targets_amount(bullet_index) > 0;
 	}
 
@@ -653,13 +672,28 @@ public:
 		if (!validate_bullet_index(bullet_index, "is_bullet_homing_node2d_target_valid")) {
 			return false;
 		}
-		return is_bullet_homing(bullet_index) &&
-				get_bullet_homing_current_target_type(bullet_index) == HomingType::Node2DTarget &&
-				UtilityFunctions::is_instance_id_valid(all_bullet_homing_targets[bullet_index].front().node2d_target_data.cached_valid_instance_id);
+
+		if (!is_bullet_homing(bullet_index)) {
+			return false;
+		}
+
+		auto &target = all_bullet_homing_targets[bullet_index].front();
+
+		if (target.type != HomingType::Node2DTarget) {
+			return false;
+		}
+
+		auto &target_data = target.node2d_target_data;
+
+		return is_bullet_homing_target_valid(target_data.target, target_data.cached_valid_instance_id);
 	}
 
 	_ALWAYS_INLINE_ Variant get_bullet_current_homing_target(int bullet_index) const {
 		if (!validate_bullet_index(bullet_index, "get_bullet_current_homing_target") || !is_bullet_homing(bullet_index)) {
+			return nullptr;
+		}
+
+		if (!is_bullet_homing(bullet_index)) {
 			return nullptr;
 		}
 
@@ -669,10 +703,13 @@ public:
 				return target.global_position_target;
 			}
 			case Node2DTarget: {
-				if (UtilityFunctions::is_instance_id_valid(target.node2d_target_data.cached_valid_instance_id)) {
-					return target.node2d_target_data.target;
+				auto &target_data = target.node2d_target_data;
+
+				if (!is_bullet_homing_target_valid(target_data.target, target_data.cached_valid_instance_id)) {
+					return nullptr;
 				}
-				return nullptr;
+
+				return target_data.target;
 			}
 			case NotHoming: {
 				return nullptr;
