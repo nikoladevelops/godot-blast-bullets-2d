@@ -231,7 +231,7 @@ public:
 		bool homing_interval_reached = update_homing_timer(delta);
 
 		// Cache the global mouse position for performance reasons (otherwise I would be fetching it per bullet when it doesn't even change..)
-		if (homing_interval_reached && are_bullets_homing_towards_mouse_global_position) {
+		if (homing_interval_reached) { // TODO need a better if sattement
 			cached_mouse_global_position = get_global_mouse_position();
 		}
 
@@ -293,11 +293,6 @@ public:
 		real_t threshold_sq = distance_from_target_before_considering_as_reached * distance_from_target_before_considering_as_reached;
 		if (post_dist_sq <= threshold_sq) { // Fully squared for perf
 
-			// TODO maybe implement this per bullet so it doesn't crash
-			if (are_bullets_homing_towards_mouse_global_position) {
-				return;
-			}
-
 			HomingTarget &target = all_bullet_homing_targets[bullet_index].front();
 
 			// Ensure that the signal is emitted only ONCE when the target is reached by the bullet
@@ -320,6 +315,9 @@ public:
 						break;
 					}
 					case NotHoming:
+						break;
+					case MousePositionTarget:
+						call_deferred("emit_signal", "bullet_homing_target_reached", this, bullet_index, nullptr, target_pos);
 						break;
 				}
 
@@ -389,13 +387,15 @@ public:
 				switch (front.type) {
 					case HomingType::GlobalPositionTarget:
 						// No need to refresh cache since the global position will never change
-						//cached_bullet_homing_deque_front_target_global_positions[bullet_index] = front.global_position_target;
 						break;
 					case HomingType::Node2DTarget:
 						// In this case the target is 100% valid since get_homing_target_global_position checks it
 						cached_bullet_homing_deque_front_target_global_positions[bullet_index] = front.node2d_target_data.target->get_global_position();
 						break;
-					case HomingType::NotHoming:
+					case HomingType::NotHoming: // This case should never happen but just in case..
+						return;
+					case MousePositionTarget:
+						cached_bullet_homing_deque_front_target_global_positions[bullet_index] = cached_mouse_global_position;
 						break;
 				}
 				target_pos = cached_bullet_homing_deque_front_target_global_positions[bullet_index];
@@ -459,6 +459,43 @@ public:
 		temporary_enable_bullet(bullet_index);
 	}
 
+	_ALWAYS_INLINE_ bool bullet_homing_push_front_mouse_position_target(int bullet_index) {
+		if (!validate_bullet_index(bullet_index, "bullet_homing_push_front_mouse_position_target") ||
+				!bullets_enabled_status[bullet_index]) {
+			return false;
+		}
+
+		HomingTarget target;
+		target.type = HomingType::MousePositionTarget;
+
+		all_bullet_homing_targets[bullet_index].emplace_front(target);
+
+		cached_bullet_homing_deque_front_target_global_positions[bullet_index] = cached_mouse_global_position;
+		return true;
+	}
+
+	_ALWAYS_INLINE_ bool bullet_homing_push_back_mouse_position_target(int bullet_index) {
+		if (!validate_bullet_index(bullet_index, "bullet_homing_push_back_mouse_position_target") ||
+				!bullets_enabled_status[bullet_index]) {
+			return false;
+		}
+
+		HomingTarget target;
+		target.type = HomingType::MousePositionTarget;
+
+		auto &bullet_queue = all_bullet_homing_targets[bullet_index];
+
+		bool is_queue_empty = bullet_queue.empty();
+
+		bullet_queue.emplace_back(target);
+
+		if (is_queue_empty) {
+			cached_bullet_homing_deque_front_target_global_positions[bullet_index] = cached_mouse_global_position;
+		}
+
+		return true;
+	}
+
 	// Homing target management
 	_ALWAYS_INLINE_ bool bullet_homing_push_back_node2d_target(int bullet_index, Node2D *new_homing_target) {
 		if (!validate_bullet_index(bullet_index, "bullet_homing_push_back_node2d_target") ||
@@ -468,12 +505,14 @@ public:
 
 		auto &bullet_queue = all_bullet_homing_targets[bullet_index];
 
-		// Update the cached global position since it will be used - target is at the front of the queue
-		if (bullet_queue.empty()) {
-			cached_bullet_homing_deque_front_target_global_positions[bullet_index] = new_homing_target->get_global_position();
-		}
+		bool is_queue_empty = bullet_queue.empty();
 
 		bullet_queue.emplace_back(new_homing_target, new_homing_target->get_instance_id());
+
+		// Update the cached global position since it will be used - target is at the front of the queue
+		if (is_queue_empty) {
+			cached_bullet_homing_deque_front_target_global_positions[bullet_index] = new_homing_target->get_global_position();
+		}
 
 		return true;
 	}
@@ -499,12 +538,15 @@ public:
 
 		auto &bullet_queue = all_bullet_homing_targets[bullet_index];
 
+		bool is_queue_empty = bullet_queue.empty();
+
+		bullet_queue.emplace_back(global_position);
+
 		// Update the cached global position since it will be used - target is at the front of the queue
-		if (bullet_queue.empty()) {
+		if (is_queue_empty) {
 			cached_bullet_homing_deque_front_target_global_positions[bullet_index] = global_position;
 		}
 
-		bullet_queue.emplace_back(global_position);
 		return true;
 	}
 
@@ -536,6 +578,8 @@ public:
 		HomingTarget target = bullet_queue.front();
 		bullet_queue.pop_front();
 
+		const Vector2 cached_pos = cached_bullet_homing_deque_front_target_global_positions[bullet_index];
+
 		if (queue_size > 1) { // If the old size was bigger than 1 it means there is an element that will now be the front of the queue
 			HomingTarget next_target = bullet_queue.front();
 
@@ -556,6 +600,9 @@ public:
 				}
 				case NotHoming:
 					break;
+				case MousePositionTarget:
+					cached_bullet_homing_deque_front_target_global_positions[bullet_index] = cached_mouse_global_position;
+					break;
 			}
 		}
 
@@ -575,6 +622,8 @@ public:
 			case NotHoming: {
 				return nullptr;
 			}
+			case MousePositionTarget:
+				return cached_pos;
 		}
 		return nullptr;
 	}
@@ -611,6 +660,11 @@ public:
 			case NotHoming: {
 				return nullptr;
 			}
+			case MousePositionTarget:
+				// It is a bit weird since this isn't really the global mouse position owned by that particular MousePositionTarget (since obviously it is not yet active),
+				// but it's fine we are returning the most recently cached mouse global position for the queue of homing targets
+				// I'm doing this to avoid returning a nullptr while also the global position being garbage as well.. so best I can do is return this
+				return cached_bullet_homing_deque_front_target_global_positions[bullet_index];
 		}
 		return nullptr;
 	}
@@ -714,6 +768,8 @@ public:
 			case NotHoming: {
 				return nullptr;
 			}
+			case MousePositionTarget:
+				return cached_bullet_homing_deque_front_target_global_positions[bullet_index];
 		}
 		return nullptr;
 	}
@@ -830,8 +886,7 @@ protected:
 		ClassDB::bind_method(D_METHOD("get_bullet_homing_current_target_type", "bullet_index"), &DirectionalBullets2D::get_bullet_homing_current_target_type);
 		ClassDB::bind_method(D_METHOD("is_bullet_homing_node2d_target_valid", "bullet_index"), &DirectionalBullets2D::is_bullet_homing_node2d_target_valid);
 		ClassDB::bind_method(D_METHOD("get_bullet_current_homing_target", "bullet_index"), &DirectionalBullets2D::get_bullet_current_homing_target);
-		ClassDB::bind_method(D_METHOD("get_are_bullets_homing_towards_mouse_global_position"), &DirectionalBullets2D::get_are_bullets_homing_towards_mouse_global_position);
-		ClassDB::bind_method(D_METHOD("set_are_bullets_homing_towards_mouse_global_position", "value"), &DirectionalBullets2D::set_are_bullets_homing_towards_mouse_global_position);
+
 		ClassDB::bind_method(D_METHOD("get_homing_smoothing"), &DirectionalBullets2D::get_homing_smoothing);
 		ClassDB::bind_method(D_METHOD("set_homing_smoothing", "value"), &DirectionalBullets2D::set_homing_smoothing);
 		ClassDB::bind_method(D_METHOD("get_homing_update_interval"), &DirectionalBullets2D::get_homing_update_interval);
@@ -865,7 +920,14 @@ protected:
 		ClassDB::bind_method(D_METHOD("set_bullet_homing_auto_pop_after_target_reached", "value"), &DirectionalBullets2D::set_bullet_homing_auto_pop_after_target_reached);
 		ADD_PROPERTY(PropertyInfo(Variant::BOOL, "bullet_homing_auto_pop_after_target_reached"), "set_bullet_homing_auto_pop_after_target_reached", "get_bullet_homing_auto_pop_after_target_reached");
 
-		ADD_PROPERTY(PropertyInfo(Variant::BOOL, "are_bullets_homing_towards_mouse_global_position"), "set_are_bullets_homing_towards_mouse_global_position", "get_are_bullets_homing_towards_mouse_global_position");
+		ClassDB::bind_method(D_METHOD("bullet_homing_push_front_mouse_position_target", "bullet_index"), &DirectionalBullets2D::bullet_homing_push_front_mouse_position_target);
+		ClassDB::bind_method(D_METHOD("bullet_homing_push_back_mouse_position_target", "bullet_index"), &DirectionalBullets2D::bullet_homing_push_back_mouse_position_target);
+
+		// TODO re-implement this with a global homing queue
+		// //ADD_PROPERTY(PropertyInfo(Variant::BOOL, "are_bullets_homing_towards_mouse_global_position"), "set_are_bullets_homing_towards_mouse_global_position", "get_are_bullets_homing_towards_mouse_global_position");
+		// ClassDB::bind_method(D_METHOD("get_are_bullets_homing_towards_mouse_global_position"), &DirectionalBullets2D::get_are_bullets_homing_towards_mouse_global_position);
+		// ClassDB::bind_method(D_METHOD("set_are_bullets_homing_towards_mouse_global_position", "value"), &DirectionalBullets2D::set_are_bullets_homing_towards_mouse_global_position);
+
 		ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "homing_smoothing"), "set_homing_smoothing", "get_homing_smoothing");
 		ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "homing_update_interval"), "set_homing_update_interval", "get_homing_update_interval");
 		ADD_PROPERTY(PropertyInfo(Variant::BOOL, "homing_take_control_of_texture_rotation"), "set_homing_take_control_of_texture_rotation", "get_homing_take_control_of_texture_rotation");

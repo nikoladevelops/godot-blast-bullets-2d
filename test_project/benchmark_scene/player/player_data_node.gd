@@ -273,7 +273,7 @@ func spawn_multi_mesh_directional_bullets()->void:
 	dir_bullets.homing_smoothing = 20.0# Set from 0 to 20 or even bigger (but you might have issues with interpolation)
 	dir_bullets.homing_update_interval = 0.02# Set an update timer - keep it low for smooth updates
 	dir_bullets.homing_take_control_of_texture_rotation = true
-	dir_bullets.distance_from_target_before_considering_as_reached = 30
+	dir_bullets.distance_from_target_before_considering_as_reached = 50
 	
 	dir_bullets.bullet_homing_auto_pop_after_target_reached = true
 	
@@ -293,6 +293,7 @@ func spawn_multi_mesh_directional_bullets()->void:
 		for enemy in BENCHMARK_GLOBALS.ALL_ENEMY_SPAWNERS[0].enemy_container.get_children():
 			for bullet in dir_bullets.get_amount_bullets():
 				dir_bullets.bullet_homing_push_back_node2d_target(bullet, enemy)
+				dir_bullets.bullet_homing_push_back_mouse_position_target(bullet)
 			
 	,false)
 	
