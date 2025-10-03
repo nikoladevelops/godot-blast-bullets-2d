@@ -94,6 +94,7 @@ protected:
 	double homing_update_timer = 0.0;
 	real_t homing_smoothing = 0.0;
 	real_t homing_boundary_distance_away_from_target = 0.0;
+	int mouse_homing_targets_amount = 0; // The idea behind this is to track whether the multimesh even has the need of tracking the mouse global position - enables caching behavior
 
 	// Minimum distance (in pixels) from the homing target at which the bullet is considered to have reached it. Once within this distance, the bullet_homing_target_reached signal is emitted
 	real_t distance_from_target_before_considering_as_reached = 5.0;
@@ -231,7 +232,7 @@ public:
 		bool homing_interval_reached = update_homing_timer(delta);
 
 		// Cache the global mouse position for performance reasons (otherwise I would be fetching it per bullet when it doesn't even change..)
-		if (homing_interval_reached) { // TODO need a better if sattement
+		if (homing_interval_reached && mouse_homing_targets_amount > 0) { // Update the cache only when homing interval has been reached and only if there are targets that do follow the mouse
 			cached_mouse_global_position = get_global_mouse_position();
 		}
 
@@ -468,6 +469,12 @@ public:
 		HomingTarget target;
 		target.type = HomingType::MousePositionTarget;
 
+		if (mouse_homing_targets_amount <= 0) {
+			cached_mouse_global_position = get_global_mouse_position();
+		}
+
+		++mouse_homing_targets_amount;
+
 		all_bullet_homing_targets[bullet_index].emplace_front(target);
 
 		cached_bullet_homing_deque_front_target_global_positions[bullet_index] = cached_mouse_global_position;
@@ -486,6 +493,12 @@ public:
 		auto &bullet_queue = all_bullet_homing_targets[bullet_index];
 
 		bool is_queue_empty = bullet_queue.empty();
+
+		if (mouse_homing_targets_amount <= 0) {
+			cached_mouse_global_position = get_global_mouse_position();
+		}
+
+		++mouse_homing_targets_amount;
 
 		bullet_queue.emplace_back(target);
 
@@ -623,6 +636,8 @@ public:
 				return nullptr;
 			}
 			case MousePositionTarget:
+				--mouse_homing_targets_amount;
+
 				return cached_pos;
 		}
 		return nullptr;
@@ -661,6 +676,8 @@ public:
 				return nullptr;
 			}
 			case MousePositionTarget:
+				--mouse_homing_targets_amount;
+
 				// It is a bit weird since this isn't really the global mouse position owned by that particular MousePositionTarget (since obviously it is not yet active),
 				// but it's fine we are returning the most recently cached mouse global position for the queue of homing targets
 				// I'm doing this to avoid returning a nullptr while also the global position being garbage as well.. so best I can do is return this
@@ -673,7 +690,12 @@ public:
 		if (!validate_bullet_index(bullet_index, "bullet_clear_homing_targets")) {
 			return;
 		}
-		all_bullet_homing_targets[bullet_index].clear();
+
+		auto &bullet_targets = all_bullet_homing_targets[bullet_index];
+		
+		while (!bullet_targets.empty()) {
+			bullet_homing_pop_back_target(bullet_index); // This is intentional because some homing targets have pop logic that needs to stay consistent (that's why using .clear is unsafe)
+		}
 	}
 
 	_ALWAYS_INLINE_ void ensure_indexes_match_amount_bullets_range(int &bullet_index_start, int &bullet_index_end_inclusive, const String &function_name) {
@@ -772,6 +794,24 @@ public:
 				return cached_bullet_homing_deque_front_target_global_positions[bullet_index];
 		}
 		return nullptr;
+	}
+
+	_ALWAYS_INLINE_ void all_bullets_push_back_mouse_position_target(int bullet_index_start = 0, int bullet_index_end_inclusive = -1) {
+		ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_push_back_mouse_position_target");
+		for (int i = bullet_index_start; i <= bullet_index_end_inclusive; ++i) {
+			if (bullets_enabled_status[i]) {
+				bullet_homing_push_back_mouse_position_target(i);
+			}
+		}
+	}
+
+	_ALWAYS_INLINE_ void all_bullets_push_front_mouse_position_target(int bullet_index_start = 0, int bullet_index_end_inclusive = -1) {
+		ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_push_front_mouse_position_target");
+		for (int i = bullet_index_start; i <= bullet_index_end_inclusive; ++i) {
+			if (bullets_enabled_status[i]) {
+				bullet_homing_push_front_mouse_position_target(i);
+			}
+		}
 	}
 
 	_ALWAYS_INLINE_ void all_bullets_push_back_homing_target(const Variant &node_or_global_position, int bullet_index_start = 0, int bullet_index_end_inclusive = -1) {
@@ -922,6 +962,8 @@ protected:
 
 		ClassDB::bind_method(D_METHOD("bullet_homing_push_front_mouse_position_target", "bullet_index"), &DirectionalBullets2D::bullet_homing_push_front_mouse_position_target);
 		ClassDB::bind_method(D_METHOD("bullet_homing_push_back_mouse_position_target", "bullet_index"), &DirectionalBullets2D::bullet_homing_push_back_mouse_position_target);
+		ClassDB::bind_method(D_METHOD("all_bullets_push_back_mouse_position_target", "bullet_index_start", "bullet_index_end_inclusive"), &DirectionalBullets2D::all_bullets_push_back_mouse_position_target, DEFVAL(0), DEFVAL(-1));
+		ClassDB::bind_method(D_METHOD("all_bullets_push_front_mouse_position_target", "bullet_index_start", "bullet_index_end_inclusive"), &DirectionalBullets2D::all_bullets_push_front_mouse_position_target, DEFVAL(0), DEFVAL(-1));
 
 		// TODO re-implement this with a global homing queue
 		// //ADD_PROPERTY(PropertyInfo(Variant::BOOL, "are_bullets_homing_towards_mouse_global_position"), "set_are_bullets_homing_towards_mouse_global_position", "get_are_bullets_homing_towards_mouse_global_position");

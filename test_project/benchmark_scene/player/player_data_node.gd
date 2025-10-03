@@ -276,19 +276,15 @@ func spawn_multi_mesh_directional_bullets()->void:
 	dir_bullets.distance_from_target_before_considering_as_reached = 50
 	
 	dir_bullets.bullet_homing_auto_pop_after_target_reached = true
+	dir_bullets.all_bullets_push_front_mouse_position_target()
+	dir_bullets.all_bullets_clear_homing_targets()
 	
+	dir_bullets.all_bullets_push_front_mouse_position_target()
+	#dir_bullets.all_bullets_push_back_mouse_position_target()
 	dir_bullets.bullet_homing_target_reached.connect(func(multimesh:DirectionalBullets2D, bullet_index:int, target: Node2D, target_global_position:Vector2):
 		print("reached target: ", target_global_position)
 		)
-		
-	#dir_bullets.multimesh_attach_time_based_function(1, func():
-		#for bullet in dir_bullets.get_amount_bullets():
-			#dir_bullets.bullet_homing_push_back_global_position_target(bullet, BENCHMARK_GLOBALS.STATIONARY_TARGET.global_position)   #.bullet_homing_push_back_node2d_target(bullet, BENCHMARK_GLOBALS.STATIONARY_TARGET)
-			#dir_bullets.bullet_homing_push_back_node2d_target(bullet, BENCHMARK_GLOBALS.MOVING_TARGET_TWO)
-			#dir_bullets.bullet_homing_push_back_node2d_target(bullet, BENCHMARK_GLOBALS.MOVING_TARGET_ONE)
-	#,false)
-	
-	
+
 	dir_bullets.multimesh_attach_time_based_function(1, func():
 		for enemy in BENCHMARK_GLOBALS.ALL_ENEMY_SPAWNERS[0].enemy_container.get_children():
 			for bullet in dir_bullets.get_amount_bullets():

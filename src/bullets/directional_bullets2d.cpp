@@ -132,6 +132,8 @@ void DirectionalBullets2D::custom_additional_activate_logic(const MultiMeshBulle
 	are_bullets_homing_towards_mouse_global_position = false;
 	bullet_homing_auto_pop_after_target_reached = false;
 
+	mouse_homing_targets_amount = 0;
+
 
 	
 
