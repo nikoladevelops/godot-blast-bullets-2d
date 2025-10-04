@@ -69,7 +69,6 @@ void DirectionalBullets2D::custom_additional_spawn_logic(const MultiMeshBulletsD
 
 	// Each bullet can have its own homing target
 	all_bullet_homing_targets.resize(amount_bullets); // Create a vector that contains an empty queue for each bullet index
-	cached_bullet_homing_deque_front_target_global_positions.resize(amount_bullets, Vector2(0, 0));
 	//
 }
 
@@ -89,7 +88,6 @@ void DirectionalBullets2D::custom_additional_load_logic(const SaveDataMultiMeshB
 	// TODO all_cached_homing_direction
 
 	all_bullet_homing_targets.resize(amount_bullets); // Create a vector that contains an empty queue for each bullet index
-	cached_bullet_homing_deque_front_target_global_positions.resize(amount_bullets, Vector2(0, 0));
 }
 
 void DirectionalBullets2D::custom_additional_activate_logic(const MultiMeshBulletsData2D &data) {
@@ -113,11 +111,8 @@ void DirectionalBullets2D::custom_additional_activate_logic(const MultiMeshBulle
 	adjust_direction_based_on_rotation = directional_data.adjust_direction_based_on_rotation;
 	// Ensure all old homing targets are cleared. Do NOT clear the vector ever.
 	for (auto &queue : all_bullet_homing_targets) {
-		queue.clear();
+		queue.clear_homing_targets(cached_mouse_global_position); // Passing garbage mouse global position but its fine
 	}
-
-	// TODO When activating a multimesh it never has homing soo no need for this - instead when pushing or popping that's when you use the cache
-	//std::fill(cached_bullet_homing_deque_front_target_global_positions.begin(), cached_bullet_homing_deque_front_target_global_positions.end(), Vector2(0, 0));
 
 	homing_update_interval = 0.0;
 	homing_update_timer = 0.0;
@@ -131,11 +126,5 @@ void DirectionalBullets2D::custom_additional_activate_logic(const MultiMeshBulle
 	distance_from_target_before_considering_as_reached = 5.0;
 	are_bullets_homing_towards_mouse_global_position = false;
 	bullet_homing_auto_pop_after_target_reached = false;
-
-	mouse_homing_targets_amount = 0;
-
-
-	
-
 }
 } //namespace BlastBullets2D
