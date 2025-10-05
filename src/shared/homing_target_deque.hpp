@@ -68,6 +68,10 @@ public:
 		return homing_targets.back();
 	}
 
+	bool empty() const noexcept{
+		return homing_targets.empty();
+	}
+
 	_ALWAYS_INLINE_ int get_homing_targets_amount() const {
 		return homing_targets.size();
 	}
@@ -201,9 +205,7 @@ public:
 	}
 
 	_ALWAYS_INLINE_ Variant pop_back_target(const Vector2 &cached_mouse_global_position) {
-		uint64_t queue_size = homing_targets.size();
-
-		if (queue_size == 0) {
+		if (homing_targets.empty()) {
 			return nullptr;
 		}
 
@@ -313,10 +315,18 @@ public:
 	}
 
 	_ALWAYS_INLINE_ HomingType get_current_target_type() const {
+		if (homing_targets.empty()) {
+			return HomingType::NotHoming;
+		}
+
 		return homing_targets.front().type;
 	}
 
 	_ALWAYS_INLINE_ Variant get_bullet_current_homing_target() const {
+		if (homing_targets.empty()) {
+			return nullptr;
+		}
+
 		const HomingTarget &target = homing_targets.front();
 
 		switch (target.type) {

@@ -430,7 +430,7 @@ protected:
 
 	// Updates homing behavior for a bullet
 	_ALWAYS_INLINE_ void update_homing(int bullet_index, double delta, bool interval_reached) {
-		if (!is_bullet_homing(bullet_index) && !are_bullets_homing_towards_mouse_global_position) {
+		if (!is_bullet_homing(bullet_index)) {
 			return;
 		}
 
@@ -443,6 +443,11 @@ protected:
 
 		// Trim invalid homing targets (dangling pointers of already freed node2ds etc..)
 		queue.bullet_homing_trim_front_invalid_targets(cached_mouse_global_position);
+
+		// If after trimming it's empty then skip homing logic
+		if (queue.empty()) {
+			return;
+		}
 
 		// Refresh cache on interval for dynamic targets - avoids calling godot get methods every physics frame..
 		if (interval_reached) {
@@ -473,6 +478,9 @@ protected:
 		Vector2 &current_direction = all_cached_direction[bullet_index];
 
 		current_direction = all_cached_instance_transforms[bullet_index][0].normalized();
+		
+		// Thrust: Align velocity to new direction
+		all_cached_velocity[bullet_index] = current_direction * cached_speed;
 
 		// Emit if target reached
 		try_to_emit_bullet_homing_target_reached_signal(bullet_index, bullet_pos, target_pos);
