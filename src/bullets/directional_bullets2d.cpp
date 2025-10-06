@@ -113,6 +113,8 @@ void DirectionalBullets2D::custom_additional_activate_logic(const MultiMeshBulle
 	for (auto &queue : all_bullet_homing_targets) {
 		queue.clear_homing_targets(cached_mouse_global_position); // Passing garbage mouse global position but its fine
 	}
+	
+	shared_homing_deque.clear_homing_targets(cached_mouse_global_position); // Passing garbage mouse global position but its fine
 
 	homing_update_interval = 0.0;
 	homing_update_timer = 0.0;
@@ -124,7 +126,6 @@ void DirectionalBullets2D::custom_additional_activate_logic(const MultiMeshBulle
 	homing_boundary_distance_away_from_target = 0.0;
 
 	distance_from_target_before_considering_as_reached = 5.0;
-	are_bullets_homing_towards_mouse_global_position = false;
 	bullet_homing_auto_pop_after_target_reached = false;
 }
 } //namespace BlastBullets2D

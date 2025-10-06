@@ -48,13 +48,20 @@ public:
 			cached_mouse_global_position = get_global_mouse_position();
 		}
 
+		bool shared_homing_deque_enabled = !shared_homing_deque.empty();
+
 		for (int i = 0; i < amount_bullets; ++i) {
 			if (!bullets_enabled_status[i]) {
 				continue;
 			}
 
 			real_t rotation_angle = update_rotation(i, delta);
-			update_homing(i, delta, homing_interval_reached);
+
+			if (shared_homing_deque_enabled) {
+				update_homing(shared_homing_deque, true, i, delta, homing_interval_reached);
+			} else if (!all_bullet_homing_targets[i].empty()) {
+				update_homing(all_bullet_homing_targets[i], false, i, delta, homing_interval_reached);
+			}
 
 			update_position(i, delta);
 
@@ -178,6 +185,50 @@ public:
 		queue.push_back_global_position_target(global_position);
 
 		return true;
+	}
+
+	// SHARED BULLET HOMING DEQUE POP METHODS
+
+	_ALWAYS_INLINE_ Variant shared_homing_deque_pop_front_target() {
+		return shared_homing_deque.pop_front_target(cached_mouse_global_position);
+	}
+
+	_ALWAYS_INLINE_ Variant shared_homing_deque_pop_back_target() {
+		return shared_homing_deque.pop_back_target(cached_mouse_global_position);
+	}
+
+	// SHARED BULLET HOMING DEQUE PUSH METHODS
+
+	_ALWAYS_INLINE_ void shared_homing_deque_push_front_mouse_position_target() {
+		if (HomingTargetDeque::mouse_homing_targets_amount <= 0) {
+			cached_mouse_global_position = get_global_mouse_position();
+		}
+
+		shared_homing_deque.push_front_mouse_position_target(cached_mouse_global_position);
+	}
+
+	_ALWAYS_INLINE_ void shared_homing_deque_push_front_node2d_target(Node2D *new_homing_target) {
+		shared_homing_deque.push_front_node2d_target(new_homing_target);
+	}
+
+	_ALWAYS_INLINE_ void shared_homing_deque_push_front_global_position_target(const Vector2 &global_position) {
+		shared_homing_deque.push_front_global_position_target(global_position);
+	}
+
+	_ALWAYS_INLINE_ void shared_homing_deque_push_back_mouse_position_target() {
+		if (HomingTargetDeque::mouse_homing_targets_amount <= 0) {
+			cached_mouse_global_position = get_global_mouse_position();
+		}
+
+		shared_homing_deque.push_back_mouse_position_target(cached_mouse_global_position);
+	}
+
+	_ALWAYS_INLINE_ void shared_homing_deque_push_back_node2d_target(Node2D *new_homing_target) {
+		shared_homing_deque.push_back_node2d_target(new_homing_target);
+	}
+
+	_ALWAYS_INLINE_ void shared_homing_deque_push_back_global_position_target(const Vector2 &global_position) {
+		shared_homing_deque.push_back_global_position_target(global_position);
 	}
 
 	////////////////////////////////////
@@ -384,8 +435,6 @@ public:
 	void set_homing_update_interval(real_t value) { homing_update_interval = value; }
 	bool get_homing_take_control_of_texture_rotation() const { return homing_take_control_of_texture_rotation; }
 	void set_homing_take_control_of_texture_rotation(bool value) { homing_take_control_of_texture_rotation = value; }
-	bool get_are_bullets_homing_towards_mouse_global_position() const { return are_bullets_homing_towards_mouse_global_position; }
-	void set_are_bullets_homing_towards_mouse_global_position(bool value) { are_bullets_homing_towards_mouse_global_position = value; }
 	real_t get_homing_boundary_distance_away_from_target() const { return homing_boundary_distance_away_from_target; }
 	void set_homing_boundary_distance_away_from_target(real_t value) { homing_boundary_distance_away_from_target = value; }
 	HomingBoundaryBehavior get_homing_boundary_behavior() const { return homing_boundary_behavior; }
@@ -408,7 +457,6 @@ protected:
 	// Configuration flags
 	bool adjust_direction_based_on_rotation = false;
 	bool homing_take_control_of_texture_rotation = false;
-	bool are_bullets_homing_towards_mouse_global_position = false;
 	bool bullet_homing_auto_pop_after_target_reached = false;
 
 	Vector2 cached_mouse_global_position{ 0, 0 };
@@ -425,42 +473,39 @@ protected:
 	HomingBoundaryBehavior homing_boundary_behavior = BoundaryDontMove;
 	HomingBoundaryFacingDirection homing_boundary_facing_direction = FaceTarget;
 
-	// Bullet state data
+	// This tracks each bullet's homing deque - allows each bullet to have its own separate homing targets
 	std::vector<HomingTargetDeque> all_bullet_homing_targets;
 
-	// Updates homing behavior for a bullet
-	_ALWAYS_INLINE_ void update_homing(int bullet_index, double delta, bool interval_reached) {
-		if (!is_bullet_homing(bullet_index)) {
-			return;
-		}
+	// This is a shared homing deque - allows the bullets to share the same target
+	HomingTargetDeque shared_homing_deque;
 
+	// Updates homing behavior for a bullet
+	_ALWAYS_INLINE_ void update_homing(HomingTargetDeque &homing_deque, bool is_using_shared_deque, int bullet_index, double delta, bool interval_reached) {
 		real_t cached_speed = all_cached_speed[bullet_index];
 		if (cached_speed <= 0.0f) { // Early zero-speed exit
 			return;
 		}
 
-		auto &queue = all_bullet_homing_targets[bullet_index];
-
 		// Trim invalid homing targets (dangling pointers of already freed node2ds etc..)
-		queue.bullet_homing_trim_front_invalid_targets(cached_mouse_global_position);
+		homing_deque.bullet_homing_trim_front_invalid_targets(cached_mouse_global_position);
 
 		// If after trimming it's empty then skip homing logic
-		if (queue.empty()) {
+		if (homing_deque.empty()) {
 			return;
 		}
 
 		// Refresh cache on interval for dynamic targets - avoids calling godot get methods every physics frame..
 		if (interval_reached) {
-			queue.refresh_cached_front_target_global_position(cached_mouse_global_position);
+			homing_deque.refresh_cached_front_target_global_position(cached_mouse_global_position);
 		}
 
 		// Get the front target's cached position
-		Vector2 target_pos{ queue.get_cached_front_target_global_position() };
+		Vector2 target_pos{ homing_deque.get_cached_front_target_global_position() };
 
 		const Vector2 &bullet_pos = all_cached_instance_origin[bullet_index];
 		Vector2 diff = target_pos - bullet_pos;
 		if (diff.length_squared() <= 0.0f) { // Early exit if already on target
-			try_to_emit_bullet_homing_target_reached_signal(bullet_index, bullet_pos, target_pos);
+			try_to_emit_bullet_homing_target_reached_signal(homing_deque, is_using_shared_deque, bullet_index, bullet_pos, target_pos);
 			return;
 		}
 
@@ -478,12 +523,12 @@ protected:
 		Vector2 &current_direction = all_cached_direction[bullet_index];
 
 		current_direction = all_cached_instance_transforms[bullet_index][0].normalized();
-		
+
 		// Thrust: Align velocity to new direction
 		all_cached_velocity[bullet_index] = current_direction * cached_speed;
 
 		// Emit if target reached
-		try_to_emit_bullet_homing_target_reached_signal(bullet_index, bullet_pos, target_pos);
+		try_to_emit_bullet_homing_target_reached_signal(homing_deque, is_using_shared_deque, bullet_index, bullet_pos, target_pos);
 	}
 
 	// Rotates bullet to face target with smoothing (boundary-agnostic version)
@@ -541,16 +586,14 @@ protected:
 		return rotation_angle;
 	}
 
-	_ALWAYS_INLINE_ void try_to_emit_bullet_homing_target_reached_signal(int bullet_index, const Vector2 &bullet_pos, const Vector2 &target_pos) {
+	_ALWAYS_INLINE_ void try_to_emit_bullet_homing_target_reached_signal(HomingTargetDeque &homing_deque, bool is_using_shared_deque, int bullet_index, const Vector2 &bullet_pos, const Vector2 &target_pos) {
 		// Reached check: Post-move, direct to actual target (ignores boundary offset)
 		Vector2 post_to_target = target_pos - bullet_pos;
 		real_t post_dist_sq = post_to_target.length_squared();
 		real_t threshold_sq = distance_from_target_before_considering_as_reached * distance_from_target_before_considering_as_reached;
 		if (post_dist_sq <= threshold_sq) { // Fully squared for perf
 
-			auto &queue = all_bullet_homing_targets[bullet_index];
-
-			HomingTarget &target = queue.front();
+			HomingTarget &target = homing_deque.front();
 
 			// Ensure that the signal is emitted only ONCE when the target is reached by the bullet
 			if (!target.has_bullet_reached_target) {
@@ -563,7 +606,7 @@ protected:
 						auto &target_data = target.node2d_target_data;
 
 						// In case the target instance is freed - will still emit the signal, but with a nullptr as the target
-						if (!queue.is_homing_target_valid(target_data.target, target_data.cached_valid_instance_id)) {
+						if (!homing_deque.is_homing_target_valid(target_data.target, target_data.cached_valid_instance_id)) {
 							call_deferred("emit_signal", "bullet_homing_target_reached", this, bullet_index, nullptr, target_pos);
 							break;
 						}
@@ -580,7 +623,11 @@ protected:
 
 				// Pop the front target automatically if that's what the user wants
 				if (bullet_homing_auto_pop_after_target_reached) {
-					call_deferred("bullet_homing_pop_front_target", bullet_index);
+					if (is_using_shared_deque) {
+						call_deferred("shared_homing_deque_pop_front_target");
+					} else {
+						call_deferred("bullet_homing_pop_front_target", bullet_index);
+					}
 				}
 			}
 		}
@@ -658,35 +705,64 @@ protected:
 	}
 
 	static void _bind_methods() {
-		ClassDB::bind_method(D_METHOD("bullet_homing_push_back_node2d_target", "bullet_index", "new_homing_target"), &DirectionalBullets2D::bullet_homing_push_back_node2d_target);
-		ClassDB::bind_method(D_METHOD("bullet_homing_push_front_node2d_target", "bullet_index", "new_homing_target"), &DirectionalBullets2D::bullet_homing_push_front_node2d_target);
-		ClassDB::bind_method(D_METHOD("bullet_homing_push_back_global_position_target", "bullet_index", "global_position"), &DirectionalBullets2D::bullet_homing_push_back_global_position_target);
-		ClassDB::bind_method(D_METHOD("bullet_homing_push_front_global_position_target", "bullet_index", "global_position"), &DirectionalBullets2D::bullet_homing_push_front_global_position_target);
-		ClassDB::bind_method(D_METHOD("bullet_clear_homing_targets", "bullet_index"), &DirectionalBullets2D::bullet_clear_homing_targets);
-		ClassDB::bind_method(D_METHOD("bullet_homing_pop_back_target", "bullet_index"), &DirectionalBullets2D::bullet_homing_pop_back_target);
+		// PER BULLET HOMING DEQUE POP METHODS
 		ClassDB::bind_method(D_METHOD("bullet_homing_pop_front_target", "bullet_index"), &DirectionalBullets2D::bullet_homing_pop_front_target);
-		ClassDB::bind_method(D_METHOD("get_bullet_homing_targets_amount", "bullet_index"), &DirectionalBullets2D::get_bullet_homing_targets_amount);
-		ClassDB::bind_method(D_METHOD("is_bullet_homing", "bullet_index"), &DirectionalBullets2D::is_bullet_homing);
-		ClassDB::bind_method(D_METHOD("get_bullet_homing_current_target_type", "bullet_index"), &DirectionalBullets2D::get_bullet_homing_current_target_type);
-		ClassDB::bind_method(D_METHOD("is_bullet_homing_node2d_target_valid", "bullet_index"), &DirectionalBullets2D::is_bullet_homing_node2d_target_valid);
-		ClassDB::bind_method(D_METHOD("get_bullet_current_homing_target", "bullet_index"), &DirectionalBullets2D::get_bullet_current_homing_target);
+		ClassDB::bind_method(D_METHOD("bullet_homing_pop_back_target", "bullet_index"), &DirectionalBullets2D::bullet_homing_pop_back_target);
 
-		ClassDB::bind_method(D_METHOD("get_homing_smoothing"), &DirectionalBullets2D::get_homing_smoothing);
-		ClassDB::bind_method(D_METHOD("set_homing_smoothing", "value"), &DirectionalBullets2D::set_homing_smoothing);
-		ClassDB::bind_method(D_METHOD("get_homing_update_interval"), &DirectionalBullets2D::get_homing_update_interval);
-		ClassDB::bind_method(D_METHOD("set_homing_update_interval", "value"), &DirectionalBullets2D::set_homing_update_interval);
-		ClassDB::bind_method(D_METHOD("get_homing_take_control_of_texture_rotation"), &DirectionalBullets2D::get_homing_take_control_of_texture_rotation);
-		ClassDB::bind_method(D_METHOD("set_homing_take_control_of_texture_rotation", "value"), &DirectionalBullets2D::set_homing_take_control_of_texture_rotation);
-		ClassDB::bind_method(D_METHOD("get_homing_boundary_distance_away_from_target"), &DirectionalBullets2D::get_homing_boundary_distance_away_from_target);
-		ClassDB::bind_method(D_METHOD("set_homing_boundary_distance_away_from_target", "value"), &DirectionalBullets2D::set_homing_boundary_distance_away_from_target);
-		ClassDB::bind_method(D_METHOD("teleport_bullet", "bullet_index", "new_global_pos"), &DirectionalBullets2D::teleport_bullet);
-		ClassDB::bind_method(D_METHOD("all_bullets_clear_homing_targets", "bullet_index_start", "bullet_index_end_inclusive"), &DirectionalBullets2D::all_bullets_clear_homing_targets, DEFVAL(0), DEFVAL(-1));
-		ClassDB::bind_method(D_METHOD("all_bullets_push_back_homing_target", "node_or_global_position", "bullet_index_start", "bullet_index_end_inclusive"), &DirectionalBullets2D::all_bullets_push_back_homing_target, DEFVAL(0), DEFVAL(-1));
+		// PER BULLET HOMING DEQUE PUSH METHODS
+		ClassDB::bind_method(D_METHOD("bullet_homing_push_front_mouse_position_target", "bullet_index"), &DirectionalBullets2D::bullet_homing_push_front_mouse_position_target);
+		ClassDB::bind_method(D_METHOD("bullet_homing_push_front_node2d_target", "bullet_index", "new_homing_target"), &DirectionalBullets2D::bullet_homing_push_front_node2d_target);
+		ClassDB::bind_method(D_METHOD("bullet_homing_push_front_global_position_target", "bullet_index", "global_position"), &DirectionalBullets2D::bullet_homing_push_front_global_position_target);
+
+		ClassDB::bind_method(D_METHOD("bullet_homing_push_back_mouse_position_target", "bullet_index"), &DirectionalBullets2D::bullet_homing_push_back_mouse_position_target);
+		ClassDB::bind_method(D_METHOD("bullet_homing_push_back_node2d_target", "bullet_index", "new_homing_target"), &DirectionalBullets2D::bullet_homing_push_back_node2d_target);
+		ClassDB::bind_method(D_METHOD("bullet_homing_push_back_global_position_target", "bullet_index", "global_position"), &DirectionalBullets2D::bullet_homing_push_back_global_position_target);
+
+		// PER BULLET HOMING DEQUE HELPERS
+		ClassDB::bind_method(D_METHOD("bullet_clear_homing_targets", "bullet_index"), &DirectionalBullets2D::bullet_clear_homing_targets);
+		ClassDB::bind_method(D_METHOD("get_bullet_homing_targets_amount", "bullet_index"), &DirectionalBullets2D::get_bullet_homing_targets_amount);
+
+		ClassDB::bind_method(D_METHOD("all_bullets_push_front_mouse_position_target", "bullet_index_start", "bullet_index_end_inclusive"), &DirectionalBullets2D::all_bullets_push_front_mouse_position_target, DEFVAL(0), DEFVAL(-1));
+		ClassDB::bind_method(D_METHOD("all_bullets_push_back_mouse_position_target", "bullet_index_start", "bullet_index_end_inclusive"), &DirectionalBullets2D::all_bullets_push_back_mouse_position_target, DEFVAL(0), DEFVAL(-1));
+
 		ClassDB::bind_method(D_METHOD("all_bullets_push_front_homing_target", "node_or_global_position", "bullet_index_start", "bullet_index_end_inclusive"), &DirectionalBullets2D::all_bullets_push_front_homing_target, DEFVAL(0), DEFVAL(-1));
-		ClassDB::bind_method(D_METHOD("all_bullets_push_back_homing_targets_array", "node2ds_or_global_positions_array", "bullet_index_start", "bullet_index_end_inclusive"), &DirectionalBullets2D::all_bullets_push_back_homing_targets_array, DEFVAL(0), DEFVAL(-1));
+		ClassDB::bind_method(D_METHOD("all_bullets_push_back_homing_target", "node_or_global_position", "bullet_index_start", "bullet_index_end_inclusive"), &DirectionalBullets2D::all_bullets_push_back_homing_target, DEFVAL(0), DEFVAL(-1));
+
 		ClassDB::bind_method(D_METHOD("all_bullets_push_front_homing_targets_array", "node2ds_or_global_positions_array", "bullet_index_start", "bullet_index_end_inclusive"), &DirectionalBullets2D::all_bullets_push_front_homing_targets_array, DEFVAL(0), DEFVAL(-1));
+		ClassDB::bind_method(D_METHOD("all_bullets_push_back_homing_targets_array", "node2ds_or_global_positions_array", "bullet_index_start", "bullet_index_end_inclusive"), &DirectionalBullets2D::all_bullets_push_back_homing_targets_array, DEFVAL(0), DEFVAL(-1));
+
 		ClassDB::bind_method(D_METHOD("all_bullets_replace_homing_targets_with_new_target", "node_or_global_position", "bullet_index_start", "bullet_index_end_inclusive"), &DirectionalBullets2D::all_bullets_replace_homing_targets_with_new_target, DEFVAL(0), DEFVAL(-1));
 		ClassDB::bind_method(D_METHOD("all_bullets_replace_homing_targets_with_new_target_array", "node2ds_or_global_positions_array", "bullet_index_start", "bullet_index_end_inclusive"), &DirectionalBullets2D::all_bullets_replace_homing_targets_with_new_target_array, DEFVAL(0), DEFVAL(-1));
+
+		ClassDB::bind_method(D_METHOD("all_bullets_clear_homing_targets", "bullet_index_start", "bullet_index_end_inclusive"), &DirectionalBullets2D::all_bullets_clear_homing_targets, DEFVAL(0), DEFVAL(-1));
+
+		// SHARED HOMING DEQUE POP METHODS
+		ClassDB::bind_method(D_METHOD("shared_homing_deque_pop_front_target"), &DirectionalBullets2D::shared_homing_deque_pop_front_target);
+		ClassDB::bind_method(D_METHOD("shared_homing_deque_pop_back_target"), &DirectionalBullets2D::shared_homing_deque_pop_back_target);
+
+		// SHARED HOMING DEQUE PUSH METHODS
+		ClassDB::bind_method(D_METHOD("shared_homing_deque_push_front_mouse_position_target"), &DirectionalBullets2D::shared_homing_deque_push_front_mouse_position_target);
+		ClassDB::bind_method(D_METHOD("shared_homing_deque_push_front_node2d_target", "new_homing_target"), &DirectionalBullets2D::shared_homing_deque_push_front_node2d_target);
+		ClassDB::bind_method(D_METHOD("shared_homing_deque_push_front_global_position_target", "global_position"), &DirectionalBullets2D::shared_homing_deque_push_front_global_position_target);
+
+		ClassDB::bind_method(D_METHOD("shared_homing_deque_push_back_mouse_position_target"), &DirectionalBullets2D::shared_homing_deque_push_back_mouse_position_target);
+		ClassDB::bind_method(D_METHOD("shared_homing_deque_push_back_node2d_target", "new_homing_target"), &DirectionalBullets2D::shared_homing_deque_push_back_node2d_target);
+		ClassDB::bind_method(D_METHOD("shared_homing_deque_push_back_global_position_target", "global_position"), &DirectionalBullets2D::shared_homing_deque_push_back_global_position_target);
+
+		// SHARED HOMING DEQUE HELPERS
+		// TODO
+		// ClassDB::bind_method(D_METHOD("all_bullets_push_front_homing_targets_array", "node2ds_or_global_positions_array", "bullet_index_start", "bullet_index_end_inclusive"), &DirectionalBullets2D::all_bullets_push_front_homing_targets_array, DEFVAL(0), DEFVAL(-1));
+		// ClassDB::bind_method(D_METHOD("all_bullets_push_back_homing_targets_array", "node2ds_or_global_positions_array", "bullet_index_start", "bullet_index_end_inclusive"), &DirectionalBullets2D::all_bullets_push_back_homing_targets_array, DEFVAL(0), DEFVAL(-1));
+		// ClassDB::bind_method(D_METHOD("all_bullets_replace_homing_targets_with_new_target_array", "node2ds_or_global_positions_array", "bullet_index_start", "bullet_index_end_inclusive"), &DirectionalBullets2D::all_bullets_replace_homing_targets_with_new_target_array, DEFVAL(0), DEFVAL(-1));
+
+		// ClassDB::bind_method(D_METHOD("all_bullets_clear_homing_targets", "bullet_index_start", "bullet_index_end_inclusive"), &DirectionalBullets2D::all_bullets_clear_homing_targets, DEFVAL(0), DEFVAL(-1));
+
+		// OTHER HOMING RELATED
+		ClassDB::bind_method(D_METHOD("is_bullet_homing", "bullet_index"), &DirectionalBullets2D::is_bullet_homing);
+		ClassDB::bind_method(D_METHOD("get_bullet_homing_current_target_type", "bullet_index"), &DirectionalBullets2D::get_bullet_homing_current_target_type);
+
+		ClassDB::bind_method(D_METHOD("is_bullet_homing_node2d_target_valid", "bullet_index"), &DirectionalBullets2D::is_bullet_homing_node2d_target_valid);
+		ClassDB::bind_method(D_METHOD("get_bullet_current_homing_target", "bullet_index"), &DirectionalBullets2D::get_bullet_current_homing_target);
 
 		ClassDB::bind_method(D_METHOD("get_distance_from_target_before_considering_as_reached"), &DirectionalBullets2D::get_distance_from_target_before_considering_as_reached);
 		ClassDB::bind_method(D_METHOD("set_distance_from_target_before_considering_as_reached", "value"), &DirectionalBullets2D::set_distance_from_target_before_considering_as_reached);
@@ -704,20 +780,25 @@ protected:
 		ClassDB::bind_method(D_METHOD("set_bullet_homing_auto_pop_after_target_reached", "value"), &DirectionalBullets2D::set_bullet_homing_auto_pop_after_target_reached);
 		ADD_PROPERTY(PropertyInfo(Variant::BOOL, "bullet_homing_auto_pop_after_target_reached"), "set_bullet_homing_auto_pop_after_target_reached", "get_bullet_homing_auto_pop_after_target_reached");
 
-		ClassDB::bind_method(D_METHOD("bullet_homing_push_front_mouse_position_target", "bullet_index"), &DirectionalBullets2D::bullet_homing_push_front_mouse_position_target);
-		ClassDB::bind_method(D_METHOD("bullet_homing_push_back_mouse_position_target", "bullet_index"), &DirectionalBullets2D::bullet_homing_push_back_mouse_position_target);
-		ClassDB::bind_method(D_METHOD("all_bullets_push_back_mouse_position_target", "bullet_index_start", "bullet_index_end_inclusive"), &DirectionalBullets2D::all_bullets_push_back_mouse_position_target, DEFVAL(0), DEFVAL(-1));
-		ClassDB::bind_method(D_METHOD("all_bullets_push_front_mouse_position_target", "bullet_index_start", "bullet_index_end_inclusive"), &DirectionalBullets2D::all_bullets_push_front_mouse_position_target, DEFVAL(0), DEFVAL(-1));
-
-		// TODO re-implement this with a global homing queue
-		// //ADD_PROPERTY(PropertyInfo(Variant::BOOL, "are_bullets_homing_towards_mouse_global_position"), "set_are_bullets_homing_towards_mouse_global_position", "get_are_bullets_homing_towards_mouse_global_position");
-		// ClassDB::bind_method(D_METHOD("get_are_bullets_homing_towards_mouse_global_position"), &DirectionalBullets2D::get_are_bullets_homing_towards_mouse_global_position);
-		// ClassDB::bind_method(D_METHOD("set_are_bullets_homing_towards_mouse_global_position", "value"), &DirectionalBullets2D::set_are_bullets_homing_towards_mouse_global_position);
-
+		ClassDB::bind_method(D_METHOD("get_homing_smoothing"), &DirectionalBullets2D::get_homing_smoothing);
+		ClassDB::bind_method(D_METHOD("set_homing_smoothing", "value"), &DirectionalBullets2D::set_homing_smoothing);
 		ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "homing_smoothing"), "set_homing_smoothing", "get_homing_smoothing");
+
+		ClassDB::bind_method(D_METHOD("get_homing_update_interval"), &DirectionalBullets2D::get_homing_update_interval);
+		ClassDB::bind_method(D_METHOD("set_homing_update_interval", "value"), &DirectionalBullets2D::set_homing_update_interval);
 		ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "homing_update_interval"), "set_homing_update_interval", "get_homing_update_interval");
+		
+		ClassDB::bind_method(D_METHOD("get_homing_take_control_of_texture_rotation"), &DirectionalBullets2D::get_homing_take_control_of_texture_rotation);
+		ClassDB::bind_method(D_METHOD("set_homing_take_control_of_texture_rotation", "value"), &DirectionalBullets2D::set_homing_take_control_of_texture_rotation);
 		ADD_PROPERTY(PropertyInfo(Variant::BOOL, "homing_take_control_of_texture_rotation"), "set_homing_take_control_of_texture_rotation", "get_homing_take_control_of_texture_rotation");
+		
+		ClassDB::bind_method(D_METHOD("get_homing_boundary_distance_away_from_target"), &DirectionalBullets2D::get_homing_boundary_distance_away_from_target);
+		ClassDB::bind_method(D_METHOD("set_homing_boundary_distance_away_from_target", "value"), &DirectionalBullets2D::set_homing_boundary_distance_away_from_target);
 		ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "homing_boundary_distance_away_from_target"), "set_homing_boundary_distance_away_from_target", "get_homing_boundary_distance_away_from_target");
+
+		// OTHER USEFUL METHODS
+		ClassDB::bind_method(D_METHOD("teleport_bullet", "bullet_index", "new_global_pos"), &DirectionalBullets2D::teleport_bullet);
+
 
 		BIND_ENUM_CONSTANT(GlobalPositionTarget);
 		BIND_ENUM_CONSTANT(Node2DTarget);
