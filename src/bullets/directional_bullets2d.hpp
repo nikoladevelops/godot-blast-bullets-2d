@@ -218,16 +218,16 @@ public:
 		}
 	}
 
-	_ALWAYS_INLINE_ void all_bullets_push_back_homing_target(const Variant &node_or_global_position, int bullet_index_start = 0, int bullet_index_end_inclusive = -1) {
+	_ALWAYS_INLINE_ void all_bullets_push_back_homing_target(const Variant &node2d_or_global_position, int bullet_index_start = 0, int bullet_index_end_inclusive = -1) {
 		ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_push_back_homing_target");
-		if (Node2D *node = Object::cast_to<Node2D>(node_or_global_position)) {
+		if (Node2D *node = Object::cast_to<Node2D>(node2d_or_global_position)) {
 			for (int i = bullet_index_start; i <= bullet_index_end_inclusive; ++i) {
 				if (bullets_enabled_status[i]) {
 					bullet_homing_push_back_node2d_target(i, node);
 				}
 			}
-		} else if (node_or_global_position.get_type() == Variant::VECTOR2) {
-			Vector2 global_pos = node_or_global_position;
+		} else if (node2d_or_global_position.get_type() == Variant::VECTOR2) {
+			Vector2 global_pos = node2d_or_global_position;
 			for (int i = bullet_index_start; i <= bullet_index_end_inclusive; ++i) {
 				if (bullets_enabled_status[i]) {
 					bullet_homing_push_back_global_position_target(i, global_pos);
@@ -238,16 +238,16 @@ public:
 		}
 	}
 
-	_ALWAYS_INLINE_ void all_bullets_push_front_homing_target(const Variant &node_or_global_position, int bullet_index_start = 0, int bullet_index_end_inclusive = -1) {
+	_ALWAYS_INLINE_ void all_bullets_push_front_homing_target(const Variant &node2d_or_global_position, int bullet_index_start = 0, int bullet_index_end_inclusive = -1) {
 		ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_push_front_homing_target");
-		if (Node2D *node = Object::cast_to<Node2D>(node_or_global_position)) {
+		if (Node2D *node = Object::cast_to<Node2D>(node2d_or_global_position)) {
 			for (int i = bullet_index_start; i <= bullet_index_end_inclusive; ++i) {
 				if (bullets_enabled_status[i]) {
 					bullet_homing_push_front_node2d_target(i, node);
 				}
 			}
-		} else if (node_or_global_position.get_type() == Variant::VECTOR2) {
-			Vector2 global_pos = node_or_global_position;
+		} else if (node2d_or_global_position.get_type() == Variant::VECTOR2) {
+			Vector2 global_pos = node2d_or_global_position;
 			for (int i = bullet_index_start; i <= bullet_index_end_inclusive; ++i) {
 				if (bullets_enabled_status[i]) {
 					bullet_homing_push_front_global_position_target(i, global_pos);
@@ -272,10 +272,10 @@ public:
 		}
 	}
 
-	_ALWAYS_INLINE_ void all_bullets_replace_homing_targets_with_new_target(const Variant &node_or_global_position, int bullet_index_start = 0, int bullet_index_end_inclusive = -1) {
+	_ALWAYS_INLINE_ void all_bullets_replace_homing_targets_with_new_target(const Variant &node2d_or_global_position, int bullet_index_start = 0, int bullet_index_end_inclusive = -1) {
 		ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_replace_homing_targets_with_new_target");
 		all_bullets_clear_homing_targets(bullet_index_start, bullet_index_end_inclusive);
-		all_bullets_push_back_homing_target(node_or_global_position, bullet_index_start, bullet_index_end_inclusive);
+		all_bullets_push_back_homing_target(node2d_or_global_position, bullet_index_start, bullet_index_end_inclusive);
 	}
 
 	_ALWAYS_INLINE_ void all_bullets_replace_homing_targets_with_new_target_array(const Array &node2ds_or_global_positions_array, int bullet_index_start = 0, int bullet_index_end_inclusive = -1) {
@@ -407,15 +407,15 @@ public:
 		shared_homing_deque.clear_homing_targets(cached_mouse_global_position);
 	}
 
-	_ALWAYS_INLINE_ void shared_homing_deque_replace_homing_targets_with_new_target(const Variant &node_or_global_position) {
-		Node2D *node2d_target = Object::cast_to<Node2D>(node_or_global_position);
+	_ALWAYS_INLINE_ void shared_homing_deque_replace_homing_targets_with_new_target(const Variant &node2d_or_global_position) {
+		Node2D *node2d_target = Object::cast_to<Node2D>(node2d_or_global_position);
 
 		if (node2d_target) {
 			shared_homing_deque_clear_homing_targets();
 			shared_homing_deque_push_back_node2d_target(node2d_target);
-		} else if (node_or_global_position.get_type() == Variant::VECTOR2) {
+		} else if (node2d_or_global_position.get_type() == Variant::VECTOR2) {
 			shared_homing_deque_clear_homing_targets();
-			shared_homing_deque_push_back_global_position_target(node_or_global_position);
+			shared_homing_deque_push_back_global_position_target(node2d_or_global_position);
 		} else {
 			UtilityFunctions::push_error("Invalid type passed to shared_homing_deque_replace_homing_targets_with_new_target");
 		}
@@ -499,6 +499,8 @@ public:
 	void set_bullet_homing_auto_pop_after_target_reached(bool value) { bullet_homing_auto_pop_after_target_reached = value; }
 	real_t get_distance_from_target_before_considering_as_reached() const { return distance_from_target_before_considering_as_reached; }
 	void set_distance_from_target_before_considering_as_reached(real_t value) { distance_from_target_before_considering_as_reached = value; }
+	bool get_shared_deque_auto_pop_after_target_reached() const { return shared_deque_auto_pop_after_target_reached; }
+	void set_shared_deque_auto_pop_after_target_reached(bool value) { shared_deque_auto_pop_after_target_reached = value; }
 
 	// Virtual methods
 	void set_up_movement_data(const TypedArray<BulletSpeedData2D> &new_speed_data);
@@ -512,6 +514,7 @@ protected:
 	bool adjust_direction_based_on_rotation = false;
 	bool homing_take_control_of_texture_rotation = false;
 	bool bullet_homing_auto_pop_after_target_reached = false;
+	bool shared_deque_auto_pop_after_target_reached = false;
 
 	Vector2 cached_mouse_global_position{ 0, 0 };
 
@@ -674,12 +677,14 @@ protected:
 						call_deferred("emit_signal", "bullet_homing_target_reached", this, bullet_index, nullptr, target_pos);
 						break;
 				}
-
+				
 				// Pop the front target automatically if that's what the user wants
-				if (bullet_homing_auto_pop_after_target_reached) {
-					if (is_using_shared_deque) {
+				if (is_using_shared_deque) {
+					if (shared_deque_auto_pop_after_target_reached) {
 						call_deferred("shared_homing_deque_pop_front_target");
-					} else {
+					}
+				} else {
+					if (bullet_homing_auto_pop_after_target_reached) {
 						call_deferred("bullet_homing_pop_front_target", bullet_index);
 					}
 				}
@@ -776,8 +781,8 @@ protected:
 		ClassDB::bind_method(D_METHOD("all_bullets_push_front_mouse_position_target", "bullet_index_start", "bullet_index_end_inclusive"), &DirectionalBullets2D::all_bullets_push_front_mouse_position_target, DEFVAL(0), DEFVAL(-1));
 		ClassDB::bind_method(D_METHOD("all_bullets_push_back_mouse_position_target", "bullet_index_start", "bullet_index_end_inclusive"), &DirectionalBullets2D::all_bullets_push_back_mouse_position_target, DEFVAL(0), DEFVAL(-1));
 
-		ClassDB::bind_method(D_METHOD("all_bullets_push_front_homing_target", "node_or_global_position", "bullet_index_start", "bullet_index_end_inclusive"), &DirectionalBullets2D::all_bullets_push_front_homing_target, DEFVAL(0), DEFVAL(-1));
-		ClassDB::bind_method(D_METHOD("all_bullets_push_back_homing_target", "node_or_global_position", "bullet_index_start", "bullet_index_end_inclusive"), &DirectionalBullets2D::all_bullets_push_back_homing_target, DEFVAL(0), DEFVAL(-1));
+		ClassDB::bind_method(D_METHOD("all_bullets_push_front_homing_target", "node2d_or_global_position", "bullet_index_start", "bullet_index_end_inclusive"), &DirectionalBullets2D::all_bullets_push_front_homing_target, DEFVAL(0), DEFVAL(-1));
+		ClassDB::bind_method(D_METHOD("all_bullets_push_back_homing_target", "node2d_or_global_position", "bullet_index_start", "bullet_index_end_inclusive"), &DirectionalBullets2D::all_bullets_push_back_homing_target, DEFVAL(0), DEFVAL(-1));
 
 		ClassDB::bind_method(D_METHOD("all_bullets_push_front_homing_targets_array", "node2ds_or_global_positions_array", "bullet_index_start", "bullet_index_end_inclusive"), &DirectionalBullets2D::all_bullets_push_front_homing_targets_array, DEFVAL(0), DEFVAL(-1));
 		ClassDB::bind_method(D_METHOD("all_bullets_push_back_homing_targets_array", "node2ds_or_global_positions_array", "bullet_index_start", "bullet_index_end_inclusive"), &DirectionalBullets2D::all_bullets_push_back_homing_targets_array, DEFVAL(0), DEFVAL(-1));
@@ -796,6 +801,10 @@ protected:
 		ClassDB::bind_method(D_METHOD("bullet_homing_check_current_target_type", "bullet_index"), &DirectionalBullets2D::bullet_homing_check_current_target_type);
 
 		ClassDB::bind_method(D_METHOD("bullet_get_current_homing_target", "bullet_index"), &DirectionalBullets2D::bullet_get_current_homing_target);
+
+		ClassDB::bind_method(D_METHOD("get_bullet_homing_auto_pop_after_target_reached"), &DirectionalBullets2D::get_bullet_homing_auto_pop_after_target_reached);
+		ClassDB::bind_method(D_METHOD("set_bullet_homing_auto_pop_after_target_reached", "value"), &DirectionalBullets2D::set_bullet_homing_auto_pop_after_target_reached);
+		ADD_PROPERTY(PropertyInfo(Variant::BOOL, "bullet_homing_auto_pop_after_target_reached"), "set_bullet_homing_auto_pop_after_target_reached", "get_bullet_homing_auto_pop_after_target_reached");
 
 
 
@@ -829,6 +838,12 @@ protected:
 
 		ClassDB::bind_method(D_METHOD("shared_homing_deque_get_current_homing_target"), &DirectionalBullets2D::shared_homing_deque_get_current_homing_target);
 
+		
+		ClassDB::bind_method(D_METHOD("get_shared_deque_auto_pop_after_target_reached"), &DirectionalBullets2D::get_shared_deque_auto_pop_after_target_reached);
+		ClassDB::bind_method(D_METHOD("set_shared_deque_auto_pop_after_target_reached", "value"), &DirectionalBullets2D::set_shared_deque_auto_pop_after_target_reached);
+		ADD_PROPERTY(PropertyInfo(Variant::BOOL, "shared_deque_auto_pop_after_target_reached"), "set_shared_deque_auto_pop_after_target_reached", "get_shared_deque_auto_pop_after_target_reached");
+
+
 		// OTHER HOMING RELATED
 
 
@@ -843,10 +858,6 @@ protected:
 		ClassDB::bind_method(D_METHOD("get_homing_boundary_facing_direction"), &DirectionalBullets2D::get_homing_boundary_facing_direction);
 		ClassDB::bind_method(D_METHOD("set_homing_boundary_facing_direction", "value"), &DirectionalBullets2D::set_homing_boundary_facing_direction);
 		ADD_PROPERTY(PropertyInfo(Variant::INT, "homing_boundary_facing_direction"), "set_homing_boundary_facing_direction", "get_homing_boundary_facing_direction");
-
-		ClassDB::bind_method(D_METHOD("get_bullet_homing_auto_pop_after_target_reached"), &DirectionalBullets2D::get_bullet_homing_auto_pop_after_target_reached);
-		ClassDB::bind_method(D_METHOD("set_bullet_homing_auto_pop_after_target_reached", "value"), &DirectionalBullets2D::set_bullet_homing_auto_pop_after_target_reached);
-		ADD_PROPERTY(PropertyInfo(Variant::BOOL, "bullet_homing_auto_pop_after_target_reached"), "set_bullet_homing_auto_pop_after_target_reached", "get_bullet_homing_auto_pop_after_target_reached");
 
 		ClassDB::bind_method(D_METHOD("get_homing_smoothing"), &DirectionalBullets2D::get_homing_smoothing);
 		ClassDB::bind_method(D_METHOD("set_homing_smoothing", "value"), &DirectionalBullets2D::set_homing_smoothing);

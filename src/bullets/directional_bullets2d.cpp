@@ -127,5 +127,6 @@ void DirectionalBullets2D::custom_additional_activate_logic(const MultiMeshBulle
 
 	distance_from_target_before_considering_as_reached = 5.0;
 	bullet_homing_auto_pop_after_target_reached = false;
+	shared_deque_auto_pop_after_target_reached = false;
 }
 } //namespace BlastBullets2D
