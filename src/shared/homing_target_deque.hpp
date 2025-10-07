@@ -113,7 +113,6 @@ public:
 		}
 	}
 
-	// Checks whether the bullet is homing a valid target and updates the target_pos with the proper global_position of the target. If the target is invalid node2d it will pop it.
 	_ALWAYS_INLINE_ Vector2 get_cached_front_target_global_position() const {
 		return cached_front_target_global_position;
 	}

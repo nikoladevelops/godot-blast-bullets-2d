@@ -276,10 +276,7 @@ func spawn_multi_mesh_directional_bullets()->void:
 	dir_bullets.distance_from_target_before_considering_as_reached = 50
 	
 	dir_bullets.bullet_homing_auto_pop_after_target_reached = true
-	#dir_bullets.all_bullets_push_front_mouse_position_target()
-	#dir_bullets.all_bullets_clear_homing_targets()
 	
-	#dir_bullets.all_bullets_push_back_mouse_position_target()
 	dir_bullets.bullet_homing_target_reached.connect(func(multimesh:DirectionalBullets2D, bullet_index:int, target: Node2D, target_global_position:Vector2):
 		print("reached target: ", target_global_position)
 		)
