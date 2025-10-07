@@ -277,7 +277,7 @@ func spawn_multi_mesh_directional_bullets()->void:
 	
 	dir_bullets.bullet_homing_auto_pop_after_target_reached = true
 	
-	dir_bullets.bullet_homing_target_reached.connect(func(multimesh:DirectionalBullets2D, bullet_index:int, target: Node2D, target_global_position:Vector2):
+	dir_bullets.bullet_homing_target_reached.connect(func(_multimesh:DirectionalBullets2D, _bullet_index:int, _target: Node2D, target_global_position:Vector2):
 		print("reached target: ", target_global_position)
 		)
 		

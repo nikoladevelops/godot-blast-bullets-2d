@@ -321,7 +321,7 @@ public:
 		return homing_targets.front().type;
 	}
 
-	_ALWAYS_INLINE_ Variant get_bullet_current_homing_target() const {
+	_ALWAYS_INLINE_ Variant get_current_homing_target() const {
 		if (homing_targets.empty()) {
 			return nullptr;
 		}
