@@ -286,7 +286,7 @@ func spawn_multi_mesh_directional_bullets()->void:
 	dir_bullets.shared_homing_deque_push_back_global_position_target(BENCHMARK_GLOBALS.MOVING_TARGET_ONE.global_position)
 	dir_bullets.shared_homing_deque_push_back_mouse_position_target()
 	
-	
+	dir_bullets.is_multimesh_pooling_enabled = false
 	dir_bullets.multimesh_attach_time_based_function(1, func():
 		for enemy in BENCHMARK_GLOBALS.ALL_ENEMY_SPAWNERS[0].enemy_container.get_children():
 			for bullet in dir_bullets.get_amount_bullets():

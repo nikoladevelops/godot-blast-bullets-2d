@@ -1,4 +1,5 @@
 #include "./directional_bullets_data2d.hpp"
+#include "godot_cpp/core/class_db.hpp"
 
 using namespace godot;
 
@@ -31,5 +32,9 @@ void DirectionalBulletsData2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_adjust_direction_based_on_rotation"), &DirectionalBulletsData2D::get_adjust_direction_based_on_rotation);
 	ClassDB::bind_method(D_METHOD("set_adjust_direction_based_on_rotation", "new_adjust_direction_based_on_rotation"), &DirectionalBulletsData2D::set_adjust_direction_based_on_rotation);
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "adjust_direction_based_on_rotation"), "set_adjust_direction_based_on_rotation", "get_adjust_direction_based_on_rotation");
+
+	ClassDB::bind_method(D_METHOD("get_is_multimesh_pooling_enabled"), &DirectionalBulletsData2D::get_is_multimesh_pooling_enabled);
+	ClassDB::bind_method(D_METHOD("set_is_multimesh_pooling_enabled", "value"), &DirectionalBulletsData2D::set_is_multimesh_pooling_enabled);
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "is_multimesh_pooling_enabled"), "set_is_multimesh_pooling_enabled", "get_is_multimesh_pooling_enabled");
 }
 } //namespace BlastBullets2D

@@ -224,7 +224,10 @@ public:
 
 	void set_physics_interpolation_related_data();
 
+	bool get_is_multimesh_pooling_enabled() const { return is_multimesh_pooling_enabled; }
+	void set_is_multimesh_pooling_enabled(bool value) { is_multimesh_pooling_enabled = value; }
 protected:
+	bool is_multimesh_pooling_enabled = true;
 	// Counts all active bullets
 	int active_bullets_counter = 0;
 
@@ -565,6 +568,10 @@ protected:
 
 		ClassDB::bind_method(D_METHOD("_do_execute_stored_callable_safely", "_callback", "_cached_multimesh_bullets_unique_id", "multimesh_bullets_unique_id"), &MultiMeshBullets2D::_do_execute_stored_callable_safely);
 
+		ClassDB::bind_method(D_METHOD("get_is_multimesh_pooling_enabled"), &MultiMeshBullets2D::get_is_multimesh_pooling_enabled);
+		ClassDB::bind_method(D_METHOD("set_is_multimesh_pooling_enabled", "value"), &MultiMeshBullets2D::set_is_multimesh_pooling_enabled);
+		ADD_PROPERTY(PropertyInfo(Variant::BOOL, "is_multimesh_pooling_enabled"), "set_is_multimesh_pooling_enabled", "get_is_multimesh_pooling_enabled");
+		
 		ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "bullets_custom_data"), "set_bullets_custom_data", "get_bullets_custom_data");
 	};
 

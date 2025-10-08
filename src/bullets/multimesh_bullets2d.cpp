@@ -571,6 +571,10 @@ void MultiMeshBullets2D::disable_multimesh() {
 	is_bullet_attachment_provided = false; // Doing this for performance reasons, so the force_delete skips logic bullet_attachments, since if the multimesh is disabled, then all attachments are already pooled and there is no need to go trough each element of the vector checking for nullptr
 	custom_additional_disable_logic();
 
+	if (!is_multimesh_pooling_enabled) {
+		return;
+	}
+	
 	bullets_pool->push(this, amount_bullets);
 }
 
