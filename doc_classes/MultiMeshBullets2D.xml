@@ -35,21 +35,43 @@
 				Check the status of a specific bullet - whether it is enabled (active and visible on screen) or disabled (inactive and invisible)
 			</description>
 		</method>
-		<method name="push_multimesh_to_object_pool">
+		<method name="multimesh_attach_time_based_function">
+			<return type="void" />
+			<param index="0" name="time" type="float" />
+			<param index="1" name="callable" type="Callable" />
+			<param index="2" name="repeat" type="bool" default="false" />
+			<description>
+				Attaches a callable that gets executed after a certain amount of time.
+				If you set the repeat argument to true, then the callable will keep executing forever.
+
+				If you want to be able to detach the callable, then make sure that it is clearly declared outside as a variable or you could even use a normal Godot function.
+
+				Callables that execute bullet related functions have no need of using call_deferred(), since all attached callables are executed at the end of the frame by default for safety.
+			</description>
+		</method>
+		<method name="multimesh_detach_all_time_based_functions">
 			<return type="void" />
 			<description>
-				Push the entire multimesh to the object pool.
-
-				If there are still moving bullets inside the multimesh, they will be disabled first before pushing to the object pool
-				
-				<b>Warning:</b>
-				Always call using call_deferred() to avoid issues
+				Detaches all time based functions that were previously attached.
+			</description>
+		</method>
+		<method name="multimesh_detach_time_based_function">
+			<return type="void" />
+			<param index="0" name="callable" type="Callable" />
+			<description>
+				Detaches a specific time based callable. This will work as long as the callable you are trying to detach
+				was previously saved in a variable or defined as a normal Godot function.
 			</description>
 		</method>
 	</methods>
 	<members>
 		<member name="bullets_custom_data" type="Resource" setter="set_bullets_custom_data" getter="get_bullets_custom_data">
 			You can edit the custom bullets data that the bullets multimesh was spawned with
+		</member>
+		<member name="is_life_time_infinite" type="bool" setter="set_is_life_time_infinite" getter="get_is_life_time_infinite" default="false">
+			If you set to true, then the lifetime will be ignored and bullets will never be destroyed.
+
+			Warning: If you don't implement "collision walls" or anything else to intercept/collide with the bullets, then they will truly live forever in your memory and you will experience lag.
 		</member>
 	</members>
 </class>

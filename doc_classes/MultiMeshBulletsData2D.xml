@@ -113,6 +113,11 @@
 
 			Note: Ensure that the [b]VALUE[/b] is of the same type as your shader instance uniform variable.
 		</member>
+		<member name="is_life_time_infinite" type="bool" setter="set_is_life_time_infinite" getter="get_is_life_time_infinite" default="false">
+			If you set to true, then the lifetime will be ignored and bullets will never be destroyed.
+
+			Warning: If you don't implement "collision walls" or anything else to intercept/collide with the bullets, then they will truly live forever in your memory and you will experience lag.
+		</member>
 		<member name="is_life_time_over_signal_enabled" type="bool" setter="set_is_life_time_over_signal_enabled" getter="get_is_life_time_over_signal_enabled" default="false">
 			If this is enabled then when the lifetime of the bullets is over, the signal [signal BulletFactory2D.life_time_over] will be emitted by the [BulletFactory2D].
 			This is helpful when you want to spawn visual effects at that time (explosion, particles, anything really..).

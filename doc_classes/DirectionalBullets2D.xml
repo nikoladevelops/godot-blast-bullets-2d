@@ -4,22 +4,474 @@
 		Bullets that travel in different directions based on their transform rotation. Never use this by its own. Always use the [BulletFactory2D], that's the only proper way.
 	</brief_description>
 	<description>
+		[DirectionalBullets2D] extends [MultiMeshBullets2D] with advanced homing capabilities. It supports per-bullet homing deques for individualized target chasing (e.g., specific enemies) and a shared deque for uniform swarm behaviors (e.g., collective waypoint following). Targets can be global positions, Node2D instances, or mouse position, with optional auto-pop on reach (see [member bullet_homing_auto_pop_after_target_reached], [member shared_deque_auto_pop_after_target_reached], [signal bullet_homing_target_reached]) and smoothing for natural turning (see [member homing_smoothing]). Enables complex bullet patterns in 2D games.
+
+		Warning: Never use [code]get_tree().create_timer()[/code] or any other godot timers with this class. It will cause issues with the internal timing of the bullets. If you need timers, use [method MultiMeshBullets2D.multimesh_attach_time_based_function] instead.
+
+		Warning: When editing runtime properties or calling methods that edit the multimesh always use [method Object.call_deferred] to avoid issues. The only exception to this are callables attached via [method MultiMeshBullets2D.multimesh_attach_time_based_function], since those are executed at the end of the frame by default for safety.
+
+		Warning: Homing functionality can be done in two ways - either using [b]per-bullet homing deques[/b] (each bullet has its own deque of homing targets) or a [b]shared homing deque[/b] (each bullet shares the same shared deque). Both are supported and if both are used then the shared deque takes precedence over the per-bullet ones. Meaning that if the shared deque has any targets in it then all bullets will follow that one instead of their own individual targets. Any method or property that mentions "shared" is related to the shared deque.
+
+		Note: Deque means double ended queue (you can push and pop from both ends), the homing target at the front is always the one being followed.
 	</description>
 	<tutorials>
 	</tutorials>
 	<methods>
-		<method name="set_bullet_homing_target">
+		<method name="all_bullets_clear_homing_targets">
 			<return type="void" />
+			<param index="0" name="bullet_index_start" type="int" default="0" />
+			<param index="1" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<description>
+				Clears all homing targets for the specified range of bullets (per-bullet deques only; shared deque unaffected).
+
+				If you want to clear all bullet targets for a shared deque, use [method shared_homing_deque_clear_homing_targets] instead.
+			</description>
+		</method>
+		<method name="all_bullets_push_back_homing_target">
+			<return type="void" />
+			<param index="0" name="node2d_or_global_position" type="Variant" />
+			<param index="1" name="bullet_index_start" type="int" default="0" />
+			<param index="2" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<description>
+				This is a helper that allows you to push a single homing target(Node2D or Vector2 global position) to the back of the deque for all bullets in the range (per-bullet deques only).
+
+				If you want to push back a target to the shared deque, use [method shared_homing_deque_push_back_global_position_target], [method shared_homing_deque_push_back_node2d_target] or [method shared_homing_deque_push_back_mouse_position_target] instead.
+			</description>
+		</method>
+		<method name="all_bullets_push_back_homing_targets_array">
+			<return type="void" />
+			<param index="0" name="node2ds_or_global_positions_array" type="Array" />
+			<param index="1" name="bullet_index_start" type="int" default="0" />
+			<param index="2" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<description>
+				Pushes an array of homing targets (mix of Node2D and Vector2) to the back of the deque for all bullets in the range (per-bullet deques only).
+
+				If you want to push back targets to the shared deque, use [method shared_homing_deque_push_back_homing_targets_array] instead.
+			</description>
+		</method>
+		<method name="all_bullets_push_back_mouse_position_target">
+			<return type="void" />
+			<param index="0" name="bullet_index_start" type="int" default="0" />
+			<param index="1" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<description>
+				Pushes the current mouse global position as a homing target to the back of the deque for all bullets in the range (per-bullet deques only).
+
+				If you want to push back a mouse position target to the shared deque, use [method shared_homing_deque_push_back_mouse_position_target] instead.
+			</description>
+		</method>
+		<method name="all_bullets_push_front_homing_target">
+			<return type="void" />
+			<param index="0" name="node2d_or_global_position" type="Variant" />
+			<param index="1" name="bullet_index_start" type="int" default="0" />
+			<param index="2" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<description>
+				Pushes a single homing target (Node2D or Vector2 global position) to the front of the deque for all bullets in the range (per-bullet deques only).
+
+				Warning: Pushing to the front changes the current target being followed immediately.
+
+				If you want to push front a target to the shared deque, use [method shared_homing_deque_push_front_global_position_target], [method shared_homing_deque_push_front_node2d_target] or [method shared_homing_deque_push_front_mouse_position_target] instead.
+			</description>
+		</method>
+		<method name="all_bullets_push_front_homing_targets_array">
+			<return type="void" />
+			<param index="0" name="node2ds_or_global_positions_array" type="Array" />
+			<param index="1" name="bullet_index_start" type="int" default="0" />
+			<param index="2" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<description>
+				Pushes an array of homing targets to the front of the deque for all bullets in the range (per-bullet deques only).
+
+				Warning: Pushing to the front changes the current target being followed immediately.
+
+				If you want to push front targets to the shared deque, use [method shared_homing_deque_push_front_homing_targets_array] instead.
+			</description>
+		</method>
+		<method name="all_bullets_push_front_mouse_position_target">
+			<return type="void" />
+			<param index="0" name="bullet_index_start" type="int" default="0" />
+			<param index="1" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<description>
+				Pushes the current mouse global position to the front of the deque for all bullets in the range (per-bullet deques only).
+
+				Warning: Pushing to the front changes the current target being followed immediately.
+
+				If you want to push front a mouse position target to the shared deque, use [method shared_homing_deque_push_front_mouse_position_target] instead.
+			</description>
+		</method>
+		<method name="all_bullets_replace_homing_targets_with_new_target">
+			<return type="void" />
+			<param index="0" name="node2d_or_global_position" type="Variant" />
+			<param index="1" name="bullet_index_start" type="int" default="0" />
+			<param index="2" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<description>
+				Clears then pushes a single homing target to the back for all bullets in the range (per-bullet deques only).
+
+				If you want to clear then push a single target to the shared deque, use [method shared_homing_deque_replace_homing_targets_with_new_target] instead.
+			</description>
+		</method>
+		<method name="all_bullets_replace_homing_targets_with_new_target_array">
+			<return type="void" />
+			<param index="0" name="node2ds_or_global_positions_array" type="Array" />
+			<param index="1" name="bullet_index_start" type="int" default="0" />
+			<param index="2" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<description>
+				Clears then pushes an array of homing targets to the back for all bullets in the range (per-bullet deques only).
+
+				If you want to clear then push an array of targets to the shared deque, use [method shared_homing_deque_replace_homing_targets_with_new_target_array] instead.
+			</description>
+		</method>
+		<method name="bullet_check_has_homing_targets" qualifiers="const">
+			<return type="bool" />
+			<param index="0" name="bullet_index" type="int" />
+			<description>
+				Returns true if the specified bullet has any homing targets in its per-bullet deque.
+
+				If you want to check if the shared deque has any targets, use [method shared_homing_deque_check_has_homing_targets] instead.
+			</description>
+		</method>
+		<method name="bullet_clear_homing_targets">
+			<return type="void" />
+			<param index="0" name="bullet_index" type="int" />
+			<description>
+				Clears all homing targets from the specified bullet's per-bullet deque. Resets individual path; shared unaffected.
+
+				If you want to clear all bullet targets for a shared deque, use [method shared_homing_deque_clear_homing_targets] instead.
+			</description>
+		</method>
+		<method name="bullet_get_current_homing_target" qualifiers="const">
+			<return type="Variant" />
+			<param index="0" name="bullet_index" type="int" />
+			<description>
+				Returns the current (front) homing target for the specified bullet's per-bullet deque as Variant (Node2D or Vector2; nullptr if invalid/empty).
+
+				If you want to get the current target from the shared deque, use [method shared_homing_deque_get_current_homing_target] instead.
+			</description>
+		</method>
+		<method name="bullet_homing_check_current_target_type" qualifiers="const">
+			<return type="int" enum="BlastBullets2D.HomingType" />
+			<param index="0" name="bullet_index" type="int" />
+			<description>
+				Returns the type of the current (front) homing target for the specified bullet's per-bullet deque (NotHoming if empty).
+
+				If you want to check the type of the current target from the shared deque, use [method shared_homing_deque_check_current_target_type] instead.
+			</description>
+		</method>
+		<method name="bullet_homing_check_targets_amount" qualifiers="const">
+			<return type="int" />
+			<param index="0" name="bullet_index" type="int" />
+			<description>
+				Returns the number of homing targets in the specified bullet's per-bullet deque.
+
+				If you want to check the number of targets in the shared deque, use [method shared_homing_deque_check_homing_targets_amount] instead.
+			</description>
+		</method>
+		<method name="bullet_homing_pop_back_target">
+			<return type="Variant" />
+			<param index="0" name="bullet_index" type="int" />
+			<description>
+				Pops and returns the back homing target from the specified bullet's per-bullet deque (Variant: Node2D or Vector2; nullptr if invalid/empty).
+
+				If you want to pop the back target from the shared deque, use [method shared_homing_deque_pop_back_target] instead.
+			</description>
+		</method>
+		<method name="bullet_homing_pop_front_target">
+			<return type="Variant" />
+			<param index="0" name="bullet_index" type="int" />
+			<description>
+				Pops and returns the front (current) homing target from the specified bullet's per-bullet deque (Variant: Node2D or Vector2; nullptr if invalid/empty).
+
+				If you want to pop the front target from the shared deque, use [method shared_homing_deque_pop_front_target] instead.
+			</description>
+		</method>
+		<method name="bullet_homing_push_back_global_position_target">
+			<return type="bool" />
+			<param index="0" name="bullet_index" type="int" />
+			<param index="1" name="global_position" type="Vector2" />
+			<description>
+				Pushes a global position target to the back of the specified bullet's per-bullet deque. Returns true on success (bullet enabled/valid index).
+
+				If you want to push back a target to the shared deque, use [method shared_homing_deque_push_back_global_position_target] instead.
+			</description>
+		</method>
+		<method name="bullet_homing_push_back_mouse_position_target">
+			<return type="bool" />
+			<param index="0" name="bullet_index" type="int" />
+			<description>
+				Pushes the current mouse global position to the back of the specified bullet's per-bullet deque. Returns true on success; caches for perf.
+
+				If you want to push back a mouse position target to the shared deque, use [method shared_homing_deque_push_back_mouse_position_target] instead.
+			</description>
+		</method>
+		<method name="bullet_homing_push_back_node2d_target">
+			<return type="bool" />
 			<param index="0" name="bullet_index" type="int" />
 			<param index="1" name="new_homing_target" type="Node2D" />
 			<description>
+				Pushes a Node2D target to the back of the specified bullet's per-bullet deque. Returns true on success (bullet enabled/valid index/target).
+
+				If you want to push back a target to the shared deque, use [method shared_homing_deque_push_back_node2d_target] instead.
 			</description>
 		</method>
-		<method name="stop_bullet_homing">
-			<return type="void" />
+		<method name="bullet_homing_push_front_global_position_target">
+			<return type="bool" />
+			<param index="0" name="bullet_index" type="int" />
+			<param index="1" name="global_position" type="Vector2" />
+			<description>
+				Pushes a global position target to the front of the specified bullet's per-bullet deque. Returns true on success (bullet enabled/valid index).
+
+				If you want to push front a target to the shared deque, use [method shared_homing_deque_push_front_global_position_target] instead.
+			</description>
+		</method>
+		<method name="bullet_homing_push_front_mouse_position_target">
+			<return type="bool" />
 			<param index="0" name="bullet_index" type="int" />
 			<description>
+				Pushes the current mouse global position to the front of the specified bullet's per-bullet deque. Returns true on success.
+
+				If you want to push front a mouse position target to the shared deque, use [method shared_homing_deque_push_front_mouse_position_target] instead.
+			</description>
+		</method>
+		<method name="bullet_homing_push_front_node2d_target">
+			<return type="bool" />
+			<param index="0" name="bullet_index" type="int" />
+			<param index="1" name="new_homing_target" type="Node2D" />
+			<description>
+				Pushes a Node2D target to the front of the specified bullet's per-bullet deque. Returns true on success (bullet enabled/valid index/target).
+
+				If you want to push front a target to the shared deque, use [method shared_homing_deque_push_front_node2d_target] instead.
+			</description>
+		</method>
+		<method name="shared_homing_deque_check_current_target_type" qualifiers="const">
+			<return type="int" enum="BlastBullets2D.HomingType" />
+			<description>
+				Returns the type of the current (front) homing target in the shared deque (NotHoming if empty).
+
+				If you want to check the type of the current target from a specific bullet's per-bullet deque, use [method bullet_homing_check_current_target_type] instead.
+			</description>
+		</method>
+		<method name="shared_homing_deque_check_has_homing_targets" qualifiers="const">
+			<return type="bool" />
+			<description>
+				Returns true if the shared deque has any homing targets.
+
+				If you want to check if a specific bullet's per-bullet deque has any targets, use [method bullet_check_has_homing_targets] instead.
+			</description>
+		</method>
+		<method name="shared_homing_deque_check_homing_targets_amount" qualifiers="const">
+			<return type="int" />
+			<description>
+				Returns the number of homing targets in the shared deque.
+
+				If you want to check the number of targets in a specific bullet's per-bullet deque, use [method bullet_homing_check_targets_amount] instead.
+			</description>
+		</method>
+		<method name="shared_homing_deque_clear_homing_targets">
+			<return type="void" />
+			<description>
+				Clears all targets from the shared deque, decrementing mouse counter if applicable. Resets swarm path.
+
+				If you want to clear all homing targets from specific bullets' per-bullet deques, use [method all_bullets_clear_homing_targets] or [method bullet_clear_homing_targets] instead.
+			</description>
+		</method>
+		<method name="shared_homing_deque_get_current_homing_target" qualifiers="const">
+			<return type="Variant" />
+			<description>
+				Returns the current (front) homing target from the shared deque as Variant (Node2D or Vector2; nullptr if invalid/empty).
+
+				If you want to get the current target from a specific bullet's per-bullet deque, use [method bullet_get_current_homing_target] instead.
+			</description>
+		</method>
+		<method name="shared_homing_deque_pop_back_target">
+			<return type="Variant" />
+			<description>
+				Pops and returns the back homing target from the shared deque (Variant: Node2D or Vector2; nullptr if invalid/empty).
+
+				If you want to pop the back target from a specific bullet's per-bullet deque, use [method bullet_homing_pop_back_target] instead.
+			</description>
+		</method>
+		<method name="shared_homing_deque_pop_front_target">
+			<return type="Variant" />
+			<description>
+				Pops and returns the front (current) homing target from the shared deque (Variant: Node2D target or Vector2; nullptr if invalid/empty).
+
+				If you want to pop the front target from a specific bullet's per-bullet deque, use [method bullet_homing_pop_front_target] instead.
+			</description>
+		</method>
+		<method name="shared_homing_deque_push_back_global_position_target">
+			<return type="void" />
+			<param index="0" name="global_position" type="Vector2" />
+			<description>
+				Pushes a global position target to the back of the shared deque.
+
+				If you want to push back a target to a specific bullet's per-bullet deque, use [method bullet_homing_push_back_global_position_target] instead.
+			</description>
+		</method>
+		<method name="shared_homing_deque_push_back_homing_targets_array">
+			<return type="void" />
+			<param index="0" name="node2ds_or_global_positions_array" type="Array" />
+			<description>
+				Pushes an array of homing targets (mix of Node2D and Vector2) to the back of the shared deque.
+
+				If you want to push back targets to a specific bullet's per-bullet deque, use [method all_bullets_push_back_homing_targets_array] instead.
+			</description>
+		</method>
+		<method name="shared_homing_deque_push_back_mouse_position_target">
+			<return type="void" />
+			<description>
+				Pushes the current mouse global position to the back of the shared deque.
+
+				If you want to push back a mouse position target to a specific bullet's per-bullet deque, use [method bullet_homing_push_back_mouse_position_target] instead.
+			</description>
+		</method>
+		<method name="shared_homing_deque_push_back_node2d_target">
+			<return type="void" />
+			<param index="0" name="new_homing_target" type="Node2D" />
+			<description>
+				Pushes a Node2D target to the back of the shared deque.
+
+				If you want to push back a target to a specific bullet's per-bullet deque, use [method bullet_homing_push_back_node2d_target] instead.
+			</description>
+		</method>
+		<method name="shared_homing_deque_push_front_global_position_target">
+			<return type="void" />
+			<param index="0" name="global_position" type="Vector2" />
+			<description>
+				Pushes a global position target to the front of the shared deque.
+
+				Warning: Pushing to the front changes the current target being followed immediately.
+
+				If you want to push front a target to a specific bullet's per-bullet deque, use [method bullet_homing_push_front_global_position_target] instead.
+			</description>
+		</method>
+		<method name="shared_homing_deque_push_front_homing_targets_array">
+			<return type="void" />
+			<param index="0" name="node2ds_or_global_positions_array" type="Array" />
+			<description>
+				Pushes an array of homing targets to the front of the shared deque.
+
+				Warning: Pushing to the front changes the current target being followed immediately.
+
+				If you want to push front targets to a specific bullet's per-bullet deque, use [method all_bullets_push_front_homing_targets_array] instead.
+			</description>
+		</method>
+		<method name="shared_homing_deque_push_front_mouse_position_target">
+			<return type="void" />
+			<description>
+				Pushes the current mouse global position to the front of the shared deque.
+
+				Warning: Pushing to the front changes the current target being followed immediately.
+
+				If you want to push front a mouse position target to a specific bullet's per-bullet deque, use [method bullet_homing_push_front_mouse_position_target] instead.
+			</description>
+		</method>
+		<method name="shared_homing_deque_push_front_node2d_target">
+			<return type="void" />
+			<param index="0" name="new_homing_target" type="Node2D" />
+			<description>
+				Pushes a Node2D target to the front of the shared deque.
+
+				Warning: Pushing to the front changes the current target being followed immediately.
+
+				If you want to push front a target to a specific bullet's per-bullet deque, use [method bullet_homing_push_front_node2d_target] instead.
+			</description>
+		</method>
+		<method name="shared_homing_deque_replace_homing_targets_with_new_target">
+			<return type="void" />
+			<param index="0" name="node2d_or_global_position" type="Variant" />
+			<description>
+				Clears then pushes a single homing target to the back of the shared deque.
+
+				If you want to clear then push a single target to a specific bullet's per-bullet deque, use [method all_bullets_replace_homing_targets_with_new_target] instead.
+			</description>
+		</method>
+		<method name="shared_homing_deque_replace_homing_targets_with_new_target_array">
+			<return type="void" />
+			<param index="0" name="node2ds_or_global_positions_array" type="Array" />
+			<description>
+				Clears then pushes an array of homing targets to the back of the shared deque.
+
+				If you want to clear then push an array of targets to a specific bullet's per-bullet deque, use [method all_bullets_replace_homing_targets_with_new_target_array] instead.
+			</description>
+		</method>
+		<method name="teleport_bullet">
+			<return type="void" />
+			<param index="0" name="bullet_index" type="int" />
+			<param index="1" name="new_global_pos" type="Vector2" />
+			<description>
+				Teleports the specified bullet to a new global position, updating transform, shape, and interpolation. Useful for repositioning mid-homing.
 			</description>
 		</method>
 	</methods>
+	<members>
+		<member name="bullet_homing_auto_pop_after_target_reached" type="bool" setter="set_bullet_homing_auto_pop_after_target_reached" getter="get_bullet_homing_auto_pop_after_target_reached" default="false">
+			Whether the current homing target should be automatically popped from the deque once it gets reached by a bullet (per-bullet deques only).
+
+			Adjust the distance for considering a target reached with [member distance_from_target_before_considering_as_reached].
+
+			The signal [signal bullet_homing_target_reached] is emitted when a target is reached.
+
+			If you want this behavior for the shared deque, use [member shared_deque_auto_pop_after_target_reached] instead.
+		</member>
+		<member name="distance_from_target_before_considering_as_reached" type="float" setter="set_distance_from_target_before_considering_as_reached" getter="get_distance_from_target_before_considering_as_reached" default="5.0">
+			Adjust if you want your bullets to consider a target reached if they are within a certain distance away from it.
+		</member>
+		<member name="homing_boundary_behavior" type="int" setter="set_homing_boundary_behavior" getter="get_homing_boundary_behavior" enum="DirectionalBullets2D.HomingBoundaryBehavior" default="0">
+		</member>
+		<member name="homing_boundary_distance_away_from_target" type="float" setter="set_homing_boundary_distance_away_from_target" getter="get_homing_boundary_distance_away_from_target" default="0.0">
+		</member>
+		<member name="homing_boundary_facing_direction" type="int" setter="set_homing_boundary_facing_direction" getter="get_homing_boundary_facing_direction" enum="DirectionalBullets2D.HomingBoundaryFacingDirection" default="0">
+		</member>
+		<member name="homing_smoothing" type="float" setter="set_homing_smoothing" getter="get_homing_smoothing" default="0.0">
+			Adjust this value for natural smooth turning. Test with values [code]0.00-20.00[/code] or even bigger.
+		</member>
+		<member name="homing_take_control_of_texture_rotation" type="bool" setter="set_homing_take_control_of_texture_rotation" getter="get_homing_take_control_of_texture_rotation" default="false">
+			If you set to true then the texture of the bullets will start facing the direction in which it is moving while homing towards a target.
+		</member>
+		<member name="homing_update_interval" type="float" setter="set_homing_update_interval" getter="get_homing_update_interval" default="0.0">
+			How often it should cache the position of the targets so that they can be re-used instead of fetching them every frame. Increase if you want to boost performance.
+		</member>
+		<member name="shared_deque_auto_pop_after_target_reached" type="bool" setter="set_shared_deque_auto_pop_after_target_reached" getter="get_shared_deque_auto_pop_after_target_reached" default="false">
+			Whether the current homing target should be automatically popped from the deque once it gets reached by a bullet (per-bullet deques only).
+
+			Adjust the distance for considering a target reached with [member distance_from_target_before_considering_as_reached].
+
+			The signal [signal bullet_homing_target_reached] is emitted when a target is reached.
+
+			If you want this behavior for the per-bullet deques, use [member bullet_homing_auto_pop_after_target_reached] instead.
+		</member>
+	</members>
+	<signals>
+		<signal name="bullet_homing_target_reached">
+			<param index="0" name="multimesh_instance" type="DirectionalBullets2D" />
+			<param index="1" name="bullet_index" type="int" />
+			<param index="2" name="target" type="Node2D" />
+			<param index="3" name="target_global_position" type="Vector2" />
+			<description>
+				Emitted once the homing target gets reached by a bullet.
+
+				The [code]target_global_position[/code] is always valid for access, it can be either the Node2D's global position, a global position target or a mouse global position target.
+
+				Warning: Always check if target is null or not since the bullet might be following a global position or a mouse position instead of a Node2D.
+			</description>
+		</signal>
+	</signals>
+	<constants>
+		<constant name="GlobalPositionTarget" value="1" enum="HomingType">
+		</constant>
+		<constant name="Node2DTarget" value="2" enum="HomingType">
+		</constant>
+		<constant name="NotHoming" value="0" enum="HomingType">
+		</constant>
+		<constant name="BoundaryDontMove" value="0" enum="HomingBoundaryBehavior">
+		</constant>
+		<constant name="BoundaryOrbitLeft" value="1" enum="HomingBoundaryBehavior">
+		</constant>
+		<constant name="BoundaryOrbitRight" value="2" enum="HomingBoundaryBehavior">
+		</constant>
+		<constant name="FaceTarget" value="0" enum="HomingBoundaryFacingDirection">
+		</constant>
+		<constant name="FaceOppositeTarget" value="1" enum="HomingBoundaryFacingDirection">
+		</constant>
+		<constant name="FaceOrbitingDirection" value="2" enum="HomingBoundaryFacingDirection">
+		</constant>
+	</constants>
 </class>

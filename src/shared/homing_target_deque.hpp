@@ -151,7 +151,7 @@ public:
 		HomingTarget target = homing_targets.front();
 		homing_targets.pop_front();
 
-		const Vector2 cached_pos = cached_front_target_global_position; //cached_bullet_homing_deque_front_target_global_positions[bullet_index];
+		const Vector2 cached_pos = cached_front_target_global_position;
 
 		if (queue_size > 1) { // If the old size was bigger than 1 it means there is an element that will now be the front of the queue
 			HomingTarget next_target = homing_targets.front();

@@ -21,7 +21,11 @@
 		[b]This plugin is completely free and created by [url=https://x.com/realNikich]realNikich[/url][/b]
 		[url=https://github.com/nikoladevelops/godot-blast-bullets-2d]Official Repository Of BlastBullets2D[/url]
 		[url=https://www.youtube.com/@realnikich]YouTube Channel[/url]
-		[url=https://www.patreon.com/realnikich]Support My Work[/url]
+		[url=https://www.youtube.com/playlist?list=PLM_yd-xZalAOkF9__9_7s-6pou_QZ_GkE]Learn To Make Or Modify C++ Plugins For Godot[/url]
+
+		Support My Work
+		[url=https://ko-fi.com/realnikich]Donate On Ko-fi[/url]
+		[url=https://www.patreon.com/realnikich]Donate On Patreon[/url]
 	</description>
 	<tutorials>
 	</tutorials>
@@ -185,12 +189,24 @@
 				These bullets can NOT be controlled individually, but they are more efficient performance wise.
 			</description>
 		</method>
-		<method name="spawn_directional_bullets">
+		<method name="spawn_controllable_directional_bullets">
 			<return type="DirectionalBullets2D" />
 			<param index="0" name="spawn_data" type="DirectionalBulletsData2D" />
 			<description>
+				Spawns DirectionalBullets2D that are meant to be controlled and edited.
+				If there is a multimesh available in the object pool then it gets re-used with the new data.
+				Use if you want homing bullets or to edit properties during runtime.
+
+				Warning: Since object pooling is enabled by default, if you save these bullets to an array you might
+				accidentally push the exact same multimesh (you end up with 2 references or more to the same exact object)
+			</description>
+		</method>
+		<method name="spawn_directional_bullets">
+			<return type="void" />
+			<param index="0" name="spawn_data" type="DirectionalBulletsData2D" />
+			<description>
 				Spawns [DirectionalBullets2D] - bullets that have individual directions determined by the rotation of their transforms.
-				These bullets can be controlled individually and are preffered for Bullet Hell games or games that require a lot of bullet control.
+				To control these bullets individually, use the [method spawn_controllable_directional_bullets] function instead.
 			</description>
 		</method>
 	</methods>

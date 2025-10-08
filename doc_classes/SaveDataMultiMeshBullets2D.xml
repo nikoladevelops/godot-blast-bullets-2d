@@ -67,6 +67,8 @@
 		</member>
 		<member name="is_bullet_attachment_provided" type="bool" setter="set_is_bullet_attachment_provided" getter="get_is_bullet_attachment_provided" default="false">
 		</member>
+		<member name="is_life_time_infinite" type="bool" setter="set_is_life_time_infinite" getter="get_is_life_time_infinite" default="false">
+		</member>
 		<member name="is_life_time_over_signal_enabled" type="bool" setter="set_is_life_time_over_signal_enabled" getter="get_is_life_time_over_signal_enabled" default="false">
 		</member>
 		<member name="light_mask" type="int" setter="set_light_mask" getter="get_light_mask" default="1">
