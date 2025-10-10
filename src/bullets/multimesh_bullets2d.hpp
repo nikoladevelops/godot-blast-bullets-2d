@@ -471,9 +471,25 @@ protected:
 		}
 	}
 
-	_ALWAYS_INLINE_ void _handle_bullet_collision(String factory_signal_name_to_emit, int bullet_index, Object *hit_target) {
+	_ALWAYS_INLINE_ void _handle_bullet_collision(String factory_signal_name_to_emit, int bullet_index, int64_t entered_instance_id) {
 		disable_bullet(bullet_index);
+
+		Object *hit_target = ObjectDB::get_instance(entered_instance_id);
+
 		bullet_factory->emit_signal(factory_signal_name_to_emit, hit_target, this, bullet_index, bullets_custom_data, all_cached_instance_transforms[bullet_index]);
+	}
+
+	/// COLLISION DETECTION METHODS
+
+	_ALWAYS_INLINE_ void area_entered_func(PhysicsServer2D::AreaBodyStatus status, RID entered_rid, int64_t entered_instance_id, int entered_shape_index, int bullet_shape_index) {
+		if (status == PhysicsServer2D::AREA_BODY_ADDED) {
+			call_deferred("_handle_bullet_collision", "area_entered", bullet_shape_index, entered_instance_id);
+		}
+	}
+	_ALWAYS_INLINE_ void body_entered_func(PhysicsServer2D::AreaBodyStatus status, RID entered_rid, int64_t entered_instance_id, int entered_shape_index, int bullet_shape_index) {
+		if (status == PhysicsServer2D::AREA_BODY_ADDED) {
+			call_deferred("_handle_bullet_collision", "body_entered", bullet_shape_index, entered_instance_id);
+		}
 	}
 
 	// Disables a single bullet temporarily
@@ -584,7 +600,7 @@ protected:
 
 		ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "bullets_custom_data"), "set_bullets_custom_data", "get_bullets_custom_data");
 
-		ClassDB::bind_method(D_METHOD("_handle_bullet_collision", "factory_signal_name_to_emit", "bullet_index", "hit_target"), &MultiMeshBullets2D::_handle_bullet_collision);
+		ClassDB::bind_method(D_METHOD("_handle_bullet_collision", "factory_signal_name_to_emit", "bullet_index", "entered_instance_id"), &MultiMeshBullets2D::_handle_bullet_collision);
 	};
 
 	bool get_is_life_time_infinite() const { return is_life_time_infinite; }
@@ -673,13 +689,6 @@ private:
 			int new_light_mask,
 			int new_visibility_layer,
 			const Dictionary &new_instance_shader_parameters);
-
-	///
-
-	/// COLLISION DETECTION METHODS
-
-	void area_entered_func(PhysicsServer2D::AreaBodyStatus, RID entered_rid, int64_t entered_instance_id, int entered_shape_index, int bullet_shape_index);
-	void body_entered_func(PhysicsServer2D::AreaBodyStatus, RID entered_rid, int64_t entered_instance_id, int entered_shape_index, int bullet_shape_index);
 
 	///
 

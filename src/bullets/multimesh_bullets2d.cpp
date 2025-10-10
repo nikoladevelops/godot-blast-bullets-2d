@@ -851,21 +851,4 @@ void MultiMeshBullets2D::set_all_physics_shapes_enabled_for_area(bool enable) {
 		physics_server->area_set_shape_disabled(area, i, !enable);
 	}
 }
-
-/// COLLISION DETECTION METHODS
-
-void MultiMeshBullets2D::area_entered_func(PhysicsServer2D::AreaBodyStatus status, RID entered_rid, int64_t entered_instance_id, int entered_shape_index, int bullet_shape_index) {
-	if (status == PhysicsServer2D::AREA_BODY_ADDED) {
-		Object *obj = ObjectDB::get_instance(entered_instance_id);
-
-		call_deferred("_handle_bullet_collision", "area_entered", bullet_shape_index, obj);
-	}
-}
-void MultiMeshBullets2D::body_entered_func(PhysicsServer2D::AreaBodyStatus status, RID entered_rid, int64_t entered_instance_id, int entered_shape_index, int bullet_shape_index) {
-	if (status == PhysicsServer2D::AREA_BODY_ADDED) {
-		Object *obj = ObjectDB::get_instance(entered_instance_id);
-
-		call_deferred("_handle_bullet_collision", "body_entered", bullet_shape_index, obj);
-	}
-}
 } //namespace BlastBullets2D
