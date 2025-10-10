@@ -13,6 +13,7 @@
 #include "../debugger/multimesh_bullets_debugger2d.hpp"
 #include "../shared/bullet_attachment2d.hpp"
 #include "../shared/multimesh_object_pool2d.hpp"
+#include "godot_cpp/classes/global_constants.hpp"
 #include "godot_cpp/core/math.hpp"
 #include "godot_cpp/variant/vector3.hpp"
 
@@ -879,7 +880,11 @@ void BulletFactory2D::_bind_methods() {
 			PropertyInfo(Variant::OBJECT, "bullets_custom_data", PROPERTY_HINT_RESOURCE_TYPE, "Resource"),
 			PropertyInfo(Variant::TRANSFORM2D, "bullet_global_transform")));
 
-	ADD_SIGNAL(MethodInfo("life_time_over", PropertyInfo(Variant::OBJECT, "bullets_custom_data", PROPERTY_HINT_RESOURCE_TYPE, "Resource"), PropertyInfo(Variant::ARRAY, "all_bullet_global_transforms")));
+	ADD_SIGNAL(MethodInfo("life_time_over",
+			PropertyInfo(Variant::OBJECT, "multimesh_bullets_instance", PROPERTY_HINT_RESOURCE_TYPE, "MultiMeshBullets2D"),
+			PropertyInfo(Variant::ARRAY, "bullet_indexes", PROPERTY_HINT_ARRAY_TYPE, "int"),
+			PropertyInfo(Variant::OBJECT, "bullets_custom_data", PROPERTY_HINT_RESOURCE_TYPE, "Resource"),
+			PropertyInfo(Variant::ARRAY, "bullets_global_transforms", PROPERTY_HINT_ARRAY_TYPE, "Transform2D")));
 
 	ADD_SIGNAL(MethodInfo("save_finished", PropertyInfo(Variant::OBJECT, "data", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_DEFAULT, "SaveDataBulletFactory2D")));
 	ADD_SIGNAL(MethodInfo("load_finished"));

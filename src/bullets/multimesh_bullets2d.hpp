@@ -137,17 +137,19 @@ public:
 			if (is_life_time_over_signal_enabled) {
 				// Will hold all transforms of bullets that have not yet hit anything / the ones we are forced to disable due to life time being over
 				TypedArray<Transform2D> transfs;
+				TypedArray<int> bullet_indexes;
 
 				for (int i = 0; i < amount_bullets; i++) {
 					// If the status is active it means that the bullet hasn't hit anything yet, so we need to disable it ourselves
 					if (bullets_enabled_status[i]) {
 						call_deferred("disable_bullet", i); // disable it
 						transfs.push_back(all_cached_instance_transforms[i]); // store the transform of the disabled bullet
+						bullet_indexes.push_back(i);
 					}
 				}
 
 				// Emit a signal and pass all the transforms of bullets that were forcefully disabled / the ones that were disabled due to life time being over (NOT because they hit a collision shape/body)
-				bullet_factory->emit_signal("life_time_over", bullets_custom_data, transfs);
+				bullet_factory->call_deferred("emit_signal", "life_time_over", this, bullet_indexes, bullets_custom_data, transfs);
 
 			} else {
 				// If we do not wish to emit the life_time_over signal, just disable the bullet and don't worry about having to pass additional data to the user

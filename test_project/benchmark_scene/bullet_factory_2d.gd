@@ -12,7 +12,7 @@ extends BulletFactory2D
 # Example: if enemy is in collision_layer = 3, then the bullets you are spawning should always have the collision_mask = 3 as well, otherwise they won't interact with eachother
 
 # This function is connected to the area_entered signal of the bullet factory. It is executed each time a bullet spawned from the factory hits an Area2D (and again in order for a thing to be hit, ensure the layers are correct!)
-func _on_area_entered(hit_target_area: Object, multimesh_bullets_instance:MultiMeshBullets2D, bullet_index:int, bullets_custom_data: Resource, _bullet_global_transform: Transform2D) -> void:	
+func _on_area_entered(hit_target_area: Object, _multimesh_bullets_instance:MultiMeshBullets2D, _bullet_index:int, bullets_custom_data: Resource, _bullet_global_transform: Transform2D) -> void:	
 	if hit_target_area is AbstractEnemy:
 		var dmg_data:DamageData = bullets_custom_data as DamageData # We know for a fact that we have a DamageData inside our bullets, because that's how we've set them up before spawning them - we can replace it with some other custom resource instead and check for its type here too (we may spawn bullets with different custom data and have additional check logic)
 		if dmg_data.is_player_owned == false: # If it wasn't the player who spawned the bullet, then that means an enemy is hitting another enemy - I want the bullet to dissapear without it damaging the enemy (No friendly fire :P)
@@ -30,9 +30,12 @@ func _on_body_entered(hit_target_body: Object, _multimesh_bullets_instance:Multi
 		
 	#print("Bullet just collided with a body")
 
-# This function will only be executed if the bullets_data has the is_life_time_over_signal_enabled property set to TRUE
-func _on_life_time_over(_bullets_custom_data: Resource, _all_bullet_global_transforms: Array) -> void:
+func _on_life_time_over(_multimesh_bullets_instance: MultiMeshBullets2D, _bullet_indexes:Array[int], _bullets_custom_data: Resource, _bullets_global_transforms: Array[Transform2D]) -> void:
 	pass
+	# Only if is_life_time_over_signal_enabled is set
+	#print(multimesh_bullets_instance)
+	#print(bullets_global_transforms.size())
+	#print(bullet_indexes)
 	# Just a small example that you can spawn particles or other things in the same exact position where the bullet got disabled (its life time got to 0)
 	#for t in all_bullet_global_transforms:
 		#var instance:Node2D = particle_scn.instantiate()
