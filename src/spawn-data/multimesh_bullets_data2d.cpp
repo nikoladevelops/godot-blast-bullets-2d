@@ -1,4 +1,5 @@
 #include "./multimesh_bullets_data2d.hpp"
+#include "godot_cpp/core/class_db.hpp"
 
 using namespace godot;
 
@@ -246,6 +247,14 @@ void MultiMeshBulletsData2D::set_stop_rotation_when_max_reached(bool new_stop_ro
 	stop_rotation_when_max_reached = new_stop_rotation_when_max_reached;
 }
 
+int MultiMeshBulletsData2D::get_bullet_max_collision_amount() const {
+	return bullet_max_collision_amount;
+}
+
+void MultiMeshBulletsData2D::set_bullet_max_collision_amount(int new_max_collision_amount) {
+	bullet_max_collision_amount = new_max_collision_amount;
+}
+
 void MultiMeshBulletsData2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_transforms"), &MultiMeshBulletsData2D::set_transforms);
 	ClassDB::bind_method(D_METHOD("get_transforms"), &MultiMeshBulletsData2D::get_transforms);
@@ -367,6 +376,10 @@ void MultiMeshBulletsData2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_stop_rotation_when_max_reached"), &MultiMeshBulletsData2D::get_stop_rotation_when_max_reached);
 	ClassDB::bind_method(D_METHOD("set_stop_rotation_when_max_reached"), &MultiMeshBulletsData2D::set_stop_rotation_when_max_reached);
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "stop_rotation_when_max_reached"), "set_stop_rotation_when_max_reached", "get_stop_rotation_when_max_reached");
+
+	ClassDB::bind_method(D_METHOD("get_bullet_max_collision_amount"), &MultiMeshBulletsData2D::get_bullet_max_collision_amount);
+	ClassDB::bind_method(D_METHOD("set_bullet_max_collision_amount", "value"), &MultiMeshBulletsData2D::set_bullet_max_collision_amount);
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "bullet_max_collision_amount"), "set_bullet_max_collision_amount", "get_bullet_max_collision_amount");
 
 	ClassDB::bind_static_method("MultiMeshBulletsData2D", D_METHOD("calculate_bitmask", "numbers"), &MultiMeshBulletsData2D::calculate_bitmask);
 }

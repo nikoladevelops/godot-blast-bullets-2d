@@ -121,6 +121,11 @@ void MultiMeshBullets2D::activate_multimesh(const MultiMeshBulletsData2D &data) 
 void MultiMeshBullets2D::set_up_bullet_instances(const MultiMeshBulletsData2D &data) {
 	active_bullets_counter = amount_bullets;
 
+	bullet_max_collision_amount = data.bullet_max_collision_amount;
+
+	bullets_collision_count.clear();
+	bullets_collision_count.resize(amount_bullets, 0);
+	
 	is_life_time_over_signal_enabled = data.is_life_time_over_signal_enabled;
 
 	is_life_time_infinite = data.is_life_time_infinite;

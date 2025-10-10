@@ -61,6 +61,9 @@ public:
 
 	// COLLISION RELATED
 
+	// How many times a single bullet can collide before being disabled. If you set to 0 the bullet will never be disabled due to collisions.
+	int bullet_max_collision_amount = 1;
+
 	// The collision layer that all bullets share. Note: pass a bitmask, it's not just a simple int. Use the calculate_bitmask function.
 	int collision_layer = 1;
 
@@ -205,6 +208,9 @@ public:
 
 	bool get_stop_rotation_when_max_reached() const;
 	void set_stop_rotation_when_max_reached(bool new_stop_rotation_when_max_reached);
+
+	int get_bullet_max_collision_amount() const;
+	void set_bullet_max_collision_amount(int new_max_collision_amount);
 
 	static void _bind_methods();
 };

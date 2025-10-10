@@ -379,6 +379,9 @@ protected:
 	//
 
 	/// COLLISION RELATED
+	
+	// How many times a single bullet can collide before being disabled. If you set to 0 the bullet will never be disabled due to collisions.
+	int bullet_max_collision_amount = 1;
 
 	// The area that holds all collision shapes
 	RID area;
@@ -388,6 +391,9 @@ protected:
 
 	// Holds a boolean value for each bullet that indicates whether its active
 	std::vector<int8_t> bullets_enabled_status;
+
+	std::vector<int> bullets_collision_count;
+
 
 	//
 
@@ -446,16 +452,7 @@ protected:
 
 	// Disables a single bullet. Always call this method using call_deferred or you will face weird synch issues
 	_ALWAYS_INLINE_ void disable_bullet(int bullet_index) {
-		int8_t &curr_bullet_status = bullets_enabled_status[bullet_index];
-
-		// I am doing this, because there is a chance that the bullet collides with more than 1 thing at the same exact time (if I didn't have this check then the active_bullets_counter would be set wrong)
-		if (curr_bullet_status == false) {
-			return;
-		}
-
 		active_bullets_counter--;
-
-		curr_bullet_status = false;
 
 		multi->set_instance_transform_2d(bullet_index, zero_transform); // Stops rendering the instance
 
@@ -474,11 +471,28 @@ protected:
 	}
 
 	_ALWAYS_INLINE_ void _handle_bullet_collision(String factory_signal_name_to_emit, int bullet_index, int64_t entered_instance_id) {
-		disable_bullet(bullet_index);
+		int8_t &curr_bullet_status = bullets_enabled_status[bullet_index];
 
+		// If the bullet is already disabled, just return
+		if (curr_bullet_status == false) {
+			return;
+		}
+
+		int &current_bullet_collision_amount = bullets_collision_count[bullet_index];
+
+		// Always keep track of how many collisions this bullet had (yes even if the user set bullet_max_collision_amount to 0, I just want consistent behavior)
+		++current_bullet_collision_amount; 
+		
+		// Only disable the bullet if the max collision count is greater than 0, otherwise the bullet should never be disabled due to collisions
+		if (bullet_max_collision_amount > 0 && current_bullet_collision_amount >= bullet_max_collision_amount) {
+			disable_bullet(bullet_index);
+			curr_bullet_status = false;
+		}
+		
 		Object *hit_target = ObjectDB::get_instance(entered_instance_id);
-
+		
 		bullet_factory->emit_signal(factory_signal_name_to_emit, hit_target, this, bullet_index, bullets_custom_data, all_cached_instance_transforms[bullet_index]);
+
 	}
 
 	/// COLLISION DETECTION METHODS
