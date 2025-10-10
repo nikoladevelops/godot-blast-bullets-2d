@@ -352,7 +352,7 @@ void MultiMeshBullets2D::load(const Ref<SaveDataMultiMeshBullets2D> &data_to_loa
 	const SaveDataMultiMeshBullets2D &data = *data_to_load.ptr();
 
 	multimesh_bullets_unique_id = generate_unique_id();
-	
+
 	bullets_pool = pool;
 	bullet_factory = factory;
 
@@ -574,7 +574,7 @@ void MultiMeshBullets2D::disable_multimesh() {
 	if (!is_multimesh_pooling_enabled) {
 		return;
 	}
-	
+
 	bullets_pool->push(this, amount_bullets);
 }
 
@@ -854,19 +854,18 @@ void MultiMeshBullets2D::set_all_physics_shapes_enabled_for_area(bool enable) {
 
 /// COLLISION DETECTION METHODS
 
-void MultiMeshBullets2D::area_entered_func(int status, RID entered_rid, int64_t entered_instance_id, int entered_shape_index, int bullet_shape_index) {
+void MultiMeshBullets2D::area_entered_func(PhysicsServer2D::AreaBodyStatus status, RID entered_rid, int64_t entered_instance_id, int entered_shape_index, int bullet_shape_index) {
 	if (status == PhysicsServer2D::AREA_BODY_ADDED) {
 		Object *obj = ObjectDB::get_instance(entered_instance_id);
-		call_deferred("disable_bullet", bullet_shape_index);
-		// another option would be to emit a signal here, and then the factory to register a callback for it and then emit its own signal, but I felt that it would be slower and also very messy, I also thought of keeping pointers to outside functions, but again its messier. Best solution I feel like is just keeping a pointer to the factory itself, which also allows me to call pool methods.
-		bullet_factory->emit_signal("area_entered", obj, bullets_custom_data, all_cached_instance_transforms[bullet_shape_index]);
+
+		call_deferred("_handle_bullet_collision", "area_entered", bullet_shape_index, obj);
 	}
 }
-void MultiMeshBullets2D::body_entered_func(int status, RID entered_rid, int64_t entered_instance_id, int entered_shape_index, int bullet_shape_index) {
+void MultiMeshBullets2D::body_entered_func(PhysicsServer2D::AreaBodyStatus status, RID entered_rid, int64_t entered_instance_id, int entered_shape_index, int bullet_shape_index) {
 	if (status == PhysicsServer2D::AREA_BODY_ADDED) {
 		Object *obj = ObjectDB::get_instance(entered_instance_id);
-		call_deferred("disable_bullet", bullet_shape_index);
-		bullet_factory->emit_signal("body_entered", obj, bullets_custom_data, all_cached_instance_transforms[bullet_shape_index]);
+
+		call_deferred("_handle_bullet_collision", "body_entered", bullet_shape_index, obj);
 	}
 }
 } //namespace BlastBullets2D

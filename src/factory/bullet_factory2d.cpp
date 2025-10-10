@@ -10,20 +10,17 @@
 #include "../save-data/save_data_bullet_factory2d.hpp"
 #include "../save-data/save_data_multimesh_bullets2d.hpp"
 
-
 #include "../debugger/multimesh_bullets_debugger2d.hpp"
 #include "../shared/bullet_attachment2d.hpp"
 #include "../shared/multimesh_object_pool2d.hpp"
 #include "godot_cpp/core/math.hpp"
 #include "godot_cpp/variant/vector3.hpp"
 
-
 #include <godot_cpp/classes/engine.hpp>
 #include <godot_cpp/classes/physics_server2d.hpp>
 #include <godot_cpp/classes/scene_tree.hpp>
 #include <godot_cpp/classes/world2d.hpp>
 #include <godot_cpp/variant/utility_functions.hpp>
-
 
 #include <algorithm>
 
@@ -198,7 +195,7 @@ void BulletFactory2D::spawn_directional_bullets(const Ref<DirectionalBulletsData
 			spawn_data);
 }
 
-DirectionalBullets2D *BulletFactory2D::spawn_controllable_directional_bullets(const Ref<DirectionalBulletsData2D> &spawn_data){
+DirectionalBullets2D *BulletFactory2D::spawn_controllable_directional_bullets(const Ref<DirectionalBulletsData2D> &spawn_data) {
 	if (is_factory_busy) {
 		UtilityFunctions::printerr("Error when trying to spawn bullets. BulletFactory2D is currently busy. Ignoring the request");
 		return nullptr;
@@ -809,7 +806,6 @@ void BulletFactory2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("spawn_directional_bullets", "spawn_data"), &BulletFactory2D::spawn_directional_bullets);
 	ClassDB::bind_method(D_METHOD("spawn_controllable_directional_bullets", "spawn_data"), &BulletFactory2D::spawn_controllable_directional_bullets);
 
-
 	ClassDB::bind_method(D_METHOD("save"), &BulletFactory2D::save);
 	ClassDB::bind_method(D_METHOD("load", "new_data"), &BulletFactory2D::load);
 
@@ -869,8 +865,20 @@ void BulletFactory2D::_bind_methods() {
 
 	//
 
-	ADD_SIGNAL(MethodInfo("area_entered", PropertyInfo(Variant::OBJECT, "enemy_area"), PropertyInfo(Variant::OBJECT, "bullets_custom_data", PROPERTY_HINT_RESOURCE_TYPE, "Resource"), PropertyInfo(Variant::TRANSFORM2D, "bullet_global_transform")));
-	ADD_SIGNAL(MethodInfo("body_entered", PropertyInfo(Variant::OBJECT, "enemy_body"), PropertyInfo(Variant::OBJECT, "bullets_custom_data", PROPERTY_HINT_RESOURCE_TYPE, "Resource"), PropertyInfo(Variant::TRANSFORM2D, "bullet_global_transform")));
+	ADD_SIGNAL(MethodInfo("area_entered",
+			PropertyInfo(Variant::OBJECT, "hit_target_area"),
+			PropertyInfo(Variant::OBJECT, "multimesh_bullets_instance", PROPERTY_HINT_RESOURCE_TYPE, "MultiMeshBullets2D"),
+			PropertyInfo(Variant::INT, "bullet_index"),
+			PropertyInfo(Variant::OBJECT, "bullets_custom_data", PROPERTY_HINT_RESOURCE_TYPE, "Resource"),
+			PropertyInfo(Variant::TRANSFORM2D, "bullet_global_transform")));
+
+	ADD_SIGNAL(MethodInfo("body_entered",
+			PropertyInfo(Variant::OBJECT, "hit_target_body"),
+			PropertyInfo(Variant::OBJECT, "multimesh_bullets_instance", PROPERTY_HINT_RESOURCE_TYPE, "MultiMeshBullets2D"),
+			PropertyInfo(Variant::INT, "bullet_index"),
+			PropertyInfo(Variant::OBJECT, "bullets_custom_data", PROPERTY_HINT_RESOURCE_TYPE, "Resource"),
+			PropertyInfo(Variant::TRANSFORM2D, "bullet_global_transform")));
+
 	ADD_SIGNAL(MethodInfo("life_time_over", PropertyInfo(Variant::OBJECT, "bullets_custom_data", PROPERTY_HINT_RESOURCE_TYPE, "Resource"), PropertyInfo(Variant::ARRAY, "all_bullet_global_transforms")));
 
 	ADD_SIGNAL(MethodInfo("save_finished", PropertyInfo(Variant::OBJECT, "data", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_DEFAULT, "SaveDataBulletFactory2D")));

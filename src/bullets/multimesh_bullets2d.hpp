@@ -226,7 +226,10 @@ public:
 
 	bool get_is_multimesh_pooling_enabled() const { return is_multimesh_pooling_enabled; }
 	void set_is_multimesh_pooling_enabled(bool value) { is_multimesh_pooling_enabled = value; }
+
 protected:
+	bool is_multimesh_disabled = false;
+
 	bool is_multimesh_pooling_enabled = true;
 	// Counts all active bullets
 	int active_bullets_counter = 0;
@@ -463,7 +466,14 @@ protected:
 
 		if (active_bullets_counter == 0) {
 			disable_multimesh();
+
+			is_multimesh_disabled = true;
 		}
+	}
+
+	_ALWAYS_INLINE_ void _handle_bullet_collision(String factory_signal_name_to_emit, int bullet_index, Object *hit_target) {
+		disable_bullet(bullet_index);
+		bullet_factory->emit_signal(factory_signal_name_to_emit, hit_target, this, bullet_index, bullets_custom_data, all_cached_instance_transforms[bullet_index]);
 	}
 
 	// Disables a single bullet temporarily
@@ -571,8 +581,10 @@ protected:
 		ClassDB::bind_method(D_METHOD("get_is_multimesh_pooling_enabled"), &MultiMeshBullets2D::get_is_multimesh_pooling_enabled);
 		ClassDB::bind_method(D_METHOD("set_is_multimesh_pooling_enabled", "value"), &MultiMeshBullets2D::set_is_multimesh_pooling_enabled);
 		ADD_PROPERTY(PropertyInfo(Variant::BOOL, "is_multimesh_pooling_enabled"), "set_is_multimesh_pooling_enabled", "get_is_multimesh_pooling_enabled");
-		
+
 		ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "bullets_custom_data"), "set_bullets_custom_data", "get_bullets_custom_data");
+
+		ClassDB::bind_method(D_METHOD("_handle_bullet_collision", "factory_signal_name_to_emit", "bullet_index", "hit_target"), &MultiMeshBullets2D::_handle_bullet_collision);
 	};
 
 	bool get_is_life_time_infinite() const { return is_life_time_infinite; }
@@ -666,8 +678,8 @@ private:
 
 	/// COLLISION DETECTION METHODS
 
-	void area_entered_func(int status, RID entered_rid, int64_t entered_instance_id, int entered_shape_index, int bullet_shape_index);
-	void body_entered_func(int status, RID entered_rid, int64_t entered_instance_id, int entered_shape_index, int bullet_shape_index);
+	void area_entered_func(PhysicsServer2D::AreaBodyStatus, RID entered_rid, int64_t entered_instance_id, int entered_shape_index, int bullet_shape_index);
+	void body_entered_func(PhysicsServer2D::AreaBodyStatus, RID entered_rid, int64_t entered_instance_id, int entered_shape_index, int bullet_shape_index);
 
 	///
 
