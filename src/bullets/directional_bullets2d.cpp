@@ -66,7 +66,7 @@ void DirectionalBullets2D::custom_additional_spawn_logic(const MultiMeshBulletsD
 	adjust_direction_based_on_rotation = directional_data.adjust_direction_based_on_rotation;
 
 	
-	is_multimesh_pooling_enabled = directional_data.is_multimesh_pooling_enabled;
+	is_multimesh_auto_pooling_enabled = directional_data.is_multimesh_auto_pooling_enabled;
 
 	// Homing behavior related //
 
@@ -79,7 +79,7 @@ void DirectionalBullets2D::custom_additional_save_logic(SaveDataMultiMeshBullets
 	SaveDataDirectionalBullets2D &directional_save_data = static_cast<SaveDataDirectionalBullets2D &>(data);
 	directional_save_data.adjust_direction_based_on_rotation = adjust_direction_based_on_rotation;
 
-	directional_save_data.is_multimesh_pooling_enabled = is_multimesh_pooling_enabled;
+	directional_save_data.is_multimesh_auto_pooling_enabled = is_multimesh_auto_pooling_enabled;
 	// TODO saving of homing behavior
 	// TODO all_cached_homing_direction
 }
@@ -88,7 +88,7 @@ void DirectionalBullets2D::custom_additional_load_logic(const SaveDataMultiMeshB
 	const SaveDataDirectionalBullets2D &directional_save_data = static_cast<const SaveDataDirectionalBullets2D &>(data);
 	adjust_direction_based_on_rotation = directional_save_data.adjust_direction_based_on_rotation;
 
-	is_multimesh_pooling_enabled = directional_save_data.is_multimesh_pooling_enabled;
+	is_multimesh_auto_pooling_enabled = directional_save_data.is_multimesh_auto_pooling_enabled;
 	
 	// TODO loading of homing behavior
 	// TODO all_cached_homing_direction
@@ -135,6 +135,6 @@ void DirectionalBullets2D::custom_additional_activate_logic(const MultiMeshBulle
 	bullet_homing_auto_pop_after_target_reached = false;
 	shared_deque_auto_pop_after_target_reached = false;
 
-	is_multimesh_pooling_enabled = directional_data.is_multimesh_pooling_enabled;
+	is_multimesh_auto_pooling_enabled = directional_data.is_multimesh_auto_pooling_enabled;
 }
 } //namespace BlastBullets2D

@@ -226,13 +226,13 @@ public:
 
 	void set_physics_interpolation_related_data();
 
-	bool get_is_multimesh_pooling_enabled() const { return is_multimesh_pooling_enabled; }
-	void set_is_multimesh_pooling_enabled(bool value) { is_multimesh_pooling_enabled = value; }
+	bool get_is_multimesh_auto_pooling_enabled() const { return is_multimesh_auto_pooling_enabled; }
+	void set_is_multimesh_auto_pooling_enabled(bool value) { is_multimesh_auto_pooling_enabled = value; }
 
 protected:
 	bool is_multimesh_disabled = false;
 
-	bool is_multimesh_pooling_enabled = true;
+	bool is_multimesh_auto_pooling_enabled = true;
 	// Counts all active bullets
 	int active_bullets_counter = 0;
 
@@ -486,7 +486,7 @@ protected:
 		// Only disable the bullet if the max collision count is greater than 0, otherwise the bullet should never be disabled due to collisions
 		if (bullet_max_collision_amount > 0 && current_bullet_collision_amount >= bullet_max_collision_amount) {
 			disable_bullet(bullet_index);
-			curr_bullet_status = false;
+			curr_bullet_status = false; // TODO move this line inside disable_bullet?
 		}
 		
 		Object *hit_target = ObjectDB::get_instance(entered_instance_id);
@@ -610,9 +610,9 @@ protected:
 
 		ClassDB::bind_method(D_METHOD("_do_execute_stored_callable_safely", "_callback", "_cached_multimesh_bullets_unique_id", "multimesh_bullets_unique_id"), &MultiMeshBullets2D::_do_execute_stored_callable_safely);
 
-		ClassDB::bind_method(D_METHOD("get_is_multimesh_pooling_enabled"), &MultiMeshBullets2D::get_is_multimesh_pooling_enabled);
-		ClassDB::bind_method(D_METHOD("set_is_multimesh_pooling_enabled", "value"), &MultiMeshBullets2D::set_is_multimesh_pooling_enabled);
-		ADD_PROPERTY(PropertyInfo(Variant::BOOL, "is_multimesh_pooling_enabled"), "set_is_multimesh_pooling_enabled", "get_is_multimesh_pooling_enabled");
+		ClassDB::bind_method(D_METHOD("get_is_multimesh_auto_pooling_enabled"), &MultiMeshBullets2D::get_is_multimesh_auto_pooling_enabled);
+		ClassDB::bind_method(D_METHOD("set_is_multimesh_auto_pooling_enabled", "value"), &MultiMeshBullets2D::set_is_multimesh_auto_pooling_enabled);
+		ADD_PROPERTY(PropertyInfo(Variant::BOOL, "is_multimesh_auto_pooling_enabled"), "set_is_multimesh_auto_pooling_enabled", "get_is_multimesh_auto_pooling_enabled");
 
 		ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "bullets_custom_data"), "set_bullets_custom_data", "get_bullets_custom_data");
 

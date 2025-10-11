@@ -16,8 +16,8 @@ public:
 
 	static void _bind_methods();
 
-	bool is_multimesh_pooling_enabled = true;
-	bool get_is_multimesh_pooling_enabled() const { return is_multimesh_pooling_enabled; }
-	void set_is_multimesh_pooling_enabled(bool value) { is_multimesh_pooling_enabled = value; }
+	bool is_multimesh_auto_pooling_enabled = true;
+	bool get_is_multimesh_auto_pooling_enabled() const { return is_multimesh_auto_pooling_enabled; }
+	void set_is_multimesh_auto_pooling_enabled(bool value) { is_multimesh_auto_pooling_enabled = value; }
 };
 } //namespace BlastBullets2D
