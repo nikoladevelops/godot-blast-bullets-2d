@@ -159,6 +159,10 @@ void BulletFactory2D::set_is_factory_processing_bullets(bool is_processing_enabl
 void BulletFactory2D::_physics_process(double delta) {
 	handle_bullet_behavior<DirectionalBullets2D>(all_directional_bullets, delta);
 	handle_bullet_behavior<BlockBullets2D>(all_block_bullets, delta);
+
+	for (auto &bullet : all_directional_bullets) {
+		bullet->run_multimesh_custom_timers(delta);
+	}
 }
 
 void BulletFactory2D::_process(double delta) {

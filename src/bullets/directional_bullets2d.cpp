@@ -109,9 +109,6 @@ void DirectionalBullets2D::custom_additional_activate_logic(const MultiMeshBulle
         disconnect("bullet_homing_target_reached", callable);
     }
 
-	multimesh_bullets_unique_id = generate_unique_id();
-	multimesh_custom_timers.clear();
-
 	set_up_movement_data(directional_data.all_bullet_speed_data);
 
 	adjust_direction_based_on_rotation = directional_data.adjust_direction_based_on_rotation;

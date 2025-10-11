@@ -230,8 +230,6 @@ public:
 	void set_is_multimesh_auto_pooling_enabled(bool value) { is_multimesh_auto_pooling_enabled = value; }
 
 protected:
-	bool is_multimesh_disabled = false;
-
 	bool is_multimesh_auto_pooling_enabled = true;
 	// Counts all active bullets
 	int active_bullets_counter = 0;
@@ -379,7 +377,7 @@ protected:
 	//
 
 	/// COLLISION RELATED
-	
+
 	// How many times a single bullet can collide before being disabled. If you set to 0 the bullet will never be disabled due to collisions.
 	int bullet_max_collision_amount = 1;
 
@@ -393,7 +391,6 @@ protected:
 	std::vector<int8_t> bullets_enabled_status;
 
 	std::vector<int> bullets_collision_count;
-
 
 	//
 
@@ -450,9 +447,84 @@ protected:
 		return false;
 	}
 
+	// Disables a single bullet attachment by either putting it in an object pool or completely freeing it
+	_ALWAYS_INLINE_ void disable_attachment(int bullet_index, bool should_pool_attachment = true) {
+		BulletAttachment2D *&attachment_ptr = bullet_attachments[bullet_index];
+
+		if (attachment_ptr == nullptr) {
+			return;
+		}
+
+		if (should_pool_attachment) {
+			attachment_ptr->call_on_bullet_disable(); // call GDScript custom virtual method to ensure proper disable behavior
+			bullet_factory->bullet_attachments_pool.push(attachment_ptr); // the bullet attachment is ready to be re-used/activated after disabling so push it to the object pool
+			attachment_ptr = nullptr; // important to set that it's not being used anymore, so it can skip it when disabling the entire multimesh (this is so that the call_on_bullet_disable function doesn't get called twice by mistake)
+		} else { // Otherwise just delete it
+			memdelete(attachment_ptr);
+		}
+	}
+
+	// Called when all bullets have been disabled
+	_ALWAYS_INLINE_ void disable_multimesh() {
+		active_bullets_counter = 0;
+		is_active = false;
+		set_visible(false); // Hide the multimesh node itself
+
+		custom_additional_disable_logic();
+		is_bullet_attachment_provided = false; // Doing this for performance reasons, so the force_delete skips logic bullet_attachments, since if the multimesh is disabled, then all attachments are already pooled and there is no need to go trough each element of the vector checking for nullptr
+
+		if (!is_multimesh_auto_pooling_enabled) {
+			return;
+		}
+
+		// Remove all attached timers
+		_do_detach_all_time_based_functions();
+		bullets_pool->push(this, amount_bullets);
+	}
+
+	_ALWAYS_INLINE_ void activate_bullet(int bullet_index, int collision_amount=0) {
+		int8_t &curr_bullet_status = bullets_enabled_status[bullet_index];
+
+		// If the bullet is already enabled, just return
+		if (curr_bullet_status == true) {
+			return;
+		}
+
+		
+		++active_bullets_counter;
+
+		multi->set_instance_transform_2d(bullet_index, all_cached_instance_transforms[bullet_index]); // Start rendering the instance
+		
+		physics_server->area_set_shape_disabled(area, bullet_index, false);
+		
+		auto &current_bullet_collision_amount = bullets_collision_count[bullet_index];
+		
+		// Ensure that the collision amount is clamped between 0 and bullet_max_collision_amount
+		if (collision_amount <= 0 || collision_amount >= bullet_max_collision_amount) {
+			current_bullet_collision_amount = bullet_max_collision_amount;;
+		} else {
+			current_bullet_collision_amount = collision_amount;
+		}
+		
+		curr_bullet_status = true;
+		if (!is_active) {
+			is_active = true;
+			set_visible(true);
+		}
+	}
+
 	// Disables a single bullet. Always call this method using call_deferred or you will face weird synch issues
 	_ALWAYS_INLINE_ void disable_bullet(int bullet_index) {
-		active_bullets_counter--;
+		int8_t &curr_bullet_status = bullets_enabled_status[bullet_index];
+
+		// If the bullet is already disabled, just return
+		if (curr_bullet_status == false) {
+			return;
+		}
+
+		curr_bullet_status = false;
+
+		--active_bullets_counter;
 
 		multi->set_instance_transform_2d(bullet_index, zero_transform); // Stops rendering the instance
 
@@ -463,10 +535,8 @@ protected:
 			disable_attachment(bullet_index);
 		}
 
-		if (active_bullets_counter == 0) {
+		if (active_bullets_counter <= 0) {
 			disable_multimesh();
-
-			is_multimesh_disabled = true;
 		}
 	}
 
@@ -481,18 +551,16 @@ protected:
 		int &current_bullet_collision_amount = bullets_collision_count[bullet_index];
 
 		// Always keep track of how many collisions this bullet had (yes even if the user set bullet_max_collision_amount to 0, I just want consistent behavior)
-		++current_bullet_collision_amount; 
-		
+		++current_bullet_collision_amount;
+
 		// Only disable the bullet if the max collision count is greater than 0, otherwise the bullet should never be disabled due to collisions
 		if (bullet_max_collision_amount > 0 && current_bullet_collision_amount >= bullet_max_collision_amount) {
 			disable_bullet(bullet_index);
-			curr_bullet_status = false; // TODO move this line inside disable_bullet?
 		}
-		
-		Object *hit_target = ObjectDB::get_instance(entered_instance_id);
-		
-		bullet_factory->emit_signal(factory_signal_name_to_emit, hit_target, this, bullet_index, bullets_custom_data, all_cached_instance_transforms[bullet_index]);
 
+		Object *hit_target = ObjectDB::get_instance(entered_instance_id);
+
+		bullet_factory->emit_signal(factory_signal_name_to_emit, hit_target, this, bullet_index, bullets_custom_data, all_cached_instance_transforms[bullet_index]);
 	}
 
 	/// COLLISION DETECTION METHODS
@@ -524,23 +592,6 @@ protected:
 		curr_bullet_status = true;
 
 		physics_server->area_set_shape_disabled(area, bullet_index, false);
-	}
-
-	// Disables a single bullet attachment by either putting it in an object pool or completely freeing it
-	_ALWAYS_INLINE_ void disable_attachment(int bullet_index, bool should_pool_attachment = true) {
-		BulletAttachment2D *&attachment_ptr = bullet_attachments[bullet_index];
-
-		if (attachment_ptr == nullptr) {
-			return;
-		}
-
-		if (should_pool_attachment) {
-			attachment_ptr->call_on_bullet_disable(); // call GDScript custom virtual method to ensure proper disable behavior
-			bullet_factory->bullet_attachments_pool.push(attachment_ptr); // the bullet attachment is ready to be re-used/activated after disabling so push it to the object pool
-			attachment_ptr = nullptr; // important to set that it's not being used anymore, so it can skip it when disabling the entire multimesh (this is so that the call_on_bullet_disable function doesn't get called twice by mistake)
-		} else { // Otherwise just delete it
-			memdelete(attachment_ptr);
-		}
 	}
 
 	// Moves a single bullet attachment
@@ -580,11 +631,10 @@ protected:
 		return original_data_transf * bullet_attachment_local_transform;
 	}
 
-	/// METHODS THAT ARE SUPPOSED TO BE OVERRIDEN TO PROVIDE CUSTOM LOGIC
-
 	// Exposes methods that should be available in Godot engine
 	static void _bind_methods() {
 		ClassDB::bind_method(D_METHOD("disable_bullet", "bullet_index"), &MultiMeshBullets2D::disable_bullet);
+		ClassDB::bind_method(D_METHOD("activate_bullet", "bullet_index", "collision_amount"), &MultiMeshBullets2D::activate_bullet, DEFVAL(0));
 
 		ClassDB::bind_method(D_METHOD("get_amount_bullets"), &MultiMeshBullets2D::get_amount_bullets);
 
@@ -593,14 +643,15 @@ protected:
 
 		ClassDB::bind_method(D_METHOD("get_bullets_custom_data"), &MultiMeshBullets2D::get_bullets_custom_data);
 		ClassDB::bind_method(D_METHOD("set_bullets_custom_data", "new_custom_data"), &MultiMeshBullets2D::set_bullets_custom_data);
+		ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "bullets_custom_data"), "set_bullets_custom_data", "get_bullets_custom_data");
 
 		ClassDB::bind_method(D_METHOD("get_is_life_time_infinite"), &MultiMeshBullets2D::get_is_life_time_infinite);
 		ClassDB::bind_method(D_METHOD("set_is_life_time_infinite", "value"), &MultiMeshBullets2D::set_is_life_time_infinite);
 		ADD_PROPERTY(PropertyInfo(Variant::BOOL, "is_life_time_infinite"), "set_is_life_time_infinite", "get_is_life_time_infinite");
 
 		// Time based functions
-		ClassDB::bind_method(D_METHOD("multimesh_attach_time_based_function", "time", "callable", "repeat"), &MultiMeshBullets2D::multimesh_attach_time_based_function, DEFVAL(false));
-		ClassDB::bind_method(D_METHOD("_do_attach_time_based_function", "time", "callable", "repeat", "cached_multimesh_bullets_unique_id"), &MultiMeshBullets2D::_do_attach_time_based_function);
+		ClassDB::bind_method(D_METHOD("multimesh_attach_time_based_function", "time", "callable", "repeat", "execute_only_if_multimesh_is_active"), &MultiMeshBullets2D::multimesh_attach_time_based_function);
+		ClassDB::bind_method(D_METHOD("_do_attach_time_based_function", "time", "callable", "repeat", "execute_only_if_multimesh_is_active"), &MultiMeshBullets2D::_do_attach_time_based_function);
 
 		ClassDB::bind_method(D_METHOD("multimesh_detach_time_based_function", "callable"), &MultiMeshBullets2D::multimesh_detach_time_based_function);
 		ClassDB::bind_method(D_METHOD("_do_detach_time_based_function", "callable"), &MultiMeshBullets2D::_do_detach_time_based_function);
@@ -608,25 +659,33 @@ protected:
 		ClassDB::bind_method(D_METHOD("multimesh_detach_all_time_based_functions"), &MultiMeshBullets2D::multimesh_detach_all_time_based_functions);
 		ClassDB::bind_method(D_METHOD("_do_detach_all_time_based_functions"), &MultiMeshBullets2D::_do_detach_all_time_based_functions);
 
-		ClassDB::bind_method(D_METHOD("_do_execute_stored_callable_safely", "_callback", "_cached_multimesh_bullets_unique_id", "multimesh_bullets_unique_id"), &MultiMeshBullets2D::_do_execute_stored_callable_safely);
+		ClassDB::bind_method(D_METHOD("_do_execute_stored_callable_safely", "_callback", "_execute_only_if_multimesh_is_active"), &MultiMeshBullets2D::_do_execute_stored_callable_safely);
 
 		ClassDB::bind_method(D_METHOD("get_is_multimesh_auto_pooling_enabled"), &MultiMeshBullets2D::get_is_multimesh_auto_pooling_enabled);
 		ClassDB::bind_method(D_METHOD("set_is_multimesh_auto_pooling_enabled", "value"), &MultiMeshBullets2D::set_is_multimesh_auto_pooling_enabled);
 		ADD_PROPERTY(PropertyInfo(Variant::BOOL, "is_multimesh_auto_pooling_enabled"), "set_is_multimesh_auto_pooling_enabled", "get_is_multimesh_auto_pooling_enabled");
 
-		ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "bullets_custom_data"), "set_bullets_custom_data", "get_bullets_custom_data");
-
+		// Collision
+		ClassDB::bind_method(D_METHOD("get_bullet_max_collision_amount"), &MultiMeshBullets2D::get_bullet_max_collision_amount);
+		ClassDB::bind_method(D_METHOD("set_bullet_max_collision_amount", "value"), &MultiMeshBullets2D::set_bullet_max_collision_amount);
+		ADD_PROPERTY(PropertyInfo(Variant::INT, "bullet_max_collision_amount"), "set_bullet_max_collision_amount", "get_bullet_max_collision_amount");
+		
 		ClassDB::bind_method(D_METHOD("_handle_bullet_collision", "factory_signal_name_to_emit", "bullet_index", "entered_instance_id"), &MultiMeshBullets2D::_handle_bullet_collision);
 	};
 
 	bool get_is_life_time_infinite() const { return is_life_time_infinite; }
 	void set_is_life_time_infinite(bool value) {
 		// If we are about to set the lifetime as not infinite, make sure to reset the timer to start over from max_life_time
-		if (value) {
+		if (!value) {
 			current_life_time = max_life_time;
 		}
+
 		is_life_time_infinite = value;
+		
 	}
+
+	int get_bullet_max_collision_amount() const { return bullet_max_collision_amount; }
+	void set_bullet_max_collision_amount(int value) { bullet_max_collision_amount = value; }
 
 	// Holds custom logic that runs before the spawn function finalizes. Note that the multimesh is not yet added to the scene tree here
 	virtual void custom_additional_spawn_logic(const MultiMeshBulletsData2D &data) {}
@@ -656,9 +715,6 @@ private:
 	void set_bullet_attachment(const Ref<PackedScene> &attachment_scene);
 
 	//
-
-	// Ensures the multimesh is fully disabled - no processing, no longer visible
-	void disable_multimesh();
 
 	// Reserves enough memory and populates all needed data structures keeping track of rotation data
 	void set_rotation_data(const TypedArray<BulletRotationData2D> &rotation_data, bool new_rotate_only_textures);
@@ -723,9 +779,6 @@ private:
 	}
 
 public:
-	// This will change on spawn and on activation/re-use of the multimesh. By caching this value you can easily determine whether you are dealing with the same "instance" or whether you just re-used it from the pool, so it should become a "different" instance
-	uint64_t multimesh_bullets_unique_id = 0;
-
 	static uint64_t generate_unique_id() {
 		static std::atomic<uint64_t> counter{ 1 }; // 0 reserved for "invalid"
 		return counter.fetch_add(1, std::memory_order_relaxed);
@@ -737,30 +790,30 @@ public:
 		double _current_time;
 		double _initial_time;
 		bool _repeating;
-		uint64_t _cached_multimesh_bullets_unique_id;
+		bool _execute_only_if_multimesh_is_active;
 
-		CustomTimer(const godot::Callable &callback, double initial_time, bool repeating, uint64_t _multimesh_bullets_unique_id) :
-				_callback(callback), _current_time(initial_time), _initial_time(initial_time), _repeating(repeating), _cached_multimesh_bullets_unique_id(_multimesh_bullets_unique_id) {};
+		CustomTimer(const godot::Callable &callback, double initial_time, bool repeating, bool execute_only_if_multimesh_is_active) :
+				_callback(callback), _current_time(initial_time), _initial_time(initial_time), _repeating(repeating), _execute_only_if_multimesh_is_active(execute_only_if_multimesh_is_active) {};
 	};
 
-	void execute_stored_callable_safely(const Callable &_callback, uint64_t _cached_multimesh_bullets_unique_id, uint64_t multimesh_bullets_unique_id) {
-		call_deferred("_do_execute_stored_callable_safely", _callback, _cached_multimesh_bullets_unique_id, multimesh_bullets_unique_id); // call deffered for safety
+	void execute_stored_callable_safely(const Callable &_callback, bool execute_only_if_multimesh_is_active) {
+		call_deferred("_do_execute_stored_callable_safely", _callback, execute_only_if_multimesh_is_active); // call deffered for safety
 	}
 
-	void _do_execute_stored_callable_safely(const Callable &_callback, uint64_t _cached_multimesh_bullets_unique_id, uint64_t multimesh_bullets_unique_id) {
-		// Prevents executing callables if the multimesh was re-used from the object pool - very nasty bug
-		if (_cached_multimesh_bullets_unique_id != multimesh_bullets_unique_id) {
+	void _do_execute_stored_callable_safely(const Callable &_callback, bool execute_only_if_multimesh_is_active) {
+		// If the user wants to execute the callable only if the multimesh is active, check for that
+		if (execute_only_if_multimesh_is_active && !is_active) {
 			return;
 		}
 
 		_callback.call();
 	}
 
-	_ALWAYS_INLINE_ void multimesh_attach_time_based_function(double time, const Callable &callable, bool repeat = false) {
-		call_deferred("_do_attach_time_based_function", time, callable, repeat, multimesh_bullets_unique_id);
+	_ALWAYS_INLINE_ void multimesh_attach_time_based_function(double time, const Callable &callable, bool repeat, bool execute_only_if_multimesh_is_active) {
+		call_deferred("_do_attach_time_based_function", time, callable, repeat, execute_only_if_multimesh_is_active);
 	}
 
-	_ALWAYS_INLINE_ void _do_attach_time_based_function(double time, const Callable &callable, bool repeat, uint64_t cached_multimesh_bullets_unique_id) {
+	_ALWAYS_INLINE_ void _do_attach_time_based_function(double time, const Callable &callable, bool repeat, bool execute_only_if_multimesh_is_active) {
 		if (time <= 0.0f) {
 			UtilityFunctions::printerr("When calling multimesh_attach_time_based_function(), you need to provide a time value that is above 0");
 			return;
@@ -771,11 +824,7 @@ public:
 			return;
 		}
 
-		if (cached_multimesh_bullets_unique_id != multimesh_bullets_unique_id) {
-			return;
-		}
-
-		multimesh_custom_timers.emplace_back(callable, time, repeat, cached_multimesh_bullets_unique_id);
+		multimesh_custom_timers.emplace_back(callable, time, repeat, execute_only_if_multimesh_is_active);
 	}
 
 	_ALWAYS_INLINE_ void multimesh_detach_time_based_function(const Callable &callable) {
@@ -804,7 +853,7 @@ public:
 		for (auto it = multimesh_custom_timers.begin(); it != multimesh_custom_timers.end();) {
 			it->_current_time -= delta;
 			if (it->_current_time <= 0.0f) {
-				execute_stored_callable_safely(it->_callback, it->_cached_multimesh_bullets_unique_id, multimesh_bullets_unique_id);
+				execute_stored_callable_safely(it->_callback, it->_execute_only_if_multimesh_is_active);
 
 				if (it->_repeating) {
 					it->_current_time = it->_initial_time;

@@ -61,6 +61,9 @@
 			Check out the [BulletAttachment2D] documentation on how to implement that.
 			Note: If you provide a scene that is not a [BulletAttachment2D], then your game will crash.
 		</member>
+		<member name="bullet_max_collision_amount" type="int" setter="set_bullet_max_collision_amount" getter="get_bullet_max_collision_amount" default="1">
+			How many times a bullet can collide before it gets disabled. If you set to 0, then the bullet will NEVER get disabled due to collisions.
+		</member>
 		<member name="bullets_custom_data" type="Resource" setter="set_bullets_custom_data" getter="get_bullets_custom_data">
 			If you want your bullets to have damage or any other data specific to this type of bullets then you have to provide a custom resource that holds all of these properties.
 

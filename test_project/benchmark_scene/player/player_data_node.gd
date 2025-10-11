@@ -265,7 +265,7 @@ func spawn_multi_mesh_directional_bullets()->void:
 		directional_bullets_data.transforms = BulletFactory2D.helper_generate_transforms_grid(bullets_amount, bullet_marker.get_global_transform(), rows_per_column, grid_alignment, col_offset, row_offset, rotate_grid_with_marker, random_local_rotation)
 	
 	#directional_bullets_data.is_life_time_over_signal_enabled = true
-	directional_bullets_data.bullet_max_collision_amount = 1
+	#directional_bullets_data.bullet_max_collision_amount = 1
 	var dir_bullets:DirectionalBullets2D = BENCHMARK_GLOBALS.FACTORY.spawn_controllable_directional_bullets(directional_bullets_data)
 	dir_bullets.homing_smoothing = 20.0# Set from 0 to 20 or even bigger (but you might have issues with interpolation)
 	dir_bullets.homing_update_interval = 0.02# Set an update timer - keep it low for smooth updates
@@ -273,25 +273,41 @@ func spawn_multi_mesh_directional_bullets()->void:
 	dir_bullets.distance_from_target_before_considering_as_reached = 50
 	
 	dir_bullets.bullet_homing_auto_pop_after_target_reached = true
-	
-	dir_bullets.bullet_homing_target_reached.connect(func(_multimesh:DirectionalBullets2D, _bullet_index:int, _target: Node2D, target_global_position:Vector2):
-		print("reached target: ", target_global_position)
-		)
-		
-	dir_bullets.shared_homing_deque_push_front_node2d_target(BENCHMARK_GLOBALS.STATIONARY_TARGET)
-	dir_bullets.shared_homing_deque_push_front_node2d_target(BENCHMARK_GLOBALS.MOVING_TARGET_TWO)
-	dir_bullets.shared_homing_deque_push_back_global_position_target(BENCHMARK_GLOBALS.MOVING_TARGET_ONE.global_position)
-	dir_bullets.shared_homing_deque_push_back_mouse_position_target()
-	
 	dir_bullets.is_multimesh_auto_pooling_enabled = false
-	dir_bullets.multimesh_attach_time_based_function(1, func():
-		for enemy in BENCHMARK_GLOBALS.ALL_ENEMY_SPAWNERS[0].enemy_container.get_children():
-			for bullet in dir_bullets.get_amount_bullets():
-				dir_bullets.bullet_homing_push_back_node2d_target(bullet, enemy)
-				dir_bullets.bullet_homing_push_back_global_position_target(bullet, BENCHMARK_GLOBALS.STATIONARY_TARGET.global_position)
-				dir_bullets.bullet_homing_push_back_mouse_position_target(bullet)
-	,false)
 	
+	dir_bullets.multimesh_attach_time_based_function(1, func(): 
+		print("Keeps executing over and over EVEN IF ALL BULLETS WERE DISABLED")
+		, true, false)
+	
+	dir_bullets.multimesh_attach_time_based_function(1, func(): 
+		print("Keeps executing over and over but only if the multimesh is active (at least one bullet left active)")
+		, true, true)
+	
+		##
+	#dir_bullets.multimesh_attach_time_based_function(2, func(): 
+		#dir_bullets.activate_bullet(0)
+		#, false, true)
+	
+	
+	
+	#dir_bullets.bullet_homing_target_reached.connect(func(_multimesh:DirectionalBullets2D, _bullet_index:int, _target: Node2D, target_global_position:Vector2):
+		#print("reached target: ", target_global_position)
+		#)
+		#
+	#dir_bullets.shared_homing_deque_push_front_node2d_target(BENCHMARK_GLOBALS.STATIONARY_TARGET)
+	#dir_bullets.shared_homing_deque_push_front_node2d_target(BENCHMARK_GLOBALS.MOVING_TARGET_TWO)
+	#dir_bullets.shared_homing_deque_push_back_global_position_target(BENCHMARK_GLOBALS.MOVING_TARGET_ONE.global_position)
+	#dir_bullets.shared_homing_deque_push_back_mouse_position_target()
+	#
+	#dir_bullets.is_multimesh_auto_pooling_enabled = false
+	#dir_bullets.multimesh_attach_time_based_function(1, func():
+		#for enemy in BENCHMARK_GLOBALS.ALL_ENEMY_SPAWNERS[0].enemy_container.get_children():
+			#for bullet in dir_bullets.get_amount_bullets():
+				#dir_bullets.bullet_homing_push_back_node2d_target(bullet, enemy)
+				#dir_bullets.bullet_homing_push_back_global_position_target(bullet, BENCHMARK_GLOBALS.STATIONARY_TARGET.global_position)
+				#dir_bullets.bullet_homing_push_back_mouse_position_target(bullet)
+	#,false)
+	#
 	#dir_bullets.multimesh_attach_time_based_function(2, func():
 		#dir_bullets.homing_boundary_distance_away_from_target = 250;
 		#dir_bullets.homing_boundary_behavior = DirectionalBullets2D.BoundaryOrbitRight

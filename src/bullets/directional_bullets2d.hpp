@@ -72,8 +72,6 @@ public:
 				multi->set_instance_transform_2d(i, all_cached_instance_transforms[i]);
 			}
 		}
-
-		run_multimesh_custom_timers(delta);
 	}
 
 	///////////// PER BULLET HOMING DEQUE POP METHODS

@@ -18,5 +18,7 @@
 			You need to provide [BulletSpeedData2D] for every single bullet - meaning that it should contain the same amount of data as the [member MultiMeshBulletsData2D.transforms] property or your game will crash.
 			Note: [BulletSpeedData2D] has a helper static method that you can use to generate random speed data - [method BulletSpeedData2D.generate_random_data()].
 		</member>
+		<member name="is_multimesh_auto_pooling_enabled" type="bool" setter="set_is_multimesh_auto_pooling_enabled" getter="get_is_multimesh_auto_pooling_enabled" default="true">
+		</member>
 	</members>
 </class>

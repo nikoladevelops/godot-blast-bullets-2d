@@ -231,17 +231,21 @@
 	</members>
 	<signals>
 		<signal name="area_entered">
-			<param index="0" name="enemy_area" type="Object" />
-			<param index="1" name="bullets_custom_data" type="Resource" />
-			<param index="2" name="bullet_global_transform" type="Transform2D" />
+			<param index="0" name="hit_target_area" type="Object" />
+			<param index="1" name="multimesh_bullets_instance" type="MultiMeshBullets2D" />
+			<param index="2" name="bullet_index" type="int" />
+			<param index="3" name="bullets_custom_data" type="Resource" />
+			<param index="4" name="bullet_global_transform" type="Transform2D" />
 			<description>
 				Emitted when a bullet enters a physics area.
 			</description>
 		</signal>
 		<signal name="body_entered">
-			<param index="0" name="enemy_body" type="Object" />
-			<param index="1" name="bullets_custom_data" type="Resource" />
-			<param index="2" name="bullet_global_transform" type="Transform2D" />
+			<param index="0" name="hit_target_body" type="Object" />
+			<param index="1" name="multimesh_bullets_instance" type="MultiMeshBullets2D" />
+			<param index="2" name="bullet_index" type="int" />
+			<param index="3" name="bullets_custom_data" type="Resource" />
+			<param index="4" name="bullet_global_transform" type="Transform2D" />
 			<description>
 				Emited when a bullet enters a physics body.
 
@@ -249,8 +253,10 @@
 			</description>
 		</signal>
 		<signal name="life_time_over">
-			<param index="0" name="bullets_custom_data" type="Resource" />
-			<param index="1" name="all_bullet_global_transforms" type="Array" />
+			<param index="0" name="multimesh_bullets_instance" type="MultiMeshBullets2D" />
+			<param index="1" name="bullet_indexes" type="int[]" />
+			<param index="2" name="bullets_custom_data" type="Resource" />
+			<param index="3" name="bullets_global_transforms" type="Transform2D[]" />
 			<description>
 				Emitted when a bullet multimesh's lifetime is over, but only if the [MultiMeshBulletsData2D]'s [member MultiMeshBulletsData2D.is_life_time_over_signal_enabled] is set to [code]true[/code].
 			</description>
