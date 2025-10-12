@@ -472,7 +472,7 @@ public:
 
 		if (bullet_factory->use_physics_interpolation) {
 			all_previous_instance_transf[bullet_index] = all_cached_instance_transforms[bullet_index];
-			if (is_bullet_attachment_provided) {
+			if (bullet_attachment_scene.is_valid()) {
 				all_previous_attachment_transf[bullet_index] = attachment_transforms[bullet_index];
 			}
 		}
@@ -722,7 +722,7 @@ protected:
 	_ALWAYS_INLINE_ void update_physics_interpolation() {
 		if (bullet_factory->use_physics_interpolation) {
 			all_previous_instance_transf = all_cached_instance_transforms;
-			if (is_bullet_attachment_provided) {
+			if (bullet_attachment_scene.is_valid()) {
 				all_previous_attachment_transf = attachment_transforms;
 			}
 		}

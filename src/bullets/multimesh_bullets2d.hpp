@@ -11,6 +11,7 @@
 #include "godot_cpp/core/defs.hpp"
 #include "godot_cpp/core/math.hpp"
 #include "godot_cpp/core/object.hpp"
+#include "godot_cpp/core/print_string.hpp"
 #include "godot_cpp/core/property_info.hpp"
 #include "godot_cpp/variant/callable.hpp"
 #include "godot_cpp/variant/callable_method_pointer.hpp"
@@ -74,9 +75,13 @@ public:
 		physics_server->area_set_area_monitor_callback(area, Variant());
 		physics_server->area_set_monitor_callback(area, Variant());
 
-		if (is_bullet_attachment_provided) {
+		if (bullet_attachment_scene.is_valid()) {
 			for (int i = 0; i < amount_bullets; i++) {
-				disable_attachment(i, pool_attachments);
+				if (pool_attachments) {
+					push_bullet_attachment_to_pool(i);
+				}else{
+					free_bullet_attachment(i);
+				}
 			}
 		}
 
@@ -98,7 +103,12 @@ public:
 			const Transform2D &interpolated_bullet_texture_transf = get_interpolated_transform(all_cached_instance_transforms[i], all_previous_instance_transf[i], fraction);
 			multi->set_instance_transform_2d(i, interpolated_bullet_texture_transf);
 
-			if (!is_bullet_attachment_provided) {
+			if (!bullet_attachment_scene.is_valid()) {
+				continue;
+			}
+
+			// TODO
+			if (bullet_attachments[i] == nullptr) {
 				continue;
 			}
 
@@ -142,7 +152,9 @@ public:
 				for (int i = 0; i < amount_bullets; i++) {
 					// If the status is active it means that the bullet hasn't hit anything yet, so we need to disable it ourselves
 					if (bullets_enabled_status[i]) {
-						call_deferred("disable_bullet", i); // disable it
+						call_deferred("disable_bullet", i, false);
+						call_deferred("push_bullet_attachment_to_pool", i);
+
 						transfs.push_back(all_cached_instance_transforms[i]); // store the transform of the disabled bullet
 						bullet_indexes.push_back(i);
 					}
@@ -155,7 +167,8 @@ public:
 				// If we do not wish to emit the life_time_over signal, just disable the bullet and don't worry about having to pass additional data to the user
 				for (int i = 0; i < amount_bullets; i++) {
 					// There is already a bullet status check inside the function so it's fine
-					call_deferred("disable_bullet", i);
+					call_deferred("disable_bullet", i, false);
+					call_deferred("push_bullet_attachment_to_pool", i);
 				}
 			}
 		}
@@ -268,7 +281,7 @@ protected:
 	/// BULLET ATTACHMENT RELATED
 
 	// Stores the bullet attachment scene, from which it sets up BulletAttachment2D nodes for each bullet instance
-	Ref<PackedScene> bullet_attachment_scene = nullptr;
+	Ref<PackedScene> bullet_attachment_scene = nullptr; // TODO scene + scene attachment in a class
 
 	// Stores pointers to all bullet attachments currently in the scene
 	std::vector<BulletAttachment2D *> bullet_attachments;
@@ -278,9 +291,6 @@ protected:
 
 	// The bullet attachment's local transform
 	Transform2D bullet_attachment_local_transform;
-
-	// Whether the bullet attachment is being used
-	bool is_bullet_attachment_provided = false;
 
 	// Caches the value of stick_relative_to_bullet from the bullet attachment scene, so it's always available
 	bool cache_stick_relative_to_bullet = false;
@@ -447,21 +457,49 @@ protected:
 		return false;
 	}
 
-	// Disables a single bullet attachment by either putting it in an object pool or completely freeing it
-	_ALWAYS_INLINE_ void disable_attachment(int bullet_index, bool should_pool_attachment = true) {
+	_ALWAYS_INLINE_ void free_bullet_attachment(int bullet_index){
+		BulletAttachment2D *&attachment_ptr = bullet_attachments[bullet_index];
+		
+		if (attachment_ptr == nullptr) {
+			return;
+		}
+
+		memdelete(attachment_ptr);
+		attachment_ptr = nullptr;
+	}
+
+	_ALWAYS_INLINE_ void push_bullet_attachment_to_pool(int bullet_index){
+		BulletAttachment2D *&attachment_ptr = bullet_attachments[bullet_index];
+		
+		if (attachment_ptr == nullptr) {
+			return;
+		}
+
+		attachment_ptr->call_on_bullet_disable();
+		bullet_factory->bullet_attachments_pool.push(attachment_ptr);
+		attachment_ptr = nullptr;
+	}
+
+	_ALWAYS_INLINE_ void activate_bullet_attachment(int bullet_index) {
 		BulletAttachment2D *&attachment_ptr = bullet_attachments[bullet_index];
 
 		if (attachment_ptr == nullptr) {
 			return;
 		}
 
-		if (should_pool_attachment) {
-			attachment_ptr->call_on_bullet_disable(); // call GDScript custom virtual method to ensure proper disable behavior
-			bullet_factory->bullet_attachments_pool.push(attachment_ptr); // the bullet attachment is ready to be re-used/activated after disabling so push it to the object pool
-			attachment_ptr = nullptr; // important to set that it's not being used anymore, so it can skip it when disabling the entire multimesh (this is so that the call_on_bullet_disable function doesn't get called twice by mistake)
-		} else { // Otherwise just delete it
-			memdelete(attachment_ptr);
+		attachment_ptr->call_on_bullet_activate();
+	}
+
+	_ALWAYS_INLINE_ void disable_bullet_attachment(int bullet_index) {
+		BulletAttachment2D *&attachment_ptr = bullet_attachments[bullet_index];
+
+		//print_line(attachment_ptr == nullptr ? "nullptr" : "not null");
+
+		if (attachment_ptr == nullptr) {
+			return;
 		}
+
+		attachment_ptr->call_on_bullet_disable();
 	}
 
 	// Called when all bullets have been disabled
@@ -471,7 +509,6 @@ protected:
 		set_visible(false); // Hide the multimesh node itself
 
 		custom_additional_disable_logic();
-		is_bullet_attachment_provided = false; // Doing this for performance reasons, so the force_delete skips logic bullet_attachments, since if the multimesh is disabled, then all attachments are already pooled and there is no need to go trough each element of the vector checking for nullptr
 
 		if (!is_multimesh_auto_pooling_enabled) {
 			return;
@@ -482,7 +519,7 @@ protected:
 		bullets_pool->push(this, amount_bullets);
 	}
 
-	_ALWAYS_INLINE_ void activate_bullet(int bullet_index, int collision_amount=0) {
+	_ALWAYS_INLINE_ void activate_bullet(int bullet_index, int collision_amount=0, bool activate_attachment=true) {
 		int8_t &curr_bullet_status = bullets_enabled_status[bullet_index];
 
 		// If the bullet is already enabled, just return
@@ -505,6 +542,10 @@ protected:
 		} else {
 			current_bullet_collision_amount = collision_amount;
 		}
+
+		if (activate_attachment) {
+			activate_bullet_attachment(bullet_index);
+		}
 		
 		curr_bullet_status = true;
 		if (!is_active) {
@@ -514,7 +555,7 @@ protected:
 	}
 
 	// Disables a single bullet. Always call this method using call_deferred or you will face weird synch issues
-	_ALWAYS_INLINE_ void disable_bullet(int bullet_index) {
+	_ALWAYS_INLINE_ void disable_bullet(int bullet_index, bool disable_attachment = true) {
 		int8_t &curr_bullet_status = bullets_enabled_status[bullet_index];
 
 		// If the bullet is already disabled, just return
@@ -530,11 +571,10 @@ protected:
 
 		physics_server->area_set_shape_disabled(area, bullet_index, true);
 
-		// If a bullet attachment is actually being used, disable it and put it in the object pool
-		if (is_bullet_attachment_provided) {
-			disable_attachment(bullet_index);
+		if (disable_attachment) {
+			disable_bullet_attachment(bullet_index);
 		}
-
+		
 		if (active_bullets_counter <= 0) {
 			disable_multimesh();
 		}
@@ -555,7 +595,9 @@ protected:
 
 		// Only disable the bullet if the max collision count is greater than 0, otherwise the bullet should never be disabled due to collisions
 		if (bullet_max_collision_amount > 0 && current_bullet_collision_amount >= bullet_max_collision_amount) {
-			disable_bullet(bullet_index);
+			disable_bullet(bullet_index, false);
+			
+			push_bullet_attachment_to_pool(bullet_index);
 		}
 
 		Object *hit_target = ObjectDB::get_instance(entered_instance_id);
@@ -596,7 +638,7 @@ protected:
 
 	// Moves a single bullet attachment
 	_ALWAYS_INLINE_ void move_bullet_attachment(const Vector2 &translate_by, int bullet_index, real_t rotation_angle) {
-		if (!is_bullet_attachment_provided) {
+		if (!bullet_attachment_scene.is_valid()) {
 			return;
 		}
 
@@ -633,8 +675,14 @@ protected:
 
 	// Exposes methods that should be available in Godot engine
 	static void _bind_methods() {
-		ClassDB::bind_method(D_METHOD("disable_bullet", "bullet_index"), &MultiMeshBullets2D::disable_bullet);
-		ClassDB::bind_method(D_METHOD("activate_bullet", "bullet_index", "collision_amount"), &MultiMeshBullets2D::activate_bullet, DEFVAL(0));
+		ClassDB::bind_method(D_METHOD("disable_bullet", "bullet_index", "disable_bullet_attachment"), &MultiMeshBullets2D::disable_bullet, DEFVAL(true));
+		ClassDB::bind_method(D_METHOD("activate_bullet", "bullet_index", "collision_amount", "activate_attachment"), &MultiMeshBullets2D::activate_bullet, DEFVAL(0), DEFVAL(true));
+
+
+		ClassDB::bind_method(D_METHOD("disable_bullet_attachment", "bullet_index"), &MultiMeshBullets2D::disable_bullet_attachment);
+		ClassDB::bind_method(D_METHOD("activate_bullet_attachment", "bullet_index"), &MultiMeshBullets2D::activate_bullet_attachment);\
+		ClassDB::bind_method(D_METHOD("free_bullet_attachment", "bullet_index"), &MultiMeshBullets2D::free_bullet_attachment);
+		ClassDB::bind_method(D_METHOD("push_bullet_attachment_to_pool", "bullet_index"), &MultiMeshBullets2D::push_bullet_attachment_to_pool);
 
 		ClassDB::bind_method(D_METHOD("get_amount_bullets"), &MultiMeshBullets2D::get_amount_bullets);
 
@@ -711,19 +759,16 @@ private:
 	// Acquires data from the bullet attachment scene and gives it to the arguments passed by reference - acquires attachment_id and attachment_rotation
 	int set_attachment_related_data(const Ref<PackedScene> &new_bullet_attachment_scene, const Vector2 &bullet_attachment_offset);
 
-	// Changes the value of is_bullet_attachment_provided and bullet_attachment_scene appropriately
-	void set_bullet_attachment(const Ref<PackedScene> &attachment_scene);
-
 	//
 
 	// Reserves enough memory and populates all needed data structures keeping track of rotation data
 	void set_rotation_data(const TypedArray<BulletRotationData2D> &rotation_data, bool new_rotate_only_textures);
 
 	// Creates a brand new bullet attachment from the bullet attachment scene and finally saves it to the bullet_attachments vector
-	void create_new_bullet_attachment(const Transform2D &attachment_global_transf);
+	void create_new_bullet_attachment(int bullet_index, const Transform2D &attachment_global_transf);
 
 	// Tries to find and reuse a bullet attachment from the object pool. If successful returns true
-	bool reuse_attachment_from_object_pool(BulletAttachmentObjectPool2D &pool, const Transform2D &attachment_global_transf, int attachment_id);
+	bool reuse_attachment_from_object_pool(int bullet_index, BulletAttachmentObjectPool2D &pool, const Transform2D &attachment_global_transf, int attachment_id);
 
 	// Generates texture transform with correct rotation and sets it to the correct bullet on the multimesh
 	Transform2D generate_texture_transform(Transform2D transf, bool is_texture_rotation_permanent, real_t texture_rotation_radians, int bullet_index);

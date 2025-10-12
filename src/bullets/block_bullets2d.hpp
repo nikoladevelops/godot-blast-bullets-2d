@@ -30,7 +30,7 @@ public:
 		// If using interpolation, store current transforms as previous ones
 		if (is_using_physics_interpolation) {
 			all_previous_instance_transf = all_cached_instance_transforms;
-			if (is_bullet_attachment_provided) {
+			if (bullet_attachment_scene.is_valid()) {
 				all_previous_attachment_transf = attachment_transforms;
 			}
 		}
