@@ -288,24 +288,26 @@ Ref<SaveDataMultiMeshBullets2D> MultiMeshBullets2D::save(const Ref<SaveDataMulti
 	data_to_populate.bullet_attachment_scene = bullet_attachment_scene;
 	//data_to_populate.is_bullet_attachment_provided = is_bullet_attachment_provided; TODO remove this
 
-	if (bullet_attachment_scene.is_valid()) {
-		data_to_populate.cache_stick_relative_to_bullet = cache_stick_relative_to_bullet;
-		data_to_populate.bullet_attachment_local_transform = bullet_attachment_local_transform;
+	data_to_populate.cache_stick_relative_to_bullet = cache_stick_relative_to_bullet;
+	data_to_populate.bullet_attachment_local_transform = bullet_attachment_local_transform;
 
-		TypedArray<Resource> &custom_data_to_save = data_to_populate.bullet_attachments_custom_data;
-		TypedArray<Transform2D> &transf_data_to_save = data_to_populate.attachment_transforms;
+	TypedArray<Resource> &custom_data_to_save = data_to_populate.bullet_attachments_custom_data;
+	TypedArray<Transform2D> &transf_data_to_save = data_to_populate.attachment_transforms;
 
-		for (int i = 0; i < amount_bullets; i++) {
-			BulletAttachment2D *attachment = bullet_attachments[i];
+	// Resize them since for every bullet we store attachment data
+	custom_data_to_save.resize(amount_bullets);
+	transf_data_to_save.resize(amount_bullets);
 
-			// Note that only data for active bullet attachments is being saved, so you should account for that in the load method. Basically there is no useless data being saved, but this requires you to pay attention to valid indexes
-			if (attachment != nullptr) {
-				Ref<Resource> attachment_data = attachment->call_on_bullet_save();
-				const Transform2D &transf = attachment_transforms[i];
+	// Go through each bullet and in case it DOES have an attachment, set the correct data
+	for (int i = 0; i < amount_bullets; i++) {
+		BulletAttachment2D *attachment = bullet_attachments[i];
 
-				custom_data_to_save.push_back(attachment_data);
-				transf_data_to_save.push_back(transf);
-			}
+		if (attachment != nullptr) {
+			Ref<Resource> attachment_data = attachment->call_on_bullet_save();
+			const Transform2D &transf = attachment_transforms[i];
+
+			custom_data_to_save[i] = attachment_data;
+			transf_data_to_save[i] = transf;
 		}
 	}
 
@@ -427,6 +429,11 @@ void MultiMeshBullets2D::load_bullet_instances(const SaveDataMultiMeshBullets2D 
 		all_cached_direction.push_back(data.all_cached_direction[i]);
 	}
 
+	// TODO collision count needs to be saved and loaded correctly instead of this
+	bullets_collision_count.clear();
+	bullets_collision_count.resize(amount_bullets, 0);
+
+
 	area = physics_server->area_create();
 
 	set_up_area(data.collision_layer, data.collision_mask, data.monitorable, bullet_factory->physics_space);
@@ -435,13 +442,14 @@ void MultiMeshBullets2D::load_bullet_instances(const SaveDataMultiMeshBullets2D 
 
 	bullet_attachment_scene = data.bullet_attachment_scene;
 	
+	// Resize them since for every bullet we store attachment data
 	bullet_attachments.resize(amount_bullets, nullptr);
+	attachment_transforms.resize(amount_bullets);
 
 	if (bullet_attachment_scene.is_valid()) {
 		cache_attachment_id = data.attachment_id;
 		cache_stick_relative_to_bullet = data.cache_stick_relative_to_bullet;
 		bullet_attachment_local_transform = data.bullet_attachment_local_transform;
-		attachment_transforms.reserve(amount_bullets);
 	}
 
 	int count_attachments = 0;
@@ -469,12 +477,11 @@ void MultiMeshBullets2D::load_bullet_instances(const SaveDataMultiMeshBullets2D 
 		physics_server->area_set_shape_transform(area, i, all_cached_shape_transforms[i]);
 		physics_server->shape_set_data(shape_rid, data.collision_shape_size);
 
-		// LOAD BULLET ATTACHMENT RELATED DATA
+		// In case the bullet atatchment scene is valid provide attachment data
 		if (bullet_attachment_scene.is_valid()) {
 			// If the bullet is disabled then that means it didnt have an attachment before being saved, so skip it and mark it as nullptr
+			// TODO this logic should be updated
 			if (!is_bullet_enabled) {
-				// Doing these for 2 reasons - 1. attachments that don't exist should always be nullptr to ensure correct state  2. I should always push transforms even if they are default constructed because I want the indexes to match (I am using the .reserve method before this after all)
-				attachment_transforms.emplace_back(Transform2D());
 				continue;
 			}
 
@@ -487,7 +494,7 @@ void MultiMeshBullets2D::load_bullet_instances(const SaveDataMultiMeshBullets2D 
 			const Transform2D &attachment_transf = data.attachment_transforms[count_attachments];
 
 			attachment->set_global_transform(attachment_transf);
-			attachment_transforms.emplace_back(attachment_transf);
+			attachment_transforms[i] = attachment_transf;
 
 			const Ref<Resource> attachment_data = data.bullet_attachments_custom_data[count_attachments];
 
