@@ -124,7 +124,7 @@ void MultiMeshBullets2D::set_up_bullet_instances(const MultiMeshBulletsData2D &d
 
 	bullets_collision_count.clear();
 	bullets_collision_count.resize(amount_bullets, 0);
-	
+
 	is_life_time_over_signal_enabled = data.is_life_time_over_signal_enabled;
 
 	is_life_time_infinite = data.is_life_time_infinite;
@@ -433,7 +433,6 @@ void MultiMeshBullets2D::load_bullet_instances(const SaveDataMultiMeshBullets2D 
 	bullets_collision_count.clear();
 	bullets_collision_count.resize(amount_bullets, 0);
 
-
 	area = physics_server->area_create();
 
 	set_up_area(data.collision_layer, data.collision_mask, data.monitorable, bullet_factory->physics_space);
@@ -441,7 +440,7 @@ void MultiMeshBullets2D::load_bullet_instances(const SaveDataMultiMeshBullets2D 
 	generate_physics_shapes_for_area(amount_bullets);
 
 	bullet_attachment_scene = data.bullet_attachment_scene;
-	
+
 	// Resize them since for every bullet we store attachment data
 	bullet_attachments.resize(amount_bullets, nullptr);
 	attachment_transforms.resize(amount_bullets);
@@ -710,7 +709,7 @@ void MultiMeshBullets2D::set_rotation_data(const TypedArray<BulletRotationData2D
 int MultiMeshBullets2D::set_attachment_related_data(const Ref<PackedScene> &new_bullet_attachment_scene, const Vector2 &bullet_attachment_offset) {
 	bullet_attachments.clear();
 	bullet_attachments.resize(amount_bullets, nullptr);
-	
+
 	bullet_attachment_scene = new_bullet_attachment_scene;
 
 	// If an attachment was not provided, then there is no point to continue
@@ -831,5 +830,51 @@ void MultiMeshBullets2D::set_all_physics_shapes_enabled_for_area(bool enable) {
 	for (int i = 0; i < amount_bullets; i++) {
 		physics_server->area_set_shape_disabled(area, i, !enable);
 	}
+}
+
+void MultiMeshBullets2D::_bind_methods() {
+	ClassDB::bind_method(D_METHOD("disable_bullet", "bullet_index", "disable_bullet_attachment"), &MultiMeshBullets2D::disable_bullet, DEFVAL(true));
+	ClassDB::bind_method(D_METHOD("activate_bullet", "bullet_index", "collision_amount", "activate_attachment"), &MultiMeshBullets2D::activate_bullet, DEFVAL(0), DEFVAL(true));
+
+	ClassDB::bind_method(D_METHOD("disable_bullet_attachment", "bullet_index"), &MultiMeshBullets2D::disable_bullet_attachment);
+	ClassDB::bind_method(D_METHOD("activate_bullet_attachment", "bullet_index"), &MultiMeshBullets2D::activate_bullet_attachment);
+	ClassDB::bind_method(D_METHOD("free_bullet_attachment", "bullet_index"), &MultiMeshBullets2D::free_bullet_attachment);
+	ClassDB::bind_method(D_METHOD("push_bullet_attachment_to_pool", "bullet_index"), &MultiMeshBullets2D::push_bullet_attachment_to_pool);
+
+	ClassDB::bind_method(D_METHOD("get_amount_bullets"), &MultiMeshBullets2D::get_amount_bullets);
+
+	ClassDB::bind_method(D_METHOD("get_all_bullets_status"), &MultiMeshBullets2D::get_all_bullets_status);
+	ClassDB::bind_method(D_METHOD("is_bullet_status_enabled", "bullet_index"), &MultiMeshBullets2D::is_bullet_status_enabled);
+
+	ClassDB::bind_method(D_METHOD("get_bullets_custom_data"), &MultiMeshBullets2D::get_bullets_custom_data);
+	ClassDB::bind_method(D_METHOD("set_bullets_custom_data", "new_custom_data"), &MultiMeshBullets2D::set_bullets_custom_data);
+	ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "bullets_custom_data"), "set_bullets_custom_data", "get_bullets_custom_data");
+
+	ClassDB::bind_method(D_METHOD("get_is_life_time_infinite"), &MultiMeshBullets2D::get_is_life_time_infinite);
+	ClassDB::bind_method(D_METHOD("set_is_life_time_infinite", "value"), &MultiMeshBullets2D::set_is_life_time_infinite);
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "is_life_time_infinite"), "set_is_life_time_infinite", "get_is_life_time_infinite");
+
+	// Time based functions
+	ClassDB::bind_method(D_METHOD("multimesh_attach_time_based_function", "time", "callable", "repeat", "execute_only_if_multimesh_is_active"), &MultiMeshBullets2D::multimesh_attach_time_based_function);
+	ClassDB::bind_method(D_METHOD("_do_attach_time_based_function", "time", "callable", "repeat", "execute_only_if_multimesh_is_active"), &MultiMeshBullets2D::_do_attach_time_based_function);
+
+	ClassDB::bind_method(D_METHOD("multimesh_detach_time_based_function", "callable"), &MultiMeshBullets2D::multimesh_detach_time_based_function);
+	ClassDB::bind_method(D_METHOD("_do_detach_time_based_function", "callable"), &MultiMeshBullets2D::_do_detach_time_based_function);
+
+	ClassDB::bind_method(D_METHOD("multimesh_detach_all_time_based_functions"), &MultiMeshBullets2D::multimesh_detach_all_time_based_functions);
+	ClassDB::bind_method(D_METHOD("_do_detach_all_time_based_functions"), &MultiMeshBullets2D::_do_detach_all_time_based_functions);
+
+	ClassDB::bind_method(D_METHOD("_do_execute_stored_callable_safely", "_callback", "_execute_only_if_multimesh_is_active"), &MultiMeshBullets2D::_do_execute_stored_callable_safely);
+
+	ClassDB::bind_method(D_METHOD("get_is_multimesh_auto_pooling_enabled"), &MultiMeshBullets2D::get_is_multimesh_auto_pooling_enabled);
+	ClassDB::bind_method(D_METHOD("set_is_multimesh_auto_pooling_enabled", "value"), &MultiMeshBullets2D::set_is_multimesh_auto_pooling_enabled);
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "is_multimesh_auto_pooling_enabled"), "set_is_multimesh_auto_pooling_enabled", "get_is_multimesh_auto_pooling_enabled");
+
+	// Collision
+	ClassDB::bind_method(D_METHOD("get_bullet_max_collision_amount"), &MultiMeshBullets2D::get_bullet_max_collision_amount);
+	ClassDB::bind_method(D_METHOD("set_bullet_max_collision_amount", "value"), &MultiMeshBullets2D::set_bullet_max_collision_amount);
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "bullet_max_collision_amount"), "set_bullet_max_collision_amount", "get_bullet_max_collision_amount");
+
+	ClassDB::bind_method(D_METHOD("_handle_bullet_collision", "factory_signal_name_to_emit", "bullet_index", "entered_instance_id"), &MultiMeshBullets2D::_handle_bullet_collision);
 }
 } //namespace BlastBullets2D

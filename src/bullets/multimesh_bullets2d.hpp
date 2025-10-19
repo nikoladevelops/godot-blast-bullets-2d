@@ -79,7 +79,7 @@ public:
 			for (int i = 0; i < amount_bullets; i++) {
 				if (pool_attachments) {
 					push_bullet_attachment_to_pool(i);
-				}else{
+				} else {
 					free_bullet_attachment(i);
 				}
 			}
@@ -243,7 +243,10 @@ public:
 	void set_is_multimesh_auto_pooling_enabled(bool value) { is_multimesh_auto_pooling_enabled = value; }
 
 protected:
+	static void _bind_methods();
+
 	bool is_multimesh_auto_pooling_enabled = true;
+
 	// Counts all active bullets
 	int active_bullets_counter = 0;
 
@@ -457,9 +460,9 @@ protected:
 		return false;
 	}
 
-	_ALWAYS_INLINE_ void free_bullet_attachment(int bullet_index){
+	_ALWAYS_INLINE_ void free_bullet_attachment(int bullet_index) {
 		BulletAttachment2D *&attachment_ptr = bullet_attachments[bullet_index];
-		
+
 		if (attachment_ptr == nullptr) {
 			return;
 		}
@@ -468,9 +471,9 @@ protected:
 		attachment_ptr = nullptr;
 	}
 
-	_ALWAYS_INLINE_ void push_bullet_attachment_to_pool(int bullet_index){
+	_ALWAYS_INLINE_ void push_bullet_attachment_to_pool(int bullet_index) {
 		BulletAttachment2D *&attachment_ptr = bullet_attachments[bullet_index];
-		
+
 		if (attachment_ptr == nullptr) {
 			return;
 		}
@@ -519,7 +522,7 @@ protected:
 		bullets_pool->push(this, amount_bullets);
 	}
 
-	_ALWAYS_INLINE_ void activate_bullet(int bullet_index, int collision_amount=0, bool activate_attachment=true) {
+	_ALWAYS_INLINE_ void activate_bullet(int bullet_index, int collision_amount = 0, bool activate_attachment = true) {
 		int8_t &curr_bullet_status = bullets_enabled_status[bullet_index];
 
 		// If the bullet is already enabled, just return
@@ -527,18 +530,17 @@ protected:
 			return;
 		}
 
-		
 		++active_bullets_counter;
 
 		multi->set_instance_transform_2d(bullet_index, all_cached_instance_transforms[bullet_index]); // Start rendering the instance
-		
+
 		physics_server->area_set_shape_disabled(area, bullet_index, false);
-		
+
 		auto &current_bullet_collision_amount = bullets_collision_count[bullet_index];
-		
+
 		// Ensure that the collision amount is clamped between 0 and bullet_max_collision_amount
 		if (collision_amount <= 0 || collision_amount >= bullet_max_collision_amount) {
-			current_bullet_collision_amount = bullet_max_collision_amount;;
+			current_bullet_collision_amount = bullet_max_collision_amount;
 		} else {
 			current_bullet_collision_amount = collision_amount;
 		}
@@ -546,7 +548,7 @@ protected:
 		if (activate_attachment) {
 			activate_bullet_attachment(bullet_index);
 		}
-		
+
 		curr_bullet_status = true;
 		if (!is_active) {
 			is_active = true;
@@ -574,7 +576,7 @@ protected:
 		if (disable_attachment) {
 			disable_bullet_attachment(bullet_index);
 		}
-		
+
 		if (active_bullets_counter <= 0) {
 			disable_multimesh();
 		}
@@ -596,7 +598,7 @@ protected:
 		// Only disable the bullet if the max collision count is greater than 0, otherwise the bullet should never be disabled due to collisions
 		if (bullet_max_collision_amount > 0 && current_bullet_collision_amount >= bullet_max_collision_amount) {
 			disable_bullet(bullet_index, false);
-			
+
 			push_bullet_attachment_to_pool(bullet_index);
 		}
 
@@ -673,54 +675,6 @@ protected:
 		return original_data_transf * bullet_attachment_local_transform;
 	}
 
-	// Exposes methods that should be available in Godot engine
-	static void _bind_methods() {
-		ClassDB::bind_method(D_METHOD("disable_bullet", "bullet_index", "disable_bullet_attachment"), &MultiMeshBullets2D::disable_bullet, DEFVAL(true));
-		ClassDB::bind_method(D_METHOD("activate_bullet", "bullet_index", "collision_amount", "activate_attachment"), &MultiMeshBullets2D::activate_bullet, DEFVAL(0), DEFVAL(true));
-
-
-		ClassDB::bind_method(D_METHOD("disable_bullet_attachment", "bullet_index"), &MultiMeshBullets2D::disable_bullet_attachment);
-		ClassDB::bind_method(D_METHOD("activate_bullet_attachment", "bullet_index"), &MultiMeshBullets2D::activate_bullet_attachment);\
-		ClassDB::bind_method(D_METHOD("free_bullet_attachment", "bullet_index"), &MultiMeshBullets2D::free_bullet_attachment);
-		ClassDB::bind_method(D_METHOD("push_bullet_attachment_to_pool", "bullet_index"), &MultiMeshBullets2D::push_bullet_attachment_to_pool);
-
-		ClassDB::bind_method(D_METHOD("get_amount_bullets"), &MultiMeshBullets2D::get_amount_bullets);
-
-		ClassDB::bind_method(D_METHOD("get_all_bullets_status"), &MultiMeshBullets2D::get_all_bullets_status);
-		ClassDB::bind_method(D_METHOD("is_bullet_status_enabled", "bullet_index"), &MultiMeshBullets2D::is_bullet_status_enabled);
-
-		ClassDB::bind_method(D_METHOD("get_bullets_custom_data"), &MultiMeshBullets2D::get_bullets_custom_data);
-		ClassDB::bind_method(D_METHOD("set_bullets_custom_data", "new_custom_data"), &MultiMeshBullets2D::set_bullets_custom_data);
-		ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "bullets_custom_data"), "set_bullets_custom_data", "get_bullets_custom_data");
-
-		ClassDB::bind_method(D_METHOD("get_is_life_time_infinite"), &MultiMeshBullets2D::get_is_life_time_infinite);
-		ClassDB::bind_method(D_METHOD("set_is_life_time_infinite", "value"), &MultiMeshBullets2D::set_is_life_time_infinite);
-		ADD_PROPERTY(PropertyInfo(Variant::BOOL, "is_life_time_infinite"), "set_is_life_time_infinite", "get_is_life_time_infinite");
-
-		// Time based functions
-		ClassDB::bind_method(D_METHOD("multimesh_attach_time_based_function", "time", "callable", "repeat", "execute_only_if_multimesh_is_active"), &MultiMeshBullets2D::multimesh_attach_time_based_function);
-		ClassDB::bind_method(D_METHOD("_do_attach_time_based_function", "time", "callable", "repeat", "execute_only_if_multimesh_is_active"), &MultiMeshBullets2D::_do_attach_time_based_function);
-
-		ClassDB::bind_method(D_METHOD("multimesh_detach_time_based_function", "callable"), &MultiMeshBullets2D::multimesh_detach_time_based_function);
-		ClassDB::bind_method(D_METHOD("_do_detach_time_based_function", "callable"), &MultiMeshBullets2D::_do_detach_time_based_function);
-
-		ClassDB::bind_method(D_METHOD("multimesh_detach_all_time_based_functions"), &MultiMeshBullets2D::multimesh_detach_all_time_based_functions);
-		ClassDB::bind_method(D_METHOD("_do_detach_all_time_based_functions"), &MultiMeshBullets2D::_do_detach_all_time_based_functions);
-
-		ClassDB::bind_method(D_METHOD("_do_execute_stored_callable_safely", "_callback", "_execute_only_if_multimesh_is_active"), &MultiMeshBullets2D::_do_execute_stored_callable_safely);
-
-		ClassDB::bind_method(D_METHOD("get_is_multimesh_auto_pooling_enabled"), &MultiMeshBullets2D::get_is_multimesh_auto_pooling_enabled);
-		ClassDB::bind_method(D_METHOD("set_is_multimesh_auto_pooling_enabled", "value"), &MultiMeshBullets2D::set_is_multimesh_auto_pooling_enabled);
-		ADD_PROPERTY(PropertyInfo(Variant::BOOL, "is_multimesh_auto_pooling_enabled"), "set_is_multimesh_auto_pooling_enabled", "get_is_multimesh_auto_pooling_enabled");
-
-		// Collision
-		ClassDB::bind_method(D_METHOD("get_bullet_max_collision_amount"), &MultiMeshBullets2D::get_bullet_max_collision_amount);
-		ClassDB::bind_method(D_METHOD("set_bullet_max_collision_amount", "value"), &MultiMeshBullets2D::set_bullet_max_collision_amount);
-		ADD_PROPERTY(PropertyInfo(Variant::INT, "bullet_max_collision_amount"), "set_bullet_max_collision_amount", "get_bullet_max_collision_amount");
-		
-		ClassDB::bind_method(D_METHOD("_handle_bullet_collision", "factory_signal_name_to_emit", "bullet_index", "entered_instance_id"), &MultiMeshBullets2D::_handle_bullet_collision);
-	};
-
 	bool get_is_life_time_infinite() const { return is_life_time_infinite; }
 	void set_is_life_time_infinite(bool value) {
 		// If we are about to set the lifetime as not infinite, make sure to reset the timer to start over from max_life_time
@@ -729,7 +683,6 @@ protected:
 		}
 
 		is_life_time_infinite = value;
-		
 	}
 
 	int get_bullet_max_collision_amount() const { return bullet_max_collision_amount; }
@@ -824,11 +777,6 @@ private:
 	}
 
 public:
-	static uint64_t generate_unique_id() {
-		static std::atomic<uint64_t> counter{ 1 }; // 0 reserved for "invalid"
-		return counter.fetch_add(1, std::memory_order_relaxed);
-	}
-
 	// Timer logic
 	struct CustomTimer {
 		godot::Callable _callback;
