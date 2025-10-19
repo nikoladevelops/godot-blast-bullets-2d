@@ -3,7 +3,6 @@
 #include "../shared/bullet_speed_data2d.hpp"
 #include "./multimesh_bullets_data2d.hpp"
 
-
 namespace BlastBullets2D {
 using namespace godot;
 
@@ -19,8 +18,6 @@ public:
 
 	bool is_multimesh_auto_pooling_enabled = true;
 
-	static void _bind_methods();
-
 	TypedArray<BulletSpeedData2D> get_all_bullet_speed_data() const;
 	void set_all_bullet_speed_data(const TypedArray<BulletSpeedData2D> &new_data);
 
@@ -29,5 +26,8 @@ public:
 
 	bool get_is_multimesh_auto_pooling_enabled() const;
 	void set_is_multimesh_auto_pooling_enabled(bool value);
+
+protected:
+	static void _bind_methods();
 };
 } //namespace BlastBullets2D

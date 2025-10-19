@@ -17,9 +17,9 @@
 
 				You can also provide a [code]collision_amount[/code], which is how many times this bullet can collide before it gets disabled.
 				
-				If you provide 0, a negative value or a value greater than [member bullet_max_collision_amount], then the bullet will be able to collide [member bullet_max_collision_amount] times before it gets disabled.
+				If you provide 0, a negative value or a value greater than [member bullet_max_collision_count], then the bullet will be able to collide [member bullet_max_collision_count] times before it gets disabled.
 				
-				It's valid to set it to a value that is less than [member bullet_max_collision_amount].
+				It's valid to set it to a value that is less than [member bullet_max_collision_count].
 			</description>
 		</method>
 		<method name="disable_bullet">
@@ -85,7 +85,7 @@
 		</method>
 	</methods>
 	<members>
-		<member name="bullet_max_collision_amount" type="int" setter="set_bullet_max_collision_amount" getter="get_bullet_max_collision_amount" default="1">
+		<member name="bullet_max_collision_count" type="int" setter="set_bullet_max_collision_count" getter="get_bullet_max_collision_count" default="1">
 			How many times a bullet can collide before it gets disabled. If you set to 0, then the bullet will NEVER get disabled due to collisions.
 		</member>
 		<member name="bullets_custom_data" type="Resource" setter="set_bullets_custom_data" getter="get_bullets_custom_data">

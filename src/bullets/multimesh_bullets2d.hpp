@@ -392,7 +392,7 @@ protected:
 	/// COLLISION RELATED
 
 	// How many times a single bullet can collide before being disabled. If you set to 0 the bullet will never be disabled due to collisions.
-	int bullet_max_collision_amount = 1;
+	int bullet_max_collision_count = 1;
 
 	// The area that holds all collision shapes
 	RID area;
@@ -403,7 +403,7 @@ protected:
 	// Holds a boolean value for each bullet that indicates whether its active
 	std::vector<int8_t> bullets_enabled_status;
 
-	std::vector<int> bullets_collision_count;
+	std::vector<int> bullets_current_collision_count;
 
 	//
 
@@ -536,11 +536,11 @@ protected:
 
 		physics_server->area_set_shape_disabled(area, bullet_index, false);
 
-		auto &current_bullet_collision_amount = bullets_collision_count[bullet_index];
+		auto &current_bullet_collision_amount = bullets_current_collision_count[bullet_index];
 
-		// Ensure that the collision amount is clamped between 0 and bullet_max_collision_amount
-		if (collision_amount <= 0 || collision_amount >= bullet_max_collision_amount) {
-			current_bullet_collision_amount = bullet_max_collision_amount;
+		// Ensure that the collision amount is clamped between 0 and bullet_max_collision_count
+		if (collision_amount <= 0 || collision_amount >= bullet_max_collision_count) {
+			current_bullet_collision_amount = bullet_max_collision_count;
 		} else {
 			current_bullet_collision_amount = collision_amount;
 		}
@@ -590,13 +590,13 @@ protected:
 			return;
 		}
 
-		int &current_bullet_collision_amount = bullets_collision_count[bullet_index];
+		int &current_bullet_collision_amount = bullets_current_collision_count[bullet_index];
 
-		// Always keep track of how many collisions this bullet had (yes even if the user set bullet_max_collision_amount to 0, I just want consistent behavior)
+		// Always keep track of how many collisions this bullet had (yes even if the user set bullet_max_collision_count to 0, I just want consistent behavior)
 		++current_bullet_collision_amount;
 
 		// Only disable the bullet if the max collision count is greater than 0, otherwise the bullet should never be disabled due to collisions
-		if (bullet_max_collision_amount > 0 && current_bullet_collision_amount >= bullet_max_collision_amount) {
+		if (bullet_max_collision_count > 0 && current_bullet_collision_amount >= bullet_max_collision_count) {
 			disable_bullet(bullet_index, false);
 
 			push_bullet_attachment_to_pool(bullet_index);
@@ -685,8 +685,41 @@ protected:
 		is_life_time_infinite = value;
 	}
 
-	int get_bullet_max_collision_amount() const { return bullet_max_collision_amount; }
-	void set_bullet_max_collision_amount(int value) { bullet_max_collision_amount = value; }
+	int get_bullet_max_collision_count() const { return bullet_max_collision_count; }
+	void set_bullet_max_collision_count(int value) { bullet_max_collision_count = value; }
+
+	TypedArray<int> get_bullets_current_collision_count() const {
+		TypedArray<int> arr;
+
+		for (auto &collision_count : bullets_current_collision_count) {
+			arr.push_back(collision_count);
+		}
+
+		return arr;
+	}
+
+	bool set_bullets_current_collision_count(const TypedArray<int> &arr) {
+		int arr_size = arr.size();
+
+		if (arr_size < amount_bullets || arr_size > amount_bullets) {
+			UtilityFunctions::push_error("You need to provide collisions amount for each bullet (same amount as the transforms array amount) when calling set_bullets_current_collision_count. Make sure the amount is not less/more than the amount of bullets available");
+			return false;
+		}
+
+		for (int collision_count : arr) {
+			if (collision_count < 0) {
+				bullets_current_collision_count.push_back(0);
+				continue;
+			} else if (collision_count > bullet_max_collision_count) {
+				bullets_current_collision_count.push_back(bullet_max_collision_count);
+				continue;
+			}
+
+			bullets_current_collision_count.push_back(collision_count);
+		}
+
+		return true;
+	}
 
 	// Holds custom logic that runs before the spawn function finalizes. Note that the multimesh is not yet added to the scene tree here
 	virtual void custom_additional_spawn_logic(const MultiMeshBulletsData2D &data) {}

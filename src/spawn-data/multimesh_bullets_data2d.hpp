@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../shared/bullet_rotation_data2d.hpp"
+#include "godot_cpp/variant/typed_array.hpp"
 
 #include <godot_cpp/classes/canvas_item_material.hpp>
 #include <godot_cpp/classes/mesh.hpp>
@@ -62,8 +63,11 @@ public:
 	// COLLISION RELATED
 
 	// How many times a single bullet can collide before being disabled. If you set to 0 the bullet will never be disabled due to collisions.
-	int bullet_max_collision_amount = 1;
+	int bullet_max_collision_count = 1;
 
+	// Each bullets collision amount - it can only be set to a value that is <= bullet_max_collision_count (excluding 0 and negative numbers)
+	TypedArray<int> bullets_current_collision_count;
+	
 	// The collision layer that all bullets share. Note: pass a bitmask, it's not just a simple int. Use the calculate_bitmask function.
 	int collision_layer = 1;
 
@@ -80,6 +84,7 @@ public:
 
 	// The idea is that you can enter additional data (base damage,armor damage,maybe healing factor,vampire bullets etc..). I am not going to force every single bullet to have a damage, because I don't know what kind of game you're making, so you are free to give any data here that will be available inside the area_entered and body_entered callbacks inside factory :) Also note that if you want that data to also be saved you should include @export keywords for each member inside your custom data resource.
 	Ref<Resource> bullets_custom_data;
+
 
 	// OTHER
 
@@ -209,9 +214,13 @@ public:
 	bool get_stop_rotation_when_max_reached() const;
 	void set_stop_rotation_when_max_reached(bool new_stop_rotation_when_max_reached);
 
-	int get_bullet_max_collision_amount() const;
-	void set_bullet_max_collision_amount(int new_max_collision_amount);
+	int get_bullet_max_collision_count() const;
+	void set_bullet_max_collision_count(int new_max_collision_amount);
 
+	TypedArray<int> get_bullets_current_collision_count() const;
+	void set_bullets_current_collision_count(const TypedArray<int> &arr);
+
+protected:
 	static void _bind_methods();
 };
 } //namespace BlastBullets2D

@@ -66,6 +66,9 @@ public:
 
 	// COLLISION RELATED
 
+	int bullet_max_collision_count = 1;
+	TypedArray<int> bullets_current_collision_count;
+
 	int collision_layer = 1;
 	int collision_mask = 1;
 
@@ -248,6 +251,13 @@ public:
 	bool get_stop_rotation_when_max_reached() const;
 	void set_stop_rotation_when_max_reached(bool new_stop_rotation_when_max_reached);
 
+	int get_bullet_max_collision_count() const;
+	void set_bullet_max_collision_count(int new_max_collision_amount);
+
+	TypedArray<int> get_bullets_current_collision_count() const;
+	void set_bullets_current_collision_count(const TypedArray<int> &arr);
+
+protected:
 	static void _bind_methods();
 };
 } //namespace BlastBullets2D

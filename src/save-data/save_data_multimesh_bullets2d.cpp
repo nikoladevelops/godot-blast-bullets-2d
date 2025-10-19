@@ -339,6 +339,22 @@ void SaveDataMultiMeshBullets2D::set_stop_rotation_when_max_reached(bool new_sto
 	stop_rotation_when_max_reached = new_stop_rotation_when_max_reached;
 }
 
+int SaveDataMultiMeshBullets2D::get_bullet_max_collision_count() const {
+	return bullet_max_collision_count;
+}
+
+void SaveDataMultiMeshBullets2D::set_bullet_max_collision_count(int new_max_collision_amount) {
+	bullet_max_collision_count = new_max_collision_amount;
+}
+
+TypedArray<int> SaveDataMultiMeshBullets2D::get_bullets_current_collision_count() const {
+	return bullets_current_collision_count;
+}
+
+void SaveDataMultiMeshBullets2D::set_bullets_current_collision_count(const TypedArray<int> &arr) {
+	bullets_current_collision_count = arr;
+}
+
 void SaveDataMultiMeshBullets2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_max_life_time"), &SaveDataMultiMeshBullets2D::set_max_life_time);
 	ClassDB::bind_method(D_METHOD("get_max_life_time"), &SaveDataMultiMeshBullets2D::get_max_life_time);
@@ -524,5 +540,13 @@ void SaveDataMultiMeshBullets2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_stop_rotation_when_max_reached"), &SaveDataMultiMeshBullets2D::get_stop_rotation_when_max_reached);
 	ClassDB::bind_method(D_METHOD("set_stop_rotation_when_max_reached"), &SaveDataMultiMeshBullets2D::set_stop_rotation_when_max_reached);
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "stop_rotation_when_max_reached"), "set_stop_rotation_when_max_reached", "get_stop_rotation_when_max_reached");
+
+	ClassDB::bind_method(D_METHOD("get_bullet_max_collision_count"), &SaveDataMultiMeshBullets2D::get_bullet_max_collision_count);
+	ClassDB::bind_method(D_METHOD("set_bullet_max_collision_count", "value"), &SaveDataMultiMeshBullets2D::set_bullet_max_collision_count);
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "bullet_max_collision_count"), "set_bullet_max_collision_count", "get_bullet_max_collision_count");
+
+	ClassDB::bind_method(D_METHOD("get_bullets_current_collision_count"), &SaveDataMultiMeshBullets2D::get_bullets_current_collision_count);
+	ClassDB::bind_method(D_METHOD("set_bullets_current_collision_count", "arr"), &SaveDataMultiMeshBullets2D::set_bullets_current_collision_count);
+	ADD_PROPERTY(PropertyInfo(Variant::ARRAY, "bullets_current_collision_count"), "set_bullets_current_collision_count", "get_bullets_current_collision_count");
 }
 } //namespace BlastBullets2D

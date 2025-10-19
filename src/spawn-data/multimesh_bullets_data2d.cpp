@@ -241,12 +241,12 @@ void MultiMeshBulletsData2D::set_stop_rotation_when_max_reached(bool new_stop_ro
 	stop_rotation_when_max_reached = new_stop_rotation_when_max_reached;
 }
 
-int MultiMeshBulletsData2D::get_bullet_max_collision_amount() const {
-	return bullet_max_collision_amount;
+int MultiMeshBulletsData2D::get_bullet_max_collision_count() const {
+	return bullet_max_collision_count;
 }
 
-void MultiMeshBulletsData2D::set_bullet_max_collision_amount(int new_max_collision_amount) {
-	bullet_max_collision_amount = new_max_collision_amount;
+void MultiMeshBulletsData2D::set_bullet_max_collision_count(int new_max_collision_amount) {
+	bullet_max_collision_count = new_max_collision_amount;
 }
 
 bool MultiMeshBulletsData2D::get_is_life_time_infinite() const {
@@ -254,6 +254,14 @@ bool MultiMeshBulletsData2D::get_is_life_time_infinite() const {
 }
 void MultiMeshBulletsData2D::set_is_life_time_infinite(bool value) {
 	is_life_time_infinite = value;
+}
+
+TypedArray<int> MultiMeshBulletsData2D::get_bullets_current_collision_count() const {
+	return bullets_current_collision_count;
+}
+
+void MultiMeshBulletsData2D::set_bullets_current_collision_count(const TypedArray<int> &arr) {
+	bullets_current_collision_count = arr;
 }
 
 void MultiMeshBulletsData2D::_bind_methods() {
@@ -359,7 +367,7 @@ void MultiMeshBulletsData2D::_bind_methods() {
 	ADD_PROPERTY(PropertyInfo(Variant::DICTIONARY, "instance_shader_parameters", PROPERTY_HINT_TYPE_STRING, "String:Variant"), "set_instance_shader_parameters", "get_instance_shader_parameters");
 
 	ClassDB::bind_method(D_METHOD("get_change_texture_times"), &MultiMeshBulletsData2D::get_change_texture_times);
-	ClassDB::bind_method(D_METHOD("set_change_texture_times"), &MultiMeshBulletsData2D::set_change_texture_times);
+	ClassDB::bind_method(D_METHOD("set_change_texture_times", "arr"), &MultiMeshBulletsData2D::set_change_texture_times);
 	ADD_PROPERTY(PropertyInfo(Variant::ARRAY, "change_texture_times"), "set_change_texture_times", "get_change_texture_times");
 
 	ClassDB::bind_method(D_METHOD("get_default_texture"), &MultiMeshBulletsData2D::get_default_texture);
@@ -378,10 +386,14 @@ void MultiMeshBulletsData2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_stop_rotation_when_max_reached"), &MultiMeshBulletsData2D::set_stop_rotation_when_max_reached);
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "stop_rotation_when_max_reached"), "set_stop_rotation_when_max_reached", "get_stop_rotation_when_max_reached");
 
-	ClassDB::bind_method(D_METHOD("get_bullet_max_collision_amount"), &MultiMeshBulletsData2D::get_bullet_max_collision_amount);
-	ClassDB::bind_method(D_METHOD("set_bullet_max_collision_amount", "value"), &MultiMeshBulletsData2D::set_bullet_max_collision_amount);
-	ADD_PROPERTY(PropertyInfo(Variant::INT, "bullet_max_collision_amount"), "set_bullet_max_collision_amount", "get_bullet_max_collision_amount");
+	ClassDB::bind_method(D_METHOD("get_bullet_max_collision_count"), &MultiMeshBulletsData2D::get_bullet_max_collision_count);
+	ClassDB::bind_method(D_METHOD("set_bullet_max_collision_count", "value"), &MultiMeshBulletsData2D::set_bullet_max_collision_count);
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "bullet_max_collision_count"), "set_bullet_max_collision_count", "get_bullet_max_collision_count");
 
+	ClassDB::bind_method(D_METHOD("get_bullets_current_collision_count"), &MultiMeshBulletsData2D::get_bullets_current_collision_count);
+	ClassDB::bind_method(D_METHOD("set_bullets_current_collision_count", "arr"), &MultiMeshBulletsData2D::set_bullets_current_collision_count);
+	ADD_PROPERTY(PropertyInfo(Variant::ARRAY, "bullets_current_collision_count"), "set_bullets_current_collision_count", "get_bullets_current_collision_count");
+	
 	ClassDB::bind_static_method("MultiMeshBulletsData2D", D_METHOD("calculate_bitmask", "numbers"), &MultiMeshBulletsData2D::calculate_bitmask);
 }
 } //namespace BlastBullets2D

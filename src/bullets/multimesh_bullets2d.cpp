@@ -120,10 +120,17 @@ void MultiMeshBullets2D::activate_multimesh(const MultiMeshBulletsData2D &data) 
 void MultiMeshBullets2D::set_up_bullet_instances(const MultiMeshBulletsData2D &data) {
 	active_bullets_counter = amount_bullets;
 
-	bullet_max_collision_amount = data.bullet_max_collision_amount;
+	bullet_max_collision_count = data.bullet_max_collision_count;
 
-	bullets_collision_count.clear();
-	bullets_collision_count.resize(amount_bullets, 0);
+	if (data.bullets_current_collision_count.size() == 0) {
+		bullets_current_collision_count.clear();
+		bullets_current_collision_count.resize(amount_bullets, 0);
+	} else {
+		bool success = set_bullets_current_collision_count(data.bullets_current_collision_count);
+		if (!success) {
+			return;
+		}
+	}
 
 	is_life_time_over_signal_enabled = data.is_life_time_over_signal_enabled;
 
@@ -283,6 +290,12 @@ Ref<SaveDataMultiMeshBullets2D> MultiMeshBullets2D::save(const Ref<SaveDataMulti
 	RID shape = physics_shapes[0];
 	data_to_populate.collision_shape_size = (Vector2)(physics_server->shape_get_data(shape));
 
+	data_to_populate.bullet_max_collision_count = bullet_max_collision_count;
+
+	for (auto curr_collision_count : bullets_current_collision_count) {
+		data_to_populate.bullets_current_collision_count.push_back(curr_collision_count);
+	}
+
 	// BULLET ATTACHMENTS RELATED
 	data_to_populate.attachment_id = cache_attachment_id;
 	data_to_populate.bullet_attachment_scene = bullet_attachment_scene;
@@ -429,9 +442,8 @@ void MultiMeshBullets2D::load_bullet_instances(const SaveDataMultiMeshBullets2D 
 		all_cached_direction.push_back(data.all_cached_direction[i]);
 	}
 
-	// TODO collision count needs to be saved and loaded correctly instead of this
-	bullets_collision_count.clear();
-	bullets_collision_count.resize(amount_bullets, 0);
+	bullet_max_collision_count = data.bullet_max_collision_count;
+	set_bullets_current_collision_count(data.bullets_current_collision_count); // this should always be valid, since im responsible for saving it after all..
 
 	area = physics_server->area_create();
 
@@ -871,9 +883,13 @@ void MultiMeshBullets2D::_bind_methods() {
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "is_multimesh_auto_pooling_enabled"), "set_is_multimesh_auto_pooling_enabled", "get_is_multimesh_auto_pooling_enabled");
 
 	// Collision
-	ClassDB::bind_method(D_METHOD("get_bullet_max_collision_amount"), &MultiMeshBullets2D::get_bullet_max_collision_amount);
-	ClassDB::bind_method(D_METHOD("set_bullet_max_collision_amount", "value"), &MultiMeshBullets2D::set_bullet_max_collision_amount);
-	ADD_PROPERTY(PropertyInfo(Variant::INT, "bullet_max_collision_amount"), "set_bullet_max_collision_amount", "get_bullet_max_collision_amount");
+	ClassDB::bind_method(D_METHOD("get_bullet_max_collision_count"), &MultiMeshBullets2D::get_bullet_max_collision_count);
+	ClassDB::bind_method(D_METHOD("set_bullet_max_collision_count", "value"), &MultiMeshBullets2D::set_bullet_max_collision_count);
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "bullet_max_collision_count"), "set_bullet_max_collision_count", "get_bullet_max_collision_count");
+
+	ClassDB::bind_method(D_METHOD("get_bullets_current_collision_count"), &MultiMeshBullets2D::get_bullets_current_collision_count);
+	ClassDB::bind_method(D_METHOD("set_bullets_current_collision_count", "arr"), &MultiMeshBullets2D::set_bullets_current_collision_count);
+	ADD_PROPERTY(PropertyInfo(Variant::ARRAY, "bullets_current_collision_count"), "set_bullets_current_collision_count", "get_bullets_current_collision_count");
 
 	ClassDB::bind_method(D_METHOD("_handle_bullet_collision", "factory_signal_name_to_emit", "bullet_index", "entered_instance_id"), &MultiMeshBullets2D::_handle_bullet_collision);
 }

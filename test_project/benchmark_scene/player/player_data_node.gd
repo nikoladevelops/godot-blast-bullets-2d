@@ -274,7 +274,7 @@ func spawn_multi_mesh_directional_bullets()->void:
 	
 	dir_bullets.bullet_homing_auto_pop_after_target_reached = true
 	dir_bullets.is_multimesh_auto_pooling_enabled = false
-	dir_bullets.bullet_max_collision_amount = 1
+	dir_bullets.bullet_max_collision_count = 2
 	
 	dir_bullets.multimesh_attach_time_based_function(1, func(): 
 		print("Keeps executing over and over EVEN IF ALL BULLETS WERE DISABLED")
