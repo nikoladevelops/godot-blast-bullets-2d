@@ -9,11 +9,7 @@ TypedArray<BulletSpeedData2D> DirectionalBulletsData2D::get_all_bullet_speed_dat
 	return all_bullet_speed_data;
 }
 void DirectionalBulletsData2D::set_all_bullet_speed_data(const TypedArray<BulletSpeedData2D> &new_data) {
-	all_bullet_speed_data.resize(new_data.size());
-
-	for (int i = 0; i < new_data.size(); i++) {
-		all_bullet_speed_data[i] = new_data[i];
-	}
+	all_bullet_speed_data = new_data;
 }
 
 bool DirectionalBulletsData2D::get_adjust_direction_based_on_rotation() const {
@@ -22,6 +18,13 @@ bool DirectionalBulletsData2D::get_adjust_direction_based_on_rotation() const {
 
 void DirectionalBulletsData2D::set_adjust_direction_based_on_rotation(bool new_adjust_direction_based_on_rotation) {
 	adjust_direction_based_on_rotation = new_adjust_direction_based_on_rotation;
+}
+
+bool DirectionalBulletsData2D::get_is_multimesh_auto_pooling_enabled() const {
+    return is_multimesh_auto_pooling_enabled;
+}
+void DirectionalBulletsData2D::set_is_multimesh_auto_pooling_enabled(bool value) {
+    is_multimesh_auto_pooling_enabled = value;
 }
 
 void DirectionalBulletsData2D::_bind_methods() {

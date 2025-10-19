@@ -17,6 +17,8 @@ public:
 	// Whether each bullet's direction should be adjusted based on the rotation data provided by the user (bullet rotates, so it now moves in that direction)
 	bool adjust_direction_based_on_rotation = false;
 
+	bool is_multimesh_auto_pooling_enabled = true;
+
 	static void _bind_methods();
 
 	TypedArray<BulletSpeedData2D> get_all_bullet_speed_data() const;
@@ -25,8 +27,7 @@ public:
 	bool get_adjust_direction_based_on_rotation() const;
 	void set_adjust_direction_based_on_rotation(bool new_adjust_direction_based_on_rotation);
 
-	bool is_multimesh_auto_pooling_enabled = true;
-	bool get_is_multimesh_auto_pooling_enabled() const { return is_multimesh_auto_pooling_enabled; }
-	void set_is_multimesh_auto_pooling_enabled(bool value) { is_multimesh_auto_pooling_enabled = value; }
+	bool get_is_multimesh_auto_pooling_enabled() const;
+	void set_is_multimesh_auto_pooling_enabled(bool value);
 };
 } //namespace BlastBullets2D

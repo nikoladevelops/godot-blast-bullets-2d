@@ -10,6 +10,13 @@ void SaveDataDirectionalBullets2D::set_adjust_direction_based_on_rotation(bool n
 	adjust_direction_based_on_rotation = new_adjust_direction_based_on_rotation;
 }
 
+bool SaveDataDirectionalBullets2D::get_is_multimesh_auto_pooling_enabled() const {
+	return is_multimesh_auto_pooling_enabled;
+}
+void SaveDataDirectionalBullets2D::set_is_multimesh_auto_pooling_enabled(bool value) {
+	is_multimesh_auto_pooling_enabled = value;
+}
+
 void SaveDataDirectionalBullets2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_adjust_direction_based_on_rotation"), &SaveDataDirectionalBullets2D::get_adjust_direction_based_on_rotation);
 	ClassDB::bind_method(D_METHOD("set_adjust_direction_based_on_rotation", "new_adjust_direction_based_on_rotation"), &SaveDataDirectionalBullets2D::set_adjust_direction_based_on_rotation);

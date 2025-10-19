@@ -1,9 +1,9 @@
 [gd_scene load_steps=19 format=3 uid="uid://dpk5aw81fio42"]
 
 [ext_resource type="Script" uid="uid://bt7w5vkn7u1xt" path="res://benchmark_scene/benchmark.gd" id="1_cfubd"]
-[ext_resource type="Texture2D" uid="uid://dxsqxrqgkkv50" path="res://icon.svg" id="3_1inld"]
+[ext_resource type="Texture2D" uid="uid://rueog7pcv610" path="res://icon.svg" id="3_1inld"]
 [ext_resource type="PackedScene" uid="uid://bv1i7q8bxfe2c" path="res://benchmark_scene/player/player.tscn" id="3_hsp4v"]
-[ext_resource type="Texture2D" uid="uid://bqjpdc8cnc8pd" path="res://extremely_important_never_delete_or_it_will_explode.jpg" id="3_rfik0"]
+[ext_resource type="Texture2D" uid="uid://cbrv6fvw6lq8f" path="res://extremely_important_never_delete_or_it_will_explode.jpg" id="3_rfik0"]
 [ext_resource type="PackedScene" uid="uid://cud5bunpvk1hb" path="res://benchmark_scene/benchmark_ui.tscn" id="4_wr2si"]
 [ext_resource type="PackedScene" uid="uid://cropisiqwmq6" path="res://shared/enemies/enemy_spawner/enemy_spawner.tscn" id="6_fj0yo"]
 [ext_resource type="Script" uid="uid://jssweshd8v73" path="res://benchmark_scene/bullet_factory_2d.gd" id="7_6fsjh"]

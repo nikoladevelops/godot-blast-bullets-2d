@@ -118,11 +118,11 @@ public:
 
 	// GETTERS AND SETTERS
 
-	bool get_is_life_time_infinite() const { return is_life_time_infinite; }
-	void set_is_life_time_infinite(bool value) { is_life_time_infinite = value; }
+	bool get_is_life_time_infinite() const;
+	void set_is_life_time_infinite(bool value);
 
 	TypedArray<Transform2D> get_transforms() const;
-	void set_transforms(TypedArray<Transform2D> new_transforms);
+	void set_transforms(const TypedArray<Transform2D> &new_transforms);
 
 	TypedArray<Texture2D> get_textures() const;
 	void set_textures(const TypedArray<Texture2D> &new_textures);
