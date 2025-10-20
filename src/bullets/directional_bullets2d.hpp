@@ -472,9 +472,11 @@ public:
 
 		if (bullet_factory->use_physics_interpolation) {
 			all_previous_instance_transf[bullet_index] = all_cached_instance_transforms[bullet_index];
-			if (bullet_attachment_scene.is_valid()) {
-				all_previous_attachment_transf[bullet_index] = attachment_transforms[bullet_index];
-			}
+			
+			// TODO fix this
+			// if (attachment_scenes.is_valid()) {
+			// 	all_previous_attachment_transf[bullet_index] = attachment_transforms[bullet_index];
+			// }
 		}
 
 		temporary_enable_bullet(bullet_index);
@@ -722,9 +724,11 @@ protected:
 	_ALWAYS_INLINE_ void update_physics_interpolation() {
 		if (bullet_factory->use_physics_interpolation) {
 			all_previous_instance_transf = all_cached_instance_transforms;
-			if (bullet_attachment_scene.is_valid()) {
-				all_previous_attachment_transf = attachment_transforms;
-			}
+			
+			// TODO fix this
+			// if (attachment_scenes.is_valid()) {
+			// 	all_previous_attachment_transf = attachment_transforms;
+			// }
 		}
 	}
 

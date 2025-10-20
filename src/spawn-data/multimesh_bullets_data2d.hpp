@@ -113,7 +113,7 @@ public:
 	Ref<Mesh> mesh;
 
 	// If you want your bullet to have other things attached to it (particles/effects whatever you want), you should pass here a packed scene that contains a BulletAttachment2D node. Note that if you pass a packed scene that contains something different from a BulletAttachment2D then the project will crash (just ensure that your packed scene contains an actual BulletAttachment2D and attach as many children as you want to it - particles, other nodes, whatever you want)
-	Ref<PackedScene> bullet_attachment_scene = nullptr;
+	Ref<PackedScene> attachment_scenes = nullptr;
 
 	// The offset of the bullet attachment relative to the center of the bullet
 	Vector2 bullet_attachment_offset;
@@ -185,8 +185,8 @@ public:
 	Vector2 get_bullet_attachment_offset() const;
 	void set_bullet_attachment_offset(const Vector2 &new_bullet_attachment_offset);
 
-	Ref<PackedScene> get_bullet_attachment_scene() const;
-	void set_bullet_attachment_scene(const Ref<PackedScene> &new_bullet_attachment_scene);
+	Ref<PackedScene> get_attachment_scenes() const;
+	void set_attachment_scenes(const Ref<PackedScene> &new_attachment_scenes);
 
 	int get_z_index() const;
 	void set_z_index(int new_z_index);

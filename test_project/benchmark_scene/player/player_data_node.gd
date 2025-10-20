@@ -276,13 +276,17 @@ func spawn_multi_mesh_directional_bullets()->void:
 	dir_bullets.is_multimesh_auto_pooling_enabled = false
 	dir_bullets.bullet_max_collision_count = 2
 	
-	dir_bullets.multimesh_attach_time_based_function(1, func(): 
-		print("Keeps executing over and over EVEN IF ALL BULLETS WERE DISABLED")
-		, true, false)
+	for i in dir_bullets.get_amount_bullets():
+		dir_bullets.bullet_set_attachment(i, gpu_particles_scn, 5, Vector2(-60,0))
 	
-	dir_bullets.multimesh_attach_time_based_function(1, func(): 
-		print("Keeps executing over and over but only if the multimesh is active (at least one bullet left active)")
-		, true, true)
+	#dir_bullets.multimesh_attach_time_based_function(1, func(): 
+		#print("Keeps executing over and over EVEN IF ALL BULLETS WERE DISABLED")
+		#, true, false)
+	#
+	#dir_bullets.multimesh_attach_time_based_function(1, func(): 
+		#print("Keeps executing over and over but only if the multimesh is active (at least one bullet left active)")
+		#
+		#, true, true)
 	
 		##
 	#dir_bullets.multimesh_attach_time_based_function(2, func(): 
@@ -532,6 +536,7 @@ func switch_attachment_scn(option_index:int)->void:
 		3:
 			new_attachment = light_attachment_scn
 	
+	# TODO fix this
 	block_bullets_data.bullet_attachment_scene = new_attachment
 	directional_bullets_data.bullet_attachment_scene = new_attachment
 

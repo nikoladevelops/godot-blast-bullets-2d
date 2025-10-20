@@ -461,14 +461,14 @@ void BulletFactory2D::free_bullets_pool(BulletType bullet_type, int amount_bulle
 	}
 }
 
-void BulletFactory2D::populate_attachments_pool(const Ref<PackedScene> bullet_attachment_scene, int amount_instances) {
+void BulletFactory2D::populate_attachments_pool(const Ref<PackedScene> attachment_scenes, int amount_instances) {
 	if (amount_instances <= 0) {
 		UtilityFunctions::printerr("Error. You can't populate the attachments pool with amount_instances <= 0");
 		return;
 	}
 
 	for (int i = 0; i < amount_instances; i++) {
-		BulletAttachment2D *attachment = static_cast<BulletAttachment2D *>(bullet_attachment_scene->instantiate()); // You better pass a packed scene that contains an actual BulletAttachment2D node or this goes kaboom
+		BulletAttachment2D *attachment = static_cast<BulletAttachment2D *>(attachment_scenes->instantiate()); // You better pass a packed scene that contains an actual BulletAttachment2D node or this goes kaboom
 		attachment->set_physics_interpolation_mode(Node::PHYSICS_INTERPOLATION_MODE_OFF); // I have custom physics interpolation logic, so disable the Godot one
 
 		attachment->call_on_bullet_spawn_as_disabled();
@@ -827,7 +827,7 @@ void BulletFactory2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("populate_bullets_pool", "bullet_type", "amount_instances", "amount_bullets_per_instance"), &BulletFactory2D::populate_bullets_pool);
 	ClassDB::bind_method(D_METHOD("free_bullets_pool", "bullet_type", "amount_bullets_per_instance"), &BulletFactory2D::free_bullets_pool, DEFVAL(0));
 
-	ClassDB::bind_method(D_METHOD("populate_attachments_pool", "bullet_attachment_scene", "amount_attachments"), &BulletFactory2D::populate_attachments_pool);
+	ClassDB::bind_method(D_METHOD("populate_attachments_pool", "attachment_scenes", "amount_attachments"), &BulletFactory2D::populate_attachments_pool);
 	ClassDB::bind_method(D_METHOD("free_attachments_pool", "attachment_id"), &BulletFactory2D::free_attachments_pool, DEFVAL(-1));
 
 	ClassDB::bind_method(D_METHOD("free_active_bullets", "pool_attachments"), &BulletFactory2D::free_active_bullets, DEFVAL(false));

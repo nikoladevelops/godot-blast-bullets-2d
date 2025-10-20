@@ -55,7 +55,7 @@
 		<member name="bullet_attachment_offset" type="Vector2" setter="set_bullet_attachment_offset" getter="get_bullet_attachment_offset" default="Vector2(0, 0)">
 			Determines the attachment's offset calculated from the center of the bullet's texture.
 		</member>
-		<member name="bullet_attachment_scene" type="PackedScene" setter="set_bullet_attachment_scene" getter="get_bullet_attachment_scene">
+		<member name="attachment_scenes" type="PackedScene" setter="set_attachment_scenes" getter="get_attachment_scenes">
 			If you want to have particles, other sprites or anything that moves along with the bullet, that also needs to be saved, then this is the place where you provide that attachment as a [PackedScene].
 
 			Check out the [BulletAttachment2D] documentation on how to implement that.

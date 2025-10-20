@@ -87,7 +87,7 @@ public:
 
 	Transform2D bullet_attachment_local_transform = Transform2D();
 
-	Ref<PackedScene> bullet_attachment_scene = nullptr;
+	Ref<PackedScene> attachment_scenes = nullptr;
 
 	TypedArray<Resource> bullet_attachments_custom_data = TypedArray<Resource>();
 
@@ -185,8 +185,8 @@ public:
 	void set_bullet_attachment_local_transform(const Transform2D &value);
 	Transform2D get_bullet_attachment_local_transform() const;
 
-	void set_bullet_attachment_scene(const Ref<PackedScene> &value);
-	Ref<PackedScene> get_bullet_attachment_scene() const;
+	void set_attachment_scenes(const Ref<PackedScene> &value);
+	Ref<PackedScene> get_attachment_scenes() const;
 
 	void set_bullet_attachments_custom_data(const TypedArray<Resource> &value);
 	TypedArray<Resource> get_bullet_attachments_custom_data() const;

@@ -15,8 +15,10 @@
 #include "godot_cpp/core/property_info.hpp"
 #include "godot_cpp/variant/callable.hpp"
 #include "godot_cpp/variant/callable_method_pointer.hpp"
+#include "godot_cpp/variant/transform2d.hpp"
 #include "godot_cpp/variant/typed_array.hpp"
 #include "godot_cpp/variant/variant.hpp"
+#include "godot_cpp/variant/vector2.hpp"
 
 #include <cstdint>
 #include <godot_cpp/classes/engine.hpp>
@@ -75,15 +77,16 @@ public:
 		physics_server->area_set_area_monitor_callback(area, Variant());
 		physics_server->area_set_monitor_callback(area, Variant());
 
-		if (bullet_attachment_scene.is_valid()) {
-			for (int i = 0; i < amount_bullets; i++) {
-				if (pool_attachments) {
-					push_bullet_attachment_to_pool(i);
-				} else {
-					free_bullet_attachment(i);
-				}
-			}
-		}
+		// TODO fix this
+		// if (attachment_scenes.is_valid()) {
+		// 	for (int i = 0; i < amount_bullets; i++) {
+		// 		if (pool_attachments) {
+		// 			push_bullet_attachment_to_pool(i);
+		// 		} else {
+		// 			free_bullet_attachment(i);
+		// 		}
+		// 	}
+		// }
 
 		memdelete(this); // Immediate deletion
 	}
@@ -103,18 +106,19 @@ public:
 			const Transform2D &interpolated_bullet_texture_transf = get_interpolated_transform(all_cached_instance_transforms[i], all_previous_instance_transf[i], fraction);
 			multi->set_instance_transform_2d(i, interpolated_bullet_texture_transf);
 
-			if (!bullet_attachment_scene.is_valid()) {
-				continue;
-			}
+			// TODO fix this
+			// if (!attachment_scenes.is_valid()) {
+			// 	continue;
+			// }
 
-			// TODO
-			if (bullet_attachments[i] == nullptr) {
-				continue;
-			}
+			// // TODO
+			// if (attachments[i] == nullptr) {
+			// 	continue;
+			// }
 
-			// Apply interpolated transform for the attachment
-			const Transform2D &interpolated_attachment_transf = get_interpolated_transform(attachment_transforms[i], all_previous_attachment_transf[i], fraction);
-			bullet_attachments[i]->set_global_transform(interpolated_attachment_transf);
+			// // Apply interpolated transform for the attachment
+			// const Transform2D &interpolated_attachment_transf = get_interpolated_transform(attachment_transforms[i], all_previous_attachment_transf[i], fraction);
+			// attachments[i]->set_global_transform(interpolated_attachment_transf);
 		}
 	}
 
@@ -242,10 +246,15 @@ public:
 	bool get_is_multimesh_auto_pooling_enabled() const { return is_multimesh_auto_pooling_enabled; }
 	void set_is_multimesh_auto_pooling_enabled(bool value) { is_multimesh_auto_pooling_enabled = value; }
 
+	bool get_is_attachments_auto_pooling_enabled() const { return is_attachments_auto_pooling_enabled; }
+	void set_is_attachments_auto_pooling_enabled(bool value) { is_attachments_auto_pooling_enabled = value; }
+
 protected:
 	static void _bind_methods();
 
 	bool is_multimesh_auto_pooling_enabled = true;
+
+	bool is_attachments_auto_pooling_enabled = true;
 
 	// Counts all active bullets
 	int active_bullets_counter = 0;
@@ -283,17 +292,29 @@ protected:
 
 	/// BULLET ATTACHMENT RELATED
 
-	// Stores the bullet attachment scene, from which it sets up BulletAttachment2D nodes for each bullet instance
-	Ref<PackedScene> bullet_attachment_scene = nullptr; // TODO scene + scene attachment in a class
+	// Stores each bullet's attachment scene
+	std::vector<Ref<PackedScene>> attachment_scenes;
+
+	// Stores each bullet's attachment pooling id
+	std::vector<uint32_t> attachment_pooling_ids;
+
+	// Stores each bullet's object id for validation purposes (whether the attachment got freed by the user)
+	std::vector<uint64_t> attachment_object_ids_for_validation;
 
 	// Stores pointers to all bullet attachments currently in the scene
-	std::vector<BulletAttachment2D *> bullet_attachments;
+	std::vector<BulletAttachment2D *> attachments;
 
 	// Stores each attachment's transform data
 	std::vector<Transform2D> attachment_transforms;
 
-	// The bullet attachment's local transform
-	Transform2D bullet_attachment_local_transform;
+	// Stores each attachment's offset relative to the bullet's texture center
+	std::vector<Vector2> attachment_offsets;
+
+	// Stores each attachment's local transform relative to the bullet's texture center
+	std::vector<Transform2D> attachment_local_transforms;
+
+	// Whether the attachment should stick while the bullet is rotating
+	std::vector<uint8_t> attachment_stick_relative_to_bullet;
 
 	// Caches the value of stick_relative_to_bullet from the bullet attachment scene, so it's always available
 	bool cache_stick_relative_to_bullet = false;
@@ -335,7 +356,7 @@ protected:
 	TypedArray<double> change_texture_times;
 
 	// The change texture time being processed now
-	double current_change_texture_time;
+	double current_change_texture_time = 0.0f;
 
 	// Holds the current texture index (the index inside the array textures)
 	int current_texture_index = 0;
@@ -346,6 +367,8 @@ protected:
 	real_t cache_texture_rotation_radians = 0.0f;
 
 	Vector2 cache_collision_shape_offset = Vector2(0, 0);
+
+	TypedArray<Transform2D> cache_texture_transforms;
 
 	///
 
@@ -403,6 +426,7 @@ protected:
 	// Holds a boolean value for each bullet that indicates whether its active
 	std::vector<int8_t> bullets_enabled_status;
 
+	// Holds current collision count for each bullet
 	std::vector<int> bullets_current_collision_count;
 
 	//
@@ -460,8 +484,90 @@ protected:
 		return false;
 	}
 
+	_ALWAYS_INLINE_ BulletAttachment2D *bullet_get_attachment(int bullet_index) {
+		return attachments[bullet_index];
+	}
+
+	_ALWAYS_INLINE_ void bullet_set_attachment_to_null(int bullet_index) {
+		attachments[bullet_index] = nullptr;
+	}
+
+
+	// _ALWAYS_INLINE_ void all_bullets_set_attachment_to_null(){
+	// 	// TODO
+	// }
+
+	// _ALWAYS_INLINE_ void all_bullets_set_attachment(int bullet_index, const Ref<PackedScene> &attachment_scene, uint32_t attachment_pooling_id, const Vector2 &bullet_attachment_offset){
+	// 	// TODO
+	// }
+
+
+
+	_ALWAYS_INLINE_ void bullet_set_attachment(int bullet_index, const Ref<PackedScene> &attachment_scene, uint32_t attachment_pooling_id, const Vector2 &bullet_attachment_offset, bool stick_relative_to_bullet = true) {
+		if (!attachment_scene.is_valid()) {
+			UtilityFunctions::printerr("Tried to set an invalid attachment scene to bullet index: " + String::num_int64(bullet_index));
+			return;
+		}
+
+		auto &curr_attachment = attachments[bullet_index];
+
+		// Try to get a bullet attachment from the object pool to avoid creating nodes that are practically the same
+		auto &pool = bullet_factory->bullet_attachments_pool;
+
+		// Decide what to do with the old attachment if there is one
+		if (curr_attachment) {
+			curr_attachment->call_on_bullet_disable(); // Call GDScript virtual function
+
+			if (is_attachments_auto_pooling_enabled) {
+				bullet_factory->bullet_attachments_pool.push(curr_attachment);
+			} else {
+				curr_attachment->queue_free();
+			}
+
+			curr_attachment = nullptr;
+		}
+
+		attachment_scenes[bullet_index] = attachment_scene;
+
+		BulletAttachment2D *attachment_instance = pool.pop(attachment_pooling_id);
+		bool created_brand_new_instance = false;
+
+		if (!attachment_instance) {
+			attachment_instance = static_cast<BulletAttachment2D *>(attachment_scene->instantiate()); // It better be a BulletAttachment2D scene or it will crash
+			created_brand_new_instance = true;
+		}
+
+		attachment_object_ids_for_validation[bullet_index] = attachment_instance->get_instance_id();
+		attachment_pooling_ids[bullet_index] = attachment_pooling_id;
+		attachment_stick_relative_to_bullet[bullet_index] = stick_relative_to_bullet; // TODO delete - attachment_instance->get_stick_relative_to_bullet(); as well as the other props that are now useless dead code..
+
+		attachment_offsets[bullet_index] = bullet_attachment_offset;
+
+		auto &local_transf = attachment_local_transforms[bullet_index];
+
+		local_transf = Transform2D();
+		local_transf.set_origin(bullet_attachment_offset);
+		local_transf.set_rotation(attachment_instance->get_rotation());
+
+		auto &global_transf = attachment_transforms[bullet_index];
+		global_transf = calculate_attachment_global_transf(bullet_index, cache_texture_transforms[bullet_index]);
+
+		attachment_instance->set_global_transform(global_transf);
+
+		if (created_brand_new_instance) {
+			attachment_instance->set_physics_interpolation_mode(Node::PHYSICS_INTERPOLATION_MODE_OFF); // I have custom physics interpolation logic, so disable the Godot one
+			attachment_instance->call_on_bullet_spawn(); // Call GDScript custom virtual method to ensure the proper state before adding to the scene tree
+			bullet_factory->bullet_attachments_container->add_child(attachment_instance);
+		} else {
+			attachment_instance->call_on_bullet_activate(); // Call GDScript custom virtual method so that it gets activated properly
+		}
+
+		curr_attachment = attachment_instance;
+	}
+
+	// TODO all these need to be fixed and also removed from bindings..
 	_ALWAYS_INLINE_ void free_bullet_attachment(int bullet_index) {
-		BulletAttachment2D *&attachment_ptr = bullet_attachments[bullet_index];
+		BulletAttachment2D *&attachment_ptr = attachments[bullet_index];
 
 		if (attachment_ptr == nullptr) {
 			return;
@@ -472,7 +578,7 @@ protected:
 	}
 
 	_ALWAYS_INLINE_ void push_bullet_attachment_to_pool(int bullet_index) {
-		BulletAttachment2D *&attachment_ptr = bullet_attachments[bullet_index];
+		BulletAttachment2D *&attachment_ptr = attachments[bullet_index];
 
 		if (attachment_ptr == nullptr) {
 			return;
@@ -481,28 +587,6 @@ protected:
 		attachment_ptr->call_on_bullet_disable();
 		bullet_factory->bullet_attachments_pool.push(attachment_ptr);
 		attachment_ptr = nullptr;
-	}
-
-	_ALWAYS_INLINE_ void activate_bullet_attachment(int bullet_index) {
-		BulletAttachment2D *&attachment_ptr = bullet_attachments[bullet_index];
-
-		if (attachment_ptr == nullptr) {
-			return;
-		}
-
-		attachment_ptr->call_on_bullet_activate();
-	}
-
-	_ALWAYS_INLINE_ void disable_bullet_attachment(int bullet_index) {
-		BulletAttachment2D *&attachment_ptr = bullet_attachments[bullet_index];
-
-		//print_line(attachment_ptr == nullptr ? "nullptr" : "not null");
-
-		if (attachment_ptr == nullptr) {
-			return;
-		}
-
-		attachment_ptr->call_on_bullet_disable();
 	}
 
 	// Called when all bullets have been disabled
@@ -546,7 +630,11 @@ protected:
 		}
 
 		if (activate_attachment) {
-			activate_bullet_attachment(bullet_index);
+			BulletAttachment2D *&attachment_ptr = attachments[bullet_index];
+
+			if (attachment_ptr != nullptr) {
+				attachment_ptr->call_on_bullet_activate();
+			}
 		}
 
 		curr_bullet_status = true;
@@ -574,7 +662,11 @@ protected:
 		physics_server->area_set_shape_disabled(area, bullet_index, true);
 
 		if (disable_attachment) {
-			disable_bullet_attachment(bullet_index);
+			BulletAttachment2D *&attachment_ptr = attachments[bullet_index];
+
+			if (attachment_ptr != nullptr) {
+				attachment_ptr->call_on_bullet_disable();
+			}
 		}
 
 		if (active_bullets_counter <= 0) {
@@ -599,7 +691,19 @@ protected:
 		if (bullet_max_collision_count > 0 && current_bullet_collision_amount >= bullet_max_collision_count) {
 			disable_bullet(bullet_index, false);
 
-			push_bullet_attachment_to_pool(bullet_index);
+			// Handle what happens with a bullet attachment if there is one
+			auto &curr_attachment = attachments[bullet_index];
+			if (curr_attachment) {
+				curr_attachment->call_on_bullet_disable(); // Call GDScript virtual function
+
+				if (is_attachments_auto_pooling_enabled) {
+					bullet_factory->bullet_attachments_pool.push(curr_attachment);
+				} else {
+					curr_attachment->queue_free();
+				}
+
+				curr_attachment = nullptr;
+			}
 		}
 
 		Object *hit_target = ObjectDB::get_instance(entered_instance_id);
@@ -640,7 +744,7 @@ protected:
 
 	// Moves a single bullet attachment
 	_ALWAYS_INLINE_ void move_bullet_attachment(const Vector2 &translate_by, int bullet_index, real_t rotation_angle) {
-		if (!bullet_attachment_scene.is_valid()) {
+		if (!attachment_scenes[bullet_index].is_valid()) {
 			return;
 		}
 
@@ -649,7 +753,7 @@ protected:
 		Transform2D new_attachment_transf;
 		if (cache_stick_relative_to_bullet) {
 			const Transform2D &bullet_global_transf = all_cached_instance_transforms[bullet_index];
-			new_attachment_transf = calculate_attachment_global_transf(bullet_global_transf);
+			new_attachment_transf = calculate_attachment_global_transf(bullet_index, bullet_global_transf);
 		} else {
 			new_attachment_transf = attachment_transforms[bullet_index];
 			new_attachment_transf = new_attachment_transf.translated(translate_by);
@@ -660,19 +764,19 @@ protected:
 
 		// Apply immediately only if not using interpolation
 		if (!is_using_physics_interpolation) {
-			bullet_attachments[bullet_index]->set_global_transform(new_attachment_transf);
+			attachments[bullet_index]->set_global_transform(new_attachment_transf);
 		}
 	}
 
 	// Calculates the global transform of the bullet attachment. Note that this function relies on bullet_attachment_local_transform being set already
-	_ALWAYS_INLINE_ Transform2D calculate_attachment_global_transf(const Transform2D &original_data_transf) {
+	_ALWAYS_INLINE_ Transform2D calculate_attachment_global_transf(int bullet_index, const Transform2D &original_data_transf) {
 		// If there was additional texture rotation applied, this should not affect the bullet attachments
 		if (cache_texture_rotation_radians != 0.0f) {
 			// So just remove that rotation and then calculate the actual global transform of the bullet attachment
-			return original_data_transf.rotated_local(-cache_texture_rotation_radians) * bullet_attachment_local_transform;
+			return original_data_transf.rotated_local(-cache_texture_rotation_radians) * attachment_local_transforms[bullet_index];
 		}
 
-		return original_data_transf * bullet_attachment_local_transform;
+		return original_data_transf * attachment_local_transforms[bullet_index];
 	}
 
 	bool get_is_life_time_infinite() const { return is_life_time_infinite; }
@@ -737,24 +841,16 @@ protected:
 	virtual void custom_additional_disable_logic() {}
 	///
 private:
-	// BULLET ATTACHMENTS RELATED
-
-	// The current attachment's id
-	int cache_attachment_id = 0;
-
 	// Acquires data from the bullet attachment scene and gives it to the arguments passed by reference - acquires attachment_id and attachment_rotation
-	int set_attachment_related_data(const Ref<PackedScene> &new_bullet_attachment_scene, const Vector2 &bullet_attachment_offset);
+	int set_attachment_related_data(const Ref<PackedScene> &new_attachment_scenes, const Vector2 &bullet_attachment_offset);
 
 	//
 
 	// Reserves enough memory and populates all needed data structures keeping track of rotation data
 	void set_rotation_data(const TypedArray<BulletRotationData2D> &rotation_data, bool new_rotate_only_textures);
 
-	// Creates a brand new bullet attachment from the bullet attachment scene and finally saves it to the bullet_attachments vector
+	// Creates a brand new bullet attachment from the bullet attachment scene and finally saves it to the attachments vector
 	void create_new_bullet_attachment(int bullet_index, const Transform2D &attachment_global_transf);
-
-	// Tries to find and reuse a bullet attachment from the object pool. If successful returns true
-	bool reuse_attachment_from_object_pool(int bullet_index, BulletAttachmentObjectPool2D &pool, const Transform2D &attachment_global_transf, int attachment_id);
 
 	// Generates texture transform with correct rotation and sets it to the correct bullet on the multimesh
 	Transform2D generate_texture_transform(Transform2D transf, bool is_texture_rotation_permanent, real_t texture_rotation_radians, int bullet_index);

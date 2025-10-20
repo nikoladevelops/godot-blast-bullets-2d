@@ -30,9 +30,11 @@ public:
 		// If using interpolation, store current transforms as previous ones
 		if (is_using_physics_interpolation) {
 			all_previous_instance_transf = all_cached_instance_transforms;
-			if (bullet_attachment_scene.is_valid()) {
-				all_previous_attachment_transf = attachment_transforms;
-			}
+			
+			// TODO fix this
+			// if (attachment_scenes.is_valid()) {
+			// 	all_previous_attachment_transf = attachment_transforms;
+			// }
 		}
 
 		Vector2 cache_velocity_calc = all_cached_velocity[0] * delta;

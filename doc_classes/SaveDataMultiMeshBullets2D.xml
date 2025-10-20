@@ -37,7 +37,7 @@
 		</member>
 		<member name="bullet_attachment_local_transform" type="Transform2D" setter="set_bullet_attachment_local_transform" getter="get_bullet_attachment_local_transform" default="Transform2D(1, 0, 0, 1, 0, 0)">
 		</member>
-		<member name="bullet_attachment_scene" type="PackedScene" setter="set_bullet_attachment_scene" getter="get_bullet_attachment_scene">
+		<member name="attachment_scenes" type="PackedScene" setter="set_attachment_scenes" getter="get_attachment_scenes">
 		</member>
 		<member name="bullet_attachments_custom_data" type="Resource[]" setter="set_bullet_attachments_custom_data" getter="get_bullet_attachments_custom_data" default="[]">
 		</member>

@@ -139,10 +139,10 @@
 		</method>
 		<method name="populate_attachments_pool">
 			<return type="void" />
-			<param index="0" name="bullet_attachment_scene" type="PackedScene" />
+			<param index="0" name="attachment_scenes" type="PackedScene" />
 			<param index="1" name="amount_attachments" type="int" />
 			<description>
-				Populates the attachments object pool. Ensure that the [code]bullet_attachment_scene[/code] contains an actual [BulletAttachment2D] scene or your game will crash. Check the [BulletAttachment2D] documentation for more info on how attachments work.
+				Populates the attachments object pool. Ensure that the [code]attachment_scenes[/code] contains an actual [BulletAttachment2D] scene or your game will crash. Check the [BulletAttachment2D] documentation for more info on how attachments work.
 			</description>
 		</method>
 		<method name="populate_bullets_pool">

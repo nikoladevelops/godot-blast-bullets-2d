@@ -55,7 +55,9 @@ func _ready() -> void:
 	bullets_data.collision_layer = DirectionalBulletsData2D.calculate_bitmask([4])
 	bullets_data.collision_mask = DirectionalBulletsData2D.calculate_bitmask(default_bullet_collision_mask)
 	bullets_data.monitorable=true # Monitorable allows for these bullets to be detected by other areas
-	bullets_data.bullet_attachment_scene = preload("res://shared/bullet_attachment_nodes/attached_particles.tscn")
+	
+	#TODO
+	bullets_data.attachment_scenes = preload("res://shared/bullet_attachment_nodes/attached_particles.tscn")
 	bullets_data.bullet_attachment_offset = Vector2(-30,0)
 	
 func _physics_process(_delta: float) -> void:

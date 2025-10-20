@@ -250,13 +250,13 @@ Transform2D SaveDataMultiMeshBullets2D::get_bullet_attachment_local_transform() 
 	return bullet_attachment_local_transform;
 }
 
-// bullet_attachment_scene
-void SaveDataMultiMeshBullets2D::set_bullet_attachment_scene(const Ref<PackedScene> &value) {
-	bullet_attachment_scene = value;
+// attachment_scenes
+void SaveDataMultiMeshBullets2D::set_attachment_scenes(const Ref<PackedScene> &value) {
+	attachment_scenes = value;
 }
 
-Ref<PackedScene> SaveDataMultiMeshBullets2D::get_bullet_attachment_scene() const {
-	return bullet_attachment_scene;
+Ref<PackedScene> SaveDataMultiMeshBullets2D::get_attachment_scenes() const {
+	return attachment_scenes;
 }
 
 void SaveDataMultiMeshBullets2D::set_bullet_attachments_custom_data(const TypedArray<Resource> &value) {
@@ -484,11 +484,11 @@ void SaveDataMultiMeshBullets2D::_bind_methods() {
 			"set_bullet_attachment_local_transform",
 			"get_bullet_attachment_local_transform");
 
-	ClassDB::bind_method(D_METHOD("get_bullet_attachment_scene"), &SaveDataMultiMeshBullets2D::get_bullet_attachment_scene);
-	ClassDB::bind_method(D_METHOD("set_bullet_attachment_scene", "value"), &SaveDataMultiMeshBullets2D::set_bullet_attachment_scene);
-	ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "bullet_attachment_scene", PROPERTY_HINT_RESOURCE_TYPE, "PackedScene"),
-			"set_bullet_attachment_scene",
-			"get_bullet_attachment_scene");
+	ClassDB::bind_method(D_METHOD("get_attachment_scenes"), &SaveDataMultiMeshBullets2D::get_attachment_scenes);
+	ClassDB::bind_method(D_METHOD("set_attachment_scenes", "value"), &SaveDataMultiMeshBullets2D::set_attachment_scenes);
+	ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "attachment_scenes", PROPERTY_HINT_RESOURCE_TYPE, "PackedScene"),
+			"set_attachment_scenes",
+			"get_attachment_scenes");
 
 	ClassDB::bind_method(D_METHOD("get_bullet_attachments_custom_data"), &SaveDataMultiMeshBullets2D::get_bullet_attachments_custom_data);
 	ClassDB::bind_method(D_METHOD("set_bullet_attachments_custom_data", "value"), &SaveDataMultiMeshBullets2D::set_bullet_attachments_custom_data);
