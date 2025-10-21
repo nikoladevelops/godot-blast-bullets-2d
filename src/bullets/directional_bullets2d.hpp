@@ -692,28 +692,6 @@ protected:
 		}
 	}
 
-	// Validates bullet index and logs error if invalid
-	_ALWAYS_INLINE_ bool validate_bullet_index(int bullet_index, const String &function_name) const {
-		if (bullet_index < 0 || bullet_index >= amount_bullets) {
-			UtilityFunctions::printerr("Invalid bullet index in " + function_name);
-			return false;
-		}
-		return true;
-	}
-
-	_ALWAYS_INLINE_ void ensure_indexes_match_amount_bullets_range(int &bullet_index_start, int &bullet_index_end_inclusive, const String &function_name) {
-		if (bullet_index_start < 0 || bullet_index_start >= amount_bullets) {
-			bullet_index_start = 0;
-		}
-		if (bullet_index_end_inclusive < 0 || bullet_index_end_inclusive >= amount_bullets) {
-			bullet_index_end_inclusive = amount_bullets - 1;
-		}
-		if (bullet_index_start > bullet_index_end_inclusive) {
-			bullet_index_start = 0;
-			bullet_index_end_inclusive = amount_bullets - 1;
-			UtilityFunctions::printerr("Invalid index range in " + function_name);
-		}
-	}
 
 	// Normalizes an angle to [-PI, PI]
 	_ALWAYS_INLINE_ void normalize_angle(real_t &angle) const {

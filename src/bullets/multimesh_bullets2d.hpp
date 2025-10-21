@@ -225,8 +225,7 @@ public:
 	}
 
 	_ALWAYS_INLINE_ bool is_bullet_status_enabled(int bullet_index) {
-		if (bullet_index < 0 || bullet_index >= amount_bullets) {
-			UtilityFunctions::printerr("Bullet index out of bounds in is_bullet_status_enabled");
+		if (!validate_bullet_index(bullet_index, "is_bullet_status_enabled")) {
 			return false;
 		}
 
@@ -470,6 +469,29 @@ protected:
 		// The origin (columns[2]) remains unchanged
 	}
 
+	// Validates bullet index and logs error if invalid
+	_ALWAYS_INLINE_ bool validate_bullet_index(int bullet_index, const String &function_name) const {
+		if (bullet_index < 0 || bullet_index >= amount_bullets) {
+			UtilityFunctions::printerr("Invalid bullet index in " + function_name);
+			return false;
+		}
+		return true;
+	}
+
+	_ALWAYS_INLINE_ void ensure_indexes_match_amount_bullets_range(int &bullet_index_start, int &bullet_index_end_inclusive, const String &function_name) {
+		if (bullet_index_start < 0 || bullet_index_start >= amount_bullets) {
+			bullet_index_start = 0;
+		}
+		if (bullet_index_end_inclusive < 0 || bullet_index_end_inclusive >= amount_bullets) {
+			bullet_index_end_inclusive = amount_bullets - 1;
+		}
+		if (bullet_index_start > bullet_index_end_inclusive) {
+			bullet_index_start = 0;
+			bullet_index_end_inclusive = amount_bullets - 1;
+			UtilityFunctions::printerr("Invalid index range in " + function_name);
+		}
+	}
+
 	// Accelerates a bullet's rotation speed, returns whether the max speed has been reached or not
 	_ALWAYS_INLINE_ bool accelerate_bullet_rotation_speed(int bullet_index, double delta) {
 		real_t &cache_rotation_speed = all_rotation_speed[bullet_index];
@@ -485,31 +507,73 @@ protected:
 	}
 
 	_ALWAYS_INLINE_ BulletAttachment2D *bullet_get_attachment(int bullet_index) {
+		if (!validate_bullet_index(bullet_index, "bullet_get_attachment")) {
+			return nullptr;
+		}
+
 		return attachments[bullet_index];
 	}
 
-	_ALWAYS_INLINE_ void bullet_set_attachment_to_null(int bullet_index) {
-		attachments[bullet_index] = nullptr;
-	}
-
-
-	// _ALWAYS_INLINE_ void all_bullets_set_attachment_to_null(){
-	// 	// TODO
-	// }
-
-	// _ALWAYS_INLINE_ void all_bullets_set_attachment(int bullet_index, const Ref<PackedScene> &attachment_scene, uint32_t attachment_pooling_id, const Vector2 &bullet_attachment_offset){
-	// 	// TODO
-	// }
-
-
-
-	_ALWAYS_INLINE_ void bullet_set_attachment(int bullet_index, const Ref<PackedScene> &attachment_scene, uint32_t attachment_pooling_id, const Vector2 &bullet_attachment_offset, bool stick_relative_to_bullet = true) {
-		if (!attachment_scene.is_valid()) {
-			UtilityFunctions::printerr("Tried to set an invalid attachment scene to bullet index: " + String::num_int64(bullet_index));
-			return;
+	_ALWAYS_INLINE_ BulletAttachment2D *bullet_set_attachment_to_null(int bullet_index) {
+		if (!validate_bullet_index(bullet_index, "bullet_set_attachment_to_null")) {
+			return nullptr;
 		}
 
 		auto &curr_attachment = attachments[bullet_index];
+		auto temp = curr_attachment;
+
+		curr_attachment = nullptr;
+		return temp;
+	}
+
+	_ALWAYS_INLINE_ TypedArray<BulletAttachment2D> all_bullets_get_attachments(int bullet_index_start = 0, int bullet_index_end_inclusive = -1) {
+		ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_get_attachments");
+
+		TypedArray<BulletAttachment2D> arr;
+
+		for (int i = bullet_index_start; i <= bullet_index_end_inclusive; ++i) {
+			arr.push_back(bullet_get_attachment(i));
+		}
+
+		return arr;
+	}
+
+	_ALWAYS_INLINE_ TypedArray<BulletAttachment2D> all_bullets_set_attachment_to_null(int bullet_index_start = 0, int bullet_index_end_inclusive = -1) {
+		ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_set_attachment_to_null");
+
+		TypedArray<BulletAttachment2D> arr;
+
+		for (int i = bullet_index_start; i <= bullet_index_end_inclusive; ++i) {
+			arr.push_back(bullet_set_attachment_to_null(i));
+		}
+
+		return arr;
+	}
+
+	_ALWAYS_INLINE_ TypedArray<BulletAttachment2D> all_bullets_set_attachment(const Ref<PackedScene> &attachment_scene, uint32_t attachment_pooling_id, const Vector2 &bullet_attachment_offset, bool stick_relative_to_bullet = true, int bullet_index_start = 0, int bullet_index_end_inclusive = -1) {
+		ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_set_attachment");
+
+		TypedArray<BulletAttachment2D> arr;
+
+		for (int i = bullet_index_start; i <= bullet_index_end_inclusive; ++i) {
+			arr.push_back(bullet_set_attachment(i, attachment_scene, attachment_pooling_id, bullet_attachment_offset, stick_relative_to_bullet));
+		}
+		
+		return arr;
+	}
+
+	_ALWAYS_INLINE_ BulletAttachment2D *bullet_set_attachment(int bullet_index, const Ref<PackedScene> &attachment_scene, uint32_t attachment_pooling_id, const Vector2 &bullet_attachment_offset, bool stick_relative_to_bullet = true) {
+		if (!validate_bullet_index(bullet_index, "bullet_set_attachment")) {
+			return nullptr;
+		}
+
+		if (!attachment_scene.is_valid()) {
+			UtilityFunctions::printerr("Tried to set an invalid attachment scene to bullet index: " + String::num_int64(bullet_index));
+			return nullptr;
+		}
+
+		auto &curr_attachment = attachments[bullet_index];
+		auto prev_attacment = curr_attachment;
 
 		// Try to get a bullet attachment from the object pool to avoid creating nodes that are practically the same
 		auto &pool = bullet_factory->bullet_attachments_pool;
@@ -521,7 +585,7 @@ protected:
 			if (is_attachments_auto_pooling_enabled) {
 				bullet_factory->bullet_attachments_pool.push(curr_attachment);
 			} else {
-				curr_attachment->queue_free();
+				curr_attachment->queue_free(); // TODO maybe retunrn the attachment if there was one akready attached?
 			}
 
 			curr_attachment = nullptr;
@@ -563,6 +627,8 @@ protected:
 		}
 
 		curr_attachment = attachment_instance;
+
+		return prev_attacment;
 	}
 
 	// TODO all these need to be fixed and also removed from bindings..

@@ -68,7 +68,7 @@ void MultiMeshBullets2D::spawn(const MultiMeshBulletsData2D &data, MultiMeshObje
 	set_up_bullet_instances(data);
 
 	// Set up bullet attachments so that for every bullet you will be able to have an attachment if needed
-	
+
 	// TODO might be best to have a property that says whether attachments are used or not so that we dont allocate memory for no reason..
 
 	attachment_scenes.resize(amount_bullets, nullptr);
@@ -192,7 +192,6 @@ void MultiMeshBullets2D::set_up_bullet_instances(const MultiMeshBulletsData2D &d
 
 	bool is_physics_interpolation_currently_enabled = bullet_factory->use_physics_interpolation;
 
-
 	for (int i = 0; i < amount_bullets; i++) {
 		RID shape = physics_shapes[i];
 
@@ -203,7 +202,7 @@ void MultiMeshBullets2D::set_up_bullet_instances(const MultiMeshBulletsData2D &d
 
 		// Generates texture transform with correct rotation and sets it to the correct bullet on the multimesh
 		const Transform2D &texture_transf = generate_texture_transform(curr_data_transf, data.is_texture_rotation_permanent, cache_texture_rotation_radians, i);
-		
+
 		cache_texture_transforms[i] = texture_transf;
 
 		// Cache bullet transforms and origin vectors
@@ -479,7 +478,6 @@ void MultiMeshBullets2D::load_bullet_instances(const SaveDataMultiMeshBullets2D 
 	set_up_area(data.collision_layer, data.collision_mask, data.monitorable, bullet_factory->physics_space);
 
 	generate_physics_shapes_for_area(amount_bullets);
-
 
 	// TODO ATTACHMENTS LOADING NEEDS REFACTOR
 
@@ -913,8 +911,12 @@ void MultiMeshBullets2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("_handle_bullet_collision", "factory_signal_name_to_emit", "bullet_index", "entered_instance_id"), &MultiMeshBullets2D::_handle_bullet_collision);
 
 	ClassDB::bind_method(D_METHOD("bullet_get_attachment", "bullet_index"), &MultiMeshBullets2D::bullet_get_attachment);
-	ClassDB::bind_method(D_METHOD("bullet_set_attachment", "bullet_index", "attachment_scene", "attachment_pooling_id", "bullet_attachment_offset", "stick_relative_to_bullet"), &MultiMeshBullets2D::bullet_set_attachment, DEFVAL(true));
 	ClassDB::bind_method(D_METHOD("bullet_set_attachment_to_null", "bullet_index"), &MultiMeshBullets2D::bullet_set_attachment_to_null);
 
+	ClassDB::bind_method(D_METHOD("all_bullets_get_attachments", "bullet_index_start", "bullet_index_end_inclusive"), &MultiMeshBullets2D::all_bullets_get_attachments, DEFVAL(0), DEFVAL(-1));
+	ClassDB::bind_method(D_METHOD("all_bullets_set_attachment_to_null", "bullet_index_start", "bullet_index_end_inclusive"), &MultiMeshBullets2D::all_bullets_set_attachment_to_null, DEFVAL(0), DEFVAL(-1));
+	ClassDB::bind_method(D_METHOD("all_bullets_set_attachment", "attachment_scene", "attachment_pooling_id", "bullet_attachment_offset", "stick_relative_to_bullet", "bullet_index_start", "bullet_index_end_inclusive"), &MultiMeshBullets2D::all_bullets_set_attachment, DEFVAL(true), DEFVAL(0), DEFVAL(-1));
+
+	ClassDB::bind_method(D_METHOD("bullet_set_attachment", "bullet_index", "attachment_scene", "attachment_pooling_id", "bullet_attachment_offset", "stick_relative_to_bullet"), &MultiMeshBullets2D::bullet_set_attachment, DEFVAL(true));
 }
 } //namespace BlastBullets2D
