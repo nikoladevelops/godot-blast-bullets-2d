@@ -37,7 +37,7 @@ public:
 	std::map<int, int> get_pool_info();
 
 private:
-	// The key corresponds to the amount of bullets a bullets multimesh has, meanwhile the value corresponds to a queue that holds all of those that have that amount of bullets. Example: If key is 5, that means it holds all deactivated multimesh instances that each have 5 bullets (5 collision shapes, 5 texture instances that are currently invisible)
+	// The key corresponds to the amount of bullets a bullets multimesh has, meanwhile the value corresponds to a queue that holds all of those that have that amount of bullets. Example: If key is 5, that means it holds all deenabled multimesh instances that each have 5 bullets (5 collision shapes, 5 texture instances that are currently invisible)
 	std::unordered_map<int, std::queue<MultiMeshBullets2D *>> pool;
 };
 } //namespace BlastBullets2D

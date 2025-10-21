@@ -507,7 +507,7 @@ public:
 	virtual void custom_additional_spawn_logic(const MultiMeshBulletsData2D &data) override final;
 	virtual void custom_additional_save_logic(SaveDataMultiMeshBullets2D &data) override final;
 	virtual void custom_additional_load_logic(const SaveDataMultiMeshBullets2D &data) override final;
-	virtual void custom_additional_activate_logic(const MultiMeshBulletsData2D &data) override final;
+	virtual void custom_additional_enable_logic(const MultiMeshBulletsData2D &data) override final;
 
 protected:
 	// Configuration flags

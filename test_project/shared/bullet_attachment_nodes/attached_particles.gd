@@ -17,7 +17,7 @@ func on_bullet_disable() -> void:
 	set_process(false)
 	set_physics_process(false)
 
-func on_bullet_activate() -> void:
+func on_bullet_enable() -> void:
 	CPUParticles.one_shot = false
 	
 	CPUParticles.restart()

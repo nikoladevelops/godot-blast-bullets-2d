@@ -8,7 +8,7 @@
 	<tutorials>
 	</tutorials>
 	<methods>
-		<method name="activate_bullet">
+		<method name="enable_bullet">
 			<return type="void" />
 			<param index="0" name="bullet_index" type="int" />
 			<param index="1" name="collision_amount" type="int" default="0" />

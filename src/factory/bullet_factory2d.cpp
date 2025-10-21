@@ -305,7 +305,7 @@ void BulletFactory2D::reset_factory_state() {
 	// Free all bullet attachments that are currently in the object pool
 	bullet_attachments_pool.free_all_bullet_attachments();
 
-	// If the debuggers are supposed to be activated then re-activate them
+	// If the debuggers are supposed to be enabled then re-enable them
 	if (debugger_curr_enabled) {
 		block_bullets_debugger->set_is_debugger_enabled(true);
 		directional_bullets_debugger->set_is_debugger_enabled(true);
@@ -362,7 +362,7 @@ void BulletFactory2D::free_active_bullets(bool pool_attachments) {
 	// Free all ACTIVE BlockBullets2D, whether their attachments also get freed depends on pool_attachments value
 	free_only_active_bullets_helper<BlockBullets2D>(all_block_bullets, block_bullets_pool, pool_attachments);
 
-	// If the debuggers are supposed to be activated then re-activate them
+	// If the debuggers are supposed to be enabled then re-enable them
 	if (debugger_curr_enabled) {
 		block_bullets_debugger->set_is_debugger_enabled(true);
 		directional_bullets_debugger->set_is_debugger_enabled(true);

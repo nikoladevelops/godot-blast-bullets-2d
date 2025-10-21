@@ -18,7 +18,7 @@ func on_bullet_disable() -> void:
 	set_process(false)
 	set_physics_process(false)
 
-func on_bullet_activate() -> void:
+func on_bullet_enable() -> void:
 	GPUParticles.restart()
 	set_process(true)
 	set_physics_process(true)

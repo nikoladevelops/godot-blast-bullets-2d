@@ -36,7 +36,7 @@ void BlockBullets2D::custom_additional_spawn_logic(const MultiMeshBulletsData2D 
 	set_up_movement_data(*block_data.block_speed.ptr());
 }
 
-void BlockBullets2D::custom_additional_activate_logic(const MultiMeshBulletsData2D &data) {
+void BlockBullets2D::custom_additional_enable_logic(const MultiMeshBulletsData2D &data) {
 	const BlockBulletsData2D &block_data = static_cast<const BlockBulletsData2D &>(data);
 
 	block_rotation_radians = block_data.block_rotation_radians;

@@ -241,7 +241,7 @@ private:
 
 	// TEMPLATES
 
-	// Populates a bullets pool with deactivated bullet instances. It's mandatory that the TBullet type inherits from MultiMeshBullets2D
+	// Populates a bullets pool with disabled bullet instances. It's mandatory that the TBullet type inherits from MultiMeshBullets2D
 	template <typename TBullet>
 	void populate_bullets_pool_helper(std::vector<TBullet *> &bullets_vec, MultiMeshObjectPool &bullets_object_pool, Node *bullets_container, int amount_instances, int amount_bullets_per_instance) {
 		bullets_vec.reserve(amount_instances);
@@ -368,7 +368,7 @@ private:
 		// Try to get a TBullet from the pool first
 		TBullet *bullets = static_cast<TBullet *>(bullets_pool.pop(key));
 		if (bullets != nullptr) {
-			bullets->activate_multimesh(*spawn_data.ptr());
+			bullets->enable_multimesh(*spawn_data.ptr());
 			return bullets;
 		}
 

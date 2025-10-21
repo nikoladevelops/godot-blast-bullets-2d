@@ -95,7 +95,7 @@ void DirectionalBullets2D::custom_additional_load_logic(const SaveDataMultiMeshB
 	all_bullet_homing_targets.resize(amount_bullets); // Create a vector that contains an empty queue for each bullet index
 }
 
-void DirectionalBullets2D::custom_additional_activate_logic(const MultiMeshBulletsData2D &data) {
+void DirectionalBullets2D::custom_additional_enable_logic(const MultiMeshBulletsData2D &data) {
 	const DirectionalBulletsData2D &directional_data = static_cast<const DirectionalBulletsData2D &>(data);
 
 	// Get the list of connections for the signal

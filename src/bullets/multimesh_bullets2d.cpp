@@ -107,7 +107,7 @@ void MultiMeshBullets2D::spawn(const MultiMeshBulletsData2D &data, MultiMeshObje
 }
 
 // Activates the multimesh
-void MultiMeshBullets2D::activate_multimesh(const MultiMeshBulletsData2D &data) {
+void MultiMeshBullets2D::enable_multimesh(const MultiMeshBulletsData2D &data) {
 	set_up_life_time_timer(data.max_life_time, data.max_life_time);
 	set_up_change_texture_timer(
 			data.textures.size(),
@@ -134,7 +134,7 @@ void MultiMeshBullets2D::activate_multimesh(const MultiMeshBulletsData2D &data) 
 			data.visibility_layer,
 			data.instance_shader_parameters);
 
-	custom_additional_activate_logic(data);
+	custom_additional_enable_logic(data);
 
 	set_visible(true);
 	is_active = true;
@@ -167,9 +167,9 @@ void MultiMeshBullets2D::set_up_bullet_instances(const MultiMeshBulletsData2D &d
 	cache_collision_shape_offset = data.collision_shape_offset;
 
 	if (all_cached_instance_transforms.size() != 0) {
-		// If there was old data then we are currently trying to activate a bullets multimesh, so clear everything that is old
+		// If there was old data then we are currently trying to enable a bullets multimesh, so clear everything that is old
 		// Note: We never really resize any of these vectors, so capacity always stays the same and the object pooling logic also ensures of this, so no need to reserve different amount of space since it's always going to be the original capacity value/ no memory reallocations
-		// Note: This logic relies on the fact that we always activate multimesh bullets based on their original amount_bullets - that's how the object pooling logic works in order to re-use everything
+		// Note: This logic relies on the fact that we always enable multimesh bullets based on their original amount_bullets - that's how the object pooling logic works in order to re-use everything
 		all_cached_instance_transforms.clear();
 		all_cached_instance_origin.clear();
 		all_cached_shape_transforms.clear();
@@ -861,7 +861,7 @@ void MultiMeshBullets2D::set_all_physics_shapes_enabled_for_area(bool enable) {
 
 void MultiMeshBullets2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("disable_bullet", "bullet_index", "disable_bullet_attachment"), &MultiMeshBullets2D::disable_bullet, DEFVAL(true));
-	ClassDB::bind_method(D_METHOD("activate_bullet", "bullet_index", "collision_amount", "activate_attachment"), &MultiMeshBullets2D::activate_bullet, DEFVAL(0), DEFVAL(true));
+	ClassDB::bind_method(D_METHOD("enable_bullet", "bullet_index", "collision_amount", "enable_attachment"), &MultiMeshBullets2D::enable_bullet, DEFVAL(0), DEFVAL(true));
 
 	ClassDB::bind_method(D_METHOD("bullet_free_attachment", "bullet_index"), &MultiMeshBullets2D::bullet_free_attachment);
 	ClassDB::bind_method(D_METHOD("bullet_disable_attachment", "bullet_index"), &MultiMeshBullets2D::bullet_disable_attachment);

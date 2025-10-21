@@ -26,7 +26,7 @@ public:
 	GDVIRTUAL0(on_bullet_disable)
 
 	// Custom activation behavior - executed when the bullet gets retrieved from the object pool. You should write logic that resets the state of your attachment node as if it's brand new
-	GDVIRTUAL0(on_bullet_activate)
+	GDVIRTUAL0(on_bullet_enable)
 
 	// Custom save behavior. You should create a brand new custom Resource class, fill it with your custom data that should be saved and then return it inside this function
 	GDVIRTUAL0R(Ref<Resource>, on_bullet_save)
@@ -41,7 +41,7 @@ public:
 
 	void call_on_bullet_spawn();
 	void call_on_bullet_disable();
-	void call_on_bullet_activate();
+	void call_on_bullet_enable();
 	Ref<Resource> call_on_bullet_save();
 	void call_on_bullet_load(Ref<Resource> custom_data_to_load);
 	void call_on_bullet_spawn_as_disabled();

@@ -9,8 +9,8 @@ void BulletAttachment2D::call_on_bullet_spawn() {
 void BulletAttachment2D::call_on_bullet_disable() {
 	GDVIRTUAL_CALL(on_bullet_disable);
 }
-void BulletAttachment2D::call_on_bullet_activate() {
-	GDVIRTUAL_CALL(on_bullet_activate);
+void BulletAttachment2D::call_on_bullet_enable() {
+	GDVIRTUAL_CALL(on_bullet_enable);
 }
 Ref<Resource> BulletAttachment2D::call_on_bullet_save() {
 	Ref<Resource> data;
@@ -44,7 +44,7 @@ void BulletAttachment2D::set_stick_relative_to_bullet(bool new_stick_relative_to
 void BulletAttachment2D::_bind_methods() {
 	GDVIRTUAL_BIND(on_bullet_spawn);
 	GDVIRTUAL_BIND(on_bullet_disable);
-	GDVIRTUAL_BIND(on_bullet_activate);
+	GDVIRTUAL_BIND(on_bullet_enable);
 	GDVIRTUAL_BIND(on_bullet_save);
 	GDVIRTUAL_BIND(on_bullet_load, "custom_data_to_load");
 	GDVIRTUAL_BIND(on_bullet_spawn_as_disabled);

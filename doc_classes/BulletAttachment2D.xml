@@ -15,10 +15,10 @@
 	<tutorials>
 	</tutorials>
 	<methods>
-		<method name="on_bullet_activate" qualifiers="virtual">
+		<method name="on_bullet_enable" qualifiers="virtual">
 			<return type="void" />
 			<description>
-				Executed when the attachment is activated again from the object pool. You should provide activation logic - attachment gets visible/enabled etc..
+				Executed when the attachment is enabled again from the object pool. You should provide activation logic - attachment gets visible/enabled etc..
 
 				Note: This function gets executed over and over again since attachment object pooling is used.
 			</description>

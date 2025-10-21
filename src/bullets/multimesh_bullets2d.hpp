@@ -56,7 +56,7 @@ public:
 	void spawn(const MultiMeshBulletsData2D &spawn_data, MultiMeshObjectPool *pool, BulletFactory2D *factory, Node *bullets_container);
 
 	// Activates the multimesh
-	void activate_multimesh(const MultiMeshBulletsData2D &data);
+	void enable_multimesh(const MultiMeshBulletsData2D &data);
 
 	// Populates an empty data class instance with the current state of the bullets and returns it so it can be saved
 	Ref<SaveDataMultiMeshBullets2D> save(const Ref<SaveDataMultiMeshBullets2D> &empty_data);
@@ -64,7 +64,7 @@ public:
 	// Used to load bullets from a SaveDataMultiMeshBullets2D resource
 	void load(const Ref<SaveDataMultiMeshBullets2D> &data, MultiMeshObjectPool *pool, BulletFactory2D *factory, Node *bullets_container);
 
-	// Spawns as a disabled invisible multimesh that is ready to be activated at any time. Method is used for object pooling, because it sets up all necessary things (like physics shapes for example) without needing additional spawn data (which would be overriden anyways by the activate function's logic)
+	// Spawns as a disabled invisible multimesh that is ready to be enabled at any time. Method is used for object pooling, because it sets up all necessary things (like physics shapes for example) without needing additional spawn data (which would be overriden anyways by the enable function's logic)
 	void spawn_as_disabled_multimesh(int amount_bullets, MultiMeshObjectPool *pool, BulletFactory2D *factory, Node *bullets_container);
 
 	// Unsafe delete - only call this if all types of bullet processing have been disabled and all dangling pointers cleared, otherwise you will face weird issues/crashes
@@ -605,7 +605,7 @@ protected:
 			attachment_instance->call_on_bullet_spawn(); // Call GDScript custom virtual method to ensure the proper state before adding to the scene tree
 			bullet_factory->bullet_attachments_container->add_child(attachment_instance);
 		} else {
-			attachment_instance->call_on_bullet_activate(); // Call GDScript custom virtual method so that it gets activated properly
+			attachment_instance->call_on_bullet_enable(); // Call GDScript custom virtual method so that it gets enabled properly
 		}
 
 		curr_attachment = attachment_instance;
@@ -638,7 +638,7 @@ protected:
 		BulletAttachment2D *&attachment_ptr = attachments[bullet_index];
 
 		if (attachment_ptr != nullptr) {
-			attachment_ptr->call_on_bullet_activate();
+			attachment_ptr->call_on_bullet_enable();
 		}
 	}
 
@@ -659,7 +659,7 @@ protected:
 		bullets_pool->push(this, amount_bullets);
 	}
 
-	_ALWAYS_INLINE_ void activate_bullet(int bullet_index, int collision_amount = 0, bool should_enable_attachment = true) {
+	_ALWAYS_INLINE_ void enable_bullet(int bullet_index, int collision_amount = 0, bool should_enable_attachment = true) {
 		int8_t &curr_bullet_status = bullets_enabled_status[bullet_index];
 
 		// If the bullet is already enabled, just return
@@ -866,7 +866,7 @@ protected:
 	virtual void custom_additional_load_logic(const SaveDataMultiMeshBullets2D &data) {}
 
 	// Holds custom logic that runs before activating this multimesh when retrieved from the object pool
-	virtual void custom_additional_activate_logic(const MultiMeshBulletsData2D &data) {}
+	virtual void custom_additional_enable_logic(const MultiMeshBulletsData2D &data) {}
 
 	// Holds custom logic that runs before disabling and pushing this multimesh inside an object pool
 	virtual void custom_additional_disable_logic() {}
