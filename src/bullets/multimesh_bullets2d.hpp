@@ -81,9 +81,9 @@ public:
 		// if (attachment_scenes.is_valid()) {
 		// 	for (int i = 0; i < amount_bullets; i++) {
 		// 		if (pool_attachments) {
-		// 			push_bullet_attachment_to_pool(i);
+		// 			bullet_disable_attachment(i);
 		// 		} else {
-		// 			free_bullet_attachment(i);
+		// 			bullet_free_attachment(i);
 		// 		}
 		// 	}
 		// }
@@ -156,8 +156,7 @@ public:
 				for (int i = 0; i < amount_bullets; i++) {
 					// If the status is active it means that the bullet hasn't hit anything yet, so we need to disable it ourselves
 					if (bullets_enabled_status[i]) {
-						call_deferred("disable_bullet", i, false);
-						call_deferred("push_bullet_attachment_to_pool", i);
+						call_deferred("disable_bullet", i, true);
 
 						transfs.push_back(all_cached_instance_transforms[i]); // store the transform of the disabled bullet
 						bullet_indexes.push_back(i);
@@ -171,8 +170,7 @@ public:
 				// If we do not wish to emit the life_time_over signal, just disable the bullet and don't worry about having to pass additional data to the user
 				for (int i = 0; i < amount_bullets; i++) {
 					// There is already a bullet status check inside the function so it's fine
-					call_deferred("disable_bullet", i, false);
-					call_deferred("push_bullet_attachment_to_pool", i);
+					call_deferred("disable_bullet", i, true);
 				}
 			}
 		}
@@ -550,46 +548,30 @@ protected:
 		return arr;
 	}
 
-	_ALWAYS_INLINE_ TypedArray<BulletAttachment2D> all_bullets_set_attachment(const Ref<PackedScene> &attachment_scene, uint32_t attachment_pooling_id, const Vector2 &bullet_attachment_offset, bool stick_relative_to_bullet = true, int bullet_index_start = 0, int bullet_index_end_inclusive = -1) {
+	_ALWAYS_INLINE_ void all_bullets_set_attachment(const Ref<PackedScene> &attachment_scene, uint32_t attachment_pooling_id, const Vector2 &bullet_attachment_offset, bool stick_relative_to_bullet = true, int bullet_index_start = 0, int bullet_index_end_inclusive = -1) {
 		ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_set_attachment");
 
-		TypedArray<BulletAttachment2D> arr;
-
 		for (int i = bullet_index_start; i <= bullet_index_end_inclusive; ++i) {
-			arr.push_back(bullet_set_attachment(i, attachment_scene, attachment_pooling_id, bullet_attachment_offset, stick_relative_to_bullet));
+			bullet_set_attachment(i, attachment_scene, attachment_pooling_id, bullet_attachment_offset, stick_relative_to_bullet);
 		}
-		
-		return arr;
 	}
 
-	_ALWAYS_INLINE_ BulletAttachment2D *bullet_set_attachment(int bullet_index, const Ref<PackedScene> &attachment_scene, uint32_t attachment_pooling_id, const Vector2 &bullet_attachment_offset, bool stick_relative_to_bullet = true) {
+	_ALWAYS_INLINE_ void bullet_set_attachment(int bullet_index, const Ref<PackedScene> &attachment_scene, uint32_t attachment_pooling_id, const Vector2 &bullet_attachment_offset, bool stick_relative_to_bullet = true) {
 		if (!validate_bullet_index(bullet_index, "bullet_set_attachment")) {
-			return nullptr;
+			return;
 		}
 
 		if (!attachment_scene.is_valid()) {
 			UtilityFunctions::printerr("Tried to set an invalid attachment scene to bullet index: " + String::num_int64(bullet_index));
-			return nullptr;
+			return;
 		}
 
 		auto &curr_attachment = attachments[bullet_index];
-		auto prev_attacment = curr_attachment;
 
 		// Try to get a bullet attachment from the object pool to avoid creating nodes that are practically the same
 		auto &pool = bullet_factory->bullet_attachments_pool;
 
-		// Decide what to do with the old attachment if there is one
-		if (curr_attachment) {
-			curr_attachment->call_on_bullet_disable(); // Call GDScript virtual function
-
-			if (is_attachments_auto_pooling_enabled) {
-				bullet_factory->bullet_attachments_pool.push(curr_attachment);
-			} else {
-				curr_attachment->queue_free(); // TODO maybe retunrn the attachment if there was one akready attached?
-			}
-
-			curr_attachment = nullptr;
-		}
+		bullet_disable_attachment(bullet_index);
 
 		attachment_scenes[bullet_index] = attachment_scene;
 
@@ -627,12 +609,9 @@ protected:
 		}
 
 		curr_attachment = attachment_instance;
-
-		return prev_attacment;
 	}
 
-	// TODO all these need to be fixed and also removed from bindings..
-	_ALWAYS_INLINE_ void free_bullet_attachment(int bullet_index) {
+	_ALWAYS_INLINE_ void bullet_free_attachment(int bullet_index) {
 		BulletAttachment2D *&attachment_ptr = attachments[bullet_index];
 
 		if (attachment_ptr == nullptr) {
@@ -643,7 +622,7 @@ protected:
 		attachment_ptr = nullptr;
 	}
 
-	_ALWAYS_INLINE_ void push_bullet_attachment_to_pool(int bullet_index) {
+	_ALWAYS_INLINE_ void bullet_disable_attachment(int bullet_index) {
 		BulletAttachment2D *&attachment_ptr = attachments[bullet_index];
 
 		if (attachment_ptr == nullptr) {
@@ -653,6 +632,14 @@ protected:
 		attachment_ptr->call_on_bullet_disable();
 		bullet_factory->bullet_attachments_pool.push(attachment_ptr);
 		attachment_ptr = nullptr;
+	}
+
+	_ALWAYS_INLINE_ void bullet_enable_attachment(int bullet_index) {
+		BulletAttachment2D *&attachment_ptr = attachments[bullet_index];
+
+		if (attachment_ptr != nullptr) {
+			attachment_ptr->call_on_bullet_activate();
+		}
 	}
 
 	// Called when all bullets have been disabled
@@ -668,11 +655,11 @@ protected:
 		}
 
 		// Remove all attached timers
-		_do_detach_all_time_based_functions();
+		_do_detach_all_time_based_functions(); // TODO maybe a separate property for this setting is more appropriate for consistent behavior?
 		bullets_pool->push(this, amount_bullets);
 	}
 
-	_ALWAYS_INLINE_ void activate_bullet(int bullet_index, int collision_amount = 0, bool activate_attachment = true) {
+	_ALWAYS_INLINE_ void activate_bullet(int bullet_index, int collision_amount = 0, bool should_enable_attachment = true) {
 		int8_t &curr_bullet_status = bullets_enabled_status[bullet_index];
 
 		// If the bullet is already enabled, just return
@@ -695,12 +682,8 @@ protected:
 			current_bullet_collision_amount = collision_amount;
 		}
 
-		if (activate_attachment) {
-			BulletAttachment2D *&attachment_ptr = attachments[bullet_index];
-
-			if (attachment_ptr != nullptr) {
-				attachment_ptr->call_on_bullet_activate();
-			}
+		if (should_enable_attachment) {
+			bullet_enable_attachment(bullet_index);
 		}
 
 		curr_bullet_status = true;
@@ -711,7 +694,7 @@ protected:
 	}
 
 	// Disables a single bullet. Always call this method using call_deferred or you will face weird synch issues
-	_ALWAYS_INLINE_ void disable_bullet(int bullet_index, bool disable_attachment = true) {
+	_ALWAYS_INLINE_ void disable_bullet(int bullet_index, bool should_disable_attachment = true) {
 		int8_t &curr_bullet_status = bullets_enabled_status[bullet_index];
 
 		// If the bullet is already disabled, just return
@@ -727,12 +710,8 @@ protected:
 
 		physics_server->area_set_shape_disabled(area, bullet_index, true);
 
-		if (disable_attachment) {
-			BulletAttachment2D *&attachment_ptr = attachments[bullet_index];
-
-			if (attachment_ptr != nullptr) {
-				attachment_ptr->call_on_bullet_disable();
-			}
+		if (should_disable_attachment) {
+			bullet_disable_attachment(bullet_index);
 		}
 
 		if (active_bullets_counter <= 0) {
@@ -755,21 +734,7 @@ protected:
 
 		// Only disable the bullet if the max collision count is greater than 0, otherwise the bullet should never be disabled due to collisions
 		if (bullet_max_collision_count > 0 && current_bullet_collision_amount >= bullet_max_collision_count) {
-			disable_bullet(bullet_index, false);
-
-			// Handle what happens with a bullet attachment if there is one
-			auto &curr_attachment = attachments[bullet_index];
-			if (curr_attachment) {
-				curr_attachment->call_on_bullet_disable(); // Call GDScript virtual function
-
-				if (is_attachments_auto_pooling_enabled) {
-					bullet_factory->bullet_attachments_pool.push(curr_attachment);
-				} else {
-					curr_attachment->queue_free();
-				}
-
-				curr_attachment = nullptr;
-			}
+			disable_bullet(bullet_index, true);
 		}
 
 		Object *hit_target = ObjectDB::get_instance(entered_instance_id);

@@ -863,8 +863,9 @@ void MultiMeshBullets2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("disable_bullet", "bullet_index", "disable_bullet_attachment"), &MultiMeshBullets2D::disable_bullet, DEFVAL(true));
 	ClassDB::bind_method(D_METHOD("activate_bullet", "bullet_index", "collision_amount", "activate_attachment"), &MultiMeshBullets2D::activate_bullet, DEFVAL(0), DEFVAL(true));
 
-	ClassDB::bind_method(D_METHOD("free_bullet_attachment", "bullet_index"), &MultiMeshBullets2D::free_bullet_attachment);
-	ClassDB::bind_method(D_METHOD("push_bullet_attachment_to_pool", "bullet_index"), &MultiMeshBullets2D::push_bullet_attachment_to_pool);
+	ClassDB::bind_method(D_METHOD("bullet_free_attachment", "bullet_index"), &MultiMeshBullets2D::bullet_free_attachment);
+	ClassDB::bind_method(D_METHOD("bullet_disable_attachment", "bullet_index"), &MultiMeshBullets2D::bullet_disable_attachment);
+	ClassDB::bind_method(D_METHOD("bullet_enable_attachment", "bullet_index"), &MultiMeshBullets2D::bullet_enable_attachment);
 
 	ClassDB::bind_method(D_METHOD("get_amount_bullets"), &MultiMeshBullets2D::get_amount_bullets);
 
