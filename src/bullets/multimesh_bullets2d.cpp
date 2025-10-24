@@ -77,8 +77,6 @@ void MultiMeshBullets2D::spawn(const MultiMeshBulletsData2D &data, MultiMeshObje
 
 	attachment_pooling_ids.resize(amount_bullets, 0);
 	
-	attachment_object_ids_for_validation.resize(amount_bullets, 0);
-	
 	attachments.resize(amount_bullets, nullptr);
 	
 	attachment_transforms.resize(amount_bullets, Transform2D());

@@ -290,9 +290,6 @@ protected:
 	// Stores each bullet's attachment pooling id
 	std::vector<uint32_t> attachment_pooling_ids;
 
-	// Stores each bullet's object id for validation purposes (whether the attachment got freed by the user)
-	std::vector<uint64_t> attachment_object_ids_for_validation;
-
 	// Stores pointers to all bullet attachments currently in the scene
 	std::vector<BulletAttachment2D *> attachments;
 
@@ -575,7 +572,6 @@ protected:
 			created_brand_new_instance = true;
 		}
 
-		attachment_object_ids_for_validation[bullet_index] = attachment_instance->get_instance_id();
 		attachment_pooling_ids[bullet_index] = attachment_pooling_id;
 		attachment_stick_relative_to_bullet[bullet_index] = stick_relative_to_bullet; // TODO delete - attachment_instance->get_stick_relative_to_bullet(); as well as the other props that are now useless dead code..
 
