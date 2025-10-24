@@ -25,10 +25,10 @@ public:
 	void clear();
 
 	// Frees memory by deleting every single MultiMeshBullets2D object that is stored in the pool and resets it to be empty
-	void free_all_bullets(bool pool_attachments);
+	void free_all_bullets();
 
 	// Frees memory by deleting MultiMeshBullets2D objects, but only those that have a specific amount of bullets
-	void free_specific_bullets(int amount_bullets, bool pool_attachments);
+	void free_specific_bullets(int amount_bullets);
 
 	// Gets the total amount of multimeshes currently present in the object pool
 	int get_total_amount_pooled();

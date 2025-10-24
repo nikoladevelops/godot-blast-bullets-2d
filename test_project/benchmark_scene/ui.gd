@@ -93,7 +93,6 @@ var last_selected_color_picker:ColorPicker = null
 # Note when refactoring this button has dependencies in other scripts
 @onready var disable_or_enable_factory_btn:SwitchButton = $BulletSettingsView/VBoxContainer2/DisableOrEnableFactoryBtn
 #
-@onready var pool_attachments_after_free_checkbox:CheckBox = $BulletSettingsView/VBoxContainer3/PoolAttachmentsAfterFreeCheckBox
 
 # Attachment pooling related
 @onready var switch_bullet_attachment_id_btn:SwitchButton = $ObjectPoolSettingsView/AttachmentPoolRelated/VBoxContainer/SwitchBulletAttachmentIdBtn
@@ -114,9 +113,6 @@ var last_selected_color_picker:ColorPicker = null
 # Responsible for setting random local rotation when spawning bullets
 @onready var random_local_rotation_check_box:CheckBox = $MoreSettingsView/VBoxContainer2/RandomLocalRotationCheckBox
 ##
-
-# Whether the attachments should go to the object pool after freeing all active bullets in the factory
-var should_pool_attachments_after_free_active_bullets:bool = false
 
 # The theme used for disabled buttons
 var disabled_btn_theme:Theme = preload("res://shared/ui/btn_disabled_theme.tres")
@@ -422,16 +418,11 @@ func _on_reset_factory_btn_pressed() -> void:
 	BENCHMARK_GLOBALS.FACTORY.reset()
 
 func _on_free_active_bullets_btn_pressed() -> void:
-	BENCHMARK_GLOBALS.FACTORY.free_active_bullets(should_pool_attachments_after_free_active_bullets)
+	BENCHMARK_GLOBALS.FACTORY.free_active_bullets()
 	
 	# Also free all Godot Area2D bullets
 	for child in BENCHMARK_GLOBALS.ALL_GODOT_AREA2D_BULLETS_CONTAINER.get_children():
 		child.queue_free()
-
-
-func _on_pool_attachments_after_free_check_box_pressed() -> void:
-	should_pool_attachments_after_free_active_bullets = pool_attachments_after_free_checkbox.button_pressed
-
 
 func _on_free_specific_attachment_pool_btn_pressed() -> void:
 	var attachment_id:int = switch_bullet_attachment_id_btn.current_selected_option_index+1 # because id 1 is the first attachment and id 2 is the second attachment but ordering of the options starts from 0 so all indexes are behind with -1

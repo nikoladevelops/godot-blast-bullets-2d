@@ -743,12 +743,6 @@ focus_mode = 0
 text = "Is Texture Rotation
  Permanent"
 
-[node name="PoolAttachmentsAfterFreeCheckBox" type="CheckBox" parent="BulletSettingsView/VBoxContainer3"]
-layout_mode = 2
-focus_mode = 0
-text = "Pool Attachments After
- Free Active Bullets"
-
 [node name="BulletCollisionVboxContainer" type="VBoxContainer" parent="BulletSettingsView"]
 layout_mode = 1
 anchors_preset = 1
@@ -1657,7 +1651,6 @@ metadata/_custom_type_script = "uid://cs67whos5iyl6"
 [connection signal="pressed" from="BulletSettingsView/VBoxContainer2/FreeActiveBulletsBtn" to="." method="_on_free_active_bullets_btn_pressed"]
 [connection signal="pressed" from="BulletSettingsView/VBoxContainer3/EnableMonitorableCheckBox" to="." method="_on_enable_monitorable_check_box_pressed"]
 [connection signal="pressed" from="BulletSettingsView/VBoxContainer3/IsTextureRotationPermanentCheckBox" to="." method="_on_is_texture_rotation_permanent_check_box_pressed"]
-[connection signal="pressed" from="BulletSettingsView/VBoxContainer3/PoolAttachmentsAfterFreeCheckBox" to="." method="_on_pool_attachments_after_free_check_box_pressed"]
 [connection signal="new_btn_selected" from="BulletSettingsView/SelectViewsContainer/SelectCollisionShapeSizeView" to="." method="_on_select_collision_shape_size_view_new_btn_selected"]
 [connection signal="new_btn_selected" from="BulletSettingsView/SelectViewsContainer/SelectBulletDamageView" to="." method="_on_select_bullet_damage_view_new_btn_selected"]
 [connection signal="new_btn_selected" from="BulletSettingsView/SelectViewsContainer/SelectBulletCollisionView" to="." method="_on_select_bullet_collision_view_new_btn_selected"]

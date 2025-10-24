@@ -73,8 +73,8 @@ public:
 	// Resets the factory - frees everything (object pools, spawned bullets, spawned attachments - all get deleted from memory)
 	void reset();
 
-	// Frees all active bullets along with all attachments that they currently have. If pool_attachments is true, the attachments will go to an object pool, otherwise they will also be freed
-	void free_active_bullets(bool pool_attachments = false);
+	// Frees all active bullets
+	void free_active_bullets();
 
 	// OBJECT POOLING RELATED
 
@@ -267,29 +267,29 @@ private:
 		bullets_vec.erase(new_end, bullets_vec.end());
 	}
 
-	// Frees specific bullets from the object pool and also erases them from the bullets_vec so dangling pointers would not be accessed. If amount_bullets_per_instance is 0 it frees ALL bullets of BulletType, otherwise frees only those BulletType instances whose amount_bullets value matches amount_bullets_per_instance. If pool_attachments is true, then the bullet attachments will go in the object pool, otherwise they will also get freed
+	// Frees specific bullets from the object pool and also erases them from the bullets_vec so dangling pointers would not be accessed. If amount_bullets_per_instance is 0 it frees ALL bullets of BulletType, otherwise frees only those BulletType instances whose amount_bullets value matches amount_bullets_per_instance
 	template <typename TBullet>
-	void free_bullets_pool_helper(std::vector<TBullet *> &bullets_vec, MultiMeshObjectPool &bullets_pool, int amount_bullets_per_instance, bool pool_attachments) {
+	void free_bullets_pool_helper(std::vector<TBullet *> &bullets_vec, MultiMeshObjectPool &bullets_pool, int amount_bullets_per_instance) {
 		// If the user wants to free MultiMeshBullets2D that each have a particular amount of bullets on each multimesh instance
 		if (amount_bullets_per_instance > 0) {
 			// Erases all bullet pointers pointing to multimesh instances that are NOT active and their amount of bullets matches amount_bullets_per_instance
 			shrink_vector(bullets_vec, [amount_bullets_per_instance](const TBullet *e) { return e != nullptr && !e->is_active && e->get_amount_bullets() == amount_bullets_per_instance; });
 
 			// Free bullets from memory but only those in the object pool that have particular amount bullets per instance
-			bullets_pool.free_specific_bullets(amount_bullets_per_instance, pool_attachments);
+			bullets_pool.free_specific_bullets(amount_bullets_per_instance);
 		} else { // If the user wants to free ALL MultiMeshBullets2D, no matter how many bullets per instance they have
 
 			// Erases all bullet pointers pointing to multimesh instances that are NOT active
 			shrink_vector(bullets_vec, [](const TBullet *e) { return e != nullptr && !e->is_active; });
 
 			// Free the bullets memory while also removing them from the object pool
-			bullets_pool.free_all_bullets(pool_attachments);
+			bullets_pool.free_all_bullets();
 		}
 	}
 
-	// Frees all bullets of a TBullet type and clears dangling pointers. If pool_attachments is true, then the bullet attachments will go in the object pool, otherwise they will also get freed
+	// Frees all bullets of a TBullet type and clears dangling pointers
 	template <typename TBullet>
-	void free_all_bullets_helper(std::vector<TBullet *> &bullets_vec, MultiMeshObjectPool &bullets_pool, bool pool_attachments) {
+	void free_all_bullets_helper(std::vector<TBullet *> &bullets_vec, MultiMeshObjectPool &bullets_pool) {
 		// Remove object pool pointers that will become invalid/dangling
 		bullets_pool.clear();
 
@@ -300,7 +300,7 @@ private:
 			TBullet *curr_bullet = bullets_vec[i];
 
 			if (curr_bullet != nullptr) {
-				curr_bullet->force_delete(pool_attachments); // when freeing specify whether the bullet attachments it may have should get object pooled or freed instead
+				curr_bullet->force_delete();
 			}
 		}
 
@@ -308,9 +308,9 @@ private:
 		bullets_vec.clear();
 	}
 
-	// Frees all ACTIVE bullets of a TBullet type and clears dangling pointers. If pool_attachments is true, then the bullet attachments will go in the object pool, otherwise they will also get freed
+	// Frees all ACTIVE bullets of a TBullet type and clears dangling pointers
 	template <typename TBullet>
-	void free_only_active_bullets_helper(std::vector<TBullet *> &bullets_vec, MultiMeshObjectPool &bullets_pool, bool pool_attachments) {
+	void free_only_active_bullets_helper(std::vector<TBullet *> &bullets_vec, MultiMeshObjectPool &bullets_pool) {
 		std::vector<TBullet *> new_bullets_vec;
 
 		for (TBullet *bullet : bullets_vec) {
@@ -319,7 +319,7 @@ private:
 			}
 
 			if (bullet->is_active) {
-				bullet->force_delete(pool_attachments);
+				bullet->force_delete();
 			} else {
 				new_bullets_vec.push_back(bullet);
 			}

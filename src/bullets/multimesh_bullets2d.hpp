@@ -68,25 +68,17 @@ public:
 	void spawn_as_disabled_multimesh(int amount_bullets, MultiMeshObjectPool *pool, BulletFactory2D *factory, Node *bullets_container);
 
 	// Unsafe delete - only call this if all types of bullet processing have been disabled and all dangling pointers cleared, otherwise you will face weird issues/crashes
-	void force_delete(bool pool_attachments) {
+	void force_delete() {
 		// Disable the area's shapes (ALL OF THEM no matter their bullets_enabled_status)
 		for (int i = 0; i < amount_bullets; i++) {
 			physics_server->area_set_shape_disabled(area, i, true);
+			
+			bullet_disable_attachment(i);
 		}
 
 		physics_server->area_set_area_monitor_callback(area, Variant());
 		physics_server->area_set_monitor_callback(area, Variant());
-
-		// TODO fix this
-		// if (attachment_scenes.is_valid()) {
-		// 	for (int i = 0; i < amount_bullets; i++) {
-		// 		if (pool_attachments) {
-		// 			bullet_disable_attachment(i);
-		// 		} else {
-		// 			bullet_free_attachment(i);
-		// 		}
-		// 	}
-		// }
+		
 
 		memdelete(this); // Immediate deletion
 	}
@@ -636,7 +628,11 @@ protected:
 		}
 
 		attachment_ptr->call_on_bullet_disable();
-		bullet_factory->bullet_attachments_pool.push(attachment_ptr, attachment_pooling_ids[bullet_index]);
+
+		if (is_attachments_auto_pooling_enabled) {
+			bullet_factory->bullet_attachments_pool.push(attachment_ptr, attachment_pooling_ids[bullet_index]);
+		}
+
 		attachment_ptr = nullptr;
 	}
 

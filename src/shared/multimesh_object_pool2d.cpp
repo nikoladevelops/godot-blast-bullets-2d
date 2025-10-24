@@ -32,17 +32,17 @@ void MultiMeshObjectPool::clear() {
 	pool.clear();
 }
 
-void MultiMeshObjectPool::free_all_bullets(bool pool_attachments) {
+void MultiMeshObjectPool::free_all_bullets() {
 	for (auto &[key, queue] : pool) {
 		while (queue.empty() == false) {
-			queue.front()->force_delete(pool_attachments); // free the bullet object
+			queue.front()->force_delete(); // free the bullet object
 			queue.pop(); // remove it from the queue
 		}
 	}
 	pool.clear(); // clear the map so it doesn't contain any empty queues
 }
 
-void MultiMeshObjectPool::free_specific_bullets(int amount_bullets, bool pool_attachments) {
+void MultiMeshObjectPool::free_specific_bullets(int amount_bullets) {
 	// Try to find a queue that exists and holds multimeshes where each multimesh has `amount_bullets` instances
 	auto it = pool.find(amount_bullets);
 
@@ -55,7 +55,7 @@ void MultiMeshObjectPool::free_specific_bullets(int amount_bullets, bool pool_at
 
 	// We know the queue contains at least 1 multimesh, so we use a do-while loop to ensure the operation happens at least once
 	do {
-		queue.front()->force_delete(pool_attachments); // free the bullet object
+		queue.front()->force_delete(); // free the bullet object
 		queue.pop(); // remove it from the queue
 	} while (queue.empty() == false);
 

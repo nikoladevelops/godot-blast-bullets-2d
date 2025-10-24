@@ -298,10 +298,10 @@ void BulletFactory2D::reset_factory_state() {
 	}
 
 	// Free all DirectionalBullets2D, their attachments and the object pool
-	free_all_bullets_helper<DirectionalBullets2D>(all_directional_bullets, directional_bullets_pool, false);
+	free_all_bullets_helper<DirectionalBullets2D>(all_directional_bullets, directional_bullets_pool);
 
 	// Free all BlockBullets2D, their attachments and the object pool
-	free_all_bullets_helper<BlockBullets2D>(all_block_bullets, block_bullets_pool, false);
+	free_all_bullets_helper<BlockBullets2D>(all_block_bullets, block_bullets_pool);
 
 	// Free all bullet attachments that are currently in the object pool
 	bullet_attachments_pool.free_all_bullet_attachments();
@@ -336,7 +336,7 @@ void BulletFactory2D::reset() {
 	emit_signal("reset_finished");
 }
 
-void BulletFactory2D::free_active_bullets(bool pool_attachments) {
+void BulletFactory2D::free_active_bullets() {
 	if (is_factory_busy) {
 		UtilityFunctions::printerr("Error when trying to free active bullets. BulletFactory2D is currently busy. Ignoring the request");
 		return;
@@ -357,11 +357,11 @@ void BulletFactory2D::free_active_bullets(bool pool_attachments) {
 		directional_bullets_debugger->set_is_debugger_enabled(false);
 	}
 
-	// Free all ACTIVE DirectionalBullets2D, whether their attachments also get freed depends on pool_attachments value
-	free_only_active_bullets_helper<DirectionalBullets2D>(all_directional_bullets, directional_bullets_pool, pool_attachments);
+	// Free all ACTIVE DirectionalBullets2D
+	free_only_active_bullets_helper<DirectionalBullets2D>(all_directional_bullets, directional_bullets_pool);
 
-	// Free all ACTIVE BlockBullets2D, whether their attachments also get freed depends on pool_attachments value
-	free_only_active_bullets_helper<BlockBullets2D>(all_block_bullets, block_bullets_pool, pool_attachments);
+	// Free all ACTIVE BlockBullets2D
+	free_only_active_bullets_helper<BlockBullets2D>(all_block_bullets, block_bullets_pool);
 
 	// If the debuggers are supposed to be enabled then re-enable them
 	if (debugger_curr_enabled) {
@@ -436,15 +436,15 @@ void BulletFactory2D::free_bullets_pool(BulletType bullet_type, int amount_bulle
 			free_bullets_pool_helper<DirectionalBullets2D>(
 					all_directional_bullets,
 					directional_bullets_pool,
-					amount_bullets_per_instance,
-					false);
+					amount_bullets_per_instance
+					);
 			break;
 		case BulletFactory2D::BLOCK_BULLETS:
 			free_bullets_pool_helper<BlockBullets2D>(
 					all_block_bullets,
 					block_bullets_pool,
-					amount_bullets_per_instance,
-					false);
+					amount_bullets_per_instance
+					);
 			break;
 		default:
 			UtilityFunctions::printerr("Unsupported type of bullet when calling free_bullets_pool");
@@ -832,7 +832,7 @@ void BulletFactory2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("populate_attachments_pool", "attachment_scenes", "amount_attachments"), &BulletFactory2D::populate_attachments_pool);
 	ClassDB::bind_method(D_METHOD("free_attachments_pool", "attachment_id"), &BulletFactory2D::free_attachments_pool, DEFVAL(-1));
 
-	ClassDB::bind_method(D_METHOD("free_active_bullets", "pool_attachments"), &BulletFactory2D::free_active_bullets, DEFVAL(false));
+	ClassDB::bind_method(D_METHOD("free_active_bullets"), &BulletFactory2D::free_active_bullets);
 
 	// Additional debug methods related
 
