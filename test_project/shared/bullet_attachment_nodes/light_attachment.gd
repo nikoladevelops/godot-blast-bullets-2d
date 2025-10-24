@@ -18,11 +18,9 @@ func _physics_process(delta: float) -> void:
 	curr_time += delta
 	
 func on_bullet_spawn() -> void:
-	attachment_id = 3
+	pass
 
 func on_bullet_spawn_as_disabled() -> void:
-	attachment_id = 3 # Very important
-	
 	set_process(false)
 	set_physics_process(false)
 	visible = false

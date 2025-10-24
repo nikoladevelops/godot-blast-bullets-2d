@@ -313,9 +313,6 @@ protected:
 	// Whether the attachment should stick while the bullet is rotating
 	std::vector<uint8_t> attachment_stick_relative_to_bullet;
 
-	// Caches the value of stick_relative_to_bullet from the bullet attachment scene, so it's always available
-	bool cache_stick_relative_to_bullet = false;
-
 	///
 
 	/// OTHER
@@ -630,7 +627,7 @@ protected:
 		}
 
 		attachment_ptr->call_on_bullet_disable();
-		bullet_factory->bullet_attachments_pool.push(attachment_ptr);
+		bullet_factory->bullet_attachments_pool.push(attachment_ptr, attachment_pooling_ids[bullet_index]);
 		attachment_ptr = nullptr;
 	}
 
@@ -782,7 +779,7 @@ protected:
 		bool is_using_physics_interpolation = bullet_factory->use_physics_interpolation;
 
 		Transform2D new_attachment_transf;
-		if (cache_stick_relative_to_bullet) {
+		if (attachment_stick_relative_to_bullet[bullet_index]) {
 			const Transform2D &bullet_global_transf = all_cached_instance_transforms[bullet_index];
 			new_attachment_transf = calculate_attachment_global_transf(bullet_index, bullet_global_transf);
 		} else {
@@ -872,7 +869,7 @@ protected:
 	virtual void custom_additional_disable_logic() {}
 	///
 private:
-	// Acquires data from the bullet attachment scene and gives it to the arguments passed by reference - acquires attachment_id and attachment_rotation
+	// Acquires data from the bullet attachment scene and gives it to the arguments passed by reference - acquires attachment pooling id and attachment_rotation
 	int set_attachment_related_data(const Ref<PackedScene> &new_attachment_scenes, const Vector2 &bullet_attachment_offset);
 
 	//

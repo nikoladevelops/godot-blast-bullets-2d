@@ -17,6 +17,7 @@
 #include "godot_cpp/core/math.hpp"
 #include "godot_cpp/variant/vector3.hpp"
 
+#include <cstdint>
 #include <godot_cpp/classes/engine.hpp>
 #include <godot_cpp/classes/physics_server2d.hpp>
 #include <godot_cpp/classes/scene_tree.hpp>
@@ -467,14 +468,15 @@ void BulletFactory2D::populate_attachments_pool(const Ref<PackedScene> attachmen
 		return;
 	}
 
-	for (int i = 0; i < amount_instances; i++) {
-		BulletAttachment2D *attachment = static_cast<BulletAttachment2D *>(attachment_scenes->instantiate()); // You better pass a packed scene that contains an actual BulletAttachment2D node or this goes kaboom
-		attachment->set_physics_interpolation_mode(Node::PHYSICS_INTERPOLATION_MODE_OFF); // I have custom physics interpolation logic, so disable the Godot one
+	// TODO fix this
+	// for (int i = 0; i < amount_instances; i++) {
+	// 	BulletAttachment2D *attachment = static_cast<BulletAttachment2D *>(attachment_scenes->instantiate()); // You better pass a packed scene that contains an actual BulletAttachment2D node or this goes kaboom
+	// 	attachment->set_physics_interpolation_mode(Node::PHYSICS_INTERPOLATION_MODE_OFF); // I have custom physics interpolation logic, so disable the Godot one
 
-		attachment->call_on_bullet_spawn_as_disabled();
-		bullet_attachments_container->add_child(attachment);
-		bullet_attachments_pool.push(attachment);
-	}
+	// 	attachment->call_on_bullet_spawn_as_disabled();
+	// 	bullet_attachments_container->add_child(attachment);
+	// 	bullet_attachments_pool.push(attachment);
+	// }
 }
 
 void BulletFactory2D::free_attachments_pool(int attachment_id) {
@@ -657,7 +659,7 @@ int BulletFactory2D::debug_get_attachments_pool_amount() {
 }
 
 Dictionary BulletFactory2D::debug_get_attachments_pool_info() {
-	std::map<int, int> pool_info = bullet_attachments_pool.get_pool_info();
+	std::map<uint32_t, int> pool_info = bullet_attachments_pool.get_pool_info();
 
 	Dictionary dict;
 	for (const auto &[key, value] : pool_info) {

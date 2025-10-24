@@ -4,12 +4,12 @@
 using namespace godot;
 namespace BlastBullets2D {
 
-void BulletAttachmentObjectPool2D::push(BulletAttachment2D *bullet_attachment) {
-	pool[bullet_attachment->attachment_id].push(bullet_attachment);
+void BulletAttachmentObjectPool2D::push(BulletAttachment2D *bullet_attachment, uint32_t pooling_id) {
+	pool[pooling_id].push(bullet_attachment);
 }
 
-BulletAttachment2D *BulletAttachmentObjectPool2D::pop(int attachment_id) {
-	auto result = pool.find(attachment_id);
+BulletAttachment2D *BulletAttachmentObjectPool2D::pop(uint32_t pooling_id) {
+	auto result = pool.find(pooling_id);
 
 	// If the pool doesn't contain a queue with that key or if it does but the queue is empty return a nullptr
 	if (result == pool.end() || result->second.size() == 0) {
@@ -26,7 +26,7 @@ BulletAttachment2D *BulletAttachmentObjectPool2D::pop(int attachment_id) {
 }
 
 void BulletAttachmentObjectPool2D::free_all_bullet_attachments() {
-	for (auto &[attachment_id, queue] : pool) {
+	for (auto &[pooling_id, queue] : pool) {
 		while (queue.empty() == false) {
 			queue.front()->queue_free(); // delete the attachment
 			queue.pop(); // remove it from the queue
@@ -36,9 +36,9 @@ void BulletAttachmentObjectPool2D::free_all_bullet_attachments() {
 	pool.clear();
 }
 
-void BulletAttachmentObjectPool2D::free_specific_bullet_attachments(int attachment_id) {
-	// Try to find a queue that exists and holds bullet attachments with a specific attachment_id
-	auto it = pool.find(attachment_id);
+void BulletAttachmentObjectPool2D::free_specific_bullet_attachments(uint32_t pooling_id) {
+	// Try to find a queue that exists and holds bullet attachments with a specific pooling_id
+	auto it = pool.find(pooling_id);
 
 	// If the queue doesn't exist or if the queue is empty, then it means there's no attachments to free
 	if (it == pool.end() || it->second.empty()) {
@@ -53,24 +53,24 @@ void BulletAttachmentObjectPool2D::free_specific_bullet_attachments(int attachme
 		queue.pop(); // remove it from the queue
 	} while (queue.empty() == false);
 
-	pool.erase(attachment_id); // delete the queue itself since it's basically empty right now
+	pool.erase(pooling_id); // delete the queue itself since it's basically empty right now
 }
 
 int BulletAttachmentObjectPool2D::get_total_amount_pooled() {
 	int amount_attachments = 0;
-	for (auto &[attachment_id, queue] : pool) {
+	for (auto &[pooling_id, queue] : pool) {
 		amount_attachments += static_cast<int>(queue.size());
 	}
 
 	return amount_attachments;
 }
 
-std::map<int, int> BulletAttachmentObjectPool2D::get_pool_info() {
-	std::map<int, int> pool_info;
+std::map<uint32_t, int> BulletAttachmentObjectPool2D::get_pool_info() {
+	std::map<uint32_t, int> pool_info;
 
-	for (auto &[attachment_id, queue] : pool) {
+	for (auto &[pooling_id, queue] : pool) {
 		if (!queue.empty()) {
-			pool_info.emplace(attachment_id, static_cast<int>(queue.size()));
+			pool_info.emplace(pooling_id, static_cast<int>(queue.size()));
 		}
 	}
 

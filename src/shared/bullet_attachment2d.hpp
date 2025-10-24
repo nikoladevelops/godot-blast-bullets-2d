@@ -13,12 +13,6 @@ class BulletAttachment2D : public Node2D {
 	GDCLASS(BulletAttachment2D, Node2D)
 
 public:
-	// Custom attachment id. It is very important that each BulletAttachment2D scene has a different/unique id. The object pooling logic depends on this
-	int attachment_id = 0;
-
-	// Whether the bullet attachment always sticks to the bullet. If the bullet is rotating then the bullet attachment respects that behavior and moves according to it
-	bool stick_relative_to_bullet = true;
-
 	// Custom spawn behavior - should be used to set up the BulletAttachment2D in proper state. Executed before _ready when a bullet is in the process of being set up. If you have behavior/data that doesn't require for the node to be in the scene tree, then use this function, otherwise just use _ready. This is the place where you have to set a custom attachment_id so the bullet attaachment can use the object pool correctly. Note that the attachment is not yet inside the scene tree when this method gets called
 	GDVIRTUAL0(on_bullet_spawn)
 
@@ -45,14 +39,6 @@ public:
 	Ref<Resource> call_on_bullet_save();
 	void call_on_bullet_load(Ref<Resource> custom_data_to_load);
 	void call_on_bullet_spawn_as_disabled();
-
-	// Getters and setters
-
-	int get_attachment_id() const;
-	void set_attachment_id(int new_attachment_id);
-
-	bool get_stick_relative_to_bullet() const;
-	void set_stick_relative_to_bullet(bool new_stick_relative_to_bullet);
 
 protected:
 	static void _bind_methods();

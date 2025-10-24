@@ -3,11 +3,9 @@ extends BulletAttachment2D
 @onready var CPUParticles = $CPUParticles2D
 
 func on_bullet_spawn() -> void:
-	attachment_id = 1
-
-func on_bullet_spawn_as_disabled() -> void:
-	attachment_id = 1 # Very important
+	pass
 	
+func on_bullet_spawn_as_disabled() -> void:
 	set_process(false)
 	set_physics_process(false)
 	visible = false

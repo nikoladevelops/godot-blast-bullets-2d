@@ -3,11 +3,9 @@ extends BulletAttachment2D
 @onready var GPUParticles = $GPUParticles2D
 
 func on_bullet_spawn() -> void:
-	attachment_id = 2
+	pass
 
-func on_bullet_spawn_as_disabled() -> void:
-	attachment_id = 2
-	
+func on_bullet_spawn_as_disabled() -> void:	
 	set_process(false)
 	set_physics_process(false)
 	visible = false

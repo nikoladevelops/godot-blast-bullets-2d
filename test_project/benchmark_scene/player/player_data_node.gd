@@ -277,7 +277,7 @@ func spawn_multi_mesh_directional_bullets()->void:
 	dir_bullets.bullet_max_collision_count = 2
 	
 	for i in dir_bullets.get_amount_bullets():
-		dir_bullets.bullet_set_attachment(i, gpu_particles_scn, 5, Vector2(-60,0))
+		dir_bullets.bullet_set_attachment(i, gpu_particles_scn, 5, Vector2(-60,0), true)
 	
 	#dir_bullets.multimesh_attach_time_based_function(1, func(): 
 		#print("Keeps executing over and over EVEN IF ALL BULLETS WERE DISABLED")
@@ -292,101 +292,6 @@ func spawn_multi_mesh_directional_bullets()->void:
 	#dir_bullets.multimesh_attach_time_based_function(2, func(): 
 		#dir_bullets.activate_bullet(0)
 		#, false, true)
-	
-	
-	
-	#dir_bullets.bullet_homing_target_reached.connect(func(_multimesh:DirectionalBullets2D, _bullet_index:int, _target: Node2D, target_global_position:Vector2):
-		#print("reached target: ", target_global_position)
-		#)
-		#
-	#dir_bullets.shared_homing_deque_push_front_node2d_target(BENCHMARK_GLOBALS.STATIONARY_TARGET)
-	#dir_bullets.shared_homing_deque_push_front_node2d_target(BENCHMARK_GLOBALS.MOVING_TARGET_TWO)
-	#dir_bullets.shared_homing_deque_push_back_global_position_target(BENCHMARK_GLOBALS.MOVING_TARGET_ONE.global_position)
-	#dir_bullets.shared_homing_deque_push_back_mouse_position_target()
-	#
-	#dir_bullets.is_multimesh_auto_pooling_enabled = false
-	#dir_bullets.multimesh_attach_time_based_function(1, func():
-		#for enemy in BENCHMARK_GLOBALS.ALL_ENEMY_SPAWNERS[0].enemy_container.get_children():
-			#for bullet in dir_bullets.get_amount_bullets():
-				#dir_bullets.bullet_homing_push_back_node2d_target(bullet, enemy)
-				#dir_bullets.bullet_homing_push_back_global_position_target(bullet, BENCHMARK_GLOBALS.STATIONARY_TARGET.global_position)
-				#dir_bullets.bullet_homing_push_back_mouse_position_target(bullet)
-	#,false)
-	#
-	#dir_bullets.multimesh_attach_time_based_function(2, func():
-		#dir_bullets.homing_boundary_distance_away_from_target = 250;
-		#dir_bullets.homing_boundary_behavior = DirectionalBullets2D.BoundaryOrbitRight
-		#dir_bullets.homing_boundary_facing_direction = DirectionalBullets2D.FaceOrbitingDirection
-		#,false)
-		#
-	#dir_bullets.multimesh_attach_time_based_function(3, func():
-		#for bullet in dir_bullets.get_amount_bullets():
-			#dir_bullets.bullet_homing_push_front_node2d_target(bullet, BENCHMARK_GLOBALS.MOVING_TARGET_TWO)
-		#
-		#dir_bullets.homing_boundary_distance_away_from_target = 700;
-		#,false)
-	#
-	#dir_bullets.multimesh_attach_time_based_function(1.5, func():
-		##dir_bullets.teleport_bullet(0, Vector2(0,0))
-		#for bullet in dir_bullets.get_amount_bullets():
-			##dir_bullets.teleport_bullet(0, Vector2(0,0))
-			#dir_bullets.bullet_homing_push_front_node2d_target(bullet, BENCHMARK_GLOBALS.MOVING_TARGET_ONE) #bullet_homing_push_back_node2d_target(bullet, BENCHMARK_GLOBALS.MOVING_TARGET_ONE)
-			#dir_bullets.bullet_homing_push_back_node2d_target(bullet, BENCHMARK_GLOBALS.MOVING_TARGET_TWO)
-			##dir_bullets.bullet_homing_pop_front_target(bullet)
-			## target1, global_pos, target2,        target2 is popped/ target1 is popped and we are left with global_pos
-	#,false)
-	##
-	#dir_bullets.multimesh_attach_time_based_function(2, func():
-		##dir_bullets.teleport_bullet(0, Vector2(0,0))
-		#for bullet in dir_bullets.get_amount_bullets():
-			#dir_bullets.bullet_homing_pop_back_target(bullet)
-			#dir_bullets.bullet_homing_pop_front_target(bullet)
-			##dir_bullets.bullet_clear_homing_targets(bullet)
-			##print(dir_bullets.get_bullet_homing_targets_amount(bullet))
-			##dir_bullets.bullet_homing_pop_front_target(bullet)
-			##dir_bullets.teleport_bullet(0, Vector2(0,0))
-			##var push_success:bool = dir_bullets.bullet_homing_push_back_node2d_target(bullet, BENCHMARK_GLOBALS.MOVING_TARGET_TWO)
-	#,false)
-	
-	#dir_bullets.multimesh_attach_time_based_function(2.5, func():
-		##dir_bullets.teleport_bullet(0, Vector2(0,0))
-		#for bullet in dir_bullets.get_amount_bullets():
-			#dir_bullets.bullet_homing_pop_front_target(bullet)
-			##dir_bullets.teleport_bullet(0, Vector2(0,0))
-			##var push_success:bool = dir_bullets.bullet_homing_push_back_node2d_target(bullet, BENCHMARK_GLOBALS.MOVING_TARGET_TWO)
-	#,false)
-		#
-	#dir_bullets.all_bullets_attach_time_based_function(1.5, func():
-		#for bullet in dir_bullets.get_amount_bullets():
-			#if dir_bullets.get_bullet_homing_current_target_type(bullet) == DirectionalBullets2D.HomingType.Node2DTarget:
-				#var result:Node2D = dir_bullets.bullet_homing_pop_front_target(bullet)
-				#print(result)
-			#elif dir_bullets.get_bullet_homing_current_target_type(bullet) == DirectionalBullets2D.HomingType.GlobalPositionTarget:
-				#var result:Vector2 = dir_bullets.bullet_homing_pop_front_target(bullet)
-				#print(result)
-			#else:
-				#print("Bullet is not tracking any targets currently")
-			#,false)
-	#
-	#dir_bullets.all_bullets_attach_time_based_function(1.8, func():
-		#for bullet in dir_bullets.get_amount_bullets():
-			#var push_success:bool = dir_bullets.bullet_homing_push_back_node2d_target(bullet, get_parent())
-		#,false)
-	#
-	# TODO things to be exposed from Multimesh bullets
-	#var amount_bullets:int = dir_bullets.get_amount_bullets()
-	
-	#dir_bullets.is_bullet_status_enabled(0)
-	
-	#dir_bullets.push_multimesh_to_object_pool()
-	
-	# TODO
-	#dir_bullets.set_bullet_transform2d()
-	#dir_bullets.get_bullet_transform2d()
-	
-	#dir_bullets.set_bullet_global_position()
-	#dir_bullets.get_bullet_global_position()
-	
 	
 	
 # Spawns MultiMeshBlock bullets

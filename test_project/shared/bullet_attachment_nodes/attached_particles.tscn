@@ -8,7 +8,6 @@ offsets = PackedFloat32Array(0, 0.450382, 0.763359, 0.885496, 1)
 colors = PackedColorArray(1, 0, 0.25098, 0.901961, 1, 0.886275, 0.152941, 1, 1, 0.572549, 0.282353, 1, 0.419608, 0.0784314, 0.0352941, 1, 0.337255, 0, 0, 0.643137)
 
 [node name="AttachedParticles" type="BulletAttachment2D"]
-attachment_id = 12
 z_index = 3
 script = ExtResource("1_yw1t4")
 metadata/attachment_id = 1
