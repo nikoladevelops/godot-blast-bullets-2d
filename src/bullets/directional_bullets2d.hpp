@@ -40,7 +40,10 @@ public:
 
 	// Updates all bullets' positions, rotations, and homing
 	_ALWAYS_INLINE_ void move_bullets(double delta) {
-		update_physics_interpolation();
+		bool is_using_physics_interpolation = bullet_factory->use_physics_interpolation;
+
+		update_previous_transforms_for_interpolation(0, amount_bullets);
+
 		bool homing_interval_reached = update_homing_timer(delta);
 
 		// Cache the global mouse position for performance reasons (otherwise I would be fetching it per bullet when it doesn't even change..)
@@ -68,7 +71,7 @@ public:
 			update_collision_shape(i);
 			update_attachment_and_speed(i, delta, rotation_angle);
 
-			if (!bullet_factory->use_physics_interpolation) {
+			if (!is_using_physics_interpolation) {
 				multi->set_instance_transform_2d(i, all_cached_instance_transforms[i]);
 			}
 		}
@@ -470,14 +473,7 @@ public:
 		shape_t.set_origin(new_global_pos + rotated_offset);
 		physics_server->area_set_shape_transform(area, bullet_index, shape_t);
 
-		if (bullet_factory->use_physics_interpolation) {
-			all_previous_instance_transf[bullet_index] = all_cached_instance_transforms[bullet_index];
-			
-			// TODO fix this
-			// if (attachment_scenes.is_valid()) {
-			// 	all_previous_attachment_transf[bullet_index] = attachment_transforms[bullet_index];
-			// }
-		}
+		update_previous_transforms_for_interpolation(bullet_index, bullet_index);
 
 		temporary_enable_bullet(bullet_index);
 	}
@@ -696,18 +692,6 @@ protected:
 	// Normalizes an angle to [-PI, PI]
 	_ALWAYS_INLINE_ void normalize_angle(real_t &angle) const {
 		angle = Math::wrapf(angle, -Math_PI, Math_PI);
-	}
-
-	// Updates interpolation data for physics
-	_ALWAYS_INLINE_ void update_physics_interpolation() {
-		if (bullet_factory->use_physics_interpolation) {
-			all_previous_instance_transf = all_cached_instance_transforms;
-			
-			// TODO fix this
-			// if (attachment_scenes.is_valid()) {
-			// 	all_previous_attachment_transf = attachment_transforms;
-			// }
-		}
 	}
 
 	// Updates the homing timer and checks if interval is reached

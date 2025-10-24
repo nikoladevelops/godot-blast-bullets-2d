@@ -4,6 +4,7 @@
 
 #include "godot_cpp/core/class_db.hpp"
 #include "godot_cpp/core/print_string.hpp"
+#include "godot_cpp/variant/transform2d.hpp"
 #include "multimesh_bullets2d.hpp"
 #include <godot_cpp/classes/physics_server2d.hpp>
 #include <godot_cpp/classes/random_number_generator.hpp>
@@ -66,29 +67,35 @@ void MultiMeshBullets2D::spawn(const MultiMeshBulletsData2D &data, MultiMeshObje
 	generate_physics_shapes_for_area(amount_bullets);
 
 	set_up_bullet_instances(data);
-
+	
 	// Set up bullet attachments so that for every bullet you will be able to have an attachment if needed
-
+	
 	// TODO might be best to have a property that says whether attachments are used or not so that we dont allocate memory for no reason..
-
+	
+	
 	attachment_scenes.resize(amount_bullets, nullptr);
 
 	attachment_pooling_ids.resize(amount_bullets, 0);
-
+	
 	attachment_object_ids_for_validation.resize(amount_bullets, 0);
-
+	
 	attachments.resize(amount_bullets, nullptr);
-
+	
 	attachment_transforms.resize(amount_bullets, Transform2D());
-
+	
 	attachment_offsets.resize(amount_bullets, Vector2());
-
+	
 	attachment_local_transforms.resize(amount_bullets, Transform2D());
-
+	
 	attachment_stick_relative_to_bullet.resize(amount_bullets, 1);
-
+	
 	set_rotation_data(data.all_bullet_rotation_data, data.rotate_only_textures);
+	
+	all_previous_instance_transf.resize(amount_bullets);
+	all_previous_attachment_transf.resize(amount_bullets);
 
+	update_previous_transforms_for_interpolation(0, amount_bullets);
+	
 	finalize_set_up(
 			data.bullets_custom_data,
 			data.textures,
@@ -122,6 +129,8 @@ void MultiMeshBullets2D::enable_multimesh(const MultiMeshBulletsData2D &data) {
 	set_rotation_data(data.all_bullet_rotation_data, data.rotate_only_textures);
 
 	move_to_front(); // Makes sure that the current old multimesh is displayed on top of the newer ones (act as if its the oldest sibling to emulate the behaviour of spawning a brand new multimesh / if I dont do this then the multimesh's instances will be displayed behind the newer ones)
+	
+	update_previous_transforms_for_interpolation(0, amount_bullets);
 
 	finalize_set_up(
 			data.bullets_custom_data,
@@ -190,8 +199,6 @@ void MultiMeshBullets2D::set_up_bullet_instances(const MultiMeshBulletsData2D &d
 
 	// BulletAttachmentObjectPool2D &attachment_pool = bullet_factory->bullet_attachments_pool;
 
-	bool is_physics_interpolation_currently_enabled = bullet_factory->use_physics_interpolation;
-
 	for (int i = 0; i < amount_bullets; i++) {
 		RID shape = physics_shapes[i];
 
@@ -221,14 +228,6 @@ void MultiMeshBullets2D::set_up_bullet_instances(const MultiMeshBulletsData2D &d
 		// 		create_new_bullet_attachment(i, attachment_transf);
 		// 	}
 
-		// 	if (is_physics_interpolation_currently_enabled) {
-		// 		all_previous_attachment_transf.emplace_back(attachment_transf);
-		// 	}
-		// }
-	}
-
-	if (is_physics_interpolation_currently_enabled) {
-		all_previous_instance_transf = all_cached_instance_transforms;
 	}
 }
 
@@ -495,7 +494,6 @@ void MultiMeshBullets2D::load_bullet_instances(const SaveDataMultiMeshBullets2D 
 
 	cache_texture_transforms.resize(amount_bullets); // TODO handle this properly -- add data to it
 
-	int count_attachments = 0;
 	for (int i = 0; i < amount_bullets; i++) {
 		all_cached_instance_transforms.push_back(data.all_cached_instance_transforms[i]);
 		all_cached_instance_origin.push_back(data.all_cached_instance_origin[i]);
@@ -556,11 +554,7 @@ void MultiMeshBullets2D::load_bullet_instances(const SaveDataMultiMeshBullets2D 
 	// LOAD ROTATION DATA
 	set_rotation_data(data.all_bullet_rotation_data, data.rotate_only_textures);
 
-	// If using physics interpolation, ensure that vectors are filled with data
-	if (bullet_factory->use_physics_interpolation) {
-		all_previous_instance_transf = all_cached_instance_transforms;
-		all_previous_attachment_transf = attachment_transforms;
-	}
+	update_previous_transforms_for_interpolation(0, amount_bullets);
 }
 
 void MultiMeshBullets2D::spawn_as_disabled_multimesh(int new_amount_bullets, MultiMeshObjectPool *pool, BulletFactory2D *factory, Node *bullets_container) {
@@ -587,12 +581,6 @@ void MultiMeshBullets2D::spawn_as_disabled_multimesh(int new_amount_bullets, Mul
 
 	// Just add it to the bullets container
 	bullets_container->add_child(this);
-}
-
-void MultiMeshBullets2D::set_physics_interpolation_related_data() {
-	// If we want to enable physics interpolation we need to ensure that we are populating the data structures that hold previous Transform2D data
-	all_previous_instance_transf = all_cached_instance_transforms;
-	all_previous_attachment_transf = attachment_transforms;
 }
 
 void MultiMeshBullets2D::generate_multimesh() {

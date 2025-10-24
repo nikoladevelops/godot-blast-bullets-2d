@@ -27,15 +27,7 @@ public:
 
 		bool is_using_physics_interpolation = bullet_factory->use_physics_interpolation;
 
-		// If using interpolation, store current transforms as previous ones
-		if (is_using_physics_interpolation) {
-			all_previous_instance_transf = all_cached_instance_transforms;
-			
-			// TODO fix this
-			// if (attachment_scenes.is_valid()) {
-			// 	all_previous_attachment_transf = attachment_transforms;
-			// }
-		}
+		update_previous_transforms_for_interpolation(0, amount_bullets);
 
 		Vector2 cache_velocity_calc = all_cached_velocity[0] * delta;
 

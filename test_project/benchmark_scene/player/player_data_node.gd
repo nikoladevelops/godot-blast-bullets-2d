@@ -273,7 +273,7 @@ func spawn_multi_mesh_directional_bullets()->void:
 	dir_bullets.distance_from_target_before_considering_as_reached = 50
 	
 	dir_bullets.bullet_homing_auto_pop_after_target_reached = true
-	dir_bullets.is_multimesh_auto_pooling_enabled = false
+	dir_bullets.is_multimesh_auto_pooling_enabled = true
 	dir_bullets.bullet_max_collision_count = 2
 	
 	for i in dir_bullets.get_amount_bullets():
@@ -441,9 +441,8 @@ func switch_attachment_scn(option_index:int)->void:
 		3:
 			new_attachment = light_attachment_scn
 	
-	# TODO fix this
-	block_bullets_data.bullet_attachment_scene = new_attachment
-	directional_bullets_data.bullet_attachment_scene = new_attachment
+	block_bullets_data.attachment_scenes = new_attachment
+	directional_bullets_data.attachment_scenes = new_attachment
 
 # Gets the attachment based on attachment_id (Note the attachment_id should match the one in the packed scene)
 func get_attachment_scn_based_on_attachment_id(chosen_attachment_id)->PackedScene:

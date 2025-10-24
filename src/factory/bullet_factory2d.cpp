@@ -81,16 +81,17 @@ void BulletFactory2D::set_use_physics_interpolation_runtime(bool new_use_physics
 	// If physics interpolation is about to be set to TRUE, then populate all needed data so that bullets work correctly
 	// I'm basically making it possible for this option to be turned on during runtime
 	if (use_physics_interpolation) {
-		int amount_bullets = static_cast<int>(all_directional_bullets.size());
-		for (int i = 0; i < amount_bullets; i++) {
+		int amount_multimesh_instances = static_cast<int>(all_directional_bullets.size());
+		for (int i = 0; i < amount_multimesh_instances; i++) {
 			DirectionalBullets2D *&bullets_multi = all_directional_bullets[i];
-			bullets_multi->set_physics_interpolation_related_data();
+			bullets_multi->update_previous_transforms_for_interpolation(0, bullets_multi->get_amount_bullets());
 		}
 
-		amount_bullets = static_cast<int>(all_block_bullets.size());
-		for (int i = 0; i < amount_bullets; i++) {
+		amount_multimesh_instances = static_cast<int>(all_block_bullets.size());
+
+		for (int i = 0; i < amount_multimesh_instances; i++) {
 			BlockBullets2D *&bullets_multi = all_block_bullets[i];
-			bullets_multi->set_physics_interpolation_related_data();
+			bullets_multi->update_previous_transforms_for_interpolation(0, bullets_multi->get_amount_bullets());
 		}
 	}
 

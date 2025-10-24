@@ -72,13 +72,12 @@ public:
 		// Disable the area's shapes (ALL OF THEM no matter their bullets_enabled_status)
 		for (int i = 0; i < amount_bullets; i++) {
 			physics_server->area_set_shape_disabled(area, i, true);
-			
+
 			bullet_disable_attachment(i);
 		}
 
 		physics_server->area_set_area_monitor_callback(area, Variant());
 		physics_server->area_set_monitor_callback(area, Variant());
-		
 
 		memdelete(this); // Immediate deletion
 	}
@@ -98,19 +97,25 @@ public:
 			const Transform2D &interpolated_bullet_texture_transf = get_interpolated_transform(all_cached_instance_transforms[i], all_previous_instance_transf[i], fraction);
 			multi->set_instance_transform_2d(i, interpolated_bullet_texture_transf);
 
-			// TODO fix this
-			// if (!attachment_scenes.is_valid()) {
-			// 	continue;
-			// }
+			if (!attachments[i]) {
+				continue;
+			}
 
-			// // TODO
-			// if (attachments[i] == nullptr) {
-			// 	continue;
-			// }
+			// Apply interpolated transform for the attachment
+			const Transform2D &interpolated_attachment_transf = get_interpolated_transform(attachment_transforms[i], all_previous_attachment_transf[i], fraction);
+			attachments[i]->set_global_transform(interpolated_attachment_transf);
+		}
+	}
 
-			// // Apply interpolated transform for the attachment
-			// const Transform2D &interpolated_attachment_transf = get_interpolated_transform(attachment_transforms[i], all_previous_attachment_transf[i], fraction);
-			// attachments[i]->set_global_transform(interpolated_attachment_transf);
+	// Updates interpolation data for physics
+	_ALWAYS_INLINE_ void update_previous_transforms_for_interpolation(int begin_bullet_index, int end_bullet_index_exclusive) {
+		if (!bullet_factory->use_physics_interpolation) {
+			return;
+		}
+
+		for (int i = begin_bullet_index; i < end_bullet_index_exclusive; ++i) {
+			all_previous_instance_transf[i] = all_cached_instance_transforms[i];
+			all_previous_attachment_transf[i] = attachment_transforms[i];
 		}
 	}
 
@@ -229,8 +234,6 @@ public:
 	_ALWAYS_INLINE_ void set_bullets_custom_data(const Ref<Resource> &new_custom_data) {
 		bullets_custom_data = new_custom_data;
 	}
-
-	void set_physics_interpolation_related_data();
 
 	bool get_is_multimesh_auto_pooling_enabled() const { return is_multimesh_auto_pooling_enabled; }
 	void set_is_multimesh_auto_pooling_enabled(bool value) { is_multimesh_auto_pooling_enabled = value; }
@@ -589,6 +592,11 @@ protected:
 
 		attachment_instance->set_global_transform(global_transf);
 
+		// Handle physics interpolation nicely if enabled
+		if (bullet_factory->use_physics_interpolation) {
+			all_previous_attachment_transf[bullet_index] = attachment_transforms[bullet_index];
+		}
+
 		if (created_brand_new_instance) {
 			attachment_instance->set_physics_interpolation_mode(Node::PHYSICS_INTERPOLATION_MODE_OFF); // I have custom physics interpolation logic, so disable the Godot one
 			attachment_instance->call_on_bullet_spawn(); // Call GDScript custom virtual method to ensure the proper state before adding to the scene tree
@@ -793,8 +801,6 @@ protected:
 			return;
 		}
 
-		bool is_using_physics_interpolation = bullet_factory->use_physics_interpolation;
-
 		Transform2D new_attachment_transf;
 		if (attachment_stick_relative_to_bullet[bullet_index]) {
 			const Transform2D &bullet_global_transf = all_cached_instance_transforms[bullet_index];
@@ -808,7 +814,7 @@ protected:
 		attachment_transforms[bullet_index] = new_attachment_transf;
 
 		// Apply immediately only if not using interpolation
-		if (!is_using_physics_interpolation) {
+		if (!bullet_factory->use_physics_interpolation) {
 			attachments[bullet_index]->set_global_transform(new_attachment_transf);
 		}
 	}
