@@ -609,17 +609,26 @@ protected:
 	}
 
 	_ALWAYS_INLINE_ void bullet_free_attachment(int bullet_index) {
+		if (!validate_bullet_index(bullet_index, "bullet_free_attachment")) {
+			return;
+		}
+
 		BulletAttachment2D *&attachment_ptr = attachments[bullet_index];
 
 		if (attachment_ptr == nullptr) {
 			return;
 		}
-
-		memdelete(attachment_ptr);
+		auto temp = attachment_ptr;
 		attachment_ptr = nullptr;
+
+		memdelete(temp);
 	}
 
 	_ALWAYS_INLINE_ void bullet_disable_attachment(int bullet_index) {
+		if (!validate_bullet_index(bullet_index, "bullet_disable_attachment")) {
+			return;
+		}
+
 		BulletAttachment2D *&attachment_ptr = attachments[bullet_index];
 
 		if (attachment_ptr == nullptr) {
@@ -632,6 +641,10 @@ protected:
 	}
 
 	_ALWAYS_INLINE_ void bullet_enable_attachment(int bullet_index) {
+		if (!validate_bullet_index(bullet_index, "bullet_enable_attachment")) {
+			return;
+		}
+
 		BulletAttachment2D *&attachment_ptr = attachments[bullet_index];
 
 		if (attachment_ptr != nullptr) {
@@ -657,6 +670,10 @@ protected:
 	}
 
 	_ALWAYS_INLINE_ void enable_bullet(int bullet_index, int collision_amount = 0, bool should_enable_attachment = true) {
+		if (!validate_bullet_index(bullet_index, "enable_bullet")) {
+			return;
+		}
+
 		int8_t &curr_bullet_status = bullets_enabled_status[bullet_index];
 
 		// If the bullet is already enabled, just return
@@ -692,6 +709,10 @@ protected:
 
 	// Disables a single bullet. Always call this method using call_deferred or you will face weird synch issues
 	_ALWAYS_INLINE_ void disable_bullet(int bullet_index, bool should_disable_attachment = true) {
+		if (!validate_bullet_index(bullet_index, "disable_bullet")) {
+			return;
+		}
+
 		int8_t &curr_bullet_status = bullets_enabled_status[bullet_index];
 
 		// If the bullet is already disabled, just return
