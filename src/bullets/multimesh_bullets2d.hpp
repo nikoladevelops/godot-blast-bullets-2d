@@ -70,7 +70,7 @@ public:
 	// Unsafe delete - only call this if all types of bullet processing have been disabled and all dangling pointers cleared, otherwise you will face weird issues/crashes
 	void force_delete() {
 		// Disable the area's shapes (ALL OF THEM no matter their bullets_enabled_status)
-		for (int i = 0; i < amount_bullets; i++) {
+		for (int i = 0; i < amount_bullets; ++i) {
 			physics_server->area_set_shape_disabled(area, i, true);
 
 			bullet_disable_attachment(i);
@@ -88,7 +88,7 @@ public:
 	_ALWAYS_INLINE_ void interpolate_bullet_visuals() {
 		double fraction = Engine::get_singleton()->get_physics_interpolation_fraction();
 
-		for (int i = 0; i < amount_bullets; i++) {
+		for (int i = 0; i < amount_bullets; ++i) {
 			if (bullets_enabled_status[i] == false) {
 				continue;
 			}
@@ -150,7 +150,7 @@ public:
 				TypedArray<Transform2D> transfs;
 				TypedArray<int> bullet_indexes;
 
-				for (int i = 0; i < amount_bullets; i++) {
+				for (int i = 0; i < amount_bullets; ++i) {
 					// If the status is active it means that the bullet hasn't hit anything yet, so we need to disable it ourselves
 					if (bullets_enabled_status[i]) {
 						call_deferred("disable_bullet", i, true);
@@ -165,7 +165,7 @@ public:
 
 			} else {
 				// If we do not wish to emit the life_time_over signal, just disable the bullet and don't worry about having to pass additional data to the user
-				for (int i = 0; i < amount_bullets; i++) {
+				for (int i = 0; i < amount_bullets; ++i) {
 					// There is already a bullet status check inside the function so it's fine
 					call_deferred("disable_bullet", i, true);
 				}
@@ -573,7 +573,7 @@ protected:
 		}
 
 		attachment_pooling_ids[bullet_index] = attachment_pooling_id;
-		attachment_stick_relative_to_bullet[bullet_index] = stick_relative_to_bullet; // TODO delete - attachment_instance->get_stick_relative_to_bullet(); as well as the other props that are now useless dead code..
+		attachment_stick_relative_to_bullet[bullet_index] = stick_relative_to_bullet;
 
 		attachment_offsets[bullet_index] = bullet_attachment_offset;
 

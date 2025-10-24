@@ -82,14 +82,14 @@ void BulletFactory2D::set_use_physics_interpolation_runtime(bool new_use_physics
 	// I'm basically making it possible for this option to be turned on during runtime
 	if (use_physics_interpolation) {
 		int amount_multimesh_instances = static_cast<int>(all_directional_bullets.size());
-		for (int i = 0; i < amount_multimesh_instances; i++) {
+		for (int i = 0; i < amount_multimesh_instances; ++i) {
 			DirectionalBullets2D *&bullets_multi = all_directional_bullets[i];
 			bullets_multi->update_previous_transforms_for_interpolation(0, bullets_multi->get_amount_bullets());
 		}
 
 		amount_multimesh_instances = static_cast<int>(all_block_bullets.size());
 
-		for (int i = 0; i < amount_multimesh_instances; i++) {
+		for (int i = 0; i < amount_multimesh_instances; ++i) {
 			BlockBullets2D *&bullets_multi = all_block_bullets[i];
 			bullets_multi->update_previous_transforms_for_interpolation(0, bullets_multi->get_amount_bullets());
 		}
@@ -470,7 +470,7 @@ void BulletFactory2D::populate_attachments_pool(const Ref<PackedScene> attachmen
 	}
 
 	// TODO fix this
-	// for (int i = 0; i < amount_instances; i++) {
+	// for (int i = 0; i < amount_instances; ++i) {
 	// 	BulletAttachment2D *attachment = static_cast<BulletAttachment2D *>(attachment_scenes->instantiate()); // You better pass a packed scene that contains an actual BulletAttachment2D node or this goes kaboom
 	// 	attachment->set_physics_interpolation_mode(Node::PHYSICS_INTERPOLATION_MODE_OFF); // I have custom physics interpolation logic, so disable the Godot one
 
@@ -635,7 +635,7 @@ int BulletFactory2D::debug_get_active_attachments_amount() {
 	int count_active_attachments = 0;
 
 	int directional_amount = static_cast<int>(all_directional_bullets.size());
-	for (int i = 0; i < directional_amount; i++) {
+	for (int i = 0; i < directional_amount; ++i) {
 		DirectionalBullets2D *bullets = all_directional_bullets[i];
 
 		if (bullets->is_active) {
@@ -644,7 +644,7 @@ int BulletFactory2D::debug_get_active_attachments_amount() {
 	}
 
 	int block_amount = static_cast<int>(all_block_bullets.size());
-	for (int i = 0; i < block_amount; i++) {
+	for (int i = 0; i < block_amount; ++i) {
 		BlockBullets2D *bullets = all_block_bullets[i];
 
 		if (bullets->is_active) {

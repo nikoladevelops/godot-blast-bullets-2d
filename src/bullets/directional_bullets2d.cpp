@@ -41,7 +41,7 @@ void DirectionalBullets2D::set_up_movement_data(const TypedArray<BulletSpeedData
 		}
 	}
 
-	for (int i = 0; i < speed_data_size; i++) {
+	for (int i = 0; i < speed_data_size; ++i) {
 		// The rotation of each transform
 		real_t curr_bullet_rotation = all_cached_shape_transforms[i].get_rotation(); // Note: I am using the shape transforms, since the instance transforms might be rotated to account for bullet texture rotation
 
@@ -102,7 +102,7 @@ void DirectionalBullets2D::custom_additional_enable_logic(const MultiMeshBullets
 	TypedArray<Dictionary> connections = get_signal_connection_list("bullet_homing_target_reached");
 
 	// Iterate through all connections and disconnect them
-	for (int i = 0; i < connections.size(); i++) {
+	for (int i = 0; i < connections.size(); ++i) {
 		Dictionary connection = connections[i];
 		Callable callable = connection["callable"];
 		disconnect("bullet_homing_target_reached", callable);

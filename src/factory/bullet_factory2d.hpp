@@ -245,7 +245,7 @@ private:
 	template <typename TBullet>
 	void populate_bullets_pool_helper(std::vector<TBullet *> &bullets_vec, MultiMeshObjectPool &bullets_object_pool, Node *bullets_container, int amount_instances, int amount_bullets_per_instance) {
 		bullets_vec.reserve(amount_instances);
-		for (int i = 0; i < amount_instances; i++) {
+		for (int i = 0; i < amount_instances; ++i) {
 			TBullet *bullets = memnew(TBullet);
 			bullets->spawn_as_disabled_multimesh(amount_bullets_per_instance, &bullets_object_pool, this, bullets_container);
 
@@ -296,7 +296,7 @@ private:
 		int count_bullets = static_cast<int>(bullets_vec.size());
 
 		// Free every single bullet multimesh instance
-		for (int i = 0; i < count_bullets; i++) {
+		for (int i = 0; i < count_bullets; ++i) {
 			TBullet *curr_bullet = bullets_vec[i];
 
 			if (curr_bullet != nullptr) {
@@ -332,7 +332,7 @@ private:
 	template <typename TBullet, typename TBulletSaveData>
 	void load_data_into_new_bullets(std::vector<TBullet *> &bullets_vec, MultiMeshObjectPool &bullets_pool, Node *bullets_container, TypedArray<TBulletSaveData> &data_to_load) {
 		int count_bullets = static_cast<int>(data_to_load.size());
-		for (int i = 0; i < count_bullets; i++) {
+		for (int i = 0; i < count_bullets; ++i) {
 			TBullet *bullets = memnew(TBullet);
 
 			bullets->load(data_to_load[i], &bullets_pool, this, bullets_container);
@@ -345,7 +345,7 @@ private:
 	template <typename TBullet, typename TBulletSaveData>
 	void insert_save_data_from_bullets_into_array(std::vector<TBullet *> &bullets_vec, TypedArray<TBulletSaveData> &array_to_save_into) {
 		int count_bullets = static_cast<int>(bullets_vec.size());
-		for (int i = 0; i < count_bullets; i++) {
+		for (int i = 0; i < count_bullets; ++i) {
 			TBullet &bullets = *bullets_vec[i];
 
 			// I only want to save bullets that are still active (I don't want to save bullets that are in the pool)

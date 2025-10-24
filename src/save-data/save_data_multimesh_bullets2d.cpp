@@ -32,7 +32,7 @@ int SaveDataMultiMeshBullets2D::get_size() const {
 void SaveDataMultiMeshBullets2D::set_bullets_enabled_status(TypedArray<bool> new_bullets_enabled_status) {
 	int new_enabled_size = new_bullets_enabled_status.size();
 	bullets_enabled_status.resize(new_enabled_size);
-	for (int i = 0; i < new_enabled_size; i++) {
+	for (int i = 0; i < new_enabled_size; ++i) {
 		bullets_enabled_status[i] = new_bullets_enabled_status[i];
 	}
 }
@@ -50,7 +50,7 @@ Ref<Resource> SaveDataMultiMeshBullets2D::get_bullets_custom_data() const {
 }
 
 void SaveDataMultiMeshBullets2D::set_textures(TypedArray<Texture2D> new_textures) {
-	for (int i = 0; i < new_textures.size(); i++) {
+	for (int i = 0; i < new_textures.size(); ++i) {
 		textures.push_back(new_textures[i]);
 	}
 }
@@ -135,7 +135,7 @@ TypedArray<BulletRotationData2D> SaveDataMultiMeshBullets2D::get_all_bullet_rota
 	return all_bullet_rotation_data;
 }
 void SaveDataMultiMeshBullets2D::set_all_bullet_rotation_data(const TypedArray<BulletRotationData2D> &new_bullet_rotation_data) {
-	for (int i = 0; i < new_bullet_rotation_data.size(); i++) {
+	for (int i = 0; i < new_bullet_rotation_data.size(); ++i) {
 		all_bullet_rotation_data.push_back(new_bullet_rotation_data[i]);
 	}
 }
