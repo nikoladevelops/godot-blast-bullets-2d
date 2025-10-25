@@ -471,7 +471,7 @@ protected:
 
 				real_t &curr_bullet_speed = all_cached_speed[i];
 				curr_bullet_speed = Math::move_toward(curr_bullet_speed, (real_t)target_speed, (real_t)(std::abs(accel) * delta));
-				curr_bullet_speed = Math::clamp(curr_bullet_speed, 0.0f, (real_t)max_spd);
+				curr_bullet_speed = Math::clamp(curr_bullet_speed, (real_t)0.0, (real_t)max_spd);
 				all_cached_velocity[i] = all_cached_direction[i] * curr_bullet_speed;
 			}
 		} else {
