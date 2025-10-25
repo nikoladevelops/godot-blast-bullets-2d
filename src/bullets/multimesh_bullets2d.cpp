@@ -38,7 +38,7 @@ int MultiMeshBullets2D::get_amount_active_attachments() const {
 			++amount_active_attachments;
 		}
 	}
-	
+
 	return amount_active_attachments;
 }
 
@@ -63,33 +63,32 @@ void MultiMeshBullets2D::spawn(const MultiMeshBulletsData2D &data, MultiMeshObje
 	generate_physics_shapes_for_area(amount_bullets);
 
 	set_up_bullet_instances(data);
-	
+
 	// Set up bullet attachments so that for every bullet you will be able to have an attachment if needed
-	
+
 	// TODO might be best to have a property that says whether attachments are used or not so that we dont allocate memory for no reason..
-	
-	
+
 	attachment_scenes.resize(amount_bullets, nullptr);
 
 	attachment_pooling_ids.resize(amount_bullets, 0);
-	
+
 	attachments.resize(amount_bullets, nullptr);
-	
+
 	attachment_transforms.resize(amount_bullets, Transform2D());
-	
+
 	attachment_offsets.resize(amount_bullets, Vector2());
-	
+
 	attachment_local_transforms.resize(amount_bullets, Transform2D());
-	
+
 	attachment_stick_relative_to_bullet.resize(amount_bullets, 1);
-	
+
 	set_rotation_data(data.all_bullet_rotation_data, data.rotate_only_textures);
-	
+
 	all_previous_instance_transf.resize(amount_bullets);
 	all_previous_attachment_transf.resize(amount_bullets);
 
 	update_previous_transforms_for_interpolation(0, amount_bullets);
-	
+
 	finalize_set_up(
 			data.bullets_custom_data,
 			data.textures,
@@ -123,7 +122,7 @@ void MultiMeshBullets2D::enable_multimesh(const MultiMeshBulletsData2D &data) {
 	set_rotation_data(data.all_bullet_rotation_data, data.rotate_only_textures);
 
 	move_to_front(); // Makes sure that the current old multimesh is displayed on top of the newer ones (act as if its the oldest sibling to emulate the behaviour of spawning a brand new multimesh / if I dont do this then the multimesh's instances will be displayed behind the newer ones)
-	
+
 	update_previous_transforms_for_interpolation(0, amount_bullets);
 
 	finalize_set_up(
@@ -221,7 +220,6 @@ void MultiMeshBullets2D::set_up_bullet_instances(const MultiMeshBulletsData2D &d
 		// 	if (!is_successful) {
 		// 		create_new_bullet_attachment(i, attachment_transf);
 		// 	}
-
 	}
 }
 
@@ -848,5 +846,11 @@ void MultiMeshBullets2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("all_bullets_set_attachment", "attachment_scene", "attachment_pooling_id", "bullet_attachment_offset", "stick_relative_to_bullet", "bullet_index_start", "bullet_index_end_inclusive"), &MultiMeshBullets2D::all_bullets_set_attachment, DEFVAL(true), DEFVAL(0), DEFVAL(-1));
 
 	ClassDB::bind_method(D_METHOD("bullet_set_attachment", "bullet_index", "attachment_scene", "attachment_pooling_id", "bullet_attachment_offset", "stick_relative_to_bullet"), &MultiMeshBullets2D::bullet_set_attachment, DEFVAL(true));
+
+	ClassDB::bind_method(D_METHOD("set_bullet_speed_curve", "curve"), &MultiMeshBullets2D::set_bullet_speed_curve);
+	ClassDB::bind_method(D_METHOD("get_bullet_speed_curve"), &MultiMeshBullets2D::get_bullet_speed_curve);
+	ADD_PROPERTY(
+			PropertyInfo(Variant::OBJECT, "bullet_speed_curve", PROPERTY_HINT_RESOURCE_TYPE, "Curve"),
+			"set_bullet_speed_curve", "get_bullet_speed_curve");
 }
 } //namespace BlastBullets2D

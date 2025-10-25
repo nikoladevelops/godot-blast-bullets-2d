@@ -82,7 +82,7 @@ public:
 			move_bullet_attachment(cache_velocity_calc, i, rotation_angle);
 		}
 
-		accelerate_bullet_speed(0, delta);
+		accelerate_bullet_speed(delta, 0, 0);
 	}
 
 protected:

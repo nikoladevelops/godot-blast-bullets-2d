@@ -724,7 +724,7 @@ protected:
 	_ALWAYS_INLINE_ void update_attachment_and_speed(int bullet_index, double delta, real_t rotation_angle) {
 		Vector2 velocity_delta = all_cached_velocity[bullet_index] * delta;
 		move_bullet_attachment(velocity_delta, bullet_index, rotation_angle);
-		accelerate_bullet_speed(bullet_index, delta);
+		accelerate_bullet_speed(delta, bullet_index, bullet_index);
 	}
 
 	static void _bind_methods();

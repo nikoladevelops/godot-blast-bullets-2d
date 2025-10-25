@@ -7,6 +7,7 @@
 #include "../shared/bullet_attachment_object_pool2d.hpp"
 #include "../shared/bullet_rotation_data2d.hpp"
 #include "../spawn-data/multimesh_bullets_data2d.hpp"
+#include "godot_cpp/classes/curve.hpp"
 #include "godot_cpp/core/class_db.hpp"
 #include "godot_cpp/core/defs.hpp"
 #include "godot_cpp/core/math.hpp"
@@ -108,7 +109,7 @@ public:
 	}
 
 	// Updates interpolation data for physics
-	_ALWAYS_INLINE_ void update_previous_transforms_for_interpolation(int begin_bullet_index, int end_bullet_index_exclusive) {
+	_ALWAYS_INLINE_ void update_previous_transforms_for_interpolation(int begin_bullet_index, int end_bullet_index_exclusive) { // TODO update all and update single methods
 		if (!bullet_factory->use_physics_interpolation) {
 			return;
 		}
@@ -241,6 +242,26 @@ public:
 	bool get_is_attachments_auto_pooling_enabled() const { return is_attachments_auto_pooling_enabled; }
 	void set_is_attachments_auto_pooling_enabled(bool value) { is_attachments_auto_pooling_enabled = value; }
 
+	Ref<Curve> get_bullet_speed_curve() const { return bullet_speed_curve; }
+	void set_bullet_speed_curve(const Ref<Curve> &curve) {
+		if (bullet_speed_curve != nullptr && bullet_speed_curve == curve)
+			return;
+
+		bullet_speed_curve = curve;
+
+		if (bullet_speed_curve.is_valid() && !is_life_time_infinite) {
+			bullet_speed_curve->bake();
+
+			double progress = get_bullet_speed_curve_progress();
+			double target = get_bullet_speed_curve_target_speed();
+
+			for (int i = 0; i < amount_bullets; ++i) {
+				all_cached_speed[i] = (real_t)target;
+				all_cached_velocity[i] = all_cached_direction[i] * all_cached_speed[i];
+			}
+		}
+	}
+
 protected:
 	static void _bind_methods();
 
@@ -364,6 +385,8 @@ protected:
 	std::vector<real_t> all_cached_max_speed;
 	std::vector<real_t> all_cached_acceleration;
 
+	Ref<Curve> bullet_speed_curve = nullptr;
+
 	///
 
 	/// CACHED CALCULATIONS FOR IMPROVED PERFORMANCE
@@ -422,17 +445,99 @@ protected:
 	// Note: If you wish to debug these functions with the debugger, remove the _ALWAYS_INLINE_ temporarily
 
 	// Accelerates an individual bullet's speed
-	_ALWAYS_INLINE_ void accelerate_bullet_speed(int speed_data_index, double delta) {
-		real_t &curr_bullet_speed = all_cached_speed[speed_data_index];
-		real_t curr_max_bullet_speed = all_cached_max_speed[speed_data_index];
+	// _ALWAYS_INLINE_ void accelerate_bullet_speed(int speed_data_index, double delta) {
+	// 	real_t &curr_bullet_speed = all_cached_speed[speed_data_index];
+	// 	real_t curr_max_bullet_speed = all_cached_max_speed[speed_data_index];
 
-		if (curr_bullet_speed == curr_max_bullet_speed) {
-			return;
+	// 	if (curr_bullet_speed == curr_max_bullet_speed) {
+	// 		return;
+	// 	}
+
+	// 	real_t acceleration = all_cached_acceleration[speed_data_index] * delta;
+	// 	curr_bullet_speed = Math::min(curr_bullet_speed + acceleration, curr_max_bullet_speed);
+	// 	all_cached_velocity[speed_data_index] = all_cached_direction[speed_data_index] * curr_bullet_speed;
+	// }
+
+	// Accelerates bullet speeds (hybrid: curve if valid, else static per-bullet)   // TODO accelerate_all  and a accelerate single method
+	_ALWAYS_INLINE_ void accelerate_bullet_speed(double delta, int begin_index, int end_index_inclusive) {
+		if (bullet_speed_curve.is_valid() && !is_life_time_infinite) {
+			double target_speed = get_bullet_speed_curve_target_speed();
+			double accel = get_bullet_speed_curve_acceleration(delta);
+			double max_spd = get_bullet_speed_curve_max_speed();
+			for (int i = begin_index; i <= end_index_inclusive; ++i) {
+				if (!bullets_enabled_status[i]) {
+					continue;
+				}
+
+				real_t &curr_bullet_speed = all_cached_speed[i];
+				curr_bullet_speed = Math::move_toward(curr_bullet_speed, (real_t)target_speed, (real_t)(std::abs(accel) * delta));
+				curr_bullet_speed = Math::clamp(curr_bullet_speed, 0.0f, (real_t)max_spd);
+				all_cached_velocity[i] = all_cached_direction[i] * curr_bullet_speed;
+			}
+		} else {
+			for (int i = begin_index; i <= end_index_inclusive; ++i) {
+				if (!bullets_enabled_status[i]) {
+					continue;
+				}
+
+				real_t &curr_bullet_speed = all_cached_speed[i];
+				real_t curr_max_bullet_speed = all_cached_max_speed[i];
+
+				if (curr_bullet_speed == curr_max_bullet_speed) {
+					continue;
+				}
+
+				real_t acceleration = all_cached_acceleration[i] * delta;
+				curr_bullet_speed = Math::min(curr_bullet_speed + acceleration, curr_max_bullet_speed);
+				all_cached_velocity[i] = all_cached_direction[i] * curr_bullet_speed;
+			}
+		}
+	}
+
+	_ALWAYS_INLINE_ real_t get_bullet_speed_curve_progress() const {
+		if (is_life_time_infinite || Math::is_equal_approx((real_t)max_life_time, 0.0f)) {
+			return 0.0f;
 		}
 
-		real_t acceleration = all_cached_acceleration[speed_data_index] * delta;
-		curr_bullet_speed = Math::min(curr_bullet_speed + acceleration, curr_max_bullet_speed);
-		all_cached_velocity[speed_data_index] = all_cached_direction[speed_data_index] * curr_bullet_speed;
+		return 1.0f - ((real_t)current_life_time / (real_t)max_life_time); // Cast lifetime to real_t
+	}
+
+	_ALWAYS_INLINE_ real_t get_bullet_speed_curve_target_speed() const {
+		if (!bullet_speed_curve.is_valid()) {
+			return 0.0f;
+		}
+
+		real_t progress = get_bullet_speed_curve_progress();
+		real_t domain_min = bullet_speed_curve->get_min_domain(); // real_t
+		real_t domain_max = bullet_speed_curve->get_max_domain(); // real_t
+		real_t t = Math::lerp(domain_min, domain_max, progress);
+		return bullet_speed_curve->sample_baked(t); // No cast: real_t input/output
+	}
+
+	_ALWAYS_INLINE_ real_t get_bullet_speed_curve_acceleration(double delta) const {
+		if (!bullet_speed_curve.is_valid() || Math::is_equal_approx((real_t)delta, 0.0f)) {
+			return 0.0f;
+		}
+
+		real_t progress = get_bullet_speed_curve_progress();
+		real_t domain_min = bullet_speed_curve->get_min_domain();
+		real_t domain_max = bullet_speed_curve->get_max_domain();
+		real_t t_now = Math::lerp(domain_min, domain_max, progress);
+		real_t domain_range = domain_max - domain_min;
+		real_t eps = (domain_range > 0.0f) ? ((real_t)delta / (real_t)max_life_time) * domain_range * 0.5f : (real_t)delta * 0.5f;
+		real_t t_next = t_now + eps;
+		real_t speed_now = get_bullet_speed_curve_target_speed();
+		real_t speed_next = bullet_speed_curve->sample_baked(t_next);
+
+		return (speed_next - speed_now) / eps;
+	}
+
+	_ALWAYS_INLINE_ real_t get_bullet_speed_curve_max_speed() const {
+		if (!bullet_speed_curve.is_valid()) {
+			return 0.0f;
+		}
+
+		return bullet_speed_curve->get_max_value(); // real_t, no cast
 	}
 
 	// Custom rotation function (I am doing this for performance reasons since Godot's rotated_local returns a brand new Transform2D, but I want to modify a reference without making copies)
