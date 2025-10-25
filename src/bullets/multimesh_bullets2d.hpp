@@ -495,7 +495,7 @@ protected:
 	}
 
 	_ALWAYS_INLINE_ real_t get_bullet_speed_curve_progress() const {
-		if (is_life_time_infinite || Math::is_equal_approx((real_t)max_life_time, 0.0f)) {
+		if (is_life_time_infinite || Math::is_equal_approx((real_t)max_life_time, (real_t)0.0)) {
 			return 0.0f;
 		}
 
@@ -515,7 +515,7 @@ protected:
 	}
 
 	_ALWAYS_INLINE_ real_t get_bullet_speed_curve_acceleration(double delta) const {
-		if (!bullet_speed_curve.is_valid() || Math::is_equal_approx((real_t)delta, 0.0f)) {
+		if (!bullet_speed_curve.is_valid() || Math::is_equal_approx((real_t)delta, (real_t)0.0)) {
 			return 0.0f;
 		}
 
