@@ -279,7 +279,7 @@ public:
 
 			// TODO fix rotation curve
 
-			
+
 			for (int i = 0; i < amount_bullets; ++i) {
 				if (!bullets_enabled_status[i]) {
 					continue;
@@ -808,7 +808,8 @@ protected:
 		if (bullet_curves_data.is_valid()) {
 			real_t target_rot = get_bullet_curves_data_target_rotation_speed();
 			real_t rot_accel = get_bullet_curves_data_rotation_acceleration(delta);
-			real_t max_rot = Math::max(bullet_curves_data->rotation_speed_curve->get_max_value(), (real_t)0.0);
+			real_t max_rot = Math::max((real_t)bullet_curves_data->rotation_speed_curve->get_max_value(), (real_t)0.0);
+			
 			for (int i = begin_index; i <= end_index_inclusive; ++i) {
 				if (!bullets_enabled_status[i]) {
 					continue;
