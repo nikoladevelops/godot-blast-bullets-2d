@@ -847,10 +847,10 @@ void MultiMeshBullets2D::_bind_methods() {
 
 	ClassDB::bind_method(D_METHOD("bullet_set_attachment", "bullet_index", "attachment_scene", "attachment_pooling_id", "bullet_attachment_offset", "stick_relative_to_bullet"), &MultiMeshBullets2D::bullet_set_attachment, DEFVAL(true));
 
-	ClassDB::bind_method(D_METHOD("set_bullet_speed_curve", "curve"), &MultiMeshBullets2D::set_bullet_speed_curve);
-	ClassDB::bind_method(D_METHOD("get_bullet_speed_curve"), &MultiMeshBullets2D::get_bullet_speed_curve);
+	ClassDB::bind_method(D_METHOD("set_bullet_curves_data", "data"), &MultiMeshBullets2D::set_bullet_curves_data);
+	ClassDB::bind_method(D_METHOD("get_bullet_curves_data"), &MultiMeshBullets2D::get_bullet_curves_data);
 	ADD_PROPERTY(
-			PropertyInfo(Variant::OBJECT, "bullet_speed_curve", PROPERTY_HINT_RESOURCE_TYPE, "Curve"),
-			"set_bullet_speed_curve", "get_bullet_speed_curve");
+			PropertyInfo(Variant::OBJECT, "bullet_curves_data", PROPERTY_HINT_RESOURCE_TYPE, "BulletCurvesData2D"),
+			"set_bullet_curves_data", "get_bullet_curves_data");
 }
 } //namespace BlastBullets2D

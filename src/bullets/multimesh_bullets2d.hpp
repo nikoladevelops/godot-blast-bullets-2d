@@ -20,6 +20,7 @@
 #include "godot_cpp/variant/typed_array.hpp"
 #include "godot_cpp/variant/variant.hpp"
 #include "godot_cpp/variant/vector2.hpp"
+#include "shared/bullet_curves_data2d.hpp"
 
 #include <cstdint>
 #include <godot_cpp/classes/engine.hpp>
@@ -242,18 +243,18 @@ public:
 	bool get_is_attachments_auto_pooling_enabled() const { return is_attachments_auto_pooling_enabled; }
 	void set_is_attachments_auto_pooling_enabled(bool value) { is_attachments_auto_pooling_enabled = value; }
 
-	Ref<Curve> get_bullet_speed_curve() const { return bullet_speed_curve; }
-	void set_bullet_speed_curve(const Ref<Curve> &curve) {
-		if (bullet_speed_curve != nullptr && bullet_speed_curve == curve)
-			return;
+	Ref<BulletCurvesData2D> get_bullet_curves_data() const { return bullet_curves_data; }
+	void set_bullet_curves_data(const Ref<BulletCurvesData2D> &new_curves_data) {
+		// if (bullet_curves_data != nullptr && bullet_curves_data == curve)
+		// 	return;
 
-		bullet_speed_curve = curve;
+		bullet_curves_data = new_curves_data;
 
-		if (bullet_speed_curve.is_valid() && !is_life_time_infinite) {
-			bullet_speed_curve->bake();
+		if (bullet_curves_data.is_valid() && !is_life_time_infinite) {
+			//bullet_curves_data->bake();
 
-			double progress = get_bullet_speed_curve_progress();
-			double target = get_bullet_speed_curve_target_speed();
+			double progress = get_bullet_curves_data_progress();
+			double target = get_bullet_curves_data_target_speed();
 
 			for (int i = 0; i < amount_bullets; ++i) {
 				all_cached_speed[i] = (real_t)target;
@@ -385,7 +386,7 @@ protected:
 	std::vector<real_t> all_cached_max_speed;
 	std::vector<real_t> all_cached_acceleration;
 
-	Ref<Curve> bullet_speed_curve = nullptr;
+	Ref<BulletCurvesData2D> bullet_curves_data = nullptr;
 
 	///
 
@@ -460,10 +461,10 @@ protected:
 
 	// Accelerates bullet speeds (hybrid: curve if valid, else static per-bullet)   // TODO accelerate_all  and a accelerate single method
 	_ALWAYS_INLINE_ void accelerate_bullet_speed(double delta, int begin_index, int end_index_inclusive) {
-		if (bullet_speed_curve.is_valid() && !is_life_time_infinite) {
-			double target_speed = get_bullet_speed_curve_target_speed();
-			double accel = get_bullet_speed_curve_acceleration(delta);
-			double max_spd = get_bullet_speed_curve_max_speed();
+		if (bullet_curves_data.is_valid() && !is_life_time_infinite) {
+			double target_speed = get_bullet_curves_data_target_speed();
+			double accel = get_bullet_curves_data_acceleration(delta);
+			double max_spd = get_bullet_curves_data_max_speed();
 			for (int i = begin_index; i <= end_index_inclusive; ++i) {
 				if (!bullets_enabled_status[i]) {
 					continue;
@@ -494,7 +495,7 @@ protected:
 		}
 	}
 
-	_ALWAYS_INLINE_ real_t get_bullet_speed_curve_progress() const {
+	_ALWAYS_INLINE_ real_t get_bullet_curves_data_progress() const {
 		if (is_life_time_infinite || Math::is_equal_approx((real_t)max_life_time, (real_t)0.0)) {
 			return 0.0;
 		}
@@ -502,42 +503,52 @@ protected:
 		return 1.0f - ((real_t)current_life_time / (real_t)max_life_time); // Cast lifetime to real_t
 	}
 
-	_ALWAYS_INLINE_ real_t get_bullet_speed_curve_target_speed() const {
-		if (!bullet_speed_curve.is_valid()) {
+	_ALWAYS_INLINE_ real_t get_bullet_curves_data_target_speed() const {
+		if (!bullet_curves_data.is_valid()) {
 			return 0.0;
 		}
 
-		real_t progress = get_bullet_speed_curve_progress();
-		real_t domain_min = bullet_speed_curve->get_min_domain(); // real_t
-		real_t domain_max = bullet_speed_curve->get_max_domain(); // real_t
+		real_t progress = get_bullet_curves_data_progress();
+
+		auto &movement_speed_curve = bullet_curves_data->movement_speed_curve;
+
+		real_t domain_min = movement_speed_curve->get_min_domain();
+		real_t domain_max = movement_speed_curve->get_max_domain();
 		real_t t = Math::lerp(domain_min, domain_max, progress);
-		return bullet_speed_curve->sample_baked(t); // No cast: real_t input/output
+
+		return movement_speed_curve->sample_baked(t); 
 	}
 
-	_ALWAYS_INLINE_ real_t get_bullet_speed_curve_acceleration(double delta) const {
-		if (!bullet_speed_curve.is_valid() || Math::is_equal_approx((real_t)delta, (real_t)0.0)) {
+	_ALWAYS_INLINE_ real_t get_bullet_curves_data_acceleration(double delta) const {
+		if (!bullet_curves_data.is_valid() || Math::is_equal_approx((real_t)delta, (real_t)0.0)) {
 			return 0.0;
 		}
 
-		real_t progress = get_bullet_speed_curve_progress();
-		real_t domain_min = bullet_speed_curve->get_min_domain();
-		real_t domain_max = bullet_speed_curve->get_max_domain();
+		real_t progress = get_bullet_curves_data_progress();
+
+		auto &movement_speed_curve = bullet_curves_data->movement_speed_curve;
+
+
+		real_t domain_min = movement_speed_curve->get_min_domain();
+		real_t domain_max = movement_speed_curve->get_max_domain();
 		real_t t_now = Math::lerp(domain_min, domain_max, progress);
 		real_t domain_range = domain_max - domain_min;
 		real_t eps = (domain_range > 0.0) ? ((real_t)delta / (real_t)max_life_time) * domain_range * 0.5f : (real_t)delta * 0.5f;
 		real_t t_next = t_now + eps;
-		real_t speed_now = get_bullet_speed_curve_target_speed();
-		real_t speed_next = bullet_speed_curve->sample_baked(t_next);
+		real_t speed_now = get_bullet_curves_data_target_speed();
+		real_t speed_next = movement_speed_curve->sample_baked(t_next);
 
 		return (speed_next - speed_now) / eps;
 	}
 
-	_ALWAYS_INLINE_ real_t get_bullet_speed_curve_max_speed() const {
-		if (!bullet_speed_curve.is_valid()) {
+	_ALWAYS_INLINE_ real_t get_bullet_curves_data_max_speed() const {
+		if (!bullet_curves_data.is_valid()) {
 			return 0.0;
 		}
 
-		return bullet_speed_curve->get_max_value(); // real_t, no cast
+		auto &movement_speed_curve = bullet_curves_data->movement_speed_curve;
+		
+		return movement_speed_curve->get_max_value();
 	}
 
 	// Custom rotation function (I am doing this for performance reasons since Godot's rotated_local returns a brand new Transform2D, but I want to modify a reference without making copies)

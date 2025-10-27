@@ -42,7 +42,7 @@ var block_bullets_data:BlockBulletsData2D
 # Holds data that is needed to set up the speed of both directional and block bullets
 var bullet_speed_data:Array[BulletSpeedData2D]
 
-var bullet_speed_curve:Curve = preload("res://shared/data/speed_curve.tres")
+var bullet_curves_data_1:BulletCurvesData2D = preload("res://shared/data/bullet_curves_data_1.tres")
 
 # Caches the option index that the user picked for bullet speed (UI related)
 var cache_bullet_speed_option_index:int = 0
@@ -266,6 +266,7 @@ func spawn_multi_mesh_directional_bullets()->void:
 	else:
 		directional_bullets_data.transforms = BulletFactory2D.helper_generate_transforms_grid(bullets_amount, bullet_marker.get_global_transform(), rows_per_column, grid_alignment, col_offset, row_offset, rotate_grid_with_marker, random_local_rotation)
 	
+	#directional_bullets_data.max_life_time = 2
 	#directional_bullets_data.is_life_time_over_signal_enabled = true
 	#directional_bullets_data.bullet_max_collision_amount = 1
 	var dir_bullets:DirectionalBullets2D = BENCHMARK_GLOBALS.FACTORY.spawn_controllable_directional_bullets(directional_bullets_data)
@@ -277,7 +278,8 @@ func spawn_multi_mesh_directional_bullets()->void:
 	dir_bullets.bullet_homing_auto_pop_after_target_reached = true
 	dir_bullets.is_multimesh_auto_pooling_enabled = true
 	dir_bullets.bullet_max_collision_count = 2
-	dir_bullets.bullet_speed_curve = bullet_speed_curve
+	
+	dir_bullets.bullet_curves_data = bullet_curves_data_1
 	
 	#for i in dir_bullets.get_amount_bullets():
 		#dir_bullets.bullet_set_attachment(i, gpu_particles_scn, 5, Vector2(-60,0), true)
