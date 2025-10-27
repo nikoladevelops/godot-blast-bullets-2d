@@ -20,11 +20,13 @@ public:
 		real_t cache_first_rotation_result = 0.0;
 		bool max_rotation_speed_reached = false;
 		// Accelerate only the first bullet rotation speed
-		if (is_rotation_active && use_only_first_rotation_data) {
-			max_rotation_speed_reached = accelerate_bullet_rotation_speed(0, delta); // accelerate only the first one once
-			cache_first_rotation_result = all_rotation_speed[0] * delta;
+		if (is_rotation_active) {
+			if (use_only_first_rotation_data) {
+				max_rotation_speed_reached = accelerate_bullet_rotation_speed(delta, 0, 0); // accelerate only the first one once
+				cache_first_rotation_result = all_rotation_speed[0] * delta;
+			}
 		}
-
+		
 		bool is_using_physics_interpolation = bullet_factory->use_physics_interpolation;
 
 		update_previous_transforms_for_interpolation(0, amount_bullets);
@@ -49,7 +51,7 @@ public:
 			real_t rotation_angle = 0.0;
 			if (is_rotation_active) {
 				if (!use_only_first_rotation_data) {
-					max_rotation_speed_reached = accelerate_bullet_rotation_speed(i, delta);
+					max_rotation_speed_reached = accelerate_bullet_rotation_speed(delta, i, i);
 					rotation_angle = all_rotation_speed[i] * delta;
 				} else {
 					rotation_angle = cache_first_rotation_result;

@@ -456,7 +456,6 @@ public:
 
 	/////////////////////////
 
-
 	// Teleports a bullet to a new global position
 	_ALWAYS_INLINE_ void teleport_bullet(int bullet_index, const Vector2 &new_global_pos) {
 		if (!validate_bullet_index(bullet_index, "teleport_bullet") || !bullets_enabled_status[bullet_index]) {
@@ -473,7 +472,7 @@ public:
 		shape_t.set_origin(new_global_pos + rotated_offset);
 		physics_server->area_set_shape_transform(area, bullet_index, shape_t);
 
-		update_previous_transforms_for_interpolation(bullet_index, bullet_index);
+		update_previous_transforms_for_interpolation(bullet_index, bullet_index + 1);
 
 		temporary_enable_bullet(bullet_index);
 	}
@@ -617,26 +616,40 @@ protected:
 
 	// Updates bullet rotation based on rotation speed
 	_ALWAYS_INLINE_ real_t update_rotation(int bullet_index, double delta) {
-		if (!is_rotation_active || bullet_index >= (int)all_rotation_speed.size()) {
-			return 0.0;
+		if (bullet_index >= (int)all_rotation_speed.size()) {
+			return (real_t)0.0;
 		}
 
-		bool max_rotation_speed_reached = accelerate_bullet_rotation_speed(bullet_index, delta);
-		real_t rotation_angle = all_rotation_speed[bullet_index] * delta;
+		// Accelerate rotation speed first (curve or static)
+		accelerate_bullet_rotation_speed(delta, bullet_index, bullet_index);
 
-		if (!(max_rotation_speed_reached && stop_rotation_when_max_reached)) {
-			rotate_transform_locally(all_cached_instance_transforms[bullet_index], rotation_angle);
+		real_t cache_rotation_speed = all_rotation_speed[bullet_index];
+		real_t rot_delta = cache_rotation_speed * (real_t)delta;
+
+		// Apply rotation if active or speed > 0
+		if (is_rotation_active || cache_rotation_speed != 0.0f) {
+			bool max_reached = (cache_rotation_speed >= all_max_rotation_speed[bullet_index]);
+			if (!(max_reached && stop_rotation_when_max_reached)) {
+				rotate_transform_locally(all_cached_instance_transforms[bullet_index], rot_delta);
+			}
 		}
 
 		if (adjust_direction_based_on_rotation) {
 			Vector2 &current_direction = all_cached_direction[bullet_index];
-			current_direction = all_cached_instance_transforms[bullet_index][0].normalized();
+			current_direction = all_cached_instance_transforms[bullet_index].columns[0].normalized();
 
 			real_t current_speed = all_cached_speed[bullet_index];
 			all_cached_velocity[bullet_index] = current_direction * current_speed;
 		}
 
-		return rotation_angle;
+		// Apply direction curve offset (radians y)
+		if (bullet_curves_data.is_valid() && !is_life_time_infinite) {
+			real_t dir_offset = get_bullet_curves_data_target_direction_offset();
+			all_cached_direction[bullet_index] = all_cached_direction[bullet_index].rotated(dir_offset).normalized();
+			all_cached_velocity[bullet_index] = all_cached_direction[bullet_index] * all_cached_speed[bullet_index];
+		}
+
+		return rot_delta;
 	}
 
 	_ALWAYS_INLINE_ void try_to_emit_bullet_homing_target_reached_signal(HomingTargetDeque &homing_deque, bool is_using_shared_deque, int bullet_index, const Vector2 &bullet_pos, const Vector2 &target_pos) {
@@ -673,7 +686,7 @@ protected:
 						call_deferred("emit_signal", "bullet_homing_target_reached", this, bullet_index, nullptr, target_pos);
 						break;
 				}
-				
+
 				// Pop the front target automatically if that's what the user wants
 				if (is_using_shared_deque) {
 					if (shared_deque_auto_pop_after_target_reached) {
@@ -687,7 +700,6 @@ protected:
 			}
 		}
 	}
-
 
 	// Normalizes an angle to [-PI, PI]
 	_ALWAYS_INLINE_ void normalize_angle(real_t &angle) const {
