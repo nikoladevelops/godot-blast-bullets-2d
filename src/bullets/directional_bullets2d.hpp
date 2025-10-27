@@ -535,7 +535,7 @@ protected:
 	// Updates homing behavior for a bullet
 	_ALWAYS_INLINE_ void update_homing(HomingTargetDeque &homing_deque, bool is_using_shared_deque, int bullet_index, double delta, bool interval_reached) {
 		real_t cached_speed = all_cached_speed[bullet_index];
-		if (cached_speed <= 0.0f) { // Early zero-speed exit
+		if (cached_speed <= 0.0) { // Early zero-speed exit
 			return;
 		}
 
@@ -557,17 +557,17 @@ protected:
 
 		const Vector2 &bullet_pos = all_cached_instance_origin[bullet_index];
 		Vector2 diff = target_pos - bullet_pos;
-		if (diff.length_squared() <= 0.0f) { // Early exit if already on target
+		if (diff.length_squared() <= 0.0) { // Early exit if already on target
 			try_to_emit_bullet_homing_target_reached_signal(homing_deque, is_using_shared_deque, bullet_index, bullet_pos, target_pos);
 			return;
 		}
 
 		real_t max_turn = homing_smoothing * delta;
-		if (max_turn < 0.0f) {
-			max_turn = 0.0f;
+		if (max_turn < 0.0) {
+			max_turn = 0.0;
 		}
 
-		bool use_smoothing = (homing_smoothing > 0.0f); // Hoist for clamp
+		bool use_smoothing = (homing_smoothing > 0.0); // Hoist for clamp
 
 		// Rotate toward target with smoothing
 		rotate_to_target(bullet_index, diff, max_turn, use_smoothing);
@@ -586,7 +586,7 @@ protected:
 
 	// Rotates bullet to face target with smoothing (boundary-agnostic version)
 	_ALWAYS_INLINE_ void rotate_to_target(int bullet_index, const Vector2 &diff, real_t max_turn, bool use_smoothing) {
-		if (!homing_take_control_of_texture_rotation || diff.length_squared() <= 0.0f) {
+		if (!homing_take_control_of_texture_rotation || diff.length_squared() <= 0.0) {
 			return;
 		}
 

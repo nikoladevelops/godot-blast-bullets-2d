@@ -187,7 +187,7 @@ public:
 		current_change_texture_time -= delta;
 
 		// When the current change texture time reaches 0, it's time to switch to the next texture
-		if (current_change_texture_time <= 0.0f) {
+		if (current_change_texture_time <= 0.0) {
 			// Change the texture to the new one
 			if (current_texture_index + 1 < textures_amount) {
 				current_texture_index++;
@@ -340,13 +340,13 @@ protected:
 	Ref<Resource> bullets_custom_data;
 
 	// The max life time before the multimesh gets disabled
-	double max_life_time = 0.0f;
+	double max_life_time = 0.0;
 
 	// Whether the life_time_over signal will be emitted when the life time of the bullets is over. Tracked by BulletFactory2D
 	bool is_life_time_over_signal_enabled = false;
 
 	// The current life time being processed
-	double current_life_time = 0.0f;
+	double current_life_time = 0.0;
 
 	// Whether the lifetime is infinite - will ignore any lifetime timers
 	bool is_life_time_infinite = false;
@@ -363,7 +363,7 @@ protected:
 	TypedArray<double> change_texture_times;
 
 	// The change texture time being processed now
-	double current_change_texture_time = 0.0f;
+	double current_change_texture_time = 0.0;
 
 	// Holds the current texture index (the index inside the array textures)
 	int current_texture_index = 0;
@@ -371,7 +371,7 @@ protected:
 	// This is the texture size of the bullets
 	Vector2 texture_size = Vector2(0, 0);
 
-	real_t cache_texture_rotation_radians = 0.0f;
+	real_t cache_texture_rotation_radians = 0.0;
 
 	Vector2 cache_collision_shape_offset = Vector2(0, 0);
 
@@ -496,7 +496,7 @@ protected:
 
 	_ALWAYS_INLINE_ real_t get_bullet_speed_curve_progress() const {
 		if (is_life_time_infinite || Math::is_equal_approx((real_t)max_life_time, (real_t)0.0)) {
-			return 0.0f;
+			return 0.0;
 		}
 
 		return 1.0f - ((real_t)current_life_time / (real_t)max_life_time); // Cast lifetime to real_t
@@ -504,7 +504,7 @@ protected:
 
 	_ALWAYS_INLINE_ real_t get_bullet_speed_curve_target_speed() const {
 		if (!bullet_speed_curve.is_valid()) {
-			return 0.0f;
+			return 0.0;
 		}
 
 		real_t progress = get_bullet_speed_curve_progress();
@@ -516,7 +516,7 @@ protected:
 
 	_ALWAYS_INLINE_ real_t get_bullet_speed_curve_acceleration(double delta) const {
 		if (!bullet_speed_curve.is_valid() || Math::is_equal_approx((real_t)delta, (real_t)0.0)) {
-			return 0.0f;
+			return 0.0;
 		}
 
 		real_t progress = get_bullet_speed_curve_progress();
@@ -524,7 +524,7 @@ protected:
 		real_t domain_max = bullet_speed_curve->get_max_domain();
 		real_t t_now = Math::lerp(domain_min, domain_max, progress);
 		real_t domain_range = domain_max - domain_min;
-		real_t eps = (domain_range > 0.0f) ? ((real_t)delta / (real_t)max_life_time) * domain_range * 0.5f : (real_t)delta * 0.5f;
+		real_t eps = (domain_range > 0.0) ? ((real_t)delta / (real_t)max_life_time) * domain_range * 0.5f : (real_t)delta * 0.5f;
 		real_t t_next = t_now + eps;
 		real_t speed_now = get_bullet_speed_curve_target_speed();
 		real_t speed_next = bullet_speed_curve->sample_baked(t_next);
@@ -534,7 +534,7 @@ protected:
 
 	_ALWAYS_INLINE_ real_t get_bullet_speed_curve_max_speed() const {
 		if (!bullet_speed_curve.is_valid()) {
-			return 0.0f;
+			return 0.0;
 		}
 
 		return bullet_speed_curve->get_max_value(); // real_t, no cast
@@ -923,7 +923,7 @@ protected:
 	// Calculates the global transform of the bullet attachment. Note that this function relies on bullet_attachment_local_transform being set already
 	_ALWAYS_INLINE_ Transform2D calculate_attachment_global_transf(int bullet_index, const Transform2D &original_data_transf) {
 		// If there was additional texture rotation applied, this should not affect the bullet attachments
-		if (cache_texture_rotation_radians != 0.0f) {
+		if (cache_texture_rotation_radians != 0.0) {
 			// So just remove that rotation and then calculate the actual global transform of the bullet attachment
 			return original_data_transf.rotated_local(-cache_texture_rotation_radians) * attachment_local_transforms[bullet_index];
 		}
@@ -1088,7 +1088,7 @@ public:
 	}
 
 	_ALWAYS_INLINE_ void _do_attach_time_based_function(double time, const Callable &callable, bool repeat, bool execute_only_if_multimesh_is_active) {
-		if (time <= 0.0f) {
+		if (time <= 0.0) {
 			UtilityFunctions::printerr("When calling multimesh_attach_time_based_function(), you need to provide a time value that is above 0");
 			return;
 		}
@@ -1126,7 +1126,7 @@ public:
 	_ALWAYS_INLINE_ void run_multimesh_custom_timers(double delta) {
 		for (auto it = multimesh_custom_timers.begin(); it != multimesh_custom_timers.end();) {
 			it->_current_time -= delta;
-			if (it->_current_time <= 0.0f) {
+			if (it->_current_time <= 0.0) {
 				execute_stored_callable_safely(it->_callback, it->_execute_only_if_multimesh_is_active);
 
 				if (it->_repeating) {

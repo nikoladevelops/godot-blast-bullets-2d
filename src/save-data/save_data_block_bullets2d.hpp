@@ -9,7 +9,7 @@ class SaveDataBlockBullets2D : public SaveDataMultiMeshBullets2D {
 	GDCLASS(SaveDataBlockBullets2D, SaveDataMultiMeshBullets2D)
 
 public:
-	real_t block_rotation_radians = 0.0f;
+	real_t block_rotation_radians = 0.0;
 
 	void set_block_rotation_radians(real_t new_block_rotation_radians);
 	real_t get_block_rotation_radians() const;

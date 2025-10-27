@@ -708,22 +708,22 @@ TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_grid(
 	// Adjust starting position based on alignment
 	switch (alignment) {
 		case Alignment::TOP_LEFT:
-			x_start = 0.0f;
-			y_start = 0.0f;
+			x_start = 0.0;
+			y_start = 0.0;
 			break;
 		case Alignment::TOP_CENTER:
 			x_start = -total_width / 2.0f;
 			if (columns_amount % 2 == 0) {
 				x_start += column_offset / 2.0f;
 			}
-			y_start = 0.0f;
+			y_start = 0.0;
 			break;
 		case Alignment::TOP_RIGHT:
 			x_start = -total_width;
-			y_start = 0.0f;
+			y_start = 0.0;
 			break;
 		case Alignment::CENTER_LEFT:
-			x_start = 0.0f;
+			x_start = 0.0;
 			break;
 		case Alignment::CENTER:
 			// Already centered by default
@@ -732,7 +732,7 @@ TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_grid(
 			x_start = -total_width;
 			break;
 		case Alignment::BOTTOM_LEFT:
-			x_start = 0.0f;
+			x_start = 0.0;
 			y_start = -total_height;
 			break;
 		case Alignment::BOTTOM_CENTER:
@@ -866,8 +866,8 @@ void BulletFactory2D::_bind_methods() {
 			&BulletFactory2D::helper_generate_transforms_grid,
 			DEFVAL(10),
 			DEFVAL(3), // CENTER_LEFT
-			DEFVAL(150.0f),
-			DEFVAL(150.0f),
+			DEFVAL(150.0),
+			DEFVAL(150.0),
 			DEFVAL(true),
 			DEFVAL(false));
 

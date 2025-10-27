@@ -22,13 +22,13 @@ public:
 
 	Vector2 texture_size = Vector2(0, 0);
 
-	double current_change_texture_time = 0.0f;
+	double current_change_texture_time = 0.0;
 
 	int current_texture_index = 0;
 
 	int z_index = 0;
 
-	real_t cache_texture_rotation_radians = 0.0f;
+	real_t cache_texture_rotation_radians = 0.0;
 
 	TypedArray<double> change_texture_times;
 
@@ -101,11 +101,11 @@ public:
 
 	int visibility_layer = 1;
 
-	double max_life_time = 0.0f;
+	double max_life_time = 0.0;
 
 	bool is_life_time_over_signal_enabled = false;
 
-	double current_life_time = 0.0f;
+	double current_life_time = 0.0;
 
 	bool is_life_time_infinite = false;
 

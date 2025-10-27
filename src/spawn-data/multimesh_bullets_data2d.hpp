@@ -27,7 +27,7 @@ public:
 	Vector2 texture_size = Vector2(32, 32);
 
 	// The texture rotation in radians. Change the value of this if you see that your texture is not rotated correctly. Example: If you want to rotate the texture 90 degrees more you would set the value to 90*PI/180
-	real_t texture_rotation_radians = 0.0f;
+	real_t texture_rotation_radians = 0.0;
 
 	// Determines the starting texture in the textures array (by default it's the first texture in the array, so it's index 0). Make sure to provide an index that actually exists.
 	int current_texture_index = 0;

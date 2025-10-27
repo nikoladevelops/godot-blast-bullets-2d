@@ -14,10 +14,10 @@ class BlockBullets2D : public MultiMeshBullets2D {
 
 public:
 	// The block rotation. The direction of the bullets is determined by it.
-	real_t block_rotation_radians = 0.0f;
+	real_t block_rotation_radians = 0.0;
 
 	_ALWAYS_INLINE_ void move_bullets(double delta) {
-		real_t cache_first_rotation_result = 0.0f;
+		real_t cache_first_rotation_result = 0.0;
 		bool max_rotation_speed_reached = false;
 		// Accelerate only the first bullet rotation speed
 		if (is_rotation_active && use_only_first_rotation_data) {
@@ -46,7 +46,7 @@ public:
 			curr_shape_origin += cache_velocity_calc;
 
 			// Handle bullet rotation and bullet rotation speed acceleration
-			real_t rotation_angle = 0.0f;
+			real_t rotation_angle = 0.0;
 			if (is_rotation_active) {
 				if (!use_only_first_rotation_data) {
 					max_rotation_speed_reached = accelerate_bullet_rotation_speed(i, delta);

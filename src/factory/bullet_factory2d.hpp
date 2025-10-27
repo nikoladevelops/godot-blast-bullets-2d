@@ -415,8 +415,8 @@ private:
 			Transform2D marker_transform,
 			int rows_per_column = 10,
 			Alignment alignment = Alignment::CENTER_LEFT,
-			real_t column_offset = 150.0f,
-			real_t row_offset = 150.0f,
+			real_t column_offset = 150.0,
+			real_t row_offset = 150.0,
 			bool rotate_grid_with_marker = true,
 			bool random_local_rotation = false);
 };
