@@ -29,7 +29,7 @@ public:
 		
 		bool is_using_physics_interpolation = bullet_factory->use_physics_interpolation;
 
-		update_previous_transforms_for_interpolation(0, amount_bullets);
+		update_all_previous_transforms_for_interpolation();
 
 		Vector2 cache_velocity_calc = all_cached_velocity[0] * delta;
 

@@ -42,7 +42,7 @@ public:
 	_ALWAYS_INLINE_ void move_bullets(double delta) {
 		bool is_using_physics_interpolation = bullet_factory->use_physics_interpolation;
 
-		update_previous_transforms_for_interpolation(0, amount_bullets);
+		update_all_previous_transforms_for_interpolation();
 
 		bool homing_interval_reached = update_homing_timer(delta);
 
@@ -58,12 +58,14 @@ public:
 				continue;
 			}
 
-			real_t rotation_angle = update_rotation(i, delta);
+			real_t rotation_angle = 0.0;
 
 			if (shared_homing_deque_enabled) {
 				update_homing(shared_homing_deque, true, i, delta, homing_interval_reached);
 			} else if (!all_bullet_homing_targets[i].empty()) {
 				update_homing(all_bullet_homing_targets[i], false, i, delta, homing_interval_reached);
+			} else if (is_rotation_active) {
+				update_rotation(i, delta); // TODO being able to rotate the bullets while also homing
 			}
 
 			update_position(i, delta);
@@ -472,7 +474,7 @@ public:
 		shape_t.set_origin(new_global_pos + rotated_offset);
 		physics_server->area_set_shape_transform(area, bullet_index, shape_t);
 
-		update_previous_transforms_for_interpolation(bullet_index, bullet_index + 1);
+		update_bullet_previous_transform_for_interpolation(bullet_index);
 
 		temporary_enable_bullet(bullet_index);
 	}
@@ -616,7 +618,7 @@ protected:
 
 	// Updates bullet rotation based on rotation speed
 	_ALWAYS_INLINE_ real_t update_rotation(int bullet_index, double delta) {
-		if (bullet_index >= (int)all_rotation_speed.size()) {
+		if (!is_rotation_active) {
 			return (real_t)0.0;
 		}
 
@@ -626,11 +628,17 @@ protected:
 		real_t cache_rotation_speed = all_rotation_speed[bullet_index];
 		real_t rot_delta = cache_rotation_speed * (real_t)delta;
 
-		// Apply rotation if active or speed > 0
-		if (is_rotation_active || cache_rotation_speed != 0.0f) {
-			bool max_reached = (cache_rotation_speed >= all_max_rotation_speed[bullet_index]);
-			if (!(max_reached && stop_rotation_when_max_reached)) {
-				rotate_transform_locally(all_cached_instance_transforms[bullet_index], rot_delta);
+		// If the curves data is valid it means we are using it, so just apply it
+		if (bullet_curves_data.is_valid() && bullet_curves_data->rotation_speed_curve.is_valid()) {
+			rotate_transform_locally(all_cached_instance_transforms[bullet_index], rot_delta);
+		} else { // Otherwise use the normal way with acceleration and ensure the valid range and options
+			// Apply rotation if active or speed > 0
+			if (cache_rotation_speed != 0.0f) {
+				bool max_reached = cache_rotation_speed >= all_max_rotation_speed[bullet_index];
+
+				if (!(max_reached && stop_rotation_when_max_reached)) {
+					rotate_transform_locally(all_cached_instance_transforms[bullet_index], rot_delta);
+				}
 			}
 		}
 
@@ -642,12 +650,14 @@ protected:
 			all_cached_velocity[bullet_index] = current_direction * current_speed;
 		}
 
-		// Apply direction curve offset (radians y)
-		if (bullet_curves_data.is_valid() && !is_life_time_infinite) {
-			real_t dir_offset = get_bullet_curves_data_target_direction_offset();
-			all_cached_direction[bullet_index] = all_cached_direction[bullet_index].rotated(dir_offset).normalized();
-			all_cached_velocity[bullet_index] = all_cached_direction[bullet_index] * all_cached_speed[bullet_index];
-		}
+		// TODO
+		// // Apply direction curve offset (radians y)
+		// if (bullet_curves_data.is_valid() && !is_life_time_infinite) {
+		// 	real_t dir_offset = get_bullet_curves_data_target_direction_offset();
+
+		// 	all_cached_direction[bullet_index] = all_cached_direction[bullet_index].rotated(dir_offset).normalized();
+		// 	all_cached_velocity[bullet_index] = all_cached_direction[bullet_index] * all_cached_speed[bullet_index];
+		// }
 
 		return rot_delta;
 	}

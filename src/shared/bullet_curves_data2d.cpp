@@ -9,6 +9,10 @@ Ref<Curve> BulletCurvesData2D::get_movement_speed_curve() const {
 }
 
 void BulletCurvesData2D::set_movement_speed_curve(const Ref<Curve> &curve) {
+	if (curve.is_valid()) {
+		curve->bake();
+	}
+
 	movement_speed_curve = curve;
 }
 
@@ -16,6 +20,10 @@ Ref<Curve> BulletCurvesData2D::get_rotation_speed_curve() const {
 	return rotation_speed_curve;
 }
 void BulletCurvesData2D::set_rotation_speed_curve(const Ref<Curve> &curve) {
+	if (curve.is_valid()) {
+		curve->bake();
+	}
+
 	rotation_speed_curve = curve;
 }
 
@@ -23,6 +31,10 @@ Ref<Curve> BulletCurvesData2D::get_direction_curve() const {
 	return direction_curve;
 }
 void BulletCurvesData2D::set_direction_curve(const Ref<Curve> &curve) {
+	if (curve.is_valid()) {
+		curve->bake();
+	}
+
 	direction_curve = curve;
 }
 

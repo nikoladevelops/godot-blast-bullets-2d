@@ -11,9 +11,9 @@ class BulletCurvesData2D : public Resource {
 	GDCLASS(BulletCurvesData2D, Resource)
 
 public:
-	Ref<Curve> movement_speed_curve = nullptr;
-	Ref<Curve> rotation_speed_curve = nullptr;
-	Ref<Curve> direction_curve = nullptr;
+	Ref<Curve> movement_speed_curve;
+	Ref<Curve> rotation_speed_curve;
+	Ref<Curve> direction_curve;
 
 	Ref<Curve> get_movement_speed_curve() const;
 	void set_movement_speed_curve(const Ref<Curve> &curve);

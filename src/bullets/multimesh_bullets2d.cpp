@@ -87,7 +87,7 @@ void MultiMeshBullets2D::spawn(const MultiMeshBulletsData2D &data, MultiMeshObje
 	all_previous_instance_transf.resize(amount_bullets);
 	all_previous_attachment_transf.resize(amount_bullets);
 
-	update_previous_transforms_for_interpolation(0, amount_bullets);
+	update_all_previous_transforms_for_interpolation();
 
 	finalize_set_up(
 			data.bullets_custom_data,
@@ -123,7 +123,7 @@ void MultiMeshBullets2D::enable_multimesh(const MultiMeshBulletsData2D &data) {
 
 	move_to_front(); // Makes sure that the current old multimesh is displayed on top of the newer ones (act as if its the oldest sibling to emulate the behaviour of spawning a brand new multimesh / if I dont do this then the multimesh's instances will be displayed behind the newer ones)
 
-	update_previous_transforms_for_interpolation(0, amount_bullets);
+	update_all_previous_transforms_for_interpolation();
 
 	finalize_set_up(
 			data.bullets_custom_data,
@@ -546,7 +546,7 @@ void MultiMeshBullets2D::load_bullet_instances(const SaveDataMultiMeshBullets2D 
 	// LOAD ROTATION DATA
 	set_rotation_data(data.all_bullet_rotation_data, data.rotate_only_textures);
 
-	update_previous_transforms_for_interpolation(0, amount_bullets);
+	update_all_previous_transforms_for_interpolation();
 }
 
 void MultiMeshBullets2D::spawn_as_disabled_multimesh(int new_amount_bullets, MultiMeshObjectPool *pool, BulletFactory2D *factory, Node *bullets_container) {

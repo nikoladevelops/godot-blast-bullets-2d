@@ -84,14 +84,14 @@ void BulletFactory2D::set_use_physics_interpolation_runtime(bool new_use_physics
 		int amount_multimesh_instances = static_cast<int>(all_directional_bullets.size());
 		for (int i = 0; i < amount_multimesh_instances; ++i) {
 			DirectionalBullets2D *&bullets_multi = all_directional_bullets[i];
-			bullets_multi->update_previous_transforms_for_interpolation(0, bullets_multi->get_amount_bullets());
+			bullets_multi->update_all_previous_transforms_for_interpolation();
 		}
 
 		amount_multimesh_instances = static_cast<int>(all_block_bullets.size());
 
 		for (int i = 0; i < amount_multimesh_instances; ++i) {
 			BlockBullets2D *&bullets_multi = all_block_bullets[i];
-			bullets_multi->update_previous_transforms_for_interpolation(0, bullets_multi->get_amount_bullets());
+			bullets_multi->update_all_previous_transforms_for_interpolation();
 		}
 	}
 
