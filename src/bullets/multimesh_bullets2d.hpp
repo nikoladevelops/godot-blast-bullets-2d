@@ -8,6 +8,7 @@
 #include "../shared/bullet_rotation_data2d.hpp"
 #include "../spawn-data/multimesh_bullets_data2d.hpp"
 #include "godot_cpp/classes/curve.hpp"
+#include "godot_cpp/classes/ref.hpp"
 #include "godot_cpp/core/class_db.hpp"
 #include "godot_cpp/core/defs.hpp"
 #include "godot_cpp/core/math.hpp"
@@ -394,7 +395,7 @@ protected:
 	std::vector<real_t> all_cached_max_speed;
 	std::vector<real_t> all_cached_acceleration;
 
-	Ref<BulletCurvesData2D> bullet_curves_data = nullptr;
+	Ref<BulletCurvesData2D> bullet_curves_data;
 
 	///
 
@@ -478,11 +479,14 @@ protected:
 
 	//////////////////// CURVES RELATED
 	_ALWAYS_INLINE_ void populate_curves_related_data(const Ref<BulletCurvesData2D> &new_curves_data) {
-		bullet_curves_data = new_curves_data;
+		if (new_curves_data.is_null()) {
+			is_rotation_active = false;
 
-		if (bullet_curves_data.is_null()) {
+			bullet_curves_data.unref();
 			return;
 		}
+
+		bullet_curves_data = new_curves_data;
 
 		const bool is_movement_curve_valid = bullet_curves_data->movement_speed_curve.is_valid();
 		const bool is_rotation_curve_valid = bullet_curves_data->rotation_speed_curve.is_valid();
