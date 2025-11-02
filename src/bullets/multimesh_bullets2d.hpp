@@ -934,7 +934,7 @@ protected:
 	}
 
 	// Moves a single bullet attachment
-	_ALWAYS_INLINE_ void move_bullet_attachment(const Vector2 &translate_by, int bullet_index, real_t rotation_angle) {
+	_ALWAYS_INLINE_ void move_bullet_attachment(const Vector2 &translate_by, int bullet_index) {
 		if (!attachment_scenes[bullet_index].is_valid()) {
 			return;
 		}

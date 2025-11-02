@@ -81,7 +81,7 @@ public:
 				multi->set_instance_transform_2d(i, curr_instance_transf);
 			}
 
-			move_bullet_attachment(cache_velocity_calc, i, rotation_angle);
+			move_bullet_attachment(cache_velocity_calc, i);
 		}
 
 		accelerate_bullet_speed(delta, 0, 0);

@@ -58,8 +58,6 @@ public:
 				continue;
 			}
 
-			real_t rotation_angle = 0.0;
-
 			if (shared_homing_deque_enabled) {
 				update_homing(shared_homing_deque, true, i, delta, homing_interval_reached);
 			} else if (!all_bullet_homing_targets[i].empty()) {
@@ -71,7 +69,7 @@ public:
 			update_position(i, delta);
 
 			update_collision_shape(i);
-			update_attachment_and_speed(i, delta, rotation_angle);
+			update_attachment_and_speed(i, delta);
 
 			if (!is_using_physics_interpolation) {
 				multi->set_instance_transform_2d(i, all_cached_instance_transforms[i]);
@@ -743,9 +741,9 @@ protected:
 	}
 
 	// Updates bullet attachment and speed
-	_ALWAYS_INLINE_ void update_attachment_and_speed(int bullet_index, double delta, real_t rotation_angle) {
+	_ALWAYS_INLINE_ void update_attachment_and_speed(int bullet_index, double delta) {
 		Vector2 velocity_delta = all_cached_velocity[bullet_index] * delta;
-		move_bullet_attachment(velocity_delta, bullet_index, rotation_angle);
+		move_bullet_attachment(velocity_delta, bullet_index);
 		accelerate_bullet_speed(delta, bullet_index, bullet_index);
 	}
 
