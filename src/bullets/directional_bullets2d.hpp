@@ -62,8 +62,10 @@ public:
 				update_homing(shared_homing_deque, true, i, delta, homing_interval_reached);
 			} else if (!all_bullet_homing_targets[i].empty()) {
 				update_homing(all_bullet_homing_targets[i], false, i, delta, homing_interval_reached);
-			} else if (is_rotation_active) {
-				update_rotation(i, delta); // TODO being able to rotate the bullets while also homing
+			}
+
+			if (is_rotation_active) {
+				update_rotation(i, delta);
 			}
 
 			update_position(i, delta);
@@ -568,13 +570,19 @@ protected:
 
 		bool use_smoothing = (homing_smoothing > 0.0); // Hoist for clamp
 
-		// Rotate toward target with smoothing
-		rotate_to_target(bullet_index, diff, max_turn, use_smoothing);
-
-		// Update direction from transform (assume unit-length for perf)
 		Vector2 &current_direction = all_cached_direction[bullet_index];
 
-		current_direction = all_cached_instance_transforms[bullet_index][0].normalized();
+		// If rotation is not active then rotate the bullet by applying smoothing
+		if (!is_rotation_active) {
+			// Rotate toward target with smoothing
+			rotate_to_target(bullet_index, diff, max_turn, use_smoothing);
+
+			// Get the new direction based on the rotated transform
+			current_direction = all_cached_instance_transforms[bullet_index][0].normalized();
+		} else {
+			// If rotation is indeed active there is no need to handle rotation yourself, the user wants spinning bullets
+			current_direction = diff.normalized();
+		}
 
 		// Thrust: Align velocity to new direction
 		all_cached_velocity[bullet_index] = current_direction * cached_speed;
