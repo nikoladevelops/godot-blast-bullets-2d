@@ -1,7 +1,7 @@
 [gd_resource type="Curve" format=3 uid="uid://d2015rl5vrm68"]
 
 [resource]
-_limits = [-50.0, 100.0, 0.0, 4.0]
-_data = [Vector2(0, 0), 0.0, 0.0, 0, 0, Vector2(0.370732, 20.6501), 0.0, 0.0, 0, 0, Vector2(0.604878, -28.6015), 0.0, 0.0, 0, 0, Vector2(1.06341, 16.0898), 0.0, 0.0, 0, 0, Vector2(2.25166, -17.7852), 0.0, 0.0, 0, 0, Vector2(3.824, 0), 0.0, 0.0, 0, 0]
-point_count = 6
+_limits = [-28.6015, 100.0, 0.0, 1.0]
+_data = [Vector2(0, 0), 0.0, 0.0, 0, 0, Vector2(0.456954, -6.59253), 0.0, 0.0, 0, 0, Vector2(0.509934, 56.241), 0.0, 0.0, 0, 0]
+point_count = 3
 metadata/_snap_count = 26

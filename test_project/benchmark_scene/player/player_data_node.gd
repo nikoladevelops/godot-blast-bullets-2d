@@ -266,7 +266,7 @@ func spawn_multi_mesh_directional_bullets()->void:
 	else:
 		directional_bullets_data.transforms = BulletFactory2D.helper_generate_transforms_grid(bullets_amount, bullet_marker.get_global_transform(), rows_per_column, grid_alignment, col_offset, row_offset, rotate_grid_with_marker, random_local_rotation)
 	
-	#directional_bullets_data.max_life_time = 2
+	#directional_bullets_data.max_life_time = 5
 	#directional_bullets_data.is_life_time_over_signal_enabled = true
 	#directional_bullets_data.bullet_max_collision_amount = 1
 	var dir_bullets:DirectionalBullets2D = BENCHMARK_GLOBALS.FACTORY.spawn_controllable_directional_bullets(directional_bullets_data)
@@ -285,10 +285,10 @@ func spawn_multi_mesh_directional_bullets()->void:
 	dir_bullets.shared_homing_deque_push_back_node2d_target(BENCHMARK_GLOBALS.STATIONARY_TARGET)
 	
 	#
-	dir_bullets.multimesh_attach_time_based_function(2, func():
-		dir_bullets.bullet_curves_data = null
-		dir_bullets.shared_homing_deque_pop_back_target()
-		, false, true)
+	#dir_bullets.multimesh_attach_time_based_function(2, func():
+		#dir_bullets.bullet_curves_data = null
+		#dir_bullets.shared_homing_deque_pop_back_target()
+		#, false, true)
 		
 		
 	#for i in dir_bullets.get_amount_bullets():

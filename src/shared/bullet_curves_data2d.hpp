@@ -15,6 +15,9 @@ public:
 	Ref<Curve> rotation_speed_curve;
 	Ref<Curve> direction_curve;
 
+	bool movement_use_unit_curve = true;
+	bool rotation_use_unit_curve = true;
+
 	Ref<Curve> get_movement_speed_curve() const;
 	void set_movement_speed_curve(const Ref<Curve> &curve);
 
@@ -23,6 +26,12 @@ public:
 
 	Ref<Curve> get_direction_curve() const;
 	void set_direction_curve(const Ref<Curve> &curve);
+
+	bool get_movement_use_unit_curve() const;
+	void set_movement_use_unit_curve(bool value);
+
+	bool get_rotation_use_unit_curve() const;
+	void set_rotation_use_unit_curve(bool value);
 
 protected:
 	static void _bind_methods();

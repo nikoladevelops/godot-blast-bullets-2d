@@ -526,11 +526,31 @@ protected:
 	}
 
 	_ALWAYS_INLINE_ real_t get_bullet_curves_movement_speed() {
-		return bullet_curves_data->movement_speed_curve->sample_baked(elapsed_time);
+		bool use_normalized = bullet_curves_data->movement_use_unit_curve && !is_life_time_infinite;
+
+		real_t input_x;
+		if (use_normalized) {
+			real_t progress = Math::clamp(elapsed_time / max_life_time, 0.0, 1.0);
+			input_x = progress; 
+		} else {
+			input_x = elapsed_time;
+		}
+
+		return bullet_curves_data->movement_speed_curve->sample_baked(input_x);
 	}
 
 	_ALWAYS_INLINE_ real_t get_bullet_curves_rotation_speed() {
-		return bullet_curves_data->rotation_speed_curve->sample_baked(elapsed_time);
+		bool use_normalized = bullet_curves_data->rotation_use_unit_curve && !is_life_time_infinite;
+
+		real_t input_x;
+		if (use_normalized) {
+			real_t progress = Math::clamp(elapsed_time / max_life_time, 0.0, 1.0);
+			input_x = progress; 
+		} else {
+			input_x = elapsed_time;
+		}
+
+		return bullet_curves_data->rotation_speed_curve->sample_baked(input_x);
 	}
 
 	////////////
