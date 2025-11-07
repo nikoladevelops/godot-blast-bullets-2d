@@ -9,6 +9,7 @@
 #include "../spawn-data/multimesh_bullets_data2d.hpp"
 #include "godot_cpp/classes/curve.hpp"
 #include "godot_cpp/classes/ref.hpp"
+#include "godot_cpp/classes/texture2d.hpp"
 #include "godot_cpp/core/class_db.hpp"
 #include "godot_cpp/core/defs.hpp"
 #include "godot_cpp/core/math.hpp"
@@ -268,6 +269,52 @@ public:
 
 	Ref<BulletCurvesData2D> get_bullet_curves_data() const { return bullet_curves_data; }
 	void set_bullet_curves_data(const Ref<BulletCurvesData2D> &new_curves_data) { populate_curves_related_data(new_curves_data); }
+
+	TypedArray<Texture2D> get_textures() const { return textures; }
+	void set_textures(const TypedArray<Texture2D> &new_textures, const TypedArray<double> &new_change_texture_times, int selected_texture_index = 0) {
+		auto curr_textures_amount = new_textures.size();
+		auto curr_change_texture_times_amount = new_change_texture_times.size();
+
+		if (curr_textures_amount <= 0) {
+			UtilityFunctions::push_error("You're trying to pass an empty/invalid array of textures to the multimesh bullets");
+			return;
+		}
+
+		if (curr_change_texture_times_amount <= 0) {
+			UtilityFunctions::push_error("You need to provide at least 1 change texture time that will be used for all provided textures");
+			return;
+		}
+
+		if (curr_change_texture_times_amount > curr_textures_amount) {
+			UtilityFunctions::push_error("You can NOT provide an amount of change texture times that is larger than the actual amount of textures");
+			return;
+		}
+
+		if (selected_texture_index < 0 || selected_texture_index >= curr_textures_amount || selected_texture_index >= curr_change_texture_times_amount) {
+			UtilityFunctions::push_error("Invalid/out of range selected_texture_index when trying to set new textures to the multimesh bullets");
+			return;
+		}
+
+		change_texture_times.clear();
+		textures.clear();
+
+		change_texture_times = new_change_texture_times.duplicate();
+		textures = new_textures.duplicate();
+
+		if (curr_change_texture_times_amount < curr_textures_amount) {
+			auto new_time = new_change_texture_times[0];
+
+			change_texture_times.push_back(new_time);
+			current_change_texture_time = new_time;
+		} else { // If curr_change_texture_times_amount == curr_textures_amount
+			change_texture_times = new_change_texture_times;
+			current_change_texture_time = new_change_texture_times[selected_texture_index];
+		}
+
+		current_texture_index = selected_texture_index;
+
+		set_texture(textures[current_texture_index]);
+	}
 
 protected:
 	static void _bind_methods();
@@ -531,7 +578,7 @@ protected:
 		real_t input_x;
 		if (use_normalized) {
 			real_t progress = Math::clamp(elapsed_time / max_life_time, 0.0, 1.0);
-			input_x = progress; 
+			input_x = progress;
 		} else {
 			input_x = elapsed_time;
 		}
@@ -545,7 +592,7 @@ protected:
 		real_t input_x;
 		if (use_normalized) {
 			real_t progress = Math::clamp(elapsed_time / max_life_time, 0.0, 1.0);
-			input_x = progress; 
+			input_x = progress;
 		} else {
 			input_x = elapsed_time;
 		}

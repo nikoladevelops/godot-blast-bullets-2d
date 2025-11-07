@@ -787,6 +787,9 @@ void MultiMeshBullets2D::set_all_physics_shapes_enabled_for_area(bool enable) {
 }
 
 void MultiMeshBullets2D::_bind_methods() {
+	ClassDB::bind_method(D_METHOD("get_textures"), &MultiMeshBullets2D::get_textures);
+	ClassDB::bind_method(D_METHOD("set_textures", "new_textures", "new_change_texture_times", "selected_texture_index"), &MultiMeshBullets2D::set_textures, DEFVAL(0));
+
 	ClassDB::bind_method(D_METHOD("disable_bullet", "bullet_index", "disable_bullet_attachment"), &MultiMeshBullets2D::disable_bullet, DEFVAL(true));
 	ClassDB::bind_method(D_METHOD("enable_bullet", "bullet_index", "collision_amount", "enable_attachment"), &MultiMeshBullets2D::enable_bullet, DEFVAL(0), DEFVAL(true));
 
