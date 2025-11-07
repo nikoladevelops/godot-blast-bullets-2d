@@ -504,7 +504,7 @@ protected:
 	// Validates bullet index and logs error if invalid
 	_ALWAYS_INLINE_ bool validate_bullet_index(int bullet_index, const String &function_name) const {
 		if (bullet_index < 0 || bullet_index >= amount_bullets) {
-			UtilityFunctions::printerr("Invalid bullet index in " + function_name);
+			UtilityFunctions::push_error("Invalid bullet index in " + function_name);
 			return false;
 		}
 		return true;
@@ -520,7 +520,7 @@ protected:
 		if (bullet_index_start > bullet_index_end_inclusive) {
 			bullet_index_start = 0;
 			bullet_index_end_inclusive = amount_bullets - 1;
-			UtilityFunctions::printerr("Invalid index range in " + function_name);
+			UtilityFunctions::push_error("Invalid index range in " + function_name);
 		}
 	}
 
@@ -763,7 +763,7 @@ protected:
 		}
 
 		if (!attachment_scene.is_valid()) {
-			UtilityFunctions::printerr("Tried to set an invalid attachment scene to bullet index: " + String::num_int64(bullet_index));
+			UtilityFunctions::push_error("Tried to set an invalid attachment scene to bullet index: " + String::num_int64(bullet_index));
 			return;
 		}
 
@@ -1196,12 +1196,12 @@ public:
 
 	_ALWAYS_INLINE_ void _do_attach_time_based_function(double time, const Callable &callable, bool repeat, bool execute_only_if_multimesh_is_active) {
 		if (time <= 0.0) {
-			UtilityFunctions::printerr("When calling multimesh_attach_time_based_function(), you need to provide a time value that is above 0");
+			UtilityFunctions::push_error("When calling multimesh_attach_time_based_function(), you need to provide a time value that is above 0");
 			return;
 		}
 
 		if (!callable.is_valid()) {
-			UtilityFunctions::printerr("Invalid callable was passed to multimesh_attach_time_based_function()");
+			UtilityFunctions::push_error("Invalid callable was passed to multimesh_attach_time_based_function()");
 			return;
 		}
 

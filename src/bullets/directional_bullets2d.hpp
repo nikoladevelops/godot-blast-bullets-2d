@@ -237,7 +237,7 @@ public:
 				}
 			}
 		} else {
-			UtilityFunctions::printerr("Invalid homing target type in all_bullets_push_back_homing_target");
+			UtilityFunctions::push_error("Invalid homing target type in all_bullets_push_back_homing_target");
 		}
 	}
 
@@ -257,7 +257,7 @@ public:
 				}
 			}
 		} else {
-			UtilityFunctions::printerr("Invalid homing target type in all_bullets_push_front_homing_target");
+			UtilityFunctions::push_error("Invalid homing target type in all_bullets_push_front_homing_target");
 		}
 	}
 

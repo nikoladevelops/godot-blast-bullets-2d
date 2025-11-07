@@ -99,7 +99,7 @@ void MultiMeshBulletsDebugger2D::generate_debug_multimesh(Node *node_entered_con
 
 	// In case the user added something else to the container_to_debug, it should typically hold only IDebuggerDataProvider2D, othwerwise weird behavior and other errors might occur
 	if (!debugger_data_provider) {
-		UtilityFunctions::printerr("Error. The node that entered the container to debug is not of type IDebuggerDataProvider2D. Never attach additional nodes to the bullets debugger.");
+		UtilityFunctions::push_error("Error. The node that entered the container to debug is not of type IDebuggerDataProvider2D. Never attach additional nodes to the bullets debugger.");
 		return;
 	}
 

@@ -66,7 +66,7 @@ bool BulletFactory2D::get_use_physics_interpolation() const {
 
 void BulletFactory2D::set_use_physics_interpolation_runtime(bool new_use_physics_interpolation) {
 	if (is_factory_busy) {
-		UtilityFunctions::printerr("Error when trying to set physics interpolation. BulletFactory2D is currently busy. Ignoring the request");
+		UtilityFunctions::push_error("Error when trying to set physics interpolation. BulletFactory2D is currently busy. Ignoring the request");
 		return;
 	}
 
@@ -148,7 +148,7 @@ void BulletFactory2D::set_is_factory_processing_bullets(bool is_processing_enabl
 	// When trying to set processing to enabled but the factory is currently busy, then something went wrong
 	// The only time you can call this method is if all tasks were completed and the factory is free to do its work
 	if (is_processing_enabled && is_factory_busy) {
-		UtilityFunctions::printerr("Error when trying to call set_is_factory_processing_bullets. BulletFactory2D is currently busy. Ignoring the request");
+		UtilityFunctions::push_error("Error when trying to call set_is_factory_processing_bullets. BulletFactory2D is currently busy. Ignoring the request");
 		return;
 	}
 
@@ -178,7 +178,7 @@ void BulletFactory2D::_process(double delta) {
 
 void BulletFactory2D::spawn_block_bullets(const Ref<BlockBulletsData2D> &spawn_data) {
 	if (is_factory_busy) {
-		UtilityFunctions::printerr("Error when trying to spawn bullets. BulletFactory2D is currently busy. Ignoring the request");
+		UtilityFunctions::push_error("Error when trying to spawn bullets. BulletFactory2D is currently busy. Ignoring the request");
 		return;
 	}
 
@@ -191,7 +191,7 @@ void BulletFactory2D::spawn_block_bullets(const Ref<BlockBulletsData2D> &spawn_d
 
 void BulletFactory2D::spawn_directional_bullets(const Ref<DirectionalBulletsData2D> &spawn_data) {
 	if (is_factory_busy) {
-		UtilityFunctions::printerr("Error when trying to spawn bullets. BulletFactory2D is currently busy. Ignoring the request");
+		UtilityFunctions::push_error("Error when trying to spawn bullets. BulletFactory2D is currently busy. Ignoring the request");
 		return;
 	}
 
@@ -204,7 +204,7 @@ void BulletFactory2D::spawn_directional_bullets(const Ref<DirectionalBulletsData
 
 DirectionalBullets2D *BulletFactory2D::spawn_controllable_directional_bullets(const Ref<DirectionalBulletsData2D> &spawn_data) {
 	if (is_factory_busy) {
-		UtilityFunctions::printerr("Error when trying to spawn bullets. BulletFactory2D is currently busy. Ignoring the request");
+		UtilityFunctions::push_error("Error when trying to spawn bullets. BulletFactory2D is currently busy. Ignoring the request");
 		return nullptr;
 	}
 
@@ -217,7 +217,7 @@ DirectionalBullets2D *BulletFactory2D::spawn_controllable_directional_bullets(co
 
 void BulletFactory2D::save() {
 	if (is_factory_busy) {
-		UtilityFunctions::printerr("Error when trying to save. BulletFactory2D is currently busy. Ignoring the request");
+		UtilityFunctions::push_error("Error when trying to save. BulletFactory2D is currently busy. Ignoring the request");
 		return;
 	}
 
@@ -249,12 +249,12 @@ void BulletFactory2D::save() {
 
 void BulletFactory2D::load(const Ref<SaveDataBulletFactory2D> new_data) {
 	if (!new_data.is_valid()) {
-		UtilityFunctions::printerr("Error. Bullet data given to load method inside BulletFactory2D is invalid");
+		UtilityFunctions::push_error("Error. Bullet data given to load method inside BulletFactory2D is invalid");
 		return;
 	}
 
 	if (is_factory_busy) {
-		UtilityFunctions::printerr("Error when trying to load data. BulletFactory2D is currently busy. Ignoring the request");
+		UtilityFunctions::push_error("Error when trying to load data. BulletFactory2D is currently busy. Ignoring the request");
 		return;
 	}
 
@@ -316,7 +316,7 @@ void BulletFactory2D::reset_factory_state() {
 
 void BulletFactory2D::reset() {
 	if (is_factory_busy) {
-		UtilityFunctions::printerr("Error when trying to call reset(). BulletFactory2D is currently busy. Ignoring the request");
+		UtilityFunctions::push_error("Error when trying to call reset(). BulletFactory2D is currently busy. Ignoring the request");
 		return;
 	}
 
@@ -339,7 +339,7 @@ void BulletFactory2D::reset() {
 
 void BulletFactory2D::free_active_bullets() {
 	if (is_factory_busy) {
-		UtilityFunctions::printerr("Error when trying to free active bullets. BulletFactory2D is currently busy. Ignoring the request");
+		UtilityFunctions::push_error("Error when trying to free active bullets. BulletFactory2D is currently busy. Ignoring the request");
 		return;
 	}
 
@@ -378,12 +378,12 @@ void BulletFactory2D::free_active_bullets() {
 
 void BulletFactory2D::populate_bullets_pool(BulletType bullet_type, int amount_instances, int amount_bullets_per_instance) {
 	if (amount_instances <= 0) {
-		UtilityFunctions::printerr("Error. You can't populate the bullets pool with amount_instances <= 0");
+		UtilityFunctions::push_error("Error. You can't populate the bullets pool with amount_instances <= 0");
 		return;
 	}
 
 	if (amount_bullets_per_instance <= 0) {
-		UtilityFunctions::printerr("Error. You can't populate the bullets pool with amount_bullets_per_instance <= 0");
+		UtilityFunctions::push_error("Error. You can't populate the bullets pool with amount_bullets_per_instance <= 0");
 		return;
 	}
 
@@ -407,14 +407,14 @@ void BulletFactory2D::populate_bullets_pool(BulletType bullet_type, int amount_i
 					amount_bullets_per_instance);
 			break;
 		default:
-			UtilityFunctions::printerr("Unsupported type of bullet when calling populate_bullets_pool");
+			UtilityFunctions::push_error("Unsupported type of bullet when calling populate_bullets_pool");
 			break;
 	}
 }
 
 void BulletFactory2D::free_bullets_pool(BulletType bullet_type, int amount_bullets_per_instance) {
 	if (is_factory_busy) {
-		UtilityFunctions::printerr("Error when trying to free bullets pool. BulletFactory2D is currently busy. Ignoring the request");
+		UtilityFunctions::push_error("Error when trying to free bullets pool. BulletFactory2D is currently busy. Ignoring the request");
 		return;
 	}
 
@@ -448,7 +448,7 @@ void BulletFactory2D::free_bullets_pool(BulletType bullet_type, int amount_bulle
 					);
 			break;
 		default:
-			UtilityFunctions::printerr("Unsupported type of bullet when calling free_bullets_pool");
+			UtilityFunctions::push_error("Unsupported type of bullet when calling free_bullets_pool");
 			break;
 	}
 
@@ -465,7 +465,7 @@ void BulletFactory2D::free_bullets_pool(BulletType bullet_type, int amount_bulle
 
 void BulletFactory2D::populate_attachments_pool(const Ref<PackedScene> attachment_scenes, int amount_instances) {
 	if (amount_instances <= 0) {
-		UtilityFunctions::printerr("Error. You can't populate the attachments pool with amount_instances <= 0");
+		UtilityFunctions::push_error("Error. You can't populate the attachments pool with amount_instances <= 0");
 		return;
 	}
 
@@ -482,7 +482,7 @@ void BulletFactory2D::populate_attachments_pool(const Ref<PackedScene> attachmen
 
 void BulletFactory2D::free_attachments_pool(int attachment_id) {
 	if (is_factory_busy) {
-		UtilityFunctions::printerr("Error when trying to free bullets pool. BulletFactory2D is currently busy. Ignoring the request");
+		UtilityFunctions::push_error("Error when trying to free bullets pool. BulletFactory2D is currently busy. Ignoring the request");
 		return;
 	}
 
@@ -572,7 +572,7 @@ int BulletFactory2D::debug_get_total_bullets_amount(BulletType bullet_type) {
 			return static_cast<int>(all_block_bullets.size());
 			break;
 		default:
-			UtilityFunctions::printerr("Error when trying to get total bullets amount. BulletType you gave is not supported");
+			UtilityFunctions::push_error("Error when trying to get total bullets amount. BulletType you gave is not supported");
 			return -1;
 			break;
 	}
@@ -587,7 +587,7 @@ int BulletFactory2D::debug_get_active_bullets_amount(BulletType bullet_type) {
 			return std::count_if(all_block_bullets.begin(), all_block_bullets.end(), [](BlockBullets2D *b) { return b->is_active; });
 			break;
 		default:
-			UtilityFunctions::printerr("Error when trying to get active bullets amount. BulletType you gave is not supported");
+			UtilityFunctions::push_error("Error when trying to get active bullets amount. BulletType you gave is not supported");
 			return -1;
 			break;
 	}
@@ -602,7 +602,7 @@ int BulletFactory2D::debug_get_bullets_pool_amount(BulletType bullet_type) {
 			return block_bullets_pool.get_total_amount_pooled();
 			break;
 		default:
-			UtilityFunctions::printerr("Error when trying to get bullets pool amount. BulletType you gave is not supported");
+			UtilityFunctions::push_error("Error when trying to get bullets pool amount. BulletType you gave is not supported");
 			return -1;
 			break;
 	}
@@ -617,7 +617,7 @@ Dictionary BulletFactory2D::debug_get_bullets_pool_info(BulletType bullet_type) 
 	} else if (bullet_type == BulletType::BLOCK_BULLETS) {
 		pool_info = block_bullets_pool.get_pool_info();
 	} else {
-		UtilityFunctions::printerr("Error when trying to get bullets pool info. BulletType you gave is not supported");
+		UtilityFunctions::push_error("Error when trying to get bullets pool info. BulletType you gave is not supported");
 	}
 
 	for (const auto &[key, value] : pool_info) {
