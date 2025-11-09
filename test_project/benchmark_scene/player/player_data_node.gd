@@ -281,7 +281,7 @@ func spawn_multi_mesh_directional_bullets()->void:
 	
 	dir_bullets.bullet_curves_data = bullet_curves_data_1
 	
-	dir_bullets.all_bullets_set_attachment(gpu_particles_scn, 0, Vector2(-60,0), true)
+	#dir_bullets.all_bullets_set_attachment(gpu_particles_scn, 0, Vector2(-60,0), true)
 	dir_bullets.shared_homing_deque_push_back_node2d_target(BENCHMARK_GLOBALS.STATIONARY_TARGET)
 	
 	#

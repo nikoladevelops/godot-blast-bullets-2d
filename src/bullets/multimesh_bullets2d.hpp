@@ -298,7 +298,6 @@ public:
 		change_texture_times.clear();
 		textures.clear();
 
-		change_texture_times = new_change_texture_times.duplicate();
 		textures = new_textures.duplicate();
 
 		if (curr_change_texture_times_amount < curr_textures_amount) {
@@ -307,7 +306,7 @@ public:
 			change_texture_times.push_back(new_time);
 			current_change_texture_time = new_time;
 		} else { // If curr_change_texture_times_amount == curr_textures_amount
-			change_texture_times = new_change_texture_times;
+			change_texture_times = new_change_texture_times.duplicate();
 			current_change_texture_time = new_change_texture_times[selected_texture_index];
 		}
 

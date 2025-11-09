@@ -651,7 +651,7 @@ void MultiMeshBullets2D::finalize_set_up(
 
 		set_texture(textures[current_texture_index]);
 	} else {
-		UtilityFunctions::print("Error. You have not provided any textures as data. Ensure that you either provide an array of textures or a default texture that can be used");
+		UtilityFunctions::push_error("You have not provided any textures as data. Ensure that you either provide an array of textures or a default texture that can be used");
 	}
 
 	if (new_material.is_valid()) {

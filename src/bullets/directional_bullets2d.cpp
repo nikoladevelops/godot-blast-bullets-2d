@@ -18,7 +18,7 @@ void DirectionalBullets2D::set_up_movement_data(const TypedArray<BulletSpeedData
 	int speed_data_size = new_speed_data.size(); // the amount of speed data provided
 
 	if (speed_data_size != amount_bullets) {
-		UtilityFunctions::print("Error. When using DirectionalBullets2D you need to provide BulletSpeedData2D for every single bullet.");
+		UtilityFunctions::push_error("When using DirectionalBullets2D you need to provide BulletSpeedData2D for every single bullet.");
 		return;
 	}
 
