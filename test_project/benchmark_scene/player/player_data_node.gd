@@ -277,7 +277,7 @@ func spawn_multi_mesh_directional_bullets()->void:
 	
 	dir_bullets.bullet_homing_auto_pop_after_target_reached = true
 	dir_bullets.is_multimesh_auto_pooling_enabled = true
-	dir_bullets.bullet_max_collision_count = 2
+	dir_bullets.bullet_max_collision_count = 1 # How many times the bullet can collide before getting disabled
 	
 	dir_bullets.bullet_curves_data = bullet_curves_data_1
 	
@@ -287,7 +287,10 @@ func spawn_multi_mesh_directional_bullets()->void:
 	#
 	
 	get_tree().create_timer(1).timeout.connect(func():
-		dir_bullets.teleport_bullet(0, Vector2(0,0))
+		#BENCHMARK_GLOBALS.FACTORY.teleport_shift_all_bullets(Vector2(20, 10))
+		#BENCHMARK_GLOBALS.FACTORY.call_deferred("teleport_shift_all_bullets", Vector2(20, 10))
+		
+		dir_bullets.teleport_shift_all_bullets(Vector2(25,0), 0, dir_bullets.get_amount_bullets())
 		)
 	#dir_bullets.multimesh_attach_time_based_function(1, func():
 		#dir_bullets.teleport_bullet(0, Vector2(0,0))

@@ -985,24 +985,6 @@ protected:
 		}
 	}
 
-	// Disables a single bullet temporarily
-	_ALWAYS_INLINE_ void temporary_disable_bullet(int bullet_index) {
-		int8_t &curr_bullet_status = bullets_enabled_status[bullet_index];
-
-		curr_bullet_status = false;
-
-		physics_server->area_set_shape_disabled(area, bullet_index, true);
-	}
-
-	// Enable a single bullet - use only after temporary_disable_bullet
-	_ALWAYS_INLINE_ void temporary_enable_bullet(int bullet_index) {
-		int8_t &curr_bullet_status = bullets_enabled_status[bullet_index];
-
-		curr_bullet_status = true;
-
-		physics_server->area_set_shape_disabled(area, bullet_index, false);
-	}
-
 	// Moves a single bullet attachment
 	_ALWAYS_INLINE_ void move_bullet_attachment(const Vector2 &translate_by, int bullet_index) {
 		if (!attachment_scenes[bullet_index].is_valid()) {

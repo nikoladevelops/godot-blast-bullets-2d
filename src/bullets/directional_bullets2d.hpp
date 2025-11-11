@@ -494,13 +494,6 @@ public:
 			return;
 		}
 
-		bool need_to_temporarily_disable = bullets_enabled_status[bullet_index] == true;
-
-		// If the bullet is enabled, temporarily disable it to avoid physics issues
-		if (need_to_temporarily_disable) {
-			temporary_disable_bullet(bullet_index);
-		}
-
 		// Bullet texture related
 		auto &curr_bullet_transf = all_cached_instance_transforms[bullet_index];
 		auto &curr_bullet_origin = all_cached_instance_origin[bullet_index];
@@ -527,14 +520,63 @@ public:
 		curr_shape_transf.set_origin(curr_shape_origin);
 
 		// Instantly apply the updated transforms
-		multi->set_instance_transform_2d(bullet_index, curr_bullet_transf);
+		if (bullets_enabled_status[bullet_index]) { // Apply to multi only if the bullet is enabled (if disabled the transform is zero which prevents the multimesh from rendering it)
+			multi->set_instance_transform_2d(bullet_index, curr_bullet_transf);
+		}
+
 		physics_server->area_set_shape_transform(area, bullet_index, curr_shape_transf);
 
 		// Reset physics interpolation data
 		update_bullet_previous_transform_for_interpolation(bullet_index);
+	}
 
-		if (need_to_temporarily_disable) {
-			temporary_enable_bullet(bullet_index);
+	// Shifts a bullet's position by a certain amount
+	_ALWAYS_INLINE_ void teleport_shift_bullet(int bullet_index, const Vector2 &shift_amount) {
+		if (!validate_bullet_index(bullet_index, "teleport_shift_bullet")) {
+			return;
+		}
+
+		// Bullet texture related
+		auto &curr_bullet_transf = all_cached_instance_transforms[bullet_index];
+		auto &curr_bullet_origin = all_cached_instance_origin[bullet_index];
+
+		// Bullet shape related
+		auto &curr_shape_transf = all_cached_shape_transforms[bullet_index];
+		auto &curr_shape_origin = all_cached_shape_origin[bullet_index];
+
+		// Update the bullet origin and transform
+		curr_bullet_origin += shift_amount;
+		curr_bullet_transf.set_origin(curr_bullet_origin);
+
+		// Update the collision shape
+		// The shape transform is based on the bullet transform plus an offset so it should always follow it no matter how the bullet moves
+		curr_shape_transf = curr_bullet_transf;
+
+		// The user had previously set a collision shape offset relative to the center of the texture, so it needs to be re-calculated by taking into account the new rotation of the bullet
+		Vector2 rotated_offset = cache_collision_shape_offset.rotated(curr_shape_transf.get_rotation());
+
+		// Update the shape origin
+		curr_shape_origin = curr_bullet_origin + rotated_offset;
+
+		// Update the shape transform origin with the rotated offset
+		curr_shape_transf.set_origin(curr_shape_origin);
+
+		// Instantly apply the updated transforms
+		if (bullets_enabled_status[bullet_index]) { // Apply to multi only if the bullet is enabled (if disabled the transform is zero which prevents the multimesh from rendering it)
+			multi->set_instance_transform_2d(bullet_index, curr_bullet_transf);
+		}
+
+		physics_server->area_set_shape_transform(area, bullet_index, curr_shape_transf);
+
+		// Reset physics interpolation data
+		update_bullet_previous_transform_for_interpolation(bullet_index);
+	}
+
+	_ALWAYS_INLINE_ void teleport_shift_all_bullets(const Vector2 &shift_amount, int bullet_index_start = 0, int bullet_index_end_inclusive = -1) {
+		ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "teleport_shift_all_bullets");
+
+		for (int i = bullet_index_start; i <= bullet_index_end_inclusive; ++i) {
+			teleport_shift_bullet(i, shift_amount);
 		}
 	}
 

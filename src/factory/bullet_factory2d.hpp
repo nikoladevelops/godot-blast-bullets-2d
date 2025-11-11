@@ -116,6 +116,8 @@ public:
 	RID get_physics_space() const;
 	void set_physics_space(RID new_space_rid);
 
+	void teleport_shift_all_bullets(const Vector2 &shift_amount);
+
 	//
 
 	// ADDITIONAL METHODS FOR DEBUGGING PURPOSES

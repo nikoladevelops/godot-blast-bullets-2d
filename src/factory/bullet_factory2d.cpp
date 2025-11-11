@@ -14,6 +14,7 @@
 #include "../shared/bullet_attachment2d.hpp"
 #include "../shared/multimesh_object_pool2d.hpp"
 #include "godot_cpp/classes/global_constants.hpp"
+#include "godot_cpp/core/class_db.hpp"
 #include "godot_cpp/core/math.hpp"
 #include "godot_cpp/variant/vector3.hpp"
 
@@ -790,7 +791,20 @@ TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_grid(
 	return generated_transforms;
 }
 
+void BulletFactory2D::teleport_shift_all_bullets(const Vector2 &shift_amount){
+	int directional_amount = static_cast<int>(all_directional_bullets.size());
+
+	for (int i = 0; i < directional_amount; ++i) {
+		DirectionalBullets2D *bullets = all_directional_bullets[i];
+		bullets->teleport_shift_all_bullets(shift_amount);
+	}
+
+	// TODO Not supported for BlockBullets2D
+}
+
 void BulletFactory2D::_bind_methods() {
+	ClassDB::bind_method(D_METHOD("teleport_shift_all_bullets", "shift_amount"), &BulletFactory2D::teleport_shift_all_bullets);
+
 	ClassDB::bind_method(D_METHOD("get_is_factory_busy"), &BulletFactory2D::get_is_factory_busy);
 
 	ClassDB::bind_method(D_METHOD("get_physics_space"), &BulletFactory2D::get_physics_space);

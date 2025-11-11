@@ -2,6 +2,7 @@
 
 #include "../save-data/save_data_directional_bullets2d.hpp"
 #include "../spawn-data/directional_bullets_data2d.hpp"
+#include "godot_cpp/core/class_db.hpp"
 #include "godot_cpp/variant/dictionary.hpp"
 #include "godot_cpp/variant/typed_array.hpp"
 #include "godot_cpp/variant/vector2.hpp"
@@ -243,6 +244,9 @@ void DirectionalBullets2D::_bind_methods() {
 
 	// OTHER USEFUL METHODS
 	ClassDB::bind_method(D_METHOD("teleport_bullet", "bullet_index", "new_global_pos"), &DirectionalBullets2D::teleport_bullet);
+	ClassDB::bind_method(D_METHOD("teleport_shift_bullet", "bullet_index", "shift_value"), &DirectionalBullets2D::teleport_shift_bullet);
+	ClassDB::bind_method(D_METHOD("teleport_shift_all_bullets", "shift_value", "bullet_index_start", "bullet_index_end_inclusive"), &DirectionalBullets2D::teleport_shift_all_bullets, DEFVAL(0), DEFVAL(-1));
+
 
 	BIND_ENUM_CONSTANT(GlobalPositionTarget);
 	BIND_ENUM_CONSTANT(Node2DTarget);
