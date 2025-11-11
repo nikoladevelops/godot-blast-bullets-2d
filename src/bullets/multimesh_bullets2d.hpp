@@ -57,10 +57,10 @@ public:
 	int get_amount_active_attachments() const;
 
 	// Used to spawn brand new bullets that are active in the scene tree
-	void spawn(const MultiMeshBulletsData2D &spawn_data, MultiMeshObjectPool *pool, BulletFactory2D *factory, Node *bullets_container);
+	void spawn(const MultiMeshBulletsData2D &spawn_data, MultiMeshObjectPool *pool, BulletFactory2D *factory, Node *bullets_container, const Vector2 &new_inherited_velocity_offset);
 
 	// Activates the multimesh
-	void enable_multimesh(const MultiMeshBulletsData2D &data);
+	void enable_multimesh(const MultiMeshBulletsData2D &data, const Vector2 &new_inherited_velocity_offset);
 
 	// Populates an empty data class instance with the current state of the bullets and returns it so it can be saved
 	Ref<SaveDataMultiMeshBullets2D> save(const Ref<SaveDataMultiMeshBullets2D> &empty_data);
@@ -261,6 +261,9 @@ public:
 		bullets_custom_data = new_custom_data;
 	}
 
+	Vector2 get_inherited_velocity_offset() const{ return inherited_velocity_offset; }
+	void set_inherited_velocity_offset(const Vector2 &new_offset) { inherited_velocity_offset = new_offset; }
+
 	bool get_is_multimesh_auto_pooling_enabled() const { return is_multimesh_auto_pooling_enabled; }
 	void set_is_multimesh_auto_pooling_enabled(bool value) { is_multimesh_auto_pooling_enabled = value; }
 
@@ -383,6 +386,9 @@ protected:
 
 	/// OTHER
 
+	// Provides inertia to the bullets by adding an additional velocity offset to their movement every physics frame
+	Vector2 inherited_velocity_offset = Vector2(0, 0);
+	
 	// The amount of bullets the multimesh has
 	int amount_bullets = 0;
 
@@ -550,7 +556,7 @@ protected:
 
 			if (is_movement_curve_valid) {
 				all_cached_speed[i] = get_bullet_curves_movement_speed();
-				all_cached_velocity[i] = all_cached_direction[i] * all_cached_speed[i];
+				all_cached_velocity[i] = all_cached_direction[i] * all_cached_speed[i] + inherited_velocity_offset;
 			}
 
 			if (is_rotation_curve_valid) {
@@ -613,7 +619,7 @@ protected:
 				real_t &curr_bullet_speed = all_cached_speed[i];
 				curr_bullet_speed = get_bullet_curves_movement_speed();
 
-				all_cached_velocity[i] = all_cached_direction[i] * curr_bullet_speed;
+				all_cached_velocity[i] = all_cached_direction[i] * curr_bullet_speed + inherited_velocity_offset;
 			}
 
 			return;
@@ -634,7 +640,8 @@ protected:
 
 			real_t acceleration = all_cached_acceleration[i] * delta;
 			curr_bullet_speed = Math::min(curr_bullet_speed + acceleration, curr_max_bullet_speed);
-			all_cached_velocity[i] = all_cached_direction[i] * curr_bullet_speed;
+
+			all_cached_velocity[i] = all_cached_direction[i] * curr_bullet_speed + inherited_velocity_offset;
 		}
 	}
 

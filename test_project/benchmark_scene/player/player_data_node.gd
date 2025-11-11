@@ -279,19 +279,19 @@ func spawn_multi_mesh_directional_bullets()->void:
 	dir_bullets.is_multimesh_auto_pooling_enabled = true
 	dir_bullets.bullet_max_collision_count = 1 # How many times the bullet can collide before getting disabled
 	
-	dir_bullets.bullet_curves_data = bullet_curves_data_1
-	
+	#dir_bullets.bullet_curves_data = bullet_curves_data_1
+	#dir_bullets.inherited_velocity_offset = Vector2(5000, 0)
 	#dir_bullets.all_bullets_set_attachment(gpu_particles_scn, 0, Vector2(-60,0), true)
-	dir_bullets.shared_homing_deque_push_back_node2d_target(BENCHMARK_GLOBALS.STATIONARY_TARGET)
+	#dir_bullets.shared_homing_deque_push_back_node2d_target(BENCHMARK_GLOBALS.STATIONARY_TARGET)
 	
 	#
 	
-	get_tree().create_timer(1).timeout.connect(func():
-		#BENCHMARK_GLOBALS.FACTORY.teleport_shift_all_bullets(Vector2(20, 10))
-		#BENCHMARK_GLOBALS.FACTORY.call_deferred("teleport_shift_all_bullets", Vector2(20, 10))
-		
-		dir_bullets.teleport_shift_all_bullets(Vector2(25,0), 0, dir_bullets.get_amount_bullets())
-		)
+	#get_tree().create_timer(1).timeout.connect(func():
+		##BENCHMARK_GLOBALS.FACTORY.teleport_shift_all_bullets(Vector2(20, 10))
+		##BENCHMARK_GLOBALS.FACTORY.call_deferred("teleport_shift_all_bullets", Vector2(20, 10))
+		#
+		#dir_bullets.teleport_shift_all_bullets(Vector2(25,0), 0, dir_bullets.get_amount_bullets())
+		#)
 	#dir_bullets.multimesh_attach_time_based_function(1, func():
 		#dir_bullets.teleport_bullet(0, Vector2(0,0))
 		##dir_bullets.set_textures([godot_texture], [0.05], 0)

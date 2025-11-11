@@ -16,6 +16,7 @@
 #include "godot_cpp/classes/global_constants.hpp"
 #include "godot_cpp/core/class_db.hpp"
 #include "godot_cpp/core/math.hpp"
+#include "godot_cpp/variant/vector2.hpp"
 #include "godot_cpp/variant/vector3.hpp"
 
 #include <cstdint>
@@ -190,7 +191,7 @@ void BulletFactory2D::spawn_block_bullets(const Ref<BlockBulletsData2D> &spawn_d
 			spawn_data);
 }
 
-void BulletFactory2D::spawn_directional_bullets(const Ref<DirectionalBulletsData2D> &spawn_data) {
+void BulletFactory2D::spawn_directional_bullets(const Ref<DirectionalBulletsData2D> &spawn_data, const Vector2 &new_inherited_velocity_offset) {
 	if (is_factory_busy) {
 		UtilityFunctions::push_error("Error when trying to spawn bullets. BulletFactory2D is currently busy. Ignoring the request");
 		return;
@@ -200,10 +201,11 @@ void BulletFactory2D::spawn_directional_bullets(const Ref<DirectionalBulletsData
 			all_directional_bullets,
 			directional_bullets_pool,
 			directional_bullets_container,
-			spawn_data);
+			spawn_data,
+			new_inherited_velocity_offset);
 }
 
-DirectionalBullets2D *BulletFactory2D::spawn_controllable_directional_bullets(const Ref<DirectionalBulletsData2D> &spawn_data) {
+DirectionalBullets2D *BulletFactory2D::spawn_controllable_directional_bullets(const Ref<DirectionalBulletsData2D> &spawn_data, const Vector2 &new_inherited_velocity_offset) {
 	if (is_factory_busy) {
 		UtilityFunctions::push_error("Error when trying to spawn bullets. BulletFactory2D is currently busy. Ignoring the request");
 		return nullptr;
@@ -213,7 +215,8 @@ DirectionalBullets2D *BulletFactory2D::spawn_controllable_directional_bullets(co
 			all_directional_bullets,
 			directional_bullets_pool,
 			directional_bullets_container,
-			spawn_data);
+			spawn_data,
+			new_inherited_velocity_offset);
 }
 
 void BulletFactory2D::save() {
@@ -438,15 +441,13 @@ void BulletFactory2D::free_bullets_pool(BulletType bullet_type, int amount_bulle
 			free_bullets_pool_helper<DirectionalBullets2D>(
 					all_directional_bullets,
 					directional_bullets_pool,
-					amount_bullets_per_instance
-					);
+					amount_bullets_per_instance);
 			break;
 		case BulletFactory2D::BLOCK_BULLETS:
 			free_bullets_pool_helper<BlockBullets2D>(
 					all_block_bullets,
 					block_bullets_pool,
-					amount_bullets_per_instance
-					);
+					amount_bullets_per_instance);
 			break;
 		default:
 			UtilityFunctions::push_error("Unsupported type of bullet when calling free_bullets_pool");
@@ -791,7 +792,7 @@ TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_grid(
 	return generated_transforms;
 }
 
-void BulletFactory2D::teleport_shift_all_bullets(const Vector2 &shift_amount){
+void BulletFactory2D::teleport_shift_all_bullets(const Vector2 &shift_amount) {
 	int directional_amount = static_cast<int>(all_directional_bullets.size());
 
 	for (int i = 0; i < directional_amount; ++i) {
@@ -825,8 +826,8 @@ void BulletFactory2D::_bind_methods() {
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "use_physics_interpolation"), "set_use_physics_interpolation_editor", "get_use_physics_interpolation");
 
 	ClassDB::bind_method(D_METHOD("spawn_block_bullets", "spawn_data"), &BulletFactory2D::spawn_block_bullets);
-	ClassDB::bind_method(D_METHOD("spawn_directional_bullets", "spawn_data"), &BulletFactory2D::spawn_directional_bullets);
-	ClassDB::bind_method(D_METHOD("spawn_controllable_directional_bullets", "spawn_data"), &BulletFactory2D::spawn_controllable_directional_bullets);
+	ClassDB::bind_method(D_METHOD("spawn_directional_bullets", "spawn_data", "inherited_velocity_offset"), &BulletFactory2D::spawn_directional_bullets, DEFVAL(Vector2(0, 0)));
+	ClassDB::bind_method(D_METHOD("spawn_controllable_directional_bullets", "spawn_data", "inherited_velocity_offset"), &BulletFactory2D::spawn_controllable_directional_bullets, DEFVAL(Vector2(0, 0)));
 
 	ClassDB::bind_method(D_METHOD("save"), &BulletFactory2D::save);
 	ClassDB::bind_method(D_METHOD("load", "new_data"), &BulletFactory2D::load);

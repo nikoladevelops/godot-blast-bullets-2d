@@ -55,7 +55,7 @@ void DirectionalBullets2D::set_up_movement_data(const TypedArray<BulletSpeedData
 		all_cached_direction.emplace_back(Vector2(Math::cos(curr_bullet_rotation), Math::sin(curr_bullet_rotation)));
 
 		// Calculate the velocity
-		all_cached_velocity.emplace_back(all_cached_direction[i] * all_cached_speed[i]);
+		all_cached_velocity.emplace_back(all_cached_direction[i] * all_cached_speed[i] + inherited_velocity_offset);
 	}
 }
 
@@ -247,6 +247,9 @@ void DirectionalBullets2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("teleport_shift_bullet", "bullet_index", "shift_value"), &DirectionalBullets2D::teleport_shift_bullet);
 	ClassDB::bind_method(D_METHOD("teleport_shift_all_bullets", "shift_value", "bullet_index_start", "bullet_index_end_inclusive"), &DirectionalBullets2D::teleport_shift_all_bullets, DEFVAL(0), DEFVAL(-1));
 
+	ClassDB::bind_method(D_METHOD("get_inherited_velocity_offset"), &DirectionalBullets2D::get_inherited_velocity_offset);
+	ClassDB::bind_method(D_METHOD("set_inherited_velocity_offset", "new_offset"), &DirectionalBullets2D::set_inherited_velocity_offset);
+	ADD_PROPERTY(PropertyInfo(Variant::VECTOR2, "inherited_velocity_offset"), "set_inherited_velocity_offset", "get_inherited_velocity_offset");
 
 	BIND_ENUM_CONSTANT(GlobalPositionTarget);
 	BIND_ENUM_CONSTANT(Node2DTarget);

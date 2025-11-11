@@ -43,7 +43,9 @@ int MultiMeshBullets2D::get_amount_active_attachments() const {
 }
 
 // Used to spawn brand new bullets.
-void MultiMeshBullets2D::spawn(const MultiMeshBulletsData2D &data, MultiMeshObjectPool *pool, BulletFactory2D *factory, Node *bullets_container) {
+void MultiMeshBullets2D::spawn(const MultiMeshBulletsData2D &data, MultiMeshObjectPool *pool, BulletFactory2D *factory, Node *bullets_container, const Vector2 &new_inherited_velocity_offset) {
+	inherited_velocity_offset = new_inherited_velocity_offset;
+
 	bullets_pool = pool;
 	bullet_factory = factory;
 	physics_server = PhysicsServer2D::get_singleton();
@@ -107,7 +109,9 @@ void MultiMeshBullets2D::spawn(const MultiMeshBulletsData2D &data, MultiMeshObje
 }
 
 // Activates the multimesh
-void MultiMeshBullets2D::enable_multimesh(const MultiMeshBulletsData2D &data) {
+void MultiMeshBullets2D::enable_multimesh(const MultiMeshBulletsData2D &data, const Vector2 &new_inherited_velocity_offset) {
+	inherited_velocity_offset = new_inherited_velocity_offset;
+
 	set_up_life_time_timer(data.max_life_time, data.max_life_time);
 	set_up_change_texture_timer(
 			data.textures.size(),

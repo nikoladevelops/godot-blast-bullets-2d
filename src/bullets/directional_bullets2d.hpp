@@ -686,7 +686,7 @@ protected:
 		}
 
 		// Thrust: Align velocity to new direction
-		all_cached_velocity[bullet_index] = current_direction * cached_speed;
+		all_cached_velocity[bullet_index] = current_direction * cached_speed + inherited_velocity_offset;
 
 		// Emit if target reached
 		try_to_emit_bullet_homing_target_reached_signal(homing_deque, is_using_shared_deque, bullet_index, bullet_pos, target_pos);

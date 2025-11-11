@@ -8,6 +8,7 @@
 
 #include "../shared/bullet_attachment_object_pool2d.hpp"
 #include "../shared/multimesh_object_pool2d.hpp"
+#include "godot_cpp/variant/vector2.hpp"
 
 namespace BlastBullets2D {
 using namespace godot;
@@ -56,13 +57,13 @@ public:
 	virtual void _process(double delta) override;
 
 	// Spawns DirectionalBullets2D when given a resource containing all needed data
-	void spawn_directional_bullets(const Ref<DirectionalBulletsData2D> &spawn_data);
+	void spawn_directional_bullets(const Ref<DirectionalBulletsData2D> &spawn_data, const Vector2 &new_inherited_velocity_offset = Vector2(0,0));
 
 	// Spawns BlockBullets2D when given a resource containing all needed data
 	void spawn_block_bullets(const Ref<BlockBulletsData2D> &spawn_data);
 
 	// Spawns DirectionalBullets2D when given a resource containing all needed data. These bullets should be controlled by the user
-	DirectionalBullets2D *spawn_controllable_directional_bullets(const Ref<DirectionalBulletsData2D> &spawn_data);
+	DirectionalBullets2D *spawn_controllable_directional_bullets(const Ref<DirectionalBulletsData2D> &spawn_data, const Vector2 &new_inherited_velocity_offset = Vector2(0,0));
 
 	// Generates a Resource that contains every bullet's state
 	void save();
@@ -364,19 +365,19 @@ private:
 
 	// Spawns bullets by either creating a brand new TBullet or retrieving one from the object pool
 	template <typename TBullet, typename TBulletSpawnData>
-	TBullet *spawn_bullets_helper(std::vector<TBullet *> &bullets_vec, MultiMeshObjectPool &bullets_pool, Node *bullets_container, const Ref<TBulletSpawnData> &spawn_data) {
+	TBullet *spawn_bullets_helper(std::vector<TBullet *> &bullets_vec, MultiMeshObjectPool &bullets_pool, Node *bullets_container, const Ref<TBulletSpawnData> &spawn_data, const Vector2 &new_inherited_velocity_offset = Vector2(0,0)) {
 		int key = spawn_data->transforms.size();
 
 		// Try to get a TBullet from the pool first
 		TBullet *bullets = static_cast<TBullet *>(bullets_pool.pop(key));
 		if (bullets != nullptr) {
-			bullets->enable_multimesh(*spawn_data.ptr());
+			bullets->enable_multimesh(*spawn_data.ptr(), new_inherited_velocity_offset);
 			return bullets;
 		}
 
 		// If there was no TBullet in the pool, create a brand new one and spawn it
 		bullets = memnew(TBullet);
-		bullets->spawn(*spawn_data.ptr(), &bullets_pool, this, bullets_container);
+		bullets->spawn(*spawn_data.ptr(), &bullets_pool, this, bullets_container, new_inherited_velocity_offset);
 		bullets_vec.emplace_back(bullets);
 
 		return bullets;
