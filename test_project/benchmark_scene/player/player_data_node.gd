@@ -285,15 +285,20 @@ func spawn_multi_mesh_directional_bullets()->void:
 	dir_bullets.shared_homing_deque_push_back_node2d_target(BENCHMARK_GLOBALS.STATIONARY_TARGET)
 	
 	#
-	dir_bullets.multimesh_attach_time_based_function(2, func():
-		dir_bullets.set_textures([godot_texture], [0.05], 0)
-		#dir_bullets.shared_homing_deque_pop_back_target()
-		, false, true)
 	
-	dir_bullets.multimesh_attach_time_based_function(4, func():
-		dir_bullets.set_textures(rocket_tectures, [0.03], 0)
-		#dir_bullets.shared_homing_deque_pop_back_target()
-		, false, true)
+	get_tree().create_timer(1).timeout.connect(func():
+		dir_bullets.teleport_bullet(0, Vector2(0,0))
+		)
+	#dir_bullets.multimesh_attach_time_based_function(1, func():
+		#dir_bullets.teleport_bullet(0, Vector2(0,0))
+		##dir_bullets.set_textures([godot_texture], [0.05], 0)
+		##dir_bullets.shared_homing_deque_pop_back_target()
+		#, false, true)
+	
+	#dir_bullets.multimesh_attach_time_based_function(4, func():
+		#dir_bullets.set_textures(rocket_tectures, [0.03], 0)
+		##dir_bullets.shared_homing_deque_pop_back_target()
+		#, false, true)
 		
 	#for i in dir_bullets.get_amount_bullets():
 		#dir_bullets.bullet_set_attachment(i, gpu_particles_scn, 5, Vector2(-60,0), true)

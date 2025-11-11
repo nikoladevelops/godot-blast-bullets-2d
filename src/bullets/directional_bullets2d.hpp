@@ -68,10 +68,40 @@ public:
 				update_rotation(i, delta);
 			}
 
-			update_position(i, delta);
+			// The velocity at which the bullet will move this frame
+			const Vector2 velocity_delta = all_cached_velocity[i] * delta;
 
-			update_collision_shape(i);
-			update_attachment_and_speed(i, delta);
+			// Bullet texture related
+			auto &curr_bullet_transf = all_cached_instance_transforms[i];
+			auto &curr_shape_transf = all_cached_shape_transforms[i];
+
+			// Bullet shape related
+			auto &curr_bullet_origin = all_cached_instance_origin[i];
+			auto &curr_shape_origin = all_cached_shape_origin[i];
+
+			// Update the bullet origin and transform
+			curr_bullet_origin += velocity_delta;
+			curr_bullet_transf.set_origin(curr_bullet_origin);
+
+			// Update the collision shape
+			// The shape transform is based on the bullet transform plus an offset so it should always follow it no matter how the bullet moves
+			curr_shape_transf = curr_bullet_transf;
+
+			// The user had previously set a collision shape offset relative to the center of the texture, so it needs to be re-calculated by taking into account the new rotation of the bullet
+			Vector2 rotated_offset = cache_collision_shape_offset.rotated(curr_shape_transf.get_rotation());
+
+			// Update the shape origin
+			curr_shape_origin = curr_bullet_origin + rotated_offset;
+
+			// Update the shape transform origin with the rotated offset
+			curr_shape_transf.set_origin(curr_shape_origin);
+
+			// Always update the physics shape (since it doesn't depend on interpolation or anything)
+			physics_server->area_set_shape_transform(area, i, curr_shape_transf);
+
+			// Updates bullet attachment and speed
+			move_bullet_attachment(velocity_delta, i);
+			accelerate_bullet_speed(delta, i, i);
 
 			if (!is_using_physics_interpolation) {
 				multi->set_instance_transform_2d(i, all_cached_instance_transforms[i]);
@@ -460,23 +490,52 @@ public:
 
 	// Teleports a bullet to a new global position
 	_ALWAYS_INLINE_ void teleport_bullet(int bullet_index, const Vector2 &new_global_pos) {
-		if (!validate_bullet_index(bullet_index, "teleport_bullet") || !bullets_enabled_status[bullet_index]) {
+		if (!validate_bullet_index(bullet_index, "teleport_bullet")) {
 			return;
 		}
 
-		temporary_disable_bullet(bullet_index);
+		bool need_to_temporarily_disable = bullets_enabled_status[bullet_index] == true;
 
-		all_cached_instance_origin[bullet_index] = new_global_pos;
-		all_cached_instance_transforms[bullet_index].set_origin(new_global_pos);
+		// If the bullet is enabled, temporarily disable it to avoid physics issues
+		if (need_to_temporarily_disable) {
+			temporary_disable_bullet(bullet_index);
+		}
 
-		Transform2D shape_t = all_cached_instance_transforms[bullet_index];
-		Vector2 rotated_offset = cache_collision_shape_offset.rotated(shape_t.get_rotation());
-		shape_t.set_origin(new_global_pos + rotated_offset);
-		physics_server->area_set_shape_transform(area, bullet_index, shape_t);
+		// Bullet texture related
+		auto &curr_bullet_transf = all_cached_instance_transforms[bullet_index];
+		auto &curr_bullet_origin = all_cached_instance_origin[bullet_index];
 
+		// Bullet shape related
+		auto &curr_shape_transf = all_cached_shape_transforms[bullet_index];
+		auto &curr_shape_origin = all_cached_shape_origin[bullet_index];
+
+		// Update the bullet origin and transform
+		curr_bullet_origin = new_global_pos;
+		curr_bullet_transf.set_origin(curr_bullet_origin);
+
+		// Update the collision shape
+		// The shape transform is based on the bullet transform plus an offset so it should always follow it no matter how the bullet moves
+		curr_shape_transf = curr_bullet_transf;
+
+		// The user had previously set a collision shape offset relative to the center of the texture, so it needs to be re-calculated by taking into account the new rotation of the bullet
+		Vector2 rotated_offset = cache_collision_shape_offset.rotated(curr_shape_transf.get_rotation());
+
+		// Update the shape origin
+		curr_shape_origin = curr_bullet_origin + rotated_offset;
+
+		// Update the shape transform origin with the rotated offset
+		curr_shape_transf.set_origin(curr_shape_origin);
+
+		// Instantly apply the updated transforms
+		multi->set_instance_transform_2d(bullet_index, curr_bullet_transf);
+		physics_server->area_set_shape_transform(area, bullet_index, curr_shape_transf);
+
+		// Reset physics interpolation data
 		update_bullet_previous_transform_for_interpolation(bullet_index);
 
-		temporary_enable_bullet(bullet_index);
+		if (need_to_temporarily_disable) {
+			temporary_enable_bullet(bullet_index);
+		}
 	}
 
 	// Property getters and setters
@@ -730,29 +789,6 @@ protected:
 			return true;
 		}
 		return false;
-	}
-
-	// Updates bullet position based on velocity
-	_ALWAYS_INLINE_ void update_position(int bullet_index, double delta) {
-		Vector2 velocity_delta = all_cached_velocity[bullet_index] * delta;
-		all_cached_instance_origin[bullet_index] += velocity_delta;
-		all_cached_shape_origin[bullet_index] += velocity_delta;
-		all_cached_instance_transforms[bullet_index].set_origin(all_cached_instance_origin[bullet_index]);
-	}
-
-	// Updates collision shape transform
-	_ALWAYS_INLINE_ void update_collision_shape(int bullet_index) {
-		all_cached_shape_transforms[bullet_index] = all_cached_instance_transforms[bullet_index];
-		Vector2 rotated_offset = cache_collision_shape_offset.rotated(all_cached_instance_transforms[bullet_index].get_rotation());
-		all_cached_shape_transforms[bullet_index].set_origin(all_cached_instance_origin[bullet_index] + rotated_offset);
-		physics_server->area_set_shape_transform(area, bullet_index, all_cached_shape_transforms[bullet_index]);
-	}
-
-	// Updates bullet attachment and speed
-	_ALWAYS_INLINE_ void update_attachment_and_speed(int bullet_index, double delta) {
-		Vector2 velocity_delta = all_cached_velocity[bullet_index] * delta;
-		move_bullet_attachment(velocity_delta, bullet_index);
-		accelerate_bullet_speed(delta, bullet_index, bullet_index);
 	}
 
 	static void _bind_methods();
