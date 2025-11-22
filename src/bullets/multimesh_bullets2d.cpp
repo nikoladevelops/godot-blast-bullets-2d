@@ -790,7 +790,65 @@ void MultiMeshBullets2D::set_all_physics_shapes_enabled_for_area(bool enable) {
 	}
 }
 
+Ref<BulletSpeedData2D> MultiMeshBullets2D::get_bullet_speed_data(int bullet_index) const {
+	Ref<BulletSpeedData2D> speed_data = memnew(BulletSpeedData2D);
+
+	if (!validate_bullet_index(bullet_index, "get_bullet_speed_data")) {
+		return speed_data;
+	}
+
+	speed_data->speed = all_cached_speed[bullet_index];
+	speed_data->max_speed = all_cached_max_speed[bullet_index];
+	speed_data->acceleration = all_cached_acceleration[bullet_index];
+
+	return speed_data;
+}
+
+void MultiMeshBullets2D::set_bullet_speed_data(int bullet_index, const Ref<BulletSpeedData2D> &new_bullet_speed_data) {
+	if (!validate_bullet_index(bullet_index, "set_bullet_speed_data")) {
+		return;
+	}
+
+	if (bullet_curves_data.is_valid() && bullet_curves_data->movement_speed_curve.is_valid()) {
+		UtilityFunctions::push_warning("You are trying to set bullet speed data directly while having a movement speed curve assigned. The curve will override any direct speed data changes. Set the curve to null first if you want to set speed data directly.");
+		return;
+	}
+
+	all_cached_speed[bullet_index] = new_bullet_speed_data->speed;
+	all_cached_max_speed[bullet_index] = new_bullet_speed_data->max_speed;
+	all_cached_acceleration[bullet_index] = new_bullet_speed_data->acceleration;
+}
+
+TypedArray<BulletSpeedData2D> MultiMeshBullets2D::all_bullets_get_speed_data(int bullet_index_start, int bullet_index_end_inclusive) const {
+	ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_get_speed_data");
+
+	TypedArray<BulletSpeedData2D> arr;
+	for (int i = bullet_index_start; i <= bullet_index_end_inclusive; ++i) {
+		arr.push_back(get_bullet_speed_data(i));
+	}
+
+	return arr;
+}
+
+void MultiMeshBullets2D::all_bullets_set_speed_data(const Ref<BulletSpeedData2D> &new_bullet_speed_data, int bullet_index_start, int bullet_index_end_inclusive) {
+	ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_set_speed_data");
+
+	if (bullet_curves_data.is_valid() && bullet_curves_data->movement_speed_curve.is_valid()) {
+		UtilityFunctions::push_warning("You are trying to set bullet speed data directly while having a movement speed curve assigned. The curve will override any direct speed data changes. Set the curve to null first if you want to set speed data directly.");
+		return;
+	}
+
+	for (int i = bullet_index_start; i <= bullet_index_end_inclusive; ++i) {
+		set_bullet_speed_data(i, new_bullet_speed_data);
+	}
+}
+
 void MultiMeshBullets2D::_bind_methods() {
+	ClassDB::bind_method(D_METHOD("get_bullet_speed_data", "bullet_index"), &MultiMeshBullets2D::get_bullet_speed_data);
+	ClassDB::bind_method(D_METHOD("set_bullet_speed_data", "bullet_index", "new_bullet_speed_data"), &MultiMeshBullets2D::set_bullet_speed_data);
+	ClassDB::bind_method(D_METHOD("all_bullets_get_speed_data", "bullet_index_start", "bullet_index_end_inclusive"), &MultiMeshBullets2D::all_bullets_get_speed_data, DEFVAL(0), DEFVAL(-1));
+	ClassDB::bind_method(D_METHOD("all_bullets_set_speed_data", "new_bullet_speed_data", "bullet_index_start", "bullet_index_end_inclusive"), &MultiMeshBullets2D::all_bullets_set_speed_data, DEFVAL(0), DEFVAL(-1));
+
 	ClassDB::bind_method(D_METHOD("get_textures"), &MultiMeshBullets2D::get_textures);
 	ClassDB::bind_method(D_METHOD("set_textures", "new_textures", "new_change_texture_times", "selected_texture_index"), &MultiMeshBullets2D::set_textures, DEFVAL(0));
 

@@ -23,6 +23,7 @@
 #include "godot_cpp/variant/variant.hpp"
 #include "godot_cpp/variant/vector2.hpp"
 #include "shared/bullet_curves_data2d.hpp"
+#include "shared/bullet_speed_data2d.hpp"
 
 #include <cstdint>
 #include <godot_cpp/classes/engine.hpp>
@@ -318,6 +319,16 @@ public:
 		set_texture(textures[current_texture_index]);
 	}
 
+	// Bullet Speed Data
+	Ref<BulletSpeedData2D> get_bullet_speed_data(int bullet_index) const;
+	void set_bullet_speed_data(int bullet_index, const Ref<BulletSpeedData2D> &new_bullet_speed_data);
+	
+	TypedArray<BulletSpeedData2D> all_bullets_get_speed_data(int bullet_index_start = 0, int bullet_index_end_inclusive = -1) const;
+	void all_bullets_set_speed_data(const Ref<BulletSpeedData2D> &new_bullet_speed_data, int bullet_index_start = 0, int bullet_index_end_inclusive = -1);
+
+
+
+
 protected:
 	static void _bind_methods();
 
@@ -515,7 +526,7 @@ protected:
 		return true;
 	}
 
-	_ALWAYS_INLINE_ void ensure_indexes_match_amount_bullets_range(int &bullet_index_start, int &bullet_index_end_inclusive, const String &function_name) {
+	_ALWAYS_INLINE_ void ensure_indexes_match_amount_bullets_range(int &bullet_index_start, int &bullet_index_end_inclusive, const String &function_name) const {
 		if (bullet_index_start < 0 || bullet_index_start >= amount_bullets) {
 			bullet_index_start = 0;
 		}
