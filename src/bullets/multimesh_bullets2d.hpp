@@ -320,11 +320,20 @@ public:
 	}
 
 	// Bullet Speed Data
+	
 	Ref<BulletSpeedData2D> get_bullet_speed_data(int bullet_index) const;
 	void set_bullet_speed_data(int bullet_index, const Ref<BulletSpeedData2D> &new_bullet_speed_data);
 	
 	TypedArray<BulletSpeedData2D> all_bullets_get_speed_data(int bullet_index_start = 0, int bullet_index_end_inclusive = -1) const;
 	void all_bullets_set_speed_data(const Ref<BulletSpeedData2D> &new_bullet_speed_data, int bullet_index_start = 0, int bullet_index_end_inclusive = -1);
+
+	// Bullet Direction
+
+	Vector2 get_bullet_direction(int bullet_index) const;
+	void set_bullet_direction(int bullet_index, const Vector2 &new_direction);
+
+	TypedArray<Vector2> all_bullets_get_direction(int bullet_index_start = 0, int bullet_index_end_inclusive = -1) const;
+	void all_bullets_set_direction(const Vector2 &new_direction, int bullet_index_start = 0, int bullet_index_end_inclusive = -1);
 
 
 

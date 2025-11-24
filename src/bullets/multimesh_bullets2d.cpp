@@ -5,6 +5,7 @@
 #include "godot_cpp/core/class_db.hpp"
 #include "godot_cpp/core/print_string.hpp"
 #include "godot_cpp/variant/transform2d.hpp"
+#include "godot_cpp/variant/vector2.hpp"
 #include "multimesh_bullets2d.hpp"
 #include <godot_cpp/classes/physics_server2d.hpp>
 #include <godot_cpp/classes/random_number_generator.hpp>
@@ -843,11 +844,51 @@ void MultiMeshBullets2D::all_bullets_set_speed_data(const Ref<BulletSpeedData2D>
 	}
 }
 
+Vector2 MultiMeshBullets2D::get_bullet_direction(int bullet_index) const {
+	if (!validate_bullet_index(bullet_index, "get_bullet_direction")) {
+		return Vector2();
+	}
+
+	return all_cached_direction[bullet_index];
+}
+
+void MultiMeshBullets2D::set_bullet_direction(int bullet_index, const Vector2 &new_direction) {
+	if (!validate_bullet_index(bullet_index, "set_bullet_direction")) {
+		return;
+	}
+
+	all_cached_direction[bullet_index] = new_direction.normalized();
+}
+
+TypedArray<Vector2> MultiMeshBullets2D::all_bullets_get_direction(int bullet_index_start, int bullet_index_end_inclusive) const {
+	ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_get_direction");
+
+	TypedArray<Vector2> arr;
+	for (int i = bullet_index_start; i <= bullet_index_end_inclusive; ++i) {
+		arr.push_back(get_bullet_direction(i));
+	}
+
+	return arr;
+}
+
+void MultiMeshBullets2D::all_bullets_set_direction(const Vector2 &new_direction, int bullet_index_start, int bullet_index_end_inclusive) {
+	ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_set_direction");
+
+	for (int i = bullet_index_start; i <= bullet_index_end_inclusive; ++i) {
+		set_bullet_direction(i, new_direction);
+	}
+}
+
 void MultiMeshBullets2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_bullet_speed_data", "bullet_index"), &MultiMeshBullets2D::get_bullet_speed_data);
 	ClassDB::bind_method(D_METHOD("set_bullet_speed_data", "bullet_index", "new_bullet_speed_data"), &MultiMeshBullets2D::set_bullet_speed_data);
 	ClassDB::bind_method(D_METHOD("all_bullets_get_speed_data", "bullet_index_start", "bullet_index_end_inclusive"), &MultiMeshBullets2D::all_bullets_get_speed_data, DEFVAL(0), DEFVAL(-1));
 	ClassDB::bind_method(D_METHOD("all_bullets_set_speed_data", "new_bullet_speed_data", "bullet_index_start", "bullet_index_end_inclusive"), &MultiMeshBullets2D::all_bullets_set_speed_data, DEFVAL(0), DEFVAL(-1));
+
+	ClassDB::bind_method(D_METHOD("get_bullet_direction", "bullet_index"), &MultiMeshBullets2D::get_bullet_direction);
+	ClassDB::bind_method(D_METHOD("set_bullet_direction", "bullet_index", "new_direction"), &MultiMeshBullets2D::set_bullet_direction);
+	ClassDB::bind_method(D_METHOD("all_bullets_get_direction", "bullet_index_start", "bullet_index_end_inclusive"), &MultiMeshBullets2D::all_bullets_get_direction, DEFVAL(0), DEFVAL(-1));
+	ClassDB::bind_method(D_METHOD("all_bullets_set_direction", "new_direction", "bullet_index_start", "bullet_index_end_inclusive"), &MultiMeshBullets2D::all_bullets_set_direction, DEFVAL(0), DEFVAL(-1));
 
 	ClassDB::bind_method(D_METHOD("get_textures"), &MultiMeshBullets2D::get_textures);
 	ClassDB::bind_method(D_METHOD("set_textures", "new_textures", "new_change_texture_times", "selected_texture_index"), &MultiMeshBullets2D::set_textures, DEFVAL(0));

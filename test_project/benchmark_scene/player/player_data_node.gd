@@ -279,18 +279,15 @@ func spawn_multi_mesh_directional_bullets()->void:
 	dir_bullets.is_multimesh_auto_pooling_enabled = true
 	dir_bullets.bullet_max_collision_count = 1 # How many times the bullet can collide before getting disabled
 	
+	#dir_bullets.shared_homing_deque_push_front_mouse_position_target()
 	#dir_bullets.bullet_curves_data = bullet_curves_data_1
 	#
-	#dir_bullets.multimesh_attach_time_based_function(1, func():
-		#var data:BulletSpeedData2D = BulletSpeedData2D.new();
-		#data.speed = 6000
-		#data.acceleration = 1.5
-		#data.max_speed = 10000
-		#
-		##print(data)
-		#
-		#dir_bullets.all_bullets_set_speed_data(data)
-		#, false, true)
+	dir_bullets.multimesh_attach_time_based_function(1, func():
+		
+		
+		
+		dir_bullets.all_bullets_set_direction(Vector2(0,1))
+		, false, true)
 		
 		
 	#dir_bullets.inherited_velocity_offset = Vector2(5000, 0)
