@@ -3,6 +3,7 @@
 #include "../shared/multimesh_object_pool2d.hpp"
 
 #include "godot_cpp/core/class_db.hpp"
+#include "godot_cpp/core/math.hpp"
 #include "godot_cpp/core/print_string.hpp"
 #include "godot_cpp/variant/transform2d.hpp"
 #include "godot_cpp/variant/vector2.hpp"
@@ -879,6 +880,82 @@ void MultiMeshBullets2D::all_bullets_set_direction(const Vector2 &new_direction,
 	}
 }
 
+real_t MultiMeshBullets2D::get_bullet_texture_rotation_radians(int bullet_index) const {
+	if (!validate_bullet_index(bullet_index, "get_bullet_texture_rotation_radians")) {
+		return 0.0;
+	}
+
+	return all_cached_instance_transforms[bullet_index].get_rotation();
+}
+
+void MultiMeshBullets2D::set_bullet_texture_rotation_radians(int bullet_index, real_t new_rotation_radians) {
+	if (!validate_bullet_index(bullet_index, "set_bullet_texture_rotation_radians")) {
+		return;
+	}
+
+	auto &curr_transf = all_cached_instance_transforms[bullet_index];
+	curr_transf.set_rotation(new_rotation_radians);
+
+	update_bullet_previous_transform_for_interpolation(bullet_index);
+}
+
+TypedArray<real_t> MultiMeshBullets2D::all_bullets_get_texture_rotation_radians(int bullet_index_start, int bullet_index_end_inclusive) const {
+	ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_get_texture_rotation_radians");
+
+	TypedArray<real_t> arr;
+	for (int i = bullet_index_start; i <= bullet_index_end_inclusive; ++i) {
+		arr.push_back(get_bullet_texture_rotation_radians(i));
+	}
+
+	return arr;
+}
+
+void MultiMeshBullets2D::all_bullets_set_texture_rotation_radians(real_t new_rotation_radians, int bullet_index_start, int bullet_index_end_inclusive) {
+	ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_set_texture_rotation_radians");
+
+	for (int i = bullet_index_start; i <= bullet_index_end_inclusive; ++i) {
+		set_bullet_texture_rotation_radians(i, new_rotation_radians);
+	}
+}
+
+real_t MultiMeshBullets2D::get_bullet_texture_rotation_degrees(int bullet_index) const {
+	if (!validate_bullet_index(bullet_index, "get_bullet_texture_rotation_degrees")) {
+		return 0.0;
+	}
+
+	return Math::rad_to_deg(all_cached_instance_transforms[bullet_index].get_rotation());
+}
+
+void MultiMeshBullets2D::set_bullet_texture_rotation_degrees(int bullet_index, real_t new_rotation_degrees) {
+	if (!validate_bullet_index(bullet_index, "set_bullet_texture_rotation_degrees")) {
+		return;
+	}
+
+	auto &curr_transf = all_cached_instance_transforms[bullet_index];
+	curr_transf.set_rotation(Math::deg_to_rad(new_rotation_degrees));
+
+	update_bullet_previous_transform_for_interpolation(bullet_index);
+}
+
+TypedArray<real_t> MultiMeshBullets2D::all_bullets_get_texture_rotation_degrees(int bullet_index_start, int bullet_index_end_inclusive) const {
+	ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_get_texture_rotation_degrees");
+
+	TypedArray<real_t> arr;
+	for (int i = bullet_index_start; i <= bullet_index_end_inclusive; ++i) {
+		arr.push_back(get_bullet_texture_rotation_degrees(i));
+	}
+
+	return arr;
+}
+
+void MultiMeshBullets2D::all_bullets_set_texture_rotation_degrees(real_t new_rotation_degrees, int bullet_index_start, int bullet_index_end_inclusive) {
+	ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_set_texture_rotation_degrees");
+
+	for (int i = bullet_index_start; i <= bullet_index_end_inclusive; ++i) {
+		set_bullet_texture_rotation_degrees(i, new_rotation_degrees);
+	}
+}
+
 void MultiMeshBullets2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_bullet_speed_data", "bullet_index"), &MultiMeshBullets2D::get_bullet_speed_data);
 	ClassDB::bind_method(D_METHOD("set_bullet_speed_data", "bullet_index", "new_bullet_speed_data"), &MultiMeshBullets2D::set_bullet_speed_data);
@@ -889,6 +966,16 @@ void MultiMeshBullets2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_bullet_direction", "bullet_index", "new_direction"), &MultiMeshBullets2D::set_bullet_direction);
 	ClassDB::bind_method(D_METHOD("all_bullets_get_direction", "bullet_index_start", "bullet_index_end_inclusive"), &MultiMeshBullets2D::all_bullets_get_direction, DEFVAL(0), DEFVAL(-1));
 	ClassDB::bind_method(D_METHOD("all_bullets_set_direction", "new_direction", "bullet_index_start", "bullet_index_end_inclusive"), &MultiMeshBullets2D::all_bullets_set_direction, DEFVAL(0), DEFVAL(-1));
+
+	ClassDB::bind_method(D_METHOD("get_bullet_texture_rotation_radians", "bullet_index"), &MultiMeshBullets2D::get_bullet_texture_rotation_radians);
+	ClassDB::bind_method(D_METHOD("set_bullet_texture_rotation_radians", "bullet_index", "new_rotation_radians"), &MultiMeshBullets2D::set_bullet_texture_rotation_radians);
+	ClassDB::bind_method(D_METHOD("all_bullets_get_texture_rotation_radians", "bullet_index_start", "bullet_index_end_inclusive"), &MultiMeshBullets2D::all_bullets_get_texture_rotation_radians, DEFVAL(0), DEFVAL(-1));
+	ClassDB::bind_method(D_METHOD("all_bullets_set_texture_rotation_radians", "new_rotation_radians", "bullet_index_start", "bullet_index_end_inclusive"), &MultiMeshBullets2D::all_bullets_set_texture_rotation_radians, DEFVAL(0), DEFVAL(-1));
+
+	ClassDB::bind_method(D_METHOD("get_bullet_texture_rotation_degrees", "bullet_index"), &MultiMeshBullets2D::get_bullet_texture_rotation_degrees);
+	ClassDB::bind_method(D_METHOD("set_bullet_texture_rotation_degrees", "bullet_index", "new_rotation_degrees"), &MultiMeshBullets2D::set_bullet_texture_rotation_degrees);
+	ClassDB::bind_method(D_METHOD("all_bullets_get_texture_rotation_degrees", "bullet_index_start", "bullet_index_end_inclusive"), &MultiMeshBullets2D::all_bullets_get_texture_rotation_degrees, DEFVAL(0), DEFVAL(-1));
+	ClassDB::bind_method(D_METHOD("all_bullets_set_texture_rotation_degrees", "new_rotation_degrees", "bullet_index_start", "bullet_index_end_inclusive"), &MultiMeshBullets2D::all_bullets_set_texture_rotation_degrees, DEFVAL(0), DEFVAL(-1));
 
 	ClassDB::bind_method(D_METHOD("get_textures"), &MultiMeshBullets2D::get_textures);
 	ClassDB::bind_method(D_METHOD("set_textures", "new_textures", "new_change_texture_times", "selected_texture_index"), &MultiMeshBullets2D::set_textures, DEFVAL(0));

@@ -262,7 +262,7 @@ public:
 		bullets_custom_data = new_custom_data;
 	}
 
-	Vector2 get_inherited_velocity_offset() const{ return inherited_velocity_offset; }
+	Vector2 get_inherited_velocity_offset() const { return inherited_velocity_offset; }
 	void set_inherited_velocity_offset(const Vector2 &new_offset) { inherited_velocity_offset = new_offset; }
 
 	bool get_is_multimesh_auto_pooling_enabled() const { return is_multimesh_auto_pooling_enabled; }
@@ -320,10 +320,10 @@ public:
 	}
 
 	// Bullet Speed Data
-	
+
 	Ref<BulletSpeedData2D> get_bullet_speed_data(int bullet_index) const;
 	void set_bullet_speed_data(int bullet_index, const Ref<BulletSpeedData2D> &new_bullet_speed_data);
-	
+
 	TypedArray<BulletSpeedData2D> all_bullets_get_speed_data(int bullet_index_start = 0, int bullet_index_end_inclusive = -1) const;
 	void all_bullets_set_speed_data(const Ref<BulletSpeedData2D> &new_bullet_speed_data, int bullet_index_start = 0, int bullet_index_end_inclusive = -1);
 
@@ -335,8 +335,21 @@ public:
 	TypedArray<Vector2> all_bullets_get_direction(int bullet_index_start = 0, int bullet_index_end_inclusive = -1) const;
 	void all_bullets_set_direction(const Vector2 &new_direction, int bullet_index_start = 0, int bullet_index_end_inclusive = -1);
 
+	// Bullet Texture Rotation (Radians)
 
+	real_t get_bullet_texture_rotation_radians(int bullet_index) const;
+	void set_bullet_texture_rotation_radians(int bullet_index, real_t new_rotation_radians);
 
+	TypedArray<real_t> all_bullets_get_texture_rotation_radians(int bullet_index_start = 0, int bullet_index_end_inclusive = -1) const;
+	void all_bullets_set_texture_rotation_radians(real_t new_rotation_radians, int bullet_index_start = 0, int bullet_index_end_inclusive = -1);
+
+	// Bullet Texture Rotation (Degrees)
+	
+	real_t get_bullet_texture_rotation_degrees(int bullet_index) const;
+	void set_bullet_texture_rotation_degrees(int bullet_index, real_t new_rotation_degrees);
+
+	TypedArray<real_t> all_bullets_get_texture_rotation_degrees(int bullet_index_start = 0, int bullet_index_end_inclusive = -1) const;
+	void all_bullets_set_texture_rotation_degrees(real_t new_rotation_degrees, int bullet_index_start = 0, int bullet_index_end_inclusive = -1);
 
 protected:
 	static void _bind_methods();
@@ -408,7 +421,7 @@ protected:
 
 	// Provides inertia to the bullets by adding an additional velocity offset to their movement every physics frame
 	Vector2 inherited_velocity_offset = Vector2(0, 0);
-	
+
 	// The amount of bullets the multimesh has
 	int amount_bullets = 0;
 
