@@ -349,6 +349,12 @@ public:
 	TypedArray<real_t> all_bullets_get_texture_rotation_radians(int bullet_index_start = 0, int bullet_index_end_inclusive = -1) const;
 	void all_bullets_set_texture_rotation_radians(real_t new_rotation_radians, int bullet_index_start = 0, int bullet_index_end_inclusive = -1);
 
+	void set_bullet_texture_rotation_towards_position(int bullet_index, const Vector2 &target_position);
+	void all_bullets_set_texture_rotation_towards_position(const Vector2 &target_position, int bullet_index_start = 0, int bullet_index_end_inclusive = -1);
+
+	void set_bullet_texture_rotation_towards_node2d(int bullet_index, const Node2D *target_node);
+	void all_bullets_set_texture_rotation_towards_node2d(const Node2D *target_node, int bullet_index_start = 0, int bullet_index_end_inclusive = -1);
+
 	// Bullet Texture Rotation (Degrees)
 
 	real_t get_bullet_texture_rotation_degrees(int bullet_index) const;
