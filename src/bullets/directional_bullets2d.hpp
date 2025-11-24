@@ -597,8 +597,8 @@ public:
 	void set_bullet_homing_auto_pop_after_target_reached(bool value) { bullet_homing_auto_pop_after_target_reached = value; }
 	real_t get_distance_from_target_before_considering_as_reached() const { return distance_from_target_before_considering_as_reached; }
 	void set_distance_from_target_before_considering_as_reached(real_t value) { distance_from_target_before_considering_as_reached = value; }
-	bool get_shared_deque_auto_pop_after_target_reached() const { return shared_deque_auto_pop_after_target_reached; }
-	void set_shared_deque_auto_pop_after_target_reached(bool value) { shared_deque_auto_pop_after_target_reached = value; }
+	bool get_shared_homing_deque_auto_pop_after_target_reached() const { return shared_homing_deque_auto_pop_after_target_reached; }
+	void set_shared_homing_deque_auto_pop_after_target_reached(bool value) { shared_homing_deque_auto_pop_after_target_reached = value; }
 
 	// Virtual methods
 	void set_up_movement_data(const TypedArray<BulletSpeedData2D> &new_speed_data);
@@ -612,7 +612,7 @@ protected:
 	bool adjust_direction_based_on_rotation = false;
 	bool homing_take_control_of_texture_rotation = false;
 	bool bullet_homing_auto_pop_after_target_reached = false;
-	bool shared_deque_auto_pop_after_target_reached = false;
+	bool shared_homing_deque_auto_pop_after_target_reached = false;
 
 	Vector2 cached_mouse_global_position{ 0, 0 };
 
@@ -635,7 +635,7 @@ protected:
 	HomingTargetDeque shared_homing_deque;
 
 	// Updates homing behavior for a bullet
-	_ALWAYS_INLINE_ void update_homing(HomingTargetDeque &homing_deque, bool is_using_shared_deque, int bullet_index, double delta, bool interval_reached) {
+	_ALWAYS_INLINE_ void update_homing(HomingTargetDeque &homing_deque, bool is_using_shared_homing_deque, int bullet_index, double delta, bool interval_reached) {
 		real_t cached_speed = all_cached_speed[bullet_index];
 		if (cached_speed <= 0.0) { // Early zero-speed exit
 			return;
@@ -660,7 +660,7 @@ protected:
 		const Vector2 &bullet_pos = all_cached_instance_origin[bullet_index];
 		Vector2 diff = target_pos - bullet_pos;
 		if (diff.length_squared() <= 0.0) { // Early exit if already on target
-			try_to_emit_bullet_homing_target_reached_signal(homing_deque, is_using_shared_deque, bullet_index, bullet_pos, target_pos);
+			try_to_emit_bullet_homing_target_reached_signal(homing_deque, is_using_shared_homing_deque, bullet_index, bullet_pos, target_pos);
 			return;
 		}
 
@@ -689,7 +689,7 @@ protected:
 		all_cached_velocity[bullet_index] = current_direction * cached_speed + inherited_velocity_offset;
 
 		// Emit if target reached
-		try_to_emit_bullet_homing_target_reached_signal(homing_deque, is_using_shared_deque, bullet_index, bullet_pos, target_pos);
+		try_to_emit_bullet_homing_target_reached_signal(homing_deque, is_using_shared_homing_deque, bullet_index, bullet_pos, target_pos);
 	}
 
 	// Rotates bullet to face target with smoothing (boundary-agnostic version)
@@ -769,7 +769,7 @@ protected:
 		return rot_delta;
 	}
 
-	_ALWAYS_INLINE_ void try_to_emit_bullet_homing_target_reached_signal(HomingTargetDeque &homing_deque, bool is_using_shared_deque, int bullet_index, const Vector2 &bullet_pos, const Vector2 &target_pos) {
+	_ALWAYS_INLINE_ void try_to_emit_bullet_homing_target_reached_signal(HomingTargetDeque &homing_deque, bool is_using_shared_homing_deque, int bullet_index, const Vector2 &bullet_pos, const Vector2 &target_pos) {
 		// Reached check: Post-move, direct to actual target
 		Vector2 post_to_target = target_pos - bullet_pos;
 		real_t post_dist_sq = post_to_target.length_squared();
@@ -805,8 +805,8 @@ protected:
 				}
 
 				// Pop the front target automatically if that's what the user wants
-				if (is_using_shared_deque) {
-					if (shared_deque_auto_pop_after_target_reached) {
+				if (is_using_shared_homing_deque) {
+					if (shared_homing_deque_auto_pop_after_target_reached) {
 						call_deferred("shared_homing_deque_pop_front_target");
 					}
 				} else {

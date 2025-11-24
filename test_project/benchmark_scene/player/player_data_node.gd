@@ -278,7 +278,6 @@ func spawn_multi_mesh_directional_bullets()->void:
 	dir_bullets.bullet_homing_auto_pop_after_target_reached = true
 	dir_bullets.is_multimesh_auto_pooling_enabled = true
 	dir_bullets.bullet_max_collision_count = 1 # How many times the bullet can collide before getting disabled
-	
 	#dir_bullets.shared_homing_deque_push_front_mouse_position_target()
 	#dir_bullets.bullet_curves_data = bullet_curves_data_1
 	#

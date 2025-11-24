@@ -4,7 +4,7 @@
 		Bullets that travel in different directions based on their transform rotation. Never use this by its own. Always use the [BulletFactory2D], that's the only proper way.
 	</brief_description>
 	<description>
-		[DirectionalBullets2D] extends [MultiMeshBullets2D] with advanced homing capabilities. It supports per-bullet homing deques for individualized target chasing (e.g., specific enemies) and a shared deque for uniform swarm behaviors (e.g., collective waypoint following). Targets can be global positions, Node2D instances, or mouse position, with optional auto-pop on reach (see [member bullet_homing_auto_pop_after_target_reached], [member shared_deque_auto_pop_after_target_reached], [signal bullet_homing_target_reached]) and smoothing for natural turning (see [member homing_smoothing]). Enables complex bullet patterns in 2D games.
+		[DirectionalBullets2D] extends [MultiMeshBullets2D] with advanced homing capabilities. It supports per-bullet homing deques for individualized target chasing (e.g., specific enemies) and a shared deque for uniform swarm behaviors (e.g., collective waypoint following). Targets can be global positions, Node2D instances, or mouse position, with optional auto-pop on reach (see [member bullet_homing_auto_pop_after_target_reached], [member shared_homing_deque_auto_pop_after_target_reached], [signal bullet_homing_target_reached]) and smoothing for natural turning (see [member homing_smoothing]). Enables complex bullet patterns in 2D games.
 
 		Warning: Never use [code]get_tree().create_timer()[/code] or any other godot timers with this class. It will cause issues with the internal timing of the bullets. If you need timers, use [method MultiMeshBullets2D.multimesh_attach_time_based_function] instead.
 
@@ -409,7 +409,7 @@
 
 			The signal [signal bullet_homing_target_reached] is emitted when a target is reached.
 
-			If you want this behavior for the shared deque, use [member shared_deque_auto_pop_after_target_reached] instead.
+			If you want this behavior for the shared deque, use [member shared_homing_deque_auto_pop_after_target_reached] instead.
 		</member>
 		<member name="distance_from_target_before_considering_as_reached" type="float" setter="set_distance_from_target_before_considering_as_reached" getter="get_distance_from_target_before_considering_as_reached" default="5.0">
 			Adjust if you want your bullets to consider a target reached if they are within a certain distance away from it.
@@ -429,7 +429,7 @@
 		<member name="homing_update_interval" type="float" setter="set_homing_update_interval" getter="get_homing_update_interval" default="0.0">
 			How often it should cache the position of the targets so that they can be re-used instead of fetching them every frame. Increase if you want to boost performance.
 		</member>
-		<member name="shared_deque_auto_pop_after_target_reached" type="bool" setter="set_shared_deque_auto_pop_after_target_reached" getter="get_shared_deque_auto_pop_after_target_reached" default="false">
+		<member name="shared_homing_deque_auto_pop_after_target_reached" type="bool" setter="set_shared_homing_deque_auto_pop_after_target_reached" getter="get_shared_homing_deque_auto_pop_after_target_reached" default="false">
 			Whether the current homing target should be automatically popped from the deque once it gets reached by a bullet (per-bullet deques only).
 
 			Adjust the distance for considering a target reached with [member distance_from_target_before_considering_as_reached].
