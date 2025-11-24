@@ -1026,6 +1026,51 @@ void MultiMeshBullets2D::all_bullets_set_transforms(const Transform2D &new_trans
 	}
 }
 
+void MultiMeshBullets2D::set_bullet_direction_towards_position(int bullet_index, const Vector2 &target_position) {
+	if (!validate_bullet_index(bullet_index, "set_bullet_direction_towards_position")) {
+		return;
+	}
+
+	all_cached_direction[bullet_index] = (target_position - all_cached_instance_origin[bullet_index]).normalized();
+}
+
+void MultiMeshBullets2D::all_bullets_set_direction_towards_position(const Vector2 &target_position, int bullet_index_start, int bullet_index_end_inclusive) {
+	ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_set_direction_towards_position");
+
+	for (int i = bullet_index_start; i <= bullet_index_end_inclusive; ++i) {
+		set_bullet_direction_towards_position(i, target_position);
+	}
+}
+
+void MultiMeshBullets2D::set_bullet_direction_towards_node2d(int bullet_index, const Node2D *target_node) {
+	if (!validate_bullet_index(bullet_index, "set_bullet_direction_towards_node2d")) {
+		return;
+	}
+
+	if (target_node == nullptr) {
+		UtilityFunctions::push_error("The target_node provided to set_bullet_direction_towards_node2d is null. Cannot set direction towards a null node.");
+		return;
+	}
+
+	const Vector2 target_position = target_node->get_global_position();
+	all_cached_direction[bullet_index] = (target_position - all_cached_instance_origin[bullet_index]).normalized();
+
+}
+void MultiMeshBullets2D::all_bullets_set_direction_towards_node2d(const Node2D *target_node, int bullet_index_start, int bullet_index_end_inclusive) {
+	ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_set_direction_towards_node2d");
+
+	if (target_node == nullptr) {
+		UtilityFunctions::push_error("The target_node provided to all_bullets_set_direction_towards_node2d is null. Cannot set direction towards a null node.");
+		return;
+	}
+
+	const Vector2 target_position = target_node->get_global_position();
+
+	for (int i = bullet_index_start; i <= bullet_index_end_inclusive; ++i) {
+		set_bullet_direction_towards_position(i, target_position);
+	}
+}
+
 void MultiMeshBullets2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_bullet_speed_data", "bullet_index"), &MultiMeshBullets2D::get_bullet_speed_data);
 	ClassDB::bind_method(D_METHOD("set_bullet_speed_data", "bullet_index", "new_bullet_speed_data"), &MultiMeshBullets2D::set_bullet_speed_data);
@@ -1036,6 +1081,12 @@ void MultiMeshBullets2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_bullet_direction", "bullet_index", "new_direction"), &MultiMeshBullets2D::set_bullet_direction);
 	ClassDB::bind_method(D_METHOD("all_bullets_get_direction", "bullet_index_start", "bullet_index_end_inclusive"), &MultiMeshBullets2D::all_bullets_get_direction, DEFVAL(0), DEFVAL(-1));
 	ClassDB::bind_method(D_METHOD("all_bullets_set_direction", "new_direction", "bullet_index_start", "bullet_index_end_inclusive"), &MultiMeshBullets2D::all_bullets_set_direction, DEFVAL(0), DEFVAL(-1));
+
+	ClassDB::bind_method(D_METHOD("set_bullet_direction_towards_position", "bullet_index", "target_position"), &MultiMeshBullets2D::set_bullet_direction_towards_position);
+	ClassDB::bind_method(D_METHOD("all_bullets_set_direction_towards_position", "target_position", "bullet_index_start", "bullet_index_end_inclusive"), &MultiMeshBullets2D::all_bullets_set_direction_towards_position, DEFVAL(0), DEFVAL(-1));
+	
+	ClassDB::bind_method(D_METHOD("set_bullet_direction_towards_node2d", "bullet_index", "target_node"), &MultiMeshBullets2D::set_bullet_direction_towards_node2d);
+	ClassDB::bind_method(D_METHOD("all_bullets_set_direction_towards_node2d", "target_node", "bullet_index_start", "bullet_index_end_inclusive"), &MultiMeshBullets2D::all_bullets_set_direction_towards_node2d, DEFVAL(0), DEFVAL(-1));
 
 	ClassDB::bind_method(D_METHOD("get_bullet_texture_rotation_radians", "bullet_index"), &MultiMeshBullets2D::get_bullet_texture_rotation_radians);
 	ClassDB::bind_method(D_METHOD("set_bullet_texture_rotation_radians", "bullet_index", "new_rotation_radians"), &MultiMeshBullets2D::set_bullet_texture_rotation_radians);

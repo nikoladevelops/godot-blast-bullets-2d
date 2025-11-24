@@ -335,6 +335,12 @@ public:
 	TypedArray<Vector2> all_bullets_get_direction(int bullet_index_start = 0, int bullet_index_end_inclusive = -1) const;
 	void all_bullets_set_direction(const Vector2 &new_direction, int bullet_index_start = 0, int bullet_index_end_inclusive = -1);
 
+	void set_bullet_direction_towards_position(int bullet_index, const Vector2 &target_position);
+	void all_bullets_set_direction_towards_position(const Vector2 &target_position, int bullet_index_start = 0, int bullet_index_end_inclusive = -1);
+
+	void set_bullet_direction_towards_node2d(int bullet_index, const Node2D *target_node);
+	void all_bullets_set_direction_towards_node2d(const Node2D *target_node, int bullet_index_start = 0, int bullet_index_end_inclusive = -1);
+
 	// Bullet Texture Rotation (Radians)
 
 	real_t get_bullet_texture_rotation_radians(int bullet_index) const;

@@ -282,11 +282,12 @@ func spawn_multi_mesh_directional_bullets()->void:
 	#dir_bullets.shared_homing_deque_push_front_mouse_position_target()
 	#dir_bullets.bullet_curves_data = bullet_curves_data_1
 	#
-	dir_bullets.multimesh_attach_time_based_function(1, func():
-		#dir_bullets.all_bullets_set_direction(Vector2(1,0))
-		dir_bullets.all_bullets_set_transforms(Transform2D(), true)
-		#dir_bullets.all_bullets_set_texture_rotation_degrees(120)
-		, false, true)
+	#dir_bullets.multimesh_attach_time_based_function(1, func():
+		##dir_bullets.all_bullets_set_direction(Vector2(1,0))
+		##dir_bullets.all_bullets_set_transforms(Transform2D(), true)
+		##dir_bullets.all_bullets_set_direction_towards_node2d(BENCHMARK_GLOBALS.MOVING_TARGET_ONE)
+		##dir_bullets.all_bullets_set_texture_rotation_degrees(120)
+		#, false, true)
 		
 		
 	#dir_bullets.inherited_velocity_offset = Vector2(5000, 0)
