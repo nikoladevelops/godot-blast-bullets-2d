@@ -344,12 +344,20 @@ public:
 	void all_bullets_set_texture_rotation_radians(real_t new_rotation_radians, int bullet_index_start = 0, int bullet_index_end_inclusive = -1);
 
 	// Bullet Texture Rotation (Degrees)
-	
+
 	real_t get_bullet_texture_rotation_degrees(int bullet_index) const;
 	void set_bullet_texture_rotation_degrees(int bullet_index, real_t new_rotation_degrees);
 
 	TypedArray<real_t> all_bullets_get_texture_rotation_degrees(int bullet_index_start = 0, int bullet_index_end_inclusive = -1) const;
 	void all_bullets_set_texture_rotation_degrees(real_t new_rotation_degrees, int bullet_index_start = 0, int bullet_index_end_inclusive = -1);
+
+	// Bullet Transforms
+
+	Transform2D get_bullet_transform(int bullet_index) const;
+	void set_bullet_transform(int bullet_index, const Transform2D &new_transform, bool set_direction_based_on_transform = false);
+
+	TypedArray<Transform2D> all_bullets_get_transforms(int bullet_index_start = 0, int bullet_index_end_inclusive = -1) const;
+	void all_bullets_set_transforms(const Transform2D &new_transform, bool set_direction_based_on_transform = false, int bullet_index_start = 0, int bullet_index_end_inclusive = -1);
 
 protected:
 	static void _bind_methods();

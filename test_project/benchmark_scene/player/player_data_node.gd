@@ -283,8 +283,9 @@ func spawn_multi_mesh_directional_bullets()->void:
 	#dir_bullets.bullet_curves_data = bullet_curves_data_1
 	#
 	dir_bullets.multimesh_attach_time_based_function(1, func():
-		dir_bullets.all_bullets_set_direction(Vector2(0,1))
-		dir_bullets.all_bullets_set_texture_rotation_degrees(120)
+		#dir_bullets.all_bullets_set_direction(Vector2(1,0))
+		dir_bullets.all_bullets_set_transforms(Transform2D(), true)
+		#dir_bullets.all_bullets_set_texture_rotation_degrees(120)
 		, false, true)
 		
 		

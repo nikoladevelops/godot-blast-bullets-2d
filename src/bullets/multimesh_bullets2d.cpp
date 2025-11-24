@@ -956,6 +956,76 @@ void MultiMeshBullets2D::all_bullets_set_texture_rotation_degrees(real_t new_rot
 	}
 }
 
+Transform2D MultiMeshBullets2D::get_bullet_transform(int bullet_index) const {
+	if (!validate_bullet_index(bullet_index, "get_bullet_transform")) {
+		return Transform2D();
+	}
+
+	return all_cached_instance_transforms[bullet_index];
+}
+void MultiMeshBullets2D::set_bullet_transform(int bullet_index, const Transform2D &new_transform, bool set_direction_based_on_transform) {
+	if (!validate_bullet_index(bullet_index, "set_bullet_transform")) {
+		return;
+	}
+	// Bullet texture related
+	auto &curr_bullet_transf = all_cached_instance_transforms[bullet_index];
+	auto &curr_bullet_origin = all_cached_instance_origin[bullet_index];
+
+	// Bullet shape related
+	auto &curr_shape_transf = all_cached_shape_transforms[bullet_index];
+	auto &curr_shape_origin = all_cached_shape_origin[bullet_index];
+
+	// Update texture transform and origin
+	curr_bullet_transf = new_transform;
+	curr_bullet_origin = new_transform.get_origin();
+
+	// Calculate new shape transform and origin
+	curr_shape_transf = new_transform;
+
+	// The user had previously set a collision shape offset relative to the center of the texture, so it needs to be re-calculated by taking into account the new rotation of the bullet
+	Vector2 rotated_offset = cache_collision_shape_offset.rotated(curr_shape_transf.get_rotation());
+
+	// Update the shape origin
+	curr_shape_origin = curr_bullet_origin + rotated_offset;
+
+	// Update the shape transform origin with the rotated offset
+	curr_shape_transf.set_origin(curr_shape_origin);
+
+	// Instantly apply the updated transforms
+	if (bullets_enabled_status[bullet_index]) { // Apply to multi only if the bullet is enabled (if disabled the transform is zero which prevents the multimesh from rendering it)
+		multi->set_instance_transform_2d(bullet_index, curr_bullet_transf);
+	}
+
+	// Update direction if requested
+	if (set_direction_based_on_transform) {
+		Vector2 new_direction = Vector2(1, 0).rotated(curr_bullet_transf.get_rotation());
+		all_cached_direction[bullet_index] = new_direction.normalized();
+	}
+
+	physics_server->area_set_shape_transform(area, bullet_index, curr_shape_transf);
+
+	update_bullet_previous_transform_for_interpolation(bullet_index);
+}
+
+TypedArray<Transform2D> MultiMeshBullets2D::all_bullets_get_transforms(int bullet_index_start, int bullet_index_end_inclusive) const {
+	ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_get_transforms");
+
+	TypedArray<Transform2D> arr;
+	for (int i = bullet_index_start; i <= bullet_index_end_inclusive; ++i) {
+		arr.push_back(get_bullet_transform(i));
+	}
+
+	return arr;
+}
+
+void MultiMeshBullets2D::all_bullets_set_transforms(const Transform2D &new_transform, bool set_direction_based_on_transform, int bullet_index_start, int bullet_index_end_inclusive) {
+	ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_set_transforms");
+
+	for (int i = bullet_index_start; i <= bullet_index_end_inclusive; ++i) {
+		set_bullet_transform(i, new_transform, set_direction_based_on_transform);
+	}
+}
+
 void MultiMeshBullets2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_bullet_speed_data", "bullet_index"), &MultiMeshBullets2D::get_bullet_speed_data);
 	ClassDB::bind_method(D_METHOD("set_bullet_speed_data", "bullet_index", "new_bullet_speed_data"), &MultiMeshBullets2D::set_bullet_speed_data);
@@ -976,6 +1046,11 @@ void MultiMeshBullets2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_bullet_texture_rotation_degrees", "bullet_index", "new_rotation_degrees"), &MultiMeshBullets2D::set_bullet_texture_rotation_degrees);
 	ClassDB::bind_method(D_METHOD("all_bullets_get_texture_rotation_degrees", "bullet_index_start", "bullet_index_end_inclusive"), &MultiMeshBullets2D::all_bullets_get_texture_rotation_degrees, DEFVAL(0), DEFVAL(-1));
 	ClassDB::bind_method(D_METHOD("all_bullets_set_texture_rotation_degrees", "new_rotation_degrees", "bullet_index_start", "bullet_index_end_inclusive"), &MultiMeshBullets2D::all_bullets_set_texture_rotation_degrees, DEFVAL(0), DEFVAL(-1));
+
+	ClassDB::bind_method(D_METHOD("get_bullet_transform", "bullet_index"), &MultiMeshBullets2D::get_bullet_transform);
+	ClassDB::bind_method(D_METHOD("set_bullet_transform", "bullet_index", "new_transform", "set_direction_based_on_transform"), &MultiMeshBullets2D::set_bullet_transform, DEFVAL(false));
+	ClassDB::bind_method(D_METHOD("all_bullets_get_transforms", "bullet_index_start", "bullet_index_end_inclusive"), &MultiMeshBullets2D::all_bullets_get_transforms, DEFVAL(0), DEFVAL(-1));
+	ClassDB::bind_method(D_METHOD("all_bullets_set_transforms", "new_transform", "set_direction_based_on_transform", "bullet_index_start", "bullet_index_end_inclusive"), &MultiMeshBullets2D::all_bullets_set_transforms, DEFVAL(false), DEFVAL(0), DEFVAL(-1));
 
 	ClassDB::bind_method(D_METHOD("get_textures"), &MultiMeshBullets2D::get_textures);
 	ClassDB::bind_method(D_METHOD("set_textures", "new_textures", "new_change_texture_times", "selected_texture_index"), &MultiMeshBullets2D::set_textures, DEFVAL(0));
