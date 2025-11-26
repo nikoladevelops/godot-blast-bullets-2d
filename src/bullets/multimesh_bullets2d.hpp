@@ -595,6 +595,7 @@ protected:
 
 		const bool is_movement_curve_valid = bullet_curves_data->movement_speed_curve.is_valid();
 		const bool is_rotation_curve_valid = bullet_curves_data->rotation_speed_curve.is_valid();
+		const bool is_x_direction_curve_valid = bullet_curves_data->x_direction_curve.is_valid();
 
 		if (is_rotation_curve_valid) {
 			if (all_rotation_speed.size() != amount_bullets) {
@@ -609,11 +610,27 @@ protected:
 
 			if (is_movement_curve_valid) {
 				all_cached_speed[i] = get_bullet_curves_movement_speed();
-				all_cached_velocity[i] = all_cached_direction[i] * all_cached_speed[i] + inherited_velocity_offset;
 			}
 
 			if (is_rotation_curve_valid) {
 				all_rotation_speed[i] = get_bullet_curves_rotation_speed();
+			}
+
+			if (is_x_direction_curve_valid) {
+				auto &current_direction = all_cached_direction[i];
+
+				apply_x_direction_curve_value_to_direction_vector_without_normalization(current_direction);
+
+				current_direction = current_direction.normalized();
+
+				// // Rotate towards direction optionally
+				// if (bullet_curves_data->rotate_towards_adjusted_direction && !is_rotation_active) {
+				// 	all_cached_instance_transforms[i].set_rotation(current_direction.angle());
+				// }
+			}
+
+			if (is_movement_curve_valid || is_x_direction_curve_valid) {
+				all_cached_velocity[i] = all_cached_direction[i] * all_cached_speed[i] + inherited_velocity_offset;
 			}
 
 			// // Rotation (always apply if curves valid, overriding static if present)
@@ -627,6 +644,41 @@ protected:
 
 		if (is_rotation_curve_valid) {
 			is_rotation_active = true;
+		}
+	}
+
+	_ALWAYS_INLINE_ void adjust_direction_based_on_x_direction_curve(int bullet_index, Vector2 &curr_bullet_direction, Transform2D &curr_bullet_transf, double delta) {
+		const bool is_x_direction_curve_valid = bullet_curves_data.is_valid() && bullet_curves_data->get_x_direction_curve().is_valid();
+
+		if (is_x_direction_curve_valid) {
+			real_t x_dir_offset = get_bullet_curves_x_direction_offset();
+
+			apply_x_direction_curve_value_to_direction_vector_without_normalization(curr_bullet_direction);
+
+			curr_bullet_direction = curr_bullet_direction.normalized();
+
+			// Rotate towards direction optionally
+			if (bullet_curves_data->rotate_towards_adjusted_direction && !is_rotation_active) {
+				real_t target = curr_bullet_direction.angle();
+				real_t current = curr_bullet_transf.get_rotation();
+
+				real_t diff = Math::fposmod(target - current + Math_PI, Math_TAU) - Math_PI;
+				real_t step = bullet_curves_data->direction_curve_rotation_speed * (real_t)delta;
+
+				rotate_transform_locally(curr_bullet_transf, Math::clamp(diff, -step, step));
+			}
+		}
+	}
+
+	_ALWAYS_INLINE_ void apply_x_direction_curve_value_to_direction_vector_without_normalization(Vector2 &direction_vector) {
+		const real_t x_dir_offset = get_bullet_curves_x_direction_offset();
+		const real_t x_direction_curve_strength = bullet_curves_data->x_direction_curve_strength;
+		auto x_curve_mode = bullet_curves_data->x_direction_curve_mode;
+
+		if (x_curve_mode == DirectionCurveMode::Additive) {
+			direction_vector.x += x_dir_offset * x_direction_curve_strength;
+		} else {
+			direction_vector.x = x_dir_offset * x_direction_curve_strength;
 		}
 	}
 
@@ -656,6 +708,20 @@ protected:
 		}
 
 		return bullet_curves_data->rotation_speed_curve->sample_baked(input_x);
+	}
+
+	_ALWAYS_INLINE_ real_t get_bullet_curves_x_direction_offset() {
+		bool use_normalized = bullet_curves_data->x_direction_use_unit_curve && !is_life_time_infinite;
+
+		real_t input_x;
+		if (use_normalized) {
+			real_t progress = Math::clamp(elapsed_time / max_life_time, 0.0, 1.0);
+			input_x = progress;
+		} else {
+			input_x = elapsed_time;
+		}
+
+		return bullet_curves_data->x_direction_curve->sample_baked(input_x);
 	}
 
 	////////////

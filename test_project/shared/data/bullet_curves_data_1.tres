@@ -1,6 +1,10 @@
-[gd_resource type="BulletCurvesData2D" load_steps=2 format=3 uid="uid://bm8i7kuaes44c"]
+[gd_resource type="BulletCurvesData2D" load_steps=3 format=3 uid="uid://bm8i7kuaes44c"]
 
 [ext_resource type="Curve" uid="uid://c8dhbcuuqpmat" path="res://shared/data/speed_curve.tres" id="1_nu7sj"]
+[ext_resource type="Curve" uid="uid://2e2x4r1ufxqn" path="res://shared/data/direction_curve.tres" id="2_3ltir"]
 
 [resource]
 movement_speed_curve = ExtResource("1_nu7sj")
+x_direction_curve = ExtResource("2_3ltir")
+x_direction_curve_strength = 0.25
+direction_curve_rotation_speed = 5.0

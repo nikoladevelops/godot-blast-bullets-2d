@@ -53,15 +53,21 @@ public:
 
 		bool shared_homing_deque_enabled = !shared_homing_deque.empty();
 
+
 		for (int i = 0; i < amount_bullets; ++i) {
 			if (!bullets_enabled_status[i]) {
 				continue;
 			}
 
+			// Bullet texture related
+			auto &curr_bullet_transf = all_cached_instance_transforms[i];
+
 			if (shared_homing_deque_enabled) {
 				update_homing(shared_homing_deque, true, i, delta, homing_interval_reached);
 			} else if (!all_bullet_homing_targets[i].empty()) {
 				update_homing(all_bullet_homing_targets[i], false, i, delta, homing_interval_reached);
+			} else {
+				adjust_direction_based_on_x_direction_curve(i, all_cached_direction[i], curr_bullet_transf, delta);
 			}
 
 			if (is_rotation_active) {
@@ -71,11 +77,7 @@ public:
 			// The velocity at which the bullet will move this frame
 			const Vector2 velocity_delta = all_cached_velocity[i] * delta;
 
-			// Bullet texture related
-			auto &curr_bullet_transf = all_cached_instance_transforms[i];
 			auto &curr_shape_transf = all_cached_shape_transforms[i];
-
-			// Bullet shape related
 			auto &curr_bullet_origin = all_cached_instance_origin[i];
 			auto &curr_shape_origin = all_cached_shape_origin[i];
 
@@ -685,12 +687,16 @@ protected:
 			current_direction = diff.normalized();
 		}
 
+		// Adjust the direction in case a direction curve was used
+		adjust_direction_based_on_x_direction_curve(bullet_index, current_direction, all_cached_instance_transforms[bullet_index], delta);
+
 		// Thrust: Align velocity to new direction
 		all_cached_velocity[bullet_index] = current_direction * cached_speed + inherited_velocity_offset;
 
 		// Emit if target reached
 		try_to_emit_bullet_homing_target_reached_signal(homing_deque, is_using_shared_homing_deque, bullet_index, bullet_pos, target_pos);
 	}
+
 
 	// Rotates bullet to face target with smoothing (boundary-agnostic version)
 	_ALWAYS_INLINE_ void rotate_to_target(int bullet_index, const Vector2 &diff, real_t max_turn, bool use_smoothing) {
