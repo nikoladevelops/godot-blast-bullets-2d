@@ -28,6 +28,11 @@ public:
 	real_t x_direction_curve_strength = 1.0;
 	DirectionCurveMode x_direction_curve_mode = DirectionCurveMode::Additive;
 
+	Ref<Curve> y_direction_curve;
+	bool y_direction_use_unit_curve = true;
+	real_t y_direction_curve_strength = 1.0;
+	DirectionCurveMode y_direction_curve_mode = DirectionCurveMode::Additive;
+
 	bool rotate_towards_adjusted_direction = true;
 	real_t direction_curve_rotation_speed = 18.0f;
 
@@ -60,6 +65,18 @@ public:
 
 	real_t get_direction_curve_rotation_speed() const;
 	void set_direction_curve_rotation_speed(real_t value);
+
+	Ref<Curve> get_y_direction_curve() const;
+	void set_y_direction_curve(const Ref<Curve> &curve);
+
+	bool get_y_direction_use_unit_curve() const;
+	void set_y_direction_use_unit_curve(bool value);
+
+	real_t get_y_direction_curve_strength() const;
+	void set_y_direction_curve_strength(real_t value);
+
+	DirectionCurveMode get_y_direction_curve_mode() const;
+	void set_y_direction_curve_mode(DirectionCurveMode mode);
 
 protected:
 	static void _bind_methods();

@@ -5,6 +5,8 @@
 
 [resource]
 movement_speed_curve = ExtResource("1_nu7sj")
+rotate_towards_adjusted_direction = false
 x_direction_curve = ExtResource("2_3ltir")
 x_direction_curve_strength = 0.25
-direction_curve_rotation_speed = 5.0
+y_direction_curve = ExtResource("2_3ltir")
+y_direction_curve_strength = 0.25

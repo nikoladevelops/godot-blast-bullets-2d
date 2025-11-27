@@ -53,7 +53,6 @@ public:
 
 		bool shared_homing_deque_enabled = !shared_homing_deque.empty();
 
-
 		for (int i = 0; i < amount_bullets; ++i) {
 			if (!bullets_enabled_status[i]) {
 				continue;
@@ -66,8 +65,13 @@ public:
 				update_homing(shared_homing_deque, true, i, delta, homing_interval_reached);
 			} else if (!all_bullet_homing_targets[i].empty()) {
 				update_homing(all_bullet_homing_targets[i], false, i, delta, homing_interval_reached);
-			} else {
-				adjust_direction_based_on_x_direction_curve(i, all_cached_direction[i], curr_bullet_transf, delta);
+			} else { // Apply curves data if available
+				auto &curr_bullet_direction = all_cached_direction[i];
+
+				apply_x_direction_curve(curr_bullet_direction);
+				apply_y_direction_curve(curr_bullet_direction);
+
+				apply_direction_curve_texture_rotation_if_needed(curr_bullet_direction, curr_bullet_transf, delta);
 			}
 
 			if (is_rotation_active) {
@@ -674,21 +678,25 @@ protected:
 		bool use_smoothing = (homing_smoothing > 0.0); // Hoist for clamp
 
 		Vector2 &current_direction = all_cached_direction[bullet_index];
-
+		
+		auto &curr_transf = all_cached_instance_transforms[bullet_index];
+		
 		// If rotation is not active then rotate the bullet by applying smoothing
 		if (!is_rotation_active) {
 			// Rotate toward target with smoothing
 			rotate_to_target(bullet_index, diff, max_turn, use_smoothing);
 
 			// Get the new direction based on the rotated transform
-			current_direction = all_cached_instance_transforms[bullet_index][0].normalized();
+			current_direction = curr_transf[0].normalized();
 		} else {
 			// If rotation is indeed active there is no need to handle rotation yourself, the user wants spinning bullets
 			current_direction = diff.normalized();
 		}
 
 		// Adjust the direction in case a direction curve was used
-		adjust_direction_based_on_x_direction_curve(bullet_index, current_direction, all_cached_instance_transforms[bullet_index], delta);
+		apply_x_direction_curve(current_direction);
+		apply_y_direction_curve(current_direction);
+		apply_direction_curve_texture_rotation_if_needed(current_direction, curr_transf, delta);
 
 		// Thrust: Align velocity to new direction
 		all_cached_velocity[bullet_index] = current_direction * cached_speed + inherited_velocity_offset;
@@ -696,7 +704,6 @@ protected:
 		// Emit if target reached
 		try_to_emit_bullet_homing_target_reached_signal(homing_deque, is_using_shared_homing_deque, bullet_index, bullet_pos, target_pos);
 	}
-
 
 	// Rotates bullet to face target with smoothing (boundary-agnostic version)
 	_ALWAYS_INLINE_ void rotate_to_target(int bullet_index, const Vector2 &diff, real_t max_turn, bool use_smoothing) {
