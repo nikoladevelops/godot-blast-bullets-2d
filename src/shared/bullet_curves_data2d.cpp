@@ -134,7 +134,7 @@ void BulletCurvesData2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_movement_use_unit_curve"), &BulletCurvesData2D::get_movement_use_unit_curve);
 	ClassDB::bind_method(D_METHOD("set_movement_use_unit_curve", "value"), &BulletCurvesData2D::set_movement_use_unit_curve);
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "movement_use_unit_curve"), "set_movement_use_unit_curve", "get_movement_use_unit_curve");
-	
+
 	//
 
 	// Rotation Speed Curve
@@ -148,9 +148,9 @@ void BulletCurvesData2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_rotation_use_unit_curve"), &BulletCurvesData2D::get_rotation_use_unit_curve);
 	ClassDB::bind_method(D_METHOD("set_rotation_use_unit_curve", "value"), &BulletCurvesData2D::set_rotation_use_unit_curve);
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "rotation_use_unit_curve"), "set_rotation_use_unit_curve", "get_rotation_use_unit_curve");
-	
+
 	//
-	
+
 	// X Direction Curve
 
 	ClassDB::bind_method(D_METHOD("get_x_direction_curve"), &BulletCurvesData2D::get_x_direction_curve);
@@ -208,7 +208,7 @@ void BulletCurvesData2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_direction_curve_rotation_speed"), &BulletCurvesData2D::get_direction_curve_rotation_speed);
 	ClassDB::bind_method(D_METHOD("set_direction_curve_rotation_speed", "value"), &BulletCurvesData2D::set_direction_curve_rotation_speed);
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "direction_curve_rotation_speed"), "set_direction_curve_rotation_speed", "get_direction_curve_rotation_speed");
-	
+
 	//
 
 	BIND_ENUM_CONSTANT(Additive);

@@ -811,7 +811,7 @@ void MultiMeshBullets2D::set_bullet_speed_data(int bullet_index, const Ref<Bulle
 		return;
 	}
 
-	if (bullet_curves_data.is_valid() && bullet_curves_data->movement_speed_curve.is_valid()) {
+	if (shared_bullet_curves_data.is_valid() && shared_bullet_curves_data->movement_speed_curve.is_valid()) {
 		UtilityFunctions::push_warning("You are trying to set bullet speed data directly while having a movement speed curve assigned. The curve will override any direct speed data changes. Set the curve to null first if you want to set speed data directly.");
 		return;
 	}
@@ -835,7 +835,7 @@ TypedArray<BulletSpeedData2D> MultiMeshBullets2D::all_bullets_get_speed_data(int
 void MultiMeshBullets2D::all_bullets_set_speed_data(const Ref<BulletSpeedData2D> &new_bullet_speed_data, int bullet_index_start, int bullet_index_end_inclusive) {
 	ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_set_speed_data");
 
-	if (bullet_curves_data.is_valid() && bullet_curves_data->movement_speed_curve.is_valid()) {
+	if (shared_bullet_curves_data.is_valid() && shared_bullet_curves_data->movement_speed_curve.is_valid()) {
 		UtilityFunctions::push_warning("You are trying to set bullet speed data directly while having a movement speed curve assigned. The curve will override any direct speed data changes. Set the curve to null first if you want to set speed data directly.");
 		return;
 	}
@@ -1226,10 +1226,14 @@ void MultiMeshBullets2D::_bind_methods() {
 
 	ClassDB::bind_method(D_METHOD("bullet_set_attachment", "bullet_index", "attachment_scene", "attachment_pooling_id", "bullet_attachment_offset", "stick_relative_to_bullet"), &MultiMeshBullets2D::bullet_set_attachment, DEFVAL(true));
 
-	ClassDB::bind_method(D_METHOD("set_bullet_curves_data", "data"), &MultiMeshBullets2D::set_bullet_curves_data);
-	ClassDB::bind_method(D_METHOD("get_bullet_curves_data"), &MultiMeshBullets2D::get_bullet_curves_data);
+	ClassDB::bind_method(D_METHOD("set_shared_bullet_curves_data", "data"), &MultiMeshBullets2D::set_shared_bullet_curves_data);
+	ClassDB::bind_method(D_METHOD("get_shared_bullet_curves_data"), &MultiMeshBullets2D::get_shared_bullet_curves_data);
 	ADD_PROPERTY(
-			PropertyInfo(Variant::OBJECT, "bullet_curves_data", PROPERTY_HINT_RESOURCE_TYPE, "BulletCurvesData2D"),
-			"set_bullet_curves_data", "get_bullet_curves_data");
+			PropertyInfo(Variant::OBJECT, "shared_bullet_curves_data", PROPERTY_HINT_RESOURCE_TYPE, "BulletCurvesData2D"),
+			"set_shared_bullet_curves_data", "get_shared_bullet_curves_data");
+
+	ClassDB::bind_method(D_METHOD("bullet_set_curves_data", "bullet_index","data"), &MultiMeshBullets2D::bullet_set_curves_data);
+	ClassDB::bind_method(D_METHOD("bullet_get_curves_data"), &MultiMeshBullets2D::bullet_get_curves_data);
+
 }
 } //namespace BlastBullets2D

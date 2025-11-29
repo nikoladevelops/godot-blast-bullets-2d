@@ -72,6 +72,8 @@ public:
 				apply_y_direction_curve(curr_bullet_direction);
 
 				apply_direction_curve_texture_rotation_if_needed(curr_bullet_direction, curr_bullet_transf, delta);
+
+				// TODO handle per bullet curves data too
 			}
 
 			if (is_rotation_active) {
@@ -678,9 +680,9 @@ protected:
 		bool use_smoothing = (homing_smoothing > 0.0); // Hoist for clamp
 
 		Vector2 &current_direction = all_cached_direction[bullet_index];
-		
+
 		auto &curr_transf = all_cached_instance_transforms[bullet_index];
-		
+
 		// If rotation is not active then rotate the bullet by applying smoothing
 		if (!is_rotation_active) {
 			// Rotate toward target with smoothing
@@ -697,6 +699,8 @@ protected:
 		apply_x_direction_curve(current_direction);
 		apply_y_direction_curve(current_direction);
 		apply_direction_curve_texture_rotation_if_needed(current_direction, curr_transf, delta);
+
+		// TODO handle per bullet curves data too
 
 		// Thrust: Align velocity to new direction
 		all_cached_velocity[bullet_index] = current_direction * cached_speed + inherited_velocity_offset;
@@ -749,7 +753,7 @@ protected:
 		real_t rot_delta = cache_rotation_speed * (real_t)delta;
 
 		// If the curves data is valid it means we are using it, so just apply it
-		if (bullet_curves_data.is_valid() && bullet_curves_data->rotation_speed_curve.is_valid()) {
+		if (shared_bullet_curves_data.is_valid() && shared_bullet_curves_data->rotation_speed_curve.is_valid()) {
 			rotate_transform_locally(all_cached_instance_transforms[bullet_index], rot_delta);
 		} else { // Otherwise use the normal way with acceleration and ensure the valid range and options
 			// Apply rotation if active or speed > 0
@@ -772,8 +776,8 @@ protected:
 
 		// TODO
 		// // Apply direction curve offset (radians y)
-		// if (bullet_curves_data.is_valid() && !is_life_time_infinite) {
-		// 	real_t dir_offset = get_bullet_curves_data_target_direction_offset();
+		// if (shared_bullet_curves_data.is_valid() && !is_life_time_infinite) {
+		// 	real_t dir_offset = get_shared_bullet_curves_data_target_direction_offset();
 
 		// 	all_cached_direction[bullet_index] = all_cached_direction[bullet_index].rotated(dir_offset).normalized();
 		// 	all_cached_velocity[bullet_index] = all_cached_direction[bullet_index] * all_cached_speed[bullet_index];
