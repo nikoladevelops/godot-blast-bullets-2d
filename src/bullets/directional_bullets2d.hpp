@@ -15,6 +15,7 @@
 #include "godot_cpp/variant/variant.hpp"
 #include "godot_cpp/variant/vector2.hpp"
 #include "multimesh_bullets2d.hpp"
+#include "shared/bullet_curves_data2d.hpp"
 #include "spawn-data/multimesh_bullets_data2d.hpp"
 
 #include <vector>
@@ -40,48 +41,98 @@ public:
 
 	// Updates all bullets' positions, rotations, and homing
 	_ALWAYS_INLINE_ void move_bullets(double delta) {
-		bool is_using_physics_interpolation = bullet_factory->use_physics_interpolation;
+		const bool is_using_physics_interpolation = bullet_factory->use_physics_interpolation;
 
 		update_all_previous_transforms_for_interpolation();
 
-		bool homing_interval_reached = update_homing_timer(delta);
+		const bool homing_interval_reached = update_homing_timer(delta);
 
 		// Cache the global mouse position for performance reasons (otherwise I would be fetching it per bullet when it doesn't even change..)
 		if (homing_interval_reached && HomingTargetDeque::mouse_homing_targets_amount > 0) { // Update the cache only when homing interval has been reached and only if there are targets that do follow the mouse
 			cached_mouse_global_position = get_global_mouse_position();
 		}
 
-		bool shared_homing_deque_enabled = !shared_homing_deque.empty();
+		const bool shared_homing_deque_enabled = !shared_homing_deque.empty();
+		Vector2 homing_bullet_pos;
+		Vector2 homing_target_pos;
+
+		const bool shared_curves_data_enabled = shared_bullet_curves_data.is_valid();
+		const BulletCurvesData2D *const shared_curves_ptr = shared_bullet_curves_data.ptr();
+
+		bool is_per_bullet_curves_valid = false;
+		const BulletCurvesData2D *per_bullet_curves_data = nullptr;
 
 		for (int i = 0; i < amount_bullets; ++i) {
 			if (!bullets_enabled_status[i]) {
 				continue;
 			}
 
-			// Bullet texture related
-			auto &curr_bullet_transf = all_cached_instance_transforms[i];
+			bool direction_got_updated = false;
 
-			if (shared_homing_deque_enabled) {
-				update_homing(shared_homing_deque, true, i, delta, homing_interval_reached);
-			} else if (!all_bullet_homing_targets[i].empty()) {
-				update_homing(all_bullet_homing_targets[i], false, i, delta, homing_interval_reached);
-			} else { // Apply curves data if available
-				auto &curr_bullet_direction = all_cached_direction[i];
+			// Handle homing
+			if (shared_homing_deque_enabled) { // Using the shared homing deque to update homing
+				update_homing(shared_homing_deque, true, i, delta, homing_interval_reached, homing_bullet_pos, homing_target_pos);
+				try_to_emit_bullet_homing_target_reached_signal(shared_homing_deque, shared_homing_deque_enabled, i, homing_bullet_pos, homing_target_pos);
+				direction_got_updated = true;
 
-				apply_x_direction_curve(curr_bullet_direction);
-				apply_y_direction_curve(curr_bullet_direction);
-
-				apply_direction_curve_texture_rotation_if_needed(curr_bullet_direction, curr_bullet_transf, delta);
-
-				// TODO handle per bullet curves data too
+			} else if (!all_bullet_homing_targets[i].empty()) { // If no shared homing deque, check if bullets have individual homing dequeues and use those instead
+				auto &curr_homing_deque = all_bullet_homing_targets[i];
+				update_homing(curr_homing_deque, false, i, delta, homing_interval_reached, homing_bullet_pos, homing_target_pos);
+				try_to_emit_bullet_homing_target_reached_signal(curr_homing_deque, shared_homing_deque_enabled, i, homing_bullet_pos, homing_target_pos);
+				direction_got_updated = true;
 			}
 
-			if (is_rotation_active) {
+			auto &curr_bullet_transf = all_cached_instance_transforms[i];
+			auto &curr_bullet_direction = all_cached_direction[i];
+
+			// Handle direction curves
+			if (shared_curves_data_enabled) {
+				apply_x_direction_curve(curr_bullet_direction, shared_curves_ptr);
+				apply_y_direction_curve(curr_bullet_direction, shared_curves_ptr);
+				apply_direction_curve_texture_rotation_if_needed(curr_bullet_direction, curr_bullet_transf, delta, shared_curves_ptr);
+
+				direction_got_updated = true;
+			} else {
+				per_bullet_curves_data = find_bullet_curves_data(i);
+				is_per_bullet_curves_valid = per_bullet_curves_data != nullptr;
+
+				if (is_per_bullet_curves_valid) {
+					per_bullet_curves_data = all_bullet_curves_data[i].ptr();
+
+					apply_x_direction_curve(curr_bullet_direction, per_bullet_curves_data);
+					apply_y_direction_curve(curr_bullet_direction, per_bullet_curves_data);
+					apply_direction_curve_texture_rotation_if_needed(curr_bullet_direction, curr_bullet_transf, delta, per_bullet_curves_data);
+
+					direction_got_updated = true;
+				}
+			}
+
+			// Handle rotation
+			if (shared_curves_data_enabled) {
+				update_rotation_using_curve(i, delta, shared_curves_ptr);
+				bullet_accelerate_rotation_speed_using_curve(i, delta, shared_curves_ptr);
+			} else if (is_per_bullet_curves_valid && per_bullet_curves_data->rotation_speed_curve.is_valid()) {
+				update_rotation_using_curve(i, delta, per_bullet_curves_data);
+				bullet_accelerate_rotation_speed_using_curve(i, delta, per_bullet_curves_data);
+			} else if (is_rotation_data_active) {
 				update_rotation(i, delta);
+				bullet_accelerate_rotation_speed(i, delta);
+			}
+
+			if (adjust_direction_based_on_rotation) {
+				curr_bullet_direction = all_cached_instance_transforms[i].columns[0].normalized();
+				direction_got_updated = true;
 			}
 
 			// The velocity at which the bullet will move this frame
-			const Vector2 velocity_delta = all_cached_velocity[i] * delta;
+			Vector2 &velocity_delta = all_cached_velocity[i];
+
+			if (direction_got_updated) {
+				const real_t cached_speed = all_cached_speed[i];
+				velocity_delta = curr_bullet_direction * cached_speed + inherited_velocity_offset;
+			}
+
+			velocity_delta *= delta;
 
 			auto &curr_shape_transf = all_cached_shape_transforms[i];
 			auto &curr_bullet_origin = all_cached_instance_origin[i];
@@ -109,7 +160,17 @@ public:
 
 			// Updates bullet attachment and speed
 			move_bullet_attachment(velocity_delta, i);
-			accelerate_bullet_speed(delta, i, i);
+
+			// Handle bullet speed acceleration
+			if (shared_curves_data_enabled) {
+				bullet_accelerate_speed_using_curve(i, delta, shared_curves_ptr);
+			} else {
+				if (is_per_bullet_curves_valid) {
+					bullet_accelerate_speed_using_curve(i, delta, per_bullet_curves_data);
+				} else {
+					bullet_accelerate_speed(i, delta);
+				}
+			}
 
 			if (!is_using_physics_interpolation) {
 				multi->set_instance_transform_2d(i, all_cached_instance_transforms[i]);
@@ -643,12 +704,7 @@ protected:
 	HomingTargetDeque shared_homing_deque;
 
 	// Updates homing behavior for a bullet
-	_ALWAYS_INLINE_ void update_homing(HomingTargetDeque &homing_deque, bool is_using_shared_homing_deque, int bullet_index, double delta, bool interval_reached) {
-		real_t cached_speed = all_cached_speed[bullet_index];
-		if (cached_speed <= 0.0) { // Early zero-speed exit
-			return;
-		}
-
+	_ALWAYS_INLINE_ void update_homing(HomingTargetDeque &homing_deque, bool is_using_shared_homing_deque, int bullet_index, double delta, bool interval_reached, Vector2 &bullet_pos, Vector2 &target_pos) {
 		// Trim invalid homing targets (dangling pointers of already freed node2ds etc..)
 		homing_deque.bullet_homing_trim_front_invalid_targets(cached_mouse_global_position);
 
@@ -663,15 +719,11 @@ protected:
 		}
 
 		// Get the front target's cached position
-		Vector2 target_pos{ homing_deque.get_cached_front_target_global_position() };
+		target_pos = homing_deque.get_cached_front_target_global_position();
 
-		const Vector2 &bullet_pos = all_cached_instance_origin[bullet_index];
+		bullet_pos = all_cached_instance_origin[bullet_index];
 		Vector2 diff = target_pos - bullet_pos;
-		if (diff.length_squared() <= 0.0) { // Early exit if already on target
-			try_to_emit_bullet_homing_target_reached_signal(homing_deque, is_using_shared_homing_deque, bullet_index, bullet_pos, target_pos);
-			return;
-		}
-
+		
 		real_t max_turn = homing_smoothing * delta;
 		if (max_turn < 0.0) {
 			max_turn = 0.0;
@@ -684,7 +736,7 @@ protected:
 		auto &curr_transf = all_cached_instance_transforms[bullet_index];
 
 		// If rotation is not active then rotate the bullet by applying smoothing
-		if (!is_rotation_active) {
+		if (!is_rotation_data_active) {
 			// Rotate toward target with smoothing
 			rotate_to_target(bullet_index, diff, max_turn, use_smoothing);
 
@@ -694,19 +746,6 @@ protected:
 			// If rotation is indeed active there is no need to handle rotation yourself, the user wants spinning bullets
 			current_direction = diff.normalized();
 		}
-
-		// Adjust the direction in case a direction curve was used
-		apply_x_direction_curve(current_direction);
-		apply_y_direction_curve(current_direction);
-		apply_direction_curve_texture_rotation_if_needed(current_direction, curr_transf, delta);
-
-		// TODO handle per bullet curves data too
-
-		// Thrust: Align velocity to new direction
-		all_cached_velocity[bullet_index] = current_direction * cached_speed + inherited_velocity_offset;
-
-		// Emit if target reached
-		try_to_emit_bullet_homing_target_reached_signal(homing_deque, is_using_shared_homing_deque, bullet_index, bullet_pos, target_pos);
 	}
 
 	// Rotates bullet to face target with smoothing (boundary-agnostic version)
@@ -741,49 +780,29 @@ protected:
 	}
 
 	// Updates bullet rotation based on rotation speed
-	_ALWAYS_INLINE_ real_t update_rotation(int bullet_index, double delta) {
-		if (!is_rotation_active) {
-			return (real_t)0.0;
+	_ALWAYS_INLINE_ void update_rotation(int bullet_index, double delta) {
+		real_t cache_rotation_speed = all_rotation_speed[bullet_index];
+		real_t rot_delta = cache_rotation_speed * (real_t)delta;
+
+		// Apply rotation if active or speed > 0
+		if (cache_rotation_speed != 0.0f) {
+			bool max_reached = cache_rotation_speed >= all_max_rotation_speed[bullet_index];
+
+			if (!(max_reached && stop_rotation_when_max_reached)) {
+				rotate_transform_locally(all_cached_instance_transforms[bullet_index], rot_delta);
+			}
 		}
+	}
 
-		// Accelerate rotation speed first (curve or static)
-		accelerate_bullet_rotation_speed(delta, bullet_index, bullet_index);
-
+	// Updates bullet rotation based on rotation speed using a curve
+	_ALWAYS_INLINE_ void update_rotation_using_curve(int bullet_index, double delta, const BulletCurvesData2D *curves_data) {
 		real_t cache_rotation_speed = all_rotation_speed[bullet_index];
 		real_t rot_delta = cache_rotation_speed * (real_t)delta;
 
 		// If the curves data is valid it means we are using it, so just apply it
-		if (shared_bullet_curves_data.is_valid() && shared_bullet_curves_data->rotation_speed_curve.is_valid()) {
+		if (curves_data != nullptr && curves_data->rotation_speed_curve.is_valid()) {
 			rotate_transform_locally(all_cached_instance_transforms[bullet_index], rot_delta);
-		} else { // Otherwise use the normal way with acceleration and ensure the valid range and options
-			// Apply rotation if active or speed > 0
-			if (cache_rotation_speed != 0.0f) {
-				bool max_reached = cache_rotation_speed >= all_max_rotation_speed[bullet_index];
-
-				if (!(max_reached && stop_rotation_when_max_reached)) {
-					rotate_transform_locally(all_cached_instance_transforms[bullet_index], rot_delta);
-				}
-			}
 		}
-
-		if (adjust_direction_based_on_rotation) {
-			Vector2 &current_direction = all_cached_direction[bullet_index];
-			current_direction = all_cached_instance_transforms[bullet_index].columns[0].normalized();
-
-			real_t current_speed = all_cached_speed[bullet_index];
-			all_cached_velocity[bullet_index] = current_direction * current_speed;
-		}
-
-		// TODO
-		// // Apply direction curve offset (radians y)
-		// if (shared_bullet_curves_data.is_valid() && !is_life_time_infinite) {
-		// 	real_t dir_offset = get_shared_bullet_curves_data_target_direction_offset();
-
-		// 	all_cached_direction[bullet_index] = all_cached_direction[bullet_index].rotated(dir_offset).normalized();
-		// 	all_cached_velocity[bullet_index] = all_cached_direction[bullet_index] * all_cached_speed[bullet_index];
-		// }
-
-		return rot_delta;
 	}
 
 	_ALWAYS_INLINE_ void try_to_emit_bullet_homing_target_reached_signal(HomingTargetDeque &homing_deque, bool is_using_shared_homing_deque, int bullet_index, const Vector2 &bullet_pos, const Vector2 &target_pos) {

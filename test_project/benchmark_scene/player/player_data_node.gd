@@ -288,7 +288,10 @@ func spawn_multi_mesh_directional_bullets()->void:
 	#dir_bullets.bullet_homing_auto_pop_after_target_reached = true
 	dir_bullets.is_multimesh_auto_pooling_enabled = true
 	dir_bullets.bullet_max_collision_count = 1 # How many times the bullet can collide before getting disabled
-	dir_bullets.bullet_curves_data = bullet_curves_data_1
+	
+	#dir_bullets.all_bullets_set_curves_data(bullet_curves_data_1)
+	#dir_bullets.bullet_set_curves_data(0, bullet_curves_data_1)
+	dir_bullets.shared_bullet_curves_data = bullet_curves_data_1
 	
 	#dir_bullets.shared_homing_deque_push_front_mouse_position_target()
 	#dir_bullets.shared_homing_deque_auto_pop_after_target_reached = true
@@ -299,16 +302,17 @@ func spawn_multi_mesh_directional_bullets()->void:
 	#
 	#dir_bullets.all_bullets_set_attachment(gpu_particles_scn, 0, Vector2(-60, 0))
 	#dir_bullets.shared_homing_deque_auto_pop_after_target_reached=true
-	#dir_bullets.multimesh_attach_time_based_function(1, func():
-		##dir_bullets.all_bullets_set_direction(Vector2(1,0))
-		##dir_bullets.all_bullets_set_transforms(Transform2D(), true)
-		##dir_bullets.all_bullets_set_direction_towards_node2d(BENCHMARK_GLOBALS.MOVING_TARGET_ONE)
-		##dir_bullets.all_bullets_set_texture_rotation_degrees(120)
-		##dir_bullets.all_bullets_set_texture_rotation_towards_node2d(BENCHMARK_GLOBALS.MOVING_TARGET_ONE)
-		#
+	dir_bullets.multimesh_attach_time_based_function(1, func():
+		#dir_bullets.all_bullets_set_direction(Vector2(1,0))
+		dir_bullets.shared_bullet_curves_data = null
+		#dir_bullets.all_bullets_set_speed_data(null)
 		#dir_bullets.shared_homing_deque_push_back_node2d_target(BENCHMARK_GLOBALS.MOVING_TARGET_ONE)
-		#, false, true)
-		#
+		, false, true)
+	
+	dir_bullets.multimesh_attach_time_based_function(3, func():
+		dir_bullets.all_bullets_set_curves_data(bullet_curves_data_1)
+		, false, true)
+		
 	#dir_bullets.multimesh_attach_time_based_function(2, func():
 		#dir_bullets.shared_homing_deque_push_back_node2d_target(BENCHMARK_GLOBALS.MOVING_TARGET_TWO)
 		#, false, true)

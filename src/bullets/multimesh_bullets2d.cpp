@@ -8,6 +8,7 @@
 #include "godot_cpp/variant/transform2d.hpp"
 #include "godot_cpp/variant/vector2.hpp"
 #include "multimesh_bullets2d.hpp"
+#include "shared/bullet_curves_data2d.hpp"
 #include <godot_cpp/classes/physics_server2d.hpp>
 #include <godot_cpp/classes/random_number_generator.hpp>
 #include <godot_cpp/classes/scene_state.hpp>
@@ -291,7 +292,7 @@ Ref<SaveDataMultiMeshBullets2D> MultiMeshBullets2D::save(const Ref<SaveDataMulti
 	}
 
 	// BULLET ROTATION RELATED
-	if (is_rotation_active) {
+	if (is_rotation_data_active) {
 		for (int i = 0; i < all_rotation_speed.size(); ++i) {
 			Ref<BulletRotationData2D> bullet_data = memnew(BulletRotationData2D);
 			bullet_data->rotation_speed = all_rotation_speed[i];
@@ -700,11 +701,11 @@ void MultiMeshBullets2D::set_rotation_data(const TypedArray<BulletRotationData2D
 	// Same as the amount of bullets -> rotation is enabled and each provided rotation data will be used for the corresponding bullet
 	// Otherwise -> rotation is enabled, but only the first data is used
 	if (amount_rotation_data == 0) {
-		is_rotation_active = false;
+		is_rotation_data_active = false;
 		return;
 	}
 
-	is_rotation_active = true;
+	is_rotation_data_active = true;
 
 	if (amount_rotation_data == amount_bullets) {
 		use_only_first_rotation_data = false;
@@ -812,7 +813,14 @@ void MultiMeshBullets2D::set_bullet_speed_data(int bullet_index, const Ref<Bulle
 	}
 
 	if (shared_bullet_curves_data.is_valid() && shared_bullet_curves_data->movement_speed_curve.is_valid()) {
-		UtilityFunctions::push_warning("You are trying to set bullet speed data directly while having a movement speed curve assigned. The curve will override any direct speed data changes. Set the curve to null first if you want to set speed data directly.");
+		UtilityFunctions::push_warning("You are trying to set bullet speed data directly while having a movement speed curve assigned to the shared curves data. The curve will override any direct speed data changes. Set the curve to null first if you want to set speed data directly.");
+		return;
+	}
+
+	BulletCurvesData2D *curves_data = find_bullet_curves_data(bullet_index);
+
+	if (curves_data != nullptr && curves_data->movement_speed_curve.is_valid()) {
+		UtilityFunctions::push_warning("You are trying to set bullet speed data directly while having a movement speed curve assigned as an individual bullet curves data. The curve will override any direct speed data changes. Set the curve to null first if you want to set speed data directly.");
 		return;
 	}
 
@@ -855,6 +863,18 @@ Vector2 MultiMeshBullets2D::get_bullet_direction(int bullet_index) const {
 
 void MultiMeshBullets2D::set_bullet_direction(int bullet_index, const Vector2 &new_direction) {
 	if (!validate_bullet_index(bullet_index, "set_bullet_direction")) {
+		return;
+	}
+
+	if (shared_bullet_curves_data.is_valid() && (shared_bullet_curves_data->x_direction_curve.is_valid() || shared_bullet_curves_data->y_direction_curve.is_valid())) {
+		UtilityFunctions::push_warning("You are trying to set bullet direction directly while having a direction curve assigned to the shared curves data. The curve will override any direct speed data changes. Set the curve to null first if you want to set speed data directly.");
+		return;
+	}
+
+	BulletCurvesData2D *curves_data = find_bullet_curves_data(bullet_index);
+
+	if (curves_data != nullptr && (curves_data->x_direction_curve.is_valid() || curves_data->y_direction_curve.is_valid())) {
+		UtilityFunctions::push_warning("You are trying to set bullet direction directly while having a direction curve assigned to the individual curves data. The curve will override any direct speed data changes. Set the curve to null first if you want to set speed data directly.");
 		return;
 	}
 
@@ -1232,8 +1252,9 @@ void MultiMeshBullets2D::_bind_methods() {
 			PropertyInfo(Variant::OBJECT, "shared_bullet_curves_data", PROPERTY_HINT_RESOURCE_TYPE, "BulletCurvesData2D"),
 			"set_shared_bullet_curves_data", "get_shared_bullet_curves_data");
 
-	ClassDB::bind_method(D_METHOD("bullet_set_curves_data", "bullet_index","data"), &MultiMeshBullets2D::bullet_set_curves_data);
+	ClassDB::bind_method(D_METHOD("bullet_set_curves_data", "bullet_index", "data"), &MultiMeshBullets2D::bullet_set_curves_data);
 	ClassDB::bind_method(D_METHOD("bullet_get_curves_data"), &MultiMeshBullets2D::bullet_get_curves_data);
-
+	ClassDB::bind_method(D_METHOD("all_bullets_get_curves_data", "bullet_index_start", "bullet_index_end_inclusive"), &MultiMeshBullets2D::all_bullets_get_curves_data, DEFVAL(0), DEFVAL(-1));
+	ClassDB::bind_method(D_METHOD("all_bullets_set_curves_data", "curves_data", "bullet_index_start", "bullet_index_end_inclusive"), &MultiMeshBullets2D::all_bullets_set_curves_data, DEFVAL(0), DEFVAL(-1));
 }
 } //namespace BlastBullets2D

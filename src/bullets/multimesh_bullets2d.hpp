@@ -25,6 +25,7 @@
 #include "shared/bullet_curves_data2d.hpp"
 #include "shared/bullet_speed_data2d.hpp"
 
+#include <cstddef>
 #include <cstdint>
 #include <godot_cpp/classes/engine.hpp>
 #include <godot_cpp/classes/mesh.hpp>
@@ -274,7 +275,7 @@ public:
 	void set_is_attachments_auto_pooling_enabled(bool value) { is_attachments_auto_pooling_enabled = value; }
 
 	Ref<BulletCurvesData2D> get_shared_bullet_curves_data() const { return shared_bullet_curves_data; }
-	void set_shared_bullet_curves_data(const Ref<BulletCurvesData2D> &new_curves_data) { populate_curves_related_data(new_curves_data); }
+	void set_shared_bullet_curves_data(const Ref<BulletCurvesData2D> &new_curves_data) { populate_shared_curves_related_data(new_curves_data); }
 
 	TypedArray<Texture2D> get_textures() const { return textures; }
 	void set_textures(const TypedArray<Texture2D> &new_textures, const TypedArray<double> &new_change_texture_times, int selected_texture_index = 0) {
@@ -404,7 +405,7 @@ protected:
 	bool rotate_only_textures = false;
 
 	// Important. Determines if there was valid rotation data passed, if its true it means the rotation logic will work
-	bool is_rotation_active = false;
+	bool is_rotation_data_active = false;
 
 	// If true it means that only a single BulletRotationData2D was provided, so it will be used for each bullet. If false it means that we have BulletRotationData2D for each bullet. It is determined by the amount of BulletRotationData2D passed to spawn()
 	bool use_only_first_rotation_data = false;
@@ -586,10 +587,8 @@ protected:
 	}
 
 	//////////////////// CURVES RELATED
-	_ALWAYS_INLINE_ void populate_curves_related_data(const Ref<BulletCurvesData2D> &new_curves_data) {
+	_ALWAYS_INLINE_ void populate_shared_curves_related_data(const Ref<BulletCurvesData2D> &new_curves_data) {
 		if (new_curves_data.is_null()) {
-			is_rotation_active = false;
-
 			shared_bullet_curves_data.unref();
 			return;
 		}
@@ -599,6 +598,7 @@ protected:
 		const bool is_movement_curve_valid = shared_bullet_curves_data->movement_speed_curve.is_valid();
 		const bool is_rotation_curve_valid = shared_bullet_curves_data->rotation_speed_curve.is_valid();
 		const bool is_x_direction_curve_valid = shared_bullet_curves_data->x_direction_curve.is_valid();
+		const bool is_y_direction_curve_valid = shared_bullet_curves_data->y_direction_curve.is_valid();
 
 		if (is_rotation_curve_valid) {
 			if (all_rotation_speed.size() != amount_bullets) {
@@ -607,46 +607,67 @@ protected:
 		}
 
 		for (int i = 0; i < amount_bullets; ++i) {
-			if (!bullets_enabled_status[i]) {
-				continue;
-			}
-
 			if (is_movement_curve_valid) {
-				all_cached_speed[i] = get_bullet_curves_movement_speed(shared_bullet_curves_data);
+				all_cached_speed[i] = get_bullet_curves_movement_speed(shared_bullet_curves_data.ptr());
 			}
 
 			if (is_rotation_curve_valid) {
-				all_rotation_speed[i] = get_bullet_curves_rotation_speed(shared_bullet_curves_data);
+				all_rotation_speed[i] = get_bullet_curves_rotation_speed(shared_bullet_curves_data.ptr());
 			}
 
 			auto &current_direction = all_cached_direction[i];
 
-			apply_x_direction_curve(current_direction, shared_bullet_curves_data);
-			apply_y_direction_curve(current_direction, shared_bullet_curves_data);
+			apply_x_direction_curve(current_direction, shared_bullet_curves_data.ptr());
+			apply_y_direction_curve(current_direction, shared_bullet_curves_data.ptr());
 
-			if (is_movement_curve_valid || is_x_direction_curve_valid) {
+			if (is_movement_curve_valid || is_x_direction_curve_valid || is_y_direction_curve_valid) {
 				all_cached_velocity[i] = all_cached_direction[i] * all_cached_speed[i] + inherited_velocity_offset;
 			}
+		}
+	}
 
-			// // Rotation (always apply if curves valid, overriding static if present)
-			// all_rotation_speed[i] = rot_target;
-
-			// Direction offset
-			//all_cached_direction[i] = all_cached_direction[i].rotated(dir_offset).normalized();
-
-			//all_cached_velocity[i] = all_cached_direction[i] * all_cached_speed[i];
-
-			// TODO handle per-bullet curves data
+	_ALWAYS_INLINE_ void populate_individual_bullet_curves_related_data(int bullet_index, const Ref<BulletCurvesData2D> &new_curves_data) {
+		if (new_curves_data.is_null()) {
+			bool previous_curve_exists = find_bullet_curves_data(bullet_index) != nullptr;
+			if (previous_curve_exists) {
+				all_bullet_curves_data.erase(bullet_index);
+			}
+			return;
 		}
 
+		auto &curr_curves = all_bullet_curves_data[bullet_index]; // This will create a brand new KVP if it doesn't exist
+		curr_curves = new_curves_data;
+
+		const bool is_movement_curve_valid = curr_curves->movement_speed_curve.is_valid();
+		const bool is_rotation_curve_valid = curr_curves->rotation_speed_curve.is_valid();
+		const bool is_x_direction_curve_valid = curr_curves->x_direction_curve.is_valid();
+		const bool is_y_direction_curve_valid = curr_curves->y_direction_curve.is_valid();
+
 		if (is_rotation_curve_valid) {
-			is_rotation_active = true;
+			if (all_rotation_speed.size() != amount_bullets) {
+				all_rotation_speed.resize(amount_bullets);
+			}
+
+			all_rotation_speed[bullet_index] = get_bullet_curves_rotation_speed(curr_curves.ptr());
+		}
+
+		if (is_movement_curve_valid) {
+			all_cached_speed[bullet_index] = get_bullet_curves_movement_speed(curr_curves.ptr());
+		}
+
+		auto &current_direction = all_cached_direction[bullet_index];
+
+		apply_x_direction_curve(current_direction, curr_curves.ptr());
+		apply_y_direction_curve(current_direction, curr_curves.ptr());
+
+		if (is_movement_curve_valid || is_x_direction_curve_valid || is_y_direction_curve_valid) {
+			all_cached_velocity[bullet_index] = all_cached_direction[bullet_index] * all_cached_speed[bullet_index] + inherited_velocity_offset;
 		}
 	}
 
 	// Applies the x direction curve offset to the provided direction vector and normalizes it
-	_ALWAYS_INLINE_ void apply_x_direction_curve(Vector2 &direction_vector, const Ref<BulletCurvesData2D> &curves_data) const {
-		const bool is_x_direction_curve_valid = curves_data.is_valid() && curves_data->get_x_direction_curve().is_valid();
+	_ALWAYS_INLINE_ void apply_x_direction_curve(Vector2 &direction_vector, const BulletCurvesData2D *curves_data) const {
+		const bool is_x_direction_curve_valid = curves_data != nullptr && curves_data->get_x_direction_curve().is_valid();
 
 		if (!is_x_direction_curve_valid) {
 			return;
@@ -666,8 +687,8 @@ protected:
 	}
 
 	// Applies the y direction curve offset to the provided direction vector and normalizes it
-	_ALWAYS_INLINE_ void apply_y_direction_curve(Vector2 &direction_vector, const Ref<BulletCurvesData2D> &curves_data) const {
-		const bool is_y_direction_curve_valid = curves_data.is_valid() && curves_data->get_y_direction_curve().is_valid();
+	_ALWAYS_INLINE_ void apply_y_direction_curve(Vector2 &direction_vector, const BulletCurvesData2D *curves_data) const {
+		const bool is_y_direction_curve_valid = curves_data != nullptr && curves_data->get_y_direction_curve().is_valid();
 
 		if (!is_y_direction_curve_valid) {
 			return;
@@ -686,7 +707,7 @@ protected:
 		direction_vector = direction_vector.normalized();
 	}
 
-	_ALWAYS_INLINE_ real_t get_bullet_curves_movement_speed(const Ref<BulletCurvesData2D> &curves_data) const {
+	_ALWAYS_INLINE_ real_t get_bullet_curves_movement_speed(const BulletCurvesData2D *curves_data) const {
 		const bool use_unit_curve = curves_data->movement_use_unit_curve && !is_life_time_infinite;
 
 		real_t input_x = curve_get_input_value(use_unit_curve);
@@ -694,7 +715,7 @@ protected:
 		return curves_data->movement_speed_curve->sample_baked(input_x);
 	}
 
-	_ALWAYS_INLINE_ real_t get_bullet_curves_rotation_speed(const Ref<BulletCurvesData2D> &curves_data) const {
+	_ALWAYS_INLINE_ real_t get_bullet_curves_rotation_speed(const BulletCurvesData2D *curves_data) const {
 		const bool use_unit_curve = curves_data->rotation_use_unit_curve;
 
 		real_t input_x = curve_get_input_value(use_unit_curve);
@@ -702,7 +723,7 @@ protected:
 		return curves_data->rotation_speed_curve->sample_baked(input_x);
 	}
 
-	_ALWAYS_INLINE_ real_t get_bullet_curves_x_direction_offset(const Ref<BulletCurvesData2D> &curves_data) const {
+	_ALWAYS_INLINE_ real_t get_bullet_curves_x_direction_offset(const BulletCurvesData2D *curves_data) const {
 		const bool use_unit_curve = curves_data->x_direction_use_unit_curve;
 
 		real_t input_x = curve_get_input_value(use_unit_curve);
@@ -710,7 +731,7 @@ protected:
 		return curves_data->x_direction_curve->sample_baked(input_x);
 	}
 
-	_ALWAYS_INLINE_ real_t get_bullet_curves_y_direction_offset(const Ref<BulletCurvesData2D> &curves_data) const {
+	_ALWAYS_INLINE_ real_t get_bullet_curves_y_direction_offset(const BulletCurvesData2D *curves_data) const {
 		const bool use_unit_curve = curves_data->y_direction_use_unit_curve;
 
 		real_t input_x = curve_get_input_value(use_unit_curve);
@@ -718,8 +739,20 @@ protected:
 		return curves_data->y_direction_curve->sample_baked(input_x);
 	}
 
-	_ALWAYS_INLINE_ void apply_direction_curve_texture_rotation_if_needed(Vector2 &curr_bullet_direction, Transform2D &curr_bullet_transf, double delta, const Ref<BulletCurvesData2D> &curves_data) const {
-		const bool should_apply = curves_data->rotate_towards_adjusted_direction && !is_rotation_active;
+	_ALWAYS_INLINE_ void apply_direction_curve_texture_rotation_if_needed(Vector2 &curr_bullet_direction, Transform2D &curr_bullet_transf, double delta, const BulletCurvesData2D *curves_data) const {
+		bool should_apply = false;
+
+		if (curves_data->x_direction_curve.is_valid()) {
+			should_apply = true;
+		} else if (curves_data->y_direction_curve.is_valid()) {
+			should_apply = true;
+		}
+
+		if (!should_apply) {
+			return;
+		}
+
+		should_apply = curves_data->rotate_towards_adjusted_direction && !is_rotation_data_active;
 
 		if (!should_apply) {
 			return;
@@ -748,7 +781,7 @@ protected:
 		return input_x;
 	}
 
-	_ALWAYS_INLINE_ Ref<BulletCurvesData2D> find_bullet_curves_data(int bullet_index){
+	_ALWAYS_INLINE_ BulletCurvesData2D *find_bullet_curves_data(int bullet_index) const {
 		const auto it = all_bullet_curves_data.find(bullet_index);
 		const auto end = all_bullet_curves_data.end();
 
@@ -756,10 +789,10 @@ protected:
 			return nullptr;
 		}
 
-		return all_bullet_curves_data[bullet_index];
+		return it->second.ptr();;
 	}
 
-	Ref<BulletCurvesData2D> bullet_get_curves_data(int bullet_index) {
+	Ref<BulletCurvesData2D> bullet_get_curves_data(int bullet_index) const {
 		if (!validate_bullet_index(bullet_index, "bullet_get_curves_data")) {
 			return Ref<BulletCurvesData2D>();
 		}
@@ -780,96 +813,91 @@ protected:
 			return;
 		}
 
-		all_bullet_curves_data[bullet_index] = curves_data;
+		if (curves_data.is_null()) {
+			all_bullet_curves_data.erase(bullet_index);
+			return;
+		}
+
+		populate_individual_bullet_curves_related_data(bullet_index, curves_data);
+	}
+
+	_ALWAYS_INLINE_ void all_bullets_set_curves_data(const Ref<BulletCurvesData2D> &curves_data, int bullet_index_start = 0, int bullet_index_end_inclusive = -1) {
+		ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_set_curves_data");
+
+		for (int i = bullet_index_start; i <= bullet_index_end_inclusive; ++i) {
+			bullet_set_curves_data(i, curves_data);
+		}
+	}
+
+	_ALWAYS_INLINE_ TypedArray<BulletCurvesData2D> all_bullets_get_curves_data(int bullet_index_start = 0, int bullet_index_end_inclusive = -1) {
+		ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_get_curves_data");
+
+		TypedArray<BulletCurvesData2D> arr;
+
+		for (int i = bullet_index_start; i <= bullet_index_end_inclusive; ++i) {
+			arr.push_back(bullet_get_curves_data(i));
+		}
+
+		return arr;
 	}
 
 	////////////
 
-	// Accelerates bullet speeds (hybrid: curve if valid, else static)
-	_ALWAYS_INLINE_ void accelerate_bullet_speed(double delta, int begin_index, int end_index_inclusive) {
-		// If a valid movement curve is used, calculate the speed based on that
-		if (shared_bullet_curves_data.is_valid() && shared_bullet_curves_data->movement_speed_curve.is_valid()) {
-			for (int i = begin_index; i <= end_index_inclusive; ++i) {
-				if (!bullets_enabled_status[i]) {
-					continue;
-				}
+	// Accelerates bullet speed
+	_ALWAYS_INLINE_ void bullet_accelerate_speed(int bullet_index, double delta) {
+		real_t &curr_bullet_speed = all_cached_speed[bullet_index];
+		real_t curr_max_bullet_speed = all_cached_max_speed[bullet_index];
 
-				real_t &curr_bullet_speed = all_cached_speed[i];
-				curr_bullet_speed = get_bullet_curves_movement_speed(shared_bullet_curves_data);
-
-				all_cached_velocity[i] = all_cached_direction[i] * curr_bullet_speed + inherited_velocity_offset;
-			}
-
+		if (curr_bullet_speed >= curr_max_bullet_speed) {
 			return;
-		}else{
-			// TODO per bullet curves data
 		}
 
-		// Otherwise just use the normal way with values
-		for (int i = begin_index; i <= end_index_inclusive; ++i) {
-			if (!bullets_enabled_status[i]) {
-				continue;
-			}
+		real_t acceleration = all_cached_acceleration[bullet_index] * delta;
+		curr_bullet_speed = Math::min(curr_bullet_speed + acceleration, curr_max_bullet_speed);
 
-			real_t &curr_bullet_speed = all_cached_speed[i];
-			real_t curr_max_bullet_speed = all_cached_max_speed[i];
-
-			if (curr_bullet_speed >= curr_max_bullet_speed) {
-				continue;
-			}
-
-			real_t acceleration = all_cached_acceleration[i] * delta;
-			curr_bullet_speed = Math::min(curr_bullet_speed + acceleration, curr_max_bullet_speed);
-
-			all_cached_velocity[i] = all_cached_direction[i] * curr_bullet_speed + inherited_velocity_offset;
-		}
+		all_cached_velocity[bullet_index] = all_cached_direction[bullet_index] * curr_bullet_speed + inherited_velocity_offset;
 	}
 
-	// Accelerates rotation speeds (hybrid: curve if valid, else static)
-	_ALWAYS_INLINE_ bool accelerate_bullet_rotation_speed(double delta, int begin_index, int end_index_inclusive) {
-		if (!is_rotation_active) {
-			return true;
+	// Accelerates bullet speed using a curve
+	_ALWAYS_INLINE_ void bullet_accelerate_speed_using_curve(int bullet_index, double delta, const BulletCurvesData2D *curves_data) {
+		const bool is_speed_curve_valid = curves_data != nullptr && curves_data->movement_speed_curve.is_valid();
+
+		if (!is_speed_curve_valid) {
+			return;
 		}
 
-		bool all_reached = true;
+		real_t &curr_bullet_speed = all_cached_speed[bullet_index];
+		curr_bullet_speed = get_bullet_curves_movement_speed(curves_data);
 
-		if (shared_bullet_curves_data.is_valid() && shared_bullet_curves_data->rotation_speed_curve.is_valid()) {
-			for (int i = begin_index; i <= end_index_inclusive; ++i) {
-				if (!bullets_enabled_status[i]) {
-					continue;
-				}
+		all_cached_velocity[bullet_index] = all_cached_direction[bullet_index] * curr_bullet_speed + inherited_velocity_offset;
 
-				real_t &cache_rotation_speed = all_rotation_speed[i];
+		return;
+	}
 
-				cache_rotation_speed = get_bullet_curves_rotation_speed(shared_bullet_curves_data);
-			}
+	// Accelerates bullet rotation speed
+	_ALWAYS_INLINE_ void bullet_accelerate_rotation_speed(int bullet_index, double delta) {
+		real_t &curr_bullet_rotation_speed = all_rotation_speed[bullet_index];
+		real_t curr_max_rotation_speed = all_max_rotation_speed[bullet_index];
 
-			return all_reached;
-		}else{
-			// TODO per bullet curves data
+		if (curr_bullet_rotation_speed >= curr_max_rotation_speed) {
+			return;
 		}
 
-		for (int i = begin_index; i <= end_index_inclusive; ++i) {
-			if (!bullets_enabled_status[i]) {
-				continue;
-			}
+		real_t acceleration = all_rotation_acceleration[bullet_index] * delta;
+		curr_bullet_rotation_speed = Math::min(curr_bullet_rotation_speed + acceleration, curr_max_rotation_speed);
+	}
 
-			real_t &cache_rotation_speed = all_rotation_speed[i];
-			real_t cache_max_rotation_speed = all_max_rotation_speed[i];
+	// Accelerates bullet rotation speed using a curve
+	_ALWAYS_INLINE_ void bullet_accelerate_rotation_speed_using_curve(int bullet_index, double delta, const BulletCurvesData2D *curves_data) {
+		const bool is_rotation_speed_curve_valid = curves_data != nullptr && curves_data->rotation_speed_curve.is_valid();
 
-			if (cache_rotation_speed >= cache_max_rotation_speed) {
-				continue;
-			}
-
-			real_t acceleration = all_rotation_acceleration[i] * delta;
-			cache_rotation_speed = Math::min(cache_rotation_speed + acceleration, cache_max_rotation_speed);
-
-			if (cache_rotation_speed < cache_max_rotation_speed) {
-				all_reached = false;
-			}
+		if (!is_rotation_speed_curve_valid) {
+			return;
 		}
 
-		return all_reached;
+		real_t &curr_bullet_rotation_speed = all_rotation_speed[bullet_index];
+
+		curr_bullet_rotation_speed = get_bullet_curves_rotation_speed(curves_data);
 	}
 
 	// Custom rotation function (I am doing this for performance reasons since Godot's rotated_local returns a brand new Transform2D, but I want to modify a reference without making copies)
@@ -1057,6 +1085,9 @@ protected:
 		active_bullets_counter = 0;
 		is_active = false;
 		elapsed_time = 0.0;
+		shared_bullet_curves_data = Ref<BulletCurvesData2D>();
+		all_bullet_curves_data.clear();
+
 		set_visible(false); // Hide the multimesh node itself
 
 		custom_additional_disable_logic();
