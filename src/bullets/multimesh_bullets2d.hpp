@@ -164,7 +164,7 @@ public:
 
 	// Reduces the lifetime of the multimesh so it can eventually get disabled entirely
 	_ALWAYS_INLINE_ void reduce_lifetime(double delta) {
-		elapsed_time += delta;
+		curves_elapsed_time += delta;
 
 		// If the lifetime is infinite there is no lifetime timer
 		if (is_life_time_infinite) {
@@ -374,6 +374,9 @@ public:
 	TypedArray<Transform2D> all_bullets_get_transforms(int bullet_index_start = 0, int bullet_index_end_inclusive = -1) const;
 	void all_bullets_set_transforms(const Transform2D &new_transform, bool set_direction_based_on_transform = false, int bullet_index_start = 0, int bullet_index_end_inclusive = -1);
 
+	real_t get_curves_elapsed_time() const;
+	void set_curves_elapsed_time(real_t new_time);
+
 protected:
 	static void _bind_methods();
 
@@ -464,7 +467,7 @@ protected:
 	double current_life_time = 0.0;
 
 	// Elapsed time from multimesh activation, used for curves
-	double elapsed_time = 0.0;
+	double curves_elapsed_time = 0.0;
 
 	// Whether the lifetime is infinite - will ignore any lifetime timers
 	bool is_life_time_infinite = false;
@@ -503,7 +506,7 @@ protected:
 	std::vector<real_t> all_cached_max_speed;
 	std::vector<real_t> all_cached_acceleration;
 
-	Ref<BulletCurvesData2D> shared_bullet_curves_data;
+	Ref<BulletCurvesData2D> shared_bullet_curves_data = nullptr;
 	std::unordered_map<int, Ref<BulletCurvesData2D>> all_bullet_curves_data;
 
 	///
@@ -772,10 +775,10 @@ protected:
 		real_t input_x;
 
 		if (use_unit_curve && !is_life_time_infinite) {
-			real_t progress = Math::clamp(elapsed_time / max_life_time, 0.0, 1.0);
+			real_t progress = Math::clamp(curves_elapsed_time / max_life_time, 0.0, 1.0);
 			input_x = progress;
 		} else {
-			input_x = elapsed_time;
+			input_x = curves_elapsed_time;
 		}
 
 		return input_x;
@@ -1084,7 +1087,7 @@ protected:
 	_ALWAYS_INLINE_ void disable_multimesh() {
 		active_bullets_counter = 0;
 		is_active = false;
-		elapsed_time = 0.0;
+		curves_elapsed_time = 0.0;
 		shared_bullet_curves_data = Ref<BulletCurvesData2D>();
 		all_bullet_curves_data.clear();
 
@@ -1243,7 +1246,7 @@ protected:
 	bool get_is_life_time_infinite() const { return is_life_time_infinite; }
 	void set_is_life_time_infinite(bool value) {
 		is_life_time_infinite = value;
-		elapsed_time = 0.0;
+		curves_elapsed_time = 0.0;
 		if (!value) {
 			current_life_time = max_life_time;
 		}

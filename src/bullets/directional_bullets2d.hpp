@@ -74,7 +74,6 @@ public:
 				update_homing(shared_homing_deque, true, i, delta, homing_interval_reached, homing_bullet_pos, homing_target_pos);
 				try_to_emit_bullet_homing_target_reached_signal(shared_homing_deque, shared_homing_deque_enabled, i, homing_bullet_pos, homing_target_pos);
 				direction_got_updated = true;
-
 			} else if (!all_bullet_homing_targets[i].empty()) { // If no shared homing deque, check if bullets have individual homing dequeues and use those instead
 				auto &curr_homing_deque = all_bullet_homing_targets[i];
 				update_homing(curr_homing_deque, false, i, delta, homing_interval_reached, homing_bullet_pos, homing_target_pos);
@@ -108,7 +107,7 @@ public:
 			}
 
 			// Handle rotation
-			if (shared_curves_data_enabled) {
+			if (shared_curves_data_enabled && shared_curves_ptr->rotation_speed_curve.is_valid()) {
 				update_rotation_using_curve(i, delta, shared_curves_ptr);
 				bullet_accelerate_rotation_speed_using_curve(i, delta, shared_curves_ptr);
 			} else if (is_per_bullet_curves_valid && per_bullet_curves_data->rotation_speed_curve.is_valid()) {
@@ -162,10 +161,10 @@ public:
 			move_bullet_attachment(velocity_delta, i);
 
 			// Handle bullet speed acceleration
-			if (shared_curves_data_enabled) {
+			if (shared_curves_data_enabled && shared_curves_ptr->movement_speed_curve.is_valid()) {
 				bullet_accelerate_speed_using_curve(i, delta, shared_curves_ptr);
 			} else {
-				if (is_per_bullet_curves_valid) {
+				if (is_per_bullet_curves_valid && per_bullet_curves_data->movement_speed_curve.is_valid()) {
 					bullet_accelerate_speed_using_curve(i, delta, per_bullet_curves_data);
 				} else {
 					bullet_accelerate_speed(i, delta);
@@ -723,7 +722,7 @@ protected:
 
 		bullet_pos = all_cached_instance_origin[bullet_index];
 		Vector2 diff = target_pos - bullet_pos;
-		
+
 		real_t max_turn = homing_smoothing * delta;
 		if (max_turn < 0.0) {
 			max_turn = 0.0;

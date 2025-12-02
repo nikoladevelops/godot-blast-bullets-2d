@@ -293,70 +293,16 @@ func spawn_multi_mesh_directional_bullets()->void:
 	#dir_bullets.bullet_set_curves_data(0, bullet_curves_data_1)
 	dir_bullets.shared_bullet_curves_data = bullet_curves_data_1
 	
-	#dir_bullets.shared_homing_deque_push_front_mouse_position_target()
-	#dir_bullets.shared_homing_deque_auto_pop_after_target_reached = true
-	#dir_bullets.shared_homing_deque_push_back_node2d_target(BENCHMARK_GLOBALS.MOVING_TARGET_ONE)
-	#dir_bullets.shared_homing_deque_push_back_node2d_target(BENCHMARK_GLOBALS.MOVING_TARGET_TWO)
+	# TODO
 	
-	#dir_bullets.bullet_curves_data = bullet_curves_data_1
-	#
-	#dir_bullets.all_bullets_set_attachment(gpu_particles_scn, 0, Vector2(-60, 0))
-	#dir_bullets.shared_homing_deque_auto_pop_after_target_reached=true
-	dir_bullets.multimesh_attach_time_based_function(1, func():
+	dir_bullets.multimesh_attach_time_based_function(2, func():
 		#dir_bullets.all_bullets_set_direction(Vector2(1,0))
-		dir_bullets.shared_bullet_curves_data = null
+		#dir_bullets.shared_bullet_curves_data = null
+		dir_bullets.curves_elapsed_time = 0
 		#dir_bullets.all_bullets_set_speed_data(null)
 		#dir_bullets.shared_homing_deque_push_back_node2d_target(BENCHMARK_GLOBALS.MOVING_TARGET_ONE)
-		, false, true)
+		, true, true)
 	
-	dir_bullets.multimesh_attach_time_based_function(3, func():
-		dir_bullets.all_bullets_set_curves_data(bullet_curves_data_1)
-		, false, true)
-		
-	#dir_bullets.multimesh_attach_time_based_function(2, func():
-		#dir_bullets.shared_homing_deque_push_back_node2d_target(BENCHMARK_GLOBALS.MOVING_TARGET_TWO)
-		#, false, true)
-		
-		
-	#dir_bullets.inherited_velocity_offset = Vector2(5000, 0)
-	#dir_bullets.all_bullets_set_attachment(gpu_particles_scn, 0, Vector2(-60,0), true)
-	#dir_bullets.shared_homing_deque_push_back_node2d_target(BENCHMARK_GLOBALS.STATIONARY_TARGET)
-	
-	#
-	
-	#get_tree().create_timer(1).timeout.connect(func():
-		##BENCHMARK_GLOBALS.FACTORY.teleport_shift_all_bullets(Vector2(20, 10))
-		##BENCHMARK_GLOBALS.FACTORY.call_deferred("teleport_shift_all_bullets", Vector2(20, 10))
-		#
-		#dir_bullets.teleport_shift_all_bullets(Vector2(25,0), 0, dir_bullets.get_amount_bullets())
-		#)
-	#dir_bullets.multimesh_attach_time_based_function(1, func():
-		#dir_bullets.teleport_bullet(0, Vector2(0,0))
-		##dir_bullets.set_textures([godot_texture], [0.05], 0)
-		##dir_bullets.shared_homing_deque_pop_back_target()
-		#, false, true)
-	
-	#dir_bullets.multimesh_attach_time_based_function(4, func():
-		#dir_bullets.set_textures(rocket_tectures, [0.03], 0)
-		##dir_bullets.shared_homing_deque_pop_back_target()
-		#, false, true)
-		
-	#for i in dir_bullets.get_amount_bullets():
-		#dir_bullets.bullet_set_attachment(i, gpu_particles_scn, 5, Vector2(-60,0), true)
-	
-	#dir_bullets.multimesh_attach_time_based_function(1, func(): 
-		#print("Keeps executing over and over EVEN IF ALL BULLETS WERE DISABLED")
-		#, true, false)
-	#
-	#dir_bullets.multimesh_attach_time_based_function(1, func(): 
-		#print("Keeps executing over and over but only if the multimesh is active (at least one bullet left active)")
-		#
-		#, true, true)
-	
-		##
-	#dir_bullets.multimesh_attach_time_based_function(2, func(): 
-		#dir_bullets.activate_bullet(0)
-		#, false, true)
 	
 	
 # Spawns MultiMeshBlock bullets

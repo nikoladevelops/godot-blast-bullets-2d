@@ -1,17 +1,11 @@
-[gd_resource type="BulletCurvesData2D" load_steps=4 format=3 uid="uid://bm8i7kuaes44c"]
+[gd_resource type="BulletCurvesData2D" load_steps=2 format=3 uid="uid://bm8i7kuaes44c"]
 
-[ext_resource type="Curve" uid="uid://c8dhbcuuqpmat" path="res://shared/data/speed_curve.tres" id="1_nu7sj"]
-[ext_resource type="Curve" uid="uid://2e2x4r1ufxqn" path="res://shared/data/direction_curve.tres" id="2_3ltir"]
-
-[sub_resource type="Curve" id="Curve_3ltir"]
-_limits = [0.0, 300.0, 0.0, 1.0]
-_data = [Vector2(0, 0), 0.0, 0.0, 0, 0, Vector2(1e-05, 1), 0.0, 0.0, 0, 0, Vector2(0.0468085, 300), 0.0, 0.0, 0, 0, Vector2(0.276596, 13.4831), 0.0, 0.0, 0, 0, Vector2(0.574468, 300), 0.0, 0.0, 0, 0, Vector2(0.774468, 0), 0.0, 0.0, 0, 0, Vector2(1, 235.955), 0.0, 0.0, 0, 0]
-point_count = 7
+[sub_resource type="Curve" id="Curve_k8esq"]
+_limits = [0.0, 1000.0, 0.0, 1.0]
+_data = [Vector2(0, 1), 0.0, 0.0, 0, 0, Vector2(0.314894, 1000), 0.0, 0.0, 0, 0, Vector2(0.787234, 1000), 0.0, 0.0, 0, 0, Vector2(1, 1000), 0.0, 0.0, 0, 0]
+point_count = 4
 
 [resource]
-movement_speed_curve = ExtResource("1_nu7sj")
-rotation_speed_curve = SubResource("Curve_3ltir")
-x_direction_curve = ExtResource("2_3ltir")
-x_direction_curve_strength = 0.25
-y_direction_curve = ExtResource("2_3ltir")
+movement_speed_curve = SubResource("Curve_k8esq")
+x_direction_curve_strength = 0.1
 y_direction_curve_strength = 0.7
