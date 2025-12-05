@@ -17,80 +17,72 @@ public:
 	real_t block_rotation_radians = 0.0;
 
 	_ALWAYS_INLINE_ void move_bullets(double delta) {
-		// real_t cache_first_rotation_result = 0.0;
-		// bool max_rotation_speed_reached = false;
-		// // Accelerate only the first bullet rotation speed
-		// if (is_rotation_data_active) {
-		// 	if (use_only_first_rotation_data) {
-		// 		max_rotation_speed_reached = accelerate_bullet_rotation_speed(delta, 0, 0); // accelerate only the first one once
-		// 		cache_first_rotation_result = all_rotation_speed[0] * delta;
-		// 	}
-		// }
-		
-		// bool is_using_physics_interpolation = bullet_factory->use_physics_interpolation;
+		real_t cache_first_rotation_result = 0.0;
+		// Accelerate only the first bullet rotation speed
+		if (is_rotation_data_active) {
+			if (use_only_first_rotation_data) {
+				bullet_accelerate_rotation_speed(0, delta); // accelerate only the first one once
+				cache_first_rotation_result = all_rotation_speed[0] * delta;
+			}
+		}
 
-		// update_all_previous_transforms_for_interpolation();
+		bool is_using_physics_interpolation = bullet_factory->use_physics_interpolation;
 
-		// Vector2 cache_velocity_calc = all_cached_velocity[0] * delta;
+		update_all_previous_transforms_for_interpolation();
 
-		// for (int i = 0; i < amount_bullets; ++i) {
-		// 	if (bullets_enabled_status[i] == false) {
-		// 		continue;
-		// 	}
+		Vector2 cache_velocity_calc = all_cached_velocity[0] * delta;
 
-		// 	Transform2D &curr_instance_transf = all_cached_instance_transforms[i];
-		// 	Transform2D &curr_shape_transf = all_cached_shape_transforms[i];
+		for (int i = 0; i < amount_bullets; ++i) {
+			if (bullets_enabled_status[i] == false) {
+				continue;
+			}
 
-		// 	Vector2 &curr_instance_origin = all_cached_instance_origin[i];
-		// 	Vector2 &curr_shape_origin = all_cached_shape_origin[i];
+			Transform2D &curr_instance_transf = all_cached_instance_transforms[i];
+			Transform2D &curr_shape_transf = all_cached_shape_transforms[i];
 
-		// 	curr_instance_origin += cache_velocity_calc;
-		// 	curr_shape_origin += cache_velocity_calc;
+			Vector2 &curr_instance_origin = all_cached_instance_origin[i];
+			Vector2 &curr_shape_origin = all_cached_shape_origin[i];
 
-		// 	// Handle bullet rotation and bullet rotation speed acceleration
-		// 	real_t rotation_angle = 0.0;
-		// 	if (is_rotation_data_active) {
-		// 		if (!use_only_first_rotation_data) {
-		// 			max_rotation_speed_reached = accelerate_bullet_rotation_speed(delta, i, i);
-		// 			rotation_angle = all_rotation_speed[i] * delta;
-		// 		} else {
-		// 			rotation_angle = cache_first_rotation_result;
-		// 		}
+			curr_instance_origin += cache_velocity_calc;
+			curr_shape_origin += cache_velocity_calc;
 
-		// 		// If max rotation speed has been reached and the setting stop_rotation_when_max_reached has been set then rotation should be stopped
-		// 		if (max_rotation_speed_reached && stop_rotation_when_max_reached) {
-		// 			// Don't rotate
-		// 		} else {
-		// 			// In all other cases rotation should continue
+			// Handle bullet rotation and bullet rotation speed acceleration
+			real_t rotation_angle = 0.0;
+			if (is_rotation_data_active) {
+				if (!use_only_first_rotation_data) {
+					bullet_accelerate_rotation_speed(0, delta);
+					rotation_angle = all_rotation_speed[i] * delta;
+				} else {
+					rotation_angle = cache_first_rotation_result;
+				}
 
-		// 			rotate_transform_locally(curr_instance_transf, rotation_angle);
+				rotate_transform_locally(curr_instance_transf, rotation_angle);
 
-		// 			if (!rotate_only_textures) {
-		// 				rotate_transform_locally(curr_shape_transf, rotation_angle);
-		// 			}
-		// 		}
-		// 	}
+				if (!rotate_only_textures) {
+					rotate_transform_locally(curr_shape_transf, rotation_angle);
+				}
+			}
 
-		// 	curr_instance_transf.set_origin(curr_instance_origin);
-		// 	curr_shape_transf.set_origin(curr_shape_origin);
+			curr_instance_transf.set_origin(curr_instance_origin);
+			curr_shape_transf.set_origin(curr_shape_origin);
 
-		// 	physics_server->area_set_shape_transform(area, i, curr_shape_transf);
+			physics_server->area_set_shape_transform(area, i, curr_shape_transf);
 
-		// 	// If we are not using physics interpolation then just render the texture in the current physics frame
-		// 	if (!is_using_physics_interpolation) {
-		// 		multi->set_instance_transform_2d(i, curr_instance_transf);
-		// 	}
+			// If we are not using physics interpolation then just render the texture in the current physics frame
+			if (!is_using_physics_interpolation) {
+				multi->set_instance_transform_2d(i, curr_instance_transf);
+			}
 
-		// 	move_bullet_attachment(cache_velocity_calc, i);
-		// }
+			move_bullet_attachment(cache_velocity_calc, i);
+		}
 
-		// accelerate_bullet_speed(delta, 0, 0);
+		bullet_accelerate_speed(0, delta);
 	}
 
 protected:
 	static void _bind_methods();
 	void set_up_movement_data(const BulletSpeedData2D &new_speed_data);
-	
+
 	virtual void custom_additional_spawn_logic(const MultiMeshBulletsData2D &data) override final;
 	virtual void custom_additional_save_logic(SaveDataMultiMeshBullets2D &data) override final;
 	virtual void custom_additional_load_logic(const SaveDataMultiMeshBullets2D &data) override final;
