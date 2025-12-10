@@ -24,6 +24,7 @@ func _ready() -> void:
 	BENCHMARK_GLOBALS.STATIONARY_TARGET = $BulletHellRelated/StationaryTarget
 	BENCHMARK_GLOBALS.MOVING_TARGET_ONE = $BulletHellRelated/MovingTargetOne
 	BENCHMARK_GLOBALS.MOVING_TARGET_TWO = $BulletHellRelated/MovingTargetTwo
+	BENCHMARK_GLOBALS.MOVEMENT_PATH_HOLDER = $Paths
 	
 	# Make sure to set the actual debugger colors to the UI buttons
 	var initial_block_debugger_color:Color = BENCHMARK_GLOBALS.FACTORY.block_bullets_debugger_color

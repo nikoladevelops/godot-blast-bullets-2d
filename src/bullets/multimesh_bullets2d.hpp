@@ -8,6 +8,8 @@
 #include "../shared/bullet_rotation_data2d.hpp"
 #include "../spawn-data/multimesh_bullets_data2d.hpp"
 #include "godot_cpp/classes/curve.hpp"
+#include "godot_cpp/classes/curve2d.hpp"
+#include "godot_cpp/classes/path2d.hpp"
 #include "godot_cpp/classes/ref.hpp"
 #include "godot_cpp/classes/texture2d.hpp"
 #include "godot_cpp/core/class_db.hpp"
@@ -24,6 +26,7 @@
 #include "godot_cpp/variant/vector2.hpp"
 #include "shared/bullet_curves_data2d.hpp"
 #include "shared/bullet_speed_data2d.hpp"
+#include "shared/bullet_movement_pattern_data2d.hpp"
 
 #include <cstddef>
 #include <cstdint>
@@ -377,6 +380,23 @@ public:
 	real_t get_curves_elapsed_time() const;
 	void set_curves_elapsed_time(real_t new_time);
 
+	// Bullet movement pattern
+
+	_ALWAYS_INLINE_ bool check_exists_bullet_movement_pattern_data(int bullet_index) const {
+		const auto it = all_movement_pattern_data.find(bullet_index);
+		const auto end = all_movement_pattern_data.end();
+
+		return it != end;
+	}
+
+	_ALWAYS_INLINE_ BulletMovementPatternData2D find_bullet_movement_pattern_data(int bullet_index) const {
+		return all_movement_pattern_data.at(bullet_index);
+	}
+
+	Ref<Curve2D> get_bullet_movement_pattern_curve(int bullet_index) const;
+	void set_bullet_movement_pattern_from_path(int bullet_index, Path2D *path_holding_pattern);
+	void set_bullet_movement_pattern_from_curve(int bullet_index, Ref<Curve2D> curve_pattern);
+
 protected:
 	static void _bind_methods();
 
@@ -530,6 +550,13 @@ protected:
 
 	// Holds all cached directions of the bullets
 	std::vector<Vector2> all_cached_direction;
+
+	///
+
+
+	/// BULLET MOVEMENT PATTERN RELATED
+
+	std::unordered_map<int, BulletMovementPatternData2D> all_movement_pattern_data;
 
 	///
 
@@ -792,7 +819,7 @@ protected:
 			return nullptr;
 		}
 
-		return it->second.ptr();;
+		return it->second.ptr();
 	}
 
 	Ref<BulletCurvesData2D> bullet_get_curves_data(int bullet_index) const {
@@ -1090,6 +1117,7 @@ protected:
 		curves_elapsed_time = 0.0;
 		shared_bullet_curves_data = Ref<BulletCurvesData2D>();
 		all_bullet_curves_data.clear();
+		all_movement_pattern_data.clear();
 
 		set_visible(false); // Hide the multimesh node itself
 

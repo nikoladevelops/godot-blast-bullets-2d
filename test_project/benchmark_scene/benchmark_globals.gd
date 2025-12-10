@@ -49,3 +49,6 @@ static var MOVING_TARGET_ONE:Node2D
 
 # Second moving target
 static var MOVING_TARGET_TWO:Node2D
+
+# Holds movement Path2Ds
+static var MOVEMENT_PATH_HOLDER:Node

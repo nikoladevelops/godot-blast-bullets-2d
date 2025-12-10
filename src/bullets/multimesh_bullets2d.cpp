@@ -2,6 +2,8 @@
 #include "../factory/bullet_factory2d.hpp"
 #include "../shared/multimesh_object_pool2d.hpp"
 
+#include "godot_cpp/classes/curve.hpp"
+#include "godot_cpp/classes/curve2d.hpp"
 #include "godot_cpp/core/class_db.hpp"
 #include "godot_cpp/core/math.hpp"
 #include "godot_cpp/core/print_string.hpp"
@@ -9,6 +11,7 @@
 #include "godot_cpp/variant/vector2.hpp"
 #include "multimesh_bullets2d.hpp"
 #include "shared/bullet_curves_data2d.hpp"
+#include "shared/bullet_movement_pattern_data2d.hpp"
 #include <godot_cpp/classes/physics_server2d.hpp>
 #include <godot_cpp/classes/random_number_generator.hpp>
 #include <godot_cpp/classes/scene_state.hpp>
@@ -1153,6 +1156,40 @@ void MultiMeshBullets2D::set_curves_elapsed_time(real_t new_time) {
 	curves_elapsed_time = new_time;
 }
 
+Ref<Curve2D> MultiMeshBullets2D::get_bullet_movement_pattern_curve(int bullet_index) const{
+    if (check_exists_bullet_movement_pattern_data(bullet_index)) {
+        return find_bullet_movement_pattern_data(bullet_index).path_curve;
+    }
+
+    return nullptr;
+}
+
+void MultiMeshBullets2D::set_bullet_movement_pattern_from_path(int bullet_index, Path2D *path_holding_pattern){
+    if (path_holding_pattern == nullptr) {
+        if (check_exists_bullet_movement_pattern_data(bullet_index)) {
+            all_movement_pattern_data.erase(bullet_index);
+        }
+        return;
+    }
+
+    Ref<Curve2D> curve = path_holding_pattern->get_curve();
+
+    set_bullet_movement_pattern_from_curve(bullet_index, curve);
+}
+
+void MultiMeshBullets2D::set_bullet_movement_pattern_from_curve(int bullet_index, Ref<Curve2D> curve_pattern){
+    if (curve_pattern.is_null()) {
+        if (check_exists_bullet_movement_pattern_data(bullet_index)) {
+            all_movement_pattern_data.erase(bullet_index);
+        }
+        return;
+    }
+
+    BulletMovementPatternData2D data { curve_pattern, all_cached_instance_origin[bullet_index] };
+
+    all_movement_pattern_data[bullet_index] = data;
+}
+
 void MultiMeshBullets2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_bullet_speed_data", "bullet_index"), &MultiMeshBullets2D::get_bullet_speed_data);
 	ClassDB::bind_method(D_METHOD("set_bullet_speed_data", "bullet_index", "new_bullet_speed_data"), &MultiMeshBullets2D::set_bullet_speed_data);
@@ -1267,6 +1304,10 @@ void MultiMeshBullets2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_curves_elapsed_time"), &MultiMeshBullets2D::get_curves_elapsed_time);
 	ClassDB::bind_method(D_METHOD("set_curves_elapsed_time", "new_time"), &MultiMeshBullets2D::set_curves_elapsed_time);
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "curves_elapsed_time"), "set_curves_elapsed_time", "get_curves_elapsed_time");
+
+	ClassDB::bind_method(D_METHOD("get_bullet_movement_pattern_curve", "bullet_index"), &MultiMeshBullets2D::get_bullet_movement_pattern_curve);
+    ClassDB::bind_method(D_METHOD("set_bullet_movement_pattern_from_path", "bullet_index", "path_holding_pattern"), &MultiMeshBullets2D::set_bullet_movement_pattern_from_path);
+    ClassDB::bind_method(D_METHOD("set_bullet_movement_pattern_from_curve", "bullet_index", "curve_pattern"), &MultiMeshBullets2D::set_bullet_movement_pattern_from_curve);
 
 }
 } //namespace BlastBullets2D
