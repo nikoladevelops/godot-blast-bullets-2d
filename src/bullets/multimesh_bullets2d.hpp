@@ -25,8 +25,8 @@
 #include "godot_cpp/variant/variant.hpp"
 #include "godot_cpp/variant/vector2.hpp"
 #include "shared/bullet_curves_data2d.hpp"
-#include "shared/bullet_speed_data2d.hpp"
 #include "shared/bullet_movement_pattern_data2d.hpp"
+#include "shared/bullet_speed_data2d.hpp"
 
 #include <cstddef>
 #include <cstdint>
@@ -394,8 +394,15 @@ public:
 	}
 
 	Ref<Curve2D> get_bullet_movement_pattern_curve(int bullet_index) const;
-	void set_bullet_movement_pattern_from_path(int bullet_index, Path2D *path_holding_pattern);
-	void set_bullet_movement_pattern_from_curve(int bullet_index, Ref<Curve2D> curve_pattern);
+
+	void set_bullet_movement_pattern_from_path(int bullet_index, Path2D *path_holding_pattern, bool face_movement_direction = false, bool repeat_pattern = true);
+	void all_bullets_set_movement_pattern_from_path(Path2D *path_holding_pattern, bool face_movement_direction = false, bool repeat_pattern = true, int start_index = 0, int end_index_inclusive = -1);
+	
+	void set_bullet_movement_pattern_from_curve(int bullet_index, const Ref<Curve2D> &curve_pattern, bool face_movement_direction = false, bool repeat_pattern = true);
+	void all_bullets_set_movement_pattern_from_curve(const Ref<Curve2D>& curve_pattern, bool face_movement_direction = false, bool repeat_pattern = true, int start_index = 0, int end_index_inclusive = -1);
+	
+	void remove_bullet_movement_pattern(int bullet_index);
+	void all_bullets_remove_movement_pattern(int start_index = 0, int end_index_inclusive = -1);
 
 protected:
 	static void _bind_methods();
@@ -552,7 +559,6 @@ protected:
 	std::vector<Vector2> all_cached_direction;
 
 	///
-
 
 	/// BULLET MOVEMENT PATTERN RELATED
 

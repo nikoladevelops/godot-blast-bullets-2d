@@ -1156,38 +1156,79 @@ void MultiMeshBullets2D::set_curves_elapsed_time(real_t new_time) {
 	curves_elapsed_time = new_time;
 }
 
-Ref<Curve2D> MultiMeshBullets2D::get_bullet_movement_pattern_curve(int bullet_index) const{
-    if (check_exists_bullet_movement_pattern_data(bullet_index)) {
-        return find_bullet_movement_pattern_data(bullet_index).path_curve;
-    }
+Ref<Curve2D> MultiMeshBullets2D::get_bullet_movement_pattern_curve(int bullet_index) const {
+	if (check_exists_bullet_movement_pattern_data(bullet_index)) {
+		return find_bullet_movement_pattern_data(bullet_index).path_curve;
+	}
 
-    return nullptr;
+	return nullptr;
 }
 
-void MultiMeshBullets2D::set_bullet_movement_pattern_from_path(int bullet_index, Path2D *path_holding_pattern){
-    if (path_holding_pattern == nullptr) {
-        if (check_exists_bullet_movement_pattern_data(bullet_index)) {
-            all_movement_pattern_data.erase(bullet_index);
-        }
-        return;
-    }
+void MultiMeshBullets2D::set_bullet_movement_pattern_from_path(int bullet_index, Path2D *path_holding_pattern, bool face_movement_direction, bool repeat_pattern) {
+	if (path_holding_pattern == nullptr) {
+		remove_bullet_movement_pattern(bullet_index);
+		return;
+	}
 
-    Ref<Curve2D> curve = path_holding_pattern->get_curve();
+	const Ref<Curve2D> &curve = path_holding_pattern->get_curve();
 
-    set_bullet_movement_pattern_from_curve(bullet_index, curve);
+	set_bullet_movement_pattern_from_curve(bullet_index, curve, face_movement_direction, repeat_pattern);
 }
 
-void MultiMeshBullets2D::set_bullet_movement_pattern_from_curve(int bullet_index, Ref<Curve2D> curve_pattern){
-    if (curve_pattern.is_null()) {
-        if (check_exists_bullet_movement_pattern_data(bullet_index)) {
-            all_movement_pattern_data.erase(bullet_index);
-        }
-        return;
-    }
+void MultiMeshBullets2D::all_bullets_set_movement_pattern_from_path(Path2D *path_holding_pattern, bool face_movement_direction, bool repeat_pattern, int start_index, int end_index_inclusive) {
+	ensure_indexes_match_amount_bullets_range(start_index, end_index_inclusive, "all_bullets_set_movement_pattern_from_path");
 
-    BulletMovementPatternData2D data { curve_pattern, all_cached_instance_origin[bullet_index] };
+	if (path_holding_pattern == nullptr) {
+		all_bullets_remove_movement_pattern(start_index, end_index_inclusive);
+		return;
+	}
 
-    all_movement_pattern_data[bullet_index] = data;
+	const Ref<Curve2D> &curve = path_holding_pattern->get_curve();
+
+	if (curve.is_null()) {
+		all_bullets_remove_movement_pattern(start_index, end_index_inclusive);
+		return;
+	}
+
+	for (int i = start_index; i <= end_index_inclusive; ++i) {
+		set_bullet_movement_pattern_from_curve(i, curve, face_movement_direction, repeat_pattern);
+	}
+}
+
+void MultiMeshBullets2D::set_bullet_movement_pattern_from_curve(int bullet_index, const Ref<Curve2D> &curve_pattern, bool face_movement_direction, bool repeat_pattern) {
+	if (curve_pattern.is_null()) {
+		remove_bullet_movement_pattern(bullet_index);
+		return;
+	}
+
+	all_movement_pattern_data[bullet_index] = BulletMovementPatternData2D{ curve_pattern, face_movement_direction, repeat_pattern };
+}
+
+void MultiMeshBullets2D::all_bullets_set_movement_pattern_from_curve(const Ref<Curve2D> &curve_pattern, bool face_movement_direction, bool repeat_pattern, int start_index, int end_index_inclusive) {
+	ensure_indexes_match_amount_bullets_range(start_index, end_index_inclusive, "all_bullets_set_movement_pattern_from_curve");
+
+	if (curve_pattern.is_null()) {
+		all_bullets_remove_movement_pattern(start_index, end_index_inclusive);
+		return;
+	}
+
+	for (int i = start_index; i <= end_index_inclusive; ++i) {
+		set_bullet_movement_pattern_from_curve(i, curve_pattern, face_movement_direction, repeat_pattern);
+	}
+}
+
+void MultiMeshBullets2D::remove_bullet_movement_pattern(int bullet_index) {
+	if (check_exists_bullet_movement_pattern_data(bullet_index)) {
+		all_movement_pattern_data.erase(bullet_index);
+	}
+}
+
+void MultiMeshBullets2D::all_bullets_remove_movement_pattern(int start_index, int end_index_inclusive) {
+	ensure_indexes_match_amount_bullets_range(start_index, end_index_inclusive, "all_bullets_remove_movement_pattern");
+
+	for (int i = start_index; i <= end_index_inclusive; ++i) {
+		remove_bullet_movement_pattern(i);
+	}
 }
 
 void MultiMeshBullets2D::_bind_methods() {
@@ -1306,8 +1347,16 @@ void MultiMeshBullets2D::_bind_methods() {
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "curves_elapsed_time"), "set_curves_elapsed_time", "get_curves_elapsed_time");
 
 	ClassDB::bind_method(D_METHOD("get_bullet_movement_pattern_curve", "bullet_index"), &MultiMeshBullets2D::get_bullet_movement_pattern_curve);
-    ClassDB::bind_method(D_METHOD("set_bullet_movement_pattern_from_path", "bullet_index", "path_holding_pattern"), &MultiMeshBullets2D::set_bullet_movement_pattern_from_path);
-    ClassDB::bind_method(D_METHOD("set_bullet_movement_pattern_from_curve", "bullet_index", "curve_pattern"), &MultiMeshBullets2D::set_bullet_movement_pattern_from_curve);
 
+	ClassDB::bind_method(D_METHOD("set_bullet_movement_pattern_from_path", "bullet_index", "path_holding_pattern", "face_movement_direction", "repeat_pattern"), &MultiMeshBullets2D::set_bullet_movement_pattern_from_path, DEFVAL(false), DEFVAL(true));
+	ClassDB::bind_method(D_METHOD("all_bullets_set_movement_pattern_from_path", "path_holding_pattern", "face_movement_direction", "repeat_pattern", "start_index", "end_index_inclusive"), &MultiMeshBullets2D::all_bullets_set_movement_pattern_from_path, DEFVAL(false), DEFVAL(true), DEFVAL(0), DEFVAL(-1));
+
+	ClassDB::bind_method(D_METHOD("set_bullet_movement_pattern_from_curve", "bullet_index", "curve_pattern", "face_movement_direction", "repeat_pattern"), &MultiMeshBullets2D::set_bullet_movement_pattern_from_curve, DEFVAL(false), DEFVAL(true));
+	ClassDB::bind_method(D_METHOD("all_bullets_set_movement_pattern_from_curve", "curve_pattern", "face_movement_direction", "repeat_pattern", "start_index", "end_index_inclusive"), &MultiMeshBullets2D::all_bullets_set_movement_pattern_from_curve, DEFVAL(false), DEFVAL(true), DEFVAL(0), DEFVAL(-1));
+
+	ClassDB::bind_method(D_METHOD("remove_bullet_movement_pattern", "bullet_index"), &MultiMeshBullets2D::remove_bullet_movement_pattern);
+	ClassDB::bind_method(D_METHOD("all_bullets_remove_movement_pattern", "start_index", "end_index_inclusive"), &MultiMeshBullets2D::all_bullets_remove_movement_pattern, DEFVAL(0), DEFVAL(-1));
+
+	ClassDB::bind_method(D_METHOD("has_bullet_movement_pattern", "bullet_index"), &MultiMeshBullets2D::check_exists_bullet_movement_pattern_data);
 }
 } //namespace BlastBullets2D

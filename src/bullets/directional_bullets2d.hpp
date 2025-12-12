@@ -40,134 +40,188 @@ public:
 	};
 
 	// Updates all bullets' positions, rotations, and homing
-    _ALWAYS_INLINE_ void move_bullets(double delta) {
-        const bool is_using_physics_interpolation = bullet_factory->use_physics_interpolation;
-        update_all_previous_transforms_for_interpolation();
-        const bool homing_interval_reached = update_homing_timer(delta);
-        // Cache the global mouse position for performance reasons (otherwise I would be fetching it per bullet when it doesn't even change..)
-        if (homing_interval_reached && HomingTargetDeque::mouse_homing_targets_amount > 0) { // Update the cache only when homing interval has been reached and only if there are targets that do follow the mouse
-            cached_mouse_global_position = get_global_mouse_position();
-        }
-        const bool shared_homing_deque_enabled = !shared_homing_deque.empty();
-        Vector2 homing_bullet_pos;
-        Vector2 homing_target_pos;
-        const bool shared_curves_data_enabled = shared_bullet_curves_data.is_valid();
-        const BulletCurvesData2D *const shared_curves_ptr = shared_bullet_curves_data.ptr();
-        bool is_per_bullet_curves_valid = false;
-        const BulletCurvesData2D *per_bullet_curves_data = nullptr;
-        for (int i = 0; i < amount_bullets; ++i) {
-            if (!bullets_enabled_status[i]) {
-                continue;
-            }
-            bool direction_got_updated = false;
-            // Handle homing
-            if (shared_homing_deque_enabled) { // Using the shared homing deque to update homing
-                update_homing(shared_homing_deque, true, i, delta, homing_interval_reached, homing_bullet_pos, homing_target_pos);
-                try_to_emit_bullet_homing_target_reached_signal(shared_homing_deque, shared_homing_deque_enabled, i, homing_bullet_pos, homing_target_pos);
-                direction_got_updated = true;
-            } else if (!all_bullet_homing_targets[i].empty()) { // If no shared homing deque, check if bullets have individual homing dequeues and use those instead
-                auto &curr_homing_deque = all_bullet_homing_targets[i];
-                update_homing(curr_homing_deque, false, i, delta, homing_interval_reached, homing_bullet_pos, homing_target_pos);
-                try_to_emit_bullet_homing_target_reached_signal(curr_homing_deque, shared_homing_deque_enabled, i, homing_bullet_pos, homing_target_pos);
-                direction_got_updated = true;
-            }
-            auto &curr_bullet_transf = all_cached_instance_transforms[i];
-            auto &curr_bullet_direction = all_cached_direction[i];
-            // Handle direction curves
-            if (shared_curves_data_enabled) {
-                apply_x_direction_curve(curr_bullet_direction, shared_curves_ptr);
-                apply_y_direction_curve(curr_bullet_direction, shared_curves_ptr);
-                apply_direction_curve_texture_rotation_if_needed(curr_bullet_direction, curr_bullet_transf, delta, shared_curves_ptr);
-                direction_got_updated = true;
-            } else {
-                per_bullet_curves_data = find_bullet_curves_data(i);
-                is_per_bullet_curves_valid = per_bullet_curves_data != nullptr;
-                if (is_per_bullet_curves_valid) {
-                    per_bullet_curves_data = all_bullet_curves_data[i].ptr();
-                    apply_x_direction_curve(curr_bullet_direction, per_bullet_curves_data);
-                    apply_y_direction_curve(curr_bullet_direction, per_bullet_curves_data);
-                    apply_direction_curve_texture_rotation_if_needed(curr_bullet_direction, curr_bullet_transf, delta, per_bullet_curves_data);
-                    direction_got_updated = true;
-                }
-            }
-            // Handle rotation
-            if (shared_curves_data_enabled && shared_curves_ptr->rotation_speed_curve.is_valid()) {
-                update_rotation_using_curve(i, delta, shared_curves_ptr);
-                bullet_accelerate_rotation_speed_using_curve(i, delta, shared_curves_ptr);
-            } else if (is_per_bullet_curves_valid && per_bullet_curves_data->rotation_speed_curve.is_valid()) {
-                update_rotation_using_curve(i, delta, per_bullet_curves_data);
-                bullet_accelerate_rotation_speed_using_curve(i, delta, per_bullet_curves_data);
-            } else if (is_rotation_data_active) {
-                update_rotation(i, delta);
-                bullet_accelerate_rotation_speed(i, delta);
-            }
-            if (adjust_direction_based_on_rotation) {
-                curr_bullet_direction = all_cached_instance_transforms[i].columns[0].normalized();
-                direction_got_updated = true;
-            }
-            // The velocity at which the bullet will move this frame
-            Vector2 &velocity_delta = all_cached_velocity[i];
-            if (direction_got_updated) {
-                const real_t cached_speed = all_cached_speed[i];
-                velocity_delta = curr_bullet_direction * cached_speed + inherited_velocity_offset;
-            }
-            velocity_delta *= delta;
-            // Handle movement pattern (moved here to avoid overwrite)
-            const bool use_pattern = check_exists_bullet_movement_pattern_data(i);
-            if (use_pattern) {
-                auto &pattern = all_movement_pattern_data[i];
-                const Ref<Curve2D> &curve = pattern.path_curve;
-                const real_t len = curve->get_baked_length();
-                const real_t prev_dist = pattern.distance_traveled;
-                const real_t move_dist = velocity_delta.length();
-                pattern.distance_traveled += move_dist;
-                const real_t s1 = Math::fmod(prev_dist, len);
-                const real_t s2 = Math::fmod(pattern.distance_traveled, len);
-                const int64_t l1 = (int64_t)(prev_dist / len);
-                const int64_t l2 = (int64_t)(pattern.distance_traveled / len);
-                const Vector2 start = curve->sample_baked(0.0f);
-                const Vector2 end = curve->sample_baked(len * 0.9999f);
-                const Vector2 disp = end - start;
-                const Vector2 p1 = l1 * disp + (curve->sample_baked(s1) - start);
-                const Vector2 p2 = l2 * disp + (curve->sample_baked(s2) - start);
-                Vector2 pattern_delta = (p2 - p1).rotated(curr_bullet_direction.angle());
-                velocity_delta = pattern_delta;
-            }
+	_ALWAYS_INLINE_ void move_bullets(double delta) {
+		const bool is_using_physics_interpolation = bullet_factory->use_physics_interpolation;
+		update_all_previous_transforms_for_interpolation();
 
-            auto &curr_shape_transf = all_cached_shape_transforms[i];
-            auto &curr_bullet_origin = all_cached_instance_origin[i];
-            auto &curr_shape_origin = all_cached_shape_origin[i];
-            // Update the bullet origin and transform
-            curr_bullet_origin += velocity_delta;
-            curr_bullet_transf.set_origin(curr_bullet_origin);
-            // Update the collision shape
-            // The shape transform is based on the bullet transform plus an offset so it should always follow it no matter how the bullet moves
-            curr_shape_transf = curr_bullet_transf;
-            // The user had previously set a collision shape offset relative to the center of the texture, so it needs to be re-calculated by taking into account the new rotation of the bullet
-            Vector2 rotated_offset = cache_collision_shape_offset.rotated(curr_shape_transf.get_rotation());
-            // Update the shape origin
-            curr_shape_origin = curr_bullet_origin + rotated_offset;
-            // Update the shape transform origin with the rotated offset
-            curr_shape_transf.set_origin(curr_shape_origin);
-            // Always update the physics shape (since it doesn't depend on interpolation or anything)
-            physics_server->area_set_shape_transform(area, i, curr_shape_transf);
-            // Updates bullet attachment and speed
-            move_bullet_attachment(velocity_delta, i);
-            // Handle bullet speed acceleration
-            if (shared_curves_data_enabled && shared_curves_ptr->movement_speed_curve.is_valid()) {
-                bullet_accelerate_speed_using_curve(i, delta, shared_curves_ptr);
-            } else {
-                if (is_per_bullet_curves_valid && per_bullet_curves_data->movement_speed_curve.is_valid()) {
-                    bullet_accelerate_speed_using_curve(i, delta, per_bullet_curves_data);
-                } else {
-                    bullet_accelerate_speed(i, delta);
-                }
-            }
-            if (!is_using_physics_interpolation) {
-                multi->set_instance_transform_2d(i, all_cached_instance_transforms[i]);
-            }
-        }
-    }
+		const bool homing_interval_reached = update_homing_timer(delta);
+		// Cache the global mouse position for performance reasons (otherwise I would be fetching it per bullet when it doesn't even change..)
+		if (homing_interval_reached && HomingTargetDeque::mouse_homing_targets_amount > 0) { // Update the cache only when homing interval has been reached and only if there are targets that do follow the mouse
+			cached_mouse_global_position = get_global_mouse_position();
+		}
+
+		const bool shared_homing_deque_enabled = !shared_homing_deque.empty();
+		Vector2 homing_bullet_pos;
+		Vector2 homing_target_pos;
+		const bool shared_curves_data_enabled = shared_bullet_curves_data.is_valid();
+		const BulletCurvesData2D *const shared_curves_ptr = shared_bullet_curves_data.ptr();
+		bool is_per_bullet_curves_valid = false;
+		const BulletCurvesData2D *per_bullet_curves_data = nullptr;
+
+		for (int i = 0; i < amount_bullets; ++i) {
+			if (!bullets_enabled_status[i]) {
+				continue;
+			}
+
+			bool direction_got_updated = false;
+
+			// Handle homing
+			if (shared_homing_deque_enabled) { // Using the shared homing deque to update homing
+				update_homing(shared_homing_deque, true, i, delta, homing_interval_reached, homing_bullet_pos, homing_target_pos);
+				try_to_emit_bullet_homing_target_reached_signal(shared_homing_deque, shared_homing_deque_enabled, i, homing_bullet_pos, homing_target_pos);
+				direction_got_updated = true;
+			} else if (!all_bullet_homing_targets[i].empty()) { // If no shared homing deque, check if bullets have individual homing dequeues and use those instead
+				auto &curr_homing_deque = all_bullet_homing_targets[i];
+				update_homing(curr_homing_deque, false, i, delta, homing_interval_reached, homing_bullet_pos, homing_target_pos);
+				try_to_emit_bullet_homing_target_reached_signal(curr_homing_deque, shared_homing_deque_enabled, i, homing_bullet_pos, homing_target_pos);
+				direction_got_updated = true;
+			}
+
+			auto &curr_bullet_transf = all_cached_instance_transforms[i];
+			auto &curr_bullet_direction = all_cached_direction[i];
+
+			// Handle direction curves
+			if (shared_curves_data_enabled) {
+				apply_x_direction_curve(curr_bullet_direction, shared_curves_ptr);
+				apply_y_direction_curve(curr_bullet_direction, shared_curves_ptr);
+				apply_direction_curve_texture_rotation_if_needed(curr_bullet_direction, curr_bullet_transf, delta, shared_curves_ptr);
+				direction_got_updated = true;
+			} else {
+				per_bullet_curves_data = find_bullet_curves_data(i);
+				is_per_bullet_curves_valid = per_bullet_curves_data != nullptr;
+
+				if (is_per_bullet_curves_valid) {
+					per_bullet_curves_data = all_bullet_curves_data[i].ptr();
+					apply_x_direction_curve(curr_bullet_direction, per_bullet_curves_data);
+					apply_y_direction_curve(curr_bullet_direction, per_bullet_curves_data);
+					apply_direction_curve_texture_rotation_if_needed(curr_bullet_direction, curr_bullet_transf, delta, per_bullet_curves_data);
+					direction_got_updated = true;
+				}
+			}
+
+			// Handle rotation
+			if (shared_curves_data_enabled && shared_curves_ptr->rotation_speed_curve.is_valid()) {
+				update_rotation_using_curve(i, delta, shared_curves_ptr);
+				bullet_accelerate_rotation_speed_using_curve(i, delta, shared_curves_ptr);
+			} else if (is_per_bullet_curves_valid && per_bullet_curves_data->rotation_speed_curve.is_valid()) {
+				update_rotation_using_curve(i, delta, per_bullet_curves_data);
+				bullet_accelerate_rotation_speed_using_curve(i, delta, per_bullet_curves_data);
+			} else if (is_rotation_data_active) {
+				update_rotation(i, delta);
+				bullet_accelerate_rotation_speed(i, delta);
+			}
+
+			if (adjust_direction_based_on_rotation) {
+				curr_bullet_direction = all_cached_instance_transforms[i].columns[0].normalized();
+				direction_got_updated = true;
+			}
+
+			// The velocity at which the bullet will move this frame
+			Vector2 &velocity_delta = all_cached_velocity[i];
+			if (direction_got_updated) {
+				const real_t cached_speed = all_cached_speed[i];
+				velocity_delta = curr_bullet_direction * cached_speed + inherited_velocity_offset;
+			}
+
+			velocity_delta *= delta;
+
+			// Handle movement pattern
+			const bool use_pattern = check_exists_bullet_movement_pattern_data(i);
+			if (use_pattern) {
+				auto &pattern = all_movement_pattern_data[i];
+				const Ref<Curve2D> &curve = pattern.path_curve;
+				const real_t len = curve->get_baked_length();
+				const real_t prev_dist = pattern.distance_traveled;
+
+				// Advance the distance traveled along the pattern
+				const real_t advance_dist = velocity_delta.length();
+				pattern.distance_traveled += advance_dist;
+
+				// Sample curve to find out new position
+				const real_t s1 = Math::fmod(prev_dist, len);
+				const real_t s2 = Math::fmod(pattern.distance_traveled, len);
+				const int64_t l1 = (int64_t)(prev_dist / len);
+				const int64_t l2 = (int64_t)(pattern.distance_traveled / len);
+
+				const Vector2 start = curve->sample_baked(0.0);
+				const Vector2 end = curve->sample_baked(len * 0.9999);
+				const Vector2 disp = end - start;
+
+				const Vector2 p1 = l1 * disp + (curve->sample_baked(s1) - start);
+				const Vector2 p2 = l2 * disp + (curve->sample_baked(s2) - start);
+
+				Vector2 local_delta = p2 - p1;
+				Vector2 pattern_direction = local_delta.rotated(curr_bullet_direction.angle()).normalized();
+
+				// Keep the original speed but change the direction to follow the pattern
+				const real_t original_speed = velocity_delta.length();
+				if (original_speed > 0.0001) {
+					velocity_delta = pattern_direction * original_speed;
+				}
+
+				// If the user wants the bullet to face the movement direction (take control of texture rotation)
+				if (pattern.face_movement_direction && velocity_delta.length_squared() > 0.0001) {
+					const Vector2 tangent = velocity_delta.normalized();
+					curr_bullet_transf.columns[0] = tangent;
+					curr_bullet_transf.columns[1] = Vector2(-tangent.y, tangent.x);
+				}
+
+				// If user doesnt want to repeat the pattern after it finishes
+				if (!pattern.repeat_pattern && pattern.distance_traveled >= len) {
+					if (pattern.face_movement_direction) {
+						const Vector2 logical_dir = curr_bullet_direction.normalized();
+						curr_bullet_transf.columns[0] = logical_dir;
+						curr_bullet_transf.columns[1] = Vector2(-logical_dir.y, logical_dir.x);
+					}
+
+					all_movement_pattern_data.erase(i);
+				}
+			}
+
+			auto &curr_shape_transf = all_cached_shape_transforms[i];
+			auto &curr_bullet_origin = all_cached_instance_origin[i];
+			auto &curr_shape_origin = all_cached_shape_origin[i];
+
+			// Update the bullet origin and transform
+			curr_bullet_origin += velocity_delta;
+			curr_bullet_transf.set_origin(curr_bullet_origin);
+
+			// Update the collision shape
+
+			// The shape transform is based on the bullet transform plus an offset so it should always follow it no matter how the bullet moves
+			curr_shape_transf = curr_bullet_transf;
+
+			// The user had previously set a collision shape offset relative to the center of the texture, so it needs to be re-calculated by taking into account the new rotation of the bullet
+			Vector2 rotated_offset = cache_collision_shape_offset.rotated(curr_shape_transf.get_rotation());
+
+			// Update the shape origin
+			curr_shape_origin = curr_bullet_origin + rotated_offset;
+
+			// Update the shape transform origin with the rotated offset
+			curr_shape_transf.set_origin(curr_shape_origin);
+
+			// Always update the physics shape (since it doesn't depend on interpolation or anything)
+			physics_server->area_set_shape_transform(area, i, curr_shape_transf);
+
+			// Updates bullet attachment and speed
+			move_bullet_attachment(velocity_delta, i);
+
+			// Handle bullet speed acceleration
+			if (shared_curves_data_enabled && shared_curves_ptr->movement_speed_curve.is_valid()) {
+				bullet_accelerate_speed_using_curve(i, delta, shared_curves_ptr);
+			} else {
+				if (is_per_bullet_curves_valid && per_bullet_curves_data->movement_speed_curve.is_valid()) {
+					bullet_accelerate_speed_using_curve(i, delta, per_bullet_curves_data);
+				} else {
+					bullet_accelerate_speed(i, delta);
+				}
+			}
+
+			if (!is_using_physics_interpolation) {
+				multi->set_instance_transform_2d(i, all_cached_instance_transforms[i]);
+			}
+		}
+	}
 
 	///////////// PER BULLET HOMING DEQUE POP METHODS
 
