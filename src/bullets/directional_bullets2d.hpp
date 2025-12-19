@@ -780,16 +780,15 @@ protected:
 
 		auto &curr_transf = all_cached_instance_transforms[bullet_index];
 
-		// If rotation is not active then rotate the bullet by applying smoothing
-		if (!is_rotation_data_active) {
+		// If rotation is controlled via movement pattern or rotation data, just set direction directly toward target
+		if (check_exists_bullet_movement_pattern_data(bullet_index) || is_rotation_data_active) {
+			current_direction = diff.normalized();
+		} else { // Otherwise use smoothing to rotate toward target
 			// Rotate toward target with smoothing
 			rotate_to_target(bullet_index, diff, max_turn, use_smoothing);
 
 			// Get the new direction based on the rotated transform
 			current_direction = curr_transf[0].normalized();
-		} else {
-			// If rotation is indeed active there is no need to handle rotation yourself, the user wants spinning bullets
-			current_direction = diff.normalized();
 		}
 	}
 

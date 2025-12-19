@@ -292,21 +292,26 @@ func spawn_multi_mesh_directional_bullets()->void:
 	#dir_bullets.all_bullets_set_curves_data(bullet_curves_data_1)
 	#dir_bullets.bullet_set_curves_data(0, bullet_curves_data_1)
 	dir_bullets.shared_bullet_curves_data = bullet_curves_data_1
-	#dir_bullets.shared_homing_deque_push_back_node2d_target(BENCHMARK_GLOBALS.MOVING_TARGET_ONE)
+	
+	dir_bullets.shared_homing_deque_push_back_node2d_target(BENCHMARK_GLOBALS.MOVING_TARGET_ONE)
 	#dir_bullets.set_bullet_movement_pattern_from_curve(0, BENCHMARK_GLOBALS.MOVEMENT_PATH_HOLDER.get_child(0).curve)
 	
+	dir_bullets.all_bullets_set_movement_pattern_from_curve(BENCHMARK_GLOBALS.MOVEMENT_PATH_HOLDER.get_child(0).curve, true, true)
+	
 	#dir_bullets.set_bullet_movement_pattern_from_path(0, BENCHMARK_GLOBALS.MOVEMENT_PATH_HOLDER.get_child(0) as Path2D, true, true)
-	dir_bullets.all_bullets_set_movement_pattern_from_path(BENCHMARK_GLOBALS.MOVEMENT_PATH_HOLDER.get_child(0) as Path2D, true, true)
-	#
-	dir_bullets.multimesh_attach_time_based_function(2, func():
-		dir_bullets.all_bullets_set_movement_pattern_from_path(null, true, true)
-		
-		#dir_bullets.all_bullets_set_direction(Vector2(1,0))
-		#dir_bullets.shared_bullet_curves_data = null
-		#dir_bullets.curves_elapsed_time = 0
-		#dir_bullets.all_bullets_set_speed_data(null)
-		#dir_bullets.shared_homing_deque_push_back_node2d_target(BENCHMARK_GLOBALS.MOVING_TARGET_ONE)
-		, false, true)
+	#dir_bullets.all_bullets_set_movement_pattern_from_path(BENCHMARK_GLOBALS.MOVEMENT_PATH_HOLDER.get_child(0) as Path2D, true, true)
+	#dir_bullets.all_bullets_set_movement_pattern_from_path(null, true, true)
+	
+	##
+	#dir_bullets.multimesh_attach_time_based_function(2, func():
+		#dir_bullets.all_bullets_set_movement_pattern_from_path(null, true, true)
+		#
+		##dir_bullets.all_bullets_set_direction(Vector2(1,0))
+		##dir_bullets.shared_bullet_curves_data = null
+		##dir_bullets.curves_elapsed_time = 0
+		##dir_bullets.all_bullets_set_speed_data(null)
+		##dir_bullets.shared_homing_deque_push_back_node2d_target(BENCHMARK_GLOBALS.MOVING_TARGET_ONE)
+		#, false, true)
 	
 	
 	
