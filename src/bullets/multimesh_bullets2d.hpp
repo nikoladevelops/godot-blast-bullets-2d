@@ -397,10 +397,10 @@ public:
 
 	void set_bullet_movement_pattern_from_path(int bullet_index, Path2D *path_holding_pattern, bool face_movement_direction = false, bool repeat_pattern = true);
 	void all_bullets_set_movement_pattern_from_path(Path2D *path_holding_pattern, bool face_movement_direction = false, bool repeat_pattern = true, int start_index = 0, int end_index_inclusive = -1);
-	
+
 	void set_bullet_movement_pattern_from_curve(int bullet_index, const Ref<Curve2D> &curve_pattern, bool face_movement_direction = false, bool repeat_pattern = true);
-	void all_bullets_set_movement_pattern_from_curve(const Ref<Curve2D>& curve_pattern, bool face_movement_direction = false, bool repeat_pattern = true, int start_index = 0, int end_index_inclusive = -1);
-	
+	void all_bullets_set_movement_pattern_from_curve(const Ref<Curve2D> &curve_pattern, bool face_movement_direction = false, bool repeat_pattern = true, int start_index = 0, int end_index_inclusive = -1);
+
 	void remove_bullet_movement_pattern(int bullet_index);
 	void all_bullets_remove_movement_pattern(int start_index = 0, int end_index_inclusive = -1);
 
@@ -577,6 +577,27 @@ protected:
 	//
 
 	/// COLLISION RELATED
+
+	enum CollisionType : uint8_t { 
+		AREA = 0,
+		BODY 
+	};
+
+	struct BulletCollisionData2D {
+		int64_t collided_instance_id = -1;
+		int bullet_index = -1;
+		CollisionType collision_type = AREA;
+
+		BulletCollisionData2D() = default;
+
+		BulletCollisionData2D(int new_bullet_index, int64_t new_collided_instance_id, CollisionType new_collision_type) :
+				collided_instance_id(new_collided_instance_id),
+				bullet_index(new_bullet_index),
+				collision_type(new_collision_type) {}
+	};
+
+	// All bullets that have collided this physics frame
+	std::vector<BulletCollisionData2D> all_collided_bullets;
 
 	// How many times a single bullet can collide before being disabled. If you set to 0 the bullet will never be disabled due to collisions.
 	int bullet_max_collision_count = 1;
@@ -1206,7 +1227,7 @@ protected:
 		}
 	}
 
-	_ALWAYS_INLINE_ void _handle_bullet_collision(String factory_signal_name_to_emit, int bullet_index, int64_t entered_instance_id) {
+	_ALWAYS_INLINE_ void handle_bullet_collision(CollisionType collision_type, int bullet_index, int64_t entered_instance_id) {
 		int8_t &curr_bullet_status = bullets_enabled_status[bullet_index];
 
 		// If the bullet is already disabled, just return
@@ -1226,19 +1247,23 @@ protected:
 
 		Object *hit_target = ObjectDB::get_instance(entered_instance_id);
 
-		bullet_factory->emit_signal(factory_signal_name_to_emit, hit_target, this, bullet_index, bullets_custom_data, all_cached_instance_transforms[bullet_index]);
+		if (collision_type == CollisionType::AREA) {
+			bullet_factory->emit_signal("area_entered", hit_target, this, bullet_index, bullets_custom_data, all_cached_instance_transforms[bullet_index]);
+		} else if (collision_type == CollisionType::BODY) {
+			bullet_factory->emit_signal("body_entered", hit_target, this, bullet_index, bullets_custom_data, all_cached_instance_transforms[bullet_index]);
+		}
 	}
 
 	/// COLLISION DETECTION METHODS
 
 	_ALWAYS_INLINE_ void area_entered_func(PhysicsServer2D::AreaBodyStatus status, RID entered_rid, int64_t entered_instance_id, int entered_shape_index, int bullet_shape_index) {
 		if (status == PhysicsServer2D::AREA_BODY_ADDED) {
-			call_deferred("_handle_bullet_collision", "area_entered", bullet_shape_index, entered_instance_id);
+			all_collided_bullets.emplace_back(bullet_shape_index, entered_instance_id, CollisionType::AREA);
 		}
 	}
 	_ALWAYS_INLINE_ void body_entered_func(PhysicsServer2D::AreaBodyStatus status, RID entered_rid, int64_t entered_instance_id, int entered_shape_index, int bullet_shape_index) {
 		if (status == PhysicsServer2D::AREA_BODY_ADDED) {
-			call_deferred("_handle_bullet_collision", "body_entered", bullet_shape_index, entered_instance_id);
+			all_collided_bullets.emplace_back(bullet_shape_index, entered_instance_id, CollisionType::BODY);
 		}
 	}
 

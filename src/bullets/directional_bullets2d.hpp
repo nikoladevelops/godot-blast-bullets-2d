@@ -311,6 +311,12 @@ public:
 				multi->set_instance_transform_2d(i, all_cached_instance_transforms[i]);
 			}
 		}
+
+		// Handle collisions safely after all physics processing logic is done
+		for (auto& data : all_collided_bullets) {
+			handle_bullet_collision(data.collision_type, data.bullet_index, data.collided_instance_id);
+		}
+		all_collided_bullets.clear();
 	}
 
 	///////////////// ORBITING DATA METHODS
