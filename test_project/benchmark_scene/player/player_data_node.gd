@@ -280,7 +280,7 @@ func spawn_multi_mesh_directional_bullets()->void:
 	#directional_bullets_data.is_life_time_over_signal_enabled = true
 	#directional_bullets_data.bullet_max_collision_amount = 1
 	var dir_bullets:DirectionalBullets2D = BENCHMARK_GLOBALS.FACTORY.spawn_controllable_directional_bullets(directional_bullets_data)
-	dir_bullets.homing_smoothing = 20.0# Set from 0 to 20 or even bigger (but you might have issues with interpolation)
+	dir_bullets.homing_smoothing = 0.0# Set from 0 to 20 or even bigger (but you might have issues with interpolation)
 	dir_bullets.homing_update_interval = 0.00# Set an update timer - keep it low for smooth updates
 	dir_bullets.homing_take_control_of_texture_rotation = true
 	dir_bullets.distance_from_target_before_considering_as_reached = 50
@@ -289,14 +289,37 @@ func spawn_multi_mesh_directional_bullets()->void:
 	dir_bullets.is_multimesh_auto_pooling_enabled = true
 	dir_bullets.bullet_max_collision_count = 1 # How many times the bullet can collide before getting disabled
 	
+	#dir_bullets.all_bullets_set_attachment(light_attachment_scn, 1, Vector2(-60,0))
 	#dir_bullets.all_bullets_set_curves_data(bullet_curves_data_1)
 	#dir_bullets.bullet_set_curves_data(0, bullet_curves_data_1)
 	dir_bullets.shared_bullet_curves_data = bullet_curves_data_1
 	
-	dir_bullets.shared_homing_deque_push_back_node2d_target(BENCHMARK_GLOBALS.MOVING_TARGET_ONE)
-	#dir_bullets.set_bullet_movement_pattern_from_curve(0, BENCHMARK_GLOBALS.MOVEMENT_PATH_HOLDER.get_child(0).curve)
+	#dir_bullets.shared_homing_deque_push_back_node2d_target(BENCHMARK_GLOBALS.MOVING_TARGET_ONE)
+	dir_bullets.all_bullets_push_back_homing_target(BENCHMARK_GLOBALS.MOVING_TARGET_ONE)
+	#dir_bullets.distance_from_target_before_considering_as_reached = 300
+	#dir_bullets.bullet_homing_auto_pop_after_target_reached = true
 	
-	dir_bullets.all_bullets_set_movement_pattern_from_curve(BENCHMARK_GLOBALS.MOVEMENT_PATH_HOLDER.get_child(0).curve, true, true)
+	dir_bullets.bullet_enable_orbiting(0, 450, DirectionalBullets2D.OrbitRight, DirectionalBullets2D.FaceOppositeOrbitingDirection)
+	#dir_bullets.bullet_enable_orbiting(1, 550, DirectionalBullets2D.OrbitRight, DirectionalBullets2D.FaceOppositeTarget)
+	#dir_bullets.bullet_enable_orbiting(2, 750, DirectionalBullets2D.OrbitLeft, DirectionalBullets2D.FaceTarget)
+	#dir_bullets.bullet_enable_orbiting(3, 850, DirectionalBullets2D.DontMove, DirectionalBullets2D.FaceTarget)
+	#dir_bullets.bullet_enable_orbiting(4, 1350, DirectionalBullets2D.DontMove, DirectionalBullets2D.FaceTarget)
+	
+	
+	
+	
+	#
+	#dir_bullets.multimesh_attach_time_based_function(2, func(): 
+		#dir_bullets.bullet_disable_orbiting(0)
+		#, false, true)
+	#
+	#dir_bullets.multimesh_attach_time_based_function(4, func(): 
+		#dir_bullets.bullet_homing_pop_back_target(0)
+	#, false, true)
+	
+	
+	#dir_bullets.set_bullet_movement_pattern_from_curve(0, BENCHMARK_GLOBALS.MOVEMENT_PATH_HOLDER.get_child(0).curve, true, true)
+	#dir_bullets.all_bullets_set_movement_pattern_from_curve(BENCHMARK_GLOBALS.MOVEMENT_PATH_HOLDER.get_child(0).curve, true, true)
 	
 	#dir_bullets.set_bullet_movement_pattern_from_path(0, BENCHMARK_GLOBALS.MOVEMENT_PATH_HOLDER.get_child(0) as Path2D, true, true)
 	#dir_bullets.all_bullets_set_movement_pattern_from_path(BENCHMARK_GLOBALS.MOVEMENT_PATH_HOLDER.get_child(0) as Path2D, true, true)

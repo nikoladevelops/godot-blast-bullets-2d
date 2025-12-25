@@ -68,11 +68,9 @@ void DirectionalBullets2D::custom_additional_spawn_logic(const MultiMeshBulletsD
 
 	is_multimesh_auto_pooling_enabled = directional_data.is_multimesh_auto_pooling_enabled;
 
-	// Homing behavior related //
 
 	// Each bullet can have its own homing target
 	all_bullet_homing_targets.resize(amount_bullets); // Create a vector that contains an empty queue for each bullet index
-	//
 }
 
 void DirectionalBullets2D::custom_additional_save_logic(SaveDataMultiMeshBullets2D &data) {
@@ -123,10 +121,6 @@ void DirectionalBullets2D::custom_additional_enable_logic(const MultiMeshBullets
 	homing_update_timer = 0.0;
 	homing_smoothing = 0.0;
 	homing_take_control_of_texture_rotation = false;
-
-	homing_boundary_behavior = BoundaryDontMove;
-	homing_boundary_facing_direction = FaceTarget;
-	homing_boundary_distance_away_from_target = 0.0;
 
 	distance_from_target_before_considering_as_reached = 5.0;
 	bullet_homing_auto_pop_after_target_reached = false;
@@ -218,14 +212,6 @@ void DirectionalBullets2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_distance_from_target_before_considering_as_reached", "value"), &DirectionalBullets2D::set_distance_from_target_before_considering_as_reached);
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "distance_from_target_before_considering_as_reached"), "set_distance_from_target_before_considering_as_reached", "get_distance_from_target_before_considering_as_reached");
 
-	ClassDB::bind_method(D_METHOD("get_homing_boundary_behavior"), &DirectionalBullets2D::get_homing_boundary_behavior);
-	ClassDB::bind_method(D_METHOD("set_homing_boundary_behavior", "value"), &DirectionalBullets2D::set_homing_boundary_behavior);
-	ADD_PROPERTY(PropertyInfo(Variant::INT, "homing_boundary_behavior"), "set_homing_boundary_behavior", "get_homing_boundary_behavior");
-
-	ClassDB::bind_method(D_METHOD("get_homing_boundary_facing_direction"), &DirectionalBullets2D::get_homing_boundary_facing_direction);
-	ClassDB::bind_method(D_METHOD("set_homing_boundary_facing_direction", "value"), &DirectionalBullets2D::set_homing_boundary_facing_direction);
-	ADD_PROPERTY(PropertyInfo(Variant::INT, "homing_boundary_facing_direction"), "set_homing_boundary_facing_direction", "get_homing_boundary_facing_direction");
-
 	ClassDB::bind_method(D_METHOD("get_homing_smoothing"), &DirectionalBullets2D::get_homing_smoothing);
 	ClassDB::bind_method(D_METHOD("set_homing_smoothing", "value"), &DirectionalBullets2D::set_homing_smoothing);
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "homing_smoothing"), "set_homing_smoothing", "get_homing_smoothing");
@@ -238,10 +224,11 @@ void DirectionalBullets2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_homing_take_control_of_texture_rotation", "value"), &DirectionalBullets2D::set_homing_take_control_of_texture_rotation);
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "homing_take_control_of_texture_rotation"), "set_homing_take_control_of_texture_rotation", "get_homing_take_control_of_texture_rotation");
 
-	ClassDB::bind_method(D_METHOD("get_homing_boundary_distance_away_from_target"), &DirectionalBullets2D::get_homing_boundary_distance_away_from_target);
-	ClassDB::bind_method(D_METHOD("set_homing_boundary_distance_away_from_target", "value"), &DirectionalBullets2D::set_homing_boundary_distance_away_from_target);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "homing_boundary_distance_away_from_target"), "set_homing_boundary_distance_away_from_target", "get_homing_boundary_distance_away_from_target");
-
+	// ORBITING RELATED
+	
+	ClassDB::bind_method(D_METHOD("bullet_enable_orbiting", "bullet_index", "orbiting_radius", "orbiting_direction", "orbiting_texture_rotation"), &DirectionalBullets2D::bullet_enable_orbiting);
+	ClassDB::bind_method(D_METHOD("bullet_disable_orbiting", "bullet_index"), &DirectionalBullets2D::bullet_disable_orbiting);
+	
 	// OTHER USEFUL METHODS
 	ClassDB::bind_method(D_METHOD("teleport_bullet", "bullet_index", "new_global_pos"), &DirectionalBullets2D::teleport_bullet);
 	ClassDB::bind_method(D_METHOD("teleport_shift_bullet", "bullet_index", "shift_value"), &DirectionalBullets2D::teleport_shift_bullet);
@@ -255,13 +242,14 @@ void DirectionalBullets2D::_bind_methods() {
 	BIND_ENUM_CONSTANT(Node2DTarget);
 	BIND_ENUM_CONSTANT(NotHoming);
 
-	BIND_ENUM_CONSTANT(BoundaryDontMove);
-	BIND_ENUM_CONSTANT(BoundaryOrbitLeft);
-	BIND_ENUM_CONSTANT(BoundaryOrbitRight);
+	BIND_ENUM_CONSTANT(DontMove);
+	BIND_ENUM_CONSTANT(OrbitLeft);
+	BIND_ENUM_CONSTANT(OrbitRight);
 
 	BIND_ENUM_CONSTANT(FaceTarget);
 	BIND_ENUM_CONSTANT(FaceOppositeTarget);
 	BIND_ENUM_CONSTANT(FaceOrbitingDirection);
+	BIND_ENUM_CONSTANT(FaceOppositeOrbitingDirection);
 
 	ADD_SIGNAL(MethodInfo("bullet_homing_target_reached",
 			PropertyInfo(Variant::OBJECT, "multimesh_instance", PROPERTY_HINT_RESOURCE_TYPE, "DirectionalBullets2D"),

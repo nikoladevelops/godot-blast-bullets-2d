@@ -36,7 +36,7 @@ gradient = SubResource("Gradient_1inld")
 
 [sub_resource type="Curve2D" id="Curve2D_nkrfg"]
 _data = {
-"points": PackedVector2Array(0, 0, 0, 0, -623, -65, 0, 0, 0, 0, -615.16, -60.6217, 0, 0, 0, 0, -529, -9, 0, 0, 0, 0, -477, -118, 0, 0, 0, 0, -410, -3)
+"points": PackedVector2Array(0, 0, 0, 0, -623, -65, 0, 0, 0, 0, -608, -52, -1.86603, 111.495, 1.86603, -111.495, -529, -9, -38.7201, 1.86603, 38.7201, -1.86603, -477, -118, 0, 0, 0, 0, -410, -3)
 }
 point_count = 5
 

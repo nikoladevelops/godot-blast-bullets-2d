@@ -414,11 +414,11 @@
 		<member name="distance_from_target_before_considering_as_reached" type="float" setter="set_distance_from_target_before_considering_as_reached" getter="get_distance_from_target_before_considering_as_reached" default="5.0">
 			Adjust if you want your bullets to consider a target reached if they are within a certain distance away from it.
 		</member>
-		<member name="homing_boundary_behavior" type="int" setter="set_homing_boundary_behavior" getter="get_homing_boundary_behavior" enum="DirectionalBullets2D.HomingBoundaryBehavior" default="0">
+		<member name="homing_boundary_behavior" type="int" setter="set_homing_boundary_behavior" getter="get_homing_boundary_behavior" enum="DirectionalBullets2D.OrbitingDirection" default="0">
 		</member>
 		<member name="homing_boundary_distance_away_from_target" type="float" setter="set_homing_boundary_distance_away_from_target" getter="get_homing_boundary_distance_away_from_target" default="0.0">
 		</member>
-		<member name="homing_boundary_facing_direction" type="int" setter="set_homing_boundary_facing_direction" getter="get_homing_boundary_facing_direction" enum="DirectionalBullets2D.HomingBoundaryFacingDirection" default="0">
+		<member name="homing_boundary_facing_direction" type="int" setter="set_homing_boundary_facing_direction" getter="get_homing_boundary_facing_direction" enum="DirectionalBullets2D.OrbitingTextureRotation" default="0">
 		</member>
 		<member name="homing_smoothing" type="float" setter="set_homing_smoothing" getter="get_homing_smoothing" default="0.0">
 			Adjust this value for natural smooth turning. Test with values [code]0.00-20.00[/code] or even bigger.
@@ -461,17 +461,17 @@
 		</constant>
 		<constant name="NotHoming" value="0" enum="HomingType">
 		</constant>
-		<constant name="BoundaryDontMove" value="0" enum="HomingBoundaryBehavior">
+		<constant name="DontMove" value="0" enum="OrbitingDirection">
 		</constant>
-		<constant name="BoundaryOrbitLeft" value="1" enum="HomingBoundaryBehavior">
+		<constant name="OrbitLeft" value="1" enum="OrbitingDirection">
 		</constant>
-		<constant name="BoundaryOrbitRight" value="2" enum="HomingBoundaryBehavior">
+		<constant name="OrbitRight" value="2" enum="OrbitingDirection">
 		</constant>
-		<constant name="FaceTarget" value="0" enum="HomingBoundaryFacingDirection">
+		<constant name="FaceTarget" value="0" enum="OrbitingTextureRotation">
 		</constant>
-		<constant name="FaceOppositeTarget" value="1" enum="HomingBoundaryFacingDirection">
+		<constant name="FaceOppositeTarget" value="1" enum="OrbitingTextureRotation">
 		</constant>
-		<constant name="FaceOrbitingDirection" value="2" enum="HomingBoundaryFacingDirection">
+		<constant name="FaceOrbitingDirection" value="2" enum="OrbitingTextureRotation">
 		</constant>
 	</constants>
 </class>

@@ -18,6 +18,8 @@
 #include "shared/bullet_curves_data2d.hpp"
 #include "spawn-data/multimesh_bullets_data2d.hpp"
 
+#include <cstdint>
+#include <unordered_map>
 #include <vector>
 
 namespace BlastBullets2D {
@@ -27,36 +29,85 @@ class DirectionalBullets2D : public MultiMeshBullets2D {
 	GDCLASS(DirectionalBullets2D, MultiMeshBullets2D)
 
 public:
-	enum HomingBoundaryBehavior {
-		BoundaryDontMove = 0,
-		BoundaryOrbitLeft,
-		BoundaryOrbitRight
+	enum OrbitingDirection {
+		DontMove = 0,
+		OrbitLeft,
+		OrbitRight
 	};
 
-	enum HomingBoundaryFacingDirection {
-		FaceTarget,
+	enum OrbitingTextureRotation {
+		FaceTarget = 0,
 		FaceOppositeTarget,
-		FaceOrbitingDirection
+		FaceOrbitingDirection,
+		FaceOppositeOrbitingDirection
 	};
 
+	struct OrbitingData {
+		real_t angle;
+		real_t radius;
+		OrbitingDirection direction;
+		OrbitingTextureRotation texture_rotation;
+
+		OrbitingData() = default;
+
+		OrbitingData(real_t new_radius, OrbitingDirection new_direction, OrbitingTextureRotation new_texture_rotation) :
+				angle(-10.0),
+				radius(new_radius),
+				direction(new_direction),
+				texture_rotation(new_texture_rotation) {};
+
+		bool check_is_already_locked_orbiting() const {
+			return angle > -9.0f;
+		}
+	};
+
+protected:
+	// Configuration flags
+	bool adjust_direction_based_on_rotation = false;
+	bool homing_take_control_of_texture_rotation = false;
+	bool bullet_homing_auto_pop_after_target_reached = false;
+	bool shared_homing_deque_auto_pop_after_target_reached = false;
+
+	Vector2 cached_mouse_global_position{ 0, 0 };
+
+	// Homing parameters
+	double homing_update_interval = 0.0;
+	double homing_update_timer = 0.0;
+	real_t homing_smoothing = 0.0;
+
+	// For each bullet containing its orbiting data
+	std::unordered_map<int, OrbitingData> all_orbiting_data;
+
+	// Minimum distance (in pixels) from the homing target at which the bullet is considered to have reached it. Once within this distance, the bullet_homing_target_reached signal is emitted
+	real_t distance_from_target_before_considering_as_reached = 5.0;
+
+	// This tracks each bullet's homing deque - allows each bullet to have its own separate homing targets
+	std::vector<HomingTargetDeque> all_bullet_homing_targets;
+
+	// This is a shared homing deque - allows the bullets to share the same target
+	HomingTargetDeque shared_homing_deque;
+
+public:
 	// Updates all bullets' positions, rotations, and homing
 	_ALWAYS_INLINE_ void move_bullets(double delta) {
 		const bool is_using_physics_interpolation = bullet_factory->use_physics_interpolation;
 		update_all_previous_transforms_for_interpolation();
 
 		const bool homing_interval_reached = update_homing_timer(delta);
-		// Cache the global mouse position for performance reasons (otherwise I would be fetching it per bullet when it doesn't even change..)
-		if (homing_interval_reached && HomingTargetDeque::mouse_homing_targets_amount > 0) { // Update the cache only when homing interval has been reached and only if there are targets that do follow the mouse
+		if (homing_interval_reached && HomingTargetDeque::mouse_homing_targets_amount > 0) {
 			cached_mouse_global_position = get_global_mouse_position();
 		}
 
 		const bool shared_homing_deque_enabled = !shared_homing_deque.empty();
 		Vector2 homing_bullet_pos;
 		Vector2 homing_target_pos;
+
 		const bool shared_curves_data_enabled = shared_bullet_curves_data.is_valid();
 		const BulletCurvesData2D *const shared_curves_ptr = shared_bullet_curves_data.ptr();
 		bool is_per_bullet_curves_valid = false;
 		const BulletCurvesData2D *per_bullet_curves_data = nullptr;
+
+		const bool skip_orbiting = all_orbiting_data.empty();
 
 		for (int i = 0; i < amount_bullets; ++i) {
 			if (!bullets_enabled_status[i]) {
@@ -64,23 +115,26 @@ public:
 			}
 
 			bool direction_got_updated = false;
+			HomingTargetDeque *target_deque_used_for_orbiting = nullptr;
 
-			// Handle homing
-			if (shared_homing_deque_enabled) { // Using the shared homing deque to update homing
+			// 1. STANDARD HOMING PHASE
+			if (shared_homing_deque_enabled) {
 				update_homing(shared_homing_deque, true, i, delta, homing_interval_reached, homing_bullet_pos, homing_target_pos);
 				try_to_emit_bullet_homing_target_reached_signal(shared_homing_deque, shared_homing_deque_enabled, i, homing_bullet_pos, homing_target_pos);
 				direction_got_updated = true;
-			} else if (!all_bullet_homing_targets[i].empty()) { // If no shared homing deque, check if bullets have individual homing dequeues and use those instead
+				target_deque_used_for_orbiting = &shared_homing_deque;
+			} else if (!all_bullet_homing_targets[i].empty()) {
 				auto &curr_homing_deque = all_bullet_homing_targets[i];
 				update_homing(curr_homing_deque, false, i, delta, homing_interval_reached, homing_bullet_pos, homing_target_pos);
 				try_to_emit_bullet_homing_target_reached_signal(curr_homing_deque, shared_homing_deque_enabled, i, homing_bullet_pos, homing_target_pos);
 				direction_got_updated = true;
+				target_deque_used_for_orbiting = &curr_homing_deque;
 			}
 
 			auto &curr_bullet_transf = all_cached_instance_transforms[i];
 			auto &curr_bullet_direction = all_cached_direction[i];
 
-			// Handle direction curves
+			// 2. CURVES & ROTATION DATA
 			if (shared_curves_data_enabled) {
 				apply_x_direction_curve(curr_bullet_direction, shared_curves_ptr);
 				apply_y_direction_curve(curr_bullet_direction, shared_curves_ptr);
@@ -89,7 +143,6 @@ public:
 			} else {
 				per_bullet_curves_data = find_bullet_curves_data(i);
 				is_per_bullet_curves_valid = per_bullet_curves_data != nullptr;
-
 				if (is_per_bullet_curves_valid) {
 					per_bullet_curves_data = all_bullet_curves_data[i].ptr();
 					apply_x_direction_curve(curr_bullet_direction, per_bullet_curves_data);
@@ -99,7 +152,6 @@ public:
 				}
 			}
 
-			// Handle rotation
 			if (shared_curves_data_enabled && shared_curves_ptr->rotation_speed_curve.is_valid()) {
 				update_rotation_using_curve(i, delta, shared_curves_ptr);
 				bullet_accelerate_rotation_speed_using_curve(i, delta, shared_curves_ptr);
@@ -116,105 +168,143 @@ public:
 				direction_got_updated = true;
 			}
 
-			// The velocity at which the bullet will move this frame
+			// 3. VELOCITY CALCULATION
 			Vector2 &velocity_delta = all_cached_velocity[i];
 			if (direction_got_updated) {
-				const real_t cached_speed = all_cached_speed[i];
-				velocity_delta = curr_bullet_direction * cached_speed + inherited_velocity_offset;
+				velocity_delta = curr_bullet_direction * all_cached_speed[i] + inherited_velocity_offset;
 			}
-
 			velocity_delta *= delta;
 
-			// Handle movement pattern
+			// 4. MOVEMENT PATTERNS
 			const bool use_pattern = check_exists_bullet_movement_pattern_data(i);
 			if (use_pattern) {
 				auto &pattern = all_movement_pattern_data[i];
 				const Ref<Curve2D> &curve = pattern.path_curve;
 				const real_t len = curve->get_baked_length();
 				const real_t prev_dist = pattern.distance_traveled;
-
-				// Advance the distance traveled along the pattern
 				const real_t advance_dist = velocity_delta.length();
 				pattern.distance_traveled += advance_dist;
-
-				// Sample curve to find out new position
 				const real_t s1 = Math::fmod(prev_dist, len);
 				const real_t s2 = Math::fmod(pattern.distance_traveled, len);
 				const int64_t l1 = (int64_t)(prev_dist / len);
 				const int64_t l2 = (int64_t)(pattern.distance_traveled / len);
-
 				const Vector2 start = curve->sample_baked(0.0);
 				const Vector2 end = curve->sample_baked(len * 0.9999);
 				const Vector2 disp = end - start;
-
 				const Vector2 p1 = l1 * disp + (curve->sample_baked(s1) - start);
 				const Vector2 p2 = l2 * disp + (curve->sample_baked(s2) - start);
-
 				Vector2 local_delta = p2 - p1;
 				Vector2 pattern_direction = local_delta.rotated(curr_bullet_direction.angle()).normalized();
-
-				// Keep the original speed but change the direction to follow the pattern
 				const real_t original_speed = velocity_delta.length();
 				if (original_speed > 0.0001) {
 					velocity_delta = pattern_direction * original_speed;
 				}
-
-				// If the user wants the bullet to face the movement direction (take control of texture rotation)
 				if (pattern.face_movement_direction && velocity_delta.length_squared() > 0.0001) {
 					const Vector2 tangent = velocity_delta.normalized();
 					curr_bullet_transf.columns[0] = tangent;
 					curr_bullet_transf.columns[1] = Vector2(-tangent.y, tangent.x);
 				}
-
-				// If user doesnt want to repeat the pattern after it finishes
 				if (!pattern.repeat_pattern && pattern.distance_traveled >= len) {
 					if (pattern.face_movement_direction) {
 						const Vector2 logical_dir = curr_bullet_direction.normalized();
 						curr_bullet_transf.columns[0] = logical_dir;
 						curr_bullet_transf.columns[1] = Vector2(-logical_dir.y, logical_dir.x);
 					}
-
 					all_movement_pattern_data.erase(i);
 				}
 			}
 
-			auto &curr_shape_transf = all_cached_shape_transforms[i];
 			auto &curr_bullet_origin = all_cached_instance_origin[i];
-			auto &curr_shape_origin = all_cached_shape_origin[i];
 
-			// Update the bullet origin and transform
+			// 5. ORBITING LOGIC
+			if (!skip_orbiting && target_deque_used_for_orbiting != nullptr && !target_deque_used_for_orbiting->empty()) {
+				OrbitingData *const orbiting_data = find_bullet_orbiting_data(i);
+				if (orbiting_data != nullptr) {
+					const Vector2 to_target = curr_bullet_origin - homing_target_pos;
+					const real_t current_dist = to_target.length();
+					const bool already_locked = orbiting_data->check_is_already_locked_orbiting();
+
+					// Track if we are ACTUALLY doing orbit movement this frame
+					bool is_actually_orbiting = false;
+
+					// Movement Logic (Locked or Boundary Arrival)
+					if (already_locked) {
+						real_t dir_multiplier = (orbiting_data->direction == OrbitRight) ? 1.0 : (orbiting_data->direction == OrbitLeft ? -1.0 : 0.0);
+						if (dir_multiplier != 0.0) {
+							real_t angular_speed = (all_cached_speed[i] / orbiting_data->radius) * dir_multiplier;
+							orbiting_data->angle += angular_speed * delta;
+						}
+						Vector2 target_pos = homing_target_pos + Vector2(orbiting_data->radius, 0).rotated(orbiting_data->angle);
+						velocity_delta = target_pos - curr_bullet_origin;
+
+						is_actually_orbiting = true;
+					}
+					// Check exact frame arrival:
+					else if (Math::abs(current_dist - orbiting_data->radius) < (all_cached_speed[i] * delta)) {
+						// REACHED RADIUS - LOCK NOW
+						orbiting_data->angle = to_target.angle();
+						Vector2 target_pos = homing_target_pos + Vector2(orbiting_data->radius, 0).rotated(orbiting_data->angle);
+						velocity_delta = target_pos - curr_bullet_origin;
+
+						// We consider this frame as orbiting because we just snapped to the ring
+						is_actually_orbiting = true;
+					} else if (current_dist < orbiting_data->radius) {
+						// SPAWNED INSIDE - PUSH OUT
+						// This is technically NOT orbiting yet, it's just moving to the border
+						Vector2 outward_dir = (current_dist > 0.1f) ? (to_target / current_dist) : Vector2(1, 0);
+						real_t next_dist = current_dist + (all_cached_speed[i] * delta);
+						Vector2 target_pos = homing_target_pos + (outward_dir * next_dist);
+						velocity_delta = target_pos - curr_bullet_origin;
+					}
+
+					// 6. TEXTURE ROTATION
+					// Only rotate if the bullet is PHYSICALLY orbiting (Locked or just snapped)
+					if (is_actually_orbiting) {
+						Vector2 look_dir;
+						Vector2 radial_vec = (curr_bullet_origin - homing_target_pos).normalized();
+
+						switch (orbiting_data->texture_rotation) {
+							case FaceTarget:
+								look_dir = -radial_vec;
+								break;
+							case FaceOppositeTarget:
+								look_dir = radial_vec;
+								break;
+							case FaceOrbitingDirection:
+								look_dir = (orbiting_data->direction == OrbitRight) ? Vector2(-radial_vec.y, radial_vec.x) : Vector2(radial_vec.y, -radial_vec.x);
+								break;
+							case FaceOppositeOrbitingDirection:
+								look_dir = (orbiting_data->direction == OrbitRight) ? Vector2(radial_vec.y, -radial_vec.x) : Vector2(-radial_vec.y, radial_vec.x);
+								break;
+						}
+
+						if (look_dir != Vector2()) {
+							rotate_to_target(i, look_dir, 0.0);
+						}
+					}
+				}
+			}
+
+			// 7. TRANSFORM UPDATES
 			curr_bullet_origin += velocity_delta;
 			curr_bullet_transf.set_origin(curr_bullet_origin);
 
-			// Update the collision shape
-
-			// The shape transform is based on the bullet transform plus an offset so it should always follow it no matter how the bullet moves
+			auto &curr_shape_transf = all_cached_shape_transforms[i];
+			auto &curr_shape_origin = all_cached_shape_origin[i];
 			curr_shape_transf = curr_bullet_transf;
-
-			// The user had previously set a collision shape offset relative to the center of the texture, so it needs to be re-calculated by taking into account the new rotation of the bullet
 			Vector2 rotated_offset = cache_collision_shape_offset.rotated(curr_shape_transf.get_rotation());
-
-			// Update the shape origin
 			curr_shape_origin = curr_bullet_origin + rotated_offset;
-
-			// Update the shape transform origin with the rotated offset
 			curr_shape_transf.set_origin(curr_shape_origin);
 
-			// Always update the physics shape (since it doesn't depend on interpolation or anything)
 			physics_server->area_set_shape_transform(area, i, curr_shape_transf);
-
-			// Updates bullet attachment and speed
 			move_bullet_attachment(velocity_delta, i);
 
-			// Handle bullet speed acceleration
 			if (shared_curves_data_enabled && shared_curves_ptr->movement_speed_curve.is_valid()) {
 				bullet_accelerate_speed_using_curve(i, delta, shared_curves_ptr);
+			} else if (is_per_bullet_curves_valid && per_bullet_curves_data->movement_speed_curve.is_valid()) {
+				bullet_accelerate_speed_using_curve(i, delta, per_bullet_curves_data);
 			} else {
-				if (is_per_bullet_curves_valid && per_bullet_curves_data->movement_speed_curve.is_valid()) {
-					bullet_accelerate_speed_using_curve(i, delta, per_bullet_curves_data);
-				} else {
-					bullet_accelerate_speed(i, delta);
-				}
+				bullet_accelerate_speed(i, delta);
 			}
 
 			if (!is_using_physics_interpolation) {
@@ -222,6 +312,40 @@ public:
 			}
 		}
 	}
+
+	///////////////// ORBITING DATA METHODS
+
+	_ALWAYS_INLINE_ void bullet_enable_orbiting(int bullet_index, real_t orbiting_radius, OrbitingDirection orbiting_direction, OrbitingTextureRotation orbiting_texture_rotation) {
+		if (!validate_bullet_index(bullet_index, "bullet_enable_orbiting")) {
+			return;
+		}
+
+		all_orbiting_data[bullet_index] = OrbitingData(orbiting_radius, orbiting_direction, orbiting_texture_rotation);
+	}
+
+	_ALWAYS_INLINE_ void bullet_disable_orbiting(int bullet_index) {
+		if (!validate_bullet_index(bullet_index, "bullet_disable_orbiting")) {
+			return;
+		}
+
+		auto it = all_orbiting_data.find(bullet_index);
+		if (it != all_orbiting_data.end()) {
+			all_orbiting_data.erase(it);
+		}
+	}
+
+	_ALWAYS_INLINE_ OrbitingData *find_bullet_orbiting_data(int bullet_index) {
+		const auto it = all_orbiting_data.find(bullet_index);
+		const auto end = all_orbiting_data.end();
+
+		if (it == end) {
+			return nullptr;
+		}
+
+		return &all_orbiting_data[bullet_index];
+	}
+
+	/////////////////
 
 	///////////// PER BULLET HOMING DEQUE POP METHODS
 
@@ -701,12 +825,6 @@ public:
 	void set_homing_update_interval(real_t value) { homing_update_interval = value; }
 	bool get_homing_take_control_of_texture_rotation() const { return homing_take_control_of_texture_rotation; }
 	void set_homing_take_control_of_texture_rotation(bool value) { homing_take_control_of_texture_rotation = value; }
-	real_t get_homing_boundary_distance_away_from_target() const { return homing_boundary_distance_away_from_target; }
-	void set_homing_boundary_distance_away_from_target(real_t value) { homing_boundary_distance_away_from_target = value; }
-	HomingBoundaryBehavior get_homing_boundary_behavior() const { return homing_boundary_behavior; }
-	void set_homing_boundary_behavior(HomingBoundaryBehavior value) { homing_boundary_behavior = value; }
-	HomingBoundaryFacingDirection get_homing_boundary_facing_direction() const { return homing_boundary_facing_direction; }
-	void set_homing_boundary_facing_direction(HomingBoundaryFacingDirection value) { homing_boundary_facing_direction = value; }
 	bool get_bullet_homing_auto_pop_after_target_reached() const { return bullet_homing_auto_pop_after_target_reached; }
 	void set_bullet_homing_auto_pop_after_target_reached(bool value) { bullet_homing_auto_pop_after_target_reached = value; }
 	real_t get_distance_from_target_before_considering_as_reached() const { return distance_from_target_before_considering_as_reached; }
@@ -722,32 +840,6 @@ public:
 	virtual void custom_additional_enable_logic(const MultiMeshBulletsData2D &data) override final;
 
 protected:
-	// Configuration flags
-	bool adjust_direction_based_on_rotation = false;
-	bool homing_take_control_of_texture_rotation = false;
-	bool bullet_homing_auto_pop_after_target_reached = false;
-	bool shared_homing_deque_auto_pop_after_target_reached = false;
-
-	Vector2 cached_mouse_global_position{ 0, 0 };
-
-	// Homing parameters
-	double homing_update_interval = 0.0;
-	double homing_update_timer = 0.0;
-	real_t homing_smoothing = 0.0;
-	real_t homing_boundary_distance_away_from_target = 0.0;
-
-	// Minimum distance (in pixels) from the homing target at which the bullet is considered to have reached it. Once within this distance, the bullet_homing_target_reached signal is emitted
-	real_t distance_from_target_before_considering_as_reached = 5.0;
-
-	HomingBoundaryBehavior homing_boundary_behavior = BoundaryDontMove;
-	HomingBoundaryFacingDirection homing_boundary_facing_direction = FaceTarget;
-
-	// This tracks each bullet's homing deque - allows each bullet to have its own separate homing targets
-	std::vector<HomingTargetDeque> all_bullet_homing_targets;
-
-	// This is a shared homing deque - allows the bullets to share the same target
-	HomingTargetDeque shared_homing_deque;
-
 	// Updates homing behavior for a bullet
 	_ALWAYS_INLINE_ void update_homing(HomingTargetDeque &homing_deque, bool is_using_shared_homing_deque, int bullet_index, double delta, bool interval_reached, Vector2 &bullet_pos, Vector2 &target_pos) {
 		// Trim invalid homing targets (dangling pointers of already freed node2ds etc..)
@@ -769,23 +861,25 @@ protected:
 		bullet_pos = all_cached_instance_origin[bullet_index];
 		Vector2 diff = target_pos - bullet_pos;
 
+		real_t dist_sq = diff.length_squared();
+		if (dist_sq <= 0.0) {
+			return;
+		}
+
 		real_t max_turn = homing_smoothing * delta;
 		if (max_turn < 0.0) {
 			max_turn = 0.0;
 		}
 
-		bool use_smoothing = (homing_smoothing > 0.0); // Hoist for clamp
-
 		Vector2 &current_direction = all_cached_direction[bullet_index];
 
 		auto &curr_transf = all_cached_instance_transforms[bullet_index];
-
 		// If rotation is controlled via movement pattern or rotation data, just set direction directly toward target
 		if (check_exists_bullet_movement_pattern_data(bullet_index) || is_rotation_data_active) {
 			current_direction = diff.normalized();
 		} else { // Otherwise use smoothing to rotate toward target
 			// Rotate toward target with smoothing
-			rotate_to_target(bullet_index, diff, max_turn, use_smoothing);
+			rotate_to_target(bullet_index, diff, max_turn);
 
 			// Get the new direction based on the rotated transform
 			current_direction = curr_transf[0].normalized();
@@ -793,7 +887,7 @@ protected:
 	}
 
 	// Rotates bullet to face target with smoothing (boundary-agnostic version)
-	_ALWAYS_INLINE_ void rotate_to_target(int bullet_index, const Vector2 &diff, real_t max_turn, bool use_smoothing) {
+	_ALWAYS_INLINE_ void rotate_to_target(int bullet_index, const Vector2 &diff, real_t max_turn) {
 		if (!homing_take_control_of_texture_rotation || diff.length_squared() <= 0.0) {
 			return;
 		}
@@ -814,6 +908,8 @@ protected:
 		real_t delta_rot = Math::atan2(cross, dot);
 		normalize_angle(delta_rot);
 
+		bool use_smoothing = max_turn > 0.0; // Hoist for clamp
+
 		// Apply smoothing clamp
 		if (use_smoothing) {
 			delta_rot = Math::clamp(delta_rot, -max_turn, max_turn);
@@ -821,6 +917,10 @@ protected:
 
 		// Rotate locally
 		rotate_transform_locally(all_cached_instance_transforms[bullet_index], delta_rot);
+
+		if (!use_smoothing) {
+			update_bullet_previous_transform_for_interpolation(bullet_index);
+		}
 	}
 
 	// Updates bullet rotation based on rotation speed
@@ -918,5 +1018,5 @@ protected:
 } // namespace BlastBullets2D
 
 VARIANT_ENUM_CAST(BlastBullets2D::HomingType);
-VARIANT_ENUM_CAST(BlastBullets2D::DirectionalBullets2D::HomingBoundaryBehavior);
-VARIANT_ENUM_CAST(BlastBullets2D::DirectionalBullets2D::HomingBoundaryFacingDirection);
+VARIANT_ENUM_CAST(BlastBullets2D::DirectionalBullets2D::OrbitingDirection);
+VARIANT_ENUM_CAST(BlastBullets2D::DirectionalBullets2D::OrbitingTextureRotation);
