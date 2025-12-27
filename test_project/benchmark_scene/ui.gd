@@ -62,11 +62,6 @@ var last_selected_color_picker:ColorPicker = null
 # Will adjust the direction of the bullets based on their rotation data if they have any
 @onready var adjust_direction_based_on_rotation_checkbox:CheckBox = $BulletSettingsView/VBoxContainer/VBoxContainer/AdjustDirectionBasedOnRotationCheckBox
 
-# The save button used to save bullet data
-@onready var save_btn:Button = $TopRightContainer/SaveBtn
-# The load button used to load bullet data
-@onready var load_btn:Button = $TopRightContainer/LoadBtn
-
 ## Bullet On Bullet Collision
 @onready var dont_collide_btn:Button = $BulletSettingsView/BulletCollisionVboxContainer/DontCollideBtn
 @onready var destroy_player_bullets_btn:Button = $BulletSettingsView/BulletCollisionVboxContainer/DestroyPlayerBulletsBtn

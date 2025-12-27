@@ -32,11 +32,9 @@ public:
 
 		Vector2 cache_velocity_calc = all_cached_velocity[0] * delta;
 
-		for (int i = 0; i < amount_bullets; ++i) {
-			if (bullets_enabled_status[i] == false) {
-				continue;
-			}
+		const auto &active_bullet_indexes = all_bullets_enabled_set.get_active_indexes();
 
+		for (int i : active_bullet_indexes) {
 			Transform2D &curr_instance_transf = all_cached_instance_transforms[i];
 			Transform2D &curr_shape_transf = all_cached_shape_transforms[i];
 

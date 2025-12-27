@@ -43,31 +43,3 @@ func _ready() -> void:
 		var spawner:EnemySpawner = child as EnemySpawner
 		BENCHMARK_GLOBALS.ALL_ENEMY_SPAWNERS.push_back(spawner)
 	
-	
-	
-	BENCHMARK_GLOBALS.FACTORY.save_finished.connect(_on_factory_save_finished)
-	
-	BENCHMARK_GLOBALS.UI.save_btn.pressed.connect(_on_save_btn_pressed)
-		
-	BENCHMARK_GLOBALS.UI.load_btn.pressed.connect(_on_load_btn_pressed)
-	
-func _on_save_btn_pressed():
-	BENCHMARK_GLOBALS.FACTORY.save();
-	
-	BENCHMARK_GLOBALS.UI.disable_or_enable_factory_btn.switch_to_option_index(0)
-
-func _on_load_btn_pressed():
-	var factory_data:SaveDataBulletFactory2D = ResourceLoader.load(save_path)
-	if factory_data == null:
-		print("Bullets data from file was invalid, loading failed.")
-	else:
-		BENCHMARK_GLOBALS.FACTORY.load(factory_data)
-		
-		BENCHMARK_GLOBALS.UI.disable_or_enable_factory_btn.switch_to_option_index(0)
-	
-	
-func _on_factory_save_finished(factory_data:SaveDataBulletFactory2D):
-	if factory_data == null:
-		print("Bullets data saving failed.")
-	else:
-		ResourceSaver.save(factory_data, save_path)

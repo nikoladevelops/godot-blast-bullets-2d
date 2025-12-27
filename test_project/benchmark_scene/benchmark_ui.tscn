@@ -108,16 +108,6 @@ focus_mode = 0
 theme = ExtResource("2_e8asd")
 text = "Not Tracking FPS"
 
-[node name="SaveBtn" type="Button" parent="TopRightContainer"]
-layout_mode = 2
-focus_mode = 0
-text = "Save Data"
-
-[node name="LoadBtn" type="Button" parent="TopRightContainer"]
-layout_mode = 2
-focus_mode = 0
-text = "Load Data"
-
 [node name="ObjectPoolSettingsView" type="Control" parent="."]
 visible = false
 layout_mode = 3
@@ -1630,8 +1620,6 @@ metadata/_custom_type_script = "uid://cs67whos5iyl6"
 [connection signal="color_changed" from="DirectionalDebuggerColorPicker" to="." method="_on_directional_debugger_color_picker_color_changed"]
 [connection signal="pressed" from="CloseCurrentColorPickerBtn" to="." method="_on_close_current_color_picker_btn_pressed"]
 [connection signal="pressed" from="TopRightContainer/TrackFPSBtn" to="." method="_on_track_fps_button_pressed"]
-[connection signal="pressed" from="TopRightContainer/SaveBtn" to="." method="_on_save_btn_pressed"]
-[connection signal="pressed" from="TopRightContainer/LoadBtn" to="." method="_on_load_btn_pressed"]
 [connection signal="pressed" from="ObjectPoolSettingsView/FreeBulletPoolVBoxContainer/FreeMultiMeshDirectionalPoolBtn" to="." method="_on_free_multi_mesh_directional_pool_btn_pressed"]
 [connection signal="pressed" from="ObjectPoolSettingsView/FreeBulletPoolVBoxContainer/FreeMultiMeshBlockBulletsPoolBtn" to="." method="_on_free_multi_mesh_block_bullets_pool_btn_pressed"]
 [connection signal="pressed" from="ObjectPoolSettingsView/FreeBulletPoolVBoxContainer/FreeAllBulletPoolsBtn" to="." method="_on_free_all_bullet_pools_btn_pressed"]

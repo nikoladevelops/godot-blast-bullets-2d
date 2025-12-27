@@ -160,7 +160,7 @@ void BulletFactory2D::set_is_factory_processing_bullets(bool is_processing_enabl
 	set_process(is_processing_enabled);
 }
 
-void BulletFactory2D::_physics_process(double delta) {
+void BulletFactory2D::_physics_process(double delta) { // TODO sparse set goes here
 	handle_bullet_behavior<DirectionalBullets2D>(all_directional_bullets, delta);
 	handle_bullet_behavior<BlockBullets2D>(all_block_bullets, delta);
 
@@ -219,8 +219,8 @@ DirectionalBullets2D *BulletFactory2D::spawn_controllable_directional_bullets(co
 			new_inherited_velocity_offset);
 }
 
-void BulletFactory2D::save() {
-	UtilityFunctions::push_error("The functionality of saving and loading is DEPRECATED for this version of the plugin. If you are in need of it open a GitHub issue or try modifying the source code yourself.");
+//void BulletFactory2D::save() {
+//	UtilityFunctions::push_error("The functionality of saving and loading is DEPRECATED for this version of the plugin. If you are in need of it open a GitHub issue or try modifying the source code yourself.");
 	
 	// if (is_factory_busy) {
 	// 	UtilityFunctions::push_error("Error when trying to save. BulletFactory2D is currently busy. Ignoring the request");
@@ -251,10 +251,10 @@ void BulletFactory2D::save() {
 	// }
 
 	// emit_signal("save_finished", data);
-}
+//}
 
-void BulletFactory2D::load(const Ref<SaveDataBulletFactory2D> new_data) {
-	UtilityFunctions::push_error("The functionality of saving and loading is DEPRECATED for this version of the plugin. If you are in need of it open a GitHub issue or try modifying the source code yourself.");
+//void BulletFactory2D::load(const Ref<SaveDataBulletFactory2D> new_data) {
+//	UtilityFunctions::push_error("The functionality of saving and loading is DEPRECATED for this version of the plugin. If you are in need of it open a GitHub issue or try modifying the source code yourself.");
 	
 	// if (!new_data.is_valid()) {
 	// 	UtilityFunctions::push_error("Error. Bullet data given to load method inside BulletFactory2D is invalid");
@@ -294,7 +294,7 @@ void BulletFactory2D::load(const Ref<SaveDataBulletFactory2D> new_data) {
 	// }
 
 	// emit_signal("load_finished");
-}
+//}
 
 void BulletFactory2D::reset_factory_state() {
 	// Check if debuggers are enabled
@@ -833,8 +833,10 @@ void BulletFactory2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("spawn_directional_bullets", "spawn_data", "inherited_velocity_offset"), &BulletFactory2D::spawn_directional_bullets, DEFVAL(Vector2(0, 0)));
 	ClassDB::bind_method(D_METHOD("spawn_controllable_directional_bullets", "spawn_data", "inherited_velocity_offset"), &BulletFactory2D::spawn_controllable_directional_bullets, DEFVAL(Vector2(0, 0)));
 
-	ClassDB::bind_method(D_METHOD("save"), &BulletFactory2D::save);
-	ClassDB::bind_method(D_METHOD("load", "new_data"), &BulletFactory2D::load);
+	// ClassDB::bind_method(D_METHOD("save"), &BulletFactory2D::save);
+	// ClassDB::bind_method(D_METHOD("load", "new_data"), &BulletFactory2D::load);
+	//ADD_SIGNAL(MethodInfo("save_finished", PropertyInfo(Variant::OBJECT, "data", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_DEFAULT, "SaveDataBulletFactory2D")));
+	// ADD_SIGNAL(MethodInfo("load_finished"));
 
 	ClassDB::bind_method(D_METHOD("reset"), &BulletFactory2D::reset);
 
@@ -912,8 +914,6 @@ void BulletFactory2D::_bind_methods() {
 			PropertyInfo(Variant::OBJECT, "bullets_custom_data", PROPERTY_HINT_RESOURCE_TYPE, "Resource"),
 			PropertyInfo(Variant::ARRAY, "bullets_global_transforms", PROPERTY_HINT_ARRAY_TYPE, "Transform2D")));
 
-	ADD_SIGNAL(MethodInfo("save_finished", PropertyInfo(Variant::OBJECT, "data", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_DEFAULT, "SaveDataBulletFactory2D")));
-	ADD_SIGNAL(MethodInfo("load_finished"));
 	ADD_SIGNAL(MethodInfo("reset_finished"));
 
 	// Need this in order to expose the enum constants to Godot Engine

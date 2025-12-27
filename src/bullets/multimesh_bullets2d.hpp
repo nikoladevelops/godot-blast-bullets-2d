@@ -27,6 +27,7 @@
 #include "shared/bullet_curves_data2d.hpp"
 #include "shared/bullet_movement_pattern_data2d.hpp"
 #include "shared/bullet_speed_data2d.hpp"
+#include "shared/dynamic_sparse_set.hpp"
 
 #include <cstddef>
 #include <cstdint>
@@ -70,10 +71,10 @@ public:
 	void enable_multimesh(const MultiMeshBulletsData2D &data, const Vector2 &new_inherited_velocity_offset);
 
 	// Populates an empty data class instance with the current state of the bullets and returns it so it can be saved
-	Ref<SaveDataMultiMeshBullets2D> save(const Ref<SaveDataMultiMeshBullets2D> &empty_data);
+	//Ref<SaveDataMultiMeshBullets2D> save(const Ref<SaveDataMultiMeshBullets2D> &empty_data);
 
 	// Used to load bullets from a SaveDataMultiMeshBullets2D resource
-	void load(const Ref<SaveDataMultiMeshBullets2D> &data, MultiMeshObjectPool *pool, BulletFactory2D *factory, Node *bullets_container);
+	//void load(const Ref<SaveDataMultiMeshBullets2D> &data, MultiMeshObjectPool *pool, BulletFactory2D *factory, Node *bullets_container);
 
 	// Spawns as a disabled invisible multimesh that is ready to be enabled at any time. Method is used for object pooling, because it sets up all necessary things (like physics shapes for example) without needing additional spawn data (which would be overriden anyways by the enable function's logic)
 	void spawn_as_disabled_multimesh(int amount_bullets, MultiMeshObjectPool *pool, BulletFactory2D *factory, Node *bullets_container);
@@ -99,11 +100,9 @@ public:
 	_ALWAYS_INLINE_ void interpolate_bullet_visuals() {
 		double fraction = Engine::get_singleton()->get_physics_interpolation_fraction();
 
-		for (int i = 0; i < amount_bullets; ++i) {
-			if (bullets_enabled_status[i] == false) {
-				continue;
-			}
+		const auto &active_bullet_indexes = all_bullets_enabled_set.get_active_indexes();
 
+		for (int i : active_bullet_indexes) {
 			// Apply interpolated transform for the bullet
 			const Transform2D &interpolated_bullet_texture_transf = get_interpolated_transform(all_cached_instance_transforms[i], all_previous_instance_transf[i], fraction);
 			multi->set_instance_transform_2d(i, interpolated_bullet_texture_transf);
@@ -185,7 +184,7 @@ public:
 
 				for (int i = 0; i < amount_bullets; ++i) {
 					// If the status is active it means that the bullet hasn't hit anything yet, so we need to disable it ourselves
-					if (bullets_enabled_status[i]) {
+					if (all_bullets_enabled_set.contains(i)) {
 						call_deferred("disable_bullet", i, true);
 
 						transfs.push_back(all_cached_instance_transforms[i]); // store the transform of the disabled bullet
@@ -244,11 +243,13 @@ public:
 		status_array.resize(amount_bullets);
 
 		int index = 0;
-		for (const bool &status : bullets_enabled_status) {
-			status_array[index] = status;
 
-			index++;
+		for (int i = 0; i < amount_bullets; i++) {
+			bool status = all_bullets_enabled_set.contains(i);
+
+			status_array[index] = status;
 		}
+
 		return status_array;
 	}
 
@@ -257,7 +258,7 @@ public:
 			return false;
 		}
 
-		return bullets_enabled_status[bullet_index];
+		return all_bullets_enabled_set.contains(bullet_index);
 	}
 
 	_ALWAYS_INLINE_ Ref<Resource> get_bullets_custom_data() const {
@@ -413,6 +414,9 @@ protected:
 
 	// Counts all active bullets
 	int active_bullets_counter = 0;
+
+	// Used to store all bullets active state and enable fast lookups and removals
+	DynamicSparseSet all_bullets_enabled_set;
 
 	BulletFactory2D *bullet_factory = nullptr;
 	MultiMeshObjectPool *bullets_pool = nullptr;
@@ -607,9 +611,6 @@ protected:
 
 	// Saves whether the bullets can detect bodies or not
 	bool monitorable = false;
-
-	// Holds a boolean value for each bullet that indicates whether its active
-	std::vector<int8_t> bullets_enabled_status;
 
 	// Holds current collision count for each bullet
 	std::vector<int> bullets_current_collision_count;
@@ -1164,10 +1165,10 @@ protected:
 			return;
 		}
 
-		int8_t &curr_bullet_status = bullets_enabled_status[bullet_index];
+		const bool curr_bullet_status = all_bullets_enabled_set.contains(bullet_index);
 
 		// If the bullet is already enabled, just return
-		if (curr_bullet_status == true) {
+		if (curr_bullet_status) {
 			return;
 		}
 
@@ -1190,7 +1191,8 @@ protected:
 			bullet_enable_attachment(bullet_index);
 		}
 
-		curr_bullet_status = true;
+		all_bullets_enabled_set.activate_data(bullet_index);
+
 		if (!is_active) {
 			is_active = true;
 			set_visible(true);
@@ -1203,14 +1205,14 @@ protected:
 			return;
 		}
 
-		int8_t &curr_bullet_status = bullets_enabled_status[bullet_index];
+		const bool curr_bullet_status = all_bullets_enabled_set.contains(bullet_index);
 
 		// If the bullet is already disabled, just return
-		if (curr_bullet_status == false) {
+		if (!curr_bullet_status) {
 			return;
 		}
 
-		curr_bullet_status = false;
+		all_bullets_enabled_set.disable_data(bullet_index);
 
 		--active_bullets_counter;
 
@@ -1228,10 +1230,10 @@ protected:
 	}
 
 	_ALWAYS_INLINE_ void handle_bullet_collision(CollisionType collision_type, int bullet_index, int64_t entered_instance_id) {
-		int8_t &curr_bullet_status = bullets_enabled_status[bullet_index];
+		const bool curr_bullet_status = all_bullets_enabled_set.contains(bullet_index);
 
 		// If the bullet is already disabled, just return
-		if (curr_bullet_status == false) {
+		if (!curr_bullet_status) {
 			return;
 		}
 
@@ -1393,7 +1395,7 @@ private:
 
 	void set_up_bullet_instances(const MultiMeshBulletsData2D &data);
 
-	void load_bullet_instances(const SaveDataMultiMeshBullets2D &data);
+	//void load_bullet_instances(const SaveDataMultiMeshBullets2D &data);
 
 	void set_up_life_time_timer(double new_max_life_time, double new_current_life_time);
 

@@ -109,11 +109,9 @@ public:
 
 		const bool skip_orbiting = all_orbiting_data.empty();
 
-		for (int i = 0; i < amount_bullets; ++i) {
-			if (!bullets_enabled_status[i]) {
-				continue;
-			}
+		const auto &active_bullet_indexes = all_bullets_enabled_set.get_active_indexes();
 
+		for (int i : active_bullet_indexes) {
 			bool direction_got_updated = false;
 			HomingTargetDeque *target_deque_used_for_orbiting = nullptr;
 
@@ -313,7 +311,7 @@ public:
 		}
 
 		// Handle collisions safely after all physics processing logic is done
-		for (auto& data : all_collided_bullets) {
+		for (auto &data : all_collided_bullets) {
 			handle_bullet_collision(data.collision_type, data.bullet_index, data.collided_instance_id);
 		}
 		all_collided_bullets.clear();
@@ -379,8 +377,7 @@ public:
 	//////////////// PER BULLET HOMING DEQUE PUSH METHODS
 
 	_ALWAYS_INLINE_ bool bullet_homing_push_front_mouse_position_target(int bullet_index) {
-		if (!validate_bullet_index(bullet_index, "bullet_homing_push_front_mouse_position_target") ||
-				!bullets_enabled_status[bullet_index]) {
+		if (!validate_bullet_index(bullet_index, "bullet_homing_push_front_mouse_position_target")) {
 			return false;
 		}
 
@@ -396,8 +393,7 @@ public:
 	}
 
 	_ALWAYS_INLINE_ bool bullet_homing_push_front_node2d_target(int bullet_index, Node2D *new_homing_target) {
-		if (!validate_bullet_index(bullet_index, "bullet_homing_push_front_node2d_target") ||
-				!bullets_enabled_status[bullet_index] || new_homing_target == nullptr) {
+		if (!validate_bullet_index(bullet_index, "bullet_homing_push_front_node2d_target")) {
 			return false;
 		}
 
@@ -409,8 +405,7 @@ public:
 	}
 
 	_ALWAYS_INLINE_ bool bullet_homing_push_front_global_position_target(int bullet_index, const Vector2 &global_position) {
-		if (!validate_bullet_index(bullet_index, "bullet_homing_push_front_global_position_target") ||
-				!bullets_enabled_status[bullet_index]) {
+		if (!validate_bullet_index(bullet_index, "bullet_homing_push_front_global_position_target")) {
 			return false;
 		}
 
@@ -422,8 +417,7 @@ public:
 	}
 
 	_ALWAYS_INLINE_ bool bullet_homing_push_back_mouse_position_target(int bullet_index) {
-		if (!validate_bullet_index(bullet_index, "bullet_homing_push_back_mouse_position_target") ||
-				!bullets_enabled_status[bullet_index]) {
+		if (!validate_bullet_index(bullet_index, "bullet_homing_push_back_mouse_position_target")) {
 			return false;
 		}
 
@@ -439,8 +433,7 @@ public:
 	}
 
 	_ALWAYS_INLINE_ bool bullet_homing_push_back_node2d_target(int bullet_index, Node2D *new_homing_target) {
-		if (!validate_bullet_index(bullet_index, "bullet_homing_push_back_node2d_target") ||
-				!bullets_enabled_status[bullet_index] || new_homing_target == nullptr) {
+		if (!validate_bullet_index(bullet_index, "bullet_homing_push_back_node2d_target")) {
 			return false;
 		}
 
@@ -452,8 +445,7 @@ public:
 	}
 
 	_ALWAYS_INLINE_ bool bullet_homing_push_back_global_position_target(int bullet_index, const Vector2 &global_position) {
-		if (!validate_bullet_index(bullet_index, "bullet_homing_push_back_global_position_target") ||
-				!bullets_enabled_status[bullet_index]) {
+		if (!validate_bullet_index(bullet_index, "bullet_homing_push_back_global_position_target")) {
 			return false;
 		}
 
@@ -480,18 +472,14 @@ public:
 	_ALWAYS_INLINE_ void all_bullets_push_back_mouse_position_target(int bullet_index_start = 0, int bullet_index_end_inclusive = -1) {
 		ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_push_back_mouse_position_target");
 		for (int i = bullet_index_start; i <= bullet_index_end_inclusive; ++i) {
-			if (bullets_enabled_status[i]) {
-				bullet_homing_push_back_mouse_position_target(i);
-			}
+			bullet_homing_push_back_mouse_position_target(i);
 		}
 	}
 
 	_ALWAYS_INLINE_ void all_bullets_push_front_mouse_position_target(int bullet_index_start = 0, int bullet_index_end_inclusive = -1) {
 		ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_push_front_mouse_position_target");
 		for (int i = bullet_index_start; i <= bullet_index_end_inclusive; ++i) {
-			if (bullets_enabled_status[i]) {
-				bullet_homing_push_front_mouse_position_target(i);
-			}
+			bullet_homing_push_front_mouse_position_target(i);
 		}
 	}
 
@@ -499,16 +487,12 @@ public:
 		ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_push_back_homing_target");
 		if (Node2D *node = Object::cast_to<Node2D>(node2d_or_global_position)) {
 			for (int i = bullet_index_start; i <= bullet_index_end_inclusive; ++i) {
-				if (bullets_enabled_status[i]) {
-					bullet_homing_push_back_node2d_target(i, node);
-				}
+				bullet_homing_push_back_node2d_target(i, node);
 			}
 		} else if (node2d_or_global_position.get_type() == Variant::VECTOR2) {
 			Vector2 global_pos = node2d_or_global_position;
 			for (int i = bullet_index_start; i <= bullet_index_end_inclusive; ++i) {
-				if (bullets_enabled_status[i]) {
-					bullet_homing_push_back_global_position_target(i, global_pos);
-				}
+				bullet_homing_push_back_global_position_target(i, global_pos);
 			}
 		} else {
 			UtilityFunctions::push_error("Invalid homing target type in all_bullets_push_back_homing_target");
@@ -519,16 +503,12 @@ public:
 		ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_push_front_homing_target");
 		if (Node2D *node = Object::cast_to<Node2D>(node2d_or_global_position)) {
 			for (int i = bullet_index_start; i <= bullet_index_end_inclusive; ++i) {
-				if (bullets_enabled_status[i]) {
-					bullet_homing_push_front_node2d_target(i, node);
-				}
+				bullet_homing_push_front_node2d_target(i, node);
 			}
 		} else if (node2d_or_global_position.get_type() == Variant::VECTOR2) {
 			Vector2 global_pos = node2d_or_global_position;
 			for (int i = bullet_index_start; i <= bullet_index_end_inclusive; ++i) {
-				if (bullets_enabled_status[i]) {
-					bullet_homing_push_front_global_position_target(i, global_pos);
-				}
+				bullet_homing_push_front_global_position_target(i, global_pos);
 			}
 		} else {
 			UtilityFunctions::push_error("Invalid homing target type in all_bullets_push_front_homing_target");
@@ -564,9 +544,7 @@ public:
 	_ALWAYS_INLINE_ void all_bullets_clear_homing_targets(int bullet_index_start = 0, int bullet_index_end_inclusive = -1) {
 		ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_clear_homing_targets");
 		for (int i = bullet_index_start; i <= bullet_index_end_inclusive; ++i) {
-			if (bullets_enabled_status[i] && bullet_check_has_homing_targets(i)) {
-				bullet_clear_homing_targets(i);
-			}
+			bullet_clear_homing_targets(i);
 		}
 	}
 
@@ -764,7 +742,7 @@ public:
 		curr_shape_transf.set_origin(curr_shape_origin);
 
 		// Instantly apply the updated transforms
-		if (bullets_enabled_status[bullet_index]) { // Apply to multi only if the bullet is enabled (if disabled the transform is zero which prevents the multimesh from rendering it)
+		if (all_bullets_enabled_set.contains(bullet_index)) { // Apply to multi only if the bullet is enabled (if disabled the transform is zero which prevents the multimesh from rendering it)
 			multi->set_instance_transform_2d(bullet_index, curr_bullet_transf);
 		}
 
@@ -806,7 +784,7 @@ public:
 		curr_shape_transf.set_origin(curr_shape_origin);
 
 		// Instantly apply the updated transforms
-		if (bullets_enabled_status[bullet_index]) { // Apply to multi only if the bullet is enabled (if disabled the transform is zero which prevents the multimesh from rendering it)
+		if (all_bullets_enabled_set.contains(bullet_index)) { // Apply to multi only if the bullet is enabled (if disabled the transform is zero which prevents the multimesh from rendering it)
 			multi->set_instance_transform_2d(bullet_index, curr_bullet_transf);
 		}
 
