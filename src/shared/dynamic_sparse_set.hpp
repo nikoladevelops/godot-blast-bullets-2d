@@ -14,12 +14,6 @@ private:
 	std::vector<int> sparse;
 
 public:
-	DynamicSparseSet(int min_size = 1024) {
-		max_size = min_size;
-		sparse.resize(min_size, -1);
-		dense.reserve(min_size);
-	}
-
 	// Resizes the sparse vector to accommodate new size
 	_ALWAYS_INLINE_ void resize(int new_size) {
 		max_size = new_size;
@@ -35,7 +29,7 @@ public:
 
 		// Allocate more space if needed
 		if (index >= max_size) {
-			int new_size = max_size * 2;
+			int new_size = (max_size == 0) ? 8 : max_size * 2;
 
 			if (index >= new_size) {
 				new_size = index + 1;

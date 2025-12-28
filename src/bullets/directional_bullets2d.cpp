@@ -71,6 +71,10 @@ void DirectionalBullets2D::custom_additional_spawn_logic(const MultiMeshBulletsD
 
 	// Each bullet can have its own homing target
 	all_bullet_homing_targets.resize(amount_bullets); // Create a vector that contains an empty queue for each bullet index
+	
+	// Orbiting
+	all_orbiting_data.resize(amount_bullets); // Create a vector that contains an empty orbiting data for each bullet index
+	all_orbiting_status.resize(amount_bullets, 0); // Initialize all orbiting status to disabled
 }
 
 void DirectionalBullets2D::custom_additional_save_logic(SaveDataMultiMeshBullets2D &data) {
@@ -116,6 +120,13 @@ void DirectionalBullets2D::custom_additional_enable_logic(const MultiMeshBullets
 	}
 
 	shared_homing_deque.clear_homing_targets(cached_mouse_global_position); // Passing garbage mouse global position but its fine
+
+	// Orbiting
+
+	all_orbiting_status.assign(amount_bullets, 0); // Initialize all orbiting status to disabled
+	active_orbiting_count = 0;
+	
+	//
 
 	homing_update_interval = 0.0;
 	homing_update_timer = 0.0;

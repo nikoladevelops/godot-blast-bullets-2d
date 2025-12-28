@@ -75,8 +75,16 @@ protected:
 	double homing_update_timer = 0.0;
 	real_t homing_smoothing = 0.0;
 
+	// ORBITING
+
 	// For each bullet containing its orbiting data
-	std::unordered_map<int, OrbitingData> all_orbiting_data;
+	std::vector<OrbitingData> all_orbiting_data;
+
+	// For each bullet whether the orbiting is enabled or not
+	std::vector<uint8_t> all_orbiting_status;
+
+	int active_orbiting_count = 0;
+	//
 
 	// Minimum distance (in pixels) from the homing target at which the bullet is considered to have reached it. Once within this distance, the bullet_homing_target_reached signal is emitted
 	real_t distance_from_target_before_considering_as_reached = 5.0;
@@ -107,7 +115,7 @@ public:
 		bool is_per_bullet_curves_valid = false;
 		const BulletCurvesData2D *per_bullet_curves_data = nullptr;
 
-		const bool skip_orbiting = all_orbiting_data.empty();
+		const bool is_orbiting_feature_enabled = (active_orbiting_count > 0);
 
 		const auto &active_bullet_indexes = all_bullets_enabled_set.get_active_indexes();
 
@@ -215,8 +223,8 @@ public:
 			auto &curr_bullet_origin = all_cached_instance_origin[i];
 
 			// 5. ORBITING LOGIC
-			if (!skip_orbiting && target_deque_used_for_orbiting != nullptr && !target_deque_used_for_orbiting->empty()) {
-				OrbitingData *const orbiting_data = find_bullet_orbiting_data(i);
+			if (is_orbiting_feature_enabled && all_orbiting_status[i] && target_deque_used_for_orbiting != nullptr && !target_deque_used_for_orbiting->empty()) {
+				OrbitingData *const orbiting_data = &all_orbiting_data[i];
 				if (orbiting_data != nullptr) {
 					const Vector2 to_target = curr_bullet_origin - homing_target_pos;
 					const real_t current_dist = to_target.length();
@@ -324,7 +332,13 @@ public:
 			return;
 		}
 
+		// ONLY increment if it was previously disabled
+		if (all_orbiting_status[bullet_index] == 0) {
+			active_orbiting_count++;
+		}
+
 		all_orbiting_data[bullet_index] = OrbitingData(orbiting_radius, orbiting_direction, orbiting_texture_rotation);
+		all_orbiting_status[bullet_index] = 1;
 	}
 
 	_ALWAYS_INLINE_ void bullet_disable_orbiting(int bullet_index) {
@@ -332,21 +346,12 @@ public:
 			return;
 		}
 
-		auto it = all_orbiting_data.find(bullet_index);
-		if (it != all_orbiting_data.end()) {
-			all_orbiting_data.erase(it);
-		}
-	}
-
-	_ALWAYS_INLINE_ OrbitingData *find_bullet_orbiting_data(int bullet_index) {
-		const auto it = all_orbiting_data.find(bullet_index);
-		const auto end = all_orbiting_data.end();
-
-		if (it == end) {
-			return nullptr;
+		// ONLY decrement if it was previously enabled
+		if (all_orbiting_status[bullet_index] == 1) {
+			active_orbiting_count--;
 		}
 
-		return &all_orbiting_data[bullet_index];
+		all_orbiting_status[bullet_index] = 0;
 	}
 
 	/////////////////
