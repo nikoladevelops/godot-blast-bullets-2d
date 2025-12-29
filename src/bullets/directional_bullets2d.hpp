@@ -9,6 +9,7 @@
 #include "godot_cpp/core/class_db.hpp"
 #include "godot_cpp/core/defs.hpp"
 #include "godot_cpp/core/math.hpp"
+#include "godot_cpp/variant/array.hpp"
 #include "godot_cpp/variant/callable.hpp"
 #include "godot_cpp/variant/typed_array.hpp"
 #include "godot_cpp/variant/utility_functions.hpp"
@@ -70,11 +71,6 @@ protected:
 
 	Vector2 cached_mouse_global_position{ 0, 0 };
 
-	// Homing parameters
-	double homing_update_interval = 0.0;
-	double homing_update_timer = 0.0;
-	real_t homing_smoothing = 0.0;
-
 	// ORBITING
 
 	// For each bullet containing its orbiting data
@@ -86,14 +82,28 @@ protected:
 	int active_orbiting_count = 0;
 	//
 
+	// HOMING
+
+	double homing_update_interval = 0.0;
+	double homing_update_timer = 0.0;
+	real_t homing_smoothing = 0.0;
+
 	// Minimum distance (in pixels) from the homing target at which the bullet is considered to have reached it. Once within this distance, the bullet_homing_target_reached signal is emitted
 	real_t distance_from_target_before_considering_as_reached = 5.0;
 
-	// This tracks each bullet's homing deque - allows each bullet to have its own separate homing targets
+	// This tracks each bullet's homing deque - allows each bullet to have its own separate homing targets (per-bullet homing)
 	std::vector<HomingTargetDeque> all_bullet_homing_targets;
+
+	// For each bullet's homing deque, store the amount targets
+	std::vector<int> all_homing_count;
+
+	// Tracks how many bullets are currently homing in TOTAL (per-bullet homing, NOT shared) - basically determines whether the per-bullet homing feature is even turned on
+	int active_homing_count = 0;
 
 	// This is a shared homing deque - allows the bullets to share the same target
 	HomingTargetDeque shared_homing_deque;
+
+	//
 
 public:
 	// Updates all bullets' positions, rotations, and homing
@@ -101,12 +111,37 @@ public:
 		const bool is_using_physics_interpolation = bullet_factory->use_physics_interpolation;
 		update_all_previous_transforms_for_interpolation();
 
-		const bool homing_interval_reached = update_homing_timer(delta);
-		if (homing_interval_reached && HomingTargetDeque::mouse_homing_targets_amount > 0) {
-			cached_mouse_global_position = get_global_mouse_position();
+		bool homing_interval_reached = false;
+
+		bool shared_homing_deque_enabled = !shared_homing_deque.empty();
+		const bool is_per_bullet_homing_enabled = (active_homing_count > 0);
+
+		// If homing is enabled (either shared or per-bullet) update the timer and cache mouse position if needed
+		if (shared_homing_deque_enabled || is_per_bullet_homing_enabled) {
+			// Update homing timer / how often to update the homing target position
+			homing_interval_reached = update_homing_timer(delta);
+
+			// In case we have the mouse as a homing target, make sure to cache its global position
+			if (homing_interval_reached && HomingTargetDeque::mouse_homing_targets_amount > 0) {
+				cached_mouse_global_position = get_global_mouse_position();
+			}
 		}
 
-		const bool shared_homing_deque_enabled = !shared_homing_deque.empty();
+		// Since shared homing deque is used for all bullets, do this once
+		if (shared_homing_deque_enabled) {
+			// Delete any invalid (freed) targets
+			auto targets_amount = shared_homing_deque.get_homing_targets_amount();
+			int trimmed = shared_homing_deque.bullet_homing_trim_front_invalid_targets(cached_mouse_global_position, targets_amount);
+			shared_homing_deque_enabled = (targets_amount - trimmed) > 0;
+
+			// If timer timed out, refresh the cached global position of the front target
+			if (shared_homing_deque_enabled && homing_interval_reached) {
+				shared_homing_deque.refresh_cached_front_target_global_position(cached_mouse_global_position);
+			}
+		}
+
+		const bool is_orbiting_feature_enabled = (active_orbiting_count > 0);
+
 		Vector2 homing_bullet_pos;
 		Vector2 homing_target_pos;
 
@@ -115,8 +150,7 @@ public:
 		bool is_per_bullet_curves_valid = false;
 		const BulletCurvesData2D *per_bullet_curves_data = nullptr;
 
-		const bool is_orbiting_feature_enabled = (active_orbiting_count > 0);
-
+		// Loop only through ACTIVE bullets (skip the disabled ones)
 		const auto &active_bullet_indexes = all_bullets_enabled_set.get_active_indexes();
 
 		for (int i : active_bullet_indexes) {
@@ -124,17 +158,37 @@ public:
 			HomingTargetDeque *target_deque_used_for_orbiting = nullptr;
 
 			// 1. STANDARD HOMING PHASE
-			if (shared_homing_deque_enabled) {
-				update_homing(shared_homing_deque, true, i, delta, homing_interval_reached, homing_bullet_pos, homing_target_pos);
+			if (shared_homing_deque_enabled) { // Handle homing towards shared deque (takes precedence over per-bullet homing)
+				update_homing(shared_homing_deque, i, delta, homing_bullet_pos, homing_target_pos);
 				try_to_emit_bullet_homing_target_reached_signal(shared_homing_deque, shared_homing_deque_enabled, i, homing_bullet_pos, homing_target_pos);
 				direction_got_updated = true;
 				target_deque_used_for_orbiting = &shared_homing_deque;
-			} else if (!all_bullet_homing_targets[i].empty()) {
-				auto &curr_homing_deque = all_bullet_homing_targets[i];
-				update_homing(curr_homing_deque, false, i, delta, homing_interval_reached, homing_bullet_pos, homing_target_pos);
-				try_to_emit_bullet_homing_target_reached_signal(curr_homing_deque, shared_homing_deque_enabled, i, homing_bullet_pos, homing_target_pos);
-				direction_got_updated = true;
-				target_deque_used_for_orbiting = &curr_homing_deque;
+			} else if (is_per_bullet_homing_enabled) { // Handle per-bullet homing
+				// Whether the deque has any targets
+				auto &curr_homing_count = all_homing_count[i];
+
+				if (curr_homing_count > 0) {
+					auto &curr_homing_deque = all_bullet_homing_targets[i];
+
+					// Trim the invalid ones
+					int trimmed_count = curr_homing_deque.bullet_homing_trim_front_invalid_targets(cached_mouse_global_position, curr_homing_count);
+
+					// Very important to keep track of the amount of targets after trimming
+					curr_homing_count -= trimmed_count; // count for the deque
+					active_homing_count -= trimmed_count; // global count across all bullets that determines whether the per-bullet homing feature is even active
+
+					if (curr_homing_count > 0) {
+						// If per bullet homing is indeed active, then refresh the cache if interval has been reached
+						if (homing_interval_reached) {
+							curr_homing_deque.refresh_cached_front_target_global_position(cached_mouse_global_position);
+						}
+
+						update_homing(curr_homing_deque, i, delta, homing_bullet_pos, homing_target_pos);
+						try_to_emit_bullet_homing_target_reached_signal(curr_homing_deque, shared_homing_deque_enabled, i, homing_bullet_pos, homing_target_pos);
+						direction_got_updated = true;
+						target_deque_used_for_orbiting = &curr_homing_deque;
+					}
+				}
 			}
 
 			auto &curr_bullet_transf = all_cached_instance_transforms[i];
@@ -365,6 +419,9 @@ public:
 
 		auto &queue = all_bullet_homing_targets[bullet_index];
 
+		--all_homing_count[bullet_index];
+		--active_homing_count;
+
 		return queue.pop_front_target(cached_mouse_global_position);
 	}
 
@@ -374,6 +431,9 @@ public:
 		}
 
 		auto &queue = all_bullet_homing_targets[bullet_index];
+
+		--all_homing_count[bullet_index];
+		--active_homing_count;
 
 		return queue.pop_back_target(cached_mouse_global_position);
 	}
@@ -394,6 +454,9 @@ public:
 
 		queue.push_front_mouse_position_target(cached_mouse_global_position);
 
+		++all_homing_count[bullet_index];
+		++active_homing_count;
+
 		return true;
 	}
 
@@ -406,6 +469,8 @@ public:
 
 		queue.push_front_node2d_target(new_homing_target);
 
+		++all_homing_count[bullet_index];
+		++active_homing_count;
 		return true;
 	}
 
@@ -418,6 +483,8 @@ public:
 
 		queue.push_front_global_position_target(global_position);
 
+		++all_homing_count[bullet_index];
+		++active_homing_count;
 		return true;
 	}
 
@@ -434,6 +501,9 @@ public:
 
 		queue.push_back_mouse_position_target(cached_mouse_global_position);
 
+		++all_homing_count[bullet_index];
+		++active_homing_count;
+
 		return true;
 	}
 
@@ -446,6 +516,9 @@ public:
 
 		queue.push_back_node2d_target(new_homing_target);
 
+		++all_homing_count[bullet_index];
+		++active_homing_count;
+
 		return true;
 	}
 
@@ -457,6 +530,9 @@ public:
 		auto &queue = all_bullet_homing_targets[bullet_index];
 
 		queue.push_back_global_position_target(global_position);
+
+		++all_homing_count[bullet_index];
+		++active_homing_count;
 
 		return true;
 	}
@@ -471,7 +547,33 @@ public:
 
 		auto &queue = all_bullet_homing_targets[bullet_index];
 
+		auto &count = all_homing_count[bullet_index];
+		active_homing_count -= count;
+		count = 0;
+
 		queue.clear_homing_targets(cached_mouse_global_position);
+	}
+
+	_ALWAYS_INLINE_ Array all_bullets_pop_front_target(int bullet_index_start = 0, int bullet_index_end_inclusive = -1) {
+		ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_pop_front_target");
+		Array popped_targets;
+
+		for (int i = bullet_index_start; i <= bullet_index_end_inclusive; ++i) {
+			popped_targets.push_back(bullet_homing_pop_front_target(i)); // could push nullptr but that's expected
+		}
+
+		return popped_targets;
+	}
+
+	_ALWAYS_INLINE_ Array all_bullets_pop_back_target(int bullet_index_start = 0, int bullet_index_end_inclusive = -1) {
+		ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_pop_back_target");
+		Array popped_targets;
+
+		for (int i = bullet_index_start; i <= bullet_index_end_inclusive; ++i) {
+			popped_targets.push_back(bullet_homing_pop_back_target(i));
+		}
+
+		return popped_targets;
 	}
 
 	_ALWAYS_INLINE_ void all_bullets_push_back_mouse_position_target(int bullet_index_start = 0, int bullet_index_end_inclusive = -1) {
@@ -544,6 +646,20 @@ public:
 		ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_replace_homing_targets_with_new_target_array");
 		all_bullets_clear_homing_targets(bullet_index_start, bullet_index_end_inclusive);
 		all_bullets_push_back_homing_targets_array(node2ds_or_global_positions_array, bullet_index_start, bullet_index_end_inclusive);
+	}
+
+	_ALWAYS_INLINE_ void all_bullets_replace_homing_targets_with_mouse(int bullet_index_start = 0, int bullet_index_end_inclusive = -1) {
+		ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_replace_homing_targets_with_mouse");
+
+		// Cache once for the whole loop
+		cached_mouse_global_position = get_global_mouse_position();
+
+		all_bullets_clear_homing_targets(bullet_index_start, bullet_index_end_inclusive);
+		for (int i = bullet_index_start; i <= bullet_index_end_inclusive; ++i) {
+			all_bullet_homing_targets[i].push_back_mouse_position_target(cached_mouse_global_position);
+			++all_homing_count[i];
+			++active_homing_count;
+		}
 	}
 
 	_ALWAYS_INLINE_ void all_bullets_clear_homing_targets(int bullet_index_start = 0, int bullet_index_end_inclusive = -1) {
@@ -830,20 +946,7 @@ public:
 
 protected:
 	// Updates homing behavior for a bullet
-	_ALWAYS_INLINE_ void update_homing(HomingTargetDeque &homing_deque, bool is_using_shared_homing_deque, int bullet_index, double delta, bool interval_reached, Vector2 &bullet_pos, Vector2 &target_pos) {
-		// Trim invalid homing targets (dangling pointers of already freed node2ds etc..)
-		homing_deque.bullet_homing_trim_front_invalid_targets(cached_mouse_global_position);
-
-		// If after trimming it's empty then skip homing logic
-		if (homing_deque.empty()) {
-			return;
-		}
-
-		// Refresh cache on interval for dynamic targets - avoids calling godot get methods every physics frame..
-		if (interval_reached) {
-			homing_deque.refresh_cached_front_target_global_position(cached_mouse_global_position);
-		}
-
+	_ALWAYS_INLINE_ void update_homing(HomingTargetDeque &homing_deque, int bullet_index, double delta, Vector2 &bullet_pos, Vector2 &target_pos) {
 		// Get the front target's cached position
 		target_pos = homing_deque.get_cached_front_target_global_position();
 

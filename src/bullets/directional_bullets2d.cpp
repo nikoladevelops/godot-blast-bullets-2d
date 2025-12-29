@@ -68,10 +68,10 @@ void DirectionalBullets2D::custom_additional_spawn_logic(const MultiMeshBulletsD
 
 	is_multimesh_auto_pooling_enabled = directional_data.is_multimesh_auto_pooling_enabled;
 
-
 	// Each bullet can have its own homing target
 	all_bullet_homing_targets.resize(amount_bullets); // Create a vector that contains an empty queue for each bullet index
-	
+	all_homing_count.resize(amount_bullets, 0);
+
 	// Orbiting
 	all_orbiting_data.resize(amount_bullets); // Create a vector that contains an empty orbiting data for each bullet index
 	all_orbiting_status.resize(amount_bullets, 0); // Initialize all orbiting status to disabled
@@ -114,18 +114,24 @@ void DirectionalBullets2D::custom_additional_enable_logic(const MultiMeshBullets
 	set_up_movement_data(directional_data.all_bullet_speed_data);
 
 	adjust_direction_based_on_rotation = directional_data.adjust_direction_based_on_rotation;
+
+	// Homing
+
 	// Ensure all old homing targets are cleared. Do NOT clear the vector ever.
 	for (auto &queue : all_bullet_homing_targets) {
 		queue.clear_homing_targets(cached_mouse_global_position); // Passing garbage mouse global position but its fine
 	}
+	active_homing_count = 0;
+	all_homing_count.assign(amount_bullets, 0);
 
 	shared_homing_deque.clear_homing_targets(cached_mouse_global_position); // Passing garbage mouse global position but its fine
+	//
 
 	// Orbiting
 
 	all_orbiting_status.assign(amount_bullets, 0); // Initialize all orbiting status to disabled
 	active_orbiting_count = 0;
-	
+
 	//
 
 	homing_update_interval = 0.0;
@@ -167,6 +173,12 @@ void DirectionalBullets2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("all_bullets_replace_homing_targets_with_new_target", "node2d_or_global_position", "bullet_index_start", "bullet_index_end_inclusive"), &DirectionalBullets2D::all_bullets_replace_homing_targets_with_new_target, DEFVAL(0), DEFVAL(-1));
 	ClassDB::bind_method(D_METHOD("all_bullets_replace_homing_targets_with_new_target_array", "node2ds_or_global_positions_array", "bullet_index_start", "bullet_index_end_inclusive"), &DirectionalBullets2D::all_bullets_replace_homing_targets_with_new_target_array, DEFVAL(0), DEFVAL(-1));
 
+	ClassDB::bind_method(D_METHOD("all_bullets_pop_front_target", "bullet_index_start", "bullet_index_end_inclusive"), &DirectionalBullets2D::all_bullets_pop_front_target, DEFVAL(0), DEFVAL(-1));
+
+	ClassDB::bind_method(D_METHOD("all_bullets_pop_back_target", "bullet_index_start", "bullet_index_end_inclusive"), &DirectionalBullets2D::all_bullets_pop_back_target, DEFVAL(0), DEFVAL(-1));
+
+	ClassDB::bind_method(D_METHOD("all_bullets_replace_homing_targets_with_mouse", "bullet_index_start", "bullet_index_end_inclusive"), &DirectionalBullets2D::all_bullets_replace_homing_targets_with_mouse, DEFVAL(0), DEFVAL(-1));
+
 	ClassDB::bind_method(D_METHOD("all_bullets_clear_homing_targets", "bullet_index_start", "bullet_index_end_inclusive"), &DirectionalBullets2D::all_bullets_clear_homing_targets, DEFVAL(0), DEFVAL(-1));
 
 	ClassDB::bind_method(D_METHOD("bullet_clear_homing_targets", "bullet_index"), &DirectionalBullets2D::bullet_clear_homing_targets);
@@ -178,6 +190,7 @@ void DirectionalBullets2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("bullet_homing_check_current_target_type", "bullet_index"), &DirectionalBullets2D::bullet_homing_check_current_target_type);
 
 	ClassDB::bind_method(D_METHOD("bullet_get_current_homing_target", "bullet_index"), &DirectionalBullets2D::bullet_get_current_homing_target);
+
 
 	ClassDB::bind_method(D_METHOD("get_bullet_homing_auto_pop_after_target_reached"), &DirectionalBullets2D::get_bullet_homing_auto_pop_after_target_reached);
 	ClassDB::bind_method(D_METHOD("set_bullet_homing_auto_pop_after_target_reached", "value"), &DirectionalBullets2D::set_bullet_homing_auto_pop_after_target_reached);
@@ -236,10 +249,10 @@ void DirectionalBullets2D::_bind_methods() {
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "homing_take_control_of_texture_rotation"), "set_homing_take_control_of_texture_rotation", "get_homing_take_control_of_texture_rotation");
 
 	// ORBITING RELATED
-	
+
 	ClassDB::bind_method(D_METHOD("bullet_enable_orbiting", "bullet_index", "orbiting_radius", "orbiting_direction", "orbiting_texture_rotation"), &DirectionalBullets2D::bullet_enable_orbiting);
 	ClassDB::bind_method(D_METHOD("bullet_disable_orbiting", "bullet_index"), &DirectionalBullets2D::bullet_disable_orbiting);
-	
+
 	// OTHER USEFUL METHODS
 	ClassDB::bind_method(D_METHOD("teleport_bullet", "bullet_index", "new_global_pos"), &DirectionalBullets2D::teleport_bullet);
 	ClassDB::bind_method(D_METHOD("teleport_shift_bullet", "bullet_index", "shift_value"), &DirectionalBullets2D::teleport_shift_bullet);

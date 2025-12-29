@@ -305,14 +305,11 @@ func spawn_multi_mesh_directional_bullets()->void:
 	#dir_bullets.bullet_enable_orbiting(3, 850, DirectionalBullets2D.DontMove, DirectionalBullets2D.FaceTarget)
 	#dir_bullets.bullet_enable_orbiting(4, 1350, DirectionalBullets2D.DontMove, DirectionalBullets2D.FaceTarget)
 	
-	
-	
-	
-	#
 	#dir_bullets.multimesh_attach_time_based_function(2, func(): 
+		#dir_bullets.all_bullets_clear_homing_targets()
 		#dir_bullets.bullet_disable_orbiting(0)
 		#, false, true)
-	#
+	
 	#dir_bullets.multimesh_attach_time_based_function(4, func(): 
 		#dir_bullets.bullet_homing_pop_back_target(0)
 	#, false, true)

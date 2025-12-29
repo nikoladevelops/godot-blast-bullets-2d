@@ -85,32 +85,36 @@ public:
 		return target != nullptr && UtilityFunctions::is_instance_id_valid(cached_instance_id);
 	}
 
-	_ALWAYS_INLINE_ void bullet_homing_trim_front_invalid_targets(const Vector2 &cached_mouse_global_position) {
-		while (!homing_targets.empty()) {
+	// Trims invalid targets from the front of the deque - returns the amount of targets trimmed
+	_ALWAYS_INLINE_ int bullet_homing_trim_front_invalid_targets(const Vector2 &cached_mouse_global_position, int current_target_count) {
+		int trimmed_count = 0;
+		while (trimmed_count != current_target_count) {
 			HomingTarget &target = homing_targets.front();
 
 			switch (target.type) {
 				case NotHoming:
 				case GlobalPositionTarget:
 				case MousePositionTarget:
-					return; // valid, stop trimming
+					return trimmed_count; // valid, stop trimming
 
 				case Node2DTarget: {
 					auto &target_data = target.node2d_target_data;
 
 					if (!is_homing_target_valid(target_data.target, target_data.cached_valid_instance_id)) {
 						pop_front_target(cached_mouse_global_position);
+						++trimmed_count;
 						continue;
 					}
 					// As soon as you find an instance that is valid, stop looping
-					return;
+					return trimmed_count;
 				}
 				default:
 					UtilityFunctions::push_error(
 							"Unsupported HomingTarget type in bullet_homing_trim_front_invalid_targets");
-					return;
+					return trimmed_count;
 			}
 		}
+		return trimmed_count;
 	}
 
 	_ALWAYS_INLINE_ Vector2 get_cached_front_target_global_position() const {
