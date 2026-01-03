@@ -43,6 +43,12 @@ void BulletFactory2D::_ready() {
 		physics_space = get_world_2d()->get_space();
 	}
 
+	all_directional_bullets.reserve(1000);
+	directional_bullets_set.resize(1000);
+
+	all_block_bullets.reserve(1000);
+	block_bullets_set.resize(1000);
+
 	add_bullet_containers();
 	add_bullet_attachment_container();
 	add_debuggers();
@@ -160,9 +166,9 @@ void BulletFactory2D::set_is_factory_processing_bullets(bool is_processing_enabl
 	set_process(is_processing_enabled);
 }
 
-void BulletFactory2D::_physics_process(double delta) { // TODO sparse set goes here
-	handle_bullet_behavior<DirectionalBullets2D>(all_directional_bullets, delta);
-	handle_bullet_behavior<BlockBullets2D>(all_block_bullets, delta);
+void BulletFactory2D::_physics_process(double delta) {
+	handle_bullet_behavior<DirectionalBullets2D>(all_directional_bullets, directional_bullets_set, delta);
+	handle_bullet_behavior<BlockBullets2D>(all_block_bullets, block_bullets_set, delta);
 
 	for (auto &bullet : all_directional_bullets) {
 		bullet->run_multimesh_custom_timers(delta);
@@ -174,8 +180,8 @@ void BulletFactory2D::_process(double delta) {
 		return;
 	}
 
-	handle_bullet_rendering_interpolation<DirectionalBullets2D>(all_directional_bullets);
-	handle_bullet_rendering_interpolation<BlockBullets2D>(all_block_bullets);
+	handle_bullet_rendering_interpolation<DirectionalBullets2D>(all_directional_bullets, directional_bullets_set);
+	handle_bullet_rendering_interpolation<BlockBullets2D>(all_block_bullets, block_bullets_set);
 }
 
 void BulletFactory2D::spawn_block_bullets(const Ref<BlockBulletsData2D> &spawn_data) {
@@ -186,6 +192,7 @@ void BulletFactory2D::spawn_block_bullets(const Ref<BlockBulletsData2D> &spawn_d
 
 	spawn_bullets_helper<BlockBullets2D, BlockBulletsData2D>(
 			all_block_bullets,
+			block_bullets_set,
 			block_bullets_pool,
 			block_bullets_container,
 			spawn_data);
@@ -199,6 +206,7 @@ void BulletFactory2D::spawn_directional_bullets(const Ref<DirectionalBulletsData
 
 	spawn_bullets_helper<DirectionalBullets2D, DirectionalBulletsData2D>(
 			all_directional_bullets,
+			directional_bullets_set,
 			directional_bullets_pool,
 			directional_bullets_container,
 			spawn_data,
@@ -213,6 +221,7 @@ DirectionalBullets2D *BulletFactory2D::spawn_controllable_directional_bullets(co
 
 	return spawn_bullets_helper<DirectionalBullets2D, DirectionalBulletsData2D>(
 			all_directional_bullets,
+			directional_bullets_set,
 			directional_bullets_pool,
 			directional_bullets_container,
 			spawn_data,
@@ -221,79 +230,79 @@ DirectionalBullets2D *BulletFactory2D::spawn_controllable_directional_bullets(co
 
 //void BulletFactory2D::save() {
 //	UtilityFunctions::push_error("The functionality of saving and loading is DEPRECATED for this version of the plugin. If you are in need of it open a GitHub issue or try modifying the source code yourself.");
-	
-	// if (is_factory_busy) {
-	// 	UtilityFunctions::push_error("Error when trying to save. BulletFactory2D is currently busy. Ignoring the request");
-	// 	return;
-	// }
 
-	// is_factory_busy = true;
+// if (is_factory_busy) {
+// 	UtilityFunctions::push_error("Error when trying to save. BulletFactory2D is currently busy. Ignoring the request");
+// 	return;
+// }
 
-	// bool enable_processing_after_finish = is_factory_processing_bullets;
+// is_factory_busy = true;
 
-	// set_is_factory_processing_bullets(false);
+// bool enable_processing_after_finish = is_factory_processing_bullets;
 
-	// Ref<SaveDataBulletFactory2D> data = memnew(SaveDataBulletFactory2D);
+// set_is_factory_processing_bullets(false);
 
-	// // Save all BlockBullets2D
-	// insert_save_data_from_bullets_into_array<BlockBullets2D, SaveDataBlockBullets2D>(
-	// 		all_block_bullets,
-	// 		data->all_block_bullets);
+// Ref<SaveDataBulletFactory2D> data = memnew(SaveDataBulletFactory2D);
 
-	// // Save all DirectionalBullets2D
-	// insert_save_data_from_bullets_into_array<DirectionalBullets2D, SaveDataDirectionalBullets2D>(
-	// 		all_directional_bullets,
-	// 		data->all_directional_bullets);
+// // Save all BlockBullets2D
+// insert_save_data_from_bullets_into_array<BlockBullets2D, SaveDataBlockBullets2D>(
+// 		all_block_bullets,
+// 		data->all_block_bullets);
 
-	// is_factory_busy = false;
-	// if (enable_processing_after_finish) {
-	// 	set_is_factory_processing_bullets(true);
-	// }
+// // Save all DirectionalBullets2D
+// insert_save_data_from_bullets_into_array<DirectionalBullets2D, SaveDataDirectionalBullets2D>(
+// 		all_directional_bullets,
+// 		data->all_directional_bullets);
 
-	// emit_signal("save_finished", data);
+// is_factory_busy = false;
+// if (enable_processing_after_finish) {
+// 	set_is_factory_processing_bullets(true);
+// }
+
+// emit_signal("save_finished", data);
 //}
 
 //void BulletFactory2D::load(const Ref<SaveDataBulletFactory2D> new_data) {
 //	UtilityFunctions::push_error("The functionality of saving and loading is DEPRECATED for this version of the plugin. If you are in need of it open a GitHub issue or try modifying the source code yourself.");
-	
-	// if (!new_data.is_valid()) {
-	// 	UtilityFunctions::push_error("Error. Bullet data given to load method inside BulletFactory2D is invalid");
-	// 	return;
-	// }
 
-	// if (is_factory_busy) {
-	// 	UtilityFunctions::push_error("Error when trying to load data. BulletFactory2D is currently busy. Ignoring the request");
-	// 	return;
-	// }
+// if (!new_data.is_valid()) {
+// 	UtilityFunctions::push_error("Error. Bullet data given to load method inside BulletFactory2D is invalid");
+// 	return;
+// }
 
-	// is_factory_busy = true;
+// if (is_factory_busy) {
+// 	UtilityFunctions::push_error("Error when trying to load data. BulletFactory2D is currently busy. Ignoring the request");
+// 	return;
+// }
 
-	// bool enable_processing_after_finish = is_factory_processing_bullets;
+// is_factory_busy = true;
 
-	// set_is_factory_processing_bullets(false);
+// bool enable_processing_after_finish = is_factory_processing_bullets;
 
-	// reset_factory_state();
+// set_is_factory_processing_bullets(false);
 
-	// // Load all BlockBullets2D
-	// load_data_into_new_bullets<BlockBullets2D, SaveDataBlockBullets2D>(
-	// 		all_block_bullets,
-	// 		block_bullets_pool,
-	// 		block_bullets_container,
-	// 		new_data->all_block_bullets);
+// reset_factory_state();
 
-	// // Load all DirectionalBullets2D
-	// load_data_into_new_bullets<DirectionalBullets2D, SaveDataDirectionalBullets2D>(
-	// 		all_directional_bullets,
-	// 		directional_bullets_pool,
-	// 		directional_bullets_container,
-	// 		new_data->all_directional_bullets);
+// // Load all BlockBullets2D
+// load_data_into_new_bullets<BlockBullets2D, SaveDataBlockBullets2D>(
+// 		all_block_bullets,
+// 		block_bullets_pool,
+// 		block_bullets_container,
+// 		new_data->all_block_bullets);
 
-	// is_factory_busy = false;
-	// if (enable_processing_after_finish) {
-	// 	set_is_factory_processing_bullets(true);
-	// }
+// // Load all DirectionalBullets2D
+// load_data_into_new_bullets<DirectionalBullets2D, SaveDataDirectionalBullets2D>(
+// 		all_directional_bullets,
+// 		directional_bullets_pool,
+// 		directional_bullets_container,
+// 		new_data->all_directional_bullets);
 
-	// emit_signal("load_finished");
+// is_factory_busy = false;
+// if (enable_processing_after_finish) {
+// 	set_is_factory_processing_bullets(true);
+// }
+
+// emit_signal("load_finished");
 //}
 
 void BulletFactory2D::reset_factory_state() {
@@ -307,10 +316,10 @@ void BulletFactory2D::reset_factory_state() {
 	}
 
 	// Free all DirectionalBullets2D, their attachments and the object pool
-	free_all_bullets_helper<DirectionalBullets2D>(all_directional_bullets, directional_bullets_pool);
+	free_all_bullets_helper<DirectionalBullets2D>(all_directional_bullets, directional_bullets_set, directional_bullets_pool);
 
 	// Free all BlockBullets2D, their attachments and the object pool
-	free_all_bullets_helper<BlockBullets2D>(all_block_bullets, block_bullets_pool);
+	free_all_bullets_helper<BlockBullets2D>(all_block_bullets, block_bullets_set, block_bullets_pool);
 
 	// Free all bullet attachments that are currently in the object pool
 	bullet_attachments_pool.free_all_bullet_attachments();
@@ -367,10 +376,10 @@ void BulletFactory2D::free_active_bullets() {
 	}
 
 	// Free all ACTIVE DirectionalBullets2D
-	free_only_active_bullets_helper<DirectionalBullets2D>(all_directional_bullets, directional_bullets_pool);
+	free_only_active_bullets_helper<DirectionalBullets2D>(all_directional_bullets, directional_bullets_set, directional_bullets_pool);
 
 	// Free all ACTIVE BlockBullets2D
-	free_only_active_bullets_helper<BlockBullets2D>(all_block_bullets, block_bullets_pool);
+	free_only_active_bullets_helper<BlockBullets2D>(all_block_bullets, directional_bullets_set, block_bullets_pool);
 
 	// If the debuggers are supposed to be enabled then re-enable them
 	if (debugger_curr_enabled) {

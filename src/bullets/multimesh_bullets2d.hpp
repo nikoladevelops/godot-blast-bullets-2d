@@ -58,6 +58,9 @@ public:
 	// Whether all the bullets should be processed/moved/rotated etc.. or just skipped (basically this value should be equal to false only when ALL bullets are completely disabled)
 	bool is_active = false;
 
+	// The id of the multimesh inside the bullet factory's sparse set
+	int sparse_set_id = -1;
+
 	// Gets the total amount of bullets that the multimesh always holds
 	_ALWAYS_INLINE_ int get_amount_bullets() const { return amount_bullets; };
 
@@ -65,7 +68,7 @@ public:
 	int get_amount_active_attachments() const;
 
 	// Used to spawn brand new bullets that are active in the scene tree
-	void spawn(const MultiMeshBulletsData2D &spawn_data, MultiMeshObjectPool *pool, BulletFactory2D *factory, Node *bullets_container, const Vector2 &new_inherited_velocity_offset);
+	void spawn(const MultiMeshBulletsData2D &spawn_data, MultiMeshObjectPool *pool, BulletFactory2D *factory, Node *bullets_container, const Vector2 &new_inherited_velocity_offset, int new_sparse_set_id);
 
 	// Activates the multimesh
 	void enable_multimesh(const MultiMeshBulletsData2D &data, const Vector2 &new_inherited_velocity_offset);

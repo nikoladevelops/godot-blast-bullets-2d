@@ -55,6 +55,10 @@ void BlockBullets2D::custom_additional_load_logic(const SaveDataMultiMeshBullets
 	block_rotation_radians = block_data.block_rotation_radians;
 }
 
+void BlockBullets2D::custom_additional_disable_logic(){
+	bullet_factory->block_bullets_set.disable_data(sparse_set_id);
+}
+
 void BlockBullets2D::_bind_methods() {
 	// Expose methods to Godot here
 }

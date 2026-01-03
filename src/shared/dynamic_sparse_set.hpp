@@ -103,7 +103,7 @@ public:
 
 	// Activates a range of indexes
 	// If end is -1, it uses max_size. If end > max_size, it resizes.
-	_ALWAYS_INLINE_ void activate_range_data(int index_start, int index_end_inclusive) {
+	_ALWAYS_INLINE_ void activate_range_data(int index_start, int index_end_inclusive = -1) {
 		// Sanitize index_start
 		index_start = (index_start < 0) ? 0 : index_start;
 

@@ -146,6 +146,10 @@ void DirectionalBullets2D::custom_additional_enable_logic(const MultiMeshBullets
 	is_multimesh_auto_pooling_enabled = directional_data.is_multimesh_auto_pooling_enabled;
 }
 
+void DirectionalBullets2D::custom_additional_disable_logic(){
+	bullet_factory->directional_bullets_set.disable_data(sparse_set_id);
+}
+
 void DirectionalBullets2D::_bind_methods() {
 	// PER BULLET HOMING DEQUE POP METHODS
 	ClassDB::bind_method(D_METHOD("bullet_homing_pop_front_target", "bullet_index"), &DirectionalBullets2D::bullet_homing_pop_front_target);

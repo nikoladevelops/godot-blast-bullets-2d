@@ -9,6 +9,7 @@
 #include "../shared/bullet_attachment_object_pool2d.hpp"
 #include "../shared/multimesh_object_pool2d.hpp"
 #include "godot_cpp/variant/vector2.hpp"
+#include "shared/dynamic_sparse_set.hpp"
 
 namespace BlastBullets2D {
 using namespace godot;
@@ -57,13 +58,13 @@ public:
 	virtual void _process(double delta) override;
 
 	// Spawns DirectionalBullets2D when given a resource containing all needed data
-	void spawn_directional_bullets(const Ref<DirectionalBulletsData2D> &spawn_data, const Vector2 &new_inherited_velocity_offset = Vector2(0,0));
+	void spawn_directional_bullets(const Ref<DirectionalBulletsData2D> &spawn_data, const Vector2 &new_inherited_velocity_offset = Vector2(0, 0));
 
 	// Spawns BlockBullets2D when given a resource containing all needed data
 	void spawn_block_bullets(const Ref<BlockBulletsData2D> &spawn_data);
 
 	// Spawns DirectionalBullets2D when given a resource containing all needed data. These bullets should be controlled by the user
-	DirectionalBullets2D *spawn_controllable_directional_bullets(const Ref<DirectionalBulletsData2D> &spawn_data, const Vector2 &new_inherited_velocity_offset = Vector2(0,0));
+	DirectionalBullets2D *spawn_controllable_directional_bullets(const Ref<DirectionalBulletsData2D> &spawn_data, const Vector2 &new_inherited_velocity_offset = Vector2(0, 0));
 
 	// Generates a Resource that contains every bullet's state
 	//void save();
@@ -136,6 +137,9 @@ public:
 	Dictionary debug_get_attachments_pool_info();
 
 	//
+
+	DynamicSparseSet directional_bullets_set;
+	DynamicSparseSet block_bullets_set;
 
 protected:
 	// Responsible for exposing C++ methods/properties to Godot Engine
@@ -292,7 +296,7 @@ private:
 
 	// Frees all bullets of a TBullet type and clears dangling pointers
 	template <typename TBullet>
-	void free_all_bullets_helper(std::vector<TBullet *> &bullets_vec, MultiMeshObjectPool &bullets_pool) {
+	void free_all_bullets_helper(std::vector<TBullet *> &bullets_vec, DynamicSparseSet &sparse_set, MultiMeshObjectPool &bullets_pool) {
 		// Remove object pool pointers that will become invalid/dangling
 		bullets_pool.clear();
 
@@ -307,15 +311,19 @@ private:
 			}
 		}
 
-		// Remove all invalid/dangling pointers
 		bullets_vec.clear();
+		sparse_set.clear();
 	}
 
 	// Frees all ACTIVE bullets of a TBullet type and clears dangling pointers
 	template <typename TBullet>
-	void free_only_active_bullets_helper(std::vector<TBullet *> &bullets_vec, MultiMeshObjectPool &bullets_pool) {
+	void free_only_active_bullets_helper(std::vector<TBullet *> &bullets_vec, DynamicSparseSet &sparse_set, MultiMeshObjectPool &bullets_pool) {
 		std::vector<TBullet *> new_bullets_vec;
+		new_bullets_vec.reserve(1000);
 
+		sparse_set.clear();
+
+		int sparse_set_id = 0;
 		for (TBullet *bullet : bullets_vec) {
 			if (bullet == nullptr) {
 				continue;
@@ -325,6 +333,9 @@ private:
 				bullet->force_delete();
 			} else {
 				new_bullets_vec.push_back(bullet);
+				bullet->sparse_set_id = sparse_set_id;
+				
+				++sparse_set_id;
 			}
 		}
 
@@ -365,48 +376,52 @@ private:
 
 	// Spawns bullets by either creating a brand new TBullet or retrieving one from the object pool
 	template <typename TBullet, typename TBulletSpawnData>
-	TBullet *spawn_bullets_helper(std::vector<TBullet *> &bullets_vec, MultiMeshObjectPool &bullets_pool, Node *bullets_container, const Ref<TBulletSpawnData> &spawn_data, const Vector2 &new_inherited_velocity_offset = Vector2(0,0)) {
+	TBullet *spawn_bullets_helper(std::vector<TBullet *> &bullets_vec, DynamicSparseSet &sparse_set, MultiMeshObjectPool &bullets_pool, Node *bullets_container, const Ref<TBulletSpawnData> &spawn_data, const Vector2 &new_inherited_velocity_offset = Vector2(0, 0)) {
 		int key = spawn_data->transforms.size();
 
 		// Try to get a TBullet from the pool first
 		TBullet *bullets = static_cast<TBullet *>(bullets_pool.pop(key));
 		if (bullets != nullptr) {
 			bullets->enable_multimesh(*spawn_data.ptr(), new_inherited_velocity_offset);
+			sparse_set.activate_data(bullets->sparse_set_id);
 			return bullets;
 		}
 
+		// Generate new id according to how many ids there are in the sparse set
+		int sparse_set_id = bullets_vec.size();
+
 		// If there was no TBullet in the pool, create a brand new one and spawn it
 		bullets = memnew(TBullet);
-		bullets->spawn(*spawn_data.ptr(), &bullets_pool, this, bullets_container, new_inherited_velocity_offset);
+		bullets->spawn(*spawn_data.ptr(), &bullets_pool, this, bullets_container, new_inherited_velocity_offset, sparse_set_id);
 		bullets_vec.emplace_back(bullets);
+
+		sparse_set.activate_data(sparse_set_id);
 
 		return bullets;
 	}
 
 	// Handles movement and other behaviors of the bullets.
-	// Note: If you are doing operations on a vector that contains nullptr, you will obviously get crashes, so ensure that all your vectors always contain valid instances
 	template <typename TBullet>
-	void handle_bullet_behavior(std::vector<TBullet *> &bullets_vec, double delta) {
-		for (auto bullets : bullets_vec) {
-			if (!bullets->is_active) {
-				continue;
-			}
+	void handle_bullet_behavior(const std::vector<TBullet *> &bullets_vec, const DynamicSparseSet &bullets_set, double delta) {
+		const auto &all_active_multis = bullets_set.get_active_indexes();
 
-			bullets->move_bullets(delta);
-			bullets->change_texture_periodically(delta);
-			bullets->reduce_lifetime(delta);
+		for (auto index : all_active_multis) {
+			auto &multi = bullets_vec[index];
+
+			multi->move_bullets(delta);
+			multi->change_texture_periodically(delta);
+			multi->reduce_lifetime(delta);
 		}
 	}
 
-	// Handles rendering in the case that physics interpolation was enabled
+	// Handles rendering with physics interpolation
 	template <typename TBullet>
-	void handle_bullet_rendering_interpolation(std::vector<TBullet *> &bullets_vec) {
-		for (auto bullets : bullets_vec) {
-			if (!bullets->is_active) {
-				continue;
-			}
+	void handle_bullet_rendering_interpolation(std::vector<TBullet *> &bullets_vec, const DynamicSparseSet &bullets_set) {
+		const auto &all_active_multis = bullets_set.get_active_indexes();
 
-			bullets->interpolate_bullet_visuals();
+		for (auto index : all_active_multis) {
+			auto &multi = bullets_vec[index];
+			multi->interpolate_bullet_visuals();
 		}
 	}
 

@@ -292,14 +292,14 @@ func spawn_multi_mesh_directional_bullets()->void:
 	#dir_bullets.all_bullets_set_attachment(light_attachment_scn, 1, Vector2(-60,0))
 	#dir_bullets.all_bullets_set_curves_data(bullet_curves_data_1)
 	#dir_bullets.bullet_set_curves_data(0, bullet_curves_data_1)
-	dir_bullets.shared_bullet_curves_data = bullet_curves_data_1
+	#dir_bullets.shared_bullet_curves_data = bullet_curves_data_1
 	
 	#dir_bullets.shared_homing_deque_push_back_node2d_target(BENCHMARK_GLOBALS.MOVING_TARGET_ONE)
-	dir_bullets.all_bullets_push_back_homing_target(BENCHMARK_GLOBALS.MOVING_TARGET_ONE)
+	#dir_bullets.all_bullets_push_back_homing_target(BENCHMARK_GLOBALS.MOVING_TARGET_ONE)
 	#dir_bullets.distance_from_target_before_considering_as_reached = 300
 	#dir_bullets.bullet_homing_auto_pop_after_target_reached = true
 	
-	dir_bullets.bullet_enable_orbiting(0, 450, DirectionalBullets2D.OrbitRight, DirectionalBullets2D.FaceOppositeOrbitingDirection)
+	#dir_bullets.bullet_enable_orbiting(0, 450, DirectionalBullets2D.OrbitRight, DirectionalBullets2D.FaceOppositeOrbitingDirection)
 	#dir_bullets.bullet_enable_orbiting(1, 550, DirectionalBullets2D.OrbitRight, DirectionalBullets2D.FaceOppositeTarget)
 	#dir_bullets.bullet_enable_orbiting(2, 750, DirectionalBullets2D.OrbitLeft, DirectionalBullets2D.FaceTarget)
 	#dir_bullets.bullet_enable_orbiting(3, 850, DirectionalBullets2D.DontMove, DirectionalBullets2D.FaceTarget)
