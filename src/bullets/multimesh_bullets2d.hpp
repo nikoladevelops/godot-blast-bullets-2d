@@ -909,10 +909,6 @@ protected:
 		real_t &curr_bullet_speed = all_cached_speed[bullet_index];
 		real_t curr_max_bullet_speed = all_cached_max_speed[bullet_index];
 
-		if (curr_bullet_speed >= curr_max_bullet_speed) {
-			return;
-		}
-
 		real_t acceleration = all_cached_acceleration[bullet_index] * delta;
 		curr_bullet_speed = Math::min(curr_bullet_speed + acceleration, curr_max_bullet_speed);
 
@@ -931,8 +927,6 @@ protected:
 		curr_bullet_speed = get_bullet_curves_movement_speed(curves_data);
 
 		all_cached_velocity[bullet_index] = all_cached_direction[bullet_index] * curr_bullet_speed + inherited_velocity_offset;
-
-		return;
 	}
 
 	// Accelerates bullet rotation speed
