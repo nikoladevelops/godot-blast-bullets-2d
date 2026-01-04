@@ -354,7 +354,7 @@ void BulletFactory2D::reset(int amount_bullets) {
 	emit_signal("reset_finished");
 }
 
-void BulletFactory2D::free_active_bullets() {
+void BulletFactory2D::free_active_bullets(int amount_bullets) {
 	if (is_factory_busy) {
 		UtilityFunctions::push_error("Error when trying to free active bullets. BulletFactory2D is currently busy. Ignoring the request");
 		return;
@@ -376,10 +376,10 @@ void BulletFactory2D::free_active_bullets() {
 	}
 
 	// Free all ACTIVE DirectionalBullets2D
-	free_only_active_bullets_helper<DirectionalBullets2D>(all_directional_bullets, directional_bullets_set);
+	free_only_active_bullets_helper<DirectionalBullets2D>(all_directional_bullets, directional_bullets_set, amount_bullets);
 
 	// Free all ACTIVE BlockBullets2D
-	free_only_active_bullets_helper<BlockBullets2D>(all_block_bullets, directional_bullets_set);
+	free_only_active_bullets_helper<BlockBullets2D>(all_block_bullets, block_bullets_set, amount_bullets);
 
 	// If the debuggers are supposed to be enabled then re-enable them
 	if (debugger_curr_enabled) {
@@ -863,7 +863,7 @@ void BulletFactory2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("populate_attachments_pool", "attachment_scenes", "amount_attachments"), &BulletFactory2D::populate_attachments_pool);
 	ClassDB::bind_method(D_METHOD("free_attachments_pool", "attachment_id"), &BulletFactory2D::free_attachments_pool, DEFVAL(-1));
 
-	ClassDB::bind_method(D_METHOD("free_active_bullets"), &BulletFactory2D::free_active_bullets);
+	ClassDB::bind_method(D_METHOD("free_active_bullets", "amount_bullets"), &BulletFactory2D::free_active_bullets, DEFVAL(0));
 
 	// Additional debug methods related
 

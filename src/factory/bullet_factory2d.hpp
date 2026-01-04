@@ -77,7 +77,7 @@ public:
 	void reset(int amount_bullets = 0);
 
 	// Frees all active bullets
-	void free_active_bullets();
+	void free_active_bullets(int amount_bullets = 0);
 
 	// OBJECT POOLING RELATED
 
@@ -300,12 +300,12 @@ private:
 	template <typename TBullet>
 	void free_all_bullets_helper(std::vector<TBullet *> &bullets_vec, DynamicSparseSet &sparse_set, MultiMeshObjectPool &bullets_pool, int amount_bullets = 0) {
 		if (amount_bullets <= 0) {
-			for (TBullet *bullet : bullets_vec) {
-				if (bullet == nullptr) {
+			for (TBullet *bullet_multi : bullets_vec) {
+				if (bullet_multi == nullptr) {
 					continue;
 				}
 
-				bullet->force_delete();
+				bullet_multi->force_delete();
 			}
 
 			bullets_pool.clear();
@@ -318,15 +318,15 @@ private:
 			// Wipe the sparse set because we are re-indexing everything
 			sparse_set.clear();
 
-			for (TBullet *bullet : bullets_vec) {
-				if (bullet == nullptr) {
+			for (TBullet *bullet_multi : bullets_vec) {
+				if (bullet_multi == nullptr) {
 					continue;
 				}
 
-				if (bullet->get_amount_bullets() == amount_bullets) {
+				if (bullet_multi->get_amount_bullets() == amount_bullets) {
 					// If it's active, it's NOT in the pool, so we must delete it here.
-					if (bullet->is_active) {
-						bullet->force_delete();
+					if (bullet_multi->is_active) {
+						bullet_multi->force_delete();
 					}
 					// If it's NOT active, it IS in the pool.
 					// We leave it alone so free_specific_bullets can handle it later.
@@ -336,12 +336,12 @@ private:
 
 					// We give it a NEW ID based on its position in the NEW vector.
 					int new_id = static_cast<int>(surviving_bullets.size());
-					bullet->sparse_set_id = new_id; // Ofc we update it in the multimesh too
+					bullet_multi->sparse_set_id = new_id; // Ofc we update it in the multimesh too
 
-					surviving_bullets.push_back(bullet);
+					surviving_bullets.push_back(bullet_multi);
 
 					// In case the multimesh was marked as active, it belongs in the dense list, so active it
-					if (bullet->is_active) {
+					if (bullet_multi->is_active) {
 						sparse_set.activate_data(new_id);
 					}
 				}
@@ -357,25 +357,47 @@ private:
 
 	// Frees all ACTIVE bullets of a TBullet type and clears dangling pointers
 	template <typename TBullet>
-	void free_only_active_bullets_helper(std::vector<TBullet *> &bullets_vec, DynamicSparseSet &sparse_set) {
+	void free_only_active_bullets_helper(std::vector<TBullet *> &bullets_vec, DynamicSparseSet &sparse_set, int amount_bullets = 0) {
 		std::vector<TBullet *> new_bullets_vec;
-		new_bullets_vec.reserve(1000);
+		new_bullets_vec.reserve(bullets_vec.size());
 
 		sparse_set.clear();
 
 		int sparse_set_id = 0;
-		for (TBullet *bullet : bullets_vec) {
-			if (bullet == nullptr) {
-				continue;
+
+		if (amount_bullets <= 0) {
+			for (TBullet *bullet_multi : bullets_vec) {
+				if (bullet_multi == nullptr) {
+					continue;
+				}
+
+				if (bullet_multi->is_active) {
+					bullet_multi->force_delete();
+				} else {
+					new_bullets_vec.push_back(bullet_multi);
+					bullet_multi->sparse_set_id = sparse_set_id;
+
+					++sparse_set_id;
+				}
 			}
+		} else {
+			for (TBullet *bullet_multi : bullets_vec) {
+				if (bullet_multi == nullptr) {
+					continue;
+				}
 
-			if (bullet->is_active) {
-				bullet->force_delete();
-			} else {
-				new_bullets_vec.push_back(bullet);
-				bullet->sparse_set_id = sparse_set_id;
+				if (bullet_multi->is_active && bullet_multi->get_amount_bullets() == amount_bullets) {
+					bullet_multi->force_delete();
+				} else {
+					new_bullets_vec.push_back(bullet_multi);
+					bullet_multi->sparse_set_id = sparse_set_id;
 
-				++sparse_set_id;
+					if (bullet_multi->is_active) {
+						sparse_set.activate_data(sparse_set_id);
+					}
+
+					++sparse_set_id;
+				}
 			}
 		}
 
