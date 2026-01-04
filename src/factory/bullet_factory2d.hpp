@@ -5,6 +5,7 @@
 #include <godot_cpp/classes/node.hpp>
 #include <godot_cpp/classes/node2d.hpp>
 #include <godot_cpp/classes/packed_scene.hpp>
+#include <utility>
 
 #include "../shared/bullet_attachment_object_pool2d.hpp"
 #include "../shared/multimesh_object_pool2d.hpp"
@@ -73,7 +74,7 @@ public:
 	//void load(const Ref<SaveDataBulletFactory2D> new_data);
 
 	// Resets the factory - frees everything (object pools, spawned bullets, spawned attachments - all get deleted from memory)
-	void reset();
+	void reset(int amount_bullets = 0);
 
 	// Frees all active bullets
 	void free_active_bullets();
@@ -158,7 +159,7 @@ private:
 	bool get_is_factory_processing_bullets() const;
 	void set_is_factory_processing_bullets(bool is_processing_enabled);
 
-	void reset_factory_state();
+	void reset_factory_state(int amount_bullets = 0);
 
 	// BULLETS RELATED
 
@@ -274,6 +275,7 @@ private:
 		bullets_vec.erase(new_end, bullets_vec.end());
 	}
 
+	// TODO fix
 	// Frees specific bullets from the object pool and also erases them from the bullets_vec so dangling pointers would not be accessed. If amount_bullets_per_instance is 0 it frees ALL bullets of BulletType, otherwise frees only those BulletType instances whose amount_bullets value matches amount_bullets_per_instance
 	template <typename TBullet>
 	void free_bullets_pool_helper(std::vector<TBullet *> &bullets_vec, MultiMeshObjectPool &bullets_pool, int amount_bullets_per_instance) {
@@ -294,30 +296,68 @@ private:
 		}
 	}
 
-	// Frees all bullets of a TBullet type and clears dangling pointers
+	// Frees all multimeshes of a TBullet type and clears dangling pointers. If amount_bullets is 0 it clears ALL multimeshes, otherwise clears all multimeshes but only those with specific N amount bullets
 	template <typename TBullet>
-	void free_all_bullets_helper(std::vector<TBullet *> &bullets_vec, DynamicSparseSet &sparse_set, MultiMeshObjectPool &bullets_pool) {
-		// Remove object pool pointers that will become invalid/dangling
-		bullets_pool.clear();
+	void free_all_bullets_helper(std::vector<TBullet *> &bullets_vec, DynamicSparseSet &sparse_set, MultiMeshObjectPool &bullets_pool, int amount_bullets = 0) {
+		if (amount_bullets <= 0) {
+			for (TBullet *bullet : bullets_vec) {
+				if (bullet == nullptr) {
+					continue;
+				}
 
-		int count_bullets = static_cast<int>(bullets_vec.size());
-
-		// Free every single bullet multimesh instance
-		for (int i = 0; i < count_bullets; ++i) {
-			TBullet *curr_bullet = bullets_vec[i];
-
-			if (curr_bullet != nullptr) {
-				curr_bullet->force_delete();
+				bullet->force_delete();
 			}
-		}
 
-		bullets_vec.clear();
-		sparse_set.clear();
+			bullets_pool.clear();
+			bullets_vec.clear();
+			sparse_set.clear();
+		} else {
+			std::vector<TBullet *> surviving_bullets;
+			surviving_bullets.reserve(bullets_vec.size());
+
+			// Wipe the sparse set because we are re-indexing everything
+			sparse_set.clear();
+
+			for (TBullet *bullet : bullets_vec) {
+				if (bullet == nullptr) {
+					continue;
+				}
+
+				if (bullet->get_amount_bullets() == amount_bullets) {
+					// If it's active, it's NOT in the pool, so we must delete it here.
+					if (bullet->is_active) {
+						bullet->force_delete();
+					}
+					// If it's NOT active, it IS in the pool.
+					// We leave it alone so free_specific_bullets can handle it later.
+				} else {
+					// Since we clear specific bullets we need to keep our vector of multimeshes correct as well as the dynamic sparse set,
+					// which means new sparse set ids ( we are generating a vector that holds only VALID instances, the others are freed so the mappings will be off otherwise)
+
+					// We give it a NEW ID based on its position in the NEW vector.
+					int new_id = static_cast<int>(surviving_bullets.size());
+					bullet->sparse_set_id = new_id; // Ofc we update it in the multimesh too
+
+					surviving_bullets.push_back(bullet);
+
+					// In case the multimesh was marked as active, it belongs in the dense list, so active it
+					if (bullet->is_active) {
+						sparse_set.activate_data(new_id);
+					}
+				}
+			}
+
+			// FREES the actual multimesh instances, and the pool remains valid
+			bullets_pool.free_specific_bullets(amount_bullets);
+
+			// Swap the vectors. Memory for the old vector is freed.
+			bullets_vec.swap(surviving_bullets);
+		}
 	}
 
 	// Frees all ACTIVE bullets of a TBullet type and clears dangling pointers
 	template <typename TBullet>
-	void free_only_active_bullets_helper(std::vector<TBullet *> &bullets_vec, DynamicSparseSet &sparse_set, MultiMeshObjectPool &bullets_pool) {
+	void free_only_active_bullets_helper(std::vector<TBullet *> &bullets_vec, DynamicSparseSet &sparse_set) {
 		std::vector<TBullet *> new_bullets_vec;
 		new_bullets_vec.reserve(1000);
 
@@ -334,13 +374,41 @@ private:
 			} else {
 				new_bullets_vec.push_back(bullet);
 				bullet->sparse_set_id = sparse_set_id;
-				
+
 				++sparse_set_id;
 			}
 		}
 
 		bullets_vec.swap(new_bullets_vec);
 	}
+
+	// // TODO
+	// // Frees all ACTIVE bullets of a TBullet type and clears dangling pointers
+	// template <typename TBullet>
+	// void free_only_disabled_bullets_helper(std::vector<TBullet *> &bullets_vec, DynamicSparseSet &sparse_set, MultiMeshObjectPool &bullets_pool) {
+	// 	std::vector<TBullet *> new_bullets_vec;
+	// 	new_bullets_vec.reserve(1000);
+
+	// 	sparse_set.clear();
+
+	// 	int sparse_set_id = 0;
+	// 	for (TBullet *bullet : bullets_vec) {
+	// 		if (bullet == nullptr) {
+	// 			continue;
+	// 		}
+
+	// 		if (bullet->is_active) {
+	// 			bullet->force_delete();
+	// 		} else {
+	// 			new_bullets_vec.push_back(bullet);
+	// 			bullet->sparse_set_id = sparse_set_id;
+
+	// 			++sparse_set_id;
+	// 		}
+	// 	}
+
+	// 	bullets_vec.swap(new_bullets_vec);
+	// }
 
 	// // Loads saved data into a bullet and adds it to the bullets_vec
 	// template <typename TBullet, typename TBulletSaveData>

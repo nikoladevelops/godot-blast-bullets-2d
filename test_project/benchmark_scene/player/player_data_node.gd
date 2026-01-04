@@ -260,7 +260,7 @@ func spawn_bullets(player_rotation:float)->void:
 			spawn_godot_area2d_bullets(player_rotation)
 
 # Testing if code is frame rate independent
-func _process(delta):
+func _process(_delta):
 	if Input.is_key_pressed(KEY_F1):
 		Engine.max_fps = 15
 		

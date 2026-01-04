@@ -305,7 +305,7 @@ DirectionalBullets2D *BulletFactory2D::spawn_controllable_directional_bullets(co
 // emit_signal("load_finished");
 //}
 
-void BulletFactory2D::reset_factory_state() {
+void BulletFactory2D::reset_factory_state(int amount_bullets) {
 	// Check if debuggers are enabled
 	bool debugger_curr_enabled = get_is_debugger_enabled();
 
@@ -316,10 +316,10 @@ void BulletFactory2D::reset_factory_state() {
 	}
 
 	// Free all DirectionalBullets2D, their attachments and the object pool
-	free_all_bullets_helper<DirectionalBullets2D>(all_directional_bullets, directional_bullets_set, directional_bullets_pool);
+	free_all_bullets_helper<DirectionalBullets2D>(all_directional_bullets, directional_bullets_set, directional_bullets_pool, amount_bullets);
 
 	// Free all BlockBullets2D, their attachments and the object pool
-	free_all_bullets_helper<BlockBullets2D>(all_block_bullets, block_bullets_set, block_bullets_pool);
+	free_all_bullets_helper<BlockBullets2D>(all_block_bullets, block_bullets_set, block_bullets_pool, amount_bullets);
 
 	// Free all bullet attachments that are currently in the object pool
 	bullet_attachments_pool.free_all_bullet_attachments();
@@ -331,7 +331,7 @@ void BulletFactory2D::reset_factory_state() {
 	}
 }
 
-void BulletFactory2D::reset() {
+void BulletFactory2D::reset(int amount_bullets) {
 	if (is_factory_busy) {
 		UtilityFunctions::push_error("Error when trying to call reset(). BulletFactory2D is currently busy. Ignoring the request");
 		return;
@@ -343,7 +343,7 @@ void BulletFactory2D::reset() {
 
 	set_is_factory_processing_bullets(false);
 
-	reset_factory_state();
+	reset_factory_state(amount_bullets);
 
 	is_factory_busy = false;
 	if (enable_processing_after_finish) {
@@ -376,10 +376,10 @@ void BulletFactory2D::free_active_bullets() {
 	}
 
 	// Free all ACTIVE DirectionalBullets2D
-	free_only_active_bullets_helper<DirectionalBullets2D>(all_directional_bullets, directional_bullets_set, directional_bullets_pool);
+	free_only_active_bullets_helper<DirectionalBullets2D>(all_directional_bullets, directional_bullets_set);
 
 	// Free all ACTIVE BlockBullets2D
-	free_only_active_bullets_helper<BlockBullets2D>(all_block_bullets, directional_bullets_set, block_bullets_pool);
+	free_only_active_bullets_helper<BlockBullets2D>(all_block_bullets, directional_bullets_set);
 
 	// If the debuggers are supposed to be enabled then re-enable them
 	if (debugger_curr_enabled) {
@@ -847,7 +847,7 @@ void BulletFactory2D::_bind_methods() {
 	//ADD_SIGNAL(MethodInfo("save_finished", PropertyInfo(Variant::OBJECT, "data", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_DEFAULT, "SaveDataBulletFactory2D")));
 	// ADD_SIGNAL(MethodInfo("load_finished"));
 
-	ClassDB::bind_method(D_METHOD("reset"), &BulletFactory2D::reset);
+	ClassDB::bind_method(D_METHOD("reset", "amount_bullets"), &BulletFactory2D::reset, DEFVAL(0));
 
 	ClassDB::bind_method(D_METHOD("get_directional_bullets_debugger_color"), &BulletFactory2D::get_directional_bullets_debugger_color);
 	ClassDB::bind_method(D_METHOD("set_directional_bullets_debugger_color", "new_color"), &BulletFactory2D::set_directional_bullets_debugger_color);
