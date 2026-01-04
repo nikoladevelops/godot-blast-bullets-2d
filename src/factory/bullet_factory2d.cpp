@@ -393,6 +393,45 @@ void BulletFactory2D::free_active_bullets(int amount_bullets) {
 	}
 }
 
+void BulletFactory2D::free_disabled_bullets(int amount_bullets) {
+	if (is_factory_busy) {
+		UtilityFunctions::push_error("BulletFactory2D is busy. Ignoring free_disabled_bullets request.");
+		return;
+	}
+
+	is_factory_busy = true;
+	bool enable_processing_after_finish = is_factory_processing_bullets;
+	set_is_factory_processing_bullets(false);
+
+	bool debugger_curr_enabled = get_is_debugger_enabled();
+	if (debugger_curr_enabled) {
+		block_bullets_debugger->set_is_debugger_enabled(false);
+		directional_bullets_debugger->set_is_debugger_enabled(false);
+	}
+
+	free_only_disabled_bullets_helper<DirectionalBullets2D>(
+			all_directional_bullets,
+			directional_bullets_set,
+			directional_bullets_pool,
+			amount_bullets);
+
+	free_only_disabled_bullets_helper<BlockBullets2D>(
+			all_block_bullets,
+			block_bullets_set,
+			block_bullets_pool,
+			amount_bullets);
+
+	if (debugger_curr_enabled) {
+		block_bullets_debugger->set_is_debugger_enabled(true);
+		directional_bullets_debugger->set_is_debugger_enabled(true);
+	}
+
+	is_factory_busy = false;
+	if (enable_processing_after_finish) {
+		set_is_factory_processing_bullets(true);
+	}
+}
+
 void BulletFactory2D::populate_bullets_pool(BulletType bullet_type, int amount_instances, int amount_bullets_per_instance) {
 	if (amount_instances <= 0) {
 		UtilityFunctions::push_error("Error. You can't populate the bullets pool with amount_instances <= 0");
@@ -864,6 +903,8 @@ void BulletFactory2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("free_attachments_pool", "attachment_id"), &BulletFactory2D::free_attachments_pool, DEFVAL(-1));
 
 	ClassDB::bind_method(D_METHOD("free_active_bullets", "amount_bullets"), &BulletFactory2D::free_active_bullets, DEFVAL(0));
+	ClassDB::bind_method(D_METHOD("free_disabled_bullets", "amount_bullets"), &BulletFactory2D::free_disabled_bullets, DEFVAL(0));
+
 
 	// Additional debug methods related
 

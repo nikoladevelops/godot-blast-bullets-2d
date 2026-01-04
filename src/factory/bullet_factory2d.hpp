@@ -79,6 +79,8 @@ public:
 	// Frees all active bullets
 	void free_active_bullets(int amount_bullets = 0);
 
+	void free_disabled_bullets(int amount_bullets = 0);
+
 	// OBJECT POOLING RELATED
 
 	// Populates the object pool of a bullet type
@@ -404,33 +406,64 @@ private:
 		bullets_vec.swap(new_bullets_vec);
 	}
 
-	// // TODO
-	// // Frees all ACTIVE bullets of a TBullet type and clears dangling pointers
-	// template <typename TBullet>
-	// void free_only_disabled_bullets_helper(std::vector<TBullet *> &bullets_vec, DynamicSparseSet &sparse_set, MultiMeshObjectPool &bullets_pool) {
-	// 	std::vector<TBullet *> new_bullets_vec;
-	// 	new_bullets_vec.reserve(1000);
+	// Frees all DISABLED bullets of a TBullet type and clears dangling pointers
+	template <typename TBullet>
+	void free_only_disabled_bullets_helper(std::vector<TBullet *> &bullets_vec, DynamicSparseSet &sparse_set, MultiMeshObjectPool &bullets_pool, int amount_bullets = 0) {
+		if (amount_bullets <= 0) {
+			std::vector<TBullet *> surviving_bullets;
+			surviving_bullets.reserve(bullets_vec.size());
 
-	// 	sparse_set.clear();
+			sparse_set.clear();
 
-	// 	int sparse_set_id = 0;
-	// 	for (TBullet *bullet : bullets_vec) {
-	// 		if (bullet == nullptr) {
-	// 			continue;
-	// 		}
+			for (TBullet *bullet_multi : bullets_vec) {
+				if (bullet_multi == nullptr) {
+					continue;
+				}
 
-	// 		if (bullet->is_active) {
-	// 			bullet->force_delete();
-	// 		} else {
-	// 			new_bullets_vec.push_back(bullet);
-	// 			bullet->sparse_set_id = sparse_set_id;
+				if (!bullet_multi->is_active) {
+					bullet_multi->force_delete();
+				} else {
+					int new_id = static_cast<int>(surviving_bullets.size());
+					bullet_multi->sparse_set_id = new_id;
 
-	// 			++sparse_set_id;
-	// 		}
-	// 	}
+					surviving_bullets.push_back(bullet_multi);
+					sparse_set.activate_data(new_id);
+				}
+			}
 
-	// 	bullets_vec.swap(new_bullets_vec);
-	// }
+			bullets_pool.clear();
+			bullets_vec.swap(surviving_bullets);
+
+		} else {
+			std::vector<TBullet *> surviving_bullets;
+			surviving_bullets.reserve(bullets_vec.size());
+
+			sparse_set.clear();
+
+			for (TBullet *bullet_multi : bullets_vec) {
+				if (bullet_multi == nullptr){
+					continue;
+				}
+
+				if (bullet_multi->get_amount_bullets() == amount_bullets && !bullet_multi->is_active) {
+					// free_specific_bullets will handle freeing these bullets
+				} else {
+					int new_id = static_cast<int>(surviving_bullets.size());
+					bullet_multi->sparse_set_id = new_id;
+
+					surviving_bullets.push_back(bullet_multi);
+
+					if (bullet_multi->is_active) {
+						sparse_set.activate_data(new_id);
+					}
+				}
+			}
+
+			bullets_pool.free_specific_bullets(amount_bullets);
+
+			bullets_vec.swap(surviving_bullets);
+		}
+	}
 
 	// // Loads saved data into a bullet and adds it to the bullets_vec
 	// template <typename TBullet, typename TBulletSaveData>
