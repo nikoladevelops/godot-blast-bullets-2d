@@ -717,9 +717,14 @@ protected:
 		}
 
 		auto &current_direction = all_cached_direction[bullet_index];
+		
+		if (is_x_direction_curve_valid) {
+			apply_x_direction_curve(current_direction, curr_curves.ptr());
+		}
 
-		apply_x_direction_curve(current_direction, curr_curves.ptr());
-		apply_y_direction_curve(current_direction, curr_curves.ptr());
+		if (is_y_direction_curve_valid) {
+			apply_y_direction_curve(current_direction, curr_curves.ptr());
+		}
 
 		if (is_movement_curve_valid || is_x_direction_curve_valid || is_y_direction_curve_valid) {
 			all_cached_velocity[bullet_index] = all_cached_direction[bullet_index] * all_cached_speed[bullet_index] + inherited_velocity_offset;
@@ -801,19 +806,7 @@ protected:
 	}
 
 	_ALWAYS_INLINE_ void apply_direction_curve_texture_rotation_if_needed(Vector2 &curr_bullet_direction, Transform2D &curr_bullet_transf, double delta, const BulletCurvesData2D *curves_data) const {
-		bool should_apply = false;
-
-		if (curves_data->x_direction_curve.is_valid()) {
-			should_apply = true;
-		} else if (curves_data->y_direction_curve.is_valid()) {
-			should_apply = true;
-		}
-
-		if (!should_apply) {
-			return;
-		}
-
-		should_apply = curves_data->rotate_towards_adjusted_direction && !is_rotation_data_active;
+		bool should_apply = curves_data->rotate_towards_adjusted_direction && !is_rotation_data_active;
 
 		if (!should_apply) {
 			return;
@@ -917,12 +910,6 @@ protected:
 
 	// Accelerates bullet speed using a curve
 	_ALWAYS_INLINE_ void bullet_accelerate_speed_using_curve(int bullet_index, double delta, const BulletCurvesData2D *curves_data) {
-		const bool is_speed_curve_valid = curves_data != nullptr && curves_data->movement_speed_curve.is_valid();
-
-		if (!is_speed_curve_valid) {
-			return;
-		}
-
 		real_t &curr_bullet_speed = all_cached_speed[bullet_index];
 		curr_bullet_speed = get_bullet_curves_movement_speed(curves_data);
 
@@ -944,12 +931,6 @@ protected:
 
 	// Accelerates bullet rotation speed using a curve
 	_ALWAYS_INLINE_ void bullet_accelerate_rotation_speed_using_curve(int bullet_index, double delta, const BulletCurvesData2D *curves_data) {
-		const bool is_rotation_speed_curve_valid = curves_data != nullptr && curves_data->rotation_speed_curve.is_valid();
-
-		if (!is_rotation_speed_curve_valid) {
-			return;
-		}
-
 		real_t &curr_bullet_rotation_speed = all_rotation_speed[bullet_index];
 
 		curr_bullet_rotation_speed = get_bullet_curves_rotation_speed(curves_data);

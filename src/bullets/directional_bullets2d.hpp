@@ -147,6 +147,13 @@ public:
 
 		const bool shared_curves_data_enabled = shared_bullet_curves_data.is_valid();
 		const BulletCurvesData2D *const shared_curves_ptr = shared_bullet_curves_data.ptr();
+
+		const bool shared_curves_x_direction_curve_valid = shared_curves_data_enabled && shared_curves_ptr->x_direction_curve.is_valid();
+		const bool shared_curves_y_direction_curve_valid = shared_curves_data_enabled && shared_curves_ptr->y_direction_curve.is_valid();
+
+		const bool shared_curves_rotation_curve_valid = shared_curves_data_enabled && shared_curves_ptr->rotation_speed_curve.is_valid();
+		const bool shared_curves_acceleration_curve_valid = shared_curves_data_enabled && shared_curves_ptr->movement_speed_curve.is_valid();
+
 		bool is_per_bullet_curves_valid = false;
 		const BulletCurvesData2D *per_bullet_curves_data = nullptr;
 
@@ -194,49 +201,72 @@ public:
 			auto &curr_bullet_transf = all_cached_instance_transforms[i];
 			auto &curr_bullet_direction = all_cached_direction[i];
 
-			// 2. CURVES & ROTATION DATA
+			// 2. DIRECTION CURVES
 			if (shared_curves_data_enabled) {
-				apply_x_direction_curve(curr_bullet_direction, shared_curves_ptr);
-				apply_y_direction_curve(curr_bullet_direction, shared_curves_ptr);
-				apply_direction_curve_texture_rotation_if_needed(curr_bullet_direction, curr_bullet_transf, delta, shared_curves_ptr);
-				direction_got_updated = true;
+				if (shared_curves_x_direction_curve_valid) {
+					apply_x_direction_curve(curr_bullet_direction, shared_curves_ptr);
+				}
+
+				if (shared_curves_y_direction_curve_valid) {
+					apply_y_direction_curve(curr_bullet_direction, shared_curves_ptr);
+				}
+
+				if (shared_curves_x_direction_curve_valid || shared_curves_y_direction_curve_valid) {
+					apply_direction_curve_texture_rotation_if_needed(curr_bullet_direction, curr_bullet_transf, delta, shared_curves_ptr);
+					direction_got_updated = true;
+				}
 			} else {
-				per_bullet_curves_data = find_bullet_curves_data(i);
+				per_bullet_curves_data = find_bullet_curves_data(i); // TODO this uses unordered map, future version should improve it
 				is_per_bullet_curves_valid = per_bullet_curves_data != nullptr;
+
 				if (is_per_bullet_curves_valid) {
 					per_bullet_curves_data = all_bullet_curves_data[i].ptr();
-					apply_x_direction_curve(curr_bullet_direction, per_bullet_curves_data);
-					apply_y_direction_curve(curr_bullet_direction, per_bullet_curves_data);
-					apply_direction_curve_texture_rotation_if_needed(curr_bullet_direction, curr_bullet_transf, delta, per_bullet_curves_data);
-					direction_got_updated = true;
+					
+					const bool per_bullet_x_curve_valid = per_bullet_curves_data->x_direction_curve.is_valid();
+					const bool per_bullet_y_curve_valid = per_bullet_curves_data->y_direction_curve.is_valid();
+
+					if (per_bullet_x_curve_valid) {
+						apply_x_direction_curve(curr_bullet_direction, per_bullet_curves_data);
+					}
+
+					if (per_bullet_y_curve_valid) {
+						apply_y_direction_curve(curr_bullet_direction, per_bullet_curves_data);
+					}
+
+					if (per_bullet_x_curve_valid || per_bullet_y_curve_valid) {
+						apply_direction_curve_texture_rotation_if_needed(curr_bullet_direction, curr_bullet_transf, delta, per_bullet_curves_data);
+						direction_got_updated = true;
+					}
 				}
 			}
 
-			if (shared_curves_data_enabled && shared_curves_ptr->rotation_speed_curve.is_valid()) {
-				update_rotation_using_curve(i, delta, shared_curves_ptr);
+			// 3. ROTATION
+			if (shared_curves_rotation_curve_valid) {
+				update_rotation_using_curve(i, delta);
 				bullet_accelerate_rotation_speed_using_curve(i, delta, shared_curves_ptr);
 			} else if (is_per_bullet_curves_valid && per_bullet_curves_data->rotation_speed_curve.is_valid()) {
-				update_rotation_using_curve(i, delta, per_bullet_curves_data);
+				update_rotation_using_curve(i, delta);
 				bullet_accelerate_rotation_speed_using_curve(i, delta, per_bullet_curves_data);
 			} else if (is_rotation_data_active) {
 				update_rotation(i, delta);
 				bullet_accelerate_rotation_speed(i, delta);
 			}
 
+			// 4. ADJUST DIRECTION BASED ON THE NEW ROTATION (OPTIONALLY)
 			if (adjust_direction_based_on_rotation) {
 				curr_bullet_direction = all_cached_instance_transforms[i].columns[0].normalized();
 				direction_got_updated = true;
 			}
 
-			// 3. VELOCITY CALCULATION
+			// 5. VELOCITY CALCULATION (ONLY IF DIRECTION GOT UPDATED)
 			Vector2 &velocity_delta = all_cached_velocity[i];
 			if (direction_got_updated) {
 				velocity_delta = curr_bullet_direction * all_cached_speed[i] + inherited_velocity_offset;
 			}
 			velocity_delta *= delta;
 
-			// 4. MOVEMENT PATTERNS
-			const bool use_pattern = check_exists_bullet_movement_pattern_data(i);
+			// 6. MOVEMENT PATTERNS (RELYING ON CURVES AND PATH2D)
+			const bool use_pattern = check_exists_bullet_movement_pattern_data(i);  // TODO this uses unordered map, future version should improve it
 			if (use_pattern) {
 				auto &pattern = all_movement_pattern_data[i];
 				const Ref<Curve2D> &curve = pattern.path_curve;
@@ -276,7 +306,7 @@ public:
 
 			auto &curr_bullet_origin = all_cached_instance_origin[i];
 
-			// 5. ORBITING LOGIC
+			// 7. ORBITING LOGIC (RELYING ON HOMING TARGETS)
 			if (is_orbiting_feature_enabled && all_orbiting_status[i] && target_deque_used_for_orbiting != nullptr && !target_deque_used_for_orbiting->empty()) {
 				OrbitingData *const orbiting_data = &all_orbiting_data[i];
 				if (orbiting_data != nullptr) {
@@ -317,7 +347,7 @@ public:
 						velocity_delta = target_pos - curr_bullet_origin;
 					}
 
-					// 6. TEXTURE ROTATION
+					// TEXTURE ROTATION WHEN ORBITING
 					// Only rotate if the bullet is PHYSICALLY orbiting (Locked or just snapped)
 					if (is_actually_orbiting) {
 						Vector2 look_dir;
@@ -345,7 +375,7 @@ public:
 				}
 			}
 
-			// 7. TRANSFORM UPDATES
+			// 8. TRANSFORM UPDATES
 			curr_bullet_origin += velocity_delta;
 			curr_bullet_transf.set_origin(curr_bullet_origin);
 
@@ -359,7 +389,8 @@ public:
 			physics_server->area_set_shape_transform(area, i, curr_shape_transf);
 			move_bullet_attachment(velocity_delta, i);
 
-			if (shared_curves_data_enabled && shared_curves_ptr->movement_speed_curve.is_valid()) {
+			// 9. MOVEMENT SPEED ACCELERATION
+			if (shared_curves_acceleration_curve_valid) {
 				bullet_accelerate_speed_using_curve(i, delta, shared_curves_ptr);
 			} else if (is_per_bullet_curves_valid && per_bullet_curves_data->movement_speed_curve.is_valid()) {
 				bullet_accelerate_speed_using_curve(i, delta, per_bullet_curves_data);
@@ -367,6 +398,7 @@ public:
 				bullet_accelerate_speed(i, delta);
 			}
 
+			// 10. IF NOT USING PHYSICS INTERPOLATION, APPLY THE TRANSFORM TO THE TEXTURE NOW IN THIS PHYSICS FRAME
 			if (!is_using_physics_interpolation) {
 				multi->set_instance_transform_2d(i, all_cached_instance_transforms[i]);
 			}
@@ -1032,14 +1064,11 @@ protected:
 	}
 
 	// Updates bullet rotation based on rotation speed using a curve
-	_ALWAYS_INLINE_ void update_rotation_using_curve(int bullet_index, double delta, const BulletCurvesData2D *curves_data) {
+	_ALWAYS_INLINE_ void update_rotation_using_curve(int bullet_index, double delta) {
 		real_t cache_rotation_speed = all_rotation_speed[bullet_index];
 		real_t rot_delta = cache_rotation_speed * (real_t)delta;
 
-		// If the curves data is valid it means we are using it, so just apply it
-		if (curves_data != nullptr && curves_data->rotation_speed_curve.is_valid()) {
-			rotate_transform_locally(all_cached_instance_transforms[bullet_index], rot_delta);
-		}
+		rotate_transform_locally(all_cached_instance_transforms[bullet_index], rot_delta);
 	}
 
 	_ALWAYS_INLINE_ void try_to_emit_bullet_homing_target_reached_signal(HomingTargetDeque &homing_deque, bool is_using_shared_homing_deque, int bullet_index, const Vector2 &bullet_pos, const Vector2 &target_pos) {
