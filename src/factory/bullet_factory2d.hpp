@@ -144,6 +144,8 @@ public:
 	DynamicSparseSet directional_bullets_set;
 	DynamicSparseSet block_bullets_set;
 
+	void handle_manual_user_deletion_of_multimesh_bullets(MultiMeshBullets2D &bullet_multi);
+
 protected:
 	// Responsible for exposing C++ methods/properties to Godot Engine
 	static void _bind_methods();
@@ -441,7 +443,7 @@ private:
 			sparse_set.clear();
 
 			for (TBullet *bullet_multi : bullets_vec) {
-				if (bullet_multi == nullptr){
+				if (bullet_multi == nullptr) {
 					continue;
 				}
 
@@ -463,6 +465,34 @@ private:
 
 			bullets_vec.swap(surviving_bullets);
 		}
+	}
+
+	template <typename T>
+	void remove_multimesh_instance_from_vec_and_sparse_set(std::vector<T *> &vec, DynamicSparseSet &sparse_set, T *target) {
+		int id_to_remove = target->sparse_set_id;
+		int last_idx = static_cast<int>(vec.size()) - 1;
+
+		// If it's not the last one we swap
+		if (id_to_remove < last_idx) {
+			T *last_bullet = vec[last_idx];
+
+			// Move the last bullet into the hole
+			vec[id_to_remove] = last_bullet;
+
+			// Update the moved bullet's internal tracking ID
+			last_bullet->sparse_set_id = id_to_remove;
+
+			// If the moved bullet was active then sync the sparse set bitmask
+			if (last_bullet->is_active) {
+				sparse_set.activate_data(id_to_remove);
+			}
+		}
+
+		// Remove the last slot
+		vec.pop_back();
+
+		// Ensure the sparse set knows this index is now dead
+		sparse_set.disable_data(last_idx);
 	}
 
 	// // Loads saved data into a bullet and adds it to the bullets_vec

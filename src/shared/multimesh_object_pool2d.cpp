@@ -9,21 +9,20 @@ using namespace godot;
 namespace BlastBullets2D {
 
 void MultiMeshObjectPool::push(MultiMeshBullets2D *multimesh, int amount_bullets) {
-	pool[amount_bullets].push(multimesh);
+	pool[amount_bullets].push_back(multimesh);
 }
 
 MultiMeshBullets2D *MultiMeshObjectPool::pop(int amount_bullets) {
-	auto result = pool.find(amount_bullets);
-	// If the pool doesn't contain a queue with that key or if it does but the queue is empty (meaning no bullets) return a nullptr
-	if (result == pool.end() || result->second.size() == 0) {
+	auto it = pool.find(amount_bullets);
+
+	// Check if key exists and vector isn't empty
+	if (it == pool.end() || it->second.empty()) {
 		return nullptr;
 	}
 
-	// Get the first multimesh pointer in the queue
-	MultiMeshBullets2D *found_multimesh = result->second.front();
-
-	// Remove it from the queue
-	result->second.pop();
+	// Get the one at the back (doesn't really matter which)
+	MultiMeshBullets2D *found_multimesh = it->second.back();
+	it->second.pop_back();
 
 	return found_multimesh;
 }
@@ -33,57 +32,74 @@ void MultiMeshObjectPool::clear() {
 }
 
 void MultiMeshObjectPool::free_all_bullets() {
-	for (auto &[key, queue] : pool) {
-		while (queue.empty() == false) {
-			queue.front()->force_delete(); // free the bullet object
-			queue.pop(); // remove it from the queue
+	for (auto &[key, vec] : pool) {
+		// Free every object in the vector
+		for (MultiMeshBullets2D *bullet_multi : vec) {
+			if (bullet_multi) {
+				bullet_multi->force_delete();
+			}
 		}
+		vec.clear();
 	}
-	pool.clear(); // clear the map so it doesn't contain any empty queues
+	pool.clear();
 }
 
 void MultiMeshObjectPool::free_specific_bullets(int amount_bullets) {
-	// Try to find a queue that exists and holds multimeshes where each multimesh has `amount_bullets` instances
 	auto it = pool.find(amount_bullets);
-
-	// If the queue doesn't exist or if the queue is empty, then it means there's no bullets to free
 	if (it == pool.end() || it->second.empty()) {
 		return;
 	}
 
-	auto &queue = it->second;
+	std::vector<MultiMeshBullets2D *> &vec = it->second;
 
-	// We know the queue contains at least 1 multimesh, so we use a do-while loop to ensure the operation happens at least once
-	do {
-		queue.front()->force_delete(); // free the bullet object
-		queue.pop(); // remove it from the queue
-	} while (queue.empty() == false);
+	// Iterate and delete
+	for (MultiMeshBullets2D *bullet_multi : vec) {
+		if (bullet_multi) {
+			bullet_multi->force_delete();
+		}
+	}
 
-	pool.erase(amount_bullets); // delete the queue itself since it's basically empty right now
+	// Erase the vector from the map
+	pool.erase(it);
 }
 
 int MultiMeshObjectPool::get_total_amount_pooled() {
 	int total_amount_pooled = 0;
-
-	for (auto &[key, queue] : pool) {
-		if (!queue.empty()) {
-			total_amount_pooled += static_cast<int>(queue.size());
-		}
+	for (auto &[key, vec] : pool) {
+		total_amount_pooled += static_cast<int>(vec.size());
 	}
-
 	return total_amount_pooled;
 }
 
 std::map<int, int> MultiMeshObjectPool::get_pool_info() {
 	std::map<int, int> result;
-
-	for (auto &[key, queue] : pool) {
-		if (!queue.empty()) {
-			// Bullets per each multimesh as the KEY and the amount of multimeshes as the VALUE
-			result.emplace(key, static_cast<int>(queue.size()));
+	for (auto &[key, vec] : pool) {
+		if (!vec.empty()) {
+			result.emplace(key, static_cast<int>(vec.size()));
 		}
 	}
-
 	return result;
+}
+
+bool MultiMeshObjectPool::try_remove_instance(MultiMeshBullets2D *target, int amount_bullets) {
+	auto it = pool.find(amount_bullets);
+	if (it == pool.end()) {
+		return false;
+	}
+
+	std::vector<MultiMeshBullets2D *> &vec = it->second;
+
+	for (size_t i = 0; i < vec.size(); ++i) {
+		if (vec[i] == target) {
+			// Swap with last element
+			vec[i] = vec.back();
+
+			// Pop the duplicate
+			vec.pop_back();
+
+			return true;
+		}
+	}
+	return false;
 }
 } //namespace BlastBullets2D

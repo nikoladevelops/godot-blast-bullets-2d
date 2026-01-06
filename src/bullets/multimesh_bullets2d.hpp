@@ -15,6 +15,7 @@
 #include "godot_cpp/core/class_db.hpp"
 #include "godot_cpp/core/defs.hpp"
 #include "godot_cpp/core/math.hpp"
+#include "godot_cpp/core/memory.hpp"
 #include "godot_cpp/core/object.hpp"
 #include "godot_cpp/core/print_string.hpp"
 #include "godot_cpp/core/property_info.hpp"
@@ -61,6 +62,8 @@ public:
 	// The id of the multimesh inside the bullet factory's sparse set
 	int sparse_set_id = -1;
 
+	bool marked_for_internal_deletion = false;
+
 	// Gets the total amount of bullets that the multimesh always holds
 	_ALWAYS_INLINE_ int get_amount_bullets() const { return amount_bullets; };
 
@@ -82,18 +85,9 @@ public:
 	// Spawns as a disabled invisible multimesh that is ready to be enabled at any time. Method is used for object pooling, because it sets up all necessary things (like physics shapes for example) without needing additional spawn data (which would be overriden anyways by the enable function's logic)
 	void spawn_as_disabled_multimesh(int amount_bullets, MultiMeshObjectPool *pool, BulletFactory2D *factory, Node *bullets_container);
 
-	// Unsafe delete - only call this if all types of bullet processing have been disabled and all dangling pointers cleared, otherwise you will face weird issues/crashes
-	void force_delete() {
-		// Disable the area's shapes (ALL OF THEM no matter their bullets_enabled_status)
-		for (int i = 0; i < amount_bullets; ++i) {
-			physics_server->area_set_shape_disabled(area, i, true);
-
-			bullet_disable_attachment(i);
-		}
-
-		physics_server->area_set_area_monitor_callback(area, Variant());
-		physics_server->area_set_monitor_callback(area, Variant());
-
+	// Internal delete - used on the C++ side only
+ 	void force_delete() {
+		marked_for_internal_deletion = true;
 		memdelete(this); // Immediate deletion
 	}
 
@@ -410,6 +404,8 @@ public:
 
 protected:
 	static void _bind_methods();
+	
+	void _notification(int p_what);
 
 	bool is_multimesh_auto_pooling_enabled = true;
 

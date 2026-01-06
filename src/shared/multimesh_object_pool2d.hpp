@@ -36,8 +36,10 @@ public:
 	// Gets the pool info by returning bullets per each multimesh as the KEY and the amount of multimeshes as the VALUE
 	std::map<int, int> get_pool_info();
 
+	bool try_remove_instance(MultiMeshBullets2D *target, int amount_bullets);
+
 private:
 	// The key corresponds to the amount of bullets a bullets multimesh has, meanwhile the value corresponds to a queue that holds all of those that have that amount of bullets. Example: If key is 5, that means it holds all deenabled multimesh instances that each have 5 bullets (5 collision shapes, 5 texture instances that are currently invisible)
-	std::unordered_map<int, std::queue<MultiMeshBullets2D *>> pool;
+	std::unordered_map<int, std::vector<MultiMeshBullets2D *>> pool;
 };
 } //namespace BlastBullets2D
