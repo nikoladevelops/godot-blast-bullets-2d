@@ -1,4 +1,5 @@
 #include "multimesh_bullets_debugger2d.hpp"
+#include "godot_cpp/core/memory.hpp"
 
 #include <godot_cpp/classes/engine.hpp>
 #include <godot_cpp/classes/multi_mesh.hpp>
@@ -203,24 +204,17 @@ void MultiMeshBulletsDebugger2D::change_debug_multimeshes_color(const Color &new
 }
 
 void MultiMeshBulletsDebugger2D::_physics_process(double delta) {
-	int mesh_id = 0;
-	for (auto *current_debug_data_provider : debug_data_providers) {
-		if (!current_debug_data_provider) {
+	for (int i = 0; i < debug_data_providers.size(); ++i) {
+		IDebuggerDataProvider2D *provider = debug_data_providers[i];
+
+		if (!provider || provider->get_skip_debugging()) {
 			continue;
 		}
-	
-		// If the data provider determines that no changes have occured since the last frame (example: if its transforms are not being updated then there is no need for the logic that comes next, so skip it). Note: This is done for performance reasons - why update debug multimesh quadmesh transforms if they haven't changed?
-		if (current_debug_data_provider->get_skip_debugging()) {
-			continue;
-		}
-	
-		MultiMeshInstance2D &current_debug_multimesh_instance = *debugger_multimeshes[mesh_id];
-	
-		ensure_quadmesh_matches_data_provider_collision_shape_size(current_debug_multimesh_instance, *current_debug_data_provider);
-	
-		update_debug_multimesh_transforms_to_match_data_provider_collision_shape_transforms(current_debug_multimesh_instance, *current_debug_data_provider);
-		
-		++mesh_id;
+
+		MultiMeshInstance2D &mesh_instance = *debugger_multimeshes[i];
+
+		ensure_quadmesh_matches_data_provider_collision_shape_size(mesh_instance, *provider);
+		update_debug_multimesh_transforms_to_match_data_provider_collision_shape_transforms(mesh_instance, *provider);
 	}
 }
 

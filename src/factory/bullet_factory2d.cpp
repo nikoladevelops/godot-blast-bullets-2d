@@ -439,35 +439,28 @@ void BulletFactory2D::handle_manual_user_deletion_of_multimesh_bullets(MultiMesh
 
 	is_factory_busy = true;
 
-	// Pause Engine Systems
 	bool enable_processing_after_finish = is_factory_processing_bullets;
 	set_is_factory_processing_bullets(false);
 
-	bool debugger_curr_enabled = get_is_debugger_enabled();
-	if (debugger_curr_enabled) {
-		block_bullets_debugger->set_is_debugger_enabled(false);
-		directional_bullets_debugger->set_is_debugger_enabled(false);
+	bool debugger_was_enabled = get_is_debugger_enabled();
+	if (debugger_was_enabled) {
+		set_is_debugger_enabled(false);
 	}
 
+	DirectionalBullets2D *dir_ptr = dynamic_cast<DirectionalBullets2D *>(&bullet_multi);
+	BlockBullets2D *block_ptr = dynamic_cast<BlockBullets2D *>(&bullet_multi);
 	int amount = bullet_multi.get_amount_bullets();
 
-	// If it's directional bullet
-	if (DirectionalBullets2D *dir_ptr = dynamic_cast<DirectionalBullets2D *>(&bullet_multi)) {
-		// Try removing from pool (if it was disabled and pooled)
+	if (dir_ptr) {
 		directional_bullets_pool.try_remove_instance(dir_ptr, amount);
-
-		// Remove from factory data structures
 		remove_multimesh_instance_from_vec_and_sparse_set<DirectionalBullets2D>(all_directional_bullets, directional_bullets_set, dir_ptr);
-	}
-	// If it's a block bullet
-	else if (BlockBullets2D *block_ptr = dynamic_cast<BlockBullets2D *>(&bullet_multi)) {
+	} else if (block_ptr) {
 		block_bullets_pool.try_remove_instance(block_ptr, amount);
 		remove_multimesh_instance_from_vec_and_sparse_set<BlockBullets2D>(all_block_bullets, block_bullets_set, block_ptr);
 	}
 
-	// Restore Engine Systems
-	if (debugger_curr_enabled) {
-		call_deferred("set_is_debugger_enabled", true); // If not using call_deffered - when queue_free() is called from the multimesh instance, the debugger will crash
+	if (debugger_was_enabled) {
+		call_deferred("set_is_debugger_enabled", true); // it will cause a crash if this is not called calL_deferred
 	}
 
 	is_factory_busy = false;

@@ -300,8 +300,9 @@ func spawn_multi_mesh_directional_bullets()->void:
 	#BENCHMARK_GLOBALS.FACTORY.free_active_bullets()
 	#
 	#dir_bullets.multimesh_attach_time_based_function(0.2, func():
-		#dir_bullets.free()
-		##dir_bullets.queue_free()
+		#if dir_bullets.get_amount_bullets() == 5:
+			##BENCHMARK_GLOBALS.FACTORY.free_active_bullets(5)
+			#dir_bullets.queue_free()
 		#,false, true)
 		
 	#dir_bullets.all_bullets_set_attachment(light_attachment_scn, 1, Vector2(-60,0))
