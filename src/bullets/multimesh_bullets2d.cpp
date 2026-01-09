@@ -73,7 +73,7 @@ int MultiMeshBullets2D::get_amount_active_attachments() const {
 }
 
 // Used to spawn brand new bullets.
-void MultiMeshBullets2D::spawn(const MultiMeshBulletsData2D &data, MultiMeshObjectPool *pool, BulletFactory2D *factory, Node *bullets_container, const Vector2 &new_inherited_velocity_offset, int new_sparse_set_id) {
+void MultiMeshBullets2D::spawn(const MultiMeshBulletsData2D &data, MultiMeshObjectPool *pool, BulletFactory2D *factory, Node *bullets_container, const Vector2 &new_inherited_velocity_offset, int new_sparse_set_id, bool spawn_in_pool) {
 	sparse_set_id = new_sparse_set_id;
 	inherited_velocity_offset = new_inherited_velocity_offset;
 
@@ -139,8 +139,16 @@ void MultiMeshBullets2D::spawn(const MultiMeshBulletsData2D &data, MultiMeshObje
 
 	custom_additional_spawn_logic(data);
 
-	is_active = true;
-	bullets_container->add_child(this);
+	if (spawn_in_pool) {
+		set_physics_process(false);
+		set_visible(false);
+		is_active = false;
+		bullets_container->add_child(this);
+		bullets_pool->push(this, amount_bullets);
+	} else {
+		is_active = true;
+		bullets_container->add_child(this);
+	}
 }
 
 // Activates the multimesh

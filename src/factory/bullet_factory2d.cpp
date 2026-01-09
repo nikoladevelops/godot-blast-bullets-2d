@@ -18,6 +18,7 @@
 #include "godot_cpp/core/math.hpp"
 #include "godot_cpp/variant/vector2.hpp"
 #include "godot_cpp/variant/vector3.hpp"
+#include "spawn-data/multimesh_bullets_data2d.hpp"
 
 #include <cstdint>
 #include <godot_cpp/classes/engine.hpp>
@@ -469,22 +470,28 @@ void BulletFactory2D::handle_manual_user_deletion_of_multimesh_bullets(MultiMesh
 	}
 }
 
-void BulletFactory2D::populate_bullets_pool(BulletType bullet_type, int amount_instances, int amount_bullets_per_instance) {
+void BulletFactory2D::populate_bullets_pool(const Ref<MultiMeshBulletsData2D> &multimesh_data, int amount_instances) {
 	if (amount_instances <= 0) {
 		UtilityFunctions::push_error("Error. You can't populate the bullets pool with amount_instances <= 0");
 		return;
 	}
 
-	if (amount_bullets_per_instance <= 0) {
-		UtilityFunctions::push_error("Error. You can't populate the bullets pool with amount_bullets_per_instance <= 0");
+	BulletType bullet_type;
+	if (multimesh_data->is_class("DirectionalBulletsData2D")) {
+		bullet_type = BulletFactory2D::DIRECTIONAL_BULLETS;
+	} else if (multimesh_data->is_class("BlockBulletsData2D")) {
+		bullet_type = BulletFactory2D::BLOCK_BULLETS;
+	} else {
+		UtilityFunctions::push_error("Error. Unsupported type of MultiMeshBulletsData2D passed to populate_bullets_pool");
 		return;
 	}
 
-	// I rely on bullet_type enum because Godot does not offer method overloading or generics and I don't want to pollute the API with a bunch of methods that are practically the same
+	const int amount_bullets_per_instance = multimesh_data->transforms.size();
 
 	switch (bullet_type) {
 		case BulletFactory2D::DIRECTIONAL_BULLETS:
 			populate_bullets_pool_helper<DirectionalBullets2D>(
+				multimesh_data,
 					all_directional_bullets,
 					directional_bullets_pool,
 					directional_bullets_container,
@@ -493,6 +500,7 @@ void BulletFactory2D::populate_bullets_pool(BulletType bullet_type, int amount_i
 			break;
 		case BulletFactory2D::BLOCK_BULLETS:
 			populate_bullets_pool_helper<BlockBullets2D>(
+				multimesh_data,
 					all_block_bullets,
 					block_bullets_pool,
 					block_bullets_container,
@@ -933,7 +941,7 @@ void BulletFactory2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_block_bullets_debugger_color", "new_color"), &BulletFactory2D::set_block_bullets_debugger_color);
 	ADD_PROPERTY(PropertyInfo(Variant::COLOR, "block_bullets_debugger_color"), "set_block_bullets_debugger_color", "get_block_bullets_debugger_color");
 
-	ClassDB::bind_method(D_METHOD("populate_bullets_pool", "bullet_type", "amount_instances", "amount_bullets_per_instance"), &BulletFactory2D::populate_bullets_pool);
+	ClassDB::bind_method(D_METHOD("populate_bullets_pool", "multimesh_data", "amount_instances"), &BulletFactory2D::populate_bullets_pool);
 	ClassDB::bind_method(D_METHOD("free_bullets_pool", "bullet_type", "amount_bullets_per_instance"), &BulletFactory2D::free_bullets_pool, DEFVAL(0));
 
 	ClassDB::bind_method(D_METHOD("populate_attachments_pool", "attachment_scenes", "amount_attachments"), &BulletFactory2D::populate_attachments_pool);

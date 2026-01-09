@@ -271,14 +271,14 @@ func _on_populate_multi_mesh_directional_pool_btn_pressed() -> void:
 	var amount_multi_meshes:int = select_amount_multi_meshes_view.get_selected_btn.text.to_int()
 	var amount_bullets:int = select_amount_bullets_view.get_selected_btn.text.to_int()
 	
-	BENCHMARK_GLOBALS.FACTORY.populate_bullets_pool(BulletFactory2D.DIRECTIONAL_BULLETS,amount_multi_meshes,amount_bullets)
+	BENCHMARK_GLOBALS.FACTORY.populate_bullets_pool(BENCHMARK_GLOBALS.PLAYER_DATA_NODE.directional_bullets_data, amount_multi_meshes)
 	
 
 func _on_populate_multi_mesh_block_pool_btn_pressed() -> void:
 	var amount_multi_meshes:int = select_amount_multi_meshes_view.get_selected_btn.text.to_int()
 	var amount_bullets:int = select_amount_bullets_view.get_selected_btn.text.to_int()
 	
-	BENCHMARK_GLOBALS.FACTORY.populate_bullets_pool(BulletFactory2D.BLOCK_BULLETS,amount_multi_meshes,amount_bullets)
+	BENCHMARK_GLOBALS.FACTORY.populate_bullets_pool(BENCHMARK_GLOBALS.PLAYER_DATA_NODE.block_bullets_data,amount_multi_meshes)
 	
 
 func _on_select_bullet_damage_view_new_btn_selected(new_selected_btn: Button) -> void:

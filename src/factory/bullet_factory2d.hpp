@@ -11,6 +11,7 @@
 #include "../shared/multimesh_object_pool2d.hpp"
 #include "godot_cpp/variant/vector2.hpp"
 #include "shared/dynamic_sparse_set.hpp"
+#include "spawn-data/multimesh_bullets_data2d.hpp"
 
 namespace BlastBullets2D {
 using namespace godot;
@@ -84,7 +85,7 @@ public:
 	// OBJECT POOLING RELATED
 
 	// Populates the object pool of a bullet type
-	void populate_bullets_pool(BulletType bullet_type, int amount_instances, int amount_bullets_per_instance);
+	void populate_bullets_pool(const Ref<MultiMeshBulletsData2D> &multimesh_data, int amount_instances);
 
 	// By default completely frees an object pool of a particular bullet type. You also have the option of freeing only the instances that each have a particular amount_bullets_per_instance if you provide a value that is bigger than 0
 	void free_bullets_pool(BulletType bullet_type, int amount_bullets_per_instance = 0);
@@ -255,14 +256,16 @@ private:
 
 	// Populates a bullets pool with disabled bullet instances. It's mandatory that the TBullet type inherits from MultiMeshBullets2D
 	template <typename TBullet>
-	void populate_bullets_pool_helper(std::vector<TBullet *> &bullets_vec, MultiMeshObjectPool &bullets_object_pool, Node *bullets_container, int amount_instances, int amount_bullets_per_instance) {
-		bullets_vec.reserve(amount_instances);
+	void populate_bullets_pool_helper(const Ref<MultiMeshBulletsData2D> &spawn_data, std::vector<TBullet *> &bullets_vec, MultiMeshObjectPool &bullets_object_pool, Node *bullets_container, int amount_instances, int amount_bullets_per_instance, const Vector2 &new_inherited_velocity_offset = Vector2(0, 0)) {
+		bullets_vec.reserve(bullets_vec.size() + amount_instances);
 		for (int i = 0; i < amount_instances; ++i) {
 			TBullet *bullets = memnew(TBullet);
-			bullets->spawn_as_disabled_multimesh(amount_bullets_per_instance, &bullets_object_pool, this, bullets_container);
 
+			// Generate new id according to how many ids there are in the sparse set
+			int sparse_set_id = bullets_vec.size();
+
+			bullets->spawn(*spawn_data.ptr(), &bullets_object_pool, this, bullets_container, new_inherited_velocity_offset, sparse_set_id, true);
 			bullets_vec.emplace_back(bullets);
-			bullets_object_pool.push(bullets, amount_bullets_per_instance);
 		}
 	}
 
@@ -279,7 +282,6 @@ private:
 		bullets_vec.erase(new_end, bullets_vec.end());
 	}
 
-	// TODO fix
 	// Frees specific bullets from the object pool and also erases them from the bullets_vec so dangling pointers would not be accessed. If amount_bullets_per_instance is 0 it frees ALL bullets of BulletType, otherwise frees only those BulletType instances whose amount_bullets value matches amount_bullets_per_instance
 	template <typename TBullet>
 	void free_bullets_pool_helper(std::vector<TBullet *> &bullets_vec, MultiMeshObjectPool &bullets_pool, int amount_bullets_per_instance) {
@@ -545,7 +547,7 @@ private:
 
 		// If there was no TBullet in the pool, create a brand new one and spawn it
 		bullets = memnew(TBullet);
-		bullets->spawn(*spawn_data.ptr(), &bullets_pool, this, bullets_container, new_inherited_velocity_offset, sparse_set_id);
+		bullets->spawn(*spawn_data.ptr(), &bullets_pool, this, bullets_container, new_inherited_velocity_offset, sparse_set_id, false);
 		bullets_vec.emplace_back(bullets);
 
 		sparse_set.activate_data(sparse_set_id);
