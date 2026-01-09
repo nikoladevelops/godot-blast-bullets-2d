@@ -102,6 +102,7 @@ func set_up_block_bullets_data()->BlockBulletsData2D:
 	data.set_collision_layer_from_array([2])
 	data.set_collision_mask_from_array([3])
 	
+	data.transforms=[Transform2D()]
 	data.texture_size = Vector2(140,140)
 	data.collision_shape_size=Vector2(32,32)
 	data.collision_shape_offset=Vector2(0,0)
@@ -133,7 +134,7 @@ func set_up_directional_bullets_data()->DirectionalBulletsData2D:
 		#0.03
 	#]
 	
-	
+	data.transforms=[Transform2D()]
 	data.all_bullet_speed_data = bullet_speed_data # for the directional bullets use every single bullet speed
 	
 	#data.collision_layer = DirectionalBulletsData2D.calculate_bitmask([2])

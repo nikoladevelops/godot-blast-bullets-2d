@@ -191,6 +191,11 @@ void BulletFactory2D::spawn_block_bullets(const Ref<BlockBulletsData2D> &spawn_d
 		return;
 	}
 
+	if (spawn_data->transforms.size() == 0) {
+		UtilityFunctions::push_error("Error when trying to spawn BlockBullets2D. No transforms were provided in the spawn data. Ignoring the request");
+		return;
+	}
+
 	spawn_bullets_helper<BlockBullets2D, BlockBulletsData2D>(
 			all_block_bullets,
 			block_bullets_set,
@@ -202,6 +207,11 @@ void BulletFactory2D::spawn_block_bullets(const Ref<BlockBulletsData2D> &spawn_d
 void BulletFactory2D::spawn_directional_bullets(const Ref<DirectionalBulletsData2D> &spawn_data, const Vector2 &new_inherited_velocity_offset) {
 	if (is_factory_busy) {
 		UtilityFunctions::push_error("Error when trying to spawn bullets. BulletFactory2D is currently busy. Ignoring the request");
+		return;
+	}
+
+	if (spawn_data->transforms.size() == 0) {
+		UtilityFunctions::push_error("Error when trying to spawn DirectionalBullets2D. No transforms were provided in the spawn data. Ignoring the request");
 		return;
 	}
 
@@ -217,6 +227,11 @@ void BulletFactory2D::spawn_directional_bullets(const Ref<DirectionalBulletsData
 DirectionalBullets2D *BulletFactory2D::spawn_controllable_directional_bullets(const Ref<DirectionalBulletsData2D> &spawn_data, const Vector2 &new_inherited_velocity_offset) {
 	if (is_factory_busy) {
 		UtilityFunctions::push_error("Error when trying to spawn bullets. BulletFactory2D is currently busy. Ignoring the request");
+		return nullptr;
+	}
+
+	if (spawn_data->transforms.size() == 0) {
+		UtilityFunctions::push_error("Error when trying to spawn DirectionalBullets2D. No transforms were provided in the spawn data. Ignoring the request");
 		return nullptr;
 	}
 
@@ -461,7 +476,7 @@ void BulletFactory2D::handle_manual_user_deletion_of_multimesh_bullets(MultiMesh
 	}
 
 	if (debugger_was_enabled) {
-		call_deferred("set_is_debugger_enabled", true); // it will cause a crash if this is not called calL_deferred
+		call_deferred("set_is_debugger_enabled", true); // it will cause a crash if this is not called with call_deferred
 	}
 
 	is_factory_busy = false;
@@ -471,8 +486,27 @@ void BulletFactory2D::handle_manual_user_deletion_of_multimesh_bullets(MultiMesh
 }
 
 void BulletFactory2D::populate_bullets_pool(const Ref<MultiMeshBulletsData2D> &multimesh_data, int amount_instances) {
+	if (is_factory_busy) {
+		return;
+	}
+
+	is_factory_busy = true;
+
+	bool enable_processing_after_finish = is_factory_processing_bullets;
+	set_is_factory_processing_bullets(false);
+
+	bool debugger_was_enabled = get_is_debugger_enabled();
+	if (debugger_was_enabled) {
+		set_is_debugger_enabled(false);
+	}
+
 	if (amount_instances <= 0) {
 		UtilityFunctions::push_error("Error. You can't populate the bullets pool with amount_instances <= 0");
+		return;
+	}
+
+	if (multimesh_data->transforms.size() == 0) {
+		UtilityFunctions::push_error("Error when trying to pool bullets. No transforms were provided in the spawn data. Ignoring the request");
 		return;
 	}
 
@@ -491,7 +525,7 @@ void BulletFactory2D::populate_bullets_pool(const Ref<MultiMeshBulletsData2D> &m
 	switch (bullet_type) {
 		case BulletFactory2D::DIRECTIONAL_BULLETS:
 			populate_bullets_pool_helper<DirectionalBullets2D>(
-				multimesh_data,
+					multimesh_data,
 					all_directional_bullets,
 					directional_bullets_pool,
 					directional_bullets_container,
@@ -500,7 +534,7 @@ void BulletFactory2D::populate_bullets_pool(const Ref<MultiMeshBulletsData2D> &m
 			break;
 		case BulletFactory2D::BLOCK_BULLETS:
 			populate_bullets_pool_helper<BlockBullets2D>(
-				multimesh_data,
+					multimesh_data,
 					all_block_bullets,
 					block_bullets_pool,
 					block_bullets_container,
@@ -510,6 +544,15 @@ void BulletFactory2D::populate_bullets_pool(const Ref<MultiMeshBulletsData2D> &m
 		default:
 			UtilityFunctions::push_error("Unsupported type of bullet when calling populate_bullets_pool");
 			break;
+	}
+
+	if (debugger_was_enabled) {
+		call_deferred("set_is_debugger_enabled", true);
+	}
+
+	is_factory_busy = false;
+	if (enable_processing_after_finish) {
+		set_is_factory_processing_bullets(true);
 	}
 }
 

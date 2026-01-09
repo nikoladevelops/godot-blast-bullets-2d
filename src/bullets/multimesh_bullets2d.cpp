@@ -138,9 +138,11 @@ void MultiMeshBullets2D::spawn(const MultiMeshBulletsData2D &data, MultiMeshObje
 			data.instance_shader_parameters);
 
 	custom_additional_spawn_logic(data);
-
+	
+	set_process(false);
+	set_physics_process(false);
+	
 	if (spawn_in_pool) {
-		set_physics_process(false);
 		set_visible(false);
 		is_active = false;
 		bullets_container->add_child(this);
@@ -601,32 +603,6 @@ void MultiMeshBullets2D::set_up_bullet_instances(const MultiMeshBulletsData2D &d
 // update_all_previous_transforms_for_interpolation();
 //}
 
-void MultiMeshBullets2D::spawn_as_disabled_multimesh(int new_amount_bullets, MultiMeshObjectPool *pool, BulletFactory2D *factory, Node *bullets_container) {
-	set_visible(false);
-
-	bullets_pool = pool;
-	bullet_factory = factory;
-	physics_server = PhysicsServer2D::get_singleton();
-
-	amount_bullets = new_amount_bullets;
-
-	generate_multimesh();
-
-	multi->set_instance_count(amount_bullets);
-
-	// Create the area that will hold collision shapes
-	area = physics_server->area_create();
-	generate_physics_shapes_for_area(amount_bullets);
-
-	// Only reason this here exists is so that the debugger can continue to work properly without throwing a bunch of errors in the console if the shape has not been configured/ doesn't have a data
-	RID shape = physics_shapes[0];
-	physics_server->shape_set_data(shape, Vector2(5, 5));
-	//
-
-	// Just add it to the bullets container
-	bullets_container->add_child(this);
-}
-
 void MultiMeshBullets2D::generate_multimesh() {
 	multi = memnew(MultiMesh);
 	set_multimesh(multi);
@@ -702,8 +678,6 @@ void MultiMeshBullets2D::finalize_set_up(
 		current_texture_index = 0;
 
 		set_texture(textures[current_texture_index]);
-	} else {
-		UtilityFunctions::push_error("You have not provided any textures as data. Ensure that you either provide an array of textures or a default texture that can be used");
 	}
 
 	if (new_material.is_valid()) {

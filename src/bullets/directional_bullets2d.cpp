@@ -6,6 +6,7 @@
 #include "godot_cpp/variant/dictionary.hpp"
 #include "godot_cpp/variant/typed_array.hpp"
 #include "godot_cpp/variant/vector2.hpp"
+#include "spawn-data/multimesh_bullets_data2d.hpp"
 #include <algorithm>
 #include <cstddef>
 #include <godot_cpp/variant/transform2d.hpp>
@@ -14,48 +15,59 @@
 using namespace godot;
 
 namespace BlastBullets2D {
-
 void DirectionalBullets2D::set_up_movement_data(const TypedArray<BulletSpeedData2D> &new_speed_data) {
-	int speed_data_size = new_speed_data.size(); // the amount of speed data provided
+	int speed_data_size = new_speed_data.size();
 
-	if (speed_data_size != amount_bullets) {
-		UtilityFunctions::push_error("When using DirectionalBullets2D you need to provide BulletSpeedData2D for every single bullet.");
-		return;
+	// Ensure vectors are the correct size before we start indexing
+	if ((int)all_cached_speed.size() != amount_bullets) {
+		all_cached_speed.resize(amount_bullets);
+		all_cached_max_speed.resize(amount_bullets);
+		all_cached_acceleration.resize(amount_bullets);
+		all_cached_direction.resize(amount_bullets);
+		all_cached_velocity.resize(amount_bullets);
 	}
 
-	// If there is any old data inside, it needs to be cleaned up
-	if (all_cached_speed.size() > 0) {
-		// Clear all old data
-		all_cached_speed.clear();
-		all_cached_max_speed.clear();
-		all_cached_acceleration.clear();
-		all_cached_direction.clear();
-		all_cached_velocity.clear();
+	// In case not enough speed data was provided, we will use the first element as fallback for all bullets
+	bool use_per_bullet = (speed_data_size == amount_bullets);
+	Ref<BulletSpeedData2D> fallback_data;
 
-		// If the new data does not fit, then reserve enough space
-		if (all_cached_speed.capacity() != speed_data_size) {
-			all_cached_speed.reserve(speed_data_size);
-			all_cached_max_speed.reserve(speed_data_size);
-			all_cached_acceleration.reserve(speed_data_size);
-			all_cached_direction.reserve(speed_data_size);
-			all_cached_velocity.reserve(speed_data_size);
+	if (!use_per_bullet) {
+		if (speed_data_size > 0) {
+			fallback_data = new_speed_data[0];
+		}
+
+		// In case no speed data was provided at all, create a default one (everything set to 0 by default)
+		if (fallback_data.is_null()) {
+			fallback_data.instantiate();
 		}
 	}
 
-	for (int i = 0; i < speed_data_size; ++i) {
-		// The rotation of each transform
-		real_t curr_bullet_rotation = all_cached_shape_transforms[i].get_rotation(); // Note: I am using the shape transforms, since the instance transforms might be rotated to account for bullet texture rotation
+	for (int i = 0; i < amount_bullets; ++i) {
+		const real_t rot = all_cached_shape_transforms[i].get_rotation();
 
-		const Ref<BulletSpeedData2D> &curr_speed_data = new_speed_data[i];
-		all_cached_speed.emplace_back(curr_speed_data->speed);
-		all_cached_max_speed.emplace_back(curr_speed_data->max_speed);
-		all_cached_acceleration.emplace_back(curr_speed_data->acceleration);
+		Ref<BulletSpeedData2D> data = fallback_data;
 
-		// Calculate the direction
-		all_cached_direction.emplace_back(Vector2(Math::cos(curr_bullet_rotation), Math::sin(curr_bullet_rotation)));
+		if (use_per_bullet) {
+			data = new_speed_data[i];
+		}
 
-		// Calculate the velocity
-		all_cached_velocity.emplace_back(all_cached_direction[i] * all_cached_speed[i] + inherited_velocity_offset);
+		// Extract values with null safety
+		real_t s = 0.0, m = 0.0, acc = 0.0;
+
+		if (data.is_valid()) {
+			s = data->speed;
+			m = data->max_speed;
+			acc = data->acceleration;
+		}
+
+		// Overwrite existing memory slots
+		all_cached_speed[i] = s;
+		all_cached_max_speed[i] = m;
+		all_cached_acceleration[i] = acc;
+
+		Vector2 dir = Vector2(Math::cos(rot), Math::sin(rot));
+		all_cached_direction[i] = dir;
+		all_cached_velocity[i] = (dir * s) + inherited_velocity_offset;
 	}
 }
 
@@ -146,7 +158,7 @@ void DirectionalBullets2D::custom_additional_enable_logic(const MultiMeshBullets
 	is_multimesh_auto_pooling_enabled = directional_data.is_multimesh_auto_pooling_enabled;
 }
 
-void DirectionalBullets2D::custom_additional_disable_logic(){
+void DirectionalBullets2D::custom_additional_disable_logic() {
 	bullet_factory->directional_bullets_set.disable_data(sparse_set_id);
 }
 
@@ -194,7 +206,6 @@ void DirectionalBullets2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("bullet_homing_check_current_target_type", "bullet_index"), &DirectionalBullets2D::bullet_homing_check_current_target_type);
 
 	ClassDB::bind_method(D_METHOD("bullet_get_current_homing_target", "bullet_index"), &DirectionalBullets2D::bullet_get_current_homing_target);
-
 
 	ClassDB::bind_method(D_METHOD("get_bullet_homing_auto_pop_after_target_reached"), &DirectionalBullets2D::get_bullet_homing_auto_pop_after_target_reached);
 	ClassDB::bind_method(D_METHOD("set_bullet_homing_auto_pop_after_target_reached", "value"), &DirectionalBullets2D::set_bullet_homing_auto_pop_after_target_reached);

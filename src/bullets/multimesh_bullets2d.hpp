@@ -82,11 +82,8 @@ public:
 	// Used to load bullets from a SaveDataMultiMeshBullets2D resource
 	//void load(const Ref<SaveDataMultiMeshBullets2D> &data, MultiMeshObjectPool *pool, BulletFactory2D *factory, Node *bullets_container);
 
-	// Spawns as a disabled invisible multimesh that is ready to be enabled at any time. Method is used for object pooling, because it sets up all necessary things (like physics shapes for example) without needing additional spawn data (which would be overriden anyways by the enable function's logic)
-	void spawn_as_disabled_multimesh(int amount_bullets, MultiMeshObjectPool *pool, BulletFactory2D *factory, Node *bullets_container);
-
 	// Internal delete - used on the C++ side only
- 	void force_delete() {
+	void force_delete() {
 		marked_for_internal_deletion = true;
 		memdelete(this); // Immediate deletion
 	}
@@ -284,7 +281,10 @@ public:
 		auto curr_change_texture_times_amount = new_change_texture_times.size();
 
 		if (curr_textures_amount <= 0) {
-			UtilityFunctions::push_error("You're trying to pass an empty/invalid array of textures to the multimesh bullets");
+			change_texture_times.clear();
+			textures.clear();
+			current_texture_index = 0;
+			set_texture(nullptr);
 			return;
 		}
 
@@ -404,7 +404,7 @@ public:
 
 protected:
 	static void _bind_methods();
-	
+
 	void _notification(int p_what);
 
 	bool is_multimesh_auto_pooling_enabled = true;
@@ -581,9 +581,9 @@ protected:
 
 	/// COLLISION RELATED
 
-	enum CollisionType : uint8_t { 
+	enum CollisionType : uint8_t {
 		AREA = 0,
-		BODY 
+		BODY
 	};
 
 	struct BulletCollisionData2D {
@@ -713,7 +713,7 @@ protected:
 		}
 
 		auto &current_direction = all_cached_direction[bullet_index];
-		
+
 		if (is_x_direction_curve_valid) {
 			apply_x_direction_curve(current_direction, curr_curves.ptr());
 		}
