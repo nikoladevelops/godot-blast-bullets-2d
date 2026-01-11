@@ -5,7 +5,6 @@
 #include <godot_cpp/core/gdvirtual.gen.inc>
 #include <godot_cpp/variant/utility_functions.hpp>
 
-
 namespace BlastBullets2D {
 using namespace godot;
 
@@ -29,7 +28,7 @@ public:
 	GDVIRTUAL1(on_bullet_load, Ref<Resource>)
 
 	// Custom spawn as disabled behavior. This method is used automatically called when the BulletAttachment2D pool is being populated with already disabled nodes. Your task is to provide the necessary logic that spawns the BulletAttachment2D as disabled (set everything to invisible, nothing moves, nothing uses processing etc..). Note that the attachment is not yet inside the scene tree when this method gets called. Note that you have to set the attachment_id here as well
-	GDVIRTUAL0(on_bullet_spawn_as_disabled)
+	GDVIRTUAL0(on_spawn_in_pool)
 
 	// Easy way of calling these virtual functions from C++
 
@@ -38,7 +37,7 @@ public:
 	void call_on_bullet_enable();
 	Ref<Resource> call_on_bullet_save();
 	void call_on_bullet_load(Ref<Resource> custom_data_to_load);
-	void call_on_bullet_spawn_as_disabled();
+	void call_on_spawn_in_pool();
 
 protected:
 	static void _bind_methods();

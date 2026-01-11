@@ -91,7 +91,7 @@ public:
 	void free_bullets_pool(BulletType bullet_type, int amount_bullets_per_instance = 0);
 
 	// Populates the bullet attachments pool. The packed scene has to contain a BulletAttachment2D
-	void populate_attachments_pool(const Ref<PackedScene> attachment_scenes, int amount_instances);
+	void populate_attachments_pool(const Ref<PackedScene> attachment_scene, int attachment_id, int amount_instances);
 
 	// By default completely frees the bullet attachments pool. You also have the option of freeing only the attachments with a particular attachment_id if you provide a value that is not a negative number
 	void free_attachments_pool(int attachment_id = -1);

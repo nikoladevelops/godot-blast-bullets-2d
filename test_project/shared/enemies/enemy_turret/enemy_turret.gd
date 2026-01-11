@@ -56,10 +56,6 @@ func _ready() -> void:
 	bullets_data.collision_mask = DirectionalBulletsData2D.calculate_bitmask(default_bullet_collision_mask)
 	bullets_data.monitorable=true # Monitorable allows for these bullets to be detected by other areas
 	
-	#TODO
-	bullets_data.attachment_scenes = preload("res://shared/bullet_attachment_nodes/attached_particles.tscn")
-	bullets_data.bullet_attachment_offset = Vector2(-30,0)
-	
 func _physics_process(_delta: float) -> void:
 	if can_look_at:
 		turret_gun.look_at(BENCHMARK_GLOBALS.PLAYER.global_position)
@@ -75,7 +71,8 @@ func shoot()->void:
 	# Create a new transform with the same rotation and position, but scale of 1. This is because I've scaled the marker by x amount of times since it's a child of the TurretGun that is scaled (it scales all children) and I want to reverse that so that only the texture_size is taken into account
 	var transf = Transform2D(original_transform.get_rotation(), original_transform.origin)
 	bullets_data.transforms = [transf]
-	BENCHMARK_GLOBALS.FACTORY.spawn_directional_bullets(bullets_data)
+	var bullets_multi:DirectionalBullets2D = BENCHMARK_GLOBALS.FACTORY.spawn_controllable_directional_bullets(bullets_data)
+	bullets_multi.all_bullets_set_attachment(BENCHMARK_GLOBALS.ATTACHMENT_SCENES[1], 1, Vector2(-30, 0))
 
 func _on_shoot_timer_timeout() -> void:
 	can_shoot=true

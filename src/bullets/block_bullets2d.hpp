@@ -71,7 +71,7 @@ public:
 				multi->set_instance_transform_2d(i, curr_instance_transf);
 			}
 
-			move_bullet_attachment(cache_velocity_calc, i);
+			//move_bullet_attachment(cache_velocity_calc, i); // Block bullets do not expose an API for attachments, use directional instead
 		}
 
 		bullet_accelerate_speed(0, delta);

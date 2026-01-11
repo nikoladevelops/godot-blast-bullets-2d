@@ -52,3 +52,6 @@ static var MOVING_TARGET_TWO:Node2D
 
 # Holds movement Path2Ds
 static var MOVEMENT_PATH_HOLDER:Node
+
+# Holds all attachment scenes
+static var ATTACHMENT_SCENES:Dictionary[int, PackedScene]

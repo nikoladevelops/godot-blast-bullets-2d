@@ -8,12 +8,24 @@ var save_path:String = OS.get_user_data_dir() + "/test.tres"; # could be either 
 # Whether the save/load button are still doing work -- used to prevent the user from spamming those buttons which would lead to crashes
 var is_curently_saving_or_loading:bool = false
 
+#@onready var cpu_particles_scn:PackedScene = preload("res://shared/bullet_attachment_nodes/attached_particles.tscn")
+#@onready var gpu_particles_scn:PackedScene = preload("res://shared/bullet_attachment_nodes/attached_particles2.tscn")
+#@onready var light_attachment_scn:PackedScene = preload("res://shared/bullet_attachment_nodes/light_attachment.tscn")
+
+@onready var attachment_scenes:Dictionary[int, PackedScene] = {
+	0 : null,
+	1 : preload("res://shared/bullet_attachment_nodes/attached_particles.tscn"),
+	2 : preload("res://shared/bullet_attachment_nodes/attached_particles2.tscn"),
+	3: preload("res://shared/bullet_attachment_nodes/light_attachment.tscn")
+}
+
 func _ready() -> void:
 	# This code here is the same as going into menu Debug->Visible Collision Shapes and setting it to true
 	# Basically makes all collision shapes visible
 	if(get_tree().is_debugging_collisions_hint() == false):
 		get_tree().set_debug_collisions_hint(true) 
-
+	
+	BENCHMARK_GLOBALS.ATTACHMENT_SCENES = attachment_scenes
 	BENCHMARK_GLOBALS.FACTORY = $BulletFactory2D
 	BENCHMARK_GLOBALS.BULLET_TYPE_TO_SPAWN = BENCHMARK_GLOBALS.BulletType.MultiMeshDirectional # set the default current bullet type that needs to be spawned
 	BENCHMARK_GLOBALS.PLAYER = $Player

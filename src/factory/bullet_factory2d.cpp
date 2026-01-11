@@ -605,40 +605,101 @@ void BulletFactory2D::free_bullets_pool(BulletType bullet_type, int amount_bulle
 	}
 }
 
-void BulletFactory2D::populate_attachments_pool(const Ref<PackedScene> attachment_scenes, int amount_instances) {
-	if (amount_instances <= 0) {
-		UtilityFunctions::push_error("Error. You can't populate the attachments pool with amount_instances <= 0");
+void BulletFactory2D::populate_attachments_pool(const Ref<PackedScene> attachment_scene, int attachment_id, int amount_instances) {
+	if (amount_instances <= 0 || attachment_scene.is_null()) {
+		UtilityFunctions::push_error("Invalid parameters for populate_attachments_pool.");
 		return;
 	}
 
-	// TODO fix this
-	// for (int i = 0; i < amount_instances; ++i) {
-	// 	BulletAttachment2D *attachment = static_cast<BulletAttachment2D *>(attachment_scenes->instantiate()); // You better pass a packed scene that contains an actual BulletAttachment2D node or this goes kaboom
-	// 	attachment->set_physics_interpolation_mode(Node::PHYSICS_INTERPOLATION_MODE_OFF); // I have custom physics interpolation logic, so disable the Godot one
-
-	// 	attachment->call_on_bullet_spawn_as_disabled();
-	// 	bullet_attachments_container->add_child(attachment);
-	// 	bullet_attachments_pool.push(attachment);
-	// }
-}
-
-void BulletFactory2D::free_attachments_pool(int attachment_id) {
 	if (is_factory_busy) {
-		UtilityFunctions::push_error("Error when trying to free bullets pool. BulletFactory2D is currently busy. Ignoring the request");
+		UtilityFunctions::push_error("BulletFactory2D is busy. Ignoring populate_attachments_pool request.");
 		return;
 	}
 
 	is_factory_busy = true;
 
 	bool enable_processing_after_finish = is_factory_processing_bullets;
-
 	set_is_factory_processing_bullets(false);
 
-	// Free all attachments no matter the attachment_id
+	bool debugger_enabled = get_is_debugger_enabled();
+	if (debugger_enabled) {
+		block_bullets_debugger->set_is_debugger_enabled(false);
+		directional_bullets_debugger->set_is_debugger_enabled(false);
+	}
+
+	Node *inst = attachment_scene->instantiate();
+	BulletAttachment2D *first_attachment = dynamic_cast<BulletAttachment2D *>(inst);
+
+	if (!first_attachment) {
+		UtilityFunctions::push_error("PackedScene does not contain a BulletAttachment2D.");
+
+		if (inst) {
+			inst->queue_free();
+		}
+
+		is_factory_busy = false;
+		if (enable_processing_after_finish) {
+			set_is_factory_processing_bullets(true);
+		}
+
+		if (debugger_enabled) {
+			block_bullets_debugger->set_is_debugger_enabled(true);
+			directional_bullets_debugger->set_is_debugger_enabled(true);
+		}
+		return;
+	}
+
+	auto setup_attachment = [&](BulletAttachment2D *a) {
+		a->set_physics_interpolation_mode(Node::PHYSICS_INTERPOLATION_MODE_OFF);
+		a->call_on_spawn_in_pool();
+		bullet_attachments_container->add_child(a);
+		bullet_attachments_pool.push(a, attachment_id);
+	};
+
+	setup_attachment(first_attachment);
+
+	for (int i = 1; i < amount_instances; ++i) {
+		BulletAttachment2D *a = static_cast<BulletAttachment2D *>(attachment_scene->instantiate());
+		setup_attachment(a);
+	}
+
+	if (debugger_enabled) {
+		block_bullets_debugger->set_is_debugger_enabled(true);
+		directional_bullets_debugger->set_is_debugger_enabled(true);
+	}
+
+	is_factory_busy = false;
+	if (enable_processing_after_finish) {
+		set_is_factory_processing_bullets(true);
+	}
+}
+
+void BulletFactory2D::free_attachments_pool(int attachment_id) {
+	if (is_factory_busy) {
+		UtilityFunctions::push_error("BulletFactory2D is busy. Ignoring free_attachments_pool request.");
+		return;
+	}
+
+	is_factory_busy = true;
+
+	bool enable_processing_after_finish = is_factory_processing_bullets;
+	set_is_factory_processing_bullets(false);
+
+	bool debugger_was_enabled = get_is_debugger_enabled();
+	if (debugger_was_enabled) {
+		block_bullets_debugger->set_is_debugger_enabled(false);
+		directional_bullets_debugger->set_is_debugger_enabled(false);
+	}
+
 	if (attachment_id < 0) {
 		bullet_attachments_pool.free_all_bullet_attachments();
-	} else { // Free only attachments in the pool with a specific attachment_id
+	} else {
 		bullet_attachments_pool.free_specific_bullet_attachments(attachment_id);
+	}
+
+	if (debugger_was_enabled) {
+		block_bullets_debugger->set_is_debugger_enabled(true);
+		directional_bullets_debugger->set_is_debugger_enabled(true);
 	}
 
 	is_factory_busy = false;
@@ -987,7 +1048,7 @@ void BulletFactory2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("populate_bullets_pool", "multimesh_data", "amount_instances"), &BulletFactory2D::populate_bullets_pool);
 	ClassDB::bind_method(D_METHOD("free_bullets_pool", "bullet_type", "amount_bullets_per_instance"), &BulletFactory2D::free_bullets_pool, DEFVAL(0));
 
-	ClassDB::bind_method(D_METHOD("populate_attachments_pool", "attachment_scenes", "amount_attachments"), &BulletFactory2D::populate_attachments_pool);
+	ClassDB::bind_method(D_METHOD("populate_attachments_pool", "attachment_scene", "attachment_id", "amount_attachments"), &BulletFactory2D::populate_attachments_pool);
 	ClassDB::bind_method(D_METHOD("free_attachments_pool", "attachment_id"), &BulletFactory2D::free_attachments_pool, DEFVAL(-1));
 
 	ClassDB::bind_method(D_METHOD("free_active_bullets", "amount_bullets"), &BulletFactory2D::free_active_bullets, DEFVAL(0));

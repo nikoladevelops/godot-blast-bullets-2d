@@ -33,7 +33,6 @@ extends AbstractEnemy
 @onready var shoot_timer:Timer = $ShootTimer
 
 # Markers where the bullets are spawned at
-
 @onready var left_marker:Marker2D = $AnimatedSprite2D/LeftMarker2D
 @onready var right_marker:Marker2D = $AnimatedSprite2D/RightMarker2D
 @onready var center_marker:Marker2D = $AnimatedSprite2D/CenterMarker2D
@@ -89,8 +88,6 @@ func _ready() -> void:
 	
 	bullets_data.max_life_time = 5
 	
-	bullets_data.bullet_attachment_offset = Vector2(-30,0)
-	
 	var sp_data:BulletSpeedData2D = BulletSpeedData2D.new()
 	sp_data.speed = 200
 	sp_data.max_speed = 300
@@ -104,8 +101,6 @@ func _ready() -> void:
 	bullets_data.collision_layer = DirectionalBulletsData2D.calculate_bitmask([4])
 	bullets_data.collision_mask = DirectionalBulletsData2D.calculate_bitmask(default_bullet_collision_mask)
 	bullets_data.monitorable=true # Monitorable allows for these bullets to be detected by other areas
-	# TODO
-	bullets_data.attachment_scenes = preload("res://shared/bullet_attachment_nodes/attached_particles.tscn")
 
 func _physics_process(delta: float) -> void:
 	calculate_new_direction()
@@ -121,7 +116,9 @@ func shoot()->void:
 		bullets_data.transforms = get_marker_transforms()
 		bullets_data.all_bullet_speed_data = get_speed_data()
 		#bullets_data.block_rotation_radians = animated_sprite.transform.get_rotation() # Since we are using block bullets, their direction is determined by this property instead of automatically by the transforms
-		BENCHMARK_GLOBALS.FACTORY.spawn_directional_bullets(bullets_data)
+		var bullets_multi:DirectionalBullets2D = BENCHMARK_GLOBALS.FACTORY.spawn_controllable_directional_bullets(bullets_data)
+		bullets_multi.all_bullets_set_attachment(BENCHMARK_GLOBALS.ATTACHMENT_SCENES[1], 1, Vector2(-30, 0))
+		
 		can_shoot=false
 		shoot_timer.start()
 

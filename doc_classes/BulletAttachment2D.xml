@@ -8,7 +8,7 @@
 		The way you use attachments is the following:
 		1. Create a new scene that has a parent node of [BulletAttachment2D].
 		2. Add any other nodes to the scene or logic to it - whatever the bullets are going to be carrying as they move.
-		3. Set the [member attachment_id] inside [method on_bullet_spawn] and [method on_bullet_spawn_as_disabled] functions.
+		3. Set the [member attachment_id] inside [method on_bullet_spawn] and [method on_spawn_in_pool] functions.
 		4. Configure any other custom logic in the rest of the functions (read the rest of the documentation carefully, you need to override the virtual functions to execute custom logic).
 		5. Set this attachment to a spawn data ([BlockBulletsData2D] or [DirectionalBulletsData2D]) by using [member MultimeshBulletsData2D.attachment_scenes] property and use one of [BulletFactory2D]'s spawn functions to spawn the actual bullets.
 	</description>
@@ -60,7 +60,7 @@
 				Note: The [BulletAttachment2D] is not yet in the scene tree when this method is executed, so don't call functions that depend on already configured children etc.. instead use [code]_ready[/code]. Just save state specific logic in variables and then later in [code]_ready[/code] handle that.
 			</description>
 		</method>
-		<method name="on_bullet_spawn_as_disabled" qualifiers="virtual">
+		<method name="on_spawn_in_pool" qualifiers="virtual">
 			<return type="void" />
 			<description>
 				This is a special case function. The [BulletFactory2D] uses it when it populates the attachment object pool. 
@@ -74,7 +74,7 @@
 	<members>
 		<member name="attachment_id" type="int" setter="set_attachment_id" getter="get_attachment_id" default="0">
 			The object pooling logic depends on this value. Make sure that no other [BulletAttachment2D] has the same [member attachment_id]. 
-			Also ensure that the value is positive and that you are setting it in the [method on_bullet_spawn] and [method on_bullet_spawn_as_disabled] functions.
+			Also ensure that the value is positive and that you are setting it in the [method on_bullet_spawn] and [method on_spawn_in_pool] functions.
 		</member>
 		<member name="stick_relative_to_bullet" type="bool" setter="set_stick_relative_to_bullet" getter="get_stick_relative_to_bullet" default="true">
 			Determines whether the attachment should "stick" to the bullets or not. If set to [code]false[/code], then the attachments won't rotate along with the bullets.

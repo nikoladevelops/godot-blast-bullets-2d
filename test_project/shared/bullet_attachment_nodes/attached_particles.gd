@@ -5,7 +5,7 @@ extends BulletAttachment2D
 func on_bullet_spawn() -> void:
 	pass
 	
-func on_bullet_spawn_as_disabled() -> void:
+func on_spawn_in_pool() -> void:
 	set_process(false)
 	set_physics_process(false)
 	visible = false

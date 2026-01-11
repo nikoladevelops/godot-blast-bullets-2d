@@ -1,11 +1,6 @@
 class_name PlayerData # using classes makes it possible for these functions to be recognized by Godot instantly, allowing you to use auto complete when typing without any problem
 extends Node
 
-# Attachment scenes
-@onready var cpu_particles_scn:PackedScene = preload("res://shared/bullet_attachment_nodes/attached_particles.tscn")
-@onready var gpu_particles_scn:PackedScene = preload("res://shared/bullet_attachment_nodes/attached_particles2.tscn")
-@onready var light_attachment_scn:PackedScene = preload("res://shared/bullet_attachment_nodes/light_attachment.tscn")
-
 # The scene for the godot area2D bullets
 @onready var godot_area2d_bullet_scn:PackedScene = preload("res://benchmark_scene/area_2d_bullet.tscn")
 
@@ -38,6 +33,12 @@ var directional_bullets_data:DirectionalBulletsData2D
 
 # Holds data that is needed for factory.spawn_block_bullets
 var block_bullets_data:BlockBulletsData2D
+
+# Holds the selected attachment id used for pooling attachments
+var selected_attachment_id:int = 0
+
+# Holds the selected attachment offset relative to the bullet texture's center
+var selected_attachment_offset:Vector2 = Vector2(-60, 0)
 
 # Holds data that is needed to set up the speed of both directional and block bullets
 var bullet_speed_data:Array[BulletSpeedData2D]
@@ -109,7 +110,6 @@ func set_up_block_bullets_data()->BlockBulletsData2D:
 	data.default_change_texture_time=0.09
 	data.max_life_time = 2
 	data.all_bullet_rotation_data = bullet_rotation_data
-	data.bullet_attachment_offset = Vector2(-60,0)
 	data.bullets_custom_data = damage_data
 	
 	return data
@@ -148,7 +148,6 @@ func set_up_directional_bullets_data()->DirectionalBulletsData2D:
 	data.default_change_texture_time=0.09
 	data.max_life_time = 2
 	data.all_bullet_rotation_data = bullet_rotation_data
-	data.bullet_attachment_offset = Vector2(-60,0)
 	data.bullets_custom_data = damage_data
 	#data.is_life_time_over_signal_enabled = true # If you want to track when the life time is over and receive a signal inside BulletFactory2D
 	
@@ -281,6 +280,10 @@ func spawn_multi_mesh_directional_bullets()->void:
 	#directional_bullets_data.is_life_time_over_signal_enabled = true
 	#directional_bullets_data.bullet_max_collision_amount = 1
 	var dir_bullets:DirectionalBullets2D = BENCHMARK_GLOBALS.FACTORY.spawn_controllable_directional_bullets(directional_bullets_data)
+	
+	if selected_attachment_id != 0:
+		dir_bullets.all_bullets_set_attachment(BENCHMARK_GLOBALS.ATTACHMENT_SCENES[selected_attachment_id], selected_attachment_id, selected_attachment_offset)
+	
 	dir_bullets.homing_smoothing = 0.0# Set from 0 to 20 or even bigger (but you might have issues with interpolation)
 	dir_bullets.homing_update_interval = 0.00# Set an update timer - keep it low for smooth updates
 	dir_bullets.homing_take_control_of_texture_rotation = true
@@ -466,8 +469,7 @@ func set_collision_shape_offset(new_offset:Vector2)->void:
 
 # Changes the bullet attachmnent's offset
 func set_bullet_attachment_offset(new_offset:Vector2)->void:
-	block_bullets_data.bullet_attachment_offset = new_offset
-	directional_bullets_data.bullet_attachment_offset = new_offset
+	selected_attachment_offset = new_offset
 
 # Changes the bullet texture's rotation
 func set_bullet_texture_rotation(degrees:int)->void:
@@ -488,32 +490,7 @@ func set_bullet_lifetime(new_lifetime:float)->void:
 
 # Switches the attachment scene
 func switch_attachment_scn(option_index:int)->void:
-	var new_attachment:PackedScene = null
-	match option_index:
-		0:
-			new_attachment = null
-		1:
-			new_attachment = cpu_particles_scn
-		2:
-			new_attachment = gpu_particles_scn
-		3:
-			new_attachment = light_attachment_scn
-	
-	block_bullets_data.attachment_scenes = new_attachment
-	directional_bullets_data.attachment_scenes = new_attachment
-
-# Gets the attachment based on attachment_id (Note the attachment_id should match the one in the packed scene)
-func get_attachment_scn_based_on_attachment_id(chosen_attachment_id)->PackedScene:
-	var attachment_to_return:PackedScene = null
-	match chosen_attachment_id:
-		1:
-			attachment_to_return = cpu_particles_scn
-		2:
-			attachment_to_return = gpu_particles_scn
-		3:
-			attachment_to_return = light_attachment_scn
-			
-	return attachment_to_return
+	selected_attachment_id = option_index
 
 # Sets whether the physics shapes should also get rotated when rotation data is provided
 func set_rotate_physics_shapes(should_rotate_physics_shapes:bool)->void:

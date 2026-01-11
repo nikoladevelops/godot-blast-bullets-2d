@@ -152,20 +152,6 @@ void MultiMeshBulletsData2D::set_is_texture_rotation_permanent(bool new_is_textu
 	is_texture_rotation_permanent = new_is_texture_rotation_permanent;
 }
 
-Vector2 MultiMeshBulletsData2D::get_bullet_attachment_offset() const {
-	return bullet_attachment_offset;
-}
-
-void MultiMeshBulletsData2D::set_bullet_attachment_offset(const Vector2 &new_bullet_attachment_offset) {
-	bullet_attachment_offset = new_bullet_attachment_offset;
-}
-
-Ref<PackedScene> MultiMeshBulletsData2D::get_attachment_scenes() const {
-	return attachment_scenes;
-}
-void MultiMeshBulletsData2D::set_attachment_scenes(const Ref<PackedScene> &new_attachment_scenes) {
-	attachment_scenes = new_attachment_scenes;
-}
 
 int MultiMeshBulletsData2D::get_z_index() const {
 	return z_index;
@@ -336,14 +322,6 @@ void MultiMeshBulletsData2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_is_texture_rotation_permanent"), &MultiMeshBulletsData2D::get_is_texture_rotation_permanent);
 	ClassDB::bind_method(D_METHOD("set_is_texture_rotation_permanent", "new_is_texture_rotation_permanent"), &MultiMeshBulletsData2D::set_is_texture_rotation_permanent);
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "is_texture_rotation_permanent"), "set_is_texture_rotation_permanent", "get_is_texture_rotation_permanent");
-
-	ClassDB::bind_method(D_METHOD("get_attachment_scenes"), &MultiMeshBulletsData2D::get_attachment_scenes);
-	ClassDB::bind_method(D_METHOD("set_attachment_scenes", "new_attachment_scenes"), &MultiMeshBulletsData2D::set_attachment_scenes);
-	ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "attachment_scenes"), "set_attachment_scenes", "get_attachment_scenes");
-
-	ClassDB::bind_method(D_METHOD("get_bullet_attachment_offset"), &MultiMeshBulletsData2D::get_bullet_attachment_offset);
-	ClassDB::bind_method(D_METHOD("set_bullet_attachment_offset", "new_bullet_attachment_offset"), &MultiMeshBulletsData2D::set_bullet_attachment_offset);
-	ADD_PROPERTY(PropertyInfo(Variant::VECTOR2, "bullet_attachment_offset"), "set_bullet_attachment_offset", "get_bullet_attachment_offset");
 
 	ClassDB::bind_method(D_METHOD("get_z_index"), &MultiMeshBulletsData2D::get_z_index);
 	ClassDB::bind_method(D_METHOD("set_z_index", "new_z_index"), &MultiMeshBulletsData2D::set_z_index);

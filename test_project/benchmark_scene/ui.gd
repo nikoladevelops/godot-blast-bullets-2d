@@ -269,14 +269,12 @@ func _on_free_all_bullet_pools_btn_pressed() -> void:
 
 func _on_populate_multi_mesh_directional_pool_btn_pressed() -> void:
 	var amount_multi_meshes:int = select_amount_multi_meshes_view.get_selected_btn.text.to_int()
-	var amount_bullets:int = select_amount_bullets_view.get_selected_btn.text.to_int()
 	
 	BENCHMARK_GLOBALS.FACTORY.populate_bullets_pool(BENCHMARK_GLOBALS.PLAYER_DATA_NODE.directional_bullets_data, amount_multi_meshes)
 	
 
 func _on_populate_multi_mesh_block_pool_btn_pressed() -> void:
 	var amount_multi_meshes:int = select_amount_multi_meshes_view.get_selected_btn.text.to_int()
-	var amount_bullets:int = select_amount_bullets_view.get_selected_btn.text.to_int()
 	
 	BENCHMARK_GLOBALS.FACTORY.populate_bullets_pool(BENCHMARK_GLOBALS.PLAYER_DATA_NODE.block_bullets_data,amount_multi_meshes)
 	
@@ -430,9 +428,7 @@ func _on_populate_attachments_pool_btn_pressed() -> void:
 	var attachment_id:int = switch_bullet_attachment_id_btn.current_selected_option_index+1 # because id 1 is the first attachment and id 2 is the second attachment but ordering of the options starts from 0 so all indexes are behind with -1
 	var amount_attachments_to_pool:int = select_amount_attachments_btn_view.get_selected_btn.text.to_int()
 	
-	var attachment_packed_scn:PackedScene = BENCHMARK_GLOBALS.PLAYER_DATA_NODE.get_attachment_scn_based_on_attachment_id(attachment_id)
-	
-	BENCHMARK_GLOBALS.FACTORY.populate_attachments_pool(attachment_packed_scn, amount_attachments_to_pool)
+	BENCHMARK_GLOBALS.FACTORY.populate_attachments_pool(BENCHMARK_GLOBALS.ATTACHMENT_SCENES[attachment_id], attachment_id, amount_attachments_to_pool)
 	
 
 func _on_rotate_physics_shapes_check_box_pressed() -> void:

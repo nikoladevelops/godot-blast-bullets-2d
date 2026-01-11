@@ -450,9 +450,6 @@ protected:
 
 	/// BULLET ATTACHMENT RELATED
 
-	// Stores each bullet's attachment scene
-	std::vector<Ref<PackedScene>> attachment_scenes;
-
 	// Stores each bullet's attachment pooling id
 	std::vector<uint32_t> attachment_pooling_ids;
 
@@ -1022,13 +1019,17 @@ protected:
 
 		bullet_disable_attachment(bullet_index);
 
-		attachment_scenes[bullet_index] = attachment_scene;
-
 		BulletAttachment2D *attachment_instance = pool.pop(attachment_pooling_id);
 		bool created_brand_new_instance = false;
 
 		if (!attachment_instance) {
-			attachment_instance = static_cast<BulletAttachment2D *>(attachment_scene->instantiate()); // It better be a BulletAttachment2D scene or it will crash
+			attachment_instance = dynamic_cast<BulletAttachment2D *>(attachment_scene->instantiate());
+
+			if (!attachment_instance) {
+				UtilityFunctions::push_error("Tried to instantiate an attachment scene that is not of type BulletAttachment2D at bullet index: " + String::num_int64(bullet_index));
+				return;
+			}
+
 			created_brand_new_instance = true;
 		}
 
@@ -1245,7 +1246,9 @@ protected:
 
 	// Moves a single bullet attachment
 	_ALWAYS_INLINE_ void move_bullet_attachment(const Vector2 &translate_by, int bullet_index) {
-		if (!attachment_scenes[bullet_index].is_valid()) {
+		auto &curr_attachment = attachments[bullet_index];
+
+		if (!curr_attachment) {
 			return;
 		}
 
@@ -1263,7 +1266,7 @@ protected:
 
 		// Apply immediately only if not using interpolation
 		if (!bullet_factory->use_physics_interpolation) {
-			attachments[bullet_index]->set_global_transform(new_attachment_transf);
+			curr_attachment->set_global_transform(new_attachment_transf);
 		}
 	}
 
@@ -1339,11 +1342,7 @@ protected:
 	virtual void custom_additional_disable_logic() {}
 	///
 private:
-	// Acquires data from the bullet attachment scene and gives it to the arguments passed by reference - acquires attachment pooling id and attachment_rotation
-	int set_attachment_related_data(const Ref<PackedScene> &new_attachment_scenes, const Vector2 &bullet_attachment_offset);
-
-	//
-
+	
 	// Reserves enough memory and populates all needed data structures keeping track of rotation data
 	void set_rotation_data(const TypedArray<BulletRotationData2D> &rotation_data, bool new_rotate_only_textures);
 
