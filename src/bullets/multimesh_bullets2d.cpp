@@ -83,9 +83,7 @@ void MultiMeshBullets2D::spawn(const MultiMeshBulletsData2D &data, MultiMeshObje
 
 	amount_bullets = data.transforms.size(); // important, because some set_up methods use this
 
-	// Activate all bullets in the sparse set
 	all_bullets_enabled_set.resize(amount_bullets);
-	all_bullets_enabled_set.activate_all_data();
 
 	set_up_life_time_timer(data.max_life_time, data.max_life_time);
 	set_up_change_texture_timer(
@@ -141,9 +139,11 @@ void MultiMeshBullets2D::spawn(const MultiMeshBulletsData2D &data, MultiMeshObje
 	if (spawn_in_pool) {
 		set_visible(false);
 		is_active = false;
+		set_all_physics_shapes_enabled_for_area(false);
 		bullets_container->add_child(this);
 		bullets_pool->push(this, amount_bullets);
 	} else {
+		all_bullets_enabled_set.activate_all_data();
 		is_active = true;
 		bullets_container->add_child(this);
 	}

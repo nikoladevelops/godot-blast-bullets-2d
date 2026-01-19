@@ -450,6 +450,7 @@ void BulletFactory2D::free_disabled_bullets(int amount_bullets) {
 
 void BulletFactory2D::handle_manual_user_deletion_of_multimesh_bullets(MultiMeshBullets2D &bullet_multi) {
 	if (is_factory_busy) {
+		UtilityFunctions::push_error("BulletFactory2D is busy. Ignoring handle_manual_user_deletion_of_multimesh_bullets request.");
 		return;
 	}
 
@@ -487,6 +488,7 @@ void BulletFactory2D::handle_manual_user_deletion_of_multimesh_bullets(MultiMesh
 
 void BulletFactory2D::populate_bullets_pool(const Ref<MultiMeshBulletsData2D> &multimesh_data, int amount_instances) {
 	if (is_factory_busy) {
+		UtilityFunctions::push_error("BulletFactory2D is busy. Ignoring populate_bullets_pool request.");
 		return;
 	}
 
@@ -558,42 +560,45 @@ void BulletFactory2D::populate_bullets_pool(const Ref<MultiMeshBulletsData2D> &m
 
 void BulletFactory2D::free_bullets_pool(BulletType bullet_type, int amount_bullets_per_instance) {
 	if (is_factory_busy) {
-		UtilityFunctions::push_error("Error when trying to free bullets pool. BulletFactory2D is currently busy. Ignoring the request");
+		UtilityFunctions::push_error("BulletFactory2D is busy. Ignoring free_bullets_pool request.");
 		return;
 	}
 
 	is_factory_busy = true;
 
 	bool enable_processing_after_finish = is_factory_processing_bullets;
-
 	set_is_factory_processing_bullets(false);
 
 	bool debugger_curr_enabled = get_is_debugger_enabled();
-
-	// If the debuggers are enabled, disable them completely
 	if (debugger_curr_enabled) {
 		block_bullets_debugger->set_is_debugger_enabled(false);
 		directional_bullets_debugger->set_is_debugger_enabled(false);
 	}
 
 	switch (bullet_type) {
-		case BulletFactory2D::DIRECTIONAL_BULLETS:
+		case BulletFactory2D::DIRECTIONAL_BULLETS: {
 			free_bullets_pool_helper<DirectionalBullets2D>(
 					all_directional_bullets,
+					directional_bullets_set,
 					directional_bullets_pool,
 					amount_bullets_per_instance);
-			break;
-		case BulletFactory2D::BLOCK_BULLETS:
+		} break;
+
+		case BulletFactory2D::BLOCK_BULLETS: {
 			free_bullets_pool_helper<BlockBullets2D>(
 					all_block_bullets,
+					block_bullets_set,
 					block_bullets_pool,
 					amount_bullets_per_instance);
-			break;
+
+		} break;
+
 		default:
 			UtilityFunctions::push_error("Unsupported type of bullet when calling free_bullets_pool");
 			break;
 	}
 
+	// Re-enable debuggers (they will now build meshes based on the new, correct indices)
 	if (debugger_curr_enabled) {
 		block_bullets_debugger->set_is_debugger_enabled(true);
 		directional_bullets_debugger->set_is_debugger_enabled(true);

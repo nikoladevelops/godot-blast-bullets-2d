@@ -268,36 +268,45 @@ private:
 			bullets_vec.emplace_back(bullets);
 		}
 	}
-
-	// Shrinks a vector full of pointers by erasing all elements matching the predicate's value
+	// Shrinks a vector and keeps capacity.
+	// We don't memdelete here
 	template <typename TBullet, typename Predicate>
 	void shrink_vector(std::vector<TBullet *> &bullets_vec, Predicate func) {
-		// Filter the vector by placing all things that match the condition at the end
-		auto new_end = std::remove_if(
-				bullets_vec.begin(),
-				bullets_vec.end(),
-				func);
-
-		// Shrink it / Note that this doesn't do re-allocations which is very good - capacity stays the same
+		auto new_end = std::remove_if(bullets_vec.begin(), bullets_vec.end(), func);
 		bullets_vec.erase(new_end, bullets_vec.end());
 	}
 
-	// Frees specific bullets from the object pool and also erases them from the bullets_vec so dangling pointers would not be accessed. If amount_bullets_per_instance is 0 it frees ALL bullets of BulletType, otherwise frees only those BulletType instances whose amount_bullets value matches amount_bullets_per_instance
 	template <typename TBullet>
-	void free_bullets_pool_helper(std::vector<TBullet *> &bullets_vec, MultiMeshObjectPool &bullets_pool, int amount_bullets_per_instance) {
-		// If the user wants to free MultiMeshBullets2D that each have a particular amount of bullets on each multimesh instance
+	void free_bullets_pool_helper(std::vector<TBullet *> &bullets_vec, DynamicSparseSet &sparse_set, MultiMeshObjectPool &bullets_pool, int amount_bullets_per_instance) {
+		// The criteria for what we are removing from the vector
+		auto removal_predicate = [amount_bullets_per_instance](const TBullet *multi) {
+			return multi != nullptr && !multi->is_active && (amount_bullets_per_instance <= 0 || multi->get_amount_bullets() == amount_bullets_per_instance);
+			// We look only for disabled bullets (those that are in the pool)
+			// If amount_bullets_per_instance is negative, we remove ALL disabled bullets
+			// Otherwise we only remove disabled bullets that have a specific amount of bullets
+		};
+
+		// We erase from the vector so we don't have any dangling pointers
+		shrink_vector(bullets_vec, removal_predicate);
+
+		// Resize to the new vector size and clear stale mapping data
+		sparse_set.resize((int)bullets_vec.size());
+		sparse_set.clear();
+
+		// Now since we've shrunk the vector, we need to re-assign sparse set ids to the remaining multimeshes (or we will get crashes)
+		for (int i = 0; i < (int)bullets_vec.size(); ++i) {
+			bullets_vec[i]->sparse_set_id = i;
+
+			// If the multi was marked as active, it belongs in the dense list, so active it
+			if (bullets_vec[i]->is_active) {
+				sparse_set.activate_data(i);
+			}
+		}
+
+		// Tell the pool to actually memdelete the objects
 		if (amount_bullets_per_instance > 0) {
-			// Erases all bullet pointers pointing to multimesh instances that are NOT active and their amount of bullets matches amount_bullets_per_instance
-			shrink_vector(bullets_vec, [amount_bullets_per_instance](const TBullet *e) { return e != nullptr && !e->is_active && e->get_amount_bullets() == amount_bullets_per_instance; });
-
-			// Free bullets from memory but only those in the object pool that have particular amount bullets per instance
 			bullets_pool.free_specific_bullets(amount_bullets_per_instance);
-		} else { // If the user wants to free ALL MultiMeshBullets2D, no matter how many bullets per instance they have
-
-			// Erases all bullet pointers pointing to multimesh instances that are NOT active
-			shrink_vector(bullets_vec, [](const TBullet *e) { return e != nullptr && !e->is_active; });
-
-			// Free the bullets memory while also removing them from the object pool
+		} else {
 			bullets_pool.free_all_bullets();
 		}
 	}
