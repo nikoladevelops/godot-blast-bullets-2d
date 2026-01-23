@@ -19,6 +19,7 @@
 #include "shared/bullet_curves_data2d.hpp"
 #include "spawn-data/multimesh_bullets_data2d.hpp"
 
+#include <cmath>
 #include <cstdint>
 #include <unordered_map>
 #include <vector>
@@ -44,22 +45,20 @@ public:
 	};
 
 	struct OrbitingData {
-		real_t angle;
-		real_t radius;
-		OrbitingDirection direction;
-		OrbitingTextureRotation texture_rotation;
+		real_t angle = 0.0f;
+		real_t radius = 0.0f;
+		OrbitingDirection direction = OrbitRight;
+		OrbitingTextureRotation texture_rotation = FaceTarget;
+		bool is_locked_orbiting = false;
 
 		OrbitingData() = default;
 
 		OrbitingData(real_t new_radius, OrbitingDirection new_direction, OrbitingTextureRotation new_texture_rotation) :
-				angle(-10.0),
+				angle(0.0),
 				radius(new_radius),
 				direction(new_direction),
-				texture_rotation(new_texture_rotation) {};
-
-		bool check_is_already_locked_orbiting() const {
-			return angle > -9.0f;
-		}
+				texture_rotation(new_texture_rotation),
+				is_locked_orbiting(false) {};
 	};
 
 protected:
@@ -221,7 +220,7 @@ public:
 
 				if (is_per_bullet_curves_valid) {
 					per_bullet_curves_data = all_bullet_curves_data[i].ptr();
-					
+
 					const bool per_bullet_x_curve_valid = per_bullet_curves_data->x_direction_curve.is_valid();
 					const bool per_bullet_y_curve_valid = per_bullet_curves_data->y_direction_curve.is_valid();
 
@@ -266,7 +265,7 @@ public:
 			velocity_delta *= delta;
 
 			// 6. MOVEMENT PATTERNS (RELYING ON CURVES AND PATH2D)
-			const bool use_pattern = check_exists_bullet_movement_pattern_data(i);  // TODO this uses unordered map, future version should improve it
+			const bool use_pattern = check_exists_bullet_movement_pattern_data(i); // TODO this uses unordered map, future version should improve it
 			if (use_pattern) {
 				auto &pattern = all_movement_pattern_data[i];
 				const Ref<Curve2D> &curve = pattern.path_curve;
@@ -312,32 +311,36 @@ public:
 				if (orbiting_data != nullptr) {
 					const Vector2 to_target = curr_bullet_origin - homing_target_pos;
 					const real_t current_dist = to_target.length();
-					const bool already_locked = orbiting_data->check_is_already_locked_orbiting();
+					const bool already_locked = orbiting_data->is_locked_orbiting;
 
 					// Track if we are ACTUALLY doing orbit movement this frame
-					bool is_actually_orbiting = false;
+					bool is_physically_orbiting_this_frame = false;
 
 					// Movement Logic (Locked or Boundary Arrival)
 					if (already_locked) {
 						real_t dir_multiplier = (orbiting_data->direction == OrbitRight) ? 1.0 : (orbiting_data->direction == OrbitLeft ? -1.0 : 0.0);
+
 						if (dir_multiplier != 0.0) {
 							real_t angular_speed = (all_cached_speed[i] / orbiting_data->radius) * dir_multiplier;
 							orbiting_data->angle += angular_speed * delta;
 						}
+
 						Vector2 target_pos = homing_target_pos + Vector2(orbiting_data->radius, 0).rotated(orbiting_data->angle);
 						velocity_delta = target_pos - curr_bullet_origin;
 
-						is_actually_orbiting = true;
+						is_physically_orbiting_this_frame = true;
 					}
 					// Check exact frame arrival:
 					else if (Math::abs(current_dist - orbiting_data->radius) < (all_cached_speed[i] * delta)) {
 						// REACHED RADIUS - LOCK NOW
 						orbiting_data->angle = to_target.angle();
+						orbiting_data->is_locked_orbiting = true;
+
 						Vector2 target_pos = homing_target_pos + Vector2(orbiting_data->radius, 0).rotated(orbiting_data->angle);
 						velocity_delta = target_pos - curr_bullet_origin;
 
 						// We consider this frame as orbiting because we just snapped to the ring
-						is_actually_orbiting = true;
+						is_physically_orbiting_this_frame = true;
 					} else if (current_dist < orbiting_data->radius) {
 						// SPAWNED INSIDE - PUSH OUT
 						// This is technically NOT orbiting yet, it's just moving to the border
@@ -349,7 +352,7 @@ public:
 
 					// TEXTURE ROTATION WHEN ORBITING
 					// Only rotate if the bullet is PHYSICALLY orbiting (Locked or just snapped)
-					if (is_actually_orbiting) {
+					if (is_physically_orbiting_this_frame) {
 						Vector2 look_dir;
 						Vector2 radial_vec = (curr_bullet_origin - homing_target_pos).normalized();
 
@@ -418,13 +421,16 @@ public:
 			return;
 		}
 
-		// ONLY increment if it was previously disabled
-		if (all_orbiting_status[bullet_index] == 0) {
-			active_orbiting_count++;
+		auto &orbiting_status = all_orbiting_status[bullet_index];
+
+		if (orbiting_status == 1) {
+			UtilityFunctions::push_warning("Bullet index " + String::num_int64(bullet_index) + " already has orbiting enabled.");
+			return;
 		}
 
 		all_orbiting_data[bullet_index] = OrbitingData(orbiting_radius, orbiting_direction, orbiting_texture_rotation);
-		all_orbiting_status[bullet_index] = 1;
+		active_orbiting_count++; // Important because it tracks whether orbiting is even used at all
+		orbiting_status = 1;
 	}
 
 	_ALWAYS_INLINE_ void bullet_disable_orbiting(int bullet_index) {
@@ -432,15 +438,169 @@ public:
 			return;
 		}
 
-		// ONLY decrement if it was previously enabled
-		if (all_orbiting_status[bullet_index] == 1) {
-			active_orbiting_count--;
+		auto &orbiting_status = all_orbiting_status[bullet_index];
+
+		if (orbiting_status == 0) {
+			UtilityFunctions::push_warning("Bullet index " + String::num_int64(bullet_index) + " already has orbiting disabled.");
+			return;
 		}
 
-		all_orbiting_status[bullet_index] = 0;
+		all_orbiting_data[bullet_index].is_locked_orbiting = false;
+		active_orbiting_count--;
+		orbiting_status = 0;
+	}
+
+	_ALWAYS_INLINE_ void bullet_set_orbiting_radius(int bullet_index, real_t new_radius) {
+		if (!validate_bullet_index(bullet_index, "bullet_set_orbiting_radius")) {
+			return;
+		}
+
+		auto &orbiting_status = all_orbiting_status[bullet_index];
+
+		if (orbiting_status == 0) {
+			UtilityFunctions::push_warning("Bullet index " + String::num_int64(bullet_index) + " has orbiting disabled. Cannot set orbiting radius.");
+			return;
+		}
+
+		auto &orbiting_data = all_orbiting_data[bullet_index];
+		orbiting_data.is_locked_orbiting = false; // Reset lock when changing radius
+
+		orbiting_data.radius = new_radius;
+	}
+
+	_ALWAYS_INLINE_ real_t bullet_get_orbiting_radius(int bullet_index) {
+		if (!validate_bullet_index(bullet_index, "bullet_get_orbiting_radius")) {
+			return 0.0;
+		}
+
+		auto &orbiting_status = all_orbiting_status[bullet_index];
+
+		if (orbiting_status == 0) {
+			UtilityFunctions::push_warning("Bullet index " + String::num_int64(bullet_index) + " has orbiting disabled. Cannot get orbiting radius.");
+			return 0.0;
+		}
+
+		auto &orbiting_data = all_orbiting_data[bullet_index];
+		return orbiting_data.radius;
+	}
+
+	_ALWAYS_INLINE_ bool bullet_is_orbiting_enabled(int bullet_index) {
+		if (!validate_bullet_index(bullet_index, "bullet_is_orbiting_enabled")) {
+			return false;
+		}
+
+		return all_orbiting_status[bullet_index] == 1;
+	}
+
+	_ALWAYS_INLINE_ void bullet_set_orbiting_texture_rotation(int bullet_index, OrbitingTextureRotation new_texture_rotation) {
+		if (!validate_bullet_index(bullet_index, "bullet_set_orbiting_texture_rotation")) {
+			return;
+		}
+
+		auto &orbiting_status = all_orbiting_status[bullet_index];
+
+		if (orbiting_status == 0) {
+			UtilityFunctions::push_warning("Bullet index " + String::num_int64(bullet_index) + " has orbiting disabled. Cannot set orbiting texture rotation.");
+			return;
+		}
+
+		auto &orbiting_data = all_orbiting_data[bullet_index];
+		orbiting_data.texture_rotation = new_texture_rotation;
+	}
+
+	_ALWAYS_INLINE_ OrbitingTextureRotation bullet_get_orbiting_texture_rotation(int bullet_index) {
+		if (!validate_bullet_index(bullet_index, "bullet_get_orbiting_texture_rotation")) {
+			return FaceTarget;
+		}
+
+		auto &orbiting_status = all_orbiting_status[bullet_index];
+
+		if (orbiting_status == 0) {
+			UtilityFunctions::push_warning("Bullet index " + String::num_int64(bullet_index) + " has orbiting disabled. Cannot get orbiting texture rotation.");
+			return FaceTarget;
+		}
+
+		auto &orbiting_data = all_orbiting_data[bullet_index];
+		return orbiting_data.texture_rotation;
+	}
+
+	_ALWAYS_INLINE_ void bullet_set_orbiting_direction(int bullet_index, OrbitingDirection new_direction) {
+		if (!validate_bullet_index(bullet_index, "bullet_set_orbiting_direction")) {
+			return;
+		}
+
+		auto &orbiting_status = all_orbiting_status[bullet_index];
+
+		if (orbiting_status == 0) {
+			UtilityFunctions::push_warning("Bullet index " + String::num_int64(bullet_index) + " has orbiting disabled. Cannot set orbiting direction.");
+			return;
+		}
+
+		auto &orbiting_data = all_orbiting_data[bullet_index];
+		orbiting_data.direction = new_direction;
+	}
+
+	_ALWAYS_INLINE_ OrbitingDirection bullet_get_orbiting_direction(int bullet_index) {
+		if (!validate_bullet_index(bullet_index, "bullet_get_orbiting_direction")) {
+			return DontMove;
+		}
+
+		auto &orbiting_status = all_orbiting_status[bullet_index];
+
+		if (orbiting_status == 0) {
+			UtilityFunctions::push_warning("Bullet index " + String::num_int64(bullet_index) + " has orbiting disabled. Cannot get orbiting direction.");
+			return DontMove;
+		}
+
+		auto &orbiting_data = all_orbiting_data[bullet_index];
+		return orbiting_data.direction;
 	}
 
 	/////////////////
+
+	///////////////// ORBITING DATA HELPERS
+
+	_ALWAYS_INLINE_ void all_bullets_enable_orbiting(real_t orbiting_radius, OrbitingDirection orbiting_direction, OrbitingTextureRotation orbiting_texture_rotation, int bullet_index_start = 0, int bullet_index_end_inclusive = -1) {
+		ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_enable_orbiting");
+
+		for (int i = bullet_index_start; i <= bullet_index_end_inclusive; ++i) {
+			bullet_enable_orbiting(i, orbiting_radius, orbiting_direction, orbiting_texture_rotation);
+		}
+	}
+
+	_ALWAYS_INLINE_ void all_bullets_disable_orbiting(int bullet_index_start = 0, int bullet_index_end_inclusive = -1) {
+		ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_disable_orbiting");
+
+		for (int i = bullet_index_start; i <= bullet_index_end_inclusive; ++i) {
+			bullet_disable_orbiting(i);
+		}
+	}
+
+	_ALWAYS_INLINE_ void all_bullets_set_orbiting_radius(real_t new_radius, int bullet_index_start = 0, int bullet_index_end_inclusive = -1) {
+		ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_set_orbiting_radius");
+		
+		for (int i = bullet_index_start; i <= bullet_index_end_inclusive; ++i) {
+			bullet_set_orbiting_radius(i, new_radius);
+		}
+	}
+
+	_ALWAYS_INLINE_ void all_bullets_set_orbiting_direction(OrbitingDirection new_direction, int bullet_index_start = 0, int bullet_index_end_inclusive = -1) {
+		ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_set_orbiting_direction");
+		
+		for (int i = bullet_index_start; i <= bullet_index_end_inclusive; ++i) {
+			bullet_set_orbiting_direction(i, new_direction);
+		}
+	}
+
+	_ALWAYS_INLINE_ void all_bullets_set_orbiting_texture_rotation(OrbitingTextureRotation new_rotation, int bullet_index_start = 0, int bullet_index_end_inclusive = -1) {
+		ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_set_orbiting_texture_rotation");
+		
+		for (int i = bullet_index_start; i <= bullet_index_end_inclusive; ++i) {
+			bullet_set_orbiting_texture_rotation(i, new_rotation);
+		}
+	}
+
+	////////////////
 
 	///////////// PER BULLET HOMING DEQUE POP METHODS
 

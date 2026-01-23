@@ -293,65 +293,8 @@ func spawn_multi_mesh_directional_bullets()->void:
 	dir_bullets.is_multimesh_auto_pooling_enabled = true
 	dir_bullets.bullet_max_collision_count = 1 # How many times the bullet can collide before getting disabled
 	#
-	#get_tree().create_timer(1).timeout.connect(func():
-		##dir_bullets.queue_free()
-		##dir_bullets.free_multimesh_bullets()
-		#dir_bullets.call_deferred("free_multimesh_bullets")
-		#)
 	
-	#dir_bullets.call_deferred("free_multimesh_bullets")
-	#dir_bullets.free_multimesh_bullets()
-	#BENCHMARK_GLOBALS.FACTORY.free_active_bullets()
-	#
-	#dir_bullets.multimesh_attach_time_based_function(0.2, func():
-		#if dir_bullets.get_amount_bullets() == 5:
-			##BENCHMARK_GLOBALS.FACTORY.free_active_bullets(5)
-			#dir_bullets.queue_free()
-		#,false, true)
-		
-	#dir_bullets.all_bullets_set_attachment(light_attachment_scn, 1, Vector2(-60,0))
-	#dir_bullets.all_bullets_set_curves_data(bullet_curves_data_1)
-	#dir_bullets.bullet_set_curves_data(0, bullet_curves_data_1)
-	#dir_bullets.shared_bullet_curves_data = bullet_curves_data_1
-	
-	#dir_bullets.shared_homing_deque_push_back_node2d_target(BENCHMARK_GLOBALS.MOVING_TARGET_ONE)
-	#dir_bullets.all_bullets_push_back_homing_target(BENCHMARK_GLOBALS.MOVING_TARGET_ONE)
-	#dir_bullets.distance_from_target_before_considering_as_reached = 300
-	#dir_bullets.bullet_homing_auto_pop_after_target_reached = true
-	
-	#dir_bullets.bullet_enable_orbiting(0, 450, DirectionalBullets2D.OrbitRight, DirectionalBullets2D.FaceOppositeOrbitingDirection)
-	#dir_bullets.bullet_enable_orbiting(1, 550, DirectionalBullets2D.OrbitRight, DirectionalBullets2D.FaceOppositeTarget)
-	#dir_bullets.bullet_enable_orbiting(2, 750, DirectionalBullets2D.OrbitLeft, DirectionalBullets2D.FaceTarget)
-	#dir_bullets.bullet_enable_orbiting(3, 850, DirectionalBullets2D.DontMove, DirectionalBullets2D.FaceTarget)
-	#dir_bullets.bullet_enable_orbiting(4, 1350, DirectionalBullets2D.DontMove, DirectionalBullets2D.FaceTarget)
-	
-	#dir_bullets.multimesh_attach_time_based_function(2, func(): 
-		#dir_bullets.all_bullets_clear_homing_targets()
-		#dir_bullets.bullet_disable_orbiting(0)
-		#, false, true)
-	
-	#dir_bullets.multimesh_attach_time_based_function(4, func(): 
-		#dir_bullets.bullet_homing_pop_back_target(0)
-	#, false, true)
-	
-	
-	#dir_bullets.set_bullet_movement_pattern_from_curve(0, BENCHMARK_GLOBALS.MOVEMENT_PATH_HOLDER.get_child(0).curve, true, true)
-	#dir_bullets.all_bullets_set_movement_pattern_from_curve(BENCHMARK_GLOBALS.MOVEMENT_PATH_HOLDER.get_child(0).curve, true, true)
-	
-	#dir_bullets.set_bullet_movement_pattern_from_path(0, BENCHMARK_GLOBALS.MOVEMENT_PATH_HOLDER.get_child(0) as Path2D, true, true)
-	#dir_bullets.all_bullets_set_movement_pattern_from_path(BENCHMARK_GLOBALS.MOVEMENT_PATH_HOLDER.get_child(0) as Path2D, true, true)
-	#dir_bullets.all_bullets_set_movement_pattern_from_path(null, true, true)
-	
-	##
-	#dir_bullets.multimesh_attach_time_based_function(2, func():
-		#dir_bullets.all_bullets_set_movement_pattern_from_path(null, true, true)
-		#
-		##dir_bullets.all_bullets_set_direction(Vector2(1,0))
-		##dir_bullets.shared_bullet_curves_data = null
-		##dir_bullets.curves_elapsed_time = 0
-		##dir_bullets.all_bullets_set_speed_data(null)
-		##dir_bullets.shared_homing_deque_push_back_node2d_target(BENCHMARK_GLOBALS.MOVING_TARGET_ONE)
-		#, false, true)
+	# Test different behaviors here
 	
 	
 	
