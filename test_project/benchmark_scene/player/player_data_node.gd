@@ -197,7 +197,6 @@ func spawn_multi_mesh_directional_bullets()->void:
 	# Test different behaviors here
 	
 	
-	
 # Spawns MultiMeshBlock bullets
 func spawn_multi_mesh_block_bullets(player_rotation:float)->void:
 	if bullets_amount < 10:

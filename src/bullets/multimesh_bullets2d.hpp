@@ -1413,7 +1413,7 @@ public:
 		_callback.call();
 	}
 
-	_ALWAYS_INLINE_ void multimesh_attach_time_based_function(double time, const Callable &callable, bool repeat, bool execute_only_if_multimesh_is_active) {
+	_ALWAYS_INLINE_ void multimesh_attach_time_based_function(double time, const Callable &callable, bool repeat=false, bool execute_only_if_multimesh_is_active=true) {
 		call_deferred("_do_attach_time_based_function", time, callable, repeat, execute_only_if_multimesh_is_active);
 	}
 
