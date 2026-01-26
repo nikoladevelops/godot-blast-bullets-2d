@@ -119,21 +119,6 @@ func set_up_directional_bullets_data()->DirectionalBulletsData2D:
 	var data:DirectionalBulletsData2D = DirectionalBulletsData2D.new()
 	data.textures = rocket_tectures
 	
-	# You can also define wait time for each texture like so as long as the amount of textures matches the amount of values in this array.
-	# Otherwise stick to using default_change_texture_time
-	#data.change_texture_times = [
-		#0.05,
-		#0.03,
-		#0.01,
-		#0.02,
-		#0.01,
-		#0.01,
-		#0.01,
-		#0.08,
-		#0.01,
-		#0.03
-	#]
-	
 	data.transforms=[Transform2D()]
 	data.all_bullet_speed_data = bullet_speed_data # for the directional bullets use every single bullet speed
 	
@@ -152,90 +137,6 @@ func set_up_directional_bullets_data()->DirectionalBulletsData2D:
 	#data.is_life_time_over_signal_enabled = true # If you want to track when the life time is over and receive a signal inside BulletFactory2D
 	
 	return data
-
-# This is no longer used and is instead moved to C++ inside BulletFactory2D, I'm leaving the code commented as GDScript because it may be helpful to someone
-#enum Alignment {
-	#TOP_LEFT,
-	#TOP_CENTER,
-	#TOP_RIGHT,
-	#CENTER_LEFT,
-	#CENTER,
-	#CENTER_RIGHT,
-	#BOTTOM_LEFT,
-	#BOTTOM_CENTER,
-	#BOTTOM_RIGHT
-#}
-
-#func helper_generate_transforms_grid(marker_transf:Transform2D, rows_per_column:int = 10, alignment: Alignment = Alignment.CENTER_LEFT, column_offset: float = 150, row_offset: float = 150, rotate_grid_with_marker:bool = true, random_local_rotation=false, random_global_rotation: bool = false) -> Array[Transform2D]:
-	#var generated_transforms: Array[Transform2D] = []
-	#generated_transforms.resize(bullets_amount)
-#
-	#var columns_amount: int = ceil(bullets_amount / float(rows_per_column))
-#
-	#var total_width: float = (columns_amount - 1) * column_offset
-	#var total_height: float = (rows_per_column - 1) * row_offset
-#
-	## Adjust for even/odd bullet counts to center properly
-	#var x_start: float = -total_width / 2.0 if columns_amount % 2 == 1 else -total_width / 2.0 + column_offset / 2.0
-	#var y_start: float = -total_height / 2.0 if rows_per_column % 2 == 1 else -total_height / 2.0 + row_offset / 2.0
-#
-	#match alignment:
-		#Alignment.TOP_LEFT:
-			#x_start = 0.0
-			#y_start = 0.0
-		#Alignment.TOP_CENTER:
-			#x_start = -total_width / 2.0 if columns_amount % 2 == 1 else -total_width / 2.0 + column_offset / 2.0
-			#y_start = 0.0
-		#Alignment.TOP_RIGHT:
-			#x_start = -total_width
-			#y_start = 0.0
-		#Alignment.CENTER_LEFT:
-			#x_start = 0.0
-		#Alignment.CENTER:
-			#pass  # x_start and y_start are already centered
-		#Alignment.CENTER_RIGHT:
-			#x_start = -total_width
-		#Alignment.BOTTOM_LEFT:
-			#x_start = 0.0
-			#y_start = -total_height
-		#Alignment.BOTTOM_CENTER:
-			#x_start = -total_width / 2.0 if columns_amount % 2 == 1 else -total_width / 2.0 + column_offset / 2.0
-			#y_start = -total_height
-		#Alignment.BOTTOM_RIGHT:
-			#x_start = -total_width
-			#y_start = -total_height
-#
-	#var count_spawned: int = 0
-#
-	#for column in range(columns_amount):
-		#for row in range(rows_per_column):
-			#if count_spawned >= bullets_amount:
-				#break
-#
-			#var x: float = x_start + column * column_offset
-			#var y: float = y_start + row * row_offset
-			#var local_offset: Vector2 = Vector2(x, y)
-#
-			#var new_transform: Transform2D
-			#if rotate_grid_with_marker:
-				#var rotated_offset = marker_transf.basis_xform(local_offset)
-				#new_transform = Transform2D(marker_transf.get_rotation(), marker_transf.origin + rotated_offset)
-			#else:
-				#var new_origin: Vector2 = marker_transf.origin + local_offset
-				#new_transform = Transform2D(marker_transf.get_rotation(), new_origin)
-			#
-			#if random_local_rotation:
-				#var random_angle = randf() * TAU
-				#new_transform = new_transform.rotated_local(random_angle)
-			#
-			#if random_global_rotation:
-				#var random_angle = randf() * TAU
-				#new_transform = new_transform.rotated(random_angle)
-#
-			#generated_transforms[count_spawned] = new_transform
-			#count_spawned += 1
-#
-	#return generated_transforms
 
 # Determines which type of bullets to be spawned
 func spawn_bullets(player_rotation:float)->void:
@@ -293,7 +194,6 @@ func spawn_multi_mesh_directional_bullets()->void:
 	dir_bullets.is_multimesh_auto_pooling_enabled = true
 	dir_bullets.bullet_max_collision_count = 1 # How many times the bullet can collide before getting disabled
 	#
-	
 	# Test different behaviors here
 	
 	

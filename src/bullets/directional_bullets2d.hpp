@@ -1132,8 +1132,6 @@ public:
 	// Virtual methods
 	void set_up_movement_data(const TypedArray<BulletSpeedData2D> &new_speed_data);
 	virtual void custom_additional_spawn_logic(const MultiMeshBulletsData2D &data) override final;
-	virtual void custom_additional_save_logic(SaveDataMultiMeshBullets2D &data) override final;
-	virtual void custom_additional_load_logic(const SaveDataMultiMeshBullets2D &data) override final;
 	virtual void custom_additional_enable_logic(const MultiMeshBulletsData2D &data) override final;
 	virtual void custom_additional_disable_logic() override final;
 

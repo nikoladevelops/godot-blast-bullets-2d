@@ -23,10 +23,3 @@ func on_bullet_enable() -> void:
 	set_process(true)
 	set_physics_process(true)
 	visible = true
-	
-func on_bullet_save() -> Resource:
-	return null
-
-func on_bullet_load(_custom_data_to_load: Resource) -> void:
-	pass
-	

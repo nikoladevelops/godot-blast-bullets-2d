@@ -2,16 +2,6 @@ extends Node2D
 
 @onready var enemy_spawners_container:Node = $EnemySpawnersContainer
 
-# The save path at which the save file is being saved/loaded from
-var save_path:String = OS.get_user_data_dir() + "/test.tres"; # could be either .tres or .res
-
-# Whether the save/load button are still doing work -- used to prevent the user from spamming those buttons which would lead to crashes
-var is_curently_saving_or_loading:bool = false
-
-#@onready var cpu_particles_scn:PackedScene = preload("res://shared/bullet_attachment_nodes/attached_particles.tscn")
-#@onready var gpu_particles_scn:PackedScene = preload("res://shared/bullet_attachment_nodes/attached_particles2.tscn")
-#@onready var light_attachment_scn:PackedScene = preload("res://shared/bullet_attachment_nodes/light_attachment.tscn")
-
 @onready var attachment_scenes:Dictionary[int, PackedScene] = {
 	0 : null,
 	1 : preload("res://shared/bullet_attachment_nodes/attached_particles.tscn"),

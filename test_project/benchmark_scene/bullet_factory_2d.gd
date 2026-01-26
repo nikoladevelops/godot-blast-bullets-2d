@@ -32,7 +32,7 @@ func _on_body_entered(hit_target_body: Object, _multimesh_bullets_instance:Multi
 
 func _on_life_time_over(_multimesh_bullets_instance: MultiMeshBullets2D, _bullet_indexes:Array[int], _bullets_custom_data: Resource, _bullets_global_transforms: Array[Transform2D]) -> void:
 	pass
-	# Only if is_life_time_over_signal_enabled is set
+	# Only if is_life_time_over_signal_enabled is set inside the bullets multimesh data
 	#print(multimesh_bullets_instance)
 	#print(bullets_global_transforms.size())
 	#print(bullet_indexes)

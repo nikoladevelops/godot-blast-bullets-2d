@@ -21,12 +21,6 @@ public:
 	// Custom activation behavior - executed when the bullet gets retrieved from the object pool. You should write logic that resets the state of your attachment node as if it's brand new
 	GDVIRTUAL0(on_bullet_enable)
 
-	// Custom save behavior. You should create a brand new custom Resource class, fill it with your custom data that should be saved and then return it inside this function
-	GDVIRTUAL0R(Ref<Resource>, on_bullet_save)
-
-	// Custom load behavior. When the bullets are being loaded, the same custom resource that you used inside on_bullet_save will be passed as an argument. You should handle loading this custom resource data to ensure the proper loaded state of your bullet attachment. Note that the attachment is not yet inside the scene tree when this method gets called
-	GDVIRTUAL1(on_bullet_load, Ref<Resource>)
-
 	// Custom spawn as disabled behavior. This method is used automatically called when the BulletAttachment2D pool is being populated with already disabled nodes. Your task is to provide the necessary logic that spawns the BulletAttachment2D as disabled (set everything to invisible, nothing moves, nothing uses processing etc..). Note that the attachment is not yet inside the scene tree when this method gets called. Note that you have to set the attachment_id here as well
 	GDVIRTUAL0(on_spawn_in_pool)
 
@@ -35,8 +29,6 @@ public:
 	void call_on_bullet_spawn();
 	void call_on_bullet_disable();
 	void call_on_bullet_enable();
-	Ref<Resource> call_on_bullet_save();
-	void call_on_bullet_load(Ref<Resource> custom_data_to_load);
 	void call_on_spawn_in_pool();
 
 protected:

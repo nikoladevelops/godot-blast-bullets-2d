@@ -6,10 +6,6 @@
 #include "../spawn-data/block_bullets_data2d.hpp"
 #include "../spawn-data/directional_bullets_data2d.hpp"
 
-#include "../save-data/save_data_block_bullets2d.hpp"
-#include "../save-data/save_data_bullet_factory2d.hpp"
-#include "../save-data/save_data_multimesh_bullets2d.hpp"
-
 #include "../debugger/multimesh_bullets_debugger2d.hpp"
 #include "../shared/bullet_attachment2d.hpp"
 #include "../shared/multimesh_object_pool2d.hpp"
@@ -243,83 +239,6 @@ DirectionalBullets2D *BulletFactory2D::spawn_controllable_directional_bullets(co
 			spawn_data,
 			new_inherited_velocity_offset);
 }
-
-//void BulletFactory2D::save() {
-//	UtilityFunctions::push_error("The functionality of saving and loading is DEPRECATED for this version of the plugin. If you are in need of it open a GitHub issue or try modifying the source code yourself.");
-
-// if (is_factory_busy) {
-// 	UtilityFunctions::push_error("Error when trying to save. BulletFactory2D is currently busy. Ignoring the request");
-// 	return;
-// }
-
-// is_factory_busy = true;
-
-// bool enable_processing_after_finish = is_factory_processing_bullets;
-
-// set_is_factory_processing_bullets(false);
-
-// Ref<SaveDataBulletFactory2D> data = memnew(SaveDataBulletFactory2D);
-
-// // Save all BlockBullets2D
-// insert_save_data_from_bullets_into_array<BlockBullets2D, SaveDataBlockBullets2D>(
-// 		all_block_bullets,
-// 		data->all_block_bullets);
-
-// // Save all DirectionalBullets2D
-// insert_save_data_from_bullets_into_array<DirectionalBullets2D, SaveDataDirectionalBullets2D>(
-// 		all_directional_bullets,
-// 		data->all_directional_bullets);
-
-// is_factory_busy = false;
-// if (enable_processing_after_finish) {
-// 	set_is_factory_processing_bullets(true);
-// }
-
-// emit_signal("save_finished", data);
-//}
-
-//void BulletFactory2D::load(const Ref<SaveDataBulletFactory2D> new_data) {
-//	UtilityFunctions::push_error("The functionality of saving and loading is DEPRECATED for this version of the plugin. If you are in need of it open a GitHub issue or try modifying the source code yourself.");
-
-// if (!new_data.is_valid()) {
-// 	UtilityFunctions::push_error("Error. Bullet data given to load method inside BulletFactory2D is invalid");
-// 	return;
-// }
-
-// if (is_factory_busy) {
-// 	UtilityFunctions::push_error("Error when trying to load data. BulletFactory2D is currently busy. Ignoring the request");
-// 	return;
-// }
-
-// is_factory_busy = true;
-
-// bool enable_processing_after_finish = is_factory_processing_bullets;
-
-// set_is_factory_processing_bullets(false);
-
-// reset_factory_state();
-
-// // Load all BlockBullets2D
-// load_data_into_new_bullets<BlockBullets2D, SaveDataBlockBullets2D>(
-// 		all_block_bullets,
-// 		block_bullets_pool,
-// 		block_bullets_container,
-// 		new_data->all_block_bullets);
-
-// // Load all DirectionalBullets2D
-// load_data_into_new_bullets<DirectionalBullets2D, SaveDataDirectionalBullets2D>(
-// 		all_directional_bullets,
-// 		directional_bullets_pool,
-// 		directional_bullets_container,
-// 		new_data->all_directional_bullets);
-
-// is_factory_busy = false;
-// if (enable_processing_after_finish) {
-// 	set_is_factory_processing_bullets(true);
-// }
-
-// emit_signal("load_finished");
-//}
 
 void BulletFactory2D::reset_factory_state(int amount_bullets) {
 	// Check if debuggers are enabled
@@ -1034,11 +953,6 @@ void BulletFactory2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("spawn_block_bullets", "spawn_data"), &BulletFactory2D::spawn_block_bullets);
 	ClassDB::bind_method(D_METHOD("spawn_directional_bullets", "spawn_data", "inherited_velocity_offset"), &BulletFactory2D::spawn_directional_bullets, DEFVAL(Vector2(0, 0)));
 	ClassDB::bind_method(D_METHOD("spawn_controllable_directional_bullets", "spawn_data", "inherited_velocity_offset"), &BulletFactory2D::spawn_controllable_directional_bullets, DEFVAL(Vector2(0, 0)));
-
-	// ClassDB::bind_method(D_METHOD("save"), &BulletFactory2D::save);
-	// ClassDB::bind_method(D_METHOD("load", "new_data"), &BulletFactory2D::load);
-	//ADD_SIGNAL(MethodInfo("save_finished", PropertyInfo(Variant::OBJECT, "data", PROPERTY_HINT_NONE, "", PROPERTY_USAGE_DEFAULT, "SaveDataBulletFactory2D")));
-	// ADD_SIGNAL(MethodInfo("load_finished"));
 
 	ClassDB::bind_method(D_METHOD("reset", "amount_bullets"), &BulletFactory2D::reset, DEFVAL(0));
 

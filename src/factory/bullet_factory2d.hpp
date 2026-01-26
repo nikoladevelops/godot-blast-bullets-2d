@@ -20,7 +20,6 @@ using namespace godot;
 class BlockBulletsData2D;
 class DirectionalBulletsData2D;
 class MultiMeshBulletsDebugger2D;
-class SaveDataBulletFactory2D;
 class DirectionalBullets2D;
 class BlockBullets2D;
 
@@ -67,12 +66,6 @@ public:
 
 	// Spawns DirectionalBullets2D when given a resource containing all needed data. These bullets should be controlled by the user
 	DirectionalBullets2D *spawn_controllable_directional_bullets(const Ref<DirectionalBulletsData2D> &spawn_data, const Vector2 &new_inherited_velocity_offset = Vector2(0, 0));
-
-	// Generates a Resource that contains every bullet's state
-	//void save();
-
-	// Loads bullets by using a Resource that contains every bullet's state
-	//void load(const Ref<SaveDataBulletFactory2D> new_data);
 
 	// Resets the factory - frees everything (object pools, spawned bullets, spawned attachments - all get deleted from memory)
 	void reset(int amount_bullets = 0);
@@ -155,7 +148,7 @@ private:
 	// Whether the factory was spawned correctly and the ready function finished. Used in order to avoid bugs related to editor executing getters/setters that should only be executed during runtime / gameplay. If a getter/setter is executed when in editor then those values get cached in different variables and finally get applied in _ready()
 	bool is_ready = false;
 
-	// Whether the factory is currently busy saving/loading/resetting etc.. and no other functions should be executed during this time
+	// Whether the factory is currently busy doing stuff and no other functions should be executed during this time
 	bool is_factory_busy = false;
 
 	// Whether bullets are currently paused and should NOT move. Always use this instead of set_processing/ set_physics_processing.
@@ -505,38 +498,6 @@ private:
 		// Ensure the sparse set knows this index is now dead
 		sparse_set.disable_data(last_idx);
 	}
-
-	// // Loads saved data into a bullet and adds it to the bullets_vec
-	// template <typename TBullet, typename TBulletSaveData>
-	// void load_data_into_new_bullets(std::vector<TBullet *> &bullets_vec, MultiMeshObjectPool &bullets_pool, Node *bullets_container, TypedArray<TBulletSaveData> &data_to_load) {
-	// 	int count_bullets = static_cast<int>(data_to_load.size());
-	// 	for (int i = 0; i < count_bullets; ++i) {
-	// 		TBullet *bullets = memnew(TBullet);
-
-	// 		bullets->load(data_to_load[i], &bullets_pool, this, bullets_container);
-
-	// 		bullets_vec.emplace_back(bullets);
-	// 	}
-	// }
-
-	// // Retrieves the save data from the bullets and places it inside a TypedArray
-	// template <typename TBullet, typename TBulletSaveData>
-	// void insert_save_data_from_bullets_into_array(std::vector<TBullet *> &bullets_vec, TypedArray<TBulletSaveData> &array_to_save_into) {
-	// 	int count_bullets = static_cast<int>(bullets_vec.size());
-	// 	for (int i = 0; i < count_bullets; ++i) {
-	// 		TBullet &bullets = *bullets_vec[i];
-
-	// 		// I only want to save bullets that are still active (I don't want to save bullets that are in the pool)
-	// 		if (!bullets.is_active) {
-	// 			continue;
-	// 		}
-
-	// 		Ref<TBulletSaveData> empty_data = memnew(TBulletSaveData);
-
-	// 		// Saves only the active bullets
-	// 		array_to_save_into.push_back(bullets.save(empty_data));
-	// 	}
-	// }
 
 	// Spawns bullets by either creating a brand new TBullet or retrieving one from the object pool
 	template <typename TBullet, typename TBulletSpawnData>

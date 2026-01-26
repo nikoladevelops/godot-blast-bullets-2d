@@ -9,14 +9,6 @@
 #include "shared/bullet_rotation_data2d.hpp"
 #include "shared/bullet_speed_data2d.hpp"
 
-
-// Save data classes
-#include "save-data/save_data_block_bullets2d.hpp"
-#include "save-data/save_data_bullet_factory2d.hpp"
-#include "save-data/save_data_directional_bullets2d.hpp"
-#include "save-data/save_data_multimesh_bullets2d.hpp"
-
-
 // Factory
 #include "factory/bullet_factory2d.hpp"
 
@@ -47,13 +39,6 @@ void initialize_blast_bullets_2d_module(ModuleInitializationLevel p_level) {
 	GDREGISTER_CLASS(BulletSpeedData2D)
 	GDREGISTER_CLASS(BulletCurvesData2D)
 	GDREGISTER_RUNTIME_CLASS(BulletAttachment2D)
-
-
-	// Save data classes
-	GDREGISTER_CLASS(SaveDataBulletFactory2D)
-	GDREGISTER_CLASS(SaveDataMultiMeshBullets2D)
-	GDREGISTER_CLASS(SaveDataDirectionalBullets2D)
-	GDREGISTER_CLASS(SaveDataBlockBullets2D)
 
 	// Factory
 	GDREGISTER_RUNTIME_CLASS(BulletFactory2D)

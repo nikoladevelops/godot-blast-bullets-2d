@@ -43,18 +43,6 @@ void BlockBullets2D::custom_additional_enable_logic(const MultiMeshBulletsData2D
 	set_up_movement_data(*block_data.block_speed.ptr());
 }
 
-void BlockBullets2D::custom_additional_save_logic(SaveDataMultiMeshBullets2D &data) {
-	SaveDataBlockBullets2D &block_data = static_cast<SaveDataBlockBullets2D &>(data);
-
-	block_data.block_rotation_radians = block_rotation_radians;
-}
-
-void BlockBullets2D::custom_additional_load_logic(const SaveDataMultiMeshBullets2D &data) {
-	const SaveDataBlockBullets2D &block_data = static_cast<const SaveDataBlockBullets2D &>(data);
-
-	block_rotation_radians = block_data.block_rotation_radians;
-}
-
 void BlockBullets2D::custom_additional_disable_logic(){
 	bullet_factory->block_bullets_set.disable_data(sparse_set_id);
 }

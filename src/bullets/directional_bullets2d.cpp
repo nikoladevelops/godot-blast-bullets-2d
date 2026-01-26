@@ -1,6 +1,5 @@
 #include "directional_bullets2d.hpp"
 
-#include "../save-data/save_data_directional_bullets2d.hpp"
 #include "../spawn-data/directional_bullets_data2d.hpp"
 #include "godot_cpp/core/class_db.hpp"
 #include "godot_cpp/core/object.hpp"
@@ -8,8 +7,6 @@
 #include "godot_cpp/variant/typed_array.hpp"
 #include "godot_cpp/variant/vector2.hpp"
 #include "spawn-data/multimesh_bullets_data2d.hpp"
-#include <algorithm>
-#include <cstddef>
 #include <godot_cpp/variant/transform2d.hpp>
 #include <godot_cpp/variant/utility_functions.hpp>
 
@@ -88,27 +85,6 @@ void DirectionalBullets2D::custom_additional_spawn_logic(const MultiMeshBulletsD
 	// Orbiting
 	all_orbiting_data.resize(amount_bullets); // Create a vector that contains an empty orbiting data for each bullet index
 	all_orbiting_status.resize(amount_bullets, 0); // Initialize all orbiting status to disabled
-}
-
-void DirectionalBullets2D::custom_additional_save_logic(SaveDataMultiMeshBullets2D &data) {
-	SaveDataDirectionalBullets2D &directional_save_data = static_cast<SaveDataDirectionalBullets2D &>(data);
-	directional_save_data.adjust_direction_based_on_rotation = adjust_direction_based_on_rotation;
-
-	directional_save_data.is_multimesh_auto_pooling_enabled = is_multimesh_auto_pooling_enabled;
-	// TODO saving of homing behavior
-	// TODO all_cached_homing_direction
-}
-
-void DirectionalBullets2D::custom_additional_load_logic(const SaveDataMultiMeshBullets2D &data) {
-	const SaveDataDirectionalBullets2D &directional_save_data = static_cast<const SaveDataDirectionalBullets2D &>(data);
-	adjust_direction_based_on_rotation = directional_save_data.adjust_direction_based_on_rotation;
-
-	is_multimesh_auto_pooling_enabled = directional_save_data.is_multimesh_auto_pooling_enabled;
-
-	// TODO loading of homing behavior
-	// TODO all_cached_homing_direction
-
-	all_bullet_homing_targets.resize(amount_bullets); // Create a vector that contains an empty queue for each bullet index
 }
 
 void DirectionalBullets2D::custom_additional_enable_logic(const MultiMeshBulletsData2D &data) {

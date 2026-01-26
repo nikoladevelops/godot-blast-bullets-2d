@@ -2,7 +2,6 @@
 
 #include "./multimesh_bullets2d.hpp"
 
-#include "../save-data/save_data_block_bullets2d.hpp"
 #include "../shared/bullet_rotation_data2d.hpp"
 #include "../shared/bullet_speed_data2d.hpp"
 
@@ -88,8 +87,6 @@ protected:
 	void set_up_movement_data(const BulletSpeedData2D &new_speed_data);
 
 	virtual void custom_additional_spawn_logic(const MultiMeshBulletsData2D &data) override final;
-	virtual void custom_additional_save_logic(SaveDataMultiMeshBullets2D &data) override final;
-	virtual void custom_additional_load_logic(const SaveDataMultiMeshBullets2D &data) override final;
 	virtual void custom_additional_enable_logic(const MultiMeshBulletsData2D &data) override final;
 	virtual void custom_additional_disable_logic() override final;
 };

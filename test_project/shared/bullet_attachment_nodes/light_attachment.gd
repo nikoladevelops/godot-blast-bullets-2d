@@ -41,20 +41,3 @@ func on_bullet_enable() -> void:
 	set_process(true)
 	set_physics_process(true)
 	
-
-## When the BulletFactory2D saves bullet states, it will save this bullet attachment state
-func on_bullet_save() -> Resource:
-	var data:LightAttachmentData = LightAttachmentData.new()
-	data.current_color = current_color
-	data.current_time = curr_time
-	
-	return data
-	
-## Same resource we just saved will get passed here, so cast it and use the data you've saved
-func on_bullet_load(custom_data_to_load: Resource) -> void:
-	var data:LightAttachmentData = custom_data_to_load as LightAttachmentData
-	if data != null:
-		current_color = data.current_color
-		curr_time = data.current_time
-		
-		modulate = current_color

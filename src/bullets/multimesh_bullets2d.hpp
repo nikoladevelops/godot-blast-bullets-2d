@@ -2,7 +2,6 @@
 
 #include "../debugger/idebugger_data_provider2d.hpp"
 #include "../factory/bullet_factory2d.hpp"
-#include "../save-data/save_data_multimesh_bullets2d.hpp"
 #include "../shared/bullet_attachment2d.hpp"
 #include "../shared/bullet_attachment_object_pool2d.hpp"
 #include "../shared/bullet_rotation_data2d.hpp"
@@ -75,12 +74,6 @@ public:
 
 	// Activates the multimesh
 	void enable_multimesh(const MultiMeshBulletsData2D &data, const Vector2 &new_inherited_velocity_offset);
-
-	// Populates an empty data class instance with the current state of the bullets and returns it so it can be saved
-	//Ref<SaveDataMultiMeshBullets2D> save(const Ref<SaveDataMultiMeshBullets2D> &empty_data);
-
-	// Used to load bullets from a SaveDataMultiMeshBullets2D resource
-	//void load(const Ref<SaveDataMultiMeshBullets2D> &data, MultiMeshObjectPool *pool, BulletFactory2D *factory, Node *bullets_container);
 
 	// Internal delete - used on the C++ side only
 	void force_delete() {
@@ -1329,12 +1322,6 @@ protected:
 	// Holds custom logic that runs before the spawn function finalizes. Note that the multimesh is not yet added to the scene tree here
 	virtual void custom_additional_spawn_logic(const MultiMeshBulletsData2D &data) {}
 
-	// Holds custom logic that runs before the save function finalizes
-	virtual void custom_additional_save_logic(SaveDataMultiMeshBullets2D &data) {}
-
-	// Holds custom logic that runs before the load function finalizes. Note that the multimesh is not yet added to the scene tree here
-	virtual void custom_additional_load_logic(const SaveDataMultiMeshBullets2D &data) {}
-
 	// Holds custom logic that runs before activating this multimesh when retrieved from the object pool
 	virtual void custom_additional_enable_logic(const MultiMeshBulletsData2D &data) {}
 
@@ -1367,8 +1354,6 @@ private:
 	void set_up_multimesh(int new_instance_count, const Ref<Mesh> &new_mesh, Vector2 new_texture_size);
 
 	void set_up_bullet_instances(const MultiMeshBulletsData2D &data);
-
-	//void load_bullet_instances(const SaveDataMultiMeshBullets2D &data);
 
 	void set_up_life_time_timer(double new_max_life_time, double new_current_life_time);
 
