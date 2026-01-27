@@ -162,33 +162,44 @@ public:
 
 		// Life time timer logic
 		current_life_time -= delta;
-		if (current_life_time <= 0) {
-			// If the user wants to track when the life time is over we need to collect some additional info about the multimesh
-			if (is_life_time_over_signal_enabled) {
-				// Will hold all transforms of bullets that have not yet hit anything / the ones we are forced to disable due to life time being over
-				TypedArray<Transform2D> transfs;
-				TypedArray<int> bullet_indexes;
 
-				for (int i = 0; i < amount_bullets; ++i) {
-					// If the status is active it means that the bullet hasn't hit anything yet, so we need to disable it ourselves
-					if (all_bullets_enabled_set.contains(i)) {
-						call_deferred("disable_bullet", i, true);
+		// The bullets still have life time left, so don't do anything yet
+		if (current_life_time > 0) {
+			return;
+		}
 
-						transfs.push_back(all_cached_instance_transforms[i]); // store the transform of the disabled bullet
-						bullet_indexes.push_back(i);
-					}
-				}
+		// Get ALL STILL ACTIVE bullets that we need to disable.. (bullets that haven't hit anything but the lifetime is over..)
+		const auto &active_bullet_indexes = all_bullets_enabled_set.get_active_indexes();
 
-				// Emit a signal and pass all the transforms of bullets that were forcefully disabled / the ones that were disabled due to life time being over (NOT because they hit a collision shape/body)
-				bullet_factory->call_deferred("emit_signal", "life_time_over", this, bullet_indexes, bullets_custom_data, transfs);
-
-			} else {
-				// If we do not wish to emit the life_time_over signal, just disable the bullet and don't worry about having to pass additional data to the user
-				for (int i = 0; i < amount_bullets; ++i) {
-					// There is already a bullet status check inside the function so it's fine
-					call_deferred("disable_bullet", i, true);
-				}
+		// If the life_time_over signal is not enabled, we can just disable all bullets right away and skip the additional logic
+		if (!is_life_time_over_signal_enabled) {
+			for (int i : active_bullet_indexes) {
+				call_deferred("disable_bullet", i, true); // Disable the attachments as well since we aren't really emitting signals that need to work with attachments..
 			}
+
+			return;
+		}
+
+		// If the life_time_over signal is enabled
+
+		// If the user wants to track when the life time is over we need to collect some additional info about the multimesh
+		// Will hold all transforms of bullets that have not yet hit anything / the ones we are forced to disable due to life time being over
+		TypedArray<Transform2D> transfs;
+		TypedArray<int> bullet_indexes;
+
+		for (int i : active_bullet_indexes) {
+			call_deferred("disable_bullet", i, false); // Don't disable attachments yet, first emit the signal for lifetime over and only after that
+
+			transfs.push_back(all_cached_instance_transforms[i]); // Store the transform of the disabled bullet
+			bullet_indexes.push_back(i);
+		}
+
+		// Emit a signal and pass all the transforms of bullets that were forcefully disabled / the ones that were disabled due to life time being over (NOT because they hit a collision shape/body)
+		bullet_factory->call_deferred("emit_signal", "life_time_over", this, bullet_indexes, bullets_custom_data, transfs);
+
+		// Now we can finally disable all attachments after the signal was emitted
+		for (int i : active_bullet_indexes) {
+			call_deferred("bullet_disable_attachment", i);
 		}
 	}
 
@@ -1005,8 +1016,6 @@ protected:
 			return;
 		}
 
-		auto &curr_attachment = attachments[bullet_index];
-
 		// Try to get a bullet attachment from the object pool to avoid creating nodes that are practically the same
 		auto &pool = bullet_factory->bullet_attachments_pool;
 
@@ -1055,7 +1064,7 @@ protected:
 			attachment_instance->call_on_bullet_enable(); // Call GDScript custom virtual method so that it gets enabled properly
 		}
 
-		curr_attachment = attachment_instance;
+		attachments[bullet_index] = attachment_instance;
 	}
 
 	_ALWAYS_INLINE_ void bullet_free_attachment(int bullet_index) {
@@ -1089,6 +1098,12 @@ protected:
 
 		if (is_attachments_auto_pooling_enabled) {
 			bullet_factory->bullet_attachments_pool.push(attachment_ptr, attachment_pooling_ids[bullet_index]);
+		} else {
+			// If the user has selected to not use auto pooling,
+			// he most likely expects for the attachments to get freed by themselves when necessary
+			// so do that, otherwise the scene will be spammed with hundreds of disabled attachments that never get freed (and user might not even notice this)
+
+			attachment_ptr->queue_free();
 		}
 
 		attachment_ptr = nullptr;
@@ -1212,7 +1227,7 @@ protected:
 
 		// Only disable the bullet if the max collision count is greater than 0, otherwise the bullet should never be disabled due to collisions
 		if (bullet_max_collision_count > 0 && current_bullet_collision_amount >= bullet_max_collision_count) {
-			disable_bullet(bullet_index, true);
+			disable_bullet(bullet_index, false); // Don't disable the attachment yet, first emit the signal for collision so user has access to the attachment and CAN detach it himself inside GDScript
 		}
 
 		Object *hit_target = ObjectDB::get_instance(entered_instance_id);
@@ -1222,6 +1237,9 @@ protected:
 		} else if (collision_type == CollisionType::BODY) {
 			bullet_factory->emit_signal("body_entered", hit_target, this, bullet_index, bullets_custom_data, all_cached_instance_transforms[bullet_index]);
 		}
+
+		// Deal with the attachment (or user detached it already inside the signal callback function)
+		bullet_disable_attachment(bullet_index);
 	}
 
 	/// COLLISION DETECTION METHODS
@@ -1329,7 +1347,6 @@ protected:
 	virtual void custom_additional_disable_logic() {}
 	///
 private:
-	
 	// Reserves enough memory and populates all needed data structures keeping track of rotation data
 	void set_rotation_data(const TypedArray<BulletRotationData2D> &rotation_data, bool new_rotate_only_textures);
 
@@ -1413,7 +1430,7 @@ public:
 		_callback.call();
 	}
 
-	_ALWAYS_INLINE_ void multimesh_attach_time_based_function(double time, const Callable &callable, bool repeat=false, bool execute_only_if_multimesh_is_active=true) {
+	_ALWAYS_INLINE_ void multimesh_attach_time_based_function(double time, const Callable &callable, bool repeat = false, bool execute_only_if_multimesh_is_active = true) {
 		call_deferred("_do_attach_time_based_function", time, callable, repeat, execute_only_if_multimesh_is_active);
 	}
 
