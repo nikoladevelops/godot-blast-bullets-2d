@@ -17,15 +17,12 @@ on:
         description: |
           Select float precision for floating-point calculations in the GDExtension:
           - single: Uses 32-bit floats (faster, less memory, recommended for compatibility with standard Godot Engine releases).
-          - double: Uses 64-bit floats (higher precision, more memory, only compatible with Godot Engine compiled with float=64). Also you need to edit the .gdextension file to point to the double precision builds.
-          - both: Builds both single and double precision versions (use if targeting both standard and custom Godot builds).
-          Note: Most Godot Engine releases use single precision (float=32). Choose 'single' unless you have a custom double-precision Godot build.
         required: true
         type: choice
         options:
           - single
-          - double
-          - both
+          #- double -- you require custom godot builds for this..
+          #- both
         default: single
       lto:
         description: |
