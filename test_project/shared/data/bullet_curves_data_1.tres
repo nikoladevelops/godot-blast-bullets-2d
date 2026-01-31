@@ -1,4 +1,4 @@
-[gd_resource type="BulletCurvesData2D" load_steps=2 format=3 uid="uid://bm8i7kuaes44c"]
+[gd_resource type="BulletCurvesData2D" format=3 uid="uid://bm8i7kuaes44c"]
 
 [sub_resource type="Curve" id="Curve_k8esq"]
 _limits = [0.0, 1000.0, 0.0, 1.0]

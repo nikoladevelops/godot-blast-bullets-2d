@@ -79,6 +79,8 @@ int MultiMeshBullets2D::get_amount_active_attachments() const {
 
 // Used to spawn brand new bullets.
 void MultiMeshBullets2D::spawn(const MultiMeshBulletsData2D &data, MultiMeshObjectPool *pool, BulletFactory2D *factory, Node *bullets_container, const Vector2 &new_inherited_velocity_offset, int new_sparse_set_id, bool spawn_in_pool) {
+	this->set_physics_interpolation_mode(Node::PHYSICS_INTERPOLATION_MODE_OFF); // We have custom physics interpolation logic, so disable the Godot one that comes from Godot 4.5
+	
 	sparse_set_id = new_sparse_set_id;
 	inherited_velocity_offset = new_inherited_velocity_offset;
 

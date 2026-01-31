@@ -18,6 +18,8 @@ void MultiMeshBulletsDebugger2D::configure(Node *new_container_to_debug, const S
 	container_to_debug = new_container_to_debug;
 	debugger_color = new_debugger_color;
 
+	this->set_physics_interpolation_mode(Node::PHYSICS_INTERPOLATION_MODE_OFF); // We have custom physics interpolation logic, so disable the Godot one that comes from Godot 4.5
+
 	set_name(new_debugger_name);
 }
 

@@ -27,6 +27,37 @@
 				If you want to clear all bullet targets for a shared deque, use [method shared_homing_deque_clear_homing_targets] instead.
 			</description>
 		</method>
+		<method name="all_bullets_disable_orbiting">
+			<return type="void" />
+			<param index="0" name="bullet_index_start" type="int" default="0" />
+			<param index="1" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<description>
+			</description>
+		</method>
+		<method name="all_bullets_enable_orbiting">
+			<return type="void" />
+			<param index="0" name="orbiting_radius" type="float" />
+			<param index="1" name="orbiting_direction" type="int" enum="DirectionalBullets2D.OrbitingDirection" />
+			<param index="2" name="orbiting_texture_rotation" type="int" enum="DirectionalBullets2D.OrbitingTextureRotation" />
+			<param index="3" name="bullet_index_start" type="int" default="0" />
+			<param index="4" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<description>
+			</description>
+		</method>
+		<method name="all_bullets_pop_back_target">
+			<return type="Array" />
+			<param index="0" name="bullet_index_start" type="int" default="0" />
+			<param index="1" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<description>
+			</description>
+		</method>
+		<method name="all_bullets_pop_front_target">
+			<return type="Array" />
+			<param index="0" name="bullet_index_start" type="int" default="0" />
+			<param index="1" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<description>
+			</description>
+		</method>
 		<method name="all_bullets_push_back_homing_target">
 			<return type="void" />
 			<param index="0" name="node2d_or_global_position" type="Variant" />
@@ -97,6 +128,13 @@
 				If you want to push front a mouse position target to the shared deque, use [method shared_homing_deque_push_front_mouse_position_target] instead.
 			</description>
 		</method>
+		<method name="all_bullets_replace_homing_targets_with_mouse">
+			<return type="void" />
+			<param index="0" name="bullet_index_start" type="int" default="0" />
+			<param index="1" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<description>
+			</description>
+		</method>
 		<method name="all_bullets_replace_homing_targets_with_new_target">
 			<return type="void" />
 			<param index="0" name="node2d_or_global_position" type="Variant" />
@@ -119,6 +157,30 @@
 				If you want to clear then push an array of targets to the shared deque, use [method shared_homing_deque_replace_homing_targets_with_new_target_array] instead.
 			</description>
 		</method>
+		<method name="all_bullets_set_orbiting_direction">
+			<return type="void" />
+			<param index="0" name="new_direction" type="int" enum="DirectionalBullets2D.OrbitingDirection" />
+			<param index="1" name="bullet_index_start" type="int" default="0" />
+			<param index="2" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<description>
+			</description>
+		</method>
+		<method name="all_bullets_set_orbiting_radius">
+			<return type="void" />
+			<param index="0" name="new_radius" type="float" />
+			<param index="1" name="bullet_index_start" type="int" default="0" />
+			<param index="2" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<description>
+			</description>
+		</method>
+		<method name="all_bullets_set_orbiting_texture_rotation">
+			<return type="void" />
+			<param index="0" name="new_rotation" type="int" enum="DirectionalBullets2D.OrbitingTextureRotation" />
+			<param index="1" name="bullet_index_start" type="int" default="0" />
+			<param index="2" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<description>
+			</description>
+		</method>
 		<method name="bullet_check_has_homing_targets" qualifiers="const">
 			<return type="bool" />
 			<param index="0" name="bullet_index" type="int" />
@@ -137,6 +199,21 @@
 				If you want to clear all bullet targets for a shared deque, use [method shared_homing_deque_clear_homing_targets] instead.
 			</description>
 		</method>
+		<method name="bullet_disable_orbiting">
+			<return type="void" />
+			<param index="0" name="bullet_index" type="int" />
+			<description>
+			</description>
+		</method>
+		<method name="bullet_enable_orbiting">
+			<return type="void" />
+			<param index="0" name="bullet_index" type="int" />
+			<param index="1" name="orbiting_radius" type="float" />
+			<param index="2" name="orbiting_direction" type="int" enum="DirectionalBullets2D.OrbitingDirection" />
+			<param index="3" name="orbiting_texture_rotation" type="int" enum="DirectionalBullets2D.OrbitingTextureRotation" />
+			<description>
+			</description>
+		</method>
 		<method name="bullet_get_current_homing_target" qualifiers="const">
 			<return type="Variant" />
 			<param index="0" name="bullet_index" type="int" />
@@ -144,6 +221,24 @@
 				Returns the current (front) homing target for the specified bullet's per-bullet deque as Variant (Node2D or Vector2; nullptr if invalid/empty).
 
 				If you want to get the current target from the shared deque, use [method shared_homing_deque_get_current_homing_target] instead.
+			</description>
+		</method>
+		<method name="bullet_get_orbiting_direction">
+			<return type="int" enum="DirectionalBullets2D.OrbitingDirection" />
+			<param index="0" name="bullet_index" type="int" />
+			<description>
+			</description>
+		</method>
+		<method name="bullet_get_orbiting_radius">
+			<return type="float" />
+			<param index="0" name="bullet_index" type="int" />
+			<description>
+			</description>
+		</method>
+		<method name="bullet_get_orbiting_texture_rotation">
+			<return type="int" enum="DirectionalBullets2D.OrbitingTextureRotation" />
+			<param index="0" name="bullet_index" type="int" />
+			<description>
 			</description>
 		</method>
 		<method name="bullet_homing_check_current_target_type" qualifiers="const">
@@ -238,6 +333,27 @@
 				Pushes a Node2D target to the front of the specified bullet's per-bullet deque. Returns true on success (bullet enabled/valid index/target).
 
 				If you want to push front a target to the shared deque, use [method shared_homing_deque_push_front_node2d_target] instead.
+			</description>
+		</method>
+		<method name="bullet_set_orbiting_direction">
+			<return type="void" />
+			<param index="0" name="bullet_index" type="int" />
+			<param index="1" name="new_direction" type="int" enum="DirectionalBullets2D.OrbitingDirection" />
+			<description>
+			</description>
+		</method>
+		<method name="bullet_set_orbiting_radius">
+			<return type="void" />
+			<param index="0" name="bullet_index" type="int" />
+			<param index="1" name="new_radius" type="float" />
+			<description>
+			</description>
+		</method>
+		<method name="bullet_set_orbiting_texture_rotation">
+			<return type="void" />
+			<param index="0" name="bullet_index" type="int" />
+			<param index="1" name="new_texture_rotation" type="int" enum="DirectionalBullets2D.OrbitingTextureRotation" />
+			<description>
 			</description>
 		</method>
 		<method name="shared_homing_deque_check_current_target_type" qualifiers="const">
@@ -400,6 +516,21 @@
 				Teleports the specified bullet to a new global position, updating transform, shape, and interpolation. Useful for repositioning mid-homing.
 			</description>
 		</method>
+		<method name="teleport_shift_all_bullets">
+			<return type="void" />
+			<param index="0" name="shift_value" type="Vector2" />
+			<param index="1" name="bullet_index_start" type="int" default="0" />
+			<param index="2" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<description>
+			</description>
+		</method>
+		<method name="teleport_shift_bullet">
+			<return type="void" />
+			<param index="0" name="bullet_index" type="int" />
+			<param index="1" name="shift_value" type="Vector2" />
+			<description>
+			</description>
+		</method>
 	</methods>
 	<members>
 		<member name="bullet_homing_auto_pop_after_target_reached" type="bool" setter="set_bullet_homing_auto_pop_after_target_reached" getter="get_bullet_homing_auto_pop_after_target_reached" default="false">
@@ -414,12 +545,6 @@
 		<member name="distance_from_target_before_considering_as_reached" type="float" setter="set_distance_from_target_before_considering_as_reached" getter="get_distance_from_target_before_considering_as_reached" default="5.0">
 			Adjust if you want your bullets to consider a target reached if they are within a certain distance away from it.
 		</member>
-		<member name="homing_boundary_behavior" type="int" setter="set_homing_boundary_behavior" getter="get_homing_boundary_behavior" enum="DirectionalBullets2D.OrbitingDirection" default="0">
-		</member>
-		<member name="homing_boundary_distance_away_from_target" type="float" setter="set_homing_boundary_distance_away_from_target" getter="get_homing_boundary_distance_away_from_target" default="0.0">
-		</member>
-		<member name="homing_boundary_facing_direction" type="int" setter="set_homing_boundary_facing_direction" getter="get_homing_boundary_facing_direction" enum="DirectionalBullets2D.OrbitingTextureRotation" default="0">
-		</member>
 		<member name="homing_smoothing" type="float" setter="set_homing_smoothing" getter="get_homing_smoothing" default="0.0">
 			Adjust this value for natural smooth turning. Test with values [code]0.00-20.00[/code] or even bigger.
 		</member>
@@ -428,6 +553,8 @@
 		</member>
 		<member name="homing_update_interval" type="float" setter="set_homing_update_interval" getter="get_homing_update_interval" default="0.0">
 			How often it should cache the position of the targets so that they can be re-used instead of fetching them every frame. Increase if you want to boost performance.
+		</member>
+		<member name="inherited_velocity_offset" type="Vector2" setter="set_inherited_velocity_offset" getter="get_inherited_velocity_offset" default="Vector2(0, 0)">
 		</member>
 		<member name="shared_homing_deque_auto_pop_after_target_reached" type="bool" setter="set_shared_homing_deque_auto_pop_after_target_reached" getter="get_shared_homing_deque_auto_pop_after_target_reached" default="false">
 			Whether the current homing target should be automatically popped from the deque once it gets reached by a bullet (per-bullet deques only).
@@ -472,6 +599,8 @@
 		<constant name="FaceOppositeTarget" value="1" enum="OrbitingTextureRotation">
 		</constant>
 		<constant name="FaceOrbitingDirection" value="2" enum="OrbitingTextureRotation">
+		</constant>
+		<constant name="FaceOppositeOrbitingDirection" value="3" enum="OrbitingTextureRotation">
 		</constant>
 	</constants>
 </class>

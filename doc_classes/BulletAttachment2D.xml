@@ -15,14 +15,6 @@
 	<tutorials>
 	</tutorials>
 	<methods>
-		<method name="on_bullet_enable" qualifiers="virtual">
-			<return type="void" />
-			<description>
-				Executed when the attachment is enabled again from the object pool. You should provide activation logic - attachment gets visible/enabled etc..
-
-				Note: This function gets executed over and over again since attachment object pooling is used.
-			</description>
-		</method>
 		<method name="on_bullet_disable" qualifiers="virtual">
 			<return type="void" />
 			<description>
@@ -31,24 +23,12 @@
 				Note: This function gets executed over and over again since attachment object pooling is used.
 			</description>
 		</method>
-		<method name="on_bullet_load" qualifiers="virtual">
+		<method name="on_bullet_enable" qualifiers="virtual">
 			<return type="void" />
-			<param index="0" name="custom_data_to_load" type="Resource" />
 			<description>
-				Executed when the attachment is being loaded from a save data resource. The [code]custom_data_to_load[/code] is the same data that has been saved from [method on_bullet_save] function.
-				This is the place where you should load all the data that you had saved previously - cast the class back to your custom resource type and access the properties you need.
+				Executed when the attachment is enabled again from the object pool. You should provide activation logic - attachment gets visible/enabled etc..
 
-				Note: Always check if [code]custom_data_to_load[/code] is [code]null[/code] or not or you may experience crashes in some cases.
-				Note: The [BulletAttachment2D] is not yet in the scene tree when this method is executed, so don't call functions that depend on already configured children etc.. instead use [code]_ready[/code]. Just save state specific logic in variables and then later in [code]_ready[/code] handle that.
-			</description>
-		</method>
-		<method name="on_bullet_save" qualifiers="virtual">
-			<return type="Resource" />
-			<description>
-				Executed when the attachment is being saved.
-				Create a brand new custom resource, populate it with data and then return it from this function.
-				[url=https://www.youtube.com/watch?v=fdRJqnOrz98&amp;t=4s]YouTube Tutorial On Custom Resources For Beginners[/url]
-				Next up you are going to handle the loading of all that data inside the [method on_bullet_load] function.
+				Note: This function gets executed over and over again since attachment object pooling is used.
 			</description>
 		</method>
 		<method name="on_bullet_spawn" qualifiers="virtual">
@@ -71,13 +51,4 @@
 			</description>
 		</method>
 	</methods>
-	<members>
-		<member name="attachment_id" type="int" setter="set_attachment_id" getter="get_attachment_id" default="0">
-			The object pooling logic depends on this value. Make sure that no other [BulletAttachment2D] has the same [member attachment_id]. 
-			Also ensure that the value is positive and that you are setting it in the [method on_bullet_spawn] and [method on_spawn_in_pool] functions.
-		</member>
-		<member name="stick_relative_to_bullet" type="bool" setter="set_stick_relative_to_bullet" getter="get_stick_relative_to_bullet" default="true">
-			Determines whether the attachment should "stick" to the bullets or not. If set to [code]false[/code], then the attachments won't rotate along with the bullets.
-		</member>
-	</members>
 </class>

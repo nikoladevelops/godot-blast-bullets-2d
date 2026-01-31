@@ -1,6 +1,6 @@
 [configuration]
 entry_symbol = "blastbullets2d_init"
-compatibility_minimum = "4.4"
+compatibility_minimum = "4.5"
 
 [libraries]
 ; Relative paths ensure that our GDExtension can be placed anywhere in the project directory.

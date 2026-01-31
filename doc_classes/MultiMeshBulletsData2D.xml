@@ -52,17 +52,10 @@
 			    	Note: If the rotation data is less than the amount of [Transform2D] saved in the [member transforms] property, then only the first bullet rotation data will be shared for all bullets.
 			Note: [BulletRotationData2D] has a helper static method that you can use to generate random rotation data - [method BulletRotationData2D.generate_random_data].
 		</member>
-		<member name="bullet_attachment_offset" type="Vector2" setter="set_bullet_attachment_offset" getter="get_bullet_attachment_offset" default="Vector2(0, 0)">
-			Determines the attachment's offset calculated from the center of the bullet's texture.
-		</member>
-		<member name="attachment_scenes" type="PackedScene" setter="set_attachment_scenes" getter="get_attachment_scenes">
-			If you want to have particles, other sprites or anything that moves along with the bullet, that also needs to be saved, then this is the place where you provide that attachment as a [PackedScene].
-
-			Check out the [BulletAttachment2D] documentation on how to implement that.
-			Note: If you provide a scene that is not a [BulletAttachment2D], then your game will crash.
-		</member>
 		<member name="bullet_max_collision_count" type="int" setter="set_bullet_max_collision_count" getter="get_bullet_max_collision_count" default="1">
 			How many times a bullet can collide before it gets disabled. If you set to 0, then the bullet will NEVER get disabled due to collisions.
+		</member>
+		<member name="bullets_current_collision_count" type="int[]" setter="set_bullets_current_collision_count" getter="get_bullets_current_collision_count" default="[]">
 		</member>
 		<member name="bullets_custom_data" type="Resource" setter="set_bullets_custom_data" getter="get_bullets_custom_data">
 			If you want your bullets to have damage or any other data specific to this type of bullets then you have to provide a custom resource that holds all of these properties.

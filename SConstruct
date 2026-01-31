@@ -53,9 +53,9 @@ opts.Add(EnumVariable(
 # You can either specify "disabled_classes", OR
 # explicitly specify "enabled_classes" which disables all other classes.
 
-is_2d_profile_used = True
+is_2d_profile_used = False
 is_3d_profile_used = False
-is_custom_profile_used = False
+is_custom_profile_used = True
 if is_2d_profile_used:
     env["build_profile"] = "2d_build_profile.json"
 elif is_3d_profile_used:

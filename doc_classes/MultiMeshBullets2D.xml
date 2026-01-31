@@ -8,25 +8,255 @@
 	<tutorials>
 	</tutorials>
 	<methods>
-		<method name="enable_bullet">
+		<method name="all_bullets_get_attachments">
+			<return type="BulletAttachment2D[]" />
+			<param index="0" name="bullet_index_start" type="int" default="0" />
+			<param index="1" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<description>
+			</description>
+		</method>
+		<method name="all_bullets_get_curves_data">
+			<return type="BulletCurvesData2D[]" />
+			<param index="0" name="bullet_index_start" type="int" default="0" />
+			<param index="1" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<description>
+			</description>
+		</method>
+		<method name="all_bullets_get_direction" qualifiers="const">
+			<return type="Vector2[]" />
+			<param index="0" name="bullet_index_start" type="int" default="0" />
+			<param index="1" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<description>
+			</description>
+		</method>
+		<method name="all_bullets_get_speed_data" qualifiers="const">
+			<return type="BulletSpeedData2D[]" />
+			<param index="0" name="bullet_index_start" type="int" default="0" />
+			<param index="1" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<description>
+			</description>
+		</method>
+		<method name="all_bullets_get_texture_rotation_degrees" qualifiers="const">
+			<return type="float[]" />
+			<param index="0" name="bullet_index_start" type="int" default="0" />
+			<param index="1" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<description>
+			</description>
+		</method>
+		<method name="all_bullets_get_texture_rotation_radians" qualifiers="const">
+			<return type="float[]" />
+			<param index="0" name="bullet_index_start" type="int" default="0" />
+			<param index="1" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<description>
+			</description>
+		</method>
+		<method name="all_bullets_get_transforms" qualifiers="const">
+			<return type="Transform2D[]" />
+			<param index="0" name="bullet_index_start" type="int" default="0" />
+			<param index="1" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<description>
+			</description>
+		</method>
+		<method name="all_bullets_remove_movement_pattern">
+			<return type="void" />
+			<param index="0" name="start_index" type="int" default="0" />
+			<param index="1" name="end_index_inclusive" type="int" default="-1" />
+			<description>
+			</description>
+		</method>
+		<method name="all_bullets_set_attachment">
+			<return type="void" />
+			<param index="0" name="attachment_scene" type="PackedScene" />
+			<param index="1" name="attachment_pooling_id" type="int" />
+			<param index="2" name="bullet_attachment_offset" type="Vector2" />
+			<param index="3" name="stick_relative_to_bullet" type="bool" default="true" />
+			<param index="4" name="bullet_index_start" type="int" default="0" />
+			<param index="5" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<description>
+			</description>
+		</method>
+		<method name="all_bullets_set_attachment_to_null">
+			<return type="BulletAttachment2D[]" />
+			<param index="0" name="bullet_index_start" type="int" default="0" />
+			<param index="1" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<description>
+			</description>
+		</method>
+		<method name="all_bullets_set_curves_data">
+			<return type="void" />
+			<param index="0" name="curves_data" type="BulletCurvesData2D" />
+			<param index="1" name="bullet_index_start" type="int" default="0" />
+			<param index="2" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<description>
+			</description>
+		</method>
+		<method name="all_bullets_set_direction">
+			<return type="void" />
+			<param index="0" name="new_direction" type="Vector2" />
+			<param index="1" name="bullet_index_start" type="int" default="0" />
+			<param index="2" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<description>
+			</description>
+		</method>
+		<method name="all_bullets_set_direction_towards_node2d">
+			<return type="void" />
+			<param index="0" name="target_node" type="Node2D" />
+			<param index="1" name="bullet_index_start" type="int" default="0" />
+			<param index="2" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<description>
+			</description>
+		</method>
+		<method name="all_bullets_set_direction_towards_position">
+			<return type="void" />
+			<param index="0" name="target_position" type="Vector2" />
+			<param index="1" name="bullet_index_start" type="int" default="0" />
+			<param index="2" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<description>
+			</description>
+		</method>
+		<method name="all_bullets_set_movement_pattern_from_curve">
+			<return type="void" />
+			<param index="0" name="curve_pattern" type="Curve2D" />
+			<param index="1" name="face_movement_direction" type="bool" default="false" />
+			<param index="2" name="repeat_pattern" type="bool" default="true" />
+			<param index="3" name="start_index" type="int" default="0" />
+			<param index="4" name="end_index_inclusive" type="int" default="-1" />
+			<description>
+			</description>
+		</method>
+		<method name="all_bullets_set_movement_pattern_from_path">
+			<return type="void" />
+			<param index="0" name="path_holding_pattern" type="Path2D" />
+			<param index="1" name="face_movement_direction" type="bool" default="false" />
+			<param index="2" name="repeat_pattern" type="bool" default="true" />
+			<param index="3" name="start_index" type="int" default="0" />
+			<param index="4" name="end_index_inclusive" type="int" default="-1" />
+			<description>
+			</description>
+		</method>
+		<method name="all_bullets_set_speed_data">
+			<return type="void" />
+			<param index="0" name="new_bullet_speed_data" type="BulletSpeedData2D" />
+			<param index="1" name="bullet_index_start" type="int" default="0" />
+			<param index="2" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<description>
+			</description>
+		</method>
+		<method name="all_bullets_set_texture_rotation_degrees">
+			<return type="void" />
+			<param index="0" name="new_rotation_degrees" type="float" />
+			<param index="1" name="bullet_index_start" type="int" default="0" />
+			<param index="2" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<description>
+			</description>
+		</method>
+		<method name="all_bullets_set_texture_rotation_radians">
+			<return type="void" />
+			<param index="0" name="new_rotation_radians" type="float" />
+			<param index="1" name="bullet_index_start" type="int" default="0" />
+			<param index="2" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<description>
+			</description>
+		</method>
+		<method name="all_bullets_set_texture_rotation_towards_node2d">
+			<return type="void" />
+			<param index="0" name="target_node" type="Node2D" />
+			<param index="1" name="bullet_index_start" type="int" default="0" />
+			<param index="2" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<description>
+			</description>
+		</method>
+		<method name="all_bullets_set_texture_rotation_towards_position">
+			<return type="void" />
+			<param index="0" name="target_position" type="Vector2" />
+			<param index="1" name="bullet_index_start" type="int" default="0" />
+			<param index="2" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<description>
+			</description>
+		</method>
+		<method name="all_bullets_set_transforms">
+			<return type="void" />
+			<param index="0" name="new_transform" type="Transform2D" />
+			<param index="1" name="set_direction_based_on_transform" type="bool" default="false" />
+			<param index="2" name="bullet_index_start" type="int" default="0" />
+			<param index="3" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<description>
+			</description>
+		</method>
+		<method name="bullet_disable_attachment">
 			<return type="void" />
 			<param index="0" name="bullet_index" type="int" />
-			<param index="1" name="collision_amount" type="int" default="0" />
 			<description>
-				Activate a specific bullet from the multimesh, making it active and visible on screen.
-
-				You can also provide a [code]collision_amount[/code], which is how many times this bullet can collide before it gets disabled.
-				
-				If you provide 0, a negative value or a value greater than [member bullet_max_collision_count], then the bullet will be able to collide [member bullet_max_collision_count] times before it gets disabled.
-				
-				It's valid to set it to a value that is less than [member bullet_max_collision_count].
+			</description>
+		</method>
+		<method name="bullet_enable_attachment">
+			<return type="void" />
+			<param index="0" name="bullet_index" type="int" />
+			<description>
+			</description>
+		</method>
+		<method name="bullet_free_attachment">
+			<return type="void" />
+			<param index="0" name="bullet_index" type="int" />
+			<description>
+			</description>
+		</method>
+		<method name="bullet_get_attachment">
+			<return type="BulletAttachment2D" />
+			<param index="0" name="bullet_index" type="int" />
+			<description>
+			</description>
+		</method>
+		<method name="bullet_get_curves_data" qualifiers="const">
+			<return type="BulletCurvesData2D" />
+			<param index="0" name="_unnamed_arg0" type="int" />
+			<description>
+			</description>
+		</method>
+		<method name="bullet_set_attachment">
+			<return type="void" />
+			<param index="0" name="bullet_index" type="int" />
+			<param index="1" name="attachment_scene" type="PackedScene" />
+			<param index="2" name="attachment_pooling_id" type="int" />
+			<param index="3" name="bullet_attachment_offset" type="Vector2" />
+			<param index="4" name="stick_relative_to_bullet" type="bool" default="true" />
+			<description>
+			</description>
+		</method>
+		<method name="bullet_set_attachment_to_null">
+			<return type="BulletAttachment2D" />
+			<param index="0" name="bullet_index" type="int" />
+			<description>
+			</description>
+		</method>
+		<method name="bullet_set_curves_data">
+			<return type="void" />
+			<param index="0" name="bullet_index" type="int" />
+			<param index="1" name="data" type="BulletCurvesData2D" />
+			<description>
 			</description>
 		</method>
 		<method name="disable_bullet">
 			<return type="void" />
 			<param index="0" name="bullet_index" type="int" />
+			<param index="1" name="disable_bullet_attachment" type="bool" default="true" />
 			<description>
 				Disable a specific bullet from the multimesh
+			</description>
+		</method>
+		<method name="enable_bullet">
+			<return type="void" />
+			<param index="0" name="bullet_index" type="int" />
+			<param index="1" name="collision_amount" type="int" default="0" />
+			<param index="2" name="enable_attachment" type="bool" default="true" />
+			<description>
+				Activate a specific bullet from the multimesh, making it active and visible on screen.
+
+				You can also provide a [code]collision_amount[/code], which is how many times this bullet can collide before it gets disabled.
+
+				If you provide 0, a negative value or a value greater than [member bullet_max_collision_count], then the bullet will be able to collide [member bullet_max_collision_count] times before it gets disabled.
+
+				It's valid to set it to a value that is less than [member bullet_max_collision_count].
 			</description>
 		</method>
 		<method name="get_all_bullets_status">
@@ -41,6 +271,58 @@
 				Get the amount of bullets inside the multimesh
 			</description>
 		</method>
+		<method name="get_bullet_direction" qualifiers="const">
+			<return type="Vector2" />
+			<param index="0" name="bullet_index" type="int" />
+			<description>
+			</description>
+		</method>
+		<method name="get_bullet_movement_pattern_curve" qualifiers="const">
+			<return type="Curve2D" />
+			<param index="0" name="bullet_index" type="int" />
+			<description>
+			</description>
+		</method>
+		<method name="get_bullet_speed_data" qualifiers="const">
+			<return type="BulletSpeedData2D" />
+			<param index="0" name="bullet_index" type="int" />
+			<description>
+			</description>
+		</method>
+		<method name="get_bullet_texture_rotation_degrees" qualifiers="const">
+			<return type="float" />
+			<param index="0" name="bullet_index" type="int" />
+			<description>
+			</description>
+		</method>
+		<method name="get_bullet_texture_rotation_radians" qualifiers="const">
+			<return type="float" />
+			<param index="0" name="bullet_index" type="int" />
+			<description>
+			</description>
+		</method>
+		<method name="get_bullet_transform" qualifiers="const">
+			<return type="Transform2D" />
+			<param index="0" name="bullet_index" type="int" />
+			<description>
+			</description>
+		</method>
+		<method name="get_inherited_velocity_offset" qualifiers="const">
+			<return type="Vector2" />
+			<description>
+			</description>
+		</method>
+		<method name="get_textures" qualifiers="const">
+			<return type="Texture2D[]" />
+			<description>
+			</description>
+		</method>
+		<method name="has_bullet_movement_pattern" qualifiers="const">
+			<return type="bool" />
+			<param index="0" name="bullet_index" type="int" />
+			<description>
+			</description>
+		</method>
 		<method name="is_bullet_status_enabled">
 			<return type="bool" />
 			<param index="0" name="bullet_index" type="int" />
@@ -52,8 +334,8 @@
 			<return type="void" />
 			<param index="0" name="time" type="float" />
 			<param index="1" name="callable" type="Callable" />
-			<param index="2" name="repeat" type="bool" />
-			<param index="3" name="execute_only_if_multimesh_is_active" type="bool" />
+			<param index="2" name="repeat" type="bool" default="false" />
+			<param index="3" name="execute_only_if_multimesh_is_active" type="bool" default="true" />
 			<description>
 				Attaches a callable that gets executed after a certain amount of time.
 
@@ -83,13 +365,127 @@
 				was previously saved in a variable or defined as a normal Godot function.
 			</description>
 		</method>
+		<method name="remove_bullet_movement_pattern">
+			<return type="void" />
+			<param index="0" name="bullet_index" type="int" />
+			<description>
+			</description>
+		</method>
+		<method name="set_bullet_direction">
+			<return type="void" />
+			<param index="0" name="bullet_index" type="int" />
+			<param index="1" name="new_direction" type="Vector2" />
+			<description>
+			</description>
+		</method>
+		<method name="set_bullet_direction_towards_node2d">
+			<return type="void" />
+			<param index="0" name="bullet_index" type="int" />
+			<param index="1" name="target_node" type="Node2D" />
+			<description>
+			</description>
+		</method>
+		<method name="set_bullet_direction_towards_position">
+			<return type="void" />
+			<param index="0" name="bullet_index" type="int" />
+			<param index="1" name="target_position" type="Vector2" />
+			<description>
+			</description>
+		</method>
+		<method name="set_bullet_movement_pattern_from_curve">
+			<return type="void" />
+			<param index="0" name="bullet_index" type="int" />
+			<param index="1" name="curve_pattern" type="Curve2D" />
+			<param index="2" name="face_movement_direction" type="bool" default="false" />
+			<param index="3" name="repeat_pattern" type="bool" default="true" />
+			<description>
+			</description>
+		</method>
+		<method name="set_bullet_movement_pattern_from_path">
+			<return type="void" />
+			<param index="0" name="bullet_index" type="int" />
+			<param index="1" name="path_holding_pattern" type="Path2D" />
+			<param index="2" name="face_movement_direction" type="bool" default="false" />
+			<param index="3" name="repeat_pattern" type="bool" default="true" />
+			<description>
+			</description>
+		</method>
+		<method name="set_bullet_speed_data">
+			<return type="void" />
+			<param index="0" name="bullet_index" type="int" />
+			<param index="1" name="new_bullet_speed_data" type="BulletSpeedData2D" />
+			<description>
+			</description>
+		</method>
+		<method name="set_bullet_texture_rotation_degrees">
+			<return type="void" />
+			<param index="0" name="bullet_index" type="int" />
+			<param index="1" name="new_rotation_degrees" type="float" />
+			<description>
+			</description>
+		</method>
+		<method name="set_bullet_texture_rotation_radians">
+			<return type="void" />
+			<param index="0" name="bullet_index" type="int" />
+			<param index="1" name="new_rotation_radians" type="float" />
+			<description>
+			</description>
+		</method>
+		<method name="set_bullet_texture_rotation_towards_node2d">
+			<return type="void" />
+			<param index="0" name="bullet_index" type="int" />
+			<param index="1" name="target_node" type="Node2D" />
+			<description>
+			</description>
+		</method>
+		<method name="set_bullet_texture_rotation_towards_position">
+			<return type="void" />
+			<param index="0" name="bullet_index" type="int" />
+			<param index="1" name="target_position" type="Vector2" />
+			<description>
+			</description>
+		</method>
+		<method name="set_bullet_transform">
+			<return type="void" />
+			<param index="0" name="bullet_index" type="int" />
+			<param index="1" name="new_transform" type="Transform2D" />
+			<param index="2" name="set_direction_based_on_transform" type="bool" default="false" />
+			<description>
+			</description>
+		</method>
+		<method name="set_bullets_current_collision_count">
+			<return type="bool" />
+			<param index="0" name="arr" type="int[]" />
+			<description>
+			</description>
+		</method>
+		<method name="set_inherited_velocity_offset">
+			<return type="void" />
+			<param index="0" name="new_offset" type="Vector2" />
+			<description>
+			</description>
+		</method>
+		<method name="set_textures">
+			<return type="void" />
+			<param index="0" name="new_textures" type="Texture2D[]" />
+			<param index="1" name="new_change_texture_times" type="float[]" />
+			<param index="2" name="selected_texture_index" type="int" default="0" />
+			<description>
+			</description>
+		</method>
 	</methods>
 	<members>
 		<member name="bullet_max_collision_count" type="int" setter="set_bullet_max_collision_count" getter="get_bullet_max_collision_count" default="1">
 			How many times a bullet can collide before it gets disabled. If you set to 0, then the bullet will NEVER get disabled due to collisions.
 		</member>
+		<member name="bullets_current_collision_count" type="int[]" setter="set_bullets_current_collision_count" getter="get_bullets_current_collision_count" default="[]">
+		</member>
 		<member name="bullets_custom_data" type="Resource" setter="set_bullets_custom_data" getter="get_bullets_custom_data">
 			You can edit the custom bullets data that the bullets multimesh was spawned with
+		</member>
+		<member name="curves_elapsed_time" type="float" setter="set_curves_elapsed_time" getter="get_curves_elapsed_time" default="0.0">
+		</member>
+		<member name="is_attachments_auto_pooling_enabled" type="bool" setter="set_is_attachments_auto_pooling_enabled" getter="get_is_attachments_auto_pooling_enabled" default="true">
 		</member>
 		<member name="is_life_time_infinite" type="bool" setter="set_is_life_time_infinite" getter="get_is_life_time_infinite" default="false">
 			If you set to true, then the lifetime will be ignored and bullets will never be destroyed.
@@ -101,8 +497,10 @@
 
 			When enabled, the multimesh will automatically get removed from the scene tree when all bullets are disabled, and it will also clear all time based callables.
 			When disabled, you are the one responsible for re-using the multimesh or clearing any time based callables that you might have attached with [member attach_time_based_function].
-			
+
 			If you are going to save your multimesh bullets in an array, then it's probably best to disable auto pooling and manage the instances yourself.
+		</member>
+		<member name="shared_bullet_curves_data" type="BulletCurvesData2D" setter="set_shared_bullet_curves_data" getter="get_shared_bullet_curves_data">
 		</member>
 	</members>
 </class>

@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="BulletCurvesData2D" inherits="Resource" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/godotengine/godot/master/doc/class.xsd">
+	<brief_description>
+	</brief_description>
+	<description>
+	</description>
+	<tutorials>
+	</tutorials>
+	<members>
+		<member name="direction_curve_rotation_speed" type="float" setter="set_direction_curve_rotation_speed" getter="get_direction_curve_rotation_speed" default="18.0">
+		</member>
+		<member name="movement_speed_curve" type="Curve" setter="set_movement_speed_curve" getter="get_movement_speed_curve">
+		</member>
+		<member name="movement_use_unit_curve" type="bool" setter="set_movement_use_unit_curve" getter="get_movement_use_unit_curve" default="true">
+		</member>
+		<member name="rotate_towards_adjusted_direction" type="bool" setter="set_rotate_towards_adjusted_direction" getter="get_rotate_towards_adjusted_direction" default="true">
+		</member>
+		<member name="rotation_speed_curve" type="Curve" setter="set_rotation_speed_curve" getter="get_rotation_speed_curve">
+		</member>
+		<member name="rotation_use_unit_curve" type="bool" setter="set_rotation_use_unit_curve" getter="get_rotation_use_unit_curve" default="true">
+		</member>
+		<member name="x_direction_curve" type="Curve" setter="set_x_direction_curve" getter="get_x_direction_curve">
+		</member>
+		<member name="x_direction_curve_mode" type="int" setter="set_x_direction_curve_mode" getter="get_x_direction_curve_mode" enum="BlastBullets2D.DirectionCurveMode" default="0">
+		</member>
+		<member name="x_direction_curve_strength" type="float" setter="set_x_direction_curve_strength" getter="get_x_direction_curve_strength" default="1.0">
+		</member>
+		<member name="x_direction_use_unit_curve" type="bool" setter="set_x_direction_use_unit_curve" getter="get_x_direction_use_unit_curve" default="true">
+		</member>
+		<member name="y_direction_curve" type="Curve" setter="set_y_direction_curve" getter="get_y_direction_curve">
+		</member>
+		<member name="y_direction_curve_mode" type="int" setter="set_y_direction_curve_mode" getter="get_y_direction_curve_mode" enum="BlastBullets2D.DirectionCurveMode" default="0">
+		</member>
+		<member name="y_direction_curve_strength" type="float" setter="set_y_direction_curve_strength" getter="get_y_direction_curve_strength" default="1.0">
+		</member>
+		<member name="y_direction_use_unit_curve" type="bool" setter="set_y_direction_use_unit_curve" getter="get_y_direction_use_unit_curve" default="true">
+		</member>
+	</members>
+	<constants>
+		<constant name="Additive" value="0" enum="DirectionCurveMode">
+		</constant>
+		<constant name="Override" value="1" enum="DirectionCurveMode">
+		</constant>
+	</constants>
+</class>

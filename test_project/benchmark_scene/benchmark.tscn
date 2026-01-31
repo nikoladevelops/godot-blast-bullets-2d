@@ -1,4 +1,4 @@
-[gd_scene load_steps=20 format=3 uid="uid://dpk5aw81fio42"]
+[gd_scene format=3 uid="uid://dpk5aw81fio42"]
 
 [ext_resource type="Script" uid="uid://bt7w5vkn7u1xt" path="res://benchmark_scene/benchmark.gd" id="1_cfubd"]
 [ext_resource type="Texture2D" uid="uid://dxsqxrqgkkv50" path="res://icon.svg" id="3_1inld"]
@@ -40,27 +40,27 @@ _data = {
 }
 point_count = 5
 
-[node name="BenchmarkScene" type="BulletAttachment2D"]
+[node name="BenchmarkScene" type="BulletAttachment2D" unique_id=775074199]
 script = ExtResource("1_cfubd")
 
-[node name="Sprite2D" type="Sprite2D" parent="."]
+[node name="Sprite2D" type="Sprite2D" parent="." unique_id=875066845]
 z_index = -12
 scale = Vector2(438, 58805)
 texture = SubResource("GradientTexture1D_t5pnj")
 metadata/_edit_lock_ = true
 
-[node name="Level" type="Node" parent="."]
+[node name="Level" type="Node" parent="." unique_id=1476091206]
 
-[node name="Area2D" type="Area2D" parent="Level"]
+[node name="Area2D" type="Area2D" parent="Level" unique_id=607904926]
 position = Vector2(1244, -196)
 collision_layer = 4
 collision_mask = 0
 monitoring = false
 
-[node name="CollisionShape2D" type="CollisionShape2D" parent="Level/Area2D"]
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Level/Area2D" unique_id=1017317209]
 shape = SubResource("RectangleShape2D_860qe")
 
-[node name="Label" type="Label" parent="Level/Area2D"]
+[node name="Label" type="Label" parent="Level/Area2D" unique_id=209708546]
 offset_left = -76.0
 offset_top = -36.0
 offset_right = 84.0
@@ -68,15 +68,15 @@ offset_bottom = 27.0
 theme_override_font_sizes/font_size = 45
 text = "Area2D"
 
-[node name="StaticBody2D" type="StaticBody2D" parent="Level"]
+[node name="StaticBody2D" type="StaticBody2D" parent="Level" unique_id=1191638064]
 position = Vector2(1284, 417)
 collision_layer = 4
 collision_mask = 0
 
-[node name="CollisionShape2D" type="CollisionShape2D" parent="Level/StaticBody2D"]
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Level/StaticBody2D" unique_id=1442990611]
 shape = SubResource("RectangleShape2D_qn5x5")
 
-[node name="Label" type="Label" parent="Level/StaticBody2D"]
+[node name="Label" type="Label" parent="Level/StaticBody2D" unique_id=1911862129]
 offset_left = -147.0
 offset_top = -49.0
 offset_right = 142.0
@@ -84,7 +84,7 @@ offset_bottom = 14.0
 theme_override_font_sizes/font_size = 45
 text = "StaticBody2D"
 
-[node name="Label2" type="Label" parent="Level/StaticBody2D"]
+[node name="Label2" type="Label" parent="Level/StaticBody2D" unique_id=1839910805]
 offset_left = -154.0
 offset_top = 11.0
 offset_right = 151.0
@@ -92,15 +92,15 @@ offset_bottom = 53.0
 theme_override_font_sizes/font_size = 30
 text = "(enable monitorable)"
 
-[node name="CharacterBody2D" type="CharacterBody2D" parent="Level"]
+[node name="CharacterBody2D" type="CharacterBody2D" parent="Level" unique_id=1764698222]
 position = Vector2(-472, 459)
 collision_layer = 4
 collision_mask = 0
 
-[node name="CollisionShape2D" type="CollisionShape2D" parent="Level/CharacterBody2D"]
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Level/CharacterBody2D" unique_id=1469232897]
 shape = SubResource("RectangleShape2D_0th2j")
 
-[node name="Label" type="Label" parent="Level/CharacterBody2D"]
+[node name="Label" type="Label" parent="Level/CharacterBody2D" unique_id=2053126180]
 offset_left = -181.0
 offset_top = -39.0
 offset_right = 201.0
@@ -108,16 +108,16 @@ offset_bottom = 24.0
 theme_override_font_sizes/font_size = 45
 text = "CharacterBody2D"
 
-[node name="RigidBody2D" type="RigidBody2D" parent="Level"]
+[node name="RigidBody2D" type="RigidBody2D" parent="Level" unique_id=810180289]
 position = Vector2(-110, -404)
 collision_layer = 4
 collision_mask = 0
 gravity_scale = 0.0
 
-[node name="CollisionShape2D" type="CollisionShape2D" parent="Level/RigidBody2D"]
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Level/RigidBody2D" unique_id=1311326134]
 shape = SubResource("RectangleShape2D_1d8s5")
 
-[node name="Label" type="Label" parent="Level/RigidBody2D"]
+[node name="Label" type="Label" parent="Level/RigidBody2D" unique_id=1628091459]
 offset_left = -120.0
 offset_top = -33.0
 offset_right = 169.0
@@ -125,13 +125,13 @@ offset_bottom = 30.0
 theme_override_font_sizes/font_size = 45
 text = "RigidBody2D"
 
-[node name="PointLight2D" type="PointLight2D" parent="Level"]
+[node name="PointLight2D" type="PointLight2D" parent="Level" unique_id=953765029]
 position = Vector2(-1389, -136)
 energy = 4.56
 texture = SubResource("GradientTexture2D_t5pnj")
 texture_scale = 4.33
 
-[node name="Label" type="Label" parent="Level/PointLight2D"]
+[node name="Label" type="Label" parent="Level/PointLight2D" unique_id=434081452]
 offset_left = -68.0
 offset_top = -15.0
 offset_right = 73.0
@@ -139,62 +139,62 @@ offset_bottom = 17.0
 theme_override_font_sizes/font_size = 23
 text = "Lighting Test"
 
-[node name="Icon" type="Sprite2D" parent="Level"]
+[node name="Icon" type="Sprite2D" parent="Level" unique_id=1470957108]
 self_modulate = Color(0, 0, 0, 1)
 position = Vector2(-723.5, -407)
 scale = Vector2(1.55469, 1.60937)
 texture = ExtResource("3_1inld")
 
-[node name="Label" type="Label" parent="Level/Icon"]
+[node name="Label" type="Label" parent="Level/Icon" unique_id=2007348710]
 offset_left = -36.9849
 offset_top = -13.0485
 offset_right = 38.0151
 offset_bottom = 9.95146
 text = "Z Index: 0"
 
-[node name="Icon2" type="Sprite2D" parent="Level"]
+[node name="Icon2" type="Sprite2D" parent="Level" unique_id=1054472472]
 self_modulate = Color(0, 0, 0, 1)
 z_index = 1
 position = Vector2(-941, -407)
 scale = Vector2(1.55469, 1.60937)
 texture = ExtResource("3_1inld")
 
-[node name="Label" type="Label" parent="Level/Icon2"]
+[node name="Label" type="Label" parent="Level/Icon2" unique_id=1285537195]
 offset_left = -36.9849
 offset_top = -13.0485
 offset_right = 38.0151
 offset_bottom = 9.95146
 text = "Z Index: 1"
 
-[node name="Icon3" type="Sprite2D" parent="Level"]
+[node name="Icon3" type="Sprite2D" parent="Level" unique_id=655168739]
 self_modulate = Color(0, 0, 0, 1)
 z_index = 2
 position = Vector2(-1159, -407)
 scale = Vector2(1.55469, 1.60937)
 texture = ExtResource("3_1inld")
 
-[node name="Label" type="Label" parent="Level/Icon3"]
+[node name="Label" type="Label" parent="Level/Icon3" unique_id=235241585]
 offset_left = -36.9849
 offset_top = -13.0485
 offset_right = 38.0151
 offset_bottom = 9.95146
 text = "Z Index: 2"
 
-[node name="Icon4" type="Sprite2D" parent="Level"]
+[node name="Icon4" type="Sprite2D" parent="Level" unique_id=1013581717]
 self_modulate = Color(0, 0, 0, 1)
 z_index = 3
 position = Vector2(-1390, -407)
 scale = Vector2(1.55469, 1.60937)
 texture = ExtResource("3_1inld")
 
-[node name="Label" type="Label" parent="Level/Icon4"]
+[node name="Label" type="Label" parent="Level/Icon4" unique_id=991691196]
 offset_left = -36.9849
 offset_top = -13.0485
 offset_right = 38.0151
 offset_bottom = 9.95146
 text = "Z Index: 3"
 
-[node name="VBoxContainer" type="VBoxContainer" parent="Level"]
+[node name="VBoxContainer" type="VBoxContainer" parent="Level" unique_id=509873073]
 offset_left = -208.0
 offset_top = -200.0
 offset_right = 1037.0
@@ -202,85 +202,85 @@ offset_bottom = -3.0
 theme_override_constants/separation = 20
 alignment = 1
 
-[node name="HBoxContainer" type="HBoxContainer" parent="Level/VBoxContainer"]
+[node name="HBoxContainer" type="HBoxContainer" parent="Level/VBoxContainer" unique_id=1057782882]
 layout_mode = 2
 alignment = 1
 
-[node name="Label3" type="Label" parent="Level/VBoxContainer/HBoxContainer"]
+[node name="Label3" type="Label" parent="Level/VBoxContainer/HBoxContainer" unique_id=942310231]
 self_modulate = Color(1, 0.609689, 0.39526, 1)
 layout_mode = 2
 theme_override_font_sizes/font_size = 45
 text = "BlastBullets2D"
 horizontal_alignment = 1
 
-[node name="Label2" type="Label" parent="Level/VBoxContainer/HBoxContainer"]
+[node name="Label2" type="Label" parent="Level/VBoxContainer/HBoxContainer" unique_id=1213331966]
 layout_mode = 2
 theme_override_font_sizes/font_size = 45
 text = " made by "
 horizontal_alignment = 1
 
-[node name="Label4" type="Label" parent="Level/VBoxContainer/HBoxContainer"]
+[node name="Label4" type="Label" parent="Level/VBoxContainer/HBoxContainer" unique_id=1651435939]
 self_modulate = Color(0.979674, 0.602475, 0.592113, 1)
 layout_mode = 2
 theme_override_font_sizes/font_size = 45
 text = "@realNikich"
 horizontal_alignment = 1
 
-[node name="Important" type="Sprite2D" parent="Level/VBoxContainer/HBoxContainer"]
+[node name="Important" type="Sprite2D" parent="Level/VBoxContainer/HBoxContainer" unique_id=176511744]
 z_index = -10
 position = Vector2(1084, -9)
 scale = Vector2(0.5, 0.5)
 texture = ExtResource("3_rfik0")
 
-[node name="Label" type="Label" parent="Level/VBoxContainer"]
+[node name="Label" type="Label" parent="Level/VBoxContainer" unique_id=851706818]
 layout_mode = 2
 theme_override_font_sizes/font_size = 45
 text = "Use Mouse Scroll Wheel For Zoom In / Zoom Out"
 horizontal_alignment = 1
 
-[node name="Label2" type="Label" parent="Level/VBoxContainer"]
+[node name="Label2" type="Label" parent="Level/VBoxContainer" unique_id=1942682874]
 modulate = Color(0.684884, 0.712312, 0.843999, 1)
 layout_mode = 2
 theme_override_font_sizes/font_size = 45
 text = "https://github.com/nikoladevelops/godot-blast-bullets-2d"
 horizontal_alignment = 1
 
-[node name="Player" parent="." instance=ExtResource("3_hsp4v")]
+[node name="Player" parent="." unique_id=830744143 instance=ExtResource("3_hsp4v")]
 position = Vector2(436, 158)
 
-[node name="EnemySpawnersContainer" type="Node" parent="."]
+[node name="EnemySpawnersContainer" type="Node" parent="." unique_id=1978341970]
 
-[node name="EnemyShipSpawner" parent="EnemySpawnersContainer" instance=ExtResource("6_fj0yo")]
+[node name="EnemyShipSpawner" parent="EnemySpawnersContainer" unique_id=963326216 instance=ExtResource("6_fj0yo")]
 position = Vector2(1743, -326)
 enemy_scn = ExtResource("8_yyku6")
 
-[node name="EnemyTurretSpawner" parent="EnemySpawnersContainer" instance=ExtResource("6_fj0yo")]
+[node name="EnemyTurretSpawner" parent="EnemySpawnersContainer" unique_id=1744478564 instance=ExtResource("6_fj0yo")]
 position = Vector2(1743, -1425)
 enemy_scn = ExtResource("7_n3lca")
 
-[node name="UI" parent="." instance=ExtResource("4_wr2si")]
+[node name="UI" parent="." unique_id=202004826 instance=ExtResource("4_wr2si")]
 
-[node name="BulletFactory2D" type="BulletFactory2D" parent="."]
+[node name="BulletFactory2D" type="BulletFactory2D" parent="." unique_id=186663547]
 block_bullets_debugger_color = Color(0, 0.711976, 0.74061, 0.8)
 script = ExtResource("7_6fsjh")
 
-[node name="AllGodotArea2DBulletsContainer" type="Node" parent="."]
+[node name="AllGodotArea2DBulletsContainer" type="Node" parent="." unique_id=2042474770]
 
-[node name="BulletHellRelated" type="Node" parent="."]
+[node name="BulletHellRelated" type="Node" parent="." unique_id=298724197]
 
-[node name="MovingTargetTwo" parent="BulletHellRelated" instance=ExtResource("10_nkrfg")]
+[node name="MovingTargetTwo" parent="BulletHellRelated" unique_id=717794385 instance=ExtResource("10_nkrfg")]
 z_index = -1
 position = Vector2(-141, -1858)
 speed = 450
 range_x = 500
 
-[node name="MovingTargetOne" parent="BulletHellRelated" instance=ExtResource("10_nkrfg")]
+[node name="MovingTargetOne" parent="BulletHellRelated" unique_id=2070981505 instance=ExtResource("10_nkrfg")]
 z_index = -1
 position = Vector2(-636, -1491)
 range_x = 300
 direction = -1
 
-[node name="StationaryTarget" parent="BulletHellRelated" instance=ExtResource("10_nkrfg")]
+[node name="StationaryTarget" parent="BulletHellRelated" unique_id=1698637180 instance=ExtResource("10_nkrfg")]
 z_index = -1
 position = Vector2(517, -1150)
 speed = 0
@@ -288,9 +288,9 @@ range_x = 300
 direction = -1
 switch_direction_when_reaching_range_x = false
 
-[node name="Paths" type="Node" parent="."]
+[node name="Paths" type="Node" parent="." unique_id=1477841289]
 
-[node name="Path2D" type="Path2D" parent="Paths"]
+[node name="Path2D" type="Path2D" parent="Paths" unique_id=517491318]
 position = Vector2(250, 293)
 curve = SubResource("Curve2D_nkrfg")
 
