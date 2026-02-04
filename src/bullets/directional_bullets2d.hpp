@@ -1061,6 +1061,22 @@ public:
 
 		physics_server->area_set_shape_transform(area, bullet_index, curr_shape_transf);
 
+		if (attachments[bullet_index]) {
+            BulletAttachment2D* attachment_instance = attachments[bullet_index];
+
+            // Calculate where the attachment should be now that the bullet moved
+            Transform2D att_global_transf = calculate_attachment_global_transf(bullet_index, curr_bullet_transf);
+            
+            // Update the cache
+            attachment_transforms[bullet_index] = att_global_transf;
+
+            // Move the actual Node
+            attachment_instance->set_global_transform(att_global_transf);
+
+            // Reset Godot's internal engine interpolation
+            attachment_instance->reset_physics_interpolation();
+        }
+		
 		// Reset physics interpolation data
 		update_bullet_previous_transform_for_interpolation(bullet_index);
 	}
@@ -1102,6 +1118,22 @@ public:
 		}
 
 		physics_server->area_set_shape_transform(area, bullet_index, curr_shape_transf);
+
+		if (attachments[bullet_index]) {
+            BulletAttachment2D* attachment_instance = attachments[bullet_index];
+
+            // Calculate where the attachment should be now that the bullet moved
+            Transform2D att_global_transf = calculate_attachment_global_transf(bullet_index, curr_bullet_transf);
+            
+            // Update the cache
+            attachment_transforms[bullet_index] = att_global_transf;
+
+            // Move the actual Node
+            attachment_instance->set_global_transform(att_global_transf);
+
+            // Reset Godot's internal engine interpolation
+            attachment_instance->reset_physics_interpolation();
+        }
 
 		// Reset physics interpolation data
 		update_bullet_previous_transform_for_interpolation(bullet_index);

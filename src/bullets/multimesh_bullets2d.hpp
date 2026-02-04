@@ -1044,12 +1044,15 @@ protected:
 
 		local_transf = Transform2D();
 		local_transf.set_origin(bullet_attachment_offset);
-		local_transf.set_rotation(attachment_instance->get_rotation());
+		local_transf.set_rotation(0.0);
 
 		auto &global_transf = attachment_transforms[bullet_index];
 		global_transf = calculate_attachment_global_transf(bullet_index, cache_texture_transforms[bullet_index]);
 
+		attachment_instance->set_transform(Transform2D());
 		attachment_instance->set_global_transform(global_transf);
+
+		attachment_instance->reset_physics_interpolation(); // Even when using custom interpolation, reset the interpolation state because Godot might try to interpolate.. Fixes a bug where the attachment would appear in the wrong place for a frame
 
 		// Handle physics interpolation nicely if enabled
 		if (bullet_factory->use_physics_interpolation) {
