@@ -76,8 +76,6 @@ void DirectionalBullets2D::custom_additional_spawn_logic(const MultiMeshBulletsD
 
 	adjust_direction_based_on_rotation = directional_data.adjust_direction_based_on_rotation;
 
-	is_multimesh_auto_pooling_enabled = directional_data.is_multimesh_auto_pooling_enabled;
-
 	// Each bullet can have its own homing target
 	all_bullet_homing_targets.resize(amount_bullets); // Create a vector that contains an empty queue for each bullet index
 	all_homing_count.resize(amount_bullets, 0);
@@ -128,11 +126,9 @@ void DirectionalBullets2D::custom_additional_enable_logic(const MultiMeshBullets
 	homing_smoothing = 0.0;
 	homing_take_control_of_texture_rotation = false;
 
-	distance_from_target_before_considering_as_reached = 5.0;
+	homing_distance_before_reached = 5.0;
 	bullet_homing_auto_pop_after_target_reached = false;
 	shared_homing_deque_auto_pop_after_target_reached = false;
-
-	is_multimesh_auto_pooling_enabled = directional_data.is_multimesh_auto_pooling_enabled;
 }
 
 void DirectionalBullets2D::custom_additional_disable_logic() {
@@ -224,9 +220,9 @@ void DirectionalBullets2D::_bind_methods() {
 
 	// OTHER HOMING RELATED
 
-	ClassDB::bind_method(D_METHOD("get_distance_from_target_before_considering_as_reached"), &DirectionalBullets2D::get_distance_from_target_before_considering_as_reached);
-	ClassDB::bind_method(D_METHOD("set_distance_from_target_before_considering_as_reached", "value"), &DirectionalBullets2D::set_distance_from_target_before_considering_as_reached);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "distance_from_target_before_considering_as_reached"), "set_distance_from_target_before_considering_as_reached", "get_distance_from_target_before_considering_as_reached");
+	ClassDB::bind_method(D_METHOD("get_homing_distance_before_reached"), &DirectionalBullets2D::get_homing_distance_before_reached);
+	ClassDB::bind_method(D_METHOD("set_homing_distance_before_reached", "value"), &DirectionalBullets2D::set_homing_distance_before_reached);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "homing_distance_before_reached"), "set_homing_distance_before_reached", "get_homing_distance_before_reached");
 
 	ClassDB::bind_method(D_METHOD("get_homing_smoothing"), &DirectionalBullets2D::get_homing_smoothing);
 	ClassDB::bind_method(D_METHOD("set_homing_smoothing", "value"), &DirectionalBullets2D::set_homing_smoothing);

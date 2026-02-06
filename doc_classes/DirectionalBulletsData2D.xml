@@ -15,10 +15,10 @@
 		</member>
 		<member name="all_bullet_speed_data" type="BulletSpeedData2D[]" setter="set_all_bullet_speed_data" getter="get_all_bullet_speed_data" default="[]">
 			[b]MANDATORY[/b]
-			You need to provide [BulletSpeedData2D] for every single bullet - meaning that it should contain the same amount of data as the [member MultiMeshBulletsData2D.transforms] property or your game will crash.
+			You can provide [BulletSpeedData2D] for every single bullet - meaning that it should contain the same amount of data as the [member MultiMeshBulletsData2D.transforms].
+
+			Warning: If you provide less [BulletSpeedData2D] than the amount of bullets (same as amount of transforms), ALL bullets will use only the first provided speed data.
 			Note: [BulletSpeedData2D] has a helper static method that you can use to generate random speed data - [method BulletSpeedData2D.generate_random_data()].
-		</member>
-		<member name="is_multimesh_auto_pooling_enabled" type="bool" setter="set_is_multimesh_auto_pooling_enabled" getter="get_is_multimesh_auto_pooling_enabled" default="true">
 		</member>
 	</members>
 </class>

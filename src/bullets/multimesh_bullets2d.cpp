@@ -1012,7 +1012,7 @@ void MultiMeshBullets2D::_bind_methods() {
 			"set_shared_bullet_curves_data", "get_shared_bullet_curves_data");
 
 	ClassDB::bind_method(D_METHOD("bullet_set_curves_data", "bullet_index", "data"), &MultiMeshBullets2D::bullet_set_curves_data);
-	ClassDB::bind_method(D_METHOD("bullet_get_curves_data"), &MultiMeshBullets2D::bullet_get_curves_data);
+	ClassDB::bind_method(D_METHOD("bullet_get_curves_data", "bullet_index"), &MultiMeshBullets2D::bullet_get_curves_data);
 	ClassDB::bind_method(D_METHOD("all_bullets_get_curves_data", "bullet_index_start", "bullet_index_end_inclusive"), &MultiMeshBullets2D::all_bullets_get_curves_data, DEFVAL(0), DEFVAL(-1));
 	ClassDB::bind_method(D_METHOD("all_bullets_set_curves_data", "curves_data", "bullet_index_start", "bullet_index_end_inclusive"), &MultiMeshBullets2D::all_bullets_set_curves_data, DEFVAL(0), DEFVAL(-1));
 

@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <class name="BlockBullets2D" inherits="MultiMeshBullets2D" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/godotengine/godot/master/doc/class.xsd">
 	<brief_description>
-		A block of bullets that travels in a single direction. Never use this by its own. Always use the [BulletFactory2D], that's the only proper way.
+		A block of bullets that travels in a single direction. Always use the [BulletFactory2D] to spawn them, that's the only proper way.
 	</brief_description>
 	<description>
 	</description>

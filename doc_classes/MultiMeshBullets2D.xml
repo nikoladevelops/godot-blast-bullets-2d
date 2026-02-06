@@ -13,6 +13,7 @@
 			<param index="0" name="bullet_index_start" type="int" default="0" />
 			<param index="1" name="bullet_index_end_inclusive" type="int" default="-1" />
 			<description>
+				Get the attachments of all bullets in the specified range. Returns an array of [BulletAttachment2D], which can be null if a bullet doesn't have an attachment.
 			</description>
 		</method>
 		<method name="all_bullets_get_curves_data">
@@ -20,6 +21,7 @@
 			<param index="0" name="bullet_index_start" type="int" default="0" />
 			<param index="1" name="bullet_index_end_inclusive" type="int" default="-1" />
 			<description>
+				Get the curves data of all bullets in the specified range. Returns an array of [BulletCurvesData2D], which can be null if a bullet doesn't have curves data assigned.
 			</description>
 		</method>
 		<method name="all_bullets_get_direction" qualifiers="const">
@@ -27,6 +29,7 @@
 			<param index="0" name="bullet_index_start" type="int" default="0" />
 			<param index="1" name="bullet_index_end_inclusive" type="int" default="-1" />
 			<description>
+				Get the direction of all bullets in the specified range. Returns an array of [Vector2] directions.
 			</description>
 		</method>
 		<method name="all_bullets_get_speed_data" qualifiers="const">
@@ -34,6 +37,7 @@
 			<param index="0" name="bullet_index_start" type="int" default="0" />
 			<param index="1" name="bullet_index_end_inclusive" type="int" default="-1" />
 			<description>
+				Get the speed data of all bullets in the specified range. Returns an array of [BulletSpeedData2D].
 			</description>
 		</method>
 		<method name="all_bullets_get_texture_rotation_degrees" qualifiers="const">
@@ -41,6 +45,7 @@
 			<param index="0" name="bullet_index_start" type="int" default="0" />
 			<param index="1" name="bullet_index_end_inclusive" type="int" default="-1" />
 			<description>
+				Get the texture rotation in degrees of all bullets in the specified range. Returns an array of floats representing the rotation in degrees.
 			</description>
 		</method>
 		<method name="all_bullets_get_texture_rotation_radians" qualifiers="const">
@@ -48,6 +53,7 @@
 			<param index="0" name="bullet_index_start" type="int" default="0" />
 			<param index="1" name="bullet_index_end_inclusive" type="int" default="-1" />
 			<description>
+				Get the texture rotation in radians of all bullets in the specified range. Returns an array of floats representing the rotation in radians.
 			</description>
 		</method>
 		<method name="all_bullets_get_transforms" qualifiers="const">
@@ -55,6 +61,7 @@
 			<param index="0" name="bullet_index_start" type="int" default="0" />
 			<param index="1" name="bullet_index_end_inclusive" type="int" default="-1" />
 			<description>
+				Get the transforms of all bullets in the specified range. Returns an array of [Transform2D].
 			</description>
 		</method>
 		<method name="all_bullets_remove_movement_pattern">
@@ -62,6 +69,7 @@
 			<param index="0" name="start_index" type="int" default="0" />
 			<param index="1" name="end_index_inclusive" type="int" default="-1" />
 			<description>
+				Removes the movement pattern from all bullets in the specified range, making them lose any [Path2D] or [Curve2D] drawn pattern they had and move solely based on their direction and speed data.
 			</description>
 		</method>
 		<method name="all_bullets_set_attachment">
@@ -73,6 +81,7 @@
 			<param index="4" name="bullet_index_start" type="int" default="0" />
 			<param index="5" name="bullet_index_end_inclusive" type="int" default="-1" />
 			<description>
+				Spawns the same attachment to all bullets in the specified range. An attachment is a [BulletAttachment2D] that can contain a [Node2D] with particles, lights, etc... that will be attached to the bullet and follow it around. You can use the [BulletAttachment2D] properties to control how the attachment behaves and is positioned relative to the bullet.
 			</description>
 		</method>
 		<method name="all_bullets_set_attachment_to_null">
@@ -80,6 +89,9 @@
 			<param index="0" name="bullet_index_start" type="int" default="0" />
 			<param index="1" name="bullet_index_end_inclusive" type="int" default="-1" />
 			<description>
+				Removes the attachments of all bullets in the specified range by setting them to null. Returns an array of the removed [BulletAttachment2D] attachments, which can be useful if you want to reuse them as they are not freed, just detached from the bullets.
+
+				Warning: You have to take care of the returned attachments yourself.
 			</description>
 		</method>
 		<method name="all_bullets_set_curves_data">
@@ -88,6 +100,7 @@
 			<param index="1" name="bullet_index_start" type="int" default="0" />
 			<param index="2" name="bullet_index_end_inclusive" type="int" default="-1" />
 			<description>
+				Sets the same curves data to all bullets in the specified range. Curves data is a [BulletCurvesData2D] resource that can contain multiple curves used to control different aspects of the bullet's behavior over time, such as movement speed, rotation speed, direction adjustment, etc...
 			</description>
 		</method>
 		<method name="all_bullets_set_direction">
@@ -96,6 +109,7 @@
 			<param index="1" name="bullet_index_start" type="int" default="0" />
 			<param index="2" name="bullet_index_end_inclusive" type="int" default="-1" />
 			<description>
+				Sets the direction of all bullets in the specified range to a new direction. The direction gets normalized automatically.
 			</description>
 		</method>
 		<method name="all_bullets_set_direction_towards_node2d">
@@ -104,6 +118,7 @@
 			<param index="1" name="bullet_index_start" type="int" default="0" />
 			<param index="2" name="bullet_index_end_inclusive" type="int" default="-1" />
 			<description>
+				Sets the direction of all bullets in the specified range towards a target [Node2D]. The direction gets normalized automatically.
 			</description>
 		</method>
 		<method name="all_bullets_set_direction_towards_position">
@@ -112,6 +127,7 @@
 			<param index="1" name="bullet_index_start" type="int" default="0" />
 			<param index="2" name="bullet_index_end_inclusive" type="int" default="-1" />
 			<description>
+				Sets the direction of all bullets in the specified range towards a target global position. The direction gets normalized automatically.
 			</description>
 		</method>
 		<method name="all_bullets_set_movement_pattern_from_curve">
@@ -122,6 +138,11 @@
 			<param index="3" name="start_index" type="int" default="0" />
 			<param index="4" name="end_index_inclusive" type="int" default="-1" />
 			<description>
+				Sets a [Curve2D] drawn movement pattern to all bullets in the specified range. The bullets will follow the shape of the curve as they move. 
+
+				If [code]face_movement_direction[/code] is set to true, the bullets will also rotate to face the direction they are moving along the curve.
+
+				If [code]repeat_pattern[/code] is set to true, once a bullet reaches the end of the curve pattern it will start again from the beginning, creating a loop. If false, once a bullet reaches the end of the curve pattern it will stop following it and continue moving in a straight line based on its current direction and speed.
 			</description>
 		</method>
 		<method name="all_bullets_set_movement_pattern_from_path">
@@ -132,6 +153,11 @@
 			<param index="3" name="start_index" type="int" default="0" />
 			<param index="4" name="end_index_inclusive" type="int" default="-1" />
 			<description>
+				Sets a [Path2D] drawn movement pattern to all bullets in the specified range. The bullets will follow the shape of the path as they move. 
+
+				If [code]face_movement_direction[/code] is set to true, the bullets will also rotate to face the direction they are moving along the path.
+
+				If [code]repeat_pattern[/code] is set to true, once a bullet reaches the end of the path pattern it will start again from the beginning, creating a loop. If false, once a bullet reaches the end of the path pattern it will stop following it and continue moving in a straight line based on its current direction and speed.
 			</description>
 		</method>
 		<method name="all_bullets_set_speed_data">
@@ -140,6 +166,7 @@
 			<param index="1" name="bullet_index_start" type="int" default="0" />
 			<param index="2" name="bullet_index_end_inclusive" type="int" default="-1" />
 			<description>
+				Sets the same speed data to all bullets in the specified range. Speed data is a [BulletSpeedData2D] resource that can contain multiple properties used to control different aspects of the bullet's speed behavior, such as initial speed, acceleration, deceleration, max speed, etc...
 			</description>
 		</method>
 		<method name="all_bullets_set_texture_rotation_degrees">
@@ -148,6 +175,7 @@
 			<param index="1" name="bullet_index_start" type="int" default="0" />
 			<param index="2" name="bullet_index_end_inclusive" type="int" default="-1" />
 			<description>
+				Sets the same texture rotation in degrees to all bullets in the specified range.
 			</description>
 		</method>
 		<method name="all_bullets_set_texture_rotation_radians">
@@ -156,6 +184,7 @@
 			<param index="1" name="bullet_index_start" type="int" default="0" />
 			<param index="2" name="bullet_index_end_inclusive" type="int" default="-1" />
 			<description>
+				Sets the same texture rotation in radians to all bullets in the specified range.
 			</description>
 		</method>
 		<method name="all_bullets_set_texture_rotation_towards_node2d">
@@ -164,6 +193,8 @@
 			<param index="1" name="bullet_index_start" type="int" default="0" />
 			<param index="2" name="bullet_index_end_inclusive" type="int" default="-1" />
 			<description>
+				Sets the texture rotation of all bullets in the specified range towards a target [Node2D].
+				The rotation will be set so that the bullet's texture faces towards the target node.
 			</description>
 		</method>
 		<method name="all_bullets_set_texture_rotation_towards_position">
@@ -172,6 +203,8 @@
 			<param index="1" name="bullet_index_start" type="int" default="0" />
 			<param index="2" name="bullet_index_end_inclusive" type="int" default="-1" />
 			<description>
+				Sets the texture rotation of all bullets in the specified range towards a target global position.
+				The rotation will be set so that the bullet's texture faces towards the target position.
 			</description>
 		</method>
 		<method name="all_bullets_set_transforms">
@@ -181,36 +214,50 @@
 			<param index="2" name="bullet_index_start" type="int" default="0" />
 			<param index="3" name="bullet_index_end_inclusive" type="int" default="-1" />
 			<description>
+				Sets the same transform to all bullets in the specified range. A transform is a [Transform2D] that contains the bullet's position, rotation and scale. If you want to set them separately, use [method all_bullets_set_direction], [method all_bullets_set_texture_rotation_degrees], [method all_bullets_set_texture_rotation_radians] or [method all_bullets_set_speed_data].
+
+				If [code]set_direction_based_on_transform[/code] is set to true, the direction of the bullets will be set based on the rotation of the provided transform.
+				If false, the transform's rotation will be ignored and only its position and scale will be applied to the bullets, keeping their original direction.
+				The direction gets normalized automatically.
 			</description>
 		</method>
 		<method name="bullet_disable_attachment">
 			<return type="void" />
 			<param index="0" name="bullet_index" type="int" />
 			<description>
+				Disables the attachment of a specific bullet by calling its virtual function [method BulletAttachment2D.on_bullet_disable].
 			</description>
 		</method>
 		<method name="bullet_enable_attachment">
 			<return type="void" />
 			<param index="0" name="bullet_index" type="int" />
 			<description>
+				Enables the attachment of a specific bullet by calling its virtual function [method BulletAttachment2D.on_bullet_enable].
 			</description>
 		</method>
 		<method name="bullet_free_attachment">
 			<return type="void" />
 			<param index="0" name="bullet_index" type="int" />
 			<description>
+				Frees the attachment of a specific bullet, removing it from the scene tree and freeing the memory it occupies. Use this if you want to permanently remove an attachment from a bullet and free its resources, instead of just disabling it with [method bullet_disable_attachment].
+
+				Warning: Once you free an attachment, you can't reuse it anymore.
 			</description>
 		</method>
 		<method name="bullet_get_attachment">
 			<return type="BulletAttachment2D" />
 			<param index="0" name="bullet_index" type="int" />
 			<description>
+				Gets the attachment of a specific bullet. Returns a [BulletAttachment2D], which can be null if the bullet doesn't have an attachment.
 			</description>
 		</method>
 		<method name="bullet_get_curves_data" qualifiers="const">
 			<return type="BulletCurvesData2D" />
-			<param index="0" name="_unnamed_arg0" type="int" />
+			<param index="0" name="bullet_index" type="int" />
 			<description>
+				Gets the curves data of a specific bullet. Returns a [BulletCurvesData2D], which can be null if the bullet doesn't have curves data assigned.
+				Curves data is a [BulletCurvesData2D] resource that can contain multiple curves used to control different aspects of the bullet's behavior over time, such as movement speed, rotation speed, direction adjustment, etc...
+				Note: If you want to set or get the curves data of multiple bullets at once, use [method all_bullets_set_curves_data] or [method all_bullets_get_curves_data].
 			</description>
 		</method>
 		<method name="bullet_set_attachment">
@@ -221,12 +268,18 @@
 			<param index="3" name="bullet_attachment_offset" type="Vector2" />
 			<param index="4" name="stick_relative_to_bullet" type="bool" default="true" />
 			<description>
+				Spawns an attachment to a specific bullet. An attachment is a [BulletAttachment2D] that can contain a [Node2D] with particles, lights, etc... that will be attached to the bullet and follow it around.
 			</description>
 		</method>
 		<method name="bullet_set_attachment_to_null">
 			<return type="BulletAttachment2D" />
 			<param index="0" name="bullet_index" type="int" />
 			<description>
+				Removes the attachment of a specific bullet by setting it to null. Returns the removed [BulletAttachment2D] attachment, which can be useful if you want to reuse it as it is not freed, just detached from the bullet.
+
+				A cool trick you can do is, when a bullet collides or you want to disable it manually (with [method disable_bullet]) but keep its attachment active for a bit longer (for example, to let some particles or lights finish their effect), you can call this function to detach the attachment from the bullet and keep it on the scene.
+
+				Warning: You have to take care of the returned attachment yourself.
 			</description>
 		</method>
 		<method name="bullet_set_curves_data">
@@ -234,6 +287,9 @@
 			<param index="0" name="bullet_index" type="int" />
 			<param index="1" name="data" type="BulletCurvesData2D" />
 			<description>
+				Sets the curves data of a specific bullet. Curves data is a [BulletCurvesData2D] resource that can contain multiple curves used to control different aspects of the bullet's behavior over time, such as movement speed, rotation speed, direction adjustment, etc...
+
+				Note: If you want to set or get the curves data of multiple bullets at once, use [method all_bullets_set_curves_data] or [method all_bullets_get_curves_data].
 			</description>
 		</method>
 		<method name="disable_bullet">
@@ -275,52 +331,64 @@
 			<return type="Vector2" />
 			<param index="0" name="bullet_index" type="int" />
 			<description>
+				Get the direction of a specific bullet. Returns a [Vector2] direction.
 			</description>
 		</method>
 		<method name="get_bullet_movement_pattern_curve" qualifiers="const">
 			<return type="Curve2D" />
 			<param index="0" name="bullet_index" type="int" />
 			<description>
+				Get the movement pattern curve of a specific bullet.
 			</description>
 		</method>
 		<method name="get_bullet_speed_data" qualifiers="const">
 			<return type="BulletSpeedData2D" />
 			<param index="0" name="bullet_index" type="int" />
 			<description>
+				Get the speed data of a specific bullet. Returns a [BulletSpeedData2D] resource.
 			</description>
 		</method>
 		<method name="get_bullet_texture_rotation_degrees" qualifiers="const">
 			<return type="float" />
 			<param index="0" name="bullet_index" type="int" />
 			<description>
+				Get the texture rotation in degrees of a specific bullet. Returns a float representing the rotation in degrees.
 			</description>
 		</method>
 		<method name="get_bullet_texture_rotation_radians" qualifiers="const">
 			<return type="float" />
 			<param index="0" name="bullet_index" type="int" />
 			<description>
+				Get the texture rotation in radians of a specific bullet. Returns a float representing the rotation in radians.
 			</description>
 		</method>
 		<method name="get_bullet_transform" qualifiers="const">
 			<return type="Transform2D" />
 			<param index="0" name="bullet_index" type="int" />
 			<description>
+				Get the transform of a specific bullet. Returns a [Transform2D] containing the bullet's position, rotation and scale.
 			</description>
 		</method>
 		<method name="get_inherited_velocity_offset" qualifiers="const">
 			<return type="Vector2" />
 			<description>
+				Get the inherited velocity offset. This is the velocity that gets added to the bullets when they are spawned. This is useful for creating effects like a machine gun that inherits the velocity of the player character, so that the bullets shoot out with more speed if the player is moving forward, and with less speed if the player is moving backward or standing still.
+				Note: If you want to set a custom inherited velocity offset, you can use [method set_inherited_velocity_offset].
 			</description>
 		</method>
 		<method name="get_textures" qualifiers="const">
 			<return type="Texture2D[]" />
 			<description>
+				Get all textures that are currently being used to render the bullets with animation.
 			</description>
 		</method>
 		<method name="has_bullet_movement_pattern" qualifiers="const">
 			<return type="bool" />
 			<param index="0" name="bullet_index" type="int" />
 			<description>
+				Check if a specific bullet has a movement pattern assigned to it, either from a [Path2D] or a [Curve2D].
+				Returns true if the bullet has a movement pattern, false if it doesn't.
+				Note: A bullet can have its movement pattern removed by using [method remove_bullet_movement_pattern] or [method all_bullets_remove_movement_pattern].
 			</description>
 		</method>
 		<method name="is_bullet_status_enabled">
@@ -343,7 +411,7 @@
 				[code]callable[/code] - the callable that will be executed. It can be a lambda, a function or a method from another object.
 				[code]repeat[/code] - if set to true, then the callable will be executed every [code]time[/code] seconds.
 				[code]execute_only_if_multimesh_is_active[/code] - if set to [code]true[/code], then the callable will only be executed if the multimesh is active in the scene tree (if it has at least a single bullet that has not yet been disabled).
-				If you wish to execute the callable regardless of the multimesh being active or not, then set this parameter to [code]false[/code].
+				If you wish to execute the callable regardless of the multimesh being active or not (even when in object pool), then set this parameter to [code]false[/code].
 				Note: For this to take effect ensure that the [member is_multimesh_auto_pooling_enabled] property is set to false - this is because auto pooling clears any callables in order to re-use the multimesh later completely reset.
 
 				If you want to be able to detach the callable, then make sure that it is clearly declared outside as a variable or you could even use a normal Godot function.
@@ -369,6 +437,9 @@
 			<return type="void" />
 			<param index="0" name="bullet_index" type="int" />
 			<description>
+				Removes the movement pattern from a specific bullet, making it lose any [Path2D] or [Curve2D] drawn pattern it had and move solely based on its direction and speed data.
+				Note: If you want to remove the movement pattern from multiple bullets at once, use [method all_bullets_remove_movement_pattern].
+				Note: A bullet can have a movement pattern assigned by using [method set_bullet_movement_pattern_from_curve] or [method set_bullet_movement_pattern_from_path].
 			</description>
 		</method>
 		<method name="set_bullet_direction">
@@ -376,6 +447,7 @@
 			<param index="0" name="bullet_index" type="int" />
 			<param index="1" name="new_direction" type="Vector2" />
 			<description>
+				Set the direction of a specific bullet to a new direction. The direction gets normalized automatically.
 			</description>
 		</method>
 		<method name="set_bullet_direction_towards_node2d">
@@ -383,6 +455,7 @@
 			<param index="0" name="bullet_index" type="int" />
 			<param index="1" name="target_node" type="Node2D" />
 			<description>
+				Set the direction of a specific bullet towards a target [Node2D]. The direction gets normalized automatically.
 			</description>
 		</method>
 		<method name="set_bullet_direction_towards_position">
@@ -390,6 +463,7 @@
 			<param index="0" name="bullet_index" type="int" />
 			<param index="1" name="target_position" type="Vector2" />
 			<description>
+				Set the direction of a specific bullet towards a target global position. The direction gets normalized automatically.
 			</description>
 		</method>
 		<method name="set_bullet_movement_pattern_from_curve">
@@ -399,6 +473,14 @@
 			<param index="2" name="face_movement_direction" type="bool" default="false" />
 			<param index="3" name="repeat_pattern" type="bool" default="true" />
 			<description>
+				Set a [Curve2D] drawn movement pattern to a specific bullet. The bullet will follow the shape of the curve as it moves. 
+
+				If [code]face_movement_direction[/code] is set to true, the bullet will also rotate to face the direction it is moving along the curve.
+
+				If [code]repeat_pattern[/code] is set to true, once the bullet reaches the end of the curve pattern it will start again from the beginning, creating a loop. If false, once the bullet reaches the end of the curve pattern it will stop following it and continue moving in a straight line based on its current direction and speed.
+				Note: If you want to set a movement pattern from a curve to multiple bullets at once, use [method all_bullets_set_movement_pattern_from_curve].
+				Note: A bullet can have its movement pattern removed by using [method remove_bullet_movement_pattern] or [method all_bullets_remove_movement_pattern].
+				Note: A bullet can only have one movement pattern at a time, so if you set a new movement pattern to a bullet that already has one, it will replace the previous one.
 			</description>
 		</method>
 		<method name="set_bullet_movement_pattern_from_path">
@@ -408,6 +490,16 @@
 			<param index="2" name="face_movement_direction" type="bool" default="false" />
 			<param index="3" name="repeat_pattern" type="bool" default="true" />
 			<description>
+				Set a [Path2D] drawn movement pattern to a specific bullet. The bullet will follow the shape of the path as it moves. 
+
+				If [code]face_movement_direction[/code] is set to true, the bullet will also rotate to face the direction it is moving along the path.
+
+				If [code]repeat_pattern[/code] is set to true, once the bullet reaches the end of the path pattern it will start again from the beginning, creating a loop. If false, once the bullet reaches the end of the path pattern it will stop following it and continue moving in a straight line based on its current direction and speed.
+				Note: If you want to set a movement pattern from a path to multiple bullets at once, use [method all_bullets_set_movement_pattern_from_path].
+				Note: A bullet can have its movement pattern removed by using [method remove_bullet_movement_pattern] or [method all_bullets_remove_movement_pattern].
+				Note: A bullet can only have one movement pattern at a time, so if you set a new movement pattern to a bullet that already has one, it will replace the previous one.
+				Note: The [Path2D] used for setting a movement pattern doesn't need to be in the scene tree, since only its curve is used for the bullets movement.
+				Warning: If you are using a [Path2D] that is in the scene tree and you modify its curve after setting it as a movement pattern for a bullet, it may cause unexpected behavior in the bullet's movement. This is because the bullet's movement pattern is based on the curve data of the [Path2D], and modifying it while it's being used can lead to inconsistencies. It's recommended to use a [Path2D] that is not in the scene tree or to avoid modifying its curve after assigning it as a movement pattern to bullets.
 			</description>
 		</method>
 		<method name="set_bullet_speed_data">
@@ -415,6 +507,7 @@
 			<param index="0" name="bullet_index" type="int" />
 			<param index="1" name="new_bullet_speed_data" type="BulletSpeedData2D" />
 			<description>
+				Set the speed data of a specific bullet.
 			</description>
 		</method>
 		<method name="set_bullet_texture_rotation_degrees">
@@ -422,6 +515,7 @@
 			<param index="0" name="bullet_index" type="int" />
 			<param index="1" name="new_rotation_degrees" type="float" />
 			<description>
+				Set the texture rotation in degrees of a specific bullet.
 			</description>
 		</method>
 		<method name="set_bullet_texture_rotation_radians">
@@ -429,6 +523,7 @@
 			<param index="0" name="bullet_index" type="int" />
 			<param index="1" name="new_rotation_radians" type="float" />
 			<description>
+				Set the texture rotation in radians of a specific bullet.
 			</description>
 		</method>
 		<method name="set_bullet_texture_rotation_towards_node2d">
@@ -436,6 +531,8 @@
 			<param index="0" name="bullet_index" type="int" />
 			<param index="1" name="target_node" type="Node2D" />
 			<description>
+				Set the texture rotation of a specific bullet towards a target [Node2D].
+				The rotation will be set so that the bullet's texture faces towards the target node.
 			</description>
 		</method>
 		<method name="set_bullet_texture_rotation_towards_position">
@@ -443,6 +540,8 @@
 			<param index="0" name="bullet_index" type="int" />
 			<param index="1" name="target_position" type="Vector2" />
 			<description>
+				Set the texture rotation of a specific bullet towards a target global position.
+				The rotation will be set so that the bullet's texture faces towards the target position.
 			</description>
 		</method>
 		<method name="set_bullet_transform">
@@ -451,18 +550,23 @@
 			<param index="1" name="new_transform" type="Transform2D" />
 			<param index="2" name="set_direction_based_on_transform" type="bool" default="false" />
 			<description>
+				Set the transform of a specific bullet.
 			</description>
 		</method>
 		<method name="set_bullets_current_collision_count">
 			<return type="bool" />
 			<param index="0" name="arr" type="int[]" />
 			<description>
+				Set the current collision count for multiple bullets at once by providing an array of integers, where each integer represents the current collision count for a bullet. The index of each integer in the array corresponds to the bullet index it is meant to set the collision count for.
+
+				For example, if you have 3 bullets and you want to set their current collision counts to 1, 2 and 3 respectively, you would call this function with an array like [1, 2, 3].
 			</description>
 		</method>
 		<method name="set_inherited_velocity_offset">
 			<return type="void" />
 			<param index="0" name="new_offset" type="Vector2" />
 			<description>
+				Sets a custom inherited velocity offset. This is the velocity that gets added to the bullets when they are spawned. This is useful for creating effects like a machine gun that inherits the velocity of the player character, so that the bullets shoot out with more speed if the player is moving forward, and with less speed if the player is moving backward or standing still.
 			</description>
 		</method>
 		<method name="set_textures">
@@ -471,6 +575,7 @@
 			<param index="1" name="new_change_texture_times" type="float[]" />
 			<param index="2" name="selected_texture_index" type="int" default="0" />
 			<description>
+				Sets the textures used to render the bullets with animation. You can provide an array of textures to create a frame by frame animation effect on the bullets. The [code]new_change_texture_times[/code] parameter is an array of floats that specifies how many seconds to wait before changing to the next texture in the [code]new_textures[/code] array. The index of each float in the [code]new_change_texture_times[/code] array corresponds to the texture index it is meant to set the change time for.
 			</description>
 		</method>
 	</methods>
@@ -479,13 +584,23 @@
 			How many times a bullet can collide before it gets disabled. If you set to 0, then the bullet will NEVER get disabled due to collisions.
 		</member>
 		<member name="bullets_current_collision_count" type="int[]" setter="set_bullets_current_collision_count" getter="get_bullets_current_collision_count" default="[]">
+			An array of integers representing the current collision count for each bullet. The index of each integer in the array corresponds to the bullet index it is meant to represent.
+
+			For example, if you have 3 bullets and their current collision counts are 1, 2 and 3 respectively, then this array would be [1, 2, 3].
+
+			You can use this property to keep track of how many times each bullet has collided, and you can also set it to update the collision counts as needed.
 		</member>
 		<member name="bullets_custom_data" type="Resource" setter="set_bullets_custom_data" getter="get_bullets_custom_data">
-			You can edit the custom bullets data that the bullets multimesh was spawned with
+			You can edit the custom bullets data that the bullets multimesh was spawned with. Use this to set damage data or anything else you want to store in a resource for your bullets to use.
 		</member>
 		<member name="curves_elapsed_time" type="float" setter="set_curves_elapsed_time" getter="get_curves_elapsed_time" default="0.0">
+			The elapsed time used for the bullets' curves. This is the time that gets passed to the curves assigned to the bullets, you can manipulate it freely.
 		</member>
 		<member name="is_attachments_auto_pooling_enabled" type="bool" setter="set_is_attachments_auto_pooling_enabled" getter="get_is_attachments_auto_pooling_enabled" default="true">
+			Whether the attachments auto pooling is enabled or not.
+
+			When enabled, the attachments will automatically get pushed to the object pool when the bullets get disabled.
+			When disabled, the attachments will automatically get freed from the scene tree upon collision.
 		</member>
 		<member name="is_life_time_infinite" type="bool" setter="set_is_life_time_infinite" getter="get_is_life_time_infinite" default="false">
 			If you set to true, then the lifetime will be ignored and bullets will never be destroyed.
@@ -495,12 +610,13 @@
 		<member name="is_multimesh_auto_pooling_enabled" type="bool" setter="set_is_multimesh_auto_pooling_enabled" getter="get_is_multimesh_auto_pooling_enabled" default="true">
 			Whether the multimesh auto pooling is enabled or not.
 
-			When enabled, the multimesh will automatically get removed from the scene tree when all bullets are disabled, and it will also clear all time based callables.
+			When enabled, the multimesh will automatically get pushed to the object pool when all bullets are disabled.
 			When disabled, you are the one responsible for re-using the multimesh or clearing any time based callables that you might have attached with [member attach_time_based_function].
 
 			If you are going to save your multimesh bullets in an array, then it's probably best to disable auto pooling and manage the instances yourself.
 		</member>
 		<member name="shared_bullet_curves_data" type="BulletCurvesData2D" setter="set_shared_bullet_curves_data" getter="get_shared_bullet_curves_data">
+			A shared [BulletCurvesData2D] resource that can be assigned to all bullets in the multimesh. This is useful for saving memory if you have a lot of bullets that share the same curves data, since you can assign the same resource to all of them instead of creating a new one for each bullet.
 		</member>
 	</members>
 </class>

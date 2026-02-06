@@ -4,13 +4,6 @@
 		Provides the functionality of bullets being able to carry particles or other nodes as they move.
 	</brief_description>
 	<description>
-		In order for attachments to work correctly they need a unique [member attachment_id] positive value.
-		The way you use attachments is the following:
-		1. Create a new scene that has a parent node of [BulletAttachment2D].
-		2. Add any other nodes to the scene or logic to it - whatever the bullets are going to be carrying as they move.
-		3. Set the [member attachment_id] inside [method on_bullet_spawn] and [method on_spawn_in_pool] functions.
-		4. Configure any other custom logic in the rest of the functions (read the rest of the documentation carefully, you need to override the virtual functions to execute custom logic).
-		5. Set this attachment to a spawn data ([BlockBulletsData2D] or [DirectionalBulletsData2D]) by using [member MultimeshBulletsData2D.attachment_scenes] property and use one of [BulletFactory2D]'s spawn functions to spawn the actual bullets.
 	</description>
 	<tutorials>
 	</tutorials>
@@ -19,35 +12,28 @@
 			<return type="void" />
 			<description>
 				Executed when the attachment is disabled before it goes to the object pool. You should provide disable logic - attachment gets invisible/disables specific functionality or children etc...
-
-				Note: This function gets executed over and over again since attachment object pooling is used.
 			</description>
 		</method>
 		<method name="on_bullet_enable" qualifiers="virtual">
 			<return type="void" />
 			<description>
 				Executed when the attachment is enabled again from the object pool. You should provide activation logic - attachment gets visible/enabled etc..
-
-				Note: This function gets executed over and over again since attachment object pooling is used.
 			</description>
 		</method>
 		<method name="on_bullet_spawn" qualifiers="virtual">
 			<return type="void" />
 			<description>
 				Executed before the attachment gets added to the scene tree.
-				This is the place where you should set a unique positive value for the [member attachment_id] property. The object pooling logic depends on it.
 
-				Note: The [BulletAttachment2D] is not yet in the scene tree when this method is executed, so don't call functions that depend on already configured children etc.. instead use [code]_ready[/code]. Just save state specific logic in variables and then later in [code]_ready[/code] handle that.
+				Warning: The [BulletAttachment2D] is not yet in the scene tree when this method is executed.
 			</description>
 		</method>
 		<method name="on_spawn_in_pool" qualifiers="virtual">
 			<return type="void" />
 			<description>
-				This is a special case function. The [BulletFactory2D] uses it when it populates the attachment object pool. 
-				You are required to set the same [member attachment_id] that you did in the [method on_bullet_spawn] function.
 				Ensure the attachment is in disabled state (example: attachment should be invisible when you are populating the object pool... in the same state as in the [method on_bullet_disable] function).
 
-				Note: The [BulletAttachment2D] is not yet in the scene tree when this method is executed, so don't call functions that depend on already configured children etc.. instead use [code]_ready[/code]. Just save state specific logic in variables and then later in [code]_ready[/code] handle that.
+				Warning: The [BulletAttachment2D] is not yet in the scene tree when this method is executed, so don't call functions that depend on already configured children etc.. instead use [code]_ready[/code]. Just save state specific logic in variables and then later in [code]_ready[/code] handle that.
 			</description>
 		</method>
 	</methods>

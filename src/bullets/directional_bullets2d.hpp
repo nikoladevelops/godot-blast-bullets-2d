@@ -2,11 +2,9 @@
 
 #include "../shared/bullet_speed_data2d.hpp"
 #include "../shared/homing_target_deque.hpp"
-#include "godot_cpp/classes/global_constants.hpp"
 #include "godot_cpp/classes/node2d.hpp"
 #include "godot_cpp/classes/object.hpp"
 #include "godot_cpp/classes/wrapped.hpp"
-#include "godot_cpp/core/class_db.hpp"
 #include "godot_cpp/core/defs.hpp"
 #include "godot_cpp/core/math.hpp"
 #include "godot_cpp/variant/array.hpp"
@@ -19,7 +17,6 @@
 #include "shared/bullet_curves_data2d.hpp"
 #include "spawn-data/multimesh_bullets_data2d.hpp"
 
-#include <cmath>
 #include <cstdint>
 #include <unordered_map>
 #include <vector>
@@ -88,7 +85,7 @@ protected:
 	real_t homing_smoothing = 0.0;
 
 	// Minimum distance (in pixels) from the homing target at which the bullet is considered to have reached it. Once within this distance, the bullet_homing_target_reached signal is emitted
-	real_t distance_from_target_before_considering_as_reached = 5.0;
+	real_t homing_distance_before_reached = 5.0;
 
 	// This tracks each bullet's homing deque - allows each bullet to have its own separate homing targets (per-bullet homing)
 	std::vector<HomingTargetDeque> all_bullet_homing_targets;
@@ -1156,8 +1153,8 @@ public:
 	void set_homing_take_control_of_texture_rotation(bool value) { homing_take_control_of_texture_rotation = value; }
 	bool get_bullet_homing_auto_pop_after_target_reached() const { return bullet_homing_auto_pop_after_target_reached; }
 	void set_bullet_homing_auto_pop_after_target_reached(bool value) { bullet_homing_auto_pop_after_target_reached = value; }
-	real_t get_distance_from_target_before_considering_as_reached() const { return distance_from_target_before_considering_as_reached; }
-	void set_distance_from_target_before_considering_as_reached(real_t value) { distance_from_target_before_considering_as_reached = value; }
+	real_t get_homing_distance_before_reached() const { return homing_distance_before_reached; }
+	void set_homing_distance_before_reached(real_t value) { homing_distance_before_reached = value; }
 	bool get_shared_homing_deque_auto_pop_after_target_reached() const { return shared_homing_deque_auto_pop_after_target_reached; }
 	void set_shared_homing_deque_auto_pop_after_target_reached(bool value) { shared_homing_deque_auto_pop_after_target_reached = value; }
 
@@ -1265,7 +1262,7 @@ protected:
 		// Reached check: Post-move, direct to actual target
 		Vector2 post_to_target = target_pos - bullet_pos;
 		real_t post_dist_sq = post_to_target.length_squared();
-		real_t threshold_sq = distance_from_target_before_considering_as_reached * distance_from_target_before_considering_as_reached;
+		real_t threshold_sq = homing_distance_before_reached * homing_distance_before_reached;
 		if (post_dist_sq <= threshold_sq) { // Fully squared for perf
 
 			HomingTarget &target = homing_deque.front();

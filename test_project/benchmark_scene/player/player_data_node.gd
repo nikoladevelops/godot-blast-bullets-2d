@@ -188,7 +188,7 @@ func spawn_multi_mesh_directional_bullets()->void:
 	dir_bullets.homing_smoothing = 0.0# Set from 0 to 20 or even bigger (but you might have issues with interpolation)
 	dir_bullets.homing_update_interval = 0.00# Set an update timer - keep it low for smooth updates
 	dir_bullets.homing_take_control_of_texture_rotation = true
-	dir_bullets.distance_from_target_before_considering_as_reached = 50
+	dir_bullets.homing_distance_before_reached = 50
 	
 	#dir_bullets.bullet_homing_auto_pop_after_target_reached = true
 	dir_bullets.is_multimesh_auto_pooling_enabled = true

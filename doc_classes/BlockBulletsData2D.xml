@@ -4,7 +4,7 @@
 		Contains spawn data for the [BlockBullets2D].
 	</brief_description>
 	<description>
-		Ensure that the [member MultiMeshBulletsData2D.transforms] property is set or your game will crash.
+		Ensure that the [member MultiMeshBulletsData2D.transforms] property is set.
 		Check [MultiMeshBulletsData2D]'s documentation for the rest of the properties.
 	</description>
 	<tutorials>
