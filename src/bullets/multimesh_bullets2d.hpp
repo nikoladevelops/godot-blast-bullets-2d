@@ -1228,8 +1228,10 @@ protected:
 		// Always keep track of how many collisions this bullet had (yes even if the user set bullet_max_collision_count to 0, I just want consistent behavior)
 		++current_bullet_collision_amount;
 
+		const bool bullet_reached_max_collisions = bullet_max_collision_count > 0 && current_bullet_collision_amount >= bullet_max_collision_count;
+		
 		// Only disable the bullet if the max collision count is greater than 0, otherwise the bullet should never be disabled due to collisions
-		if (bullet_max_collision_count > 0 && current_bullet_collision_amount >= bullet_max_collision_count) {
+		if (bullet_reached_max_collisions) {
 			disable_bullet(bullet_index, false); // Don't disable the attachment yet, first emit the signal for collision so user has access to the attachment and CAN detach it himself inside GDScript
 		}
 
@@ -1241,8 +1243,11 @@ protected:
 			bullet_factory->emit_signal("body_entered", hit_target, this, bullet_index, bullets_custom_data, all_cached_instance_transforms[bullet_index]);
 		}
 
-		// Deal with the attachment (or user detached it already inside the signal callback function)
-		bullet_disable_attachment(bullet_index);
+		// Disable the bullet attachment if the bullet reached its max collision count and the attachment is still enabled
+		if (bullet_reached_max_collisions) {
+			// Deal with the attachment (or user detached it already inside the signal callback function)
+			bullet_disable_attachment(bullet_index);
+		}
 	}
 
 	/// COLLISION DETECTION METHODS
