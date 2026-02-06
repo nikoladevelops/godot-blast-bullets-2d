@@ -1,4 +1,4 @@
-[gd_scene load_steps=11 format=3 uid="uid://3dxd6rfhxqym"]
+[gd_scene format=3 uid="uid://3dxd6rfhxqym"]
 
 [ext_resource type="Script" uid="uid://vmu7hbo17mwy" path="res://shared/enemies/enemy_ship/enemy_ship.gd" id="1_vp35s"]
 [ext_resource type="PackedScene" uid="uid://d17ruamw4uuqo" path="res://shared/components/health_bar_component/health_bar_component.tscn" id="2_eiqo5"]
@@ -42,50 +42,50 @@ animations = [{
 "speed": 12.0
 }]
 
-[node name="EnemyShip" type="Area2D"]
+[node name="EnemyShip" type="Area2D" unique_id=1702296689]
 collision_layer = 4
 collision_mask = 0
 monitoring = false
 script = ExtResource("1_vp35s")
 
-[node name="CollisionShape2D" type="CollisionShape2D" parent="."]
+[node name="CollisionShape2D" type="CollisionShape2D" parent="." unique_id=202931782]
 visible = false
 position = Vector2(-1, -0.5)
 shape = SubResource("RectangleShape2D_c1d14")
 
-[node name="FollowTargetRadiusArea2D" type="Area2D" parent="."]
+[node name="FollowTargetRadiusArea2D" type="Area2D" parent="." unique_id=7061103]
 visible = false
 collision_layer = 4
 monitorable = false
 
-[node name="CollisionShape2D" type="CollisionShape2D" parent="FollowTargetRadiusArea2D"]
+[node name="CollisionShape2D" type="CollisionShape2D" parent="FollowTargetRadiusArea2D" unique_id=2106826478]
 shape = SubResource("CircleShape2D_kvg0p")
 
-[node name="HealthBar" parent="." instance=ExtResource("2_eiqo5")]
+[node name="HealthBar" parent="." unique_id=940710495 instance=ExtResource("2_eiqo5")]
 offset_left = -49.0
 offset_top = -109.0
 offset_right = 51.0
 offset_bottom = -86.0
 
-[node name="AnimatedSprite2D" type="AnimatedSprite2D" parent="."]
+[node name="AnimatedSprite2D" type="AnimatedSprite2D" parent="." unique_id=1741007266]
 rotation = 1.5708
 scale = Vector2(5, 5)
 sprite_frames = SubResource("SpriteFrames_wqqrr")
 animation = &"idle"
 
-[node name="LeftMarker2D" type="Marker2D" parent="AnimatedSprite2D"]
+[node name="LeftMarker2D" type="Marker2D" parent="AnimatedSprite2D" unique_id=40854020]
 position = Vector2(-9, -17)
 rotation = -1.5708
 
-[node name="CenterMarker2D" type="Marker2D" parent="AnimatedSprite2D"]
+[node name="CenterMarker2D" type="Marker2D" parent="AnimatedSprite2D" unique_id=220569991]
 position = Vector2(0.199999, -22)
 rotation = -1.5708
 
-[node name="RightMarker2D" type="Marker2D" parent="AnimatedSprite2D"]
+[node name="RightMarker2D" type="Marker2D" parent="AnimatedSprite2D" unique_id=1071363261]
 position = Vector2(11, -19)
 rotation = -1.5708
 
-[node name="ShootTimer" type="Timer" parent="."]
+[node name="ShootTimer" type="Timer" parent="." unique_id=2123705527]
 one_shot = true
 
 [connection signal="body_entered" from="FollowTargetRadiusArea2D" to="." method="_on_follow_target_radius_area_2d_body_entered"]

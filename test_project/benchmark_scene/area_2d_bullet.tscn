@@ -1,4 +1,4 @@
-[gd_scene load_steps=14 format=3 uid="uid://c6uqang4rbwas"]
+[gd_scene format=3 uid="uid://c6uqang4rbwas"]
 
 [ext_resource type="Texture2D" uid="uid://b3cy0txg2yjjs" path="res://shared/art/player_bullets/1.png" id="1_m5hbg"]
 [ext_resource type="Script" uid="uid://cv5tcf461jeeh" path="res://benchmark_scene/area_2d_bullet.gd" id="1_uakmy"]
@@ -53,21 +53,21 @@ animations = [{
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_1exyw"]
 size = Vector2(11, 6)
 
-[node name="Area2DBullet" type="Area2D"]
+[node name="Area2DBullet" type="Area2D" unique_id=259201478]
 collision_layer = 2
 collision_mask = 4
 script = ExtResource("1_uakmy")
 
-[node name="AnimatedSprite2D" type="AnimatedSprite2D" parent="."]
+[node name="AnimatedSprite2D" type="AnimatedSprite2D" parent="." unique_id=577701872]
 sprite_frames = SubResource("SpriteFrames_dvth3")
 frame = 4
 frame_progress = 0.551344
 
-[node name="CollisionShape2D" type="CollisionShape2D" parent="."]
+[node name="CollisionShape2D" type="CollisionShape2D" parent="." unique_id=430842792]
 position = Vector2(0.5, 0)
 shape = SubResource("RectangleShape2D_1exyw")
 
-[node name="LifeTimeTimer" type="Timer" parent="."]
+[node name="LifeTimeTimer" type="Timer" parent="." unique_id=1089974176]
 one_shot = true
 
 [connection signal="area_entered" from="." to="." method="_on_area_entered"]

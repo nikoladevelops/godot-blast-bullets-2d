@@ -1,4 +1,4 @@
-[gd_scene load_steps=18 format=3 uid="uid://cud5bunpvk1hb"]
+[gd_scene format=3 uid="uid://cud5bunpvk1hb"]
 
 [ext_resource type="Script" uid="uid://cj7yt22hrpu8v" path="res://benchmark_scene/ui.gd" id="1_lkveq"]
 [ext_resource type="Theme" uid="uid://cqmgct2nhqx0e" path="res://shared/ui/btn_disabled_theme.tres" id="2_e8asd"]
@@ -26,11 +26,11 @@ Button/styles/disabled = SubResource("StyleBoxFlat_vfxln")
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_e0ht7"]
 
-[node name="UI" type="CanvasLayer"]
+[node name="UI" type="CanvasLayer" unique_id=1629046844]
 script = ExtResource("1_lkveq")
 default_player_health = 100.0
 
-[node name="BlockDebuggerColorPicker" type="ColorPicker" parent="."]
+[node name="BlockDebuggerColorPicker" type="ColorPicker" parent="." unique_id=1467060132]
 visible = false
 z_index = 5
 anchors_preset = 8
@@ -49,7 +49,7 @@ size_flags_horizontal = 4
 mouse_filter = 0
 theme = SubResource("Theme_ptpx1")
 
-[node name="DirectionalDebuggerColorPicker" type="ColorPicker" parent="."]
+[node name="DirectionalDebuggerColorPicker" type="ColorPicker" parent="." unique_id=1438354296]
 visible = false
 z_index = 5
 anchors_preset = 8
@@ -68,7 +68,7 @@ size_flags_horizontal = 4
 mouse_filter = 0
 theme = SubResource("Theme_vfxln")
 
-[node name="CloseCurrentColorPickerBtn" type="Button" parent="."]
+[node name="CloseCurrentColorPickerBtn" type="Button" parent="." unique_id=1891504070]
 visible = false
 z_index = 5
 anchors_preset = 8
@@ -85,7 +85,7 @@ grow_vertical = 2
 focus_mode = 0
 text = "Close Color Picker"
 
-[node name="TopRightContainer" type="VBoxContainer" parent="."]
+[node name="TopRightContainer" type="VBoxContainer" parent="." unique_id=1529341854]
 custom_minimum_size = Vector2(200, 0)
 anchors_preset = 1
 anchor_left = 1.0
@@ -94,21 +94,21 @@ offset_left = -200.0
 offset_bottom = 147.0
 grow_horizontal = 0
 
-[node name="CurrentFPS" type="Label" parent="TopRightContainer"]
+[node name="CurrentFPS" type="Label" parent="TopRightContainer" unique_id=1443015256]
 layout_mode = 2
 text = "FPS::"
 
-[node name="LowFPS" type="Label" parent="TopRightContainer"]
+[node name="LowFPS" type="Label" parent="TopRightContainer" unique_id=670312590]
 layout_mode = 2
 text = "Low:"
 
-[node name="TrackFPSBtn" type="Button" parent="TopRightContainer"]
+[node name="TrackFPSBtn" type="Button" parent="TopRightContainer" unique_id=1412509999]
 layout_mode = 2
 focus_mode = 0
 theme = ExtResource("2_e8asd")
 text = "Not Tracking FPS"
 
-[node name="ObjectPoolSettingsView" type="Control" parent="."]
+[node name="ObjectPoolSettingsView" type="Control" parent="." unique_id=530912329]
 visible = false
 layout_mode = 3
 anchors_preset = 15
@@ -118,7 +118,7 @@ grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
 
-[node name="FreeBulletPoolVBoxContainer" type="VBoxContainer" parent="ObjectPoolSettingsView"]
+[node name="FreeBulletPoolVBoxContainer" type="VBoxContainer" parent="ObjectPoolSettingsView" unique_id=2100869197]
 layout_mode = 1
 anchors_preset = 3
 anchor_left = 1.0
@@ -131,13 +131,13 @@ grow_horizontal = 0
 grow_vertical = 0
 size_flags_vertical = 8
 
-[node name="Label" type="Label" parent="ObjectPoolSettingsView/FreeBulletPoolVBoxContainer"]
+[node name="Label" type="Label" parent="ObjectPoolSettingsView/FreeBulletPoolVBoxContainer" unique_id=2007634529]
 layout_mode = 2
 text = "Free specific bullets object pool
 that has N amount bullets"
 horizontal_alignment = 1
 
-[node name="FreeMultiMeshDirectionalPoolBtn" type="Button" parent="ObjectPoolSettingsView/FreeBulletPoolVBoxContainer"]
+[node name="FreeMultiMeshDirectionalPoolBtn" type="Button" parent="ObjectPoolSettingsView/FreeBulletPoolVBoxContainer" unique_id=638277059]
 custom_minimum_size = Vector2(200, 46)
 layout_mode = 2
 size_flags_vertical = 8
@@ -147,7 +147,7 @@ text = "Free Directional Bullets Pool
 (only those with N amount bullets)"
 autowrap_mode = 2
 
-[node name="FreeMultiMeshBlockBulletsPoolBtn" type="Button" parent="ObjectPoolSettingsView/FreeBulletPoolVBoxContainer"]
+[node name="FreeMultiMeshBlockBulletsPoolBtn" type="Button" parent="ObjectPoolSettingsView/FreeBulletPoolVBoxContainer" unique_id=280404643]
 custom_minimum_size = Vector2(200, 46)
 layout_mode = 2
 size_flags_vertical = 8
@@ -157,7 +157,7 @@ text = "Free Block Bullets Pool
 (only those with N amount bullets)"
 autowrap_mode = 2
 
-[node name="FreeAllBulletPoolsBtn" type="Button" parent="ObjectPoolSettingsView/FreeBulletPoolVBoxContainer"]
+[node name="FreeAllBulletPoolsBtn" type="Button" parent="ObjectPoolSettingsView/FreeBulletPoolVBoxContainer" unique_id=1844945031]
 custom_minimum_size = Vector2(151, 46)
 layout_mode = 2
 size_flags_vertical = 8
@@ -168,7 +168,7 @@ text = "Free All Bullet Pools
 "
 autowrap_mode = 2
 
-[node name="PopulateBulletPoolVBoxContainer" type="VBoxContainer" parent="ObjectPoolSettingsView"]
+[node name="PopulateBulletPoolVBoxContainer" type="VBoxContainer" parent="ObjectPoolSettingsView" unique_id=2089181824]
 layout_mode = 1
 anchors_preset = 3
 anchor_left = 1.0
@@ -183,14 +183,14 @@ grow_horizontal = 0
 grow_vertical = 0
 size_flags_vertical = 8
 
-[node name="Label" type="Label" parent="ObjectPoolSettingsView/PopulateBulletPoolVBoxContainer"]
+[node name="Label" type="Label" parent="ObjectPoolSettingsView/PopulateBulletPoolVBoxContainer" unique_id=689906736]
 layout_mode = 2
 text = "Populate X amount
 MultiMeshInstances
 with N amount bullets"
 horizontal_alignment = 1
 
-[node name="PopulateMultiMeshDirectionalPoolBtn" type="Button" parent="ObjectPoolSettingsView/PopulateBulletPoolVBoxContainer"]
+[node name="PopulateMultiMeshDirectionalPoolBtn" type="Button" parent="ObjectPoolSettingsView/PopulateBulletPoolVBoxContainer" unique_id=1063897349]
 custom_minimum_size = Vector2(200, 69)
 layout_mode = 2
 size_flags_vertical = 8
@@ -200,7 +200,7 @@ text = "Populate Directional Bullets Pool
 ( X amount MultiMeshes with N amount bullets)"
 autowrap_mode = 2
 
-[node name="PopulateMultiMeshBlockPoolBtn" type="Button" parent="ObjectPoolSettingsView/PopulateBulletPoolVBoxContainer"]
+[node name="PopulateMultiMeshBlockPoolBtn" type="Button" parent="ObjectPoolSettingsView/PopulateBulletPoolVBoxContainer" unique_id=1403601704]
 custom_minimum_size = Vector2(200, 46)
 layout_mode = 2
 size_flags_vertical = 8
@@ -211,7 +211,7 @@ Bullets Pool
 ( X amount MultiMeshes with N amount bullets)"
 autowrap_mode = 2
 
-[node name="AmountMultiMeshInstancesVboxContainer" type="VBoxContainer" parent="ObjectPoolSettingsView"]
+[node name="AmountMultiMeshInstancesVboxContainer" type="VBoxContainer" parent="ObjectPoolSettingsView" unique_id=522313607]
 layout_mode = 1
 anchors_preset = 2
 anchor_top = 1.0
@@ -223,145 +223,148 @@ offset_bottom = -5.0
 grow_vertical = 0
 alignment = 1
 
-[node name="Label" type="Label" parent="ObjectPoolSettingsView/AmountMultiMeshInstancesVboxContainer"]
+[node name="Label" type="Label" parent="ObjectPoolSettingsView/AmountMultiMeshInstancesVboxContainer" unique_id=1483116611]
 layout_mode = 2
 text = "Amount MultiMeshInstances (X)"
 horizontal_alignment = 1
 
-[node name="HBoxContainer" type="HBoxContainer" parent="ObjectPoolSettingsView/AmountMultiMeshInstancesVboxContainer"]
+[node name="HBoxContainer" type="HBoxContainer" parent="ObjectPoolSettingsView/AmountMultiMeshInstancesVboxContainer" unique_id=2058705799]
 layout_mode = 2
 alignment = 1
 
-[node name="1" type="Button" parent="ObjectPoolSettingsView/AmountMultiMeshInstancesVboxContainer/HBoxContainer"]
+[node name="1" type="Button" parent="ObjectPoolSettingsView/AmountMultiMeshInstancesVboxContainer/HBoxContainer" unique_id=837580298]
 custom_minimum_size = Vector2(32, 0)
 layout_mode = 2
 focus_mode = 0
 text = "1"
 
-[node name="5" type="Button" parent="ObjectPoolSettingsView/AmountMultiMeshInstancesVboxContainer/HBoxContainer"]
+[node name="5" type="Button" parent="ObjectPoolSettingsView/AmountMultiMeshInstancesVboxContainer/HBoxContainer" unique_id=823130215]
 custom_minimum_size = Vector2(32, 0)
 layout_mode = 2
 focus_mode = 0
 text = "5"
 
-[node name="15" type="Button" parent="ObjectPoolSettingsView/AmountMultiMeshInstancesVboxContainer/HBoxContainer"]
+[node name="15" type="Button" parent="ObjectPoolSettingsView/AmountMultiMeshInstancesVboxContainer/HBoxContainer" unique_id=1711292588]
 custom_minimum_size = Vector2(32, 0)
 layout_mode = 2
 focus_mode = 0
 text = "15"
 
-[node name="30" type="Button" parent="ObjectPoolSettingsView/AmountMultiMeshInstancesVboxContainer/HBoxContainer"]
+[node name="30" type="Button" parent="ObjectPoolSettingsView/AmountMultiMeshInstancesVboxContainer/HBoxContainer" unique_id=408272927]
 custom_minimum_size = Vector2(32, 0)
 layout_mode = 2
 focus_mode = 0
 text = "30"
 
-[node name="60" type="Button" parent="ObjectPoolSettingsView/AmountMultiMeshInstancesVboxContainer/HBoxContainer"]
+[node name="60" type="Button" parent="ObjectPoolSettingsView/AmountMultiMeshInstancesVboxContainer/HBoxContainer" unique_id=1163103048]
 custom_minimum_size = Vector2(32, 0)
 layout_mode = 2
 focus_mode = 0
 text = "60"
 
-[node name="100" type="Button" parent="ObjectPoolSettingsView/AmountMultiMeshInstancesVboxContainer/HBoxContainer"]
+[node name="100" type="Button" parent="ObjectPoolSettingsView/AmountMultiMeshInstancesVboxContainer/HBoxContainer" unique_id=390375897]
 custom_minimum_size = Vector2(32, 0)
 layout_mode = 2
 focus_mode = 0
 text = "100"
 
-[node name="200" type="Button" parent="ObjectPoolSettingsView/AmountMultiMeshInstancesVboxContainer/HBoxContainer"]
+[node name="200" type="Button" parent="ObjectPoolSettingsView/AmountMultiMeshInstancesVboxContainer/HBoxContainer" unique_id=493441306]
 custom_minimum_size = Vector2(32, 0)
 layout_mode = 2
 focus_mode = 0
 text = "200"
 
-[node name="500" type="Button" parent="ObjectPoolSettingsView/AmountMultiMeshInstancesVboxContainer/HBoxContainer"]
+[node name="500" type="Button" parent="ObjectPoolSettingsView/AmountMultiMeshInstancesVboxContainer/HBoxContainer" unique_id=1236154870]
 custom_minimum_size = Vector2(32, 0)
 layout_mode = 2
 focus_mode = 0
 text = "500"
 
-[node name="1000" type="Button" parent="ObjectPoolSettingsView/AmountMultiMeshInstancesVboxContainer/HBoxContainer"]
+[node name="1000" type="Button" parent="ObjectPoolSettingsView/AmountMultiMeshInstancesVboxContainer/HBoxContainer" unique_id=1880108391]
 custom_minimum_size = Vector2(32, 0)
 layout_mode = 2
 focus_mode = 0
 text = "1000
 "
 
-[node name="SelectAmountMultiMeshesBtnView" parent="ObjectPoolSettingsView" node_paths=PackedStringArray("all_btns") instance=ExtResource("3_cgqfs")]
+[node name="SelectAmountMultiMeshesBtnView" parent="ObjectPoolSettingsView" unique_id=1197564796 node_paths=PackedStringArray("all_btns") instance=ExtResource("3_cgqfs")]
 visible = false
+layout_mode = 0
+offset_top = 0.0
+offset_bottom = 0.0
 all_btns = [NodePath("../AmountMultiMeshInstancesVboxContainer/HBoxContainer/1"), NodePath("../AmountMultiMeshInstancesVboxContainer/HBoxContainer/5"), NodePath("../AmountMultiMeshInstancesVboxContainer/HBoxContainer/15"), NodePath("../AmountMultiMeshInstancesVboxContainer/HBoxContainer/30"), NodePath("../AmountMultiMeshInstancesVboxContainer/HBoxContainer/60"), NodePath("../AmountMultiMeshInstancesVboxContainer/HBoxContainer/100"), NodePath("../AmountMultiMeshInstancesVboxContainer/HBoxContainer/200"), NodePath("../AmountMultiMeshInstancesVboxContainer/HBoxContainer/500"), NodePath("../AmountMultiMeshInstancesVboxContainer/HBoxContainer/1000")]
 
-[node name="AdditionalDebugDataContainer" type="VBoxContainer" parent="ObjectPoolSettingsView"]
+[node name="AdditionalDebugDataContainer" type="VBoxContainer" parent="ObjectPoolSettingsView" unique_id=1929526133]
 layout_mode = 1
 offset_right = 245.0
 offset_bottom = 239.0
 script = ExtResource("5_1mjrc")
 
-[node name="ActiveDirectionalMultiMeshesCustomLabel" parent="ObjectPoolSettingsView/AdditionalDebugDataContainer" instance=ExtResource("5_i53y2")]
+[node name="ActiveDirectionalMultiMeshesCustomLabel" parent="ObjectPoolSettingsView/AdditionalDebugDataContainer" unique_id=2066304836 instance=ExtResource("5_i53y2")]
 layout_mode = 2
 default_text = "Active Directional MultiMeshes:"
 
-[node name="ActiveBlockMultiMeshesCustomLabel" parent="ObjectPoolSettingsView/AdditionalDebugDataContainer" instance=ExtResource("5_i53y2")]
+[node name="ActiveBlockMultiMeshesCustomLabel" parent="ObjectPoolSettingsView/AdditionalDebugDataContainer" unique_id=2065926148 instance=ExtResource("5_i53y2")]
 layout_mode = 2
 default_text = "Active Block MultiMeshes:"
 
-[node name="ActiveBulletAttachmentsCustomLabel" parent="ObjectPoolSettingsView/AdditionalDebugDataContainer" instance=ExtResource("5_i53y2")]
+[node name="ActiveBulletAttachmentsCustomLabel" parent="ObjectPoolSettingsView/AdditionalDebugDataContainer" unique_id=76869897 instance=ExtResource("5_i53y2")]
 layout_mode = 2
 default_text = "Active Bullet Attachments:"
 
-[node name="Control" type="Control" parent="ObjectPoolSettingsView/AdditionalDebugDataContainer"]
+[node name="Control" type="Control" parent="ObjectPoolSettingsView/AdditionalDebugDataContainer" unique_id=483451645]
 custom_minimum_size = Vector2(0, 20)
 layout_mode = 2
 mouse_filter = 2
 
-[node name="PooledDirectionalMultiMeshesCustomLabel" parent="ObjectPoolSettingsView/AdditionalDebugDataContainer" instance=ExtResource("5_i53y2")]
+[node name="PooledDirectionalMultiMeshesCustomLabel" parent="ObjectPoolSettingsView/AdditionalDebugDataContainer" unique_id=140627347 instance=ExtResource("5_i53y2")]
 layout_mode = 2
 default_text = "Pooled Directional MultiMeshes:"
 
-[node name="PooledBlockMultiMeshesCustomLabel" parent="ObjectPoolSettingsView/AdditionalDebugDataContainer" instance=ExtResource("5_i53y2")]
+[node name="PooledBlockMultiMeshesCustomLabel" parent="ObjectPoolSettingsView/AdditionalDebugDataContainer" unique_id=366365038 instance=ExtResource("5_i53y2")]
 layout_mode = 2
 default_text = "Pooled Block MultiMeshes:"
 
-[node name="PooledBulletAttachmentsCustomLabel" parent="ObjectPoolSettingsView/AdditionalDebugDataContainer" instance=ExtResource("5_i53y2")]
+[node name="PooledBulletAttachmentsCustomLabel" parent="ObjectPoolSettingsView/AdditionalDebugDataContainer" unique_id=1280452547 instance=ExtResource("5_i53y2")]
 layout_mode = 2
 default_text = "Pooled Bullet Attachments:"
 
-[node name="Control2" type="Control" parent="ObjectPoolSettingsView/AdditionalDebugDataContainer"]
+[node name="Control2" type="Control" parent="ObjectPoolSettingsView/AdditionalDebugDataContainer" unique_id=1901907745]
 custom_minimum_size = Vector2(0, 20)
 layout_mode = 2
 mouse_filter = 2
 
-[node name="DirectionalPoolInfoCustomLabel" parent="ObjectPoolSettingsView/AdditionalDebugDataContainer" instance=ExtResource("5_i53y2")]
+[node name="DirectionalPoolInfoCustomLabel" parent="ObjectPoolSettingsView/AdditionalDebugDataContainer" unique_id=1413990276 instance=ExtResource("5_i53y2")]
 layout_mode = 2
 default_text = "Directional Pool Info:"
 
-[node name="BlockPoolInfoCustomLabel" parent="ObjectPoolSettingsView/AdditionalDebugDataContainer" instance=ExtResource("5_i53y2")]
+[node name="BlockPoolInfoCustomLabel" parent="ObjectPoolSettingsView/AdditionalDebugDataContainer" unique_id=584881102 instance=ExtResource("5_i53y2")]
 layout_mode = 2
 default_text = "Block Pool Info:"
 
-[node name="AttachmentsPoolInfoCustomLabel" parent="ObjectPoolSettingsView/AdditionalDebugDataContainer" instance=ExtResource("5_i53y2")]
+[node name="AttachmentsPoolInfoCustomLabel" parent="ObjectPoolSettingsView/AdditionalDebugDataContainer" unique_id=1298054100 instance=ExtResource("5_i53y2")]
 layout_mode = 2
 default_text = "Attachments Pool Info:"
 
-[node name="UpdateDebugDataTimer" type="Timer" parent="ObjectPoolSettingsView/AdditionalDebugDataContainer"]
+[node name="UpdateDebugDataTimer" type="Timer" parent="ObjectPoolSettingsView/AdditionalDebugDataContainer" unique_id=1430951984]
 wait_time = 0.5
 autostart = true
 
-[node name="AttachmentPoolRelated" type="HBoxContainer" parent="ObjectPoolSettingsView"]
+[node name="AttachmentPoolRelated" type="HBoxContainer" parent="ObjectPoolSettingsView" unique_id=1355191524]
 layout_mode = 1
 offset_left = 303.0
 offset_right = 929.0
 offset_bottom = 193.0
 
-[node name="VBoxContainer" type="VBoxContainer" parent="ObjectPoolSettingsView/AttachmentPoolRelated"]
+[node name="VBoxContainer" type="VBoxContainer" parent="ObjectPoolSettingsView/AttachmentPoolRelated" unique_id=1422652040]
 layout_mode = 2
 
-[node name="Label2" type="Label" parent="ObjectPoolSettingsView/AttachmentPoolRelated/VBoxContainer"]
+[node name="Label2" type="Label" parent="ObjectPoolSettingsView/AttachmentPoolRelated/VBoxContainer" unique_id=1572306012]
 layout_mode = 2
 text = "Selected Attachment Id"
 horizontal_alignment = 1
 
-[node name="SwitchBulletAttachmentIdBtn" type="Button" parent="ObjectPoolSettingsView/AttachmentPoolRelated/VBoxContainer"]
+[node name="SwitchBulletAttachmentIdBtn" type="Button" parent="ObjectPoolSettingsView/AttachmentPoolRelated/VBoxContainer" unique_id=344996161]
 layout_mode = 2
 focus_mode = 0
 theme = ExtResource("3_vd08o")
@@ -370,52 +373,52 @@ script = ExtResource("7_gbr8l")
 text_options = Array[String](["Attachment Id: 1", "Attachment Id: 2", "Attachment Id: 3"])
 metadata/_custom_type_script = "uid://b7wucn8wglgth"
 
-[node name="Label" type="Label" parent="ObjectPoolSettingsView/AttachmentPoolRelated/VBoxContainer"]
+[node name="Label" type="Label" parent="ObjectPoolSettingsView/AttachmentPoolRelated/VBoxContainer" unique_id=1099595940]
 layout_mode = 2
 text = "Amount Attachments (Y)"
 horizontal_alignment = 1
 
-[node name="HBoxContainer" type="HBoxContainer" parent="ObjectPoolSettingsView/AttachmentPoolRelated/VBoxContainer"]
+[node name="HBoxContainer" type="HBoxContainer" parent="ObjectPoolSettingsView/AttachmentPoolRelated/VBoxContainer" unique_id=182087049]
 layout_mode = 2
 size_flags_horizontal = 4
 
-[node name="1" type="Button" parent="ObjectPoolSettingsView/AttachmentPoolRelated/VBoxContainer/HBoxContainer"]
+[node name="1" type="Button" parent="ObjectPoolSettingsView/AttachmentPoolRelated/VBoxContainer/HBoxContainer" unique_id=745806805]
 custom_minimum_size = Vector2(32, 0)
 layout_mode = 2
 focus_mode = 0
 text = "1"
 
-[node name="5" type="Button" parent="ObjectPoolSettingsView/AttachmentPoolRelated/VBoxContainer/HBoxContainer"]
+[node name="5" type="Button" parent="ObjectPoolSettingsView/AttachmentPoolRelated/VBoxContainer/HBoxContainer" unique_id=1484594319]
 custom_minimum_size = Vector2(32, 0)
 layout_mode = 2
 focus_mode = 0
 text = "5"
 
-[node name="15" type="Button" parent="ObjectPoolSettingsView/AttachmentPoolRelated/VBoxContainer/HBoxContainer"]
+[node name="15" type="Button" parent="ObjectPoolSettingsView/AttachmentPoolRelated/VBoxContainer/HBoxContainer" unique_id=313905688]
 custom_minimum_size = Vector2(32, 0)
 layout_mode = 2
 focus_mode = 0
 text = "15"
 
-[node name="30" type="Button" parent="ObjectPoolSettingsView/AttachmentPoolRelated/VBoxContainer/HBoxContainer"]
+[node name="30" type="Button" parent="ObjectPoolSettingsView/AttachmentPoolRelated/VBoxContainer/HBoxContainer" unique_id=1905783399]
 custom_minimum_size = Vector2(32, 0)
 layout_mode = 2
 focus_mode = 0
 text = "30"
 
-[node name="60" type="Button" parent="ObjectPoolSettingsView/AttachmentPoolRelated/VBoxContainer/HBoxContainer"]
+[node name="60" type="Button" parent="ObjectPoolSettingsView/AttachmentPoolRelated/VBoxContainer/HBoxContainer" unique_id=620498061]
 custom_minimum_size = Vector2(32, 0)
 layout_mode = 2
 focus_mode = 0
 text = "60"
 
-[node name="100" type="Button" parent="ObjectPoolSettingsView/AttachmentPoolRelated/VBoxContainer/HBoxContainer"]
+[node name="100" type="Button" parent="ObjectPoolSettingsView/AttachmentPoolRelated/VBoxContainer/HBoxContainer" unique_id=609357206]
 custom_minimum_size = Vector2(32, 0)
 layout_mode = 2
 focus_mode = 0
 text = "100"
 
-[node name="PopulateAttachmentsPoolBtn" type="Button" parent="ObjectPoolSettingsView/AttachmentPoolRelated/VBoxContainer"]
+[node name="PopulateAttachmentsPoolBtn" type="Button" parent="ObjectPoolSettingsView/AttachmentPoolRelated/VBoxContainer" unique_id=1935235510]
 layout_mode = 2
 size_flags_vertical = 8
 focus_mode = 0
@@ -424,11 +427,11 @@ text = "Populate Attachment Pool
 (with Y amount )"
 autowrap_mode = 2
 
-[node name="VBoxContainer2" type="HBoxContainer" parent="ObjectPoolSettingsView/AttachmentPoolRelated"]
+[node name="VBoxContainer2" type="HBoxContainer" parent="ObjectPoolSettingsView/AttachmentPoolRelated" unique_id=1583426820]
 layout_mode = 2
 size_flags_vertical = 0
 
-[node name="FreeSpecificAttachmentPoolBtn" type="Button" parent="ObjectPoolSettingsView/AttachmentPoolRelated/VBoxContainer2"]
+[node name="FreeSpecificAttachmentPoolBtn" type="Button" parent="ObjectPoolSettingsView/AttachmentPoolRelated/VBoxContainer2" unique_id=57845736]
 custom_minimum_size = Vector2(200, 69)
 layout_mode = 2
 size_flags_vertical = 8
@@ -439,7 +442,7 @@ Attachment Pool
 (based on selected attachment_id)"
 autowrap_mode = 2
 
-[node name="FreeAllAttachmentPoolsBtn" type="Button" parent="ObjectPoolSettingsView/AttachmentPoolRelated/VBoxContainer2"]
+[node name="FreeAllAttachmentPoolsBtn" type="Button" parent="ObjectPoolSettingsView/AttachmentPoolRelated/VBoxContainer2" unique_id=983967240]
 custom_minimum_size = Vector2(200, 69)
 layout_mode = 2
 size_flags_vertical = 8
@@ -450,14 +453,14 @@ Attachment Pools
 (no matter the attachment_id)"
 autowrap_mode = 2
 
-[node name="SelectAmountAttachmentsBtnView" type="Control" parent="ObjectPoolSettingsView/AttachmentPoolRelated" node_paths=PackedStringArray("all_btns")]
+[node name="SelectAmountAttachmentsBtnView" type="Control" parent="ObjectPoolSettingsView/AttachmentPoolRelated" unique_id=10346908 node_paths=PackedStringArray("all_btns")]
 visible = false
 layout_mode = 2
 script = ExtResource("8_44pmw")
 all_btns = [NodePath("../VBoxContainer/HBoxContainer/1"), NodePath("../VBoxContainer/HBoxContainer/5"), NodePath("../VBoxContainer/HBoxContainer/15"), NodePath("../VBoxContainer/HBoxContainer/30"), NodePath("../VBoxContainer/HBoxContainer/60"), NodePath("../VBoxContainer/HBoxContainer/100")]
 metadata/_custom_type_script = "uid://cs67whos5iyl6"
 
-[node name="BulletSettingsView" type="Control" parent="."]
+[node name="BulletSettingsView" type="Control" parent="." unique_id=303884450]
 layout_direction = 1
 layout_mode = 3
 anchors_preset = 15
@@ -467,7 +470,7 @@ grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
 
-[node name="ZIndexContainer" type="VBoxContainer" parent="BulletSettingsView"]
+[node name="ZIndexContainer" type="VBoxContainer" parent="BulletSettingsView" unique_id=706732977]
 custom_minimum_size = Vector2(57, 198)
 layout_mode = 1
 anchors_preset = 2
@@ -479,46 +482,46 @@ offset_right = 417.0
 offset_bottom = 34.0
 grow_vertical = 0
 
-[node name="Label" type="Label" parent="BulletSettingsView/ZIndexContainer"]
+[node name="Label" type="Label" parent="BulletSettingsView/ZIndexContainer" unique_id=1780170504]
 layout_mode = 2
 text = "Z Index"
 
-[node name="Z_INDEX_0" type="Button" parent="BulletSettingsView/ZIndexContainer"]
+[node name="Z_INDEX_0" type="Button" parent="BulletSettingsView/ZIndexContainer" unique_id=1945293167]
 layout_mode = 2
 focus_mode = 0
 text = "0"
 
-[node name="Z_INDEX_1" type="Button" parent="BulletSettingsView/ZIndexContainer"]
+[node name="Z_INDEX_1" type="Button" parent="BulletSettingsView/ZIndexContainer" unique_id=854587553]
 layout_mode = 2
 focus_mode = 0
 text = "1"
 
-[node name="Z_INDEX_2" type="Button" parent="BulletSettingsView/ZIndexContainer"]
+[node name="Z_INDEX_2" type="Button" parent="BulletSettingsView/ZIndexContainer" unique_id=951603942]
 layout_mode = 2
 focus_mode = 0
 text = "2"
 
-[node name="Z_INDEX_3" type="Button" parent="BulletSettingsView/ZIndexContainer"]
+[node name="Z_INDEX_3" type="Button" parent="BulletSettingsView/ZIndexContainer" unique_id=336561921]
 layout_mode = 2
 focus_mode = 0
 text = "3"
 
-[node name="Z_INDEX_MINUS_5" type="Button" parent="BulletSettingsView/ZIndexContainer"]
+[node name="Z_INDEX_MINUS_5" type="Button" parent="BulletSettingsView/ZIndexContainer" unique_id=18286663]
 layout_mode = 2
 focus_mode = 0
 text = "-5"
 
-[node name="VBoxContainer" type="HBoxContainer" parent="BulletSettingsView"]
+[node name="VBoxContainer" type="HBoxContainer" parent="BulletSettingsView" unique_id=283871008]
 layout_mode = 1
 offset_left = 401.0
 offset_right = 842.0
 offset_bottom = 117.0
 theme_override_constants/separation = 12
 
-[node name="DirectionalDebuggerVBoxContainer" type="VBoxContainer" parent="BulletSettingsView/VBoxContainer"]
+[node name="DirectionalDebuggerVBoxContainer" type="VBoxContainer" parent="BulletSettingsView/VBoxContainer" unique_id=1023093027]
 layout_mode = 2
 
-[node name="ShowDirectionalDebuggerColorPickerBtn" type="Button" parent="BulletSettingsView/VBoxContainer/DirectionalDebuggerVBoxContainer"]
+[node name="ShowDirectionalDebuggerColorPickerBtn" type="Button" parent="BulletSettingsView/VBoxContainer/DirectionalDebuggerVBoxContainer" unique_id=1938260879]
 custom_minimum_size = Vector2(64, 64)
 layout_mode = 2
 size_flags_horizontal = 4
@@ -526,16 +529,16 @@ size_flags_vertical = 4
 focus_mode = 0
 theme_override_styles/normal = SubResource("StyleBoxFlat_5up31")
 
-[node name="Label" type="Label" parent="BulletSettingsView/VBoxContainer/DirectionalDebuggerVBoxContainer"]
+[node name="Label" type="Label" parent="BulletSettingsView/VBoxContainer/DirectionalDebuggerVBoxContainer" unique_id=551605980]
 layout_mode = 2
 text = "DirectionalBullets
 Debugger"
 horizontal_alignment = 1
 
-[node name="BlockDebuggerVBoxContainer2" type="VBoxContainer" parent="BulletSettingsView/VBoxContainer"]
+[node name="BlockDebuggerVBoxContainer2" type="VBoxContainer" parent="BulletSettingsView/VBoxContainer" unique_id=184103996]
 layout_mode = 2
 
-[node name="ShowBlockDebuggerColorPickerBtn" type="Button" parent="BulletSettingsView/VBoxContainer/BlockDebuggerVBoxContainer2"]
+[node name="ShowBlockDebuggerColorPickerBtn" type="Button" parent="BulletSettingsView/VBoxContainer/BlockDebuggerVBoxContainer2" unique_id=1931114056]
 custom_minimum_size = Vector2(64, 64)
 layout_mode = 2
 size_flags_horizontal = 4
@@ -543,36 +546,36 @@ size_flags_vertical = 4
 focus_mode = 0
 theme_override_styles/normal = SubResource("StyleBoxFlat_e0ht7")
 
-[node name="Label" type="Label" parent="BulletSettingsView/VBoxContainer/BlockDebuggerVBoxContainer2"]
+[node name="Label" type="Label" parent="BulletSettingsView/VBoxContainer/BlockDebuggerVBoxContainer2" unique_id=336272836]
 layout_mode = 2
 text = "BlockBullets
 Debugger"
 horizontal_alignment = 1
 
-[node name="VBoxContainer" type="VBoxContainer" parent="BulletSettingsView/VBoxContainer"]
+[node name="VBoxContainer" type="VBoxContainer" parent="BulletSettingsView/VBoxContainer" unique_id=1762485]
 layout_mode = 2
 
-[node name="EnableDebuggerCheckBox" type="CheckBox" parent="BulletSettingsView/VBoxContainer/VBoxContainer"]
+[node name="EnableDebuggerCheckBox" type="CheckBox" parent="BulletSettingsView/VBoxContainer/VBoxContainer" unique_id=1066462979]
 layout_mode = 2
 focus_mode = 0
 text = "Enable Debugger"
 
-[node name="RotatePhysicsShapesCheckBox" type="CheckBox" parent="BulletSettingsView/VBoxContainer/VBoxContainer"]
+[node name="RotatePhysicsShapesCheckBox" type="CheckBox" parent="BulletSettingsView/VBoxContainer/VBoxContainer" unique_id=1598475774]
 layout_mode = 2
 focus_mode = 0
 text = "Rotate Physics Shapes"
 
-[node name="AdjustDirectionBasedOnRotationCheckBox" type="CheckBox" parent="BulletSettingsView/VBoxContainer/VBoxContainer"]
+[node name="AdjustDirectionBasedOnRotationCheckBox" type="CheckBox" parent="BulletSettingsView/VBoxContainer/VBoxContainer" unique_id=1134841387]
 layout_mode = 2
 focus_mode = 0
 text = "Adjust Direction Based On Rotation"
 
-[node name="StopRotationWhenMaxReachedCheckBox" type="CheckBox" parent="BulletSettingsView/VBoxContainer/VBoxContainer"]
+[node name="StopRotationWhenMaxReachedCheckBox" type="CheckBox" parent="BulletSettingsView/VBoxContainer/VBoxContainer" unique_id=1799614189]
 layout_mode = 2
 focus_mode = 0
 text = "Stop Rotation When Max Reached"
 
-[node name="VBoxContainer5" type="VBoxContainer" parent="BulletSettingsView"]
+[node name="VBoxContainer5" type="VBoxContainer" parent="BulletSettingsView" unique_id=508925416]
 layout_mode = 1
 anchors_preset = 3
 anchor_left = 1.0
@@ -586,7 +589,7 @@ offset_bottom = -12.0
 grow_horizontal = 0
 grow_vertical = 0
 
-[node name="SwitchMaterialBtn" type="Button" parent="BulletSettingsView/VBoxContainer5"]
+[node name="SwitchMaterialBtn" type="Button" parent="BulletSettingsView/VBoxContainer5" unique_id=2094810834]
 custom_minimum_size = Vector2(151, 46)
 layout_mode = 2
 size_flags_vertical = 8
@@ -599,7 +602,7 @@ script = ExtResource("7_gbr8l")
 text_options = Array[String](["No Material", "CanvasItem Material", "Colorful Fragment Shader", "Glitch Fragment Shader", "Scale Vertex Shader"])
 metadata/_custom_type_script = "uid://b7wucn8wglgth"
 
-[node name="SwitchBulletTextureBtn" type="Button" parent="BulletSettingsView/VBoxContainer5"]
+[node name="SwitchBulletTextureBtn" type="Button" parent="BulletSettingsView/VBoxContainer5" unique_id=2136685656]
 custom_minimum_size = Vector2(151, 46)
 layout_mode = 2
 size_flags_vertical = 8
@@ -612,7 +615,7 @@ script = ExtResource("7_gbr8l")
 text_options = Array[String](["Animated Rocket Texture", "Single Godot Texture"])
 metadata/_custom_type_script = "uid://b7wucn8wglgth"
 
-[node name="SwitchAttachmentBtn" type="Button" parent="BulletSettingsView/VBoxContainer5"]
+[node name="SwitchAttachmentBtn" type="Button" parent="BulletSettingsView/VBoxContainer5" unique_id=1061980349]
 custom_minimum_size = Vector2(151, 46)
 layout_mode = 2
 size_flags_vertical = 8
@@ -625,7 +628,7 @@ script = ExtResource("7_gbr8l")
 text_options = Array[String](["No Bullet Attachment", "CPU Particles", "GPU Particles", "Light Sprite Attachment"])
 metadata/_custom_type_script = "uid://b7wucn8wglgth"
 
-[node name="VBoxContainer4" type="VBoxContainer" parent="BulletSettingsView"]
+[node name="VBoxContainer4" type="VBoxContainer" parent="BulletSettingsView" unique_id=790087604]
 layout_mode = 1
 anchors_preset = 3
 anchor_left = 1.0
@@ -640,7 +643,7 @@ grow_horizontal = 0
 grow_vertical = 0
 size_flags_vertical = 8
 
-[node name="GenerateSpeedBtn" type="Button" parent="BulletSettingsView/VBoxContainer4"]
+[node name="GenerateSpeedBtn" type="Button" parent="BulletSettingsView/VBoxContainer4" unique_id=112417892]
 custom_minimum_size = Vector2(151, 46)
 layout_mode = 2
 size_flags_vertical = 8
@@ -652,7 +655,7 @@ script = ExtResource("7_gbr8l")
 text_options = Array[String](["Random Speed Data 1", "Random Speed Data 2", "Random Speed Data 3"])
 metadata/_custom_type_script = "uid://b7wucn8wglgth"
 
-[node name="GenerateRotationBtn" type="Button" parent="BulletSettingsView/VBoxContainer4"]
+[node name="GenerateRotationBtn" type="Button" parent="BulletSettingsView/VBoxContainer4" unique_id=257220646]
 custom_minimum_size = Vector2(151, 46)
 layout_mode = 2
 focus_mode = 0
@@ -663,7 +666,7 @@ script = ExtResource("7_gbr8l")
 text_options = Array[String](["Disabled Rotation", "Random Rotation Data 1", "Random Rotation Data 2", "Random Rotation Data 3"])
 metadata/_custom_type_script = "uid://b7wucn8wglgth"
 
-[node name="VBoxContainer2" type="VBoxContainer" parent="BulletSettingsView"]
+[node name="VBoxContainer2" type="VBoxContainer" parent="BulletSettingsView" unique_id=1932469294]
 layout_mode = 1
 anchors_preset = 3
 anchor_left = 1.0
@@ -677,7 +680,7 @@ offset_bottom = -12.0
 grow_horizontal = 0
 grow_vertical = 0
 
-[node name="DisableOrEnableFactoryBtn" type="Button" parent="BulletSettingsView/VBoxContainer2"]
+[node name="DisableOrEnableFactoryBtn" type="Button" parent="BulletSettingsView/VBoxContainer2" unique_id=1804688607]
 custom_minimum_size = Vector2(151, 46)
 layout_mode = 2
 size_flags_vertical = 8
@@ -689,7 +692,7 @@ script = ExtResource("7_gbr8l")
 text_options = Array[String](["Disable BulletFactory2D", "Enable BulletFactory2D"])
 metadata/_custom_type_script = "uid://b7wucn8wglgth"
 
-[node name="ResetFactoryBtn" type="Button" parent="BulletSettingsView/VBoxContainer2"]
+[node name="ResetFactoryBtn" type="Button" parent="BulletSettingsView/VBoxContainer2" unique_id=762492034]
 custom_minimum_size = Vector2(151, 46)
 layout_mode = 2
 size_flags_vertical = 8
@@ -698,7 +701,7 @@ theme = ExtResource("3_vd08o")
 text = "Reset BulletFactory2D"
 autowrap_mode = 2
 
-[node name="FreeActiveBulletsBtn" type="Button" parent="BulletSettingsView/VBoxContainer2"]
+[node name="FreeActiveBulletsBtn" type="Button" parent="BulletSettingsView/VBoxContainer2" unique_id=1656736060]
 custom_minimum_size = Vector2(151, 46)
 layout_mode = 2
 size_flags_vertical = 8
@@ -707,7 +710,7 @@ theme = ExtResource("3_vd08o")
 text = "Free Active Bullets"
 autowrap_mode = 2
 
-[node name="VBoxContainer3" type="VBoxContainer" parent="BulletSettingsView"]
+[node name="VBoxContainer3" type="VBoxContainer" parent="BulletSettingsView" unique_id=1210507654]
 layout_mode = 1
 anchors_preset = 3
 anchor_left = 1.0
@@ -722,18 +725,18 @@ grow_horizontal = 0
 grow_vertical = 0
 size_flags_vertical = 8
 
-[node name="EnableMonitorableCheckBox" type="CheckBox" parent="BulletSettingsView/VBoxContainer3"]
+[node name="EnableMonitorableCheckBox" type="CheckBox" parent="BulletSettingsView/VBoxContainer3" unique_id=1834602878]
 layout_mode = 2
 focus_mode = 0
 text = "Enable Monitorable"
 
-[node name="IsTextureRotationPermanentCheckBox" type="CheckBox" parent="BulletSettingsView/VBoxContainer3"]
+[node name="IsTextureRotationPermanentCheckBox" type="CheckBox" parent="BulletSettingsView/VBoxContainer3" unique_id=272833530]
 layout_mode = 2
 focus_mode = 0
 text = "Is Texture Rotation
  Permanent"
 
-[node name="BulletCollisionVboxContainer" type="VBoxContainer" parent="BulletSettingsView"]
+[node name="BulletCollisionVboxContainer" type="VBoxContainer" parent="BulletSettingsView" unique_id=543388122]
 layout_mode = 1
 anchors_preset = 1
 anchor_left = 1.0
@@ -743,32 +746,32 @@ offset_top = 158.0
 offset_bottom = 321.0
 grow_horizontal = 0
 
-[node name="Label" type="Label" parent="BulletSettingsView/BulletCollisionVboxContainer"]
+[node name="Label" type="Label" parent="BulletSettingsView/BulletCollisionVboxContainer" unique_id=1861678758]
 layout_mode = 2
 text = "Bullet On Bullet Collision"
 horizontal_alignment = 1
 
-[node name="DontCollideBtn" type="Button" parent="BulletSettingsView/BulletCollisionVboxContainer"]
+[node name="DontCollideBtn" type="Button" parent="BulletSettingsView/BulletCollisionVboxContainer" unique_id=771719724]
 layout_mode = 2
 focus_mode = 0
 text = "Don't Collide"
 
-[node name="DestroyPlayerBulletsBtn" type="Button" parent="BulletSettingsView/BulletCollisionVboxContainer"]
+[node name="DestroyPlayerBulletsBtn" type="Button" parent="BulletSettingsView/BulletCollisionVboxContainer" unique_id=1035080220]
 layout_mode = 2
 focus_mode = 0
 text = "Destroy Player Bullets"
 
-[node name="DestroyEnemyBulletsBtn" type="Button" parent="BulletSettingsView/BulletCollisionVboxContainer"]
+[node name="DestroyEnemyBulletsBtn" type="Button" parent="BulletSettingsView/BulletCollisionVboxContainer" unique_id=1620246841]
 layout_mode = 2
 focus_mode = 0
 text = "Destroy Enemy Bullets"
 
-[node name="DestroyBothBtn" type="Button" parent="BulletSettingsView/BulletCollisionVboxContainer"]
+[node name="DestroyBothBtn" type="Button" parent="BulletSettingsView/BulletCollisionVboxContainer" unique_id=1119014358]
 layout_mode = 2
 focus_mode = 0
 text = "DestroyBoth"
 
-[node name="BulletDamageVboxContainer" type="VBoxContainer" parent="BulletSettingsView"]
+[node name="BulletDamageVboxContainer" type="VBoxContainer" parent="BulletSettingsView" unique_id=1704295089]
 layout_mode = 1
 anchors_preset = 3
 anchor_left = 1.0
@@ -782,277 +785,304 @@ offset_bottom = -164.0
 grow_horizontal = 0
 grow_vertical = 0
 
-[node name="Label" type="Label" parent="BulletSettingsView/BulletDamageVboxContainer"]
+[node name="Label" type="Label" parent="BulletSettingsView/BulletDamageVboxContainer" unique_id=801719748]
 layout_mode = 2
 text = "Bullet Damage"
 horizontal_alignment = 1
 
-[node name="5" type="Button" parent="BulletSettingsView/BulletDamageVboxContainer"]
+[node name="5" type="Button" parent="BulletSettingsView/BulletDamageVboxContainer" unique_id=1507856729]
 layout_mode = 2
 focus_mode = 0
 text = "5"
 
-[node name="10" type="Button" parent="BulletSettingsView/BulletDamageVboxContainer"]
+[node name="10" type="Button" parent="BulletSettingsView/BulletDamageVboxContainer" unique_id=255044003]
 layout_mode = 2
 focus_mode = 0
 text = "10"
 
-[node name="30" type="Button" parent="BulletSettingsView/BulletDamageVboxContainer"]
+[node name="30" type="Button" parent="BulletSettingsView/BulletDamageVboxContainer" unique_id=442112585]
 layout_mode = 2
 focus_mode = 0
 text = "30"
 
-[node name="60" type="Button" parent="BulletSettingsView/BulletDamageVboxContainer"]
+[node name="60" type="Button" parent="BulletSettingsView/BulletDamageVboxContainer" unique_id=1114470908]
 layout_mode = 2
 focus_mode = 0
 text = "60"
 
-[node name="CollisionShapeSizeContainer" type="HBoxContainer" parent="BulletSettingsView"]
+[node name="CollisionShapeSizeContainer" type="HBoxContainer" parent="BulletSettingsView" unique_id=209275176]
 layout_mode = 0
 offset_right = 40.0
 offset_bottom = 40.0
 
-[node name="Label" type="Label" parent="BulletSettingsView/CollisionShapeSizeContainer"]
+[node name="Label" type="Label" parent="BulletSettingsView/CollisionShapeSizeContainer" unique_id=1039151015]
 layout_mode = 2
 text = "Collision Shape Size"
 
-[node name="32" type="Button" parent="BulletSettingsView/CollisionShapeSizeContainer"]
+[node name="32" type="Button" parent="BulletSettingsView/CollisionShapeSizeContainer" unique_id=135409155]
 custom_minimum_size = Vector2(40, 40)
 layout_mode = 2
 focus_mode = 0
 text = "32;32"
 
-[node name="64" type="Button" parent="BulletSettingsView/CollisionShapeSizeContainer"]
+[node name="64" type="Button" parent="BulletSettingsView/CollisionShapeSizeContainer" unique_id=749316215]
 custom_minimum_size = Vector2(40, 40)
 layout_mode = 2
 focus_mode = 0
 text = "64;64"
 
-[node name="128" type="Button" parent="BulletSettingsView/CollisionShapeSizeContainer"]
+[node name="128" type="Button" parent="BulletSettingsView/CollisionShapeSizeContainer" unique_id=1688329983]
 custom_minimum_size = Vector2(40, 40)
 layout_mode = 2
 focus_mode = 0
 text = "128;128"
 
-[node name="256" type="Button" parent="BulletSettingsView/CollisionShapeSizeContainer"]
+[node name="256" type="Button" parent="BulletSettingsView/CollisionShapeSizeContainer" unique_id=455070586]
 custom_minimum_size = Vector2(40, 40)
 layout_mode = 2
 focus_mode = 0
 text = "256;256"
 
-[node name="CollisionShapeOffsetContainer" type="HBoxContainer" parent="BulletSettingsView"]
+[node name="CollisionShapeOffsetContainer" type="HBoxContainer" parent="BulletSettingsView" unique_id=1685571403]
 layout_mode = 0
 offset_top = 45.0
 offset_right = 236.0
 offset_bottom = 85.0
 
-[node name="Label" type="Label" parent="BulletSettingsView/CollisionShapeOffsetContainer"]
+[node name="Label" type="Label" parent="BulletSettingsView/CollisionShapeOffsetContainer" unique_id=1301700086]
 layout_mode = 2
 text = "Collision Shape Offset"
 
-[node name="0" type="Button" parent="BulletSettingsView/CollisionShapeOffsetContainer"]
+[node name="0" type="Button" parent="BulletSettingsView/CollisionShapeOffsetContainer" unique_id=1847483007]
 custom_minimum_size = Vector2(40, 40)
 layout_mode = 2
 focus_mode = 0
 text = "0;0"
 
-[node name="25_0" type="Button" parent="BulletSettingsView/CollisionShapeOffsetContainer"]
+[node name="25_0" type="Button" parent="BulletSettingsView/CollisionShapeOffsetContainer" unique_id=1978325915]
 custom_minimum_size = Vector2(40, 40)
 layout_mode = 2
 focus_mode = 0
 text = "25;0"
 
-[node name="0_25" type="Button" parent="BulletSettingsView/CollisionShapeOffsetContainer"]
+[node name="0_25" type="Button" parent="BulletSettingsView/CollisionShapeOffsetContainer" unique_id=2069455574]
 custom_minimum_size = Vector2(40, 40)
 layout_mode = 2
 focus_mode = 0
 text = "0;25"
 
-[node name="25_25" type="Button" parent="BulletSettingsView/CollisionShapeOffsetContainer"]
+[node name="25_25" type="Button" parent="BulletSettingsView/CollisionShapeOffsetContainer" unique_id=2122907489]
 custom_minimum_size = Vector2(40, 40)
 layout_mode = 2
 focus_mode = 0
 text = "25;25"
 
-[node name="AttachmentOffsetContainer" type="HBoxContainer" parent="BulletSettingsView"]
+[node name="AttachmentOffsetContainer" type="HBoxContainer" parent="BulletSettingsView" unique_id=670868505]
 layout_mode = 0
 offset_top = 93.0
 offset_right = 275.0
 offset_bottom = 133.0
 
-[node name="Label" type="Label" parent="BulletSettingsView/AttachmentOffsetContainer"]
+[node name="Label" type="Label" parent="BulletSettingsView/AttachmentOffsetContainer" unique_id=1403240395]
 layout_mode = 2
 text = "Bullet Attachment Offset"
 
-[node name="-60_0" type="Button" parent="BulletSettingsView/AttachmentOffsetContainer"]
+[node name="-60_0" type="Button" parent="BulletSettingsView/AttachmentOffsetContainer" unique_id=52275078]
 custom_minimum_size = Vector2(40, 40)
 layout_mode = 2
 focus_mode = 0
 text = "-60;0"
 
-[node name="0_0" type="Button" parent="BulletSettingsView/AttachmentOffsetContainer"]
+[node name="0_0" type="Button" parent="BulletSettingsView/AttachmentOffsetContainer" unique_id=1964163826]
 custom_minimum_size = Vector2(40, 40)
 layout_mode = 2
 focus_mode = 0
 text = "0;0"
 
-[node name="0_-60" type="Button" parent="BulletSettingsView/AttachmentOffsetContainer"]
+[node name="0_-60" type="Button" parent="BulletSettingsView/AttachmentOffsetContainer" unique_id=1071120729]
 custom_minimum_size = Vector2(40, 40)
 layout_mode = 2
 focus_mode = 0
 text = "0;-60"
 
-[node name="-60_-60" type="Button" parent="BulletSettingsView/AttachmentOffsetContainer"]
+[node name="-60_-60" type="Button" parent="BulletSettingsView/AttachmentOffsetContainer" unique_id=1594569521]
 custom_minimum_size = Vector2(40, 40)
 layout_mode = 2
 focus_mode = 0
 text = "-60;-60"
 
-[node name="TextureRotationContainer" type="HBoxContainer" parent="BulletSettingsView"]
+[node name="TextureRotationContainer" type="HBoxContainer" parent="BulletSettingsView" unique_id=617828251]
 layout_mode = 0
 offset_left = 3.0
 offset_top = 141.0
 offset_right = 239.0
 offset_bottom = 181.0
 
-[node name="Label" type="Label" parent="BulletSettingsView/TextureRotationContainer"]
+[node name="Label" type="Label" parent="BulletSettingsView/TextureRotationContainer" unique_id=75946076]
 layout_mode = 2
 text = "Texture Rotation"
 
-[node name="0" type="Button" parent="BulletSettingsView/TextureRotationContainer"]
+[node name="0" type="Button" parent="BulletSettingsView/TextureRotationContainer" unique_id=1086933484]
 custom_minimum_size = Vector2(40, 40)
 layout_mode = 2
 focus_mode = 0
 text = "0"
 
-[node name="90" type="Button" parent="BulletSettingsView/TextureRotationContainer"]
+[node name="90" type="Button" parent="BulletSettingsView/TextureRotationContainer" unique_id=1871218888]
 custom_minimum_size = Vector2(40, 40)
 layout_mode = 2
 focus_mode = 0
 text = "90"
 
-[node name="180" type="Button" parent="BulletSettingsView/TextureRotationContainer"]
+[node name="180" type="Button" parent="BulletSettingsView/TextureRotationContainer" unique_id=2137135139]
 custom_minimum_size = Vector2(40, 40)
 layout_mode = 2
 focus_mode = 0
 text = "180"
 
-[node name="-90" type="Button" parent="BulletSettingsView/TextureRotationContainer"]
+[node name="-90" type="Button" parent="BulletSettingsView/TextureRotationContainer" unique_id=217286140]
 custom_minimum_size = Vector2(40, 40)
 layout_mode = 2
 focus_mode = 0
 text = "-90"
 
-[node name="BulletLifeTimeContainer" type="HBoxContainer" parent="BulletSettingsView"]
+[node name="BulletLifeTimeContainer" type="HBoxContainer" parent="BulletSettingsView" unique_id=1176680]
 layout_mode = 0
 offset_left = 3.0
 offset_top = 188.0
 offset_right = 213.0
 offset_bottom = 219.0
 
-[node name="Label" type="Label" parent="BulletSettingsView/BulletLifeTimeContainer"]
+[node name="Label" type="Label" parent="BulletSettingsView/BulletLifeTimeContainer" unique_id=361889608]
 layout_mode = 2
 text = "Bullet Lifetime"
 
-[node name="2" type="Button" parent="BulletSettingsView/BulletLifeTimeContainer"]
+[node name="2" type="Button" parent="BulletSettingsView/BulletLifeTimeContainer" unique_id=1085620900]
 custom_minimum_size = Vector2(40, 40)
 layout_mode = 2
 focus_mode = 0
 text = "2"
 
-[node name="0_5" type="Button" parent="BulletSettingsView/BulletLifeTimeContainer"]
+[node name="0_5" type="Button" parent="BulletSettingsView/BulletLifeTimeContainer" unique_id=930160423]
 custom_minimum_size = Vector2(40, 40)
 layout_mode = 2
 focus_mode = 0
 text = "0.5"
 
-[node name="0_2" type="Button" parent="BulletSettingsView/BulletLifeTimeContainer"]
+[node name="0_2" type="Button" parent="BulletSettingsView/BulletLifeTimeContainer" unique_id=1904295372]
 custom_minimum_size = Vector2(40, 40)
 layout_mode = 2
 focus_mode = 0
 text = "0.2"
 
-[node name="5" type="Button" parent="BulletSettingsView/BulletLifeTimeContainer"]
+[node name="5" type="Button" parent="BulletSettingsView/BulletLifeTimeContainer" unique_id=1184569483]
 custom_minimum_size = Vector2(40, 40)
 layout_mode = 2
 focus_mode = 0
 text = "5"
 
-[node name="Infinite" type="Button" parent="BulletSettingsView/BulletLifeTimeContainer"]
+[node name="Infinite" type="Button" parent="BulletSettingsView/BulletLifeTimeContainer" unique_id=935127781]
 custom_minimum_size = Vector2(40, 40)
 layout_mode = 2
 focus_mode = 0
 text = "Infinite"
 
-[node name="TextureSizeContainer" type="HBoxContainer" parent="BulletSettingsView"]
+[node name="TextureSizeContainer" type="HBoxContainer" parent="BulletSettingsView" unique_id=827009208]
 layout_mode = 0
 offset_left = 3.0
 offset_top = 236.0
 offset_right = 292.0
 offset_bottom = 276.0
 
-[node name="Label" type="Label" parent="BulletSettingsView/TextureSizeContainer"]
+[node name="Label" type="Label" parent="BulletSettingsView/TextureSizeContainer" unique_id=2141815516]
 layout_mode = 2
 text = "Texture Size"
 
-[node name="140_140" type="Button" parent="BulletSettingsView/TextureSizeContainer"]
+[node name="140_140" type="Button" parent="BulletSettingsView/TextureSizeContainer" unique_id=404931495]
 custom_minimum_size = Vector2(40, 40)
 layout_mode = 2
 focus_mode = 0
 text = "140;140"
 
-[node name="200_200" type="Button" parent="BulletSettingsView/TextureSizeContainer"]
+[node name="200_200" type="Button" parent="BulletSettingsView/TextureSizeContainer" unique_id=110453033]
 custom_minimum_size = Vector2(40, 40)
 layout_mode = 2
 focus_mode = 0
 text = "200;200"
 
-[node name="320_320" type="Button" parent="BulletSettingsView/TextureSizeContainer"]
+[node name="320_320" type="Button" parent="BulletSettingsView/TextureSizeContainer" unique_id=1129031785]
 custom_minimum_size = Vector2(40, 40)
 layout_mode = 2
 focus_mode = 0
 text = "320;320"
 
-[node name="64_64" type="Button" parent="BulletSettingsView/TextureSizeContainer"]
+[node name="64_64" type="Button" parent="BulletSettingsView/TextureSizeContainer" unique_id=1861235187]
 custom_minimum_size = Vector2(40, 40)
 layout_mode = 2
 focus_mode = 0
 text = "64;64"
 
-[node name="SelectViewsContainer" type="Control" parent="BulletSettingsView"]
+[node name="SelectViewsContainer" type="Control" parent="BulletSettingsView" unique_id=874927359]
 visible = false
 anchors_preset = 0
 offset_right = 40.0
 offset_bottom = 40.0
 
-[node name="SelectCollisionShapeSizeView" parent="BulletSettingsView/SelectViewsContainer" node_paths=PackedStringArray("all_btns") instance=ExtResource("3_cgqfs")]
+[node name="SelectCollisionShapeSizeView" parent="BulletSettingsView/SelectViewsContainer" unique_id=1056262356 node_paths=PackedStringArray("all_btns") instance=ExtResource("3_cgqfs")]
+layout_mode = 0
+offset_top = 0.0
+offset_bottom = 0.0
 all_btns = [NodePath("../../CollisionShapeSizeContainer/32"), NodePath("../../CollisionShapeSizeContainer/64"), NodePath("../../CollisionShapeSizeContainer/128"), NodePath("../../CollisionShapeSizeContainer/256")]
 
-[node name="SelectBulletDamageView" parent="BulletSettingsView/SelectViewsContainer" node_paths=PackedStringArray("all_btns") instance=ExtResource("3_cgqfs")]
+[node name="SelectBulletDamageView" parent="BulletSettingsView/SelectViewsContainer" unique_id=348725187 node_paths=PackedStringArray("all_btns") instance=ExtResource("3_cgqfs")]
+layout_mode = 0
+offset_top = 0.0
+offset_bottom = 0.0
 all_btns = [NodePath("../../BulletDamageVboxContainer/5"), NodePath("../../BulletDamageVboxContainer/10"), NodePath("../../BulletDamageVboxContainer/30"), NodePath("../../BulletDamageVboxContainer/60")]
 
-[node name="SelectBulletCollisionView" parent="BulletSettingsView/SelectViewsContainer" node_paths=PackedStringArray("all_btns") instance=ExtResource("3_cgqfs")]
+[node name="SelectBulletCollisionView" parent="BulletSettingsView/SelectViewsContainer" unique_id=1888876757 node_paths=PackedStringArray("all_btns") instance=ExtResource("3_cgqfs")]
+layout_mode = 0
+offset_top = 0.0
+offset_bottom = 0.0
 all_btns = [NodePath("../../BulletCollisionVboxContainer/DontCollideBtn"), NodePath("../../BulletCollisionVboxContainer/DestroyPlayerBulletsBtn"), NodePath("../../BulletCollisionVboxContainer/DestroyEnemyBulletsBtn"), NodePath("../../BulletCollisionVboxContainer/DestroyBothBtn")]
 
-[node name="SelectCollisionShapeOffsetView" parent="BulletSettingsView/SelectViewsContainer" node_paths=PackedStringArray("all_btns") instance=ExtResource("3_cgqfs")]
+[node name="SelectCollisionShapeOffsetView" parent="BulletSettingsView/SelectViewsContainer" unique_id=1955790454 node_paths=PackedStringArray("all_btns") instance=ExtResource("3_cgqfs")]
+layout_mode = 0
+offset_top = 0.0
+offset_bottom = 0.0
 all_btns = [NodePath("../../CollisionShapeOffsetContainer/0"), NodePath("../../CollisionShapeOffsetContainer/25_0"), NodePath("../../CollisionShapeOffsetContainer/0_25"), NodePath("../../CollisionShapeOffsetContainer/25_25")]
 
-[node name="SelectBulletAttachmentOffsetView" parent="BulletSettingsView/SelectViewsContainer" node_paths=PackedStringArray("all_btns") instance=ExtResource("3_cgqfs")]
+[node name="SelectBulletAttachmentOffsetView" parent="BulletSettingsView/SelectViewsContainer" unique_id=1177416728 node_paths=PackedStringArray("all_btns") instance=ExtResource("3_cgqfs")]
+layout_mode = 0
+offset_top = 0.0
+offset_bottom = 0.0
 all_btns = [NodePath("../../AttachmentOffsetContainer/-60_0"), NodePath("../../AttachmentOffsetContainer/0_-60"), NodePath("../../AttachmentOffsetContainer/0_0"), NodePath("../../AttachmentOffsetContainer/-60_-60")]
 
-[node name="SelectTextureRotationView" parent="BulletSettingsView/SelectViewsContainer" node_paths=PackedStringArray("all_btns") instance=ExtResource("3_cgqfs")]
+[node name="SelectTextureRotationView" parent="BulletSettingsView/SelectViewsContainer" unique_id=430997943 node_paths=PackedStringArray("all_btns") instance=ExtResource("3_cgqfs")]
+layout_mode = 0
+offset_top = 0.0
+offset_bottom = 0.0
 all_btns = [NodePath("../../TextureRotationContainer/0"), NodePath("../../TextureRotationContainer/90"), NodePath("../../TextureRotationContainer/180"), NodePath("../../TextureRotationContainer/-90")]
 
-[node name="SelectBulletLifetimeView" parent="BulletSettingsView/SelectViewsContainer" node_paths=PackedStringArray("all_btns") instance=ExtResource("3_cgqfs")]
+[node name="SelectBulletLifetimeView" parent="BulletSettingsView/SelectViewsContainer" unique_id=408327826 node_paths=PackedStringArray("all_btns") instance=ExtResource("3_cgqfs")]
+layout_mode = 0
+offset_top = 0.0
+offset_bottom = 0.0
 all_btns = [NodePath("../../BulletLifeTimeContainer/2"), NodePath("../../BulletLifeTimeContainer/0_5"), NodePath("../../BulletLifeTimeContainer/0_2"), NodePath("../../BulletLifeTimeContainer/5"), NodePath("../../BulletLifeTimeContainer/Infinite")]
 
-[node name="SelectTextureSizeBtnView" parent="BulletSettingsView/SelectViewsContainer" node_paths=PackedStringArray("all_btns") instance=ExtResource("3_cgqfs")]
+[node name="SelectTextureSizeBtnView" parent="BulletSettingsView/SelectViewsContainer" unique_id=898752228 node_paths=PackedStringArray("all_btns") instance=ExtResource("3_cgqfs")]
+layout_mode = 0
+offset_top = 0.0
+offset_bottom = 0.0
 all_btns = [NodePath("../../TextureSizeContainer/140_140"), NodePath("../../TextureSizeContainer/200_200"), NodePath("../../TextureSizeContainer/320_320"), NodePath("../../TextureSizeContainer/64_64")]
 
-[node name="SelectZIndexBtnView" parent="BulletSettingsView/SelectViewsContainer" node_paths=PackedStringArray("all_btns") instance=ExtResource("3_cgqfs")]
+[node name="SelectZIndexBtnView" parent="BulletSettingsView/SelectViewsContainer" unique_id=153009147 node_paths=PackedStringArray("all_btns") instance=ExtResource("3_cgqfs")]
+layout_mode = 0
+offset_top = 0.0
+offset_bottom = 0.0
 all_btns = [NodePath("../../ZIndexContainer/Z_INDEX_0"), NodePath("../../ZIndexContainer/Z_INDEX_1"), NodePath("../../ZIndexContainer/Z_INDEX_2"), NodePath("../../ZIndexContainer/Z_INDEX_3"), NodePath("../../ZIndexContainer/Z_INDEX_MINUS_5")]
 
-[node name="MoreSettingsView" type="Control" parent="."]
+[node name="MoreSettingsView" type="Control" parent="." unique_id=1865970130]
 visible = false
 layout_mode = 3
 anchors_preset = 15
@@ -1062,63 +1092,122 @@ grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
 
-[node name="HBoxContainer" type="HBoxContainer" parent="MoreSettingsView"]
-layout_mode = 1
-offset_right = 705.0
+[node name="VBoxContainer3" type="VBoxContainer" parent="MoreSettingsView" unique_id=583709514]
+layout_mode = 0
+offset_right = 40.0
 offset_bottom = 40.0
 
-[node name="PhysicsTickVBoxContainer" type="HBoxContainer" parent="MoreSettingsView/HBoxContainer"]
+[node name="HBoxContainer" type="HBoxContainer" parent="MoreSettingsView/VBoxContainer3" unique_id=369412085]
 layout_mode = 2
 
-[node name="Label" type="Label" parent="MoreSettingsView/HBoxContainer/PhysicsTickVBoxContainer"]
+[node name="PhysicsTickVBoxContainer" type="HBoxContainer" parent="MoreSettingsView/VBoxContainer3/HBoxContainer" unique_id=2018298643]
+layout_mode = 2
+
+[node name="Label" type="Label" parent="MoreSettingsView/VBoxContainer3/HBoxContainer/PhysicsTickVBoxContainer" unique_id=1181584825]
 layout_mode = 2
 text = "Physics Ticks per Second"
 
-[node name="60" type="Button" parent="MoreSettingsView/HBoxContainer/PhysicsTickVBoxContainer"]
+[node name="60" type="Button" parent="MoreSettingsView/VBoxContainer3/HBoxContainer/PhysicsTickVBoxContainer" unique_id=1097448829]
 custom_minimum_size = Vector2(40, 40)
 layout_mode = 2
 focus_mode = 0
 text = "60"
 
-[node name="40" type="Button" parent="MoreSettingsView/HBoxContainer/PhysicsTickVBoxContainer"]
+[node name="40" type="Button" parent="MoreSettingsView/VBoxContainer3/HBoxContainer/PhysicsTickVBoxContainer" unique_id=300731582]
 custom_minimum_size = Vector2(40, 40)
 layout_mode = 2
 focus_mode = 0
 text = "40"
 
-[node name="25" type="Button" parent="MoreSettingsView/HBoxContainer/PhysicsTickVBoxContainer"]
+[node name="25" type="Button" parent="MoreSettingsView/VBoxContainer3/HBoxContainer/PhysicsTickVBoxContainer" unique_id=291382639]
 custom_minimum_size = Vector2(40, 40)
 layout_mode = 2
 focus_mode = 0
 text = "25"
 
-[node name="15" type="Button" parent="MoreSettingsView/HBoxContainer/PhysicsTickVBoxContainer"]
+[node name="15" type="Button" parent="MoreSettingsView/VBoxContainer3/HBoxContainer/PhysicsTickVBoxContainer" unique_id=155851599]
 custom_minimum_size = Vector2(40, 40)
 layout_mode = 2
 focus_mode = 0
 text = "15"
 
-[node name="120" type="Button" parent="MoreSettingsView/HBoxContainer/PhysicsTickVBoxContainer"]
+[node name="120" type="Button" parent="MoreSettingsView/VBoxContainer3/HBoxContainer/PhysicsTickVBoxContainer" unique_id=877945415]
 custom_minimum_size = Vector2(40, 40)
 layout_mode = 2
 focus_mode = 0
 text = "120"
 
-[node name="PhysicsInterpolationCheckBox" type="CheckBox" parent="MoreSettingsView/HBoxContainer"]
+[node name="PhysicsInterpolationCheckBox" type="CheckBox" parent="MoreSettingsView/VBoxContainer3/HBoxContainer" unique_id=1074037543]
 layout_mode = 2
 focus_mode = 0
 text = "Enable Physics Interpolation"
 
-[node name="VSyncCheckBox" type="CheckBox" parent="MoreSettingsView/HBoxContainer"]
+[node name="VSyncCheckBox" type="CheckBox" parent="MoreSettingsView/VBoxContainer3/HBoxContainer" unique_id=836784967]
 layout_mode = 2
 focus_mode = 0
 text = "Enable VSync"
 
-[node name="SelectPhysicsTicksBtnView" parent="MoreSettingsView" node_paths=PackedStringArray("all_btns") instance=ExtResource("3_cgqfs")]
-visible = false
-all_btns = [NodePath("../HBoxContainer/PhysicsTickVBoxContainer/60"), NodePath("../HBoxContainer/PhysicsTickVBoxContainer/40"), NodePath("../HBoxContainer/PhysicsTickVBoxContainer/25"), NodePath("../HBoxContainer/PhysicsTickVBoxContainer/15"), NodePath("../HBoxContainer/PhysicsTickVBoxContainer/120")]
+[node name="HBoxContainer2" type="HBoxContainer" parent="MoreSettingsView/VBoxContainer3" unique_id=1572207736]
+layout_mode = 2
 
-[node name="VBoxContainer" type="VBoxContainer" parent="MoreSettingsView"]
+[node name="LimitFPSContainer" type="HBoxContainer" parent="MoreSettingsView/VBoxContainer3/HBoxContainer2" unique_id=648470335]
+layout_mode = 2
+
+[node name="Label" type="Label" parent="MoreSettingsView/VBoxContainer3/HBoxContainer2/LimitFPSContainer" unique_id=437058524]
+layout_mode = 2
+text = "Limit FPS"
+
+[node name="NoLimit" type="Button" parent="MoreSettingsView/VBoxContainer3/HBoxContainer2/LimitFPSContainer" unique_id=1198446117]
+custom_minimum_size = Vector2(40, 40)
+layout_mode = 2
+focus_mode = 0
+text = "No Limit"
+
+[node name="60" type="Button" parent="MoreSettingsView/VBoxContainer3/HBoxContainer2/LimitFPSContainer" unique_id=232866730]
+custom_minimum_size = Vector2(40, 40)
+layout_mode = 2
+focus_mode = 0
+text = "60"
+
+[node name="40" type="Button" parent="MoreSettingsView/VBoxContainer3/HBoxContainer2/LimitFPSContainer" unique_id=1254070452]
+custom_minimum_size = Vector2(40, 40)
+layout_mode = 2
+focus_mode = 0
+text = "40"
+
+[node name="25" type="Button" parent="MoreSettingsView/VBoxContainer3/HBoxContainer2/LimitFPSContainer" unique_id=1759766490]
+custom_minimum_size = Vector2(40, 40)
+layout_mode = 2
+focus_mode = 0
+text = "25"
+
+[node name="15" type="Button" parent="MoreSettingsView/VBoxContainer3/HBoxContainer2/LimitFPSContainer" unique_id=1998877422]
+custom_minimum_size = Vector2(40, 40)
+layout_mode = 2
+focus_mode = 0
+text = "15"
+
+[node name="120" type="Button" parent="MoreSettingsView/VBoxContainer3/HBoxContainer2/LimitFPSContainer" unique_id=643448492]
+custom_minimum_size = Vector2(40, 40)
+layout_mode = 2
+focus_mode = 0
+text = "120"
+
+[node name="SelectLimitFPSBtnView" parent="MoreSettingsView" unique_id=1989831996 node_paths=PackedStringArray("all_btns") instance=ExtResource("3_cgqfs")]
+visible = false
+layout_mode = 0
+offset_top = 162.0
+offset_bottom = 162.0
+all_btns = [NodePath("../VBoxContainer3/HBoxContainer2/LimitFPSContainer/NoLimit"), NodePath("../VBoxContainer3/HBoxContainer2/LimitFPSContainer/60"), NodePath("../VBoxContainer3/HBoxContainer2/LimitFPSContainer/40"), NodePath("../VBoxContainer3/HBoxContainer2/LimitFPSContainer/25"), NodePath("../VBoxContainer3/HBoxContainer2/LimitFPSContainer/15"), NodePath("../VBoxContainer3/HBoxContainer2/LimitFPSContainer/120")]
+
+[node name="SelectPhysicsTicksBtnView" parent="MoreSettingsView" unique_id=767601189 node_paths=PackedStringArray("all_btns") instance=ExtResource("3_cgqfs")]
+visible = false
+layout_mode = 0
+offset_top = 0.0
+offset_bottom = 0.0
+all_btns = [NodePath("../VBoxContainer3/HBoxContainer/PhysicsTickVBoxContainer/60"), NodePath("../VBoxContainer3/HBoxContainer/PhysicsTickVBoxContainer/40"), NodePath("../VBoxContainer3/HBoxContainer/PhysicsTickVBoxContainer/25"), NodePath("../VBoxContainer3/HBoxContainer/PhysicsTickVBoxContainer/15"), NodePath("../VBoxContainer3/HBoxContainer/PhysicsTickVBoxContainer/120")]
+
+[node name="VBoxContainer" type="VBoxContainer" parent="MoreSettingsView" unique_id=79864768]
 layout_mode = 1
 anchors_preset = 3
 anchor_left = 1.0
@@ -1131,148 +1220,148 @@ offset_right = -261.0
 grow_horizontal = 0
 grow_vertical = 0
 
-[node name="Label" type="Label" parent="MoreSettingsView/VBoxContainer"]
+[node name="Label" type="Label" parent="MoreSettingsView/VBoxContainer" unique_id=1996653568]
 layout_mode = 2
 text = "Bullet Grid Options"
 horizontal_alignment = 1
 
-[node name="RowsPerColumnHBoxContainer" type="HBoxContainer" parent="MoreSettingsView/VBoxContainer"]
+[node name="RowsPerColumnHBoxContainer" type="HBoxContainer" parent="MoreSettingsView/VBoxContainer" unique_id=1421883674]
 layout_mode = 2
 
-[node name="Label" type="Label" parent="MoreSettingsView/VBoxContainer/RowsPerColumnHBoxContainer"]
+[node name="Label" type="Label" parent="MoreSettingsView/VBoxContainer/RowsPerColumnHBoxContainer" unique_id=470407446]
 layout_mode = 2
 text = "Rows per Column"
 
-[node name="10rows" type="Button" parent="MoreSettingsView/VBoxContainer/RowsPerColumnHBoxContainer"]
+[node name="10rows" type="Button" parent="MoreSettingsView/VBoxContainer/RowsPerColumnHBoxContainer" unique_id=535632180]
 custom_minimum_size = Vector2(40, 40)
 layout_mode = 2
 focus_mode = 0
 text = "10"
 
-[node name="15rows" type="Button" parent="MoreSettingsView/VBoxContainer/RowsPerColumnHBoxContainer"]
+[node name="15rows" type="Button" parent="MoreSettingsView/VBoxContainer/RowsPerColumnHBoxContainer" unique_id=1845201296]
 custom_minimum_size = Vector2(40, 40)
 layout_mode = 2
 focus_mode = 0
 text = "15"
 
-[node name="25rows" type="Button" parent="MoreSettingsView/VBoxContainer/RowsPerColumnHBoxContainer"]
+[node name="25rows" type="Button" parent="MoreSettingsView/VBoxContainer/RowsPerColumnHBoxContainer" unique_id=1111059806]
 custom_minimum_size = Vector2(40, 40)
 layout_mode = 2
 focus_mode = 0
 text = "25"
 
-[node name="5rows" type="Button" parent="MoreSettingsView/VBoxContainer/RowsPerColumnHBoxContainer"]
+[node name="5rows" type="Button" parent="MoreSettingsView/VBoxContainer/RowsPerColumnHBoxContainer" unique_id=1361066331]
 custom_minimum_size = Vector2(40, 40)
 layout_mode = 2
 focus_mode = 0
 text = "5"
 
-[node name="50rows" type="Button" parent="MoreSettingsView/VBoxContainer/RowsPerColumnHBoxContainer"]
+[node name="50rows" type="Button" parent="MoreSettingsView/VBoxContainer/RowsPerColumnHBoxContainer" unique_id=593290242]
 custom_minimum_size = Vector2(40, 40)
 layout_mode = 2
 focus_mode = 0
 text = "50"
 
-[node name="AlignmentOptionsHBoxContainer" type="HBoxContainer" parent="MoreSettingsView/VBoxContainer"]
+[node name="AlignmentOptionsHBoxContainer" type="HBoxContainer" parent="MoreSettingsView/VBoxContainer" unique_id=704654792]
 layout_mode = 2
 
-[node name="Label" type="Label" parent="MoreSettingsView/VBoxContainer/AlignmentOptionsHBoxContainer"]
+[node name="Label" type="Label" parent="MoreSettingsView/VBoxContainer/AlignmentOptionsHBoxContainer" unique_id=1712774085]
 layout_mode = 2
 text = "Alignment"
 
-[node name="CenterLeftAlignmentBtn" type="Button" parent="MoreSettingsView/VBoxContainer/AlignmentOptionsHBoxContainer"]
+[node name="CenterLeftAlignmentBtn" type="Button" parent="MoreSettingsView/VBoxContainer/AlignmentOptionsHBoxContainer" unique_id=1071162410]
 custom_minimum_size = Vector2(40, 40)
 layout_mode = 2
 focus_mode = 0
 text = "CenterLeft"
 
-[node name="TopLeftAlignmentBtn" type="Button" parent="MoreSettingsView/VBoxContainer/AlignmentOptionsHBoxContainer"]
+[node name="TopLeftAlignmentBtn" type="Button" parent="MoreSettingsView/VBoxContainer/AlignmentOptionsHBoxContainer" unique_id=1425566529]
 custom_minimum_size = Vector2(40, 40)
 layout_mode = 2
 focus_mode = 0
 text = "TopLeft"
 
-[node name="BottomLeftAlignmentBtn" type="Button" parent="MoreSettingsView/VBoxContainer/AlignmentOptionsHBoxContainer"]
+[node name="BottomLeftAlignmentBtn" type="Button" parent="MoreSettingsView/VBoxContainer/AlignmentOptionsHBoxContainer" unique_id=335166153]
 custom_minimum_size = Vector2(40, 40)
 layout_mode = 2
 focus_mode = 0
 text = "BottomLeft"
 
-[node name="ColumnOffsetHBoxContainer" type="HBoxContainer" parent="MoreSettingsView/VBoxContainer"]
+[node name="ColumnOffsetHBoxContainer" type="HBoxContainer" parent="MoreSettingsView/VBoxContainer" unique_id=2000622312]
 layout_mode = 2
 
-[node name="Label" type="Label" parent="MoreSettingsView/VBoxContainer/ColumnOffsetHBoxContainer"]
+[node name="Label" type="Label" parent="MoreSettingsView/VBoxContainer/ColumnOffsetHBoxContainer" unique_id=1588624560]
 layout_mode = 2
 text = "Column Offset"
 
-[node name="150col-offset" type="Button" parent="MoreSettingsView/VBoxContainer/ColumnOffsetHBoxContainer"]
+[node name="150col-offset" type="Button" parent="MoreSettingsView/VBoxContainer/ColumnOffsetHBoxContainer" unique_id=1500925520]
 custom_minimum_size = Vector2(40, 40)
 layout_mode = 2
 focus_mode = 0
 text = "150"
 
-[node name="250col-offset" type="Button" parent="MoreSettingsView/VBoxContainer/ColumnOffsetHBoxContainer"]
+[node name="250col-offset" type="Button" parent="MoreSettingsView/VBoxContainer/ColumnOffsetHBoxContainer" unique_id=1486607687]
 custom_minimum_size = Vector2(40, 40)
 layout_mode = 2
 focus_mode = 0
 text = "250"
 
-[node name="350col-offset" type="Button" parent="MoreSettingsView/VBoxContainer/ColumnOffsetHBoxContainer"]
+[node name="350col-offset" type="Button" parent="MoreSettingsView/VBoxContainer/ColumnOffsetHBoxContainer" unique_id=1195972491]
 custom_minimum_size = Vector2(40, 40)
 layout_mode = 2
 focus_mode = 0
 text = "350"
 
-[node name="500col-offset" type="Button" parent="MoreSettingsView/VBoxContainer/ColumnOffsetHBoxContainer"]
+[node name="500col-offset" type="Button" parent="MoreSettingsView/VBoxContainer/ColumnOffsetHBoxContainer" unique_id=216984037]
 custom_minimum_size = Vector2(40, 40)
 layout_mode = 2
 focus_mode = 0
 text = "500"
 
-[node name="50col-offset" type="Button" parent="MoreSettingsView/VBoxContainer/ColumnOffsetHBoxContainer"]
+[node name="50col-offset" type="Button" parent="MoreSettingsView/VBoxContainer/ColumnOffsetHBoxContainer" unique_id=202695736]
 custom_minimum_size = Vector2(40, 40)
 layout_mode = 2
 focus_mode = 0
 text = "50"
 
-[node name="RowOffsetHBoxContainer2" type="HBoxContainer" parent="MoreSettingsView/VBoxContainer"]
+[node name="RowOffsetHBoxContainer2" type="HBoxContainer" parent="MoreSettingsView/VBoxContainer" unique_id=1509743462]
 layout_mode = 2
 
-[node name="Label" type="Label" parent="MoreSettingsView/VBoxContainer/RowOffsetHBoxContainer2"]
+[node name="Label" type="Label" parent="MoreSettingsView/VBoxContainer/RowOffsetHBoxContainer2" unique_id=1285622642]
 layout_mode = 2
 text = "Row Offset"
 
-[node name="150row-offset" type="Button" parent="MoreSettingsView/VBoxContainer/RowOffsetHBoxContainer2"]
+[node name="150row-offset" type="Button" parent="MoreSettingsView/VBoxContainer/RowOffsetHBoxContainer2" unique_id=956736149]
 custom_minimum_size = Vector2(40, 40)
 layout_mode = 2
 focus_mode = 0
 text = "150"
 
-[node name="250row-offset" type="Button" parent="MoreSettingsView/VBoxContainer/RowOffsetHBoxContainer2"]
+[node name="250row-offset" type="Button" parent="MoreSettingsView/VBoxContainer/RowOffsetHBoxContainer2" unique_id=552037406]
 custom_minimum_size = Vector2(40, 40)
 layout_mode = 2
 focus_mode = 0
 text = "250"
 
-[node name="350row-offset" type="Button" parent="MoreSettingsView/VBoxContainer/RowOffsetHBoxContainer2"]
+[node name="350row-offset" type="Button" parent="MoreSettingsView/VBoxContainer/RowOffsetHBoxContainer2" unique_id=654501532]
 custom_minimum_size = Vector2(40, 40)
 layout_mode = 2
 focus_mode = 0
 text = "350"
 
-[node name="500row-offset" type="Button" parent="MoreSettingsView/VBoxContainer/RowOffsetHBoxContainer2"]
+[node name="500row-offset" type="Button" parent="MoreSettingsView/VBoxContainer/RowOffsetHBoxContainer2" unique_id=1674279143]
 custom_minimum_size = Vector2(40, 40)
 layout_mode = 2
 focus_mode = 0
 text = "500"
 
-[node name="50row-offset" type="Button" parent="MoreSettingsView/VBoxContainer/RowOffsetHBoxContainer2"]
+[node name="50row-offset" type="Button" parent="MoreSettingsView/VBoxContainer/RowOffsetHBoxContainer2" unique_id=27365981]
 custom_minimum_size = Vector2(40, 40)
 layout_mode = 2
 focus_mode = 0
 text = "50"
 
-[node name="VBoxContainer2" type="VBoxContainer" parent="MoreSettingsView"]
+[node name="VBoxContainer2" type="VBoxContainer" parent="MoreSettingsView" unique_id=1486294317]
 layout_mode = 1
 anchors_preset = 3
 anchor_left = 1.0
@@ -1284,34 +1373,46 @@ offset_top = -40.0
 grow_horizontal = 0
 grow_vertical = 0
 
-[node name="RotateGridWithMarkerCheckBox" type="CheckBox" parent="MoreSettingsView/VBoxContainer2"]
+[node name="RotateGridWithMarkerCheckBox" type="CheckBox" parent="MoreSettingsView/VBoxContainer2" unique_id=1493819152]
 layout_mode = 2
 focus_mode = 0
 button_pressed = true
 text = "Rotate Grid With Marker"
 
-[node name="RandomLocalRotationCheckBox" type="CheckBox" parent="MoreSettingsView/VBoxContainer2"]
+[node name="RandomLocalRotationCheckBox" type="CheckBox" parent="MoreSettingsView/VBoxContainer2" unique_id=1113531706]
 layout_mode = 2
 focus_mode = 0
 text = "Random Local Rotation"
 
-[node name="SelectRowsPerColumnBtnView" parent="MoreSettingsView" node_paths=PackedStringArray("all_btns") instance=ExtResource("3_cgqfs")]
+[node name="SelectRowsPerColumnBtnView" parent="MoreSettingsView" unique_id=1065716988 node_paths=PackedStringArray("all_btns") instance=ExtResource("3_cgqfs")]
 visible = false
+layout_mode = 0
+offset_top = 0.0
+offset_bottom = 0.0
 all_btns = [NodePath("../VBoxContainer/RowsPerColumnHBoxContainer/10rows"), NodePath("../VBoxContainer/RowsPerColumnHBoxContainer/15rows"), NodePath("../VBoxContainer/RowsPerColumnHBoxContainer/25rows"), NodePath("../VBoxContainer/RowsPerColumnHBoxContainer/5rows"), NodePath("../VBoxContainer/RowsPerColumnHBoxContainer/50rows")]
 
-[node name="SelectGridAlignmentBtnView" parent="MoreSettingsView" node_paths=PackedStringArray("all_btns") instance=ExtResource("3_cgqfs")]
+[node name="SelectGridAlignmentBtnView" parent="MoreSettingsView" unique_id=545075841 node_paths=PackedStringArray("all_btns") instance=ExtResource("3_cgqfs")]
 visible = false
+layout_mode = 0
+offset_top = 0.0
+offset_bottom = 0.0
 all_btns = [NodePath("../VBoxContainer/AlignmentOptionsHBoxContainer/CenterLeftAlignmentBtn"), NodePath("../VBoxContainer/AlignmentOptionsHBoxContainer/TopLeftAlignmentBtn"), NodePath("../VBoxContainer/AlignmentOptionsHBoxContainer/BottomLeftAlignmentBtn")]
 
-[node name="SelectColumnOffsetBtnView" parent="MoreSettingsView" node_paths=PackedStringArray("all_btns") instance=ExtResource("3_cgqfs")]
+[node name="SelectColumnOffsetBtnView" parent="MoreSettingsView" unique_id=1339069376 node_paths=PackedStringArray("all_btns") instance=ExtResource("3_cgqfs")]
 visible = false
+layout_mode = 0
+offset_top = 0.0
+offset_bottom = 0.0
 all_btns = [NodePath("../VBoxContainer/ColumnOffsetHBoxContainer/150col-offset"), NodePath("../VBoxContainer/ColumnOffsetHBoxContainer/250col-offset"), NodePath("../VBoxContainer/ColumnOffsetHBoxContainer/350col-offset"), NodePath("../VBoxContainer/ColumnOffsetHBoxContainer/500col-offset"), NodePath("../VBoxContainer/ColumnOffsetHBoxContainer/50col-offset")]
 
-[node name="SelectRowOffsetBtnView" parent="MoreSettingsView" node_paths=PackedStringArray("all_btns") instance=ExtResource("3_cgqfs")]
+[node name="SelectRowOffsetBtnView" parent="MoreSettingsView" unique_id=434215871 node_paths=PackedStringArray("all_btns") instance=ExtResource("3_cgqfs")]
 visible = false
+layout_mode = 0
+offset_top = 0.0
+offset_bottom = 0.0
 all_btns = [NodePath("../VBoxContainer/RowOffsetHBoxContainer2/150row-offset"), NodePath("../VBoxContainer/RowOffsetHBoxContainer2/250row-offset"), NodePath("../VBoxContainer/RowOffsetHBoxContainer2/350row-offset"), NodePath("../VBoxContainer/RowOffsetHBoxContainer2/500row-offset"), NodePath("../VBoxContainer/RowOffsetHBoxContainer2/50row-offset")]
 
-[node name="GodotArea2DBulletsView" type="Control" parent="."]
+[node name="GodotArea2DBulletsView" type="Control" parent="." unique_id=1936559472]
 visible = false
 layout_mode = 3
 anchors_preset = 15
@@ -1321,7 +1422,7 @@ grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
 
-[node name="Label" type="Label" parent="GodotArea2DBulletsView"]
+[node name="Label" type="Label" parent="GodotArea2DBulletsView" unique_id=285743372]
 layout_mode = 1
 anchors_preset = 5
 anchor_left = 0.5
@@ -1332,7 +1433,7 @@ offset_bottom = 23.0
 grow_horizontal = 2
 text = "Godot Area2D bullets do NOT support BlastBullets2D plugin features"
 
-[node name="AlwaysVisibleView" type="Control" parent="."]
+[node name="AlwaysVisibleView" type="Control" parent="." unique_id=487175531]
 layout_mode = 3
 anchors_preset = 15
 anchor_right = 1.0
@@ -1341,7 +1442,7 @@ grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
 
-[node name="HealthBar" parent="AlwaysVisibleView" instance=ExtResource("5_avyxe")]
+[node name="HealthBar" parent="AlwaysVisibleView" unique_id=752409122 instance=ExtResource("5_avyxe")]
 custom_minimum_size = Vector2(200, 30)
 layout_mode = 1
 anchors_preset = 2
@@ -1353,7 +1454,7 @@ offset_right = 220.0
 offset_bottom = -116.0
 grow_vertical = 0
 
-[node name="FillUpPlayerHealthBtn" type="Button" parent="AlwaysVisibleView"]
+[node name="FillUpPlayerHealthBtn" type="Button" parent="AlwaysVisibleView" unique_id=863780386]
 layout_mode = 1
 anchors_preset = 2
 anchor_top = 1.0
@@ -1366,12 +1467,15 @@ grow_vertical = 0
 focus_mode = 0
 text = "Heal"
 
-[node name="SelectFireTimerBtnView" parent="AlwaysVisibleView" node_paths=PackedStringArray("all_btns") instance=ExtResource("3_cgqfs")]
+[node name="SelectFireTimerBtnView" parent="AlwaysVisibleView" unique_id=1145824 node_paths=PackedStringArray("all_btns") instance=ExtResource("3_cgqfs")]
 visible = false
+layout_mode = 0
+offset_top = 0.0
+offset_bottom = 0.0
 all_btns = [NodePath("../FireTimerVboxContainer/HBoxContainer/0_05"), NodePath("../FireTimerVboxContainer/HBoxContainer/0_10"), NodePath("../FireTimerVboxContainer/HBoxContainer/0_15"), NodePath("../FireTimerVboxContainer/HBoxContainer/0_20"), NodePath("../FireTimerVboxContainer/HBoxContainer/0_50"), NodePath("../FireTimerVboxContainer/HBoxContainer/1_00"), NodePath("../FireTimerVboxContainer/HBoxContainer/2_00"), NodePath("../FireTimerVboxContainer/HBoxContainer/0_02")]
 selected_btn_index = 7
 
-[node name="SelectAmountBulletsBtnView" parent="AlwaysVisibleView" node_paths=PackedStringArray("all_btns") instance=ExtResource("3_cgqfs")]
+[node name="SelectAmountBulletsBtnView" parent="AlwaysVisibleView" unique_id=494730021 node_paths=PackedStringArray("all_btns") instance=ExtResource("3_cgqfs")]
 visible = false
 layout_mode = 1
 anchors_preset = 3
@@ -1387,7 +1491,7 @@ grow_horizontal = 0
 grow_vertical = 0
 all_btns = [NodePath("../AmountBulletsVboxContainer/HBoxContainer/1"), NodePath("../AmountBulletsVboxContainer/HBoxContainer/500"), NodePath("../AmountBulletsVboxContainer/HBoxContainer/5"), NodePath("../AmountBulletsVboxContainer/HBoxContainer/60"), NodePath("../AmountBulletsVboxContainer/HBoxContainer/100"), NodePath("../AmountBulletsVboxContainer/HBoxContainer/200"), NodePath("../AmountBulletsVboxContainer/HBoxContainer/1000"), NodePath("../AmountBulletsVboxContainer/HBoxContainer/30"), NodePath("../AmountBulletsVboxContainer/HBoxContainer/15")]
 
-[node name="FireTimerVboxContainer" type="VBoxContainer" parent="AlwaysVisibleView"]
+[node name="FireTimerVboxContainer" type="VBoxContainer" parent="AlwaysVisibleView" unique_id=1003812881]
 layout_mode = 1
 anchors_preset = 2
 anchor_top = 1.0
@@ -1399,72 +1503,72 @@ offset_bottom = -60.0
 grow_vertical = 0
 alignment = 1
 
-[node name="Label" type="Label" parent="AlwaysVisibleView/FireTimerVboxContainer"]
+[node name="Label" type="Label" parent="AlwaysVisibleView/FireTimerVboxContainer" unique_id=686880145]
 layout_mode = 2
 text = "Fire Timer Cooldown Time"
 horizontal_alignment = 1
 
-[node name="HBoxContainer" type="HBoxContainer" parent="AlwaysVisibleView/FireTimerVboxContainer"]
+[node name="HBoxContainer" type="HBoxContainer" parent="AlwaysVisibleView/FireTimerVboxContainer" unique_id=731859443]
 layout_mode = 2
 alignment = 1
 
-[node name="0_02" type="Button" parent="AlwaysVisibleView/FireTimerVboxContainer/HBoxContainer"]
+[node name="0_02" type="Button" parent="AlwaysVisibleView/FireTimerVboxContainer/HBoxContainer" unique_id=218436635]
 custom_minimum_size = Vector2(32, 0)
 layout_mode = 2
 focus_mode = 0
 text = "0.02
 "
 
-[node name="0_05" type="Button" parent="AlwaysVisibleView/FireTimerVboxContainer/HBoxContainer"]
+[node name="0_05" type="Button" parent="AlwaysVisibleView/FireTimerVboxContainer/HBoxContainer" unique_id=857658006]
 custom_minimum_size = Vector2(32, 0)
 layout_mode = 2
 focus_mode = 0
 text = "0.05
 "
 
-[node name="0_10" type="Button" parent="AlwaysVisibleView/FireTimerVboxContainer/HBoxContainer"]
+[node name="0_10" type="Button" parent="AlwaysVisibleView/FireTimerVboxContainer/HBoxContainer" unique_id=1182396653]
 custom_minimum_size = Vector2(32, 0)
 layout_mode = 2
 focus_mode = 0
 text = "0.10
 "
 
-[node name="0_15" type="Button" parent="AlwaysVisibleView/FireTimerVboxContainer/HBoxContainer"]
+[node name="0_15" type="Button" parent="AlwaysVisibleView/FireTimerVboxContainer/HBoxContainer" unique_id=1790597914]
 custom_minimum_size = Vector2(32, 0)
 layout_mode = 2
 focus_mode = 0
 text = "0.15
 "
 
-[node name="0_20" type="Button" parent="AlwaysVisibleView/FireTimerVboxContainer/HBoxContainer"]
+[node name="0_20" type="Button" parent="AlwaysVisibleView/FireTimerVboxContainer/HBoxContainer" unique_id=808886927]
 custom_minimum_size = Vector2(32, 0)
 layout_mode = 2
 focus_mode = 0
 text = "0.20
 "
 
-[node name="0_50" type="Button" parent="AlwaysVisibleView/FireTimerVboxContainer/HBoxContainer"]
+[node name="0_50" type="Button" parent="AlwaysVisibleView/FireTimerVboxContainer/HBoxContainer" unique_id=283874654]
 custom_minimum_size = Vector2(32, 0)
 layout_mode = 2
 focus_mode = 0
 text = "0.50
 "
 
-[node name="1_00" type="Button" parent="AlwaysVisibleView/FireTimerVboxContainer/HBoxContainer"]
+[node name="1_00" type="Button" parent="AlwaysVisibleView/FireTimerVboxContainer/HBoxContainer" unique_id=629579215]
 custom_minimum_size = Vector2(32, 0)
 layout_mode = 2
 focus_mode = 0
 text = "1.00
 "
 
-[node name="2_00" type="Button" parent="AlwaysVisibleView/FireTimerVboxContainer/HBoxContainer"]
+[node name="2_00" type="Button" parent="AlwaysVisibleView/FireTimerVboxContainer/HBoxContainer" unique_id=1372654012]
 custom_minimum_size = Vector2(32, 0)
 layout_mode = 2
 focus_mode = 0
 text = "2.00
 "
 
-[node name="AmountBulletsVboxContainer" type="VBoxContainer" parent="AlwaysVisibleView"]
+[node name="AmountBulletsVboxContainer" type="VBoxContainer" parent="AlwaysVisibleView" unique_id=766586298]
 layout_mode = 1
 anchors_preset = 2
 anchor_top = 1.0
@@ -1476,71 +1580,71 @@ offset_bottom = -5.0
 grow_vertical = 0
 alignment = 1
 
-[node name="Label" type="Label" parent="AlwaysVisibleView/AmountBulletsVboxContainer"]
+[node name="Label" type="Label" parent="AlwaysVisibleView/AmountBulletsVboxContainer" unique_id=875686895]
 layout_mode = 2
 text = "Amount Bullets (N)"
 horizontal_alignment = 1
 
-[node name="HBoxContainer" type="HBoxContainer" parent="AlwaysVisibleView/AmountBulletsVboxContainer"]
+[node name="HBoxContainer" type="HBoxContainer" parent="AlwaysVisibleView/AmountBulletsVboxContainer" unique_id=1751236239]
 layout_mode = 2
 alignment = 1
 
-[node name="1" type="Button" parent="AlwaysVisibleView/AmountBulletsVboxContainer/HBoxContainer"]
+[node name="1" type="Button" parent="AlwaysVisibleView/AmountBulletsVboxContainer/HBoxContainer" unique_id=1276734169]
 custom_minimum_size = Vector2(32, 0)
 layout_mode = 2
 focus_mode = 0
 text = "1"
 
-[node name="5" type="Button" parent="AlwaysVisibleView/AmountBulletsVboxContainer/HBoxContainer"]
+[node name="5" type="Button" parent="AlwaysVisibleView/AmountBulletsVboxContainer/HBoxContainer" unique_id=1953955848]
 custom_minimum_size = Vector2(32, 0)
 layout_mode = 2
 focus_mode = 0
 text = "5"
 
-[node name="15" type="Button" parent="AlwaysVisibleView/AmountBulletsVboxContainer/HBoxContainer"]
+[node name="15" type="Button" parent="AlwaysVisibleView/AmountBulletsVboxContainer/HBoxContainer" unique_id=1003270981]
 custom_minimum_size = Vector2(32, 0)
 layout_mode = 2
 focus_mode = 0
 text = "15"
 
-[node name="30" type="Button" parent="AlwaysVisibleView/AmountBulletsVboxContainer/HBoxContainer"]
+[node name="30" type="Button" parent="AlwaysVisibleView/AmountBulletsVboxContainer/HBoxContainer" unique_id=1082211149]
 custom_minimum_size = Vector2(32, 0)
 layout_mode = 2
 focus_mode = 0
 text = "30"
 
-[node name="60" type="Button" parent="AlwaysVisibleView/AmountBulletsVboxContainer/HBoxContainer"]
+[node name="60" type="Button" parent="AlwaysVisibleView/AmountBulletsVboxContainer/HBoxContainer" unique_id=1700508201]
 custom_minimum_size = Vector2(32, 0)
 layout_mode = 2
 focus_mode = 0
 text = "60"
 
-[node name="100" type="Button" parent="AlwaysVisibleView/AmountBulletsVboxContainer/HBoxContainer"]
+[node name="100" type="Button" parent="AlwaysVisibleView/AmountBulletsVboxContainer/HBoxContainer" unique_id=366840439]
 custom_minimum_size = Vector2(32, 0)
 layout_mode = 2
 focus_mode = 0
 text = "100"
 
-[node name="200" type="Button" parent="AlwaysVisibleView/AmountBulletsVboxContainer/HBoxContainer"]
+[node name="200" type="Button" parent="AlwaysVisibleView/AmountBulletsVboxContainer/HBoxContainer" unique_id=228770929]
 custom_minimum_size = Vector2(32, 0)
 layout_mode = 2
 focus_mode = 0
 text = "200"
 
-[node name="500" type="Button" parent="AlwaysVisibleView/AmountBulletsVboxContainer/HBoxContainer"]
+[node name="500" type="Button" parent="AlwaysVisibleView/AmountBulletsVboxContainer/HBoxContainer" unique_id=214124075]
 custom_minimum_size = Vector2(32, 0)
 layout_mode = 2
 focus_mode = 0
 text = "500"
 
-[node name="1000" type="Button" parent="AlwaysVisibleView/AmountBulletsVboxContainer/HBoxContainer"]
+[node name="1000" type="Button" parent="AlwaysVisibleView/AmountBulletsVboxContainer/HBoxContainer" unique_id=896703732]
 custom_minimum_size = Vector2(32, 0)
 layout_mode = 2
 focus_mode = 0
 text = "1000
 "
 
-[node name="BulletTypeContainer" type="VBoxContainer" parent="AlwaysVisibleView"]
+[node name="BulletTypeContainer" type="VBoxContainer" parent="AlwaysVisibleView" unique_id=351312914]
 layout_mode = 1
 offset_left = 18.0
 offset_top = 283.0
@@ -1548,39 +1652,40 @@ offset_right = 246.0
 offset_bottom = 411.0
 size_flags_vertical = 8
 
-[node name="Label" type="Label" parent="AlwaysVisibleView/BulletTypeContainer"]
+[node name="Label" type="Label" parent="AlwaysVisibleView/BulletTypeContainer" unique_id=75842918]
 layout_mode = 2
 text = "Bullet Type"
 horizontal_alignment = 1
 
-[node name="DirectionalBtn" type="Button" parent="AlwaysVisibleView/BulletTypeContainer"]
+[node name="DirectionalBtn" type="Button" parent="AlwaysVisibleView/BulletTypeContainer" unique_id=242276313]
 custom_minimum_size = Vector2(155, 0)
 layout_mode = 2
 focus_mode = 0
 text = "DirectionalBullets
 "
 
-[node name="BlockBulletsBtn" type="Button" parent="AlwaysVisibleView/BulletTypeContainer"]
+[node name="BlockBulletsBtn" type="Button" parent="AlwaysVisibleView/BulletTypeContainer" unique_id=1934151629]
 custom_minimum_size = Vector2(155, 0)
 layout_mode = 2
 focus_mode = 0
 text = "BlockBullets"
 
-[node name="GodotArea2DBulletsBtn" type="Button" parent="AlwaysVisibleView/BulletTypeContainer"]
+[node name="GodotArea2DBulletsBtn" type="Button" parent="AlwaysVisibleView/BulletTypeContainer" unique_id=1174109171]
 custom_minimum_size = Vector2(155, 0)
 layout_mode = 2
 focus_mode = 0
 text = "Godot Area2D Bullets"
 
-[node name="SelectBulletTypeView" parent="AlwaysVisibleView" node_paths=PackedStringArray("all_btns") instance=ExtResource("3_cgqfs")]
+[node name="SelectBulletTypeView" parent="AlwaysVisibleView" unique_id=1506756560 node_paths=PackedStringArray("all_btns") instance=ExtResource("3_cgqfs")]
 visible = false
+layout_mode = 0
 offset_left = 42.0
 offset_top = 528.0
 offset_right = 262.0
 offset_bottom = 528.0
 all_btns = [NodePath("../BulletTypeContainer/DirectionalBtn"), NodePath("../BulletTypeContainer/BlockBulletsBtn"), NodePath("../BulletTypeContainer/GodotArea2DBulletsBtn")]
 
-[node name="SettingsUIManagerVBoxContainer" type="VBoxContainer" parent="AlwaysVisibleView"]
+[node name="SettingsUIManagerVBoxContainer" type="VBoxContainer" parent="AlwaysVisibleView" unique_id=391469247]
 layout_mode = 1
 anchors_preset = 2
 anchor_top = 1.0
@@ -1591,22 +1696,22 @@ offset_right = 228.0
 offset_bottom = -130.0
 grow_vertical = 0
 
-[node name="BulletSettingsBtn" type="Button" parent="AlwaysVisibleView/SettingsUIManagerVBoxContainer"]
+[node name="BulletSettingsBtn" type="Button" parent="AlwaysVisibleView/SettingsUIManagerVBoxContainer" unique_id=935299468]
 layout_mode = 2
 focus_mode = 0
 text = "Bullet Settings"
 
-[node name="ObjectPoolSettingsBtn" type="Button" parent="AlwaysVisibleView/SettingsUIManagerVBoxContainer"]
+[node name="ObjectPoolSettingsBtn" type="Button" parent="AlwaysVisibleView/SettingsUIManagerVBoxContainer" unique_id=688513397]
 layout_mode = 2
 focus_mode = 0
 text = "Object Pool Settings"
 
-[node name="MoreSettingsBtn" type="Button" parent="AlwaysVisibleView/SettingsUIManagerVBoxContainer"]
+[node name="MoreSettingsBtn" type="Button" parent="AlwaysVisibleView/SettingsUIManagerVBoxContainer" unique_id=1532633965]
 layout_mode = 2
 focus_mode = 0
 text = "More Settings"
 
-[node name="ChangeSettingsUISelectBtnView" type="Control" parent="AlwaysVisibleView" node_paths=PackedStringArray("all_btns")]
+[node name="ChangeSettingsUISelectBtnView" type="Control" parent="AlwaysVisibleView" unique_id=1247672632 node_paths=PackedStringArray("all_btns")]
 anchors_preset = 0
 offset_right = 40.0
 offset_bottom = 40.0
@@ -1648,8 +1753,9 @@ metadata/_custom_type_script = "uid://cs67whos5iyl6"
 [connection signal="new_btn_selected" from="BulletSettingsView/SelectViewsContainer/SelectBulletLifetimeView" to="." method="_on_select_bullet_lifetime_view_new_btn_selected"]
 [connection signal="new_btn_selected" from="BulletSettingsView/SelectViewsContainer/SelectTextureSizeBtnView" to="." method="_on_select_texture_size_btn_view_new_btn_selected"]
 [connection signal="new_btn_selected" from="BulletSettingsView/SelectViewsContainer/SelectZIndexBtnView" to="." method="_on_select_z_index_btn_view_new_btn_selected"]
-[connection signal="pressed" from="MoreSettingsView/HBoxContainer/PhysicsInterpolationCheckBox" to="." method="_on_physics_interpolation_check_box_pressed"]
-[connection signal="pressed" from="MoreSettingsView/HBoxContainer/VSyncCheckBox" to="." method="_on_v_sync_check_box_pressed"]
+[connection signal="pressed" from="MoreSettingsView/VBoxContainer3/HBoxContainer/PhysicsInterpolationCheckBox" to="." method="_on_physics_interpolation_check_box_pressed"]
+[connection signal="pressed" from="MoreSettingsView/VBoxContainer3/HBoxContainer/VSyncCheckBox" to="." method="_on_v_sync_check_box_pressed"]
+[connection signal="new_btn_selected" from="MoreSettingsView/SelectLimitFPSBtnView" to="." method="_on_select_limit_fps_btn_view_new_btn_selected"]
 [connection signal="new_btn_selected" from="MoreSettingsView/SelectPhysicsTicksBtnView" to="." method="_on_select_physics_ticks_btn_view_new_btn_selected"]
 [connection signal="pressed" from="MoreSettingsView/VBoxContainer2/RotateGridWithMarkerCheckBox" to="." method="_on_rotate_grid_with_marker_check_box_pressed"]
 [connection signal="pressed" from="MoreSettingsView/VBoxContainer2/RandomLocalRotationCheckBox" to="." method="_on_random_local_rotation_check_box_pressed"]

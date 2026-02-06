@@ -1,16 +1,16 @@
-[gd_scene load_steps=2 format=3 uid="uid://bmmgv82lf5hy2"]
+[gd_scene format=3 uid="uid://bmmgv82lf5hy2"]
 
 [ext_resource type="Script" uid="uid://847l1t2a3f0j" path="res://shared/ui/custom_label.gd" id="1_1cfk3"]
 
-[node name="CustomLabel" type="HBoxContainer"]
+[node name="CustomLabel" type="HBoxContainer" unique_id=1951274944]
 offset_right = 241.0
 offset_bottom = 23.0
 script = ExtResource("1_1cfk3")
 
-[node name="TextLabel" type="Label" parent="."]
+[node name="TextLabel" type="Label" parent="." unique_id=1214339205]
 layout_mode = 2
 text = "Text Goes Here:"
 
-[node name="ValueLabel" type="Label" parent="."]
+[node name="ValueLabel" type="Label" parent="." unique_id=841246007]
 layout_mode = 2
 text = "ValueGoesHere"

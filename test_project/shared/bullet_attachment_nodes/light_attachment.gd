@@ -4,6 +4,11 @@ var current_color:Color = Color.WHITE
 var change_color_max_time:float = 0.5
 var curr_time:float = 0.0
 
+func _ready() -> void:
+	BENCHMARK_GLOBALS.UI.bullets_selected_z_index_changed.connect(func(new_z_index):
+		z_index = new_z_index
+	)
+
 func _physics_process(delta: float) -> void:
 	if curr_time >= change_color_max_time:
 		var rand_R:float = randf()

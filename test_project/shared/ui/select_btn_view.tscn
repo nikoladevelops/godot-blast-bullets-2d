@@ -1,8 +1,8 @@
-[gd_scene load_steps=2 format=3 uid="uid://cxelp27ipxssv"]
+[gd_scene format=3 uid="uid://cxelp27ipxssv"]
 
 [ext_resource type="Script" uid="uid://cs67whos5iyl6" path="res://shared/ui/select_btn_view.gd" id="1_xuhp7"]
 
-[node name="SelectBtnView" type="Control"]
+[node name="SelectBtnView" type="Control" unique_id=990569999]
 layout_mode = 3
 anchors_preset = 0
 offset_top = 81.0

@@ -1,9 +1,9 @@
-[gd_scene load_steps=3 format=3 uid="uid://ogdi5pxcfi3x"]
+[gd_scene format=3 uid="uid://ogdi5pxcfi3x"]
 
 [ext_resource type="Theme" uid="uid://12g5de2h44s0" path="res://shared/ui/btn_generation_theme.tres" id="1_vmbpy"]
 [ext_resource type="Script" uid="uid://b7wucn8wglgth" path="res://shared/ui/switch_button.gd" id="2_dsem5"]
 
-[node name="SwitchButton" type="Button"]
+[node name="SwitchButton" type="Button" unique_id=1340475397]
 offset_right = 8.0
 offset_bottom = 8.0
 theme = ExtResource("1_vmbpy")

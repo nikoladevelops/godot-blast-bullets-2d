@@ -160,16 +160,6 @@ func spawn_bullets(player_rotation:float)->void:
 		BENCHMARK_GLOBALS.BulletType.GodotArea2D:
 			spawn_godot_area2d_bullets(player_rotation)
 
-# Testing if code is frame rate independent
-func _process(_delta):
-	if Input.is_key_pressed(KEY_F1):
-		Engine.max_fps = 15
-		
-	if Input.is_key_pressed(KEY_F2):
-		Engine.max_fps = 0
-	
-
-
 # Spawns MultiMeshDirectional bullets
 func spawn_multi_mesh_directional_bullets()->void:
 	if bullets_amount < 10:

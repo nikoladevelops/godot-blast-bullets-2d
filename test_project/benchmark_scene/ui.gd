@@ -100,14 +100,17 @@ var last_selected_color_picker:ColorPicker = null
 
 ## More Settings
 # Responsible for setting physics interpolation ON/OFF (both the engine setting and the BulletFactory2D setting)
-@onready var physics_interpolation_check_box:CheckBox = $MoreSettingsView/HBoxContainer/PhysicsInterpolationCheckBox
+@onready var physics_interpolation_check_box:CheckBox = $MoreSettingsView/VBoxContainer3/HBoxContainer/PhysicsInterpolationCheckBox
 # Responsible for setting VSync ON/OFF
-@onready var enable_v_sync_check_box:CheckBox = $MoreSettingsView/HBoxContainer/VSyncCheckBox
+@onready var enable_v_sync_check_box:CheckBox = $MoreSettingsView/VBoxContainer3/HBoxContainer/VSyncCheckBox
 # Responsible for setting whether the grid should rotate with the marker
 @onready var rotate_grid_with_marker_check_box:CheckBox = $MoreSettingsView/VBoxContainer2/RotateGridWithMarkerCheckBox
 # Responsible for setting random local rotation when spawning bullets
 @onready var random_local_rotation_check_box:CheckBox = $MoreSettingsView/VBoxContainer2/RandomLocalRotationCheckBox
 ##
+
+# Emitted when the selected z-index changes
+signal bullets_selected_z_index_changed(new_z_index:int)
 
 # The theme used for disabled buttons
 var disabled_btn_theme:Theme = preload("res://shared/ui/btn_disabled_theme.tres")
@@ -122,6 +125,10 @@ var lowest_fps:int = 100000000
 func _ready() -> void:
 	player_health_bar.set_up(default_player_health);
 	player_health_bar.health = default_player_health
+	
+	bullets_selected_z_index_changed.connect(func(new_z_index):
+		BENCHMARK_GLOBALS.PLAYER_DATA_NODE.set_bullets_z_index(new_z_index)
+	)
 	
 	switch_bullet_texture_btn.switch_btn_pressed.connect(func(_option:String, option_index:int):
 		BENCHMARK_GLOBALS.PLAYER_DATA_NODE.switch_bullet_texture(option_index)
@@ -445,7 +452,7 @@ func _on_select_texture_size_btn_view_new_btn_selected(new_selected_btn: Button)
 
 func _on_select_z_index_btn_view_new_btn_selected(new_selected_btn: Button) -> void:
 	var new_z_index:int = new_selected_btn.text.to_int()
-	BENCHMARK_GLOBALS.PLAYER_DATA_NODE.set_bullets_z_index(new_z_index)
+	emit_signal("bullets_selected_z_index_changed", new_z_index)
 
 
 func _on_adjust_direction_based_on_rotation_check_box_pressed() -> void:
@@ -543,3 +550,14 @@ func _on_random_local_rotation_check_box_pressed() -> void:
 func _on_stop_rotation_when_max_reached_check_box_pressed() -> void:
 	var should_stop_rotation_when_max_reached:bool = stop_rotation_when_max_reached_checkbox.button_pressed
 	BENCHMARK_GLOBALS.PLAYER_DATA_NODE.set_stop_rotation_when_max_reached(should_stop_rotation_when_max_reached)
+
+
+func _on_select_limit_fps_btn_view_new_btn_selected(new_selected_btn: Button) -> void:
+	if new_selected_btn.name == "NoLimit":
+		Engine.max_fps = 0
+		return
+	
+	var new_fps:int = new_selected_btn.text.to_int()
+	Engine.max_fps = new_fps
+	
+	

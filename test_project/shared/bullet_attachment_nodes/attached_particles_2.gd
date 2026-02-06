@@ -2,6 +2,11 @@ extends BulletAttachment2D
 
 @onready var GPUParticles = $GPUParticles2D
 
+func _ready()->void:
+	BENCHMARK_GLOBALS.UI.bullets_selected_z_index_changed.connect(func(new_z_index):
+		z_index = new_z_index
+	)
+
 func on_bullet_spawn() -> void:
 	pass
 
