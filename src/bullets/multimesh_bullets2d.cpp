@@ -80,7 +80,7 @@ int MultiMeshBullets2D::get_amount_active_attachments() const {
 // Used to spawn brand new bullets.
 void MultiMeshBullets2D::spawn(const MultiMeshBulletsData2D &data, MultiMeshObjectPool *pool, BulletFactory2D *factory, Node *bullets_container, const Vector2 &new_inherited_velocity_offset, int new_sparse_set_id, bool spawn_in_pool) {
 	this->set_physics_interpolation_mode(Node::PHYSICS_INTERPOLATION_MODE_OFF); // We have custom physics interpolation logic, so disable the Godot one that comes from Godot 4.5
-	
+
 	sparse_set_id = new_sparse_set_id;
 	inherited_velocity_offset = new_inherited_velocity_offset;
 
@@ -907,6 +907,41 @@ void MultiMeshBullets2D::all_bullets_remove_movement_pattern(int start_index, in
 	}
 }
 
+int MultiMeshBullets2D::get_collision_layer() const {
+	return physics_server->area_get_collision_layer(area);
+}
+
+void MultiMeshBullets2D::set_collision_layer(int new_collision_layer) {
+	physics_server->area_set_collision_layer(area, new_collision_layer);
+}
+
+void MultiMeshBullets2D::set_collision_layer_from_array(const TypedArray<int> &numbers) {
+	int bitmask = MultiMeshBulletsData2D::calculate_bitmask(numbers);
+	physics_server->area_set_collision_layer(area, bitmask);
+}
+
+int MultiMeshBullets2D::get_collision_mask() const {
+	return physics_server->area_get_collision_mask(area);
+}
+
+void MultiMeshBullets2D::set_collision_mask(int new_collision_mask) {
+	physics_server->area_set_collision_mask(area, new_collision_mask);
+}
+
+void MultiMeshBullets2D::set_collision_mask_from_array(const TypedArray<int> &numbers) {
+	int bitmask = MultiMeshBulletsData2D::calculate_bitmask(numbers);
+	physics_server->area_set_collision_mask(area, bitmask);
+}
+
+bool MultiMeshBullets2D::get_monitorable() const {
+	return monitorable;
+}
+
+void MultiMeshBullets2D::set_monitorable(bool value) {
+	monitorable = value;
+	physics_server->area_set_monitorable(area, monitorable);
+}
+
 void MultiMeshBullets2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_bullet_speed_data", "bullet_index"), &MultiMeshBullets2D::get_bullet_speed_data);
 	ClassDB::bind_method(D_METHOD("set_bullet_speed_data", "bullet_index", "new_bullet_speed_data"), &MultiMeshBullets2D::set_bullet_speed_data);
@@ -995,6 +1030,20 @@ void MultiMeshBullets2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_bullets_current_collision_count"), &MultiMeshBullets2D::get_bullets_current_collision_count);
 	ClassDB::bind_method(D_METHOD("set_bullets_current_collision_count", "arr"), &MultiMeshBullets2D::set_bullets_current_collision_count);
 	ADD_PROPERTY(PropertyInfo(Variant::ARRAY, "bullets_current_collision_count"), "set_bullets_current_collision_count", "get_bullets_current_collision_count");
+
+	ClassDB::bind_method(D_METHOD("get_collision_layer"), &MultiMeshBullets2D::get_collision_layer);
+	ClassDB::bind_method(D_METHOD("set_collision_layer", "new_collision_layer"), &MultiMeshBullets2D::set_collision_layer);
+
+	ClassDB::bind_method(D_METHOD("get_collision_mask"), &MultiMeshBullets2D::get_collision_mask);
+	ClassDB::bind_method(D_METHOD("set_collision_mask", "new_collision_mask"), &MultiMeshBullets2D::set_collision_mask);
+
+	ClassDB::bind_method(D_METHOD("set_collision_layer_from_array", "array_of_layers"), &MultiMeshBullets2D::set_collision_layer_from_array);
+	ClassDB::bind_method(D_METHOD("set_collision_mask_from_array", "array_of_masks"), &MultiMeshBullets2D::set_collision_mask_from_array);
+
+	ClassDB::bind_method(D_METHOD("get_monitorable"), &MultiMeshBullets2D::get_monitorable);
+	ClassDB::bind_method(D_METHOD("set_monitorable", "value"), &MultiMeshBullets2D::set_monitorable);
+
+	//
 
 	ClassDB::bind_method(D_METHOD("bullet_get_attachment", "bullet_index"), &MultiMeshBullets2D::bullet_get_attachment);
 	ClassDB::bind_method(D_METHOD("bullet_set_attachment_to_null", "bullet_index"), &MultiMeshBullets2D::bullet_set_attachment_to_null);

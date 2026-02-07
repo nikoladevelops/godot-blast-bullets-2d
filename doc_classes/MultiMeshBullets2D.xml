@@ -369,11 +369,29 @@
 				Get the transform of a specific bullet. Returns a [Transform2D] containing the bullet's position, rotation and scale.
 			</description>
 		</method>
+		<method name="get_collision_layer" qualifiers="const">
+			<return type="int" />
+			<description>
+				Get the collision layer of the multimesh.
+			</description>
+		</method>
+		<method name="get_collision_mask" qualifiers="const">
+			<return type="int" />
+			<description>
+				Get the collision mask of the multimesh.
+			</description>
+		</method>
 		<method name="get_inherited_velocity_offset" qualifiers="const">
 			<return type="Vector2" />
 			<description>
 				Get the inherited velocity offset. This is the velocity that gets added to the bullets when they are spawned. This is useful for creating effects like a machine gun that inherits the velocity of the player character, so that the bullets shoot out with more speed if the player is moving forward, and with less speed if the player is moving backward or standing still.
 				Note: If you want to set a custom inherited velocity offset, you can use [method set_inherited_velocity_offset].
+			</description>
+		</method>
+		<method name="get_monitorable" qualifiers="const">
+			<return type="bool" />
+			<description>
+				Check if the multimesh is monitorable.
 			</description>
 		</method>
 		<method name="get_textures" qualifiers="const">
@@ -562,11 +580,46 @@
 				For example, if you have 3 bullets and you want to set their current collision counts to 1, 2 and 3 respectively, you would call this function with an array like [1, 2, 3].
 			</description>
 		</method>
+		<method name="set_collision_layer">
+			<return type="void" />
+			<param index="0" name="new_collision_layer" type="int" />
+			<description>
+				Sets the collision layer of the multimesh.
+			</description>
+		</method>
+		<method name="set_collision_layer_from_array">
+			<return type="void" />
+			<param index="0" name="array_of_layers" type="int[]" />
+			<description>
+				Sets the collision layer of the multimesh by providing an array of integers, where each integer represents a layer to be added to the collision layer. 
+			</description>
+		</method>
+		<method name="set_collision_mask">
+			<return type="void" />
+			<param index="0" name="new_collision_mask" type="int" />
+			<description>
+				Sets the collision mask of the multimesh.
+			</description>
+		</method>
+		<method name="set_collision_mask_from_array">
+			<return type="void" />
+			<param index="0" name="array_of_masks" type="int[]" />
+			<description>
+				Sets the collision mask of the multimesh by providing an array of integers, where each integer represents a mask to be added to the collision mask. 
+			</description>
+		</method>
 		<method name="set_inherited_velocity_offset">
 			<return type="void" />
 			<param index="0" name="new_offset" type="Vector2" />
 			<description>
 				Sets a custom inherited velocity offset. This is the velocity that gets added to the bullets when they are spawned. This is useful for creating effects like a machine gun that inherits the velocity of the player character, so that the bullets shoot out with more speed if the player is moving forward, and with less speed if the player is moving backward or standing still.
+			</description>
+		</method>
+		<method name="set_monitorable">
+			<return type="void" />
+			<param index="0" name="value" type="bool" />
+			<description>
+				Sets whether the multimesh is monitorable or not. 
 			</description>
 		</method>
 		<method name="set_textures">

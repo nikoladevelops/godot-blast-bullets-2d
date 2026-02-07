@@ -12,7 +12,7 @@ extends Node
 
 # These textures are used as animation frames for the bullets. 
 # They are being iterated over again and again until the life time of the bullets is over.
-var rocket_tectures:Array[Texture2D] = [
+var rocket_textures:Array[Texture2D] = [
 	preload("res://shared/art/player_bullets/1.png"), 
 	preload("res://shared/art/player_bullets/2.png"),
 	preload("res://shared/art/player_bullets/3.png"),
@@ -95,7 +95,7 @@ func set_up(new_bullet_marker:Marker2D) -> void:
 # Returns a partially set up BlockBulletsData2D, only thing left to do is set a new value to the .transforms and .block_rotation properties
 func set_up_block_bullets_data()->BlockBulletsData2D:
 	var data:BlockBulletsData2D = BlockBulletsData2D.new();
-	data.textures = rocket_tectures
+	data.textures = rocket_textures
 	data.block_speed = bullet_speed_data[0] # for the block of bullets use only the first bullet_speed_data as the block_speed
 	
 	#data.collision_layer = BlockBulletsData2D.calculate_bitmask([2])
@@ -117,7 +117,7 @@ func set_up_block_bullets_data()->BlockBulletsData2D:
 # Returns a partially set up DirectionalBulletsData2D, only thing left to do is set a new value to the .transforms property
 func set_up_directional_bullets_data()->DirectionalBulletsData2D:
 	var data:DirectionalBulletsData2D = DirectionalBulletsData2D.new()
-	data.textures = rocket_tectures
+	data.textures = rocket_textures
 	
 	data.transforms=[Transform2D()]
 	data.all_bullet_speed_data = bullet_speed_data # for the directional bullets use every single bullet speed
@@ -256,8 +256,8 @@ func generate_bullet_speed_data(option_index:int)->void:
 # Switches the bullet texture currently being used
 func switch_bullet_texture(option_index:int)->void:
 	if option_index == 0:
-		directional_bullets_data.textures = rocket_tectures;
-		block_bullets_data.textures = rocket_tectures;
+		directional_bullets_data.textures = rocket_textures;
+		block_bullets_data.textures = rocket_textures;
 	elif option_index == 1:
 		
 		# Always reset these to an empty array otherwise the default_texture property won't be used since the .textures array will be still populated

@@ -406,6 +406,17 @@ public:
 	void remove_bullet_movement_pattern(int bullet_index);
 	void all_bullets_remove_movement_pattern(int start_index = 0, int end_index_inclusive = -1);
 
+	int get_collision_layer() const;
+	void set_collision_layer(int new_collision_layer);
+	void set_collision_layer_from_array(const TypedArray<int> &numbers);
+
+	int get_collision_mask() const;
+	void set_collision_mask(int new_collision_mask);
+	void set_collision_mask_from_array(const TypedArray<int> &numbers);
+
+	bool get_monitorable() const;
+	void set_monitorable(bool value);
+
 protected:
 	static void _bind_methods();
 
