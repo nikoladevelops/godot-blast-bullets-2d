@@ -2,11 +2,9 @@
   <img src="showcase/logo-big.jpg" alt="BlastBullets2D - Logo" width="500"/>
 </p>
 
-## 🚀 Purpose
+## Purpose
 
 **BlastBullets2D** is a high-performance, **free and open source** C++ plugin for [Godot Engine](https://godotengine.org) that enables **optimized bullet spawning and management** in 2D games. It’s designed to efficiently handle a large number of bullets with minimal performance overhead, making it ideal for fast-paced, bullet-heavy gameplay.
-
-Compared to standard methods like using `Area2D` with `AnimationPlayer`, **BlastBullets2D** offers a **significant performance boost**. In addition to speed, it includes built-in support to **save and load bullet states** with simple `save()` and `load()` functions.
 
 If you're searching for a **Godot optimized bullets plugin**, **BlastBullets2D** is built exactly for that purpose.
 
@@ -18,91 +16,67 @@ The plugin comes precompiled for the following platforms:
 - **iOS**
 - **Web**
 
-✅ **BlastBullets2D is fully cross platform now, because it uses the [godot-plus-plus template](https://github.com/nikoladevelops/godot-plus-plus)**. If you also want to write C++ code in Godot or you have some old GDExtension plugins you want to update, I suggest checking it out
+**BlastBullets2D is fully cross platform now, because it uses the [godot-plus-plus template](https://github.com/nikoladevelops/godot-plus-plus)**. If you also want to write C++ code in Godot or you have some old GDExtension plugins you want to update, I suggest checking it out
 
 **BlastBullets2D** integrates seamlessly into your Godot project. You do not need any knowledge of C++ to use it. Everything is controlled through **GDScript**, made possible by Godot’s [GDExtension](https://docs.godotengine.org/en/stable/tutorials/scripting/gdextension/what_is_gdextension.html) system.
 
 ---
 
-## ✅ Why Choose BlastBullets2D?
+## Why Choose BlastBullets2D?
 
 <p align="center">
   <img src="showcase/example.gif" alt="BlastBullets2D - Showcase Gif" width="500"/>
 </p>
 
-If you're developing a bullet-hell shooter or any game that involves a high number of 2D bullets, **BlastBullets2D** provides a powerful and easy-to-use solution that delivers outstanding performance inside Godot Engine.
+If you're developing a bullet-hell shooter or any game that involves a high number of 2D bullets, **BlastBullets2D** provides a powerful and easy-to-use solution that delivers **outstanding performance** inside Godot Engine.
 
-Video introduction of the plugin
-https://www.youtube.com/watch?v=eMvR3UWXtH0
+The main advantages to using this custom built plugin:
 
-Video showing some of the features of the plugin
-https://youtu.be/SeyD1YVIZss?si=oNXiFWNMiCd7JcZw
+- **Production Ready, Free, Open Source And Yours Forever Without Any Hidden Fees Or Weird Licenses.** - If you like what I do and you find the plugin useful consider supporting further development of such tools on [KoFi](https://ko-fi.com/realnikich) and [Patreon](https://patreon.com/realnikich). Expect tutorials on [My Youtube Channel](https://www.youtube.com/@realnikich).
 
+- **Superior Performance And Simple To Use API That Does NOT Require Any Math Knowledge**.
 
-<details>
-<summary><b>✨ What's New In Version 2.0</b></summary>
+- **Homing Bullets** - Targets Node2D enemies, GlobalPositions and even the Mouse. You have support for shared homing targets and per-bullet homing targets with a double ended queue implementation. You can control the smoothness of the rotation, the update time interval for tracking the targets, register a callback function when the required distance away from the target has been reached and much much more!
 
-- **Physics Interpolation**  
-  Bullets will always appear smooth when this option is enabled, regardless of the device's physics tick rate or refresh rate (perfect for monitors above 60Hz).
+- **Orbiting Bullets** - Each bullet can begin orbiting a homing target at a custom radius while also moving in a circle around it.
 
-- **Bullet Attachments**  
-  You can now attach particles, sprites, or any other nodes to bullets. These attachments move with the bullet and have their state saved and loaded automatically.
+- **Path2D Movement Patterns** - Draw a Path2D in your scene and suddenly the bullets possess that movement behavior
+relative to their direction (allows zig zag patterns and any other creative pattern you can think about).
 
-- **Instance Shader Parameter Support**  
-  Instance shader uniform values are now automatically saved and loaded. This is useful when using custom per-instance variables in shaders.
+- **BulletCurvesData2D** - You can use curves inside the Inspector to control the speed, rotation and direction.
 
-- **Z-Indexing**  
-  Z index is now available as a configurable data property.
+- **Control Speed And Rotation The Normal Way** - If bullet curves are not needed, you can still use normal speed and speed acceleration values for both movement and rotation using **BulletSpeedData2D** and **BulletRotationData2D**
 
-- **Object Pool API**  
-  Simplified object pooling functions are now provided.
+- **Animated Textures** - Support for animation that switches between an array of textures and texture times (how long the texture should be on screen before moving to the next).
 
-- **Rotation-Based Direction Control**    
-  Bullet movement can now be adjusted automatically based on rotation data.
+- **Custom Collision Shape Sizes** - Support for rectangle collision shapes with a custom Vector2 size.
 
-- **In-Editor Documentation**    
-  Every function and property now includes documentation viewable directly inside the Godot editor.
+- **Support For Custom Bullet Max Collisions Amount** - A bullet can collide multiple times before being disabled.
 
-- **Crash Fixes**     
-  Known crash issues have been resolved.
+- **Custom Bullets Debugger** - Debug collision shapes easily to see what is going on in your game and find problems.
 
-- **Collision Sync Fixes**    
-  Collision state synchronization has been improved and made more reliable.
+- **Attach Timer Logic** - The ability to attach function callbacks that execute at a particular time with the option to be repeated over and over (safely executes code during runtime while preventing crashes that might occur with the normal timers if you don't use call_deferred()).
 
-- **Refactored C++ Codebase**    
-  The C++ source code has been refactored to be cleaner and more extendable for future development.
+- **Edit Properties And Call Methods During Runtime** - Every single feature has helper methods that you can use during runtime to adjust the behavior of the bullets (change homing targets, orbiting radius, switch movement pattern, disable a bulllet and so on..) - combine this with the attach timer logic and you have the most flexible bullet system ever created.
 
-- **Test Game Project**   
-  A fully functional game project is included to help you test all plugin features and compare performance against `Area2D`-based bullets.
+- **Teleport And Offset Support** - Instantly shift active bullets in global space or teleport the system to a new position with a calculated offset.
 
-- **New Helpful Functions And Properties**    
-  Comes with way more helpful functions and properties to make your life easier!
+- **Custom Physics Interpolation logic** - Bullets will always look smooth no matter the refresh rate of the monitor/device that you are targeting.
 
-</details>
+- **Bullet Attachments** - Seamlessly attach GPUParticles2D, CPUParticles2D, or custom sprites that follow the bullet's transform with optional offsets.
+
+- **Automatic Object Pooling** - MultiMesh instances and attachments are automatically pooled and reused. You can manually populate or free pools, or disable the system to use your own custom reuse logic.
+
+- **Bullets Custom Data** - Attach a custom resource that the multimesh of bullets carries - used for storing damage, armor damage or anything else custom that should be available during collision.
+
+- **Familiar Signals** - Collisions happen in area_entered and body_entered functions right inside the BulletFactory2D node. Combine this with the bullet custom data and you can easily differentiate between types of bullets.
+
+- **Extensive Documentation** - Full in-editor documentation for every function and property, accessible directly within the Godot Inspector and Script Editor.
+
+- **Even Faster Release Builds** - Compiled with Link Time Optimization (LTO) for maximum runtime performance in your exported projects.
 
 
-<details>
-<summary><b>📦 Core Features Of BlastBullets2D</b></summary>
-
-- Efficient rendering using `MultiMeshInstance2D`
-- High performance thanks to full C++ implementation (no GDScript bottlenecks)
-- Built-in object pooling to minimize memory allocation overhead
-- Save and load the state of all active bullets
-- Debug collision shapes to visually inspect collision behavior
-- Movement properties: speed, max speed, acceleration
-- Rotation control: rotation speed, max rotation speed, rotation acceleration
-- Customizable collision layers and masks via bitmasks
-- Bullet animation through texture swapping over time
-- Control over texture size and collision shape size
-- Control over collision shape position offset relative to texture center
-- Bullet lifetime control via `max_life_time`
-- Support for custom `Material` and `Mesh` (ideal for shader use)
-- Built-in `area_entered` and `body_entered` signals similar to `Area2D`
-- Support for custom bullet data (e.g., `armor_damage`, `magic_damage`, `bullet_type`)  
-  This data is automatically saved, loaded, and passed to signals for use when bullets hit targets.
-
-</details>
-
+- **....AND SO MUCH MORE** - Download the plugin and experiment with it right away! There is also a test_project.zip available where you can check out some of the features and benchmark against a normal Godot Area2D bullet implementation.
 
 <details>
 <summary><b>⚠️ When Not To Use BlastBullets2D</b></summary>
@@ -123,6 +97,8 @@ In conclusion, **BlastBullets2D is ideal for top-down shooters and arcade-style 
 </details>
 
 ---
+
+// TODO UPDATE NEXT SECTIONS
 
 ## How To Install
 #### BlastBullets2D targets <b>Godot Engine 4.4.1</b>. As long as there are no breaking changes to GDExtension in the future, then it should work for all future 4.4.x Godot releases.
