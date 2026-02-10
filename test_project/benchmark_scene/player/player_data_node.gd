@@ -1,11 +1,6 @@
 class_name PlayerData # using classes makes it possible for these functions to be recognized by Godot instantly, allowing you to use auto complete when typing without any problem
 extends Node
 
-# Attachment scenes
-@onready var cpu_particles_scn:PackedScene = preload("res://shared/bullet_attachment_nodes/attached_particles.tscn")
-@onready var gpu_particles_scn:PackedScene = preload("res://shared/bullet_attachment_nodes/attached_particles2.tscn")
-@onready var light_attachment_scn:PackedScene = preload("res://shared/bullet_attachment_nodes/light_attachment.tscn")
-
 # The scene for the godot area2D bullets
 @onready var godot_area2d_bullet_scn:PackedScene = preload("res://benchmark_scene/area_2d_bullet.tscn")
 
@@ -17,7 +12,7 @@ extends Node
 
 # These textures are used as animation frames for the bullets. 
 # They are being iterated over again and again until the life time of the bullets is over.
-var rocket_tectures:Array[Texture2D] = [
+var rocket_textures:Array[Texture2D] = [
 	preload("res://shared/art/player_bullets/1.png"), 
 	preload("res://shared/art/player_bullets/2.png"),
 	preload("res://shared/art/player_bullets/3.png"),
@@ -33,15 +28,22 @@ var rocket_tectures:Array[Texture2D] = [
 # The default texture that can be used, instead of having animations
 var godot_texture:Texture2D = preload("res://icon.svg")
 
-
 # Holds data that is needed for factory.spawn_directional_bullets
 var directional_bullets_data:DirectionalBulletsData2D
 
 # Holds data that is needed for factory.spawn_block_bullets
 var block_bullets_data:BlockBulletsData2D
 
+# Holds the selected attachment id used for pooling attachments
+var selected_attachment_id:int = 0
+
+# Holds the selected attachment offset relative to the bullet texture's center
+var selected_attachment_offset:Vector2 = Vector2(-60, 0)
+
 # Holds data that is needed to set up the speed of both directional and block bullets
 var bullet_speed_data:Array[BulletSpeedData2D]
+
+var bullet_curves_data_1:BulletCurvesData2D = preload("res://shared/data/bullet_curves_data_1.tres")
 
 # Caches the option index that the user picked for bullet speed (UI related)
 var cache_bullet_speed_option_index:int = 0
@@ -93,7 +95,7 @@ func set_up(new_bullet_marker:Marker2D) -> void:
 # Returns a partially set up BlockBulletsData2D, only thing left to do is set a new value to the .transforms and .block_rotation properties
 func set_up_block_bullets_data()->BlockBulletsData2D:
 	var data:BlockBulletsData2D = BlockBulletsData2D.new();
-	data.textures = rocket_tectures
+	data.textures = rocket_textures
 	data.block_speed = bullet_speed_data[0] # for the block of bullets use only the first bullet_speed_data as the block_speed
 	
 	#data.collision_layer = BlockBulletsData2D.calculate_bitmask([2])
@@ -101,13 +103,13 @@ func set_up_block_bullets_data()->BlockBulletsData2D:
 	data.set_collision_layer_from_array([2])
 	data.set_collision_mask_from_array([3])
 	
+	data.transforms=[Transform2D()]
 	data.texture_size = Vector2(140,140)
 	data.collision_shape_size=Vector2(32,32)
 	data.collision_shape_offset=Vector2(0,0)
 	data.default_change_texture_time=0.09
 	data.max_life_time = 2
 	data.all_bullet_rotation_data = bullet_rotation_data
-	data.bullet_attachment_offset = Vector2(-60,0)
 	data.bullets_custom_data = damage_data
 	
 	return data
@@ -115,24 +117,9 @@ func set_up_block_bullets_data()->BlockBulletsData2D:
 # Returns a partially set up DirectionalBulletsData2D, only thing left to do is set a new value to the .transforms property
 func set_up_directional_bullets_data()->DirectionalBulletsData2D:
 	var data:DirectionalBulletsData2D = DirectionalBulletsData2D.new()
-	data.textures = rocket_tectures
+	data.textures = rocket_textures
 	
-	# You can also define wait time for each texture like so as long as the amount of textures matches the amount of values in this array.
-	# Otherwise stick to using default_change_texture_time
-	#data.change_texture_times = [
-		#0.05,
-		#0.03,
-		#0.01,
-		#0.02,
-		#0.01,
-		#0.01,
-		#0.01,
-		#0.08,
-		#0.01,
-		#0.03
-	#]
-	
-	
+	data.transforms=[Transform2D()]
 	data.all_bullet_speed_data = bullet_speed_data # for the directional bullets use every single bullet speed
 	
 	#data.collision_layer = DirectionalBulletsData2D.calculate_bitmask([2])
@@ -146,95 +133,10 @@ func set_up_directional_bullets_data()->DirectionalBulletsData2D:
 	data.default_change_texture_time=0.09
 	data.max_life_time = 2
 	data.all_bullet_rotation_data = bullet_rotation_data
-	data.bullet_attachment_offset = Vector2(-60,0)
 	data.bullets_custom_data = damage_data
 	#data.is_life_time_over_signal_enabled = true # If you want to track when the life time is over and receive a signal inside BulletFactory2D
 	
 	return data
-
-# This is no longer used and is instead moved to C++ inside BulletFactory2D, I'm leaving the code commented as GDScript because it may be helpful to someone
-#enum Alignment {
-	#TOP_LEFT,
-	#TOP_CENTER,
-	#TOP_RIGHT,
-	#CENTER_LEFT,
-	#CENTER,
-	#CENTER_RIGHT,
-	#BOTTOM_LEFT,
-	#BOTTOM_CENTER,
-	#BOTTOM_RIGHT
-#}
-
-#func helper_generate_transforms_grid(marker_transf:Transform2D, rows_per_column:int = 10, alignment: Alignment = Alignment.CENTER_LEFT, column_offset: float = 150, row_offset: float = 150, rotate_grid_with_marker:bool = true, random_local_rotation=false, random_global_rotation: bool = false) -> Array[Transform2D]:
-	#var generated_transforms: Array[Transform2D] = []
-	#generated_transforms.resize(bullets_amount)
-#
-	#var columns_amount: int = ceil(bullets_amount / float(rows_per_column))
-#
-	#var total_width: float = (columns_amount - 1) * column_offset
-	#var total_height: float = (rows_per_column - 1) * row_offset
-#
-	## Adjust for even/odd bullet counts to center properly
-	#var x_start: float = -total_width / 2.0 if columns_amount % 2 == 1 else -total_width / 2.0 + column_offset / 2.0
-	#var y_start: float = -total_height / 2.0 if rows_per_column % 2 == 1 else -total_height / 2.0 + row_offset / 2.0
-#
-	#match alignment:
-		#Alignment.TOP_LEFT:
-			#x_start = 0.0
-			#y_start = 0.0
-		#Alignment.TOP_CENTER:
-			#x_start = -total_width / 2.0 if columns_amount % 2 == 1 else -total_width / 2.0 + column_offset / 2.0
-			#y_start = 0.0
-		#Alignment.TOP_RIGHT:
-			#x_start = -total_width
-			#y_start = 0.0
-		#Alignment.CENTER_LEFT:
-			#x_start = 0.0
-		#Alignment.CENTER:
-			#pass  # x_start and y_start are already centered
-		#Alignment.CENTER_RIGHT:
-			#x_start = -total_width
-		#Alignment.BOTTOM_LEFT:
-			#x_start = 0.0
-			#y_start = -total_height
-		#Alignment.BOTTOM_CENTER:
-			#x_start = -total_width / 2.0 if columns_amount % 2 == 1 else -total_width / 2.0 + column_offset / 2.0
-			#y_start = -total_height
-		#Alignment.BOTTOM_RIGHT:
-			#x_start = -total_width
-			#y_start = -total_height
-#
-	#var count_spawned: int = 0
-#
-	#for column in range(columns_amount):
-		#for row in range(rows_per_column):
-			#if count_spawned >= bullets_amount:
-				#break
-#
-			#var x: float = x_start + column * column_offset
-			#var y: float = y_start + row * row_offset
-			#var local_offset: Vector2 = Vector2(x, y)
-#
-			#var new_transform: Transform2D
-			#if rotate_grid_with_marker:
-				#var rotated_offset = marker_transf.basis_xform(local_offset)
-				#new_transform = Transform2D(marker_transf.get_rotation(), marker_transf.origin + rotated_offset)
-			#else:
-				#var new_origin: Vector2 = marker_transf.origin + local_offset
-				#new_transform = Transform2D(marker_transf.get_rotation(), new_origin)
-			#
-			#if random_local_rotation:
-				#var random_angle = randf() * TAU
-				#new_transform = new_transform.rotated_local(random_angle)
-			#
-			#if random_global_rotation:
-				#var random_angle = randf() * TAU
-				#new_transform = new_transform.rotated(random_angle)
-#
-			#generated_transforms[count_spawned] = new_transform
-			#count_spawned += 1
-#
-	#return generated_transforms
 
 # Determines which type of bullets to be spawned
 func spawn_bullets(player_rotation:float)->void:
@@ -265,7 +167,25 @@ func spawn_multi_mesh_directional_bullets()->void:
 	else:
 		directional_bullets_data.transforms = BulletFactory2D.helper_generate_transforms_grid(bullets_amount, bullet_marker.get_global_transform(), rows_per_column, grid_alignment, col_offset, row_offset, rotate_grid_with_marker, random_local_rotation)
 	
-	BENCHMARK_GLOBALS.FACTORY.spawn_directional_bullets(directional_bullets_data)
+	#directional_bullets_data.max_life_time = 5
+	#directional_bullets_data.is_life_time_over_signal_enabled = true
+	#directional_bullets_data.bullet_max_collision_amount = 1
+	var dir_bullets:DirectionalBullets2D = BENCHMARK_GLOBALS.FACTORY.spawn_controllable_directional_bullets(directional_bullets_data)
+	
+	if selected_attachment_id != 0:
+		dir_bullets.all_bullets_set_attachment(BENCHMARK_GLOBALS.ATTACHMENT_SCENES[selected_attachment_id], selected_attachment_id, selected_attachment_offset)
+	
+	dir_bullets.homing_smoothing = 0.0# Set from 0 to 20 or even bigger (but you might have issues with interpolation)
+	dir_bullets.homing_update_interval = 0.00# Set an update timer - keep it low for smooth updates
+	dir_bullets.homing_take_control_of_texture_rotation = true
+	dir_bullets.homing_distance_before_reached = 50
+	
+	#dir_bullets.bullet_homing_auto_pop_after_target_reached = true
+	dir_bullets.is_multimesh_auto_pooling_enabled = true
+	dir_bullets.bullet_max_collision_count = 1 # How many times the bullet can collide before getting disabled
+	#
+	# Test different behaviors here
+	
 	
 # Spawns MultiMeshBlock bullets
 func spawn_multi_mesh_block_bullets(player_rotation:float)->void:
@@ -336,8 +256,8 @@ func generate_bullet_speed_data(option_index:int)->void:
 # Switches the bullet texture currently being used
 func switch_bullet_texture(option_index:int)->void:
 	if option_index == 0:
-		directional_bullets_data.textures = rocket_tectures;
-		block_bullets_data.textures = rocket_tectures;
+		directional_bullets_data.textures = rocket_textures;
+		block_bullets_data.textures = rocket_textures;
 	elif option_index == 1:
 		
 		# Always reset these to an empty array otherwise the default_texture property won't be used since the .textures array will be still populated
@@ -381,8 +301,7 @@ func set_collision_shape_offset(new_offset:Vector2)->void:
 
 # Changes the bullet attachmnent's offset
 func set_bullet_attachment_offset(new_offset:Vector2)->void:
-	block_bullets_data.bullet_attachment_offset = new_offset
-	directional_bullets_data.bullet_attachment_offset = new_offset
+	selected_attachment_offset = new_offset
 
 # Changes the bullet texture's rotation
 func set_bullet_texture_rotation(degrees:int)->void:
@@ -391,37 +310,19 @@ func set_bullet_texture_rotation(degrees:int)->void:
 
 # Changes the bullet's lifetime
 func set_bullet_lifetime(new_lifetime:float)->void:
+	if new_lifetime <= 0:
+		block_bullets_data.is_life_time_infinite = true
+		directional_bullets_data.is_life_time_infinite = true
+	else:
+		block_bullets_data.is_life_time_infinite = false
+		directional_bullets_data.is_life_time_infinite = false
+
 	block_bullets_data.max_life_time = new_lifetime
 	directional_bullets_data.max_life_time = new_lifetime
 
 # Switches the attachment scene
 func switch_attachment_scn(option_index:int)->void:
-	var new_attachment:PackedScene = null
-	match option_index:
-		0:
-			new_attachment = null
-		1:
-			new_attachment = cpu_particles_scn
-		2:
-			new_attachment = gpu_particles_scn
-		3:
-			new_attachment = light_attachment_scn
-	
-	block_bullets_data.bullet_attachment_scene = new_attachment
-	directional_bullets_data.bullet_attachment_scene = new_attachment
-
-# Gets the attachment based on attachment_id (Note the attachment_id should match the one in the packed scene)
-func get_attachment_scn_based_on_attachment_id(chosen_attachment_id)->PackedScene:
-	var attachment_to_return:PackedScene = null
-	match chosen_attachment_id:
-		1:
-			attachment_to_return = cpu_particles_scn
-		2:
-			attachment_to_return = gpu_particles_scn
-		3:
-			attachment_to_return = light_attachment_scn
-			
-	return attachment_to_return
+	selected_attachment_id = option_index
 
 # Sets whether the physics shapes should also get rotated when rotation data is provided
 func set_rotate_physics_shapes(should_rotate_physics_shapes:bool)->void:

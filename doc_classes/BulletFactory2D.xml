@@ -1,27 +1,20 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <class name="BulletFactory2D" inherits="Node2D" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/godotengine/godot/master/doc/class.xsd">
 	<brief_description>
-		The heart of the BlastBullets2D plugin. Use this to spawn bullets.
+		The heart of the BlastBullets2D plugin. Use this node to spawn bullets.
 	</brief_description>
 	<description>
-		You should have a single [b]BulletFactory2D[/b] node inside your scene. The factory does all the work in spawning bullets and configuring other plugin related options (save/load state, object pooling, physics interpolation, debugger etc..).
-	Keep a reference to your [b]BulletFactory2D[/b] node throughout the lifetime of your game and call the functions you need.
+		The factory does all the work in spawning bullets and configuring other plugin related options.
+		Keep a reference of your [b]BulletFactory2D[/b] node throughout the lifetime of your game and call the functions you need.
 
-	Note: To handle collisions register the [signal area_entered] and [signal body_entered] signals. You also have the option of tracking when the bullets' lifetime is over by registering the signal [signal life_time_over], but this is only enabled if the [MultiMeshBulletsData2D] you pass to the spawn functions has the [member MultiMeshBulletsData2D.is_life_time_over_signal_enabled] property set to true.
-	Note: You can attach a script to the node, but never override Godot functions like [code]_ready[/code].
-	Note: Never use [code]set_process[/code]/[code]set_physics_process[/code], always use [member is_factory_processing_bullets] to determine whether the plugin is paused or not (bullets stop moving). 
-	Note: Object pooling is automatic, bullets are [b]never destroyed[/b] by default, but you do have the option of freeing the object pools whenever you want.
-	Note: Never use [code]queue_free[/code] on already spawned bullets or your game will crash. The plugin has its own bullet tracking logic.
+		For tutorials and usage examples:
+		[url=https://www.youtube.com/@realnikich]YouTube Channel[/url]
+		[url=https://github.com/nikoladevelops/godot-blast-bullets-2d]Official Repository Of BlastBullets2D[/url]
 
-	The way you use the factory is the following:
-	1. Add [b]BulletFactory2D[/b] to the scene tree and save this reference in a variable so that you can access it in every script you want (autoload or a static variable).
-	2. Use the spawn functions to spawn bullets (You will have to set up [MultiMeshBulletsData2D] properly (pick [BlockBulletsData2D] or [DirectionalBulletsData2D]). You might get an instant crash if you are missing mandatory properties, so be aware of that).
-	3. Optionally use any of the other functions that the [b]BulletFactory2D[/b] provides.
-
-	[b]This plugin is completely free and created by [url=https://x.com/realNikich]realNikich[/url][/b]
-	[url=https://github.com/nikoladevelops/godot-blast-bullets-2d]Official Repository Of BlastBullets2D[/url]
-	[url=https://www.youtube.com/@realnikich]YouTube Channel[/url]
-	[url=https://www.patreon.com/realnikich]Support My Work[/url]
+		[b]This plugin is completely free and open source - created by [url=https://x.com/realNikich]realNikich[/url][/b]
+		Support My Work
+		[url=https://ko-fi.com/realnikich]Donate On Ko-fi[/url]
+		[url=https://www.patreon.com/realnikich]Donate On Patreon[/url]
 	</description>
 	<tutorials>
 	</tutorials>
@@ -60,7 +53,7 @@
 		</method>
 		<method name="debug_get_bullets_pool_info">
 			<return type="Dictionary" />
-			<param index="0" name="bullet_type" type="int" enum="BulletFactory2D.BulletType"/>
+			<param index="0" name="bullet_type" type="int" enum="BulletFactory2D.BulletType" />
 			<description>
 				Get the whole information about the bullet multimeshes object pool of a specific type. Returns a [Dictionary] containing [b]amount bullets in the multimesh as the KEY[/b] and the [b]amount of multimeshes that contain exactly that amount as the VALUE[/b].
 			</description>
@@ -80,16 +73,16 @@
 		</method>
 		<method name="free_active_bullets">
 			<return type="void" />
-			<param index="0" name="pool_attachments" type="bool" default="false" />
+			<param index="0" name="amount_bullets" type="int" default="0" />
 			<description>
-				Frees all active bullets that are currently in the scene tree. Additionaly you have the option to return all the [BulletAttachment2D] nodes to the object pool if you set [code]pool_attachments[/code] to true.
+				Frees all active bullets that are currently in the scene tree. You also have the option of freeing only the instances that each have a particular [code]amount_bullets_per_instance[/code] if you provide a value that is bigger than 0. Example: if you want to free all those multimeshes in the scene tree that each have 200 bullets each ([code]amount_bullets_per_instance=200[/code]).
 			</description>
 		</method>
 		<method name="free_attachments_pool">
 			<return type="void" />
 			<param index="0" name="attachment_id" type="int" default="-1" />
 			<description>
-				By default completely frees the [BulletAttachment2D] object pools. You also have the option of freeing only the attachments with a particular [code]attachment_id[/code] if you provide a value that is not a negative number.
+				By default completely frees the [BulletAttachment2D] object pools. You also have the option of freeing only the attachments with a particular [code]attachment_id[/code] if you provide a value that is not a negative number. Example: if you want to free all those attachments in the object pool that each have an [code]attachment_id=5[/code].
 			</description>
 		</method>
 		<method name="free_bullets_pool">
@@ -98,6 +91,13 @@
 			<param index="1" name="amount_bullets_per_instance" type="int" default="0" />
 			<description>
 				By default completely frees an object pool of a particular bullet type. You also have the option of freeing only the instances that each have a particular [code]amount_bullets_per_instance[/code] if you provide a value that is bigger than 0. Example: if you want to free all those multimeshes in the object pool that each have 200 bullets each ([code]amount_bullets_per_instance=200[/code]).
+			</description>
+		</method>
+		<method name="free_disabled_bullets">
+			<return type="void" />
+			<param index="0" name="amount_bullets" type="int" default="0" />
+			<description>
+				Frees all disabled bullets that are currently in the scene tree. You also have the option of freeing only the instances that each have a particular [code]amount_bullets_per_instance[/code] if you provide a value that is bigger than 0. Example: if you want to free all those multimeshes in the scene tree that each have 200 bullets each ([code]amount_bullets_per_instance=200[/code]).
 			</description>
 		</method>
 		<method name="get_is_factory_busy" qualifiers="const">
@@ -126,41 +126,29 @@
 				Generates a grid of transforms that are positioned relative to the [code]marker_transform[/code].
 			</description>
 		</method>
-		<method name="load">
-			<return type="void" />
-			<param index="0" name="new_data" type="SaveDataBulletFactory2D" />
-			<description>
-				Loads bullets data. Emits the [signal load_finished] signal when finished.
-			</description>
-		</method>
 		<method name="populate_attachments_pool">
 			<return type="void" />
-			<param index="0" name="bullet_attachment_scene" type="PackedScene" />
-			<param index="1" name="amount_attachments" type="int" />
+			<param index="0" name="attachment_scene" type="PackedScene" />
+			<param index="1" name="attachment_id" type="int" />
+			<param index="2" name="amount_attachments" type="int" />
 			<description>
-				Populates the attachments object pool. Ensure that the [code]bullet_attachment_scene[/code] contains an actual [BulletAttachment2D] scene or your game will crash. Check the [BulletAttachment2D] documentation for more info on how attachments work.
+				Populates the attachments object pool. Ensure that the [code]attachment_scene[/code] contains an actual [BulletAttachment2D] scene where you attach other nodes - particles or anything else you could think of.
 			</description>
 		</method>
 		<method name="populate_bullets_pool">
 			<return type="void" />
-			<param index="0" name="bullet_type" type="int" enum="BulletFactory2D.BulletType" />
+			<param index="0" name="multimesh_data" type="MultiMeshBulletsData2D" />
 			<param index="1" name="amount_instances" type="int" />
-			<param index="2" name="amount_bullets_per_instance" type="int" />
 			<description>
 				Populates a specific [code]bullet_type[/code] object pool. The [code]amount_instances[/code] is the amount of multimeshes, while the [code]amount_bullets_per_instance[/code] determines how many bullets each multimesh instance has.
 			</description>
 		</method>
 		<method name="reset">
 			<return type="void" />
+			<param index="0" name="amount_bullets" type="int" default="0" />
 			<description>
 				Resets the factory - free everything (object pools, spawned bullets, spawned attachments - all get deleted from memory).
-			Emits the [signal reset_finished] signal when complete.
-			</description>
-		</method>
-		<method name="save">
-			<return type="void" />
-			<description>
-				Generates a [SaveDataBulletFactory2D] that contains the state of the bullets. When finished, emits the [signal save_finished] signal with the saved data so you can decide what to do with it (save it on disk as a save file etc..).
+				Emits the [signal reset_finished] signal when complete.
 			</description>
 		</method>
 		<method name="set_physics_space">
@@ -174,21 +162,47 @@
 			<return type="void" />
 			<param index="0" name="enable" type="bool" />
 			<description>
-				Controls whether physics interpolation is enabled or not for all bullets controlled by the [b]BulletFactory2D[/b].
+				Controls whether physics interpolation is enabled or not for all bullets controlled by the [b]BulletFactory2D[/b]. This method is supposed to be called during runtime, while the [method set_use_physics_interpolation_editor] method is supposed to be called in the editor.
 			</description>
 		</method>
 		<method name="spawn_block_bullets">
 			<return type="void" />
 			<param index="0" name="spawn_data" type="BlockBulletsData2D" />
 			<description>
-				Spawns [BlockBullets2D] - bullets that act as a block that travels in a single direction.
+				Spawns [BlockBullets2D] - bullets that act as a block that travels in a single direction with the same speed.
+				If there is already a multimesh available in the object pool (that matches the amount of transforms provided) then it gets re-used with the new data.
+				These bullets can NOT be controlled individually, but they are more efficient performance wise.
+			</description>
+		</method>
+		<method name="spawn_controllable_directional_bullets">
+			<return type="DirectionalBullets2D" />
+			<param index="0" name="spawn_data" type="DirectionalBulletsData2D" />
+			<param index="1" name="inherited_velocity_offset" type="Vector2" default="Vector2(0, 0)" />
+			<description>
+				Spawns DirectionalBullets2D that are meant to be controlled and edited.
+				If there is a multimesh available in the object pool then it gets re-used with the new data.
+				Use if you want homing bullets or to edit properties during runtime.
+
+				Warning: Since object pooling is enabled by default, if you save these bullets to an array you might
+				accidentally push the exact same multimesh (you end up with 2 references or more to the same exact object),
+				that's why it's smart to disable auto pooling if you are storing them in arrays or other data structures - that way you can even implement your own pooling system.
 			</description>
 		</method>
 		<method name="spawn_directional_bullets">
 			<return type="void" />
 			<param index="0" name="spawn_data" type="DirectionalBulletsData2D" />
+			<param index="1" name="inherited_velocity_offset" type="Vector2" default="Vector2(0, 0)" />
 			<description>
 				Spawns [DirectionalBullets2D] - bullets that have individual directions determined by the rotation of their transforms.
+				If there is already a multimesh available in the object pool (that matches the amount of transforms provided) then it gets re-used with the new data.
+				To control these bullets individually, use the [method spawn_controllable_directional_bullets] function instead.
+			</description>
+		</method>
+		<method name="teleport_shift_all_bullets">
+			<return type="void" />
+			<param index="0" name="shift_amount" type="Vector2" />
+			<description>
+				Shifts all bullets in the scene by a certain amount (only bullets spawned by this particular [b]BulletFactory2D[/b]).
 			</description>
 		</method>
 	</methods>
@@ -208,49 +222,44 @@
 		<member name="use_physics_interpolation" type="bool" setter="set_use_physics_interpolation_editor" getter="get_use_physics_interpolation" default="false">
 			Determines whether physics interpolation is enabled or not. The setter is for the editor only.
 
-		Instead always use [method set_use_physics_interpolation_runtime] if you are doing changes during runtime.
+			Instead always use [method set_use_physics_interpolation_runtime] if you are doing changes during runtime.
 		</member>
 	</members>
 	<signals>
 		<signal name="area_entered">
-			<param index="0" name="enemy_area" type="Object" />
-			<param index="1" name="bullets_custom_data" type="Resource" />
-			<param index="2" name="bullet_global_transform" type="Transform2D" />
+			<param index="0" name="hit_target_area" type="Object" />
+			<param index="1" name="multimesh_bullets_instance" type="MultiMeshBullets2D" />
+			<param index="2" name="bullet_index" type="int" />
+			<param index="3" name="bullets_custom_data" type="Resource" />
+			<param index="4" name="bullet_global_transform" type="Transform2D" />
 			<description>
 				Emitted when a bullet enters a physics area.
 			</description>
 		</signal>
 		<signal name="body_entered">
-			<param index="0" name="enemy_body" type="Object" />
-			<param index="1" name="bullets_custom_data" type="Resource" />
-			<param index="2" name="bullet_global_transform" type="Transform2D" />
+			<param index="0" name="hit_target_body" type="Object" />
+			<param index="1" name="multimesh_bullets_instance" type="MultiMeshBullets2D" />
+			<param index="2" name="bullet_index" type="int" />
+			<param index="3" name="bullets_custom_data" type="Resource" />
+			<param index="4" name="bullet_global_transform" type="Transform2D" />
 			<description>
 				Emited when a bullet enters a physics body.
 
-			Note: Static bodies can be detected by the bullets, but only if you set the [MultiMeshBulletsData2D]'s [member MultiMeshBulletsData2D.monitorable] property to [code]true[/code] when spawning bullets - this is at the cost of performance of course, so it's better to stick with [Area2D] or other types of bodies for enemies/buildings etc and leave the [member MultiMeshBulletsData2D.monitorable] property to be false.
+				Note: Static bodies can be detected by the bullets, but only if you set the [MultiMeshBulletsData2D]'s [member MultiMeshBulletsData2D.monitorable] property to [code]true[/code] when spawning bullets - this is at the cost of performance of course, so it's better to stick with [Area2D] or other types of bodies for enemies/buildings etc and leave the [member MultiMeshBulletsData2D.monitorable] property to be false.
 			</description>
 		</signal>
 		<signal name="life_time_over">
-			<param index="0" name="bullets_custom_data" type="Resource" />
-			<param index="1" name="all_bullet_global_transforms" type="Array" />
+			<param index="0" name="multimesh_bullets_instance" type="MultiMeshBullets2D" />
+			<param index="1" name="bullet_indexes" type="int[]" />
+			<param index="2" name="bullets_custom_data" type="Resource" />
+			<param index="3" name="bullets_global_transforms" type="Transform2D[]" />
 			<description>
 				Emitted when a bullet multimesh's lifetime is over, but only if the [MultiMeshBulletsData2D]'s [member MultiMeshBulletsData2D.is_life_time_over_signal_enabled] is set to [code]true[/code].
 			</description>
 		</signal>
-		<signal name="load_finished">
-			<description>
-				Emitted when the loading of data has finished.
-			</description>
-		</signal>
 		<signal name="reset_finished">
 			<description>
-				Emitted when the reset of the state has finished.
-			</description>
-		</signal>
-		<signal name="save_finished">
-			<param index="0" name="data" type="SaveDataBulletFactory2D" />
-			<description>
-				Emitted when the saving of data has finished.
+				Emitted when the [method reset] method finishes.
 			</description>
 		</signal>
 	</signals>

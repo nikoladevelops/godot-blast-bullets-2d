@@ -40,3 +40,18 @@ static var ALL_ENEMY_SPAWNERS:Array[EnemySpawner]
 
 # Contains all spawned area2d bullets
 static var ALL_GODOT_AREA2D_BULLETS_CONTAINER:Node
+
+# A stationary target used for homing bullets tests
+static var STATIONARY_TARGET:Node2D
+
+# First Moving target
+static var MOVING_TARGET_ONE:Node2D
+
+# Second moving target
+static var MOVING_TARGET_TWO:Node2D
+
+# Holds movement Path2Ds
+static var MOVEMENT_PATH_HOLDER:Node
+
+# Holds all attachment scenes
+static var ATTACHMENT_SCENES:Dictionary[int, PackedScene]

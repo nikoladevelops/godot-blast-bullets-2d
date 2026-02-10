@@ -1,4 +1,4 @@
-[gd_scene load_steps=11 format=3 uid="uid://bv1i7q8bxfe2c"]
+[gd_scene format=3 uid="uid://bv1i7q8bxfe2c"]
 
 [ext_resource type="Script" uid="uid://ce54f7rw3qbxw" path="res://benchmark_scene/player/player.gd" id="1_kd16u"]
 [ext_resource type="Script" uid="uid://bpikyjmoq0pcs" path="res://benchmark_scene/player/player_data_node.gd" id="2_314d0"]
@@ -43,34 +43,35 @@ animations = [{
 "speed": 12.0
 }]
 
-[node name="Player" type="CharacterBody2D"]
+[node name="Player" type="CharacterBody2D" unique_id=423782505]
 z_index = 1
 collision_mask = 4
 script = ExtResource("1_kd16u")
 
-[node name="PlayerDataNode" type="Node" parent="."]
+[node name="PlayerDataNode" type="Node" parent="." unique_id=1286344902]
 script = ExtResource("2_314d0")
 
-[node name="MarkerContainer" type="Node2D" parent="."]
+[node name="MarkerContainer" type="Node2D" parent="." unique_id=470424005]
 
-[node name="BulletMarker" type="Marker2D" parent="MarkerContainer"]
+[node name="BulletMarker" type="Marker2D" parent="MarkerContainer" unique_id=586614649]
 position = Vector2(117, 0)
 
-[node name="FireTimer" type="Timer" parent="."]
+[node name="FireTimer" type="Timer" parent="." unique_id=1549858968]
 wait_time = 0.02
 one_shot = true
 
-[node name="Camera2D" type="Camera2D" parent="."]
+[node name="Camera2D" type="Camera2D" parent="." unique_id=446608743]
 zoom = Vector2(0.5, 0.5)
+process_callback = 0
 position_smoothing_enabled = true
 position_smoothing_speed = 12.0
 editor_draw_drag_margin = true
 
-[node name="CollisionShape2D" type="CollisionShape2D" parent="."]
+[node name="CollisionShape2D" type="CollisionShape2D" parent="." unique_id=1927604603]
 visible = false
 shape = SubResource("CircleShape2D_8qahb")
 
-[node name="AnimatedSprite2D" type="AnimatedSprite2D" parent="."]
+[node name="AnimatedSprite2D" type="AnimatedSprite2D" parent="." unique_id=562404998]
 rotation = 1.5708
 scale = Vector2(5, 5)
 sprite_frames = SubResource("SpriteFrames_18wp6")

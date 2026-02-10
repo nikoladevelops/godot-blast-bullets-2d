@@ -62,11 +62,6 @@ var last_selected_color_picker:ColorPicker = null
 # Will adjust the direction of the bullets based on their rotation data if they have any
 @onready var adjust_direction_based_on_rotation_checkbox:CheckBox = $BulletSettingsView/VBoxContainer/VBoxContainer/AdjustDirectionBasedOnRotationCheckBox
 
-# The save button used to save bullet data
-@onready var save_btn:Button = $TopRightContainer/SaveBtn
-# The load button used to load bullet data
-@onready var load_btn:Button = $TopRightContainer/LoadBtn
-
 ## Bullet On Bullet Collision
 @onready var dont_collide_btn:Button = $BulletSettingsView/BulletCollisionVboxContainer/DontCollideBtn
 @onready var destroy_player_bullets_btn:Button = $BulletSettingsView/BulletCollisionVboxContainer/DestroyPlayerBulletsBtn
@@ -93,7 +88,6 @@ var last_selected_color_picker:ColorPicker = null
 # Note when refactoring this button has dependencies in other scripts
 @onready var disable_or_enable_factory_btn:SwitchButton = $BulletSettingsView/VBoxContainer2/DisableOrEnableFactoryBtn
 #
-@onready var pool_attachments_after_free_checkbox:CheckBox = $BulletSettingsView/VBoxContainer3/PoolAttachmentsAfterFreeCheckBox
 
 # Attachment pooling related
 @onready var switch_bullet_attachment_id_btn:SwitchButton = $ObjectPoolSettingsView/AttachmentPoolRelated/VBoxContainer/SwitchBulletAttachmentIdBtn
@@ -106,17 +100,17 @@ var last_selected_color_picker:ColorPicker = null
 
 ## More Settings
 # Responsible for setting physics interpolation ON/OFF (both the engine setting and the BulletFactory2D setting)
-@onready var physics_interpolation_check_box:CheckBox = $MoreSettingsView/HBoxContainer/PhysicsInterpolationCheckBox
+@onready var physics_interpolation_check_box:CheckBox = $MoreSettingsView/VBoxContainer3/HBoxContainer/PhysicsInterpolationCheckBox
 # Responsible for setting VSync ON/OFF
-@onready var enable_v_sync_check_box:CheckBox = $MoreSettingsView/HBoxContainer/VSyncCheckBox
+@onready var enable_v_sync_check_box:CheckBox = $MoreSettingsView/VBoxContainer3/HBoxContainer/VSyncCheckBox
 # Responsible for setting whether the grid should rotate with the marker
 @onready var rotate_grid_with_marker_check_box:CheckBox = $MoreSettingsView/VBoxContainer2/RotateGridWithMarkerCheckBox
 # Responsible for setting random local rotation when spawning bullets
 @onready var random_local_rotation_check_box:CheckBox = $MoreSettingsView/VBoxContainer2/RandomLocalRotationCheckBox
 ##
 
-# Whether the attachments should go to the object pool after freeing all active bullets in the factory
-var should_pool_attachments_after_free_active_bullets:bool = false
+# Emitted when the selected z-index changes
+signal bullets_selected_z_index_changed(new_z_index:int)
 
 # The theme used for disabled buttons
 var disabled_btn_theme:Theme = preload("res://shared/ui/btn_disabled_theme.tres")
@@ -131,6 +125,10 @@ var lowest_fps:int = 100000000
 func _ready() -> void:
 	player_health_bar.set_up(default_player_health);
 	player_health_bar.health = default_player_health
+	
+	bullets_selected_z_index_changed.connect(func(new_z_index):
+		BENCHMARK_GLOBALS.PLAYER_DATA_NODE.set_bullets_z_index(new_z_index)
+	)
 	
 	switch_bullet_texture_btn.switch_btn_pressed.connect(func(_option:String, option_index:int):
 		BENCHMARK_GLOBALS.PLAYER_DATA_NODE.switch_bullet_texture(option_index)
@@ -278,16 +276,14 @@ func _on_free_all_bullet_pools_btn_pressed() -> void:
 
 func _on_populate_multi_mesh_directional_pool_btn_pressed() -> void:
 	var amount_multi_meshes:int = select_amount_multi_meshes_view.get_selected_btn.text.to_int()
-	var amount_bullets:int = select_amount_bullets_view.get_selected_btn.text.to_int()
 	
-	BENCHMARK_GLOBALS.FACTORY.populate_bullets_pool(BulletFactory2D.DIRECTIONAL_BULLETS,amount_multi_meshes,amount_bullets)
+	BENCHMARK_GLOBALS.FACTORY.populate_bullets_pool(BENCHMARK_GLOBALS.PLAYER_DATA_NODE.directional_bullets_data, amount_multi_meshes)
 	
 
 func _on_populate_multi_mesh_block_pool_btn_pressed() -> void:
 	var amount_multi_meshes:int = select_amount_multi_meshes_view.get_selected_btn.text.to_int()
-	var amount_bullets:int = select_amount_bullets_view.get_selected_btn.text.to_int()
 	
-	BENCHMARK_GLOBALS.FACTORY.populate_bullets_pool(BulletFactory2D.BLOCK_BULLETS,amount_multi_meshes,amount_bullets)
+	BENCHMARK_GLOBALS.FACTORY.populate_bullets_pool(BENCHMARK_GLOBALS.PLAYER_DATA_NODE.block_bullets_data,amount_multi_meshes)
 	
 
 func _on_select_bullet_damage_view_new_btn_selected(new_selected_btn: Button) -> void:
@@ -411,7 +407,9 @@ func _on_select_texture_rotation_view_new_btn_selected(new_selected_btn: Button)
 
 
 func _on_select_bullet_lifetime_view_new_btn_selected(new_selected_btn: Button) -> void:
-	var new_life_time:float = new_selected_btn.text.to_float()
+	var new_life_time:float = 0
+	if new_selected_btn.text != "Infinite":
+		new_life_time = new_selected_btn.text.to_float()
 
 	BENCHMARK_GLOBALS.PLAYER_DATA_NODE.set_bullet_lifetime(new_life_time)
 
@@ -420,16 +418,11 @@ func _on_reset_factory_btn_pressed() -> void:
 	BENCHMARK_GLOBALS.FACTORY.reset()
 
 func _on_free_active_bullets_btn_pressed() -> void:
-	BENCHMARK_GLOBALS.FACTORY.free_active_bullets(should_pool_attachments_after_free_active_bullets)
+	BENCHMARK_GLOBALS.FACTORY.free_active_bullets()
 	
 	# Also free all Godot Area2D bullets
 	for child in BENCHMARK_GLOBALS.ALL_GODOT_AREA2D_BULLETS_CONTAINER.get_children():
 		child.queue_free()
-
-
-func _on_pool_attachments_after_free_check_box_pressed() -> void:
-	should_pool_attachments_after_free_active_bullets = pool_attachments_after_free_checkbox.button_pressed
-
 
 func _on_free_specific_attachment_pool_btn_pressed() -> void:
 	var attachment_id:int = switch_bullet_attachment_id_btn.current_selected_option_index+1 # because id 1 is the first attachment and id 2 is the second attachment but ordering of the options starts from 0 so all indexes are behind with -1
@@ -442,9 +435,7 @@ func _on_populate_attachments_pool_btn_pressed() -> void:
 	var attachment_id:int = switch_bullet_attachment_id_btn.current_selected_option_index+1 # because id 1 is the first attachment and id 2 is the second attachment but ordering of the options starts from 0 so all indexes are behind with -1
 	var amount_attachments_to_pool:int = select_amount_attachments_btn_view.get_selected_btn.text.to_int()
 	
-	var attachment_packed_scn:PackedScene = BENCHMARK_GLOBALS.PLAYER_DATA_NODE.get_attachment_scn_based_on_attachment_id(attachment_id)
-	
-	BENCHMARK_GLOBALS.FACTORY.populate_attachments_pool(attachment_packed_scn, amount_attachments_to_pool)
+	BENCHMARK_GLOBALS.FACTORY.populate_attachments_pool(BENCHMARK_GLOBALS.ATTACHMENT_SCENES[attachment_id], attachment_id, amount_attachments_to_pool)
 	
 
 func _on_rotate_physics_shapes_check_box_pressed() -> void:
@@ -461,7 +452,7 @@ func _on_select_texture_size_btn_view_new_btn_selected(new_selected_btn: Button)
 
 func _on_select_z_index_btn_view_new_btn_selected(new_selected_btn: Button) -> void:
 	var new_z_index:int = new_selected_btn.text.to_int()
-	BENCHMARK_GLOBALS.PLAYER_DATA_NODE.set_bullets_z_index(new_z_index)
+	emit_signal("bullets_selected_z_index_changed", new_z_index)
 
 
 func _on_adjust_direction_based_on_rotation_check_box_pressed() -> void:
@@ -559,3 +550,14 @@ func _on_random_local_rotation_check_box_pressed() -> void:
 func _on_stop_rotation_when_max_reached_check_box_pressed() -> void:
 	var should_stop_rotation_when_max_reached:bool = stop_rotation_when_max_reached_checkbox.button_pressed
 	BENCHMARK_GLOBALS.PLAYER_DATA_NODE.set_stop_rotation_when_max_reached(should_stop_rotation_when_max_reached)
+
+
+func _on_select_limit_fps_btn_view_new_btn_selected(new_selected_btn: Button) -> void:
+	if new_selected_btn.name == "NoLimit":
+		Engine.max_fps = 0
+		return
+	
+	var new_fps:int = new_selected_btn.text.to_int()
+	Engine.max_fps = new_fps
+	
+	

@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="BulletCurvesData2D" inherits="Resource" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/godotengine/godot/master/doc/class.xsd">
+	<brief_description>
+		Holds data for controlling bullet movement and rotation using curves in 2D. Can override [BulletSpeedData2D] and [BulletRotationData2D].
+	</brief_description>
+	<description>
+	</description>
+	<tutorials>
+	</tutorials>
+	<members>
+		<member name="direction_curve_rotation_speed" type="float" setter="set_direction_curve_rotation_speed" getter="get_direction_curve_rotation_speed" default="18.0">
+			The speed at which the bullet rotates to face the adjusted direction defined by the X and Y direction curves.
+		</member>
+		<member name="movement_speed_curve" type="Curve" setter="set_movement_speed_curve" getter="get_movement_speed_curve">
+			The curve used to control the movement speed of the bullet over time. 
+			The X-axis represents the normalized time (0 start of life to 1 end of life) of the bullet's lifetime, while the Y-axis represents the speed value at that particular time.
+
+			Note that you can set [member movement_use_unit_curve] to false to have absolute values for the time.
+		</member>
+		<member name="movement_use_unit_curve" type="bool" setter="set_movement_use_unit_curve" getter="get_movement_use_unit_curve" default="true">
+			Whether to use a unit curve for the movement speed curve. 
+			If [code]true[/code], the X-axis of the curve is normalized (0 start of life to 1 end of life) based on the bullet's lifetime. 
+			If [code]false[/code], the X-axis represents absolute time values (at exactly X lifetime have THIS Y SPEED value).
+		</member>
+		<member name="rotate_towards_adjusted_direction" type="bool" setter="set_rotate_towards_adjusted_direction" getter="get_rotate_towards_adjusted_direction" default="true">
+			Whether the bullet should rotate to face the adjusted direction defined by the X and Y direction curves.
+		</member>
+		<member name="rotation_speed_curve" type="Curve" setter="set_rotation_speed_curve" getter="get_rotation_speed_curve">
+			The curve used to control the rotation speed of the bullet over time.
+			The X-axis represents the normalized time (0 start of life to 1 end of life) of the bullet's lifetime, while the Y-axis represents the rotation speed value at that particular time.
+
+			Note that you can set [member rotation_use_unit_curve] to false to have absolute values for the time.
+		</member>
+		<member name="rotation_use_unit_curve" type="bool" setter="set_rotation_use_unit_curve" getter="get_rotation_use_unit_curve" default="true">
+			Whether to use a unit curve for the rotation speed curve. 
+			If [code]true[/code], the X-axis of the curve is normalized (0 start of life to 1 end of life) based on the bullet's lifetime. 
+			If [code]false[/code], the X-axis represents absolute time values (at exactly X lifetime have THIS Y ROTATION SPEED value).
+		</member>
+		<member name="x_direction_curve" type="Curve" setter="set_x_direction_curve" getter="get_x_direction_curve">
+			The curve used to control the bullet's direction adjustment along the X-axis over time. 
+			The X-axis represents the normalized time (0 start of life to 1 end of life) of the bullet's lifetime, while the Y-axis represents the direction adjustment value at that particular time.
+
+			Note that you can set [member x_direction_use_unit_curve] to false to have absolute values for the time.
+		</member>
+		<member name="x_direction_curve_mode" type="int" setter="set_x_direction_curve_mode" getter="get_x_direction_curve_mode" enum="BlastBullets2D.DirectionCurveMode" default="0">
+			Whether the X direction curve should be applied additively to the bullet's current direction or override it entirely.
+		</member>
+		<member name="x_direction_curve_strength" type="float" setter="set_x_direction_curve_strength" getter="get_x_direction_curve_strength" default="1.0">
+			A multiplier for the X direction curve's output value, allowing you to scale the effect of the curve on the bullet's direction.
+		</member>
+		<member name="x_direction_use_unit_curve" type="bool" setter="set_x_direction_use_unit_curve" getter="get_x_direction_use_unit_curve" default="true">
+			Whether to use a unit curve for the X direction curve. 
+			If [code]true[/code], the X-axis of the curve is normalized (0 start of life to 1 end of life) based on the bullet's lifetime. 
+			If [code]false[/code], the X-axis represents absolute time values (at exactly X lifetime have THIS Y DIRECTION value).
+		</member>
+		<member name="y_direction_curve" type="Curve" setter="set_y_direction_curve" getter="get_y_direction_curve">
+			The curve used to control the bullet's direction adjustment along the Y-axis over time. 
+			The X-axis represents the normalized time (0 start of life to 1 end of life) of the bullet's lifetime, while the Y-axis represents the direction adjustment value at that particular time.
+
+			Note that you can set [member y_direction_use_unit_curve] to false to have absolute values for the time.
+		</member>
+		<member name="y_direction_curve_mode" type="int" setter="set_y_direction_curve_mode" getter="get_y_direction_curve_mode" enum="BlastBullets2D.DirectionCurveMode" default="0">
+			Whether the Y direction curve should be applied additively to the bullet's current direction or override it entirely.
+		</member>
+		<member name="y_direction_curve_strength" type="float" setter="set_y_direction_curve_strength" getter="get_y_direction_curve_strength" default="1.0">
+			A multiplier for the Y direction curve's output value, allowing you to scale the effect of the curve on the bullet's direction.
+		</member>
+		<member name="y_direction_use_unit_curve" type="bool" setter="set_y_direction_use_unit_curve" getter="get_y_direction_use_unit_curve" default="true">
+			Whether to use a unit curve for the Y direction curve. 
+			If [code]true[/code], the X-axis of the curve is normalized (0 start of life to 1 end of life) based on the bullet's lifetime. 
+			If [code]false[/code], the X-axis represents absolute time values (at exactly X lifetime have THIS Y DIRECTION value).
+		</member>
+	</members>
+	<constants>
+		<constant name="Additive" value="0" enum="DirectionCurveMode">
+		</constant>
+		<constant name="Override" value="1" enum="DirectionCurveMode">
+		</constant>
+	</constants>
+</class>

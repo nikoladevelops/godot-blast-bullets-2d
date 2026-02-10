@@ -80,9 +80,6 @@ cmake-build-*/
 .kdev_include_paths
 .kdevses
 
-# Zed Editor
-.zed/
-
 # Sublime Text
 *.sublime-workspace
 *.sublime-project

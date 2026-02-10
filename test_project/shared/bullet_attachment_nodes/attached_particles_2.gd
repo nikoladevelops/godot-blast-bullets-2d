@@ -2,12 +2,15 @@ extends BulletAttachment2D
 
 @onready var GPUParticles = $GPUParticles2D
 
-func on_bullet_spawn() -> void:
-	attachment_id = 2
+func _ready()->void:
+	BENCHMARK_GLOBALS.UI.bullets_selected_z_index_changed.connect(func(new_z_index):
+		z_index = new_z_index
+	)
 
-func on_bullet_spawn_as_disabled() -> void:
-	attachment_id = 2
-	
+func on_bullet_spawn() -> void:
+	pass
+
+func on_spawn_in_pool() -> void:
 	set_process(false)
 	set_physics_process(false)
 	visible = false
@@ -18,15 +21,9 @@ func on_bullet_disable() -> void:
 	set_process(false)
 	set_physics_process(false)
 
-func on_bullet_activate() -> void:
+func on_bullet_enable() -> void:
 	GPUParticles.restart()
 	set_process(true)
 	set_physics_process(true)
 	
 	visible = true
-	
-func on_bullet_save() -> Resource:
-	return Resource.new()
-
-func on_bullet_load(_custom_data_to_load: Resource) -> void:
-	pass

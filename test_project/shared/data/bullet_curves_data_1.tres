@@ -1,0 +1,11 @@
+[gd_resource type="BulletCurvesData2D" format=3 uid="uid://bm8i7kuaes44c"]
+
+[sub_resource type="Curve" id="Curve_k8esq"]
+_limits = [0.0, 1000.0, 0.0, 1.0]
+_data = [Vector2(0, 1), 0.0, 0.0, 0, 0, Vector2(0.314894, 1000), 0.0, 0.0, 0, 0, Vector2(0.787234, 1000), 0.0, 0.0, 0, 0, Vector2(1, 1000), 0.0, 0.0, 0, 0]
+point_count = 4
+
+[resource]
+movement_speed_curve = SubResource("Curve_k8esq")
+x_direction_curve_strength = 0.1
+y_direction_curve_strength = 0.7
