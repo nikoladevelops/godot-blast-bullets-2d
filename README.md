@@ -4,11 +4,13 @@
 
 ## Purpose
 
-**BlastBullets2D** is a high-performance, **free and open source** C++ plugin for [Godot Engine](https://godotengine.org) that enables **optimized bullet spawning and management** in 2D games. It’s designed to efficiently handle a large number of bullets with minimal performance overhead, making it ideal for fast-paced, bullet-heavy gameplay.
+**BlastBullets2D** is a high-performance, **free and open source C++ plugin** for [Godot Engine](https://godotengine.org) that enables **optimized bullet spawning and management** in 2D games. It’s designed to efficiently handle a large number of bullets with minimal performance overhead, making it **ideal for fast-paced, bullet-heavy gameplay**.
 
 If you're searching for a **Godot optimized bullets plugin**, **BlastBullets2D** is built exactly for that purpose.
 
-The plugin comes precompiled for the following platforms:
+Also perfect as a **Godot bullet hell plugin** since it allows having **THOUSANDS of bullets visible on screen**.
+
+BlastBullets2D comes already compiled and ready for these platforms:
 - **Windows**
 - **macOS**
 - **Linux**
@@ -16,9 +18,11 @@ The plugin comes precompiled for the following platforms:
 - **iOS**
 - **Web**
 
-**BlastBullets2D is fully cross platform now, because it uses the [godot-plus-plus template](https://github.com/nikoladevelops/godot-plus-plus)**. If you also want to write C++ code in Godot or you have some old GDExtension plugins you want to update, I suggest checking it out
+**BlastBullets2D is fully cross platform now, because it uses the [godot-plus-plus template](https://github.com/nikoladevelops/godot-plus-plus)**. If you also want to write C++ code in Godot or you have some old GDExtension plugins you want to update, I suggest checking it out.
 
 **BlastBullets2D** integrates seamlessly into your Godot project. You do not need any knowledge of C++ to use it. Everything is controlled through **GDScript**, made possible by Godot’s [GDExtension](https://docs.godotengine.org/en/stable/tutorials/scripting/gdextension/what_is_gdextension.html) system.
+
+[GDExtension C++ Tutorial](https://www.youtube.com/watch?v=I79u5KNl34o&t=1s)
 
 ---
 
@@ -32,49 +36,54 @@ If you're developing a bullet-hell shooter or any game that involves a high numb
 
 The main advantages to using this custom built plugin:
 
-- **Production Ready, Free, Open Source And Yours Forever Without Any Hidden Fees Or Weird Licenses.** - If you like what I do and you find the plugin useful consider supporting further development of such tools on [KoFi](https://ko-fi.com/realnikich) and [Patreon](https://patreon.com/realnikich). Expect tutorials on [My Youtube Channel](https://www.youtube.com/@realnikich).
+- **Production Ready, Free, Open Source And Yours Forever Without Any Hidden Fees Or Weird Licenses** - If you like what I do and you find the plugin useful consider supporting further development of such tools on [KoFi](https://ko-fi.com/realnikich) and [Patreon](https://patreon.com/realnikich). Expect tutorials on [My Youtube Channel](https://www.youtube.com/@realnikich).
 
 - **Superior Performance And Simple To Use API That Does NOT Require Any Math Knowledge**.
 
 - **Homing Bullets** - Targets Node2D enemies, GlobalPositions and even the Mouse. You have support for shared homing targets and per-bullet homing targets with a double ended queue implementation. You can control the smoothness of the rotation, the update time interval for tracking the targets, register a callback function when the required distance away from the target has been reached and much much more!
 
-- **Orbiting Bullets** - Each bullet can begin orbiting a homing target at a custom radius while also moving in a circle around it.
+- **Orbiting Bullets** - Each bullet can begin orbiting a homing target at a custom radius while also moving in a circle around it. Imagine a swarm of bullets orbiting your mouse as you move it, while the radius increases or decreases then some of them go and orbit another target, this is the type of behavior you can implement on the go.
 
 - **Path2D Movement Patterns** - Draw a Path2D in your scene and suddenly the bullets possess that movement behavior
-relative to their direction (allows zig zag patterns and any other creative pattern you can think about).
+relative to their direction (allows zig zag patterns and any other creative pattern you can think about). Example: A bullet gets spawned with a zig zag pattern (that might or might not repeat), then you can swap it with another pattern during runtime or even have homing bullets with custom movement patterns - very powerful.
 
-- **BulletCurvesData2D** - You can use curves inside the Inspector to control the speed, rotation and direction.
+- **BulletCurvesData2D** - You can use curves inside the Inspector to control the speed, rotation and direction. Choose between using unit curves (normalized time) or absolute values (at exactly X time have Y speed) - super easy and creative way of having bulllets that speed up/slow down at specific times without the need of writing any extra code.
 
-- **Control Speed And Rotation The Normal Way** - If bullet curves are not needed, you can still use normal speed and speed acceleration values for both movement and rotation using **BulletSpeedData2D** and **BulletRotationData2D**
+- **Control Speed And Rotation The Normal Way** - If bullet curves are not needed, you can still use normal speed and speed acceleration values for both movement and rotation using **BulletSpeedData2D** and **BulletRotationData2D**.
 
-- **Animated Textures** - Support for animation that switches between an array of textures and texture times (how long the texture should be on screen before moving to the next).
+- **Animated Textures** - Support for animation that switches between an array of textures and texture times (how long the texture should be on screen before moving to the next). Set a default texture or have full blown animated bullets, no problem!
 
 - **Custom Collision Shape Sizes** - Support for rectangle collision shapes with a custom Vector2 size.
 
-- **Support For Custom Bullet Max Collisions Amount** - A bullet can collide multiple times before being disabled.
+- **Support For Custom Bullet Max Collisions Amount** - A bullet can collide multiple times before being disabled. Very useful for Bullet Hell games.
 
 - **Custom Bullets Debugger** - Debug collision shapes easily to see what is going on in your game and find problems.
 
-- **Attach Timer Logic** - The ability to attach function callbacks that execute at a particular time with the option to be repeated over and over (safely executes code during runtime while preventing crashes that might occur with the normal timers if you don't use call_deferred()).
+- **Attach Timer Logic** - The ability to attach function callbacks that execute at a particular time on the entire multimesh with the option to be repeated over and over (safely executes code during runtime while preventing crashes that might occur with the normal timers if you don't use `call_deferred()`). This is the preferred way of manipulating bullet related data, don't use the normal Godot timers!
 
-- **Edit Properties And Call Methods During Runtime** - Every single feature has helper methods that you can use during runtime to adjust the behavior of the bullets (change homing targets, orbiting radius, switch movement pattern, disable a bulllet and so on..) - combine this with the attach timer logic and you have the most flexible bullet system ever created.
+- **Edit Properties And Call Methods During Runtime** - Every single feature has helper methods that you can use during runtime to adjust the behavior of the bullets (change homing targets, orbiting radius, switch movement pattern, disable a bulllet and so on..). Combine this with the attach timer logic and you have the most flexible bullet system ever created. If you are not using the attach timer logic, make sure to use `call_deferred()` to avoid issues like game crashes or inconsistent behavior.
 
-- **Teleport And Offset Support** - Instantly shift active bullets in global space or teleport the system to a new position with a calculated offset.
+- **Teleport And Offset Support** - Instantly shift bullets with a Vector2 offset value or teleport them in global space to a new position.
 
-- **Custom Physics Interpolation logic** - Bullets will always look smooth no matter the refresh rate of the monitor/device that you are targeting.
+- **Set Inherited Velocity Offset** - This is the velocity that gets added to the bullets when they are spawned. Useful for creating effects like a machine gun that inherits the velocity of the player character, so that the bullets shoot out with more speed if the player is moving forward, and with less speed if the player is moving backward or standing still.
 
-- **Bullet Attachments** - Seamlessly attach GPUParticles2D, CPUParticles2D, or custom sprites that follow the bullet's transform with optional offsets.
+- **Instance Shader Parameters** - Support for shaders with instance uniform variables.
 
-- **Automatic Object Pooling** - MultiMesh instances and attachments are automatically pooled and reused. You can manually populate or free pools, or disable the system to use your own custom reuse logic.
+- **Custom Physics Interpolation logic** - Bullets will always look smooth no matter the refresh rate of the monitor/device that you are targeting. No more weird jitter and buggy choppy feel on screens above 60Hz.
+
+- **Bullet Attachments** - Seamlessly attach GPUParticles2D, CPUParticles2D or custom sprites that follow the bullet's transform with optional offsets. The use of **modern GDExtension features** like virtual methods allow you to override what happens when attachments are spawned/disabled/pooled. These custom methods get called *inside C++* to set up your bullet attachment as necessary. Example - Spawn attachments with visible particles but when they collide you have to disable the emitting and even disable visibility of extra nodes you might've attached. Super flexible and easy to use.
+
+- **Automatic Object Pooling** - MultiMesh instances and attachments are automatically pooled and reused. You can manually populate or free pools, or disable the system to use your own custom logic. You can choose the easy way of using the plugin without any care (because performance is handled for you already) OR you can delve deeper. Example: disable auto pooling, which will allow you to save your bullet instances into an array of multimeshes without fear of problems. Reuse them whenever you want with runtime functions such as `enable_bullet()`/`disable_bullet()`.
+
+- **Dynamic Sparse Set** - The plugin uses custom made data structure that is used internally for precise tracking and looping over ONLY ACTIVE MultiMeshInstances and ONLY THE ACTIVE bullets inside them. This reduces branching and improves performance (a pattern used in ECS engines that could be further improved in future versions of BlastBullets2D).
 
 - **Bullets Custom Data** - Attach a custom resource that the multimesh of bullets carries - used for storing damage, armor damage or anything else custom that should be available during collision.
 
-- **Familiar Signals** - Collisions happen in area_entered and body_entered functions right inside the BulletFactory2D node. Combine this with the bullet custom data and you can easily differentiate between types of bullets.
+- **Familiar Signals** - Collisions are tracked with `area_entered` and `body_entered` signals inside the BulletFactory2D node. Combine this with the bullet custom data and you can easily differentiate between types of bullets. You can even detach/attach new bullet attachments or make explosion effects while editing runtime properties inside the function callbacks.
 
 - **Extensive Documentation** - Full in-editor documentation for every function and property, accessible directly within the Godot Inspector and Script Editor.
 
-- **Even Faster Release Builds** - Compiled with Link Time Optimization (LTO) for maximum runtime performance in your exported projects.
-
+- **Even Faster Release Builds** - Compiled with Link Time Optimization (LTO) for maximum runtime performance in your exported projects. Debug builds contain the in-engine docs, while release builds are automatically detected and used by Godot for the final release of your game.
 
 - **....AND SO MUCH MORE** - Download the plugin and experiment with it right away! There is also a test_project.zip available where you can check out some of the features and benchmark against a normal Godot Area2D bullet implementation.
 
@@ -83,14 +92,19 @@ relative to their direction (allows zig zag patterns and any other creative patt
 
 While **BlastBullets2D** is highly optimized and feature-rich for top-down 2D games, there are a few limitations you should be aware of:
 
-- ❌ **Y-sorting is not supported**  
-  If your game relies heavily on Y-based depth sorting (common in platformers or isometric games), this plugin may not be a good fit.
+- ❌ **Y-sorting is not supported**<br>
+If your game relies heavily on Y-based depth sorting (common in platformers or isometric games), this plugin may not be a good fit.
 
-- ❌ **Only `RectangleShape2D` is supported for collisions**  
-  Currently, other collision shapes like `CircleShape2D` or `ConvexPolygonShape2D` are not supported.
+- ❌ **Only `RectangleShape2D` is supported for collisions**<br>
+Currently, other collision shapes like `CircleShape2D` or `ConvexPolygonShape2D` are not supported.
 
-- ❌ **Only Area2D like behavior**  
-  All bullets act as `Area2D` - they are not `RigidBody2D` and don't support bouncing off of other bullets and so on. Basically you can NOT apply impulse forces. Just view them as `Area2D` bullets.
+- ❌ **Only Area2D like behavior**<br>
+All bullets act as `Area2D` - they are not `RigidBody2D` and don't support bouncing off of other bullets and so on. Basically you can NOT apply impulse forces. Just view them as `Area2D` bullets.
+
+- ❌**No Save/Load System**<br>
+Version 2.0 of BlastBullets2D had a saving/loading system based on custom resources that **got removed in version 3.0.** This is due to the enormous amount of features and changes that got added and the difficulty of keeping everything supported for **every type of game** and **every mix of features**, which proved very hard in practice. The recommended way is for the user to implement this logic depending on the game he's working on - you can fork the repository and begin experimenting. There are currently no plans of this getting implemented again, since people that donated or contacted me privately wanted the advanced features mostly and found the saving/loading unnecessary.
+
+   
 
 In conclusion, **BlastBullets2D is ideal for top-down shooters and arcade-style games**, but may not be suitable for other 2D genres if those specific features are essential to your project.
 
@@ -98,10 +112,8 @@ In conclusion, **BlastBullets2D is ideal for top-down shooters and arcade-style 
 
 ---
 
-// TODO UPDATE NEXT SECTIONS
-
 ## How To Install
-#### BlastBullets2D targets <b>Godot Engine 4.4.1</b>. As long as there are no breaking changes to GDExtension in the future, then it should work for all future 4.4.x Godot releases.
+#### BlastBullets2D targets <b>Godot Engine 4.5 and 4.6</b>. As long as there are no breaking changes to GDExtension in the future, then it should work for all future Godot releases.
 
 1. Go in [Releases](https://github.com/nikoladevelops/godot-blast-bullets-2d/releases) and on the latest release click and download `blastbullets2d.zip`
 
@@ -116,25 +128,21 @@ The compiled plugin files have been loaded and you are ready to begin coding!
 
 All functions and properties have been documented <b>INSIDE THE EDITOR</b>, so it will be extremely easy for you to take full advantage of all features.
 
-If you want to benchmark/compare performance of `BlastBullets2D` bullets to `Area2D` bullets you can download the second zip file `test_project.zip` that contains the test project showcased in the gif and in the videos on my [Youtube Channel](https://www.youtube.com/@realnikich). I will post some tutorials there so make sure you subscribe
+If you want to benchmark/compare performance of `BlastBullets2D` bullets to `Area2D` bullets you can download the second zip file `test_project.zip` that contains the test project showcased in the gif and in the videos on my [Youtube Channel](https://www.youtube.com/@realnikich). I will post some tutorials there.
 
 ---
 ## How To Use
-When designing the API, I've ensured that it's as easy as possible for anyone no matter the skill level to use this plugin. The only node that you are interested in is the `BulletFactory2D` and it's spawn functions. You should add it to your scene, attach a script and make it into an [Autoload/Singleton](https://docs.godotengine.org/en/stable/tutorials/scripting/singletons_autoload.html) or just keep it's reference (using a static variable) so that you can easily use it in any script (player/enemies). The only classes that you should be making new instances of is the data resource classes - `DirectionalBulletsData2D` and `BlockBulletsData2D` that you pass to the `BulletFactory2D`'s spawn functions - `spawn_directional_bullets()` and `spawn_block_bullets()` as well as the `BulletSpeedData2D` and `BulletRotationData2D` that are needed by those two data resource classes for proper set up.
-
-Additionally you can read the `BulletAttachment2D` documentation to see how you can attach particles, sprites or any other custom nodes you have that need to move along with the bullets.
-
-That's all! You just have to ensure that you are setting the data resource classes' properties correctly (read the documentation of the plugin that is available in the editor) and then play around modifying the properties during runtime, nothing complex, it's super simple! You can always check out the test project for some inspiration.
+When designing the API, I've ensured that it's as easy as possible for anyone no matter the skill level to use this plugin.
 
 Here is how the basic setup goes:
 1. Add a `BulletFactory2D` node to your scene tree. The BulletFactory's job is to spawn bullets and manage plugin related options (debugger, physics interpolations and so on..).
-2. Attach a script to the factory. The `BulletFactory2D` node has the signals `area_entered`, `body_entered` and `life_time_over`. You should handle them in your script and write custom logic for your game.
+2. The `BulletFactory2D` node has the signals `area_entered`, `body_entered` and `life_time_over`. You should handle them in your script and write custom logic for your game.
 
-You should probably keep a reference to the factory globally, so you can access it in any other script(enemies/player). There's two ways of doing this.
+Keep a reference to the factory globally, so you can access it in any other script(enemies/player). There's two ways of doing this.
 
 The first way would be to create an [Autoload/Singleton](https://docs.godotengine.org/en/stable/tutorials/scripting/singletons_autoload.html) where you keep the factory as a variable.
 
-The second way would be to create a class with a static variable that keeps the reference of the factory. I personally prefer using this way.
+The second way would be to create a class with a static variable that keeps the reference of the factory. This approach is the one I'll be using, since you can put your Invetory, UI and other stuff you plan on supporting.
 
 Example:
 
@@ -166,83 +174,43 @@ func spawn_bullets()->void:
 	GLOBALS.BULLET_FACTORY.spawn_directional_bullets(bullets_data)
 ```
 
-3. Use the `BulletFactory2D`'s functions to spawn bullets in any other script. You can use either `spawn_directional_bullets()` or `spawn_block_bullets()`.
-4. To save the bullet state you can call the `save()` and `load()` functions of your `BulletFactory2D` node and then handle the signals `save_finished` and `load_finished`.
+3. Use the `BulletFactory2D`'s functions to spawn bullets in any other script.
 
-To handle the collisions properly and apply damage to enemies/player or any other custom data, you have to deal with [`Custom Resources`](https://docs.godotengine.org/en/stable/tutorials/scripting/resources.html). Inside the data resource class you've chosen (either `DirectionalBulletsData2D` or `BlockBulletsData2D`) you should attach a custom resource with properties such as `damage` - this is done by setting the `bullets_custom_data` property to your custom resource class. The same knowledge is needed when you are trying to save/load data. If you are not familiar with this concept or how to implement all of that then I suggest watching my [Godot Custom Resources For Beginners Tutorial](https://youtu.be/fdRJqnOrz98?si=gstLFNWaCcrENnjJ).
+#### If you just need normal bullets without extra options:<br>
+- <b>`spawn_block_bullets()`</b> - Spawns a multimesh of bullets where the direction is determined by `block_rotation_radians` and the speed by `block_speed`.
 
-#### What's the difference between `DirectionalBulletsData2D` and `BlockBulletsData2D`?
+- <b>`spawn_directional_bullets()`</b> - Spawns a multimesh of bullets where the direction is determined by the `transforms`'s rotation and each bullet has its own speed data.
 
-- `DirectionalBulletsData2D` is used when you want to spawn a huge amount of bullets and each bullet travels in its own unique direction that is determined by its `Transform2D`. Ensure that the **MANDATORY** `all_bullet_speed_data` property is set to an array of `BulletSpeedData2D` and the amount of values matches the amount of values inside the `transforms` property or you will experience a crash.
+#### For advanced features:<br><br>
+- <b>`spawn_controllable_directional_bullets`</b> - Same as `spawn_directional_bullets()`, however this method returns the multimesh instance as a result. Save it to a variable and try modifying its properties/ calling functions. This is where all the advanced features are hidden - homing, orbiting, bullet curves, attachments, movement patterns, teleporting, timer related functionality, object pooling options and so on.
+
+#### How to configure `DirectionalBulletsData2D` and `BlockBulletsData2D`?
+
+The spawn functions will either require a `BlockBulletsData2D` or a `DirectionalBulletsData2D`.
+It's important that you always check the in-engine documentation of both and also the base class that they inherit from `MultiMeshBulletsData2D`.<br>
+
+The same thing should be said for the `BlockBullets2D`, `DirectionalBullets2D` and `MultiMeshBullets2D` classes, since inside them you will find runtime properties and helper functions. The documentation is always there to help you!
 
 
-- `BlockBulletsData2D` is used when you want to spawn a huge amount of bullets as a block of bullets that travels in a single direction that is determined by the `block_rotation_radians` property. Here you need to set the `block_speed` property to a single `BulletSpeedData2D` - all bullets move at the same speed.
+`BlockBulletsData2D` and `DirectionalBulletsData2D` resource classes need to have their `transforms` property set to an array of `Transform2D` - this data determines the global position and rotation of all bullets. The amount of `Transform2D` will also determine the amount of bullets that need to be spawned.
 
-Both of these resource classes need to have their `transforms` property set to an array of `Transform2D` - this data determines the global position and rotation of all bullets. This property is **MANDATORY**, if you do not set it you will experience a crash. The amount of `Transform2D` will also determine the amount of bullets that need to be spawned - and again always ensure that the amount of `transforms` matches the amount of `BulletSpeedData2D` when using `DirectionalBulletsData2D`.
+A smart way is to generate these transforms using a bunch of `Marker2D` nodes as children of your player (that is supposed to shoot bullets). This way, as he moves the markers will also move along with him. The only thing you need to do is get all these marker2d's transforms, store them in an array and set it to the bullets data resource class each time you need to spawn bullets. Having a shoot cooldown timer would be nice too.
 
+Only thing is your bullets are invisible and have no collision shape size set..
+So how about start playing around with all the properties the data class provides?
 
----
-
-## Code Examples
-
-After you've set up your `BulletFactory2D` and you can access it from anywhere it's time to spawn some bullets. You can use these code snippets and modify them to your needs:
-
-#### Create Custom Resource Class For Damage Data
-
+Code example:
 ```
-class_name DamageData
-extends Resource
-
-# The base damage amount
-@export var base_damage:int
-# Whether the bullet was spawned from the player
-@export var is_player_owned:bool
-```
-
-#
-#### Set Up Bullet Spawn Data
-
-On top of your script you should have variables:
-```
-# These textures are used as animation frames for the bullets. 
-# They are being iterated over again and again until the life time of the bullets is over.
-var rocket_tectures:Array[Texture2D] = [
-	preload("pathgoeshere"),
-  preload("pathgoeshere")
-  ... each texture you provide here makes up the animation
-	]
-
-
-# The default texture that can be used, instead of having animations
-var godot_texture:Texture2D = preload("res://icon.svg")
-
-# Holds data that is needed for factory.spawn_directional_bullets
-var directional_bullets_data:DirectionalBulletsData2D
-
-# Holds data that is needed for factory.spawn_block_bullets
-var block_bullets_data:BlockBulletsData2D
-
-# Holds data that is needed to set up the speed of both directional and block bullets
-var bullet_speed_data:Array[BulletSpeedData2D]
-
-# Holds data that is optional if we want to set up the rotation of both directional and block bullets
-var bullet_rotation_data:Array[BulletRotationData2D]
-
-# Holds the custom resource data to which we have access every single time a bullet hits something
-var damage_data:DamageData
-```
-
-And now lets get some set up functions:
-####
-For `DirectionalBulletsData2D`
-```
-# Returns a partially set up DirectionalBulletsData2D, only thing left to do is set a new value to the .transforms property
+# Returns a partially set up DirectionalBulletsData2D, only thing left to do is set a new value to the .transforms property when the fire cooldown timer times out and you are ready to spawn a new batch of bullets..
 func set_up_directional_bullets_data()->DirectionalBulletsData2D:
 	var data:DirectionalBulletsData2D = DirectionalBulletsData2D.new()
-	data.textures = rocket_tectures
-	
+	data.textures = rocket_textures # Set an array of textures
+	# WARNING: Make sure your textures are FACING the Vector2.RIGHT direction when you draw them (basically your bullets should be facing right)
+	# If you have to, go through each texture and rotate it manually with an image editor and only then load them all in Godot.
+
+	data.default_change_texture_time = 0.4 # configure default change texture time
+
 	# You can also define wait time for each texture like so as long as the amount of textures matches the amount of values in this array.
-	# Otherwise stick to using default_change_texture_time
 	#data.change_texture_times = [
 		#0.05,
 		#0.03,
@@ -259,8 +227,6 @@ func set_up_directional_bullets_data()->DirectionalBulletsData2D:
 	
 	data.all_bullet_speed_data = bullet_speed_data # for the directional bullets use every single bullet speed
 	
-	#data.collision_layer = DirectionalBulletsData2D.calculate_bitmask([2])
-	#data.collision_mask = DirectionalBulletsData2D.calculate_bitmask([3]) # by default bullets interact only with enemy
 	data.set_collision_layer_from_array([2])
 	data.set_collision_mask_from_array([3])
 
@@ -270,319 +236,148 @@ func set_up_directional_bullets_data()->DirectionalBulletsData2D:
 	data.default_change_texture_time=0.09
 	data.max_life_time = 2
 	data.all_bullet_rotation_data = bullet_rotation_data
-	data.bullet_attachment_offset = Vector2(-60,0)
 	data.bullets_custom_data = damage_data
 	#data.is_life_time_over_signal_enabled = true # If you want to track when the life time is over and receive a signal inside BulletFactory2D
 	
 	return data
 ```
 
-For `BlockBulletsData2D`
-```
-# Returns a partially set up BlockBulletsData2D, only thing left to do is set a new value to the .transforms and .block_rotation properties
-func set_up_block_bullets_data()->BlockBulletsData2D:
-	var data:BlockBulletsData2D = BlockBulletsData2D.new();
-	data.textures = rocket_tectures
-	data.block_speed = bullet_speed_data[0] # for the block of bullets use only the first bullet_speed_data as the block_speed
-	
-	#data.collision_layer = BlockBulletsData2D.calculate_bitmask([2])
-	#data.collision_mask = BlockBulletsData2D.calculate_bitmask([3]) # by default bullets interact only with enemy
-	data.set_collision_layer_from_array([2])
-	data.set_collision_mask_from_array([3])
-	
-	data.texture_size = Vector2(140,140)
-	data.collision_shape_size=Vector2(32,32)
-	data.collision_shape_offset=Vector2(0,0)
-	data.default_change_texture_time=0.09
-	data.max_life_time = 2
-	data.all_bullet_rotation_data = bullet_rotation_data
-	data.bullet_attachment_offset = Vector2(-60,0)
-	data.bullets_custom_data = damage_data
-	
-	return data
-```
-#
-#### Spawn Bullets
+#### How do we handle collision and bullet damage?<br>
+Notice the ``data.bullets_custom_data = damage_data``. This is a custom resource class instance that you should create. The data it holds can help you differentiate between types of bullets and damage.
 
-For `DirectionalBulletsData2D`
+Example:
+
+
 ```
-func spawn_multi_mesh_directional_bullets()->void:
-	if bullets_amount < 10:
-		directional_bullets_data.transforms = BulletFactory2D.helper_generate_transforms_grid(bullets_amount, bullet_marker.get_global_transform(), bullets_amount, grid_alignment, col_offset, row_offset, rotate_grid_with_marker, random_local_rotation)
-	else:
-		directional_bullets_data.transforms = BulletFactory2D.helper_generate_transforms_grid(bullets_amount, bullet_marker.get_global_transform(), rows_per_column, grid_alignment, col_offset, row_offset, rotate_grid_with_marker, random_local_rotation)
-	
-	BENCHMARK_GLOBALS.FACTORY.spawn_directional_bullets(directional_bullets_data)
+class_name DamageData
+extends Resource
+
+# The base damage amount
+@export var base_damage:int
+# Whether the bullet was spawned from the player
+@export var is_player_owned:bool
 ```
 
-For `BlockBulletsData2D`
+
+Next up go inside the ``BulletFactory2D`` node and register callbacks for the signals ``area_entered``, ``body_entered`` and even ``life_time_over`` if you are interested in it.
+
+Example:
+
 ```
-func spawn_multi_mesh_block_bullets(player_rotation:float)->void:
-	if bullets_amount < 10:
-		block_bullets_data.transforms = BulletFactory2D.helper_generate_transforms_grid(bullets_amount, bullet_marker.get_global_transform(), bullets_amount, grid_alignment, col_offset, row_offset, rotate_grid_with_marker, random_local_rotation)
-	else:
-		block_bullets_data.transforms = BulletFactory2D.helper_generate_transforms_grid(bullets_amount, bullet_marker.get_global_transform(), rows_per_column, grid_alignment, col_offset, row_offset, rotate_grid_with_marker, random_local_rotation)
-	
-	
-	block_bullets_data.block_rotation_radians=player_rotation # I want the block of bullets to be rotated the same way that the player is rotated
-		
-	BENCHMARK_GLOBALS.FACTORY.spawn_block_bullets(block_bullets_data)
-```
-
-#
-
-#### Handle Collisions Inside BulletFactory2D Script
-```
-extends BulletFactory2D
-
-@onready var particle_scn:PackedScene = preload("res://shared/bullet_attachment_nodes/attached_particles.tscn")
-
-# BlastBullets2D plugin created by https://x.com/realNikich / https://github.com/nikoladevelops
-# For tutorials: https://www.youtube.com/@realnikich
-
-# NOTE NEVER OVERRIDE THE _ready FUNC HERE IF YOU ARE PLANNING TO ATTACH A CUSTOM SCRIPT. YOUR GAME WILL CRASH!!
-# NOTE Depending on the enemy type (whether the thing being hit by the bullets is an area or a body), you need to handle either the _on_area_entered or _on_body_entered of the BulletFactory2D
-# NOTE Ensure the enemy is in the correct collision_layer and that the bullets are also in the same collision_mask
-# NOTE Static bodies can be hit by the bullets, but only if you set the data of the bullets's monitorable property to true - this is at the cost of performance of course, so it's better to stick with Area2D or other types of bodies
-# Example: if enemy is in collision_layer = 3, then the bullets you are spawning should always have the collision_mask = 3 as well, otherwise they won't interact with eachother
-
 # This function is connected to the area_entered signal of the bullet factory. It is executed each time a bullet spawned from the factory hits an Area2D (and again in order for a thing to be hit, ensure the layers are correct!)
-func _on_area_entered(enemy_area: Object, bullets_custom_data: Resource, _bullet_global_transform: Transform2D) -> void:
-	if enemy_area is AbstractEnemy:
+func _on_area_entered(hit_target_area: Object, _multimesh_bullets_instance:MultiMeshBullets2D, _bullet_index:int, bullets_custom_data: Resource, _bullet_global_transform: Transform2D) -> void:	
+	if hit_target_area is AbstractEnemy:
 		var dmg_data:DamageData = bullets_custom_data as DamageData # We know for a fact that we have a DamageData inside our bullets, because that's how we've set them up before spawning them - we can replace it with some other custom resource instead and check for its type here too (we may spawn bullets with different custom data and have additional check logic)
-		if dmg_data.is_player_owned == false: # If it wasn't the player who spawned the bullet, then that means an enemy is hitting another enemy - I want the bullet to dissapear without it damaging the enemy (No friendly fire :P)
+		if dmg_data.is_player_owned == false: # If it wasn't the player who spawned the bullet, then that means an enemy is hitting another enemy - I want the bullet to disappear without it damaging the enemy (No friendly fire :P)
 			return
-		enemy_area.take_damage(dmg_data.base_damage) # You can do way more complex damage logic with the rest of the properties inside bullets_custom_data, you can do anything..
+		hit_target_area.take_damage(dmg_data.base_damage) # You can do way more complex damage logic with the rest of the properties inside bullets_custom_data, you can do anything..
 		#print("Bullet just collided with an enemy area")
 	#else:
 		#print("Bullet just collided with an area")
 
 # This function is connected to the body_entered signal of the bullet factory.  It is executed each time a bullet spawned from the factory hits a body (and again in order for a thing to be hit, ensure the layers are correct and you also have enabled the .monitorable property inside bullets data!)
-func _on_body_entered(enemy_body: Object, bullets_custom_data: Resource, _bullet_global_transform: Transform2D) -> void:
-	if enemy_body is Player:
+func _on_body_entered(hit_target_body: Object, _multimesh_bullets_instance:MultiMeshBullets2D, _bullet_index:int, bullets_custom_data: Resource, _bullet_global_transform: Transform2D) -> void:
+	if hit_target_body is Player:
 		var dmg_data:DamageData = bullets_custom_data as DamageData
-		enemy_body.take_damage(dmg_data.base_damage)
+		hit_target_body.take_damage(dmg_data.base_damage)
 		
 	#print("Bullet just collided with a body")
 
-# This function will only be executed if the bullets_data has the is_life_time_over_signal_enabled property set to TRUE
-func _on_life_time_over(_bullets_custom_data: Resource, _all_bullet_global_transforms: Array) -> void:
+# Works only if data.is_life_time_over_signal_enabled set to true
+func _on_life_time_over(_multimesh_bullets_instance: MultiMeshBullets2D, _bullet_indexes:Array[int], _bullets_custom_data: Resource, _bullets_global_transforms: Array[Transform2D]) -> void:
 	pass
-	# Just a small example that you can spawn particles or other things in the same exact position where the bullet got disabled (its life time got to 0)
-	#for t in all_bullet_global_transforms:
-		#var instance:Node2D = particle_scn.instantiate()
-		#instance.global_transform = t
-		#get_tree().root.add_child(instance)
-
-```
-#
-### What Is The `BulletAttachment2D` Node For?
-Provides the functionality of bullets being able to carry particles or other nodes as they move.
-
-In order for attachments to work correctly they need a unique `attachment_id` positive value.
-
-The way you use attachments is the following:
-
-1. Create a new scene that has a parent node of `BulletAttachment2D`.
-
-2. Add any other nodes to the scene or logic to it - whatever the bullets are going to be carrying as they move.
-
-3. Set the `attachment_id` inside `on_bullet_spawn()` and `on_bullet_spawn_as_disabled()` functions.
-
-4. Configure any other custom logic in the rest of the functions (read the rest of the documentation carefully, you need to override the virtual functions to execute custom logic).
-
-5. Set this attachment to a spawn data (`BlockBulletsData2D` or `DirectionalBulletsData2D`) by using the `bullet_attachment_scene` property and use one of `BulletFactory2D`'s spawn functions to spawn the actual bullets.
-
-Example of implementing `BulletAttachment2D`
-
-```
-extends BulletAttachment2D
-
-var current_color:Color = Color.WHITE
-var change_color_max_time:float = 0.5
-var curr_time:float = 0.0
-
-func _physics_process(delta: float) -> void:
-	if curr_time >= change_color_max_time:
-		var rand_R:float = randf()
-		var rand_G:float = randf()
-		var rand_B:float = randf()
-		
-		current_color = Color(rand_R, rand_G, rand_B, 1)
-		modulate = current_color
-		
-		curr_time = 0.0
-	
-	curr_time += delta
-	
-func on_bullet_spawn() -> void:
-	attachment_id = 3
-
-func on_bullet_spawn_as_disabled() -> void:
-	attachment_id = 3 # Very important
-	
-	set_process(false)
-	set_physics_process(false)
-	visible = false
-	
-	curr_time = 0
-
-func on_bullet_disable() -> void:
-	visible = false
-	set_process(false)
-	set_physics_process(false)
-
-func on_bullet_activate() -> void:
-	curr_time = 0
-	current_color = Color.WHITE
-	modulate = current_color
-	
-	visible = true
-	set_process(true)
-	set_physics_process(true)
-	
-
-## When the BulletFactory2D saves bullet states, it will save this bullet attachment state
-func on_bullet_save() -> Resource:
-	var data:LightAttachmentData = LightAttachmentData.new()
-	data.current_color = current_color
-	data.current_time = curr_time
-	
-	return data
-	
-## Same resource we just saved will get passed here, so cast it and use the data you've saved
-func on_bullet_load(custom_data_to_load: Resource) -> void:
-	var data:LightAttachmentData = custom_data_to_load as LightAttachmentData
-	if data != null:
-		current_color = data.current_color
-		curr_time = data.current_time
-		
-		modulate = current_color
 ```
 
-#
-#### Saving And Loading Bullets Data
+
+#### Accessing advanced features
 
 ```
-# The save path at which the save file is being saved/loaded from
-var save_path:String = OS.get_user_data_dir() + "/test.tres"; # could be either .tres or .res
+# All this code is inside a function that you call each time you spawn bullets..
+# Note the .transforms of the directional_bullets_data class is edited outside this, each time the player shoots..
 
-func _on_save_btn_pressed():
-	BENCHMARK_GLOBALS.FACTORY.save();
+var dir_bullets:DirectionalBullets2D = BENCHMARK_GLOBALS.FACTORY.spawn_controllable_directional_bullets(directional_bullets_data)
 
-func _on_load_btn_pressed():
-	var factory_data:SaveDataBulletFactory2D = ResourceLoader.load(save_path)
-	if factory_data == null:
-		print("Bullets data from file was invalid, loading failed.")
-	else:
-		BENCHMARK_GLOBALS.FACTORY.load(factory_data)
-		
-	
-func _on_factory_save_finished(factory_data:SaveDataBulletFactory2D):
-	if factory_data == null:
-		print("Bullets data saving failed.")
-	else:
-		ResourceSaver.save(factory_data, save_path)
+# Homing Functionality
+# We have a shared homing deque and a per-bullet homing deque. Depends on what you need
+
+# Settings
+dir_bullets.homing_smoothing = 0.0# Set from 0 to 20 or even bigger (but you might have issues with interpolation)
+dir_bullets.homing_update_interval = 0.00# Set an update timer - keep it low for smooth updates
+dir_bullets.homing_take_control_of_texture_rotation = true
+dir_bullets.homing_distance_before_reached = 50 # instead of always going to the center of the texture, this acts like radius offset
+dir_bullets.bullet_homing_auto_pop_after_target_reached = false # should it automatically go to the next target in the deque or keep homing even if it had reached the target
+dir_bullets.shared_homing_deque_auto_pop_after_target_reached = false
+
+# When target gets reached do this..
+dir_bullets.bullet_homing_target_reached.connect(func():
+	print("Hey I reached the target..")
+)
+
+
+# Push actual target (choose per-bullet homing or shared or even both).
+# Note that shared homing deque takes precedence, until its empty it won't target the per bullet homing deque..
+
+#dir_bullets.shared_homing_deque_push_back_node2d_target(target1) # shared homing
+#dir_bullets.bullet_homing_push_back_node2d_target(bullet_index, target1) # per-bullet homing
+#dir_bullets.all_bullets_push_back_homing_target(target1) # per-bullet homing helper function with range
+# Check out all the docs in the engine where you can push the Mouse or a global position target as the homing target.
+
+# Orbiting
+#dir_bullets.bullet_enable_orbiting(...)
+#dir_bullets.all_bullets_enable_orbiting(...)
+
+# Bullet Curves Data - Takes precedence over BulletSpeedData2D and BulletRotationData2D
+# Note that you should create a BulletCurvesData2D resource in the editor and configure it first
+#In FileSystem -> Right Click With Mouse -> New Resource -> Search And Select BulletCurvesData2D. Configure it to your liking.
+
+# Next here in code just do this
+#dir_bullets.bullet_set_curves_data(...)
+#dir_bullets.all_bullets_set_curves_data(...)
+
+# Movement Patterns
+# Note that you should create a Path2D inside your scene and place it/ draw a few points to make a nice pattern.
+
+# Get a reference of it and call these:
+#dir_bullets.set_bullet_movement_pattern_from_path(...)
+#dir_bullets.all_bullets_set_movement_pattern_from_path(...)
+
+# Bullet attachments - attaching GPU particles and other custom nodes to follow the bullets..
+
+# Create a brand new scene and make sure the type is set to BulletAttachment2D. Very important!
+# Place particles or anything you want inside
+# Next override the functions ``on_bullet_disable()``, ``on_bullet_enable()``, ``on_bullet_spawn()``,``on_spawn_in_pool()`` and ``_ready()`` and implement custom logic to your liking.
+#(Check out the test_project.zip for examples)
+
+# Load the BulletAttachment2D a PackedScene, then do this:
+#dir_bullets.bullet_set_attachment(...)
+#dir_bullets.all_bullets_set_attachment(...)
+
+
+# Attach timer related functions
+# Imagine wanting to change the movement pattern at a specific time, or you want your bullets to home towards another target or you want to switch textures and so on..
+
+# To edit runtime properties safely at a specific time, use this function:
+#dir_bullets.multimesh_attach_time_based_function(0.5, func():
+	# custom code goes here
+	# change orbiting radius, do anything basically..
+#)
+
 ```
 
-**All of these code snippets were taken from the test project in order to guide you in the right direction, you'll have to modify them to make them work for your own game**
 
----
+This is pretty much everything you need to know to get started. Practice with the plugin by looking at the in-engine docs!
+
+You can also download the `test_project.zip` from the latest release and get a feel for it by modifying the `player_data_node.gd` script.
+
+For smooth bullets no matter the refresh rate enable physics interpolation in your project settings as well as
+tick the checkbox inside the inspector in BulletFactory2D. That's all, enjoy the plugin!
+
+
 ## How To Compile
 
-The easy way is to just fork the plugin, then go inside the GitHub Actions tab, and run the workflow for `full_plugin_compilation`, instead of `debug`. This easy process is due to using [godot-plus-plus template](https://github.com/nikoladevelops/godot-plus-plus) - allows for cross platform easy workflow when making Godot C++ GDExtension plugins
+Fork the repository, then go inside the GitHub Actions tab, and run the workflow for `full_plugin_compilation`, instead of `debug`. This easy process is due to using [godot-plus-plus template](https://github.com/nikoladevelops/godot-plus-plus) - allows for cross platform easy workflow when making Godot C++ GDExtension plugins.
 
-#
-The hard way - doing it locally on your own devices
-
-If you want to modify the C++ code and add custom logic or fix issues: 
-
-1. Install [Python](https://www.python.org/downloads/).
-2. Install [Scons](https://scons.org/).
-```
-python -m pip install scons
-```
-3. Install [Git](https://git-scm.com/)
-4. Download source code of the plugin with included <b>godot_cpp</b> submodule.
-
-```
-git clone --recurse-submodules https://github.com/nikoladevelops/godot-blast-bullets-2d.git
-```
-5. Go to <b>main</b> folder where <b>SContrsuct.py</b> file is located.
-Open your command terminal (Example: <b>cmd</b> on <b>Windows</b>) in the same directory then type one of these depending on the platform you are targeting (if you receive an error it means you don't have the required toolchain to compile for the platform you are targeting, so do some research on what you're missing):
-
-
-
-#### For Windows x64
-
-Set up the environment
-```
-"C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build\vcvarsall.bat" amd64
-```
-
-Compile the code
-```
-scons platform=windows arch=x86_64 target=template_debug
-scons platform=windows arch=x86_64 target=template_release lto=full
-```
-
-#### For Windows arm64
-Set up the environment
-```
-"C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build\vcvarsall.bat" amd64_arm64
-```
-
-Compile the code
-```
-scons platform=windows arch=arm64 target=template_debug
-scons platform=windows arch=arm64 target=template_release lto=full
-```
-
-#### For Linux x64
-It's possible to compile for Linux using [wsl](https://learn.microsoft.com/en-us/windows/wsl/install) if you are on Windows.
-```
-wsl --install
-```
-```
-scons platform=linux arch=x86_64 target=template_debug
-scons platform=linux arch=x86_64 target=template_release lto=full
-```
-
-#### For Android x64
-Ensure you have an <b>Android SDK</b> (you can download <b>Android Studio</b> and get all the things you need from there). Here is some useful documentation [Compiling for Android](https://docs.godotengine.org/en/stable/contributing/development/compiling/compiling_for_android.html)
-
-```
-scons platform=android arch=x86_64 target=template_debug ANDROID_HOME=C:\Users\Admin\AppData\Local\Android\Sdk
-scons platform=android arch=x86_64 target=template_release ANDROID_HOME=C:\Users\Admin\AppData\Local\Android\Sdk lto=full
-```
-#### For Android arm64
-Ensure you have an <b>Android SDK</b> (you can download <b>Android Studio</b> and get all the things you need from there). Here is some useful documentation [Compiling for Android](https://docs.godotengine.org/en/stable/contributing/development/compiling/compiling_for_android.html)
-
-```
-scons platform=android arch=arm64 target=template_debug ANDROID_HOME=C:\Users\Admin\AppData\Local\Android\Sdk
-scons platform=android arch=arm64 target=template_release ANDROID_HOME=C:\Users\Admin\AppData\Local\Android\Sdk lto=full
-```
-
-#### For Web
-You need [emscripten SDK](https://emscripten.org/docs/getting_started/downloads.html). Put <b>emsdk</b> and emscripten's location inside environment variable <b>Path</b>.
-Before trying to compile for web, each time you open your command terminal you need to run this
-```
-emsdk activate latest
-```
-
-After than run each of these:
-```
-scons platform=web target=template_debug
-scons platform=web target=template_release lto=full
-```
-
-#### For IOS and macOS
-Research on which toolchain you need for <b>IOS</b> and for <b>macOS</b>, download them and then run the same scons commands, but for your desired platform and other desired arguments.
-See the official [GDExtension Documentation](https://docs.godotengine.org/en/stable/tutorials/scripting/gdextension/index.html) or search for some tutorials online. Sadly <b>GDExtenstion</b> is not well documented, so you might spend some time searching. I recommend joining <b>Godot's Discord Server</b> it has a <b>gdnative-gdextension channel</b> so you might find some help there.
-  
-</details>
-
----
+[GDExtension C++ Tutorial](https://www.youtube.com/watch?v=I79u5KNl34o&t=1s)
 
 ## Support
 If you wish to support me you can do so here - https://ko-fi.com/realnikich or https://patreon.com/realnikich
