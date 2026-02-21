@@ -32,6 +32,8 @@ BlastBullets2D comes already compiled and ready for these platforms:
   <img src="showcase/example.gif" alt="BlastBullets2D - Showcase Gif" width="500"/>
 </p>
 
+Check out [The Official Trailer Of BlastBullets2D](https://www.youtube.com/watch?v=OJK7201pzsE)
+
 If you're developing a bullet-hell shooter or any game that involves a high number of 2D bullets, **BlastBullets2D** provides a powerful and easy-to-use solution that delivers **outstanding performance** inside Godot Engine.
 
 The main advantages to using this custom built plugin:
