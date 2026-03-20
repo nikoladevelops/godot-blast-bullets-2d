@@ -33,6 +33,8 @@ BlastBullets2D comes already compiled and ready for these platforms:
 
 [The Official Trailer Of BlastBullets2D](https://www.youtube.com/watch?v=OJK7201pzsE)
 
+[BlastBullets2D Features Showcase](https://www.youtube.com/watch?v=SeyD1YVIZss)
+
 [BlastBullets2D TUTORIAL PART 1](https://www.youtube.com/watch?v=L10sHF4BnLs)
 
 [BlastBullets2D TUTORIAL PART 2](https://www.youtube.com/watch?v=R2olIyF7aPQ)
