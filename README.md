@@ -22,7 +22,6 @@ BlastBullets2D comes already compiled and ready for these platforms:
 
 **BlastBullets2D** integrates seamlessly into your Godot project. You do not need any knowledge of C++ to use it. Everything is controlled through **GDScript**, made possible by Godot’s [GDExtension](https://docs.godotengine.org/en/stable/tutorials/scripting/gdextension/what_is_gdextension.html) system.
 
-[GDExtension C++ Tutorial](https://www.youtube.com/watch?v=I79u5KNl34o&t=1s)
 
 ---
 
@@ -32,7 +31,16 @@ BlastBullets2D comes already compiled and ready for these platforms:
   <img src="showcase/example.gif" alt="BlastBullets2D - Showcase Gif" width="500"/>
 </p>
 
-Check out [The Official Trailer Of BlastBullets2D](https://www.youtube.com/watch?v=OJK7201pzsE)
+[The Official Trailer Of BlastBullets2D](https://www.youtube.com/watch?v=OJK7201pzsE)
+
+[BlastBullets2D TUTORIAL PART 1](https://www.youtube.com/watch?v=L10sHF4BnLs)
+
+[BlastBullets2D TUTORIAL PART 2](https://www.youtube.com/watch?v=R2olIyF7aPQ)
+
+[Old Video Showcasing The Plugin](https://www.youtube.com/watch?v=eMvR3UWXtH0)
+
+[GDExtension C++ Tutorial](https://www.youtube.com/watch?v=I79u5KNl34o&t=1s)
+
 
 If you're developing a bullet-hell shooter or any game that involves a high number of 2D bullets, **BlastBullets2D** provides a powerful and easy-to-use solution that delivers **outstanding performance** inside Godot Engine.
 
@@ -135,6 +143,12 @@ If you want to benchmark/compare performance of `BlastBullets2D` bullets to `Are
 ---
 ## How To Use
 When designing the API, I've ensured that it's as easy as possible for anyone no matter the skill level to use this plugin.
+
+It is recommended to watch these tutorials if you are struggling with the documentation:
+
+[BlastBullets2D TUTORIAL PART 1](https://www.youtube.com/watch?v=L10sHF4BnLs)
+
+[BlastBullets2D TUTORIAL PART 2](https://www.youtube.com/watch?v=R2olIyF7aPQ)
 
 Here is how the basic setup goes:
 1. Add a `BulletFactory2D` node to your scene tree. The BulletFactory's job is to spawn bullets and manage plugin related options (debugger, physics interpolations and so on..).
