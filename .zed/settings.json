@@ -87,12 +87,12 @@
     "README.md",
     "SConstruct",
     ".gitignore",
-    ".github",
-    "godot-cpp"
+    //".github",
+    "godot-cpp",
   ],
   "project_panel": {
-    "auto_reveal_entries": false
+    "auto_reveal_entries": false,
   },
   "ensure_final_newline_on_save": true,
-  "remove_trailing_whitespace_on_save": true
+  "remove_trailing_whitespace_on_save": true,
 }

@@ -115,7 +115,7 @@ jobs:
             { platform: android, arch: arm64, os: ubuntu-22.04 },
             { platform: ios, arch: arm64, os: macos-latest },
             { platform: web, arch: wasm32, os: ubuntu-22.04, threads: "no" },
-            { platform: web, arch: wasm32, os: ubuntu-22.04, threads: "yes" }
+            { platform: web, arch: wasm32, os: ubuntu-22.04, threads: "yes" },
           ]
         target-type: ${{ fromJson(needs.set-matrix.outputs.target_types) }}
         float-precision: ${{ fromJson(needs.set-matrix.outputs.float_precisions) }}
@@ -178,8 +178,10 @@ jobs:
 
           LTO_FLAG=""
           if [[ "${{ github.event.inputs.lto }}" = "auto" && "${{ matrix.target-type }}" = "template_release" ]]; then
-            if [[ "${{ matrix.target.platform }}" = "linux" || "${{ matrix.target.platform }}" = "windows" || "${{ matrix.target.platform }}" = "macos" || "${{ matrix.target.platform }}" = "android" || "${{ matrix.target.platform }}" = "ios" ]]; then
+            if [[ "${{ matrix.target.platform }}" = "linux" || "${{ matrix.target.platform }}" = "macos" || "${{ matrix.target.platform }}" = "android" || "${{ matrix.target.platform }}" = "ios" ]]; then
               LTO_FLAG=" lto=auto"
+            elif [[ "${{ matrix.target.platform }}" = "windows" ]]; then
+              echo "WARNING: LTO explicitly disabled for Windows MinGW to prevent template linking crashes."
             elif [[ "${{ matrix.target.platform }}" = "web" ]]; then
               if [[ "${{ matrix.target.threads }}" = "no" ]]; then
                 LTO_FLAG=" lto=auto"
