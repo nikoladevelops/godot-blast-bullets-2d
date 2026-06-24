@@ -494,7 +494,7 @@ protected:
 	int amount_bullets = 0;
 
 	// Pointer to the multimesh instead of always calling the get method
-	MultiMesh *multi = nullptr;
+	Ref<MultiMesh> multi = nullptr;
 
 	// The user can pass any custom data they desire and have access to it in the area_entered and body_entered function callbacks
 	Ref<Resource> bullets_custom_data;
@@ -1240,7 +1240,7 @@ protected:
 		++current_bullet_collision_amount;
 
 		const bool bullet_reached_max_collisions = bullet_max_collision_count > 0 && current_bullet_collision_amount >= bullet_max_collision_count;
-		
+
 		// Only disable the bullet if the max collision count is greater than 0, otherwise the bullet should never be disabled due to collisions
 		if (bullet_reached_max_collisions) {
 			disable_bullet(bullet_index, false); // Don't disable the attachment yet, first emit the signal for collision so user has access to the attachment and CAN detach it himself inside GDScript

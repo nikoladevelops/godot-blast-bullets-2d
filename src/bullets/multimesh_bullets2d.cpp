@@ -264,7 +264,10 @@ void MultiMeshBullets2D::set_up_bullet_instances(const MultiMeshBulletsData2D &d
 }
 
 void MultiMeshBullets2D::generate_multimesh() {
-	multi = memnew(MultiMesh);
+    Ref<MultiMesh> new_multi;
+    new_multi.instantiate();
+
+	multi = new_multi;
 	set_multimesh(multi);
 }
 
