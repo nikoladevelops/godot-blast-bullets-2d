@@ -1,25 +1,14 @@
-import os
-import sys
 import subprocess
+import sys
 from pathlib import Path
-import platform
-import re
-from typing import Optional
 
-# Constants
+from config_manager import config
+from paths import DOCS_SOURCE_DIR, PROJECT_ROOT, get_godot_project_dir
+from scons_helpers import clear_screen
+
 TOOL_HEADER = "Tool For Generating XML Editor Documentation By @realNikich"
-SCRIPT_DIR = Path(__file__).resolve().parent
-ROOT_DIR = SCRIPT_DIR.parent
-PROJECT_DIR = ROOT_DIR / "test_project"
-DONT_TOUCH_FILE = ROOT_DIR / "dont_touch.txt"
-GODOT_PATTERN = r"Godot|godot"
-VALID_EXECUTABLE_EXTENSIONS = {
-    "Windows": ".exe",
-    "Linux": "",
-    "Darwin": ""  # macOS
-}
-DOCS_OUTPUT_DIR = ROOT_DIR / "doc_classes"
-GODOT_DOCS_URL = "https://docs.godotengine.org/en/stable/tutorials/scripting/gdextension/gdextension_docs_system.html#documentation-styling"
+GODOT_DOCS_URL = "https://docs.godotengine.org/en/stable/tutorials/scripting/cpp/gdextension_docs_system.html"
+
 
 def print_header() -> None:
     """Display the tool's header and instructions."""
@@ -28,173 +17,75 @@ def print_header() -> None:
     print(f"{'=' * 80}")
     print("This tool generates XML documentation for your GDExtension plugin.")
 
+
 def display_warning() -> None:
-    """Display warnings about requirements for generating documentation."""
+    """Display warnings about requirements for generating documentation and handle prompt cancellation."""
+    project_dir = get_godot_project_dir()
     print(f"\n{'!' * 80}")
-    print("WARNING: The Godot Engine test_project MUST be open in the Godot Editor!")
-    print(f"Please open '{PROJECT_DIR / 'project.godot'}' in Godot and keep the editor running.")
-    print("Documentation will NOT be generated if the project is not open.")
-    print("\nWARNING: Before trying to generate XML documentation, ensure you have a 'bin' folder")
-    print("with the necessary binaries. If you have used the renaming feature recently, you must")
-    print("recompile the project and try again.")
+    print("IMPORTANT WORKFLOW INSTRUCTIONS:")
+    print("1. Ensure the Godot Editor is CLOSED before compiling and generating docs.")
+    print("   (Having the editor open locks the GDExtension binary and prevents SCons from")
+    print("   updating it, which causes doctool to miss your custom classes).")
+    print("2. Ensure you have recently compiled your plugin (debug/release build) so that")
+    print("   the test project's 'bin' folder contains the latest compiled binary.")
+    print(f"\nTarget Godot Project Directory: {project_dir}")
     print(f"{'!' * 80}")
-    input("\nPress any key to continue... ")
 
-def normalize_path(user_input: str) -> Optional[Path]:
-    """Convert user input into a resolved Path object, handling quotes and errors."""
-    cleaned_input = user_input.strip().strip('"').strip("'")
-    try:
-        return Path(cleaned_input).expanduser().resolve()
-    except Exception as e:
-        print(f"Error normalizing path '{cleaned_input}': {e}")
-        return None
+    choice = input("\nPress Enter to continue, or type 'q' to cancel: ").strip().lower()
+    if choice == "q":
+        print("\nOperation cancelled by user.")
+        sys.exit(0)
 
-def handle_macos_app_bundle(path: Path) -> Path:
-    """Resolve macOS .app bundles to the internal executable."""
-    if platform.system() == "Darwin" and path.suffix == ".app":
-        executable_path = path / "Contents" / "MacOS" / "Godot"
-        return executable_path if executable_path.is_file() else path
-    return path
 
-def find_godot_executable_in_dir(directory: Path) -> Optional[str]:
-    """Search for a Godot executable in the given directory."""
-    os_name = platform.system()
-    ext = VALID_EXECUTABLE_EXTENSIONS.get(os_name, "")
-    godot_regex = re.compile(GODOT_PATTERN + re.escape(ext) + r"$", re.IGNORECASE)
+def print_documentation_guide() -> None:
+    """Print formatting guidelines and BBCode attribute syntax directly to the user."""
+    print(f"\n{'=' * 80}")
+    print(f"{'GODOT XML DOCUMENTATION QUICK GUIDE':^80}")
+    print(f"{'=' * 80}")
+    print(f"Once generated, your XML files are located in: '{DOCS_SOURCE_DIR}'")
+    print("You can style descriptions using BBCode-style tags inside the text fields:\n")
 
-    if not directory.is_dir():
-        return None
+    print("1. CROSS-REFERENCING CLASSES & MEMBERS:")
+    print("    • [Node2D]                    -> Links to another class reference.")
+    print("    • [method Node.add_child]    -> Links to a specific method.")
+    print("    • [member Node2D.position] -> Links to a class property.")
+    print("    • [param spawn_pos]        -> Highlights a method parameter name.")
+    print("    • [constant OK]            -> Links to an enum or constant value.\n")
 
-    for entry in directory.iterdir():
-        if entry.is_file() and godot_regex.search(entry.name):
-            return str(entry)
-    return None
+    print("2. FORMATTING & CODE EXAMPLES:")
+    print("    • [code]true[/code]         -> Inline monospaced code styling.")
+    print("    • [codeblock]")
+    print("      var factory = BulletFactory2D.new()")
+    print("      factory.spawn()")
+    print("      [/codeblock]              -> Multi-line code block display.")
+    print("    • [b]bold text[/b]         -> Bold emphasis formatting.")
+    print("    • [i]italic text[/i]       -> Italic emphasis formatting.")
+    print(f"{'=' * 80}\n")
 
-def check_system_path() -> Optional[str]:
-    """Check if 'godot' is in the system PATH and is a valid executable."""
-    print("Checking for Godot executable in system PATH...")
-    try:
-        result = subprocess.run(
-            ["godot", "--version"],
-            capture_output=True,
-            text=True,
-            timeout=5,
-            check=True,
-            shell=platform.system() == "Windows"
-        )
-        if "Godot Engine" in result.stdout:
-            print("Godot executable found in system PATH.")
-            return "godot"
-    except (subprocess.CalledProcessError, FileNotFoundError, subprocess.TimeoutExpired):
-        print("Godot executable not found in system PATH.")
-    return None
 
-def read_cached_path() -> Optional[str]:
-    """Read and validate the cached Godot executable path from dont_touch.txt."""
-    print(f"Checking for cached path in '{DONT_TOUCH_FILE}'...")
-    if not DONT_TOUCH_FILE.exists():
-        print("Cache file does not exist.")
-        return None
-
-    try:
-        with open(DONT_TOUCH_FILE, "r", encoding="utf-8") as f:
-            lines = f.readlines()
-
-        if len(lines) < 3:
-            print("Cache file is malformed or too short.")
-            return None
-
-        cached_path = lines[2].strip()
-        path = Path(cached_path)
-        resolved_path = handle_macos_app_bundle(path)
-
-        if resolved_path.is_file() and re.search(GODOT_PATTERN, resolved_path.name, re.IGNORECASE):
-            print(f"Valid Godot path found in cache: {cached_path}")
-            return cached_path
-        else:
-            print(f"Invalid path in cache: '{cached_path}'. File is missing or not a valid Godot executable.")
-            return None
-    except Exception as e:
-        print(f"Error reading cache file: {e}")
-        return None
-
-def prompt_for_path() -> Optional[str]:
-    """Prompt user for a Godot executable path, handling files and directories."""
-    print("\n")
-    print("No valid Godot executable found.")
-    print("Type 'q' to quit or enter path manually.\n")
-    while True:
-        user_input = input(
-            "Enter the folder path or full path to your Godot executable "
-            "(if a folder, the executable must be directly inside): "
-        ).strip()
-        if user_input.lower() == "q":
-            sys.exit(0)
-
-        path = normalize_path(user_input)
-        if not path or not path.exists():
-            print("Path does not exist or is invalid. Please try again.\n")
-            continue
-
-        resolved_path = handle_macos_app_bundle(path)
-        if resolved_path.is_file() and re.search(GODOT_PATTERN, resolved_path.name, re.IGNORECASE):
-            return str(resolved_path)
-        elif resolved_path.is_dir():
-            exe_path = find_godot_executable_in_dir(resolved_path)
-            if exe_path:
-                return exe_path
-            else:
-                print(
-                    "No Godot executable found in directory (looking for 'Godot' or 'godot' in filename). "
-                    "Ensure it’s directly inside or provide the full path.\n"
-                )
-        else:
-            print("Path is neither a file nor a directory. Please try again.\n")
-
-def update_cached_path(new_path: str) -> None:
-    """Update the cached Godot executable path in dont_touch.txt."""
-    print(f"Caching new Godot executable path to '{DONT_TOUCH_FILE}'...")
-    lines = []
-    if DONT_TOUCH_FILE.exists():
-        try:
-            with open(DONT_TOUCH_FILE, "r", encoding="utf-8") as f:
-                lines = f.readlines()
-        except Exception as e:
-            print(f"Warning: Could not read existing cache file. Creating a new one. Error: {e}")
-
-    while len(lines) < 3:
-        lines.append("\n")
-    lines[2] = f"{new_path}\n"
-
-    try:
-        DONT_TOUCH_FILE.parent.mkdir(parents=True, exist_ok=True)
-        with open(DONT_TOUCH_FILE, "w", encoding="utf-8") as f:
-            f.writelines(lines)
-        print("Cache updated successfully.")
-    except Exception as e:
-        print(f"Warning: Failed to update cache file. Error: {e}")
-
-def validate_project_directory() -> bool:
+def validate_project_directory(project_dir: Path) -> bool:
     """Validate that the project directory contains a valid Godot project."""
-    if not PROJECT_DIR.is_dir() or not (PROJECT_DIR / "project.godot").is_file():
-        print(f"Error: The project directory at '{PROJECT_DIR}' is not a valid Godot project.")
+    if not project_dir.is_dir() or not (project_dir / "project.godot").is_file():
+        print(f"Error: The project directory at '{project_dir}' is not a valid Godot project.")
+        print("Please check your configuration or run 'Select Godot Project Folder'.")
         return False
     return True
 
-def generate_docs(godot_exec: str) -> bool:
-    """Run the Godot executable to generate documentation."""
-    if not validate_project_directory():
+
+def generate_docs(godot_exec: str, project_dir: Path) -> bool:
+    """Run the Godot executable to generate documentation via --doctool."""
+    if not validate_project_directory(project_dir):
         return False
 
     print(f"\nUsing Godot executable: {godot_exec}")
-    print(f"Project directory (CWD): {PROJECT_DIR}")
-    print(f"Documentation output directory: {ROOT_DIR}")
+    print(f"Project directory (CWD): {project_dir}")
+    print(f"Documentation output directory: {PROJECT_ROOT}")
 
     command = [
-        str(godot_exec),  # Ensure path is string for compatibility
+        str(godot_exec),
         "--doctool",
-        str(ROOT_DIR.resolve()),  # Absolute path for output directory
-        "--gdextension-docs"
+        str(PROJECT_ROOT.resolve()),
+        "--gdextension-docs",
     ]
 
     print(f"Running command: {' '.join(command)}")
@@ -202,44 +93,61 @@ def generate_docs(godot_exec: str) -> bool:
     try:
         result = subprocess.run(
             command,
-            cwd=str(PROJECT_DIR.resolve()),  # Run from project directory
+            cwd=str(project_dir.resolve()),
             capture_output=True,
             text=True,
             check=True,
-            encoding="utf-8"
+            encoding="utf-8",
         )
         print("\nDocumentation generated successfully.")
-        print(f"Godot Output (stdout):\n{result.stdout.strip()}")
+        if result.stdout.strip():
+            print(f"Godot Output (stdout):\n{result.stdout.strip()}")
         return True
     except subprocess.CalledProcessError as e:
         print("\nERROR: Failed to generate documentation. Godot exited with an error.")
         print(f"Error Details (stderr):\n{e.stderr.strip()}")
-        print(f"Output (stdout):\n{e.stdout.strip()}\n")
+        if e.stdout.strip():
+            print(f"Output (stdout):\n{e.stdout.strip()}\n")
         return False
     except FileNotFoundError:
-        print(f"\nERROR: The executable '{godot_exec}' was not found. Please check the path.")
+        print(f"\nERROR: The executable '{godot_exec}' was not found. Please check your active path.")
         return False
     except Exception as e:
         print(f"\nAn unexpected error occurred while running the executable: {e}\n")
         return False
 
+
 def main() -> None:
     """Main entry point for the script."""
+    clear_screen()
     print_header()
+
+    godot_executable = config.getGodotActivePath()
+    project_dir = get_godot_project_dir()
+
+    if not godot_executable:
+        print("\n[!] ERROR: No active Godot Engine executable path found in configuration.")
+        print("Please run option ('Select Godot Engine Executable Path') from the main setup menu first")
+        print("to configure and select a valid Godot executable before generating documentation.")
+        input("\nPress Enter to exit...")
+        return
+
     display_warning()
 
-    godot_executable = check_system_path() or read_cached_path() or prompt_for_path()
-
-    if godot_executable:
-        update_cached_path(godot_executable)
-        if generate_docs(godot_executable):
-            print(f"\nDone! Check the '{DOCS_OUTPUT_DIR}' folder and add custom documentation to the files!")
-            print(f"Find out more here: {GODOT_DOCS_URL}")
-            print("\nAfter writing your custom documentation inside the files, you need to recompile again!")
+    if generate_docs(godot_executable, project_dir):
+        print(f"\nDone! Check the '{DOCS_SOURCE_DIR}' folder and customize your XML files.")
+        print_documentation_guide()
+        print(f"Official Documentation Reference: {GODOT_DOCS_URL}")
+        print("\nAfter writing your custom documentation inside the files, remember to recompile your project!")
     else:
-        print("\nExiting. No Godot executable could be found or provided.")
+        print("\nDocumentation generation process failed.")
 
     input("\nPress Enter to exit...")
 
+
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except KeyboardInterrupt:
+        print("\nOperation cancelled.")
+        sys.exit(0)

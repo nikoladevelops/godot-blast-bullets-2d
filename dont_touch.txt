@@ -1,3 +1,0 @@
-blastbullets2d
-4.5
-B:\GodotEngine\Godot_v4.6-stable_win64.exe
