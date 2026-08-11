@@ -393,7 +393,7 @@ tick the checkbox inside the inspector in BulletFactory2D. That's all, enjoy the
 
 ## How To Compile
 
-Fork the repository, then go inside the GitHub Actions tab, and run the workflow for `full_plugin_compilation`, instead of `debug`. This easy process is due to using [godot-plus-plus template](https://github.com/nikoladevelops/godot-plus-plus) - allows for cross platform easy workflow when making Godot C++ GDExtension plugins.
+Fork the repository, then go inside the GitHub Actions tab, and run the workflow. This easy process is due to using [godot-plus-plus template](https://github.com/nikoladevelops/godot-plus-plus) - allows for cross platform easy workflow when making Godot C++ GDExtension plugins.
 
 [GDExtension C++ Tutorial](https://www.youtube.com/watch?v=I79u5KNl34o&t=1s)
 
