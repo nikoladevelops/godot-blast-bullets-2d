@@ -1,8 +1,8 @@
 [gd_scene format=3 uid="uid://cjrcvxa7bnus"]
 
 [ext_resource type="Script" uid="uid://dpcvrqqwn57li" path="res://shared/enemies/enemy_turret/enemy_turret.gd" id="1_3gihl"]
-[ext_resource type="Texture2D" uid="uid://cwp0gxby36cg6" path="res://shared/art/enemy_turret/enemy_turret_holder.png" id="1_me7l0"]
-[ext_resource type="Texture2D" uid="uid://c2rlnm8rihr33" path="res://shared/art/enemy_turret/enemy_turret.png" id="2_wqeu6"]
+[ext_resource type="Texture2D" uid="uid://dwewxrfjic31m" path="res://shared/art/enemy_turret/enemy_turret_holder.png" id="1_me7l0"]
+[ext_resource type="Texture2D" uid="uid://ckhv0nqgp6e53" path="res://shared/art/enemy_turret/enemy_turret.png" id="2_wqeu6"]
 [ext_resource type="PackedScene" uid="uid://d17ruamw4uuqo" path="res://shared/components/health_bar_component/health_bar_component.tscn" id="4_1br1k"]
 
 [sub_resource type="CircleShape2D" id="CircleShape2D_hvh1d"]

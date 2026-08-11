@@ -1,7 +1,7 @@
 [gd_scene format=3 uid="uid://331neay58a3r"]
 
 [ext_resource type="Script" uid="uid://cbte70d3pv4s6" path="res://shared/bullet_attachment_nodes/light_attachment.gd" id="1_cqoog"]
-[ext_resource type="Texture2D" uid="uid://ns0t5t3knsp4" path="res://shared/art/light/light_texture.png" id="2_qbtnj"]
+[ext_resource type="Texture2D" uid="uid://b36wg4ut31vkd" path="res://shared/art/light/light_texture.png" id="2_qbtnj"]
 
 [sub_resource type="CanvasItemMaterial" id="CanvasItemMaterial_qbtnj"]
 blend_mode = 1

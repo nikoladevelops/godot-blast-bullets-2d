@@ -2,11 +2,11 @@
 
 [ext_resource type="Script" uid="uid://vmu7hbo17mwy" path="res://shared/enemies/enemy_ship/enemy_ship.gd" id="1_vp35s"]
 [ext_resource type="PackedScene" uid="uid://d17ruamw4uuqo" path="res://shared/components/health_bar_component/health_bar_component.tscn" id="2_eiqo5"]
-[ext_resource type="Texture2D" uid="uid://bdsdupca1ibhw" path="res://shared/art/enemy_ship/enemy_ship_idle.png" id="3_qmcsm"]
-[ext_resource type="Texture2D" uid="uid://dime8axs0b5qx" path="res://shared/art/enemy_ship/enemy_ship1.png" id="4_y57bp"]
-[ext_resource type="Texture2D" uid="uid://dvhnjj7wx3b5u" path="res://shared/art/enemy_ship/enemy_ship2.png" id="5_0uxn5"]
-[ext_resource type="Texture2D" uid="uid://cq5y75kkhpwg0" path="res://shared/art/enemy_ship/enemy_ship3.png" id="6_kh4be"]
-[ext_resource type="Texture2D" uid="uid://c32od4xymubg6" path="res://shared/art/enemy_ship/enemy_ship4.png" id="7_iuadr"]
+[ext_resource type="Texture2D" uid="uid://disnto0bjt2ve" path="res://shared/art/enemy_ship/enemy_ship_idle.png" id="3_qmcsm"]
+[ext_resource type="Texture2D" uid="uid://dtf3i5meggref" path="res://shared/art/enemy_ship/enemy_ship1.png" id="4_y57bp"]
+[ext_resource type="Texture2D" uid="uid://jtdl4riwj5ct" path="res://shared/art/enemy_ship/enemy_ship2.png" id="5_0uxn5"]
+[ext_resource type="Texture2D" uid="uid://cii0pcggbs1r2" path="res://shared/art/enemy_ship/enemy_ship3.png" id="6_kh4be"]
+[ext_resource type="Texture2D" uid="uid://bu8jsj3o5kewt" path="res://shared/art/enemy_ship/enemy_ship4.png" id="7_iuadr"]
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_c1d14"]
 size = Vector2(116, 117)
@@ -20,7 +20,7 @@ animations = [{
 "duration": 1.0,
 "texture": ExtResource("3_qmcsm")
 }],
-"loop": true,
+"loop": 1,
 "name": &"idle",
 "speed": 5.0
 }, {
@@ -37,7 +37,7 @@ animations = [{
 "duration": 1.0,
 "texture": ExtResource("7_iuadr")
 }],
-"loop": true,
+"loop": 1,
 "name": &"moving",
 "speed": 12.0
 }]
