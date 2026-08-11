@@ -13,6 +13,6 @@
   "selectedBuildProfile": "build_profile.json",
   "extensionApiPath": "godot-cpp/gdextension/extension_api-4-5.json",
   "reloadable": true,
-  "editorTargetMode": "release",
+  "editorTargetMode": "debug",
   "debugSymbols": "no"
 }

@@ -2,7 +2,10 @@ import os
 
 from tools.apple_helpers import build_apple_framework
 from tools.config_manager import config
-from tools.gdextension_file_helper import sync_gdextension_to_target_project
+from tools.gdextension_file_helper import (
+    force_editor_target_to_release,
+    sync_gdextension_to_target_project,
+)
 from tools.paths import DOCS_SOURCE_DIR
 from tools.scons_build_helpers import (
     find_sources,
@@ -17,6 +20,9 @@ if not os.environ.get("CI") and not os.environ.get("SKIP_SYNC"):
     sync_gdextension_to_target_project()
 else:
     print("Skipping target project synchronization (CI/Runner environment detected).")
+
+    print("Ensuring that Godot Editor loads release builds of your plugin always. Editing .gdextension file..")
+    force_editor_target_to_release() # Force Godot Editor to use the template_release builds by editing the .gdextension file (doesn't touch config.json)
 
 # Base Configuration Setup
 libname = config.getPluginName()

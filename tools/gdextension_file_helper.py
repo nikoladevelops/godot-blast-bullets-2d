@@ -57,7 +57,7 @@ def purge_old_project_gdextension(old_name: str) -> None:
             print(f"Warning: Could not remove locked file {ext_file.name}: {e}")
 
 
-def set_editor_target_mode(mode: str, file_path: Path | None = None) -> None:
+def set_editor_target_mode(mode: str, file_path: Path | None = None, sync: bool = True) -> None:
     """
     Updates all `.debug` target entries in [libraries] and [dependencies] inside the
     .gdextension file to point to either 'template_debug' binaries (mode="debug")
@@ -101,7 +101,17 @@ def set_editor_target_mode(mode: str, file_path: Path | None = None) -> None:
         updated_lines.append(line)
 
     target_path.write_text("\n".join(updated_lines) + "\n", encoding="utf-8")
-    sync_gdextension_to_target_project()
+
+    if sync:
+        sync_gdextension_to_target_project()
+
+
+def force_editor_target_to_release(file_path: Path | None = None) -> None:
+    """
+    Forces the .gdextension manifest to point all editor target bindings to
+    'template_release' WITHOUT triggering synchronization. Safe for CI environments.
+    """
+    set_editor_target_mode("release", file_path=file_path, sync=False)
 
 
 def set_reloadable(reloadable: bool, file_path: Path | None = None) -> None:
