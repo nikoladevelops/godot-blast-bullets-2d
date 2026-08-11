@@ -3,14 +3,6 @@ name: Build GDExtension Cross Platform Plugin
 on:
   workflow_dispatch:
     inputs:
-      build_type:
-        description: "Select build type (debug or full_plugin_compilation)"
-        required: true
-        type: choice
-        options:
-          - debug
-          - full_plugin_compilation
-        default: debug
       lto_linux:
         description: "LTO mode for Linux builds"
         required: true
@@ -111,12 +103,7 @@ jobs:
       - name: Set matrix values
         id: set-matrix
         run: |
-          if [ "${{ github.event.inputs.build_type }}" = "full_plugin_compilation" ]; then
-            TARGET_TYPES='["template_debug", "template_release"]'
-          else
-            TARGET_TYPES='["template_debug"]'
-          fi
-          echo "target_types=$TARGET_TYPES" >> $GITHUB_OUTPUT
+          echo "target_types=['template_release']" >> $GITHUB_OUTPUT
 
   clear-cache:
     runs-on: ubuntu-22.04
@@ -262,7 +249,7 @@ jobs:
           }
 
           $ltoFlag = ""
-          if ("${{ matrix.target-type }}" -eq "template_release" -and "${{ matrix.target.lto_input }}" -ne "none") {
+          if ("${{ matrix.target.lto_input }}" -ne "none") {
               $ltoFlag = " lto=${{ matrix.target.lto_input }}"
           }
 
@@ -280,7 +267,7 @@ jobs:
           fi
 
           LTO_FLAG=""
-          if [ "${{ matrix.target-type }}" = "template_release" ] && [ "${{ matrix.target.lto_input }}" != "none" ]; then
+          if [ "${{ matrix.target.lto_input }}" != "none" ]; then
             LTO_FLAG=" lto=${{ matrix.target.lto_input }}"
           fi
 
