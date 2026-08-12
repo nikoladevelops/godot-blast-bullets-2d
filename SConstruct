@@ -66,17 +66,15 @@ bundle_id_prefix = env.get('bundle_id_prefix', 'com.gdextension')
 env.Append(CPPPATH=include_dirs)
 sources = find_sources(source_dirs, source_exts)
 
-# Bind Documentation Generation
-is_debug_target = env.get("target") == "template_debug"
-editor_target_mode = config.getEditorTargetMode()
-
-if is_debug_target or (env.get("target") == "template_release" and editor_target_mode == "release"):
-    try:
-        doc_output_file = os.path.join(doc_output_dir, 'doc_data.gen.cpp')
-        doc_data = env.GodotCPPDocData(doc_output_file, source=Glob(str(DOCS_SOURCE_DIR / "*.xml")))
+# Bind Documentation Generation (in both template_debug and template_release builds)
+try:
+    doc_output_file = os.path.join(doc_output_dir, 'doc_data.gen.cpp')
+    xml_files = Glob(str(DOCS_SOURCE_DIR / "*.xml"))
+    if xml_files:
+        doc_data = env.GodotCPPDocData(doc_output_file, source=xml_files)
         sources.append(doc_data)
-    except AttributeError:
-        print("Skipping class reference (pre-4.3 baseline target).")
+except AttributeError:
+    print("Skipping class reference (pre-4.3 baseline target).")
 
 lib_filename = get_library_filename(env, libname, precision)
 build_target = env.get('target')

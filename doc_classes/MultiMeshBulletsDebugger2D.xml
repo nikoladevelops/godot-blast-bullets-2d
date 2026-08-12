@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8" ?>
-<class name="MultiMeshBulletsDebugger2D" inherits="Node" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/godotengine/godot/master/doc/class.xsd">
+<class name="MultiMeshBulletsDebugger2D" inherits="Node" api_type="extension" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/godotengine/godot/master/doc/class.xsd">
 	<brief_description>
 		Debugger for the collision shapes of the bullets.
 		This class is only meant to be used by the [BulletFactory2D] inside C++.

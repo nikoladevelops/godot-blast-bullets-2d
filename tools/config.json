@@ -8,7 +8,7 @@
       "version": "4.7.1.stable.arch_linux.a13da4feb"
     }
   ],
-  "godotProjectFolder": "/home/nik/Coding/godot-plus-plus/test_project",
+  "godotProjectFolder": "/home/nik/Coding/godot-blast-bullets-2d/test_project",
   "ltoMode": "auto",
   "selectedBuildProfile": "build_profile.json",
   "extensionApiPath": "godot-cpp/gdextension/extension_api-4-5.json",

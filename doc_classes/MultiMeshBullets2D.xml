@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8" ?>
-<class name="MultiMeshBullets2D" inherits="MultiMeshInstance2D" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/godotengine/godot/master/doc/class.xsd">
+<class name="MultiMeshBullets2D" inherits="MultiMeshInstance2D" api_type="extension" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/godotengine/godot/master/doc/class.xsd">
 	<brief_description>
 		This class is only meant to be inherited by other C++ classes. Never use this by its own. Always use the [BulletFactory2D], that's the only proper way.
 	</brief_description>
@@ -591,7 +591,7 @@
 			<return type="void" />
 			<param index="0" name="array_of_layers" type="int[]" />
 			<description>
-				Sets the collision layer of the multimesh by providing an array of integers, where each integer represents a layer to be added to the collision layer. 
+				Sets the collision layer of the multimesh by providing an array of integers, where each integer represents a layer to be added to the collision layer.
 			</description>
 		</method>
 		<method name="set_collision_mask">
@@ -605,7 +605,7 @@
 			<return type="void" />
 			<param index="0" name="array_of_masks" type="int[]" />
 			<description>
-				Sets the collision mask of the multimesh by providing an array of integers, where each integer represents a mask to be added to the collision mask. 
+				Sets the collision mask of the multimesh by providing an array of integers, where each integer represents a mask to be added to the collision mask.
 			</description>
 		</method>
 		<method name="set_inherited_velocity_offset">
@@ -619,7 +619,7 @@
 			<return type="void" />
 			<param index="0" name="value" type="bool" />
 			<description>
-				Sets whether the multimesh is monitorable or not. 
+				Sets whether the multimesh is monitorable or not.
 			</description>
 		</method>
 		<method name="set_textures">

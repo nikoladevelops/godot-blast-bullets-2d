@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8" ?>
-<class name="BulletCurvesData2D" inherits="Resource" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/godotengine/godot/master/doc/class.xsd">
+<class name="BulletCurvesData2D" inherits="Resource" api_type="extension" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/godotengine/godot/master/doc/class.xsd">
 	<brief_description>
 		Holds data for controlling bullet movement and rotation using curves in 2D. Can override [BulletSpeedData2D] and [BulletRotationData2D].
 	</brief_description>
