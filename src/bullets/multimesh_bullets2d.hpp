@@ -14,6 +14,7 @@
 #include "godot_cpp/core/class_db.hpp"
 #include "godot_cpp/core/defs.hpp"
 #include "godot_cpp/core/math.hpp"
+#include "godot_cpp/core/math_defs.hpp"
 #include "godot_cpp/core/memory.hpp"
 #include "godot_cpp/core/object.hpp"
 #include "godot_cpp/core/print_string.hpp"
@@ -823,7 +824,7 @@ protected:
 		real_t target = curr_bullet_direction.angle();
 		real_t current = curr_bullet_transf.get_rotation();
 
-		real_t diff = Math::fposmod(target - current + Math_PI, Math_TAU) - Math_PI;
+		real_t diff = Math::fposmod(target - current + static_cast<real_t>(Math::PI), static_cast<real_t>(Math::TAU)) - static_cast<real_t>(Math::PI);
 		real_t step = curves_data->direction_curve_rotation_speed * (real_t)delta;
 
 		rotate_transform_locally(curr_bullet_transf, Math::clamp(diff, -step, step));

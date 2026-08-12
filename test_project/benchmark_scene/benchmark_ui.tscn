@@ -461,13 +461,13 @@ all_btns = [NodePath("../VBoxContainer/HBoxContainer/1"), NodePath("../VBoxConta
 metadata/_custom_type_script = "uid://cs67whos5iyl6"
 
 [node name="BulletSettingsView" type="Control" parent="." unique_id=303884450]
-layout_direction = 1
 layout_mode = 3
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
+layout_direction = 1
 mouse_filter = 2
 
 [node name="ZIndexContainer" type="VBoxContainer" parent="BulletSettingsView" unique_id=706732977]

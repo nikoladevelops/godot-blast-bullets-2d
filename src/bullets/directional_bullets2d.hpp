@@ -7,6 +7,7 @@
 #include "godot_cpp/classes/wrapped.hpp"
 #include "godot_cpp/core/defs.hpp"
 #include "godot_cpp/core/math.hpp"
+#include "godot_cpp/core/math_defs.hpp"
 #include "godot_cpp/variant/array.hpp"
 #include "godot_cpp/variant/callable.hpp"
 #include "godot_cpp/variant/typed_array.hpp"
@@ -575,7 +576,7 @@ public:
 
 	_ALWAYS_INLINE_ void all_bullets_set_orbiting_radius(real_t new_radius, int bullet_index_start = 0, int bullet_index_end_inclusive = -1) {
 		ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_set_orbiting_radius");
-		
+
 		for (int i = bullet_index_start; i <= bullet_index_end_inclusive; ++i) {
 			bullet_set_orbiting_radius(i, new_radius);
 		}
@@ -583,7 +584,7 @@ public:
 
 	_ALWAYS_INLINE_ void all_bullets_set_orbiting_direction(OrbitingDirection new_direction, int bullet_index_start = 0, int bullet_index_end_inclusive = -1) {
 		ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_set_orbiting_direction");
-		
+
 		for (int i = bullet_index_start; i <= bullet_index_end_inclusive; ++i) {
 			bullet_set_orbiting_direction(i, new_direction);
 		}
@@ -591,7 +592,7 @@ public:
 
 	_ALWAYS_INLINE_ void all_bullets_set_orbiting_texture_rotation(OrbitingTextureRotation new_rotation, int bullet_index_start = 0, int bullet_index_end_inclusive = -1) {
 		ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_set_orbiting_texture_rotation");
-		
+
 		for (int i = bullet_index_start; i <= bullet_index_end_inclusive; ++i) {
 			bullet_set_orbiting_texture_rotation(i, new_rotation);
 		}
@@ -1063,7 +1064,7 @@ public:
 
             // Calculate where the attachment should be now that the bullet moved
             Transform2D att_global_transf = calculate_attachment_global_transf(bullet_index, curr_bullet_transf);
-            
+
             // Update the cache
             attachment_transforms[bullet_index] = att_global_transf;
 
@@ -1073,7 +1074,7 @@ public:
             // Reset Godot's internal engine interpolation
             attachment_instance->reset_physics_interpolation();
         }
-		
+
 		// Reset physics interpolation data
 		update_bullet_previous_transform_for_interpolation(bullet_index);
 	}
@@ -1121,7 +1122,7 @@ public:
 
             // Calculate where the attachment should be now that the bullet moved
             Transform2D att_global_transf = calculate_attachment_global_transf(bullet_index, curr_bullet_transf);
-            
+
             // Update the cache
             attachment_transforms[bullet_index] = att_global_transf;
 
@@ -1309,8 +1310,8 @@ protected:
 
 	// Normalizes an angle to [-PI, PI]
 	_ALWAYS_INLINE_ void normalize_angle(real_t &angle) const {
-		angle = Math::wrapf(angle, -Math_PI, Math_PI);
-	}
+        angle = Math::wrapf(angle, -static_cast<real_t>(Math::PI), static_cast<real_t>(Math::PI));
+    }
 
 	// Updates the homing timer and checks if interval is reached
 	_ALWAYS_INLINE_ bool update_homing_timer(double delta) {

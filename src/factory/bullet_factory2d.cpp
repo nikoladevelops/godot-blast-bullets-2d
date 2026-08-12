@@ -12,6 +12,7 @@
 #include "godot_cpp/classes/global_constants.hpp"
 #include "godot_cpp/core/class_db.hpp"
 #include "godot_cpp/core/math.hpp"
+#include "godot_cpp/core/math_defs.hpp"
 #include "godot_cpp/variant/vector2.hpp"
 #include "godot_cpp/variant/vector3.hpp"
 #include "spawn-data/multimesh_bullets_data2d.hpp"
@@ -904,7 +905,7 @@ TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_grid(
 
 			// Apply random local rotation if enabled
 			if (random_local_rotation) {
-				real_t random_angle = UtilityFunctions::randf() * Math_TAU;
+				real_t random_angle = UtilityFunctions::randf() * Math::TAU;
 				new_transform = Transform2D(new_transform.get_rotation() + random_angle, new_transform.get_origin());
 			}
 
