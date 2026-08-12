@@ -100,10 +100,6 @@ jobs:
           PLUGIN_NAME=$(python3 -c "from tools.config_manager import config; print(config.getPluginName())")
           echo "plugin_name=$PLUGIN_NAME" >> $GITHUB_OUTPUT
 
-      - name: Force .gdextension manifest to release mode globally
-        run: |
-          python3 -c "from tools.gdextension_file_helper import force_editor_target_to_release; force_editor_target_to_release()"
-
       - name: Set matrix values
         id: set-matrix
         run: |
@@ -336,12 +332,15 @@ jobs:
             cp -R "icons" "$STAGING_DIR/icons"
           fi
 
+          # Force .gdextension manifest entries to release mode right before copying
+          python3 -c "from tools.gdextension_file_helper import force_editor_target_to_release; force_editor_target_to_release()"
+
           # Copy .gdextension manifest if it exists
           if [ -f "${{ env.PLUGIN_NAME }}.gdextension" ]; then
             cp "${{ env.PLUGIN_NAME }}.gdextension" "$STAGING_DIR/${{ env.PLUGIN_NAME }}.gdextension"
           fi
 
-          # Safely copy any README variant (README, README.md, README.txt, etc.) if it exists
+          # Safely copy any README variant if it exists
           find . -maxdepth 1 -iname "readme*" -type f | head -n 1 | while read -r readme_file; do
             if [ -n "$readme_file" ] && [ -f "$readme_file" ]; then
               cp "$readme_file" "$STAGING_DIR/"
@@ -349,7 +348,7 @@ jobs:
             fi
           done
 
-          # Safely copy any LICENSE variant (LICENSE, LICENSE.md, LICENSE.txt, etc.) if it exists
+          # Safely copy any LICENSE variant if it exists
           find . -maxdepth 1 -iname "license*" -type f | head -n 1 | while read -r license_file; do
             if [ -n "$license_file" ] && [ -f "$license_file" ]; then
               cp "$license_file" "$STAGING_DIR/"
