@@ -95,7 +95,7 @@ relative to their direction (allows zig zag patterns and any other creative patt
 
 - **Extensive Documentation** - Full in-editor documentation for every function and property, accessible directly within the Godot Inspector and Script Editor.
 
-- **Even Faster Release Builds** - Compiled with Link Time Optimization (LTO) for maximum runtime performance in your exported projects. Debug builds contain the in-engine docs, while release builds are automatically detected and used by Godot for the final release of your game.
+- **Even Faster Release Builds** - Compiled with Link Time Optimization (LTO) for maximum runtime performance in your exported projects. Release builds are used for both the editor and game release.
 
 - **....AND SO MUCH MORE** - Download the plugin and experiment with it right away! There is also a test_project.zip available where you can check out some of the features and benchmark against a normal Godot Area2D bullet implementation.
 
@@ -388,7 +388,10 @@ This is pretty much everything you need to know to get started. Practice with th
 You can also download the `test_project.zip` from the latest release and get a feel for it by modifying the `player_data_node.gd` script.
 
 For smooth bullets no matter the refresh rate enable physics interpolation in your project settings as well as
-tick the checkbox inside the inspector in BulletFactory2D. That's all, enjoy the plugin!
+tick the checkbox inside the inspector in `BulletFactory2D`. That's all, enjoy the plugin!
+
+## WARNING
+- Never override the `_ready` function inside `BulletFactory2D` or you will experience crashes
 
 
 ## How To Compile
