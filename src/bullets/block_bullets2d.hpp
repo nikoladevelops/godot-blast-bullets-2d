@@ -47,7 +47,7 @@ public:
 			real_t rotation_angle = 0.0;
 			if (is_rotation_data_active) {
 				if (!use_only_first_rotation_data) {
-					bullet_accelerate_rotation_speed(0, delta);
+					bullet_accelerate_rotation_speed(i, delta);
 					rotation_angle = all_rotation_speed[i] * delta;
 				} else {
 					rotation_angle = cache_first_rotation_result;

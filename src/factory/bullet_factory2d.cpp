@@ -424,11 +424,25 @@ void BulletFactory2D::populate_bullets_pool(const Ref<MultiMeshBulletsData2D> &m
 
 	if (amount_instances <= 0) {
 		UtilityFunctions::push_error("Error. You can't populate the bullets pool with amount_instances <= 0");
+		if (debugger_was_enabled) {
+			call_deferred("set_is_debugger_enabled", true);
+		}
+		is_factory_busy = false;
+		if (enable_processing_after_finish) {
+			set_is_factory_processing_bullets(true);
+		}
 		return;
 	}
 
-	if (multimesh_data->transforms.size() == 0) {
+	if (multimesh_data.is_null() || multimesh_data->transforms.size() == 0) {
 		UtilityFunctions::push_error("Error when trying to pool bullets. No transforms were provided in the spawn data. Ignoring the request");
+		if (debugger_was_enabled) {
+			call_deferred("set_is_debugger_enabled", true);
+		}
+		is_factory_busy = false;
+		if (enable_processing_after_finish) {
+			set_is_factory_processing_bullets(true);
+		}
 		return;
 	}
 
@@ -439,6 +453,13 @@ void BulletFactory2D::populate_bullets_pool(const Ref<MultiMeshBulletsData2D> &m
 		bullet_type = BulletFactory2D::BLOCK_BULLETS;
 	} else {
 		UtilityFunctions::push_error("Error. Unsupported type of MultiMeshBulletsData2D passed to populate_bullets_pool");
+		if (debugger_was_enabled) {
+			call_deferred("set_is_debugger_enabled", true);
+		}
+		is_factory_busy = false;
+		if (enable_processing_after_finish) {
+			set_is_factory_processing_bullets(true);
+		}
 		return;
 	}
 

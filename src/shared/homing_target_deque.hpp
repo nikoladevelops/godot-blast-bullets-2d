@@ -88,7 +88,7 @@ public:
 	// Trims invalid targets from the front of the deque - returns the amount of targets trimmed
 	_ALWAYS_INLINE_ int bullet_homing_trim_front_invalid_targets(const Vector2 &cached_mouse_global_position, int current_target_count) {
 		int trimmed_count = 0;
-		while (trimmed_count != current_target_count) {
+		while (trimmed_count < current_target_count && !homing_targets.empty()) {
 			HomingTarget &target = homing_targets.front();
 
 			switch (target.type) {

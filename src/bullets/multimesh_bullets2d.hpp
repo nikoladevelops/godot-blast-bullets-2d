@@ -241,12 +241,9 @@ public:
 		TypedArray<bool> status_array;
 		status_array.resize(amount_bullets);
 
-		int index = 0;
-
 		for (int i = 0; i < amount_bullets; i++) {
 			bool status = all_bullets_enabled_set.contains(i);
-
-			status_array[index] = status;
+			status_array[i] = status;
 		}
 
 		return status_array;
@@ -860,15 +857,13 @@ protected:
 			return Ref<BulletCurvesData2D>();
 		}
 
-		const int amount_curves_data = all_bullet_curves_data.size();
-
-		if (amount_curves_data < 1 || amount_curves_data - 1 < bullet_index) {
+		auto it = all_bullet_curves_data.find(bullet_index);
+		if (it == all_bullet_curves_data.end()) {
 			UtilityFunctions::push_error("Invalid bullet_index at bullet_get_curves_data(). This bullet has no individual curves data, did you mean to access shared_bullet_curves_data?");
-
 			return Ref<BulletCurvesData2D>();
 		}
 
-		return find_bullet_curves_data(bullet_index);
+		return it->second;
 	}
 
 	void bullet_set_curves_data(int bullet_index, const Ref<BulletCurvesData2D> &curves_data) {
@@ -1337,16 +1332,19 @@ protected:
 	bool set_bullets_current_collision_count(const TypedArray<int> &arr) {
 		int arr_size = arr.size();
 
-		if (arr_size < amount_bullets || arr_size > amount_bullets) {
+		if (arr_size != amount_bullets) {
 			UtilityFunctions::push_error("You need to provide collisions amount for each bullet (same amount as the transforms array amount) when calling set_bullets_current_collision_count. Make sure the amount is not less/more than the amount of bullets available");
 			return false;
 		}
+
+		bullets_current_collision_count.clear();
+		bullets_current_collision_count.reserve(amount_bullets);
 
 		for (int collision_count : arr) {
 			if (collision_count < 0) {
 				bullets_current_collision_count.push_back(0);
 				continue;
-			} else if (collision_count > bullet_max_collision_count) {
+			} else if (bullet_max_collision_count > 0 && collision_count > bullet_max_collision_count) {
 				bullets_current_collision_count.push_back(bullet_max_collision_count);
 				continue;
 			}
