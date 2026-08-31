@@ -300,7 +300,7 @@ public:
 			return;
 		}
 
-		if (selected_texture_index < 0 || selected_texture_index >= curr_textures_amount || selected_texture_index >= curr_change_texture_times_amount) {
+		if (selected_texture_index < 0 || selected_texture_index >= curr_textures_amount) {
 			UtilityFunctions::push_error("Invalid/out of range selected_texture_index when trying to set new textures to the multimesh bullets");
 			return;
 		}
@@ -695,7 +695,7 @@ protected:
 
 	_ALWAYS_INLINE_ void populate_individual_bullet_curves_related_data(int bullet_index, const Ref<BulletCurvesData2D> &new_curves_data) {
 		if (new_curves_data.is_null()) {
-			bool previous_curve_exists = find_bullet_curves_data(bullet_index) != nullptr;
+			bool previous_curve_exists = find_bullet_curves_data_ptr(bullet_index) != nullptr;
 			if (previous_curve_exists) {
 				all_bullet_curves_data.erase(bullet_index);
 			}
@@ -841,14 +841,12 @@ protected:
 		return input_x;
 	}
 
-	_ALWAYS_INLINE_ BulletCurvesData2D *find_bullet_curves_data(int bullet_index) const {
+	// Borrows raw pointer - valid only until next map mutation (no refcount inc). Keep scope transient.
+	_ALWAYS_INLINE_ BulletCurvesData2D *find_bullet_curves_data_ptr(int bullet_index) const {
 		const auto it = all_bullet_curves_data.find(bullet_index);
-		const auto end = all_bullet_curves_data.end();
-
-		if (it == end) {
+		if (it == all_bullet_curves_data.end()) {
 			return nullptr;
 		}
-
 		return it->second.ptr();
 	}
 

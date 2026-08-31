@@ -402,20 +402,33 @@ void MultiMeshBullets2D::set_rotation_data(const TypedArray<BulletRotationData2D
 	all_max_rotation_speed.clear();
 	all_rotation_acceleration.clear();
 
-	// Reserve more space if needed
-	if (amount_rotation_data > all_rotation_speed.capacity()) {
-		all_rotation_speed.reserve(amount_rotation_data);
-		all_max_rotation_speed.reserve(amount_rotation_data);
-		all_rotation_acceleration.reserve(amount_rotation_data);
-	}
+	if (use_only_first_rotation_data) {
+		// Single rotation data provided but amount_bullets is N -> expand to N identical entries to avoid OOB when consumers index by bullet_index
+		BulletRotationData2D &single_data = *Object::cast_to<BulletRotationData2D>(rotation_data[0]);
+		if (amount_bullets > (int)all_rotation_speed.capacity()) {
+			all_rotation_speed.reserve(amount_bullets);
+			all_max_rotation_speed.reserve(amount_bullets);
+			all_rotation_acceleration.reserve(amount_bullets);
+		}
+		for (int i = 0; i < amount_bullets; ++i) {
+			all_rotation_speed.emplace_back(single_data.rotation_speed);
+			all_max_rotation_speed.emplace_back(single_data.max_rotation_speed);
+			all_rotation_acceleration.emplace_back(single_data.rotation_acceleration);
+		}
+	} else {
+		// Per-bullet data: size must equal amount_bullets
+		if (amount_rotation_data > (int)all_rotation_speed.capacity()) {
+			all_rotation_speed.reserve(amount_rotation_data);
+			all_max_rotation_speed.reserve(amount_rotation_data);
+			all_rotation_acceleration.reserve(amount_rotation_data);
+		}
+		for (int i = 0; i < amount_rotation_data; ++i) {
+			BulletRotationData2D &curr_bullet_data = *Object::cast_to<BulletRotationData2D>(rotation_data[i]);
 
-	// Add newest data
-	for (int i = 0; i < amount_rotation_data; ++i) {
-		BulletRotationData2D &curr_bullet_data = *Object::cast_to<BulletRotationData2D>(rotation_data[i]);
-
-		all_rotation_speed.emplace_back(curr_bullet_data.rotation_speed);
-		all_max_rotation_speed.emplace_back(curr_bullet_data.max_rotation_speed);
-		all_rotation_acceleration.emplace_back(curr_bullet_data.rotation_acceleration);
+			all_rotation_speed.emplace_back(curr_bullet_data.rotation_speed);
+			all_max_rotation_speed.emplace_back(curr_bullet_data.max_rotation_speed);
+			all_rotation_acceleration.emplace_back(curr_bullet_data.rotation_acceleration);
+		}
 	}
 }
 
@@ -447,10 +460,8 @@ Transform2D MultiMeshBullets2D::generate_collision_shape_transform_for_area(Tran
 	// The rotation of each transform
 	real_t curr_bullet_rotation = transf.get_rotation();
 
-	// Rotate collision_shape_offset based on the direction of the bullets
-	Vector2 rotated_offset(
-			collision_shape_offset.x * Math::cos(curr_bullet_rotation) - collision_shape_offset.y * Math::sin(curr_bullet_rotation),
-			collision_shape_offset.x * Math::sin(curr_bullet_rotation) + collision_shape_offset.y * Math::cos(curr_bullet_rotation));
+	// Rotate collision_shape_offset based on the direction of the bullets (single cos/sin)
+	Vector2 rotated_offset = collision_shape_offset.rotated(curr_bullet_rotation);
 
 	transf.set_origin(transf.get_origin() + rotated_offset);
 
@@ -499,7 +510,7 @@ void MultiMeshBullets2D::set_bullet_speed_data(int bullet_index, const Ref<Bulle
 		return;
 	}
 
-	BulletCurvesData2D *curves_data = find_bullet_curves_data(bullet_index);
+	BulletCurvesData2D *curves_data = find_bullet_curves_data_ptr(bullet_index);
 
 	if (curves_data != nullptr && curves_data->movement_speed_curve.is_valid()) {
 		UtilityFunctions::push_warning("You are trying to set bullet speed data directly while having a movement speed curve assigned as an individual bullet curves data. The curve will override any direct speed data changes. Set the curve to null first if you want to set speed data directly.");
@@ -553,7 +564,7 @@ void MultiMeshBullets2D::set_bullet_direction(int bullet_index, const Vector2 &n
 		return;
 	}
 
-	BulletCurvesData2D *curves_data = find_bullet_curves_data(bullet_index);
+	BulletCurvesData2D *curves_data = find_bullet_curves_data_ptr(bullet_index);
 
 	if (curves_data != nullptr && (curves_data->x_direction_curve.is_valid() || curves_data->y_direction_curve.is_valid())) {
 		UtilityFunctions::push_warning("You are trying to set bullet direction directly while having a direction curve assigned to the individual curves data. The curve will override any direct speed data changes. Set the curve to null first if you want to set speed data directly.");

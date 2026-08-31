@@ -213,11 +213,10 @@ public:
 					direction_got_updated = true;
 				}
 			} else {
-				per_bullet_curves_data = find_bullet_curves_data(i); // TODO this uses unordered map, future version should improve it
-				is_per_bullet_curves_valid = per_bullet_curves_data != nullptr;
-
+				auto it_curves = all_bullet_curves_data.find(i);
+				is_per_bullet_curves_valid = it_curves != all_bullet_curves_data.end();
 				if (is_per_bullet_curves_valid) {
-					per_bullet_curves_data = all_bullet_curves_data[i].ptr();
+					per_bullet_curves_data = it_curves->second.ptr(); // single hash, borrows - valid until map mutates
 
 					const bool per_bullet_x_curve_valid = per_bullet_curves_data->x_direction_curve.is_valid();
 					const bool per_bullet_y_curve_valid = per_bullet_curves_data->y_direction_curve.is_valid();
@@ -319,7 +318,12 @@ public:
 						real_t dir_multiplier = (orbiting_data->direction == OrbitRight) ? 1.0 : (orbiting_data->direction == OrbitLeft ? -1.0 : 0.0);
 
 						if (dir_multiplier != 0.0) {
-							real_t angular_speed = (all_cached_speed[i] / orbiting_data->radius) * dir_multiplier;
+							// Guard against tiny radius (division by zero -> inf/NaN)
+							real_t safe_radius = orbiting_data->radius;
+							if (safe_radius < 0.01) {
+								safe_radius = 0.01;
+							}
+							real_t angular_speed = (all_cached_speed[i] / safe_radius) * dir_multiplier;
 							orbiting_data->angle += angular_speed * delta;
 						}
 
@@ -328,8 +332,8 @@ public:
 
 						is_physically_orbiting_this_frame = true;
 					}
-					// Check exact frame arrival:
-					else if (Math::abs(current_dist - orbiting_data->radius) < (all_cached_speed[i] * delta)) {
+					// Check exact frame arrival: use epsilon so low-speed / high-FPS bullets still lock (speed*delta can be <0.2px)
+					else if (Math::abs(current_dist - orbiting_data->radius) < Math::max((real_t)(all_cached_speed[i] * delta), (real_t)2.0)) {
 						// REACHED RADIUS - LOCK NOW
 						orbiting_data->angle = to_target.angle();
 						orbiting_data->is_locked_orbiting = true;
@@ -419,6 +423,11 @@ public:
 			return;
 		}
 
+		if (orbiting_radius < 0.01) {
+			UtilityFunctions::push_error("Orbiting radius must be >= 0.01, got " + String::num(orbiting_radius) + ". Clamping to 0.01 to avoid division by zero.");
+			orbiting_radius = 0.01;
+		}
+
 		auto &orbiting_status = all_orbiting_status[bullet_index];
 
 		if (orbiting_status == 1) {
@@ -451,6 +460,11 @@ public:
 	_ALWAYS_INLINE_ void bullet_set_orbiting_radius(int bullet_index, real_t new_radius) {
 		if (!validate_bullet_index(bullet_index, "bullet_set_orbiting_radius")) {
 			return;
+		}
+
+		if (new_radius < 0.01) {
+			UtilityFunctions::push_error("Orbiting radius must be >= 0.01, got " + String::num(new_radius) + ". Clamping to 0.01.");
+			new_radius = 0.01;
 		}
 
 		auto &orbiting_status = all_orbiting_status[bullet_index];

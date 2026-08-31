@@ -37,7 +37,7 @@ struct HomingTarget {
 
 	HomingTarget() :
 			type(HomingType::NotHoming), has_bullet_reached_target(false) {
-		global_position_target = Vector2(0, 0); // Safe fallback
+		new (&global_position_target) Vector2(0, 0); // placement-new activates union member (avoids UB on inactive assignment)
 	}
 
 	HomingTarget(Vector2 pos) :

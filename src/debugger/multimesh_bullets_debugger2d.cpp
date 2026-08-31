@@ -73,7 +73,12 @@ void MultiMeshBulletsDebugger2D::enable() {
 	}
 
 	// Add a function that runs whenever a new child gets added to the container to debug / when the child_entered_tree signal gets emitted
-	container_to_debug->connect("child_entered_tree", callable_mp(this, &MultiMeshBulletsDebugger2D::generate_debug_multimesh));
+	if (container_to_debug) {
+		Callable cb = callable_mp(this, &MultiMeshBulletsDebugger2D::generate_debug_multimesh);
+		if (!container_to_debug->is_connected("child_entered_tree", cb)) {
+			container_to_debug->connect("child_entered_tree", cb);
+		}
+	}
 
 	set_physics_process(true);
 	is_debugger_enabled = true;
@@ -84,7 +89,12 @@ void MultiMeshBulletsDebugger2D::disable() {
 	is_debugger_enabled = false;
 
 	// Disconnect the function that runs whenever a new child gets added to the container to debug / when the child_entered_tree signal gets emitted
-	container_to_debug->disconnect("child_entered_tree", callable_mp(this, &MultiMeshBulletsDebugger2D::generate_debug_multimesh));
+	if (container_to_debug) {
+		Callable cb = callable_mp(this, &MultiMeshBulletsDebugger2D::generate_debug_multimesh);
+		if (container_to_debug->is_connected("child_entered_tree", cb)) {
+			container_to_debug->disconnect("child_entered_tree", cb);
+		}
+	}
 	// Note: If you ever see a "trying to disconnect a signal that wasn't actually connected before" type of error message in the godot console, it means that your object state is not valid. Ensure you always initialize variables that you may access for the first time (variables accessed without actually calling the setter first = accessing undefined value = undefined behavior)..
 
 	for (int i = 0; i < debugger_multimeshes.size(); ++i) {
@@ -200,7 +210,7 @@ void MultiMeshBulletsDebugger2D::change_debug_multimeshes_color(const Color &new
 		// For each quadmesh inside the multimesh
 		for (int j = 0; j < amount_quadmeshes; j++) {
 			// Set its color to the new one
-			multi->set_instance_color(j, debugger_color);
+			multi->set_instance_color(j, new_multimesh_color);
 		}
 	}
 }
