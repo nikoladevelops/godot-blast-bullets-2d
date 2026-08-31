@@ -19,7 +19,6 @@
 #include "spawn-data/multimesh_bullets_data2d.hpp"
 
 #include <cstdint>
-#include <unordered_map>
 #include <vector>
 
 namespace BlastBullets2D {
@@ -213,10 +212,9 @@ public:
 					direction_got_updated = true;
 				}
 			} else {
-				auto it_curves = all_bullet_curves_data.find(i);
-				is_per_bullet_curves_valid = it_curves != all_bullet_curves_data.end();
+				is_per_bullet_curves_valid = (i >= 0 && i < (int)all_bullet_curves_data.size() && all_bullet_curves_data[i].is_valid());
 				if (is_per_bullet_curves_valid) {
-					per_bullet_curves_data = it_curves->second.ptr(); // single hash, borrows - valid until map mutates
+					per_bullet_curves_data = all_bullet_curves_data[i].ptr(); // O(1) vector index, borrows - valid until vector reassigned
 
 					const bool per_bullet_x_curve_valid = per_bullet_curves_data->x_direction_curve.is_valid();
 					const bool per_bullet_y_curve_valid = per_bullet_curves_data->y_direction_curve.is_valid();
@@ -262,7 +260,7 @@ public:
 			velocity_delta *= delta;
 
 			// 6. MOVEMENT PATTERNS (RELYING ON CURVES AND PATH2D)
-			const bool use_pattern = check_exists_bullet_movement_pattern_data(i); // TODO this uses unordered map, future version should improve it
+			const bool use_pattern = check_exists_bullet_movement_pattern_data(i);
 			if (use_pattern) {
 				auto &pattern = all_movement_pattern_data[i];
 				const Ref<Curve2D> &curve = pattern.path_curve;
@@ -296,7 +294,7 @@ public:
 						curr_bullet_transf.columns[0] = logical_dir;
 						curr_bullet_transf.columns[1] = Vector2(-logical_dir.y, logical_dir.x);
 					}
-					all_movement_pattern_data.erase(i);
+					all_movement_pattern_data[i] = BulletMovementPatternData2D();
 				}
 			}
 

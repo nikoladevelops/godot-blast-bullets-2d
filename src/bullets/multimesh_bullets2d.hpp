@@ -41,7 +41,6 @@
 #include <godot_cpp/classes/quad_mesh.hpp>
 #include <godot_cpp/variant/utility_functions.hpp>
 #include <iterator>
-#include <unordered_map>
 #include <vector>
 
 namespace BlastBullets2D {
@@ -383,14 +382,14 @@ public:
 	// Bullet movement pattern
 
 	_ALWAYS_INLINE_ bool check_exists_bullet_movement_pattern_data(int bullet_index) const {
-		const auto it = all_movement_pattern_data.find(bullet_index);
-		const auto end = all_movement_pattern_data.end();
-
-		return it != end;
+		if (bullet_index < 0 || bullet_index >= (int)all_movement_pattern_data.size()) {
+			return false;
+		}
+		return all_movement_pattern_data[bullet_index].path_curve.is_valid();
 	}
 
 	_ALWAYS_INLINE_ BulletMovementPatternData2D find_bullet_movement_pattern_data(int bullet_index) const {
-		return all_movement_pattern_data.at(bullet_index);
+		return all_movement_pattern_data[bullet_index];
 	}
 
 	Ref<Curve2D> get_bullet_movement_pattern_curve(int bullet_index) const;
@@ -547,7 +546,7 @@ protected:
 	std::vector<real_t> all_cached_acceleration;
 
 	Ref<BulletCurvesData2D> shared_bullet_curves_data = nullptr;
-	std::unordered_map<int, Ref<BulletCurvesData2D>> all_bullet_curves_data;
+	std::vector<Ref<BulletCurvesData2D>> all_bullet_curves_data;
 
 	///
 
@@ -575,7 +574,7 @@ protected:
 
 	/// BULLET MOVEMENT PATTERN RELATED
 
-	std::unordered_map<int, BulletMovementPatternData2D> all_movement_pattern_data;
+	std::vector<BulletMovementPatternData2D> all_movement_pattern_data;
 
 	///
 
@@ -695,15 +694,15 @@ protected:
 
 	_ALWAYS_INLINE_ void populate_individual_bullet_curves_related_data(int bullet_index, const Ref<BulletCurvesData2D> &new_curves_data) {
 		if (new_curves_data.is_null()) {
-			bool previous_curve_exists = find_bullet_curves_data_ptr(bullet_index) != nullptr;
-			if (previous_curve_exists) {
-				all_bullet_curves_data.erase(bullet_index);
+			if (bullet_index >= 0 && bullet_index < (int)all_bullet_curves_data.size() && all_bullet_curves_data[bullet_index].is_valid()) {
+				all_bullet_curves_data[bullet_index].unref();
 			}
 			return;
 		}
 
-		auto &curr_curves = all_bullet_curves_data[bullet_index]; // This will create a brand new KVP if it doesn't exist
-		curr_curves = new_curves_data;
+		// Vector is pre-sized to amount_bullets, direct index
+		all_bullet_curves_data[bullet_index] = new_curves_data;
+		Ref<BulletCurvesData2D> &curr_curves = all_bullet_curves_data[bullet_index];
 
 		const bool is_movement_curve_valid = curr_curves->movement_speed_curve.is_valid();
 		const bool is_rotation_curve_valid = curr_curves->rotation_speed_curve.is_valid();
@@ -841,13 +840,16 @@ protected:
 		return input_x;
 	}
 
-	// Borrows raw pointer - valid only until next map mutation (no refcount inc). Keep scope transient.
+	// Borrows raw pointer - valid until next reassignment (no refcount inc). Keep scope transient.
 	_ALWAYS_INLINE_ BulletCurvesData2D *find_bullet_curves_data_ptr(int bullet_index) const {
-		const auto it = all_bullet_curves_data.find(bullet_index);
-		if (it == all_bullet_curves_data.end()) {
+		if (bullet_index < 0 || bullet_index >= (int)all_bullet_curves_data.size()) {
 			return nullptr;
 		}
-		return it->second.ptr();
+		const Ref<BulletCurvesData2D> &r = all_bullet_curves_data[bullet_index];
+		if (r.is_null()) {
+			return nullptr;
+		}
+		return r.ptr();
 	}
 
 	Ref<BulletCurvesData2D> bullet_get_curves_data(int bullet_index) const {
@@ -855,13 +857,12 @@ protected:
 			return Ref<BulletCurvesData2D>();
 		}
 
-		auto it = all_bullet_curves_data.find(bullet_index);
-		if (it == all_bullet_curves_data.end()) {
+		if (bullet_index < 0 || bullet_index >= (int)all_bullet_curves_data.size() || all_bullet_curves_data[bullet_index].is_null()) {
 			UtilityFunctions::push_error("Invalid bullet_index at bullet_get_curves_data(). This bullet has no individual curves data, did you mean to access shared_bullet_curves_data?");
 			return Ref<BulletCurvesData2D>();
 		}
 
-		return it->second;
+		return all_bullet_curves_data[bullet_index];
 	}
 
 	void bullet_set_curves_data(int bullet_index, const Ref<BulletCurvesData2D> &curves_data) {
@@ -870,7 +871,9 @@ protected:
 		}
 
 		if (curves_data.is_null()) {
-			all_bullet_curves_data.erase(bullet_index);
+			if (bullet_index >= 0 && bullet_index < (int)all_bullet_curves_data.size()) {
+				all_bullet_curves_data[bullet_index].unref();
+			}
 			return;
 		}
 
@@ -1135,8 +1138,12 @@ protected:
 		is_active = false;
 		curves_elapsed_time = 0.0;
 		shared_bullet_curves_data = Ref<BulletCurvesData2D>();
-		all_bullet_curves_data.clear();
-		all_movement_pattern_data.clear();
+		for (auto &r : all_bullet_curves_data) {
+			r.unref();
+		}
+		for (auto &p : all_movement_pattern_data) {
+			p = BulletMovementPatternData2D();
+		}
 
 		set_visible(false); // Hide the multimesh node itself
 

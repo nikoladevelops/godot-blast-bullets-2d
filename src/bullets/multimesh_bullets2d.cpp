@@ -91,6 +91,8 @@ void MultiMeshBullets2D::spawn(const MultiMeshBulletsData2D &data, MultiMeshObje
 	amount_bullets = data.transforms.size(); // important, because some set_up methods use this
 
 	all_bullets_enabled_set.resize(amount_bullets);
+	all_bullet_curves_data.assign(amount_bullets, Ref<BulletCurvesData2D>());
+	all_movement_pattern_data.assign(amount_bullets, BulletMovementPatternData2D());
 
 	set_up_life_time_timer(data.max_life_time, data.max_life_time);
 	set_up_change_texture_timer(
@@ -909,7 +911,7 @@ void MultiMeshBullets2D::all_bullets_set_movement_pattern_from_curve(const Ref<C
 
 void MultiMeshBullets2D::remove_bullet_movement_pattern(int bullet_index) {
 	if (check_exists_bullet_movement_pattern_data(bullet_index)) {
-		all_movement_pattern_data.erase(bullet_index);
+		all_movement_pattern_data[bullet_index] = BulletMovementPatternData2D();
 	}
 }
 
