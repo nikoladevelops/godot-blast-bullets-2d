@@ -130,10 +130,14 @@ public:
 				case HomingType::GlobalPositionTarget:
 					// No need to refresh cache since the global position will never change
 					break;
-				case HomingType::Node2DTarget:
-					// In this case the target is 100% valid since get_homing_target_global_position checks it
-					cached_front_target_global_position = front.node2d_target_data.target->get_global_position();
+				case HomingType::Node2DTarget: {
+					auto &d = front.node2d_target_data;
+					if (!is_homing_target_valid(d.target, d.cached_valid_instance_id)) {
+						break;
+					}
+					cached_front_target_global_position = d.target->get_global_position();
 					break;
+				}
 				case HomingType::NotHoming: // This case should never happen but just in case..
 					return;
 				case MousePositionTarget:
@@ -167,8 +171,9 @@ public:
 				case Node2DTarget: {
 					auto &next_target_data = next_target.node2d_target_data;
 
-					// If its not valid no need to edit cache since it wont be used either way..
 					if (!is_homing_target_valid(next_target_data.target, next_target_data.cached_valid_instance_id)) {
+						// Next is invalid - will be trimmed next frame, keep cache stale-free
+						cached_front_target_global_position = Vector2(0, 0);
 						break;
 					}
 
@@ -257,6 +262,10 @@ public:
 	}
 
 	_ALWAYS_INLINE_ void push_front_node2d_target(Node2D *new_homing_target) {
+		if (!new_homing_target) {
+			UtilityFunctions::push_error("push_front_node2d_target: target is null");
+			return;
+		}
 		homing_targets.emplace_front(new_homing_target, new_homing_target->get_instance_id());
 
 		cached_front_target_global_position = new_homing_target->get_global_position();
@@ -284,6 +293,10 @@ public:
 	}
 
 	_ALWAYS_INLINE_ void push_back_node2d_target(Node2D *new_homing_target) {
+		if (!new_homing_target) {
+			UtilityFunctions::push_error("push_back_node2d_target: target is null");
+			return;
+		}
 		bool is_queue_empty = homing_targets.empty();
 
 		homing_targets.emplace_back(new_homing_target, new_homing_target->get_instance_id());

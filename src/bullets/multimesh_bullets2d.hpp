@@ -78,13 +78,23 @@ public:
 	// Internal delete - used on the C++ side only
 	void force_delete() {
 		marked_for_internal_deletion = true;
-		memdelete(this); // Immediate deletion
+		Node *parent = get_parent();
+		if (parent) {
+			parent->remove_child(this);
+		}
+		memdelete(this); // Immediate deletion after removal from tree
 	}
 
 	/// METHODS RESPONSIBLE FOR VARIOUS BULLET FEATURES
 
 	// Use this method when you want to use physics interpolation - smooth rendering of textures despite physics ticks per second
 	_ALWAYS_INLINE_ void interpolate_bullet_visuals() {
+		if (!bullet_factory || !bullet_factory->use_physics_interpolation) {
+			return;
+		}
+		if (!multi.is_valid()) {
+			return;
+		}
 		double fraction = Engine::get_singleton()->get_physics_interpolation_fraction();
 
 		const auto &active_bullet_indexes = all_bullets_enabled_set.get_active_indexes();
@@ -105,7 +115,7 @@ public:
 	}
 
 	_ALWAYS_INLINE_ void update_specific_previous_transforms_for_interpolation(int begin_bullet_index, int end_bullet_index_inclusive) {
-		if (!bullet_factory->use_physics_interpolation) {
+		if (!bullet_factory || !bullet_factory->use_physics_interpolation) {
 			return;
 		}
 
@@ -116,7 +126,7 @@ public:
 	}
 
 	_ALWAYS_INLINE_ void update_all_previous_transforms_for_interpolation() {
-		if (!bullet_factory->use_physics_interpolation) {
+		if (!bullet_factory || !bullet_factory->use_physics_interpolation) {
 			return;
 		}
 
@@ -128,7 +138,7 @@ public:
 
 	// Updates interpolation data for physics
 	_ALWAYS_INLINE_ void update_bullet_previous_transform_for_interpolation(int bullet_index) {
-		if (!bullet_factory->use_physics_interpolation) {
+		if (!bullet_factory || !bullet_factory->use_physics_interpolation) {
 			return;
 		}
 
@@ -168,38 +178,44 @@ public:
 			return;
 		}
 
-		// Get ALL STILL ACTIVE bullets that we need to disable.. (bullets that haven't hit anything but the lifetime is over..)
-		const auto &active_bullet_indexes = all_bullets_enabled_set.get_active_indexes();
+		// Copy to avoid mutating set while iterating (disable_bullet modifies sparse set)
+		const auto active_copy = all_bullets_enabled_set.get_active_indexes();
 
 		// If the life_time_over signal is not enabled, we can just disable all bullets right away and skip the additional logic
 		if (!is_life_time_over_signal_enabled) {
-			for (int i : active_bullet_indexes) {
-				call_deferred("disable_bullet", i, true); // Disable the attachments as well since we aren't really emitting signals that need to work with attachments..
+			for (int i : active_copy) {
+				if (!all_bullets_enabled_set.contains(i)) {
+					continue;
+				}
+				disable_bullet(i, true);
 			}
 
 			return;
 		}
 
-		// If the life_time_over signal is enabled
-
-		// If the user wants to track when the life time is over we need to collect some additional info about the multimesh
-		// Will hold all transforms of bullets that have not yet hit anything / the ones we are forced to disable due to life time being over
+		// If the life_time_over signal is enabled - collect transforms, disable bullets immediately (consistent with collision path),
+		// but keep attachment disable and signal deferred so handler can still access attachment.
 		TypedArray<Transform2D> transfs;
 		TypedArray<int> bullet_indexes;
 
-		for (int i : active_bullet_indexes) {
-			call_deferred("disable_bullet", i, false); // Don't disable attachments yet, first emit the signal for lifetime over and only after that
-
-			transfs.push_back(all_cached_instance_transforms[i]); // Store the transform of the disabled bullet
+		for (int i : active_copy) {
+			if (!all_bullets_enabled_set.contains(i)) {
+				continue;
+			}
+			transfs.push_back(all_cached_instance_transforms[i]); // Store the transform before disabling
 			bullet_indexes.push_back(i);
+			disable_bullet(i, false); // immediate shape disable, keep attachment for signal
 		}
 
-		// Emit a signal and pass all the transforms of bullets that were forcefully disabled / the ones that were disabled due to life time being over (NOT because they hit a collision shape/body)
-		bullet_factory->call_deferred("emit_signal", "life_time_over", this, bullet_indexes, bullets_custom_data, transfs);
+		if (bullet_indexes.size() > 0) {
+			// Emit signal deferred so user code runs outside physics step
+			bullet_factory->call_deferred("emit_signal", "life_time_over", this, bullet_indexes, bullets_custom_data, transfs);
 
-		// Now we can finally disable all attachments after the signal was emitted
-		for (int i : active_bullet_indexes) {
-			call_deferred("bullet_disable_attachment", i);
+			// Disable attachments after signal (deferred keeps order)
+			for (int i = 0; i < bullet_indexes.size(); ++i) {
+				int idx = bullet_indexes[i];
+				call_deferred("bullet_disable_attachment", idx);
+			}
 		}
 	}
 
@@ -436,7 +452,7 @@ protected:
 	std::vector<RID> physics_shapes;
 
 	// This is used to effectively hide a single bullet instance from being rendered by the multimesh
-	const Transform2D zero_transform = Transform2D().scaled(Vector2(0, 0));
+	static inline const Transform2D zero_transform = Transform2D().scaled(Vector2(0, 0));
 
 	///
 
@@ -649,6 +665,23 @@ protected:
 			bullet_index_start = 0;
 			bullet_index_end_inclusive = amount_bullets - 1;
 			UtilityFunctions::push_error("Invalid index range in " + function_name);
+		}
+	}
+
+	// Sync shape transform from instance transform (shared logic for teleport/set_transform)
+	_ALWAYS_INLINE_ void sync_shape_transform_from_instance(int bullet_index, const Transform2D &instance_transf) {
+		auto &shape_transf = all_cached_shape_transforms[bullet_index];
+		auto &shape_origin = all_cached_shape_origin[bullet_index];
+		auto &instance_origin = all_cached_instance_origin[bullet_index];
+		shape_transf = instance_transf;
+		Vector2 rotated_offset = Vector2(0, 0);
+		if (cache_collision_shape_offset != Vector2(0, 0)) {
+			rotated_offset = cache_collision_shape_offset.rotated(instance_transf.get_rotation());
+		}
+		shape_origin = instance_origin + rotated_offset;
+		shape_transf.set_origin(shape_origin);
+		if (physics_server) {
+			physics_server->area_set_shape_transform(area, bullet_index, shape_transf);
 		}
 	}
 
@@ -1019,6 +1052,11 @@ protected:
 			return;
 		}
 
+		if (is_class("BlockBullets2D")) {
+			UtilityFunctions::push_error("BlockBullets2D does not support attachments - use DirectionalBullets2D for bullet_set_attachment");
+			return;
+		}
+
 		if (!attachment_scene.is_valid()) {
 			UtilityFunctions::push_error("Tried to set an invalid attachment scene to bullet index: " + String::num_int64(bullet_index));
 			return;
@@ -1091,6 +1129,9 @@ protected:
 		auto temp = attachment_ptr;
 		attachment_ptr = nullptr;
 
+		if (temp->get_parent()) {
+			temp->get_parent()->remove_child(temp);
+		}
 		memdelete(temp);
 	}
 
@@ -1314,6 +1355,9 @@ protected:
 
 	bool get_is_life_time_infinite() const { return is_life_time_infinite; }
 	void set_is_life_time_infinite(bool value) {
+		if (is_life_time_infinite == value) {
+			return;
+		}
 		is_life_time_infinite = value;
 		curves_elapsed_time = 0.0;
 		if (!value) {
@@ -1416,7 +1460,14 @@ private:
 	/// METHODS COMING FROM THE IDebuggerDataProvider2D INTERFACE
 
 	const Vector2 get_collision_shape_size_for_debugging() const override {
-		return static_cast<Vector2>(physics_server->shape_get_data(physics_shapes[0]));
+		if (physics_shapes.empty() || !physics_server) {
+			return Vector2(0, 0);
+		}
+		Variant data = physics_server->shape_get_data(physics_shapes[0]);
+		if (data.get_type() != Variant::VECTOR2) {
+			return Vector2(0, 0);
+		}
+		return static_cast<Vector2>(data);
 	}
 
 	const std::vector<Transform2D> &get_all_collision_shape_transforms_for_debugging() const override {

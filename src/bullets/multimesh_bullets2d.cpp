@@ -41,26 +41,34 @@ void MultiMeshBullets2D::_notification(int p_what) {
 				break;
 			}
 
-			if (!marked_for_internal_deletion) {
+			if (!marked_for_internal_deletion && bullet_factory) {
 				bullet_factory->handle_manual_user_deletion_of_multimesh_bullets(*this);
 			}
 
-			// Disable the area's shapes (ALL OF THEM no matter their bullets_enabled_status)
-			for (int i = 0; i < amount_bullets; ++i) {
-				physics_server->area_set_shape_disabled(area, i, true);
+			if (physics_server) {
+				// Disable the area's shapes (ALL OF THEM no matter their bullets_enabled_status)
+				for (int i = 0; i < amount_bullets; ++i) {
+					physics_server->area_set_shape_disabled(area, i, true);
 
-				bullet_disable_attachment(i);
+					bullet_disable_attachment(i);
+				}
+
+				physics_server->area_set_area_monitor_callback(area, Variant());
+				physics_server->area_set_monitor_callback(area, Variant());
+
+				// Avoid memory leaks if you've used the PhysicsServer2D to generate area and shapes
+				for (auto &shape : physics_shapes) {
+					if (shape.is_valid()) {
+						physics_server->free_rid(shape);
+					}
+				}
+				physics_shapes.clear();
+
+				if (area.is_valid()) {
+					physics_server->free_rid(area);
+				}
+				area = RID();
 			}
-
-			physics_server->area_set_area_monitor_callback(area, Variant());
-			physics_server->area_set_monitor_callback(area, Variant());
-
-			// Avoid memory leaks if you've used the PhysicsServer2D to generate area and shapes
-			for (auto &shape : physics_shapes) {
-				physics_server->free_rid(shape);
-			}
-
-			physics_server->free_rid(area);
 		} break;
 	}
 }
@@ -462,8 +470,11 @@ Transform2D MultiMeshBullets2D::generate_collision_shape_transform_for_area(Tran
 	// The rotation of each transform
 	real_t curr_bullet_rotation = transf.get_rotation();
 
-	// Rotate collision_shape_offset based on the direction of the bullets (single cos/sin)
-	Vector2 rotated_offset = collision_shape_offset.rotated(curr_bullet_rotation);
+	// Rotate collision_shape_offset based on the direction of the bullets (single cos/sin) - early out if zero (common case)
+	Vector2 rotated_offset = Vector2(0, 0);
+	if (collision_shape_offset != Vector2(0, 0)) {
+		rotated_offset = collision_shape_offset.rotated(curr_bullet_rotation);
+	}
 
 	transf.set_origin(transf.get_origin() + rotated_offset);
 
@@ -682,32 +693,16 @@ void MultiMeshBullets2D::set_bullet_transform(int bullet_index, const Transform2
 	if (!validate_bullet_index(bullet_index, "set_bullet_transform")) {
 		return;
 	}
-	// Bullet texture related
 	auto &curr_bullet_transf = all_cached_instance_transforms[bullet_index];
 	auto &curr_bullet_origin = all_cached_instance_origin[bullet_index];
 
-	// Bullet shape related
-	auto &curr_shape_transf = all_cached_shape_transforms[bullet_index];
-	auto &curr_shape_origin = all_cached_shape_origin[bullet_index];
-
-	// Update texture transform and origin
 	curr_bullet_transf = new_transform;
 	curr_bullet_origin = new_transform.get_origin();
 
-	// Calculate new shape transform and origin
-	curr_shape_transf = new_transform;
-
-	// The user had previously set a collision shape offset relative to the center of the texture, so it needs to be re-calculated by taking into account the new rotation of the bullet
-	Vector2 rotated_offset = cache_collision_shape_offset.rotated(curr_shape_transf.get_rotation());
-
-	// Update the shape origin
-	curr_shape_origin = curr_bullet_origin + rotated_offset;
-
-	// Update the shape transform origin with the rotated offset
-	curr_shape_transf.set_origin(curr_shape_origin);
+	sync_shape_transform_from_instance(bullet_index, curr_bullet_transf);
 
 	// Instantly apply the updated transforms
-	if (all_bullets_enabled_set.contains(bullet_index)) { // Apply to multi only if the bullet is enabled (if disabled the transform is zero which prevents the multimesh from rendering it)
+	if (all_bullets_enabled_set.contains(bullet_index)) {
 		multi->set_instance_transform_2d(bullet_index, curr_bullet_transf);
 	}
 
@@ -716,8 +711,6 @@ void MultiMeshBullets2D::set_bullet_transform(int bullet_index, const Transform2
 		Vector2 new_direction = Vector2(1, 0).rotated(curr_bullet_transf.get_rotation());
 		all_cached_direction[bullet_index] = new_direction.normalized();
 	}
-
-	physics_server->area_set_shape_transform(area, bullet_index, curr_shape_transf);
 
 	update_bullet_previous_transform_for_interpolation(bullet_index);
 }

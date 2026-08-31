@@ -11,22 +11,23 @@ using namespace godot;
 namespace BlastBullets2D {
 
 void BlockBullets2D::set_up_movement_data(const BulletSpeedData2D &new_speed_data) {
-	// Ensure all old data is removed
-	if (all_cached_speed.size() > 0) {
-		all_cached_speed.clear();
-		all_cached_max_speed.clear();
-		all_cached_acceleration.clear();
-		all_cached_direction.clear();
-		all_cached_velocity.clear();
+	// Keep vectors sized to amount_bullets and fill identically (Block moves as one)
+	if ((int)all_cached_speed.size() != amount_bullets) {
+		all_cached_speed.resize(amount_bullets);
+		all_cached_max_speed.resize(amount_bullets);
+		all_cached_acceleration.resize(amount_bullets);
+		all_cached_direction.resize(amount_bullets);
+		all_cached_velocity.resize(amount_bullets);
 	}
 
-	// BlockBullets work by moving with the same speed in the same direction
-	all_cached_speed.emplace_back(new_speed_data.speed);
-	all_cached_max_speed.emplace_back(new_speed_data.max_speed);
-	all_cached_acceleration.emplace_back(new_speed_data.acceleration);
-
-	all_cached_direction.emplace_back(Vector2(Math::cos(block_rotation_radians), Math::sin(block_rotation_radians)));
-	all_cached_velocity.emplace_back(all_cached_direction[0] * all_cached_speed[0]);
+	Vector2 dir = Vector2(Math::cos(block_rotation_radians), Math::sin(block_rotation_radians));
+	for (int i = 0; i < amount_bullets; ++i) {
+		all_cached_speed[i] = new_speed_data.speed;
+		all_cached_max_speed[i] = new_speed_data.max_speed;
+		all_cached_acceleration[i] = new_speed_data.acceleration;
+		all_cached_direction[i] = dir;
+		all_cached_velocity[i] = dir * new_speed_data.speed + inherited_velocity_offset;
+	}
 }
 
 void BlockBullets2D::custom_additional_spawn_logic(const MultiMeshBulletsData2D &data) {

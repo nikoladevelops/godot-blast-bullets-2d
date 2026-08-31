@@ -476,27 +476,33 @@ private:
 		int id_to_remove = target->sparse_set_id;
 		int last_idx = static_cast<int>(vec.size()) - 1;
 
-		// If it's not the last one we swap
+		if (id_to_remove < 0 || id_to_remove > last_idx) {
+			return;
+		}
+
+		T *last_bullet = vec[last_idx];
+		bool last_was_active = last_bullet && last_bullet->is_active;
+
+		// Remove both ids from active set if present (order matters - disable target first)
+		sparse_set.disable_data(id_to_remove);
+		if (last_idx != id_to_remove) {
+			sparse_set.disable_data(last_idx);
+		}
+
+		// Move last into hole if not removing the last itself
 		if (id_to_remove < last_idx) {
-			T *last_bullet = vec[last_idx];
-
-			// Move the last bullet into the hole
 			vec[id_to_remove] = last_bullet;
-
-			// Update the moved bullet's internal tracking ID
-			last_bullet->sparse_set_id = id_to_remove;
-
-			// If the moved bullet was active then sync the sparse set bitmask
-			if (last_bullet->is_active) {
-				sparse_set.activate_data(id_to_remove);
+			if (last_bullet) {
+				last_bullet->sparse_set_id = id_to_remove;
 			}
 		}
 
-		// Remove the last slot
 		vec.pop_back();
 
-		// Ensure the sparse set knows this index is now dead
-		sparse_set.disable_data(last_idx);
+		// Re-activate moved element if it was active
+		if (last_was_active && id_to_remove < last_idx) {
+			sparse_set.activate_data(id_to_remove);
+		}
 	}
 
 	// Spawns bullets by either creating a brand new TBullet or retrieving one from the object pool
@@ -528,10 +534,16 @@ private:
 	// Handles movement and other behaviors of the bullets.
 	template <typename TBullet>
 	void handle_bullet_behavior(const std::vector<TBullet *> &bullets_vec, const DynamicSparseSet &bullets_set, double delta) {
-		const auto &all_active_multis = bullets_set.get_active_indexes();
+		// Copy dense to avoid invalidation if move_bullets/reduce_lifetime disables a multimesh and mutates the set mid-iteration
+		const auto dense_copy = bullets_set.get_active_indexes();
 
-		for (auto index : all_active_multis) {
-			auto &multi = bullets_vec[index];
+		for (auto index : dense_copy) {
+#ifdef DEV_ENABLED
+			// Defensive asserts - dense should always contain valid active ids
+			ERR_FAIL_COND(index < 0 || index >= (int)bullets_vec.size());
+			ERR_FAIL_COND(!bullets_vec[index] || !bullets_vec[index]->is_active);
+#endif
+			auto *multi = bullets_vec[index];
 
 			multi->move_bullets(delta);
 			multi->change_texture_periodically(delta);

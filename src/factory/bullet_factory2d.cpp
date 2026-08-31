@@ -41,11 +41,11 @@ void BulletFactory2D::_ready() {
 		physics_space = get_world_2d()->get_space();
 	}
 
-	all_directional_bullets.reserve(1000);
-	directional_bullets_set.resize(1000);
+	all_directional_bullets.reserve(2048);
+	directional_bullets_set.resize(2048);
 
-	all_block_bullets.reserve(1000);
-	block_bullets_set.resize(1000);
+	all_block_bullets.reserve(2048);
+	block_bullets_set.resize(2048);
 
 	add_bullet_containers();
 	add_bullet_attachment_container();
@@ -188,8 +188,8 @@ void BulletFactory2D::spawn_block_bullets(const Ref<BlockBulletsData2D> &spawn_d
 		return;
 	}
 
-	if (spawn_data->transforms.size() == 0) {
-		UtilityFunctions::push_error("Error when trying to spawn BlockBullets2D. No transforms were provided in the spawn data. Ignoring the request");
+	if (spawn_data.is_null() || spawn_data->transforms.size() == 0) {
+		UtilityFunctions::push_error("Error when trying to spawn BlockBullets2D. No spawn_data or no transforms were provided. Ignoring the request");
 		return;
 	}
 
@@ -207,8 +207,8 @@ void BulletFactory2D::spawn_directional_bullets(const Ref<DirectionalBulletsData
 		return;
 	}
 
-	if (spawn_data->transforms.size() == 0) {
-		UtilityFunctions::push_error("Error when trying to spawn DirectionalBullets2D. No transforms were provided in the spawn data. Ignoring the request");
+	if (spawn_data.is_null() || spawn_data->transforms.size() == 0) {
+		UtilityFunctions::push_error("Error when trying to spawn DirectionalBullets2D. No spawn_data or no transforms were provided. Ignoring the request");
 		return;
 	}
 
@@ -227,8 +227,8 @@ DirectionalBullets2D *BulletFactory2D::spawn_controllable_directional_bullets(co
 		return nullptr;
 	}
 
-	if (spawn_data->transforms.size() == 0) {
-		UtilityFunctions::push_error("Error when trying to spawn DirectionalBullets2D. No transforms were provided in the spawn data. Ignoring the request");
+	if (spawn_data.is_null() || spawn_data->transforms.size() == 0) {
+		UtilityFunctions::push_error("Error when trying to spawn DirectionalBullets2D. No spawn_data or no transforms were provided. Ignoring the request");
 		return nullptr;
 	}
 
