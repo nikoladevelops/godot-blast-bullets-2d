@@ -3,7 +3,6 @@
 #include "../shared/bullet_speed_data2d.hpp"
 #include "./multimesh_bullets_data2d.hpp"
 
-
 #include <godot_cpp/classes/ref.hpp>
 #include <godot_cpp/variant/typed_array.hpp>
 

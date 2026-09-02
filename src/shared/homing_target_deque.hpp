@@ -68,7 +68,7 @@ public:
 		return homing_targets.back();
 	}
 
-	bool empty() const noexcept{
+	bool empty() const noexcept {
 		return homing_targets.empty();
 	}
 

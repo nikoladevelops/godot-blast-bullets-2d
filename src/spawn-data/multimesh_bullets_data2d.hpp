@@ -67,7 +67,7 @@ public:
 
 	// Each bullets collision amount - it can only be set to a value that is <= bullet_max_collision_count (excluding 0 and negative numbers)
 	TypedArray<int> bullets_current_collision_count;
-	
+
 	// The collision layer that all bullets share. Note: pass a bitmask, it's not just a simple int. Use the calculate_bitmask function.
 	int collision_layer = 1;
 
@@ -84,7 +84,6 @@ public:
 
 	// The idea is that you can enter additional data (base damage,armor damage,maybe healing factor,vampire bullets etc..). I am not going to force every single bullet to have a damage, because I don't know what kind of game you're making, so you are free to give any data here that will be available inside the area_entered and body_entered callbacks inside factory
 	Ref<Resource> bullets_custom_data;
-
 
 	// OTHER
 

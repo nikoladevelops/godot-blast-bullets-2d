@@ -4,9 +4,8 @@
 #include <godot_cpp/classes/resource.hpp>
 #include <godot_cpp/variant/typed_array.hpp>
 
-namespace BlastBullets2D {	
+namespace BlastBullets2D {
 using namespace godot;
-
 
 enum DirectionCurveMode {
 	Additive,
@@ -19,10 +18,10 @@ class BulletCurvesData2D : public Resource {
 public:
 	Ref<Curve> movement_speed_curve;
 	bool movement_use_unit_curve = true;
-	
+
 	Ref<Curve> rotation_speed_curve;
 	bool rotation_use_unit_curve = true;
-	
+
 	Ref<Curve> x_direction_curve;
 	bool x_direction_use_unit_curve = true;
 	real_t x_direction_curve_strength = 1.0;

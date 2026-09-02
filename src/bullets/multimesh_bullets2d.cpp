@@ -274,8 +274,9 @@ void MultiMeshBullets2D::set_up_bullet_instances(const MultiMeshBulletsData2D &d
 }
 
 void MultiMeshBullets2D::generate_multimesh() {
-    Ref<MultiMesh> new_multi;
-    new_multi.instantiate();
+	Ref<MultiMesh> new_multi;
+	new_multi.instantiate();
+	new_multi->set_transform_format(MultiMesh::TRANSFORM_2D);
 
 	multi = new_multi;
 	set_multimesh(multi);

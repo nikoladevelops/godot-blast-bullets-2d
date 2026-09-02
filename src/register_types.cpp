@@ -20,7 +20,6 @@
 #include "spawn-data/directional_bullets_data2d.hpp"
 #include "spawn-data/multimesh_bullets_data2d.hpp"
 
-
 // Bullets classes
 #include "bullets/block_bullets2d.hpp"
 #include "bullets/directional_bullets2d.hpp"

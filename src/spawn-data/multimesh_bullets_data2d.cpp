@@ -157,7 +157,6 @@ void MultiMeshBulletsData2D::set_is_texture_rotation_permanent(bool new_is_textu
 	is_texture_rotation_permanent = new_is_texture_rotation_permanent;
 }
 
-
 int MultiMeshBulletsData2D::get_z_index() const {
 	return z_index;
 }
@@ -376,7 +375,7 @@ void MultiMeshBulletsData2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_bullets_current_collision_count"), &MultiMeshBulletsData2D::get_bullets_current_collision_count);
 	ClassDB::bind_method(D_METHOD("set_bullets_current_collision_count", "arr"), &MultiMeshBulletsData2D::set_bullets_current_collision_count);
 	ADD_PROPERTY(PropertyInfo(Variant::ARRAY, "bullets_current_collision_count"), "set_bullets_current_collision_count", "get_bullets_current_collision_count");
-	
+
 	ClassDB::bind_static_method("MultiMeshBulletsData2D", D_METHOD("calculate_bitmask", "numbers"), &MultiMeshBulletsData2D::calculate_bitmask);
 }
 } //namespace BlastBullets2D

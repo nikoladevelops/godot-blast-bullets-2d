@@ -5,7 +5,6 @@
 #include <queue>
 #include <unordered_map>
 
-
 namespace BlastBullets2D {
 using namespace godot;
 

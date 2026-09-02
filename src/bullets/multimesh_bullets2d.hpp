@@ -96,22 +96,54 @@ public:
 			return;
 		}
 		double fraction = Engine::get_singleton()->get_physics_interpolation_fraction();
-
-		const auto &active_bullet_indexes = all_bullets_enabled_set.get_active_indexes();
-
-		for (int i : active_bullet_indexes) {
-			// Apply interpolated transform for the bullet
-			const Transform2D &interpolated_bullet_texture_transf = get_interpolated_transform(all_cached_instance_transforms[i], all_previous_instance_transf[i], fraction);
-			multi->set_instance_transform_2d(i, interpolated_bullet_texture_transf);
-
-			if (!attachments[i]) {
-				continue;
+		// Batch: 8 floats per instance, row-major as in mesh_storage.cpp: x.x, y.x, 0, ox, x.y, y.y, 0, oy
+		PackedFloat32Array buffer;
+		buffer.resize(amount_bullets * 8);
+		float *w = buffer.ptrw();
+		for (int i = 0; i < amount_bullets; ++i) {
+			Transform2D t;
+			if (all_bullets_enabled_set.contains(i)) {
+				t = get_interpolated_transform(all_cached_instance_transforms[i], all_previous_instance_transf[i], fraction);
+			} else {
+				t = zero_transform;
 			}
-
-			// Apply interpolated transform for the attachment
-			const Transform2D &interpolated_attachment_transf = get_interpolated_transform(attachment_transforms[i], all_previous_attachment_transf[i], fraction);
-			attachments[i]->set_global_transform(interpolated_attachment_transf);
+			w[i * 8 + 0] = t.columns[0][0];
+			w[i * 8 + 1] = t.columns[1][0];
+			w[i * 8 + 2] = 0;
+			w[i * 8 + 3] = t.columns[2][0];
+			w[i * 8 + 4] = t.columns[0][1];
+			w[i * 8 + 5] = t.columns[1][1];
+			w[i * 8 + 6] = 0;
+			w[i * 8 + 7] = t.columns[2][1];
 		}
+		multi->set_buffer(buffer);
+		const auto &active_bullet_indexes = all_bullets_enabled_set.get_active_indexes();
+		for (int i : active_bullet_indexes) {
+			if (!attachments[i])
+				continue;
+			const Transform2D &at = get_interpolated_transform(attachment_transforms[i], all_previous_attachment_transf[i], fraction);
+			attachments[i]->set_global_transform(at);
+		}
+	}
+
+	_ALWAYS_INLINE_ void batch_flush_instance_transforms() {
+		if (!multi.is_valid() || amount_bullets != multi->get_instance_count())
+			return;
+		PackedFloat32Array buffer;
+		buffer.resize(amount_bullets * 8);
+		float *w = buffer.ptrw();
+		for (int i = 0; i < amount_bullets; ++i) {
+			const Transform2D &t = all_bullets_enabled_set.contains(i) ? all_cached_instance_transforms[i] : zero_transform;
+			w[i * 8 + 0] = t.columns[0][0];
+			w[i * 8 + 1] = t.columns[1][0];
+			w[i * 8 + 2] = 0;
+			w[i * 8 + 3] = t.columns[2][0];
+			w[i * 8 + 4] = t.columns[0][1];
+			w[i * 8 + 5] = t.columns[1][1];
+			w[i * 8 + 6] = 0;
+			w[i * 8 + 7] = t.columns[2][1];
+		}
+		multi->set_buffer(buffer);
 	}
 
 	_ALWAYS_INLINE_ void update_specific_previous_transforms_for_interpolation(int begin_bullet_index, int end_bullet_index_inclusive) {

@@ -21,6 +21,7 @@ public:
 
 	bool get_adjust_direction_based_on_rotation() const;
 	void set_adjust_direction_based_on_rotation(bool new_adjust_direction_based_on_rotation);
+
 protected:
 	static void _bind_methods();
 };

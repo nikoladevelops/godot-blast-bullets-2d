@@ -4,7 +4,6 @@
 #include <godot_cpp/variant/vector2.hpp>
 #include <vector>
 
-
 namespace BlastBullets2D {
 using namespace godot;
 

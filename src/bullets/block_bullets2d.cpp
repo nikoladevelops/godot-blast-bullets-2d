@@ -56,7 +56,7 @@ void BlockBullets2D::custom_additional_enable_logic(const MultiMeshBulletsData2D
 	}
 }
 
-void BlockBullets2D::custom_additional_disable_logic(){
+void BlockBullets2D::custom_additional_disable_logic() {
 	bullet_factory->block_bullets_set.disable_data(sparse_set_id);
 }
 

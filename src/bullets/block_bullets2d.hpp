@@ -67,12 +67,10 @@ public:
 
 			physics_server->area_set_shape_transform(area, i, curr_shape_transf);
 
-			// If we are not using physics interpolation then just render the texture in the current physics frame
-			if (!is_using_physics_interpolation) {
-				multi->set_instance_transform_2d(i, curr_instance_transf);
-			}
-
 			//move_bullet_attachment(cache_velocity_calc, i); // Block bullets do not expose an API for attachments, use directional instead
+		}
+		if (!is_using_physics_interpolation) {
+			batch_flush_instance_transforms();
 		}
 
 		bullet_accelerate_speed(0, delta);

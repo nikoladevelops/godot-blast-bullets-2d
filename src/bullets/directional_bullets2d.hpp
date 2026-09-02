@@ -306,37 +306,37 @@ public:
 					if (len < 0.001) {
 						all_movement_pattern_data[i] = BulletMovementPatternData2D();
 					} else {
-				const real_t prev_dist = pattern.distance_traveled;
-				const real_t advance_dist = velocity_delta.length();
-				pattern.distance_traveled += advance_dist;
-				const real_t s1 = Math::fmod(prev_dist, len);
-				const real_t s2 = Math::fmod(pattern.distance_traveled, len);
-				const int64_t l1 = (int64_t)(prev_dist / len);
-				const int64_t l2 = (int64_t)(pattern.distance_traveled / len);
-				const Vector2 start = curve->sample_baked(0.0);
-				const Vector2 end = curve->sample_baked(len * 0.9999);
-				const Vector2 disp = end - start;
-				const Vector2 p1 = l1 * disp + (curve->sample_baked(s1) - start);
-				const Vector2 p2 = l2 * disp + (curve->sample_baked(s2) - start);
-				Vector2 local_delta = p2 - p1;
-				Vector2 pattern_direction = local_delta.rotated(curr_bullet_direction.angle()).normalized();
-				const real_t original_speed = velocity_delta.length();
-				if (original_speed > 0.0001) {
-					velocity_delta = pattern_direction * original_speed;
-				}
-				if (pattern.face_movement_direction && velocity_delta.length_squared() > 0.0001) {
-					const Vector2 tangent = velocity_delta.normalized();
-					curr_bullet_transf.columns[0] = tangent;
-					curr_bullet_transf.columns[1] = Vector2(-tangent.y, tangent.x);
-				}
-				if (!pattern.repeat_pattern && pattern.distance_traveled >= len) {
-					if (pattern.face_movement_direction) {
-						const Vector2 logical_dir = curr_bullet_direction.normalized();
-						curr_bullet_transf.columns[0] = logical_dir;
-						curr_bullet_transf.columns[1] = Vector2(-logical_dir.y, logical_dir.x);
-					}
-					all_movement_pattern_data[i] = BulletMovementPatternData2D();
-				}
+						const real_t prev_dist = pattern.distance_traveled;
+						const real_t advance_dist = velocity_delta.length();
+						pattern.distance_traveled += advance_dist;
+						const real_t s1 = Math::fmod(prev_dist, len);
+						const real_t s2 = Math::fmod(pattern.distance_traveled, len);
+						const int64_t l1 = (int64_t)(prev_dist / len);
+						const int64_t l2 = (int64_t)(pattern.distance_traveled / len);
+						const Vector2 start = curve->sample_baked(0.0);
+						const Vector2 end = curve->sample_baked(len * 0.9999);
+						const Vector2 disp = end - start;
+						const Vector2 p1 = l1 * disp + (curve->sample_baked(s1) - start);
+						const Vector2 p2 = l2 * disp + (curve->sample_baked(s2) - start);
+						Vector2 local_delta = p2 - p1;
+						Vector2 pattern_direction = local_delta.rotated(curr_bullet_direction.angle()).normalized();
+						const real_t original_speed = velocity_delta.length();
+						if (original_speed > 0.0001) {
+							velocity_delta = pattern_direction * original_speed;
+						}
+						if (pattern.face_movement_direction && velocity_delta.length_squared() > 0.0001) {
+							const Vector2 tangent = velocity_delta.normalized();
+							curr_bullet_transf.columns[0] = tangent;
+							curr_bullet_transf.columns[1] = Vector2(-tangent.y, tangent.x);
+						}
+						if (!pattern.repeat_pattern && pattern.distance_traveled >= len) {
+							if (pattern.face_movement_direction) {
+								const Vector2 logical_dir = curr_bullet_direction.normalized();
+								curr_bullet_transf.columns[0] = logical_dir;
+								curr_bullet_transf.columns[1] = Vector2(-logical_dir.y, logical_dir.x);
+							}
+							all_movement_pattern_data[i] = BulletMovementPatternData2D();
+						}
 					}
 				}
 			}
@@ -447,11 +447,9 @@ public:
 			} else {
 				bullet_accelerate_speed(i, delta);
 			}
-
-			// 10. IF NOT USING PHYSICS INTERPOLATION, APPLY THE TRANSFORM TO THE TEXTURE NOW IN THIS PHYSICS FRAME
-			if (!is_using_physics_interpolation) {
-				multi->set_instance_transform_2d(i, all_cached_instance_transforms[i]);
-			}
+		}
+		if (!is_using_physics_interpolation) {
+			batch_flush_instance_transforms();
 		}
 
 		// Handle collisions safely after all physics processing logic is done
@@ -1100,20 +1098,20 @@ public:
 		}
 
 		if (attachments[bullet_index]) {
-            BulletAttachment2D* attachment_instance = attachments[bullet_index];
+			BulletAttachment2D *attachment_instance = attachments[bullet_index];
 
-            // Calculate where the attachment should be now that the bullet moved
-            Transform2D att_global_transf = calculate_attachment_global_transf(bullet_index, curr_bullet_transf);
+			// Calculate where the attachment should be now that the bullet moved
+			Transform2D att_global_transf = calculate_attachment_global_transf(bullet_index, curr_bullet_transf);
 
-            // Update the cache
-            attachment_transforms[bullet_index] = att_global_transf;
+			// Update the cache
+			attachment_transforms[bullet_index] = att_global_transf;
 
-            // Move the actual Node
-            attachment_instance->set_global_transform(att_global_transf);
+			// Move the actual Node
+			attachment_instance->set_global_transform(att_global_transf);
 
-            // Reset Godot's internal engine interpolation
-            attachment_instance->reset_physics_interpolation();
-        }
+			// Reset Godot's internal engine interpolation
+			attachment_instance->reset_physics_interpolation();
+		}
 
 		// Reset physics interpolation data
 		update_bullet_previous_transform_for_interpolation(bullet_index);
@@ -1139,20 +1137,20 @@ public:
 		}
 
 		if (attachments[bullet_index]) {
-            BulletAttachment2D* attachment_instance = attachments[bullet_index];
+			BulletAttachment2D *attachment_instance = attachments[bullet_index];
 
-            // Calculate where the attachment should be now that the bullet moved
-            Transform2D att_global_transf = calculate_attachment_global_transf(bullet_index, curr_bullet_transf);
+			// Calculate where the attachment should be now that the bullet moved
+			Transform2D att_global_transf = calculate_attachment_global_transf(bullet_index, curr_bullet_transf);
 
-            // Update the cache
-            attachment_transforms[bullet_index] = att_global_transf;
+			// Update the cache
+			attachment_transforms[bullet_index] = att_global_transf;
 
-            // Move the actual Node
-            attachment_instance->set_global_transform(att_global_transf);
+			// Move the actual Node
+			attachment_instance->set_global_transform(att_global_transf);
 
-            // Reset Godot's internal engine interpolation
-            attachment_instance->reset_physics_interpolation();
-        }
+			// Reset Godot's internal engine interpolation
+			attachment_instance->reset_physics_interpolation();
+		}
 
 		// Reset physics interpolation data
 		update_bullet_previous_transform_for_interpolation(bullet_index);
@@ -1334,8 +1332,8 @@ protected:
 
 	// Normalizes an angle to [-PI, PI]
 	_ALWAYS_INLINE_ void normalize_angle(real_t &angle) const {
-        angle = Math::wrapf(angle, -static_cast<real_t>(Math::PI), static_cast<real_t>(Math::PI));
-    }
+		angle = Math::wrapf(angle, -static_cast<real_t>(Math::PI), static_cast<real_t>(Math::PI));
+	}
 
 	// Updates the homing timer and checks if interval is reached
 	_ALWAYS_INLINE_ bool update_homing_timer(double delta) {
