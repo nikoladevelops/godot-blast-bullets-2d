@@ -15,12 +15,13 @@ using namespace godot;
 struct CollisionShapeHelper2D {
 	static const Vector2 DEFAULT_RECT_SIZE; // 32x32 full size
 	static const Vector2 DEFAULT_RECT_HALF; // 16x16 half extents
+	static constexpr float DEFAULT_CIRCLE_RADIUS = 16.0f; // diameter 32, same coverage as rect 32
 
-	// Resolve Ref<Shape2D> to engine enum. Null => RECTANGLE (default).
-	// Unsupported => SHAPE_CUSTOM (caller must error + fallback).
+	// Resolve Ref<Shape2D> to engine enum. Null => CIRCLE (default r16).
+	// Unsupported => SHAPE_CUSTOM (caller must error + fallback to circle r16).
 	_ALWAYS_INLINE_ static PhysicsServer2D::ShapeType resolve_type(const Ref<Shape2D> &shape) {
 		if (shape.is_null()) {
-			return PhysicsServer2D::SHAPE_RECTANGLE;
+			return PhysicsServer2D::SHAPE_CIRCLE;
 		}
 		// Typed checks, no strings.
 		if (Object::cast_to<RectangleShape2D>(shape.ptr()) != nullptr) {
@@ -58,34 +59,40 @@ struct CollisionShapeHelper2D {
 	}
 
 	// Effective type after fallback. If print_error, prints once for unsupported/invalid (caller must ensure called once per spawn, not per bullet/tick).
+	// Null/unsupported/invalid => CIRCLE r16 (consistent default, cheapest physics).
 	_ALWAYS_INLINE_ static PhysicsServer2D::ShapeType get_effective_type(const Ref<Shape2D> &shape, bool print_error) {
 		PhysicsServer2D::ShapeType raw = resolve_type(shape);
 		if (shape.is_null()) {
-			return PhysicsServer2D::SHAPE_RECTANGLE;
+			return PhysicsServer2D::SHAPE_CIRCLE;
 		}
 		if (!is_supported(raw)) {
 			if (print_error) {
-				UtilityFunctions::push_error("Unsupported collision shape type: " + shape->get_class() + " - only RectangleShape2D/CircleShape2D/CapsuleShape2D supported. Falling back to rectangle 32x32.");
+				UtilityFunctions::push_error("Unsupported collision shape type: " + shape->get_class() + " - only RectangleShape2D/CircleShape2D/CapsuleShape2D supported. Falling back to circle r16.");
 			}
-			return PhysicsServer2D::SHAPE_RECTANGLE;
+			return PhysicsServer2D::SHAPE_CIRCLE;
 		}
 		if (!is_valid_data(shape)) {
 			if (print_error) {
-				UtilityFunctions::push_error("Invalid collision shape parameters for " + shape->get_class() + " (size/radius/height must be > 0). Falling back to rectangle 32x32.");
+				UtilityFunctions::push_error("Invalid collision shape parameters for " + shape->get_class() + " (size/radius/height must be > 0). Falling back to circle r16.");
 			}
-			return PhysicsServer2D::SHAPE_RECTANGLE;
+			return PhysicsServer2D::SHAPE_CIRCLE;
 		}
 		return raw;
 	}
 
 	// Quiet apply, no error print (error already printed once at creation). Uses effective type.
+	// Null/fallback => circle r16. Effective determines RID type, so data must match RID.
 	_ALWAYS_INLINE_ static void apply_shape_data_quiet(PhysicsServer2D *server, const RID &rid, const Ref<Shape2D> &shape, PhysicsServer2D::ShapeType effective) {
+		if (shape.is_null()) {
+			server->shape_set_data(rid, DEFAULT_CIRCLE_RADIUS);
+			return;
+		}
 		switch (effective) {
 			case PhysicsServer2D::SHAPE_CIRCLE: {
 				auto *circle = Object::cast_to<CircleShape2D>(shape.ptr());
 				float r = circle ? circle->get_radius() : 0.0f;
 				if (r <= 0.0f) {
-					server->shape_set_data(rid, DEFAULT_RECT_HALF);
+					server->shape_set_data(rid, DEFAULT_CIRCLE_RADIUS);
 				} else {
 					server->shape_set_data(rid, r);
 				}
@@ -96,7 +103,7 @@ struct CollisionShapeHelper2D {
 				float r = capsule ? capsule->get_radius() : 0.0f;
 				float h = capsule ? capsule->get_height() : 0.0f;
 				if (r <= 0.0f || h <= 0.0f) {
-					server->shape_set_data(rid, DEFAULT_RECT_HALF);
+					server->shape_set_data(rid, DEFAULT_CIRCLE_RADIUS);
 				} else {
 					server->shape_set_data(rid, Vector2(r, h));
 				}
@@ -104,37 +111,18 @@ struct CollisionShapeHelper2D {
 			}
 			case PhysicsServer2D::SHAPE_RECTANGLE:
 			default: {
-				if (shape.is_null()) {
-					server->shape_set_data(rid, DEFAULT_RECT_HALF);
-				} else if (auto *rect = Object::cast_to<RectangleShape2D>(shape.ptr())) {
+				if (auto *rect = Object::cast_to<RectangleShape2D>(shape.ptr())) {
 					Vector2 s = rect->get_size();
 					if (s.x <= 0.0f || s.y <= 0.0f) {
-						server->shape_set_data(rid, DEFAULT_RECT_HALF);
+						server->shape_set_data(rid, DEFAULT_CIRCLE_RADIUS);
 					} else {
 						server->shape_set_data(rid, s / 2);
 					}
 				} else {
-					// Effective should already be RECTANGLE here, but shape is circle/capsule with fallback? Use default.
-					server->shape_set_data(rid, DEFAULT_RECT_HALF);
+					server->shape_set_data(rid, DEFAULT_CIRCLE_RADIUS);
 				}
 				break;
 			}
-		}
-	}
-
-	// Full visual size for debugger (not half extents). Uses Shape2D::get_rect() so math matches engine.
-	_ALWAYS_INLINE_ static Vector2 get_full_size(const Ref<Shape2D> &shape) {
-		if (shape.is_null()) {
-			return DEFAULT_RECT_SIZE;
-		}
-		PhysicsServer2D::ShapeType type = resolve_type(shape);
-		switch (type) {
-			case PhysicsServer2D::SHAPE_RECTANGLE:
-			case PhysicsServer2D::SHAPE_CIRCLE:
-			case PhysicsServer2D::SHAPE_CAPSULE:
-				return shape->get_rect().size;
-			default:
-				return DEFAULT_RECT_SIZE;
 		}
 	}
 
@@ -149,49 +137,6 @@ struct CollisionShapeHelper2D {
 			default:
 				return server->rectangle_shape_create();
 		}
-	}
-
-	// Push correct Variant to server. Returns resolved type actually used (fallback => RECTANGLE).
-	// Always prints error on unsupported so user sees what went wrong.
-	_ALWAYS_INLINE_ static PhysicsServer2D::ShapeType apply_shape_data(PhysicsServer2D *server, const RID &rid, const Ref<Shape2D> &shape) {
-		if (shape.is_null()) {
-			server->shape_set_data(rid, DEFAULT_RECT_HALF);
-			return PhysicsServer2D::SHAPE_RECTANGLE;
-		}
-		if (auto *circle = Object::cast_to<CircleShape2D>(shape.ptr())) {
-			float r = circle->get_radius();
-			if (r <= 0.0f) {
-				UtilityFunctions::push_error("CircleShape2D radius must be > 0. Falling back to rectangle 32x32.");
-				server->shape_set_data(rid, DEFAULT_RECT_HALF);
-				return PhysicsServer2D::SHAPE_RECTANGLE;
-			}
-			server->shape_set_data(rid, r);
-			return PhysicsServer2D::SHAPE_CIRCLE;
-		}
-		if (auto *capsule = Object::cast_to<CapsuleShape2D>(shape.ptr())) {
-			float r = capsule->get_radius();
-			float h = capsule->get_height();
-			if (r <= 0.0f || h <= 0.0f) {
-				UtilityFunctions::push_error("CapsuleShape2D radius/height must be > 0. Falling back to rectangle 32x32.");
-				server->shape_set_data(rid, DEFAULT_RECT_HALF);
-				return PhysicsServer2D::SHAPE_RECTANGLE;
-			}
-			server->shape_set_data(rid, Vector2(r, h));
-			return PhysicsServer2D::SHAPE_CAPSULE;
-		}
-		if (auto *rect = Object::cast_to<RectangleShape2D>(shape.ptr())) {
-			Vector2 size = rect->get_size();
-			if (size.x <= 0.0f || size.y <= 0.0f) {
-				UtilityFunctions::push_error("RectangleShape2D size must be > 0. Falling back to rectangle 32x32.");
-				server->shape_set_data(rid, DEFAULT_RECT_HALF);
-				return PhysicsServer2D::SHAPE_RECTANGLE;
-			}
-			server->shape_set_data(rid, size / 2);
-			return PhysicsServer2D::SHAPE_RECTANGLE;
-		}
-		UtilityFunctions::push_error("Unsupported collision shape type: " + shape->get_class() + " - only RectangleShape2D/CircleShape2D/CapsuleShape2D supported. Falling back to rectangle 32x32.");
-		server->shape_set_data(rid, DEFAULT_RECT_HALF);
-		return PhysicsServer2D::SHAPE_RECTANGLE;
 	}
 };
 

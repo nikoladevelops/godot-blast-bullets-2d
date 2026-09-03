@@ -9,6 +9,7 @@
 #include "../debugger/multimesh_bullets_debugger2d.hpp"
 #include "../shared/bullet_attachment2d.hpp"
 #include "../shared/multimesh_object_pool2d.hpp"
+#include "../shared/multimesh_pool_key2d.hpp"
 #include "godot_cpp/classes/global_constants.hpp"
 #include "godot_cpp/core/class_db.hpp"
 #include "godot_cpp/core/math.hpp"
@@ -29,6 +30,16 @@
 using namespace godot;
 
 namespace BlastBullets2D {
+
+// Converts nullable GDScript key to internal pointer. Null Ref = all buckets (nullptr).
+// Returns pointer valid only for the caller's local PoolKey lifetime.
+_ALWAYS_INLINE_ static const PoolKey *resolve_pool_key(const Ref<MultiMeshPoolKey2D> &key, PoolKey &storage) {
+	if (key.is_null()) {
+		return nullptr;
+	}
+	storage = key->to_internal();
+	return &storage;
+}
 
 void BulletFactory2D::_ready() {
 	// Ensure the code that is next will not be ran in the editor
@@ -241,7 +252,7 @@ DirectionalBullets2D *BulletFactory2D::spawn_controllable_directional_bullets(co
 			new_inherited_velocity_offset);
 }
 
-void BulletFactory2D::reset_factory_state(int amount_bullets) {
+void BulletFactory2D::reset_factory_state(const PoolKey *key) {
 	// Check if debuggers are enabled
 	bool debugger_curr_enabled = get_is_debugger_enabled();
 
@@ -252,13 +263,18 @@ void BulletFactory2D::reset_factory_state(int amount_bullets) {
 	}
 
 	// Free all DirectionalBullets2D, their attachments and the object pool
-	free_all_bullets_helper<DirectionalBullets2D>(all_directional_bullets, directional_bullets_set, directional_bullets_pool, amount_bullets);
+	free_all_bullets_helper<DirectionalBullets2D>(all_directional_bullets, directional_bullets_set, directional_bullets_pool, key);
 
 	// Free all BlockBullets2D, their attachments and the object pool
-	free_all_bullets_helper<BlockBullets2D>(all_block_bullets, block_bullets_set, block_bullets_pool, amount_bullets);
+	free_all_bullets_helper<BlockBullets2D>(all_block_bullets, block_bullets_set, block_bullets_pool, key);
 
-	// Free all bullet attachments that are currently in the object pool
-	bullet_attachments_pool.free_all_bullet_attachments();
+	// Attachments of freed multis are already handled per-multi via force_delete ->
+	// bullet_disable_attachment (pushed to the pool or queue_freed per auto-pool flag).
+	// Only a full (null-key) reset wipes the global attachment pool; a scoped reset must
+	// preserve unrelated pooled attachments.
+	if (key == nullptr) {
+		bullet_attachments_pool.free_all_bullet_attachments();
+	}
 
 	// If the debuggers are supposed to be enabled then re-enable them
 	if (debugger_curr_enabled) {
@@ -267,7 +283,7 @@ void BulletFactory2D::reset_factory_state(int amount_bullets) {
 	}
 }
 
-void BulletFactory2D::reset(int amount_bullets) {
+void BulletFactory2D::reset(const Ref<MultiMeshPoolKey2D> &key) {
 	if (is_factory_busy) {
 		UtilityFunctions::push_error("Error when trying to call reset(). BulletFactory2D is currently busy. Ignoring the request");
 		return;
@@ -279,7 +295,8 @@ void BulletFactory2D::reset(int amount_bullets) {
 
 	set_is_factory_processing_bullets(false);
 
-	reset_factory_state(amount_bullets);
+	PoolKey resolved;
+	reset_factory_state(resolve_pool_key(key, resolved));
 
 	is_factory_busy = false;
 	if (enable_processing_after_finish) {
@@ -290,7 +307,7 @@ void BulletFactory2D::reset(int amount_bullets) {
 	emit_signal("reset_finished");
 }
 
-void BulletFactory2D::free_active_bullets(int amount_bullets) {
+void BulletFactory2D::free_active_bullets(const Ref<MultiMeshPoolKey2D> &key) {
 	if (is_factory_busy) {
 		UtilityFunctions::push_error("Error when trying to free active bullets. BulletFactory2D is currently busy. Ignoring the request");
 		return;
@@ -312,10 +329,12 @@ void BulletFactory2D::free_active_bullets(int amount_bullets) {
 	}
 
 	// Free all ACTIVE DirectionalBullets2D
-	free_only_active_bullets_helper<DirectionalBullets2D>(all_directional_bullets, directional_bullets_set, amount_bullets);
+	PoolKey resolved;
+	const PoolKey *key_ptr = resolve_pool_key(key, resolved);
+	free_only_active_bullets_helper<DirectionalBullets2D>(all_directional_bullets, directional_bullets_set, key_ptr);
 
 	// Free all ACTIVE BlockBullets2D
-	free_only_active_bullets_helper<BlockBullets2D>(all_block_bullets, block_bullets_set, amount_bullets);
+	free_only_active_bullets_helper<BlockBullets2D>(all_block_bullets, block_bullets_set, key_ptr);
 
 	// If the debuggers are supposed to be enabled then re-enable them
 	if (debugger_curr_enabled) {
@@ -329,7 +348,7 @@ void BulletFactory2D::free_active_bullets(int amount_bullets) {
 	}
 }
 
-void BulletFactory2D::free_disabled_bullets(int amount_bullets) {
+void BulletFactory2D::free_disabled_bullets(const Ref<MultiMeshPoolKey2D> &key) {
 	if (is_factory_busy) {
 		UtilityFunctions::push_error("BulletFactory2D is busy. Ignoring free_disabled_bullets request.");
 		return;
@@ -345,17 +364,20 @@ void BulletFactory2D::free_disabled_bullets(int amount_bullets) {
 		directional_bullets_debugger->set_is_debugger_enabled(false);
 	}
 
+	PoolKey resolved;
+	const PoolKey *key_ptr = resolve_pool_key(key, resolved);
+
 	free_only_disabled_bullets_helper<DirectionalBullets2D>(
 			all_directional_bullets,
 			directional_bullets_set,
 			directional_bullets_pool,
-			amount_bullets);
+			key_ptr);
 
 	free_only_disabled_bullets_helper<BlockBullets2D>(
 			all_block_bullets,
 			block_bullets_set,
 			block_bullets_pool,
-			amount_bullets);
+			key_ptr);
 
 	if (debugger_curr_enabled) {
 		block_bullets_debugger->set_is_debugger_enabled(true);
@@ -386,13 +408,13 @@ void BulletFactory2D::handle_manual_user_deletion_of_multimesh_bullets(MultiMesh
 
 	DirectionalBullets2D *dir_ptr = dynamic_cast<DirectionalBullets2D *>(&bullet_multi);
 	BlockBullets2D *block_ptr = dynamic_cast<BlockBullets2D *>(&bullet_multi);
-	int amount = bullet_multi.get_amount_bullets();
+	const PoolKey pool_key = bullet_multi.get_pool_key();
 
 	if (dir_ptr) {
-		directional_bullets_pool.try_remove_instance(dir_ptr, amount);
+		directional_bullets_pool.try_remove_instance(dir_ptr, pool_key);
 		remove_multimesh_instance_from_vec_and_sparse_set<DirectionalBullets2D>(all_directional_bullets, directional_bullets_set, dir_ptr);
 	} else if (block_ptr) {
-		block_bullets_pool.try_remove_instance(block_ptr, amount);
+		block_bullets_pool.try_remove_instance(block_ptr, pool_key);
 		remove_multimesh_instance_from_vec_and_sparse_set<BlockBullets2D>(all_block_bullets, block_bullets_set, block_ptr);
 	}
 
@@ -406,7 +428,7 @@ void BulletFactory2D::handle_manual_user_deletion_of_multimesh_bullets(MultiMesh
 	}
 }
 
-void BulletFactory2D::populate_bullets_pool(const Ref<MultiMeshBulletsData2D> &multimesh_data, int amount_instances) {
+void BulletFactory2D::populate_bullets_pool(const Ref<MultiMeshPoolKey2D> &key, const Ref<MultiMeshBulletsData2D> &multimesh_data, int instance_count) {
 	if (is_factory_busy) {
 		UtilityFunctions::push_error("BulletFactory2D is busy. Ignoring populate_bullets_pool request.");
 		return;
@@ -422,8 +444,20 @@ void BulletFactory2D::populate_bullets_pool(const Ref<MultiMeshBulletsData2D> &m
 		set_is_debugger_enabled(false);
 	}
 
-	if (amount_instances <= 0) {
-		UtilityFunctions::push_error("Error. You can't populate the bullets pool with amount_instances <= 0");
+	if (key.is_null()) {
+		UtilityFunctions::push_error("populate_bullets_pool requires an explicit MultiMeshPoolKey2D (amount_bullets + shape). Null is not allowed.");
+		if (debugger_was_enabled) {
+			call_deferred("set_is_debugger_enabled", true);
+		}
+		is_factory_busy = false;
+		if (enable_processing_after_finish) {
+			set_is_factory_processing_bullets(true);
+		}
+		return;
+	}
+
+	if (instance_count <= 0) {
+		UtilityFunctions::push_error("Error. You can't populate the bullets pool with instance_count <= 0");
 		if (debugger_was_enabled) {
 			call_deferred("set_is_debugger_enabled", true);
 		}
@@ -436,6 +470,24 @@ void BulletFactory2D::populate_bullets_pool(const Ref<MultiMeshBulletsData2D> &m
 
 	if (multimesh_data.is_null() || multimesh_data->transforms.size() == 0) {
 		UtilityFunctions::push_error("Error when trying to pool bullets. No transforms were provided in the spawn data. Ignoring the request");
+		if (debugger_was_enabled) {
+			call_deferred("set_is_debugger_enabled", true);
+		}
+		is_factory_busy = false;
+		if (enable_processing_after_finish) {
+			set_is_factory_processing_bullets(true);
+		}
+		return;
+	}
+
+	// The bucket is always amount_bullets per multimesh + effective shape. Validate the explicit
+	// key against the data-derived key (same quiet fallback logic as spawn_bullets_helper).
+	// instance_count is orthogonal: how many multimesh instances to pre-create in that bucket.
+	const PoolKey requested = key->to_internal();
+	const PhysicsServer2D::ShapeType effective = CollisionShapeHelper2D::get_effective_type(multimesh_data->collision_shape, false);
+	const PoolKey expected{ (int)multimesh_data->transforms.size(), effective };
+	if (!(requested == expected)) {
+		UtilityFunctions::push_error(vformat("populate_bullets_pool key mismatch: key is (amount_bullets=%d, shape=%d) but spawn data derives (amount_bullets=%d, shape=%d). No instances were created.", requested.amount_bullets, (int)requested.shape_type, expected.amount_bullets, (int)expected.shape_type));
 		if (debugger_was_enabled) {
 			call_deferred("set_is_debugger_enabled", true);
 		}
@@ -463,26 +515,24 @@ void BulletFactory2D::populate_bullets_pool(const Ref<MultiMeshBulletsData2D> &m
 		return;
 	}
 
-	const int amount_bullets_per_instance = multimesh_data->transforms.size();
-
 	switch (bullet_type) {
 		case BulletFactory2D::DIRECTIONAL_BULLETS:
 			populate_bullets_pool_helper<DirectionalBullets2D>(
+					requested,
 					multimesh_data,
 					all_directional_bullets,
 					directional_bullets_pool,
 					directional_bullets_container,
-					amount_instances,
-					amount_bullets_per_instance);
+					instance_count);
 			break;
 		case BulletFactory2D::BLOCK_BULLETS:
 			populate_bullets_pool_helper<BlockBullets2D>(
+					requested,
 					multimesh_data,
 					all_block_bullets,
 					block_bullets_pool,
 					block_bullets_container,
-					amount_instances,
-					amount_bullets_per_instance);
+					instance_count);
 			break;
 		default:
 			UtilityFunctions::push_error("Unsupported type of bullet when calling populate_bullets_pool");
@@ -499,7 +549,7 @@ void BulletFactory2D::populate_bullets_pool(const Ref<MultiMeshBulletsData2D> &m
 	}
 }
 
-void BulletFactory2D::free_bullets_pool(BulletType bullet_type, int amount_bullets_per_instance) {
+void BulletFactory2D::free_bullets_pool(BulletType bullet_type, const Ref<MultiMeshPoolKey2D> &key) {
 	if (is_factory_busy) {
 		UtilityFunctions::push_error("BulletFactory2D is busy. Ignoring free_bullets_pool request.");
 		return;
@@ -518,19 +568,21 @@ void BulletFactory2D::free_bullets_pool(BulletType bullet_type, int amount_bulle
 
 	switch (bullet_type) {
 		case BulletFactory2D::DIRECTIONAL_BULLETS: {
+			PoolKey resolved;
 			free_bullets_pool_helper<DirectionalBullets2D>(
 					all_directional_bullets,
 					directional_bullets_set,
 					directional_bullets_pool,
-					amount_bullets_per_instance);
+					resolve_pool_key(key, resolved));
 		} break;
 
 		case BulletFactory2D::BLOCK_BULLETS: {
+			PoolKey resolved;
 			free_bullets_pool_helper<BlockBullets2D>(
 					all_block_bullets,
 					block_bullets_set,
 					block_bullets_pool,
-					amount_bullets_per_instance);
+					resolve_pool_key(key, resolved));
 
 		} break;
 
@@ -759,7 +811,7 @@ int BulletFactory2D::debug_get_bullets_pool_amount(BulletType bullet_type) {
 
 Dictionary BulletFactory2D::debug_get_bullets_pool_info(BulletType bullet_type) {
 	Dictionary dict;
-	std::map<int, int> pool_info;
+	std::map<PoolKey, int> pool_info;
 
 	if (bullet_type == BulletType::DIRECTIONAL_BULLETS) {
 		pool_info = directional_bullets_pool.get_pool_info();
@@ -767,10 +819,14 @@ Dictionary BulletFactory2D::debug_get_bullets_pool_info(BulletType bullet_type) 
 		pool_info = block_bullets_pool.get_pool_info();
 	} else {
 		UtilityFunctions::push_error("Error when trying to get bullets pool info. BulletType you gave is not supported");
+		return dict;
 	}
 
+	// Expose internal PoolKey as Godot Resource keys: Dictionary[MultiMeshPoolKey2D] = count.
+	// One Resource per exact bucket (amount + shape), mirroring the real object pool.
 	for (const auto &[key, value] : pool_info) {
-		dict[Variant(key)] = Variant(value);
+		Ref<MultiMeshPoolKey2D> res = MultiMeshPoolKey2D::from_internal(key);
+		dict[Variant(res)] = Variant(value);
 	}
 
 	return dict;
@@ -976,7 +1032,7 @@ void BulletFactory2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("spawn_directional_bullets", "spawn_data", "inherited_velocity_offset"), &BulletFactory2D::spawn_directional_bullets, DEFVAL(Vector2(0, 0)));
 	ClassDB::bind_method(D_METHOD("spawn_controllable_directional_bullets", "spawn_data", "inherited_velocity_offset"), &BulletFactory2D::spawn_controllable_directional_bullets, DEFVAL(Vector2(0, 0)));
 
-	ClassDB::bind_method(D_METHOD("reset", "amount_bullets"), &BulletFactory2D::reset, DEFVAL(0));
+	ClassDB::bind_method(D_METHOD("reset", "key"), &BulletFactory2D::reset, DEFVAL(Ref<MultiMeshPoolKey2D>()));
 
 	ClassDB::bind_method(D_METHOD("get_directional_bullets_debugger_color"), &BulletFactory2D::get_directional_bullets_debugger_color);
 	ClassDB::bind_method(D_METHOD("set_directional_bullets_debugger_color", "new_color"), &BulletFactory2D::set_directional_bullets_debugger_color);
@@ -986,14 +1042,14 @@ void BulletFactory2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_block_bullets_debugger_color", "new_color"), &BulletFactory2D::set_block_bullets_debugger_color);
 	ADD_PROPERTY(PropertyInfo(Variant::COLOR, "block_bullets_debugger_color"), "set_block_bullets_debugger_color", "get_block_bullets_debugger_color");
 
-	ClassDB::bind_method(D_METHOD("populate_bullets_pool", "multimesh_data", "amount_instances"), &BulletFactory2D::populate_bullets_pool);
-	ClassDB::bind_method(D_METHOD("free_bullets_pool", "bullet_type", "amount_bullets_per_instance"), &BulletFactory2D::free_bullets_pool, DEFVAL(0));
+	ClassDB::bind_method(D_METHOD("populate_bullets_pool", "key", "multimesh_data", "instance_count"), &BulletFactory2D::populate_bullets_pool);
+	ClassDB::bind_method(D_METHOD("free_bullets_pool", "bullet_type", "key"), &BulletFactory2D::free_bullets_pool, DEFVAL(Ref<MultiMeshPoolKey2D>()));
 
 	ClassDB::bind_method(D_METHOD("populate_attachments_pool", "attachment_scene", "attachment_id", "amount_attachments"), &BulletFactory2D::populate_attachments_pool);
 	ClassDB::bind_method(D_METHOD("free_attachments_pool", "attachment_id"), &BulletFactory2D::free_attachments_pool, DEFVAL(-1));
 
-	ClassDB::bind_method(D_METHOD("free_active_bullets", "amount_bullets"), &BulletFactory2D::free_active_bullets, DEFVAL(0));
-	ClassDB::bind_method(D_METHOD("free_disabled_bullets", "amount_bullets"), &BulletFactory2D::free_disabled_bullets, DEFVAL(0));
+	ClassDB::bind_method(D_METHOD("free_active_bullets", "key"), &BulletFactory2D::free_active_bullets, DEFVAL(Ref<MultiMeshPoolKey2D>()));
+	ClassDB::bind_method(D_METHOD("free_disabled_bullets", "key"), &BulletFactory2D::free_disabled_bullets, DEFVAL(Ref<MultiMeshPoolKey2D>()));
 
 	// Additional debug methods related
 

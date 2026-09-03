@@ -8,6 +8,7 @@
 #include "shared/bullet_curves_data2d.hpp"
 #include "shared/bullet_rotation_data2d.hpp"
 #include "shared/bullet_speed_data2d.hpp"
+#include "shared/multimesh_pool_key2d.hpp"
 
 // Factory
 #include "factory/bullet_factory2d.hpp"
@@ -37,6 +38,7 @@ void initialize_blast_bullets_2d_module(ModuleInitializationLevel p_level) {
 	GDREGISTER_CLASS(BulletRotationData2D)
 	GDREGISTER_CLASS(BulletSpeedData2D)
 	GDREGISTER_CLASS(BulletCurvesData2D)
+	GDREGISTER_CLASS(MultiMeshPoolKey2D)
 	GDREGISTER_RUNTIME_CLASS(BulletAttachment2D)
 
 	// Factory

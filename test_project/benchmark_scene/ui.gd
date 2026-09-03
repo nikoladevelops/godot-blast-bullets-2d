@@ -256,15 +256,24 @@ func _on_select_fire_timer_btn_view_new_btn_selected(new_selected_btn: Button) -
 
 ## Freeing object pool logic
 
+static func _effective_shape_type(shape: Shape2D) -> int:
+	if shape is RectangleShape2D:
+		return PhysicsServer2D.SHAPE_RECTANGLE
+	if shape is CapsuleShape2D:
+		return PhysicsServer2D.SHAPE_CAPSULE
+	return PhysicsServer2D.SHAPE_CIRCLE
+
 func _on_free_multi_mesh_directional_pool_btn_pressed() -> void:
 	var amount_bullets:int = select_amount_bullets_view.get_selected_btn.text.to_int()
-	
-	BENCHMARK_GLOBALS.FACTORY.free_bullets_pool(BulletFactory2D.DIRECTIONAL_BULLETS, amount_bullets)
+	var shape_type:int = _effective_shape_type(BENCHMARK_GLOBALS.PLAYER_DATA_NODE.directional_bullets_data.collision_shape)
+
+	BENCHMARK_GLOBALS.FACTORY.free_bullets_pool(BulletFactory2D.DIRECTIONAL_BULLETS, MultiMeshPoolKey2D.make(amount_bullets, shape_type))
 
 func _on_free_multi_mesh_block_bullets_pool_btn_pressed() -> void:
 	var amount_bullets:int = select_amount_bullets_view.get_selected_btn.text.to_int()
-	
-	BENCHMARK_GLOBALS.FACTORY.free_bullets_pool(BulletFactory2D.BLOCK_BULLETS, amount_bullets)
+	var shape_type:int = _effective_shape_type(BENCHMARK_GLOBALS.PLAYER_DATA_NODE.block_bullets_data.collision_shape)
+
+	BENCHMARK_GLOBALS.FACTORY.free_bullets_pool(BulletFactory2D.BLOCK_BULLETS, MultiMeshPoolKey2D.make(amount_bullets, shape_type))
 
 func _on_free_all_bullet_pools_btn_pressed() -> void:
 	BENCHMARK_GLOBALS.FACTORY.free_bullets_pool(BulletFactory2D.DIRECTIONAL_BULLETS)
@@ -276,14 +285,18 @@ func _on_free_all_bullet_pools_btn_pressed() -> void:
 
 func _on_populate_multi_mesh_directional_pool_btn_pressed() -> void:
 	var amount_multi_meshes:int = select_amount_multi_meshes_view.get_selected_btn.text.to_int()
-	
-	BENCHMARK_GLOBALS.FACTORY.populate_bullets_pool(BENCHMARK_GLOBALS.PLAYER_DATA_NODE.directional_bullets_data, amount_multi_meshes)
+	var data = BENCHMARK_GLOBALS.PLAYER_DATA_NODE.directional_bullets_data
+	var pool_key:MultiMeshPoolKey2D = MultiMeshPoolKey2D.make(data.transforms.size(), _effective_shape_type(data.collision_shape))
+
+	BENCHMARK_GLOBALS.FACTORY.populate_bullets_pool(pool_key, data, amount_multi_meshes)
 	
 
 func _on_populate_multi_mesh_block_pool_btn_pressed() -> void:
 	var amount_multi_meshes:int = select_amount_multi_meshes_view.get_selected_btn.text.to_int()
-	
-	BENCHMARK_GLOBALS.FACTORY.populate_bullets_pool(BENCHMARK_GLOBALS.PLAYER_DATA_NODE.block_bullets_data,amount_multi_meshes)
+	var data = BENCHMARK_GLOBALS.PLAYER_DATA_NODE.block_bullets_data
+	var pool_key:MultiMeshPoolKey2D = MultiMeshPoolKey2D.make(data.transforms.size(), _effective_shape_type(data.collision_shape))
+
+	BENCHMARK_GLOBALS.FACTORY.populate_bullets_pool(pool_key, data, amount_multi_meshes)
 	
 
 func _on_select_bullet_damage_view_new_btn_selected(new_selected_btn: Button) -> void:

@@ -161,7 +161,7 @@ void MultiMeshBullets2D::spawn(const MultiMeshBulletsData2D &data, MultiMeshObje
 		is_active = false;
 		set_all_physics_shapes_enabled_for_area(false);
 		bullets_container->add_child(this);
-		bullets_pool->push(this, amount_bullets);
+		bullets_pool->push(this, get_pool_key());
 	} else {
 		all_bullets_enabled_set.activate_all_data();
 		is_active = true;
@@ -997,6 +997,54 @@ void MultiMeshBullets2D::set_monitorable(bool value) {
 	physics_server->area_set_monitorable(area, monitorable);
 }
 
+void MultiMeshBullets2D::set_collision_shape_runtime(const Ref<Shape2D> &new_shape) {
+	if (!physics_server || !area.is_valid()) {
+		UtilityFunctions::push_error("set_collision_shape_runtime: physics not ready, cannot change shape at runtime.");
+		return;
+	}
+	PhysicsServer2D::ShapeType old_effective = cached_effective_shape_type;
+	const PoolKey old_key{ amount_bullets, old_effective };
+	cache_collision_shape_typed(new_shape);
+	// Typed cache already printed error once + fallback if needed.
+	if (cached_effective_shape_type != old_effective) {
+		// RID type mismatch: clear area, free old RIDs and recreate correct type to avoid setting Vector2 data on circle RID etc.
+		physics_server->area_clear_shapes(area);
+		for (RID &s : physics_shapes) {
+			if (s.is_valid()) {
+				physics_server->free_rid(s);
+			}
+		}
+		physics_shapes.clear();
+		generate_physics_shapes_for_area(amount_bullets);
+	}
+	// Refresh data + transforms for all bullets so physics + debugger pick up new size immediately.
+	// generate sets area transform + shape data from typed cache; then sync cached vectors (no second area_set) + interp cache to avoid lerp pop.
+	if ((int)physics_shapes.size() != amount_bullets) {
+		UtilityFunctions::push_error("set_collision_shape_runtime: shape RID count mismatch, cannot refresh.");
+		return;
+	}
+	for (int i = 0; i < amount_bullets; ++i) {
+		(void)generate_collision_shape_transform_for_area(all_cached_instance_transforms[i], physics_shapes[i], cache_collision_shape_offset, i);
+		all_cached_shape_transforms[i] = all_cached_instance_transforms[i];
+		Vector2 off = Vector2(0, 0);
+		if (cache_collision_shape_offset != Vector2(0, 0)) {
+			off = cache_collision_shape_offset.rotated(all_cached_instance_transforms[i].get_rotation());
+		}
+		all_cached_shape_origin[i] = all_cached_instance_origin[i] + off;
+		all_cached_shape_transforms[i].set_origin(all_cached_shape_origin[i]);
+		update_bullet_previous_transform_for_interpolation(i);
+	}
+	// Pooled instances live inside a bucket keyed by get_pool_key(). A runtime type change
+	// while disabled would otherwise leave this instance in the stale bucket. Re-bucket it.
+	if (!is_active && bullets_pool != nullptr) {
+		const PoolKey new_key = get_pool_key();
+		if (!(new_key == old_key)) {
+			bullets_pool->try_remove_instance(this, old_key);
+			bullets_pool->push(this, new_key);
+		}
+	}
+}
+
 void MultiMeshBullets2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_bullet_speed_data", "bullet_index"), &MultiMeshBullets2D::get_bullet_speed_data);
 	ClassDB::bind_method(D_METHOD("set_bullet_speed_data", "bullet_index", "new_bullet_speed_data"), &MultiMeshBullets2D::set_bullet_speed_data);
@@ -1097,6 +1145,9 @@ void MultiMeshBullets2D::_bind_methods() {
 
 	ClassDB::bind_method(D_METHOD("get_monitorable"), &MultiMeshBullets2D::get_monitorable);
 	ClassDB::bind_method(D_METHOD("set_monitorable", "value"), &MultiMeshBullets2D::set_monitorable);
+
+	ClassDB::bind_method(D_METHOD("get_collision_shape"), &MultiMeshBullets2D::get_collision_shape);
+	ClassDB::bind_method(D_METHOD("set_collision_shape_runtime", "new_shape"), &MultiMeshBullets2D::set_collision_shape_runtime);
 
 	//
 

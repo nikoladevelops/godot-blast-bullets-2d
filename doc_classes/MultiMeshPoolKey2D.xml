@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="MultiMeshPoolKey2D" inherits="Resource" api_type="extension" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/godotengine/godot/master/doc/class.xsd">
+	<brief_description>
+		GDScript-visible key identifying one exact object-pool bucket (amount_bullets + shape).
+	</brief_description>
+	<description>
+		Create with [method make] or by setting [member amount_bullets] and [member shape_type].
+		[code]amount_bullets[/code] is bullets per multimesh (bucket identity, must equal spawn data transforms size). It is NOT the instance count — see [method BulletFactory2D.populate_bullets_pool] [code]instance_count[/code] for how many multimeshes to pre-create.
+		Pass to [method BulletFactory2D.reset], [method BulletFactory2D.free_active_bullets], [method BulletFactory2D.free_disabled_bullets] and [method BulletFactory2D.free_bullets_pool]. Pass [code]null[/code] to affect all buckets, or a key for one exact bucket.
+		Keys returned by [method BulletFactory2D.debug_get_bullets_pool_info] are one [MultiMeshPoolKey2D] per bucket.
+		Internally the pool uses a plain value-type key for speed; this Resource is only the Godot boundary wrapper.
+	</description>
+	<tutorials>
+	</tutorials>
+	<methods>
+		<method name="make" qualifiers="static">
+			<return type="MultiMeshPoolKey2D" />
+			<param index="0" name="amount_bullets" type="int" />
+			<param index="1" name="shape_type" type="int" />
+			<description>
+				Creates a key for the exact bucket with [code]amount_bullets[/code] bullets per multimesh and PhysicsServer2D shape type.
+			</description>
+		</method>
+	</methods>
+	<members>
+		<member name="amount_bullets" type="int" setter="set_amount_bullets" getter="get_amount_bullets" default="0">
+			Bullets per multimesh in this bucket (bucket identity). Must be &gt;= 0 and match spawn data transforms size.
+		</member>
+		<member name="shape_type" type="int" setter="set_shape_type" getter="get_shape_type" default="3">
+			PhysicsServer2D shape type for this bucket. Use PhysicsServer2D.SHAPE_* (Circle=3, Rectangle=4, Capsule=5).
+		</member>
+	</members>
+</class>

@@ -15,7 +15,7 @@ public:
 	// The block rotation. The direction of the bullets is determined by it.
 	real_t block_rotation_radians = 0.0;
 
-	_ALWAYS_INLINE_ void move_bullets(double delta) {
+	inline void move_bullets(double delta) {
 		real_t cache_first_rotation_result = 0.0;
 		// Accelerate only the first bullet rotation speed
 		if (is_rotation_data_active) {

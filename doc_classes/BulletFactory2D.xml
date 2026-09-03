@@ -55,7 +55,7 @@
 			<return type="Dictionary" />
 			<param index="0" name="bullet_type" type="int" enum="BulletFactory2D.BulletType" />
 			<description>
-				Get the whole information about the bullet multimeshes object pool of a specific type. Returns a [Dictionary] containing [b]amount bullets in the multimesh as the KEY[/b] and the [b]amount of multimeshes that contain exactly that amount as the VALUE[/b].
+				Get the whole information about the bullet multimeshes object pool of a specific type. Returns a [Dictionary] containing [MultiMeshPoolKey2D] as the KEY (one per exact amount+shape bucket) and the amount of pooled multimeshes in that bucket as the VALUE.
 			</description>
 		</method>
 		<method name="debug_get_total_attachments_amount">
@@ -73,9 +73,9 @@
 		</method>
 		<method name="free_active_bullets">
 			<return type="void" />
-			<param index="0" name="amount_bullets" type="int" default="0" />
+			<param index="0" name="key" type="MultiMeshPoolKey2D" default="null" />
 			<description>
-				Frees all active bullets that are currently in the scene tree. You also have the option of freeing only the instances that each have a particular [code]amount_bullets_per_instance[/code] if you provide a value that is bigger than 0. Example: if you want to free all those multimeshes in the scene tree that each have 200 bullets each ([code]amount_bullets_per_instance=200[/code]).
+				Frees active bullets in the scene tree. Pass [code]null[/code] (default) to free all, or a [MultiMeshPoolKey2D] to free only that exact amount+shape bucket.
 			</description>
 		</method>
 		<method name="free_attachments_pool">
@@ -88,16 +88,16 @@
 		<method name="free_bullets_pool">
 			<return type="void" />
 			<param index="0" name="bullet_type" type="int" enum="BulletFactory2D.BulletType" />
-			<param index="1" name="amount_bullets_per_instance" type="int" default="0" />
+			<param index="1" name="key" type="MultiMeshPoolKey2D" default="null" />
 			<description>
-				By default completely frees an object pool of a particular bullet type. You also have the option of freeing only the instances that each have a particular [code]amount_bullets_per_instance[/code] if you provide a value that is bigger than 0. Example: if you want to free all those multimeshes in the object pool that each have 200 bullets each ([code]amount_bullets_per_instance=200[/code]).
+				Frees the object pool of a particular bullet type. Pass [code]null[/code] (default) to free the whole pool, or a [MultiMeshPoolKey2D] to free only that exact amount+shape bucket. Example: [code]MultiMeshPoolKey2D.make(200, PhysicsServer2D.SHAPE_CIRCLE)[/code].
 			</description>
 		</method>
 		<method name="free_disabled_bullets">
 			<return type="void" />
-			<param index="0" name="amount_bullets" type="int" default="0" />
+			<param index="0" name="key" type="MultiMeshPoolKey2D" default="null" />
 			<description>
-				Frees all disabled bullets that are currently in the scene tree. You also have the option of freeing only the instances that each have a particular [code]amount_bullets_per_instance[/code] if you provide a value that is bigger than 0. Example: if you want to free all those multimeshes in the scene tree that each have 200 bullets each ([code]amount_bullets_per_instance=200[/code]).
+				Frees disabled (pooled) bullets. Pass [code]null[/code] (default) to free all, or a [MultiMeshPoolKey2D] to free only that exact amount+shape bucket.
 			</description>
 		</method>
 		<method name="get_is_factory_busy" qualifiers="const">
@@ -137,17 +137,18 @@
 		</method>
 		<method name="populate_bullets_pool">
 			<return type="void" />
-			<param index="0" name="multimesh_data" type="MultiMeshBulletsData2D" />
-			<param index="1" name="amount_instances" type="int" />
+			<param index="0" name="key" type="MultiMeshPoolKey2D" />
+			<param index="1" name="multimesh_data" type="MultiMeshBulletsData2D" />
+			<param index="2" name="instance_count" type="int" />
 			<description>
-				Populates a specific [code]bullet_type[/code] object pool. The [code]amount_instances[/code] is the amount of multimeshes, while the [code]amount_bullets_per_instance[/code] determines how many bullets each multimesh instance has.
+				Pre-creates [code]instance_count[/code] disabled multimeshes in one exact bucket. [code]key.amount_bullets[/code] is bullets per multimesh (must equal [code]multimesh_data[/code] transforms size); [code]instance_count[/code] is how many multimeshes to create. The [code]key[/code] is required and must match the bucket derived from [code]multimesh_data[/code] (amount_bullets + effective collision shape); mismatch aborts with an error and creates nothing. Example: [code]populate_bullets_pool(MultiMeshPoolKey2D.make(5, PhysicsServer2D.SHAPE_CIRCLE), data, 2)[/code] creates 2 multimeshes of 5 bullets each.
 			</description>
 		</method>
 		<method name="reset">
 			<return type="void" />
-			<param index="0" name="amount_bullets" type="int" default="0" />
+			<param index="0" name="key" type="MultiMeshPoolKey2D" default="null" />
 			<description>
-				Resets the factory - free everything (object pools, spawned bullets, spawned attachments - all get deleted from memory).
+				Resets the factory. Pass [code]null[/code] (default) for a full reset (all bullets, pools, and the full attachment pool). Pass a [MultiMeshPoolKey2D] to reset only that exact amount_bullets+shape bucket; unrelated pooled attachments are preserved.
 				Emits the [signal reset_finished] signal when complete.
 			</description>
 		</method>

@@ -149,7 +149,7 @@ public:
 
 	////////////////////// POP METHODS
 
-	_ALWAYS_INLINE_ Variant pop_front_target(const Vector2 &cached_mouse_global_position) {
+	inline Variant pop_front_target(const Vector2 &cached_mouse_global_position) {
 		uint64_t queue_size = homing_targets.size();
 
 		if (queue_size == 0) {

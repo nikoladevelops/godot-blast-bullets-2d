@@ -9,21 +9,8 @@ using namespace godot;
 
 namespace BlastBullets2D {
 
-void MultiMeshObjectPool::push(MultiMeshBullets2D *multimesh, int amount_bullets) {
-	PoolKey key{ amount_bullets, PhysicsServer2D::SHAPE_RECTANGLE };
-	if (multimesh) {
-		key.shape_type = CollisionShapeHelper2D::get_effective_type(multimesh->get_collision_shape(), false);
-	}
-	pool[key].push_back(multimesh);
-}
-
 void MultiMeshObjectPool::push(MultiMeshBullets2D *multimesh, const PoolKey &key) {
 	pool[key].push_back(multimesh);
-}
-
-MultiMeshBullets2D *MultiMeshObjectPool::pop(int amount_bullets) {
-	PoolKey key{ amount_bullets, PhysicsServer2D::SHAPE_RECTANGLE };
-	return pop(key);
 }
 
 MultiMeshBullets2D *MultiMeshObjectPool::pop(const PoolKey &key) {
@@ -58,22 +45,17 @@ void MultiMeshObjectPool::free_all_bullets() {
 	pool.clear();
 }
 
-void MultiMeshObjectPool::free_specific_bullets(int amount_bullets) {
-	// Collect keys to erase (can't erase while iterating)
-	std::vector<PoolKey> keys_to_erase;
-	for (auto &kv : pool) {
-		if (kv.first.amount == amount_bullets) {
-			for (MultiMeshBullets2D *bullet_multi : kv.second) {
-				if (bullet_multi) {
-					bullet_multi->force_delete();
-				}
-			}
-			keys_to_erase.push_back(kv.first);
+void MultiMeshObjectPool::free_specific_bullets(const PoolKey &key) {
+	auto it = pool.find(key);
+	if (it == pool.end()) {
+		return;
+	}
+	for (MultiMeshBullets2D *bullet_multi : it->second) {
+		if (bullet_multi) {
+			bullet_multi->force_delete();
 		}
 	}
-	for (auto &k : keys_to_erase) {
-		pool.erase(k);
-	}
+	pool.erase(it);
 }
 
 int MultiMeshObjectPool::get_total_amount_pooled() {
@@ -84,32 +66,30 @@ int MultiMeshObjectPool::get_total_amount_pooled() {
 	return total_amount_pooled;
 }
 
-std::map<int, int> MultiMeshObjectPool::get_pool_info() {
-	std::map<int, int> result;
+std::map<PoolKey, int> MultiMeshObjectPool::get_pool_info() {
+	std::map<PoolKey, int> result;
 	for (auto &[key, vec] : pool) {
 		if (!vec.empty()) {
-			result[key.amount] += static_cast<int>(vec.size());
+			result[key] = static_cast<int>(vec.size());
 		}
 	}
 	return result;
 }
 
-bool MultiMeshObjectPool::try_remove_instance(MultiMeshBullets2D *target, int amount_bullets) {
-	// Search all buckets with matching amount (any shape_type)
-	for (auto it = pool.begin(); it != pool.end(); ++it) {
-		if (it->first.amount != amount_bullets) {
-			continue;
-		}
-		std::vector<MultiMeshBullets2D *> &vec = it->second;
-		for (size_t i = 0; i < vec.size(); ++i) {
-			if (vec[i] == target) {
-				vec[i] = vec.back();
-				vec.pop_back();
-				if (vec.empty()) {
-					pool.erase(it);
-				}
-				return true;
+bool MultiMeshObjectPool::try_remove_instance(MultiMeshBullets2D *target, const PoolKey &key) {
+	auto it = pool.find(key);
+	if (it == pool.end()) {
+		return false;
+	}
+	std::vector<MultiMeshBullets2D *> &vec = it->second;
+	for (size_t i = 0; i < vec.size(); ++i) {
+		if (vec[i] == target) {
+			vec[i] = vec.back();
+			vec.pop_back();
+			if (vec.empty()) {
+				pool.erase(it);
 			}
+			return true;
 		}
 	}
 	return false;

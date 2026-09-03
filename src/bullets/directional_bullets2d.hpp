@@ -103,7 +103,7 @@ protected:
 
 public:
 	// Updates all bullets' positions, rotations, and homing
-	_ALWAYS_INLINE_ void move_bullets(double delta) {
+	inline void move_bullets(double delta) {
 		const bool is_using_physics_interpolation = bullet_factory->use_physics_interpolation;
 		if (is_using_physics_interpolation) {
 			update_all_previous_transforms_for_interpolation();

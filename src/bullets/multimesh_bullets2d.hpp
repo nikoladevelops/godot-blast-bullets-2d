@@ -31,6 +31,7 @@
 #include "shared/bullet_speed_data2d.hpp"
 #include "shared/collision_shape_helper2d.hpp"
 #include "shared/dynamic_sparse_set.hpp"
+#include "shared/multimesh_pool_key2d.hpp"
 
 #include <cstddef>
 #include <cstdint>
@@ -202,7 +203,7 @@ float *w = batch_buffer.ptrw();
 	}
 
 	// Reduces the lifetime of the multimesh so it can eventually get disabled entirely
-	_ALWAYS_INLINE_ void reduce_lifetime(double delta) {
+	inline void reduce_lifetime(double delta) {
 		curves_elapsed_time += delta;
 
 		// If the lifetime is infinite there is no lifetime timer
@@ -470,6 +471,10 @@ float *w = batch_buffer.ptrw();
 	void set_monitorable(bool value);
 
 	Ref<Shape2D> get_collision_shape() const { return cached_collision_shape; }
+	// Explicit runtime shape change. Recreates RIDs if effective type changed, else updates data.
+	// Debugger picks up new type/size next physics tick via ensure function. Safe for pooling (caller must re-push with new key if pooled).
+	void set_collision_shape_runtime(const Ref<Shape2D> &new_shape);
+	PoolKey get_pool_key() const { return PoolKey{ amount_bullets, cached_effective_shape_type }; }
 	static void _bind_methods();
 
 	void _notification(int p_what);
@@ -681,7 +686,8 @@ float *w = batch_buffer.ptrw();
 	Ref<Shape2D> cached_collision_shape;
 
 	// Typed cache resolved once at spawn/enable via casting. Physics + debugger branch on this, no per-bullet cast.
-	PhysicsServer2D::ShapeType cached_effective_shape_type = PhysicsServer2D::SHAPE_RECTANGLE;
+	// Default null => circle r16 (diameter 32, same coverage as rect 32, faster physics).
+	PhysicsServer2D::ShapeType cached_effective_shape_type = PhysicsServer2D::SHAPE_CIRCLE;
 	Vector2 cached_rect_size = Vector2(32, 32);
 	float cached_circle_radius = 16.0f;
 	float cached_capsule_radius = 8.0f;
@@ -720,12 +726,12 @@ float *w = batch_buffer.ptrw();
 	}
 
 	// Resolve Ref<Shape2D> once via casting into typed cache. Single error per spawn/enable, then quiet.
+	// Null/unsupported/invalid => circle r16 (consistent default, cheapest physics).
 	_ALWAYS_INLINE_ void cache_collision_shape_typed(const Ref<Shape2D> &shape) {
 		cached_collision_shape = shape;
-		// Defaults: rect 32x32.
-		cached_effective_shape_type = PhysicsServer2D::SHAPE_RECTANGLE;
+		cached_effective_shape_type = PhysicsServer2D::SHAPE_CIRCLE;
 		cached_rect_size = CollisionShapeHelper2D::DEFAULT_RECT_SIZE;
-		cached_circle_radius = 16.0f;
+		cached_circle_radius = CollisionShapeHelper2D::DEFAULT_CIRCLE_RADIUS;
 		cached_capsule_radius = 8.0f;
 		cached_capsule_height = 24.0f;
 		if (shape.is_null()) {
@@ -734,7 +740,7 @@ float *w = batch_buffer.ptrw();
 		if (auto *rect = Object::cast_to<RectangleShape2D>(shape.ptr())) {
 			Vector2 s = rect->get_size();
 			if (s.x <= 0.0f || s.y <= 0.0f) {
-				UtilityFunctions::push_error("RectangleShape2D size must be > 0. Falling back to rectangle 32x32.");
+				UtilityFunctions::push_error("RectangleShape2D size must be > 0. Falling back to circle r16.");
 				return;
 			}
 			cached_effective_shape_type = PhysicsServer2D::SHAPE_RECTANGLE;
@@ -744,7 +750,7 @@ float *w = batch_buffer.ptrw();
 		if (auto *circle = Object::cast_to<CircleShape2D>(shape.ptr())) {
 			float r = circle->get_radius();
 			if (r <= 0.0f) {
-				UtilityFunctions::push_error("CircleShape2D radius must be > 0. Falling back to rectangle 32x32.");
+				UtilityFunctions::push_error("CircleShape2D radius must be > 0. Falling back to circle r16.");
 				return;
 			}
 			cached_effective_shape_type = PhysicsServer2D::SHAPE_CIRCLE;
@@ -755,7 +761,7 @@ float *w = batch_buffer.ptrw();
 			float r = capsule->get_radius();
 			float h = capsule->get_height();
 			if (r <= 0.0f || h <= 0.0f) {
-				UtilityFunctions::push_error("CapsuleShape2D radius/height must be > 0. Falling back to rectangle 32x32.");
+				UtilityFunctions::push_error("CapsuleShape2D radius/height must be > 0. Falling back to circle r16.");
 				return;
 			}
 			cached_effective_shape_type = PhysicsServer2D::SHAPE_CAPSULE;
@@ -763,7 +769,7 @@ float *w = batch_buffer.ptrw();
 			cached_capsule_height = h;
 			return;
 		}
-		UtilityFunctions::push_error("Unsupported collision shape type: " + shape->get_class() + " - only RectangleShape2D/CircleShape2D/CapsuleShape2D supported. Falling back to rectangle 32x32.");
+		UtilityFunctions::push_error("Unsupported collision shape type: " + shape->get_class() + " - only RectangleShape2D/CircleShape2D/CapsuleShape2D supported. Falling back to circle r16.");
 	}
 
 	// Sync shape transform from instance transform (shared logic for teleport/set_transform)
@@ -784,7 +790,7 @@ float *w = batch_buffer.ptrw();
 	}
 
 	//////////////////// CURVES RELATED
-	_ALWAYS_INLINE_ void populate_shared_curves_related_data(const Ref<BulletCurvesData2D> &new_curves_data) {
+	inline void populate_shared_curves_related_data(const Ref<BulletCurvesData2D> &new_curves_data) {
 		if (new_curves_data.is_null()) {
 			shared_bullet_curves_data.unref();
 			return;
@@ -1311,7 +1317,7 @@ float *w = batch_buffer.ptrw();
 
 		// Remove all attached timers
 		_do_detach_all_time_based_functions(); // TODO maybe a separate property for this setting is more appropriate for consistent behavior?
-		bullets_pool->push(this, amount_bullets);
+		bullets_pool->push(this, get_pool_key());
 	}
 
 	_ALWAYS_INLINE_ void enable_bullet(int bullet_index, int collision_amount = 0, bool should_enable_attachment = true) {

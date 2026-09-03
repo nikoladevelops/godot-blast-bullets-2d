@@ -123,12 +123,13 @@ void MultiMeshBulletsDebugger2D::generate_debug_multimesh(Node *node_entered_con
 	}
 
 	// Provider type drives mesh: rect->QuadMesh(size), circle->ArrayMesh fan(r), capsule->ArrayMesh rect+caps.
+	// Fallback is circle r16 (consistent default, cheapest physics).
 	PhysicsServer2D::ShapeType shape_type = debugger_data_provider->get_collision_shape_type_for_debugging();
 	Vector2 shape_size = debugger_data_provider->get_collision_shape_size_for_debugging();
 	if (shape_size.x <= 0.0f || shape_size.y <= 0.0f) {
-		UtilityFunctions::push_error("Debugger got invalid shape size, falling back to 32x32.");
+		UtilityFunctions::push_error("Debugger got invalid shape size, falling back to circle r16.");
 		shape_size = Vector2(32, 32);
-		shape_type = PhysicsServer2D::SHAPE_RECTANGLE;
+		shape_type = PhysicsServer2D::SHAPE_CIRCLE;
 	}
 	Ref<Mesh> new_mesh = create_debug_mesh_for_shape(shape_type, shape_size);
 
@@ -280,7 +281,7 @@ void MultiMeshBulletsDebugger2D::ensure_quadmesh_matches_data_provider_collision
 	Vector2 want_size = debugger_data_provider.get_collision_shape_size_for_debugging();
 	if (want_size.x <= 0.0f || want_size.y <= 0.0f) {
 		want_size = Vector2(32, 32);
-		want_type = PhysicsServer2D::SHAPE_RECTANGLE;
+		want_type = PhysicsServer2D::SHAPE_CIRCLE;
 	}
 	PhysicsServer2D::ShapeType have_type = debugger_mesh_types[dbg_index];
 	Vector2 have_size = debugger_mesh_sizes[dbg_index];

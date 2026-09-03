@@ -126,9 +126,14 @@ func set_up_directional_bullets_data()->DirectionalBulletsData2D:
 	data.set_collision_layer_from_array([2])
 	data.set_collision_mask_from_array([3])
 	
-	var shape:CircleShape2D = CircleShape2D.new()
-	shape.radius = 32
-	data.collision_shape = shape
+	var circle:CircleShape2D = CircleShape2D.new()
+	circle.radius = 32
+	
+	var rectangle:RectangleShape2D = RectangleShape2D.new()
+	rectangle.size = Vector2(32,32)
+	
+	data.collision_shape = circle
+	
 	
 	data.texture_size = Vector2(140,140)
 	data.collision_shape_offset=Vector2(0,0)
