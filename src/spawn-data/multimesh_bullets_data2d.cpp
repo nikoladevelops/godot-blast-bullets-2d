@@ -87,11 +87,11 @@ void MultiMeshBulletsData2D::set_collision_mask_from_array(const TypedArray<int>
 	collision_mask = bitmask;
 }
 
-Vector2 MultiMeshBulletsData2D::get_collision_shape_size() const {
-	return collision_shape_size;
+Ref<Shape2D> MultiMeshBulletsData2D::get_collision_shape() const {
+	return collision_shape;
 }
-void MultiMeshBulletsData2D::set_collision_shape_size(const Vector2 &new_collision_shape_size) {
-	collision_shape_size = new_collision_shape_size;
+void MultiMeshBulletsData2D::set_collision_shape(const Ref<Shape2D> &new_shape) {
+	collision_shape = new_shape;
 }
 
 Vector2 MultiMeshBulletsData2D::get_collision_shape_offset() const {
@@ -287,9 +287,9 @@ void MultiMeshBulletsData2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_collision_mask", "new_collision_mask"), &MultiMeshBulletsData2D::set_collision_mask);
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "collision_mask"), "set_collision_mask", "get_collision_mask");
 
-	ClassDB::bind_method(D_METHOD("get_collision_shape_size"), &MultiMeshBulletsData2D::get_collision_shape_size);
-	ClassDB::bind_method(D_METHOD("set_collision_shape_size", "new_collision_shape_size"), &MultiMeshBulletsData2D::set_collision_shape_size);
-	ADD_PROPERTY(PropertyInfo(Variant::VECTOR2, "collision_shape_size"), "set_collision_shape_size", "get_collision_shape_size");
+	ClassDB::bind_method(D_METHOD("get_collision_shape"), &MultiMeshBulletsData2D::get_collision_shape);
+	ClassDB::bind_method(D_METHOD("set_collision_shape", "new_shape"), &MultiMeshBulletsData2D::set_collision_shape);
+	ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "collision_shape", PROPERTY_HINT_RESOURCE_TYPE, "Shape2D"), "set_collision_shape", "get_collision_shape");
 
 	ClassDB::bind_method(D_METHOD("get_collision_shape_offset"), &MultiMeshBulletsData2D::get_collision_shape_offset);
 	ClassDB::bind_method(D_METHOD("set_collision_shape_offset", "new_collision_shape_offset"), &MultiMeshBulletsData2D::set_collision_shape_offset);
@@ -377,5 +377,7 @@ void MultiMeshBulletsData2D::_bind_methods() {
 	ADD_PROPERTY(PropertyInfo(Variant::ARRAY, "bullets_current_collision_count"), "set_bullets_current_collision_count", "get_bullets_current_collision_count");
 
 	ClassDB::bind_static_method("MultiMeshBulletsData2D", D_METHOD("calculate_bitmask", "numbers"), &MultiMeshBulletsData2D::calculate_bitmask);
+
+
 }
 } //namespace BlastBullets2D

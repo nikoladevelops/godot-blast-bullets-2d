@@ -74,21 +74,6 @@ public:
 		}
 
 		bullet_accelerate_speed(0, delta);
-		// Keep per-bullet SoA consistent (API allows get_bullet_speed_data(i) for any i)
-		if (amount_bullets > 1) {
-			real_t s = all_cached_speed[0];
-			real_t m = all_cached_max_speed[0];
-			real_t a = all_cached_acceleration[0];
-			Vector2 d = all_cached_direction[0];
-			Vector2 v = all_cached_velocity[0];
-			for (int i = 1; i < amount_bullets; ++i) {
-				all_cached_speed[i] = s;
-				all_cached_max_speed[i] = m;
-				all_cached_acceleration[i] = a;
-				all_cached_direction[i] = d;
-				all_cached_velocity[i] = v;
-			}
-		}
 
 		// Handle collisions safely after all physics processing logic is done
 		for (auto &data : all_collided_bullets) {

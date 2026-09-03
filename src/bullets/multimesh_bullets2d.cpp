@@ -12,6 +12,7 @@
 #include "multimesh_bullets2d.hpp"
 #include "shared/bullet_curves_data2d.hpp"
 #include "shared/bullet_movement_pattern_data2d.hpp"
+#include "shared/collision_shape_helper2d.hpp"
 #include <godot_cpp/classes/physics_server2d.hpp>
 #include <godot_cpp/classes/random_number_generator.hpp>
 #include <godot_cpp/classes/scene_state.hpp>
@@ -97,10 +98,12 @@ void MultiMeshBullets2D::spawn(const MultiMeshBulletsData2D &data, MultiMeshObje
 	physics_server = PhysicsServer2D::get_singleton();
 
 	amount_bullets = data.transforms.size(); // important, because some set_up methods use this
+	cache_collision_shape_typed(data.collision_shape);
 
 	all_bullets_enabled_set.resize(amount_bullets);
 	all_bullet_curves_data.assign(amount_bullets, Ref<BulletCurvesData2D>());
 	all_movement_pattern_data.assign(amount_bullets, BulletMovementPatternData2D());
+	batch_buffer.resize(amount_bullets * 8);
 
 	set_up_life_time_timer(data.max_life_time, data.max_life_time);
 	set_up_change_texture_timer(
@@ -169,6 +172,7 @@ void MultiMeshBullets2D::spawn(const MultiMeshBulletsData2D &data, MultiMeshObje
 // Activates the multimesh
 void MultiMeshBullets2D::enable_multimesh(const MultiMeshBulletsData2D &data, const Vector2 &new_inherited_velocity_offset) {
 	inherited_velocity_offset = new_inherited_velocity_offset;
+	cache_collision_shape_typed(data.collision_shape);
 
 	set_up_life_time_timer(data.max_life_time, data.max_life_time);
 	set_up_change_texture_timer(
@@ -257,7 +261,7 @@ void MultiMeshBullets2D::set_up_bullet_instances(const MultiMeshBulletsData2D &d
 		const Transform2D &curr_data_transf = data.transforms[i];
 
 		// Generates a collision shape transform for a particular bullet and attaches it to the area
-		Transform2D shape_transf = generate_collision_shape_transform_for_area(curr_data_transf, shape, data.collision_shape_size, data.collision_shape_offset, i);
+		Transform2D shape_transf = generate_collision_shape_transform_for_area(curr_data_transf, shape, data.collision_shape_offset, i);
 
 		// Generates texture transform with correct rotation and sets it to the correct bullet on the multimesh
 		const Transform2D &texture_transf = generate_texture_transform(curr_data_transf, data.is_texture_rotation_permanent, cache_texture_rotation_radians, i);
@@ -293,6 +297,7 @@ void MultiMeshBullets2D::set_up_multimesh(int new_instance_count, const Ref<Mesh
 	}
 
 	multi->set_instance_count(new_instance_count);
+	batch_buffer.resize(new_instance_count * 8);
 }
 
 void MultiMeshBullets2D::set_up_life_time_timer(double new_max_life_time, double new_current_life_time) {
@@ -467,7 +472,7 @@ void MultiMeshBullets2D::set_up_area(const int collision_layer, const int collis
 	physics_server->area_set_collision_mask(area, collision_mask);
 }
 
-Transform2D MultiMeshBullets2D::generate_collision_shape_transform_for_area(Transform2D transf, const RID &shape, const Vector2 &collision_shape_size, const Vector2 &collision_shape_offset, int bullet_index) {
+Transform2D MultiMeshBullets2D::generate_collision_shape_transform_for_area(Transform2D transf, const RID &shape, const Vector2 &collision_shape_offset, int bullet_index) {
 	// The rotation of each transform
 	real_t curr_bullet_rotation = transf.get_rotation();
 
@@ -480,15 +485,28 @@ Transform2D MultiMeshBullets2D::generate_collision_shape_transform_for_area(Tran
 	transf.set_origin(transf.get_origin() + rotated_offset);
 
 	physics_server->area_set_shape_transform(area, bullet_index, transf);
-	physics_server->shape_set_data(shape, collision_shape_size / 2); // SHAPE_RECTANGLE: a Vector2 half_extents  (I'm dividing by 2 to get the actual size the user wants for the rectangle, the function wants half_extents, if it gets the size 32 for the x, that means only the half width is 32 so the other half will also be 32 meaning 64 total width if I give the user's 32 that he said, to avoid that im deviding by 2 so the size gets set correctly to 32)
+
+	switch (cached_effective_shape_type) {
+		case PhysicsServer2D::SHAPE_CIRCLE:
+			physics_server->shape_set_data(shape, cached_circle_radius);
+			break;
+		case PhysicsServer2D::SHAPE_CAPSULE:
+			physics_server->shape_set_data(shape, Vector2(cached_capsule_radius, cached_capsule_height));
+			break;
+		case PhysicsServer2D::SHAPE_RECTANGLE:
+		default:
+			physics_server->shape_set_data(shape, cached_rect_size / 2);
+			break;
+	}
 
 	return transf;
 }
 
 void MultiMeshBullets2D::generate_physics_shapes_for_area(int amount) {
 	physics_shapes.reserve(amount);
+	// Type already resolved + error printed once in cache_collision_shape_typed(). No per-RID error.
 	for (int i = 0; i < amount; ++i) {
-		RID shape = physics_server->rectangle_shape_create();
+		RID shape = CollisionShapeHelper2D::create_server_shape(physics_server, cached_effective_shape_type);
 		physics_server->area_add_shape(area, shape);
 		physics_shapes.emplace_back(shape);
 	}
@@ -507,9 +525,11 @@ Ref<BulletSpeedData2D> MultiMeshBullets2D::get_bullet_speed_data(int bullet_inde
 		return speed_data;
 	}
 
-	speed_data->speed = all_cached_speed[bullet_index];
-	speed_data->max_speed = all_cached_max_speed[bullet_index];
-	speed_data->acceleration = all_cached_acceleration[bullet_index];
+	// BlockBullets keeps single entry for speed - map any index to 0
+	int eff = (all_cached_speed.size() == 1) ? 0 : bullet_index;
+	speed_data->speed = all_cached_speed[eff];
+	speed_data->max_speed = all_cached_max_speed[eff];
+	speed_data->acceleration = all_cached_acceleration[eff];
 
 	return speed_data;
 }
@@ -529,6 +549,11 @@ void MultiMeshBullets2D::set_bullet_speed_data(int bullet_index, const Ref<Bulle
 	if (curves_data != nullptr && curves_data->movement_speed_curve.is_valid()) {
 		UtilityFunctions::push_warning("You are trying to set bullet speed data directly while having a movement speed curve assigned as an individual bullet curves data. The curve will override any direct speed data changes. Set the curve to null first if you want to set speed data directly.");
 		return;
+	}
+
+	// Block keeps single entry
+	if (all_cached_speed.size() == 1) {
+		bullet_index = 0;
 	}
 
 	all_cached_speed[bullet_index] = new_bullet_speed_data->speed;
@@ -565,7 +590,8 @@ Vector2 MultiMeshBullets2D::get_bullet_direction(int bullet_index) const {
 		return Vector2();
 	}
 
-	return all_cached_direction[bullet_index];
+	int eff = (all_cached_direction.size() == 1) ? 0 : bullet_index;
+	return all_cached_direction[eff];
 }
 
 void MultiMeshBullets2D::set_bullet_direction(int bullet_index, const Vector2 &new_direction) {
@@ -585,7 +611,14 @@ void MultiMeshBullets2D::set_bullet_direction(int bullet_index, const Vector2 &n
 		return;
 	}
 
+	if (all_cached_direction.size() == 1) {
+		bullet_index = 0;
+	}
 	all_cached_direction[bullet_index] = new_direction.normalized();
+	// For Block with single dir, keep velocity in sync
+	if (all_cached_velocity.size() == 1) {
+		all_cached_velocity[0] = all_cached_direction[0] * all_cached_speed[0] + inherited_velocity_offset;
+	}
 }
 
 TypedArray<Vector2> MultiMeshBullets2D::all_bullets_get_direction(int bullet_index_start, int bullet_index_end_inclusive) const {
@@ -710,7 +743,11 @@ void MultiMeshBullets2D::set_bullet_transform(int bullet_index, const Transform2
 	// Update direction if requested
 	if (set_direction_based_on_transform) {
 		Vector2 new_direction = Vector2(1, 0).rotated(curr_bullet_transf.get_rotation());
-		all_cached_direction[bullet_index] = new_direction.normalized();
+		int eff = (all_cached_direction.size() == 1) ? 0 : bullet_index;
+		all_cached_direction[eff] = new_direction.normalized();
+		if (all_cached_velocity.size() == 1) {
+			all_cached_velocity[0] = all_cached_direction[0] * all_cached_speed[0] + inherited_velocity_offset;
+		}
 	}
 
 	update_bullet_previous_transform_for_interpolation(bullet_index);
@@ -740,7 +777,11 @@ void MultiMeshBullets2D::set_bullet_direction_towards_position(int bullet_index,
 		return;
 	}
 
-	all_cached_direction[bullet_index] = (target_position - all_cached_instance_origin[bullet_index]).normalized();
+	int eff = (all_cached_direction.size() == 1) ? 0 : bullet_index;
+	all_cached_direction[eff] = (target_position - all_cached_instance_origin[bullet_index]).normalized();
+	if (all_cached_velocity.size() == 1) {
+		all_cached_velocity[0] = all_cached_direction[0] * all_cached_speed[0] + inherited_velocity_offset;
+	}
 }
 
 void MultiMeshBullets2D::all_bullets_set_direction_towards_position(const Vector2 &target_position, int bullet_index_start, int bullet_index_end_inclusive) {
@@ -762,7 +803,11 @@ void MultiMeshBullets2D::set_bullet_direction_towards_node2d(int bullet_index, c
 	}
 
 	const Vector2 target_position = target_node->get_global_position();
-	all_cached_direction[bullet_index] = (target_position - all_cached_instance_origin[bullet_index]).normalized();
+	int eff = (all_cached_direction.size() == 1) ? 0 : bullet_index;
+	all_cached_direction[eff] = (target_position - all_cached_instance_origin[bullet_index]).normalized();
+	if (all_cached_velocity.size() == 1) {
+		all_cached_velocity[0] = all_cached_direction[0] * all_cached_speed[0] + inherited_velocity_offset;
+	}
 }
 
 void MultiMeshBullets2D::all_bullets_set_direction_towards_node2d(const Node2D *target_node, int bullet_index_start, int bullet_index_end_inclusive) {

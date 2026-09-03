@@ -5,6 +5,7 @@
 
 #include <godot_cpp/classes/canvas_item_material.hpp>
 #include <godot_cpp/classes/mesh.hpp>
+#include <godot_cpp/classes/shape2d.hpp>
 #include <godot_cpp/classes/packed_scene.hpp>
 #include <godot_cpp/classes/resource.hpp>
 #include <godot_cpp/classes/texture2d.hpp>
@@ -74,8 +75,9 @@ public:
 	// The collision mask that all bullets share. Note: pass a bitmask, it's not just a simple int. Use the calculate_bitmask function.
 	int collision_mask = 1;
 
-	// The collision shape is always a rectangle. This determines the width and height it has.
-	Vector2 collision_shape_size = Vector2(5, 5);
+	// The collision shape. Supports RectangleShape2D, CircleShape2D and CapsuleShape2D. For any other shape an error will be printed.
+	Ref<Shape2D> collision_shape;
+
 	// Determines the offset of the collision shape (the collision shape is by default at the center of the texture, but with this you are able to control it's position)
 	Vector2 collision_shape_offset = Vector2(0, 0);
 
@@ -145,8 +147,8 @@ public:
 	void set_collision_mask(int new_collision_mask);
 	void set_collision_mask_from_array(const TypedArray<int> &numbers);
 
-	Vector2 get_collision_shape_size() const;
-	void set_collision_shape_size(const Vector2 &new_collision_shape_size);
+	Ref<Shape2D> get_collision_shape() const;
+	void set_collision_shape(const Ref<Shape2D> &new_shape);
 
 	Vector2 get_collision_shape_offset() const;
 	void set_collision_shape_offset(const Vector2 &new_collision_shape_offset);
@@ -211,3 +213,5 @@ protected:
 	static void _bind_methods();
 };
 } //namespace BlastBullets2D
+
+

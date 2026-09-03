@@ -21,6 +21,7 @@
 #include "godot_cpp/core/property_info.hpp"
 #include "godot_cpp/variant/callable.hpp"
 #include "godot_cpp/variant/callable_method_pointer.hpp"
+#include "godot_cpp/variant/packed_float32_array.hpp"
 #include "godot_cpp/variant/transform2d.hpp"
 #include "godot_cpp/variant/typed_array.hpp"
 #include "godot_cpp/variant/variant.hpp"
@@ -28,6 +29,7 @@
 #include "shared/bullet_curves_data2d.hpp"
 #include "shared/bullet_movement_pattern_data2d.hpp"
 #include "shared/bullet_speed_data2d.hpp"
+#include "shared/collision_shape_helper2d.hpp"
 #include "shared/dynamic_sparse_set.hpp"
 
 #include <cstddef>
@@ -39,6 +41,7 @@
 #include <godot_cpp/classes/packed_scene.hpp>
 #include <godot_cpp/classes/physics_server2d.hpp>
 #include <godot_cpp/classes/quad_mesh.hpp>
+#include <godot_cpp/classes/shape2d.hpp>
 #include <godot_cpp/variant/utility_functions.hpp>
 #include <iterator>
 #include <vector>
@@ -96,10 +99,12 @@ public:
 			return;
 		}
 		double fraction = Engine::get_singleton()->get_physics_interpolation_fraction();
-		// Batch: 8 floats per instance, row-major as in mesh_storage.cpp: x.x, y.x, 0, ox, x.y, y.y, 0, oy
-		PackedFloat32Array buffer;
-		buffer.resize(amount_bullets * 8);
-		float *w = buffer.ptrw();
+
+		// batch_buffer sized in spawn/set_up_multimesh (amount never changes on reuse)
+#ifdef DEV_ENABLED
+		ERR_FAIL_COND((int)batch_buffer.size() != amount_bullets * 8);
+#endif
+		float *w = batch_buffer.ptrw();
 		for (int i = 0; i < amount_bullets; ++i) {
 			Transform2D t;
 			if (all_bullets_enabled_set.contains(i)) {
@@ -116,7 +121,7 @@ public:
 			w[i * 8 + 6] = 0;
 			w[i * 8 + 7] = t.columns[2][1];
 		}
-		multi->set_buffer(buffer);
+		multi->set_buffer(batch_buffer);
 		const auto &active_bullet_indexes = all_bullets_enabled_set.get_active_indexes();
 		for (int i : active_bullet_indexes) {
 			if (!attachments[i])
@@ -127,11 +132,13 @@ public:
 	}
 
 	_ALWAYS_INLINE_ void batch_flush_instance_transforms() {
-		if (!multi.is_valid() || amount_bullets != multi->get_instance_count())
-			return;
-		PackedFloat32Array buffer;
-		buffer.resize(amount_bullets * 8);
-		float *w = buffer.ptrw();
+		if (!multi.is_valid() || amount_bullets != multi->get_instance_count()){
+		    return;
+		}
+#ifdef DEV_ENABLED
+		ERR_FAIL_COND((int)batch_buffer.size() != amount_bullets * 8);
+#endif
+float *w = batch_buffer.ptrw();
 		for (int i = 0; i < amount_bullets; ++i) {
 			const Transform2D &t = all_bullets_enabled_set.contains(i) ? all_cached_instance_transforms[i] : zero_transform;
 			w[i * 8 + 0] = t.columns[0][0];
@@ -143,7 +150,8 @@ public:
 			w[i * 8 + 6] = 0;
 			w[i * 8 + 7] = t.columns[2][1];
 		}
-		multi->set_buffer(buffer);
+
+		multi->set_buffer(batch_buffer);
 	}
 
 	_ALWAYS_INLINE_ void update_specific_previous_transforms_for_interpolation(int begin_bullet_index, int end_bullet_index_inclusive) {
@@ -210,8 +218,7 @@ public:
 			return;
 		}
 
-		// Copy to avoid mutating set while iterating (disable_bullet modifies sparse set)
-		const auto active_copy = all_bullets_enabled_set.get_active_indexes();
+		std::vector<int> active_copy = all_bullets_enabled_set.get_active_indexes();
 
 		// If the life_time_over signal is not enabled, we can just disable all bullets right away and skip the additional logic
 		if (!is_life_time_over_signal_enabled) {
@@ -462,7 +469,7 @@ public:
 	bool get_monitorable() const;
 	void set_monitorable(bool value);
 
-protected:
+	Ref<Shape2D> get_collision_shape() const { return cached_collision_shape; }
 	static void _bind_methods();
 
 	void _notification(int p_what);
@@ -540,6 +547,9 @@ protected:
 
 	// Pointer to the multimesh instead of always calling the get method
 	Ref<MultiMesh> multi = nullptr;
+
+	// Reusable buffer for batch uploads (avoid per-frame alloc)
+	mutable PackedFloat32Array batch_buffer;
 
 	// The user can pass any custom data they desire and have access to it in the area_entered and body_entered function callbacks
 	Ref<Resource> bullets_custom_data;
@@ -668,6 +678,15 @@ protected:
 	// Saves whether the bullets can detect bodies or not
 	bool monitorable = false;
 
+	Ref<Shape2D> cached_collision_shape;
+
+	// Typed cache resolved once at spawn/enable via casting. Physics + debugger branch on this, no per-bullet cast.
+	PhysicsServer2D::ShapeType cached_effective_shape_type = PhysicsServer2D::SHAPE_RECTANGLE;
+	Vector2 cached_rect_size = Vector2(32, 32);
+	float cached_circle_radius = 16.0f;
+	float cached_capsule_radius = 8.0f;
+	float cached_capsule_height = 24.0f;
+
 	// Holds current collision count for each bullet
 	std::vector<int> bullets_current_collision_count;
 
@@ -698,6 +717,53 @@ protected:
 			bullet_index_end_inclusive = amount_bullets - 1;
 			UtilityFunctions::push_error("Invalid index range in " + function_name);
 		}
+	}
+
+	// Resolve Ref<Shape2D> once via casting into typed cache. Single error per spawn/enable, then quiet.
+	_ALWAYS_INLINE_ void cache_collision_shape_typed(const Ref<Shape2D> &shape) {
+		cached_collision_shape = shape;
+		// Defaults: rect 32x32.
+		cached_effective_shape_type = PhysicsServer2D::SHAPE_RECTANGLE;
+		cached_rect_size = CollisionShapeHelper2D::DEFAULT_RECT_SIZE;
+		cached_circle_radius = 16.0f;
+		cached_capsule_radius = 8.0f;
+		cached_capsule_height = 24.0f;
+		if (shape.is_null()) {
+			return;
+		}
+		if (auto *rect = Object::cast_to<RectangleShape2D>(shape.ptr())) {
+			Vector2 s = rect->get_size();
+			if (s.x <= 0.0f || s.y <= 0.0f) {
+				UtilityFunctions::push_error("RectangleShape2D size must be > 0. Falling back to rectangle 32x32.");
+				return;
+			}
+			cached_effective_shape_type = PhysicsServer2D::SHAPE_RECTANGLE;
+			cached_rect_size = s;
+			return;
+		}
+		if (auto *circle = Object::cast_to<CircleShape2D>(shape.ptr())) {
+			float r = circle->get_radius();
+			if (r <= 0.0f) {
+				UtilityFunctions::push_error("CircleShape2D radius must be > 0. Falling back to rectangle 32x32.");
+				return;
+			}
+			cached_effective_shape_type = PhysicsServer2D::SHAPE_CIRCLE;
+			cached_circle_radius = r;
+			return;
+		}
+		if (auto *capsule = Object::cast_to<CapsuleShape2D>(shape.ptr())) {
+			float r = capsule->get_radius();
+			float h = capsule->get_height();
+			if (r <= 0.0f || h <= 0.0f) {
+				UtilityFunctions::push_error("CapsuleShape2D radius/height must be > 0. Falling back to rectangle 32x32.");
+				return;
+			}
+			cached_effective_shape_type = PhysicsServer2D::SHAPE_CAPSULE;
+			cached_capsule_radius = r;
+			cached_capsule_height = h;
+			return;
+		}
+		UtilityFunctions::push_error("Unsupported collision shape type: " + shape->get_class() + " - only RectangleShape2D/CircleShape2D/CapsuleShape2D supported. Falling back to rectangle 32x32.");
 	}
 
 	// Sync shape transform from instance transform (shared logic for teleport/set_transform)
@@ -737,22 +803,38 @@ protected:
 			}
 		}
 
-		for (int i = 0; i < amount_bullets; ++i) {
+		// Block has single speed/dir - handle separately to avoid OOB
+		if (all_cached_speed.size() == 1) {
 			if (is_movement_curve_valid) {
-				all_cached_speed[i] = get_bullet_curves_movement_speed(shared_bullet_curves_data.ptr());
+				all_cached_speed[0] = get_bullet_curves_movement_speed(shared_bullet_curves_data.ptr());
 			}
-
 			if (is_rotation_curve_valid) {
-				all_rotation_speed[i] = get_bullet_curves_rotation_speed(shared_bullet_curves_data.ptr());
+				all_rotation_speed[0] = get_bullet_curves_rotation_speed(shared_bullet_curves_data.ptr());
 			}
-
-			auto &current_direction = all_cached_direction[i];
-
+			auto &current_direction = all_cached_direction[0];
 			apply_x_direction_curve(current_direction, shared_bullet_curves_data.ptr());
 			apply_y_direction_curve(current_direction, shared_bullet_curves_data.ptr());
-
 			if (is_movement_curve_valid || is_x_direction_curve_valid || is_y_direction_curve_valid) {
-				all_cached_velocity[i] = all_cached_direction[i] * all_cached_speed[i] + inherited_velocity_offset;
+				all_cached_velocity[0] = all_cached_direction[0] * all_cached_speed[0] + inherited_velocity_offset;
+			}
+		} else {
+			for (int i = 0; i < amount_bullets; ++i) {
+				if (is_movement_curve_valid) {
+					all_cached_speed[i] = get_bullet_curves_movement_speed(shared_bullet_curves_data.ptr());
+				}
+
+				if (is_rotation_curve_valid) {
+					all_rotation_speed[i] = get_bullet_curves_rotation_speed(shared_bullet_curves_data.ptr());
+				}
+
+				auto &current_direction = all_cached_direction[i];
+
+				apply_x_direction_curve(current_direction, shared_bullet_curves_data.ptr());
+				apply_y_direction_curve(current_direction, shared_bullet_curves_data.ptr());
+
+				if (is_movement_curve_valid || is_x_direction_curve_valid || is_y_direction_curve_valid) {
+					all_cached_velocity[i] = all_cached_direction[i] * all_cached_speed[i] + inherited_velocity_offset;
+				}
 			}
 		}
 	}
@@ -782,11 +864,12 @@ protected:
 			all_rotation_speed[bullet_index] = get_bullet_curves_rotation_speed(curr_curves.ptr());
 		}
 
+		int eff = (all_cached_speed.size() == 1) ? 0 : bullet_index;
 		if (is_movement_curve_valid) {
-			all_cached_speed[bullet_index] = get_bullet_curves_movement_speed(curr_curves.ptr());
+			all_cached_speed[eff] = get_bullet_curves_movement_speed(curr_curves.ptr());
 		}
 
-		auto &current_direction = all_cached_direction[bullet_index];
+		auto &current_direction = all_cached_direction[eff];
 
 		if (is_x_direction_curve_valid) {
 			apply_x_direction_curve(current_direction, curr_curves.ptr());
@@ -797,7 +880,7 @@ protected:
 		}
 
 		if (is_movement_curve_valid || is_x_direction_curve_valid || is_y_direction_curve_valid) {
-			all_cached_velocity[bullet_index] = all_cached_direction[bullet_index] * all_cached_speed[bullet_index] + inherited_velocity_offset;
+			all_cached_velocity[eff] = all_cached_direction[eff] * all_cached_speed[eff] + inherited_velocity_offset;
 		}
 	}
 
@@ -1456,7 +1539,7 @@ private:
 	Transform2D generate_texture_transform(Transform2D transf, bool is_texture_rotation_permanent, real_t texture_rotation_radians, int bullet_index);
 
 	// Generates a collision shape transform for a particular bullet and attaches it to the area
-	Transform2D generate_collision_shape_transform_for_area(Transform2D transf, const RID &shape, const Vector2 &collision_shape_size, const Vector2 &collision_shape_offset, int bullet_index);
+	Transform2D generate_collision_shape_transform_for_area(Transform2D transf, const RID &shape, const Vector2 &collision_shape_offset, int bullet_index);
 
 	// Sets up the area correctly with collision related data
 	void set_up_area(const int collision_layer, const int collision_mask, bool new_monitorable, const RID &physics_space);
@@ -1491,15 +1574,21 @@ private:
 
 	/// METHODS COMING FROM THE IDebuggerDataProvider2D INTERFACE
 
+	PhysicsServer2D::ShapeType get_collision_shape_type_for_debugging() const override {
+		return cached_effective_shape_type;
+	}
+
 	const Vector2 get_collision_shape_size_for_debugging() const override {
-		if (physics_shapes.empty() || !physics_server) {
-			return Vector2(0, 0);
+		// Full size from typed cache so math is exact per shape. No cast per tick.
+		switch (cached_effective_shape_type) {
+			case PhysicsServer2D::SHAPE_CIRCLE:
+				return Vector2(cached_circle_radius * 2.0f, cached_circle_radius * 2.0f);
+			case PhysicsServer2D::SHAPE_CAPSULE:
+				return Vector2(cached_capsule_radius * 2.0f, cached_capsule_height);
+			case PhysicsServer2D::SHAPE_RECTANGLE:
+			default:
+				return cached_rect_size;
 		}
-		Variant data = physics_server->shape_get_data(physics_shapes[0]);
-		if (data.get_type() != Variant::VECTOR2) {
-			return Vector2(0, 0);
-		}
-		return static_cast<Vector2>(data);
 	}
 
 	const std::vector<Transform2D> &get_all_collision_shape_transforms_for_debugging() const override {

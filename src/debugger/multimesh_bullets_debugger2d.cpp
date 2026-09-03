@@ -1,13 +1,18 @@
 #include "multimesh_bullets_debugger2d.hpp"
 #include "godot_cpp/core/memory.hpp"
 
+#include <godot_cpp/classes/array_mesh.hpp>
 #include <godot_cpp/classes/engine.hpp>
+#include <godot_cpp/classes/mesh.hpp>
 #include <godot_cpp/classes/multi_mesh.hpp>
 #include <godot_cpp/classes/multi_mesh_instance2d.hpp>
 #include <godot_cpp/classes/physics_server2d.hpp>
+#include <godot_cpp/core/math.hpp>
 #include <godot_cpp/classes/quad_mesh.hpp>
+#include <godot_cpp/variant/packed_vector3_array.hpp>
 #include <godot_cpp/variant/utility_functions.hpp>
 #include <godot_cpp/variant/vector2.hpp>
+#include <godot_cpp/variant/vector3.hpp>
 
 using namespace godot;
 
@@ -104,6 +109,8 @@ void MultiMeshBulletsDebugger2D::disable() {
 	// Clear both vectors so they don't contain any pointers / Note that .clear() doesn't do memory reallocations which is good
 	debugger_multimeshes.clear();
 	debug_data_providers.clear();
+	debugger_mesh_types.clear();
+	debugger_mesh_sizes.clear();
 }
 
 void MultiMeshBulletsDebugger2D::generate_debug_multimesh(Node *node_entered_container_to_debug) {
@@ -115,25 +122,21 @@ void MultiMeshBulletsDebugger2D::generate_debug_multimesh(Node *node_entered_con
 		return;
 	}
 
-	// The physics server in Godot creates shape sizes by half extents when dealing with RectangleShape and it also returns half extents every time you use shape_get_data or shape_set_data..
-	// Example: If the debugger_data_provider rectangle shape was originally created using shape_set_data with argument Vector2(16,16) this would mean that Godot has created a shape with half the width being 16 and half the height being also 16, meaning we are dealing with a rectangle shape with the actual size of Vector2(32,32)
-	// So because shape_get_data returns the half extents, I need to multiply it by 2 to get the actual size that the QuadMesh I'm trying to create will have (this is so I can use a QuadMesh to represent the actual bullet collision shape)
-	// This is because setting the QuadMesh size works with normal sizing settings - meaning it expects the ACTUAL SIZE and not THE HALF EXTENTS that we get from shape_get_data
-	// Note that I only know that shape_get_data returns half_extents because BlastBullets2D is hard coded to use only RectangleShape as the physics collision shape type for all bullets (everything is Rectangles basically)
-	// So if it changes it the future there is a lot of code including this one over here that would need more complex logic to deal with each different physics shape type
-	// Note: Debugger is hardcoded to use only QuadMesh for rendering as well
-
-	// Create QuadMesh that will match the size of the physics collision shape exactly
-	Ref<QuadMesh> new_mesh = memnew(QuadMesh);
-
-	// Get the collision shape size
-	const Vector2 &shape_size = debugger_data_provider->get_collision_shape_size_for_debugging() * 2; // now this represents the actual size that the QuadMesh will have
-	new_mesh->set_size(shape_size);
+	// Provider type drives mesh: rect->QuadMesh(size), circle->ArrayMesh fan(r), capsule->ArrayMesh rect+caps.
+	PhysicsServer2D::ShapeType shape_type = debugger_data_provider->get_collision_shape_type_for_debugging();
+	Vector2 shape_size = debugger_data_provider->get_collision_shape_size_for_debugging();
+	if (shape_size.x <= 0.0f || shape_size.y <= 0.0f) {
+		UtilityFunctions::push_error("Debugger got invalid shape size, falling back to 32x32.");
+		shape_size = Vector2(32, 32);
+		shape_type = PhysicsServer2D::SHAPE_RECTANGLE;
+	}
+	Ref<Mesh> new_mesh = create_debug_mesh_for_shape(shape_type, shape_size);
 
 	// Create a multimesh
 	Ref<MultiMesh> multi = memnew(MultiMesh);
+	multi->set_transform_format(MultiMesh::TRANSFORM_2D);
 
-	// Add the Quadmesh to the multimesh -> now the multimesh can render a bunch of QuadMesh
+	// Add the true-shape mesh to the multimesh
 	multi->set_mesh(new_mesh);
 
 	// Allow for the multimesh instances (for each QuadMesh) to have a different color -- this is needed in order to support debugger_color
@@ -166,24 +169,134 @@ void MultiMeshBulletsDebugger2D::generate_debug_multimesh(Node *node_entered_con
 
 	// Store the generated multimesh so I can track it as well
 	debugger_multimeshes.emplace_back(debugger_multimesh);
+	debugger_mesh_types.emplace_back(shape_type);
+	debugger_mesh_sizes.emplace_back(shape_size);
 
 	// Finally just add the debugger multimesh instance as a child so that it can begin doing its job - rendering
 	add_child(debugger_multimesh);
 }
 
-void MultiMeshBulletsDebugger2D::ensure_quadmesh_matches_data_provider_collision_shape_size(MultiMeshInstance2D &debug_multimesh_instance, IDebuggerDataProvider2D &debugger_data_provider) {
-	Ref<MultiMesh> debug_inner_multi = debug_multimesh_instance.get_multimesh();
-
-	// Get the quadmesh of the debug multimesh
-	QuadMesh *quad_mesh_ptr = static_cast<QuadMesh *>(debug_inner_multi->get_mesh().ptr());
-
-	// Acquire the collision shape size again (just in case the shape size was updated we need to update the quadmesh here in order to match that - all of this logic is needed because of the object pooling logic for the bullets since I'm re-using already generated multimeshes)
-	const Vector2 &shape_size = debugger_data_provider.get_collision_shape_size_for_debugging() * 2; // now this represents the actual size that the QuadMesh supposedly already has
-
-	// If the collision shape size has changed, then the quadmesh for the debugger multimesh instance has to match that new size
-	if (shape_size != quad_mesh_ptr->get_size()) {
-		quad_mesh_ptr->set_size(shape_size);
+Ref<Mesh> MultiMeshBulletsDebugger2D::create_debug_mesh_for_shape(PhysicsServer2D::ShapeType type, const Vector2 &full_size) {
+	// Rectangle: QuadMesh with full size - exact bounds.
+	if (type == PhysicsServer2D::SHAPE_RECTANGLE) {
+		Ref<QuadMesh> quad = memnew(QuadMesh);
+		quad->set_size(full_size);
+		return quad;
 	}
+	// Circle: ArrayMesh triangle fan in XY plane (z=0) for MultiMeshInstance2D.
+	if (type == PhysicsServer2D::SHAPE_CIRCLE) {
+		float r = full_size.x * 0.5f;
+		if (r <= 0.0f) {
+			UtilityFunctions::push_error("Debugger circle radius must be > 0, falling back to 32x32 quad.");
+			Ref<QuadMesh> fallback = memnew(QuadMesh);
+			fallback->set_size(Vector2(32, 32));
+			return fallback;
+		}
+		const int segments = 24;
+		PackedVector3Array verts;
+		verts.resize((segments + 2));
+		verts[0] = Vector3(0, 0, 0);
+		for (int i = 0; i <= segments; ++i) {
+			float a = (Math::TAU * (float)i) / (float)segments;
+			verts[i + 1] = Vector3(Math::cos(a) * r, Math::sin(a) * r, 0);
+		}
+		// TRIANGLE_FAN: center + perimeter. Use TRIANGLES fan manually for compatibility.
+		PackedVector3Array tris;
+		tris.resize(segments * 3);
+		for (int i = 0; i < segments; ++i) {
+			tris[i * 3 + 0] = verts[0];
+			tris[i * 3 + 1] = verts[i + 1];
+			tris[i * 3 + 2] = verts[i + 2];
+		}
+		Array arrays;
+		arrays.resize(Mesh::ARRAY_MAX);
+		arrays[Mesh::ARRAY_VERTEX] = tris;
+		Ref<ArrayMesh> mesh = memnew(ArrayMesh);
+		mesh->add_surface_from_arrays(Mesh::PRIMITIVE_TRIANGLES, arrays);
+		return mesh;
+	}
+	// Capsule: ArrayMesh rect + two half-circles. full_size = Vector2(2r, h) where h is total height.
+	if (type == PhysicsServer2D::SHAPE_CAPSULE) {
+		float r = full_size.x * 0.5f;
+		float h = full_size.y;
+		if (r <= 0.0f || h <= 0.0f) {
+			UtilityFunctions::push_error("Debugger capsule radius/height must be > 0, falling back to 32x32 quad.");
+			Ref<QuadMesh> fallback = memnew(QuadMesh);
+			fallback->set_size(Vector2(32, 32));
+			return fallback;
+		}
+		float cyl_half = Math::max(0.0f, (h * 0.5f) - r);
+		const int cap_segments = 12;
+		PackedVector3Array tris;
+		// Rect part: two triangles covering [-r,r] x [-cyl_half,cyl_half]
+		tris.push_back(Vector3(-r, -cyl_half, 0));
+		tris.push_back(Vector3(r, -cyl_half, 0));
+		tris.push_back(Vector3(r, cyl_half, 0));
+		tris.push_back(Vector3(-r, -cyl_half, 0));
+		tris.push_back(Vector3(r, cyl_half, 0));
+		tris.push_back(Vector3(-r, cyl_half, 0));
+		// Top half-circle fan at y=+cyl_half
+		Vector3 top_center(0, cyl_half, 0);
+		for (int i = 0; i < cap_segments; ++i) {
+			float a0 = (Math::PI * (float)i) / (float)cap_segments; // 0..PI (upper half, x from +r to -r? Actually angle 0=+x)
+			float a1 = (Math::PI * (float)(i + 1)) / (float)cap_segments;
+			// Upper half: angle 0..PI gives y>=0
+			Vector3 p0(Math::cos(a0) * r, cyl_half + Math::sin(a0) * r, 0);
+			Vector3 p1(Math::cos(a1) * r, cyl_half + Math::sin(a1) * r, 0);
+			tris.push_back(top_center);
+			tris.push_back(p0);
+			tris.push_back(p1);
+		}
+		// Bottom half-circle fan at y=-cyl_half (angles PI..2PI give y<=0)
+		Vector3 bottom_center(0, -cyl_half, 0);
+		for (int i = 0; i < cap_segments; ++i) {
+			float a0 = Math::PI + (Math::PI * (float)i) / (float)cap_segments;
+			float a1 = Math::PI + (Math::PI * (float)(i + 1)) / (float)cap_segments;
+			Vector3 p0(Math::cos(a0) * r, -cyl_half + Math::sin(a0) * r, 0);
+			Vector3 p1(Math::cos(a1) * r, -cyl_half + Math::sin(a1) * r, 0);
+			tris.push_back(bottom_center);
+			tris.push_back(p1);
+			tris.push_back(p0);
+		}
+		Array arrays;
+		arrays.resize(Mesh::ARRAY_MAX);
+		arrays[Mesh::ARRAY_VERTEX] = tris;
+		Ref<ArrayMesh> mesh = memnew(ArrayMesh);
+		mesh->add_surface_from_arrays(Mesh::PRIMITIVE_TRIANGLES, arrays);
+		return mesh;
+	}
+	UtilityFunctions::push_error("Debugger unsupported shape type, falling back to rectangle 32x32.");
+	Ref<QuadMesh> fallback = memnew(QuadMesh);
+	fallback->set_size(Vector2(32, 32));
+	return fallback;
+}
+
+void MultiMeshBulletsDebugger2D::ensure_quadmesh_matches_data_provider_collision_shape_size(int dbg_index, MultiMeshInstance2D &debug_multimesh_instance, IDebuggerDataProvider2D &debugger_data_provider) {
+	Ref<MultiMesh> debug_inner_multi = debug_multimesh_instance.get_multimesh();
+	if (dbg_index < 0 || dbg_index >= (int)debugger_mesh_types.size()) {
+		return;
+	}
+	PhysicsServer2D::ShapeType want_type = debugger_data_provider.get_collision_shape_type_for_debugging();
+	Vector2 want_size = debugger_data_provider.get_collision_shape_size_for_debugging();
+	if (want_size.x <= 0.0f || want_size.y <= 0.0f) {
+		want_size = Vector2(32, 32);
+		want_type = PhysicsServer2D::SHAPE_RECTANGLE;
+	}
+	PhysicsServer2D::ShapeType have_type = debugger_mesh_types[dbg_index];
+	Vector2 have_size = debugger_mesh_sizes[dbg_index];
+	if (want_type == have_type && want_size == have_size) {
+		return;
+	}
+	// Type or size changed (pool reuse) -> recreate true-shape mesh. Transforms/colors preserved via instance_count.
+	Ref<Mesh> new_mesh = create_debug_mesh_for_shape(want_type, want_size);
+	debug_inner_multi->set_mesh(new_mesh);
+	// Re-apply colors (new mesh resets instance colors? keep debugger_color for all).
+	int count = debug_inner_multi->get_instance_count();
+	for (int i = 0; i < count; ++i) {
+		debug_inner_multi->set_instance_color(i, debugger_color);
+	}
+	debugger_mesh_types[dbg_index] = want_type;
+	debugger_mesh_sizes[dbg_index] = want_size;
 }
 
 void MultiMeshBulletsDebugger2D::update_debug_multimesh_transforms_to_match_data_provider_collision_shape_transforms(MultiMeshInstance2D &debug_multimesh_instance, IDebuggerDataProvider2D &debugger_data_provider) {
@@ -225,7 +338,7 @@ void MultiMeshBulletsDebugger2D::_physics_process(double delta) {
 
 		MultiMeshInstance2D &mesh_instance = *debugger_multimeshes[i];
 
-		ensure_quadmesh_matches_data_provider_collision_shape_size(mesh_instance, *provider);
+		ensure_quadmesh_matches_data_provider_collision_shape_size(i, mesh_instance, *provider);
 		update_debug_multimesh_transforms_to_match_data_provider_collision_shape_transforms(mesh_instance, *provider);
 	}
 }

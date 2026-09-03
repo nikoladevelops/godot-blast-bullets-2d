@@ -1,7 +1,9 @@
 #pragma once
 
 #include "idebugger_data_provider2d.hpp"
+#include <godot_cpp/classes/mesh.hpp>
 #include <godot_cpp/classes/node.hpp>
+#include <godot_cpp/classes/physics_server2d.hpp>
 
 namespace godot {
 
@@ -51,6 +53,10 @@ private:
 	// Stores pointers to the spawned debug multimeshes
 	std::vector<MultiMeshInstance2D *> debugger_multimeshes;
 
+	// Tracks mesh type/size per debugger entry so pool reuse with different sizes recreates correct true-shape mesh
+	std::vector<PhysicsServer2D::ShapeType> debugger_mesh_types;
+	std::vector<Vector2> debugger_mesh_sizes;
+
 	// A pointer to where the IDebuggerDataProvider2D nodes are stored
 	Node *container_to_debug = nullptr;
 
@@ -60,8 +66,11 @@ private:
 	// Generates a debug multimesh from a node that should inherit from IDebuggerDataProvider2D
 	void generate_debug_multimesh(Node *node_entered_container_to_debug);
 
-	// Ensures that the quadmesh amount_bullets of a debug multimesh matches the amount_bullets of the collision shapes of a IDebuggerDataProvider2D
-	void ensure_quadmesh_matches_data_provider_collision_shape_size(MultiMeshInstance2D &debug_multimesh_instance, IDebuggerDataProvider2D &debugger_data_provider);
+	// Creates true-shape debug mesh by type: rect->QuadMesh, circle->ArrayMesh fan, capsule->ArrayMesh rect+caps
+	Ref<Mesh> create_debug_mesh_for_shape(PhysicsServer2D::ShapeType type, const Vector2 &full_size);
+
+	// Ensures debug mesh type/size matches provider (handles pool reuse with different sizes)
+	void ensure_quadmesh_matches_data_provider_collision_shape_size(int dbg_index, MultiMeshInstance2D &debug_multimesh_instance, IDebuggerDataProvider2D &debugger_data_provider);
 
 	// Updates each debug multimesh's instance transforms to match the debug_data_providers's data
 	void update_debug_multimesh_transforms_to_match_data_provider_collision_shape_transforms(MultiMeshInstance2D &debug_multimesh_instance, IDebuggerDataProvider2D &debugger_data_provider);

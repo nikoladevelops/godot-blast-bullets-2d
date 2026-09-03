@@ -8,6 +8,7 @@
 #include <utility>
 
 #include "../shared/bullet_attachment_object_pool2d.hpp"
+#include "../shared/collision_shape_helper2d.hpp"
 #include "../shared/multimesh_object_pool2d.hpp"
 #include "godot_cpp/variant/vector2.hpp"
 #include "shared/dynamic_sparse_set.hpp"
@@ -508,7 +509,9 @@ private:
 	// Spawns bullets by either creating a brand new TBullet or retrieving one from the object pool
 	template <typename TBullet, typename TBulletSpawnData>
 	TBullet *spawn_bullets_helper(std::vector<TBullet *> &bullets_vec, DynamicSparseSet &sparse_set, MultiMeshObjectPool &bullets_pool, Node *bullets_container, const Ref<TBulletSpawnData> &spawn_data, const Vector2 &new_inherited_velocity_offset = Vector2(0, 0)) {
-		int key = spawn_data->transforms.size();
+		// Quiet: creation prints error once per spawn. Pool key must use effective type (fallback included) to match RIDs.
+		PhysicsServer2D::ShapeType shape_type = CollisionShapeHelper2D::get_effective_type(spawn_data->collision_shape, false);
+		PoolKey key{ (int)spawn_data->transforms.size(), shape_type };
 
 		// Try to get a TBullet from the pool first
 		TBullet *bullets = static_cast<TBullet *>(bullets_pool.pop(key));
@@ -534,8 +537,7 @@ private:
 	// Handles movement and other behaviors of the bullets.
 	template <typename TBullet>
 	void handle_bullet_behavior(const std::vector<TBullet *> &bullets_vec, const DynamicSparseSet &bullets_set, double delta) {
-		// Copy dense to avoid invalidation if move_bullets/reduce_lifetime disables a multimesh and mutates the set mid-iteration
-		const auto dense_copy = bullets_set.get_active_indexes();
+		std::vector<int> dense_copy = bullets_set.get_active_indexes();
 
 		for (auto index : dense_copy) {
 #ifdef DEV_ENABLED

@@ -11,23 +11,21 @@ using namespace godot;
 namespace BlastBullets2D {
 
 void BlockBullets2D::set_up_movement_data(const BulletSpeedData2D &new_speed_data) {
-	// Keep vectors sized to amount_bullets and fill identically (Block moves as one)
-	if ((int)all_cached_speed.size() != amount_bullets) {
-		all_cached_speed.resize(amount_bullets);
-		all_cached_max_speed.resize(amount_bullets);
-		all_cached_acceleration.resize(amount_bullets);
-		all_cached_direction.resize(amount_bullets);
-		all_cached_velocity.resize(amount_bullets);
+	// Block moves as one - keep single entry for speed/dir/velocity, other SoA stays sized to amount_bullets for API
+	if (all_cached_speed.size() != 1) {
+		all_cached_speed.resize(1);
+		all_cached_max_speed.resize(1);
+		all_cached_acceleration.resize(1);
+		all_cached_direction.resize(1);
+		all_cached_velocity.resize(1);
 	}
 
 	Vector2 dir = Vector2(Math::cos(block_rotation_radians), Math::sin(block_rotation_radians));
-	for (int i = 0; i < amount_bullets; ++i) {
-		all_cached_speed[i] = new_speed_data.speed;
-		all_cached_max_speed[i] = new_speed_data.max_speed;
-		all_cached_acceleration[i] = new_speed_data.acceleration;
-		all_cached_direction[i] = dir;
-		all_cached_velocity[i] = dir * new_speed_data.speed + inherited_velocity_offset;
-	}
+	all_cached_speed[0] = new_speed_data.speed;
+	all_cached_max_speed[0] = new_speed_data.max_speed;
+	all_cached_acceleration[0] = new_speed_data.acceleration;
+	all_cached_direction[0] = dir;
+	all_cached_velocity[0] = dir * new_speed_data.speed + inherited_velocity_offset;
 }
 
 void BlockBullets2D::custom_additional_spawn_logic(const MultiMeshBulletsData2D &data) {

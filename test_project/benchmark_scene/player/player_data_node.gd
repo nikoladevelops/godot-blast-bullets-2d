@@ -105,7 +105,6 @@ func set_up_block_bullets_data()->BlockBulletsData2D:
 	
 	data.transforms=[Transform2D()]
 	data.texture_size = Vector2(140,140)
-	data.collision_shape_size=Vector2(32,32)
 	data.collision_shape_offset=Vector2(0,0)
 	data.default_change_texture_time=0.09
 	data.max_life_time = 2
@@ -126,9 +125,12 @@ func set_up_directional_bullets_data()->DirectionalBulletsData2D:
 	#data.collision_mask = DirectionalBulletsData2D.calculate_bitmask([3]) # by default bullets interact only with enemy
 	data.set_collision_layer_from_array([2])
 	data.set_collision_mask_from_array([3])
-
+	
+	var shape:CircleShape2D = CircleShape2D.new()
+	shape.radius = 32
+	data.collision_shape = shape
+	
 	data.texture_size = Vector2(140,140)
-	data.collision_shape_size=Vector2(32,32)
 	data.collision_shape_offset=Vector2(0,0)
 	data.default_change_texture_time=0.09
 	data.max_life_time = 2

@@ -10,7 +10,7 @@
   ],
   "godotProjectFolder": "/home/nik/Coding/godot-blast-bullets-2d/test_project",
   "ltoMode": "auto",
-  "selectedBuildProfile": "build_profile.json",
+  "selectedBuildProfile": "2d_build_profile.json",
   "extensionApiPath": "godot-cpp/gdextension/extension_api-4-5.json",
   "reloadable": true,
   "editorTargetMode": "debug",
