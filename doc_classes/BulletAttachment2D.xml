@@ -4,6 +4,7 @@
 		Provides the functionality of bullets being able to carry particles or other nodes as they move.
 	</brief_description>
 	<description>
+		Attach this to bullets to carry particles, lights, or any custom nodes along with them. Create a scene rooted at [BulletAttachment2D], pass it to [method MultiMeshBullets2D.bullet_set_attachment] (or the all_bullets_ variant), and override the on_bullet_spawn / on_bullet_enable / on_bullet_disable / on_spawn_in_pool callbacks to set up your nodes for each stage. Attachments are pooled and reused together with their bullets.
 	</description>
 	<tutorials>
 	</tutorials>

@@ -4,6 +4,7 @@
 		A block of bullets that travels in a single direction. Always use the [BulletFactory2D] to spawn them, that's the only proper way.
 	</brief_description>
 	<description>
+		A [BlockBullets2D] moves as one solid block: every bullet shares the same direction, set by [member BlockBulletsData2D.block_rotation_radians], and the same speed, set by [member BlockBulletsData2D.block_speed]. Cheaper than [DirectionalBullets2D] because there is only one direction and speed to integrate, but individual bullets cannot be steered. Get instances from [method BulletFactory2D.spawn_block_bullets], never with new().
 	</description>
 	<tutorials>
 	</tutorials>

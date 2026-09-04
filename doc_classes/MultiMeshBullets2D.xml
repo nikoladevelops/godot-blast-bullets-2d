@@ -4,6 +4,7 @@
 		This class is only meant to be inherited by other C++ classes. Never use this by its own. Always use the [BulletFactory2D], that's the only proper way.
 	</brief_description>
 	<description>
+		Shared base for [DirectionalBullets2D] and [BlockBullets2D]. Holds everything a bullet batch needs at runtime: the multimesh, physics shapes, per-bullet caches, attachments, curves, movement patterns, timers, and the SpriteFrames animation state. You never create these directly. Spawn them through [BulletFactory2D], control live ones through the returned instance, and let the object pool recycle them.
 	</description>
 	<tutorials>
 	</tutorials>
@@ -369,6 +370,12 @@
 				Get the transform of a specific bullet. Returns a [Transform2D] containing the bullet's position, rotation and scale.
 			</description>
 		</method>
+		<method name="get_bullets_current_collision_count" qualifiers="const">
+			<return type="int[]" />
+			<description>
+				The current collision count of every bullet, one entry per bullet index.
+			</description>
+		</method>
 		<method name="get_collision_layer" qualifiers="const">
 			<return type="int" />
 			<description>
@@ -384,6 +391,7 @@
 		<method name="get_collision_shape" qualifiers="const">
 			<return type="Shape2D" />
 			<description>
+				The collision shape currently cached for this multimesh.
 			</description>
 		</method>
 		<method name="get_inherited_velocity_offset" qualifiers="const">
@@ -484,6 +492,37 @@
 			<description>
 				Detaches a specific time based callable. This will work as long as the callable you are trying to detach
 				was previously saved in a variable or defined as a normal Godot function.
+			</description>
+		</method>
+		<method name="_do_attach_time_based_function">
+			<return type="void" />
+			<param index="0" name="time" type="float" />
+			<param index="1" name="callable" type="Callable" />
+			<param index="2" name="repeat" type="bool" />
+			<param index="3" name="execute_only_if_multimesh_is_active" type="bool" />
+			<description>
+				Internal worker behind [method multimesh_attach_time_based_function]. Deferred here so it runs outside the physics tick. Do not call it directly.
+			</description>
+		</method>
+		<method name="_do_detach_time_based_function">
+			<return type="void" />
+			<param index="0" name="callable" type="Callable" />
+			<description>
+				Internal worker behind [method multimesh_detach_time_based_function]. Do not call it directly.
+			</description>
+		</method>
+		<method name="_do_detach_all_time_based_functions">
+			<return type="void" />
+			<description>
+				Internal worker behind [method multimesh_detach_all_time_based_functions]. Do not call it directly.
+			</description>
+		</method>
+		<method name="_do_execute_stored_callable_safely">
+			<return type="void" />
+			<param index="0" name="_callback" type="Callable" />
+			<param index="1" name="_execute_only_if_multimesh_is_active" type="bool" default="true" />
+			<description>
+				Internal worker that runs one stored timer callable at end of frame. Do not call it directly.
 			</description>
 		</method>
 		<method name="play_sprite_animation">
@@ -674,6 +713,7 @@
 			<return type="void" />
 			<param index="0" name="new_shape" type="Shape2D" />
 			<description>
+				Swaps the collision shape live, on an active or pooled multimesh. Size-only changes apply to every bullet right away through the physics server. A different effective type additionally rebuilds the physics shapes and moves pooled instances into the matching pool bucket. The visual QuadMesh is texture-driven and stays untouched. The debugger picks up the new type and size on the next physics tick.
 			</description>
 		</method>
 		<method name="set_inherited_velocity_offset">

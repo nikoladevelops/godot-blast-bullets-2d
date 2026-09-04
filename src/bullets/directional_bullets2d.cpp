@@ -269,6 +269,7 @@ void DirectionalBullets2D::_bind_methods() {
 
 	BIND_ENUM_CONSTANT(GlobalPositionTarget);
 	BIND_ENUM_CONSTANT(Node2DTarget);
+	BIND_ENUM_CONSTANT(MousePositionTarget);
 	BIND_ENUM_CONSTANT(NotHoming);
 
 	BIND_ENUM_CONSTANT(DontMove);

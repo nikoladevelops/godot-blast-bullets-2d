@@ -595,7 +595,7 @@
 			Adjust this value for natural smooth turning. Test with values [code]0.00-20.00[/code] or even bigger.
 		</member>
 		<member name="homing_take_control_of_texture_rotation" type="bool" setter="set_homing_take_control_of_texture_rotation" getter="get_homing_take_control_of_texture_rotation" default="false">
-			If you set to true then the texture of the bullets will start facing the direction in which it is moving while homing towards a target.
+			If you set to true then the texture of the bullets will start facing the direction in which it is moving while homing towards a target. Leave it off and homing targets will not steer bullets at all (unless a movement pattern or rotation data does), and you get one warning about it.
 		</member>
 		<member name="homing_update_interval" type="float" setter="set_homing_update_interval" getter="get_homing_update_interval" default="0.0">
 			How often it should cache the position of the targets so that they can be re-used instead of fetching them every frame. Increase if you want to boost performance.
@@ -634,6 +634,8 @@
 		<constant name="GlobalPositionTarget" value="1" enum="HomingType">
 		</constant>
 		<constant name="Node2DTarget" value="2" enum="HomingType">
+		</constant>
+		<constant name="MousePositionTarget" value="3" enum="HomingType">
 		</constant>
 		<constant name="NotHoming" value="0" enum="HomingType">
 		</constant>

@@ -4,6 +4,7 @@
 		Contains bullet speed related data.
 	</brief_description>
 	<description>
+		Per-bullet movement speeds: current speed, cap, and acceleration. Pass one entry to share it across all bullets, or one entry per bullet. Use [method generate_random_data] to roll a batch with ranges.
 	</description>
 	<tutorials>
 	</tutorials>

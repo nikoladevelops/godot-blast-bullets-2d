@@ -137,6 +137,11 @@ func set_up_directional_bullets_data()->DirectionalBulletsData2D:
 	var rectangle:RectangleShape2D = RectangleShape2D.new()
 	rectangle.size = Vector2(32,32)
 	
+	var capsule:CapsuleShape2D = CapsuleShape2D.new()
+	capsule.height = 10
+	capsule.radius = 10
+	capsule.mid_height = 15
+	
 	data.collision_shape = circle
 	
 	

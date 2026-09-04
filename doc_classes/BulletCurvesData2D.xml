@@ -4,6 +4,7 @@
 		Holds data for controlling bullet movement and rotation using curves in 2D. Can override [BulletSpeedData2D] and [BulletRotationData2D].
 	</brief_description>
 	<description>
+		Drive speed, rotation, and direction from [Curve] resources instead of fixed numbers. Each aspect has its own curve plus a use_unit_curve toggle: on means the horizontal axis runs 0 to 1 over the bullet lifetime, off means it runs in seconds. Direction offsets blend additively or override per axis, with adjustable strength. When any curve is present it takes precedence over [BulletSpeedData2D] and [BulletRotationData2D].
 	</description>
 	<tutorials>
 	</tutorials>

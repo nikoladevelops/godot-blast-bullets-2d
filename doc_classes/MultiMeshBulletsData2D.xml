@@ -4,6 +4,7 @@
 		Contains spawn data for all [MultiMeshBullets2D].
 	</brief_description>
 	<description>
+		Shared base for [DirectionalBulletsData2D] and [BlockBulletsData2D]. Fill in [member transforms] (mandatory, one per bullet), a [member sprite_frames] animation, collision settings, lifetime, and optional rotation, material, and custom data, then hand it to a [BulletFactory2D] spawn method. The same resource can be reused for every volley.
 	</description>
 	<tutorials>
 	</tutorials>
@@ -59,6 +60,7 @@
 			How many times a bullet can collide before it gets disabled. If you set to 0, then the bullet will NEVER get disabled due to collisions.
 		</member>
 		<member name="bullets_current_collision_count" type="int[]" setter="set_bullets_current_collision_count" getter="get_bullets_current_collision_count" default="[]">
+			Per-bullet collision counters, one entry per bullet. Leave empty to start every bullet at zero. Values must stay at or below [member bullet_max_collision_count]; out-of-range input is rejected with an error.
 		</member>
 		<member name="bullets_custom_data" type="Resource" setter="set_bullets_custom_data" getter="get_bullets_custom_data">
 			If you want your bullets to have damage or any other data specific to this type of bullets then you have to provide a custom resource that holds all of these properties.
@@ -78,6 +80,7 @@
 			Tip: [method set_collision_mask_from_array] takes plain layer numbers and builds the bitmask for you.
 		</member>
 		<member name="collision_shape" type="Shape2D" setter="set_collision_shape" getter="get_collision_shape">
+			The collision shape shared by all bullets in the multimesh. Supports [RectangleShape2D], [CircleShape2D] and [CapsuleShape2D]; anything else falls back to a circle with an error. The effective type is part of the pool bucket, so changing it changes which pooled instances get reused. Use [member collision_shape_offset] to shift it away from the texture center, and enable the [BulletFactory2D] debugger to see it.
 		</member>
 		<member name="collision_shape_offset" type="Vector2" setter="set_collision_shape_offset" getter="get_collision_shape_offset" default="Vector2(0, 0)">
 			The offset for the collision shape calculated from the center of the bullet texture.

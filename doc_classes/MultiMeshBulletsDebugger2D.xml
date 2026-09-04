@@ -5,6 +5,7 @@
 		This class is only meant to be used by the [BulletFactory2D] inside C++.
 	</brief_description>
 	<description>
+		Draws every bullet collision shape as colored geometry so you can see what the physics server sees. Owned and driven by [BulletFactory2D]; toggle it with the factory debugger properties. True-shape meshes (rectangles, circle fans, capsules) rebuild automatically when a pooled instance is reused with a different shape.
 	</description>
 	<tutorials>
 	</tutorials>

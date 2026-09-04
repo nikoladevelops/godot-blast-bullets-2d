@@ -4,6 +4,7 @@
 		Contains bullet rotation related data.
 	</brief_description>
 	<description>
+		Per-bullet rotation speeds: how fast the texture spins, how fast it is allowed to get, and how quickly it accelerates. Pass one entry to share it across all bullets, or one entry per bullet. Use [method generate_random_data] to roll a batch with ranges.
 	</description>
 	<tutorials>
 	</tutorials>
