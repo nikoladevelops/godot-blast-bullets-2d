@@ -27,12 +27,18 @@ void MultiMeshBulletsData2D::set_transforms(const TypedArray<Transform2D> &new_t
 	transforms = new_transforms;
 }
 
-TypedArray<Texture2D> MultiMeshBulletsData2D::get_textures() const {
-	return textures;
+Ref<SpriteFrames> MultiMeshBulletsData2D::get_sprite_frames() const {
+	return sprite_frames;
+}
+void MultiMeshBulletsData2D::set_sprite_frames(const Ref<SpriteFrames> &new_sprite_frames) {
+	sprite_frames = new_sprite_frames;
 }
 
-void MultiMeshBulletsData2D::set_textures(const TypedArray<Texture2D> &new_textures) {
-	textures = new_textures;
+StringName MultiMeshBulletsData2D::get_animation() const {
+	return animation;
+}
+void MultiMeshBulletsData2D::set_animation(const StringName &new_animation) {
+	animation = new_animation;
 }
 
 Vector2 MultiMeshBulletsData2D::get_texture_size() const {
@@ -47,20 +53,6 @@ real_t MultiMeshBulletsData2D::get_texture_rotation_radians() const {
 }
 void MultiMeshBulletsData2D::set_texture_rotation_radians(real_t new_texture_rotation_radians) {
 	texture_rotation_radians = new_texture_rotation_radians;
-}
-
-int MultiMeshBulletsData2D::get_current_texture_index() const {
-	return current_texture_index;
-}
-void MultiMeshBulletsData2D::set_current_texture_index(int new_current_texture_index) {
-	current_texture_index = new_current_texture_index;
-}
-
-double MultiMeshBulletsData2D::get_default_change_texture_time() const {
-	return default_change_texture_time;
-}
-void MultiMeshBulletsData2D::set_default_change_texture_time(double new_default_change_texture_time) {
-	default_change_texture_time = new_default_change_texture_time;
 }
 
 int MultiMeshBulletsData2D::get_collision_layer() const {
@@ -199,22 +191,6 @@ void MultiMeshBulletsData2D::set_instance_shader_parameters(const Dictionary &ne
 	instance_shader_parameters = new_instance_shader_parameters;
 }
 
-TypedArray<double> MultiMeshBulletsData2D::get_change_texture_times() const {
-	return change_texture_times;
-}
-
-void MultiMeshBulletsData2D::set_change_texture_times(const TypedArray<double> &new_change_texture_times) {
-	change_texture_times = new_change_texture_times;
-}
-
-Ref<Texture2D> MultiMeshBulletsData2D::get_default_texture() const {
-	return default_texture;
-}
-
-void MultiMeshBulletsData2D::set_default_texture(const Ref<Texture2D> &new_default_texture) {
-	default_texture = new_default_texture;
-}
-
 bool MultiMeshBulletsData2D::get_is_life_time_over_signal_enabled() const {
 	return is_life_time_over_signal_enabled;
 }
@@ -259,9 +235,13 @@ void MultiMeshBulletsData2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_transforms"), &MultiMeshBulletsData2D::get_transforms);
 	ADD_PROPERTY(PropertyInfo(Variant::ARRAY, "transforms"), "set_transforms", "get_transforms");
 
-	ClassDB::bind_method(D_METHOD("get_textures"), &MultiMeshBulletsData2D::get_textures);
-	ClassDB::bind_method(D_METHOD("set_textures", "new_textures"), &MultiMeshBulletsData2D::set_textures);
-	ADD_PROPERTY(PropertyInfo(Variant::ARRAY, "textures"), "set_textures", "get_textures");
+	ClassDB::bind_method(D_METHOD("get_sprite_frames"), &MultiMeshBulletsData2D::get_sprite_frames);
+	ClassDB::bind_method(D_METHOD("set_sprite_frames", "new_sprite_frames"), &MultiMeshBulletsData2D::set_sprite_frames);
+	ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "sprite_frames", PROPERTY_HINT_RESOURCE_TYPE, "SpriteFrames"), "set_sprite_frames", "get_sprite_frames");
+
+	ClassDB::bind_method(D_METHOD("get_animation"), &MultiMeshBulletsData2D::get_animation);
+	ClassDB::bind_method(D_METHOD("set_animation", "new_animation"), &MultiMeshBulletsData2D::set_animation);
+	ADD_PROPERTY(PropertyInfo(Variant::STRING_NAME, "animation"), "set_animation", "get_animation");
 
 	ClassDB::bind_method(D_METHOD("get_texture_size"), &MultiMeshBulletsData2D::get_texture_size);
 	ClassDB::bind_method(D_METHOD("set_texture_size", "new_texture_size"), &MultiMeshBulletsData2D::set_texture_size);
@@ -270,14 +250,6 @@ void MultiMeshBulletsData2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_texture_rotation_radians"), &MultiMeshBulletsData2D::get_texture_rotation_radians);
 	ClassDB::bind_method(D_METHOD("set_texture_rotation_radians", "new_texture_rotation_radians"), &MultiMeshBulletsData2D::set_texture_rotation_radians);
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "texture_rotation_radians"), "set_texture_rotation_radians", "get_texture_rotation_radians");
-
-	ClassDB::bind_method(D_METHOD("get_current_texture_index"), &MultiMeshBulletsData2D::get_current_texture_index);
-	ClassDB::bind_method(D_METHOD("set_current_texture_index", "new_current_texture_index"), &MultiMeshBulletsData2D::set_current_texture_index);
-	ADD_PROPERTY(PropertyInfo(Variant::INT, "current_texture_index"), "set_current_texture_index", "get_current_texture_index");
-
-	ClassDB::bind_method(D_METHOD("get_default_change_texture_time"), &MultiMeshBulletsData2D::get_default_change_texture_time);
-	ClassDB::bind_method(D_METHOD("set_default_change_texture_time", "new_default_change_texture_time"), &MultiMeshBulletsData2D::set_default_change_texture_time);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "default_change_texture_time"), "set_default_change_texture_time", "get_default_change_texture_time");
 
 	ClassDB::bind_method(D_METHOD("get_collision_layer"), &MultiMeshBulletsData2D::get_collision_layer);
 	ClassDB::bind_method(D_METHOD("set_collision_layer", "new_collision_layer"), &MultiMeshBulletsData2D::set_collision_layer);
@@ -347,14 +319,6 @@ void MultiMeshBulletsData2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_instance_shader_parameters"), &MultiMeshBulletsData2D::get_instance_shader_parameters);
 	ClassDB::bind_method(D_METHOD("set_instance_shader_parameters", "new_instance_shader_parameters"), &MultiMeshBulletsData2D::set_instance_shader_parameters);
 	ADD_PROPERTY(PropertyInfo(Variant::DICTIONARY, "instance_shader_parameters", PROPERTY_HINT_TYPE_STRING, "String:Variant"), "set_instance_shader_parameters", "get_instance_shader_parameters");
-
-	ClassDB::bind_method(D_METHOD("get_change_texture_times"), &MultiMeshBulletsData2D::get_change_texture_times);
-	ClassDB::bind_method(D_METHOD("set_change_texture_times", "arr"), &MultiMeshBulletsData2D::set_change_texture_times);
-	ADD_PROPERTY(PropertyInfo(Variant::ARRAY, "change_texture_times"), "set_change_texture_times", "get_change_texture_times");
-
-	ClassDB::bind_method(D_METHOD("get_default_texture"), &MultiMeshBulletsData2D::get_default_texture);
-	ClassDB::bind_method(D_METHOD("set_default_texture"), &MultiMeshBulletsData2D::set_default_texture);
-	ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "default_texture"), "set_default_texture", "get_default_texture");
 
 	ClassDB::bind_method(D_METHOD("get_is_life_time_over_signal_enabled"), &MultiMeshBulletsData2D::get_is_life_time_over_signal_enabled);
 	ClassDB::bind_method(D_METHOD("set_is_life_time_over_signal_enabled"), &MultiMeshBulletsData2D::set_is_life_time_over_signal_enabled);

@@ -96,6 +96,10 @@ protected:
 	// Tracks how many bullets are currently homing in TOTAL (per-bullet homing, NOT shared) - basically determines whether the per-bullet homing feature is even turned on
 	int active_homing_count = 0;
 
+	// Once-flag so the silent-homing footgun warns exactly once per multimesh lifetime
+	// segment (reset on spawn/enable). See move_bullets homing branch.
+	bool homing_inert_warning_issued = false;
+
 	// This is a shared homing deque - allows the bullets to share the same target
 	HomingTargetDeque shared_homing_deque;
 
@@ -178,6 +182,23 @@ public:
 
 		bool is_per_bullet_curves_valid = false;
 		const BulletCurvesData2D *per_bullet_curves_data = nullptr;
+
+		// Usability guard: homing targets without steering is a silent no-op (direction only
+		// changes via rotate_to_target, movement patterns, rotation data, or orbiting).
+		// Warn once.
+		if (!homing_inert_warning_issued && (shared_homing_deque_enabled || is_per_bullet_homing_enabled) && !homing_take_control_of_texture_rotation && !is_rotation_data_active && active_orbiting_count == 0) {
+			bool any_pattern = false;
+			for (int pi : all_bullets_enabled_set.get_active_indexes()) {
+				if (check_exists_bullet_movement_pattern_data(pi)) {
+					any_pattern = true;
+					break;
+				}
+			}
+			if (!any_pattern) {
+				UtilityFunctions::push_warning("DirectionalBullets2D has homing targets but homing_take_control_of_texture_rotation is false (and no movement pattern/rotation data), so homing will not steer bullets. Set it to true.");
+				homing_inert_warning_issued = true;
+			}
+		}
 
 		// Loop only through ACTIVE bullets (skip the disabled ones)
 		const auto &active_bullet_indexes = all_bullets_enabled_set.get_active_indexes();
@@ -326,14 +347,15 @@ public:
 						}
 						if (pattern.face_movement_direction && velocity_delta.length_squared() > 0.0001) {
 							const Vector2 tangent = velocity_delta.normalized();
-							curr_bullet_transf.columns[0] = tangent;
-							curr_bullet_transf.columns[1] = Vector2(-tangent.y, tangent.x);
+							// Preserve scale like set_bullet_texture_rotation_towards_position does.
+							const Vector2 pattern_scale = curr_bullet_transf.get_scale();
+							curr_bullet_transf.set_rotation_and_scale(tangent.angle(), pattern_scale);
 						}
 						if (!pattern.repeat_pattern && pattern.distance_traveled >= len) {
 							if (pattern.face_movement_direction) {
 								const Vector2 logical_dir = curr_bullet_direction.normalized();
-								curr_bullet_transf.columns[0] = logical_dir;
-								curr_bullet_transf.columns[1] = Vector2(-logical_dir.y, logical_dir.x);
+								const Vector2 pattern_scale = curr_bullet_transf.get_scale();
+								curr_bullet_transf.set_rotation_and_scale(logical_dir.angle(), pattern_scale);
 							}
 							all_movement_pattern_data[i] = BulletMovementPatternData2D();
 						}

@@ -35,6 +35,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <godot_cpp/classes/atlas_texture.hpp>
 #include <godot_cpp/classes/engine.hpp>
 #include <godot_cpp/classes/mesh.hpp>
 #include <godot_cpp/classes/multi_mesh.hpp>
@@ -43,6 +44,7 @@
 #include <godot_cpp/classes/physics_server2d.hpp>
 #include <godot_cpp/classes/quad_mesh.hpp>
 #include <godot_cpp/classes/shape2d.hpp>
+#include <godot_cpp/classes/sprite_frames.hpp>
 #include <godot_cpp/variant/utility_functions.hpp>
 #include <iterator>
 #include <vector>
@@ -55,7 +57,8 @@ class MultiMeshObjectPool;
 class MultiMeshBullets2D : public MultiMeshInstance2D, public IDebuggerDataProvider2D {
 	GDCLASS(MultiMeshBullets2D, MultiMeshInstance2D)
 public:
-	// Having constructors with initializer lists would be very cool, but Godot's memnew keyword sadly does not support that, so I'm left with using custom spawn() methods - Remeber when you create a new instance of this class with memnew you have to call a spawn method in order for everything to work
+	// Godot's memnew cannot forward constructor arguments, so instances are created
+	// with memnew and then initialized through spawn(). Always call spawn() after memnew.
 
 	virtual ~MultiMeshBullets2D();
 
@@ -79,7 +82,8 @@ public:
 	// Activates the multimesh
 	void enable_multimesh(const MultiMeshBulletsData2D &data, const Vector2 &new_inherited_velocity_offset);
 
-	// Internal delete - used on the C++ side only
+	// Internal delete, C++ side only. Never call this from GDScript or from inside a
+	// physics callback; factory free/reset methods already call it for you at a safe time.
 	void force_delete() {
 		marked_for_internal_deletion = true;
 		Node *parent = get_parent();
@@ -259,34 +263,51 @@ float *w = batch_buffer.ptrw();
 		}
 	}
 
-	// Changes the texture periodically
-	_ALWAYS_INLINE_ void change_texture_periodically(double delta) {
-		int64_t textures_amount = textures.size();
-
-		// No need to change textures if there is nothing to animate..
-		if (textures_amount <= 1) {
+	// Advances the SpriteFrames animation baked in anim_frames/anim_frame_secs.
+	// Hot path: plain countdown + index + one set_texture. No SpriteFrames calls here.
+	// Texture swaps are interpolation-exempt (interpolation only lerps transforms).
+	_ALWAYS_INLINE_ void advance_sprite_animation(double delta) {
+		const int64_t frame_count = (int64_t)anim_frames.size();
+		if (frame_count <= 1 || !is_active || anim_paused || anim_finished) {
 			return;
 		}
-
-		// Keep reducing the current change texture time every frame
-		current_change_texture_time -= delta;
-
-		// When the current change texture time reaches 0, it's time to switch to the next texture
-		if (current_change_texture_time <= 0.0) {
-			// Change the texture to the new one
-			if (current_texture_index + 1 < textures_amount) {
-				current_texture_index++;
-			} else { // Loop if you reach the end so you don't access invalid indexes
-				current_texture_index = 0;
+		if (delta <= 0.0) {
+			return;
+		}
+		if (delta > 0.5) {
+			delta = 0.5; // clamp hitch spikes so one tick can't fast-forward whole anims
+		}
+		anim_frame_time_left -= delta;
+		int strides = 0;
+		while (anim_frame_time_left <= 0.0) {
+			if (++strides > 8) {
+				// Anti-spiral: resync timer to current frame instead of looping forever.
+				anim_frame_time_left = anim_frame_secs[anim_frame_index] > 0.0 ? anim_frame_secs[anim_frame_index] : 0.0;
+				break;
 			}
-
-			set_texture(textures[current_texture_index]);
-
-			// If the user has provided same amount of change texture times as textures, it means he wants to have different wait time for each texture
-			if (change_texture_times.size() == textures_amount) {
-				current_change_texture_time = change_texture_times[current_texture_index]; // use the next texture's time
-			} else { // Otherwise just use the default change texture time again which is saved in index 0
-				current_change_texture_time = change_texture_times[0]; // use the default time
+			int next = anim_frame_index + 1;
+			if (next >= frame_count) {
+				if (anim_loop) {
+					next = 0;
+				} else {
+					anim_frame_index = (int)frame_count - 1;
+					anim_frame_time_left = 0.0;
+					if (!anim_finished) {
+						anim_finished = true;
+						// Deferred like life_time_over: never emit directly from physics tick.
+						// NOTE: the signal lives on the multimesh itself (not the factory),
+						// so it must be emitted on `this`.
+						call_deferred("emit_signal", "sprite_animation_finished", this);
+					}
+					return;
+				}
+			}
+			anim_frame_index = next;
+			set_texture(anim_frames[anim_frame_index]);
+			anim_frame_time_left += anim_frame_secs[anim_frame_index];
+			// Guard against zero-length frames looping forever in one tick.
+			if (anim_frame_secs[anim_frame_index] <= 0.0) {
+				break;
 			}
 		}
 	}
@@ -332,53 +353,22 @@ float *w = batch_buffer.ptrw();
 	Ref<BulletCurvesData2D> get_shared_bullet_curves_data() const { return shared_bullet_curves_data; }
 	void set_shared_bullet_curves_data(const Ref<BulletCurvesData2D> &new_curves_data) { populate_shared_curves_related_data(new_curves_data); }
 
-	TypedArray<Texture2D> get_textures() const { return textures; }
-	void set_textures(const TypedArray<Texture2D> &new_textures, const TypedArray<double> &new_change_texture_times, int selected_texture_index = 0) {
-		auto curr_textures_amount = new_textures.size();
-		auto curr_change_texture_times_amount = new_change_texture_times.size();
+	// Re-bakes the animation cache from a SpriteFrames resource and switches to it.
+	// Empty animation means auto: "default" if present, else first animation, silently.
+	// Returns false (leaving the previous animation untouched) on null/empty/missing.
+	bool play_sprite_animation(const Ref<SpriteFrames> &p_sprite_frames, const StringName &p_animation = StringName("default"));
+	// Reuses the cached SpriteFrames source. Same resolve rules as play_sprite_animation.
+	bool play_sprite_animation_name(const StringName &p_animation);
+	bool restart_sprite_animation();
+	void stop_sprite_animation() { anim_paused = true; }
+	void resume_sprite_animation() { anim_paused = false; }
+	bool is_sprite_animation_playing() const { return is_active && !anim_paused && !anim_finished && anim_frames.size() > 1; }
+	bool is_sprite_animation_finished() const { return anim_finished; }
 
-		if (curr_textures_amount <= 0) {
-			change_texture_times.clear();
-			textures.clear();
-			current_texture_index = 0;
-			set_texture(nullptr);
-			return;
-		}
-
-		if (curr_change_texture_times_amount <= 0) {
-			UtilityFunctions::push_error("You need to provide at least 1 change texture time that will be used for all provided textures");
-			return;
-		}
-
-		if (curr_change_texture_times_amount > curr_textures_amount) {
-			UtilityFunctions::push_error("You can NOT provide an amount of change texture times that is larger than the actual amount of textures");
-			return;
-		}
-
-		if (selected_texture_index < 0 || selected_texture_index >= curr_textures_amount) {
-			UtilityFunctions::push_error("Invalid/out of range selected_texture_index when trying to set new textures to the multimesh bullets");
-			return;
-		}
-
-		change_texture_times.clear();
-		textures.clear();
-
-		textures = new_textures.duplicate();
-
-		if (curr_change_texture_times_amount < curr_textures_amount) {
-			auto new_time = new_change_texture_times[0];
-
-			change_texture_times.push_back(new_time);
-			current_change_texture_time = new_time;
-		} else { // If curr_change_texture_times_amount == curr_textures_amount
-			change_texture_times = new_change_texture_times.duplicate();
-			current_change_texture_time = new_change_texture_times[selected_texture_index];
-		}
-
-		current_texture_index = selected_texture_index;
-
-		set_texture(textures[current_texture_index]);
-	}
+	StringName get_sprite_animation() const { return anim_name; }
+	Ref<SpriteFrames> get_sprite_frames() const { return anim_source; }
+	int get_sprite_frame() const { return anim_frame_index; }
+	int get_sprite_frame_count() const { return (int)anim_frames.size(); }
 
 	// Bullet Speed Data
 
@@ -471,8 +461,10 @@ float *w = batch_buffer.ptrw();
 	void set_monitorable(bool value);
 
 	Ref<Shape2D> get_collision_shape() const { return cached_collision_shape; }
-	// Explicit runtime shape change. Recreates RIDs if effective type changed, else updates data.
-	// Debugger picks up new type/size next physics tick via ensure function. Safe for pooling (caller must re-push with new key if pooled).
+	// Explicit runtime shape change. Size-only changes apply immediately through the
+	// PhysicsServer for every bullet (same bucket, no re-bucketing needed). Effective-type
+	// changes additionally recreate the RIDs and re-bucket pooled instances. The visual
+	// QuadMesh is texture-driven and intentionally untouched by shape edits.
 	void set_collision_shape_runtime(const Ref<Shape2D> &new_shape);
 	PoolKey get_pool_key() const { return PoolKey{ amount_bullets, cached_effective_shape_type }; }
 	static void _bind_methods();
@@ -577,19 +569,21 @@ float *w = batch_buffer.ptrw();
 	// If a ShaderMaterial was provided and it has instance shader parameters, then they should get cached here
 	Dictionary instance_shader_parameters;
 
-	/// TEXTURE RELATED
+	/// TEXTURE / ANIMATION RELATED
 
-	// Holds all textures
-	TypedArray<Texture2D> textures;
-
-	// Holds all change texture times (each time corresponds to each texture)
-	TypedArray<double> change_texture_times;
-
-	// The change texture time being processed now
-	double current_change_texture_time = 0.0;
-
-	// Holds the current texture index (the index inside the array textures)
-	int current_texture_index = 0;
+	// Baked SpriteFrames animation. Rebuilt at spawn/enable/play only; the per-tick
+	// advance_sprite_animation() touches just these vectors + set_texture.
+	// Texture swaps are interpolation-exempt: physics interpolation only lerps transform
+	// buffers, so play/rebuild must never touch all_previous_* caches (and doesn't).
+	Ref<SpriteFrames> anim_source;
+	StringName anim_name = "default";
+	std::vector<Ref<Texture2D>> anim_frames;
+	std::vector<double> anim_frame_secs;
+	bool anim_loop = true;
+	bool anim_paused = false;
+	bool anim_finished = false;
+	int anim_frame_index = 0;
+	double anim_frame_time_left = 0.0;
 
 	// This is the texture size of the bullets
 	Vector2 texture_size = Vector2(0, 0);
@@ -1299,6 +1293,12 @@ float *w = batch_buffer.ptrw();
 		active_bullets_counter = 0;
 		is_active = false;
 		curves_elapsed_time = 0.0;
+		anim_frame_index = 0;
+		anim_paused = false;
+		anim_finished = false;
+		if (!anim_frame_secs.empty()) {
+			anim_frame_time_left = anim_frame_secs[0];
+		}
 		shared_bullet_curves_data = Ref<BulletCurvesData2D>();
 		for (auto &r : all_bullet_curves_data) {
 			r.unref();
@@ -1562,14 +1562,25 @@ private:
 
 	void set_up_life_time_timer(double new_max_life_time, double new_current_life_time);
 
-	void set_up_change_texture_timer(int64_t new_amount_textures, double new_default_change_texture_time, const TypedArray<double> &new_change_texture_times);
+	// Bakes frames + per-frame seconds from SpriteFrames (fps-relative durations) and
+	// applies frame 0. Returns false on null/empty/missing (previous animation kept).
+	bool rebuild_sprite_animation(const Ref<SpriteFrames> &p_sprite_frames, const StringName &p_animation);
+
+	// Silent auto-resolution shared by rebuild + quad sizing: empty or missing "default"
+	// resolves to first animation without error; explicit wrong names error once here.
+	// Returns true with out_anim set, false when unusable (caller must not alter state).
+	static bool resolve_sprite_animation(const Ref<SpriteFrames> &p_sprite_frames, const StringName &p_requested, StringName &out_anim);
+	// Same resolution without any error output, for sizing-only paths where the
+	// subsequent rebuild owns reporting.
+	static bool resolve_sprite_animation_quiet(const Ref<SpriteFrames> &p_sprite_frames, const StringName &p_requested, StringName &out_anim);
+
+	// Resolves QuadMesh size: manual override wins, else first-frame size
+	// (AtlasTexture region, else texture size), else 32x32 fallback.
+	static Vector2 resolve_quad_size(const Ref<SpriteFrames> &p_sprite_frames, const StringName &p_animation, Vector2 override_size);
 
 	// Always called last
 	void finalize_set_up(
 			const Ref<Resource> &new_bullets_custom_data,
-			const TypedArray<Texture2D> &new_textures,
-			const Ref<Texture2D> &new_default_texture,
-			int new_current_texture_index,
 			const Ref<Material> &new_material,
 			int new_z_index,
 			int new_light_mask,

@@ -63,9 +63,9 @@ relative to their direction (allows zig zag patterns and any other creative patt
 
 - **Control Speed And Rotation The Normal Way** - If bullet curves are not needed, you can still use normal speed and speed acceleration values for both movement and rotation using **BulletSpeedData2D** and **BulletRotationData2D**.
 
-- **Animated Textures** - Support for animation that switches between an array of textures and texture times (how long the texture should be on screen before moving to the next). Set a default texture or have full blown animated bullets, no problem!
+- **Animated Textures With SpriteFrames** - Assign a `SpriteFrames` resource (plain textures or `AtlasTexture` regions) and an animation name. Timing comes from the animation itself (speed as fps, per-frame durations, loop flag). QuadMesh size auto-derives from the first frame unless you override `texture_size`. Switch animations at runtime per multimesh with `play_sprite_animation()` and get a `sprite_animation_finished` signal for non-looping animations.
 
-- **Custom Collision Shape Sizes** - Support for rectangle collision shapes with a custom Vector2 size.
+- **Custom Collision Shapes** - Support for `RectangleShape2D`, `CircleShape2D` and `CapsuleShape2D` with custom sizes.
 
 - **Support For Custom Bullet Max Collisions Amount** - A bullet can collide multiple times before being disabled. Very useful for Bullet Hell games.
 
@@ -85,7 +85,7 @@ relative to their direction (allows zig zag patterns and any other creative patt
 
 - **Bullet Attachments** - Seamlessly attach GPUParticles2D, CPUParticles2D or custom sprites that follow the bullet's transform with optional offsets. The use of **modern GDExtension features** like virtual methods allow you to override what happens when attachments are spawned/disabled/pooled. These custom methods get called *inside C++* to set up your bullet attachment as necessary. Example - Spawn attachments with visible particles but when they collide you have to disable the emitting and even disable visibility of extra nodes you might've attached. Super flexible and easy to use.
 
-- **Automatic Object Pooling** - MultiMesh instances and attachments are automatically pooled and reused. You can manually populate or free pools, or disable the system to use your own custom logic. You can choose the easy way of using the plugin without any care (because performance is handled for you already) OR you can delve deeper. Example: disable auto pooling, which will allow you to save your bullet instances into an array of multimeshes without fear of problems. Reuse them whenever you want with runtime functions such as `enable_bullet()`/`disable_bullet()`.
+- **Automatic Object Pooling** - MultiMesh instances and attachments are automatically pooled and reused. Pool buckets are exact `(amount of bullets, collision shape type)` pairs identified by `MultiMeshPoolKey2D` — e.g. `MultiMeshPoolKey2D.make(200, PhysicsServer2D.SHAPE_CIRCLE)`. You can manually populate (`populate_bullets_pool(key, data, instance_count)`) or free (`free_bullets_pool()`, `free_active_bullets()`, `free_disabled_bullets()`, `reset()` — pass `null` for everything or a key for one bucket), or disable the system to use your own custom logic. You can choose the easy way of using the plugin without any care (because performance is handled for you already) OR you can delve deeper. Example: disable auto pooling, which will allow you to save your bullet instances into an array of multimeshes without fear of problems. Reuse them whenever you want with runtime functions such as `enable_bullet()`/`disable_bullet()`.
 
 - **Dynamic Sparse Set** - The plugin uses custom made data structure that is used internally for precise tracking and looping over ONLY ACTIVE MultiMeshInstances and ONLY THE ACTIVE bullets inside them. This reduces branching and improves performance (a pattern used in ECS engines that could be further improved in future versions of BlastBullets2D).
 
@@ -107,8 +107,8 @@ While **BlastBullets2D** is highly optimized and feature-rich for top-down 2D ga
 - ❌ **Y-sorting is not supported**<br>
 If your game relies heavily on Y-based depth sorting (common in platformers or isometric games), this plugin may not be a good fit.
 
-- ❌ **Only `RectangleShape2D` is supported for collisions**<br>
-Currently, other collision shapes like `CircleShape2D` or `ConvexPolygonShape2D` are not supported.
+- ❌ **Only `RectangleShape2D`, `CircleShape2D` and `CapsuleShape2D` are supported for collisions**<br>
+Other collision shapes fall back to a circle with an error message.
 
 - ❌ **Only Area2D like behavior**<br>
 All bullets act as `Area2D` - they are not `RigidBody2D` and don't support bouncing off of other bullets and so on. Basically you can NOT apply impulse forces. Just view them as `Area2D` bullets.
@@ -154,7 +154,7 @@ It is recommended to watch these tutorials if you are struggling with the docume
 
 Here is how the basic setup goes:
 1. Add a `BulletFactory2D` node to your scene tree. The BulletFactory's job is to spawn bullets and manage plugin related options (debugger, physics interpolations and so on..).
-2. The `BulletFactory2D` node has the signals `area_entered`, `body_entered` and `life_time_over`. You should handle them in your script and write custom logic for your game.
+2. The `BulletFactory2D` node has the signals `area_entered`, `body_entered`, `life_time_over` and each bullet multimesh emits `sprite_animation_finished` when a non-looping animation ends. You should handle them in your script and write custom logic for your game.
 
 Keep a reference to the factory globally, so you can access it in any other script(enemies/player). There's two ways of doing this.
 
@@ -222,25 +222,17 @@ Code example:
 # Returns a partially set up DirectionalBulletsData2D, only thing left to do is set a new value to the .transforms property when the fire cooldown timer times out and you are ready to spawn a new batch of bullets..
 func set_up_directional_bullets_data()->DirectionalBulletsData2D:
 	var data:DirectionalBulletsData2D = DirectionalBulletsData2D.new()
-	data.textures = rocket_textures # Set an array of textures
+	# Build a SpriteFrames animation (plain textures or AtlasTexture regions work).
 	# WARNING: Make sure your textures are FACING the Vector2.RIGHT direction when you draw them (basically your bullets should be facing right)
 	# If you have to, go through each texture and rotate it manually with an image editor and only then load them all in Godot.
-
-	data.default_change_texture_time = 0.4 # configure default change texture time
-
-	# You can also define wait time for each texture like so as long as the amount of textures matches the amount of values in this array.
-	#data.change_texture_times = [
-		#0.05,
-		#0.03,
-		#0.01,
-		#0.02,
-		#0.01,
-		#0.01,
-		#0.01,
-		#0.08,
-		#0.01,
-		#0.03
-	#]
+	var frames := SpriteFrames.new()
+	frames.add_animation(&"default")
+	frames.set_animation_speed(&"default", 11.0) # fps; each frame shows for duration / fps seconds
+	frames.set_animation_loop(&"default", true)
+	for tex in rocket_textures:
+		frames.add_frame(&"default", tex)
+	data.sprite_frames = frames
+	data.animation = &"default" # empty also works: plays "default" if present, else the first animation
 	
 	
 	data.all_bullet_speed_data = bullet_speed_data # for the directional bullets use every single bullet speed
@@ -248,10 +240,8 @@ func set_up_directional_bullets_data()->DirectionalBulletsData2D:
 	data.set_collision_layer_from_array([2])
 	data.set_collision_mask_from_array([3])
 
-	data.texture_size = Vector2(140,140)
-	data.collision_shape_size=Vector2(32,32)
+	data.texture_size = Vector2(140,140) # QuadMesh override; use Vector2(0,0) to auto-size from the first frame
 	data.collision_shape_offset=Vector2(0,0)
-	data.default_change_texture_time=0.09
 	data.max_life_time = 2
 	data.all_bullet_rotation_data = bullet_rotation_data
 	data.bullets_custom_data = damage_data

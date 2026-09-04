@@ -8,6 +8,7 @@
 #include <godot_cpp/classes/shape2d.hpp>
 #include <godot_cpp/classes/packed_scene.hpp>
 #include <godot_cpp/classes/resource.hpp>
+#include <godot_cpp/classes/sprite_frames.hpp>
 #include <godot_cpp/classes/texture2d.hpp>
 
 namespace BlastBullets2D {
@@ -16,28 +17,25 @@ using namespace godot;
 class MultiMeshBulletsData2D : public Resource {
 	GDCLASS(MultiMeshBulletsData2D, Resource)
 public:
-	// TEXTURE RELATED
+	// TEXTURE / ANIMATION RELATED
 
-	// All textures. If you give an array containing more than 1 texture then the default_change_texture_time will be used to periodically change the texture to the next one in the array.
-	TypedArray<Texture2D> textures;
+	// SpriteFrames resource holding all animations. Each frame is a Texture2D
+	// (plain texture or AtlasTexture region of a spritesheet). The whole multimesh
+	// batch shares one frame at a time; per-frame timing comes from the SpriteFrames
+	// animation (speed=fps, per-frame duration multiplier, loop flag).
+	Ref<SpriteFrames> sprite_frames;
 
-	// The default texture that is used if no textures were given inside the textures array
-	Ref<Texture2D> default_texture = nullptr;
+	// Which SpriteFrames animation to play. Empty or "default" auto-resolves silently:
+	// "default" if present, else the first animation. Explicit wrong names fall back
+	// to the first animation with a single error.
+	StringName animation = "default";
 
-	// The texture amount_bullets. Keep in mind that this will be used only if a mesh was NOT provided
-	Vector2 texture_size = Vector2(32, 32);
+	// QuadMesh size override. Used only if mesh is null. If x/y <= 0 the size is
+	// auto-derived from the first frame (AtlasTexture region size, else texture size).
+	Vector2 texture_size = Vector2(0, 0);
 
 	// The texture rotation in radians. Change the value of this if you see that your texture is not rotated correctly. Example: If you want to rotate the texture 90 degrees more you would set the value to 90*PI/180
 	real_t texture_rotation_radians = 0.0;
-
-	// Determines the starting texture in the textures array (by default it's the first texture in the array, so it's index 0). Make sure to provide an index that actually exists.
-	int current_texture_index = 0;
-
-	// Determines the time before the multimesh changes its texture to the next one in the array of textures. Because of this, animation is possible.
-	double default_change_texture_time = 0.3f;
-
-	// Determines the time before the multimesh changes its texture to the next one in the array of textures. Each time saved in the array corresponds to each texture inside the textures array. If you do NOT provide any data here then default_change_texture_time will be used by default
-	TypedArray<double> change_texture_times;
 
 	// Whether the rotation of the texture should never change depending on the direction the bullets move in
 	bool is_texture_rotation_permanent = false;
@@ -124,20 +122,17 @@ public:
 	TypedArray<Transform2D> get_transforms() const;
 	void set_transforms(const TypedArray<Transform2D> &new_transforms);
 
-	TypedArray<Texture2D> get_textures() const;
-	void set_textures(const TypedArray<Texture2D> &new_textures);
+	Ref<SpriteFrames> get_sprite_frames() const;
+	void set_sprite_frames(const Ref<SpriteFrames> &new_sprite_frames);
+
+	StringName get_animation() const;
+	void set_animation(const StringName &new_animation);
 
 	Vector2 get_texture_size() const;
 	void set_texture_size(Vector2 new_texture_size);
 
 	real_t get_texture_rotation_radians() const;
 	void set_texture_rotation_radians(real_t new_texture_rotation_radians);
-
-	int get_current_texture_index() const;
-	void set_current_texture_index(int new_current_texture_index);
-
-	double get_default_change_texture_time() const;
-	void set_default_change_texture_time(double new_default_change_texture_time);
 
 	int get_collision_layer() const;
 	void set_collision_layer(int new_collision_layer);
@@ -190,12 +185,6 @@ public:
 
 	Dictionary get_instance_shader_parameters() const;
 	void set_instance_shader_parameters(const Dictionary &new_instance_shader_parameters);
-
-	TypedArray<double> get_change_texture_times() const;
-	void set_change_texture_times(const TypedArray<double> &new_change_texture_times);
-
-	Ref<Texture2D> get_default_texture() const;
-	void set_default_texture(const Ref<Texture2D> &new_default_texture);
 
 	bool get_is_life_time_over_signal_enabled() const;
 	void set_is_life_time_over_signal_enabled(bool new_is_life_time_over_signal_enabled);

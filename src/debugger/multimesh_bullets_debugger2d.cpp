@@ -103,7 +103,7 @@ void MultiMeshBulletsDebugger2D::disable() {
 	// Note: If you ever see a "trying to disconnect a signal that wasn't actually connected before" type of error message in the godot console, it means that your object state is not valid. Ensure you always initialize variables that you may access for the first time (variables accessed without actually calling the setter first = accessing undefined value = undefined behavior)..
 
 	for (int i = 0; i < debugger_multimeshes.size(); ++i) {
-		memdelete(debugger_multimeshes[i]); // basically a forceful freeing instead of the usual queue_free, should be safe as long as those multimeshes don't do anything additional that is related to physics_process
+		memdelete(debugger_multimeshes[i]); // Debugger meshes are plain nodes with no physics/RID state, so immediate delete is safe here.
 	}
 
 	// Clear both vectors so they don't contain any pointers / Note that .clear() doesn't do memory reallocations which is good
@@ -306,6 +306,14 @@ void MultiMeshBulletsDebugger2D::update_debug_multimesh_transforms_to_match_data
 
 	const std::vector<Transform2D> &collision_shape_transforms_for_debugging = debugger_data_provider.get_all_collision_shape_transforms_for_debugging();
 
+#ifdef DEV_ENABLED
+	// Amount is pool-keyed and immutable per instance, so these must always agree.
+	ERR_FAIL_COND((int)collision_shape_transforms_for_debugging.size() != amount_quadmeshes);
+#endif
+	if ((int)collision_shape_transforms_for_debugging.size() != amount_quadmeshes) {
+		return;
+	}
+
 	// Set each quadmesh instance's transform to match the collision shape's transform
 	for (int i = 0; i < amount_quadmeshes; ++i) {
 		const Transform2D &collision_shape_transf = collision_shape_transforms_for_debugging[i];
@@ -330,7 +338,12 @@ void MultiMeshBulletsDebugger2D::change_debug_multimeshes_color(const Color &new
 }
 
 void MultiMeshBulletsDebugger2D::_physics_process(double delta) {
-	for (int i = 0; i < debug_data_providers.size(); ++i) {
+	(void)delta;
+	// Parallel arrays; bail on any desync instead of indexing out of bounds.
+	if (debug_data_providers.size() != debugger_multimeshes.size()) {
+		return;
+	}
+	for (int i = 0; i < (int)debug_data_providers.size(); ++i) {
 		IDebuggerDataProvider2D *provider = debug_data_providers[i];
 
 		if (!provider || provider->get_skip_debugging()) {

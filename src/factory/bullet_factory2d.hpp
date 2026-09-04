@@ -146,13 +146,19 @@ public:
 
 	void handle_manual_user_deletion_of_multimesh_bullets(MultiMeshBullets2D &bullet_multi);
 
-protected:
+	void _notification(int p_what);
+
+ protected:
 	// Responsible for exposing C++ methods/properties to Godot Engine
 	static void _bind_methods();
 
-private:
+ private:
 	// Whether the factory was spawned correctly and the ready function finished. Used in order to avoid bugs related to editor executing getters/setters that should only be executed during runtime / gameplay. If a getter/setter is executed when in editor then those values get cached in different variables and finally get applied in _ready()
 	bool is_ready = false;
+
+	// Set in NOTIFICATION_PREDELETE (parent notified before children are destroyed).
+	// Teardown paths must not touch child pointers (debuggers/containers may be gone).
+	bool is_tearing_down = false;
 
 	// Whether the factory is currently busy doing stuff and no other functions should be executed during this time
 	bool is_factory_busy = false;
@@ -370,7 +376,7 @@ private:
 
 					// We give it a NEW ID based on its position in the NEW vector.
 					int new_id = static_cast<int>(surviving_bullets.size());
-					bullet_multi->sparse_set_id = new_id; // Ofc we update it in the multimesh too
+					bullet_multi->sparse_set_id = new_id; // keep the multimesh in sync with its new index
 
 					surviving_bullets.push_back(bullet_multi);
 
@@ -579,7 +585,7 @@ private:
 			auto *multi = bullets_vec[index];
 
 			multi->move_bullets(delta);
-			multi->change_texture_periodically(delta);
+			multi->advance_sprite_animation(delta);
 			multi->reduce_lifetime(delta);
 		}
 	}

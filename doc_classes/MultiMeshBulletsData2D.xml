@@ -62,11 +62,8 @@
 
 			[url=https://www.youtube.com/watch?v=fdRJqnOrz98&amp;t=63s]YouTube Tutorial On Custom Resources[/url]
 		</member>
-		<member name="change_texture_times" type="float[]" setter="set_change_texture_times" getter="get_change_texture_times" default="[]">
-			Each value in the array is used to animate each texture for that specific amount of time.
-
-			Note: If you want all your textures to share the same change texture time, then use [member default_change_texture_time] instead.
-			Note: If the amount of values provided to [member change_texture_times] does not match the amount of textures that were provided for the bullets, then [member default_change_texture_time] will be the property that is used for animation.
+		<member name="animation" type="StringName" setter="set_animation" getter="get_animation" default="&amp;&quot;default&quot;">
+			Which SpriteFrames animation to play. Empty or "default" auto-resolves silently ("default" if present, else first animation). Explicit wrong names fall back to the first animation with one error. The whole multimesh batch shares one frame at a time; timing uses animation speed (fps), per-frame durations, and loop flag.
 		</member>
 		<member name="collision_layer" type="int" setter="set_collision_layer" getter="get_collision_layer" default="1">
 			The bitmask for the collision layer.
@@ -89,19 +86,6 @@
 			The size of the collision shape.
 
 			Note: You can enable the [BulletFactory2D]'s debugger to make collision shapes visible.
-		</member>
-		<member name="current_texture_index" type="int" setter="set_current_texture_index" getter="get_current_texture_index" default="0">
-			If you have provided an array of textures, you can set which texture is the one you begin from before animation starts.
-		</member>
-		<member name="default_change_texture_time" type="float" setter="set_default_change_texture_time" getter="get_default_change_texture_time" default="0.3">
-			This is the default time used for animating the textures.
-
-			Note: If you want each texture to have a different animation time then check out the [member change_texture_times] property.
-		</member>
-		<member name="default_texture" type="Texture2D" setter="set_default_texture" getter="get_default_texture">
-			This is the [Texture2D] that is used for the bullets.
-
-			Note: If you want animation, then you should use the [member textures] property instead.
 		</member>
 		<member name="instance_shader_parameters" type="Dictionary" setter="set_instance_shader_parameters" getter="get_instance_shader_parameters" default="{}">
 			If you are using shaders with instance uniform variables, then you can pass a [Dictionary] containing them here.
@@ -153,13 +137,11 @@
 		<member name="texture_rotation_radians" type="float" setter="set_texture_rotation_radians" getter="get_texture_rotation_radians" default="0.0">
 			If your texture is not rotated properly, you can use this property to rotate it more.
 		</member>
-		<member name="texture_size" type="Vector2" setter="set_texture_size" getter="get_texture_size" default="Vector2(32, 32)">
-			Determines the size of the texture. This is used only when a mesh has not been provided.
+		<member name="sprite_frames" type="SpriteFrames" setter="set_sprite_frames" getter="get_sprite_frames">
+			SpriteFrames holding all animations. Each frame is a Texture2D (plain or AtlasTexture region). The batch shares one frame; per-frame duration and loop come from the animation.
 		</member>
-		<member name="textures" type="Texture2D[]" setter="set_textures" getter="get_textures" default="[]">
-			Populate this array with textures if you want animation for the bullets.
-
-			Note: If you want only a single texture without any animation, then use [member default_texture] instead.
+		<member name="texture_size" type="Vector2" setter="set_texture_size" getter="get_texture_size" default="Vector2(0, 0)">
+			QuadMesh size override, used only when no mesh is provided. If x/y &lt;= 0 the size auto-derives from the first frame (AtlasTexture region, else texture size).
 		</member>
 		<member name="transforms" type="Transform2D[]" setter="set_transforms" getter="get_transforms" default="[]">
 			[b]MANDATORY[/b]

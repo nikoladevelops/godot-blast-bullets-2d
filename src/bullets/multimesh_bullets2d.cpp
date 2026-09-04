@@ -13,10 +13,12 @@
 #include "shared/bullet_curves_data2d.hpp"
 #include "shared/bullet_movement_pattern_data2d.hpp"
 #include "shared/collision_shape_helper2d.hpp"
+#include <godot_cpp/classes/atlas_texture.hpp>
 #include <godot_cpp/classes/physics_server2d.hpp>
 #include <godot_cpp/classes/random_number_generator.hpp>
 #include <godot_cpp/classes/scene_state.hpp>
 #include <godot_cpp/classes/shader_material.hpp>
+#include <godot_cpp/classes/sprite_frames.hpp>
 #include <godot_cpp/variant/utility_functions.hpp>
 
 using namespace godot;
@@ -37,7 +39,7 @@ MultiMeshBullets2D::~MultiMeshBullets2D() {
 void MultiMeshBullets2D::_notification(int p_what) {
 	switch (p_what) {
 		case NOTIFICATION_PREDELETE: {
-			// For some reason the destructor runs on project start up by default, so avoid doing that
+			// The destructor also runs for editor-time instances, which have no runtime state.
 			if (Engine::get_singleton()->is_editor_hint()) {
 				break;
 			}
@@ -47,11 +49,14 @@ void MultiMeshBullets2D::_notification(int p_what) {
 			}
 
 			if (physics_server) {
-				// Disable the area's shapes (ALL OF THEM no matter their bullets_enabled_status)
+				// Disable the area's shapes (ALL OF THEM no matter their bullets_enabled_status).
+				// Bounds-checked: never let a desynced attachments vector take down PREDELETE.
 				for (int i = 0; i < amount_bullets; ++i) {
 					physics_server->area_set_shape_disabled(area, i, true);
 
-					bullet_disable_attachment(i);
+					if (i >= 0 && i < (int)attachments.size() && attachments[i] != nullptr) {
+						bullet_disable_attachment(i);
+					}
 				}
 
 				physics_server->area_set_area_monitor_callback(area, Variant());
@@ -106,13 +111,9 @@ void MultiMeshBullets2D::spawn(const MultiMeshBulletsData2D &data, MultiMeshObje
 	batch_buffer.resize(amount_bullets * 8);
 
 	set_up_life_time_timer(data.max_life_time, data.max_life_time);
-	set_up_change_texture_timer(
-			data.textures.size(),
-			data.default_change_texture_time,
-			data.change_texture_times);
 
 	generate_multimesh();
-	set_up_multimesh(amount_bullets, data.mesh, data.texture_size);
+	set_up_multimesh(amount_bullets, data.mesh, resolve_quad_size(data.sprite_frames, data.animation, data.texture_size));
 
 	area = physics_server->area_create();
 	generate_physics_shapes_for_area(amount_bullets);
@@ -142,14 +143,15 @@ void MultiMeshBullets2D::spawn(const MultiMeshBulletsData2D &data, MultiMeshObje
 
 	finalize_set_up(
 			data.bullets_custom_data,
-			data.textures,
-			data.default_texture,
-			data.current_texture_index,
 			data.material,
 			data.z_index,
 			data.light_mask,
 			data.visibility_layer,
 			data.instance_shader_parameters);
+
+	// Single-error policy: rebuild_sprite_animation already reported the cause;
+	// no wrapper error here. Failure leaves previous texture/cache untouched.
+	rebuild_sprite_animation(data.sprite_frames, data.animation);
 
 	custom_additional_spawn_logic(data);
 
@@ -175,32 +177,35 @@ void MultiMeshBullets2D::enable_multimesh(const MultiMeshBulletsData2D &data, co
 	cache_collision_shape_typed(data.collision_shape);
 
 	set_up_life_time_timer(data.max_life_time, data.max_life_time);
-	set_up_change_texture_timer(
-			data.textures.size(),
-			data.default_change_texture_time,
-			data.change_texture_times);
 
-	set_up_multimesh(amount_bullets, data.mesh, data.texture_size);
+	set_up_multimesh(amount_bullets, data.mesh, resolve_quad_size(data.sprite_frames, data.animation, data.texture_size));
 
 	set_up_bullet_instances(data);
 	set_all_physics_shapes_enabled_for_area(true);
 
 	set_rotation_data(data.all_bullet_rotation_data, data.rotate_only_textures);
 
-	move_to_front(); // Makes sure that the current old multimesh is displayed on top of the newer ones (act as if its the oldest sibling to emulate the behaviour of spawning a brand new multimesh / if I dont do this then the multimesh's instances will be displayed behind the newer ones)
+	move_to_front(); // Pooled instances render behind newer ones without this; moving to front emulates fresh spawn order.
 
 	update_all_previous_transforms_for_interpolation();
 
 	finalize_set_up(
 			data.bullets_custom_data,
-			data.textures,
-			data.default_texture,
-			data.current_texture_index,
 			data.material,
 			data.z_index,
 			data.light_mask,
 			data.visibility_layer,
 			data.instance_shader_parameters);
+
+	// Single-error policy: rebuild already reported; previous texture kept on failure.
+	rebuild_sprite_animation(data.sprite_frames, data.animation);
+
+	// Pooled instances may carry user connections from a previous owner; they must not
+	// fire for the new spawn. Mirrors the homing-signal cleanup in directional enable logic.
+	for (const Dictionary &connection : get_signal_connection_list("sprite_animation_finished")) {
+		const Callable callable = connection["callable"];
+		disconnect("sprite_animation_finished", callable);
+	}
 
 	custom_additional_enable_logic(data);
 
@@ -305,59 +310,173 @@ void MultiMeshBullets2D::set_up_life_time_timer(double new_max_life_time, double
 	current_life_time = new_current_life_time;
 }
 
-void MultiMeshBullets2D::set_up_change_texture_timer(int64_t new_amount_textures, double new_default_change_texture_time, const TypedArray<double> &new_change_texture_times) {
-	if (new_amount_textures > 1) { // the change texture timer will be active only if more than 1 texture was provided
-		change_texture_times.clear();
-
-		int64_t amount_change_texture_times = new_change_texture_times.size();
-
-		// The change texture times will only be used if their amount is the same as the amount of textures currently present. Each time value corresponds to a texture
-		if (amount_change_texture_times > 0 && amount_change_texture_times == new_amount_textures) {
-			change_texture_times = new_change_texture_times.duplicate();
-
-			current_change_texture_time = change_texture_times[0];
-		} else {
-			change_texture_times.append(new_default_change_texture_time);
-
-			current_change_texture_time = new_default_change_texture_time;
+static bool resolve_sprite_animation_impl(const Ref<SpriteFrames> &p_sprite_frames, const StringName &p_requested, StringName &out_anim, bool silent) {
+	if (p_sprite_frames.is_null()) {
+		if (!silent) {
+			UtilityFunctions::push_error("MultiMeshBullets2D: sprite_frames is null. Assign a SpriteFrames resource.");
 		}
+		return false;
 	}
+	const String requested_str = String(p_requested);
+	const bool is_auto = requested_str.is_empty() || p_requested == StringName("default");
+	if (is_auto) {
+		// Unselected animation: play "default" silently, else first animation silently.
+		if (p_sprite_frames->has_animation(StringName("default"))) {
+			out_anim = StringName("default");
+			return true;
+		}
+		const PackedStringArray names = p_sprite_frames->get_animation_names();
+		if (names.is_empty()) {
+			if (!silent) {
+				UtilityFunctions::push_error("MultiMeshBullets2D: sprite_frames has no animations.");
+			}
+			return false;
+		}
+		out_anim = names[0];
+		return true;
+	}
+	if (p_sprite_frames->has_animation(p_requested)) {
+		out_anim = p_requested;
+		return true;
+	}
+	const PackedStringArray names = p_sprite_frames->get_animation_names();
+	if (names.is_empty()) {
+		if (!silent) {
+			UtilityFunctions::push_error("MultiMeshBullets2D: sprite_frames has no animations.");
+		}
+		return false;
+	}
+	if (!silent) {
+		UtilityFunctions::push_error("MultiMeshBullets2D: missing animation '" + requested_str + "', falling back to '" + String(names[0]) + "'.");
+	}
+	out_anim = names[0];
+	return true;
 }
 
-// Always called last
+bool MultiMeshBullets2D::resolve_sprite_animation(const Ref<SpriteFrames> &p_sprite_frames, const StringName &p_requested, StringName &out_anim) {
+	return resolve_sprite_animation_impl(p_sprite_frames, p_requested, out_anim, false);
+}
+
+bool MultiMeshBullets2D::resolve_sprite_animation_quiet(const Ref<SpriteFrames> &p_sprite_frames, const StringName &p_requested, StringName &out_anim) {
+	return resolve_sprite_animation_impl(p_sprite_frames, p_requested, out_anim, true);
+}
+
+bool MultiMeshBullets2D::rebuild_sprite_animation(const Ref<SpriteFrames> &p_sprite_frames, const StringName &p_animation) {
+	StringName anim;
+	if (!resolve_sprite_animation(p_sprite_frames, p_animation, anim)) {
+		return false; // error already reported, previous animation untouched
+	}
+	const int count = p_sprite_frames->get_frame_count(anim);
+	if (count <= 0) {
+		UtilityFunctions::push_error("MultiMeshBullets2D: animation '" + String(anim) + "' has no frames.");
+		return false;
+	}
+	double fps = p_sprite_frames->get_animation_speed(anim);
+	if (fps <= 0.0) {
+		UtilityFunctions::push_error("MultiMeshBullets2D: animation '" + String(anim) + "' has invalid speed, using 1 fps.");
+		fps = 1.0;
+	}
+	std::vector<Ref<Texture2D>> frames;
+	std::vector<double> secs;
+	frames.reserve(count);
+	secs.reserve(count);
+	for (int i = 0; i < count; ++i) {
+		Ref<Texture2D> tex = p_sprite_frames->get_frame_texture(anim, i);
+		if (tex.is_null()) {
+			UtilityFunctions::push_error("MultiMeshBullets2D: animation '" + String(anim) + "' frame " + String::num_int64(i) + " has null texture.");
+			return false; // previous cache untouched (swap only on success below)
+		}
+		const float dur = p_sprite_frames->get_frame_duration(anim, i);
+		frames.push_back(tex);
+		secs.push_back((dur <= 0.0f ? 0.0 : (double)dur / fps));
+	}
+	anim_source = p_sprite_frames;
+	anim_name = anim;
+	anim_frames.swap(frames);
+	anim_frame_secs.swap(secs);
+	anim_loop = p_sprite_frames->get_animation_loop(anim);
+	anim_paused = false;
+	anim_finished = false;
+	anim_frame_index = 0;
+	anim_frame_time_left = anim_frame_secs[0];
+	set_texture(anim_frames[0]);
+	return true;
+}
+
+bool MultiMeshBullets2D::play_sprite_animation(const Ref<SpriteFrames> &p_sprite_frames, const StringName &p_animation) {
+	if (p_sprite_frames.is_null()) {
+		UtilityFunctions::push_error("MultiMeshBullets2D play_sprite_animation: sprite_frames is null.");
+		return false;
+	}
+	if (p_animation == StringName() || String(p_animation).is_empty()) {
+		UtilityFunctions::push_error("MultiMeshBullets2D play_sprite_animation: animation is empty.");
+		return false;
+	}
+	return rebuild_sprite_animation(p_sprite_frames, p_animation);
+}
+
+bool MultiMeshBullets2D::play_sprite_animation_name(const StringName &p_animation) {
+	if (anim_source.is_null()) {
+		UtilityFunctions::push_error("MultiMeshBullets2D play_sprite_animation_name: no SpriteFrames cached yet, call play_sprite_animation first.");
+		return false;
+	}
+	if (p_animation == StringName() || String(p_animation).is_empty()) {
+		UtilityFunctions::push_error("MultiMeshBullets2D play_sprite_animation_name: animation is empty.");
+		return false;
+	}
+	return rebuild_sprite_animation(anim_source, p_animation);
+}
+
+bool MultiMeshBullets2D::restart_sprite_animation() {
+	if (anim_frames.empty()) {
+		UtilityFunctions::push_error("MultiMeshBullets2D restart_sprite_animation: no baked animation to restart.");
+		return false;
+	}
+	anim_frame_index = 0;
+	anim_frame_time_left = anim_frame_secs[0];
+	anim_paused = false;
+	anim_finished = false;
+	set_texture(anim_frames[0]);
+	return true;
+}
+
+Vector2 MultiMeshBullets2D::resolve_quad_size(const Ref<SpriteFrames> &p_sprite_frames, const StringName &p_animation, Vector2 override_size) {
+	if (override_size.x > 0.0f && override_size.y > 0.0f) {
+		return override_size;
+	}
+	// Silent fallback: rebuild_sprite_animation owns all error reporting (spawn calls
+	// both, so resolving loudly here would print every failure twice).
+	StringName anim;
+	if (!resolve_sprite_animation_quiet(p_sprite_frames, p_animation, anim)) {
+		return Vector2(32, 32);
+	}	if (p_sprite_frames->get_frame_count(anim) > 0) {
+		if (const Ref<Texture2D> tex = p_sprite_frames->get_frame_texture(anim, 0); tex.is_valid()) {
+			if (const Ref<AtlasTexture> atlas = tex; atlas.is_valid()) {
+				const Vector2 region = atlas->get_region().size;
+				if (region.x > 0.0f && region.y > 0.0f) {
+					return region;
+				}
+			}
+			const Vector2 size = tex->get_size();
+			if (size.x > 0.0f && size.y > 0.0f) {
+				return size;
+			}
+		}
+	}
+	return Vector2(32, 32);
+}
+
+// Always called last (texture comes from rebuild_sprite_animation, called by spawn/enable)
 void MultiMeshBullets2D::finalize_set_up(
 		const Ref<Resource> &new_bullets_custom_data,
-		const TypedArray<Texture2D> &new_textures,
-		const Ref<Texture2D> &new_default_texture,
-		int new_current_texture_index,
 		const Ref<Material> &new_material,
 		int new_z_index,
 		int new_light_mask,
 		int new_visibility_layer,
 		const Dictionary &new_instance_shader_parameters) {
-	// Bullets custom data
-	if (new_bullets_custom_data.is_valid()) {
-		bullets_custom_data = new_bullets_custom_data;
-	}
-
-	textures.clear(); // Clear old textures data if any
-	// Texture logic
-	if (new_textures.size() > 0) {
-		textures = new_textures.duplicate();
-
-		// Make sure the current_texture_index is valid
-		if (new_current_texture_index >= textures.size() || new_current_texture_index < 0) {
-			new_current_texture_index = 0;
-		}
-		current_texture_index = new_current_texture_index;
-
-		set_texture(textures[current_texture_index]);
-	} else if (new_default_texture != nullptr) {
-		textures.append(new_default_texture);
-		current_texture_index = 0;
-
-		set_texture(textures[current_texture_index]);
-	}
+	// Bullets custom data. Always assigned (null clears) so pool reuse never leaks
+	// the previous owner's data into a new spawn.
+	bullets_custom_data = new_bullets_custom_data;
 
 	if (new_material.is_valid()) {
 		godot::Ref<ShaderMaterial> shader_material = new_material;
@@ -1082,8 +1201,17 @@ void MultiMeshBullets2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("all_bullets_get_transforms", "bullet_index_start", "bullet_index_end_inclusive"), &MultiMeshBullets2D::all_bullets_get_transforms, DEFVAL(0), DEFVAL(-1));
 	ClassDB::bind_method(D_METHOD("all_bullets_set_transforms", "new_transform", "set_direction_based_on_transform", "bullet_index_start", "bullet_index_end_inclusive"), &MultiMeshBullets2D::all_bullets_set_transforms, DEFVAL(false), DEFVAL(0), DEFVAL(-1));
 
-	ClassDB::bind_method(D_METHOD("get_textures"), &MultiMeshBullets2D::get_textures);
-	ClassDB::bind_method(D_METHOD("set_textures", "new_textures", "new_change_texture_times", "selected_texture_index"), &MultiMeshBullets2D::set_textures, DEFVAL(0));
+	ClassDB::bind_method(D_METHOD("play_sprite_animation", "sprite_frames", "animation"), &MultiMeshBullets2D::play_sprite_animation, DEFVAL(StringName("default")));
+	ClassDB::bind_method(D_METHOD("play_sprite_animation_name", "animation"), &MultiMeshBullets2D::play_sprite_animation_name);
+	ClassDB::bind_method(D_METHOD("restart_sprite_animation"), &MultiMeshBullets2D::restart_sprite_animation);
+	ClassDB::bind_method(D_METHOD("stop_sprite_animation"), &MultiMeshBullets2D::stop_sprite_animation);
+	ClassDB::bind_method(D_METHOD("resume_sprite_animation"), &MultiMeshBullets2D::resume_sprite_animation);
+	ClassDB::bind_method(D_METHOD("is_sprite_animation_playing"), &MultiMeshBullets2D::is_sprite_animation_playing);
+	ClassDB::bind_method(D_METHOD("is_sprite_animation_finished"), &MultiMeshBullets2D::is_sprite_animation_finished);
+	ClassDB::bind_method(D_METHOD("get_sprite_animation"), &MultiMeshBullets2D::get_sprite_animation);
+	ClassDB::bind_method(D_METHOD("get_sprite_frames"), &MultiMeshBullets2D::get_sprite_frames);
+	ClassDB::bind_method(D_METHOD("get_sprite_frame"), &MultiMeshBullets2D::get_sprite_frame);
+	ClassDB::bind_method(D_METHOD("get_sprite_frame_count"), &MultiMeshBullets2D::get_sprite_frame_count);
 
 	ClassDB::bind_method(D_METHOD("disable_bullet", "bullet_index", "disable_bullet_attachment"), &MultiMeshBullets2D::disable_bullet, DEFVAL(true));
 	ClassDB::bind_method(D_METHOD("enable_bullet", "bullet_index", "collision_amount", "enable_attachment"), &MultiMeshBullets2D::enable_bullet, DEFVAL(0), DEFVAL(true));
@@ -1187,5 +1315,8 @@ void MultiMeshBullets2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("all_bullets_remove_movement_pattern", "start_index", "end_index_inclusive"), &MultiMeshBullets2D::all_bullets_remove_movement_pattern, DEFVAL(0), DEFVAL(-1));
 
 	ClassDB::bind_method(D_METHOD("has_bullet_movement_pattern", "bullet_index"), &MultiMeshBullets2D::check_exists_bullet_movement_pattern_data);
+
+	ADD_SIGNAL(MethodInfo("sprite_animation_finished",
+			PropertyInfo(Variant::OBJECT, "multimesh_bullets_instance", PROPERTY_HINT_RESOURCE_TYPE, "MultiMeshBullets2D")));
 }
 } //namespace BlastBullets2D

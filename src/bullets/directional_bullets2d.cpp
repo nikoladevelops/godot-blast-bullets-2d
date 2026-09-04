@@ -83,6 +83,7 @@ void DirectionalBullets2D::custom_additional_spawn_logic(const MultiMeshBulletsD
 	// Orbiting
 	all_orbiting_data.resize(amount_bullets); // Create a vector that contains an empty orbiting data for each bullet index
 	all_orbiting_status.resize(amount_bullets, 0); // Initialize all orbiting status to disabled
+	homing_inert_warning_issued = false;
 }
 
 void DirectionalBullets2D::custom_additional_enable_logic(const MultiMeshBulletsData2D &data) {
@@ -125,6 +126,7 @@ void DirectionalBullets2D::custom_additional_enable_logic(const MultiMeshBullets
 	homing_update_timer = 0.0;
 	homing_smoothing = 0.0;
 	homing_take_control_of_texture_rotation = false;
+	homing_inert_warning_issued = false;
 
 	homing_distance_before_reached = 5.0;
 	bullet_homing_auto_pop_after_target_reached = false;

@@ -41,6 +41,14 @@ _ALWAYS_INLINE_ static const PoolKey *resolve_pool_key(const Ref<MultiMeshPoolKe
 	return &storage;
 }
 
+void BulletFactory2D::_notification(int p_what) {
+	if (p_what == NOTIFICATION_PREDELETE) {
+		// Parent is notified before children are destroyed. From here on no child
+		// pointer (debuggers, containers) may be touched by teardown paths.
+		is_tearing_down = true;
+	}
+}
+
 void BulletFactory2D::_ready() {
 	// Ensure the code that is next will not be ran in the editor
 	if (Engine::get_singleton()->is_editor_hint()) {
@@ -391,6 +399,11 @@ void BulletFactory2D::free_disabled_bullets(const Ref<MultiMeshPoolKey2D> &key) 
 }
 
 void BulletFactory2D::handle_manual_user_deletion_of_multimesh_bullets(MultiMeshBullets2D &bullet_multi) {
+	// During factory teardown the whole subtree dies with it; vectors die too, so
+	// there is nothing to fix up and child pointers must not be touched.
+	if (is_tearing_down) {
+		return;
+	}
 	if (is_factory_busy) {
 		UtilityFunctions::push_error("BulletFactory2D is busy. Ignoring handle_manual_user_deletion_of_multimesh_bullets request.");
 		return;
@@ -746,16 +759,24 @@ void BulletFactory2D::set_directional_bullets_debugger_color(const Color &new_co
 }
 
 bool BulletFactory2D::get_is_debugger_enabled() const {
-	if (!is_ready) {
+	if (!is_ready || is_tearing_down) {
 		return is_debugger_enabled_cached_before_ready;
+	}
+
+	if (block_bullets_debugger == nullptr || directional_bullets_debugger == nullptr) {
+		return false;
 	}
 
 	return block_bullets_debugger->get_is_debugger_enabled() && directional_bullets_debugger->get_is_debugger_enabled();
 }
 
 void BulletFactory2D::set_is_debugger_enabled(bool new_is_enabled) {
-	if (!is_ready) {
+	if (!is_ready || is_tearing_down) {
 		is_debugger_enabled_cached_before_ready = new_is_enabled;
+		return;
+	}
+
+	if (directional_bullets_debugger == nullptr || block_bullets_debugger == nullptr) {
 		return;
 	}
 

@@ -25,6 +25,8 @@ var rocket_textures:Array[Texture2D] = [
 	preload("res://shared/art/player_bullets/10.png")
 	]
 	
+@onready var animatedSprite:AnimatedSprite2D = $BulletsAnimatedSprite
+	
 # The default texture that can be used, instead of having animations
 var godot_texture:Texture2D = preload("res://icon.svg")
 
@@ -95,7 +97,9 @@ func set_up(new_bullet_marker:Marker2D) -> void:
 # Returns a partially set up BlockBulletsData2D, only thing left to do is set a new value to the .transforms and .block_rotation properties
 func set_up_block_bullets_data()->BlockBulletsData2D:
 	var data:BlockBulletsData2D = BlockBulletsData2D.new();
-	data.textures = rocket_textures
+	data.sprite_frames = animatedSprite.sprite_frames
+	#data.animation = &"default"
+	
 	data.block_speed = bullet_speed_data[0] # for the block of bullets use only the first bullet_speed_data as the block_speed
 	
 	#data.collision_layer = BlockBulletsData2D.calculate_bitmask([2])
@@ -106,7 +110,6 @@ func set_up_block_bullets_data()->BlockBulletsData2D:
 	data.transforms=[Transform2D()]
 	data.texture_size = Vector2(140,140)
 	data.collision_shape_offset=Vector2(0,0)
-	data.default_change_texture_time=0.09
 	data.max_life_time = 2
 	data.all_bullet_rotation_data = bullet_rotation_data
 	data.bullets_custom_data = damage_data
@@ -116,7 +119,9 @@ func set_up_block_bullets_data()->BlockBulletsData2D:
 # Returns a partially set up DirectionalBulletsData2D, only thing left to do is set a new value to the .transforms property
 func set_up_directional_bullets_data()->DirectionalBulletsData2D:
 	var data:DirectionalBulletsData2D = DirectionalBulletsData2D.new()
-	data.textures = rocket_textures
+	data.sprite_frames = animatedSprite.sprite_frames
+
+	data.animation = "idk2"
 	
 	data.transforms=[Transform2D()]
 	data.all_bullet_speed_data = bullet_speed_data # for the directional bullets use every single bullet speed
@@ -137,7 +142,6 @@ func set_up_directional_bullets_data()->DirectionalBulletsData2D:
 	
 	data.texture_size = Vector2(140,140)
 	data.collision_shape_offset=Vector2(0,0)
-	data.default_change_texture_time=0.09
 	data.max_life_time = 2
 	data.all_bullet_rotation_data = bullet_rotation_data
 	data.bullets_custom_data = damage_data
@@ -259,20 +263,17 @@ func generate_bullet_speed_data(option_index:int)->void:
 	cache_bullet_speed_option_index = option_index
 	block_bullets_data.block_speed = bullet_speed_data[0] # only use the first speed data for the whole block of bullets
 	directional_bullets_data.all_bullet_speed_data = bullet_speed_data
-
-# Switches the bullet texture currently being used
-func switch_bullet_texture(option_index:int)->void:
-	if option_index == 0:
-		directional_bullets_data.textures = rocket_textures;
-		block_bullets_data.textures = rocket_textures;
-	elif option_index == 1:
-		
-		# Always reset these to an empty array otherwise the default_texture property won't be used since the .textures array will be still populated
-		directional_bullets_data.textures = [];
-		block_bullets_data.textures = [];
-		
-		directional_bullets_data.default_texture = godot_texture
-		block_bullets_data.default_texture = godot_texture
+#
+## Switches the bullet texture currently being used
+#func switch_bullet_texture(option_index:int)->void:
+	#if option_index == 0:
+		#var rocket_frames := make_sprite_frames(rocket_textures)
+		#directional_bullets_data.sprite_frames = rocket_frames
+		#block_bullets_data.sprite_frames = rocket_frames
+	#elif option_index == 1:
+		#var single_frames := make_sprite_frames([godot_texture])
+		#directional_bullets_data.sprite_frames = single_frames
+		#block_bullets_data.sprite_frames = single_frames
 
 # Sets the is_texture_rotation_permanent property for the bullet that are going to be spawned -> Whether the texture should rotate depending on the direction or if it should stay the same
 func set_bullet_is_texture_rotation_permanent(is_permanent:bool)->void:

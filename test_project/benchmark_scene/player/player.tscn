@@ -2,12 +2,64 @@
 
 [ext_resource type="Script" uid="uid://ce54f7rw3qbxw" path="res://benchmark_scene/player/player.gd" id="1_kd16u"]
 [ext_resource type="Script" uid="uid://bpikyjmoq0pcs" path="res://benchmark_scene/player/player_data_node.gd" id="2_314d0"]
+[ext_resource type="Texture2D" uid="uid://k3w8kovbd3of" path="res://shared/art/player_bullets/1.png" id="3_haodk"]
 [ext_resource type="Texture2D" uid="uid://dasn7br5xsnm0" path="res://shared/art/player_ship/player_ship_idle.png" id="3_uv82v"]
 [ext_resource type="Texture2D" uid="uid://dckljl3a6lyfs" path="res://shared/art/player_ship/player_ship1.png" id="4_5npko"]
+[ext_resource type="Texture2D" uid="uid://b4ea1fdniop2s" path="res://shared/art/player_bullets/2.png" id="4_167wf"]
+[ext_resource type="Texture2D" uid="uid://tuheuh0unwfj" path="res://shared/art/player_bullets/3.png" id="5_3olnc"]
 [ext_resource type="Texture2D" uid="uid://xybe51l16k26" path="res://shared/art/player_ship/player_ship2.png" id="5_v6s76"]
+[ext_resource type="Texture2D" uid="uid://c8uinnqjkqm36" path="res://shared/art/player_bullets/4.png" id="6_pmbdh"]
 [ext_resource type="Texture2D" uid="uid://bij0e2aniwn27" path="res://shared/art/player_ship/player_ship3.png" id="6_ubyhp"]
+[ext_resource type="Texture2D" uid="uid://dfte4vi7e63y3" path="res://shared/art/player_bullets/5.png" id="7_7gf7s"]
 [ext_resource type="Texture2D" uid="uid://dexyp8b58k0hc" path="res://shared/art/player_ship/player_ship5.png" id="7_b2scj"]
+[ext_resource type="Texture2D" uid="uid://dfsthpgoe72e6" path="res://shared/art/player_bullets/6.png" id="8_phtgh"]
 [ext_resource type="Texture2D" uid="uid://c5q05ts0g8hau" path="res://shared/art/player_ship/player_ship6.png" id="8_x0q6y"]
+[ext_resource type="Texture2D" uid="uid://utwcy3ouuwq2" path="res://shared/art/player_bullets/7.png" id="9_78gy5"]
+[ext_resource type="Texture2D" uid="uid://yxnghs5h272e" path="res://shared/art/player_bullets/8.png" id="10_r5aj2"]
+[ext_resource type="Texture2D" uid="uid://dwtaxuaickco" path="res://shared/art/player_bullets/9.png" id="11_3vjuf"]
+[ext_resource type="Texture2D" uid="uid://dbhqsxhfkdrh7" path="res://shared/art/player_bullets/10.png" id="12_fq8kj"]
+[ext_resource type="Texture2D" uid="uid://4gdgni3y4km7" path="res://icon.svg" id="13_167wf"]
+
+[sub_resource type="SpriteFrames" id="SpriteFrames_qt42x"]
+animations = [{
+"frames": [{
+"duration": 1.0,
+"texture": ExtResource("3_haodk")
+}, {
+"duration": 1.0,
+"texture": ExtResource("4_167wf")
+}, {
+"duration": 1.0,
+"texture": ExtResource("5_3olnc")
+}, {
+"duration": 1.0,
+"texture": ExtResource("6_pmbdh")
+}, {
+"duration": 1.0,
+"texture": ExtResource("7_7gf7s")
+}, {
+"duration": 1.0,
+"texture": ExtResource("8_phtgh")
+}, {
+"duration": 1.0,
+"texture": ExtResource("9_78gy5")
+}, {
+"duration": 1.0,
+"texture": ExtResource("10_r5aj2")
+}, {
+"duration": 1.0,
+"texture": ExtResource("11_3vjuf")
+}, {
+"duration": 1.0,
+"texture": ExtResource("12_fq8kj")
+}, {
+"duration": 1.0,
+"texture": ExtResource("13_167wf")
+}],
+"loop": 1,
+"name": &"idk2",
+"speed": 5.0
+}]
 
 [sub_resource type="CircleShape2D" id="CircleShape2D_8qahb"]
 radius = 43.382
@@ -50,6 +102,10 @@ script = ExtResource("1_kd16u")
 
 [node name="PlayerDataNode" type="Node" parent="." unique_id=1286344902]
 script = ExtResource("2_314d0")
+
+[node name="BulletsAnimatedSprite" type="AnimatedSprite2D" parent="PlayerDataNode" unique_id=1742962089]
+sprite_frames = SubResource("SpriteFrames_qt42x")
+animation = &"idk2"
 
 [node name="MarkerContainer" type="Node2D" parent="." unique_id=470424005]
 

@@ -394,10 +394,28 @@
 				Check if the multimesh is monitorable.
 			</description>
 		</method>
-		<method name="get_textures" qualifiers="const">
-			<return type="Texture2D[]" />
+		<method name="get_sprite_animation" qualifiers="const">
+			<return type="StringName" />
 			<description>
-				Get all textures that are currently being used to render the bullets with animation.
+				Currently playing SpriteFrames animation (one per multimesh batch).
+			</description>
+		</method>
+		<method name="get_sprite_frames" qualifiers="const">
+			<return type="SpriteFrames" />
+			<description>
+				Cached SpriteFrames source of the playing animation. The bake is a snapshot: later edits to the resource need a replay via [method play_sprite_animation] or [method play_sprite_animation_name]. Playing on a pooled (inactive) instance applies immediately but is discarded by the next pool-reuse bake.
+			</description>
+		</method>
+		<method name="get_sprite_frame" qualifiers="const">
+			<return type="int" />
+			<description>
+				Current frame index within the playing animation.
+			</description>
+		</method>
+		<method name="get_sprite_frame_count" qualifiers="const">
+			<return type="int" />
+			<description>
+				Amount of baked frames in the playing animation.
 			</description>
 		</method>
 		<method name="has_bullet_movement_pattern" qualifiers="const">
@@ -414,6 +432,18 @@
 			<param index="0" name="bullet_index" type="int" />
 			<description>
 				Check the status of a specific bullet - whether it is enabled (active and visible on screen) or disabled (inactive and invisible)
+			</description>
+		</method>
+		<method name="is_sprite_animation_finished" qualifiers="const">
+			<return type="bool" />
+			<description>
+				True after a non-looping animation reached its last frame (emits sprite_animation_finished once, deferred).
+			</description>
+		</method>
+		<method name="is_sprite_animation_playing" qualifiers="const">
+			<return type="bool" />
+			<description>
+				True when active, unpaused, unfinished, with more than one baked frame.
 			</description>
 		</method>
 		<method name="multimesh_attach_time_based_function">
@@ -622,13 +652,37 @@
 				Sets whether the multimesh is monitorable or not.
 			</description>
 		</method>
-		<method name="set_textures">
-			<return type="void" />
-			<param index="0" name="new_textures" type="Texture2D[]" />
-			<param index="1" name="new_change_texture_times" type="float[]" />
-			<param index="2" name="selected_texture_index" type="int" default="0" />
+		<method name="play_sprite_animation">
+			<return type="bool" />
+			<param index="0" name="sprite_frames" type="SpriteFrames" />
+			<param index="1" name="animation" type="StringName" default="&amp;&quot;default&quot;" />
 			<description>
-				Sets the textures used to render the bullets with animation. You can provide an array of textures to create a frame by frame animation effect on the bullets. The [code]new_change_texture_times[/code] parameter is an array of floats that specifies how many seconds to wait before changing to the next texture in the [code]new_textures[/code] array. The index of each float in the [code]new_change_texture_times[/code] array corresponds to the texture index it is meant to set the change time for.
+				Switches this multimesh to a SpriteFrames animation (bakes frames, per-frame seconds from fps-relative durations, loop flag; AtlasTexture frames supported). Empty or missing "default" auto-resolves silently to the first animation; explicit wrong names fall back with one error. Returns false on null/empty/missing with previous animation untouched. Note: pooled reuse re-bakes from spawn data and disconnects these handlers, so reconnect after reuse if needed.
+			</description>
+		</method>
+		<method name="play_sprite_animation_name">
+			<return type="bool" />
+			<param index="0" name="animation" type="StringName" />
+			<description>
+				Switches animation reusing the cached SpriteFrames source. Same resolve rules. Errors when no source cached yet or animation empty.
+			</description>
+		</method>
+		<method name="restart_sprite_animation">
+			<return type="bool" />
+			<description>
+				Restarts the baked animation at frame 0 (unpauses, clears finished). Errors when nothing baked.
+			</description>
+		</method>
+		<method name="stop_sprite_animation">
+			<return type="void" />
+			<description>
+				Freezes frame advancement (frozen multimeshes cost one branch per tick).
+			</description>
+		</method>
+		<method name="resume_sprite_animation">
+			<return type="void" />
+			<description>
+				Unfreezes frame advancement.
 			</description>
 		</method>
 	</methods>
@@ -672,4 +726,12 @@
 			A shared [BulletCurvesData2D] resource that can be assigned to all bullets in the multimesh. This is useful for saving memory if you have a lot of bullets that share the same curves data, since you can assign the same resource to all of them instead of creating a new one for each bullet.
 		</member>
 	</members>
+	<signals>
+		<signal name="sprite_animation_finished">
+			<param index="0" name="multimesh_bullets_instance" type="MultiMeshBullets2D" />
+			<description>
+				Emitted once (deferred, outside the physics tick) when a non-looping SpriteFrames animation reaches its last frame. Re-armed by every play/restart/rebuild. Note: the instance may already be pooled (inactive) when the deferred call runs — check its state in the handler if that matters.
+			</description>
+		</signal>
+	</signals>
 </class>
