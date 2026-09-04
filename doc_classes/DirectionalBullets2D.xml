@@ -30,7 +30,7 @@
 
 		Note: Bullets can be made to collide multiple times - use [member MultiMeshBullets2D.bullet_max_collision_count] and [member MultiMeshBullets2D.bullets_current_collision_count].
 
-		Note: Bullets animate via SpriteFrames — switch with [method MultiMeshBullets2D.play_sprite_animation].
+		Note: Bullets animate via SpriteFrames. Switch with [method MultiMeshBullets2D.play_sprite_animation].
 	</description>
 	<tutorials>
 	</tutorials>

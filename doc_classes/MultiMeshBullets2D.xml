@@ -381,6 +381,11 @@
 				Get the collision mask of the multimesh.
 			</description>
 		</method>
+		<method name="get_collision_shape" qualifiers="const">
+			<return type="Shape2D" />
+			<description>
+			</description>
+		</method>
 		<method name="get_inherited_velocity_offset" qualifiers="const">
 			<return type="Vector2" />
 			<description>
@@ -400,12 +405,6 @@
 				Currently playing SpriteFrames animation (one per multimesh batch).
 			</description>
 		</method>
-		<method name="get_sprite_frames" qualifiers="const">
-			<return type="SpriteFrames" />
-			<description>
-				Cached SpriteFrames source of the playing animation. The bake is a snapshot: later edits to the resource need a replay via [method play_sprite_animation] or [method play_sprite_animation_name]. Playing on a pooled (inactive) instance applies immediately but is discarded by the next pool-reuse bake.
-			</description>
-		</method>
 		<method name="get_sprite_frame" qualifiers="const">
 			<return type="int" />
 			<description>
@@ -416,6 +415,12 @@
 			<return type="int" />
 			<description>
 				Amount of baked frames in the playing animation.
+			</description>
+		</method>
+		<method name="get_sprite_frames" qualifiers="const">
+			<return type="SpriteFrames" />
+			<description>
+				Cached SpriteFrames source of the playing animation. The bake is a snapshot: later edits to the resource need a replay via [method play_sprite_animation] or [method play_sprite_animation_name]. Playing on a pooled (inactive) instance applies immediately but is discarded by the next pool-reuse bake.
 			</description>
 		</method>
 		<method name="has_bullet_movement_pattern" qualifiers="const">
@@ -481,6 +486,21 @@
 				was previously saved in a variable or defined as a normal Godot function.
 			</description>
 		</method>
+		<method name="play_sprite_animation">
+			<return type="bool" />
+			<param index="0" name="sprite_frames" type="SpriteFrames" />
+			<param index="1" name="animation" type="StringName" default="&amp;&quot;default&quot;" />
+			<description>
+				Switches this multimesh to a SpriteFrames animation (bakes frames, per-frame seconds from fps-relative durations, loop flag; AtlasTexture frames supported). Empty or missing "default" auto-resolves silently to the first animation; explicit wrong names fall back with one error. Returns false on null/empty/missing with previous animation untouched. Note: pooled reuse re-bakes from spawn data and disconnects these handlers, so reconnect after reuse if needed.
+			</description>
+		</method>
+		<method name="play_sprite_animation_name">
+			<return type="bool" />
+			<param index="0" name="animation" type="StringName" />
+			<description>
+				Switches animation reusing the cached SpriteFrames source. Same resolve rules. Errors when no source cached yet or animation empty.
+			</description>
+		</method>
 		<method name="remove_bullet_movement_pattern">
 			<return type="void" />
 			<param index="0" name="bullet_index" type="int" />
@@ -488,6 +508,18 @@
 				Removes the movement pattern from a specific bullet, making it lose any [Path2D] or [Curve2D] drawn pattern it had and move solely based on its direction and speed data.
 				Note: If you want to remove the movement pattern from multiple bullets at once, use [method all_bullets_remove_movement_pattern].
 				Note: A bullet can have a movement pattern assigned by using [method set_bullet_movement_pattern_from_curve] or [method set_bullet_movement_pattern_from_path].
+			</description>
+		</method>
+		<method name="restart_sprite_animation">
+			<return type="bool" />
+			<description>
+				Restarts the baked animation at frame 0 (unpauses, clears finished). Errors when nothing baked.
+			</description>
+		</method>
+		<method name="resume_sprite_animation">
+			<return type="void" />
+			<description>
+				Unfreezes frame advancement.
 			</description>
 		</method>
 		<method name="set_bullet_direction">
@@ -638,6 +670,12 @@
 				Sets the collision mask of the multimesh by providing an array of integers, where each integer represents a mask to be added to the collision mask.
 			</description>
 		</method>
+		<method name="set_collision_shape_runtime">
+			<return type="void" />
+			<param index="0" name="new_shape" type="Shape2D" />
+			<description>
+			</description>
+		</method>
 		<method name="set_inherited_velocity_offset">
 			<return type="void" />
 			<param index="0" name="new_offset" type="Vector2" />
@@ -652,37 +690,10 @@
 				Sets whether the multimesh is monitorable or not.
 			</description>
 		</method>
-		<method name="play_sprite_animation">
-			<return type="bool" />
-			<param index="0" name="sprite_frames" type="SpriteFrames" />
-			<param index="1" name="animation" type="StringName" default="&amp;&quot;default&quot;" />
-			<description>
-				Switches this multimesh to a SpriteFrames animation (bakes frames, per-frame seconds from fps-relative durations, loop flag; AtlasTexture frames supported). Empty or missing "default" auto-resolves silently to the first animation; explicit wrong names fall back with one error. Returns false on null/empty/missing with previous animation untouched. Note: pooled reuse re-bakes from spawn data and disconnects these handlers, so reconnect after reuse if needed.
-			</description>
-		</method>
-		<method name="play_sprite_animation_name">
-			<return type="bool" />
-			<param index="0" name="animation" type="StringName" />
-			<description>
-				Switches animation reusing the cached SpriteFrames source. Same resolve rules. Errors when no source cached yet or animation empty.
-			</description>
-		</method>
-		<method name="restart_sprite_animation">
-			<return type="bool" />
-			<description>
-				Restarts the baked animation at frame 0 (unpauses, clears finished). Errors when nothing baked.
-			</description>
-		</method>
 		<method name="stop_sprite_animation">
 			<return type="void" />
 			<description>
 				Freezes frame advancement (frozen multimeshes cost one branch per tick).
-			</description>
-		</method>
-		<method name="resume_sprite_animation">
-			<return type="void" />
-			<description>
-				Unfreezes frame advancement.
 			</description>
 		</method>
 	</methods>
@@ -730,7 +741,7 @@
 		<signal name="sprite_animation_finished">
 			<param index="0" name="multimesh_bullets_instance" type="MultiMeshBullets2D" />
 			<description>
-				Emitted once (deferred, outside the physics tick) when a non-looping SpriteFrames animation reaches its last frame. Re-armed by every play/restart/rebuild. Note: the instance may already be pooled (inactive) when the deferred call runs — check its state in the handler if that matters.
+				Emitted once (deferred, outside the physics tick) when a non-looping SpriteFrames animation reaches its last frame. Re-armed by every play/restart/rebuild. Note: the instance may already be pooled (inactive) when the deferred call runs, so check its state in the handler if that matters.
 			</description>
 		</signal>
 	</signals>

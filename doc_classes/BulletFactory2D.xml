@@ -55,7 +55,7 @@
 			<return type="Dictionary" />
 			<param index="0" name="bullet_type" type="int" enum="BulletFactory2D.BulletType" />
 			<description>
-				Get the whole information about the bullet multimeshes object pool of a specific type. Returns a [Dictionary] containing [MultiMeshPoolKey2D] as the KEY (one per exact amount+shape bucket) and the amount of pooled multimeshes in that bucket as the VALUE.
+				Get the whole information about the bullet multimeshes object pool of a specific type. Returns a [Dictionary] containing [MultiMeshPoolKey2D] as the KEY (one per exact amount_bullets + shape bucket) and the amount of pooled multimeshes in that bucket as the VALUE.
 			</description>
 		</method>
 		<method name="debug_get_total_attachments_amount">
@@ -75,7 +75,7 @@
 			<return type="void" />
 			<param index="0" name="key" type="MultiMeshPoolKey2D" default="null" />
 			<description>
-				Frees active bullets in the scene tree. Pass [code]null[/code] (default) to free all, or a [MultiMeshPoolKey2D] to free only that exact amount+shape bucket.
+				Frees active bullets in the scene tree. Pass [code]null[/code] (default) to free all, or a [MultiMeshPoolKey2D] to free only that exact amount_bullets + shape bucket.
 			</description>
 		</method>
 		<method name="free_attachments_pool">
@@ -90,14 +90,14 @@
 			<param index="0" name="bullet_type" type="int" enum="BulletFactory2D.BulletType" />
 			<param index="1" name="key" type="MultiMeshPoolKey2D" default="null" />
 			<description>
-				Frees the object pool of a particular bullet type. Pass [code]null[/code] (default) to free the whole pool, or a [MultiMeshPoolKey2D] to free only that exact amount+shape bucket. Example: [code]MultiMeshPoolKey2D.make(200, PhysicsServer2D.SHAPE_CIRCLE)[/code].
+				Frees the object pool of a particular bullet type. Pass [code]null[/code] (default) to free the whole pool, or a [MultiMeshPoolKey2D] to free only that exact amount_bullets + shape bucket. Example: [code]MultiMeshPoolKey2D.make(200, PhysicsServer2D.SHAPE_CIRCLE)[/code].
 			</description>
 		</method>
 		<method name="free_disabled_bullets">
 			<return type="void" />
 			<param index="0" name="key" type="MultiMeshPoolKey2D" default="null" />
 			<description>
-				Frees disabled (pooled) bullets. Pass [code]null[/code] (default) to free all, or a [MultiMeshPoolKey2D] to free only that exact amount+shape bucket.
+				Frees disabled (pooled) bullets. Pass [code]null[/code] (default) to free all, or a [MultiMeshPoolKey2D] to free only that exact amount_bullets + shape bucket.
 			</description>
 		</method>
 		<method name="get_is_factory_busy" qualifiers="const">

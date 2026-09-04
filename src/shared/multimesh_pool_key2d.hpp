@@ -37,7 +37,7 @@ struct PoolKeyHash {
 // GDScript-visible pool key. Single source of truth for callers: they must always provide amount_bullets + shape.
 // amount_bullets = bullets per multimesh (bucket identity, must equal spawn_data.transforms.size()).
 // Null Ref<MultiMeshPoolKey2D> means "all buckets". Non-null means exact bucket match.
-// Never used inside the hot path — convert once via to_internal() then use plain PoolKey.
+// Never used inside the hot path. Convert once via to_internal(), then use plain PoolKey.
 class MultiMeshPoolKey2D : public Resource {
 	GDCLASS(MultiMeshPoolKey2D, Resource)
 

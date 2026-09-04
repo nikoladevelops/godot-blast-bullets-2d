@@ -239,9 +239,8 @@ public:
 			case MousePositionTarget:
 				--mouse_homing_targets_amount;
 
-				// It is a bit weird since this isn't really the global mouse position owned by that particular MousePositionTarget (since obviously it is not yet active),
-				// but it's fine we are returning the most recently cached mouse global position for the queue of homing targets
-				// I'm doing this to avoid returning a nullptr while also the global position being garbage as well.. so best I can do is return this
+				// No per-target position exists yet, so return the last cached mouse
+				// position. Good enough for one frame until the cache refreshes.
 				return cached_mouse_global_position;
 		}
 		return nullptr;

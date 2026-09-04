@@ -38,7 +38,7 @@ public:
 			resize(new_size);
 		}
 
-		// If it's already active, do nothing - this avoids duplicates js in case
+		// If it's already active, do nothing - this avoids duplicates just in case
 		if (sparse[index] != -1) {
 			return;
 		}

@@ -52,6 +52,9 @@
 			    	Note: If the rotation data is less than the amount of [Transform2D] saved in the [member transforms] property, then only the first bullet rotation data will be shared for all bullets.
 			Note: [BulletRotationData2D] has a helper static method that you can use to generate random rotation data - [method BulletRotationData2D.generate_random_data].
 		</member>
+		<member name="animation" type="StringName" setter="set_animation" getter="get_animation" default="&amp;&quot;default&quot;">
+			Which SpriteFrames animation to play. Empty or "default" auto-resolves silently ("default" if present, else first animation). Explicit wrong names fall back to the first animation with one error. The whole multimesh batch shares one frame at a time; timing uses animation speed (fps), per-frame durations, and loop flag.
+		</member>
 		<member name="bullet_max_collision_count" type="int" setter="set_bullet_max_collision_count" getter="get_bullet_max_collision_count" default="1">
 			How many times a bullet can collide before it gets disabled. If you set to 0, then the bullet will NEVER get disabled due to collisions.
 		</member>
@@ -62,28 +65,22 @@
 
 			[url=https://www.youtube.com/watch?v=fdRJqnOrz98&amp;t=63s]YouTube Tutorial On Custom Resources[/url]
 		</member>
-		<member name="animation" type="StringName" setter="set_animation" getter="get_animation" default="&amp;&quot;default&quot;">
-			Which SpriteFrames animation to play. Empty or "default" auto-resolves silently ("default" if present, else first animation). Explicit wrong names fall back to the first animation with one error. The whole multimesh batch shares one frame at a time; timing uses animation speed (fps), per-frame durations, and loop flag.
-		</member>
 		<member name="collision_layer" type="int" setter="set_collision_layer" getter="get_collision_layer" default="1">
 			The bitmask for the collision layer.
 
 			Note: Needs to be set to a bitmask, so use [method calculate_bitmask].
-			Note: It may be better to just use the [method set_collision_layer_from_array] function.
+			Tip: [method set_collision_layer_from_array] takes plain layer numbers and builds the bitmask for you.
 		</member>
 		<member name="collision_mask" type="int" setter="set_collision_mask" getter="get_collision_mask" default="1">
 			The bitmask for the collision mask.
 
 			Note: Needs to be set to a bitmask, so use [method calculate_bitmask].
-			Note: It may be better to just use the [method set_collision_mask_from_array] function.
+			Tip: [method set_collision_mask_from_array] takes plain layer numbers and builds the bitmask for you.
+		</member>
+		<member name="collision_shape" type="Shape2D" setter="set_collision_shape" getter="get_collision_shape">
 		</member>
 		<member name="collision_shape_offset" type="Vector2" setter="set_collision_shape_offset" getter="get_collision_shape_offset" default="Vector2(0, 0)">
 			The offset for the collision shape calculated from the center of the bullet texture.
-
-			Note: You can enable the [BulletFactory2D]'s debugger to make collision shapes visible.
-		</member>
-		<member name="collision_shape_size" type="Vector2" setter="set_collision_shape_size" getter="get_collision_shape_size" default="Vector2(5, 5)">
-			The size of the collision shape.
 
 			Note: You can enable the [BulletFactory2D]'s debugger to make collision shapes visible.
 		</member>
@@ -110,7 +107,7 @@
 			The bitmask for the light mask.
 
 			Note: Needs to be set to a bitmask, so use [method calculate_bitmask].
-			Note: It may be better to just use the [method set_light_mask_from_array] function.
+			Tip: [method set_light_mask_from_array] takes plain layer numbers and builds the bitmask for you.
 		</member>
 		<member name="material" type="Material" setter="set_material" getter="get_material">
 			Feel free to set a [CanvasItemMaterial] or [ShaderMaterial].
@@ -131,14 +128,14 @@
 
 			Note: You can enable the [BulletFactory2D]'s debugger to make collision shapes visible.
 		</member>
+		<member name="sprite_frames" type="SpriteFrames" setter="set_sprite_frames" getter="get_sprite_frames">
+			SpriteFrames holding all animations. Each frame is a Texture2D (plain or AtlasTexture region). The batch shares one frame; per-frame duration and loop come from the animation.
+		</member>
 		<member name="stop_rotation_when_max_reached" type="bool" setter="set_stop_rotation_when_max_reached" getter="get_stop_rotation_when_max_reached" default="false">
 			Set this to true if you want for the bullets to stop rotating when they reach the maximum rotation speed.
 		</member>
 		<member name="texture_rotation_radians" type="float" setter="set_texture_rotation_radians" getter="get_texture_rotation_radians" default="0.0">
 			If your texture is not rotated properly, you can use this property to rotate it more.
-		</member>
-		<member name="sprite_frames" type="SpriteFrames" setter="set_sprite_frames" getter="get_sprite_frames">
-			SpriteFrames holding all animations. Each frame is a Texture2D (plain or AtlasTexture region). The batch shares one frame; per-frame duration and loop come from the animation.
 		</member>
 		<member name="texture_size" type="Vector2" setter="set_texture_size" getter="get_texture_size" default="Vector2(0, 0)">
 			QuadMesh size override, used only when no mesh is provided. If x/y &lt;= 0 the size auto-derives from the first frame (AtlasTexture region, else texture size).
@@ -147,14 +144,14 @@
 			[b]MANDATORY[/b]
 			Determines the transforms of the bullets.
 
-			Note: It's best to just have some [Marker2D] nodes in your scene tree and retrieve their global transforms over and over when you need to spawn bullets.
+			Tip: place [Marker2D] nodes in your scene and read their global transforms each time you spawn.
 			Note: There is a helper static function that can generate a grid pattern of [Transform2D] that you can use: [method BulletFactory2D.helper_generate_transforms_grid]. You might want to implement your own custom pattern generation logic in C++ for maximum performance.
 		</member>
 		<member name="visibility_layer" type="int" setter="set_visibility_layer" getter="get_visibility_layer" default="1">
 			The bitmask for the visibility layer.
 
 			Note: Needs to be set to a bitmask, so use [method calculate_bitmask].
-			Note: It may be better to just use the [method set_visibility_layer_from_array] function.
+			Tip: [method set_visibility_layer_from_array] takes plain layer numbers and builds the bitmask for you.
 		</member>
 		<member name="z_index" type="int" setter="set_z_index" getter="get_z_index" default="0">
 			The z index of the bullets.

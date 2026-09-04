@@ -100,13 +100,14 @@ void MultiMeshBulletsDebugger2D::disable() {
 			container_to_debug->disconnect("child_entered_tree", cb);
 		}
 	}
-	// Note: If you ever see a "trying to disconnect a signal that wasn't actually connected before" type of error message in the godot console, it means that your object state is not valid. Ensure you always initialize variables that you may access for the first time (variables accessed without actually calling the setter first = accessing undefined value = undefined behavior)..
+	// Note: this error means some state was read before its setter ever ran.
+	// Always initialize member variables so they hold a valid value from the start.
 
 	for (int i = 0; i < debugger_multimeshes.size(); ++i) {
 		memdelete(debugger_multimeshes[i]); // Debugger meshes are plain nodes with no physics/RID state, so immediate delete is safe here.
 	}
 
-	// Clear both vectors so they don't contain any pointers / Note that .clear() doesn't do memory reallocations which is good
+	// Clear both vectors so they hold no stale pointers. clear() keeps capacity.
 	debugger_multimeshes.clear();
 	debug_data_providers.clear();
 	debugger_mesh_types.clear();
@@ -173,7 +174,7 @@ void MultiMeshBulletsDebugger2D::generate_debug_multimesh(Node *node_entered_con
 	debugger_mesh_types.emplace_back(shape_type);
 	debugger_mesh_sizes.emplace_back(shape_size);
 
-	// Finally just add the debugger multimesh instance as a child so that it can begin doing its job - rendering
+	// Add the debugger multimesh to the tree so it starts rendering.
 	add_child(debugger_multimesh);
 }
 

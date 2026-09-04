@@ -5,7 +5,7 @@
 	</brief_description>
 	<description>
 		Create with [method make] or by setting [member amount_bullets] and [member shape_type].
-		[code]amount_bullets[/code] is bullets per multimesh (bucket identity, must equal spawn data transforms size). It is NOT the instance count — see [method BulletFactory2D.populate_bullets_pool] [code]instance_count[/code] for how many multimeshes to pre-create.
+		[code]amount_bullets[/code] is bullets per multimesh (bucket identity, must equal spawn data transforms size). It is NOT the instance count. See [method BulletFactory2D.populate_bullets_pool] [code]instance_count[/code] for how many multimeshes to pre-create.
 		Pass to [method BulletFactory2D.reset], [method BulletFactory2D.free_active_bullets], [method BulletFactory2D.free_disabled_bullets] and [method BulletFactory2D.free_bullets_pool]. Pass [code]null[/code] to affect all buckets, or a key for one exact bucket.
 		Keys returned by [method BulletFactory2D.debug_get_bullets_pool_info] are one [MultiMeshPoolKey2D] per bucket.
 		Internally the pool uses a plain value-type key for speed; this Resource is only the Godot boundary wrapper.

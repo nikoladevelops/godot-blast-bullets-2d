@@ -21,8 +21,9 @@ public:
 	// Gets the engine shape type so debugger can scale math per shape.
 	virtual PhysicsServer2D::ShapeType get_collision_shape_type_for_debugging() const = 0;
 
-	// Gets all collision shapes' global transforms
-	virtual const std::vector<Transform2D> &get_all_collision_shape_transforms_for_debugging() const = 0; // Reference here for performance reasons I don't want copies - ensure that the vector is an actual lvalue that is a member of the class / doesn't get freed accidentally
+	// Gets all collision shapes' global transforms. Takes a reference for performance
+	// (no copies). Make sure the vector is a member of the class that stays alive.
+	virtual const std::vector<Transform2D> &get_all_collision_shape_transforms_for_debugging() const = 0;
 
 	// Whether the debugging should be skipped for some reason
 	virtual bool get_skip_debugging() const = 0;

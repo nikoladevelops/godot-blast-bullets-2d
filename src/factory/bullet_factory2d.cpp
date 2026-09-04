@@ -103,8 +103,8 @@ void BulletFactory2D::set_use_physics_interpolation_runtime(bool new_use_physics
 
 	use_physics_interpolation = new_use_physics_interpolation;
 
-	// If physics interpolation is about to be set to TRUE, then populate all needed data so that bullets work correctly
-	// I'm basically making it possible for this option to be turned on during runtime
+	// Turning it on mid-game needs previous-frame data to exist, so seed it here.
+	// Without this the first interpolated frames would lerp from stale transforms.
 	if (use_physics_interpolation) {
 		int amount_multimesh_instances = static_cast<int>(all_directional_bullets.size());
 		for (int i = 0; i < amount_multimesh_instances; ++i) {

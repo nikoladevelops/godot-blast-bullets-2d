@@ -11,7 +11,7 @@
 	</tutorials>
 	<members>
 		<member name="adjust_direction_based_on_rotation" type="bool" setter="set_adjust_direction_based_on_rotation" getter="get_adjust_direction_based_on_rotation" default="false">
-			If enabled, the bullets will adjust their direction when rotating, instead of just simply spinning.
+			If enabled, the bullets will adjust their direction when rotating, instead of only spinning in place.
 		</member>
 		<member name="all_bullet_speed_data" type="BulletSpeedData2D[]" setter="set_all_bullet_speed_data" getter="get_all_bullet_speed_data" default="[]">
 			[b]MANDATORY[/b]

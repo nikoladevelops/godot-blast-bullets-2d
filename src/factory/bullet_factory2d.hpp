@@ -153,7 +153,8 @@ public:
 	static void _bind_methods();
 
  private:
-	// Whether the factory was spawned correctly and the ready function finished. Used in order to avoid bugs related to editor executing getters/setters that should only be executed during runtime / gameplay. If a getter/setter is executed when in editor then those values get cached in different variables and finally get applied in _ready()
+	// Set when the factory enters the scene tree. Editor runs of getters/setters only
+	// fill the cached values below; the real ones apply in _ready() once nodes exist.
 	bool is_ready = false;
 
 	// Set in NOTIFICATION_PREDELETE (parent notified before children are destroyed).
@@ -347,7 +348,8 @@ public:
 			}
 
 			// All vec objects (including pooled ones) are already memdeleted above, so only
-			// drop the pool's dangling pointers here — never free_all_bullets() (would double-free).
+			// drop the pool's dangling pointers here. Never call free_all_bullets() here,
+			// it would delete the same objects twice.
 			bullets_pool.clear();
 			bullets_vec.clear();
 			sparse_set.clear();

@@ -33,7 +33,7 @@
 			<description>
 				Ensure the attachment is in disabled state (example: attachment should be invisible when you are populating the object pool... in the same state as in the [method on_bullet_disable] function).
 
-				Warning: The [BulletAttachment2D] is not yet in the scene tree when this method is executed, so don't call functions that depend on already configured children etc.. instead use [code]_ready[/code]. Just save state specific logic in variables and then later in [code]_ready[/code] handle that.
+				Warning: The [BulletAttachment2D] is not yet in the scene tree when this method runs, so avoid calls that need configured children. Store that kind of setup in variables and handle it later in [code]_ready[/code].
 			</description>
 		</method>
 	</methods>

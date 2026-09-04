@@ -242,15 +242,14 @@ void MultiMeshBullets2D::set_up_bullet_instances(const MultiMeshBulletsData2D &d
 	cache_collision_shape_offset = data.collision_shape_offset;
 
 	if (all_cached_instance_transforms.size() != 0) {
-		// If there was old data then we are currently trying to enable a bullets multimesh, so clear everything that is old
-		// Note: We never really resize any of these vectors, so capacity always stays the same and the object pooling logic also ensures of this, so no need to reserve different amount of space since it's always going to be the original capacity value/ no memory reallocations
-		// Note: This logic relies on the fact that we always enable multimesh bullets based on their original amount_bullets - that's how the object pooling logic works in order to re-use everything
+		// Enabling a pooled multimesh: drop old frame data. Capacity stays put and the
+		// pool always reuses the original amount_bullets, so no reallocation happens here.
 		all_cached_instance_transforms.clear();
 		all_cached_instance_origin.clear();
 		all_cached_shape_transforms.clear();
 		all_cached_shape_origin.clear();
 	} else {
-		// If there wasn't any old data, that means we are spawning a bullets multimesh, so we need to ensure that all data structures reserve needed memory at once
+		// First spawn: reserve everything up front for the fixed bullet count.
 		all_cached_instance_transforms.reserve(amount_bullets);
 		all_cached_instance_origin.reserve(amount_bullets);
 		all_cached_shape_transforms.reserve(amount_bullets);
