@@ -31,37 +31,6 @@ public:
 			update_all_previous_transforms_for_interpolation();
 		}
 
-		// Shared curves animate the single block entry per tick, mirroring the
-		// directional shared-curves branch (speed, rotation speed, direction).
-		if (shared_bullet_curves_data.is_valid()) {
-			const BulletCurvesData2D *curves_ptr = shared_bullet_curves_data.ptr();
-			bool curves_updated_velocity = false;
-			if (curves_ptr->movement_speed_curve.is_valid()) {
-				if (!all_cached_speed.empty()) {
-					all_cached_speed[0] = get_bullet_curves_movement_speed(curves_ptr);
-					curves_updated_velocity = true;
-				}
-			}
-			if (curves_ptr->rotation_speed_curve.is_valid()) {
-				if (!all_rotation_speed.empty()) {
-					all_rotation_speed[0] = get_bullet_curves_rotation_speed(curves_ptr);
-				}
-			}
-			if (!all_cached_direction.empty()) {
-				if (curves_ptr->x_direction_curve.is_valid()) {
-					apply_x_direction_curve(all_cached_direction[0], curves_ptr);
-					curves_updated_velocity = true;
-				}
-				if (curves_ptr->y_direction_curve.is_valid()) {
-					apply_y_direction_curve(all_cached_direction[0], curves_ptr);
-					curves_updated_velocity = true;
-				}
-			}
-			if (curves_updated_velocity && !all_cached_velocity.empty() && !all_cached_speed.empty() && !all_cached_direction.empty()) {
-				all_cached_velocity[0] = all_cached_direction[0] * all_cached_speed[0] + inherited_velocity_offset;
-			}
-		}
-
 		Vector2 cache_velocity_calc = all_cached_velocity[0] * delta;
 
 		const auto &active_bullet_indexes = all_bullets_enabled_set.get_active_indexes();
@@ -104,11 +73,7 @@ public:
 			batch_flush_instance_transforms();
 		}
 
-		// Shared movement curves own the single speed entry (sampled above); running the
-		// normal acceleration after them would clamp the curve value back to max_speed.
-		if (!(shared_bullet_curves_data.is_valid() && shared_bullet_curves_data->movement_speed_curve.is_valid())) {
-			bullet_accelerate_speed(0, delta);
-		}
+		bullet_accelerate_speed(0, delta);
 
 		// Handle collisions safely after all physics processing logic is done
 		for (auto &data : all_collided_bullets) {

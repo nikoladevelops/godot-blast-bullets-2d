@@ -101,7 +101,7 @@
 			<param index="1" name="bullet_index_start" type="int" default="0" />
 			<param index="2" name="bullet_index_end_inclusive" type="int" default="-1" />
 			<description>
-				Sets the same curves data to all bullets in the specified range. Curves data is a [BulletCurvesData2D] resource that can contain multiple curves used to control different aspects of the bullet's behavior over time, such as movement speed, rotation speed, direction adjustment, etc...
+				Sets the same curves data to all bullets in the specified range. Curves data is a [BulletCurvesData2D] resource that can contain multiple curves used to control different aspects of the bullet's behavior over time, such as movement speed, rotation speed, direction adjustment, etc... Not supported on [BlockBullets2D].
 			</description>
 		</method>
 		<method name="all_bullets_set_direction">
@@ -139,7 +139,7 @@
 			<param index="3" name="start_index" type="int" default="0" />
 			<param index="4" name="end_index_inclusive" type="int" default="-1" />
 			<description>
-				Sets a [Curve2D] drawn movement pattern to all bullets in the specified range. The bullets will follow the shape of the curve as they move. 
+				Sets a [Curve2D] drawn movement pattern to all bullets in the specified range. The bullets will follow the shape of the curve as they move. Not supported on [BlockBullets2D].
 
 				If [code]face_movement_direction[/code] is set to true, the bullets will also rotate to face the direction they are moving along the curve.
 
@@ -154,7 +154,7 @@
 			<param index="3" name="start_index" type="int" default="0" />
 			<param index="4" name="end_index_inclusive" type="int" default="-1" />
 			<description>
-				Sets a [Path2D] drawn movement pattern to all bullets in the specified range. The bullets will follow the shape of the path as they move. 
+				Sets a [Path2D] drawn movement pattern to all bullets in the specified range. The bullets will follow the shape of the path as they move. Not supported on [BlockBullets2D].
 
 				If [code]face_movement_direction[/code] is set to true, the bullets will also rotate to face the direction they are moving along the path.
 
@@ -296,7 +296,7 @@
 			<param index="0" name="bullet_index" type="int" />
 			<param index="1" name="data" type="BulletCurvesData2D" />
 			<description>
-				Sets the curves data of a specific bullet. Curves data is a [BulletCurvesData2D] resource that can contain multiple curves used to control different aspects of the bullet's behavior over time, such as movement speed, rotation speed, direction adjustment, etc...
+				Sets the curves data of a specific bullet. Curves data is a [BulletCurvesData2D] resource that can contain multiple curves used to control different aspects of the bullet's behavior over time, such as movement speed, rotation speed, direction adjustment, etc... Not supported on [BlockBullets2D].
 
 				Note: If you want to set or get the curves data of multiple bullets at once, use [method all_bullets_set_curves_data] or [method all_bullets_get_curves_data].
 			</description>
@@ -596,7 +596,7 @@
 			<param index="2" name="face_movement_direction" type="bool" default="false" />
 			<param index="3" name="repeat_pattern" type="bool" default="true" />
 			<description>
-				Set a [Curve2D] drawn movement pattern to a specific bullet. The bullet will follow the shape of the curve as it moves. 
+				Set a [Curve2D] drawn movement pattern to a specific bullet. The bullet will follow the shape of the curve as it moves. Not supported on [BlockBullets2D].
 
 				If [code]face_movement_direction[/code] is set to true, the bullet will also rotate to face the direction it is moving along the curve.
 
@@ -613,7 +613,7 @@
 			<param index="2" name="face_movement_direction" type="bool" default="false" />
 			<param index="3" name="repeat_pattern" type="bool" default="true" />
 			<description>
-				Set a [Path2D] drawn movement pattern to a specific bullet. The bullet will follow the shape of the path as it moves. 
+				Set a [Path2D] drawn movement pattern to a specific bullet. The bullet will follow the shape of the path as it moves. Not supported on [BlockBullets2D].
 
 				If [code]face_movement_direction[/code] is set to true, the bullet will also rotate to face the direction it is moving along the path.
 
@@ -778,7 +778,7 @@
 			If you are going to save your multimesh bullets in an array, then it's probably best to disable auto pooling and manage the instances yourself.
 		</member>
 		<member name="shared_bullet_curves_data" type="BulletCurvesData2D" setter="set_shared_bullet_curves_data" getter="get_shared_bullet_curves_data">
-			A shared [BulletCurvesData2D] resource that can be assigned to all bullets in the multimesh. This is useful for saving memory if you have a lot of bullets that share the same curves data, since you can assign the same resource to all of them instead of creating a new one for each bullet.
+			A shared [BulletCurvesData2D] resource that can be assigned to all bullets in the multimesh. This is useful for saving memory if you have a lot of bullets that share the same curves data, since you can assign the same resource to all of them instead of creating a new one for each bullet. Not supported on [BlockBullets2D] (setting it there errors and is ignored).
 		</member>
 	</members>
 	<signals>

@@ -1104,8 +1104,11 @@ void MultiMeshBullets2D::set_bullet_movement_pattern_from_curve(int bullet_index
 		remove_bullet_movement_pattern(bullet_index);
 		return;
 	}
+	// Block bullets are spawned without an instance handle by design (spawn_block_bullets
+	// returns void), so movement patterns stay on DirectionalBullets2D.
 	if (is_class("BlockBullets2D")) {
-		UtilityFunctions::push_warning("Movement patterns are not simulated on BlockBullets2D (the block moves as one); use DirectionalBullets2D for patterned movement. Pattern stored but ignored.");
+		UtilityFunctions::push_error("BlockBullets2D does not support movement patterns - use DirectionalBullets2D for patterned movement.");
+		return;
 	}
 
 	all_movement_pattern_data[bullet_index] = BulletMovementPatternData2D{ curve_pattern, face_movement_direction, repeat_pattern };
@@ -1119,17 +1122,13 @@ void MultiMeshBullets2D::all_bullets_set_movement_pattern_from_curve(const Ref<C
 		return;
 	}
 
-	// Single warning for the whole range instead of one per bullet below.
-	const bool is_block = is_class("BlockBullets2D");
-	if (is_block) {
-		UtilityFunctions::push_warning("Movement patterns are not simulated on BlockBullets2D (the block moves as one); use DirectionalBullets2D for patterned movement. Patterns stored but ignored.");
+	// Single error for the whole range instead of one per bullet below.
+	if (is_class("BlockBullets2D")) {
+		UtilityFunctions::push_error("BlockBullets2D does not support movement patterns - use DirectionalBullets2D for patterned movement.");
+		return;
 	}
 
 	for (int i = start_index; i <= end_index_inclusive; ++i) {
-		if (is_block) {
-			all_movement_pattern_data[i] = BulletMovementPatternData2D{ curve_pattern, face_movement_direction, repeat_pattern };
-			continue;
-		}
 		set_bullet_movement_pattern_from_curve(i, curve_pattern, face_movement_direction, repeat_pattern);
 	}
 }

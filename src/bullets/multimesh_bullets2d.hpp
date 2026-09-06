@@ -359,7 +359,15 @@ float *w = batch_buffer.ptrw();
 	void set_is_attachments_auto_pooling_enabled(bool value) { is_attachments_auto_pooling_enabled = value; }
 
 	Ref<BulletCurvesData2D> get_shared_bullet_curves_data() const { return shared_bullet_curves_data; }
-	void set_shared_bullet_curves_data(const Ref<BulletCurvesData2D> &new_curves_data) { populate_shared_curves_related_data(new_curves_data); }
+	void set_shared_bullet_curves_data(const Ref<BulletCurvesData2D> &new_curves_data) {
+		// Block bullets are spawned without an instance handle by design (spawn_block_bullets
+		// returns void), so advanced per-instance features stay on DirectionalBullets2D.
+		if (!new_curves_data.is_null() && is_class("BlockBullets2D")) {
+			UtilityFunctions::push_error("BlockBullets2D does not support bullet curves - use DirectionalBullets2D for curves.");
+			return;
+		}
+		populate_shared_curves_related_data(new_curves_data);
+	}
 
 	// Re-bakes the animation cache from a SpriteFrames resource and switches to it.
 	// Empty animation means auto: "default" if present, else first animation, silently.
@@ -1034,7 +1042,8 @@ float *w = batch_buffer.ptrw();
 		}
 
 		if (is_class("BlockBullets2D")) {
-			UtilityFunctions::push_warning("Individual bullet curves on BlockBullets2D apply once at assignment and do not animate per tick (the block shares one entry). Use shared_bullet_curves_data for animated curves.");
+			UtilityFunctions::push_error("BlockBullets2D does not support bullet curves - use DirectionalBullets2D for curves.");
+			return;
 		}
 
 		populate_individual_bullet_curves_related_data(bullet_index, curves_data);
@@ -1043,18 +1052,13 @@ float *w = batch_buffer.ptrw();
 	_ALWAYS_INLINE_ void all_bullets_set_curves_data(const Ref<BulletCurvesData2D> &curves_data, int bullet_index_start = 0, int bullet_index_end_inclusive = -1) {
 		ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_set_curves_data");
 
-		// Single warning for the whole range; the per-index setter would otherwise spam once per bullet.
-		// warn_block_once implies non-null curves_data, so populate directly below.
-		const bool warn_block_once = !curves_data.is_null() && is_class("BlockBullets2D");
-		if (warn_block_once) {
-			UtilityFunctions::push_warning("Individual bullet curves on BlockBullets2D apply once at assignment and do not animate per tick (the block shares one entry). Use shared_bullet_curves_data for animated curves.");
+		// Single error for the whole range instead of one per bullet below.
+		if (!curves_data.is_null() && is_class("BlockBullets2D")) {
+			UtilityFunctions::push_error("BlockBullets2D does not support bullet curves - use DirectionalBullets2D for curves.");
+			return;
 		}
 
 		for (int i = bullet_index_start; i <= bullet_index_end_inclusive; ++i) {
-			if (warn_block_once) {
-				populate_individual_bullet_curves_related_data(i, curves_data);
-				continue;
-			}
 			bullet_set_curves_data(i, curves_data);
 		}
 	}
