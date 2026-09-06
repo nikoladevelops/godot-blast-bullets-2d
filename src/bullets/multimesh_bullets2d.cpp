@@ -48,10 +48,12 @@ void MultiMeshBullets2D::_notification(int p_what) {
 				bullet_factory->handle_manual_user_deletion_of_multimesh_bullets(*this);
 			}
 
-			if (physics_server) {
+			clear_homing_state_for_teardown();
+
+			if (physics_server && area.is_valid()) {
 				// Disable the area's shapes (ALL OF THEM no matter their bullets_enabled_status).
 				// Bounds-checked: never let a desynced attachments vector take down PREDELETE.
-				for (int i = 0; i < amount_bullets; ++i) {
+				for (int i = 0; i < amount_bullets && i < (int)physics_shapes.size(); ++i) {
 					physics_server->area_set_shape_disabled(area, i, true);
 
 					if (i >= 0 && i < (int)attachments.size() && attachments[i] != nullptr) {
@@ -104,6 +106,8 @@ void MultiMeshBullets2D::spawn(const MultiMeshBulletsData2D &data, MultiMeshObje
 
 	amount_bullets = data.transforms.size(); // important, because some set_up methods use this
 	cache_collision_shape_typed(data.collision_shape);
+
+	++multimesh_generation;
 
 	all_bullets_enabled_set.resize(amount_bullets);
 	all_bullet_curves_data.assign(amount_bullets, Ref<BulletCurvesData2D>());
@@ -175,6 +179,8 @@ void MultiMeshBullets2D::spawn(const MultiMeshBulletsData2D &data, MultiMeshObje
 void MultiMeshBullets2D::enable_multimesh(const MultiMeshBulletsData2D &data, const Vector2 &new_inherited_velocity_offset) {
 	inherited_velocity_offset = new_inherited_velocity_offset;
 	cache_collision_shape_typed(data.collision_shape);
+
+	++multimesh_generation;
 
 	set_up_life_time_timer(data.max_life_time, data.max_life_time);
 
@@ -297,8 +303,10 @@ void MultiMeshBullets2D::set_up_multimesh(int new_instance_count, const Ref<Mesh
 		Ref<QuadMesh> mesh = memnew(QuadMesh);
 		mesh->set_size(new_texture_size);
 		multi->set_mesh(mesh);
-		texture_size = new_texture_size;
 	}
+	// Always track the resolved size, even with a custom mesh, so pooled reuse
+	// with different data cannot inherit a stale quad size.
+	texture_size = new_texture_size;
 
 	multi->set_instance_count(new_instance_count);
 	batch_buffer.resize(new_instance_count * 8);
@@ -316,28 +324,6 @@ static bool resolve_sprite_animation_impl(const Ref<SpriteFrames> &p_sprite_fram
 		}
 		return false;
 	}
-	const String requested_str = String(p_requested);
-	const bool is_auto = requested_str.is_empty() || p_requested == StringName("default");
-	if (is_auto) {
-		// Unselected animation: play "default" silently, else first animation silently.
-		if (p_sprite_frames->has_animation(StringName("default"))) {
-			out_anim = StringName("default");
-			return true;
-		}
-		const PackedStringArray names = p_sprite_frames->get_animation_names();
-		if (names.is_empty()) {
-			if (!silent) {
-				UtilityFunctions::push_error("MultiMeshBullets2D: sprite_frames has no animations.");
-			}
-			return false;
-		}
-		out_anim = names[0];
-		return true;
-	}
-	if (p_sprite_frames->has_animation(p_requested)) {
-		out_anim = p_requested;
-		return true;
-	}
 	const PackedStringArray names = p_sprite_frames->get_animation_names();
 	if (names.is_empty()) {
 		if (!silent) {
@@ -345,10 +331,50 @@ static bool resolve_sprite_animation_impl(const Ref<SpriteFrames> &p_sprite_fram
 		}
 		return false;
 	}
-	if (!silent) {
-		UtilityFunctions::push_error("MultiMeshBullets2D: missing animation '" + requested_str + "', falling back to '" + String(names[0]) + "'.");
+	const String requested_str = String(p_requested);
+	const bool is_auto = requested_str.is_empty() || p_requested == StringName("default");
+	// Picks the first animation that actually has frames. An empty "default" (fresh
+	// SpriteFrames resources always contain one) must not shadow a populated animation.
+	auto first_with_frames = [&]() -> StringName {
+		for (int i = 0; i < names.size(); ++i) {
+			if (p_sprite_frames->get_frame_count(names[i]) > 0) {
+				return names[i];
+			}
+		}
+		return StringName();
+	};
+	if (is_auto) {
+		// Unselected animation: play "default" silently when usable, else first animation
+		// with frames, silently.
+		if (p_sprite_frames->has_animation(StringName("default")) && p_sprite_frames->get_frame_count(StringName("default")) > 0) {
+			out_anim = StringName("default");
+			return true;
+		}
+		const StringName fallback = first_with_frames();
+		if (String(fallback).is_empty()) {
+			if (!silent) {
+				UtilityFunctions::push_error("MultiMeshBullets2D: sprite_frames has no animation with frames.");
+			}
+			return false;
+		}
+		out_anim = fallback;
+		return true;
 	}
-	out_anim = names[0];
+	if (p_sprite_frames->has_animation(p_requested) && p_sprite_frames->get_frame_count(p_requested) > 0) {
+		out_anim = p_requested;
+		return true;
+	}
+	const StringName fallback = first_with_frames();
+	if (String(fallback).is_empty()) {
+		if (!silent) {
+			UtilityFunctions::push_error("MultiMeshBullets2D: sprite_frames has no animation with frames.");
+		}
+		return false;
+	}
+	if (!silent) {
+		UtilityFunctions::push_error("MultiMeshBullets2D: missing animation '" + requested_str + "', falling back to '" + String(fallback) + "'.");
+	}
+	out_anim = fallback;
 	return true;
 }
 
@@ -490,10 +516,15 @@ void MultiMeshBullets2D::finalize_set_up(
 
 				set_instance_shader_parameter(key, value);
 			}
+		} else {
+			// Shader without params (or non-shader material handled below): drop the
+			// previous owner's dict so pool reuse can't leak stale entries into it.
+			instance_shader_parameters.clear();
 		}
 
 		set_material(new_material);
 	} else {
+		instance_shader_parameters.clear();
 		set_material(nullptr);
 	}
 
@@ -527,6 +558,17 @@ void MultiMeshBullets2D::set_rotation_data(const TypedArray<BulletRotationData2D
 		use_only_first_rotation_data = false;
 	} else {
 		use_only_first_rotation_data = true;
+	}
+
+	// Validate every element we are about to read. A null or wrong-typed entry would
+	// crash on dereference below, so fail open to no-rotation instead.
+	const int validate_count = use_only_first_rotation_data ? 1 : amount_rotation_data;
+	for (int i = 0; i < validate_count; ++i) {
+		if (Object::cast_to<BulletRotationData2D>(rotation_data[i]) == nullptr) {
+			UtilityFunctions::push_error("Invalid rotation data at index " + String::num_int64(i) + ": expected BulletRotationData2D. Ignoring all rotation data.");
+			is_rotation_data_active = false;
+			return;
+		}
 	}
 
 	rotate_only_textures = new_rotate_only_textures;
@@ -657,6 +699,11 @@ void MultiMeshBullets2D::set_bullet_speed_data(int bullet_index, const Ref<Bulle
 		return;
 	}
 
+	if (new_bullet_speed_data.is_null()) {
+		UtilityFunctions::push_error("set_bullet_speed_data: new_bullet_speed_data is null.");
+		return;
+	}
+
 	if (shared_bullet_curves_data.is_valid() && shared_bullet_curves_data->movement_speed_curve.is_valid()) {
 		UtilityFunctions::push_warning("You are trying to set bullet speed data directly while having a movement speed curve assigned to the shared curves data. The curve will override any direct speed data changes. Set the curve to null first if you want to set speed data directly.");
 		return;
@@ -692,6 +739,11 @@ TypedArray<BulletSpeedData2D> MultiMeshBullets2D::all_bullets_get_speed_data(int
 
 void MultiMeshBullets2D::all_bullets_set_speed_data(const Ref<BulletSpeedData2D> &new_bullet_speed_data, int bullet_index_start, int bullet_index_end_inclusive) {
 	ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_set_speed_data");
+
+	if (new_bullet_speed_data.is_null()) {
+		UtilityFunctions::push_error("all_bullets_set_speed_data: new_bullet_speed_data is null.");
+		return;
+	}
 
 	if (shared_bullet_curves_data.is_valid() && shared_bullet_curves_data->movement_speed_curve.is_valid()) {
 		UtilityFunctions::push_warning("You are trying to set bullet speed data directly while having a movement speed curve assigned. The curve will override any direct speed data changes. Set the curve to null first if you want to set speed data directly.");
@@ -1045,9 +1097,15 @@ void MultiMeshBullets2D::all_bullets_set_movement_pattern_from_path(Path2D *path
 }
 
 void MultiMeshBullets2D::set_bullet_movement_pattern_from_curve(int bullet_index, const Ref<Curve2D> &curve_pattern, bool face_movement_direction, bool repeat_pattern) {
+	if (!validate_bullet_index(bullet_index, "set_bullet_movement_pattern_from_curve")) {
+		return;
+	}
 	if (curve_pattern.is_null()) {
 		remove_bullet_movement_pattern(bullet_index);
 		return;
+	}
+	if (is_class("BlockBullets2D")) {
+		UtilityFunctions::push_warning("Movement patterns are not simulated on BlockBullets2D (the block moves as one); use DirectionalBullets2D for patterned movement. Pattern stored but ignored.");
 	}
 
 	all_movement_pattern_data[bullet_index] = BulletMovementPatternData2D{ curve_pattern, face_movement_direction, repeat_pattern };
@@ -1061,7 +1119,17 @@ void MultiMeshBullets2D::all_bullets_set_movement_pattern_from_curve(const Ref<C
 		return;
 	}
 
+	// Single warning for the whole range instead of one per bullet below.
+	const bool is_block = is_class("BlockBullets2D");
+	if (is_block) {
+		UtilityFunctions::push_warning("Movement patterns are not simulated on BlockBullets2D (the block moves as one); use DirectionalBullets2D for patterned movement. Patterns stored but ignored.");
+	}
+
 	for (int i = start_index; i <= end_index_inclusive; ++i) {
+		if (is_block) {
+			all_movement_pattern_data[i] = BulletMovementPatternData2D{ curve_pattern, face_movement_direction, repeat_pattern };
+			continue;
+		}
 		set_bullet_movement_pattern_from_curve(i, curve_pattern, face_movement_direction, repeat_pattern);
 	}
 }
@@ -1081,28 +1149,52 @@ void MultiMeshBullets2D::all_bullets_remove_movement_pattern(int start_index, in
 }
 
 int MultiMeshBullets2D::get_collision_layer() const {
+	if (physics_server == nullptr || !area.is_valid()) {
+		UtilityFunctions::push_error("get_collision_layer: multimesh was never spawned through BulletFactory2D.");
+		return 0;
+	}
 	return physics_server->area_get_collision_layer(area);
 }
 
 void MultiMeshBullets2D::set_collision_layer(int new_collision_layer) {
+	if (physics_server == nullptr || !area.is_valid()) {
+		UtilityFunctions::push_error("set_collision_layer: multimesh was never spawned through BulletFactory2D.");
+		return;
+	}
 	physics_server->area_set_collision_layer(area, new_collision_layer);
 }
 
 void MultiMeshBullets2D::set_collision_layer_from_array(const TypedArray<int> &numbers) {
 	int bitmask = MultiMeshBulletsData2D::calculate_bitmask(numbers);
+	if (physics_server == nullptr || !area.is_valid()) {
+		UtilityFunctions::push_error("set_collision_layer_from_array: multimesh was never spawned through BulletFactory2D.");
+		return;
+	}
 	physics_server->area_set_collision_layer(area, bitmask);
 }
 
 int MultiMeshBullets2D::get_collision_mask() const {
+	if (physics_server == nullptr || !area.is_valid()) {
+		UtilityFunctions::push_error("get_collision_mask: multimesh was never spawned through BulletFactory2D.");
+		return 0;
+	}
 	return physics_server->area_get_collision_mask(area);
 }
 
 void MultiMeshBullets2D::set_collision_mask(int new_collision_mask) {
+	if (physics_server == nullptr || !area.is_valid()) {
+		UtilityFunctions::push_error("set_collision_mask: multimesh was never spawned through BulletFactory2D.");
+		return;
+	}
 	physics_server->area_set_collision_mask(area, new_collision_mask);
 }
 
 void MultiMeshBullets2D::set_collision_mask_from_array(const TypedArray<int> &numbers) {
 	int bitmask = MultiMeshBulletsData2D::calculate_bitmask(numbers);
+	if (physics_server == nullptr || !area.is_valid()) {
+		UtilityFunctions::push_error("set_collision_mask_from_array: multimesh was never spawned through BulletFactory2D.");
+		return;
+	}
 	physics_server->area_set_collision_mask(area, bitmask);
 }
 
@@ -1112,6 +1204,10 @@ bool MultiMeshBullets2D::get_monitorable() const {
 
 void MultiMeshBullets2D::set_monitorable(bool value) {
 	monitorable = value;
+	if (physics_server == nullptr || !area.is_valid()) {
+		UtilityFunctions::push_error("set_monitorable: multimesh was never spawned through BulletFactory2D.");
+		return;
+	}
 	physics_server->area_set_monitorable(area, monitorable);
 }
 
@@ -1150,11 +1246,17 @@ void MultiMeshBullets2D::set_collision_shape_runtime(const Ref<Shape2D> &new_sha
 		}
 		all_cached_shape_origin[i] = all_cached_instance_origin[i] + off;
 		all_cached_shape_transforms[i].set_origin(all_cached_shape_origin[i]);
+		// Fresh RIDs from a type change come enabled; restore per-bullet disabled state
+		// so individually disabled bullets don't become collidable again.
+		if (!all_bullets_enabled_set.contains(i)) {
+			physics_server->area_set_shape_disabled(area, i, true);
+		}
 		update_bullet_previous_transform_for_interpolation(i);
 	}
 	// Pooled instances live inside a bucket keyed by get_pool_key(). A runtime type change
-	// while disabled would otherwise leave this instance in the stale bucket. Re-bucket it.
-	if (!is_active && bullets_pool != nullptr) {
+	// while disabled would otherwise leave this instance in the stale bucket. Re-bucket it,
+	// unless the user opted out of auto pooling (then it must never enter the pool).
+	if (!is_active && is_multimesh_auto_pooling_enabled && bullets_pool != nullptr) {
 		const PoolKey new_key = get_pool_key();
 		if (!(new_key == old_key)) {
 			bullets_pool->try_remove_instance(this, old_key);
@@ -1218,6 +1320,7 @@ void MultiMeshBullets2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("bullet_free_attachment", "bullet_index"), &MultiMeshBullets2D::bullet_free_attachment);
 	ClassDB::bind_method(D_METHOD("bullet_disable_attachment", "bullet_index"), &MultiMeshBullets2D::bullet_disable_attachment);
 	ClassDB::bind_method(D_METHOD("bullet_enable_attachment", "bullet_index"), &MultiMeshBullets2D::bullet_enable_attachment);
+	ClassDB::bind_method(D_METHOD("_do_deferred_bullet_disable_attachment", "bullet_index", "expected_generation"), &MultiMeshBullets2D::_do_deferred_bullet_disable_attachment);
 
 	ClassDB::bind_method(D_METHOD("get_amount_bullets"), &MultiMeshBullets2D::get_amount_bullets);
 

@@ -52,7 +52,7 @@ public:
 
 	// Marks a specific index as inactive by removing it from the dense vector
 	_ALWAYS_INLINE_ void disable_data(int index) {
-		if (index >= max_size) {
+		if (index < 0 || index >= max_size) {
 			return;
 		}
 

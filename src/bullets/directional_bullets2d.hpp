@@ -210,7 +210,7 @@ public:
 			// 1. STANDARD HOMING PHASE
 			if (shared_homing_deque_enabled) { // Handle homing towards shared deque (takes precedence over per-bullet homing)
 				update_homing(shared_homing_deque, i, delta, homing_bullet_pos, homing_target_pos);
-				try_to_emit_bullet_homing_target_reached_signal(shared_homing_deque, shared_homing_deque_enabled, i, homing_bullet_pos, homing_target_pos);
+				try_to_emit_bullet_homing_target_reached_signal(shared_homing_deque, shared_homing_deque_enabled, i, homing_bullet_pos, homing_target_pos, delta);
 				direction_got_updated = true;
 				target_deque_used_for_orbiting = &shared_homing_deque;
 			} else if (is_per_bullet_homing_enabled) { // Handle per-bullet homing
@@ -234,7 +234,7 @@ public:
 						}
 
 						update_homing(curr_homing_deque, i, delta, homing_bullet_pos, homing_target_pos);
-						try_to_emit_bullet_homing_target_reached_signal(curr_homing_deque, shared_homing_deque_enabled, i, homing_bullet_pos, homing_target_pos);
+						try_to_emit_bullet_homing_target_reached_signal(curr_homing_deque, shared_homing_deque_enabled, i, homing_bullet_pos, homing_target_pos, delta);
 						direction_got_updated = true;
 						target_deque_used_for_orbiting = &curr_homing_deque;
 					}
@@ -330,10 +330,13 @@ public:
 						const real_t prev_dist = pattern.distance_traveled;
 						const real_t advance_dist = velocity_delta.length();
 						pattern.distance_traveled += advance_dist;
+						// Non-repeating patterns stop exactly at the end: clamp into the
+						// final tile instead of wrapping once past it and snapping back.
+						const real_t clamped_dist = (!pattern.repeat_pattern && pattern.distance_traveled >= len) ? len : pattern.distance_traveled;
 						const real_t s1 = Math::fmod(prev_dist, len);
-						const real_t s2 = Math::fmod(pattern.distance_traveled, len);
+						const real_t s2 = Math::fmod(clamped_dist, len);
 						const int64_t l1 = (int64_t)(prev_dist / len);
-						const int64_t l2 = (int64_t)(pattern.distance_traveled / len);
+						const int64_t l2 = (int64_t)(clamped_dist / len);
 						const Vector2 start = curve->sample_baked(0.0);
 						const Vector2 end = curve->sample_baked(len * 0.9999);
 						const Vector2 disp = end - start;
@@ -366,6 +369,11 @@ public:
 			auto &curr_bullet_origin = all_cached_instance_origin[i];
 
 			// 7. ORBITING LOGIC (RELYING ON HOMING TARGETS)
+			// A deque that ran dry unlocks the orbit: keeping a stale angle would snap
+			// the bullet when the next target arrives.
+			if (target_deque_used_for_orbiting == nullptr || target_deque_used_for_orbiting->empty()) {
+				all_orbiting_data[i].is_locked_orbiting = false;
+			}
 			if (is_orbiting_feature_enabled && all_orbiting_status[i] && target_deque_used_for_orbiting != nullptr && !target_deque_used_for_orbiting->empty()) {
 				OrbitingData *const orbiting_data = &all_orbiting_data[i];
 				if (orbiting_data != nullptr) {
@@ -416,8 +424,9 @@ public:
 					}
 
 					// TEXTURE ROTATION WHEN ORBITING
-					// Only rotate if the bullet is PHYSICALLY orbiting (Locked or just snapped)
-					if (is_physically_orbiting_this_frame) {
+					// Only rotate if the bullet is PHYSICALLY orbiting (Locked or just snapped).
+					// DontMove means frozen: leave the texture alone.
+					if (is_physically_orbiting_this_frame && orbiting_data->direction != DontMove) {
 						Vector2 look_dir;
 						Vector2 radial_vec = (curr_bullet_origin - homing_target_pos).normalized();
 
@@ -734,6 +743,11 @@ public:
 			return false;
 		}
 
+		if (new_homing_target == nullptr) {
+			UtilityFunctions::push_error("bullet_homing_push_front_node2d_target: target is null, nothing pushed.");
+			return false;
+		}
+
 		auto &queue = all_bullet_homing_targets[bullet_index];
 
 		queue.push_front_node2d_target(new_homing_target);
@@ -778,6 +792,11 @@ public:
 
 	_ALWAYS_INLINE_ bool bullet_homing_push_back_node2d_target(int bullet_index, Node2D *new_homing_target) {
 		if (!validate_bullet_index(bullet_index, "bullet_homing_push_back_node2d_target")) {
+			return false;
+		}
+
+		if (new_homing_target == nullptr) {
+			UtilityFunctions::push_error("bullet_homing_push_back_node2d_target: target is null, nothing pushed.");
 			return false;
 		}
 
@@ -1188,15 +1207,33 @@ public:
 
 	// Property getters and setters
 	real_t get_homing_smoothing() const { return homing_smoothing; }
-	void set_homing_smoothing(real_t value) { homing_smoothing = value; }
+	void set_homing_smoothing(real_t value) {
+		if (!Math::is_finite(value) || value < 0.0) {
+			UtilityFunctions::push_error("homing_smoothing must be a finite value >= 0 (0 snaps instantly).");
+			return;
+		}
+		homing_smoothing = value;
+	}
 	real_t get_homing_update_interval() const { return homing_update_interval; }
-	void set_homing_update_interval(real_t value) { homing_update_interval = value; }
+	void set_homing_update_interval(real_t value) {
+		if (!Math::is_finite(value) || value < 0.0) {
+			UtilityFunctions::push_error("homing_update_interval must be a finite value >= 0 (0 refreshes every tick).");
+			return;
+		}
+		homing_update_interval = value;
+	}
 	bool get_homing_take_control_of_texture_rotation() const { return homing_take_control_of_texture_rotation; }
 	void set_homing_take_control_of_texture_rotation(bool value) { homing_take_control_of_texture_rotation = value; }
 	bool get_bullet_homing_auto_pop_after_target_reached() const { return bullet_homing_auto_pop_after_target_reached; }
 	void set_bullet_homing_auto_pop_after_target_reached(bool value) { bullet_homing_auto_pop_after_target_reached = value; }
 	real_t get_homing_distance_before_reached() const { return homing_distance_before_reached; }
-	void set_homing_distance_before_reached(real_t value) { homing_distance_before_reached = value; }
+	void set_homing_distance_before_reached(real_t value) {
+		if (!Math::is_finite(value) || value < 0.0) {
+			UtilityFunctions::push_error("homing_distance_before_reached must be a finite value >= 0.");
+			return;
+		}
+		homing_distance_before_reached = value;
+	}
 	bool get_shared_homing_deque_auto_pop_after_target_reached() const { return shared_homing_deque_auto_pop_after_target_reached; }
 	void set_shared_homing_deque_auto_pop_after_target_reached(bool value) { shared_homing_deque_auto_pop_after_target_reached = value; }
 
@@ -1205,6 +1242,18 @@ public:
 	virtual void custom_additional_spawn_logic(const MultiMeshBulletsData2D &data) override final;
 	virtual void custom_additional_enable_logic(const MultiMeshBulletsData2D &data) override final;
 	virtual void custom_additional_disable_logic() override final;
+
+	// Teardown hook: drop every homing target (per-bullet + shared) through the same
+	// clear helpers the enable path uses, so the global mouse-target counter can't leak
+	// when a multimesh dies holding mouse targets.
+	virtual void clear_homing_state_for_teardown() override {
+		for (auto &queue : all_bullet_homing_targets) {
+			queue.clear_homing_targets(cached_mouse_global_position);
+		}
+		all_homing_count.assign(all_homing_count.size(), 0);
+		active_homing_count = 0;
+		shared_homing_deque.clear_homing_targets(cached_mouse_global_position);
+	}
 
 protected:
 	// Updates homing behavior for a bullet
@@ -1300,12 +1349,17 @@ protected:
 		rotate_transform_locally(all_cached_instance_transforms[bullet_index], rot_delta);
 	}
 
-	_ALWAYS_INLINE_ void try_to_emit_bullet_homing_target_reached_signal(HomingTargetDeque &homing_deque, bool is_using_shared_homing_deque, int bullet_index, const Vector2 &bullet_pos, const Vector2 &target_pos) {
+	_ALWAYS_INLINE_ void try_to_emit_bullet_homing_target_reached_signal(HomingTargetDeque &homing_deque, bool is_using_shared_homing_deque, int bullet_index, const Vector2 &bullet_pos, const Vector2 &target_pos, double delta) {
 		if (homing_deque.empty()) {
 			return;
 		}
-		// Reached check: Post-move, direct to actual target
-		Vector2 post_to_target = target_pos - bullet_pos;
+		// Reached check against the predicted post-move position: at high speed a bullet
+		// can tunnel past the threshold within one tick and never fire on pre-move pos.
+		Vector2 check_pos = bullet_pos;
+		if (delta > 0.0 && bullet_index >= 0 && bullet_index < (int)all_cached_velocity.size()) {
+			check_pos += all_cached_velocity[bullet_index] * (real_t)delta;
+		}
+		Vector2 post_to_target = target_pos - check_pos;
 		real_t post_dist_sq = post_to_target.length_squared();
 		real_t threshold_sq = homing_distance_before_reached * homing_distance_before_reached;
 		if (post_dist_sq <= threshold_sq) { // Fully squared for perf

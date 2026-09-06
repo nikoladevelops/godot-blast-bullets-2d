@@ -10,6 +10,7 @@
 #include "../shared/bullet_attachment_object_pool2d.hpp"
 #include "../shared/collision_shape_helper2d.hpp"
 #include "../shared/multimesh_object_pool2d.hpp"
+#include "godot_cpp/variant/utility_functions.hpp"
 #include "godot_cpp/variant/vector2.hpp"
 #include "shared/dynamic_sparse_set.hpp"
 #include "spawn-data/multimesh_bullets_data2d.hpp"
@@ -146,6 +147,10 @@ public:
 
 	void handle_manual_user_deletion_of_multimesh_bullets(MultiMeshBullets2D &bullet_multi);
 
+	// Re-registers a pooled multimesh that was woken via enable_bullet() outside spawn,
+	// so the factory processes it again. No-op when already active or tearing down.
+	void reactivate_multimesh_instance(MultiMeshBullets2D &bullet_multi);
+
 	void _notification(int p_what);
 
  protected:
@@ -166,6 +171,21 @@ public:
 
 	// Whether bullets are currently paused and should NOT move. Always use this instead of set_processing/ set_physics_processing.
 	bool is_factory_processing_bullets = true;
+
+	// True while _physics_process iterates bullet vectors. Shrinking operations
+	// (free_*, reset) must not run then; they error out and suggest call_deferred.
+	// Spawning only appends, so it stays allowed.
+	bool is_iterating_bullets = false;
+
+	// Errors (once per call) when a shrinking operation runs mid-iteration.
+	// Returns true when the caller must abort.
+	bool reject_when_iterating(const char *caller_name) const {
+		if (is_iterating_bullets) {
+			UtilityFunctions::push_error(String("BulletFactory2D::") + caller_name + " cannot run while bullets are being processed (e.g. inside area_entered/body_entered/life_time_over handlers). Use call_deferred() to run it after the physics step.");
+			return true;
+		}
+		return false;
+	}
 
 	bool get_is_factory_processing_bullets() const;
 	void set_is_factory_processing_bullets(bool is_processing_enabled);
@@ -282,33 +302,26 @@ public:
 			bullets_vec.emplace_back(bullets);
 		}
 	}
-	// Shrinks a vector and keeps capacity.
-	// We don't memdelete here
-	template <typename TBullet, typename Predicate>
-	void shrink_vector(std::vector<TBullet *> &bullets_vec, Predicate func) {
-		auto new_end = std::remove_if(bullets_vec.begin(), bullets_vec.end(), func);
-		bullets_vec.erase(new_end, bullets_vec.end());
-	}
-
 	template <typename TBullet>
 	void free_bullets_pool_helper(std::vector<TBullet *> &bullets_vec, DynamicSparseSet &sparse_set, MultiMeshObjectPool &bullets_pool, const PoolKey *key) {
 		// Ownership: bullets_vec is the source of truth; the pool holds a subset (disabled only).
-		// Order matters: shrink the vec FIRST so no dangling pointers remain, then memdelete
-		// via the pool. force_delete() sets marked_for_internal_deletion so _notification
-		// never re-enters handle_manual_user_deletion while is_factory_busy is set.
+		// Collect first, then unlink each removed instance from the pool and free it exactly
+		// once. This stays correct whether auto pooling is on (pooled), off (never pooled),
+		// or was toggled mid-game (mixed). force_delete() sets marked_for_internal_deletion
+		// so _notification never re-enters handle_manual_user_deletion while is_factory_busy.
 		// The criteria for what we are removing from the vector. Null key = all disabled.
-		auto removal_predicate = [key](const TBullet *multi) {
+		std::vector<TBullet *> removed;
+		auto new_end = std::remove_if(bullets_vec.begin(), bullets_vec.end(), [key, &removed](TBullet *multi) {
 			if (multi == nullptr || multi->is_active) {
 				return false;
 			}
-			if (key == nullptr) {
-				return true;
+			if (key != nullptr && !(multi->get_pool_key() == *key)) {
+				return false;
 			}
-			return multi->get_pool_key() == *key;
-		};
-
-		// We erase from the vector so we don't have any dangling pointers
-		shrink_vector(bullets_vec, removal_predicate);
+			removed.push_back(multi);
+			return true;
+		});
+		bullets_vec.erase(new_end, bullets_vec.end());
 
 		// Clear stale active mapping and re-index survivors. Keep sparse capacity:
 		// DynamicSparseSet auto-grows on populate/activate, shrinking max_size here only
@@ -325,7 +338,13 @@ public:
 			}
 		}
 
-		// Tell the pool to actually memdelete the objects
+		// Tell the pool to actually memdelete the objects. Unlink each removed instance
+		// first (it may or may not be pooled depending on the auto-pooling flag), then
+		// free it exactly once. Leftovers still in the pool get freed right after.
+		for (TBullet *multi : removed) {
+			bullets_pool.try_remove_instance(multi, multi->get_pool_key());
+			multi->force_delete();
+		}
 		if (key != nullptr) {
 			bullets_pool.free_specific_bullets(*key);
 		} else {
@@ -334,8 +353,8 @@ public:
 	}
 
 	// Frees all multimeshes of a TBullet type and clears dangling pointers. Null key clears ALL multimeshes, otherwise only exact PoolKey match.
-	// Specific-key path avoids double-free: active matches are force_deleted here (they are NOT
-	// in the pool), disabled matches are left for free_specific_bullets() below.
+	// Matching instances are unlinked from the pool (when present) and freed exactly once
+	// here, which stays correct whether auto pooling is on, off, or was toggled mid-game.
 	template <typename TBullet>
 	void free_all_bullets_helper(std::vector<TBullet *> &bullets_vec, DynamicSparseSet &sparse_set, MultiMeshObjectPool &bullets_pool, const PoolKey *key = nullptr) {
 		if (key == nullptr) {
@@ -366,12 +385,10 @@ public:
 				}
 
 				if (bullet_multi->get_pool_key() == *key) {
-					// If it's active, it's NOT in the pool, so we must delete it here.
-					if (bullet_multi->is_active) {
-						bullet_multi->force_delete();
-					}
-					// If it's NOT active, it IS in the pool.
-					// We leave it alone so free_specific_bullets can handle it later.
+					// Unlink from the pool first when present (disabled + auto pooling on),
+					// then free exactly once. Active instances are never pooled.
+					bullets_pool.try_remove_instance(bullet_multi, *key);
+					bullet_multi->force_delete();
 				} else {
 					// Since we clear specific bullets we need to keep our vector of multimeshes correct as well as the dynamic sparse set,
 					// which means new sparse set ids ( we are generating a vector that holds only VALID instances, the others are freed so the mappings will be off otherwise)
@@ -389,7 +406,7 @@ public:
 				}
 			}
 
-			// FREES the actual multimesh instances, and the pool remains valid
+			// FREES any pooled leftovers that were never tracked in the vec.
 			bullets_pool.free_specific_bullets(*key);
 
 			// Swap the vectors. Memory for the old vector is freed.
@@ -449,8 +466,8 @@ public:
 
 	// Frees all DISABLED bullets of a TBullet type and clears dangling pointers. Null key = all buckets, else exact PoolKey match.
 	// Null path: vec-side force_delete already memdeleted every disabled instance, so only
-	// pool.clear() (drop pointers). Specific path: matching disabled are left for
-	// free_specific_bullets() to avoid double-free. Pool is always a subset of vec.
+	// pool.clear() (drop pointers). Specific path unlinks each match from the pool first and
+	// frees it exactly once, which stays correct whether auto pooling is on or off.
 	template <typename TBullet>
 	void free_only_disabled_bullets_helper(std::vector<TBullet *> &bullets_vec, DynamicSparseSet &sparse_set, MultiMeshObjectPool &bullets_pool, const PoolKey *key = nullptr) {
 		if (key == nullptr) {
@@ -490,7 +507,9 @@ public:
 				}
 
 				if (bullet_multi->get_pool_key() == *key && !bullet_multi->is_active) {
-					// free_specific_bullets will handle freeing these bullets
+					// Unlink from the pool first when present, then free exactly once.
+					bullets_pool.try_remove_instance(bullet_multi, *key);
+					bullet_multi->force_delete();
 				} else {
 					int new_id = static_cast<int>(surviving_bullets.size());
 					bullet_multi->sparse_set_id = new_id;
@@ -518,6 +537,22 @@ public:
 
 		if (id_to_remove < 0 || id_to_remove > last_idx) {
 			return;
+		}
+
+		// Identity check: a stale id must never delete an innocent element.
+		// Fall back to a linear search so the right instance is still removed.
+		if (vec[id_to_remove] != target) {
+			id_to_remove = -1;
+			for (int i = 0; i <= last_idx; ++i) {
+				if (vec[i] == target) {
+					id_to_remove = i;
+					break;
+				}
+			}
+			if (id_to_remove < 0) {
+				return;
+			}
+			target->sparse_set_id = id_to_remove;
 		}
 
 		T *last_bullet = vec[last_idx];
@@ -556,7 +591,26 @@ public:
 		TBullet *bullets = static_cast<TBullet *>(bullets_pool.pop(key));
 		if (bullets != nullptr) {
 			bullets->enable_multimesh(*spawn_data.ptr(), new_inherited_velocity_offset);
-			sparse_set.activate_data(bullets->sparse_set_id);
+			// Identity-checked: a stale pooled id must never activate a foreign entry.
+			// Pooled instances normally stay in the vec, so this is just a safe lookup.
+			int reuse_id = bullets->sparse_set_id;
+			if (reuse_id < 0 || reuse_id >= (int)bullets_vec.size() || bullets_vec[reuse_id] != bullets) {
+				reuse_id = -1;
+				for (int i = 0; i < (int)bullets_vec.size(); ++i) {
+					if (bullets_vec[i] == bullets) {
+						reuse_id = i;
+						break;
+					}
+				}
+				if (reuse_id < 0) {
+					// Orphaned pooled instance (unreachable via factory paths): adopt it
+					// exactly once so later frees stay correct instead of leaking it.
+					reuse_id = (int)bullets_vec.size();
+					bullets_vec.push_back(bullets);
+				}
+				bullets->sparse_set_id = reuse_id;
+			}
+			sparse_set.activate_data(reuse_id);
 			return bullets;
 		}
 

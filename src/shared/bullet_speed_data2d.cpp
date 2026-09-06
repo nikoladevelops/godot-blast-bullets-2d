@@ -1,6 +1,7 @@
 #include "./bullet_speed_data2d.hpp"
 
 #include <godot_cpp/classes/random_number_generator.hpp>
+#include <godot_cpp/variant/utility_functions.hpp>
 
 using namespace godot;
 namespace BlastBullets2D {
@@ -14,8 +15,17 @@ TypedArray<BulletSpeedData2D> BulletSpeedData2D::generate_random_data(
 		real_t acceleration_MIN,
 		real_t acceleration_MAX) {
 	Ref<RandomNumberGenerator> rand_gen = memnew(RandomNumberGenerator);
+	rand_gen->randomize();
 
 	TypedArray<BulletSpeedData2D> data;
+	if (amount_to_generate <= 0) {
+		UtilityFunctions::push_error("BulletSpeedData2D.generate_random_data: amount_to_generate must be > 0.");
+		return data;
+	}
+	if (!(speed_MIN <= speed_MAX) || !(max_speed_MIN <= max_speed_MAX) || !(acceleration_MIN <= acceleration_MAX)) {
+		UtilityFunctions::push_error("BulletSpeedData2D.generate_random_data: every MIN must be <= its MAX.");
+		return data;
+	}
 	data.resize(amount_to_generate);
 
 	for (int i = 0; i < amount_to_generate; ++i) {

@@ -238,6 +238,13 @@
 				Disables orbiting for the specified bullet.
 			</description>
 		</method>
+		<method name="bullet_is_orbiting_enabled">
+			<return type="bool" />
+			<param index="0" name="bullet_index" type="int" />
+			<description>
+				Whether orbiting is currently enabled for the specified bullet.
+			</description>
+		</method>
 		<method name="bullet_enable_orbiting">
 			<return type="void" />
 			<param index="0" name="bullet_index" type="int" />

@@ -4,6 +4,7 @@
 #include <map>
 #include <queue>
 #include <unordered_map>
+#include <vector>
 
 namespace BlastBullets2D {
 using namespace godot;
@@ -17,6 +18,14 @@ public:
 
 	// Retrieve a bullet attachment
 	BulletAttachment2D *pop(uint32_t pooling_id);
+
+	// Removes one instance without freeing it. Used by the attachment PREDELETE hook
+	// when users free pooled attachments by hand. Returns false when not found.
+	bool remove_instance(BulletAttachment2D *target, uint32_t pooling_id);
+
+	// Drops pool tracking flags without freeing. Called once from factory teardown so
+	// later attachment PREDELETEs never touch this pool object again.
+	void detach_all();
 
 	// Free memory by deleting all bullet attachments that are in the pool
 	void free_all_bullet_attachments();

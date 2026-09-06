@@ -1,7 +1,27 @@
 #include "./bullet_attachment2d.hpp"
+#include "./bullet_attachment_object_pool2d.hpp"
+
+#include <godot_cpp/classes/engine.hpp>
 
 using namespace godot;
 namespace BlastBullets2D {
+
+void BulletAttachment2D::_notification(int p_what) {
+	if (p_what != NOTIFICATION_PREDELETE) {
+		return;
+	}
+	if (Engine::get_singleton()->is_editor_hint()) {
+		return;
+	}
+	// Manually freed while pooled: drop from the pool so a later pop() can never
+	// hand out freed memory. Factory teardown detaches first (see detach_all),
+	// so home_pool is always alive here.
+	if (is_pooled && home_pool != nullptr) {
+		home_pool->remove_instance(this, home_pooling_id);
+	}
+	is_pooled = false;
+	home_pool = nullptr;
+}
 
 void BulletAttachment2D::call_on_bullet_spawn() {
 	GDVIRTUAL_CALL(on_bullet_spawn);

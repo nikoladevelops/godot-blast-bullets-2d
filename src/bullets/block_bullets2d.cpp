@@ -21,6 +21,15 @@ void BlockBullets2D::set_up_movement_data(const BulletSpeedData2D &new_speed_dat
 	}
 
 	Vector2 dir = Vector2(Math::cos(block_rotation_radians), Math::sin(block_rotation_radians));
+	if (!Math::is_finite(block_rotation_radians) || !Math::is_finite(new_speed_data.speed) || !Math::is_finite(new_speed_data.max_speed) || !Math::is_finite(new_speed_data.acceleration)) {
+		UtilityFunctions::push_error("BlockBullets2D movement data contains NaN/Inf, using zeros for this setup.");
+		all_cached_speed[0] = 0.0;
+		all_cached_max_speed[0] = 0.0;
+		all_cached_acceleration[0] = 0.0;
+		all_cached_direction[0] = Vector2(1, 0);
+		all_cached_velocity[0] = inherited_velocity_offset;
+		return;
+	}
 	all_cached_speed[0] = new_speed_data.speed;
 	all_cached_max_speed[0] = new_speed_data.max_speed;
 	all_cached_acceleration[0] = new_speed_data.acceleration;

@@ -75,7 +75,7 @@
 			<return type="void" />
 			<param index="0" name="key" type="MultiMeshPoolKey2D" default="null" />
 			<description>
-				Frees active bullets in the scene tree. Pass [code]null[/code] (default) to free all, or a [MultiMeshPoolKey2D] to free only that exact amount_bullets + shape bucket.
+				Frees active bullets in the scene tree. Pass [code]null[/code] (default) to free all, or a [MultiMeshPoolKey2D] to free only that exact amount_bullets + shape bucket. Refused during the physics step (for example inside collision handlers); call it deferred then.
 			</description>
 		</method>
 		<method name="free_attachments_pool">
@@ -90,14 +90,14 @@
 			<param index="0" name="bullet_type" type="int" enum="BulletFactory2D.BulletType" />
 			<param index="1" name="key" type="MultiMeshPoolKey2D" default="null" />
 			<description>
-				Frees the object pool of a particular bullet type. Pass [code]null[/code] (default) to free the whole pool, or a [MultiMeshPoolKey2D] to free only that exact amount_bullets + shape bucket. Example: [code]MultiMeshPoolKey2D.make(200, PhysicsServer2D.SHAPE_CIRCLE)[/code].
+				Frees the object pool of a particular bullet type. Pass [code]null[/code] (default) to free the whole pool, or a [MultiMeshPoolKey2D] to free only that exact amount_bullets + shape bucket. Example: [code]MultiMeshPoolKey2D.make(200, PhysicsServer2D.SHAPE_CIRCLE)[/code]. Refused during the physics step; call it deferred then.
 			</description>
 		</method>
 		<method name="free_disabled_bullets">
 			<return type="void" />
 			<param index="0" name="key" type="MultiMeshPoolKey2D" default="null" />
 			<description>
-				Frees disabled (pooled) bullets. Pass [code]null[/code] (default) to free all, or a [MultiMeshPoolKey2D] to free only that exact amount_bullets + shape bucket.
+				Frees disabled (pooled) bullets. Pass [code]null[/code] (default) to free all, or a [MultiMeshPoolKey2D] to free only that exact amount_bullets + shape bucket. Refused during the physics step; call it deferred then.
 			</description>
 		</method>
 		<method name="get_is_factory_busy" qualifiers="const">
@@ -148,7 +148,7 @@
 			<return type="void" />
 			<param index="0" name="key" type="MultiMeshPoolKey2D" default="null" />
 			<description>
-				Resets the factory. Pass [code]null[/code] (default) for a full reset (all bullets, pools, and the full attachment pool). Pass a [MultiMeshPoolKey2D] to reset only that exact amount_bullets+shape bucket; unrelated pooled attachments are preserved.
+				Resets the factory. Pass [code]null[/code] (default) for a full reset (all bullets, pools, and the full attachment pool). Pass a [MultiMeshPoolKey2D] to reset only that exact amount_bullets+shape bucket; unrelated pooled attachments are preserved. Refused during the physics step; call it deferred then.
 				Emits the [signal reset_finished] signal when complete.
 			</description>
 		</method>
@@ -171,7 +171,7 @@
 			<param index="0" name="spawn_data" type="BlockBulletsData2D" />
 			<description>
 				Spawns [BlockBullets2D] - bullets that act as a block that travels in a single direction with the same speed.
-				If there is already a multimesh available in the object pool (that matches the amount of transforms provided) then it gets re-used with the new data.
+				If there is already a multimesh available in the object pool (that matches the amount of transforms provided and the collision shape) then it gets re-used with the new data.
 				These bullets can NOT be controlled individually, but they are more efficient performance wise.
 			</description>
 		</method>
@@ -181,7 +181,7 @@
 			<param index="1" name="inherited_velocity_offset" type="Vector2" default="Vector2(0, 0)" />
 			<description>
 				Spawns DirectionalBullets2D that are meant to be controlled and edited.
-				If there is a multimesh available in the object pool then it gets re-used with the new data.
+				If there is a multimesh available in the object pool (that matches the amount of transforms provided and the collision shape) then it gets re-used with the new data.
 				Use if you want homing bullets or to edit properties during runtime.
 
 				Warning: Since object pooling is enabled by default, if you save these bullets to an array you might
@@ -195,7 +195,7 @@
 			<param index="1" name="inherited_velocity_offset" type="Vector2" default="Vector2(0, 0)" />
 			<description>
 				Spawns [DirectionalBullets2D] - bullets that have individual directions determined by the rotation of their transforms.
-				If there is already a multimesh available in the object pool (that matches the amount of transforms provided) then it gets re-used with the new data.
+				If there is already a multimesh available in the object pool (that matches the amount of transforms provided and the collision shape) then it gets re-used with the new data.
 				To control these bullets individually, use the [method spawn_controllable_directional_bullets] function instead.
 			</description>
 		</method>
@@ -203,7 +203,7 @@
 			<return type="void" />
 			<param index="0" name="shift_amount" type="Vector2" />
 			<description>
-				Shifts all bullets in the scene by a certain amount (only bullets spawned by this particular [b]BulletFactory2D[/b]).
+				Shifts all directional bullets in the scene by a certain amount (only bullets spawned by this particular [b]BulletFactory2D[/b]). Block bullets are not affected.
 			</description>
 		</method>
 	</methods>

@@ -242,6 +242,7 @@ void DirectionalBullets2D::_bind_methods() {
 
 	ClassDB::bind_method(D_METHOD("bullet_enable_orbiting", "bullet_index", "orbiting_radius", "orbiting_direction", "orbiting_texture_rotation"), &DirectionalBullets2D::bullet_enable_orbiting);
 	ClassDB::bind_method(D_METHOD("bullet_disable_orbiting", "bullet_index"), &DirectionalBullets2D::bullet_disable_orbiting);
+	ClassDB::bind_method(D_METHOD("bullet_is_orbiting_enabled", "bullet_index"), &DirectionalBullets2D::bullet_is_orbiting_enabled);
 
 	ClassDB::bind_method(D_METHOD("bullet_get_orbiting_radius", "bullet_index"), &DirectionalBullets2D::bullet_get_orbiting_radius);
 	ClassDB::bind_method(D_METHOD("bullet_set_orbiting_radius", "bullet_index", "new_radius"), &DirectionalBullets2D::bullet_set_orbiting_radius);

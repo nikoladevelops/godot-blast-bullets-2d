@@ -2,6 +2,7 @@
 
 #include <godot_cpp/classes/random_number_generator.hpp>
 #include <godot_cpp/variant/dictionary.hpp>
+#include <godot_cpp/variant/utility_functions.hpp>
 
 using namespace godot;
 
@@ -16,8 +17,17 @@ TypedArray<BulletRotationData2D> BulletRotationData2D::generate_random_data(
 		real_t rotation_acceleration_MIN,
 		real_t rotation_acceleration_MAX) {
 	Ref<RandomNumberGenerator> rand_gen = memnew(RandomNumberGenerator);
+	rand_gen->randomize();
 
 	TypedArray<BulletRotationData2D> data;
+	if (amount_to_generate <= 0) {
+		UtilityFunctions::push_error("BulletRotationData2D.generate_random_data: amount_to_generate must be > 0.");
+		return data;
+	}
+	if (!(rotation_speed_MIN <= rotation_speed_MAX) || !(max_rotation_speed_MIN <= max_rotation_speed_MAX) || !(rotation_acceleration_MIN <= rotation_acceleration_MAX)) {
+		UtilityFunctions::push_error("BulletRotationData2D.generate_random_data: every MIN must be <= its MAX.");
+		return data;
+	}
 	data.resize(amount_to_generate);
 
 	for (int i = 0; i < amount_to_generate; ++i) {

@@ -68,6 +68,10 @@ public:
 	// The id of the multimesh inside the bullet factory's sparse set
 	int sparse_set_id = -1;
 
+	// Counts spawn/enable cycles. Deferred attachment disables carry the value they were
+	// queued with so pool reuse in between can't misfire them onto a new owner.
+	int multimesh_generation = 0;
+
 	bool marked_for_internal_deletion = false;
 
 	// Gets the total amount of bullets that the multimesh always holds
@@ -81,6 +85,10 @@ public:
 
 	// Activates the multimesh
 	void enable_multimesh(const MultiMeshBulletsData2D &data, const Vector2 &new_inherited_velocity_offset);
+
+	// Clears homing state (target deques + counters) on teardown so global mouse-target
+	// accounting can't leak. Base version is a no-op (only directional bullets home).
+	virtual void clear_homing_state_for_teardown() {}
 
 	// Internal delete, C++ side only. Never call this from GDScript or from inside a
 	// physics callback; factory free/reset methods already call it for you at a safe time.
@@ -258,7 +266,7 @@ float *w = batch_buffer.ptrw();
 			// Disable attachments after signal (deferred keeps order)
 			for (int i = 0; i < bullet_indexes.size(); ++i) {
 				int idx = bullet_indexes[i];
-				call_deferred("bullet_disable_attachment", idx);
+				call_deferred("_do_deferred_bullet_disable_attachment", idx, multimesh_generation);
 			}
 		}
 	}
@@ -1025,13 +1033,28 @@ float *w = batch_buffer.ptrw();
 			return;
 		}
 
+		if (is_class("BlockBullets2D")) {
+			UtilityFunctions::push_warning("Individual bullet curves on BlockBullets2D apply once at assignment and do not animate per tick (the block shares one entry). Use shared_bullet_curves_data for animated curves.");
+		}
+
 		populate_individual_bullet_curves_related_data(bullet_index, curves_data);
 	}
 
 	_ALWAYS_INLINE_ void all_bullets_set_curves_data(const Ref<BulletCurvesData2D> &curves_data, int bullet_index_start = 0, int bullet_index_end_inclusive = -1) {
 		ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_set_curves_data");
 
+		// Single warning for the whole range; the per-index setter would otherwise spam once per bullet.
+		// warn_block_once implies non-null curves_data, so populate directly below.
+		const bool warn_block_once = !curves_data.is_null() && is_class("BlockBullets2D");
+		if (warn_block_once) {
+			UtilityFunctions::push_warning("Individual bullet curves on BlockBullets2D apply once at assignment and do not animate per tick (the block shares one entry). Use shared_bullet_curves_data for animated curves.");
+		}
+
 		for (int i = bullet_index_start; i <= bullet_index_end_inclusive; ++i) {
+			if (warn_block_once) {
+				populate_individual_bullet_curves_related_data(i, curves_data);
+				continue;
+			}
 			bullet_set_curves_data(i, curves_data);
 		}
 	}
@@ -1177,6 +1200,11 @@ float *w = batch_buffer.ptrw();
 			return;
 		}
 
+		if (bullet_factory == nullptr) {
+			UtilityFunctions::push_error("bullet_set_attachment: multimesh was never spawned through BulletFactory2D.");
+			return;
+		}
+
 		// Try to get a bullet attachment from the object pool to avoid creating nodes that are practically the same
 		auto &pool = bullet_factory->bullet_attachments_pool;
 
@@ -1276,6 +1304,17 @@ float *w = batch_buffer.ptrw();
 		attachment_ptr = nullptr;
 	}
 
+	// Deferred attachment disable carrying the spawn generation. Lifetime expiry queues
+	// disables that flush after the tick; if the multimesh was pooled and reused in between
+	// (e.g. a collision handler spawned the same bucket), a stale call must not steal
+	// the new owner's attachments.
+	void _do_deferred_bullet_disable_attachment(int bullet_index, int expected_generation) {
+		if (expected_generation != multimesh_generation) {
+			return;
+		}
+		bullet_disable_attachment(bullet_index);
+	}
+
 	_ALWAYS_INLINE_ void bullet_enable_attachment(int bullet_index) {
 		if (!validate_bullet_index(bullet_index, "bullet_enable_attachment")) {
 			return;
@@ -1293,6 +1332,9 @@ float *w = batch_buffer.ptrw();
 		active_bullets_counter = 0;
 		is_active = false;
 		curves_elapsed_time = 0.0;
+		// Drop pending collision records: they belong to the expiring lifetime and must
+		// never be processed after a pool reuse as phantom hits on the new owner.
+		all_collided_bullets.clear();
 		anim_frame_index = 0;
 		anim_paused = false;
 		anim_finished = false;
@@ -1340,9 +1382,13 @@ float *w = batch_buffer.ptrw();
 
 		auto &current_bullet_collision_amount = bullets_current_collision_count[bullet_index];
 
-		// Ensure that the collision amount is clamped between 0 and bullet_max_collision_count
-		if (collision_amount <= 0 || collision_amount >= bullet_max_collision_count) {
-			current_bullet_collision_amount = bullet_max_collision_count;
+		// collision_amount is how many hits the bullet has already taken: 0 means fresh
+		// (full hits remaining). Clamp into range so re-enabling can't grant extra hits
+		// or kill the bullet one hit early.
+		if (collision_amount < 0) {
+			current_bullet_collision_amount = 0;
+		} else if (bullet_max_collision_count > 0 && collision_amount >= bullet_max_collision_count) {
+			current_bullet_collision_amount = bullet_max_collision_count - 1;
 		} else {
 			current_bullet_collision_amount = collision_amount;
 		}
@@ -1354,6 +1400,22 @@ float *w = batch_buffer.ptrw();
 		all_bullets_enabled_set.activate_data(bullet_index);
 
 		if (!is_active) {
+			// Waking a fully pooled multimesh outside the factory pop path: drop it from
+			// the pool first, otherwise the next pop() would hand out this live instance
+			// to a second owner while the first still drives it. The factory also resumes
+			// processing it so woken bullets actually move.
+			if (bullets_pool != nullptr) {
+				bullets_pool->try_remove_instance(this, get_pool_key());
+			}
+			if (bullet_factory != nullptr) {
+				bullet_factory->reactivate_multimesh_instance(*this);
+			}
+			// An expiry-pooled wake would otherwise die again on the next tick with an
+			// exhausted timer. Only top it up when expired; manual-disable wakes keep
+			// their remaining lifetime untouched.
+			if (!is_life_time_infinite && current_life_time <= 0.0) {
+				current_life_time = max_life_time;
+			}
 			is_active = true;
 			set_visible(true);
 		}

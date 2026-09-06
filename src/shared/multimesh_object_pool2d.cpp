@@ -10,7 +10,18 @@ using namespace godot;
 namespace BlastBullets2D {
 
 void MultiMeshObjectPool::push(MultiMeshBullets2D *multimesh, const PoolKey &key) {
-	pool[key].push_back(multimesh);
+	if (multimesh == nullptr) {
+		UtilityFunctions::push_error("MultiMeshObjectPool::push got a null multimesh, ignoring.");
+		return;
+	}
+	std::vector<MultiMeshBullets2D *> &bucket = pool[key];
+	for (MultiMeshBullets2D *existing : bucket) {
+		if (existing == multimesh) {
+			UtilityFunctions::push_error("MultiMeshObjectPool::push got a duplicate multimesh, ignoring to avoid double-free.");
+			return;
+		}
+	}
+	bucket.push_back(multimesh);
 }
 
 MultiMeshBullets2D *MultiMeshObjectPool::pop(const PoolKey &key) {

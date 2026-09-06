@@ -41,11 +41,29 @@ _ALWAYS_INLINE_ static const PoolKey *resolve_pool_key(const Ref<MultiMeshPoolKe
 	return &storage;
 }
 
+// Validates spawn data before any pool pop or memnew happens, so a bad resource can
+// never leave a half-set-up multimesh behind. Returns false with an error when invalid.
+static bool validate_spawn_data(const Ref<MultiMeshBulletsData2D> &spawn_data, const char *caller_name) {
+	if (spawn_data.is_null() || spawn_data->transforms.size() == 0) {
+		UtilityFunctions::push_error(String("Error when trying to spawn bullets in ") + caller_name + ". No spawn_data or no transforms were provided. Ignoring the request");
+		return false;
+	}
+	const int bullet_count = spawn_data->transforms.size();
+	if (spawn_data->bullets_current_collision_count.size() != 0 && spawn_data->bullets_current_collision_count.size() != bullet_count) {
+		UtilityFunctions::push_error(String("Error in ") + caller_name + ": bullets_current_collision_count must be empty or match transforms size.");
+		return false;
+	}
+	return true;
+}
+
 void BulletFactory2D::_notification(int p_what) {
 	if (p_what == NOTIFICATION_PREDELETE) {
 		// Parent is notified before children are destroyed. From here on no child
 		// pointer (debuggers, containers) may be touched by teardown paths.
 		is_tearing_down = true;
+		// Pooled attachments outlive this call as engine children; drop their pool
+		// tracking now so their later PREDELETEs never touch this pool object again.
+		bullet_attachments_pool.detach_all();
 	}
 }
 
@@ -57,7 +75,12 @@ void BulletFactory2D::_ready() {
 
 	// Use default physics space if physics_space is invalid
 	if (physics_space.is_valid() == false) {
-		physics_space = get_world_2d()->get_space();
+		Ref<World2D> world = get_world_2d();
+		if (world.is_null()) {
+			UtilityFunctions::push_error("BulletFactory2D needs to be inside a World2D (a Node2D scene tree) to work.");
+			return;
+		}
+		physics_space = world->get_space();
 	}
 
 	all_directional_bullets.reserve(2048);
@@ -108,15 +131,19 @@ void BulletFactory2D::set_use_physics_interpolation_runtime(bool new_use_physics
 	if (use_physics_interpolation) {
 		int amount_multimesh_instances = static_cast<int>(all_directional_bullets.size());
 		for (int i = 0; i < amount_multimesh_instances; ++i) {
-			DirectionalBullets2D *&bullets_multi = all_directional_bullets[i];
-			bullets_multi->update_all_previous_transforms_for_interpolation();
+			DirectionalBullets2D *bullets_multi = all_directional_bullets[i];
+			if (bullets_multi != nullptr) {
+				bullets_multi->update_all_previous_transforms_for_interpolation();
+			}
 		}
 
 		amount_multimesh_instances = static_cast<int>(all_block_bullets.size());
 
 		for (int i = 0; i < amount_multimesh_instances; ++i) {
-			BlockBullets2D *&bullets_multi = all_block_bullets[i];
-			bullets_multi->update_all_previous_transforms_for_interpolation();
+			BlockBullets2D *bullets_multi = all_block_bullets[i];
+			if (bullets_multi != nullptr) {
+				bullets_multi->update_all_previous_transforms_for_interpolation();
+			}
 		}
 	}
 
@@ -184,12 +211,22 @@ void BulletFactory2D::set_is_factory_processing_bullets(bool is_processing_enabl
 }
 
 void BulletFactory2D::_physics_process(double delta) {
+	is_iterating_bullets = true;
 	handle_bullet_behavior<DirectionalBullets2D>(all_directional_bullets, directional_bullets_set, delta);
 	handle_bullet_behavior<BlockBullets2D>(all_block_bullets, block_bullets_set, delta);
 
 	for (auto &bullet : all_directional_bullets) {
-		bullet->run_multimesh_custom_timers(delta);
+		if (bullet != nullptr) {
+			bullet->run_multimesh_custom_timers(delta);
+		}
 	}
+
+	for (auto &bullet : all_block_bullets) {
+		if (bullet != nullptr) {
+			bullet->run_multimesh_custom_timers(delta);
+		}
+	}
+	is_iterating_bullets = false;
 }
 
 void BulletFactory2D::_process(double delta) {
@@ -207,8 +244,17 @@ void BulletFactory2D::spawn_block_bullets(const Ref<BlockBulletsData2D> &spawn_d
 		return;
 	}
 
+	if (!is_ready) {
+		UtilityFunctions::push_error("spawn_block_bullets: BulletFactory2D is not in the scene tree yet. Add it first, then spawn.");
+		return;
+	}
+
 	if (spawn_data.is_null() || spawn_data->transforms.size() == 0) {
 		UtilityFunctions::push_error("Error when trying to spawn BlockBullets2D. No spawn_data or no transforms were provided. Ignoring the request");
+		return;
+	}
+
+	if (!validate_spawn_data(spawn_data, "spawn_block_bullets")) {
 		return;
 	}
 
@@ -226,8 +272,17 @@ void BulletFactory2D::spawn_directional_bullets(const Ref<DirectionalBulletsData
 		return;
 	}
 
+	if (!is_ready) {
+		UtilityFunctions::push_error("spawn_directional_bullets: BulletFactory2D is not in the scene tree yet. Add it first, then spawn.");
+		return;
+	}
+
 	if (spawn_data.is_null() || spawn_data->transforms.size() == 0) {
 		UtilityFunctions::push_error("Error when trying to spawn DirectionalBullets2D. No spawn_data or no transforms were provided. Ignoring the request");
+		return;
+	}
+
+	if (!validate_spawn_data(spawn_data, "spawn_directional_bullets")) {
 		return;
 	}
 
@@ -246,8 +301,17 @@ DirectionalBullets2D *BulletFactory2D::spawn_controllable_directional_bullets(co
 		return nullptr;
 	}
 
+	if (!is_ready) {
+		UtilityFunctions::push_error("spawn_controllable_directional_bullets: BulletFactory2D is not in the scene tree yet. Add it first, then spawn.");
+		return nullptr;
+	}
+
 	if (spawn_data.is_null() || spawn_data->transforms.size() == 0) {
 		UtilityFunctions::push_error("Error when trying to spawn DirectionalBullets2D. No spawn_data or no transforms were provided. Ignoring the request");
+		return nullptr;
+	}
+
+	if (!validate_spawn_data(spawn_data, "spawn_controllable_directional_bullets")) {
 		return nullptr;
 	}
 
@@ -297,6 +361,10 @@ void BulletFactory2D::reset(const Ref<MultiMeshPoolKey2D> &key) {
 		return;
 	}
 
+	if (reject_when_iterating("reset")) {
+		return;
+	}
+
 	is_factory_busy = true;
 
 	bool enable_processing_after_finish = is_factory_processing_bullets;
@@ -318,6 +386,10 @@ void BulletFactory2D::reset(const Ref<MultiMeshPoolKey2D> &key) {
 void BulletFactory2D::free_active_bullets(const Ref<MultiMeshPoolKey2D> &key) {
 	if (is_factory_busy) {
 		UtilityFunctions::push_error("Error when trying to free active bullets. BulletFactory2D is currently busy. Ignoring the request");
+		return;
+	}
+
+	if (reject_when_iterating("free_active_bullets")) {
 		return;
 	}
 
@@ -359,6 +431,10 @@ void BulletFactory2D::free_active_bullets(const Ref<MultiMeshPoolKey2D> &key) {
 void BulletFactory2D::free_disabled_bullets(const Ref<MultiMeshPoolKey2D> &key) {
 	if (is_factory_busy) {
 		UtilityFunctions::push_error("BulletFactory2D is busy. Ignoring free_disabled_bullets request.");
+		return;
+	}
+
+	if (reject_when_iterating("free_disabled_bullets")) {
 		return;
 	}
 
@@ -441,9 +517,32 @@ void BulletFactory2D::handle_manual_user_deletion_of_multimesh_bullets(MultiMesh
 	}
 }
 
+void BulletFactory2D::reactivate_multimesh_instance(MultiMeshBullets2D &bullet_multi) {
+	if (is_tearing_down || is_factory_busy) {
+		return;
+	}
+	// Identity-check the id first: activating a stale id would drive the wrong multimesh.
+	if (DirectionalBullets2D *dir_ptr = dynamic_cast<DirectionalBullets2D *>(&bullet_multi)) {
+		const int id = dir_ptr->sparse_set_id;
+		if (id >= 0 && id < (int)all_directional_bullets.size() && all_directional_bullets[id] == dir_ptr) {
+			directional_bullets_set.activate_data(id);
+		}
+	} else if (BlockBullets2D *block_ptr = dynamic_cast<BlockBullets2D *>(&bullet_multi)) {
+		const int id = block_ptr->sparse_set_id;
+		if (id >= 0 && id < (int)all_block_bullets.size() && all_block_bullets[id] == block_ptr) {
+			block_bullets_set.activate_data(id);
+		}
+	}
+}
+
 void BulletFactory2D::populate_bullets_pool(const Ref<MultiMeshPoolKey2D> &key, const Ref<MultiMeshBulletsData2D> &multimesh_data, int instance_count) {
 	if (is_factory_busy) {
 		UtilityFunctions::push_error("BulletFactory2D is busy. Ignoring populate_bullets_pool request.");
+		return;
+	}
+
+	if (!is_ready) {
+		UtilityFunctions::push_error("populate_bullets_pool: BulletFactory2D is not in the scene tree yet. Add it first, then populate.");
 		return;
 	}
 
@@ -483,6 +582,17 @@ void BulletFactory2D::populate_bullets_pool(const Ref<MultiMeshPoolKey2D> &key, 
 
 	if (multimesh_data.is_null() || multimesh_data->transforms.size() == 0) {
 		UtilityFunctions::push_error("Error when trying to pool bullets. No transforms were provided in the spawn data. Ignoring the request");
+		if (debugger_was_enabled) {
+			call_deferred("set_is_debugger_enabled", true);
+		}
+		is_factory_busy = false;
+		if (enable_processing_after_finish) {
+			set_is_factory_processing_bullets(true);
+		}
+		return;
+	}
+
+	if (!validate_spawn_data(multimesh_data, "populate_bullets_pool")) {
 		if (debugger_was_enabled) {
 			call_deferred("set_is_debugger_enabled", true);
 		}
@@ -568,6 +678,10 @@ void BulletFactory2D::free_bullets_pool(BulletType bullet_type, const Ref<MultiM
 		return;
 	}
 
+	if (reject_when_iterating("free_bullets_pool")) {
+		return;
+	}
+
 	is_factory_busy = true;
 
 	bool enable_processing_after_finish = is_factory_processing_bullets;
@@ -622,6 +736,16 @@ void BulletFactory2D::populate_attachments_pool(const Ref<PackedScene> attachmen
 		return;
 	}
 
+	if (attachment_id < 0) {
+		UtilityFunctions::push_error("populate_attachments_pool: attachment_id must be >= 0. Negative ids collide with the free-all convention.");
+		return;
+	}
+
+	if (bullet_attachments_container == nullptr) {
+		UtilityFunctions::push_error("populate_attachments_pool: factory is not ready yet (no attachments container).");
+		return;
+	}
+
 	if (is_factory_busy) {
 		UtilityFunctions::push_error("BulletFactory2D is busy. Ignoring populate_attachments_pool request.");
 		return;
@@ -670,7 +794,15 @@ void BulletFactory2D::populate_attachments_pool(const Ref<PackedScene> attachmen
 	setup_attachment(first_attachment);
 
 	for (int i = 1; i < amount_instances; ++i) {
-		BulletAttachment2D *a = static_cast<BulletAttachment2D *>(attachment_scene->instantiate());
+		Node *later_inst = attachment_scene->instantiate();
+		BulletAttachment2D *a = dynamic_cast<BulletAttachment2D *>(later_inst);
+		if (a == nullptr) {
+			UtilityFunctions::push_error("PackedScene stopped producing BulletAttachment2D during populate_attachments_pool. Keeping what was created so far.");
+			if (later_inst) {
+				later_inst->queue_free();
+			}
+			break;
+		}
 		setup_attachment(a);
 	}
 
@@ -803,10 +935,10 @@ int BulletFactory2D::debug_get_total_bullets_amount(BulletType bullet_type) {
 int BulletFactory2D::debug_get_active_bullets_amount(BulletType bullet_type) {
 	switch (bullet_type) {
 		case BlastBullets2D::BulletFactory2D::DIRECTIONAL_BULLETS:
-			return std::count_if(all_directional_bullets.begin(), all_directional_bullets.end(), [](DirectionalBullets2D *b) { return b->is_active; });
+			return std::count_if(all_directional_bullets.begin(), all_directional_bullets.end(), [](DirectionalBullets2D *b) { return b != nullptr && b->is_active; });
 			break;
 		case BlastBullets2D::BulletFactory2D::BLOCK_BULLETS:
-			return std::count_if(all_block_bullets.begin(), all_block_bullets.end(), [](BlockBullets2D *b) { return b->is_active; });
+			return std::count_if(all_block_bullets.begin(), all_block_bullets.end(), [](BlockBullets2D *b) { return b != nullptr && b->is_active; });
 			break;
 		default:
 			UtilityFunctions::push_error("Error when trying to get active bullets amount. BulletType you gave is not supported");
@@ -854,6 +986,9 @@ Dictionary BulletFactory2D::debug_get_bullets_pool_info(BulletType bullet_type) 
 }
 
 int BulletFactory2D::debug_get_total_attachments_amount() {
+	if (bullet_attachments_container == nullptr) {
+		return 0;
+	}
 	return bullet_attachments_container->get_child_count();
 }
 
@@ -864,7 +999,7 @@ int BulletFactory2D::debug_get_active_attachments_amount() {
 	for (int i = 0; i < directional_amount; ++i) {
 		DirectionalBullets2D *bullets = all_directional_bullets[i];
 
-		if (bullets->is_active) {
+		if (bullets != nullptr && bullets->is_active) {
 			count_active_attachments += bullets->get_amount_active_attachments();
 		}
 	}
@@ -873,7 +1008,7 @@ int BulletFactory2D::debug_get_active_attachments_amount() {
 	for (int i = 0; i < block_amount; ++i) {
 		BlockBullets2D *bullets = all_block_bullets[i];
 
-		if (bullets->is_active) {
+		if (bullets != nullptr && bullets->is_active) {
 			count_active_attachments += bullets->get_amount_active_attachments();
 		}
 	}
@@ -905,6 +1040,18 @@ TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_grid(
 		real_t row_offset,
 		bool rotate_grid_with_marker,
 		bool random_local_rotation) {
+	if (transforms_amount < 0) {
+		UtilityFunctions::push_error("helper_generate_transforms_grid: transforms_amount must be >= 0.");
+		return TypedArray<Transform2D>();
+	}
+	if (!Math::is_finite(column_offset) || !Math::is_finite(row_offset)) {
+		UtilityFunctions::push_error("helper_generate_transforms_grid: offsets must be finite numbers.");
+		return TypedArray<Transform2D>();
+	}
+	if (rows_per_column <= 0) {
+		UtilityFunctions::push_error("helper_generate_transforms_grid: rows_per_column must be > 0.");
+		return TypedArray<Transform2D>();
+	}
 	// Initialize the array to hold the transforms
 	TypedArray<Transform2D> generated_transforms;
 	generated_transforms.resize(transforms_amount);
@@ -972,6 +1119,9 @@ TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_grid(
 			x_start = -total_width;
 			y_start = -total_height;
 			break;
+		default:
+			UtilityFunctions::push_error("helper_generate_transforms_grid: unknown alignment, falling back to centered grid.");
+			break;
 	}
 
 	// Counter for spawned transforms
@@ -1021,7 +1171,9 @@ void BulletFactory2D::teleport_shift_all_bullets(const Vector2 &shift_amount) {
 
 	for (int i = 0; i < directional_amount; ++i) {
 		DirectionalBullets2D *bullets = all_directional_bullets[i];
-		bullets->teleport_shift_all_bullets(shift_amount);
+		if (bullets != nullptr) {
+			bullets->teleport_shift_all_bullets(shift_amount);
+		}
 	}
 
 	// TODO Not supported for BlockBullets2D

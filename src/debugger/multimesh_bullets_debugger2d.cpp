@@ -60,6 +60,13 @@ Color MultiMeshBulletsDebugger2D::get_debugger_color() const {
 }
 
 void MultiMeshBulletsDebugger2D::enable() {
+	if (is_debugger_enabled) {
+		return;
+	}
+	if (container_to_debug == nullptr) {
+		UtilityFunctions::push_error("MultiMeshBulletsDebugger2D::enable with no container, call configure() first.");
+		return;
+	}
 	// In case the container to debug already has things to debug
 	TypedArray<Node> already_spawned_debugger_data_providers = container_to_debug->get_children();
 	int amount_already_spawned = already_spawned_debugger_data_providers.size();
@@ -347,11 +354,17 @@ void MultiMeshBulletsDebugger2D::_physics_process(double delta) {
 	for (int i = 0; i < (int)debug_data_providers.size(); ++i) {
 		IDebuggerDataProvider2D *provider = debug_data_providers[i];
 
-		if (!provider || provider->get_skip_debugging()) {
+		if (debugger_multimeshes[i] == nullptr) {
 			continue;
 		}
-
 		MultiMeshInstance2D &mesh_instance = *debugger_multimeshes[i];
+
+		if (!provider || provider->get_skip_debugging()) {
+			// Inactive providers keep no live shapes; hide instead of showing stale ghosts.
+			mesh_instance.set_visible(false);
+			continue;
+		}
+		mesh_instance.set_visible(true);
 
 		ensure_quadmesh_matches_data_provider_collision_shape_size(i, mesh_instance, *provider);
 		update_debug_multimesh_transforms_to_match_data_provider_collision_shape_transforms(mesh_instance, *provider);

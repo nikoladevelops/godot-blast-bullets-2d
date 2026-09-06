@@ -8,10 +8,20 @@
 namespace BlastBullets2D {
 using namespace godot;
 
+class BulletAttachmentObjectPool2D;
+
 class BulletAttachment2D : public Node2D {
 	GDCLASS(BulletAttachment2D, Node2D)
 
 public:
+	// Pool tracking so a manually freed pooled attachment removes itself instead of
+	// dangling. Managed by BulletAttachmentObjectPool2D::push/pop/free and the factory
+	// teardown path; never set these by hand.
+	BulletAttachmentObjectPool2D *home_pool = nullptr;
+	uint32_t home_pooling_id = 0;
+	bool is_pooled = false;
+
+	void _notification(int p_what);
 	// Custom spawn behavior - should be used to set up the BulletAttachment2D in proper state. Executed before _ready when a bullet is in the process of being set up. If you have behavior/data that doesn't require for the node to be in the scene tree, then use this function, otherwise just use _ready. This is the place where you have to set a custom attachment_id so the bullet attaachment can use the object pool correctly. Note that the attachment is not yet inside the scene tree when this method gets called
 	GDVIRTUAL0(on_bullet_spawn)
 
