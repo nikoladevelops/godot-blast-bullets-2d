@@ -238,13 +238,6 @@
 				Disables orbiting for the specified bullet.
 			</description>
 		</method>
-		<method name="bullet_is_orbiting_enabled">
-			<return type="bool" />
-			<param index="0" name="bullet_index" type="int" />
-			<description>
-				Whether orbiting is currently enabled for the specified bullet.
-			</description>
-		</method>
 		<method name="bullet_enable_orbiting">
 			<return type="void" />
 			<param index="0" name="bullet_index" type="int" />
@@ -379,6 +372,13 @@
 				Pushes a Node2D target to the front of the specified bullet's per-bullet deque. Returns true on success (bullet enabled/valid index/target).
 
 				If you want to push front a target to the shared deque, use [method shared_homing_deque_push_front_node2d_target] instead.
+			</description>
+		</method>
+		<method name="bullet_is_orbiting_enabled">
+			<return type="bool" />
+			<param index="0" name="bullet_index" type="int" />
+			<description>
+				Whether orbiting is currently enabled for the specified bullet.
 			</description>
 		</method>
 		<method name="bullet_set_orbiting_direction">

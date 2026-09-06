@@ -236,14 +236,6 @@
 				Enables the attachment of a specific bullet, if it has one.
 			</description>
 		</method>
-		<method name="_do_deferred_bullet_disable_attachment">
-			<return type="void" />
-			<param index="0" name="bullet_index" type="int" />
-			<param index="1" name="expected_generation" type="int" />
-			<description>
-				Internal worker for lifetime-expiry attachment cleanup. Ignores the call when the multimesh was reused since (generation mismatch). Do not call it directly.
-			</description>
-		</method>
 		<method name="bullet_free_attachment">
 			<return type="void" />
 			<param index="0" name="bullet_index" type="int" />
@@ -374,12 +366,6 @@
 				Get the transform of a specific bullet. Returns a [Transform2D] containing the bullet's position, rotation and scale.
 			</description>
 		</method>
-		<method name="get_bullets_current_collision_count" qualifiers="const">
-			<return type="int[]" />
-			<description>
-				The current collision count of every bullet, one entry per bullet index.
-			</description>
-		</method>
 		<method name="get_collision_layer" qualifiers="const">
 			<return type="int" />
 			<description>
@@ -496,37 +482,6 @@
 			<description>
 				Detaches a specific time based callable. This will work as long as the callable you are trying to detach
 				was previously saved in a variable or defined as a normal Godot function.
-			</description>
-		</method>
-		<method name="_do_attach_time_based_function">
-			<return type="void" />
-			<param index="0" name="time" type="float" />
-			<param index="1" name="callable" type="Callable" />
-			<param index="2" name="repeat" type="bool" />
-			<param index="3" name="execute_only_if_multimesh_is_active" type="bool" />
-			<description>
-				Internal worker behind [method multimesh_attach_time_based_function]. Deferred here so it runs outside the physics tick. Do not call it directly.
-			</description>
-		</method>
-		<method name="_do_detach_time_based_function">
-			<return type="void" />
-			<param index="0" name="callable" type="Callable" />
-			<description>
-				Internal worker behind [method multimesh_detach_time_based_function]. Do not call it directly.
-			</description>
-		</method>
-		<method name="_do_detach_all_time_based_functions">
-			<return type="void" />
-			<description>
-				Internal worker behind [method multimesh_detach_all_time_based_functions]. Do not call it directly.
-			</description>
-		</method>
-		<method name="_do_execute_stored_callable_safely">
-			<return type="void" />
-			<param index="0" name="_callback" type="Callable" />
-			<param index="1" name="_execute_only_if_multimesh_is_active" type="bool" default="true" />
-			<description>
-				Internal worker that runs one stored timer callable at end of frame. Do not call it directly.
 			</description>
 		</method>
 		<method name="play_sprite_animation">
