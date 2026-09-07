@@ -22,9 +22,9 @@
 
 		Note: For bullet attachments (particles, lights, etc...) use [BulletAttachment2D] and attach them via [method MultiMeshBullets2D.bullet_set_attachment] or [method MultiMeshBullets2D.all_bullets_set_attachment].
 
-		Note: For initial velocity/inertia use [member MultiMeshBullets2D.inherited_velocity_offset].
+			Note: For initial velocity/inertia use [member inherited_velocity_offset].
 
-		Note: For custom data that the multimesh should carry use [method MultiMeshBullets2D.bullets_custom_data] - used for damage or anything else custom that is available in collision callbacks inside [BulletFactory2D].
+			Note: For custom data that the multimesh should carry use [member bullets_custom_data] - used for damage or anything else custom that is available in collision callbacks inside [BulletFactory2D].
 
 		Note: For object pooling options see [member MultiMeshBullets2D.is_multimesh_auto_pooling_enabled] and [member MultiMeshBullets2D.is_attachments_auto_pooling_enabled].
 
@@ -35,6 +35,15 @@
 	<tutorials>
 	</tutorials>
 	<methods>
+		<method name="all_bullets_assign_homing_targets_array">
+			<return type="void" />
+			<param index="0" name="node2ds_or_global_positions_array" type="Array" />
+			<param index="1" name="bullet_index_start" type="int" default="0" />
+			<param index="2" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<description>
+				Pushes one homing target per bullet: array element i goes to bullet (start + i), pushed to the back of its per-bullet deque. The array size must match the range size, and every element must be a Node2D or Vector2, otherwise nothing is pushed. Useful for scatter-to-enemies spreads.
+			</description>
+		</method>
 		<method name="all_bullets_clear_homing_targets">
 			<return type="void" />
 			<param index="0" name="bullet_index_start" type="int" default="0" />
@@ -64,6 +73,42 @@
 				Enables orbiting for the specified range of bullets with the given parameters.
 
 				Note that orbiting relies on having a homing target to orbit around.
+			</description>
+		</method>
+		<method name="all_bullets_enable_orbiting_linear">
+			<return type="void" />
+			<param index="0" name="radius_start" type="float" />
+			<param index="1" name="radius_step" type="float" />
+			<param index="2" name="orbiting_direction" type="int" enum="DirectionalBullets2D.OrbitingDirection" default="2" />
+			<param index="3" name="orbiting_texture_rotation" type="int" enum="DirectionalBullets2D.OrbitingTextureRotation" default="0" />
+			<param index="4" name="bullet_index_start" type="int" default="0" />
+			<param index="5" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<description>
+				Enables orbiting with concentric radii: bullet (start + k) orbits at radius_start + radius_step * k. Useful for shield rings. Bullets that already orbit keep their radius with a warning.
+			</description>
+		</method>
+		<method name="all_bullets_get_orbiting_radius">
+			<return type="PackedFloat32Array" />
+			<param index="0" name="bullet_index_start" type="int" default="0" />
+			<param index="1" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<description>
+				Returns the orbiting radius of all bullets in the range.
+			</description>
+		</method>
+		<method name="all_bullets_get_velocity" qualifiers="const">
+			<return type="Vector2[]" />
+			<param index="0" name="bullet_index_start" type="int" default="0" />
+			<param index="1" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<description>
+				Returns the exact instantaneous velocities of all bullets in the range, including movement patterns, orbiting and curves. Pair with [method BulletFactory2D.helper_generate_transforms_fan] for split patterns.
+			</description>
+		</method>
+		<method name="all_bullets_is_orbiting_enabled">
+			<return type="bool[]" />
+			<param index="0" name="bullet_index_start" type="int" default="0" />
+			<param index="1" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<description>
+				Returns whether orbiting is enabled for each bullet in the range.
 			</description>
 		</method>
 		<method name="all_bullets_pop_back_target">
@@ -164,6 +209,15 @@
 				Each homing target gets cleared and replaced with the Mouse as the target for all bullets in the range (per-bullet deques only).
 			</description>
 		</method>
+		<method name="all_bullets_set_homing_smoothing">
+			<return type="void" />
+			<param index="0" name="value" type="float" />
+			<param index="1" name="bullet_index_start" type="int" default="0" />
+			<param index="2" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<description>
+				Sets the homing turn agility for each bullet in the range. Setting any per-bullet value enables per-bullet mode, after which the shared [member homing_smoothing] is ignored. Useful for mixed volleys with fast and drifting homers.
+			</description>
+		</method>
 		<method name="all_bullets_replace_homing_targets_with_new_target">
 			<return type="void" />
 			<param index="0" name="node2d_or_global_position" type="Variant" />
@@ -213,6 +267,15 @@
 				Sets the orbiting texture rotation for all bullets in the range.
 			</description>
 		</method>
+		<method name="all_bullets_set_velocity">
+			<return type="void" />
+			<param index="0" name="new_velocity" type="Vector2" />
+			<param index="1" name="bullet_index_start" type="int" default="0" />
+			<param index="2" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<description>
+				Sets the exact velocity of all bullets in the range (wind, knockback, slow fields). Decomposes into direction and speed so the integrator keeps producing it. Non-finite input is rejected.
+			</description>
+		</method>
 		<method name="bullet_check_has_homing_targets" qualifiers="const">
 			<return type="bool" />
 			<param index="0" name="bullet_index" type="int" />
@@ -258,6 +321,13 @@
 				Returns the current (front) homing target for the specified bullet's per-bullet deque as Variant (Node2D or Vector2; nullptr if invalid/empty).
 
 				If you want to get the current target from the shared deque, use [method shared_homing_deque_get_current_homing_target] instead.
+			</description>
+		</method>
+		<method name="bullet_get_homing_smoothing" qualifiers="const">
+			<return type="float" />
+			<param index="0" name="bullet_index" type="int" />
+			<description>
+				Returns the effective homing turn agility for the specified bullet: its per-bullet value when per-bullet mode is active, otherwise the shared [member homing_smoothing].
 			</description>
 		</method>
 		<method name="bullet_get_orbiting_direction">
@@ -327,6 +397,14 @@
 				If you want to push back a target to the shared deque, use [method shared_homing_deque_push_back_global_position_target] instead.
 			</description>
 		</method>
+		<method name="bullet_homing_push_back_homing_target">
+			<return type="bool" />
+			<param index="0" name="bullet_index" type="int" />
+			<param index="1" name="node2d_or_global_position" type="Variant" />
+			<description>
+				Pushes a Node2D or Vector2 target to the back of the specified bullet's per-bullet deque. Returns false with an error on invalid index or target type, pushing nothing.
+			</description>
+		</method>
 		<method name="bullet_homing_push_back_mouse_position_target">
 			<return type="bool" />
 			<param index="0" name="bullet_index" type="int" />
@@ -356,6 +434,14 @@
 				If you want to push front a target to the shared deque, use [method shared_homing_deque_push_front_global_position_target] instead.
 			</description>
 		</method>
+		<method name="bullet_homing_push_front_homing_target">
+			<return type="bool" />
+			<param index="0" name="bullet_index" type="int" />
+			<param index="1" name="node2d_or_global_position" type="Variant" />
+			<description>
+				Pushes a Node2D or Vector2 target to the front of the specified bullet's per-bullet deque. Returns false with an error on invalid index or target type, pushing nothing.
+			</description>
+		</method>
 		<method name="bullet_homing_push_front_mouse_position_target">
 			<return type="bool" />
 			<param index="0" name="bullet_index" type="int" />
@@ -382,6 +468,14 @@
 				Whether orbiting is currently enabled for the specified bullet.
 			</description>
 		</method>
+		<method name="bullet_set_homing_smoothing">
+			<return type="void" />
+			<param index="0" name="bullet_index" type="int" />
+			<param index="1" name="value" type="float" />
+			<description>
+				Sets the homing turn agility for the specified bullet. Enables per-bullet mode for the whole multimesh (see [method all_bullets_set_homing_smoothing]). Non-finite or negative values are rejected.
+			</description>
+		</method>
 		<method name="bullet_set_orbiting_direction">
 			<return type="void" />
 			<param index="0" name="bullet_index" type="int" />
@@ -404,6 +498,14 @@
 			<param index="1" name="new_texture_rotation" type="int" enum="DirectionalBullets2D.OrbitingTextureRotation" />
 			<description>
 				Sets the orbiting texture rotation for the specified bullet. Invalid values are rejected with an error and the rotation stays unchanged.
+			</description>
+		</method>
+		<method name="bullet_set_velocity">
+			<return type="void" />
+			<param index="0" name="bullet_index" type="int" />
+			<param index="1" name="new_velocity" type="Vector2" />
+			<description>
+				Sets the exact velocity of the specified bullet (wind, knockback, split inheritance). See [method all_bullets_set_velocity] for details.
 			</description>
 		</method>
 		<method name="shared_homing_deque_check_current_target_type" qualifiers="const">
@@ -612,7 +714,7 @@
 			Use this for initial velocity when the bullets are supposed to inherit velocity from the emitter.
 		</member>
 		<member name="shared_homing_deque_auto_pop_after_target_reached" type="bool" setter="set_shared_homing_deque_auto_pop_after_target_reached" getter="get_shared_homing_deque_auto_pop_after_target_reached" default="false">
-			Whether the current homing target should be automatically popped from the deque once it gets reached by a bullet (per-bullet deques only).
+			Whether the current homing target should be automatically popped from the deque once it gets reached by a bullet (shared deque only).
 
 			Adjust the distance for considering a target reached with [member homing_distance_before_reached].
 

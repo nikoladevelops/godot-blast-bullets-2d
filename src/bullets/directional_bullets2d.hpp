@@ -93,6 +93,12 @@ protected:
 	// For each bullet's homing deque, store the amount targets
 	std::vector<int> all_homing_count;
 
+	// Per-bullet turn agility. Empty/unused unless any per-bullet smoothing was
+	// set (use_per_bullet_homing_smoothing), in which case update_homing reads
+	// the per-bullet value and the shared homing_smoothing is ignored.
+	std::vector<real_t> all_bullet_homing_smoothing;
+	bool use_per_bullet_homing_smoothing = false;
+
 	// Tracks how many bullets are currently homing in TOTAL (per-bullet homing, NOT shared) - basically determines whether the per-bullet homing feature is even turned on
 	int active_homing_count = 0;
 
@@ -245,51 +251,46 @@ public:
 			auto &curr_bullet_direction = all_cached_direction[i];
 
 			// 2. DIRECTION CURVES - shared sampled once before loop
-			if (shared_curves_data_enabled) {
-				if (shared_curves_x_direction_curve_valid) {
-					if (shared_x_mode == DirectionCurveMode::Additive) {
-						curr_bullet_direction.x += shared_x_offset * shared_x_strength;
-					} else {
-						curr_bullet_direction.x = shared_x_offset * shared_x_strength;
-					}
-					curr_bullet_direction = curr_bullet_direction.normalized();
-				}
+		// Per-bullet curves resolve regardless of shared data so individual channels
+		// can fill gaps left by a partially specified shared resource (shared wins ties).
+		is_per_bullet_curves_valid = (i >= 0 && i < (int)all_bullet_curves_data.size() && all_bullet_curves_data[i].is_valid());
+		per_bullet_curves_data = is_per_bullet_curves_valid ? all_bullet_curves_data[i].ptr() : nullptr; // O(1) vector index, borrows - valid until vector reassigned
+		const bool per_bullet_x_curve_valid = is_per_bullet_curves_valid && per_bullet_curves_data->x_direction_curve.is_valid();
+		const bool per_bullet_y_curve_valid = is_per_bullet_curves_valid && per_bullet_curves_data->y_direction_curve.is_valid();
 
-				if (shared_curves_y_direction_curve_valid) {
-					if (shared_y_mode == DirectionCurveMode::Additive) {
-						curr_bullet_direction.y += shared_y_offset * shared_y_strength;
-					} else {
-						curr_bullet_direction.y = shared_y_offset * shared_y_strength;
-					}
-					curr_bullet_direction = curr_bullet_direction.normalized();
-				}
-
-				if (shared_curves_x_direction_curve_valid || shared_curves_y_direction_curve_valid) {
-					apply_direction_curve_texture_rotation_if_needed(curr_bullet_direction, curr_bullet_transf, delta, shared_curves_ptr);
-					direction_got_updated = true;
-				}
+		const BulletCurvesData2D *direction_curves_for_texture = nullptr;
+		if (shared_curves_x_direction_curve_valid) {
+			if (shared_x_mode == DirectionCurveMode::Additive) {
+				curr_bullet_direction.x += shared_x_offset * shared_x_strength;
 			} else {
-				is_per_bullet_curves_valid = (i >= 0 && i < (int)all_bullet_curves_data.size() && all_bullet_curves_data[i].is_valid());
-				if (is_per_bullet_curves_valid) {
-					per_bullet_curves_data = all_bullet_curves_data[i].ptr(); // O(1) vector index, borrows - valid until vector reassigned
-
-					const bool per_bullet_x_curve_valid = per_bullet_curves_data->x_direction_curve.is_valid();
-					const bool per_bullet_y_curve_valid = per_bullet_curves_data->y_direction_curve.is_valid();
-
-					if (per_bullet_x_curve_valid) {
-						apply_x_direction_curve(curr_bullet_direction, per_bullet_curves_data);
-					}
-
-					if (per_bullet_y_curve_valid) {
-						apply_y_direction_curve(curr_bullet_direction, per_bullet_curves_data);
-					}
-
-					if (per_bullet_x_curve_valid || per_bullet_y_curve_valid) {
-						apply_direction_curve_texture_rotation_if_needed(curr_bullet_direction, curr_bullet_transf, delta, per_bullet_curves_data);
-						direction_got_updated = true;
-					}
-				}
+				curr_bullet_direction.x = shared_x_offset * shared_x_strength;
 			}
+			curr_bullet_direction = curr_bullet_direction.normalized();
+			direction_curves_for_texture = shared_curves_ptr;
+		} else if (per_bullet_x_curve_valid) {
+			apply_x_direction_curve(curr_bullet_direction, per_bullet_curves_data);
+			direction_curves_for_texture = per_bullet_curves_data;
+		}
+
+		if (shared_curves_y_direction_curve_valid) {
+			if (shared_y_mode == DirectionCurveMode::Additive) {
+				curr_bullet_direction.y += shared_y_offset * shared_y_strength;
+			} else {
+				curr_bullet_direction.y = shared_y_offset * shared_y_strength;
+			}
+			curr_bullet_direction = curr_bullet_direction.normalized();
+			direction_curves_for_texture = shared_curves_ptr;
+		} else if (per_bullet_y_curve_valid) {
+			apply_y_direction_curve(curr_bullet_direction, per_bullet_curves_data);
+			if (direction_curves_for_texture == nullptr) {
+				direction_curves_for_texture = per_bullet_curves_data;
+			}
+		}
+
+		if (direction_curves_for_texture != nullptr) {
+			apply_direction_curve_texture_rotation_if_needed(curr_bullet_direction, curr_bullet_transf, delta, direction_curves_for_texture);
+			direction_got_updated = true;
+		}
 
 			// 3. ROTATION - shared sampled once before loop
 			if (shared_curves_rotation_curve_valid) {
@@ -674,6 +675,39 @@ public:
 		}
 	}
 
+	// Concentric-ring enable: bullet (start + k) orbits at radius_start + radius_step * k.
+	// Invalid enums are rejected per bullet by bullet_enable_orbiting (already-enabled
+	// bullets keep their radius with a warning instead of erroring the whole range).
+	_ALWAYS_INLINE_ void all_bullets_enable_orbiting_linear(real_t radius_start, real_t radius_step, OrbitingDirection orbiting_direction = OrbitRight, OrbitingTextureRotation orbiting_texture_rotation = FaceTarget, int bullet_index_start = 0, int bullet_index_end_inclusive = -1) {
+		ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_enable_orbiting_linear");
+
+		for (int i = bullet_index_start; i <= bullet_index_end_inclusive; ++i) {
+			bullet_enable_orbiting(i, radius_start + radius_step * (real_t)(i - bullet_index_start), orbiting_direction, orbiting_texture_rotation);
+		}
+	}
+
+	_ALWAYS_INLINE_ PackedFloat32Array all_bullets_get_orbiting_radius(int bullet_index_start = 0, int bullet_index_end_inclusive = -1) {
+		ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_get_orbiting_radius");
+
+		PackedFloat32Array arr;
+		for (int i = bullet_index_start; i <= bullet_index_end_inclusive; ++i) {
+			arr.push_back(bullet_get_orbiting_radius(i));
+		}
+
+		return arr;
+	}
+
+	_ALWAYS_INLINE_ TypedArray<bool> all_bullets_is_orbiting_enabled(int bullet_index_start = 0, int bullet_index_end_inclusive = -1) {
+		ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_is_orbiting_enabled");
+
+		TypedArray<bool> arr;
+		for (int i = bullet_index_start; i <= bullet_index_end_inclusive; ++i) {
+			arr.push_back(bullet_is_orbiting_enabled(i));
+		}
+
+		return arr;
+	}
+
 	_ALWAYS_INLINE_ void all_bullets_disable_orbiting(int bullet_index_start = 0, int bullet_index_end_inclusive = -1) {
 		ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_disable_orbiting");
 
@@ -844,6 +878,35 @@ public:
 
 		return true;
 	}
+
+	// Single-bullet Variant push (Node2D or Vector2), mirroring the
+	// all_bullets_*_homing_target type branch. Returns false with an error on
+	// invalid index or target type, pushing nothing.
+	_ALWAYS_INLINE_ bool bullet_homing_push_back_homing_target(int bullet_index, const Variant &node2d_or_global_position) {
+		if (!validate_bullet_index(bullet_index, "bullet_homing_push_back_homing_target")) {
+			return false;
+		}
+		if (Node2D *node = Object::cast_to<Node2D>(node2d_or_global_position)) {
+			return bullet_homing_push_back_node2d_target(bullet_index, node);
+		} else if (node2d_or_global_position.get_type() == Variant::VECTOR2) {
+			return bullet_homing_push_back_global_position_target(bullet_index, node2d_or_global_position);
+		}
+		UtilityFunctions::push_error("Invalid homing target type in bullet_homing_push_back_homing_target. Use a Node2D or Vector2.");
+		return false;
+	}
+
+	_ALWAYS_INLINE_ bool bullet_homing_push_front_homing_target(int bullet_index, const Variant &node2d_or_global_position) {
+		if (!validate_bullet_index(bullet_index, "bullet_homing_push_front_homing_target")) {
+			return false;
+		}
+		if (Node2D *node = Object::cast_to<Node2D>(node2d_or_global_position)) {
+			return bullet_homing_push_front_node2d_target(bullet_index, node);
+		} else if (node2d_or_global_position.get_type() == Variant::VECTOR2) {
+			return bullet_homing_push_front_global_position_target(bullet_index, node2d_or_global_position);
+		}
+		UtilityFunctions::push_error("Invalid homing target type in bullet_homing_push_front_homing_target. Use a Node2D or Vector2.");
+		return false;
+	}
 	/////////////////////////////
 
 	///  PER BULLET HOMING DEQUE HELPERS
@@ -967,6 +1030,30 @@ public:
 			all_bullet_homing_targets[i].push_back_mouse_position_target(cached_mouse_global_position);
 			++all_homing_count[i];
 			++active_homing_count;
+		}
+	}
+
+	_ALWAYS_INLINE_ void all_bullets_assign_homing_targets_array(const Array &node2ds_or_global_positions_array, int bullet_index_start = 0, int bullet_index_end_inclusive = -1) {
+		ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_assign_homing_targets_array");
+
+		const int range_size = bullet_index_end_inclusive - bullet_index_start + 1;
+		if (node2ds_or_global_positions_array.size() != range_size) {
+			UtilityFunctions::push_error("all_bullets_assign_homing_targets_array: targets array size must match the bullet range size. Nothing pushed.");
+			return;
+		}
+
+		// Validate every element first so a bad entry can't leave a half-assigned range behind.
+		for (int k = 0; k < range_size; ++k) {
+			const Variant &target = node2ds_or_global_positions_array[k];
+			if (Object::cast_to<Node2D>(target) == nullptr && target.get_type() != Variant::VECTOR2) {
+				UtilityFunctions::push_error("Invalid homing target type in all_bullets_assign_homing_targets_array at array index " + String::num_int64(k) + ". Use Node2D or Vector2 entries. Nothing pushed.");
+				return;
+			}
+		}
+
+		// Element i of the array goes to bullet (start + i), pushed to the back.
+		for (int k = 0; k < range_size; ++k) {
+			bullet_homing_push_back_homing_target(bullet_index_start + k, node2ds_or_global_positions_array[k]);
 		}
 	}
 
@@ -1225,6 +1312,71 @@ public:
 		}
 	}
 
+	// Sets a bullet's velocity directly (wind, knockback, split inheritance).
+	// Decomposes into direction + speed so the per-tick integrator
+	// (velocity = direction * speed + inherited offset) keeps producing exactly
+	// this velocity. max_speed is raised when below the new speed so the next
+	// tick doesn't snap it back down. Non-finite input is rejected.
+	_ALWAYS_INLINE_ void bullet_set_velocity(int bullet_index, const Vector2 &new_velocity) {
+		if (!validate_bullet_index(bullet_index, "bullet_set_velocity")) {
+			return;
+		}
+
+		if (!new_velocity.is_finite()) {
+			UtilityFunctions::push_error("bullet_set_velocity: new_velocity must be finite.");
+			return;
+		}
+
+		if (shared_bullet_curves_data.is_valid() && shared_bullet_curves_data->movement_speed_curve.is_valid()) {
+			UtilityFunctions::push_warning("You are trying to set bullet velocity directly while having a movement speed curve assigned to the shared curves data. The curve will override any direct velocity changes. Set the curve to null first if you want to set velocity directly.");
+			return;
+		}
+
+		BulletCurvesData2D *curves_data = find_bullet_curves_data_ptr(bullet_index);
+
+		if (curves_data != nullptr && curves_data->movement_speed_curve.is_valid()) {
+			UtilityFunctions::push_warning("You are trying to set bullet velocity directly while having a movement speed curve assigned as an individual bullet curves data. The curve will override any direct velocity changes. Set the curve to null first if you want to set velocity directly.");
+			return;
+		}
+
+		const Vector2 without_offset = new_velocity - inherited_velocity_offset;
+		const real_t new_speed = without_offset.length();
+
+		if (new_speed > 0.0001) {
+			all_cached_direction[bullet_index] = without_offset / new_speed;
+		}
+
+		all_cached_speed[bullet_index] = new_speed;
+		if (all_cached_max_speed[bullet_index] < new_speed) {
+			all_cached_max_speed[bullet_index] = new_speed;
+		}
+		all_cached_velocity[bullet_index] = all_cached_direction[bullet_index] * new_speed + inherited_velocity_offset;
+	}
+
+	_ALWAYS_INLINE_ void all_bullets_set_velocity(const Vector2 &new_velocity, int bullet_index_start = 0, int bullet_index_end_inclusive = -1) {
+		ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_set_velocity");
+
+		for (int i = bullet_index_start; i <= bullet_index_end_inclusive; ++i) {
+			bullet_set_velocity(i, new_velocity);
+		}
+	}
+
+	_ALWAYS_INLINE_ TypedArray<Vector2> all_bullets_get_velocity(int bullet_index_start = 0, int bullet_index_end_inclusive = -1) const {
+		ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_get_velocity");
+
+		TypedArray<Vector2> arr;
+		for (int i = bullet_index_start; i <= bullet_index_end_inclusive; ++i) {
+			int eff = ((int)all_cached_velocity.size() == 1) ? 0 : i;
+			if (eff < 0 || eff >= (int)all_cached_velocity.size()) {
+				arr.push_back(Vector2());
+				continue;
+			}
+			arr.push_back(all_cached_velocity[eff]);
+		}
+
+		return arr;
+	}
+
 	// Property getters and setters
 	real_t get_homing_smoothing() const { return homing_smoothing; }
 	void set_homing_smoothing(real_t value) {
@@ -1256,6 +1408,61 @@ public:
 	}
 	bool get_shared_homing_deque_auto_pop_after_target_reached() const { return shared_homing_deque_auto_pop_after_target_reached; }
 	void set_shared_homing_deque_auto_pop_after_target_reached(bool value) { shared_homing_deque_auto_pop_after_target_reached = value; }
+
+	// Per-bullet turn agility. Setting any value enables per-bullet mode, after
+	// which update_homing ignores the shared homing_smoothing. Same validation
+	// as the shared setter. Reading returns the effective value per bullet.
+	real_t bullet_get_homing_smoothing(int bullet_index) const {
+		if (!validate_bullet_index(bullet_index, "bullet_get_homing_smoothing")) {
+			return 0.0;
+		}
+		if (use_per_bullet_homing_smoothing && bullet_index >= 0 && bullet_index < (int)all_bullet_homing_smoothing.size()) {
+			return all_bullet_homing_smoothing[bullet_index];
+		}
+		return homing_smoothing;
+	}
+	void bullet_set_homing_smoothing(int bullet_index, real_t value) {
+		if (!validate_bullet_index(bullet_index, "bullet_set_homing_smoothing")) {
+			return;
+		}
+		if (!Math::is_finite(value) || value < 0.0) {
+			UtilityFunctions::push_error("bullet_set_homing_smoothing: value must be finite and >= 0 (0 snaps instantly).");
+			return;
+		}
+		if (bullet_index < 0 || bullet_index >= (int)all_bullet_homing_smoothing.size()) {
+			UtilityFunctions::push_error("bullet_set_homing_smoothing: per-bullet smoothing storage is not set up for this multimesh.");
+			return;
+		}
+		// First per-bullet write seeds every bullet with the shared value so
+		// untouched bullets keep steering exactly as before.
+		if (!use_per_bullet_homing_smoothing) {
+			all_bullet_homing_smoothing.assign(all_bullet_homing_smoothing.size(), homing_smoothing);
+		}
+		all_bullet_homing_smoothing[bullet_index] = value;
+		use_per_bullet_homing_smoothing = true;
+	}
+	void all_bullets_set_homing_smoothing(real_t value, int bullet_index_start = 0, int bullet_index_end_inclusive = -1) {
+		ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_set_homing_smoothing");
+		if (!Math::is_finite(value) || value < 0.0) {
+			UtilityFunctions::push_error("all_bullets_set_homing_smoothing: value must be finite and >= 0 (0 snaps instantly).");
+			return;
+		}
+		for (int i = bullet_index_start; i <= bullet_index_end_inclusive; ++i) {
+			if (i < 0 || i >= (int)all_bullet_homing_smoothing.size()) {
+				UtilityFunctions::push_error("all_bullets_set_homing_smoothing: per-bullet smoothing storage is not set up for this multimesh.");
+				return;
+			}
+		}
+		// First per-bullet write seeds every bullet with the shared value so
+		// untouched bullets keep steering exactly as before.
+		if (!use_per_bullet_homing_smoothing) {
+			all_bullet_homing_smoothing.assign(all_bullet_homing_smoothing.size(), homing_smoothing);
+		}
+		for (int i = bullet_index_start; i <= bullet_index_end_inclusive; ++i) {
+			all_bullet_homing_smoothing[i] = value;
+		}
+		use_per_bullet_homing_smoothing = true;
+	}
 
 	// Virtual methods
 	void set_up_movement_data(const TypedArray<BulletSpeedData2D> &new_speed_data);
@@ -1290,6 +1497,9 @@ protected:
 		}
 
 		real_t max_turn = homing_smoothing * delta;
+		if (use_per_bullet_homing_smoothing && bullet_index >= 0 && bullet_index < (int)all_bullet_homing_smoothing.size()) {
+			max_turn = all_bullet_homing_smoothing[bullet_index] * delta;
+		}
 		if (max_turn < 0.0) {
 			max_turn = 0.0;
 		}

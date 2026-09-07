@@ -174,6 +174,17 @@
 				Generates transforms along an expanding spiral around the marker, each bullet facing outward. Useful for rotating emitter looks and volute patterns.
 			</description>
 		</method>
+		<method name="helper_generate_transforms_line" qualifiers="static">
+			<return type="Transform2D[]" />
+			<param index="0" name="transforms_amount" type="int" />
+			<param index="1" name="marker_transform" type="Transform2D" />
+			<param index="2" name="direction" type="Vector2" />
+			<param index="3" name="spacing" type="float" default="32.0" />
+			<param index="4" name="face_direction" type="bool" default="true" />
+			<description>
+				Generates transforms in a straight wall centered on the marker along [code]direction[/code], spaced evenly by [code]spacing[/code]. Bullets face along the line when [code]face_direction[/code] is true, otherwise they keep the marker rotation. Useful for walls, curtains and gates. Returns an empty array when the direction is zero.
+			</description>
+		</method>
 		<method name="populate_attachments_pool">
 			<return type="void" />
 			<param index="0" name="attachment_scene" type="PackedScene" />
@@ -204,7 +215,7 @@
 			<return type="void" />
 			<param index="0" name="new_physics_space" type="RID" />
 			<description>
-				Sets the world physics space that the bullets interact in.
+				Sets the world physics space that the bullets interact in. Set it before spawning: it applies to subsequently spawned bullets, already spawned areas stay in their space. Invalid RIDs are rejected with an error.
 			</description>
 		</method>
 		<method name="set_use_physics_interpolation_runtime">
@@ -251,7 +262,7 @@
 			<return type="void" />
 			<param index="0" name="shift_amount" type="Vector2" />
 			<description>
-				Shifts all directional bullets in the scene by a certain amount (only bullets spawned by this particular [b]BulletFactory2D[/b]). Block bullets are not affected.
+				Shifts all directional bullets in the scene by a certain amount (only bullets spawned by this particular [b]BulletFactory2D[/b]). Block bullets are not affected (a warning is emitted when any exist and are skipped).
 			</description>
 		</method>
 	</methods>

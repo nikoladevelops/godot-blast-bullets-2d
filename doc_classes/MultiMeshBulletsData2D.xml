@@ -60,7 +60,7 @@
 			How many times a bullet can collide before it gets disabled. If you set to 0, then the bullet will NEVER get disabled due to collisions.
 		</member>
 		<member name="bullets_current_collision_count" type="int[]" setter="set_bullets_current_collision_count" getter="get_bullets_current_collision_count" default="[]">
-			Per-bullet collision counters, one entry per bullet. Leave empty to start every bullet at zero. Values must stay at or below [member bullet_max_collision_count]; out-of-range input is rejected with an error.
+			Per-bullet collision counters, one entry per bullet. Leave empty to start every bullet at zero. Values are clamped into range (negatives become 0, values above [member bullet_max_collision_count] become the max when the max is above 0); only a wrong array size is rejected with an error.
 		</member>
 		<member name="bullets_custom_data" type="Resource" setter="set_bullets_custom_data" getter="get_bullets_custom_data">
 			If you want your bullets to have damage or any other data specific to this type of bullets then you have to provide a custom resource that holds all of these properties.

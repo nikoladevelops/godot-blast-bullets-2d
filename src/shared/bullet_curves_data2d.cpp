@@ -1,5 +1,7 @@
 #include "./bullet_curves_data2d.hpp"
 
+#include <godot_cpp/variant/utility_functions.hpp>
+
 using namespace godot;
 
 namespace BlastBullets2D {
@@ -73,6 +75,10 @@ DirectionCurveMode BulletCurvesData2D::get_x_direction_curve_mode() const {
 }
 
 void BulletCurvesData2D::set_x_direction_curve_mode(DirectionCurveMode mode) {
+	if (mode < Additive || mode > Override) {
+		UtilityFunctions::push_error("Invalid x direction curve mode. Use Additive or Override.");
+		return;
+	}
 	x_direction_curve_mode = mode;
 }
 
@@ -119,6 +125,10 @@ DirectionCurveMode BulletCurvesData2D::get_y_direction_curve_mode() const {
 	return y_direction_curve_mode;
 }
 void BulletCurvesData2D::set_y_direction_curve_mode(DirectionCurveMode mode) {
+	if (mode < Additive || mode > Override) {
+		UtilityFunctions::push_error("Invalid y direction curve mode. Use Additive or Override.");
+		return;
+	}
 	y_direction_curve_mode = mode;
 }
 

@@ -26,6 +26,10 @@ TypedArray<BulletSpeedData2D> BulletSpeedData2D::generate_random_data(
 		UtilityFunctions::push_error("BulletSpeedData2D.generate_random_data: every MIN must be <= its MAX.");
 		return data;
 	}
+	if (!Math::is_finite(speed_MIN) || !Math::is_finite(speed_MAX) || !Math::is_finite(max_speed_MIN) || !Math::is_finite(max_speed_MAX) || !Math::is_finite(acceleration_MIN) || !Math::is_finite(acceleration_MAX)) {
+		UtilityFunctions::push_error("BulletSpeedData2D.generate_random_data: MIN/MAX bounds must be finite.");
+		return data;
+	}
 	data.resize(amount_to_generate);
 
 	for (int i = 0; i < amount_to_generate; ++i) {

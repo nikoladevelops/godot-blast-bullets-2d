@@ -53,6 +53,11 @@ static bool validate_spawn_data(const Ref<MultiMeshBulletsData2D> &spawn_data, c
 		UtilityFunctions::push_error(String("Error in ") + caller_name + ": bullets_current_collision_count must be empty or match transforms size.");
 		return false;
 	}
+	// A non-positive finite lifetime would die on the first tick; fail open with an error instead of a silent vanish.
+	if (!spawn_data->is_life_time_infinite && spawn_data->max_life_time <= 0.0) {
+		UtilityFunctions::push_error(String("Error in ") + caller_name + ": max_life_time must be > 0 when lifetime is not infinite.");
+		return false;
+	}
 	return true;
 }
 
@@ -215,13 +220,21 @@ void BulletFactory2D::_physics_process(double delta) {
 	handle_bullet_behavior<DirectionalBullets2D>(all_directional_bullets, directional_bullets_set, delta);
 	handle_bullet_behavior<BlockBullets2D>(all_block_bullets, block_bullets_set, delta);
 
-	for (auto &bullet : all_directional_bullets) {
+	// Index loops with cached size: timer callbacks run user code that may spawn
+	// (appending reallocates), which would dangle a range-for reference. operator[]
+	// re-evaluates the buffer each access, so this stays valid. Multis spawned
+	// mid-loop simply wait for the next tick.
+	const size_t directional_count = all_directional_bullets.size();
+	for (size_t idx = 0; idx < directional_count && idx < all_directional_bullets.size(); ++idx) {
+		DirectionalBullets2D *bullet = all_directional_bullets[idx];
 		if (bullet != nullptr) {
 			bullet->run_multimesh_custom_timers(delta);
 		}
 	}
 
-	for (auto &bullet : all_block_bullets) {
+	const size_t block_count = all_block_bullets.size();
+	for (size_t idx = 0; idx < block_count && idx < all_block_bullets.size(); ++idx) {
+		BlockBullets2D *bullet = all_block_bullets[idx];
 		if (bullet != nullptr) {
 			bullet->run_multimesh_custom_timers(delta);
 		}
@@ -823,6 +836,10 @@ void BulletFactory2D::free_attachments_pool(int attachment_id) {
 		return;
 	}
 
+	if (reject_when_iterating("free_attachments_pool")) {
+		return;
+	}
+
 	is_factory_busy = true;
 
 	bool enable_processing_after_finish = is_factory_processing_bullets;
@@ -855,6 +872,10 @@ RID BulletFactory2D::get_physics_space() const {
 	return physics_space;
 }
 void BulletFactory2D::set_physics_space(RID new_space_rid) {
+	if (!new_space_rid.is_valid()) {
+		UtilityFunctions::push_error("set_physics_space: the provided RID is invalid. Set a valid physics space before spawning (it applies to subsequently spawned bullets; already spawned areas stay in their space).");
+		return;
+	}
 	physics_space = new_space_rid;
 }
 
@@ -1281,6 +1302,41 @@ TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_spiral(
 	return generated_transforms;
 }
 
+TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_line(
+		int transforms_amount,
+		Transform2D marker_transform,
+		const Vector2 &direction,
+		real_t spacing,
+		bool face_direction) {
+	if (transforms_amount < 0) {
+		UtilityFunctions::push_error("helper_generate_transforms_line: transforms_amount must be >= 0.");
+		return TypedArray<Transform2D>();
+	}
+	if (!direction.is_finite() || !Math::is_finite(spacing)) {
+		UtilityFunctions::push_error("helper_generate_transforms_line: direction and spacing must be finite.");
+		return TypedArray<Transform2D>();
+	}
+	if (direction.length_squared() <= 0.0) {
+		UtilityFunctions::push_error("helper_generate_transforms_line: direction must not be zero, the line axis is undefined.");
+		return TypedArray<Transform2D>();
+	}
+	TypedArray<Transform2D> generated_transforms;
+	generated_transforms.resize(transforms_amount);
+	if (transforms_amount == 0) {
+		return generated_transforms;
+	}
+
+	const Vector2 axis = direction.normalized();
+	const real_t facing = face_direction ? axis.angle() : marker_transform.get_rotation();
+	const Vector2 origin = marker_transform.get_origin();
+	// Center the wall on the marker so a single bullet lands exactly on it.
+	const real_t center_offset = (real_t)(transforms_amount - 1) * 0.5;
+	for (int i = 0; i < transforms_amount; ++i) {
+		generated_transforms[i] = Transform2D(facing, origin + axis * (spacing * ((real_t)i - center_offset)));
+	}
+	return generated_transforms;
+}
+
 TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_aimed(
 		int transforms_amount,
 		Transform2D marker_transform,
@@ -1309,6 +1365,12 @@ void BulletFactory2D::teleport_shift_all_bullets(const Vector2 &shift_amount) {
 		if (bullets != nullptr) {
 			bullets->teleport_shift_all_bullets(shift_amount);
 		}
+	}
+
+	// Block bullets move as one rigid volley with no per-bullet teleport support,
+	// so they are intentionally skipped. Warn instead of staying silent.
+	if (!all_block_bullets.empty()) {
+		UtilityFunctions::push_warning("teleport_shift_all_bullets only affects DirectionalBullets2D; BlockBullets2D instances were skipped.");
 	}
 
 	// TODO Not supported for BlockBullets2D
@@ -1449,6 +1511,17 @@ void BulletFactory2D::_bind_methods() {
 								&BulletFactory2D::helper_generate_transforms_aimed,
 								DEFVAL(0.3),
 								DEFVAL(0.0));
+
+	ClassDB::bind_static_method("BulletFactory2D",
+								D_METHOD("helper_generate_transforms_line",
+										 "transforms_amount",
+										 "marker_transform",
+										 "direction",
+										 "spacing",
+										 "face_direction"),
+								&BulletFactory2D::helper_generate_transforms_line,
+								DEFVAL(32.0),
+								DEFVAL(true));
 
 	//
 

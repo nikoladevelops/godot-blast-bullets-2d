@@ -125,6 +125,10 @@ public:
 
 	void teleport_shift_all_bullets(const Vector2 &shift_amount);
 
+	// True once NOTIFICATION_PREDELETE started. Teardown paths use this to avoid
+	// touching half-destroyed state (e.g. re-pooling attachments into a dying pool).
+	bool get_is_tearing_down() const { return is_tearing_down; }
+
 	//
 
 	// ADDITIONAL METHODS FOR DEBUGGING PURPOSES
@@ -701,6 +705,17 @@ public:
 			real_t radius_step = 15.0,
 			real_t angle_step = 0.6,
 			bool rotate_with_marker = true);
+
+	// Generates transforms in a straight wall/curtain/row centered on the marker.
+	// direction is the line axis (need not be normalized); origins spread evenly
+	// with the given spacing. Bullets face along the line when face_direction is
+	// true, otherwise they keep the marker rotation.
+	static TypedArray<Transform2D> helper_generate_transforms_line(
+			int transforms_amount,
+			Transform2D marker_transform,
+			const Vector2 &direction,
+			real_t spacing = 32.0,
+			bool face_direction = true);
 
 	// Aimed fan: same as helper_generate_transforms_fan with the cone centered on
 	// the marker-to-target direction.

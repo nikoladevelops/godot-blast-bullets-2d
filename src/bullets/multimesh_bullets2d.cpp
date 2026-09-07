@@ -53,11 +53,20 @@ void MultiMeshBullets2D::_notification(int p_what) {
 			if (physics_server && area.is_valid()) {
 				// Disable the area's shapes (ALL OF THEM no matter their bullets_enabled_status).
 				// Bounds-checked: never let a desynced attachments vector take down PREDELETE.
+				// When the factory itself is tearing down, only run the script callback and
+				// drop the slot: re-pooling into (or queue_freeing from) a dying factory is
+				// pointless, the engine destroys the whole subtree anyway.
+				const bool factory_is_dying = bullet_factory == nullptr || bullet_factory->get_is_tearing_down();
 				for (int i = 0; i < amount_bullets && i < (int)physics_shapes.size(); ++i) {
 					physics_server->area_set_shape_disabled(area, i, true);
 
 					if (i >= 0 && i < (int)attachments.size() && attachments[i] != nullptr) {
-						bullet_disable_attachment(i);
+						if (factory_is_dying) {
+							attachments[i]->call_on_bullet_disable();
+							attachments[i] = nullptr;
+						} else {
+							bullet_disable_attachment(i);
+						}
 					}
 				}
 
@@ -165,6 +174,10 @@ void MultiMeshBullets2D::spawn(const MultiMeshBulletsData2D &data, MultiMeshObje
 	if (spawn_in_pool) {
 		set_visible(false);
 		is_active = false;
+		// Pooled instances hold zero enabled bullets: reset the counter that
+		// set_up_bullet_instances set to amount_bullets so counter==0 matches
+		// the empty enabled set (enable_bullet wake counts up from here).
+		active_bullets_counter = 0;
 		set_all_physics_shapes_enabled_for_area(false);
 		bullets_container->add_child(this);
 		bullets_pool->push(this, get_pool_key());
@@ -562,10 +575,18 @@ void MultiMeshBullets2D::set_rotation_data(const TypedArray<BulletRotationData2D
 
 	// Validate every element we are about to read. A null or wrong-typed entry would
 	// crash on dereference below, so fail open to no-rotation instead.
+	// Non-finite values would poison the tick path (INF rotation never heals and
+	// NaNs the transform), so they fail open the same way.
 	const int validate_count = use_only_first_rotation_data ? 1 : amount_rotation_data;
 	for (int i = 0; i < validate_count; ++i) {
-		if (Object::cast_to<BulletRotationData2D>(rotation_data[i]) == nullptr) {
+		BulletRotationData2D *entry = Object::cast_to<BulletRotationData2D>(rotation_data[i]);
+		if (entry == nullptr) {
 			UtilityFunctions::push_error("Invalid rotation data at index " + String::num_int64(i) + ": expected BulletRotationData2D. Ignoring all rotation data.");
+			is_rotation_data_active = false;
+			return;
+		}
+		if (!Math::is_finite(entry->rotation_speed) || !Math::is_finite(entry->max_rotation_speed) || !Math::is_finite(entry->rotation_acceleration)) {
+			UtilityFunctions::push_error("Non-finite rotation data at index " + String::num_int64(i) + ": rotation values must be finite. Ignoring all rotation data.");
 			is_rotation_data_active = false;
 			return;
 		}
@@ -721,6 +742,11 @@ void MultiMeshBullets2D::set_bullet_speed_data(int bullet_index, const Ref<Bulle
 		bullet_index = 0;
 	}
 
+	if (!Math::is_finite(new_bullet_speed_data->speed) || !Math::is_finite(new_bullet_speed_data->max_speed) || !Math::is_finite(new_bullet_speed_data->acceleration)) {
+		UtilityFunctions::push_error("set_bullet_speed_data: speed values must be finite.");
+		return;
+	}
+
 	all_cached_speed[bullet_index] = new_bullet_speed_data->speed;
 	all_cached_max_speed[bullet_index] = new_bullet_speed_data->max_speed;
 	all_cached_acceleration[bullet_index] = new_bullet_speed_data->acceleration;
@@ -826,6 +852,11 @@ void MultiMeshBullets2D::set_bullet_texture_rotation_radians(int bullet_index, r
 	auto &curr_transf = all_cached_instance_transforms[bullet_index];
 	curr_transf.set_rotation(new_rotation_radians);
 
+	// Instantly apply the updated transform so paused factories don't render stale visuals.
+	if (all_bullets_enabled_set.contains(bullet_index)) {
+		multi->set_instance_transform_2d(bullet_index, curr_transf);
+	}
+
 	update_bullet_previous_transform_for_interpolation(bullet_index);
 }
 
@@ -863,6 +894,11 @@ void MultiMeshBullets2D::set_bullet_texture_rotation_degrees(int bullet_index, r
 
 	auto &curr_transf = all_cached_instance_transforms[bullet_index];
 	curr_transf.set_rotation(Math::deg_to_rad(new_rotation_degrees));
+
+	// Instantly apply the updated transform so paused factories don't render stale visuals.
+	if (all_bullets_enabled_set.contains(bullet_index)) {
+		multi->set_instance_transform_2d(bullet_index, curr_transf);
+	}
 
 	update_bullet_previous_transform_for_interpolation(bullet_index);
 }
@@ -920,6 +956,8 @@ void MultiMeshBullets2D::set_bullet_transform(int bullet_index, const Transform2
 	auto &curr_bullet_transf = all_cached_instance_transforms[bullet_index];
 	auto &curr_bullet_origin = all_cached_instance_origin[bullet_index];
 
+	const Vector2 origin_delta = new_transform.get_origin() - curr_bullet_origin;
+
 	curr_bullet_transf = new_transform;
 	curr_bullet_origin = new_transform.get_origin();
 
@@ -928,6 +966,20 @@ void MultiMeshBullets2D::set_bullet_transform(int bullet_index, const Transform2
 	// Instantly apply the updated transforms
 	if (all_bullets_enabled_set.contains(bullet_index)) {
 		multi->set_instance_transform_2d(bullet_index, curr_bullet_transf);
+	}
+
+	// Carry the attachment along so it doesn't stay behind at the old position.
+	// Stick-relative attachments recompute from the new transform (same as the next
+	// tick would); non-stick ones translate by the jump delta (they never heal otherwise).
+	if (bullet_factory != nullptr && bullet_index >= 0 && bullet_index < (int)attachments.size() && attachments[bullet_index] != nullptr) {
+		if (attachment_stick_relative_to_bullet[bullet_index]) {
+			attachment_transforms[bullet_index] = calculate_attachment_global_transf(bullet_index, curr_bullet_transf);
+		} else {
+			attachment_transforms[bullet_index] = attachment_transforms[bullet_index].translated(origin_delta);
+		}
+		if (!bullet_factory->use_physics_interpolation) {
+			attachments[bullet_index]->set_global_transform(attachment_transforms[bullet_index]);
+		}
 	}
 
 	// Update direction if requested
@@ -1386,7 +1438,7 @@ void MultiMeshBullets2D::_bind_methods() {
 
 	// Time based functions
 	ClassDB::bind_method(D_METHOD("multimesh_attach_time_based_function", "time", "callable", "repeat", "execute_only_if_multimesh_is_active"), &MultiMeshBullets2D::multimesh_attach_time_based_function, DEFVAL(false), DEFVAL(true));
-	ClassDB::bind_method(D_METHOD("_do_attach_time_based_function", "time", "callable", "repeat", "execute_only_if_multimesh_is_active"), &MultiMeshBullets2D::_do_attach_time_based_function);
+	ClassDB::bind_method(D_METHOD("_do_attach_time_based_function", "time", "callable", "repeat", "execute_only_if_multimesh_is_active", "expected_timers_generation"), &MultiMeshBullets2D::_do_attach_time_based_function);
 
 	ClassDB::bind_method(D_METHOD("multimesh_detach_time_based_function", "callable"), &MultiMeshBullets2D::multimesh_detach_time_based_function);
 	ClassDB::bind_method(D_METHOD("_do_detach_time_based_function", "callable"), &MultiMeshBullets2D::_do_detach_time_based_function);

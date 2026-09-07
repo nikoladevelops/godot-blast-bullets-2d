@@ -4,7 +4,7 @@
 		Contains spawn data for the [DirectionalBullets2D].
 	</brief_description>
 	<description>
-		Ensure that the [member MultiMeshBulletsData2D.transforms] and [member all_bullet_speed_data] are set or your game will crash.
+		Ensure that the [member MultiMeshBulletsData2D.transforms] and [member all_bullet_speed_data] are set, otherwise spawning fails with an error and no bullets are created (missing speed data falls back to zeros).
 		Check [MultiMeshBulletsData2D]'s documentation for the rest of the properties.
 	</description>
 	<tutorials>

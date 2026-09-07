@@ -72,6 +72,10 @@ public:
 	// queued with so pool reuse in between can't misfire them onto a new owner.
 	int multimesh_generation = 0;
 
+	// Same idea for time-based functions: a deferred attach stamped with a stale
+	// generation is dropped, so a full-disable landing first can't leak it onward.
+	int multimesh_timers_generation = 0;
+
 	bool marked_for_internal_deletion = false;
 
 	// Gets the total amount of bullets that the multimesh always holds
@@ -370,8 +374,9 @@ float *w = batch_buffer.ptrw();
 	}
 
 	// Re-bakes the animation cache from a SpriteFrames resource and switches to it.
-	// Empty animation means auto: "default" if present, else first animation, silently.
-	// Returns false (leaving the previous animation untouched) on null/empty/missing.
+	// An empty animation name is rejected with an error (returns false, previous
+	// animation untouched). The default "default" animation name auto-resolves via
+	// the same rules as spawn: "default" if present, else the first animation.
 	bool play_sprite_animation(const Ref<SpriteFrames> &p_sprite_frames, const StringName &p_animation = StringName("default"));
 	// Reuses the cached SpriteFrames source. Same resolve rules as play_sprite_animation.
 	bool play_sprite_animation_name(const StringName &p_animation);
@@ -959,7 +964,7 @@ float *w = batch_buffer.ptrw();
 	}
 
 	_ALWAYS_INLINE_ real_t get_bullet_curves_rotation_speed(const BulletCurvesData2D *curves_data) const {
-		const bool use_unit_curve = curves_data->rotation_use_unit_curve;
+		const bool use_unit_curve = curves_data->rotation_use_unit_curve && !is_life_time_infinite;
 
 		real_t input_x = curve_get_input_value(use_unit_curve);
 
@@ -967,7 +972,7 @@ float *w = batch_buffer.ptrw();
 	}
 
 	_ALWAYS_INLINE_ real_t get_bullet_curves_x_direction_offset(const BulletCurvesData2D *curves_data) const {
-		const bool use_unit_curve = curves_data->x_direction_use_unit_curve;
+		const bool use_unit_curve = curves_data->x_direction_use_unit_curve && !is_life_time_infinite;
 
 		real_t input_x = curve_get_input_value(use_unit_curve);
 
@@ -975,7 +980,7 @@ float *w = batch_buffer.ptrw();
 	}
 
 	_ALWAYS_INLINE_ real_t get_bullet_curves_y_direction_offset(const BulletCurvesData2D *curves_data) const {
-		const bool use_unit_curve = curves_data->y_direction_use_unit_curve;
+		const bool use_unit_curve = curves_data->y_direction_use_unit_curve && !is_life_time_infinite;
 
 		real_t input_x = curve_get_input_value(use_unit_curve);
 
@@ -1189,7 +1194,7 @@ float *w = batch_buffer.ptrw();
 		return arr;
 	}
 
-	_ALWAYS_INLINE_ void all_bullets_set_attachment(const Ref<PackedScene> &attachment_scene, uint32_t attachment_pooling_id, const Vector2 &bullet_attachment_offset, bool stick_relative_to_bullet = true, int bullet_index_start = 0, int bullet_index_end_inclusive = -1) {
+	_ALWAYS_INLINE_ void all_bullets_set_attachment(const Ref<PackedScene> &attachment_scene, int64_t attachment_pooling_id, const Vector2 &bullet_attachment_offset, bool stick_relative_to_bullet = true, int bullet_index_start = 0, int bullet_index_end_inclusive = -1) {
 		ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_set_attachment");
 
 		for (int i = bullet_index_start; i <= bullet_index_end_inclusive; ++i) {
@@ -1197,8 +1202,13 @@ float *w = batch_buffer.ptrw();
 		}
 	}
 
-	_ALWAYS_INLINE_ void bullet_set_attachment(int bullet_index, const Ref<PackedScene> &attachment_scene, uint32_t attachment_pooling_id, const Vector2 &bullet_attachment_offset, bool stick_relative_to_bullet = true) {
+	_ALWAYS_INLINE_ void bullet_set_attachment(int bullet_index, const Ref<PackedScene> &attachment_scene, int64_t attachment_pooling_id, const Vector2 &bullet_attachment_offset, bool stick_relative_to_bullet = true) {
 		if (!validate_bullet_index(bullet_index, "bullet_set_attachment")) {
+			return;
+		}
+
+		if (attachment_pooling_id < 0 || attachment_pooling_id > (int64_t)UINT32_MAX) {
+			UtilityFunctions::push_error("bullet_set_attachment: attachment_pooling_id must be >= 0.");
 			return;
 		}
 
@@ -1724,10 +1734,15 @@ public:
 	}
 
 	_ALWAYS_INLINE_ void multimesh_attach_time_based_function(double time, const Callable &callable, bool repeat = false, bool execute_only_if_multimesh_is_active = true) {
-		call_deferred("_do_attach_time_based_function", time, callable, repeat, execute_only_if_multimesh_is_active);
+		// Stamp the timers generation so a full-disable (which detaches directly)
+		// landing before this deferred call can't leak the timer into the next owner.
+		call_deferred("_do_attach_time_based_function", time, callable, repeat, execute_only_if_multimesh_is_active, multimesh_timers_generation);
 	}
 
-	_ALWAYS_INLINE_ void _do_attach_time_based_function(double time, const Callable &callable, bool repeat, bool execute_only_if_multimesh_is_active) {
+	_ALWAYS_INLINE_ void _do_attach_time_based_function(double time, const Callable &callable, bool repeat, bool execute_only_if_multimesh_is_active, int expected_timers_generation) {
+		if (expected_timers_generation != multimesh_timers_generation) {
+			return;
+		}
 		if (time <= 0.0) {
 			UtilityFunctions::push_error("When calling multimesh_attach_time_based_function(), you need to provide a time value that is above 0");
 			return;
@@ -1760,6 +1775,7 @@ public:
 	}
 
 	_ALWAYS_INLINE_ void _do_detach_all_time_based_functions() {
+		++multimesh_timers_generation;
 		multimesh_custom_timers.clear();
 	}
 

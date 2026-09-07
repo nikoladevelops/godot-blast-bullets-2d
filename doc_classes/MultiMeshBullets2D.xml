@@ -411,13 +411,6 @@
 				The collision shape currently cached for this multimesh.
 			</description>
 		</method>
-		<method name="get_inherited_velocity_offset" qualifiers="const">
-			<return type="Vector2" />
-			<description>
-				Get the inherited velocity offset. This is the velocity that gets added to the bullets when they are spawned. This is useful for creating effects like a machine gun that inherits the velocity of the player character, so that the bullets shoot out with more speed if the player is moving forward, and with less speed if the player is moving backward or standing still.
-				Note: If you want to set a custom inherited velocity offset, you can use [method set_inherited_velocity_offset].
-			</description>
-		</method>
 		<method name="get_monitorable" qualifiers="const">
 			<return type="bool" />
 			<description>
@@ -710,13 +703,6 @@
 				Swaps the collision shape live, on an active or pooled multimesh. Size-only changes apply to every bullet right away through the physics server. A different effective type additionally rebuilds the physics shapes and moves pooled instances into the matching pool bucket. The visual QuadMesh is texture-driven and stays untouched. The debugger picks up the new type and size on the next physics tick.
 			</description>
 		</method>
-		<method name="set_inherited_velocity_offset">
-			<return type="void" />
-			<param index="0" name="new_offset" type="Vector2" />
-			<description>
-				Sets a custom inherited velocity offset. This is the velocity that gets added to the bullets when they are spawned. This is useful for creating effects like a machine gun that inherits the velocity of the player character, so that the bullets shoot out with more speed if the player is moving forward, and with less speed if the player is moving backward or standing still.
-			</description>
-		</method>
 		<method name="set_monitorable">
 			<return type="void" />
 			<param index="0" name="value" type="bool" />
@@ -763,7 +749,7 @@
 			Whether the multimesh auto pooling is enabled or not.
 
 			When enabled, the multimesh will automatically get pushed to the object pool when all bullets are disabled.
-			When disabled, you are the one responsible for re-using the multimesh or clearing any time based callables that you might have attached with [member attach_time_based_function].
+			When disabled, you are the one responsible for re-using the multimesh or clearing any time based callables that you might have attached with [method multimesh_attach_time_based_function].
 
 			If you are going to save your multimesh bullets in an array, then it's probably best to disable auto pooling and manage the instances yourself.
 		</member>
