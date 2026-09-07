@@ -10,6 +10,7 @@
 #include "../shared/bullet_attachment_object_pool2d.hpp"
 #include "../shared/collision_shape_helper2d.hpp"
 #include "../shared/multimesh_object_pool2d.hpp"
+#include "godot_cpp/core/math.hpp"
 #include "godot_cpp/variant/utility_functions.hpp"
 #include "godot_cpp/variant/vector2.hpp"
 #include "shared/dynamic_sparse_set.hpp"
@@ -669,6 +670,46 @@ public:
 			real_t row_offset = 150.0,
 			bool rotate_grid_with_marker = true,
 			bool random_local_rotation = false);
+
+	// Generates transforms on a ring (or arc) around marker_transform.
+	// Set face_outward to false for implosion patterns that fly toward the center.
+	static TypedArray<Transform2D> helper_generate_transforms_ring(
+			int transforms_amount,
+			Transform2D marker_transform,
+			real_t radius = 150.0,
+			real_t start_angle = 0.0,
+			real_t arc = Math::TAU,
+			bool rotate_with_marker = true,
+			bool random_rotation = false,
+			bool face_outward = true);
+
+	// Generates transforms in an aimed cone: direction_angle is the cone center,
+	// spread is the full cone width, origins stagger along the direction so pellets
+	// do not stack on top of each other.
+	static TypedArray<Transform2D> helper_generate_transforms_fan(
+			int transforms_amount,
+			Transform2D marker_transform,
+			real_t spread = 0.5,
+			real_t direction_angle = 0.0,
+			real_t step_offset = 0.0);
+
+	// Generates transforms along an expanding spiral around marker_transform.
+	static TypedArray<Transform2D> helper_generate_transforms_spiral(
+			int transforms_amount,
+			Transform2D marker_transform,
+			real_t start_radius = 50.0,
+			real_t radius_step = 15.0,
+			real_t angle_step = 0.6,
+			bool rotate_with_marker = true);
+
+	// Aimed fan: same as helper_generate_transforms_fan with the cone centered on
+	// the marker-to-target direction.
+	static TypedArray<Transform2D> helper_generate_transforms_aimed(
+			int transforms_amount,
+			Transform2D marker_transform,
+			const Vector2 &target_position,
+			real_t spread = 0.3,
+			real_t step_offset = 0.0);
 };
 } //namespace BlastBullets2D
 

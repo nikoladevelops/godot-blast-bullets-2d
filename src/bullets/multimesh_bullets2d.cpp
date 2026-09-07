@@ -893,6 +893,26 @@ Transform2D MultiMeshBullets2D::get_bullet_transform(int bullet_index) const {
 
 	return all_cached_instance_transforms[bullet_index];
 }
+
+Transform2D MultiMeshBullets2D::get_bullet_global_transform(int bullet_index) const {
+	if (!validate_bullet_index(bullet_index, "get_bullet_global_transform")) {
+		return Transform2D();
+	}
+
+	return get_global_transform() * all_cached_instance_transforms[bullet_index];
+}
+
+Vector2 MultiMeshBullets2D::get_bullet_velocity(int bullet_index) const {
+	if (!validate_bullet_index(bullet_index, "get_bullet_velocity")) {
+		return Vector2();
+	}
+
+	int eff = (all_cached_velocity.size() == 1) ? 0 : bullet_index;
+	if (eff < 0 || eff >= (int)all_cached_velocity.size()) {
+		return Vector2();
+	}
+	return all_cached_velocity[eff];
+}
 void MultiMeshBullets2D::set_bullet_transform(int bullet_index, const Transform2D &new_transform, bool set_direction_based_on_transform) {
 	if (!validate_bullet_index(bullet_index, "set_bullet_transform")) {
 		return;
@@ -1264,6 +1284,33 @@ void MultiMeshBullets2D::set_collision_shape_runtime(const Ref<Shape2D> &new_sha
 	}
 }
 
+int MultiMeshBullets2D::get_bullet_collision_count(int bullet_index) const {
+	if (!validate_bullet_index(bullet_index, "get_bullet_collision_count")) {
+		return 0;
+	}
+	if (bullet_index < 0 || bullet_index >= (int)bullets_current_collision_count.size()) {
+		return 0;
+	}
+	return bullets_current_collision_count[bullet_index];
+}
+
+void MultiMeshBullets2D::set_bullet_collision_count(int bullet_index, int value) {
+	if (!validate_bullet_index(bullet_index, "set_bullet_collision_count")) {
+		return;
+	}
+	if (bullet_index < 0 || bullet_index >= (int)bullets_current_collision_count.size()) {
+		UtilityFunctions::push_error("set_bullet_collision_count: collision data not initialized for this multimesh.");
+		return;
+	}
+	if (value < 0) {
+		bullets_current_collision_count[bullet_index] = 0;
+	} else if (bullet_max_collision_count > 0 && value > bullet_max_collision_count) {
+		bullets_current_collision_count[bullet_index] = bullet_max_collision_count;
+	} else {
+		bullets_current_collision_count[bullet_index] = value;
+	}
+}
+
 void MultiMeshBullets2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_bullet_speed_data", "bullet_index"), &MultiMeshBullets2D::get_bullet_speed_data);
 	ClassDB::bind_method(D_METHOD("set_bullet_speed_data", "bullet_index", "new_bullet_speed_data"), &MultiMeshBullets2D::set_bullet_speed_data);
@@ -1297,6 +1344,8 @@ void MultiMeshBullets2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("all_bullets_set_texture_rotation_towards_node2d", "target_node", "bullet_index_start", "bullet_index_end_inclusive"), &MultiMeshBullets2D::all_bullets_set_texture_rotation_towards_node2d, DEFVAL(0), DEFVAL(-1));
 
 	ClassDB::bind_method(D_METHOD("get_bullet_transform", "bullet_index"), &MultiMeshBullets2D::get_bullet_transform);
+	ClassDB::bind_method(D_METHOD("get_bullet_global_transform", "bullet_index"), &MultiMeshBullets2D::get_bullet_global_transform);
+	ClassDB::bind_method(D_METHOD("get_bullet_velocity", "bullet_index"), &MultiMeshBullets2D::get_bullet_velocity);
 	ClassDB::bind_method(D_METHOD("set_bullet_transform", "bullet_index", "new_transform", "set_direction_based_on_transform"), &MultiMeshBullets2D::set_bullet_transform, DEFVAL(false));
 	ClassDB::bind_method(D_METHOD("all_bullets_get_transforms", "bullet_index_start", "bullet_index_end_inclusive"), &MultiMeshBullets2D::all_bullets_get_transforms, DEFVAL(0), DEFVAL(-1));
 	ClassDB::bind_method(D_METHOD("all_bullets_set_transforms", "new_transform", "set_direction_based_on_transform", "bullet_index_start", "bullet_index_end_inclusive"), &MultiMeshBullets2D::all_bullets_set_transforms, DEFVAL(false), DEFVAL(0), DEFVAL(-1));
@@ -1359,6 +1408,8 @@ void MultiMeshBullets2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_bullet_max_collision_count", "value"), &MultiMeshBullets2D::set_bullet_max_collision_count);
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "bullet_max_collision_count"), "set_bullet_max_collision_count", "get_bullet_max_collision_count");
 
+	ClassDB::bind_method(D_METHOD("get_bullet_collision_count", "bullet_index"), &MultiMeshBullets2D::get_bullet_collision_count);
+	ClassDB::bind_method(D_METHOD("set_bullet_collision_count", "bullet_index", "value"), &MultiMeshBullets2D::set_bullet_collision_count);
 	ClassDB::bind_method(D_METHOD("get_bullets_current_collision_count"), &MultiMeshBullets2D::get_bullets_current_collision_count);
 	ClassDB::bind_method(D_METHOD("set_bullets_current_collision_count", "arr"), &MultiMeshBullets2D::set_bullets_current_collision_count);
 	ADD_PROPERTY(PropertyInfo(Variant::ARRAY, "bullets_current_collision_count"), "set_bullets_current_collision_count", "get_bullets_current_collision_count");

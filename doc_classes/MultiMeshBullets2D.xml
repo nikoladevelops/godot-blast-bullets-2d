@@ -324,11 +324,25 @@
 				Get the amount of bullets inside the multimesh
 			</description>
 		</method>
+		<method name="get_bullet_collision_count" qualifiers="const">
+			<return type="int" />
+			<param index="0" name="bullet_index" type="int" />
+			<description>
+				Get how many times a specific bullet has collided so far. See [method set_bullet_collision_count] for writing it.
+			</description>
+		</method>
 		<method name="get_bullet_direction" qualifiers="const">
 			<return type="Vector2" />
 			<param index="0" name="bullet_index" type="int" />
 			<description>
 				Get the direction of a specific bullet. Returns a [Vector2] direction.
+			</description>
+		</method>
+		<method name="get_bullet_global_transform" qualifiers="const">
+			<return type="Transform2D" />
+			<param index="0" name="bullet_index" type="int" />
+			<description>
+				Get a specific bullet's transform in global space (the multimesh transform applied). Use this when you need world coordinates, for example to spawn child bullets exactly where a bullet died. [method get_bullet_transform] returns the same transform in the multimesh local space instead.
 			</description>
 		</method>
 		<method name="get_bullet_movement_pattern_curve" qualifiers="const">
@@ -364,6 +378,13 @@
 			<param index="0" name="bullet_index" type="int" />
 			<description>
 				Get the transform of a specific bullet. Returns a [Transform2D] containing the bullet's position, rotation and scale.
+			</description>
+		</method>
+		<method name="get_bullet_velocity" qualifiers="const">
+			<return type="Vector2" />
+			<param index="0" name="bullet_index" type="int" />
+			<description>
+				Get the exact instantaneous velocity of a specific bullet, including movement patterns, orbiting and curves. Use this for gameplay logic such as splitting bullets, where rebuilding velocity from direction and speed would lose those effects.
 			</description>
 		</method>
 		<method name="get_collision_layer" qualifiers="const">
@@ -518,6 +539,14 @@
 			<return type="void" />
 			<description>
 				Unfreezes frame advancement.
+			</description>
+		</method>
+		<method name="set_bullet_collision_count">
+			<return type="void" />
+			<param index="0" name="bullet_index" type="int" />
+			<param index="1" name="value" type="int" />
+			<description>
+				Set how many times a specific bullet has collided so far. Negative values become 0, values above [member bullet_max_collision_count] become the max (when the max is above 0). See [method get_bullet_collision_count] for reading it.
 			</description>
 		</method>
 		<method name="set_bullet_direction">

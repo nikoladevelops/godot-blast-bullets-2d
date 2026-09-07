@@ -112,6 +112,28 @@
 				Get the physics world space in which the bullets interact.
 			</description>
 		</method>
+		<method name="helper_generate_transforms_aimed" qualifiers="static">
+			<return type="Transform2D[]" />
+			<param index="0" name="transforms_amount" type="int" />
+			<param index="1" name="marker_transform" type="Transform2D" />
+			<param index="2" name="target_position" type="Vector2" />
+			<param index="3" name="spread" type="float" default="0.3" />
+			<param index="4" name="step_offset" type="float" default="0.0" />
+			<description>
+				Generates a fan of transforms aimed from the marker at [code]target_position[/code]. Same as [method helper_generate_transforms_fan] with the cone centered on the marker to target direction. Useful for aimed bursts and shotgun spreads that track a player. Returns an empty array if the target coincides with the marker.
+			</description>
+		</method>
+		<method name="helper_generate_transforms_fan" qualifiers="static">
+			<return type="Transform2D[]" />
+			<param index="0" name="transforms_amount" type="int" />
+			<param index="1" name="marker_transform" type="Transform2D" />
+			<param index="2" name="spread" type="float" default="0.5" />
+			<param index="3" name="direction_angle" type="float" default="0.0" />
+			<param index="4" name="step_offset" type="float" default="0.0" />
+			<description>
+				Generates a fan of transforms spread evenly across a cone. [code]direction_angle[/code] is the cone center relative to the marker rotation, [code]spread[/code] is the full cone width in radians, and [code]step_offset[/code] staggers origins along the direction so pellets do not stack on top of each other. A single bullet flies straight down the cone center. Useful for shotgun spreads.
+			</description>
+		</method>
 		<method name="helper_generate_transforms_grid" qualifiers="static">
 			<return type="Transform2D[]" />
 			<param index="0" name="transforms_amount" type="int" />
@@ -124,6 +146,32 @@
 			<param index="7" name="random_local_rotation" type="bool" default="false" />
 			<description>
 				Generates a grid of transforms that are positioned relative to the [code]marker_transform[/code].
+			</description>
+		</method>
+		<method name="helper_generate_transforms_ring" qualifiers="static">
+			<return type="Transform2D[]" />
+			<param index="0" name="transforms_amount" type="int" />
+			<param index="1" name="marker_transform" type="Transform2D" />
+			<param index="2" name="radius" type="float" default="150.0" />
+			<param index="3" name="start_angle" type="float" default="0.0" />
+			<param index="4" name="arc" type="float" default="6.2831855" />
+			<param index="5" name="rotate_with_marker" type="bool" default="true" />
+			<param index="6" name="random_rotation" type="bool" default="false" />
+			<param index="7" name="face_outward" type="bool" default="true" />
+			<description>
+				Generates transforms placed evenly on a ring (or arc, when [code]arc[/code] is smaller than a full turn) around the marker. Every bullet faces outward, so art drawn facing right travels away from the center. Set [code]face_outward[/code] to false for implosion patterns that fly toward the center. Useful for radial bursts and boss rings.
+			</description>
+		</method>
+		<method name="helper_generate_transforms_spiral" qualifiers="static">
+			<return type="Transform2D[]" />
+			<param index="0" name="transforms_amount" type="int" />
+			<param index="1" name="marker_transform" type="Transform2D" />
+			<param index="2" name="start_radius" type="float" default="50.0" />
+			<param index="3" name="radius_step" type="float" default="15.0" />
+			<param index="4" name="angle_step" type="float" default="0.6" />
+			<param index="5" name="rotate_with_marker" type="bool" default="true" />
+			<description>
+				Generates transforms along an expanding spiral around the marker, each bullet facing outward. Useful for rotating emitter looks and volute patterns.
 			</description>
 		</method>
 		<method name="populate_attachments_pool">

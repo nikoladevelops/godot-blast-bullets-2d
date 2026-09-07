@@ -435,6 +435,14 @@ float *w = batch_buffer.ptrw();
 	Transform2D get_bullet_transform(int bullet_index) const;
 	void set_bullet_transform(int bullet_index, const Transform2D &new_transform, bool set_direction_based_on_transform = false);
 
+	// Instance transform in global space (multimesh global transform applied).
+	// Use this for gameplay logic such as spawning child bullets at a bullet's position.
+	Transform2D get_bullet_global_transform(int bullet_index) const;
+
+	// Exact instantaneous velocity of a bullet, including movement patterns,
+	// orbiting and curves. Use this for gameplay logic such as splitting bullets.
+	Vector2 get_bullet_velocity(int bullet_index) const;
+
 	TypedArray<Transform2D> all_bullets_get_transforms(int bullet_index_start = 0, int bullet_index_end_inclusive = -1) const;
 	void all_bullets_set_transforms(const Transform2D &new_transform, bool set_direction_based_on_transform = false, int bullet_index_start = 0, int bullet_index_end_inclusive = -1);
 
@@ -1554,6 +1562,13 @@ float *w = batch_buffer.ptrw();
 
 	int get_bullet_max_collision_count() const { return bullet_max_collision_count; }
 	void set_bullet_max_collision_count(int value) { bullet_max_collision_count = value; }
+
+	// Single-bullet collision counter read. See set_bullet_collision_count for writing.
+	int get_bullet_collision_count(int bullet_index) const;
+
+	// Single-bullet collision counter write. Clamped like set_bullets_current_collision_count:
+	// negatives become 0, values above max become max (when max > 0).
+	void set_bullet_collision_count(int bullet_index, int value);
 
 	TypedArray<int> get_bullets_current_collision_count() const {
 		TypedArray<int> arr;
