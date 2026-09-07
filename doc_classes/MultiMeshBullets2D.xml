@@ -236,6 +236,12 @@
 				Enables the attachment of a specific bullet, if it has one.
 			</description>
 		</method>
+		<method name="get_amount_active_attachments" qualifiers="const">
+			<return type="int" />
+			<description>
+				Returns how many bullets of this multimesh currently have an attachment assigned. Useful for debugging attachment pooling on a [BulletFactory2D] controllable handle.
+			</description>
+		</method>
 		<method name="bullet_free_attachment">
 			<return type="void" />
 			<param index="0" name="bullet_index" type="int" />
@@ -266,7 +272,7 @@
 			<param index="0" name="bullet_index" type="int" />
 			<param index="1" name="attachment_scene" type="PackedScene" />
 			<param index="2" name="attachment_pooling_id" type="int" />
-			<param index="3" name="bullet_attachment_offset" type="Vector2" />
+			<param index="3" name="bullet_attachment_offset" type="Vector2" default="Vector2(0, 0)" />
 			<param index="4" name="stick_relative_to_bullet" type="bool" default="true" />
 			<description>
 				Spawns an attachment to a specific bullet. An attachment is a [BulletAttachment2D] that can contain a [Node2D] with particles, lights, etc... that will be attached to the bullet and follow it around.

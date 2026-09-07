@@ -64,15 +64,15 @@ void BulletRotationData2D::set_rotation_acceleration(real_t new_rotation_acceler
 }
 
 void BulletRotationData2D::_bind_methods() {
-	ClassDB::bind_method(D_METHOD("set_rotation_speed"), &BulletRotationData2D::set_rotation_speed);
+	ClassDB::bind_method(D_METHOD("set_rotation_speed", "new_rotation_speed"), &BulletRotationData2D::set_rotation_speed);
 	ClassDB::bind_method(D_METHOD("get_rotation_speed"), &BulletRotationData2D::get_rotation_speed);
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "rotation_speed"), "set_rotation_speed", "get_rotation_speed");
 
-	ClassDB::bind_method(D_METHOD("set_max_rotation_speed"), &BulletRotationData2D::set_max_rotation_speed);
+	ClassDB::bind_method(D_METHOD("set_max_rotation_speed", "new_max_rotation_speed"), &BulletRotationData2D::set_max_rotation_speed);
 	ClassDB::bind_method(D_METHOD("get_max_rotation_speed"), &BulletRotationData2D::get_max_rotation_speed);
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "max_rotation_speed"), "set_max_rotation_speed", "get_max_rotation_speed");
 
-	ClassDB::bind_method(D_METHOD("set_rotation_acceleration"), &BulletRotationData2D::set_rotation_acceleration);
+	ClassDB::bind_method(D_METHOD("set_rotation_acceleration", "new_rotation_acceleration"), &BulletRotationData2D::set_rotation_acceleration);
 	ClassDB::bind_method(D_METHOD("get_rotation_acceleration"), &BulletRotationData2D::get_rotation_acceleration);
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "rotation_acceleration"), "set_rotation_acceleration", "get_rotation_acceleration");
 

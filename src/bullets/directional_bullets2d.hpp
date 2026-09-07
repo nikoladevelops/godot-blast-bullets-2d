@@ -426,24 +426,26 @@ public:
 					// TEXTURE ROTATION WHEN ORBITING
 					// Only rotate if the bullet is PHYSICALLY orbiting (Locked or just snapped).
 					// DontMove means frozen: leave the texture alone.
-					if (is_physically_orbiting_this_frame && orbiting_data->direction != DontMove) {
-						Vector2 look_dir;
-						Vector2 radial_vec = (curr_bullet_origin - homing_target_pos).normalized();
+				if (is_physically_orbiting_this_frame && orbiting_data->direction != DontMove) {
+					Vector2 look_dir = Vector2();
+					Vector2 radial_vec = (curr_bullet_origin - homing_target_pos).normalized();
 
-						switch (orbiting_data->texture_rotation) {
-							case FaceTarget:
-								look_dir = -radial_vec;
-								break;
-							case FaceOppositeTarget:
-								look_dir = radial_vec;
-								break;
-							case FaceOrbitingDirection:
-								look_dir = (orbiting_data->direction == OrbitRight) ? Vector2(-radial_vec.y, radial_vec.x) : Vector2(radial_vec.y, -radial_vec.x);
-								break;
-							case FaceOppositeOrbitingDirection:
-								look_dir = (orbiting_data->direction == OrbitRight) ? Vector2(radial_vec.y, -radial_vec.x) : Vector2(-radial_vec.y, radial_vec.x);
-								break;
-						}
+					switch (orbiting_data->texture_rotation) {
+						case FaceTarget:
+							look_dir = -radial_vec;
+							break;
+						case FaceOppositeTarget:
+							look_dir = radial_vec;
+							break;
+						case FaceOrbitingDirection:
+							look_dir = (orbiting_data->direction == OrbitRight) ? Vector2(-radial_vec.y, radial_vec.x) : Vector2(radial_vec.y, -radial_vec.x);
+							break;
+						case FaceOppositeOrbitingDirection:
+							look_dir = (orbiting_data->direction == OrbitRight) ? Vector2(radial_vec.y, -radial_vec.x) : Vector2(-radial_vec.y, radial_vec.x);
+							break;
+						default:
+							break;
+					}
 
 						if (look_dir != Vector2()) {
 							rotate_to_target(i, look_dir, 0.0);
@@ -500,6 +502,16 @@ public:
 		if (orbiting_radius < 0.01) {
 			UtilityFunctions::push_error("Orbiting radius must be >= 0.01, got " + String::num(orbiting_radius) + ". Clamping to 0.01 to avoid division by zero.");
 			orbiting_radius = 0.01;
+		}
+
+		if (orbiting_direction < DontMove || orbiting_direction > OrbitRight) {
+			UtilityFunctions::push_error("Invalid orbiting direction " + String::num_int64(orbiting_direction) + ". Use DontMove, OrbitLeft or OrbitRight.");
+			return;
+		}
+
+		if (orbiting_texture_rotation < FaceTarget || orbiting_texture_rotation > FaceOppositeOrbitingDirection) {
+			UtilityFunctions::push_error("Invalid orbiting texture rotation " + String::num_int64(orbiting_texture_rotation) + ". Use FaceTarget, FaceOppositeTarget, FaceOrbitingDirection or FaceOppositeOrbitingDirection.");
+			return;
 		}
 
 		auto &orbiting_status = all_orbiting_status[bullet_index];
@@ -591,6 +603,10 @@ public:
 		}
 
 		auto &orbiting_data = all_orbiting_data[bullet_index];
+		if (new_texture_rotation < FaceTarget || new_texture_rotation > FaceOppositeOrbitingDirection) {
+			UtilityFunctions::push_error("Invalid orbiting texture rotation " + String::num_int64(new_texture_rotation) + ". Use FaceTarget, FaceOppositeTarget, FaceOrbitingDirection or FaceOppositeOrbitingDirection.");
+			return;
+		}
 		orbiting_data.texture_rotation = new_texture_rotation;
 	}
 
@@ -623,6 +639,10 @@ public:
 		}
 
 		auto &orbiting_data = all_orbiting_data[bullet_index];
+		if (new_direction < DontMove || new_direction > OrbitRight) {
+			UtilityFunctions::push_error("Invalid orbiting direction " + String::num_int64(new_direction) + ". Use DontMove, OrbitLeft or OrbitRight.");
+			return;
+		}
 		orbiting_data.direction = new_direction;
 	}
 

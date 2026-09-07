@@ -242,10 +242,11 @@
 			<return type="void" />
 			<param index="0" name="bullet_index" type="int" />
 			<param index="1" name="orbiting_radius" type="float" />
-			<param index="2" name="orbiting_direction" type="int" enum="DirectionalBullets2D.OrbitingDirection" />
-			<param index="3" name="orbiting_texture_rotation" type="int" enum="DirectionalBullets2D.OrbitingTextureRotation" />
+			<param index="2" name="orbiting_direction" type="int" enum="DirectionalBullets2D.OrbitingDirection" default="2" />
+			<param index="3" name="orbiting_texture_rotation" type="int" enum="DirectionalBullets2D.OrbitingTextureRotation" default="0" />
 			<description>
 				Enables orbiting for the specified bullet with the given parameters.
+				Invalid direction or texture rotation values are rejected with an error and orbiting stays disabled.
 
 				Note that orbiting relies on having a homing target to orbit around.
 			</description>
@@ -386,7 +387,7 @@
 			<param index="0" name="bullet_index" type="int" />
 			<param index="1" name="new_direction" type="int" enum="DirectionalBullets2D.OrbitingDirection" />
 			<description>
-				Sets the orbiting direction for the specified bullet.
+				Sets the orbiting direction for the specified bullet. Invalid values are rejected with an error and the direction stays unchanged.
 			</description>
 		</method>
 		<method name="bullet_set_orbiting_radius">
@@ -402,7 +403,7 @@
 			<param index="0" name="bullet_index" type="int" />
 			<param index="1" name="new_texture_rotation" type="int" enum="DirectionalBullets2D.OrbitingTextureRotation" />
 			<description>
-				Sets the orbiting texture rotation for the specified bullet.
+				Sets the orbiting texture rotation for the specified bullet. Invalid values are rejected with an error and the rotation stays unchanged.
 			</description>
 		</method>
 		<method name="shared_homing_deque_check_current_target_type" qualifiers="const">

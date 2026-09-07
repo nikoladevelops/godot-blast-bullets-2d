@@ -1368,6 +1368,7 @@ void MultiMeshBullets2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("bullet_free_attachment", "bullet_index"), &MultiMeshBullets2D::bullet_free_attachment);
 	ClassDB::bind_method(D_METHOD("bullet_disable_attachment", "bullet_index"), &MultiMeshBullets2D::bullet_disable_attachment);
 	ClassDB::bind_method(D_METHOD("bullet_enable_attachment", "bullet_index"), &MultiMeshBullets2D::bullet_enable_attachment);
+	ClassDB::bind_method(D_METHOD("get_amount_active_attachments"), &MultiMeshBullets2D::get_amount_active_attachments);
 	ClassDB::bind_method(D_METHOD("_do_deferred_bullet_disable_attachment", "bullet_index", "expected_generation"), &MultiMeshBullets2D::_do_deferred_bullet_disable_attachment);
 
 	ClassDB::bind_method(D_METHOD("get_amount_bullets"), &MultiMeshBullets2D::get_amount_bullets);
@@ -1438,7 +1439,7 @@ void MultiMeshBullets2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("all_bullets_set_attachment_to_null", "bullet_index_start", "bullet_index_end_inclusive"), &MultiMeshBullets2D::all_bullets_set_attachment_to_null, DEFVAL(0), DEFVAL(-1));
 	ClassDB::bind_method(D_METHOD("all_bullets_set_attachment", "attachment_scene", "attachment_pooling_id", "bullet_attachment_offset", "stick_relative_to_bullet", "bullet_index_start", "bullet_index_end_inclusive"), &MultiMeshBullets2D::all_bullets_set_attachment, DEFVAL(true), DEFVAL(0), DEFVAL(-1));
 
-	ClassDB::bind_method(D_METHOD("bullet_set_attachment", "bullet_index", "attachment_scene", "attachment_pooling_id", "bullet_attachment_offset", "stick_relative_to_bullet"), &MultiMeshBullets2D::bullet_set_attachment, DEFVAL(true));
+	ClassDB::bind_method(D_METHOD("bullet_set_attachment", "bullet_index", "attachment_scene", "attachment_pooling_id", "bullet_attachment_offset", "stick_relative_to_bullet"), &MultiMeshBullets2D::bullet_set_attachment, DEFVAL(Vector2(0, 0)), DEFVAL(true));
 
 	ClassDB::bind_method(D_METHOD("set_shared_bullet_curves_data", "data"), &MultiMeshBullets2D::set_shared_bullet_curves_data);
 	ClassDB::bind_method(D_METHOD("get_shared_bullet_curves_data"), &MultiMeshBullets2D::get_shared_bullet_curves_data);

@@ -231,7 +231,7 @@ void MultiMeshBulletsData2D::set_bullets_current_collision_count(const TypedArra
 }
 
 void MultiMeshBulletsData2D::_bind_methods() {
-	ClassDB::bind_method(D_METHOD("set_transforms"), &MultiMeshBulletsData2D::set_transforms);
+	ClassDB::bind_method(D_METHOD("set_transforms", "new_transforms"), &MultiMeshBulletsData2D::set_transforms);
 	ClassDB::bind_method(D_METHOD("get_transforms"), &MultiMeshBulletsData2D::get_transforms);
 	ADD_PROPERTY(PropertyInfo(Variant::ARRAY, "transforms"), "set_transforms", "get_transforms");
 
