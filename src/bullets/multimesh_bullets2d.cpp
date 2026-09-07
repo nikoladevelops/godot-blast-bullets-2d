@@ -246,7 +246,10 @@ void MultiMeshBullets2D::set_up_bullet_instances(const MultiMeshBulletsData2D &d
 	} else {
 		bool success = set_bullets_current_collision_count(data.bullets_current_collision_count);
 		if (!success) {
-			return;
+			// set_* already reported the mismatch; fall back to zeros explicitly so
+			// the vector can't be left half-cleared below by the size check inside.
+			bullets_current_collision_count.clear();
+			bullets_current_collision_count.resize(amount_bullets, 0);
 		}
 	}
 
@@ -446,10 +449,8 @@ bool MultiMeshBullets2D::play_sprite_animation(const Ref<SpriteFrames> &p_sprite
 		UtilityFunctions::push_error("MultiMeshBullets2D play_sprite_animation: sprite_frames is null.");
 		return false;
 	}
-	if (p_animation == StringName() || String(p_animation).is_empty()) {
-		UtilityFunctions::push_error("MultiMeshBullets2D play_sprite_animation: animation is empty.");
-		return false;
-	}
+	// Empty follows the same auto-resolve rules as spawn ("default" if present,
+	// else the first animation with frames) instead of erroring.
 	return rebuild_sprite_animation(p_sprite_frames, p_animation);
 }
 
@@ -458,10 +459,7 @@ bool MultiMeshBullets2D::play_sprite_animation_name(const StringName &p_animatio
 		UtilityFunctions::push_error("MultiMeshBullets2D play_sprite_animation_name: no SpriteFrames cached yet, call play_sprite_animation first.");
 		return false;
 	}
-	if (p_animation == StringName() || String(p_animation).is_empty()) {
-		UtilityFunctions::push_error("MultiMeshBullets2D play_sprite_animation_name: animation is empty.");
-		return false;
-	}
+	// Empty follows the same auto-resolve rules as spawn.
 	return rebuild_sprite_animation(anim_source, p_animation);
 }
 
@@ -645,7 +643,10 @@ Transform2D MultiMeshBullets2D::generate_texture_transform(Transform2D transf, b
 
 void MultiMeshBullets2D::set_up_area(const int collision_layer, const int collision_mask, bool new_monitorable, const RID &physics_space) {
 	monitorable = new_monitorable;
-	physics_server->area_set_space(area, bullet_factory->physics_space);
+	// Prefer the explicitly passed space; fall back to the factory's only when the
+	// caller handed us an invalid RID.
+	const RID &space_to_use = physics_space.is_valid() ? physics_space : bullet_factory->physics_space;
+	physics_server->area_set_space(area, space_to_use);
 	physics_server->area_set_monitorable(area, monitorable);
 	physics_server->area_set_area_monitor_callback(area, callable_mp(this, &MultiMeshBullets2D::area_entered_func));
 	physics_server->area_set_monitor_callback(area, callable_mp(this, &MultiMeshBullets2D::body_entered_func));
@@ -935,7 +936,7 @@ Transform2D MultiMeshBullets2D::get_bullet_global_transform(int bullet_index) co
 		return Transform2D();
 	}
 
-	return get_global_transform() * all_cached_instance_transforms[bullet_index];
+	return all_cached_instance_transforms[bullet_index];
 }
 
 Vector2 MultiMeshBullets2D::get_bullet_velocity(int bullet_index) const {

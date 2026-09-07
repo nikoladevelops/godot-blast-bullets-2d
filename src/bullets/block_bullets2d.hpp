@@ -75,11 +75,17 @@ public:
 
 		bullet_accelerate_speed(0, delta);
 
-		// Handle collisions safely after all physics processing logic is done
-		for (auto &data : all_collided_bullets) {
-			handle_bullet_collision(data.collision_type, data.bullet_index, data.collided_instance_id);
+		// Swap into a local first: handle_bullet_collision can funnel into
+		// disable_multimesh() (last bullet out), which clears the member vector.
+		// Iterating the member directly would invalidate iterators mid-loop and
+		// silently drop the remaining collisions of this frame.
+		if (!all_collided_bullets.empty()) {
+			std::vector<BulletCollisionData2D> pending_collisions;
+			pending_collisions.swap(all_collided_bullets);
+			for (auto &data : pending_collisions) {
+				handle_bullet_collision(data.collision_type, data.bullet_index, data.collided_instance_id);
+			}
 		}
-		all_collided_bullets.clear();
 	}
 
 protected:

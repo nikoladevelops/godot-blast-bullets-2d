@@ -348,7 +348,7 @@
 			<return type="Transform2D" />
 			<param index="0" name="bullet_index" type="int" />
 			<description>
-				Get a specific bullet's transform in global space (the multimesh transform applied). Use this when you need world coordinates, for example to spawn child bullets exactly where a bullet died. [method get_bullet_transform] returns the same transform in the multimesh local space instead.
+				Get a specific bullet's transform in global space (the caches already hold global-space transforms). Use this when you need world coordinates, for example to spawn child bullets exactly where a bullet died. [method get_bullet_transform] returns the same transform instead.
 			</description>
 		</method>
 		<method name="get_bullet_movement_pattern_curve" qualifiers="const">

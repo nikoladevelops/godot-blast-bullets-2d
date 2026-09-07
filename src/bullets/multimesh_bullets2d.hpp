@@ -254,6 +254,9 @@ float *w = batch_buffer.ptrw();
 		TypedArray<Transform2D> transfs;
 		TypedArray<int> bullet_indexes;
 
+		// Caches already hold global-space transforms (spawn data is global and all
+		// movement/homing math is global), so store them directly. Composing with
+		// get_global_transform() here would double-apply the node transform.
 		for (int i : active_copy) {
 			if (!all_bullets_enabled_set.contains(i)) {
 				continue;
@@ -440,7 +443,8 @@ float *w = batch_buffer.ptrw();
 	Transform2D get_bullet_transform(int bullet_index) const;
 	void set_bullet_transform(int bullet_index, const Transform2D &new_transform, bool set_direction_based_on_transform = false);
 
-	// Instance transform in global space (multimesh global transform applied).
+	// Instance transform in global space. The caches already hold global-space
+	// transforms, so this returns the cache directly.
 	// Use this for gameplay logic such as spawning child bullets at a bullet's position.
 	Transform2D get_bullet_global_transform(int bullet_index) const;
 
@@ -742,9 +746,11 @@ float *w = batch_buffer.ptrw();
 			bullet_index_end_inclusive = amount_bullets - 1;
 		}
 		if (bullet_index_start > bullet_index_end_inclusive) {
-			bullet_index_start = 0;
-			bullet_index_end_inclusive = amount_bullets - 1;
-			UtilityFunctions::push_error("Invalid index range in " + function_name);
+			// Clamp the inverted range to empty instead of silently expanding to
+			// "everything": start==end could no-op, but widening to the full
+			// multimesh on a typo'd range is how users nuke state they didn't mean to.
+			UtilityFunctions::push_error("Invalid index range in " + function_name + " (start > end). Nothing was applied.");
+			bullet_index_end_inclusive = bullet_index_start - 1;
 		}
 	}
 
@@ -1370,6 +1376,10 @@ float *w = batch_buffer.ptrw();
 		for (auto &p : all_movement_pattern_data) {
 			p = BulletMovementPatternData2D();
 		}
+		// Drop homing targets here too (the override is a no-op for block bullets).
+		// Otherwise a pooled instance carries stale deques into its next owner and
+		// keeps the global mouse-target counter inflated while sitting idle.
+		clear_homing_state_for_teardown();
 
 		set_visible(false); // Hide the multimesh node itself
 
@@ -1495,10 +1505,15 @@ float *w = batch_buffer.ptrw();
 
 		Object *hit_target = ObjectDB::get_instance(entered_instance_id);
 
+		// Caches already hold global-space transforms (spawn data is global, all
+		// movement/homing math is global), so pass the cache straight through.
+		// Composing with get_global_transform() here would double-apply the node.
+		const Transform2D bullet_global_transf = all_cached_instance_transforms[bullet_index];
+
 		if (collision_type == CollisionType::AREA) {
-			bullet_factory->emit_signal("area_entered", hit_target, this, bullet_index, bullets_custom_data, all_cached_instance_transforms[bullet_index]);
+			bullet_factory->emit_signal("area_entered", hit_target, this, bullet_index, bullets_custom_data, bullet_global_transf);
 		} else if (collision_type == CollisionType::BODY) {
-			bullet_factory->emit_signal("body_entered", hit_target, this, bullet_index, bullets_custom_data, all_cached_instance_transforms[bullet_index]);
+			bullet_factory->emit_signal("body_entered", hit_target, this, bullet_index, bullets_custom_data, bullet_global_transf);
 		}
 
 		// Disable the bullet attachment if the bullet reached its max collision count and the attachment is still enabled

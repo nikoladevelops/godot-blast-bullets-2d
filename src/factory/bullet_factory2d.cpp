@@ -54,8 +54,9 @@ static bool validate_spawn_data(const Ref<MultiMeshBulletsData2D> &spawn_data, c
 		return false;
 	}
 	// A non-positive finite lifetime would die on the first tick; fail open with an error instead of a silent vanish.
-	if (!spawn_data->is_life_time_infinite && spawn_data->max_life_time <= 0.0) {
-		UtilityFunctions::push_error(String("Error in ") + caller_name + ": max_life_time must be > 0 when lifetime is not infinite.");
+	// NaN must be rejected explicitly: NaN <= 0.0 is false, so it would slip through and never expire.
+	if (!spawn_data->is_life_time_infinite && (!(spawn_data->max_life_time > 0.0) || !Math::is_finite(spawn_data->max_life_time))) {
+		UtilityFunctions::push_error(String("Error in ") + caller_name + ": max_life_time must be a finite value > 0 when lifetime is not infinite.");
 		return false;
 	}
 	return true;
@@ -1215,7 +1216,10 @@ TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_ring(
 	}
 
 	const real_t base_rotation = rotate_with_marker ? marker_transform.get_rotation() : 0.0;
-	const real_t step = (transforms_amount > 1) ? arc / (real_t)(transforms_amount - 1) : 0.0;
+	// Closed ring (arc ~= TAU): divide by n so first/last don't stack on the same
+	// spot. Open arcs keep the n-1 divisor so the endpoints land on start/arc end.
+	const bool is_closed_ring = Math::abs(Math::abs(arc) - Math::TAU) < 0.0001;
+	const real_t step = (transforms_amount > 1) ? arc / (real_t)(is_closed_ring ? transforms_amount : (transforms_amount - 1)) : 0.0;
 	for (int i = 0; i < transforms_amount; ++i) {
 		const real_t angle = base_rotation + start_angle + step * (real_t)i;
 		const Vector2 offset = Vector2(Math::cos(angle), Math::sin(angle)) * radius;
