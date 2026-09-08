@@ -106,6 +106,12 @@
 				Sometimes the [b]BulletFactory2D[/b] might be busy doing some important work. This property provides an easy way to check if that's true.
 			</description>
 		</method>
+		<method name="get_is_tearing_down" qualifiers="const">
+			<return type="bool" />
+			<description>
+			Returns true once the factory started destroying itself. While true, teardown paths stop touching child nodes and most factory operations report an error instead of running.
+			</description>
+		</method>
 		<method name="get_physics_space" qualifiers="const">
 			<return type="RID" />
 			<description>
@@ -148,6 +154,17 @@
 				Generates a grid of transforms that are positioned relative to the [code]marker_transform[/code].
 			</description>
 		</method>
+		<method name="helper_generate_transforms_line" qualifiers="static">
+			<return type="Transform2D[]" />
+			<param index="0" name="transforms_amount" type="int" />
+			<param index="1" name="marker_transform" type="Transform2D" />
+			<param index="2" name="direction" type="Vector2" />
+			<param index="3" name="spacing" type="float" default="32.0" />
+			<param index="4" name="face_direction" type="bool" default="true" />
+			<description>
+				Generates transforms in a straight wall centered on the marker along [code]direction[/code], spaced evenly by [code]spacing[/code]. Bullets face along the line when [code]face_direction[/code] is true, otherwise they keep the marker rotation. Useful for walls, curtains and gates. Returns an empty array when the direction is zero.
+			</description>
+		</method>
 		<method name="helper_generate_transforms_ring" qualifiers="static">
 			<return type="Transform2D[]" />
 			<param index="0" name="transforms_amount" type="int" />
@@ -174,17 +191,6 @@
 				Generates transforms along an expanding spiral around the marker, each bullet facing outward. Useful for rotating emitter looks and volute patterns.
 			</description>
 		</method>
-		<method name="helper_generate_transforms_line" qualifiers="static">
-			<return type="Transform2D[]" />
-			<param index="0" name="transforms_amount" type="int" />
-			<param index="1" name="marker_transform" type="Transform2D" />
-			<param index="2" name="direction" type="Vector2" />
-			<param index="3" name="spacing" type="float" default="32.0" />
-			<param index="4" name="face_direction" type="bool" default="true" />
-			<description>
-				Generates transforms in a straight wall centered on the marker along [code]direction[/code], spaced evenly by [code]spacing[/code]. Bullets face along the line when [code]face_direction[/code] is true, otherwise they keep the marker rotation. Useful for walls, curtains and gates. Returns an empty array when the direction is zero.
-			</description>
-		</method>
 		<method name="populate_attachments_pool">
 			<return type="void" />
 			<param index="0" name="attachment_scene" type="PackedScene" />
@@ -201,6 +207,13 @@
 			<param index="2" name="instance_count" type="int" />
 			<description>
 				Pre-creates [code]instance_count[/code] disabled multimeshes in one exact bucket. [code]key.amount_bullets[/code] is bullets per multimesh (must equal [code]multimesh_data[/code] transforms size); [code]instance_count[/code] is how many multimeshes to create. The [code]key[/code] is required and must match the bucket derived from [code]multimesh_data[/code] (amount_bullets + effective collision shape); mismatch aborts with an error and creates nothing. Example: [code]populate_bullets_pool(MultiMeshPoolKey2D.make(5, PhysicsServer2D.SHAPE_CIRCLE), data, 2)[/code] creates 2 multimeshes of 5 bullets each.
+			</description>
+		</method>
+		<method name="reactivate_multimesh_instance">
+			<return type="void" />
+			<param index="0" name="multimesh_bullets" type="MultiMeshBullets2D" />
+			<description>
+			Re-registers a pooled multimesh inside the factory's active set after one of its bullets was woken with enable_bullet() outside of a normal spawn. Does nothing when the multimesh is already active, when the factory is busy, or when the factory is tearing down. You normally never call this yourself, enable_bullet() already handles it.
 			</description>
 		</method>
 		<method name="reset">
@@ -228,6 +241,7 @@
 		<method name="spawn_block_bullets">
 			<return type="void" />
 			<param index="0" name="spawn_data" type="BlockBulletsData2D" />
+			<param index="1" name="inherited_velocity_offset" type="Vector2" default="Vector2(0, 0)" />
 			<description>
 				Spawns [BlockBullets2D] - bullets that act as a block that travels in a single direction with the same speed.
 				If there is already a multimesh available in the object pool (that matches the amount of transforms provided and the collision shape) then it gets re-used with the new data.
@@ -267,10 +281,10 @@
 		</method>
 	</methods>
 	<members>
-		<member name="block_bullets_debugger_color" type="Color" setter="set_block_bullets_debugger_color" getter="get_block_bullets_debugger_color" default="Color(0, 0, 2, 0.8)">
+		<member name="block_bullets_debugger_color" type="Color" setter="set_block_bullets_debugger_color" getter="get_block_bullets_debugger_color" default="Color(0, 0, 1, 0.8)">
 			The color for the collision shapes of all [BlockBullets2D].
 		</member>
-		<member name="directional_bullets_debugger_color" type="Color" setter="set_directional_bullets_debugger_color" getter="get_directional_bullets_debugger_color" default="Color(0, 0, 2, 0.8)">
+		<member name="directional_bullets_debugger_color" type="Color" setter="set_directional_bullets_debugger_color" getter="get_directional_bullets_debugger_color" default="Color(0, 0, 1, 0.8)">
 			The color for the collision shapes of all [DirectionalBullets2D].
 		</member>
 		<member name="is_debugger_enabled" type="bool" setter="set_is_debugger_enabled" getter="get_is_debugger_enabled" default="false">
@@ -288,7 +302,7 @@
 	<signals>
 		<signal name="area_entered">
 			<param index="0" name="hit_target_area" type="Object" />
-			<param index="1" name="multimesh_bullets_instance" type="MultiMeshBullets2D" />
+			<param index="1" name="multimesh_bullets_instance" type="Object" />
 			<param index="2" name="bullet_index" type="int" />
 			<param index="3" name="bullets_custom_data" type="Resource" />
 			<param index="4" name="bullet_global_transform" type="Transform2D" />
@@ -298,7 +312,7 @@
 		</signal>
 		<signal name="body_entered">
 			<param index="0" name="hit_target_body" type="Object" />
-			<param index="1" name="multimesh_bullets_instance" type="MultiMeshBullets2D" />
+			<param index="1" name="multimesh_bullets_instance" type="Object" />
 			<param index="2" name="bullet_index" type="int" />
 			<param index="3" name="bullets_custom_data" type="Resource" />
 			<param index="4" name="bullet_global_transform" type="Transform2D" />
@@ -309,7 +323,7 @@
 			</description>
 		</signal>
 		<signal name="life_time_over">
-			<param index="0" name="multimesh_bullets_instance" type="MultiMeshBullets2D" />
+			<param index="0" name="multimesh_bullets_instance" type="Object" />
 			<param index="1" name="bullet_indexes" type="int[]" />
 			<param index="2" name="bullets_custom_data" type="Resource" />
 			<param index="3" name="bullets_global_transforms" type="Transform2D[]" />
@@ -325,26 +339,37 @@
 	</signals>
 	<constants>
 		<constant name="DIRECTIONAL_BULLETS" value="0" enum="BulletType">
+			Bullet type for DirectionalBullets2D, bullets that move independently with per-bullet direction, speed and features.
 		</constant>
 		<constant name="BLOCK_BULLETS" value="1" enum="BulletType">
+			Bullet type for BlockBullets2D, bullets that travel as one rigid volley in a single direction.
 		</constant>
 		<constant name="TOP_LEFT" value="0" enum="Alignment">
+			Grid anchor used by helper_generate_transforms_grid(), the grid grows right and down starting at the marker.
 		</constant>
 		<constant name="TOP_CENTER" value="1" enum="Alignment">
+			Grid anchor used by helper_generate_transforms_grid(), horizontally centered on the marker, growing downward.
 		</constant>
 		<constant name="TOP_RIGHT" value="2" enum="Alignment">
+			Grid anchor used by helper_generate_transforms_grid(), grows left and down starting at the marker.
 		</constant>
 		<constant name="CENTER_LEFT" value="3" enum="Alignment">
+			Grid anchor used by helper_generate_transforms_grid(), grows rightward, vertically centered on the marker.
 		</constant>
 		<constant name="CENTER" value="4" enum="Alignment">
+			Grid anchor used by helper_generate_transforms_grid(), centered on the marker in both axes.
 		</constant>
 		<constant name="CENTER_RIGHT" value="5" enum="Alignment">
+			Grid anchor used by helper_generate_transforms_grid(), grows leftward, vertically centered on the marker.
 		</constant>
 		<constant name="BOTTOM_LEFT" value="6" enum="Alignment">
+			Grid anchor used by helper_generate_transforms_grid(), grows right and up starting at the marker.
 		</constant>
 		<constant name="BOTTOM_CENTER" value="7" enum="Alignment">
+			Grid anchor used by helper_generate_transforms_grid(), horizontally centered on the marker, growing upward.
 		</constant>
 		<constant name="BOTTOM_RIGHT" value="8" enum="Alignment">
+			Grid anchor used by helper_generate_transforms_grid(), grows left and up starting at the marker.
 		</constant>
 	</constants>
 </class>

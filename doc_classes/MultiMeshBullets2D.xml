@@ -236,12 +236,6 @@
 				Enables the attachment of a specific bullet, if it has one.
 			</description>
 		</method>
-		<method name="get_amount_active_attachments" qualifiers="const">
-			<return type="int" />
-			<description>
-				Returns how many bullets of this multimesh currently have an attachment assigned. Useful for debugging attachment pooling on a [BulletFactory2D] controllable handle.
-			</description>
-		</method>
 		<method name="bullet_free_attachment">
 			<return type="void" />
 			<param index="0" name="bullet_index" type="int" />
@@ -322,6 +316,12 @@
 			<return type="bool[]" />
 			<description>
 				Get the status of all bullets inside the multimesh - whether they are enabled (active and visible on screen) or disabled (inactive and invisible)
+			</description>
+		</method>
+		<method name="get_amount_active_attachments" qualifiers="const">
+			<return type="int" />
+			<description>
+				Returns how many bullets of this multimesh currently have an attachment assigned. Useful for debugging attachment pooling on a [BulletFactory2D] controllable handle.
 			</description>
 		</method>
 		<method name="get_amount_bullets" qualifiers="const">
@@ -409,6 +409,12 @@
 			<return type="Shape2D" />
 			<description>
 				The collision shape currently cached for this multimesh.
+			</description>
+		</method>
+		<method name="get_inherited_velocity_offset" qualifiers="const">
+			<return type="Vector2" />
+			<description>
+			Returns the extra velocity offset that gets added to every bullet's movement each physics frame. Set it at spawn time or through set_inherited_velocity_offset().
 			</description>
 		</method>
 		<method name="get_monitorable" qualifiers="const">
@@ -659,15 +665,6 @@
 				Set the transform of a specific bullet, in global space (matching [method get_bullet_transform] and [method get_bullet_global_transform]).
 			</description>
 		</method>
-		<method name="set_bullets_current_collision_count">
-			<return type="bool" />
-			<param index="0" name="arr" type="int[]" />
-			<description>
-				Set the current collision count for multiple bullets at once by providing an array of integers, where each integer represents the current collision count for a bullet. The index of each integer in the array corresponds to the bullet index it is meant to set the collision count for.
-
-				For example, if you have 3 bullets and you want to set their current collision counts to 1, 2 and 3 respectively, you would call this function with an array like [1, 2, 3].
-			</description>
-		</method>
 		<method name="set_collision_layer">
 			<return type="void" />
 			<param index="0" name="new_collision_layer" type="int" />
@@ -703,6 +700,13 @@
 				Swaps the collision shape live, on an active or pooled multimesh. Size-only changes apply to every bullet right away through the physics server. A different effective type additionally rebuilds the physics shapes and moves pooled instances into the matching pool bucket. The visual QuadMesh is texture-driven and stays untouched. The debugger picks up the new type and size on the next physics tick.
 			</description>
 		</method>
+		<method name="set_inherited_velocity_offset">
+			<return type="void" />
+			<param index="0" name="new_offset" type="Vector2" />
+			<description>
+			Sets an extra velocity offset, think wind, knockback or the speed of a moving platform, that gets added to every bullet's movement each physics frame. The value must be a finite Vector2, otherwise the old value is kept.
+			</description>
+		</method>
 		<method name="set_monitorable">
 			<return type="void" />
 			<param index="0" name="value" type="bool" />
@@ -721,7 +725,7 @@
 		<member name="bullet_max_collision_count" type="int" setter="set_bullet_max_collision_count" getter="get_bullet_max_collision_count" default="1">
 			How many times a bullet can collide before it gets disabled. If you set to 0, then the bullet will NEVER get disabled due to collisions.
 		</member>
-		<member name="bullets_current_collision_count" type="int[]" setter="set_bullets_current_collision_count" getter="get_bullets_current_collision_count" default="[]">
+		<member name="bullets_current_collision_count" type="int[]" setter="set_bullets_current_collision_count_no_return" getter="get_bullets_current_collision_count" default="[]">
 			An array of integers representing the current collision count for each bullet. The index of each integer in the array corresponds to the bullet index it is meant to represent.
 
 			For example, if you have 3 bullets and their current collision counts are 1, 2 and 3 respectively, then this array would be [1, 2, 3].
@@ -759,7 +763,7 @@
 	</members>
 	<signals>
 		<signal name="sprite_animation_finished">
-			<param index="0" name="multimesh_bullets_instance" type="MultiMeshBullets2D" />
+			<param index="0" name="multimesh_bullets_instance" type="Object" />
 			<description>
 				Emitted once (deferred, outside the physics tick) when a non-looping SpriteFrames animation reaches its last frame. Re-armed by every play/restart/rebuild. Note: the instance may already be pooled (inactive) when the deferred call runs, so check its state in the handler if that matters.
 			</description>

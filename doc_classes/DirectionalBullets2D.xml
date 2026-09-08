@@ -65,8 +65,8 @@
 		<method name="all_bullets_enable_orbiting">
 			<return type="void" />
 			<param index="0" name="orbiting_radius" type="float" />
-			<param index="1" name="orbiting_direction" type="int" enum="DirectionalBullets2D.OrbitingDirection" />
-			<param index="2" name="orbiting_texture_rotation" type="int" enum="DirectionalBullets2D.OrbitingTextureRotation" />
+			<param index="1" name="orbiting_direction" type="int" enum="DirectionalBullets2D.OrbitingDirection" default="2" />
+			<param index="2" name="orbiting_texture_rotation" type="int" enum="DirectionalBullets2D.OrbitingTextureRotation" default="0" />
 			<param index="3" name="bullet_index_start" type="int" default="0" />
 			<param index="4" name="bullet_index_end_inclusive" type="int" default="-1" />
 			<description>
@@ -209,15 +209,6 @@
 				Each homing target gets cleared and replaced with the Mouse as the target for all bullets in the range (per-bullet deques only).
 			</description>
 		</method>
-		<method name="all_bullets_set_homing_smoothing">
-			<return type="void" />
-			<param index="0" name="value" type="float" />
-			<param index="1" name="bullet_index_start" type="int" default="0" />
-			<param index="2" name="bullet_index_end_inclusive" type="int" default="-1" />
-			<description>
-				Sets the homing turn agility for each bullet in the range. Setting any per-bullet value enables per-bullet mode, after which the shared [member homing_smoothing] is ignored. Useful for mixed volleys with fast and drifting homers.
-			</description>
-		</method>
 		<method name="all_bullets_replace_homing_targets_with_new_target">
 			<return type="void" />
 			<param index="0" name="node2d_or_global_position" type="Variant" />
@@ -238,6 +229,15 @@
 				Clears then pushes an array of homing targets to the back for all bullets in the range (per-bullet deques only).
 
 				If you want to clear then push an array of targets to the shared deque, use [method shared_homing_deque_replace_homing_targets_with_new_target_array] instead.
+			</description>
+		</method>
+		<method name="all_bullets_set_homing_smoothing">
+			<return type="void" />
+			<param index="0" name="value" type="float" />
+			<param index="1" name="bullet_index_start" type="int" default="0" />
+			<param index="2" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<description>
+				Sets the homing turn agility for each bullet in the range. Setting any per-bullet value enables per-bullet mode, after which the shared [member homing_smoothing] is ignored. Useful for mixed volleys with fast and drifting homers.
 			</description>
 		</method>
 		<method name="all_bullets_set_orbiting_direction">
@@ -725,9 +725,9 @@
 	</members>
 	<signals>
 		<signal name="bullet_homing_target_reached">
-			<param index="0" name="multimesh_instance" type="DirectionalBullets2D" />
+			<param index="0" name="multimesh_instance" type="Object" />
 			<param index="1" name="bullet_index" type="int" />
-			<param index="2" name="target" type="Node2D" />
+			<param index="2" name="target" type="Object" />
 			<param index="3" name="target_global_position" type="Vector2" />
 			<description>
 				Emitted once the homing target gets reached by a bullet.
@@ -742,26 +742,37 @@
 	</signals>
 	<constants>
 		<constant name="GlobalPositionTarget" value="1" enum="HomingType">
+			Homing target type, the target is a fixed Vector2 global position.
 		</constant>
 		<constant name="Node2DTarget" value="2" enum="HomingType">
+			Homing target type, the target is a Node2D and the bullet tracks its live global position. Freed targets get trimmed automatically.
 		</constant>
 		<constant name="MousePositionTarget" value="3" enum="HomingType">
+			Homing target type, the target is the mouse cursor position, refreshed on the homing update interval.
 		</constant>
 		<constant name="NotHoming" value="0" enum="HomingType">
+			Homing target type, no valid target. An empty homing deque reports this.
 		</constant>
 		<constant name="DontMove" value="0" enum="OrbitingDirection">
+			Orbiting direction, the bullet never locks onto the orbit ring and the orbit logic never moves it. Its normal movement continues untouched.
 		</constant>
 		<constant name="OrbitLeft" value="1" enum="OrbitingDirection">
+			Orbiting direction, the bullet circles the target counter-clockwise on screen (Godot uses a y-down coordinate space).
 		</constant>
 		<constant name="OrbitRight" value="2" enum="OrbitingDirection">
+			Orbiting direction, the bullet circles the target clockwise on screen (Godot uses a y-down coordinate space).
 		</constant>
 		<constant name="FaceTarget" value="0" enum="OrbitingTextureRotation">
+			Orbiting texture rotation, the bullet texture keeps facing the target it orbits.
 		</constant>
 		<constant name="FaceOppositeTarget" value="1" enum="OrbitingTextureRotation">
+			Orbiting texture rotation, the bullet texture faces away from the target it orbits.
 		</constant>
 		<constant name="FaceOrbitingDirection" value="2" enum="OrbitingTextureRotation">
+			Orbiting texture rotation, the bullet texture faces along its direction of travel around the ring.
 		</constant>
 		<constant name="FaceOppositeOrbitingDirection" value="3" enum="OrbitingTextureRotation">
+			Orbiting texture rotation, the bullet texture faces against its direction of travel around the ring.
 		</constant>
 	</constants>
 </class>

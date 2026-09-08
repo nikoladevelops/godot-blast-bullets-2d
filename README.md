@@ -69,7 +69,7 @@ relative to their direction (allows zig zag patterns and any other creative patt
 
 - **Support For Custom Bullet Max Collisions Amount** - A bullet can collide multiple times before being disabled. Very useful for Bullet Hell games.
 
-- **Custom Bullets Debugger** - Debug collision shapes easily to see what is going on in your game and find problems.
+- **Custom Bullets Debugger** - Debug collision shapes easily to see what is going on in your game and find problems. The debugger draws every shape of every bullet multimesh at all times: live bullets follow their movement, collided or disabled bullets stay visible frozen where they stopped, and even pooled multimesh instances keep their full shape set on screen. It also survives multimesh frees, pool reuse and shape changes without any manual cleanup on your side.
 
 - **Attach Timer Logic** - The ability to attach function callbacks that execute at a particular time on the entire multimesh with the option to be repeated over and over (safely executes code during runtime while preventing crashes that might occur with the normal timers if you don't use `call_deferred()`). This is the preferred way of manipulating bullet related data, don't use the normal Godot timers!
 
@@ -85,7 +85,7 @@ relative to their direction (allows zig zag patterns and any other creative patt
 
 - **Bullet Attachments** - Seamlessly attach GPUParticles2D, CPUParticles2D or custom sprites that follow the bullet's transform with optional offsets. The use of **modern GDExtension features** like virtual methods allow you to override what happens when attachments are spawned/disabled/pooled. These custom methods get called *inside C++* to set up your bullet attachment as necessary. Example - Spawn attachments with visible particles but when they collide you have to disable the emitting and even disable visibility of extra nodes you might've attached. Super flexible and easy to use.
 
-- **Automatic Object Pooling** - MultiMesh instances and attachments are automatically pooled and reused. Pool buckets are exact `(amount of bullets, collision shape type)` pairs identified by `MultiMeshPoolKey2D` (for example `MultiMeshPoolKey2D.make(200, PhysicsServer2D.SHAPE_CIRCLE)`). You can manually populate (`populate_bullets_pool(key, data, instance_count)`) or free (`free_bullets_pool()`, `free_active_bullets()`, `free_disabled_bullets()`, `reset()`; pass `null` for everything or a key for one bucket), or disable the system to use your own custom logic. You can choose the easy way of using the plugin without any care (because performance is handled for you already) OR you can delve deeper. Example: disable auto pooling, which will allow you to save your bullet instances into an array of multimeshes without fear of problems. Reuse them whenever you want with runtime functions such as `enable_bullet()`/`disable_bullet()`.
+- **Automatic Object Pooling** - MultiMesh instances and attachments are automatically pooled and reused. Pool buckets are exact `(amount of bullets, collision shape type)` pairs identified by `MultiMeshPoolKey2D` (for example `MultiMeshPoolKey2D.make(200, PhysicsServer2D.SHAPE_CIRCLE)`). You can manually populate (`populate_bullets_pool(key, data, instance_count)`) or free (`free_bullets_pool()`, `free_active_bullets()`, `free_disabled_bullets()`, `reset()`; pass `null` for everything or a key for one bucket), or disable the system to use your own custom logic. Every pre-populated instance is verified against its key and fully initialized before it enters the bucket, so pooled instances are always safe to reuse and safe for the debugger to visualize. You can choose the easy way of using the plugin without any care (because performance is handled for you already) OR you can delve deeper. Example: disable auto pooling, which will allow you to save your bullet instances into an array of multimeshes without fear of problems. Reuse them whenever you want with runtime functions such as `enable_bullet()`/`disable_bullet()`.
 
 - **Dynamic Sparse Set** - The plugin uses custom made data structure that is used internally for precise tracking and looping over ONLY ACTIVE MultiMeshInstances and ONLY THE ACTIVE bullets inside them. This reduces branching and improves performance (a pattern used in ECS engines that could be further improved in future versions of BlastBullets2D).
 
@@ -195,7 +195,7 @@ func spawn_bullets()->void:
 3. Use the `BulletFactory2D`'s functions to spawn bullets in any other script.
 
 #### If you just need normal bullets without extra options:<br>
-- <b>`spawn_block_bullets()`</b> - Spawns a multimesh of bullets where the direction is determined by `block_rotation_radians` and the speed by `block_speed`.
+- <b>`spawn_block_bullets()`</b> - Spawns a multimesh of bullets where the direction is determined by `block_rotation_radians` and the speed by `block_speed`. Optionally pass an `inherited_velocity_offset` (Vector2) that gets added on top of the whole volley's movement, useful for recoil or moving shooters.
 
 - <b>`spawn_directional_bullets()`</b> - Spawns a multimesh of bullets where the direction is determined by the `transforms`'s rotation and each bullet has its own speed data.
 
@@ -382,6 +382,7 @@ tick the checkbox inside the inspector in `BulletFactory2D`. That's all, enjoy t
 
 ## WARNING
 - Never override the `_ready` function inside `BulletFactory2D` or you will experience crashes
+- Use `queue_free()` when you delete a bullet multimesh or a bullet attachment yourself, never `free()`. Especially never call `free()` on a multimesh from inside one of its own collision or attachment callbacks (for example inside `area_entered` or `on_bullet_disable`). `queue_free()` is always safe in those situations.
 
 
 ## How To Compile

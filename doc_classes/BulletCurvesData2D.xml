@@ -74,8 +74,10 @@
 	</members>
 	<constants>
 		<constant name="Additive" value="0" enum="DirectionCurveMode">
+			The curve offset gets added on top of the current direction axis before the direction is normalized, so the base direction still influences the bullet.
 		</constant>
 		<constant name="Override" value="1" enum="DirectionCurveMode">
+			The curve fully replaces the current direction axis before the direction is normalized, ignoring whatever the base direction had on that axis.
 		</constant>
 	</constants>
 </class>
