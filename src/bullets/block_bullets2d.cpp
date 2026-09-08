@@ -38,11 +38,18 @@ void BlockBullets2D::set_up_movement_data(const BulletSpeedData2D &new_speed_dat
 }
 
 void BlockBullets2D::custom_additional_spawn_logic(const MultiMeshBulletsData2D &data) {
-	const BlockBulletsData2D &block_data = static_cast<const BlockBulletsData2D &>(data);
+	const BlockBulletsData2D *block_data = Object::cast_to<BlockBulletsData2D>(&data);
+	// Size movement SoA up front: the tick path indexes all_cached_speed[0]
+	// unconditionally, so even a wrong-type early-return must leave it sized.
+	set_up_movement_data(BulletSpeedData2D());
+	if (block_data == nullptr) {
+		UtilityFunctions::push_error("BlockBullets2D::spawn got wrong spawn data type, expected BlockBulletsData2D.");
+		return;
+	}
 
-	block_rotation_radians = block_data.block_rotation_radians;
-	if (block_data.block_speed.is_valid()) {
-		set_up_movement_data(*block_data.block_speed.ptr());
+	block_rotation_radians = block_data->block_rotation_radians;
+	if (block_data->block_speed.is_valid()) {
+		set_up_movement_data(*block_data->block_speed.ptr());
 	} else {
 		UtilityFunctions::push_error("BlockBulletsData2D.block_speed is null in spawn - using default speed 0. Set block_speed to avoid this.");
 		BulletSpeedData2D default_data;
@@ -51,11 +58,18 @@ void BlockBullets2D::custom_additional_spawn_logic(const MultiMeshBulletsData2D 
 }
 
 void BlockBullets2D::custom_additional_enable_logic(const MultiMeshBulletsData2D &data) {
-	const BlockBulletsData2D &block_data = static_cast<const BlockBulletsData2D &>(data);
+	const BlockBulletsData2D *block_data = Object::cast_to<BlockBulletsData2D>(&data);
+	// Same defensive sizing as spawn (a wrong-type enable must not leave the
+	// movement SoA empty for the tick path).
+	set_up_movement_data(BulletSpeedData2D());
+	if (block_data == nullptr) {
+		UtilityFunctions::push_error("BlockBullets2D::enable got wrong spawn data type, expected BlockBulletsData2D.");
+		return;
+	}
 
-	block_rotation_radians = block_data.block_rotation_radians;
-	if (block_data.block_speed.is_valid()) {
-		set_up_movement_data(*block_data.block_speed.ptr());
+	block_rotation_radians = block_data->block_rotation_radians;
+	if (block_data->block_speed.is_valid()) {
+		set_up_movement_data(*block_data->block_speed.ptr());
 	} else {
 		UtilityFunctions::push_error("BlockBulletsData2D.block_speed is null in enable - using default speed 0.");
 		BulletSpeedData2D default_data;
@@ -64,7 +78,9 @@ void BlockBullets2D::custom_additional_enable_logic(const MultiMeshBulletsData2D
 }
 
 void BlockBullets2D::custom_additional_disable_logic() {
-	bullet_factory->block_bullets_set.disable_data(sparse_set_id);
+	if (bullet_factory != nullptr) {
+		bullet_factory->block_bullets_set.disable_data(sparse_set_id);
+	}
 }
 
 void BlockBullets2D::_bind_methods() {

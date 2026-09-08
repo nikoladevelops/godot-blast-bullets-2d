@@ -21,6 +21,13 @@ public:
 	uint32_t home_pooling_id = 0;
 	bool is_pooled = false;
 
+	// Owner tracking (managed by MultiMeshBullets2D, never set by hand): which
+	// multimesh slot currently owns this ACTIVE attachment. Lets PREDELETE of a
+	// manually freed active attachment drop its slot instead of leaving a dangling
+	// pointer in the multimesh's attachments array.
+	uint64_t owner_multimesh_id = 0;
+	int owner_bullet_index = -1;
+
 	void _notification(int p_what);
 	// Custom spawn behavior - should be used to set up the BulletAttachment2D in proper state. Executed before _ready when a bullet is in the process of being set up. If you have behavior/data that doesn't require for the node to be in the scene tree, then use this function, otherwise just use _ready. This is the place where you have to set a custom attachment_id so the bullet attaachment can use the object pool correctly. Note that the attachment is not yet inside the scene tree when this method gets called
 	GDVIRTUAL0(on_bullet_spawn)

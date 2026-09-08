@@ -59,6 +59,16 @@ static bool validate_spawn_data(const Ref<MultiMeshBulletsData2D> &spawn_data, c
 		UtilityFunctions::push_error(String("Error in ") + caller_name + ": max_life_time must be a finite value > 0 when lifetime is not infinite.");
 		return false;
 	}
+	// NaN/Inf origins or rotations would poison movement, physics and the
+	// pool key. Reject the whole spawn instead of emitting broken bullets.
+	for (int i = 0; i < bullet_count; ++i) {
+		const Transform2D t = spawn_data->transforms[i];
+		const Vector2 o = t.get_origin();
+		if (!o.is_finite() || !Math::is_finite(t.get_rotation()) || !t.get_scale().is_finite()) {
+			UtilityFunctions::push_error(String("Error in ") + caller_name + ": transforms[" + String::num_int64(i) + "] contains NaN/Inf. Nothing was spawned.");
+			return false;
+		}
+	}
 	return true;
 }
 
@@ -119,6 +129,10 @@ bool BulletFactory2D::get_use_physics_interpolation() const {
 }
 
 void BulletFactory2D::set_use_physics_interpolation_runtime(bool new_use_physics_interpolation) {
+	if (!is_ready || is_tearing_down) {
+		UtilityFunctions::push_error("set_use_physics_interpolation_runtime: BulletFactory2D is not in the scene tree yet (or is being destroyed). Set the use_physics_interpolation property instead.");
+		return;
+	}
 	if (is_factory_busy) {
 		UtilityFunctions::push_error("Error when trying to set physics interpolation. BulletFactory2D is currently busy. Ignoring the request");
 		return;
@@ -161,6 +175,9 @@ void BulletFactory2D::set_use_physics_interpolation_runtime(bool new_use_physics
 
 void BulletFactory2D::set_use_physics_interpolation_editor(bool new_use_physics_interpolation) {
 	use_physics_interpolation_cached_before_ready = new_use_physics_interpolation;
+	if (is_ready && !is_factory_busy) {
+		set_use_physics_interpolation_runtime(new_use_physics_interpolation);
+	}
 }
 
 void BulletFactory2D::add_bullet_containers() {
@@ -218,8 +235,8 @@ void BulletFactory2D::set_is_factory_processing_bullets(bool is_processing_enabl
 
 void BulletFactory2D::_physics_process(double delta) {
 	is_iterating_bullets = true;
-	handle_bullet_behavior<DirectionalBullets2D>(all_directional_bullets, directional_bullets_set, delta);
-	handle_bullet_behavior<BlockBullets2D>(all_block_bullets, block_bullets_set, delta);
+	handle_bullet_behavior<DirectionalBullets2D>(all_directional_bullets, directional_bullets_set, delta, directional_iteration_scratch);
+	handle_bullet_behavior<BlockBullets2D>(all_block_bullets, block_bullets_set, delta, block_iteration_scratch);
 
 	// Index loops with cached size: timer callbacks run user code that may spawn
 	// (appending reallocates), which would dangle a range-for reference. operator[]
@@ -248,11 +265,11 @@ void BulletFactory2D::_process(double delta) {
 		return;
 	}
 
-	handle_bullet_rendering_interpolation<DirectionalBullets2D>(all_directional_bullets, directional_bullets_set);
-	handle_bullet_rendering_interpolation<BlockBullets2D>(all_block_bullets, block_bullets_set);
+	handle_bullet_rendering_interpolation<DirectionalBullets2D>(all_directional_bullets, directional_bullets_set, directional_iteration_scratch);
+	handle_bullet_rendering_interpolation<BlockBullets2D>(all_block_bullets, block_bullets_set, block_iteration_scratch);
 }
 
-void BulletFactory2D::spawn_block_bullets(const Ref<BlockBulletsData2D> &spawn_data) {
+void BulletFactory2D::spawn_block_bullets(const Ref<BlockBulletsData2D> &spawn_data, const Vector2 &new_inherited_velocity_offset) {
 	if (is_factory_busy) {
 		UtilityFunctions::push_error("Error when trying to spawn bullets. BulletFactory2D is currently busy. Ignoring the request");
 		return;
@@ -260,6 +277,16 @@ void BulletFactory2D::spawn_block_bullets(const Ref<BlockBulletsData2D> &spawn_d
 
 	if (!is_ready) {
 		UtilityFunctions::push_error("spawn_block_bullets: BulletFactory2D is not in the scene tree yet. Add it first, then spawn.");
+		return;
+	}
+
+	if (is_tearing_down) {
+		UtilityFunctions::push_error("spawn_block_bullets: BulletFactory2D is being freed. Ignoring the request.");
+		return;
+	}
+
+	if (!new_inherited_velocity_offset.is_finite()) {
+		UtilityFunctions::push_error("Error in spawn_block_bullets: inherited velocity offset must be finite. Nothing was spawned.");
 		return;
 	}
 
@@ -277,7 +304,8 @@ void BulletFactory2D::spawn_block_bullets(const Ref<BlockBulletsData2D> &spawn_d
 			block_bullets_set,
 			block_bullets_pool,
 			block_bullets_container,
-			spawn_data);
+			spawn_data,
+			new_inherited_velocity_offset);
 }
 
 void BulletFactory2D::spawn_directional_bullets(const Ref<DirectionalBulletsData2D> &spawn_data, const Vector2 &new_inherited_velocity_offset) {
@@ -291,12 +319,22 @@ void BulletFactory2D::spawn_directional_bullets(const Ref<DirectionalBulletsData
 		return;
 	}
 
+	if (is_tearing_down) {
+		UtilityFunctions::push_error("spawn_directional_bullets: BulletFactory2D is being freed. Ignoring the request.");
+		return;
+	}
+
 	if (spawn_data.is_null() || spawn_data->transforms.size() == 0) {
 		UtilityFunctions::push_error("Error when trying to spawn DirectionalBullets2D. No spawn_data or no transforms were provided. Ignoring the request");
 		return;
 	}
 
 	if (!validate_spawn_data(spawn_data, "spawn_directional_bullets")) {
+		return;
+	}
+
+	if (!new_inherited_velocity_offset.is_finite()) {
+		UtilityFunctions::push_error("Error in spawn_directional_bullets: inherited velocity offset must be finite. Nothing was spawned.");
 		return;
 	}
 
@@ -320,12 +358,22 @@ DirectionalBullets2D *BulletFactory2D::spawn_controllable_directional_bullets(co
 		return nullptr;
 	}
 
+	if (is_tearing_down) {
+		UtilityFunctions::push_error("spawn_controllable_directional_bullets: BulletFactory2D is being freed. Ignoring the request.");
+		return nullptr;
+	}
+
 	if (spawn_data.is_null() || spawn_data->transforms.size() == 0) {
 		UtilityFunctions::push_error("Error when trying to spawn DirectionalBullets2D. No spawn_data or no transforms were provided. Ignoring the request");
 		return nullptr;
 	}
 
 	if (!validate_spawn_data(spawn_data, "spawn_controllable_directional_bullets")) {
+		return nullptr;
+	}
+
+	if (!new_inherited_velocity_offset.is_finite()) {
+		UtilityFunctions::push_error("Error in spawn_controllable_directional_bullets: inherited velocity offset must be finite. Nothing was spawned.");
 		return nullptr;
 	}
 
@@ -379,6 +427,11 @@ void BulletFactory2D::reset(const Ref<MultiMeshPoolKey2D> &key) {
 		return;
 	}
 
+	if (!is_ready || is_tearing_down) {
+		UtilityFunctions::push_error("reset: BulletFactory2D is not ready or is being freed. Ignoring the request.");
+		return;
+	}
+
 	is_factory_busy = true;
 
 	bool enable_processing_after_finish = is_factory_processing_bullets;
@@ -404,6 +457,11 @@ void BulletFactory2D::free_active_bullets(const Ref<MultiMeshPoolKey2D> &key) {
 	}
 
 	if (reject_when_iterating("free_active_bullets")) {
+		return;
+	}
+
+	if (!is_ready || is_tearing_down) {
+		UtilityFunctions::push_error("free_active_bullets: BulletFactory2D is not ready or is being freed. Ignoring the request.");
 		return;
 	}
 
@@ -452,6 +510,11 @@ void BulletFactory2D::free_disabled_bullets(const Ref<MultiMeshPoolKey2D> &key) 
 		return;
 	}
 
+	if (!is_ready || is_tearing_down) {
+		UtilityFunctions::push_error("free_disabled_bullets: BulletFactory2D is not ready or is being freed. Ignoring the request.");
+		return;
+	}
+
 	is_factory_busy = true;
 	bool enable_processing_after_finish = is_factory_processing_bullets;
 	set_is_factory_processing_bullets(false);
@@ -494,11 +557,17 @@ void BulletFactory2D::handle_manual_user_deletion_of_multimesh_bullets(MultiMesh
 	if (is_tearing_down) {
 		return;
 	}
-	if (is_factory_busy) {
-		UtilityFunctions::push_error("BulletFactory2D is busy. Ignoring handle_manual_user_deletion_of_multimesh_bullets request.");
-		return;
-	}
-
+	// NOTE 1: deliberately NOT rejected while is_iterating_bullets. This runs from the
+	// dying multimesh's PREDELETE - the node is already gone, so the vec fixup below
+	// MUST run now or the factory keeps a dangling pointer that crashes the next
+	// tick. The swap-remove is safe mid-iteration: handle_bullet_behavior copies the
+	// dense list up front and re-checks bounds/identity per element.
+	// NOTE 2: also NOT rejected while is_factory_busy. During reset()/free_* loops
+	// every deletion is marked_for_internal_deletion so this callback never fires from
+	// them; the only busy-region entry is a user freeing a multimesh from a script
+	// callback nested in an internal busy region (e.g. a disable sweep). Rejecting
+	// there would strand a dangling pointer in the vec, so the fixup must always run.
+	const bool saved_busy = is_factory_busy;
 	is_factory_busy = true;
 
 	bool enable_processing_after_finish = is_factory_processing_bullets;
@@ -509,8 +578,8 @@ void BulletFactory2D::handle_manual_user_deletion_of_multimesh_bullets(MultiMesh
 		set_is_debugger_enabled(false);
 	}
 
-	DirectionalBullets2D *dir_ptr = dynamic_cast<DirectionalBullets2D *>(&bullet_multi);
-	BlockBullets2D *block_ptr = dynamic_cast<BlockBullets2D *>(&bullet_multi);
+	DirectionalBullets2D *dir_ptr = Object::cast_to<DirectionalBullets2D>(&bullet_multi);
+	BlockBullets2D *block_ptr = Object::cast_to<BlockBullets2D>(&bullet_multi);
 	const PoolKey pool_key = bullet_multi.get_pool_key();
 
 	if (dir_ptr) {
@@ -525,23 +594,27 @@ void BulletFactory2D::handle_manual_user_deletion_of_multimesh_bullets(MultiMesh
 		call_deferred("set_is_debugger_enabled", true); // it will cause a crash if this is not called with call_deferred
 	}
 
-	is_factory_busy = false;
+	is_factory_busy = saved_busy;
 	if (enable_processing_after_finish) {
 		set_is_factory_processing_bullets(true);
 	}
 }
 
 void BulletFactory2D::reactivate_multimesh_instance(MultiMeshBullets2D &bullet_multi) {
-	if (is_tearing_down || is_factory_busy) {
+	if (is_tearing_down) {
+		return;
+	}
+	if (is_factory_busy) {
+		UtilityFunctions::push_error("reactivate_multimesh_instance: BulletFactory2D is busy, so the multimesh was left out of the active set. It will not move until the factory processes it again.");
 		return;
 	}
 	// Identity-check the id first: activating a stale id would drive the wrong multimesh.
-	if (DirectionalBullets2D *dir_ptr = dynamic_cast<DirectionalBullets2D *>(&bullet_multi)) {
+	if (DirectionalBullets2D *dir_ptr = Object::cast_to<DirectionalBullets2D>(&bullet_multi)) {
 		const int id = dir_ptr->sparse_set_id;
 		if (id >= 0 && id < (int)all_directional_bullets.size() && all_directional_bullets[id] == dir_ptr) {
 			directional_bullets_set.activate_data(id);
 		}
-	} else if (BlockBullets2D *block_ptr = dynamic_cast<BlockBullets2D *>(&bullet_multi)) {
+	} else if (BlockBullets2D *block_ptr = Object::cast_to<BlockBullets2D>(&bullet_multi)) {
 		const int id = block_ptr->sparse_set_id;
 		if (id >= 0 && id < (int)all_block_bullets.size() && all_block_bullets[id] == block_ptr) {
 			block_bullets_set.activate_data(id);
@@ -557,6 +630,15 @@ void BulletFactory2D::populate_bullets_pool(const Ref<MultiMeshPoolKey2D> &key, 
 
 	if (!is_ready) {
 		UtilityFunctions::push_error("populate_bullets_pool: BulletFactory2D is not in the scene tree yet. Add it first, then populate.");
+		return;
+	}
+
+	if (is_tearing_down) {
+		UtilityFunctions::push_error("populate_bullets_pool: BulletFactory2D is being freed. Ignoring the request.");
+		return;
+	}
+
+	if (reject_when_iterating("populate_bullets_pool")) {
 		return;
 	}
 
@@ -696,6 +778,11 @@ void BulletFactory2D::free_bullets_pool(BulletType bullet_type, const Ref<MultiM
 		return;
 	}
 
+	if (!is_ready || is_tearing_down) {
+		UtilityFunctions::push_error("free_bullets_pool: BulletFactory2D is not ready or is being freed. Ignoring the request.");
+		return;
+	}
+
 	is_factory_busy = true;
 
 	bool enable_processing_after_finish = is_factory_processing_bullets;
@@ -765,6 +852,15 @@ void BulletFactory2D::populate_attachments_pool(const Ref<PackedScene> attachmen
 		return;
 	}
 
+	if (is_tearing_down) {
+		UtilityFunctions::push_error("populate_attachments_pool: BulletFactory2D is being freed. Ignoring the request.");
+		return;
+	}
+
+	if (reject_when_iterating("populate_attachments_pool")) {
+		return;
+	}
+
 	is_factory_busy = true;
 
 	bool enable_processing_after_finish = is_factory_processing_bullets;
@@ -777,7 +873,7 @@ void BulletFactory2D::populate_attachments_pool(const Ref<PackedScene> attachmen
 	}
 
 	Node *inst = attachment_scene->instantiate();
-	BulletAttachment2D *first_attachment = dynamic_cast<BulletAttachment2D *>(inst);
+	BulletAttachment2D *first_attachment = Object::cast_to<BulletAttachment2D>(inst);
 
 	if (!first_attachment) {
 		UtilityFunctions::push_error("PackedScene does not contain a BulletAttachment2D.");
@@ -809,7 +905,7 @@ void BulletFactory2D::populate_attachments_pool(const Ref<PackedScene> attachmen
 
 	for (int i = 1; i < amount_instances; ++i) {
 		Node *later_inst = attachment_scene->instantiate();
-		BulletAttachment2D *a = dynamic_cast<BulletAttachment2D *>(later_inst);
+		BulletAttachment2D *a = Object::cast_to<BulletAttachment2D>(later_inst);
 		if (a == nullptr) {
 			UtilityFunctions::push_error("PackedScene stopped producing BulletAttachment2D during populate_attachments_pool. Keeping what was created so far.");
 			if (later_inst) {
@@ -832,6 +928,11 @@ void BulletFactory2D::populate_attachments_pool(const Ref<PackedScene> attachmen
 }
 
 void BulletFactory2D::free_attachments_pool(int attachment_id) {
+	if (!is_ready || is_tearing_down) {
+		UtilityFunctions::push_error("free_attachments_pool: BulletFactory2D is not in the scene tree yet (or is being destroyed). Add it first, then manage attachment pools.");
+		return;
+	}
+
 	if (is_factory_busy) {
 		UtilityFunctions::push_error("BulletFactory2D is busy. Ignoring free_attachments_pool request.");
 		return;
@@ -1070,6 +1171,10 @@ TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_grid(
 		UtilityFunctions::push_error("helper_generate_transforms_grid: offsets must be finite numbers.");
 		return TypedArray<Transform2D>();
 	}
+	if (!marker_transform.get_origin().is_finite() || !Math::is_finite(marker_transform.get_rotation()) || !marker_transform.get_scale().is_finite()) {
+		UtilityFunctions::push_error("helper_generate_transforms_grid: marker_transform contains NaN/Inf.");
+		return TypedArray<Transform2D>();
+	}
 	if (rows_per_column <= 0) {
 		UtilityFunctions::push_error("helper_generate_transforms_grid: rows_per_column must be > 0.");
 		return TypedArray<Transform2D>();
@@ -1077,6 +1182,15 @@ TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_grid(
 	// Initialize the array to hold the transforms
 	TypedArray<Transform2D> generated_transforms;
 	generated_transforms.resize(transforms_amount);
+	if (transforms_amount == 0) {
+		return generated_transforms;
+	}
+
+	// A lone bullet lands exactly on the marker (matches ring/fan/line).
+	if (transforms_amount == 1) {
+		generated_transforms[0] = Transform2D(marker_transform.get_rotation(), marker_transform.get_origin());
+		return generated_transforms;
+	}
 
 	int columns_amount = 0;
 
@@ -1086,36 +1200,32 @@ TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_grid(
 		columns_amount = static_cast<int>(Math::ceil(static_cast<real_t>(transforms_amount) / static_cast<real_t>(rows_per_column)));
 	}
 
+	// Size by the rows/columns actually used, not the full rows_per_column:
+	// otherwise a partial grid (e.g. n=1 with rows=10) centers on empty space.
+	const int used_rows = (columns_amount > 1) ? rows_per_column : transforms_amount;
+	const int last_column_rows = transforms_amount - (columns_amount - 1) * rows_per_column;
+
 	// Calculate total grid dimensions
 	real_t total_width = (columns_amount - 1) * column_offset;
-	real_t total_height = (rows_per_column - 1) * row_offset;
-
-	// Default starting position (centered)
+	// Default starting position (centered): -total/2 already centers even
+	// counts (n=2 -> -off/2, +off/2). The old +=offset/2 shifted the mean +off/2.
 	real_t x_start = -total_width / 2.0f;
-	if (columns_amount % 2 == 0) {
-		x_start += column_offset / 2.0f;
-	}
-	real_t y_start = -total_height / 2.0f;
-	if (rows_per_column % 2 == 0) {
-		y_start += row_offset / 2.0f;
-	}
+
+	// Default y per column: full columns center on used_rows, the ragged last
+	// column centers on its own count so it doesn't hang off-center.
+	const real_t full_col_height = (used_rows - 1) * row_offset;
+	const real_t last_col_height = (last_column_rows - 1) * row_offset;
 
 	// Adjust starting position based on alignment
 	switch (alignment) {
 		case Alignment::TOP_LEFT:
 			x_start = 0.0;
-			y_start = 0.0;
 			break;
 		case Alignment::TOP_CENTER:
 			x_start = -total_width / 2.0f;
-			if (columns_amount % 2 == 0) {
-				x_start += column_offset / 2.0f;
-			}
-			y_start = 0.0;
 			break;
 		case Alignment::TOP_RIGHT:
 			x_start = -total_width;
-			y_start = 0.0;
 			break;
 		case Alignment::CENTER_LEFT:
 			x_start = 0.0;
@@ -1128,22 +1238,16 @@ TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_grid(
 			break;
 		case Alignment::BOTTOM_LEFT:
 			x_start = 0.0;
-			y_start = -total_height;
 			break;
 		case Alignment::BOTTOM_CENTER:
 			x_start = -total_width / 2.0f;
-			if (columns_amount % 2 == 0) {
-				x_start += column_offset / 2.0f;
-			}
-			y_start = -total_height;
 			break;
 		case Alignment::BOTTOM_RIGHT:
 			x_start = -total_width;
-			y_start = -total_height;
 			break;
 		default:
-			UtilityFunctions::push_error("helper_generate_transforms_grid: unknown alignment, falling back to centered grid.");
-			break;
+			UtilityFunctions::push_error("helper_generate_transforms_grid: unknown alignment, cannot generate grid.");
+			return TypedArray<Transform2D>();
 	}
 
 	// Counter for spawned transforms
@@ -1151,7 +1255,26 @@ TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_grid(
 
 	// Generate transforms in a grid pattern
 	for (int column = 0; column < columns_amount; ++column) {
-		for (int row = 0; row < rows_per_column; ++row) {
+		const bool is_last_column = (column == columns_amount - 1);
+		const int rows_this_column = is_last_column ? last_column_rows : rows_per_column;
+		const real_t col_height = is_last_column ? last_col_height : full_col_height;
+		// Per-column y start so TOP_* / CENTER / BOTTOM_* anchor each column.
+		real_t y_start = -col_height / 2.0f;
+		switch (alignment) {
+			case Alignment::TOP_LEFT:
+			case Alignment::TOP_CENTER:
+			case Alignment::TOP_RIGHT:
+				y_start = 0.0;
+				break;
+			case Alignment::BOTTOM_LEFT:
+			case Alignment::BOTTOM_CENTER:
+			case Alignment::BOTTOM_RIGHT:
+				y_start = -col_height;
+				break;
+			default:
+				break;
+		}
+		for (int row = 0; row < rows_this_column; ++row) {
 			if (count_spawned >= transforms_amount) {
 				break;
 			}
@@ -1205,6 +1328,10 @@ TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_ring(
 		UtilityFunctions::push_error("helper_generate_transforms_ring: radius, start_angle and arc must be finite numbers.");
 		return TypedArray<Transform2D>();
 	}
+	if (!marker_transform.get_origin().is_finite() || !Math::is_finite(marker_transform.get_rotation()) || !marker_transform.get_scale().is_finite()) {
+		UtilityFunctions::push_error("helper_generate_transforms_ring: marker_transform contains NaN/Inf.");
+		return TypedArray<Transform2D>();
+	}
 	if (radius < 0.0) {
 		UtilityFunctions::push_error("helper_generate_transforms_ring: radius must be >= 0.");
 		return TypedArray<Transform2D>();
@@ -1250,6 +1377,10 @@ TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_fan(
 		UtilityFunctions::push_error("helper_generate_transforms_fan: spread, direction_angle and step_offset must be finite numbers.");
 		return TypedArray<Transform2D>();
 	}
+	if (!marker_transform.get_origin().is_finite() || !Math::is_finite(marker_transform.get_rotation()) || !marker_transform.get_scale().is_finite()) {
+		UtilityFunctions::push_error("helper_generate_transforms_fan: marker_transform contains NaN/Inf.");
+		return TypedArray<Transform2D>();
+	}
 	TypedArray<Transform2D> generated_transforms;
 	generated_transforms.resize(transforms_amount);
 	if (transforms_amount == 0) {
@@ -1284,6 +1415,10 @@ TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_spiral(
 		UtilityFunctions::push_error("helper_generate_transforms_spiral: start_radius, radius_step and angle_step must be finite numbers.");
 		return TypedArray<Transform2D>();
 	}
+	if (!marker_transform.get_origin().is_finite() || !Math::is_finite(marker_transform.get_rotation()) || !marker_transform.get_scale().is_finite()) {
+		UtilityFunctions::push_error("helper_generate_transforms_spiral: marker_transform contains NaN/Inf.");
+		return TypedArray<Transform2D>();
+	}
 	if (start_radius < 0.0) {
 		UtilityFunctions::push_error("helper_generate_transforms_spiral: start_radius must be >= 0.");
 		return TypedArray<Transform2D>();
@@ -1300,8 +1435,10 @@ TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_spiral(
 		const real_t r = start_radius + radius_step * (real_t)i;
 		const real_t angle = base_rotation + angle_step * (real_t)i;
 		const Vector2 offset = Vector2(Math::cos(angle), Math::sin(angle)) * r;
-		// Face outward like the ring helper.
-		generated_transforms[i] = Transform2D(angle, origin + offset);
+		// A negative radius mirrors the position to the opposite side; face
+		// that way too so position and facing stay consistent.
+		const real_t facing = (r < 0.0) ? angle + Math::PI : angle;
+		generated_transforms[i] = Transform2D(facing, origin + offset);
 	}
 	return generated_transforms;
 }
@@ -1318,6 +1455,10 @@ TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_line(
 	}
 	if (!direction.is_finite() || !Math::is_finite(spacing)) {
 		UtilityFunctions::push_error("helper_generate_transforms_line: direction and spacing must be finite.");
+		return TypedArray<Transform2D>();
+	}
+	if (!marker_transform.get_origin().is_finite() || !Math::is_finite(marker_transform.get_rotation()) || !marker_transform.get_scale().is_finite()) {
+		UtilityFunctions::push_error("helper_generate_transforms_line: marker_transform contains NaN/Inf.");
 		return TypedArray<Transform2D>();
 	}
 	if (direction.length_squared() <= 0.0) {
@@ -1347,6 +1488,18 @@ TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_aimed(
 		const Vector2 &target_position,
 		real_t spread,
 		real_t step_offset) {
+	if (transforms_amount < 0) {
+		UtilityFunctions::push_error("helper_generate_transforms_aimed: transforms_amount must be >= 0.");
+		return TypedArray<Transform2D>();
+	}
+	if (!Math::is_finite(spread) || !Math::is_finite(step_offset)) {
+		UtilityFunctions::push_error("helper_generate_transforms_aimed: spread and step_offset must be finite numbers.");
+		return TypedArray<Transform2D>();
+	}
+	if (!marker_transform.get_origin().is_finite() || !Math::is_finite(marker_transform.get_rotation()) || !marker_transform.get_scale().is_finite()) {
+		UtilityFunctions::push_error("helper_generate_transforms_aimed: marker_transform contains NaN/Inf.");
+		return TypedArray<Transform2D>();
+	}
 	if (!target_position.is_finite()) {
 		UtilityFunctions::push_error("helper_generate_transforms_aimed: target_position must be finite.");
 		return TypedArray<Transform2D>();
@@ -1362,6 +1515,10 @@ TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_aimed(
 }
 
 void BulletFactory2D::teleport_shift_all_bullets(const Vector2 &shift_amount) {
+	if (!shift_amount.is_finite()) {
+		UtilityFunctions::push_error("teleport_shift_all_bullets: shift_amount must be finite, nothing moved.");
+		return;
+	}
 	int directional_amount = static_cast<int>(all_directional_bullets.size());
 
 	for (int i = 0; i < directional_amount; ++i) {
@@ -1376,11 +1533,13 @@ void BulletFactory2D::teleport_shift_all_bullets(const Vector2 &shift_amount) {
 	if (!all_block_bullets.empty()) {
 		UtilityFunctions::push_warning("teleport_shift_all_bullets only affects DirectionalBullets2D; BlockBullets2D instances were skipped.");
 	}
-
-	// TODO Not supported for BlockBullets2D
 }
 
 void BulletFactory2D::_bind_methods() {
+	ClassDB::bind_method(D_METHOD("get_is_tearing_down"), &BulletFactory2D::get_is_tearing_down);
+
+	ClassDB::bind_method(D_METHOD("reactivate_multimesh_instance", "multimesh_bullets"), &BulletFactory2D::reactivate_multimesh_instance_for_script);
+
 	ClassDB::bind_method(D_METHOD("teleport_shift_all_bullets", "shift_amount"), &BulletFactory2D::teleport_shift_all_bullets);
 
 	ClassDB::bind_method(D_METHOD("get_is_factory_busy"), &BulletFactory2D::get_is_factory_busy);
@@ -1402,7 +1561,7 @@ void BulletFactory2D::_bind_methods() {
 
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "use_physics_interpolation"), "set_use_physics_interpolation_editor", "get_use_physics_interpolation");
 
-	ClassDB::bind_method(D_METHOD("spawn_block_bullets", "spawn_data"), &BulletFactory2D::spawn_block_bullets);
+	ClassDB::bind_method(D_METHOD("spawn_block_bullets", "spawn_data", "inherited_velocity_offset"), &BulletFactory2D::spawn_block_bullets, DEFVAL(Vector2(0, 0)));
 	ClassDB::bind_method(D_METHOD("spawn_directional_bullets", "spawn_data", "inherited_velocity_offset"), &BulletFactory2D::spawn_directional_bullets, DEFVAL(Vector2(0, 0)));
 	ClassDB::bind_method(D_METHOD("spawn_controllable_directional_bullets", "spawn_data", "inherited_velocity_offset"), &BulletFactory2D::spawn_controllable_directional_bullets, DEFVAL(Vector2(0, 0)));
 
@@ -1531,20 +1690,20 @@ void BulletFactory2D::_bind_methods() {
 
 	ADD_SIGNAL(MethodInfo("area_entered",
 						  PropertyInfo(Variant::OBJECT, "hit_target_area"),
-						  PropertyInfo(Variant::OBJECT, "multimesh_bullets_instance", PROPERTY_HINT_RESOURCE_TYPE, "MultiMeshBullets2D"),
+						  PropertyInfo(Variant::OBJECT, "multimesh_bullets_instance", PROPERTY_HINT_NODE_TYPE, "MultiMeshBullets2D"),
 						  PropertyInfo(Variant::INT, "bullet_index"),
 						  PropertyInfo(Variant::OBJECT, "bullets_custom_data", PROPERTY_HINT_RESOURCE_TYPE, "Resource"),
 						  PropertyInfo(Variant::TRANSFORM2D, "bullet_global_transform")));
 
 	ADD_SIGNAL(MethodInfo("body_entered",
 						  PropertyInfo(Variant::OBJECT, "hit_target_body"),
-						  PropertyInfo(Variant::OBJECT, "multimesh_bullets_instance", PROPERTY_HINT_RESOURCE_TYPE, "MultiMeshBullets2D"),
+						  PropertyInfo(Variant::OBJECT, "multimesh_bullets_instance", PROPERTY_HINT_NODE_TYPE, "MultiMeshBullets2D"),
 						  PropertyInfo(Variant::INT, "bullet_index"),
 						  PropertyInfo(Variant::OBJECT, "bullets_custom_data", PROPERTY_HINT_RESOURCE_TYPE, "Resource"),
 						  PropertyInfo(Variant::TRANSFORM2D, "bullet_global_transform")));
 
 	ADD_SIGNAL(MethodInfo("life_time_over",
-						  PropertyInfo(Variant::OBJECT, "multimesh_bullets_instance", PROPERTY_HINT_RESOURCE_TYPE, "MultiMeshBullets2D"),
+						  PropertyInfo(Variant::OBJECT, "multimesh_bullets_instance", PROPERTY_HINT_NODE_TYPE, "MultiMeshBullets2D"),
 						  PropertyInfo(Variant::ARRAY, "bullet_indexes", PROPERTY_HINT_ARRAY_TYPE, "int"),
 						  PropertyInfo(Variant::OBJECT, "bullets_custom_data", PROPERTY_HINT_RESOURCE_TYPE, "Resource"),
 						  PropertyInfo(Variant::ARRAY, "bullets_global_transforms", PROPERTY_HINT_ARRAY_TYPE, "Transform2D")));

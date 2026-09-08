@@ -62,8 +62,12 @@ void MultiMeshBullets2D::_notification(int p_what) {
 
 					if (i >= 0 && i < (int)attachments.size() && attachments[i] != nullptr) {
 						if (factory_is_dying) {
-							attachments[i]->call_on_bullet_disable();
+							// Null the slot BEFORE the callback (same ordering as
+							// bullet_disable_attachment): re-entrant API calls from the
+							// script must see an empty slot.
+							BulletAttachment2D *detaching = attachments[i];
 							attachments[i] = nullptr;
+							detaching->call_on_bullet_disable();
 						} else {
 							bullet_disable_attachment(i);
 						}
@@ -93,13 +97,37 @@ void MultiMeshBullets2D::_notification(int p_what) {
 int MultiMeshBullets2D::get_amount_active_attachments() const {
 	int amount_active_attachments = 0;
 
-	for (int i = 0; i < amount_bullets; ++i) {
+	// min(): the vector is sized to amount_bullets by spawn(), but this can be
+	// called on a not-yet-spawned instance through debug helpers.
+	const int count = Math::min((int)attachments.size(), amount_bullets);
+	for (int i = 0; i < count; ++i) {
 		if (attachments[i] != nullptr) {
 			++amount_active_attachments;
 		}
 	}
 
 	return amount_active_attachments;
+}
+
+void MultiMeshBullets2D::reset_attachment_state_for_reuse() {
+	// Force-disable any surviving slot first. Deferred attachment disables can be
+	// dropped by a generation bump (e.g. lifetime expiry pooled this instance and a
+	// spawn re-enabled it before the deferred flush ran), so a new owner must never
+	// be able to observe, disable or re-pool a previous owner's attachment.
+	for (int i = 0; i < (int)attachments.size(); ++i) {
+		if (attachments[i] != nullptr) {
+			bullet_disable_attachment(i);
+		}
+	}
+
+	const int count = amount_bullets;
+	attachment_pooling_ids.assign(count, 0);
+	attachments.assign(count, nullptr);
+	attachment_transforms.assign(count, Transform2D());
+	attachment_offsets.assign(count, Vector2());
+	attachment_local_transforms.assign(count, Transform2D());
+	attachment_stick_relative_to_bullet.assign(count, 1);
+	all_previous_attachment_transf.assign(count, Transform2D());
 }
 
 // Used to spawn brand new bullets.
@@ -133,19 +161,10 @@ void MultiMeshBullets2D::spawn(const MultiMeshBulletsData2D &data, MultiMeshObje
 
 	set_up_bullet_instances(data);
 
-	// Set up bullet attachments so that for every bullet you will be able to have an attachment if needed
-
-	attachment_pooling_ids.resize(amount_bullets, 0);
-
-	attachments.resize(amount_bullets, nullptr);
-
-	attachment_transforms.resize(amount_bullets, Transform2D());
-
-	attachment_offsets.resize(amount_bullets, Vector2());
-
-	attachment_local_transforms.resize(amount_bullets, Transform2D());
-
-	attachment_stick_relative_to_bullet.resize(amount_bullets, 1);
+	// Set up bullet attachments so that for every bullet you will be able to have an attachment if needed.
+	// Blanks all slots and arrays (fresh instances get zeroed vectors; the loop in
+	// reset_attachment_state_for_reuse is a no-op here but keeps the invariant in one place).
+	reset_attachment_state_for_reuse();
 
 	set_rotation_data(data.all_bullet_rotation_data, data.rotate_only_textures);
 
@@ -189,11 +208,59 @@ void MultiMeshBullets2D::spawn(const MultiMeshBulletsData2D &data, MultiMeshObje
 }
 
 // Activates the multimesh
-void MultiMeshBullets2D::enable_multimesh(const MultiMeshBulletsData2D &data, const Vector2 &new_inherited_velocity_offset) {
+bool MultiMeshBullets2D::enable_multimesh(const MultiMeshBulletsData2D &data, const Vector2 &new_inherited_velocity_offset) {
+	// Pool buckets are keyed by amount, but a direct GDScript call can hand a
+	// mismatched array. set_up_bullet_instances indexes data.transforms by
+	// amount_bullets, so reject early without touching state.
+	if (data.transforms.size() != amount_bullets) {
+		UtilityFunctions::push_error("enable_multimesh: transforms size (" + String::num_int64(data.transforms.size()) + ") must match amount_bullets (" + String::num_int64(amount_bullets) + ").");
+		return false;
+	}
+
+	// A direct re-enable on an in-use instance must start curves and patterns
+	// from scratch, same as a pooled pop does through disable_multimesh().
+	shared_bullet_curves_data.unref();
+	for (auto &r : all_bullet_curves_data) {
+		r.unref();
+	}
+	for (auto &p : all_movement_pattern_data) {
+		p = BulletMovementPatternData2D();
+	}
+
 	inherited_velocity_offset = new_inherited_velocity_offset;
+
+	const PhysicsServer2D::ShapeType old_effective_shape_type = cached_effective_shape_type;
 	cache_collision_shape_typed(data.collision_shape);
 
+	// Reused RIDs keep their original type. If the new spawn switches shape type,
+	// the old RIDs would receive mismatched data below, so recreate them exactly
+	// like set_collision_shape_runtime() does.
+	if (cached_effective_shape_type != old_effective_shape_type && physics_server != nullptr && area.is_valid()) {
+		physics_server->area_clear_shapes(area);
+		for (RID &s : physics_shapes) {
+			if (s.is_valid()) {
+				physics_server->free_rid(s);
+			}
+		}
+		physics_shapes.clear();
+		generate_physics_shapes_for_area(amount_bullets);
+	}
+
+	// Blank attachment state before anything else: a reused instance must never
+	// carry the previous owner's attachment slots into this enable.
+	reset_attachment_state_for_reuse();
+
 	++multimesh_generation;
+
+	// Fresh lifetime must not inherit stale hits or timers from the previous
+	// owner. disable_multimesh() clears these when pooling is on, but an
+	// instance woken with pooling off (or a direct enable) would leak them.
+	all_collided_bullets.clear();
+	_do_detach_all_time_based_functions(multimesh_timers_generation);
+
+	// Same reason: a woken instance that never went through disable_multimesh()
+	// would keep counting curve time from the previous owner.
+	curves_elapsed_time = 0.0;
 
 	set_up_life_time_timer(data.max_life_time, data.max_life_time);
 
@@ -216,15 +283,25 @@ void MultiMeshBullets2D::enable_multimesh(const MultiMeshBulletsData2D &data, co
 			data.visibility_layer,
 			data.instance_shader_parameters);
 
-	// Single-error policy: rebuild already reported; previous texture kept on failure.
+	// A pooled instance carries the previous owner's baked animation. rebuild only
+	// overwrites on success, so ALWAYS clear first: a failed rebuild (missing
+	// animation, null frame texture, ...) must leave a blank state, never the
+	// previous owner's animation playing for the new one.
+	anim_source.unref();
+	anim_frames.clear();
+	anim_frame_secs.clear();
+	anim_frame_index = 0;
+	anim_frame_time_left = 0.0;
+	anim_paused = false;
+	anim_finished = false;
+	set_texture(Ref<Texture2D>());
+
+	// Single-error policy: rebuild already reported; blank animation kept on failure.
 	rebuild_sprite_animation(data.sprite_frames, data.animation);
 
 	// Pooled instances may carry user connections from a previous owner; they must not
 	// fire for the new spawn. Mirrors the homing-signal cleanup in directional enable logic.
-	for (const Dictionary &connection : get_signal_connection_list("sprite_animation_finished")) {
-		const Callable callable = connection["callable"];
-		disconnect("sprite_animation_finished", callable);
-	}
+	disconnect_sprite_animation_connections();
 
 	custom_additional_enable_logic(data);
 
@@ -233,6 +310,7 @@ void MultiMeshBullets2D::enable_multimesh(const MultiMeshBulletsData2D &data, co
 	// Mark all bullets as enabled in the sparse set (amount_bullets never changes)
 	all_bullets_enabled_set.activate_all_data();
 	is_active = true;
+	return true;
 }
 
 void MultiMeshBullets2D::set_up_bullet_instances(const MultiMeshBulletsData2D &data) {
@@ -257,7 +335,7 @@ void MultiMeshBullets2D::set_up_bullet_instances(const MultiMeshBulletsData2D &d
 
 	is_life_time_infinite = data.is_life_time_infinite;
 
-	set_up_area(data.collision_layer, data.collision_mask, data.monitorable, bullet_factory->physics_space);
+	set_up_area(data.collision_layer, data.collision_mask, data.monitorable, bullet_factory != nullptr ? bullet_factory->physics_space : RID());
 
 	stop_rotation_when_max_reached = data.stop_rotation_when_max_reached;
 
@@ -560,6 +638,10 @@ void MultiMeshBullets2D::set_rotation_data(const TypedArray<BulletRotationData2D
 	// Otherwise -> rotation is enabled, but only the first data is used
 	if (amount_rotation_data == 0) {
 		is_rotation_data_active = false;
+		use_only_first_rotation_data = false;
+		all_rotation_speed.clear();
+		all_max_rotation_speed.clear();
+		all_rotation_acceleration.clear();
 		return;
 	}
 
@@ -636,16 +718,25 @@ Transform2D MultiMeshBullets2D::generate_texture_transform(Transform2D transf, b
 		transf.set_rotation(transf.get_rotation() + texture_rotation_radians);
 	}
 
-	multi->set_instance_transform_2d(bullet_index, transf);
+	multi->set_instance_transform_2d(bullet_index, to_local_for_multimesh(transf));
 
 	return transf;
 }
 
 void MultiMeshBullets2D::set_up_area(const int collision_layer, const int collision_mask, bool new_monitorable, const RID &physics_space) {
 	monitorable = new_monitorable;
-	// Prefer the explicitly passed space; fall back to the factory's only when the
-	// caller handed us an invalid RID.
-	const RID &space_to_use = physics_space.is_valid() ? physics_space : bullet_factory->physics_space;
+	if (physics_server == nullptr || !area.is_valid()) {
+		UtilityFunctions::push_error("set_up_area: physics server or area is not ready, bullets will not collide.");
+		return;
+	}
+	RID space_to_use = physics_space;
+	if (!space_to_use.is_valid() && bullet_factory != nullptr) {
+		space_to_use = bullet_factory->physics_space;
+	}
+	if (!space_to_use.is_valid()) {
+		UtilityFunctions::push_error("set_up_area: no valid physics space, bullets will not collide. Set BulletFactory2D physics_space first.");
+		return;
+	}
 	physics_server->area_set_space(area, space_to_use);
 	physics_server->area_set_monitorable(area, monitorable);
 	physics_server->area_set_area_monitor_callback(area, callable_mp(this, &MultiMeshBullets2D::area_entered_func));
@@ -709,6 +800,9 @@ Ref<BulletSpeedData2D> MultiMeshBullets2D::get_bullet_speed_data(int bullet_inde
 
 	// BlockBullets keeps single entry for speed - map any index to 0
 	int eff = (all_cached_speed.size() == 1) ? 0 : bullet_index;
+	if (eff < 0 || eff >= (int)all_cached_speed.size() || eff >= (int)all_cached_max_speed.size() || eff >= (int)all_cached_acceleration.size()) {
+		return speed_data;
+	}
 	speed_data->speed = all_cached_speed[eff];
 	speed_data->max_speed = all_cached_max_speed[eff];
 	speed_data->acceleration = all_cached_acceleration[eff];
@@ -748,9 +842,14 @@ void MultiMeshBullets2D::set_bullet_speed_data(int bullet_index, const Ref<Bulle
 		return;
 	}
 
+	if (bullet_index < 0 || bullet_index >= (int)all_cached_speed.size() || bullet_index >= (int)all_cached_max_speed.size() || bullet_index >= (int)all_cached_acceleration.size() || bullet_index >= (int)all_cached_velocity.size() || bullet_index >= (int)all_cached_direction.size()) {
+		return;
+	}
+
 	all_cached_speed[bullet_index] = new_bullet_speed_data->speed;
 	all_cached_max_speed[bullet_index] = new_bullet_speed_data->max_speed;
 	all_cached_acceleration[bullet_index] = new_bullet_speed_data->acceleration;
+	all_cached_velocity[bullet_index] = all_cached_direction[bullet_index] * new_bullet_speed_data->speed + inherited_velocity_offset;
 }
 
 TypedArray<BulletSpeedData2D> MultiMeshBullets2D::all_bullets_get_speed_data(int bullet_index_start, int bullet_index_end_inclusive) const {
@@ -788,11 +887,19 @@ Vector2 MultiMeshBullets2D::get_bullet_direction(int bullet_index) const {
 	}
 
 	int eff = (all_cached_direction.size() == 1) ? 0 : bullet_index;
+	if (eff < 0 || eff >= (int)all_cached_direction.size()) {
+		return Vector2();
+	}
 	return all_cached_direction[eff];
 }
 
 void MultiMeshBullets2D::set_bullet_direction(int bullet_index, const Vector2 &new_direction) {
 	if (!validate_bullet_index(bullet_index, "set_bullet_direction")) {
+		return;
+	}
+
+	if (!new_direction.is_finite()) {
+		UtilityFunctions::push_error("set_bullet_direction: new_direction must be finite, keeping the old direction.");
 		return;
 	}
 
@@ -811,11 +918,11 @@ void MultiMeshBullets2D::set_bullet_direction(int bullet_index, const Vector2 &n
 	if (all_cached_direction.size() == 1) {
 		bullet_index = 0;
 	}
-	all_cached_direction[bullet_index] = new_direction.normalized();
-	// For Block with single dir, keep velocity in sync
-	if (all_cached_velocity.size() == 1) {
-		all_cached_velocity[0] = all_cached_direction[0] * all_cached_speed[0] + inherited_velocity_offset;
+	if (bullet_index < 0 || bullet_index >= (int)all_cached_direction.size() || bullet_index >= (int)all_cached_velocity.size() || bullet_index >= (int)all_cached_speed.size()) {
+		return;
 	}
+	all_cached_direction[bullet_index] = new_direction.normalized();
+	all_cached_velocity[bullet_index] = all_cached_direction[bullet_index] * all_cached_speed[bullet_index] + inherited_velocity_offset;
 }
 
 TypedArray<Vector2> MultiMeshBullets2D::all_bullets_get_direction(int bullet_index_start, int bullet_index_end_inclusive) const {
@@ -841,6 +948,9 @@ real_t MultiMeshBullets2D::get_bullet_texture_rotation_radians(int bullet_index)
 	if (!validate_bullet_index(bullet_index, "get_bullet_texture_rotation_radians")) {
 		return 0.0;
 	}
+	if (bullet_index < 0 || bullet_index >= (int)all_cached_instance_transforms.size()) {
+		return 0.0;
+	}
 
 	return all_cached_instance_transforms[bullet_index].get_rotation();
 }
@@ -849,13 +959,21 @@ void MultiMeshBullets2D::set_bullet_texture_rotation_radians(int bullet_index, r
 	if (!validate_bullet_index(bullet_index, "set_bullet_texture_rotation_radians")) {
 		return;
 	}
+	if (!Math::is_finite(new_rotation_radians)) {
+		UtilityFunctions::push_error("set_bullet_texture_rotation_radians: rotation must be finite, keeping the old rotation.");
+		return;
+	}
+	if (bullet_index >= (int)all_cached_instance_transforms.size()) {
+		return;
+	}
 
 	auto &curr_transf = all_cached_instance_transforms[bullet_index];
 	curr_transf.set_rotation(new_rotation_radians);
+	sync_shape_transform_from_instance(bullet_index, curr_transf);
 
 	// Instantly apply the updated transform so paused factories don't render stale visuals.
 	if (all_bullets_enabled_set.contains(bullet_index)) {
-		multi->set_instance_transform_2d(bullet_index, curr_transf);
+		multi->set_instance_transform_2d(bullet_index, to_local_for_multimesh(curr_transf));
 	}
 
 	update_bullet_previous_transform_for_interpolation(bullet_index);
@@ -884,6 +1002,9 @@ real_t MultiMeshBullets2D::get_bullet_texture_rotation_degrees(int bullet_index)
 	if (!validate_bullet_index(bullet_index, "get_bullet_texture_rotation_degrees")) {
 		return 0.0;
 	}
+	if (bullet_index < 0 || bullet_index >= (int)all_cached_instance_transforms.size()) {
+		return 0.0;
+	}
 
 	return Math::rad_to_deg(all_cached_instance_transforms[bullet_index].get_rotation());
 }
@@ -892,13 +1013,21 @@ void MultiMeshBullets2D::set_bullet_texture_rotation_degrees(int bullet_index, r
 	if (!validate_bullet_index(bullet_index, "set_bullet_texture_rotation_degrees")) {
 		return;
 	}
+	if (!Math::is_finite(new_rotation_degrees)) {
+		UtilityFunctions::push_error("set_bullet_texture_rotation_degrees: rotation must be finite, keeping the old rotation.");
+		return;
+	}
+	if (bullet_index >= (int)all_cached_instance_transforms.size()) {
+		return;
+	}
 
 	auto &curr_transf = all_cached_instance_transforms[bullet_index];
 	curr_transf.set_rotation(Math::deg_to_rad(new_rotation_degrees));
+	sync_shape_transform_from_instance(bullet_index, curr_transf);
 
 	// Instantly apply the updated transform so paused factories don't render stale visuals.
 	if (all_bullets_enabled_set.contains(bullet_index)) {
-		multi->set_instance_transform_2d(bullet_index, curr_transf);
+		multi->set_instance_transform_2d(bullet_index, to_local_for_multimesh(curr_transf));
 	}
 
 	update_bullet_previous_transform_for_interpolation(bullet_index);
@@ -927,12 +1056,20 @@ Transform2D MultiMeshBullets2D::get_bullet_transform(int bullet_index) const {
 	if (!validate_bullet_index(bullet_index, "get_bullet_transform")) {
 		return Transform2D();
 	}
+	if (bullet_index < 0 || bullet_index >= (int)all_cached_instance_transforms.size()) {
+		return Transform2D();
+	}
 
+	// Caches are global; return the cache directly so get()/set() round-trip in
+	// the same space. Use get_bullet_global_transform() for an explicit world read.
 	return all_cached_instance_transforms[bullet_index];
 }
 
 Transform2D MultiMeshBullets2D::get_bullet_global_transform(int bullet_index) const {
 	if (!validate_bullet_index(bullet_index, "get_bullet_global_transform")) {
+		return Transform2D();
+	}
+	if (bullet_index < 0 || bullet_index >= (int)all_cached_instance_transforms.size()) {
 		return Transform2D();
 	}
 
@@ -954,6 +1091,13 @@ void MultiMeshBullets2D::set_bullet_transform(int bullet_index, const Transform2
 	if (!validate_bullet_index(bullet_index, "set_bullet_transform")) {
 		return;
 	}
+	if (!new_transform.get_origin().is_finite() || !Math::is_finite(new_transform.get_rotation()) || !new_transform.get_scale().is_finite()) {
+		UtilityFunctions::push_error("set_bullet_transform: new_transform must be finite, keeping the old transform.");
+		return;
+	}
+	if (bullet_index >= (int)all_cached_instance_transforms.size() || bullet_index >= (int)all_cached_instance_origin.size()) {
+		return;
+	}
 	auto &curr_bullet_transf = all_cached_instance_transforms[bullet_index];
 	auto &curr_bullet_origin = all_cached_instance_origin[bullet_index];
 
@@ -966,7 +1110,7 @@ void MultiMeshBullets2D::set_bullet_transform(int bullet_index, const Transform2
 
 	// Instantly apply the updated transforms
 	if (all_bullets_enabled_set.contains(bullet_index)) {
-		multi->set_instance_transform_2d(bullet_index, curr_bullet_transf);
+		multi->set_instance_transform_2d(bullet_index, to_local_for_multimesh(curr_bullet_transf));
 	}
 
 	// Carry the attachment along so it doesn't stay behind at the old position.
@@ -983,13 +1127,23 @@ void MultiMeshBullets2D::set_bullet_transform(int bullet_index, const Transform2
 		}
 	}
 
-	// Update direction if requested
+	// Update direction if requested. A direction curve owns the direction, so
+	// skip just this part (the transform itself is still applied above).
 	if (set_direction_based_on_transform) {
-		Vector2 new_direction = Vector2(1, 0).rotated(curr_bullet_transf.get_rotation());
-		int eff = (all_cached_direction.size() == 1) ? 0 : bullet_index;
-		all_cached_direction[eff] = new_direction.normalized();
-		if (all_cached_velocity.size() == 1) {
-			all_cached_velocity[0] = all_cached_direction[0] * all_cached_speed[0] + inherited_velocity_offset;
+		bool direction_owned_by_curve = shared_bullet_curves_data.is_valid() && (shared_bullet_curves_data->x_direction_curve.is_valid() || shared_bullet_curves_data->y_direction_curve.is_valid());
+		BulletCurvesData2D *transform_curves_data = direction_owned_by_curve ? nullptr : find_bullet_curves_data_ptr(bullet_index);
+		if (transform_curves_data != nullptr && (transform_curves_data->x_direction_curve.is_valid() || transform_curves_data->y_direction_curve.is_valid())) {
+			direction_owned_by_curve = true;
+		}
+		if (direction_owned_by_curve) {
+			UtilityFunctions::push_warning("set_bullet_transform was asked to derive the direction while a direction curve is assigned. The curve owns the direction, so it was left alone. Set the curve to null first if you want the transform to steer.");
+		} else {
+			Vector2 new_direction = Vector2(1, 0).rotated(curr_bullet_transf.get_rotation());
+			int eff = (all_cached_direction.size() == 1) ? 0 : bullet_index;
+			if (eff >= 0 && eff < (int)all_cached_direction.size() && eff < (int)all_cached_velocity.size() && eff < (int)all_cached_speed.size()) {
+				all_cached_direction[eff] = new_direction.normalized();
+				all_cached_velocity[eff] = all_cached_direction[eff] * all_cached_speed[eff] + inherited_velocity_offset;
+			}
 		}
 	}
 
@@ -1019,12 +1173,29 @@ void MultiMeshBullets2D::set_bullet_direction_towards_position(int bullet_index,
 	if (!validate_bullet_index(bullet_index, "set_bullet_direction_towards_position")) {
 		return;
 	}
+	if (!target_position.is_finite()) {
+		UtilityFunctions::push_error("set_bullet_direction_towards_position: target_position must be finite.");
+		return;
+	}
+
+	if (shared_bullet_curves_data.is_valid() && (shared_bullet_curves_data->x_direction_curve.is_valid() || shared_bullet_curves_data->y_direction_curve.is_valid())) {
+		UtilityFunctions::push_warning("You are trying to set bullet direction directly while having a direction curve assigned to the shared curves data. The curve will override any direct direction changes. Set the curve to null first if you want to set direction directly.");
+		return;
+	}
+
+	BulletCurvesData2D *towards_curves_data = find_bullet_curves_data_ptr(bullet_index);
+
+	if (towards_curves_data != nullptr && (towards_curves_data->x_direction_curve.is_valid() || towards_curves_data->y_direction_curve.is_valid())) {
+		UtilityFunctions::push_warning("You are trying to set bullet direction directly while having a direction curve assigned to the individual curves data. The curve will override any direct direction changes. Set the curve to null first if you want to set direction directly.");
+		return;
+	}
 
 	int eff = (all_cached_direction.size() == 1) ? 0 : bullet_index;
-	all_cached_direction[eff] = (target_position - all_cached_instance_origin[bullet_index]).normalized();
-	if (all_cached_velocity.size() == 1) {
-		all_cached_velocity[0] = all_cached_direction[0] * all_cached_speed[0] + inherited_velocity_offset;
+	if (eff < 0 || eff >= (int)all_cached_direction.size() || eff >= (int)all_cached_velocity.size() || eff >= (int)all_cached_speed.size() || bullet_index >= (int)all_cached_instance_origin.size()) {
+		return;
 	}
+	all_cached_direction[eff] = (target_position - all_cached_instance_origin[bullet_index]).normalized();
+	all_cached_velocity[eff] = all_cached_direction[eff] * all_cached_speed[eff] + inherited_velocity_offset;
 }
 
 void MultiMeshBullets2D::all_bullets_set_direction_towards_position(const Vector2 &target_position, int bullet_index_start, int bullet_index_end_inclusive) {
@@ -1046,11 +1217,27 @@ void MultiMeshBullets2D::set_bullet_direction_towards_node2d(int bullet_index, c
 	}
 
 	const Vector2 target_position = target_node->get_global_position();
-	int eff = (all_cached_direction.size() == 1) ? 0 : bullet_index;
-	all_cached_direction[eff] = (target_position - all_cached_instance_origin[bullet_index]).normalized();
-	if (all_cached_velocity.size() == 1) {
-		all_cached_velocity[0] = all_cached_direction[0] * all_cached_speed[0] + inherited_velocity_offset;
+	if (!target_position.is_finite()) {
+		UtilityFunctions::push_error("set_bullet_direction_towards_node2d: target position must be finite.");
+		return;
 	}
+	if (shared_bullet_curves_data.is_valid() && (shared_bullet_curves_data->x_direction_curve.is_valid() || shared_bullet_curves_data->y_direction_curve.is_valid())) {
+		UtilityFunctions::push_warning("You are trying to set bullet direction directly while having a direction curve assigned to the shared curves data. The curve will override any direct direction changes. Set the curve to null first if you want to set direction directly.");
+		return;
+	}
+
+	BulletCurvesData2D *towards_node_curves_data = find_bullet_curves_data_ptr(bullet_index);
+
+	if (towards_node_curves_data != nullptr && (towards_node_curves_data->x_direction_curve.is_valid() || towards_node_curves_data->y_direction_curve.is_valid())) {
+		UtilityFunctions::push_warning("You are trying to set bullet direction directly while having a direction curve assigned to the individual curves data. The curve will override any direct direction changes. Set the curve to null first if you want to set direction directly.");
+		return;
+	}
+	int eff = (all_cached_direction.size() == 1) ? 0 : bullet_index;
+	if (eff < 0 || eff >= (int)all_cached_direction.size() || eff >= (int)all_cached_velocity.size() || eff >= (int)all_cached_speed.size() || bullet_index >= (int)all_cached_instance_origin.size()) {
+		return;
+	}
+	all_cached_direction[eff] = (target_position - all_cached_instance_origin[bullet_index]).normalized();
+	all_cached_velocity[eff] = all_cached_direction[eff] * all_cached_speed[eff] + inherited_velocity_offset;
 }
 
 void MultiMeshBullets2D::all_bullets_set_direction_towards_node2d(const Node2D *target_node, int bullet_index_start, int bullet_index_end_inclusive) {
@@ -1071,6 +1258,13 @@ void MultiMeshBullets2D::all_bullets_set_direction_towards_node2d(const Node2D *
 void MultiMeshBullets2D::set_bullet_texture_rotation_towards_position(int bullet_index, const Vector2 &target_position) {
 	if (!validate_bullet_index(bullet_index, "set_bullet_texture_rotation_towards_position"))
 		return;
+	if (!target_position.is_finite()) {
+		UtilityFunctions::push_error("set_bullet_texture_rotation_towards_position: target_position must be finite.");
+		return;
+	}
+	if (bullet_index >= (int)all_cached_instance_transforms.size() || bullet_index >= (int)all_cached_instance_origin.size()) {
+		return;
+	}
 
 	Transform2D &transf = all_cached_instance_transforms[bullet_index];
 
@@ -1081,8 +1275,14 @@ void MultiMeshBullets2D::set_bullet_texture_rotation_towards_position(int bullet
 	Vector2 scale = transf.get_scale();
 	transf.set_rotation_and_scale(angle, scale);
 	transf.set_origin(pos);
+	sync_shape_transform_from_instance(bullet_index, transf);
 
-	multi->set_instance_transform_2d(bullet_index, transf);
+	// Only write the multimesh slot for ENABLED bullets: a disabled slot holds the
+	// zero transform that hides it, and writing a real transform here would
+	// resurrect the visual for a frame (or permanently on a paused factory).
+	if (all_bullets_enabled_set.contains(bullet_index)) {
+		multi->set_instance_transform_2d(bullet_index, to_local_for_multimesh(transf));
+	}
 
 	update_bullet_previous_transform_for_interpolation(bullet_index);
 }
@@ -1127,6 +1327,12 @@ real_t MultiMeshBullets2D::get_curves_elapsed_time() const {
 	return curves_elapsed_time;
 }
 void MultiMeshBullets2D::set_curves_elapsed_time(real_t new_time) {
+	// NaN/Inf here would poison every curve sample (speed/rotation/direction) with no
+	// recovery, so reject non-finite time like the other movement setters do.
+	if (!Math::is_finite(new_time) || new_time < 0.0) {
+		UtilityFunctions::push_error("set_curves_elapsed_time: new_time must be a finite value >= 0.");
+		return;
+	}
 	curves_elapsed_time = new_time;
 }
 
@@ -1154,6 +1360,12 @@ void MultiMeshBullets2D::all_bullets_set_movement_pattern_from_path(Path2D *path
 
 	if (path_holding_pattern == nullptr) {
 		all_bullets_remove_movement_pattern(start_index, end_index_inclusive);
+		return;
+	}
+
+	// Single error for the whole range instead of one per bullet below.
+	if (is_class("BlockBullets2D")) {
+		UtilityFunctions::push_error("BlockBullets2D does not support movement patterns - use DirectionalBullets2D for patterned movement.");
 		return;
 	}
 
@@ -1310,14 +1522,12 @@ void MultiMeshBullets2D::set_collision_shape_runtime(const Ref<Shape2D> &new_sha
 		return;
 	}
 	for (int i = 0; i < amount_bullets; ++i) {
+		// Push the new size/type data to the server shape. The returned transform
+		// is intentionally discarded: the cached shape transform below is derived
+		// through the sync helper so rotate_only_textures and the texture-rotation
+		// strip stay consistent with the tick and teleport paths.
 		(void)generate_collision_shape_transform_for_area(all_cached_instance_transforms[i], physics_shapes[i], cache_collision_shape_offset, i);
-		all_cached_shape_transforms[i] = all_cached_instance_transforms[i];
-		Vector2 off = Vector2(0, 0);
-		if (cache_collision_shape_offset != Vector2(0, 0)) {
-			off = cache_collision_shape_offset.rotated(all_cached_instance_transforms[i].get_rotation());
-		}
-		all_cached_shape_origin[i] = all_cached_instance_origin[i] + off;
-		all_cached_shape_transforms[i].set_origin(all_cached_shape_origin[i]);
+		sync_shape_transform_from_instance(i, all_cached_instance_transforms[i]);
 		// Fresh RIDs from a type change come enabled; restore per-bullet disabled state
 		// so individually disabled bullets don't become collidable again.
 		if (!all_bullets_enabled_set.contains(i)) {
@@ -1422,9 +1632,15 @@ void MultiMeshBullets2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("bullet_disable_attachment", "bullet_index"), &MultiMeshBullets2D::bullet_disable_attachment);
 	ClassDB::bind_method(D_METHOD("bullet_enable_attachment", "bullet_index"), &MultiMeshBullets2D::bullet_enable_attachment);
 	ClassDB::bind_method(D_METHOD("get_amount_active_attachments"), &MultiMeshBullets2D::get_amount_active_attachments);
-	ClassDB::bind_method(D_METHOD("_do_deferred_bullet_disable_attachment", "bullet_index", "expected_generation"), &MultiMeshBullets2D::_do_deferred_bullet_disable_attachment);
+	ClassDB::bind_method(D_METHOD("_do_deferred_bullet_disable_attachment", "bullet_index", "expected_generation", "expected_attachment"), &MultiMeshBullets2D::_do_deferred_bullet_disable_attachment);
 
 	ClassDB::bind_method(D_METHOD("get_amount_bullets"), &MultiMeshBullets2D::get_amount_bullets);
+
+	// Base-class methods only (no ADD_PROPERTY here): DirectionalBullets2D binds its
+	// own versions and exposes the "inherited_velocity_offset" property; these binds
+	// make the getters/setters reachable on MultiMeshBullets2D/BlockBullets2D too.
+	ClassDB::bind_method(D_METHOD("get_inherited_velocity_offset"), &MultiMeshBullets2D::get_inherited_velocity_offset);
+	ClassDB::bind_method(D_METHOD("set_inherited_velocity_offset", "new_offset"), &MultiMeshBullets2D::set_inherited_velocity_offset);
 
 	ClassDB::bind_method(D_METHOD("get_all_bullets_status"), &MultiMeshBullets2D::get_all_bullets_status);
 	ClassDB::bind_method(D_METHOD("is_bullet_status_enabled", "bullet_index"), &MultiMeshBullets2D::is_bullet_status_enabled);
@@ -1442,12 +1658,12 @@ void MultiMeshBullets2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("_do_attach_time_based_function", "time", "callable", "repeat", "execute_only_if_multimesh_is_active", "expected_timers_generation"), &MultiMeshBullets2D::_do_attach_time_based_function);
 
 	ClassDB::bind_method(D_METHOD("multimesh_detach_time_based_function", "callable"), &MultiMeshBullets2D::multimesh_detach_time_based_function);
-	ClassDB::bind_method(D_METHOD("_do_detach_time_based_function", "callable"), &MultiMeshBullets2D::_do_detach_time_based_function);
+	ClassDB::bind_method(D_METHOD("_do_detach_time_based_function", "callable", "expected_timers_generation"), &MultiMeshBullets2D::_do_detach_time_based_function);
 
 	ClassDB::bind_method(D_METHOD("multimesh_detach_all_time_based_functions"), &MultiMeshBullets2D::multimesh_detach_all_time_based_functions);
-	ClassDB::bind_method(D_METHOD("_do_detach_all_time_based_functions"), &MultiMeshBullets2D::_do_detach_all_time_based_functions);
+	ClassDB::bind_method(D_METHOD("_do_detach_all_time_based_functions", "expected_timers_generation"), &MultiMeshBullets2D::_do_detach_all_time_based_functions);
 
-	ClassDB::bind_method(D_METHOD("_do_execute_stored_callable_safely", "_callback", "_execute_only_if_multimesh_is_active"), &MultiMeshBullets2D::_do_execute_stored_callable_safely);
+	ClassDB::bind_method(D_METHOD("_do_execute_stored_callable_safely", "_callback", "_execute_only_if_multimesh_is_active", "expected_timers_generation"), &MultiMeshBullets2D::_do_execute_stored_callable_safely);
 
 	ClassDB::bind_method(D_METHOD("get_is_multimesh_auto_pooling_enabled"), &MultiMeshBullets2D::get_is_multimesh_auto_pooling_enabled);
 	ClassDB::bind_method(D_METHOD("set_is_multimesh_auto_pooling_enabled", "value"), &MultiMeshBullets2D::set_is_multimesh_auto_pooling_enabled);
@@ -1465,8 +1681,8 @@ void MultiMeshBullets2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_bullet_collision_count", "bullet_index"), &MultiMeshBullets2D::get_bullet_collision_count);
 	ClassDB::bind_method(D_METHOD("set_bullet_collision_count", "bullet_index", "value"), &MultiMeshBullets2D::set_bullet_collision_count);
 	ClassDB::bind_method(D_METHOD("get_bullets_current_collision_count"), &MultiMeshBullets2D::get_bullets_current_collision_count);
-	ClassDB::bind_method(D_METHOD("set_bullets_current_collision_count", "arr"), &MultiMeshBullets2D::set_bullets_current_collision_count);
-	ADD_PROPERTY(PropertyInfo(Variant::ARRAY, "bullets_current_collision_count"), "set_bullets_current_collision_count", "get_bullets_current_collision_count");
+	ClassDB::bind_method(D_METHOD("set_bullets_current_collision_count_no_return", "arr"), &MultiMeshBullets2D::set_bullets_current_collision_count_no_return);
+	ADD_PROPERTY(PropertyInfo(Variant::ARRAY, "bullets_current_collision_count", PROPERTY_HINT_ARRAY_TYPE, "int"), "set_bullets_current_collision_count_no_return", "get_bullets_current_collision_count");
 
 	ClassDB::bind_method(D_METHOD("get_collision_layer"), &MultiMeshBullets2D::get_collision_layer);
 	ClassDB::bind_method(D_METHOD("set_collision_layer", "new_collision_layer"), &MultiMeshBullets2D::set_collision_layer);
@@ -1523,6 +1739,6 @@ void MultiMeshBullets2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("has_bullet_movement_pattern", "bullet_index"), &MultiMeshBullets2D::check_exists_bullet_movement_pattern_data);
 
 	ADD_SIGNAL(MethodInfo("sprite_animation_finished",
-			PropertyInfo(Variant::OBJECT, "multimesh_bullets_instance", PROPERTY_HINT_RESOURCE_TYPE, "MultiMeshBullets2D")));
+			PropertyInfo(Variant::OBJECT, "multimesh_bullets_instance", PROPERTY_HINT_NODE_TYPE, "MultiMeshBullets2D")));
 }
 } //namespace BlastBullets2D

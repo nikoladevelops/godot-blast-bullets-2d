@@ -82,49 +82,10 @@ struct CollisionShapeHelper2D {
 
 	// Quiet apply, no error print (error already printed once at creation). Uses effective type.
 	// Null/fallback => circle r16. Effective determines RID type, so data must match RID.
-	_ALWAYS_INLINE_ static void apply_shape_data_quiet(PhysicsServer2D *server, const RID &rid, const Ref<Shape2D> &shape, PhysicsServer2D::ShapeType effective) {
-		if (shape.is_null()) {
-			server->shape_set_data(rid, DEFAULT_CIRCLE_RADIUS);
-			return;
-		}
-		switch (effective) {
-			case PhysicsServer2D::SHAPE_CIRCLE: {
-				auto *circle = Object::cast_to<CircleShape2D>(shape.ptr());
-				float r = circle ? circle->get_radius() : 0.0f;
-				if (r <= 0.0f) {
-					server->shape_set_data(rid, DEFAULT_CIRCLE_RADIUS);
-				} else {
-					server->shape_set_data(rid, r);
-				}
-				break;
-			}
-			case PhysicsServer2D::SHAPE_CAPSULE: {
-				auto *capsule = Object::cast_to<CapsuleShape2D>(shape.ptr());
-				float r = capsule ? capsule->get_radius() : 0.0f;
-				float h = capsule ? capsule->get_height() : 0.0f;
-				if (r <= 0.0f || h <= 0.0f) {
-					server->shape_set_data(rid, DEFAULT_CIRCLE_RADIUS);
-				} else {
-					server->shape_set_data(rid, Vector2(r, h));
-				}
-				break;
-			}
-			case PhysicsServer2D::SHAPE_RECTANGLE:
-			default: {
-				if (auto *rect = Object::cast_to<RectangleShape2D>(shape.ptr())) {
-					Vector2 s = rect->get_size();
-					if (s.x <= 0.0f || s.y <= 0.0f) {
-						server->shape_set_data(rid, DEFAULT_CIRCLE_RADIUS);
-					} else {
-						server->shape_set_data(rid, s / 2);
-					}
-				} else {
-					server->shape_set_data(rid, DEFAULT_CIRCLE_RADIUS);
-				}
-				break;
-			}
-		}
-	}
+	// NOTE: removed apply_shape_data_quiet() - it was dead code and its rect/capsule
+	// fallbacks passed a float where Vector2 data is required (wrong shape data type).
+	// generate_collision_shape_transform_for_area() in multimesh_bullets2d.cpp is the
+	// single applier of shape data and is type-correct.
 
 	// Create RID of correct server type. Caller must area_add_shape + track for free_rid.
 	_ALWAYS_INLINE_ static RID create_server_shape(PhysicsServer2D *server, PhysicsServer2D::ShapeType type) {

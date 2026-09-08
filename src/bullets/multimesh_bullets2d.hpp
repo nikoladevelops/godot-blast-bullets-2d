@@ -87,8 +87,9 @@ public:
 	// Used to spawn brand new bullets that are active in the scene tree
 	void spawn(const MultiMeshBulletsData2D &spawn_data, MultiMeshObjectPool *pool, BulletFactory2D *factory, Node *bullets_container, const Vector2 &new_inherited_velocity_offset, int new_sparse_set_id, bool spawn_in_pool);
 
-	// Activates the multimesh
-	void enable_multimesh(const MultiMeshBulletsData2D &data, const Vector2 &new_inherited_velocity_offset);
+	// Activates the multimesh. Returns false (without leaving it factory-active)
+	// when the spawn data is incompatible, so the pool owner can re-push it.
+	bool enable_multimesh(const MultiMeshBulletsData2D &data, const Vector2 &new_inherited_velocity_offset);
 
 	// Clears homing state (target deques + counters) on teardown so global mouse-target
 	// accounting can't leak. Base version is a no-op (only directional bullets home).
@@ -107,6 +108,14 @@ public:
 
 	/// METHODS RESPONSIBLE FOR VARIOUS BULLET FEATURES
 
+	// Caches hold GLOBAL-space transforms, but MultiMesh instance slots are LOCAL
+	// to this MultiMeshInstance2D (rendered global = node_global * instance).
+	// Convert on every visual write so a moved factory/multimesh doesn't offset
+	// rendering away from physics (physics areas are node-independent).
+	_ALWAYS_INLINE_ Transform2D to_local_for_multimesh(const Transform2D &global_transf) const {
+		return get_global_transform().affine_inverse() * global_transf;
+	}
+
 	// Use this method when you want to use physics interpolation - smooth rendering of textures despite physics ticks per second
 	_ALWAYS_INLINE_ void interpolate_bullet_visuals() {
 		if (!bullet_factory || !bullet_factory->use_physics_interpolation) {
@@ -115,7 +124,14 @@ public:
 		if (!multi.is_valid()) {
 			return;
 		}
+		if ((int)all_cached_instance_transforms.size() != amount_bullets || (int)all_previous_instance_transf.size() != amount_bullets) {
+			return;
+		}
+		if ((int)batch_buffer.size() != amount_bullets * 8) {
+			return;
+		}
 		double fraction = Engine::get_singleton()->get_physics_interpolation_fraction();
+		const Transform2D multimesh_inv = get_global_transform().affine_inverse();
 
 		// batch_buffer sized in spawn/set_up_multimesh (amount never changes on reuse)
 #ifdef DEV_ENABLED
@@ -125,7 +141,7 @@ public:
 		for (int i = 0; i < amount_bullets; ++i) {
 			Transform2D t;
 			if (all_bullets_enabled_set.contains(i)) {
-				t = get_interpolated_transform(all_cached_instance_transforms[i], all_previous_instance_transf[i], fraction);
+				t = multimesh_inv * get_interpolated_transform(all_cached_instance_transforms[i], all_previous_instance_transf[i], fraction);
 			} else {
 				t = zero_transform;
 			}
@@ -141,6 +157,9 @@ public:
 		multi->set_buffer(batch_buffer);
 		const auto &active_bullet_indexes = all_bullets_enabled_set.get_active_indexes();
 		for (int i : active_bullet_indexes) {
+			if (i < 0 || i >= amount_bullets || i >= (int)attachments.size() || i >= (int)attachment_transforms.size() || i >= (int)all_previous_attachment_transf.size()) {
+				continue;
+			}
 			if (!attachments[i])
 				continue;
 			const Transform2D &at = get_interpolated_transform(attachment_transforms[i], all_previous_attachment_transf[i], fraction);
@@ -152,12 +171,19 @@ public:
 		if (!multi.is_valid() || amount_bullets != multi->get_instance_count()){
 		    return;
 		}
+		if ((int)all_cached_instance_transforms.size() != amount_bullets || (int)batch_buffer.size() != amount_bullets * 8) {
+			return;
+		}
 #ifdef DEV_ENABLED
 		ERR_FAIL_COND((int)batch_buffer.size() != amount_bullets * 8);
 #endif
 float *w = batch_buffer.ptrw();
+		const Transform2D multimesh_inv = get_global_transform().affine_inverse();
 		for (int i = 0; i < amount_bullets; ++i) {
-			const Transform2D &t = all_bullets_enabled_set.contains(i) ? all_cached_instance_transforms[i] : zero_transform;
+			Transform2D t = zero_transform;
+			if (all_bullets_enabled_set.contains(i)) {
+				t = multimesh_inv * all_cached_instance_transforms[i];
+			}
 			w[i * 8 + 0] = t.columns[0][0];
 			w[i * 8 + 1] = t.columns[1][0];
 			w[i * 8 + 2] = 0;
@@ -175,6 +201,29 @@ float *w = batch_buffer.ptrw();
 		if (!bullet_factory || !bullet_factory->use_physics_interpolation) {
 			return;
 		}
+		if (amount_bullets <= 0) {
+			return;
+		}
+		if ((int)all_previous_instance_transf.size() != amount_bullets || (int)all_previous_attachment_transf.size() != amount_bullets) {
+			return;
+		}
+		if ((int)all_cached_instance_transforms.size() != amount_bullets || (int)attachment_transforms.size() != amount_bullets) {
+			return;
+		}
+		// Clamp instead of trusting the caller: this writes into fixed-size caches,
+		// so an unvalidated range would be an OOB write.
+		if (begin_bullet_index < 0) {
+			begin_bullet_index = 0;
+		}
+		if (begin_bullet_index >= amount_bullets) {
+			return;
+		}
+		if (end_bullet_index_inclusive >= amount_bullets) {
+			end_bullet_index_inclusive = amount_bullets - 1;
+		}
+		if (begin_bullet_index > end_bullet_index_inclusive) {
+			return;
+		}
 
 		for (int i = begin_bullet_index; i <= end_bullet_index_inclusive; ++i) {
 			all_previous_instance_transf[i] = all_cached_instance_transforms[i];
@@ -184,6 +233,9 @@ float *w = batch_buffer.ptrw();
 
 	_ALWAYS_INLINE_ void update_all_previous_transforms_for_interpolation() {
 		if (!bullet_factory || !bullet_factory->use_physics_interpolation) {
+			return;
+		}
+		if ((int)all_previous_instance_transf.size() != amount_bullets || (int)all_previous_attachment_transf.size() != amount_bullets) {
 			return;
 		}
 
@@ -196,6 +248,15 @@ float *w = batch_buffer.ptrw();
 	// Updates interpolation data for physics
 	_ALWAYS_INLINE_ void update_bullet_previous_transform_for_interpolation(int bullet_index) {
 		if (!bullet_factory || !bullet_factory->use_physics_interpolation) {
+			return;
+		}
+		if (bullet_index < 0 || bullet_index >= amount_bullets) {
+			return;
+		}
+		if (bullet_index >= (int)all_previous_instance_transf.size() || bullet_index >= (int)all_previous_attachment_transf.size()) {
+			return;
+		}
+		if (bullet_index >= (int)all_cached_instance_transforms.size() || bullet_index >= (int)attachment_transforms.size()) {
 			return;
 		}
 
@@ -214,12 +275,19 @@ float *w = batch_buffer.ptrw();
 		double curr_rot = curr_transf.get_rotation();
 		double interpolated_rot = godot::Math::lerp_angle(prev_rot, curr_rot, fraction);
 
-		// Apply interpolated transform
-		return Transform2D(interpolated_rot, interpolated_pos);
+		// Preserve scale (lerped): the old Transform2D(rot, pos) form reset
+		// scaled bullets to scale 1 every interpolated frame (flicker).
+		Vector2 interpolated_scale = prev_transf.get_scale().lerp(curr_transf.get_scale(), fraction);
+		Transform2D out(interpolated_rot, interpolated_pos);
+		out.set_scale(interpolated_scale);
+		return out;
 	}
 
 	// Reduces the lifetime of the multimesh so it can eventually get disabled entirely
 	inline void reduce_lifetime(double delta) {
+		if (!Math::is_finite(delta) || delta < 0.0) {
+			return;
+		}
 		curves_elapsed_time += delta;
 
 		// If the lifetime is infinite there is no lifetime timer
@@ -261,6 +329,9 @@ float *w = batch_buffer.ptrw();
 			if (!all_bullets_enabled_set.contains(i)) {
 				continue;
 			}
+			if (i < 0 || i >= (int)all_cached_instance_transforms.size()) {
+				continue;
+			}
 			transfs.push_back(all_cached_instance_transforms[i]); // Store the transform before disabling
 			bullet_indexes.push_back(i);
 			disable_bullet(i, false); // immediate shape disable, keep attachment for signal
@@ -273,7 +344,7 @@ float *w = batch_buffer.ptrw();
 			// Disable attachments after signal (deferred keeps order)
 			for (int i = 0; i < bullet_indexes.size(); ++i) {
 				int idx = bullet_indexes[i];
-				call_deferred("_do_deferred_bullet_disable_attachment", idx, multimesh_generation);
+				call_deferred("_do_deferred_bullet_disable_attachment", idx, multimesh_generation, attachments[idx]);
 			}
 		}
 	}
@@ -286,7 +357,7 @@ float *w = batch_buffer.ptrw();
 		if (frame_count <= 1 || !is_active || anim_paused || anim_finished) {
 			return;
 		}
-		if (delta <= 0.0) {
+		if (!Math::is_finite(delta) || delta <= 0.0) {
 			return;
 		}
 		if (delta > 0.5) {
@@ -357,7 +428,13 @@ float *w = batch_buffer.ptrw();
 	}
 
 	Vector2 get_inherited_velocity_offset() const { return inherited_velocity_offset; }
-	void set_inherited_velocity_offset(const Vector2 &new_offset) { inherited_velocity_offset = new_offset; }
+	void set_inherited_velocity_offset(const Vector2 &new_offset) {
+		if (!new_offset.is_finite()) {
+			UtilityFunctions::push_error("set_inherited_velocity_offset: offset must be finite, keeping the old value.");
+			return;
+		}
+		inherited_velocity_offset = new_offset;
+	}
 
 	bool get_is_multimesh_auto_pooling_enabled() const { return is_multimesh_auto_pooling_enabled; }
 	void set_is_multimesh_auto_pooling_enabled(bool value) { is_multimesh_auto_pooling_enabled = value; }
@@ -440,6 +517,9 @@ float *w = batch_buffer.ptrw();
 
 	// Bullet Transforms
 
+	// Bullet transform in the same global space as the movement caches.
+	// get_bullet_global_transform() is the explicit-world alias; set_bullet_transform
+	// accepts the same space so get()/set() round-trip without a node-transform shift.
 	Transform2D get_bullet_transform(int bullet_index) const;
 	void set_bullet_transform(int bullet_index, const Transform2D &new_transform, bool set_direction_based_on_transform = false);
 
@@ -508,6 +588,10 @@ float *w = batch_buffer.ptrw();
 
 	bool is_attachments_auto_pooling_enabled = true;
 
+	// Maintained by MultiMeshObjectPool (push/pop/try_remove_instance) so duplicate
+	// pool pushes are an O(1) check instead of an O(n) bucket scan.
+	bool is_pooled_in_pool = false;
+
 	// Counts all active bullets
 	int active_bullets_counter = 0;
 
@@ -522,6 +606,8 @@ float *w = batch_buffer.ptrw();
 
 	// This is used to effectively hide a single bullet instance from being rendered by the multimesh
 	static inline const Transform2D zero_transform = Transform2D().scaled(Vector2(0, 0));
+	// Shared debugger can also read the zero transform to hide disabled shapes.
+	// (Exposed as static so it's reachable without an instance.)
 
 	///
 
@@ -552,6 +638,10 @@ float *w = batch_buffer.ptrw();
 
 	// Stores pointers to all bullet attachments currently in the scene
 	std::vector<BulletAttachment2D *> attachments;
+
+	// Re-entrancy latch for bullet_set_attachment (see the guard there): the setup
+	// path runs user script callbacks which must not nest another setup call.
+	int _attachment_setup_depth = 0;
 
 	// Stores each attachment's transform data
 	std::vector<Transform2D> attachment_transforms;
@@ -802,14 +892,23 @@ float *w = batch_buffer.ptrw();
 	}
 
 	// Sync shape transform from instance transform (shared logic for teleport/set_transform)
+	// Matches the tick convention (directional/block step 8): the instance rotation
+	// includes the texture rotation for rendering, but the physics shape must use the
+	// logical (un-textured) rotation when shapes follow rotation. With
+	// rotate_only_textures=true the shape keeps its previous orientation (origin-only sync).
 	_ALWAYS_INLINE_ void sync_shape_transform_from_instance(int bullet_index, const Transform2D &instance_transf) {
 		auto &shape_transf = all_cached_shape_transforms[bullet_index];
 		auto &shape_origin = all_cached_shape_origin[bullet_index];
 		auto &instance_origin = all_cached_instance_origin[bullet_index];
-		shape_transf = instance_transf;
+		if (!rotate_only_textures) {
+			shape_transf = instance_transf;
+			if (cache_texture_rotation_radians != 0.0) {
+				shape_transf = shape_transf.rotated_local(-cache_texture_rotation_radians);
+			}
+		}
 		Vector2 rotated_offset = Vector2(0, 0);
 		if (cache_collision_shape_offset != Vector2(0, 0)) {
-			rotated_offset = cache_collision_shape_offset.rotated(instance_transf.get_rotation());
+			rotated_offset = cache_collision_shape_offset.rotated(shape_transf.get_rotation());
 		}
 		shape_origin = instance_origin + rotated_offset;
 		shape_transf.set_origin(shape_origin);
@@ -832,10 +931,12 @@ float *w = batch_buffer.ptrw();
 		const bool is_x_direction_curve_valid = shared_bullet_curves_data->x_direction_curve.is_valid();
 		const bool is_y_direction_curve_valid = shared_bullet_curves_data->y_direction_curve.is_valid();
 
-		if (is_rotation_curve_valid) {
-			if (all_rotation_speed.size() != amount_bullets) {
-				all_rotation_speed.resize(amount_bullets);
-			}
+		// Size unconditionally: BulletCurvesData2D is a mutable shared Resource, so a user
+		// can gain a rotation curve AFTER this call. move_bullets then reads all_rotation_speed
+		// by bullet index whenever the curve is valid - an undersized/empty vector here would
+		// become an OOB write in the tick. Reset to 0.0 so no previous owner's speeds leak.
+		if ((int)all_rotation_speed.size() != amount_bullets) {
+			all_rotation_speed.resize(amount_bullets, 0.0);
 		}
 
 		// Block has single speed/dir - handle separately to avoid OOB
@@ -891,11 +992,13 @@ float *w = batch_buffer.ptrw();
 		const bool is_x_direction_curve_valid = curr_curves->x_direction_curve.is_valid();
 		const bool is_y_direction_curve_valid = curr_curves->y_direction_curve.is_valid();
 
-		if (is_rotation_curve_valid) {
-			if (all_rotation_speed.size() != amount_bullets) {
-				all_rotation_speed.resize(amount_bullets);
-			}
+		// Same unconditional sizing as populate_shared_curves_related_data: a per-bullet
+		// rotation curve can also appear on a vector that was never rotation-sized.
+		if ((int)all_rotation_speed.size() != amount_bullets) {
+			all_rotation_speed.resize(amount_bullets, 0.0);
+		}
 
+		if (is_rotation_curve_valid) {
 			all_rotation_speed[bullet_index] = get_bullet_curves_rotation_speed(curr_curves.ptr());
 		}
 
@@ -961,12 +1064,15 @@ float *w = batch_buffer.ptrw();
 		direction_vector = direction_vector.normalized();
 	}
 
+	// A NaN baked into a Curve resource would otherwise flow straight into
+	// speed/direction caches with no recovery, so fail each sample to 0.
 	_ALWAYS_INLINE_ real_t get_bullet_curves_movement_speed(const BulletCurvesData2D *curves_data) const {
 		const bool use_unit_curve = curves_data->movement_use_unit_curve && !is_life_time_infinite;
 
 		real_t input_x = curve_get_input_value(use_unit_curve);
 
-		return curves_data->movement_speed_curve->sample_baked(input_x);
+		const real_t sampled = curves_data->movement_speed_curve->sample_baked(input_x);
+		return Math::is_finite(sampled) ? sampled : 0.0;
 	}
 
 	_ALWAYS_INLINE_ real_t get_bullet_curves_rotation_speed(const BulletCurvesData2D *curves_data) const {
@@ -974,7 +1080,8 @@ float *w = batch_buffer.ptrw();
 
 		real_t input_x = curve_get_input_value(use_unit_curve);
 
-		return curves_data->rotation_speed_curve->sample_baked(input_x);
+		const real_t sampled = curves_data->rotation_speed_curve->sample_baked(input_x);
+		return Math::is_finite(sampled) ? sampled : 0.0;
 	}
 
 	_ALWAYS_INLINE_ real_t get_bullet_curves_x_direction_offset(const BulletCurvesData2D *curves_data) const {
@@ -982,7 +1089,8 @@ float *w = batch_buffer.ptrw();
 
 		real_t input_x = curve_get_input_value(use_unit_curve);
 
-		return curves_data->x_direction_curve->sample_baked(input_x);
+		const real_t sampled = curves_data->x_direction_curve->sample_baked(input_x);
+		return Math::is_finite(sampled) ? sampled : 0.0;
 	}
 
 	_ALWAYS_INLINE_ real_t get_bullet_curves_y_direction_offset(const BulletCurvesData2D *curves_data) const {
@@ -990,7 +1098,8 @@ float *w = batch_buffer.ptrw();
 
 		real_t input_x = curve_get_input_value(use_unit_curve);
 
-		return curves_data->y_direction_curve->sample_baked(input_x);
+		const real_t sampled = curves_data->y_direction_curve->sample_baked(input_x);
+		return Math::is_finite(sampled) ? sampled : 0.0;
 	}
 
 	_ALWAYS_INLINE_ void apply_direction_curve_texture_rotation_if_needed(Vector2 &curr_bullet_direction, Transform2D &curr_bullet_transf, double delta, const BulletCurvesData2D *curves_data) const {
@@ -1004,7 +1113,9 @@ float *w = batch_buffer.ptrw();
 		real_t current = curr_bullet_transf.get_rotation();
 
 		real_t diff = Math::fposmod(target - current + static_cast<real_t>(Math::PI), static_cast<real_t>(Math::TAU)) - static_cast<real_t>(Math::PI);
-		real_t step = curves_data->direction_curve_rotation_speed * (real_t)delta;
+		// Math::abs: a negative rotation speed would make Math::clamp's min > max,
+		// collapsing the clamp to a single bound (full-rate rotation, wrong direction).
+		real_t step = Math::abs(curves_data->direction_curve_rotation_speed) * (real_t)delta;
 
 		rotate_transform_locally(curr_bullet_transf, Math::clamp(diff, -step, step));
 	}
@@ -1014,6 +1125,12 @@ float *w = batch_buffer.ptrw();
 		real_t input_x;
 
 		if (use_unit_curve && !is_life_time_infinite) {
+			// max_life_time can legitimately be 0 (infinite lifetime flipped off at
+			// runtime before any lifetime was configured): 0/0 = NaN would poison the
+			// whole tick, so treat the (empty) lifetime as fully elapsed instead.
+			if (max_life_time <= 0.0) {
+				return 1.0;
+			}
 			real_t progress = Math::clamp(curves_elapsed_time / max_life_time, 0.0, 1.0);
 			input_x = progress;
 		} else {
@@ -1102,7 +1219,13 @@ float *w = batch_buffer.ptrw();
 		real_t curr_max_bullet_speed = all_cached_max_speed[bullet_index];
 
 		real_t acceleration = all_cached_acceleration[bullet_index] * delta;
-		curr_bullet_speed = Math::min(curr_bullet_speed + acceleration, curr_max_bullet_speed);
+		real_t new_speed = curr_bullet_speed + acceleration;
+		if (acceleration >= 0.0) {
+			new_speed = Math::min(new_speed, curr_max_bullet_speed);
+		} else {
+			new_speed = Math::max(new_speed, (real_t)0.0);
+		}
+		curr_bullet_speed = new_speed;
 
 		all_cached_velocity[bullet_index] = all_cached_direction[bullet_index] * curr_bullet_speed + inherited_velocity_offset;
 	}
@@ -1120,12 +1243,17 @@ float *w = batch_buffer.ptrw();
 		real_t &curr_bullet_rotation_speed = all_rotation_speed[bullet_index];
 		real_t curr_max_rotation_speed = all_max_rotation_speed[bullet_index];
 
-		if (curr_bullet_rotation_speed >= curr_max_rotation_speed) {
-			return;
-		}
-
+		// Symmetric with bullet_accelerate_speed: clamp both directions so a
+		// sustained negative acceleration can't run to -inf and an overspeed
+		// above max decays back instead of freezing there forever.
 		real_t acceleration = all_rotation_acceleration[bullet_index] * delta;
-		curr_bullet_rotation_speed = Math::min(curr_bullet_rotation_speed + acceleration, curr_max_rotation_speed);
+		real_t new_speed = curr_bullet_rotation_speed + acceleration;
+		if (acceleration >= 0.0) {
+			new_speed = Math::min(new_speed, curr_max_rotation_speed);
+		} else {
+			new_speed = Math::max(new_speed, -curr_max_rotation_speed);
+		}
+		curr_bullet_rotation_speed = new_speed;
 	}
 
 	// Accelerates bullet rotation speed using a curve
@@ -1172,8 +1300,27 @@ float *w = batch_buffer.ptrw();
 		auto &curr_attachment = attachments[bullet_index];
 		auto temp = curr_attachment;
 
+		// Detached without being disabled: clear owner tracking so its PREDELETE
+		// doesn't try to drop this (now stale) slot.
+		if (temp != nullptr) {
+			temp->owner_multimesh_id = 0;
+			temp->owner_bullet_index = -1;
+		}
+
 		curr_attachment = nullptr;
 		return temp;
+	}
+
+	// Called by BulletAttachment2D's PREDELETE when an ACTIVE attachment is freed
+	// manually: drops the slot only if it still holds this exact pointer. Safe to
+	// call on any state (bounds- and identity-checked).
+	void _do_drop_attachment_slot_if_matches(int bullet_index, BulletAttachment2D *attachment) {
+		if (bullet_index < 0 || bullet_index >= (int)attachments.size()) {
+			return;
+		}
+		if (attachments[bullet_index] == attachment) {
+			attachments[bullet_index] = nullptr;
+		}
 	}
 
 	_ALWAYS_INLINE_ TypedArray<BulletAttachment2D> all_bullets_get_attachments(int bullet_index_start = 0, int bullet_index_end_inclusive = -1) {
@@ -1214,7 +1361,7 @@ float *w = batch_buffer.ptrw();
 		}
 
 		if (attachment_pooling_id < 0 || attachment_pooling_id > (int64_t)UINT32_MAX) {
-			UtilityFunctions::push_error("bullet_set_attachment: attachment_pooling_id must be >= 0.");
+			UtilityFunctions::push_error("bullet_set_attachment: attachment_pooling_id must be between 0 and 4294967295.");
 			return;
 		}
 
@@ -1233,6 +1380,22 @@ float *w = batch_buffer.ptrw();
 			return;
 		}
 
+		// Re-entrancy guard: the script callbacks below (on_bullet_spawn /
+		// on_bullet_enable) run user code; a handler calling bullet_set_attachment on
+		// the same index here would recurse unboundedly or leave an orphaned,
+		// untracked node when the outer call overwrites the slot. Nested calls reject
+		// with this error; defer them with call_deferred instead.
+		if (_attachment_setup_depth > 0) {
+			UtilityFunctions::push_error("bullet_set_attachment: re-entrant call from inside on_bullet_spawn/on_bullet_enable/on_bullet_disable is not allowed. Use call_deferred to replace attachments from those callbacks.");
+			return;
+		}
+		struct _AttachmentSetupGuard {
+			int &depth;
+			_AttachmentSetupGuard(int &d) :
+					depth(d) { ++depth; }
+			~_AttachmentSetupGuard() { --depth; }
+		} attachment_setup_guard(_attachment_setup_depth);
+
 		// Try to get a bullet attachment from the object pool to avoid creating nodes that are practically the same
 		auto &pool = bullet_factory->bullet_attachments_pool;
 
@@ -1242,7 +1405,7 @@ float *w = batch_buffer.ptrw();
 		bool created_brand_new_instance = false;
 
 		if (!attachment_instance) {
-			attachment_instance = dynamic_cast<BulletAttachment2D *>(attachment_scene->instantiate());
+			attachment_instance = Object::cast_to<BulletAttachment2D>(attachment_scene->instantiate());
 
 			if (!attachment_instance) {
 				UtilityFunctions::push_error("Tried to instantiate an attachment scene that is not of type BulletAttachment2D at bullet index: " + String::num_int64(bullet_index));
@@ -1251,6 +1414,11 @@ float *w = batch_buffer.ptrw();
 
 			created_brand_new_instance = true;
 		}
+
+		// Own the slot immediately: the script callbacks below run user code, and
+		// holding the slot keeps re-entrant API reads and the owner-tracking PREDELETE
+		// hook consistent from the first moment.
+		attachments[bullet_index] = attachment_instance;
 
 		attachment_pooling_ids[bullet_index] = attachment_pooling_id;
 		attachment_stick_relative_to_bullet[bullet_index] = stick_relative_to_bullet;
@@ -1271,10 +1439,17 @@ float *w = batch_buffer.ptrw();
 
 		attachment_instance->reset_physics_interpolation(); // Even when using custom interpolation, reset the interpolation state because Godot might try to interpolate.. Fixes a bug where the attachment would appear in the wrong place for a frame
 
+		// Track ownership so a manually freed ACTIVE attachment can drop this slot
+		// from its own PREDELETE instead of leaving a dangling pointer here.
+		attachment_instance->owner_multimesh_id = get_instance_id();
+		attachment_instance->owner_bullet_index = bullet_index;
+
 		// Handle physics interpolation nicely if enabled
 		if (bullet_factory->use_physics_interpolation) {
 			all_previous_attachment_transf[bullet_index] = attachment_transforms[bullet_index];
 		}
+
+		const uint64_t setup_instance_id = attachment_instance->get_instance_id();
 
 		if (created_brand_new_instance) {
 			attachment_instance->set_physics_interpolation_mode(Node::PHYSICS_INTERPOLATION_MODE_OFF); // I have custom physics interpolation logic, so disable the Godot one
@@ -1284,7 +1459,13 @@ float *w = batch_buffer.ptrw();
 			attachment_instance->call_on_bullet_enable(); // Call GDScript custom virtual method so that it gets enabled properly
 		}
 
-		attachments[bullet_index] = attachment_instance;
+		// The callback may have freed the attachment itself (immediate free()); the
+		// PREDELETE owner hook already nulled the slot in that case.
+		if (ObjectDB::get_instance(ObjectID(setup_instance_id)) == nullptr) {
+			return;
+		}
+
+		// The slot was claimed right after instance selection; nothing left to assign.
 	}
 
 	_ALWAYS_INLINE_ void bullet_free_attachment(int bullet_index) {
@@ -1299,6 +1480,11 @@ float *w = batch_buffer.ptrw();
 		}
 		auto temp = attachment_ptr;
 		attachment_ptr = nullptr;
+
+		// Being freed outright: clear owner tracking first so its PREDELETE skip
+		// path can't race with this deletion.
+		temp->owner_multimesh_id = 0;
+		temp->owner_bullet_index = -1;
 
 		if (temp->get_parent()) {
 			temp->get_parent()->remove_child(temp);
@@ -1317,27 +1503,54 @@ float *w = batch_buffer.ptrw();
 			return;
 		}
 
-		attachment_ptr->call_on_bullet_disable();
+		// Detach FIRST, then run the script callback: on_bullet_disable runs user
+		// code, and with the slot still holding the pointer a handler that re-enters
+		// (bullet_set_attachment / bullet_disable_attachment / disable_bullet on the
+		// same index) would recurse infinitely or double-pool the attachment. After
+		// the null, any re-entrant call on this slot sees a clean, empty slot.
+		BulletAttachment2D *detaching = attachment_ptr;
+		attachment_ptr = nullptr;
+
+		// Owner tracking cleared before the callback: if the handler frees the
+		// attachment itself, its PREDELETE hook then finds nothing left to do.
+		detaching->owner_multimesh_id = 0;
+		detaching->owner_bullet_index = -1;
+
+		const uint64_t detaching_id = detaching->get_instance_id();
+		detaching->call_on_bullet_disable();
+
+		// The callback may have freed the attachment itself (immediate free()).
+		// Everything below touches detaching, so revalidate first; the slot is
+		// already null, so there is nothing left to clean up when it is gone.
+		if (ObjectDB::get_instance(ObjectID(detaching_id)) == nullptr) {
+			return;
+		}
+
+		if (bullet_factory == nullptr) {
+			UtilityFunctions::push_error("bullet_disable_attachment: multimesh was never spawned through BulletFactory2D.");
+			return;
+		}
 
 		if (is_attachments_auto_pooling_enabled) {
-			bullet_factory->bullet_attachments_pool.push(attachment_ptr, attachment_pooling_ids[bullet_index]);
+			bullet_factory->bullet_attachments_pool.push(detaching, attachment_pooling_ids[bullet_index]);
 		} else {
 			// If the user has selected to not use auto pooling,
 			// he most likely expects for the attachments to get freed by themselves when necessary
 			// so do that, otherwise the scene will be spammed with hundreds of disabled attachments that never get freed (and user might not even notice this)
 
-			attachment_ptr->queue_free();
+			detaching->queue_free();
 		}
-
-		attachment_ptr = nullptr;
 	}
 
-	// Deferred attachment disable carrying the spawn generation. Lifetime expiry queues
-	// disables that flush after the tick; if the multimesh was pooled and reused in between
-	// (e.g. a collision handler spawned the same bucket), a stale call must not steal
-	// the new owner's attachments.
-	void _do_deferred_bullet_disable_attachment(int bullet_index, int expected_generation) {
+	// Deferred attachment disable carrying the spawn generation AND the exact
+	// attachment pointer. Lifetime expiry queues disables that flush after the
+	// tick; if the slot was detached or re-assigned in a handler, we must not
+	// pool the new owner's attachment by index alone.
+	void _do_deferred_bullet_disable_attachment(int bullet_index, int expected_generation, BulletAttachment2D *expected_attachment) {
 		if (expected_generation != multimesh_generation) {
+			return;
+		}
+		if (bullet_index < 0 || bullet_index >= (int)attachments.size() || attachments[bullet_index] != expected_attachment) {
 			return;
 		}
 		bullet_disable_attachment(bullet_index);
@@ -1355,11 +1568,47 @@ float *w = batch_buffer.ptrw();
 		}
 	}
 
-	// Called when all bullets have been disabled
+	// Drops user connections to sprite_animation_finished: pooled instances carry them
+	// across owners. Used by enable_multimesh AND the enable_bullet wake path (a wake
+	// re-activates a pooled instance outside the pool pop, so it needs the same cleanup).
+	void disconnect_sprite_animation_connections() {
+		for (const Dictionary &connection : get_signal_connection_list("sprite_animation_finished")) {
+			const Callable callable = connection["callable"];
+			disconnect("sprite_animation_finished", callable);
+		}
+	}
+
+	// Called when all bullets have been disabled. Clears per-frame state, then
+	// hands this instance back to the multimesh pool (unless the user opted out).
+	// Pooling is NOT just a memory optimization: pooled instances MUST return here
+	// with zero live bullets, zero pending hits, zero timers and detached homing,
+	// or the next pop() inherits stale state (phantom hits, leaked counters).
 	_ALWAYS_INLINE_ void disable_multimesh() {
+		// Re-entrancy guard: the sweep below fires user script callbacks
+		// (attachment on_bullet_disable), and a handler calling factory.reset() /
+		// free_* there would force_delete this multimesh mid-sweep (use-after-free).
+		// Holding the factory's busy flag makes those paths reject with the standard
+		// busy error until the sweep and the pool push are done.
+		const bool saved_factory_busy = bullet_factory != nullptr ? bullet_factory->get_is_factory_busy() : false;
+		if (bullet_factory != nullptr) {
+			bullet_factory->_set_internal_operation_busy(true);
+		}
+
+		_disable_multimesh_internal();
+
+		if (bullet_factory != nullptr) {
+			bullet_factory->_set_internal_operation_busy(saved_factory_busy);
+		}
+	}
+
+	_ALWAYS_INLINE_ void _disable_multimesh_internal() {
 		active_bullets_counter = 0;
 		is_active = false;
 		curves_elapsed_time = 0.0;
+		// No path should reach here with live bits: every drain goes through
+		// disable_bullet() first. Clear anyway so a future direct call can't
+		// pool an instance whose sparse set claims live bullets at counter 0.
+		all_bullets_enabled_set.clear();
 		// Drop pending collision records: they belong to the expiring lifetime and must
 		// never be processed after a pool reuse as phantom hits on the new owner.
 		all_collided_bullets.clear();
@@ -1368,6 +1617,14 @@ float *w = batch_buffer.ptrw();
 		anim_finished = false;
 		if (!anim_frame_secs.empty()) {
 			anim_frame_time_left = anim_frame_secs[0];
+		}
+		// Deferred attachment disables can be dropped by a generation bump, so the
+		// pool push below must never inherit live slots: sweep every survivor now
+		// (auto-pool returns them to the pool, otherwise they are queue_freed).
+		for (int i = 0; i < (int)attachments.size(); ++i) {
+			if (attachments[i] != nullptr) {
+				bullet_disable_attachment(i);
+			}
 		}
 		shared_bullet_curves_data = Ref<BulletCurvesData2D>();
 		for (auto &r : all_bullet_curves_data) {
@@ -1385,17 +1642,35 @@ float *w = batch_buffer.ptrw();
 
 		custom_additional_disable_logic();
 
+		// Timers belong to the expiring lifetime: detach on EVERY path, not just
+		// the pooled one. Otherwise a pooling-opted-out instance keeps ticking
+		// stale callbacks, and enable_bullet() wake inherits them.
+		_do_detach_all_time_based_functions(multimesh_timers_generation);
+
 		if (!is_multimesh_auto_pooling_enabled) {
 			return;
 		}
 
-		// Remove all attached timers
-		_do_detach_all_time_based_functions(); // TODO maybe a separate property for this setting is more appropriate for consistent behavior?
-		bullets_pool->push(this, get_pool_key());
+		// A script callback inside the sweep can legally wake a bullet again
+		// (enable_bullet). Pooling an instance with live bullets would hand an ACTIVE
+		// multimesh to the next pop() as if it were disabled - only pool when the
+		// instance is truly drained.
+		if (bullets_pool != nullptr && active_bullets_counter == 0) {
+			bullets_pool->push(this, get_pool_key());
+		}
 	}
 
 	_ALWAYS_INLINE_ void enable_bullet(int bullet_index, int collision_amount = 0, bool should_enable_attachment = true) {
 		if (!validate_bullet_index(bullet_index, "enable_bullet")) {
+			return;
+		}
+		if (bullet_index >= (int)all_cached_instance_transforms.size() || bullet_index >= (int)bullets_current_collision_count.size()) {
+			return;
+		}
+		if (multi.is_null() || !multi.is_valid()) {
+			return;
+		}
+		if (physics_server == nullptr || !area.is_valid()) {
 			return;
 		}
 
@@ -1407,8 +1682,11 @@ float *w = batch_buffer.ptrw();
 		}
 
 		++active_bullets_counter;
+		if (active_bullets_counter > amount_bullets) {
+			active_bullets_counter = amount_bullets;
+		}
 
-		multi->set_instance_transform_2d(bullet_index, all_cached_instance_transforms[bullet_index]); // Start rendering the instance
+		multi->set_instance_transform_2d(bullet_index, to_local_for_multimesh(all_cached_instance_transforms[bullet_index])); // Start rendering the instance
 
 		physics_server->area_set_shape_disabled(area, bullet_index, false);
 
@@ -1442,6 +1720,9 @@ float *w = batch_buffer.ptrw();
 			if (bullet_factory != nullptr) {
 				bullet_factory->reactivate_multimesh_instance(*this);
 			}
+			// A pooled instance carries the previous owner's signal connections; they
+			// must not fire for this wake (same cleanup the pool-pop enable does).
+			disconnect_sprite_animation_connections();
 			// An expiry-pooled wake would otherwise die again on the next tick with an
 			// exhausted timer. Only top it up when expired; manual-disable wakes keep
 			// their remaining lifetime untouched.
@@ -1453,7 +1734,13 @@ float *w = batch_buffer.ptrw();
 		}
 	}
 
-	// Disables a single bullet. Always call this method using call_deferred or you will face weird synch issues
+	// Disables a single bullet: removes it from the live set, hides the visual,
+	// disables its physics shape, and (unless told otherwise) returns its
+	// attachment to the attachment pool. When the last bullet goes out, the
+	// whole instance is pooled via disable_multimesh() below.
+	// Virtual hook so DirectionalBullets2D can drop per-bullet homing/orbit
+	// state alongside the sparse-set removal (base version only handles core).
+	virtual void on_bullet_disabled(int bullet_index) {}
 	_ALWAYS_INLINE_ void disable_bullet(int bullet_index, bool should_disable_attachment = true) {
 		if (!validate_bullet_index(bullet_index, "disable_bullet")) {
 			return;
@@ -1469,6 +1756,14 @@ float *w = batch_buffer.ptrw();
 		all_bullets_enabled_set.disable_data(bullet_index);
 
 		--active_bullets_counter;
+		if (active_bullets_counter < 0) {
+			active_bullets_counter = 0;
+		}
+
+		// Drop per-bullet homing/orbit state now (directional override): the tick
+		// only trims active bullets, so without this a disabled bullet's invalid
+		// targets leak counters until the whole multimesh dies.
+		on_bullet_disabled(bullet_index);
 
 		multi->set_instance_transform_2d(bullet_index, zero_transform); // Stops rendering the instance
 
@@ -1484,6 +1779,12 @@ float *w = batch_buffer.ptrw();
 	}
 
 	_ALWAYS_INLINE_ void handle_bullet_collision(CollisionType collision_type, int bullet_index, int64_t entered_instance_id) {
+		if (bullet_index < 0 || bullet_index >= amount_bullets) {
+			return;
+		}
+		if (bullet_index >= (int)bullets_current_collision_count.size() || bullet_index >= (int)attachments.size() || bullet_index >= (int)all_cached_instance_transforms.size()) {
+			return;
+		}
 		const bool curr_bullet_status = all_bullets_enabled_set.contains(bullet_index);
 
 		// If the bullet is already disabled, just return
@@ -1503,6 +1804,11 @@ float *w = batch_buffer.ptrw();
 			disable_bullet(bullet_index, false); // Don't disable the attachment yet, first emit the signal for collision so user has access to the attachment and CAN detach it himself inside GDScript
 		}
 
+		// Capture the slot before the signal: the handler runs user code that may
+		// detach, replace, or - through a re-entrant spawn that pops this instance
+		// from the pool - hand the whole multimesh to a new owner.
+		BulletAttachment2D *attachment_at_signal_time = attachments[bullet_index];
+
 		Object *hit_target = ObjectDB::get_instance(entered_instance_id);
 
 		// Caches already hold global-space transforms (spawn data is global, all
@@ -1518,8 +1824,15 @@ float *w = batch_buffer.ptrw();
 
 		// Disable the bullet attachment if the bullet reached its max collision count and the attachment is still enabled
 		if (bullet_reached_max_collisions) {
-			// Deal with the attachment (or user detached it already inside the signal callback function)
-			bullet_disable_attachment(bullet_index);
+			// The signal above runs user code that may have detached this slot
+			// already (bullet_set_attachment_to_null / bullet_free_attachment /
+			// bullet_set_attachment), or re-assigned it. Only disable the slot if
+			// it still holds what we captured - anything else belongs to whoever
+			// changed it (possibly a new pool owner), and disable_multimesh()'s
+			// sweep catches any survivor that would otherwise leak.
+			if (attachment_at_signal_time != nullptr && attachments[bullet_index] == attachment_at_signal_time) {
+				bullet_disable_attachment(bullet_index);
+			}
 		}
 	}
 
@@ -1578,6 +1891,12 @@ float *w = batch_buffer.ptrw();
 		if (is_life_time_infinite == value) {
 			return;
 		}
+		// A finite lifetime needs a positive max_life_time: with 0 the multimesh dies
+		// on the first tick and unit curves divide 0/0 = NaN (see curve_get_input_value).
+		if (!value && !(max_life_time > 0.0)) {
+			UtilityFunctions::push_error("set_is_life_time_infinite(false) requires a max_life_time > 0, but this multimesh has none (it was spawned with an infinite lifetime). Keep the lifetime infinite or spawn with a finite max_life_time.");
+			return;
+		}
 		is_life_time_infinite = value;
 		curves_elapsed_time = 0.0;
 		if (!value) {
@@ -1631,6 +1950,11 @@ float *w = batch_buffer.ptrw();
 		return true;
 	}
 
+	// Void wrapper for the editor property (property setters must return void).
+	void set_bullets_current_collision_count_no_return(const TypedArray<int> &arr) {
+		(void)set_bullets_current_collision_count(arr);
+	}
+
 	// Holds custom logic that runs before the spawn function finalizes. Note that the multimesh is not yet added to the scene tree here
 	virtual void custom_additional_spawn_logic(const MultiMeshBulletsData2D &data) {}
 
@@ -1644,8 +1968,11 @@ private:
 	// Reserves enough memory and populates all needed data structures keeping track of rotation data
 	void set_rotation_data(const TypedArray<BulletRotationData2D> &rotation_data, bool new_rotate_only_textures);
 
-	// Creates a brand new bullet attachment from the bullet attachment scene and finally saves it to the attachments vector
-	void create_new_bullet_attachment(int bullet_index, const Transform2D &attachment_global_transf);
+	// Guarantees no attachment slot survives into a new owner: force-disables any
+	// live slot and blanks all five attachment arrays plus the interpolation cache.
+	// Used by spawn() and enable_multimesh() so pooled reuse can't inherit stale
+	// pointers when a deferred disable was dropped by a generation bump.
+	void reset_attachment_state_for_reuse();
 
 	// Generates texture transform with correct rotation and sets it to the correct bullet on the multimesh
 	Transform2D generate_texture_transform(Transform2D transf, bool is_texture_rotation_permanent, real_t texture_rotation_radians, int bullet_index);
@@ -1719,7 +2046,14 @@ private:
 	}
 
 	bool get_skip_debugging() const override {
-		return !is_active; // Skip debugging for the multimesh if it's not active (meaning bullets have stopped moving so no need for the debugger to update transforms)
+		// NEVER skip: the debugger always inspects multimesh shapes, including pooled
+		// (inactive) instances - their frozen cached shape transforms keep rendering.
+		// The debugger's null-provider guard still protects against dangling entries.
+		return false;
+	}
+
+	bool is_active_for_debugging() const override {
+		return is_active;
 	}
 
 public:
@@ -1736,12 +2070,26 @@ public:
 	};
 
 	void execute_stored_callable_safely(const Callable &_callback, bool execute_only_if_multimesh_is_active) {
-		call_deferred("_do_execute_stored_callable_safely", _callback, execute_only_if_multimesh_is_active); // call deffered for safety
+		// Stamp the timers generation: between this deferred queue and its execution the
+		// multimesh can be disabled, pooled and re-enabled for a NEW owner - the stale
+		// owner's callback must not fire then (execute_only_if_multimesh_is_active alone
+		// can't catch it, since the new owner is active too).
+		call_deferred("_do_execute_stored_callable_safely", _callback, execute_only_if_multimesh_is_active, multimesh_timers_generation);
 	}
 
-	void _do_execute_stored_callable_safely(const Callable &_callback, bool execute_only_if_multimesh_is_active) {
+	void _do_execute_stored_callable_safely(const Callable &_callback, bool execute_only_if_multimesh_is_active, int expected_timers_generation) {
+		if (expected_timers_generation != multimesh_timers_generation) {
+			return;
+		}
+
 		// If the user wants to execute the callable only if the multimesh is active, check for that
 		if (execute_only_if_multimesh_is_active && !is_active) {
+			return;
+		}
+
+		// The bound object can be freed between attach and fire; calling an invalid
+		// callable would spam engine errors every repeat.
+		if (!_callback.is_valid()) {
 			return;
 		}
 
@@ -1772,10 +2120,15 @@ public:
 	}
 
 	_ALWAYS_INLINE_ void multimesh_detach_time_based_function(const Callable &callable) {
-		call_deferred("_do_detach_time_based_function", callable);
+		// Stamp the generation so a full-disable landing before this deferred
+		// call can't erase the next owner's timers.
+		call_deferred("_do_detach_time_based_function", callable, multimesh_timers_generation);
 	}
 
-	_ALWAYS_INLINE_ void _do_detach_time_based_function(const Callable &callable) {
+	_ALWAYS_INLINE_ void _do_detach_time_based_function(const Callable &callable, int expected_timers_generation) {
+		if (expected_timers_generation != multimesh_timers_generation) {
+			return;
+		}
 		for (auto it = multimesh_custom_timers.begin(); it != multimesh_custom_timers.end();) {
 			if (it->_callback == callable) {
 				it = multimesh_custom_timers.erase(it); // Order-preserving
@@ -1786,15 +2139,21 @@ public:
 	}
 
 	_ALWAYS_INLINE_ void multimesh_detach_all_time_based_functions() {
-		call_deferred("_do_detach_all_time_based_functions");
+		call_deferred("_do_detach_all_time_based_functions", multimesh_timers_generation);
 	}
 
-	_ALWAYS_INLINE_ void _do_detach_all_time_based_functions() {
+	_ALWAYS_INLINE_ void _do_detach_all_time_based_functions(int expected_timers_generation) {
+		if (expected_timers_generation != multimesh_timers_generation) {
+			return;
+		}
 		++multimesh_timers_generation;
 		multimesh_custom_timers.clear();
 	}
 
 	_ALWAYS_INLINE_ void run_multimesh_custom_timers(double delta) {
+		if (!Math::is_finite(delta) || delta < 0.0) {
+			return;
+		}
 		for (auto it = multimesh_custom_timers.begin(); it != multimesh_custom_timers.end();) {
 			it->_current_time -= delta;
 			if (it->_current_time <= 0.0) {

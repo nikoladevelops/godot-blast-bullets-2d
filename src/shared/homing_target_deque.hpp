@@ -29,16 +29,10 @@ struct Node2DTargetData {
 struct HomingTarget {
 	HomingType type = HomingType::NotHoming;
 	bool has_bullet_reached_target = false;
+	Vector2 global_position_target{ 0, 0 };
+	Node2DTargetData node2d_target_data{ nullptr, 0 };
 
-	union {
-		Vector2 global_position_target;
-		Node2DTargetData node2d_target_data;
-	};
-
-	HomingTarget() :
-			type(HomingType::NotHoming), has_bullet_reached_target(false) {
-		new (&global_position_target) Vector2(0, 0); // placement-new activates union member (avoids UB on inactive assignment)
-	}
+	HomingTarget() = default;
 
 	HomingTarget(Vector2 pos) :
 			type(GlobalPositionTarget), global_position_target(pos) {}
@@ -48,9 +42,9 @@ struct HomingTarget {
 
 class HomingTargetDeque {
 public:
-	void resize(int new_size) {
-		homing_targets.resize(new_size);
-	}
+	// NOTE: no resize() on purpose - growth via std::deque::resize would insert
+	// default HomingTargets (NotHoming) that block trimming and home toward a stale
+	// cache. Deques are sized implicitly by push/pop only.
 
 	HomingTarget &front() {
 		return homing_targets.front();
@@ -82,7 +76,10 @@ public:
 
 	// Checks if a homing target is valid
 	_ALWAYS_INLINE_ bool is_homing_target_valid(const Node *target, uint64_t cached_instance_id) const {
-		return target != nullptr && UtilityFunctions::is_instance_id_valid(cached_instance_id);
+		if (target == nullptr || !UtilityFunctions::is_instance_id_valid(cached_instance_id)) {
+			return false;
+		}
+		return target->get_instance_id() == cached_instance_id;
 	}
 
 	// Trims invalid targets from the front of the deque - returns the amount of targets trimmed
@@ -270,10 +267,17 @@ public:
 		cached_front_target_global_position = new_homing_target->get_global_position();
 	}
 
-	_ALWAYS_INLINE_ void push_front_global_position_target(const Vector2 &global_position) {
+	// Returns false when the push was rejected (non-finite position), so callers that
+	// track homing counters don't count a target that was never stored.
+	_ALWAYS_INLINE_ bool push_front_global_position_target(const Vector2 &global_position) {
+		if (!global_position.is_finite()) {
+			UtilityFunctions::push_error("push_front_global_position_target: position must be finite, nothing pushed.");
+			return false;
+		}
 		homing_targets.emplace_front(global_position);
 
 		cached_front_target_global_position = global_position;
+		return true;
 	}
 
 	_ALWAYS_INLINE_ void push_back_mouse_position_target(const Vector2 &cached_mouse_global_position) {
@@ -306,7 +310,12 @@ public:
 		}
 	}
 
-	_ALWAYS_INLINE_ void push_back_global_position_target(const Vector2 &global_position) {
+	// Returns false when the push was rejected (non-finite position). See push_front variant.
+	_ALWAYS_INLINE_ bool push_back_global_position_target(const Vector2 &global_position) {
+		if (!global_position.is_finite()) {
+			UtilityFunctions::push_error("push_back_global_position_target: position must be finite, nothing pushed.");
+			return false;
+		}
 		bool is_queue_empty = homing_targets.empty();
 
 		homing_targets.emplace_back(global_position);
@@ -315,6 +324,7 @@ public:
 		if (is_queue_empty) {
 			cached_front_target_global_position = global_position;
 		}
+		return true;
 	}
 
 	///////////////////////////////////////

@@ -11,10 +11,22 @@ void BulletAttachmentObjectPool2D::push(BulletAttachment2D *bullet_attachment, u
 		UtilityFunctions::push_error("BulletAttachmentObjectPool2D::push got a null attachment, ignoring.");
 		return;
 	}
+	if (bullet_attachment->is_pooled) {
+		if (bullet_attachment->home_pool == this && bullet_attachment->home_pooling_id == pooling_id) {
+			UtilityFunctions::push_error("BulletAttachmentObjectPool2D::push got a duplicate attachment, ignoring to avoid double-free.");
+			return;
+		}
+		// Stale flag (e.g. manually reparented without pop): drop the old queue
+		// entry first so the same pointer can't sit in two queues at once.
+		if (bullet_attachment->home_pool != nullptr) {
+			bullet_attachment->home_pool->remove_instance(bullet_attachment, bullet_attachment->home_pooling_id);
+		}
+	}
+	std::queue<BulletAttachment2D *> &queue = pool[pooling_id];
 	bullet_attachment->home_pool = this;
 	bullet_attachment->home_pooling_id = pooling_id;
 	bullet_attachment->is_pooled = true;
-	pool[pooling_id].push(bullet_attachment);
+	queue.push(bullet_attachment);
 }
 
 BulletAttachment2D *BulletAttachmentObjectPool2D::pop(uint32_t pooling_id) {
@@ -25,11 +37,30 @@ BulletAttachment2D *BulletAttachmentObjectPool2D::pop(uint32_t pooling_id) {
 		return nullptr;
 	}
 
-	// Get the first BulletAttachment2D pointer in the queue
-	BulletAttachment2D *found_attachment = result->second.front();
+	// Get the first live BulletAttachment2D pointer in the queue, skipping entries
+	// whose nodes were freed without PREDELETE cleanup (e.g. scene reload).
+	BulletAttachment2D *found_attachment = nullptr;
+	while (!result->second.empty()) {
+		BulletAttachment2D *candidate = result->second.front();
+		result->second.pop();
+		if (candidate == nullptr || candidate->is_queued_for_deletion()) {
+			if (candidate != nullptr) {
+				candidate->home_pool = nullptr;
+				candidate->is_pooled = false;
+			}
+			continue;
+		}
+		found_attachment = candidate;
+		break;
+	}
 
-	// Remove it from the queue
-	result->second.pop();
+	if (result->second.empty()) {
+		pool.erase(result);
+	}
+
+	if (found_attachment == nullptr) {
+		return nullptr;
+	}
 
 	found_attachment->home_pool = nullptr;
 	found_attachment->is_pooled = false;

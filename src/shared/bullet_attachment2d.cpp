@@ -1,7 +1,10 @@
 #include "./bullet_attachment2d.hpp"
 #include "./bullet_attachment_object_pool2d.hpp"
 
+#include "../bullets/multimesh_bullets2d.hpp"
+
 #include <godot_cpp/classes/engine.hpp>
+#include <godot_cpp/core/object.hpp>
 
 using namespace godot;
 namespace BlastBullets2D {
@@ -21,6 +24,19 @@ void BulletAttachment2D::_notification(int p_what) {
 	}
 	is_pooled = false;
 	home_pool = nullptr;
+
+	// Manually freed while ACTIVE: drop the owning multimesh's slot so it can't
+	// keep a dangling pointer. The owner may itself be dying/freed - resolving via
+	// ObjectDB returns null then and the call is skipped safely.
+	if (owner_multimesh_id != 0) {
+		Object *owner_object = ObjectDB::get_instance(ObjectID(owner_multimesh_id));
+		MultiMeshBullets2D *owner = Object::cast_to<MultiMeshBullets2D>(owner_object);
+		if (owner != nullptr && owner_bullet_index >= 0) {
+			owner->_do_drop_attachment_slot_if_matches(owner_bullet_index, this);
+		}
+		owner_multimesh_id = 0;
+		owner_bullet_index = -1;
+	}
 }
 
 void BulletAttachment2D::call_on_bullet_spawn() {

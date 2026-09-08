@@ -25,6 +25,6 @@ void BlockBulletsData2D::_bind_methods() {
 
 	ClassDB::bind_method(D_METHOD("get_block_speed"), &BlockBulletsData2D::get_block_speed);
 	ClassDB::bind_method(D_METHOD("set_block_speed", "new_block_speed"), &BlockBulletsData2D::set_block_speed);
-	ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "block_speed"), "set_block_speed", "get_block_speed");
+	ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "block_speed", PROPERTY_HINT_RESOURCE_TYPE, "BulletSpeedData2D"), "set_block_speed", "get_block_speed");
 }
 } //namespace BlastBullets2D

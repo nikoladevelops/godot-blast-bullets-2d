@@ -39,13 +39,13 @@ void initialize_blast_bullets_2d_module(ModuleInitializationLevel p_level) {
 	GDREGISTER_CLASS(BulletSpeedData2D)
 	GDREGISTER_CLASS(BulletCurvesData2D)
 	GDREGISTER_CLASS(MultiMeshPoolKey2D)
-	GDREGISTER_RUNTIME_CLASS(BulletAttachment2D)
+	GDREGISTER_CLASS(BulletAttachment2D)
 
 	// Factory
-	GDREGISTER_RUNTIME_CLASS(BulletFactory2D)
+	GDREGISTER_CLASS(BulletFactory2D)
 
 	// Debugger
-	GDREGISTER_RUNTIME_CLASS(MultiMeshBulletsDebugger2D)
+	GDREGISTER_CLASS(MultiMeshBulletsDebugger2D)
 
 	// Spawn data classes
 	GDREGISTER_CLASS(MultiMeshBulletsData2D)
@@ -53,9 +53,11 @@ void initialize_blast_bullets_2d_module(ModuleInitializationLevel p_level) {
 	GDREGISTER_CLASS(BlockBulletsData2D)
 
 	// Bullets classes
-	GDREGISTER_RUNTIME_CLASS(MultiMeshBullets2D)
-	GDREGISTER_RUNTIME_CLASS(DirectionalBullets2D)
-	GDREGISTER_RUNTIME_CLASS(BlockBullets2D)
+	// GDREGISTER_CLASS (not RUNTIME): runtime classes are not creatable in the editor,
+	// which would break restoring any scene that contains these nodes.
+	GDREGISTER_CLASS(MultiMeshBullets2D)
+	GDREGISTER_CLASS(DirectionalBullets2D)
+	GDREGISTER_CLASS(BlockBullets2D)
 }
 
 void uninitialize_blast_bullets_2d_module(ModuleInitializationLevel p_level) {

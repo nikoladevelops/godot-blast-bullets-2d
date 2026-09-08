@@ -53,6 +53,12 @@ public:
 	// Whether the factory is currently busy doing something important and it can't handle any other requests
 	bool get_is_factory_busy() const;
 
+	// Internal re-entrancy guard for MultiMeshBullets2D teardown: a multimesh's disable
+	// sweep fires user script callbacks, and a handler calling reset()/free_*/populate
+	// there could force_delete the multimesh mid-sweep (use-after-free). While the
+	// internal busy flag is held, those operations reject with the standard busy error.
+	void _set_internal_operation_busy(bool value) { is_factory_busy = value; }
+
 	// Ensures the correct initial state
 	virtual void _ready() override;
 
@@ -65,7 +71,7 @@ public:
 	void spawn_directional_bullets(const Ref<DirectionalBulletsData2D> &spawn_data, const Vector2 &new_inherited_velocity_offset = Vector2(0, 0));
 
 	// Spawns BlockBullets2D when given a resource containing all needed data
-	void spawn_block_bullets(const Ref<BlockBulletsData2D> &spawn_data);
+	void spawn_block_bullets(const Ref<BlockBulletsData2D> &spawn_data, const Vector2 &new_inherited_velocity_offset = Vector2(0, 0));
 
 	// Spawns DirectionalBullets2D when given a resource containing all needed data. These bullets should be controlled by the user
 	DirectionalBullets2D *spawn_controllable_directional_bullets(const Ref<DirectionalBulletsData2D> &spawn_data, const Vector2 &new_inherited_velocity_offset = Vector2(0, 0));
@@ -156,6 +162,16 @@ public:
 	// so the factory processes it again. No-op when already active or tearing down.
 	void reactivate_multimesh_instance(MultiMeshBullets2D &bullet_multi);
 
+	// GDScript entry for the same: enable_bullet() wake from script can't pass a
+	// C++ reference, so this validates the node first. Unbound C++ path stays.
+	void reactivate_multimesh_instance_for_script(MultiMeshBullets2D *bullet_multi) {
+		if (bullet_multi == nullptr) {
+			UtilityFunctions::push_error("reactivate_multimesh_instance: multimesh_bullets is null.");
+			return;
+		}
+		reactivate_multimesh_instance(*bullet_multi);
+	}
+
 	void _notification(int p_what);
 
  protected:
@@ -181,6 +197,11 @@ public:
 	// (free_*, reset) must not run then; they error out and suggest call_deferred.
 	// Spawning only appends, so it stays allowed.
 	bool is_iterating_bullets = false;
+
+	// Reusable per-frame iteration buffers (dense-index copies). Avoid 2-4 heap
+	// allocations every physics/render frame; only used on the main thread.
+	std::vector<int> directional_iteration_scratch;
+	std::vector<int> block_iteration_scratch;
 
 	// Errors (once per call) when a shrinking operation runs mid-iteration.
 	// Returns true when the caller must abort.
@@ -241,7 +262,7 @@ public:
 	MultiMeshBulletsDebugger2D *directional_bullets_debugger = nullptr;
 
 	// The color for the collision shapes of all DirectionalBullets2D
-	Color directional_bullets_debugger_color_cached_before_ready = Color(0, 0, 2, 0.8);
+	Color directional_bullets_debugger_color_cached_before_ready = Color(0, 0, 1, 0.8);
 	Color get_directional_bullets_debugger_color() const;
 	void set_directional_bullets_debugger_color(const Color &new_color);
 
@@ -253,7 +274,7 @@ public:
 	MultiMeshBulletsDebugger2D *block_bullets_debugger = nullptr;
 
 	// The color for the collision shapes of all BlockBullets2D
-	Color block_bullets_debugger_color_cached_before_ready = Color(0, 0, 2, 0.8);
+	Color block_bullets_debugger_color_cached_before_ready = Color(0, 0, 1, 0.8);
 	Color get_block_bullets_debugger_color() const;
 	void set_block_bullets_debugger_color(const Color &new_color);
 
@@ -335,6 +356,9 @@ public:
 
 		// Now since we've shrunk the vector, we need to re-assign sparse set ids to the remaining multimeshes (or we will get crashes)
 		for (int i = 0; i < (int)bullets_vec.size(); ++i) {
+			if (bullets_vec[i] == nullptr) {
+				continue;
+			}
 			bullets_vec[i]->sparse_set_id = i;
 
 			// If the multi was marked as active, it belongs in the dense list, so active it
@@ -595,7 +619,14 @@ public:
 		// Try to get a TBullet from the pool first
 		TBullet *bullets = static_cast<TBullet *>(bullets_pool.pop(key));
 		if (bullets != nullptr) {
-			bullets->enable_multimesh(*spawn_data.ptr(), new_inherited_velocity_offset);
+			if (!bullets->enable_multimesh(*spawn_data.ptr(), new_inherited_velocity_offset)) {
+				// enable_multimesh aborts without mutating state: put it back where
+				// it came from so the slot isn't lost and do not activate it. Use
+				// the live key, not the spawn key, so a size/shape mismatch can never
+				// file this instance under the wrong bucket.
+				bullets_pool.push(bullets, bullets->get_pool_key());
+				return nullptr;
+			}
 			// Identity-checked: a stale pooled id must never activate a foreign entry.
 			// Pooled instances normally stay in the vec, so this is just a safe lookup.
 			int reuse_id = bullets->sparse_set_id;
@@ -633,17 +664,29 @@ public:
 	}
 
 	// Handles movement and other behaviors of the bullets.
+	// scratch is a reusable buffer (avoids a per-frame heap alloc for the dense copy);
+	// only touched from _physics_process/_process on the main thread.
 	template <typename TBullet>
-	void handle_bullet_behavior(const std::vector<TBullet *> &bullets_vec, const DynamicSparseSet &bullets_set, double delta) {
-		std::vector<int> dense_copy = bullets_set.get_active_indexes();
+	void handle_bullet_behavior(const std::vector<TBullet *> &bullets_vec, const DynamicSparseSet &bullets_set, double delta, std::vector<int> &scratch) {
+		if (!Math::is_finite(delta) || delta < 0.0) {
+			return;
+		}
+		const std::vector<int> &dense = bullets_set.get_active_indexes();
+		scratch.assign(dense.begin(), dense.end());
 
-		for (auto index : dense_copy) {
-#ifdef DEV_ENABLED
-			// Defensive asserts - dense should always contain valid active ids
-			ERR_FAIL_COND(index < 0 || index >= (int)bullets_vec.size());
-			ERR_FAIL_COND(!bullets_vec[index] || !bullets_vec[index]->is_active);
-#endif
+		for (auto index : scratch) {
+			// Bounds re-check: a user calling free() (not queue_free) inside a collision
+			// handler legitimately removes a multimesh from this vec mid-iteration, so
+			// scratch can hold indexes that are stale or now out of range. Skip them
+			// instead of reading out of bounds; a swapped-in element may simulate twice
+			// for one frame in that rare edge, which is benign.
+			if (index < 0 || index >= (int)bullets_vec.size()) {
+				continue;
+			}
 			auto *multi = bullets_vec[index];
+			if (multi == nullptr || !multi->is_active) {
+				continue;
+			}
 
 			multi->move_bullets(delta);
 			multi->advance_sprite_animation(delta);
@@ -653,11 +696,20 @@ public:
 
 	// Handles rendering with physics interpolation
 	template <typename TBullet>
-	void handle_bullet_rendering_interpolation(std::vector<TBullet *> &bullets_vec, const DynamicSparseSet &bullets_set) {
-		const auto &all_active_multis = bullets_set.get_active_indexes();
+	void handle_bullet_rendering_interpolation(std::vector<TBullet *> &bullets_vec, const DynamicSparseSet &bullets_set, std::vector<int> &scratch) {
+		// Copy: interpolate only reads, but a re-entrant free/reset mid-loop
+		// would otherwise mutate the vec under iteration.
+		const std::vector<int> &dense = bullets_set.get_active_indexes();
+		scratch.assign(dense.begin(), dense.end());
 
-		for (auto index : all_active_multis) {
-			auto &multi = bullets_vec[index];
+		for (auto index : scratch) {
+			if (index < 0 || index >= (int)bullets_vec.size()) {
+				continue;
+			}
+			auto *multi = bullets_vec[index];
+			if (multi == nullptr || !multi->is_active) {
+				continue;
+			}
 			multi->interpolate_bullet_visuals();
 		}
 	}

@@ -13,7 +13,7 @@ class BlockBulletsData2D : public MultiMeshBulletsData2D {
 	GDCLASS(BlockBulletsData2D, MultiMeshBulletsData2D)
 
 public:
-	// Used only when use_block_rotation_radians is set to true. Provides the rotation in which all bullets move as a block with the BulletSpeedData2D. Note that this uses radians, to convert degrees to radians you would do degrees*PI/180.
+	// Direction in which all bullets move as a block, combined with BulletSpeedData2D. Note that this uses radians, to convert degrees to radians you would do degrees*PI/180.
 	real_t block_rotation_radians = 0.0;
 
 	// The speed at which the block of bullets is moving

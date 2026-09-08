@@ -32,6 +32,10 @@ TypedArray<BulletRotationData2D> BulletRotationData2D::generate_random_data(
 		UtilityFunctions::push_error("BulletRotationData2D.generate_random_data: MIN/MAX bounds must be finite.");
 		return data;
 	}
+	if (max_rotation_speed_MIN < 0.0) {
+		UtilityFunctions::push_error("BulletRotationData2D.generate_random_data: max_rotation_speed bounds must be >= 0.");
+		return data;
+	}
 	data.resize(amount_to_generate);
 
 	for (int i = 0; i < amount_to_generate; ++i) {
@@ -50,6 +54,10 @@ real_t BulletRotationData2D::get_rotation_speed() {
 	return rotation_speed;
 }
 void BulletRotationData2D::set_rotation_speed(real_t new_rotation_speed) {
+	if (!Math::is_finite(new_rotation_speed)) {
+		UtilityFunctions::push_error("BulletRotationData2D.rotation_speed must be a finite value (NaN/Inf would poison bullet rotation).");
+		return;
+	}
 	rotation_speed = new_rotation_speed;
 }
 
@@ -57,6 +65,10 @@ real_t BulletRotationData2D::get_max_rotation_speed() {
 	return max_rotation_speed;
 }
 void BulletRotationData2D::set_max_rotation_speed(real_t new_max_rotation_speed) {
+	if (!Math::is_finite(new_max_rotation_speed) || new_max_rotation_speed < 0.0) {
+		UtilityFunctions::push_error("BulletRotationData2D.max_rotation_speed must be a finite value >= 0.");
+		return;
+	}
 	max_rotation_speed = new_max_rotation_speed;
 }
 
@@ -64,6 +76,10 @@ real_t BulletRotationData2D::get_rotation_acceleration() {
 	return rotation_acceleration;
 }
 void BulletRotationData2D::set_rotation_acceleration(real_t new_rotation_acceleration) {
+	if (!Math::is_finite(new_rotation_acceleration)) {
+		UtilityFunctions::push_error("BulletRotationData2D.rotation_acceleration must be a finite value.");
+		return;
+	}
 	rotation_acceleration = new_rotation_acceleration;
 }
 

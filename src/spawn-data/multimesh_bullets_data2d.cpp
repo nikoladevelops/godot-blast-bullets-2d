@@ -233,7 +233,7 @@ void MultiMeshBulletsData2D::set_bullets_current_collision_count(const TypedArra
 void MultiMeshBulletsData2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_transforms", "new_transforms"), &MultiMeshBulletsData2D::set_transforms);
 	ClassDB::bind_method(D_METHOD("get_transforms"), &MultiMeshBulletsData2D::get_transforms);
-	ADD_PROPERTY(PropertyInfo(Variant::ARRAY, "transforms"), "set_transforms", "get_transforms");
+	ADD_PROPERTY(PropertyInfo(Variant::ARRAY, "transforms", PROPERTY_HINT_ARRAY_TYPE, "Transform2D"), "set_transforms", "get_transforms");
 
 	ClassDB::bind_method(D_METHOD("get_sprite_frames"), &MultiMeshBulletsData2D::get_sprite_frames);
 	ClassDB::bind_method(D_METHOD("set_sprite_frames", "new_sprite_frames"), &MultiMeshBulletsData2D::set_sprite_frames);
@@ -289,7 +289,7 @@ void MultiMeshBulletsData2D::_bind_methods() {
 
 	ClassDB::bind_method(D_METHOD("get_all_bullet_rotation_data"), &MultiMeshBulletsData2D::get_all_bullet_rotation_data);
 	ClassDB::bind_method(D_METHOD("set_all_bullet_rotation_data", "new_data"), &MultiMeshBulletsData2D::set_all_bullet_rotation_data);
-	ADD_PROPERTY(PropertyInfo(Variant::ARRAY, "all_bullet_rotation_data"), "set_all_bullet_rotation_data", "get_all_bullet_rotation_data");
+	ADD_PROPERTY(PropertyInfo(Variant::ARRAY, "all_bullet_rotation_data", PROPERTY_HINT_ARRAY_TYPE, "BulletRotationData2D"), "set_all_bullet_rotation_data", "get_all_bullet_rotation_data");
 
 	ClassDB::bind_method(D_METHOD("get_rotate_only_textures"), &MultiMeshBulletsData2D::get_rotate_only_textures);
 	ClassDB::bind_method(D_METHOD("set_rotate_only_textures", "new_rotate_only_textures"), &MultiMeshBulletsData2D::set_rotate_only_textures);
@@ -338,7 +338,7 @@ void MultiMeshBulletsData2D::_bind_methods() {
 
 	ClassDB::bind_method(D_METHOD("get_bullets_current_collision_count"), &MultiMeshBulletsData2D::get_bullets_current_collision_count);
 	ClassDB::bind_method(D_METHOD("set_bullets_current_collision_count", "arr"), &MultiMeshBulletsData2D::set_bullets_current_collision_count);
-	ADD_PROPERTY(PropertyInfo(Variant::ARRAY, "bullets_current_collision_count"), "set_bullets_current_collision_count", "get_bullets_current_collision_count");
+	ADD_PROPERTY(PropertyInfo(Variant::ARRAY, "bullets_current_collision_count", PROPERTY_HINT_ARRAY_TYPE, "int"), "set_bullets_current_collision_count", "get_bullets_current_collision_count");
 
 	ClassDB::bind_static_method("MultiMeshBulletsData2D", D_METHOD("calculate_bitmask", "numbers"), &MultiMeshBulletsData2D::calculate_bitmask);
 

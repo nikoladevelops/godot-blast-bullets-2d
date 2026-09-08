@@ -1,5 +1,6 @@
 #include "./bullet_curves_data2d.hpp"
 
+#include <godot_cpp/core/math.hpp>
 #include <godot_cpp/variant/utility_functions.hpp>
 
 using namespace godot;
@@ -67,6 +68,10 @@ real_t BulletCurvesData2D::get_x_direction_curve_strength() const {
 }
 
 void BulletCurvesData2D::set_x_direction_curve_strength(real_t value) {
+	if (!Math::is_finite(value)) {
+		UtilityFunctions::push_error("BulletCurvesData2D x_direction_curve_strength must be finite, keeping the old value.");
+		return;
+	}
 	x_direction_curve_strength = value;
 }
 
@@ -93,6 +98,10 @@ real_t BulletCurvesData2D::get_direction_curve_rotation_speed() const {
 	return direction_curve_rotation_speed;
 }
 void BulletCurvesData2D::set_direction_curve_rotation_speed(real_t value) {
+	if (!Math::is_finite(value)) {
+		UtilityFunctions::push_error("BulletCurvesData2D direction_curve_rotation_speed must be finite, keeping the old value.");
+		return;
+	}
 	direction_curve_rotation_speed = value;
 }
 
@@ -118,6 +127,10 @@ real_t BulletCurvesData2D::get_y_direction_curve_strength() const {
 	return y_direction_curve_strength;
 }
 void BulletCurvesData2D::set_y_direction_curve_strength(real_t value) {
+	if (!Math::is_finite(value)) {
+		UtilityFunctions::push_error("BulletCurvesData2D y_direction_curve_strength must be finite, keeping the old value.");
+		return;
+	}
 	y_direction_curve_strength = value;
 }
 

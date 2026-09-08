@@ -383,7 +383,7 @@
 			<return type="Transform2D" />
 			<param index="0" name="bullet_index" type="int" />
 			<description>
-				Get the transform of a specific bullet. Returns a [Transform2D] containing the bullet's position, rotation and scale.
+				Get the transform of a specific bullet in global space (the same space as [method set_bullet_transform] and [method get_bullet_global_transform]). Returns a [Transform2D] containing the bullet's position, rotation and scale.
 			</description>
 		</method>
 		<method name="get_bullet_velocity" qualifiers="const">
@@ -516,7 +516,7 @@
 			<return type="bool" />
 			<param index="0" name="animation" type="StringName" />
 			<description>
-				Switches animation reusing the cached SpriteFrames source. Same resolve rules. Errors when no source cached yet or animation empty.
+				Switches animation reusing the cached SpriteFrames source. Same resolve rules (empty or missing "default" auto-resolves to the first animation). Errors only when no source cached yet.
 			</description>
 		</method>
 		<method name="remove_bullet_movement_pattern">
@@ -656,7 +656,7 @@
 			<param index="1" name="new_transform" type="Transform2D" />
 			<param index="2" name="set_direction_based_on_transform" type="bool" default="false" />
 			<description>
-				Set the transform of a specific bullet.
+				Set the transform of a specific bullet, in global space (matching [method get_bullet_transform] and [method get_bullet_global_transform]).
 			</description>
 		</method>
 		<method name="set_bullets_current_collision_count">

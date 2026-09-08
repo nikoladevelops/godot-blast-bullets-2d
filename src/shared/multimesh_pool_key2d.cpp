@@ -16,8 +16,8 @@ void MultiMeshPoolKey2D::set_amount_bullets(int p_amount_bullets) {
 }
 
 void MultiMeshPoolKey2D::set_shape_type(int p_shape_type) {
-	if (p_shape_type < PhysicsServer2D::SHAPE_WORLD_BOUNDARY || p_shape_type > PhysicsServer2D::SHAPE_CUSTOM) {
-		UtilityFunctions::push_error("MultiMeshPoolKey2D shape_type out of range. Use PhysicsServer2D.SHAPE_*.");
+	if (p_shape_type != PhysicsServer2D::SHAPE_CIRCLE && p_shape_type != PhysicsServer2D::SHAPE_RECTANGLE && p_shape_type != PhysicsServer2D::SHAPE_CAPSULE) {
+		UtilityFunctions::push_error("MultiMeshPoolKey2D shape_type must be Circle, Rectangle or Capsule (the only types the bullet physics supports).");
 		return;
 	}
 	shape_type = p_shape_type;
@@ -44,7 +44,7 @@ void MultiMeshPoolKey2D::_bind_methods() {
 
 	ClassDB::bind_method(D_METHOD("get_shape_type"), &MultiMeshPoolKey2D::get_shape_type);
 	ClassDB::bind_method(D_METHOD("set_shape_type", "shape_type"), &MultiMeshPoolKey2D::set_shape_type);
-	ADD_PROPERTY(PropertyInfo(Variant::INT, "shape_type", PROPERTY_HINT_ENUM, "WorldBoundary,SeparationRay,Segment,Circle,Rectangle,Capsule,Convex,Concave,Custom"), "set_shape_type", "get_shape_type");
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "shape_type", PROPERTY_HINT_ENUM, "Circle,Rectangle,Capsule"), "set_shape_type", "get_shape_type");
 
 	ClassDB::bind_static_method("MultiMeshPoolKey2D", D_METHOD("make", "amount_bullets", "shape_type"), &MultiMeshPoolKey2D::make);
 }

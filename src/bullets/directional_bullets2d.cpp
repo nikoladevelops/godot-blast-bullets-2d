@@ -78,26 +78,41 @@ void DirectionalBullets2D::set_up_movement_data(const TypedArray<BulletSpeedData
 }
 
 void DirectionalBullets2D::custom_additional_spawn_logic(const MultiMeshBulletsData2D &data) {
-	const DirectionalBulletsData2D &directional_data = static_cast<const DirectionalBulletsData2D &>(data);
-
-	set_up_movement_data(directional_data.all_bullet_speed_data);
-
-	adjust_direction_based_on_rotation = directional_data.adjust_direction_based_on_rotation;
-
-	// Each bullet can have its own homing target
-	all_bullet_homing_targets.resize(amount_bullets); // Create a vector that contains an empty queue for each bullet index
-	all_homing_count.resize(amount_bullets, 0);
-	all_bullet_homing_smoothing.resize(amount_bullets, 0.0);
+	const DirectionalBulletsData2D *directional_data = Object::cast_to<DirectionalBulletsData2D>(&data);
+	// Size movement/homing/orbit SoA up front: the tick path indexes them
+	// unconditionally, so even a wrong-type early-return must leave them sized.
+	set_up_movement_data(TypedArray<BulletSpeedData2D>());
+	adjust_direction_based_on_rotation = false;
+	all_bullet_homing_targets.resize(amount_bullets);
+	all_homing_count.assign(amount_bullets, 0);
+	all_bullet_homing_smoothing.assign(amount_bullets, 0.0);
 	use_per_bullet_homing_smoothing = false;
-
-	// Orbiting
-	all_orbiting_data.resize(amount_bullets); // Create a vector that contains an empty orbiting data for each bullet index
-	all_orbiting_status.resize(amount_bullets, 0); // Initialize all orbiting status to disabled
+	all_orbiting_data.resize(amount_bullets);
+	all_orbiting_status.assign(amount_bullets, 0);
+	all_shared_homing_reached.resize(amount_bullets);
 	homing_inert_warning_issued = false;
+	// Parity with custom_additional_enable_logic: spawn must not inherit counters or
+	// the mouse cache from a previous owner either (defensive - fresh instances start
+	// zeroed, but the invariant belongs here in one place).
+	active_homing_count = 0;
+	active_orbiting_count = 0;
+	cached_mouse_global_position = Vector2(0, 0);
+	if (directional_data == nullptr) {
+		UtilityFunctions::push_error("DirectionalBullets2D::spawn got wrong spawn data type, expected DirectionalBulletsData2D.");
+		return;
+	}
+
+	set_up_movement_data(directional_data->all_bullet_speed_data);
+
+	adjust_direction_based_on_rotation = directional_data->adjust_direction_based_on_rotation;
 }
 
 void DirectionalBullets2D::custom_additional_enable_logic(const MultiMeshBulletsData2D &data) {
-	const DirectionalBulletsData2D &directional_data = static_cast<const DirectionalBulletsData2D &>(data);
+	const DirectionalBulletsData2D *directional_data = Object::cast_to<DirectionalBulletsData2D>(&data);
+	if (directional_data == nullptr) {
+		UtilityFunctions::push_error("DirectionalBullets2D::enable got wrong spawn data type, expected DirectionalBulletsData2D.");
+		return;
+	}
 
 	// Get the list of connections for the signal
 	TypedArray<Dictionary> connections = get_signal_connection_list("bullet_homing_target_reached");
@@ -109,9 +124,18 @@ void DirectionalBullets2D::custom_additional_enable_logic(const MultiMeshBullets
 		disconnect("bullet_homing_target_reached", callable);
 	}
 
-	set_up_movement_data(directional_data.all_bullet_speed_data);
+	set_up_movement_data(directional_data->all_bullet_speed_data);
 
-	adjust_direction_based_on_rotation = directional_data.adjust_direction_based_on_rotation;
+	adjust_direction_based_on_rotation = directional_data->adjust_direction_based_on_rotation;
+
+	// Vectors are sized in spawn, but a wrong-type spawn early-returns before
+	// sizing. Resize here so the clears/assigns below can't run on empty vectors.
+	all_bullet_homing_targets.resize(amount_bullets);
+	all_homing_count.resize(amount_bullets, 0);
+	all_bullet_homing_smoothing.resize(amount_bullets, 0.0);
+	all_orbiting_data.resize(amount_bullets);
+	all_orbiting_status.resize(amount_bullets, 0);
+	all_shared_homing_reached.resize(amount_bullets);
 
 	// Homing
 
@@ -125,6 +149,7 @@ void DirectionalBullets2D::custom_additional_enable_logic(const MultiMeshBullets
 	use_per_bullet_homing_smoothing = false;
 
 	shared_homing_deque.clear_homing_targets(cached_mouse_global_position); // Passing garbage mouse global position but its fine
+	reset_shared_homing_reached_state();
 	//
 
 	// Orbiting
@@ -146,7 +171,9 @@ void DirectionalBullets2D::custom_additional_enable_logic(const MultiMeshBullets
 }
 
 void DirectionalBullets2D::custom_additional_disable_logic() {
-	bullet_factory->directional_bullets_set.disable_data(sparse_set_id);
+	if (bullet_factory != nullptr) {
+		bullet_factory->directional_bullets_set.disable_data(sparse_set_id);
+	}
 }
 
 void DirectionalBullets2D::_bind_methods() {
@@ -204,6 +231,7 @@ void DirectionalBullets2D::_bind_methods() {
 	// SHARED HOMING DEQUE POP METHODS
 	ClassDB::bind_method(D_METHOD("shared_homing_deque_pop_front_target"), &DirectionalBullets2D::shared_homing_deque_pop_front_target);
 	ClassDB::bind_method(D_METHOD("shared_homing_deque_pop_back_target"), &DirectionalBullets2D::shared_homing_deque_pop_back_target);
+	ClassDB::bind_method(D_METHOD("_do_shared_auto_pop_front_target"), &DirectionalBullets2D::_do_shared_auto_pop_front_target);
 
 	// SHARED HOMING DEQUE PUSH METHODS
 	ClassDB::bind_method(D_METHOD("shared_homing_deque_push_front_mouse_position_target"), &DirectionalBullets2D::shared_homing_deque_push_front_mouse_position_target);
@@ -272,7 +300,7 @@ void DirectionalBullets2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("bullet_get_orbiting_direction", "bullet_index"), &DirectionalBullets2D::bullet_get_orbiting_direction);
 	ClassDB::bind_method(D_METHOD("bullet_set_orbiting_direction", "bullet_index", "new_direction"), &DirectionalBullets2D::bullet_set_orbiting_direction);
 
-	ClassDB::bind_method(D_METHOD("all_bullets_enable_orbiting", "orbiting_radius", "orbiting_direction", "orbiting_texture_rotation", "bullet_index_start", "bullet_index_end_inclusive"), &DirectionalBullets2D::all_bullets_enable_orbiting, DEFVAL(0), DEFVAL(-1));
+	ClassDB::bind_method(D_METHOD("all_bullets_enable_orbiting", "orbiting_radius", "orbiting_direction", "orbiting_texture_rotation", "bullet_index_start", "bullet_index_end_inclusive"), &DirectionalBullets2D::all_bullets_enable_orbiting, DEFVAL(OrbitRight), DEFVAL(FaceTarget), DEFVAL(0), DEFVAL(-1));
 	ClassDB::bind_method(D_METHOD("all_bullets_enable_orbiting_linear", "radius_start", "radius_step", "orbiting_direction", "orbiting_texture_rotation", "bullet_index_start", "bullet_index_end_inclusive"), &DirectionalBullets2D::all_bullets_enable_orbiting_linear, DEFVAL(OrbitRight), DEFVAL(FaceTarget), DEFVAL(0), DEFVAL(-1));
 	ClassDB::bind_method(D_METHOD("all_bullets_get_orbiting_radius", "bullet_index_start", "bullet_index_end_inclusive"), &DirectionalBullets2D::all_bullets_get_orbiting_radius, DEFVAL(0), DEFVAL(-1));
 	ClassDB::bind_method(D_METHOD("all_bullets_is_orbiting_enabled", "bullet_index_start", "bullet_index_end_inclusive"), &DirectionalBullets2D::all_bullets_is_orbiting_enabled, DEFVAL(0), DEFVAL(-1));
@@ -290,8 +318,9 @@ void DirectionalBullets2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("all_bullets_set_velocity", "new_velocity", "bullet_index_start", "bullet_index_end_inclusive"), &DirectionalBullets2D::all_bullets_set_velocity, DEFVAL(0), DEFVAL(-1));
 	ClassDB::bind_method(D_METHOD("all_bullets_get_velocity", "bullet_index_start", "bullet_index_end_inclusive"), &DirectionalBullets2D::all_bullets_get_velocity, DEFVAL(0), DEFVAL(-1));
 
-	ClassDB::bind_method(D_METHOD("get_inherited_velocity_offset"), &DirectionalBullets2D::get_inherited_velocity_offset);
-	ClassDB::bind_method(D_METHOD("set_inherited_velocity_offset", "new_offset"), &DirectionalBullets2D::set_inherited_velocity_offset);
+	// The get/set methods live on the base class (bound there so BlockBullets2D
+	// gets them too). Re-binding the same names here trips a duplicate-method
+	// error at startup, so only the property is declared on top of them.
 	ADD_PROPERTY(PropertyInfo(Variant::VECTOR2, "inherited_velocity_offset"), "set_inherited_velocity_offset", "get_inherited_velocity_offset");
 
 	BIND_ENUM_CONSTANT(GlobalPositionTarget);
@@ -309,9 +338,9 @@ void DirectionalBullets2D::_bind_methods() {
 	BIND_ENUM_CONSTANT(FaceOppositeOrbitingDirection);
 
 	ADD_SIGNAL(MethodInfo("bullet_homing_target_reached",
-						  PropertyInfo(Variant::OBJECT, "multimesh_instance", PROPERTY_HINT_RESOURCE_TYPE, "DirectionalBullets2D"),
+						  PropertyInfo(Variant::OBJECT, "multimesh_instance", PROPERTY_HINT_NODE_TYPE, "DirectionalBullets2D"),
 						  PropertyInfo(Variant::INT, "bullet_index"),
-						  PropertyInfo(Variant::OBJECT, "target", PROPERTY_HINT_RESOURCE_TYPE, "Node2D"),
+						  PropertyInfo(Variant::OBJECT, "target", PROPERTY_HINT_NODE_TYPE, "Node2D"),
 						  PropertyInfo(Variant::VECTOR2, "target_global_position")));
 }
 

@@ -16,6 +16,25 @@ private:
 public:
 	// Resizes the sparse vector to accommodate new size
 	_ALWAYS_INLINE_ void resize(int new_size) {
+		if (new_size < 0) {
+			return;
+		}
+		if (new_size < max_size) {
+			// Shrinking: dense may hold indexes beyond the new range. Strip them and
+			// rebuild sparse positions, otherwise get_active_indexes() would return
+			// out-of-bounds indexes after a shrink (consumers index arrays with them).
+			std::vector<int> kept;
+			kept.reserve(dense.size());
+			for (int idx : dense) {
+				if (idx < new_size) {
+					kept.push_back(idx);
+				}
+			}
+			dense.swap(kept);
+			for (int pos = 0; pos < (int)dense.size(); ++pos) {
+				sparse[dense[pos]] = pos;
+			}
+		}
 		max_size = new_size;
 		sparse.resize(new_size, -1);
 		dense.reserve(new_size);
@@ -110,7 +129,14 @@ public:
 		// Sanitize End
 		int end = index_end_inclusive;
 		if (end < 0) {
-			end = (max_size > 0) ? max_size - 1 : 0;
+			if (max_size <= 0) {
+				return;
+			}
+			end = max_size - 1;
+		}
+
+		if (index_start > end) {
+			return;
 		}
 
 		// If the range goes beyond current memory, grow once to fit the whole range
@@ -126,11 +152,18 @@ public:
 
 	// Disables a range of indexes
 	_ALWAYS_INLINE_ void disable_range_data(int index_start, int index_end_inclusive) {
+		if (max_size <= 0) {
+			return;
+		}
 		index_start = (index_start < 0) ? 0 : index_start;
 		int end = index_end_inclusive;
 
 		if (end < 0 || end >= max_size) {
 			end = max_size - 1;
+		}
+
+		if (index_start > end) {
+			return;
 		}
 
 		// if user is disabling the ENTIRE range, just clear it
@@ -146,11 +179,17 @@ public:
 
 	// Activate all indexes
 	_ALWAYS_INLINE_ void activate_all_data() {
+		if (max_size <= 0) {
+			return;
+		}
 		activate_range_data(0, max_size - 1);
 	}
 
 	// Disable all indexes
 	_ALWAYS_INLINE_ void disable_all_data() {
+		if (max_size <= 0) {
+			return;
+		}
 		disable_range_data(0, max_size - 1);
 	}
 };

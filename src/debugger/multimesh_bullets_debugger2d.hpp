@@ -44,6 +44,13 @@ private:
 	// Whether the debugger is actually working or not
 	bool is_debugger_enabled = false; // Note: weird bugs might happen if this isn't initialized and is not the same value as the one used outside. Always initialize values that are exposed to the outside world or used instanly without having to run the setter first - undefined values will be read and you will waste time figuring out why code sometimes works and sometimes doesn't lol
 
+	// One-shot throttling for the release-build size-mismatch warning.
+	bool size_mismatch_warned = false;
+
+	// Separate latch for tracking-array desync: sharing one flag with the
+	// per-multimesh size warning would silence the other condition forever.
+	bool desync_warned = false;
+
 	// The color which the debugger uses to visualize the collision shapes of all bullets
 	Color debugger_color = Color(0, 0, 0, 1);
 
@@ -57,6 +64,11 @@ private:
 	std::vector<PhysicsServer2D::ShapeType> debugger_mesh_types;
 	std::vector<Vector2> debugger_mesh_sizes;
 
+	// Per-entry active state, kept parallel with the other arrays: lets the tick skip
+	// the transform rewrite for inactive (pooled) providers whose frozen transforms
+	// cannot change, while still drawing them (one final sync on the transition).
+	std::vector<bool> debugger_last_active_states;
+
 	// A pointer to where the IDebuggerDataProvider2D nodes are stored
 	Node *container_to_debug = nullptr;
 
@@ -65,6 +77,11 @@ private:
 
 	// Generates a debug multimesh from a node that should inherit from IDebuggerDataProvider2D
 	void generate_debug_multimesh(Node *node_entered_container_to_debug);
+
+	// Drops the provider + its debug mesh when the multimesh exits the container's
+	// subtree (manual free/reparent/scene teardown). Without this the raw provider
+	// pointer dangles and _physics_process dereferences freed memory every tick.
+	void remove_debug_multimesh_for_node(Node *node_exiting_container_to_debug);
 
 	// Creates true-shape debug mesh by type: rect->QuadMesh, circle->ArrayMesh fan, capsule->ArrayMesh rect+caps
 	Ref<Mesh> create_debug_mesh_for_shape(PhysicsServer2D::ShapeType type, const Vector2 &full_size);
@@ -81,8 +98,9 @@ private:
 	// Disables the debugger and frees all debugger multimeshes
 	void disable();
 
-	// Activates the debugger and spawns all needed debugger multimeshes
-	void enable();
+	// Activates the debugger and spawns all needed debugger multimeshes.
+	// Returns false (without latching state) when it had to abort (no container).
+	bool enable();
 };
 
 } //namespace BlastBullets2D

@@ -145,7 +145,7 @@
 		</member>
 		<member name="transforms" type="Transform2D[]" setter="set_transforms" getter="get_transforms" default="[]">
 			[b]MANDATORY[/b]
-			Determines the transforms of the bullets.
+			Determines the transforms of the bullets, in global space (use each marker's global transform). Movement, physics shapes, collision signals and [method MultiMeshBullets2D.get_bullet_global_transform] all operate in global space.
 
 			Tip: place [Marker2D] nodes in your scene and read their global transforms each time you spawn.
 			Note: There is a helper static function that can generate a grid pattern of [Transform2D] that you can use: [method BulletFactory2D.helper_generate_transforms_grid]. You might want to implement your own custom pattern generation logic in C++ for maximum performance.

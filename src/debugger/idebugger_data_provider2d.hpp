@@ -25,6 +25,11 @@ public:
 	// (no copies). Make sure the vector is a member of the class that stays alive.
 	virtual const std::vector<Transform2D> &get_all_collision_shape_transforms_for_debugging() const = 0;
 
+	// Policy: the debugger ALWAYS draws every shape. Disabled bullets keep their last
+	// cached transform (frozen where they died), pooled instances render their full
+	// frozen set - nothing is ever hidden with the zero transform on the debug side.
+	virtual bool is_active_for_debugging() const = 0;
+
 	// Whether the debugging should be skipped for some reason
 	virtual bool get_skip_debugging() const = 0;
 };

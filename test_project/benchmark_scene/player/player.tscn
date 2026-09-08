@@ -104,6 +104,7 @@ script = ExtResource("1_kd16u")
 script = ExtResource("2_314d0")
 
 [node name="BulletsAnimatedSprite" type="AnimatedSprite2D" parent="PlayerDataNode" unique_id=1742962089]
+visible = false
 sprite_frames = SubResource("SpriteFrames_qt42x")
 animation = &"idk2"
 

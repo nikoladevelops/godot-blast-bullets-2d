@@ -14,14 +14,16 @@ void MultiMeshObjectPool::push(MultiMeshBullets2D *multimesh, const PoolKey &key
 		UtilityFunctions::push_error("MultiMeshObjectPool::push got a null multimesh, ignoring.");
 		return;
 	}
-	std::vector<MultiMeshBullets2D *> &bucket = pool[key];
-	for (MultiMeshBullets2D *existing : bucket) {
-		if (existing == multimesh) {
-			UtilityFunctions::push_error("MultiMeshObjectPool::push got a duplicate multimesh, ignoring to avoid double-free.");
-			return;
-		}
+	// O(1) duplicate guard via the flag the pool maintains itself. The old O(n)
+	// bucket scan made bulk populate_bullets_pool O(n^2) on large pools.
+	if (multimesh->is_pooled_in_pool) {
+#ifdef DEV_ENABLED
+		UtilityFunctions::push_error("MultiMeshObjectPool::push got a duplicate multimesh, ignoring to avoid double-free.");
+#endif
+		return;
 	}
-	bucket.push_back(multimesh);
+	pool[key].push_back(multimesh);
+	multimesh->is_pooled_in_pool = true;
 }
 
 MultiMeshBullets2D *MultiMeshObjectPool::pop(const PoolKey &key) {
@@ -32,9 +34,33 @@ MultiMeshBullets2D *MultiMeshObjectPool::pop(const PoolKey &key) {
 		return nullptr;
 	}
 
+	// Skip any entries that can never be reused: null leftovers (bad push) and
+	// instances the user queue_free'd while pooled. Handing out a dying instance
+	// would silently lose the caller's volley when the deferred deletion lands.
+	while (!it->second.empty()) {
+		MultiMeshBullets2D *candidate = it->second.back();
+		if (candidate == nullptr || candidate->is_queued_for_deletion()) {
+			if (candidate != nullptr) {
+				candidate->is_pooled_in_pool = false;
+			}
+			it->second.pop_back();
+			continue;
+		}
+		break;
+	}
+	if (it->second.empty()) {
+		pool.erase(it);
+		return nullptr;
+	}
+
 	// Get the one at the back (doesn't really matter which)
 	MultiMeshBullets2D *found_multimesh = it->second.back();
 	it->second.pop_back();
+	found_multimesh->is_pooled_in_pool = false;
+
+	if (it->second.empty()) {
+		pool.erase(it);
+	}
 
 	return found_multimesh;
 }
@@ -97,6 +123,7 @@ bool MultiMeshObjectPool::try_remove_instance(MultiMeshBullets2D *target, const 
 		if (vec[i] == target) {
 			vec[i] = vec.back();
 			vec.pop_back();
+			target->is_pooled_in_pool = false;
 			if (vec.empty()) {
 				pool.erase(it);
 			}

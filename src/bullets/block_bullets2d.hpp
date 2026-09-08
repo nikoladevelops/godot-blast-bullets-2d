@@ -16,6 +16,12 @@ public:
 	real_t block_rotation_radians = 0.0;
 
 	inline void move_bullets(double delta) {
+		if (amount_bullets <= 0 || all_cached_velocity.empty() || physics_server == nullptr || !area.is_valid()) {
+			return;
+		}
+		if (!Math::is_finite(delta) || delta < 0.0) {
+			return;
+		}
 		real_t cache_first_rotation_result = 0.0;
 		// Accelerate only the first bullet rotation speed
 		if (is_rotation_data_active) {
@@ -25,7 +31,7 @@ public:
 			}
 		}
 
-		bool is_using_physics_interpolation = bullet_factory->use_physics_interpolation;
+		bool is_using_physics_interpolation = bullet_factory != nullptr && bullet_factory->use_physics_interpolation;
 
 		if (is_using_physics_interpolation) {
 			update_all_previous_transforms_for_interpolation();
@@ -36,6 +42,9 @@ public:
 		const auto &active_bullet_indexes = all_bullets_enabled_set.get_active_indexes();
 
 		for (int i : active_bullet_indexes) {
+			if (i < 0 || i >= amount_bullets || i >= (int)all_cached_instance_transforms.size() || i >= (int)all_cached_shape_transforms.size()) {
+				continue;
+			}
 			Transform2D &curr_instance_transf = all_cached_instance_transforms[i];
 			Transform2D &curr_shape_transf = all_cached_shape_transforms[i];
 
@@ -43,7 +52,6 @@ public:
 			Vector2 &curr_shape_origin = all_cached_shape_origin[i];
 
 			curr_instance_origin += cache_velocity_calc;
-			curr_shape_origin += cache_velocity_calc;
 
 			// Handle bullet rotation and bullet rotation speed acceleration
 			real_t rotation_angle = 0.0;
@@ -63,6 +71,13 @@ public:
 			}
 
 			curr_instance_transf.set_origin(curr_instance_origin);
+			// Rotation changes the offset basis, so re-derive the shape origin
+			// instead of translating the stale one.
+			if (cache_collision_shape_offset != Vector2(0, 0)) {
+				curr_shape_origin = curr_instance_origin + cache_collision_shape_offset.rotated(curr_shape_transf.get_rotation());
+			} else {
+				curr_shape_origin = curr_instance_origin;
+			}
 			curr_shape_transf.set_origin(curr_shape_origin);
 
 			physics_server->area_set_shape_transform(area, i, curr_shape_transf);

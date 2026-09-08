@@ -1,4 +1,5 @@
 #include "multimesh_bullets_debugger2d.hpp"
+#include "../bullets/multimesh_bullets2d.hpp"
 #include "godot_cpp/core/memory.hpp"
 
 #include <godot_cpp/classes/array_mesh.hpp>
@@ -19,6 +20,11 @@ using namespace godot;
 namespace BlastBullets2D {
 
 void MultiMeshBulletsDebugger2D::configure(Node *new_container_to_debug, const String &new_debugger_name, const Color &new_debugger_color) {
+	// Re-configuring while enabled would leave the old container's signals
+	// connected, so shut down first instead of leaking stale callbacks.
+	if (is_debugger_enabled) {
+		disable();
+	}
 	physics_server = PhysicsServer2D::get_singleton();
 	container_to_debug = new_container_to_debug;
 	debugger_color = new_debugger_color;
@@ -34,7 +40,12 @@ void MultiMeshBulletsDebugger2D::set_is_debugger_enabled(bool value) {
 	}
 
 	if (value) {
-		enable();
+		// Only commit the flag on a successful enable: latching true after an abort
+		// (e.g. no container) left the debugger permanently inert until a false->true
+		// cycle, because this setter early-returns when the flag already matches.
+		if (!enable()) {
+			return;
+		}
 	} else {
 		disable();
 	}
@@ -59,13 +70,13 @@ Color MultiMeshBulletsDebugger2D::get_debugger_color() const {
 	return debugger_color;
 }
 
-void MultiMeshBulletsDebugger2D::enable() {
+bool MultiMeshBulletsDebugger2D::enable() {
 	if (is_debugger_enabled) {
-		return;
+		return true;
 	}
 	if (container_to_debug == nullptr) {
 		UtilityFunctions::push_error("MultiMeshBulletsDebugger2D::enable with no container, call configure() first.");
-		return;
+		return false;
 	}
 	// In case the container to debug already has things to debug
 	TypedArray<Node> already_spawned_debugger_data_providers = container_to_debug->get_children();
@@ -90,28 +101,43 @@ void MultiMeshBulletsDebugger2D::enable() {
 		if (!container_to_debug->is_connected("child_entered_tree", cb)) {
 			container_to_debug->connect("child_entered_tree", cb);
 		}
+		// Track exits too: a multimesh freed/reparented by the user while debugging
+		// must drop its entry here, otherwise the raw provider pointer dangles and
+		// _physics_process dereferences freed memory every tick.
+		Callable cb_exit = callable_mp(this, &MultiMeshBulletsDebugger2D::remove_debug_multimesh_for_node);
+		if (!container_to_debug->is_connected("child_exiting_tree", cb_exit)) {
+			container_to_debug->connect("child_exiting_tree", cb_exit);
+		}
 	}
 
 	set_physics_process(true);
 	is_debugger_enabled = true;
+	return true;
 }
 
 void MultiMeshBulletsDebugger2D::disable() {
 	set_physics_process(false);
 	is_debugger_enabled = false;
 
-	// Disconnect the function that runs whenever a new child gets added to the container to debug / when the child_entered_tree signal gets emitted
+	// Disconnect the enter/exit handlers
 	if (container_to_debug) {
 		Callable cb = callable_mp(this, &MultiMeshBulletsDebugger2D::generate_debug_multimesh);
 		if (container_to_debug->is_connected("child_entered_tree", cb)) {
 			container_to_debug->disconnect("child_entered_tree", cb);
 		}
+		Callable cb_exit = callable_mp(this, &MultiMeshBulletsDebugger2D::remove_debug_multimesh_for_node);
+		if (container_to_debug->is_connected("child_exiting_tree", cb_exit)) {
+			container_to_debug->disconnect("child_exiting_tree", cb_exit);
+		}
 	}
-	// Note: this error means some state was read before its setter ever ran.
-	// Always initialize member variables so they hold a valid value from the start.
 
 	for (int i = 0; i < debugger_multimeshes.size(); ++i) {
-		memdelete(debugger_multimeshes[i]); // Debugger meshes are plain nodes with no physics/RID state, so immediate delete is safe here.
+		if (debugger_multimeshes[i] != nullptr) {
+			if (debugger_multimeshes[i]->get_parent() != nullptr) {
+				debugger_multimeshes[i]->get_parent()->remove_child(debugger_multimeshes[i]);
+			}
+			memdelete(debugger_multimeshes[i]);
+		}
 	}
 
 	// Clear both vectors so they hold no stale pointers. clear() keeps capacity.
@@ -119,15 +145,61 @@ void MultiMeshBulletsDebugger2D::disable() {
 	debug_data_providers.clear();
 	debugger_mesh_types.clear();
 	debugger_mesh_sizes.clear();
+	debugger_last_active_states.clear();
+	// Fresh enable deserves fresh warnings: otherwise a problem fixed by a
+	// disable/enable cycle would stay silent forever after the first report.
+	size_mismatch_warned = false;
+	desync_warned = false;
+}
+
+void MultiMeshBulletsDebugger2D::remove_debug_multimesh_for_node(Node *node_exiting_container_to_debug) {
+	IDebuggerDataProvider2D *exiting_provider = Object::cast_to<MultiMeshBullets2D>(node_exiting_container_to_debug);
+	if (exiting_provider == nullptr) {
+		return;
+	}
+
+	for (int i = (int)debug_data_providers.size() - 1; i >= 0; --i) {
+		if (debug_data_providers[i] != exiting_provider) {
+			continue;
+		}
+		// Free this entry's debug mesh and erase it from all four parallel arrays.
+		// Order-preserving erase keeps every array aligned at the same index.
+		if (i < (int)debugger_multimeshes.size() && debugger_multimeshes[i] != nullptr) {
+			if (debugger_multimeshes[i]->get_parent() != nullptr) {
+				debugger_multimeshes[i]->get_parent()->remove_child(debugger_multimeshes[i]);
+			}
+			memdelete(debugger_multimeshes[i]);
+		}
+		debug_data_providers.erase(debug_data_providers.begin() + i);
+		if (i < (int)debugger_multimeshes.size()) {
+			debugger_multimeshes.erase(debugger_multimeshes.begin() + i);
+		}
+		if (i < (int)debugger_mesh_types.size()) {
+			debugger_mesh_types.erase(debugger_mesh_types.begin() + i);
+		}
+		if (i < (int)debugger_mesh_sizes.size()) {
+			debugger_mesh_sizes.erase(debugger_mesh_sizes.begin() + i);
+		}
+		if (i < (int)debugger_last_active_states.size()) {
+			debugger_last_active_states.erase(debugger_last_active_states.begin() + i);
+		}
+	}
 }
 
 void MultiMeshBulletsDebugger2D::generate_debug_multimesh(Node *node_entered_container_to_debug) {
-	IDebuggerDataProvider2D *debugger_data_provider = dynamic_cast<IDebuggerDataProvider2D *>(node_entered_container_to_debug); // I wish I could static_cast this but not possible since im using godot engine signals and they require actual Node objects (which have no relationship to my custom interface class)
-
-	// In case the user added something else to the container_to_debug, it should typically hold only IDebuggerDataProvider2D, othwerwise weird behavior and other errors might occur
-	if (!debugger_data_provider) {
-		UtilityFunctions::push_error("Error. The node that entered the container to debug is not of type IDebuggerDataProvider2D. Never attach additional nodes to the bullets debugger.");
+	MultiMeshBullets2D *bullets_node = Object::cast_to<MultiMeshBullets2D>(node_entered_container_to_debug);
+	if (bullets_node == nullptr) {
+		UtilityFunctions::push_error("Error. The node that entered the container to debug is not of type MultiMeshBullets2D. Never attach additional nodes to the bullets debugger.");
 		return;
+	}
+	IDebuggerDataProvider2D *debugger_data_provider = bullets_node;
+
+	// Dedupe guard: a multimesh that re-enters the container (reparent flows) would
+	// otherwise get a second debug mesh + a second entry (double rendering, growth).
+	for (IDebuggerDataProvider2D *tracked : debug_data_providers) {
+		if (tracked == debugger_data_provider) {
+			return;
+		}
 	}
 
 	// Provider type drives mesh: rect->QuadMesh(size), circle->ArrayMesh fan(r), capsule->ArrayMesh rect+caps.
@@ -168,6 +240,11 @@ void MultiMeshBulletsDebugger2D::generate_debug_multimesh(Node *node_entered_con
 
 	// From the multimesh create a multimesh instance node
 	MultiMeshInstance2D *debugger_multimesh = memnew(MultiMeshInstance2D);
+	// Shape caches are global, but MultiMesh slots compose with the node transform.
+	// Top-level keeps this node out of the factory's transform so verbatim global
+	// copies render at the true physics positions even when the factory is moved.
+	debugger_multimesh->set_as_top_level(true);
+	debugger_multimesh->set_transform(Transform2D());
 	debugger_multimesh->set_multimesh(multi);
 
 	// Set the Z index to be a huge value so that the debugger shapes are always visible/ on top of all other textures
@@ -180,6 +257,7 @@ void MultiMeshBulletsDebugger2D::generate_debug_multimesh(Node *node_entered_con
 	debugger_multimeshes.emplace_back(debugger_multimesh);
 	debugger_mesh_types.emplace_back(shape_type);
 	debugger_mesh_sizes.emplace_back(shape_size);
+	debugger_last_active_states.emplace_back(debugger_data_provider->is_active_for_debugging());
 
 	// Add the debugger multimesh to the tree so it starts rendering.
 	add_child(debugger_multimesh);
@@ -283,6 +361,12 @@ Ref<Mesh> MultiMeshBulletsDebugger2D::create_debug_mesh_for_shape(PhysicsServer2
 void MultiMeshBulletsDebugger2D::ensure_quadmesh_matches_data_provider_collision_shape_size(int dbg_index, MultiMeshInstance2D &debug_multimesh_instance, IDebuggerDataProvider2D &debugger_data_provider) {
 	Ref<MultiMesh> debug_inner_multi = debug_multimesh_instance.get_multimesh();
 	if (dbg_index < 0 || dbg_index >= (int)debugger_mesh_types.size()) {
+		// Same one-shot policy as the other desync paths: staying silent here
+		// would hide a parallel-array drift with no diagnostic at all.
+		if (!desync_warned) {
+			UtilityFunctions::push_warning("MultiMeshBulletsDebugger2D: debugger index out of range, mesh sync skipped.");
+			desync_warned = true;
+		}
 		return;
 	}
 	PhysicsServer2D::ShapeType want_type = debugger_data_provider.get_collision_shape_type_for_debugging();
@@ -293,7 +377,9 @@ void MultiMeshBulletsDebugger2D::ensure_quadmesh_matches_data_provider_collision
 	}
 	PhysicsServer2D::ShapeType have_type = debugger_mesh_types[dbg_index];
 	Vector2 have_size = debugger_mesh_sizes[dbg_index];
-	if (want_type == have_type && want_size == have_size) {
+	// Approximate compare: exact Vector2 equality would rebuild the mesh every frame
+	// if a provider ever computes the size through a differing float path.
+	if (want_type == have_type && Math::is_equal_approx(want_size.x, have_size.x) && Math::is_equal_approx(want_size.y, have_size.y)) {
 		return;
 	}
 	// Type or size changed (pool reuse) -> recreate true-shape mesh. Transforms/colors preserved via instance_count.
@@ -319,13 +405,21 @@ void MultiMeshBulletsDebugger2D::update_debug_multimesh_transforms_to_match_data
 	ERR_FAIL_COND((int)collision_shape_transforms_for_debugging.size() != amount_quadmeshes);
 #endif
 	if ((int)collision_shape_transforms_for_debugging.size() != amount_quadmeshes) {
+		// Throttled release-build warning: silently freezing debug rendering with zero
+		// diagnostics would make a future desync undiagnosable outside dev builds.
+		if (!size_mismatch_warned) {
+			UtilityFunctions::push_warning("MultiMeshBulletsDebugger2D: shape transform count (" + String::num_int64((int64_t)collision_shape_transforms_for_debugging.size()) + ") does not match instance count (" + String::num_int64(amount_quadmeshes) + "). Debug rendering for this multimesh is frozen.");
+			size_mismatch_warned = true;
+		}
 		return;
 	}
 
-	// Set each quadmesh instance's transform to match the collision shape's transform
+	// Set each quadmesh instance's transform to match the collision shape's transform.
+	// Policy: the debugger ALWAYS draws every shape. Disabled bullets keep their last
+	// cached transform (frozen where they died), pooled instances render their full
+	// frozen set - nothing is ever hidden with the zero transform on the debug side.
 	for (int i = 0; i < amount_quadmeshes; ++i) {
-		const Transform2D &collision_shape_transf = collision_shape_transforms_for_debugging[i];
-		multi->set_instance_transform_2d(i, collision_shape_transf);
+		multi->set_instance_transform_2d(i, collision_shape_transforms_for_debugging[i]);
 	}
 }
 
@@ -334,7 +428,13 @@ void MultiMeshBulletsDebugger2D::change_debug_multimeshes_color(const Color &new
 
 	// For each debug multimesh
 	for (int i = 0; i < amount_debug_multimeshes; ++i) {
+		if (debugger_multimeshes[i] == nullptr) {
+			continue;
+		}
 		Ref<MultiMesh> multi = debugger_multimeshes[i]->get_multimesh();
+		if (!multi.is_valid()) {
+			continue;
+		}
 		int amount_quadmeshes = multi->get_instance_count();
 
 		// For each quadmesh inside the multimesh
@@ -348,7 +448,14 @@ void MultiMeshBulletsDebugger2D::change_debug_multimeshes_color(const Color &new
 void MultiMeshBulletsDebugger2D::_physics_process(double delta) {
 	(void)delta;
 	// Parallel arrays; bail on any desync instead of indexing out of bounds.
-	if (debug_data_providers.size() != debugger_multimeshes.size()) {
+	if (debug_data_providers.size() != debugger_multimeshes.size() ||
+			debugger_mesh_types.size() != debugger_multimeshes.size() ||
+			debugger_mesh_sizes.size() != debugger_multimeshes.size() ||
+			debugger_last_active_states.size() != debugger_multimeshes.size()) {
+		if (!desync_warned) {
+			UtilityFunctions::push_warning("MultiMeshBulletsDebugger2D: internal tracking arrays went out of sync. Debug rendering is frozen until re-enabled.");
+			desync_warned = true;
+		}
 		return;
 	}
 	for (int i = 0; i < (int)debug_data_providers.size(); ++i) {
@@ -360,14 +467,25 @@ void MultiMeshBulletsDebugger2D::_physics_process(double delta) {
 		MultiMeshInstance2D &mesh_instance = *debugger_multimeshes[i];
 
 		if (!provider || provider->get_skip_debugging()) {
-			// Inactive providers keep no live shapes; hide instead of showing stale ghosts.
 			mesh_instance.set_visible(false);
 			continue;
 		}
+		// Providers are NEVER skipped (get_skip_debugging is always false for multimeshes):
+		// pooled/inactive instances keep their full frozen shape set drawn.
 		mesh_instance.set_visible(true);
 
+		// Still cheap every tick (early-outs unless type/size changed on pool reuse).
 		ensure_quadmesh_matches_data_provider_collision_shape_size(i, mesh_instance, *provider);
-		update_debug_multimesh_transforms_to_match_data_provider_collision_shape_transforms(mesh_instance, *provider);
+
+		// Active providers rewrite every tick. Inactive (pooled) providers hold FROZEN
+		// cached transforms that cannot change, so do one final sync on the
+		// active->inactive transition and skip the per-tick rewrite afterwards - pooled
+		// shapes stay drawn without thousands of redundant writes per tick.
+		const bool provider_active = provider->is_active_for_debugging();
+		if (provider_active || debugger_last_active_states[i]) {
+			update_debug_multimesh_transforms_to_match_data_provider_collision_shape_transforms(mesh_instance, *provider);
+			debugger_last_active_states[i] = provider_active;
+		}
 	}
 }
 
