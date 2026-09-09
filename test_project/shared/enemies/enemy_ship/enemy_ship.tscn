@@ -7,6 +7,7 @@
 [ext_resource type="Texture2D" uid="uid://jtdl4riwj5ct" path="res://shared/art/enemy_ship/enemy_ship2.png" id="5_0uxn5"]
 [ext_resource type="Texture2D" uid="uid://cii0pcggbs1r2" path="res://shared/art/enemy_ship/enemy_ship3.png" id="6_kh4be"]
 [ext_resource type="Texture2D" uid="uid://bu8jsj3o5kewt" path="res://shared/art/enemy_ship/enemy_ship4.png" id="7_iuadr"]
+[ext_resource type="SpriteFrames" uid="uid://dm6fv2ulo5qm6" path="res://shared/enemies/enemy_bullet_sprite_frames.tres" id="8_5vb7x"]
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_c1d14"]
 size = Vector2(116, 117)
@@ -87,6 +88,11 @@ rotation = -1.5708
 
 [node name="ShootTimer" type="Timer" parent="." unique_id=2123705527]
 one_shot = true
+
+[node name="BulletAnimatedSprite" type="AnimatedSprite2D" parent="." unique_id=1682853447]
+visible = false
+sprite_frames = ExtResource("8_5vb7x")
+frame_progress = 0.47371674
 
 [connection signal="body_entered" from="FollowTargetRadiusArea2D" to="." method="_on_follow_target_radius_area_2d_body_entered"]
 [connection signal="body_exited" from="FollowTargetRadiusArea2D" to="." method="_on_follow_target_radius_area_2d_body_exited"]

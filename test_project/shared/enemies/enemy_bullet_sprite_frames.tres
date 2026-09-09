@@ -1,0 +1,26 @@
+[gd_resource type="SpriteFrames" format=3 uid="uid://dm6fv2ulo5qm6"]
+
+[ext_resource type="Texture2D" uid="uid://fg061as0ss1o" path="res://shared/art/enemy_bullets/enemy_bullet1.png" id="1_jl2am"]
+[ext_resource type="Texture2D" uid="uid://cmvklt4kge35w" path="res://shared/art/enemy_bullets/enemy_bullet2.png" id="2_mufc6"]
+[ext_resource type="Texture2D" uid="uid://dwqwuseyc2cfo" path="res://shared/art/enemy_bullets/enemy_bullet3.png" id="3_rg52a"]
+[ext_resource type="Texture2D" uid="uid://ddnexf0qpih04" path="res://shared/art/enemy_bullets/enemy_bullet4.png" id="4_ct5mj"]
+
+[resource]
+animations = [{
+"frames": [{
+"duration": 0.35,
+"texture": ExtResource("1_jl2am")
+}, {
+"duration": 0.35,
+"texture": ExtResource("2_mufc6")
+}, {
+"duration": 0.35,
+"texture": ExtResource("3_rg52a")
+}, {
+"duration": 0.35,
+"texture": ExtResource("4_ct5mj")
+}],
+"loop": 1,
+"name": &"default",
+"speed": 5.0
+}]

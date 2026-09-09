@@ -75,19 +75,8 @@ func _ready() -> void:
 	
 	# Set up bullets data
 	bullets_data = DirectionalBulletsData2D.new()
-	var enemy_frames := SpriteFrames.new()
-	enemy_frames.add_animation(&"default")
-	enemy_frames.set_animation_speed(&"default", 11.0)
-	enemy_frames.set_animation_loop(&"default", true)
-	for tex in [
-		preload("res://shared/art/enemy_bullets/enemy_bullet1.png"),
-		preload("res://shared/art/enemy_bullets/enemy_bullet2.png"),
-		preload("res://shared/art/enemy_bullets/enemy_bullet3.png"),
-		preload("res://shared/art/enemy_bullets/enemy_bullet4.png")
-	]:
-		enemy_frames.add_frame(&"default", tex)
-	bullets_data.sprite_frames = enemy_frames
-	bullets_data.animation = &"default"
+	
+	bullets_data.sprite_frames = $BulletAnimatedSprite.sprite_frames
 	
 	bullets_data.texture_size = Vector2(100,100)
 	
