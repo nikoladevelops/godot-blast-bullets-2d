@@ -26,6 +26,11 @@
 #include "bullets/directional_bullets2d.hpp"
 #include "bullets/multimesh_bullets2d.hpp"
 
+// Bullet Spawner
+#include "bullet_spawner/bullet_spawner2d.hpp"
+#include "bullet_spawner/bullet_spawner_data2d.hpp"
+
+
 using namespace godot;
 using namespace BlastBullets2D;
 
@@ -58,6 +63,10 @@ void initialize_blast_bullets_2d_module(ModuleInitializationLevel p_level) {
 	GDREGISTER_CLASS(MultiMeshBullets2D)
 	GDREGISTER_CLASS(DirectionalBullets2D)
 	GDREGISTER_CLASS(BlockBullets2D)
+
+	// Bullet Spawner
+	GDREGISTER_CLASS(BulletSpawner2D)
+	GDREGISTER_CLASS(BulletSpawnerData2D)
 }
 
 void uninitialize_blast_bullets_2d_module(ModuleInitializationLevel p_level) {

@@ -11,6 +11,11 @@
 [ext_resource type="PackedScene" uid="uid://3dxd6rfhxqym" path="res://shared/enemies/enemy_ship/enemy_ship.tscn" id="8_yyku6"]
 [ext_resource type="PackedScene" uid="uid://bqi8tdtf1dh4n" path="res://shared/moving_target.tscn" id="10_nkrfg"]
 
+[sub_resource type="DirectionalBulletsData2D" id="DirectionalBulletsData2D_nkrfg"]
+
+[sub_resource type="BulletSpawnerData2D" id="BulletSpawnerData2D_qt42x"]
+data = SubResource("DirectionalBulletsData2D_nkrfg")
+
 [sub_resource type="Gradient" id="Gradient_rfik0"]
 colors = PackedColorArray(0.215686, 0.215686, 0.215686, 1, 0.215686, 0.215686, 0.215686, 1)
 
@@ -40,8 +45,13 @@ _data = {
 }
 point_count = 5
 
-[node name="BenchmarkScene" type="BulletAttachment2D" unique_id=775074199]
+[node name="BenchmarkScene" type="Node2D" unique_id=775074199]
 script = ExtResource("1_cfubd")
+
+[node name="BulletSpawner2D" type="BulletSpawner2D" parent="." unique_id=1540696231]
+bullet_factory_path = NodePath("../BulletFactory2D")
+movement_pattern_path = NodePath("../Paths/Path2D")
+spawn_data = SubResource("BulletSpawnerData2D_qt42x")
 
 [node name="Sprite2D" type="Sprite2D" parent="." unique_id=875066845]
 z_index = -12
@@ -260,8 +270,7 @@ enemy_scn = ExtResource("7_n3lca")
 
 [node name="UI" parent="." unique_id=202004826 instance=ExtResource("4_wr2si")]
 
-[node name="BulletFactory2D" type="BulletFactory2D" parent="." unique_id=186663547]
-block_bullets_debugger_color = Color(0, 0.711976, 0.74061, 0.8)
+[node name="BulletFactory2D" type="BulletFactory2D" parent="." unique_id=1288814825]
 script = ExtResource("7_6fsjh")
 
 [node name="AllGodotArea2DBulletsContainer" type="Node" parent="." unique_id=2042474770]
@@ -293,7 +302,3 @@ switch_direction_when_reaching_range_x = false
 [node name="Path2D" type="Path2D" parent="Paths" unique_id=517491318]
 position = Vector2(250, 293)
 curve = SubResource("Curve2D_nkrfg")
-
-[connection signal="area_entered" from="BulletFactory2D" to="BulletFactory2D" method="_on_area_entered"]
-[connection signal="body_entered" from="BulletFactory2D" to="BulletFactory2D" method="_on_body_entered"]
-[connection signal="life_time_over" from="BulletFactory2D" to="BulletFactory2D" method="_on_life_time_over"]
