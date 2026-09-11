@@ -1,6 +1,7 @@
 #include "directional_bullets2d.hpp"
 
 #include "../spawn-data/directional_bullets_data2d.hpp"
+#include "godot_cpp/classes/scene_tree.hpp"
 #include "godot_cpp/core/class_db.hpp"
 #include "godot_cpp/core/object.hpp"
 #include "godot_cpp/variant/dictionary.hpp"
@@ -77,6 +78,62 @@ void DirectionalBullets2D::set_up_movement_data(const TypedArray<BulletSpeedData
 	}
 }
 
+void DirectionalBullets2D::apply_shared_movement_pattern_from_data(const DirectionalBulletsData2D &directional_data) {
+	// Null/empty removes the feature: clear the shared slot so a previously
+	// set pattern (or curves, via populate_shared below) cannot linger.
+	// Distances reset so re-adding the feature later starts every bullet at 0.
+	if (directional_data.shared_movement_pattern_path.is_empty()) {
+		shared_movement_pattern_curve.unref();
+		shared_movement_pattern_face_movement_direction = false;
+		shared_movement_pattern_repeat = true;
+		shared_movement_pattern_distances.assign(amount_bullets, 0.0);
+		return;
+	}
+	if (bullet_factory == nullptr) {
+		UtilityFunctions::push_error("DirectionalBullets2D: cannot resolve shared_movement_pattern_path without a BulletFactory2D (multimesh was never spawned through one).");
+		return;
+	}
+	// A Path2D node cannot live inside a Resource, so the path is stored and
+	// resolved here. Relative to the factory (stable landmark, always in the
+	// tree at spawn/enable time), with a scene-root fallback for editor-picked
+	// paths. Wrong-type or missing targets warn and clear the slot; the Curve2D
+	// itself is extracted by storing the resolved Path2D's curve below.
+	Node *node = bullet_factory->get_node_or_null(directional_data.shared_movement_pattern_path);
+	if (node == nullptr) {
+		SceneTree *tree = bullet_factory->get_tree();
+		Node *current_scene = (tree != nullptr) ? tree->get_current_scene() : nullptr;
+		if (current_scene != nullptr) {
+			node = current_scene->get_node_or_null(directional_data.shared_movement_pattern_path);
+		}
+	}
+	Path2D *path = (node != nullptr) ? Object::cast_to<Path2D>(node) : nullptr;
+	if (path == nullptr) {
+		if (node == nullptr) {
+			UtilityFunctions::push_warning("DirectionalBullets2D: shared_movement_pattern_path target not found, shared movement pattern removed.");
+		} else {
+			UtilityFunctions::push_warning("DirectionalBullets2D: shared_movement_pattern_path node is not a Path2D, shared movement pattern removed.");
+		}
+		shared_movement_pattern_curve.unref();
+		shared_movement_pattern_face_movement_direction = false;
+		shared_movement_pattern_repeat = true;
+		shared_movement_pattern_distances.assign(amount_bullets, 0.0);
+		return;
+	}
+	const Ref<Curve2D> &curve = path->get_curve();
+	if (curve.is_null()) {
+		UtilityFunctions::push_warning("DirectionalBullets2D: shared_movement_pattern_path Path2D holds no Curve2D, shared movement pattern removed.");
+		shared_movement_pattern_curve.unref();
+		shared_movement_pattern_face_movement_direction = false;
+		shared_movement_pattern_repeat = true;
+		shared_movement_pattern_distances.assign(amount_bullets, 0.0);
+		return;
+	}
+	shared_movement_pattern_curve = curve;
+	shared_movement_pattern_face_movement_direction = directional_data.shared_movement_pattern_face_movement_direction;
+	shared_movement_pattern_repeat = directional_data.shared_movement_pattern_repeat;
+	shared_movement_pattern_distances.assign(amount_bullets, 0.0);
+}
+
 void DirectionalBullets2D::custom_additional_spawn_logic(const MultiMeshBulletsData2D &data) {
 	const DirectionalBulletsData2D *directional_data = Object::cast_to<DirectionalBulletsData2D>(&data);
 	// Size movement/homing/orbit SoA up front: the tick path indexes them
@@ -105,6 +162,13 @@ void DirectionalBullets2D::custom_additional_spawn_logic(const MultiMeshBulletsD
 	set_up_movement_data(directional_data->all_bullet_speed_data);
 
 	adjust_direction_based_on_rotation = directional_data->adjust_direction_based_on_rotation;
+
+	// Shared spawn-data features. Curves always applied (a null data unrefs
+	// any stale member via populate_shared); the pattern resolver clears its
+	// own slot on empty/unresolvable paths. Per-bullet runtime state set after
+	// spawn still overrides afterwards.
+	populate_shared_curves_related_data(directional_data->shared_bullet_curves_data);
+	apply_shared_movement_pattern_from_data(*directional_data);
 }
 
 void DirectionalBullets2D::custom_additional_enable_logic(const MultiMeshBulletsData2D &data) {
@@ -127,6 +191,12 @@ void DirectionalBullets2D::custom_additional_enable_logic(const MultiMeshBullets
 	set_up_movement_data(directional_data->all_bullet_speed_data);
 
 	adjust_direction_based_on_rotation = directional_data->adjust_direction_based_on_rotation;
+
+	// Shared spawn-data features (same as spawn; enable runs on every pool
+	// reuse, and stale state was cleared above by enable_multimesh).
+	// Always applied: null data removes previously set features.
+	populate_shared_curves_related_data(directional_data->shared_bullet_curves_data);
+	apply_shared_movement_pattern_from_data(*directional_data);
 
 	// Vectors are sized in spawn, but a wrong-type spawn early-returns before
 	// sizing. Resize here so the clears/assigns below can't run on empty vectors.
@@ -322,6 +392,22 @@ void DirectionalBullets2D::_bind_methods() {
 	// gets them too). Re-binding the same names here trips a duplicate-method
 	// error at startup, so only the property is declared on top of them.
 	ADD_PROPERTY(PropertyInfo(Variant::VECTOR2, "inherited_velocity_offset"), "set_inherited_velocity_offset", "get_inherited_velocity_offset");
+
+	// SHARED MOVEMENT PATTERN RUNTIME API (spawn-data equivalent, editable live).
+	ClassDB::bind_method(D_METHOD("get_shared_movement_pattern_curve"), &DirectionalBullets2D::get_shared_movement_pattern_curve);
+	ClassDB::bind_method(D_METHOD("set_shared_movement_pattern_curve", "new_curve"), &DirectionalBullets2D::set_shared_movement_pattern_curve);
+	ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "shared_movement_pattern_curve", PROPERTY_HINT_RESOURCE_TYPE, "Curve2D"), "set_shared_movement_pattern_curve", "get_shared_movement_pattern_curve");
+
+	ClassDB::bind_method(D_METHOD("get_shared_movement_pattern_face_movement_direction"), &DirectionalBullets2D::get_shared_movement_pattern_face_movement_direction);
+	ClassDB::bind_method(D_METHOD("set_shared_movement_pattern_face_movement_direction", "value"), &DirectionalBullets2D::set_shared_movement_pattern_face_movement_direction);
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "shared_movement_pattern_face_movement_direction"), "set_shared_movement_pattern_face_movement_direction", "get_shared_movement_pattern_face_movement_direction");
+
+	ClassDB::bind_method(D_METHOD("get_shared_movement_pattern_repeat"), &DirectionalBullets2D::get_shared_movement_pattern_repeat);
+	ClassDB::bind_method(D_METHOD("set_shared_movement_pattern_repeat", "value"), &DirectionalBullets2D::set_shared_movement_pattern_repeat);
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "shared_movement_pattern_repeat"), "set_shared_movement_pattern_repeat", "get_shared_movement_pattern_repeat");
+
+	ClassDB::bind_method(D_METHOD("has_shared_movement_pattern"), &DirectionalBullets2D::has_shared_movement_pattern);
+	ClassDB::bind_method(D_METHOD("remove_shared_movement_pattern"), &DirectionalBullets2D::remove_shared_movement_pattern);
 
 	BIND_ENUM_CONSTANT(GlobalPositionTarget);
 	BIND_ENUM_CONSTANT(Node2DTarget);

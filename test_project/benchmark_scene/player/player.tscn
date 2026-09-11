@@ -61,6 +61,12 @@ animations = [{
 "speed": 5.0
 }]
 
+[sub_resource type="Curve2D" id="Curve2D_167wf"]
+_data = {
+"points": PackedVector2Array(0, 0, 0, 0, -333, 187, -20.328644, 24.184076, 20.328644, -24.184076, -295, 189, -28.390001, -23.483088, 28.390001, 23.483088, -258, 154, -19.97815, -12.267284, 19.97815, 12.267284, -232, 195, -23.483088, -25.235558, 23.483088, 25.235558, -186, 154)
+}
+point_count = 5
+
 [sub_resource type="CircleShape2D" id="CircleShape2D_8qahb"]
 radius = 43.382
 
@@ -107,6 +113,9 @@ script = ExtResource("2_314d0")
 visible = false
 sprite_frames = SubResource("SpriteFrames_qt42x")
 animation = &"idk2"
+
+[node name="Path2D" type="Path2D" parent="PlayerDataNode" unique_id=836975807]
+curve = SubResource("Curve2D_167wf")
 
 [node name="MarkerContainer" type="Node2D" parent="." unique_id=470424005]
 

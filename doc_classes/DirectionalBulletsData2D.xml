@@ -20,5 +20,17 @@
 			Warning: If you provide less [BulletSpeedData2D] than the amount of bullets (same as amount of transforms), ALL bullets will use only the first provided speed data.
 			Note: [BulletSpeedData2D] has a helper static method that you can use to generate random speed data - [method BulletSpeedData2D.generate_random_data()].
 		</member>
+		<member name="shared_bullet_curves_data" type="BulletCurvesData2D" setter="set_shared_bullet_curves_data" getter="get_shared_bullet_curves_data">
+			Shared curves applied to every bullet at spawn time (and on pool reuse). Tick precedence is unchanged: shared channels win ties, per-bullet curves fill gaps, plain speed data covers the rest.
+		</member>
+		<member name="shared_movement_pattern_face_movement_direction" type="bool" setter="set_shared_movement_pattern_face_movement_direction" getter="get_shared_movement_pattern_face_movement_direction" default="false">
+			Whether the shared movement pattern rotates bullets to face their direction of travel.
+		</member>
+		<member name="shared_movement_pattern_path" type="NodePath" setter="set_shared_movement_pattern_path" getter="get_shared_movement_pattern_path" default="NodePath(&quot;&quot;)">
+			Path to a [Path2D] in the scene tree whose curve is applied as the movement pattern of every bullet at spawn time (and on pool reuse). Resolved relative to the [BulletFactory2D] with a scene-root fallback; absolute paths always work. Empty (default) disables the feature.
+		</member>
+		<member name="shared_movement_pattern_repeat" type="bool" setter="set_shared_movement_pattern_repeat" getter="get_shared_movement_pattern_repeat" default="true">
+			Whether the shared movement pattern repeats instead of stopping at the end of the curve.
+		</member>
 	</members>
 </class>

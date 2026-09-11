@@ -2,8 +2,10 @@
 
 #include "../shared/bullet_speed_data2d.hpp"
 #include "../shared/homing_target_deque.hpp"
+#include "godot_cpp/classes/curve2d.hpp"
 #include "godot_cpp/classes/node2d.hpp"
 #include "godot_cpp/classes/object.hpp"
+#include "godot_cpp/classes/path2d.hpp"
 #include "godot_cpp/classes/wrapped.hpp"
 #include "godot_cpp/core/defs.hpp"
 #include "godot_cpp/core/math.hpp"
@@ -16,6 +18,7 @@
 #include "godot_cpp/variant/vector2.hpp"
 #include "multimesh_bullets2d.hpp"
 #include "shared/bullet_curves_data2d.hpp"
+#include "spawn-data/directional_bullets_data2d.hpp"
 #include "spawn-data/multimesh_bullets_data2d.hpp"
 
 #include <cstdint>
@@ -111,7 +114,67 @@ protected:
 
 	//
 
+	// SHARED MOVEMENT PATTERN (from spawn data; per-bullet entries in
+	// all_movement_pattern_data stay exclusively runtime-owned). The slot holds
+	// only curve+flags - distance traveled is per bullet (see below), so one
+	// shared pattern costs one curve instead of N copies.
+	Ref<Curve2D> shared_movement_pattern_curve;
+	bool shared_movement_pattern_face_movement_direction = false;
+	bool shared_movement_pattern_repeat = true;
+	// Per-bullet distance ledger for the shared pattern. Sized to
+	// amount_bullets at spawn/enable; a finished non-repeating bullet is one
+	// whose distance reached the curve length (no extra flag needed).
+	std::vector<real_t> shared_movement_pattern_distances;
+
 public:
+	// Advances one bullet along a movement-pattern curve for this tick.
+	// distance_traveled is updated in place. Returns false when the pattern is
+	// finished (degenerate curve or completed non-repeating run); the caller
+	// then clears per-bullet entries or parks the shared ledger at the end.
+	// Single implementation shared by the per-bullet and shared patterns.
+	_ALWAYS_INLINE_ bool advance_movement_pattern(const Ref<Curve2D> &curve, bool face_movement_direction, bool repeat_pattern, real_t &distance_traveled, Vector2 &velocity_delta, Vector2 &curr_bullet_direction, Transform2D &curr_bullet_transf) {
+		const real_t len = curve->get_baked_length();
+		if (len < 0.001) {
+			return false;
+		}
+		const real_t prev_dist = distance_traveled;
+		const real_t advance_dist = velocity_delta.length();
+		distance_traveled += advance_dist;
+		// Non-repeating patterns stop exactly at the end: clamp into the
+		// final tile instead of wrapping once past it and snapping back.
+		const real_t clamped_dist = (!repeat_pattern && distance_traveled >= len) ? len : distance_traveled;
+		const real_t s1 = Math::fmod(prev_dist, len);
+		const real_t s2 = Math::fmod(clamped_dist, len);
+		const int64_t l1 = (int64_t)(prev_dist / len);
+		const int64_t l2 = (int64_t)(clamped_dist / len);
+		const Vector2 start = curve->sample_baked(0.0);
+		const Vector2 end = curve->sample_baked(len * 0.9999);
+		const Vector2 disp = end - start;
+		const Vector2 p1 = l1 * disp + (curve->sample_baked(s1) - start);
+		const Vector2 p2 = l2 * disp + (curve->sample_baked(s2) - start);
+		Vector2 local_delta = p2 - p1;
+		const real_t original_speed = velocity_delta.length();
+		if (original_speed > 0.0001 && local_delta.length_squared() > 0.00000001) {
+			Vector2 pattern_direction = local_delta.rotated(curr_bullet_direction.angle()).normalized();
+			velocity_delta = pattern_direction * original_speed;
+		}
+		if (face_movement_direction && velocity_delta.length_squared() > 0.0001) {
+			const Vector2 tangent = velocity_delta.normalized();
+			// Preserve scale like set_bullet_texture_rotation_towards_position does.
+			const Vector2 pattern_scale = curr_bullet_transf.get_scale();
+			curr_bullet_transf.set_rotation_and_scale(tangent.angle(), pattern_scale);
+		}
+		if (!repeat_pattern && distance_traveled >= len) {
+			if (face_movement_direction) {
+				const Vector2 logical_dir = curr_bullet_direction.normalized();
+				const Vector2 pattern_scale = curr_bullet_transf.get_scale();
+				curr_bullet_transf.set_rotation_and_scale(logical_dir.angle(), pattern_scale);
+			}
+			return false;
+		}
+		return true;
+	}
+
 	// Updates all bullets' positions, rotations, and homing
 	inline void move_bullets(double delta) {
 		if (amount_bullets <= 0 || physics_server == nullptr || !area.is_valid()) {
@@ -200,6 +263,13 @@ public:
 		bool is_per_bullet_curves_valid = false;
 		const BulletCurvesData2D *per_bullet_curves_data = nullptr;
 
+		// Shared movement pattern curve sampled once (same for all bullets).
+		const bool shared_pattern_curve_valid = shared_movement_pattern_curve.is_valid();
+		real_t shared_pattern_len = 0.0;
+		if (shared_pattern_curve_valid) {
+			shared_pattern_len = shared_movement_pattern_curve->get_baked_length();
+		}
+
 		// Usability guard: homing targets without steering is a silent no-op (direction only
 		// changes via rotate_to_target, movement patterns, rotation data, or orbiting).
 		// Warn once.
@@ -211,6 +281,9 @@ public:
 					break;
 				}
 			}
+			// The spawn-data shared pattern counts too (per-bullet entries are
+			// only half the story now).
+			any_pattern = any_pattern || shared_movement_pattern_curve.is_valid();
 			if (!any_pattern) {
 				UtilityFunctions::push_warning("DirectionalBullets2D has homing targets but homing_take_control_of_texture_rotation is false (and no movement pattern/rotation data), so homing will not steer bullets. Set it to true.");
 				homing_inert_warning_issued = true;
@@ -357,56 +430,36 @@ public:
 			}
 			Vector2 velocity_delta = all_cached_velocity[i] * (real_t)delta;
 
-			// 6. MOVEMENT PATTERNS (RELYING ON CURVES AND PATH2D)
-			const bool use_pattern = check_exists_bullet_movement_pattern_data(i);
-			if (use_pattern) {
+		// 6. MOVEMENT PATTERNS (RELYING ON CURVES AND PATH2D)
+		// Per-bullet entries are exclusively runtime-owned; the spawn-data
+		// shared pattern lives in the shared slot with a per-bullet distance
+		// ledger. Shared wins while active (consistent with shared curves and
+		// the shared homing deque); per-bullet runs only when no shared
+		// pattern is set - or once a non-repeating shared run finished.
+		// Patterns (either source) steer direction, keeping the speed
+		// magnitude from BulletSpeedData2D.
+		bool use_shared_pattern = false;
+		if (shared_pattern_curve_valid && shared_pattern_len >= 0.001 && i >= 0 && i < (int)shared_movement_pattern_distances.size()) {
+			use_shared_pattern = shared_movement_pattern_repeat || shared_movement_pattern_distances[i] < shared_pattern_len;
+		}
+		const bool use_per_bullet_pattern = !use_shared_pattern && check_exists_bullet_movement_pattern_data(i);
+		if (use_shared_pattern || use_per_bullet_pattern) {
+			if (use_shared_pattern) {
+				if (!advance_movement_pattern(shared_movement_pattern_curve, shared_movement_pattern_face_movement_direction, shared_movement_pattern_repeat, shared_movement_pattern_distances[i], velocity_delta, curr_bullet_direction, curr_bullet_transf)) {
+					// Park the ledger at the end (degenerate curve or completed
+					// run) so finished bullets skip without an extra flag.
+					shared_movement_pattern_distances[i] = shared_pattern_len;
+				}
+			} else {
 				auto &pattern = all_movement_pattern_data[i];
 				const Ref<Curve2D> &curve = pattern.path_curve;
 				if (curve.is_null()) {
 					all_movement_pattern_data[i] = BulletMovementPatternData2D();
-				} else {
-					const real_t len = curve->get_baked_length();
-					if (len < 0.001) {
-						all_movement_pattern_data[i] = BulletMovementPatternData2D();
-					} else {
-						const real_t prev_dist = pattern.distance_traveled;
-						const real_t advance_dist = velocity_delta.length();
-						pattern.distance_traveled += advance_dist;
-						// Non-repeating patterns stop exactly at the end: clamp into the
-						// final tile instead of wrapping once past it and snapping back.
-						const real_t clamped_dist = (!pattern.repeat_pattern && pattern.distance_traveled >= len) ? len : pattern.distance_traveled;
-						const real_t s1 = Math::fmod(prev_dist, len);
-						const real_t s2 = Math::fmod(clamped_dist, len);
-						const int64_t l1 = (int64_t)(prev_dist / len);
-						const int64_t l2 = (int64_t)(clamped_dist / len);
-						const Vector2 start = curve->sample_baked(0.0);
-						const Vector2 end = curve->sample_baked(len * 0.9999);
-						const Vector2 disp = end - start;
-						const Vector2 p1 = l1 * disp + (curve->sample_baked(s1) - start);
-						const Vector2 p2 = l2 * disp + (curve->sample_baked(s2) - start);
-						Vector2 local_delta = p2 - p1;
-						const real_t original_speed = velocity_delta.length();
-						if (original_speed > 0.0001 && local_delta.length_squared() > 0.00000001) {
-							Vector2 pattern_direction = local_delta.rotated(curr_bullet_direction.angle()).normalized();
-							velocity_delta = pattern_direction * original_speed;
-						}
-						if (pattern.face_movement_direction && velocity_delta.length_squared() > 0.0001) {
-							const Vector2 tangent = velocity_delta.normalized();
-							// Preserve scale like set_bullet_texture_rotation_towards_position does.
-							const Vector2 pattern_scale = curr_bullet_transf.get_scale();
-							curr_bullet_transf.set_rotation_and_scale(tangent.angle(), pattern_scale);
-						}
-						if (!pattern.repeat_pattern && pattern.distance_traveled >= len) {
-							if (pattern.face_movement_direction) {
-								const Vector2 logical_dir = curr_bullet_direction.normalized();
-								const Vector2 pattern_scale = curr_bullet_transf.get_scale();
-								curr_bullet_transf.set_rotation_and_scale(logical_dir.angle(), pattern_scale);
-							}
-							all_movement_pattern_data[i] = BulletMovementPatternData2D();
-						}
-					}
+				} else if (!advance_movement_pattern(curve, pattern.face_movement_direction, pattern.repeat_pattern, pattern.distance_traveled, velocity_delta, curr_bullet_direction, curr_bullet_transf)) {
+					all_movement_pattern_data[i] = BulletMovementPatternData2D();
 				}
 			}
+		}
 
 			auto &curr_bullet_origin = all_cached_instance_origin[i];
 
@@ -1665,6 +1718,36 @@ public:
 	virtual void custom_additional_enable_logic(const MultiMeshBulletsData2D &data) override final;
 	virtual void custom_additional_disable_logic() override final;
 
+	// Resolves the spawn data's shared movement pattern Path2D and applies its
+	// Curve2D to every bullet through the existing helpers. Empty path = off.
+	void apply_shared_movement_pattern_from_data(const DirectionalBulletsData2D &directional_data);
+
+	// SHARED MOVEMENT PATTERN RUNTIME API (spawn-data equivalent, editable live
+	// on the instance; per-bullet helpers stay in the base class). While a
+	// shared pattern is set it takes precedence over per-bullet patterns;
+	// clearing it (null curve) hands control back to them.
+	Ref<Curve2D> get_shared_movement_pattern_curve() const { return shared_movement_pattern_curve; }
+	void set_shared_movement_pattern_curve(const Ref<Curve2D> &new_curve) {
+		shared_movement_pattern_curve = new_curve;
+		// A fresh pattern starts every bullet at distance 0. A null curve
+		// removes the feature: flags go back to defaults, matching the
+		// spawn-data null handling.
+		if (new_curve.is_null()) {
+			shared_movement_pattern_face_movement_direction = false;
+			shared_movement_pattern_repeat = true;
+		}
+		shared_movement_pattern_distances.assign(amount_bullets, 0.0);
+	}
+
+	bool get_shared_movement_pattern_face_movement_direction() const { return shared_movement_pattern_face_movement_direction; }
+	void set_shared_movement_pattern_face_movement_direction(bool value) { shared_movement_pattern_face_movement_direction = value; }
+
+	bool get_shared_movement_pattern_repeat() const { return shared_movement_pattern_repeat; }
+	void set_shared_movement_pattern_repeat(bool value) { shared_movement_pattern_repeat = value; }
+
+	bool has_shared_movement_pattern() const { return shared_movement_pattern_curve.is_valid(); }
+	void remove_shared_movement_pattern() { set_shared_movement_pattern_curve(Ref<Curve2D>()); }
+
 	// Teardown hook: drop every homing target (per-bullet + shared) through the same
 	// clear helpers the enable path uses, so the global mouse-target counter can't leak
 	// when a multimesh dies holding mouse targets.
@@ -1762,8 +1845,9 @@ protected:
 		Vector2 &current_direction = all_cached_direction[bullet_index];
 
 		auto &curr_transf = all_cached_instance_transforms[bullet_index];
-		// If rotation is controlled via movement pattern or rotation data, just set direction directly toward target
-		if (check_exists_bullet_movement_pattern_data(bullet_index) || is_rotation_data_active) {
+		// If rotation is controlled via movement pattern (per-bullet or shared)
+		// or rotation data, just set direction directly toward target
+		if (check_exists_bullet_movement_pattern_data(bullet_index) || shared_movement_pattern_curve.is_valid() || is_rotation_data_active) {
 			current_direction = diff.normalized();
 		} else { // Otherwise use smoothing to rotate toward target
 			// Rotate toward target with smoothing

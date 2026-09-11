@@ -146,7 +146,6 @@ func set_up_directional_bullets_data()->DirectionalBulletsData2D:
 	
 	data.collision_shape = circle
 	
-	
 	data.texture_size = Vector2(140,140)
 	data.collision_shape_offset=Vector2(0,0)
 	data.max_life_time = 2
