@@ -1485,19 +1485,13 @@ float *w = batch_buffer.ptrw();
 			return;
 		}
 
-		if (is_class("BlockBullets2D")) {
-			UtilityFunctions::push_error("BlockBullets2D does not support attachments - use DirectionalBullets2D for bullet_set_attachment");
-			return;
-		}
-
 		attach_bullet_attachment_internal(bullet_index, attachment_scene, bullet_attachment_offset, stick_relative_to_bullet);
 	}
 
 	// Applies the spawn data's shared attachment to every bullet. Called from
-	// spawn()/enable_multimesh() so both bullet types behave identically; the
-	// public setters stay Directional-only (BlockBullets2D has no controllable
-	// spawn, so its users configure attachments here). Stops after the first
-	// failure so a bad scene prints one error instead of one per bullet.
+	// spawn()/enable_multimesh() so both bullet types behave identically.
+	// Stops after the first failure so a bad scene prints one error instead of
+	// one per bullet.
 	_ALWAYS_INLINE_ void apply_shared_bullet_attachment_from_data(const MultiMeshBulletsData2D &data) {
 		if (data.shared_bullet_attachment.is_null()) {
 			return;

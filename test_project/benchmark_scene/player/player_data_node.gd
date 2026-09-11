@@ -114,6 +114,8 @@ func set_up_block_bullets_data()->BlockBulletsData2D:
 	data.all_bullet_rotation_data = bullet_rotation_data
 	data.bullets_custom_data = damage_data
 	
+	data.shared_bullet_attachment_offset = selected_attachment_offset
+	
 	return data
 
 # Returns a partially set up DirectionalBulletsData2D, only thing left to do is set a new value to the .transforms property
@@ -151,7 +153,7 @@ func set_up_directional_bullets_data()->DirectionalBulletsData2D:
 	data.all_bullet_rotation_data = bullet_rotation_data
 	data.bullets_custom_data = damage_data
 	#data.is_life_time_over_signal_enabled = true # If you want to track when the life time is over and receive a signal inside BulletFactory2D
-	
+	data.shared_bullet_attachment_offset = selected_attachment_offset
 	return data
 
 # Determines which type of bullets to be spawned
@@ -187,9 +189,6 @@ func spawn_multi_mesh_directional_bullets()->void:
 	#directional_bullets_data.is_life_time_over_signal_enabled = true
 	#directional_bullets_data.bullet_max_collision_amount = 1
 	var dir_bullets:DirectionalBullets2D = BENCHMARK_GLOBALS.FACTORY.spawn_controllable_directional_bullets(directional_bullets_data)
-	
-	if selected_attachment_id != 0:
-		dir_bullets.all_bullets_set_attachment(BENCHMARK_GLOBALS.ATTACHMENT_SCENES[selected_attachment_id], selected_attachment_offset)
 	
 	dir_bullets.homing_smoothing = 0.0# Set from 0 to 20 or even bigger (but you might have issues with interpolation)
 	dir_bullets.homing_update_interval = 0.00# Set an update timer - keep it low for smooth updates
@@ -315,6 +314,9 @@ func set_collision_shape_offset(new_offset:Vector2)->void:
 # Changes the bullet attachmnent's offset
 func set_bullet_attachment_offset(new_offset:Vector2)->void:
 	selected_attachment_offset = new_offset
+	
+	directional_bullets_data.shared_bullet_attachment_offset = new_offset
+	block_bullets_data.shared_bullet_attachment_offset = new_offset
 
 # Changes the bullet texture's rotation
 func set_bullet_texture_rotation(degrees:int)->void:
@@ -336,6 +338,12 @@ func set_bullet_lifetime(new_lifetime:float)->void:
 # Switches the attachment scene
 func switch_attachment_scn(option_index:int)->void:
 	selected_attachment_id = option_index
+	
+	var scene:PackedScene = BENCHMARK_GLOBALS.ATTACHMENT_SCENES[selected_attachment_id]
+	
+	directional_bullets_data.shared_bullet_attachment = scene
+	block_bullets_data.shared_bullet_attachment = scene
+	
 
 # Sets whether the physics shapes should also get rotated when rotation data is provided
 func set_rotate_physics_shapes(should_rotate_physics_shapes:bool)->void:

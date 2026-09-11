@@ -37,21 +37,22 @@ public:
 			update_all_previous_transforms_for_interpolation();
 		}
 
-		Vector2 cache_velocity_calc = all_cached_velocity[0] * delta;
-
 		const auto &active_bullet_indexes = all_bullets_enabled_set.get_active_indexes();
 
 		for (int i : active_bullet_indexes) {
-			if (i < 0 || i >= amount_bullets || i >= (int)all_cached_instance_transforms.size() || i >= (int)all_cached_shape_transforms.size()) {
+			if (i < 0 || i >= amount_bullets || i >= (int)all_cached_instance_transforms.size() || i >= (int)all_cached_shape_transforms.size() || i >= (int)all_cached_velocity.size()) {
 				continue;
 			}
+			// Per-bullet velocity (same shared values by default, so block motion
+			// is unchanged, but per-bullet overrides via the setters are honored).
+			const Vector2 velocity_delta = all_cached_velocity[i] * (real_t)delta;
 			Transform2D &curr_instance_transf = all_cached_instance_transforms[i];
 			Transform2D &curr_shape_transf = all_cached_shape_transforms[i];
 
 			Vector2 &curr_instance_origin = all_cached_instance_origin[i];
 			Vector2 &curr_shape_origin = all_cached_shape_origin[i];
 
-			curr_instance_origin += cache_velocity_calc;
+			curr_instance_origin += velocity_delta;
 
 			// Handle bullet rotation and bullet rotation speed acceleration
 			real_t rotation_angle = 0.0;
@@ -82,13 +83,18 @@ public:
 
 			physics_server->area_set_shape_transform(area, i, curr_shape_transf);
 
-			move_bullet_attachment(cache_velocity_calc, i);
+			move_bullet_attachment(velocity_delta, i);
 		}
 		if (!is_using_physics_interpolation) {
 			batch_flush_instance_transforms();
 		}
 
-		bullet_accelerate_speed(0, delta);
+		// Accelerate every entry (not just active ones): a re-enabled bullet
+		// rejoins at the block's current speed, matching the old shared-entry
+		// behavior exactly.
+		for (int i = 0; i < amount_bullets && i < (int)all_cached_speed.size(); ++i) {
+			bullet_accelerate_speed(i, delta);
+		}
 
 		// Swap into a local first: handle_bullet_collision can funnel into
 		// disable_multimesh() (last bullet out), which clears the member vector.

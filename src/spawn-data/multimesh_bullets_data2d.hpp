@@ -89,7 +89,7 @@ public:
 
 	// Shared attachment scene applied to every bullet at spawn/enable time.
 	// Null (default) disables the feature; use the runtime bullet_set_attachment
-	// methods for per-bullet attachments instead (DirectionalBullets2D only).
+	// methods for per-bullet attachments instead.
 	Ref<PackedScene> shared_bullet_attachment;
 
 	// Offset of the shared attachment relative to the bullet's texture center.
