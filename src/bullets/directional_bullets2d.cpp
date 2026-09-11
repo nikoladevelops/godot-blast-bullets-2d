@@ -78,6 +78,46 @@ void DirectionalBullets2D::set_up_movement_data(const TypedArray<BulletSpeedData
 	}
 }
 
+void DirectionalBullets2D::apply_per_bullet_curves_from_data(const DirectionalBulletsData2D &directional_data) {
+	// Seatbelt: base spawn() sizes this before the custom logic runs, and
+	// enable preserves the size - but never index an unsized vector.
+	if ((int)all_bullet_curves_data.size() != amount_bullets) {
+		all_bullet_curves_data.assign(amount_bullets, Ref<BulletCurvesData2D>());
+	}
+	for (int i = 0; i < amount_bullets; ++i) {
+		const int entry = resolve_per_bullet_data_index(directional_data.all_bullet_curves_data.size(), i);
+		if (entry < 0) {
+			return; // empty = off
+		}
+		Ref<BulletCurvesData2D> curves = directional_data.all_bullet_curves_data[entry];
+		if (curves.is_null()) {
+			continue;
+		}
+		populate_individual_bullet_curves_related_data(i, curves);
+	}
+}
+
+void DirectionalBullets2D::apply_per_bullet_movement_patterns_from_data(const DirectionalBulletsData2D &directional_data) {
+	for (int i = 0; i < amount_bullets; ++i) {
+		const int entry = resolve_per_bullet_data_index(directional_data.all_bullet_movement_pattern_curves.size(), i);
+		if (entry < 0) {
+			return; // empty = off
+		}
+		Ref<Curve2D> curve = directional_data.all_bullet_movement_pattern_curves[entry];
+		if (curve.is_null()) {
+			continue;
+		}
+		// Flags resolve per bullet when sized, otherwise the shared flags drive.
+		const bool face = (directional_data.all_bullet_movement_pattern_face_movement_directions.size() == amount_bullets)
+				? (bool)directional_data.all_bullet_movement_pattern_face_movement_directions[i]
+				: directional_data.shared_movement_pattern_face_movement_direction;
+		const bool repeat = (directional_data.all_bullet_movement_pattern_repeats.size() == amount_bullets)
+				? (bool)directional_data.all_bullet_movement_pattern_repeats[i]
+				: directional_data.shared_movement_pattern_repeat;
+		set_bullet_movement_pattern_from_curve(i, curve, face, repeat);
+	}
+}
+
 void DirectionalBullets2D::apply_shared_movement_pattern_from_data(const DirectionalBulletsData2D &directional_data) {
 	// Null/empty removes the feature: clear the shared slot so a previously
 	// set pattern (or curves, via populate_shared below) cannot linger.
@@ -181,6 +221,11 @@ void DirectionalBullets2D::custom_additional_spawn_logic(const MultiMeshBulletsD
 		set_rotation_data(single_rotation, data.rotate_only_textures);
 	}
 
+	// Per-bullet spawn-data curves/patterns first, then the shared features
+	// below (separate storages, so the tick resolves precedence live).
+	apply_per_bullet_curves_from_data(*directional_data);
+	apply_per_bullet_movement_patterns_from_data(*directional_data);
+
 	// Shared spawn-data features. Curves always applied (a null data unrefs
 	// any stale member via populate_shared); the pattern resolver clears its
 	// own slot on empty/unresolvable paths. Per-bullet runtime state set after
@@ -224,6 +269,11 @@ void DirectionalBullets2D::custom_additional_enable_logic(const MultiMeshBullets
 		single_rotation.push_back(shared_bullet_rotation_data);
 		set_rotation_data(single_rotation, data.rotate_only_textures);
 	}
+
+	// Per-bullet spawn-data curves/patterns first, then the shared features
+	// below (separate storages, so the tick resolves precedence live).
+	apply_per_bullet_curves_from_data(*directional_data);
+	apply_per_bullet_movement_patterns_from_data(*directional_data);
 
 	// Shared spawn-data features (same as spawn; enable runs on every pool
 	// reuse, and stale state was cleared above by enable_multimesh).

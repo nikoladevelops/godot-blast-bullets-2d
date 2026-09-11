@@ -1729,6 +1729,26 @@ public:
 	// Curve2D to every bullet through the existing helpers. Empty path = off.
 	void apply_shared_movement_pattern_from_data(const DirectionalBulletsData2D &directional_data);
 
+	// Shared fallback rule for per-bullet spawn-data arrays (same as
+	// all_bullet_speed_data): empty = off (-1), size == amount = entry i,
+	// otherwise the first entry drives all bullets.
+	int resolve_per_bullet_data_index(int array_size, int bullet_index) const {
+		if (array_size <= 0) {
+			return -1;
+		}
+		if (array_size == amount_bullets) {
+			return bullet_index;
+		}
+		return 0;
+	}
+
+	// Seeds per-bullet curves/patterns from spawn data through the regular
+	// per-bullet helpers (null entries skipped). Called from the custom
+	// spawn/enable logic alongside the shared application; storage is
+	// separate so ordering between them is irrelevant.
+	void apply_per_bullet_curves_from_data(const DirectionalBulletsData2D &directional_data);
+	void apply_per_bullet_movement_patterns_from_data(const DirectionalBulletsData2D &directional_data);
+
 	// SHARED MOVEMENT PATTERN RUNTIME API (spawn-data equivalent, editable live
 	// on the instance; per-bullet helpers stay in the base class). While a
 	// shared pattern is set it takes precedence over per-bullet patterns;

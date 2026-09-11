@@ -5,7 +5,9 @@
 #include "../shared/bullet_speed_data2d.hpp"
 #include "./multimesh_bullets_data2d.hpp"
 
+#include "godot_cpp/classes/curve2d.hpp"
 #include "godot_cpp/variant/node_path.hpp"
+#include "godot_cpp/variant/typed_array.hpp"
 
 namespace BlastBullets2D {
 using namespace godot;
@@ -52,6 +54,28 @@ public:
 	// Whether the shared movement pattern repeats instead of stopping at the end of the curve.
 	bool shared_movement_pattern_repeat = true;
 
+	// PER-BULLET CURVES / PATTERNS (runtime-owned; this data seeds them here).
+	// Same fallback rule as all_bullet_speed_data: empty = off, size ==
+	// amount = per bullet, otherwise the first entry drives all bullets.
+	// Null entries are skipped per bullet.
+
+	// Per-bullet curves applied at spawn/enable time through the regular
+	// per-bullet machinery (shared curves still win ties per tick).
+	TypedArray<BulletCurvesData2D> all_bullet_curves_data;
+
+	// PER-BULLET MOVEMENT PATTERN RELATED
+
+	// Per-bullet movement pattern curves applied at spawn/enable time. The
+	// face/repeat flags below resolve per bullet when sized to the amount,
+	// otherwise the shared flags drive.
+	TypedArray<Curve2D> all_bullet_movement_pattern_curves;
+
+	// Per-bullet face flags for the curves above.
+	TypedArray<bool> all_bullet_movement_pattern_face_movement_directions;
+
+	// Per-bullet repeat flags for the curves above.
+	TypedArray<bool> all_bullet_movement_pattern_repeats;
+
 	TypedArray<BulletSpeedData2D> get_all_bullet_speed_data() const;
 	void set_all_bullet_speed_data(const TypedArray<BulletSpeedData2D> &new_data);
 
@@ -75,6 +99,18 @@ public:
 
 	bool get_shared_movement_pattern_repeat() const;
 	void set_shared_movement_pattern_repeat(bool value);
+
+	TypedArray<BulletCurvesData2D> get_all_bullet_curves_data() const;
+	void set_all_bullet_curves_data(const TypedArray<BulletCurvesData2D> &new_data);
+
+	TypedArray<Curve2D> get_all_bullet_movement_pattern_curves() const;
+	void set_all_bullet_movement_pattern_curves(const TypedArray<Curve2D> &new_curves);
+
+	TypedArray<bool> get_all_bullet_movement_pattern_face_movement_directions() const;
+	void set_all_bullet_movement_pattern_face_movement_directions(const TypedArray<bool> &new_flags);
+
+	TypedArray<bool> get_all_bullet_movement_pattern_repeats() const;
+	void set_all_bullet_movement_pattern_repeats(const TypedArray<bool> &new_flags);
 
 protected:
 	static void _bind_methods();

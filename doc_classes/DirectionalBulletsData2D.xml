@@ -13,6 +13,18 @@
 		<member name="adjust_direction_based_on_rotation" type="bool" setter="set_adjust_direction_based_on_rotation" getter="get_adjust_direction_based_on_rotation" default="false">
 			If enabled, the bullets will adjust their direction when rotating, instead of only spinning in place.
 		</member>
+		<member name="all_bullet_curves_data" type="BulletCurvesData2D[]" setter="set_all_bullet_curves_data" getter="get_all_bullet_curves_data" default="[]">
+			Per-bullet curves applied at spawn time (and on pool reuse). Same fallback rule as [member all_bullet_speed_data]: empty disables the feature, matching size means per bullet, otherwise the first entry drives all bullets. Null entries are skipped per bullet. Shared curves still win ties per tick.
+		</member>
+		<member name="all_bullet_movement_pattern_curves" type="Curve2D[]" setter="set_all_bullet_movement_pattern_curves" getter="get_all_bullet_movement_pattern_curves" default="[]">
+			Per-bullet movement pattern curves applied at spawn time (and on pool reuse), same fallback rule as above. Null entries are skipped per bullet. A set shared pattern takes precedence while active.
+		</member>
+		<member name="all_bullet_movement_pattern_face_movement_directions" type="bool[]" setter="set_all_bullet_movement_pattern_face_movement_directions" getter="get_all_bullet_movement_pattern_face_movement_directions" default="[]">
+			Per-bullet face flags for [member all_bullet_movement_pattern_curves]. Matching size means per bullet, otherwise the shared [member shared_movement_pattern_face_movement_direction] flag drives.
+		</member>
+		<member name="all_bullet_movement_pattern_repeats" type="bool[]" setter="set_all_bullet_movement_pattern_repeats" getter="get_all_bullet_movement_pattern_repeats" default="[]">
+			Per-bullet repeat flags for [member all_bullet_movement_pattern_curves]. Matching size means per bullet, otherwise the shared [member shared_movement_pattern_repeat] flag drives.
+		</member>
 		<member name="all_bullet_speed_data" type="BulletSpeedData2D[]" setter="set_all_bullet_speed_data" getter="get_all_bullet_speed_data" default="[]">
 			[b]MANDATORY[/b]
 			You can provide [BulletSpeedData2D] for every single bullet - meaning that it should contain the same amount of data as the [member MultiMeshBulletsData2D.transforms].

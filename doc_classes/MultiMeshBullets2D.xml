@@ -454,6 +454,18 @@
 				Note: A bullet can have its movement pattern removed by using [method remove_bullet_movement_pattern] or [method all_bullets_remove_movement_pattern].
 			</description>
 		</method>
+		<method name="has_shared_bullet_curves_data" qualifiers="const">
+			<return type="bool" />
+			<description>
+				Whether shared bullet curves are currently set.
+			</description>
+		</method>
+		<method name="remove_shared_bullet_curves_data">
+			<return type="void" />
+			<description>
+				Removes the shared bullet curves (same as setting null). Per-bullet curves, if any, take over.
+			</description>
+		</method>
 		<method name="is_bullet_status_enabled">
 			<return type="bool" />
 			<param index="0" name="bullet_index" type="int" />

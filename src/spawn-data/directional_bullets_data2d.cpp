@@ -62,6 +62,34 @@ void DirectionalBulletsData2D::set_shared_movement_pattern_repeat(bool value) {
 	shared_movement_pattern_repeat = value;
 }
 
+TypedArray<BulletCurvesData2D> DirectionalBulletsData2D::get_all_bullet_curves_data() const {
+	return all_bullet_curves_data;
+}
+void DirectionalBulletsData2D::set_all_bullet_curves_data(const TypedArray<BulletCurvesData2D> &new_data) {
+	all_bullet_curves_data = new_data;
+}
+
+TypedArray<Curve2D> DirectionalBulletsData2D::get_all_bullet_movement_pattern_curves() const {
+	return all_bullet_movement_pattern_curves;
+}
+void DirectionalBulletsData2D::set_all_bullet_movement_pattern_curves(const TypedArray<Curve2D> &new_curves) {
+	all_bullet_movement_pattern_curves = new_curves;
+}
+
+TypedArray<bool> DirectionalBulletsData2D::get_all_bullet_movement_pattern_face_movement_directions() const {
+	return all_bullet_movement_pattern_face_movement_directions;
+}
+void DirectionalBulletsData2D::set_all_bullet_movement_pattern_face_movement_directions(const TypedArray<bool> &new_flags) {
+	all_bullet_movement_pattern_face_movement_directions = new_flags;
+}
+
+TypedArray<bool> DirectionalBulletsData2D::get_all_bullet_movement_pattern_repeats() const {
+	return all_bullet_movement_pattern_repeats;
+}
+void DirectionalBulletsData2D::set_all_bullet_movement_pattern_repeats(const TypedArray<bool> &new_flags) {
+	all_bullet_movement_pattern_repeats = new_flags;
+}
+
 void DirectionalBulletsData2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_all_bullet_speed_data"), &DirectionalBulletsData2D::get_all_bullet_speed_data);
 	ClassDB::bind_method(D_METHOD("set_all_bullet_speed_data", "new_data"), &DirectionalBulletsData2D::set_all_bullet_speed_data);
@@ -94,5 +122,21 @@ void DirectionalBulletsData2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_shared_movement_pattern_repeat"), &DirectionalBulletsData2D::get_shared_movement_pattern_repeat);
 	ClassDB::bind_method(D_METHOD("set_shared_movement_pattern_repeat", "value"), &DirectionalBulletsData2D::set_shared_movement_pattern_repeat);
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "shared_movement_pattern_repeat"), "set_shared_movement_pattern_repeat", "get_shared_movement_pattern_repeat");
+
+	ClassDB::bind_method(D_METHOD("get_all_bullet_curves_data"), &DirectionalBulletsData2D::get_all_bullet_curves_data);
+	ClassDB::bind_method(D_METHOD("set_all_bullet_curves_data", "new_data"), &DirectionalBulletsData2D::set_all_bullet_curves_data);
+	ADD_PROPERTY(PropertyInfo(Variant::ARRAY, "all_bullet_curves_data", PROPERTY_HINT_ARRAY_TYPE, "BulletCurvesData2D"), "set_all_bullet_curves_data", "get_all_bullet_curves_data");
+
+	ClassDB::bind_method(D_METHOD("get_all_bullet_movement_pattern_curves"), &DirectionalBulletsData2D::get_all_bullet_movement_pattern_curves);
+	ClassDB::bind_method(D_METHOD("set_all_bullet_movement_pattern_curves", "new_curves"), &DirectionalBulletsData2D::set_all_bullet_movement_pattern_curves);
+	ADD_PROPERTY(PropertyInfo(Variant::ARRAY, "all_bullet_movement_pattern_curves", PROPERTY_HINT_ARRAY_TYPE, "Curve2D"), "set_all_bullet_movement_pattern_curves", "get_all_bullet_movement_pattern_curves");
+
+	ClassDB::bind_method(D_METHOD("get_all_bullet_movement_pattern_face_movement_directions"), &DirectionalBulletsData2D::get_all_bullet_movement_pattern_face_movement_directions);
+	ClassDB::bind_method(D_METHOD("set_all_bullet_movement_pattern_face_movement_directions", "new_flags"), &DirectionalBulletsData2D::set_all_bullet_movement_pattern_face_movement_directions);
+	ADD_PROPERTY(PropertyInfo(Variant::ARRAY, "all_bullet_movement_pattern_face_movement_directions", PROPERTY_HINT_ARRAY_TYPE, "bool"), "set_all_bullet_movement_pattern_face_movement_directions", "get_all_bullet_movement_pattern_face_movement_directions");
+
+	ClassDB::bind_method(D_METHOD("get_all_bullet_movement_pattern_repeats"), &DirectionalBulletsData2D::get_all_bullet_movement_pattern_repeats);
+	ClassDB::bind_method(D_METHOD("set_all_bullet_movement_pattern_repeats", "new_flags"), &DirectionalBulletsData2D::set_all_bullet_movement_pattern_repeats);
+	ADD_PROPERTY(PropertyInfo(Variant::ARRAY, "all_bullet_movement_pattern_repeats", PROPERTY_HINT_ARRAY_TYPE, "bool"), "set_all_bullet_movement_pattern_repeats", "get_all_bullet_movement_pattern_repeats");
 }
 } //namespace BlastBullets2D

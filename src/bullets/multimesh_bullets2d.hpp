@@ -452,6 +452,8 @@ float *w = batch_buffer.ptrw();
 		}
 		populate_shared_curves_related_data(new_curves_data);
 	}
+	bool has_shared_bullet_curves_data() const { return shared_bullet_curves_data.is_valid(); }
+	void remove_shared_bullet_curves_data() { set_shared_bullet_curves_data(Ref<BulletCurvesData2D>()); }
 
 	// Re-bakes the animation cache from a SpriteFrames resource and switches to it.
 	// An empty animation name is rejected with an error (returns false, previous
