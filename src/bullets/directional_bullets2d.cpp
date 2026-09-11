@@ -163,6 +163,24 @@ void DirectionalBullets2D::custom_additional_spawn_logic(const MultiMeshBulletsD
 
 	adjust_direction_based_on_rotation = directional_data->adjust_direction_based_on_rotation;
 
+	// Shared spawn-data speed/rotation take precedence over the arrays when
+	// set (a single entry fans out to every bullet through the same
+	// machinery). Null hands control back to the arrays (vectors were just
+	// re-seeded above), and the members mirror the data so the runtime
+	// getters stay truthful across pool reuse.
+	shared_bullet_speed_data = directional_data->shared_bullet_speed_data;
+	if (shared_bullet_speed_data.is_valid()) {
+		TypedArray<BulletSpeedData2D> single_speed;
+		single_speed.push_back(shared_bullet_speed_data);
+		set_up_movement_data(single_speed);
+	}
+	shared_bullet_rotation_data = directional_data->shared_bullet_rotation_data;
+	if (shared_bullet_rotation_data.is_valid()) {
+		TypedArray<BulletRotationData2D> single_rotation;
+		single_rotation.push_back(shared_bullet_rotation_data);
+		set_rotation_data(single_rotation, data.rotate_only_textures);
+	}
+
 	// Shared spawn-data features. Curves always applied (a null data unrefs
 	// any stale member via populate_shared); the pattern resolver clears its
 	// own slot on empty/unresolvable paths. Per-bullet runtime state set after
@@ -191,6 +209,21 @@ void DirectionalBullets2D::custom_additional_enable_logic(const MultiMeshBullets
 	set_up_movement_data(directional_data->all_bullet_speed_data);
 
 	adjust_direction_based_on_rotation = directional_data->adjust_direction_based_on_rotation;
+
+	// Shared spawn-data speed/rotation (same as spawn; enable runs on every
+	// pool reuse). Members mirror the data so runtime getters stay truthful.
+	shared_bullet_speed_data = directional_data->shared_bullet_speed_data;
+	if (shared_bullet_speed_data.is_valid()) {
+		TypedArray<BulletSpeedData2D> single_speed;
+		single_speed.push_back(shared_bullet_speed_data);
+		set_up_movement_data(single_speed);
+	}
+	shared_bullet_rotation_data = directional_data->shared_bullet_rotation_data;
+	if (shared_bullet_rotation_data.is_valid()) {
+		TypedArray<BulletRotationData2D> single_rotation;
+		single_rotation.push_back(shared_bullet_rotation_data);
+		set_rotation_data(single_rotation, data.rotate_only_textures);
+	}
 
 	// Shared spawn-data features (same as spawn; enable runs on every pool
 	// reuse, and stale state was cleared above by enable_multimesh).
@@ -408,6 +441,25 @@ void DirectionalBullets2D::_bind_methods() {
 
 	ClassDB::bind_method(D_METHOD("has_shared_movement_pattern"), &DirectionalBullets2D::has_shared_movement_pattern);
 	ClassDB::bind_method(D_METHOD("remove_shared_movement_pattern"), &DirectionalBullets2D::remove_shared_movement_pattern);
+
+	// SHARED SPEED / ROTATION RUNTIME API.
+	ClassDB::bind_method(D_METHOD("get_shared_bullet_speed_data"), &DirectionalBullets2D::get_shared_bullet_speed_data);
+	ClassDB::bind_method(D_METHOD("set_shared_bullet_speed_data", "new_speed_data"), &DirectionalBullets2D::set_shared_bullet_speed_data);
+	ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "shared_bullet_speed_data", PROPERTY_HINT_RESOURCE_TYPE, "BulletSpeedData2D"), "set_shared_bullet_speed_data", "get_shared_bullet_speed_data");
+
+	ClassDB::bind_method(D_METHOD("has_shared_bullet_speed_data"), &DirectionalBullets2D::has_shared_bullet_speed_data);
+	ClassDB::bind_method(D_METHOD("remove_shared_bullet_speed_data"), &DirectionalBullets2D::remove_shared_bullet_speed_data);
+
+	ClassDB::bind_method(D_METHOD("get_shared_bullet_rotation_data"), &DirectionalBullets2D::get_shared_bullet_rotation_data);
+	ClassDB::bind_method(D_METHOD("set_shared_bullet_rotation_data", "new_rotation_data"), &DirectionalBullets2D::set_shared_bullet_rotation_data);
+	ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "shared_bullet_rotation_data", PROPERTY_HINT_RESOURCE_TYPE, "BulletRotationData2D"), "set_shared_bullet_rotation_data", "get_shared_bullet_rotation_data");
+
+	ClassDB::bind_method(D_METHOD("has_shared_bullet_rotation_data"), &DirectionalBullets2D::has_shared_bullet_rotation_data);
+	ClassDB::bind_method(D_METHOD("remove_shared_bullet_rotation_data"), &DirectionalBullets2D::remove_shared_bullet_rotation_data);
+
+	ClassDB::bind_method(D_METHOD("get_adjust_direction_based_on_rotation"), &DirectionalBullets2D::get_adjust_direction_based_on_rotation);
+	ClassDB::bind_method(D_METHOD("set_adjust_direction_based_on_rotation", "value"), &DirectionalBullets2D::set_adjust_direction_based_on_rotation);
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "adjust_direction_based_on_rotation"), "set_adjust_direction_based_on_rotation", "get_adjust_direction_based_on_rotation");
 
 	BIND_ENUM_CONSTANT(GlobalPositionTarget);
 	BIND_ENUM_CONSTANT(Node2DTarget);

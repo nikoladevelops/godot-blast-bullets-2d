@@ -23,6 +23,12 @@
 		<member name="shared_bullet_curves_data" type="BulletCurvesData2D" setter="set_shared_bullet_curves_data" getter="get_shared_bullet_curves_data">
 			Shared curves applied to every bullet at spawn time (and on pool reuse). Tick precedence is unchanged: shared channels win ties, per-bullet curves fill gaps, plain speed data covers the rest.
 		</member>
+		<member name="shared_bullet_rotation_data" type="BulletRotationData2D" setter="set_shared_bullet_rotation_data" getter="get_shared_bullet_rotation_data">
+			Shared rotation applied to every bullet at spawn time (and on pool reuse), taking precedence over per-bullet rotation data when set. Null (default) disables the feature and the rotation array drives instead.
+		</member>
+		<member name="shared_bullet_speed_data" type="BulletSpeedData2D" setter="set_shared_bullet_speed_data" getter="get_shared_bullet_speed_data">
+			Shared speed applied to every bullet at spawn time (and on pool reuse), taking precedence over [member all_bullet_speed_data] when set. Null (default) disables the feature and the array drives instead. Note: shared movement-speed curves still outrank it per tick.
+		</member>
 		<member name="shared_movement_pattern_face_movement_direction" type="bool" setter="set_shared_movement_pattern_face_movement_direction" getter="get_shared_movement_pattern_face_movement_direction" default="false">
 			Whether the shared movement pattern rotates bullets to face their direction of travel.
 		</member>

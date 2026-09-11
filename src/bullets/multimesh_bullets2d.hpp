@@ -1999,7 +1999,9 @@ float *w = batch_buffer.ptrw();
 	// Holds custom logic that runs before disabling and pushing this multimesh inside an object pool
 	virtual void custom_additional_disable_logic() {}
 	///
-private:
+protected:
+	// Internal setup helpers (also usable by subclasses, e.g. DirectionalBullets2D
+	// applies shared spawn-data through set_rotation_data). Not bound to scripts.
 	// Reserves enough memory and populates all needed data structures keeping track of rotation data
 	void set_rotation_data(const TypedArray<BulletRotationData2D> &rotation_data, bool new_rotate_only_textures);
 

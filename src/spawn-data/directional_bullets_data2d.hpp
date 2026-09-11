@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../shared/bullet_curves_data2d.hpp"
+#include "../shared/bullet_rotation_data2d.hpp"
 #include "../shared/bullet_speed_data2d.hpp"
 #include "./multimesh_bullets_data2d.hpp"
 
@@ -18,6 +19,18 @@ public:
 
 	// Whether each bullet's direction should be adjusted based on the rotation data provided by the user (bullet rotates, so it now moves in that direction)
 	bool adjust_direction_based_on_rotation = false;
+
+	// SHARED SPEED / ROTATION RELATED
+
+	// Shared speed applied to every bullet at spawn/enable time, taking
+	// precedence over all_bullet_speed_data when set. Null (default) disables
+	// the feature and the array drives instead.
+	Ref<BulletSpeedData2D> shared_bullet_speed_data;
+
+	// Shared rotation applied to every bullet at spawn/enable time, taking
+	// precedence over all_bullet_rotation_data when set. Null (default)
+	// disables the feature and the array drives instead.
+	Ref<BulletRotationData2D> shared_bullet_rotation_data;
 
 	// Shared curves applied to every bullet at spawn/enable time, before any
 	// per-bullet curves. Null (default) disables the feature. Tick precedence
@@ -44,6 +57,12 @@ public:
 
 	bool get_adjust_direction_based_on_rotation() const;
 	void set_adjust_direction_based_on_rotation(bool new_adjust_direction_based_on_rotation);
+
+	Ref<BulletSpeedData2D> get_shared_bullet_speed_data() const;
+	void set_shared_bullet_speed_data(const Ref<BulletSpeedData2D> &new_speed_data);
+
+	Ref<BulletRotationData2D> get_shared_bullet_rotation_data() const;
+	void set_shared_bullet_rotation_data(const Ref<BulletRotationData2D> &new_rotation_data);
 
 	Ref<BulletCurvesData2D> get_shared_bullet_curves_data() const;
 	void set_shared_bullet_curves_data(const Ref<BulletCurvesData2D> &new_curves_data);

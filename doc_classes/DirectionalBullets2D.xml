@@ -660,6 +660,69 @@
 				If you want to clear then push an array of targets to a specific bullet's per-bullet deque, use [method all_bullets_replace_homing_targets_with_new_target_array] instead.
 			</description>
 		</method>
+		<method name="get_adjust_direction_based_on_rotation" qualifiers="const">
+			<return type="bool" />
+			<description>
+				Whether each bullet's direction is adjusted based on rotation data. Mirrors the spawn data flag; pool reuse re-applies the data value.
+			</description>
+		</method>
+		<method name="set_adjust_direction_based_on_rotation">
+			<return type="void" />
+			<param index="0" name="value" type="bool" />
+			<description>
+				Whether each bullet's direction is adjusted based on rotation data. Mirrors the spawn data flag; pool reuse re-applies the data value.
+			</description>
+		</method>
+		<method name="get_shared_bullet_rotation_data" qualifiers="const">
+			<return type="BulletRotationData2D" />
+			<description>
+				Returns the shared rotation applied to every bullet. Null when the feature is off.
+			</description>
+		</method>
+		<method name="set_shared_bullet_rotation_data">
+			<return type="void" />
+			<param index="0" name="new_rotation_data" type="BulletRotationData2D" />
+			<description>
+				Sets the shared rotation applied to every bullet, taking precedence over per-bullet rotation data while set. Passing null removes the feature (already-seeded values persist - re-spawn or re-set to change those).
+			</description>
+		</method>
+		<method name="has_shared_bullet_rotation_data" qualifiers="const">
+			<return type="bool" />
+			<description>
+				Whether a shared rotation is currently set.
+			</description>
+		</method>
+		<method name="remove_shared_bullet_rotation_data">
+			<return type="void" />
+			<description>
+				Removes the shared rotation (same as setting null). Per-bullet rotation data, if any, takes over.
+			</description>
+		</method>
+		<method name="get_shared_bullet_speed_data" qualifiers="const">
+			<return type="BulletSpeedData2D" />
+			<description>
+				Returns the shared speed applied to every bullet. Null when the feature is off.
+			</description>
+		</method>
+		<method name="set_shared_bullet_speed_data">
+			<return type="void" />
+			<param index="0" name="new_speed_data" type="BulletSpeedData2D" />
+			<description>
+				Sets the shared speed applied to every bullet, taking precedence over per-bullet speed data while set. Passing null removes the feature (already-seeded values persist - re-spawn or re-set to change those). Note: shared movement-speed curves still outrank it per tick.
+			</description>
+		</method>
+		<method name="has_shared_bullet_speed_data" qualifiers="const">
+			<return type="bool" />
+			<description>
+				Whether a shared speed is currently set.
+			</description>
+		</method>
+		<method name="remove_shared_bullet_speed_data">
+			<return type="void" />
+			<description>
+				Removes the shared speed (same as setting null). Per-bullet speed data, if any, takes over.
+			</description>
+		</method>
 		<method name="get_shared_movement_pattern_curve" qualifiers="const">
 			<return type="Curve2D" />
 			<description>
@@ -740,6 +803,9 @@
 		</method>
 	</methods>
 	<members>
+		<member name="adjust_direction_based_on_rotation" type="bool" setter="set_adjust_direction_based_on_rotation" getter="get_adjust_direction_based_on_rotation" default="false">
+			Whether each bullet's direction is adjusted based on rotation data (the bullet moves where it faces). Mirrors the spawn data flag; pool reuse re-applies the data value.
+		</member>
 		<member name="bullet_homing_auto_pop_after_target_reached" type="bool" setter="set_bullet_homing_auto_pop_after_target_reached" getter="get_bullet_homing_auto_pop_after_target_reached" default="false">
 			Whether the current homing target should be automatically popped from the deque once it gets reached by a bullet (per-bullet deques only).
 
@@ -774,6 +840,12 @@
 			The signal [signal bullet_homing_target_reached] is emitted when a target is reached.
 
 			If you want this behavior for the per-bullet deques, use [member bullet_homing_auto_pop_after_target_reached] instead.
+		</member>
+		<member name="shared_bullet_rotation_data" type="BulletRotationData2D" setter="set_shared_bullet_rotation_data" getter="get_shared_bullet_rotation_data">
+			Shared rotation applied to every bullet, taking precedence over per-bullet rotation data while set. Clearing it (null) hands control back, keeping already-seeded values - re-spawn or re-set to change those.
+		</member>
+		<member name="shared_bullet_speed_data" type="BulletSpeedData2D" setter="set_shared_bullet_speed_data" getter="get_shared_bullet_speed_data">
+			Shared speed applied to every bullet, taking precedence over per-bullet speed data while set. Clearing it (null) hands control back, keeping already-seeded values - re-spawn or re-set to change those. Note: shared movement-speed curves still outrank it per tick.
 		</member>
 		<member name="shared_movement_pattern_curve" type="Curve2D" setter="set_shared_movement_pattern_curve" getter="get_shared_movement_pattern_curve">
 			Shared movement pattern curve applied to every bullet. While set it takes precedence over per-bullet patterns. Null (default) disables the feature; per-bullet patterns, if any, take over.

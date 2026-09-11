@@ -126,6 +126,13 @@ protected:
 	// whose distance reached the curve length (no extra flag needed).
 	std::vector<real_t> shared_movement_pattern_distances;
 
+	// SHARED SPEED / ROTATION (from spawn data or the runtime API below;
+	// mirrors the data so getters stay truthful across pool reuse). When set
+	// they take precedence over the per-bullet arrays; null hands control back
+	// (already-seeded values persist - re-spawn or re-set to change them).
+	Ref<BulletSpeedData2D> shared_bullet_speed_data;
+	Ref<BulletRotationData2D> shared_bullet_rotation_data;
+
 public:
 	// Advances one bullet along a movement-pattern curve for this tick.
 	// distance_traveled is updated in place. Returns false when the pattern is
@@ -1747,6 +1754,39 @@ public:
 
 	bool has_shared_movement_pattern() const { return shared_movement_pattern_curve.is_valid(); }
 	void remove_shared_movement_pattern() { set_shared_movement_pattern_curve(Ref<Curve2D>()); }
+
+	// SHARED SPEED / ROTATION RUNTIME API (spawn-data equivalent, editable live
+	// on the instance). While set they take precedence over the per-bullet
+	// arrays; clearing them (null) hands control back, keeping already-seeded
+	// values - re-spawn or re-set to change those.
+	Ref<BulletSpeedData2D> get_shared_bullet_speed_data() const { return shared_bullet_speed_data; }
+	void set_shared_bullet_speed_data(const Ref<BulletSpeedData2D> &new_speed_data) {
+		shared_bullet_speed_data = new_speed_data;
+		if (new_speed_data.is_null()) {
+			return;
+		}
+		TypedArray<BulletSpeedData2D> single_speed;
+		single_speed.push_back(new_speed_data);
+		set_up_movement_data(single_speed);
+	}
+	bool has_shared_bullet_speed_data() const { return shared_bullet_speed_data.is_valid(); }
+	void remove_shared_bullet_speed_data() { set_shared_bullet_speed_data(Ref<BulletSpeedData2D>()); }
+
+	Ref<BulletRotationData2D> get_shared_bullet_rotation_data() const { return shared_bullet_rotation_data; }
+	void set_shared_bullet_rotation_data(const Ref<BulletRotationData2D> &new_rotation_data) {
+		shared_bullet_rotation_data = new_rotation_data;
+		if (new_rotation_data.is_null()) {
+			return;
+		}
+		TypedArray<BulletRotationData2D> single_rotation;
+		single_rotation.push_back(new_rotation_data);
+		set_rotation_data(single_rotation, rotate_only_textures);
+	}
+	bool has_shared_bullet_rotation_data() const { return shared_bullet_rotation_data.is_valid(); }
+	void remove_shared_bullet_rotation_data() { set_shared_bullet_rotation_data(Ref<BulletRotationData2D>()); }
+
+	bool get_adjust_direction_based_on_rotation() const { return adjust_direction_based_on_rotation; }
+	void set_adjust_direction_based_on_rotation(bool value) { adjust_direction_based_on_rotation = value; }
 
 	// Teardown hook: drop every homing target (per-bullet + shared) through the same
 	// clear helpers the enable path uses, so the global mouse-target counter can't leak
