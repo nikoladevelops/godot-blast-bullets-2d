@@ -92,7 +92,6 @@ one_shot = true
 [node name="BulletAnimatedSprite" type="AnimatedSprite2D" parent="." unique_id=1682853447]
 visible = false
 sprite_frames = ExtResource("8_5vb7x")
-frame_progress = 0.47371674
 
 [connection signal="body_entered" from="FollowTargetRadiusArea2D" to="." method="_on_follow_target_radius_area_2d_body_entered"]
 [connection signal="body_exited" from="FollowTargetRadiusArea2D" to="." method="_on_follow_target_radius_area_2d_body_exited"]

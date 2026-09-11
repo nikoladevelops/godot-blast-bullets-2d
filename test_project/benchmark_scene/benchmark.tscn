@@ -302,3 +302,7 @@ switch_direction_when_reaching_range_x = false
 [node name="Path2D" type="Path2D" parent="Paths" unique_id=517491318]
 position = Vector2(250, 293)
 curve = SubResource("Curve2D_nkrfg")
+
+[connection signal="area_entered" from="BulletFactory2D" to="BulletFactory2D" method="_on_area_entered"]
+[connection signal="body_entered" from="BulletFactory2D" to="BulletFactory2D" method="_on_body_entered"]
+[connection signal="life_time_over" from="BulletFactory2D" to="BulletFactory2D" method="_on_life_time_over"]

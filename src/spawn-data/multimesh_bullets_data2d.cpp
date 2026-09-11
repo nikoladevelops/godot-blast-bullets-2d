@@ -253,11 +253,11 @@ void MultiMeshBulletsData2D::_bind_methods() {
 
 	ClassDB::bind_method(D_METHOD("get_collision_layer"), &MultiMeshBulletsData2D::get_collision_layer);
 	ClassDB::bind_method(D_METHOD("set_collision_layer", "new_collision_layer"), &MultiMeshBulletsData2D::set_collision_layer);
-	ADD_PROPERTY(PropertyInfo(Variant::INT, "collision_layer"), "set_collision_layer", "get_collision_layer");
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "collision_layer", PROPERTY_HINT_LAYERS_2D_PHYSICS), "set_collision_layer", "get_collision_layer");
 
 	ClassDB::bind_method(D_METHOD("get_collision_mask"), &MultiMeshBulletsData2D::get_collision_mask);
 	ClassDB::bind_method(D_METHOD("set_collision_mask", "new_collision_mask"), &MultiMeshBulletsData2D::set_collision_mask);
-	ADD_PROPERTY(PropertyInfo(Variant::INT, "collision_mask"), "set_collision_mask", "get_collision_mask");
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "collision_mask", PROPERTY_HINT_LAYERS_2D_PHYSICS), "set_collision_mask", "get_collision_mask");
 
 	ClassDB::bind_method(D_METHOD("get_collision_shape"), &MultiMeshBulletsData2D::get_collision_shape);
 	ClassDB::bind_method(D_METHOD("set_collision_shape", "new_shape"), &MultiMeshBulletsData2D::set_collision_shape);
@@ -305,11 +305,11 @@ void MultiMeshBulletsData2D::_bind_methods() {
 
 	ClassDB::bind_method(D_METHOD("get_light_mask"), &MultiMeshBulletsData2D::get_light_mask);
 	ClassDB::bind_method(D_METHOD("set_light_mask", "new_light_mask"), &MultiMeshBulletsData2D::set_light_mask);
-	ADD_PROPERTY(PropertyInfo(Variant::INT, "light_mask"), "set_light_mask", "get_light_mask");
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "light_mask", PROPERTY_HINT_LAYERS_2D_RENDER), "set_light_mask", "get_light_mask");
 
 	ClassDB::bind_method(D_METHOD("get_visibility_layer"), &MultiMeshBulletsData2D::get_visibility_layer);
 	ClassDB::bind_method(D_METHOD("set_visibility_layer", "new_visibility_layer"), &MultiMeshBulletsData2D::set_visibility_layer);
-	ADD_PROPERTY(PropertyInfo(Variant::INT, "visibility_layer"), "set_visibility_layer", "get_visibility_layer");
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "visibility_layer", PROPERTY_HINT_LAYERS_2D_RENDER), "set_visibility_layer", "get_visibility_layer");
 
 	ClassDB::bind_method(D_METHOD("set_collision_layer_from_array", "array_of_layers"), &MultiMeshBulletsData2D::set_collision_layer_from_array);
 	ClassDB::bind_method(D_METHOD("set_collision_mask_from_array", "array_of_masks"), &MultiMeshBulletsData2D::set_collision_mask_from_array);
