@@ -6,6 +6,72 @@
 using namespace godot;
 namespace BlastBullets2D {
 
+uint32_t BulletAttachmentObjectPool2D::make_pooling_key_for_scene(const Ref<PackedScene> &scene) {
+	if (scene.is_null()) {
+		return DEFAULT_BUCKET_KEY;
+	}
+	const String path = scene->get_path();
+	if (!path.is_empty()) {
+		// FNV-1a over the UTF-8 bytes: deterministic within and across runs,
+		// so every loader of the same file lands in the same bucket.
+		const PackedByteArray bytes = path.to_utf8_buffer();
+		uint32_t hash = 2166136261u;
+		for (int i = 0; i < bytes.size(); ++i) {
+			hash ^= static_cast<uint8_t>(bytes[i]);
+			hash *= 16777619u;
+		}
+		if (hash == 0 || hash == DEFAULT_BUCKET_KEY) {
+			return 1u; // 0 stays reserved for "no key"
+		}
+		return hash;
+	}
+	// Pathless (in-memory / duplicated) scene: fold the instance id. Instance
+	// ids are unique per Ref within a session (and the pool is runtime-only),
+	// so this Ref always maps to its own private bucket - safe, just without
+	// cross-Ref sharing.
+	const uint64_t instance_id = (uint64_t)scene->get_instance_id();
+	const uint32_t folded = (uint32_t)(instance_id ^ (instance_id >> 32));
+	if (folded == 0 || folded == DEFAULT_BUCKET_KEY) {
+		return 0x9E3779B9u;
+	}
+	return folded;
+}
+
+String BulletAttachmentObjectPool2D::make_key_label_for_scene(const Ref<PackedScene> &scene) {
+	if (scene.is_null()) {
+		return String("<unknown>");
+	}
+	const String path = scene->get_path();
+	return path.is_empty() ? String("<in-memory>") : path;
+}
+
+void BulletAttachmentObjectPool2D::note_key_label(uint32_t pooling_id, const String &label) {
+	if (pooling_id == 0 || label.is_empty()) {
+		return;
+	}
+	if (key_labels.find(pooling_id) == key_labels.end()) {
+		key_labels[pooling_id] = label;
+	}
+}
+
+uint32_t BulletAttachmentObjectPool2D::key_for_scene(const Ref<PackedScene> &scene) {
+	const uint32_t key = make_pooling_key_for_scene(scene);
+	note_key_label(key, make_key_label_for_scene(scene));
+	return key;
+}
+
+bool BulletAttachmentObjectPool2D::is_key_recognized(uint32_t pooling_id) const {
+	return key_labels.find(pooling_id) != key_labels.end();
+}
+
+String BulletAttachmentObjectPool2D::get_key_label(uint32_t pooling_id) const {
+	auto it = key_labels.find(pooling_id);
+	if (it == key_labels.end()) {
+		return String();
+	}
+	return it->second;
+}
+
 void BulletAttachmentObjectPool2D::push(BulletAttachment2D *bullet_attachment, uint32_t pooling_id) {
 	if (bullet_attachment == nullptr) {
 		UtilityFunctions::push_error("BulletAttachmentObjectPool2D::push got a null attachment, ignoring.");
@@ -131,6 +197,8 @@ void BulletAttachmentObjectPool2D::free_all_bullet_attachments() {
 	}
 
 	pool.clear();
+	// Labels intentionally survive: recognition is about the scene type, not
+	// about currently pooled instances, so a re-pooled scene skips re-validation.
 }
 
 void BulletAttachmentObjectPool2D::free_specific_bullet_attachments(uint32_t pooling_id) {
@@ -156,6 +224,7 @@ void BulletAttachmentObjectPool2D::free_specific_bullet_attachments(uint32_t poo
 	} while (queue.empty() == false);
 
 	pool.erase(pooling_id); // delete the queue itself since it's basically empty right now
+	// Label intentionally survives (see free_all_bullet_attachments).
 }
 
 int BulletAttachmentObjectPool2D::get_total_amount_pooled() {

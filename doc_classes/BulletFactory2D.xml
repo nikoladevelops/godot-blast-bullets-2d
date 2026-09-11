@@ -41,7 +41,7 @@
 		<method name="debug_get_attachments_pool_info">
 			<return type="Dictionary" />
 			<description>
-				Get the whole information about the attachment object pool. Returns a [Dictionary] containing [b]attachment_id as the KEY[/b] and [b]amount of attachments with that attachment_id as the VALUE[/b].
+				Get the whole information about the attachment object pool. Returns a [Dictionary] containing the scene path (or [code]"&lt;in-memory&gt;"[/code] for unsaved scenes) as the KEY and the amount of pooled attachments from that scene as the VALUE.
 			</description>
 		</method>
 		<method name="debug_get_bullets_pool_amount">
@@ -80,9 +80,15 @@
 		</method>
 		<method name="free_attachments_pool">
 			<return type="void" />
-			<param index="0" name="attachment_id" type="int" default="-1" />
 			<description>
-				By default completely frees the [BulletAttachment2D] object pools. You also have the option of freeing only the attachments with a particular [code]attachment_id[/code] if you provide a value that is not a negative number. Example: if you want to free all those attachments in the object pool that each have an [code]attachment_id=5[/code].
+				Completely frees the [BulletAttachment2D] object pool. To free only the attachments that came from one scene, use [method free_attachments_pool_for_scene].
+			</description>
+		</method>
+		<method name="free_attachments_pool_for_scene">
+			<return type="void" />
+			<param index="0" name="attachment_scene" type="PackedScene" />
+			<description>
+				Frees only the pooled [BulletAttachment2D] attachments that came from the given scene.
 			</description>
 		</method>
 		<method name="free_bullets_pool">
@@ -194,10 +200,9 @@
 		<method name="populate_attachments_pool">
 			<return type="void" />
 			<param index="0" name="attachment_scene" type="PackedScene" />
-			<param index="1" name="attachment_id" type="int" />
-			<param index="2" name="amount_attachments" type="int" />
+			<param index="1" name="amount_attachments" type="int" />
 			<description>
-				Populates the attachments object pool. Ensure that the [code]attachment_scene[/code] contains an actual [BulletAttachment2D] scene where you attach other nodes - particles or anything else you could think of.
+				Populates the attachments object pool. Ensure that the [code]attachment_scene[/code] contains an actual [BulletAttachment2D] scene where you attach other nodes - particles or anything else you could think of. Pooling is keyed by the scene itself, so every loader of the same scene shares one pool bucket.
 			</description>
 		</method>
 		<method name="populate_bullets_pool">

@@ -76,13 +76,12 @@
 		<method name="all_bullets_set_attachment">
 			<return type="void" />
 			<param index="0" name="attachment_scene" type="PackedScene" />
-			<param index="1" name="attachment_pooling_id" type="int" />
-			<param index="2" name="bullet_attachment_offset" type="Vector2" />
-			<param index="3" name="stick_relative_to_bullet" type="bool" default="true" />
-			<param index="4" name="bullet_index_start" type="int" default="0" />
-			<param index="5" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<param index="1" name="bullet_attachment_offset" type="Vector2" />
+			<param index="2" name="stick_relative_to_bullet" type="bool" default="true" />
+			<param index="3" name="bullet_index_start" type="int" default="0" />
+			<param index="4" name="bullet_index_end_inclusive" type="int" default="-1" />
 			<description>
-				Spawns the same attachment to all bullets in the specified range. An attachment is a [BulletAttachment2D] that can contain a [Node2D] with particles, lights, etc... that will be attached to the bullet and follow it around. You can use the [BulletAttachment2D] properties to control how the attachment behaves and is positioned relative to the bullet.
+				Spawns the same attachment to all bullets in the specified range. An attachment is a [BulletAttachment2D] that can contain a [Node2D] with particles, lights, etc... that will be attached to the bullet and follow it around. You can use the [BulletAttachment2D] properties to control how the attachment behaves and is positioned relative to the bullet. Pooling is keyed by the scene itself, so every loader of the same scene shares one pool bucket.
 			</description>
 		</method>
 		<method name="all_bullets_set_attachment_to_null">
@@ -265,11 +264,10 @@
 			<return type="void" />
 			<param index="0" name="bullet_index" type="int" />
 			<param index="1" name="attachment_scene" type="PackedScene" />
-			<param index="2" name="attachment_pooling_id" type="int" />
-			<param index="3" name="bullet_attachment_offset" type="Vector2" default="Vector2(0, 0)" />
-			<param index="4" name="stick_relative_to_bullet" type="bool" default="true" />
+			<param index="2" name="bullet_attachment_offset" type="Vector2" default="Vector2(0, 0)" />
+			<param index="3" name="stick_relative_to_bullet" type="bool" default="true" />
 			<description>
-				Spawns an attachment to a specific bullet. An attachment is a [BulletAttachment2D] that can contain a [Node2D] with particles, lights, etc... that will be attached to the bullet and follow it around.
+				Spawns an attachment to a specific bullet. An attachment is a [BulletAttachment2D] that can contain a [Node2D] with particles, lights, etc... that will be attached to the bullet and follow it around. Pooling is keyed by the scene itself, so every loader of the same scene shares one pool bucket.
 			</description>
 		</method>
 		<method name="bullet_set_attachment_to_null">

@@ -67,7 +67,7 @@ func shoot()->void:
 	var transf = Transform2D(original_transform.get_rotation(), original_transform.origin)
 	bullets_data.transforms = [transf]
 	var bullets_multi:DirectionalBullets2D = BENCHMARK_GLOBALS.FACTORY.spawn_controllable_directional_bullets(bullets_data)
-	bullets_multi.all_bullets_set_attachment(BENCHMARK_GLOBALS.ATTACHMENT_SCENES[1], 1, Vector2(-30, 0))
+	bullets_multi.all_bullets_set_attachment(BENCHMARK_GLOBALS.ATTACHMENT_SCENES[1], Vector2(-30, 0))
 
 func _on_shoot_timer_timeout() -> void:
 	can_shoot=true

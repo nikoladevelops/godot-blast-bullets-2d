@@ -97,11 +97,16 @@ public:
 	// Frees an object pool of a particular bullet type. Pass null key to free all, or exact PoolKey to free only that bucket
 	void free_bullets_pool(BulletType bullet_type, const Ref<MultiMeshPoolKey2D> &key = Ref<MultiMeshPoolKey2D>());
 
-	// Populates the bullet attachments pool. The packed scene has to contain a BulletAttachment2D
-	void populate_attachments_pool(const Ref<PackedScene> attachment_scene, int attachment_id, int amount_instances);
+	// Populates the bullet attachments pool. The packed scene has to contain a BulletAttachment2D.
+	// Pooling is keyed by the scene itself (see BulletAttachmentObjectPool2D::key_for_scene),
+	// so every loader of the same scene shares one bucket - no ids needed.
+	void populate_attachments_pool(const Ref<PackedScene> attachment_scene, int amount_instances);
 
-	// By default completely frees the bullet attachments pool. You also have the option of freeing only the attachments with a particular attachment_id if you provide a value that is not a negative number
-	void free_attachments_pool(int attachment_id = -1);
+	// Frees the whole bullet attachments pool.
+	void free_attachments_pool();
+
+	// Frees only the pooled attachments that came from the given scene.
+	void free_attachments_pool_for_scene(const Ref<PackedScene> &attachment_scene);
 
 	//
 

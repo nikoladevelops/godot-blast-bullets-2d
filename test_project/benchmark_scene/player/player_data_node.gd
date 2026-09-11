@@ -189,7 +189,7 @@ func spawn_multi_mesh_directional_bullets()->void:
 	var dir_bullets:DirectionalBullets2D = BENCHMARK_GLOBALS.FACTORY.spawn_controllable_directional_bullets(directional_bullets_data)
 	
 	if selected_attachment_id != 0:
-		dir_bullets.all_bullets_set_attachment(BENCHMARK_GLOBALS.ATTACHMENT_SCENES[selected_attachment_id], selected_attachment_id, selected_attachment_offset)
+		dir_bullets.all_bullets_set_attachment(BENCHMARK_GLOBALS.ATTACHMENT_SCENES[selected_attachment_id], selected_attachment_offset)
 	
 	dir_bullets.homing_smoothing = 0.0# Set from 0 to 20 or even bigger (but you might have issues with interpolation)
 	dir_bullets.homing_update_interval = 0.00# Set an update timer - keep it low for smooth updates

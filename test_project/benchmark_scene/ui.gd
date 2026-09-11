@@ -438,17 +438,17 @@ func _on_free_active_bullets_btn_pressed() -> void:
 		child.queue_free()
 
 func _on_free_specific_attachment_pool_btn_pressed() -> void:
-	var attachment_id:int = switch_bullet_attachment_id_btn.current_selected_option_index+1 # because id 1 is the first attachment and id 2 is the second attachment but ordering of the options starts from 0 so all indexes are behind with -1
-	BENCHMARK_GLOBALS.FACTORY.free_attachments_pool(attachment_id)
+	var attachment_index:int = switch_bullet_attachment_id_btn.current_selected_option_index+1 # because index 1 is the first attachment and index 2 is the second attachment but ordering of the options starts from 0 so all indexes are behind with -1
+	BENCHMARK_GLOBALS.FACTORY.free_attachments_pool_for_scene(BENCHMARK_GLOBALS.ATTACHMENT_SCENES[attachment_index])
 
 func _on_free_all_attachment_pools_btn_pressed() -> void:
-	BENCHMARK_GLOBALS.FACTORY.free_attachments_pool(-1)
+	BENCHMARK_GLOBALS.FACTORY.free_attachments_pool()
 
 func _on_populate_attachments_pool_btn_pressed() -> void:
-	var attachment_id:int = switch_bullet_attachment_id_btn.current_selected_option_index+1 # because id 1 is the first attachment and id 2 is the second attachment but ordering of the options starts from 0 so all indexes are behind with -1
+	var attachment_index:int = switch_bullet_attachment_id_btn.current_selected_option_index+1 # because index 1 is the first attachment and index 2 is the second attachment but ordering of the options starts from 0 so all indexes are behind with -1
 	var amount_attachments_to_pool:int = select_amount_attachments_btn_view.get_selected_btn.text.to_int()
-	
-	BENCHMARK_GLOBALS.FACTORY.populate_attachments_pool(BENCHMARK_GLOBALS.ATTACHMENT_SCENES[attachment_id], attachment_id, amount_attachments_to_pool)
+
+	BENCHMARK_GLOBALS.FACTORY.populate_attachments_pool(BENCHMARK_GLOBALS.ATTACHMENT_SCENES[attachment_index], amount_attachments_to_pool)
 	
 
 func _on_rotate_physics_shapes_check_box_pressed() -> void:

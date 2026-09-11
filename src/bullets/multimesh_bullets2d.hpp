@@ -1347,21 +1347,16 @@ float *w = batch_buffer.ptrw();
 		return arr;
 	}
 
-	_ALWAYS_INLINE_ void all_bullets_set_attachment(const Ref<PackedScene> &attachment_scene, int64_t attachment_pooling_id, const Vector2 &bullet_attachment_offset, bool stick_relative_to_bullet = true, int bullet_index_start = 0, int bullet_index_end_inclusive = -1) {
+	_ALWAYS_INLINE_ void all_bullets_set_attachment(const Ref<PackedScene> &attachment_scene, const Vector2 &bullet_attachment_offset, bool stick_relative_to_bullet = true, int bullet_index_start = 0, int bullet_index_end_inclusive = -1) {
 		ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_set_attachment");
 
 		for (int i = bullet_index_start; i <= bullet_index_end_inclusive; ++i) {
-			bullet_set_attachment(i, attachment_scene, attachment_pooling_id, bullet_attachment_offset, stick_relative_to_bullet);
+			bullet_set_attachment(i, attachment_scene, bullet_attachment_offset, stick_relative_to_bullet);
 		}
 	}
 
-	_ALWAYS_INLINE_ void bullet_set_attachment(int bullet_index, const Ref<PackedScene> &attachment_scene, int64_t attachment_pooling_id, const Vector2 &bullet_attachment_offset, bool stick_relative_to_bullet = true) {
+	_ALWAYS_INLINE_ void bullet_set_attachment(int bullet_index, const Ref<PackedScene> &attachment_scene, const Vector2 &bullet_attachment_offset, bool stick_relative_to_bullet = true) {
 		if (!validate_bullet_index(bullet_index, "bullet_set_attachment")) {
-			return;
-		}
-
-		if (attachment_pooling_id < 0 || attachment_pooling_id > (int64_t)UINT32_MAX) {
-			UtilityFunctions::push_error("bullet_set_attachment: attachment_pooling_id must be between 0 and 4294967295.");
 			return;
 		}
 
@@ -1396,22 +1391,38 @@ float *w = batch_buffer.ptrw();
 			~_AttachmentSetupGuard() { --depth; }
 		} attachment_setup_guard(_attachment_setup_depth);
 
-		// Try to get a bullet attachment from the object pool to avoid creating nodes that are practically the same
+		// Pooling is keyed by the scene itself: every loader of the same scene
+		// shares one bucket, no ids needed. A remembered (recognized) key pops
+		// with zero scene interaction; a miss instantiates, which doubles as
+		// the type check, and the key is only remembered after a successful
+		// check. The derived key is stored per slot so disable-time push-back
+		// returns the instance to the right bucket.
 		auto &pool = bullet_factory->bullet_attachments_pool;
+		const uint32_t pooling_key = BulletAttachmentObjectPool2D::make_pooling_key_for_scene(attachment_scene);
+		const bool key_recognized = pool.is_key_recognized(pooling_key);
 
 		bullet_disable_attachment(bullet_index);
 
-		BulletAttachment2D *attachment_instance = pool.pop(attachment_pooling_id);
+		BulletAttachment2D *attachment_instance = pool.pop(pooling_key);
 		bool created_brand_new_instance = false;
 
 		if (!attachment_instance) {
-			attachment_instance = Object::cast_to<BulletAttachment2D>(attachment_scene->instantiate());
+			Node *fresh_inst = attachment_scene->instantiate();
+			attachment_instance = Object::cast_to<BulletAttachment2D>(fresh_inst);
 
 			if (!attachment_instance) {
-				UtilityFunctions::push_error("Tried to instantiate an attachment scene that is not of type BulletAttachment2D at bullet index: " + String::num_int64(bullet_index));
+				if (key_recognized) {
+					UtilityFunctions::push_error("bullet_set_attachment: scene stopped producing BulletAttachment2D at bullet index: " + String::num_int64(bullet_index));
+				} else {
+					UtilityFunctions::push_error("Tried to instantiate an attachment scene that is not of type BulletAttachment2D at bullet index: " + String::num_int64(bullet_index));
+				}
+				if (fresh_inst) {
+					fresh_inst->queue_free();
+				}
 				return;
 			}
 
+			pool.note_key_label(pooling_key, BulletAttachmentObjectPool2D::make_key_label_for_scene(attachment_scene));
 			created_brand_new_instance = true;
 		}
 
@@ -1420,7 +1431,7 @@ float *w = batch_buffer.ptrw();
 		// hook consistent from the first moment.
 		attachments[bullet_index] = attachment_instance;
 
-		attachment_pooling_ids[bullet_index] = attachment_pooling_id;
+		attachment_pooling_ids[bullet_index] = pooling_key;
 		attachment_stick_relative_to_bullet[bullet_index] = stick_relative_to_bullet;
 
 		attachment_offsets[bullet_index] = bullet_attachment_offset;

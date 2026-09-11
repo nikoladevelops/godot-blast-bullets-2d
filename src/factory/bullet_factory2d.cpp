@@ -831,14 +831,9 @@ void BulletFactory2D::free_bullets_pool(BulletType bullet_type, const Ref<MultiM
 	}
 }
 
-void BulletFactory2D::populate_attachments_pool(const Ref<PackedScene> attachment_scene, int attachment_id, int amount_instances) {
+void BulletFactory2D::populate_attachments_pool(const Ref<PackedScene> attachment_scene, int amount_instances) {
 	if (amount_instances <= 0 || attachment_scene.is_null()) {
 		UtilityFunctions::push_error("Invalid parameters for populate_attachments_pool.");
-		return;
-	}
-
-	if (attachment_id < 0) {
-		UtilityFunctions::push_error("populate_attachments_pool: attachment_id must be >= 0. Negative ids collide with the free-all convention.");
 		return;
 	}
 
@@ -875,8 +870,18 @@ void BulletFactory2D::populate_attachments_pool(const Ref<PackedScene> attachmen
 	Node *inst = attachment_scene->instantiate();
 	BulletAttachment2D *first_attachment = Object::cast_to<BulletAttachment2D>(inst);
 
+	// Validate by instantiation (a PackedScene's contents are unknowable any
+	// other way). The key is only remembered AFTER this check, so an invalid
+	// scene is never recognized and every retry re-validates loudly.
+	const uint32_t pooling_key = BulletAttachmentObjectPool2D::make_pooling_key_for_scene(attachment_scene);
+	const bool key_recognized = bullet_attachments_pool.is_key_recognized(pooling_key);
+
 	if (!first_attachment) {
-		UtilityFunctions::push_error("PackedScene does not contain a BulletAttachment2D.");
+		if (key_recognized) {
+			UtilityFunctions::push_error("populate_attachments_pool: scene stopped producing BulletAttachment2D (it validated before). Nothing was pooled.");
+		} else {
+			UtilityFunctions::push_error("PackedScene does not contain a BulletAttachment2D. Nothing was pooled.");
+		}
 
 		if (inst) {
 			inst->queue_free();
@@ -893,15 +898,16 @@ void BulletFactory2D::populate_attachments_pool(const Ref<PackedScene> attachmen
 		}
 		return;
 	}
+	bullet_attachments_pool.note_key_label(pooling_key, BulletAttachmentObjectPool2D::make_key_label_for_scene(attachment_scene));
 
-	auto setup_attachment = [&](BulletAttachment2D *a) {
+	auto setup_attachment = [&](BulletAttachment2D *a, uint32_t key) {
 		a->set_physics_interpolation_mode(Node::PHYSICS_INTERPOLATION_MODE_OFF);
 		a->call_on_spawn_in_pool();
 		bullet_attachments_container->add_child(a);
-		bullet_attachments_pool.push(a, attachment_id);
+		bullet_attachments_pool.push(a, key);
 	};
 
-	setup_attachment(first_attachment);
+	setup_attachment(first_attachment, pooling_key);
 
 	for (int i = 1; i < amount_instances; ++i) {
 		Node *later_inst = attachment_scene->instantiate();
@@ -913,7 +919,7 @@ void BulletFactory2D::populate_attachments_pool(const Ref<PackedScene> attachmen
 			}
 			break;
 		}
-		setup_attachment(a);
+		setup_attachment(a, pooling_key);
 	}
 
 	if (debugger_enabled) {
@@ -927,7 +933,7 @@ void BulletFactory2D::populate_attachments_pool(const Ref<PackedScene> attachmen
 	}
 }
 
-void BulletFactory2D::free_attachments_pool(int attachment_id) {
+void BulletFactory2D::free_attachments_pool() {
 	if (!is_ready || is_tearing_down) {
 		UtilityFunctions::push_error("free_attachments_pool: BulletFactory2D is not in the scene tree yet (or is being destroyed). Add it first, then manage attachment pools.");
 		return;
@@ -953,11 +959,51 @@ void BulletFactory2D::free_attachments_pool(int attachment_id) {
 		directional_bullets_debugger->set_is_debugger_enabled(false);
 	}
 
-	if (attachment_id < 0) {
-		bullet_attachments_pool.free_all_bullet_attachments();
-	} else {
-		bullet_attachments_pool.free_specific_bullet_attachments(attachment_id);
+	bullet_attachments_pool.free_all_bullet_attachments();
+
+	if (debugger_was_enabled) {
+		block_bullets_debugger->set_is_debugger_enabled(true);
+		directional_bullets_debugger->set_is_debugger_enabled(true);
 	}
+
+	is_factory_busy = false;
+	if (enable_processing_after_finish) {
+		set_is_factory_processing_bullets(true);
+	}
+}
+
+void BulletFactory2D::free_attachments_pool_for_scene(const Ref<PackedScene> &attachment_scene) {
+	if (attachment_scene.is_null()) {
+		UtilityFunctions::push_error("free_attachments_pool_for_scene: attachment_scene is null, nothing to free.");
+		return;
+	}
+
+	if (!is_ready || is_tearing_down) {
+		UtilityFunctions::push_error("free_attachments_pool_for_scene: BulletFactory2D is not in the scene tree yet (or is being destroyed). Add it first, then manage attachment pools.");
+		return;
+	}
+
+	if (is_factory_busy) {
+		UtilityFunctions::push_error("BulletFactory2D is busy. Ignoring free_attachments_pool_for_scene request.");
+		return;
+	}
+
+	if (reject_when_iterating("free_attachments_pool_for_scene")) {
+		return;
+	}
+
+	is_factory_busy = true;
+
+	bool enable_processing_after_finish = is_factory_processing_bullets;
+	set_is_factory_processing_bullets(false);
+
+	bool debugger_was_enabled = get_is_debugger_enabled();
+	if (debugger_was_enabled) {
+		block_bullets_debugger->set_is_debugger_enabled(false);
+		directional_bullets_debugger->set_is_debugger_enabled(false);
+	}
+
+	bullet_attachments_pool.free_specific_bullet_attachments(bullet_attachments_pool.key_for_scene(attachment_scene));
 
 	if (debugger_was_enabled) {
 		block_bullets_debugger->set_is_debugger_enabled(true);
@@ -1148,7 +1194,8 @@ Dictionary BulletFactory2D::debug_get_attachments_pool_info() {
 
 	Dictionary dict;
 	for (const auto &[key, value] : pool_info) {
-		dict[Variant(key)] = Variant(value);
+		String label = bullet_attachments_pool.get_key_label(key);
+		dict[label.is_empty() ? Variant(key) : Variant(label)] = Variant(value);
 	}
 
 	return dict;
@@ -1578,8 +1625,9 @@ void BulletFactory2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("populate_bullets_pool", "key", "multimesh_data", "instance_count"), &BulletFactory2D::populate_bullets_pool);
 	ClassDB::bind_method(D_METHOD("free_bullets_pool", "bullet_type", "key"), &BulletFactory2D::free_bullets_pool, DEFVAL(Ref<MultiMeshPoolKey2D>()));
 
-	ClassDB::bind_method(D_METHOD("populate_attachments_pool", "attachment_scene", "attachment_id", "amount_attachments"), &BulletFactory2D::populate_attachments_pool);
-	ClassDB::bind_method(D_METHOD("free_attachments_pool", "attachment_id"), &BulletFactory2D::free_attachments_pool, DEFVAL(-1));
+	ClassDB::bind_method(D_METHOD("populate_attachments_pool", "attachment_scene", "amount_attachments"), &BulletFactory2D::populate_attachments_pool);
+	ClassDB::bind_method(D_METHOD("free_attachments_pool"), &BulletFactory2D::free_attachments_pool);
+	ClassDB::bind_method(D_METHOD("free_attachments_pool_for_scene", "attachment_scene"), &BulletFactory2D::free_attachments_pool_for_scene);
 
 	ClassDB::bind_method(D_METHOD("free_active_bullets", "key"), &BulletFactory2D::free_active_bullets, DEFVAL(Ref<MultiMeshPoolKey2D>()));
 	ClassDB::bind_method(D_METHOD("free_disabled_bullets", "key"), &BulletFactory2D::free_disabled_bullets, DEFVAL(Ref<MultiMeshPoolKey2D>()));
