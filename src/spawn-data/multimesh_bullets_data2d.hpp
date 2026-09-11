@@ -85,6 +85,19 @@ public:
 	// The idea is that you can enter additional data (base damage,armor damage,maybe healing factor,vampire bullets etc..). I am not going to force every single bullet to have a damage, because I don't know what kind of game you're making, so you are free to give any data here that will be available inside the area_entered and body_entered callbacks inside factory
 	Ref<Resource> bullets_custom_data;
 
+	// BULLET ATTACHMENT RELATED
+
+	// Shared attachment scene applied to every bullet at spawn/enable time.
+	// Null (default) disables the feature; use the runtime bullet_set_attachment
+	// methods for per-bullet attachments instead (DirectionalBullets2D only).
+	Ref<PackedScene> shared_bullet_attachment;
+
+	// Offset of the shared attachment relative to the bullet's texture center.
+	Vector2 shared_bullet_attachment_offset = Vector2(0, 0);
+
+	// Whether the shared attachment sticks while the bullet rotates.
+	bool shared_bullet_attachment_stick_relative_to_bullet = true;
+
 	// OTHER
 
 	// Light mask. Note: pass a bitmask, it's not just a simple int. Use the calculate_bitmask function.
@@ -153,6 +166,15 @@ public:
 
 	Ref<Resource> get_bullets_custom_data() const;
 	void set_bullets_custom_data(const Ref<Resource> &new_bullets_custom_data);
+
+	Ref<PackedScene> get_shared_bullet_attachment() const;
+	void set_shared_bullet_attachment(const Ref<PackedScene> &new_attachment);
+
+	Vector2 get_shared_bullet_attachment_offset() const;
+	void set_shared_bullet_attachment_offset(const Vector2 &new_offset);
+
+	bool get_shared_bullet_attachment_stick_relative_to_bullet() const;
+	void set_shared_bullet_attachment_stick_relative_to_bullet(bool value);
 
 	double get_max_life_time() const;
 	void set_max_life_time(double new_max_life_time);

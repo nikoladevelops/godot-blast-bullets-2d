@@ -107,6 +107,27 @@ void MultiMeshBulletsData2D::set_bullets_custom_data(const Ref<Resource> &new_bu
 	bullets_custom_data = new_bullets_custom_data;
 }
 
+Ref<PackedScene> MultiMeshBulletsData2D::get_shared_bullet_attachment() const {
+	return shared_bullet_attachment;
+}
+void MultiMeshBulletsData2D::set_shared_bullet_attachment(const Ref<PackedScene> &new_attachment) {
+	shared_bullet_attachment = new_attachment;
+}
+
+Vector2 MultiMeshBulletsData2D::get_shared_bullet_attachment_offset() const {
+	return shared_bullet_attachment_offset;
+}
+void MultiMeshBulletsData2D::set_shared_bullet_attachment_offset(const Vector2 &new_offset) {
+	shared_bullet_attachment_offset = new_offset;
+}
+
+bool MultiMeshBulletsData2D::get_shared_bullet_attachment_stick_relative_to_bullet() const {
+	return shared_bullet_attachment_stick_relative_to_bullet;
+}
+void MultiMeshBulletsData2D::set_shared_bullet_attachment_stick_relative_to_bullet(bool value) {
+	shared_bullet_attachment_stick_relative_to_bullet = value;
+}
+
 double MultiMeshBulletsData2D::get_max_life_time() const {
 	return max_life_time;
 }
@@ -274,6 +295,18 @@ void MultiMeshBulletsData2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_bullets_custom_data"), &MultiMeshBulletsData2D::get_bullets_custom_data);
 	ClassDB::bind_method(D_METHOD("set_bullets_custom_data", "new_bullets_custom_data"), &MultiMeshBulletsData2D::set_bullets_custom_data);
 	ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "bullets_custom_data"), "set_bullets_custom_data", "get_bullets_custom_data");
+
+	ClassDB::bind_method(D_METHOD("get_shared_bullet_attachment"), &MultiMeshBulletsData2D::get_shared_bullet_attachment);
+	ClassDB::bind_method(D_METHOD("set_shared_bullet_attachment", "new_attachment"), &MultiMeshBulletsData2D::set_shared_bullet_attachment);
+	ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "shared_bullet_attachment", PROPERTY_HINT_RESOURCE_TYPE, "PackedScene"), "set_shared_bullet_attachment", "get_shared_bullet_attachment");
+
+	ClassDB::bind_method(D_METHOD("get_shared_bullet_attachment_offset"), &MultiMeshBulletsData2D::get_shared_bullet_attachment_offset);
+	ClassDB::bind_method(D_METHOD("set_shared_bullet_attachment_offset", "new_offset"), &MultiMeshBulletsData2D::set_shared_bullet_attachment_offset);
+	ADD_PROPERTY(PropertyInfo(Variant::VECTOR2, "shared_bullet_attachment_offset"), "set_shared_bullet_attachment_offset", "get_shared_bullet_attachment_offset");
+
+	ClassDB::bind_method(D_METHOD("get_shared_bullet_attachment_stick_relative_to_bullet"), &MultiMeshBulletsData2D::get_shared_bullet_attachment_stick_relative_to_bullet);
+	ClassDB::bind_method(D_METHOD("set_shared_bullet_attachment_stick_relative_to_bullet", "value"), &MultiMeshBulletsData2D::set_shared_bullet_attachment_stick_relative_to_bullet);
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "shared_bullet_attachment_stick_relative_to_bullet"), "set_shared_bullet_attachment_stick_relative_to_bullet", "get_shared_bullet_attachment_stick_relative_to_bullet");
 
 	ClassDB::bind_method(D_METHOD("get_max_life_time"), &MultiMeshBulletsData2D::get_max_life_time);
 	ClassDB::bind_method(D_METHOD("set_max_life_time", "new_max_life_time"), &MultiMeshBulletsData2D::set_max_life_time);

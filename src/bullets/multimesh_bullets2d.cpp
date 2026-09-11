@@ -205,6 +205,13 @@ void MultiMeshBullets2D::spawn(const MultiMeshBulletsData2D &data, MultiMeshObje
 		is_active = true;
 		bullets_container->add_child(this);
 	}
+
+	// Shared spawn-data attachments (both bullet types). Skipped for pooled
+	// pre-population: the slots were just blanked above, and enable_multimesh()
+	// applies the data when the instance is popped instead.
+	if (!spawn_in_pool) {
+		apply_shared_bullet_attachment_from_data(data);
+	}
 }
 
 // Activates the multimesh
@@ -268,6 +275,11 @@ bool MultiMeshBullets2D::enable_multimesh(const MultiMeshBulletsData2D &data, co
 
 	set_up_bullet_instances(data);
 	set_all_physics_shapes_enabled_for_area(true);
+
+	// Shared spawn-data attachments (both bullet types). Slot vectors were
+	// reset above and caches sized by set_up_bullet_instances, so this is safe
+	// for pooled reuse with new data.
+	apply_shared_bullet_attachment_from_data(data);
 
 	set_rotation_data(data.all_bullet_rotation_data, data.rotate_only_textures);
 

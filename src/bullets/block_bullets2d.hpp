@@ -82,7 +82,7 @@ public:
 
 			physics_server->area_set_shape_transform(area, i, curr_shape_transf);
 
-			//move_bullet_attachment(cache_velocity_calc, i); // Block bullets do not expose an API for attachments, use directional instead
+			move_bullet_attachment(cache_velocity_calc, i);
 		}
 		if (!is_using_physics_interpolation) {
 			batch_flush_instance_transforms();

@@ -131,6 +131,15 @@
 
 			Note: You can enable the [BulletFactory2D]'s debugger to make collision shapes visible.
 		</member>
+		<member name="shared_bullet_attachment" type="PackedScene" setter="set_shared_bullet_attachment" getter="get_shared_bullet_attachment">
+			Shared attachment scene applied to every bullet at spawn time (and on pool reuse). The scene must contain a [BulletAttachment2D]. Null (default) disables the feature; use the runtime [method MultiMeshBullets2D.bullet_set_attachment] methods for per-bullet attachments instead (DirectionalBullets2D only).
+		</member>
+		<member name="shared_bullet_attachment_offset" type="Vector2" setter="set_shared_bullet_attachment_offset" getter="get_shared_bullet_attachment_offset" default="Vector2(0, 0)">
+			Offset of the shared attachment relative to the bullet's texture center.
+		</member>
+		<member name="shared_bullet_attachment_stick_relative_to_bullet" type="bool" setter="set_shared_bullet_attachment_stick_relative_to_bullet" getter="get_shared_bullet_attachment_stick_relative_to_bullet" default="true">
+			Whether the shared attachment sticks while the bullet rotates.
+		</member>
 		<member name="sprite_frames" type="SpriteFrames" setter="set_sprite_frames" getter="get_sprite_frames">
 			SpriteFrames holding all animations. Each frame is a Texture2D (plain or AtlasTexture region). The batch shares one frame; per-frame duration and loop come from the animation.
 		</member>
