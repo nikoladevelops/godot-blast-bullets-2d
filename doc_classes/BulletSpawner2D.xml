@@ -87,6 +87,29 @@
 		</member>
 	</members>
 	<signals>
+		<signal name="area_entered">
+			<param index="0" name="hit_target_area" type="Object" />
+			<param index="1" name="directional_bullets_instance" type="DirectionalBullets2D" />
+			<param index="2" name="bullet_index" type="int" />
+			<description>
+				Emitted synchronously in the physics tick when a bullet from a volley spawned by this spawner enters a physics area. Only fires for this spawner's own volleys (factory-spawned bullets report to the factory signals instead). Same handler contract as the factory collision signals: game logic is safe directly, structural factory calls must be deferred.
+			</description>
+		</signal>
+		<signal name="body_entered">
+			<param index="0" name="hit_target_body" type="Object" />
+			<param index="1" name="directional_bullets_instance" type="DirectionalBullets2D" />
+			<param index="2" name="bullet_index" type="int" />
+			<description>
+				Emitted synchronously in the physics tick when a bullet from a volley spawned by this spawner enters a physics body. Only fires for this spawner's own volleys; same handler contract as above.
+			</description>
+		</signal>
+		<signal name="life_time_over">
+			<param index="0" name="directional_bullets_instance" type="DirectionalBullets2D" />
+			<param index="1" name="bullet_indexes" type="int[]" />
+			<description>
+				Emitted (deferred, outside the physics step) when a volley spawned by this spawner expires, but only if [member MultiMeshBulletsData2D.is_life_time_over_signal_enabled] is set. Only fires for this spawner's own volleys.
+			</description>
+		</signal>
 		<signal name="shooting_finished">
 			<description>
 				Emitted exactly when the volley cap is reached - by the volley that hits [member max_volleys], or by lowering [member max_volleys] to or below the fired count. Manual shots past the cap do not re-emit it.

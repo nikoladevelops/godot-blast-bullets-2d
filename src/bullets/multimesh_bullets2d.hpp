@@ -334,10 +334,18 @@ float *w = batch_buffer.ptrw();
 
 		if (bullet_indexes.size() > 0) {
 			// Emit signal deferred so user code runs outside physics step.
-			// Typed per bullet kind, slim payload (custom data and transforms
-			// are one instance call away).
-			const char *signal_name = is_class("BlockBullets2D") ? "block_life_time_over" : "directional_life_time_over";
-			bullet_factory->call_deferred("emit_signal", signal_name, this, bullet_indexes);
+			// Possessed by the tagged spawner when there is one (plain
+			// life_time_over), else the typed factory signal. Deferred calls
+			// to a freed emitter are dropped safely by the engine.
+			Object *emitter = resolve_signal_emitter();
+			if (emitter != nullptr) {
+				if (emitter == bullet_factory) {
+					const char *signal_name = is_class("BlockBullets2D") ? "block_life_time_over" : "directional_life_time_over";
+					emitter->call_deferred("emit_signal", signal_name, this, bullet_indexes);
+				} else {
+					emitter->call_deferred("emit_signal", "life_time_over", this, bullet_indexes);
+				}
+			}
 
 			// Disable attachments after signal (deferred keeps order)
 			for (int i = 0; i < bullet_indexes.size(); ++i) {
@@ -636,6 +644,13 @@ float *w = batch_buffer.ptrw();
 	DynamicSparseSet all_bullets_enabled_set;
 
 	BulletFactory2D *bullet_factory = nullptr;
+	// Optional spawner owner (ObjectID, 0 = none), mirroring owner_multimesh_id
+	// on attachments. When a live BulletSpawner2D is tagged, collision and
+	// lifetime signals are possessed by it; otherwise they stay on the factory.
+	// Plain integer: no ownership, nothing to clean up on free. Reset in
+	// spawn()/enable_multimesh() so pooled reuse never inherits a stale owner;
+	// stamped by BulletSpawner2D::shoot_once() after every spawn it performs.
+	uint64_t owner_spawner_id = 0;
 	MultiMeshObjectPool *bullets_pool = nullptr;
 	PhysicsServer2D *physics_server = nullptr;
 
@@ -1856,6 +1871,22 @@ float *w = batch_buffer.ptrw();
 		}
 	}
 
+	// Resolves who owns the collision/lifetime signals for this multimesh: the
+	// tagged BulletSpawner2D while it is alive, else the BulletFactory2D.
+	// Spawner death therefore degrades gracefully to factory signals instead
+	// of dropping events. May return null during teardown (both gone) - the
+	// caller must skip emission then (this also fixes a latent null-factory
+	// crash in the old code path).
+	_ALWAYS_INLINE_ Object *resolve_signal_emitter() const {
+		if (owner_spawner_id != 0) {
+			Object *spawner = ObjectDB::get_instance(ObjectID(owner_spawner_id));
+			if (spawner != nullptr) {
+				return spawner;
+			}
+		}
+		return bullet_factory;
+	}
+
 	_ALWAYS_INLINE_ void handle_bullet_collision(CollisionType collision_type, int bullet_index, int64_t entered_instance_id) {
 		if (bullet_index < 0 || bullet_index >= amount_bullets) {
 			return;
@@ -1895,17 +1926,31 @@ float *w = batch_buffer.ptrw();
 		// game logic. Slim payload - custom data and transforms are one
 		// instance call away (bullet_get_custom_data(),
 		// get_bullet_global_transform()).
-		if (is_class("BlockBullets2D")) {
-			if (collision_type == CollisionType::AREA) {
-				bullet_factory->emit_signal("block_area_entered", hit_target, this, bullet_index);
-			} else if (collision_type == CollisionType::BODY) {
-				bullet_factory->emit_signal("block_body_entered", hit_target, this, bullet_index);
-			}
-		} else {
-			if (collision_type == CollisionType::AREA) {
-				bullet_factory->emit_signal("directional_area_entered", hit_target, this, bullet_index);
-			} else if (collision_type == CollisionType::BODY) {
-				bullet_factory->emit_signal("directional_body_entered", hit_target, this, bullet_index);
+		// Possessed by the tagged spawner when there is one, else the factory.
+		// A null emitter (teardown, both gone) only skips the notification -
+		// cleanup below still runs.
+		Object *emitter = resolve_signal_emitter();
+		if (emitter != nullptr) {
+			if (emitter == bullet_factory) {
+				if (is_class("BlockBullets2D")) {
+					if (collision_type == CollisionType::AREA) {
+						emitter->emit_signal("block_area_entered", hit_target, this, bullet_index);
+					} else if (collision_type == CollisionType::BODY) {
+						emitter->emit_signal("block_body_entered", hit_target, this, bullet_index);
+					}
+				} else {
+					if (collision_type == CollisionType::AREA) {
+						emitter->emit_signal("directional_area_entered", hit_target, this, bullet_index);
+					} else if (collision_type == CollisionType::BODY) {
+						emitter->emit_signal("directional_body_entered", hit_target, this, bullet_index);
+					}
+				}
+			} else {
+				if (collision_type == CollisionType::AREA) {
+					emitter->emit_signal("area_entered", hit_target, this, bullet_index);
+				} else if (collision_type == CollisionType::BODY) {
+					emitter->emit_signal("body_entered", hit_target, this, bullet_index);
+				}
 			}
 		}
 

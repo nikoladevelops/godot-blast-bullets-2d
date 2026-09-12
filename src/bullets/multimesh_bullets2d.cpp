@@ -139,6 +139,11 @@ void MultiMeshBullets2D::spawn(const MultiMeshBulletsData2D &data, MultiMeshObje
 
 	bullets_pool = pool;
 	bullet_factory = factory;
+	// A fresh spawn starts unattributed: only an explicit spawner stamp after
+	// this call (BulletSpawner2D::shoot_once) routes signals to a spawner.
+	// Pooled pre-population flows through here too, so reused instances can
+	// never inherit a previous owner's spawner.
+	owner_spawner_id = 0;
 	physics_server = PhysicsServer2D::get_singleton();
 
 	amount_bullets = data.transforms.size(); // important, because some set_up methods use this
@@ -226,6 +231,8 @@ bool MultiMeshBullets2D::enable_multimesh(const MultiMeshBulletsData2D &data, co
 
 	// A direct re-enable on an in-use instance must start curves and patterns
 	// from scratch, same as a pooled pop does through disable_multimesh().
+	// Spawner ownership resets here as well: whoever enables next stamps anew.
+	owner_spawner_id = 0;
 	shared_bullet_curves_data.unref();
 	for (auto &r : all_bullet_curves_data) {
 		r.unref();

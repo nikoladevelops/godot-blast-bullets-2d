@@ -69,8 +69,7 @@ script = ExtResource("1_cfubd")
 [node name="BulletSpawner2D" type="BulletSpawner2D" parent="." unique_id=1540696231]
 bullet_factory_path = NodePath("../BulletFactory2D")
 spawn_data = SubResource("DirectionalBulletsData2D_nkrfg")
-shoot_interval_sec = 0.02
-max_volleys = 50
+shoot_interval_sec = 0.1
 
 [node name="Marker2D" type="Marker2D" parent="BulletSpawner2D" unique_id=1785719658]
 position = Vector2(28, -42)
@@ -331,6 +330,8 @@ switch_direction_when_reaching_range_x = false
 position = Vector2(250, 293)
 curve = SubResource("Curve2D_nkrfg")
 
+[connection signal="area_entered" from="BulletSpawner2D" to="." method="_on_bullet_spawner_2d_area_entered"]
+[connection signal="body_entered" from="BulletSpawner2D" to="." method="_on_bullet_spawner_2d_body_entered"]
 [connection signal="block_area_entered" from="BulletFactory2D" to="BulletFactory2D" method="_on_block_area_entered"]
 [connection signal="block_body_entered" from="BulletFactory2D" to="BulletFactory2D" method="_on_block_body_entered"]
 [connection signal="block_life_time_over" from="BulletFactory2D" to="BulletFactory2D" method="_on_block_life_time_over"]

@@ -245,6 +245,11 @@ bool BulletSpawner2D::shoot_once() {
     if (bullets == nullptr) {
         return false; // Factory already reported why (busy/teardown/bad data).
     }
+    // Tag the instance (fresh or pooled): from here on its area_entered,
+    // body_entered and life_time_over signals are possessed by this spawner
+    // instead of the factory. Pool reuse resets the tag, so this stamp covers
+    // every spawn path through this function.
+    bullets->owner_spawner_id = get_instance_id();
     volleys_fired += 1;
     emit_signal("volley_fired", bullets, volleys_fired);
     // Exact-equality = transition only: further manual shots past the cap do
@@ -330,6 +335,25 @@ void BulletSpawner2D::_bind_methods() {
 	ADD_SIGNAL(MethodInfo("shooting_started"));
 	ADD_SIGNAL(MethodInfo("shooting_stopped"));
 	ADD_SIGNAL(MethodInfo("shooting_finished"));
+
+	// Collision/lifetime signals possessed by this spawner for the volleys it
+	// spawned (see owner_spawner_id). Same slim payload shape as the factory
+	// typed signals; emitted synchronously (area/body) or deferred
+	// (life_time_over) under the same handler contract. If this spawner is
+	// gone, its bullets gracefully fall back to the factory signals.
+	// NOTE: PROPERTY_HINT_RESOURCE_TYPE (not NODE_TYPE) carries the class name
+	// to ClassDB/--doctool; see the note on the factory signals.
+	ADD_SIGNAL(MethodInfo("area_entered",
+		PropertyInfo(Variant::OBJECT, "hit_target_area"),
+		PropertyInfo(Variant::OBJECT, "directional_bullets_instance", PROPERTY_HINT_RESOURCE_TYPE, "DirectionalBullets2D"),
+		PropertyInfo(Variant::INT, "bullet_index")));
+	ADD_SIGNAL(MethodInfo("body_entered",
+		PropertyInfo(Variant::OBJECT, "hit_target_body"),
+		PropertyInfo(Variant::OBJECT, "directional_bullets_instance", PROPERTY_HINT_RESOURCE_TYPE, "DirectionalBullets2D"),
+		PropertyInfo(Variant::INT, "bullet_index")));
+	ADD_SIGNAL(MethodInfo("life_time_over",
+		PropertyInfo(Variant::OBJECT, "directional_bullets_instance", PROPERTY_HINT_RESOURCE_TYPE, "DirectionalBullets2D"),
+		PropertyInfo(Variant::ARRAY, "bullet_indexes", PROPERTY_HINT_ARRAY_TYPE, "int")));
 
 	ClassDB::bind_method(D_METHOD("get_shooting_enabled"), &BulletSpawner2D::get_shooting_enabled);
 	ClassDB::bind_method(D_METHOD("set_shooting_enabled", "value"), &BulletSpawner2D::set_shooting_enabled);

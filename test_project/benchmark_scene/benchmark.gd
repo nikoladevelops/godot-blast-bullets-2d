@@ -45,3 +45,11 @@ func _ready() -> void:
 		var spawner:EnemySpawner = child as EnemySpawner
 		BENCHMARK_GLOBALS.ALL_ENEMY_SPAWNERS.push_back(spawner)
 	
+
+
+func _on_bullet_spawner_2d_area_entered(hit_target_area: Object, directional_bullets_instance: DirectionalBullets2D, bullet_index: int) -> void:
+	print("Spawner hit an area!")
+
+
+func _on_bullet_spawner_2d_body_entered(hit_target_body: Object, directional_bullets_instance: DirectionalBullets2D, bullet_index: int) -> void:
+	print("Spawner hit a body!")
