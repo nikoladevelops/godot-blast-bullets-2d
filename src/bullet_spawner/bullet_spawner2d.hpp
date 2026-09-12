@@ -1,7 +1,6 @@
 #pragma once
 
 #include "factory/bullet_factory2d.hpp"
-#include "godot_cpp/classes/line2d.hpp"
 #include "godot_cpp/classes/node2d.hpp"
 #include "godot_cpp/classes/wrapped.hpp"
 #include "godot_cpp/core/property_info.hpp"
@@ -12,6 +11,50 @@
 
 namespace BlastBullets2D {
 using namespace godot;
+
+// Editor-only preview layer with self-repainting custom drawing.
+//
+// The engine owns a CanvasItem's command list and can clear/re-issue it on
+// any redraw (zoom, pan, selection, idle refresh). One-shot
+// RenderingServer::canvas_item_add_* calls therefore vanish as soon as the
+// engine repaints, which is why the old preview disappeared ~1s after it was
+// built. The documented contract is: custom drawing lives in _draw(), the
+// engine calls it on every repaint, and rebuilds only store data +
+// queue_redraw(). This class implements exactly that: rebuild_preview()
+// fills it with a snapshot, _draw() repaints it forever.
+class PatternPreviewLayer2D : public Node2D {
+    GDCLASS(PatternPreviewLayer2D, Node2D)
+
+    public:
+        enum LayerKind {
+            LAYER_DOTS = 0,
+            LAYER_ARROWS
+        };
+
+        LayerKind kind = LAYER_DOTS;
+
+        // Snapshot data (holder-local). Assigned by rebuild_preview(),
+        // consumed by _draw(). Plain values: the layer never reads the
+        // spawner live, so a repaint cannot depend on stale pointers.
+        PackedVector2Array dots;
+        Color dot_color = Color(1.0, 0.05, 0.05);
+        float dot_radius = 4.0f;
+        PackedVector2Array arrow_tails;
+        PackedVector2Array arrow_dirs;
+        Color arrow_color = Color(1.0, 0.05, 0.05);
+        float arrow_length = 16.0f;
+        float arrow_width = 2.0f;
+        float arrow_head_length = 8.0f;
+        float arrow_head_width = 10.0f;
+
+        void set_dots_data(const PackedVector2Array &p_dots, const Color &p_color, float p_radius);
+        void set_arrows_data(const PackedVector2Array &p_tails, const PackedVector2Array &p_dirs, const Color &p_color, float p_length, float p_width, float p_head_length, float p_head_width);
+
+        void _draw() override;
+
+    protected:
+        static void _bind_methods();
+};
 
 class BulletSpawner2D : public Node2D{
     GDCLASS(BulletSpawner2D, Node2D)
@@ -180,17 +223,43 @@ class BulletSpawner2D : public Node2D{
 
         // PATTERN PREVIEW (EDITOR ONLY)
         //
-        // Draws the volley pattern (position dots + facing ticks) in the
-        // editor so helper options can be tuned visually. The preview lives in
-        // an owner-less holder node: it is never saved to the scene, never
-        // exported, and never created at runtime.
+        // Draws the volley pattern in the editor so helper options can be
+        // tuned visually: one dot per spawn transform plus one facing arrow.
+        // Rendered by two self-repainting PatternPreviewLayer2D nodes (custom
+        // _draw, re-invoked by the engine on every repaint) inside an
+        // owner-less holder node: the holder is never saved to the scene,
+        // never exported, and never created at runtime.
         bool show_pattern_preview = true;
-        Color preview_color = Color(0.3, 0.85, 1.0);
+        Color preview_dot_color = Color(1.0, 0.05, 0.05);
+        Color preview_arrow_color = Color(1.0, 0.05, 0.05);
+        double preview_dot_radius = 4.0;
+        // Extra pixels between the dot edge and the arrow tail: the shaft
+        // starts at dot_radius + gap so it never hides under the dot.
+        double preview_arrow_gap = 3.0;
+        // Shaft length in pixels, measured from the gap end to the tip.
+        double preview_arrow_length = 16.0;
+        double preview_arrow_width = 2.0;
+        double preview_arrow_head_length = 8.0;
+        double preview_arrow_head_width = 10.0;
 
         bool get_show_pattern_preview() const;
         void set_show_pattern_preview(bool value);
-        Color get_preview_color() const;
-        void set_preview_color(const Color &value);
+        Color get_preview_dot_color() const;
+        void set_preview_dot_color(const Color &value);
+        Color get_preview_arrow_color() const;
+        void set_preview_arrow_color(const Color &value);
+        double get_preview_dot_radius() const;
+        void set_preview_dot_radius(double value);
+        double get_preview_arrow_gap() const;
+        void set_preview_arrow_gap(double value);
+        double get_preview_arrow_length() const;
+        void set_preview_arrow_length(double value);
+        double get_preview_arrow_width() const;
+        void set_preview_arrow_width(double value);
+        double get_preview_arrow_head_length() const;
+        void set_preview_arrow_head_length(double value);
+        double get_preview_arrow_head_width() const;
+        void set_preview_arrow_head_width(double value);
 
         bool get_shooting_enabled() const;
         void set_shooting_enabled(bool value);
@@ -319,8 +388,11 @@ class BulletSpawner2D : public Node2D{
         // Spin runtime state (never stored, advances in _process only).
         double spin_angle_deg = 0.0;
         double spin_time_sec = 0.0;
-        // Editor-only pattern preview holder (null at runtime, never saved).
+        // Editor-only pattern preview holder (null at runtime, never saved),
+        // plus its two self-repainting _draw layers (dots + arrows).
         Node2D *preview_holder = nullptr;
+        PatternPreviewLayer2D *preview_dots_layer = nullptr;
+        PatternPreviewLayer2D *preview_arrows_layer = nullptr;
 
         bool auto_shooting_active() const;
         // Advances spin_angle_deg by delta according to spin_mode.
@@ -335,7 +407,7 @@ class BulletSpawner2D : public Node2D{
 
 
 };
-}
+} // namespace BlastBullets2D
 
 // Need this in order to expose the enum to Godot Engine
 VARIANT_ENUM_CAST(BlastBullets2D::BulletSpawner2D::TransformsSource);

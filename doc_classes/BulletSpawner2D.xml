@@ -252,10 +252,31 @@
 			Aimed pattern: straddle the target direction symmetrically. Set false for a one-sided cone opening from the target direction toward +spread.
 		</member>
 		<member name="show_pattern_preview" type="bool" setter="set_show_pattern_preview" getter="get_show_pattern_preview" default="true">
-			Draws the volley pattern (position dots in [member preview_color] plus white facing ticks) in the editor only. The preview lives in an owner-less holder node: never saved, never exported, never present at runtime. Moving an external generator or target refreshes on the next spawner-side change.
+			Draws the volley pattern (one dot per spawn transform plus one detached facing arrow, colored by [member preview_dot_color] and [member preview_arrow_color]) in the editor only, while this is on. Both default to red. The layers repaint themselves through a custom _draw, so the gizmo survives zoom, pan, selection, and idle redraws. The preview lives in an owner-less holder node: never saved, never exported, never present at runtime. Moving an external generator or target refreshes on the next spawner-side change.
 		</member>
-		<member name="preview_color" type="Color" setter="set_preview_color" getter="get_preview_color" default="Color(0.3, 0.85, 1, 1)">
-			Dot color of the editor-only pattern preview.
+		<member name="preview_dot_color" type="Color" setter="set_preview_dot_color" getter="get_preview_dot_color" default="Color(1, 0.05, 0.05, 1)">
+			Dot color of the editor-only pattern preview. Hidden while [member show_pattern_preview] is off.
+		</member>
+		<member name="preview_arrow_color" type="Color" setter="set_preview_arrow_color" getter="get_preview_arrow_color" default="Color(1, 0.05, 0.05, 1)">
+			Facing-arrow color of the editor-only pattern preview. Hidden while [member show_pattern_preview] is off.
+		</member>
+		<member name="preview_dot_radius" type="float" setter="set_preview_dot_radius" getter="get_preview_dot_radius" default="4.0">
+			Radius in pixels of each preview dot. Hidden while [member show_pattern_preview] is off.
+		</member>
+		<member name="preview_arrow_gap" type="float" setter="set_preview_arrow_gap" getter="get_preview_arrow_gap" default="3.0">
+			Extra pixels between the dot edge and the arrow tail. The shaft starts at dot radius + gap so it never hides under the dot. Hidden while [member show_pattern_preview] is off.
+		</member>
+		<member name="preview_arrow_length" type="float" setter="set_preview_arrow_length" getter="get_preview_arrow_length" default="16.0">
+			Length in pixels of each preview facing-arrow shaft, from the gap end to the tip. Hidden while [member show_pattern_preview] is off.
+		</member>
+		<member name="preview_arrow_width" type="float" setter="set_preview_arrow_width" getter="get_preview_arrow_width" default="2.0">
+			Width in pixels of each preview facing-arrow shaft. Drawn without antialiasing for crisp hard edges. Hidden while [member show_pattern_preview] is off.
+		</member>
+		<member name="preview_arrow_head_length" type="float" setter="set_preview_arrow_head_length" getter="get_preview_arrow_head_length" default="8.0">
+			Length in pixels of each preview facing-arrow head. Hidden while [member show_pattern_preview] is off.
+		</member>
+		<member name="preview_arrow_head_width" type="float" setter="set_preview_arrow_head_width" getter="get_preview_arrow_head_width" default="10.0">
+			Width in pixels of each preview facing-arrow head base. Hidden while [member show_pattern_preview] is off.
 		</member>
 	</members>
 	<constants>

@@ -47,9 +47,9 @@ func _ready() -> void:
 	
 
 
-func _on_bullet_spawner_2d_area_entered(hit_target_area: Object, directional_bullets_instance: DirectionalBullets2D, bullet_index: int) -> void:
+func _on_bullet_spawner_2d_area_entered(_hit_target_area: Object, _directional_bullets_instance: DirectionalBullets2D, _bullet_index: int) -> void:
 	print("Spawner hit an area!")
 
 
-func _on_bullet_spawner_2d_body_entered(hit_target_body: Object, directional_bullets_instance: DirectionalBullets2D, bullet_index: int) -> void:
+func _on_bullet_spawner_2d_body_entered(_hit_target_body: Object, _directional_bullets_instance: DirectionalBullets2D, _bullet_index: int) -> void:
 	print("Spawner hit a body!")

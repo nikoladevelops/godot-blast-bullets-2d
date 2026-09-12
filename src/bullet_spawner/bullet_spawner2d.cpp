@@ -67,6 +67,59 @@ static Transform2D scale_spawn_transform(const Transform2D &t, const Vector2 &ba
 static const char *PREVIEW_META_KEY = "blastbullets_pattern_preview";
 static const char *PREVIEW_HOLDER_NAME = "~BlastBulletsPatternPreview";
 
+// Self-repainting preview layer: rebuild_preview() stores a snapshot via the
+// setters below, the engine re-invokes _draw() on every repaint (zoom, pan,
+// selection, idle refresh), so the gizmo can never vanish between rebuilds.
+void PatternPreviewLayer2D::_bind_methods() {
+}
+
+void PatternPreviewLayer2D::set_dots_data(const PackedVector2Array &p_dots, const Color &p_color, float p_radius) {
+    dots = p_dots;
+    dot_color = p_color;
+    dot_radius = p_radius;
+    queue_redraw();
+}
+
+void PatternPreviewLayer2D::set_arrows_data(const PackedVector2Array &p_tails, const PackedVector2Array &p_dirs, const Color &p_color, float p_length, float p_width, float p_head_length, float p_head_width) {
+    arrow_tails = p_tails;
+    arrow_dirs = p_dirs;
+    arrow_color = p_color;
+    arrow_length = p_length;
+    arrow_width = p_width;
+    arrow_head_length = p_head_length;
+    arrow_head_width = p_head_width;
+    queue_redraw();
+}
+
+void PatternPreviewLayer2D::_draw() {
+    if (kind == LAYER_DOTS) {
+        for (int i = 0; i < dots.size(); i++) {
+            draw_circle(dots[i], dot_radius, dot_color);
+        }
+        return;
+    }
+    // One true arrow silhouette per bullet: the shaft ends exactly where the
+    // head begins (clamped, never inverted), and the filled triangular head
+    // sits forward of that joint. No overlap means no nub poking past the
+    // tip and no line showing through the triangle.
+    const int count = MIN(arrow_tails.size(), arrow_dirs.size());
+    for (int i = 0; i < count; i++) {
+        const Vector2 dir = arrow_dirs[i];
+        const Vector2 tail = arrow_tails[i];
+        const Vector2 tip = tail + dir * arrow_length;
+        const float head_len = MIN(arrow_head_length, arrow_length);
+        const bool has_head = head_len > 0.0f && arrow_head_width > 0.0f;
+        const Vector2 head_base = has_head ? tip - dir * head_len : tip;
+        if (arrow_length > 0.0f && arrow_width > 0.0f) {
+            draw_line(tail, head_base, arrow_color, arrow_width, false);
+        }
+        if (has_head) {
+            const Vector2 perp = dir.orthogonal() * (arrow_head_width * 0.5f);
+            draw_colored_polygon(PackedVector2Array({ tip, head_base + perp, head_base - perp }), arrow_color);
+        }
+    }
+}
+
 // Human-readable mode name for error messages (mirrors the transforms_source enum hint).
 static const char *transforms_source_name(BulletSpawner2D::TransformsSource source) {
     switch (source) {
@@ -716,11 +769,84 @@ void BulletSpawner2D::set_show_pattern_preview(bool value) {
     show_pattern_preview = value;
     rebuild_preview();
 }
-Color BulletSpawner2D::get_preview_color() const {
-    return preview_color;
+Color BulletSpawner2D::get_preview_dot_color() const {
+    return preview_dot_color;
 }
-void BulletSpawner2D::set_preview_color(const Color &value) {
-    preview_color = value;
+void BulletSpawner2D::set_preview_dot_color(const Color &value) {
+    preview_dot_color = value;
+    rebuild_preview();
+}
+Color BulletSpawner2D::get_preview_arrow_color() const {
+    return preview_arrow_color;
+}
+void BulletSpawner2D::set_preview_arrow_color(const Color &value) {
+    preview_arrow_color = value;
+    rebuild_preview();
+}
+double BulletSpawner2D::get_preview_dot_radius() const {
+    return preview_dot_radius;
+}
+void BulletSpawner2D::set_preview_dot_radius(double value) {
+    if (!Math::is_finite(value) || value < 0.0) {
+        UtilityFunctions::push_error("BulletSpawner2D: preview_dot_radius must be finite and >= 0, keeping the old value.");
+        return;
+    }
+    preview_dot_radius = value;
+    rebuild_preview();
+}
+double BulletSpawner2D::get_preview_arrow_gap() const {
+    return preview_arrow_gap;
+}
+void BulletSpawner2D::set_preview_arrow_gap(double value) {
+    if (!Math::is_finite(value) || value < 0.0) {
+        UtilityFunctions::push_error("BulletSpawner2D: preview_arrow_gap must be finite and >= 0, keeping the old value.");
+        return;
+    }
+    preview_arrow_gap = value;
+    rebuild_preview();
+}
+double BulletSpawner2D::get_preview_arrow_length() const {
+    return preview_arrow_length;
+}
+void BulletSpawner2D::set_preview_arrow_length(double value) {
+    if (!Math::is_finite(value) || value < 0.0) {
+        UtilityFunctions::push_error("BulletSpawner2D: preview_arrow_length must be finite and >= 0, keeping the old value.");
+        return;
+    }
+    preview_arrow_length = value;
+    rebuild_preview();
+}
+double BulletSpawner2D::get_preview_arrow_width() const {
+    return preview_arrow_width;
+}
+void BulletSpawner2D::set_preview_arrow_width(double value) {
+    if (!Math::is_finite(value) || value < 0.0) {
+        UtilityFunctions::push_error("BulletSpawner2D: preview_arrow_width must be finite and >= 0, keeping the old value.");
+        return;
+    }
+    preview_arrow_width = value;
+    rebuild_preview();
+}
+double BulletSpawner2D::get_preview_arrow_head_length() const {
+    return preview_arrow_head_length;
+}
+void BulletSpawner2D::set_preview_arrow_head_length(double value) {
+    if (!Math::is_finite(value) || value < 0.0) {
+        UtilityFunctions::push_error("BulletSpawner2D: preview_arrow_head_length must be finite and >= 0, keeping the old value.");
+        return;
+    }
+    preview_arrow_head_length = value;
+    rebuild_preview();
+}
+double BulletSpawner2D::get_preview_arrow_head_width() const {
+    return preview_arrow_head_width;
+}
+void BulletSpawner2D::set_preview_arrow_head_width(double value) {
+    if (!Math::is_finite(value) || value < 0.0) {
+        UtilityFunctions::push_error("BulletSpawner2D: preview_arrow_head_width must be finite and >= 0, keeping the old value.");
+        return;
+    }
+    preview_arrow_head_width = value;
     rebuild_preview();
 }
 
@@ -817,18 +943,25 @@ void BulletSpawner2D::rebuild_preview() {
         return;
     }
     if (!show_pattern_preview) {
-        if (preview_holder != nullptr) {
-            remove_child(preview_holder);
-            memdelete(preview_holder);
-            preview_holder = nullptr;
+        // Re-resolve instead of trusting the cache: the editor may have
+        // dropped the holder without us, and a stale pointer here would
+        // leave a ghost preview behind (or crash on remove_child).
+        Node *live = get_node_or_null(NodePath(PREVIEW_HOLDER_NAME));
+        if (live != nullptr) {
+            remove_child(live);
+            memdelete(live);
         }
+        preview_holder = nullptr;
+        preview_dots_layer = nullptr;
+        preview_arrows_layer = nullptr;
         return;
     }
-    if (preview_holder == nullptr) {
-        // Heal first: duplicating this node in the editor copies the holder
-        // child but not the pointer, so adopt it instead of stacking a second.
-        preview_holder = Object::cast_to<Node2D>(get_node_or_null(NodePath(PREVIEW_HOLDER_NAME)));
-    }
+    // Heal from the tree every rebuild: duplicating this node copies the
+    // holder and its layers but not the cached pointers, and the editor can
+    // drop the nodes without us (undo/redo, scene reload). The cache is only
+    // ever assigned from a fresh lookup, never trusted, so a stale pointer
+    // can never silently kill the preview.
+    preview_holder = Object::cast_to<Node2D>(get_node_or_null(NodePath(PREVIEW_HOLDER_NAME)));
     if (preview_holder == nullptr) {
         // Owner-less on purpose: never written to the scene, never exported.
         preview_holder = memnew(Node2D);
@@ -836,27 +969,49 @@ void BulletSpawner2D::rebuild_preview() {
         preview_holder->set_meta(PREVIEW_META_KEY, true);
         add_child(preview_holder);
     }
-    Line2D *dots = Object::cast_to<Line2D>(preview_holder->get_node_or_null(NodePath("Dots")));
-    if (dots == nullptr) {
-        dots = memnew(Line2D);
-        dots->set_name("Dots");
-        dots->set_width(7.0);
-        dots->set_antialiased(true);
-        dots->set_begin_cap_mode(Line2D::LINE_CAP_ROUND);
-        dots->set_end_cap_mode(Line2D::LINE_CAP_ROUND);
-        dots->set_z_index(4000);
-        preview_holder->add_child(dots);
+    // Legacy cleanup first: older versions drew the preview with Line2D strips
+    // ("Dots"/"Ticks"). Remove any leftover before adopting/creating the
+    // plain Node2D layers, so a healed holder can never clash on child names
+    // and upgraded scenes keep no stray-segment nodes around.
+    TypedArray<Node> legacy = preview_holder->find_children("*", "Line2D", false, false);
+    for (int i = 0; i < legacy.size(); i++) {
+        Node *stray = Object::cast_to<Node>(legacy[i]);
+        if (stray != nullptr) {
+            preview_holder->remove_child(stray);
+            memdelete(stray);
+        }
     }
-    dots->set_default_color(preview_color);
-    Line2D *ticks = Object::cast_to<Line2D>(preview_holder->get_node_or_null(NodePath("Ticks")));
-    if (ticks == nullptr) {
-        ticks = memnew(Line2D);
-        ticks->set_name("Ticks");
-        ticks->set_width(2.0);
-        ticks->set_default_color(Color(1.0, 1.0, 1.0));
-        ticks->set_antialiased(true);
-        ticks->set_z_index(4000);
-        preview_holder->add_child(ticks);
+    // Layers are likewise re-resolved from the tree every rebuild, so an
+    // externally removed layer is recreated instead of silently killing the
+    // preview. Only 3 nodes total regardless of bullet count.
+    preview_dots_layer = Object::cast_to<PatternPreviewLayer2D>(preview_holder->get_node_or_null(NodePath("Dots")));
+    if (preview_dots_layer == nullptr) {
+        // Wrong-type leftover (plain Node2D from the RenderingServer build):
+        // drop it so the typed layer can take the canonical name.
+        Node *legacy_dots = preview_holder->get_node_or_null(NodePath("Dots"));
+        if (legacy_dots != nullptr) {
+            preview_holder->remove_child(legacy_dots);
+            memdelete(legacy_dots);
+        }
+        preview_dots_layer = memnew(PatternPreviewLayer2D);
+        preview_dots_layer->set_name("Dots");
+        preview_dots_layer->kind = PatternPreviewLayer2D::LAYER_DOTS;
+        preview_dots_layer->set_z_index(4000);
+        preview_holder->add_child(preview_dots_layer);
+    }
+    preview_arrows_layer = Object::cast_to<PatternPreviewLayer2D>(preview_holder->get_node_or_null(NodePath("Arrows")));
+    if (preview_arrows_layer == nullptr) {
+        // Same wrong-type migration as Dots above.
+        Node *legacy_arrows = preview_holder->get_node_or_null(NodePath("Arrows"));
+        if (legacy_arrows != nullptr) {
+            preview_holder->remove_child(legacy_arrows);
+            memdelete(legacy_arrows);
+        }
+        preview_arrows_layer = memnew(PatternPreviewLayer2D);
+        preview_arrows_layer->set_name("Arrows");
+        preview_arrows_layer->kind = PatternPreviewLayer2D::LAYER_ARROWS;
+        preview_arrows_layer->set_z_index(4000);
+        preview_holder->add_child(preview_arrows_layer);
     }
     // Quiet collect: the preview must visualize, never scold (e.g. aimed
     // without a target simply draws nothing instead of erroring per rebuild).
@@ -864,25 +1019,41 @@ void BulletSpawner2D::rebuild_preview() {
     const Transform2D holder_global = preview_holder->get_global_transform();
     const Transform2D to_local = holder_global.affine_inverse();
     const real_t holder_rotation = holder_global.get_rotation();
-    PackedVector2Array dot_points;
-    dot_points.resize(transforms.size() * 2);
-    PackedVector2Array tick_points;
-    tick_points.resize(transforms.size() * 2);
+    // Snapshot into the layers: _draw() repaints this data on every engine
+    // redraw by itself, so zoom/pan/selection/idle can never wipe the gizmo.
+    // (One-shot RenderingServer canvas_item_add_* calls cannot do this: the
+    // engine owns the command list and drops it on the next repaint.)
+    PackedVector2Array dots;
+    dots.resize(transforms.size());
+    PackedVector2Array tails;
+    tails.resize(transforms.size());
+    PackedVector2Array dirs;
+    dirs.resize(transforms.size());
     for (int i = 0; i < transforms.size(); ++i) {
         const Transform2D t = transforms[i];
         const Vector2 p = to_local.xform(t.get_origin());
-        dot_points[i * 2] = p;
-        dot_points[i * 2 + 1] = p; // degenerate segment + round caps = dot
+        dots[i] = p;
+        // Holder-local facing: strip the holder rotation so moving/rotating
+        // the spawner does not skew the arrow. The tail starts outside the
+        // dot (radius + gap); _draw() builds the shaft + head from there.
         const Vector2 dir = Vector2(1.0, 0.0).rotated(t.get_rotation() - holder_rotation);
-        tick_points[i * 2] = p;
-        tick_points[i * 2 + 1] = p + dir * 18.0;
+        tails[i] = p + dir * (real_t)(preview_dot_radius + preview_arrow_gap);
+        dirs[i] = dir;
     }
-    dots->set_points(dot_points);
-    ticks->set_points(tick_points);
+    preview_dots_layer->set_dots_data(dots, preview_dot_color, (float)preview_dot_radius);
+    preview_arrows_layer->set_arrows_data(tails, dirs, preview_arrow_color, (float)preview_arrow_length, (float)preview_arrow_width, (float)preview_arrow_head_length, (float)preview_arrow_head_width);
 }
 
 void BulletSpawner2D::_validate_property(PropertyInfo &p_property) const {
     const String property_name = p_property.name;
+    // Tidy inspector: hide the preview tuning knobs while the preview itself
+    // is off. The toggle + spin props stay always visible.
+    if (property_name.begins_with("preview_") && property_name != "show_pattern_preview") {
+        if (!show_pattern_preview) {
+            p_property.usage &= ~PROPERTY_USAGE_EDITOR;
+        }
+        return;
+    }
     // Only the helper_* option groups are gated; everything else is always shown.
     if (!property_name.begins_with("helper_")) {
         return;
@@ -969,6 +1140,8 @@ void BulletSpawner2D::_ready() {
     // Paranoia: the preview holder is owner-less and thus never saved, but
     // drop it if one is somehow present so runtime is never affected.
     preview_holder = nullptr;
+    preview_dots_layer = nullptr;
+    preview_arrows_layer = nullptr;
     Node *stray = get_node_or_null(NodePath(PREVIEW_HOLDER_NAME));
     if (stray != nullptr) {
         remove_child(stray);
@@ -1269,9 +1442,37 @@ void BulletSpawner2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_show_pattern_preview", "value"), &BulletSpawner2D::set_show_pattern_preview);
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "show_pattern_preview"), "set_show_pattern_preview", "get_show_pattern_preview");
 
-	ClassDB::bind_method(D_METHOD("get_preview_color"), &BulletSpawner2D::get_preview_color);
-	ClassDB::bind_method(D_METHOD("set_preview_color", "value"), &BulletSpawner2D::set_preview_color);
-	ADD_PROPERTY(PropertyInfo(Variant::COLOR, "preview_color"), "set_preview_color", "get_preview_color");
+	ClassDB::bind_method(D_METHOD("get_preview_dot_color"), &BulletSpawner2D::get_preview_dot_color);
+	ClassDB::bind_method(D_METHOD("set_preview_dot_color", "value"), &BulletSpawner2D::set_preview_dot_color);
+	ADD_PROPERTY(PropertyInfo(Variant::COLOR, "preview_dot_color"), "set_preview_dot_color", "get_preview_dot_color");
+
+	ClassDB::bind_method(D_METHOD("get_preview_arrow_color"), &BulletSpawner2D::get_preview_arrow_color);
+	ClassDB::bind_method(D_METHOD("set_preview_arrow_color", "value"), &BulletSpawner2D::set_preview_arrow_color);
+	ADD_PROPERTY(PropertyInfo(Variant::COLOR, "preview_arrow_color"), "set_preview_arrow_color", "get_preview_arrow_color");
+
+	ClassDB::bind_method(D_METHOD("get_preview_dot_radius"), &BulletSpawner2D::get_preview_dot_radius);
+	ClassDB::bind_method(D_METHOD("set_preview_dot_radius", "value"), &BulletSpawner2D::set_preview_dot_radius);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "preview_dot_radius"), "set_preview_dot_radius", "get_preview_dot_radius");
+
+	ClassDB::bind_method(D_METHOD("get_preview_arrow_gap"), &BulletSpawner2D::get_preview_arrow_gap);
+	ClassDB::bind_method(D_METHOD("set_preview_arrow_gap", "value"), &BulletSpawner2D::set_preview_arrow_gap);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "preview_arrow_gap"), "set_preview_arrow_gap", "get_preview_arrow_gap");
+
+	ClassDB::bind_method(D_METHOD("get_preview_arrow_length"), &BulletSpawner2D::get_preview_arrow_length);
+	ClassDB::bind_method(D_METHOD("set_preview_arrow_length", "value"), &BulletSpawner2D::set_preview_arrow_length);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "preview_arrow_length"), "set_preview_arrow_length", "get_preview_arrow_length");
+
+	ClassDB::bind_method(D_METHOD("get_preview_arrow_width"), &BulletSpawner2D::get_preview_arrow_width);
+	ClassDB::bind_method(D_METHOD("set_preview_arrow_width", "value"), &BulletSpawner2D::set_preview_arrow_width);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "preview_arrow_width"), "set_preview_arrow_width", "get_preview_arrow_width");
+
+	ClassDB::bind_method(D_METHOD("get_preview_arrow_head_length"), &BulletSpawner2D::get_preview_arrow_head_length);
+	ClassDB::bind_method(D_METHOD("set_preview_arrow_head_length", "value"), &BulletSpawner2D::set_preview_arrow_head_length);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "preview_arrow_head_length"), "set_preview_arrow_head_length", "get_preview_arrow_head_length");
+
+	ClassDB::bind_method(D_METHOD("get_preview_arrow_head_width"), &BulletSpawner2D::get_preview_arrow_head_width);
+	ClassDB::bind_method(D_METHOD("set_preview_arrow_head_width", "value"), &BulletSpawner2D::set_preview_arrow_head_width);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "preview_arrow_head_width"), "set_preview_arrow_head_width", "get_preview_arrow_head_width");
 
 	// Need this in order to expose the enum constants to Godot Engine
 	BIND_ENUM_CONSTANT(TRANSFORMS_FROM_CHILDREN);

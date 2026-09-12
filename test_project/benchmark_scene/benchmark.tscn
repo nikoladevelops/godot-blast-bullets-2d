@@ -70,16 +70,21 @@ script = ExtResource("1_cfubd")
 bullet_factory_path = NodePath("../BulletFactory2D")
 transforms_generator = NodePath(".")
 spawn_data = SubResource("DirectionalBulletsData2D_nkrfg")
-shoot_interval_sec = 0.1
 spin_enabled = true
-transforms_source = 2
-preview_color = Color(1, 0, 0, 1)
+helper_bullets_amount = 5
+helper_ring_face_outward = false
+helper_ring_y_scale = 2.0
+helper_ring_facing_offset_deg = 122.0
+helper_fan_spread = 3.0
+helper_spiral_facing = 3
+position = Vector2(-245, 102)
 
 [node name="Marker2D" type="Marker2D" parent="BulletSpawner2D" unique_id=1785719658]
 position = Vector2(28, -42)
 
 [node name="Marker2D2" type="Marker2D" parent="BulletSpawner2D" unique_id=1923250570]
 position = Vector2(48, -10)
+rotation = 1.3910275
 
 [node name="Marker2D3" type="Marker2D" parent="BulletSpawner2D" unique_id=799012093]
 position = Vector2(37, 37)
