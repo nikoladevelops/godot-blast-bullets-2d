@@ -1,6 +1,7 @@
 [gd_scene format=3 uid="uid://dpk5aw81fio42"]
 
 [ext_resource type="Script" uid="uid://bt7w5vkn7u1xt" path="res://benchmark_scene/benchmark.gd" id="1_cfubd"]
+[ext_resource type="Texture2D" uid="uid://k3w8kovbd3of" path="res://shared/art/player_bullets/1.png" id="2_mouoi"]
 [ext_resource type="Texture2D" uid="uid://4gdgni3y4km7" path="res://icon.svg" id="3_1inld"]
 [ext_resource type="PackedScene" uid="uid://bv1i7q8bxfe2c" path="res://benchmark_scene/player/player.tscn" id="3_hsp4v"]
 [ext_resource type="Texture2D" uid="uid://hyg3pm8cmfij" path="res://extremely_important_never_delete_or_it_will_explode.jpg" id="3_rfik0"]
@@ -11,7 +12,27 @@
 [ext_resource type="PackedScene" uid="uid://3dxd6rfhxqym" path="res://shared/enemies/enemy_ship/enemy_ship.tscn" id="8_yyku6"]
 [ext_resource type="PackedScene" uid="uid://bqi8tdtf1dh4n" path="res://shared/moving_target.tscn" id="10_nkrfg"]
 
+[sub_resource type="BulletSpeedData2D" id="BulletSpeedData2D_7gbxi"]
+speed = 300.0
+max_speed = 1500.0
+acceleration = 50.0
+
+[sub_resource type="SpriteFrames" id="SpriteFrames_y4v7i"]
+animations = [{
+"frames": [{
+"duration": 1.0,
+"texture": ExtResource("2_mouoi")
+}],
+"loop": 1,
+"name": &"default",
+"speed": 5.0
+}]
+
 [sub_resource type="DirectionalBulletsData2D" id="DirectionalBulletsData2D_nkrfg"]
+shared_bullet_speed_data = SubResource("BulletSpeedData2D_7gbxi")
+sprite_frames = SubResource("SpriteFrames_y4v7i")
+texture_size = Vector2(120, 120)
+max_life_time = 5.0
 
 [sub_resource type="Gradient" id="Gradient_rfik0"]
 colors = PackedColorArray(0.215686, 0.215686, 0.215686, 1, 0.215686, 0.215686, 0.215686, 1)
@@ -47,8 +68,18 @@ script = ExtResource("1_cfubd")
 
 [node name="BulletSpawner2D" type="BulletSpawner2D" parent="." unique_id=1540696231]
 bullet_factory_path = NodePath("../BulletFactory2D")
-movement_pattern_path = NodePath("../Paths/Path2D")
 spawn_data = SubResource("DirectionalBulletsData2D_nkrfg")
+shoot_interval_sec = 0.02
+max_volleys = 50
+
+[node name="Marker2D" type="Marker2D" parent="BulletSpawner2D" unique_id=1785719658]
+position = Vector2(28, -42)
+
+[node name="Marker2D2" type="Marker2D" parent="BulletSpawner2D" unique_id=1923250570]
+position = Vector2(48, -10)
+
+[node name="Marker2D3" type="Marker2D" parent="BulletSpawner2D" unique_id=799012093]
+position = Vector2(37, 37)
 
 [node name="Sprite2D" type="Sprite2D" parent="." unique_id=875066845]
 z_index = -12

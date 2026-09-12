@@ -38,7 +38,21 @@ void initialize_blast_bullets_2d_module(ModuleInitializationLevel p_level) {
 		return;
 	}
 
-	// Shared
+// REGISTRATION POLICY - read before changing anything here.
+//
+// Every class below stays GDREGISTER_CLASS on purpose, even the purely
+// runtime-created ones. Per the official docs, GDREGISTER_RUNTIME_CLASS means
+// "only available at runtime (but not in the editor)": the editor then
+// creates mere placeholders instead of real instances (no properties, failed
+// casts, broken scene restore for any .tscn containing such nodes).
+//
+// Editor behavior is therefore NEVER controlled through registration. Code
+// that must not run in the editor (shoot timers, physics setup, processing)
+// is guarded with Engine::is_editor_hint() at the call site - see
+// BulletFactory2D::_ready() and BulletSpawner2D::_ready()/_process().
+// Do not "fix" editor log spam by switching macros; fix (or add) the guard.
+
+// Shared
 	GDREGISTER_CLASS(BulletRotationData2D)
 	GDREGISTER_CLASS(BulletSpeedData2D)
 	GDREGISTER_CLASS(BulletCurvesData2D)
