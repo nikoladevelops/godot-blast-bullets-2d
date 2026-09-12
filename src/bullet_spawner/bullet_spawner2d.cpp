@@ -373,6 +373,7 @@ void BulletSpawner2D::set_transforms_source(TransformsSource value) {
     // inspector immediately, otherwise the new mode's options stay hidden
     // until the selection is re-clicked (see _validate_property).
     notify_property_list_changed();
+    update_preview_process_state();
     rebuild_preview();
 }
 
@@ -767,6 +768,15 @@ bool BulletSpawner2D::get_show_pattern_preview() const {
 }
 void BulletSpawner2D::set_show_pattern_preview(bool value) {
     show_pattern_preview = value;
+    update_preview_process_state();
+    rebuild_preview();
+}
+bool BulletSpawner2D::get_show_preview_during_runtime() const {
+    return show_preview_during_runtime;
+}
+void BulletSpawner2D::set_show_preview_during_runtime(bool value) {
+    show_preview_during_runtime = value;
+    update_preview_process_state();
     rebuild_preview();
 }
 Color BulletSpawner2D::get_preview_dot_color() const {
@@ -936,10 +946,82 @@ TypedArray<Transform2D> BulletSpawner2D::collect_spawn_transforms_impl(bool quie
     return transforms;
 }
 
+bool BulletSpawner2D::preview_allowed_here() const {
+    if (!is_inside_tree()) {
+        return false;
+    }
+    if (Engine::get_singleton()->is_editor_hint()) {
+        return true;
+    }
+    return show_preview_during_runtime;
+}
+
+bool BulletSpawner2D::preview_active() const {
+    return show_pattern_preview && preview_allowed_here();
+}
+
+// Resolves the effective base exactly like collect_spawn_transforms_impl()
+// (generator, else self) plus the aimed target, then snapshots ids and
+// global transforms. Never assumes an old pointer: everything is freshly
+// resolved from paths here.
+void BulletSpawner2D::snapshot_preview_sources() {
+    tracked_self_global = get_global_transform();
+    tracked_has_self = true;
+    tracked_base = get_transforms_generator();
+    if (tracked_base == nullptr) {
+        tracked_base = this;
+    }
+    tracked_base_id = tracked_base->get_instance_id();
+    tracked_target = nullptr;
+    tracked_target_id = 0;
+    tracked_has_target_origin = false;
+    if (transforms_source == TRANSFORMS_FROM_HELPER_AIMED) {
+        Node2D *target = get_helper_aimed_target();
+        if (target != nullptr) {
+            tracked_target = target;
+            tracked_target_id = target->get_instance_id();
+            tracked_target_origin = target->get_global_transform();
+            tracked_has_target_origin = true;
+        }
+    }
+    tracked_marker_origins.clear();
+    tracked_marker_rots.clear();
+    tracked_marker_ids.clear();
+    tracked_child_count = -1;
+    if (!is_inside_tree() || tracked_base == nullptr) {
+        return;
+    }
+    // Marker slots: origin + rotation + id per child index. A non-Node2D
+    // child and a freed-then-reused slot both compare unequal (dirty), which
+    // triggers a rebuild that re-resolves - never a dereference of garbage.
+    tracked_child_count = tracked_base->get_child_count();
+    tracked_marker_origins.resize(tracked_child_count);
+    tracked_marker_rots.resize(tracked_child_count);
+    // Two int64 entries per child (low/high 32 bits): instance ids don't fit
+    // a double bit-exactly, and float packing would alias distinct objects.
+    tracked_marker_ids.resize(tracked_child_count * 2);
+    for (int i = 0; i < tracked_child_count; i++) {
+        Node2D *marker = Object::cast_to<Node2D>(tracked_base->get_child(i));
+        if (marker == nullptr) {
+            tracked_marker_origins[i] = Vector2(Math::INF, Math::INF);
+            tracked_marker_rots[i] = Math::INF;
+            tracked_marker_ids[i * 2] = 0;
+            tracked_marker_ids[i * 2 + 1] = 0;
+            continue;
+        }
+        tracked_marker_origins[i] = marker->get_global_transform().get_origin();
+        tracked_marker_rots[i] = marker->get_global_rotation();
+        const uint64_t id = marker->get_instance_id();
+        tracked_marker_ids[i * 2] = (int64_t)(id & 0xFFFFFFFFu);
+        tracked_marker_ids[i * 2 + 1] = (int64_t)(id >> 32);
+    }
+}
+
 void BulletSpawner2D::rebuild_preview() {
-    // Editor visualization only: never build anything at runtime, before the
-    // node is inside the tree (scene load sets properties first), or off.
-    if (!Engine::get_singleton()->is_editor_hint() || !is_inside_tree()) {
+    // Preview may exist in the editor (toggle decides) and at runtime only
+    // when the user opted in via show_preview_during_runtime. Never before
+    // the node is inside the tree (scene load sets properties first).
+    if (!preview_allowed_here()) {
         return;
     }
     if (!show_pattern_preview) {
@@ -1042,14 +1124,103 @@ void BulletSpawner2D::rebuild_preview() {
     }
     preview_dots_layer->set_dots_data(dots, preview_dot_color, (float)preview_dot_radius);
     preview_arrows_layer->set_arrows_data(tails, dirs, preview_arrow_color, (float)preview_arrow_length, (float)preview_arrow_width, (float)preview_arrow_head_length, (float)preview_arrow_head_width);
+    // The snapshot must match what was just drawn: dirty-checks compare
+    // against this, so snap AFTER the collect, not before.
+    snapshot_preview_sources();
+}
+
+// Compares live source state against the snapshot. Crash-safe by
+// construction: cached pointers are NEVER dereferenced here. Everything is
+// freshly resolved from paths (resolve_node_path / get_child); the stored
+// ids only participate in integer comparisons. A freed node (or a slot
+// reused by an unrelated object, caught via the id check) reports dirty and
+// the rebuild re-resolves - never a touch of garbage memory.
+bool BulletSpawner2D::preview_sources_dirty() {
+    // No snapshot yet (first frames): dirty so the loop rebuilds + snaps.
+    if (!tracked_has_self) {
+        return true;
+    }
+    if (!is_inside_tree()) {
+        return false;
+    }
+    if (get_global_transform() != tracked_self_global) {
+        return true;
+    }
+    Node2D *base = get_transforms_generator();
+    if (base == nullptr) {
+        base = this;
+    }
+    if (base->get_instance_id() != tracked_base_id || !is_tracked_node_alive(base, tracked_base_id)) {
+        return true;
+    }
+    if (transforms_source == TRANSFORMS_FROM_HELPER_AIMED) {
+        Node2D *target = get_helper_aimed_target();
+        const uint64_t target_id = target != nullptr ? target->get_instance_id() : 0;
+        if (target_id != tracked_target_id) {
+            return true;
+        }
+        if (target != nullptr) {
+            if (!is_tracked_node_alive(target, tracked_target_id)) {
+                return true;
+            }
+            if (tracked_has_target_origin && target->get_global_transform() != tracked_target_origin) {
+                return true;
+            }
+        } else if (tracked_has_target_origin) {
+            return true;
+        }
+    } else if (tracked_target_id != 0 || tracked_has_target_origin) {
+        return true;
+    }
+    const int count = base->get_child_count();
+    if (count != tracked_child_count) {
+        return true;
+    }
+    if (tracked_marker_origins.size() != count || tracked_marker_rots.size() != count || tracked_marker_ids.size() != count * 2) {
+        return true;
+    }
+    for (int i = 0; i < count; i++) {
+        Node2D *marker = Object::cast_to<Node2D>(base->get_child(i));
+        if (marker == nullptr) {
+            if (tracked_marker_origins[i] != Vector2(Math::INF, Math::INF)) {
+                return true;
+            }
+            continue;
+        }
+        // Identity first (catches freed + slot-reused objects), then pose:
+        // a marker rotated exactly in place keeps its origin, so the
+        // rotation check is what catches your inspector-rotation bug.
+        const uint64_t id = marker->get_instance_id();
+        if (tracked_marker_ids[i * 2] != (int64_t)(id & 0xFFFFFFFFu) || tracked_marker_ids[i * 2 + 1] != (int64_t)(id >> 32)) {
+            return true;
+        }
+        if (marker->get_global_transform().get_origin() != tracked_marker_origins[i] || marker->get_global_rotation() != tracked_marker_rots[i]) {
+            return true;
+        }
+    }
+    return false;
+}
+
+void BulletSpawner2D::update_preview_process_state() {
+    // Editor: processing runs only while the preview is on, so inspector
+    // rotations, gizmo drags, and add/remove marker refresh live.
+    // Runtime: never touched here - shooting/spinning own _process, and the
+    // runtime preview piggy-backs that loop via preview_sources_dirty().
+    if (Engine::get_singleton()->is_editor_hint() && is_inside_tree()) {
+        if (show_pattern_preview) {
+            set_process(true);
+        } else {
+            set_process(false);
+        }
+    }
 }
 
 void BulletSpawner2D::_validate_property(PropertyInfo &p_property) const {
     const String property_name = p_property.name;
-    // Tidy inspector: hide the preview tuning knobs while the preview itself
-    // is off. The toggle + spin props stay always visible.
+    // Tidy inspector: hide the preview tuning knobs while both preview
+    // switches are off. The toggles + spin props stay always visible.
     if (property_name.begins_with("preview_") && property_name != "show_pattern_preview") {
-        if (!show_pattern_preview) {
+        if (!show_pattern_preview && !show_preview_during_runtime) {
             p_property.usage &= ~PROPERTY_USAGE_EDITOR;
         }
         return;
@@ -1118,8 +1289,8 @@ bool BulletSpawner2D::shoot_once() {
     // Exact-equality = transition only: further manual shots past the cap do
     // not re-emit, and the setter path reports its own transition.
     if (max_volleys >= 0 && volleys_fired == max_volleys) {
-        // Stop shooting, but stay awake while spinning.
-        set_process(spin_enabled);
+        // Stop shooting, but stay awake while spinning or previewing.
+        set_process(spin_enabled || preview_active());
         emit_signal("shooting_finished");
     }
     return true;
@@ -1131,25 +1302,37 @@ void BulletSpawner2D::_ready() {
     // this the shoot timer would fire against a factory that is deliberately
     // never ready outside the running game.
     if (Engine::get_singleton()->is_editor_hint()) {
-        set_process(false);
-        // Editor preview follows the spawner's own transform live.
+        // Editor preview: self-transform notice for instant self moves +
+        // the tracked-sources loop for markers/generator/target/children.
         set_notify_transform(true);
+        update_preview_process_state();
         rebuild_preview();
         return;
     }
-    // Paranoia: the preview holder is owner-less and thus never saved, but
-    // drop it if one is somehow present so runtime is never affected.
-    preview_holder = nullptr;
-    preview_dots_layer = nullptr;
-    preview_arrows_layer = nullptr;
-    Node *stray = get_node_or_null(NodePath(PREVIEW_HOLDER_NAME));
-    if (stray != nullptr) {
-        remove_child(stray);
-        memdelete(stray);
+    // Runtime: the preview holder is owner-less and thus never saved, but a
+    // stray may exist after "Play Scene" from a dirty editor state. Keep it
+    // only when the user opted into a runtime preview; else drop it so
+    // runtime is never affected.
+    if (!preview_active()) {
+        preview_holder = nullptr;
+        preview_dots_layer = nullptr;
+        preview_arrows_layer = nullptr;
+        Node *stray = get_node_or_null(NodePath(PREVIEW_HOLDER_NAME));
+        if (stray != nullptr) {
+            remove_child(stray);
+            memdelete(stray);
+        }
+    } else {
+        set_notify_transform(true);
+        rebuild_preview();
     }
     volleys_fired = 0;
     shoot_time_left = shoot_initial_delay_sec;
-    set_process(auto_shooting_active() || spin_enabled);
+    if (preview_active()) {
+        set_process(true);
+    } else {
+        set_process(auto_shooting_active() || spin_enabled);
+    }
     if (auto_shooting_active()) {
         emit_signal("shooting_started");
     }
@@ -1157,17 +1340,46 @@ void BulletSpawner2D::_ready() {
 
 void BulletSpawner2D::_notification(int p_what) {
     if (p_what == NOTIFICATION_LOCAL_TRANSFORM_CHANGED) {
-        // Editor: moving/rotating the spawner refreshes the preview.
-        // Runtime: rebuild_preview() is a guarded no-op there.
+        // Moving/rotating the spawner itself refreshes instantly.
         rebuild_preview();
+    } else if (p_what == NOTIFICATION_CHILD_ORDER_CHANGED) {
+        // A marker child was added, removed, or reordered: the tracked count
+        // changes, so rebuild at once instead of waiting for the _process
+        // dirty-check. Guarded no-op when the preview may not exist.
+        if (is_inside_tree()) {
+            rebuild_preview();
+            // Rebuild already re-snapshots; the loop below stays in sync.
+        }
+    } else if (p_what == NOTIFICATION_EXIT_TREE) {
+        // Leaving the tree (scene change, quit): drop caches so a later
+        // _ready starts clean. The holder is a child and frees itself; only
+        // null the pointers, never memdelete detached nodes here.
+        preview_holder = nullptr;
+        preview_dots_layer = nullptr;
+        preview_arrows_layer = nullptr;
+        tracked_base = nullptr;
+        tracked_base_id = 0;
+        tracked_target = nullptr;
+        tracked_target_id = 0;
+        tracked_has_target_origin = false;
+        tracked_marker_origins.clear();
+        tracked_marker_rots.clear();
+        tracked_marker_ids.clear();
+        tracked_child_count = -1;
+        tracked_has_self = false;
     }
 }
 
 void BulletSpawner2D::_process(double delta) {
+    // Live-refresh loop for the preview: any tracked source move/add/remove
+    // rebuilds at once (inspector rotation, gizmo drag, new marker, undo).
+    // Crash-safe: preview_sources_dirty() never dereferences a stale node.
+    if (preview_active() && preview_sources_dirty()) {
+        rebuild_preview();
+    }
     // Self-healing: even if processing gets enabled in the editor somehow
     // (e.g. set_shooting_enabled(true) from an editor dock), never shoot.
     if (Engine::get_singleton()->is_editor_hint()) {
-        set_process(false);
         return;
     }
     if (!Math::is_finite(delta) || delta < 0.0) {
@@ -1181,8 +1393,9 @@ void BulletSpawner2D::_process(double delta) {
         advance_spin(delta);
     }
     if (!auto_shooting_active()) {
-        // Sleep when there is nothing to do, but stay awake while spinning.
-        set_process(spin_enabled);
+        // Sleep when there is nothing to do, but stay awake while spinning
+        // or while the runtime preview loop must keep refreshing.
+        set_process(spin_enabled || preview_active());
         return;
     }
     shoot_time_left -= delta;
@@ -1441,6 +1654,10 @@ void BulletSpawner2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_show_pattern_preview"), &BulletSpawner2D::get_show_pattern_preview);
 	ClassDB::bind_method(D_METHOD("set_show_pattern_preview", "value"), &BulletSpawner2D::set_show_pattern_preview);
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "show_pattern_preview"), "set_show_pattern_preview", "get_show_pattern_preview");
+
+	ClassDB::bind_method(D_METHOD("get_show_preview_during_runtime"), &BulletSpawner2D::get_show_preview_during_runtime);
+	ClassDB::bind_method(D_METHOD("set_show_preview_during_runtime", "value"), &BulletSpawner2D::set_show_preview_during_runtime);
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "show_preview_during_runtime"), "set_show_preview_during_runtime", "get_show_preview_during_runtime");
 
 	ClassDB::bind_method(D_METHOD("get_preview_dot_color"), &BulletSpawner2D::get_preview_dot_color);
 	ClassDB::bind_method(D_METHOD("set_preview_dot_color", "value"), &BulletSpawner2D::set_preview_dot_color);

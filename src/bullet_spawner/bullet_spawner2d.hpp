@@ -59,6 +59,21 @@ class PatternPreviewLayer2D : public Node2D {
 class BulletSpawner2D : public Node2D{
     GDCLASS(BulletSpawner2D, Node2D)
 
+    // Crash-safety for preview source tracking: a raw Node* cached across
+    // frames may dangle after the node is freed (stale object id: the memory
+    // can even be reused by an unrelated object). The ONLY safe pattern is:
+    // store the pointer AND its instance id, then validate with
+    // is_instance_id_valid() + id equality BEFORE touching the pointer.
+    // A failed check means "gone": never dereference, just treat as dirty so
+    // the next rebuild re-resolves from the tree. Same idea as
+    // homing_target_deque's is_homing_target_valid().
+    static bool is_tracked_node_alive(const Node *node, uint64_t cached_id) {
+        if (node == nullptr || !godot::UtilityFunctions::is_instance_id_valid(cached_id)) {
+            return false;
+        }
+        return node->get_instance_id() == cached_id;
+    }
+
     public:
         // Where volley transforms come from. Children/Self read the scene
         // tree; the helper modes call the BulletFactory2D static generators
@@ -230,6 +245,9 @@ class BulletSpawner2D : public Node2D{
         // owner-less holder node: the holder is never saved to the scene,
         // never exported, and never created at runtime.
         bool show_pattern_preview = true;
+        // When true, the preview holder + layers are also built at runtime
+        // (fresh at _ready, never serialized) and follow live transforms.
+        bool show_preview_during_runtime = false;
         Color preview_dot_color = Color(1.0, 0.05, 0.05);
         Color preview_arrow_color = Color(1.0, 0.05, 0.05);
         double preview_dot_radius = 4.0;
@@ -244,6 +262,8 @@ class BulletSpawner2D : public Node2D{
 
         bool get_show_pattern_preview() const;
         void set_show_pattern_preview(bool value);
+        bool get_show_preview_during_runtime() const;
+        void set_show_preview_during_runtime(bool value);
         Color get_preview_dot_color() const;
         void set_preview_dot_color(const Color &value);
         Color get_preview_arrow_color() const;
@@ -388,6 +408,22 @@ class BulletSpawner2D : public Node2D{
         // Spin runtime state (never stored, advances in _process only).
         double spin_angle_deg = 0.0;
         double spin_time_sec = 0.0;
+        // Preview source tracking: dirty-check state for the live-refresh loop.
+        // Only instance ids + global transforms are stored - never assumed
+        // alive. Every access goes through is_tracked_node_alive() first, so
+        // a freed marker/generator/target can never crash the game.
+        uint64_t tracked_base_id = 0;
+        Node2D *tracked_base = nullptr;
+        uint64_t tracked_target_id = 0;
+        Node2D *tracked_target = nullptr;
+        Transform2D tracked_target_origin;
+        bool tracked_has_target_origin = false;
+        PackedVector2Array tracked_marker_origins;
+        PackedRealArray tracked_marker_rots;
+        PackedInt64Array tracked_marker_ids;
+        int tracked_child_count = -1;
+        Transform2D tracked_self_global;
+        bool tracked_has_self = false;
         // Editor-only pattern preview holder (null at runtime, never saved),
         // plus its two self-repainting _draw layers (dots + arrows).
         Node2D *preview_holder = nullptr;
@@ -397,6 +433,22 @@ class BulletSpawner2D : public Node2D{
         bool auto_shooting_active() const;
         // Advances spin_angle_deg by delta according to spin_mode.
         void advance_spin(double delta);
+        // Whether the preview may exist right now: editor always (toggle
+        // decides), runtime only when the user opted in.
+        bool preview_allowed_here() const;
+        // Whether the preview refresh loop must run: allowed + toggled on.
+        bool preview_active() const;
+        // Snapshots the currently observed source nodes (validated ids +
+        // global transforms) without touching the preview itself.
+        void snapshot_preview_sources();
+        // True when any tracked source moved, appeared, or vanished
+        // (freed nodes count as dirty, never as a crash).
+        bool preview_sources_dirty();
+        // Enables/disables _process for the preview live-refresh loop.
+        // Editor: processing runs only while the preview is on. Runtime:
+        // never touched here (shooting/spinning own it) - the runtime
+        // preview piggy-backs the existing loop via preview_sources_dirty().
+        void update_preview_process_state();
         // (Re)builds the editor preview from the current pattern.
         // No-op outside the editor or when the preview is disabled.
         void rebuild_preview();
