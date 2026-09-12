@@ -28,7 +28,6 @@
 
 // Bullet Spawner
 #include "bullet_spawner/bullet_spawner2d.hpp"
-#include "bullet_spawner/bullet_spawner_data2d.hpp"
 
 
 using namespace godot;
@@ -66,7 +65,6 @@ void initialize_blast_bullets_2d_module(ModuleInitializationLevel p_level) {
 
 	// Bullet Spawner
 	GDREGISTER_CLASS(BulletSpawner2D)
-	GDREGISTER_CLASS(BulletSpawnerData2D)
 }
 
 void uninitialize_blast_bullets_2d_module(ModuleInitializationLevel p_level) {

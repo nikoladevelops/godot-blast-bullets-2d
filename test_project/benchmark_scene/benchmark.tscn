@@ -13,9 +13,6 @@
 
 [sub_resource type="DirectionalBulletsData2D" id="DirectionalBulletsData2D_nkrfg"]
 
-[sub_resource type="BulletSpawnerData2D" id="BulletSpawnerData2D_qt42x"]
-data = SubResource("DirectionalBulletsData2D_nkrfg")
-
 [sub_resource type="Gradient" id="Gradient_rfik0"]
 colors = PackedColorArray(0.215686, 0.215686, 0.215686, 1, 0.215686, 0.215686, 0.215686, 1)
 
@@ -51,7 +48,7 @@ script = ExtResource("1_cfubd")
 [node name="BulletSpawner2D" type="BulletSpawner2D" parent="." unique_id=1540696231]
 bullet_factory_path = NodePath("../BulletFactory2D")
 movement_pattern_path = NodePath("../Paths/Path2D")
-spawn_data = SubResource("BulletSpawnerData2D_qt42x")
+spawn_data = SubResource("DirectionalBulletsData2D_nkrfg")
 
 [node name="Sprite2D" type="Sprite2D" parent="." unique_id=875066845]
 z_index = -12

@@ -1,6 +1,0 @@
-[gd_resource type="BulletSpawnerData2D" format=3 uid="uid://yy0n3yjmo6x0"]
-
-[sub_resource type="DirectionalBulletsData2D" id="DirectionalBulletsData2D_kignr"]
-
-[resource]
-data = Array[DirectionalBulletsData2D]([SubResource("DirectionalBulletsData2D_kignr")])

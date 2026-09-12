@@ -113,10 +113,10 @@ void BulletSpawner2D::set_movement_pattern_path_node(Path2D *path) {
     assign_node_to_path(this, path, movement_pattern_path, movement_pattern_path_node);
 }
 
-Ref<BulletSpawnerData2D> BulletSpawner2D::get_spawn_data() const {
+Ref<DirectionalBulletsData2D> BulletSpawner2D::get_spawn_data() const {
     return spawn_data;
 }
-void BulletSpawner2D::set_spawn_data(const Ref<BulletSpawnerData2D> &new_data) {
+void BulletSpawner2D::set_spawn_data(const Ref<DirectionalBulletsData2D> &new_data) {
     spawn_data = new_data;
 }
 
@@ -145,7 +145,7 @@ void BulletSpawner2D::_bind_methods() {
 
     ClassDB::bind_method(D_METHOD("get_spawn_data"), &BulletSpawner2D::get_spawn_data);
     ClassDB::bind_method(D_METHOD("set_spawn_data", "new_spawn_data"), &BulletSpawner2D::set_spawn_data);
-    ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "spawn_data", PROPERTY_HINT_RESOURCE_TYPE, "BulletSpawnerData2D"), "set_spawn_data", "get_spawn_data");
+	ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "spawn_data", PROPERTY_HINT_RESOURCE_TYPE, "DirectionalBulletsData2D"), "set_spawn_data", "get_spawn_data");
 
 }
 
