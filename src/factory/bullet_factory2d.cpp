@@ -655,7 +655,14 @@ void BulletFactory2D::populate_bullets_pool(const Ref<MultiMeshPoolKey2D> &key, 
 	if (key.is_null()) {
 		UtilityFunctions::push_error("populate_bullets_pool requires an explicit MultiMeshPoolKey2D (amount_bullets + shape). Null is not allowed.");
 		if (debugger_was_enabled) {
-			call_deferred("set_is_debugger_enabled", true);
+			// Immediate outside physics processing (no frame of missing
+			// debugger); deferred within it, where tree mutation could race
+			// the debugger tick.
+			if (Engine::get_singleton()->is_in_physics_frame()) {
+				call_deferred("set_is_debugger_enabled", true);
+			} else {
+				set_is_debugger_enabled(true);
+			}
 		}
 		is_factory_busy = false;
 		if (enable_processing_after_finish) {
@@ -667,7 +674,14 @@ void BulletFactory2D::populate_bullets_pool(const Ref<MultiMeshPoolKey2D> &key, 
 	if (instance_count <= 0) {
 		UtilityFunctions::push_error("Error. You can't populate the bullets pool with instance_count <= 0");
 		if (debugger_was_enabled) {
-			call_deferred("set_is_debugger_enabled", true);
+			// Immediate outside physics processing (no frame of missing
+			// debugger); deferred within it, where tree mutation could race
+			// the debugger tick.
+			if (Engine::get_singleton()->is_in_physics_frame()) {
+				call_deferred("set_is_debugger_enabled", true);
+			} else {
+				set_is_debugger_enabled(true);
+			}
 		}
 		is_factory_busy = false;
 		if (enable_processing_after_finish) {
@@ -679,7 +693,14 @@ void BulletFactory2D::populate_bullets_pool(const Ref<MultiMeshPoolKey2D> &key, 
 	if (multimesh_data.is_null() || multimesh_data->transforms.size() == 0) {
 		UtilityFunctions::push_error("Error when trying to pool bullets. No transforms were provided in the spawn data. Ignoring the request");
 		if (debugger_was_enabled) {
-			call_deferred("set_is_debugger_enabled", true);
+			// Immediate outside physics processing (no frame of missing
+			// debugger); deferred within it, where tree mutation could race
+			// the debugger tick.
+			if (Engine::get_singleton()->is_in_physics_frame()) {
+				call_deferred("set_is_debugger_enabled", true);
+			} else {
+				set_is_debugger_enabled(true);
+			}
 		}
 		is_factory_busy = false;
 		if (enable_processing_after_finish) {
@@ -690,7 +711,14 @@ void BulletFactory2D::populate_bullets_pool(const Ref<MultiMeshPoolKey2D> &key, 
 
 	if (!validate_spawn_data(multimesh_data, "populate_bullets_pool")) {
 		if (debugger_was_enabled) {
-			call_deferred("set_is_debugger_enabled", true);
+			// Immediate outside physics processing (no frame of missing
+			// debugger); deferred within it, where tree mutation could race
+			// the debugger tick.
+			if (Engine::get_singleton()->is_in_physics_frame()) {
+				call_deferred("set_is_debugger_enabled", true);
+			} else {
+				set_is_debugger_enabled(true);
+			}
 		}
 		is_factory_busy = false;
 		if (enable_processing_after_finish) {
@@ -708,7 +736,14 @@ void BulletFactory2D::populate_bullets_pool(const Ref<MultiMeshPoolKey2D> &key, 
 	if (!(requested == expected)) {
 		UtilityFunctions::push_error(vformat("populate_bullets_pool key mismatch: key is (amount_bullets=%d, shape=%d) but spawn data derives (amount_bullets=%d, shape=%d). No instances were created.", requested.amount_bullets, (int)requested.shape_type, expected.amount_bullets, (int)expected.shape_type));
 		if (debugger_was_enabled) {
-			call_deferred("set_is_debugger_enabled", true);
+			// Immediate outside physics processing (no frame of missing
+			// debugger); deferred within it, where tree mutation could race
+			// the debugger tick.
+			if (Engine::get_singleton()->is_in_physics_frame()) {
+				call_deferred("set_is_debugger_enabled", true);
+			} else {
+				set_is_debugger_enabled(true);
+			}
 		}
 		is_factory_busy = false;
 		if (enable_processing_after_finish) {
@@ -725,7 +760,14 @@ void BulletFactory2D::populate_bullets_pool(const Ref<MultiMeshPoolKey2D> &key, 
 	} else {
 		UtilityFunctions::push_error("Error. Unsupported type of MultiMeshBulletsData2D passed to populate_bullets_pool");
 		if (debugger_was_enabled) {
-			call_deferred("set_is_debugger_enabled", true);
+			// Immediate outside physics processing (no frame of missing
+			// debugger); deferred within it, where tree mutation could race
+			// the debugger tick.
+			if (Engine::get_singleton()->is_in_physics_frame()) {
+				call_deferred("set_is_debugger_enabled", true);
+			} else {
+				set_is_debugger_enabled(true);
+			}
 		}
 		is_factory_busy = false;
 		if (enable_processing_after_finish) {
@@ -759,7 +801,14 @@ void BulletFactory2D::populate_bullets_pool(const Ref<MultiMeshPoolKey2D> &key, 
 	}
 
 	if (debugger_was_enabled) {
-		call_deferred("set_is_debugger_enabled", true);
+		// Immediate outside physics processing (no frame of missing
+		// debugger); deferred within it, where tree mutation could race
+		// the debugger tick.
+		if (Engine::get_singleton()->is_in_physics_frame()) {
+			call_deferred("set_is_debugger_enabled", true);
+		} else {
+			set_is_debugger_enabled(true);
+		}
 	}
 
 	is_factory_busy = false;
@@ -1736,25 +1785,40 @@ void BulletFactory2D::_bind_methods() {
 
 	//
 
-	ADD_SIGNAL(MethodInfo("area_entered",
+	// Typed per-bullet-kind collision signals. Emitted synchronously from the
+	// physics tick (Godot-style): handlers run with live instance state, need
+	// no casts, and only structural factory calls (reset/free_*/populate_*)
+	// must be deferred - the error message says so when it happens.
+	// Slim payloads: custom data and transforms are one instance call away
+	// (bullet_get_custom_data(), get_bullet_global_transform()).
+
+	ADD_SIGNAL(MethodInfo("directional_area_entered",
 						  PropertyInfo(Variant::OBJECT, "hit_target_area"),
-						  PropertyInfo(Variant::OBJECT, "multimesh_bullets_instance", PROPERTY_HINT_NODE_TYPE, "MultiMeshBullets2D"),
-						  PropertyInfo(Variant::INT, "bullet_index"),
-						  PropertyInfo(Variant::OBJECT, "shared_bullets_custom_data", PROPERTY_HINT_RESOURCE_TYPE, "Resource"),
-						  PropertyInfo(Variant::TRANSFORM2D, "bullet_global_transform")));
+						  PropertyInfo(Variant::OBJECT, "directional_bullets_instance", PROPERTY_HINT_NODE_TYPE, "DirectionalBullets2D"),
+						  PropertyInfo(Variant::INT, "bullet_index")));
 
-	ADD_SIGNAL(MethodInfo("body_entered",
+	ADD_SIGNAL(MethodInfo("directional_body_entered",
 						  PropertyInfo(Variant::OBJECT, "hit_target_body"),
-						  PropertyInfo(Variant::OBJECT, "multimesh_bullets_instance", PROPERTY_HINT_NODE_TYPE, "MultiMeshBullets2D"),
-						  PropertyInfo(Variant::INT, "bullet_index"),
-						  PropertyInfo(Variant::OBJECT, "shared_bullets_custom_data", PROPERTY_HINT_RESOURCE_TYPE, "Resource"),
-						  PropertyInfo(Variant::TRANSFORM2D, "bullet_global_transform")));
+						  PropertyInfo(Variant::OBJECT, "directional_bullets_instance", PROPERTY_HINT_NODE_TYPE, "DirectionalBullets2D"),
+						  PropertyInfo(Variant::INT, "bullet_index")));
 
-	ADD_SIGNAL(MethodInfo("life_time_over",
-						  PropertyInfo(Variant::OBJECT, "multimesh_bullets_instance", PROPERTY_HINT_NODE_TYPE, "MultiMeshBullets2D"),
-						  PropertyInfo(Variant::ARRAY, "bullet_indexes", PROPERTY_HINT_ARRAY_TYPE, "int"),
-						  PropertyInfo(Variant::OBJECT, "shared_bullets_custom_data", PROPERTY_HINT_RESOURCE_TYPE, "Resource"),
-						  PropertyInfo(Variant::ARRAY, "bullets_global_transforms", PROPERTY_HINT_ARRAY_TYPE, "Transform2D")));
+	ADD_SIGNAL(MethodInfo("directional_life_time_over",
+						  PropertyInfo(Variant::OBJECT, "directional_bullets_instance", PROPERTY_HINT_NODE_TYPE, "DirectionalBullets2D"),
+						  PropertyInfo(Variant::ARRAY, "bullet_indexes", PROPERTY_HINT_ARRAY_TYPE, "int")));
+
+	ADD_SIGNAL(MethodInfo("block_area_entered",
+						  PropertyInfo(Variant::OBJECT, "hit_target_area"),
+						  PropertyInfo(Variant::OBJECT, "block_bullets_instance", PROPERTY_HINT_NODE_TYPE, "BlockBullets2D"),
+						  PropertyInfo(Variant::INT, "bullet_index")));
+
+	ADD_SIGNAL(MethodInfo("block_body_entered",
+						  PropertyInfo(Variant::OBJECT, "hit_target_body"),
+						  PropertyInfo(Variant::OBJECT, "block_bullets_instance", PROPERTY_HINT_NODE_TYPE, "BlockBullets2D"),
+						  PropertyInfo(Variant::INT, "bullet_index")));
+
+	ADD_SIGNAL(MethodInfo("block_life_time_over",
+						  PropertyInfo(Variant::OBJECT, "block_bullets_instance", PROPERTY_HINT_NODE_TYPE, "BlockBullets2D"),
+						  PropertyInfo(Variant::ARRAY, "bullet_indexes", PROPERTY_HINT_ARRAY_TYPE, "int")));
 
 	ADD_SIGNAL(MethodInfo("reset_finished"));
 

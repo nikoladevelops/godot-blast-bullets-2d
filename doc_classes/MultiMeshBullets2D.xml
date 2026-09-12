@@ -532,6 +532,7 @@
 				[code]execute_only_if_multimesh_is_active[/code] - if set to [code]true[/code], then the callable will only be executed if the multimesh is active in the scene tree (if it has at least a single bullet that has not yet been disabled).
 				If you wish to execute the callable regardless of the multimesh being active or not (even when in object pool), then set this parameter to [code]false[/code].
 				Note: For this to take effect ensure that the [member is_multimesh_auto_pooling_enabled] property is set to false - this is because auto pooling clears any callables in order to re-use the multimesh later completely reset.
+				Note: applies immediately outside physics processing; inside a physics frame it is deferred like before.
 
 				If you want to be able to detach the callable, then make sure that it is clearly declared outside as a variable or you could even use a normal Godot function.
 
@@ -740,6 +741,8 @@
 			<param index="0" name="new_shape" type="Shape2D" />
 			<description>
 				Swaps the collision shape live, on an active or pooled multimesh. Size-only changes apply to every bullet right away through the physics server. A different effective type additionally rebuilds the physics shapes and moves pooled instances into the matching pool bucket. The visual QuadMesh is texture-driven and stays untouched. The debugger picks up the new type and size on the next physics tick.
+
+				Note: cannot run while bullets are being processed or inside a physics frame (same contract as the factory structural methods) - use call_deferred() then.
 			</description>
 		</method>
 		<method name="set_inherited_velocity_offset">

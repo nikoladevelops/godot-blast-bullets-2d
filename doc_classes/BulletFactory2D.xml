@@ -305,35 +305,52 @@
 		</member>
 	</members>
 	<signals>
-		<signal name="area_entered">
+		<signal name="directional_area_entered">
 			<param index="0" name="hit_target_area" type="Object" />
-			<param index="1" name="multimesh_bullets_instance" type="Object" />
+			<param index="1" name="directional_bullets_instance" type="DirectionalBullets2D" />
 			<param index="2" name="bullet_index" type="int" />
-			<param index="3" name="shared_bullets_custom_data" type="Resource" />
-			<param index="4" name="bullet_global_transform" type="Transform2D" />
 			<description>
-				Emitted when a bullet enters a physics area.
+				Emitted synchronously in the physics tick when a directional bullet enters a physics area. Handlers run with live instance state (no casts needed); custom data and transforms are one instance call away (bullet_get_custom_data(), get_bullet_global_transform()). Only structural factory calls (reset/free_*/populate_*) must be deferred - the error message says so when it happens.
 			</description>
 		</signal>
-		<signal name="body_entered">
+		<signal name="directional_body_entered">
 			<param index="0" name="hit_target_body" type="Object" />
-			<param index="1" name="multimesh_bullets_instance" type="Object" />
+			<param index="1" name="directional_bullets_instance" type="DirectionalBullets2D" />
 			<param index="2" name="bullet_index" type="int" />
-			<param index="3" name="shared_bullets_custom_data" type="Resource" />
-			<param index="4" name="bullet_global_transform" type="Transform2D" />
 			<description>
-				Emited when a bullet enters a physics body.
+				Emitted synchronously in the physics tick when a directional bullet enters a physics body.
 
 				Note: Static bodies can be detected by the bullets, but only if you set the [MultiMeshBulletsData2D]'s [member MultiMeshBulletsData2D.monitorable] property to [code]true[/code] when spawning bullets - this is at the cost of performance of course, so it's better to stick with [Area2D] or other types of bodies for enemies/buildings etc and leave the [member MultiMeshBulletsData2D.monitorable] property to be false.
 			</description>
 		</signal>
-		<signal name="life_time_over">
-			<param index="0" name="multimesh_bullets_instance" type="Object" />
+		<signal name="directional_life_time_over">
+			<param index="0" name="directional_bullets_instance" type="DirectionalBullets2D" />
 			<param index="1" name="bullet_indexes" type="int[]" />
-			<param index="2" name="shared_bullets_custom_data" type="Resource" />
-			<param index="3" name="bullets_global_transforms" type="Transform2D[]" />
 			<description>
-				Emitted when a bullet multimesh's lifetime is over, but only if the [MultiMeshBulletsData2D]'s [member MultiMeshBulletsData2D.is_life_time_over_signal_enabled] is set to [code]true[/code].
+				Emitted (deferred, outside the physics step) when a directional bullet multimesh's lifetime is over, but only if the [MultiMeshBulletsData2D]'s [member MultiMeshBulletsData2D.is_life_time_over_signal_enabled] is set to [code]true[/code].
+			</description>
+		</signal>
+		<signal name="block_area_entered">
+			<param index="0" name="hit_target_area" type="Object" />
+			<param index="1" name="block_bullets_instance" type="BlockBullets2D" />
+			<param index="2" name="bullet_index" type="int" />
+			<description>
+				Emitted synchronously in the physics tick when a block bullet enters a physics area. Same handler contract as [signal directional_area_entered].
+			</description>
+		</signal>
+		<signal name="block_body_entered">
+			<param index="0" name="hit_target_body" type="Object" />
+			<param index="1" name="block_bullets_instance" type="BlockBullets2D" />
+			<param index="2" name="bullet_index" type="int" />
+			<description>
+				Emitted synchronously in the physics tick when a block bullet enters a physics body. Same handler contract as [signal directional_body_entered].
+			</description>
+		</signal>
+		<signal name="block_life_time_over">
+			<param index="0" name="block_bullets_instance" type="BlockBullets2D" />
+			<param index="1" name="bullet_indexes" type="int[]" />
+			<description>
+				Emitted (deferred, outside the physics step) when a block bullet multimesh's lifetime is over, but only if the [MultiMeshBulletsData2D]'s [member MultiMeshBulletsData2D.is_life_time_over_signal_enabled] is set to [code]true[/code].
 			</description>
 		</signal>
 		<signal name="reset_finished">

@@ -91,7 +91,7 @@ relative to their direction (allows zig zag patterns and any other creative patt
 
 - **Bullets Custom Data** - Attach a custom resource that the multimesh of bullets carries - used for storing damage, armor damage or anything else custom that should be available during collision.
 
-- **Familiar Signals** - Collisions are tracked with `area_entered` and `body_entered` signals inside the BulletFactory2D node. Combine this with the bullet custom data and you can easily differentiate between types of bullets. You can even detach/attach new bullet attachments or make explosion effects while editing runtime properties inside the function callbacks.
+- **Familiar Signals** - Collisions are tracked with the typed `directional_area_entered` / `directional_body_entered` signals (plus `block_*` variants) inside the BulletFactory2D node. Combine this with the bullet custom data and you can easily differentiate between types of bullets. You can even detach/attach new bullet attachments or make explosion effects while editing runtime properties inside the function callbacks.
 
 - **Extensive Documentation** - Full in-editor documentation for every function and property, accessible directly within the Godot Inspector and Script Editor.
 
@@ -154,7 +154,7 @@ It is recommended to watch these tutorials if you are struggling with the docume
 
 Here is how the basic setup goes:
 1. Add a `BulletFactory2D` node to your scene tree. The BulletFactory's job is to spawn bullets and manage plugin related options (debugger, physics interpolations and so on..).
-2. The `BulletFactory2D` node has the signals `area_entered`, `body_entered`, `life_time_over` and each bullet multimesh emits `sprite_animation_finished` when a non-looping animation ends. You should handle them in your script and write custom logic for your game.
+2. The `BulletFactory2D` node has the typed signals `directional_area_entered`, `directional_body_entered`, `directional_life_time_over` (and the `block_*` variants) and each bullet multimesh emits `sprite_animation_finished` when a non-looping animation ends. The instance argument is already typed (`DirectionalBullets2D` / `BlockBullets2D`), so handlers need no casts - custom data and transforms are one instance call away (`bullet_get_custom_data()`, `get_bullet_global_transform()`). Collision signals fire synchronously in the physics tick; only structural factory calls (`reset()`/`free_*()`/`populate_*()`) must be deferred, and the error message tells you when that happens. You should handle them in your script and write custom logic for your game.
 
 Keep a reference to the factory globally, so you can access it in any other script(enemies/player). There's two ways of doing this.
 
@@ -267,15 +267,15 @@ extends Resource
 ```
 
 
-Next up go inside the ``BulletFactory2D`` node and register callbacks for the signals ``area_entered``, ``body_entered`` and even ``life_time_over`` if you are interested in it.
+Next up go inside the ``BulletFactory2D`` node and register callbacks for the signals ``directional_area_entered``, ``directional_body_entered`` (or the ``block_*`` variants) and even ``directional_life_time_over`` if you are interested in it.
 
 Example:
 
 ```
-# This function is connected to the area_entered signal of the bullet factory. It is executed each time a bullet spawned from the factory hits an Area2D (and again in order for a thing to be hit, ensure the layers are correct!)
-func _on_area_entered(hit_target_area: Object, _multimesh_bullets_instance:MultiMeshBullets2D, _bullet_index:int, bullets_custom_data: Resource, _bullet_global_transform: Transform2D) -> void:	
+# This function is connected to the directional_area_entered signal of the bullet factory. It is executed each time a bullet spawned from the factory hits an Area2D (and again in order for a thing to be hit, ensure the layers are correct!)
+func _on_directional_area_entered(hit_target_area: Object, directional_bullets: DirectionalBullets2D, bullet_index: int) -> void:	
 	if hit_target_area is AbstractEnemy:
-		var dmg_data:DamageData = bullets_custom_data as DamageData # We know for a fact that we have a DamageData inside our bullets, because that's how we've set them up before spawning them - we can replace it with some other custom resource instead and check for its type here too (we may spawn bullets with different custom data and have additional check logic)
+		var dmg_data:DamageData = directional_bullets.bullet_get_custom_data(bullet_index) as DamageData # We know for a fact that we have a DamageData inside our bullets, because that's how we've set them up before spawning them - we can replace it with some other custom resource instead and check for its type here too (we may spawn bullets with different custom data and have additional check logic)
 		if dmg_data.is_player_owned == false: # If it wasn't the player who spawned the bullet, then that means an enemy is hitting another enemy - I want the bullet to disappear without it damaging the enemy (No friendly fire :P)
 			return
 		hit_target_area.take_damage(dmg_data.base_damage) # You can do way more complex damage logic with the rest of the properties inside bullets_custom_data, you can do anything..
@@ -283,16 +283,16 @@ func _on_area_entered(hit_target_area: Object, _multimesh_bullets_instance:Multi
 	#else:
 		#print("Bullet just collided with an area")
 
-# This function is connected to the body_entered signal of the bullet factory.  It is executed each time a bullet spawned from the factory hits a body (and again in order for a thing to be hit, ensure the layers are correct and you also have enabled the .monitorable property inside bullets data!)
-func _on_body_entered(hit_target_body: Object, _multimesh_bullets_instance:MultiMeshBullets2D, _bullet_index:int, bullets_custom_data: Resource, _bullet_global_transform: Transform2D) -> void:
+# This function is connected to the directional_body_entered signal of the bullet factory.  It is executed each time a bullet spawned from the factory hits a body (and again in order for a thing to be hit, ensure the layers are correct and you also have enabled the .monitorable property inside bullets data!)
+func _on_directional_body_entered(hit_target_body: Object, directional_bullets: DirectionalBullets2D, bullet_index: int) -> void:
 	if hit_target_body is Player:
-		var dmg_data:DamageData = bullets_custom_data as DamageData
+		var dmg_data:DamageData = directional_bullets.bullet_get_custom_data(bullet_index) as DamageData
 		hit_target_body.take_damage(dmg_data.base_damage)
 		
 	#print("Bullet just collided with a body")
 
 # Works only if data.is_life_time_over_signal_enabled set to true
-func _on_life_time_over(_multimesh_bullets_instance: MultiMeshBullets2D, _bullet_indexes:Array[int], _bullets_custom_data: Resource, _bullets_global_transforms: Array[Transform2D]) -> void:
+func _on_directional_life_time_over(_directional_bullets: DirectionalBullets2D, _bullet_indexes: Array[int]) -> void:
 	pass
 ```
 
@@ -382,7 +382,7 @@ tick the checkbox inside the inspector in `BulletFactory2D`. That's all, enjoy t
 
 ## WARNING
 - Never override the `_ready` function inside `BulletFactory2D` or you will experience crashes
-- Use `queue_free()` when you delete a bullet multimesh or a bullet attachment yourself, never `free()`. Especially never call `free()` on a multimesh from inside one of its own collision or attachment callbacks (for example inside `area_entered` or `on_bullet_disable`). `queue_free()` is always safe in those situations.
+- Use `queue_free()` when you delete a bullet multimesh or a bullet attachment yourself, never `free()`. Especially never call `free()` on a multimesh from inside one of its own collision or attachment callbacks (for example inside `directional_area_entered` or `on_bullet_disable`). `queue_free()` is always safe in those situations.
 
 
 ## How To Compile

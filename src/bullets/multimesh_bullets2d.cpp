@@ -1526,6 +1526,13 @@ void MultiMeshBullets2D::set_collision_shape_runtime(const Ref<Shape2D> &new_sha
 		UtilityFunctions::push_error("set_collision_shape_runtime: physics not ready, cannot change shape at runtime.");
 		return;
 	}
+	// Frees/recreates server RIDs and re-buckets the pool: unsafe while the
+	// factory iterates bullet state or inside any physics frame (server flush
+	// locks apply). Same contract as the factory structural methods.
+	if (bullet_factory != nullptr && bullet_factory->is_bullets_iterating()) {
+		UtilityFunctions::push_error("set_collision_shape_runtime cannot run while bullets are being processed or inside a physics frame (e.g. inside directional_area_entered/block_body_entered handlers). Use call_deferred() to run this after the physics step.");
+		return;
+	}
 	PhysicsServer2D::ShapeType old_effective = cached_effective_shape_type;
 	const PoolKey old_key{ amount_bullets, old_effective };
 	cache_collision_shape_typed(new_shape);

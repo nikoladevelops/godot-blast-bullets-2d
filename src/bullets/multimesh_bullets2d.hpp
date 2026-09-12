@@ -317,29 +317,27 @@ float *w = batch_buffer.ptrw();
 			return;
 		}
 
-		// If the life_time_over signal is enabled - collect transforms, disable bullets immediately (consistent with collision path),
+		// If the life_time_over signal is enabled - collect indexes, disable bullets immediately (consistent with collision path),
 		// but keep attachment disable and signal deferred so handler can still access attachment.
-		TypedArray<Transform2D> transfs;
 		TypedArray<int> bullet_indexes;
 
 		// Caches already hold global-space transforms (spawn data is global and all
-		// movement/homing math is global), so store them directly. Composing with
-		// get_global_transform() here would double-apply the node transform.
+		// movement/homing math is global), so no get_global_transform() compose is
+		// needed anywhere transforms are read (handlers use get_bullet_global_transform()).
 		for (int i : active_copy) {
 			if (!all_bullets_enabled_set.contains(i)) {
 				continue;
 			}
-			if (i < 0 || i >= (int)all_cached_instance_transforms.size()) {
-				continue;
-			}
-			transfs.push_back(all_cached_instance_transforms[i]); // Store the transform before disabling
 			bullet_indexes.push_back(i);
 			disable_bullet(i, false); // immediate shape disable, keep attachment for signal
 		}
 
 		if (bullet_indexes.size() > 0) {
-			// Emit signal deferred so user code runs outside physics step
-			bullet_factory->call_deferred("emit_signal", "life_time_over", this, bullet_indexes, shared_bullets_custom_data, transfs);
+			// Emit signal deferred so user code runs outside physics step.
+			// Typed per bullet kind, slim payload (custom data and transforms
+			// are one instance call away).
+			const char *signal_name = is_class("BlockBullets2D") ? "block_life_time_over" : "directional_life_time_over";
+			bullet_factory->call_deferred("emit_signal", signal_name, this, bullet_indexes);
 
 			// Disable attachments after signal (deferred keeps order)
 			for (int i = 0; i < bullet_indexes.size(); ++i) {
@@ -380,7 +378,7 @@ float *w = batch_buffer.ptrw();
 					anim_frame_time_left = 0.0;
 					if (!anim_finished) {
 						anim_finished = true;
-						// Deferred like life_time_over: never emit directly from physics tick.
+						// Deferred like the life_time_over signals: never emit directly from physics tick.
 						// NOTE: the signal lives on the multimesh itself (not the factory),
 						// so it must be emitted on `this`.
 						call_deferred("emit_signal", "sprite_animation_finished", this);
@@ -722,7 +720,7 @@ float *w = batch_buffer.ptrw();
 	// The max life time before the multimesh gets disabled
 	double max_life_time = 0.0;
 
-	// Whether the life_time_over signal will be emitted when the life time of the bullets is over. Tracked by BulletFactory2D
+	// Whether the directional_life_time_over / block_life_time_over signal will be emitted when the life time of the bullets is over. Tracked by BulletFactory2D
 	bool is_life_time_over_signal_enabled = false;
 
 	// The current life time being processed
@@ -1891,15 +1889,24 @@ float *w = batch_buffer.ptrw();
 
 		Object *hit_target = ObjectDB::get_instance(entered_instance_id);
 
-		// Caches already hold global-space transforms (spawn data is global, all
-		// movement/homing math is global), so pass the cache straight through.
-		// Composing with get_global_transform() here would double-apply the node.
-		const Transform2D bullet_global_transf = all_cached_instance_transforms[bullet_index];
-
-		if (collision_type == CollisionType::AREA) {
-			bullet_factory->emit_signal("area_entered", hit_target, this, bullet_index, shared_bullets_custom_data, bullet_global_transf);
-		} else if (collision_type == CollisionType::BODY) {
-			bullet_factory->emit_signal("body_entered", hit_target, this, bullet_index, shared_bullets_custom_data, bullet_global_transf);
+		// Typed per-kind signals emit synchronously (Godot-style): the instance
+		// is alive and the slot state valid by construction here, so handlers
+		// run with live data, need no casts, and need no call_deferred for
+		// game logic. Slim payload - custom data and transforms are one
+		// instance call away (bullet_get_custom_data(),
+		// get_bullet_global_transform()).
+		if (is_class("BlockBullets2D")) {
+			if (collision_type == CollisionType::AREA) {
+				bullet_factory->emit_signal("block_area_entered", hit_target, this, bullet_index);
+			} else if (collision_type == CollisionType::BODY) {
+				bullet_factory->emit_signal("block_body_entered", hit_target, this, bullet_index);
+			}
+		} else {
+			if (collision_type == CollisionType::AREA) {
+				bullet_factory->emit_signal("directional_area_entered", hit_target, this, bullet_index);
+			} else if (collision_type == CollisionType::BODY) {
+				bullet_factory->emit_signal("directional_body_entered", hit_target, this, bullet_index);
+			}
 		}
 
 		// Disable the bullet attachment if the bullet reached its max collision count and the attachment is still enabled
@@ -2181,9 +2188,19 @@ public:
 	_ALWAYS_INLINE_ void multimesh_attach_time_based_function(double time, const Callable &callable, bool repeat = false, bool execute_only_if_multimesh_is_active = true) {
 		// Stamp the timers generation so a full-disable (which detaches directly)
 		// landing before this deferred call can't leak the timer into the next owner.
-		call_deferred("_do_attach_time_based_function", time, callable, repeat, execute_only_if_multimesh_is_active, multimesh_timers_generation);
+		// Outside physics processing the timer applies immediately (no frame of
+		// delay); inside a physics frame it defers, since
+		// run_multimesh_custom_timers() may be iterating the vector.
+		if (Engine::get_singleton()->is_in_physics_frame()) {
+			call_deferred("_do_attach_time_based_function", time, callable, repeat, execute_only_if_multimesh_is_active, multimesh_timers_generation);
+			return;
+		}
+		_do_attach_time_based_function(time, callable, repeat, execute_only_if_multimesh_is_active, multimesh_timers_generation);
 	}
 
+	// Deferred implementation of multimesh_attach_time_based_function above.
+	// Advanced: calling directly runs synchronously, which is only safe
+	// outside physics processing (the timer vector may be iterated then).
 	_ALWAYS_INLINE_ void _do_attach_time_based_function(double time, const Callable &callable, bool repeat, bool execute_only_if_multimesh_is_active, int expected_timers_generation) {
 		if (expected_timers_generation != multimesh_timers_generation) {
 			return;
@@ -2203,10 +2220,18 @@ public:
 
 	_ALWAYS_INLINE_ void multimesh_detach_time_based_function(const Callable &callable) {
 		// Stamp the generation so a full-disable landing before this deferred
-		// call can't erase the next owner's timers.
-		call_deferred("_do_detach_time_based_function", callable, multimesh_timers_generation);
+		// call can't erase the next owner's timers. Immediate outside physics
+		// processing, deferred within it (same rationale as attach above).
+		if (Engine::get_singleton()->is_in_physics_frame()) {
+			call_deferred("_do_detach_time_based_function", callable, multimesh_timers_generation);
+			return;
+		}
+		_do_detach_time_based_function(callable, multimesh_timers_generation);
 	}
 
+	// Deferred implementation of multimesh_detach_time_based_function above.
+	// Advanced: calling directly runs synchronously, which is only safe
+	// outside physics processing (the timer vector may be iterated then).
 	_ALWAYS_INLINE_ void _do_detach_time_based_function(const Callable &callable, int expected_timers_generation) {
 		if (expected_timers_generation != multimesh_timers_generation) {
 			return;
@@ -2221,9 +2246,18 @@ public:
 	}
 
 	_ALWAYS_INLINE_ void multimesh_detach_all_time_based_functions() {
-		call_deferred("_do_detach_all_time_based_functions", multimesh_timers_generation);
+		// Immediate outside physics processing, deferred within it (same
+		// rationale as attach above).
+		if (Engine::get_singleton()->is_in_physics_frame()) {
+			call_deferred("_do_detach_all_time_based_functions", multimesh_timers_generation);
+			return;
+		}
+		_do_detach_all_time_based_functions(multimesh_timers_generation);
 	}
 
+	// Deferred implementation of multimesh_detach_all_time_based_functions above.
+	// Advanced: calling directly runs synchronously, which is only safe
+	// outside physics processing (the timer vector may be iterated then).
 	_ALWAYS_INLINE_ void _do_detach_all_time_based_functions(int expected_timers_generation) {
 		if (expected_timers_generation != multimesh_timers_generation) {
 			return;

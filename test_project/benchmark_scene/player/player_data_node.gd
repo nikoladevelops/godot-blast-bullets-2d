@@ -86,7 +86,7 @@ func set_up(new_bullet_marker:Marker2D) -> void:
 	bullet_speed_data = BulletSpeedData2D.generate_random_data(bullets_amount, 50,350,900,900,300,300)
 	
 	# Set up damage data that will be used when setting up block and directional bullets
-	# Create functions to track area_entered and body_entered signals of the factory and this data will be available there
+	# Create functions to track directional_area_entered and directional_body_entered signals of the factory and this data will be available there
 	damage_data = DamageData.new()
 	damage_data.base_damage=5 # the default damage set currently
 	damage_data.is_player_owned=true

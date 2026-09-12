@@ -82,8 +82,7 @@ public:
 	// If set to true it would mean it can detect bodies. I suggest you do NOT enable it, because it tanks performance, but I left it just in case someone is stubborn and has that need. Instead consider adding an Area2D to the body that you are trying to damage and set up its collision layer correctly so that the bullets can interact with it.
 	bool monitorable = false;
 
-	// The idea is that you can enter additional data (base damage,armor damage,maybe healing factor,vampire bullets etc..). I am not going to force every single bullet to have a damage, because I don't know what kind of game you're making, so you are free to give any data here that will be available inside the area_entered and body_entered callbacks inside factory.
-	// Per-bullet overrides via all_bullets_custom_data; bullet_get_custom_data() on the instance returns the effective (per-bullet if set, else this shared) value.
+	// Available inside the directional_area_entered / directional_body_entered (or block_* variants) callbacks inside factory.
 	Ref<Resource> shared_bullets_custom_data;
 
 	// PER-BULLET CUSTOM DATA
@@ -120,7 +119,7 @@ public:
 	// How long will the bullets last, before being disabled. Depending on whether the bullets pool has reached its limit, it will either add the bullets to the pool or it will queue_free them.
 	double max_life_time = 2.0f;
 
-	// Whether the life_time_over signal will be emitted when the life time of the bullets is over. Tracked by BulletFactory2D
+	// Whether the directional_life_time_over / block_life_time_over signal will be emitted when the life time of the bullets is over. Tracked by BulletFactory2D
 	bool is_life_time_over_signal_enabled = false;
 
 	// Whether the lifetime is infinite
@@ -238,5 +237,3 @@ protected:
 	static void _bind_methods();
 };
 } //namespace BlastBullets2D
-
-

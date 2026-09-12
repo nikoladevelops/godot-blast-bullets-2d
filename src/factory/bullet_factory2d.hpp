@@ -2,6 +2,7 @@
 
 #include <algorithm>
 
+#include <godot_cpp/classes/engine.hpp>
 #include <godot_cpp/classes/node.hpp>
 #include <godot_cpp/classes/node2d.hpp>
 #include <godot_cpp/classes/packed_scene.hpp>
@@ -179,7 +180,20 @@ public:
 
 	void _notification(int p_what);
 
- protected:
+	// True while bullet state must not be structurally mutated: either this
+	// factory is iterating it, or any physics frame is running (server flush
+	// locks apply). Single source of truth for all mutation guards, usable
+	// from multimesh-level mutators that free/recreate RIDs or re-bucket
+	// pools. Not bound.
+	bool is_bullets_iterating() const {
+		if (is_iterating_bullets) {
+			return true;
+		}
+		const Engine *engine = Engine::get_singleton();
+		return engine != nullptr && engine->is_in_physics_frame();
+	}
+
+  protected:
 	// Responsible for exposing C++ methods/properties to Godot Engine
 	static void _bind_methods();
 
@@ -208,11 +222,19 @@ public:
 	std::vector<int> directional_iteration_scratch;
 	std::vector<int> block_iteration_scratch;
 
-	// Errors (once per call) when a shrinking operation runs mid-iteration.
+	// Errors (once per call) when a structural operation runs while mutation
+	// is unsafe: mid-iteration, or inside any physics frame (server flush
+	// locks apply to RIDs the operation would free). E.g. reset()/free_*()/
+	// populate_*() called from inside a collision or lifetime handler
+	// (directional_area_entered, block_body_entered,
+	// directional_life_time_over, ...) or from a native flush callback.
+	// Wrap the call in call_deferred() to run it after the physics step.
+	// Game logic (spawning, homing, teleporting, attachments, custom data)
+	// is always safe to touch directly.
 	// Returns true when the caller must abort.
 	bool reject_when_iterating(const char *caller_name) const {
-		if (is_iterating_bullets) {
-			UtilityFunctions::push_error(String("BulletFactory2D::") + caller_name + " cannot run while bullets are being processed (e.g. inside area_entered/body_entered/life_time_over handlers). Use call_deferred() to run it after the physics step.");
+		if (is_bullets_iterating()) {
+			UtilityFunctions::push_error(String("BulletFactory2D::") + caller_name + " cannot run while bullets are being processed or inside a physics frame (e.g. inside directional_area_entered/block_body_entered/directional_life_time_over handlers). Only structural calls are affected - use call_deferred() to run this after the physics step.");
 			return true;
 		}
 		return false;
