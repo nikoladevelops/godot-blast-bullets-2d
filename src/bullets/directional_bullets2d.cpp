@@ -525,10 +525,13 @@ void DirectionalBullets2D::_bind_methods() {
 	BIND_ENUM_CONSTANT(FaceOrbitingDirection);
 	BIND_ENUM_CONSTANT(FaceOppositeOrbitingDirection);
 
+	// NOTE: signal args use PROPERTY_HINT_RESOURCE_TYPE (not NODE_TYPE) so the
+	// class name reaches ClassDB and --doctool; see the note on the factory
+	// signals.
 	ADD_SIGNAL(MethodInfo("bullet_homing_target_reached",
-						  PropertyInfo(Variant::OBJECT, "multimesh_instance", PROPERTY_HINT_NODE_TYPE, "DirectionalBullets2D"),
+						  PropertyInfo(Variant::OBJECT, "multimesh_instance", PROPERTY_HINT_RESOURCE_TYPE, "DirectionalBullets2D"),
 						  PropertyInfo(Variant::INT, "bullet_index"),
-						  PropertyInfo(Variant::OBJECT, "target", PROPERTY_HINT_NODE_TYPE, "Node2D"),
+						  PropertyInfo(Variant::OBJECT, "target", PROPERTY_HINT_RESOURCE_TYPE, "Node2D"),
 						  PropertyInfo(Variant::VECTOR2, "target_global_position")));
 }
 

@@ -53,6 +53,9 @@
 			    	Note: If the rotation data is less than the amount of [Transform2D] saved in the [member transforms] property, then only the first bullet rotation data will be shared for all bullets.
 			Note: [BulletRotationData2D] has a helper static method that you can use to generate random rotation data - [method BulletRotationData2D.generate_random_data].
 		</member>
+		<member name="all_bullets_custom_data" type="Resource[]" setter="set_all_bullets_custom_data" getter="get_all_bullets_custom_data" default="[]">
+			Custom data carried per bullet, readable in the factory collision callbacks through [method MultiMeshBullets2D.bullet_get_custom_data]. Same fallback rule as the speed data: empty means none, matching size means per bullet, otherwise the first entry drives all bullets. Stays strictly separate from [member shared_bullets_custom_data]: null entries read as null.
+		</member>
 		<member name="animation" type="StringName" setter="set_animation" getter="get_animation" default="&amp;&quot;default&quot;">
 			Which SpriteFrames animation to play. Empty or "default" auto-resolves silently ("default" if present, else first animation). Explicit wrong names fall back to the first animation with one error. The whole multimesh batch shares one frame at a time; timing uses animation speed (fps), per-frame durations, and loop flag.
 		</member>
@@ -61,14 +64,6 @@
 		</member>
 		<member name="bullets_current_collision_count" type="int[]" setter="set_bullets_current_collision_count" getter="get_bullets_current_collision_count" default="[]">
 			Per-bullet collision counters, one entry per bullet. Leave empty to start every bullet at zero. Values are clamped into range (negatives become 0, values above [member bullet_max_collision_count] become the max when the max is above 0); only a wrong array size is rejected with an error.
-		</member>
-		<member name="all_bullets_custom_data" type="Resource[]" setter="set_all_bullets_custom_data" getter="get_all_bullets_custom_data" default="[]">
-			Custom data carried per bullet, readable in the factory collision callbacks through [method MultiMeshBullets2D.bullet_get_custom_data]. Same fallback rule as the speed data: empty means none, matching size means per bullet, otherwise the first entry drives all bullets. Stays strictly separate from [member shared_bullets_custom_data]: null entries read as null.
-		</member>
-		<member name="shared_bullets_custom_data" type="Resource" setter="set_shared_bullets_custom_data" getter="get_shared_bullets_custom_data">
-			If you want your bullets to have damage or any other data specific to this type of bullets then you have to provide a custom resource that holds all of these properties.
-
-			[url=https://www.youtube.com/watch?v=fdRJqnOrz98&amp;t=63s]YouTube Tutorial On Custom Resources[/url]
 		</member>
 		<member name="collision_layer" type="int" setter="set_collision_layer" getter="get_collision_layer" default="1">
 			The bitmask for the collision layer.
@@ -142,6 +137,11 @@
 		</member>
 		<member name="shared_bullet_attachment_stick_relative_to_bullet" type="bool" setter="set_shared_bullet_attachment_stick_relative_to_bullet" getter="get_shared_bullet_attachment_stick_relative_to_bullet" default="true">
 			Whether the shared attachment sticks while the bullet rotates.
+		</member>
+		<member name="shared_bullets_custom_data" type="Resource" setter="set_shared_bullets_custom_data" getter="get_shared_bullets_custom_data">
+			If you want your bullets to have damage or any other data specific to this type of bullets then you have to provide a custom resource that holds all of these properties.
+
+			[url=https://www.youtube.com/watch?v=fdRJqnOrz98&amp;t=63s]YouTube Tutorial On Custom Resources[/url]
 		</member>
 		<member name="sprite_frames" type="SpriteFrames" setter="set_sprite_frames" getter="get_sprite_frames">
 			SpriteFrames holding all animations. Each frame is a Texture2D (plain or AtlasTexture region). The batch shares one frame; per-frame duration and loop come from the animation.

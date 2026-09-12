@@ -1791,33 +1791,37 @@ void BulletFactory2D::_bind_methods() {
 	// must be deferred - the error message says so when it happens.
 	// Slim payloads: custom data and transforms are one instance call away
 	// (bullet_get_custom_data(), get_bullet_global_transform()).
+	// NOTE: signal args use PROPERTY_HINT_RESOURCE_TYPE (not NODE_TYPE) so the
+	// class name reaches ClassDB and --doctool; with NODE_TYPE the class_name
+	// stays empty and docs downgrade the params to Object. This mirrors how
+	// the engine declares e.g. Area2D.area_entered.
 
 	ADD_SIGNAL(MethodInfo("directional_area_entered",
 						  PropertyInfo(Variant::OBJECT, "hit_target_area"),
-						  PropertyInfo(Variant::OBJECT, "directional_bullets_instance", PROPERTY_HINT_NODE_TYPE, "DirectionalBullets2D"),
+						  PropertyInfo(Variant::OBJECT, "directional_bullets_instance", PROPERTY_HINT_RESOURCE_TYPE, "DirectionalBullets2D"),
 						  PropertyInfo(Variant::INT, "bullet_index")));
 
 	ADD_SIGNAL(MethodInfo("directional_body_entered",
 						  PropertyInfo(Variant::OBJECT, "hit_target_body"),
-						  PropertyInfo(Variant::OBJECT, "directional_bullets_instance", PROPERTY_HINT_NODE_TYPE, "DirectionalBullets2D"),
+						  PropertyInfo(Variant::OBJECT, "directional_bullets_instance", PROPERTY_HINT_RESOURCE_TYPE, "DirectionalBullets2D"),
 						  PropertyInfo(Variant::INT, "bullet_index")));
 
 	ADD_SIGNAL(MethodInfo("directional_life_time_over",
-						  PropertyInfo(Variant::OBJECT, "directional_bullets_instance", PROPERTY_HINT_NODE_TYPE, "DirectionalBullets2D"),
+						  PropertyInfo(Variant::OBJECT, "directional_bullets_instance", PROPERTY_HINT_RESOURCE_TYPE, "DirectionalBullets2D"),
 						  PropertyInfo(Variant::ARRAY, "bullet_indexes", PROPERTY_HINT_ARRAY_TYPE, "int")));
 
 	ADD_SIGNAL(MethodInfo("block_area_entered",
 						  PropertyInfo(Variant::OBJECT, "hit_target_area"),
-						  PropertyInfo(Variant::OBJECT, "block_bullets_instance", PROPERTY_HINT_NODE_TYPE, "BlockBullets2D"),
+						  PropertyInfo(Variant::OBJECT, "block_bullets_instance", PROPERTY_HINT_RESOURCE_TYPE, "BlockBullets2D"),
 						  PropertyInfo(Variant::INT, "bullet_index")));
 
 	ADD_SIGNAL(MethodInfo("block_body_entered",
 						  PropertyInfo(Variant::OBJECT, "hit_target_body"),
-						  PropertyInfo(Variant::OBJECT, "block_bullets_instance", PROPERTY_HINT_NODE_TYPE, "BlockBullets2D"),
+						  PropertyInfo(Variant::OBJECT, "block_bullets_instance", PROPERTY_HINT_RESOURCE_TYPE, "BlockBullets2D"),
 						  PropertyInfo(Variant::INT, "bullet_index")));
 
 	ADD_SIGNAL(MethodInfo("block_life_time_over",
-						  PropertyInfo(Variant::OBJECT, "block_bullets_instance", PROPERTY_HINT_NODE_TYPE, "BlockBullets2D"),
+						  PropertyInfo(Variant::OBJECT, "block_bullets_instance", PROPERTY_HINT_RESOURCE_TYPE, "BlockBullets2D"),
 						  PropertyInfo(Variant::ARRAY, "bullet_indexes", PROPERTY_HINT_ARRAY_TYPE, "int")));
 
 	ADD_SIGNAL(MethodInfo("reset_finished"));

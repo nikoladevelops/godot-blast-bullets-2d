@@ -115,7 +115,7 @@
 		<method name="get_is_tearing_down" qualifiers="const">
 			<return type="bool" />
 			<description>
-			Returns true once the factory started destroying itself. While true, teardown paths stop touching child nodes and most factory operations report an error instead of running.
+				Returns true once the factory started destroying itself. While true, teardown paths stop touching child nodes and most factory operations report an error instead of running.
 			</description>
 		</method>
 		<method name="get_physics_space" qualifiers="const">
@@ -218,7 +218,7 @@
 			<return type="void" />
 			<param index="0" name="multimesh_bullets" type="MultiMeshBullets2D" />
 			<description>
-			Re-registers a pooled multimesh inside the factory's active set after one of its bullets was woken with enable_bullet() outside of a normal spawn. Does nothing when the multimesh is already active, when the factory is busy, or when the factory is tearing down. You normally never call this yourself, enable_bullet() already handles it.
+				Re-registers a pooled multimesh inside the factory's active set after one of its bullets was woken with enable_bullet() outside of a normal spawn. Does nothing when the multimesh is already active, when the factory is busy, or when the factory is tearing down. You normally never call this yourself, enable_bullet() already handles it.
 			</description>
 		</method>
 		<method name="reset">
@@ -234,6 +234,13 @@
 			<param index="0" name="new_physics_space" type="RID" />
 			<description>
 				Sets the world physics space that the bullets interact in. Set it before spawning: it applies to subsequently spawned bullets, already spawned areas stay in their space. Invalid RIDs are rejected with an error.
+			</description>
+		</method>
+		<method name="set_use_physics_interpolation_editor">
+			<return type="void" />
+			<param index="0" name="enable" type="bool" />
+			<description>
+				Editor-side setter behind the [member use_physics_interpolation] property. At runtime always use [method set_use_physics_interpolation_runtime] instead.
 			</description>
 		</method>
 		<method name="set_use_physics_interpolation_runtime">
@@ -305,6 +312,29 @@
 		</member>
 	</members>
 	<signals>
+		<signal name="block_area_entered">
+			<param index="0" name="hit_target_area" type="Object" />
+			<param index="1" name="block_bullets_instance" type="BlockBullets2D" />
+			<param index="2" name="bullet_index" type="int" />
+			<description>
+				Emitted synchronously in the physics tick when a block bullet enters a physics area. Same handler contract as [signal directional_area_entered].
+			</description>
+		</signal>
+		<signal name="block_body_entered">
+			<param index="0" name="hit_target_body" type="Object" />
+			<param index="1" name="block_bullets_instance" type="BlockBullets2D" />
+			<param index="2" name="bullet_index" type="int" />
+			<description>
+				Emitted synchronously in the physics tick when a block bullet enters a physics body. Same handler contract as [signal directional_body_entered].
+			</description>
+		</signal>
+		<signal name="block_life_time_over">
+			<param index="0" name="block_bullets_instance" type="BlockBullets2D" />
+			<param index="1" name="bullet_indexes" type="int[]" />
+			<description>
+				Emitted (deferred, outside the physics step) when a block bullet multimesh's lifetime is over, but only if the [MultiMeshBulletsData2D]'s [member MultiMeshBulletsData2D.is_life_time_over_signal_enabled] is set to [code]true[/code].
+			</description>
+		</signal>
 		<signal name="directional_area_entered">
 			<param index="0" name="hit_target_area" type="Object" />
 			<param index="1" name="directional_bullets_instance" type="DirectionalBullets2D" />
@@ -328,29 +358,6 @@
 			<param index="1" name="bullet_indexes" type="int[]" />
 			<description>
 				Emitted (deferred, outside the physics step) when a directional bullet multimesh's lifetime is over, but only if the [MultiMeshBulletsData2D]'s [member MultiMeshBulletsData2D.is_life_time_over_signal_enabled] is set to [code]true[/code].
-			</description>
-		</signal>
-		<signal name="block_area_entered">
-			<param index="0" name="hit_target_area" type="Object" />
-			<param index="1" name="block_bullets_instance" type="BlockBullets2D" />
-			<param index="2" name="bullet_index" type="int" />
-			<description>
-				Emitted synchronously in the physics tick when a block bullet enters a physics area. Same handler contract as [signal directional_area_entered].
-			</description>
-		</signal>
-		<signal name="block_body_entered">
-			<param index="0" name="hit_target_body" type="Object" />
-			<param index="1" name="block_bullets_instance" type="BlockBullets2D" />
-			<param index="2" name="bullet_index" type="int" />
-			<description>
-				Emitted synchronously in the physics tick when a block bullet enters a physics body. Same handler contract as [signal directional_body_entered].
-			</description>
-		</signal>
-		<signal name="block_life_time_over">
-			<param index="0" name="block_bullets_instance" type="BlockBullets2D" />
-			<param index="1" name="bullet_indexes" type="int[]" />
-			<description>
-				Emitted (deferred, outside the physics step) when a block bullet multimesh's lifetime is over, but only if the [MultiMeshBulletsData2D]'s [member MultiMeshBulletsData2D.is_life_time_over_signal_enabled] is set to [code]true[/code].
 			</description>
 		</signal>
 		<signal name="reset_finished">

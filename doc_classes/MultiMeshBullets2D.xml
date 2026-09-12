@@ -444,7 +444,7 @@
 		<method name="get_inherited_velocity_offset" qualifiers="const">
 			<return type="Vector2" />
 			<description>
-			Returns the extra velocity offset that gets added to every bullet's movement each physics frame. Set it at spawn time or through set_inherited_velocity_offset().
+				Returns the extra velocity offset that gets added to every bullet's movement each physics frame. Set it at spawn time or through set_inherited_velocity_offset().
 			</description>
 		</method>
 		<method name="get_monitorable" qualifiers="const">
@@ -490,12 +490,6 @@
 			<return type="bool" />
 			<description>
 				Whether shared bullet curves are currently set.
-			</description>
-		</method>
-		<method name="remove_shared_bullet_curves_data">
-			<return type="void" />
-			<description>
-				Removes the shared bullet curves (same as setting null). Per-bullet curves, if any, take over.
 			</description>
 		</method>
 		<method name="is_bullet_status_enabled">
@@ -575,6 +569,12 @@
 				Removes the movement pattern from a specific bullet, making it lose any [Path2D] or [Curve2D] drawn pattern it had and move solely based on its direction and speed data.
 				Note: If you want to remove the movement pattern from multiple bullets at once, use [method all_bullets_remove_movement_pattern].
 				Note: A bullet can have a movement pattern assigned by using [method set_bullet_movement_pattern_from_curve] or [method set_bullet_movement_pattern_from_path].
+			</description>
+		</method>
+		<method name="remove_shared_bullet_curves_data">
+			<return type="void" />
+			<description>
+				Removes the shared bullet curves (same as setting null). Per-bullet curves, if any, take over.
 			</description>
 		</method>
 		<method name="restart_sprite_animation">
@@ -749,7 +749,7 @@
 			<return type="void" />
 			<param index="0" name="new_offset" type="Vector2" />
 			<description>
-			Sets an extra velocity offset, think wind, knockback or the speed of a moving platform, that gets added to every bullet's movement each physics frame. The value must be a finite Vector2, otherwise the old value is kept.
+				Sets an extra velocity offset, think wind, knockback or the speed of a moving platform, that gets added to every bullet's movement each physics frame. The value must be a finite Vector2, otherwise the old value is kept.
 			</description>
 		</method>
 		<method name="set_monitorable">
@@ -777,9 +777,6 @@
 
 			You can use this property to keep track of how many times each bullet has collided, and you can also set it to update the collision counts as needed.
 		</member>
-		<member name="shared_bullets_custom_data" type="Resource" setter="set_shared_bullets_custom_data" getter="get_shared_bullets_custom_data">
-			You can edit the custom bullets data that the bullets multimesh was spawned with. Use this to set damage data or anything else you want to store in a resource for your bullets to use.
-		</member>
 		<member name="curves_elapsed_time" type="float" setter="set_curves_elapsed_time" getter="get_curves_elapsed_time" default="0.0">
 			The elapsed time used for the bullets' curves. This is the time that gets passed to the curves assigned to the bullets, you can manipulate it freely.
 		</member>
@@ -805,10 +802,13 @@
 		<member name="shared_bullet_curves_data" type="BulletCurvesData2D" setter="set_shared_bullet_curves_data" getter="get_shared_bullet_curves_data">
 			A shared [BulletCurvesData2D] resource that can be assigned to all bullets in the multimesh. This is useful for saving memory if you have a lot of bullets that share the same curves data, since you can assign the same resource to all of them instead of creating a new one for each bullet. Not supported on [BlockBullets2D] (setting it there errors and is ignored).
 		</member>
+		<member name="shared_bullets_custom_data" type="Resource" setter="set_shared_bullets_custom_data" getter="get_shared_bullets_custom_data">
+			You can edit the custom bullets data that the bullets multimesh was spawned with. Use this to set damage data or anything else you want to store in a resource for your bullets to use.
+		</member>
 	</members>
 	<signals>
 		<signal name="sprite_animation_finished">
-			<param index="0" name="multimesh_bullets_instance" type="Object" />
+			<param index="0" name="multimesh_bullets_instance" type="MultiMeshBullets2D" />
 			<description>
 				Emitted once (deferred, outside the physics tick) when a non-looping SpriteFrames animation reaches its last frame. Re-armed by every play/restart/rebuild. Note: the instance may already be pooled (inactive) when the deferred call runs, so check its state in the handler if that matters.
 			</description>

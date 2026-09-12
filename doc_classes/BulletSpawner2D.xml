@@ -1,0 +1,113 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="BulletSpawner2D" inherits="Node2D" api_type="extension" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/godotengine/godot/master/doc/class.xsd">
+	<brief_description>
+		Fires volleys of directional bullets on a timer using a [BulletFactory2D].
+	</brief_description>
+	<description>
+		Place this node in the scene, point [member bullet_factory_path] at a [BulletFactory2D], assign [member spawn_data], and arrange marker nodes under [member transforms_generator]. Every [member shoot_interval_sec] seconds (after [member shoot_initial_delay_sec]) it collects one global transform per volley bullet and spawns them through [method BulletFactory2D.spawn_controllable_directional_bullets]. Each volley duplicates the spawn data first, so shared .tres files are never mutated. Never shoots in the editor.
+	</description>
+	<tutorials>
+	</tutorials>
+	<methods>
+		<method name="collect_spawn_transforms" qualifiers="const">
+			<return type="Transform2D[]" />
+			<description>
+				Collects one global transform per volley bullet: the [Node2D] children of the transforms generator (non-Node2D children are skipped). When the generator has no Node2D children, its own global transform is used; when no generator is assigned, this node's own transform is used. Always returns at least one transform. [member transforms_scale] is applied relative to the generator.
+			</description>
+		</method>
+		<method name="get_bullet_factory" qualifiers="const">
+			<return type="BulletFactory2D" />
+			<description>
+				Returns the resolved [BulletFactory2D] from [member bullet_factory_path], or null when the path is empty or the target is gone. A node of the wrong type produces a warning and resolves to null.
+			</description>
+		</method>
+		<method name="get_transforms_generator" qualifiers="const">
+			<return type="Node2D" />
+			<description>
+				Returns the resolved transforms generator behind [member transforms_generator], or null when unset. Falls back to nothing - [method collect_spawn_transforms] uses this node itself then.
+			</description>
+		</method>
+		<method name="get_volleys_fired" qualifiers="const">
+			<return type="int" />
+			<description>
+				How many volleys were fired since the last (re)arm. Reset by [method reset_shooting].
+			</description>
+		</method>
+		<method name="reset_shooting">
+			<return type="void" />
+			<description>
+				Zeroes the volley counter, re-arms the timer with [member shoot_initial_delay_sec], and resumes processing when shooting is active. Emits [signal shooting_started] when it arms shooting.
+			</description>
+		</method>
+		<method name="set_bullet_factory">
+			<return type="void" />
+			<param index="0" name="factory" type="BulletFactory2D" />
+			<description>
+				Assigns the [BulletFactory2D] directly and syncs [member bullet_factory_path] to it when both nodes are in the tree. Pass null to clear both.
+			</description>
+		</method>
+		<method name="set_transforms_generator">
+			<return type="void" />
+			<param index="0" name="generator" type="Node2D" />
+			<description>
+				Assigns the transforms generator directly and syncs [member transforms_generator] to it when both nodes are in the tree. Pass null to clear both.
+			</description>
+		</method>
+		<method name="shoot_once">
+			<return type="bool" />
+			<description>
+				Fires one volley immediately, counting it and re-arming the timer. Returns false (and prints an error) when misconfigured - no factory, no spawn data - or when the factory refuses (busy, tearing down, bad data). Manual shots bypass the [member max_volleys] cap but still count toward it.
+			</description>
+		</method>
+	</methods>
+	<members>
+		<member name="bullet_factory_path" type="NodePath" setter="set_bullet_factory_path" getter="get_bullet_factory_path" default="NodePath(&quot;&quot;)">
+			Path to the [BulletFactory2D] used for spawning. Stored unfiltered so every node in the scene is pickable; the typed pointer resolves on demand with a runtime type check.
+		</member>
+		<member name="max_volleys" type="int" setter="set_max_volleys" getter="get_max_volleys" default="-1">
+			Volleys after which auto-shooting stops. -1 means infinite, 0 means it never fires automatically (manual [method shoot_once] still works). Lowering it at or below [method get_volleys_fired] emits [signal shooting_finished]; raising it back up re-emits [signal shooting_started].
+		</member>
+		<member name="shoot_initial_delay_sec" type="float" setter="set_shoot_initial_delay_sec" getter="get_shoot_initial_delay_sec" default="0.0">
+			Delay in seconds before the first volley after (re)arming. Must be finite and &gt;= 0.
+		</member>
+		<member name="shoot_interval_sec" type="float" setter="set_shoot_interval_sec" getter="get_shoot_interval_sec" default="1.0">
+			Seconds between automatic volleys. Must be finite and &gt; 0.
+		</member>
+		<member name="shooting_enabled" type="bool" setter="set_shooting_enabled" getter="get_shooting_enabled" default="true">
+			Master switch for automatic shooting. Toggling it emits [signal shooting_started] / [signal shooting_stopped] on transitions. Manual [method shoot_once] works regardless.
+		</member>
+		<member name="spawn_data" type="DirectionalBulletsData2D" setter="set_spawn_data" getter="get_spawn_data">
+			The directional bullet data each volley is spawned with. Duplicated per volley with fresh transforms, so a shared resource is safe to assign.
+		</member>
+		<member name="transforms_generator" type="NodePath" setter="set_transforms_generator_path" getter="get_transforms_generator_path" default="NodePath(&quot;&quot;)">
+			Path to the Node2D whose children provide per-volley spawn transforms. Native Node2D filtering always matches, so any Node2D in the scene is selectable.
+		</member>
+		<member name="transforms_scale" type="float" setter="set_transforms_scale" getter="get_transforms_scale" default="1.0">
+			Uniform scale applied to every generated transform, relative to the generator origin - marker offsets (spread radius) and basis (bullet size) grow together while rotation is preserved. 1.0 is identity. Must be finite; 0 collapses the whole volley onto the generator, negatives mirror it.
+		</member>
+	</members>
+	<signals>
+		<signal name="shooting_finished">
+			<description>
+				Emitted exactly when the volley cap is reached - by the volley that hits [member max_volleys], or by lowering [member max_volleys] to or below the fired count. Manual shots past the cap do not re-emit it.
+			</description>
+		</signal>
+		<signal name="shooting_started">
+			<description>
+				Emitted when automatic shooting arms: on scene ready, on [method reset_shooting], when [member shooting_enabled] flips on, and when raising [member max_volleys] resumes a stopped spawner. Connect after this spawner's own ready (e.g. from the parent) to catch the initial arm.
+			</description>
+		</signal>
+		<signal name="shooting_stopped">
+			<description>
+				Emitted when automatic shooting disarms via [member shooting_enabled] flipping off. Cap-driven stops emit [signal shooting_finished] instead.
+			</description>
+		</signal>
+		<signal name="volley_fired">
+			<param index="0" name="directional_bullets_instance" type="DirectionalBullets2D" />
+			<param index="1" name="volley_index" type="int" />
+			<description>
+				Emitted for every successful volley, automatic or manual. The typed instance lets handlers drive homing, attachments, or patterns immediately with no casts; volley_index is 1-based (use it for wave logic or chaining spawners).
+			</description>
+		</signal>
+	</signals>
+</class>

@@ -1779,7 +1779,10 @@ void MultiMeshBullets2D::_bind_methods() {
 
 	ClassDB::bind_method(D_METHOD("has_bullet_movement_pattern", "bullet_index"), &MultiMeshBullets2D::check_exists_bullet_movement_pattern_data);
 
+	// NOTE: signal args use PROPERTY_HINT_RESOURCE_TYPE (not NODE_TYPE) so the
+	// class name reaches ClassDB and --doctool; see the note on the factory
+	// signals.
 	ADD_SIGNAL(MethodInfo("sprite_animation_finished",
-			PropertyInfo(Variant::OBJECT, "multimesh_bullets_instance", PROPERTY_HINT_NODE_TYPE, "MultiMeshBullets2D")));
+			PropertyInfo(Variant::OBJECT, "multimesh_bullets_instance", PROPERTY_HINT_RESOURCE_TYPE, "MultiMeshBullets2D")));
 }
 } //namespace BlastBullets2D

@@ -322,8 +322,10 @@ void BulletSpawner2D::_bind_methods() {
 	// happens (timer tick, setters, reset, _ready): handlers run with live
 	// state and follow the same contract as the factory collision signals -
 	// game logic is safe directly, structural factory calls must be deferred.
+	// NOTE: PROPERTY_HINT_RESOURCE_TYPE (not NODE_TYPE) carries the class name
+	// to ClassDB/--doctool; see the note on the factory signals.
 	ADD_SIGNAL(MethodInfo("volley_fired",
-		PropertyInfo(Variant::OBJECT, "directional_bullets_instance", PROPERTY_HINT_NODE_TYPE, "DirectionalBullets2D"),
+		PropertyInfo(Variant::OBJECT, "directional_bullets_instance", PROPERTY_HINT_RESOURCE_TYPE, "DirectionalBullets2D"),
 		PropertyInfo(Variant::INT, "volley_index")));
 	ADD_SIGNAL(MethodInfo("shooting_started"));
 	ADD_SIGNAL(MethodInfo("shooting_stopped"));
