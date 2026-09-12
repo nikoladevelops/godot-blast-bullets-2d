@@ -90,7 +90,7 @@ func _ready() -> void:
 	var dmg_data:DamageData = DamageData.new()
 	dmg_data.base_damage = 1
 	
-	bullets_data.bullets_custom_data = dmg_data
+	bullets_data.shared_bullets_custom_data = dmg_data
 	
 	bullets_data.collision_layer = DirectionalBulletsData2D.calculate_bitmask([4])
 	bullets_data.collision_mask = DirectionalBulletsData2D.calculate_bitmask(default_bullet_collision_mask)

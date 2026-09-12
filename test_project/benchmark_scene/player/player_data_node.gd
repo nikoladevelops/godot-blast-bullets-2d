@@ -112,7 +112,7 @@ func set_up_block_bullets_data()->BlockBulletsData2D:
 	data.collision_shape_offset=Vector2(0,0)
 	data.max_life_time = 2
 	data.all_bullet_rotation_data = bullet_rotation_data
-	data.bullets_custom_data = damage_data
+	data.shared_bullets_custom_data = damage_data
 	
 	data.shared_bullet_attachment_offset = selected_attachment_offset
 	
@@ -150,7 +150,7 @@ func set_up_directional_bullets_data()->DirectionalBulletsData2D:
 	data.collision_shape_offset=Vector2(0,0)
 	data.max_life_time = 2
 	data.all_bullet_rotation_data = bullet_rotation_data
-	data.bullets_custom_data = damage_data
+	data.shared_bullets_custom_data = damage_data
 	#data.is_life_time_over_signal_enabled = true # If you want to track when the life time is over and receive a signal inside BulletFactory2D
 	data.shared_bullet_attachment_offset = selected_attachment_offset
 	return data

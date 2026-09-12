@@ -25,6 +25,14 @@
 				Get the curves data of all bullets in the specified range. Returns an array of [BulletCurvesData2D], which can be null if a bullet doesn't have curves data assigned.
 			</description>
 		</method>
+		<method name="all_bullets_get_custom_data">
+			<return type="Resource[]" />
+			<param index="0" name="bullet_index_start" type="int" default="0" />
+			<param index="1" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<description>
+				Get the per-bullet custom data of all bullets in the specified range. Returns an array of [Resource], null where a bullet has none set. Strictly separate from [member shared_bullets_custom_data].
+			</description>
+		</method>
 		<method name="all_bullets_get_direction" qualifiers="const">
 			<return type="Vector2[]" />
 			<param index="0" name="bullet_index_start" type="int" default="0" />
@@ -101,6 +109,15 @@
 			<param index="2" name="bullet_index_end_inclusive" type="int" default="-1" />
 			<description>
 				Sets the same curves data to all bullets in the specified range. Curves data is a [BulletCurvesData2D] resource that can contain multiple curves used to control different aspects of the bullet's behavior over time, such as movement speed, rotation speed, direction adjustment, etc... Not supported on [BlockBullets2D].
+			</description>
+		</method>
+		<method name="all_bullets_set_custom_data">
+			<return type="void" />
+			<param index="0" name="new_custom_data" type="Resource" />
+			<param index="1" name="bullet_index_start" type="int" default="0" />
+			<param index="2" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<description>
+				Sets the same custom data to all bullets in the specified range. Pass null to clear the per-bullet values (they read as null afterwards, never as the shared value).
 			</description>
 		</method>
 		<method name="all_bullets_set_direction">
@@ -260,6 +277,13 @@
 				Note: If you want to set or get the curves data of multiple bullets at once, use [method all_bullets_set_curves_data] or [method all_bullets_get_curves_data].
 			</description>
 		</method>
+		<method name="bullet_get_custom_data" qualifiers="const">
+			<return type="Resource" />
+			<param index="0" name="bullet_index" type="int" />
+			<description>
+				Gets the per-bullet custom data of a specific bullet, null when none is set. Strictly separate from [member shared_bullets_custom_data] - read that member for the shared value.
+			</description>
+		</method>
 		<method name="bullet_set_attachment">
 			<return type="void" />
 			<param index="0" name="bullet_index" type="int" />
@@ -289,6 +313,14 @@
 				Sets the curves data of a specific bullet. Curves data is a [BulletCurvesData2D] resource that can contain multiple curves used to control different aspects of the bullet's behavior over time, such as movement speed, rotation speed, direction adjustment, etc... Not supported on [BlockBullets2D].
 
 				Note: If you want to set or get the curves data of multiple bullets at once, use [method all_bullets_set_curves_data] or [method all_bullets_get_curves_data].
+			</description>
+		</method>
+		<method name="bullet_set_custom_data">
+			<return type="void" />
+			<param index="0" name="bullet_index" type="int" />
+			<param index="1" name="new_custom_data" type="Resource" />
+			<description>
+				Sets the custom data of a specific bullet. Pass null to clear it (reads as null afterwards, never as the shared value).
 			</description>
 		</method>
 		<method name="disable_bullet">
@@ -742,7 +774,7 @@
 
 			You can use this property to keep track of how many times each bullet has collided, and you can also set it to update the collision counts as needed.
 		</member>
-		<member name="bullets_custom_data" type="Resource" setter="set_bullets_custom_data" getter="get_bullets_custom_data">
+		<member name="shared_bullets_custom_data" type="Resource" setter="set_shared_bullets_custom_data" getter="get_shared_bullets_custom_data">
 			You can edit the custom bullets data that the bullets multimesh was spawned with. Use this to set damage data or anything else you want to store in a resource for your bullets to use.
 		</member>
 		<member name="curves_elapsed_time" type="float" setter="set_curves_elapsed_time" getter="get_curves_elapsed_time" default="0.0">

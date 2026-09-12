@@ -339,7 +339,7 @@ float *w = batch_buffer.ptrw();
 
 		if (bullet_indexes.size() > 0) {
 			// Emit signal deferred so user code runs outside physics step
-			bullet_factory->call_deferred("emit_signal", "life_time_over", this, bullet_indexes, bullets_custom_data, transfs);
+			bullet_factory->call_deferred("emit_signal", "life_time_over", this, bullet_indexes, shared_bullets_custom_data, transfs);
 
 			// Disable attachments after signal (deferred keeps order)
 			for (int i = 0; i < bullet_indexes.size(); ++i) {
@@ -419,12 +419,49 @@ float *w = batch_buffer.ptrw();
 		return all_bullets_enabled_set.contains(bullet_index);
 	}
 
-	_ALWAYS_INLINE_ Ref<Resource> get_bullets_custom_data() const {
-		return bullets_custom_data;
+	_ALWAYS_INLINE_ Ref<Resource> get_shared_bullets_custom_data() const {
+		return shared_bullets_custom_data;
 	}
 
-	_ALWAYS_INLINE_ void set_bullets_custom_data(const Ref<Resource> &new_custom_data) {
-		bullets_custom_data = new_custom_data;
+	_ALWAYS_INLINE_ void set_shared_bullets_custom_data(const Ref<Resource> &new_shared_bullets_custom_data) {
+		shared_bullets_custom_data = new_shared_bullets_custom_data;
+	}
+
+	// Per-bullet custom data (seeded from spawn data). Strictly separated from
+	// shared_bullets_custom_data: a bullet with no per-bullet value reads as
+	// null, never as the shared value, so the two can never be confused.
+	_ALWAYS_INLINE_ Ref<Resource> bullet_get_custom_data(int bullet_index) const {
+		if (!validate_bullet_index(bullet_index, "bullet_get_custom_data")) {
+			return Ref<Resource>();
+		}
+		if (bullet_index >= 0 && bullet_index < (int)all_bullets_custom_data.size() && all_bullets_custom_data[bullet_index].is_valid()) {
+			return all_bullets_custom_data[bullet_index];
+		}
+		return Ref<Resource>();
+	}
+	_ALWAYS_INLINE_ void bullet_set_custom_data(int bullet_index, const Ref<Resource> &new_custom_data) {
+		if (!validate_bullet_index(bullet_index, "bullet_set_custom_data")) {
+			return;
+		}
+		if (bullet_index < 0 || bullet_index >= (int)all_bullets_custom_data.size()) {
+			return;
+		}
+		all_bullets_custom_data[bullet_index] = new_custom_data;
+	}
+
+	_ALWAYS_INLINE_ TypedArray<Resource> all_bullets_get_custom_data(int bullet_index_start = 0, int bullet_index_end_inclusive = -1) {
+		ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_get_custom_data");
+		TypedArray<Resource> arr;
+		for (int i = bullet_index_start; i <= bullet_index_end_inclusive; ++i) {
+			arr.push_back(bullet_get_custom_data(i));
+		}
+		return arr;
+	}
+	_ALWAYS_INLINE_ void all_bullets_set_custom_data(const Ref<Resource> &new_custom_data, int bullet_index_start = 0, int bullet_index_end_inclusive = -1) {
+		ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_set_custom_data");
+		for (int i = bullet_index_start; i <= bullet_index_end_inclusive; ++i) {
+			bullet_set_custom_data(i, new_custom_data);
+		}
 	}
 
 	Vector2 get_inherited_velocity_offset() const { return inherited_velocity_offset; }
@@ -673,8 +710,14 @@ float *w = batch_buffer.ptrw();
 	// Reusable buffer for batch uploads (avoid per-frame alloc)
 	mutable PackedFloat32Array batch_buffer;
 
-	// The user can pass any custom data they desire and have access to it in the area_entered and body_entered function callbacks
-	Ref<Resource> bullets_custom_data;
+	// The user can pass any custom data they desire and have access to it in the area_entered and body_entered function callbacks.
+	// Per-bullet overrides via all_bullets_custom_data; bullet_get_custom_data() returns the effective (per-bullet if set, else this shared) value.
+	Ref<Resource> shared_bullets_custom_data;
+
+	// Per-bullet custom data, seeded from spawn data. Kept strictly separate
+	// from shared_bullets_custom_data: unset entries stay null and never read
+	// as the shared value.
+	std::vector<Ref<Resource>> all_bullets_custom_data;
 
 	// The max life time before the multimesh gets disabled
 	double max_life_time = 0.0;
@@ -1854,9 +1897,9 @@ float *w = batch_buffer.ptrw();
 		const Transform2D bullet_global_transf = all_cached_instance_transforms[bullet_index];
 
 		if (collision_type == CollisionType::AREA) {
-			bullet_factory->emit_signal("area_entered", hit_target, this, bullet_index, bullets_custom_data, bullet_global_transf);
+			bullet_factory->emit_signal("area_entered", hit_target, this, bullet_index, shared_bullets_custom_data, bullet_global_transf);
 		} else if (collision_type == CollisionType::BODY) {
-			bullet_factory->emit_signal("body_entered", hit_target, this, bullet_index, bullets_custom_data, bullet_global_transf);
+			bullet_factory->emit_signal("body_entered", hit_target, this, bullet_index, shared_bullets_custom_data, bullet_global_transf);
 		}
 
 		// Disable the bullet attachment if the bullet reached its max collision count and the attachment is still enabled
@@ -2052,7 +2095,7 @@ protected:
 
 	// Always called last
 	void finalize_set_up(
-			const Ref<Resource> &new_bullets_custom_data,
+			const Ref<Resource> &new_shared_bullets_custom_data,
 			const Ref<Material> &new_material,
 			int new_z_index,
 			int new_light_mask,

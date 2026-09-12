@@ -82,8 +82,19 @@ public:
 	// If set to true it would mean it can detect bodies. I suggest you do NOT enable it, because it tanks performance, but I left it just in case someone is stubborn and has that need. Instead consider adding an Area2D to the body that you are trying to damage and set up its collision layer correctly so that the bullets can interact with it.
 	bool monitorable = false;
 
-	// The idea is that you can enter additional data (base damage,armor damage,maybe healing factor,vampire bullets etc..). I am not going to force every single bullet to have a damage, because I don't know what kind of game you're making, so you are free to give any data here that will be available inside the area_entered and body_entered callbacks inside factory
-	Ref<Resource> bullets_custom_data;
+	// The idea is that you can enter additional data (base damage,armor damage,maybe healing factor,vampire bullets etc..). I am not going to force every single bullet to have a damage, because I don't know what kind of game you're making, so you are free to give any data here that will be available inside the area_entered and body_entered callbacks inside factory.
+	// Per-bullet overrides via all_bullets_custom_data; bullet_get_custom_data() on the instance returns the effective (per-bullet if set, else this shared) value.
+	Ref<Resource> shared_bullets_custom_data;
+
+	// PER-BULLET CUSTOM DATA
+
+	// Custom data carried per bullet, readable in the factory collision
+	// callbacks through the instance (bullet_get_custom_data) alongside the
+	// shared value above. Same fallback rule as all_bullet_speed_data: empty
+	// = none, size == amount = per bullet, otherwise the first entry drives
+	// all bullets. Stays strictly separate from shared_bullets_custom_data:
+	// null entries read as null, never as the shared value.
+	TypedArray<Resource> all_bullets_custom_data;
 
 	// BULLET ATTACHMENT RELATED
 
@@ -164,8 +175,11 @@ public:
 	bool get_monitorable() const;
 	void set_monitorable(bool new_monitorable);
 
-	Ref<Resource> get_bullets_custom_data() const;
-	void set_bullets_custom_data(const Ref<Resource> &new_bullets_custom_data);
+	Ref<Resource> get_shared_bullets_custom_data() const;
+	void set_shared_bullets_custom_data(const Ref<Resource> &new_shared_bullets_custom_data);
+
+	TypedArray<Resource> get_all_bullets_custom_data() const;
+	void set_all_bullets_custom_data(const TypedArray<Resource> &new_custom_data);
 
 	Ref<PackedScene> get_shared_bullet_attachment() const;
 	void set_shared_bullet_attachment(const Ref<PackedScene> &new_attachment);

@@ -24,7 +24,7 @@
 
 			Note: For initial velocity/inertia use [member inherited_velocity_offset].
 
-			Note: For custom data that the multimesh should carry use [member bullets_custom_data] - used for damage or anything else custom that is available in collision callbacks inside [BulletFactory2D].
+			Note: For custom data that the multimesh should carry use [member shared_bullets_custom_data] - used for damage or anything else custom that is available in collision callbacks inside [BulletFactory2D].
 
 		Note: For object pooling options see [member MultiMeshBullets2D.is_multimesh_auto_pooling_enabled] and [member MultiMeshBullets2D.is_attachments_auto_pooling_enabled].
 

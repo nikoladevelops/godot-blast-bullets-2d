@@ -100,11 +100,18 @@ void MultiMeshBulletsData2D::set_monitorable(bool new_monitorable) {
 	monitorable = new_monitorable;
 }
 
-Ref<Resource> MultiMeshBulletsData2D::get_bullets_custom_data() const {
-	return bullets_custom_data;
+Ref<Resource> MultiMeshBulletsData2D::get_shared_bullets_custom_data() const {
+	return shared_bullets_custom_data;
 }
-void MultiMeshBulletsData2D::set_bullets_custom_data(const Ref<Resource> &new_bullets_custom_data) {
-	bullets_custom_data = new_bullets_custom_data;
+void MultiMeshBulletsData2D::set_shared_bullets_custom_data(const Ref<Resource> &new_shared_bullets_custom_data) {
+	shared_bullets_custom_data = new_shared_bullets_custom_data;
+}
+
+TypedArray<Resource> MultiMeshBulletsData2D::get_all_bullets_custom_data() const {
+	return all_bullets_custom_data;
+}
+void MultiMeshBulletsData2D::set_all_bullets_custom_data(const TypedArray<Resource> &new_custom_data) {
+	all_bullets_custom_data = new_custom_data;
 }
 
 Ref<PackedScene> MultiMeshBulletsData2D::get_shared_bullet_attachment() const {
@@ -292,9 +299,13 @@ void MultiMeshBulletsData2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_monitorable", "new_monitorable"), &MultiMeshBulletsData2D::set_monitorable);
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "monitorable"), "set_monitorable", "get_monitorable");
 
-	ClassDB::bind_method(D_METHOD("get_bullets_custom_data"), &MultiMeshBulletsData2D::get_bullets_custom_data);
-	ClassDB::bind_method(D_METHOD("set_bullets_custom_data", "new_bullets_custom_data"), &MultiMeshBulletsData2D::set_bullets_custom_data);
-	ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "bullets_custom_data"), "set_bullets_custom_data", "get_bullets_custom_data");
+	ClassDB::bind_method(D_METHOD("get_shared_bullets_custom_data"), &MultiMeshBulletsData2D::get_shared_bullets_custom_data);
+	ClassDB::bind_method(D_METHOD("set_shared_bullets_custom_data", "new_shared_bullets_custom_data"), &MultiMeshBulletsData2D::set_shared_bullets_custom_data);
+	ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "shared_bullets_custom_data"), "set_shared_bullets_custom_data", "get_shared_bullets_custom_data");
+
+	ClassDB::bind_method(D_METHOD("get_all_bullets_custom_data"), &MultiMeshBulletsData2D::get_all_bullets_custom_data);
+	ClassDB::bind_method(D_METHOD("set_all_bullets_custom_data", "new_custom_data"), &MultiMeshBulletsData2D::set_all_bullets_custom_data);
+	ADD_PROPERTY(PropertyInfo(Variant::ARRAY, "all_bullets_custom_data", PROPERTY_HINT_ARRAY_TYPE, "Resource"), "set_all_bullets_custom_data", "get_all_bullets_custom_data");
 
 	ClassDB::bind_method(D_METHOD("get_shared_bullet_attachment"), &MultiMeshBulletsData2D::get_shared_bullet_attachment);
 	ClassDB::bind_method(D_METHOD("set_shared_bullet_attachment", "new_attachment"), &MultiMeshBulletsData2D::set_shared_bullet_attachment);

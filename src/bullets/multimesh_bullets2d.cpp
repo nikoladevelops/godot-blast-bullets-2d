@@ -174,7 +174,7 @@ void MultiMeshBullets2D::spawn(const MultiMeshBulletsData2D &data, MultiMeshObje
 	update_all_previous_transforms_for_interpolation();
 
 	finalize_set_up(
-			data.bullets_custom_data,
+			data.shared_bullets_custom_data,
 			data.material,
 			data.z_index,
 			data.light_mask,
@@ -288,7 +288,7 @@ bool MultiMeshBullets2D::enable_multimesh(const MultiMeshBulletsData2D &data, co
 	update_all_previous_transforms_for_interpolation();
 
 	finalize_set_up(
-			data.bullets_custom_data,
+			data.shared_bullets_custom_data,
 			data.material,
 			data.z_index,
 			data.light_mask,
@@ -340,6 +340,20 @@ void MultiMeshBullets2D::set_up_bullet_instances(const MultiMeshBulletsData2D &d
 			// the vector can't be left half-cleared below by the size check inside.
 			bullets_current_collision_count.clear();
 			bullets_current_collision_count.resize(amount_bullets, 0);
+		}
+	}
+
+	// Per-bullet custom data (same fallback rule as speed data; null entries
+	// fall back to the shared value when read).
+	all_bullets_custom_data.assign(amount_bullets, Ref<Resource>());
+	if (data.all_bullets_custom_data.size() == amount_bullets) {
+		for (int i = 0; i < amount_bullets; ++i) {
+			all_bullets_custom_data[i] = data.all_bullets_custom_data[i];
+		}
+	} else if (data.all_bullets_custom_data.size() > 0) {
+		Ref<Resource> first_custom_data = data.all_bullets_custom_data[0];
+		for (int i = 0; i < amount_bullets; ++i) {
+			all_bullets_custom_data[i] = first_custom_data;
 		}
 	}
 
@@ -594,7 +608,7 @@ Vector2 MultiMeshBullets2D::resolve_quad_size(const Ref<SpriteFrames> &p_sprite_
 
 // Always called last (texture comes from rebuild_sprite_animation, called by spawn/enable)
 void MultiMeshBullets2D::finalize_set_up(
-		const Ref<Resource> &new_bullets_custom_data,
+		const Ref<Resource> &new_shared_bullets_custom_data,
 		const Ref<Material> &new_material,
 		int new_z_index,
 		int new_light_mask,
@@ -602,7 +616,7 @@ void MultiMeshBullets2D::finalize_set_up(
 		const Dictionary &new_instance_shader_parameters) {
 	// Bullets custom data. Always assigned (null clears) so pool reuse never leaks
 	// the previous owner's data into a new spawn.
-	bullets_custom_data = new_bullets_custom_data;
+	shared_bullets_custom_data = new_shared_bullets_custom_data;
 
 	if (new_material.is_valid()) {
 		godot::Ref<ShaderMaterial> shader_material = new_material;
@@ -1657,9 +1671,14 @@ void MultiMeshBullets2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_all_bullets_status"), &MultiMeshBullets2D::get_all_bullets_status);
 	ClassDB::bind_method(D_METHOD("is_bullet_status_enabled", "bullet_index"), &MultiMeshBullets2D::is_bullet_status_enabled);
 
-	ClassDB::bind_method(D_METHOD("get_bullets_custom_data"), &MultiMeshBullets2D::get_bullets_custom_data);
-	ClassDB::bind_method(D_METHOD("set_bullets_custom_data", "new_custom_data"), &MultiMeshBullets2D::set_bullets_custom_data);
-	ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "bullets_custom_data"), "set_bullets_custom_data", "get_bullets_custom_data");
+	ClassDB::bind_method(D_METHOD("get_shared_bullets_custom_data"), &MultiMeshBullets2D::get_shared_bullets_custom_data);
+	ClassDB::bind_method(D_METHOD("set_shared_bullets_custom_data", "new_shared_bullets_custom_data"), &MultiMeshBullets2D::set_shared_bullets_custom_data);
+	ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "shared_bullets_custom_data"), "set_shared_bullets_custom_data", "get_shared_bullets_custom_data");
+
+	ClassDB::bind_method(D_METHOD("bullet_get_custom_data", "bullet_index"), &MultiMeshBullets2D::bullet_get_custom_data);
+	ClassDB::bind_method(D_METHOD("bullet_set_custom_data", "bullet_index", "new_custom_data"), &MultiMeshBullets2D::bullet_set_custom_data);
+	ClassDB::bind_method(D_METHOD("all_bullets_get_custom_data", "bullet_index_start", "bullet_index_end_inclusive"), &MultiMeshBullets2D::all_bullets_get_custom_data, DEFVAL(0), DEFVAL(-1));
+	ClassDB::bind_method(D_METHOD("all_bullets_set_custom_data", "new_custom_data", "bullet_index_start", "bullet_index_end_inclusive"), &MultiMeshBullets2D::all_bullets_set_custom_data, DEFVAL(0), DEFVAL(-1));
 
 	ClassDB::bind_method(D_METHOD("get_is_life_time_infinite"), &MultiMeshBullets2D::get_is_life_time_infinite);
 	ClassDB::bind_method(D_METHOD("set_is_life_time_infinite", "value"), &MultiMeshBullets2D::set_is_life_time_infinite);

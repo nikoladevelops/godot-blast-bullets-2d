@@ -1740,20 +1740,20 @@ void BulletFactory2D::_bind_methods() {
 						  PropertyInfo(Variant::OBJECT, "hit_target_area"),
 						  PropertyInfo(Variant::OBJECT, "multimesh_bullets_instance", PROPERTY_HINT_NODE_TYPE, "MultiMeshBullets2D"),
 						  PropertyInfo(Variant::INT, "bullet_index"),
-						  PropertyInfo(Variant::OBJECT, "bullets_custom_data", PROPERTY_HINT_RESOURCE_TYPE, "Resource"),
+						  PropertyInfo(Variant::OBJECT, "shared_bullets_custom_data", PROPERTY_HINT_RESOURCE_TYPE, "Resource"),
 						  PropertyInfo(Variant::TRANSFORM2D, "bullet_global_transform")));
 
 	ADD_SIGNAL(MethodInfo("body_entered",
 						  PropertyInfo(Variant::OBJECT, "hit_target_body"),
 						  PropertyInfo(Variant::OBJECT, "multimesh_bullets_instance", PROPERTY_HINT_NODE_TYPE, "MultiMeshBullets2D"),
 						  PropertyInfo(Variant::INT, "bullet_index"),
-						  PropertyInfo(Variant::OBJECT, "bullets_custom_data", PROPERTY_HINT_RESOURCE_TYPE, "Resource"),
+						  PropertyInfo(Variant::OBJECT, "shared_bullets_custom_data", PROPERTY_HINT_RESOURCE_TYPE, "Resource"),
 						  PropertyInfo(Variant::TRANSFORM2D, "bullet_global_transform")));
 
 	ADD_SIGNAL(MethodInfo("life_time_over",
 						  PropertyInfo(Variant::OBJECT, "multimesh_bullets_instance", PROPERTY_HINT_NODE_TYPE, "MultiMeshBullets2D"),
 						  PropertyInfo(Variant::ARRAY, "bullet_indexes", PROPERTY_HINT_ARRAY_TYPE, "int"),
-						  PropertyInfo(Variant::OBJECT, "bullets_custom_data", PROPERTY_HINT_RESOURCE_TYPE, "Resource"),
+						  PropertyInfo(Variant::OBJECT, "shared_bullets_custom_data", PROPERTY_HINT_RESOURCE_TYPE, "Resource"),
 						  PropertyInfo(Variant::ARRAY, "bullets_global_transforms", PROPERTY_HINT_ARRAY_TYPE, "Transform2D")));
 
 	ADD_SIGNAL(MethodInfo("reset_finished"));
