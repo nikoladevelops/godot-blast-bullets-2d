@@ -16,7 +16,7 @@ extends BulletFactory2D
 # This function is connected to the directional_area_entered signal of the bullet factory. It is executed each time a directional bullet spawned from the factory hits an Area2D (and again in order for a thing to be hit, ensure the layers are correct!)
 func _on_directional_area_entered(hit_target_area: Object, directional_bullets: DirectionalBullets2D, bullet_index: int) -> void:
 	if hit_target_area is AbstractEnemy:
-		var dmg_data: DamageData = directional_bullets.bullet_get_custom_data(bullet_index) as DamageData # We know for a fact that we have a DamageData inside our bullets, because that's how we've set them up before spawning them - we can replace it with some other custom resource instead and check for its type here too (we may spawn bullets with different custom data and have additional check logic)
+		var dmg_data: DamageData = directional_bullets.shared_bullets_custom_data as DamageData # We know for a fact that we have a DamageData inside our bullets, because that's how we've set them up before spawning them - we can replace it with some other custom resource instead and check for its type here too (we may spawn bullets with different custom data and have additional check logic)
 		if dmg_data.is_player_owned == false: # If it wasn't the player who spawned the bullet, then that means an enemy is hitting another enemy - I want the bullet to dissapear without it damaging the enemy (No friendly fire :P)
 			return
 		hit_target_area.take_damage(dmg_data.base_damage) # You can do way more complex damage logic with the rest of the properties inside the custom data, you can do anything..
@@ -27,7 +27,7 @@ func _on_directional_area_entered(hit_target_area: Object, directional_bullets: 
 # This function is connected to the directional_body_entered signal of the bullet factory.  It is executed each time a directional bullet spawned from the factory hits a body (and again in order for a thing to be hit, ensure the layers are correct and you also have enabled the .monitorable property inside bullets data!)
 func _on_directional_body_entered(hit_target_body: Object, directional_bullets: DirectionalBullets2D, bullet_index: int) -> void:
 	if hit_target_body is Player:
-		var dmg_data: DamageData = directional_bullets.bullet_get_custom_data(bullet_index) as DamageData
+		var dmg_data: DamageData = directional_bullets.shared_bullets_custom_data as DamageData
 		hit_target_body.take_damage(dmg_data.base_damage)
 
 	#print("Bullet just collided with a body")
@@ -46,14 +46,14 @@ func _on_directional_life_time_over(_directional_bullets: DirectionalBullets2D, 
 # Same handlers for block bullets - same slim signature, typed BlockBullets2D instance, no casts.
 func _on_block_area_entered(hit_target_area: Object, block_bullets: BlockBullets2D, bullet_index: int) -> void:
 	if hit_target_area is AbstractEnemy:
-		var dmg_data: DamageData = block_bullets.bullet_get_custom_data(bullet_index) as DamageData
+		var dmg_data: DamageData = block_bullets.shared_bullets_custom_data as DamageData
 		if dmg_data.is_player_owned == false:
 			return
 		hit_target_area.take_damage(dmg_data.base_damage)
 
 func _on_block_body_entered(hit_target_body: Object, block_bullets: BlockBullets2D, bullet_index: int) -> void:
 	if hit_target_body is Player:
-		var dmg_data: DamageData = block_bullets.bullet_get_custom_data(bullet_index) as DamageData
+		var dmg_data: DamageData = block_bullets.shared_bullets_custom_data as DamageData
 		hit_target_body.take_damage(dmg_data.base_damage)
 
 func _on_block_life_time_over(_block_bullets: BlockBullets2D, _bullet_indexes: Array[int]) -> void:

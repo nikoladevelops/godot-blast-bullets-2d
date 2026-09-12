@@ -303,9 +303,9 @@ switch_direction_when_reaching_range_x = false
 position = Vector2(250, 293)
 curve = SubResource("Curve2D_nkrfg")
 
-[connection signal="directional_area_entered" from="BulletFactory2D" to="BulletFactory2D" method="_on_directional_area_entered"]
-[connection signal="directional_body_entered" from="BulletFactory2D" to="BulletFactory2D" method="_on_directional_body_entered"]
-[connection signal="directional_life_time_over" from="BulletFactory2D" to="BulletFactory2D" method="_on_directional_life_time_over"]
 [connection signal="block_area_entered" from="BulletFactory2D" to="BulletFactory2D" method="_on_block_area_entered"]
 [connection signal="block_body_entered" from="BulletFactory2D" to="BulletFactory2D" method="_on_block_body_entered"]
 [connection signal="block_life_time_over" from="BulletFactory2D" to="BulletFactory2D" method="_on_block_life_time_over"]
+[connection signal="directional_area_entered" from="BulletFactory2D" to="BulletFactory2D" method="_on_directional_area_entered"]
+[connection signal="directional_body_entered" from="BulletFactory2D" to="BulletFactory2D" method="_on_directional_body_entered"]
+[connection signal="directional_life_time_over" from="BulletFactory2D" to="BulletFactory2D" method="_on_directional_life_time_over"]
