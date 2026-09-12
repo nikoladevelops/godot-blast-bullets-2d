@@ -741,8 +741,9 @@ public:
 		}
 	}
 
-	// Exposed helper methods
+	// Exposed helper methods (public so BulletSpawner2D can reuse them for transforms_source modes)
 
+public:
 	// Generates a grid of 2D transforms positioned relative to marker_transform
 	static TypedArray<Transform2D> helper_generate_transforms_grid(
 			int transforms_amount,

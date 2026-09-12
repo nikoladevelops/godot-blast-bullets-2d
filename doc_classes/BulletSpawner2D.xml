@@ -4,7 +4,7 @@
 		Fires volleys of directional bullets on a timer using a [BulletFactory2D].
 	</brief_description>
 	<description>
-		Place this node in the scene, point [member bullet_factory_path] at a [BulletFactory2D], assign [member spawn_data], and arrange marker nodes under [member transforms_generator]. Every [member shoot_interval_sec] seconds (after [member shoot_initial_delay_sec]) it collects one global transform per volley bullet and spawns them through [method BulletFactory2D.spawn_controllable_directional_bullets]. Each volley duplicates the spawn data first, so shared .tres files are never mutated. Never shoots in the editor.
+		Place this node in the scene, point [member bullet_factory_path] at a [BulletFactory2D], assign [member spawn_data], and pick a [member transforms_source]: arrange marker nodes under [member transforms_generator], or generate the volley procedurally with the helper_* options (same patterns as the [BulletFactory2D] spawn helpers). Every [member shoot_interval_sec] seconds (after [member shoot_initial_delay_sec]) it collects one global transform per volley bullet and spawns them through [method BulletFactory2D.spawn_controllable_directional_bullets]. Each volley duplicates the spawn data first, so shared .tres files are never mutated. Never shoots in the editor.
 	</description>
 	<tutorials>
 	</tutorials>
@@ -12,7 +12,7 @@
 		<method name="collect_spawn_transforms" qualifiers="const">
 			<return type="Transform2D[]" />
 			<description>
-				Collects one global transform per volley bullet: the [Node2D] children of the transforms generator (non-Node2D children are skipped). When the generator has no Node2D children, its own global transform is used; when no generator is assigned, this node's own transform is used. Always returns at least one transform. [member transforms_scale] is applied relative to the generator.
+				Collects one global transform per volley bullet according to [member transforms_source]: the [Node2D] children of the transforms generator, this node's own transform, or one of the procedural helper patterns (grid, ring, fan, spiral, line, aimed). Child and self modes fall back to the generator's own transform when it has no Node2D children; when no generator is assigned, this node's own transform is used. Always returns at least one transform, except aimed mode with no target (prints an error, volley skipped). [member transforms_scale] is applied to every source relative to the generator.
 			</description>
 		</method>
 		<method name="get_bullet_factory" qualifiers="const">
@@ -25,6 +25,12 @@
 			<return type="Node2D" />
 			<description>
 				Returns the resolved transforms generator behind [member transforms_generator], or null when unset. Falls back to nothing - [method collect_spawn_transforms] uses this node itself then.
+			</description>
+		</method>
+		<method name="get_helper_aimed_target" qualifiers="const">
+			<return type="Node2D" />
+			<description>
+				Returns the resolved aim target behind [member helper_aimed_target], or null when unset. Aimed mode with no target prints an error and skips the volley.
 			</description>
 		</method>
 		<method name="get_volleys_fired" qualifiers="const">
@@ -51,6 +57,13 @@
 			<param index="0" name="generator" type="Node2D" />
 			<description>
 				Assigns the transforms generator directly and syncs [member transforms_generator] to it when both nodes are in the tree. Pass null to clear both.
+			</description>
+		</method>
+		<method name="set_helper_aimed_target">
+			<return type="void" />
+			<param index="0" name="target" type="Node2D" />
+			<description>
+				Assigns the aim target directly and syncs [member helper_aimed_target] to it when both nodes are in the tree. Pass null to clear both.
 			</description>
 		</method>
 		<method name="shoot_once">
@@ -85,7 +98,114 @@
 		<member name="transforms_scale" type="float" setter="set_transforms_scale" getter="get_transforms_scale" default="1.0">
 			Uniform scale applied to every generated transform, relative to the generator origin - marker offsets (spread radius) and basis (bullet size) grow together while rotation is preserved. 1.0 is identity. Must be finite; 0 collapses the whole volley onto the generator, negatives mirror it.
 		</member>
+		<member name="transforms_source" type="int" setter="set_transforms_source" getter="get_transforms_source" default="0">
+			Where [method collect_spawn_transforms] gets the per-volley transforms: 0 children of the transforms generator, 1 this spawner's own transform, 2+ procedural patterns driven by the helper_* options below. Only the option group of the active pattern is shown in the inspector (switching modes refreshes it immediately). Every mode produces a static snapshot per volley - Spiral places bullets along an expanding spiral facing radially outward, Line centers a wall on the generator facing the line axis, and Aimed centers a cone on [member helper_aimed_target] (the volley is skipped with an error when no target is assigned).
+		</member>
+		<member name="helper_bullets_amount" type="int" setter="set_helper_bullets_amount" getter="get_helper_bullets_amount" default="10">
+			How many transforms the active procedural pattern generates. Clamped to &gt;= 1.
+		</member>
+		<member name="helper_grid_rows_per_column" type="int" setter="set_helper_grid_rows_per_column" getter="get_helper_grid_rows_per_column" default="4">
+			Grid pattern: rows per column. Clamped to &gt;= 1.
+		</member>
+		<member name="helper_grid_alignment" type="int" setter="set_helper_grid_alignment" getter="get_helper_grid_alignment" default="3">
+			Grid pattern: anchor alignment, same values as [enum BulletFactory2D.Alignment].
+		</member>
+		<member name="helper_grid_column_offset" type="float" setter="set_helper_grid_column_offset" getter="get_helper_grid_column_offset" default="100.0">
+			Grid pattern: horizontal spacing between columns.
+		</member>
+		<member name="helper_grid_row_offset" type="float" setter="set_helper_grid_row_offset" getter="get_helper_grid_row_offset" default="100.0">
+			Grid pattern: vertical spacing between rows.
+		</member>
+		<member name="helper_grid_rotate_with_marker" type="bool" setter="set_helper_grid_rotate_with_marker" getter="get_helper_grid_rotate_with_marker" default="true">
+			Grid pattern: rotate the grid with the generator's rotation.
+		</member>
+		<member name="helper_grid_random_local_rotation" type="bool" setter="set_helper_grid_random_local_rotation" getter="get_helper_grid_random_local_rotation" default="false">
+			Grid pattern: give each transform a random rotation.
+		</member>
+		<member name="helper_ring_radius" type="float" setter="set_helper_ring_radius" getter="get_helper_ring_radius" default="150.0">
+			Ring pattern: circle radius around the generator.
+		</member>
+		<member name="helper_ring_start_angle" type="float" setter="set_helper_ring_start_angle" getter="get_helper_ring_start_angle" default="0.0">
+			Ring pattern: angle in radians where the arc starts.
+		</member>
+		<member name="helper_ring_arc" type="float" setter="set_helper_ring_arc" getter="get_helper_ring_arc" default="6.283185307179586">
+			Ring pattern: arc length in radians. Full circle by default; smaller values make partial arcs.
+		</member>
+		<member name="helper_ring_rotate_with_marker" type="bool" setter="set_helper_ring_rotate_with_marker" getter="get_helper_ring_rotate_with_marker" default="true">
+			Ring pattern: rotate the ring with the generator's rotation.
+		</member>
+		<member name="helper_ring_random_rotation" type="bool" setter="set_helper_ring_random_rotation" getter="get_helper_ring_random_rotation" default="false">
+			Ring pattern: give each transform a random rotation.
+		</member>
+		<member name="helper_ring_face_outward" type="bool" setter="set_helper_ring_face_outward" getter="get_helper_ring_face_outward" default="true">
+			Ring pattern: face transforms away from the center. Set false for implosion patterns that fly toward the center.
+		</member>
+		<member name="helper_fan_spread" type="float" setter="set_helper_fan_spread" getter="get_helper_fan_spread" default="0.5">
+			Fan pattern: full cone width in radians.
+		</member>
+		<member name="helper_fan_direction_angle" type="float" setter="set_helper_fan_direction_angle" getter="get_helper_fan_direction_angle" default="0.0">
+			Fan pattern: cone center direction in radians.
+		</member>
+		<member name="helper_fan_step_offset" type="float" setter="set_helper_fan_step_offset" getter="get_helper_fan_step_offset" default="0.0">
+			Fan pattern: stagger between consecutive origins so pellets do not stack.
+		</member>
+		<member name="helper_spiral_start_radius" type="float" setter="set_helper_spiral_start_radius" getter="get_helper_spiral_start_radius" default="50.0">
+			Spiral pattern: radius of the first transform.
+		</member>
+		<member name="helper_spiral_radius_step" type="float" setter="set_helper_spiral_radius_step" getter="get_helper_spiral_radius_step" default="15.0">
+			Spiral pattern: radius growth per transform.
+		</member>
+		<member name="helper_spiral_angle_step" type="float" setter="set_helper_spiral_angle_step" getter="get_helper_spiral_angle_step" default="0.6">
+			Spiral pattern: angle step in radians per transform.
+		</member>
+		<member name="helper_spiral_rotate_with_marker" type="bool" setter="set_helper_spiral_rotate_with_marker" getter="get_helper_spiral_rotate_with_marker" default="true">
+			Spiral pattern: rotate the spiral with the generator's rotation.
+		</member>
+		<member name="helper_line_direction" type="Vector2" setter="set_helper_line_direction" getter="get_helper_line_direction" default="Vector2(1, 0)">
+			Line pattern: the line axis. Need not be normalized.
+		</member>
+		<member name="helper_line_spacing" type="float" setter="set_helper_line_spacing" getter="get_helper_line_spacing" default="32.0">
+			Line pattern: spacing between consecutive transforms.
+		</member>
+		<member name="helper_line_face_direction" type="bool" setter="set_helper_line_face_direction" getter="get_helper_line_face_direction" default="true">
+			Line pattern: face transforms along the line axis instead of keeping the generator rotation.
+		</member>
+		<member name="helper_aimed_target" type="NodePath" setter="set_helper_aimed_target_path" getter="get_helper_aimed_target_path" default="NodePath(&quot;&quot;)">
+			Path to the Node2D the aimed cone is centered on (generator-to-target direction). Native Node2D filtering always matches, so any Node2D in the scene is selectable.
+		</member>
+		<member name="helper_aimed_spread" type="float" setter="set_helper_aimed_spread" getter="get_helper_aimed_spread" default="0.3">
+			Aimed pattern: full cone width in radians around the generator-to-target direction.
+		</member>
+		<member name="helper_aimed_step_offset" type="float" setter="set_helper_aimed_step_offset" getter="get_helper_aimed_step_offset" default="0.0">
+			Aimed pattern: stagger between consecutive origins so pellets do not stack.
+		</member>
 	</members>
+	<constants>
+		<constant name="TRANSFORMS_FROM_CHILDREN" value="0">
+			Per-volley transforms come from the Node2D children of the transforms generator.
+		</constant>
+		<constant name="TRANSFORMS_FROM_SELF" value="1">
+			Every volley fires a single bullet from the generator's own transform.
+		</constant>
+		<constant name="TRANSFORMS_FROM_HELPER_GRID" value="2">
+			Per-volley transforms come from the procedural grid pattern and its helper_grid_* options.
+		</constant>
+		<constant name="TRANSFORMS_FROM_HELPER_RING" value="3">
+			Per-volley transforms come from the procedural ring pattern and its helper_ring_* options.
+		</constant>
+		<constant name="TRANSFORMS_FROM_HELPER_FAN" value="4">
+			Per-volley transforms come from the procedural fan pattern and its helper_fan_* options.
+		</constant>
+		<constant name="TRANSFORMS_FROM_HELPER_SPIRAL" value="5">
+			Per-volley transforms come from the procedural spiral pattern and its helper_spiral_* options.
+		</constant>
+		<constant name="TRANSFORMS_FROM_HELPER_LINE" value="6">
+			Per-volley transforms come from the procedural line pattern and its helper_line_* options.
+		</constant>
+		<constant name="TRANSFORMS_FROM_HELPER_AIMED" value="7">
+			Per-volley transforms come from the aimed cone at [member helper_aimed_target] and its helper_aimed_* options.
+		</constant>
+	</constants>
 	<signals>
 		<signal name="area_entered">
 			<param index="0" name="hit_target_area" type="Object" />
