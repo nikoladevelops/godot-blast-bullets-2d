@@ -236,13 +236,6 @@
 				Sets the world physics space that the bullets interact in. Set it before spawning: it applies to subsequently spawned bullets, already spawned areas stay in their space. Invalid RIDs are rejected with an error.
 			</description>
 		</method>
-		<method name="set_use_physics_interpolation_editor">
-			<return type="void" />
-			<param index="0" name="enable" type="bool" />
-			<description>
-				Editor-side setter behind the [member use_physics_interpolation] property. At runtime always use [method set_use_physics_interpolation_runtime] instead.
-			</description>
-		</method>
 		<method name="set_use_physics_interpolation_runtime">
 			<return type="void" />
 			<param index="0" name="enable" type="bool" />
