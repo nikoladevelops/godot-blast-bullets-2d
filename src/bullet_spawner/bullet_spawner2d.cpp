@@ -41,6 +41,15 @@ static void assign_node_to_path(const Node *self, T *node, NodePath &r_path, T *
     }
 }
 
+// Rotates a spawn transform around an origin, so a spinning emitter orbits
+// bullet positions and turns facings together. Zero rotation is a no-op.
+static Transform2D rotate_spawn_transform(const Transform2D &t, const Vector2 &origin, real_t radians) {
+    if (radians == 0.0) {
+        return t;
+    }
+    const Vector2 rotated_offset = (t.get_origin() - origin).rotated(radians);
+    return Transform2D(t.get_rotation() + radians, origin + rotated_offset);
+}
 // Uniformly scales a spawn transform relative to the generator origin, so
 // marker offsets (spread radius) and basis (bullet size) grow together while
 // rotation is preserved. Scale 1.0 returns the transform untouched.
@@ -50,6 +59,13 @@ static Transform2D scale_spawn_transform(const Transform2D &t, const Vector2 &ba
     }
     return Transform2D(t.columns[0] * scale, t.columns[1] * scale, base_origin + (t.columns[2] - base_origin) * scale);
 }
+
+// Metadata tag + node name for the editor-only pattern preview holder.
+// The children-mode collection skips anything carrying the tag, so the
+// preview can never become a spawn marker. The tilde sorts it last and marks
+// it as internal. The holder is owner-less: never saved, never exported.
+static const char *PREVIEW_META_KEY = "blastbullets_pattern_preview";
+static const char *PREVIEW_HOLDER_NAME = "~BlastBulletsPatternPreview";
 
 // Human-readable mode name for error messages (mirrors the transforms_source enum hint).
 static const char *transforms_source_name(BulletSpawner2D::TransformsSource source) {
@@ -115,6 +131,7 @@ void BulletSpawner2D::set_transforms_generator_path(const NodePath &p_path) {
             resolve_node_path(this, transforms_generator_path, transforms_generator);
         }
     }
+    rebuild_preview();
 }
 
 Node2D *BulletSpawner2D::get_transforms_generator() const {
@@ -123,6 +140,7 @@ Node2D *BulletSpawner2D::get_transforms_generator() const {
 
 void BulletSpawner2D::set_transforms_generator(Node2D *generator) {
     assign_node_to_path(this, generator, transforms_generator_path, transforms_generator);
+    rebuild_preview();
 }
 
 Ref<DirectionalBulletsData2D> BulletSpawner2D::get_spawn_data() const {
@@ -144,7 +162,7 @@ void BulletSpawner2D::set_shooting_enabled(bool value) {
     shooting_enabled = value;
     const bool now_active = auto_shooting_active();
     if (is_inside_tree()) {
-        set_process(now_active);
+        set_process(now_active || spin_enabled);
     }
     if (!was_active && now_active) {
         emit_signal("shooting_started");
@@ -189,7 +207,7 @@ void BulletSpawner2D::set_max_volleys(int value) {
     max_volleys = value;
     const bool now_active = auto_shooting_active();
     if (is_inside_tree()) {
-        set_process(now_active);
+        set_process(now_active || spin_enabled);
     }
     if (!was_active && now_active) {
         emit_signal("shooting_started");
@@ -211,6 +229,82 @@ void BulletSpawner2D::set_transforms_scale(double value) {
         return;
     }
     transforms_scale = value;
+    rebuild_preview();
+}
+
+bool BulletSpawner2D::get_spin_enabled() const {
+    return spin_enabled;
+}
+void BulletSpawner2D::set_spin_enabled(bool value) {
+    spin_enabled = value;
+    if (!Engine::get_singleton()->is_editor_hint() && is_inside_tree()) {
+        // Spinning needs _process even when auto-shooting is off.
+        set_process(spin_enabled || auto_shooting_active());
+    }
+}
+double BulletSpawner2D::get_spin_speed_deg_per_sec() const {
+    return spin_speed_deg_per_sec;
+}
+void BulletSpawner2D::set_spin_speed_deg_per_sec(double value) {
+    if (!Math::is_finite(value)) {
+        UtilityFunctions::push_error("BulletSpawner2D: spin_speed_deg_per_sec must be finite, keeping the old value.");
+        return;
+    }
+    spin_speed_deg_per_sec = value;
+}
+BulletSpawner2D::SpinMode BulletSpawner2D::get_spin_mode() const {
+    return spin_mode;
+}
+void BulletSpawner2D::set_spin_mode(SpinMode value) {
+    if (value < SPIN_CONTINUOUS || value > SPIN_OSCILLATE) {
+        UtilityFunctions::push_error("BulletSpawner2D: invalid spin_mode, keeping the old value.");
+        return;
+    }
+    spin_mode = value;
+}
+double BulletSpawner2D::get_spin_amplitude_deg() const {
+    return spin_amplitude_deg;
+}
+void BulletSpawner2D::set_spin_amplitude_deg(double value) {
+    if (!Math::is_finite(value) || value < 0.0) {
+        UtilityFunctions::push_error("BulletSpawner2D: spin_amplitude_deg must be finite and >= 0, keeping the old value.");
+        return;
+    }
+    spin_amplitude_deg = value;
+}
+double BulletSpawner2D::get_spin_frequency_hz() const {
+    return spin_frequency_hz;
+}
+void BulletSpawner2D::set_spin_frequency_hz(double value) {
+    if (!Math::is_finite(value) || value < 0.0) {
+        UtilityFunctions::push_error("BulletSpawner2D: spin_frequency_hz must be finite and >= 0, keeping the old value.");
+        return;
+    }
+    spin_frequency_hz = value;
+}
+double BulletSpawner2D::get_spin_angle_deg() const {
+    return spin_angle_deg;
+}
+bool BulletSpawner2D::is_spinning() const {
+    return spin_enabled && !Engine::get_singleton()->is_editor_hint();
+}
+void BulletSpawner2D::start_spinning() {
+    set_spin_enabled(true);
+}
+void BulletSpawner2D::stop_spinning() {
+    set_spin_enabled(false);
+}
+void BulletSpawner2D::reset_spin_angle() {
+    spin_angle_deg = 0.0;
+    spin_time_sec = 0.0;
+}
+void BulletSpawner2D::advance_spin(double delta) {
+    if (spin_mode == SPIN_OSCILLATE) {
+        spin_time_sec += delta;
+        spin_angle_deg = spin_amplitude_deg * Math::sin(Math::TAU * spin_frequency_hz * spin_time_sec);
+    } else {
+        spin_angle_deg = Math::fposmod(spin_angle_deg + spin_speed_deg_per_sec * delta, 360.0);
+    }
 }
 
 BulletSpawner2D::TransformsSource BulletSpawner2D::get_transforms_source() const {
@@ -226,6 +320,7 @@ void BulletSpawner2D::set_transforms_source(TransformsSource value) {
     // inspector immediately, otherwise the new mode's options stay hidden
     // until the selection is re-clicked (see _validate_property).
     notify_property_list_changed();
+    rebuild_preview();
 }
 
 int BulletSpawner2D::get_helper_bullets_amount() const {
@@ -237,6 +332,7 @@ void BulletSpawner2D::set_helper_bullets_amount(int value) {
         return;
     }
     helper_bullets_amount = value;
+    rebuild_preview();
 }
 
 int BulletSpawner2D::get_helper_grid_rows_per_column() const {
@@ -248,6 +344,7 @@ void BulletSpawner2D::set_helper_grid_rows_per_column(int value) {
         return;
     }
     helper_grid_rows_per_column = value;
+    rebuild_preview();
 }
 
 int BulletSpawner2D::get_helper_grid_alignment() const {
@@ -259,6 +356,7 @@ void BulletSpawner2D::set_helper_grid_alignment(int value) {
         return;
     }
     helper_grid_alignment = value;
+    rebuild_preview();
 }
 
 double BulletSpawner2D::get_helper_grid_column_offset() const {
@@ -270,6 +368,7 @@ void BulletSpawner2D::set_helper_grid_column_offset(double value) {
         return;
     }
     helper_grid_column_offset = value;
+    rebuild_preview();
 }
 
 double BulletSpawner2D::get_helper_grid_row_offset() const {
@@ -281,6 +380,7 @@ void BulletSpawner2D::set_helper_grid_row_offset(double value) {
         return;
     }
     helper_grid_row_offset = value;
+    rebuild_preview();
 }
 
 bool BulletSpawner2D::get_helper_grid_rotate_with_marker() const {
@@ -288,6 +388,7 @@ bool BulletSpawner2D::get_helper_grid_rotate_with_marker() const {
 }
 void BulletSpawner2D::set_helper_grid_rotate_with_marker(bool value) {
     helper_grid_rotate_with_marker = value;
+    rebuild_preview();
 }
 
 bool BulletSpawner2D::get_helper_grid_random_local_rotation() const {
@@ -295,6 +396,18 @@ bool BulletSpawner2D::get_helper_grid_random_local_rotation() const {
 }
 void BulletSpawner2D::set_helper_grid_random_local_rotation(bool value) {
     helper_grid_random_local_rotation = value;
+    rebuild_preview();
+}
+double BulletSpawner2D::get_helper_grid_jitter() const {
+    return helper_grid_jitter;
+}
+void BulletSpawner2D::set_helper_grid_jitter(double value) {
+    if (!Math::is_finite(value) || value < 0.0) {
+        UtilityFunctions::push_error("BulletSpawner2D: helper_grid_jitter must be finite and >= 0, keeping the old value.");
+        return;
+    }
+    helper_grid_jitter = value;
+    rebuild_preview();
 }
 
 double BulletSpawner2D::get_helper_ring_radius() const {
@@ -306,6 +419,7 @@ void BulletSpawner2D::set_helper_ring_radius(double value) {
         return;
     }
     helper_ring_radius = value;
+    rebuild_preview();
 }
 
 double BulletSpawner2D::get_helper_ring_start_angle() const {
@@ -317,6 +431,7 @@ void BulletSpawner2D::set_helper_ring_start_angle(double value) {
         return;
     }
     helper_ring_start_angle = value;
+    rebuild_preview();
 }
 
 double BulletSpawner2D::get_helper_ring_arc() const {
@@ -328,6 +443,7 @@ void BulletSpawner2D::set_helper_ring_arc(double value) {
         return;
     }
     helper_ring_arc = value;
+    rebuild_preview();
 }
 
 bool BulletSpawner2D::get_helper_ring_rotate_with_marker() const {
@@ -335,6 +451,7 @@ bool BulletSpawner2D::get_helper_ring_rotate_with_marker() const {
 }
 void BulletSpawner2D::set_helper_ring_rotate_with_marker(bool value) {
     helper_ring_rotate_with_marker = value;
+    rebuild_preview();
 }
 
 bool BulletSpawner2D::get_helper_ring_random_rotation() const {
@@ -342,6 +459,7 @@ bool BulletSpawner2D::get_helper_ring_random_rotation() const {
 }
 void BulletSpawner2D::set_helper_ring_random_rotation(bool value) {
     helper_ring_random_rotation = value;
+    rebuild_preview();
 }
 
 bool BulletSpawner2D::get_helper_ring_face_outward() const {
@@ -349,6 +467,7 @@ bool BulletSpawner2D::get_helper_ring_face_outward() const {
 }
 void BulletSpawner2D::set_helper_ring_face_outward(bool value) {
     helper_ring_face_outward = value;
+    rebuild_preview();
 }
 
 double BulletSpawner2D::get_helper_fan_spread() const {
@@ -360,6 +479,7 @@ void BulletSpawner2D::set_helper_fan_spread(double value) {
         return;
     }
     helper_fan_spread = value;
+    rebuild_preview();
 }
 
 double BulletSpawner2D::get_helper_fan_direction_angle() const {
@@ -371,6 +491,7 @@ void BulletSpawner2D::set_helper_fan_direction_angle(double value) {
         return;
     }
     helper_fan_direction_angle = value;
+    rebuild_preview();
 }
 
 double BulletSpawner2D::get_helper_fan_step_offset() const {
@@ -382,6 +503,7 @@ void BulletSpawner2D::set_helper_fan_step_offset(double value) {
         return;
     }
     helper_fan_step_offset = value;
+    rebuild_preview();
 }
 
 double BulletSpawner2D::get_helper_spiral_start_radius() const {
@@ -393,6 +515,7 @@ void BulletSpawner2D::set_helper_spiral_start_radius(double value) {
         return;
     }
     helper_spiral_start_radius = value;
+    rebuild_preview();
 }
 
 double BulletSpawner2D::get_helper_spiral_radius_step() const {
@@ -404,6 +527,7 @@ void BulletSpawner2D::set_helper_spiral_radius_step(double value) {
         return;
     }
     helper_spiral_radius_step = value;
+    rebuild_preview();
 }
 
 double BulletSpawner2D::get_helper_spiral_angle_step() const {
@@ -415,6 +539,7 @@ void BulletSpawner2D::set_helper_spiral_angle_step(double value) {
         return;
     }
     helper_spiral_angle_step = value;
+    rebuild_preview();
 }
 
 bool BulletSpawner2D::get_helper_spiral_rotate_with_marker() const {
@@ -422,6 +547,7 @@ bool BulletSpawner2D::get_helper_spiral_rotate_with_marker() const {
 }
 void BulletSpawner2D::set_helper_spiral_rotate_with_marker(bool value) {
     helper_spiral_rotate_with_marker = value;
+    rebuild_preview();
 }
 
 Vector2 BulletSpawner2D::get_helper_line_direction() const {
@@ -433,6 +559,7 @@ void BulletSpawner2D::set_helper_line_direction(const Vector2 &value) {
         return;
     }
     helper_line_direction = value;
+    rebuild_preview();
 }
 
 double BulletSpawner2D::get_helper_line_spacing() const {
@@ -444,6 +571,7 @@ void BulletSpawner2D::set_helper_line_spacing(double value) {
         return;
     }
     helper_line_spacing = value;
+    rebuild_preview();
 }
 
 bool BulletSpawner2D::get_helper_line_face_direction() const {
@@ -451,6 +579,7 @@ bool BulletSpawner2D::get_helper_line_face_direction() const {
 }
 void BulletSpawner2D::set_helper_line_face_direction(bool value) {
     helper_line_face_direction = value;
+    rebuild_preview();
 }
 
 NodePath BulletSpawner2D::get_helper_aimed_target_path() const {
@@ -468,6 +597,7 @@ void BulletSpawner2D::set_helper_aimed_target_path(const NodePath &p_path) {
             resolve_node_path(this, helper_aimed_target_path, helper_aimed_target);
         }
     }
+    rebuild_preview();
 }
 
 Node2D *BulletSpawner2D::get_helper_aimed_target() const {
@@ -476,6 +606,7 @@ Node2D *BulletSpawner2D::get_helper_aimed_target() const {
 
 void BulletSpawner2D::set_helper_aimed_target(Node2D *target) {
     assign_node_to_path(this, target, helper_aimed_target_path, helper_aimed_target);
+    rebuild_preview();
 }
 
 double BulletSpawner2D::get_helper_aimed_spread() const {
@@ -487,6 +618,7 @@ void BulletSpawner2D::set_helper_aimed_spread(double value) {
         return;
     }
     helper_aimed_spread = value;
+    rebuild_preview();
 }
 
 double BulletSpawner2D::get_helper_aimed_step_offset() const {
@@ -498,13 +630,105 @@ void BulletSpawner2D::set_helper_aimed_step_offset(double value) {
         return;
     }
     helper_aimed_step_offset = value;
+    rebuild_preview();
+}
+
+double BulletSpawner2D::get_helper_ring_y_scale() const {
+    return helper_ring_y_scale;
+}
+void BulletSpawner2D::set_helper_ring_y_scale(double value) {
+    if (!Math::is_finite(value)) {
+        UtilityFunctions::push_error("BulletSpawner2D: helper_ring_y_scale must be finite, keeping the old value.");
+        return;
+    }
+    helper_ring_y_scale = value;
+    rebuild_preview();
+}
+double BulletSpawner2D::get_helper_ring_facing_offset_deg() const {
+    return helper_ring_facing_offset_deg;
+}
+void BulletSpawner2D::set_helper_ring_facing_offset_deg(double value) {
+    if (!Math::is_finite(value)) {
+        UtilityFunctions::push_error("BulletSpawner2D: helper_ring_facing_offset_deg must be finite, keeping the old value.");
+        return;
+    }
+    helper_ring_facing_offset_deg = value;
+    rebuild_preview();
+}
+bool BulletSpawner2D::get_helper_fan_centered() const {
+    return helper_fan_centered;
+}
+void BulletSpawner2D::set_helper_fan_centered(bool value) {
+    helper_fan_centered = value;
+    rebuild_preview();
+}
+int BulletSpawner2D::get_helper_spiral_facing() const {
+    return helper_spiral_facing;
+}
+void BulletSpawner2D::set_helper_spiral_facing(int value) {
+    if (value < (int)BulletFactory2D::SPIRAL_FACING_TANGENT || value > (int)BulletFactory2D::SPIRAL_FACING_KEEP_MARKER) {
+        UtilityFunctions::push_error("BulletSpawner2D: helper_spiral_facing out of range, keeping the old value.");
+        return;
+    }
+    helper_spiral_facing = value;
+    rebuild_preview();
+}
+double BulletSpawner2D::get_helper_spiral_facing_offset_deg() const {
+    return helper_spiral_facing_offset_deg;
+}
+void BulletSpawner2D::set_helper_spiral_facing_offset_deg(double value) {
+    if (!Math::is_finite(value)) {
+        UtilityFunctions::push_error("BulletSpawner2D: helper_spiral_facing_offset_deg must be finite, keeping the old value.");
+        return;
+    }
+    helper_spiral_facing_offset_deg = value;
+    rebuild_preview();
+}
+int BulletSpawner2D::get_helper_line_anchor() const {
+    return helper_line_anchor;
+}
+void BulletSpawner2D::set_helper_line_anchor(int value) {
+    if (value < (int)BulletFactory2D::LINE_ANCHOR_START || value > (int)BulletFactory2D::LINE_ANCHOR_END) {
+        UtilityFunctions::push_error("BulletSpawner2D: helper_line_anchor out of range, keeping the old value.");
+        return;
+    }
+    helper_line_anchor = value;
+    rebuild_preview();
+}
+bool BulletSpawner2D::get_helper_line_perpendicular() const {
+    return helper_line_perpendicular;
+}
+void BulletSpawner2D::set_helper_line_perpendicular(bool value) {
+    helper_line_perpendicular = value;
+    rebuild_preview();
+}
+bool BulletSpawner2D::get_helper_aimed_centered() const {
+    return helper_aimed_centered;
+}
+void BulletSpawner2D::set_helper_aimed_centered(bool value) {
+    helper_aimed_centered = value;
+    rebuild_preview();
+}
+bool BulletSpawner2D::get_show_pattern_preview() const {
+    return show_pattern_preview;
+}
+void BulletSpawner2D::set_show_pattern_preview(bool value) {
+    show_pattern_preview = value;
+    rebuild_preview();
+}
+Color BulletSpawner2D::get_preview_color() const {
+    return preview_color;
+}
+void BulletSpawner2D::set_preview_color(const Color &value) {
+    preview_color = value;
+    rebuild_preview();
 }
 
 void BulletSpawner2D::reset_shooting() {
     volleys_fired = 0;
     shoot_time_left = shoot_initial_delay_sec;
     if (is_inside_tree()) {
-        set_process(auto_shooting_active());
+        set_process(auto_shooting_active() || spin_enabled);
     }
     // An explicit restart counts as a (re)start whenever it arms shooting.
     if (auto_shooting_active()) {
@@ -513,6 +737,10 @@ void BulletSpawner2D::reset_shooting() {
 }
 
 TypedArray<Transform2D> BulletSpawner2D::collect_spawn_transforms() const {
+    return collect_spawn_transforms_impl(false);
+}
+
+TypedArray<Transform2D> BulletSpawner2D::collect_spawn_transforms_impl(bool quiet) const {
     Node2D *base = get_transforms_generator();
     if (base == nullptr) {
         base = const_cast<BulletSpawner2D *>(this);
@@ -525,27 +753,29 @@ TypedArray<Transform2D> BulletSpawner2D::collect_spawn_transforms() const {
             raw.push_back(marker);
             break;
         case TRANSFORMS_FROM_HELPER_GRID:
-            raw = BulletFactory2D::helper_generate_transforms_grid(helper_bullets_amount, marker, helper_grid_rows_per_column, (BulletFactory2D::Alignment)helper_grid_alignment, helper_grid_column_offset, helper_grid_row_offset, helper_grid_rotate_with_marker, helper_grid_random_local_rotation);
+            raw = BulletFactory2D::helper_generate_transforms_grid(helper_bullets_amount, marker, helper_grid_rows_per_column, (BulletFactory2D::Alignment)helper_grid_alignment, helper_grid_column_offset, helper_grid_row_offset, helper_grid_rotate_with_marker, helper_grid_random_local_rotation, helper_grid_jitter);
             break;
         case TRANSFORMS_FROM_HELPER_RING:
-            raw = BulletFactory2D::helper_generate_transforms_ring(helper_bullets_amount, marker, helper_ring_radius, helper_ring_start_angle, helper_ring_arc, helper_ring_rotate_with_marker, helper_ring_random_rotation, helper_ring_face_outward);
+            raw = BulletFactory2D::helper_generate_transforms_ring(helper_bullets_amount, marker, helper_ring_radius, helper_ring_start_angle, helper_ring_arc, helper_ring_rotate_with_marker, helper_ring_random_rotation, helper_ring_face_outward, helper_ring_y_scale, helper_ring_facing_offset_deg);
             break;
         case TRANSFORMS_FROM_HELPER_FAN:
-            raw = BulletFactory2D::helper_generate_transforms_fan(helper_bullets_amount, marker, helper_fan_spread, helper_fan_direction_angle, helper_fan_step_offset);
+            raw = BulletFactory2D::helper_generate_transforms_fan(helper_bullets_amount, marker, helper_fan_spread, helper_fan_direction_angle, helper_fan_step_offset, helper_fan_centered);
             break;
         case TRANSFORMS_FROM_HELPER_SPIRAL:
-            raw = BulletFactory2D::helper_generate_transforms_spiral(helper_bullets_amount, marker, helper_spiral_start_radius, helper_spiral_radius_step, helper_spiral_angle_step, helper_spiral_rotate_with_marker);
+            raw = BulletFactory2D::helper_generate_transforms_spiral(helper_bullets_amount, marker, helper_spiral_start_radius, helper_spiral_radius_step, helper_spiral_angle_step, helper_spiral_rotate_with_marker, (BulletFactory2D::SpiralFacingMode)helper_spiral_facing, helper_spiral_facing_offset_deg);
             break;
         case TRANSFORMS_FROM_HELPER_LINE:
-            raw = BulletFactory2D::helper_generate_transforms_line(helper_bullets_amount, marker, helper_line_direction, helper_line_spacing, helper_line_face_direction);
+            raw = BulletFactory2D::helper_generate_transforms_line(helper_bullets_amount, marker, helper_line_direction, helper_line_spacing, helper_line_face_direction, (BulletFactory2D::LineAnchor)helper_line_anchor, helper_line_perpendicular);
             break;
         case TRANSFORMS_FROM_HELPER_AIMED: {
             Node2D *target = get_helper_aimed_target();
             if (target == nullptr) {
-                UtilityFunctions::push_error("BulletSpawner2D::collect_spawn_transforms: no aimed target assigned (helper_aimed_target_path).");
+                if (!quiet) {
+                    UtilityFunctions::push_error("BulletSpawner2D::collect_spawn_transforms: no aimed target assigned (helper_aimed_target_path).");
+                }
                 break;
             }
-            raw = BulletFactory2D::helper_generate_transforms_aimed(helper_bullets_amount, marker, target->get_global_transform().get_origin(), helper_aimed_spread, helper_aimed_step_offset);
+            raw = BulletFactory2D::helper_generate_transforms_aimed(helper_bullets_amount, marker, target->get_global_transform().get_origin(), helper_aimed_spread, helper_aimed_step_offset, helper_aimed_centered);
             break;
         }
         case TRANSFORMS_FROM_CHILDREN:
@@ -553,7 +783,9 @@ TypedArray<Transform2D> BulletSpawner2D::collect_spawn_transforms() const {
             bool collected = false;
             for (int i = 0; i < base->get_child_count(); ++i) {
                 Node2D *as_2d = Object::cast_to<Node2D>(base->get_child(i));
-                if (as_2d != nullptr) {
+                // The editor preview holder is a Node2D child too, but it is
+                // visualization only and must never become a spawn marker.
+                if (as_2d != nullptr && !as_2d->has_meta(PREVIEW_META_KEY)) {
                     raw.push_back(as_2d->get_global_transform());
                     collected = true;
                 }
@@ -564,14 +796,89 @@ TypedArray<Transform2D> BulletSpawner2D::collect_spawn_transforms() const {
             break;
         }
     }
-    // Single scale pass for every source (identity when transforms_scale is 1.0).
+    // Spin first, then scale: both pivot around the generator origin, so a
+    // spinning emitter orbits positions and turns facings together while the
+    // scale pass keeps working exactly as before (identity at 1.0).
+    const real_t spin_radians = Math::deg_to_rad((real_t)spin_angle_deg);
     const real_t scale = (real_t)transforms_scale;
     TypedArray<Transform2D> transforms;
     for (int i = 0; i < raw.size(); ++i) {
         Transform2D t = raw[i];
+        t = rotate_spawn_transform(t, base_origin, spin_radians);
         transforms.push_back(scale_spawn_transform(t, base_origin, scale));
     }
     return transforms;
+}
+
+void BulletSpawner2D::rebuild_preview() {
+    // Editor visualization only: never build anything at runtime, before the
+    // node is inside the tree (scene load sets properties first), or off.
+    if (!Engine::get_singleton()->is_editor_hint() || !is_inside_tree()) {
+        return;
+    }
+    if (!show_pattern_preview) {
+        if (preview_holder != nullptr) {
+            remove_child(preview_holder);
+            memdelete(preview_holder);
+            preview_holder = nullptr;
+        }
+        return;
+    }
+    if (preview_holder == nullptr) {
+        // Heal first: duplicating this node in the editor copies the holder
+        // child but not the pointer, so adopt it instead of stacking a second.
+        preview_holder = Object::cast_to<Node2D>(get_node_or_null(NodePath(PREVIEW_HOLDER_NAME)));
+    }
+    if (preview_holder == nullptr) {
+        // Owner-less on purpose: never written to the scene, never exported.
+        preview_holder = memnew(Node2D);
+        preview_holder->set_name(PREVIEW_HOLDER_NAME);
+        preview_holder->set_meta(PREVIEW_META_KEY, true);
+        add_child(preview_holder);
+    }
+    Line2D *dots = Object::cast_to<Line2D>(preview_holder->get_node_or_null(NodePath("Dots")));
+    if (dots == nullptr) {
+        dots = memnew(Line2D);
+        dots->set_name("Dots");
+        dots->set_width(7.0);
+        dots->set_antialiased(true);
+        dots->set_begin_cap_mode(Line2D::LINE_CAP_ROUND);
+        dots->set_end_cap_mode(Line2D::LINE_CAP_ROUND);
+        dots->set_z_index(4000);
+        preview_holder->add_child(dots);
+    }
+    dots->set_default_color(preview_color);
+    Line2D *ticks = Object::cast_to<Line2D>(preview_holder->get_node_or_null(NodePath("Ticks")));
+    if (ticks == nullptr) {
+        ticks = memnew(Line2D);
+        ticks->set_name("Ticks");
+        ticks->set_width(2.0);
+        ticks->set_default_color(Color(1.0, 1.0, 1.0));
+        ticks->set_antialiased(true);
+        ticks->set_z_index(4000);
+        preview_holder->add_child(ticks);
+    }
+    // Quiet collect: the preview must visualize, never scold (e.g. aimed
+    // without a target simply draws nothing instead of erroring per rebuild).
+    const TypedArray<Transform2D> transforms = collect_spawn_transforms_impl(true);
+    const Transform2D holder_global = preview_holder->get_global_transform();
+    const Transform2D to_local = holder_global.affine_inverse();
+    const real_t holder_rotation = holder_global.get_rotation();
+    PackedVector2Array dot_points;
+    dot_points.resize(transforms.size() * 2);
+    PackedVector2Array tick_points;
+    tick_points.resize(transforms.size() * 2);
+    for (int i = 0; i < transforms.size(); ++i) {
+        const Transform2D t = transforms[i];
+        const Vector2 p = to_local.xform(t.get_origin());
+        dot_points[i * 2] = p;
+        dot_points[i * 2 + 1] = p; // degenerate segment + round caps = dot
+        const Vector2 dir = Vector2(1.0, 0.0).rotated(t.get_rotation() - holder_rotation);
+        tick_points[i * 2] = p;
+        tick_points[i * 2 + 1] = p + dir * 18.0;
+    }
+    dots->set_points(dot_points);
+    ticks->set_points(tick_points);
 }
 
 void BulletSpawner2D::_validate_property(PropertyInfo &p_property) const {
@@ -640,7 +947,8 @@ bool BulletSpawner2D::shoot_once() {
     // Exact-equality = transition only: further manual shots past the cap do
     // not re-emit, and the setter path reports its own transition.
     if (max_volleys >= 0 && volleys_fired == max_volleys) {
-        set_process(false);
+        // Stop shooting, but stay awake while spinning.
+        set_process(spin_enabled);
         emit_signal("shooting_finished");
     }
     return true;
@@ -653,13 +961,32 @@ void BulletSpawner2D::_ready() {
     // never ready outside the running game.
     if (Engine::get_singleton()->is_editor_hint()) {
         set_process(false);
+        // Editor preview follows the spawner's own transform live.
+        set_notify_transform(true);
+        rebuild_preview();
         return;
+    }
+    // Paranoia: the preview holder is owner-less and thus never saved, but
+    // drop it if one is somehow present so runtime is never affected.
+    preview_holder = nullptr;
+    Node *stray = get_node_or_null(NodePath(PREVIEW_HOLDER_NAME));
+    if (stray != nullptr) {
+        remove_child(stray);
+        memdelete(stray);
     }
     volleys_fired = 0;
     shoot_time_left = shoot_initial_delay_sec;
-    set_process(auto_shooting_active());
+    set_process(auto_shooting_active() || spin_enabled);
     if (auto_shooting_active()) {
         emit_signal("shooting_started");
+    }
+}
+
+void BulletSpawner2D::_notification(int p_what) {
+    if (p_what == NOTIFICATION_LOCAL_TRANSFORM_CHANGED) {
+        // Editor: moving/rotating the spawner refreshes the preview.
+        // Runtime: rebuild_preview() is a guarded no-op there.
+        rebuild_preview();
     }
 }
 
@@ -670,15 +997,20 @@ void BulletSpawner2D::_process(double delta) {
         set_process(false);
         return;
     }
-    if (!auto_shooting_active()) {
-        set_process(false);
-        return;
-    }
     if (!Math::is_finite(delta) || delta < 0.0) {
         return;
     }
     if (delta > 0.5) {
         delta = 0.5; // clamp hitch spikes so one stall can't fast-forward volleys
+    }
+    // Spin runs independently of shooting: a silent rotating emitter is valid.
+    if (spin_enabled) {
+        advance_spin(delta);
+    }
+    if (!auto_shooting_active()) {
+        // Sleep when there is nothing to do, but stay awake while spinning.
+        set_process(spin_enabled);
+        return;
     }
     shoot_time_left -= delta;
     if (shoot_time_left > 0.0) {
@@ -760,6 +1092,32 @@ void BulletSpawner2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_transforms_scale", "value"), &BulletSpawner2D::set_transforms_scale);
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "transforms_scale"), "set_transforms_scale", "get_transforms_scale");
 
+	ClassDB::bind_method(D_METHOD("get_spin_enabled"), &BulletSpawner2D::get_spin_enabled);
+	ClassDB::bind_method(D_METHOD("set_spin_enabled", "value"), &BulletSpawner2D::set_spin_enabled);
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "spin_enabled"), "set_spin_enabled", "get_spin_enabled");
+
+	ClassDB::bind_method(D_METHOD("get_spin_speed_deg_per_sec"), &BulletSpawner2D::get_spin_speed_deg_per_sec);
+	ClassDB::bind_method(D_METHOD("set_spin_speed_deg_per_sec", "value"), &BulletSpawner2D::set_spin_speed_deg_per_sec);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "spin_speed_deg_per_sec"), "set_spin_speed_deg_per_sec", "get_spin_speed_deg_per_sec");
+
+	ClassDB::bind_method(D_METHOD("get_spin_mode"), &BulletSpawner2D::get_spin_mode);
+	ClassDB::bind_method(D_METHOD("set_spin_mode", "value"), &BulletSpawner2D::set_spin_mode);
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "spin_mode", PROPERTY_HINT_ENUM, "Continuous,Oscillate"), "set_spin_mode", "get_spin_mode");
+
+	ClassDB::bind_method(D_METHOD("get_spin_amplitude_deg"), &BulletSpawner2D::get_spin_amplitude_deg);
+	ClassDB::bind_method(D_METHOD("set_spin_amplitude_deg", "value"), &BulletSpawner2D::set_spin_amplitude_deg);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "spin_amplitude_deg"), "set_spin_amplitude_deg", "get_spin_amplitude_deg");
+
+	ClassDB::bind_method(D_METHOD("get_spin_frequency_hz"), &BulletSpawner2D::get_spin_frequency_hz);
+	ClassDB::bind_method(D_METHOD("set_spin_frequency_hz", "value"), &BulletSpawner2D::set_spin_frequency_hz);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "spin_frequency_hz"), "set_spin_frequency_hz", "get_spin_frequency_hz");
+
+	ClassDB::bind_method(D_METHOD("get_spin_angle_deg"), &BulletSpawner2D::get_spin_angle_deg);
+	ClassDB::bind_method(D_METHOD("is_spinning"), &BulletSpawner2D::is_spinning);
+	ClassDB::bind_method(D_METHOD("start_spinning"), &BulletSpawner2D::start_spinning);
+	ClassDB::bind_method(D_METHOD("stop_spinning"), &BulletSpawner2D::stop_spinning);
+	ClassDB::bind_method(D_METHOD("reset_spin_angle"), &BulletSpawner2D::reset_spin_angle);
+
 	ClassDB::bind_method(D_METHOD("get_transforms_source"), &BulletSpawner2D::get_transforms_source);
 	ClassDB::bind_method(D_METHOD("set_transforms_source", "value"), &BulletSpawner2D::set_transforms_source);
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "transforms_source", PROPERTY_HINT_ENUM, "From Children,From Self,Grid,Ring,Fan,Spiral,Line,Aimed"), "set_transforms_source", "get_transforms_source");
@@ -792,6 +1150,10 @@ void BulletSpawner2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_helper_grid_random_local_rotation", "value"), &BulletSpawner2D::set_helper_grid_random_local_rotation);
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "helper_grid_random_local_rotation"), "set_helper_grid_random_local_rotation", "get_helper_grid_random_local_rotation");
 
+	ClassDB::bind_method(D_METHOD("get_helper_grid_jitter"), &BulletSpawner2D::get_helper_grid_jitter);
+	ClassDB::bind_method(D_METHOD("set_helper_grid_jitter", "value"), &BulletSpawner2D::set_helper_grid_jitter);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_grid_jitter"), "set_helper_grid_jitter", "get_helper_grid_jitter");
+
 	ClassDB::bind_method(D_METHOD("get_helper_ring_radius"), &BulletSpawner2D::get_helper_ring_radius);
 	ClassDB::bind_method(D_METHOD("set_helper_ring_radius", "value"), &BulletSpawner2D::set_helper_ring_radius);
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_ring_radius"), "set_helper_ring_radius", "get_helper_ring_radius");
@@ -816,6 +1178,14 @@ void BulletSpawner2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_helper_ring_face_outward", "value"), &BulletSpawner2D::set_helper_ring_face_outward);
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "helper_ring_face_outward"), "set_helper_ring_face_outward", "get_helper_ring_face_outward");
 
+	ClassDB::bind_method(D_METHOD("get_helper_ring_y_scale"), &BulletSpawner2D::get_helper_ring_y_scale);
+	ClassDB::bind_method(D_METHOD("set_helper_ring_y_scale", "value"), &BulletSpawner2D::set_helper_ring_y_scale);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_ring_y_scale"), "set_helper_ring_y_scale", "get_helper_ring_y_scale");
+
+	ClassDB::bind_method(D_METHOD("get_helper_ring_facing_offset_deg"), &BulletSpawner2D::get_helper_ring_facing_offset_deg);
+	ClassDB::bind_method(D_METHOD("set_helper_ring_facing_offset_deg", "value"), &BulletSpawner2D::set_helper_ring_facing_offset_deg);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_ring_facing_offset_deg"), "set_helper_ring_facing_offset_deg", "get_helper_ring_facing_offset_deg");
+
 	ClassDB::bind_method(D_METHOD("get_helper_fan_spread"), &BulletSpawner2D::get_helper_fan_spread);
 	ClassDB::bind_method(D_METHOD("set_helper_fan_spread", "value"), &BulletSpawner2D::set_helper_fan_spread);
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_fan_spread"), "set_helper_fan_spread", "get_helper_fan_spread");
@@ -827,6 +1197,10 @@ void BulletSpawner2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_helper_fan_step_offset"), &BulletSpawner2D::get_helper_fan_step_offset);
 	ClassDB::bind_method(D_METHOD("set_helper_fan_step_offset", "value"), &BulletSpawner2D::set_helper_fan_step_offset);
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_fan_step_offset"), "set_helper_fan_step_offset", "get_helper_fan_step_offset");
+
+	ClassDB::bind_method(D_METHOD("get_helper_fan_centered"), &BulletSpawner2D::get_helper_fan_centered);
+	ClassDB::bind_method(D_METHOD("set_helper_fan_centered", "value"), &BulletSpawner2D::set_helper_fan_centered);
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "helper_fan_centered"), "set_helper_fan_centered", "get_helper_fan_centered");
 
 	ClassDB::bind_method(D_METHOD("get_helper_spiral_start_radius"), &BulletSpawner2D::get_helper_spiral_start_radius);
 	ClassDB::bind_method(D_METHOD("set_helper_spiral_start_radius", "value"), &BulletSpawner2D::set_helper_spiral_start_radius);
@@ -844,6 +1218,14 @@ void BulletSpawner2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_helper_spiral_rotate_with_marker", "value"), &BulletSpawner2D::set_helper_spiral_rotate_with_marker);
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "helper_spiral_rotate_with_marker"), "set_helper_spiral_rotate_with_marker", "get_helper_spiral_rotate_with_marker");
 
+	ClassDB::bind_method(D_METHOD("get_helper_spiral_facing"), &BulletSpawner2D::get_helper_spiral_facing);
+	ClassDB::bind_method(D_METHOD("set_helper_spiral_facing", "value"), &BulletSpawner2D::set_helper_spiral_facing);
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "helper_spiral_facing", PROPERTY_HINT_ENUM, "Tangent,Radial Outward,Toward Center,Keep Marker"), "set_helper_spiral_facing", "get_helper_spiral_facing");
+
+	ClassDB::bind_method(D_METHOD("get_helper_spiral_facing_offset_deg"), &BulletSpawner2D::get_helper_spiral_facing_offset_deg);
+	ClassDB::bind_method(D_METHOD("set_helper_spiral_facing_offset_deg", "value"), &BulletSpawner2D::set_helper_spiral_facing_offset_deg);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_spiral_facing_offset_deg"), "set_helper_spiral_facing_offset_deg", "get_helper_spiral_facing_offset_deg");
+
 	ClassDB::bind_method(D_METHOD("get_helper_line_direction"), &BulletSpawner2D::get_helper_line_direction);
 	ClassDB::bind_method(D_METHOD("set_helper_line_direction", "value"), &BulletSpawner2D::set_helper_line_direction);
 	ADD_PROPERTY(PropertyInfo(Variant::VECTOR2, "helper_line_direction"), "set_helper_line_direction", "get_helper_line_direction");
@@ -855,6 +1237,14 @@ void BulletSpawner2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_helper_line_face_direction"), &BulletSpawner2D::get_helper_line_face_direction);
 	ClassDB::bind_method(D_METHOD("set_helper_line_face_direction", "value"), &BulletSpawner2D::set_helper_line_face_direction);
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "helper_line_face_direction"), "set_helper_line_face_direction", "get_helper_line_face_direction");
+
+	ClassDB::bind_method(D_METHOD("get_helper_line_anchor"), &BulletSpawner2D::get_helper_line_anchor);
+	ClassDB::bind_method(D_METHOD("set_helper_line_anchor", "value"), &BulletSpawner2D::set_helper_line_anchor);
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "helper_line_anchor", PROPERTY_HINT_ENUM, "Start,Center,End"), "set_helper_line_anchor", "get_helper_line_anchor");
+
+	ClassDB::bind_method(D_METHOD("get_helper_line_perpendicular"), &BulletSpawner2D::get_helper_line_perpendicular);
+	ClassDB::bind_method(D_METHOD("set_helper_line_perpendicular", "value"), &BulletSpawner2D::set_helper_line_perpendicular);
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "helper_line_perpendicular"), "set_helper_line_perpendicular", "get_helper_line_perpendicular");
 
 	ClassDB::bind_method(D_METHOD("get_helper_aimed_target_path"), &BulletSpawner2D::get_helper_aimed_target_path);
 	ClassDB::bind_method(D_METHOD("set_helper_aimed_target_path", "path"), &BulletSpawner2D::set_helper_aimed_target_path);
@@ -871,6 +1261,18 @@ void BulletSpawner2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_helper_aimed_step_offset", "value"), &BulletSpawner2D::set_helper_aimed_step_offset);
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_aimed_step_offset"), "set_helper_aimed_step_offset", "get_helper_aimed_step_offset");
 
+	ClassDB::bind_method(D_METHOD("get_helper_aimed_centered"), &BulletSpawner2D::get_helper_aimed_centered);
+	ClassDB::bind_method(D_METHOD("set_helper_aimed_centered", "value"), &BulletSpawner2D::set_helper_aimed_centered);
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "helper_aimed_centered"), "set_helper_aimed_centered", "get_helper_aimed_centered");
+
+	ClassDB::bind_method(D_METHOD("get_show_pattern_preview"), &BulletSpawner2D::get_show_pattern_preview);
+	ClassDB::bind_method(D_METHOD("set_show_pattern_preview", "value"), &BulletSpawner2D::set_show_pattern_preview);
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "show_pattern_preview"), "set_show_pattern_preview", "get_show_pattern_preview");
+
+	ClassDB::bind_method(D_METHOD("get_preview_color"), &BulletSpawner2D::get_preview_color);
+	ClassDB::bind_method(D_METHOD("set_preview_color", "value"), &BulletSpawner2D::set_preview_color);
+	ADD_PROPERTY(PropertyInfo(Variant::COLOR, "preview_color"), "set_preview_color", "get_preview_color");
+
 	// Need this in order to expose the enum constants to Godot Engine
 	BIND_ENUM_CONSTANT(TRANSFORMS_FROM_CHILDREN);
 	BIND_ENUM_CONSTANT(TRANSFORMS_FROM_SELF);
@@ -880,6 +1282,10 @@ void BulletSpawner2D::_bind_methods() {
 	BIND_ENUM_CONSTANT(TRANSFORMS_FROM_HELPER_SPIRAL);
 	BIND_ENUM_CONSTANT(TRANSFORMS_FROM_HELPER_LINE);
 	BIND_ENUM_CONSTANT(TRANSFORMS_FROM_HELPER_AIMED);
+
+	// Need this in order to expose the enum constants to Godot Engine
+	BIND_ENUM_CONSTANT(SPIN_CONTINUOUS);
+	BIND_ENUM_CONSTANT(SPIN_OSCILLATE);
 
 	ClassDB::bind_method(D_METHOD("get_volleys_fired"), &BulletSpawner2D::get_volleys_fired);
 	ClassDB::bind_method(D_METHOD("collect_spawn_transforms"), &BulletSpawner2D::collect_spawn_transforms);

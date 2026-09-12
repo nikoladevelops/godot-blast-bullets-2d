@@ -1,6 +1,7 @@
 #pragma once
 
 #include "factory/bullet_factory2d.hpp"
+#include "godot_cpp/classes/line2d.hpp"
 #include "godot_cpp/classes/node2d.hpp"
 #include "godot_cpp/classes/wrapped.hpp"
 #include "godot_cpp/core/property_info.hpp"
@@ -28,6 +29,15 @@ class BulletSpawner2D : public Node2D{
             TRANSFORMS_FROM_HELPER_SPIRAL,
             TRANSFORMS_FROM_HELPER_LINE,
             TRANSFORMS_FROM_HELPER_AIMED
+        };
+
+        // How the spin angle evolves. CONTINUOUS rotates forever at
+        // spin_speed_deg_per_sec (signed: positive = clockwise, per the
+        // Godot 2D convention); OSCILLATE swings +-spin_amplitude_deg at
+        // spin_frequency_hz instead, ignoring the speed.
+        enum SpinMode {
+            SPIN_CONTINUOUS = 0,
+            SPIN_OSCILLATE
         };
 
         // Scene-tree reference to the factory. Stored as an unfiltered NodePath
@@ -75,6 +85,36 @@ class BulletSpawner2D : public Node2D{
         // collapses the whole volley onto the generator, negatives mirror it.
         double transforms_scale = 1.0;
 
+        // SPIN (ROTATE MARKER)
+        //
+        // Virtual rotation applied to every volley, no matter which
+        // transforms_source is picked: collect_spawn_transforms() rotates each
+        // transform around the generator origin by the current spin angle.
+        // The scene tree is never touched (no node is rotated). Runtime only:
+        // the angle advances in _process and freezes in the editor.
+        bool spin_enabled = false;
+        double spin_speed_deg_per_sec = 90.0;
+        SpinMode spin_mode = SPIN_CONTINUOUS;
+        double spin_amplitude_deg = 45.0;
+        double spin_frequency_hz = 0.5;
+
+        bool get_spin_enabled() const;
+        void set_spin_enabled(bool value);
+        double get_spin_speed_deg_per_sec() const;
+        void set_spin_speed_deg_per_sec(double value);
+        SpinMode get_spin_mode() const;
+        void set_spin_mode(SpinMode value);
+        double get_spin_amplitude_deg() const;
+        void set_spin_amplitude_deg(double value);
+        double get_spin_frequency_hz() const;
+        void set_spin_frequency_hz(double value);
+        // Current spin angle in degrees (runtime state, not stored).
+        double get_spin_angle_deg() const;
+        bool is_spinning() const;
+        void start_spinning();
+        void stop_spinning();
+        void reset_spin_angle();
+
         // TRANSFORMS SOURCE + HELPER GENERATORS
         //
         // Which behavior collect_spawn_transforms() uses. Children (default)
@@ -95,6 +135,7 @@ class BulletSpawner2D : public Node2D{
         double helper_grid_row_offset = 150.0;
         bool helper_grid_rotate_with_marker = true;
         bool helper_grid_random_local_rotation = false;
+        double helper_grid_jitter = 0.0;
 
         // RING
         double helper_ring_radius = 150.0;
@@ -103,22 +144,29 @@ class BulletSpawner2D : public Node2D{
         bool helper_ring_rotate_with_marker = true;
         bool helper_ring_random_rotation = false;
         bool helper_ring_face_outward = true;
+        double helper_ring_y_scale = 1.0;
+        double helper_ring_facing_offset_deg = 0.0;
 
         // FAN
         double helper_fan_spread = 0.5;
         double helper_fan_direction_angle = 0.0;
         double helper_fan_step_offset = 0.0;
+        bool helper_fan_centered = true;
 
         // SPIRAL
         double helper_spiral_start_radius = 50.0;
         double helper_spiral_radius_step = 15.0;
         double helper_spiral_angle_step = 0.6;
         bool helper_spiral_rotate_with_marker = true;
+        int helper_spiral_facing = 0; // BulletFactory2D::SpiralFacingMode, tangent
+        double helper_spiral_facing_offset_deg = 0.0;
 
         // LINE
         Vector2 helper_line_direction = Vector2(1, 0);
         double helper_line_spacing = 32.0;
         bool helper_line_face_direction = true;
+        int helper_line_anchor = 1; // BulletFactory2D::LineAnchor, center
+        bool helper_line_perpendicular = false;
 
         // AIMED
         // Scene-tree reference to the target node the aimed cone centers on.
@@ -128,6 +176,21 @@ class BulletSpawner2D : public Node2D{
         mutable Node2D *helper_aimed_target = nullptr;
         double helper_aimed_spread = 0.3;
         double helper_aimed_step_offset = 0.0;
+        bool helper_aimed_centered = true;
+
+        // PATTERN PREVIEW (EDITOR ONLY)
+        //
+        // Draws the volley pattern (position dots + facing ticks) in the
+        // editor so helper options can be tuned visually. The preview lives in
+        // an owner-less holder node: it is never saved to the scene, never
+        // exported, and never created at runtime.
+        bool show_pattern_preview = true;
+        Color preview_color = Color(0.3, 0.85, 1.0);
+
+        bool get_show_pattern_preview() const;
+        void set_show_pattern_preview(bool value);
+        Color get_preview_color() const;
+        void set_preview_color(const Color &value);
 
         bool get_shooting_enabled() const;
         void set_shooting_enabled(bool value);
@@ -158,6 +221,8 @@ class BulletSpawner2D : public Node2D{
         void set_helper_grid_rotate_with_marker(bool value);
         bool get_helper_grid_random_local_rotation() const;
         void set_helper_grid_random_local_rotation(bool value);
+        double get_helper_grid_jitter() const;
+        void set_helper_grid_jitter(double value);
 
         double get_helper_ring_radius() const;
         void set_helper_ring_radius(double value);
@@ -171,6 +236,10 @@ class BulletSpawner2D : public Node2D{
         void set_helper_ring_random_rotation(bool value);
         bool get_helper_ring_face_outward() const;
         void set_helper_ring_face_outward(bool value);
+        double get_helper_ring_y_scale() const;
+        void set_helper_ring_y_scale(double value);
+        double get_helper_ring_facing_offset_deg() const;
+        void set_helper_ring_facing_offset_deg(double value);
 
         double get_helper_fan_spread() const;
         void set_helper_fan_spread(double value);
@@ -178,6 +247,8 @@ class BulletSpawner2D : public Node2D{
         void set_helper_fan_direction_angle(double value);
         double get_helper_fan_step_offset() const;
         void set_helper_fan_step_offset(double value);
+        bool get_helper_fan_centered() const;
+        void set_helper_fan_centered(bool value);
 
         double get_helper_spiral_start_radius() const;
         void set_helper_spiral_start_radius(double value);
@@ -187,6 +258,10 @@ class BulletSpawner2D : public Node2D{
         void set_helper_spiral_angle_step(double value);
         bool get_helper_spiral_rotate_with_marker() const;
         void set_helper_spiral_rotate_with_marker(bool value);
+        int get_helper_spiral_facing() const;
+        void set_helper_spiral_facing(int value);
+        double get_helper_spiral_facing_offset_deg() const;
+        void set_helper_spiral_facing_offset_deg(double value);
 
         Vector2 get_helper_line_direction() const;
         void set_helper_line_direction(const Vector2 &value);
@@ -194,6 +269,10 @@ class BulletSpawner2D : public Node2D{
         void set_helper_line_spacing(double value);
         bool get_helper_line_face_direction() const;
         void set_helper_line_face_direction(bool value);
+        int get_helper_line_anchor() const;
+        void set_helper_line_anchor(int value);
+        bool get_helper_line_perpendicular() const;
+        void set_helper_line_perpendicular(bool value);
 
         NodePath get_helper_aimed_target_path() const;
         void set_helper_aimed_target_path(const NodePath &p_path);
@@ -205,6 +284,8 @@ class BulletSpawner2D : public Node2D{
         void set_helper_aimed_spread(double value);
         double get_helper_aimed_step_offset() const;
         void set_helper_aimed_step_offset(double value);
+        bool get_helper_aimed_centered() const;
+        void set_helper_aimed_centered(bool value);
 
         // Collects one global transform per volley bullet: the Node2D children
         // of the transforms generator (else the generator itself, else this).
@@ -217,6 +298,9 @@ class BulletSpawner2D : public Node2D{
 
         virtual void _ready() override;
         virtual void _process(double delta) override;
+        // Plain name (no override): godot-cpp routes notifications to this
+        // method through the binding machinery, same as BulletFactory2D.
+        void _notification(int p_what);
 
         // Hides the helper_* property groups that don't belong to the active
         // transforms_source, so the inspector only shows relevant options.
@@ -232,8 +316,21 @@ class BulletSpawner2D : public Node2D{
         // Countdown to the next volley; volleys fired since (re)arming.
         double shoot_time_left = 0.0;
         int volleys_fired = 0;
+        // Spin runtime state (never stored, advances in _process only).
+        double spin_angle_deg = 0.0;
+        double spin_time_sec = 0.0;
+        // Editor-only pattern preview holder (null at runtime, never saved).
+        Node2D *preview_holder = nullptr;
 
         bool auto_shooting_active() const;
+        // Advances spin_angle_deg by delta according to spin_mode.
+        void advance_spin(double delta);
+        // (Re)builds the editor preview from the current pattern.
+        // No-op outside the editor or when the preview is disabled.
+        void rebuild_preview();
+        // collect_spawn_transforms() with error reporting: the public method
+        // reports problems, the preview passes true to stay quiet.
+        TypedArray<Transform2D> collect_spawn_transforms_impl(bool quiet) const;
 
 
 
@@ -242,3 +339,4 @@ class BulletSpawner2D : public Node2D{
 
 // Need this in order to expose the enum to Godot Engine
 VARIANT_ENUM_CAST(BlastBullets2D::BulletSpawner2D::TransformsSource);
+VARIANT_ENUM_CAST(BlastBullets2D::BulletSpawner2D::SpinMode);

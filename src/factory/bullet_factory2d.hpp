@@ -51,6 +51,26 @@ public:
 		BOTTOM_RIGHT
 	};
 
+	// Facing modes for the spiral transform generator. TANGENT faces each
+	// bullet along its travel direction on the spiral (analytic derivative);
+	// RADIAL_OUTWARD keeps the historical behavior (away from the marker,
+	// mirrored for negative radii); TOWARD_CENTER faces the marker;
+	// KEEP_MARKER keeps the marker rotation on every transform.
+	enum SpiralFacingMode {
+		SPIRAL_FACING_TANGENT,
+		SPIRAL_FACING_RADIAL_OUTWARD,
+		SPIRAL_FACING_TOWARD_CENTER,
+		SPIRAL_FACING_KEEP_MARKER
+	};
+
+	// Anchor for the line transform generator: which end of the row the
+	// marker sits at. CENTER (default) preserves the historical behavior.
+	enum LineAnchor {
+		LINE_ANCHOR_START,
+		LINE_ANCHOR_CENTER,
+		LINE_ANCHOR_END
+	};
+
 	// Whether the factory is currently busy doing something important and it can't handle any other requests
 	bool get_is_factory_busy() const;
 
@@ -753,10 +773,13 @@ public:
 			real_t column_offset = 150.0,
 			real_t row_offset = 150.0,
 			bool rotate_grid_with_marker = true,
-			bool random_local_rotation = false);
+			bool random_local_rotation = false,
+			real_t jitter = 0.0);
 
 	// Generates transforms on a ring (or arc) around marker_transform.
 	// Set face_outward to false for implosion patterns that fly toward the center.
+	// y_scale stretches the ring into an ellipse (1.0 = circle); the facing
+	// stays radial, so it is approximate on stretched rings.
 	static TypedArray<Transform2D> helper_generate_transforms_ring(
 			int transforms_amount,
 			Transform2D marker_transform,
@@ -765,37 +788,48 @@ public:
 			real_t arc = Math::TAU,
 			bool rotate_with_marker = true,
 			bool random_rotation = false,
-			bool face_outward = true);
+			bool face_outward = true,
+			real_t y_scale = 1.0,
+			real_t facing_offset_degrees = 0.0);
 
 	// Generates transforms in an aimed cone: direction_angle is the cone center,
 	// spread is the full cone width, origins stagger along the direction so pellets
-	// do not stack on top of each other.
+	// do not stack on top of each other. When centered is false the cone is
+	// one-sided, from the center direction out to +spread.
 	static TypedArray<Transform2D> helper_generate_transforms_fan(
 			int transforms_amount,
 			Transform2D marker_transform,
 			real_t spread = 0.5,
 			real_t direction_angle = 0.0,
-			real_t step_offset = 0.0);
+			real_t step_offset = 0.0,
+			bool centered = true);
 
 	// Generates transforms along an expanding spiral around marker_transform.
+	// facing_mode picks the bullet facing (tangent = travel direction);
+	// facing_offset_degrees twists every facing by a fixed amount.
 	static TypedArray<Transform2D> helper_generate_transforms_spiral(
 			int transforms_amount,
 			Transform2D marker_transform,
 			real_t start_radius = 50.0,
 			real_t radius_step = 15.0,
 			real_t angle_step = 0.6,
-			bool rotate_with_marker = true);
+			bool rotate_with_marker = true,
+			SpiralFacingMode facing_mode = SPIRAL_FACING_TANGENT,
+			real_t facing_offset_degrees = 0.0);
 
 	// Generates transforms in a straight wall/curtain/row centered on the marker.
 	// direction is the line axis (need not be normalized); origins spread evenly
 	// with the given spacing. Bullets face along the line when face_direction is
-	// true, otherwise they keep the marker rotation.
+	// true, otherwise they keep the marker rotation. anchor moves the marker to
+	// the start/end of the row; perpendicular faces them 90 degrees off the axis.
 	static TypedArray<Transform2D> helper_generate_transforms_line(
 			int transforms_amount,
 			Transform2D marker_transform,
 			const Vector2 &direction,
 			real_t spacing = 32.0,
-			bool face_direction = true);
+			bool face_direction = true,
+			LineAnchor anchor = LINE_ANCHOR_CENTER,
+			bool perpendicular = false);
 
 	// Aimed fan: same as helper_generate_transforms_fan with the cone centered on
 	// the marker-to-target direction.
@@ -804,10 +838,13 @@ public:
 			Transform2D marker_transform,
 			const Vector2 &target_position,
 			real_t spread = 0.3,
-			real_t step_offset = 0.0);
+			real_t step_offset = 0.0,
+			bool centered = true);
 };
 } //namespace BlastBullets2D
 
 // Need this in order to expose the enum to Godot Engine
-VARIANT_ENUM_CAST(BlastBullets2D::BulletFactory2D::BulletType);
-VARIANT_ENUM_CAST(BlastBullets2D::BulletFactory2D::Alignment);
+	VARIANT_ENUM_CAST(BlastBullets2D::BulletFactory2D::BulletType);
+	VARIANT_ENUM_CAST(BlastBullets2D::BulletFactory2D::Alignment);
+	VARIANT_ENUM_CAST(BlastBullets2D::BulletFactory2D::SpiralFacingMode);
+	VARIANT_ENUM_CAST(BlastBullets2D::BulletFactory2D::LineAnchor);

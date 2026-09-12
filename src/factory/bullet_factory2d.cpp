@@ -1258,13 +1258,18 @@ TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_grid(
 		real_t column_offset,
 		real_t row_offset,
 		bool rotate_grid_with_marker,
-		bool random_local_rotation) {
+		bool random_local_rotation,
+		real_t jitter) {
 	if (transforms_amount < 0) {
 		UtilityFunctions::push_error("helper_generate_transforms_grid: transforms_amount must be >= 0.");
 		return TypedArray<Transform2D>();
 	}
 	if (!Math::is_finite(column_offset) || !Math::is_finite(row_offset)) {
 		UtilityFunctions::push_error("helper_generate_transforms_grid: offsets must be finite numbers.");
+		return TypedArray<Transform2D>();
+	}
+	if (!Math::is_finite(jitter) || jitter < 0.0) {
+		UtilityFunctions::push_error("helper_generate_transforms_grid: jitter must be a finite number >= 0.");
 		return TypedArray<Transform2D>();
 	}
 	if (!marker_transform.get_origin().is_finite() || !Math::is_finite(marker_transform.get_rotation()) || !marker_transform.get_scale().is_finite()) {
@@ -1392,11 +1397,17 @@ TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_grid(
 				new_transform = Transform2D(marker_transform.get_rotation(), new_origin);
 			}
 
-			// Apply random local rotation if enabled
-			if (random_local_rotation) {
-				real_t random_angle = UtilityFunctions::randf() * Math::TAU;
-				new_transform = Transform2D(new_transform.get_rotation() + random_angle, new_transform.get_origin());
-			}
+		// Apply random local rotation if enabled
+		if (random_local_rotation) {
+			real_t random_angle = UtilityFunctions::randf() * Math::TAU;
+			new_transform = Transform2D(new_transform.get_rotation() + random_angle, new_transform.get_origin());
+		}
+
+		// Scatter each origin by up to +-jitter on both axes (0 disables it).
+		if (jitter > 0.0) {
+			const Vector2 scatter(UtilityFunctions::randf_range(-jitter, jitter), UtilityFunctions::randf_range(-jitter, jitter));
+			new_transform = Transform2D(new_transform.get_rotation(), new_transform.get_origin() + scatter);
+		}
 
 			// Store the transform and increment the counter
 			generated_transforms[count_spawned] = new_transform;
@@ -1415,13 +1426,19 @@ TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_ring(
 		real_t arc,
 		bool rotate_with_marker,
 		bool random_rotation,
-		bool face_outward) {
+		bool face_outward,
+		real_t y_scale,
+		real_t facing_offset_degrees) {
 	if (transforms_amount < 0) {
 		UtilityFunctions::push_error("helper_generate_transforms_ring: transforms_amount must be >= 0.");
 		return TypedArray<Transform2D>();
 	}
 	if (!Math::is_finite(radius) || !Math::is_finite(start_angle) || !Math::is_finite(arc)) {
 		UtilityFunctions::push_error("helper_generate_transforms_ring: radius, start_angle and arc must be finite numbers.");
+		return TypedArray<Transform2D>();
+	}
+	if (!Math::is_finite(y_scale) || !Math::is_finite(facing_offset_degrees)) {
+		UtilityFunctions::push_error("helper_generate_transforms_ring: y_scale and facing_offset_degrees must be finite numbers.");
 		return TypedArray<Transform2D>();
 	}
 	if (!marker_transform.get_origin().is_finite() || !Math::is_finite(marker_transform.get_rotation()) || !marker_transform.get_scale().is_finite()) {
@@ -1445,8 +1462,8 @@ TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_ring(
 	const real_t step = (transforms_amount > 1) ? arc / (real_t)(is_closed_ring ? transforms_amount : (transforms_amount - 1)) : 0.0;
 	for (int i = 0; i < transforms_amount; ++i) {
 		const real_t angle = base_rotation + start_angle + step * (real_t)i;
-		const Vector2 offset = Vector2(Math::cos(angle), Math::sin(angle)) * radius;
-		real_t texture_rotation = angle;
+		const Vector2 offset = Vector2(Math::cos(angle) * radius, Math::sin(angle) * radius * y_scale);
+		real_t texture_rotation = angle + Math::deg_to_rad(facing_offset_degrees);
 		if (!face_outward) {
 			texture_rotation += Math::PI;
 		}
@@ -1464,7 +1481,8 @@ TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_fan(
 		Transform2D marker_transform,
 		real_t spread,
 		real_t direction_angle,
-		real_t step_offset) {
+		real_t step_offset,
+		bool centered) {
 	if (transforms_amount < 0) {
 		UtilityFunctions::push_error("helper_generate_transforms_fan: transforms_amount must be >= 0.");
 		return TypedArray<Transform2D>();
@@ -1486,7 +1504,9 @@ TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_fan(
 	const real_t base_rotation = marker_transform.get_rotation() + direction_angle;
 	const real_t step = (transforms_amount > 1) ? spread / (real_t)(transforms_amount - 1) : 0.0;
 	// A lone bullet flies straight down the cone center instead of its edge.
-	const real_t first_angle = (transforms_amount > 1) ? base_rotation - spread * 0.5 : base_rotation;
+	// A one-sided fan (centered = false) starts at the center direction and
+	// opens toward +spread instead of straddling the center.
+	const real_t first_angle = (transforms_amount > 1 && centered) ? base_rotation - spread * 0.5 : base_rotation;
 	const Vector2 origin = marker_transform.get_origin();
 	for (int i = 0; i < transforms_amount; ++i) {
 		const real_t angle = first_angle + step * (real_t)i;
@@ -1502,13 +1522,23 @@ TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_spiral(
 		real_t start_radius,
 		real_t radius_step,
 		real_t angle_step,
-		bool rotate_with_marker) {
+		bool rotate_with_marker,
+		SpiralFacingMode facing_mode,
+		real_t facing_offset_degrees) {
 	if (transforms_amount < 0) {
 		UtilityFunctions::push_error("helper_generate_transforms_spiral: transforms_amount must be >= 0.");
 		return TypedArray<Transform2D>();
 	}
 	if (!Math::is_finite(start_radius) || !Math::is_finite(radius_step) || !Math::is_finite(angle_step)) {
 		UtilityFunctions::push_error("helper_generate_transforms_spiral: start_radius, radius_step and angle_step must be finite numbers.");
+		return TypedArray<Transform2D>();
+	}
+	if (!Math::is_finite(facing_offset_degrees)) {
+		UtilityFunctions::push_error("helper_generate_transforms_spiral: facing_offset_degrees must be a finite number.");
+		return TypedArray<Transform2D>();
+	}
+	if (facing_mode < SPIRAL_FACING_TANGENT || facing_mode > SPIRAL_FACING_KEEP_MARKER) {
+		UtilityFunctions::push_error("helper_generate_transforms_spiral: unknown facing_mode.");
 		return TypedArray<Transform2D>();
 	}
 	if (!marker_transform.get_origin().is_finite() || !Math::is_finite(marker_transform.get_rotation()) || !marker_transform.get_scale().is_finite()) {
@@ -1527,14 +1557,34 @@ TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_spiral(
 
 	const real_t base_rotation = rotate_with_marker ? marker_transform.get_rotation() : 0.0;
 	const Vector2 origin = marker_transform.get_origin();
+	const real_t facing_offset = Math::deg_to_rad(facing_offset_degrees);
 	for (int i = 0; i < transforms_amount; ++i) {
 		const real_t r = start_radius + radius_step * (real_t)i;
 		const real_t angle = base_rotation + angle_step * (real_t)i;
 		const Vector2 offset = Vector2(Math::cos(angle), Math::sin(angle)) * r;
-		// A negative radius mirrors the position to the opposite side; face
-		// that way too so position and facing stay consistent.
-		const real_t facing = (r < 0.0) ? angle + Math::PI : angle;
-		generated_transforms[i] = Transform2D(facing, origin + offset);
+		real_t facing = angle;
+		switch (facing_mode) {
+			case SPIRAL_FACING_TANGENT: {
+				// Travel direction along r(theta) = start + step * theta:
+				// dp/dtheta = (step * cos - r * sin, step * sin + r * cos).
+				// Exact for collapsed spirals too (step = 0 -> ring tangent).
+				const Vector2 tangent = Vector2(radius_step * Math::cos(angle) - r * Math::sin(angle), radius_step * Math::sin(angle) + r * Math::cos(angle));
+				facing = (tangent.length_squared() > 0.0) ? tangent.angle() : offset.angle();
+				break;
+			}
+			case SPIRAL_FACING_RADIAL_OUTWARD:
+				// offset already carries the radius sign, so a negative radius
+				// mirrors position and facing together (historical behavior).
+				facing = offset.angle();
+				break;
+			case SPIRAL_FACING_TOWARD_CENTER:
+				facing = offset.angle() + Math::PI;
+				break;
+			case SPIRAL_FACING_KEEP_MARKER:
+				facing = base_rotation;
+				break;
+		}
+		generated_transforms[i] = Transform2D(facing + facing_offset, origin + offset);
 	}
 	return generated_transforms;
 }
@@ -1544,7 +1594,9 @@ TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_line(
 		Transform2D marker_transform,
 		const Vector2 &direction,
 		real_t spacing,
-		bool face_direction) {
+		bool face_direction,
+		LineAnchor anchor,
+		bool perpendicular) {
 	if (transforms_amount < 0) {
 		UtilityFunctions::push_error("helper_generate_transforms_line: transforms_amount must be >= 0.");
 		return TypedArray<Transform2D>();
@@ -1561,6 +1613,10 @@ TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_line(
 		UtilityFunctions::push_error("helper_generate_transforms_line: direction must not be zero, the line axis is undefined.");
 		return TypedArray<Transform2D>();
 	}
+	if (anchor < LINE_ANCHOR_START || anchor > LINE_ANCHOR_END) {
+		UtilityFunctions::push_error("helper_generate_transforms_line: unknown anchor.");
+		return TypedArray<Transform2D>();
+	}
 	TypedArray<Transform2D> generated_transforms;
 	generated_transforms.resize(transforms_amount);
 	if (transforms_amount == 0) {
@@ -1568,12 +1624,24 @@ TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_line(
 	}
 
 	const Vector2 axis = direction.normalized();
-	const real_t facing = face_direction ? axis.angle() : marker_transform.get_rotation();
+	real_t facing = marker_transform.get_rotation();
+	if (face_direction) {
+		facing = axis.angle();
+		if (perpendicular) {
+			facing += Math::PI * 0.5; // strafe wall: fly 90 degrees off the axis
+		}
+	}
 	const Vector2 origin = marker_transform.get_origin();
-	// Center the wall on the marker so a single bullet lands exactly on it.
-	const real_t center_offset = (real_t)(transforms_amount - 1) * 0.5;
+	// Anchor picks where the marker sits on the row: center (historical),
+	// start, or end. A single bullet always lands exactly on the marker.
+	real_t anchor_offset = (real_t)(transforms_amount - 1) * 0.5;
+	if (anchor == LINE_ANCHOR_START) {
+		anchor_offset = 0.0;
+	} else if (anchor == LINE_ANCHOR_END) {
+		anchor_offset = (real_t)(transforms_amount - 1);
+	}
 	for (int i = 0; i < transforms_amount; ++i) {
-		generated_transforms[i] = Transform2D(facing, origin + axis * (spacing * ((real_t)i - center_offset)));
+		generated_transforms[i] = Transform2D(facing, origin + axis * (spacing * ((real_t)i - anchor_offset)));
 	}
 	return generated_transforms;
 }
@@ -1583,7 +1651,8 @@ TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_aimed(
 		Transform2D marker_transform,
 		const Vector2 &target_position,
 		real_t spread,
-		real_t step_offset) {
+		real_t step_offset,
+		bool centered) {
 	if (transforms_amount < 0) {
 		UtilityFunctions::push_error("helper_generate_transforms_aimed: transforms_amount must be >= 0.");
 		return TypedArray<Transform2D>();
@@ -1607,7 +1676,7 @@ TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_aimed(
 	}
 	// Cone centered on the marker-to-target direction, in marker-local terms.
 	const real_t direction_angle = to_target.angle() - marker_transform.get_rotation();
-	return helper_generate_transforms_fan(transforms_amount, marker_transform, spread, direction_angle, step_offset);
+	return helper_generate_transforms_fan(transforms_amount, marker_transform, spread, direction_angle, step_offset, centered);
 }
 
 void BulletFactory2D::teleport_shift_all_bullets(const Vector2 &shift_amount) {
@@ -1708,14 +1777,16 @@ void BulletFactory2D::_bind_methods() {
 										 "column_offset",
 										 "row_offset",
 										 "rotate_grid_with_marker",
-										 "random_local_rotation"),
+										 "random_local_rotation",
+										 "jitter"),
 								&BulletFactory2D::helper_generate_transforms_grid,
 								DEFVAL(10),
 								DEFVAL(3), // CENTER_LEFT
 								DEFVAL(150.0),
 								DEFVAL(150.0),
 								DEFVAL(true),
-								DEFVAL(false));
+								DEFVAL(false),
+								DEFVAL(0.0));
 
 	ClassDB::bind_static_method("BulletFactory2D",
 								D_METHOD("helper_generate_transforms_ring",
@@ -1726,14 +1797,18 @@ void BulletFactory2D::_bind_methods() {
 										 "arc",
 										 "rotate_with_marker",
 										 "random_rotation",
-										 "face_outward"),
+										 "face_outward",
+										 "y_scale",
+										 "facing_offset_degrees"),
 								&BulletFactory2D::helper_generate_transforms_ring,
 								DEFVAL(150.0),
 								DEFVAL(0.0),
 								DEFVAL(Math::TAU),
 								DEFVAL(true),
 								DEFVAL(false),
-								DEFVAL(true));
+								DEFVAL(true),
+								DEFVAL(1.0),
+								DEFVAL(0.0));
 
 	ClassDB::bind_static_method("BulletFactory2D",
 								D_METHOD("helper_generate_transforms_fan",
@@ -1741,11 +1816,13 @@ void BulletFactory2D::_bind_methods() {
 										 "marker_transform",
 										 "spread",
 										 "direction_angle",
-										 "step_offset"),
+										 "step_offset",
+										 "centered"),
 								&BulletFactory2D::helper_generate_transforms_fan,
 								DEFVAL(0.5),
 								DEFVAL(0.0),
-								DEFVAL(0.0));
+								DEFVAL(0.0),
+								DEFVAL(true));
 
 	ClassDB::bind_static_method("BulletFactory2D",
 								D_METHOD("helper_generate_transforms_spiral",
@@ -1754,12 +1831,16 @@ void BulletFactory2D::_bind_methods() {
 										 "start_radius",
 										 "radius_step",
 										 "angle_step",
-										 "rotate_with_marker"),
+										 "rotate_with_marker",
+										 "facing_mode",
+										 "facing_offset_degrees"),
 								&BulletFactory2D::helper_generate_transforms_spiral,
 								DEFVAL(50.0),
 								DEFVAL(15.0),
 								DEFVAL(0.6),
-								DEFVAL(true));
+								DEFVAL(true),
+								DEFVAL(SPIRAL_FACING_TANGENT),
+								DEFVAL(0.0));
 
 	ClassDB::bind_static_method("BulletFactory2D",
 								D_METHOD("helper_generate_transforms_aimed",
@@ -1767,10 +1848,12 @@ void BulletFactory2D::_bind_methods() {
 										 "marker_transform",
 										 "target_position",
 										 "spread",
-										 "step_offset"),
+										 "step_offset",
+										 "centered"),
 								&BulletFactory2D::helper_generate_transforms_aimed,
 								DEFVAL(0.3),
-								DEFVAL(0.0));
+								DEFVAL(0.0),
+								DEFVAL(true));
 
 	ClassDB::bind_static_method("BulletFactory2D",
 								D_METHOD("helper_generate_transforms_line",
@@ -1778,10 +1861,23 @@ void BulletFactory2D::_bind_methods() {
 										 "marker_transform",
 										 "direction",
 										 "spacing",
-										 "face_direction"),
+										 "face_direction",
+										 "anchor",
+										 "perpendicular"),
 								&BulletFactory2D::helper_generate_transforms_line,
 								DEFVAL(32.0),
-								DEFVAL(true));
+								DEFVAL(true),
+								DEFVAL(LINE_ANCHOR_CENTER),
+								DEFVAL(false));
+
+	// Need this in order to expose the enum constants to Godot Engine
+	BIND_ENUM_CONSTANT(SPIRAL_FACING_TANGENT);
+	BIND_ENUM_CONSTANT(SPIRAL_FACING_RADIAL_OUTWARD);
+	BIND_ENUM_CONSTANT(SPIRAL_FACING_TOWARD_CENTER);
+	BIND_ENUM_CONSTANT(SPIRAL_FACING_KEEP_MARKER);
+	BIND_ENUM_CONSTANT(LINE_ANCHOR_START);
+	BIND_ENUM_CONSTANT(LINE_ANCHOR_CENTER);
+	BIND_ENUM_CONSTANT(LINE_ANCHOR_END);
 
 	//
 

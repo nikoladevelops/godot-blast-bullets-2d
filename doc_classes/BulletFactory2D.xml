@@ -131,6 +131,7 @@
 			<param index="2" name="target_position" type="Vector2" />
 			<param index="3" name="spread" type="float" default="0.3" />
 			<param index="4" name="step_offset" type="float" default="0.0" />
+			<param index="5" name="centered" type="bool" default="true" />
 			<description>
 				Generates a fan of transforms aimed from the marker at [code]target_position[/code]. Same as [method helper_generate_transforms_fan] with the cone centered on the marker to target direction. Useful for aimed bursts and shotgun spreads that track a player. Returns an empty array if the target coincides with the marker.
 			</description>
@@ -142,8 +143,9 @@
 			<param index="2" name="spread" type="float" default="0.5" />
 			<param index="3" name="direction_angle" type="float" default="0.0" />
 			<param index="4" name="step_offset" type="float" default="0.0" />
+			<param index="5" name="centered" type="bool" default="true" />
 			<description>
-				Generates a fan of transforms spread evenly across a cone. [code]direction_angle[/code] is the cone center relative to the marker rotation, [code]spread[/code] is the full cone width in radians, and [code]step_offset[/code] staggers origins along the direction so pellets do not stack on top of each other. A single bullet flies straight down the cone center. Useful for shotgun spreads.
+				Generates a fan of transforms spread evenly across a cone. [code]direction_angle[/code] is the cone center relative to the marker rotation, [code]spread[/code] is the full cone width in radians, and [code]step_offset[/code] staggers origins along the direction so pellets do not stack on top of each other. A single bullet flies straight down the cone center. Set [code]centered[/code] to false for a one-sided fan opening from the center direction toward +spread. Useful for shotgun spreads.
 			</description>
 		</method>
 		<method name="helper_generate_transforms_grid" qualifiers="static">
@@ -156,8 +158,9 @@
 			<param index="5" name="row_offset" type="float" default="150.0" />
 			<param index="6" name="rotate_grid_with_marker" type="bool" default="true" />
 			<param index="7" name="random_local_rotation" type="bool" default="false" />
+			<param index="8" name="jitter" type="float" default="0.0" />
 			<description>
-				Generates a grid of transforms that are positioned relative to the [code]marker_transform[/code].
+				Generates a grid of transforms that are positioned relative to the [code]marker_transform[/code]. [code]jitter[/code] scatters each origin by up to +-jitter pixels on both axes (0 disables it).
 			</description>
 		</method>
 		<method name="helper_generate_transforms_line" qualifiers="static">
@@ -167,8 +170,10 @@
 			<param index="2" name="direction" type="Vector2" />
 			<param index="3" name="spacing" type="float" default="32.0" />
 			<param index="4" name="face_direction" type="bool" default="true" />
+			<param index="5" name="anchor" type="int" enum="BulletFactory2D.LineAnchor" default="1" />
+			<param index="6" name="perpendicular" type="bool" default="false" />
 			<description>
-				Generates transforms in a straight wall centered on the marker along [code]direction[/code], spaced evenly by [code]spacing[/code]. Bullets face along the line when [code]face_direction[/code] is true, otherwise they keep the marker rotation. Useful for walls, curtains and gates. Returns an empty array when the direction is zero.
+				Generates transforms in a straight wall along [code]direction[/code], spaced evenly by [code]spacing[/code]. [code]anchor[/code] picks where the marker sits on the row (start, center, end). Bullets face along the line when [code]face_direction[/code] is true - plus 90 degrees when [code]perpendicular[/code] is set, for strafe walls - otherwise they keep the marker rotation. Useful for walls, curtains and gates. Returns an empty array when the direction is zero.
 			</description>
 		</method>
 		<method name="helper_generate_transforms_ring" qualifiers="static">
@@ -181,8 +186,10 @@
 			<param index="5" name="rotate_with_marker" type="bool" default="true" />
 			<param index="6" name="random_rotation" type="bool" default="false" />
 			<param index="7" name="face_outward" type="bool" default="true" />
+			<param index="8" name="y_scale" type="float" default="1.0" />
+			<param index="9" name="facing_offset_degrees" type="float" default="0.0" />
 			<description>
-				Generates transforms placed evenly on a ring (or arc, when [code]arc[/code] is smaller than a full turn) around the marker. Every bullet faces outward, so art drawn facing right travels away from the center. Set [code]face_outward[/code] to false for implosion patterns that fly toward the center. Useful for radial bursts and boss rings.
+				Generates transforms placed evenly on a ring (or arc, when [code]arc[/code] is smaller than a full turn) around the marker. Every bullet faces outward, so art drawn facing right travels away from the center. Set [code]face_outward[/code] to false for implosion patterns that fly toward the center. [code]y_scale[/code] stretches the ring into an ellipse (facing stays radial, approximate on stretched rings) and [code]facing_offset_degrees[/code] twists every facing. Useful for radial bursts and boss rings.
 			</description>
 		</method>
 		<method name="helper_generate_transforms_spiral" qualifiers="static">
@@ -193,8 +200,10 @@
 			<param index="3" name="radius_step" type="float" default="15.0" />
 			<param index="4" name="angle_step" type="float" default="0.6" />
 			<param index="5" name="rotate_with_marker" type="bool" default="true" />
+			<param index="6" name="facing_mode" type="int" enum="BulletFactory2D.SpiralFacingMode" default="0" />
+			<param index="7" name="facing_offset_degrees" type="float" default="0.0" />
 			<description>
-				Generates transforms along an expanding spiral around the marker, each bullet facing outward. Useful for rotating emitter looks and volute patterns.
+				Generates transforms along an expanding spiral around the marker. [code]facing_mode[/code] picks the bullet facing: tangent means each bullet flies along its travel direction on the spiral (the default), radial outward is the historical behavior, toward center faces the marker, keep marker preserves the marker rotation. [code]facing_offset_degrees[/code] twists every facing by a fixed amount. Useful for rotating emitter looks and volute patterns.
 			</description>
 		</method>
 		<method name="populate_attachments_pool">
@@ -392,6 +401,27 @@
 		</constant>
 		<constant name="BOTTOM_RIGHT" value="8" enum="Alignment">
 			Grid anchor used by helper_generate_transforms_grid(), grows left and up starting at the marker.
+		</constant>
+		<constant name="SPIRAL_FACING_TANGENT" value="0" enum="SpiralFacingMode">
+			Spiral facing used by helper_generate_transforms_spiral(): each bullet faces along its travel direction on the spiral.
+		</constant>
+		<constant name="SPIRAL_FACING_RADIAL_OUTWARD" value="1" enum="SpiralFacingMode">
+			Spiral facing used by helper_generate_transforms_spiral(): each bullet faces away from the marker (historical behavior, mirrored for negative radii).
+		</constant>
+		<constant name="SPIRAL_FACING_TOWARD_CENTER" value="2" enum="SpiralFacingMode">
+			Spiral facing used by helper_generate_transforms_spiral(): each bullet faces the marker.
+		</constant>
+		<constant name="SPIRAL_FACING_KEEP_MARKER" value="3" enum="SpiralFacingMode">
+			Spiral facing used by helper_generate_transforms_spiral(): every bullet keeps the marker rotation.
+		</constant>
+		<constant name="LINE_ANCHOR_START" value="0" enum="LineAnchor">
+			Line anchor used by helper_generate_transforms_line(): the row grows from the marker in the line direction.
+		</constant>
+		<constant name="LINE_ANCHOR_CENTER" value="1" enum="LineAnchor">
+			Line anchor used by helper_generate_transforms_line(): the row is centered on the marker.
+		</constant>
+		<constant name="LINE_ANCHOR_END" value="2" enum="LineAnchor">
+			Line anchor used by helper_generate_transforms_line(): the row ends at the marker, growing against the line direction.
 		</constant>
 	</constants>
 </class>
