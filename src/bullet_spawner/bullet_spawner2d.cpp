@@ -302,6 +302,16 @@ void BulletSpawner2D::set_transforms_scale(double value) {
     transforms_scale = value;
     rebuild_preview();
 }
+Vector2 BulletSpawner2D::get_spawn_position_offset() const {
+    return spawn_position_offset;
+}
+void BulletSpawner2D::set_spawn_position_offset(const Vector2 &value) {
+    if (!value.is_finite()) {
+        UtilityFunctions::push_error("BulletSpawner2D: spawn_position_offset must be finite (NaN/Inf would poison bullet movement), keeping the old value.");
+        return;
+    }
+    spawn_position_offset = value;
+}
 
 bool BulletSpawner2D::get_spin_enabled() const {
     return spin_enabled;
@@ -941,7 +951,7 @@ BulletSpawner2D::HomingTargetSelection BulletSpawner2D::get_homing_target_select
     return homing_target_selection;
 }
 void BulletSpawner2D::set_homing_target_selection(HomingTargetSelection value) {
-    if (value < HOMING_SELECT_NEAREST || value > HOMING_SELECT_ROUND_ROBIN) {
+    if (value < HOMING_SELECT_NEAREST || value > HOMING_SELECT_DISTRIBUTE) {
         UtilityFunctions::push_error("BulletSpawner2D: invalid homing_target_selection, keeping the old value.");
         return;
     }
@@ -1058,6 +1068,12 @@ bool BulletSpawner2D::get_homing_take_control_of_texture_rotation() const {
 }
 void BulletSpawner2D::set_homing_take_control_of_texture_rotation(bool value) {
     homing_take_control_of_texture_rotation = value;
+}
+bool BulletSpawner2D::get_adjust_direction_based_on_rotation() const {
+    return adjust_direction_based_on_rotation;
+}
+void BulletSpawner2D::set_adjust_direction_based_on_rotation(bool value) {
+    adjust_direction_based_on_rotation = value;
 }
 bool BulletSpawner2D::get_homing_auto_pop_after_target_reached() const {
     return homing_auto_pop_after_target_reached;
@@ -1521,6 +1537,90 @@ void BulletSpawner2D::clear_live_volleys() {
     live_volley_instance_ids.clear();
 }
 
+Array BulletSpawner2D::get_live_volleys() const {
+    prune_live_volleys();
+    Array out;
+    for (int i = 0; i < live_volley_instance_ids.size(); ++i) {
+        Object *obj = ObjectDB::get_instance(ObjectID((uint64_t)live_volley_instance_ids[i]));
+        DirectionalBullets2D *volley = Object::cast_to<DirectionalBullets2D>(obj);
+        // Prune just filtered, but re-check cheaply: never hand out a
+        // foreign or inactive instance for direct engine calls.
+        if (volley != nullptr && volley->owner_spawner_id == get_instance_id() && volley->is_active) {
+            out.push_back(volley);
+        }
+    }
+    return out;
+}
+
+bool BulletSpawner2D::adopt_live_volley(DirectionalBullets2D *bullets) {
+    if (bullets == nullptr) {
+        UtilityFunctions::push_error("BulletSpawner2D::adopt_live_volley: instance is null.");
+        return false;
+    }
+    if (!bullets->is_active || !bullets->is_inside_tree()) {
+        UtilityFunctions::push_error("BulletSpawner2D::adopt_live_volley: instance is not live (pooled or outside the tree). Wake it first.");
+        return false;
+    }
+    // Takes over a manually-woken volley (manual wake detaches the previous
+    // owner): stamps, hooks the forwarder, tracks. Queues are left alone.
+    bullets->owner_spawner_id = get_instance_id();
+    const Callable forward_callable(this, "_on_volley_bullet_homing_target_reached");
+    if (!bullets->is_connected("bullet_homing_target_reached", forward_callable)) {
+        bullets->connect("bullet_homing_target_reached", forward_callable);
+    }
+    track_live_volley(bullets);
+    return true;
+}
+
+int BulletSpawner2D::clear_live_volleys_homing() {
+    prune_live_volleys();
+    int done = 0;
+    const uint64_t self_id = get_instance_id();
+    for (int i = 0; i < live_volley_instance_ids.size(); ++i) {
+        Object *obj = ObjectDB::get_instance(ObjectID((uint64_t)live_volley_instance_ids[i]));
+        DirectionalBullets2D *volley = Object::cast_to<DirectionalBullets2D>(obj);
+        if (volley == nullptr || volley->owner_spawner_id != self_id || !volley->is_active) {
+            continue;
+        }
+        // Engine clears keep every counter exact; orbit is stopped with the
+        // same per-bullet guard the retarget path uses (disable warns when
+        // already off).
+        volley->shared_homing_deque_clear_homing_targets();
+        volley->all_bullets_clear_homing_targets();
+        const int bullet_count = volley->get_amount_bullets();
+        for (int b = 0; b < bullet_count; ++b) {
+            if (volley->bullet_is_orbiting_enabled(b)) {
+                volley->bullet_disable_orbiting(b);
+            }
+        }
+        ++done;
+    }
+    return done;
+}
+
+int BulletSpawner2D::override_live_volleys_velocity(const Vector2 &new_velocity) {
+    if (!new_velocity.is_finite()) {
+        UtilityFunctions::push_error("BulletSpawner2D::override_live_volleys_velocity: velocity must be finite.");
+        return 0;
+    }
+    prune_live_volleys();
+    int done = 0;
+    const uint64_t self_id = get_instance_id();
+    for (int i = 0; i < live_volley_instance_ids.size(); ++i) {
+        Object *obj = ObjectDB::get_instance(ObjectID((uint64_t)live_volley_instance_ids[i]));
+        DirectionalBullets2D *volley = Object::cast_to<DirectionalBullets2D>(obj);
+        if (volley == nullptr || volley->owner_spawner_id != self_id || !volley->is_active) {
+            continue;
+        }
+        // Engine-owned semantics: a speed curve overrides direct velocity
+        // (warns per bullet and no-ops), so this visibly works only for
+        // curve-free volleys.
+        volley->all_bullets_set_velocity(new_velocity);
+        ++done;
+    }
+    return done;
+}
+
 int BulletSpawner2D::retarget_live_volleys() {
     prune_live_volleys();
     // Resolve is the expensive part (group poll / scene scan): skip it when
@@ -1529,12 +1629,12 @@ int BulletSpawner2D::retarget_live_volleys() {
         return 0;
     }
     const bool use_mouse = homing_target_source == HOMING_SOURCE_MOUSE;
-    // RANDOM rolls and ROUND_ROBIN rotates per volley at spawn time; a single
-    // shared array would hand every volley an identical queue, so those two
-    // modes re-resolve inside the loop. Round-robin peeks without consuming
-    // the cursor: flying volleys keep stable targets while new volleys rotate.
-    const bool per_volley_resolve = !use_mouse && (homing_target_selection == HOMING_SELECT_RANDOM || homing_target_selection == HOMING_SELECT_ROUND_ROBIN);
-    const bool advance_cursor = homing_target_selection != HOMING_SELECT_ROUND_ROBIN;
+    // RANDOM rolls, ROUND_ROBIN rotates, and DISTRIBUTE deals per volley at
+    // spawn time; a single shared array would hand every volley an identical
+    // queue, so those modes re-resolve inside the loop. Round-robin peeks
+    // without consuming the cursor: flying volleys keep stable targets while
+    // new volleys rotate.
+    const bool per_volley_resolve = !use_mouse && (homing_target_selection == HOMING_SELECT_RANDOM || homing_target_selection == HOMING_SELECT_ROUND_ROBIN || homing_target_selection == HOMING_SELECT_DISTRIBUTE);
     Array shared_targets;
     if (!use_mouse && !per_volley_resolve) {
         // Quiet: an empty group mid-flight keeps the old queues instead of
@@ -1556,7 +1656,7 @@ int BulletSpawner2D::retarget_live_volleys() {
         }
         Array volley_targets = shared_targets;
         if (per_volley_resolve) {
-            volley_targets = resolve_homing_targets(true, advance_cursor);
+            volley_targets = resolve_homing_targets(true, false);
             if (volley_targets.is_empty()) {
                 continue;
             }
@@ -1575,12 +1675,33 @@ int BulletSpawner2D::retarget_live_volleys() {
         } else {
             if (use_mouse) {
                 volley->all_bullets_replace_homing_targets_with_mouse();
+            } else if (homing_target_selection == HOMING_SELECT_DISTRIBUTE) {
+                // Re-deal like at spawn: clear first, because assign
+                // push-backs onto existing queues (a replace would grow them
+                // every pass).
+                Array deal;
+                const int bullet_count = volley->get_amount_bullets();
+                for (int i = 0; i < bullet_count; ++i) {
+                    deal.push_back(volley_targets[i % volley_targets.size()]);
+                }
+                volley->all_bullets_clear_homing_targets();
+                volley->all_bullets_assign_homing_targets_array(deal);
             } else {
                 volley->all_bullets_replace_homing_targets_with_new_target_array(volley_targets);
             }
         }
         if (orbiting_enabled && homing_enabled) {
             apply_orbiting_to_volley(volley);
+        } else if (homing_enabled) {
+            // Toggle switched off after spawn: stop live rings instead of
+            // orbiting forever. Guarded per bullet: disabling an already
+            // disabled orbit warns, and this runs every pass.
+            const int bullet_count = volley->get_amount_bullets();
+            for (int i = 0; i < bullet_count; ++i) {
+                if (volley->bullet_is_orbiting_enabled(i)) {
+                    volley->bullet_disable_orbiting(i);
+                }
+            }
         }
         ++done;
     }
@@ -1596,6 +1717,7 @@ void BulletSpawner2D::apply_steering_to_volley(DirectionalBullets2D *volley) con
     volley->set_homing_update_interval((real_t)homing_update_interval);
     volley->set_homing_distance_before_reached((real_t)homing_distance_before_reached);
     volley->set_homing_take_control_of_texture_rotation(homing_take_control_of_texture_rotation);
+    volley->set_adjust_direction_based_on_rotation(adjust_direction_based_on_rotation);
     volley->set_bullet_homing_auto_pop_after_target_reached(homing_auto_pop_after_target_reached);
     volley->set_shared_homing_deque_auto_pop_after_target_reached(shared_homing_auto_pop_after_target_reached);
     if (homing_per_bullet_smoothing_enabled) {
@@ -1662,6 +1784,16 @@ void BulletSpawner2D::apply_volley_homing_and_orbiting(DirectionalBullets2D *bul
             if (!resolved_targets.is_empty()) {
                 if (homing_mode == HOMING_SHARED) {
                     bullets->shared_homing_deque_replace_homing_targets_with_new_target_array(resolved_targets);
+                } else if (homing_target_selection == HOMING_SELECT_DISTRIBUTE) {
+                    // Deal the pool 1:1 across bullets (cycling): bullet i
+                    // chases pool[i % pool]. Sized exactly to the volley so
+                    // the engine assign validation always passes.
+                    Array deal;
+                    const int bullet_count = bullets->get_amount_bullets();
+                    for (int i = 0; i < bullet_count; ++i) {
+                        deal.push_back(resolved_targets[i % resolved_targets.size()]);
+                    }
+                    bullets->all_bullets_assign_homing_targets_array(deal);
                 } else {
                     bullets->all_bullets_replace_homing_targets_with_new_target_array(resolved_targets);
                 }
@@ -1674,6 +1806,12 @@ void BulletSpawner2D::apply_volley_homing_and_orbiting(DirectionalBullets2D *bul
     // ring on the very first tick instead of flying straight for a frame.
     if (orbiting_enabled && homing_enabled) {
         apply_orbiting_to_volley(bullets);
+    }
+    // Flat post-spawn nudge (muzzle offsets, whole-volley follows). Runs
+    // through the engine teleport path so shapes, attachments, and
+    // interpolation stay consistent.
+    if (spawn_position_offset != Vector2(0, 0)) {
+        bullets->teleport_shift_all_bullets(spawn_position_offset);
     }
     // Re-hooked every volley: enabling (pool reuse) disconnects all
     // bullet_homing_target_reached handlers, so a stale connection can never
@@ -2118,6 +2256,14 @@ void BulletSpawner2D::_validate_property(PropertyInfo &p_property) const {
         }
         return;
     }
+    // Steering-group member under a movement name: only meaningful while the
+    // homing steering block runs.
+    if (property_name == "adjust_direction_based_on_rotation") {
+        if (!homing_enabled) {
+            p_property.usage &= ~PROPERTY_USAGE_EDITOR;
+        }
+        return;
+    }
     // Homing/orbiting inspector gating: the master switches and mode/source
     // pickers are always visible, everything else appears only when its
     // feature (and source/mode) is active - same idea as the helper_* groups.
@@ -2458,6 +2604,10 @@ void BulletSpawner2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_transforms_scale", "value"), &BulletSpawner2D::set_transforms_scale);
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "transforms_scale"), "set_transforms_scale", "get_transforms_scale");
 
+	ClassDB::bind_method(D_METHOD("get_spawn_position_offset"), &BulletSpawner2D::get_spawn_position_offset);
+	ClassDB::bind_method(D_METHOD("set_spawn_position_offset", "value"), &BulletSpawner2D::set_spawn_position_offset);
+	ADD_PROPERTY(PropertyInfo(Variant::VECTOR2, "spawn_position_offset"), "set_spawn_position_offset", "get_spawn_position_offset");
+
 	ClassDB::bind_method(D_METHOD("get_spin_enabled"), &BulletSpawner2D::get_spin_enabled);
 	ClassDB::bind_method(D_METHOD("set_spin_enabled", "value"), &BulletSpawner2D::set_spin_enabled);
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "spin_enabled"), "set_spin_enabled", "get_spin_enabled");
@@ -2673,7 +2823,7 @@ void BulletSpawner2D::_bind_methods() {
 
 	ClassDB::bind_method(D_METHOD("get_homing_target_selection"), &BulletSpawner2D::get_homing_target_selection);
 	ClassDB::bind_method(D_METHOD("set_homing_target_selection", "value"), &BulletSpawner2D::set_homing_target_selection);
-	ADD_PROPERTY(PropertyInfo(Variant::INT, "homing_target_selection", PROPERTY_HINT_ENUM, "Nearest,Random,First,Round Robin"), "set_homing_target_selection", "get_homing_target_selection");
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "homing_target_selection", PROPERTY_HINT_ENUM, "Nearest,Random,First,Round Robin,Distribute"), "set_homing_target_selection", "get_homing_target_selection");
 
 	ClassDB::bind_method(D_METHOD("get_homing_max_targets"), &BulletSpawner2D::get_homing_max_targets);
 	ClassDB::bind_method(D_METHOD("set_homing_max_targets", "value"), &BulletSpawner2D::set_homing_max_targets);
@@ -2726,6 +2876,10 @@ void BulletSpawner2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_homing_take_control_of_texture_rotation"), &BulletSpawner2D::get_homing_take_control_of_texture_rotation);
 	ClassDB::bind_method(D_METHOD("set_homing_take_control_of_texture_rotation", "value"), &BulletSpawner2D::set_homing_take_control_of_texture_rotation);
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "homing_take_control_of_texture_rotation"), "set_homing_take_control_of_texture_rotation", "get_homing_take_control_of_texture_rotation");
+
+	ClassDB::bind_method(D_METHOD("get_adjust_direction_based_on_rotation"), &BulletSpawner2D::get_adjust_direction_based_on_rotation);
+	ClassDB::bind_method(D_METHOD("set_adjust_direction_based_on_rotation", "value"), &BulletSpawner2D::set_adjust_direction_based_on_rotation);
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "adjust_direction_based_on_rotation"), "set_adjust_direction_based_on_rotation", "get_adjust_direction_based_on_rotation");
 
 	ClassDB::bind_method(D_METHOD("get_homing_auto_pop_after_target_reached"), &BulletSpawner2D::get_homing_auto_pop_after_target_reached);
 	ClassDB::bind_method(D_METHOD("set_homing_auto_pop_after_target_reached", "value"), &BulletSpawner2D::set_homing_auto_pop_after_target_reached);
@@ -2794,7 +2948,11 @@ void BulletSpawner2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("resolve_homing_targets", "quiet", "advance_round_robin"), &BulletSpawner2D::resolve_homing_targets, DEFVAL(false), DEFVAL(true));
 	ClassDB::bind_method(D_METHOD("retarget_live_volleys"), &BulletSpawner2D::retarget_live_volleys);
 	ClassDB::bind_method(D_METHOD("get_live_volley_count"), &BulletSpawner2D::get_live_volley_count);
+	ClassDB::bind_method(D_METHOD("get_live_volleys"), &BulletSpawner2D::get_live_volleys);
 	ClassDB::bind_method(D_METHOD("clear_live_volleys"), &BulletSpawner2D::clear_live_volleys);
+	ClassDB::bind_method(D_METHOD("adopt_live_volley", "directional_bullets_instance"), &BulletSpawner2D::adopt_live_volley);
+	ClassDB::bind_method(D_METHOD("clear_live_volleys_homing"), &BulletSpawner2D::clear_live_volleys_homing);
+	ClassDB::bind_method(D_METHOD("override_live_volleys_velocity", "new_velocity"), &BulletSpawner2D::override_live_volleys_velocity);
 	ClassDB::bind_method(D_METHOD("_on_volley_bullet_homing_target_reached", "directional_bullets_instance", "bullet_index", "target", "target_global_position"), &BulletSpawner2D::_on_volley_bullet_homing_target_reached);
 
 	// Need this in order to expose the enum constants to Godot Engine
@@ -2814,6 +2972,7 @@ void BulletSpawner2D::_bind_methods() {
 	BIND_ENUM_CONSTANT(HOMING_SELECT_RANDOM);
 	BIND_ENUM_CONSTANT(HOMING_SELECT_FIRST);
 	BIND_ENUM_CONSTANT(HOMING_SELECT_ROUND_ROBIN);
+	BIND_ENUM_CONSTANT(HOMING_SELECT_DISTRIBUTE);
 	BIND_ENUM_CONSTANT(HOMING_RETARGET_OFF);
 	BIND_ENUM_CONSTANT(HOMING_RETARGET_ON_INTERVAL);
 

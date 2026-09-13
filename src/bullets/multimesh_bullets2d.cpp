@@ -1673,6 +1673,8 @@ void MultiMeshBullets2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("bullet_enable_attachment", "bullet_index"), &MultiMeshBullets2D::bullet_enable_attachment);
 	ClassDB::bind_method(D_METHOD("get_amount_active_attachments"), &MultiMeshBullets2D::get_amount_active_attachments);
 	ClassDB::bind_method(D_METHOD("_do_deferred_bullet_disable_attachment", "bullet_index", "expected_generation", "expected_attachment"), &MultiMeshBullets2D::_do_deferred_bullet_disable_attachment);
+	ClassDB::bind_method(D_METHOD("_do_emit_life_time_over", "expected_generation", "emitter_instance_id", "signal_name", "bullet_indexes"), &MultiMeshBullets2D::_do_emit_life_time_over);
+	ClassDB::bind_method(D_METHOD("_do_emit_sprite_animation_finished", "expected_generation"), &MultiMeshBullets2D::_do_emit_sprite_animation_finished);
 
 	ClassDB::bind_method(D_METHOD("get_amount_bullets"), &MultiMeshBullets2D::get_amount_bullets);
 

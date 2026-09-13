@@ -147,6 +147,11 @@ class BulletSpawner2D : public Node2D{
         // 1.0 = identity. Must stay finite (setter rejects the rest); 0
         // collapses the whole volley onto the generator, negatives mirror it.
         double transforms_scale = 1.0;
+        // Flat global offset added to every bullet right after spawn (muzzle
+        // offsets, spawn-then-nudge, whole-volley follows). (0, 0) disables
+        // the pass. Must stay finite. Applied through the engine teleport
+        // path, so shapes, attachments, and interpolation stay in sync.
+        Vector2 spawn_position_offset = Vector2(0, 0);
 
         // SPIN (ROTATE MARKER)
         //
@@ -291,7 +296,8 @@ class BulletSpawner2D : public Node2D{
             HOMING_SELECT_NEAREST = 0, // closest to the spawner, up to homing_max_targets
             HOMING_SELECT_RANDOM, // random pick, up to homing_max_targets
             HOMING_SELECT_FIRST, // tree order, up to homing_max_targets
-            HOMING_SELECT_ROUND_ROBIN // cycle through the group across volleys
+            HOMING_SELECT_ROUND_ROBIN, // cycle through the group across volleys
+            HOMING_SELECT_DISTRIBUTE // deal targets across bullets: bullet i chases pool[i % pool]
         };
 
         // Whether already-flying volleys keep chasing fresh targets.
@@ -358,6 +364,11 @@ class BulletSpawner2D : public Node2D{
         // fast bullets still trigger). Must stay finite and >= 0.
         double homing_distance_before_reached = 5.0;
         bool homing_take_control_of_texture_rotation = true;
+        // Mirrors DirectionalBulletsData2D.adjust_direction_based_on_rotation
+        // per volley: bullet directions follow their rotation data. Applied
+        // with the steering block; interacts with take-control above (see
+        // the engine inert-warning path when both fight).
+        bool adjust_direction_based_on_rotation = false;
         // Pop the reached target in per-bullet mode (queues advance).
         bool homing_auto_pop_after_target_reached = false;
         // Pop the reached target in shared mode (queue advances once per tick).
@@ -440,6 +451,8 @@ class BulletSpawner2D : public Node2D{
         void set_homing_distance_before_reached(double value);
         bool get_homing_take_control_of_texture_rotation() const;
         void set_homing_take_control_of_texture_rotation(bool value);
+        bool get_adjust_direction_based_on_rotation() const;
+        void set_adjust_direction_based_on_rotation(bool value);
         bool get_homing_auto_pop_after_target_reached() const;
         void set_homing_auto_pop_after_target_reached(bool value);
         bool get_shared_homing_auto_pop_after_target_reached() const;
@@ -491,8 +504,27 @@ class BulletSpawner2D : public Node2D{
         int retarget_live_volleys();
         // How many spawned volleys are currently tracked for retargeting.
         int get_live_volley_count() const;
+        // The tracked live volley instances (pruned first). Lets GDScript
+        // call the full DirectionalBullets2D API on each volley directly.
+        // Variants auto-null if an instance is freed later.
+        Array get_live_volleys() const;
         // Forgets all tracked volleys (they keep flying untouched).
         void clear_live_volleys();
+        // Takes ownership of a manually-woken volley (see enable_bullet,
+        // which detaches spawner ownership): stamps, hooks the reached
+        // forwarder, and tracks it for retargeting. Queues are left alone.
+        // Returns false for null or non-live (pooled/outside-tree) instances.
+        bool adopt_live_volley(DirectionalBullets2D *bullets);
+        // Kill-switch: clears homing queues and disables orbiting on every
+        // tracked live volley (engine clears, counters stay exact). Returns
+        // how many volleys were touched. Retargeting will re-arm them while
+        // homing stays on; turn homing off (or clear tracking) to keep them dumb.
+        int clear_live_volleys_homing();
+        // Overwrites velocity on every tracked live volley through the engine
+        // setter (curves override direct velocity: the engine warns and
+        // no-ops per bullet when a speed curve is assigned). Returns how many
+        // volleys were touched. Must be finite.
+        int override_live_volleys_velocity(const Vector2 &new_velocity);
         // Forwards the volley instance's bullet_homing_target_reached as the
         // spawner-level volley_bullet_homing_target_reached signal.
         void _on_volley_bullet_homing_target_reached(Object *directional_bullets_instance, int bullet_index, Object *target, const Vector2 &target_global_position);
@@ -553,6 +585,8 @@ class BulletSpawner2D : public Node2D{
         int get_volleys_fired() const;
         double get_transforms_scale() const;
         void set_transforms_scale(double value);
+        Vector2 get_spawn_position_offset() const;
+        void set_spawn_position_offset(const Vector2 &value);
 
         TransformsSource get_transforms_source() const;
         void set_transforms_source(TransformsSource value);

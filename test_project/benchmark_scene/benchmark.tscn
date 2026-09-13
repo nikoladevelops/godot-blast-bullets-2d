@@ -35,7 +35,7 @@ sprite_frames = SubResource("SpriteFrames_y4v7i")
 texture_size = Vector2(120, 120)
 collision_layer = 2
 collision_mask = 2
-max_life_time = 5.0
+max_life_time = 15.0
 
 [sub_resource type="Gradient" id="Gradient_rfik0"]
 colors = PackedColorArray(0.215686, 0.215686, 0.215686, 1, 0.215686, 0.215686, 0.215686, 1)
@@ -83,11 +83,9 @@ homing_enabled = true
 homing_target_source = 4
 homing_node_group = &"player"
 homing_target_path = NodePath("../Player")
-homing_distance_before_reached = 200.0
 shared_homing_auto_pop_after_target_reached = true
-orbiting_direction = 1
-orbiting_texture_rotation = 3
-show_preview_during_runtime = true
+homing_retarget_previous_volleys = false
+orbiting_enabled = true
 position = Vector2(-373, -61)
 
 [node name="Marker2D" type="Marker2D" parent="BulletSpawner2D" unique_id=1785719658]

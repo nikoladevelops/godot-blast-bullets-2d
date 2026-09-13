@@ -332,20 +332,22 @@ float *w = batch_buffer.ptrw();
 			disable_bullet(i, false); // immediate shape disable, keep attachment for signal
 		}
 
-		if (bullet_indexes.size() > 0) {
-			// Emit signal deferred so user code runs outside physics step.
-			// Possessed by the tagged spawner when there is one (plain
-			// life_time_over), else the typed factory signal. Deferred calls
-			// to a freed emitter are dropped safely by the engine.
-			Object *emitter = resolve_signal_emitter();
-			if (emitter != nullptr) {
-				if (emitter == bullet_factory) {
-					const char *signal_name = is_class("BlockBullets2D") ? "block_life_time_over" : "directional_life_time_over";
-					emitter->call_deferred("emit_signal", signal_name, this, bullet_indexes);
-				} else {
-					emitter->call_deferred("emit_signal", "life_time_over", this, bullet_indexes);
-				}
+	if (bullet_indexes.size() > 0) {
+		// Emit deferred so user code runs outside physics step. Guarded by
+		// spawn generation (not just emitter validity): expiry queues the
+		// emit, then a same-frame pool reuse hands this instance to a new
+		// owner before the flush. The bare call_deferred("emit_signal")
+		// would then deliver the OLD life's indexes to the NEW life.
+		Object *emitter = resolve_signal_emitter();
+		if (emitter != nullptr) {
+			const uint64_t emitter_id = emitter->get_instance_id();
+			if (emitter == bullet_factory) {
+				const char *signal_name = is_class("BlockBullets2D") ? "block_life_time_over" : "directional_life_time_over";
+				call_deferred("_do_emit_life_time_over", multimesh_generation, emitter_id, StringName(signal_name), bullet_indexes);
+			} else {
+				call_deferred("_do_emit_life_time_over", multimesh_generation, emitter_id, StringName("life_time_over"), bullet_indexes);
 			}
+		}
 
 			// Disable attachments after signal (deferred keeps order)
 			for (int i = 0; i < bullet_indexes.size(); ++i) {
@@ -384,13 +386,14 @@ float *w = batch_buffer.ptrw();
 				} else {
 					anim_frame_index = (int)frame_count - 1;
 					anim_frame_time_left = 0.0;
-					if (!anim_finished) {
-						anim_finished = true;
-						// Deferred like the life_time_over signals: never emit directly from physics tick.
-						// NOTE: the signal lives on the multimesh itself (not the factory),
-						// so it must be emitted on `this`.
-						call_deferred("emit_signal", "sprite_animation_finished", this);
-					}
+				if (!anim_finished) {
+					anim_finished = true;
+					// Deferred like the life_time_over signals: never emit directly from physics tick.
+					// NOTE: the signal lives on the multimesh itself (not the factory),
+					// so it must be emitted on `this`. Generation-guarded: a pool
+					// reuse before the flush must not emit for the new life.
+					call_deferred("_do_emit_sprite_animation_finished", multimesh_generation);
+				}
 					return;
 				}
 			}
@@ -1649,6 +1652,37 @@ float *w = batch_buffer.ptrw();
 		bullet_disable_attachment(bullet_index);
 	}
 
+	// Generation-guarded deferred life_time_over emit (see schedule site in
+	// reduce_lifetime): drops stale emissions when the instance was pooled
+	// and re-enabled for a new owner before the flush. The emitter is
+	// re-resolved by id so a freed factory/spawner also drops cleanly.
+	void _do_emit_life_time_over(int expected_generation, uint64_t emitter_instance_id, const StringName &signal_name, const TypedArray<int> &bullet_indexes) {
+		if (expected_generation != multimesh_generation) {
+			return;
+		}
+		if (bullet_indexes.is_empty()) {
+			return;
+		}
+		Object *emitter = ObjectDB::get_instance(ObjectID(emitter_instance_id));
+		if (emitter == nullptr) {
+			return;
+		}
+		emitter->emit_signal(signal_name, this, bullet_indexes);
+	}
+
+	// Generation-guarded deferred sprite_animation_finished emit: a restart
+	// or pool reuse before the flush must not emit for the wrong life. The
+	// anim_finished re-check covers restart-in-place (no generation change).
+	void _do_emit_sprite_animation_finished(int expected_generation) {
+		if (expected_generation != multimesh_generation) {
+			return;
+		}
+		if (!anim_finished) {
+			return;
+		}
+		emit_signal("sprite_animation_finished", this);
+	}
+
 	_ALWAYS_INLINE_ void bullet_enable_attachment(int bullet_index) {
 		if (!validate_bullet_index(bullet_index, "bullet_enable_attachment")) {
 			return;
@@ -1813,9 +1847,22 @@ float *w = batch_buffer.ptrw();
 			if (bullet_factory != nullptr) {
 				bullet_factory->reactivate_multimesh_instance(*this);
 			}
-			// A pooled instance carries the previous owner's signal connections; they
-			// must not fire for this wake (same cleanup the pool-pop enable does).
-			disconnect_sprite_animation_connections();
+		// A pooled instance carries the previous owner's signal connections; they
+		// must not fire for this wake (same cleanup the pool-pop enable does).
+		disconnect_sprite_animation_connections();
+		// Same for the previous owner's homing forward: without this, the old
+		// spawner would keep retargeting a volley someone else woke manually.
+		// Guarded by has_signal so BlockBullets2D (no homing signal) no-ops.
+		if (has_signal("bullet_homing_target_reached")) {
+			for (const Dictionary &connection : get_signal_connection_list("bullet_homing_target_reached")) {
+				const Callable callable = connection["callable"];
+				disconnect("bullet_homing_target_reached", callable);
+			}
+		}
+		// Ownership restarts from scratch: whoever woke this re-stamps if it
+		// is a spawner (see BulletSpawner2D::adopt_live_volley). Keeping the
+		// old id would let a foreign spawner steer manual wakes.
+		owner_spawner_id = 0;
 			// An expiry-pooled wake would otherwise die again on the next tick with an
 			// exhausted timer. Only top it up when expired; manual-disable wakes keep
 			// their remaining lifetime untouched.
