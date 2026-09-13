@@ -112,14 +112,15 @@
 		<method name="resolve_homing_targets" qualifiers="const">
 			<return type="Array" />
 			<param index="0" name="quiet" type="bool" default="false" />
+			<param index="1" name="advance_round_robin" type="bool" default="true" />
 			<description>
-				Resolves the current homing targets without touching any volley: group members, name matches (case-insensitive unless [member homing_node_name_case_sensitive]), children of the parent path, the node at [member homing_target_path], or the [member homing_global_position] snapshot. The Mouse source returns an empty array (the cursor is pushed live, not resolved). Entries are Node2D or Vector2. Unless quiet is true, an empty result warns.
+				Resolves the current homing targets without touching any volley: group members, name matches (case-insensitive unless [member homing_node_name_case_sensitive]), children of the parent path, the node at [member homing_target_path], or the [member homing_global_position] snapshot. The Mouse source returns an empty array (the cursor is pushed live, not resolved). Entries are Node2D or Vector2. Unless quiet is true, an empty result warns once until a resolution succeeds again. With advance_round_robin off, the round-robin pick is resolved without consuming the cursor (retarget passes use this so flying volleys keep stable targets).
 			</description>
 		</method>
 		<method name="retarget_live_volleys">
 			<return type="int" />
 			<description>
-				Re-resolves targets and replaces the queues of every still-active volley owned by this spawner (expired or pooled volleys are skipped). Volleys with no resolvable targets are skipped quietly and keep their old queues. Returns how many volleys were retargeted. Also runs automatically when [member homing_retarget_mode] is On Interval.
+				Re-resolves targets and replaces the queues of every still-active volley owned by this spawner (expired or pooled volleys are skipped), and re-applies steering and orbiting tuning so runtime changes reach flying volleys. Random and round-robin selections resolve per volley. Volleys with no resolvable targets are skipped quietly and keep their old queues. Returns how many volleys were retargeted. Also runs automatically when [member homing_retarget_mode] is On Interval. Only the newest volley is touched when [member homing_retarget_previous_volleys] is off.
 			</description>
 		</method>
 		<method name="get_live_volley_count" qualifiers="const">
@@ -391,6 +392,9 @@
 		<member name="homing_retarget_interval_sec" type="float" setter="set_homing_retarget_interval_sec" getter="get_homing_retarget_interval_sec" default="0.5">
 			Seconds between automatic retarget passes. Must be above zero.
 		</member>
+		<member name="homing_retarget_previous_volleys" type="bool" setter="set_homing_retarget_previous_volleys" getter="get_homing_retarget_previous_volleys" default="true">
+			Retargeting re-aims every tracked live volley. Turn off to re-aim only the newest volley, letting older ones fly at whatever they chased last.
+		</member>
 		<member name="homing_debug_log_volleys" type="bool" setter="set_homing_debug_log_volleys" getter="get_homing_debug_log_volleys" default="false">
 			Prints resolved target count and first target per homing volley. Use it when bullets fly straight unexpectedly.
 		</member>
@@ -568,7 +572,7 @@
 			<param index="2" name="target" type="Node2D" />
 			<param index="3" name="target_global_position" type="Vector2" />
 			<description>
-				Forwarded from the volley instance when one of its bullets reaches its homing target. Target is null for position and mouse targets, and for freed nodes.
+				Forwarded from the volley instance when one of its bullets reaches its homing target. Target is null for position and mouse targets, and for freed nodes. Note: pool reuse clears all handlers on the instance, so connect here on the spawner instead of on volley instances directly.
 			</description>
 		</signal>
 	</signals>

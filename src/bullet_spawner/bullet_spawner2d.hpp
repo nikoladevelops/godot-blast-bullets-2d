@@ -373,6 +373,12 @@ class BulletSpawner2D : public Node2D{
         // live; each pass is cheap (id validation + one re-resolve, skipped
         // volleys untouched).
         double homing_retarget_interval_sec = 0.5;
+        // When true (default), interval retargeting re-aims every tracked
+        // live volley. When false, only the newest tracked volley is
+        // re-aimed: older volleys keep flying at whatever they chased last
+        // (or nothing). Useful for "latest shot follows the player, old
+        // shots go dumb" patterns.
+        bool homing_retarget_previous_volleys = true;
         // When true, every homing volley prints how many targets it resolved
         // (and the first one's name/position). Cheap printf debugging for
         // "why do my bullets fly straight" moments. Off by default.
@@ -448,6 +454,8 @@ class BulletSpawner2D : public Node2D{
         void set_homing_retarget_mode(HomingRetargetMode value);
         double get_homing_retarget_interval_sec() const;
         void set_homing_retarget_interval_sec(double value);
+        bool get_homing_retarget_previous_volleys() const;
+        void set_homing_retarget_previous_volleys(bool value);
         bool get_homing_debug_log_volleys() const;
         void set_homing_debug_log_volleys(bool value);
 
@@ -471,9 +479,12 @@ class BulletSpawner2D : public Node2D{
         // homing_target_path, or the homing_global_position snapshot.
         // MOUSE source returns an empty array (the cursor is pushed live, not
         // resolved). Entries are Node2D* Variants or Vector2. With quiet =
-        // false (default) an empty result warns; retarget passes use quiet =
-        // true and silently keep the old queues instead.
-        Array resolve_homing_targets(bool quiet = false) const;
+        // false (default) an empty result warns once until a resolution
+        // succeeds again; retarget passes use quiet = true and silently keep
+        // the old queues instead. advance_round_robin = false resolves the
+        // round-robin pick without consuming the cursor (used by retarget
+        // passes so flying volleys keep stable targets).
+        Array resolve_homing_targets(bool quiet = false, bool advance_round_robin = true) const;
         // Re-resolves targets and replaces the queues of every still-alive
         // volley owned by this spawner. Volleys with no resolvable targets
         // are skipped quietly. Returns how many volleys were retargeted.
@@ -663,8 +674,15 @@ class BulletSpawner2D : public Node2D{
         // live is_active flag, so pooled inactive instances or instances
         // re-owned by another spawner can never be touched by mistake.
         mutable PackedInt64Array live_volley_instance_ids;
-        // Countdown to the next retarget pass.
+        // Countdown to the next retarget pass. 0.0 means "due on the next
+        // tick": arming (or reset_shooting) always re-arms to due-now so the
+        // first pass never waits a full interval.
         double homing_retarget_time_left = 0.0;
+        // Warn-once latch for empty target resolution (mutable: used by the
+        // const resolve_homing_targets). Without it every volley/retarget
+        // with no enemies present spams the debugger; the latch clears as
+        // soon as any resolution succeeds, so a regression warns again.
+        mutable bool homing_empty_targets_warned = false;
         // Cursor for HOMING_SELECT_ROUND_ROBIN across volleys (mutable: used
         // by the const resolve_homing_targets).
         mutable int homing_round_robin_cursor = 0;
@@ -746,6 +764,21 @@ class BulletSpawner2D : public Node2D{
         // children of p_parent (whole subtree when recursive), honoring
         // homing_filter_group. Never collects this spawner itself.
         void collect_homing_candidates_from_children(Node *p_parent, bool recursive, Array &r_candidates) const;
+        // Warn-once latch helper for empty resolutions (const: flips the
+        // mutable latch). Quiet passes never warn; a success clears the
+        // latch via clear_empty_homing_targets_warning().
+        void warn_empty_homing_targets_once(const String &message, bool quiet) const;
+        void clear_empty_homing_targets_warning() const;
+        // Pushes the steering block (smoothing, update interval, reached
+        // distance, texture control, auto-pop flags, per-bullet smoothing
+        // fan) onto a volley. Shared by volley setup and retarget passes so
+        // runtime tuning reaches flying volleys instead of only new ones.
+        void apply_steering_to_volley(DirectionalBullets2D *volley) const;
+        // Enables or refreshes orbiting on a volley: bullets whose orbit is
+        // not yet enabled get enabled, the rest get radius/direction/texture
+        // updated in place (re-enabling would warn and keep stale values).
+        // Skipped entirely for DontMove.
+        void apply_orbiting_to_volley(DirectionalBullets2D *volley) const;
         // Applies the homing + orbiting configuration to a freshly spawned
         // (or pool-reused) volley: steering props, resolved targets (pushed
         // before orbiting so rings can lock immediately), orbiting, signal
