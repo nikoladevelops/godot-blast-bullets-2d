@@ -74,6 +74,7 @@ spawn_data = SubResource("DirectionalBulletsData2D_nkrfg")
 shoot_interval_sec = 0.1
 spin_enabled = true
 transforms_source = 3
+helper_bullets_amount = 2
 helper_ring_radius = 50.0
 helper_fan_spread = 3.0
 show_preview_during_runtime = true

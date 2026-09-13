@@ -97,13 +97,58 @@ void DirectionalBullets2D::apply_per_bullet_curves_from_data(const DirectionalBu
 	}
 }
 
+// Resolves a movement-pattern NodePath to its Path2D curve, mirroring the
+// shared-path behavior: relative to the factory with a scene-root fallback.
+// Empty paths resolve to null silently (feature off for that slot); missing,
+// wrong-type, or curve-less targets warn once per call site and resolve null.
+static Ref<Curve2D> resolve_movement_pattern_curve(Node *p_factory, const NodePath &p_path, const String &p_context) {
+	if (p_path.is_empty()) {
+		return Ref<Curve2D>();
+	}
+	if (p_factory == nullptr) {
+		UtilityFunctions::push_error("DirectionalBullets2D: cannot resolve " + p_context + " without a BulletFactory2D (multimesh was never spawned through one).");
+		return Ref<Curve2D>();
+	}
+	// A Path2D node cannot live inside a Resource, so paths are stored and
+	// resolved here. Relative to the factory (stable landmark, always in the
+	// tree at spawn/enable time), with a scene-root fallback for editor-picked
+	// paths.
+	Node *node = p_factory->get_node_or_null(p_path);
+	if (node == nullptr) {
+		SceneTree *tree = p_factory->get_tree();
+		Node *current_scene = (tree != nullptr) ? tree->get_current_scene() : nullptr;
+		if (current_scene != nullptr) {
+			node = current_scene->get_node_or_null(p_path);
+		}
+	}
+	Path2D *path = (node != nullptr) ? Object::cast_to<Path2D>(node) : nullptr;
+	if (path == nullptr) {
+		if (node == nullptr) {
+			UtilityFunctions::push_warning("DirectionalBullets2D: " + p_context + " target not found, movement pattern skipped.");
+		} else {
+			UtilityFunctions::push_warning("DirectionalBullets2D: " + p_context + " node is not a Path2D, movement pattern skipped.");
+		}
+		return Ref<Curve2D>();
+	}
+	const Ref<Curve2D> &curve = path->get_curve();
+	if (curve.is_null()) {
+		UtilityFunctions::push_warning("DirectionalBullets2D: " + p_context + " Path2D holds no Curve2D, movement pattern skipped.");
+		return Ref<Curve2D>();
+	}
+	return curve;
+}
+
 void DirectionalBullets2D::apply_per_bullet_movement_patterns_from_data(const DirectionalBulletsData2D &directional_data) {
 	for (int i = 0; i < amount_bullets; ++i) {
-		const int entry = resolve_per_bullet_data_index(directional_data.all_bullet_movement_pattern_curves.size(), i);
+		const int entry = resolve_per_bullet_data_index(directional_data.all_bullet_movement_pattern_paths.size(), i);
 		if (entry < 0) {
 			return; // empty = off
 		}
-		Ref<Curve2D> curve = directional_data.all_bullet_movement_pattern_curves[entry];
+		const NodePath entry_path = directional_data.all_bullet_movement_pattern_paths[entry];
+		if (entry_path.is_empty()) {
+			continue;
+		}
+		Ref<Curve2D> curve = resolve_movement_pattern_curve(bullet_factory, entry_path, "all_bullet_movement_pattern_paths[" + String::num_int64(entry) + "]");
 		if (curve.is_null()) {
 			continue;
 		}
@@ -129,39 +174,8 @@ void DirectionalBullets2D::apply_shared_movement_pattern_from_data(const Directi
 		shared_movement_pattern_distances.assign(amount_bullets, 0.0);
 		return;
 	}
-	if (bullet_factory == nullptr) {
-		UtilityFunctions::push_error("DirectionalBullets2D: cannot resolve shared_movement_pattern_path without a BulletFactory2D (multimesh was never spawned through one).");
-		return;
-	}
-	// A Path2D node cannot live inside a Resource, so the path is stored and
-	// resolved here. Relative to the factory (stable landmark, always in the
-	// tree at spawn/enable time), with a scene-root fallback for editor-picked
-	// paths. Wrong-type or missing targets warn and clear the slot; the Curve2D
-	// itself is extracted by storing the resolved Path2D's curve below.
-	Node *node = bullet_factory->get_node_or_null(directional_data.shared_movement_pattern_path);
-	if (node == nullptr) {
-		SceneTree *tree = bullet_factory->get_tree();
-		Node *current_scene = (tree != nullptr) ? tree->get_current_scene() : nullptr;
-		if (current_scene != nullptr) {
-			node = current_scene->get_node_or_null(directional_data.shared_movement_pattern_path);
-		}
-	}
-	Path2D *path = (node != nullptr) ? Object::cast_to<Path2D>(node) : nullptr;
-	if (path == nullptr) {
-		if (node == nullptr) {
-			UtilityFunctions::push_warning("DirectionalBullets2D: shared_movement_pattern_path target not found, shared movement pattern removed.");
-		} else {
-			UtilityFunctions::push_warning("DirectionalBullets2D: shared_movement_pattern_path node is not a Path2D, shared movement pattern removed.");
-		}
-		shared_movement_pattern_curve.unref();
-		shared_movement_pattern_face_movement_direction = false;
-		shared_movement_pattern_repeat = true;
-		shared_movement_pattern_distances.assign(amount_bullets, 0.0);
-		return;
-	}
-	const Ref<Curve2D> &curve = path->get_curve();
+	Ref<Curve2D> curve = resolve_movement_pattern_curve(bullet_factory, directional_data.shared_movement_pattern_path, "shared_movement_pattern_path");
 	if (curve.is_null()) {
-		UtilityFunctions::push_warning("DirectionalBullets2D: shared_movement_pattern_path Path2D holds no Curve2D, shared movement pattern removed.");
 		shared_movement_pattern_curve.unref();
 		shared_movement_pattern_face_movement_direction = false;
 		shared_movement_pattern_repeat = true;

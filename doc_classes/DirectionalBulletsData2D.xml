@@ -16,14 +16,14 @@
 		<member name="all_bullet_curves_data" type="BulletCurvesData2D[]" setter="set_all_bullet_curves_data" getter="get_all_bullet_curves_data" default="[]">
 			Per-bullet curves applied at spawn time (and on pool reuse). Same fallback rule as [member all_bullet_speed_data]: empty disables the feature, matching size means per bullet, otherwise the first entry drives all bullets. Null entries are skipped per bullet. Shared curves still win ties per tick.
 		</member>
-		<member name="all_bullet_movement_pattern_curves" type="Curve2D[]" setter="set_all_bullet_movement_pattern_curves" getter="get_all_bullet_movement_pattern_curves" default="[]">
-			Per-bullet movement pattern curves applied at spawn time (and on pool reuse), same fallback rule as above. Null entries are skipped per bullet. A set shared pattern takes precedence while active.
+		<member name="all_bullet_movement_pattern_paths" type="NodePath[]" setter="set_all_bullet_movement_pattern_paths" getter="get_all_bullet_movement_pattern_paths" default="[]">
+			Per-bullet paths to [Path2D] nodes applied at spawn time (and on pool reuse), same fallback rule as above. Each path's curve is extracted when the volley spawns. Empty or bad entries are skipped per bullet. A set shared pattern takes precedence while active.
 		</member>
 		<member name="all_bullet_movement_pattern_face_movement_directions" type="bool[]" setter="set_all_bullet_movement_pattern_face_movement_directions" getter="get_all_bullet_movement_pattern_face_movement_directions" default="[]">
-			Per-bullet face flags for [member all_bullet_movement_pattern_curves]. Matching size means per bullet, otherwise the shared [member shared_movement_pattern_face_movement_direction] flag drives.
+			Per-bullet face flags for [member all_bullet_movement_pattern_paths]. Matching size means per bullet, otherwise the shared [member shared_movement_pattern_face_movement_direction] flag drives.
 		</member>
 		<member name="all_bullet_movement_pattern_repeats" type="bool[]" setter="set_all_bullet_movement_pattern_repeats" getter="get_all_bullet_movement_pattern_repeats" default="[]">
-			Per-bullet repeat flags for [member all_bullet_movement_pattern_curves]. Matching size means per bullet, otherwise the shared [member shared_movement_pattern_repeat] flag drives.
+			Per-bullet repeat flags for [member all_bullet_movement_pattern_paths]. Matching size means per bullet, otherwise the shared [member shared_movement_pattern_repeat] flag drives.
 		</member>
 		<member name="all_bullet_speed_data" type="BulletSpeedData2D[]" setter="set_all_bullet_speed_data" getter="get_all_bullet_speed_data" default="[]">
 			[b]MANDATORY[/b]

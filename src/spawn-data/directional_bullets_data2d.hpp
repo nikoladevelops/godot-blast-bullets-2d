@@ -5,7 +5,6 @@
 #include "../shared/bullet_speed_data2d.hpp"
 #include "./multimesh_bullets_data2d.hpp"
 
-#include "godot_cpp/classes/curve2d.hpp"
 #include "godot_cpp/variant/node_path.hpp"
 #include "godot_cpp/variant/typed_array.hpp"
 
@@ -65,10 +64,12 @@ public:
 
 	// PER-BULLET MOVEMENT PATTERN RELATED
 
-	// Per-bullet movement pattern curves applied at spawn/enable time. The
-	// face/repeat flags below resolve per bullet when sized to the amount,
-	// otherwise the shared flags drive.
-	TypedArray<Curve2D> all_bullet_movement_pattern_curves;
+	// Per-bullet movement pattern paths applied at spawn/enable time. Each
+	// entry must point at a Path2D; its Curve2D is extracted when the volley
+	// spawns. Same fallback rule as above. The face/repeat flags below
+	// resolve per bullet when sized to the amount, otherwise the shared
+	// flags drive. Bad entries are skipped per bullet.
+	TypedArray<NodePath> all_bullet_movement_pattern_paths;
 
 	// Per-bullet face flags for the curves above.
 	TypedArray<bool> all_bullet_movement_pattern_face_movement_directions;
@@ -103,8 +104,8 @@ public:
 	TypedArray<BulletCurvesData2D> get_all_bullet_curves_data() const;
 	void set_all_bullet_curves_data(const TypedArray<BulletCurvesData2D> &new_data);
 
-	TypedArray<Curve2D> get_all_bullet_movement_pattern_curves() const;
-	void set_all_bullet_movement_pattern_curves(const TypedArray<Curve2D> &new_curves);
+	TypedArray<NodePath> get_all_bullet_movement_pattern_paths() const;
+	void set_all_bullet_movement_pattern_paths(const TypedArray<NodePath> &new_paths);
 
 	TypedArray<bool> get_all_bullet_movement_pattern_face_movement_directions() const;
 	void set_all_bullet_movement_pattern_face_movement_directions(const TypedArray<bool> &new_flags);
