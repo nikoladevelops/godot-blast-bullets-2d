@@ -30,6 +30,7 @@ animations = [{
 
 [sub_resource type="DirectionalBulletsData2D" id="DirectionalBulletsData2D_nkrfg"]
 shared_bullet_speed_data = SubResource("BulletSpeedData2D_mouoi")
+shared_movement_pattern_face_movement_direction = true
 sprite_frames = SubResource("SpriteFrames_y4v7i")
 texture_size = Vector2(120, 120)
 collision_layer = 2
@@ -74,9 +75,18 @@ spawn_data = SubResource("DirectionalBulletsData2D_nkrfg")
 shoot_interval_sec = 0.1
 spin_enabled = true
 transforms_source = 3
-helper_bullets_amount = 2
 helper_ring_radius = 50.0
+helper_ring_y_scale = 2.0
+helper_ring_facing_offset_deg = 122.0
 helper_fan_spread = 3.0
+homing_enabled = true
+homing_target_source = 4
+homing_node_group = &"player"
+homing_target_path = NodePath("../Player")
+homing_distance_before_reached = 200.0
+shared_homing_auto_pop_after_target_reached = true
+orbiting_direction = 1
+orbiting_texture_rotation = 3
 show_preview_during_runtime = true
 position = Vector2(-373, -61)
 

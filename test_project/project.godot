@@ -28,6 +28,10 @@ movie_writer/movie_file="C:/Users/Admin/Desktop/2025/yt/test.avi"
 movie_writer/disable_vsync=true
 movie_writer/mjpeg_quality=1.0
 
+[global_group]
+
+player=""
+
 [input]
 
 move_left={

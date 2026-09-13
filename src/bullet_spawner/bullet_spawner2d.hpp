@@ -1,7 +1,9 @@
 #pragma once
 
+#include "bullets/directional_bullets2d.hpp"
 #include "factory/bullet_factory2d.hpp"
 #include "godot_cpp/classes/node2d.hpp"
+#include "godot_cpp/classes/random_number_generator.hpp"
 #include "godot_cpp/classes/wrapped.hpp"
 #include "godot_cpp/core/property_info.hpp"
 #include "godot_cpp/variant/node_path.hpp"
@@ -239,6 +241,251 @@ class BulletSpawner2D : public Node2D{
         double helper_aimed_step_offset = 0.0;
         bool helper_aimed_centered = true;
 
+        // HOMING (EASY API)
+        //
+        // The spawner resolves homing targets at volley time and pushes them
+        // onto the controllable DirectionalBullets2D instance returned by the
+        // factory, using that class's shared / per-bullet deque API. Nothing
+        // is stored in spawn_data: the same .tres stays movement-only while
+        // every volley can chase different targets.
+        //
+        // Engine rules that still apply (handled for you, documented so the
+        // behavior never surprises):
+        // - Enabling (pool reuse) wipes all homing/orbit state, so the
+        //   configuration below is re-applied on EVERY volley.
+        // - Orbiting without a homing target does nothing: enable orbiting
+        //   only takes effect once a non-empty deque exists, which is why
+        //   targets are always pushed before orbiting is enabled.
+        // - homing_take_control_of_texture_rotation defaults to TRUE here
+        //   (the engine class defaults to false, which silently steers
+        //   nothing). Turn it off only when a movement pattern, rotation
+        //   data, or orbiting texture mode already owns the facing.
+        enum HomingMode {
+            HOMING_SHARED = 0, // one deque shared by every bullet of the volley
+            HOMING_PER_BULLET // every bullet owns its own deque (same queue each)
+        };
+
+        // Where volley homing targets come from. Each source owns its own
+        // setting group below (same dropdown-and-details pattern as
+        // transforms_source): only the active source's options show in the
+        // inspector, plus the shared steering block.
+        enum HomingTargetSource {
+            HOMING_SOURCE_NODE_GROUP = 0, // poll get_nodes_in_group(homing_node_group)
+            HOMING_SOURCE_MOUSE, // chase the mouse cursor position
+            HOMING_SOURCE_GLOBAL_POSITION, // chase homing_global_position (snapshot per volley)
+            HOMING_SOURCE_NODE_PATH, // chase the Node2D at homing_target_path
+            HOMING_SOURCE_NODE_NAME, // chase Node2Ds whose name matches homing_node_name
+            HOMING_SOURCE_NODE_CHILDREN // chase Node2D children of homing_children_parent_path
+        };
+
+        // How homing_node_name is compared against node names (node-name source).
+        enum HomingNodeNameMatch {
+            HOMING_NAME_MATCH_EXACT = 0, // "Player" matches only "Player"
+            HOMING_NAME_MATCH_CONTAINS, // "Player" matches "Player2", "EnemyPlayer", ...
+            HOMING_NAME_MATCH_STARTS_WITH, // "Player" matches "Player2" but not "EnemyPlayer"
+            HOMING_NAME_MATCH_ENDS_WITH // "Player" matches "EnemyPlayer" but not "Player2"
+        };
+
+        // Which of the detected nodes become targets (node-group source).
+        enum HomingTargetSelection {
+            HOMING_SELECT_NEAREST = 0, // closest to the spawner, up to homing_max_targets
+            HOMING_SELECT_RANDOM, // random pick, up to homing_max_targets
+            HOMING_SELECT_FIRST, // tree order, up to homing_max_targets
+            HOMING_SELECT_ROUND_ROBIN // cycle through the group across volleys
+        };
+
+        // Whether already-flying volleys keep chasing fresh targets.
+        enum HomingRetargetMode {
+            HOMING_RETARGET_OFF = 0,
+            HOMING_RETARGET_ON_INTERVAL // re-resolve + replace every homing_retarget_interval_sec
+        };
+
+        // Master switch. False = volleys fly exactly as spawn_data says.
+        bool homing_enabled = false;
+        HomingMode homing_mode = HOMING_SHARED;
+        HomingTargetSource homing_target_source = HOMING_SOURCE_NODE_GROUP;
+        // Polled group for HOMING_SOURCE_NODE_GROUP. Only Node2D members are
+        // usable; the rest are skipped quietly.
+        StringName homing_node_group = "enemies";
+        // Extra allow-list applied on top of any source: when non-empty, only
+        // targets that are ALSO in this group are kept. Empty = no filtering.
+        StringName homing_filter_group;
+        HomingTargetSelection homing_target_selection = HOMING_SELECT_NEAREST;
+        // How many targets enter the queue (1 = classic single-target homing).
+        // Only the multi-target sources (node group, node name) use it.
+        // Must stay >= 1 (setter rejects the rest).
+        int homing_max_targets = 1;
+        // Detection radius around the spawner for the multi-target sources
+        // (node group, node name). 0 = unlimited. Must stay finite and >= 0.
+        double homing_max_detection_range = 0.0;
+        // Snapshot chased per volley for HOMING_SOURCE_GLOBAL_POSITION.
+        Vector2 homing_global_position = Vector2(0, 0);
+        // Node chased per volley for HOMING_SOURCE_NODE_PATH. Must point at a
+        // Node2D; a missing/freed/wrong-type target skips homing for that
+        // volley with a warning, never aborts it.
+        NodePath homing_target_path;
+        // NODE-NAME SOURCE (HOMING_SOURCE_NODE_NAME)
+        //
+        // Finds targets by node name instead of group membership: the whole
+        // scene is scanned for Node2Ds whose name matches homing_node_name
+        // per homing_node_name_match_mode, then the shared selection
+        // (nearest/random/first/round robin), homing_max_targets, range, and
+        // filter-group rules pick the queue. Handy when enemies are spawned
+        // dynamically and never added to a group.
+        String homing_node_name = "Player";
+        HomingNodeNameMatch homing_node_name_match_mode = HOMING_NAME_MATCH_CONTAINS;
+        // Case-insensitive by default: "Player" matches "PlAyEr". Turn on for
+        // strict comparison.
+        bool homing_node_name_case_sensitive = false;
+        // NODE-CHILDREN SOURCE (HOMING_SOURCE_NODE_CHILDREN)
+        //
+        // Chases the Node2D children of one parent node instead of a group or
+        // a name scan: point it at an enemy container, a carrier, or anything
+        // whose children should be hunted. The path is required (empty
+        // resolves nothing with a warning); a missing/freed/non-Node parent
+        // skips homing for that volley, never aborts it. The shared selection
+        // (nearest/random/first/round robin), homing_max_targets, range, and
+        // filter-group rules pick the queue, exactly like the group source.
+        NodePath homing_children_parent_path;
+        // When true, grandchildren and deeper descendants are included too.
+        bool homing_children_recursive = false;
+        // Max turn rate in radians/sec. 0 = snap instantly. Must stay finite
+        // and >= 0 (setter rejects the rest).
+        double homing_smoothing = 5.0;
+        // Seconds between target position refreshes. 0 = every tick.
+        double homing_update_interval = 0.0;
+        // A target counts as reached inside this distance (predictive, so
+        // fast bullets still trigger). Must stay finite and >= 0.
+        double homing_distance_before_reached = 5.0;
+        bool homing_take_control_of_texture_rotation = true;
+        // Pop the reached target in per-bullet mode (queues advance).
+        bool homing_auto_pop_after_target_reached = false;
+        // Pop the reached target in shared mode (queue advances once per tick).
+        bool shared_homing_auto_pop_after_target_reached = false;
+        // When true, per-bullet smoothing fans out linearly: bullet i steers
+        // with homing_smoothing_start + homing_smoothing_step * i.
+        bool homing_per_bullet_smoothing_enabled = false;
+        double homing_smoothing_start = 5.0;
+        double homing_smoothing_step = 0.0;
+        HomingRetargetMode homing_retarget_mode = HOMING_RETARGET_ON_INTERVAL;
+        // Seconds between retarget passes. Must stay > 0. Short by default so
+        // group / name / children membership (spawns, deaths) is picked up
+        // live; each pass is cheap (id validation + one re-resolve, skipped
+        // volleys untouched).
+        double homing_retarget_interval_sec = 0.5;
+        // When true, every homing volley prints how many targets it resolved
+        // (and the first one's name/position). Cheap printf debugging for
+        // "why do my bullets fly straight" moments. Off by default.
+        bool homing_debug_log_volleys = false;
+
+        // ORBITING (EASY API)
+        //
+        // Applied after the homing targets of the same volley, so freshly
+        // spawned bullets can lock onto their ring immediately. Requires a
+        // homing target: orbiting_enabled without homing_enabled warns and
+        // does nothing (engine rule, see above).
+        bool orbiting_enabled = false;
+        // Ring radius in pixels. Must stay >= 0.01 (setter rejects the rest).
+        double orbiting_radius = 64.0;
+        DirectionalBullets2D::OrbitingDirection orbiting_direction = DirectionalBullets2D::OrbitRight;
+        DirectionalBullets2D::OrbitingTextureRotation orbiting_texture_rotation = DirectionalBullets2D::FaceTarget;
+        // When true, bullet i orbits with orbiting_radius_start +
+        // orbiting_radius_step * i (concentric shells) instead of the flat
+        // orbiting_radius.
+        bool orbiting_radius_linear_enabled = false;
+        double orbiting_radius_start = 64.0;
+        double orbiting_radius_step = 0.0;
+
+        bool get_homing_enabled() const;
+        void set_homing_enabled(bool value);
+        HomingMode get_homing_mode() const;
+        void set_homing_mode(HomingMode value);
+        HomingTargetSource get_homing_target_source() const;
+        void set_homing_target_source(HomingTargetSource value);
+        StringName get_homing_node_group() const;
+        void set_homing_node_group(const StringName &value);
+        StringName get_homing_filter_group() const;
+        void set_homing_filter_group(const StringName &value);
+        HomingTargetSelection get_homing_target_selection() const;
+        void set_homing_target_selection(HomingTargetSelection value);
+        int get_homing_max_targets() const;
+        void set_homing_max_targets(int value);
+        double get_homing_max_detection_range() const;
+        void set_homing_max_detection_range(double value);
+        Vector2 get_homing_global_position() const;
+        void set_homing_global_position(const Vector2 &value);
+        NodePath get_homing_target_path() const;
+        void set_homing_target_path(const NodePath &p_path);
+        String get_homing_node_name() const;
+        void set_homing_node_name(const String &value);
+        HomingNodeNameMatch get_homing_node_name_match_mode() const;
+        void set_homing_node_name_match_mode(HomingNodeNameMatch value);
+        bool get_homing_node_name_case_sensitive() const;
+        void set_homing_node_name_case_sensitive(bool value);
+        NodePath get_homing_children_parent_path() const;
+        void set_homing_children_parent_path(const NodePath &p_path);
+        bool get_homing_children_recursive() const;
+        void set_homing_children_recursive(bool value);
+        double get_homing_smoothing() const;
+        void set_homing_smoothing(double value);
+        double get_homing_update_interval() const;
+        void set_homing_update_interval(double value);
+        double get_homing_distance_before_reached() const;
+        void set_homing_distance_before_reached(double value);
+        bool get_homing_take_control_of_texture_rotation() const;
+        void set_homing_take_control_of_texture_rotation(bool value);
+        bool get_homing_auto_pop_after_target_reached() const;
+        void set_homing_auto_pop_after_target_reached(bool value);
+        bool get_shared_homing_auto_pop_after_target_reached() const;
+        void set_shared_homing_auto_pop_after_target_reached(bool value);
+        bool get_homing_per_bullet_smoothing_enabled() const;
+        void set_homing_per_bullet_smoothing_enabled(bool value);
+        double get_homing_smoothing_start() const;
+        void set_homing_smoothing_start(double value);
+        double get_homing_smoothing_step() const;
+        void set_homing_smoothing_step(double value);
+        HomingRetargetMode get_homing_retarget_mode() const;
+        void set_homing_retarget_mode(HomingRetargetMode value);
+        double get_homing_retarget_interval_sec() const;
+        void set_homing_retarget_interval_sec(double value);
+        bool get_homing_debug_log_volleys() const;
+        void set_homing_debug_log_volleys(bool value);
+
+        bool get_orbiting_enabled() const;
+        void set_orbiting_enabled(bool value);
+        double get_orbiting_radius() const;
+        void set_orbiting_radius(double value);
+        DirectionalBullets2D::OrbitingDirection get_orbiting_direction() const;
+        void set_orbiting_direction(DirectionalBullets2D::OrbitingDirection value);
+        DirectionalBullets2D::OrbitingTextureRotation get_orbiting_texture_rotation() const;
+        void set_orbiting_texture_rotation(DirectionalBullets2D::OrbitingTextureRotation value);
+        bool get_orbiting_radius_linear_enabled() const;
+        void set_orbiting_radius_linear_enabled(bool value);
+        double get_orbiting_radius_start() const;
+        void set_orbiting_radius_start(double value);
+        double get_orbiting_radius_step() const;
+        void set_orbiting_radius_step(double value);
+
+        // Resolves the current homing targets without touching any volley:
+        // node-group members (filtered + selected), the node at
+        // homing_target_path, or the homing_global_position snapshot.
+        // MOUSE source returns an empty array (the cursor is pushed live, not
+        // resolved). Entries are Node2D* Variants or Vector2. With quiet =
+        // false (default) an empty result warns; retarget passes use quiet =
+        // true and silently keep the old queues instead.
+        Array resolve_homing_targets(bool quiet = false) const;
+        // Re-resolves targets and replaces the queues of every still-alive
+        // volley owned by this spawner. Volleys with no resolvable targets
+        // are skipped quietly. Returns how many volleys were retargeted.
+        int retarget_live_volleys();
+        // How many spawned volleys are currently tracked for retargeting.
+        int get_live_volley_count() const;
+        // Forgets all tracked volleys (they keep flying untouched).
+        void clear_live_volleys();
+        // Forwards the volley instance's bullet_homing_target_reached as the
+        // spawner-level volley_bullet_homing_target_reached signal.
+        void _on_volley_bullet_homing_target_reached(Object *directional_bullets_instance, int bullet_index, Object *target, const Vector2 &target_global_position);
+
         // PATTERN PREVIEW (EDITOR ONLY)
         //
         // Draws the volley pattern in the editor so helper options can be
@@ -408,6 +655,22 @@ class BulletSpawner2D : public Node2D{
         // Countdown to the next volley; volleys fired since (re)arming.
         double shoot_time_left = 0.0;
         int volleys_fired = 0;
+        // Homing/orbiting runtime state (never stored).
+        // Instance ids of spawned volleys, for interval retargeting. Mutable:
+        // even const readers (get_live_volley_count) prune dead entries, so
+        // the count never reports corpses. Ids are validated with ObjectDB on
+        // every pass and ownership is re-checked via owner_spawner_id plus the
+        // live is_active flag, so pooled inactive instances or instances
+        // re-owned by another spawner can never be touched by mistake.
+        mutable PackedInt64Array live_volley_instance_ids;
+        // Countdown to the next retarget pass.
+        double homing_retarget_time_left = 0.0;
+        // Cursor for HOMING_SELECT_ROUND_ROBIN across volleys (mutable: used
+        // by the const resolve_homing_targets).
+        mutable int homing_round_robin_cursor = 0;
+        // Lazily created RNG for HOMING_SELECT_RANDOM (mutable: used by the
+        // const resolve_homing_targets).
+        mutable Ref<RandomNumberGenerator> homing_rng;
         // Spin runtime state (never stored, advances in _process only).
         double spin_angle_deg = 0.0;
         double spin_time_sec = 0.0;
@@ -462,6 +725,34 @@ class BulletSpawner2D : public Node2D{
         // reports problems, the preview passes true to stay quiet.
         TypedArray<Transform2D> collect_spawn_transforms_impl(bool quiet) const;
 
+        // True while interval retargeting must keep _process alive: homing on
+        // + retarget armed + inside the tree at runtime.
+        bool homing_retarget_active() const;
+        // Wakes _process when retargeting becomes active (runtime only).
+        void update_homing_process_state();
+        // Remembers a fresh volley for retargeting (deduped: pooled instances
+        // reuse ids) and prunes dead/foreign entries.
+        void track_live_volley(DirectionalBullets2D *bullets);
+        // Drops ids that are freed, inactive, or no longer owned by this
+        // spawner. Const (prunes the mutable id list) so readers like
+        // get_live_volley_count never report corpses.
+        void prune_live_volleys() const;
+        // Recursive scene scan for the node-name source: collects live
+        // Node2Ds under p_node whose name matches homing_node_name per
+        // homing_node_name_match_mode and homing_node_name_case_sensitive,
+        // honoring homing_filter_group.
+        void collect_homing_candidates_by_name(Node *p_node, Array &r_candidates) const;
+        // Children scan for the node-children source: collects Node2D
+        // children of p_parent (whole subtree when recursive), honoring
+        // homing_filter_group. Never collects this spawner itself.
+        void collect_homing_candidates_from_children(Node *p_parent, bool recursive, Array &r_candidates) const;
+        // Applies the homing + orbiting configuration to a freshly spawned
+        // (or pool-reused) volley: steering props, resolved targets (pushed
+        // before orbiting so rings can lock immediately), orbiting, signal
+        // hookup, and live-volley tracking. Called from shoot_once() before
+        // volley_fired so handlers observe fully configured bullets.
+        void apply_volley_homing_and_orbiting(DirectionalBullets2D *bullets);
+
 
 
 };
@@ -470,3 +761,8 @@ class BulletSpawner2D : public Node2D{
 // Need this in order to expose the enum to Godot Engine
 VARIANT_ENUM_CAST(BlastBullets2D::BulletSpawner2D::TransformsSource);
 VARIANT_ENUM_CAST(BlastBullets2D::BulletSpawner2D::SpinMode);
+VARIANT_ENUM_CAST(BlastBullets2D::BulletSpawner2D::HomingMode);
+VARIANT_ENUM_CAST(BlastBullets2D::BulletSpawner2D::HomingTargetSource);
+VARIANT_ENUM_CAST(BlastBullets2D::BulletSpawner2D::HomingNodeNameMatch);
+VARIANT_ENUM_CAST(BlastBullets2D::BulletSpawner2D::HomingTargetSelection);
+VARIANT_ENUM_CAST(BlastBullets2D::BulletSpawner2D::HomingRetargetMode);

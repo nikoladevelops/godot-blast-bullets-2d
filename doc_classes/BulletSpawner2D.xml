@@ -5,6 +5,7 @@
 	</brief_description>
 	<description>
 		Assign a [BulletFactory2D], a [DirectionalBulletsData2D], and a [member transforms_source]. Each volley collects one global transform per bullet from the [member transforms_generator] and spawns it through the factory. It never fires in the editor.
+		Homing quick-start: turn on [member homing_enabled], leave [member homing_target_source] on Node Group, and put your player (any Node2D) in the [member homing_node_group] group. Every volley then chases [member homing_target_selection] targets with [member homing_smoothing] turn rate. Set [member homing_target_source] to Mouse to chase the cursor instead, and turn on [member orbiting_enabled] to make bullets ring their target once they arrive. Use [member homing_retarget_mode] so flying volleys keep following fresh targets, and [signal volley_bullet_homing_target_reached] to react when a bullet arrives.
 	</description>
 	<tutorials>
 	</tutorials>
@@ -106,6 +107,31 @@
 			<return type="bool" />
 			<description>
 				Fires one volley now. Returns false when misconfigured or the factory refuses it. Counts toward [member max_volleys].
+			</description>
+		</method>
+		<method name="resolve_homing_targets" qualifiers="const">
+			<return type="Array" />
+			<param index="0" name="quiet" type="bool" default="false" />
+			<description>
+				Resolves the current homing targets without touching any volley: group members, name matches (case-insensitive unless [member homing_node_name_case_sensitive]), children of the parent path, the node at [member homing_target_path], or the [member homing_global_position] snapshot. The Mouse source returns an empty array (the cursor is pushed live, not resolved). Entries are Node2D or Vector2. Unless quiet is true, an empty result warns.
+			</description>
+		</method>
+		<method name="retarget_live_volleys">
+			<return type="int" />
+			<description>
+				Re-resolves targets and replaces the queues of every still-active volley owned by this spawner (expired or pooled volleys are skipped). Volleys with no resolvable targets are skipped quietly and keep their old queues. Returns how many volleys were retargeted. Also runs automatically when [member homing_retarget_mode] is On Interval.
+			</description>
+		</method>
+		<method name="get_live_volley_count" qualifiers="const">
+			<return type="int" />
+			<description>
+				How many spawned volleys are currently tracked for retargeting.
+			</description>
+		</method>
+		<method name="clear_live_volleys">
+			<return type="void" />
+			<description>
+				Forgets all tracked volleys. They keep flying untouched and are no longer retargeted.
 			</description>
 		</method>
 	</methods>
@@ -287,6 +313,108 @@
 		<member name="preview_arrow_head_width" type="float" setter="set_preview_arrow_head_width" getter="get_preview_arrow_head_width" default="10.0">
 			Preview arrow head width in pixels.
 		</member>
+		<member name="homing_enabled" type="bool" setter="set_homing_enabled" getter="get_homing_enabled" default="false">
+			Master switch: every volley chases the configured targets. Off means volleys fly exactly as the spawn data says.
+		</member>
+		<member name="homing_mode" type="int" setter="set_homing_mode" getter="get_homing_mode" default="0">
+			0 shares one target queue across the whole volley, 1 gives every bullet its own queue (same targets each).
+		</member>
+		<member name="homing_target_source" type="int" setter="set_homing_target_source" getter="get_homing_target_source" default="0">
+			Where volley targets come from: a node group, the mouse cursor, a global position snapshot, a node path, a node name, or a node's children. Each source shows its own settings, like the transforms_source helper patterns do.
+		</member>
+		<member name="homing_node_group" type="StringName" setter="set_homing_node_group" getter="get_homing_node_group" default="&quot;enemies&quot;">
+			Polled group for the Node Group source. Only Node2D members can be chased, the rest are skipped.
+		</member>
+		<member name="homing_filter_group" type="StringName" setter="set_homing_filter_group" getter="get_homing_filter_group" default="&quot;&quot;">
+			Extra allow-list on top of any source: only targets also in this group are kept. Empty means no filtering.
+		</member>
+		<member name="homing_target_selection" type="int" setter="set_homing_target_selection" getter="get_homing_target_selection" default="0">
+			Which detected nodes become targets: nearest to the spawner, random, tree order, or round robin across volleys.
+		</member>
+		<member name="homing_max_targets" type="int" setter="set_homing_max_targets" getter="get_homing_max_targets" default="1">
+			How many targets enter the queue. 1 is classic single-target homing. Only the node group, node name, and node children sources use it.
+		</member>
+		<member name="homing_max_detection_range" type="float" setter="set_homing_max_detection_range" getter="get_homing_max_detection_range" default="0.0">
+			Detection radius around the spawner for the node group, node name, and node children sources. 0 is unlimited.
+		</member>
+		<member name="homing_global_position" type="Vector2" setter="set_homing_global_position" getter="get_homing_global_position" default="Vector2(0, 0)">
+			Position chased per volley for the Global Position source. Must be finite.
+		</member>
+		<member name="homing_target_path" type="NodePath" setter="set_homing_target_path" getter="get_homing_target_path" default="NodePath(&quot;&quot;)">
+			Node chased per volley for the Node Path source. Must point at a live Node2D, otherwise the volley flies without homing.
+		</member>
+		<member name="homing_node_name" type="String" setter="set_homing_node_name" getter="get_homing_node_name" default="&quot;Player&quot;">
+			Name pattern chased for the Node Name source. The whole scene is scanned, so dynamically spawned enemies are found with no group setup. The spawner itself never matches.
+		</member>
+		<member name="homing_node_name_match_mode" type="int" setter="set_homing_node_name_match_mode" getter="get_homing_node_name_match_mode" default="1">
+			How the node name source compares names: exact, contains, starts with, or ends with.
+		</member>
+		<member name="homing_node_name_case_sensitive" type="bool" setter="set_homing_node_name_case_sensitive" getter="get_homing_node_name_case_sensitive" default="false">
+			Compares node names strictly. Off (default) matches "Player" against "PlAyEr".
+		</member>
+		<member name="homing_children_parent_path" type="NodePath" setter="set_homing_children_parent_path" getter="get_homing_children_parent_path" default="NodePath(&quot;&quot;)">
+			Parent whose Node2D children are chased for the Node Children source. Required: empty or invalid paths fly without homing.
+		</member>
+		<member name="homing_children_recursive" type="bool" setter="set_homing_children_recursive" getter="get_homing_children_recursive" default="false">
+			Includes grandchildren and deeper descendants for the Node Children source.
+		</member>
+		<member name="homing_smoothing" type="float" setter="set_homing_smoothing" getter="get_homing_smoothing" default="5.0">
+			Max turn rate in radians per second. 0 snaps instantly.
+		</member>
+		<member name="homing_update_interval" type="float" setter="set_homing_update_interval" getter="get_homing_update_interval" default="0.0">
+			Seconds between target position refreshes. 0 refreshes every tick.
+		</member>
+		<member name="homing_distance_before_reached" type="float" setter="set_homing_distance_before_reached" getter="get_homing_distance_before_reached" default="5.0">
+			A target counts as reached inside this distance. Predictive, so fast bullets still trigger.
+		</member>
+		<member name="homing_take_control_of_texture_rotation" type="bool" setter="set_homing_take_control_of_texture_rotation" getter="get_homing_take_control_of_texture_rotation" default="true">
+			Lets homing steer the bullet facing. Turn off only when a movement pattern, rotation data, or orbiting texture mode already owns the facing, otherwise homing steers nothing.
+		</member>
+		<member name="homing_auto_pop_after_target_reached" type="bool" setter="set_homing_auto_pop_after_target_reached" getter="get_homing_auto_pop_after_target_reached" default="false">
+			Advances per-bullet queues when a target is reached. Only used in Per Bullet mode.
+		</member>
+		<member name="shared_homing_auto_pop_after_target_reached" type="bool" setter="set_shared_homing_auto_pop_after_target_reached" getter="get_shared_homing_auto_pop_after_target_reached" default="false">
+			Advances the shared queue when a target is reached. Only used in Shared mode.
+		</member>
+		<member name="homing_per_bullet_smoothing_enabled" type="bool" setter="set_homing_per_bullet_smoothing_enabled" getter="get_homing_per_bullet_smoothing_enabled" default="false">
+			Fans smoothing out per bullet: bullet i steers with start + step times i.
+		</member>
+		<member name="homing_smoothing_start" type="float" setter="set_homing_smoothing_start" getter="get_homing_smoothing_start" default="5.0">
+			Per-bullet smoothing of the first bullet.
+		</member>
+		<member name="homing_smoothing_step" type="float" setter="set_homing_smoothing_step" getter="get_homing_smoothing_step" default="0.0">
+			Per-bullet smoothing growth per bullet. May be negative, results clamp at 0.
+		</member>
+		<member name="homing_retarget_mode" type="int" setter="set_homing_retarget_mode" getter="get_homing_retarget_mode" default="1">
+			0 leaves flying volleys alone, On Interval re-resolves and replaces their queues every interval. On by default so group, name, and children tracking stays live as members spawn and die.
+		</member>
+		<member name="homing_retarget_interval_sec" type="float" setter="set_homing_retarget_interval_sec" getter="get_homing_retarget_interval_sec" default="0.5">
+			Seconds between automatic retarget passes. Must be above zero.
+		</member>
+		<member name="homing_debug_log_volleys" type="bool" setter="set_homing_debug_log_volleys" getter="get_homing_debug_log_volleys" default="false">
+			Prints resolved target count and first target per homing volley. Use it when bullets fly straight unexpectedly.
+		</member>
+		<member name="orbiting_enabled" type="bool" setter="set_orbiting_enabled" getter="get_orbiting_enabled" default="false">
+			Bullets ring their homing target once they arrive. Needs [member homing_enabled]: orbiting without a homing target does nothing.
+		</member>
+		<member name="orbiting_radius" type="float" setter="set_orbiting_radius" getter="get_orbiting_radius" default="64.0">
+			Orbit ring radius in pixels. Must be at least 0.01.
+		</member>
+		<member name="orbiting_direction" type="int" setter="set_orbiting_direction" getter="get_orbiting_direction" default="2">
+			Orbit direction. Dont Move keeps the course (orbiting is skipped with a warning).
+		</member>
+		<member name="orbiting_texture_rotation" type="int" setter="set_orbiting_texture_rotation" getter="get_orbiting_texture_rotation" default="0">
+			How bullet textures face while physically orbiting.
+		</member>
+		<member name="orbiting_radius_linear_enabled" type="bool" setter="set_orbiting_radius_linear_enabled" getter="get_orbiting_radius_linear_enabled" default="false">
+			Fans the radius out per bullet: bullet i orbits with start + step times i (concentric shells).
+		</member>
+		<member name="orbiting_radius_start" type="float" setter="set_orbiting_radius_start" getter="get_orbiting_radius_start" default="64.0">
+			Orbit radius of the first bullet in linear mode.
+		</member>
+		<member name="orbiting_radius_step" type="float" setter="set_orbiting_radius_step" getter="get_orbiting_radius_step" default="0.0">
+			Orbit radius growth per bullet in linear mode. May be negative, results clamp at 0.01.
+		</member>
 	</members>
 	<constants>
 		<constant name="TRANSFORMS_FROM_CHILDREN" value="0">
@@ -318,6 +446,60 @@
 		</constant>
 		<constant name="SPIN_OSCILLATE" value="1">
 			Swings back and forth using amplitude and frequency.
+		</constant>
+		<constant name="HOMING_SHARED" value="0">
+			One homing queue shared by every bullet of the volley.
+		</constant>
+		<constant name="HOMING_PER_BULLET" value="1">
+			Every bullet owns its own homing queue (same targets each).
+		</constant>
+		<constant name="HOMING_SOURCE_NODE_GROUP" value="0">
+			Targets are polled from [member homing_node_group].
+		</constant>
+		<constant name="HOMING_SOURCE_MOUSE" value="1">
+			Targets chase the mouse cursor position.
+		</constant>
+		<constant name="HOMING_SOURCE_GLOBAL_POSITION" value="2">
+			Targets chase the [member homing_global_position] snapshot.
+		</constant>
+		<constant name="HOMING_SOURCE_NODE_PATH" value="3">
+			Targets chase the Node2D at [member homing_target_path].
+		</constant>
+		<constant name="HOMING_SOURCE_NODE_NAME" value="4">
+			Targets are scanned by node name ([member homing_node_name]).
+		</constant>
+		<constant name="HOMING_SOURCE_NODE_CHILDREN" value="5">
+			Targets are the Node2D children of [member homing_children_parent_path].
+		</constant>
+		<constant name="HOMING_NAME_MATCH_EXACT" value="0">
+			The node name source matches full names only.
+		</constant>
+		<constant name="HOMING_NAME_MATCH_CONTAINS" value="1">
+			The node name source matches names containing the pattern.
+		</constant>
+		<constant name="HOMING_NAME_MATCH_STARTS_WITH" value="2">
+			The node name source matches names starting with the pattern.
+		</constant>
+		<constant name="HOMING_NAME_MATCH_ENDS_WITH" value="3">
+			The node name source matches names ending with the pattern.
+		</constant>
+		<constant name="HOMING_SELECT_NEAREST" value="0">
+			Picks the closest nodes to the spawner, up to [member homing_max_targets].
+		</constant>
+		<constant name="HOMING_SELECT_RANDOM" value="1">
+			Picks random nodes, up to [member homing_max_targets].
+		</constant>
+		<constant name="HOMING_SELECT_FIRST" value="2">
+			Picks nodes in tree order, up to [member homing_max_targets].
+		</constant>
+		<constant name="HOMING_SELECT_ROUND_ROBIN" value="3">
+			Cycles through the group across volleys, up to [member homing_max_targets] each.
+		</constant>
+		<constant name="HOMING_RETARGET_OFF" value="0">
+			Flying volleys keep the targets they spawned with.
+		</constant>
+		<constant name="HOMING_RETARGET_ON_INTERVAL" value="1">
+			Flying volleys are re-aimed every [member homing_retarget_interval_sec].
 		</constant>
 	</constants>
 	<signals>
@@ -364,6 +546,29 @@
 			<param index="1" name="volley_index" type="int" />
 			<description>
 				Fired for every volley, with a 1-based counter.
+			</description>
+		</signal>
+		<signal name="volley_homing_configured">
+			<param index="0" name="directional_bullets_instance" type="DirectionalBullets2D" />
+			<param index="1" name="volley_index" type="int" />
+			<description>
+				Fired for every homing/orbiting volley right after it is configured, before [signal volley_fired]. Only fires when homing or orbiting is enabled.
+			</description>
+		</signal>
+		<signal name="homing_targets_resolved">
+			<param index="0" name="directional_bullets_instance" type="DirectionalBullets2D" />
+			<param index="1" name="targets" type="Array" />
+			<description>
+				Fired per volley with the resolved targets (Node2D or Vector2 entries). Empty for the Mouse source and for volleys that found nothing.
+			</description>
+		</signal>
+		<signal name="volley_bullet_homing_target_reached">
+			<param index="0" name="directional_bullets_instance" type="DirectionalBullets2D" />
+			<param index="1" name="bullet_index" type="int" />
+			<param index="2" name="target" type="Node2D" />
+			<param index="3" name="target_global_position" type="Vector2" />
+			<description>
+				Forwarded from the volley instance when one of its bullets reaches its homing target. Target is null for position and mouse targets, and for freed nodes.
 			</description>
 		</signal>
 	</signals>

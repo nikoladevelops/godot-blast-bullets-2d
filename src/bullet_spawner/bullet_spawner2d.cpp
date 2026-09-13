@@ -2,9 +2,12 @@
 #include "bullets/directional_bullets2d.hpp"
 #include "godot_cpp/classes/engine.hpp"
 #include "godot_cpp/classes/global_constants.hpp"
+#include "godot_cpp/classes/scene_tree.hpp"
+#include "godot_cpp/classes/window.hpp"
 #include "godot_cpp/core/class_db.hpp"
 #include "godot_cpp/core/math.hpp"
 #include "godot_cpp/core/object.hpp"
+#include "godot_cpp/variant/callable.hpp"
 #include "godot_cpp/variant/utility_functions.hpp"
 
 
@@ -230,7 +233,7 @@ void BulletSpawner2D::set_shooting_enabled(bool value) {
     shooting_enabled = value;
     const bool now_active = auto_shooting_active();
     if (is_inside_tree()) {
-        set_process(now_active || spin_enabled);
+        set_process(now_active || spin_enabled || homing_retarget_active());
     }
     if (!was_active && now_active) {
         emit_signal("shooting_started");
@@ -275,7 +278,7 @@ void BulletSpawner2D::set_max_volleys(int value) {
     max_volleys = value;
     const bool now_active = auto_shooting_active();
     if (is_inside_tree()) {
-        set_process(now_active || spin_enabled);
+        set_process(now_active || spin_enabled || homing_retarget_active());
     }
     if (!was_active && now_active) {
         emit_signal("shooting_started");
@@ -307,7 +310,7 @@ void BulletSpawner2D::set_spin_enabled(bool value) {
     spin_enabled = value;
     if (!Engine::get_singleton()->is_editor_hint() && is_inside_tree()) {
         // Spinning needs _process even when auto-shooting is off.
-        set_process(spin_enabled || auto_shooting_active());
+        set_process(spin_enabled || auto_shooting_active() || homing_retarget_active());
     }
 }
 double BulletSpawner2D::get_spin_speed_deg_per_sec() const {
@@ -878,13 +881,738 @@ void BulletSpawner2D::set_preview_arrow_head_width(double value) {
 void BulletSpawner2D::reset_shooting() {
     volleys_fired = 0;
     shoot_time_left = shoot_initial_delay_sec;
+    homing_retarget_time_left = homing_retarget_interval_sec;
     if (is_inside_tree()) {
-        set_process(auto_shooting_active() || spin_enabled);
+        set_process(auto_shooting_active() || spin_enabled || homing_retarget_active());
     }
     // An explicit restart counts as a (re)start whenever it arms shooting.
     if (auto_shooting_active()) {
         emit_signal("shooting_started");
     }
+}
+
+// HOMING + ORBITING (EASY API)
+
+bool BulletSpawner2D::get_homing_enabled() const {
+    return homing_enabled;
+}
+void BulletSpawner2D::set_homing_enabled(bool value) {
+    homing_enabled = value;
+    notify_property_list_changed();
+    update_homing_process_state();
+}
+BulletSpawner2D::HomingMode BulletSpawner2D::get_homing_mode() const {
+    return homing_mode;
+}
+void BulletSpawner2D::set_homing_mode(HomingMode value) {
+    if (value != HOMING_SHARED && value != HOMING_PER_BULLET) {
+        UtilityFunctions::push_error("BulletSpawner2D: invalid homing_mode, keeping the old value.");
+        return;
+    }
+    homing_mode = value;
+    notify_property_list_changed();
+}
+BulletSpawner2D::HomingTargetSource BulletSpawner2D::get_homing_target_source() const {
+    return homing_target_source;
+}
+void BulletSpawner2D::set_homing_target_source(HomingTargetSource value) {
+    if (value < HOMING_SOURCE_NODE_GROUP || value > HOMING_SOURCE_NODE_CHILDREN) {
+        UtilityFunctions::push_error("BulletSpawner2D: invalid homing_target_source, keeping the old value.");
+        return;
+    }
+    homing_target_source = value;
+    notify_property_list_changed();
+}
+StringName BulletSpawner2D::get_homing_node_group() const {
+    return homing_node_group;
+}
+void BulletSpawner2D::set_homing_node_group(const StringName &value) {
+    homing_node_group = value;
+}
+StringName BulletSpawner2D::get_homing_filter_group() const {
+    return homing_filter_group;
+}
+void BulletSpawner2D::set_homing_filter_group(const StringName &value) {
+    homing_filter_group = value;
+}
+BulletSpawner2D::HomingTargetSelection BulletSpawner2D::get_homing_target_selection() const {
+    return homing_target_selection;
+}
+void BulletSpawner2D::set_homing_target_selection(HomingTargetSelection value) {
+    if (value < HOMING_SELECT_NEAREST || value > HOMING_SELECT_ROUND_ROBIN) {
+        UtilityFunctions::push_error("BulletSpawner2D: invalid homing_target_selection, keeping the old value.");
+        return;
+    }
+    homing_target_selection = value;
+}
+int BulletSpawner2D::get_homing_max_targets() const {
+    return homing_max_targets;
+}
+void BulletSpawner2D::set_homing_max_targets(int value) {
+    if (value < 1) {
+        UtilityFunctions::push_error("BulletSpawner2D: homing_max_targets must be >= 1, keeping the old value.");
+        return;
+    }
+    homing_max_targets = value;
+}
+double BulletSpawner2D::get_homing_max_detection_range() const {
+    return homing_max_detection_range;
+}
+void BulletSpawner2D::set_homing_max_detection_range(double value) {
+    if (!Math::is_finite(value) || value < 0.0) {
+        UtilityFunctions::push_error("BulletSpawner2D: homing_max_detection_range must be finite and >= 0 (0 is unlimited), keeping the old value.");
+        return;
+    }
+    homing_max_detection_range = value;
+}
+Vector2 BulletSpawner2D::get_homing_global_position() const {
+    return homing_global_position;
+}
+void BulletSpawner2D::set_homing_global_position(const Vector2 &value) {
+    if (!value.is_finite()) {
+        UtilityFunctions::push_error("BulletSpawner2D: homing_global_position must be finite (NaN/Inf would poison homing), keeping the old value.");
+        return;
+    }
+    homing_global_position = value;
+}
+NodePath BulletSpawner2D::get_homing_target_path() const {
+    return homing_target_path;
+}
+void BulletSpawner2D::set_homing_target_path(const NodePath &p_path) {
+    homing_target_path = p_path;
+}
+String BulletSpawner2D::get_homing_node_name() const {
+    return homing_node_name;
+}
+void BulletSpawner2D::set_homing_node_name(const String &value) {
+    homing_node_name = value;
+}
+BulletSpawner2D::HomingNodeNameMatch BulletSpawner2D::get_homing_node_name_match_mode() const {
+    return homing_node_name_match_mode;
+}
+void BulletSpawner2D::set_homing_node_name_match_mode(HomingNodeNameMatch value) {
+    if (value < HOMING_NAME_MATCH_EXACT || value > HOMING_NAME_MATCH_ENDS_WITH) {
+        UtilityFunctions::push_error("BulletSpawner2D: invalid homing_node_name_match_mode, keeping the old value.");
+        return;
+    }
+    homing_node_name_match_mode = value;
+}
+bool BulletSpawner2D::get_homing_node_name_case_sensitive() const {
+    return homing_node_name_case_sensitive;
+}
+void BulletSpawner2D::set_homing_node_name_case_sensitive(bool value) {
+    homing_node_name_case_sensitive = value;
+}
+NodePath BulletSpawner2D::get_homing_children_parent_path() const {
+    return homing_children_parent_path;
+}
+void BulletSpawner2D::set_homing_children_parent_path(const NodePath &p_path) {
+    homing_children_parent_path = p_path;
+}
+bool BulletSpawner2D::get_homing_children_recursive() const {
+    return homing_children_recursive;
+}
+void BulletSpawner2D::set_homing_children_recursive(bool value) {
+    homing_children_recursive = value;
+}
+bool BulletSpawner2D::get_homing_debug_log_volleys() const {
+    return homing_debug_log_volleys;
+}
+void BulletSpawner2D::set_homing_debug_log_volleys(bool value) {
+    homing_debug_log_volleys = value;
+}
+double BulletSpawner2D::get_homing_smoothing() const {
+    return homing_smoothing;
+}
+void BulletSpawner2D::set_homing_smoothing(double value) {
+    if (!Math::is_finite(value) || value < 0.0) {
+        UtilityFunctions::push_error("BulletSpawner2D: homing_smoothing must be finite and >= 0 (0 snaps instantly), keeping the old value.");
+        return;
+    }
+    homing_smoothing = value;
+}
+double BulletSpawner2D::get_homing_update_interval() const {
+    return homing_update_interval;
+}
+void BulletSpawner2D::set_homing_update_interval(double value) {
+    if (!Math::is_finite(value) || value < 0.0) {
+        UtilityFunctions::push_error("BulletSpawner2D: homing_update_interval must be finite and >= 0 (0 refreshes every tick), keeping the old value.");
+        return;
+    }
+    homing_update_interval = value;
+}
+double BulletSpawner2D::get_homing_distance_before_reached() const {
+    return homing_distance_before_reached;
+}
+void BulletSpawner2D::set_homing_distance_before_reached(double value) {
+    if (!Math::is_finite(value) || value < 0.0) {
+        UtilityFunctions::push_error("BulletSpawner2D: homing_distance_before_reached must be finite and >= 0, keeping the old value.");
+        return;
+    }
+    homing_distance_before_reached = value;
+}
+bool BulletSpawner2D::get_homing_take_control_of_texture_rotation() const {
+    return homing_take_control_of_texture_rotation;
+}
+void BulletSpawner2D::set_homing_take_control_of_texture_rotation(bool value) {
+    homing_take_control_of_texture_rotation = value;
+}
+bool BulletSpawner2D::get_homing_auto_pop_after_target_reached() const {
+    return homing_auto_pop_after_target_reached;
+}
+void BulletSpawner2D::set_homing_auto_pop_after_target_reached(bool value) {
+    homing_auto_pop_after_target_reached = value;
+}
+bool BulletSpawner2D::get_shared_homing_auto_pop_after_target_reached() const {
+    return shared_homing_auto_pop_after_target_reached;
+}
+void BulletSpawner2D::set_shared_homing_auto_pop_after_target_reached(bool value) {
+    shared_homing_auto_pop_after_target_reached = value;
+}
+bool BulletSpawner2D::get_homing_per_bullet_smoothing_enabled() const {
+    return homing_per_bullet_smoothing_enabled;
+}
+void BulletSpawner2D::set_homing_per_bullet_smoothing_enabled(bool value) {
+    homing_per_bullet_smoothing_enabled = value;
+    notify_property_list_changed();
+}
+double BulletSpawner2D::get_homing_smoothing_start() const {
+    return homing_smoothing_start;
+}
+void BulletSpawner2D::set_homing_smoothing_start(double value) {
+    if (!Math::is_finite(value) || value < 0.0) {
+        UtilityFunctions::push_error("BulletSpawner2D: homing_smoothing_start must be finite and >= 0, keeping the old value.");
+        return;
+    }
+    homing_smoothing_start = value;
+}
+double BulletSpawner2D::get_homing_smoothing_step() const {
+    return homing_smoothing_step;
+}
+void BulletSpawner2D::set_homing_smoothing_step(double value) {
+    // Any finite step is allowed (even negative): per-bullet results are
+    // clamped at 0 when applied, so a downward fan can never poison steering.
+    if (!Math::is_finite(value)) {
+        UtilityFunctions::push_error("BulletSpawner2D: homing_smoothing_step must be finite, keeping the old value.");
+        return;
+    }
+    homing_smoothing_step = value;
+}
+BulletSpawner2D::HomingRetargetMode BulletSpawner2D::get_homing_retarget_mode() const {
+    return homing_retarget_mode;
+}
+void BulletSpawner2D::set_homing_retarget_mode(HomingRetargetMode value) {
+    if (value != HOMING_RETARGET_OFF && value != HOMING_RETARGET_ON_INTERVAL) {
+        UtilityFunctions::push_error("BulletSpawner2D: invalid homing_retarget_mode, keeping the old value.");
+        return;
+    }
+    homing_retarget_mode = value;
+    notify_property_list_changed();
+    update_homing_process_state();
+}
+double BulletSpawner2D::get_homing_retarget_interval_sec() const {
+    return homing_retarget_interval_sec;
+}
+void BulletSpawner2D::set_homing_retarget_interval_sec(double value) {
+    if (!Math::is_finite(value) || !(value > 0.0)) {
+        UtilityFunctions::push_error("BulletSpawner2D: homing_retarget_interval_sec must be finite and > 0, keeping the old value.");
+        return;
+    }
+    homing_retarget_interval_sec = value;
+}
+
+bool BulletSpawner2D::get_orbiting_enabled() const {
+    return orbiting_enabled;
+}
+void BulletSpawner2D::set_orbiting_enabled(bool value) {
+    orbiting_enabled = value;
+    notify_property_list_changed();
+}
+double BulletSpawner2D::get_orbiting_radius() const {
+    return orbiting_radius;
+}
+void BulletSpawner2D::set_orbiting_radius(double value) {
+    if (!Math::is_finite(value) || value < 0.01) {
+        UtilityFunctions::push_error("BulletSpawner2D: orbiting_radius must be finite and >= 0.01, keeping the old value.");
+        return;
+    }
+    orbiting_radius = value;
+}
+DirectionalBullets2D::OrbitingDirection BulletSpawner2D::get_orbiting_direction() const {
+    return orbiting_direction;
+}
+void BulletSpawner2D::set_orbiting_direction(DirectionalBullets2D::OrbitingDirection value) {
+    if (value != DirectionalBullets2D::DontMove && value != DirectionalBullets2D::OrbitLeft && value != DirectionalBullets2D::OrbitRight) {
+        UtilityFunctions::push_error("BulletSpawner2D: invalid orbiting_direction, keeping the old value.");
+        return;
+    }
+    orbiting_direction = value;
+}
+DirectionalBullets2D::OrbitingTextureRotation BulletSpawner2D::get_orbiting_texture_rotation() const {
+    return orbiting_texture_rotation;
+}
+void BulletSpawner2D::set_orbiting_texture_rotation(DirectionalBullets2D::OrbitingTextureRotation value) {
+    if (value < DirectionalBullets2D::FaceTarget || value > DirectionalBullets2D::FaceOppositeOrbitingDirection) {
+        UtilityFunctions::push_error("BulletSpawner2D: invalid orbiting_texture_rotation, keeping the old value.");
+        return;
+    }
+    orbiting_texture_rotation = value;
+}
+bool BulletSpawner2D::get_orbiting_radius_linear_enabled() const {
+    return orbiting_radius_linear_enabled;
+}
+void BulletSpawner2D::set_orbiting_radius_linear_enabled(bool value) {
+    orbiting_radius_linear_enabled = value;
+    notify_property_list_changed();
+}
+double BulletSpawner2D::get_orbiting_radius_start() const {
+    return orbiting_radius_start;
+}
+void BulletSpawner2D::set_orbiting_radius_start(double value) {
+    if (!Math::is_finite(value) || value < 0.01) {
+        UtilityFunctions::push_error("BulletSpawner2D: orbiting_radius_start must be finite and >= 0.01, keeping the old value.");
+        return;
+    }
+    orbiting_radius_start = value;
+}
+double BulletSpawner2D::get_orbiting_radius_step() const {
+    return orbiting_radius_step;
+}
+void BulletSpawner2D::set_orbiting_radius_step(double value) {
+    // Any finite step is allowed (even negative): per-bullet results are
+    // clamped at 0.01 when applied, so a shrinking fan stays valid.
+    if (!Math::is_finite(value)) {
+        UtilityFunctions::push_error("BulletSpawner2D: orbiting_radius_step must be finite, keeping the old value.");
+        return;
+    }
+    orbiting_radius_step = value;
+}
+
+bool BulletSpawner2D::homing_retarget_active() const {
+    return homing_enabled && homing_retarget_mode == HOMING_RETARGET_ON_INTERVAL && !Engine::get_singleton()->is_editor_hint() && is_inside_tree();
+}
+
+void BulletSpawner2D::update_homing_process_state() {
+    if (homing_retarget_active()) {
+        homing_retarget_time_left = homing_retarget_interval_sec;
+        set_process(true);
+    }
+}
+
+void BulletSpawner2D::collect_homing_candidates_by_name(Node *p_node, Array &r_candidates) const {
+    if (p_node == nullptr) {
+        return;
+    }
+    Node2D *as_2d = Object::cast_to<Node2D>(p_node);
+    // Never chase ourselves or our own markers: the spawner (and any Node2D
+    // markers under it) would otherwise match a broad pattern like "Node2D".
+    if (as_2d != nullptr && as_2d != this) {
+        String node_name = String(as_2d->get_name());
+        String pattern = homing_node_name;
+        if (!homing_node_name_case_sensitive) {
+            node_name = node_name.to_lower();
+            pattern = pattern.to_lower();
+        }
+        bool match = false;
+        switch (homing_node_name_match_mode) {
+            case HOMING_NAME_MATCH_CONTAINS:
+                match = node_name.contains(pattern);
+                break;
+            case HOMING_NAME_MATCH_STARTS_WITH:
+                match = node_name.begins_with(pattern);
+                break;
+            case HOMING_NAME_MATCH_ENDS_WITH:
+                match = node_name.ends_with(pattern);
+                break;
+            case HOMING_NAME_MATCH_EXACT:
+            default:
+                match = node_name == pattern;
+                break;
+        }
+        if (match && (homing_filter_group.is_empty() || as_2d->is_in_group(homing_filter_group))) {
+            r_candidates.push_back(as_2d);
+        }
+    }
+    for (int i = 0; i < p_node->get_child_count(); ++i) {
+        collect_homing_candidates_by_name(p_node->get_child(i), r_candidates);
+    }
+}
+
+void BulletSpawner2D::collect_homing_candidates_from_children(Node *p_parent, bool recursive, Array &r_candidates) const {
+    if (p_parent == nullptr) {
+        return;
+    }
+    for (int i = 0; i < p_parent->get_child_count(); ++i) {
+        Node *child = p_parent->get_child(i);
+        Node2D *as_2d = Object::cast_to<Node2D>(child);
+        // Never the spawner itself (a parent pointing at our own node would
+        // otherwise make the volley chase its emitter).
+        if (as_2d != nullptr && as_2d != this) {
+            if (homing_filter_group.is_empty() || as_2d->is_in_group(homing_filter_group)) {
+                r_candidates.push_back(as_2d);
+            }
+        }
+        if (recursive) {
+            collect_homing_candidates_from_children(child, true, r_candidates);
+        }
+    }
+}
+
+Array BulletSpawner2D::resolve_homing_targets(bool quiet) const {
+    Array targets;
+    if (!is_inside_tree()) {
+        if (!quiet) {
+            UtilityFunctions::push_error("BulletSpawner2D::resolve_homing_targets: spawner is outside the scene tree, no targets resolved.");
+        }
+        return targets;
+    }
+    // The cursor is consumed live (never resolved): pushes refresh it
+    // themselves, so there is nothing to snapshot here.
+    if (homing_target_source == HOMING_SOURCE_MOUSE) {
+        return targets;
+    }
+    if (homing_target_source == HOMING_SOURCE_GLOBAL_POSITION) {
+        if (!homing_global_position.is_finite()) {
+            if (!quiet) {
+                UtilityFunctions::push_error("BulletSpawner2D::resolve_homing_targets: homing_global_position is not finite, no targets resolved.");
+            }
+            return targets;
+        }
+        targets.push_back(homing_global_position);
+        return targets;
+    }
+    if (homing_target_source == HOMING_SOURCE_NODE_PATH) {
+        Node2D *target = Object::cast_to<Node2D>(get_node_or_null(homing_target_path));
+        if (target == nullptr) {
+            if (!quiet) {
+                UtilityFunctions::push_warning("BulletSpawner2D::resolve_homing_targets: homing_target_path does not point at a live Node2D, volley flies without homing.");
+            }
+            return targets;
+        }
+        if (!homing_filter_group.is_empty() && !target->is_in_group(homing_filter_group)) {
+            if (!quiet) {
+                UtilityFunctions::push_warning("BulletSpawner2D::resolve_homing_targets: homing_target_path node is not in homing_filter_group, volley flies without homing.");
+            }
+            return targets;
+        }
+        targets.push_back(target);
+        return targets;
+    }
+    // Multi-target sources (group, name, children) share one tail below
+    // (range cull, empty check, selection): each branch only fills
+    // `candidates`.
+    Array candidates;
+    if (homing_target_source == HOMING_SOURCE_NODE_CHILDREN) {
+        if (homing_children_parent_path.is_empty()) {
+            if (!quiet) {
+                UtilityFunctions::push_warning("BulletSpawner2D::resolve_homing_targets: Node Children source needs homing_children_parent_path, volley flies without homing.");
+            }
+            return targets;
+        }
+        Node *parent = get_node_or_null(homing_children_parent_path);
+        if (parent == nullptr) {
+            if (!quiet) {
+                UtilityFunctions::push_warning("BulletSpawner2D::resolve_homing_targets: homing_children_parent_path does not point at a live node, volley flies without homing.");
+            }
+            return targets;
+        }
+        collect_homing_candidates_from_children(parent, homing_children_recursive, candidates);
+    } else {
+        // HOMING_SOURCE_NODE_GROUP: poll the tree, keep live Node2Ds (plus
+        // the optional allow-list), then pick up to homing_max_targets.
+        SceneTree *tree = get_tree();
+        if (tree == nullptr) {
+            if (!quiet) {
+                UtilityFunctions::push_error("BulletSpawner2D::resolve_homing_targets: no SceneTree, no targets resolved.");
+            }
+            return targets;
+        }
+        if (homing_target_source == HOMING_SOURCE_NODE_NAME) {
+            if (homing_node_name.is_empty()) {
+                if (!quiet) {
+                    UtilityFunctions::push_warning("BulletSpawner2D::resolve_homing_targets: homing_node_name is empty, volley flies without homing.");
+                }
+                return targets;
+            }
+            // Scan from the scene root: dynamically spawned enemies are found
+            // without any group setup. current_scene may be null (autoload-only
+            // setups), the viewport root always exists instead.
+            Node *scan_root = tree->get_current_scene();
+            if (scan_root == nullptr) {
+                scan_root = tree->get_root();
+            }
+            if (scan_root != nullptr) {
+                collect_homing_candidates_by_name(scan_root, candidates);
+            }
+        } else {
+            TypedArray<Node> members = tree->get_nodes_in_group(homing_node_group);
+            for (int i = 0; i < members.size(); ++i) {
+                Node2D *candidate = Object::cast_to<Node2D>(members[i]);
+                if (candidate == nullptr) {
+                    continue; // group may hold anything: only Node2Ds can be chased
+                }
+                if (!homing_filter_group.is_empty() && !candidate->is_in_group(homing_filter_group)) {
+                    continue;
+                }
+                candidates.push_back(candidate);
+            }
+        }
+    }
+    // Detection range culls all multi-target sources around the spawner.
+    if (homing_max_detection_range > 0.0 && !candidates.is_empty()) {
+        const Vector2 origin = get_global_position();
+        const real_t max_dist_sq = (real_t)(homing_max_detection_range * homing_max_detection_range);
+        Array in_range;
+        for (int i = 0; i < candidates.size(); ++i) {
+            Node2D *candidate = Object::cast_to<Node2D>(candidates[i]);
+            if (candidate != nullptr && candidate->get_global_position().distance_squared_to(origin) <= max_dist_sq) {
+                in_range.push_back(candidate);
+            }
+        }
+        candidates = in_range;
+    }
+    if (candidates.is_empty()) {
+        if (!quiet) {
+            if (homing_target_source == HOMING_SOURCE_NODE_NAME) {
+                UtilityFunctions::push_warning(String("BulletSpawner2D::resolve_homing_targets: no live Node2D named like '") + homing_node_name + "' found, volley flies without homing.");
+            } else if (homing_target_source == HOMING_SOURCE_NODE_CHILDREN) {
+                UtilityFunctions::push_warning("BulletSpawner2D::resolve_homing_targets: parent has no live Node2D children to chase, volley flies without homing.");
+            } else {
+                UtilityFunctions::push_warning(String("BulletSpawner2D::resolve_homing_targets: no live Node2D found in group '") + String(homing_node_group) + "', volley flies without homing.");
+            }
+        }
+        return targets;
+    }
+    const int take = MIN(homing_max_targets, (int)candidates.size());
+    switch (homing_target_selection) {
+        case HOMING_SELECT_FIRST: {
+            for (int k = 0; k < take; ++k) {
+                targets.push_back(candidates[k]);
+            }
+            break;
+        }
+        case HOMING_SELECT_RANDOM: {
+            if (homing_rng.is_null()) {
+                homing_rng.instantiate();
+                homing_rng->randomize();
+            }
+            Array pool = candidates.duplicate();
+            for (int k = 0; k < take && !pool.is_empty(); ++k) {
+                const int idx = (int)homing_rng->randi_range(0, pool.size() - 1);
+                targets.push_back(pool[idx]);
+                pool.remove_at(idx);
+            }
+            break;
+        }
+        case HOMING_SELECT_ROUND_ROBIN: {
+            const int n = (int)candidates.size();
+            for (int k = 0; k < take; ++k) {
+                targets.push_back(candidates[(homing_round_robin_cursor + k) % n]);
+            }
+            homing_round_robin_cursor = (homing_round_robin_cursor + take) % n;
+            break;
+        }
+        case HOMING_SELECT_NEAREST:
+        default: {
+            // Repeated min-extraction: take is tiny (usually 1), so O(n*k)
+            // beats sorting and needs no extra includes.
+            const Vector2 origin = get_global_position();
+            Array pool = candidates.duplicate();
+            for (int k = 0; k < take && !pool.is_empty(); ++k) {
+                int best = 0;
+                real_t best_dist = Object::cast_to<Node2D>(pool[0])->get_global_position().distance_squared_to(origin);
+                for (int j = 1; j < pool.size(); ++j) {
+                    const real_t d = Object::cast_to<Node2D>(pool[j])->get_global_position().distance_squared_to(origin);
+                    if (d < best_dist) {
+                        best_dist = d;
+                        best = j;
+                    }
+                }
+                targets.push_back(pool[best]);
+                pool.remove_at(best);
+            }
+            break;
+        }
+    }
+    return targets;
+}
+
+void BulletSpawner2D::track_live_volley(DirectionalBullets2D *bullets) {
+    if (bullets == nullptr) {
+        return;
+    }
+    const int64_t id = (int64_t)bullets->get_instance_id();
+    if (!live_volley_instance_ids.has(id)) {
+        live_volley_instance_ids.push_back(id);
+    }
+    prune_live_volleys();
+}
+
+void BulletSpawner2D::prune_live_volleys() const {
+    PackedInt64Array kept;
+    const uint64_t self_id = get_instance_id();
+    for (int i = 0; i < live_volley_instance_ids.size(); ++i) {
+        Object *obj = ObjectDB::get_instance(ObjectID((uint64_t)live_volley_instance_ids[i]));
+        DirectionalBullets2D *volley = Object::cast_to<DirectionalBullets2D>(obj);
+        // Freed instances (teardown), pooled instances re-owned by another
+        // spawner (owner tag changed), and fully-disabled instances (a new
+        // enable wipes homing anyway) are dropped, never touched. The
+        // is_active gate matters: disable keeps owner_spawner_id, so without
+        // it retargets would arm dead queues and inflate homing counters.
+        if (volley != nullptr && volley->owner_spawner_id == self_id && volley->is_active) {
+            kept.push_back(live_volley_instance_ids[i]);
+        }
+    }
+    live_volley_instance_ids = kept;
+}
+
+int BulletSpawner2D::get_live_volley_count() const {
+    prune_live_volleys();
+    return live_volley_instance_ids.size();
+}
+
+void BulletSpawner2D::clear_live_volleys() {
+    live_volley_instance_ids.clear();
+}
+
+int BulletSpawner2D::retarget_live_volleys() {
+    prune_live_volleys();
+    if (!homing_enabled || !is_inside_tree()) {
+        return 0;
+    }
+    const bool use_mouse = homing_target_source == HOMING_SOURCE_MOUSE;
+    Array targets;
+    if (!use_mouse) {
+        // Quiet: an empty group mid-flight keeps the old queues instead of
+        // wiping them with a warning every interval.
+        targets = resolve_homing_targets(true);
+        if (targets.is_empty()) {
+            return 0;
+        }
+    }
+    int done = 0;
+    const uint64_t self_id = get_instance_id();
+    for (int i = 0; i < live_volley_instance_ids.size(); ++i) {
+        Object *obj = ObjectDB::get_instance(ObjectID((uint64_t)live_volley_instance_ids[i]));
+        DirectionalBullets2D *volley = Object::cast_to<DirectionalBullets2D>(obj);
+        if (volley == nullptr || volley->owner_spawner_id != self_id || !volley->is_active) {
+            continue;
+        }
+        if (homing_mode == HOMING_SHARED) {
+            if (use_mouse) {
+                volley->shared_homing_deque_clear_homing_targets();
+                volley->shared_homing_deque_push_back_mouse_position_target();
+            } else {
+                volley->shared_homing_deque_replace_homing_targets_with_new_target_array(targets);
+            }
+        } else {
+            if (use_mouse) {
+                volley->all_bullets_replace_homing_targets_with_mouse();
+            } else {
+                volley->all_bullets_replace_homing_targets_with_new_target_array(targets);
+            }
+        }
+        ++done;
+    }
+    return done;
+}
+
+void BulletSpawner2D::_on_volley_bullet_homing_target_reached(Object *directional_bullets_instance, int bullet_index, Object *target, const Vector2 &target_global_position) {
+    emit_signal("volley_bullet_homing_target_reached", directional_bullets_instance, bullet_index, target, target_global_position);
+}
+
+void BulletSpawner2D::apply_volley_homing_and_orbiting(DirectionalBullets2D *bullets) {
+    if (bullets == nullptr) {
+        return;
+    }
+    if (!homing_enabled && !orbiting_enabled) {
+        return;
+    }
+    // Orbiting locks onto a homing target: without homing there is nothing
+    // to orbit, so warn once per volley instead of arming a dead feature.
+    if (orbiting_enabled && !homing_enabled) {
+        UtilityFunctions::push_warning("BulletSpawner2D: orbiting_enabled needs homing_enabled (orbiting locks onto a homing target). Volley flies without orbiting.");
+    }
+    Array resolved_targets;
+    if (homing_enabled) {
+        bullets->set_homing_smoothing((real_t)homing_smoothing);
+        bullets->set_homing_update_interval((real_t)homing_update_interval);
+        bullets->set_homing_distance_before_reached((real_t)homing_distance_before_reached);
+        bullets->set_homing_take_control_of_texture_rotation(homing_take_control_of_texture_rotation);
+        bullets->set_bullet_homing_auto_pop_after_target_reached(homing_auto_pop_after_target_reached);
+        bullets->set_shared_homing_deque_auto_pop_after_target_reached(shared_homing_auto_pop_after_target_reached);
+        if (homing_per_bullet_smoothing_enabled) {
+            const int bullet_count = bullets->get_amount_bullets();
+            for (int i = 0; i < bullet_count; ++i) {
+                // A negative step fans downward: clamp per bullet so the
+                // engine setter never sees an invalid value.
+                const double per_bullet = MAX(homing_smoothing_start + homing_smoothing_step * i, 0.0);
+                bullets->bullet_set_homing_smoothing(i, (real_t)per_bullet);
+            }
+        }
+        // The volley instance is freshly spawned/enabled, so both deques are
+        // empty: replace (clear + push) keeps that invariant explicit and
+        // stays correct even if the pool ever changes.
+        if (homing_target_source == HOMING_SOURCE_MOUSE) {
+            if (homing_mode == HOMING_SHARED) {
+                bullets->shared_homing_deque_clear_homing_targets();
+                bullets->shared_homing_deque_push_back_mouse_position_target();
+            } else {
+                bullets->all_bullets_replace_homing_targets_with_mouse();
+            }
+        } else {
+            resolved_targets = resolve_homing_targets(false);
+            if (!resolved_targets.is_empty()) {
+                if (homing_mode == HOMING_SHARED) {
+                    bullets->shared_homing_deque_replace_homing_targets_with_new_target_array(resolved_targets);
+                } else {
+                    bullets->all_bullets_replace_homing_targets_with_new_target_array(resolved_targets);
+                }
+            }
+            // Empty = plain volley (resolve already warned): flies straight,
+            // and a later retarget pass can still pick up targets.
+        }
+    }
+    // Targets go in first so freshly spawned bullets can lock onto their
+    // ring on the very first tick instead of flying straight for a frame.
+    if (orbiting_enabled) {
+        if (orbiting_direction == DirectionalBullets2D::DontMove) {
+            UtilityFunctions::push_warning("BulletSpawner2D: orbiting_direction is Dont Move (bullets keep their course), orbiting skipped for this volley.");
+        } else if (orbiting_radius_linear_enabled) {
+            bullets->all_bullets_enable_orbiting_linear((real_t)MAX(orbiting_radius_start, 0.01), (real_t)orbiting_radius_step, orbiting_direction, orbiting_texture_rotation);
+        } else {
+            bullets->all_bullets_enable_orbiting((real_t)orbiting_radius, orbiting_direction, orbiting_texture_rotation);
+        }
+    }
+    // Re-hooked every volley: enabling (pool reuse) disconnects all
+    // bullet_homing_target_reached handlers, so a stale connection can never
+    // survive here, and is_connected guards the double-spawn edge anyway.
+    const Callable forward_callable(this, "_on_volley_bullet_homing_target_reached");
+    if (!bullets->is_connected("bullet_homing_target_reached", forward_callable)) {
+        bullets->connect("bullet_homing_target_reached", forward_callable);
+    }
+    track_live_volley(bullets);
+    if (homing_debug_log_volleys && homing_enabled) {
+        String first_desc = "mouse cursor";
+        if (homing_target_source != HOMING_SOURCE_MOUSE) {
+            if (resolved_targets.is_empty()) {
+                first_desc = "none (plain volley)";
+            } else {
+                const Variant &first = resolved_targets[0];
+                Node2D *first_node = Object::cast_to<Node2D>(first);
+                if (first_node != nullptr) {
+                    first_desc = String("'") + String(first_node->get_name()) + "' at " + UtilityFunctions::str(first_node->get_global_position());
+                } else {
+                    first_desc = UtilityFunctions::str(first);
+                }
+            }
+        }
+        UtilityFunctions::print("BulletSpawner2D: volley ", volleys_fired + 1, " homing targets: ", resolved_targets.size(), ", first: ", first_desc);
+    }
+    emit_signal("homing_targets_resolved", bullets, resolved_targets);
+    // volleys_fired still holds the previous count here (shoot_once bumps it
+    // right after), so +1 names the volley being configured.
+    emit_signal("volley_homing_configured", bullets, volleys_fired + 1);
 }
 
 TypedArray<Transform2D> BulletSpawner2D::collect_spawn_transforms() const {
@@ -1290,6 +2018,63 @@ void BulletSpawner2D::_validate_property(PropertyInfo &p_property) const {
         }
         return;
     }
+    // Homing/orbiting inspector gating: the master switches and mode/source
+    // pickers are always visible, everything else appears only when its
+    // feature (and source/mode) is active - same idea as the helper_* groups.
+    if (property_name.begins_with("homing_") || property_name.begins_with("orbiting_") || property_name.begins_with("shared_homing_")) {
+        bool show = true;
+        if (property_name.begins_with("homing_")) {
+            if (property_name != "homing_enabled" && property_name != "homing_mode" && property_name != "homing_target_source") {
+                show = homing_enabled;
+            }
+            if (show && homing_enabled) {
+                const bool multi_source = homing_target_source == HOMING_SOURCE_NODE_GROUP || homing_target_source == HOMING_SOURCE_NODE_NAME || homing_target_source == HOMING_SOURCE_NODE_CHILDREN;
+                if (property_name == "homing_node_group") {
+                    show = homing_target_source == HOMING_SOURCE_NODE_GROUP;
+                } else if (property_name == "homing_node_name" || property_name == "homing_node_name_match_mode" || property_name == "homing_node_name_case_sensitive") {
+                    show = homing_target_source == HOMING_SOURCE_NODE_NAME;
+                } else if (property_name == "homing_children_parent_path" || property_name == "homing_children_recursive") {
+                    show = homing_target_source == HOMING_SOURCE_NODE_CHILDREN;
+                } else if (property_name == "homing_target_selection" || property_name == "homing_max_targets" || property_name == "homing_max_detection_range") {
+                    show = multi_source;
+                } else if (property_name == "homing_filter_group") {
+                    show = multi_source || homing_target_source == HOMING_SOURCE_NODE_PATH;
+                } else if (property_name == "homing_global_position") {
+                    show = homing_target_source == HOMING_SOURCE_GLOBAL_POSITION;
+                } else if (property_name == "homing_target_path") {
+                    show = homing_target_source == HOMING_SOURCE_NODE_PATH;
+                } else if (property_name == "homing_auto_pop_after_target_reached") {
+                    show = homing_mode == HOMING_PER_BULLET;
+                } else if (property_name == "homing_per_bullet_smoothing_enabled") {
+                    show = homing_mode == HOMING_PER_BULLET;
+                } else if (property_name == "homing_smoothing_start" || property_name == "homing_smoothing_step") {
+                    show = homing_mode == HOMING_PER_BULLET && homing_per_bullet_smoothing_enabled;
+                } else if (property_name == "homing_retarget_interval_sec") {
+                    show = homing_retarget_mode == HOMING_RETARGET_ON_INTERVAL;
+                }
+            }
+        } else if (property_name == "shared_homing_auto_pop_after_target_reached") {
+            show = homing_enabled && homing_mode == HOMING_SHARED;
+        } else {
+            // Orbiting only works with homing on (it locks onto a homing
+            // target): without homing the tunables would arm a dead feature,
+            // so they hide until both switches are on.
+            if (property_name != "orbiting_enabled") {
+                show = homing_enabled && orbiting_enabled;
+            }
+            if (show && orbiting_enabled) {
+                if (property_name == "orbiting_radius") {
+                    show = !orbiting_radius_linear_enabled;
+                } else if (property_name == "orbiting_radius_start" || property_name == "orbiting_radius_step") {
+                    show = orbiting_radius_linear_enabled;
+                }
+            }
+        }
+        if (!show) {
+            p_property.usage &= ~PROPERTY_USAGE_EDITOR;
+        }
+        return;
+    }
     // Only the helper_* option groups are gated; everything else is always shown.
     if (!property_name.begins_with("helper_")) {
         return;
@@ -1349,13 +2134,16 @@ bool BulletSpawner2D::shoot_once() {
     // instead of the factory. Pool reuse resets the tag, so this stamp covers
     // every spawn path through this function.
     bullets->owner_spawner_id = get_instance_id();
+    // Homing/orbiting runs on the same stamp: the instance is fully
+    // configured before volley_fired, so handlers observe live behavior.
+    apply_volley_homing_and_orbiting(bullets);
     volleys_fired += 1;
     emit_signal("volley_fired", bullets, volleys_fired);
     // Exact-equality = transition only: further manual shots past the cap do
     // not re-emit, and the setter path reports its own transition.
     if (max_volleys >= 0 && volleys_fired == max_volleys) {
         // Stop shooting, but stay awake while spinning or previewing.
-        set_process(spin_enabled || preview_active());
+        set_process(spin_enabled || preview_active() || homing_retarget_active());
         emit_signal("shooting_finished");
     }
     return true;
@@ -1404,7 +2192,7 @@ void BulletSpawner2D::_ready() {
     if (preview_active()) {
         set_process(true);
     } else {
-        set_process(auto_shooting_active() || spin_enabled);
+        set_process(auto_shooting_active() || spin_enabled || homing_retarget_active());
     }
     if (auto_shooting_active()) {
         emit_signal("shooting_started");
@@ -1442,6 +2230,9 @@ void BulletSpawner2D::_notification(int p_what) {
         tracked_marker_ids.clear();
         tracked_child_count = -1;
         tracked_has_self = false;
+        // Homing: forget tracked volleys (plain ids, no ownership of nodes).
+        live_volley_instance_ids.clear();
+        homing_retarget_time_left = 0.0;
     }
 }
 
@@ -1467,10 +2258,20 @@ void BulletSpawner2D::_process(double delta) {
     if (spin_enabled) {
         advance_spin(delta);
     }
+    // Interval retargeting runs independently of shooting too: manual
+    // shoot_once() volleys keep chasing fresh targets while auto-shooting
+    // stays off.
+    if (homing_retarget_active()) {
+        homing_retarget_time_left -= delta;
+        if (homing_retarget_time_left <= 0.0) {
+            retarget_live_volleys();
+            homing_retarget_time_left = homing_retarget_interval_sec;
+        }
+    }
     if (!auto_shooting_active()) {
-        // Sleep when there is nothing to do, but stay awake while spinning
-        // or while the runtime preview loop must keep refreshing.
-        set_process(spin_enabled || preview_active());
+        // Sleep when there is nothing to do, but stay awake while spinning,
+        // retargeting, or while the runtime preview loop must keep refreshing.
+        set_process(spin_enabled || preview_active() || homing_retarget_active());
         return;
     }
     shoot_time_left -= delta;
@@ -1726,6 +2527,188 @@ void BulletSpawner2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_helper_aimed_centered"), &BulletSpawner2D::get_helper_aimed_centered);
 	ClassDB::bind_method(D_METHOD("set_helper_aimed_centered", "value"), &BulletSpawner2D::set_helper_aimed_centered);
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "helper_aimed_centered"), "set_helper_aimed_centered", "get_helper_aimed_centered");
+
+	// Homing + orbiting signals. Same slim payload shape and handler contract
+	// as the spawner lifecycle signals above: volley_homing_configured and
+	// homing_targets_resolved fire synchronously inside shoot_once() (after
+	// the instance is fully configured, before volley_fired);
+	// volley_bullet_homing_target_reached is a synchronous forward of the
+	// instance's deferred bullet_homing_target_reached.
+	// NOTE: PROPERTY_HINT_RESOURCE_TYPE (not NODE_TYPE) carries the class name
+	// to ClassDB/--doctool; see the note on the factory signals.
+	ADD_SIGNAL(MethodInfo("volley_homing_configured",
+		PropertyInfo(Variant::OBJECT, "directional_bullets_instance", PROPERTY_HINT_RESOURCE_TYPE, "DirectionalBullets2D"),
+		PropertyInfo(Variant::INT, "volley_index")));
+	ADD_SIGNAL(MethodInfo("homing_targets_resolved",
+		PropertyInfo(Variant::OBJECT, "directional_bullets_instance", PROPERTY_HINT_RESOURCE_TYPE, "DirectionalBullets2D"),
+		PropertyInfo(Variant::ARRAY, "targets")));
+	ADD_SIGNAL(MethodInfo("volley_bullet_homing_target_reached",
+		PropertyInfo(Variant::OBJECT, "directional_bullets_instance", PROPERTY_HINT_RESOURCE_TYPE, "DirectionalBullets2D"),
+		PropertyInfo(Variant::INT, "bullet_index"),
+		PropertyInfo(Variant::OBJECT, "target", PROPERTY_HINT_RESOURCE_TYPE, "Node2D"),
+		PropertyInfo(Variant::VECTOR2, "target_global_position")));
+
+	ClassDB::bind_method(D_METHOD("get_homing_enabled"), &BulletSpawner2D::get_homing_enabled);
+	ClassDB::bind_method(D_METHOD("set_homing_enabled", "value"), &BulletSpawner2D::set_homing_enabled);
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "homing_enabled"), "set_homing_enabled", "get_homing_enabled");
+
+	ClassDB::bind_method(D_METHOD("get_homing_mode"), &BulletSpawner2D::get_homing_mode);
+	ClassDB::bind_method(D_METHOD("set_homing_mode", "value"), &BulletSpawner2D::set_homing_mode);
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "homing_mode", PROPERTY_HINT_ENUM, "Shared,Per Bullet"), "set_homing_mode", "get_homing_mode");
+
+	ClassDB::bind_method(D_METHOD("get_homing_target_source"), &BulletSpawner2D::get_homing_target_source);
+	ClassDB::bind_method(D_METHOD("set_homing_target_source", "value"), &BulletSpawner2D::set_homing_target_source);
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "homing_target_source", PROPERTY_HINT_ENUM, "Node Group,Mouse,Global Position,Node Path,Node Name,Node Children"), "set_homing_target_source", "get_homing_target_source");
+
+	ClassDB::bind_method(D_METHOD("get_homing_node_group"), &BulletSpawner2D::get_homing_node_group);
+	ClassDB::bind_method(D_METHOD("set_homing_node_group", "value"), &BulletSpawner2D::set_homing_node_group);
+	ADD_PROPERTY(PropertyInfo(Variant::STRING_NAME, "homing_node_group"), "set_homing_node_group", "get_homing_node_group");
+
+	ClassDB::bind_method(D_METHOD("get_homing_filter_group"), &BulletSpawner2D::get_homing_filter_group);
+	ClassDB::bind_method(D_METHOD("set_homing_filter_group", "value"), &BulletSpawner2D::set_homing_filter_group);
+	ADD_PROPERTY(PropertyInfo(Variant::STRING_NAME, "homing_filter_group"), "set_homing_filter_group", "get_homing_filter_group");
+
+	ClassDB::bind_method(D_METHOD("get_homing_target_selection"), &BulletSpawner2D::get_homing_target_selection);
+	ClassDB::bind_method(D_METHOD("set_homing_target_selection", "value"), &BulletSpawner2D::set_homing_target_selection);
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "homing_target_selection", PROPERTY_HINT_ENUM, "Nearest,Random,First,Round Robin"), "set_homing_target_selection", "get_homing_target_selection");
+
+	ClassDB::bind_method(D_METHOD("get_homing_max_targets"), &BulletSpawner2D::get_homing_max_targets);
+	ClassDB::bind_method(D_METHOD("set_homing_max_targets", "value"), &BulletSpawner2D::set_homing_max_targets);
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "homing_max_targets"), "set_homing_max_targets", "get_homing_max_targets");
+
+	ClassDB::bind_method(D_METHOD("get_homing_max_detection_range"), &BulletSpawner2D::get_homing_max_detection_range);
+	ClassDB::bind_method(D_METHOD("set_homing_max_detection_range", "value"), &BulletSpawner2D::set_homing_max_detection_range);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "homing_max_detection_range"), "set_homing_max_detection_range", "get_homing_max_detection_range");
+
+	ClassDB::bind_method(D_METHOD("get_homing_global_position"), &BulletSpawner2D::get_homing_global_position);
+	ClassDB::bind_method(D_METHOD("set_homing_global_position", "value"), &BulletSpawner2D::set_homing_global_position);
+	ADD_PROPERTY(PropertyInfo(Variant::VECTOR2, "homing_global_position"), "set_homing_global_position", "get_homing_global_position");
+
+	ClassDB::bind_method(D_METHOD("get_homing_target_path"), &BulletSpawner2D::get_homing_target_path);
+	ClassDB::bind_method(D_METHOD("set_homing_target_path", "path"), &BulletSpawner2D::set_homing_target_path);
+	ADD_PROPERTY(PropertyInfo(Variant::NODE_PATH, "homing_target_path", PROPERTY_HINT_NODE_PATH_VALID_TYPES, "Node2D"), "set_homing_target_path", "get_homing_target_path");
+
+	ClassDB::bind_method(D_METHOD("get_homing_node_name"), &BulletSpawner2D::get_homing_node_name);
+	ClassDB::bind_method(D_METHOD("set_homing_node_name", "value"), &BulletSpawner2D::set_homing_node_name);
+	ADD_PROPERTY(PropertyInfo(Variant::STRING, "homing_node_name"), "set_homing_node_name", "get_homing_node_name");
+
+	ClassDB::bind_method(D_METHOD("get_homing_node_name_match_mode"), &BulletSpawner2D::get_homing_node_name_match_mode);
+	ClassDB::bind_method(D_METHOD("set_homing_node_name_match_mode", "value"), &BulletSpawner2D::set_homing_node_name_match_mode);
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "homing_node_name_match_mode", PROPERTY_HINT_ENUM, "Exact,Contains,Starts With,Ends With"), "set_homing_node_name_match_mode", "get_homing_node_name_match_mode");
+
+	ClassDB::bind_method(D_METHOD("get_homing_node_name_case_sensitive"), &BulletSpawner2D::get_homing_node_name_case_sensitive);
+	ClassDB::bind_method(D_METHOD("set_homing_node_name_case_sensitive", "value"), &BulletSpawner2D::set_homing_node_name_case_sensitive);
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "homing_node_name_case_sensitive"), "set_homing_node_name_case_sensitive", "get_homing_node_name_case_sensitive");
+
+	ClassDB::bind_method(D_METHOD("get_homing_children_parent_path"), &BulletSpawner2D::get_homing_children_parent_path);
+	ClassDB::bind_method(D_METHOD("set_homing_children_parent_path", "path"), &BulletSpawner2D::set_homing_children_parent_path);
+	ADD_PROPERTY(PropertyInfo(Variant::NODE_PATH, "homing_children_parent_path"), "set_homing_children_parent_path", "get_homing_children_parent_path");
+
+	ClassDB::bind_method(D_METHOD("get_homing_children_recursive"), &BulletSpawner2D::get_homing_children_recursive);
+	ClassDB::bind_method(D_METHOD("set_homing_children_recursive", "value"), &BulletSpawner2D::set_homing_children_recursive);
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "homing_children_recursive"), "set_homing_children_recursive", "get_homing_children_recursive");
+
+	ClassDB::bind_method(D_METHOD("get_homing_smoothing"), &BulletSpawner2D::get_homing_smoothing);
+	ClassDB::bind_method(D_METHOD("set_homing_smoothing", "value"), &BulletSpawner2D::set_homing_smoothing);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "homing_smoothing"), "set_homing_smoothing", "get_homing_smoothing");
+
+	ClassDB::bind_method(D_METHOD("get_homing_update_interval"), &BulletSpawner2D::get_homing_update_interval);
+	ClassDB::bind_method(D_METHOD("set_homing_update_interval", "value"), &BulletSpawner2D::set_homing_update_interval);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "homing_update_interval"), "set_homing_update_interval", "get_homing_update_interval");
+
+	ClassDB::bind_method(D_METHOD("get_homing_distance_before_reached"), &BulletSpawner2D::get_homing_distance_before_reached);
+	ClassDB::bind_method(D_METHOD("set_homing_distance_before_reached", "value"), &BulletSpawner2D::set_homing_distance_before_reached);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "homing_distance_before_reached"), "set_homing_distance_before_reached", "get_homing_distance_before_reached");
+
+	ClassDB::bind_method(D_METHOD("get_homing_take_control_of_texture_rotation"), &BulletSpawner2D::get_homing_take_control_of_texture_rotation);
+	ClassDB::bind_method(D_METHOD("set_homing_take_control_of_texture_rotation", "value"), &BulletSpawner2D::set_homing_take_control_of_texture_rotation);
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "homing_take_control_of_texture_rotation"), "set_homing_take_control_of_texture_rotation", "get_homing_take_control_of_texture_rotation");
+
+	ClassDB::bind_method(D_METHOD("get_homing_auto_pop_after_target_reached"), &BulletSpawner2D::get_homing_auto_pop_after_target_reached);
+	ClassDB::bind_method(D_METHOD("set_homing_auto_pop_after_target_reached", "value"), &BulletSpawner2D::set_homing_auto_pop_after_target_reached);
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "homing_auto_pop_after_target_reached"), "set_homing_auto_pop_after_target_reached", "get_homing_auto_pop_after_target_reached");
+
+	ClassDB::bind_method(D_METHOD("get_shared_homing_auto_pop_after_target_reached"), &BulletSpawner2D::get_shared_homing_auto_pop_after_target_reached);
+	ClassDB::bind_method(D_METHOD("set_shared_homing_auto_pop_after_target_reached", "value"), &BulletSpawner2D::set_shared_homing_auto_pop_after_target_reached);
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "shared_homing_auto_pop_after_target_reached"), "set_shared_homing_auto_pop_after_target_reached", "get_shared_homing_auto_pop_after_target_reached");
+
+	ClassDB::bind_method(D_METHOD("get_homing_per_bullet_smoothing_enabled"), &BulletSpawner2D::get_homing_per_bullet_smoothing_enabled);
+	ClassDB::bind_method(D_METHOD("set_homing_per_bullet_smoothing_enabled", "value"), &BulletSpawner2D::set_homing_per_bullet_smoothing_enabled);
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "homing_per_bullet_smoothing_enabled"), "set_homing_per_bullet_smoothing_enabled", "get_homing_per_bullet_smoothing_enabled");
+
+	ClassDB::bind_method(D_METHOD("get_homing_smoothing_start"), &BulletSpawner2D::get_homing_smoothing_start);
+	ClassDB::bind_method(D_METHOD("set_homing_smoothing_start", "value"), &BulletSpawner2D::set_homing_smoothing_start);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "homing_smoothing_start"), "set_homing_smoothing_start", "get_homing_smoothing_start");
+
+	ClassDB::bind_method(D_METHOD("get_homing_smoothing_step"), &BulletSpawner2D::get_homing_smoothing_step);
+	ClassDB::bind_method(D_METHOD("set_homing_smoothing_step", "value"), &BulletSpawner2D::set_homing_smoothing_step);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "homing_smoothing_step"), "set_homing_smoothing_step", "get_homing_smoothing_step");
+
+	ClassDB::bind_method(D_METHOD("get_homing_retarget_mode"), &BulletSpawner2D::get_homing_retarget_mode);
+	ClassDB::bind_method(D_METHOD("set_homing_retarget_mode", "value"), &BulletSpawner2D::set_homing_retarget_mode);
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "homing_retarget_mode", PROPERTY_HINT_ENUM, "Off,On Interval"), "set_homing_retarget_mode", "get_homing_retarget_mode");
+
+	ClassDB::bind_method(D_METHOD("get_homing_retarget_interval_sec"), &BulletSpawner2D::get_homing_retarget_interval_sec);
+	ClassDB::bind_method(D_METHOD("set_homing_retarget_interval_sec", "value"), &BulletSpawner2D::set_homing_retarget_interval_sec);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "homing_retarget_interval_sec"), "set_homing_retarget_interval_sec", "get_homing_retarget_interval_sec");
+
+	ClassDB::bind_method(D_METHOD("get_homing_debug_log_volleys"), &BulletSpawner2D::get_homing_debug_log_volleys);
+	ClassDB::bind_method(D_METHOD("set_homing_debug_log_volleys", "value"), &BulletSpawner2D::set_homing_debug_log_volleys);
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "homing_debug_log_volleys"), "set_homing_debug_log_volleys", "get_homing_debug_log_volleys");
+
+	ClassDB::bind_method(D_METHOD("get_orbiting_enabled"), &BulletSpawner2D::get_orbiting_enabled);
+	ClassDB::bind_method(D_METHOD("set_orbiting_enabled", "value"), &BulletSpawner2D::set_orbiting_enabled);
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "orbiting_enabled"), "set_orbiting_enabled", "get_orbiting_enabled");
+
+	ClassDB::bind_method(D_METHOD("get_orbiting_radius"), &BulletSpawner2D::get_orbiting_radius);
+	ClassDB::bind_method(D_METHOD("set_orbiting_radius", "value"), &BulletSpawner2D::set_orbiting_radius);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "orbiting_radius"), "set_orbiting_radius", "get_orbiting_radius");
+
+	ClassDB::bind_method(D_METHOD("get_orbiting_direction"), &BulletSpawner2D::get_orbiting_direction);
+	ClassDB::bind_method(D_METHOD("set_orbiting_direction", "value"), &BulletSpawner2D::set_orbiting_direction);
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "orbiting_direction", PROPERTY_HINT_ENUM, "Dont Move,Orbit Left,Orbit Right"), "set_orbiting_direction", "get_orbiting_direction");
+
+	ClassDB::bind_method(D_METHOD("get_orbiting_texture_rotation"), &BulletSpawner2D::get_orbiting_texture_rotation);
+	ClassDB::bind_method(D_METHOD("set_orbiting_texture_rotation", "value"), &BulletSpawner2D::set_orbiting_texture_rotation);
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "orbiting_texture_rotation", PROPERTY_HINT_ENUM, "Face Target,Face Opposite Target,Face Orbiting Direction,Face Opposite Orbiting Direction"), "set_orbiting_texture_rotation", "get_orbiting_texture_rotation");
+
+	ClassDB::bind_method(D_METHOD("get_orbiting_radius_linear_enabled"), &BulletSpawner2D::get_orbiting_radius_linear_enabled);
+	ClassDB::bind_method(D_METHOD("set_orbiting_radius_linear_enabled", "value"), &BulletSpawner2D::set_orbiting_radius_linear_enabled);
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "orbiting_radius_linear_enabled"), "set_orbiting_radius_linear_enabled", "get_orbiting_radius_linear_enabled");
+
+	ClassDB::bind_method(D_METHOD("get_orbiting_radius_start"), &BulletSpawner2D::get_orbiting_radius_start);
+	ClassDB::bind_method(D_METHOD("set_orbiting_radius_start", "value"), &BulletSpawner2D::set_orbiting_radius_start);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "orbiting_radius_start"), "set_orbiting_radius_start", "get_orbiting_radius_start");
+
+	ClassDB::bind_method(D_METHOD("get_orbiting_radius_step"), &BulletSpawner2D::get_orbiting_radius_step);
+	ClassDB::bind_method(D_METHOD("set_orbiting_radius_step", "value"), &BulletSpawner2D::set_orbiting_radius_step);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "orbiting_radius_step"), "set_orbiting_radius_step", "get_orbiting_radius_step");
+
+	ClassDB::bind_method(D_METHOD("resolve_homing_targets", "quiet"), &BulletSpawner2D::resolve_homing_targets, DEFVAL(false));
+	ClassDB::bind_method(D_METHOD("retarget_live_volleys"), &BulletSpawner2D::retarget_live_volleys);
+	ClassDB::bind_method(D_METHOD("get_live_volley_count"), &BulletSpawner2D::get_live_volley_count);
+	ClassDB::bind_method(D_METHOD("clear_live_volleys"), &BulletSpawner2D::clear_live_volleys);
+	ClassDB::bind_method(D_METHOD("_on_volley_bullet_homing_target_reached", "directional_bullets_instance", "bullet_index", "target", "target_global_position"), &BulletSpawner2D::_on_volley_bullet_homing_target_reached);
+
+	// Need this in order to expose the enum constants to Godot Engine
+	BIND_ENUM_CONSTANT(HOMING_SHARED);
+	BIND_ENUM_CONSTANT(HOMING_PER_BULLET);
+	BIND_ENUM_CONSTANT(HOMING_SOURCE_NODE_GROUP);
+	BIND_ENUM_CONSTANT(HOMING_SOURCE_MOUSE);
+	BIND_ENUM_CONSTANT(HOMING_SOURCE_GLOBAL_POSITION);
+	BIND_ENUM_CONSTANT(HOMING_SOURCE_NODE_PATH);
+	BIND_ENUM_CONSTANT(HOMING_SOURCE_NODE_NAME);
+	BIND_ENUM_CONSTANT(HOMING_SOURCE_NODE_CHILDREN);
+	BIND_ENUM_CONSTANT(HOMING_NAME_MATCH_EXACT);
+	BIND_ENUM_CONSTANT(HOMING_NAME_MATCH_CONTAINS);
+	BIND_ENUM_CONSTANT(HOMING_NAME_MATCH_STARTS_WITH);
+	BIND_ENUM_CONSTANT(HOMING_NAME_MATCH_ENDS_WITH);
+	BIND_ENUM_CONSTANT(HOMING_SELECT_NEAREST);
+	BIND_ENUM_CONSTANT(HOMING_SELECT_RANDOM);
+	BIND_ENUM_CONSTANT(HOMING_SELECT_FIRST);
+	BIND_ENUM_CONSTANT(HOMING_SELECT_ROUND_ROBIN);
+	BIND_ENUM_CONSTANT(HOMING_RETARGET_OFF);
+	BIND_ENUM_CONSTANT(HOMING_RETARGET_ON_INTERVAL);
 
 	ClassDB::bind_method(D_METHOD("get_show_pattern_preview"), &BulletSpawner2D::get_show_pattern_preview);
 	ClassDB::bind_method(D_METHOD("set_show_pattern_preview", "value"), &BulletSpawner2D::set_show_pattern_preview);
