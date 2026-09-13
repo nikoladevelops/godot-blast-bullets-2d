@@ -31,6 +31,12 @@ class DirectionalBullets2D : public MultiMeshBullets2D {
 	GDCLASS(DirectionalBullets2D, MultiMeshBullets2D)
 
 public:
+	// Clears both homing deques through the pop loop so the global
+	// mouse-target counter stays exact: force_delete() memdeletes without
+	// running disable logic, and a leaked counter would query the mouse every
+	// homing tick forever. Pop paths never touch the tree, so this is safe.
+	~DirectionalBullets2D() override;
+
 	enum OrbitingDirection {
 		DontMove = 0,
 		OrbitLeft,
@@ -108,6 +114,15 @@ protected:
 	// Once-flag so the silent-homing footgun warns exactly once per multimesh lifetime
 	// segment (reset on spawn/enable). See move_bullets homing branch.
 	bool homing_inert_warning_issued = false;
+
+	// Ownership stamp for deferred homing work (reached-emits, auto-pops).
+	// Bumped on every spawn/enable/disable: a deferred call scheduled by a
+	// previous life carries a stale generation and no-ops instead of eating
+	// the new life's targets or emitting ghost signals. Without this, a
+	// disable→pool-reuse within the same frame (the deferred flush runs last)
+	// corrupts the fresh configuration - a certainty at bullet-hell rates
+	// with several spawners sharing one factory.
+	uint64_t homing_operation_generation = 0;
 
 	// This is a shared homing deque - allows the bullets to share the same target
 	HomingTargetDeque shared_homing_deque;
@@ -2028,9 +2043,35 @@ protected:
 	// bullets reaching in one tick queue exactly one pop instead of draining the deque.
 	bool shared_auto_pop_queued = false;
 
-	_ALWAYS_INLINE_ void _do_shared_auto_pop_front_target() {
+	// Generation-guarded deferred emit: the target travels as an instance id
+	// and is resolved at fire time (null when freed) instead of carrying a
+	// possibly-dangling raw pointer across the frame.
+	_ALWAYS_INLINE_ void _do_emit_homing_target_reached(uint64_t p_generation, int p_bullet_index, uint64_t p_target_instance_id, const Vector2 &p_target_global_position) {
+		if (p_generation != homing_operation_generation) {
+			return; // Scheduled by a previous life (pool reuse before the flush).
+		}
+		Node2D *target = nullptr;
+		if (p_target_instance_id != 0) {
+			target = Object::cast_to<Node2D>(ObjectDB::get_instance(ObjectID(p_target_instance_id)));
+		}
+		emit_signal("bullet_homing_target_reached", this, p_bullet_index, target, p_target_global_position);
+	}
+
+	_ALWAYS_INLINE_ void _do_shared_auto_pop_front_target(uint64_t p_generation) {
+		if (p_generation != homing_operation_generation) {
+			return; // Never touch the flag: it belongs to the new life now.
+		}
 		shared_auto_pop_queued = false;
 		shared_homing_deque_pop_front_target();
+	}
+
+	// Generation-guarded deferred per-bullet pop: a stale call no-ops instead
+	// of eating the new life's front target.
+	_ALWAYS_INLINE_ void _do_auto_pop_front_target(uint64_t p_generation, int p_bullet_index) {
+		if (p_generation != homing_operation_generation) {
+			return;
+		}
+		bullet_homing_pop_front_target(p_bullet_index);
 	}
 
 	_ALWAYS_INLINE_ void try_to_emit_bullet_homing_target_reached_signal(HomingTargetDeque &homing_deque, bool is_using_shared_homing_deque, int bullet_index, const Vector2 &bullet_pos, const Vector2 &target_pos, double delta) {
@@ -2070,24 +2111,27 @@ protected:
 			if (fire_for_this_bullet) {
 				switch (target.type) {
 					case GlobalPositionTarget:
-						call_deferred("emit_signal", "bullet_homing_target_reached", this, bullet_index, nullptr, target_pos);
+						// Deferred through the generation-guarded emitter: the target travels
+						// as an instance id (resolved at fire time, null when freed) and a
+						// stale generation no-ops, so pool reuse before the flush can neither
+						// crash on a dangling pointer nor emit ghosts.
+						call_deferred("_do_emit_homing_target_reached", homing_operation_generation, bullet_index, (uint64_t)0, target_pos);
 						break;
 					case Node2DTarget: {
 						auto &target_data = target.node2d_target_data;
 
 						// In case the target instance is freed - will still emit the signal, but with a nullptr as the target
-						if (!homing_deque.is_homing_target_valid(target_data.target, target_data.cached_valid_instance_id)) {
-							call_deferred("emit_signal", "bullet_homing_target_reached", this, bullet_index, nullptr, target_pos);
-							break;
+						uint64_t target_id = 0;
+						if (homing_deque.is_homing_target_valid(target_data.target, target_data.cached_valid_instance_id)) {
+							target_id = target_data.cached_valid_instance_id;
 						}
-
-						call_deferred("emit_signal", "bullet_homing_target_reached", this, bullet_index, target_data.target, target_pos);
+						call_deferred("_do_emit_homing_target_reached", homing_operation_generation, bullet_index, target_id, target_pos);
 						break;
 					}
 					case NotHoming:
 						break;
 					case MousePositionTarget:
-						call_deferred("emit_signal", "bullet_homing_target_reached", this, bullet_index, nullptr, target_pos);
+						call_deferred("_do_emit_homing_target_reached", homing_operation_generation, bullet_index, (uint64_t)0, target_pos);
 						break;
 				}
 
@@ -2097,13 +2141,15 @@ protected:
 				// user pushed. Per-bullet deques pop their own deque per bullet - no
 				// storm there.
 				if (is_using_shared_homing_deque) {
+					// Both pops carry the generation: a pool reuse before the flush
+					// no-ops instead of eating the new life's targets.
 					if (shared_homing_deque_auto_pop_after_target_reached && !shared_auto_pop_queued) {
 						shared_auto_pop_queued = true;
-						call_deferred("_do_shared_auto_pop_front_target");
+						call_deferred("_do_shared_auto_pop_front_target", homing_operation_generation);
 					}
 				} else {
 					if (bullet_homing_auto_pop_after_target_reached) {
-						call_deferred("bullet_homing_pop_front_target", bullet_index);
+						call_deferred("_do_auto_pop_front_target", homing_operation_generation, bullet_index);
 					}
 				}
 			}
