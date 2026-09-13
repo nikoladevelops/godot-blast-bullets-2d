@@ -123,6 +123,9 @@ class BulletSpawner2D : public Node2D{
 
         Node2D *get_transforms_generator() const;
         void set_transforms_generator(Node2D *generator);
+        // Anchor every transforms_source mode lives on: the assigned generator,
+        // or this spawner when unset/unresolvable. Never null inside the tree.
+        Node2D *get_effective_generator() const;
 
         Ref<DirectionalBulletsData2D> get_spawn_data() const;
         void set_spawn_data(const Ref<DirectionalBulletsData2D> &new_spawn_data);
@@ -414,6 +417,9 @@ class BulletSpawner2D : public Node2D{
         // a freed marker/generator/target can never crash the game.
         uint64_t tracked_base_id = 0;
         Node2D *tracked_base = nullptr;
+        Transform2D tracked_base_global;
+        bool tracked_has_base_global = false;
+        double tracked_spin_angle = 0.0;
         uint64_t tracked_target_id = 0;
         Node2D *tracked_target = nullptr;
         Transform2D tracked_target_origin;

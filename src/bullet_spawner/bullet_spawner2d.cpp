@@ -196,6 +196,21 @@ void BulletSpawner2D::set_transforms_generator(Node2D *generator) {
     rebuild_preview();
 }
 
+// Anchor for every transforms_source mode. Empty/unresolvable path falls back
+// to the spawner itself. A generator outside the tree is ignored while the
+// spawner is inside it (its global transform is invalid), so callers can
+// always use the result for global-space work when inside the tree.
+Node2D *BulletSpawner2D::get_effective_generator() const {
+    Node2D *base = get_transforms_generator();
+    if (base == nullptr) {
+        return const_cast<BulletSpawner2D *>(this);
+    }
+    if (is_inside_tree() && !base->is_inside_tree()) {
+        return const_cast<BulletSpawner2D *>(this);
+    }
+    return base;
+}
+
 Ref<DirectionalBulletsData2D> BulletSpawner2D::get_spawn_data() const {
     return spawn_data;
 }
@@ -877,9 +892,14 @@ TypedArray<Transform2D> BulletSpawner2D::collect_spawn_transforms() const {
 }
 
 TypedArray<Transform2D> BulletSpawner2D::collect_spawn_transforms_impl(bool quiet) const {
-    Node2D *base = get_transforms_generator();
-    if (base == nullptr) {
-        base = const_cast<BulletSpawner2D *>(this);
+    Node2D *base = get_effective_generator();
+    if (base == nullptr || !base->is_inside_tree()) {
+        // Outside the tree there is no valid global transform; report loudly
+        // for real shots, stay silent for the preview.
+        if (!quiet) {
+            UtilityFunctions::push_error("BulletSpawner2D::collect_spawn_transforms: spawner is outside the scene tree.");
+        }
+        return TypedArray<Transform2D>();
     }
     const Vector2 base_origin = base->get_global_transform().get_origin();
     const Transform2D marker = base->get_global_transform();
@@ -960,18 +980,22 @@ bool BulletSpawner2D::preview_active() const {
     return show_pattern_preview && preview_allowed_here();
 }
 
-// Resolves the effective base exactly like collect_spawn_transforms_impl()
-// (generator, else self) plus the aimed target, then snapshots ids and
-// global transforms. Never assumes an old pointer: everything is freshly
-// resolved from paths here.
+// Snapshots the effective generator (same fallback as the collect path) plus
+// the aimed target, storing ids and global transforms. Never assumes an old
+// pointer: everything is freshly resolved from paths here.
 void BulletSpawner2D::snapshot_preview_sources() {
     tracked_self_global = get_global_transform();
     tracked_has_self = true;
-    tracked_base = get_transforms_generator();
+    tracked_base = get_effective_generator();
     if (tracked_base == nullptr) {
-        tracked_base = this;
+        tracked_base_id = 0;
+        tracked_has_base_global = false;
+    } else {
+        tracked_base_id = tracked_base->get_instance_id();
+        tracked_base_global = tracked_base->get_global_transform();
+        tracked_has_base_global = true;
     }
-    tracked_base_id = tracked_base->get_instance_id();
+    tracked_spin_angle = spin_angle_deg;
     tracked_target = nullptr;
     tracked_target_id = 0;
     tracked_has_target_origin = false;
@@ -1024,32 +1048,67 @@ void BulletSpawner2D::rebuild_preview() {
     if (!preview_allowed_here()) {
         return;
     }
+    Node2D *effective_base = get_effective_generator();
+    if (effective_base == nullptr) {
+        return;
+    }
+    // Removes a preview holder child from a parent without trusting caches.
+    // Returns true when something was removed.
+    auto remove_holder_from = [&](Node *parent) -> bool {
+        if (parent == nullptr) {
+            return false;
+        }
+        Node *live = parent->get_node_or_null(NodePath(PREVIEW_HOLDER_NAME));
+        if (live == nullptr) {
+            return false;
+        }
+        parent->remove_child(live);
+        memdelete(live);
+        return true;
+    };
     if (!show_pattern_preview) {
-        // Re-resolve instead of trusting the cache: the editor may have
-        // dropped the holder without us, and a stale pointer here would
-        // leave a ghost preview behind (or crash on remove_child).
-        Node *live = get_node_or_null(NodePath(PREVIEW_HOLDER_NAME));
-        if (live != nullptr) {
-            remove_child(live);
-            memdelete(live);
+        remove_holder_from(this);
+        if (effective_base != this) {
+            remove_holder_from(effective_base);
+        }
+        // The generator may have been retargeted earlier: also clear a holder
+        // left under the previously tracked base.
+        if (tracked_base != nullptr && tracked_base != this && tracked_base != effective_base &&
+                is_tracked_node_alive(tracked_base, tracked_base_id)) {
+            remove_holder_from(tracked_base);
         }
         preview_holder = nullptr;
         preview_dots_layer = nullptr;
         preview_arrows_layer = nullptr;
         return;
     }
-    // Heal from the tree every rebuild: duplicating this node copies the
-    // holder and its layers but not the cached pointers, and the editor can
-    // drop the nodes without us (undo/redo, scene reload). The cache is only
-    // ever assigned from a fresh lookup, never trusted, so a stale pointer
-    // can never silently kill the preview.
-    preview_holder = Object::cast_to<Node2D>(get_node_or_null(NodePath(PREVIEW_HOLDER_NAME)));
+    // Preview lives under the effective generator so patterns are drawn where
+    // they spawn. Heal from the tree every rebuild: never trust cached
+    // pointers (undo/redo, duplication, scene reload can drop nodes).
+    preview_holder = Object::cast_to<Node2D>(effective_base->get_node_or_null(NodePath(PREVIEW_HOLDER_NAME)));
+    if (preview_holder == nullptr) {
+        // Generator was retargeted: drop the stale holder under the spawner
+        // (or under the previously tracked base) so only one preview exists.
+        remove_holder_from(this);
+        if (tracked_base != nullptr && tracked_base != this && tracked_base != effective_base &&
+                is_tracked_node_alive(tracked_base, tracked_base_id)) {
+            remove_holder_from(tracked_base);
+        }
+        preview_holder = Object::cast_to<Node2D>(effective_base->get_node_or_null(NodePath(PREVIEW_HOLDER_NAME)));
+    }
     if (preview_holder == nullptr) {
         // Owner-less on purpose: never written to the scene, never exported.
         preview_holder = memnew(Node2D);
         preview_holder->set_name(PREVIEW_HOLDER_NAME);
         preview_holder->set_meta(PREVIEW_META_KEY, true);
-        add_child(preview_holder);
+        effective_base->add_child(preview_holder);
+    } else if (preview_holder->get_parent() != effective_base) {
+        // Healed a holder from the wrong parent (e.g. duplicated subtree).
+        Node *old_parent = preview_holder->get_parent();
+        if (old_parent != nullptr) {
+            old_parent->remove_child(preview_holder);
+        }
+        effective_base->add_child(preview_holder);
     }
     // Legacy cleanup first: older versions drew the preview with Line2D strips
     // ("Dots"/"Ticks"). Remove any leftover before adopting/creating the
@@ -1146,11 +1205,17 @@ bool BulletSpawner2D::preview_sources_dirty() {
     if (get_global_transform() != tracked_self_global) {
         return true;
     }
-    Node2D *base = get_transforms_generator();
+    Node2D *base = get_effective_generator();
     if (base == nullptr) {
-        base = this;
+        return true;
     }
     if (base->get_instance_id() != tracked_base_id || !is_tracked_node_alive(base, tracked_base_id)) {
+        return true;
+    }
+    if (!tracked_has_base_global || base->get_global_transform() != tracked_base_global) {
+        return true;
+    }
+    if (spin_angle_deg != tracked_spin_angle) {
         return true;
     }
     if (transforms_source == TRANSFORMS_FROM_HELPER_AIMED) {
@@ -1322,6 +1387,14 @@ void BulletSpawner2D::_ready() {
             remove_child(stray);
             memdelete(stray);
         }
+        Node2D *base = get_effective_generator();
+        if (base != nullptr && base != this) {
+            Node *stray_base = base->get_node_or_null(NodePath(PREVIEW_HOLDER_NAME));
+            if (stray_base != nullptr) {
+                base->remove_child(stray_base);
+                memdelete(stray_base);
+            }
+        }
     } else {
         set_notify_transform(true);
         rebuild_preview();
@@ -1343,9 +1416,9 @@ void BulletSpawner2D::_notification(int p_what) {
         // Moving/rotating the spawner itself refreshes instantly.
         rebuild_preview();
     } else if (p_what == NOTIFICATION_CHILD_ORDER_CHANGED) {
-        // A marker child was added, removed, or reordered: the tracked count
-        // changes, so rebuild at once instead of waiting for the _process
-        // dirty-check. Guarded no-op when the preview may not exist.
+        // Instant refresh for marker changes under this spawner. Markers under
+        // an external generator are picked up by the _process dirty-check
+        // instead (no notification arrives here for another node's children).
         if (is_inside_tree()) {
             rebuild_preview();
             // Rebuild already re-snapshots; the loop below stays in sync.
@@ -1359,6 +1432,8 @@ void BulletSpawner2D::_notification(int p_what) {
         preview_arrows_layer = nullptr;
         tracked_base = nullptr;
         tracked_base_id = 0;
+        tracked_has_base_global = false;
+        tracked_spin_angle = 0.0;
         tracked_target = nullptr;
         tracked_target_id = 0;
         tracked_has_target_origin = false;
@@ -1419,8 +1494,9 @@ void BulletSpawner2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_transforms_generator_path", "path"), &BulletSpawner2D::set_transforms_generator_path);
 	ADD_PROPERTY(PropertyInfo(Variant::NODE_PATH, "transforms_generator", PROPERTY_HINT_NODE_PATH_VALID_TYPES, "Node2D"), "set_transforms_generator_path", "get_transforms_generator_path");
 
-	ClassDB::bind_method(D_METHOD("get_transforms_generator"), &BulletSpawner2D::get_transforms_generator);
-	ClassDB::bind_method(D_METHOD("set_transforms_generator", "generator"), &BulletSpawner2D::set_transforms_generator);
+ 	ClassDB::bind_method(D_METHOD("get_transforms_generator"), &BulletSpawner2D::get_transforms_generator);
+ 	ClassDB::bind_method(D_METHOD("set_transforms_generator", "generator"), &BulletSpawner2D::set_transforms_generator);
+ 	ClassDB::bind_method(D_METHOD("get_effective_generator"), &BulletSpawner2D::get_effective_generator);
 
 	ClassDB::bind_method(D_METHOD("get_spawn_data"), &BulletSpawner2D::get_spawn_data);
 	ClassDB::bind_method(D_METHOD("set_spawn_data", "new_spawn_data"), &BulletSpawner2D::set_spawn_data);

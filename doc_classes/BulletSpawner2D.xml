@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <class name="BulletSpawner2D" inherits="Node2D" api_type="extension" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/godotengine/godot/master/doc/class.xsd">
 	<brief_description>
-		Fires volleys of directional bullets on a timer using a [BulletFactory2D].
+		Fires timed volleys of directional bullets through a [BulletFactory2D].
 	</brief_description>
 	<description>
-		Place this node in the scene, point [member bullet_factory_path] at a [BulletFactory2D], assign [member spawn_data], and pick a [member transforms_source]: arrange marker nodes under [member transforms_generator], or generate the volley procedurally with the helper_* options (same patterns as the [BulletFactory2D] spawn helpers). [member spin_enabled] rotates the whole volley at runtime in any mode, and [member show_pattern_preview] draws the pattern in the editor for visual tuning. Every [member shoot_interval_sec] seconds (after [member shoot_initial_delay_sec]) it collects one global transform per volley bullet and spawns them through [method BulletFactory2D.spawn_controllable_directional_bullets]. Each volley duplicates the spawn data first, so shared .tres files are never mutated. Never shoots in the editor.
+		Assign a [BulletFactory2D], a [DirectionalBulletsData2D], and a [member transforms_source]. Each volley collects one global transform per bullet from the [member transforms_generator] and spawns it through the factory. It never fires in the editor.
 	</description>
 	<tutorials>
 	</tutorials>
@@ -12,306 +12,312 @@
 		<method name="collect_spawn_transforms" qualifiers="const">
 			<return type="Transform2D[]" />
 			<description>
-				Collects one global transform per volley bullet according to [member transforms_source]: the [Node2D] children of the transforms generator, this node's own transform, or one of the procedural helper patterns (grid, ring, fan, spiral, line, aimed). Child and self modes fall back to the generator's own transform when it has no Node2D children; when no generator is assigned, this node's own transform is used. Always returns at least one transform, except aimed mode with no target (prints an error, volley skipped). [member transforms_scale] is applied to every source relative to the generator, and the runtime [member spin_enabled] angle rotates every transform around the generator origin first.
+				Returns one global transform per bullet for the current [member transforms_source]. Empty [member transforms_generator] means this node. Children mode with no markers falls back to the generator itself. Aimed mode with no target returns an empty array.
 			</description>
 		</method>
 		<method name="get_bullet_factory" qualifiers="const">
 			<return type="BulletFactory2D" />
 			<description>
-				Returns the resolved [BulletFactory2D] from [member bullet_factory_path], or null when the path is empty or the target is gone. A node of the wrong type produces a warning and resolves to null.
+				Returns the factory from [member bullet_factory_path], or null when unset or invalid.
 			</description>
 		</method>
 		<method name="get_transforms_generator" qualifiers="const">
 			<return type="Node2D" />
 			<description>
-				Returns the resolved transforms generator behind [member transforms_generator], or null when unset. Falls back to nothing - [method collect_spawn_transforms] uses this node itself then.
+				Returns the assigned generator, or null when unset. Use [method get_effective_generator] when you need the fallback included.
+			</description>
+		</method>
+		<method name="get_effective_generator" qualifiers="const">
+			<return type="Node2D" />
+			<description>
+				Returns the node patterns are built on: the assigned generator, or this spawner when unset or invalid. Never null in the tree.
 			</description>
 		</method>
 		<method name="get_helper_aimed_target" qualifiers="const">
 			<return type="Node2D" />
 			<description>
-				Returns the resolved aim target behind [member helper_aimed_target], or null when unset. Aimed mode with no target prints an error and skips the volley.
+				Returns the aimed-mode target, or null when unset.
 			</description>
 		</method>
 		<method name="get_spin_angle_deg" qualifiers="const">
 			<return type="float" />
 			<description>
-				Current spin angle in degrees. Runtime state, advances in [method _process] only while [member spin_enabled] is set.
+				Current spin angle in degrees. Only advances at runtime while [member spin_enabled] is on.
 			</description>
 		</method>
 		<method name="get_volleys_fired" qualifiers="const">
 			<return type="int" />
 			<description>
-				How many volleys were fired since the last (re)arm. Reset by [method reset_shooting].
+				Volleys fired since the last (re)arm. Reset with [method reset_shooting].
 			</description>
 		</method>
 		<method name="is_spinning" qualifiers="const">
 			<return type="bool" />
 			<description>
-				Returns true when [member spin_enabled] is set and the game is running (spin never advances in the editor).
+				Returns true when [member spin_enabled] is on and the game is running.
 			</description>
 		</method>
 		<method name="reset_shooting">
 			<return type="void" />
 			<description>
-				Zeroes the volley counter, re-arms the timer with [member shoot_initial_delay_sec], and resumes processing when shooting is active. Emits [signal shooting_started] when it arms shooting.
+				Resets the volley counter and restarts the timer with [member shoot_initial_delay_sec].
 			</description>
 		</method>
 		<method name="set_bullet_factory">
 			<return type="void" />
 			<param index="0" name="factory" type="BulletFactory2D" />
 			<description>
-				Assigns the [BulletFactory2D] directly and syncs [member bullet_factory_path] to it when both nodes are in the tree. Pass null to clear both.
+				Assigns the factory directly. Pass null to clear it.
 			</description>
 		</method>
 		<method name="set_transforms_generator">
 			<return type="void" />
 			<param index="0" name="generator" type="Node2D" />
 			<description>
-				Assigns the transforms generator directly and syncs [member transforms_generator] to it when both nodes are in the tree. Pass null to clear both.
+				Assigns the generator directly. Pass null to use this spawner instead. Takes effect right away, in the editor and at runtime.
 			</description>
 		</method>
 		<method name="set_helper_aimed_target">
 			<return type="void" />
 			<param index="0" name="target" type="Node2D" />
 			<description>
-				Assigns the aim target directly and syncs [member helper_aimed_target] to it when both nodes are in the tree. Pass null to clear both.
+				Assigns the aimed-mode target directly. Pass null to clear it.
 			</description>
 		</method>
 		<method name="start_spinning">
 			<return type="void" />
 			<description>
-				Enables [member spin_enabled], waking up processing when needed so the pattern rotates even while auto-shooting is off.
+				Turns [member spin_enabled] on.
 			</description>
 		</method>
 		<method name="stop_spinning">
 			<return type="void" />
 			<description>
-				Disables [member spin_enabled], freezing the pattern at its current angle.
+				Turns [member spin_enabled] off, freezing the angle.
 			</description>
 		</method>
 		<method name="reset_spin_angle">
 			<return type="void" />
 			<description>
-				Zeroes the spin angle and the oscillate clock.
+				Resets the spin angle to zero.
 			</description>
 		</method>
 		<method name="shoot_once">
 			<return type="bool" />
 			<description>
-				Fires one volley immediately, counting it and re-arming the timer. Returns false (and prints an error) when misconfigured - no factory, no spawn data - or when the factory refuses (busy, tearing down, bad data). Manual shots bypass the [member max_volleys] cap but still count toward it.
+				Fires one volley now. Returns false when misconfigured or the factory refuses it. Counts toward [member max_volleys].
 			</description>
 		</method>
 	</methods>
 	<members>
 		<member name="bullet_factory_path" type="NodePath" setter="set_bullet_factory_path" getter="get_bullet_factory_path" default="NodePath(&quot;&quot;)">
-			Path to the [BulletFactory2D] used for spawning. Stored unfiltered so every node in the scene is pickable; the typed pointer resolves on demand with a runtime type check.
+			Path to the [BulletFactory2D] used for spawning.
 		</member>
 		<member name="max_volleys" type="int" setter="set_max_volleys" getter="get_max_volleys" default="-1">
-			Volleys after which auto-shooting stops. -1 means infinite, 0 means it never fires automatically (manual [method shoot_once] still works). Lowering it at or below [method get_volleys_fired] emits [signal shooting_finished]; raising it back up re-emits [signal shooting_started].
+			Auto-shooting stops after this many volleys. -1 is infinite, 0 disables auto-shooting ([method shoot_once] still works).
 		</member>
 		<member name="shoot_initial_delay_sec" type="float" setter="set_shoot_initial_delay_sec" getter="get_shoot_initial_delay_sec" default="0.0">
-			Delay in seconds before the first volley after (re)arming. Must be finite and &gt;= 0.
+			Delay before the first volley after (re)arming.
 		</member>
 		<member name="shoot_interval_sec" type="float" setter="set_shoot_interval_sec" getter="get_shoot_interval_sec" default="1.0">
-			Seconds between automatic volleys. Must be finite and &gt; 0.
+			Seconds between automatic volleys. Must be above zero.
 		</member>
 		<member name="shooting_enabled" type="bool" setter="set_shooting_enabled" getter="get_shooting_enabled" default="true">
-			Master switch for automatic shooting. Toggling it emits [signal shooting_started] / [signal shooting_stopped] on transitions. Manual [method shoot_once] works regardless.
+			Master switch for automatic shooting. [method shoot_once] works regardless.
 		</member>
 		<member name="spawn_data" type="DirectionalBulletsData2D" setter="set_spawn_data" getter="get_spawn_data">
-			The directional bullet data each volley is spawned with. Duplicated per volley with fresh transforms, so a shared resource is safe to assign.
+			Bullet data for each volley. Duplicated per volley, so sharing one resource is safe.
 		</member>
 		<member name="transforms_generator" type="NodePath" setter="set_transforms_generator_path" getter="get_transforms_generator_path" default="NodePath(&quot;&quot;)">
-			Path to the Node2D whose children provide per-volley spawn transforms. Native Node2D filtering always matches, so any Node2D in the scene is selectable.
+			Node patterns are built on. Empty means this spawner. Point it at another Node2D to move children markers, helper shapes, spin pivot, scale center, and the preview there.
 		</member>
 		<member name="transforms_scale" type="float" setter="set_transforms_scale" getter="get_transforms_scale" default="1.0">
-			Uniform scale applied to every generated transform, relative to the generator origin - marker offsets (spread radius) and basis (bullet size) grow together while rotation is preserved. 1.0 is identity. Must be finite; 0 collapses the whole volley onto the generator, negatives mirror it.
+			Scales the whole pattern around the generator. 1.0 keeps it as is, 0 collapses it onto the generator, negatives mirror it.
 		</member>
 		<member name="spin_enabled" type="bool" setter="set_spin_enabled" getter="get_spin_enabled" default="false">
-			Rotates the volley pattern around the generator origin at runtime, in every transforms_source mode. Virtual rotation only - no scene node is ever rotated. Has no effect in the editor.
+			Rotates each volley around the generator at runtime. Editor preview stays still.
 		</member>
 		<member name="spin_speed_deg_per_sec" type="float" setter="set_spin_speed_deg_per_sec" getter="get_spin_speed_deg_per_sec" default="90.0">
-			Continuous-mode spin rate in degrees per second. Signed: positive spins clockwise, negative counter-clockwise. Must be finite. Ignored in oscillate mode.
+			Spin speed in continuous mode. Positive is clockwise.
 		</member>
 		<member name="spin_mode" type="int" setter="set_spin_mode" getter="get_spin_mode" default="0">
-			How the spin angle evolves: 0 continuous rotation at [member spin_speed_deg_per_sec], 1 oscillation swinging +- [member spin_amplitude_deg] at [member spin_frequency_hz].
+			0 rotates forever, 1 swings back and forth (see amplitude and frequency).
 		</member>
 		<member name="spin_amplitude_deg" type="float" setter="set_spin_amplitude_deg" getter="get_spin_amplitude_deg" default="45.0">
-			Oscillate-mode swing in degrees to either side. Must be finite and &gt;= 0.
+			How far the pattern swings each way in oscillate mode.
 		</member>
 		<member name="spin_frequency_hz" type="float" setter="set_spin_frequency_hz" getter="get_spin_frequency_hz" default="0.5">
-			Oscillate-mode frequency in swings per second. Must be finite and &gt;= 0.
+			Swings per second in oscillate mode.
 		</member>
 		<member name="transforms_source" type="int" setter="set_transforms_source" getter="get_transforms_source" default="0">
-			Where [method collect_spawn_transforms] gets the per-volley transforms: 0 children of the transforms generator, 1 this spawner's own transform, 2+ procedural patterns driven by the helper_* options below. Only the option group of the active pattern is shown in the inspector (switching modes refreshes it immediately). Every mode produces a static snapshot per volley - Spiral places bullets along an expanding spiral facing along the travel direction by default (see [member helper_spiral_facing]), Line centers a wall on the generator facing the line axis, and Aimed centers a cone on [member helper_aimed_target] (the volley is skipped with an error when no target is assigned).
+			Where volley transforms come from: children markers, this generator itself, or a procedural helper pattern. Only the active pattern's options show in the inspector.
 		</member>
 		<member name="helper_bullets_amount" type="int" setter="set_helper_bullets_amount" getter="get_helper_bullets_amount" default="10">
-			How many transforms the active procedural pattern generates. Clamped to &gt;= 1.
+			Bullet count for helper patterns.
 		</member>
 		<member name="helper_grid_rows_per_column" type="int" setter="set_helper_grid_rows_per_column" getter="get_helper_grid_rows_per_column" default="4">
-			Grid pattern: rows per column. Clamped to &gt;= 1.
+			Grid rows per column.
 		</member>
 		<member name="helper_grid_alignment" type="int" setter="set_helper_grid_alignment" getter="get_helper_grid_alignment" default="3">
-			Grid pattern: anchor alignment, same values as [enum BulletFactory2D.Alignment].
+			Grid anchor, same values as [enum BulletFactory2D.Alignment].
 		</member>
 		<member name="helper_grid_column_offset" type="float" setter="set_helper_grid_column_offset" getter="get_helper_grid_column_offset" default="100.0">
-			Grid pattern: horizontal spacing between columns.
+			Grid horizontal spacing.
 		</member>
 		<member name="helper_grid_row_offset" type="float" setter="set_helper_grid_row_offset" getter="get_helper_grid_row_offset" default="100.0">
-			Grid pattern: vertical spacing between rows.
+			Grid vertical spacing.
 		</member>
 		<member name="helper_grid_rotate_with_marker" type="bool" setter="set_helper_grid_rotate_with_marker" getter="get_helper_grid_rotate_with_marker" default="true">
-			Grid pattern: rotate the grid with the generator's rotation.
+			Rotate the grid with the generator.
 		</member>
 		<member name="helper_grid_random_local_rotation" type="bool" setter="set_helper_grid_random_local_rotation" getter="get_helper_grid_random_local_rotation" default="false">
-			Grid pattern: give each transform a random rotation.
+			Give each grid bullet a random facing.
 		</member>
 		<member name="helper_grid_jitter" type="float" setter="set_helper_grid_jitter" getter="get_helper_grid_jitter" default="0.0">
-			Grid pattern: scatters each origin by up to +-jitter pixels on both axes. 0 disables it. Must be finite and &gt;= 0.
+			Random position offset per grid bullet. 0 is off.
 		</member>
 		<member name="helper_ring_radius" type="float" setter="set_helper_ring_radius" getter="get_helper_ring_radius" default="150.0">
-			Ring pattern: circle radius around the generator.
+			Ring radius around the generator.
 		</member>
 		<member name="helper_ring_start_angle" type="float" setter="set_helper_ring_start_angle" getter="get_helper_ring_start_angle" default="0.0">
-			Ring pattern: angle in radians where the arc starts.
+			Angle in radians where the ring starts.
 		</member>
 		<member name="helper_ring_arc" type="float" setter="set_helper_ring_arc" getter="get_helper_ring_arc" default="6.283185307179586">
-			Ring pattern: arc length in radians. Full circle by default; smaller values make partial arcs.
+			Ring length in radians. Full circle by default.
 		</member>
 		<member name="helper_ring_rotate_with_marker" type="bool" setter="set_helper_ring_rotate_with_marker" getter="get_helper_ring_rotate_with_marker" default="true">
-			Ring pattern: rotate the ring with the generator's rotation.
+			Rotate the ring with the generator.
 		</member>
 		<member name="helper_ring_random_rotation" type="bool" setter="set_helper_ring_random_rotation" getter="get_helper_ring_random_rotation" default="false">
-			Ring pattern: give each transform a random rotation.
+			Give each ring bullet a random facing.
 		</member>
 		<member name="helper_ring_face_outward" type="bool" setter="set_helper_ring_face_outward" getter="get_helper_ring_face_outward" default="true">
-			Ring pattern: face transforms away from the center. Set false for implosion patterns that fly toward the center.
+			Face bullets away from the center. Off faces them inward.
 		</member>
 		<member name="helper_ring_y_scale" type="float" setter="set_helper_ring_y_scale" getter="get_helper_ring_y_scale" default="1.0">
-			Ring pattern: stretches the ring into an ellipse (1.0 is a circle). Facing stays radial, so it is approximate on stretched rings. Must be finite.
+			Squashes the ring into an ellipse. 1.0 is a circle.
 		</member>
 		<member name="helper_ring_facing_offset_deg" type="float" setter="set_helper_ring_facing_offset_deg" getter="get_helper_ring_facing_offset_deg" default="0.0">
-			Ring pattern: twists every facing by a fixed amount in degrees. Must be finite.
+			Twists every ring facing by this many degrees.
 		</member>
 		<member name="helper_fan_spread" type="float" setter="set_helper_fan_spread" getter="get_helper_fan_spread" default="0.5">
-			Fan pattern: full cone width in radians.
+			Fan width in radians.
 		</member>
 		<member name="helper_fan_direction_angle" type="float" setter="set_helper_fan_direction_angle" getter="get_helper_fan_direction_angle" default="0.0">
-			Fan pattern: cone center direction in radians.
+			Fan center direction in radians.
 		</member>
 		<member name="helper_fan_step_offset" type="float" setter="set_helper_fan_step_offset" getter="get_helper_fan_step_offset" default="0.0">
-			Fan pattern: stagger between consecutive origins so pellets do not stack.
+			Spacing between fan origins so bullets do not stack.
 		</member>
 		<member name="helper_fan_centered" type="bool" setter="set_helper_fan_centered" getter="get_helper_fan_centered" default="true">
-			Fan pattern: straddle the center direction symmetrically. Set false for a one-sided fan opening from the center toward +spread.
+			Center the fan on its direction. Off starts it to one side.
 		</member>
 		<member name="helper_spiral_start_radius" type="float" setter="set_helper_spiral_start_radius" getter="get_helper_spiral_start_radius" default="50.0">
-			Spiral pattern: radius of the first transform.
+			Radius of the first spiral bullet.
 		</member>
 		<member name="helper_spiral_radius_step" type="float" setter="set_helper_spiral_radius_step" getter="get_helper_spiral_radius_step" default="15.0">
-			Spiral pattern: radius growth per transform.
+			Radius growth per spiral bullet.
 		</member>
 		<member name="helper_spiral_angle_step" type="float" setter="set_helper_spiral_angle_step" getter="get_helper_spiral_angle_step" default="0.6">
-			Spiral pattern: angle step in radians per transform.
+			Angle step in radians per spiral bullet.
 		</member>
 		<member name="helper_spiral_rotate_with_marker" type="bool" setter="set_helper_spiral_rotate_with_marker" getter="get_helper_spiral_rotate_with_marker" default="true">
-			Spiral pattern: rotate the spiral with the generator's rotation.
+			Rotate the spiral with the generator.
 		</member>
 		<member name="helper_spiral_facing" type="int" setter="set_helper_spiral_facing" getter="get_helper_spiral_facing" default="0">
-			Spiral pattern: bullet facing, same values as [enum BulletFactory2D.SpiralFacingMode]. Tangent (default) flies each bullet along its travel direction on the spiral.
+			Spiral facing, same values as [enum BulletFactory2D.SpiralFacingMode].
 		</member>
 		<member name="helper_spiral_facing_offset_deg" type="float" setter="set_helper_spiral_facing_offset_deg" getter="get_helper_spiral_facing_offset_deg" default="0.0">
-			Spiral pattern: twists every facing by a fixed amount in degrees. Must be finite.
+			Twists every spiral facing by this many degrees.
 		</member>
 		<member name="helper_line_direction" type="Vector2" setter="set_helper_line_direction" getter="get_helper_line_direction" default="Vector2(1, 0)">
-			Line pattern: the line axis. Need not be normalized.
+			Line axis. Does not need to be normalized.
 		</member>
 		<member name="helper_line_spacing" type="float" setter="set_helper_line_spacing" getter="get_helper_line_spacing" default="32.0">
-			Line pattern: spacing between consecutive transforms.
+			Distance between line bullets.
 		</member>
 		<member name="helper_line_face_direction" type="bool" setter="set_helper_line_face_direction" getter="get_helper_line_face_direction" default="true">
-			Line pattern: face transforms along the line axis instead of keeping the generator rotation.
+			Face line bullets along the line. Off keeps the generator facing.
 		</member>
 		<member name="helper_line_anchor" type="int" setter="set_helper_line_anchor" getter="get_helper_line_anchor" default="1">
-			Line pattern: where the marker sits on the row, same values as [enum BulletFactory2D.LineAnchor]. Center (default) preserves the historical behavior.
+			Where the generator sits on the line, same values as [enum BulletFactory2D.LineAnchor].
 		</member>
 		<member name="helper_line_perpendicular" type="bool" setter="set_helper_line_perpendicular" getter="get_helper_line_perpendicular" default="false">
-			Line pattern: face transforms 90 degrees off the line axis, for strafe walls. Only applies when [member helper_line_face_direction] is set.
+			Face line bullets across the line. Needs [member helper_line_face_direction].
 		</member>
 		<member name="helper_aimed_target" type="NodePath" setter="set_helper_aimed_target_path" getter="get_helper_aimed_target_path" default="NodePath(&quot;&quot;)">
-			Path to the Node2D the aimed cone is centered on (generator-to-target direction). Native Node2D filtering always matches, so any Node2D in the scene is selectable.
+			Node the aimed cone points at. No target means no bullets.
 		</member>
 		<member name="helper_aimed_spread" type="float" setter="set_helper_aimed_spread" getter="get_helper_aimed_spread" default="0.3">
-			Aimed pattern: full cone width in radians around the generator-to-target direction.
+			Aimed cone width in radians.
 		</member>
 		<member name="helper_aimed_step_offset" type="float" setter="set_helper_aimed_step_offset" getter="get_helper_aimed_step_offset" default="0.0">
-			Aimed pattern: stagger between consecutive origins so pellets do not stack.
+			Spacing between aimed origins so bullets do not stack.
 		</member>
 		<member name="helper_aimed_centered" type="bool" setter="set_helper_aimed_centered" getter="get_helper_aimed_centered" default="true">
-			Aimed pattern: straddle the target direction symmetrically. Set false for a one-sided cone opening from the target direction toward +spread.
+			Center the cone on the target. Off starts it to one side.
 		</member>
 		<member name="show_pattern_preview" type="bool" setter="set_show_pattern_preview" getter="get_show_pattern_preview" default="true">
-			Master switch for the volley preview (one dot per spawn transform plus one detached facing arrow, colored by [member preview_dot_color] and [member preview_arrow_color]). Both default to red. The preview follows marker, generator, and target moves live in the editor - inspector rotations, gizmo drags, adding/removing markers, and undo all refresh at once. The layers repaint themselves through a custom _draw, so the gizmo survives zoom, pan, selection, and idle redraws. The preview lives in an owner-less holder node: never saved, never exported. At runtime it only appears when [member show_preview_during_runtime] is also on.
+			Shows one dot and facing arrow per bullet in the editor. Follows the generator live. Never saved to the scene.
 		</member>
 		<member name="show_preview_during_runtime" type="bool" setter="set_show_preview_during_runtime" getter="get_show_preview_during_runtime" default="false">
-			When true (and [member show_pattern_preview] is on), the preview holder and layers are also built while the game is running and follow live transforms, including spin. Defaults to false so release builds stay clean.
+			Also shows the preview while the game runs. Off by default.
 		</member>
 		<member name="preview_dot_color" type="Color" setter="set_preview_dot_color" getter="get_preview_dot_color" default="Color(1, 0.05, 0.05, 1)">
-			Dot color of the pattern preview. Hidden while both [member show_pattern_preview] and [member show_preview_during_runtime] are off.
+			Preview dot color.
 		</member>
 		<member name="preview_arrow_color" type="Color" setter="set_preview_arrow_color" getter="get_preview_arrow_color" default="Color(1, 0.05, 0.05, 1)">
-			Facing-arrow color of the pattern preview. Hidden while both [member show_pattern_preview] and [member show_preview_during_runtime] are off.
+			Preview arrow color.
 		</member>
 		<member name="preview_dot_radius" type="float" setter="set_preview_dot_radius" getter="get_preview_dot_radius" default="4.0">
-			Radius in pixels of each preview dot. Hidden while both [member show_pattern_preview] and [member show_preview_during_runtime] are off.
+			Preview dot radius in pixels.
 		</member>
 		<member name="preview_arrow_gap" type="float" setter="set_preview_arrow_gap" getter="get_preview_arrow_gap" default="3.0">
-			Extra pixels between the dot edge and the arrow tail. The shaft starts at dot radius + gap so it never hides under the dot. Hidden while both [member show_pattern_preview] and [member show_preview_during_runtime] are off.
+			Gap in pixels between dot edge and arrow tail.
 		</member>
 		<member name="preview_arrow_length" type="float" setter="set_preview_arrow_length" getter="get_preview_arrow_length" default="16.0">
-			Length in pixels of each preview facing-arrow shaft, from the gap end to the tip. Hidden while both [member show_pattern_preview] and [member show_preview_during_runtime] are off.
+			Preview arrow length in pixels.
 		</member>
 		<member name="preview_arrow_width" type="float" setter="set_preview_arrow_width" getter="get_preview_arrow_width" default="2.0">
-			Width in pixels of each preview facing-arrow shaft. Drawn without antialiasing for crisp hard edges. Hidden while both [member show_pattern_preview] and [member show_preview_during_runtime] are off.
+			Preview arrow shaft width in pixels.
 		</member>
 		<member name="preview_arrow_head_length" type="float" setter="set_preview_arrow_head_length" getter="get_preview_arrow_head_length" default="8.0">
-			Length in pixels of each preview facing-arrow head. Hidden while both [member show_pattern_preview] and [member show_preview_during_runtime] are off.
+			Preview arrow head length in pixels.
 		</member>
 		<member name="preview_arrow_head_width" type="float" setter="set_preview_arrow_head_width" getter="get_preview_arrow_head_width" default="10.0">
-			Width in pixels of each preview facing-arrow head base. Hidden while both [member show_pattern_preview] and [member show_preview_during_runtime] are off.
+			Preview arrow head width in pixels.
 		</member>
 	</members>
 	<constants>
 		<constant name="TRANSFORMS_FROM_CHILDREN" value="0">
-			Per-volley transforms come from the Node2D children of the transforms generator.
+			One transform per child marker of the generator.
 		</constant>
 		<constant name="TRANSFORMS_FROM_SELF" value="1">
-			Every volley fires a single bullet from the generator's own transform.
+			Single bullet from the generator itself.
 		</constant>
 		<constant name="TRANSFORMS_FROM_HELPER_GRID" value="2">
-			Per-volley transforms come from the procedural grid pattern and its helper_grid_* options.
+			Grid pattern around the generator.
 		</constant>
 		<constant name="TRANSFORMS_FROM_HELPER_RING" value="3">
-			Per-volley transforms come from the procedural ring pattern and its helper_ring_* options.
+			Ring pattern around the generator.
 		</constant>
 		<constant name="TRANSFORMS_FROM_HELPER_FAN" value="4">
-			Per-volley transforms come from the procedural fan pattern and its helper_fan_* options.
+			Fan pattern from the generator.
 		</constant>
 		<constant name="TRANSFORMS_FROM_HELPER_SPIRAL" value="5">
-			Per-volley transforms come from the procedural spiral pattern and its helper_spiral_* options.
+			Spiral pattern from the generator.
 		</constant>
 		<constant name="TRANSFORMS_FROM_HELPER_LINE" value="6">
-			Per-volley transforms come from the procedural line pattern and its helper_line_* options.
+			Line pattern through the generator.
 		</constant>
 		<constant name="TRANSFORMS_FROM_HELPER_AIMED" value="7">
-			Per-volley transforms come from the aimed cone at [member helper_aimed_target] and its helper_aimed_* options.
+			Cone from the generator toward the aimed target.
 		</constant>
 		<constant name="SPIN_CONTINUOUS" value="0">
-			Spin mode that rotates the volley pattern forever at [member spin_speed_deg_per_sec].
+			Spins forever at [member spin_speed_deg_per_sec].
 		</constant>
 		<constant name="SPIN_OSCILLATE" value="1">
-			Spin mode that swings the volley pattern +- [member spin_amplitude_deg] at [member spin_frequency_hz].
+			Swings back and forth using amplitude and frequency.
 		</constant>
 	</constants>
 	<signals>
@@ -320,7 +326,7 @@
 			<param index="1" name="directional_bullets_instance" type="DirectionalBullets2D" />
 			<param index="2" name="bullet_index" type="int" />
 			<description>
-				Emitted synchronously in the physics tick when a bullet from a volley spawned by this spawner enters a physics area. Only fires for this spawner's own volleys (factory-spawned bullets report to the factory signals instead). Same handler contract as the factory collision signals: game logic is safe directly, structural factory calls must be deferred.
+				Fired when one of this spawner's bullets enters an area.
 			</description>
 		</signal>
 		<signal name="body_entered">
@@ -328,36 +334,36 @@
 			<param index="1" name="directional_bullets_instance" type="DirectionalBullets2D" />
 			<param index="2" name="bullet_index" type="int" />
 			<description>
-				Emitted synchronously in the physics tick when a bullet from a volley spawned by this spawner enters a physics body. Only fires for this spawner's own volleys; same handler contract as above.
+				Fired when one of this spawner's bullets hits a body.
 			</description>
 		</signal>
 		<signal name="life_time_over">
 			<param index="0" name="directional_bullets_instance" type="DirectionalBullets2D" />
 			<param index="1" name="bullet_indexes" type="int[]" />
 			<description>
-				Emitted (deferred, outside the physics step) when a volley spawned by this spawner expires, but only if [member MultiMeshBulletsData2D.is_life_time_over_signal_enabled] is set. Only fires for this spawner's own volleys.
+				Fired when this spawner's bullets expire. Needs the lifetime signal enabled in the bullet data.
 			</description>
 		</signal>
 		<signal name="shooting_finished">
 			<description>
-				Emitted exactly when the volley cap is reached - by the volley that hits [member max_volleys], or by lowering [member max_volleys] to or below the fired count. Manual shots past the cap do not re-emit it.
+				Fired when the volley counter reaches [member max_volleys].
 			</description>
 		</signal>
 		<signal name="shooting_started">
 			<description>
-				Emitted when automatic shooting arms: on scene ready, on [method reset_shooting], when [member shooting_enabled] flips on, and when raising [member max_volleys] resumes a stopped spawner. Connect after this spawner's own ready (e.g. from the parent) to catch the initial arm.
+				Fired when automatic shooting turns on.
 			</description>
 		</signal>
 		<signal name="shooting_stopped">
 			<description>
-				Emitted when automatic shooting disarms via [member shooting_enabled] flipping off. Cap-driven stops emit [signal shooting_finished] instead.
+				Fired when automatic shooting turns off via [member shooting_enabled].
 			</description>
 		</signal>
 		<signal name="volley_fired">
 			<param index="0" name="directional_bullets_instance" type="DirectionalBullets2D" />
 			<param index="1" name="volley_index" type="int" />
 			<description>
-				Emitted for every successful volley, automatic or manual. The typed instance lets handlers drive homing, attachments, or patterns immediately with no casts; volley_index is 1-based (use it for wave logic or chaining spawners).
+				Fired for every volley, with a 1-based counter.
 			</description>
 		</signal>
 	</signals>
