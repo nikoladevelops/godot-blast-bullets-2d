@@ -116,7 +116,7 @@
 		<method name="shoot_once">
 			<return type="bool" />
 			<description>
-				Fires one volley now. Returns false when misconfigured or the factory refuses it. Counts toward [member max_volleys]. Safe to call from _physics_process (same-shape pool reuse applies immediately; only a shape-type change waits for a safe point). Must not be called re-entrantly from inside spawner signal handlers (homing_targets_resolved, volley_homing_configured, volley_fired, shooting_finished): nested calls are rejected, use [method shoot_once_deferred] (or call_deferred("shoot_once")) instead. If a handler frees or re-homes the volley mid-setup, the shot is safely dropped (returns false) instead of emitting volley_fired with a dead instance.
+				Fires one volley now. Returns false when misconfigured or the factory refuses it. Counts toward [member max_volleys]. Safe to call from _physics_process (same-shape pool reuse applies immediately; only a shape-type change waits for a safe point). Must not be called re-entrantly from inside spawner signal handlers (pre_shoot, homing_targets_resolved, volley_homing_configured, volley_fired, volley_skipped, shooting_finished): nested calls are rejected, use [method shoot_once_deferred] (or call_deferred("shoot_once")) instead. If a handler frees or re-homes the volley mid-setup, the shot is safely dropped (returns false) instead of emitting volley_fired with a dead instance.
 			</description>
 		</method>
 		<method name="shoot_once_deferred">
@@ -175,6 +175,49 @@
 			<param index="0" name="new_velocity" type="Vector2" />
 			<description>
 				Overwrites velocity on every tracked live volley (wind, knockback). A speed curve overrides direct velocity, so this visibly works only for curve-free volleys. Returns how many volleys were touched. Must be finite.
+			</description>
+		</method>
+		<method name="apply_pattern_preset">
+			<return type="void" />
+			<param index="0" name="preset" type="int" enum="BulletFactory2D.PatternPreset" />
+			<description>
+				Fills the helper_* properties with a named starter pattern (radial dense/sparse, 3-arm spiral, narrow/wide aimed fan, slow ring, gap wall, rain, 6-petal flower, scatter burst) and switches transforms_source to match. Tunes from there; the preset only writes the properties, nothing fires. Custom (-1) does nothing.
+			</description>
+		</method>
+		<method name="get_burst_shots_left" qualifiers="const">
+			<return type="int" />
+			<description>
+				Shots left in the current burst chain (0 when idle). Waves and HUD can poll this to sequence phases.
+			</description>
+		</method>
+		<method name="get_active_live_bullet_count" qualifiers="const">
+			<return type="int" />
+			<description>
+				Total live bullets across all tracked volleys owned by this spawner (pruned first). Budget governors and wave gates read this alongside max_live_bullets.
+			</description>
+		</method>
+		<method name="get_pooled_volley_count" qualifiers="const">
+			<return type="int" />
+			<description>
+				How many directional volleys sit ready in the factory pool. Warm-up checks and pool sizing read this (0 with no factory assigned).
+			</description>
+		</method>
+		<method name="begin_burst">
+			<return type="void" />
+			<description>
+				Starts a burst chain by hand (waves and boss phases driving phrasing on timers instead of the auto loop). Clears any pending telegraph first. The chain then fires through [method fire_burst_volley] on the burst interval.
+			</description>
+		</method>
+		<method name="begin_telegraph">
+			<return type="void" />
+			<description>
+				Starts a telegraph warning by hand: emits volley_telegraphed with a snapshot of the current aim, then fires after telegraph_sec. The actual fire re-collects transforms, so markers that move during the warning still aim correctly.
+			</description>
+		</method>
+		<method name="fire_burst_volley">
+			<return type="void" />
+			<description>
+				Fires the next volley of the active burst/telegraph chain (auto loop calls this; manual drivers call it on their own timers). Alternate-mirror bursts flip chirality on even shots. Manual shoot_once stays legal any time: a chain never blocks it, the chain only owns the shots it fires itself.
 			</description>
 		</method>
 	</methods>
@@ -328,6 +371,168 @@
 		</member>
 		<member name="helper_aimed_centered" type="bool" setter="set_helper_aimed_centered" getter="get_helper_aimed_centered" default="true">
 			Center the cone on the target. Off starts it to one side.
+		</member>
+		<member name="helper_aimed_prediction" type="float" setter="set_helper_aimed_prediction" getter="get_helper_aimed_prediction" default="0.0">
+			Blend toward the predicted target position: 0 aims at where the target is now, 1 fully leads it by helper_aimed_prediction_time at its current velocity (needs get_velocity on the target, else aims live).
+		</member>
+		<member name="helper_aimed_prediction_time" type="float" setter="set_helper_aimed_prediction_time" getter="get_helper_aimed_prediction_time" default="0.5">
+			Seconds of travel to lead the target by at full helper_aimed_prediction.
+		</member>
+		<member name="helper_flower_petals" type="int" setter="set_helper_flower_petals" getter="get_helper_flower_petals" default="6">
+			Lobes in the flower pattern. Must be 1 or more.
+		</member>
+		<member name="helper_flower_bullets_per_petal" type="int" setter="set_helper_flower_bullets_per_petal" getter="get_helper_flower_bullets_per_petal" default="5">
+			Slots per lobe. Must be 1 or more.
+		</member>
+		<member name="helper_flower_radius" type="float" setter="set_helper_flower_radius" getter="get_helper_flower_radius" default="150.0">
+			Flower radius in pixels. Must be finite and 0 or more.
+		</member>
+		<member name="helper_flower_petal_spread" type="float" setter="set_helper_flower_petal_spread" getter="get_helper_flower_petal_spread" default="0.5">
+			Angular width of each lobe in radians. Must be finite and 0 or more.
+		</member>
+		<member name="helper_flower_petal_sharpness" type="float" setter="set_helper_flower_petal_sharpness" getter="get_helper_flower_petal_sharpness" default="1.0">
+			Pinch between lobes: 0 is round, higher is tighter. Must be finite and 0 or more.
+		</member>
+		<member name="helper_flower_base_rotation" type="float" setter="set_helper_flower_base_rotation" getter="get_helper_flower_base_rotation" default="0.0">
+			Rotates the whole flower. Must be finite.
+		</member>
+		<member name="helper_flower_face_outward" type="bool" setter="set_helper_flower_face_outward" getter="get_helper_flower_face_outward" default="true">
+			Face away from the marker. Off faces the marker (implosion blossoms).
+		</member>
+		<member name="helper_flower_facing_offset_deg" type="float" setter="set_helper_flower_facing_offset_deg" getter="get_helper_flower_facing_offset_deg" default="0.0">
+			Twists every flower facing. Must be finite.
+		</member>
+		<member name="helper_ellipse_radius_x" type="float" setter="set_helper_ellipse_radius_x" getter="get_helper_ellipse_radius_x" default="150.0">
+			Ellipse semi-axis X in pixels. Must be finite and 0 or more.
+		</member>
+		<member name="helper_ellipse_radius_y" type="float" setter="set_helper_ellipse_radius_y" getter="get_helper_ellipse_radius_y" default="100.0">
+			Ellipse semi-axis Y in pixels. Must be finite and 0 or more.
+		</member>
+		<member name="helper_ellipse_rotation" type="float" setter="set_helper_ellipse_rotation" getter="get_helper_ellipse_rotation" default="0.0">
+			Rotates the ellipse axes. Must be finite.
+		</member>
+		<member name="helper_ellipse_start_angle" type="float" setter="set_helper_ellipse_start_angle" getter="get_helper_ellipse_start_angle" default="0.0">
+			Where Arc/Wall segments start. Must be finite.
+		</member>
+		<member name="helper_ellipse_arc" type="float" setter="set_helper_ellipse_arc" getter="get_helper_ellipse_arc" default="6.2831855">
+			Arc span for Arc/Wall modes (full turn draws the whole ellipse). Must be finite.
+		</member>
+		<member name="helper_ellipse_mode" type="int" setter="set_helper_ellipse_mode" getter="get_helper_ellipse_mode" default="0">
+			0 draws the full ring, 1 draws an arc segment, 2 draws a dense wall with carved dodge gaps.
+		</member>
+		<member name="helper_ellipse_gap_count" type="int" setter="set_helper_ellipse_gap_count" getter="get_helper_ellipse_gap_count" default="2">
+			Dodge gaps carved into Wall mode. Shown only in Wall mode. Must be 0 or more.
+		</member>
+		<member name="helper_ellipse_gap_width" type="float" setter="set_helper_ellipse_gap_width" getter="get_helper_ellipse_gap_width" default="0.3">
+			Width of each Wall gap in radians. Shown only in Wall mode. Must be finite and 0 or more.
+		</member>
+		<member name="helper_ellipse_face_outward" type="bool" setter="set_helper_ellipse_face_outward" getter="get_helper_ellipse_face_outward" default="true">
+			Face along the ellipse outward normal. Off faces inward.
+		</member>
+		<member name="helper_ellipse_facing_offset_deg" type="float" setter="set_helper_ellipse_facing_offset_deg" getter="get_helper_ellipse_facing_offset_deg" default="0.0">
+			Twists every ellipse facing. Must be finite.
+		</member>
+		<member name="helper_rain_band_width" type="float" setter="set_helper_rain_band_width" getter="get_helper_rain_band_width" default="600.0">
+			Width of the rain band in pixels. Must be finite and 0 or more.
+		</member>
+		<member name="helper_rain_direction" type="Vector2" setter="set_helper_rain_direction" getter="get_helper_rain_direction" default="Vector2(0, 1)">
+			Direction the rain falls (need not be normalized). Must be finite and non-zero.
+		</member>
+		<member name="helper_rain_drop_spacing" type="float" setter="set_helper_rain_drop_spacing" getter="get_helper_rain_drop_spacing" default="48.0">
+			Row spacing of the layered sheets. Must be finite and 0 or more.
+		</member>
+		<member name="helper_rain_jitter" type="float" setter="set_helper_rain_jitter" getter="get_helper_rain_jitter" default="12.0">
+			Random offset per slot in pixels. Must be finite and 0 or more.
+		</member>
+		<member name="helper_scatter_burst_radius" type="float" setter="set_helper_scatter_burst_radius" getter="get_helper_scatter_burst_radius" default="120.0">
+			Burst disc radius in pixels. Must be finite and 0 or more.
+		</member>
+		<member name="helper_scatter_facing_jitter" type="float" setter="set_helper_scatter_facing_jitter" getter="get_helper_scatter_facing_jitter" default="0.4">
+			Random twist on each radial facing in radians. Must be finite and 0 or more.
+		</member>
+		<member name="helper_scatter_seed" type="int" setter="set_helper_scatter_seed" getter="get_helper_scatter_seed" default="0">
+			Scatter seed: 0 is non-deterministic, otherwise reproducible. Falls back to pattern_seed when 0.
+		</member>
+		<member name="helper_polygon_vertices" type="int" setter="set_helper_polygon_vertices" getter="get_helper_polygon_vertices" default="5">
+			Star vertices. Must be 3 or more.
+		</member>
+		<member name="helper_polygon_radius" type="float" setter="set_helper_polygon_radius" getter="get_helper_polygon_radius" default="150.0">
+			Star radius in pixels. Must be finite and 0 or more.
+		</member>
+		<member name="helper_polygon_vertex_bias" type="float" setter="set_helper_polygon_vertex_bias" getter="get_helper_polygon_vertex_bias" default="2.0">
+			Star sharpness: 0 is an even ring, higher pulls density toward the vertices. Must be finite and 0 or more.
+		</member>
+		<member name="helper_polygon_base_rotation" type="float" setter="set_helper_polygon_base_rotation" getter="get_helper_polygon_base_rotation" default="0.0">
+			Rotates the whole star. Must be finite.
+		</member>
+		<member name="helper_polygon_face_outward" type="bool" setter="set_helper_polygon_face_outward" getter="get_helper_polygon_face_outward" default="true">
+			Face away from the marker. Off faces the marker.
+		</member>
+		<member name="helper_polygon_facing_offset_deg" type="float" setter="set_helper_polygon_facing_offset_deg" getter="get_helper_polygon_facing_offset_deg" default="0.0">
+			Twists every star facing. Must be finite.
+		</member>
+		<member name="helper_multispiral_arms" type="int" setter="set_helper_multispiral_arms" getter="get_helper_multispiral_arms" default="3">
+			Interleaved spiral arms. Must be 1 or more.
+		</member>
+		<member name="helper_multispiral_start_radius" type="float" setter="set_helper_multispiral_start_radius" getter="get_helper_multispiral_start_radius" default="50.0">
+			First-slot radius in pixels. Must be finite and 0 or more.
+		</member>
+		<member name="helper_multispiral_radius_step" type="float" setter="set_helper_multispiral_radius_step" getter="get_helper_multispiral_radius_step" default="15.0">
+			Radius growth per step along each arm. Must be finite.
+		</member>
+		<member name="helper_multispiral_angle_step" type="float" setter="set_helper_multispiral_angle_step" getter="get_helper_multispiral_angle_step" default="0.6">
+			Angle growth per step along each arm. Must be finite.
+		</member>
+		<member name="helper_multispiral_rotate_with_marker" type="bool" setter="set_helper_multispiral_rotate_with_marker" getter="get_helper_multispiral_rotate_with_marker" default="true">
+			Rotate the arm phases with the marker. Off aims arms in global space.
+		</member>
+		<member name="helper_multispiral_facing" type="int" setter="set_helper_multispiral_facing" getter="get_helper_multispiral_facing" default="0">
+			Per-arm facing: tangent (travel direction), radial outward, toward center, or keep marker.
+		</member>
+		<member name="helper_multispiral_facing_offset_deg" type="float" setter="set_helper_multispiral_facing_offset_deg" getter="get_helper_multispiral_facing_offset_deg" default="0.0">
+			Twists every arm facing. Must be finite.
+		</member>
+		<member name="helper_multispiral_arm_stride" type="int" setter="set_helper_multispiral_arm_stride" getter="get_helper_multispiral_arm_stride" default="1">
+			1 interleaves consecutive slots across arms, higher values group slots per arm. Must be 1 or more.
+		</member>
+		<member name="burst_enabled" type="bool" setter="set_burst_enabled" getter="get_burst_enabled" default="false">
+			Fire multi-volley bursts per trigger: each interval pulls the trigger for burst_count shots spaced burst_interval_sec apart. Mid-burst shots ignore the main interval.
+		</member>
+		<member name="burst_count" type="int" setter="set_burst_count" getter="get_burst_count" default="3">
+			Shots per burst trigger. Must be 1 or more.
+		</member>
+		<member name="burst_interval_sec" type="float" setter="set_burst_interval_sec" getter="get_burst_interval_sec" default="0.15">
+			Seconds between burst shots. Must be finite and above zero.
+		</member>
+		<member name="burst_alternate_mirror" type="bool" setter="set_burst_alternate_mirror" getter="get_burst_alternate_mirror" default="false">
+			Mirror every other burst volley (fan/spiral chirality flip): even burst shots fire mirrored, odd shots plain.
+		</member>
+		<member name="telegraph_enabled" type="bool" setter="set_telegraph_enabled" getter="get_telegraph_enabled" default="false">
+			Warn before firing: emits volley_telegraphed with the current aim, then fires after telegraph_sec. Transforms re-collect at fire time.
+		</member>
+		<member name="telegraph_sec" type="float" setter="set_telegraph_sec" getter="get_telegraph_sec" default="0.5">
+			Warning time before the volley fires. Must be finite and 0 or more.
+		</member>
+		<member name="homing_target_scorer" type="Callable" setter="set_homing_target_scorer" getter="get_homing_target_scorer" default="Callable()">
+			Custom target scorer: Callable(candidate: Node2D) to float, highest score wins (up to homing_max_targets). First/Last/Strongest/Weakest/Fastest live in game code this way (HP, armor, speed are user metadata). Invalid returns fall back to the built-in order for that candidate. Multi-target sources only.
+		</member>
+		<member name="homing_priority_group" type="StringName" setter="set_homing_priority_group" getter="get_homing_priority_group" default="&quot;&quot;">
+			Priority pin (boss, decoy, aggro): resolved before the normal selection, returned directly when non-empty. Empty disables it.
+		</member>
+		<member name="homing_fire_requires_target" type="bool" setter="set_homing_fire_requires_target" getter="get_homing_fire_requires_target" default="false">
+			Hold fire with no target: skips the spawn cycle entirely (volley_skipped "no_target") instead of firing a plain volley. Towers stay silent until something is in scope.
+		</member>
+		<member name="homing_sticky_targets" type="bool" setter="set_homing_sticky_targets" getter="get_homing_sticky_targets" default="false">
+			Focus fire for dealt queues: each bullet keeps its dealt target across retargets (only emptied queues refill) instead of re-dealing every pass. Per-bullet Distribute only.
+		</member>
+		<member name="pattern_seed" type="int" setter="set_pattern_seed" getter="get_pattern_seed" default="0">
+			Deterministic helper randomness: 0 is non-deterministic, otherwise seeds grid jitter, ring random rotation and target random selection. Replays and boss patterns stay reproducible.
+		</member>
+		<member name="max_live_bullets" type="int" setter="set_max_live_bullets" getter="get_max_live_bullets" default="0">
+			Soft live-bullet fuse: 0 is unlimited, otherwise firing pauses (volley_skipped "over_budget") while tracked live bullets reach this count.
+		</member>
+		<member name="homing_retarget_phase" type="float" setter="set_homing_retarget_phase" getter="get_homing_retarget_phase" default="0.0">
+			Staggers the retarget phase so many towers do not scene-scan on the same tick. The period stays homing_retarget_interval_sec. Must be finite and 0 or more.
 		</member>
 		<member name="show_pattern_preview" type="bool" setter="set_show_pattern_preview" getter="get_show_pattern_preview" default="true">
 			Shows one dot and facing arrow per bullet in the editor. Follows the generator live. Never saved to the scene.
@@ -505,6 +710,24 @@
 		<constant name="TRANSFORMS_FROM_HELPER_AIMED" value="7">
 			Cone from the generator toward the aimed target.
 		</constant>
+		<constant name="TRANSFORMS_FROM_HELPER_FLOWER" value="8">
+			Floral blossom pattern from the generator.
+		</constant>
+		<constant name="TRANSFORMS_FROM_HELPER_ELLIPSE" value="9">
+			Ellipse ring, arc, or wall-with-gaps from the generator.
+		</constant>
+		<constant name="TRANSFORMS_FROM_HELPER_RAIN" value="10">
+			Rain curtain from the generator.
+		</constant>
+		<constant name="TRANSFORMS_FROM_HELPER_SCATTER" value="11">
+			Random disc burst from the generator.
+		</constant>
+		<constant name="TRANSFORMS_FROM_HELPER_POLYGON" value="12">
+			Star/polygon pattern from the generator.
+		</constant>
+		<constant name="TRANSFORMS_FROM_HELPER_MULTISPIRAL" value="13">
+			Multi-arm spiral from the generator.
+		</constant>
 		<constant name="SPIN_CONTINUOUS" value="0">
 			Spins forever at [member spin_speed_deg_per_sec].
 		</constant>
@@ -613,6 +836,43 @@
 			<param index="1" name="volley_index" type="int" />
 			<description>
 				Fired for every volley, with a 1-based counter.
+			</description>
+		</signal>
+		<signal name="pre_shoot">
+			<param index="0" name="directional_bullets_instance" type="DirectionalBullets2D" />
+			<param index="1" name="volley_index" type="int" />
+			<description>
+				Last-chance hook fired after the volley instance is stamped but before homing/orbiting is configured and before volley_fired. Handlers may tweak the duplicated volley data (speed ramp, difficulty scale). Same handler contract as volley_fired: never call shoot_once from here (use shoot_once_deferred).
+			</description>
+		</signal>
+		<signal name="volley_skipped">
+			<param index="0" name="reason" type="StringName" />
+			<description>
+				Fired when a volley is skipped without spawning: "no_transforms" (empty pattern), "no_target" (fire-requires-target hold), or "over_budget" (max_live_bullets fuse). Games can fall back on these instead of log-diving.
+			</description>
+		</signal>
+		<signal name="volley_telegraphed">
+			<param index="0" name="aim_transforms" type="Array" />
+			<description>
+				Fired when a telegraph warning starts, with a snapshot of the current aim (advisory: the actual fire re-collects transforms). Draw warning lines, flash markers, play the cue.
+			</description>
+		</signal>
+		<signal name="burst_shot_fired">
+			<param index="0" name="shot_index" type="int" />
+			<param index="1" name="mirrored" type="bool" />
+			<description>
+				Fired for every shot inside a burst chain, with the 1-based shot number and whether this shot fired mirrored (alternate-mirror mode).
+			</description>
+		</signal>
+		<signal name="burst_finished">
+			<description>
+				Fired when the last shot of a burst chain fires.
+			</description>
+		</signal>
+		<signal name="retarget_applied">
+			<param index="0" name="volleys_retargeted" type="int" />
+			<description>
+				Fired after an automatic interval retarget pass that touched at least one volley. HUD and wave logic can observe tracking health from this.
 			</description>
 		</signal>
 		<signal name="volley_homing_configured">

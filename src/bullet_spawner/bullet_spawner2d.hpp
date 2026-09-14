@@ -88,7 +88,13 @@ class BulletSpawner2D : public Node2D{
             TRANSFORMS_FROM_HELPER_FAN,
             TRANSFORMS_FROM_HELPER_SPIRAL,
             TRANSFORMS_FROM_HELPER_LINE,
-            TRANSFORMS_FROM_HELPER_AIMED
+            TRANSFORMS_FROM_HELPER_AIMED,
+            TRANSFORMS_FROM_HELPER_FLOWER,
+            TRANSFORMS_FROM_HELPER_ELLIPSE,
+            TRANSFORMS_FROM_HELPER_RAIN,
+            TRANSFORMS_FROM_HELPER_SCATTER,
+            TRANSFORMS_FROM_HELPER_POLYGON,
+            TRANSFORMS_FROM_HELPER_MULTISPIRAL
         };
 
         // How the spin angle evolves. CONTINUOUS rotates forever at
@@ -245,6 +251,109 @@ class BulletSpawner2D : public Node2D{
         double helper_aimed_spread = 0.3;
         double helper_aimed_step_offset = 0.0;
         bool helper_aimed_centered = true;
+        // Blend toward the predicted target position: 0 aims at where the
+        // target is now, 1 aims where it will be after helper_aimed_prediction
+        // seconds at its current velocity (needs a target that exposes
+        // get_velocity(), e.g. CharacterBody2D; otherwise falls back to now).
+        double helper_aimed_prediction = 0.0;
+        double helper_aimed_prediction_time = 0.5;
+
+        // FLOWER (spell-card blossoms: petals symmetric lobes).
+        int helper_flower_petals = 6;
+        int helper_flower_bullets_per_petal = 5;
+        double helper_flower_radius = 150.0;
+        double helper_flower_petal_spread = 0.5;
+        double helper_flower_petal_sharpness = 1.0;
+        double helper_flower_base_rotation = 0.0;
+        bool helper_flower_face_outward = true;
+        double helper_flower_facing_offset_deg = 0.0;
+
+        // ELLIPSE (true ellipse ring / arc / wall-with-gaps).
+        double helper_ellipse_radius_x = 150.0;
+        double helper_ellipse_radius_y = 100.0;
+        double helper_ellipse_rotation = 0.0;
+        double helper_ellipse_start_angle = 0.0;
+        double helper_ellipse_arc = 6.283185307179586;
+        int helper_ellipse_mode = 0; // BulletFactory2D::EllipseMode, full
+        int helper_ellipse_gap_count = 2;
+        double helper_ellipse_gap_width = 0.3;
+        bool helper_ellipse_face_outward = true;
+        double helper_ellipse_facing_offset_deg = 0.0;
+
+        // RAIN (curtain band of descending bullets).
+        double helper_rain_band_width = 600.0;
+        Vector2 helper_rain_direction = Vector2(0, 1);
+        double helper_rain_drop_spacing = 48.0;
+        double helper_rain_jitter = 12.0;
+
+        // SCATTER (biased-random burst disc: explosions, deaths, pops).
+        double helper_scatter_burst_radius = 120.0;
+        double helper_scatter_facing_jitter = 0.4;
+        // 0 = non-deterministic, otherwise reproducible (replays, bosses).
+        int helper_scatter_seed = 0;
+
+        // POLYGON (star emphasis: density pulled toward N vertices).
+        int helper_polygon_vertices = 5;
+        double helper_polygon_radius = 150.0;
+        double helper_polygon_vertex_bias = 2.0;
+        double helper_polygon_base_rotation = 0.0;
+        bool helper_polygon_face_outward = true;
+        double helper_polygon_facing_offset_deg = 0.0;
+
+        // MULTISPIRAL (interleaved galaxy/windmill/rose arms).
+        int helper_multispiral_arms = 3;
+        double helper_multispiral_start_radius = 50.0;
+        double helper_multispiral_radius_step = 15.0;
+        double helper_multispiral_angle_step = 0.6;
+        bool helper_multispiral_rotate_with_marker = true;
+        int helper_multispiral_facing = 0; // BulletFactory2D::SpiralFacingMode, tangent
+        double helper_multispiral_facing_offset_deg = 0.0;
+        int helper_multispiral_arm_stride = 1;
+
+        // BURST (multi-volley danmaku phrasing: N shots per trigger).
+        bool burst_enabled = false;
+        // Shots per trigger. Must stay >= 1.
+        int burst_count = 3;
+        // Seconds between burst shots. Must stay > 0.
+        double burst_interval_sec = 0.15;
+        // Mirror every other burst volley (fan/spiral chirality flip): the
+        // classic reverse-the-angle rhythm without scripting.
+        bool burst_alternate_mirror = false;
+        // Telegraph: warn before each burst volley fires.
+        bool telegraph_enabled = false;
+        // Seconds of warning before the volley. Must stay >= 0.
+        double telegraph_sec = 0.5;
+
+        // TARGETING UPGRADES (tower-defense core).
+        // Score callback: Callable(candidate: Node2D) -> float. When valid,
+        // it replaces the built-in selection for multi-target sources: the
+        // highest score wins (up to homing_max_targets). Lets First / Last /
+        // Strongest / Weakest / Fastest all live in game code (HP, armor,
+        // speed live in user metadata, not in this plugin).
+        Callable homing_target_scorer;
+        // Priority group: resolved first, falls back to normal selection when
+        // empty (boss / decoy / aggro pin). Empty = disabled.
+        StringName homing_priority_group;
+        // Hold fire with no target: skip the spawn cycle entirely instead of
+        // firing a plain volley. Towers stay silent until something is in
+        // scope; danmaku bosses leave this off for rhythmic firing.
+        bool homing_fire_requires_target = false;
+        // Keep each bullet's dealt target across retargets (focus fire)
+        // instead of re-dealing every pass (spread). Per-bullet DISTRIBUTE
+        // only; shared queues always re-resolve.
+        bool homing_sticky_targets = false;
+
+        // PERFORMANCE / REPRODUCIBILITY.
+        // Deterministic helper randomness: 0 = non-deterministic, otherwise
+        // seeds grid jitter, ring random rotation and scatter without an
+        // explicit seed. Replays and boss patterns stay reproducible.
+        int pattern_seed = 0;
+        // Soft live-bullet fuse: 0 = unlimited, otherwise auto-shooting and
+        // retargeting pause while active live bullets reach this count.
+        int max_live_bullets = 0;
+        // Stagger the retarget phase so N towers don't scene-scan on the same
+        // tick: actual period stays homing_retarget_interval_sec.
+        double homing_retarget_phase = 0.0;
 
         // HOMING (EASY API)
         //
@@ -512,6 +621,123 @@ class BulletSpawner2D : public Node2D{
         bool get_orbiting_rigid_follow() const;
         void set_orbiting_rigid_follow(bool value);
 
+        // BURST / TELEGRAPH / TARGETING / PERF accessors (members above).
+        bool get_burst_enabled() const;
+        void set_burst_enabled(bool value);
+        int get_burst_count() const;
+        void set_burst_count(int value);
+        double get_burst_interval_sec() const;
+        void set_burst_interval_sec(double value);
+        bool get_burst_alternate_mirror() const;
+        void set_burst_alternate_mirror(bool value);
+        bool get_telegraph_enabled() const;
+        void set_telegraph_enabled(bool value);
+        double get_telegraph_sec() const;
+        void set_telegraph_sec(double value);
+        Callable get_homing_target_scorer() const;
+        void set_homing_target_scorer(const Callable &value);
+        StringName get_homing_priority_group() const;
+        void set_homing_priority_group(const StringName &value);
+        bool get_homing_fire_requires_target() const;
+        void set_homing_fire_requires_target(bool value);
+        bool get_homing_sticky_targets() const;
+        void set_homing_sticky_targets(bool value);
+        int get_pattern_seed() const;
+        void set_pattern_seed(int value);
+        int get_max_live_bullets() const;
+        void set_max_live_bullets(int value);
+        double get_homing_retarget_phase() const;
+        void set_homing_retarget_phase(double value);
+        // Helper accessors for the new danmaku generators + aimed prediction.
+        double get_helper_aimed_prediction() const;
+        void set_helper_aimed_prediction(double value);
+        double get_helper_aimed_prediction_time() const;
+        void set_helper_aimed_prediction_time(double value);
+        int get_helper_flower_petals() const;
+        void set_helper_flower_petals(int value);
+        int get_helper_flower_bullets_per_petal() const;
+        void set_helper_flower_bullets_per_petal(int value);
+        double get_helper_flower_radius() const;
+        void set_helper_flower_radius(double value);
+        double get_helper_flower_petal_spread() const;
+        void set_helper_flower_petal_spread(double value);
+        double get_helper_flower_petal_sharpness() const;
+        void set_helper_flower_petal_sharpness(double value);
+        double get_helper_flower_base_rotation() const;
+        void set_helper_flower_base_rotation(double value);
+        bool get_helper_flower_face_outward() const;
+        void set_helper_flower_face_outward(bool value);
+        double get_helper_flower_facing_offset_deg() const;
+        void set_helper_flower_facing_offset_deg(double value);
+        double get_helper_ellipse_radius_x() const;
+        void set_helper_ellipse_radius_x(double value);
+        double get_helper_ellipse_radius_y() const;
+        void set_helper_ellipse_radius_y(double value);
+        double get_helper_ellipse_rotation() const;
+        void set_helper_ellipse_rotation(double value);
+        double get_helper_ellipse_start_angle() const;
+        void set_helper_ellipse_start_angle(double value);
+        double get_helper_ellipse_arc() const;
+        void set_helper_ellipse_arc(double value);
+        int get_helper_ellipse_mode() const;
+        void set_helper_ellipse_mode(int value);
+        int get_helper_ellipse_gap_count() const;
+        void set_helper_ellipse_gap_count(int value);
+        double get_helper_ellipse_gap_width() const;
+        void set_helper_ellipse_gap_width(double value);
+        bool get_helper_ellipse_face_outward() const;
+        void set_helper_ellipse_face_outward(bool value);
+        double get_helper_ellipse_facing_offset_deg() const;
+        void set_helper_ellipse_facing_offset_deg(double value);
+        double get_helper_rain_band_width() const;
+        void set_helper_rain_band_width(double value);
+        Vector2 get_helper_rain_direction() const;
+        void set_helper_rain_direction(const Vector2 &value);
+        double get_helper_rain_drop_spacing() const;
+        void set_helper_rain_drop_spacing(double value);
+        double get_helper_rain_jitter() const;
+        void set_helper_rain_jitter(double value);
+        double get_helper_scatter_burst_radius() const;
+        void set_helper_scatter_burst_radius(double value);
+        double get_helper_scatter_facing_jitter() const;
+        void set_helper_scatter_facing_jitter(double value);
+        int get_helper_scatter_seed() const;
+        void set_helper_scatter_seed(int value);
+        int get_helper_polygon_vertices() const;
+        void set_helper_polygon_vertices(int value);
+        double get_helper_polygon_radius() const;
+        void set_helper_polygon_radius(double value);
+        double get_helper_polygon_vertex_bias() const;
+        void set_helper_polygon_vertex_bias(double value);
+        double get_helper_polygon_base_rotation() const;
+        void set_helper_polygon_base_rotation(double value);
+        bool get_helper_polygon_face_outward() const;
+        void set_helper_polygon_face_outward(bool value);
+        double get_helper_polygon_facing_offset_deg() const;
+        void set_helper_polygon_facing_offset_deg(double value);
+        int get_helper_multispiral_arms() const;
+        void set_helper_multispiral_arms(int value);
+        double get_helper_multispiral_start_radius() const;
+        void set_helper_multispiral_start_radius(double value);
+        double get_helper_multispiral_radius_step() const;
+        void set_helper_multispiral_radius_step(double value);
+        double get_helper_multispiral_angle_step() const;
+        void set_helper_multispiral_angle_step(double value);
+        bool get_helper_multispiral_rotate_with_marker() const;
+        void set_helper_multispiral_rotate_with_marker(bool value);
+        int get_helper_multispiral_facing() const;
+        void set_helper_multispiral_facing(int value);
+        double get_helper_multispiral_facing_offset_deg() const;
+        void set_helper_multispiral_facing_offset_deg(double value);
+        int get_helper_multispiral_arm_stride() const;
+        void set_helper_multispiral_arm_stride(int value);
+        // One-call preset fill (see BulletFactory2D::PatternPreset).
+        void apply_pattern_preset(int preset);
+        // Live introspection for waves, budgets and debug.
+        int get_burst_shots_left() const;
+        int get_active_live_bullet_count() const;
+        int get_pooled_volley_count() const;
+
         // Resolves the current homing targets without touching any volley:
         // node-group members (filtered + selected), the node at
         // homing_target_path, or the homing_global_position snapshot.
@@ -535,6 +761,12 @@ class BulletSpawner2D : public Node2D{
         Array get_live_volleys() const;
         // Forgets all tracked volleys (they keep flying untouched).
         void clear_live_volleys();
+        // Begins a burst chain / telegraph warning / fires the next burst
+        // volley. Public so waves and boss phases can drive phrasing by hand
+        // (begin + fire on timers) instead of only through the auto loop.
+        void begin_burst();
+        void begin_telegraph();
+        void fire_burst_volley();
         // Takes ownership of a manually-woken volley (see enable_bullet,
         // which detaches spawner ownership): stamps, hooks the reached
         // forwarder, and tracks it for retargeting. Queues are left alone.
@@ -770,6 +1002,24 @@ class BulletSpawner2D : public Node2D{
         // Spin runtime state (never stored, advances in _process only).
         double spin_angle_deg = 0.0;
         double spin_time_sec = 0.0;
+        // Burst runtime state (never stored): shots left in the current burst,
+        // countdown to the next burst shot, telegraph countdown, and the
+        // mirror flag for the next burst volley.
+        int burst_shots_left = 0;
+        double burst_time_left = 0.0;
+        double telegraph_time_left = 0.0;
+        bool burst_mirror_next = false;
+        // True once the current burst chain has shown its telegraph: stops
+        // the expiry re-firing the warning in a loop instead of firing.
+        bool burst_telegraph_done = false;
+        // True while fire_burst_volley() runs its internal shoot_once(): the
+        // manual-shot guard rejects direct shoot_once() mid-chain, but the
+        // chain's own shots must pass through.
+        bool burst_firing = false;
+        // Telegraph runtime: the pending volley config while warning. Stored
+        // as a flag only (transforms re-collect at fire time, so markers that
+        // move during the warning still aim correctly).
+        bool telegraph_pending = false;
         // Preview source tracking: dirty-check state for the live-refresh loop.
         // Only instance ids + global transforms are stored - never assumed
         // alive. Every access goes through is_tracked_node_alive() first, so

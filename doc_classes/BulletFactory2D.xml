@@ -206,6 +206,93 @@
 				Generates transforms along an expanding spiral around the marker. [code]facing_mode[/code] picks the bullet facing: tangent means each bullet flies along its travel direction on the spiral (the default), radial outward is the historical behavior, toward center faces the marker, keep marker preserves the marker rotation. [code]facing_offset_degrees[/code] twists every facing by a fixed amount. Useful for rotating emitter looks and volute patterns.
 			</description>
 		</method>
+		<method name="helper_generate_transforms_flower" qualifiers="static">
+			<return type="Transform2D[]" />
+			<param index="0" name="transforms_amount" type="int" />
+			<param index="1" name="marker_transform" type="Transform2D" />
+			<param index="2" name="petals" type="int" default="6" />
+			<param index="3" name="bullets_per_petal" type="int" default="5" />
+			<param index="4" name="radius" type="float" default="150.0" />
+			<param index="5" name="petal_spread" type="float" default="0.5" />
+			<param index="6" name="petal_sharpness" type="float" default="1.0" />
+			<param index="7" name="base_rotation" type="float" default="0.0" />
+			<param index="8" name="face_outward" type="bool" default="true" />
+			<param index="9" name="facing_offset_degrees" type="float" default="0.0" />
+			<description>
+				Generates a floral spell-card pattern: [code]petals[/code] symmetric lobes around the marker, each holding [code]bullets_per_petal[/code] slots spread over [code]petal_spread[/code] radians. [code]petal_sharpness[/code] 0 gives round lobes, higher values pinch the waist into tighter flowers. [code]transforms_amount[/code] sizes the array (fewer slots than petals times per-petal truncates). Useful for boss blossoms and mandala rings.
+			</description>
+		</method>
+		<method name="helper_generate_transforms_ellipse" qualifiers="static">
+			<return type="Transform2D[]" />
+			<param index="0" name="transforms_amount" type="int" />
+			<param index="1" name="marker_transform" type="Transform2D" />
+			<param index="2" name="radius_x" type="float" default="150.0" />
+			<param index="3" name="radius_y" type="float" default="100.0" />
+			<param index="4" name="ellipse_rotation" type="float" default="0.0" />
+			<param index="5" name="start_angle" type="float" default="0.0" />
+			<param index="6" name="arc" type="float" default="6.2831855" />
+			<param index="7" name="mode" type="int" enum="BulletFactory2D.EllipseMode" default="0" />
+			<param index="8" name="gap_count" type="int" default="2" />
+			<param index="9" name="gap_width" type="float" default="0.3" />
+			<param index="10" name="face_outward" type="bool" default="true" />
+			<param index="11" name="facing_offset_degrees" type="float" default="0.0" />
+			<description>
+				Generates a true ellipse ring with independent [code]radius_x[/code] / [code]radius_y[/code] semi-axes rotated by [code]ellipse_rotation[/code] (the ring helper's y_scale is only an approximation). Full draws every slot, Arc draws a spaced segment, Wall draws a dense arc with [code]gap_count[/code] carved dodge gaps of [code]gap_width[/code] radians each (danmaku walls with readable escape routes; the array shrinks to the surviving slots). Facings follow the ellipse outward normal. Useful for oval bosses, stadium arenas and gap walls.
+			</description>
+		</method>
+		<method name="helper_generate_transforms_rain" qualifiers="static">
+			<return type="Transform2D[]" />
+			<param index="0" name="transforms_amount" type="int" />
+			<param index="1" name="marker_transform" type="Transform2D" />
+			<param index="2" name="band_width" type="float" default="600.0" />
+			<param index="3" name="rain_direction" type="Vector2" default="Vector2(0, 1)" />
+			<param index="4" name="drop_spacing" type="float" default="48.0" />
+			<param index="5" name="jitter" type="float" default="12.0" />
+			<description>
+				Generates a rain curtain: slots spread along a horizontal band of [code]band_width[/code] facing [code]rain_direction[/code], with rows staggered by [code]drop_spacing[/code] so the curtain reads as layered sheets, plus random [code]jitter[/code] per slot. Useful for bullet-rain phases, storm walls and descending curtains.
+			</description>
+		</method>
+		<method name="helper_generate_transforms_scatter" qualifiers="static">
+			<return type="Transform2D[]" />
+			<param index="0" name="transforms_amount" type="int" />
+			<param index="1" name="marker_transform" type="Transform2D" />
+			<param index="2" name="burst_radius" type="float" default="120.0" />
+			<param index="3" name="facing_jitter" type="float" default="0.4" />
+			<param index="4" name="seed" type="int" default="0" />
+			<description>
+				Generates a biased-random disc burst: offsets fill the [code]burst_radius[/code] disc with even density (not center-clumped), facings are radial-outward plus [code]facing_jitter[/code]. [code]seed[/code] 0 is non-deterministic, otherwise reproducible (replays, synced bosses). Useful for explosions, boss deaths and petal pops.
+			</description>
+		</method>
+		<method name="helper_generate_transforms_polygon" qualifiers="static">
+			<return type="Transform2D[]" />
+			<param index="0" name="transforms_amount" type="int" />
+			<param index="1" name="marker_transform" type="Transform2D" />
+			<param index="2" name="vertices" type="int" default="5" />
+			<param index="3" name="radius" type="float" default="150.0" />
+			<param index="4" name="vertex_bias" type="float" default="2.0" />
+			<param index="5" name="base_rotation" type="float" default="0.0" />
+			<param index="6" name="face_outward" type="bool" default="true" />
+			<param index="7" name="facing_offset_degrees" type="float" default="0.0" />
+			<description>
+				Generates a star/polygon emphasis pattern: [code]vertices[/code] symmetric directions with extra density pulled toward each vertex. [code]vertex_bias[/code] 0 is an even ring, higher values sharpen the star. Useful for pentagram bosses, shuriken patterns and geometric spell cards.
+			</description>
+		</method>
+		<method name="helper_generate_transforms_multispiral" qualifiers="static">
+			<return type="Transform2D[]" />
+			<param index="0" name="transforms_amount" type="int" />
+			<param index="1" name="marker_transform" type="Transform2D" />
+			<param index="2" name="arms" type="int" default="3" />
+			<param index="3" name="start_radius" type="float" default="50.0" />
+			<param index="4" name="radius_step" type="float" default="15.0" />
+			<param index="5" name="angle_step" type="float" default="0.6" />
+			<param index="6" name="rotate_with_marker" type="bool" default="true" />
+			<param index="7" name="facing_mode" type="int" enum="BulletFactory2D.SpiralFacingMode" default="0" />
+			<param index="8" name="facing_offset_degrees" type="float" default="0.0" />
+			<param index="9" name="arm_index_stride" type="int" default="1" />
+			<description>
+				Generates a multi-arm spiral: [code]arms[/code] interleaved arms around the marker (galaxy, windmill and rose looks at low bullet counts). [code]arm_index_stride[/code] 1 interleaves consecutive slots across arms, higher values group slots per arm. Same facing modes as the single spiral. Useful for pinwheels, galaxies and rotating boss arms.
+			</description>
+		</method>
 		<method name="populate_attachments_pool">
 			<return type="void" />
 			<param index="0" name="attachment_scene" type="PackedScene" />
@@ -422,6 +509,48 @@
 		</constant>
 		<constant name="LINE_ANCHOR_END" value="2" enum="LineAnchor">
 			Line anchor used by helper_generate_transforms_line(): the row ends at the marker, growing against the line direction.
+		</constant>
+		<constant name="ELLIPSE_FULL" value="0" enum="EllipseMode">
+			Ellipse mode used by helper_generate_transforms_ellipse(): every slot is drawn around the full ellipse.
+		</constant>
+		<constant name="ELLIPSE_ARC" value="1" enum="EllipseMode">
+			Ellipse mode used by helper_generate_transforms_ellipse(): slots are spread over the arc segment from start_angle over arc radians.
+		</constant>
+		<constant name="ELLIPSE_WALL" value="2" enum="EllipseMode">
+			Ellipse mode used by helper_generate_transforms_ellipse(): a dense arc with gap_count carved dodge gaps of gap_width radians each. The returned array shrinks to the surviving slots.
+		</constant>
+		<constant name="PATTERN_PRESET_CUSTOM" value="-1" enum="PatternPreset">
+			Preset marker used by BulletSpawner2D.apply_pattern_preset(): no preset, the spawner keeps its current helper settings.
+		</constant>
+		<constant name="PATTERN_PRESET_RADIAL_DENSE" value="0" enum="PatternPreset">
+			Preset used by BulletSpawner2D.apply_pattern_preset(): dense 36-bullet ring for boss radials.
+		</constant>
+		<constant name="PATTERN_PRESET_RADIAL_SPARSE" value="1" enum="PatternPreset">
+			Preset used by BulletSpawner2D.apply_pattern_preset(): sparse 12-bullet ring for aimed sidearms and light radials.
+		</constant>
+		<constant name="PATTERN_PRESET_SPIRAL_3ARM" value="2" enum="PatternPreset">
+			Preset used by BulletSpawner2D.apply_pattern_preset(): 3-arm interleaved spiral (galaxy / windmill look).
+		</constant>
+		<constant name="PATTERN_PRESET_AIMED_FAN_NARROW" value="3" enum="PatternPreset">
+			Preset used by BulletSpawner2D.apply_pattern_preset(): narrow 5-pellet aimed fan for turrets.
+		</constant>
+		<constant name="PATTERN_PRESET_AIMED_FAN_WIDE" value="4" enum="PatternPreset">
+			Preset used by BulletSpawner2D.apply_pattern_preset(): wide 9-pellet aimed fan for shotgun towers.
+		</constant>
+		<constant name="PATTERN_PRESET_RING_SLOW" value="5" enum="PatternPreset">
+			Preset used by BulletSpawner2D.apply_pattern_preset(): slow wide ring for curtain openers.
+		</constant>
+		<constant name="PATTERN_PRESET_WALL_GAPS" value="6" enum="PatternPreset">
+			Preset used by BulletSpawner2D.apply_pattern_preset(): dense wall with 3 dodge gaps (danmaku gate).
+		</constant>
+		<constant name="PATTERN_PRESET_RAIN" value="7" enum="PatternPreset">
+			Preset used by BulletSpawner2D.apply_pattern_preset(): descending rain curtain for storm phases.
+		</constant>
+		<constant name="PATTERN_PRESET_FLOWER_6" value="8" enum="PatternPreset">
+			Preset used by BulletSpawner2D.apply_pattern_preset(): 6-petal blossom for spell cards.
+		</constant>
+		<constant name="PATTERN_PRESET_SCATTER_BURST" value="9" enum="PatternPreset">
+			Preset used by BulletSpawner2D.apply_pattern_preset(): random disc burst for explosions and boss deaths.
 		</constant>
 	</constants>
 </class>

@@ -71,6 +71,32 @@ public:
 		LINE_ANCHOR_END
 	};
 
+	// Ring mode for the ellipse transform generator: FULL draws every slot
+	// around the ellipse; ARC draws a spaced arc segment; WALL draws a dense
+	// arc with carved dodge gaps (danmaku wall with readable escape routes).
+	enum EllipseMode {
+		ELLIPSE_FULL,
+		ELLIPSE_ARC,
+		ELLIPSE_WALL
+	};
+
+	// Named pattern presets that fill the spawner's helper_* properties in
+	// one call (discoverability over 40 raw knobs; see
+	// BulletSpawner2D::apply_pattern_preset).
+	enum PatternPreset {
+		PATTERN_PRESET_CUSTOM = -1,
+		PATTERN_PRESET_RADIAL_DENSE = 0,
+		PATTERN_PRESET_RADIAL_SPARSE,
+		PATTERN_PRESET_SPIRAL_3ARM,
+		PATTERN_PRESET_AIMED_FAN_NARROW,
+		PATTERN_PRESET_AIMED_FAN_WIDE,
+		PATTERN_PRESET_RING_SLOW,
+		PATTERN_PRESET_WALL_GAPS,
+		PATTERN_PRESET_RAIN,
+		PATTERN_PRESET_FLOWER_6,
+		PATTERN_PRESET_SCATTER_BURST
+	};
+
 	// Whether the factory is currently busy doing something important and it can't handle any other requests
 	bool get_is_factory_busy() const;
 
@@ -858,6 +884,91 @@ public:
 			real_t spread = 0.3,
 			real_t step_offset = 0.0,
 			bool centered = true);
+
+	// Floral spell-card pattern: petals symmetric lobes around the marker,
+	// each petal holding bullets_per_petal slots spread over petal_spread.
+	// petals * bullets_per_petal slots are emitted (transforms_amount sizes
+	// the array; fewer slots than petals * per-petal simply truncates).
+	// petal_sharpness 0 = round lobes, higher = tighter flowers.
+	static TypedArray<Transform2D> helper_generate_transforms_flower(
+			int transforms_amount,
+			Transform2D marker_transform,
+			int petals = 6,
+			int bullets_per_petal = 5,
+			real_t radius = 150.0,
+			real_t petal_spread = 0.5,
+			real_t petal_sharpness = 1.0,
+			real_t base_rotation = 0.0,
+			bool face_outward = true,
+			real_t facing_offset_degrees = 0.0);
+
+	// True ellipse ring with independent radii and rotation (the ring
+	// helper's y_scale is only an approximation): rx/ry semi-axes rotated by
+	// ellipse_rotation. mode picks FULL ring, ARC segment, or WALL (dense
+	// arc with gap_count carved dodge gaps of gap_width radians each).
+	static TypedArray<Transform2D> helper_generate_transforms_ellipse(
+			int transforms_amount,
+			Transform2D marker_transform,
+			real_t radius_x = 150.0,
+			real_t radius_y = 100.0,
+			real_t ellipse_rotation = 0.0,
+			real_t start_angle = 0.0,
+			real_t arc = Math::TAU,
+			EllipseMode mode = ELLIPSE_FULL,
+			int gap_count = 2,
+			real_t gap_width = 0.3,
+			bool face_outward = true,
+			real_t facing_offset_degrees = 0.0);
+
+	// Rain curtain: slots spread along a horizontal band of band_width above
+	// (or around) the marker, facing rain_direction. drop_spacing staggers
+	// rows so the curtain reads as layered sheets instead of one flat row.
+	static TypedArray<Transform2D> helper_generate_transforms_rain(
+			int transforms_amount,
+			Transform2D marker_transform,
+			real_t band_width = 600.0,
+			Vector2 rain_direction = Vector2(0, 1),
+			real_t drop_spacing = 48.0,
+			real_t jitter = 12.0);
+
+	// Scatter burst: biased-random disc for explosions, boss deaths, petal
+	// pops. Offsets fill the disc of burst_radius (sqrt distribution, so
+	// density is even, not center-clumped); facings are radial-outward plus
+	// facing_jitter. seed = 0 means non-deterministic, otherwise reproducible.
+	static TypedArray<Transform2D> helper_generate_transforms_scatter(
+			int transforms_amount,
+			Transform2D marker_transform,
+			real_t burst_radius = 120.0,
+			real_t facing_jitter = 0.4,
+			uint64_t seed = 0);
+
+	// Star/polygon emphasis: vertices symmetric directions around the marker
+	// with extra density pulled toward each vertex (vertex_bias 0 = even
+	// ring, higher = sharper star). edges bullets per edge fill the spans.
+	static TypedArray<Transform2D> helper_generate_transforms_polygon(
+			int transforms_amount,
+			Transform2D marker_transform,
+			int vertices = 5,
+			real_t radius = 150.0,
+			real_t vertex_bias = 2.0,
+			real_t base_rotation = 0.0,
+			bool face_outward = true,
+			real_t facing_offset_degrees = 0.0);
+
+	// Multi-arm spiral: arms interleaved arms around the marker (galaxy,
+	// windmill, rose looks at low bullet counts). arm_index_stride lets
+	// callers interleave (1) or group (arms) consecutive slots per arm.
+	static TypedArray<Transform2D> helper_generate_transforms_multispiral(
+			int transforms_amount,
+			Transform2D marker_transform,
+			int arms = 3,
+			real_t start_radius = 50.0,
+			real_t radius_step = 15.0,
+			real_t angle_step = 0.6,
+			bool rotate_with_marker = true,
+			SpiralFacingMode facing_mode = SPIRAL_FACING_TANGENT,
+			real_t facing_offset_degrees = 0.0,
+			int arm_index_stride = 1);
 };
 } //namespace BlastBullets2D
 
@@ -866,3 +977,5 @@ public:
 	VARIANT_ENUM_CAST(BlastBullets2D::BulletFactory2D::Alignment);
 	VARIANT_ENUM_CAST(BlastBullets2D::BulletFactory2D::SpiralFacingMode);
 	VARIANT_ENUM_CAST(BlastBullets2D::BulletFactory2D::LineAnchor);
+	VARIANT_ENUM_CAST(BlastBullets2D::BulletFactory2D::EllipseMode);
+	VARIANT_ENUM_CAST(BlastBullets2D::BulletFactory2D::PatternPreset);
