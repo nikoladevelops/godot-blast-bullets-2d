@@ -413,6 +413,12 @@ void BulletSpawner2D::set_helper_bullets_amount(int value) {
         UtilityFunctions::push_error("BulletSpawner2D: helper_bullets_amount must be >= 1, keeping the old value.");
         return;
     }
+    // One shoot_once() fans this out to transforms + SoA vectors + physics
+    // RIDs: an unchecked typo would freeze/OOM in a single call.
+    if (value > 10000) {
+        UtilityFunctions::push_error("BulletSpawner2D: helper_bullets_amount must be <= 10000, keeping the old value.");
+        return;
+    }
     helper_bullets_amount = value;
     rebuild_preview();
 }
@@ -1288,8 +1294,19 @@ void BulletSpawner2D::collect_homing_candidates_from_children(Node *p_parent, bo
     if (p_parent == nullptr) {
         return;
     }
-    for (int i = 0; i < p_parent->get_child_count(); ++i) {
-        Node *child = p_parent->get_child(i);
+    // Explicit stack instead of recursion (same reason as
+    // collect_homing_candidates_by_name): trees can be arbitrarily deep and
+    // this runs per volley plus per retarget pass. Reverse-push keeps
+    // depth-first pre-order identical to the old recursive walk.
+    Array stack;
+    for (int i = p_parent->get_child_count() - 1; i >= 0; --i) {
+        stack.push_back(p_parent->get_child(i));
+    }
+    while (!stack.is_empty()) {
+        Node *child = Object::cast_to<Node>(stack.pop_back());
+        if (child == nullptr) {
+            continue;
+        }
         Node2D *as_2d = Object::cast_to<Node2D>(child);
         // Never the spawner itself (a parent pointing at our own node would
         // otherwise make the volley chase its emitter).
@@ -1299,7 +1316,9 @@ void BulletSpawner2D::collect_homing_candidates_from_children(Node *p_parent, bo
             }
         }
         if (recursive) {
-            collect_homing_candidates_from_children(child, true, r_candidates);
+            for (int i = child->get_child_count() - 1; i >= 0; --i) {
+                stack.push_back(child->get_child(i));
+            }
         }
     }
 }
@@ -1508,6 +1527,13 @@ void BulletSpawner2D::track_live_volley(DirectionalBullets2D *bullets) {
         live_volley_instance_ids.push_back(id);
     }
     prune_live_volleys();
+    // Bound the list: infinite-lifetime volleys never prune, so auto-shoot
+    // would grow retarget cost (O(volleys*bullets + volleys*tree)) without
+    // limit. Keep the most recent; drop oldest first. Use clear_live_volleys()
+    // to reset manually.
+    while (live_volley_instance_ids.size() > 256) {
+        live_volley_instance_ids.remove_at(0);
+    }
 }
 
 void BulletSpawner2D::prune_live_volleys() const {
@@ -1834,8 +1860,13 @@ void BulletSpawner2D::apply_volley_homing_and_orbiting(DirectionalBullets2D *bul
                 const Variant &first = resolved_targets[0];
                 Node2D *first_node = Object::cast_to<Node2D>(first);
                 // The target may have been freed by a re-entrant handler
-                // between resolution and this log line: same guard pattern
-                // as is_tracked_node_alive(), describe instead of touching.
+                // between resolution and this log line. Validate the cached id
+                // before touching the pointer (same guard pattern as
+                // is_tracked_node_alive()); describe instead of touching.
+                // NOTE: get_instance_id() on a freed pointer is still a deref -
+                // resolution paths above must trim invalid targets first, this
+                // log line only avoids crashing on the queued-but-not-freed
+                // window and on id reuse.
                 if (first_node != nullptr && UtilityFunctions::is_instance_id_valid(first_node->get_instance_id())) {
                     first_desc = String("'") + String(first_node->get_name()) + "' at " + UtilityFunctions::str(first_node->get_global_position());
                 } else if (first_node != nullptr) {

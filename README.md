@@ -73,7 +73,7 @@ relative to their direction (allows zig zag patterns and any other creative patt
 
 - **Attach Timer Logic** - The ability to attach function callbacks that execute at a particular time on the entire multimesh with the option to be repeated over and over (safely executes code during runtime while preventing crashes that might occur with the normal timers if you don't use `call_deferred()`). This is the preferred way of manipulating bullet related data, don't use the normal Godot timers!
 
-- **Edit Properties And Call Methods During Runtime** - Every single feature has helper methods that you can use during runtime to adjust the behavior of the bullets (change homing targets, orbiting radius, switch movement pattern, disable a bullet and so on..). Combine this with the attach timer logic and you have the most flexible bullet system ever created. If you are not using the attach timer logic, make sure to use `call_deferred()` to avoid issues like game crashes or inconsistent behavior.
+- **Edit Properties And Call Methods During Runtime** - Every single feature has helper methods that you can use during runtime to adjust the behavior of the bullets (change homing targets, orbiting radius, switch movement pattern, disable a bullet and so on..). Combine this with the attach timer logic and you have the most flexible bullet system ever created. Collision signals fire synchronously in the physics tick; only structural factory calls (`reset()`/`free_*()`/`populate_*()`, and `enable_multimesh()` with a shape change) must be deferred with `call_deferred()` - per-bullet edits apply immediately.
 
 - **Teleport And Offset Support** - Instantly shift bullets with a Vector2 offset value or teleport them in global space to a new position.
 
@@ -95,7 +95,7 @@ relative to their direction (allows zig zag patterns and any other creative patt
 
 - **Extensive Documentation** - Full in-editor documentation for every function and property, accessible directly within the Godot Inspector and Script Editor.
 
-- **Even Faster Release Builds** - Compiled with Link Time Optimization (LTO) for maximum runtime performance in your exported projects. Release builds are used for both the editor and game release.
+- **Even Faster Release Builds** - Release builds (`template_release`) enable Link Time Optimization (LTO) for maximum runtime performance in your exported projects. Release builds are used for both the editor and game release.
 
 - **....AND SO MUCH MORE** - Download the plugin and experiment with it right away! There is also a test_project.zip available where you can check out some of the features and benchmark against a normal Godot Area2D bullet implementation.
 
@@ -125,7 +125,7 @@ In conclusion, **BlastBullets2D is ideal for top-down shooters and arcade-style 
 ---
 
 ## How To Install
-#### BlastBullets2D targets <b>Godot Engine 4.5 and 4.6</b>. As long as there are no breaking changes to GDExtension in the future, then it should work for all future Godot releases.
+#### BlastBullets2D targets <b>Godot Engine 4.5+</b> (tested on 4.7). As long as there are no breaking changes to GDExtension in the future, then it should work for all future Godot releases.
 
 1. Go in [Releases](https://github.com/nikoladevelops/godot-blast-bullets-2d/releases) and on the latest release click and download `blastbullets2d.zip`
 
@@ -200,7 +200,7 @@ func spawn_bullets()->void:
 - <b>`spawn_directional_bullets()`</b> - Spawns a multimesh of bullets where the direction is determined by the `transforms`'s rotation and each bullet has its own speed data.
 
 #### For advanced features:<br><br>
-- <b>`spawn_controllable_directional_bullets`</b> - Same as `spawn_directional_bullets()`, however this method returns the multimesh instance as a result. Save it to a variable and try modifying its properties/ calling functions. This is where all the advanced features are hidden - homing, orbiting, bullet curves, attachments, movement patterns, teleporting, timer related functionality, object pooling options and so on.
+- <b>`spawn_controllable_directional_bullets()`</b> - Same as `spawn_directional_bullets()`, however this method returns the multimesh instance as a result. Save it to a variable and try modifying its properties/ calling functions. This is where all the advanced features are hidden - homing, orbiting, bullet curves, attachments, movement patterns, teleporting, timer related functionality, object pooling options and so on.
 
 #### How to configure `DirectionalBulletsData2D` and `BlockBulletsData2D`?
 
@@ -244,14 +244,14 @@ func set_up_directional_bullets_data()->DirectionalBulletsData2D:
 	data.collision_shape_offset=Vector2(0,0)
 	data.max_life_time = 2
 	data.all_bullet_rotation_data = bullet_rotation_data
-	data.bullets_custom_data = damage_data
+	data.shared_bullets_custom_data = damage_data # shared by the whole volley; use all_bullets_custom_data for per-bullet resources, read with bullet_get_custom_data(index)
 	#data.is_life_time_over_signal_enabled = true # If you want to track when the life time is over and receive a signal inside BulletFactory2D
 	
 	return data
 ```
 
 #### How do we handle collision and bullet damage?<br>
-Notice the ``data.bullets_custom_data = damage_data``. This is a custom resource class instance that you should create. The data it holds can help you differentiate between types of bullets and damage.
+Notice the ``data.shared_bullets_custom_data = damage_data``. This is a custom resource class instance that you should create. The data it holds can help you differentiate between types of bullets and damage. Use `shared_bullets_custom_data` for one resource shared by the whole volley, or `all_bullets_custom_data` (array) for per-bullet resources; read either slot with `bullet_get_custom_data(index)` on the multimesh.
 
 Example:
 
@@ -353,8 +353,8 @@ dir_bullets.bullet_homing_target_reached.connect(func():
 
 # Create a brand new scene and make sure the type is set to BulletAttachment2D. Very important!
 # Place particles or anything you want inside
-# Next override the functions ``on_bullet_disable()``, ``on_bullet_enable()``, ``on_bullet_spawn()``,``on_spawn_in_pool()`` and ``_ready()`` and implement custom logic to your liking.
-#(Check out the test_project.zip for examples)
+# Next override the BulletAttachment2D functions ``on_bullet_disable()``, ``on_bullet_enable()``, ``on_bullet_spawn()``, ``on_spawn_in_pool()`` and (for tree setup) ``_ready()`` and implement custom logic to your liking.
+#(Check out the test_project.zip for examples). Note: this `_ready()` note is only about BulletAttachment2D - never override `_ready()` inside BulletFactory2D (see WARNING below).
 
 # Load the BulletAttachment2D a PackedScene, then do this:
 #dir_bullets.bullet_set_attachment(...)
@@ -383,6 +383,8 @@ tick the checkbox inside the inspector in `BulletFactory2D`. That's all, enjoy t
 ## WARNING
 - Never override the `_ready` function inside `BulletFactory2D` or you will experience crashes
 - Use `queue_free()` when you delete a bullet multimesh or a bullet attachment yourself, never `free()`. Especially never call `free()` on a multimesh from inside one of its own collision or attachment callbacks (for example inside `directional_area_entered` or `on_bullet_disable`). `queue_free()` is always safe in those situations.
+- Cross-owner reuse must go through `spawn_*()` / `enable_multimesh()` (which re-seed appearance, custom data, speeds and patterns). `enable_bullet()` wakes a pooled instance with its current appearance/custom-data intact - intended for same-owner re-enable, not for handing a volley to a new owner.
+- v4 migration: generic `area_entered` / `body_entered` / `life_time_over` signals were renamed to typed `directional_area_entered`, `directional_body_entered`, `directional_life_time_over` (plus `block_*` variants). Reconnect scenes/scripts. `MultiMeshPoolKey2D.make()` now returns `null` on invalid input instead of a default bucket.
 
 
 ## How To Compile

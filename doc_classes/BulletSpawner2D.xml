@@ -138,7 +138,7 @@
 		<method name="clear_live_volleys">
 			<return type="void" />
 			<description>
-				Forgets all tracked volleys. They keep flying untouched and are no longer retargeted. Reached-signal forwarding stays connected.
+				Forgets all tracked volleys. They keep flying untouched and are no longer retargeted. Reached-signal forwarding stays connected. Tracking is also capped at the 256 most recent volleys (oldest dropped first), so long auto-shoot sessions with infinite lifetimes cannot grow retarget cost without bound.
 			</description>
 		</method>
 		<method name="adopt_live_volley">
@@ -209,7 +209,7 @@
 			Where volley transforms come from: children markers, this generator itself, or a procedural helper pattern. Only the active pattern's options show in the inspector.
 		</member>
 		<member name="helper_bullets_amount" type="int" setter="set_helper_bullets_amount" getter="get_helper_bullets_amount" default="10">
-			Bullet count for helper patterns.
+			Bullet count for helper patterns. Clamped to 1-10000: one volley fans out to transforms, instance buffers and physics shapes, so uncapped values would freeze on a typo.
 		</member>
 		<member name="helper_grid_rows_per_column" type="int" setter="set_helper_grid_rows_per_column" getter="get_helper_grid_rows_per_column" default="10">
 			Grid rows per column.

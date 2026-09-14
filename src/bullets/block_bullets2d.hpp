@@ -15,6 +15,51 @@ public:
 	// The block rotation. The direction of the bullets is determined by it.
 	real_t block_rotation_radians = 0.0;
 
+	// Rigid whole-volley shift: blocks move as one, so per-bullet teleport
+	// makes no sense, but the factory/spawner "shift all" contract must move
+	// them too. Mirrors DirectionalBullets2D::teleport_shift_bullet per bullet
+	// (finite check, shape sync, attachment carry, interpolation sync).
+	_ALWAYS_INLINE_ void teleport_shift_bullet(int bullet_index, const Vector2 &shift_amount) {
+		if (!validate_bullet_index(bullet_index, "teleport_shift_bullet")) {
+			return;
+		}
+		if (!shift_amount.is_finite()) {
+			UtilityFunctions::push_error("teleport_shift_bullet: shift_amount must be finite (NaN/Inf is rejected).");
+			return;
+		}
+		if (bullet_index >= (int)all_cached_instance_transforms.size() || bullet_index >= (int)all_cached_instance_origin.size()) {
+			return;
+		}
+		auto &curr_bullet_transf = all_cached_instance_transforms[bullet_index];
+		auto &curr_bullet_origin = all_cached_instance_origin[bullet_index];
+		curr_bullet_origin += shift_amount;
+		curr_bullet_transf.set_origin(curr_bullet_origin);
+		sync_shape_transform_from_instance(bullet_index, curr_bullet_transf);
+		if (all_bullets_enabled_set.contains(bullet_index)) {
+			multi->set_instance_transform_2d(bullet_index, to_local_for_multimesh(curr_bullet_transf));
+		}
+		if (bullet_index < (int)attachments.size() && bullet_index < (int)attachment_transforms.size() && bullet_index < (int)attachment_stick_relative_to_bullet.size() && attachments[bullet_index]) {
+			BulletAttachment2D *attachment_instance = attachments[bullet_index];
+			Transform2D att_global_transf;
+			if (attachment_stick_relative_to_bullet[bullet_index]) {
+				att_global_transf = calculate_attachment_global_transf(bullet_index, curr_bullet_transf);
+			} else {
+				att_global_transf = attachment_transforms[bullet_index].translated(shift_amount);
+			}
+			attachment_transforms[bullet_index] = att_global_transf;
+			attachment_instance->set_global_transform(att_global_transf);
+			attachment_instance->reset_physics_interpolation();
+		}
+		update_bullet_previous_transform_for_interpolation(bullet_index);
+	}
+
+	_ALWAYS_INLINE_ void teleport_shift_all_bullets(const Vector2 &shift_amount, int bullet_index_start = 0, int bullet_index_end_inclusive = -1) {
+		ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "teleport_shift_all_bullets");
+		for (int i = bullet_index_start; i <= bullet_index_end_inclusive; ++i) {
+			teleport_shift_bullet(i, shift_amount);
+		}
+	}
+
 	inline void move_bullets(double delta) {
 		if (amount_bullets <= 0 || all_cached_velocity.empty() || physics_server == nullptr || !area.is_valid()) {
 			return;

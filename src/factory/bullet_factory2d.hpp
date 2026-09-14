@@ -213,6 +213,13 @@ public:
 		return engine != nullptr && engine->is_in_physics_frame();
 	}
 
+	// Public read of the pause flag for multimesh-level guards: physics
+	// callbacks keep firing while paused (drain stopped), so producers must
+	// drop instead of queue. Not bound.
+	bool is_bullet_processing_paused() const {
+		return !is_factory_processing_bullets;
+	}
+
   protected:
 	// Responsible for exposing C++ methods/properties to Godot Engine
 	static void _bind_methods();

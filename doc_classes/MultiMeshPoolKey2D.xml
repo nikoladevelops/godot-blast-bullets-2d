@@ -18,7 +18,7 @@
 			<param index="0" name="amount_bullets" type="int" />
 			<param index="1" name="shape_type" type="int" />
 			<description>
-				Creates a key for the exact bucket with [code]amount_bullets[/code] bullets per multimesh and PhysicsServer2D shape type.
+				Creates a key for the exact bucket with [code]amount_bullets[/code] bullets per multimesh and PhysicsServer2D shape type. Returns null (with an error) when amount_bullets is negative or shape_type is not Circle/Rectangle/Capsule - never a default bucket.
 			</description>
 		</method>
 	</methods>

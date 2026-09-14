@@ -290,7 +290,7 @@
 			<return type="void" />
 			<param index="0" name="shift_amount" type="Vector2" />
 			<description>
-				Shifts all directional bullets in the scene by a certain amount (only bullets spawned by this particular [b]BulletFactory2D[/b]). Block bullets are not affected (a warning is emitted when any exist and are skipped).
+				Shifts all bullets in the scene by a certain amount (only bullets spawned by this particular [b]BulletFactory2D[/b]). Both [DirectionalBullets2D] volleys and [BlockBullets2D] volleys (shifted rigidly as a whole) are moved, with shape, attachment and interpolation state synced per bullet.
 			</description>
 		</method>
 	</methods>
@@ -305,7 +305,7 @@
 			Whether the debugger of the collision shapes is enabled or not.
 		</member>
 		<member name="is_factory_processing_bullets" type="bool" setter="set_is_factory_processing_bullets" getter="get_is_factory_processing_bullets" default="true">
-			Use this if you want to pause processing of bullets - being able to stop bullets in place. Always use this instead of [code]set_process[/code]/[code]set_physics_process[/code].
+			Use this if you want to pause processing of bullets - being able to stop bullets in place. Always use this instead of [code]set_process[/code]/[code]set_physics_process[/code]. While paused, physics callbacks are dropped instead of queued, so overlapping areas cannot accumulate a backlog (no resume hitch).
 		</member>
 		<member name="use_physics_interpolation" type="bool" setter="set_use_physics_interpolation_editor" getter="get_use_physics_interpolation" default="false">
 			Determines whether physics interpolation is enabled or not. The setter is for the editor only.

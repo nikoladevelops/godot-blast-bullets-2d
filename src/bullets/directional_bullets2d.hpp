@@ -617,7 +617,12 @@ public:
 			physics_server->area_set_shape_transform(area, i, curr_shape_transf);
 			move_bullet_attachment(velocity_delta, i);
 
-			// 9. MOVEMENT SPEED ACCELERATION - shared sampled once before loop
+			// 9. MOVEMENT SPEED ACCELERATION - shared sampled once before loop.
+			// NOTE: unlike BlockBullets2D (which accelerates ALL entries so a
+			// re-enabled bullet rejoins at the volley's current speed),
+			// directional freezes disabled bullets at their disable-time speed:
+			// per-bullet ballistics are individually owned here, so a wake
+			// resumes where that bullet left off (see enable_bullet).
 			if (shared_curves_acceleration_curve_valid) {
 				all_cached_speed[i] = shared_movement_speed_val;
 				all_cached_velocity[i] = all_cached_direction[i] * shared_movement_speed_val + inherited_velocity_offset;
@@ -1839,8 +1844,10 @@ public:
 		// wake (which skips that path) starts from the same blank state.
 		all_bullet_homing_smoothing.assign(all_bullet_homing_smoothing.size(), 0.0);
 		use_per_bullet_homing_smoothing = false;
+		// Value-reset the whole orbit payload, not just the lock: a stale
+		// radius/direction/angle must never ride into the next life.
 		for (auto &o : all_orbiting_data) {
-			o.is_locked_orbiting = false;
+			o = OrbitingData();
 		}
 		all_orbiting_status.assign(all_orbiting_status.size(), 0);
 		active_orbiting_count = 0;
@@ -1854,6 +1861,17 @@ public:
 		adjust_direction_based_on_rotation = false;
 		homing_inert_warning_issued = false;
 		cached_mouse_global_position = Vector2(0, 0);
+		// Shared movement/speed/rotation are per-owner runtime state like the
+		// homing deques: a pooled instance must not steer the next owner along
+		// the previous owner's pattern or speed. enable_multimesh() re-seeds
+		// these from spawn data; an enable_bullet() wake has no data, so blank
+		// them here to make the pool neutral on every reuse path.
+		shared_movement_pattern_curve.unref();
+		shared_movement_pattern_face_movement_direction = false;
+		shared_movement_pattern_repeat = true;
+		shared_movement_pattern_distances.assign(shared_movement_pattern_distances.size(), 0.0);
+		shared_bullet_speed_data.unref();
+		shared_bullet_rotation_data.unref();
 	}
 
 	// Single-bullet hook called from disable_bullet(): the tick only trims
@@ -1885,7 +1903,7 @@ public:
 			}
 		}
 		if (bullet_index >= 0 && bullet_index < (int)all_orbiting_data.size()) {
-			all_orbiting_data[bullet_index].is_locked_orbiting = false;
+			all_orbiting_data[bullet_index] = OrbitingData();
 		}
 	}
 
@@ -2003,7 +2021,9 @@ protected:
 
 		// Apply rotation if active or speed > 0
 		if (cache_rotation_speed != 0.0f) {
-			bool max_reached = cache_rotation_speed >= all_max_rotation_speed[bullet_index];
+			// Symmetric check: rotation_speed may be negative (CCW), max is
+			// always >= 0. Without abs(), negative spin never triggers the stop.
+			bool max_reached = Math::abs(cache_rotation_speed) >= all_max_rotation_speed[bullet_index];
 
 			if (!(max_reached && stop_rotation_when_max_reached)) {
 				rotate_transform_locally(all_cached_instance_transforms[bullet_index], rot_delta);

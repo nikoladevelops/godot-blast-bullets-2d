@@ -57,6 +57,16 @@ private:
 	// Stores pointers to the spawned debug_data_providers
 	std::vector<IDebuggerDataProvider2D *> debug_data_providers;
 
+	// Instance ids parallel to debug_data_providers. Raw provider pointers can
+	// dangle when a multimesh is freed while pooled or during factory teardown;
+	// the id lets the tick validate via ObjectDB before touching the pointer.
+	std::vector<uint64_t> debug_data_provider_ids;
+
+	// Node identity parallel to debug_data_providers, captured while alive.
+	// Only ever compared BY VALUE against the ObjectDB-resolved live node -
+	// never dereferenced - so id reuse by an unrelated object can't pass.
+	std::vector<Node *> debug_data_provider_nodes;
+
 	// Stores pointers to the spawned debug multimeshes
 	std::vector<MultiMeshInstance2D *> debugger_multimeshes;
 

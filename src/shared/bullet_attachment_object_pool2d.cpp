@@ -178,9 +178,11 @@ void BulletAttachmentObjectPool2D::detach_all() {
 				attachment->home_pool = nullptr;
 				attachment->is_pooled = false;
 			}
-			queue.push(attachment);
+			// Do not re-queue: after detach the pool is dead (factory teardown).
+			// Re-queuing detached pointers would report dead children as reusable stock.
 		}
 	}
+	pool.clear();
 }
 
 void BulletAttachmentObjectPool2D::free_all_bullet_attachments() {

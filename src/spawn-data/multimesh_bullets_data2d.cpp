@@ -139,6 +139,14 @@ double MultiMeshBulletsData2D::get_max_life_time() const {
 	return max_life_time;
 }
 void MultiMeshBulletsData2D::set_max_life_time(double new_max_life_time) {
+	if (!Math::is_finite(new_max_life_time)) {
+		UtilityFunctions::push_error("MultiMeshBulletsData2D max_life_time must be finite, keeping previous value.");
+		return;
+	}
+	if (!is_life_time_infinite && new_max_life_time <= 0.0) {
+		UtilityFunctions::push_error("MultiMeshBulletsData2D max_life_time must be > 0 when lifetime is not infinite (or enable is_life_time_infinite). Keeping previous value.");
+		return;
+	}
 	max_life_time = new_max_life_time;
 }
 
@@ -240,6 +248,10 @@ int MultiMeshBulletsData2D::get_bullet_max_collision_count() const {
 }
 
 void MultiMeshBulletsData2D::set_bullet_max_collision_count(int new_max_collision_amount) {
+	if (new_max_collision_amount < 0) {
+		UtilityFunctions::push_error("MultiMeshBulletsData2D bullet_max_collision_count must be >= 0 (0 = infinite collisions). Keeping previous value.");
+		return;
+	}
 	bullet_max_collision_count = new_max_collision_amount;
 }
 

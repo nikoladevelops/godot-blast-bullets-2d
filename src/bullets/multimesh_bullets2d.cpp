@@ -229,6 +229,16 @@ bool MultiMeshBullets2D::enable_multimesh(const MultiMeshBulletsData2D &data, co
 		return false;
 	}
 
+	// Structural RID work below (area_clear_shapes/free_rid) must never run
+	// inside the bullet iteration / physics flush: a collision-signal handler
+	// calling spawn with a different shape type would otherwise free RIDs
+	// under the server flush lock. Same contract as set_collision_shape_runtime
+	// and the factory reset/free_*/populate_* guards. Use call_deferred().
+	if (bullet_factory != nullptr && bullet_factory->is_bullets_iterating()) {
+		UtilityFunctions::push_error("enable_multimesh cannot run while bullets are being processed (e.g. inside a collision or lifetime signal handler). Use call_deferred() to enable outside the physics step.");
+		return false;
+	}
+
 	// A direct re-enable on an in-use instance must start curves and patterns
 	// from scratch, same as a pooled pop does through disable_multimesh().
 	// Spawner ownership resets here as well: whoever enables next stamps anew.
@@ -434,6 +444,17 @@ void MultiMeshBullets2D::set_up_multimesh(int new_instance_count, const Ref<Mesh
 	// Always track the resolved size, even with a custom mesh, so pooled reuse
 	// with different data cannot inherit a stale quad size.
 	texture_size = new_texture_size;
+
+	// Bullets scatter across the whole level, but frustum culling is tested
+	// once per MultiMeshInstance2D node against the MultiMesh AABB. Without a
+	// custom AABB the box is single-quad-sized at the node origin, so zooming
+	// a Camera2D in culls the ENTIRE volley the moment that tiny box leaves
+	// the frustum. A huge box effectively disables culling for this node
+	// (always drawn); overdraw stays cheap because disabled bullets write
+	// scale-0 transforms. Must live here (not spawn()/ctor): generate_multimesh()
+	// recreates the resource on every fresh spawn.
+	// AABB is Vector3-based even for TRANSFORM_2D, so z must be non-degenerate.
+	multi->set_custom_aabb(AABB(Vector3(-100000, -100000, -1000), Vector3(200000, 200000, 2000)));
 
 	multi->set_instance_count(new_instance_count);
 	batch_buffer.resize(new_instance_count * 8);
@@ -675,6 +696,10 @@ void MultiMeshBullets2D::set_rotation_data(const TypedArray<BulletRotationData2D
 		all_rotation_speed.clear();
 		all_max_rotation_speed.clear();
 		all_rotation_acceleration.clear();
+		// The flag must follow the new data even when rotation is disabled:
+		// otherwise a dead owner's texture/shape-follow mode leaks into the
+		// next life (e.g. set_shared_bullet_rotation_data reuses this flag).
+		rotate_only_textures = new_rotate_only_textures;
 		return;
 	}
 
@@ -696,11 +721,21 @@ void MultiMeshBullets2D::set_rotation_data(const TypedArray<BulletRotationData2D
 		if (entry == nullptr) {
 			UtilityFunctions::push_error("Invalid rotation data at index " + String::num_int64(i) + ": expected BulletRotationData2D. Ignoring all rotation data.");
 			is_rotation_data_active = false;
+			use_only_first_rotation_data = false;
+			all_rotation_speed.clear();
+			all_max_rotation_speed.clear();
+			all_rotation_acceleration.clear();
+			rotate_only_textures = new_rotate_only_textures;
 			return;
 		}
 		if (!Math::is_finite(entry->rotation_speed) || !Math::is_finite(entry->max_rotation_speed) || !Math::is_finite(entry->rotation_acceleration)) {
 			UtilityFunctions::push_error("Non-finite rotation data at index " + String::num_int64(i) + ": rotation values must be finite. Ignoring all rotation data.");
 			is_rotation_data_active = false;
+			use_only_first_rotation_data = false;
+			all_rotation_speed.clear();
+			all_max_rotation_speed.clear();
+			all_rotation_acceleration.clear();
+			rotate_only_textures = new_rotate_only_textures;
 			return;
 		}
 	}
@@ -933,6 +968,11 @@ void MultiMeshBullets2D::set_bullet_direction(int bullet_index, const Vector2 &n
 
 	if (!new_direction.is_finite()) {
 		UtilityFunctions::push_error("set_bullet_direction: new_direction must be finite, keeping the old direction.");
+		return;
+	}
+
+	if (new_direction.length_squared() < 0.000001) {
+		UtilityFunctions::push_error("set_bullet_direction: new_direction is zero, keeping the old direction.");
 		return;
 	}
 
@@ -1227,7 +1267,12 @@ void MultiMeshBullets2D::set_bullet_direction_towards_position(int bullet_index,
 	if (eff < 0 || eff >= (int)all_cached_direction.size() || eff >= (int)all_cached_velocity.size() || eff >= (int)all_cached_speed.size() || bullet_index >= (int)all_cached_instance_origin.size()) {
 		return;
 	}
-	all_cached_direction[eff] = (target_position - all_cached_instance_origin[bullet_index]).normalized();
+	const Vector2 to_target = target_position - all_cached_instance_origin[bullet_index];
+	if (to_target.length_squared() < 0.000001) {
+		UtilityFunctions::push_error("set_bullet_direction_towards_position: bullet is already at the target position, keeping the old direction.");
+		return;
+	}
+	all_cached_direction[eff] = to_target.normalized();
 	all_cached_velocity[eff] = all_cached_direction[eff] * all_cached_speed[eff] + inherited_velocity_offset;
 }
 
@@ -1269,7 +1314,12 @@ void MultiMeshBullets2D::set_bullet_direction_towards_node2d(int bullet_index, c
 	if (eff < 0 || eff >= (int)all_cached_direction.size() || eff >= (int)all_cached_velocity.size() || eff >= (int)all_cached_speed.size() || bullet_index >= (int)all_cached_instance_origin.size()) {
 		return;
 	}
-	all_cached_direction[eff] = (target_position - all_cached_instance_origin[bullet_index]).normalized();
+	const Vector2 to_node = target_position - all_cached_instance_origin[bullet_index];
+	if (to_node.length_squared() < 0.000001) {
+		UtilityFunctions::push_error("set_bullet_direction_towards_node2d: bullet is already at the target position, keeping the old direction.");
+		return;
+	}
+	all_cached_direction[eff] = to_node.normalized();
 	all_cached_velocity[eff] = all_cached_direction[eff] * all_cached_speed[eff] + inherited_velocity_offset;
 }
 

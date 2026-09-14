@@ -1349,12 +1349,17 @@ float *w = batch_buffer.ptrw();
 		if (!validate_bullet_index(bullet_index, "bullet_get_attachment")) {
 			return nullptr;
 		}
-
+		if (bullet_index >= (int)attachments.size()) {
+			return nullptr;
+		}
 		return attachments[bullet_index];
 	}
 
 	_ALWAYS_INLINE_ BulletAttachment2D *bullet_set_attachment_to_null(int bullet_index) {
 		if (!validate_bullet_index(bullet_index, "bullet_set_attachment_to_null")) {
+			return nullptr;
+		}
+		if (bullet_index >= (int)attachments.size()) {
 			return nullptr;
 		}
 
@@ -1788,6 +1793,12 @@ float *w = batch_buffer.ptrw();
 	}
 
 	_ALWAYS_INLINE_ void enable_bullet(int bullet_index, int collision_amount = 0, bool should_enable_attachment = true) {
+		// NOTE (wake semantics): this wake intentionally keeps ballistics
+		// (speed/direction/velocity/position), appearance, custom data and
+		// per-bullet movement state: it takes no spawn data, so there is
+		// nothing to reseed from. Treat it as "resume", not "respawn".
+		// Cross-owner reuse must go through spawn_*()/enable_multimesh(),
+		// which reseed everything from fresh data.
 		if (!validate_bullet_index(bullet_index, "enable_bullet")) {
 			return;
 		}
@@ -1817,6 +1828,10 @@ float *w = batch_buffer.ptrw();
 
 		physics_server->area_set_shape_disabled(area, bullet_index, false);
 
+		// Woken bullets must not lerp from a stale pre-disable position.
+		// Every other teleport-sentenced path syncs prev==curr; do the same.
+		update_bullet_previous_transform_for_interpolation(bullet_index);
+
 		auto &current_bullet_collision_amount = bullets_current_collision_count[bullet_index];
 
 		// collision_amount is how many hits the bullet has already taken: 0 means fresh
@@ -1841,22 +1856,37 @@ float *w = batch_buffer.ptrw();
 			// the pool first, otherwise the next pop() would hand out this live instance
 			// to a second owner while the first still drives it. The factory also resumes
 			// processing it so woken bullets actually move.
-			if (bullets_pool != nullptr) {
-				bullets_pool->try_remove_instance(this, get_pool_key());
-			}
+			// Bump the generation so deferred work queued by the expiring life
+			// (life_time_over emit, deferred attachment disable) cannot fire into
+			// this new life: the generation check would otherwise still match.
+			// Bump the generation so deferred work queued by the expiring life
+			// (life_time_over emit, deferred attachment disable) cannot fire into
+			// this new life: the generation check would otherwise still match.
+			++multimesh_generation;
+			// Only a foreign life (actually pooled) carries the previous
+			// owner's volley-wide signal connections. A same-owner revive of
+			// a drained-but-unpooled volley must keep them: disconnecting here
+			// would silence the whole volley because of one bullet's wake.
+			// try_remove_instance returns false when pooling is off or the
+			// instance was never pooled - both mean same-owner revive.
+			const bool was_pooled = (bullets_pool != nullptr) && bullets_pool->try_remove_instance(this, get_pool_key());
 			if (bullet_factory != nullptr) {
 				bullet_factory->reactivate_multimesh_instance(*this);
 			}
 		// A pooled instance carries the previous owner's signal connections; they
 		// must not fire for this wake (same cleanup the pool-pop enable does).
-		disconnect_sprite_animation_connections();
-		// Same for the previous owner's homing forward: without this, the old
-		// spawner would keep retargeting a volley someone else woke manually.
-		// Guarded by has_signal so BlockBullets2D (no homing signal) no-ops.
-		if (has_signal("bullet_homing_target_reached")) {
-			for (const Dictionary &connection : get_signal_connection_list("bullet_homing_target_reached")) {
-				const Callable callable = connection["callable"];
-				disconnect("bullet_homing_target_reached", callable);
+		// Scoped to foreign lives only (see was_pooled above): same-owner
+		// revives skip the disconnects so sibling notifications survive.
+		if (was_pooled) {
+			disconnect_sprite_animation_connections();
+			// Same for the previous owner's homing forward: without this, the old
+			// spawner would keep retargeting a volley someone else woke manually.
+			// Guarded by has_signal so BlockBullets2D (no homing signal) no-ops.
+			if (has_signal("bullet_homing_target_reached")) {
+				for (const Dictionary &connection : get_signal_connection_list("bullet_homing_target_reached")) {
+					const Callable callable = connection["callable"];
+					disconnect("bullet_homing_target_reached", callable);
+				}
 			}
 		}
 		// Ownership restarts from scratch: whoever woke this re-stamps if it
@@ -1865,12 +1895,20 @@ float *w = batch_buffer.ptrw();
 		owner_spawner_id = 0;
 			// An expiry-pooled wake would otherwise die again on the next tick with an
 			// exhausted timer. Only top it up when expired; manual-disable wakes keep
-			// their remaining lifetime untouched.
+			// their remaining lifetime untouched. Both clocks restart together:
+			// curves sample curves_elapsed_time/max_life_time, so topping up one
+			// without the other would pin curves at their end sample (1.0).
 			if (!is_life_time_infinite && current_life_time <= 0.0) {
 				current_life_time = max_life_time;
+				curves_elapsed_time = 0.0;
 			}
 			is_active = true;
 			set_visible(true);
+			// Keep the interpolator consistent for the whole volley: disabled
+			// bullets are not rendered, but their prev cache is stale. Sync all
+			// so a later enable_bullet() never lerps from a pre-disable pose.
+			// (The woken bullet itself was already synced above.)
+			update_all_previous_transforms_for_interpolation();
 		}
 	}
 
@@ -2019,11 +2057,20 @@ float *w = batch_buffer.ptrw();
 
 	_ALWAYS_INLINE_ void area_entered_func(PhysicsServer2D::AreaBodyStatus status, RID entered_rid, int64_t entered_instance_id, int entered_shape_index, int bullet_shape_index) {
 		if (status == PhysicsServer2D::AREA_BODY_ADDED) {
+			// Paused factory stops draining (no _physics_process) but the
+			// physics server keeps firing: without this gate the vector grows
+			// unbounded while paused and resumes with one giant hitch.
+			if (bullet_factory != nullptr && bullet_factory->is_bullet_processing_paused()) {
+				return;
+			}
 			all_collided_bullets.emplace_back(bullet_shape_index, entered_instance_id, CollisionType::AREA);
 		}
 	}
 	_ALWAYS_INLINE_ void body_entered_func(PhysicsServer2D::AreaBodyStatus status, RID entered_rid, int64_t entered_instance_id, int entered_shape_index, int bullet_shape_index) {
 		if (status == PhysicsServer2D::AREA_BODY_ADDED) {
+			if (bullet_factory != nullptr && bullet_factory->is_bullet_processing_paused()) {
+				return;
+			}
 			all_collided_bullets.emplace_back(bullet_shape_index, entered_instance_id, CollisionType::BODY);
 		}
 	}
@@ -2084,7 +2131,26 @@ float *w = batch_buffer.ptrw();
 	}
 
 	int get_bullet_max_collision_count() const { return bullet_max_collision_count; }
-	void set_bullet_max_collision_count(int value) { bullet_max_collision_count = value; }
+	void set_bullet_max_collision_count(int value) {
+		if (value < 0) {
+			UtilityFunctions::push_error("set_bullet_max_collision_count: value must be >= 0 (0 = infinite collisions). Keeping previous value.");
+			return;
+		}
+		bullet_max_collision_count = value;
+		// Lowering the max must not leave stored counts above it (count > max
+		// would stay observable until the next hit). Clamp live counts down,
+		// mirroring set_bullet(s)_collision_count. max == 0 means infinite.
+		if (value > 0) {
+			for (auto &count : bullets_current_collision_count) {
+				if (count >= value) {
+					count = value - 1;
+				}
+				if (count < 0) {
+					count = 0;
+				}
+			}
+		}
+	}
 
 	// Single-bullet collision counter read. See set_bullet_collision_count for writing.
 	int get_bullet_collision_count(int bullet_index) const;
@@ -2297,6 +2363,13 @@ public:
 		if (expected_timers_generation != multimesh_timers_generation) {
 			return;
 		}
+		// Direct script calls to this _do_* impl bypass the phase check in the
+		// public wrapper. run_multimesh_custom_timers() may be iterating the
+		// vector right now (factory holds the busy flag during the timer sweep).
+		if (bullet_factory != nullptr && bullet_factory->is_bullets_iterating()) {
+			UtilityFunctions::push_error("Cannot modify attached timers while bullets are being processed (e.g. inside a timer callback or collision handler). Use multimesh_attach_time_based_function() instead of the _do_* implementation.");
+			return;
+		}
 		if (time <= 0.0) {
 			UtilityFunctions::push_error("When calling multimesh_attach_time_based_function(), you need to provide a time value that is above 0");
 			return;
@@ -2328,6 +2401,10 @@ public:
 		if (expected_timers_generation != multimesh_timers_generation) {
 			return;
 		}
+		if (bullet_factory != nullptr && bullet_factory->is_bullets_iterating()) {
+			UtilityFunctions::push_error("Cannot modify attached timers while bullets are being processed (e.g. inside a timer callback or collision handler). Use multimesh_detach_time_based_function() instead of the _do_* implementation.");
+			return;
+		}
 		for (auto it = multimesh_custom_timers.begin(); it != multimesh_custom_timers.end();) {
 			if (it->_callback == callable) {
 				it = multimesh_custom_timers.erase(it); // Order-preserving
@@ -2350,6 +2427,10 @@ public:
 	// Deferred implementation of multimesh_detach_all_time_based_functions above.
 	// Advanced: calling directly runs synchronously, which is only safe
 	// outside physics processing (the timer vector may be iterated then).
+	// NOTE: no is_bullets_iterating() guard here on purpose: the internal
+	// disable path (_disable_multimesh_internal) must clear timers even when
+	// it runs inside the physics sweep. Direct script calls during iteration
+	// are still unsafe - use the public wrapper instead.
 	_ALWAYS_INLINE_ void _do_detach_all_time_based_functions(int expected_timers_generation) {
 		if (expected_timers_generation != multimesh_timers_generation) {
 			return;

@@ -74,7 +74,10 @@ public:
 		return get_homing_targets_amount() > 0;
 	}
 
-	// Checks if a homing target is valid
+	// Checks if a homing target is valid. Follows the same guard pattern as
+	// BulletSpawner2D::is_tracked_node_alive(): the cached id must still be
+	// registered and must still belong to this exact pointer. A failed check
+	// means "gone": callers trim/pop instead of dereferencing.
 	_ALWAYS_INLINE_ bool is_homing_target_valid(const Node *target, uint64_t cached_instance_id) const {
 		if (target == nullptr || !UtilityFunctions::is_instance_id_valid(cached_instance_id)) {
 			return false;

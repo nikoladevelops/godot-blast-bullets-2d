@@ -99,7 +99,9 @@ void BlockBullets2D::custom_additional_disable_logic() {
 }
 
 void BlockBullets2D::_bind_methods() {
-	// Expose methods to Godot here
+	// Rigid whole-volley teleport (see header). Same signature as Directional.
+	ClassDB::bind_method(D_METHOD("teleport_shift_bullet", "bullet_index", "shift_value"), &BlockBullets2D::teleport_shift_bullet);
+	ClassDB::bind_method(D_METHOD("teleport_shift_all_bullets", "shift_value", "bullet_index_start", "bullet_index_end_inclusive"), &BlockBullets2D::teleport_shift_all_bullets, DEFVAL(0), DEFVAL(-1));
 }
 
 } //namespace BlastBullets2D

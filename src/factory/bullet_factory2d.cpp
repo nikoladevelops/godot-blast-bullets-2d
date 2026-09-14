@@ -1688,15 +1688,18 @@ void BulletFactory2D::teleport_shift_all_bullets(const Vector2 &shift_amount) {
 
 	for (int i = 0; i < directional_amount; ++i) {
 		DirectionalBullets2D *bullets = all_directional_bullets[i];
-		if (bullets != nullptr) {
+		if (bullets != nullptr && !bullets->is_queued_for_deletion()) {
 			bullets->teleport_shift_all_bullets(shift_amount);
 		}
 	}
 
-	// Block bullets move as one rigid volley with no per-bullet teleport support,
-	// so they are intentionally skipped. Warn instead of staying silent.
-	if (!all_block_bullets.empty()) {
-		UtilityFunctions::push_warning("teleport_shift_all_bullets only affects DirectionalBullets2D; BlockBullets2D instances were skipped.");
+	// Block volleys shift rigidly via their own teleport path (same finite
+	// check, shape sync, attachment carry and interpolation sync per bullet).
+	for (int i = 0; i < (int)all_block_bullets.size(); ++i) {
+		BlockBullets2D *bullets = all_block_bullets[i];
+		if (bullets != nullptr && !bullets->is_queued_for_deletion()) {
+			bullets->teleport_shift_all_bullets(shift_amount);
+		}
 	}
 }
 

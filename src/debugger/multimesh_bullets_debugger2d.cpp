@@ -1,6 +1,7 @@
 #include "multimesh_bullets_debugger2d.hpp"
 #include "../bullets/multimesh_bullets2d.hpp"
 #include "godot_cpp/core/memory.hpp"
+#include "godot_cpp/core/object.hpp"
 
 #include <godot_cpp/classes/array_mesh.hpp>
 #include <godot_cpp/classes/engine.hpp>
@@ -143,6 +144,8 @@ void MultiMeshBulletsDebugger2D::disable() {
 	// Clear both vectors so they hold no stale pointers. clear() keeps capacity.
 	debugger_multimeshes.clear();
 	debug_data_providers.clear();
+	debug_data_provider_ids.clear();
+	debug_data_provider_nodes.clear();
 	debugger_mesh_types.clear();
 	debugger_mesh_sizes.clear();
 	debugger_last_active_states.clear();
@@ -171,6 +174,12 @@ void MultiMeshBulletsDebugger2D::remove_debug_multimesh_for_node(Node *node_exit
 			memdelete(debugger_multimeshes[i]);
 		}
 		debug_data_providers.erase(debug_data_providers.begin() + i);
+		if (i < (int)debug_data_provider_ids.size()) {
+			debug_data_provider_ids.erase(debug_data_provider_ids.begin() + i);
+		}
+		if (i < (int)debug_data_provider_nodes.size()) {
+			debug_data_provider_nodes.erase(debug_data_provider_nodes.begin() + i);
+		}
 		if (i < (int)debugger_multimeshes.size()) {
 			debugger_multimeshes.erase(debugger_multimeshes.begin() + i);
 		}
@@ -252,6 +261,8 @@ void MultiMeshBulletsDebugger2D::generate_debug_multimesh(Node *node_entered_con
 
 	// Store the debugger_data_provider so I can track him
 	debug_data_providers.emplace_back(debugger_data_provider);
+	debug_data_provider_ids.emplace_back(bullets_node->get_instance_id());
+	debug_data_provider_nodes.emplace_back(bullets_node);
 
 	// Store the generated multimesh so I can track it as well
 	debugger_multimeshes.emplace_back(debugger_multimesh);
@@ -449,6 +460,8 @@ void MultiMeshBulletsDebugger2D::_physics_process(double delta) {
 	(void)delta;
 	// Parallel arrays; bail on any desync instead of indexing out of bounds.
 	if (debug_data_providers.size() != debugger_multimeshes.size() ||
+			debug_data_provider_ids.size() != debugger_multimeshes.size() ||
+			debug_data_provider_nodes.size() != debugger_multimeshes.size() ||
 			debugger_mesh_types.size() != debugger_multimeshes.size() ||
 			debugger_mesh_sizes.size() != debugger_multimeshes.size() ||
 			debugger_last_active_states.size() != debugger_multimeshes.size()) {
@@ -461,12 +474,35 @@ void MultiMeshBulletsDebugger2D::_physics_process(double delta) {
 	for (int i = 0; i < (int)debug_data_providers.size(); ++i) {
 		IDebuggerDataProvider2D *provider = debug_data_providers[i];
 
-		if (debugger_multimeshes[i] == nullptr) {
+		if (debugger_multimeshes[i] == nullptr || debugger_multimeshes[i]->is_queued_for_deletion()) {
 			continue;
 		}
 		MultiMeshInstance2D &mesh_instance = *debugger_multimeshes[i];
 
-		if (!provider || provider->get_skip_debugging()) {
+		// Providers are raw pointers: the multimesh may be freed while pooled
+		// or during factory teardown (parent PREDELETE lands before children).
+		// Validate via ObjectDB using the stored id BEFORE touching the
+		// pointer. The stored Node value is compared BY VALUE only (never
+		// dereferenced), so id reuse by an unrelated object can't pass:
+		// dead id, null object, queued object, or identity mismatch all mean
+		// "gone" - hide the mesh and never dereference the provider.
+		// is_queued_for_deletion covers the queued-but-not-freed window that
+		// child_exiting_tree has not delivered yet.
+		bool provider_alive = false;
+		const uint64_t cached_id = (i < (int)debug_data_provider_ids.size()) ? debug_data_provider_ids[i] : 0;
+		Node *stored_node = (i < (int)debug_data_provider_nodes.size()) ? debug_data_provider_nodes[i] : nullptr;
+		if (provider != nullptr && stored_node != nullptr && cached_id != 0 && UtilityFunctions::is_instance_id_valid(cached_id)) {
+			Object *live = ObjectDB::get_instance(ObjectID(cached_id));
+			Node *live_node = Object::cast_to<Node>(live);
+			if (live_node != nullptr && live_node == stored_node && !live_node->is_queued_for_deletion()) {
+				provider_alive = true;
+			}
+		}
+		if (!provider_alive) {
+			mesh_instance.set_visible(false);
+			continue;
+		}
+		if (provider->get_skip_debugging()) {
 			mesh_instance.set_visible(false);
 			continue;
 		}

@@ -24,6 +24,14 @@ void MultiMeshPoolKey2D::set_shape_type(int p_shape_type) {
 }
 
 Ref<MultiMeshPoolKey2D> MultiMeshPoolKey2D::make(int p_amount_bullets, int p_shape_type) {
+	if (p_amount_bullets < 0) {
+		UtilityFunctions::push_error("MultiMeshPoolKey2D.make: amount_bullets must be >= 0, returning null.");
+		return Ref<MultiMeshPoolKey2D>();
+	}
+	if (p_shape_type != PhysicsServer2D::SHAPE_CIRCLE && p_shape_type != PhysicsServer2D::SHAPE_RECTANGLE && p_shape_type != PhysicsServer2D::SHAPE_CAPSULE) {
+		UtilityFunctions::push_error("MultiMeshPoolKey2D.make: shape_type must be Circle, Rectangle or Capsule, returning null.");
+		return Ref<MultiMeshPoolKey2D>();
+	}
 	Ref<MultiMeshPoolKey2D> key = memnew(MultiMeshPoolKey2D);
 	key->set_amount_bullets(p_amount_bullets);
 	key->set_shape_type(p_shape_type);
