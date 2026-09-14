@@ -40,7 +40,8 @@ public:
 	enum OrbitingDirection {
 		DontMove = 0,
 		OrbitLeft,
-		OrbitRight
+		OrbitRight,
+		OrbitRandom
 	};
 
 	enum OrbitingTextureRotation {
@@ -50,12 +51,31 @@ public:
 		FaceOppositeOrbitingDirection
 	};
 
+	enum OrbitingFollowMode {
+		FollowTarget = 0,
+		FollowDeadzone,
+		Anchored
+	};
+
+	enum OrbitingLockPolicy {
+		RelockAlways = 0,
+		StayLocked,
+		RelockOnTargetChange
+	};
+
 	struct OrbitingData {
 		real_t angle = 0.0f;
 		real_t radius = 0.0f;
 		OrbitingDirection direction = OrbitRight;
 		OrbitingTextureRotation texture_rotation = FaceTarget;
 		bool is_locked_orbiting = false;
+		OrbitingFollowMode follow_mode = FollowTarget;
+		real_t follow_deadzone = 0.0f;
+		OrbitingLockPolicy lock_policy = RelockAlways;
+		bool rigid_follow = true;
+		Vector2 locked_center{ 0, 0 };
+		HomingType locked_target_type = NotHoming;
+		uint64_t locked_target_identity = 0;
 
 		OrbitingData() = default;
 
@@ -65,6 +85,17 @@ public:
 				direction(new_direction),
 				texture_rotation(new_texture_rotation),
 				is_locked_orbiting(false) {};
+
+		OrbitingData(real_t new_radius, OrbitingDirection new_direction, OrbitingTextureRotation new_texture_rotation, OrbitingFollowMode new_follow_mode, real_t new_follow_deadzone, OrbitingLockPolicy new_lock_policy, bool new_rigid_follow = true) :
+				angle(0.0),
+				radius(new_radius),
+				direction(new_direction),
+				texture_rotation(new_texture_rotation),
+				is_locked_orbiting(false),
+				follow_mode(new_follow_mode),
+				follow_deadzone(new_follow_deadzone),
+				lock_policy(new_lock_policy),
+				rigid_follow(new_rigid_follow) {};
 	};
 
 protected:
@@ -511,22 +542,36 @@ public:
 			auto &curr_bullet_origin = all_cached_instance_origin[i];
 
 			// 7. ORBITING LOGIC (RELYING ON HOMING TARGETS)
-			// A deque that ran dry unlocks the orbit: keeping a stale angle would snap
-			// the bullet when the next target arrives. Gated on the feature flag:
-			// with zero orbiting bullets no lock can legitimately exist, so
-			// skipping the clear is a no-op that saves 2 compares + 1 store per
-			// bullet per tick in the common no-orbit game.
+			// A deque that ran dry unlocks the orbit under RelockAlways and
+			// RelockOnTargetChange; StayLocked rides out the gap, keeping
+			// angle/center/identity so the ring re-pins silently when a target
+			// returns. Helpers below keep this policy-aware everywhere.
 			const bool orbit_vectors_ready = i >= 0 && i < (int)all_orbiting_data.size() && i < (int)all_orbiting_status.size();
 			if (is_orbiting_feature_enabled && (target_deque_used_for_orbiting == nullptr || target_deque_used_for_orbiting->empty())) {
-				if (orbit_vectors_ready) {
+				if (orbit_vectors_ready && all_orbiting_data[i].lock_policy != StayLocked) {
 					all_orbiting_data[i].is_locked_orbiting = false;
 				}
 			}
 			if (is_orbiting_feature_enabled && orbit_vectors_ready && all_orbiting_status[i] && target_deque_used_for_orbiting != nullptr && !target_deque_used_for_orbiting->empty()) {
 				OrbitingData *const orbiting_data = &all_orbiting_data[i];
 				if (orbiting_data != nullptr) {
-					const Vector2 to_target = curr_bullet_origin - homing_target_pos;
-					const real_t current_dist = to_target.length();
+					// RelockOnTargetChange watches identity, not distance: a new
+					// front target (retarget, round-robin, reached-pop) unlocks
+					// so the bullet re-acquires the ring around the new target;
+					// the same target moving keeps the lock. StayLocked never
+					// unlocks here; RelockAlways unlocked via the no-op write
+					// and replace paths, not per-frame distance.
+					if (orbiting_data->is_locked_orbiting && orbiting_data->lock_policy == RelockOnTargetChange && orbit_should_unlock_for_front_change(*orbiting_data, *target_deque_used_for_orbiting)) {
+						orbiting_data->is_locked_orbiting = false;
+					}
+					// Ring center for this frame: FollowTarget tracks the target,
+					// FollowDeadzone pins until the target walks out of the
+					// deadzone, Anchored freezes at the lock point. Unlocked
+					// bullets always fly toward the live target so they can
+					// still reach the ring.
+					const Vector2 orbit_center = orbiting_data->is_locked_orbiting ? orbit_effective_center(*orbiting_data, homing_target_pos) : homing_target_pos;
+					const Vector2 to_center = curr_bullet_origin - orbit_center;
+					const real_t current_dist = to_center.length();
 					const bool already_locked = orbiting_data->is_locked_orbiting;
 
 					// Track if we are ACTUALLY doing orbit movement this frame
@@ -536,7 +581,7 @@ public:
 					// DontMove = escort: holds a fixed ring slot (angle set at
 					// lock time, never advanced) and translates with the target.
 					if (already_locked && orbiting_data->direction == DontMove) {
-						Vector2 target_pos = homing_target_pos + Vector2(orbiting_data->radius, 0).rotated(orbiting_data->angle);
+						Vector2 target_pos = orbit_center + Vector2(orbiting_data->radius, 0).rotated(orbiting_data->angle);
 						Vector2 snap_delta = target_pos - curr_bullet_origin;
 						// Rigid follow (no max_step clamp): the formation holds
 						// regardless of bullet speed, so fast targets can't drag
@@ -553,17 +598,30 @@ public:
 							if (safe_radius < 0.01) {
 								safe_radius = 0.01;
 							}
-							real_t angular_speed = (all_cached_speed[i] / safe_radius) * dir_multiplier;
-							orbiting_data->angle += angular_speed * delta;
+							// Rigid follow moves the whole ring slot with the
+							// target first (same as DontMove escorts), then
+							// advances the angle: circling never lags behind a
+							// moving target, no matter how slow the bullet is.
+							// With rigid follow off, the angle advances but the
+							// ring center lags: cheap drift look, bullets fall
+							// behind fast targets (clamped to speed * delta).
+							if (orbiting_data->rigid_follow) {
+								orbiting_data->angle += (all_cached_speed[i] / safe_radius) * dir_multiplier * (real_t)delta;
+								velocity_delta = (orbit_center + Vector2(orbiting_data->radius, 0).rotated(orbiting_data->angle)) - curr_bullet_origin;
+							} else {
+								real_t angular_speed = (all_cached_speed[i] / safe_radius) * dir_multiplier;
+								orbiting_data->angle += angular_speed * delta;
+								Vector2 target_pos = orbit_center + Vector2(orbiting_data->radius, 0).rotated(orbiting_data->angle);
+								Vector2 snap_delta = target_pos - curr_bullet_origin;
+								real_t max_step = all_cached_speed[i] * (real_t)delta;
+								if (max_step > 0.0 && snap_delta.length_squared() > max_step * max_step) {
+									snap_delta = snap_delta.normalized() * max_step;
+								}
+								velocity_delta = snap_delta;
+							}
+						} else {
+							velocity_delta = (orbit_center + Vector2(orbiting_data->radius, 0).rotated(orbiting_data->angle)) - curr_bullet_origin;
 						}
-
-						Vector2 target_pos = homing_target_pos + Vector2(orbiting_data->radius, 0).rotated(orbiting_data->angle);
-						Vector2 snap_delta = target_pos - curr_bullet_origin;
-						real_t max_step = all_cached_speed[i] * (real_t)delta;
-						if (max_step > 0.0 && snap_delta.length_squared() > max_step * max_step) {
-							snap_delta = snap_delta.normalized() * max_step;
-						}
-						velocity_delta = snap_delta;
 
 						is_physically_orbiting_this_frame = true;
 					}
@@ -572,10 +630,10 @@ public:
 					// fixed slot, held (never advanced) by the branch above.
 					else if (Math::abs(current_dist - orbiting_data->radius) < Math::max((real_t)(all_cached_speed[i] * delta), (real_t)2.0)) {
 						// REACHED RADIUS - LOCK NOW
-						orbiting_data->angle = to_target.angle();
-						orbiting_data->is_locked_orbiting = true;
+						orbiting_data->angle = to_center.angle();
+						orbit_stamp_lock(*orbiting_data, orbit_center, *target_deque_used_for_orbiting);
 
-						Vector2 target_pos = homing_target_pos + Vector2(orbiting_data->radius, 0).rotated(orbiting_data->angle);
+						Vector2 target_pos = orbit_center + Vector2(orbiting_data->radius, 0).rotated(orbiting_data->angle);
 						Vector2 snap_delta = target_pos - curr_bullet_origin;
 						real_t max_step = all_cached_speed[i] * (real_t)delta;
 						if (max_step > 0.0 && snap_delta.length_squared() > max_step * max_step) {
@@ -588,9 +646,9 @@ public:
 					} else if (current_dist < orbiting_data->radius) {
 						// SPAWNED INSIDE - PUSH OUT
 						// This is technically NOT orbiting yet, it's just moving to the border.
-						Vector2 outward_dir = (current_dist > 0.1f) ? (to_target / current_dist) : Vector2(1, 0);
+						Vector2 outward_dir = (current_dist > 0.1f) ? (to_center / current_dist) : Vector2(1, 0);
 						real_t next_dist = current_dist + (all_cached_speed[i] * delta);
-						Vector2 target_pos = homing_target_pos + (outward_dir * next_dist);
+						Vector2 target_pos = orbit_center + (outward_dir * next_dist);
 						velocity_delta = target_pos - curr_bullet_origin;
 					}
 
@@ -601,7 +659,7 @@ public:
 					// escort has no direction of travel.
 				if (is_physically_orbiting_this_frame && (orbiting_data->direction != DontMove || (orbiting_data->texture_rotation != FaceOrbitingDirection && orbiting_data->texture_rotation != FaceOppositeOrbitingDirection))) {
 					Vector2 look_dir = Vector2();
-					Vector2 radial_vec = (curr_bullet_origin - homing_target_pos).normalized();
+					Vector2 radial_vec = (curr_bullet_origin - orbit_center).normalized();
 
 					switch (orbiting_data->texture_rotation) {
 						case FaceTarget:
@@ -698,9 +756,121 @@ public:
 		}
 	}
 
+	// Identity used by the RelockOnTargetChange policy: the front target the
+	// bullet locked onto last. Node2D = instance id, Vector2 = bit hash of
+	// the snapshot, mouse = 1 (it has no stable address).
+	_ALWAYS_INLINE_ uint64_t orbit_target_identity(const HomingTargetDeque &deque) const {
+		if (deque.empty()) {
+			return 0;
+		}
+		const HomingTarget &front = deque.front();
+		switch (front.type) {
+			case Node2DTarget:
+				if (deque.is_homing_target_valid(front.node2d_target_data.target, front.node2d_target_data.cached_valid_instance_id)) {
+					return front.node2d_target_data.cached_valid_instance_id;
+				}
+				return 0;
+			case GlobalPositionTarget: {
+				const Vector2 p = front.global_position_target;
+				if (!p.is_finite()) {
+					return 0;
+				}
+				uint64_t hx = (uint64_t)Math::abs(p.x * 73856093.0);
+				uint64_t hy = (uint64_t)Math::abs(p.y * 19349663.0);
+				return (hx * 31ULL + hy * 7ULL + (uint64_t)GlobalPositionTarget) | 1ULL;
+			}
+			case MousePositionTarget:
+				return (uint64_t)MousePositionTarget;
+			default:
+				return 0;
+		}
+	}
+
+	// Locked bullet's live deque (shared wins, same precedence as the tick):
+	// the center getter needs the unlocked fallback without duplicating it.
+	_ALWAYS_INLINE_ bool orbit_live_deque_for_bullet(int bullet_index, const HomingTargetDeque *&r_deque) const {
+		if (!shared_homing_deque.empty()) {
+			r_deque = &shared_homing_deque;
+			return true;
+		}
+		if (bullet_index < 0 || bullet_index >= (int)all_bullet_homing_targets.size() || bullet_index >= (int)all_homing_count.size()) {
+			return false;
+		}
+		if (all_homing_count[bullet_index] <= 0 || all_bullet_homing_targets[bullet_index].empty()) {
+			return false;
+		}
+		r_deque = &all_bullet_homing_targets[bullet_index];
+		return true;
+	}
+
+	_ALWAYS_INLINE_ HomingType orbit_target_type(const HomingTargetDeque &deque) const {
+		if (deque.empty()) {
+			return NotHoming;
+		}
+		return deque.front().type;
+	}
+
+	// Locked-ring center for this tick. FollowTarget tracks the target.
+	// FollowDeadzone pins locked_center until the target walks farther than
+	// follow_deadzone from it, then re-pins. Anchored ignores the target
+	// entirely: the ring freezes where it locked.
+	_ALWAYS_INLINE_ Vector2 orbit_effective_center(OrbitingData &orbiting_data, const Vector2 &live_target_pos) {
+		switch (orbiting_data.follow_mode) {
+			case Anchored:
+				if (!orbiting_data.locked_center.is_finite()) {
+					return live_target_pos;
+				}
+				return orbiting_data.locked_center;
+			case FollowDeadzone: {
+				const real_t deadzone = (orbiting_data.follow_deadzone > 0.0f) ? orbiting_data.follow_deadzone : 0.0f;
+				if (!orbiting_data.locked_center.is_finite() || !live_target_pos.is_finite()) {
+					return live_target_pos;
+				}
+				if ((live_target_pos - orbiting_data.locked_center).length() > deadzone) {
+					orbiting_data.locked_center = live_target_pos;
+				}
+				return orbiting_data.locked_center;
+			}
+			case FollowTarget:
+			default:
+				return live_target_pos;
+		}
+	}
+
+	// Stamp the lock bookkeeping shared by every lock site.
+	_ALWAYS_INLINE_ void orbit_stamp_lock(OrbitingData &orbiting_data, const Vector2 &center, const HomingTargetDeque &deque) {
+		orbiting_data.is_locked_orbiting = true;
+		orbiting_data.locked_center = center;
+		orbiting_data.locked_target_type = orbit_target_type(deque);
+		orbiting_data.locked_target_identity = orbit_target_identity(deque);
+	}
+
+	// Policy gate for every event that would drop the lock.
+	// Explicit user action (disable, clear, freed target) always unlocks.
+	// Otherwise: RelockAlways unlocks, StayLocked keeps everything
+	// (angle + center + identity) so the ring re-pins silently when the
+	// target returns, and RelockOnTargetChange unlocks only when the front
+	// target is a different identity than the one the bullet locked onto.
+	_ALWAYS_INLINE_ bool orbit_should_unlock_for_front_change(OrbitingData &orbiting_data, const HomingTargetDeque &deque) {
+		switch (orbiting_data.lock_policy) {
+			case StayLocked:
+				return false;
+			case RelockOnTargetChange: {
+				const uint64_t current = orbit_target_identity(deque);
+				if (current == 0 || current != orbiting_data.locked_target_identity) {
+					return true;
+				}
+				return false;
+			}
+			case RelockAlways:
+			default:
+				return true;
+		}
+	}
+
 	///////////////// ORBITING DATA METHODS
 
-	_ALWAYS_INLINE_ void bullet_enable_orbiting(int bullet_index, real_t orbiting_radius, OrbitingDirection orbiting_direction, OrbitingTextureRotation orbiting_texture_rotation) {
+	_ALWAYS_INLINE_ void bullet_enable_orbiting(int bullet_index, real_t orbiting_radius, OrbitingDirection orbiting_direction, OrbitingTextureRotation orbiting_texture_rotation, OrbitingFollowMode orbiting_follow_mode = FollowTarget, real_t orbiting_follow_deadzone = 0.0f, OrbitingLockPolicy orbiting_lock_policy = RelockAlways, bool orbiting_rigid_follow = true) {
 		if (!validate_bullet_index(bullet_index, "bullet_enable_orbiting")) {
 			return;
 		}
@@ -710,13 +880,36 @@ public:
 			orbiting_radius = 0.01;
 		}
 
+		// OrbitRandom resolves per bullet at enable time: each bullet rolls
+		// OrbitLeft or OrbitRight (never DontMove) so one call fans a mixed
+		// ring. Stored as the rolled value, so getters and re-applies see a
+		// concrete direction and the roll never changes mid-flight.
+		if (orbiting_direction == OrbitRandom) {
+			orbiting_direction = (UtilityFunctions::randi() % 2 == 0) ? OrbitLeft : OrbitRight;
+		}
+
 		if (orbiting_direction < DontMove || orbiting_direction > OrbitRight) {
-			UtilityFunctions::push_error("Invalid orbiting direction " + String::num_int64(orbiting_direction) + ". Use DontMove, OrbitLeft or OrbitRight.");
+			UtilityFunctions::push_error("Invalid orbiting direction " + String::num_int64(orbiting_direction) + ". Use DontMove, OrbitLeft, OrbitRight or OrbitRandom.");
 			return;
 		}
 
 		if (orbiting_texture_rotation < FaceTarget || orbiting_texture_rotation > FaceOppositeOrbitingDirection) {
 			UtilityFunctions::push_error("Invalid orbiting texture rotation " + String::num_int64(orbiting_texture_rotation) + ". Use FaceTarget, FaceOppositeTarget, FaceOrbitingDirection or FaceOppositeOrbitingDirection.");
+			return;
+		}
+
+		if (orbiting_follow_mode < FollowTarget || orbiting_follow_mode > Anchored) {
+			UtilityFunctions::push_error("Invalid orbiting follow mode " + String::num_int64(orbiting_follow_mode) + ". Use FollowTarget, FollowDeadzone or Anchored.");
+			return;
+		}
+
+		if (!Math::is_finite(orbiting_follow_deadzone) || orbiting_follow_deadzone < 0.0) {
+			UtilityFunctions::push_error("Orbiting follow deadzone must be finite and >= 0, got " + String::num(orbiting_follow_deadzone) + ".");
+			return;
+		}
+
+		if (orbiting_lock_policy < RelockAlways || orbiting_lock_policy > RelockOnTargetChange) {
+			UtilityFunctions::push_error("Invalid orbiting lock policy " + String::num_int64(orbiting_lock_policy) + ". Use RelockAlways, StayLocked or RelockOnTargetChange.");
 			return;
 		}
 
@@ -727,10 +920,7 @@ public:
 			return;
 		}
 
-		// DontMove = escort: the bullet locks onto a fixed ring slot and follows
-		// the target without circling (see the tick's locked branch). Counts as
-		// orbiting so the orbit section runs for it.
-		all_orbiting_data[bullet_index] = OrbitingData(orbiting_radius, orbiting_direction, orbiting_texture_rotation);
+		all_orbiting_data[bullet_index] = OrbitingData(orbiting_radius, orbiting_direction, orbiting_texture_rotation, orbiting_follow_mode, orbiting_follow_deadzone, orbiting_lock_policy, orbiting_rigid_follow);
 		active_orbiting_count++; // Important because it tracks whether orbiting is even used at all
 		orbiting_status = 1;
 	}
@@ -770,6 +960,14 @@ public:
 		}
 
 		auto &orbiting_data = all_orbiting_data[bullet_index];
+		// No-op writes keep the lock: the spawner re-applies identical
+		// tuning every retarget pass, and unlocking there caused the
+		// 1-frame fly-to-rim flicker on moving targets.
+		if (Math::is_equal_approx(orbiting_data.radius, new_radius)) {
+			orbiting_data.radius = new_radius;
+			return;
+		}
+
 		orbiting_data.is_locked_orbiting = false; // Reset lock when changing radius
 
 		orbiting_data.radius = new_radius;
@@ -848,12 +1046,19 @@ public:
 		}
 
 		auto &orbiting_data = all_orbiting_data[bullet_index];
+		// OrbitRandom rolls a concrete direction per call (never DontMove):
+		// setting it re-rolls instead of storing the sentinel, so the stored
+		// direction is always a real sweep.
+		if (new_direction == OrbitRandom) {
+			new_direction = (UtilityFunctions::randi() % 2 == 0) ? OrbitLeft : OrbitRight;
+		}
 		if (new_direction < DontMove || new_direction > OrbitRight) {
-			UtilityFunctions::push_error("Invalid orbiting direction " + String::num_int64(new_direction) + ". Use DontMove, OrbitLeft or OrbitRight.");
+			UtilityFunctions::push_error("Invalid orbiting direction " + String::num_int64(new_direction) + ". Use DontMove, OrbitLeft, OrbitRight or OrbitRandom.");
 			return;
 		}
-		// Same as changing the radius: the old lock belongs to the old sweep, so
-		// drop it instead of reversing around a stale angle mid-orbit.
+		if (orbiting_data.direction == new_direction) {
+			return;
+		}
 		orbiting_data.is_locked_orbiting = false;
 		orbiting_data.direction = new_direction;
 	}
@@ -878,22 +1083,266 @@ public:
 
 	///////////////// ORBITING DATA HELPERS
 
-	_ALWAYS_INLINE_ void all_bullets_enable_orbiting(real_t orbiting_radius, OrbitingDirection orbiting_direction, OrbitingTextureRotation orbiting_texture_rotation, int bullet_index_start = 0, int bullet_index_end_inclusive = -1) {
+	// Re-lock every locked bullet onto a fresh deque without the fly-to-rim
+	// flicker: same front identity = keep angle + center, new identity =
+	// stamp the new target (angle preserved, center re-pinned) under
+	// StayLocked/RelockOnTargetChange, full relock under RelockAlways.
+	// Explicit clears still go through bullet_clear_homing_targets (unlock).
+	_ALWAYS_INLINE_ void orbit_keep_lock_across_replace(HomingTargetDeque &deque) {
+		for (size_t k = 0; k < all_orbiting_data.size(); ++k) {
+			if (k >= all_orbiting_status.size() || all_orbiting_status[k] == 0) {
+				continue;
+			}
+			OrbitingData &o = all_orbiting_data[k];
+			if (!o.is_locked_orbiting) {
+				continue;
+			}
+			if (deque.empty()) {
+				if (o.lock_policy == StayLocked) {
+					continue;
+				}
+				o.is_locked_orbiting = false;
+				continue;
+			}
+			if (o.lock_policy == RelockAlways) {
+				o.is_locked_orbiting = false;
+				continue;
+			}
+			if (!orbit_should_unlock_for_front_change(o, deque)) {
+				o.locked_center = deque.get_cached_front_target_global_position();
+				o.locked_target_type = orbit_target_type(deque);
+				o.locked_target_identity = orbit_target_identity(deque);
+			} else {
+				o.is_locked_orbiting = false;
+			}
+		}
+	}
+
+	// Policy-aware unlock for a deque that ran dry: StayLocked rides out the
+	// gap (keeps angle/center/identity so the ring re-pins silently when a
+	// target returns), every other policy unlocks.
+	_ALWAYS_INLINE_ void orbit_unlock_on_empty_deque() {
+		for (size_t k = 0; k < all_orbiting_data.size(); ++k) {
+			if (k >= all_orbiting_status.size() || all_orbiting_status[k] == 0) {
+				continue;
+			}
+			OrbitingData &o = all_orbiting_data[k];
+			if (!o.is_locked_orbiting || o.lock_policy == StayLocked) {
+				continue;
+			}
+			o.is_locked_orbiting = false;
+		}
+	}
+
+	// Same, scoped to one per-bullet deque's owner.
+	_ALWAYS_INLINE_ void orbit_unlock_on_empty_deque_for_bullet(int bullet_index) {
+		if (bullet_index < 0 || bullet_index >= (int)all_orbiting_data.size() || bullet_index >= (int)all_orbiting_status.size()) {
+			return;
+		}
+		if (all_orbiting_status[bullet_index] == 0) {
+			return;
+		}
+		OrbitingData &o = all_orbiting_data[bullet_index];
+		if (!o.is_locked_orbiting || o.lock_policy == StayLocked) {
+			return;
+		}
+		o.is_locked_orbiting = false;
+	}
+
+	_ALWAYS_INLINE_ void all_bullets_enable_orbiting(real_t orbiting_radius, OrbitingDirection orbiting_direction, OrbitingTextureRotation orbiting_texture_rotation, int bullet_index_start = 0, int bullet_index_end_inclusive = -1, OrbitingFollowMode orbiting_follow_mode = FollowTarget, real_t orbiting_follow_deadzone = 0.0f, OrbitingLockPolicy orbiting_lock_policy = RelockAlways, bool orbiting_rigid_follow = true) {
 		ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_enable_orbiting");
 
 		for (int i = bullet_index_start; i <= bullet_index_end_inclusive; ++i) {
-			bullet_enable_orbiting(i, orbiting_radius, orbiting_direction, orbiting_texture_rotation);
+			bullet_enable_orbiting(i, orbiting_radius, orbiting_direction, orbiting_texture_rotation, orbiting_follow_mode, orbiting_follow_deadzone, orbiting_lock_policy, orbiting_rigid_follow);
 		}
 	}
 
 	// Concentric-ring enable: bullet (start + k) orbits at radius_start + radius_step * k.
 	// Invalid enums are rejected per bullet by bullet_enable_orbiting (already-enabled
 	// bullets keep their radius with a warning instead of erroring the whole range).
-	_ALWAYS_INLINE_ void all_bullets_enable_orbiting_linear(real_t radius_start, real_t radius_step, OrbitingDirection orbiting_direction = OrbitRight, OrbitingTextureRotation orbiting_texture_rotation = FaceTarget, int bullet_index_start = 0, int bullet_index_end_inclusive = -1) {
+	_ALWAYS_INLINE_ void all_bullets_enable_orbiting_linear(real_t radius_start, real_t radius_step, OrbitingDirection orbiting_direction = OrbitRight, OrbitingTextureRotation orbiting_texture_rotation = FaceTarget, int bullet_index_start = 0, int bullet_index_end_inclusive = -1, OrbitingFollowMode orbiting_follow_mode = FollowTarget, real_t orbiting_follow_deadzone = 0.0f, OrbitingLockPolicy orbiting_lock_policy = RelockAlways, bool orbiting_rigid_follow = true) {
 		ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_enable_orbiting_linear");
 
 		for (int i = bullet_index_start; i <= bullet_index_end_inclusive; ++i) {
-			bullet_enable_orbiting(i, radius_start + radius_step * (real_t)(i - bullet_index_start), orbiting_direction, orbiting_texture_rotation);
+			bullet_enable_orbiting(i, radius_start + radius_step * (real_t)(i - bullet_index_start), orbiting_direction, orbiting_texture_rotation, orbiting_follow_mode, orbiting_follow_deadzone, orbiting_lock_policy, orbiting_rigid_follow);
+		}
+	}
+
+	_ALWAYS_INLINE_ bool bullet_is_orbiting_locked(int bullet_index) {
+		if (!validate_bullet_index(bullet_index, "bullet_is_orbiting_locked")) {
+			return false;
+		}
+		if (all_orbiting_status[bullet_index] == 0) {
+			return false;
+		}
+		return all_orbiting_data[bullet_index].is_locked_orbiting;
+	}
+
+	_ALWAYS_INLINE_ Vector2 bullet_get_orbiting_center(int bullet_index) {
+		if (!validate_bullet_index(bullet_index, "bullet_get_orbiting_center")) {
+			return Vector2(0, 0);
+		}
+		if (all_orbiting_status[bullet_index] == 0) {
+			UtilityFunctions::push_warning("Bullet index " + String::num_int64(bullet_index) + " has orbiting disabled. Cannot get orbiting center.");
+			return Vector2(0, 0);
+		}
+		auto &orbiting_data = all_orbiting_data[bullet_index];
+		if (orbiting_data.is_locked_orbiting) {
+			return orbiting_data.locked_center;
+		}
+		const HomingTargetDeque *live_deque = nullptr;
+		if (orbit_live_deque_for_bullet(bullet_index, live_deque) && live_deque != nullptr) {
+			return live_deque->get_cached_front_target_global_position();
+		}
+		return Vector2(0, 0);
+	}
+
+	// Locked angle in radians: the ring slot the bullet holds (or is flying to).
+	_ALWAYS_INLINE_ real_t bullet_get_orbiting_angle(int bullet_index) {
+		if (!validate_bullet_index(bullet_index, "bullet_get_orbiting_angle")) {
+			return 0.0;
+		}
+		if (all_orbiting_status[bullet_index] == 0) {
+			UtilityFunctions::push_warning("Bullet index " + String::num_int64(bullet_index) + " has orbiting disabled. Cannot get orbiting angle.");
+			return 0.0;
+		}
+		return all_orbiting_data[bullet_index].angle;
+	}
+
+	// Re-pin the locked ring center without unlocking: Anchored rings follow a
+	// scripted point, Deadzone rings skip ahead, StayLocked rings jump to a
+	// teleported target. Rejected (no unlock) when orbiting is off or the
+	// bullet never locked.
+	_ALWAYS_INLINE_ void bullet_set_orbiting_center(int bullet_index, const Vector2 &new_center) {
+		if (!validate_bullet_index(bullet_index, "bullet_set_orbiting_center")) {
+			return;
+		}
+		if (!new_center.is_finite()) {
+			UtilityFunctions::push_error("bullet_set_orbiting_center: new_center must be finite (NaN/Inf is rejected).");
+			return;
+		}
+		if (all_orbiting_status[bullet_index] == 0) {
+			UtilityFunctions::push_warning("Bullet index " + String::num_int64(bullet_index) + " has orbiting disabled. Cannot set orbiting center.");
+			return;
+		}
+		auto &orbiting_data = all_orbiting_data[bullet_index];
+		if (!orbiting_data.is_locked_orbiting) {
+			UtilityFunctions::push_warning("Bullet index " + String::num_int64(bullet_index) + " is not locked onto its ring yet. Cannot set orbiting center.");
+			return;
+		}
+		orbiting_data.locked_center = new_center;
+	}
+
+	_ALWAYS_INLINE_ void bullet_set_orbiting_follow_mode(int bullet_index, OrbitingFollowMode new_follow_mode) {
+		if (!validate_bullet_index(bullet_index, "bullet_set_orbiting_follow_mode")) {
+			return;
+		}
+		if (new_follow_mode < FollowTarget || new_follow_mode > Anchored) {
+			UtilityFunctions::push_error("Invalid orbiting follow mode " + String::num_int64(new_follow_mode) + ". Use FollowTarget, FollowDeadzone or Anchored.");
+			return;
+		}
+		if (all_orbiting_status[bullet_index] == 0) {
+			UtilityFunctions::push_warning("Bullet index " + String::num_int64(bullet_index) + " has orbiting disabled. Cannot set orbiting follow mode.");
+			return;
+		}
+		all_orbiting_data[bullet_index].follow_mode = new_follow_mode;
+	}
+
+	_ALWAYS_INLINE_ OrbitingFollowMode bullet_get_orbiting_follow_mode(int bullet_index) {
+		if (!validate_bullet_index(bullet_index, "bullet_get_orbiting_follow_mode")) {
+			return FollowTarget;
+		}
+		if (all_orbiting_status[bullet_index] == 0) {
+			UtilityFunctions::push_warning("Bullet index " + String::num_int64(bullet_index) + " has orbiting disabled. Cannot get orbiting follow mode.");
+			return FollowTarget;
+		}
+		return all_orbiting_data[bullet_index].follow_mode;
+	}
+
+	_ALWAYS_INLINE_ void bullet_set_orbiting_follow_deadzone(int bullet_index, real_t new_deadzone) {
+		if (!validate_bullet_index(bullet_index, "bullet_set_orbiting_follow_deadzone")) {
+			return;
+		}
+		if (!Math::is_finite(new_deadzone) || new_deadzone < 0.0) {
+			UtilityFunctions::push_error("Orbiting follow deadzone must be finite and >= 0, got " + String::num(new_deadzone) + ".");
+			return;
+		}
+		if (all_orbiting_status[bullet_index] == 0) {
+			UtilityFunctions::push_warning("Bullet index " + String::num_int64(bullet_index) + " has orbiting disabled. Cannot set orbiting follow deadzone.");
+			return;
+		}
+		all_orbiting_data[bullet_index].follow_deadzone = new_deadzone;
+	}
+
+	_ALWAYS_INLINE_ real_t bullet_get_orbiting_follow_deadzone(int bullet_index) {
+		if (!validate_bullet_index(bullet_index, "bullet_get_orbiting_follow_deadzone")) {
+			return 0.0;
+		}
+		if (all_orbiting_status[bullet_index] == 0) {
+			UtilityFunctions::push_warning("Bullet index " + String::num_int64(bullet_index) + " has orbiting disabled. Cannot get orbiting follow deadzone.");
+			return 0.0;
+		}
+		return all_orbiting_data[bullet_index].follow_deadzone;
+	}
+
+	_ALWAYS_INLINE_ void bullet_set_orbiting_lock_policy(int bullet_index, OrbitingLockPolicy new_lock_policy) {
+		if (!validate_bullet_index(bullet_index, "bullet_set_orbiting_lock_policy")) {
+			return;
+		}
+		if (new_lock_policy < RelockAlways || new_lock_policy > RelockOnTargetChange) {
+			UtilityFunctions::push_error("Invalid orbiting lock policy " + String::num_int64(new_lock_policy) + ". Use RelockAlways, StayLocked or RelockOnTargetChange.");
+			return;
+		}
+		if (all_orbiting_status[bullet_index] == 0) {
+			UtilityFunctions::push_warning("Bullet index " + String::num_int64(bullet_index) + " has orbiting disabled. Cannot set orbiting lock policy.");
+			return;
+		}
+		all_orbiting_data[bullet_index].lock_policy = new_lock_policy;
+	}
+
+	_ALWAYS_INLINE_ OrbitingLockPolicy bullet_get_orbiting_lock_policy(int bullet_index) {
+		if (!validate_bullet_index(bullet_index, "bullet_get_orbiting_lock_policy")) {
+			return RelockAlways;
+		}
+		if (all_orbiting_status[bullet_index] == 0) {
+			UtilityFunctions::push_warning("Bullet index " + String::num_int64(bullet_index) + " has orbiting disabled. Cannot get orbiting lock policy.");
+			return RelockAlways;
+		}
+		return all_orbiting_data[bullet_index].lock_policy;
+	}
+
+	// When on, locked OrbitLeft/OrbitRight bullets translate 1:1 with the
+	// target (same rigid snap DontMove escorts use) and keep circling: the
+	// ring never lags, stretches, or re-locks when the target moves. When
+	// off, locked bullets chase the ring clamped to speed * delta, so slow
+	// bullets trail behind fast targets. Never drops the lock.
+	_ALWAYS_INLINE_ void bullet_set_orbiting_rigid_follow(int bullet_index, bool new_rigid_follow) {
+		if (!validate_bullet_index(bullet_index, "bullet_set_orbiting_rigid_follow")) {
+			return;
+		}
+		if (all_orbiting_status[bullet_index] == 0) {
+			UtilityFunctions::push_warning("Bullet index " + String::num_int64(bullet_index) + " has orbiting disabled. Cannot set orbiting rigid follow.");
+			return;
+		}
+		all_orbiting_data[bullet_index].rigid_follow = new_rigid_follow;
+	}
+
+	_ALWAYS_INLINE_ bool bullet_get_orbiting_rigid_follow(int bullet_index) {
+		if (!validate_bullet_index(bullet_index, "bullet_get_orbiting_rigid_follow")) {
+			return true;
+		}
+		if (all_orbiting_status[bullet_index] == 0) {
+			UtilityFunctions::push_warning("Bullet index " + String::num_int64(bullet_index) + " has orbiting disabled. Cannot get orbiting rigid follow.");
+			return true;
+		}
+		return all_orbiting_data[bullet_index].rigid_follow;
+	}
+
+	_ALWAYS_INLINE_ void all_bullets_set_orbiting_rigid_follow(bool new_rigid_follow, int bullet_index_start = 0, int bullet_index_end_inclusive = -1) {
+		ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_set_orbiting_rigid_follow");
+
+		for (int i = bullet_index_start; i <= bullet_index_end_inclusive; ++i) {
+			bullet_set_orbiting_rigid_follow(i, new_rigid_follow);
 		}
 	}
 
@@ -951,6 +1400,49 @@ public:
 		}
 	}
 
+	_ALWAYS_INLINE_ void all_bullets_set_orbiting_follow_mode(OrbitingFollowMode new_follow_mode, int bullet_index_start = 0, int bullet_index_end_inclusive = -1) {
+		ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_set_orbiting_follow_mode");
+
+		for (int i = bullet_index_start; i <= bullet_index_end_inclusive; ++i) {
+			bullet_set_orbiting_follow_mode(i, new_follow_mode);
+		}
+	}
+
+	_ALWAYS_INLINE_ void all_bullets_set_orbiting_follow_deadzone(real_t new_deadzone, int bullet_index_start = 0, int bullet_index_end_inclusive = -1) {
+		ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_set_orbiting_follow_deadzone");
+
+		for (int i = bullet_index_start; i <= bullet_index_end_inclusive; ++i) {
+			bullet_set_orbiting_follow_deadzone(i, new_deadzone);
+		}
+	}
+
+	_ALWAYS_INLINE_ void all_bullets_set_orbiting_lock_policy(OrbitingLockPolicy new_lock_policy, int bullet_index_start = 0, int bullet_index_end_inclusive = -1) {
+		ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_set_orbiting_lock_policy");
+
+		for (int i = bullet_index_start; i <= bullet_index_end_inclusive; ++i) {
+			bullet_set_orbiting_lock_policy(i, new_lock_policy);
+		}
+	}
+
+	_ALWAYS_INLINE_ void all_bullets_set_orbiting_center(const Vector2 &new_center, int bullet_index_start = 0, int bullet_index_end_inclusive = -1) {
+		ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_set_orbiting_center");
+
+		for (int i = bullet_index_start; i <= bullet_index_end_inclusive; ++i) {
+			bullet_set_orbiting_center(i, new_center);
+		}
+	}
+
+	_ALWAYS_INLINE_ TypedArray<bool> all_bullets_is_orbiting_locked(int bullet_index_start = 0, int bullet_index_end_inclusive = -1) {
+		ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_is_orbiting_locked");
+
+		TypedArray<bool> arr;
+		for (int i = bullet_index_start; i <= bullet_index_end_inclusive; ++i) {
+			arr.push_back(bullet_is_orbiting_locked(i));
+		}
+
+		return arr;
+	}
+
 	////////////////
 
 	///////////// PER BULLET HOMING DEQUE POP METHODS
@@ -987,7 +1479,7 @@ public:
 			all_homing_count[bullet_index] = live;
 		}
 		if (all_homing_count[bullet_index] == 0 && live == 0 && bullet_index >= 0 && bullet_index < (int)all_orbiting_data.size()) {
-			all_orbiting_data[bullet_index].is_locked_orbiting = false;
+			orbit_unlock_on_empty_deque_for_bullet(bullet_index);
 		}
 		return popped;
 	}
@@ -1025,7 +1517,7 @@ public:
 		// the tick only heals this next frame - direct is_locked reads in between
 		// would observe a stale lock.
 		if (all_homing_count[bullet_index] == 0 && live == 0 && bullet_index >= 0 && bullet_index < (int)all_orbiting_data.size()) {
-			all_orbiting_data[bullet_index].is_locked_orbiting = false;
+			orbit_unlock_on_empty_deque_for_bullet(bullet_index);
 		}
 		return popped;
 	}
@@ -1211,11 +1703,7 @@ public:
 		count = 0;
 
 		queue.clear_homing_targets(cached_mouse_global_position);
-		// An emptied deque unlocks the orbit (same as the pops): without this a
-		// direct is_locked read observes a stale lock until the next tick heals it.
-		if (bullet_index >= 0 && bullet_index < (int)all_orbiting_data.size()) {
-			all_orbiting_data[bullet_index].is_locked_orbiting = false;
-		}
+		orbit_unlock_on_empty_deque_for_bullet(bullet_index);
 	}
 
 	_ALWAYS_INLINE_ Array all_bullets_pop_front_target(int bullet_index_start = 0, int bullet_index_end_inclusive = -1) {
@@ -1300,6 +1788,65 @@ public:
 		}
 	}
 
+	// Per-bullet variant of the shared replace above: instead of clear (which
+	// unlocks) + push, clear the raw deque inline and re-pin surviving locks
+	// onto the fresh front.
+	_ALWAYS_INLINE_ void bullet_replace_homing_targets_with_new_target(int bullet_index, const Variant &node2d_or_global_position) {
+		if (!validate_bullet_index(bullet_index, "bullet_replace_homing_targets_with_new_target")) {
+			return;
+		}
+		Node2D *node = Object::cast_to<Node2D>(node2d_or_global_position);
+		const bool is_vec = node2d_or_global_position.get_type() == Variant::VECTOR2;
+		if (node == nullptr && !is_vec) {
+			UtilityFunctions::push_error("Invalid homing target type in bullet_replace_homing_targets_with_new_target. Use a Node2D or Vector2. Nothing was changed.");
+			return;
+		}
+		if (is_vec && !Vector2(node2d_or_global_position).is_finite()) {
+			UtilityFunctions::push_error("Non-finite homing target in bullet_replace_homing_targets_with_new_target. Nothing was changed.");
+			return;
+		}
+		auto &queue = all_bullet_homing_targets[bullet_index];
+		auto &count = all_homing_count[bullet_index];
+		active_homing_count -= count;
+		if (active_homing_count < 0) {
+			active_homing_count = 0;
+		}
+		count = 0;
+		queue.clear_homing_targets(cached_mouse_global_position);
+		bullet_homing_push_back_homing_target(bullet_index, node2d_or_global_position);
+		orbit_keep_lock_across_replace_for_bullet(bullet_index, queue);
+	}
+
+	_ALWAYS_INLINE_ void orbit_keep_lock_across_replace_for_bullet(int bullet_index, HomingTargetDeque &deque) {
+		if (bullet_index < 0 || bullet_index >= (int)all_orbiting_data.size() || bullet_index >= (int)all_orbiting_status.size()) {
+			return;
+		}
+		if (all_orbiting_status[bullet_index] == 0) {
+			return;
+		}
+		OrbitingData &o = all_orbiting_data[bullet_index];
+		if (!o.is_locked_orbiting) {
+			return;
+		}
+		if (deque.empty()) {
+			if (o.lock_policy != StayLocked) {
+				o.is_locked_orbiting = false;
+			}
+			return;
+		}
+		if (o.lock_policy == RelockAlways) {
+			o.is_locked_orbiting = false;
+			return;
+		}
+		if (!orbit_should_unlock_for_front_change(o, deque)) {
+			o.locked_center = deque.get_cached_front_target_global_position();
+			o.locked_target_type = orbit_target_type(deque);
+			o.locked_target_identity = orbit_target_identity(deque);
+		} else {
+			o.is_locked_orbiting = false;
+		}
+	}
+
 	_ALWAYS_INLINE_ void all_bullets_replace_homing_targets_with_new_target(const Variant &node2d_or_global_position, int bullet_index_start = 0, int bullet_index_end_inclusive = -1) {
 		ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_replace_homing_targets_with_new_target");
 
@@ -1309,9 +1856,14 @@ public:
 			UtilityFunctions::push_error("Invalid homing target type in all_bullets_replace_homing_targets_with_new_target. Use a Node2D or Vector2. Nothing was changed.");
 			return;
 		}
+		if (node2d_or_global_position.get_type() == Variant::VECTOR2 && !Vector2(node2d_or_global_position).is_finite()) {
+			UtilityFunctions::push_error("Non-finite homing target in all_bullets_replace_homing_targets_with_new_target. Nothing was changed.");
+			return;
+		}
 
-		all_bullets_clear_homing_targets(bullet_index_start, bullet_index_end_inclusive);
-		all_bullets_push_back_homing_target(node2d_or_global_position, bullet_index_start, bullet_index_end_inclusive);
+		for (int i = bullet_index_start; i <= bullet_index_end_inclusive; ++i) {
+			bullet_replace_homing_targets_with_new_target(i, node2d_or_global_position);
+		}
 	}
 
 	_ALWAYS_INLINE_ void all_bullets_replace_homing_targets_with_new_target_array(const Array &node2ds_or_global_positions_array, int bullet_index_start = 0, int bullet_index_end_inclusive = -1) {
@@ -1325,10 +1877,26 @@ public:
 				UtilityFunctions::push_error("Invalid homing target type in all_bullets_replace_homing_targets_with_new_target_array at array index " + String::num_int64(k) + ". Use Node2D or Vector2 entries. Nothing was changed.");
 				return;
 			}
+			if (target.get_type() == Variant::VECTOR2 && !Vector2(target).is_finite()) {
+				UtilityFunctions::push_error("Non-finite homing target in all_bullets_replace_homing_targets_with_new_target_array at array index " + String::num_int64(k) + ". Nothing was changed.");
+				return;
+			}
 		}
 
-		all_bullets_clear_homing_targets(bullet_index_start, bullet_index_end_inclusive);
+		for (int i = bullet_index_start; i <= bullet_index_end_inclusive; ++i) {
+			auto &queue = all_bullet_homing_targets[i];
+			auto &count = all_homing_count[i];
+			active_homing_count -= count;
+			if (active_homing_count < 0) {
+				active_homing_count = 0;
+			}
+			count = 0;
+			queue.clear_homing_targets(cached_mouse_global_position);
+		}
 		all_bullets_push_back_homing_targets_array(node2ds_or_global_positions_array, bullet_index_start, bullet_index_end_inclusive);
+		for (int i = bullet_index_start; i <= bullet_index_end_inclusive; ++i) {
+			orbit_keep_lock_across_replace_for_bullet(i, all_bullet_homing_targets[i]);
+		}
 	}
 
 	_ALWAYS_INLINE_ void all_bullets_replace_homing_targets_with_mouse(int bullet_index_start = 0, int bullet_index_end_inclusive = -1) {
@@ -1337,12 +1905,20 @@ public:
 		// Cache once for the whole loop
 		cached_mouse_global_position = get_global_mouse_position();
 
-		all_bullets_clear_homing_targets(bullet_index_start, bullet_index_end_inclusive);
 		for (int i = bullet_index_start; i <= bullet_index_end_inclusive; ++i) {
+			auto &queue = all_bullet_homing_targets[i];
+			auto &count = all_homing_count[i];
+			active_homing_count -= count;
+			if (active_homing_count < 0) {
+				active_homing_count = 0;
+			}
+			count = 0;
+			queue.clear_homing_targets(cached_mouse_global_position);
 			if (all_bullet_homing_targets[i].push_back_mouse_position_target(cached_mouse_global_position)) {
 				++all_homing_count[i];
 				++active_homing_count;
 			}
+			orbit_keep_lock_across_replace_for_bullet(i, all_bullet_homing_targets[i]);
 		}
 	}
 
@@ -1531,30 +2107,40 @@ public:
 	_ALWAYS_INLINE_ void shared_homing_deque_clear_homing_targets() {
 		shared_homing_deque.clear_homing_targets(cached_mouse_global_position);
 		reset_shared_homing_reached_state();
-		// Shared deque ran dry: drop every orbit lock now instead of leaving
-		// stale locks observable until the next tick heals them (per-bullet
-		// clear/pop paths unlock the same way).
-		for (auto &o : all_orbiting_data) {
-			o.is_locked_orbiting = false;
-		}
+		orbit_unlock_on_empty_deque();
 	}
 
+	// Replace = clear + push, but locks must survive the intermediate empty
+	// deque under StayLocked/RelockOnTargetChange: validate first (invalid
+	// input keeps the old queue AND the old lock), then re-pin surviving
+	// locks onto the fresh front instead of dropping them.
 	_ALWAYS_INLINE_ void shared_homing_deque_replace_homing_targets_with_new_target(const Variant &node2d_or_global_position) {
 		Node2D *node2d_target = Object::cast_to<Node2D>(node2d_or_global_position);
 
 		if (node2d_target) {
-			shared_homing_deque_clear_homing_targets();
+			shared_homing_deque.clear_homing_targets(cached_mouse_global_position);
+			reset_shared_homing_reached_state();
 			shared_homing_deque_push_back_node2d_target(node2d_target);
+			orbit_keep_lock_across_replace(shared_homing_deque);
 		} else if (node2d_or_global_position.get_type() == Variant::VECTOR2) {
-			shared_homing_deque_clear_homing_targets();
+			shared_homing_deque.clear_homing_targets(cached_mouse_global_position);
+			reset_shared_homing_reached_state();
 			shared_homing_deque_push_back_global_position_target(node2d_or_global_position);
+			orbit_keep_lock_across_replace(shared_homing_deque);
 		} else {
 			UtilityFunctions::push_error("Invalid type passed to shared_homing_deque_replace_homing_targets_with_new_target");
 		}
 	}
 
 	_ALWAYS_INLINE_ void shared_homing_deque_replace_homing_targets_with_new_target_array(const Array &node2ds_or_global_positions_array) {
-		shared_homing_deque_clear_homing_targets();
+		for (auto &target : node2ds_or_global_positions_array) {
+			if (Object::cast_to<Node2D>(target) == nullptr && target.get_type() != Variant::VECTOR2) {
+				UtilityFunctions::push_error("Invalid type passed to shared_homing_deque_replace_homing_targets_with_new_target_array. Nothing was changed.");
+				return;
+			}
+		}
+		shared_homing_deque.clear_homing_targets(cached_mouse_global_position);
+		reset_shared_homing_reached_state();
 
 		for (auto &target : node2ds_or_global_positions_array) {
 			Node2D *node2d_target = Object::cast_to<Node2D>(target);
@@ -1567,6 +2153,7 @@ public:
 				UtilityFunctions::push_error("Invalid type passed to shared_homing_deque_replace_homing_targets_with_new_target_array");
 			}
 		}
+		orbit_keep_lock_across_replace(shared_homing_deque);
 	}
 
 	_ALWAYS_INLINE_ int shared_homing_deque_check_homing_targets_amount() const {
@@ -2358,3 +2945,5 @@ protected:
 VARIANT_ENUM_CAST(BlastBullets2D::HomingType);
 VARIANT_ENUM_CAST(BlastBullets2D::DirectionalBullets2D::OrbitingDirection);
 VARIANT_ENUM_CAST(BlastBullets2D::DirectionalBullets2D::OrbitingTextureRotation);
+VARIANT_ENUM_CAST(BlastBullets2D::DirectionalBullets2D::OrbitingFollowMode);
+VARIANT_ENUM_CAST(BlastBullets2D::DirectionalBullets2D::OrbitingLockPolicy);

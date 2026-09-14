@@ -412,6 +412,23 @@ class BulletSpawner2D : public Node2D{
         bool orbiting_radius_linear_enabled = false;
         double orbiting_radius_start = 64.0;
         double orbiting_radius_step = 0.0;
+        // How the locked ring follows a moving target: FollowTarget tracks it
+        // 1:1, FollowDeadzone pins the center until the target walks
+        // farther than orbiting_follow_deadzone from it (jitter zone), Anchored
+        // freezes the ring where it locked and ignores target motion.
+        DirectionalBullets2D::OrbitingFollowMode orbiting_follow_mode = DirectionalBullets2D::FollowTarget;
+        // Deadzone radius in pixels, used only by FollowDeadzone.
+        double orbiting_follow_deadzone = 8.0;
+        // What drops the lock: RelockAlways re-acquires every retarget,
+        // StayLocked never unlocks on retarget/empty (only explicit
+        // disable, clear, or a freed target), RelockOnTargetChange unlocks
+        // only when the front target is a different target.
+        DirectionalBullets2D::OrbitingLockPolicy orbiting_lock_policy = DirectionalBullets2D::RelockAlways;
+        // When on, locked OrbitLeft/OrbitRight bullets translate 1:1 with the
+        // target and keep circling (rings never lag or stretch when the
+        // target moves). When off, locked bullets chase the ring center
+        // clamped to speed * delta, so slow bullets trail fast targets.
+        bool orbiting_rigid_follow = true;
 
         bool get_homing_enabled() const;
         void set_homing_enabled(bool value);
@@ -486,6 +503,14 @@ class BulletSpawner2D : public Node2D{
         void set_orbiting_radius_start(double value);
         double get_orbiting_radius_step() const;
         void set_orbiting_radius_step(double value);
+        DirectionalBullets2D::OrbitingFollowMode get_orbiting_follow_mode() const;
+        void set_orbiting_follow_mode(DirectionalBullets2D::OrbitingFollowMode value);
+        double get_orbiting_follow_deadzone() const;
+        void set_orbiting_follow_deadzone(double value);
+        DirectionalBullets2D::OrbitingLockPolicy get_orbiting_lock_policy() const;
+        void set_orbiting_lock_policy(DirectionalBullets2D::OrbitingLockPolicy value);
+        bool get_orbiting_rigid_follow() const;
+        void set_orbiting_rigid_follow(bool value);
 
         // Resolves the current homing targets without touching any volley:
         // node-group members (filtered + selected), the node at

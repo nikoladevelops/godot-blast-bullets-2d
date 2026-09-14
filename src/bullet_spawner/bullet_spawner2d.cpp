@@ -1185,7 +1185,7 @@ DirectionalBullets2D::OrbitingDirection BulletSpawner2D::get_orbiting_direction(
     return orbiting_direction;
 }
 void BulletSpawner2D::set_orbiting_direction(DirectionalBullets2D::OrbitingDirection value) {
-    if (value != DirectionalBullets2D::DontMove && value != DirectionalBullets2D::OrbitLeft && value != DirectionalBullets2D::OrbitRight) {
+    if (value != DirectionalBullets2D::DontMove && value != DirectionalBullets2D::OrbitLeft && value != DirectionalBullets2D::OrbitRight && value != DirectionalBullets2D::OrbitRandom) {
         UtilityFunctions::push_error("BulletSpawner2D: invalid orbiting_direction, keeping the old value.");
         return;
     }
@@ -1229,6 +1229,43 @@ void BulletSpawner2D::set_orbiting_radius_step(double value) {
         return;
     }
     orbiting_radius_step = value;
+}
+DirectionalBullets2D::OrbitingFollowMode BulletSpawner2D::get_orbiting_follow_mode() const {
+    return orbiting_follow_mode;
+}
+void BulletSpawner2D::set_orbiting_follow_mode(DirectionalBullets2D::OrbitingFollowMode value) {
+    if (value != DirectionalBullets2D::FollowTarget && value != DirectionalBullets2D::FollowDeadzone && value != DirectionalBullets2D::Anchored) {
+        UtilityFunctions::push_error("BulletSpawner2D: invalid orbiting_follow_mode, keeping the old value.");
+        return;
+    }
+    orbiting_follow_mode = value;
+    notify_property_list_changed();
+}
+double BulletSpawner2D::get_orbiting_follow_deadzone() const {
+    return orbiting_follow_deadzone;
+}
+void BulletSpawner2D::set_orbiting_follow_deadzone(double value) {
+    if (!Math::is_finite(value) || value < 0.0) {
+        UtilityFunctions::push_error("BulletSpawner2D: orbiting_follow_deadzone must be finite and >= 0, keeping the old value.");
+        return;
+    }
+    orbiting_follow_deadzone = value;
+}
+DirectionalBullets2D::OrbitingLockPolicy BulletSpawner2D::get_orbiting_lock_policy() const {
+    return orbiting_lock_policy;
+}
+void BulletSpawner2D::set_orbiting_lock_policy(DirectionalBullets2D::OrbitingLockPolicy value) {
+    if (value != DirectionalBullets2D::RelockAlways && value != DirectionalBullets2D::StayLocked && value != DirectionalBullets2D::RelockOnTargetChange) {
+        UtilityFunctions::push_error("BulletSpawner2D: invalid orbiting_lock_policy, keeping the old value.");
+        return;
+    }
+    orbiting_lock_policy = value;
+}
+bool BulletSpawner2D::get_orbiting_rigid_follow() const {
+    return orbiting_rigid_follow;
+}
+void BulletSpawner2D::set_orbiting_rigid_follow(bool value) {
+    orbiting_rigid_follow = value;
 }
 
 bool BulletSpawner2D::homing_retarget_active() const {
@@ -1783,11 +1820,28 @@ void BulletSpawner2D::apply_orbiting_to_volley(DirectionalBullets2D *volley) con
                 ? MAX(orbiting_radius_start + orbiting_radius_step * i, 0.01)
                 : orbiting_radius;
         if (!volley->bullet_is_orbiting_enabled(i)) {
-            volley->bullet_enable_orbiting(i, (real_t)radius, orbiting_direction, orbiting_texture_rotation);
+            volley->bullet_enable_orbiting(i, (real_t)radius, orbiting_direction, orbiting_texture_rotation, orbiting_follow_mode, (real_t)orbiting_follow_deadzone, orbiting_lock_policy, orbiting_rigid_follow);
+        } else if (orbiting_direction == DirectionalBullets2D::OrbitRandom) {
+            // OrbitRandom rolls once per bullet at enable time: re-rolling on
+            // every retarget pass would flip circling directions mid-flight,
+            // so live bullets keep their rolled direction here.
+            volley->bullet_set_orbiting_radius(i, (real_t)radius);
+            volley->bullet_set_orbiting_texture_rotation(i, orbiting_texture_rotation);
+            volley->bullet_set_orbiting_follow_mode(i, orbiting_follow_mode);
+            volley->bullet_set_orbiting_follow_deadzone(i, (real_t)orbiting_follow_deadzone);
+            volley->bullet_set_orbiting_lock_policy(i, orbiting_lock_policy);
+            volley->bullet_set_orbiting_rigid_follow(i, orbiting_rigid_follow);
         } else {
+            // No-op writes keep the engine lock (radius/direction setters skip
+            // identical values), so a retarget pass with unchanged tuning no
+            // longer causes the 1-frame fly-to-rim flicker.
             volley->bullet_set_orbiting_radius(i, (real_t)radius);
             volley->bullet_set_orbiting_direction(i, orbiting_direction);
             volley->bullet_set_orbiting_texture_rotation(i, orbiting_texture_rotation);
+            volley->bullet_set_orbiting_follow_mode(i, orbiting_follow_mode);
+            volley->bullet_set_orbiting_follow_deadzone(i, (real_t)orbiting_follow_deadzone);
+            volley->bullet_set_orbiting_lock_policy(i, orbiting_lock_policy);
+            volley->bullet_set_orbiting_rigid_follow(i, orbiting_rigid_follow);
         }
     }
 }
@@ -2127,13 +2181,13 @@ void BulletSpawner2D::rebuild_preview() {
         }
         effective_base->add_child(preview_holder);
     }
-    // Legacy cleanup first: older versions drew the preview with Line2D strips
+    // Cleanup first: older versions drew the preview with Line2D strips
     // ("Dots"/"Ticks"). Remove any leftover before adopting/creating the
     // plain Node2D layers, so a healed holder can never clash on child names
     // and upgraded scenes keep no stray-segment nodes around.
-    TypedArray<Node> legacy = preview_holder->find_children("*", "Line2D", false, false);
-    for (int i = 0; i < legacy.size(); i++) {
-        Node *stray = Object::cast_to<Node>(legacy[i]);
+    TypedArray<Node> stray_lines = preview_holder->find_children("*", "Line2D", false, false);
+    for (int i = 0; i < stray_lines.size(); i++) {
+        Node *stray = Object::cast_to<Node>(stray_lines[i]);
         if (stray != nullptr) {
             preview_holder->remove_child(stray);
             memdelete(stray);
@@ -2146,10 +2200,10 @@ void BulletSpawner2D::rebuild_preview() {
     if (preview_dots_layer == nullptr) {
         // Wrong-type leftover (plain Node2D from the RenderingServer build):
         // drop it so the typed layer can take the canonical name.
-        Node *legacy_dots = preview_holder->get_node_or_null(NodePath("Dots"));
-        if (legacy_dots != nullptr) {
-            preview_holder->remove_child(legacy_dots);
-            memdelete(legacy_dots);
+        Node *old_dots = preview_holder->get_node_or_null(NodePath("Dots"));
+        if (old_dots != nullptr) {
+            preview_holder->remove_child(old_dots);
+            memdelete(old_dots);
         }
         preview_dots_layer = memnew(PatternPreviewLayer2D);
         preview_dots_layer->set_name("Dots");
@@ -2160,10 +2214,10 @@ void BulletSpawner2D::rebuild_preview() {
     preview_arrows_layer = Object::cast_to<PatternPreviewLayer2D>(preview_holder->get_node_or_null(NodePath("Arrows")));
     if (preview_arrows_layer == nullptr) {
         // Same wrong-type migration as Dots above.
-        Node *legacy_arrows = preview_holder->get_node_or_null(NodePath("Arrows"));
-        if (legacy_arrows != nullptr) {
-            preview_holder->remove_child(legacy_arrows);
-            memdelete(legacy_arrows);
+        Node *old_arrows = preview_holder->get_node_or_null(NodePath("Arrows"));
+        if (old_arrows != nullptr) {
+            preview_holder->remove_child(old_arrows);
+            memdelete(old_arrows);
         }
         preview_arrows_layer = memnew(PatternPreviewLayer2D);
         preview_arrows_layer->set_name("Arrows");
@@ -2364,6 +2418,8 @@ void BulletSpawner2D::_validate_property(PropertyInfo &p_property) const {
                     show = !orbiting_radius_linear_enabled;
                 } else if (property_name == "orbiting_radius_start" || property_name == "orbiting_radius_step") {
                     show = orbiting_radius_linear_enabled;
+                } else if (property_name == "orbiting_follow_deadzone") {
+                    show = orbiting_follow_mode == DirectionalBullets2D::FollowDeadzone;
                 }
             }
         }
@@ -3039,7 +3095,7 @@ void BulletSpawner2D::_bind_methods() {
 
 	ClassDB::bind_method(D_METHOD("get_orbiting_direction"), &BulletSpawner2D::get_orbiting_direction);
 	ClassDB::bind_method(D_METHOD("set_orbiting_direction", "value"), &BulletSpawner2D::set_orbiting_direction);
-	ADD_PROPERTY(PropertyInfo(Variant::INT, "orbiting_direction", PROPERTY_HINT_ENUM, "Dont Move,Orbit Left,Orbit Right"), "set_orbiting_direction", "get_orbiting_direction");
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "orbiting_direction", PROPERTY_HINT_ENUM, "Dont Move,Orbit Left,Orbit Right,Orbit Random"), "set_orbiting_direction", "get_orbiting_direction");
 
 	ClassDB::bind_method(D_METHOD("get_orbiting_texture_rotation"), &BulletSpawner2D::get_orbiting_texture_rotation);
 	ClassDB::bind_method(D_METHOD("set_orbiting_texture_rotation", "value"), &BulletSpawner2D::set_orbiting_texture_rotation);
@@ -3056,6 +3112,22 @@ void BulletSpawner2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_orbiting_radius_step"), &BulletSpawner2D::get_orbiting_radius_step);
 	ClassDB::bind_method(D_METHOD("set_orbiting_radius_step", "value"), &BulletSpawner2D::set_orbiting_radius_step);
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "orbiting_radius_step"), "set_orbiting_radius_step", "get_orbiting_radius_step");
+
+	ClassDB::bind_method(D_METHOD("get_orbiting_follow_mode"), &BulletSpawner2D::get_orbiting_follow_mode);
+	ClassDB::bind_method(D_METHOD("set_orbiting_follow_mode", "value"), &BulletSpawner2D::set_orbiting_follow_mode);
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "orbiting_follow_mode", PROPERTY_HINT_ENUM, "Follow Target,Follow Deadzone,Anchored"), "set_orbiting_follow_mode", "get_orbiting_follow_mode");
+
+	ClassDB::bind_method(D_METHOD("get_orbiting_follow_deadzone"), &BulletSpawner2D::get_orbiting_follow_deadzone);
+	ClassDB::bind_method(D_METHOD("set_orbiting_follow_deadzone", "value"), &BulletSpawner2D::set_orbiting_follow_deadzone);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "orbiting_follow_deadzone"), "set_orbiting_follow_deadzone", "get_orbiting_follow_deadzone");
+
+	ClassDB::bind_method(D_METHOD("get_orbiting_lock_policy"), &BulletSpawner2D::get_orbiting_lock_policy);
+	ClassDB::bind_method(D_METHOD("set_orbiting_lock_policy", "value"), &BulletSpawner2D::set_orbiting_lock_policy);
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "orbiting_lock_policy", PROPERTY_HINT_ENUM, "Relock Always,Stay Locked,Relock On Target Change"), "set_orbiting_lock_policy", "get_orbiting_lock_policy");
+
+	ClassDB::bind_method(D_METHOD("get_orbiting_rigid_follow"), &BulletSpawner2D::get_orbiting_rigid_follow);
+	ClassDB::bind_method(D_METHOD("set_orbiting_rigid_follow", "value"), &BulletSpawner2D::set_orbiting_rigid_follow);
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "orbiting_rigid_follow"), "set_orbiting_rigid_follow", "get_orbiting_rigid_follow");
 
 	ClassDB::bind_method(D_METHOD("resolve_homing_targets", "quiet", "advance_round_robin"), &BulletSpawner2D::resolve_homing_targets, DEFVAL(false), DEFVAL(true));
 	ClassDB::bind_method(D_METHOD("retarget_live_volleys"), &BulletSpawner2D::retarget_live_volleys);

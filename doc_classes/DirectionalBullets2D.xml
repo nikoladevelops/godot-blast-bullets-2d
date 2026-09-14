@@ -69,6 +69,10 @@
 			<param index="2" name="orbiting_texture_rotation" type="int" enum="DirectionalBullets2D.OrbitingTextureRotation" default="0" />
 			<param index="3" name="bullet_index_start" type="int" default="0" />
 			<param index="4" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<param index="5" name="orbiting_follow_mode" type="int" enum="DirectionalBullets2D.OrbitingFollowMode" default="0" />
+			<param index="6" name="orbiting_follow_deadzone" type="float" default="0.0" />
+			<param index="7" name="orbiting_lock_policy" type="int" enum="DirectionalBullets2D.OrbitingLockPolicy" default="0" />
+			<param index="8" name="orbiting_rigid_follow" type="bool" default="true" />
 			<description>
 				Enables orbiting for the specified range of bullets with the given parameters.
 
@@ -83,6 +87,10 @@
 			<param index="3" name="orbiting_texture_rotation" type="int" enum="DirectionalBullets2D.OrbitingTextureRotation" default="0" />
 			<param index="4" name="bullet_index_start" type="int" default="0" />
 			<param index="5" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<param index="6" name="orbiting_follow_mode" type="int" enum="DirectionalBullets2D.OrbitingFollowMode" default="0" />
+			<param index="7" name="orbiting_follow_deadzone" type="float" default="0.0" />
+			<param index="8" name="orbiting_lock_policy" type="int" enum="DirectionalBullets2D.OrbitingLockPolicy" default="0" />
+			<param index="9" name="orbiting_rigid_follow" type="bool" default="true" />
 			<description>
 				Enables orbiting with concentric radii: bullet (start + k) orbits at radius_start + radius_step * k. Useful for shield rings. Bullets that already orbit keep their radius with a warning.
 			</description>
@@ -240,13 +248,30 @@
 				Sets the homing turn agility for each bullet in the range. Setting any per-bullet value enables per-bullet mode, after which the shared [member homing_smoothing] is ignored. Useful for mixed volleys with fast and drifting homers.
 			</description>
 		</method>
+		<method name="all_bullets_is_orbiting_locked">
+			<return type="bool[]" />
+			<param index="0" name="bullet_index_start" type="int" default="0" />
+			<param index="1" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<description>
+				Returns whether each bullet in the range is currently locked onto its orbit ring (as opposed to merely enabled but still flying to the ring).
+			</description>
+		</method>
+		<method name="all_bullets_set_orbiting_center">
+			<return type="void" />
+			<param index="0" name="new_center" type="Vector2" />
+			<param index="1" name="bullet_index_start" type="int" default="0" />
+			<param index="2" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<description>
+				Re-pins the locked ring center for each locked bullet in the range without unlocking. Unlocked or disabled bullets warn and are skipped.
+			</description>
+		</method>
 		<method name="all_bullets_set_orbiting_direction">
 			<return type="void" />
 			<param index="0" name="new_direction" type="int" enum="DirectionalBullets2D.OrbitingDirection" />
 			<param index="1" name="bullet_index_start" type="int" default="0" />
 			<param index="2" name="bullet_index_end_inclusive" type="int" default="-1" />
 			<description>
-				Sets the orbiting direction for all bullets in the range.
+				Sets the orbiting direction for all bullets in the range. Passing OrbitRandom re-rolls OrbitLeft or OrbitRight per bullet (never DontMove).
 			</description>
 		</method>
 		<method name="all_bullets_set_orbiting_radius">
@@ -256,6 +281,42 @@
 			<param index="2" name="bullet_index_end_inclusive" type="int" default="-1" />
 			<description>
 				Sets the orbiting radius for all bullets in the range.
+			</description>
+		</method>
+		<method name="all_bullets_set_orbiting_follow_deadzone">
+			<return type="void" />
+			<param index="0" name="new_deadzone" type="float" />
+			<param index="1" name="bullet_index_start" type="int" default="0" />
+			<param index="2" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<description>
+				Sets the follow deadzone in pixels for all bullets in the range. Only meaningful with FollowDeadzone mode; non-finite or negative values are rejected.
+			</description>
+		</method>
+		<method name="all_bullets_set_orbiting_follow_mode">
+			<return type="void" />
+			<param index="0" name="new_follow_mode" type="int" enum="DirectionalBullets2D.OrbitingFollowMode" />
+			<param index="1" name="bullet_index_start" type="int" default="0" />
+			<param index="2" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<description>
+				Sets how the locked ring follows a moving target for all bullets in the range: FollowTarget tracks 1:1, FollowDeadzone pins the center inside the deadzone, Anchored freezes the ring where it locked.
+			</description>
+		</method>
+		<method name="all_bullets_set_orbiting_lock_policy">
+			<return type="void" />
+			<param index="0" name="new_lock_policy" type="int" enum="DirectionalBullets2D.OrbitingLockPolicy" />
+			<param index="1" name="bullet_index_start" type="int" default="0" />
+			<param index="2" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<description>
+				Sets what drops the orbit lock for all bullets in the range: RelockAlways re-acquires on every retarget, StayLocked never unlocks on retarget/empty, RelockOnTargetChange unlocks only when the front target changes identity.
+			</description>
+		</method>
+		<method name="all_bullets_set_orbiting_rigid_follow">
+			<return type="void" />
+			<param index="0" name="new_rigid_follow" type="bool" />
+			<param index="1" name="bullet_index_start" type="int" default="0" />
+			<param index="2" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<description>
+				Sets rigid follow for all bullets in the range. When on, locked bullets translate 1:1 with the target while circling, exactly like DontMove escorts. When off, locked bullets chase the ring clamped to speed times delta and trail behind fast targets.
 			</description>
 		</method>
 		<method name="all_bullets_set_orbiting_texture_rotation">
@@ -307,10 +368,15 @@
 			<param index="1" name="orbiting_radius" type="float" />
 			<param index="2" name="orbiting_direction" type="int" enum="DirectionalBullets2D.OrbitingDirection" default="2" />
 			<param index="3" name="orbiting_texture_rotation" type="int" enum="DirectionalBullets2D.OrbitingTextureRotation" default="0" />
+			<param index="4" name="orbiting_follow_mode" type="int" enum="DirectionalBullets2D.OrbitingFollowMode" default="0" />
+			<param index="5" name="orbiting_follow_deadzone" type="float" default="0.0" />
+			<param index="6" name="orbiting_lock_policy" type="int" enum="DirectionalBullets2D.OrbitingLockPolicy" default="0" />
+			<param index="7" name="orbiting_rigid_follow" type="bool" default="true" />
 			<description>
 				Enables orbiting for the specified bullet with the given parameters.
 				Invalid direction or texture rotation values are rejected with an error and orbiting stays disabled.
-				DontMove as direction means escort: the bullet holds a fixed slot on the ring and follows the target without circling (rigid follow, formation holds regardless of bullet speed). Tangential texture rotations (FaceOrbitingDirection, FaceOppositeOrbitingDirection) have no effect for escorts since there is no direction of travel.
+				DontMove as direction means escort: the bullet holds a fixed slot on the ring and follows the target without circling. Tangential texture rotations (FaceOrbitingDirection, FaceOppositeOrbitingDirection) have no effect for escorts since there is no direction of travel.
+				The follow mode controls how the locked ring tracks a moving target (FollowTarget, FollowDeadzone with a pixel deadzone, or Anchored), the lock policy controls what drops the lock (RelockAlways, StayLocked, or RelockOnTargetChange), and rigid follow controls whether circling bullets translate 1:1 with the target like escorts (on) or chase the ring and trail behind fast targets (off).
 
 				Note that orbiting relies on having a homing target to orbit around.
 			</description>
@@ -331,11 +397,53 @@
 				Returns the effective homing turn agility for the specified bullet: its per-bullet value when per-bullet mode is active, otherwise the shared [member homing_smoothing].
 			</description>
 		</method>
+		<method name="bullet_get_orbiting_angle">
+			<return type="float" />
+			<param index="0" name="bullet_index" type="int" />
+			<description>
+				Returns the locked ring angle in radians for the specified bullet (the slot it holds on the ring).
+			</description>
+		</method>
+		<method name="bullet_get_orbiting_center">
+			<return type="Vector2" />
+			<param index="0" name="bullet_index" type="int" />
+			<description>
+				Returns the current ring center for the specified bullet: the locked center when locked, otherwise the live front-target position.
+			</description>
+		</method>
 		<method name="bullet_get_orbiting_direction">
 			<return type="int" enum="DirectionalBullets2D.OrbitingDirection" />
 			<param index="0" name="bullet_index" type="int" />
 			<description>
 				Returns the orbiting direction for the specified bullet.
+			</description>
+		</method>
+		<method name="bullet_get_orbiting_follow_deadzone">
+			<return type="float" />
+			<param index="0" name="bullet_index" type="int" />
+			<description>
+				Returns the follow deadzone in pixels for the specified bullet.
+			</description>
+		</method>
+		<method name="bullet_get_orbiting_follow_mode">
+			<return type="int" enum="DirectionalBullets2D.OrbitingFollowMode" />
+			<param index="0" name="bullet_index" type="int" />
+			<description>
+				Returns how the locked ring follows a moving target for the specified bullet.
+			</description>
+		</method>
+		<method name="bullet_get_orbiting_lock_policy">
+			<return type="int" enum="DirectionalBullets2D.OrbitingLockPolicy" />
+			<param index="0" name="bullet_index" type="int" />
+			<description>
+				Returns what drops the orbit lock for the specified bullet.
+			</description>
+		</method>
+		<method name="bullet_get_orbiting_rigid_follow">
+			<return type="bool" />
+			<param index="0" name="bullet_index" type="int" />
+			<description>
+				Returns whether the specified bullet uses rigid follow (locked bullets translate 1:1 with the target while circling).
 			</description>
 		</method>
 		<method name="bullet_get_orbiting_radius">
@@ -469,6 +577,21 @@
 				Whether orbiting is currently enabled for the specified bullet.
 			</description>
 		</method>
+		<method name="bullet_is_orbiting_locked">
+			<return type="bool" />
+			<param index="0" name="bullet_index" type="int" />
+			<description>
+				Returns whether the specified bullet is currently locked onto its orbit ring (as opposed to merely enabled but still flying to the ring).
+			</description>
+		</method>
+		<method name="bullet_replace_homing_targets_with_new_target">
+			<return type="void" />
+			<param index="0" name="bullet_index" type="int" />
+			<param index="1" name="node2d_or_global_position" type="Variant" />
+			<description>
+				Replaces the specified bullet's per-bullet homing queue with a single new target (Node2D or Vector2) while preserving the orbit lock under StayLocked and RelockOnTargetChange (same front target keeps angle and center). Invalid targets change nothing.
+			</description>
+		</method>
 		<method name="bullet_set_homing_smoothing">
 			<return type="void" />
 			<param index="0" name="bullet_index" type="int" />
@@ -477,12 +600,44 @@
 				Sets the homing turn agility for the specified bullet. Enables per-bullet mode for the whole multimesh (see [method all_bullets_set_homing_smoothing]). Non-finite or negative values are rejected.
 			</description>
 		</method>
+		<method name="bullet_set_orbiting_center">
+			<return type="void" />
+			<param index="0" name="bullet_index" type="int" />
+			<param index="1" name="new_center" type="Vector2" />
+			<description>
+				Re-pins the locked ring center for the specified bullet without unlocking. Rejected when orbiting is disabled or the bullet never locked.
+			</description>
+		</method>
 		<method name="bullet_set_orbiting_direction">
 			<return type="void" />
 			<param index="0" name="bullet_index" type="int" />
 			<param index="1" name="new_direction" type="int" enum="DirectionalBullets2D.OrbitingDirection" />
 			<description>
-				Sets the orbiting direction for the specified bullet. Invalid values are rejected with an error and the direction stays unchanged.
+				Sets the orbiting direction for the specified bullet. Invalid values are rejected with an error and the direction stays unchanged. Passing OrbitRandom rolls OrbitLeft or OrbitRight (never DontMove).
+			</description>
+		</method>
+		<method name="bullet_set_orbiting_follow_deadzone">
+			<return type="void" />
+			<param index="0" name="bullet_index" type="int" />
+			<param index="1" name="new_deadzone" type="float" />
+			<description>
+				Sets the follow deadzone in pixels for the specified bullet. Only meaningful with FollowDeadzone mode; non-finite or negative values are rejected.
+			</description>
+		</method>
+		<method name="bullet_set_orbiting_follow_mode">
+			<return type="void" />
+			<param index="0" name="bullet_index" type="int" />
+			<param index="1" name="new_follow_mode" type="int" enum="DirectionalBullets2D.OrbitingFollowMode" />
+			<description>
+				Sets how the locked ring follows a moving target for the specified bullet: FollowTarget tracks 1:1, FollowDeadzone pins the center inside the deadzone, Anchored freezes the ring where it locked.
+			</description>
+		</method>
+		<method name="bullet_set_orbiting_lock_policy">
+			<return type="void" />
+			<param index="0" name="bullet_index" type="int" />
+			<param index="1" name="new_lock_policy" type="int" enum="DirectionalBullets2D.OrbitingLockPolicy" />
+			<description>
+				Sets what drops the orbit lock for the specified bullet: RelockAlways re-acquires on every retarget, StayLocked never unlocks on retarget/empty, RelockOnTargetChange unlocks only when the front target changes identity.
 			</description>
 		</method>
 		<method name="bullet_set_orbiting_radius">
@@ -490,7 +645,15 @@
 			<param index="0" name="bullet_index" type="int" />
 			<param index="1" name="new_radius" type="float" />
 			<description>
-				Sets the orbiting radius for the specified bullet.
+				Sets the orbiting radius for the specified bullet. Writing the current value keeps the lock; a changed value re-locks.
+			</description>
+		</method>
+		<method name="bullet_set_orbiting_rigid_follow">
+			<return type="void" />
+			<param index="0" name="bullet_index" type="int" />
+			<param index="1" name="new_rigid_follow" type="bool" />
+			<description>
+				Sets rigid follow for the specified bullet without dropping the lock. When on, locked bullets translate 1:1 with the target while circling, exactly like DontMove escorts. When off, locked bullets chase the ring clamped to speed times delta and trail behind fast targets.
 			</description>
 		</method>
 		<method name="bullet_set_orbiting_texture_rotation">
@@ -817,6 +980,9 @@
 		<constant name="OrbitRight" value="2" enum="OrbitingDirection">
 			Orbiting direction, the bullet circles the target clockwise on screen (Godot uses a y-down coordinate space).
 		</constant>
+		<constant name="OrbitRandom" value="3" enum="OrbitingDirection">
+			Orbiting direction, each bullet rolls OrbitLeft or OrbitRight when orbiting is enabled (never DontMove). The rolled value is stored per bullet, so getters report the concrete direction and retarget passes never re-roll mid-flight. Passing it to [method bullet_set_orbiting_direction] or [method all_bullets_set_orbiting_direction] re-rolls instead.
+		</constant>
 		<constant name="FaceTarget" value="0" enum="OrbitingTextureRotation">
 			Orbiting texture rotation, the bullet texture keeps facing the target it orbits.
 		</constant>
@@ -828,6 +994,24 @@
 		</constant>
 		<constant name="FaceOppositeOrbitingDirection" value="3" enum="OrbitingTextureRotation">
 			Orbiting texture rotation, the bullet texture faces against its direction of travel around the ring.
+		</constant>
+		<constant name="FollowTarget" value="0" enum="OrbitingFollowMode">
+			Orbiting follow mode, the locked ring tracks the target 1:1. A moving Node2D drags the whole ring with it.
+		</constant>
+		<constant name="FollowDeadzone" value="1" enum="OrbitingFollowMode">
+			Orbiting follow mode, the ring center stays pinned until the target walks farther than the follow deadzone from the lock point, then re-pins. Absorbs target jitter without breaking the ring.
+		</constant>
+		<constant name="Anchored" value="2" enum="OrbitingFollowMode">
+			Orbiting follow mode, the ring freezes where it locked and ignores target motion entirely. The target can leave the ring.
+		</constant>
+		<constant name="RelockAlways" value="0" enum="OrbitingLockPolicy">
+			Orbiting lock policy, every retarget or queue replace drops the lock and the bullet re-acquires the radius.
+		</constant>
+		<constant name="StayLocked" value="1" enum="OrbitingLockPolicy">
+			Orbiting lock policy, once locked the bullet stays locked: retargets and empty-queue gaps never unlock, only an explicit disable, clear, or a freed target does. Use for bodyguard rings on moving Node2Ds.
+		</constant>
+		<constant name="RelockOnTargetChange" value="2" enum="OrbitingLockPolicy">
+			Orbiting lock policy, the lock drops only when the front target is a different target than the one the bullet locked onto. The same moving Node2D never breaks the ring, but switching enemies re-acquires it.
 		</constant>
 	</constants>
 </class>

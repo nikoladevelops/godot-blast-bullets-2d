@@ -443,7 +443,7 @@
 			Orbit ring radius in pixels. Must be at least 0.01.
 		</member>
 		<member name="orbiting_direction" type="int" setter="set_orbiting_direction" getter="get_orbiting_direction" default="2">
-			Orbit direction. DontMove means escort: bullets hold a fixed slot on the ring and follow the target without circling.
+			Orbit direction. DontMove means escort: bullets hold a fixed slot on the ring and follow the target without circling. OrbitRandom rolls OrbitLeft or OrbitRight per bullet when the volley spawns (never DontMove); live volleys keep their rolled direction on retarget passes.
 		</member>
 		<member name="orbiting_texture_rotation" type="int" setter="set_orbiting_texture_rotation" getter="get_orbiting_texture_rotation" default="0">
 			How bullet textures face while physically orbiting.
@@ -456,6 +456,18 @@
 		</member>
 		<member name="orbiting_radius_step" type="float" setter="set_orbiting_radius_step" getter="get_orbiting_radius_step" default="0.0">
 			Orbit radius growth per bullet in linear mode. May be negative, results clamp at 0.01.
+		</member>
+		<member name="orbiting_follow_mode" type="int" setter="set_orbiting_follow_mode" getter="get_orbiting_follow_mode" default="0">
+			How the locked ring follows a moving target. FollowTarget tracks the target 1:1. FollowDeadzone pins the ring center until the target walks farther than [member orbiting_follow_deadzone] from it, absorbing jitter. Anchored freezes the ring where it locked and ignores target motion entirely.
+		</member>
+		<member name="orbiting_follow_deadzone" type="float" setter="set_orbiting_follow_deadzone" getter="get_orbiting_follow_deadzone" default="8.0">
+			Deadzone radius in pixels, used only when [member orbiting_follow_mode] is FollowDeadzone. The ring center stays pinned while the target moves within this distance of the lock point, then re-pins to the target.
+		</member>
+		<member name="orbiting_lock_policy" type="int" setter="set_orbiting_lock_policy" getter="get_orbiting_lock_policy" default="0">
+			What drops the orbit lock. RelockAlways re-acquires the radius on every retarget. StayLocked never unlocks on retarget or empty queues: once locked, bullets keep their angle and center until you explicitly disable orbiting, clear targets, or the target is freed. RelockOnTargetChange unlocks only when the front target is a different target than the one the bullet locked onto, so the same moving Node2D never breaks the ring. For a bodyguard ring on a moving Node2D use StayLocked with FollowTarget (or FollowDeadzone) and a stationary retarget mode.
+		</member>
+		<member name="orbiting_rigid_follow" type="bool" setter="set_orbiting_rigid_follow" getter="get_orbiting_rigid_follow" default="true">
+			When on, locked OrbitLeft/OrbitRight bullets translate 1:1 with the target and keep circling, exactly like DontMove escorts. When off, locked bullets chase the ring clamped to speed times delta and trail behind fast targets.
 		</member>
 	</members>
 	<constants>
