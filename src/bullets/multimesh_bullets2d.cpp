@@ -67,6 +67,12 @@ void MultiMeshBullets2D::_notification(int p_what) {
 							// script must see an empty slot.
 							BulletAttachment2D *detaching = attachments[i];
 							attachments[i] = nullptr;
+							// Owner tracking cleared like bullet_disable_attachment:
+							// attachments outlive this multimesh (siblings in the
+							// container), and a stale owner id would make their
+							// PREDELETE resolve a dead multimesh.
+							detaching->owner_multimesh_id = 0;
+							detaching->owner_bullet_index = -1;
 							detaching->call_on_bullet_disable();
 						} else {
 							bullet_disable_attachment(i);
@@ -159,6 +165,7 @@ void MultiMeshBullets2D::spawn(const MultiMeshBulletsData2D &data, MultiMeshObje
 	all_bullets_enabled_set.resize(amount_bullets);
 	all_bullet_curves_data.assign(amount_bullets, Ref<BulletCurvesData2D>());
 	all_movement_pattern_data.assign(amount_bullets, BulletMovementPatternData2D());
+	bullet_collision_epochs.assign(amount_bullets, 0);
 	batch_buffer.resize(amount_bullets * 8);
 
 	set_up_life_time_timer(data.max_life_time, data.max_life_time);
@@ -271,12 +278,78 @@ bool MultiMeshBullets2D::enable_multimesh(const MultiMeshBulletsData2D &data, co
 		p = BulletMovementPatternData2D();
 	}
 
+	// The factory spawn_* paths validate finiteness, but a direct
+	// enable_multimesh() call bypasses them: a NaN/Inf offset here would
+	// poison every bullet's velocity for the whole volley.
+	if (!new_inherited_velocity_offset.is_finite()) {
+		UtilityFunctions::push_error("enable_multimesh: inherited velocity offset must be finite, keeping the old value.");
+		return false;
+	}
+	// Snapshot everything the enable below reseeds, so the wrong-type
+	// rollback restores a clean disabled instance instead of one carrying
+	// the failed owner's state (see the rollback at the end). CanvasItem
+	// visuals use the inherited Node2D/CanvasItem API (get/set_texture via
+	// the multimesh texture, material/z/light/visibility), hence the
+	// qualified calls below.
+	const Ref<Shape2D> old_collision_shape = cached_collision_shape;
+	const Vector2 old_collision_shape_offset = cache_collision_shape_offset;
+	const double old_max_life_time = max_life_time;
+	const double old_current_life_time = current_life_time;
+	const double old_curves_elapsed_time = curves_elapsed_time;
+	const bool old_rotate_only_textures = rotate_only_textures;
+	const Ref<Resource> old_shared_custom_data = shared_bullets_custom_data;
+	const Ref<Material> old_material = get_material();
+	const int old_z_index = get_z_index();
+	const int old_light_mask = get_light_mask();
+	const int old_visibility_layer = get_visibility_layer();
+	const Dictionary old_shader_params = instance_shader_parameters;
+	const Ref<SpriteFrames> old_anim_source = anim_source;
+	const std::vector<Ref<Texture2D>> old_anim_frames = anim_frames;
+	const std::vector<double> old_anim_frame_secs = anim_frame_secs;
+	const StringName old_anim_name = anim_name;
+	const bool old_anim_loop = anim_loop;
+	const int old_anim_frame_index = anim_frame_index;
+	const double old_anim_frame_time_left = anim_frame_time_left;
+	const bool old_anim_paused = anim_paused;
+	const bool old_anim_finished = anim_finished;
+	const Ref<Texture2D> old_texture = get_texture();
+	// Rotation + per-instance state the failed enable reseeds through
+	// set_rotation_data / set_up_bullet_instances / set_up_area: snapshot
+	// the live vectors and scalars so the rollback below restores them.
+	const std::vector<real_t> old_rotation_speed = all_rotation_speed;
+	const std::vector<real_t> old_max_rotation_speed = all_max_rotation_speed;
+	const std::vector<real_t> old_rotation_acceleration = all_rotation_acceleration;
+	const bool old_is_rotation_data_active = is_rotation_data_active;
+	const bool old_use_only_first_rotation_data = use_only_first_rotation_data;
+	const bool old_stop_rotation_when_max_reached = stop_rotation_when_max_reached;
+	const std::vector<Transform2D> old_instance_transforms = all_cached_instance_transforms;
+	const std::vector<Vector2> old_instance_origin = all_cached_instance_origin;
+	const std::vector<Transform2D> old_shape_transforms = all_cached_shape_transforms;
+	const std::vector<Vector2> old_shape_origin = all_cached_shape_origin;
+	const std::vector<int> old_collision_counts = bullets_current_collision_count;
+	const int old_bullet_max_collision_count = bullet_max_collision_count;
+	const std::vector<Ref<Resource>> old_custom_data = all_bullets_custom_data;
+	const bool old_life_time_over_signal_enabled = is_life_time_over_signal_enabled;
+	const bool old_life_time_infinite = is_life_time_infinite;
+	const int old_area_collision_layer = (physics_server != nullptr && area.is_valid()) ? physics_server->area_get_collision_layer(area) : 0;
+	const int old_area_collision_mask = (physics_server != nullptr && area.is_valid()) ? physics_server->area_get_collision_mask(area) : 0;
+	const bool old_monitorable = monitorable;
+	const real_t old_texture_rotation_radians = cache_texture_rotation_radians;
+	// Base ballistic SoA reseeded by subclass custom logic (directional
+	// set_up_movement_data zeroes/overwrites these on wrong-type too).
+	const std::vector<real_t> old_cached_speed = all_cached_speed;
+	const std::vector<real_t> old_cached_max_speed = all_cached_max_speed;
+	const std::vector<real_t> old_cached_acceleration = all_cached_acceleration;
+	const std::vector<Vector2> old_cached_direction = all_cached_direction;
+	const std::vector<Vector2> old_cached_velocity = all_cached_velocity;
+	const Vector2 old_inherited_velocity_offset = inherited_velocity_offset;
+	// Spawn-pose fallback + quad size overwritten by set_up_bullet_instances /
+	// set_up_multimesh: restore so getters don't advertise failed data.
+	const TypedArray<Transform2D> old_texture_transforms = cache_texture_transforms;
+	const Vector2 old_texture_size = texture_size;
+	// Multimesh visual resource recreated by generate_multimesh on fresh
+	// spawns only (enable reuses it): no snapshot needed for enable path.
 	inherited_velocity_offset = new_inherited_velocity_offset;
-
-	// Reused RIDs keep their original type. The guard above already ensured a
-	// type change only reaches here outside the physics frame / sweep, so the
-	// area_clear_shapes + free_rid below never runs under a server flush lock.
-	// Same-shape reuse skips this branch entirely (fast, physics-safe path).
 	const PhysicsServer2D::ShapeType old_effective_shape_type = cached_effective_shape_type;
 	cache_collision_shape_typed(data.collision_shape);
 
@@ -357,21 +430,100 @@ bool MultiMeshBullets2D::enable_multimesh(const MultiMeshBulletsData2D &data, co
 	disconnect_sprite_animation_connections();
 
 	// Wrong data type (e.g. block data on a directional instance): roll back
-	// the mutations above (counter, shapes, attachments, generations) so the
-	// caller can re-push a clean disabled instance instead of one with live
-	// shapes, foreign attachments and counter != dense size.
+	// the mutations above so the caller can re-push a clean disabled
+	// instance instead of one carrying the failed owner's state. Every cache
+	// reseeded between the shape snapshot and here is restored: shape typed
+	// cache + offset, lifetime, appearance/custom/material, animation,
+	// rotation, collision counts/custom/transforms, timers.
 	if (!custom_additional_enable_logic(data)) {
-		for (int i = 0; i < (int)attachments.size(); ++i) {
-			if (attachments[i] != nullptr) {
-				bullet_disable_attachment(i);
-			}
-		}
+		cached_effective_shape_type = old_effective_shape_type;
+		cache_collision_shape_typed(old_collision_shape);
+		cache_collision_shape_offset = old_collision_shape_offset;
+		// Full side-array reset (not just the slot loop below): the failed
+		// enable may have reseeded pooling ids/offsets/flags that the loop
+		// never touches, and the next owner must not see them.
+		reset_attachment_state_for_reuse();
 		set_all_physics_shapes_enabled_for_area(false);
 		all_bullets_enabled_set.clear();
 		all_collided_bullets.clear();
 		active_bullets_counter = 0;
 		is_active = false;
 		set_visible(false);
+		// Timers armed by attachment on_bullet_spawn/enable callbacks during
+		// the failed enable must not survive on the recycled instance: the
+		// factory timer sweep has no is_active gate and would tick them.
+		multimesh_custom_timers.clear();
+		++multimesh_timers_generation;
+		set_up_life_time_timer(old_max_life_time, old_current_life_time);
+		curves_elapsed_time = old_curves_elapsed_time;
+		// Restore rotation + per-instance state reseeded above: without this
+		// the recycled instance advertises the failed owner's speeds,
+		// transforms, collision counts and area flags via its getters.
+		all_rotation_speed = old_rotation_speed;
+		all_max_rotation_speed = old_max_rotation_speed;
+		all_rotation_acceleration = old_rotation_acceleration;
+		is_rotation_data_active = old_is_rotation_data_active;
+		use_only_first_rotation_data = old_use_only_first_rotation_data;
+		stop_rotation_when_max_reached = old_stop_rotation_when_max_reached;
+		rotate_only_textures = old_rotate_only_textures;
+		all_cached_instance_transforms = old_instance_transforms;
+		all_cached_instance_origin = old_instance_origin;
+		all_cached_shape_transforms = old_shape_transforms;
+		all_cached_shape_origin = old_shape_origin;
+		bullets_current_collision_count = old_collision_counts;
+		bullet_max_collision_count = old_bullet_max_collision_count;
+		all_bullets_custom_data = old_custom_data;
+		is_life_time_over_signal_enabled = old_life_time_over_signal_enabled;
+		is_life_time_infinite = old_life_time_infinite;
+		if (physics_server != nullptr && area.is_valid()) {
+			physics_server->area_set_collision_layer(area, old_area_collision_layer);
+			physics_server->area_set_collision_mask(area, old_area_collision_mask);
+			physics_server->area_set_monitorable(area, old_monitorable);
+		}
+		monitorable = old_monitorable;
+		cache_texture_rotation_radians = old_texture_rotation_radians;
+		// Ballistic SoA zeroed by the subclass neutralize step: restore so a
+		// recycled disabled instance keeps prior-owner ballistics instead of
+		// advertising zeros (next correct enable reseeds anyway).
+		all_cached_speed = old_cached_speed;
+		all_cached_max_speed = old_cached_max_speed;
+		all_cached_acceleration = old_cached_acceleration;
+		all_cached_direction = old_cached_direction;
+		all_cached_velocity = old_cached_velocity;
+		inherited_velocity_offset = old_inherited_velocity_offset;
+		cache_texture_transforms = old_texture_transforms;
+		texture_size = old_texture_size;
+		// Shape RIDs recreated above on a type change belong to the failed
+		// data: without this the recycled instance keeps new-type RIDs under
+		// the restored old-type enum (next correct enable re-detects the
+		// mismatch and self-heals, but the interim is inconsistent).
+		if (cached_effective_shape_type != old_effective_shape_type && physics_server != nullptr && area.is_valid()) {
+			physics_server->area_clear_shapes(area);
+			for (RID &s : physics_shapes) {
+				if (s.is_valid()) {
+					physics_server->free_rid(s);
+				}
+			}
+			physics_shapes.clear();
+			generate_physics_shapes_for_area(amount_bullets);
+		}
+		finalize_set_up(
+				old_shared_custom_data,
+				old_material,
+				old_z_index,
+				old_light_mask,
+				old_visibility_layer,
+				old_shader_params);
+		anim_source = old_anim_source;
+		anim_frames = old_anim_frames;
+		anim_frame_secs = old_anim_frame_secs;
+		anim_name = old_anim_name;
+		anim_loop = old_anim_loop;
+		anim_frame_index = old_anim_frame_index;
+		anim_frame_time_left = old_anim_frame_time_left;
+		anim_paused = old_anim_paused;
+		anim_finished = old_anim_finished;
+		set_texture(old_texture);
 		return false;
 	}
 
@@ -1082,13 +1234,22 @@ void MultiMeshBullets2D::set_bullet_texture_rotation_radians(int bullet_index, r
 	}
 
 	auto &curr_transf = all_cached_instance_transforms[bullet_index];
-	curr_transf.set_rotation(new_rotation_radians);
+	// Absolute visual rotation: the volley-wide texture offset is part of
+	// the instance basis (spawn path bakes it in), so writing absolute
+	// would double-count it in adjust_direction_based_on_rotation (which
+	// strips exactly one offset). Compose like the towards_position setter.
+	curr_transf.set_rotation(new_rotation_radians + cache_texture_rotation_radians);
 	sync_shape_transform_from_instance(bullet_index, curr_transf);
 
 	// Instantly apply the updated transform so paused factories don't render stale visuals.
 	if (all_bullets_enabled_set.contains(bullet_index)) {
 		multi->set_instance_transform_2d(bullet_index, to_local_for_multimesh(curr_transf));
 	}
+
+	// Stick-relative attachments follow the rotation like set_bullet_transform
+	// does: without this they sit at the old angle until the next tick (and
+	// forever while paused).
+	carry_attachment_with_transform(bullet_index, curr_transf, Vector2(0, 0));
 
 	update_bullet_previous_transform_for_interpolation(bullet_index);
 }
@@ -1136,13 +1297,15 @@ void MultiMeshBullets2D::set_bullet_texture_rotation_degrees(int bullet_index, r
 	}
 
 	auto &curr_transf = all_cached_instance_transforms[bullet_index];
-	curr_transf.set_rotation(Math::deg_to_rad(new_rotation_degrees));
+	curr_transf.set_rotation(Math::deg_to_rad(new_rotation_degrees) + cache_texture_rotation_radians);
 	sync_shape_transform_from_instance(bullet_index, curr_transf);
 
 	// Instantly apply the updated transform so paused factories don't render stale visuals.
 	if (all_bullets_enabled_set.contains(bullet_index)) {
 		multi->set_instance_transform_2d(bullet_index, to_local_for_multimesh(curr_transf));
 	}
+
+	carry_attachment_with_transform(bullet_index, curr_transf, Vector2(0, 0));
 
 	update_bullet_previous_transform_for_interpolation(bullet_index);
 }
@@ -1260,7 +1423,10 @@ void MultiMeshBullets2D::set_bullet_transform(int bullet_index, const Transform2
 		if (direction_owned_by_curve) {
 			UtilityFunctions::push_warning("set_bullet_transform was asked to derive the direction while a direction curve is assigned. The curve owns the direction, so it was left alone. Set the curve to null first if you want the transform to steer.");
 		} else {
-			Vector2 new_direction = Vector2(1, 0).rotated(curr_bullet_transf.get_rotation());
+			// Strip the volley-wide texture offset like the tick's adjust
+			// path does: the instance basis carries it, the logical
+			// direction must not.
+			Vector2 new_direction = Vector2(1, 0).rotated(curr_bullet_transf.get_rotation() - cache_texture_rotation_radians);
 			int eff = (all_cached_direction.size() == 1) ? 0 : bullet_index;
 			if (eff >= 0 && eff < (int)all_cached_direction.size() && eff < (int)all_cached_velocity.size() && eff < (int)all_cached_speed.size()) {
 				all_cached_direction[eff] = new_direction.normalized();
@@ -1404,8 +1570,13 @@ void MultiMeshBullets2D::set_bullet_texture_rotation_towards_position(int bullet
 	Vector2 dir = (target_position - pos).normalized();
 	real_t angle = Math::atan2(dir.y, dir.x);
 
+	// Compose with the volley-wide texture offset like the spawn path does
+	// (generate_texture_transform adds cache_texture_rotation_radians):
+	// without it the visual faces the target while the physics shape
+	// (synced with -cache stripped) sits off by exactly the offset, and
+	// adjust_direction_based_on_rotation re-derives a wrong direction.
 	Vector2 scale = transf.get_scale();
-	transf.set_rotation_and_scale(angle, scale);
+	transf.set_rotation_and_scale(angle + cache_texture_rotation_radians, scale);
 	transf.set_origin(pos);
 	sync_shape_transform_from_instance(bullet_index, transf);
 
@@ -1415,6 +1586,8 @@ void MultiMeshBullets2D::set_bullet_texture_rotation_towards_position(int bullet
 	if (all_bullets_enabled_set.contains(bullet_index)) {
 		multi->set_instance_transform_2d(bullet_index, to_local_for_multimesh(transf));
 	}
+
+	carry_attachment_with_transform(bullet_index, transf, Vector2(0, 0));
 
 	update_bullet_previous_transform_for_interpolation(bullet_index);
 }
@@ -1677,6 +1850,9 @@ void MultiMeshBullets2D::set_collision_shape_runtime(const Ref<Shape2D> &new_sha
 	// Pooled instances live inside a bucket keyed by get_pool_key(). A runtime type change
 	// while disabled would otherwise leave this instance in the stale bucket. Re-bucket it,
 	// unless the user opted out of auto pooling (then it must never enter the pool).
+	// An unpooled instance with pooling off keeps its new key cached but stays
+	// out of every bucket on purpose: it is only reusable through a direct
+	// enable_multimesh() (which reads the live key) or free_disabled_bullets().
 	if (!is_active && is_multimesh_auto_pooling_enabled && bullets_pool != nullptr) {
 		const PoolKey new_key = get_pool_key();
 		if (!(new_key == old_key)) {
@@ -1822,6 +1998,8 @@ void MultiMeshBullets2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_is_attachments_auto_pooling_enabled"), &MultiMeshBullets2D::get_is_attachments_auto_pooling_enabled);
 	ClassDB::bind_method(D_METHOD("set_is_attachments_auto_pooling_enabled", "value"), &MultiMeshBullets2D::set_is_attachments_auto_pooling_enabled);
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "is_attachments_auto_pooling_enabled"), "set_is_attachments_auto_pooling_enabled", "get_is_attachments_auto_pooling_enabled");
+
+	ClassDB::bind_method(D_METHOD("reset_pooling_flags_to_default"), &MultiMeshBullets2D::reset_pooling_flags_to_default);
 
 	// Collision
 	ClassDB::bind_method(D_METHOD("get_bullet_max_collision_count"), &MultiMeshBullets2D::get_bullet_max_collision_count);

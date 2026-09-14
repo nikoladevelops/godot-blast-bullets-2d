@@ -77,6 +77,51 @@ public:
 	// Per-bullet repeat flags for the curves above.
 	TypedArray<bool> all_bullet_movement_pattern_repeats;
 
+	// HOMING STEERING (spawn-time seed; every value below also exists as a
+	// live DirectionalBullets2D setter for runtime tuning). Pool reuse
+	// re-seeds these on every enable, so direct BulletFactory2D.spawn_* users
+	// no longer lose steering on the first reuse. BulletSpawner2D users can
+	// ignore them: apply_steering_to_volley overwrites them per volley.
+
+	// Shared homing turn agility (0 snaps instantly). Must stay finite and >= 0.
+	double homing_smoothing = 0.0;
+
+	// Seconds between homing target position refreshes (0 = every tick).
+	// Must stay finite and >= 0.
+	double homing_update_interval = 0.0;
+
+	// Distance in pixels at which a bullet counts as having reached its
+	// target. Must stay finite and >= 0.
+	double homing_distance_before_reached = 5.0;
+
+	// Whether homing steers the bullet facing (leave off when a movement
+	// pattern, rotation data, or orbiting texture mode already owns it).
+	bool homing_take_control_of_texture_rotation = false;
+
+	// Per-bullet queue: pop the front target when this bullet reaches it.
+	bool bullet_homing_auto_pop_after_target_reached = false;
+
+	// Shared queue: one deferred pop when any bullet reaches the front target.
+	bool shared_homing_deque_auto_pop_after_target_reached = false;
+
+	double get_homing_smoothing() const;
+	void set_homing_smoothing(double value);
+
+	double get_homing_update_interval() const;
+	void set_homing_update_interval(double value);
+
+	double get_homing_distance_before_reached() const;
+	void set_homing_distance_before_reached(double value);
+
+	bool get_homing_take_control_of_texture_rotation() const;
+	void set_homing_take_control_of_texture_rotation(bool value);
+
+	bool get_bullet_homing_auto_pop_after_target_reached() const;
+	void set_bullet_homing_auto_pop_after_target_reached(bool value);
+
+	bool get_shared_homing_deque_auto_pop_after_target_reached() const;
+	void set_shared_homing_deque_auto_pop_after_target_reached(bool value);
+
 	TypedArray<BulletSpeedData2D> get_all_bullet_speed_data() const;
 	void set_all_bullet_speed_data(const TypedArray<BulletSpeedData2D> &new_data);
 

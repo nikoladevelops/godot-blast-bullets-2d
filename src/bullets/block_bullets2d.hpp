@@ -71,8 +71,13 @@ public:
 		// Accelerate only the first bullet rotation speed
 		if (is_rotation_data_active) {
 			if (use_only_first_rotation_data) {
-				bullet_accelerate_rotation_speed(0, delta); // accelerate only the first one once
-				cache_first_rotation_result = all_rotation_speed[0] * delta;
+				// Frozen while its slot is disabled: the cached sweep below
+				// must come from a live bullet, or a disabled bullet 0 drives
+				// the whole volley's spin from stale state.
+				if (all_bullets_enabled_set.contains(0)) {
+					bullet_accelerate_rotation_speed(0, delta); // accelerate only the first one once
+					cache_first_rotation_result = all_rotation_speed[0] * delta;
+				}
 			}
 		}
 
@@ -154,7 +159,7 @@ public:
 			collision_scratch.clear();
 			collision_scratch.swap(all_collided_bullets);
 			for (auto &data : collision_scratch) {
-				handle_bullet_collision(data.collision_type, data.bullet_index, data.collided_instance_id);
+				handle_bullet_collision(data.collision_type, data.bullet_index, data.collided_instance_id, data.queue_bullet_epoch);
 				if (is_queued_for_deletion()) {
 					collision_scratch.clear();
 					break;

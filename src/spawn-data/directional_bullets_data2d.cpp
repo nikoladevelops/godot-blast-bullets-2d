@@ -91,6 +91,60 @@ void DirectionalBulletsData2D::set_all_bullet_movement_pattern_repeats(const Typ
 	all_bullet_movement_pattern_repeats = new_flags;
 }
 
+double DirectionalBulletsData2D::get_homing_smoothing() const {
+	return homing_smoothing;
+}
+void DirectionalBulletsData2D::set_homing_smoothing(double value) {
+	if (!Math::is_finite(value) || value < 0.0) {
+		UtilityFunctions::push_error("DirectionalBulletsData2D: homing_smoothing must be finite and >= 0 (0 snaps instantly), keeping the old value.");
+		return;
+	}
+	homing_smoothing = value;
+}
+
+double DirectionalBulletsData2D::get_homing_update_interval() const {
+	return homing_update_interval;
+}
+void DirectionalBulletsData2D::set_homing_update_interval(double value) {
+	if (!Math::is_finite(value) || value < 0.0) {
+		UtilityFunctions::push_error("DirectionalBulletsData2D: homing_update_interval must be finite and >= 0 (0 refreshes every tick), keeping the old value.");
+		return;
+	}
+	homing_update_interval = value;
+}
+
+double DirectionalBulletsData2D::get_homing_distance_before_reached() const {
+	return homing_distance_before_reached;
+}
+void DirectionalBulletsData2D::set_homing_distance_before_reached(double value) {
+	if (!Math::is_finite(value) || value < 0.0) {
+		UtilityFunctions::push_error("DirectionalBulletsData2D: homing_distance_before_reached must be finite and >= 0, keeping the old value.");
+		return;
+	}
+	homing_distance_before_reached = value;
+}
+
+bool DirectionalBulletsData2D::get_homing_take_control_of_texture_rotation() const {
+	return homing_take_control_of_texture_rotation;
+}
+void DirectionalBulletsData2D::set_homing_take_control_of_texture_rotation(bool value) {
+	homing_take_control_of_texture_rotation = value;
+}
+
+bool DirectionalBulletsData2D::get_bullet_homing_auto_pop_after_target_reached() const {
+	return bullet_homing_auto_pop_after_target_reached;
+}
+void DirectionalBulletsData2D::set_bullet_homing_auto_pop_after_target_reached(bool value) {
+	bullet_homing_auto_pop_after_target_reached = value;
+}
+
+bool DirectionalBulletsData2D::get_shared_homing_deque_auto_pop_after_target_reached() const {
+	return shared_homing_deque_auto_pop_after_target_reached;
+}
+void DirectionalBulletsData2D::set_shared_homing_deque_auto_pop_after_target_reached(bool value) {
+	shared_homing_deque_auto_pop_after_target_reached = value;
+}
+
 void DirectionalBulletsData2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_all_bullet_speed_data"), &DirectionalBulletsData2D::get_all_bullet_speed_data);
 	ClassDB::bind_method(D_METHOD("set_all_bullet_speed_data", "new_data"), &DirectionalBulletsData2D::set_all_bullet_speed_data);
@@ -139,5 +193,29 @@ void DirectionalBulletsData2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_all_bullet_movement_pattern_repeats"), &DirectionalBulletsData2D::get_all_bullet_movement_pattern_repeats);
 	ClassDB::bind_method(D_METHOD("set_all_bullet_movement_pattern_repeats", "new_flags"), &DirectionalBulletsData2D::set_all_bullet_movement_pattern_repeats);
 	ADD_PROPERTY(PropertyInfo(Variant::ARRAY, "all_bullet_movement_pattern_repeats", PROPERTY_HINT_ARRAY_TYPE, "bool"), "set_all_bullet_movement_pattern_repeats", "get_all_bullet_movement_pattern_repeats");
+
+	ClassDB::bind_method(D_METHOD("get_homing_smoothing"), &DirectionalBulletsData2D::get_homing_smoothing);
+	ClassDB::bind_method(D_METHOD("set_homing_smoothing", "value"), &DirectionalBulletsData2D::set_homing_smoothing);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "homing_smoothing"), "set_homing_smoothing", "get_homing_smoothing");
+
+	ClassDB::bind_method(D_METHOD("get_homing_update_interval"), &DirectionalBulletsData2D::get_homing_update_interval);
+	ClassDB::bind_method(D_METHOD("set_homing_update_interval", "value"), &DirectionalBulletsData2D::set_homing_update_interval);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "homing_update_interval"), "set_homing_update_interval", "get_homing_update_interval");
+
+	ClassDB::bind_method(D_METHOD("get_homing_distance_before_reached"), &DirectionalBulletsData2D::get_homing_distance_before_reached);
+	ClassDB::bind_method(D_METHOD("set_homing_distance_before_reached", "value"), &DirectionalBulletsData2D::set_homing_distance_before_reached);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "homing_distance_before_reached"), "set_homing_distance_before_reached", "get_homing_distance_before_reached");
+
+	ClassDB::bind_method(D_METHOD("get_homing_take_control_of_texture_rotation"), &DirectionalBulletsData2D::get_homing_take_control_of_texture_rotation);
+	ClassDB::bind_method(D_METHOD("set_homing_take_control_of_texture_rotation", "value"), &DirectionalBulletsData2D::set_homing_take_control_of_texture_rotation);
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "homing_take_control_of_texture_rotation"), "set_homing_take_control_of_texture_rotation", "get_homing_take_control_of_texture_rotation");
+
+	ClassDB::bind_method(D_METHOD("get_bullet_homing_auto_pop_after_target_reached"), &DirectionalBulletsData2D::get_bullet_homing_auto_pop_after_target_reached);
+	ClassDB::bind_method(D_METHOD("set_bullet_homing_auto_pop_after_target_reached", "value"), &DirectionalBulletsData2D::set_bullet_homing_auto_pop_after_target_reached);
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "bullet_homing_auto_pop_after_target_reached"), "set_bullet_homing_auto_pop_after_target_reached", "get_bullet_homing_auto_pop_after_target_reached");
+
+	ClassDB::bind_method(D_METHOD("get_shared_homing_deque_auto_pop_after_target_reached"), &DirectionalBulletsData2D::get_shared_homing_deque_auto_pop_after_target_reached);
+	ClassDB::bind_method(D_METHOD("set_shared_homing_deque_auto_pop_after_target_reached", "value"), &DirectionalBulletsData2D::set_shared_homing_deque_auto_pop_after_target_reached);
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "shared_homing_deque_auto_pop_after_target_reached"), "set_shared_homing_deque_auto_pop_after_target_reached", "get_shared_homing_deque_auto_pop_after_target_reached");
 }
 } //namespace BlastBullets2D

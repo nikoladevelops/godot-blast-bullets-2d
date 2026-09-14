@@ -60,12 +60,19 @@ static bool validate_spawn_data(const Ref<MultiMeshBulletsData2D> &spawn_data, c
 		return false;
 	}
 	// NaN/Inf origins or rotations would poison movement, physics and the
-	// pool key. Reject the whole spawn instead of emitting broken bullets.
+	// pool key. Zero/near-zero scale would split visual vs collision (the
+	// texture path heals the basis, the shape path preserves it) and poison
+	// direction math downstream, so reject it like set_bullet_transform does.
+	// Reject the whole spawn instead of emitting broken bullets.
 	for (int i = 0; i < bullet_count; ++i) {
 		const Transform2D t = spawn_data->transforms[i];
 		const Vector2 o = t.get_origin();
 		if (!o.is_finite() || !Math::is_finite(t.get_rotation()) || !t.get_scale().is_finite()) {
 			UtilityFunctions::push_error(String("Error in ") + caller_name + ": transforms[" + String::num_int64(i) + "] contains NaN/Inf. Nothing was spawned.");
+			return false;
+		}
+		if (t.get_scale().length_squared() < 0.00000001) {
+			UtilityFunctions::push_error(String("Error in ") + caller_name + ": transforms[" + String::num_int64(i) + "] has zero scale. Nothing was spawned.");
 			return false;
 		}
 	}
@@ -269,8 +276,13 @@ void BulletFactory2D::_process(double delta) {
 		return;
 	}
 
+	// Same guard as _physics_process: reset/free_* during the render sweep
+	// would mutate the vec under iteration. The interpolation pass only
+	// reads, but its inputs (vec, sparse set) are shared with the writers.
+	is_iterating_bullets = true;
 	handle_bullet_rendering_interpolation<DirectionalBullets2D>(all_directional_bullets, directional_bullets_set, directional_iteration_scratch);
 	handle_bullet_rendering_interpolation<BlockBullets2D>(all_block_bullets, block_bullets_set, block_iteration_scratch);
+	is_iterating_bullets = false;
 }
 
 void BulletFactory2D::spawn_block_bullets(const Ref<BlockBulletsData2D> &spawn_data, const Vector2 &new_inherited_velocity_offset) {
@@ -955,6 +967,10 @@ void BulletFactory2D::populate_attachments_pool(const Ref<PackedScene> attachmen
 
 	auto setup_attachment = [&](BulletAttachment2D *a, uint32_t key) {
 		a->set_physics_interpolation_mode(Node::PHYSICS_INTERPOLATION_MODE_OFF);
+		// Stamp the source scene like the attach path does: the pop guard
+		// verifies identity against it, and pre-pooled stock without a stamp
+		// would never match (fresh instantiate every attach instead).
+		a->source_scene = attachment_scene;
 		a->call_on_spawn_in_pool();
 		bullet_attachments_container->add_child(a);
 		bullet_attachments_pool.push(a, key);
@@ -1056,7 +1072,10 @@ void BulletFactory2D::free_attachments_pool_for_scene(const Ref<PackedScene> &at
 		directional_bullets_debugger->set_is_debugger_enabled(false);
 	}
 
-	bullet_attachments_pool.free_specific_bullet_attachments(bullet_attachments_pool.key_for_scene(attachment_scene));
+	// Freed via the non-recording key: key_for_scene would permanently mark
+	// even an invalid scene as recognized (changing later error branches),
+	// so derive + free without recording anything.
+	bullet_attachments_pool.free_specific_bullet_attachments(BulletAttachmentObjectPool2D::make_pooling_key_for_scene(attachment_scene));
 
 	if (debugger_was_enabled) {
 		block_bullets_debugger->set_is_debugger_enabled(true);
@@ -1291,9 +1310,12 @@ TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_grid(
 		return generated_transforms;
 	}
 
-	// A lone bullet lands exactly on the marker (matches ring/fan/line).
+	// A lone bullet lands exactly on the marker (matches ring/fan/line),
+	// carrying the marker scale with it.
 	if (transforms_amount == 1) {
-		generated_transforms[0] = Transform2D(marker_transform.get_rotation(), marker_transform.get_origin());
+		Transform2D lone(marker_transform.get_rotation(), marker_transform.get_origin());
+		lone.set_scale(marker_transform.get_scale());
+		generated_transforms[0] = lone;
 		return generated_transforms;
 	}
 
@@ -1389,7 +1411,8 @@ TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_grid(
 			real_t y = y_start + row * row_offset;
 			Vector2 local_offset(x, y);
 
-			// Create the new transform
+			// Create the new transform, carrying the marker scale: a scaled
+			// generator scales its bullets (spin/scale passes preserve it too).
 			Transform2D new_transform;
 			if (rotate_grid_with_marker) {
 				// Rotate the offset with the marker's basis
@@ -1400,17 +1423,21 @@ TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_grid(
 				Vector2 new_origin = marker_transform.get_origin() + local_offset;
 				new_transform = Transform2D(marker_transform.get_rotation(), new_origin);
 			}
+			new_transform.set_scale(marker_transform.get_scale());
 
-		// Apply random local rotation if enabled
+		// Apply random local rotation if enabled (scale preserved: the
+		// rotation-only constructor resets it to 1).
 		if (random_local_rotation) {
 			real_t random_angle = UtilityFunctions::randf() * Math::TAU;
 			new_transform = Transform2D(new_transform.get_rotation() + random_angle, new_transform.get_origin());
+			new_transform.set_scale(marker_transform.get_scale());
 		}
 
 		// Scatter each origin by up to +-jitter on both axes (0 disables it).
 		if (jitter > 0.0) {
 			const Vector2 scatter(UtilityFunctions::randf_range(-jitter, jitter), UtilityFunctions::randf_range(-jitter, jitter));
 			new_transform = Transform2D(new_transform.get_rotation(), new_transform.get_origin() + scatter);
+			new_transform.set_scale(marker_transform.get_scale());
 		}
 
 			// Store the transform and increment the counter
@@ -1475,7 +1502,10 @@ TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_ring(
 			texture_rotation = UtilityFunctions::randf() * Math::TAU;
 		}
 		// Face outward so bullet art pointing right travels away from the marker.
-		generated_transforms[i] = Transform2D(texture_rotation, marker_transform.get_origin() + offset);
+		// Marker scale carries over: a scaled generator scales its bullets.
+		Transform2D ring_transf(texture_rotation, marker_transform.get_origin() + offset);
+		ring_transf.set_scale(marker_transform.get_scale());
+		generated_transforms[i] = ring_transf;
 	}
 	return generated_transforms;
 }
@@ -1515,7 +1545,9 @@ TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_fan(
 	for (int i = 0; i < transforms_amount; ++i) {
 		const real_t angle = first_angle + step * (real_t)i;
 		const Vector2 dir = Vector2(Math::cos(angle), Math::sin(angle));
-		generated_transforms[i] = Transform2D(angle, origin + dir * (step_offset * (real_t)i));
+		Transform2D fan_transf(angle, origin + dir * (step_offset * (real_t)i));
+		fan_transf.set_scale(marker_transform.get_scale());
+		generated_transforms[i] = fan_transf;
 	}
 	return generated_transforms;
 }
@@ -1588,7 +1620,9 @@ TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_spiral(
 				facing = base_rotation;
 				break;
 		}
-		generated_transforms[i] = Transform2D(facing + facing_offset, origin + offset);
+		Transform2D spiral_transf(facing + facing_offset, origin + offset);
+		spiral_transf.set_scale(marker_transform.get_scale());
+		generated_transforms[i] = spiral_transf;
 	}
 	return generated_transforms;
 }
@@ -1645,7 +1679,9 @@ TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_line(
 		anchor_offset = (real_t)(transforms_amount - 1);
 	}
 	for (int i = 0; i < transforms_amount; ++i) {
-		generated_transforms[i] = Transform2D(facing, origin + axis * (spacing * ((real_t)i - anchor_offset)));
+		Transform2D line_transf(facing, origin + axis * (spacing * ((real_t)i - anchor_offset)));
+		line_transf.set_scale(marker_transform.get_scale());
+		generated_transforms[i] = line_transf;
 	}
 	return generated_transforms;
 }

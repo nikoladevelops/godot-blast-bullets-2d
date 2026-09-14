@@ -16,6 +16,8 @@
 
 		Note: Bullets can orbit around their current homing target if enabled (see [method bullet_enable_orbiting], [method all_bullets_enable_orbiting]). Orbiting requires having a valid homing target to orbit around. Be aware that orbiting does not care about the difference between a shared homing deque or a per bullet deque, as long as there is a target to orbit around it will work.
 
+		Note: Feature mixing has a fixed precedence each tick: homing steers the direction, direction curves adjust it (shared wins ties, per-bullet fills gaps), rotation spins only the visual, adjust_direction_based_on_rotation feeds the visual back into ballistics (skipped when rotate_only_textures is on, since that spin is rendering-only), movement patterns steer the displacement (skipped while a locked orbit owns the bullet, so non-repeating patterns never finish invisibly on the ring), and a locked orbit owns the final displacement. Homing smoothing has no effect while a movement pattern or rotation data drives the direction (the direction snaps instead). Teleporting a locked bullet re-aims its ring slot from the new position instead of snapping back. [member MultiMeshBullets2D.get_bullet_velocity] reports the logical velocity (direction times speed plus wind), excluding pattern and orbit displacement.
+
 		Note: Instead of [BulletSpeedData2D] with [method MultiMeshBullets2D.set_bullet_speed_data] you can take advantage of [BulletCurvesData2D] by using [method MultiMeshBullets2D.bullet_set_curves_data], [method MultiMeshBullets2D.all_bullets_set_curves_data] or [member shared_bullet_curves_data] if you want a shared curve for all bullets.
 
 		Note: For [Path2D] drawn bullet patterns try using [method MultiMeshBullets2D.set_bullet_movement_pattern_from_path] or [method MultiMeshBullets2D.set_bullet_movement_pattern_from_curve].
@@ -214,7 +216,7 @@
 			<param index="0" name="bullet_index_start" type="int" default="0" />
 			<param index="1" name="bullet_index_end_inclusive" type="int" default="-1" />
 			<description>
-				Each homing target gets cleared and replaced with the Mouse as the target for all bullets in the range (per-bullet deques only).
+				Each homing target gets cleared and replaced with the Mouse as the target for all bullets in the range (per-bullet deques only). Locked orbit rings follow the lock policy ([method bullet_set_orbiting_lock_policy]); explicit clears still always unlock unless the policy is StayLocked.
 			</description>
 		</method>
 		<method name="all_bullets_replace_homing_targets_with_new_target">
@@ -223,7 +225,7 @@
 			<param index="1" name="bullet_index_start" type="int" default="0" />
 			<param index="2" name="bullet_index_end_inclusive" type="int" default="-1" />
 			<description>
-				Clears then pushes a single homing target to the back for all bullets in the range (per-bullet deques only).
+				Clears then pushes a single homing target to the back for all bullets in the range (per-bullet deques only). Locked orbit rings are kept or re-acquired per the lock policy instead of always dropping: same target keeps angle and center, a different target re-locks.
 
 				If you want to clear then push a single target to the shared deque, use [method shared_homing_deque_replace_homing_targets_with_new_target] instead.
 			</description>
@@ -234,7 +236,7 @@
 			<param index="1" name="bullet_index_start" type="int" default="0" />
 			<param index="2" name="bullet_index_end_inclusive" type="int" default="-1" />
 			<description>
-				Clears then pushes an array of homing targets to the back for all bullets in the range (per-bullet deques only).
+				Clears then pushes an array of homing targets to the back for all bullets in the range (per-bullet deques only). Locked orbit rings are kept or re-acquired per the lock policy ([method bullet_set_orbiting_lock_policy]).
 
 				If you want to clear then push an array of targets to the shared deque, use [method shared_homing_deque_replace_homing_targets_with_new_target_array] instead.
 			</description>
@@ -374,11 +376,11 @@
 			<param index="7" name="orbiting_rigid_follow" type="bool" default="true" />
 			<description>
 				Enables orbiting for the specified bullet with the given parameters.
-				Invalid direction or texture rotation values are rejected with an error and orbiting stays disabled.
+				Invalid direction or texture rotation values are rejected with an error and orbiting stays disabled. Enabling on a disabled bullet is rejected: wake it with [method MultiMeshBullets2D.enable_bullet] first, then push targets and enable orbiting.
 				DontMove as direction means escort: the bullet holds a fixed slot on the ring and follows the target without circling. Tangential texture rotations (FaceOrbitingDirection, FaceOppositeOrbitingDirection) have no effect for escorts since there is no direction of travel.
 				The follow mode controls how the locked ring tracks a moving target (FollowTarget, FollowDeadzone with a pixel deadzone, or Anchored), the lock policy controls what drops the lock (RelockAlways, StayLocked, or RelockOnTargetChange), and rigid follow controls whether circling bullets translate 1:1 with the target like escorts (on) or chase the ring and trail behind fast targets (off).
 
-				Note that orbiting relies on having a homing target to orbit around.
+				Note that orbiting relies on having a homing target to orbit around. Push targets only onto enabled bullets for the same reason; the spawner retarget pass skips disabled slots automatically.
 			</description>
 		</method>
 		<method name="bullet_get_current_homing_target" qualifiers="const">
@@ -585,11 +587,11 @@
 			</description>
 		</method>
 		<method name="bullet_replace_homing_targets_with_new_target">
-			<return type="void" />
+			<return type="bool" />
 			<param index="0" name="bullet_index" type="int" />
 			<param index="1" name="node2d_or_global_position" type="Variant" />
 			<description>
-				Replaces the specified bullet's per-bullet homing queue with a single new target (Node2D or Vector2) while preserving the orbit lock under StayLocked and RelockOnTargetChange (same front target keeps angle and center). Invalid targets change nothing.
+				Replaces the specified bullet's per-bullet homing queue with a single new target (Node2D or Vector2) while preserving the orbit lock under StayLocked and RelockOnTargetChange (same front target keeps angle and center). Returns true when replaced; false when the slot is disabled or the target is invalid (nothing changed).
 			</description>
 		</method>
 		<method name="bullet_set_homing_smoothing">
@@ -670,6 +672,33 @@
 			<param index="1" name="new_velocity" type="Vector2" />
 			<description>
 				Sets the exact velocity of the specified bullet (wind, knockback, split inheritance). See [method all_bullets_set_velocity] for details.
+			</description>
+		</method>
+		<method name="_do_auto_pop_front_target">
+			<return type="void" />
+			<param index="0" name="operation_generation" type="int" />
+			<param index="1" name="bullet_index" type="int" />
+			<param index="2" name="bullet_epoch" type="int" />
+			<description>
+				Internal deferred worker for per-bullet auto-pop (do not call directly): pops the front target when the generation and epoch still match. Routes the orbit lock per policy like a manual pop.
+			</description>
+		</method>
+		<method name="_do_emit_homing_target_reached">
+			<return type="void" />
+			<param index="0" name="operation_generation" type="int" />
+			<param index="1" name="bullet_index" type="int" />
+			<param index="2" name="bullet_epoch" type="int" />
+			<param index="3" name="target_instance_id" type="int" />
+			<param index="4" name="target_global_position" type="Vector2" />
+			<description>
+				Internal deferred worker for the reached signal (do not call directly): emits only when the generation and epoch still match, resolving the target by instance id (null when freed).
+			</description>
+		</method>
+		<method name="_do_shared_auto_pop_front_target">
+			<return type="void" />
+			<param index="0" name="operation_generation" type="int" />
+			<description>
+				Internal deferred worker for shared auto-pop (do not call directly): pops the shared front once per tick at most, then routes reached state and the orbit lock per policy.
 			</description>
 		</method>
 		<method name="has_shared_bullet_rotation_data" qualifiers="const">

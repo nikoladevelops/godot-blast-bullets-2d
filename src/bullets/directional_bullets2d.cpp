@@ -259,10 +259,32 @@ void DirectionalBullets2D::custom_additional_spawn_logic(const MultiMeshBulletsD
 	// spawn still overrides afterwards.
 	populate_shared_curves_related_data(directional_data->shared_bullet_curves_data);
 	apply_shared_movement_pattern_from_data(*directional_data);
+
+	// Homing steering seeds from the same spawn data (direct factory users
+	// keep it on fresh spawns too, matching the enable path).
+	homing_smoothing = (real_t)directional_data->homing_smoothing;
+	homing_update_interval = (real_t)directional_data->homing_update_interval;
+	homing_update_timer = 0.0;
+	homing_take_control_of_texture_rotation = directional_data->homing_take_control_of_texture_rotation;
+	homing_distance_before_reached = (real_t)directional_data->homing_distance_before_reached;
+	bullet_homing_auto_pop_after_target_reached = directional_data->bullet_homing_auto_pop_after_target_reached;
+	shared_homing_deque_auto_pop_after_target_reached = directional_data->shared_homing_deque_auto_pop_after_target_reached;
 }
 
 bool DirectionalBullets2D::custom_additional_enable_logic(const MultiMeshBulletsData2D &data) {
 	const DirectionalBulletsData2D *directional_data = Object::cast_to<DirectionalBulletsData2D>(&data);
+	// Wrong-type enable must still leave clean state: base cleared curves
+	// and patterns, but ballistics/shared/homing would otherwise keep the
+	// previous owner's values (base rollback cannot clear subclass state).
+	// Neutralize them first so a failed enable never leaks them.
+	set_up_movement_data(TypedArray<BulletSpeedData2D>());
+	shared_bullet_speed_data.unref();
+	shared_bullet_rotation_data.unref();
+	shared_movement_pattern_curve.unref();
+	shared_movement_pattern_face_movement_direction = false;
+	shared_movement_pattern_repeat = true;
+	shared_movement_pattern_distances.assign(amount_bullets, 0.0);
+	clear_homing_state_for_teardown();
 	if (directional_data == nullptr) {
 		UtilityFunctions::push_error("DirectionalBullets2D::enable got wrong spawn data type, expected DirectionalBulletsData2D.");
 		return false;
@@ -349,15 +371,18 @@ bool DirectionalBullets2D::custom_additional_enable_logic(const MultiMeshBullets
 
 	//
 
-	homing_update_interval = 0.0;
+	// Homing steering seeds from spawn data (direct factory users keep it
+	// across pool reuse now) and is always overwritten by the spawner
+	// afterwards, so spawner users keep their exact tuning either way.
+	homing_smoothing = (real_t)directional_data->homing_smoothing;
+	homing_update_interval = (real_t)directional_data->homing_update_interval;
 	homing_update_timer = 0.0;
-	homing_smoothing = 0.0;
-	homing_take_control_of_texture_rotation = false;
+	homing_take_control_of_texture_rotation = directional_data->homing_take_control_of_texture_rotation;
 	homing_inert_warning_issued = false;
 
-	homing_distance_before_reached = 5.0;
-	bullet_homing_auto_pop_after_target_reached = false;
-	shared_homing_deque_auto_pop_after_target_reached = false;
+	homing_distance_before_reached = (real_t)directional_data->homing_distance_before_reached;
+	bullet_homing_auto_pop_after_target_reached = directional_data->bullet_homing_auto_pop_after_target_reached;
+	shared_homing_deque_auto_pop_after_target_reached = directional_data->shared_homing_deque_auto_pop_after_target_reached;
 	return true;
 }
 

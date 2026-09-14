@@ -420,6 +420,16 @@ public:
 		}
 		return nullptr;
 	}
+	// Re-arms the front target's reached flag (per-bullet reached semantics
+	// live on the target itself, unlike the shared deque's per-bullet
+	// states). Push-front paths call this so a popped-then-repushed target
+	// fires again instead of staying latched from its previous exposure.
+	_ALWAYS_INLINE_ void reset_front_reached_flag() {
+		if (!homing_targets.empty()) {
+			homing_targets.front().has_bullet_reached_target = false;
+		}
+	}
+
 	//////////////////////////////////////
 
 	// The idea behind this is to track whether the multimesh even has the need of tracking the mouse global position - enables caching behavior

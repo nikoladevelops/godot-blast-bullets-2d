@@ -1,6 +1,7 @@
 #pragma once
 
 #include <godot_cpp/classes/node2d.hpp>
+#include <godot_cpp/classes/packed_scene.hpp>
 #include <godot_cpp/classes/resource.hpp>
 #include <godot_cpp/core/gdvirtual.gen.inc>
 #include <godot_cpp/variant/utility_functions.hpp>
@@ -20,6 +21,12 @@ public:
 	BulletAttachmentObjectPool2D *home_pool = nullptr;
 	uint32_t home_pooling_id = 0;
 	bool is_pooled = false;
+
+	// Source scene this instance was instantiated from. Stamped at pop-time
+	// creation so the pool-pop path can verify a 32-bit key collision never
+	// hands out a foreign scene's node. Saved across pooling; never set by
+	// hand.
+	Ref<PackedScene> source_scene;
 
 	// Owner tracking (managed by MultiMeshBullets2D, never set by hand): which
 	// multimesh slot currently owns this ACTIVE attachment. Lets PREDELETE of a

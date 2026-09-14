@@ -16,6 +16,16 @@
 				Returns one global transform per bullet for the current [member transforms_source]. Empty [member transforms_generator] means this node. Children mode with no markers falls back to the generator itself. Aimed mode with no target returns an empty array.
 			</description>
 		</method>
+		<method name="_on_volley_bullet_homing_target_reached">
+			<return type="void" />
+			<param index="0" name="directional_bullets_instance" type="Object" />
+			<param index="1" name="bullet_index" type="int" />
+			<param index="2" name="target" type="Object" />
+			<param index="3" name="target_global_position" type="Vector2" />
+			<description>
+				Internal reached-signal forwarder (do not call directly): re-emits a volley's [signal volley_bullet_homing_target_reached] on this spawner. Connected automatically on every spawned and adopted volley.
+			</description>
+		</method>
 		<method name="get_bullet_factory" qualifiers="const">
 			<return type="BulletFactory2D" />
 			<description>
@@ -126,7 +136,7 @@
 		<method name="retarget_live_volleys">
 			<return type="int" />
 			<description>
-				Re-resolves targets and replaces the queues of every still-active volley owned by this spawner (expired or pooled volleys are skipped), and re-applies steering and orbiting tuning so runtime changes reach flying volleys. Random and round-robin selections resolve per volley. Volleys with no resolvable targets are skipped quietly and keep their old queues. Returns how many volleys were retargeted. Also runs automatically when [member homing_retarget_mode] is On Interval. Only the newest volley is touched when [member homing_retarget_previous_volleys] is off.
+				Re-resolves targets and replaces the queues of every still-active volley owned by this spawner (expired or pooled volleys are skipped), and re-applies steering and orbiting tuning so runtime changes reach flying volleys. Random and round-robin selections resolve per volley. Volleys with no resolvable targets are skipped quietly and keep their old queues. Volleys whose bullets are all disabled are skipped too: the tick never moves disabled slots, so pushing targets there would only inflate counters. Returns how many volleys were retargeted. Also runs automatically when [member homing_retarget_mode] is On Interval. Only the newest volley is touched when [member homing_retarget_previous_volleys] is off. Locked orbit rings survive the replace per the lock policy ([member orbiting_lock_policy]) instead of always re-locking.
 			</description>
 		</method>
 		<method name="get_live_volley_count" qualifiers="const">
@@ -138,7 +148,7 @@
 		<method name="get_live_volleys" qualifiers="const">
 			<return type="Array" />
 			<description>
-				The tracked live volley instances (pruned first), so scripts can call the full DirectionalBullets2D API on each volley directly.
+				The tracked live volley instances (pruned first), so scripts can call the full DirectionalBullets2D API on each volley directly. Inspect-only handles: a volley can be pooled and reused for a new owner while you still hold it, so always check [method MultiMeshBullets2D.is_bullet_status_enabled] and ownership before steering a held volley. Use [method adopt_live_volley] to take ownership of a manually-woken volley.
 			</description>
 		</method>
 		<method name="clear_live_volleys">
@@ -151,7 +161,7 @@
 			<return type="bool" />
 			<param index="0" name="directional_bullets_instance" type="DirectionalBullets2D" />
 			<description>
-				Takes ownership of a manually-woken volley (manual wake detaches the previous owner): stamps it, replaces any surviving reached forwarder with its own, and tracks it for retargeting. Queues are left alone. Returns false for null or non-live instances.
+				Takes ownership of a manually-woken volley (manual wake detaches the previous owner): stamps it, replaces the previous spawner's reached forwarder with its own, and tracks it for retargeting. Queues are left alone. Handlers you connected directly on the volley are kept; only spawner forwarders are replaced. Returns false for null or non-live instances.
 			</description>
 		</method>
 		<method name="clear_live_volleys_homing">
@@ -173,7 +183,7 @@
 			Path to the [BulletFactory2D] used for spawning.
 		</member>
 		<member name="max_volleys" type="int" setter="set_max_volleys" getter="get_max_volleys" default="-1">
-			Auto-shooting stops after this many volleys. -1 is infinite, 0 disables auto-shooting ([method shoot_once] still works).
+			Auto-shooting stops after this many volleys. -1 is infinite, 0 disables auto-shooting ([method shoot_once] still works). Lowering the cap reports nothing by itself: [signal shooting_finished] fires once from the volley that trips the cap, so a volley_fired handler that lowers the cap never double-fires it.
 		</member>
 		<member name="shoot_initial_delay_sec" type="float" setter="set_shoot_initial_delay_sec" getter="get_shoot_initial_delay_sec" default="0.0">
 			Delay before the first volley after (re)arming.
@@ -368,7 +378,7 @@
 			Which detected nodes become targets: nearest to the spawner, random, tree order, round robin across volleys, or dealt across bullets (Per Bullet mode only).
 		</member>
 		<member name="homing_max_targets" type="int" setter="set_homing_max_targets" getter="get_homing_max_targets" default="1">
-			How many targets enter the queue. 1 is classic single-target homing. Only the node group, node name, and node children sources use it.
+			How many targets enter the queue. 1 is classic single-target homing. Only the node group, node name, and node children sources use it. Valid range is 1-10000; each homing queue caps at 256 entries, so larger resolutions are clamped to 256 per queue.
 		</member>
 		<member name="homing_max_detection_range" type="float" setter="set_homing_max_detection_range" getter="get_homing_max_detection_range" default="0.0">
 			Detection radius around the spawner for the node group, node name, and node children sources. 0 is unlimited.
@@ -443,7 +453,7 @@
 			Orbit ring radius in pixels. Must be at least 0.01.
 		</member>
 		<member name="orbiting_direction" type="int" setter="set_orbiting_direction" getter="get_orbiting_direction" default="2">
-			Orbit direction. DontMove means escort: bullets hold a fixed slot on the ring and follow the target without circling. OrbitRandom rolls OrbitLeft or OrbitRight per bullet when the volley spawns (never DontMove); live volleys keep their rolled direction on retarget passes.
+			Orbit direction. DontMove means escort: bullets hold a fixed slot on the ring and follow the target without circling. OrbitRandom rolls OrbitLeft or OrbitRight per bullet when the volley spawns (never DontMove); live volleys keep their rolled direction on retarget passes, so switching to OrbitRandom mid-flight only affects new volleys.
 		</member>
 		<member name="orbiting_texture_rotation" type="int" setter="set_orbiting_texture_rotation" getter="get_orbiting_texture_rotation" default="0">
 			How bullet textures face while physically orbiting.

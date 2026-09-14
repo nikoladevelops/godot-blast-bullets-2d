@@ -339,7 +339,7 @@
 			<description>
 				Activate a specific bullet from the multimesh, making it active and visible on screen. Waking a fully pooled multimesh this way also removes it from the pool and resumes factory processing, so prefer spawn methods for pooled instances. An expiry-pooled wake tops up an exhausted lifetime timer (both lifetime and curve clocks restart together); a manually disabled wake keeps its remaining time.
 
-				Wake means resume, not respawn: ballistics (speed, direction, position), appearance, custom data and movement state are kept as-is. Two deliberate exceptions: (1) per-bullet homing queues and orbit state are NOT resumed - disable_bullet() clears them, so re-push targets and re-enable orbit after the wake; (2) a volley-wide expiry wake gives the whole volley a fresh full lifetime, not just the woken bullet. Cross-owner reuse must go through spawn methods or [method enable_multimesh], which reseed everything from fresh data. Waking a pooled instance owned by someone else drops that owner's volley-wide signal connections; a same-owner revive keeps them.
+				Wake means resume, not respawn: ballistics (speed, direction, position), appearance, custom data and movement state are kept as-is. Two deliberate exceptions: (1) per-bullet homing queues and orbit state are NOT resumed - disable_bullet() clears them, so re-push targets and re-enable orbit after the wake; (2) a volley-wide expiry wake gives the whole volley a fresh full lifetime, not just the woken bullet. Waking a pooled volley owned by someone else keeps that owner's ballistics and appearance (a warning is printed: enable_bullet warns when it wakes a pooled instance outside spawn or enable_multimesh): reseed through spawn methods or [method enable_multimesh], or take over with [method BulletSpawner2D.adopt_live_volley] and re-push. Waking a pooled instance owned by someone else drops that owner's volley-wide signal connections; a same-owner revive keeps them. Attachments are never restored by a wake: re-attach explicitly.
 
 				Never call enable_bullet()/disable_bullet() re-entrantly from inside an on_bullet_enable callback (use call_deferred instead); such calls are rejected with an error so the live-bullet counter cannot drift.
 
@@ -544,6 +544,68 @@
 				Detaches all time based functions that were previously attached.
 			</description>
 		</method>
+		<method name="_do_attach_time_based_function">
+			<return type="void" />
+			<param index="0" name="time" type="float" />
+			<param index="1" name="callable" type="Callable" />
+			<param index="2" name="repeat" type="bool" />
+			<param index="3" name="execute_only_if_multimesh_is_active" type="bool" />
+			<param index="4" name="expected_timers_generation" type="int" />
+			<description>
+				Internal deferred worker for timer attach (do not call directly): applies only when the timers generation still matches.
+			</description>
+		</method>
+		<method name="_do_deferred_bullet_disable_attachment">
+			<return type="void" />
+			<param index="0" name="bullet_index" type="int" />
+			<param index="1" name="expected_generation" type="int" />
+			<param index="2" name="expected_attachment_id" type="int" />
+			<param index="3" name="expected_attachment" type="BulletAttachment2D" />
+			<description>
+				Internal deferred worker for attachment disable (do not call directly): pools the expected attachment only when the generation, id and slot still match.
+			</description>
+		</method>
+		<method name="_do_detach_all_time_based_functions">
+			<return type="void" />
+			<param index="0" name="expected_timers_generation" type="int" />
+			<description>
+				Internal deferred worker for detaching all timers (do not call directly): applies only when the timers generation still matches.
+			</description>
+		</method>
+		<method name="_do_detach_time_based_function">
+			<return type="void" />
+			<param index="0" name="callable" type="Callable" />
+			<param index="1" name="expected_timers_generation" type="int" />
+			<description>
+				Internal deferred worker for timer detach (do not call directly): applies only when the timers generation still matches.
+			</description>
+		</method>
+		<method name="_do_emit_life_time_over">
+			<return type="void" />
+			<param index="0" name="expected_generation" type="int" />
+			<param index="1" name="emitter_instance_id" type="int" />
+			<param index="2" name="signal_name" type="StringName" />
+			<param index="3" name="bullet_indexes" type="int[]" />
+			<description>
+				Internal deferred worker for the lifetime-over signal (do not call directly): emits only when the spawn generation still matches.
+			</description>
+		</method>
+		<method name="_do_emit_sprite_animation_finished">
+			<return type="void" />
+			<param index="0" name="expected_generation" type="int" />
+			<description>
+				Internal deferred worker for the animation-finished signal (do not call directly): emits only when the spawn generation still matches and the animation is still finished.
+			</description>
+		</method>
+		<method name="_do_execute_stored_callable_safely">
+			<return type="void" />
+			<param index="0" name="_callback" type="Callable" />
+			<param index="1" name="_execute_only_if_multimesh_is_active" type="bool" />
+			<param index="2" name="expected_timers_generation" type="int" />
+			<description>
+				Internal deferred worker for timer callbacks (do not call directly): runs the callable only when the timers generation still matches.
+			</description>
+		</method>
 		<method name="multimesh_detach_time_based_function">
 			<return type="void" />
 			<param index="0" name="callable" type="Callable" />
@@ -565,6 +627,12 @@
 			<param index="0" name="animation" type="StringName" />
 			<description>
 				Switches animation reusing the cached SpriteFrames source. Same resolve rules (empty or missing "default" auto-resolves to the first animation). Errors only when no source cached yet.
+			</description>
+		</method>
+		<method name="reset_pooling_flags_to_default">
+			<return type="void" />
+			<description>
+				Resets both pooling flags ([member is_multimesh_auto_pooling_enabled] and [member is_attachments_auto_pooling_enabled]) to true. Use after taking over a pooled instance whose previous owner customized them.
 			</description>
 		</method>
 		<method name="remove_bullet_movement_pattern">
@@ -683,7 +751,7 @@
 			<param index="0" name="bullet_index" type="int" />
 			<param index="1" name="new_rotation_radians" type="float" />
 			<description>
-				Set the texture rotation in radians of a specific bullet.
+				Set the texture rotation in radians of a specific bullet. Composes with the volley-wide texture offset, so direction math that strips the offset stays exact. Stick-relative attachments follow immediately.
 			</description>
 		</method>
 		<method name="set_bullet_texture_rotation_towards_node2d">
@@ -692,7 +760,7 @@
 			<param index="1" name="target_node" type="Node2D" />
 			<description>
 				Set the texture rotation of a specific bullet towards a target [Node2D].
-				The rotation will be set so that the bullet's texture faces towards the target node.
+				The rotation will be set so that the bullet's texture faces towards the target node. Composes with the volley-wide texture offset (physics shape stays logical). Stick-relative attachments follow immediately.
 			</description>
 		</method>
 		<method name="set_bullet_texture_rotation_towards_position">
@@ -701,7 +769,7 @@
 			<param index="1" name="target_position" type="Vector2" />
 			<description>
 				Set the texture rotation of a specific bullet towards a target global position.
-				The rotation will be set so that the bullet's texture faces towards the target position.
+				The rotation will be set so that the bullet's texture faces towards the target position. Composes with the volley-wide texture offset (physics shape stays logical). Stick-relative attachments follow immediately.
 			</description>
 		</method>
 		<method name="set_bullet_transform">
@@ -710,7 +778,7 @@
 			<param index="1" name="new_transform" type="Transform2D" />
 			<param index="2" name="set_direction_based_on_transform" type="bool" default="false" />
 			<description>
-				Set the transform of a specific bullet, in global space (matching [method get_bullet_transform] and [method get_bullet_global_transform]).
+				Set the transform of a specific bullet, in global space (matching [method get_bullet_transform] and [method get_bullet_global_transform]). Zero-scale and non-finite transforms are rejected. With set_direction_based_on_transform, the logical direction is derived from the transform with the volley-wide texture offset stripped (same convention as the tick), unless a direction curve owns the direction.
 			</description>
 		</method>
 		<method name="set_collision_layer">
@@ -803,9 +871,11 @@
 			When disabled, you are the one responsible for re-using the multimesh or clearing any time based callables that you might have attached with [method multimesh_attach_time_based_function].
 
 			If you are going to save your multimesh bullets in an array, then it's probably best to disable auto pooling and manage the instances yourself.
+
+			Note: both pooling flags are per-instance state, not spawn data. A pooled instance keeps the previous owner's flags across reuse (defaults reset only at spawn). Call [method reset_pooling_flags_to_default] if you need a clean slate.
 		</member>
 		<member name="shared_bullet_curves_data" type="BulletCurvesData2D" setter="set_shared_bullet_curves_data" getter="get_shared_bullet_curves_data">
-			A shared [BulletCurvesData2D] resource that can be assigned to all bullets in the multimesh. This is useful for saving memory if you have a lot of bullets that share the same curves data, since you can assign the same resource to all of them instead of creating a new one for each bullet. Not supported on [BlockBullets2D] (setting it there errors and is ignored).
+			A shared [BulletCurvesData2D] resource that can be assigned to all bullets in the multimesh. This is useful for saving memory if you have a lot of bullets that share the same curves data, since you can assign the same resource to all of them instead of creating a new one for each bullet. Not supported on [BlockBullets2D] (setting it there errors and is ignored). Values are copied at set time: editing the resource in place afterwards changes nothing until you set it again. Direction channels never park the direction at zero: an Override result near zero keeps the incoming direction.
 		</member>
 		<member name="shared_bullets_custom_data" type="Resource" setter="set_shared_bullets_custom_data" getter="get_shared_bullets_custom_data">
 			You can edit the custom bullets data that the bullets multimesh was spawned with. Use this to set damage data or anything else you want to store in a resource for your bullets to use.

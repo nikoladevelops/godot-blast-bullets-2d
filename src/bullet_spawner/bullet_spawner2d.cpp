@@ -46,13 +46,16 @@ static void assign_node_to_path(const Node *self, T *node, NodePath &r_path, T *
 }
 
 // Rotates a spawn transform around an origin, so a spinning emitter orbits
-// bullet positions and turns facings together. Zero rotation is a no-op.
+// bullet positions and turns facings together. Scale is preserved: only the
+// rotation and the origin offset move. Zero rotation is a no-op.
 static Transform2D rotate_spawn_transform(const Transform2D &t, const Vector2 &origin, real_t radians) {
     if (radians == 0.0) {
         return t;
     }
     const Vector2 rotated_offset = (t.get_origin() - origin).rotated(radians);
-    return Transform2D(t.get_rotation() + radians, origin + rotated_offset);
+    Transform2D out(t.get_rotation() + radians, origin + rotated_offset);
+    out.set_scale(t.get_scale());
+    return out;
 }
 // Uniformly scales a spawn transform relative to the generator origin, so
 // marker offsets (spread radius) and basis (bullet size) grow together while
@@ -288,10 +291,14 @@ void BulletSpawner2D::set_max_volleys(int value) {
     if (is_inside_tree()) {
         set_process(now_active || spin_enabled || homing_retarget_active() || preview_active());
     }
+    // The shoot_once() cap path emits shooting_finished for the volley that
+    // trips the cap. When this setter crosses the same boundary (e.g. a
+    // volley_fired handler lowering the cap onto the just-fired count),
+    // emitting here too would fire the signal twice for one volley, so the
+    // setter only reports resume transitions and leaves the finish report to
+    // the shooting path.
     if (!was_active && now_active) {
         emit_signal("shooting_started");
-    } else if (was_active && !now_active) {
-        emit_signal("shooting_finished");
     }
 }
 
@@ -514,6 +521,13 @@ void BulletSpawner2D::set_helper_ring_radius(double value) {
         UtilityFunctions::push_error("BulletSpawner2D: helper_ring_radius must be finite, keeping the old value.");
         return;
     }
+    // The factory generator rejects negatives at spawn time (empty volley +
+    // a spawn-path error). Reject here instead so the inspector never holds
+    // a value that cannot spawn.
+    if (value < 0.0) {
+        UtilityFunctions::push_error("BulletSpawner2D: helper_ring_radius must be >= 0, keeping the old value.");
+        return;
+    }
     helper_ring_radius = value;
     rebuild_preview();
 }
@@ -610,6 +624,13 @@ void BulletSpawner2D::set_helper_spiral_start_radius(double value) {
         UtilityFunctions::push_error("BulletSpawner2D: helper_spiral_start_radius must be finite, keeping the old value.");
         return;
     }
+    // The factory generator rejects negatives at spawn time (empty volley +
+    // a spawn-path error). Reject here instead so the inspector never holds
+    // a value that cannot spawn (same guard as helper_ring_radius).
+    if (value < 0.0) {
+        UtilityFunctions::push_error("BulletSpawner2D: helper_spiral_start_radius must be >= 0, keeping the old value.");
+        return;
+    }
     helper_spiral_start_radius = value;
     rebuild_preview();
 }
@@ -652,6 +673,12 @@ Vector2 BulletSpawner2D::get_helper_line_direction() const {
 void BulletSpawner2D::set_helper_line_direction(const Vector2 &value) {
     if (!value.is_finite()) {
         UtilityFunctions::push_error("BulletSpawner2D: helper_line_direction must be finite, keeping the old value.");
+        return;
+    }
+    // The factory generator rejects a zero direction at spawn time. Reject
+    // here instead so the inspector never holds a value that cannot spawn.
+    if (value.length_squared() <= 0.0) {
+        UtilityFunctions::push_error("BulletSpawner2D: helper_line_direction must be non-zero, keeping the old value.");
         return;
     }
     helper_line_direction = value;
@@ -818,6 +845,12 @@ bool BulletSpawner2D::get_show_preview_during_runtime() const {
 }
 void BulletSpawner2D::set_show_preview_during_runtime(bool value) {
     show_preview_during_runtime = value;
+    // Runtime preview piggy-backs the shooting/spin/retarget loop: enabling
+    // it mid-game while that loop sleeps must wake it, or the preview builds
+    // once here and never refreshes marker moves afterwards.
+    if (!Engine::get_singleton()->is_editor_hint() && is_inside_tree()) {
+        set_process(auto_shooting_active() || spin_enabled || homing_retarget_active() || preview_active());
+    }
     update_preview_process_state();
     rebuild_preview();
 }
@@ -977,6 +1010,13 @@ int BulletSpawner2D::get_homing_max_targets() const {
 void BulletSpawner2D::set_homing_max_targets(int value) {
     if (value < 1) {
         UtilityFunctions::push_error("BulletSpawner2D: homing_max_targets must be >= 1, keeping the old value.");
+        return;
+    }
+    // Bounded like helper_bullets_amount: the name scan + NEAREST selection
+    // run per volley and per retarget pass, so an unbounded value turns a
+    // huge scene into a per-interval hitch.
+    if (value > 10000) {
+        UtilityFunctions::push_error("BulletSpawner2D: homing_max_targets must be <= 10000, keeping the old value.");
         return;
     }
     homing_max_targets = value;
@@ -1496,7 +1536,15 @@ Array BulletSpawner2D::resolve_homing_targets(bool quiet, bool advance_round_rob
         return targets;
     }
     clear_empty_homing_targets_warning();
-    const int take = MIN(homing_max_targets, (int)candidates.size());
+    // The deque caps at 256 targets per queue (see HomingTargetDeque): clamp
+    // the take there too, otherwise a huge max_targets fans thousands of
+    // rejected pushes (one error each) every volley and every retarget pass.
+    // DISTRIBUTE is unaffected (exactly one target per bullet).
+    const int take = MIN(MIN(homing_max_targets, (int)candidates.size()), 256);
+    // DISTRIBUTE deals one target per bullet across the volley (cycling), so
+    // the resolution order here does not matter: spawn and retarget build
+    // the deal with i % pool themselves. NEAREST order is returned, same as
+    // the default selection.
     switch (homing_target_selection) {
         case HOMING_SELECT_FIRST: {
             for (int k = 0; k < take; ++k) {
@@ -1634,13 +1682,16 @@ bool BulletSpawner2D::adopt_live_volley(DirectionalBullets2D *bullets) {
     }
     // Takes over a manually-woken volley (manual wake detaches the previous
     // owner): stamps, hooks the forwarder, tracks. Queues are left alone.
-    // A same-owner revive keeps the previous owner's forwarder (wake cleanup
-    // is scoped to pooled wakes), so drop all existing forwards first:
-    // otherwise the old spawner keeps receiving events for a foreign volley.
+    // Only the previous spawner's forwarder is dropped: user handlers
+    // connected directly on the volley (bullet_homing_target_reached) belong
+    // to the game, not to the old spawner, and must survive the handover.
     bullets->owner_spawner_id = get_instance_id();
     for (const Dictionary &connection : bullets->get_signal_connection_list("bullet_homing_target_reached")) {
         const Callable callable = connection["callable"];
-        bullets->disconnect("bullet_homing_target_reached", callable);
+        const Object *target = callable.get_object();
+        if (target != nullptr && Object::cast_to<BulletSpawner2D>(target) != nullptr && callable.get_method() == StringName("_on_volley_bullet_homing_target_reached")) {
+            bullets->disconnect("bullet_homing_target_reached", callable);
+        }
     }
     const Callable forward_callable(this, "_on_volley_bullet_homing_target_reached");
     if (!bullets->is_connected("bullet_homing_target_reached", forward_callable)) {
@@ -1739,6 +1790,24 @@ int BulletSpawner2D::retarget_live_volleys() {
                 continue;
             }
         }
+        // Skip partially-disabled volleys for the queue rewrite below: the
+        // tick only trims active bullets, so pushing targets onto disabled
+        // slots inflates homing counters and leaks mouse targets that never
+        // drain. Fully-disabled volleys are already pruned above; this
+        // covers the partial case (some bullets dead, volley still active).
+        {
+            bool any_enabled = false;
+            const int bullet_count = volley->get_amount_bullets();
+            for (int b = 0; b < bullet_count; ++b) {
+                if (volley->is_bullet_status_enabled(b)) {
+                    any_enabled = true;
+                    break;
+                }
+            }
+            if (!any_enabled) {
+                continue;
+            }
+        }
         // Re-apply live tuning: without this, changing smoothing, interval,
         // reached distance, auto-pop, or orbit settings mid-fight would only
         // ever affect future volleys.
@@ -1754,16 +1823,16 @@ int BulletSpawner2D::retarget_live_volleys() {
             if (use_mouse) {
                 volley->all_bullets_replace_homing_targets_with_mouse();
             } else if (homing_target_selection == HOMING_SELECT_DISTRIBUTE) {
-                // Re-deal like at spawn: clear first, because assign
-                // push-backs onto existing queues (a replace would grow them
-                // every pass).
-                Array deal;
+                // Re-deal like at spawn: per-bullet replace (not clear +
+                // assign) so locked rings survive per the lock policy instead
+                // of unlocking on every pass. Skips disabled slots silently.
                 const int bullet_count = volley->get_amount_bullets();
                 for (int i = 0; i < bullet_count; ++i) {
-                    deal.push_back(volley_targets[i % volley_targets.size()]);
+                    if (!volley->is_bullet_status_enabled(i)) {
+                        continue;
+                    }
+                    volley->bullet_replace_homing_targets_with_new_target(i, volley_targets[i % volley_targets.size()]);
                 }
-                volley->all_bullets_clear_homing_targets();
-                volley->all_bullets_assign_homing_targets_array(deal);
             } else {
                 volley->all_bullets_replace_homing_targets_with_new_target_array(volley_targets);
             }
@@ -1812,8 +1881,14 @@ void BulletSpawner2D::apply_steering_to_volley(DirectionalBullets2D *volley) con
 void BulletSpawner2D::apply_orbiting_to_volley(DirectionalBullets2D *volley) const {
     // No direction is skipped: DontMove = escort (fixed ring slot, follows the
     // target without circling), armed through the same engine path below.
+    // Disabled bullets are skipped: they own no orbit state (disable clears
+    // it), and enabling there would inflate the orbiting counter for a slot
+    // the tick never moves.
     const int bullet_count = volley->get_amount_bullets();
     for (int i = 0; i < bullet_count; ++i) {
+        if (!volley->is_bullet_status_enabled(i)) {
+            continue;
+        }
         // Negative linear steps fan downward: clamp per bullet so the
         // engine never sees an invalid radius (it errors per bullet).
         const double radius = orbiting_radius_linear_enabled

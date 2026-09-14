@@ -13,6 +13,24 @@
 		<member name="adjust_direction_based_on_rotation" type="bool" setter="set_adjust_direction_based_on_rotation" getter="get_adjust_direction_based_on_rotation" default="false">
 			If enabled, the bullets will adjust their direction when rotating, instead of only spinning in place.
 		</member>
+		<member name="bullet_homing_auto_pop_after_target_reached" type="bool" setter="set_bullet_homing_auto_pop_after_target_reached" getter="get_bullet_homing_auto_pop_after_target_reached" default="false">
+			Per-bullet queue: pop the front target when the owning bullet reaches it. Pooled reuse re-seeds this from the spawn data, so direct [BulletFactory2D] spawns keep it without a spawner.
+		</member>
+		<member name="homing_distance_before_reached" type="float" setter="set_homing_distance_before_reached" getter="get_homing_distance_before_reached" default="5.0">
+			Distance in pixels at which a bullet counts as having reached its target (drives the reached signal and auto-pop). Tested against the final steered position, so locked orbiting bullets test their orbit motion.
+		</member>
+		<member name="homing_smoothing" type="float" setter="set_homing_smoothing" getter="get_homing_smoothing" default="0.0">
+			Shared homing turn agility (0 snaps instantly). Pooled reuse re-seeds this from the spawn data. Setting any per-bullet smoothing on the live volley switches it to per-bullet mode.
+		</member>
+		<member name="homing_take_control_of_texture_rotation" type="bool" setter="set_homing_take_control_of_texture_rotation" getter="get_homing_take_control_of_texture_rotation" default="false">
+			Whether homing steers the bullet facing. Leave off when a movement pattern, rotation data, or orbiting texture mode already owns the facing, otherwise homing steers nothing visible.
+		</member>
+		<member name="homing_update_interval" type="float" setter="set_homing_update_interval" getter="get_homing_update_interval" default="0.0">
+			Seconds between homing target position refreshes (0 refreshes every tick). Larger values make rings lag and step on moving targets; keep 0 for bodyguard rings.
+		</member>
+		<member name="shared_homing_deque_auto_pop_after_target_reached" type="bool" setter="set_shared_homing_deque_auto_pop_after_target_reached" getter="get_shared_homing_deque_auto_pop_after_target_reached" default="false">
+			Shared queue: one deferred pop when any bullet reaches the front target. Locked orbit rings follow the lock policy on the new front instead of holding a stale center.
+		</member>
 		<member name="all_bullet_curves_data" type="BulletCurvesData2D[]" setter="set_all_bullet_curves_data" getter="get_all_bullet_curves_data" default="[]">
 			Per-bullet curves applied at spawn time (and on pool reuse). Same fallback rule as [member all_bullet_speed_data]: empty disables the feature, matching size means per bullet, otherwise the first entry drives all bullets. Null entries are skipped per bullet. Shared curves still win ties per tick.
 		</member>
