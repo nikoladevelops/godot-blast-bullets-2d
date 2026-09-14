@@ -219,6 +219,7 @@ void DirectionalBullets2D::custom_additional_spawn_logic(const MultiMeshBulletsD
 	// New life: stale deferred emits/pops (scheduled before a pool reuse)
 	// carry the old generation and no-op at flush time.
 	++homing_operation_generation;
+	bullet_homing_epochs.assign(amount_bullets, 0);
 	shared_auto_pop_queued = false;
 	if (directional_data == nullptr) {
 		UtilityFunctions::push_error("DirectionalBullets2D::spawn got wrong spawn data type, expected DirectionalBulletsData2D.");
@@ -280,6 +281,7 @@ bool DirectionalBullets2D::custom_additional_enable_logic(const MultiMeshBullets
 	// New life (pool reuse): stale deferred emits/pops no-op at flush, and
 	// the coalescing flag restarts clean so the fresh queue can auto-pop.
 	++homing_operation_generation;
+	bullet_homing_epochs.assign(amount_bullets, 0);
 	shared_auto_pop_queued = false;
 
 	set_up_movement_data(directional_data->all_bullet_speed_data);
@@ -320,6 +322,7 @@ bool DirectionalBullets2D::custom_additional_enable_logic(const MultiMeshBullets
 	all_orbiting_data.resize(amount_bullets);
 	all_orbiting_status.resize(amount_bullets, 0);
 	all_shared_homing_reached.resize(amount_bullets);
+	bullet_homing_epochs.resize(amount_bullets, 0);
 
 	// Homing
 
@@ -339,6 +342,9 @@ bool DirectionalBullets2D::custom_additional_enable_logic(const MultiMeshBullets
 	// Orbiting
 
 	all_orbiting_status.assign(amount_bullets, 0); // Initialize all orbiting status to disabled
+	for (auto &o : all_orbiting_data) {
+		o = OrbitingData();
+	}
 	active_orbiting_count = 0;
 
 	//
@@ -420,8 +426,8 @@ void DirectionalBullets2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("shared_homing_deque_pop_front_target"), &DirectionalBullets2D::shared_homing_deque_pop_front_target);
 	ClassDB::bind_method(D_METHOD("shared_homing_deque_pop_back_target"), &DirectionalBullets2D::shared_homing_deque_pop_back_target);
 	ClassDB::bind_method(D_METHOD("_do_shared_auto_pop_front_target", "operation_generation"), &DirectionalBullets2D::_do_shared_auto_pop_front_target);
-	ClassDB::bind_method(D_METHOD("_do_auto_pop_front_target", "operation_generation", "bullet_index"), &DirectionalBullets2D::_do_auto_pop_front_target);
-	ClassDB::bind_method(D_METHOD("_do_emit_homing_target_reached", "operation_generation", "bullet_index", "target_instance_id", "target_global_position"), &DirectionalBullets2D::_do_emit_homing_target_reached);
+	ClassDB::bind_method(D_METHOD("_do_auto_pop_front_target", "operation_generation", "bullet_index", "bullet_epoch"), &DirectionalBullets2D::_do_auto_pop_front_target);
+	ClassDB::bind_method(D_METHOD("_do_emit_homing_target_reached", "operation_generation", "bullet_index", "bullet_epoch", "target_instance_id", "target_global_position"), &DirectionalBullets2D::_do_emit_homing_target_reached);
 
 	// SHARED HOMING DEQUE PUSH METHODS
 	ClassDB::bind_method(D_METHOD("shared_homing_deque_push_front_mouse_position_target"), &DirectionalBullets2D::shared_homing_deque_push_front_mouse_position_target);

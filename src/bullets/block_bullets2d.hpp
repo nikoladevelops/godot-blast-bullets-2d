@@ -134,10 +134,15 @@ public:
 			batch_flush_instance_transforms();
 		}
 
-		// Accelerate every entry (not just active ones): a re-enabled bullet
-		// rejoins at the block's current speed, matching the old shared-entry
-		// behavior exactly.
+		// Accelerate only live entries (matching DirectionalBullets2D, which
+		// freezes disabled bullets at their disable-time speed): accelerating
+		// disabled entries made a re-enabled bullet rejoin at the volley's
+		// current speed instead of resuming where it left off (see
+		// enable_bullet's "resume, not respawn" contract).
 		for (int i = 0; i < amount_bullets && i < (int)all_cached_speed.size(); ++i) {
+			if (!all_bullets_enabled_set.contains(i)) {
+				continue;
+			}
 			bullet_accelerate_speed(i, delta);
 		}
 
@@ -150,6 +155,10 @@ public:
 			collision_scratch.swap(all_collided_bullets);
 			for (auto &data : collision_scratch) {
 				handle_bullet_collision(data.collision_type, data.bullet_index, data.collided_instance_id);
+				if (is_queued_for_deletion()) {
+					collision_scratch.clear();
+					break;
+				}
 			}
 		}
 	}

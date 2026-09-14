@@ -337,11 +337,13 @@
 			<param index="1" name="collision_amount" type="int" default="0" />
 			<param index="2" name="enable_attachment" type="bool" default="true" />
 			<description>
-				Activate a specific bullet from the multimesh, making it active and visible on screen. Waking a fully pooled multimesh this way also removes it from the pool and resumes factory processing, so prefer spawn methods for pooled instances. An expiry-pooled wake tops up an exhausted lifetime timer (both lifetime and curve clocks restart); a manually disabled wake keeps its remaining time.
+				Activate a specific bullet from the multimesh, making it active and visible on screen. Waking a fully pooled multimesh this way also removes it from the pool and resumes factory processing, so prefer spawn methods for pooled instances. An expiry-pooled wake tops up an exhausted lifetime timer (both lifetime and curve clocks restart together); a manually disabled wake keeps its remaining time.
 
-				Wake means resume, not respawn: ballistics (speed, direction, position), appearance, custom data and movement state are kept as-is. Cross-owner reuse must go through spawn methods or [method enable_multimesh], which reseed everything from fresh data. Waking a pooled instance owned by someone else drops that owner's volley-wide signal connections; a same-owner revive keeps them.
+				Wake means resume, not respawn: ballistics (speed, direction, position), appearance, custom data and movement state are kept as-is. Two deliberate exceptions: (1) per-bullet homing queues and orbit state are NOT resumed - disable_bullet() clears them, so re-push targets and re-enable orbit after the wake; (2) a volley-wide expiry wake gives the whole volley a fresh full lifetime, not just the woken bullet. Cross-owner reuse must go through spawn methods or [method enable_multimesh], which reseed everything from fresh data. Waking a pooled instance owned by someone else drops that owner's volley-wide signal connections; a same-owner revive keeps them.
 
-				You can also provide a [code]collision_amount[/code], which is how many hits this bullet has already taken: 0 (default) means fresh with full hits remaining. Values below 0 count as 0, values at or above [member bullet_max_collision_count] grant a single remaining hit.
+				Never call enable_bullet()/disable_bullet() re-entrantly from inside an on_bullet_enable callback (use call_deferred instead); such calls are rejected with an error so the live-bullet counter cannot drift.
+
+				You can also provide a [code]collision_amount[/code], which is how many hits this bullet has already taken: 0 (default) means fresh with full hits remaining. Values below 0 count as 0, values at or above [member bullet_max_collision_count] grant a single remaining hit (same clamp as [method set_bullet_collision_count]).
 			</description>
 		</method>
 		<method name="get_all_bullets_status">
@@ -597,7 +599,7 @@
 			<param index="0" name="bullet_index" type="int" />
 			<param index="1" name="value" type="int" />
 			<description>
-				Set how many times a specific bullet has collided so far. Negative values become 0, values above [member bullet_max_collision_count] become the max (when the max is above 0). See [method get_bullet_collision_count] for reading it.
+				Set how many times a specific bullet has collided so far. Negative values become 0, values at or above [member bullet_max_collision_count] become max - 1 (exactly one hit remaining, when the max is above 0). Same clamp as [method enable_bullet]'s wake top-up. See [method get_bullet_collision_count] for reading it.
 			</description>
 		</method>
 		<method name="set_bullet_direction">

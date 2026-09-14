@@ -116,13 +116,16 @@ protected:
 	bool homing_inert_warning_issued = false;
 
 	// Ownership stamp for deferred homing work (reached-emits, auto-pops).
-	// Bumped on every spawn/enable/disable: a deferred call scheduled by a
-	// previous life carries a stale generation and no-ops instead of eating
-	// the new life's targets or emitting ghost signals. Without this, a
-	// disable→pool-reuse within the same frame (the deferred flush runs last)
-	// corrupts the fresh configuration - a certainty at bullet-hell rates
-	// with several spawners sharing one factory.
+	// The volley-wide generation is bumped on every spawn/enable/disable: a
+	// deferred call scheduled by a previous life carries a stale generation
+	// and no-ops instead of eating the new life's targets or emitting ghost
+	// signals. The per-bullet epoch below covers the single-bullet path the
+	// volley generation can't: reach -> disable_bullet(i) -> enable_bullet(i)
+	// -> push-new-target(i) before the flush. Without it the stale deferred
+	// pop/emit (same volley generation) would eat the fresh front target and
+	// fire a ghost reached signal for the dead life's target.
 	uint64_t homing_operation_generation = 0;
+	std::vector<uint64_t> bullet_homing_epochs;
 
 	// This is a shared homing deque - allows the bullets to share the same target
 	HomingTargetDeque shared_homing_deque;
@@ -158,7 +161,10 @@ public:
 	// instead of re-querying it per bullet per tick (< 0 = query inside).
 	_ALWAYS_INLINE_ bool advance_movement_pattern(const Ref<Curve2D> &curve, bool face_movement_direction, bool repeat_pattern, real_t &distance_traveled, Vector2 &velocity_delta, Vector2 &curr_bullet_direction, Transform2D &curr_bullet_transf, real_t known_len = -1.0) {
 		const real_t len = (known_len >= 0.001) ? known_len : curve->get_baked_length();
-		if (len < 0.001) {
+		// NaN baked length (corrupt Curve2D points) fails the < comparison, so
+		// check finiteness explicitly: without it fmod/sample_baked propagate
+		// NaN into velocity/origin and brick the volley permanently.
+		if (!Math::is_finite(len) || len < 0.001) {
 			return false;
 		}
 		const real_t prev_dist = distance_traveled;
@@ -293,6 +299,12 @@ public:
 		real_t shared_pattern_len = 0.0;
 		if (shared_pattern_curve_valid) {
 			shared_pattern_len = shared_movement_pattern_curve->get_baked_length();
+			// NaN baked length (corrupt Curve2D points) would flow into the
+			// per-bullet advance as known_len; normalize to 0 here so the
+			// use_shared_pattern gate below stays shut (advance also guards).
+			if (!Math::is_finite(shared_pattern_len)) {
+				shared_pattern_len = 0.0;
+			}
 		}
 
 		// Usability guard: homing targets without steering is a silent no-op (direction only
@@ -663,6 +675,14 @@ public:
 			collision_scratch.swap(all_collided_bullets);
 			for (auto &data : collision_scratch) {
 				handle_bullet_collision(data.collision_type, data.bullet_index, data.collided_instance_id);
+				// handle_bullet_collision emits synchronously into user code, and a
+				// handler may queue_free THIS multimesh mid-drain. The vectors above
+				// are members - stop before the next iteration touches freed memory
+				// (direct free() paths already reject via the factory guards).
+				if (is_queued_for_deletion()) {
+					collision_scratch.clear();
+					break;
+				}
 			}
 		}
 	}
@@ -693,6 +713,15 @@ public:
 
 		if (orbiting_status == 1) {
 			UtilityFunctions::push_warning("Bullet index " + String::num_int64(bullet_index) + " already has orbiting enabled.");
+			return;
+		}
+
+		// DontMove freezes the bullet instead of orbiting (the tick treats it as
+		// a no-steer hold): accepting it here would inflate
+		// active_orbiting_count and keep the orbit preamble armed forever for a
+		// dead feature. Reject so the counter always means "actually orbiting".
+		if (orbiting_direction == DontMove) {
+			UtilityFunctions::push_error("Invalid orbiting direction DontMove in bullet_enable_orbiting: it freezes the bullet instead of orbiting. Use OrbitLeft or OrbitRight.");
 			return;
 		}
 
@@ -921,6 +950,11 @@ public:
 
 	///////////// PER BULLET HOMING DEQUE POP METHODS
 
+	// NOTE: manual pop/clear + push in the same frame as a reach races the
+	// deferred auto-pop/emit queued for the old front (same bullet epoch):
+	// the flush still pops the fresh front and fires a ghost reached signal.
+	// Keep manual edits and auto-pop apart in one frame, or re-push after
+	// the flush.
 	_ALWAYS_INLINE_ Variant bullet_homing_pop_front_target(int bullet_index) {
 		if (!validate_bullet_index(bullet_index, "bullet_homing_pop_front_target") || !bullet_check_has_homing_targets(bullet_index)) {
 			return nullptr;
@@ -953,6 +987,11 @@ public:
 		return popped;
 	}
 
+	// NOTE: manual pop/clear + push in the same frame as a reach races the
+	// deferred auto-pop/emit queued for the old front (same bullet epoch):
+	// the flush still pops the fresh front and fires a ghost reached signal.
+	// Keep manual edits and auto-pop apart in one frame, or re-push after
+	// the flush.
 	_ALWAYS_INLINE_ Variant bullet_homing_pop_back_target(int bullet_index) {
 		if (!validate_bullet_index(bullet_index, "bullet_homing_pop_back_target") || !bullet_check_has_homing_targets(bullet_index)) {
 			return nullptr;
@@ -976,6 +1015,12 @@ public:
 				active_homing_count = 0;
 			}
 			all_homing_count[bullet_index] = live;
+		}
+		// Same unlock as the front-pop: a size-1 back-pop empties the deque, and
+		// the tick only heals this next frame - direct is_locked reads in between
+		// would observe a stale lock.
+		if (all_homing_count[bullet_index] == 0 && live == 0 && bullet_index >= 0 && bullet_index < (int)all_orbiting_data.size()) {
+			all_orbiting_data[bullet_index].is_locked_orbiting = false;
 		}
 		return popped;
 	}
@@ -1141,6 +1186,11 @@ public:
 
 	///  PER BULLET HOMING DEQUE HELPERS
 
+	// NOTE: manual pop/clear + push in the same frame as a reach races the
+	// deferred auto-pop/emit queued for the old front (same bullet epoch):
+	// the flush still pops the fresh front and fires a ghost reached signal.
+	// Keep manual edits and auto-pop apart in one frame, or re-push after
+	// the flush.
 	_ALWAYS_INLINE_ void bullet_clear_homing_targets(int bullet_index) {
 		if (!validate_bullet_index(bullet_index, "bullet_clear_homing_targets")) {
 			return;
@@ -1156,6 +1206,11 @@ public:
 		count = 0;
 
 		queue.clear_homing_targets(cached_mouse_global_position);
+		// An emptied deque unlocks the orbit (same as the pops): without this a
+		// direct is_locked read observes a stale lock until the next tick heals it.
+		if (bullet_index >= 0 && bullet_index < (int)all_orbiting_data.size()) {
+			all_orbiting_data[bullet_index].is_locked_orbiting = false;
+		}
 	}
 
 	_ALWAYS_INLINE_ Array all_bullets_pop_front_target(int bullet_index_start = 0, int bullet_index_end_inclusive = -1) {
@@ -1360,6 +1415,11 @@ public:
 	//////////////////////////////
 
 	// SHARED BULLET HOMING DEQUE POP METHODS
+	// NOTE: the deferred coalesced auto-pop (_do_shared_auto_pop_front_target)
+	// is stamped with the volley generation only. A manual clear/pop/push
+	// between the queue and the flush therefore races it: keep manual edits and
+	// auto-pop apart in the same frame (or re-push after the flush), otherwise
+	// the stale pop can eat the fresh front target.
 
 	_ALWAYS_INLINE_ Variant shared_homing_deque_pop_front_target() {
 		Variant popped = shared_homing_deque.pop_front_target(cached_mouse_global_position);
@@ -1466,6 +1526,12 @@ public:
 	_ALWAYS_INLINE_ void shared_homing_deque_clear_homing_targets() {
 		shared_homing_deque.clear_homing_targets(cached_mouse_global_position);
 		reset_shared_homing_reached_state();
+		// Shared deque ran dry: drop every orbit lock now instead of leaving
+		// stale locks observable until the next tick heals them (per-bullet
+		// clear/pop paths unlock the same way).
+		for (auto &o : all_orbiting_data) {
+			o.is_locked_orbiting = false;
+		}
 	}
 
 	_ALWAYS_INLINE_ void shared_homing_deque_replace_homing_targets_with_new_target(const Variant &node2d_or_global_position) {
@@ -1943,9 +2009,18 @@ public:
 	// Single-bullet hook called from disable_bullet(): the tick only trims
 	// active bullets, so a partially disabled multimesh would otherwise leak
 	// this bullet's targets (and the global mouse counter) until full teardown.
+	// Also bumps this bullet's homing epoch: deferred reached-emits/auto-pops
+	// queued before the disable carry the old epoch and no-op, so a
+	// disable -> enable -> push-new-target sequence before the flush can
+	// neither eat the fresh front target nor fire a ghost signal. The
+	// volley-wide generation is intentionally NOT bumped here - that would
+	// invalidate every sibling's legitimately queued work.
 	virtual void on_bullet_disabled(int bullet_index) override {
 		if (bullet_index < 0 || bullet_index >= (int)all_bullet_homing_targets.size()) {
 			return;
+		}
+		if (bullet_index >= 0 && bullet_index < (int)bullet_homing_epochs.size()) {
+			++bullet_homing_epochs[bullet_index];
 		}
 		auto &queue = all_bullet_homing_targets[bullet_index];
 		queue.clear_homing_targets(cached_mouse_global_position);
@@ -2132,9 +2207,16 @@ protected:
 	// Generation-guarded deferred emit: the target travels as an instance id
 	// and is resolved at fire time (null when freed) instead of carrying a
 	// possibly-dangling raw pointer across the frame.
-	_ALWAYS_INLINE_ void _do_emit_homing_target_reached(uint64_t p_generation, int p_bullet_index, uint64_t p_target_instance_id, const Vector2 &p_target_global_position) {
+	_ALWAYS_INLINE_ void _do_emit_homing_target_reached(uint64_t p_generation, int p_bullet_index, uint64_t p_bullet_epoch, uint64_t p_target_instance_id, const Vector2 &p_target_global_position) {
 		if (p_generation != homing_operation_generation) {
 			return; // Scheduled by a previous life (pool reuse before the flush).
+		}
+		// No signal for a bullet whose life ended after the queue: single-bullet
+		// disable/enable bumps the per-bullet epoch (but not the volley
+		// generation), and a disabled bullet must stay silent even when its
+		// epoch still matches (e.g. reach -> disable with no re-enable).
+		if (p_bullet_index < 0 || p_bullet_index >= (int)bullet_homing_epochs.size() || bullet_homing_epochs[p_bullet_index] != p_bullet_epoch || !all_bullets_enabled_set.contains(p_bullet_index)) {
+			return;
 		}
 		Node2D *target = nullptr;
 		if (p_target_instance_id != 0) {
@@ -2152,9 +2234,14 @@ protected:
 	}
 
 	// Generation-guarded deferred per-bullet pop: a stale call no-ops instead
-	// of eating the new life's front target.
-	_ALWAYS_INLINE_ void _do_auto_pop_front_target(uint64_t p_generation, int p_bullet_index) {
+	// of eating the new life's front target. Guards both the volley
+	// generation (pool reuse) and the per-bullet epoch (single-bullet
+	// disable/enable + fresh push before the flush).
+	_ALWAYS_INLINE_ void _do_auto_pop_front_target(uint64_t p_generation, int p_bullet_index, uint64_t p_bullet_epoch) {
 		if (p_generation != homing_operation_generation) {
+			return;
+		}
+		if (p_bullet_index < 0 || p_bullet_index >= (int)bullet_homing_epochs.size() || bullet_homing_epochs[p_bullet_index] != p_bullet_epoch) {
 			return;
 		}
 		bullet_homing_pop_front_target(p_bullet_index);
@@ -2195,13 +2282,14 @@ protected:
 
 			// Ensure that the signal is emitted only ONCE per bullet per target
 			if (fire_for_this_bullet) {
+				const uint64_t bullet_epoch = (bullet_index >= 0 && bullet_index < (int)bullet_homing_epochs.size()) ? bullet_homing_epochs[bullet_index] : 0;
 				switch (target.type) {
 					case GlobalPositionTarget:
 						// Deferred through the generation-guarded emitter: the target travels
 						// as an instance id (resolved at fire time, null when freed) and a
 						// stale generation no-ops, so pool reuse before the flush can neither
 						// crash on a dangling pointer nor emit ghosts.
-						call_deferred("_do_emit_homing_target_reached", homing_operation_generation, bullet_index, (uint64_t)0, target_pos);
+						call_deferred("_do_emit_homing_target_reached", homing_operation_generation, bullet_index, bullet_epoch, (uint64_t)0, target_pos);
 						break;
 					case Node2DTarget: {
 						auto &target_data = target.node2d_target_data;
@@ -2211,13 +2299,13 @@ protected:
 						if (homing_deque.is_homing_target_valid(target_data.target, target_data.cached_valid_instance_id)) {
 							target_id = target_data.cached_valid_instance_id;
 						}
-						call_deferred("_do_emit_homing_target_reached", homing_operation_generation, bullet_index, target_id, target_pos);
+						call_deferred("_do_emit_homing_target_reached", homing_operation_generation, bullet_index, bullet_epoch, target_id, target_pos);
 						break;
 					}
 					case NotHoming:
 						break;
 					case MousePositionTarget:
-						call_deferred("_do_emit_homing_target_reached", homing_operation_generation, bullet_index, (uint64_t)0, target_pos);
+						call_deferred("_do_emit_homing_target_reached", homing_operation_generation, bullet_index, bullet_epoch, (uint64_t)0, target_pos);
 						break;
 				}
 
@@ -2235,7 +2323,8 @@ protected:
 					}
 				} else {
 					if (bullet_homing_auto_pop_after_target_reached) {
-						call_deferred("_do_auto_pop_front_target", homing_operation_generation, bullet_index);
+						const uint64_t pop_epoch = (bullet_index >= 0 && bullet_index < (int)bullet_homing_epochs.size()) ? bullet_homing_epochs[bullet_index] : 0;
+						call_deferred("_do_auto_pop_front_target", homing_operation_generation, bullet_index, pop_epoch);
 					}
 				}
 			}

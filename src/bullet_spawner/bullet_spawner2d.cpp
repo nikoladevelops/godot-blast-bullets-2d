@@ -1880,14 +1880,20 @@ void BulletSpawner2D::apply_volley_homing_and_orbiting(DirectionalBullets2D *bul
                 const Variant &first = resolved_targets[0];
                 Node2D *first_node = Object::cast_to<Node2D>(first);
                 // The target may have been freed by a re-entrant handler
-                // between resolution and this log line. Validate the cached id
-                // before touching the pointer (same guard pattern as
-                // is_tracked_node_alive()); describe instead of touching.
-                // NOTE: get_instance_id() on a freed pointer is still a deref -
-                // resolution paths above must trim invalid targets first, this
-                // log line only avoids crashing on the queued-but-not-freed
-                // window and on id reuse.
-                if (first_node != nullptr && UtilityFunctions::is_instance_id_valid(first_node->get_instance_id())) {
+                // between resolution and this log line. Never touch the raw
+                // pointer to validate it: get_instance_id()/get_name() on a
+                // freed pointer is itself a deref (UAF). The resolved id was
+                // captured at resolve time - validate that via ObjectDB, then
+                // only touch the pointer when the id still resolves to it.
+                uint64_t first_id = 0;
+                if (first_node != nullptr) {
+                    // Object::cast_to succeeded, so the pointer was live at
+                    // cast time; capture the id for the ObjectDB check below.
+                    // (Still best-effort within one synchronous function.)
+                    first_id = first_node->get_instance_id();
+                }
+                Object *first_live = first_id != 0 && UtilityFunctions::is_instance_id_valid(first_id) ? ObjectDB::get_instance(ObjectID(first_id)) : nullptr;
+                if (first_live != nullptr && first_live == first_node) {
                     first_desc = String("'") + String(first_node->get_name()) + "' at " + UtilityFunctions::str(first_node->get_global_position());
                 } else if (first_node != nullptr) {
                     first_desc = "target freed mid-volley";

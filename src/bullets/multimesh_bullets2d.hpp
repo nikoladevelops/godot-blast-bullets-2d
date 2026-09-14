@@ -349,13 +349,15 @@ float *w = batch_buffer.ptrw();
 			}
 		}
 
-			// Disable attachments after signal (deferred keeps order)
-			for (int i = 0; i < bullet_indexes.size(); ++i) {
-				int idx = bullet_indexes[i];
-				call_deferred("_do_deferred_bullet_disable_attachment", idx, multimesh_generation, attachments[idx]);
-			}
+		// Disable attachments after signal (deferred keeps order)
+		for (int i = 0; i < bullet_indexes.size(); ++i) {
+			int idx = bullet_indexes[i];
+			BulletAttachment2D *queued_attachment = attachments[idx];
+			const uint64_t queued_attachment_id = queued_attachment != nullptr ? queued_attachment->get_instance_id() : 0;
+			call_deferred("_do_deferred_bullet_disable_attachment", idx, multimesh_generation, queued_attachment_id, queued_attachment);
 		}
 	}
+}
 
 	// Advances the SpriteFrames animation baked in anim_frames/anim_frame_secs.
 	// Hot path: plain countdown + index + one set_texture. No SpriteFrames calls here.
@@ -699,6 +701,13 @@ float *w = batch_buffer.ptrw();
 	// Re-entrancy latch for bullet_set_attachment (see the guard there): the setup
 	// path runs user script callbacks which must not nest another setup call.
 	int _attachment_setup_depth = 0;
+
+	// Set while enable_bullet()/disable_bullet() run user script callbacks
+	// (on_bullet_enable/on_bullet_disable): nested enable/disable calls on this
+	// volley would drift active_bullets_counter vs the sparse set
+	// (activate_data dedups, the counter does not) and break pool accounting.
+	// Nested calls reject with an error; use call_deferred from those callbacks.
+	int _bullet_enable_depth = 0;
 
 	// Stores each attachment's transform data
 	std::vector<Transform2D> attachment_transforms;
@@ -1650,15 +1659,20 @@ float *w = batch_buffer.ptrw();
 		}
 	}
 
-	// Deferred attachment disable carrying the spawn generation AND the exact
-	// attachment pointer. Lifetime expiry queues disables that flush after the
-	// tick; if the slot was detached or re-assigned in a handler, we must not
-	// pool the new owner's attachment by index alone.
-	void _do_deferred_bullet_disable_attachment(int bullet_index, int expected_generation, BulletAttachment2D *expected_attachment) {
+	// Deferred attachment disable carrying the spawn generation, the slot's
+	// attachment id AND the exact pointer. Lifetime expiry queues disables that
+	// flush after the tick; if the slot was detached or re-assigned in a
+	// handler, we must not pool the new owner's attachment by index alone. The
+	// id re-resolves at flush so a memdelete + allocator reuse at the same
+	// address (ABA) can never falsely match a new owner's attachment.
+	void _do_deferred_bullet_disable_attachment(int bullet_index, int expected_generation, uint64_t expected_attachment_id, BulletAttachment2D *expected_attachment) {
 		if (expected_generation != multimesh_generation) {
 			return;
 		}
 		if (bullet_index < 0 || bullet_index >= (int)attachments.size() || attachments[bullet_index] != expected_attachment) {
+			return;
+		}
+		if (expected_attachment == nullptr || expected_attachment_id == 0 || ObjectDB::get_instance(ObjectID(expected_attachment_id)) != expected_attachment) {
 			return;
 		}
 		bullet_disable_attachment(bullet_index);
@@ -1760,9 +1774,17 @@ float *w = batch_buffer.ptrw();
 		// Deferred attachment disables can be dropped by a generation bump, so the
 		// pool push below must never inherit live slots: sweep every survivor now
 		// (auto-pool returns them to the pool, otherwise they are queue_freed).
+		// The sweep runs user script callbacks (on_bullet_disable), and a handler
+		// may wake a bullet again via enable_bullet(). The wake sets is_active and
+		// bumps the counter/generations, so the trailing steps below (which belong
+		// to the dying life: hide, homing/teardown clears, timer detach, pool push)
+		// must not run over the fresh life - abort the disable instead.
 		for (int i = 0; i < (int)attachments.size(); ++i) {
 			if (attachments[i] != nullptr) {
 				bullet_disable_attachment(i);
+			}
+			if (is_active || active_bullets_counter > 0) {
+				return;
 			}
 		}
 		shared_bullet_curves_data = Ref<BulletCurvesData2D>();
@@ -1800,10 +1822,16 @@ float *w = batch_buffer.ptrw();
 	}
 
 	_ALWAYS_INLINE_ void enable_bullet(int bullet_index, int collision_amount = 0, bool should_enable_attachment = true) {
-		// NOTE (wake semantics): this wake intentionally keeps ballistics
-		// (speed/direction/velocity/position), appearance, custom data and
-		// per-bullet movement state: it takes no spawn data, so there is
-		// nothing to reseed from. Treat it as "resume", not "respawn".
+		// Wake semantics (contract, keep in sync with the doc XML):
+		// "resume, not respawn" for ballistics (speed/direction/velocity/
+		// position), appearance, custom data and per-bullet movement state -
+		// there is no spawn data to reseed from. Two deliberate exceptions:
+		// (1) an expiry-pooled wake tops up the whole volley's lifetime AND
+		// rewinds the curve clock together (curves sample
+		// curves_elapsed_time/max_life_time, so one without the other would
+		// pin curves at their end sample); (2) per-bullet homing queues and
+		// orbit state are NOT resumed - disable_bullet() clears them, so
+		// re-push targets and re-enable orbit after the wake.
 		// Cross-owner reuse must go through spawn_*()/enable_multimesh(),
 		// which reseed everything from fresh data.
 		if (!validate_bullet_index(bullet_index, "enable_bullet")) {
@@ -1826,6 +1854,33 @@ float *w = batch_buffer.ptrw();
 			return;
 		}
 
+		// A wake from inside the disable sweep (on_bullet_disable handler) would
+		// resurrect the volley while _disable_multimesh_internal() is tearing it
+		// down; the sweep aborts on wake now, but the factory also drops the
+		// re-registration (reactivate fails under the busy flag), leaving a live
+		// volley the factory never ticks. Reject here so the wake is explicit
+		// (call_deferred) instead of silently frozen.
+		if (bullet_factory != nullptr && bullet_factory->get_is_factory_busy()) {
+			UtilityFunctions::push_error("enable_bullet: cannot wake a bullet while the factory is busy (e.g. inside an on_bullet_disable handler during the disable sweep). Use call_deferred to wake after the sweep.");
+			return;
+		}
+
+		// The attachment callback below runs user code that may re-enter
+		// enable_bullet()/disable_bullet() on this volley. Claim the slot (set
+		// + counter) BEFORE it runs, and reject nested enable/disable calls
+		// while the latch is held, so the counter can never drift vs the
+		// sparse set (activate_data dedups, the counter does not).
+		if (_bullet_enable_depth > 0) {
+			UtilityFunctions::push_error("enable_bullet: re-entrant call from inside on_bullet_enable is not allowed. Use call_deferred to change bullet state from that callback.");
+			return;
+		}
+		struct _BulletEnableGuard {
+			int &depth;
+			_BulletEnableGuard(int &d) :
+					depth(d) { ++depth; }
+			~_BulletEnableGuard() { --depth; }
+		} bullet_enable_guard(_bullet_enable_depth);
+
 		// Full-volley wake coming: the generations must bump BEFORE the
 		// attachment callback below (user on_bullet_enable code) runs, so work
 		// it queues is stamped with the new life instead of being invalidated
@@ -1838,6 +1893,7 @@ float *w = batch_buffer.ptrw();
 			++multimesh_timers_generation;
 		}
 
+		all_bullets_enabled_set.activate_data(bullet_index);
 		++active_bullets_counter;
 		if (active_bullets_counter > amount_bullets) {
 			active_bullets_counter = amount_bullets;
@@ -1855,7 +1911,8 @@ float *w = batch_buffer.ptrw();
 
 		// collision_amount is how many hits the bullet has already taken: 0 means fresh
 		// (full hits remaining). Clamp into range so re-enabling can't grant extra hits
-		// or kill the bullet one hit early.
+		// or kill the bullet one hit early: values at/above max leave exactly one
+		// hit remaining (max - 1), same as set_bullet_collision_count().
 		if (collision_amount < 0) {
 			current_bullet_collision_amount = 0;
 		} else if (bullet_max_collision_count > 0 && collision_amount >= bullet_max_collision_count) {
@@ -1867,8 +1924,6 @@ float *w = batch_buffer.ptrw();
 		if (should_enable_attachment) {
 			bullet_enable_attachment(bullet_index);
 		}
-
-		all_bullets_enabled_set.activate_data(bullet_index);
 
 		if (!is_active) {
 			// Waking a fully pooled multimesh outside the factory pop path: drop it from
@@ -1937,6 +1992,24 @@ float *w = batch_buffer.ptrw();
 	virtual void on_bullet_disabled(int bullet_index) {}
 	_ALWAYS_INLINE_ void disable_bullet(int bullet_index, bool should_disable_attachment = true) {
 		if (!validate_bullet_index(bullet_index, "disable_bullet")) {
+			return;
+		}
+		// disable_bullet() is a teardown-adjacent path (debug helpers call it on
+		// unspawned instances; PREDELETE frees the area). enable_bullet() guards
+		// these; mirror the guards so a dead multimesh can't null-deref below.
+		if (multi.is_null() || !multi.is_valid()) {
+			return;
+		}
+		if (physics_server == nullptr || !area.is_valid()) {
+			return;
+		}
+
+		// Same re-entrancy latch as enable_bullet(): the attachment callback
+		// below runs user code that may call enable_bullet()/disable_bullet().
+		// A nested enable-then-disable pair inside one outer disable would
+		// otherwise decrement the counter twice for one claimed slot.
+		if (_bullet_enable_depth > 0) {
+			UtilityFunctions::push_error("disable_bullet: re-entrant call from inside on_bullet_enable is not allowed. Use call_deferred to change bullet state from that callback.");
 			return;
 		}
 
@@ -2063,6 +2136,12 @@ float *w = batch_buffer.ptrw();
 			// it still holds what we captured - anything else belongs to whoever
 			// changed it (possibly a new pool owner), and disable_multimesh()'s
 			// sweep catches any survivor that would otherwise leak.
+			// The handler may also have freed THIS multimesh (queue_free during
+			// the sync emit): attachments[]/bullets_current_collision_count[] are
+			// member vectors, so bail before touching them.
+			if (is_queued_for_deletion()) {
+				return;
+			}
 			if (attachment_at_signal_time != nullptr && attachments[bullet_index] == attachment_at_signal_time) {
 				bullet_disable_attachment(bullet_index);
 			}
@@ -2179,8 +2258,10 @@ float *w = batch_buffer.ptrw();
 	// Single-bullet collision counter read. See set_bullet_collision_count for writing.
 	int get_bullet_collision_count(int bullet_index) const;
 
-	// Single-bullet collision counter write. Clamped like set_bullets_current_collision_count:
-	// negatives become 0, values above max become max (when max > 0).
+	// Single-bullet collision counter write. Clamped like enable_bullet()'s
+	// wake top-up: negatives become 0, values at/above max become max - 1
+	// (exactly one hit remaining). Storing the threshold itself would kill on
+	// the next hit, unlike an equivalent wake.
 	void set_bullet_collision_count(int bullet_index, int value);
 
 	TypedArray<int> get_bullets_current_collision_count() const {
@@ -2204,12 +2285,14 @@ float *w = batch_buffer.ptrw();
 		bullets_current_collision_count.clear();
 		bullets_current_collision_count.reserve(amount_bullets);
 
+		// Same clamp as enable_bullet()/set_bullet_collision_count(): at/above max
+		// leaves exactly one hit remaining (max - 1), never a pinned kill.
 		for (int collision_count : arr) {
 			if (collision_count < 0) {
 				bullets_current_collision_count.push_back(0);
 				continue;
-			} else if (bullet_max_collision_count > 0 && collision_count > bullet_max_collision_count) {
-				bullets_current_collision_count.push_back(bullet_max_collision_count);
+			} else if (bullet_max_collision_count > 0 && collision_count >= bullet_max_collision_count) {
+				bullets_current_collision_count.push_back(bullet_max_collision_count - 1);
 				continue;
 			}
 

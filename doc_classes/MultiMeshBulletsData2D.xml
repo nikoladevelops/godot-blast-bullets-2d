@@ -63,7 +63,7 @@
 			How many times a bullet can collide before it gets disabled. If you set to 0, then the bullet will NEVER get disabled due to collisions.
 		</member>
 		<member name="bullets_current_collision_count" type="int[]" setter="set_bullets_current_collision_count" getter="get_bullets_current_collision_count" default="[]">
-			Per-bullet collision counters, one entry per bullet. Leave empty to start every bullet at zero. Values are clamped into range (negatives become 0, values above [member bullet_max_collision_count] become the max when the max is above 0); only a wrong array size is rejected with an error.
+			Per-bullet collision counters, one entry per bullet. Leave empty to start every bullet at zero. Values are clamped into range (negatives become 0, values at or above [member bullet_max_collision_count] become max - 1, exactly one hit remaining, when the max is above 0); only a wrong array size is rejected with an error.
 		</member>
 		<member name="collision_layer" type="int" setter="set_collision_layer" getter="get_collision_layer" default="1">
 			The bitmask for the collision layer.

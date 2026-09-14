@@ -686,10 +686,9 @@ public:
 		TBullet *bullets = static_cast<TBullet *>(bullets_pool.pop(key));
 		if (bullets != nullptr) {
 			if (!bullets->enable_multimesh(*spawn_data.ptr(), new_inherited_velocity_offset)) {
-				// enable_multimesh aborts without mutating state: put it back where
-				// it came from so the slot isn't lost and do not activate it. Use
-				// the live key, not the spawn key, so a size/shape mismatch can never
-				// file this instance under the wrong bucket.
+				// enable_multimesh rolls its own mutations back on failure, so the
+				// instance is a clean disabled one here: just file it back under
+				// the live key (not the spawn key) and do not activate it.
 				bullets_pool.push(bullets, bullets->get_pool_key());
 				return nullptr;
 			}

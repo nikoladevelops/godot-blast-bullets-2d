@@ -77,6 +77,11 @@ void MultiMeshBullets2D::_notification(int p_what) {
 				physics_server->area_set_area_monitor_callback(area, Variant());
 				physics_server->area_set_monitor_callback(area, Variant());
 
+				// Detach the shapes from the area BEFORE freeing their RIDs (same
+				// order as enable_multimesh()/set_collision_shape_runtime()): freeing
+				// still-attached shape RIDs warns/leaks on the physics server.
+				physics_server->area_clear_shapes(area);
+
 				// Avoid memory leaks if you've used the PhysicsServer2D to generate area and shapes
 				for (auto &shape : physics_shapes) {
 					if (shape.is_valid()) {
@@ -351,9 +356,22 @@ bool MultiMeshBullets2D::enable_multimesh(const MultiMeshBulletsData2D &data, co
 	// fire for the new spawn. Mirrors the homing-signal cleanup in directional enable logic.
 	disconnect_sprite_animation_connections();
 
-	// Wrong data type (e.g. block data on a directional instance): abort
-	// without activating. The caller re-pushes the instance to the pool.
+	// Wrong data type (e.g. block data on a directional instance): roll back
+	// the mutations above (counter, shapes, attachments, generations) so the
+	// caller can re-push a clean disabled instance instead of one with live
+	// shapes, foreign attachments and counter != dense size.
 	if (!custom_additional_enable_logic(data)) {
+		for (int i = 0; i < (int)attachments.size(); ++i) {
+			if (attachments[i] != nullptr) {
+				bullet_disable_attachment(i);
+			}
+		}
+		set_all_physics_shapes_enabled_for_area(false);
+		all_bullets_enabled_set.clear();
+		all_collided_bullets.clear();
+		active_bullets_counter = 0;
+		is_active = false;
+		set_visible(false);
 		return false;
 	}
 
@@ -1686,10 +1704,14 @@ void MultiMeshBullets2D::set_bullet_collision_count(int bullet_index, int value)
 		UtilityFunctions::push_error("set_bullet_collision_count: collision data not initialized for this multimesh.");
 		return;
 	}
+	// Same clamp as enable_bullet()'s wake top-up: values at/above max leave
+	// exactly one hit remaining (max - 1). Storing max itself would pin the
+	// bullet at the kill threshold so the next handle_bullet_collision() hit
+	// disables it immediately - inconsistent with a wake with the same amount.
 	if (value < 0) {
 		bullets_current_collision_count[bullet_index] = 0;
-	} else if (bullet_max_collision_count > 0 && value > bullet_max_collision_count) {
-		bullets_current_collision_count[bullet_index] = bullet_max_collision_count;
+	} else if (bullet_max_collision_count > 0 && value >= bullet_max_collision_count) {
+		bullets_current_collision_count[bullet_index] = bullet_max_collision_count - 1;
 	} else {
 		bullets_current_collision_count[bullet_index] = value;
 	}
@@ -1753,7 +1775,7 @@ void MultiMeshBullets2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("bullet_disable_attachment", "bullet_index"), &MultiMeshBullets2D::bullet_disable_attachment);
 	ClassDB::bind_method(D_METHOD("bullet_enable_attachment", "bullet_index"), &MultiMeshBullets2D::bullet_enable_attachment);
 	ClassDB::bind_method(D_METHOD("get_amount_active_attachments"), &MultiMeshBullets2D::get_amount_active_attachments);
-	ClassDB::bind_method(D_METHOD("_do_deferred_bullet_disable_attachment", "bullet_index", "expected_generation", "expected_attachment"), &MultiMeshBullets2D::_do_deferred_bullet_disable_attachment);
+	ClassDB::bind_method(D_METHOD("_do_deferred_bullet_disable_attachment", "bullet_index", "expected_generation", "expected_attachment_id", "expected_attachment"), &MultiMeshBullets2D::_do_deferred_bullet_disable_attachment);
 	ClassDB::bind_method(D_METHOD("_do_emit_life_time_over", "expected_generation", "emitter_instance_id", "signal_name", "bullet_indexes"), &MultiMeshBullets2D::_do_emit_life_time_over);
 	ClassDB::bind_method(D_METHOD("_do_emit_sprite_animation_finished", "expected_generation"), &MultiMeshBullets2D::_do_emit_sprite_animation_finished);
 
