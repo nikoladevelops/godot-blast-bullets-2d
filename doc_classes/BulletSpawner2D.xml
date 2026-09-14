@@ -443,7 +443,7 @@
 			Orbit ring radius in pixels. Must be at least 0.01.
 		</member>
 		<member name="orbiting_direction" type="int" setter="set_orbiting_direction" getter="get_orbiting_direction" default="2">
-			Orbit direction. Dont Move keeps the course (orbiting is skipped with a warning).
+			Orbit direction. DontMove means escort: bullets hold a fixed slot on the ring and follow the target without circling.
 		</member>
 		<member name="orbiting_texture_rotation" type="int" setter="set_orbiting_texture_rotation" getter="get_orbiting_texture_rotation" default="0">
 			How bullet textures face while physically orbiting.

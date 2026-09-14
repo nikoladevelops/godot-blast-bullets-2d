@@ -310,6 +310,7 @@
 			<description>
 				Enables orbiting for the specified bullet with the given parameters.
 				Invalid direction or texture rotation values are rejected with an error and orbiting stays disabled.
+				DontMove as direction means escort: the bullet holds a fixed slot on the ring and follows the target without circling (rigid follow, formation holds regardless of bullet speed). Tangential texture rotations (FaceOrbitingDirection, FaceOppositeOrbitingDirection) have no effect for escorts since there is no direction of travel.
 
 				Note that orbiting relies on having a homing target to orbit around.
 			</description>
@@ -808,7 +809,7 @@
 			Homing target type, no valid target. An empty homing deque reports this.
 		</constant>
 		<constant name="DontMove" value="0" enum="OrbitingDirection">
-			Orbiting direction, the bullet never locks onto the orbit ring and the orbit logic never moves it. Its normal movement continues untouched.
+			Orbiting direction, the bullet locks onto a fixed slot on the orbit ring and follows the target without circling (escort). Pre-lock flight (homing approach, push-out from inside the ring) behaves like the circling modes.
 		</constant>
 		<constant name="OrbitLeft" value="1" enum="OrbitingDirection">
 			Orbiting direction, the bullet circles the target counter-clockwise on screen (Godot uses a y-down coordinate space).

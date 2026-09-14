@@ -1189,11 +1189,6 @@ void BulletSpawner2D::set_orbiting_direction(DirectionalBullets2D::OrbitingDirec
         UtilityFunctions::push_error("BulletSpawner2D: invalid orbiting_direction, keeping the old value.");
         return;
     }
-    if (value == DirectionalBullets2D::DontMove) {
-        // Warn here, once, instead of per volley: DontMove keeps the bullet
-        // course, so orbiting is skipped wherever it is applied.
-        UtilityFunctions::push_warning("BulletSpawner2D: orbiting_direction is Dont Move (bullets keep their course), orbiting will be skipped.");
-    }
     orbiting_direction = value;
 }
 DirectionalBullets2D::OrbitingTextureRotation BulletSpawner2D::get_orbiting_texture_rotation() const {
@@ -1778,9 +1773,8 @@ void BulletSpawner2D::apply_steering_to_volley(DirectionalBullets2D *volley) con
 }
 
 void BulletSpawner2D::apply_orbiting_to_volley(DirectionalBullets2D *volley) const {
-    if (orbiting_direction == DirectionalBullets2D::DontMove) {
-        return; // The setter already warned: enabling it would be a silent no-op.
-    }
+    // No direction is skipped: DontMove = escort (fixed ring slot, follows the
+    // target without circling), armed through the same engine path below.
     const int bullet_count = volley->get_amount_bullets();
     for (int i = 0; i < bullet_count; ++i) {
         // Negative linear steps fan downward: clamp per bullet so the

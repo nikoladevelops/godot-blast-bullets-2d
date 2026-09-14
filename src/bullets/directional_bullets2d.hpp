@@ -533,9 +533,18 @@ public:
 					bool is_physically_orbiting_this_frame = false;
 
 					// Movement Logic (Locked or Boundary Arrival)
-					// DontMove keeps course: apply_orbiting_to_volley() never
-					// enables it, so this branch is dead defense-in-depth.
-					if (already_locked && orbiting_data->direction != DontMove) {
+					// DontMove = escort: holds a fixed ring slot (angle set at
+					// lock time, never advanced) and translates with the target.
+					if (already_locked && orbiting_data->direction == DontMove) {
+						Vector2 target_pos = homing_target_pos + Vector2(orbiting_data->radius, 0).rotated(orbiting_data->angle);
+						Vector2 snap_delta = target_pos - curr_bullet_origin;
+						// Rigid follow (no max_step clamp): the formation holds
+						// regardless of bullet speed, so fast targets can't drag
+						// escorts behind.
+						velocity_delta = snap_delta;
+
+						is_physically_orbiting_this_frame = true;
+					} else if (already_locked) {
 						real_t dir_multiplier = (orbiting_data->direction == OrbitRight) ? 1.0 : (orbiting_data->direction == OrbitLeft ? -1.0 : 0.0);
 
 						if (dir_multiplier != 0.0) {
@@ -559,8 +568,9 @@ public:
 						is_physically_orbiting_this_frame = true;
 					}
 					// Check exact frame arrival: use epsilon so low-speed / high-FPS bullets still lock (speed*delta can be <0.2px)
-					// DontMove is excluded: freezing means no ring snap, no push-out, no target tracking.
-					else if (orbiting_data->direction != DontMove && Math::abs(current_dist - orbiting_data->radius) < Math::max((real_t)(all_cached_speed[i] * delta), (real_t)2.0)) {
+					// DontMove locks here too: the angle stored is the escort's
+					// fixed slot, held (never advanced) by the branch above.
+					else if (Math::abs(current_dist - orbiting_data->radius) < Math::max((real_t)(all_cached_speed[i] * delta), (real_t)2.0)) {
 						// REACHED RADIUS - LOCK NOW
 						orbiting_data->angle = to_target.angle();
 						orbiting_data->is_locked_orbiting = true;
@@ -575,10 +585,9 @@ public:
 
 						// We consider this frame as orbiting because we just snapped to the ring
 						is_physically_orbiting_this_frame = true;
-					} else if (orbiting_data->direction != DontMove && current_dist < orbiting_data->radius) {
+					} else if (current_dist < orbiting_data->radius) {
 						// SPAWNED INSIDE - PUSH OUT
-						// This is technically NOT orbiting yet, it's just moving to the border
-						// (skipped for DontMove: frozen bullets never move toward the ring)
+						// This is technically NOT orbiting yet, it's just moving to the border.
 						Vector2 outward_dir = (current_dist > 0.1f) ? (to_target / current_dist) : Vector2(1, 0);
 						real_t next_dist = current_dist + (all_cached_speed[i] * delta);
 						Vector2 target_pos = homing_target_pos + (outward_dir * next_dist);
@@ -587,8 +596,10 @@ public:
 
 					// TEXTURE ROTATION WHEN ORBITING
 					// Only rotate if the bullet is PHYSICALLY orbiting (Locked or just snapped).
-					// DontMove means frozen: leave the texture alone.
-				if (is_physically_orbiting_this_frame && orbiting_data->direction != DontMove) {
+					// DontMove escorts still face the target (FaceTarget /
+					// FaceOppositeTarget); tangential modes are skipped - an
+					// escort has no direction of travel.
+				if (is_physically_orbiting_this_frame && (orbiting_data->direction != DontMove || (orbiting_data->texture_rotation != FaceOrbitingDirection && orbiting_data->texture_rotation != FaceOppositeOrbitingDirection))) {
 					Vector2 look_dir = Vector2();
 					Vector2 radial_vec = (curr_bullet_origin - homing_target_pos).normalized();
 
@@ -716,15 +727,9 @@ public:
 			return;
 		}
 
-		// DontMove freezes the bullet instead of orbiting (the tick treats it as
-		// a no-steer hold): accepting it here would inflate
-		// active_orbiting_count and keep the orbit preamble armed forever for a
-		// dead feature. Reject so the counter always means "actually orbiting".
-		if (orbiting_direction == DontMove) {
-			UtilityFunctions::push_error("Invalid orbiting direction DontMove in bullet_enable_orbiting: it freezes the bullet instead of orbiting. Use OrbitLeft or OrbitRight.");
-			return;
-		}
-
+		// DontMove = escort: the bullet locks onto a fixed ring slot and follows
+		// the target without circling (see the tick's locked branch). Counts as
+		// orbiting so the orbit section runs for it.
 		all_orbiting_data[bullet_index] = OrbitingData(orbiting_radius, orbiting_direction, orbiting_texture_rotation);
 		active_orbiting_count++; // Important because it tracks whether orbiting is even used at all
 		orbiting_status = 1;
