@@ -73,14 +73,14 @@ void BlockBullets2D::custom_additional_spawn_logic(const MultiMeshBulletsData2D 
 	}
 }
 
-void BlockBullets2D::custom_additional_enable_logic(const MultiMeshBulletsData2D &data) {
+bool BlockBullets2D::custom_additional_enable_logic(const MultiMeshBulletsData2D &data) {
 	const BlockBulletsData2D *block_data = Object::cast_to<BlockBulletsData2D>(&data);
 	// Same defensive sizing as spawn (a wrong-type enable must not leave the
 	// movement SoA empty for the tick path).
 	set_up_movement_data(*get_default_block_speed_data().ptr());
 	if (block_data == nullptr) {
 		UtilityFunctions::push_error("BlockBullets2D::enable got wrong spawn data type, expected BlockBulletsData2D.");
-		return;
+		return false;
 	}
 
 	block_rotation_radians = block_data->block_rotation_radians;
@@ -90,6 +90,7 @@ void BlockBullets2D::custom_additional_enable_logic(const MultiMeshBulletsData2D
 		UtilityFunctions::push_error("BlockBulletsData2D.block_speed is null in enable - using default speed 0.");
 		set_up_movement_data(*get_default_block_speed_data().ptr());
 	}
+	return true;
 }
 
 void BlockBullets2D::custom_additional_disable_logic() {

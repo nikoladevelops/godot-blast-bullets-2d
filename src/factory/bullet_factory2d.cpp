@@ -245,7 +245,11 @@ void BulletFactory2D::_physics_process(double delta) {
 	const size_t directional_count = all_directional_bullets.size();
 	for (size_t idx = 0; idx < directional_count && idx < all_directional_bullets.size(); ++idx) {
 		DirectionalBullets2D *bullet = all_directional_bullets[idx];
-		if (bullet != nullptr) {
+		// Skip the call entirely when the volley holds no timers: the common
+		// no-timer game pays nothing per volley per tick. The vector is only
+		// mutated outside this loop (attach/detach defer during physics), so
+		// the emptiness check cannot race the iteration it guards.
+		if (bullet != nullptr && !bullet->multimesh_custom_timers.empty()) {
 			bullet->run_multimesh_custom_timers(delta);
 		}
 	}
@@ -253,7 +257,7 @@ void BulletFactory2D::_physics_process(double delta) {
 	const size_t block_count = all_block_bullets.size();
 	for (size_t idx = 0; idx < block_count && idx < all_block_bullets.size(); ++idx) {
 		BlockBullets2D *bullet = all_block_bullets[idx];
-		if (bullet != nullptr) {
+		if (bullet != nullptr && !bullet->multimesh_custom_timers.empty()) {
 			bullet->run_multimesh_custom_timers(delta);
 		}
 	}

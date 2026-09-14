@@ -100,7 +100,7 @@
 			<param index="0" name="bullet_index_start" type="int" default="0" />
 			<param index="1" name="bullet_index_end_inclusive" type="int" default="-1" />
 			<description>
-				Returns the exact instantaneous velocities of all bullets in the range, including movement patterns, orbiting and curves. Pair with [method BulletFactory2D.helper_generate_transforms_fan] for split patterns.
+				Returns the logical velocities of all bullets in the range (direction x speed + inherited offset), excluding per-tick pattern/orbit displacement. Pair with [method BulletFactory2D.helper_generate_transforms_fan] for split patterns.
 			</description>
 		</method>
 		<method name="all_bullets_is_orbiting_enabled">

@@ -260,11 +260,11 @@ void DirectionalBullets2D::custom_additional_spawn_logic(const MultiMeshBulletsD
 	apply_shared_movement_pattern_from_data(*directional_data);
 }
 
-void DirectionalBullets2D::custom_additional_enable_logic(const MultiMeshBulletsData2D &data) {
+bool DirectionalBullets2D::custom_additional_enable_logic(const MultiMeshBulletsData2D &data) {
 	const DirectionalBulletsData2D *directional_data = Object::cast_to<DirectionalBulletsData2D>(&data);
 	if (directional_data == nullptr) {
 		UtilityFunctions::push_error("DirectionalBullets2D::enable got wrong spawn data type, expected DirectionalBulletsData2D.");
-		return;
+		return false;
 	}
 
 	// Get the list of connections for the signal
@@ -352,6 +352,7 @@ void DirectionalBullets2D::custom_additional_enable_logic(const MultiMeshBullets
 	homing_distance_before_reached = 5.0;
 	bullet_homing_auto_pop_after_target_reached = false;
 	shared_homing_deque_auto_pop_after_target_reached = false;
+	return true;
 }
 
 void DirectionalBullets2D::custom_additional_disable_logic() {

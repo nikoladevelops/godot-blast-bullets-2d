@@ -676,7 +676,16 @@ class BulletSpawner2D : public Node2D{
         TypedArray<Transform2D> collect_spawn_transforms() const;
         // Fires one volley immediately (counts, re-arms the timer). Returns
         // false when misconfigured or the factory refused (busy/teardown).
+        // Safe to call from _physics_process (same-shape pool reuse applies
+        // immediately; only a shape-type change defers internally). Never call
+        // from inside a spawner signal handler (volley_homing_configured,
+        // homing_targets_resolved, volley_fired): nested calls are rejected;
+        // use shoot_once_deferred() there instead.
         bool shoot_once();
+        // Deferred variant for signal handlers / colliding contexts: queues a
+        // shoot_once() with call_deferred() and returns true when queued.
+        // Rejected (false) when the spawner is not in the tree.
+        bool shoot_once_deferred();
         // Zeroes the volley counter and re-arms with the initial delay.
         void reset_shooting();
 
@@ -700,6 +709,16 @@ class BulletSpawner2D : public Node2D{
         // Countdown to the next volley; volleys fired since (re)arming.
         double shoot_time_left = 0.0;
         int volleys_fired = 0;
+        // Re-entrancy latch for shoot_once(): the configuring signals emitted
+        // during apply_volley_homing_and_orbiting() AND volley_fired below run
+        // user code synchronously, which must not nest another shoot_once()
+        // (unbounded recursion, counter races, pool double-pop). The latch is
+        // held across apply + emit + the max_volleys cap transition (cleared
+        // after), so nested calls from ANY of those handlers are rejected; use
+        // call_deferred("shoot_once") (or shoot_once_deferred()) instead.
+        // Per-spawner: cross-spawner A->B->A nesting is additionally stopped
+        // by the file-local global depth guard in the .cpp.
+        bool shoot_once_reentrant_guard = false;
         // Homing/orbiting runtime state (never stored).
         // Instance ids of spawned volleys, for interval retargeting. Mutable:
         // even const readers (get_live_volley_count) prune dead entries, so

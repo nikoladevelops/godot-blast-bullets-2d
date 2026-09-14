@@ -200,12 +200,24 @@ public:
 
 	void _notification(int p_what);
 
-	// True while bullet state must not be structurally mutated: either this
-	// factory is iterating it, or any physics frame is running (server flush
-	// locks apply). Single source of truth for all mutation guards, usable
-	// from multimesh-level mutators that free/recreate RIDs or re-bucket
-	// pools. Not bound.
+	// True while bullet state must not be structurally mutated: the factory is
+	// actively iterating flight vectors (physics sweep, disable sweeps holding
+	// the busy flag). Same-shape pool reuse (no RID alloc/free) is safe from
+	// ordinary physics callbacks, so this is intentionally NARROWER than
+	// is_in_physics_frame(): callers that only need "am I inside any physics
+	// frame" check the engine directly. Single source of truth for spawn-safe
+	// paths (enable_multimesh fast path), usable from multimesh-level
+	// mutators. Not bound.
 	bool is_bullets_iterating() const {
+		return is_iterating_bullets;
+	}
+
+	// True while structural RID work (area_clear_shapes / free_rid / re-bucket)
+	// is unsafe: either the factory is iterating, or any physics frame is
+	// running (server flush locks apply). Structural paths (reset/free_* /
+	// populate_*, shape-type changes) reject on this; the spawn fast path
+	// does not. Not bound.
+	bool is_structural_mutation_unsafe() const {
 		if (is_iterating_bullets) {
 			return true;
 		}
@@ -256,11 +268,11 @@ public:
 	// (directional_area_entered, block_body_entered,
 	// directional_life_time_over, ...) or from a native flush callback.
 	// Wrap the call in call_deferred() to run it after the physics step.
-	// Game logic (spawning, homing, teleporting, attachments, custom data)
-	// is always safe to touch directly.
+	// Game logic (spawning same-shape volleys, homing, teleporting,
+	// attachments, custom data) is always safe to touch directly.
 	// Returns true when the caller must abort.
 	bool reject_when_iterating(const char *caller_name) const {
-		if (is_bullets_iterating()) {
+		if (is_structural_mutation_unsafe()) {
 			UtilityFunctions::push_error(String("BulletFactory2D::") + caller_name + " cannot run while bullets are being processed or inside a physics frame (e.g. inside directional_area_entered/block_body_entered/directional_life_time_over handlers). Only structural calls are affected - use call_deferred() to run this after the physics step.");
 			return true;
 		}

@@ -8,6 +8,7 @@
 #include "godot_cpp/core/math.hpp"
 #include "godot_cpp/core/object.hpp"
 #include "godot_cpp/variant/callable.hpp"
+#include "godot_cpp/variant/dictionary.hpp"
 #include "godot_cpp/variant/utility_functions.hpp"
 
 
@@ -69,6 +70,13 @@ static Transform2D scale_spawn_transform(const Transform2D &t, const Vector2 &ba
 // it as internal. The holder is owner-less: never saved, never exported.
 static const char *PREVIEW_META_KEY = "blastbullets_pattern_preview";
 static const char *PREVIEW_HOLDER_NAME = "~BlastBulletsPatternPreview";
+
+// Global shoot_once() nesting depth across ALL spawners sharing this module.
+// The per-spawner latch stops self-recursion; this stops A->B->A ping-pong
+// through signal handlers sharing one factory pool. Incremented alongside the
+// latch, decremented at the same single clear-point after volley_fired + cap
+// transition. File-local: never exposed, never persisted.
+static int g_shoot_once_nesting_depth = 0;
 
 // Self-repainting preview layer: rebuild_preview() stores a snapshot via the
 // setters below, the engine re-invokes _draw() on every repaint (zoom, pan,
@@ -233,7 +241,7 @@ void BulletSpawner2D::set_shooting_enabled(bool value) {
     shooting_enabled = value;
     const bool now_active = auto_shooting_active();
     if (is_inside_tree()) {
-        set_process(now_active || spin_enabled || homing_retarget_active());
+        set_process(now_active || spin_enabled || homing_retarget_active() || preview_active());
     }
     if (!was_active && now_active) {
         emit_signal("shooting_started");
@@ -278,7 +286,7 @@ void BulletSpawner2D::set_max_volleys(int value) {
     max_volleys = value;
     const bool now_active = auto_shooting_active();
     if (is_inside_tree()) {
-        set_process(now_active || spin_enabled || homing_retarget_active());
+        set_process(now_active || spin_enabled || homing_retarget_active() || preview_active());
     }
     if (!was_active && now_active) {
         emit_signal("shooting_started");
@@ -320,7 +328,7 @@ void BulletSpawner2D::set_spin_enabled(bool value) {
     spin_enabled = value;
     if (!Engine::get_singleton()->is_editor_hint() && is_inside_tree()) {
         // Spinning needs _process even when auto-shooting is off.
-        set_process(spin_enabled || auto_shooting_active() || homing_retarget_active());
+        set_process(spin_enabled || auto_shooting_active() || homing_retarget_active() || preview_active());
     }
 }
 double BulletSpawner2D::get_spin_speed_deg_per_sec() const {
@@ -901,7 +909,7 @@ void BulletSpawner2D::reset_shooting() {
     // waiting a full interval on stale membership data.
     homing_retarget_time_left = 0.0;
     if (is_inside_tree()) {
-        set_process(auto_shooting_active() || spin_enabled || homing_retarget_active());
+        set_process(auto_shooting_active() || spin_enabled || homing_retarget_active() || preview_active());
     }
     // An explicit restart counts as a (re)start whenever it arms shooting.
     if (auto_shooting_active()) {
@@ -1157,6 +1165,11 @@ bool BulletSpawner2D::get_orbiting_enabled() const {
 void BulletSpawner2D::set_orbiting_enabled(bool value) {
     orbiting_enabled = value;
     notify_property_list_changed();
+    // Orbiting rides on homing targets: toggling it must not leave _process
+    // asleep. Editor-guarded: the preview owns processing in the editor.
+    if (!Engine::get_singleton()->is_editor_hint() && is_inside_tree()) {
+        set_process(auto_shooting_active() || spin_enabled || homing_retarget_active() || preview_active());
+    }
 }
 double BulletSpawner2D::get_orbiting_radius() const {
     return orbiting_radius;
@@ -1589,7 +1602,14 @@ bool BulletSpawner2D::adopt_live_volley(DirectionalBullets2D *bullets) {
     }
     // Takes over a manually-woken volley (manual wake detaches the previous
     // owner): stamps, hooks the forwarder, tracks. Queues are left alone.
+    // A same-owner revive keeps the previous owner's forwarder (wake cleanup
+    // is scoped to pooled wakes), so drop all existing forwards first:
+    // otherwise the old spawner keeps receiving events for a foreign volley.
     bullets->owner_spawner_id = get_instance_id();
+    for (const Dictionary &connection : bullets->get_signal_connection_list("bullet_homing_target_reached")) {
+        const Callable callable = connection["callable"];
+        bullets->disconnect("bullet_homing_target_reached", callable);
+    }
     const Callable forward_callable(this, "_on_volley_bullet_homing_target_reached");
     if (!bullets->is_connected("bullet_homing_target_reached", forward_callable)) {
         bullets->connect("bullet_homing_target_reached", forward_callable);
@@ -2378,6 +2398,16 @@ void BulletSpawner2D::_validate_property(PropertyInfo &p_property) const {
 }
 
 bool BulletSpawner2D::shoot_once() {
+    // No nesting: the configuring signals fired below AND volley_fired run
+    // user code synchronously, and a nested shoot_once() from such a handler
+    // would recurse without bound and race volleys_fired past the cap.
+    // The per-spawner latch stops self-recursion; the global depth stops
+    // cross-spawner A->B->A ping-pong through one shared factory pool.
+    // Error string names all guarded signals (kept as-is, truthful).
+    if (shoot_once_reentrant_guard || g_shoot_once_nesting_depth > 0) {
+        UtilityFunctions::push_error("BulletSpawner2D::shoot_once: re-entrant call from inside a spawner signal handler is not allowed (homing_targets_resolved, volley_homing_configured, volley_fired). Use call_deferred(\"shoot_once\") instead.");
+        return false;
+    }
     BulletFactory2D *factory = get_bullet_factory();
     if (factory == nullptr) {
         UtilityFunctions::push_error("BulletSpawner2D::shoot_once: no BulletFactory2D assigned (bullet_factory_path).");
@@ -2411,18 +2441,69 @@ bool BulletSpawner2D::shoot_once() {
     // instead of the factory. Pool reuse resets the tag, so this stamp covers
     // every spawn path through this function.
     bullets->owner_spawner_id = get_instance_id();
+    // Capture the id BEFORE user code runs: the configuring signals below
+    // execute handlers synchronously, and a handler may free or re-home this
+    // volley. The raw pointer must not be touched again without validation.
+    const uint64_t volley_id = bullets->get_instance_id();
+    const uint64_t self_id = get_instance_id();
+    shoot_once_reentrant_guard = true;
+    ++g_shoot_once_nesting_depth;
     // Homing/orbiting runs on the same stamp: the instance is fully
     // configured before volley_fired, so handlers observe live behavior.
+    // The latch stays up through volley_fired below (not just the configuring
+    // signals): every emit on this path runs user code synchronously.
     apply_volley_homing_and_orbiting(bullets);
+    // Re-validate: handlers of homing_targets_resolved/volley_homing_configured
+    // ran above and may have freed this volley (factory reset/free_*, queue_free)
+    // or handed it to another owner (adopt_live_volley). Dereferencing the raw
+    // pointer now would be use-after-free: resolve by id and compare BY VALUE.
+    Object *live = UtilityFunctions::is_instance_id_valid(volley_id) ? ObjectDB::get_instance(ObjectID(volley_id)) : nullptr;
+    DirectionalBullets2D *live_volley = Object::cast_to<DirectionalBullets2D>(live);
+    if (live_volley == nullptr || live_volley != bullets || !live_volley->is_active || live_volley->owner_spawner_id != self_id) {
+        // Volley is gone or foreign: counting it or emitting volley_fired for it
+        // would lie about ownership and hand out a dead pointer. The spawn
+        // itself succeeded (bullets were created), but this shot is dropped.
+        // Pre-emit failure: clear both latch and global depth (nothing emitted).
+        shoot_once_reentrant_guard = false;
+        --g_shoot_once_nesting_depth;
+        if (g_shoot_once_nesting_depth < 0) {
+            g_shoot_once_nesting_depth = 0;
+        }
+        return false;
+    }
     volleys_fired += 1;
+    // The latch stays up through this emit AND the cap transition below: a
+    // volley_fired (or shooting_finished) handler calling shoot_once() (same
+    // or cross spawner) would otherwise recurse without bound past the
+    // max_volleys cap. Single clear-point right after, so sequential
+    // (non-nested) shots are unaffected. All pre-emit failure paths above
+    // return while the guard is either unset or already cleared.
     emit_signal("volley_fired", bullets, volleys_fired);
     // Exact-equality = transition only: further manual shots past the cap do
     // not re-emit, and the setter path reports its own transition.
+    // NOTE: a shooting_finished handler runs while the latch is still up, so
+    // a nested shoot_once() from there is rejected the same way.
     if (max_volleys >= 0 && volleys_fired == max_volleys) {
         // Stop shooting, but stay awake while spinning or previewing.
         set_process(spin_enabled || preview_active() || homing_retarget_active());
         emit_signal("shooting_finished");
     }
+    shoot_once_reentrant_guard = false;
+    --g_shoot_once_nesting_depth;
+    if (g_shoot_once_nesting_depth < 0) {
+        g_shoot_once_nesting_depth = 0;
+    }
+    return true;
+}
+
+// Deferred variant for signal handlers / physics callbacks: queues the shot
+// so it runs after the current emission / physics step instead of nesting.
+bool BulletSpawner2D::shoot_once_deferred() {
+    if (!is_inside_tree()) {
+        UtilityFunctions::push_error("BulletSpawner2D::shoot_once_deferred: spawner is not inside the tree, shot dropped.");
+        return false;
+    }
+    call_deferred("shoot_once");
     return true;
 }
 
@@ -3064,6 +3145,7 @@ void BulletSpawner2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_volleys_fired"), &BulletSpawner2D::get_volleys_fired);
 	ClassDB::bind_method(D_METHOD("collect_spawn_transforms"), &BulletSpawner2D::collect_spawn_transforms);
 	ClassDB::bind_method(D_METHOD("shoot_once"), &BulletSpawner2D::shoot_once);
+	ClassDB::bind_method(D_METHOD("shoot_once_deferred"), &BulletSpawner2D::shoot_once_deferred);
 	ClassDB::bind_method(D_METHOD("reset_shooting"), &BulletSpawner2D::reset_shooting);
 
 }

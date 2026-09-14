@@ -422,7 +422,7 @@
 			<return type="Vector2" />
 			<param index="0" name="bullet_index" type="int" />
 			<description>
-				Get the exact instantaneous velocity of a specific bullet, including movement patterns, orbiting and curves. Use this for gameplay logic such as splitting bullets, where rebuilding velocity from direction and speed would lose those effects.
+				Logical velocity of a specific bullet (direction x speed + inherited offset). Excludes per-tick pattern/orbit displacement, which steers the movement delta after this value is computed. Use this for gameplay logic such as splitting bullets or speed checks.
 			</description>
 		</method>
 		<method name="get_collision_layer" qualifiers="const">
@@ -529,6 +529,7 @@
 				If you wish to execute the callable regardless of the multimesh being active or not (even when in object pool), then set this parameter to [code]false[/code].
 				Note: For this to take effect ensure that the [member is_multimesh_auto_pooling_enabled] property is set to false - this is because auto pooling clears any callables in order to re-use the multimesh later completely reset.
 				Note: applies immediately outside physics processing; inside a physics frame it is deferred like before.
+				Note: capped at 64 timers per multimesh (extra attaches are rejected); pool-pop re-enables wipe armed timers, manual wakes drop timers armed while pooled.
 
 				If you want to be able to detach the callable, then make sure that it is clearly declared outside as a variable or you could even use a normal Godot function.
 

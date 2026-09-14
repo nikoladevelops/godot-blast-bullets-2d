@@ -229,13 +229,28 @@ bool MultiMeshBullets2D::enable_multimesh(const MultiMeshBulletsData2D &data, co
 		return false;
 	}
 
-	// Structural RID work below (area_clear_shapes/free_rid) must never run
-	// inside the bullet iteration / physics flush: a collision-signal handler
-	// calling spawn with a different shape type would otherwise free RIDs
-	// under the server flush lock. Same contract as set_collision_shape_runtime
-	// and the factory reset/free_*/populate_* guards. Use call_deferred().
+	// Narrow guard: same-shape reuse only rewrites transforms, re-enables
+	// shapes and reseeds SoA vectors (no RID alloc/free), so it is safe from
+	// ordinary physics callbacks such as _physics_process shooting. Only a
+	// shape-TYPE change performs structural RID work (area_clear_shapes /
+	// free_rid / re-bucket) and must wait for a safe point. Iterating sweeps
+	// (factory busy) always reject: vectors below are being walked.
+	const PhysicsServer2D::ShapeType incoming_effective = CollisionShapeHelper2D::get_effective_type(data.collision_shape, false);
+	const bool shape_type_changes = (incoming_effective != cached_effective_shape_type);
 	if (bullet_factory != nullptr && bullet_factory->is_bullets_iterating()) {
-		UtilityFunctions::push_error("enable_multimesh cannot run while bullets are being processed (e.g. inside a collision or lifetime signal handler). Use call_deferred() to enable outside the physics step.");
+		UtilityFunctions::push_error("enable_multimesh cannot run while bullets are being processed (factory sweep in progress, e.g. inside a collision or lifetime signal handler). Use call_deferred() to enable outside the sweep.");
+		return false;
+	}
+	if (shape_type_changes && bullet_factory != nullptr && bullet_factory->is_structural_mutation_unsafe()) {
+		UtilityFunctions::push_error("enable_multimesh with a different collision shape type cannot run inside a physics frame (server flush locks apply to the shape RIDs it must recreate). Use call_deferred() to enable outside the physics step.");
+		return false;
+	}
+
+	// Re-enabling a live volley would wipe its attachments, timers, curves and
+	// patterns mid-flight. Pool pops only hand out disabled instances, so a
+	// live instance here is always a direct (mis)call: reject, don't reseed.
+	if (is_active) {
+		UtilityFunctions::push_error("enable_multimesh: instance is already active. Disable it first or spawn a new volley instead.");
 		return false;
 	}
 
@@ -253,6 +268,10 @@ bool MultiMeshBullets2D::enable_multimesh(const MultiMeshBulletsData2D &data, co
 
 	inherited_velocity_offset = new_inherited_velocity_offset;
 
+	// Reused RIDs keep their original type. The guard above already ensured a
+	// type change only reaches here outside the physics frame / sweep, so the
+	// area_clear_shapes + free_rid below never runs under a server flush lock.
+	// Same-shape reuse skips this branch entirely (fast, physics-safe path).
 	const PhysicsServer2D::ShapeType old_effective_shape_type = cached_effective_shape_type;
 	cache_collision_shape_typed(data.collision_shape);
 
@@ -332,7 +351,11 @@ bool MultiMeshBullets2D::enable_multimesh(const MultiMeshBulletsData2D &data, co
 	// fire for the new spawn. Mirrors the homing-signal cleanup in directional enable logic.
 	disconnect_sprite_animation_connections();
 
-	custom_additional_enable_logic(data);
+	// Wrong data type (e.g. block data on a directional instance): abort
+	// without activating. The caller re-pushes the instance to the pool.
+	if (!custom_additional_enable_logic(data)) {
+		return false;
+	}
 
 	set_visible(true);
 
@@ -1168,6 +1191,14 @@ void MultiMeshBullets2D::set_bullet_transform(int bullet_index, const Transform2
 		UtilityFunctions::push_error("set_bullet_transform: new_transform must be finite, keeping the old transform.");
 		return;
 	}
+	// A degenerate (near-zero) scale collapses columns[0] to zero, which silently
+	// zeroes the movement direction wherever it is derived from the transform
+	// (adjust_direction_based_on_rotation tick path -> velocity falls back to
+	// the inherited offset only). Reject instead of storing a poisoned basis.
+	if (new_transform.get_scale().length_squared() < 0.00000001) {
+		UtilityFunctions::push_error("set_bullet_transform: scale must be non-zero, keeping the old transform.");
+		return;
+	}
 	if (bullet_index >= (int)all_cached_instance_transforms.size() || bullet_index >= (int)all_cached_instance_origin.size()) {
 		return;
 	}
@@ -1586,7 +1617,7 @@ void MultiMeshBullets2D::set_collision_shape_runtime(const Ref<Shape2D> &new_sha
 	// Frees/recreates server RIDs and re-buckets the pool: unsafe while the
 	// factory iterates bullet state or inside any physics frame (server flush
 	// locks apply). Same contract as the factory structural methods.
-	if (bullet_factory != nullptr && bullet_factory->is_bullets_iterating()) {
+	if (bullet_factory != nullptr && bullet_factory->is_structural_mutation_unsafe()) {
 		UtilityFunctions::push_error("set_collision_shape_runtime cannot run while bullets are being processed or inside a physics frame (e.g. inside directional_area_entered/block_body_entered handlers). Use call_deferred() to run this after the physics step.");
 		return;
 	}

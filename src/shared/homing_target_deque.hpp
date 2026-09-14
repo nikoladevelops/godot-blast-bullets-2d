@@ -45,6 +45,19 @@ public:
 	// NOTE: no resize() on purpose - growth via std::deque::resize would insert
 	// default HomingTargets (NotHoming) that block trimming and home toward a stale
 	// cache. Deques are sized implicitly by push/pop only.
+	// Per-deque cap: pushes are user-driven and unbounded by default (a
+	// push-per-tick script would grow memory and per-tick trim cost forever).
+	static constexpr int MAX_HOMING_TARGETS_PER_DEQUE = 256;
+
+	// Rejects the push when full (warn + false/no-store) so callers that
+	// track counters never count a target that was never stored.
+	_ALWAYS_INLINE_ bool has_room_for_push() const {
+		if ((int)homing_targets.size() >= MAX_HOMING_TARGETS_PER_DEQUE) {
+			UtilityFunctions::push_error("HomingTargetDeque is full (256 targets). Pop or clear before pushing more.");
+			return false;
+		}
+		return true;
+	}
 
 	HomingTarget &front() {
 		return homing_targets.front();
@@ -249,7 +262,12 @@ public:
 	//////////////////////////////////////////////
 
 	//// PUSH METHODS
-	_ALWAYS_INLINE_ void push_front_mouse_position_target(const Vector2 &cached_mouse_global_position) {
+	// Returns false when the push was rejected (deque full), so callers that
+	// track homing counters don't count a target that was never stored.
+	_ALWAYS_INLINE_ bool push_front_mouse_position_target(const Vector2 &cached_mouse_global_position) {
+		if (!has_room_for_push()) {
+			return false;
+		}
 		HomingTarget target;
 		target.type = HomingType::MousePositionTarget;
 
@@ -258,23 +276,33 @@ public:
 		cached_front_target_global_position = cached_mouse_global_position;
 
 		homing_targets.emplace_front(target);
+		return true;
 	}
 
-	_ALWAYS_INLINE_ void push_front_node2d_target(Node2D *new_homing_target) {
+	// Returns false when the push was rejected (null target or deque full).
+	_ALWAYS_INLINE_ bool push_front_node2d_target(Node2D *new_homing_target) {
 		if (!new_homing_target) {
 			UtilityFunctions::push_error("push_front_node2d_target: target is null");
-			return;
+			return false;
+		}
+		if (!has_room_for_push()) {
+			return false;
 		}
 		homing_targets.emplace_front(new_homing_target, new_homing_target->get_instance_id());
 
 		cached_front_target_global_position = new_homing_target->get_global_position();
+		return true;
 	}
 
-	// Returns false when the push was rejected (non-finite position), so callers that
-	// track homing counters don't count a target that was never stored.
+	// Returns false when the push was rejected (non-finite position or deque
+	// full), so callers that track homing counters don't count a target that
+	// was never stored.
 	_ALWAYS_INLINE_ bool push_front_global_position_target(const Vector2 &global_position) {
 		if (!global_position.is_finite()) {
 			UtilityFunctions::push_error("push_front_global_position_target: position must be finite, nothing pushed.");
+			return false;
+		}
+		if (!has_room_for_push()) {
 			return false;
 		}
 		homing_targets.emplace_front(global_position);
@@ -283,7 +311,11 @@ public:
 		return true;
 	}
 
-	_ALWAYS_INLINE_ void push_back_mouse_position_target(const Vector2 &cached_mouse_global_position) {
+	// Returns false when the push was rejected (deque full). See front variant.
+	_ALWAYS_INLINE_ bool push_back_mouse_position_target(const Vector2 &cached_mouse_global_position) {
+		if (!has_room_for_push()) {
+			return false;
+		}
 		HomingTarget target;
 		target.type = HomingType::MousePositionTarget;
 
@@ -296,12 +328,17 @@ public:
 		if (is_queue_empty) {
 			cached_front_target_global_position = cached_mouse_global_position;
 		}
+		return true;
 	}
 
-	_ALWAYS_INLINE_ void push_back_node2d_target(Node2D *new_homing_target) {
+	// Returns false when the push was rejected (null target or deque full).
+	_ALWAYS_INLINE_ bool push_back_node2d_target(Node2D *new_homing_target) {
 		if (!new_homing_target) {
 			UtilityFunctions::push_error("push_back_node2d_target: target is null");
-			return;
+			return false;
+		}
+		if (!has_room_for_push()) {
+			return false;
 		}
 		bool is_queue_empty = homing_targets.empty();
 
@@ -311,12 +348,17 @@ public:
 		if (is_queue_empty) {
 			cached_front_target_global_position = new_homing_target->get_global_position();
 		}
+		return true;
 	}
 
-	// Returns false when the push was rejected (non-finite position). See push_front variant.
+	// Returns false when the push was rejected (non-finite position or deque
+	// full). See push_front variant.
 	_ALWAYS_INLINE_ bool push_back_global_position_target(const Vector2 &global_position) {
 		if (!global_position.is_finite()) {
 			UtilityFunctions::push_error("push_back_global_position_target: position must be finite, nothing pushed.");
+			return false;
+		}
+		if (!has_room_for_push()) {
 			return false;
 		}
 		bool is_queue_empty = homing_targets.empty();

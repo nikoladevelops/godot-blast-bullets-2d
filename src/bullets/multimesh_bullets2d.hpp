@@ -576,8 +576,10 @@ float *w = batch_buffer.ptrw();
 	// Use this for gameplay logic such as spawning child bullets at a bullet's position.
 	Transform2D get_bullet_global_transform(int bullet_index) const;
 
-	// Exact instantaneous velocity of a bullet, including movement patterns,
-	// orbiting and curves. Use this for gameplay logic such as splitting bullets.
+	// Logical velocity of a bullet (direction x speed + inherited offset).
+	// Excludes per-tick pattern/orbit displacement: those steer the movement
+	// delta after this value is computed, so this stays the stable gameplay
+	// read (splitting bullets, speed checks) rather than the rendered delta.
 	Vector2 get_bullet_velocity(int bullet_index) const;
 
 	TypedArray<Transform2D> all_bullets_get_transforms(int bullet_index_start = 0, int bullet_index_end_inclusive = -1) const;
@@ -851,6 +853,11 @@ float *w = batch_buffer.ptrw();
 
 	// All bullets that have collided this physics frame
 	std::vector<BulletCollisionData2D> all_collided_bullets;
+
+	// Reusable drain buffer: swapping into a fresh local every hit-frame would
+	// heap-allocate per collision frame. Single-threaded tick, same rationale
+	// as the factory iteration_scratch.
+	std::vector<BulletCollisionData2D> collision_scratch;
 
 	// How many times a single bullet can collide before being disabled. If you set to 0 the bullet will never be disabled due to collisions.
 	int bullet_max_collision_count = 1;
@@ -1819,6 +1826,18 @@ float *w = batch_buffer.ptrw();
 			return;
 		}
 
+		// Full-volley wake coming: the generations must bump BEFORE the
+		// attachment callback below (user on_bullet_enable code) runs, so work
+		// it queues is stamped with the new life instead of being invalidated
+		// right after. Deferred work from the dead life is correctly dropped.
+		// The timers bump also drops timers armed while pooled, matching the
+		// pool-pop enable path (which detaches them).
+		const bool will_reactivate_volley = !is_active;
+		if (will_reactivate_volley) {
+			++multimesh_generation;
+			++multimesh_timers_generation;
+		}
+
 		++active_bullets_counter;
 		if (active_bullets_counter > amount_bullets) {
 			active_bullets_counter = amount_bullets;
@@ -1856,13 +1875,10 @@ float *w = batch_buffer.ptrw();
 			// the pool first, otherwise the next pop() would hand out this live instance
 			// to a second owner while the first still drives it. The factory also resumes
 			// processing it so woken bullets actually move.
-			// Bump the generation so deferred work queued by the expiring life
-			// (life_time_over emit, deferred attachment disable) cannot fire into
-			// this new life: the generation check would otherwise still match.
-			// Bump the generation so deferred work queued by the expiring life
-			// (life_time_over emit, deferred attachment disable) cannot fire into
-			// this new life: the generation check would otherwise still match.
-			++multimesh_generation;
+			// Generations were already bumped above (before user callbacks), so
+			// deferred work from the dead life is gone and anything queued from
+			// here on belongs to this new life.
+			// Only a foreign life (actually pooled) carries the previous
 			// Only a foreign life (actually pooled) carries the previous
 			// owner's volley-wide signal connections. A same-owner revive of
 			// a drained-but-unpooled volley must keep them: disconnecting here
@@ -2075,8 +2091,16 @@ float *w = batch_buffer.ptrw();
 		}
 	}
 
-	// Moves a single bullet attachment
+	// Moves a single bullet attachment. Indices come from the tick loop, but
+	// every vector here is indexed bare - a desync would be an OOB write per
+	// tick, so validate sizes instead of trusting the reset invariant.
 	_ALWAYS_INLINE_ void move_bullet_attachment(const Vector2 &translate_by, int bullet_index) {
+		if (bullet_index < 0 || bullet_index >= amount_bullets) {
+			return;
+		}
+		if (bullet_index >= (int)attachments.size() || bullet_index >= (int)attachment_stick_relative_to_bullet.size() || bullet_index >= (int)attachment_transforms.size() || bullet_index >= (int)all_cached_instance_transforms.size()) {
+			return;
+		}
 		auto &curr_attachment = attachments[bullet_index];
 
 		if (!curr_attachment) {
@@ -2203,8 +2227,10 @@ float *w = batch_buffer.ptrw();
 	// Holds custom logic that runs before the spawn function finalizes. Note that the multimesh is not yet added to the scene tree here
 	virtual void custom_additional_spawn_logic(const MultiMeshBulletsData2D &data) {}
 
-	// Holds custom logic that runs before activating this multimesh when retrieved from the object pool
-	virtual void custom_additional_enable_logic(const MultiMeshBulletsData2D &data) {}
+	// Holds custom logic that runs before activating this multimesh when retrieved from the object pool.
+	// Returns false when the data type is wrong: enable_multimesh() aborts
+	// without activating, so a mismatched reuse never goes live half-seeded.
+	virtual bool custom_additional_enable_logic(const MultiMeshBulletsData2D &data) { return true; }
 
 	// Holds custom logic that runs before disabling and pushing this multimesh inside an object pool
 	virtual void custom_additional_disable_logic() {}
@@ -2365,7 +2391,8 @@ public:
 		}
 		// Direct script calls to this _do_* impl bypass the phase check in the
 		// public wrapper. run_multimesh_custom_timers() may be iterating the
-		// vector right now (factory holds the busy flag during the timer sweep).
+		// vector right now (factory holds the iterating flag during the timer
+		// sweep).
 		if (bullet_factory != nullptr && bullet_factory->is_bullets_iterating()) {
 			UtilityFunctions::push_error("Cannot modify attached timers while bullets are being processed (e.g. inside a timer callback or collision handler). Use multimesh_attach_time_based_function() instead of the _do_* implementation.");
 			return;
@@ -2377,6 +2404,13 @@ public:
 
 		if (!callable.is_valid()) {
 			UtilityFunctions::push_error("Invalid callable was passed to multimesh_attach_time_based_function()");
+			return;
+		}
+
+		// Uncapped user attaches would grow memory and per-tick iteration cost
+		// without bound (an attach-per-tick script degrades every future tick).
+		if (multimesh_custom_timers.size() >= 64) {
+			UtilityFunctions::push_error("multimesh_attach_time_based_function: timer limit (64 per multimesh) reached, detach some first.");
 			return;
 		}
 

@@ -146,9 +146,9 @@ public:
 		// Iterating the member directly would invalidate iterators mid-loop and
 		// silently drop the remaining collisions of this frame.
 		if (!all_collided_bullets.empty()) {
-			std::vector<BulletCollisionData2D> pending_collisions;
-			pending_collisions.swap(all_collided_bullets);
-			for (auto &data : pending_collisions) {
+			collision_scratch.clear();
+			collision_scratch.swap(all_collided_bullets);
+			for (auto &data : collision_scratch) {
 				handle_bullet_collision(data.collision_type, data.bullet_index, data.collided_instance_id);
 			}
 		}
@@ -159,7 +159,7 @@ protected:
 	void set_up_movement_data(const BulletSpeedData2D &new_speed_data);
 
 	virtual void custom_additional_spawn_logic(const MultiMeshBulletsData2D &data) override final;
-	virtual void custom_additional_enable_logic(const MultiMeshBulletsData2D &data) override final;
+	virtual bool custom_additional_enable_logic(const MultiMeshBulletsData2D &data) override final;
 	virtual void custom_additional_disable_logic() override final;
 };
 } //namespace BlastBullets2D
