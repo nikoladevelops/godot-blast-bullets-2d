@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <class name="BulletWobbleData2D" inherits="Resource" api_type="extension" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/godotengine/godot/master/doc/class.xsd">
 	<brief_description>
-		Sine/cos flight modulation for danmaku snakes, weaves, and petals.
+		Sine/cosine flight modulation for danmaku snakes, weaves, and petals.
 	</brief_description>
 	<description>
-		Attach as [member DirectionalBulletsData2D.shared_bullet_wobble_data] (one resource fans out per bullet via [member phase_step_per_bullet]) or per bullet via [member DirectionalBulletsData2D.all_bullet_wobble_data]. Lateral mode weaves perpendicular to flight; Angular mode oscillates the heading. Set [member enabled] to true, otherwise the entry is skipped.
+		Attach as [member DirectionalBulletsData2D.shared_bullet_wobble_data] (one resource fans out per bullet via [member phase_step_per_bullet]) or per bullet via [member DirectionalBulletsData2D.all_bullet_wobble_data]. Lateral mode weaves perpendicular to flight; Angular mode oscillates the heading. Set [member enabled] to true, otherwise the entry is skipped. Pick the shape with [member waveform]: Sine starts at zero offset (smooth weave away from center), Cosine starts at full offset (bullets fan out immediately) — both work in either mode and combine freely with homing, curves, rotation, speed, gravity, and drag.
 	</description>
 	<tutorials>
 	</tutorials>
@@ -28,6 +28,9 @@
 		<member name="mode" type="int" setter="set_mode" getter="get_mode" default="0">
 			0 = Lateral (weave perpendicular to flight), 1 = Angular (oscillate heading in degrees).
 		</member>
+		<member name="waveform" type="int" setter="set_waveform" getter="get_waveform" default="0">
+			Wave shape evaluated in the wobble tick: 0 = Sine (sin, starts at zero offset), 1 = Cosine (cos, starts at full offset, equal to Sine with a quarter-period phase shift). Applies to both modes and stacks with the delay/duration/damping envelope, distance_phased timing, and per-bullet phase fan-out.
+		</member>
 		<member name="amplitude" type="float" setter="set_amplitude" getter="get_amplitude" default="24.0">
 			Wobble size in pixels (Lateral) or degrees (Angular). Must be finite and &gt;= 0.
 		</member>
@@ -35,7 +38,7 @@
 			Oscillations per second. Must be finite and &gt;= 0.
 		</member>
 		<member name="phase_rad" type="float" setter="set_phase_rad" getter="get_phase_rad" default="0.0">
-			Base phase in radians. Each bullet adds [member phase_step_per_bullet] times its index.
+			Base phase in radians. Each bullet adds [member phase_step_per_bullet] times its index. Tip: Cosine with phase 0 behaves like Sine with phase PI/2, so switching [member waveform] is the easy way to get that quarter-period shift without doing the math.
 		</member>
 		<member name="phase_step_per_bullet" type="float" setter="set_phase_step_per_bullet" getter="get_phase_step_per_bullet" default="0.35">
 			Per-bullet phase fan-out. One shared resource with a non-zero step makes snakes and petals instead of synced waves.

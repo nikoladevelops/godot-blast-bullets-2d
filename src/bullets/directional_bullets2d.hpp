@@ -192,6 +192,7 @@ protected:
 	struct WobbleSeed {
 		bool active = false;
 		int mode = 0;
+		int waveform = 0; // mirrors BulletWobbleData2D::WobbleWaveform (0 = Sine, 1 = Cosine)
 		real_t amplitude = 0.0;
 		real_t frequency_hz = 0.0;
 		real_t phase = 0.0;
@@ -200,6 +201,14 @@ protected:
 		real_t delay_sec = 0.0;
 		real_t duration_sec = 0.0;
 	};
+
+	// Single evaluation point for the wobble waveform so the now/prev tick
+	// samples can never drift apart (pause/teleport-safe delta relies on
+	// both halves using the same shape). Out-of-range seeds fail open to
+	// sine instead of stalling the bullet.
+	_ALWAYS_INLINE_ real_t evaluate_wobble_waveform(int waveform, real_t angle) const {
+		return (waveform == 1) ? Math::cos(angle) : Math::sin(angle);
+	}
 	std::vector<WobbleSeed> all_bullet_wobble;
 	bool is_wobble_feature_enabled = false;
 	// Per-bullet distance ledger for distance-phased wobble (same idea as
@@ -580,7 +589,7 @@ public:
 			direction_got_updated = true;
 		}
 
-		// 2b. WOBBLE (sine/cos flight modulation). Lateral displaces the
+		// 2b. WOBBLE (waveform flight modulation). Lateral displaces the
 		// heading perpendicular to flight (snakes, weaves, curtains);
 		// angular oscillates the heading itself (corkscrews, petals).
 		// Runs on the analytic offset DELTA between frames (not the absolute
@@ -596,7 +605,7 @@ public:
 						? wobble_distance_traveled[i] * 0.02
 						: t;
 				const real_t damp = (w.damping_per_sec > 0.0 && t > w.delay_sec) ? (real_t)Math::exp(-(double)(w.damping_per_sec * (t - w.delay_sec))) : 1.0;
-				const real_t now_off = w.amplitude * damp * Math::sin(Math::TAU * w.frequency_hz * phase_base + w.phase);
+				const real_t now_off = w.amplitude * damp * evaluate_wobble_waveform(w.waveform, Math::TAU * w.frequency_hz * phase_base + w.phase);
 				const real_t prev_t = t - (real_t)delta;
 				const bool prev_in = prev_t >= w.delay_sec && (w.duration_sec <= 0.0 || prev_t < w.delay_sec + w.duration_sec);
 				real_t prev_off = 0.0;
@@ -605,7 +614,7 @@ public:
 							? (wobble_distance_traveled[i] - (curr_bullet_direction * all_cached_speed[i]).length() * (real_t)delta) * 0.02
 							: prev_t;
 					const real_t prev_damp = (w.damping_per_sec > 0.0 && prev_t > w.delay_sec) ? (real_t)Math::exp(-(double)(w.damping_per_sec * (prev_t - w.delay_sec))) : 1.0;
-					prev_off = w.amplitude * prev_damp * Math::sin(Math::TAU * w.frequency_hz * prev_base + w.phase);
+					prev_off = w.amplitude * prev_damp * evaluate_wobble_waveform(w.waveform, Math::TAU * w.frequency_hz * prev_base + w.phase);
 				}
 				const real_t frame_delta = now_off - prev_off;
 				if (Math::is_finite(frame_delta) && Math::abs(frame_delta) > 0.00001) {
@@ -2991,6 +3000,7 @@ public:
 		}
 		seed.active = true;
 		seed.mode = (w->mode == BulletWobbleData2D::WOBBLE_ANGULAR) ? 1 : 0;
+		seed.waveform = (w->waveform == BulletWobbleData2D::WOBBLE_COSINE) ? 1 : 0;
 		seed.amplitude = w->amplitude;
 		seed.frequency_hz = w->frequency_hz;
 		seed.phase = w->phase_rad + w->phase_step_per_bullet * (real_t)bullet_index;

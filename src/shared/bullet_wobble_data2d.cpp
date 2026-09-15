@@ -55,6 +55,15 @@ void BulletWobbleData2D::set_mode(WobbleMode value) {
 	mode = value;
 }
 
+BulletWobbleData2D::WobbleWaveform BulletWobbleData2D::get_waveform() const { return waveform; }
+void BulletWobbleData2D::set_waveform(WobbleWaveform value) {
+	if (value < WOBBLE_SINE || value > WOBBLE_COSINE) {
+		UtilityFunctions::push_error("BulletWobbleData2D.waveform is out of range, keeping the old value.");
+		return;
+	}
+	waveform = value;
+}
+
 real_t BulletWobbleData2D::get_amplitude() const { return amplitude; }
 void BulletWobbleData2D::set_amplitude(real_t value) {
 	if (!Math::is_finite(value) || value < 0.0) {
@@ -129,6 +138,10 @@ void BulletWobbleData2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_mode"), &BulletWobbleData2D::get_mode);
 	ClassDB::bind_method(D_METHOD("set_mode", "value"), &BulletWobbleData2D::set_mode);
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "mode", PROPERTY_HINT_ENUM, "Lateral,Angular"), "set_mode", "get_mode");
+
+	ClassDB::bind_method(D_METHOD("get_waveform"), &BulletWobbleData2D::get_waveform);
+	ClassDB::bind_method(D_METHOD("set_waveform", "value"), &BulletWobbleData2D::set_waveform);
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "waveform", PROPERTY_HINT_ENUM, "Sine,Cosine"), "set_waveform", "get_waveform");
 
 	ClassDB::bind_method(D_METHOD("get_amplitude"), &BulletWobbleData2D::get_amplitude);
 	ClassDB::bind_method(D_METHOD("set_amplitude", "value"), &BulletWobbleData2D::set_amplitude);

@@ -15,8 +15,14 @@ public:
 		WOBBLE_ANGULAR
 	};
 
+	enum WobbleWaveform {
+		WOBBLE_SINE = 0,
+		WOBBLE_COSINE
+	};
+
 	bool enabled = false;
 	WobbleMode mode = WOBBLE_LATERAL;
+	WobbleWaveform waveform = WOBBLE_SINE;
 	real_t amplitude = 24.0;
 	real_t frequency_hz = 2.0;
 	real_t phase_rad = 0.0;
@@ -38,6 +44,9 @@ public:
 
 	WobbleMode get_mode() const;
 	void set_mode(WobbleMode value);
+
+	WobbleWaveform get_waveform() const;
+	void set_waveform(WobbleWaveform value);
 
 	real_t get_amplitude() const;
 	void set_amplitude(real_t value);
@@ -69,3 +78,4 @@ protected:
 } //namespace BlastBullets2D
 
 VARIANT_ENUM_CAST(BlastBullets2D::BulletWobbleData2D::WobbleMode);
+VARIANT_ENUM_CAST(BlastBullets2D::BulletWobbleData2D::WobbleWaveform);

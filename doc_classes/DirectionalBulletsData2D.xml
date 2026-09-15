@@ -69,7 +69,7 @@
 			Whether the shared movement pattern repeats instead of stopping at the end of the curve.
 		</member>
 		<member name="shared_bullet_wobble_data" type="BulletWobbleData2D" setter="set_shared_bullet_wobble_data" getter="get_shared_bullet_wobble_data">
-			Shared sine/cos wobble applied to every bullet at spawn time (and on pool reuse), taking precedence over [member all_bullet_wobble_data] when set and enabled. Phase fans out per bullet so one resource makes snakes and petals. Null (default) disables the feature and the array drives instead.
+			Shared sine/cosine wobble applied to every bullet at spawn time (and on pool reuse), taking precedence over [member all_bullet_wobble_data] when set and enabled. Phase fans out per bullet so one resource makes snakes and petals; pick Sine vs Cosine on the resource's waveform. Null (default) disables the feature and the array drives instead.
 		</member>
 		<member name="all_bullet_wobble_data" type="BulletWobbleData2D[]" setter="set_all_bullet_wobble_data" getter="get_all_bullet_wobble_data" default="[]">
 			Per-bullet wobble applied at spawn time (and on pool reuse). Same fallback rule as [member all_bullet_speed_data]: empty disables the feature, matching size means per bullet, otherwise the first entry drives all bullets. Null and disabled entries are skipped per bullet.
