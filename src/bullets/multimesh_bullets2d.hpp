@@ -2130,9 +2130,13 @@ public:
 	// (disable) or when same-owner wakes must keep their connections.
 	void reset_transient_volley_state(uint64_t new_owner_spawner_id, bool drop_stale_work);
 
-	// Subclass half of the reset above: neutralize ballistics/homing/wobble
-	// without reseeding. drop_stale_work mirrors the outer flag (scrub
-	// connections + invalidate deferred subclass work only for a new life).
+	// Subclass half of the reset above: neutralize subclass-only ballistics
+	// (movement SoA, wobble, gravity/drag, homing/orbit) without reseeding.
+	// drop_stale_work mirrors the outer flag (scrub connections + invalidate
+	// deferred subclass work only for a new life). Shared curves/patterns are
+	// cleared by the reset body itself, never here: an override must not be
+	// able to skip them by forgetting a base call (that leaked the previous
+	// owner's per-bullet curves/patterns into reused volleys).
 	virtual void reset_transient_subclass_state(bool drop_stale_work);
 
 	// Shared deactivation tail: enabled set, counter, active flag, visibility,

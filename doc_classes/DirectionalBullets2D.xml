@@ -996,6 +996,8 @@
 
 				Adjust the distance for considering a target reached with [member homing_distance_before_reached].
 
+				Connection lifetime across pool reuse: handlers you connect DIRECTLY on the volley instance are dropped when the volley is reused by a new owner (spawn/enable) or woken by someone else (foreign enable_bullet wake) - reconnect after volley_fired/volley_homing_configured. They are KEPT on same-owner revives and on adopt_live_volley (which replaces only the spawner's forwarder). Spawner forwarders are always re-hooked automatically.
+
 				The [code]target_global_position[/code] is always valid for access, it can be either the Node2D's global position, a global position target or a mouse global position target.
 
 				Warning: Always check if target is null or not since the bullet might be following a global position or a mouse position instead of a Node2D.

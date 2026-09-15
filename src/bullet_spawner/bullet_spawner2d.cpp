@@ -3165,15 +3165,34 @@ int BulletSpawner2D::retarget_live_volleys() {
     const int loop_start = homing_retarget_previous_volleys ? 0 : (int)tracked_ids.size() - 1;
     int done = 0;
     const uint64_t self_id = get_instance_id();
+    BulletFactory2D *factory = get_bullet_factory();
     for (int i = loop_start; i < (int)tracked_ids.size(); ++i) {
         DirectionalBullets2D *volley = VolleyTracker2D::resolve_live(tracked_ids[i], self_id);
         if (volley == nullptr) {
             continue;
         }
+        // Factory-scoped retargeting: after set_bullet_factory() points
+        // elsewhere, old-factory volleys keep their last steering instead of
+        // being re-aimed by a spawner that no longer spawns into their world.
+        // Matches the max_live_bullets fuse, which counts the current factory
+        // only — ownership alone would steer volleys the budget can't see.
+        if (volley->bullet_factory != factory) {
+            continue;
+        }
         Array volley_targets = shared_targets;
         if (per_volley_resolve) {
+            // The resolve below runs user code (homing_target_scorer,
+            // priority getters) AFTER the volley was validated above: a
+            // hostile scorer could adopt/free this volley mid-loop. Capture
+            // the id and re-resolve afterwards; a changed volley is skipped
+            // instead of steered through a stale pointer.
+            const uint64_t volley_id = volley->get_instance_id();
             volley_targets = resolve_homing_targets(true, false);
             if (volley_targets.is_empty()) {
+                continue;
+            }
+            volley = VolleyTracker2D::resolve_live((int64_t)volley_id, self_id);
+            if (volley == nullptr) {
                 continue;
             }
         }

@@ -155,11 +155,23 @@ public:
 		// disable_multimesh() (last bullet out), which clears the member vector.
 		// Iterating the member directly would invalidate iterators mid-loop and
 		// silently drop the remaining collisions of this frame.
+		// Self-liveness token (same pattern as handle_bullet_collision): a
+		// handler that immediately frees this volley leaves every member
+		// access below as use-after-free. ObjectDB validates the id without
+		// touching the object, so a freed volley breaks safely instead of
+		// crashing (misuse is still prohibited by the handler contract).
+		const uint64_t drain_self_id = get_instance_id();
 		if (!all_collided_bullets.empty()) {
 			collision_scratch.clear();
 			collision_scratch.swap(all_collided_bullets);
 			for (auto &data : collision_scratch) {
 				handle_bullet_collision(data.collision_type, data.bullet_index, data.collided_instance_id, data.queue_bullet_epoch);
+				// Liveness FIRST (see token above): no member touch - not even
+				// is_queued_for_deletion - when the handler freed this volley.
+				if (ObjectDB::get_instance(ObjectID(drain_self_id)) != this) {
+					collision_scratch.clear();
+					break;
+				}
 				if (is_queued_for_deletion()) {
 					collision_scratch.clear();
 					break;

@@ -864,10 +864,10 @@ int BulletFactory2D::debug_get_total_bullets_amount(BulletType bullet_type) {
 int BulletFactory2D::debug_get_active_bullets_amount(BulletType bullet_type) {
 	switch (bullet_type) {
 		case BlastBullets2D::BulletFactory2D::DIRECTIONAL_BULLETS:
-			return std::count_if(all_directional_bullets.begin(), all_directional_bullets.end(), [](DirectionalBullets2D *b) { return b != nullptr && b->is_active; });
+			return std::count_if(all_directional_bullets.begin(), all_directional_bullets.end(), [](DirectionalBullets2D *b) { return b != nullptr && b->is_active && !b->is_queued_for_deletion(); });
 			break;
 		case BlastBullets2D::BulletFactory2D::BLOCK_BULLETS:
-			return std::count_if(all_block_bullets.begin(), all_block_bullets.end(), [](BlockBullets2D *b) { return b != nullptr && b->is_active; });
+			return std::count_if(all_block_bullets.begin(), all_block_bullets.end(), [](BlockBullets2D *b) { return b != nullptr && b->is_active && !b->is_queued_for_deletion(); });
 			break;
 		default:
 			UtilityFunctions::push_error("Error when trying to get active bullets amount. BulletType you gave is not supported");
@@ -928,7 +928,7 @@ int BulletFactory2D::debug_get_active_attachments_amount() {
 	for (int i = 0; i < directional_amount; ++i) {
 		DirectionalBullets2D *bullets = all_directional_bullets[i];
 
-		if (bullets != nullptr && bullets->is_active) {
+		if (bullets != nullptr && bullets->is_active && !bullets->is_queued_for_deletion()) {
 			count_active_attachments += bullets->get_amount_active_attachments();
 		}
 	}
@@ -937,7 +937,7 @@ int BulletFactory2D::debug_get_active_attachments_amount() {
 	for (int i = 0; i < block_amount; ++i) {
 		BlockBullets2D *bullets = all_block_bullets[i];
 
-		if (bullets != nullptr && bullets->is_active) {
+		if (bullets != nullptr && bullets->is_active && !bullets->is_queued_for_deletion()) {
 			count_active_attachments += bullets->get_amount_active_attachments();
 		}
 	}
@@ -952,7 +952,10 @@ int BulletFactory2D::debug_get_attachments_pool_amount() {
 int BulletFactory2D::count_active_bullets_owned_by(uint64_t owner_spawner_id) const {
 	int total = 0;
 	for (const DirectionalBullets2D *volley : all_directional_bullets) {
-		if (volley != nullptr && volley->is_active && volley->owner_spawner_id == owner_spawner_id) {
+		// Queued-for-deletion volleys are still is_active until the flush:
+		// counting them would hold the budget fuse shut for one frame on a
+		// corpse (fail-safe direction, but a corpse all the same).
+		if (volley != nullptr && volley->is_active && !volley->is_queued_for_deletion() && volley->owner_spawner_id == owner_spawner_id) {
 			total += volley->active_bullets_counter;
 		}
 	}

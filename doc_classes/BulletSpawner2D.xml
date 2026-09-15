@@ -116,7 +116,7 @@
 		<method name="shoot_once">
 			<return type="bool" />
 			<description>
-				Fires one volley now. Returns false when misconfigured or the factory refuses it. Counts toward [member max_volleys]. Safe to call from _physics_process (same-shape pool reuse applies immediately; only a shape-type change waits for a safe point). Must not be called re-entrantly from inside spawner signal handlers (pre_shoot, homing_targets_resolved, volley_homing_configured, volley_fired, volley_skipped, shooting_finished): nested calls are rejected, use [method shoot_once_deferred] (or call_deferred("shoot_once")) instead. If a handler frees or re-homes the volley mid-setup, the shot is safely dropped (returns false) instead of emitting volley_fired with a dead instance.
+				Fires one volley now. Returns false when misconfigured or the factory refuses it. Counts toward [member max_volleys]. Safe to call from _physics_process (same-shape pool reuse applies immediately; only a shape-type change waits for a safe point). Must not be called re-entrantly from inside spawner signal handlers (pre_shoot, homing_targets_resolved, volley_homing_configured, volley_fired, volley_skipped, shooting_finished): nested calls are rejected, use [method shoot_once_deferred] (or call_deferred("shoot_once")) instead. This also means intentional synchronous cascades (a handler firing another spawner immediately) are deferred by one frame by design. If a handler frees or re-homes the volley mid-setup (including pre_shoot, which is validated before configuring), the shot is safely dropped (returns false) instead of emitting volley_fired with a dead instance.
 			</description>
 		</method>
 		<method name="shoot_once_deferred">
@@ -220,7 +220,7 @@
 		<method name="get_active_live_bullet_count" qualifiers="const">
 			<return type="int" />
 			<description>
-				Total live bullets across all tracked volleys owned by this spawner (pruned first). Budget governors and wave gates read this alongside max_live_bullets.
+				Total live bullets across ALL volleys owned by this spawner (pruned first, counted via the factory by ownership - plain non-homing volleys count exactly like tracked homing volleys). Budget governors and wave gates read this alongside max_live_bullets.
 			</description>
 		</method>
 		<method name="get_pooled_volley_count" qualifiers="const">
@@ -685,7 +685,7 @@
 			Deterministic helper randomness: 0 is non-deterministic, otherwise seeds grid jitter, ring random rotation and target random selection. Replays and boss patterns stay reproducible.
 		</member>
 		<member name="max_live_bullets" type="int" setter="set_max_live_bullets" getter="get_max_live_bullets" default="0">
-			Soft live-bullet fuse: 0 is unlimited, otherwise firing pauses (volley_skipped "over_budget") while tracked live bullets reach this count.
+			Soft live-bullet fuse: 0 is unlimited, otherwise firing pauses (volley_skipped "over_budget") while this spawner's live bullets (homing AND plain volleys, counted via the factory) reach this count. The census is O(factory volleys) per trigger pull: fine for a handful of budgeted spawners, prefer fewer budgeted towers (or staggered intervals) past ~100 spawners.
 		</member>
 		<member name="homing_retarget_phase" type="float" setter="set_homing_retarget_phase" getter="get_homing_retarget_phase" default="0.0">
 			Staggers the retarget phase so many towers do not scene-scan on the same tick. The period stays homing_retarget_interval_sec. Must be finite and 0 or more.

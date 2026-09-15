@@ -232,7 +232,21 @@ void MultiMeshBullets2D::spawn(const MultiMeshBulletsData2D &data, MultiMeshObje
 }
 
 void MultiMeshBullets2D::reset_transient_subclass_state(bool drop_stale_work) {
+	// Base holds no subclass state; overrides neutralize their own ballistics
+	// below. Shared curves/patterns live in the reset body itself (not here)
+	// so no override can skip them by forgetting a base call.
 	(void)drop_stale_work;
+}
+
+void MultiMeshBullets2D::reset_transient_volley_state(uint64_t new_owner_spawner_id, bool drop_stale_work) {
+	// Ownership is stamped first so every step below already belongs to the
+	// new life (or to nobody, when dying).
+	owner_spawner_id = new_owner_spawner_id;
+	// Shared curves/patterns are cleared HERE, not in the virtual below: an
+	// override that forgets its base call would otherwise leak the previous
+	// owner's per-bullet curves and movement patterns into the next life
+	// (the reseed functions return early on empty arrays and skip null
+	// entries, so stale slots would never be blanked).
 	shared_bullet_curves_data.unref();
 	for (auto &r : all_bullet_curves_data) {
 		r.unref();
@@ -240,12 +254,6 @@ void MultiMeshBullets2D::reset_transient_subclass_state(bool drop_stale_work) {
 	for (auto &p : all_movement_pattern_data) {
 		p = BulletMovementPatternData2D();
 	}
-}
-
-void MultiMeshBullets2D::reset_transient_volley_state(uint64_t new_owner_spawner_id, bool drop_stale_work) {
-	// Ownership is stamped first so every step below already belongs to the
-	// new life (or to nobody, when dying).
-	owner_spawner_id = new_owner_spawner_id;
 	reset_transient_subclass_state(drop_stale_work);
 	// Blank attachment state: a reused instance must never carry the previous
 	// owner's attachment slots into the next life.
@@ -317,6 +325,14 @@ bool MultiMeshBullets2D::enable_multimesh(const MultiMeshBulletsData2D &data, co
 	// live instance here is always a direct (mis)call: reject, don't reseed.
 	if (is_active) {
 		UtilityFunctions::push_error("enable_multimesh: instance is already active. Disable it first or spawn a new volley instead.");
+		return false;
+	}
+
+	// Reseeding a dying instance would configure a volley that never lives a
+	// tick (pool pops already filter these; this covers direct GDScript
+	// calls). queue_free() is terminal.
+	if (is_queued_for_deletion()) {
+		UtilityFunctions::push_error("enable_multimesh: multimesh is queued for deletion.");
 		return false;
 	}
 
@@ -2105,7 +2121,19 @@ void MultiMeshBullets2D::reduce_lifetime(double delta) {
 		// and the deferred disable below would fire on_bullet_disable a
 		// second time with no enable in between.
 		if (!is_active && bullet_indexes.size() > 0 && bullet_factory != nullptr) {
+			// Self-liveness token (same pattern as handle_bullet_collision):
+			// call_on_bullet_enable() below runs user code that may free this
+			// volley; every later member access would then be use-after-free.
+			const uint64_t reclaim_self_id = get_instance_id();
 			for (int k = 0; k < bullet_indexes.size(); ++k) {
+				// A previous iteration's callback may have freed this volley:
+				// bail before touching members (ObjectDB validates without
+				// touching the object). Remaining slots stay pooled; the
+				// deferred signal below is skipped with them.
+				if (ObjectDB::get_instance(ObjectID(reclaim_self_id)) != this) {
+					bullet_indexes.clear();
+					break;
+				}
 				const int idx = (int)bullet_indexes[k];
 				if (idx < 0 || idx >= amount_bullets || idx >= (int)attachments.size() || idx >= (int)attachment_pooling_ids.size()) {
 					continue;
@@ -2485,6 +2513,14 @@ void MultiMeshBullets2D::handle_bullet_collision(CollisionType collision_type, i
 		// Possessed by the tagged spawner when there is one, else the factory.
 		// A null emitter (teardown, spawner gone, or both gone) only skips the
 		// notification - cleanup below still runs.
+		// Self-liveness token, captured before user code runs: a handler that
+		// immediately frees this volley (against the contract below) leaves
+		// every member access after the emit as use-after-free - including the
+		// is_queued_for_deletion() check itself. ObjectDB validates the id
+		// without touching the object, and comparing the result against this
+		// performs no dereference, so a freed volley bails safely instead of
+		// crashing (misuse is still prohibited: state after the emit is lost).
+		const uint64_t self_id = get_instance_id();
 		if (emitter != nullptr) {
 			if (emitter == bullet_factory) {
 				if (is_class("BlockBullets2D")) {
@@ -2523,6 +2559,11 @@ void MultiMeshBullets2D::handle_bullet_collision(CollisionType collision_type, i
 			// The handler may also have freed the captured attachment itself:
 			// compare by instance id (never a raw dangling pointer), and only
 			// after confirming this multimesh is still alive.
+			// Liveness FIRST (see self_id token above): no member touch - not
+			// even is_queued_for_deletion() - when the handler freed us.
+		if (ObjectDB::get_instance(ObjectID(self_id)) != this) {
+			return;
+		}
 		if (is_queued_for_deletion()) {
 			return;
 		}

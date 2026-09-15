@@ -76,6 +76,7 @@
 			<param index="0" name="key" type="MultiMeshPoolKey2D" default="null" />
 			<description>
 				Frees active bullets in the scene tree. Pass [code]null[/code] (default) to free all, or a [MultiMeshPoolKey2D] to free only that exact amount_bullets + shape bucket. Refused during the physics step (for example inside collision handlers); call it deferred then.
+				Warning (shared factories): this frees live volleys from EVERY spawner using this factory (or bucket), not just yours.
 			</description>
 		</method>
 		<method name="free_attachments_pool">
@@ -414,6 +415,7 @@
 			<param index="0" name="key" type="MultiMeshPoolKey2D" default="null" />
 			<description>
 				Resets the factory. Pass [code]null[/code] (default) for a full reset (all bullets, pools, and the full attachment pool). Pass a [MultiMeshPoolKey2D] to reset only that exact amount_bullets+shape bucket; unrelated pooled attachments are preserved. Refused during the physics step; call it deferred then.
+				Warning (shared factories): this kills live volleys from EVERY spawner using this factory (or every spawner sharing the bucket, when keyed) - not just yours. Spawner trackers prune the dead ids on next read.
 				Emits the [signal reset_finished] signal when complete.
 			</description>
 		</method>
@@ -470,6 +472,7 @@
 			<param index="0" name="shift_amount" type="Vector2" />
 			<description>
 				Shifts all bullets in the scene by a certain amount (only bullets spawned by this particular [b]BulletFactory2D[/b]). Both [DirectionalBullets2D] volleys and [BlockBullets2D] volleys (shifted rigidly as a whole) are moved, with shape, attachment and interpolation state synced per bullet.
+				Warning (shared factories): this moves EVERY spawner's live volleys at once - there is no per-spawner or per-bucket variant.
 			</description>
 		</method>
 	</methods>
@@ -485,6 +488,7 @@
 		</member>
 		<member name="is_factory_processing_bullets" type="bool" setter="set_is_factory_processing_bullets" getter="get_is_factory_processing_bullets" default="true">
 			Use this if you want to pause processing of bullets - being able to stop bullets in place. Always use this instead of [code]set_process[/code]/[code]set_physics_process[/code]. While paused, physics callbacks are dropped instead of queued, so overlapping areas cannot accumulate a backlog (no resume hitch).
+			Warning (shared factories): pausing stops EVERY spawner's bullets at once - there is no per-spawner pause.
 		</member>
 		<member name="use_physics_interpolation" type="bool" setter="set_use_physics_interpolation_editor" getter="get_use_physics_interpolation" default="false">
 			Determines whether physics interpolation is enabled or not. The setter is for the editor only.
