@@ -20,7 +20,7 @@
 		</method>
 		<method name="apply_pattern_preset">
 			<return type="void" />
-			<param index="0" name="preset" type="int" enum="BulletFactory2D.PatternPreset" />
+			<param index="0" name="preset" type="int" />
 			<description>
 				Fills the helper_* properties with a named starter pattern (radial dense/sparse, 3-arm spiral, narrow/wide aimed fan, slow ring, gap wall, rain, 6-petal flower, scatter burst, cross burst, star shell, heart bloom, snake wave, waterfall curtain, petal storm via Rose, twin counter-spiral via Counter Spiral, aimed trap via Corridor, blossom finale via Rose) and switches transforms_source to match. Tunes from there; the preset only writes the properties, nothing fires. Custom (-1) does nothing. Note: the twin counter-spiral preset also turns spin on at -60 deg/sec and the blossom finale preset turns spin on at +30 deg/sec.
 			</description>
@@ -306,7 +306,7 @@
 		<member name="helper_counter_spiral_arms" type="int" setter="set_helper_counter_spiral_arms" getter="get_helper_counter_spiral_arms" default="2">
 			Counter-rotating arms. Must be 2 or more (use Multi Spiral for 1 arm).
 		</member>
-		<member name="helper_counter_spiral_facing" type="int" setter="set_helper_counter_spiral_facing" getter="get_helper_counter_spiral_facing" default="0" enum="BulletFactory2D.SpiralFacingMode">
+		<member name="helper_counter_spiral_facing" type="int" setter="set_helper_counter_spiral_facing" getter="get_helper_counter_spiral_facing" default="0">
 			Per-arm facing: tangent (travel direction), radial outward, toward center, or keep marker.
 		</member>
 		<member name="helper_counter_spiral_facing_offset_deg" type="float" setter="set_helper_counter_spiral_facing_offset_deg" getter="get_helper_counter_spiral_facing_offset_deg" default="0.0">
@@ -357,7 +357,7 @@
 		<member name="helper_ellipse_gap_width" type="float" setter="set_helper_ellipse_gap_width" getter="get_helper_ellipse_gap_width" default="0.3">
 			Width of each Wall gap in radians. Shown only in Wall mode. Must be finite and 0 or more.
 		</member>
-		<member name="helper_ellipse_mode" type="int" setter="set_helper_ellipse_mode" getter="get_helper_ellipse_mode" default="0" enum="BulletFactory2D.EllipseMode">
+		<member name="helper_ellipse_mode" type="int" setter="set_helper_ellipse_mode" getter="get_helper_ellipse_mode" default="0">
 			0 draws the full ring, 1 draws an arc segment, 2 draws a dense wall with carved dodge gaps. Wall mode with gap_count 0 or gap_width 0 draws the plain arc (no carving).
 		</member>
 		<member name="helper_ellipse_radius_x" type="float" setter="set_helper_ellipse_radius_x" getter="get_helper_ellipse_radius_x" default="150.0">
@@ -411,7 +411,7 @@
 		<member name="helper_flower_radius" type="float" setter="set_helper_flower_radius" getter="get_helper_flower_radius" default="150.0">
 			Flower radius in pixels. Must be finite and 0 or more.
 		</member>
-		<member name="helper_grid_alignment" type="int" setter="set_helper_grid_alignment" getter="get_helper_grid_alignment" default="3" enum="BulletFactory2D.Alignment">
+		<member name="helper_grid_alignment" type="int" setter="set_helper_grid_alignment" getter="get_helper_grid_alignment" default="3">
 			Grid anchor, same values as [enum BulletFactory2D.Alignment].
 		</member>
 		<member name="helper_grid_column_offset" type="float" setter="set_helper_grid_column_offset" getter="get_helper_grid_column_offset" default="150.0">
@@ -465,7 +465,7 @@
 		<member name="helper_lattice_stagger_rows" type="bool" setter="set_helper_lattice_stagger_rows" getter="get_helper_lattice_stagger_rows" default="true">
 			Offset odd rows by half spacing for the honeycomb look.
 		</member>
-		<member name="helper_line_anchor" type="int" setter="set_helper_line_anchor" getter="get_helper_line_anchor" default="1" enum="BulletFactory2D.LineAnchor">
+		<member name="helper_line_anchor" type="int" setter="set_helper_line_anchor" getter="get_helper_line_anchor" default="1">
 			Where the generator sits on the line, same values as [enum BulletFactory2D.LineAnchor].
 		</member>
 		<member name="helper_line_direction" type="Vector2" setter="set_helper_line_direction" getter="get_helper_line_direction" default="Vector2(1, 0)">
@@ -510,7 +510,7 @@
 		<member name="helper_multispiral_arms" type="int" setter="set_helper_multispiral_arms" getter="get_helper_multispiral_arms" default="3">
 			Interleaved spiral arms. Must be 1 or more.
 		</member>
-		<member name="helper_multispiral_facing" type="int" setter="set_helper_multispiral_facing" getter="get_helper_multispiral_facing" default="0" enum="BulletFactory2D.SpiralFacingMode">
+		<member name="helper_multispiral_facing" type="int" setter="set_helper_multispiral_facing" getter="get_helper_multispiral_facing" default="0">
 			Per-arm facing: tangent (travel direction), radial outward, toward center, or keep marker.
 		</member>
 		<member name="helper_multispiral_facing_offset_deg" type="float" setter="set_helper_multispiral_facing_offset_deg" getter="get_helper_multispiral_facing_offset_deg" default="0.0">
@@ -612,7 +612,7 @@
 		<member name="helper_spiral_angle_step" type="float" setter="set_helper_spiral_angle_step" getter="get_helper_spiral_angle_step" default="0.6">
 			Angle step in radians per spiral bullet.
 		</member>
-		<member name="helper_spiral_facing" type="int" setter="set_helper_spiral_facing" getter="get_helper_spiral_facing" default="0" enum="BulletFactory2D.SpiralFacingMode">
+		<member name="helper_spiral_facing" type="int" setter="set_helper_spiral_facing" getter="get_helper_spiral_facing" default="0">
 			Spiral facing, same values as [enum BulletFactory2D.SpiralFacingMode].
 		</member>
 		<member name="helper_spiral_facing_offset_deg" type="float" setter="set_helper_spiral_facing_offset_deg" getter="get_helper_spiral_facing_offset_deg" default="0.0">

@@ -179,5 +179,10 @@ void BulletWobbleData2D::_bind_methods() {
 			"BulletWobbleData2D",
 			D_METHOD("generate_random_data", "amount_to_generate", "amplitude_MIN", "amplitude_MAX", "frequency_MIN", "frequency_MAX"),
 			&BulletWobbleData2D::generate_random_data);
+
+	BIND_ENUM_CONSTANT(WOBBLE_LATERAL);
+	BIND_ENUM_CONSTANT(WOBBLE_ANGULAR);
+	BIND_ENUM_CONSTANT(WOBBLE_SINE);
+	BIND_ENUM_CONSTANT(WOBBLE_COSINE);
 }
 } //namespace BlastBullets2D
