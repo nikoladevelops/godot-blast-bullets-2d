@@ -165,6 +165,18 @@ static const char *transforms_source_name(BulletSpawner2D::TransformsSource sour
             return "Polygon";
         case BulletSpawner2D::TRANSFORMS_FROM_HELPER_MULTISPIRAL:
             return "Multi Spiral";
+        case BulletSpawner2D::TRANSFORMS_FROM_HELPER_CROSS:
+            return "Cross";
+        case BulletSpawner2D::TRANSFORMS_FROM_HELPER_STAR:
+            return "Star";
+        case BulletSpawner2D::TRANSFORMS_FROM_HELPER_HEART:
+            return "Heart";
+        case BulletSpawner2D::TRANSFORMS_FROM_HELPER_WAVE:
+            return "Wave";
+        case BulletSpawner2D::TRANSFORMS_FROM_HELPER_WATERFALL:
+            return "Waterfall";
+        case BulletSpawner2D::TRANSFORMS_FROM_HELPER_LATTICE:
+            return "Lattice";
         default:
             return "unknown";
     }
@@ -419,7 +431,7 @@ BulletSpawner2D::TransformsSource BulletSpawner2D::get_transforms_source() const
     return transforms_source;
 }
 void BulletSpawner2D::set_transforms_source(TransformsSource value) {
-    if (value < TRANSFORMS_FROM_CHILDREN || value > TRANSFORMS_FROM_HELPER_MULTISPIRAL) {
+    if (value < TRANSFORMS_FROM_CHILDREN || value > TRANSFORMS_FROM_HELPER_LATTICE) {
         UtilityFunctions::push_error("BulletSpawner2D: invalid transforms_source, keeping the old value.");
         return;
     }
@@ -1287,6 +1299,359 @@ void BulletSpawner2D::set_helper_multispiral_arm_stride(int value) {
     helper_multispiral_arm_stride = value;
     rebuild_preview();
 }
+int BulletSpawner2D::get_helper_cross_arm_count() const { return helper_cross_arm_count; }
+void BulletSpawner2D::set_helper_cross_arm_count(int value) {
+    if (value < 1) {
+        UtilityFunctions::push_error("BulletSpawner2D: helper_cross_arm_count must be >= 1, keeping the old value.");
+        return;
+    }
+    helper_cross_arm_count = value;
+    rebuild_preview();
+}
+double BulletSpawner2D::get_helper_cross_arm_length() const { return helper_cross_arm_length; }
+void BulletSpawner2D::set_helper_cross_arm_length(double value) {
+    if (!Math::is_finite(value) || value < 0.0) {
+        UtilityFunctions::push_error("BulletSpawner2D: helper_cross_arm_length must be finite and >= 0, keeping the old value.");
+        return;
+    }
+    helper_cross_arm_length = value;
+    rebuild_preview();
+}
+double BulletSpawner2D::get_helper_cross_spacing() const { return helper_cross_spacing; }
+void BulletSpawner2D::set_helper_cross_spacing(double value) {
+    if (!Math::is_finite(value) || value <= 0.0) {
+        UtilityFunctions::push_error("BulletSpawner2D: helper_cross_spacing must be finite and > 0, keeping the old value.");
+        return;
+    }
+    helper_cross_spacing = value;
+    rebuild_preview();
+}
+double BulletSpawner2D::get_helper_cross_base_rotation() const { return helper_cross_base_rotation; }
+void BulletSpawner2D::set_helper_cross_base_rotation(double value) {
+    if (!Math::is_finite(value)) {
+        UtilityFunctions::push_error("BulletSpawner2D: helper_cross_base_rotation must be finite, keeping the old value.");
+        return;
+    }
+    helper_cross_base_rotation = value;
+    rebuild_preview();
+}
+bool BulletSpawner2D::get_helper_cross_face_outward() const { return helper_cross_face_outward; }
+void BulletSpawner2D::set_helper_cross_face_outward(bool value) {
+    helper_cross_face_outward = value;
+    rebuild_preview();
+}
+double BulletSpawner2D::get_helper_cross_facing_offset_deg() const { return helper_cross_facing_offset_deg; }
+void BulletSpawner2D::set_helper_cross_facing_offset_deg(double value) {
+    if (!Math::is_finite(value)) {
+        UtilityFunctions::push_error("BulletSpawner2D: helper_cross_facing_offset_deg must be finite, keeping the old value.");
+        return;
+    }
+    helper_cross_facing_offset_deg = value;
+    rebuild_preview();
+}
+int BulletSpawner2D::get_helper_star_points() const { return helper_star_points; }
+void BulletSpawner2D::set_helper_star_points(int value) {
+    if (value < 2) {
+        UtilityFunctions::push_error("BulletSpawner2D: helper_star_points must be >= 2, keeping the old value.");
+        return;
+    }
+    helper_star_points = value;
+    rebuild_preview();
+}
+double BulletSpawner2D::get_helper_star_outer_radius() const { return helper_star_outer_radius; }
+void BulletSpawner2D::set_helper_star_outer_radius(double value) {
+    if (!Math::is_finite(value) || value < 0.0) {
+        UtilityFunctions::push_error("BulletSpawner2D: helper_star_outer_radius must be finite and >= 0, keeping the old value.");
+        return;
+    }
+    helper_star_outer_radius = value;
+    rebuild_preview();
+}
+double BulletSpawner2D::get_helper_star_inner_radius() const { return helper_star_inner_radius; }
+void BulletSpawner2D::set_helper_star_inner_radius(double value) {
+    if (!Math::is_finite(value) || value < 0.0) {
+        UtilityFunctions::push_error("BulletSpawner2D: helper_star_inner_radius must be finite and >= 0, keeping the old value.");
+        return;
+    }
+    helper_star_inner_radius = value;
+    rebuild_preview();
+}
+double BulletSpawner2D::get_helper_star_base_rotation() const { return helper_star_base_rotation; }
+void BulletSpawner2D::set_helper_star_base_rotation(double value) {
+    if (!Math::is_finite(value)) {
+        UtilityFunctions::push_error("BulletSpawner2D: helper_star_base_rotation must be finite, keeping the old value.");
+        return;
+    }
+    helper_star_base_rotation = value;
+    rebuild_preview();
+}
+bool BulletSpawner2D::get_helper_star_face_outward() const { return helper_star_face_outward; }
+void BulletSpawner2D::set_helper_star_face_outward(bool value) {
+    helper_star_face_outward = value;
+    rebuild_preview();
+}
+double BulletSpawner2D::get_helper_star_facing_offset_deg() const { return helper_star_facing_offset_deg; }
+void BulletSpawner2D::set_helper_star_facing_offset_deg(double value) {
+    if (!Math::is_finite(value)) {
+        UtilityFunctions::push_error("BulletSpawner2D: helper_star_facing_offset_deg must be finite, keeping the old value.");
+        return;
+    }
+    helper_star_facing_offset_deg = value;
+    rebuild_preview();
+}
+double BulletSpawner2D::get_helper_heart_size() const { return helper_heart_size; }
+void BulletSpawner2D::set_helper_heart_size(double value) {
+    if (!Math::is_finite(value) || value <= 0.0) {
+        UtilityFunctions::push_error("BulletSpawner2D: helper_heart_size must be finite and > 0, keeping the old value.");
+        return;
+    }
+    helper_heart_size = value;
+    rebuild_preview();
+}
+double BulletSpawner2D::get_helper_heart_base_rotation() const { return helper_heart_base_rotation; }
+void BulletSpawner2D::set_helper_heart_base_rotation(double value) {
+    if (!Math::is_finite(value)) {
+        UtilityFunctions::push_error("BulletSpawner2D: helper_heart_base_rotation must be finite, keeping the old value.");
+        return;
+    }
+    helper_heart_base_rotation = value;
+    rebuild_preview();
+}
+bool BulletSpawner2D::get_helper_heart_face_outward() const { return helper_heart_face_outward; }
+void BulletSpawner2D::set_helper_heart_face_outward(bool value) {
+    helper_heart_face_outward = value;
+    rebuild_preview();
+}
+double BulletSpawner2D::get_helper_heart_facing_offset_deg() const { return helper_heart_facing_offset_deg; }
+void BulletSpawner2D::set_helper_heart_facing_offset_deg(double value) {
+    if (!Math::is_finite(value)) {
+        UtilityFunctions::push_error("BulletSpawner2D: helper_heart_facing_offset_deg must be finite, keeping the old value.");
+        return;
+    }
+    helper_heart_facing_offset_deg = value;
+    rebuild_preview();
+}
+double BulletSpawner2D::get_helper_wave_width() const { return helper_wave_width; }
+void BulletSpawner2D::set_helper_wave_width(double value) {
+    if (!Math::is_finite(value) || value < 0.0) {
+        UtilityFunctions::push_error("BulletSpawner2D: helper_wave_width must be finite and >= 0, keeping the old value.");
+        return;
+    }
+    helper_wave_width = value;
+    rebuild_preview();
+}
+double BulletSpawner2D::get_helper_wave_amplitude() const { return helper_wave_amplitude; }
+void BulletSpawner2D::set_helper_wave_amplitude(double value) {
+    if (!Math::is_finite(value) || value < 0.0) {
+        UtilityFunctions::push_error("BulletSpawner2D: helper_wave_amplitude must be finite and >= 0, keeping the old value.");
+        return;
+    }
+    helper_wave_amplitude = value;
+    rebuild_preview();
+}
+double BulletSpawner2D::get_helper_wave_waves() const { return helper_wave_waves; }
+void BulletSpawner2D::set_helper_wave_waves(double value) {
+    if (!Math::is_finite(value) || value < 0.0) {
+        UtilityFunctions::push_error("BulletSpawner2D: helper_wave_waves must be finite and >= 0, keeping the old value.");
+        return;
+    }
+    helper_wave_waves = value;
+    rebuild_preview();
+}
+Vector2 BulletSpawner2D::get_helper_wave_direction() const { return helper_wave_direction; }
+void BulletSpawner2D::set_helper_wave_direction(const Vector2 &value) {
+    if (!value.is_finite() || value.length_squared() <= 0.0) {
+        UtilityFunctions::push_error("BulletSpawner2D: helper_wave_direction must be finite and non-zero, keeping the old value.");
+        return;
+    }
+    helper_wave_direction = value;
+    rebuild_preview();
+}
+bool BulletSpawner2D::get_helper_wave_face_direction() const { return helper_wave_face_direction; }
+void BulletSpawner2D::set_helper_wave_face_direction(bool value) {
+    helper_wave_face_direction = value;
+    rebuild_preview();
+}
+double BulletSpawner2D::get_helper_wave_facing_offset_deg() const { return helper_wave_facing_offset_deg; }
+void BulletSpawner2D::set_helper_wave_facing_offset_deg(double value) {
+    if (!Math::is_finite(value)) {
+        UtilityFunctions::push_error("BulletSpawner2D: helper_wave_facing_offset_deg must be finite, keeping the old value.");
+        return;
+    }
+    helper_wave_facing_offset_deg = value;
+    rebuild_preview();
+}
+int BulletSpawner2D::get_helper_waterfall_columns() const { return helper_waterfall_columns; }
+void BulletSpawner2D::set_helper_waterfall_columns(int value) {
+    if (value < 1) {
+        UtilityFunctions::push_error("BulletSpawner2D: helper_waterfall_columns must be >= 1, keeping the old value.");
+        return;
+    }
+    helper_waterfall_columns = value;
+    rebuild_preview();
+}
+double BulletSpawner2D::get_helper_waterfall_column_spacing() const { return helper_waterfall_column_spacing; }
+void BulletSpawner2D::set_helper_waterfall_column_spacing(double value) {
+    if (!Math::is_finite(value) || value < 0.0) {
+        UtilityFunctions::push_error("BulletSpawner2D: helper_waterfall_column_spacing must be finite and >= 0, keeping the old value.");
+        return;
+    }
+    helper_waterfall_column_spacing = value;
+    rebuild_preview();
+}
+int BulletSpawner2D::get_helper_waterfall_rows() const { return helper_waterfall_rows; }
+void BulletSpawner2D::set_helper_waterfall_rows(int value) {
+    if (value < 1) {
+        UtilityFunctions::push_error("BulletSpawner2D: helper_waterfall_rows must be >= 1, keeping the old value.");
+        return;
+    }
+    helper_waterfall_rows = value;
+    rebuild_preview();
+}
+double BulletSpawner2D::get_helper_waterfall_row_spacing() const { return helper_waterfall_row_spacing; }
+void BulletSpawner2D::set_helper_waterfall_row_spacing(double value) {
+    if (!Math::is_finite(value) || value < 0.0) {
+        UtilityFunctions::push_error("BulletSpawner2D: helper_waterfall_row_spacing must be finite and >= 0, keeping the old value.");
+        return;
+    }
+    helper_waterfall_row_spacing = value;
+    rebuild_preview();
+}
+double BulletSpawner2D::get_helper_waterfall_stagger() const { return helper_waterfall_stagger; }
+void BulletSpawner2D::set_helper_waterfall_stagger(double value) {
+    if (!Math::is_finite(value)) {
+        UtilityFunctions::push_error("BulletSpawner2D: helper_waterfall_stagger must be finite, keeping the old value.");
+        return;
+    }
+    helper_waterfall_stagger = value;
+    rebuild_preview();
+}
+Vector2 BulletSpawner2D::get_helper_waterfall_rain_direction() const { return helper_waterfall_rain_direction; }
+void BulletSpawner2D::set_helper_waterfall_rain_direction(const Vector2 &value) {
+    if (!value.is_finite() || value.length_squared() <= 0.0) {
+        UtilityFunctions::push_error("BulletSpawner2D: helper_waterfall_rain_direction must be finite and non-zero, keeping the old value.");
+        return;
+    }
+    helper_waterfall_rain_direction = value;
+    rebuild_preview();
+}
+double BulletSpawner2D::get_helper_waterfall_jitter() const { return helper_waterfall_jitter; }
+void BulletSpawner2D::set_helper_waterfall_jitter(double value) {
+    if (!Math::is_finite(value) || value < 0.0) {
+        UtilityFunctions::push_error("BulletSpawner2D: helper_waterfall_jitter must be finite and >= 0, keeping the old value.");
+        return;
+    }
+    helper_waterfall_jitter = value;
+    rebuild_preview();
+}
+int BulletSpawner2D::get_helper_lattice_columns() const { return helper_lattice_columns; }
+void BulletSpawner2D::set_helper_lattice_columns(int value) {
+    if (value < 1) {
+        UtilityFunctions::push_error("BulletSpawner2D: helper_lattice_columns must be >= 1, keeping the old value.");
+        return;
+    }
+    helper_lattice_columns = value;
+    rebuild_preview();
+}
+int BulletSpawner2D::get_helper_lattice_rows() const { return helper_lattice_rows; }
+void BulletSpawner2D::set_helper_lattice_rows(int value) {
+    if (value < 1) {
+        UtilityFunctions::push_error("BulletSpawner2D: helper_lattice_rows must be >= 1, keeping the old value.");
+        return;
+    }
+    helper_lattice_rows = value;
+    rebuild_preview();
+}
+double BulletSpawner2D::get_helper_lattice_spacing_x() const { return helper_lattice_spacing_x; }
+void BulletSpawner2D::set_helper_lattice_spacing_x(double value) {
+    if (!Math::is_finite(value) || value < 0.0) {
+        UtilityFunctions::push_error("BulletSpawner2D: helper_lattice_spacing_x must be finite and >= 0, keeping the old value.");
+        return;
+    }
+    helper_lattice_spacing_x = value;
+    rebuild_preview();
+}
+double BulletSpawner2D::get_helper_lattice_spacing_y() const { return helper_lattice_spacing_y; }
+void BulletSpawner2D::set_helper_lattice_spacing_y(double value) {
+    if (!Math::is_finite(value) || value < 0.0) {
+        UtilityFunctions::push_error("BulletSpawner2D: helper_lattice_spacing_y must be finite and >= 0, keeping the old value.");
+        return;
+    }
+    helper_lattice_spacing_y = value;
+    rebuild_preview();
+}
+bool BulletSpawner2D::get_helper_lattice_stagger_rows() const { return helper_lattice_stagger_rows; }
+void BulletSpawner2D::set_helper_lattice_stagger_rows(bool value) {
+    helper_lattice_stagger_rows = value;
+    rebuild_preview();
+}
+bool BulletSpawner2D::get_helper_lattice_face_outward() const { return helper_lattice_face_outward; }
+void BulletSpawner2D::set_helper_lattice_face_outward(bool value) {
+    helper_lattice_face_outward = value;
+    rebuild_preview();
+}
+double BulletSpawner2D::get_helper_lattice_facing_offset_deg() const { return helper_lattice_facing_offset_deg; }
+void BulletSpawner2D::set_helper_lattice_facing_offset_deg(double value) {
+    if (!Math::is_finite(value)) {
+        UtilityFunctions::push_error("BulletSpawner2D: helper_lattice_facing_offset_deg must be finite, keeping the old value.");
+        return;
+    }
+    helper_lattice_facing_offset_deg = value;
+    rebuild_preview();
+}
+PackedInt32Array BulletSpawner2D::get_helper_skip_indices() const { return helper_skip_indices; }
+void BulletSpawner2D::set_helper_skip_indices(const PackedInt32Array &value) {
+    helper_skip_indices = value;
+    rebuild_preview();
+}
+BulletSpawner2D::HomingTargetPriority BulletSpawner2D::get_homing_target_priority() const { return homing_target_priority; }
+void BulletSpawner2D::set_homing_target_priority(HomingTargetPriority value) {
+    if (value < HOMING_PRIORITY_NEAREST || value > HOMING_PRIORITY_CUSTOM) {
+        UtilityFunctions::push_error("BulletSpawner2D: invalid homing_target_priority, keeping the old value.");
+        return;
+    }
+    homing_target_priority = value;
+}
+double BulletSpawner2D::get_homing_delay_sec() const { return homing_delay_sec; }
+void BulletSpawner2D::set_homing_delay_sec(double value) {
+    if (!Math::is_finite(value) || value < 0.0) {
+        UtilityFunctions::push_error("BulletSpawner2D: homing_delay_sec must be finite and >= 0, keeping the old value.");
+        return;
+    }
+    homing_delay_sec = value;
+}
+double BulletSpawner2D::get_homing_duration_sec() const { return homing_duration_sec; }
+void BulletSpawner2D::set_homing_duration_sec(double value) {
+    if (!Math::is_finite(value) || value < 0.0) {
+        UtilityFunctions::push_error("BulletSpawner2D: homing_duration_sec must be finite and >= 0 (0 = infinite), keeping the old value.");
+        return;
+    }
+    homing_duration_sec = value;
+}
+double BulletSpawner2D::get_homing_lose_range_px() const { return homing_lose_range_px; }
+void BulletSpawner2D::set_homing_lose_range_px(double value) {
+    if (!Math::is_finite(value) || value < 0.0) {
+        UtilityFunctions::push_error("BulletSpawner2D: homing_lose_range_px must be finite and >= 0 (0 = unlimited), keeping the old value.");
+        return;
+    }
+    homing_lose_range_px = value;
+}
+double BulletSpawner2D::get_homing_fire_arc_deg() const { return homing_fire_arc_deg; }
+void BulletSpawner2D::set_homing_fire_arc_deg(double value) {
+    if (!Math::is_finite(value) || value < 0.0) {
+        UtilityFunctions::push_error("BulletSpawner2D: homing_fire_arc_deg must be finite and >= 0 (0 = omnidirectional), keeping the old value.");
+        return;
+    }
+    homing_fire_arc_deg = value;
+}
+double BulletSpawner2D::get_reload_jitter_sec() const { return reload_jitter_sec; }
+void BulletSpawner2D::set_reload_jitter_sec(double value) {
+    if (!Math::is_finite(value) || value < 0.0) {
+        UtilityFunctions::push_error("BulletSpawner2D: reload_jitter_sec must be finite and >= 0, keeping the old value.");
+        return;
+    }
+    reload_jitter_sec = value;
+}
 // Burst / telegraph / targeting / perf setters: same reject-and-keep
 // contract as every other spawner knob (validated setters never leave a
 // half-applied value behind).
@@ -1507,6 +1872,84 @@ void BulletSpawner2D::apply_pattern_preset(int preset) {
             helper_bullets_amount = 26;
             helper_scatter_burst_radius = 130.0;
             helper_scatter_facing_jitter = 0.5;
+            break;
+        case BulletFactory2D::PATTERN_PRESET_CROSS_BURST:
+            transforms_source = TRANSFORMS_FROM_HELPER_CROSS;
+            helper_bullets_amount = 24;
+            helper_cross_arm_count = 4;
+            helper_cross_arm_length = 150.0;
+            helper_cross_spacing = 32.0;
+            break;
+        case BulletFactory2D::PATTERN_PRESET_STAR_SHELL:
+            transforms_source = TRANSFORMS_FROM_HELPER_STAR;
+            helper_bullets_amount = 20;
+            helper_star_points = 5;
+            helper_star_outer_radius = 150.0;
+            helper_star_inner_radius = 65.0;
+            break;
+        case BulletFactory2D::PATTERN_PRESET_HEART_BLOOM:
+            transforms_source = TRANSFORMS_FROM_HELPER_HEART;
+            helper_bullets_amount = 40;
+            helper_heart_size = 150.0;
+            break;
+        case BulletFactory2D::PATTERN_PRESET_SNAKE_WAVE:
+            transforms_source = TRANSFORMS_FROM_HELPER_WAVE;
+            helper_bullets_amount = 28;
+            helper_wave_width = 600.0;
+            helper_wave_amplitude = 48.0;
+            helper_wave_waves = 2.0;
+            break;
+        case BulletFactory2D::PATTERN_PRESET_WATERFALL_CURTAIN:
+            transforms_source = TRANSFORMS_FROM_HELPER_WATERFALL;
+            helper_bullets_amount = 36;
+            helper_waterfall_columns = 12;
+            helper_waterfall_rows = 3;
+            helper_waterfall_column_spacing = 48.0;
+            helper_waterfall_row_spacing = 64.0;
+            break;
+        case BulletFactory2D::PATTERN_PRESET_PETAL_STORM:
+            transforms_source = TRANSFORMS_FROM_HELPER_FLOWER;
+            helper_bullets_amount = 48;
+            helper_flower_petals = 8;
+            helper_flower_bullets_per_petal = 6;
+            helper_flower_radius = 170.0;
+            helper_flower_petal_spread = 0.7;
+            break;
+        case BulletFactory2D::PATTERN_PRESET_TWIN_SPIRAL_COUNTER:
+            transforms_source = TRANSFORMS_FROM_HELPER_MULTISPIRAL;
+            helper_bullets_amount = 40;
+            helper_multispiral_arms = 2;
+            helper_multispiral_start_radius = 50.0;
+            helper_multispiral_radius_step = 15.0;
+            helper_multispiral_angle_step = 0.6;
+            spin_enabled = true;
+            spin_speed_deg_per_sec = -60.0;
+            break;
+        case BulletFactory2D::PATTERN_PRESET_AIMED_TRAP:
+            transforms_source = TRANSFORMS_FROM_HELPER_AIMED;
+            helper_bullets_amount = 9;
+            helper_aimed_spread = 1.2;
+            helper_aimed_centered = true;
+            helper_aimed_prediction = 1.0;
+            helper_aimed_prediction_time = 0.5;
+            break;
+        case BulletFactory2D::PATTERN_PRESET_TD_RING_GUARD:
+            transforms_source = TRANSFORMS_FROM_HELPER_RING;
+            helper_bullets_amount = 16;
+            helper_ring_radius = 120.0;
+            helper_ring_arc = Math::TAU;
+            helper_ring_face_outward = true;
+            homing_enabled = true;
+            homing_max_detection_range = 600.0;
+            break;
+        case BulletFactory2D::PATTERN_PRESET_BLOSSOM_FINALE:
+            transforms_source = TRANSFORMS_FROM_HELPER_FLOWER;
+            helper_bullets_amount = 60;
+            helper_flower_petals = 12;
+            helper_flower_bullets_per_petal = 5;
+            helper_flower_radius = 200.0;
+            spin_enabled = true;
+            spin_speed_deg_per_sec = 30.0;
             break;
         case BulletFactory2D::PATTERN_PRESET_CUSTOM:
         default:
@@ -2334,6 +2777,158 @@ Array BulletSpawner2D::resolve_homing_targets(bool quiet, bool advance_round_rob
             break;
         }
     }
+    // Target priority presets (tower-defense First/Last/Strongest/Weakest/
+    // Fastest without GDScript): built-in scoring runs over the same
+    // candidate set. CUSTOM keeps the user Callable below. FIRST/LAST read
+    // each candidate's "progress" (path followers: PathFollow2D progress,
+    // meta, or property); STRONGEST/WEAKEST read "hp"/"health";
+    // FASTEST reads get_velocity().length(). Missing data warns once and
+    // falls back to nearest for that candidate. RANDOM shuffles via the
+    // pattern-seeded RNG. NEAREST keeps the built-in order above.
+    if (homing_target_priority != HOMING_PRIORITY_NEAREST && homing_target_priority != HOMING_PRIORITY_CUSTOM && !candidates.is_empty()) {
+        Array scored;
+        const Vector2 origin = get_global_position();
+        Ref<RandomNumberGenerator> prio_rng;
+        if (homing_target_priority == HOMING_PRIORITY_RANDOM) {
+            prio_rng.instantiate();
+            if (pattern_seed != 0) {
+                prio_rng->set_seed((uint64_t)pattern_seed);
+            } else {
+                prio_rng->randomize();
+            }
+        }
+        for (int i = 0; i < candidates.size(); ++i) {
+            Node2D *node = Object::cast_to<Node2D>(candidates[i]);
+            if (node == nullptr) {
+                continue;
+            }
+            double score = 0.0;
+            bool resolved = true;
+            switch (homing_target_priority) {
+                case HOMING_PRIORITY_FIRST:
+                case HOMING_PRIORITY_LAST: {
+                    double progress = 0.0;
+                    bool has_progress = false;
+                    if (node->has_method("get_progress")) {
+                        Variant v = node->call("get_progress");
+                        if (v.get_type() == Variant::FLOAT || v.get_type() == Variant::INT) {
+                            progress = (double)v;
+                            has_progress = true;
+                        }
+                    }
+                    if (!has_progress && node->has_meta("progress")) {
+                        Variant v = node->get_meta("progress");
+                        if (v.get_type() == Variant::FLOAT || v.get_type() == Variant::INT) {
+                            progress = (double)v;
+                            has_progress = true;
+                        }
+                    }
+                    if (!has_progress) {
+                        Variant v = node->get("progress");
+                        if (v.get_type() == Variant::FLOAT || v.get_type() == Variant::INT) {
+                            progress = (double)v;
+                            has_progress = true;
+                        }
+                    }
+                    if (!has_progress) {
+                        resolved = false;
+                    } else {
+                        score = (homing_target_priority == HOMING_PRIORITY_FIRST) ? progress : -progress;
+                    }
+                    break;
+                }
+                case HOMING_PRIORITY_STRONGEST:
+                case HOMING_PRIORITY_WEAKEST: {
+                    double hp = 0.0;
+                    bool has_hp = false;
+                    const char *keys[4] = { "hp", "health", "hit_points", "max_hp" };
+                    for (int k = 0; k < 4 && !has_hp; ++k) {
+                        if (node->has_meta(keys[k])) {
+                            Variant v = node->get_meta(keys[k]);
+                            if (v.get_type() == Variant::FLOAT || v.get_type() == Variant::INT) {
+                                hp = (double)v;
+                                has_hp = true;
+                            }
+                        }
+                    }
+                    for (int k = 0; k < 4 && !has_hp; ++k) {
+                        Variant v = node->get(keys[k]);
+                        if (v.get_type() == Variant::FLOAT || v.get_type() == Variant::INT) {
+                            hp = (double)v;
+                            has_hp = true;
+                        }
+                    }
+                    if (!has_hp) {
+                        resolved = false;
+                    } else {
+                        score = (homing_target_priority == HOMING_PRIORITY_STRONGEST) ? hp : -hp;
+                    }
+                    break;
+                }
+                case HOMING_PRIORITY_FASTEST: {
+                    double speed = 0.0;
+                    bool has_speed = false;
+                    if (node->has_method("get_velocity")) {
+                        Variant v = node->call("get_velocity");
+                        if (v.get_type() == Variant::VECTOR2) {
+                            speed = ((Vector2)v).length();
+                            has_speed = true;
+                        }
+                    }
+                    if (!has_speed) {
+                        Variant v = node->get("velocity");
+                        if (v.get_type() == Variant::VECTOR2) {
+                            speed = ((Vector2)v).length();
+                            has_speed = true;
+                        }
+                    }
+                    if (!has_speed) {
+                        resolved = false;
+                    } else {
+                        score = speed;
+                    }
+                    break;
+                }
+                case HOMING_PRIORITY_RANDOM: {
+                    score = prio_rng->randf();
+                    break;
+                }
+                default:
+                    break;
+            }
+            if (!resolved) {
+                // Fail open to nearest for this candidate (negative distance
+                // keeps the global desc-sort consistent).
+                score = -node->get_global_position().distance_squared_to(origin);
+            }
+            Dictionary entry;
+            entry["node"] = node;
+            entry["score"] = score;
+            entry["dist"] = node->get_global_position().distance_squared_to(origin);
+            scored.push_back(entry);
+        }
+        if (!scored.is_empty()) {
+            for (int a = 0; a < scored.size(); ++a) {
+                for (int b = a + 1; b < scored.size(); ++b) {
+                    Dictionary da = scored[a];
+                    Dictionary db = scored[b];
+                    const double sa = (double)da["score"];
+                    const double sb = (double)db["score"];
+                    const double da_dist = (double)da["dist"];
+                    const double db_dist = (double)db["dist"];
+                    if (sb > sa || (Math::is_equal_approx(sb, sa) && db_dist < da_dist)) {
+                        scored[a] = db;
+                        scored[b] = da;
+                    }
+                }
+            }
+            targets.clear();
+            for (int k = 0; k < take && k < scored.size(); ++k) {
+                Dictionary entry = scored[k];
+                targets.push_back(entry["node"]);
+            }
+        }
+    }
     // Custom scorer (TD First/Last/Strongest/Weakest/Fastest in game code):
     // Callable(candidate: Node2D) -> float, highest score wins. Runs after
     // the built-in selection over the same candidate set; invalid returns
@@ -2669,6 +3264,9 @@ void BulletSpawner2D::apply_steering_to_volley(DirectionalBullets2D *volley) con
     volley->set_adjust_direction_based_on_rotation(adjust_direction_based_on_rotation);
     volley->set_bullet_homing_auto_pop_after_target_reached(homing_auto_pop_after_target_reached);
     volley->set_shared_homing_deque_auto_pop_after_target_reached(shared_homing_auto_pop_after_target_reached);
+    volley->set_homing_delay_sec((real_t)homing_delay_sec);
+    volley->set_homing_duration_sec((real_t)homing_duration_sec);
+    volley->set_homing_lose_range_px((real_t)homing_lose_range_px);
     if (homing_per_bullet_smoothing_enabled) {
         const int bullet_count = volley->get_amount_bullets();
         for (int i = 0; i < bullet_count; ++i) {
@@ -2922,6 +3520,24 @@ TypedArray<Transform2D> BulletSpawner2D::collect_spawn_transforms_impl(bool quie
         case TRANSFORMS_FROM_HELPER_MULTISPIRAL:
             raw = BulletFactory2D::helper_generate_transforms_multispiral(helper_bullets_amount, marker, helper_multispiral_arms, helper_multispiral_start_radius, helper_multispiral_radius_step, helper_multispiral_angle_step, helper_multispiral_rotate_with_marker, (BulletFactory2D::SpiralFacingMode)helper_multispiral_facing, helper_multispiral_facing_offset_deg, helper_multispiral_arm_stride);
             break;
+        case TRANSFORMS_FROM_HELPER_CROSS:
+            raw = BulletFactory2D::helper_generate_transforms_cross(helper_bullets_amount, marker, helper_cross_arm_count, helper_cross_arm_length, helper_cross_spacing, helper_cross_base_rotation, helper_cross_face_outward, helper_cross_facing_offset_deg);
+            break;
+        case TRANSFORMS_FROM_HELPER_STAR:
+            raw = BulletFactory2D::helper_generate_transforms_star(helper_bullets_amount, marker, helper_star_points, helper_star_outer_radius, helper_star_inner_radius, helper_star_base_rotation, helper_star_face_outward, helper_star_facing_offset_deg);
+            break;
+        case TRANSFORMS_FROM_HELPER_HEART:
+            raw = BulletFactory2D::helper_generate_transforms_heart(helper_bullets_amount, marker, helper_heart_size, helper_heart_base_rotation, helper_heart_face_outward, helper_heart_facing_offset_deg);
+            break;
+        case TRANSFORMS_FROM_HELPER_WAVE:
+            raw = BulletFactory2D::helper_generate_transforms_wave(helper_bullets_amount, marker, helper_wave_width, helper_wave_amplitude, helper_wave_waves, helper_wave_direction, helper_wave_face_direction, helper_wave_facing_offset_deg);
+            break;
+        case TRANSFORMS_FROM_HELPER_WATERFALL:
+            raw = BulletFactory2D::helper_generate_transforms_waterfall(helper_bullets_amount, marker, helper_waterfall_columns, helper_waterfall_column_spacing, helper_waterfall_rows, helper_waterfall_row_spacing, helper_waterfall_stagger, helper_waterfall_rain_direction, helper_waterfall_jitter);
+            break;
+        case TRANSFORMS_FROM_HELPER_LATTICE:
+            raw = BulletFactory2D::helper_generate_transforms_lattice(helper_bullets_amount, marker, helper_lattice_columns, helper_lattice_rows, helper_lattice_spacing_x, helper_lattice_spacing_y, helper_lattice_stagger_rows, helper_lattice_face_outward, helper_lattice_facing_offset_deg);
+            break;
         case TRANSFORMS_FROM_CHILDREN:
         default: {
             bool collected = false;
@@ -2956,6 +3572,11 @@ TypedArray<Transform2D> BulletSpawner2D::collect_spawn_transforms_impl(bool quie
         Transform2D t = raw[i];
         t = rotate_spawn_transform(t, base_origin, spin_radians);
         transforms.push_back(scale_spawn_transform(t, base_origin, scale));
+    }
+    // Negative space last (post spin/scale so indexes match the preview):
+    // carve dodge doors or bullet text out of any helper layout.
+    if (!helper_skip_indices.is_empty() && transforms_source >= TRANSFORMS_FROM_HELPER_GRID) {
+        transforms = BulletFactory2D::helper_apply_skip_indices(transforms, helper_skip_indices);
     }
     return transforms;
 }
@@ -3327,6 +3948,12 @@ void BulletSpawner2D::_validate_property(PropertyInfo &p_property) const {
                     show = homing_retarget_mode == HOMING_RETARGET_ON_INTERVAL;
                 } else if (property_name == "homing_target_scorer" || property_name == "homing_priority_group" || property_name == "homing_fire_requires_target" || property_name == "homing_sticky_targets") {
                     show = multi_source;
+                } else if (property_name == "homing_target_priority") {
+                    show = multi_source;
+                } else if (property_name == "homing_delay_sec" || property_name == "homing_duration_sec" || property_name == "homing_lose_range_px" || property_name == "homing_fire_arc_deg") {
+                    show = true;
+                } else if (property_name == "reload_jitter_sec") {
+                    show = true;
                 } else if (property_name == "homing_retarget_phase") {
                     show = homing_retarget_mode == HOMING_RETARGET_ON_INTERVAL;
                 }
@@ -3389,6 +4016,20 @@ void BulletSpawner2D::_validate_property(PropertyInfo &p_property) const {
         relevant = transforms_source == TRANSFORMS_FROM_HELPER_POLYGON;
     } else if (property_name.begins_with("helper_multispiral_")) {
         relevant = transforms_source == TRANSFORMS_FROM_HELPER_MULTISPIRAL;
+    } else if (property_name.begins_with("helper_cross_")) {
+        relevant = transforms_source == TRANSFORMS_FROM_HELPER_CROSS;
+    } else if (property_name.begins_with("helper_star_")) {
+        relevant = transforms_source == TRANSFORMS_FROM_HELPER_STAR;
+    } else if (property_name.begins_with("helper_heart_")) {
+        relevant = transforms_source == TRANSFORMS_FROM_HELPER_HEART;
+    } else if (property_name.begins_with("helper_wave_")) {
+        relevant = transforms_source == TRANSFORMS_FROM_HELPER_WAVE;
+    } else if (property_name.begins_with("helper_waterfall_")) {
+        relevant = transforms_source == TRANSFORMS_FROM_HELPER_WATERFALL;
+    } else if (property_name.begins_with("helper_lattice_")) {
+        relevant = transforms_source == TRANSFORMS_FROM_HELPER_LATTICE;
+    } else if (property_name == "helper_skip_indices") {
+        relevant = transforms_source >= TRANSFORMS_FROM_HELPER_GRID;
     } else if (property_name == "helper_bullets_amount") {
         relevant = transforms_source >= TRANSFORMS_FROM_HELPER_GRID;
     }
@@ -3461,10 +4102,15 @@ bool BulletSpawner2D::shoot_once() {
     }
     // Tower-defense hold-fire: no target, no shot, no volley counted. Quiet
     // by design (towers idle most of the time); the skip signal carries it.
+    // The fire arc gates the same way: a target outside the turret cone
+    // holds fire instead of wasting a volley off-arc.
     if (homing_enabled && homing_fire_requires_target && homing_target_source != HOMING_SOURCE_MOUSE) {
         Array precheck = resolve_homing_targets(true, false);
         if (precheck.is_empty()) {
             return fail_early(nullptr, StringName("no_target"), true);
+        }
+        if (homing_fire_arc_deg > 0.0 && !fire_arc_covers_targets(precheck)) {
+            return fail_early(nullptr, StringName("off_arc"), true);
         }
     }
     // Soft live-bullet fuse: pause firing (not erroring) while the cap holds.
@@ -3721,11 +4367,25 @@ void BulletSpawner2D::_process(double delta) {
         set_process(true);
         return;
     }
+    // Pattern-list sequencer: entries fire in order (interval apart) until
+    // the queue drains, then the list goes idle. Runs even with auto-
+    // shooting off (manual boss-phase driver).
+    if (pattern_list_active) {
+        pattern_list_time_left -= delta;
+        if (pattern_list_time_left <= 0.0) {
+            fire_pattern_list_entry();
+            if (pattern_list_active) {
+                pattern_list_time_left = pattern_list_interval_sec;
+            }
+        }
+        set_process(true);
+        return;
+    }
     if (!auto_shooting_active()) {
         // Sleep when there is nothing to do, but stay awake while spinning,
-        // retargeting, bursting, telegraphing, or while the runtime preview
-        // loop must keep refreshing.
-        set_process(spin_enabled || preview_active() || homing_retarget_active() || burst_shots_left > 0 || telegraph_pending);
+        // retargeting, bursting, telegraphing, sequencing, or while the
+        // runtime preview loop must keep refreshing.
+        set_process(spin_enabled || preview_active() || homing_retarget_active() || burst_shots_left > 0 || telegraph_pending || pattern_list_active);
         return;
     }
     shoot_time_left -= delta;
@@ -3741,7 +4401,7 @@ void BulletSpawner2D::_process(double delta) {
     } else {
         shoot_once(); // errors, if any, are per-attempt (interval-gated, no spam storm)
     }
-    shoot_time_left = shoot_interval_sec;
+    shoot_time_left = next_shoot_interval_sec();
 }
 
 void BulletSpawner2D::begin_burst() {
@@ -3814,7 +4474,214 @@ void BulletSpawner2D::fire_burst_volley() {
     burst_firing = true;
     shoot_once();
     burst_firing = false;
-    set_process(auto_shooting_active() || spin_enabled || homing_retarget_active() || preview_active());
+    set_process(auto_shooting_active() || spin_enabled || homing_retarget_active() || preview_active() || pattern_list_active);
+}
+
+double BulletSpawner2D::next_shoot_interval_sec() const {
+    // Reload jitter: +/- uniform jitter around the base interval (seeded by
+    // pattern_seed for replays; non-deterministic at 0). Clamped to a small
+    // positive floor so a huge jitter can never invert or stall the timer.
+    if (reload_jitter_sec <= 0.0 || !Math::is_finite(reload_jitter_sec)) {
+        return shoot_interval_sec;
+    }
+    Ref<RandomNumberGenerator> rng = homing_rng;
+    if (rng.is_null()) {
+        rng.instantiate();
+    }
+    if (pattern_seed != 0) {
+        rng->set_seed((uint64_t)pattern_seed + (uint64_t)volleys_fired);
+    } else {
+        rng->randomize();
+    }
+    const double jitter = rng->randf_range(-reload_jitter_sec, reload_jitter_sec);
+    return Math::max(0.05, shoot_interval_sec + jitter);
+}
+
+int BulletSpawner2D::spawn_pattern_list(const Array &entries, bool simultaneous, double interval_sec) {
+    if (entries.is_empty()) {
+        UtilityFunctions::push_error("BulletSpawner2D::spawn_pattern_list: entries is empty, nothing queued.");
+        return 0;
+    }
+    if (!Math::is_finite(interval_sec) || interval_sec < 0.0) {
+        UtilityFunctions::push_error("BulletSpawner2D::spawn_pattern_list: interval_sec must be finite and >= 0, keeping simultaneous fire.");
+        interval_sec = 0.0;
+    }
+    if (!is_inside_tree()) {
+        UtilityFunctions::push_error("BulletSpawner2D::spawn_pattern_list: spawner is outside the scene tree.");
+        return 0;
+    }
+    pattern_list_entries = entries.duplicate();
+    pattern_list_simultaneous = simultaneous;
+    pattern_list_interval_sec = interval_sec;
+    pattern_list_cursor = 0;
+    pattern_list_time_left = 0.0;
+    pattern_list_active = true;
+    if (simultaneous) {
+        // One tick, N shots: each entry overrides the live source, fires via
+        // the guarded shoot_once() path (homing/orbit/signals consistent),
+        // then restores. A bad entry skips with an error, never aborts.
+        const TransformsSource saved_source = transforms_source;
+        const int saved_amount = helper_bullets_amount;
+        Ref<DirectionalBulletsData2D> saved_data = spawn_data;
+        int fired = 0;
+        for (int i = 0; i < pattern_list_entries.size(); ++i) {
+            if (apply_pattern_list_entry(pattern_list_entries[i])) {
+                if (shoot_once()) {
+                    ++fired;
+                }
+            }
+            transforms_source = saved_source;
+            helper_bullets_amount = saved_amount;
+            spawn_data = saved_data;
+        }
+        pattern_list_active = false;
+        pattern_list_entries.clear();
+        pattern_list_cursor = 0;
+        notify_property_list_changed();
+        rebuild_preview();
+        return fired;
+    }
+    set_process(true);
+    return pattern_list_entries.size();
+}
+
+void BulletSpawner2D::stop_pattern_list() {
+    pattern_list_active = false;
+    pattern_list_entries.clear();
+    pattern_list_cursor = 0;
+    pattern_list_time_left = 0.0;
+    set_process(auto_shooting_active() || spin_enabled || homing_retarget_active() || preview_active() || burst_shots_left > 0 || telegraph_pending);
+}
+
+bool BulletSpawner2D::is_pattern_list_active() const {
+    return pattern_list_active;
+}
+
+bool BulletSpawner2D::apply_pattern_list_entry(const Variant &entry) {
+    if (entry.get_type() != Variant::DICTIONARY) {
+        UtilityFunctions::push_error("BulletSpawner2D::spawn_pattern_list: every entry must be a Dictionary, skipping one.");
+        return false;
+    }
+    const Dictionary dict = entry;
+    if (dict.has("preset")) {
+        Variant v = dict["preset"];
+        if (v.get_type() == Variant::INT) {
+            apply_pattern_preset((int)v);
+        } else {
+            UtilityFunctions::push_error("BulletSpawner2D::spawn_pattern_list: entry 'preset' must be an int, skipping preset.");
+        }
+    }
+    if (dict.has("transforms_source")) {
+        Variant v = dict["transforms_source"];
+        if (v.get_type() == Variant::INT) {
+            const int src = (int)v;
+            if (src < (int)TRANSFORMS_FROM_CHILDREN || src > (int)TRANSFORMS_FROM_HELPER_LATTICE) {
+                UtilityFunctions::push_error("BulletSpawner2D::spawn_pattern_list: entry 'transforms_source' out of range, keeping current.");
+            } else {
+                set_transforms_source((TransformsSource)src);
+            }
+        } else {
+            UtilityFunctions::push_error("BulletSpawner2D::spawn_pattern_list: entry 'transforms_source' must be an int, keeping current.");
+        }
+    }
+    if (dict.has("helper_bullets_amount")) {
+        Variant v = dict["helper_bullets_amount"];
+        if (v.get_type() == Variant::INT) {
+            set_helper_bullets_amount((int)v);
+        } else {
+            UtilityFunctions::push_error("BulletSpawner2D::spawn_pattern_list: entry 'helper_bullets_amount' must be an int, keeping current.");
+        }
+    }
+    if (dict.has("spawn_data")) {
+        Variant v = dict["spawn_data"];
+        Ref<DirectionalBulletsData2D> override_data = v;
+        if (override_data.is_valid()) {
+            Ref<DirectionalBulletsData2D> saved = spawn_data;
+            spawn_data = override_data;
+            // Restored by the caller after shoot_once(); stash on the entry
+            // is unnecessary since simultaneous/simulated paths restore below.
+            (void)saved;
+        } else {
+            UtilityFunctions::push_error("BulletSpawner2D::spawn_pattern_list: entry 'spawn_data' must be a DirectionalBulletsData2D, keeping current.");
+        }
+    }
+    return true;
+}
+
+void BulletSpawner2D::fire_pattern_list_entry() {
+    if (!pattern_list_active || pattern_list_cursor < 0 || pattern_list_cursor >= pattern_list_entries.size()) {
+        stop_pattern_list();
+        return;
+    }
+    // Sequential mode restores the base source after every shot so entries
+    // are overrides, not permanent inspector edits... except the source
+    // itself stays (boss phases visibly advance). Amount restores too.
+    const TransformsSource saved_source = transforms_source;
+    const int saved_amount = helper_bullets_amount;
+    Ref<DirectionalBulletsData2D> saved_data = spawn_data;
+    Variant entry = pattern_list_entries[pattern_list_cursor];
+    ++pattern_list_cursor;
+    bool entry_ok = apply_pattern_list_entry(entry);
+    // spawn_data override from the entry (if any) is live now.
+    Ref<DirectionalBulletsData2D> entry_data = spawn_data;
+    if (entry_ok) {
+        shoot_once();
+    }
+    spawn_data = saved_data;
+    helper_bullets_amount = saved_amount;
+    (void)entry_data;
+    if (pattern_list_cursor >= pattern_list_entries.size()) {
+        // Keep the last entry's source (phase advanced), drop the queue.
+        stop_pattern_list();
+        notify_property_list_changed();
+        rebuild_preview();
+        emit_signal("pattern_list_finished");
+    } else {
+        transforms_source = saved_source;
+        notify_property_list_changed();
+        rebuild_preview();
+    }
+}
+
+bool BulletSpawner2D::fire_arc_covers_targets(const Array &targets) const {
+    if (homing_fire_arc_deg <= 0.0 || !Math::is_finite(homing_fire_arc_deg)) {
+        return true;
+    }
+    if (targets.is_empty() || !is_inside_tree()) {
+        return false;
+    }
+    const Vector2 origin = get_global_position();
+    const real_t facing = get_global_rotation();
+    const real_t half_arc = Math::deg_to_rad((real_t)homing_fire_arc_deg) * 0.5;
+    for (int i = 0; i < targets.size(); ++i) {
+        Vector2 pos = Vector2(0, 0);
+        bool has_pos = false;
+        if (Node2D *node = Object::cast_to<Node2D>(targets[i])) {
+            pos = node->get_global_position();
+            has_pos = pos.is_finite();
+        } else if (targets[i].get_type() == Variant::VECTOR2) {
+            pos = targets[i];
+            has_pos = pos.is_finite();
+        }
+        if (!has_pos) {
+            continue;
+        }
+        const Vector2 diff = pos - origin;
+        if (diff.length_squared() <= 0.0) {
+            return true;
+        }
+        real_t delta = diff.angle() - facing;
+        while (delta > Math::PI) {
+            delta -= Math::TAU;
+        }
+        while (delta < -Math::PI) {
+            delta += Math::TAU;
+        }
+        if (Math::abs(delta) <= half_arc) {
+            return true;
+        }
+    }
+    return false;
 }
 
 
@@ -3858,6 +4725,7 @@ void BulletSpawner2D::_bind_methods() {
 		PropertyInfo(Variant::INT, "shot_index"),
 		PropertyInfo(Variant::BOOL, "mirrored")));
 	ADD_SIGNAL(MethodInfo("burst_finished"));
+	ADD_SIGNAL(MethodInfo("pattern_list_finished"));
 	ADD_SIGNAL(MethodInfo("retarget_applied",
 		PropertyInfo(Variant::INT, "volleys_retargeted")));
 	ADD_SIGNAL(MethodInfo("shooting_started"));
@@ -3935,7 +4803,7 @@ void BulletSpawner2D::_bind_methods() {
 
 	ClassDB::bind_method(D_METHOD("get_transforms_source"), &BulletSpawner2D::get_transforms_source);
 	ClassDB::bind_method(D_METHOD("set_transforms_source", "value"), &BulletSpawner2D::set_transforms_source);
-	ADD_PROPERTY(PropertyInfo(Variant::INT, "transforms_source", PROPERTY_HINT_ENUM, "From Children,From Self,Grid,Ring,Fan,Spiral,Line,Aimed,Flower,Ellipse,Rain,Scatter,Polygon,Multi Spiral"), "set_transforms_source", "get_transforms_source");
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "transforms_source", PROPERTY_HINT_ENUM, "From Children,From Self,Grid,Ring,Fan,Spiral,Line,Aimed,Flower,Ellipse,Rain,Scatter,Polygon,Multi Spiral,Cross,Star,Heart,Wave,Waterfall,Lattice"), "set_transforms_source", "get_transforms_source");
 
 	ClassDB::bind_method(D_METHOD("get_helper_bullets_amount"), &BulletSpawner2D::get_helper_bullets_amount);
 	ClassDB::bind_method(D_METHOD("set_helper_bullets_amount", "value"), &BulletSpawner2D::set_helper_bullets_amount);
@@ -4244,6 +5112,178 @@ void BulletSpawner2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_helper_multispiral_arm_stride", "value"), &BulletSpawner2D::set_helper_multispiral_arm_stride);
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "helper_multispiral_arm_stride"), "set_helper_multispiral_arm_stride", "get_helper_multispiral_arm_stride");
 
+	ClassDB::bind_method(D_METHOD("get_helper_cross_arm_count"), &BulletSpawner2D::get_helper_cross_arm_count);
+	ClassDB::bind_method(D_METHOD("set_helper_cross_arm_count", "value"), &BulletSpawner2D::set_helper_cross_arm_count);
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "helper_cross_arm_count"), "set_helper_cross_arm_count", "get_helper_cross_arm_count");
+
+	ClassDB::bind_method(D_METHOD("get_helper_cross_arm_length"), &BulletSpawner2D::get_helper_cross_arm_length);
+	ClassDB::bind_method(D_METHOD("set_helper_cross_arm_length", "value"), &BulletSpawner2D::set_helper_cross_arm_length);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_cross_arm_length"), "set_helper_cross_arm_length", "get_helper_cross_arm_length");
+
+	ClassDB::bind_method(D_METHOD("get_helper_cross_spacing"), &BulletSpawner2D::get_helper_cross_spacing);
+	ClassDB::bind_method(D_METHOD("set_helper_cross_spacing", "value"), &BulletSpawner2D::set_helper_cross_spacing);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_cross_spacing"), "set_helper_cross_spacing", "get_helper_cross_spacing");
+
+	ClassDB::bind_method(D_METHOD("get_helper_cross_base_rotation"), &BulletSpawner2D::get_helper_cross_base_rotation);
+	ClassDB::bind_method(D_METHOD("set_helper_cross_base_rotation", "value"), &BulletSpawner2D::set_helper_cross_base_rotation);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_cross_base_rotation"), "set_helper_cross_base_rotation", "get_helper_cross_base_rotation");
+
+	ClassDB::bind_method(D_METHOD("get_helper_cross_face_outward"), &BulletSpawner2D::get_helper_cross_face_outward);
+	ClassDB::bind_method(D_METHOD("set_helper_cross_face_outward", "value"), &BulletSpawner2D::set_helper_cross_face_outward);
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "helper_cross_face_outward"), "set_helper_cross_face_outward", "get_helper_cross_face_outward");
+
+	ClassDB::bind_method(D_METHOD("get_helper_cross_facing_offset_deg"), &BulletSpawner2D::get_helper_cross_facing_offset_deg);
+	ClassDB::bind_method(D_METHOD("set_helper_cross_facing_offset_deg", "value"), &BulletSpawner2D::set_helper_cross_facing_offset_deg);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_cross_facing_offset_deg"), "set_helper_cross_facing_offset_deg", "get_helper_cross_facing_offset_deg");
+
+	ClassDB::bind_method(D_METHOD("get_helper_star_points"), &BulletSpawner2D::get_helper_star_points);
+	ClassDB::bind_method(D_METHOD("set_helper_star_points", "value"), &BulletSpawner2D::set_helper_star_points);
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "helper_star_points"), "set_helper_star_points", "get_helper_star_points");
+
+	ClassDB::bind_method(D_METHOD("get_helper_star_outer_radius"), &BulletSpawner2D::get_helper_star_outer_radius);
+	ClassDB::bind_method(D_METHOD("set_helper_star_outer_radius", "value"), &BulletSpawner2D::set_helper_star_outer_radius);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_star_outer_radius"), "set_helper_star_outer_radius", "get_helper_star_outer_radius");
+
+	ClassDB::bind_method(D_METHOD("get_helper_star_inner_radius"), &BulletSpawner2D::get_helper_star_inner_radius);
+	ClassDB::bind_method(D_METHOD("set_helper_star_inner_radius", "value"), &BulletSpawner2D::set_helper_star_inner_radius);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_star_inner_radius"), "set_helper_star_inner_radius", "get_helper_star_inner_radius");
+
+	ClassDB::bind_method(D_METHOD("get_helper_star_base_rotation"), &BulletSpawner2D::get_helper_star_base_rotation);
+	ClassDB::bind_method(D_METHOD("set_helper_star_base_rotation", "value"), &BulletSpawner2D::set_helper_star_base_rotation);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_star_base_rotation"), "set_helper_star_base_rotation", "get_helper_star_base_rotation");
+
+	ClassDB::bind_method(D_METHOD("get_helper_star_face_outward"), &BulletSpawner2D::get_helper_star_face_outward);
+	ClassDB::bind_method(D_METHOD("set_helper_star_face_outward", "value"), &BulletSpawner2D::set_helper_star_face_outward);
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "helper_star_face_outward"), "set_helper_star_face_outward", "get_helper_star_face_outward");
+
+	ClassDB::bind_method(D_METHOD("get_helper_star_facing_offset_deg"), &BulletSpawner2D::get_helper_star_facing_offset_deg);
+	ClassDB::bind_method(D_METHOD("set_helper_star_facing_offset_deg", "value"), &BulletSpawner2D::set_helper_star_facing_offset_deg);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_star_facing_offset_deg"), "set_helper_star_facing_offset_deg", "get_helper_star_facing_offset_deg");
+
+	ClassDB::bind_method(D_METHOD("get_helper_heart_size"), &BulletSpawner2D::get_helper_heart_size);
+	ClassDB::bind_method(D_METHOD("set_helper_heart_size", "value"), &BulletSpawner2D::set_helper_heart_size);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_heart_size"), "set_helper_heart_size", "get_helper_heart_size");
+
+	ClassDB::bind_method(D_METHOD("get_helper_heart_base_rotation"), &BulletSpawner2D::get_helper_heart_base_rotation);
+	ClassDB::bind_method(D_METHOD("set_helper_heart_base_rotation", "value"), &BulletSpawner2D::set_helper_heart_base_rotation);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_heart_base_rotation"), "set_helper_heart_base_rotation", "get_helper_heart_base_rotation");
+
+	ClassDB::bind_method(D_METHOD("get_helper_heart_face_outward"), &BulletSpawner2D::get_helper_heart_face_outward);
+	ClassDB::bind_method(D_METHOD("set_helper_heart_face_outward", "value"), &BulletSpawner2D::set_helper_heart_face_outward);
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "helper_heart_face_outward"), "set_helper_heart_face_outward", "get_helper_heart_face_outward");
+
+	ClassDB::bind_method(D_METHOD("get_helper_heart_facing_offset_deg"), &BulletSpawner2D::get_helper_heart_facing_offset_deg);
+	ClassDB::bind_method(D_METHOD("set_helper_heart_facing_offset_deg", "value"), &BulletSpawner2D::set_helper_heart_facing_offset_deg);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_heart_facing_offset_deg"), "set_helper_heart_facing_offset_deg", "get_helper_heart_facing_offset_deg");
+
+	ClassDB::bind_method(D_METHOD("get_helper_wave_width"), &BulletSpawner2D::get_helper_wave_width);
+	ClassDB::bind_method(D_METHOD("set_helper_wave_width", "value"), &BulletSpawner2D::set_helper_wave_width);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_wave_width"), "set_helper_wave_width", "get_helper_wave_width");
+
+	ClassDB::bind_method(D_METHOD("get_helper_wave_amplitude"), &BulletSpawner2D::get_helper_wave_amplitude);
+	ClassDB::bind_method(D_METHOD("set_helper_wave_amplitude", "value"), &BulletSpawner2D::set_helper_wave_amplitude);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_wave_amplitude"), "set_helper_wave_amplitude", "get_helper_wave_amplitude");
+
+	ClassDB::bind_method(D_METHOD("get_helper_wave_waves"), &BulletSpawner2D::get_helper_wave_waves);
+	ClassDB::bind_method(D_METHOD("set_helper_wave_waves", "value"), &BulletSpawner2D::set_helper_wave_waves);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_wave_waves"), "set_helper_wave_waves", "get_helper_wave_waves");
+
+	ClassDB::bind_method(D_METHOD("get_helper_wave_direction"), &BulletSpawner2D::get_helper_wave_direction);
+	ClassDB::bind_method(D_METHOD("set_helper_wave_direction", "value"), &BulletSpawner2D::set_helper_wave_direction);
+	ADD_PROPERTY(PropertyInfo(Variant::VECTOR2, "helper_wave_direction"), "set_helper_wave_direction", "get_helper_wave_direction");
+
+	ClassDB::bind_method(D_METHOD("get_helper_wave_face_direction"), &BulletSpawner2D::get_helper_wave_face_direction);
+	ClassDB::bind_method(D_METHOD("set_helper_wave_face_direction", "value"), &BulletSpawner2D::set_helper_wave_face_direction);
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "helper_wave_face_direction"), "set_helper_wave_face_direction", "get_helper_wave_face_direction");
+
+	ClassDB::bind_method(D_METHOD("get_helper_wave_facing_offset_deg"), &BulletSpawner2D::get_helper_wave_facing_offset_deg);
+	ClassDB::bind_method(D_METHOD("set_helper_wave_facing_offset_deg", "value"), &BulletSpawner2D::set_helper_wave_facing_offset_deg);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_wave_facing_offset_deg"), "set_helper_wave_facing_offset_deg", "get_helper_wave_facing_offset_deg");
+
+	ClassDB::bind_method(D_METHOD("get_helper_waterfall_columns"), &BulletSpawner2D::get_helper_waterfall_columns);
+	ClassDB::bind_method(D_METHOD("set_helper_waterfall_columns", "value"), &BulletSpawner2D::set_helper_waterfall_columns);
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "helper_waterfall_columns"), "set_helper_waterfall_columns", "get_helper_waterfall_columns");
+
+	ClassDB::bind_method(D_METHOD("get_helper_waterfall_column_spacing"), &BulletSpawner2D::get_helper_waterfall_column_spacing);
+	ClassDB::bind_method(D_METHOD("set_helper_waterfall_column_spacing", "value"), &BulletSpawner2D::set_helper_waterfall_column_spacing);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_waterfall_column_spacing"), "set_helper_waterfall_column_spacing", "get_helper_waterfall_column_spacing");
+
+	ClassDB::bind_method(D_METHOD("get_helper_waterfall_rows"), &BulletSpawner2D::get_helper_waterfall_rows);
+	ClassDB::bind_method(D_METHOD("set_helper_waterfall_rows", "value"), &BulletSpawner2D::set_helper_waterfall_rows);
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "helper_waterfall_rows"), "set_helper_waterfall_rows", "get_helper_waterfall_rows");
+
+	ClassDB::bind_method(D_METHOD("get_helper_waterfall_row_spacing"), &BulletSpawner2D::get_helper_waterfall_row_spacing);
+	ClassDB::bind_method(D_METHOD("set_helper_waterfall_row_spacing", "value"), &BulletSpawner2D::set_helper_waterfall_row_spacing);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_waterfall_row_spacing"), "set_helper_waterfall_row_spacing", "get_helper_waterfall_row_spacing");
+
+	ClassDB::bind_method(D_METHOD("get_helper_waterfall_stagger"), &BulletSpawner2D::get_helper_waterfall_stagger);
+	ClassDB::bind_method(D_METHOD("set_helper_waterfall_stagger", "value"), &BulletSpawner2D::set_helper_waterfall_stagger);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_waterfall_stagger"), "set_helper_waterfall_stagger", "get_helper_waterfall_stagger");
+
+	ClassDB::bind_method(D_METHOD("get_helper_waterfall_rain_direction"), &BulletSpawner2D::get_helper_waterfall_rain_direction);
+	ClassDB::bind_method(D_METHOD("set_helper_waterfall_rain_direction", "value"), &BulletSpawner2D::set_helper_waterfall_rain_direction);
+	ADD_PROPERTY(PropertyInfo(Variant::VECTOR2, "helper_waterfall_rain_direction"), "set_helper_waterfall_rain_direction", "get_helper_waterfall_rain_direction");
+
+	ClassDB::bind_method(D_METHOD("get_helper_waterfall_jitter"), &BulletSpawner2D::get_helper_waterfall_jitter);
+	ClassDB::bind_method(D_METHOD("set_helper_waterfall_jitter", "value"), &BulletSpawner2D::set_helper_waterfall_jitter);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_waterfall_jitter"), "set_helper_waterfall_jitter", "get_helper_waterfall_jitter");
+
+	ClassDB::bind_method(D_METHOD("get_helper_lattice_columns"), &BulletSpawner2D::get_helper_lattice_columns);
+	ClassDB::bind_method(D_METHOD("set_helper_lattice_columns", "value"), &BulletSpawner2D::set_helper_lattice_columns);
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "helper_lattice_columns"), "set_helper_lattice_columns", "get_helper_lattice_columns");
+
+	ClassDB::bind_method(D_METHOD("get_helper_lattice_rows"), &BulletSpawner2D::get_helper_lattice_rows);
+	ClassDB::bind_method(D_METHOD("set_helper_lattice_rows", "value"), &BulletSpawner2D::set_helper_lattice_rows);
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "helper_lattice_rows"), "set_helper_lattice_rows", "get_helper_lattice_rows");
+
+	ClassDB::bind_method(D_METHOD("get_helper_lattice_spacing_x"), &BulletSpawner2D::get_helper_lattice_spacing_x);
+	ClassDB::bind_method(D_METHOD("set_helper_lattice_spacing_x", "value"), &BulletSpawner2D::set_helper_lattice_spacing_x);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_lattice_spacing_x"), "set_helper_lattice_spacing_x", "get_helper_lattice_spacing_x");
+
+	ClassDB::bind_method(D_METHOD("get_helper_lattice_spacing_y"), &BulletSpawner2D::get_helper_lattice_spacing_y);
+	ClassDB::bind_method(D_METHOD("set_helper_lattice_spacing_y", "value"), &BulletSpawner2D::set_helper_lattice_spacing_y);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_lattice_spacing_y"), "set_helper_lattice_spacing_y", "get_helper_lattice_spacing_y");
+
+	ClassDB::bind_method(D_METHOD("get_helper_lattice_stagger_rows"), &BulletSpawner2D::get_helper_lattice_stagger_rows);
+	ClassDB::bind_method(D_METHOD("set_helper_lattice_stagger_rows", "value"), &BulletSpawner2D::set_helper_lattice_stagger_rows);
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "helper_lattice_stagger_rows"), "set_helper_lattice_stagger_rows", "get_helper_lattice_stagger_rows");
+
+	ClassDB::bind_method(D_METHOD("get_helper_lattice_face_outward"), &BulletSpawner2D::get_helper_lattice_face_outward);
+	ClassDB::bind_method(D_METHOD("set_helper_lattice_face_outward", "value"), &BulletSpawner2D::set_helper_lattice_face_outward);
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "helper_lattice_face_outward"), "set_helper_lattice_face_outward", "get_helper_lattice_face_outward");
+
+	ClassDB::bind_method(D_METHOD("get_helper_lattice_facing_offset_deg"), &BulletSpawner2D::get_helper_lattice_facing_offset_deg);
+	ClassDB::bind_method(D_METHOD("set_helper_lattice_facing_offset_deg", "value"), &BulletSpawner2D::set_helper_lattice_facing_offset_deg);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_lattice_facing_offset_deg"), "set_helper_lattice_facing_offset_deg", "get_helper_lattice_facing_offset_deg");
+
+	ClassDB::bind_method(D_METHOD("get_helper_skip_indices"), &BulletSpawner2D::get_helper_skip_indices);
+	ClassDB::bind_method(D_METHOD("set_helper_skip_indices", "value"), &BulletSpawner2D::set_helper_skip_indices);
+	ADD_PROPERTY(PropertyInfo(Variant::PACKED_INT32_ARRAY, "helper_skip_indices"), "set_helper_skip_indices", "get_helper_skip_indices");
+
+	ClassDB::bind_method(D_METHOD("get_homing_target_priority"), &BulletSpawner2D::get_homing_target_priority);
+	ClassDB::bind_method(D_METHOD("set_homing_target_priority", "value"), &BulletSpawner2D::set_homing_target_priority);
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "homing_target_priority", PROPERTY_HINT_ENUM, "Nearest,First,Last,Strongest,Weakest,Fastest,Random,Custom"), "set_homing_target_priority", "get_homing_target_priority");
+
+	ClassDB::bind_method(D_METHOD("get_homing_delay_sec"), &BulletSpawner2D::get_homing_delay_sec);
+	ClassDB::bind_method(D_METHOD("set_homing_delay_sec", "value"), &BulletSpawner2D::set_homing_delay_sec);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "homing_delay_sec"), "set_homing_delay_sec", "get_homing_delay_sec");
+
+	ClassDB::bind_method(D_METHOD("get_homing_duration_sec"), &BulletSpawner2D::get_homing_duration_sec);
+	ClassDB::bind_method(D_METHOD("set_homing_duration_sec", "value"), &BulletSpawner2D::set_homing_duration_sec);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "homing_duration_sec"), "set_homing_duration_sec", "get_homing_duration_sec");
+
+	ClassDB::bind_method(D_METHOD("get_homing_lose_range_px"), &BulletSpawner2D::get_homing_lose_range_px);
+	ClassDB::bind_method(D_METHOD("set_homing_lose_range_px", "value"), &BulletSpawner2D::set_homing_lose_range_px);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "homing_lose_range_px"), "set_homing_lose_range_px", "get_homing_lose_range_px");
+
+	ClassDB::bind_method(D_METHOD("get_homing_fire_arc_deg"), &BulletSpawner2D::get_homing_fire_arc_deg);
+	ClassDB::bind_method(D_METHOD("set_homing_fire_arc_deg", "value"), &BulletSpawner2D::set_homing_fire_arc_deg);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "homing_fire_arc_deg"), "set_homing_fire_arc_deg", "get_homing_fire_arc_deg");
+
+	ClassDB::bind_method(D_METHOD("get_reload_jitter_sec"), &BulletSpawner2D::get_reload_jitter_sec);
+	ClassDB::bind_method(D_METHOD("set_reload_jitter_sec", "value"), &BulletSpawner2D::set_reload_jitter_sec);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "reload_jitter_sec"), "set_reload_jitter_sec", "get_reload_jitter_sec");
+
 	ClassDB::bind_method(D_METHOD("get_burst_enabled"), &BulletSpawner2D::get_burst_enabled);
 	ClassDB::bind_method(D_METHOD("set_burst_enabled", "value"), &BulletSpawner2D::set_burst_enabled);
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "burst_enabled"), "set_burst_enabled", "get_burst_enabled");
@@ -4297,6 +5337,10 @@ void BulletSpawner2D::_bind_methods() {
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "homing_retarget_phase"), "set_homing_retarget_phase", "get_homing_retarget_phase");
 
 	ClassDB::bind_method(D_METHOD("apply_pattern_preset", "preset"), &BulletSpawner2D::apply_pattern_preset);
+	ClassDB::bind_method(D_METHOD("spawn_pattern_list", "entries", "simultaneous", "interval_sec"), &BulletSpawner2D::spawn_pattern_list, DEFVAL(false), DEFVAL(0.25));
+	ClassDB::bind_method(D_METHOD("stop_pattern_list"), &BulletSpawner2D::stop_pattern_list);
+	ClassDB::bind_method(D_METHOD("is_pattern_list_active"), &BulletSpawner2D::is_pattern_list_active);
+	ClassDB::bind_method(D_METHOD("next_shoot_interval_sec"), &BulletSpawner2D::next_shoot_interval_sec);
 	ClassDB::bind_method(D_METHOD("get_burst_shots_left"), &BulletSpawner2D::get_burst_shots_left);
 	ClassDB::bind_method(D_METHOD("get_active_live_bullet_count"), &BulletSpawner2D::get_active_live_bullet_count);
 	ClassDB::bind_method(D_METHOD("get_pooled_volley_count"), &BulletSpawner2D::get_pooled_volley_count);
@@ -4512,6 +5556,14 @@ void BulletSpawner2D::_bind_methods() {
 	BIND_ENUM_CONSTANT(HOMING_SELECT_FIRST);
 	BIND_ENUM_CONSTANT(HOMING_SELECT_ROUND_ROBIN);
 	BIND_ENUM_CONSTANT(HOMING_SELECT_DISTRIBUTE);
+	BIND_ENUM_CONSTANT(HOMING_PRIORITY_NEAREST);
+	BIND_ENUM_CONSTANT(HOMING_PRIORITY_FIRST);
+	BIND_ENUM_CONSTANT(HOMING_PRIORITY_LAST);
+	BIND_ENUM_CONSTANT(HOMING_PRIORITY_STRONGEST);
+	BIND_ENUM_CONSTANT(HOMING_PRIORITY_WEAKEST);
+	BIND_ENUM_CONSTANT(HOMING_PRIORITY_FASTEST);
+	BIND_ENUM_CONSTANT(HOMING_PRIORITY_RANDOM);
+	BIND_ENUM_CONSTANT(HOMING_PRIORITY_CUSTOM);
 	BIND_ENUM_CONSTANT(HOMING_RETARGET_OFF);
 	BIND_ENUM_CONSTANT(HOMING_RETARGET_ON_INTERVAL);
 
@@ -4570,6 +5622,12 @@ void BulletSpawner2D::_bind_methods() {
 	BIND_ENUM_CONSTANT(TRANSFORMS_FROM_HELPER_SCATTER);
 	BIND_ENUM_CONSTANT(TRANSFORMS_FROM_HELPER_POLYGON);
 	BIND_ENUM_CONSTANT(TRANSFORMS_FROM_HELPER_MULTISPIRAL);
+	BIND_ENUM_CONSTANT(TRANSFORMS_FROM_HELPER_CROSS);
+	BIND_ENUM_CONSTANT(TRANSFORMS_FROM_HELPER_STAR);
+	BIND_ENUM_CONSTANT(TRANSFORMS_FROM_HELPER_HEART);
+	BIND_ENUM_CONSTANT(TRANSFORMS_FROM_HELPER_WAVE);
+	BIND_ENUM_CONSTANT(TRANSFORMS_FROM_HELPER_WATERFALL);
+	BIND_ENUM_CONSTANT(TRANSFORMS_FROM_HELPER_LATTICE);
 
 	// Need this in order to expose the enum constants to Godot Engine
 	BIND_ENUM_CONSTANT(SPIN_CONTINUOUS);

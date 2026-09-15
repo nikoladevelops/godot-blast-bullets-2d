@@ -68,5 +68,26 @@
 		<member name="shared_movement_pattern_repeat" type="bool" setter="set_shared_movement_pattern_repeat" getter="get_shared_movement_pattern_repeat" default="true">
 			Whether the shared movement pattern repeats instead of stopping at the end of the curve.
 		</member>
+		<member name="shared_bullet_wobble_data" type="BulletWobbleData2D" setter="set_shared_bullet_wobble_data" getter="get_shared_bullet_wobble_data">
+			Shared sine/cos wobble applied to every bullet at spawn time (and on pool reuse), taking precedence over [member all_bullet_wobble_data] when set and enabled. Phase fans out per bullet so one resource makes snakes and petals. Null (default) disables the feature and the array drives instead.
+		</member>
+		<member name="all_bullet_wobble_data" type="BulletWobbleData2D[]" setter="set_all_bullet_wobble_data" getter="get_all_bullet_wobble_data" default="[]">
+			Per-bullet wobble applied at spawn time (and on pool reuse). Same fallback rule as [member all_bullet_speed_data]: empty disables the feature, matching size means per bullet, otherwise the first entry drives all bullets. Null and disabled entries are skipped per bullet.
+		</member>
+		<member name="gravity" type="Vector2" setter="set_gravity" getter="get_gravity" default="Vector2(0, 0)">
+			Constant acceleration in px/s^2 added to every bullet each tick (2D sideview arcs, tower-defense shells). (0, 0) disables. Must stay finite.
+		</member>
+		<member name="linear_drag" type="float" setter="set_linear_drag" getter="get_linear_drag" default="0.0">
+			Linear drag trimming speed each tick (speed -= speed * drag * delta). 0 disables. Must be finite and &gt;= 0.
+		</member>
+		<member name="homing_delay_sec" type="float" setter="set_homing_delay_sec" getter="get_homing_delay_sec" default="0.0">
+			Seconds of straight flight before homing steering starts (classic aimed-then-homing). 0 steers immediately.
+		</member>
+		<member name="homing_duration_sec" type="float" setter="set_homing_duration_sec" getter="get_homing_duration_sec" default="0.0">
+			Seconds of steering before bullets fly straight (lets fast players escape). 0 = infinite.
+		</member>
+		<member name="homing_lose_range_px" type="float" setter="set_homing_lose_range_px" getter="get_homing_lose_range_px" default="0.0">
+			Steering pauses while the bullet is farther than this from its target. 0 = unlimited.
+		</member>
 	</members>
 </class>

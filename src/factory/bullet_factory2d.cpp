@@ -2107,6 +2107,332 @@ TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_multispiral(
 	return generated_transforms;
 }
 
+TypedArray<Transform2D> BulletFactory2D::helper_apply_skip_indices(
+		const TypedArray<Transform2D> &transforms,
+		const PackedInt32Array &skip_indices) {
+	TypedArray<Transform2D> out;
+	if (skip_indices.is_empty()) {
+		return transforms;
+	}
+	const int n = transforms.size();
+	std::vector<uint8_t> skip(n, 0);
+	bool warned_oob = false;
+	for (int k = 0; k < skip_indices.size(); ++k) {
+		const int idx = skip_indices[k];
+		if (idx < 0 || idx >= n) {
+			if (!warned_oob) {
+				UtilityFunctions::push_warning("helper_apply_skip_indices: skip index out of range, ignoring it.");
+				warned_oob = true;
+			}
+			continue;
+		}
+		skip[idx] = 1;
+	}
+	for (int i = 0; i < n; ++i) {
+		if (!skip[i]) {
+			out.push_back(transforms[i]);
+		}
+	}
+	return out;
+}
+
+TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_cross(
+		int transforms_amount,
+		Transform2D marker_transform,
+		int arm_count,
+		real_t arm_length,
+		real_t spacing,
+		real_t base_rotation,
+		bool face_outward,
+		real_t facing_offset_degrees) {
+	if (!danmaku_validate_head("helper_generate_transforms_cross", transforms_amount, marker_transform)) {
+		return TypedArray<Transform2D>();
+	}
+	if (arm_count < 1) {
+		UtilityFunctions::push_error("helper_generate_transforms_cross: arm_count must be >= 1.");
+		return TypedArray<Transform2D>();
+	}
+	if (!Math::is_finite(arm_length) || arm_length < 0.0 || !Math::is_finite(spacing) || spacing <= 0.0) {
+		UtilityFunctions::push_error("helper_generate_transforms_cross: arm_length must be finite and >= 0, spacing finite and > 0.");
+		return TypedArray<Transform2D>();
+	}
+	if (!Math::is_finite(base_rotation) || !Math::is_finite(facing_offset_degrees)) {
+		UtilityFunctions::push_error("helper_generate_transforms_cross: base_rotation and facing_offset_degrees must be finite.");
+		return TypedArray<Transform2D>();
+	}
+	TypedArray<Transform2D> generated_transforms = danmaku_make_slots(transforms_amount);
+	if (transforms_amount == 0) {
+		return generated_transforms;
+	}
+	const Vector2 origin = marker_transform.get_origin();
+	const real_t facing_offset = Math::deg_to_rad(facing_offset_degrees);
+	const int per_arm = Math::max(1, (int)Math::ceil((double)transforms_amount / (double)arm_count));
+	for (int i = 0; i < transforms_amount; ++i) {
+		const int arm = i % arm_count;
+		const int step = i / arm_count;
+		const real_t ray = base_rotation + Math::TAU * (real_t)arm / (real_t)arm_count;
+		const real_t dist = Math::min(arm_length, spacing * (real_t)(step + 1));
+		const Vector2 offset = Vector2(Math::cos(ray), Math::sin(ray)) * dist;
+		real_t facing = face_outward ? ray : ray + Math::PI;
+		(void)per_arm;
+		Transform2D slot(facing + facing_offset, origin + offset);
+		danmaku_apply_marker_scale(slot, marker_transform);
+		generated_transforms[i] = slot;
+	}
+	return generated_transforms;
+}
+
+TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_star(
+		int transforms_amount,
+		Transform2D marker_transform,
+		int points,
+		real_t outer_radius,
+		real_t inner_radius,
+		real_t base_rotation,
+		bool face_outward,
+		real_t facing_offset_degrees) {
+	if (!danmaku_validate_head("helper_generate_transforms_star", transforms_amount, marker_transform)) {
+		return TypedArray<Transform2D>();
+	}
+	if (points < 2) {
+		UtilityFunctions::push_error("helper_generate_transforms_star: points must be >= 2.");
+		return TypedArray<Transform2D>();
+	}
+	if (!Math::is_finite(outer_radius) || outer_radius < 0.0 || !Math::is_finite(inner_radius) || inner_radius < 0.0) {
+		UtilityFunctions::push_error("helper_generate_transforms_star: outer_radius and inner_radius must be finite and >= 0.");
+		return TypedArray<Transform2D>();
+	}
+	if (!Math::is_finite(base_rotation) || !Math::is_finite(facing_offset_degrees)) {
+		UtilityFunctions::push_error("helper_generate_transforms_star: base_rotation and facing_offset_degrees must be finite.");
+		return TypedArray<Transform2D>();
+	}
+	TypedArray<Transform2D> generated_transforms = danmaku_make_slots(transforms_amount);
+	if (transforms_amount == 0) {
+		return generated_transforms;
+	}
+	const Vector2 origin = marker_transform.get_origin();
+	const real_t facing_offset = Math::deg_to_rad(facing_offset_degrees);
+	const int corners = points * 2;
+	for (int i = 0; i < transforms_amount; ++i) {
+		const int corner = i % corners;
+		const bool is_outer = (corner % 2) == 0;
+		const real_t angle = base_rotation + Math::TAU * (real_t)corner / (real_t)corners;
+		const real_t r = is_outer ? outer_radius : inner_radius;
+		const Vector2 offset = Vector2(Math::cos(angle), Math::sin(angle)) * r;
+		real_t facing = face_outward ? angle : angle + Math::PI;
+		Transform2D slot(facing + facing_offset, origin + offset);
+		danmaku_apply_marker_scale(slot, marker_transform);
+		generated_transforms[i] = slot;
+	}
+	return generated_transforms;
+}
+
+TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_heart(
+		int transforms_amount,
+		Transform2D marker_transform,
+		real_t size,
+		real_t base_rotation,
+		bool face_outward,
+		real_t facing_offset_degrees) {
+	if (!danmaku_validate_head("helper_generate_transforms_heart", transforms_amount, marker_transform)) {
+		return TypedArray<Transform2D>();
+	}
+	if (!Math::is_finite(size) || size <= 0.0) {
+		UtilityFunctions::push_error("helper_generate_transforms_heart: size must be finite and > 0.");
+		return TypedArray<Transform2D>();
+	}
+	if (!Math::is_finite(base_rotation) || !Math::is_finite(facing_offset_degrees)) {
+		UtilityFunctions::push_error("helper_generate_transforms_heart: base_rotation and facing_offset_degrees must be finite.");
+		return TypedArray<Transform2D>();
+	}
+	TypedArray<Transform2D> generated_transforms = danmaku_make_slots(transforms_amount);
+	if (transforms_amount == 0) {
+		return generated_transforms;
+	}
+	const Vector2 origin = marker_transform.get_origin();
+	const real_t facing_offset = Math::deg_to_rad(facing_offset_degrees);
+	const real_t scale = size / 32.0;
+	for (int i = 0; i < transforms_amount; ++i) {
+		const real_t t = Math::TAU * (real_t)i / (real_t)transforms_amount;
+		const real_t hx = (real_t)16.0 * Math::pow((double)Math::sin(t), 3.0);
+		const real_t hy = 13.0 * Math::cos(t) - 5.0 * Math::cos(2.0 * t) - 2.0 * Math::cos(3.0 * t) - Math::cos(4.0 * t);
+		Vector2 local = Vector2(hx, -hy) * scale;
+		local = local.rotated(base_rotation);
+		const Vector2 pos = origin + local;
+		const real_t radial = (local.length_squared() > 0.0) ? local.angle() : base_rotation;
+		real_t facing = face_outward ? radial : radial + Math::PI;
+		Transform2D slot(facing + facing_offset, pos);
+		danmaku_apply_marker_scale(slot, marker_transform);
+		generated_transforms[i] = slot;
+	}
+	return generated_transforms;
+}
+
+TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_wave(
+		int transforms_amount,
+		Transform2D marker_transform,
+		real_t width,
+		real_t amplitude,
+		real_t waves,
+		Vector2 direction,
+		bool face_direction,
+		real_t facing_offset_degrees) {
+	if (!danmaku_validate_head("helper_generate_transforms_wave", transforms_amount, marker_transform)) {
+		return TypedArray<Transform2D>();
+	}
+	if (!Math::is_finite(width) || width < 0.0 || !Math::is_finite(amplitude) || amplitude < 0.0 || !Math::is_finite(waves) || waves < 0.0) {
+		UtilityFunctions::push_error("helper_generate_transforms_wave: width, amplitude and waves must be finite and >= 0.");
+		return TypedArray<Transform2D>();
+	}
+	if (!direction.is_finite() || direction.length_squared() <= 0.0) {
+		UtilityFunctions::push_error("helper_generate_transforms_wave: direction must be finite and non-zero.");
+		return TypedArray<Transform2D>();
+	}
+	if (!Math::is_finite(facing_offset_degrees)) {
+		UtilityFunctions::push_error("helper_generate_transforms_wave: facing_offset_degrees must be finite.");
+		return TypedArray<Transform2D>();
+	}
+	TypedArray<Transform2D> generated_transforms = danmaku_make_slots(transforms_amount);
+	if (transforms_amount == 0) {
+		return generated_transforms;
+	}
+	const Vector2 origin = marker_transform.get_origin();
+	const Vector2 axis = direction.normalized();
+	const Vector2 across = axis.orthogonal();
+	const real_t facing_offset = Math::deg_to_rad(facing_offset_degrees);
+	for (int i = 0; i < transforms_amount; ++i) {
+		const real_t frac = (transforms_amount > 1) ? ((real_t)i / (real_t)(transforms_amount - 1) - 0.5) : 0.0;
+		const real_t along = frac * width;
+		const real_t wave = amplitude * Math::sin(frac * waves * Math::TAU);
+		const Vector2 pos = origin + axis * along + across * wave;
+		const Vector2 tangent = (axis + across * (amplitude * waves * Math::TAU / Math::max(width, (real_t)1.0) * Math::cos(frac * waves * Math::TAU))).normalized();
+		real_t facing = face_direction ? tangent.angle() : marker_transform.get_rotation();
+		Transform2D slot(facing + facing_offset, pos);
+		danmaku_apply_marker_scale(slot, marker_transform);
+		generated_transforms[i] = slot;
+	}
+	return generated_transforms;
+}
+
+TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_waterfall(
+		int transforms_amount,
+		Transform2D marker_transform,
+		int columns,
+		real_t column_spacing,
+		int rows,
+		real_t row_spacing,
+		real_t stagger,
+		Vector2 rain_direction,
+		real_t jitter) {
+	if (!danmaku_validate_head("helper_generate_transforms_waterfall", transforms_amount, marker_transform)) {
+		return TypedArray<Transform2D>();
+	}
+	if (columns < 1 || rows < 1) {
+		UtilityFunctions::push_error("helper_generate_transforms_waterfall: columns and rows must be >= 1.");
+		return TypedArray<Transform2D>();
+	}
+	if (!Math::is_finite(column_spacing) || column_spacing < 0.0 || !Math::is_finite(row_spacing) || row_spacing < 0.0) {
+		UtilityFunctions::push_error("helper_generate_transforms_waterfall: column_spacing and row_spacing must be finite and >= 0.");
+		return TypedArray<Transform2D>();
+	}
+	if (!Math::is_finite(stagger) || !Math::is_finite(jitter) || jitter < 0.0) {
+		UtilityFunctions::push_error("helper_generate_transforms_waterfall: stagger must be finite, jitter finite and >= 0.");
+		return TypedArray<Transform2D>();
+	}
+	if (!rain_direction.is_finite() || rain_direction.length_squared() <= 0.0) {
+		UtilityFunctions::push_error("helper_generate_transforms_waterfall: rain_direction must be finite and non-zero.");
+		return TypedArray<Transform2D>();
+	}
+	TypedArray<Transform2D> generated_transforms = danmaku_make_slots(transforms_amount);
+	if (transforms_amount == 0) {
+		return generated_transforms;
+	}
+	const Vector2 origin = marker_transform.get_origin();
+	const Vector2 axis = rain_direction.normalized();
+	const Vector2 across = axis.orthogonal();
+	const real_t facing = axis.angle();
+	const int capacity = columns * rows;
+	const int emit = Math::min(transforms_amount, capacity);
+	for (int i = 0; i < emit; ++i) {
+		const int row = i / columns;
+		const int col = i % columns;
+		const real_t row_phase = (rows > 1) ? ((real_t)row / (real_t)(rows - 1) - 0.5) : 0.0;
+		const real_t col_centered = (columns > 1) ? ((real_t)col / (real_t)(columns - 1) - 0.5) : 0.0;
+		Vector2 pos = origin + across * (col_centered * column_spacing * (real_t)(columns - 1) + stagger * column_spacing * row_phase) + axis * ((real_t)row * row_spacing);
+		if (jitter > 0.0) {
+			pos += Vector2(UtilityFunctions::randf_range(-jitter, jitter), UtilityFunctions::randf_range(-jitter, jitter));
+		}
+		Transform2D slot(facing, pos);
+		danmaku_apply_marker_scale(slot, marker_transform);
+		generated_transforms[i] = slot;
+	}
+	for (int i = emit; i < transforms_amount; ++i) {
+		const int extra = i - emit;
+		const int row = (extra / columns) % rows;
+		const int col = extra % columns;
+		const real_t col_centered = (columns > 1) ? ((real_t)col / (real_t)(columns - 1) - 0.5) : 0.0;
+		Vector2 pos = origin + across * col_centered * column_spacing * (real_t)(columns - 1) + axis * ((real_t)(rows + extra / columns) * row_spacing);
+		(void)row;
+		Transform2D slot(facing, pos);
+		danmaku_apply_marker_scale(slot, marker_transform);
+		generated_transforms[i] = slot;
+	}
+	return generated_transforms;
+}
+
+TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_lattice(
+		int transforms_amount,
+		Transform2D marker_transform,
+		int columns,
+		int rows,
+		real_t spacing_x,
+		real_t spacing_y,
+		bool stagger_rows,
+		bool face_outward,
+		real_t facing_offset_degrees) {
+	if (!danmaku_validate_head("helper_generate_transforms_lattice", transforms_amount, marker_transform)) {
+		return TypedArray<Transform2D>();
+	}
+	if (columns < 1 || rows < 1) {
+		UtilityFunctions::push_error("helper_generate_transforms_lattice: columns and rows must be >= 1.");
+		return TypedArray<Transform2D>();
+	}
+	if (!Math::is_finite(spacing_x) || spacing_x < 0.0 || !Math::is_finite(spacing_y) || spacing_y < 0.0) {
+		UtilityFunctions::push_error("helper_generate_transforms_lattice: spacing_x and spacing_y must be finite and >= 0.");
+		return TypedArray<Transform2D>();
+	}
+	if (!Math::is_finite(facing_offset_degrees)) {
+		UtilityFunctions::push_error("helper_generate_transforms_lattice: facing_offset_degrees must be finite.");
+		return TypedArray<Transform2D>();
+	}
+	TypedArray<Transform2D> generated_transforms = danmaku_make_slots(transforms_amount);
+	if (transforms_amount == 0) {
+		return generated_transforms;
+	}
+	const Vector2 origin = marker_transform.get_origin();
+	const real_t marker_rot = marker_transform.get_rotation();
+	const real_t facing_offset = Math::deg_to_rad(facing_offset_degrees);
+	const int capacity = columns * rows;
+	const int emit = Math::min(transforms_amount, capacity);
+	for (int i = 0; i < emit; ++i) {
+		const int row = i / columns;
+		const int col = i % columns;
+		const real_t stagger = (stagger_rows && (row % 2 == 1)) ? spacing_x * 0.5 : 0.0;
+		const Vector2 pos = origin + Vector2(((real_t)col - (real_t)(columns - 1) * 0.5) * spacing_x + stagger, ((real_t)row - (real_t)(rows - 1) * 0.5) * spacing_y);
+		const real_t radial = (pos - origin).length_squared() > 0.0 ? (pos - origin).angle() : marker_rot;
+		real_t facing = face_outward ? radial : marker_rot;
+		Transform2D slot(facing + facing_offset, pos);
+		danmaku_apply_marker_scale(slot, marker_transform);
+		generated_transforms[i] = slot;
+	}
+	for (int i = emit; i < transforms_amount; ++i) {
+		Transform2D slot(marker_rot + facing_offset, origin);
+		danmaku_apply_marker_scale(slot, marker_transform);
+		generated_transforms[i] = slot;
+	}
+	return generated_transforms;
+}
+
 void BulletFactory2D::teleport_shift_all_bullets(const Vector2 &shift_amount) {
 	if (!shift_amount.is_finite()) {
 		UtilityFunctions::push_error("teleport_shift_all_bullets: shift_amount must be finite, nothing moved.");
@@ -2415,6 +2741,120 @@ void BulletFactory2D::_bind_methods() {
 								DEFVAL(0.0),
 								DEFVAL(1));
 
+	ClassDB::bind_static_method("BulletFactory2D",
+								D_METHOD("helper_apply_skip_indices",
+										 "transforms",
+										 "skip_indices"),
+								&BulletFactory2D::helper_apply_skip_indices);
+
+	ClassDB::bind_static_method("BulletFactory2D",
+								D_METHOD("helper_generate_transforms_cross",
+										 "transforms_amount",
+										 "marker_transform",
+										 "arm_count",
+										 "arm_length",
+										 "spacing",
+										 "base_rotation",
+										 "face_outward",
+										 "facing_offset_degrees"),
+								&BulletFactory2D::helper_generate_transforms_cross,
+								DEFVAL(4),
+								DEFVAL(150.0),
+								DEFVAL(32.0),
+								DEFVAL(0.0),
+								DEFVAL(true),
+								DEFVAL(0.0));
+
+	ClassDB::bind_static_method("BulletFactory2D",
+								D_METHOD("helper_generate_transforms_star",
+										 "transforms_amount",
+										 "marker_transform",
+										 "points",
+										 "outer_radius",
+										 "inner_radius",
+										 "base_rotation",
+										 "face_outward",
+										 "facing_offset_degrees"),
+								&BulletFactory2D::helper_generate_transforms_star,
+								DEFVAL(5),
+								DEFVAL(150.0),
+								DEFVAL(65.0),
+								DEFVAL(0.0),
+								DEFVAL(true),
+								DEFVAL(0.0));
+
+	ClassDB::bind_static_method("BulletFactory2D",
+								D_METHOD("helper_generate_transforms_heart",
+										 "transforms_amount",
+										 "marker_transform",
+										 "size",
+										 "base_rotation",
+										 "face_outward",
+										 "facing_offset_degrees"),
+								&BulletFactory2D::helper_generate_transforms_heart,
+								DEFVAL(150.0),
+								DEFVAL(0.0),
+								DEFVAL(true),
+								DEFVAL(0.0));
+
+	ClassDB::bind_static_method("BulletFactory2D",
+								D_METHOD("helper_generate_transforms_wave",
+										 "transforms_amount",
+										 "marker_transform",
+										 "width",
+										 "amplitude",
+										 "waves",
+										 "direction",
+										 "face_direction",
+										 "facing_offset_degrees"),
+								&BulletFactory2D::helper_generate_transforms_wave,
+								DEFVAL(600.0),
+								DEFVAL(48.0),
+								DEFVAL(2.0),
+								DEFVAL(Vector2(1, 0)),
+								DEFVAL(true),
+								DEFVAL(0.0));
+
+	ClassDB::bind_static_method("BulletFactory2D",
+								D_METHOD("helper_generate_transforms_waterfall",
+										 "transforms_amount",
+										 "marker_transform",
+										 "columns",
+										 "column_spacing",
+										 "rows",
+										 "row_spacing",
+										 "stagger",
+										 "rain_direction",
+										 "jitter"),
+								&BulletFactory2D::helper_generate_transforms_waterfall,
+								DEFVAL(12),
+								DEFVAL(48.0),
+								DEFVAL(3),
+								DEFVAL(64.0),
+								DEFVAL(0.5),
+								DEFVAL(Vector2(0, 1)),
+								DEFVAL(6.0));
+
+	ClassDB::bind_static_method("BulletFactory2D",
+								D_METHOD("helper_generate_transforms_lattice",
+										 "transforms_amount",
+										 "marker_transform",
+										 "columns",
+										 "rows",
+										 "spacing_x",
+										 "spacing_y",
+										 "stagger_rows",
+										 "face_outward",
+										 "facing_offset_degrees"),
+								&BulletFactory2D::helper_generate_transforms_lattice,
+								DEFVAL(8),
+								DEFVAL(5),
+								DEFVAL(48.0),
+								DEFVAL(42.0),
+								DEFVAL(true),
+								DEFVAL(true),
+								DEFVAL(0.0));
+
 	// Need this in order to expose the enum constants to Godot Engine
 	BIND_ENUM_CONSTANT(SPIRAL_FACING_TANGENT);
 	BIND_ENUM_CONSTANT(SPIRAL_FACING_RADIAL_OUTWARD);
@@ -2437,6 +2877,16 @@ void BulletFactory2D::_bind_methods() {
 	BIND_ENUM_CONSTANT(PATTERN_PRESET_RAIN);
 	BIND_ENUM_CONSTANT(PATTERN_PRESET_FLOWER_6);
 	BIND_ENUM_CONSTANT(PATTERN_PRESET_SCATTER_BURST);
+	BIND_ENUM_CONSTANT(PATTERN_PRESET_CROSS_BURST);
+	BIND_ENUM_CONSTANT(PATTERN_PRESET_STAR_SHELL);
+	BIND_ENUM_CONSTANT(PATTERN_PRESET_HEART_BLOOM);
+	BIND_ENUM_CONSTANT(PATTERN_PRESET_SNAKE_WAVE);
+	BIND_ENUM_CONSTANT(PATTERN_PRESET_WATERFALL_CURTAIN);
+	BIND_ENUM_CONSTANT(PATTERN_PRESET_PETAL_STORM);
+	BIND_ENUM_CONSTANT(PATTERN_PRESET_TWIN_SPIRAL_COUNTER);
+	BIND_ENUM_CONSTANT(PATTERN_PRESET_AIMED_TRAP);
+	BIND_ENUM_CONSTANT(PATTERN_PRESET_TD_RING_GUARD);
+	BIND_ENUM_CONSTANT(PATTERN_PRESET_BLOSSOM_FINALE);
 
 	//
 

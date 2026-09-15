@@ -171,6 +171,28 @@ void DirectionalBullets2D::apply_per_bullet_movement_patterns_from_data(const Di
 	}
 }
 
+void DirectionalBullets2D::apply_wobble_from_data(const DirectionalBulletsData2D &directional_data) {
+	all_bullet_wobble.assign(amount_bullets, WobbleSeed());
+	wobble_distance_traveled.assign(amount_bullets, 0.0);
+	is_wobble_feature_enabled = false;
+	const bool use_shared = directional_data.shared_bullet_wobble_data.is_valid() && directional_data.shared_bullet_wobble_data->enabled;
+	for (int i = 0; i < amount_bullets; ++i) {
+		if (use_shared) {
+			all_bullet_wobble[i] = make_wobble_seed(directional_data.shared_bullet_wobble_data, i);
+			continue;
+		}
+		const int entry = resolve_per_bullet_data_index(directional_data.all_bullet_wobble_data.size(), i);
+		if (entry < 0) {
+			return; // empty = off
+		}
+		if (entry < 0 || entry >= directional_data.all_bullet_wobble_data.size()) {
+			continue;
+		}
+		all_bullet_wobble[i] = make_wobble_seed(directional_data.all_bullet_wobble_data[entry], i);
+	}
+	refresh_wobble_feature_flag();
+}
+
 void DirectionalBullets2D::apply_shared_movement_pattern_from_data(const DirectionalBulletsData2D &directional_data) {
 	// Null/empty removes the feature: clear the shared slot so a previously
 	// set pattern (or curves, via populate_shared below) cannot linger.
@@ -202,6 +224,14 @@ void DirectionalBullets2D::custom_additional_spawn_logic(const MultiMeshBulletsD
 	// unconditionally, so even a wrong-type early-return must leave them sized.
 	set_up_movement_data(TypedArray<BulletSpeedData2D>());
 	adjust_direction_based_on_rotation = false;
+	all_bullet_wobble.assign(amount_bullets, WobbleSeed());
+	wobble_distance_traveled.assign(amount_bullets, 0.0);
+	is_wobble_feature_enabled = false;
+	gravity = Vector2(0, 0);
+	linear_drag = 0.0;
+	homing_delay_sec = 0.0;
+	homing_duration_sec = 0.0;
+	homing_lose_range_px = 0.0;
 	all_bullet_homing_targets.resize(amount_bullets);
 	all_homing_count.assign(amount_bullets, 0);
 	all_bullet_homing_smoothing.assign(amount_bullets, 0.0);
@@ -259,6 +289,7 @@ void DirectionalBullets2D::custom_additional_spawn_logic(const MultiMeshBulletsD
 	// spawn still overrides afterwards.
 	populate_shared_curves_related_data(directional_data->shared_bullet_curves_data);
 	apply_shared_movement_pattern_from_data(*directional_data);
+	apply_wobble_from_data(*directional_data);
 
 	// Homing steering seeds from the same spawn data (direct factory users
 	// keep it on fresh spawns too, matching the enable path).
@@ -269,6 +300,11 @@ void DirectionalBullets2D::custom_additional_spawn_logic(const MultiMeshBulletsD
 	homing_distance_before_reached = (real_t)directional_data->homing_distance_before_reached;
 	bullet_homing_auto_pop_after_target_reached = directional_data->bullet_homing_auto_pop_after_target_reached;
 	shared_homing_deque_auto_pop_after_target_reached = directional_data->shared_homing_deque_auto_pop_after_target_reached;
+	gravity = directional_data->gravity;
+	linear_drag = (real_t)directional_data->linear_drag;
+	homing_delay_sec = (real_t)directional_data->homing_delay_sec;
+	homing_duration_sec = (real_t)directional_data->homing_duration_sec;
+	homing_lose_range_px = (real_t)directional_data->homing_lose_range_px;
 }
 
 bool DirectionalBullets2D::custom_additional_enable_logic(const MultiMeshBulletsData2D &data) {
@@ -284,6 +320,14 @@ bool DirectionalBullets2D::custom_additional_enable_logic(const MultiMeshBullets
 	shared_movement_pattern_face_movement_direction = false;
 	shared_movement_pattern_repeat = true;
 	shared_movement_pattern_distances.assign(amount_bullets, 0.0);
+	all_bullet_wobble.assign(amount_bullets, WobbleSeed());
+	wobble_distance_traveled.assign(amount_bullets, 0.0);
+	is_wobble_feature_enabled = false;
+	gravity = Vector2(0, 0);
+	linear_drag = 0.0;
+	homing_delay_sec = 0.0;
+	homing_duration_sec = 0.0;
+	homing_lose_range_px = 0.0;
 	clear_homing_state_for_teardown();
 	if (directional_data == nullptr) {
 		UtilityFunctions::push_error("DirectionalBullets2D::enable got wrong spawn data type, expected DirectionalBulletsData2D.");
@@ -335,9 +379,12 @@ bool DirectionalBullets2D::custom_additional_enable_logic(const MultiMeshBullets
 	// Always applied: null data removes previously set features.
 	populate_shared_curves_related_data(directional_data->shared_bullet_curves_data);
 	apply_shared_movement_pattern_from_data(*directional_data);
+	apply_wobble_from_data(*directional_data);
 
 	// Vectors are sized in spawn, but a wrong-type spawn early-returns before
 	// sizing. Resize here so the clears/assigns below can't run on empty vectors.
+	all_bullet_wobble.resize(amount_bullets);
+	wobble_distance_traveled.resize(amount_bullets, 0.0);
 	all_bullet_homing_targets.resize(amount_bullets);
 	all_homing_count.resize(amount_bullets, 0);
 	all_bullet_homing_smoothing.resize(amount_bullets, 0.0);
@@ -383,6 +430,11 @@ bool DirectionalBullets2D::custom_additional_enable_logic(const MultiMeshBullets
 	homing_distance_before_reached = (real_t)directional_data->homing_distance_before_reached;
 	bullet_homing_auto_pop_after_target_reached = directional_data->bullet_homing_auto_pop_after_target_reached;
 	shared_homing_deque_auto_pop_after_target_reached = directional_data->shared_homing_deque_auto_pop_after_target_reached;
+	gravity = directional_data->gravity;
+	linear_drag = (real_t)directional_data->linear_drag;
+	homing_delay_sec = (real_t)directional_data->homing_delay_sec;
+	homing_duration_sec = (real_t)directional_data->homing_duration_sec;
+	homing_lose_range_px = (real_t)directional_data->homing_lose_range_px;
 	return true;
 }
 
@@ -505,6 +557,28 @@ void DirectionalBullets2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_homing_take_control_of_texture_rotation"), &DirectionalBullets2D::get_homing_take_control_of_texture_rotation);
 	ClassDB::bind_method(D_METHOD("set_homing_take_control_of_texture_rotation", "value"), &DirectionalBullets2D::set_homing_take_control_of_texture_rotation);
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "homing_take_control_of_texture_rotation"), "set_homing_take_control_of_texture_rotation", "get_homing_take_control_of_texture_rotation");
+
+	ClassDB::bind_method(D_METHOD("get_gravity"), &DirectionalBullets2D::get_gravity);
+	ClassDB::bind_method(D_METHOD("set_gravity", "value"), &DirectionalBullets2D::set_gravity);
+	ADD_PROPERTY(PropertyInfo(Variant::VECTOR2, "gravity"), "set_gravity", "get_gravity");
+
+	ClassDB::bind_method(D_METHOD("get_linear_drag"), &DirectionalBullets2D::get_linear_drag);
+	ClassDB::bind_method(D_METHOD("set_linear_drag", "value"), &DirectionalBullets2D::set_linear_drag);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "linear_drag"), "set_linear_drag", "get_linear_drag");
+
+	ClassDB::bind_method(D_METHOD("get_homing_delay_sec"), &DirectionalBullets2D::get_homing_delay_sec);
+	ClassDB::bind_method(D_METHOD("set_homing_delay_sec", "value"), &DirectionalBullets2D::set_homing_delay_sec);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "homing_delay_sec"), "set_homing_delay_sec", "get_homing_delay_sec");
+
+	ClassDB::bind_method(D_METHOD("get_homing_duration_sec"), &DirectionalBullets2D::get_homing_duration_sec);
+	ClassDB::bind_method(D_METHOD("set_homing_duration_sec", "value"), &DirectionalBullets2D::set_homing_duration_sec);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "homing_duration_sec"), "set_homing_duration_sec", "get_homing_duration_sec");
+
+	ClassDB::bind_method(D_METHOD("get_homing_lose_range_px"), &DirectionalBullets2D::get_homing_lose_range_px);
+	ClassDB::bind_method(D_METHOD("set_homing_lose_range_px", "value"), &DirectionalBullets2D::set_homing_lose_range_px);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "homing_lose_range_px"), "set_homing_lose_range_px", "get_homing_lose_range_px");
+
+	ClassDB::bind_method(D_METHOD("get_is_wobble_enabled"), &DirectionalBullets2D::get_is_wobble_enabled);
 
 	// ORBITING RELATED
 

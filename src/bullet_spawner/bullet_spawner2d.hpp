@@ -94,7 +94,13 @@ class BulletSpawner2D : public Node2D{
             TRANSFORMS_FROM_HELPER_RAIN,
             TRANSFORMS_FROM_HELPER_SCATTER,
             TRANSFORMS_FROM_HELPER_POLYGON,
-            TRANSFORMS_FROM_HELPER_MULTISPIRAL
+            TRANSFORMS_FROM_HELPER_MULTISPIRAL,
+            TRANSFORMS_FROM_HELPER_CROSS,
+            TRANSFORMS_FROM_HELPER_STAR,
+            TRANSFORMS_FROM_HELPER_HEART,
+            TRANSFORMS_FROM_HELPER_WAVE,
+            TRANSFORMS_FROM_HELPER_WATERFALL,
+            TRANSFORMS_FROM_HELPER_LATTICE
         };
 
         // How the spin angle evolves. CONTINUOUS rotates forever at
@@ -310,6 +316,57 @@ class BulletSpawner2D : public Node2D{
         double helper_multispiral_facing_offset_deg = 0.0;
         int helper_multispiral_arm_stride = 1;
 
+        // CROSS (plus/X barrage: rays from the marker).
+        int helper_cross_arm_count = 4;
+        double helper_cross_arm_length = 150.0;
+        double helper_cross_spacing = 32.0;
+        double helper_cross_base_rotation = 0.0;
+        bool helper_cross_face_outward = true;
+        double helper_cross_facing_offset_deg = 0.0;
+
+        // STAR (true star shell: alternating outer/inner vertices).
+        int helper_star_points = 5;
+        double helper_star_outer_radius = 150.0;
+        double helper_star_inner_radius = 65.0;
+        double helper_star_base_rotation = 0.0;
+        bool helper_star_face_outward = true;
+        double helper_star_facing_offset_deg = 0.0;
+
+        // HEART (parametric heart bloom for boss love attacks).
+        double helper_heart_size = 150.0;
+        double helper_heart_base_rotation = 0.0;
+        bool helper_heart_face_outward = true;
+        double helper_heart_facing_offset_deg = 0.0;
+
+        // WAVE (snake row along a sine wave).
+        double helper_wave_width = 600.0;
+        double helper_wave_amplitude = 48.0;
+        double helper_wave_waves = 2.0;
+        Vector2 helper_wave_direction = Vector2(1, 0);
+        bool helper_wave_face_direction = true;
+        double helper_wave_facing_offset_deg = 0.0;
+
+        // WATERFALL (staggered curtain grid).
+        int helper_waterfall_columns = 12;
+        double helper_waterfall_column_spacing = 48.0;
+        int helper_waterfall_rows = 3;
+        double helper_waterfall_row_spacing = 64.0;
+        double helper_waterfall_stagger = 0.5;
+        Vector2 helper_waterfall_rain_direction = Vector2(0, 1);
+        double helper_waterfall_jitter = 6.0;
+
+        // LATTICE (staggered honeycomb for TD walls).
+        int helper_lattice_columns = 8;
+        int helper_lattice_rows = 5;
+        double helper_lattice_spacing_x = 48.0;
+        double helper_lattice_spacing_y = 42.0;
+        bool helper_lattice_stagger_rows = true;
+        bool helper_lattice_face_outward = true;
+        double helper_lattice_facing_offset_deg = 0.0;
+
+        // NEGATIVE SPACE (skip slots by index: dodge doors, bullet text).
+        PackedInt32Array helper_skip_indices;
+
         // BURST (multi-volley danmaku phrasing: N shots per trigger).
         bool burst_enabled = false;
         // Shots per trigger. Must stay >= 1.
@@ -392,6 +449,21 @@ class BulletSpawner2D : public Node2D{
             HOMING_SOURCE_NODE_CHILDREN // chase Node2D children of homing_children_parent_path
         };
 
+        // How homing picks among candidates. PRIORITY_* presets build the
+        // scoring automatically (see HomingTargetPriority); CUSTOM respects
+        // the user Callable. FIRST/LAST read each candidate's "progress"
+        // (path followers), STRONGEST/WEAKEST read "hp", FASTEST reads
+        // get_velocity().length(). Missing data falls back to nearest.
+        enum HomingTargetPriority {
+            HOMING_PRIORITY_NEAREST = 0,
+            HOMING_PRIORITY_FIRST,
+            HOMING_PRIORITY_LAST,
+            HOMING_PRIORITY_STRONGEST,
+            HOMING_PRIORITY_WEAKEST,
+            HOMING_PRIORITY_FASTEST,
+            HOMING_PRIORITY_RANDOM,
+            HOMING_PRIORITY_CUSTOM
+        };
         // How homing_node_name is compared against node names (node-name source).
         enum HomingNodeNameMatch {
             HOMING_NAME_MATCH_EXACT = 0, // "Player" matches only "Player"
@@ -426,6 +498,26 @@ class BulletSpawner2D : public Node2D{
         // targets that are ALSO in this group are kept. Empty = no filtering.
         StringName homing_filter_group;
         HomingTargetSelection homing_target_selection = HOMING_SELECT_NEAREST;
+        // Tower-defense priority preset: builds scoring automatically without
+        // GDScript (see the enum docs). CUSTOM keeps the user Callable.
+        HomingTargetPriority homing_target_priority = HOMING_PRIORITY_NEAREST;
+        // Seconds of straight flight before volley steering starts (0 = steer
+        // immediately). Must stay finite and >= 0.
+        double homing_delay_sec = 0.0;
+        // Seconds of steering before volleys fly straight (0 = infinite).
+        // Must stay finite and >= 0.
+        double homing_duration_sec = 0.0;
+        // Steering pauses beyond this distance from the target (0 = unlimited).
+        // Must stay finite and >= 0.
+        double homing_lose_range_px = 0.0;
+        // Turret cone: volleys whose aim deviates more than half this from the
+        // target bearing are skipped when homing_fire_requires_target is on
+        // (0 = omnidirectional). Must stay finite and >= 0.
+        double homing_fire_arc_deg = 0.0;
+        // Reload jitter: each auto volley waits shoot_interval_sec +/-
+        // random * reload_jitter_sec (seeded by pattern_seed). 0 = exact.
+        // Must stay finite and >= 0.
+        double reload_jitter_sec = 0.0;
         // How many targets enter the queue (1 = classic single-target homing).
         // Only the multi-target sources (node group, node name) use it.
         // Must stay >= 1 (setter rejects the rest).
@@ -731,8 +823,101 @@ class BulletSpawner2D : public Node2D{
         void set_helper_multispiral_facing_offset_deg(double value);
         int get_helper_multispiral_arm_stride() const;
         void set_helper_multispiral_arm_stride(int value);
+        int get_helper_cross_arm_count() const;
+        void set_helper_cross_arm_count(int value);
+        double get_helper_cross_arm_length() const;
+        void set_helper_cross_arm_length(double value);
+        double get_helper_cross_spacing() const;
+        void set_helper_cross_spacing(double value);
+        double get_helper_cross_base_rotation() const;
+        void set_helper_cross_base_rotation(double value);
+        bool get_helper_cross_face_outward() const;
+        void set_helper_cross_face_outward(bool value);
+        double get_helper_cross_facing_offset_deg() const;
+        void set_helper_cross_facing_offset_deg(double value);
+        int get_helper_star_points() const;
+        void set_helper_star_points(int value);
+        double get_helper_star_outer_radius() const;
+        void set_helper_star_outer_radius(double value);
+        double get_helper_star_inner_radius() const;
+        void set_helper_star_inner_radius(double value);
+        double get_helper_star_base_rotation() const;
+        void set_helper_star_base_rotation(double value);
+        bool get_helper_star_face_outward() const;
+        void set_helper_star_face_outward(bool value);
+        double get_helper_star_facing_offset_deg() const;
+        void set_helper_star_facing_offset_deg(double value);
+        double get_helper_heart_size() const;
+        void set_helper_heart_size(double value);
+        double get_helper_heart_base_rotation() const;
+        void set_helper_heart_base_rotation(double value);
+        bool get_helper_heart_face_outward() const;
+        void set_helper_heart_face_outward(bool value);
+        double get_helper_heart_facing_offset_deg() const;
+        void set_helper_heart_facing_offset_deg(double value);
+        double get_helper_wave_width() const;
+        void set_helper_wave_width(double value);
+        double get_helper_wave_amplitude() const;
+        void set_helper_wave_amplitude(double value);
+        double get_helper_wave_waves() const;
+        void set_helper_wave_waves(double value);
+        Vector2 get_helper_wave_direction() const;
+        void set_helper_wave_direction(const Vector2 &value);
+        bool get_helper_wave_face_direction() const;
+        void set_helper_wave_face_direction(bool value);
+        double get_helper_wave_facing_offset_deg() const;
+        void set_helper_wave_facing_offset_deg(double value);
+        int get_helper_waterfall_columns() const;
+        void set_helper_waterfall_columns(int value);
+        double get_helper_waterfall_column_spacing() const;
+        void set_helper_waterfall_column_spacing(double value);
+        int get_helper_waterfall_rows() const;
+        void set_helper_waterfall_rows(int value);
+        double get_helper_waterfall_row_spacing() const;
+        void set_helper_waterfall_row_spacing(double value);
+        double get_helper_waterfall_stagger() const;
+        void set_helper_waterfall_stagger(double value);
+        Vector2 get_helper_waterfall_rain_direction() const;
+        void set_helper_waterfall_rain_direction(const Vector2 &value);
+        double get_helper_waterfall_jitter() const;
+        void set_helper_waterfall_jitter(double value);
+        int get_helper_lattice_columns() const;
+        void set_helper_lattice_columns(int value);
+        int get_helper_lattice_rows() const;
+        void set_helper_lattice_rows(int value);
+        double get_helper_lattice_spacing_x() const;
+        void set_helper_lattice_spacing_x(double value);
+        double get_helper_lattice_spacing_y() const;
+        void set_helper_lattice_spacing_y(double value);
+        bool get_helper_lattice_stagger_rows() const;
+        void set_helper_lattice_stagger_rows(bool value);
+        bool get_helper_lattice_face_outward() const;
+        void set_helper_lattice_face_outward(bool value);
+        double get_helper_lattice_facing_offset_deg() const;
+        void set_helper_lattice_facing_offset_deg(double value);
+        PackedInt32Array get_helper_skip_indices() const;
+        void set_helper_skip_indices(const PackedInt32Array &value);
+        HomingTargetPriority get_homing_target_priority() const;
+        void set_homing_target_priority(HomingTargetPriority value);
+        double get_homing_delay_sec() const;
+        void set_homing_delay_sec(double value);
+        double get_homing_duration_sec() const;
+        void set_homing_duration_sec(double value);
+        double get_homing_lose_range_px() const;
+        void set_homing_lose_range_px(double value);
+        double get_homing_fire_arc_deg() const;
+        void set_homing_fire_arc_deg(double value);
+        double get_reload_jitter_sec() const;
+        void set_reload_jitter_sec(double value);
         // One-call preset fill (see BulletFactory2D::PatternPreset).
         void apply_pattern_preset(int preset);
+        // Sequencer: queue pattern entries, then fire them in order
+        // (interval apart) or all at once. Returns entries queued.
+        int spawn_pattern_list(const Array &entries, bool simultaneous = false, double interval_sec = 0.25);
+        void stop_pattern_list();
+        bool is_pattern_list_active() const;
+        // Next auto-shot interval with reload jitter applied.
+        double next_shoot_interval_sec() const;
         // Live introspection for waves, budgets and debug.
         int get_burst_shots_left() const;
         int get_active_live_bullet_count() const;
@@ -1020,6 +1205,17 @@ class BulletSpawner2D : public Node2D{
         // as a flag only (transforms re-collect at fire time, so markers that
         // move during the warning still aim correctly).
         bool telegraph_pending = false;
+        // Pattern sequencer (BLAST-style spawn_list): queued entries fired in
+        // order (interval apart) or all at once. Runtime state, never stored.
+        // Each entry is a Dictionary: { "transforms_source": int,
+        // "helper_bullets_amount": int, "spawn_data": Ref, "preset": int }.
+        // Only set keys override the live spawner for that shot.
+        Array pattern_list_entries;
+        bool pattern_list_simultaneous = false;
+        double pattern_list_interval_sec = 0.25;
+        int pattern_list_cursor = 0;
+        double pattern_list_time_left = 0.0;
+        bool pattern_list_active = false;
         // Preview source tracking: dirty-check state for the live-refresh loop.
         // Only instance ids + global transforms are stored - never assumed
         // alive. Every access goes through is_tracked_node_alive() first, so
@@ -1113,6 +1309,14 @@ class BulletSpawner2D : public Node2D{
         // hookup, and live-volley tracking. Called from shoot_once() before
         // volley_fired so handlers observe fully configured bullets.
         void apply_volley_homing_and_orbiting(DirectionalBullets2D *bullets);
+        // Sequencer internals: validates one Dictionary entry (preset /
+        // source / amount / spawn_data overrides) and fires the next queued
+        // entry for the _process driver.
+        bool apply_pattern_list_entry(const Variant &entry);
+        void fire_pattern_list_entry();
+        // Turret cone check: true when any resolved target sits within half
+        // the fire arc of the spawner's facing. 0 arc = omnidirectional.
+        bool fire_arc_covers_targets(const Array &targets) const;
 
 
 
@@ -1126,4 +1330,5 @@ VARIANT_ENUM_CAST(BlastBullets2D::BulletSpawner2D::HomingMode);
 VARIANT_ENUM_CAST(BlastBullets2D::BulletSpawner2D::HomingTargetSource);
 VARIANT_ENUM_CAST(BlastBullets2D::BulletSpawner2D::HomingNodeNameMatch);
 VARIANT_ENUM_CAST(BlastBullets2D::BulletSpawner2D::HomingTargetSelection);
+VARIANT_ENUM_CAST(BlastBullets2D::BulletSpawner2D::HomingTargetPriority);
 VARIANT_ENUM_CAST(BlastBullets2D::BulletSpawner2D::HomingRetargetMode);

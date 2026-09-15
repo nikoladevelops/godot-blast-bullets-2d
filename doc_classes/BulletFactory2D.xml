@@ -293,6 +293,98 @@
 				Generates a multi-arm spiral: [code]arms[/code] interleaved arms around the marker (galaxy, windmill and rose looks at low bullet counts). [code]arm_index_stride[/code] 1 interleaves consecutive slots across arms, higher values group slots per arm. Same facing modes as the single spiral. Useful for pinwheels, galaxies and rotating boss arms.
 			</description>
 		</method>
+		<method name="helper_apply_skip_indices" qualifiers="static">
+			<return type="Transform2D[]" />
+			<param index="0" name="transforms" type="Transform2D[]" />
+			<param index="1" name="skip_indices" type="PackedInt32Array" />
+			<description>
+				Drops slot indexes from a generated array (dodge doors, bullet text). Out-of-range entries are ignored with one warning; the output shrinks. The spawner applies this automatically via helper_skip_indices.
+			</description>
+		</method>
+		<method name="helper_generate_transforms_cross" qualifiers="static">
+			<return type="Transform2D[]" />
+			<param index="0" name="transforms_amount" type="int" />
+			<param index="1" name="marker_transform" type="Transform2D" />
+			<param index="2" name="arm_count" type="int" default="4" />
+			<param index="3" name="arm_length" type="float" default="150.0" />
+			<param index="4" name="spacing" type="float" default="32.0" />
+			<param index="5" name="base_rotation" type="float" default="0.0" />
+			<param index="6" name="face_outward" type="bool" default="true" />
+			<param index="7" name="facing_offset_degrees" type="float" default="0.0" />
+			<description>
+				Generates a cross/plus barrage: arm_count rays of evenly spaced slots from the marker out to arm_length. Tower-defense crossfire and plus-shaped danmaku bursts.
+			</description>
+		</method>
+		<method name="helper_generate_transforms_star" qualifiers="static">
+			<return type="Transform2D[]" />
+			<param index="0" name="transforms_amount" type="int" />
+			<param index="1" name="marker_transform" type="Transform2D" />
+			<param index="2" name="points" type="int" default="5" />
+			<param index="3" name="outer_radius" type="float" default="150.0" />
+			<param index="4" name="inner_radius" type="float" default="65.0" />
+			<param index="5" name="base_rotation" type="float" default="0.0" />
+			<param index="6" name="face_outward" type="bool" default="true" />
+			<param index="7" name="facing_offset_degrees" type="float" default="0.0" />
+			<description>
+				Generates a true star shell: points alternating outer/inner vertices around the marker (distinct from the polygon helper's density bias). Boss star bursts and celebratory shells.
+			</description>
+		</method>
+		<method name="helper_generate_transforms_heart" qualifiers="static">
+			<return type="Transform2D[]" />
+			<param index="0" name="transforms_amount" type="int" />
+			<param index="1" name="marker_transform" type="Transform2D" />
+			<param index="2" name="size" type="float" default="150.0" />
+			<param index="3" name="base_rotation" type="float" default="0.0" />
+			<param index="4" name="face_outward" type="bool" default="true" />
+			<param index="5" name="facing_offset_degrees" type="float" default="0.0" />
+			<description>
+				Generates a parametric heart outline (classic 16sin^3 curve) scaled by size. Boss love attacks and ending cards.
+			</description>
+		</method>
+		<method name="helper_generate_transforms_wave" qualifiers="static">
+			<return type="Transform2D[]" />
+			<param index="0" name="transforms_amount" type="int" />
+			<param index="1" name="marker_transform" type="Transform2D" />
+			<param index="2" name="width" type="float" default="600.0" />
+			<param index="3" name="amplitude" type="float" default="48.0" />
+			<param index="4" name="waves" type="float" default="2.0" />
+			<param index="5" name="direction" type="Vector2" default="Vector2(1, 0)" />
+			<param index="6" name="face_direction" type="bool" default="true" />
+			<param index="7" name="facing_offset_degrees" type="float" default="0.0" />
+			<description>
+				Generates a snake row along a sine wave of width, amplitude and wave count around the marker axis. Pairs with wobble flight for slithering curtains.
+			</description>
+		</method>
+		<method name="helper_generate_transforms_waterfall" qualifiers="static">
+			<return type="Transform2D[]" />
+			<param index="0" name="transforms_amount" type="int" />
+			<param index="1" name="marker_transform" type="Transform2D" />
+			<param index="2" name="columns" type="int" default="12" />
+			<param index="3" name="column_spacing" type="float" default="48.0" />
+			<param index="4" name="rows" type="int" default="3" />
+			<param index="5" name="row_spacing" type="float" default="64.0" />
+			<param index="6" name="stagger" type="float" default="0.5" />
+			<param index="7" name="rain_direction" type="Vector2" default="Vector2(0, 1)" />
+			<param index="8" name="jitter" type="float" default="6.0" />
+			<description>
+				Generates a staggered waterfall curtain: columns by rows grid with per-row stagger offsets and jitter, firing along rain_direction. Combine with skip indices for readable doors.
+			</description>
+		</method>
+		<method name="helper_generate_transforms_lattice" qualifiers="static">
+			<return type="Transform2D[]" />
+			<param index="0" name="transforms_amount" type="int" />
+			<param index="1" name="marker_transform" type="Transform2D" />
+			<param index="2" name="columns" type="int" default="8" />
+			<param index="3" name="rows" type="int" default="5" />
+			<param index="4" name="spacing_x" type="float" default="48.0" />
+			<param index="5" name="spacing_y" type="float" default="42.0" />
+			<param index="6" name="stagger_rows" type="bool" default="true" />
+			<param index="7" name="face_outward" type="bool" default="true" />
+			<param index="8" name="facing_offset_degrees" type="float" default="0.0" />
+			<description>
+				Generates a staggered honeycomb lattice for tower-defense walls and geometric curtains.
+			</description>
+		</method>
 		<method name="populate_attachments_pool">
 			<return type="void" />
 			<param index="0" name="attachment_scene" type="PackedScene" />

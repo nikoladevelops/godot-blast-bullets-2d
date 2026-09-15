@@ -94,7 +94,17 @@ public:
 		PATTERN_PRESET_WALL_GAPS,
 		PATTERN_PRESET_RAIN,
 		PATTERN_PRESET_FLOWER_6,
-		PATTERN_PRESET_SCATTER_BURST
+		PATTERN_PRESET_SCATTER_BURST,
+		PATTERN_PRESET_CROSS_BURST,
+		PATTERN_PRESET_STAR_SHELL,
+		PATTERN_PRESET_HEART_BLOOM,
+		PATTERN_PRESET_SNAKE_WAVE,
+		PATTERN_PRESET_WATERFALL_CURTAIN,
+		PATTERN_PRESET_PETAL_STORM,
+		PATTERN_PRESET_TWIN_SPIRAL_COUNTER,
+		PATTERN_PRESET_AIMED_TRAP,
+		PATTERN_PRESET_TD_RING_GUARD,
+		PATTERN_PRESET_BLOSSOM_FINALE
 	};
 
 	// Whether the factory is currently busy doing something important and it can't handle any other requests
@@ -969,6 +979,88 @@ public:
 			SpiralFacingMode facing_mode = SPIRAL_FACING_TANGENT,
 			real_t facing_offset_degrees = 0.0,
 			int arm_index_stride = 1);
+
+	// Cross/plus barrage: arm_count rays of evenly spaced slots from the
+	// marker out to arm_length. Tower-defense crossfire and plus-shaped
+	// danmaku bursts.
+	static TypedArray<Transform2D> helper_generate_transforms_cross(
+			int transforms_amount,
+			Transform2D marker_transform,
+			int arm_count = 4,
+			real_t arm_length = 150.0,
+			real_t spacing = 32.0,
+			real_t base_rotation = 0.0,
+			bool face_outward = true,
+			real_t facing_offset_degrees = 0.0);
+
+	// True star shell: points alternating outer/inner vertices around the
+	// marker (distinct from the polygon helper's density bias). Boss star
+	// bursts and celebratory shells.
+	static TypedArray<Transform2D> helper_generate_transforms_star(
+			int transforms_amount,
+			Transform2D marker_transform,
+			int points = 5,
+			real_t outer_radius = 150.0,
+			real_t inner_radius = 65.0,
+			real_t base_rotation = 0.0,
+			bool face_outward = true,
+			real_t facing_offset_degrees = 0.0);
+
+	// Heart bloom: parametric heart outline (boss love attacks, endings).
+	// size scales the classic 16sin^3 / 13cos-5cos2t curve.
+	static TypedArray<Transform2D> helper_generate_transforms_heart(
+			int transforms_amount,
+			Transform2D marker_transform,
+			real_t size = 150.0,
+			real_t base_rotation = 0.0,
+			bool face_outward = true,
+			real_t facing_offset_degrees = 0.0);
+
+	// Snake row: slots along a sine wave of width, amplitude and wave count
+	// around the marker axis (direction need not be normalized). Pairs with
+	// wobble flight for slithering curtains.
+	static TypedArray<Transform2D> helper_generate_transforms_wave(
+			int transforms_amount,
+			Transform2D marker_transform,
+			real_t width = 600.0,
+			real_t amplitude = 48.0,
+			real_t waves = 2.0,
+			Vector2 direction = Vector2(1, 0),
+			bool face_direction = true,
+			real_t facing_offset_degrees = 0.0);
+
+	// Waterfall curtain: staggered rows x columns grid with per-row stagger
+	// offsets and jitter (danmaku curtains with readable doors when combined
+	// with skip_indices). Fires along rain_direction.
+	static TypedArray<Transform2D> helper_generate_transforms_waterfall(
+			int transforms_amount,
+			Transform2D marker_transform,
+			int columns = 12,
+			real_t column_spacing = 48.0,
+			int rows = 3,
+			real_t row_spacing = 64.0,
+			real_t stagger = 0.5,
+			Vector2 rain_direction = Vector2(0, 1),
+			real_t jitter = 6.0);
+
+	// Lattice honeycomb: staggered hex-style rows for tower-defense walls.
+	static TypedArray<Transform2D> helper_generate_transforms_lattice(
+			int transforms_amount,
+			Transform2D marker_transform,
+			int columns = 8,
+			int rows = 5,
+			real_t spacing_x = 48.0,
+			real_t spacing_y = 42.0,
+			bool stagger_rows = true,
+			bool face_outward = true,
+			real_t facing_offset_degrees = 0.0);
+
+	// Negative space: drops slot indexes from a generated array (carve dodge
+	// doors, write bullet text). Out-of-range entries are ignored with a
+	// single warning; the output shrinks like ELLIPSE_WALL.
+	static TypedArray<Transform2D> helper_apply_skip_indices(
+			const TypedArray<Transform2D> &transforms,
+			const PackedInt32Array &skip_indices);
 };
 } //namespace BlastBullets2D
 

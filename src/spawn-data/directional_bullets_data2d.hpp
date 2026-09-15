@@ -3,6 +3,7 @@
 #include "../shared/bullet_curves_data2d.hpp"
 #include "../shared/bullet_rotation_data2d.hpp"
 #include "../shared/bullet_speed_data2d.hpp"
+#include "../shared/bullet_wobble_data2d.hpp"
 #include "./multimesh_bullets_data2d.hpp"
 
 #include "godot_cpp/variant/node_path.hpp"
@@ -77,6 +78,27 @@ public:
 	// Per-bullet repeat flags for the curves above.
 	TypedArray<bool> all_bullet_movement_pattern_repeats;
 
+	// WOBBLE (sine/cos flight modulation; editor-friendly danmaku staple).
+	// Shared wobble applied to every bullet at spawn/enable time, taking
+	// precedence over all_bullet_wobble_data when set and enabled. Null
+	// (default) disables the feature and the array drives instead.
+	Ref<BulletWobbleData2D> shared_bullet_wobble_data;
+
+	// Per-bullet wobble applied at spawn/enable time through the per-bullet
+	// machinery (same fallback rule as speed data: empty = off, size ==
+	// amount = per bullet, otherwise the first entry drives all bullets).
+	// Null entries and entries with enabled = false are skipped per bullet.
+	TypedArray<BulletWobbleData2D> all_bullet_wobble_data;
+
+	// GRAVITY / DRAG (2D sideview + tower-defense shells).
+	// Constant acceleration added to every bullet each tick (px/s^2).
+	// (0, 0) disables. Must stay finite.
+	Vector2 gravity = Vector2(0, 0);
+
+	// Linear drag applied to speed each tick: speed -= speed * drag * delta.
+	// 0 disables. Must stay finite and >= 0.
+	double linear_drag = 0.0;
+
 	// HOMING STEERING (spawn-time seed; every value below also exists as a
 	// live DirectionalBullets2D setter for runtime tuning). Pool reuse
 	// re-seeds these on every enable, so direct BulletFactory2D.spawn_* users
@@ -103,6 +125,19 @@ public:
 
 	// Shared queue: one deferred pop when any bullet reaches the front target.
 	bool shared_homing_deque_auto_pop_after_target_reached = false;
+
+	// When > 0, homing steering only begins after this many seconds of
+	// straight flight (classic aimed-then-homing). Must stay finite and >= 0.
+	double homing_delay_sec = 0.0;
+
+	// When > 0, homing steering stops after this many seconds (lets fast
+	// players escape). 0 = infinite. Must stay finite and >= 0.
+	double homing_duration_sec = 0.0;
+
+	// When > 0, homing steering pauses while the bullet is farther than this
+	// from its target (BLAST-style homing range). 0 = unlimited.
+	// Must stay finite and >= 0.
+	double homing_lose_range_px = 0.0;
 
 	double get_homing_smoothing() const;
 	void set_homing_smoothing(double value);
@@ -157,6 +192,27 @@ public:
 
 	TypedArray<bool> get_all_bullet_movement_pattern_repeats() const;
 	void set_all_bullet_movement_pattern_repeats(const TypedArray<bool> &new_flags);
+
+	Ref<BulletWobbleData2D> get_shared_bullet_wobble_data() const;
+	void set_shared_bullet_wobble_data(const Ref<BulletWobbleData2D> &new_wobble_data);
+
+	TypedArray<BulletWobbleData2D> get_all_bullet_wobble_data() const;
+	void set_all_bullet_wobble_data(const TypedArray<BulletWobbleData2D> &new_data);
+
+	Vector2 get_gravity() const;
+	void set_gravity(const Vector2 &value);
+
+	double get_linear_drag() const;
+	void set_linear_drag(double value);
+
+	double get_homing_delay_sec() const;
+	void set_homing_delay_sec(double value);
+
+	double get_homing_duration_sec() const;
+	void set_homing_duration_sec(double value);
+
+	double get_homing_lose_range_px() const;
+	void set_homing_lose_range_px(double value);
 
 protected:
 	static void _bind_methods();

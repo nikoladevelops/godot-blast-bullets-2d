@@ -145,6 +145,75 @@ void DirectionalBulletsData2D::set_shared_homing_deque_auto_pop_after_target_rea
 	shared_homing_deque_auto_pop_after_target_reached = value;
 }
 
+Ref<BulletWobbleData2D> DirectionalBulletsData2D::get_shared_bullet_wobble_data() const {
+	return shared_bullet_wobble_data;
+}
+void DirectionalBulletsData2D::set_shared_bullet_wobble_data(const Ref<BulletWobbleData2D> &new_wobble_data) {
+	shared_bullet_wobble_data = new_wobble_data;
+}
+
+TypedArray<BulletWobbleData2D> DirectionalBulletsData2D::get_all_bullet_wobble_data() const {
+	return all_bullet_wobble_data;
+}
+void DirectionalBulletsData2D::set_all_bullet_wobble_data(const TypedArray<BulletWobbleData2D> &new_data) {
+	all_bullet_wobble_data = new_data;
+}
+
+Vector2 DirectionalBulletsData2D::get_gravity() const {
+	return gravity;
+}
+void DirectionalBulletsData2D::set_gravity(const Vector2 &value) {
+	if (!value.is_finite()) {
+		UtilityFunctions::push_error("DirectionalBulletsData2D: gravity must be finite, keeping the old value.");
+		return;
+	}
+	gravity = value;
+}
+
+double DirectionalBulletsData2D::get_linear_drag() const {
+	return linear_drag;
+}
+void DirectionalBulletsData2D::set_linear_drag(double value) {
+	if (!Math::is_finite(value) || value < 0.0) {
+		UtilityFunctions::push_error("DirectionalBulletsData2D: linear_drag must be finite and >= 0, keeping the old value.");
+		return;
+	}
+	linear_drag = value;
+}
+
+double DirectionalBulletsData2D::get_homing_delay_sec() const {
+	return homing_delay_sec;
+}
+void DirectionalBulletsData2D::set_homing_delay_sec(double value) {
+	if (!Math::is_finite(value) || value < 0.0) {
+		UtilityFunctions::push_error("DirectionalBulletsData2D: homing_delay_sec must be finite and >= 0, keeping the old value.");
+		return;
+	}
+	homing_delay_sec = value;
+}
+
+double DirectionalBulletsData2D::get_homing_duration_sec() const {
+	return homing_duration_sec;
+}
+void DirectionalBulletsData2D::set_homing_duration_sec(double value) {
+	if (!Math::is_finite(value) || value < 0.0) {
+		UtilityFunctions::push_error("DirectionalBulletsData2D: homing_duration_sec must be finite and >= 0 (0 = infinite), keeping the old value.");
+		return;
+	}
+	homing_duration_sec = value;
+}
+
+double DirectionalBulletsData2D::get_homing_lose_range_px() const {
+	return homing_lose_range_px;
+}
+void DirectionalBulletsData2D::set_homing_lose_range_px(double value) {
+	if (!Math::is_finite(value) || value < 0.0) {
+		UtilityFunctions::push_error("DirectionalBulletsData2D: homing_lose_range_px must be finite and >= 0 (0 = unlimited), keeping the old value.");
+		return;
+	}
+	homing_lose_range_px = value;
+}
+
 void DirectionalBulletsData2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_all_bullet_speed_data"), &DirectionalBulletsData2D::get_all_bullet_speed_data);
 	ClassDB::bind_method(D_METHOD("set_all_bullet_speed_data", "new_data"), &DirectionalBulletsData2D::set_all_bullet_speed_data);
@@ -217,5 +286,33 @@ void DirectionalBulletsData2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_shared_homing_deque_auto_pop_after_target_reached"), &DirectionalBulletsData2D::get_shared_homing_deque_auto_pop_after_target_reached);
 	ClassDB::bind_method(D_METHOD("set_shared_homing_deque_auto_pop_after_target_reached", "value"), &DirectionalBulletsData2D::set_shared_homing_deque_auto_pop_after_target_reached);
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "shared_homing_deque_auto_pop_after_target_reached"), "set_shared_homing_deque_auto_pop_after_target_reached", "get_shared_homing_deque_auto_pop_after_target_reached");
+
+	ClassDB::bind_method(D_METHOD("get_shared_bullet_wobble_data"), &DirectionalBulletsData2D::get_shared_bullet_wobble_data);
+	ClassDB::bind_method(D_METHOD("set_shared_bullet_wobble_data", "new_wobble_data"), &DirectionalBulletsData2D::set_shared_bullet_wobble_data);
+	ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "shared_bullet_wobble_data", PROPERTY_HINT_RESOURCE_TYPE, "BulletWobbleData2D"), "set_shared_bullet_wobble_data", "get_shared_bullet_wobble_data");
+
+	ClassDB::bind_method(D_METHOD("get_all_bullet_wobble_data"), &DirectionalBulletsData2D::get_all_bullet_wobble_data);
+	ClassDB::bind_method(D_METHOD("set_all_bullet_wobble_data", "new_data"), &DirectionalBulletsData2D::set_all_bullet_wobble_data);
+	ADD_PROPERTY(PropertyInfo(Variant::ARRAY, "all_bullet_wobble_data", PROPERTY_HINT_ARRAY_TYPE, "BulletWobbleData2D"), "set_all_bullet_wobble_data", "get_all_bullet_wobble_data");
+
+	ClassDB::bind_method(D_METHOD("get_gravity"), &DirectionalBulletsData2D::get_gravity);
+	ClassDB::bind_method(D_METHOD("set_gravity", "value"), &DirectionalBulletsData2D::set_gravity);
+	ADD_PROPERTY(PropertyInfo(Variant::VECTOR2, "gravity"), "set_gravity", "get_gravity");
+
+	ClassDB::bind_method(D_METHOD("get_linear_drag"), &DirectionalBulletsData2D::get_linear_drag);
+	ClassDB::bind_method(D_METHOD("set_linear_drag", "value"), &DirectionalBulletsData2D::set_linear_drag);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "linear_drag"), "set_linear_drag", "get_linear_drag");
+
+	ClassDB::bind_method(D_METHOD("get_homing_delay_sec"), &DirectionalBulletsData2D::get_homing_delay_sec);
+	ClassDB::bind_method(D_METHOD("set_homing_delay_sec", "value"), &DirectionalBulletsData2D::set_homing_delay_sec);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "homing_delay_sec"), "set_homing_delay_sec", "get_homing_delay_sec");
+
+	ClassDB::bind_method(D_METHOD("get_homing_duration_sec"), &DirectionalBulletsData2D::get_homing_duration_sec);
+	ClassDB::bind_method(D_METHOD("set_homing_duration_sec", "value"), &DirectionalBulletsData2D::set_homing_duration_sec);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "homing_duration_sec"), "set_homing_duration_sec", "get_homing_duration_sec");
+
+	ClassDB::bind_method(D_METHOD("get_homing_lose_range_px"), &DirectionalBulletsData2D::get_homing_lose_range_px);
+	ClassDB::bind_method(D_METHOD("set_homing_lose_range_px", "value"), &DirectionalBulletsData2D::set_homing_lose_range_px);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "homing_lose_range_px"), "set_homing_lose_range_px", "get_homing_lose_range_px");
 }
 } //namespace BlastBullets2D

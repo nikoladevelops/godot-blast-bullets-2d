@@ -942,6 +942,21 @@
 		<member name="homing_update_interval" type="float" setter="set_homing_update_interval" getter="get_homing_update_interval" default="0.0">
 			How often it should cache the position of the targets so that they can be re-used instead of fetching them every frame. Increase if you want to boost performance.
 		</member>
+		<member name="gravity" type="Vector2" setter="set_gravity" getter="get_gravity" default="Vector2(0, 0)">
+			Constant acceleration in px/s^2 added to every bullet each tick (2D sideview arcs, tower-defense shells). (0, 0) disables.
+		</member>
+		<member name="linear_drag" type="float" setter="set_linear_drag" getter="get_linear_drag" default="0.0">
+			Linear drag trimming speed each tick. 0 disables.
+		</member>
+		<member name="homing_delay_sec" type="float" setter="set_homing_delay_sec" getter="get_homing_delay_sec" default="0.0">
+			Seconds of straight flight before steering starts (classic aimed-then-homing). 0 steers immediately.
+		</member>
+		<member name="homing_duration_sec" type="float" setter="set_homing_duration_sec" getter="get_homing_duration_sec" default="0.0">
+			Seconds of steering before bullets fly straight (lets fast players escape). 0 is infinite.
+		</member>
+		<member name="homing_lose_range_px" type="float" setter="set_homing_lose_range_px" getter="get_homing_lose_range_px" default="0.0">
+			Steering pauses while the bullet is farther than this from its target. 0 is unlimited.
+		</member>
 		<member name="inherited_velocity_offset" type="Vector2" setter="set_inherited_velocity_offset" getter="get_inherited_velocity_offset" default="Vector2(0, 0)">
 			Use this for initial velocity when the bullets are supposed to inherit velocity from the emitter.
 		</member>

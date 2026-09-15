@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../shared/bullet_speed_data2d.hpp"
+#include "../shared/bullet_wobble_data2d.hpp"
 #include "../shared/homing_target_deque.hpp"
 #include "godot_cpp/classes/curve2d.hpp"
 #include "godot_cpp/classes/node2d.hpp"
@@ -181,6 +182,43 @@ protected:
 	// (already-seeded values persist - re-spawn or re-set to change them).
 	Ref<BulletSpeedData2D> shared_bullet_speed_data;
 	Ref<BulletRotationData2D> shared_bullet_rotation_data;
+
+	// WOBBLE (sine/cos flight modulation, seeded from spawn data; editable
+	// live below). Per-bullet entries resolve with the shared fallback rule
+	// (empty = off, size == amount = entry i, else first drives all); null
+	// entries and disabled entries are skipped per bullet. Shared wobble
+	// takes precedence when set and enabled. Phase seeds fan out per bullet
+	// (phase + step * i) so one resource makes snakes/petals, not sync waves.
+	struct WobbleSeed {
+		bool active = false;
+		int mode = 0;
+		real_t amplitude = 0.0;
+		real_t frequency_hz = 0.0;
+		real_t phase = 0.0;
+		bool distance_phased = false;
+		real_t damping_per_sec = 0.0;
+		real_t delay_sec = 0.0;
+		real_t duration_sec = 0.0;
+	};
+	std::vector<WobbleSeed> all_bullet_wobble;
+	bool is_wobble_feature_enabled = false;
+	// Per-bullet distance ledger for distance-phased wobble (same idea as
+	// the shared pattern ledger; time-phased wobble uses curves_elapsed_time).
+	std::vector<real_t> wobble_distance_traveled;
+
+	// GRAVITY / DRAG (seeded from spawn data; editable live below).
+	// Gravity is a constant acceleration in px/s^2; drag is a linear
+	// coefficient (speed -= speed * drag * delta). Both default to off.
+	Vector2 gravity = Vector2(0, 0);
+	real_t linear_drag = 0.0;
+
+	// HOMING GATING (seeded from spawn data; editable live below).
+	// delay = straight-flight seconds before steering starts; duration =
+	// seconds of steering before it stops (0 = infinite); lose_range =
+	// steering pauses beyond this distance from the target (0 = unlimited).
+	real_t homing_delay_sec = 0.0;
+	real_t homing_duration_sec = 0.0;
+	real_t homing_lose_range_px = 0.0;
 
 public:
 	// Advances one bullet along a movement-pattern curve for this tick.
@@ -542,6 +580,53 @@ public:
 			direction_got_updated = true;
 		}
 
+		// 2b. WOBBLE (sine/cos flight modulation). Lateral displaces the
+		// heading perpendicular to flight (snakes, weaves, curtains);
+		// angular oscillates the heading itself (corkscrews, petals).
+		// Runs on the analytic offset DELTA between frames (not the absolute
+		// offset) so pausing/teleporting never jumps the bullet. Disabled
+		// entries cost one bool check per bullet; fully disabled volleys
+		// skip the loop via the hoisted flag below.
+		if (is_wobble_feature_enabled && i >= 0 && i < (int)all_bullet_wobble.size() && all_bullet_wobble[i].active) {
+			const WobbleSeed &w = all_bullet_wobble[i];
+			const real_t t = (real_t)curves_elapsed_time;
+			bool in_window = t >= w.delay_sec && (w.duration_sec <= 0.0 || t < w.delay_sec + w.duration_sec);
+			if (in_window && w.frequency_hz >= 0.0 && w.amplitude >= 0.0) {
+				const real_t phase_base = w.distance_phased && i >= 0 && i < (int)wobble_distance_traveled.size()
+						? wobble_distance_traveled[i] * 0.02
+						: t;
+				const real_t damp = (w.damping_per_sec > 0.0 && t > w.delay_sec) ? (real_t)Math::exp(-(double)(w.damping_per_sec * (t - w.delay_sec))) : 1.0;
+				const real_t now_off = w.amplitude * damp * Math::sin(Math::TAU * w.frequency_hz * phase_base + w.phase);
+				const real_t prev_t = t - (real_t)delta;
+				const bool prev_in = prev_t >= w.delay_sec && (w.duration_sec <= 0.0 || prev_t < w.delay_sec + w.duration_sec);
+				real_t prev_off = 0.0;
+				if (prev_in && delta > 0.0) {
+					const real_t prev_base = w.distance_phased && i >= 0 && i < (int)wobble_distance_traveled.size()
+							? (wobble_distance_traveled[i] - (curr_bullet_direction * all_cached_speed[i]).length() * (real_t)delta) * 0.02
+							: prev_t;
+					const real_t prev_damp = (w.damping_per_sec > 0.0 && prev_t > w.delay_sec) ? (real_t)Math::exp(-(double)(w.damping_per_sec * (prev_t - w.delay_sec))) : 1.0;
+					prev_off = w.amplitude * prev_damp * Math::sin(Math::TAU * w.frequency_hz * prev_base + w.phase);
+				}
+				const real_t frame_delta = now_off - prev_off;
+				if (Math::is_finite(frame_delta) && Math::abs(frame_delta) > 0.00001) {
+					if (w.mode == 1) {
+						curr_bullet_direction = curr_bullet_direction.rotated(Math::deg_to_rad(frame_delta));
+						if (curr_bullet_direction.length_squared() < 0.00000001) {
+							curr_bullet_direction = Vector2(1, 0);
+						} else {
+							curr_bullet_direction = curr_bullet_direction.normalized();
+						}
+					} else {
+						if (curr_bullet_direction.length_squared() > 0.00000001) {
+							const Vector2 perp = Vector2(-curr_bullet_direction.y, curr_bullet_direction.x).normalized();
+							curr_bullet_direction = (curr_bullet_direction + perp * (frame_delta * 0.01)).normalized();
+						}
+					}
+					direction_got_updated = true;
+				}
+			}
+		}
+
 			// 3. ROTATION - shared sampled once before loop
 			if (shared_curves_rotation_curve_valid) {
 				all_rotation_speed[i] = shared_rotation_speed_val;
@@ -623,6 +708,16 @@ public:
 		// the ballistic step and the offset drifts the result (matches the
 		// documented velocity composition direction * speed + offset).
 		velocity_delta += inherited_velocity_offset * (real_t)delta;
+		// Gravity: constant world-space acceleration folded into the step
+		// (0.5 * g * dt^2 positional term; the velocity term lands in the
+		// speed/drag phase below through all_cached_velocity). Drag trims
+		// speed there. Distance-phased wobble measures true travel below.
+		if (gravity.length_squared() > 0.0) {
+			velocity_delta += gravity * (real_t)(0.5 * delta * delta);
+		}
+		if (is_wobble_feature_enabled && i >= 0 && i < (int)wobble_distance_traveled.size()) {
+			wobble_distance_traveled[i] += velocity_delta.length();
+		}
 
 			auto &curr_bullet_origin = all_cached_instance_origin[i];
 
@@ -846,13 +941,23 @@ public:
 			// directional freezes disabled bullets at their disable-time speed:
 			// per-bullet ballistics are individually owned here, so a wake
 			// resumes where that bullet left off (see enable_bullet).
+			// Gravity steers velocity directly (no uphill slowdown model here:
+			// speed magnitude stays ballistic, the step already curved above).
+			// Linear drag trims speed after curves/accel so TD shells decay.
 			if (shared_curves_acceleration_curve_valid) {
 				all_cached_speed[i] = shared_movement_speed_val;
-				all_cached_velocity[i] = all_cached_direction[i] * shared_movement_speed_val + inherited_velocity_offset;
+				all_cached_velocity[i] = all_cached_direction[i] * shared_movement_speed_val + inherited_velocity_offset + gravity * (real_t)delta;
 			} else if (is_per_bullet_curves_valid && per_bullet_curves_data->movement_speed_curve.is_valid()) {
 				bullet_accelerate_speed_using_curve(i, delta, per_bullet_curves_data);
 			} else {
 				bullet_accelerate_speed(i, delta);
+			}
+			if (linear_drag > 0.0 && Math::is_finite(linear_drag)) {
+				const real_t keep = Math::max((real_t)0.0, (real_t)1.0 - linear_drag * (real_t)delta);
+				all_cached_speed[i] *= keep;
+				all_cached_velocity[i] = all_cached_direction[i] * all_cached_speed[i] + inherited_velocity_offset + gravity * (real_t)delta;
+			} else if (gravity.length_squared() > 0.0) {
+				all_cached_velocity[i] = all_cached_direction[i] * all_cached_speed[i] + inherited_velocity_offset + gravity * (real_t)delta;
 			}
 		}
 		if (!is_using_physics_interpolation) {
@@ -2850,6 +2955,90 @@ public:
 	// separate so ordering between them is irrelevant.
 	void apply_per_bullet_curves_from_data(const DirectionalBulletsData2D &directional_data);
 	void apply_per_bullet_movement_patterns_from_data(const DirectionalBulletsData2D &directional_data);
+	void apply_wobble_from_data(const DirectionalBulletsData2D &directional_data);
+
+	// WOBBLE / GRAVITY / DRAG / HOMING-GATE RUNTIME API (spawn-data
+	// equivalents, editable live on the instance). Wobble entries resolve
+	// with the shared fallback rule; setters validate like spawn data.
+	WobbleSeed make_wobble_seed(const Ref<BulletWobbleData2D> &wobble, int bullet_index) const {
+		WobbleSeed seed;
+		BulletWobbleData2D *w = wobble.ptr();
+		if (w == nullptr || !w->enabled) {
+			return seed;
+		}
+		if (!Math::is_finite(w->amplitude) || w->amplitude < 0.0 || !Math::is_finite(w->frequency_hz) || w->frequency_hz < 0.0) {
+			return seed;
+		}
+		if (!Math::is_finite(w->phase_rad) || !Math::is_finite(w->phase_step_per_bullet) || !Math::is_finite(w->damping_per_sec) || w->damping_per_sec < 0.0) {
+			return seed;
+		}
+		if (!Math::is_finite(w->delay_sec) || w->delay_sec < 0.0 || !Math::is_finite(w->duration_sec) || w->duration_sec < 0.0) {
+			return seed;
+		}
+		seed.active = true;
+		seed.mode = (w->mode == BulletWobbleData2D::WOBBLE_ANGULAR) ? 1 : 0;
+		seed.amplitude = w->amplitude;
+		seed.frequency_hz = w->frequency_hz;
+		seed.phase = w->phase_rad + w->phase_step_per_bullet * (real_t)bullet_index;
+		seed.distance_phased = w->distance_phased;
+		seed.damping_per_sec = w->damping_per_sec;
+		seed.delay_sec = w->delay_sec;
+		seed.duration_sec = w->duration_sec;
+		return seed;
+	}
+	void refresh_wobble_feature_flag() {
+		is_wobble_feature_enabled = false;
+		for (const auto &w : all_bullet_wobble) {
+			if (w.active) {
+				is_wobble_feature_enabled = true;
+				break;
+			}
+		}
+		if (!is_wobble_feature_enabled) {
+			wobble_distance_traveled.assign(amount_bullets, 0.0);
+		}
+	}
+	bool get_is_wobble_enabled() const { return is_wobble_feature_enabled; }
+	Vector2 get_gravity() const { return gravity; }
+	void set_gravity(const Vector2 &value) {
+		if (!value.is_finite()) {
+			UtilityFunctions::push_error("DirectionalBullets2D.set_gravity: value must be finite, keeping the old value.");
+			return;
+		}
+		gravity = value;
+	}
+	real_t get_linear_drag() const { return linear_drag; }
+	void set_linear_drag(real_t value) {
+		if (!Math::is_finite(value) || value < 0.0) {
+			UtilityFunctions::push_error("DirectionalBullets2D.set_linear_drag: value must be finite and >= 0, keeping the old value.");
+			return;
+		}
+		linear_drag = value;
+	}
+	real_t get_homing_delay_sec() const { return homing_delay_sec; }
+	void set_homing_delay_sec(real_t value) {
+		if (!Math::is_finite(value) || value < 0.0) {
+			UtilityFunctions::push_error("DirectionalBullets2D.set_homing_delay_sec: value must be finite and >= 0, keeping the old value.");
+			return;
+		}
+		homing_delay_sec = value;
+	}
+	real_t get_homing_duration_sec() const { return homing_duration_sec; }
+	void set_homing_duration_sec(real_t value) {
+		if (!Math::is_finite(value) || value < 0.0) {
+			UtilityFunctions::push_error("DirectionalBullets2D.set_homing_duration_sec: value must be finite and >= 0 (0 = infinite), keeping the old value.");
+			return;
+		}
+		homing_duration_sec = value;
+	}
+	real_t get_homing_lose_range_px() const { return homing_lose_range_px; }
+	void set_homing_lose_range_px(real_t value) {
+		if (!Math::is_finite(value) || value < 0.0) {
+			UtilityFunctions::push_error("DirectionalBullets2D.set_homing_lose_range_px: value must be finite and >= 0 (0 = unlimited), keeping the old value.");
+			return;
+		}
+		homing_lose_range_px = value;
+	}
 
 	// SHARED MOVEMENT PATTERN RUNTIME API (spawn-data equivalent, editable live
 	// on the instance; per-bullet helpers stay in the base class). While a
@@ -3025,6 +3214,19 @@ protected:
 
 		real_t dist_sq = diff.length_squared();
 		if (dist_sq <= 0.0) {
+			return;
+		}
+
+		// Homing gating: delay (straight flight first), duration (escape
+		// window), lose-range (pause while too far). All cheap float
+		// compares; curves_elapsed_time is the volley clock.
+		if (homing_delay_sec > 0.0 && curves_elapsed_time < homing_delay_sec) {
+			return;
+		}
+		if (homing_duration_sec > 0.0 && curves_elapsed_time >= homing_delay_sec + homing_duration_sec) {
+			return;
+		}
+		if (homing_lose_range_px > 0.0 && dist_sq > homing_lose_range_px * homing_lose_range_px) {
 			return;
 		}
 

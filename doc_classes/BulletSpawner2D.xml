@@ -181,7 +181,34 @@
 			<return type="void" />
 			<param index="0" name="preset" type="int" enum="BulletFactory2D.PatternPreset" />
 			<description>
-				Fills the helper_* properties with a named starter pattern (radial dense/sparse, 3-arm spiral, narrow/wide aimed fan, slow ring, gap wall, rain, 6-petal flower, scatter burst) and switches transforms_source to match. Tunes from there; the preset only writes the properties, nothing fires. Custom (-1) does nothing.
+				Fills the helper_* properties with a named starter pattern (radial dense/sparse, 3-arm spiral, narrow/wide aimed fan, slow ring, gap wall, rain, 6-petal flower, scatter burst, cross burst, star shell, heart bloom, snake wave, waterfall curtain, petal storm, twin-spiral counter, aimed trap, TD ring guard, blossom finale) and switches transforms_source to match. Tunes from there; the preset only writes the properties, nothing fires. Custom (-1) does nothing.
+			</description>
+		</method>
+		<method name="spawn_pattern_list">
+			<return type="int" />
+			<param index="0" name="entries" type="Array" />
+			<param index="1" name="simultaneous" type="bool" />
+			<param index="2" name="interval_sec" type="float" />
+			<description>
+				Queues pattern entries (BLAST-style spawn_list): each entry is a Dictionary with optional "preset", "transforms_source", "helper_bullets_amount", "spawn_data" keys. Sequential mode (default) fires one entry per interval_sec through the guarded shoot path; simultaneous mode fires all at once. Returns entries queued (sequential) or volleys fired (simultaneous). Bad entries skip with an error, never abort the list. Emits pattern_list_finished when the queue drains.
+			</description>
+		</method>
+		<method name="stop_pattern_list">
+			<return type="void" />
+			<description>
+				Cancels the active pattern list (queued entries are dropped, fired volleys keep flying).
+			</description>
+		</method>
+		<method name="is_pattern_list_active" qualifiers="const">
+			<return type="bool" />
+			<description>
+				Whether a pattern list is currently queued/firing.
+			</description>
+		</method>
+		<method name="next_shoot_interval_sec" qualifiers="const">
+			<return type="float" />
+			<description>
+				Next auto-shot interval with reload jitter applied (shoot_interval_sec +/- jitter, seeded by pattern_seed). Poll for HUD reload bars.
 			</description>
 		</method>
 		<method name="get_burst_shots_left" qualifiers="const">
@@ -495,6 +522,117 @@
 		<member name="helper_multispiral_arm_stride" type="int" setter="set_helper_multispiral_arm_stride" getter="get_helper_multispiral_arm_stride" default="1">
 			1 interleaves consecutive slots across arms, higher values group slots per arm. Must be 1 or more.
 		</member>
+		<member name="helper_cross_arm_count" type="int" setter="set_helper_cross_arm_count" getter="get_helper_cross_arm_count" default="4">
+			Rays in the cross/plus barrage. Must be 1 or more.
+		</member>
+		<member name="helper_cross_arm_length" type="float" setter="set_helper_cross_arm_length" getter="get_helper_cross_arm_length" default="150.0">
+			How far each ray reaches from the marker. Must be finite and 0 or more.
+		</member>
+		<member name="helper_cross_spacing" type="float" setter="set_helper_cross_spacing" getter="get_helper_cross_spacing" default="32.0">
+			Spacing between slots along each ray. Must be finite and above zero.
+		</member>
+		<member name="helper_cross_base_rotation" type="float" setter="set_helper_cross_base_rotation" getter="get_helper_cross_base_rotation" default="0.0">
+			Base rotation of the cross in radians.
+		</member>
+		<member name="helper_cross_face_outward" type="bool" setter="set_helper_cross_face_outward" getter="get_helper_cross_face_outward" default="true">
+			Whether slots face away from the marker along their ray.
+		</member>
+		<member name="helper_cross_facing_offset_deg" type="float" setter="set_helper_cross_facing_offset_deg" getter="get_helper_cross_facing_offset_deg" default="0.0">
+			Extra facing twist in degrees.
+		</member>
+		<member name="helper_star_points" type="int" setter="set_helper_star_points" getter="get_helper_star_points" default="5">
+			Star points (alternating outer/inner vertices). Must be 2 or more.
+		</member>
+		<member name="helper_star_outer_radius" type="float" setter="set_helper_star_outer_radius" getter="get_helper_star_outer_radius" default="150.0">
+			Outer vertex radius. Must be finite and 0 or more.
+		</member>
+		<member name="helper_star_inner_radius" type="float" setter="set_helper_star_inner_radius" getter="get_helper_star_inner_radius" default="65.0">
+			Inner vertex radius. Must be finite and 0 or more.
+		</member>
+		<member name="helper_star_base_rotation" type="float" setter="set_helper_star_base_rotation" getter="get_helper_star_base_rotation" default="0.0">
+			Base rotation of the star in radians.
+		</member>
+		<member name="helper_star_face_outward" type="bool" setter="set_helper_star_face_outward" getter="get_helper_star_face_outward" default="true">
+			Whether slots face away from the marker.
+		</member>
+		<member name="helper_star_facing_offset_deg" type="float" setter="set_helper_star_facing_offset_deg" getter="get_helper_star_facing_offset_deg" default="0.0">
+			Extra facing twist in degrees.
+		</member>
+		<member name="helper_heart_size" type="float" setter="set_helper_heart_size" getter="get_helper_heart_size" default="150.0">
+			Heart outline size in pixels. Must be finite and above zero.
+		</member>
+		<member name="helper_heart_base_rotation" type="float" setter="set_helper_heart_base_rotation" getter="get_helper_heart_base_rotation" default="0.0">
+			Base rotation of the heart in radians.
+		</member>
+		<member name="helper_heart_face_outward" type="bool" setter="set_helper_heart_face_outward" getter="get_helper_heart_face_outward" default="true">
+			Whether slots face away from the heart center.
+		</member>
+		<member name="helper_heart_facing_offset_deg" type="float" setter="set_helper_heart_facing_offset_deg" getter="get_helper_heart_facing_offset_deg" default="0.0">
+			Extra facing twist in degrees.
+		</member>
+		<member name="helper_wave_width" type="float" setter="set_helper_wave_width" getter="get_helper_wave_width" default="600.0">
+			Snake row width in pixels. Must be finite and 0 or more.
+		</member>
+		<member name="helper_wave_amplitude" type="float" setter="set_helper_wave_amplitude" getter="get_helper_wave_amplitude" default="48.0">
+			Sine amplitude in pixels. Must be finite and 0 or more.
+		</member>
+		<member name="helper_wave_waves" type="float" setter="set_helper_wave_waves" getter="get_helper_wave_waves" default="2.0">
+			Wave count across the row. Must be finite and 0 or more.
+		</member>
+		<member name="helper_wave_direction" type="Vector2" setter="set_helper_wave_direction" getter="get_helper_wave_direction" default="Vector2(1, 0)">
+			Row axis (need not be normalized). Must be finite and non-zero.
+		</member>
+		<member name="helper_wave_face_direction" type="bool" setter="set_helper_wave_face_direction" getter="get_helper_wave_face_direction" default="true">
+			Whether slots face along the wave tangent.
+		</member>
+		<member name="helper_wave_facing_offset_deg" type="float" setter="set_helper_wave_facing_offset_deg" getter="get_helper_wave_facing_offset_deg" default="0.0">
+			Extra facing twist in degrees.
+		</member>
+		<member name="helper_waterfall_columns" type="int" setter="set_helper_waterfall_columns" getter="get_helper_waterfall_columns" default="12">
+			Curtain columns. Must be 1 or more.
+		</member>
+		<member name="helper_waterfall_column_spacing" type="float" setter="set_helper_waterfall_column_spacing" getter="get_helper_waterfall_column_spacing" default="48.0">
+			Horizontal spacing in pixels. Must be finite and 0 or more.
+		</member>
+		<member name="helper_waterfall_rows" type="int" setter="set_helper_waterfall_rows" getter="get_helper_waterfall_rows" default="3">
+			Curtain rows. Must be 1 or more.
+		</member>
+		<member name="helper_waterfall_row_spacing" type="float" setter="set_helper_waterfall_row_spacing" getter="get_helper_waterfall_row_spacing" default="64.0">
+			Row spacing in pixels. Must be finite and 0 or more.
+		</member>
+		<member name="helper_waterfall_stagger" type="float" setter="set_helper_waterfall_stagger" getter="get_helper_waterfall_stagger" default="0.5">
+			Per-row stagger factor. Must be finite.
+		</member>
+		<member name="helper_waterfall_rain_direction" type="Vector2" setter="set_helper_waterfall_rain_direction" getter="get_helper_waterfall_rain_direction" default="Vector2(0, 1)">
+			Fall direction (need not be normalized). Must be finite and non-zero.
+		</member>
+		<member name="helper_waterfall_jitter" type="float" setter="set_helper_waterfall_jitter" getter="get_helper_waterfall_jitter" default="6.0">
+			Random offset per slot in pixels. Must be finite and 0 or more.
+		</member>
+		<member name="helper_lattice_columns" type="int" setter="set_helper_lattice_columns" getter="get_helper_lattice_columns" default="8">
+			Honeycomb columns. Must be 1 or more.
+		</member>
+		<member name="helper_lattice_rows" type="int" setter="set_helper_lattice_rows" getter="get_helper_lattice_rows" default="5">
+			Honeycomb rows. Must be 1 or more.
+		</member>
+		<member name="helper_lattice_spacing_x" type="float" setter="set_helper_lattice_spacing_x" getter="get_helper_lattice_spacing_x" default="48.0">
+			Horizontal spacing in pixels. Must be finite and 0 or more.
+		</member>
+		<member name="helper_lattice_spacing_y" type="float" setter="set_helper_lattice_spacing_y" getter="get_helper_lattice_spacing_y" default="42.0">
+			Vertical spacing in pixels. Must be finite and 0 or more.
+		</member>
+		<member name="helper_lattice_stagger_rows" type="bool" setter="set_helper_lattice_stagger_rows" getter="get_helper_lattice_stagger_rows" default="true">
+			Offset odd rows by half spacing for the honeycomb look.
+		</member>
+		<member name="helper_lattice_face_outward" type="bool" setter="set_helper_lattice_face_outward" getter="get_helper_lattice_face_outward" default="true">
+			Whether slots face away from the marker.
+		</member>
+		<member name="helper_lattice_facing_offset_deg" type="float" setter="set_helper_lattice_facing_offset_deg" getter="get_helper_lattice_facing_offset_deg" default="0.0">
+			Extra facing twist in degrees.
+		</member>
+		<member name="helper_skip_indices" type="PackedInt32Array" setter="set_helper_skip_indices" getter="get_helper_skip_indices" default="PackedInt32Array()">
+			Slot indexes to drop from any helper layout (dodge doors, bullet text). Out-of-range entries are ignored with one warning. Applied after spin/scale so indexes match the preview.
+		</member>
 		<member name="burst_enabled" type="bool" setter="set_burst_enabled" getter="get_burst_enabled" default="false">
 			Fire multi-volley bursts per trigger: each interval pulls the trigger for burst_count shots spaced burst_interval_sec apart. Mid-burst shots ignore the main interval.
 		</member>
@@ -524,6 +662,24 @@
 		</member>
 		<member name="homing_sticky_targets" type="bool" setter="set_homing_sticky_targets" getter="get_homing_sticky_targets" default="false">
 			Focus fire for dealt queues: each bullet keeps its dealt target across retargets (only emptied queues refill) instead of re-dealing every pass. Per-bullet Distribute only.
+		</member>
+		<member name="homing_target_priority" type="int" setter="set_homing_target_priority" getter="get_homing_target_priority" default="0">
+			Tower-defense priority preset without GDScript: Nearest, First, Last, Strongest, Weakest, Fastest, Random, Custom. First/Last read each candidate's "progress" (method, meta, or property), Strongest/Weakest read "hp"/"health", Fastest reads get_velocity(). Missing data falls back to nearest for that candidate. Custom keeps the homing_target_scorer Callable. Multi-target sources only.
+		</member>
+		<member name="homing_delay_sec" type="float" setter="set_homing_delay_sec" getter="get_homing_delay_sec" default="0.0">
+			Seconds of straight flight before volley steering starts (classic aimed-then-homing). 0 steers immediately. Must be finite and 0 or more.
+		</member>
+		<member name="homing_duration_sec" type="float" setter="set_homing_duration_sec" getter="get_homing_duration_sec" default="0.0">
+			Seconds of steering before volleys fly straight (lets fast players escape). 0 is infinite. Must be finite and 0 or more.
+		</member>
+		<member name="homing_lose_range_px" type="float" setter="set_homing_lose_range_px" getter="get_homing_lose_range_px" default="0.0">
+			Volley steering pauses while the bullet is farther than this from its target. 0 is unlimited. Must be finite and 0 or more.
+		</member>
+		<member name="homing_fire_arc_deg" type="float" setter="set_homing_fire_arc_deg" getter="get_homing_fire_arc_deg" default="0.0">
+			Turret cone in degrees: with hold-fire on, volleys whose targets sit outside half this arc from the spawner facing are skipped (volley_skipped "off_arc"). 0 is omnidirectional. Must be finite and 0 or more.
+		</member>
+		<member name="reload_jitter_sec" type="float" setter="set_reload_jitter_sec" getter="get_reload_jitter_sec" default="0.0">
+			Reload jitter in seconds: each auto volley waits shoot_interval_sec +/- uniform jitter (seeded by pattern_seed, floor 0.05s). 0 is exact. Must be finite and 0 or more.
 		</member>
 		<member name="pattern_seed" type="int" setter="set_pattern_seed" getter="get_pattern_seed" default="0">
 			Deterministic helper randomness: 0 is non-deterministic, otherwise seeds grid jitter, ring random rotation and target random selection. Replays and boss patterns stay reproducible.
