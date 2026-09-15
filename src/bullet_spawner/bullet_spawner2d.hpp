@@ -101,7 +101,11 @@ class BulletSpawner2D : public Node2D{
             TRANSFORMS_FROM_HELPER_HEART,
             TRANSFORMS_FROM_HELPER_WAVE,
             TRANSFORMS_FROM_HELPER_WATERFALL,
-            TRANSFORMS_FROM_HELPER_LATTICE
+            TRANSFORMS_FROM_HELPER_LATTICE,
+            TRANSFORMS_FROM_HELPER_ROSE,
+            TRANSFORMS_FROM_HELPER_COUNTER_SPIRAL,
+            TRANSFORMS_FROM_HELPER_CORRIDOR,
+            TRANSFORMS_FROM_HELPER_LISSAJOUS
         };
 
         // How the spin angle evolves. CONTINUOUS rotates forever at
@@ -233,6 +237,8 @@ class BulletSpawner2D : public Node2D{
         double helper_fan_direction_angle = 0.0;
         double helper_fan_step_offset = 0.0;
         bool helper_fan_centered = true;
+        // Per-slot random angle variance in radians (shotgun spread, 0 = exact).
+        double helper_fan_angle_jitter = 0.0;
 
         // SPIRAL
         double helper_spiral_start_radius = 50.0;
@@ -355,8 +361,9 @@ class BulletSpawner2D : public Node2D{
         double helper_waterfall_stagger = 0.5;
         Vector2 helper_waterfall_rain_direction = Vector2(0, 1);
         double helper_waterfall_jitter = 6.0;
+        double helper_waterfall_facing_offset_deg = 0.0;
 
-        // LATTICE (staggered honeycomb for TD walls).
+        // LATTICE (staggered honeycomb wall).
         int helper_lattice_columns = 8;
         int helper_lattice_rows = 5;
         double helper_lattice_spacing_x = 48.0;
@@ -364,6 +371,44 @@ class BulletSpawner2D : public Node2D{
         bool helper_lattice_stagger_rows = true;
         bool helper_lattice_face_outward = true;
         double helper_lattice_facing_offset_deg = 0.0;
+
+        // ROSE (exact rhodonea rose for petal-storm / blossom-finale blooms).
+        int helper_rose_petals = 6;
+        double helper_rose_radius = 150.0;
+        double helper_rose_lobe_sharpness = 1.0;
+        double helper_rose_base_rotation = 0.0;
+        bool helper_rose_face_outward = true;
+        double helper_rose_facing_offset_deg = 0.0;
+
+        // COUNTER SPIRAL (twin counter-rotating galaxy / windmill arms).
+        int helper_counter_spiral_arms = 2;
+        double helper_counter_spiral_start_radius = 50.0;
+        double helper_counter_spiral_radius_step = 15.0;
+        double helper_counter_spiral_angle_step = 0.6;
+        bool helper_counter_spiral_rotate_with_marker = true;
+        int helper_counter_spiral_facing = 0; // BulletFactory2D::SpiralFacingMode, tangent
+        double helper_counter_spiral_facing_offset_deg = 0.0;
+        int helper_counter_spiral_arm_stride = 1;
+        bool helper_counter_spiral_mirror_alternate_arms = true;
+
+        // CORRIDOR (aimed trap: dense wall with a carved center dodge door).
+        // Slots spread evenly across helper_corridor_width; helper_corridor
+        // _spacing is reserved (unused) so the signature stays stable.
+        Vector2 helper_corridor_aim_direction = Vector2(0, 1);
+        double helper_corridor_width = 400.0;
+        double helper_corridor_spacing = 32.0;
+        double helper_corridor_gap_width = 96.0;
+        bool helper_corridor_face_aim = true;
+        double helper_corridor_facing_offset_deg = 0.0;
+
+        // LISSAJOUS (figure-8 / weave openings for crossing curtains).
+        double helper_lissajous_size_x = 200.0;
+        double helper_lissajous_size_y = 120.0;
+        double helper_lissajous_freq_x = 3.0;
+        double helper_lissajous_freq_y = 2.0;
+        double helper_lissajous_phase = 0.0;
+        bool helper_lissajous_face_outward = true;
+        double helper_lissajous_facing_offset_deg = 0.0;
 
         // NEGATIVE SPACE (skip slots by index: dodge doors, bullet text).
         PackedInt32Array helper_skip_indices;
@@ -382,25 +427,6 @@ class BulletSpawner2D : public Node2D{
         // Seconds of warning before the volley. Must stay >= 0.
         double telegraph_sec = 0.5;
 
-        // TARGETING UPGRADES (tower-defense core).
-        // Score callback: Callable(candidate: Node2D) -> float. When valid,
-        // it replaces the built-in selection for multi-target sources: the
-        // highest score wins (up to homing_max_targets). Lets First / Last /
-        // Strongest / Weakest / Fastest all live in game code (HP, armor,
-        // speed live in user metadata, not in this plugin).
-        Callable homing_target_scorer;
-        // Priority group: resolved first, falls back to normal selection when
-        // empty (boss / decoy / aggro pin). Empty = disabled.
-        StringName homing_priority_group;
-        // Hold fire with no target: skip the spawn cycle entirely instead of
-        // firing a plain volley. Towers stay silent until something is in
-        // scope; danmaku bosses leave this off for rhythmic firing.
-        bool homing_fire_requires_target = false;
-        // Keep each bullet's dealt target across retargets (focus fire)
-        // instead of re-dealing every pass (spread). Per-bullet DISTRIBUTE
-        // only; shared queues always re-resolve.
-        bool homing_sticky_targets = false;
-
         // PERFORMANCE / REPRODUCIBILITY.
         // Deterministic helper randomness: 0 = non-deterministic, otherwise
         // seeds grid jitter, ring random rotation and scatter without an
@@ -409,7 +435,7 @@ class BulletSpawner2D : public Node2D{
         // Soft live-bullet fuse: 0 = unlimited, otherwise auto-shooting and
         // retargeting pause while active live bullets reach this count.
         int max_live_bullets = 0;
-        // Stagger the retarget phase so N towers don't scene-scan on the same
+        // Stagger the retarget phase so N spawners don't scene-scan on the same
         // tick: actual period stays homing_retarget_interval_sec.
         double homing_retarget_phase = 0.0;
 
@@ -450,21 +476,6 @@ class BulletSpawner2D : public Node2D{
             HOMING_SOURCE_NODE_CHILDREN // chase Node2D children of homing_children_parent_path
         };
 
-        // How homing picks among candidates. PRIORITY_* presets build the
-        // scoring automatically (see HomingTargetPriority); CUSTOM respects
-        // the user Callable. FIRST/LAST read each candidate's "progress"
-        // (path followers), STRONGEST/WEAKEST read "hp", FASTEST reads
-        // get_velocity().length(). Missing data falls back to nearest.
-        enum HomingTargetPriority {
-            HOMING_PRIORITY_NEAREST = 0,
-            HOMING_PRIORITY_FIRST,
-            HOMING_PRIORITY_LAST,
-            HOMING_PRIORITY_STRONGEST,
-            HOMING_PRIORITY_WEAKEST,
-            HOMING_PRIORITY_FASTEST,
-            HOMING_PRIORITY_RANDOM,
-            HOMING_PRIORITY_CUSTOM
-        };
         // How homing_node_name is compared against node names (node-name source).
         enum HomingNodeNameMatch {
             HOMING_NAME_MATCH_EXACT = 0, // "Player" matches only "Player"
@@ -499,9 +510,6 @@ class BulletSpawner2D : public Node2D{
         // targets that are ALSO in this group are kept. Empty = no filtering.
         StringName homing_filter_group;
         HomingTargetSelection homing_target_selection = HOMING_SELECT_NEAREST;
-        // Tower-defense priority preset: builds scoring automatically without
-        // GDScript (see the enum docs). CUSTOM keeps the user Callable.
-        HomingTargetPriority homing_target_priority = HOMING_PRIORITY_NEAREST;
         // Seconds of straight flight before volley steering starts (0 = steer
         // immediately). Must stay finite and >= 0.
         double homing_delay_sec = 0.0;
@@ -511,9 +519,8 @@ class BulletSpawner2D : public Node2D{
         // Steering pauses beyond this distance from the target (0 = unlimited).
         // Must stay finite and >= 0.
         double homing_lose_range_px = 0.0;
-        // Turret cone: volleys whose aim deviates more than half this from the
-        // target bearing are skipped when homing_fire_requires_target is on
-        // (0 = omnidirectional). Must stay finite and >= 0.
+        // Fire cone: volleys whose aim deviates more than half this from the
+        // target bearing are skipped (0 = omnidirectional). Must stay finite and >= 0.
         double homing_fire_arc_deg = 0.0;
         // Reload jitter: each auto volley waits shoot_interval_sec +/-
         // random * reload_jitter_sec (seeded by pattern_seed). 0 = exact.
@@ -727,14 +734,6 @@ class BulletSpawner2D : public Node2D{
         void set_telegraph_enabled(bool value);
         double get_telegraph_sec() const;
         void set_telegraph_sec(double value);
-        Callable get_homing_target_scorer() const;
-        void set_homing_target_scorer(const Callable &value);
-        StringName get_homing_priority_group() const;
-        void set_homing_priority_group(const StringName &value);
-        bool get_homing_fire_requires_target() const;
-        void set_homing_fire_requires_target(bool value);
-        bool get_homing_sticky_targets() const;
-        void set_homing_sticky_targets(bool value);
         int get_pattern_seed() const;
         void set_pattern_seed(int value);
         int get_max_live_bullets() const;
@@ -882,6 +881,8 @@ class BulletSpawner2D : public Node2D{
         void set_helper_waterfall_rain_direction(const Vector2 &value);
         double get_helper_waterfall_jitter() const;
         void set_helper_waterfall_jitter(double value);
+        double get_helper_waterfall_facing_offset_deg() const;
+        void set_helper_waterfall_facing_offset_deg(double value);
         int get_helper_lattice_columns() const;
         void set_helper_lattice_columns(int value);
         int get_helper_lattice_rows() const;
@@ -896,10 +897,64 @@ class BulletSpawner2D : public Node2D{
         void set_helper_lattice_face_outward(bool value);
         double get_helper_lattice_facing_offset_deg() const;
         void set_helper_lattice_facing_offset_deg(double value);
+        int get_helper_rose_petals() const;
+        void set_helper_rose_petals(int value);
+        double get_helper_rose_radius() const;
+        void set_helper_rose_radius(double value);
+        double get_helper_rose_lobe_sharpness() const;
+        void set_helper_rose_lobe_sharpness(double value);
+        double get_helper_rose_base_rotation() const;
+        void set_helper_rose_base_rotation(double value);
+        bool get_helper_rose_face_outward() const;
+        void set_helper_rose_face_outward(bool value);
+        double get_helper_rose_facing_offset_deg() const;
+        void set_helper_rose_facing_offset_deg(double value);
+        int get_helper_counter_spiral_arms() const;
+        void set_helper_counter_spiral_arms(int value);
+        double get_helper_counter_spiral_start_radius() const;
+        void set_helper_counter_spiral_start_radius(double value);
+        double get_helper_counter_spiral_radius_step() const;
+        void set_helper_counter_spiral_radius_step(double value);
+        double get_helper_counter_spiral_angle_step() const;
+        void set_helper_counter_spiral_angle_step(double value);
+        bool get_helper_counter_spiral_rotate_with_marker() const;
+        void set_helper_counter_spiral_rotate_with_marker(bool value);
+        int get_helper_counter_spiral_facing() const;
+        void set_helper_counter_spiral_facing(int value);
+        double get_helper_counter_spiral_facing_offset_deg() const;
+        void set_helper_counter_spiral_facing_offset_deg(double value);
+        int get_helper_counter_spiral_arm_stride() const;
+        void set_helper_counter_spiral_arm_stride(int value);
+        bool get_helper_counter_spiral_mirror_alternate_arms() const;
+        void set_helper_counter_spiral_mirror_alternate_arms(bool value);
+        Vector2 get_helper_corridor_aim_direction() const;
+        void set_helper_corridor_aim_direction(const Vector2 &value);
+        double get_helper_corridor_width() const;
+        void set_helper_corridor_width(double value);
+        double get_helper_corridor_spacing() const;
+        void set_helper_corridor_spacing(double value);
+        double get_helper_corridor_gap_width() const;
+        void set_helper_corridor_gap_width(double value);
+        bool get_helper_corridor_face_aim() const;
+        void set_helper_corridor_face_aim(bool value);
+        double get_helper_corridor_facing_offset_deg() const;
+        void set_helper_corridor_facing_offset_deg(double value);
+        double get_helper_lissajous_size_x() const;
+        void set_helper_lissajous_size_x(double value);
+        double get_helper_lissajous_size_y() const;
+        void set_helper_lissajous_size_y(double value);
+        double get_helper_lissajous_freq_x() const;
+        void set_helper_lissajous_freq_x(double value);
+        double get_helper_lissajous_freq_y() const;
+        void set_helper_lissajous_freq_y(double value);
+        double get_helper_lissajous_phase() const;
+        void set_helper_lissajous_phase(double value);
+        bool get_helper_lissajous_face_outward() const;
+        void set_helper_lissajous_face_outward(bool value);
+        double get_helper_lissajous_facing_offset_deg() const;
+        void set_helper_lissajous_facing_offset_deg(double value);
         PackedInt32Array get_helper_skip_indices() const;
         void set_helper_skip_indices(const PackedInt32Array &value);
-        HomingTargetPriority get_homing_target_priority() const;
-        void set_homing_target_priority(HomingTargetPriority value);
         double get_homing_delay_sec() const;
         void set_homing_delay_sec(double value);
         double get_homing_duration_sec() const;
@@ -1076,6 +1131,8 @@ class BulletSpawner2D : public Node2D{
         void set_helper_fan_step_offset(double value);
         bool get_helper_fan_centered() const;
         void set_helper_fan_centered(bool value);
+        double get_helper_fan_angle_jitter() const;
+        void set_helper_fan_angle_jitter(double value);
 
         double get_helper_spiral_start_radius() const;
         void set_helper_spiral_start_radius(double value);
@@ -1316,7 +1373,7 @@ class BulletSpawner2D : public Node2D{
         // entry for the _process driver.
         bool apply_pattern_list_entry(const Variant &entry);
         void fire_pattern_list_entry();
-        // Turret cone check: true when any resolved target sits within half
+        // Fire cone check: true when any resolved target sits within half
         // the fire arc of the spawner's facing. 0 arc = omnidirectional.
         bool fire_arc_covers_targets(const Array &targets) const;
 
@@ -1332,5 +1389,4 @@ VARIANT_ENUM_CAST(BlastBullets2D::BulletSpawner2D::HomingMode);
 VARIANT_ENUM_CAST(BlastBullets2D::BulletSpawner2D::HomingTargetSource);
 VARIANT_ENUM_CAST(BlastBullets2D::BulletSpawner2D::HomingNodeNameMatch);
 VARIANT_ENUM_CAST(BlastBullets2D::BulletSpawner2D::HomingTargetSelection);
-VARIANT_ENUM_CAST(BlastBullets2D::BulletSpawner2D::HomingTargetPriority);
 VARIANT_ENUM_CAST(BlastBullets2D::BulletSpawner2D::HomingRetargetMode);

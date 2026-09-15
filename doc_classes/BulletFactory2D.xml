@@ -145,8 +145,9 @@
 			<param index="3" name="direction_angle" type="float" default="0.0" />
 			<param index="4" name="step_offset" type="float" default="0.0" />
 			<param index="5" name="centered" type="bool" default="true" />
+			<param index="6" name="angle_jitter" type="float" default="0.0" />
 			<description>
-				Generates a fan of transforms spread evenly across a cone. [code]direction_angle[/code] is the cone center relative to the marker rotation, [code]spread[/code] is the full cone width in radians, and [code]step_offset[/code] staggers origins along the direction so pellets do not stack on top of each other. A single bullet flies straight down the cone center. Set [code]centered[/code] to false for a one-sided fan opening from the center direction toward +spread. Useful for shotgun spreads.
+				Generates a fan of transforms spread evenly across a cone. [code]direction_angle[/code] is the cone center relative to the marker rotation, [code]spread[/code] is the full cone width in radians, and [code]step_offset[/code] staggers origins along the direction so pellets do not stack on top of each other. A single bullet flies straight down the cone center. Set [code]centered[/code] to false for a one-sided fan opening from the center direction toward +spread. [code]angle_jitter[/code] adds per-slot random variance in radians for shotgun spreads (0 fires the exact cone). Useful for shotgun spreads.
 			</description>
 		</method>
 		<method name="helper_generate_transforms_grid" qualifiers="static">
@@ -313,7 +314,7 @@
 			<param index="6" name="face_outward" type="bool" default="true" />
 			<param index="7" name="facing_offset_degrees" type="float" default="0.0" />
 			<description>
-				Generates a cross/plus barrage: arm_count rays of evenly spaced slots from the marker out to arm_length. Tower-defense crossfire and plus-shaped danmaku bursts.
+				Generates a cross/plus barrage: arm_count rays of evenly spaced slots from the marker out to arm_length. Crossfire and plus-shaped danmaku bursts.
 			</description>
 		</method>
 		<method name="helper_generate_transforms_star" qualifiers="static">
@@ -367,8 +368,9 @@
 			<param index="6" name="stagger" type="float" default="0.5" />
 			<param index="7" name="rain_direction" type="Vector2" default="Vector2(0, 1)" />
 			<param index="8" name="jitter" type="float" default="6.0" />
+			<param index="9" name="facing_offset_degrees" type="float" default="0.0" />
 			<description>
-				Generates a staggered waterfall curtain: columns by rows grid with per-row stagger offsets and jitter, firing along rain_direction. Combine with skip indices for readable doors.
+				Generates a staggered waterfall curtain: columns by rows grid with per-row stagger offsets and jitter, firing along rain_direction. Past capacity the curtain keeps growing row by row instead of stacking. Combine with skip indices for readable doors.
 			</description>
 		</method>
 		<method name="helper_generate_transforms_lattice" qualifiers="static">
@@ -383,7 +385,67 @@
 			<param index="7" name="face_outward" type="bool" default="true" />
 			<param index="8" name="facing_offset_degrees" type="float" default="0.0" />
 			<description>
-				Generates a staggered honeycomb lattice for tower-defense walls and geometric curtains.
+				Generates a staggered honeycomb lattice for honeycomb walls and geometric curtains.
+			</description>
+		</method>
+		<method name="helper_generate_transforms_rose" qualifiers="static">
+			<return type="Transform2D[]" />
+			<param index="0" name="transforms_amount" type="int" />
+			<param index="1" name="marker_transform" type="Transform2D" />
+			<param index="2" name="petals" type="int" default="6" />
+			<param index="3" name="radius" type="float" default="150.0" />
+			<param index="4" name="lobe_sharpness" type="float" default="1.0" />
+			<param index="5" name="base_rotation" type="float" default="0.0" />
+			<param index="6" name="face_outward" type="bool" default="true" />
+			<param index="7" name="facing_offset_degrees" type="float" default="0.0" />
+			<description>
+				Generates an exact rhodonea rose bloom: slots sweep theta over the full turn and sit at r = R * cos(k * theta) with k = petals. lobe_sharpness 1.0 is the exact rose (0 is round, higher pinches the waist). Recipe: Rose + phase_step_per_bullet + angular wobble = blossom finale. Used by the petal storm and blossom finale presets.
+			</description>
+		</method>
+		<method name="helper_generate_transforms_counter_spiral" qualifiers="static">
+			<return type="Transform2D[]" />
+			<param index="0" name="transforms_amount" type="int" />
+			<param index="1" name="marker_transform" type="Transform2D" />
+			<param index="2" name="arms" type="int" default="2" />
+			<param index="3" name="start_radius" type="float" default="50.0" />
+			<param index="4" name="radius_step" type="float" default="15.0" />
+			<param index="5" name="angle_step" type="float" default="0.6" />
+			<param index="6" name="rotate_with_marker" type="bool" default="true" />
+			<param index="7" name="facing_mode" type="int" enum="BulletFactory2D.SpiralFacingMode" default="0" />
+			<param index="8" name="facing_offset_degrees" type="float" default="0.0" />
+			<param index="9" name="arm_index_stride" type="int" default="1" />
+			<param index="10" name="mirror_alternate_arms" type="bool" default="true" />
+			<description>
+				Generates a twin counter-rotating galaxy: odd arms wind -angle_step while even arms wind +angle_step when mirrored (same facing switch as the multi spiral, including tangent-aware chirality). Turn mirroring off for a same-chirality multi spiral. Used by the twin spiral counter preset.
+			</description>
+		</method>
+		<method name="helper_generate_transforms_corridor" qualifiers="static">
+			<return type="Transform2D[]" />
+			<param index="0" name="transforms_amount" type="int" />
+			<param index="1" name="marker_transform" type="Transform2D" />
+			<param index="2" name="aim_direction" type="Vector2" />
+			<param index="3" name="width" type="float" default="400.0" />
+			<param index="4" name="spacing" type="float" default="32.0" />
+			<param index="5" name="gap_width" type="float" default="96.0" />
+			<param index="6" name="face_aim" type="bool" default="true" />
+			<param index="7" name="facing_offset_degrees" type="float" default="0.0" />
+			<description>
+				Generates a dense wall perpendicular to aim_direction with a carved center dodge door of gap_width pixels. spacing is reserved (unused): slots spread evenly across width. Returns at most transforms_amount slots (the gap shrinks the array like Ellipse Wall). Combine with skip indices for multi-door variants. Used by the aimed trap preset.
+			</description>
+		</method>
+		<method name="helper_generate_transforms_lissajous" qualifiers="static">
+			<return type="Transform2D[]" />
+			<param index="0" name="transforms_amount" type="int" />
+			<param index="1" name="marker_transform" type="Transform2D" />
+			<param index="2" name="size_x" type="float" default="200.0" />
+			<param index="3" name="size_y" type="float" default="120.0" />
+			<param index="4" name="freq_x" type="float" default="3.0" />
+			<param index="5" name="freq_y" type="float" default="2.0" />
+			<param index="6" name="phase" type="float" default="0.0" />
+			<param index="7" name="face_outward" type="bool" default="true" />
+			<param index="8" name="facing_offset_degrees" type="float" default="0.0" />
+			<description>
+				Generates figure-8 / weave openings: slots sweep t over the full turn on the lissajous curve (size_x * sin(freq_x * t + phase), size_y * sin(freq_y * t)) for crossing curtains with readable doors. Recipe: slow spin + lissajous weave = butterfly curtain.
 			</description>
 		</method>
 		<method name="populate_attachments_pool">
@@ -631,7 +693,7 @@
 			Preset used by BulletSpawner2D.apply_pattern_preset(): narrow 5-pellet aimed fan for turrets.
 		</constant>
 		<constant name="PATTERN_PRESET_AIMED_FAN_WIDE" value="4" enum="PatternPreset">
-			Preset used by BulletSpawner2D.apply_pattern_preset(): wide 9-pellet aimed fan for shotgun towers.
+			Preset used by BulletSpawner2D.apply_pattern_preset(): wide 9-pellet aimed fan for shotguns.
 		</constant>
 		<constant name="PATTERN_PRESET_RING_SLOW" value="5" enum="PatternPreset">
 			Preset used by BulletSpawner2D.apply_pattern_preset(): slow wide ring for curtain openers.
@@ -647,6 +709,33 @@
 		</constant>
 		<constant name="PATTERN_PRESET_SCATTER_BURST" value="9" enum="PatternPreset">
 			Preset used by BulletSpawner2D.apply_pattern_preset(): random disc burst for explosions and boss deaths.
+		</constant>
+		<constant name="PATTERN_PRESET_CROSS_BURST" value="10" enum="PatternPreset">
+			Preset used by BulletSpawner2D.apply_pattern_preset(): cross/plus barrage for symmetric bursts.
+		</constant>
+		<constant name="PATTERN_PRESET_STAR_SHELL" value="11" enum="PatternPreset">
+			Preset used by BulletSpawner2D.apply_pattern_preset(): true star shell for geometric cards.
+		</constant>
+		<constant name="PATTERN_PRESET_HEART_BLOOM" value="12" enum="PatternPreset">
+			Preset used by BulletSpawner2D.apply_pattern_preset(): parametric heart outline for love attacks.
+		</constant>
+		<constant name="PATTERN_PRESET_SNAKE_WAVE" value="13" enum="PatternPreset">
+			Preset used by BulletSpawner2D.apply_pattern_preset(): sine snake row for slithering curtains.
+		</constant>
+		<constant name="PATTERN_PRESET_WATERFALL_CURTAIN" value="14" enum="PatternPreset">
+			Preset used by BulletSpawner2D.apply_pattern_preset(): staggered waterfall curtain for descending walls.
+		</constant>
+		<constant name="PATTERN_PRESET_PETAL_STORM" value="15" enum="PatternPreset">
+			Preset used by BulletSpawner2D.apply_pattern_preset(): 8-lobe exact rose bloom (mathematical petal storm).
+		</constant>
+		<constant name="PATTERN_PRESET_TWIN_SPIRAL_COUNTER" value="16" enum="PatternPreset">
+			Preset used by BulletSpawner2D.apply_pattern_preset(): twin counter-rotating galaxy arms.
+		</constant>
+		<constant name="PATTERN_PRESET_AIMED_TRAP" value="17" enum="PatternPreset">
+			Preset used by BulletSpawner2D.apply_pattern_preset(): dense corridor wall with a carved center dodge door along the aim axis.
+		</constant>
+		<constant name="PATTERN_PRESET_BLOSSOM_FINALE" value="18" enum="PatternPreset">
+			Preset used by BulletSpawner2D.apply_pattern_preset(): 12-lobe exact rose bloom with slow spin (ending card).
 		</constant>
 	</constants>
 </class>

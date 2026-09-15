@@ -13,17 +13,9 @@
 [ext_resource type="PackedScene" uid="uid://bqi8tdtf1dh4n" path="res://shared/moving_target.tscn" id="10_nkrfg"]
 
 [sub_resource type="BulletSpeedData2D" id="BulletSpeedData2D_mouoi"]
-speed = 1000.0
-max_speed = 1500.0
+speed = 500.0
+max_speed = 200.0
 acceleration = 20.0
-
-[sub_resource type="BulletWobbleData2D" id="BulletWobbleData2D_lxtuk"]
-enabled = true
-mode = 1
-amplitude = 54.0
-frequency_hz = 5.0
-phase_rad = 2.0
-phase_step_per_bullet = 1.0
 
 [sub_resource type="SpriteFrames" id="SpriteFrames_y4v7i"]
 animations = [{
@@ -39,7 +31,6 @@ animations = [{
 [sub_resource type="DirectionalBulletsData2D" id="DirectionalBulletsData2D_nkrfg"]
 shared_bullet_speed_data = SubResource("BulletSpeedData2D_mouoi")
 shared_movement_pattern_face_movement_direction = true
-shared_bullet_wobble_data = SubResource("BulletWobbleData2D_lxtuk")
 sprite_frames = SubResource("SpriteFrames_y4v7i")
 texture_size = Vector2(120, 120)
 collision_layer = 2
@@ -86,7 +77,6 @@ spin_enabled = true
 transforms_source = 16
 helper_bullets_amount = 55
 helper_ring_radius = 50.0
-helper_ring_random_rotation = true
 helper_ring_y_scale = 3.0
 helper_fan_spread = 3.0
 helper_scatter_facing_jitter = 1.0

@@ -114,7 +114,6 @@ public:
 		PATTERN_PRESET_PETAL_STORM,
 		PATTERN_PRESET_TWIN_SPIRAL_COUNTER,
 		PATTERN_PRESET_AIMED_TRAP,
-		PATTERN_PRESET_TD_RING_GUARD,
 		PATTERN_PRESET_BLOSSOM_FINALE
 	};
 
@@ -816,17 +815,19 @@ public:
 			real_t y_scale = 1.0,
 			real_t facing_offset_degrees = 0.0);
 
-	// Generates transforms in an aimed cone: direction_angle is the cone center,
+	// Generates transforms in an aimed cone (shotgun spread): direction_angle is the cone center,
 	// spread is the full cone width, origins stagger along the direction so pellets
 	// do not stack on top of each other. When centered is false the cone is
 	// one-sided, from the center direction out to +spread.
+	// angle_jitter adds per-slot random variance for shotgun spread.
 	static TypedArray<Transform2D> helper_generate_transforms_fan(
 			int transforms_amount,
 			Transform2D marker_transform,
 			real_t spread = 0.5,
 			real_t direction_angle = 0.0,
 			real_t step_offset = 0.0,
-			bool centered = true);
+			bool centered = true,
+			real_t angle_jitter = 0.0);
 
 	// Generates transforms along an expanding spiral around marker_transform.
 	// facing_mode picks the bullet facing (tangent = travel direction);
@@ -951,7 +952,7 @@ public:
 			int arm_index_stride = 1);
 
 	// Cross/plus barrage: arm_count rays of evenly spaced slots from the
-	// marker out to arm_length. Tower-defense crossfire and plus-shaped
+	// marker out to arm_length. Crossfire and plus-shaped
 	// danmaku bursts.
 	static TypedArray<Transform2D> helper_generate_transforms_cross(
 			int transforms_amount,
@@ -1011,9 +1012,10 @@ public:
 			real_t row_spacing = 64.0,
 			real_t stagger = 0.5,
 			Vector2 rain_direction = Vector2(0, 1),
-			real_t jitter = 6.0);
+			real_t jitter = 6.0,
+			real_t facing_offset_degrees = 0.0);
 
-	// Lattice honeycomb: staggered hex-style rows for tower-defense walls.
+	// Lattice honeycomb: staggered hex-style rows for honeycomb walls.
 	static TypedArray<Transform2D> helper_generate_transforms_lattice(
 			int transforms_amount,
 			Transform2D marker_transform,
@@ -1022,6 +1024,60 @@ public:
 			real_t spacing_x = 48.0,
 			real_t spacing_y = 42.0,
 			bool stagger_rows = true,
+			bool face_outward = true,
+			real_t facing_offset_degrees = 0.0);
+
+	// Mathematical rose for petal-storm/blossom-finales: exact rhodonea rose
+	// r = R * cos(k * theta); k = petals; dense slot sweep theta = i / n * TAU.
+	static TypedArray<Transform2D> helper_generate_transforms_rose(
+			int transforms_amount,
+			Transform2D marker_transform,
+			int petals = 6,
+			real_t radius = 150.0,
+			real_t lobe_sharpness = 1.0,
+			real_t base_rotation = 0.0,
+			bool face_outward = true,
+			real_t facing_offset_degrees = 0.0);
+
+	// Twin counter-rotating galaxy: odd arms rotate +angle_step, even arms
+	// -angle_step when mirrored (same facing switch as multispiral).
+	static TypedArray<Transform2D> helper_generate_transforms_counter_spiral(
+			int transforms_amount,
+			Transform2D marker_transform,
+			int arms = 2,
+			real_t start_radius = 50.0,
+			real_t radius_step = 15.0,
+			real_t angle_step = 0.6,
+			bool rotate_with_marker = true,
+			SpiralFacingMode facing_mode = SPIRAL_FACING_TANGENT,
+			real_t facing_offset_degrees = 0.0,
+			int arm_index_stride = 1,
+			bool mirror_alternate_arms = true);
+
+	// Dense wall perpendicular to aim with carved center dodge door.
+	// Aimed-trap usage: slots spread across width on the axis across from
+	// aim_direction; the center gap of gap_width stays empty as the door.
+	// spacing is reserved (unused): slots spread evenly across width.
+	static TypedArray<Transform2D> helper_generate_transforms_corridor(
+			int transforms_amount,
+			Transform2D marker_transform,
+			const Vector2 &aim_direction,
+			real_t width = 400.0,
+			real_t spacing = 32.0,
+			real_t gap_width = 96.0,
+			bool face_aim = true,
+			real_t facing_offset_degrees = 0.0);
+
+	// Figure-8/weave openings: slots sweep t = i / n * TAU over the
+	// lissajous curve for weaving curtains with readable doors.
+	static TypedArray<Transform2D> helper_generate_transforms_lissajous(
+			int transforms_amount,
+			Transform2D marker_transform,
+			real_t size_x = 200.0,
+			real_t size_y = 120.0,
+			real_t freq_x = 3.0,
+			real_t freq_y = 2.0,
+			real_t phase = 0.0,
 			bool face_outward = true,
 			real_t facing_offset_degrees = 0.0);
 
