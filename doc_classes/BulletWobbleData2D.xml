@@ -17,34 +17,13 @@
 			<param index="3" name="frequency_MIN" type="float" />
 			<param index="4" name="frequency_MAX" type="float" />
 			<description>
-				Generates enabled random wobble data.
+				Generates enabled random wobble data: amount_to_generate entries with amplitude and frequency rolled inside their MIN/MAX ranges. Requires amount_to_generate above 0 and every MIN at or below its MAX, otherwise returns empty.
 			</description>
 		</method>
 	</methods>
 	<members>
-		<member name="enabled" type="bool" setter="set_enabled" getter="get_enabled" default="false">
-			Master switch for this entry. Disabled entries are skipped per bullet.
-		</member>
-		<member name="mode" type="int" setter="set_mode" getter="get_mode" default="0">
-			0 = Lateral (weave perpendicular to flight), 1 = Angular (oscillate heading in degrees).
-		</member>
-		<member name="waveform" type="int" setter="set_waveform" getter="get_waveform" default="0">
-			Wave shape evaluated in the wobble tick: 0 = Sine (sin, starts at zero offset), 1 = Cosine (cos, starts at full offset, equal to Sine with a quarter-period phase shift). Applies to both modes and stacks with the delay/duration/damping envelope, distance_phased timing, and per-bullet phase fan-out.
-		</member>
 		<member name="amplitude" type="float" setter="set_amplitude" getter="get_amplitude" default="24.0">
 			Wobble size in pixels (Lateral) or degrees (Angular). Must be finite and &gt;= 0.
-		</member>
-		<member name="frequency_hz" type="float" setter="set_frequency_hz" getter="get_frequency_hz" default="2.0">
-			Oscillations per second. Must be finite and &gt;= 0.
-		</member>
-		<member name="phase_rad" type="float" setter="set_phase_rad" getter="get_phase_rad" default="0.0">
-			Base phase in radians. Each bullet adds [member phase_step_per_bullet] times its index. Tip: Cosine with phase 0 behaves like Sine with phase PI/2, so switching [member waveform] is the easy way to get that quarter-period shift without doing the math.
-		</member>
-		<member name="phase_step_per_bullet" type="float" setter="set_phase_step_per_bullet" getter="get_phase_step_per_bullet" default="0.35">
-			Per-bullet phase fan-out. One shared resource with a non-zero step makes snakes and petals instead of synced waves.
-		</member>
-		<member name="distance_phased" type="bool" setter="set_distance_phased" getter="get_distance_phased" default="false">
-			Phase from distance traveled instead of time, so speed changes do not warp the shape.
 		</member>
 		<member name="damping_per_sec" type="float" setter="set_damping_per_sec" getter="get_damping_per_sec" default="0.0">
 			Exponential decay of the wobble over time. 0 = undamped.
@@ -52,8 +31,43 @@
 		<member name="delay_sec" type="float" setter="set_delay_sec" getter="get_delay_sec" default="0.0">
 			Seconds of straight flight before wobble starts.
 		</member>
+		<member name="distance_phased" type="bool" setter="set_distance_phased" getter="get_distance_phased" default="false">
+			Phase from distance traveled instead of time, so speed changes do not warp the shape.
+		</member>
 		<member name="duration_sec" type="float" setter="set_duration_sec" getter="get_duration_sec" default="0.0">
 			Seconds of wobble before it stops. 0 = infinite.
 		</member>
+		<member name="enabled" type="bool" setter="set_enabled" getter="get_enabled" default="false">
+			Master switch for this entry. Disabled entries are skipped per bullet.
+		</member>
+		<member name="frequency_hz" type="float" setter="set_frequency_hz" getter="get_frequency_hz" default="2.0">
+			Oscillations per second. Must be finite and &gt;= 0.
+		</member>
+		<member name="mode" type="int" setter="set_mode" getter="get_mode" enum="BulletWobbleData2D.WobbleMode" default="0">
+			0 = Lateral (weave perpendicular to flight), 1 = Angular (oscillate heading in degrees).
+		</member>
+		<member name="phase_rad" type="float" setter="set_phase_rad" getter="get_phase_rad" default="0.0">
+			Base phase in radians. Each bullet adds [member phase_step_per_bullet] times its index. Tip: Cosine with phase 0 behaves like Sine with phase PI/2, so switching [member waveform] is the easy way to get that quarter-period shift without doing the math.
+		</member>
+		<member name="phase_step_per_bullet" type="float" setter="set_phase_step_per_bullet" getter="get_phase_step_per_bullet" default="0.35">
+			Per-bullet phase fan-out. One shared resource with a non-zero step makes snakes and petals instead of synced waves.
+		</member>
+		<member name="waveform" type="int" setter="set_waveform" getter="get_waveform" enum="BulletWobbleData2D.WobbleWaveform" default="0">
+			Wave shape evaluated in the wobble tick: 0 = Sine (sin, starts at zero offset), 1 = Cosine (cos, starts at full offset, equal to Sine with a quarter-period phase shift). Applies to both modes and stacks with the delay/duration/damping envelope, distance_phased timing, and per-bullet phase fan-out.
+		</member>
 	</members>
+	<constants>
+		<constant name="WOBBLE_LATERAL" value="0" enum="WobbleMode">
+			Wobble mode that weaves perpendicular to flight (pixels). Set via [member mode].
+		</constant>
+		<constant name="WOBBLE_ANGULAR" value="1" enum="WobbleMode">
+			Wobble mode that oscillates the heading (degrees). Set via [member mode].
+		</constant>
+		<constant name="WOBBLE_SINE" value="0" enum="WobbleWaveform">
+			Sine waveform: starts at zero offset. Set via [member waveform].
+		</constant>
+		<constant name="WOBBLE_COSINE" value="1" enum="WobbleWaveform">
+			Cosine waveform: starts at full offset. Set via [member waveform].
+		</constant>
+	</constants>
 </class>

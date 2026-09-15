@@ -125,6 +125,14 @@
 				Get the physics world space in which the bullets interact.
 			</description>
 		</method>
+		<method name="helper_apply_skip_indices" qualifiers="static">
+			<return type="Transform2D[]" />
+			<param index="0" name="transforms" type="Transform2D[]" />
+			<param index="1" name="skip_indices" type="PackedInt32Array" />
+			<description>
+				Drops slot indexes from a generated array (dodge doors, bullet text). Out-of-range entries are ignored with one warning; the output shrinks. The spawner applies this automatically via helper_skip_indices.
+			</description>
+		</method>
 		<method name="helper_generate_transforms_aimed" qualifiers="static">
 			<return type="Transform2D[]" />
 			<param index="0" name="transforms_amount" type="int" />
@@ -137,269 +145,18 @@
 				Generates a fan of transforms aimed from the marker at [code]target_position[/code]. Same as [method helper_generate_transforms_fan] with the cone centered on the marker to target direction. Useful for aimed bursts and shotgun spreads that track a player. Returns an empty array if the target coincides with the marker.
 			</description>
 		</method>
-		<method name="helper_generate_transforms_fan" qualifiers="static">
+		<method name="helper_generate_transforms_corridor" qualifiers="static">
 			<return type="Transform2D[]" />
 			<param index="0" name="transforms_amount" type="int" />
 			<param index="1" name="marker_transform" type="Transform2D" />
-			<param index="2" name="spread" type="float" default="0.5" />
-			<param index="3" name="direction_angle" type="float" default="0.0" />
-			<param index="4" name="step_offset" type="float" default="0.0" />
-			<param index="5" name="centered" type="bool" default="true" />
-			<param index="6" name="angle_jitter" type="float" default="0.0" />
-			<description>
-				Generates a fan of transforms spread evenly across a cone. [code]direction_angle[/code] is the cone center relative to the marker rotation, [code]spread[/code] is the full cone width in radians, and [code]step_offset[/code] staggers origins along the direction so pellets do not stack on top of each other. A single bullet flies straight down the cone center. Set [code]centered[/code] to false for a one-sided fan opening from the center direction toward +spread. [code]angle_jitter[/code] adds per-slot random variance in radians for shotgun spreads (0 fires the exact cone). Useful for shotgun spreads.
-			</description>
-		</method>
-		<method name="helper_generate_transforms_grid" qualifiers="static">
-			<return type="Transform2D[]" />
-			<param index="0" name="transforms_amount" type="int" />
-			<param index="1" name="marker_transform" type="Transform2D" />
-			<param index="2" name="rows_per_column" type="int" default="10" />
-			<param index="3" name="alignment" type="int" enum="BulletFactory2D.Alignment" default="3" />
-			<param index="4" name="column_offset" type="float" default="150.0" />
-			<param index="5" name="row_offset" type="float" default="150.0" />
-			<param index="6" name="rotate_grid_with_marker" type="bool" default="true" />
-			<param index="7" name="random_local_rotation" type="bool" default="false" />
-			<param index="8" name="jitter" type="float" default="0.0" />
-			<description>
-				Generates a grid of transforms that are positioned relative to the [code]marker_transform[/code]. [code]jitter[/code] scatters each origin by up to +-jitter pixels on both axes (0 disables it).
-			</description>
-		</method>
-		<method name="helper_generate_transforms_line" qualifiers="static">
-			<return type="Transform2D[]" />
-			<param index="0" name="transforms_amount" type="int" />
-			<param index="1" name="marker_transform" type="Transform2D" />
-			<param index="2" name="direction" type="Vector2" />
-			<param index="3" name="spacing" type="float" default="32.0" />
-			<param index="4" name="face_direction" type="bool" default="true" />
-			<param index="5" name="anchor" type="int" enum="BulletFactory2D.LineAnchor" default="1" />
-			<param index="6" name="perpendicular" type="bool" default="false" />
-			<description>
-				Generates transforms in a straight wall along [code]direction[/code], spaced evenly by [code]spacing[/code]. [code]anchor[/code] picks where the marker sits on the row (start, center, end). Bullets face along the line when [code]face_direction[/code] is true - plus 90 degrees when [code]perpendicular[/code] is set, for strafe walls - otherwise they keep the marker rotation. Useful for walls, curtains and gates. Returns an empty array when the direction is zero.
-			</description>
-		</method>
-		<method name="helper_generate_transforms_ring" qualifiers="static">
-			<return type="Transform2D[]" />
-			<param index="0" name="transforms_amount" type="int" />
-			<param index="1" name="marker_transform" type="Transform2D" />
-			<param index="2" name="radius" type="float" default="150.0" />
-			<param index="3" name="start_angle" type="float" default="0.0" />
-			<param index="4" name="arc" type="float" default="6.2831855" />
-			<param index="5" name="rotate_with_marker" type="bool" default="true" />
-			<param index="6" name="random_rotation" type="bool" default="false" />
-			<param index="7" name="face_outward" type="bool" default="true" />
-			<param index="8" name="y_scale" type="float" default="1.0" />
-			<param index="9" name="facing_offset_degrees" type="float" default="0.0" />
-			<description>
-				Generates transforms placed evenly on a ring (or arc, when [code]arc[/code] is smaller than a full turn) around the marker. Every bullet faces outward, so art drawn facing right travels away from the center. Set [code]face_outward[/code] to false for implosion patterns that fly toward the center. [code]y_scale[/code] stretches the ring into an ellipse (facing stays radial, approximate on stretched rings) and [code]facing_offset_degrees[/code] twists every facing. Useful for radial bursts and boss rings.
-			</description>
-		</method>
-		<method name="helper_generate_transforms_spiral" qualifiers="static">
-			<return type="Transform2D[]" />
-			<param index="0" name="transforms_amount" type="int" />
-			<param index="1" name="marker_transform" type="Transform2D" />
-			<param index="2" name="start_radius" type="float" default="50.0" />
-			<param index="3" name="radius_step" type="float" default="15.0" />
-			<param index="4" name="angle_step" type="float" default="0.6" />
-			<param index="5" name="rotate_with_marker" type="bool" default="true" />
-			<param index="6" name="facing_mode" type="int" enum="BulletFactory2D.SpiralFacingMode" default="0" />
-			<param index="7" name="facing_offset_degrees" type="float" default="0.0" />
-			<description>
-				Generates transforms along an expanding spiral around the marker. [code]facing_mode[/code] picks the bullet facing: tangent means each bullet flies along its travel direction on the spiral (the default), radial outward is the historical behavior, toward center faces the marker, keep marker preserves the marker rotation. [code]facing_offset_degrees[/code] twists every facing by a fixed amount. Useful for rotating emitter looks and volute patterns.
-			</description>
-		</method>
-		<method name="helper_generate_transforms_flower" qualifiers="static">
-			<return type="Transform2D[]" />
-			<param index="0" name="transforms_amount" type="int" />
-			<param index="1" name="marker_transform" type="Transform2D" />
-			<param index="2" name="petals" type="int" default="6" />
-			<param index="3" name="bullets_per_petal" type="int" default="5" />
-			<param index="4" name="radius" type="float" default="150.0" />
-			<param index="5" name="petal_spread" type="float" default="0.5" />
-			<param index="6" name="petal_sharpness" type="float" default="1.0" />
-			<param index="7" name="base_rotation" type="float" default="0.0" />
-			<param index="8" name="face_outward" type="bool" default="true" />
-			<param index="9" name="facing_offset_degrees" type="float" default="0.0" />
-			<description>
-				Generates a floral spell-card pattern: [code]petals[/code] symmetric lobes around the marker, each holding [code]bullets_per_petal[/code] slots spread over [code]petal_spread[/code] radians. [code]petal_sharpness[/code] 0 gives round lobes, higher values pinch the waist into tighter flowers. [code]transforms_amount[/code] sizes the array (fewer slots than petals times per-petal truncates). Useful for boss blossoms and mandala rings.
-			</description>
-		</method>
-		<method name="helper_generate_transforms_ellipse" qualifiers="static">
-			<return type="Transform2D[]" />
-			<param index="0" name="transforms_amount" type="int" />
-			<param index="1" name="marker_transform" type="Transform2D" />
-			<param index="2" name="radius_x" type="float" default="150.0" />
-			<param index="3" name="radius_y" type="float" default="100.0" />
-			<param index="4" name="ellipse_rotation" type="float" default="0.0" />
-			<param index="5" name="start_angle" type="float" default="0.0" />
-			<param index="6" name="arc" type="float" default="6.2831855" />
-			<param index="7" name="mode" type="int" enum="BulletFactory2D.EllipseMode" default="0" />
-			<param index="8" name="gap_count" type="int" default="2" />
-			<param index="9" name="gap_width" type="float" default="0.3" />
-			<param index="10" name="face_outward" type="bool" default="true" />
-			<param index="11" name="facing_offset_degrees" type="float" default="0.0" />
-			<description>
-				Generates a true ellipse ring with independent [code]radius_x[/code] / [code]radius_y[/code] semi-axes rotated by [code]ellipse_rotation[/code] (the ring helper's y_scale is only an approximation). Full draws every slot, Arc draws a spaced segment, Wall draws a dense arc with [code]gap_count[/code] carved dodge gaps of [code]gap_width[/code] radians each (danmaku walls with readable escape routes; the array shrinks to the surviving slots). Facings follow the ellipse outward normal. Useful for oval bosses, stadium arenas and gap walls.
-			</description>
-		</method>
-		<method name="helper_generate_transforms_rain" qualifiers="static">
-			<return type="Transform2D[]" />
-			<param index="0" name="transforms_amount" type="int" />
-			<param index="1" name="marker_transform" type="Transform2D" />
-			<param index="2" name="band_width" type="float" default="600.0" />
-			<param index="3" name="rain_direction" type="Vector2" default="Vector2(0, 1)" />
-			<param index="4" name="drop_spacing" type="float" default="48.0" />
-			<param index="5" name="jitter" type="float" default="12.0" />
-			<description>
-				Generates a rain curtain: slots spread along a horizontal band of [code]band_width[/code] facing [code]rain_direction[/code], with rows staggered by [code]drop_spacing[/code] so the curtain reads as layered sheets, plus random [code]jitter[/code] per slot. Useful for bullet-rain phases, storm walls and descending curtains.
-			</description>
-		</method>
-		<method name="helper_generate_transforms_scatter" qualifiers="static">
-			<return type="Transform2D[]" />
-			<param index="0" name="transforms_amount" type="int" />
-			<param index="1" name="marker_transform" type="Transform2D" />
-			<param index="2" name="burst_radius" type="float" default="120.0" />
-			<param index="3" name="facing_jitter" type="float" default="0.4" />
-			<param index="4" name="seed" type="int" default="0" />
-			<description>
-				Generates a biased-random disc burst: offsets fill the [code]burst_radius[/code] disc with even density (not center-clumped), facings are radial-outward plus [code]facing_jitter[/code]. [code]seed[/code] 0 is non-deterministic, otherwise reproducible (replays, synced bosses). Useful for explosions, boss deaths and petal pops.
-			</description>
-		</method>
-		<method name="helper_generate_transforms_polygon" qualifiers="static">
-			<return type="Transform2D[]" />
-			<param index="0" name="transforms_amount" type="int" />
-			<param index="1" name="marker_transform" type="Transform2D" />
-			<param index="2" name="vertices" type="int" default="5" />
-			<param index="3" name="radius" type="float" default="150.0" />
-			<param index="4" name="vertex_bias" type="float" default="2.0" />
-			<param index="5" name="base_rotation" type="float" default="0.0" />
-			<param index="6" name="face_outward" type="bool" default="true" />
-			<param index="7" name="facing_offset_degrees" type="float" default="0.0" />
-			<description>
-				Generates a star/polygon emphasis pattern: [code]vertices[/code] symmetric directions with extra density pulled toward each vertex. [code]vertex_bias[/code] 0 is an even ring, higher values sharpen the star. Useful for pentagram bosses, shuriken patterns and geometric spell cards.
-			</description>
-		</method>
-		<method name="helper_generate_transforms_multispiral" qualifiers="static">
-			<return type="Transform2D[]" />
-			<param index="0" name="transforms_amount" type="int" />
-			<param index="1" name="marker_transform" type="Transform2D" />
-			<param index="2" name="arms" type="int" default="3" />
-			<param index="3" name="start_radius" type="float" default="50.0" />
-			<param index="4" name="radius_step" type="float" default="15.0" />
-			<param index="5" name="angle_step" type="float" default="0.6" />
-			<param index="6" name="rotate_with_marker" type="bool" default="true" />
-			<param index="7" name="facing_mode" type="int" enum="BulletFactory2D.SpiralFacingMode" default="0" />
-			<param index="8" name="facing_offset_degrees" type="float" default="0.0" />
-			<param index="9" name="arm_index_stride" type="int" default="1" />
-			<description>
-				Generates a multi-arm spiral: [code]arms[/code] interleaved arms around the marker (galaxy, windmill and rose looks at low bullet counts). [code]arm_index_stride[/code] 1 interleaves consecutive slots across arms, higher values group slots per arm. Same facing modes as the single spiral. Useful for pinwheels, galaxies and rotating boss arms.
-			</description>
-		</method>
-		<method name="helper_apply_skip_indices" qualifiers="static">
-			<return type="Transform2D[]" />
-			<param index="0" name="transforms" type="Transform2D[]" />
-			<param index="1" name="skip_indices" type="PackedInt32Array" />
-			<description>
-				Drops slot indexes from a generated array (dodge doors, bullet text). Out-of-range entries are ignored with one warning; the output shrinks. The spawner applies this automatically via helper_skip_indices.
-			</description>
-		</method>
-		<method name="helper_generate_transforms_cross" qualifiers="static">
-			<return type="Transform2D[]" />
-			<param index="0" name="transforms_amount" type="int" />
-			<param index="1" name="marker_transform" type="Transform2D" />
-			<param index="2" name="arm_count" type="int" default="4" />
-			<param index="3" name="arm_length" type="float" default="150.0" />
+			<param index="2" name="aim_direction" type="Vector2" />
+			<param index="3" name="width" type="float" default="400.0" />
 			<param index="4" name="spacing" type="float" default="32.0" />
-			<param index="5" name="base_rotation" type="float" default="0.0" />
-			<param index="6" name="face_outward" type="bool" default="true" />
+			<param index="5" name="gap_width" type="float" default="96.0" />
+			<param index="6" name="face_aim" type="bool" default="true" />
 			<param index="7" name="facing_offset_degrees" type="float" default="0.0" />
 			<description>
-				Generates a cross/plus barrage: arm_count rays of evenly spaced slots from the marker out to arm_length. Crossfire and plus-shaped danmaku bursts.
-			</description>
-		</method>
-		<method name="helper_generate_transforms_star" qualifiers="static">
-			<return type="Transform2D[]" />
-			<param index="0" name="transforms_amount" type="int" />
-			<param index="1" name="marker_transform" type="Transform2D" />
-			<param index="2" name="points" type="int" default="5" />
-			<param index="3" name="outer_radius" type="float" default="150.0" />
-			<param index="4" name="inner_radius" type="float" default="65.0" />
-			<param index="5" name="base_rotation" type="float" default="0.0" />
-			<param index="6" name="face_outward" type="bool" default="true" />
-			<param index="7" name="facing_offset_degrees" type="float" default="0.0" />
-			<description>
-				Generates a true star shell: points alternating outer/inner vertices around the marker (distinct from the polygon helper's density bias). Boss star bursts and celebratory shells.
-			</description>
-		</method>
-		<method name="helper_generate_transforms_heart" qualifiers="static">
-			<return type="Transform2D[]" />
-			<param index="0" name="transforms_amount" type="int" />
-			<param index="1" name="marker_transform" type="Transform2D" />
-			<param index="2" name="size" type="float" default="150.0" />
-			<param index="3" name="base_rotation" type="float" default="0.0" />
-			<param index="4" name="face_outward" type="bool" default="true" />
-			<param index="5" name="facing_offset_degrees" type="float" default="0.0" />
-			<description>
-				Generates a parametric heart outline (classic 16sin^3 curve) scaled by size. Boss love attacks and ending cards.
-			</description>
-		</method>
-		<method name="helper_generate_transforms_wave" qualifiers="static">
-			<return type="Transform2D[]" />
-			<param index="0" name="transforms_amount" type="int" />
-			<param index="1" name="marker_transform" type="Transform2D" />
-			<param index="2" name="width" type="float" default="600.0" />
-			<param index="3" name="amplitude" type="float" default="48.0" />
-			<param index="4" name="waves" type="float" default="2.0" />
-			<param index="5" name="direction" type="Vector2" default="Vector2(1, 0)" />
-			<param index="6" name="face_direction" type="bool" default="true" />
-			<param index="7" name="facing_offset_degrees" type="float" default="0.0" />
-			<description>
-				Generates a snake row along a sine wave of width, amplitude and wave count around the marker axis. Pairs with wobble flight for slithering curtains.
-			</description>
-		</method>
-		<method name="helper_generate_transforms_waterfall" qualifiers="static">
-			<return type="Transform2D[]" />
-			<param index="0" name="transforms_amount" type="int" />
-			<param index="1" name="marker_transform" type="Transform2D" />
-			<param index="2" name="columns" type="int" default="12" />
-			<param index="3" name="column_spacing" type="float" default="48.0" />
-			<param index="4" name="rows" type="int" default="3" />
-			<param index="5" name="row_spacing" type="float" default="64.0" />
-			<param index="6" name="stagger" type="float" default="0.5" />
-			<param index="7" name="rain_direction" type="Vector2" default="Vector2(0, 1)" />
-			<param index="8" name="jitter" type="float" default="6.0" />
-			<param index="9" name="facing_offset_degrees" type="float" default="0.0" />
-			<description>
-				Generates a staggered waterfall curtain: columns by rows grid with per-row stagger offsets and jitter, firing along rain_direction. Past capacity the curtain keeps growing row by row instead of stacking. Combine with skip indices for readable doors.
-			</description>
-		</method>
-		<method name="helper_generate_transforms_lattice" qualifiers="static">
-			<return type="Transform2D[]" />
-			<param index="0" name="transforms_amount" type="int" />
-			<param index="1" name="marker_transform" type="Transform2D" />
-			<param index="2" name="columns" type="int" default="8" />
-			<param index="3" name="rows" type="int" default="5" />
-			<param index="4" name="spacing_x" type="float" default="48.0" />
-			<param index="5" name="spacing_y" type="float" default="42.0" />
-			<param index="6" name="stagger_rows" type="bool" default="true" />
-			<param index="7" name="face_outward" type="bool" default="true" />
-			<param index="8" name="facing_offset_degrees" type="float" default="0.0" />
-			<description>
-				Generates a staggered honeycomb lattice for honeycomb walls and geometric curtains.
-			</description>
-		</method>
-		<method name="helper_generate_transforms_rose" qualifiers="static">
-			<return type="Transform2D[]" />
-			<param index="0" name="transforms_amount" type="int" />
-			<param index="1" name="marker_transform" type="Transform2D" />
-			<param index="2" name="petals" type="int" default="6" />
-			<param index="3" name="radius" type="float" default="150.0" />
-			<param index="4" name="lobe_sharpness" type="float" default="1.0" />
-			<param index="5" name="base_rotation" type="float" default="0.0" />
-			<param index="6" name="face_outward" type="bool" default="true" />
-			<param index="7" name="facing_offset_degrees" type="float" default="0.0" />
-			<description>
-				Generates an exact rhodonea rose bloom: slots sweep theta over the full turn and sit at r = R * cos(k * theta) with k = petals. lobe_sharpness 1.0 is the exact rose (0 is round, higher pinches the waist). Recipe: Rose + phase_step_per_bullet + angular wobble = blossom finale. Used by the petal storm and blossom finale presets.
+				Generates a dense wall perpendicular to aim_direction with a carved center dodge door of gap_width pixels. spacing is reserved (unused): slots spread evenly across width (but spacing must still be finite and above zero, and gap_width narrower than width, or the call returns empty). Returns at most transforms_amount slots (the gap shrinks the array like Ellipse Wall). Combine with skip indices for multi-door variants. Used by the aimed trap preset.
 			</description>
 		</method>
 		<method name="helper_generate_transforms_counter_spiral" qualifiers="static">
@@ -419,18 +176,120 @@
 				Generates a twin counter-rotating galaxy: odd arms wind -angle_step while even arms wind +angle_step when mirrored (same facing switch as the multi spiral, including tangent-aware chirality). Turn mirroring off for a same-chirality multi spiral. Used by the twin spiral counter preset.
 			</description>
 		</method>
-		<method name="helper_generate_transforms_corridor" qualifiers="static">
+		<method name="helper_generate_transforms_cross" qualifiers="static">
 			<return type="Transform2D[]" />
 			<param index="0" name="transforms_amount" type="int" />
 			<param index="1" name="marker_transform" type="Transform2D" />
-			<param index="2" name="aim_direction" type="Vector2" />
-			<param index="3" name="width" type="float" default="400.0" />
+			<param index="2" name="arm_count" type="int" default="4" />
+			<param index="3" name="arm_length" type="float" default="150.0" />
 			<param index="4" name="spacing" type="float" default="32.0" />
-			<param index="5" name="gap_width" type="float" default="96.0" />
-			<param index="6" name="face_aim" type="bool" default="true" />
+			<param index="5" name="base_rotation" type="float" default="0.0" />
+			<param index="6" name="face_outward" type="bool" default="true" />
 			<param index="7" name="facing_offset_degrees" type="float" default="0.0" />
 			<description>
-				Generates a dense wall perpendicular to aim_direction with a carved center dodge door of gap_width pixels. spacing is reserved (unused): slots spread evenly across width. Returns at most transforms_amount slots (the gap shrinks the array like Ellipse Wall). Combine with skip indices for multi-door variants. Used by the aimed trap preset.
+				Generates a cross/plus barrage: arm_count rays of evenly spaced slots from the marker out to arm_length. Crossfire and plus-shaped danmaku bursts.
+			</description>
+		</method>
+		<method name="helper_generate_transforms_ellipse" qualifiers="static">
+			<return type="Transform2D[]" />
+			<param index="0" name="transforms_amount" type="int" />
+			<param index="1" name="marker_transform" type="Transform2D" />
+			<param index="2" name="radius_x" type="float" default="150.0" />
+			<param index="3" name="radius_y" type="float" default="100.0" />
+			<param index="4" name="ellipse_rotation" type="float" default="0.0" />
+			<param index="5" name="start_angle" type="float" default="0.0" />
+			<param index="6" name="arc" type="float" default="6.2831855" />
+			<param index="7" name="mode" type="int" enum="BulletFactory2D.EllipseMode" default="0" />
+			<param index="8" name="gap_count" type="int" default="2" />
+			<param index="9" name="gap_width" type="float" default="0.3" />
+			<param index="10" name="face_outward" type="bool" default="true" />
+			<param index="11" name="facing_offset_degrees" type="float" default="0.0" />
+			<description>
+				Generates a true ellipse ring with independent [code]radius_x[/code] / [code]radius_y[/code] semi-axes rotated by [code]ellipse_rotation[/code] (the ring helper's y_scale is only an approximation). Full draws every slot, Arc draws a spaced segment, Wall draws a dense arc with [code]gap_count[/code] carved dodge gaps of [code]gap_width[/code] radians each (danmaku walls with readable escape routes; the array shrinks to the surviving slots). Wall mode with gap_count 0 or gap_width 0 draws the plain arc (no carving). Facings follow the ellipse outward normal. Useful for oval bosses, stadium arenas and gap walls.
+			</description>
+		</method>
+		<method name="helper_generate_transforms_fan" qualifiers="static">
+			<return type="Transform2D[]" />
+			<param index="0" name="transforms_amount" type="int" />
+			<param index="1" name="marker_transform" type="Transform2D" />
+			<param index="2" name="spread" type="float" default="0.5" />
+			<param index="3" name="direction_angle" type="float" default="0.0" />
+			<param index="4" name="step_offset" type="float" default="0.0" />
+			<param index="5" name="centered" type="bool" default="true" />
+			<param index="6" name="angle_jitter" type="float" default="0.0" />
+			<description>
+				Generates a fan of transforms spread evenly across a cone. [code]direction_angle[/code] is the cone center relative to the marker rotation, [code]spread[/code] is the full cone width in radians, and [code]step_offset[/code] staggers origins along the direction so pellets do not stack on top of each other. A single bullet flies straight down the cone center. Set [code]centered[/code] to false for a one-sided fan opening from the center direction toward +spread. [code]angle_jitter[/code] adds per-slot random variance in radians for shotgun spreads (0 fires the exact cone). Useful for shotgun spreads.
+			</description>
+		</method>
+		<method name="helper_generate_transforms_flower" qualifiers="static">
+			<return type="Transform2D[]" />
+			<param index="0" name="transforms_amount" type="int" />
+			<param index="1" name="marker_transform" type="Transform2D" />
+			<param index="2" name="petals" type="int" default="6" />
+			<param index="3" name="bullets_per_petal" type="int" default="5" />
+			<param index="4" name="radius" type="float" default="150.0" />
+			<param index="5" name="petal_spread" type="float" default="0.5" />
+			<param index="6" name="petal_sharpness" type="float" default="1.0" />
+			<param index="7" name="base_rotation" type="float" default="0.0" />
+			<param index="8" name="face_outward" type="bool" default="true" />
+			<param index="9" name="facing_offset_degrees" type="float" default="0.0" />
+			<description>
+				Generates a floral spell-card pattern: [code]petals[/code] symmetric lobes around the marker, each holding [code]bullets_per_petal[/code] slots spread over [code]petal_spread[/code] radians. [code]petal_sharpness[/code] 0 gives round lobes, higher values pinch the waist into tighter flowers. [code]transforms_amount[/code] sizes the array (fewer slots than petals times per-petal truncates). Useful for boss blossoms and mandala rings.
+			</description>
+		</method>
+		<method name="helper_generate_transforms_grid" qualifiers="static">
+			<return type="Transform2D[]" />
+			<param index="0" name="transforms_amount" type="int" />
+			<param index="1" name="marker_transform" type="Transform2D" />
+			<param index="2" name="rows_per_column" type="int" default="10" />
+			<param index="3" name="alignment" type="int" enum="BulletFactory2D.Alignment" default="3" />
+			<param index="4" name="column_offset" type="float" default="150.0" />
+			<param index="5" name="row_offset" type="float" default="150.0" />
+			<param index="6" name="rotate_grid_with_marker" type="bool" default="true" />
+			<param index="7" name="random_local_rotation" type="bool" default="false" />
+			<param index="8" name="jitter" type="float" default="0.0" />
+			<description>
+				Generates a grid of transforms that are positioned relative to the [code]marker_transform[/code]. [code]jitter[/code] scatters each origin by up to +-jitter pixels on both axes (0 disables it).
+			</description>
+		</method>
+		<method name="helper_generate_transforms_heart" qualifiers="static">
+			<return type="Transform2D[]" />
+			<param index="0" name="transforms_amount" type="int" />
+			<param index="1" name="marker_transform" type="Transform2D" />
+			<param index="2" name="size" type="float" default="150.0" />
+			<param index="3" name="base_rotation" type="float" default="0.0" />
+			<param index="4" name="face_outward" type="bool" default="true" />
+			<param index="5" name="facing_offset_degrees" type="float" default="0.0" />
+			<description>
+				Generates a parametric heart outline (classic 16sin^3 curve) scaled by size. Boss love attacks and ending cards.
+			</description>
+		</method>
+		<method name="helper_generate_transforms_lattice" qualifiers="static">
+			<return type="Transform2D[]" />
+			<param index="0" name="transforms_amount" type="int" />
+			<param index="1" name="marker_transform" type="Transform2D" />
+			<param index="2" name="columns" type="int" default="8" />
+			<param index="3" name="rows" type="int" default="5" />
+			<param index="4" name="spacing_x" type="float" default="48.0" />
+			<param index="5" name="spacing_y" type="float" default="42.0" />
+			<param index="6" name="stagger_rows" type="bool" default="true" />
+			<param index="7" name="face_outward" type="bool" default="true" />
+			<param index="8" name="facing_offset_degrees" type="float" default="0.0" />
+			<description>
+				Generates a staggered honeycomb lattice for honeycomb walls and geometric curtains.
+			</description>
+		</method>
+		<method name="helper_generate_transforms_line" qualifiers="static">
+			<return type="Transform2D[]" />
+			<param index="0" name="transforms_amount" type="int" />
+			<param index="1" name="marker_transform" type="Transform2D" />
+			<param index="2" name="direction" type="Vector2" />
+			<param index="3" name="spacing" type="float" default="32.0" />
+			<param index="4" name="face_direction" type="bool" default="true" />
+			<param index="5" name="anchor" type="int" enum="BulletFactory2D.LineAnchor" default="1" />
+			<param index="6" name="perpendicular" type="bool" default="false" />
+			<description>
+				Generates transforms in a straight wall along [code]direction[/code], spaced evenly by [code]spacing[/code]. [code]anchor[/code] picks where the marker sits on the row (start, center, end). Bullets face along the line when [code]face_direction[/code] is true - plus 90 degrees when [code]perpendicular[/code] is set, for strafe walls - otherwise they keep the marker rotation. Useful for walls, curtains and gates. Returns an empty array when the direction is zero.
 			</description>
 		</method>
 		<method name="helper_generate_transforms_lissajous" qualifiers="static">
@@ -446,6 +305,147 @@
 			<param index="8" name="facing_offset_degrees" type="float" default="0.0" />
 			<description>
 				Generates figure-8 / weave openings: slots sweep t over the full turn on the lissajous curve (size_x * sin(freq_x * t + phase), size_y * sin(freq_y * t)) for crossing curtains with readable doors. Recipe: slow spin + lissajous weave = butterfly curtain.
+			</description>
+		</method>
+		<method name="helper_generate_transforms_multispiral" qualifiers="static">
+			<return type="Transform2D[]" />
+			<param index="0" name="transforms_amount" type="int" />
+			<param index="1" name="marker_transform" type="Transform2D" />
+			<param index="2" name="arms" type="int" default="3" />
+			<param index="3" name="start_radius" type="float" default="50.0" />
+			<param index="4" name="radius_step" type="float" default="15.0" />
+			<param index="5" name="angle_step" type="float" default="0.6" />
+			<param index="6" name="rotate_with_marker" type="bool" default="true" />
+			<param index="7" name="facing_mode" type="int" enum="BulletFactory2D.SpiralFacingMode" default="0" />
+			<param index="8" name="facing_offset_degrees" type="float" default="0.0" />
+			<param index="9" name="arm_index_stride" type="int" default="1" />
+			<description>
+				Generates a multi-arm spiral: [code]arms[/code] interleaved arms around the marker (galaxy, windmill and rose looks at low bullet counts). [code]arm_index_stride[/code] 1 interleaves consecutive slots across arms, higher values group slots per arm. Same facing modes as the single spiral. Useful for pinwheels, galaxies and rotating boss arms.
+			</description>
+		</method>
+		<method name="helper_generate_transforms_polygon" qualifiers="static">
+			<return type="Transform2D[]" />
+			<param index="0" name="transforms_amount" type="int" />
+			<param index="1" name="marker_transform" type="Transform2D" />
+			<param index="2" name="vertices" type="int" default="5" />
+			<param index="3" name="radius" type="float" default="150.0" />
+			<param index="4" name="vertex_bias" type="float" default="2.0" />
+			<param index="5" name="base_rotation" type="float" default="0.0" />
+			<param index="6" name="face_outward" type="bool" default="true" />
+			<param index="7" name="facing_offset_degrees" type="float" default="0.0" />
+			<description>
+				Generates a star/polygon emphasis pattern: [code]vertices[/code] symmetric directions with extra density pulled toward each vertex. [code]vertex_bias[/code] 0 is an even ring, higher values sharpen the star. Useful for pentagram bosses, shuriken patterns and geometric spell cards.
+			</description>
+		</method>
+		<method name="helper_generate_transforms_rain" qualifiers="static">
+			<return type="Transform2D[]" />
+			<param index="0" name="transforms_amount" type="int" />
+			<param index="1" name="marker_transform" type="Transform2D" />
+			<param index="2" name="band_width" type="float" default="600.0" />
+			<param index="3" name="rain_direction" type="Vector2" default="Vector2(0, 1)" />
+			<param index="4" name="drop_spacing" type="float" default="48.0" />
+			<param index="5" name="jitter" type="float" default="12.0" />
+			<description>
+				Generates a rain curtain: slots spread along a horizontal band of [code]band_width[/code] facing [code]rain_direction[/code], with rows staggered by [code]drop_spacing[/code] so the curtain reads as layered sheets, plus random [code]jitter[/code] per slot. Useful for bullet-rain phases, storm walls and descending curtains.
+			</description>
+		</method>
+		<method name="helper_generate_transforms_ring" qualifiers="static">
+			<return type="Transform2D[]" />
+			<param index="0" name="transforms_amount" type="int" />
+			<param index="1" name="marker_transform" type="Transform2D" />
+			<param index="2" name="radius" type="float" default="150.0" />
+			<param index="3" name="start_angle" type="float" default="0.0" />
+			<param index="4" name="arc" type="float" default="6.2831855" />
+			<param index="5" name="rotate_with_marker" type="bool" default="true" />
+			<param index="6" name="random_rotation" type="bool" default="false" />
+			<param index="7" name="face_outward" type="bool" default="true" />
+			<param index="8" name="y_scale" type="float" default="1.0" />
+			<param index="9" name="facing_offset_degrees" type="float" default="0.0" />
+			<description>
+				Generates transforms placed evenly on a ring (or arc, when [code]arc[/code] is smaller than a full turn) around the marker. Every bullet faces outward, so art drawn facing right travels away from the center. Set [code]face_outward[/code] to false for implosion patterns that fly toward the center. [code]y_scale[/code] stretches the ring into an ellipse (facing stays radial, approximate on stretched rings) and [code]facing_offset_degrees[/code] twists every facing. Useful for radial bursts and boss rings.
+			</description>
+		</method>
+		<method name="helper_generate_transforms_rose" qualifiers="static">
+			<return type="Transform2D[]" />
+			<param index="0" name="transforms_amount" type="int" />
+			<param index="1" name="marker_transform" type="Transform2D" />
+			<param index="2" name="petals" type="int" default="6" />
+			<param index="3" name="radius" type="float" default="150.0" />
+			<param index="4" name="lobe_sharpness" type="float" default="1.0" />
+			<param index="5" name="base_rotation" type="float" default="0.0" />
+			<param index="6" name="face_outward" type="bool" default="true" />
+			<param index="7" name="facing_offset_degrees" type="float" default="0.0" />
+			<description>
+				Generates an exact rhodonea rose bloom: slots sweep theta over the full turn and sit at r = R * cos(k * theta) with k = petals. lobe_sharpness 1.0 is the exact rose (0 is round, higher pinches the waist). Recipe: Rose + phase_step_per_bullet + angular wobble = blossom finale. Used by the petal storm and blossom finale presets.
+			</description>
+		</method>
+		<method name="helper_generate_transforms_scatter" qualifiers="static">
+			<return type="Transform2D[]" />
+			<param index="0" name="transforms_amount" type="int" />
+			<param index="1" name="marker_transform" type="Transform2D" />
+			<param index="2" name="burst_radius" type="float" default="120.0" />
+			<param index="3" name="facing_jitter" type="float" default="0.4" />
+			<param index="4" name="seed" type="int" default="0" />
+			<description>
+				Generates a biased-random disc burst: offsets fill the [code]burst_radius[/code] disc with even density (not center-clumped), facings are radial-outward plus [code]facing_jitter[/code]. [code]seed[/code] 0 is non-deterministic, otherwise reproducible (replays, synced bosses). Useful for explosions, boss deaths and petal pops.
+			</description>
+		</method>
+		<method name="helper_generate_transforms_spiral" qualifiers="static">
+			<return type="Transform2D[]" />
+			<param index="0" name="transforms_amount" type="int" />
+			<param index="1" name="marker_transform" type="Transform2D" />
+			<param index="2" name="start_radius" type="float" default="50.0" />
+			<param index="3" name="radius_step" type="float" default="15.0" />
+			<param index="4" name="angle_step" type="float" default="0.6" />
+			<param index="5" name="rotate_with_marker" type="bool" default="true" />
+			<param index="6" name="facing_mode" type="int" enum="BulletFactory2D.SpiralFacingMode" default="0" />
+			<param index="7" name="facing_offset_degrees" type="float" default="0.0" />
+			<description>
+				Generates transforms along an expanding spiral around the marker. [code]facing_mode[/code] picks the bullet facing: tangent means each bullet flies along its travel direction on the spiral (the default), radial outward is the historical behavior, toward center faces the marker, keep marker preserves the marker rotation. [code]facing_offset_degrees[/code] twists every facing by a fixed amount. Useful for rotating emitter looks and volute patterns.
+			</description>
+		</method>
+		<method name="helper_generate_transforms_star" qualifiers="static">
+			<return type="Transform2D[]" />
+			<param index="0" name="transforms_amount" type="int" />
+			<param index="1" name="marker_transform" type="Transform2D" />
+			<param index="2" name="points" type="int" default="5" />
+			<param index="3" name="outer_radius" type="float" default="150.0" />
+			<param index="4" name="inner_radius" type="float" default="65.0" />
+			<param index="5" name="base_rotation" type="float" default="0.0" />
+			<param index="6" name="face_outward" type="bool" default="true" />
+			<param index="7" name="facing_offset_degrees" type="float" default="0.0" />
+			<description>
+				Generates a true star shell: points alternating outer/inner vertices around the marker (distinct from the polygon helper's density bias). Boss star bursts and celebratory shells.
+			</description>
+		</method>
+		<method name="helper_generate_transforms_waterfall" qualifiers="static">
+			<return type="Transform2D[]" />
+			<param index="0" name="transforms_amount" type="int" />
+			<param index="1" name="marker_transform" type="Transform2D" />
+			<param index="2" name="columns" type="int" default="12" />
+			<param index="3" name="column_spacing" type="float" default="48.0" />
+			<param index="4" name="rows" type="int" default="3" />
+			<param index="5" name="row_spacing" type="float" default="64.0" />
+			<param index="6" name="stagger" type="float" default="0.5" />
+			<param index="7" name="rain_direction" type="Vector2" default="Vector2(0, 1)" />
+			<param index="8" name="jitter" type="float" default="6.0" />
+			<param index="9" name="facing_offset_degrees" type="float" default="0.0" />
+			<description>
+				Generates a staggered waterfall curtain: columns by rows grid with per-row stagger offsets and jitter, firing along rain_direction. Past capacity the curtain keeps growing row by row instead of stacking. Combine with skip indices for readable doors.
+			</description>
+		</method>
+		<method name="helper_generate_transforms_wave" qualifiers="static">
+			<return type="Transform2D[]" />
+			<param index="0" name="transforms_amount" type="int" />
+			<param index="1" name="marker_transform" type="Transform2D" />
+			<param index="2" name="width" type="float" default="600.0" />
+			<param index="3" name="amplitude" type="float" default="48.0" />
+			<param index="4" name="waves" type="float" default="2.0" />
+			<param index="5" name="direction" type="Vector2" default="Vector2(1, 0)" />
+			<param index="6" name="face_direction" type="bool" default="true" />
+			<param index="7" name="facing_offset_degrees" type="float" default="0.0" />
+			<description>
+				Generates a snake row along a sine wave of width, amplitude and wave count around the marker axis. Pairs with wobble flight for slithering curtains.
 			</description>
 		</method>
 		<method name="populate_attachments_pool">
@@ -509,6 +509,7 @@
 			<return type="DirectionalBullets2D" />
 			<param index="0" name="spawn_data" type="DirectionalBulletsData2D" />
 			<param index="1" name="inherited_velocity_offset" type="Vector2" default="Vector2(0, 0)" />
+			<param index="2" name="spawner_id" type="int" default="0" />
 			<description>
 				Spawns DirectionalBullets2D that are meant to be controlled and edited.
 				If there is a multimesh available in the object pool (that matches the amount of transforms provided and the collision shape) then it gets re-used with the new data.
@@ -614,39 +615,6 @@
 		</signal>
 	</signals>
 	<constants>
-		<constant name="DIRECTIONAL_BULLETS" value="0" enum="BulletType">
-			Bullet type for DirectionalBullets2D, bullets that move independently with per-bullet direction, speed and features.
-		</constant>
-		<constant name="BLOCK_BULLETS" value="1" enum="BulletType">
-			Bullet type for BlockBullets2D, bullets that travel as one rigid volley in a single direction.
-		</constant>
-		<constant name="TOP_LEFT" value="0" enum="Alignment">
-			Grid anchor used by helper_generate_transforms_grid(), the grid grows right and down starting at the marker.
-		</constant>
-		<constant name="TOP_CENTER" value="1" enum="Alignment">
-			Grid anchor used by helper_generate_transforms_grid(), horizontally centered on the marker, growing downward.
-		</constant>
-		<constant name="TOP_RIGHT" value="2" enum="Alignment">
-			Grid anchor used by helper_generate_transforms_grid(), grows left and down starting at the marker.
-		</constant>
-		<constant name="CENTER_LEFT" value="3" enum="Alignment">
-			Grid anchor used by helper_generate_transforms_grid(), grows rightward, vertically centered on the marker.
-		</constant>
-		<constant name="CENTER" value="4" enum="Alignment">
-			Grid anchor used by helper_generate_transforms_grid(), centered on the marker in both axes.
-		</constant>
-		<constant name="CENTER_RIGHT" value="5" enum="Alignment">
-			Grid anchor used by helper_generate_transforms_grid(), grows leftward, vertically centered on the marker.
-		</constant>
-		<constant name="BOTTOM_LEFT" value="6" enum="Alignment">
-			Grid anchor used by helper_generate_transforms_grid(), grows right and up starting at the marker.
-		</constant>
-		<constant name="BOTTOM_CENTER" value="7" enum="Alignment">
-			Grid anchor used by helper_generate_transforms_grid(), horizontally centered on the marker, growing upward.
-		</constant>
-		<constant name="BOTTOM_RIGHT" value="8" enum="Alignment">
-			Grid anchor used by helper_generate_transforms_grid(), grows left and up starting at the marker.
-		</constant>
 		<constant name="SPIRAL_FACING_TANGENT" value="0" enum="SpiralFacingMode">
 			Spiral facing used by helper_generate_transforms_spiral(): each bullet faces along its travel direction on the spiral.
 		</constant>
@@ -690,7 +658,7 @@
 			Preset used by BulletSpawner2D.apply_pattern_preset(): 3-arm interleaved spiral (galaxy / windmill look).
 		</constant>
 		<constant name="PATTERN_PRESET_AIMED_FAN_NARROW" value="3" enum="PatternPreset">
-			Preset used by BulletSpawner2D.apply_pattern_preset(): narrow 5-pellet aimed fan for turrets.
+			Preset used by BulletSpawner2D.apply_pattern_preset(): narrow 5-pellet aimed fan for focused shooters.
 		</constant>
 		<constant name="PATTERN_PRESET_AIMED_FAN_WIDE" value="4" enum="PatternPreset">
 			Preset used by BulletSpawner2D.apply_pattern_preset(): wide 9-pellet aimed fan for shotguns.
@@ -736,6 +704,39 @@
 		</constant>
 		<constant name="PATTERN_PRESET_BLOSSOM_FINALE" value="18" enum="PatternPreset">
 			Preset used by BulletSpawner2D.apply_pattern_preset(): 12-lobe exact rose bloom with slow spin (ending card).
+		</constant>
+		<constant name="DIRECTIONAL_BULLETS" value="0" enum="BulletType">
+			Bullet type for DirectionalBullets2D, bullets that move independently with per-bullet direction, speed and features.
+		</constant>
+		<constant name="BLOCK_BULLETS" value="1" enum="BulletType">
+			Bullet type for BlockBullets2D, bullets that travel as one rigid volley in a single direction.
+		</constant>
+		<constant name="TOP_LEFT" value="0" enum="Alignment">
+			Grid anchor used by helper_generate_transforms_grid(), the grid grows right and down starting at the marker.
+		</constant>
+		<constant name="TOP_CENTER" value="1" enum="Alignment">
+			Grid anchor used by helper_generate_transforms_grid(), horizontally centered on the marker, growing downward.
+		</constant>
+		<constant name="TOP_RIGHT" value="2" enum="Alignment">
+			Grid anchor used by helper_generate_transforms_grid(), grows left and down starting at the marker.
+		</constant>
+		<constant name="CENTER_LEFT" value="3" enum="Alignment">
+			Grid anchor used by helper_generate_transforms_grid(), grows rightward, vertically centered on the marker.
+		</constant>
+		<constant name="CENTER" value="4" enum="Alignment">
+			Grid anchor used by helper_generate_transforms_grid(), centered on the marker in both axes.
+		</constant>
+		<constant name="CENTER_RIGHT" value="5" enum="Alignment">
+			Grid anchor used by helper_generate_transforms_grid(), grows leftward, vertically centered on the marker.
+		</constant>
+		<constant name="BOTTOM_LEFT" value="6" enum="Alignment">
+			Grid anchor used by helper_generate_transforms_grid(), grows right and up starting at the marker.
+		</constant>
+		<constant name="BOTTOM_CENTER" value="7" enum="Alignment">
+			Grid anchor used by helper_generate_transforms_grid(), horizontally centered on the marker, growing upward.
+		</constant>
+		<constant name="BOTTOM_RIGHT" value="8" enum="Alignment">
+			Grid anchor used by helper_generate_transforms_grid(), grows left and up starting at the marker.
 		</constant>
 	</constants>
 </class>

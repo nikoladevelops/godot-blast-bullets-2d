@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <class name="MultiMeshBullets2D" inherits="MultiMeshInstance2D" api_type="extension" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/godotengine/godot/master/doc/class.xsd">
 	<brief_description>
-		This class is only meant to be inherited by other C++ classes. Never use this by its own. Always use the [BulletFactory2D], that's the only proper way.
+		Shared live-volley base for [DirectionalBullets2D] and [BlockBullets2D]. Spawn through [BulletFactory2D], steer through the returned instance.
 	</brief_description>
 	<description>
 		Shared base for [DirectionalBullets2D] and [BlockBullets2D]. Holds everything a bullet batch needs at runtime: the multimesh, physics shapes, per-bullet caches, attachments, curves, movement patterns, timers, and the SpriteFrames animation state. You never create these directly. Spawn them through [BulletFactory2D], control live ones through the returned instance, and let the object pool recycle them.
@@ -544,68 +544,6 @@
 				Detaches all time based functions that were previously attached.
 			</description>
 		</method>
-		<method name="_do_attach_time_based_function">
-			<return type="void" />
-			<param index="0" name="time" type="float" />
-			<param index="1" name="callable" type="Callable" />
-			<param index="2" name="repeat" type="bool" />
-			<param index="3" name="execute_only_if_multimesh_is_active" type="bool" />
-			<param index="4" name="expected_timers_generation" type="int" />
-			<description>
-				Internal deferred worker for timer attach (do not call directly): applies only when the timers generation still matches.
-			</description>
-		</method>
-		<method name="_do_deferred_bullet_disable_attachment">
-			<return type="void" />
-			<param index="0" name="bullet_index" type="int" />
-			<param index="1" name="expected_generation" type="int" />
-			<param index="2" name="expected_attachment_id" type="int" />
-			<param index="3" name="expected_attachment" type="BulletAttachment2D" />
-			<description>
-				Internal deferred worker for attachment disable (do not call directly): pools the expected attachment only when the generation, id and slot still match.
-			</description>
-		</method>
-		<method name="_do_detach_all_time_based_functions">
-			<return type="void" />
-			<param index="0" name="expected_timers_generation" type="int" />
-			<description>
-				Internal deferred worker for detaching all timers (do not call directly): applies only when the timers generation still matches.
-			</description>
-		</method>
-		<method name="_do_detach_time_based_function">
-			<return type="void" />
-			<param index="0" name="callable" type="Callable" />
-			<param index="1" name="expected_timers_generation" type="int" />
-			<description>
-				Internal deferred worker for timer detach (do not call directly): applies only when the timers generation still matches.
-			</description>
-		</method>
-		<method name="_do_emit_life_time_over">
-			<return type="void" />
-			<param index="0" name="expected_generation" type="int" />
-			<param index="1" name="emitter_instance_id" type="int" />
-			<param index="2" name="signal_name" type="StringName" />
-			<param index="3" name="bullet_indexes" type="int[]" />
-			<description>
-				Internal deferred worker for the lifetime-over signal (do not call directly): emits only when the spawn generation still matches.
-			</description>
-		</method>
-		<method name="_do_emit_sprite_animation_finished">
-			<return type="void" />
-			<param index="0" name="expected_generation" type="int" />
-			<description>
-				Internal deferred worker for the animation-finished signal (do not call directly): emits only when the spawn generation still matches and the animation is still finished.
-			</description>
-		</method>
-		<method name="_do_execute_stored_callable_safely">
-			<return type="void" />
-			<param index="0" name="_callback" type="Callable" />
-			<param index="1" name="_execute_only_if_multimesh_is_active" type="bool" />
-			<param index="2" name="expected_timers_generation" type="int" />
-			<description>
-				Internal deferred worker for timer callbacks (do not call directly): runs the callable only when the timers generation still matches.
-			</description>
-		</method>
 		<method name="multimesh_detach_time_based_function">
 			<return type="void" />
 			<param index="0" name="callable" type="Callable" />
@@ -629,12 +567,6 @@
 				Switches animation reusing the cached SpriteFrames source. Same resolve rules (empty or missing "default" auto-resolves to the first animation). Errors only when no source cached yet.
 			</description>
 		</method>
-		<method name="reset_pooling_flags_to_default">
-			<return type="void" />
-			<description>
-				Resets both pooling flags ([member is_multimesh_auto_pooling_enabled] and [member is_attachments_auto_pooling_enabled]) to true. Use after taking over a pooled instance whose previous owner customized them.
-			</description>
-		</method>
 		<method name="remove_bullet_movement_pattern">
 			<return type="void" />
 			<param index="0" name="bullet_index" type="int" />
@@ -648,6 +580,12 @@
 			<return type="void" />
 			<description>
 				Removes the shared bullet curves (same as setting null). Per-bullet curves, if any, take over.
+			</description>
+		</method>
+		<method name="reset_pooling_flags_to_default">
+			<return type="void" />
+			<description>
+				Resets both pooling flags ([member is_multimesh_auto_pooling_enabled] and [member is_attachments_auto_pooling_enabled]) to true. Use after taking over a pooled instance whose previous owner customized them.
 			</description>
 		</method>
 		<method name="restart_sprite_animation">

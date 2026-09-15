@@ -19,7 +19,7 @@
 			<param index="5" name="rotation_acceleration_MIN" type="float" />
 			<param index="6" name="rotation_acceleration_MAX" type="float" />
 			<description>
-				Generates random rotation data.
+				Generates random rotation data: amount_to_generate entries with each value rolled inside its MIN/MAX range. Requires amount_to_generate above 0 and every MIN at or below its MAX, otherwise returns empty.
 			</description>
 		</method>
 	</methods>

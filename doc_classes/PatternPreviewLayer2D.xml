@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="PatternPreviewLayer2D" inherits="Node2D" api_type="extension" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/godotengine/godot/master/doc/class.xsd">
+	<brief_description>
+		Internal editor preview layer owned by [BulletSpawner2D]. Not for direct use.
+	</brief_description>
+	<description>
+		Internal helper behind the [BulletSpawner2D] pattern preview (the "~BlastBulletsPatternPreview" holder). It draws one dot plus one facing arrow per bullet the spawner would fire, repainting itself on every engine redraw so zoom, pan, selection, and idle refreshes can never wipe the gizmo. It is owner-less (never saved to scenes, never exported) and only runs at runtime when [member BulletSpawner2D.show_preview_during_runtime] is on. There is nothing to configure here - tune the preview through the spawner properties instead.
+	</description>
+	<tutorials>
+	</tutorials>
+</class>

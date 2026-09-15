@@ -1,8 +1,7 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <class name="MultiMeshBulletsDebugger2D" inherits="Node" api_type="extension" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/godotengine/godot/master/doc/class.xsd">
 	<brief_description>
-		Debugger for the collision shapes of the bullets.
-		This class is only meant to be used by the [BulletFactory2D] inside C++.
+		Debugger for the collision shapes of the bullets. Toggle it from the [BulletFactory2D] debugger properties.
 	</brief_description>
 	<description>
 		Draws every bullet collision shape as colored geometry so you can see what the physics server sees. Owned and driven by [BulletFactory2D]; toggle it with the factory debugger properties. True-shape meshes (rectangles, circle fans, capsules) rebuild automatically when a pooled instance is reused with a different shape.

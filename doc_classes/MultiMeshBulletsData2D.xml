@@ -49,7 +49,7 @@
 		<member name="all_bullet_rotation_data" type="BulletRotationData2D[]" setter="set_all_bullet_rotation_data" getter="get_all_bullet_rotation_data" default="[]">
 			Provide [BulletRotationData2D] if you want your bullets to rotate.
 
-			Note: If you want each bullet to have it's own rotation data then make sure that the amount of rotation data you provide is the same amount of data inside the [member transforms] property.
+			Note: If you want each bullet to have its own rotation data then make sure that the amount of rotation data you provide is the same amount of data inside the [member transforms] property.
 			    	Note: If the rotation data is less than the amount of [Transform2D] saved in the [member transforms] property, then only the first bullet rotation data will be shared for all bullets.
 			Note: [BulletRotationData2D] has a helper static method that you can use to generate random rotation data - [method BulletRotationData2D.generate_random_data].
 		</member>

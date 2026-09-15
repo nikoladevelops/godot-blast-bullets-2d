@@ -19,7 +19,7 @@
 			<param index="5" name="acceleration_MIN" type="float" />
 			<param index="6" name="acceleration_MAX" type="float" />
 			<description>
-				Generates random speed data.
+				Generates random speed data: amount_to_generate entries with each value rolled inside its MIN/MAX range. Requires amount_to_generate above 0 and every MIN at or below its MAX, otherwise returns empty.
 			</description>
 		</method>
 	</methods>

@@ -4,7 +4,7 @@
 		Contains spawn data for the [BlockBullets2D].
 	</brief_description>
 	<description>
-		Ensure that the [member MultiMeshBulletsData2D.transforms] property is set.
+		Spawn data for [BlockBullets2D]: a rigid block volley driven by [member block_rotation_radians] and [member block_speed], not by per-bullet arrays. Ensure that the [member MultiMeshBulletsData2D.transforms] property is set (it sizes the block).
 		Check [MultiMeshBulletsData2D]'s documentation for the rest of the properties.
 	</description>
 	<tutorials>

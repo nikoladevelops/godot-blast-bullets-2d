@@ -18,15 +18,15 @@
 
 		Note: Feature mixing has a fixed precedence each tick: homing steers the direction, direction curves adjust it (shared wins ties, per-bullet fills gaps), rotation spins only the visual, adjust_direction_based_on_rotation feeds the visual back into ballistics (skipped when rotate_only_textures is on, since that spin is rendering-only), movement patterns steer the displacement (skipped while a locked orbit owns the bullet, so non-repeating patterns never finish invisibly on the ring), and a locked orbit owns the final displacement. Homing smoothing has no effect while a movement pattern or rotation data drives the direction (the direction snaps instead). Teleporting a locked bullet re-aims its ring slot from the new position instead of snapping back. [member MultiMeshBullets2D.get_bullet_velocity] reports the logical velocity (direction times speed plus wind), excluding pattern and orbit displacement.
 
-		Note: Instead of [BulletSpeedData2D] with [method MultiMeshBullets2D.set_bullet_speed_data] you can take advantage of [BulletCurvesData2D] by using [method MultiMeshBullets2D.bullet_set_curves_data], [method MultiMeshBullets2D.all_bullets_set_curves_data] or [member shared_bullet_curves_data] if you want a shared curve for all bullets.
+		Note: Instead of [BulletSpeedData2D] with [method MultiMeshBullets2D.set_bullet_speed_data] you can take advantage of [BulletCurvesData2D] by using [method MultiMeshBullets2D.bullet_set_curves_data], [method MultiMeshBullets2D.all_bullets_set_curves_data] or [member MultiMeshBullets2D.shared_bullet_curves_data] if you want a shared curve for all bullets.
 
 		Note: For [Path2D] drawn bullet patterns try using [method MultiMeshBullets2D.set_bullet_movement_pattern_from_path] or [method MultiMeshBullets2D.set_bullet_movement_pattern_from_curve].
 
 		Note: For bullet attachments (particles, lights, etc...) use [BulletAttachment2D] and attach them via [method MultiMeshBullets2D.bullet_set_attachment] or [method MultiMeshBullets2D.all_bullets_set_attachment].
 
-			Note: For initial velocity/inertia use [member inherited_velocity_offset].
+			Note: For initial velocity/inertia use [member MultiMeshBullets2D.inherited_velocity_offset].
 
-			Note: For custom data that the multimesh should carry use [member shared_bullets_custom_data] - used for damage or anything else custom that is available in collision callbacks inside [BulletFactory2D].
+			Note: For custom data that the multimesh should carry use [member MultiMeshBullets2D.shared_bullets_custom_data] - used for damage or anything else custom that is available in collision callbacks inside [BulletFactory2D].
 
 		Note: For object pooling options see [member MultiMeshBullets2D.is_multimesh_auto_pooling_enabled] and [member MultiMeshBullets2D.is_attachments_auto_pooling_enabled].
 
@@ -119,6 +119,14 @@
 			<param index="1" name="bullet_index_end_inclusive" type="int" default="-1" />
 			<description>
 				Returns whether orbiting is enabled for each bullet in the range.
+			</description>
+		</method>
+		<method name="all_bullets_is_orbiting_locked">
+			<return type="bool[]" />
+			<param index="0" name="bullet_index_start" type="int" default="0" />
+			<param index="1" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<description>
+				Returns whether each bullet in the range is currently locked onto its orbit ring (as opposed to merely enabled but still flying to the ring).
 			</description>
 		</method>
 		<method name="all_bullets_pop_back_target">
@@ -250,14 +258,6 @@
 				Sets the homing turn agility for each bullet in the range. Setting any per-bullet value enables per-bullet mode, after which the shared [member homing_smoothing] is ignored. Useful for mixed volleys with fast and drifting homers.
 			</description>
 		</method>
-		<method name="all_bullets_is_orbiting_locked">
-			<return type="bool[]" />
-			<param index="0" name="bullet_index_start" type="int" default="0" />
-			<param index="1" name="bullet_index_end_inclusive" type="int" default="-1" />
-			<description>
-				Returns whether each bullet in the range is currently locked onto its orbit ring (as opposed to merely enabled but still flying to the ring).
-			</description>
-		</method>
 		<method name="all_bullets_set_orbiting_center">
 			<return type="void" />
 			<param index="0" name="new_center" type="Vector2" />
@@ -274,15 +274,6 @@
 			<param index="2" name="bullet_index_end_inclusive" type="int" default="-1" />
 			<description>
 				Sets the orbiting direction for all bullets in the range. Passing OrbitRandom re-rolls OrbitLeft or OrbitRight per bullet (never DontMove).
-			</description>
-		</method>
-		<method name="all_bullets_set_orbiting_radius">
-			<return type="void" />
-			<param index="0" name="new_radius" type="float" />
-			<param index="1" name="bullet_index_start" type="int" default="0" />
-			<param index="2" name="bullet_index_end_inclusive" type="int" default="-1" />
-			<description>
-				Sets the orbiting radius for all bullets in the range.
 			</description>
 		</method>
 		<method name="all_bullets_set_orbiting_follow_deadzone">
@@ -310,6 +301,15 @@
 			<param index="2" name="bullet_index_end_inclusive" type="int" default="-1" />
 			<description>
 				Sets what drops the orbit lock for all bullets in the range: RelockAlways re-acquires on every retarget, StayLocked never unlocks on retarget/empty, RelockOnTargetChange unlocks only when the front target changes identity.
+			</description>
+		</method>
+		<method name="all_bullets_set_orbiting_radius">
+			<return type="void" />
+			<param index="0" name="new_radius" type="float" />
+			<param index="1" name="bullet_index_start" type="int" default="0" />
+			<param index="2" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<description>
+				Sets the orbiting radius for all bullets in the range.
 			</description>
 		</method>
 		<method name="all_bullets_set_orbiting_rigid_follow">
@@ -441,18 +441,18 @@
 				Returns what drops the orbit lock for the specified bullet.
 			</description>
 		</method>
-		<method name="bullet_get_orbiting_rigid_follow">
-			<return type="bool" />
-			<param index="0" name="bullet_index" type="int" />
-			<description>
-				Returns whether the specified bullet uses rigid follow (locked bullets translate 1:1 with the target while circling).
-			</description>
-		</method>
 		<method name="bullet_get_orbiting_radius">
 			<return type="float" />
 			<param index="0" name="bullet_index" type="int" />
 			<description>
 				Returns the orbiting radius for the specified bullet.
+			</description>
+		</method>
+		<method name="bullet_get_orbiting_rigid_follow">
+			<return type="bool" />
+			<param index="0" name="bullet_index" type="int" />
+			<description>
+				Returns whether the specified bullet uses rigid follow (locked bullets translate 1:1 with the target while circling).
 			</description>
 		</method>
 		<method name="bullet_get_orbiting_texture_rotation">
@@ -674,31 +674,10 @@
 				Sets the exact velocity of the specified bullet (wind, knockback, split inheritance). See [method all_bullets_set_velocity] for details.
 			</description>
 		</method>
-		<method name="_do_auto_pop_front_target">
-			<return type="void" />
-			<param index="0" name="operation_generation" type="int" />
-			<param index="1" name="bullet_index" type="int" />
-			<param index="2" name="bullet_epoch" type="int" />
+		<method name="get_is_wobble_enabled" qualifiers="const">
+			<return type="bool" />
 			<description>
-				Internal deferred worker for per-bullet auto-pop (do not call directly): pops the front target when the generation and epoch still match. Routes the orbit lock per policy like a manual pop.
-			</description>
-		</method>
-		<method name="_do_emit_homing_target_reached">
-			<return type="void" />
-			<param index="0" name="operation_generation" type="int" />
-			<param index="1" name="bullet_index" type="int" />
-			<param index="2" name="bullet_epoch" type="int" />
-			<param index="3" name="target_instance_id" type="int" />
-			<param index="4" name="target_global_position" type="Vector2" />
-			<description>
-				Internal deferred worker for the reached signal (do not call directly): emits only when the generation and epoch still match, resolving the target by instance id (null when freed).
-			</description>
-		</method>
-		<method name="_do_shared_auto_pop_front_target">
-			<return type="void" />
-			<param index="0" name="operation_generation" type="int" />
-			<description>
-				Internal deferred worker for shared auto-pop (do not call directly): pops the shared front once per tick at most, then routes reached state and the orbit lock per policy.
+				Whether any wobble entry is currently enabled on this volley (shared or per-bullet). Set wobble data with [method MultiMeshBullets2D.bullet_set_wobble_data], [method MultiMeshBullets2D.all_bullets_set_wobble_data], or [member MultiMeshBullets2D.shared_bullet_wobble_data].
 			</description>
 		</method>
 		<method name="has_shared_bullet_rotation_data" qualifiers="const">
@@ -928,10 +907,22 @@
 
 			If you want this behavior for the shared deque, use [member shared_homing_deque_auto_pop_after_target_reached] instead.
 		</member>
+		<member name="gravity" type="Vector2" setter="set_gravity" getter="get_gravity" default="Vector2(0, 0)">
+			Constant acceleration in px/s^2 added to every bullet each tick (2D sideview arcs, tower-defense shells). (0, 0) disables.
+		</member>
+		<member name="homing_delay_sec" type="float" setter="set_homing_delay_sec" getter="get_homing_delay_sec" default="0.0">
+			Seconds of straight flight before steering starts (classic aimed-then-homing). 0 steers immediately.
+		</member>
 		<member name="homing_distance_before_reached" type="float" setter="set_homing_distance_before_reached" getter="get_homing_distance_before_reached" default="5.0">
 			Adjust if you want your bullets to consider a homing target reached if they are within a certain distance away from it.
 
 			The [signal bullet_homing_target_reached] signal is emitted when a target is reached.
+		</member>
+		<member name="homing_duration_sec" type="float" setter="set_homing_duration_sec" getter="get_homing_duration_sec" default="0.0">
+			Seconds of steering before bullets fly straight (lets fast players escape). 0 is infinite.
+		</member>
+		<member name="homing_lose_range_px" type="float" setter="set_homing_lose_range_px" getter="get_homing_lose_range_px" default="0.0">
+			Steering pauses while the bullet is farther than this from its target. 0 is unlimited.
 		</member>
 		<member name="homing_smoothing" type="float" setter="set_homing_smoothing" getter="get_homing_smoothing" default="0.0">
 			Adjust this value for natural smooth turning. Test with values [code]0.00-20.00[/code] or even bigger.
@@ -942,23 +933,11 @@
 		<member name="homing_update_interval" type="float" setter="set_homing_update_interval" getter="get_homing_update_interval" default="0.0">
 			How often it should cache the position of the targets so that they can be re-used instead of fetching them every frame. Increase if you want to boost performance.
 		</member>
-		<member name="gravity" type="Vector2" setter="set_gravity" getter="get_gravity" default="Vector2(0, 0)">
-			Constant acceleration in px/s^2 added to every bullet each tick (2D sideview arcs, tower-defense shells). (0, 0) disables.
+		<member name="inherited_velocity_offset" type="Vector2" setter="set_inherited_velocity_offset" getter="get_inherited_velocity_offset" default="Vector2(0, 0)">
+			Use this for initial velocity when the bullets are supposed to inherit velocity from the emitter.
 		</member>
 		<member name="linear_drag" type="float" setter="set_linear_drag" getter="get_linear_drag" default="0.0">
 			Linear drag trimming speed each tick. 0 disables.
-		</member>
-		<member name="homing_delay_sec" type="float" setter="set_homing_delay_sec" getter="get_homing_delay_sec" default="0.0">
-			Seconds of straight flight before steering starts (classic aimed-then-homing). 0 steers immediately.
-		</member>
-		<member name="homing_duration_sec" type="float" setter="set_homing_duration_sec" getter="get_homing_duration_sec" default="0.0">
-			Seconds of steering before bullets fly straight (lets fast players escape). 0 is infinite.
-		</member>
-		<member name="homing_lose_range_px" type="float" setter="set_homing_lose_range_px" getter="get_homing_lose_range_px" default="0.0">
-			Steering pauses while the bullet is farther than this from its target. 0 is unlimited.
-		</member>
-		<member name="inherited_velocity_offset" type="Vector2" setter="set_inherited_velocity_offset" getter="get_inherited_velocity_offset" default="Vector2(0, 0)">
-			Use this for initial velocity when the bullets are supposed to inherit velocity from the emitter.
 		</member>
 		<member name="shared_bullet_rotation_data" type="BulletRotationData2D" setter="set_shared_bullet_rotation_data" getter="get_shared_bullet_rotation_data">
 			Shared rotation applied to every bullet, taking precedence over per-bullet rotation data while set. Clearing it (null) hands control back, keeping already-seeded values - re-spawn or re-set to change those.

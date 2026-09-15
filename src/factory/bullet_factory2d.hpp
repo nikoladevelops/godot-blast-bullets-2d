@@ -1039,8 +1039,8 @@ public:
 			bool face_outward = true,
 			real_t facing_offset_degrees = 0.0);
 
-	// Twin counter-rotating galaxy: odd arms rotate +angle_step, even arms
-	// -angle_step when mirrored (same facing switch as multispiral).
+	// Twin counter-rotating galaxy: odd arms wind -angle_step, even arms
+	// +angle_step when mirrored (same facing switch as multispiral).
 	static TypedArray<Transform2D> helper_generate_transforms_counter_spiral(
 			int transforms_amount,
 			Transform2D marker_transform,
