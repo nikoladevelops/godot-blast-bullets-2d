@@ -1,5 +1,6 @@
 #pragma once
 
+#include "bullet_spawner/volley_tracker2d.hpp"
 #include "bullets/directional_bullets2d.hpp"
 #include "factory/bullet_factory2d.hpp"
 #include "godot_cpp/classes/node2d.hpp"
@@ -1161,14 +1162,18 @@ class BulletSpawner2D : public Node2D{
         // Per-spawner: cross-spawner A->B->A nesting is additionally stopped
         // by the file-local global depth guard in the .cpp.
         bool shoot_once_reentrant_guard = false;
+        // Single clear-point for the latch + global depth above. Every abort
+        // and the normal exit go through here so a new early return can never
+        // leak the latch (permanent shoot lockout) or the depth (permanent
+        // cross-spawner lockout).
+        void clear_shoot_once_latch();
         // Homing/orbiting runtime state (never stored).
-        // Instance ids of spawned volleys, for interval retargeting. Mutable:
-        // even const readers (get_live_volley_count) prune dead entries, so
-        // the count never reports corpses. Ids are validated with ObjectDB on
-        // every pass and ownership is re-checked via owner_spawner_id plus the
-        // live is_active flag, so pooled inactive instances or instances
-        // re-owned by another spawner can never be touched by mistake.
-        mutable PackedInt64Array live_volley_instance_ids;
+        // Tracked-volley registry for interval retargeting. VolleyTracker2D
+        // owns the ids plus the prune-before-touch invariant (every reader
+        // prunes freed/re-homed/inactive volleys first, and every resolved
+        // volley is re-validated), so pooled or adopted volleys can never be
+        // touched by mistake. Mutable: const readers prune dead entries.
+        mutable VolleyTracker2D volley_tracker;
         // Countdown to the next retarget pass. 0.0 means "due on the next
         // tick": arming (or reset_shooting) always re-arms to due-now so the
         // first pass never waits a full interval.
@@ -1197,10 +1202,11 @@ class BulletSpawner2D : public Node2D{
         // True once the current burst chain has shown its telegraph: stops
         // the expiry re-firing the warning in a loop instead of firing.
         bool burst_telegraph_done = false;
-        // True while fire_burst_volley() runs its internal shoot_once(): the
-        // manual-shot guard rejects direct shoot_once() mid-chain, but the
-        // chain's own shots must pass through.
-        bool burst_firing = false;
+        // NOTE: nesting protection for burst chains is solely the
+        // shoot_once() latch + global depth (a handler calling shoot_once()
+        // from any spawner emission is rejected; use shoot_once_deferred()).
+        // A dedicated burst_firing flag was removed: it was write-only and
+        // shoot_once() never checked it, so it protected nothing.
         // Telegraph runtime: the pending volley config while warning. Stored
         // as a flag only (transforms re-collect at fire time, so markers that
         // move during the warning still aim correctly).
@@ -1273,12 +1279,8 @@ class BulletSpawner2D : public Node2D{
         // Wakes _process when retargeting becomes active (runtime only).
         void update_homing_process_state();
         // Remembers a fresh volley for retargeting (deduped: pooled instances
-        // reuse ids) and prunes dead/foreign entries.
+        // reuse ids) and prunes dead/foreign entries via the tracker.
         void track_live_volley(DirectionalBullets2D *bullets);
-        // Drops ids that are freed, inactive, or no longer owned by this
-        // spawner. Const (prunes the mutable id list) so readers like
-        // get_live_volley_count never report corpses.
-        void prune_live_volleys() const;
         // Recursive scene scan for the node-name source: collects live
         // Node2Ds under p_node whose name matches homing_node_name per
         // homing_node_name_match_mode and homing_node_name_case_sensitive,

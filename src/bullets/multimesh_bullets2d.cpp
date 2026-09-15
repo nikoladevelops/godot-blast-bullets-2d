@@ -2186,6 +2186,13 @@ void MultiMeshBullets2D::enable_bullet(int bullet_index, int collision_amount, b
 		if (!validate_bullet_index(bullet_index, "enable_bullet")) {
 			return;
 		}
+		// Waking a volley that is queued for deletion would reactivate,
+		// re-pool-unlink, and re-register an instance that dies at the end
+		// of the frame. Refuse: queue_free() is terminal.
+		if (is_queued_for_deletion()) {
+			UtilityFunctions::push_error("enable_bullet: multimesh is queued for deletion.");
+			return;
+		}
 		if (bullet_index >= (int)all_cached_instance_transforms.size() || bullet_index >= (int)bullets_current_collision_count.size()) {
 			return;
 		}
@@ -2309,19 +2316,32 @@ void MultiMeshBullets2D::enable_bullet(int bullet_index, int collision_amount, b
 					disconnect("bullet_homing_target_reached", callable);
 				}
 			}
+			// Fail-safe neutral subset: the queue_free-vs-pool decision and the
+			// rotation drive must not follow a dead owner into the new life.
+			// Pooling flags reset to default (a foreign wake must never inherit
+			// "don't pool" and strand itself, nor "pool" against the new owner's
+			// wishes — set them explicitly after the wake if needed). Rotation
+			// speeds are cleared (stale spin would steer the new life with no
+			// data behind it). Ballistics, appearance, custom data, collision
+			// counts/max, lifetime and shape state resume by design (warned
+			// below): reseed via spawn_*/enable_multimesh for a clean slate.
+			reset_pooling_flags_to_default();
+			set_rotation_data(TypedArray<BulletRotationData2D>(), rotate_only_textures);
 		}
 		// Ownership restarts from scratch: whoever woke this re-stamps if it
 		// is a spawner (see BulletSpawner2D::adopt_live_volley). Keeping the
 		// old id would let a foreign spawner steer manual wakes.
 		owner_spawner_id = 0;
-		// A foreign pooled wake is a new owner with stale ballistics: ballistics,
-		// appearance, custom data and patterns still hold the previous owner's
-		// values (only the woken slot's collision count was reseeded above).
-		// Same-owner revives resume them by design; foreign wakes must reseed
+		// A foreign pooled wake is a new owner with partially stale state:
+		// ballistics, appearance, custom data, collision counts/max, lifetime
+		// and shape state still hold the previous owner's values (only the
+		// woken slot's collision count was reseeded above). Pooling flags,
+		// rotation, signals and ownership were neutralized above. Same-owner
+		// revives resume everything by design; foreign wakes must reseed
 		// through spawn_*/enable_multimesh or adopt_live_volley + manual
 		// re-push, so warn once per wake instead of driving silently stale.
 		if (was_pooled) {
-			UtilityFunctions::push_warning("enable_bullet: woke a pooled volley from the pool outside spawn_*/enable_multimesh. Ballistics, appearance, custom data and patterns still hold the previous owner's values: reseed them (or adopt_live_volley + re-push homing/orbit) before relying on this volley.");
+			UtilityFunctions::push_warning("enable_bullet: woke a pooled volley from the pool outside spawn_*/enable_multimesh. Ballistics, appearance, custom data, collision counts, lifetime and shape state still hold the previous owner's values: reseed them (or adopt_live_volley + re-push homing/orbit) before relying on this volley.");
 		}
 			// An expiry-pooled wake would otherwise die again on the next tick with an
 			// exhausted timer. Only top it up when expired; manual-disable wakes keep
@@ -2454,7 +2474,12 @@ void MultiMeshBullets2D::handle_bullet_collision(CollisionType collision_type, i
 		// Typed per-kind signals emit synchronously (Godot-style): the instance
 		// is alive and the slot state valid by construction here, so handlers
 		// run with live data, need no casts, and need no call_deferred for
-		// game logic. Slim payload - custom data and transforms are one
+		// game logic. HANDLER CONTRACT: to destroy this volley from inside
+		// the handler use queue_free() (or call_deferred factory free/reset
+		// calls) — never immediate Object.free()/memdelete. The post-emit
+		// code below touches this instance, so an immediately-freed volley
+		// would be use-after-free. Slim payload - custom data and transforms
+		// are one
 		// instance call away (bullet_get_custom_data(),
 		// get_bullet_global_transform()).
 		// Possessed by the tagged spawner when there is one, else the factory.

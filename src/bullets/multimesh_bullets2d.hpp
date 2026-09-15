@@ -77,6 +77,23 @@ public:
 	// generation is dropped, so a full-disable landing first can't leak it onward.
 	int multimesh_timers_generation = 0;
 
+	// DEFERRED-WORK CONTRACT (mandatory for every call_deferred addition):
+	// pool reuse, frees, and re-homes can all land between queue and flush, so
+	// 1. stamp the current generation (plus epoch/instance-id where they apply)
+	//    at queue time;
+	// 2. at flush, drop on generation mismatch FIRST, then re-resolve ids via
+	//    ObjectDB::get_instance, then re-validate ownership/slot/active state;
+	// 3. queue on the object whose lifetime covers the flush, and never carry
+	//    raw pointers across the defer (Godot drops the call if that object
+	//    died, which is the safe outcome);
+	// 4. emits that must survive a pool hand-over resolve the emitter fresh and
+	//    apply the re-ownership check - never trust a cached pointer.
+	// Current inventory (all compliant): life_time_over, sprite_animation_
+	// finished, deferred attachment disables, timer attach/detach/execute,
+	// homing reached-emits/auto-pops (generation + per-bullet epoch), spawner
+	// shoot_once_deferred (full revalidation at flush), debugger restore
+	// (idempotent flag, needs no generation).
+
 	bool marked_for_internal_deletion = false;
 
 	// Gets the total amount of bullets that the multimesh always holds

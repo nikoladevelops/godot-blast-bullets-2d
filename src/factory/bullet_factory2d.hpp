@@ -226,6 +226,14 @@ public:
 
 	Dictionary debug_get_attachments_pool_info();
 
+	// Live-bullet census attributed by spawner ownership. Sums
+	// active_bullets_counter over every ACTIVE directional volley whose
+	// owner_spawner_id matches (spawners only spawn directional volleys).
+	// Used by BulletSpawner2D's max_live_bullets fuse so the budget sees ALL
+	// of a spawner's live bullets — not just the homing-tracked subset.
+	// O(volleys); call sparingly (per-shot gates, not per-bullet ticks).
+	int count_active_bullets_owned_by(uint64_t owner_spawner_id) const;
+
 	//
 
 	DynamicSparseSet directional_bullets_set;

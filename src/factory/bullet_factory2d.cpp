@@ -949,6 +949,16 @@ int BulletFactory2D::debug_get_attachments_pool_amount() {
 	return bullet_attachments_pool.get_total_amount_pooled();
 }
 
+int BulletFactory2D::count_active_bullets_owned_by(uint64_t owner_spawner_id) const {
+	int total = 0;
+	for (const DirectionalBullets2D *volley : all_directional_bullets) {
+		if (volley != nullptr && volley->is_active && volley->owner_spawner_id == owner_spawner_id) {
+			total += volley->active_bullets_counter;
+		}
+	}
+	return total;
+}
+
 Dictionary BulletFactory2D::debug_get_attachments_pool_info() {
 	std::map<uint32_t, int> pool_info = bullet_attachments_pool.get_pool_info();
 

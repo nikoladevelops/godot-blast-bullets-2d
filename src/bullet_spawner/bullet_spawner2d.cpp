@@ -81,6 +81,37 @@ static const char *PREVIEW_HOLDER_NAME = "~BlastBulletsPatternPreview";
 // transition. File-local: never exposed, never persisted.
 static int g_shoot_once_nesting_depth = 0;
 
+// Re-resolves a volley by the id captured before user code ran and verifies
+// it is still the same live instance owned by the given spawner. Used after
+// EVERY synchronous user-code emission on the shoot path (pre_shoot and the
+// configuring signals): a handler may have freed the volley (queue_free or a
+// factory free/reset) or handed it to another spawner (adopt_live_volley).
+// Returns the live volley, or nullptr when the shot must be dropped (no
+// count, no volley_fired). Compare BY VALUE: the raw pointer must never be
+// trusted after user code ran.
+static DirectionalBullets2D *revalidate_configured_volley(uint64_t volley_id, DirectionalBullets2D *expected, uint64_t self_id) {
+	Object *live = UtilityFunctions::is_instance_id_valid(volley_id) ? ObjectDB::get_instance(ObjectID(volley_id)) : nullptr;
+	DirectionalBullets2D *live_volley = Object::cast_to<DirectionalBullets2D>(live);
+	// is_queued_for_deletion matters: queue_free() is the sanctioned way to
+	// kill a volley from a handler, and it leaves every other check passing
+	// (same pointer, active, owned) until the end-of-frame flush. Configuring
+	// or counting a dying volley would emit volley_fired for a volley that
+	// never lives a tick, so a queued-for-deletion volley drops like a freed
+	// one (the user's free still happens at flush).
+	if (live_volley == nullptr || live_volley != expected || live_volley->is_queued_for_deletion() || !live_volley->is_active || live_volley->owner_spawner_id != self_id) {
+		return nullptr;
+	}
+	return live_volley;
+}
+
+void BulletSpawner2D::clear_shoot_once_latch() {
+	shoot_once_reentrant_guard = false;
+	--g_shoot_once_nesting_depth;
+	if (g_shoot_once_nesting_depth < 0) {
+		g_shoot_once_nesting_depth = 0;
+	}
+}
+
 // Self-repainting preview layer: rebuild_preview() stores a snapshot via the
 // setters below, the engine re-invokes _draw() on every repaint (zoom, pan,
 // selection, idle refresh), so the gizmo can never vanish between rebuilds.
@@ -1780,18 +1811,15 @@ int BulletSpawner2D::get_burst_shots_left() const {
     return burst_shots_left;
 }
 int BulletSpawner2D::get_active_live_bullet_count() const {
-    prune_live_volleys();
-    int total = 0;
-    const uint64_t self_id = get_instance_id();
-    for (int i = 0; i < live_volley_instance_ids.size(); ++i) {
-        Object *obj = ObjectDB::get_instance(ObjectID((uint64_t)live_volley_instance_ids[i]));
-        DirectionalBullets2D *volley = Object::cast_to<DirectionalBullets2D>(obj);
-        if (volley == nullptr || volley->owner_spawner_id != self_id || !volley->is_active) {
-            continue;
-        }
-        total += volley->active_bullets_counter;
+    BulletFactory2D *factory = get_bullet_factory();
+    if (factory == nullptr) {
+        return 0;
     }
-    return total;
+    // Count-all census: attributed by factory-side ownership, so plain
+    // (non-homing, untracked) volleys count toward max_live_bullets exactly
+    // like tracked homing volleys. (The tracked list stays homing-only for
+    // retargeting; the budget must not be blind to plain volleys.)
+    return factory->count_active_bullets_owned_by(get_instance_id());
 }
 int BulletSpawner2D::get_pooled_volley_count() const {
     BulletFactory2D *factory = get_bullet_factory();
@@ -2073,9 +2101,11 @@ void BulletSpawner2D::reset_shooting() {
     burst_time_left = 0.0;
     burst_mirror_next = false;
     burst_telegraph_done = false;
-    burst_firing = false;
     telegraph_pending = false;
     telegraph_time_left = 0.0;
+    // Pattern-list sequencers clear with the rest: resuming a stale queue
+    // into a reset wave would fire another wave's pattern entries.
+    stop_pattern_list();
     if (is_inside_tree()) {
         set_process(auto_shooting_active() || spin_enabled || homing_retarget_active() || preview_active());
     }
@@ -2995,59 +3025,29 @@ Array BulletSpawner2D::resolve_homing_targets(bool quiet, bool advance_round_rob
 }
 
 void BulletSpawner2D::track_live_volley(DirectionalBullets2D *bullets) {
-    if (bullets == nullptr) {
-        return;
-    }
-    const int64_t id = (int64_t)bullets->get_instance_id();
-    if (!live_volley_instance_ids.has(id)) {
-        live_volley_instance_ids.push_back(id);
-    }
-    prune_live_volleys();
-    // Bound the list: infinite-lifetime volleys never prune, so auto-shoot
-    // would grow retarget cost (O(volleys*bullets + volleys*tree)) without
-    // limit. Keep the most recent; drop oldest first. Use clear_live_volleys()
-    // to reset manually.
-    while (live_volley_instance_ids.size() > 256) {
-        live_volley_instance_ids.remove_at(0);
-    }
-}
-
-void BulletSpawner2D::prune_live_volleys() const {
-    PackedInt64Array kept;
-    const uint64_t self_id = get_instance_id();
-    for (int i = 0; i < live_volley_instance_ids.size(); ++i) {
-        Object *obj = ObjectDB::get_instance(ObjectID((uint64_t)live_volley_instance_ids[i]));
-        DirectionalBullets2D *volley = Object::cast_to<DirectionalBullets2D>(obj);
-        // Freed instances (teardown), pooled instances re-owned by another
-        // spawner (owner tag changed), and fully-disabled instances (a new
-        // enable wipes homing anyway) are dropped, never touched. The
-        // is_active gate matters: disable keeps owner_spawner_id, so without
-        // it retargets would arm dead queues and inflate homing counters.
-        if (volley != nullptr && volley->owner_spawner_id == self_id && volley->is_active) {
-            kept.push_back(live_volley_instance_ids[i]);
-        }
-    }
-    live_volley_instance_ids = kept;
+    volley_tracker.track(bullets, get_instance_id());
 }
 
 int BulletSpawner2D::get_live_volley_count() const {
-    prune_live_volleys();
-    return live_volley_instance_ids.size();
+    return volley_tracker.count(get_instance_id());
 }
 
 void BulletSpawner2D::clear_live_volleys() {
-    live_volley_instance_ids.clear();
+    volley_tracker.clear();
+    // Forget targeting rotation too: a manual clear means "forget everything",
+    // so the next wave restarts round-robin from the top instead of resuming
+    // mid-rotation from volleys that no longer exist.
+    homing_round_robin_cursor = 0;
 }
 
 Array BulletSpawner2D::get_live_volleys() const {
-    prune_live_volleys();
+    // Snapshot prunes first; resolve_live re-checks per id so a volley freed
+    // between the two can never be handed out for direct engine calls.
+    const PackedInt64Array ids = volley_tracker.snapshot(get_instance_id());
     Array out;
-    for (int i = 0; i < live_volley_instance_ids.size(); ++i) {
-        Object *obj = ObjectDB::get_instance(ObjectID((uint64_t)live_volley_instance_ids[i]));
-        DirectionalBullets2D *volley = Object::cast_to<DirectionalBullets2D>(obj);
-        // Prune just filtered, but re-check cheaply: never hand out a
-        // foreign or inactive instance for direct engine calls.
-        if (volley != nullptr && volley->owner_spawner_id == get_instance_id() && volley->is_active) {
+    for (int i = 0; i < ids.size(); ++i) {
+        DirectionalBullets2D *volley = VolleyTracker2D::resolve_live(ids[i], get_instance_id());
+        if (volley != nullptr) {
             out.push_back(volley);
         }
     }
@@ -3061,6 +3061,13 @@ bool BulletSpawner2D::adopt_live_volley(DirectionalBullets2D *bullets) {
     }
     if (!bullets->is_active || !bullets->is_inside_tree()) {
         UtilityFunctions::push_error("BulletSpawner2D::adopt_live_volley: instance is not live (pooled or outside the tree). Wake it first.");
+        return false;
+    }
+    // Same liveness bar as the shoot-path revalidation: adopting a volley
+    // that is queued for deletion would stamp, hook, and track an instance
+    // that dies at the end of the frame.
+    if (bullets->is_queued_for_deletion()) {
+        UtilityFunctions::push_error("BulletSpawner2D::adopt_live_volley: instance is queued for deletion.");
         return false;
     }
     // Takes over a manually-woken volley (manual wake detaches the previous
@@ -3085,13 +3092,12 @@ bool BulletSpawner2D::adopt_live_volley(DirectionalBullets2D *bullets) {
 }
 
 int BulletSpawner2D::clear_live_volleys_homing() {
-    prune_live_volleys();
+    const PackedInt64Array ids = volley_tracker.snapshot(get_instance_id());
     int done = 0;
     const uint64_t self_id = get_instance_id();
-    for (int i = 0; i < live_volley_instance_ids.size(); ++i) {
-        Object *obj = ObjectDB::get_instance(ObjectID((uint64_t)live_volley_instance_ids[i]));
-        DirectionalBullets2D *volley = Object::cast_to<DirectionalBullets2D>(obj);
-        if (volley == nullptr || volley->owner_spawner_id != self_id || !volley->is_active) {
+    for (int i = 0; i < ids.size(); ++i) {
+        DirectionalBullets2D *volley = VolleyTracker2D::resolve_live(ids[i], self_id);
+        if (volley == nullptr) {
             continue;
         }
         // Engine clears keep every counter exact; orbit is stopped with the
@@ -3115,13 +3121,12 @@ int BulletSpawner2D::override_live_volleys_velocity(const Vector2 &new_velocity)
         UtilityFunctions::push_error("BulletSpawner2D::override_live_volleys_velocity: velocity must be finite.");
         return 0;
     }
-    prune_live_volleys();
+    const PackedInt64Array ids = volley_tracker.snapshot(get_instance_id());
     int done = 0;
     const uint64_t self_id = get_instance_id();
-    for (int i = 0; i < live_volley_instance_ids.size(); ++i) {
-        Object *obj = ObjectDB::get_instance(ObjectID((uint64_t)live_volley_instance_ids[i]));
-        DirectionalBullets2D *volley = Object::cast_to<DirectionalBullets2D>(obj);
-        if (volley == nullptr || volley->owner_spawner_id != self_id || !volley->is_active) {
+    for (int i = 0; i < ids.size(); ++i) {
+        DirectionalBullets2D *volley = VolleyTracker2D::resolve_live(ids[i], self_id);
+        if (volley == nullptr) {
             continue;
         }
         // Engine-owned semantics: a speed curve overrides direct velocity
@@ -3134,10 +3139,10 @@ int BulletSpawner2D::override_live_volleys_velocity(const Vector2 &new_velocity)
 }
 
 int BulletSpawner2D::retarget_live_volleys() {
-    prune_live_volleys();
-    // Resolve is the expensive part (group poll / scene scan): skip it when
-    // no live volley could consume the result.
-    if (!homing_enabled || !is_inside_tree() || live_volley_instance_ids.is_empty()) {
+    // Snapshot prunes first; resolve is the expensive part (group poll /
+    // scene scan), so skip it when no live volley could consume the result.
+    const PackedInt64Array tracked_ids = volley_tracker.snapshot(get_instance_id());
+    if (!homing_enabled || !is_inside_tree() || tracked_ids.is_empty()) {
         return 0;
     }
     const bool use_mouse = homing_target_source == HOMING_SOURCE_MOUSE;
@@ -3157,13 +3162,12 @@ int BulletSpawner2D::retarget_live_volleys() {
         }
     }
     // Newest tracked volley is last (spawn order preserved by prune).
-    const int loop_start = homing_retarget_previous_volleys ? 0 : (int)live_volley_instance_ids.size() - 1;
+    const int loop_start = homing_retarget_previous_volleys ? 0 : (int)tracked_ids.size() - 1;
     int done = 0;
     const uint64_t self_id = get_instance_id();
-    for (int i = loop_start; i < (int)live_volley_instance_ids.size(); ++i) {
-        Object *obj = ObjectDB::get_instance(ObjectID((uint64_t)live_volley_instance_ids[i]));
-        DirectionalBullets2D *volley = Object::cast_to<DirectionalBullets2D>(obj);
-        if (volley == nullptr || volley->owner_spawner_id != self_id || !volley->is_active) {
+    for (int i = loop_start; i < (int)tracked_ids.size(); ++i) {
+        DirectionalBullets2D *volley = VolleyTracker2D::resolve_live(tracked_ids[i], self_id);
+        if (volley == nullptr) {
             continue;
         }
         Array volley_targets = shared_targets;
@@ -3333,6 +3337,14 @@ void BulletSpawner2D::apply_volley_homing_and_orbiting(DirectionalBullets2D *bul
     if (orbiting_enabled && !homing_enabled) {
         UtilityFunctions::push_warning("BulletSpawner2D: orbiting_enabled needs homing_enabled (orbiting locks onto a homing target). Volley flies without orbiting.");
     }
+    // Flat post-spawn nudge (muzzle offsets, whole-volley follows). Runs FIRST,
+    // before homing/orbit seeding: orbit locks and homing caches then form at
+    // the volley's final positions instead of locking pre-displacement and
+    // re-converging on the first tick. Runs through the engine teleport path
+    // so shapes, attachments, and interpolation stay consistent.
+    if (spawn_position_offset != Vector2(0, 0)) {
+        bullets->teleport_shift_all_bullets(spawn_position_offset);
+    }
     Array resolved_targets;
     if (homing_enabled) {
         apply_steering_to_volley(bullets);
@@ -3375,12 +3387,6 @@ void BulletSpawner2D::apply_volley_homing_and_orbiting(DirectionalBullets2D *bul
     // ring on the very first tick instead of flying straight for a frame.
     if (orbiting_enabled && homing_enabled) {
         apply_orbiting_to_volley(bullets);
-    }
-    // Flat post-spawn nudge (muzzle offsets, whole-volley follows). Runs
-    // through the engine teleport path so shapes, attachments, and
-    // interpolation stay consistent.
-    if (spawn_position_offset != Vector2(0, 0)) {
-        bullets->teleport_shift_all_bullets(spawn_position_offset);
     }
     // Re-hooked every volley: enabling (pool reuse) disconnects all
     // bullet_homing_target_reached handlers, so a stale connection can never
@@ -4071,11 +4077,7 @@ bool BulletSpawner2D::shoot_once() {
         if (with_signal) {
             emit_signal("volley_skipped", skip_reason);
         }
-        shoot_once_reentrant_guard = false;
-        --g_shoot_once_nesting_depth;
-        if (g_shoot_once_nesting_depth < 0) {
-            g_shoot_once_nesting_depth = 0;
-        }
+        clear_shoot_once_latch();
         return false;
     };
     BulletFactory2D *factory = get_bullet_factory();
@@ -4126,11 +4128,7 @@ bool BulletSpawner2D::shoot_once() {
     if (bullets == nullptr) {
         // Factory already reported why (busy/teardown/bad data): clear and
         // report, no skip signal (nothing about the request was skippable).
-        shoot_once_reentrant_guard = false;
-        --g_shoot_once_nesting_depth;
-        if (g_shoot_once_nesting_depth < 0) {
-            g_shoot_once_nesting_depth = 0;
-        }
+        clear_shoot_once_latch();
         return false;
     }
     // Tag the instance (fresh or pooled): from here on its area_entered,
@@ -4149,28 +4147,32 @@ bool BulletSpawner2D::shoot_once() {
     // (speed ramp, count scale by phase/difficulty) before it spawns. The
     // volley instance is already stamped, so ownership checks still apply.
     emit_signal("pre_shoot", bullets, volleys_fired + 1);
+    // G1: a pre_shoot handler may have freed this volley (factory reset/free_*,
+    // queue_free) or handed it to another owner (adopt_live_volley). Feeding a
+    // dead/foreign pointer into the configuring step below would be
+    // use-after-free (or silently overwrite the new owner's steering), so
+    // revalidate BEFORE configuring, not just before volley_fired.
+    if (revalidate_configured_volley(volley_id, bullets, self_id) == nullptr) {
+        // Same drop semantics as below: the spawn succeeded but this shot is
+        // dropped (no count, no volley_fired).
+        clear_shoot_once_latch();
+        return false;
+    }
     // Homing/orbiting runs on the same stamp: the instance is fully
     // configured before volley_fired, so handlers observe live behavior.
     // The latch stays up through volley_fired below (not just the configuring
     // signals): every emit on this path runs user code synchronously.
     apply_volley_homing_and_orbiting(bullets);
-    // Re-validate: handlers of pre_shoot/homing_targets_resolved/
-    // volley_homing_configured ran above and may have freed this volley
-    // (factory reset/free_*, queue_free) or handed it to another owner
-    // (adopt_live_volley). Dereferencing the raw pointer now would be
-    // use-after-free: resolve by id and compare BY VALUE.
-    Object *live = UtilityFunctions::is_instance_id_valid(volley_id) ? ObjectDB::get_instance(ObjectID(volley_id)) : nullptr;
-    DirectionalBullets2D *live_volley = Object::cast_to<DirectionalBullets2D>(live);
-    if (live_volley == nullptr || live_volley != bullets || !live_volley->is_active || live_volley->owner_spawner_id != self_id) {
+    // Re-validate: handlers of homing_targets_resolved/volley_homing_configured
+    // ran above and may have freed this volley or handed it to another owner.
+    // Dereferencing the raw pointer now would be use-after-free: resolve by id
+    // and compare BY VALUE.
+    if (revalidate_configured_volley(volley_id, bullets, self_id) == nullptr) {
         // Volley is gone or foreign: counting it or emitting volley_fired for it
         // would lie about ownership and hand out a dead pointer. The spawn
         // itself succeeded (bullets were created), but this shot is dropped.
         // Pre-emit failure: clear both latch and global depth (nothing emitted).
-        shoot_once_reentrant_guard = false;
-        --g_shoot_once_nesting_depth;
-        if (g_shoot_once_nesting_depth < 0) {
-            g_shoot_once_nesting_depth = 0;
-        }
+        clear_shoot_once_latch();
         return false;
     }
     volleys_fired += 1;
@@ -4191,11 +4193,7 @@ bool BulletSpawner2D::shoot_once() {
         set_process(spin_enabled || preview_active() || homing_retarget_active() || burst_shots_left > 0 || telegraph_pending);
         emit_signal("shooting_finished");
     }
-    shoot_once_reentrant_guard = false;
-    --g_shoot_once_nesting_depth;
-    if (g_shoot_once_nesting_depth < 0) {
-        g_shoot_once_nesting_depth = 0;
-    }
+    clear_shoot_once_latch();
     return true;
 }
 
@@ -4295,18 +4293,20 @@ void BulletSpawner2D::_notification(int p_what) {
         // reset the round-robin cursor, and re-arm the retarget pass (with
         // the stagger phase) so a scene change starts clean instead of
         // inheriting stale rotation.
-        live_volley_instance_ids.clear();
+        volley_tracker.clear();
         homing_round_robin_cursor = 0;
         homing_retarget_time_left = homing_retarget_phase;
         // Burst/telegraph never survive a tree exit: countdowns firing after
         // re-entry would double-fire into the new scene.
         burst_shots_left = 0;
         burst_time_left = 0.0;
-        burst_mirror_next = false;
-        burst_telegraph_done = false;
-        burst_firing = false;
-        telegraph_pending = false;
-        telegraph_time_left = 0.0;
+    burst_mirror_next = false;
+    burst_telegraph_done = false;
+    telegraph_pending = false;
+    telegraph_time_left = 0.0;
+    // Pattern-list sequencers clear with the rest: a queued sequence must
+        // not resume into a new scene on re-entry.
+        stop_pattern_list();
     }
 }
 
@@ -4406,6 +4406,10 @@ void BulletSpawner2D::_process(double delta) {
     } else {
         shoot_once(); // errors, if any, are per-attempt (interval-gated, no spam storm)
     }
+    // Throttle-on-pull: the interval rearms even when the pull skipped,
+    // failed, or dropped its volley. Throttle-on-success instead would
+    // hot-loop a persistently failing shot (busy factory, over budget)
+    // every frame until it succeeds.
     shoot_time_left = next_shoot_interval_sec();
 }
 
@@ -4453,9 +4457,7 @@ void BulletSpawner2D::fire_burst_volley() {
         // flips only on alternate mode; plain bursts never touch the flag.
         const bool mirrored = burst_alternate_mirror && (burst_shots_left % 2 == 0);
         burst_mirror_next = mirrored;
-        burst_firing = true;
         const bool fired = shoot_once();
-        burst_firing = false;
         if (fired) {
             emit_signal("burst_shot_fired", burst_count - burst_shots_left + 1, mirrored);
         }
@@ -4476,9 +4478,7 @@ void BulletSpawner2D::fire_burst_volley() {
     burst_shots_left = 0;
     burst_telegraph_done = false;
     burst_mirror_next = false;
-    burst_firing = true;
     shoot_once();
-    burst_firing = false;
     set_process(auto_shooting_active() || spin_enabled || homing_retarget_active() || preview_active() || pattern_list_active);
 }
 
@@ -4714,6 +4714,12 @@ void BulletSpawner2D::_bind_methods() {
 	// happens (timer tick, setters, reset, _ready): handlers run with live
 	// state and follow the same contract as the factory collision signals -
 	// game logic is safe directly, structural factory calls must be deferred.
+	// HANDLER CONTRACT (pre_shoot/volley_fired especially): the volley handle
+	// is only valid for the duration of the emission. To destroy it, use
+	// queue_free() (or call_deferred factory free/reset) - never immediate
+	// Object.free(); the shoot path keeps touching the instance after the
+	// emit. shoot_once() itself must not be called nested (rejected); use
+	// shoot_once_deferred() instead.
 	// NOTE: PROPERTY_HINT_RESOURCE_TYPE (not NODE_TYPE) carries the class name
 	// to ClassDB/--doctool; see the note on the factory signals.
 	ADD_SIGNAL(MethodInfo("pre_shoot",
