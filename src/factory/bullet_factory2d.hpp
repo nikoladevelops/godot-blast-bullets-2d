@@ -130,8 +130,10 @@ public:
 	// Spawns BlockBullets2D when given a resource containing all needed data
 	void spawn_block_bullets(const Ref<BlockBulletsData2D> &spawn_data, const Vector2 &new_inherited_velocity_offset = Vector2(0, 0));
 
-	// Spawns DirectionalBullets2D when given a resource containing all needed data. These bullets should be controlled by the user
-	DirectionalBullets2D *spawn_controllable_directional_bullets(const Ref<DirectionalBulletsData2D> &spawn_data, const Vector2 &new_inherited_velocity_offset = Vector2(0, 0));
+	// Spawns DirectionalBullets2D when given a resource containing all needed data. These bullets should be controlled by the user.
+	// spawner_id pre-stamps signal ownership before activation (configure-then-attach):
+	// BulletSpawner2D passes its instance id; direct factory users leave 0 (factory-owned).
+	DirectionalBullets2D *spawn_controllable_directional_bullets(const Ref<DirectionalBulletsData2D> &spawn_data, const Vector2 &new_inherited_velocity_offset = Vector2(0, 0), uint64_t spawner_id = 0);
 
 	// Resets the factory. Null key frees everything (all bullets, pools, and the full
 	// attachment pool). Exact key frees only that bucket; unrelated pooled attachments
@@ -711,9 +713,11 @@ public:
 		}
 	}
 
-	// Spawns bullets by either creating a brand new TBullet or retrieving one from the object pool
+	// Spawns bullets by either creating a brand new TBullet or retrieving one from the object pool.
+	// spawner_id is stamped inside spawn()/enable_multimesh() BEFORE any
+	// physics/tree activation (configure-then-attach): 0 = factory-owned.
 	template <typename TBullet, typename TBulletSpawnData>
-	TBullet *spawn_bullets_helper(std::vector<TBullet *> &bullets_vec, DynamicSparseSet &sparse_set, MultiMeshObjectPool &bullets_pool, Node *bullets_container, const Ref<TBulletSpawnData> &spawn_data, const Vector2 &new_inherited_velocity_offset = Vector2(0, 0)) {
+	TBullet *spawn_bullets_helper(std::vector<TBullet *> &bullets_vec, DynamicSparseSet &sparse_set, MultiMeshObjectPool &bullets_pool, Node *bullets_container, const Ref<TBulletSpawnData> &spawn_data, const Vector2 &new_inherited_velocity_offset = Vector2(0, 0), uint64_t spawner_id = 0) {
 		// Quiet: creation prints error once per spawn. Pool key must use effective type (fallback included) to match RIDs.
 		PhysicsServer2D::ShapeType shape_type = CollisionShapeHelper2D::get_effective_type(spawn_data->collision_shape, false);
 		PoolKey key{ (int)spawn_data->transforms.size(), shape_type };
@@ -721,7 +725,7 @@ public:
 		// Try to get a TBullet from the pool first
 		TBullet *bullets = static_cast<TBullet *>(bullets_pool.pop(key));
 		if (bullets != nullptr) {
-			if (!bullets->enable_multimesh(*spawn_data.ptr(), new_inherited_velocity_offset)) {
+			if (!bullets->enable_multimesh(*spawn_data.ptr(), new_inherited_velocity_offset, spawner_id)) {
 				// enable_multimesh rolls its own mutations back on failure, so the
 				// instance is a clean disabled one here: just file it back under
 				// the live key (not the spawn key) and do not activate it.
@@ -756,7 +760,7 @@ public:
 
 		// If there was no TBullet in the pool, create a brand new one and spawn it
 		bullets = memnew(TBullet);
-		bullets->spawn(*spawn_data.ptr(), &bullets_pool, this, bullets_container, new_inherited_velocity_offset, sparse_set_id, false);
+		bullets->spawn(*spawn_data.ptr(), &bullets_pool, this, bullets_container, new_inherited_velocity_offset, sparse_set_id, false, spawner_id);
 		bullets_vec.emplace_back(bullets);
 
 		sparse_set.activate_data(sparse_set_id);

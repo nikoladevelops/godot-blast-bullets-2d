@@ -142,7 +142,7 @@ void MultiMeshBullets2D::reset_attachment_state_for_reuse() {
 }
 
 // Used to spawn brand new bullets.
-void MultiMeshBullets2D::spawn(const MultiMeshBulletsData2D &data, MultiMeshObjectPool *pool, BulletFactory2D *factory, Node *bullets_container, const Vector2 &new_inherited_velocity_offset, int new_sparse_set_id, bool spawn_in_pool) {
+void MultiMeshBullets2D::spawn(const MultiMeshBulletsData2D &data, MultiMeshObjectPool *pool, BulletFactory2D *factory, Node *bullets_container, const Vector2 &new_inherited_velocity_offset, int new_sparse_set_id, bool spawn_in_pool, uint64_t spawner_id) {
 	this->set_physics_interpolation_mode(Node::PHYSICS_INTERPOLATION_MODE_OFF); // We have custom physics interpolation logic, so disable the Godot one that comes from Godot 4.5
 
 	sparse_set_id = new_sparse_set_id;
@@ -150,11 +150,11 @@ void MultiMeshBullets2D::spawn(const MultiMeshBulletsData2D &data, MultiMeshObje
 
 	bullets_pool = pool;
 	bullet_factory = factory;
-	// A fresh spawn starts unattributed: only an explicit spawner stamp after
-	// this call (BulletSpawner2D::shoot_once) routes signals to a spawner.
-	// Pooled pre-population flows through here too, so reused instances can
-	// never inherit a previous owner's spawner.
-	owner_spawner_id = 0;
+	// Ownership is stamped FIRST, before the area gets a physics space, shapes
+	// are enabled, or the node enters the tree below: a spawner volley is never
+	// observable as factory-owned. Pooled pre-population passes 0, so reused
+	// instances can never inherit a previous owner's spawner.
+	owner_spawner_id = spawner_id;
 	physics_server = PhysicsServer2D::get_singleton();
 
 	amount_bullets = data.transforms.size(); // important, because some set_up methods use this
@@ -232,7 +232,7 @@ void MultiMeshBullets2D::spawn(const MultiMeshBulletsData2D &data, MultiMeshObje
 }
 
 // Activates the multimesh
-bool MultiMeshBullets2D::enable_multimesh(const MultiMeshBulletsData2D &data, const Vector2 &new_inherited_velocity_offset) {
+bool MultiMeshBullets2D::enable_multimesh(const MultiMeshBulletsData2D &data, const Vector2 &new_inherited_velocity_offset, uint64_t spawner_id) {
 	// Pool buckets are keyed by amount, but a direct GDScript call can hand a
 	// mismatched array. set_up_bullet_instances indexes data.transforms by
 	// amount_bullets, so reject early without touching state.
@@ -268,8 +268,11 @@ bool MultiMeshBullets2D::enable_multimesh(const MultiMeshBulletsData2D &data, co
 
 	// A direct re-enable on an in-use instance must start curves and patterns
 	// from scratch, same as a pooled pop does through disable_multimesh().
-	// Spawner ownership resets here as well: whoever enables next stamps anew.
-	owner_spawner_id = 0;
+	// Spawner ownership is stamped here (before any re-activation below), so
+	// a spawner reuse is never observable as factory-owned. Whoever enables
+	// next stamps anew; 0 keeps the factory-owned default.
+	const uint64_t old_owner_spawner_id = owner_spawner_id;
+	owner_spawner_id = spawner_id;
 	shared_bullet_curves_data.unref();
 	for (auto &r : all_bullet_curves_data) {
 		r.unref();
@@ -436,6 +439,9 @@ bool MultiMeshBullets2D::enable_multimesh(const MultiMeshBulletsData2D &data, co
 	// cache + offset, lifetime, appearance/custom/material, animation,
 	// rotation, collision counts/custom/transforms, timers.
 	if (!custom_additional_enable_logic(data)) {
+		// The failed enable must not leave the new owner's stamp behind: the
+		// recycled disabled instance keeps its previous ownership.
+		owner_spawner_id = old_owner_spawner_id;
 		cached_effective_shape_type = old_effective_shape_type;
 		cache_collision_shape_typed(old_collision_shape);
 		cache_collision_shape_offset = old_collision_shape_offset;

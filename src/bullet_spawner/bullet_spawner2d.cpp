@@ -4118,7 +4118,11 @@ bool BulletSpawner2D::shoot_once() {
     if (max_live_bullets > 0 && get_active_live_bullet_count() >= max_live_bullets) {
         return fail_early(nullptr, StringName("over_budget"), true);
     }
-    DirectionalBullets2D *bullets = factory->spawn_controllable_directional_bullets(volley_data);
+    // Configure-then-attach: the spawner id is pre-stamped inside the factory
+    // spawn (before physics space, shapes, tree entry, and activation), so the
+    // volley is never observable as factory-owned. The re-stamp below is kept
+    // as belt-and-braces for any path that could not carry the id through.
+    DirectionalBullets2D *bullets = factory->spawn_controllable_directional_bullets(volley_data, Vector2(0, 0), get_instance_id());
     if (bullets == nullptr) {
         // Factory already reported why (busy/teardown/bad data): clear and
         // report, no skip signal (nothing about the request was skippable).
@@ -4132,7 +4136,8 @@ bool BulletSpawner2D::shoot_once() {
     // Tag the instance (fresh or pooled): from here on its area_entered,
     // body_entered and life_time_over signals are possessed by this spawner
     // instead of the factory. Pool reuse resets the tag, so this stamp covers
-    // every spawn path through this function.
+    // every spawn path through this function. Already stamped pre-activation
+    // by the factory call above; re-assert here in case that ever changes.
     bullets->owner_spawner_id = get_instance_id();
     // Capture the id BEFORE user code runs: the configuring signals below
     // execute handlers synchronously, and a handler may free or re-home this
@@ -4735,8 +4740,9 @@ void BulletSpawner2D::_bind_methods() {
 	// Collision/lifetime signals possessed by this spawner for the volleys it
 	// spawned (see owner_spawner_id). Same slim payload shape as the factory
 	// typed signals; emitted synchronously (area/body) or deferred
-	// (life_time_over) under the same handler contract. If this spawner is
-	// gone, its bullets gracefully fall back to the factory signals.
+	// (life_time_over) under the same handler contract. A spawner volley
+	// NEVER fires factory signals: if this spawner is gone, its bullets'
+	// events are dropped instead of falling back to the factory.
 	// NOTE: PROPERTY_HINT_RESOURCE_TYPE (not NODE_TYPE) carries the class name
 	// to ClassDB/--doctool; see the note on the factory signals.
 	ADD_SIGNAL(MethodInfo("area_entered",

@@ -84,12 +84,16 @@ public:
 	// Gets the total amount of attachments that are active
 	int get_amount_active_attachments() const;
 
-	// Used to spawn brand new bullets that are active in the scene tree
-	void spawn(const MultiMeshBulletsData2D &spawn_data, MultiMeshObjectPool *pool, BulletFactory2D *factory, Node *bullets_container, const Vector2 &new_inherited_velocity_offset, int new_sparse_set_id, bool spawn_in_pool);
+	// Used to spawn brand new bullets that are active in the scene tree.
+	// spawner_id stamps signal ownership BEFORE any physics/tree activation
+	// (configure-then-attach): a spawner passes its instance id so the volley
+	// is never observable as factory-owned. 0 = factory-owned (default).
+	void spawn(const MultiMeshBulletsData2D &spawn_data, MultiMeshObjectPool *pool, BulletFactory2D *factory, Node *bullets_container, const Vector2 &new_inherited_velocity_offset, int new_sparse_set_id, bool spawn_in_pool, uint64_t spawner_id = 0);
 
 	// Activates the multimesh. Returns false (without leaving it factory-active)
 	// when the spawn data is incompatible, so the pool owner can re-push it.
-	bool enable_multimesh(const MultiMeshBulletsData2D &data, const Vector2 &new_inherited_velocity_offset);
+	// spawner_id works like spawn()'s: stamped before re-activation.
+	bool enable_multimesh(const MultiMeshBulletsData2D &data, const Vector2 &new_inherited_velocity_offset, uint64_t spawner_id = 0);
 
 	// Clears homing state (target deques + counters) on teardown so global mouse-target
 	// accounting can't leak. Base version is a no-op (only directional bullets home).
@@ -345,6 +349,12 @@ public:
 		// slots alive for the signal; the deferred disables re-pool them after.
 		TypedArray<int> bullet_indexes;
 
+		// Snapshot the signal owner BEFORE the disable loop below: a full-volley
+		// expiry funnels into disable_multimesh(), which clears owner_spawner_id
+		// and pools the instance. Resolving after would schedule the factory's
+		// life_time_over signal for a spawner-owned volley.
+		Object *lifetime_emitter = resolve_signal_emitter();
+
 		// Caches already hold global-space transforms (spawn data is global and all
 		// movement/homing math is global), so no get_global_transform() compose is
 		// needed anywhere transforms are read (handlers use get_bullet_global_transform()).
@@ -417,7 +427,8 @@ public:
 		// emit, then a same-frame pool reuse hands this instance to a new
 		// owner before the flush. The bare call_deferred("emit_signal")
 		// would then deliver the OLD life's indexes to the NEW life.
-		Object *emitter = resolve_signal_emitter();
+		// Uses the pre-disable snapshot above, never a post-disable resolve.
+		Object *emitter = lifetime_emitter;
 		if (emitter != nullptr) {
 			const uint64_t emitter_id = emitter->get_instance_id();
 			if (emitter == bullet_factory) {
@@ -1888,6 +1899,15 @@ public:
 		if (emitter == nullptr) {
 			return;
 		}
+		// Re-ownership guard: the volley may have been handed to a different
+		// owner without a generation bump (adopt_live_volley re-stamps only).
+		// Never deliver the old life's expiry to the new owner, and never
+		// deliver a spawner life's expiry to the factory. A cleared tag
+		// (owner == 0 after the expiry pooled the instance) still belongs to
+		// the captured emitter, so only a *different live owner* drops here.
+		if (owner_spawner_id != 0 && owner_spawner_id != emitter_instance_id) {
+			return;
+		}
 		emitter->emit_signal(signal_name, this, bullet_indexes);
 	}
 
@@ -2285,16 +2305,14 @@ public:
 
 	// Resolves who owns the collision/lifetime signals for this multimesh: the
 	// tagged BulletSpawner2D while it is alive, else the BulletFactory2D.
-	// Spawner death therefore degrades gracefully to factory signals instead
-	// of dropping events. May return null during teardown (both gone) - the
-	// caller must skip emission then (this also fixes a latent null-factory
-	// crash in the old code path).
+	// A spawner-owned volley NEVER falls back to the factory: if the owning
+	// spawner is gone the event is dropped (return null) instead of firing
+	// factory signals for another node's bullets. May also return null
+	// during teardown (both gone) - the caller must skip emission then
+	// (this also fixes a latent null-factory crash in the old code path).
 	_ALWAYS_INLINE_ Object *resolve_signal_emitter() const {
 		if (owner_spawner_id != 0) {
-			Object *spawner = ObjectDB::get_instance(ObjectID(owner_spawner_id));
-			if (spawner != nullptr) {
-				return spawner;
-			}
+			return ObjectDB::get_instance(ObjectID(owner_spawner_id));
 		}
 		return bullet_factory;
 	}
@@ -2327,6 +2345,12 @@ public:
 
 		const bool bullet_reached_max_collisions = bullet_max_collision_count > 0 && current_bullet_collision_amount >= bullet_max_collision_count;
 
+		// Snapshot the signal owner BEFORE any disable below: the killing blow
+		// funnels into disable_multimesh(), which clears owner_spawner_id and
+		// pools the instance. Resolving after would route a spawner volley's
+		// hit to the factory (or drop it) instead of the owning spawner.
+		Object *emitter = resolve_signal_emitter();
+
 		// Only disable the bullet if the max collision count is greater than 0, otherwise the bullet should never be disabled due to collisions
 		if (bullet_reached_max_collisions) {
 			disable_bullet(bullet_index, false); // Don't disable the attachment yet, first emit the signal for collision so user has access to the attachment and CAN detach it himself inside GDScript
@@ -2346,9 +2370,8 @@ public:
 		// instance call away (bullet_get_custom_data(),
 		// get_bullet_global_transform()).
 		// Possessed by the tagged spawner when there is one, else the factory.
-		// A null emitter (teardown, both gone) only skips the notification -
-		// cleanup below still runs.
-		Object *emitter = resolve_signal_emitter();
+		// A null emitter (teardown, spawner gone, or both gone) only skips the
+		// notification - cleanup below still runs.
 		if (emitter != nullptr) {
 			if (emitter == bullet_factory) {
 				if (is_class("BlockBullets2D")) {
