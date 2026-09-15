@@ -307,12 +307,13 @@ void DirectionalBullets2D::custom_additional_spawn_logic(const MultiMeshBulletsD
 	homing_lose_range_px = (real_t)directional_data->homing_lose_range_px;
 }
 
-bool DirectionalBullets2D::custom_additional_enable_logic(const MultiMeshBulletsData2D &data) {
-	const DirectionalBulletsData2D *directional_data = Object::cast_to<DirectionalBulletsData2D>(&data);
-	// Wrong-type enable must still leave clean state: base cleared curves
-	// and patterns, but ballistics/shared/homing would otherwise keep the
-	// previous owner's values (base rollback cannot clear subclass state).
-	// Neutralize them first so a failed enable never leaks them.
+bool DirectionalBullets2D::is_data_type_compatible(const MultiMeshBulletsData2D &data) const {
+	return Object::cast_to<DirectionalBulletsData2D>(&data) != nullptr;
+}
+
+void DirectionalBullets2D::reset_transient_subclass_state(bool drop_stale_work) {
+	// Neutralize ballistics/shared/homing so a new life never inherits the
+	// previous owner's values (base reset cannot clear subclass state).
 	set_up_movement_data(TypedArray<BulletSpeedData2D>());
 	shared_bullet_speed_data.unref();
 	shared_bullet_rotation_data.unref();
@@ -329,27 +330,30 @@ bool DirectionalBullets2D::custom_additional_enable_logic(const MultiMeshBullets
 	homing_duration_sec = 0.0;
 	homing_lose_range_px = 0.0;
 	clear_homing_state_for_teardown();
+	if (drop_stale_work) {
+		// New life only: the previous owner's homing forwarder must not fire
+		// again, and stale deferred emits/pops no-op at flush time. Disabled
+		// (unpooled) volleys keep them for same-owner wakes.
+		for (const Dictionary &connection : get_signal_connection_list("bullet_homing_target_reached")) {
+			const Callable callable = connection["callable"];
+			disconnect("bullet_homing_target_reached", callable);
+		}
+		++homing_operation_generation;
+		bullet_homing_epochs.assign(amount_bullets, 0);
+		shared_auto_pop_queued = false;
+	}
+}
+
+bool DirectionalBullets2D::custom_additional_enable_logic(const MultiMeshBulletsData2D &data) {
+	const DirectionalBulletsData2D *directional_data = Object::cast_to<DirectionalBulletsData2D>(&data);
+	// Unreachable in practice (is_data_type_compatible pre-checked): the base
+	// reset above already neutralized everything, so just refuse.
 	if (directional_data == nullptr) {
 		UtilityFunctions::push_error("DirectionalBullets2D::enable got wrong spawn data type, expected DirectionalBulletsData2D.");
 		return false;
 	}
 
-	// Get the list of connections for the signal
-	TypedArray<Dictionary> connections = get_signal_connection_list("bullet_homing_target_reached");
-
-	// Iterate through all connections and disconnect them
-	for (int i = 0; i < connections.size(); ++i) {
-		Dictionary connection = connections[i];
-		Callable callable = connection["callable"];
-		disconnect("bullet_homing_target_reached", callable);
-	}
-
-	// New life (pool reuse): stale deferred emits/pops no-op at flush, and
-	// the coalescing flag restarts clean so the fresh queue can auto-pop.
-	++homing_operation_generation;
-	bullet_homing_epochs.assign(amount_bullets, 0);
-	shared_auto_pop_queued = false;
-
+	// Seeding-only from here: base reset left blank ballistics/homing/orbit.
 	set_up_movement_data(directional_data->all_bullet_speed_data);
 
 	adjust_direction_based_on_rotation = directional_data->adjust_direction_based_on_rotation;
@@ -382,7 +386,8 @@ bool DirectionalBullets2D::custom_additional_enable_logic(const MultiMeshBullets
 	apply_wobble_from_data(*directional_data);
 
 	// Vectors are sized in spawn, but a wrong-type spawn early-returns before
-	// sizing. Resize here so the clears/assigns below can't run on empty vectors.
+	// sizing. Resize defensively (base reset already blanked them, so no
+	// clears are needed here anymore).
 	all_bullet_wobble.resize(amount_bullets);
 	wobble_distance_traveled.resize(amount_bullets, 0.0);
 	all_bullet_homing_targets.resize(amount_bullets);
@@ -392,31 +397,6 @@ bool DirectionalBullets2D::custom_additional_enable_logic(const MultiMeshBullets
 	all_orbiting_status.resize(amount_bullets, 0);
 	all_shared_homing_reached.resize(amount_bullets);
 	bullet_homing_epochs.resize(amount_bullets, 0);
-
-	// Homing
-
-	// Ensure all old homing targets are cleared. Do NOT clear the vector ever.
-	for (auto &queue : all_bullet_homing_targets) {
-		queue.clear_homing_targets(cached_mouse_global_position); // Passing garbage mouse global position but its fine
-	}
-	active_homing_count = 0;
-	all_homing_count.assign(amount_bullets, 0);
-	all_bullet_homing_smoothing.assign(amount_bullets, 0.0);
-	use_per_bullet_homing_smoothing = false;
-
-	shared_homing_deque.clear_homing_targets(cached_mouse_global_position); // Passing garbage mouse global position but its fine
-	reset_shared_homing_reached_state();
-	//
-
-	// Orbiting
-
-	all_orbiting_status.assign(amount_bullets, 0); // Initialize all orbiting status to disabled
-	for (auto &o : all_orbiting_data) {
-		o = OrbitingData();
-	}
-	active_orbiting_count = 0;
-
-	//
 
 	// Homing steering seeds from spawn data (direct factory users keep it
 	// across pool reuse now) and is always overwritten by the spawner

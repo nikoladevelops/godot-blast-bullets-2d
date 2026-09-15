@@ -231,6 +231,60 @@ void MultiMeshBullets2D::spawn(const MultiMeshBulletsData2D &data, MultiMeshObje
 	}
 }
 
+void MultiMeshBullets2D::reset_transient_subclass_state(bool drop_stale_work) {
+	(void)drop_stale_work;
+	shared_bullet_curves_data.unref();
+	for (auto &r : all_bullet_curves_data) {
+		r.unref();
+	}
+	for (auto &p : all_movement_pattern_data) {
+		p = BulletMovementPatternData2D();
+	}
+}
+
+void MultiMeshBullets2D::reset_transient_volley_state(uint64_t new_owner_spawner_id, bool drop_stale_work) {
+	// Ownership is stamped first so every step below already belongs to the
+	// new life (or to nobody, when dying).
+	owner_spawner_id = new_owner_spawner_id;
+	reset_transient_subclass_state(drop_stale_work);
+	// Blank attachment state: a reused instance must never carry the previous
+	// owner's attachment slots into the next life.
+	reset_attachment_state_for_reuse();
+	if (drop_stale_work) {
+		// New life: stale deferred emits/disables (scheduled before a pool
+		// reuse) carry the old generation and no-op at flush time, and the
+		// previous owner's volley-wide connections must not fire again.
+		// Disabled (but not pooled) volleys keep their connections here: a
+		// same-owner enable_bullet() wake must not silence the volley.
+		++multimesh_generation;
+		disconnect_sprite_animation_connections();
+	}
+	// Fresh lifetime must not inherit stale hits or timers from the previous
+	// owner. disable_multimesh() clears these when pooling is on, but an
+	// instance woken with pooling off (or a direct enable) would leak them.
+	all_collided_bullets.clear();
+	_do_detach_all_time_based_functions(multimesh_timers_generation);
+	// Same reason: a woken instance that never went through disable_multimesh()
+	// would keep counting curve time from the previous owner.
+	curves_elapsed_time = 0.0;
+	// Animation cursor restarts; baked frames are kept so a same-owner wake
+	// resumes them. New-life paths blank the frames before rebuilding.
+	anim_frame_index = 0;
+	anim_paused = false;
+	anim_finished = false;
+	if (!anim_frame_secs.empty()) {
+		anim_frame_time_left = anim_frame_secs[0];
+	}
+}
+
+void MultiMeshBullets2D::deactivate_volley() {
+	all_bullets_enabled_set.clear();
+	active_bullets_counter = 0;
+	is_active = false;
+	set_visible(false);
+	set_all_physics_shapes_enabled_for_area(false);
+}
+
 // Activates the multimesh
 bool MultiMeshBullets2D::enable_multimesh(const MultiMeshBulletsData2D &data, const Vector2 &new_inherited_velocity_offset, uint64_t spawner_id) {
 	// Pool buckets are keyed by amount, but a direct GDScript call can hand a
@@ -266,92 +320,44 @@ bool MultiMeshBullets2D::enable_multimesh(const MultiMeshBulletsData2D &data, co
 		return false;
 	}
 
-	// A direct re-enable on an in-use instance must start curves and patterns
-	// from scratch, same as a pooled pop does through disable_multimesh().
-	// Spawner ownership is stamped here (before any re-activation below), so
-	// a spawner reuse is never observable as factory-owned. Whoever enables
-	// next stamps anew; 0 keeps the factory-owned default.
-	const uint64_t old_owner_spawner_id = owner_spawner_id;
-	owner_spawner_id = spawner_id;
-	shared_bullet_curves_data.unref();
-	for (auto &r : all_bullet_curves_data) {
-		r.unref();
-	}
-	for (auto &p : all_movement_pattern_data) {
-		p = BulletMovementPatternData2D();
+	// WP-A: two-phase enable. Phase 1 (validate everything) runs before the
+	// first mutation, so a reject below leaves zero state behind and no
+	// rollback is needed. Phase 2 (reset + reseed) only runs on valid input.
+	// Wrong-type data is refused here: custom_additional_enable_logic() is
+	// seeding-only now and its own check is unreachable defense-in-depth.
+	if (!is_data_type_compatible(data)) {
+		UtilityFunctions::push_error("enable_multimesh: wrong spawn data type for this multimesh, ignoring the enable.");
+		return false;
 	}
 
 	// The factory spawn_* paths validate finiteness, but a direct
 	// enable_multimesh() call bypasses them: a NaN/Inf offset here would
-	// poison every bullet's velocity for the whole volley.
+	// poison every bullet's velocity for the whole volley. Checked before any
+	// mutation (previously after the owner/curve clears, leaking on reject).
 	if (!new_inherited_velocity_offset.is_finite()) {
 		UtilityFunctions::push_error("enable_multimesh: inherited velocity offset must be finite, keeping the old value.");
 		return false;
 	}
-	// Snapshot everything the enable below reseeds, so the wrong-type
-	// rollback restores a clean disabled instance instead of one carrying
-	// the failed owner's state (see the rollback at the end). CanvasItem
-	// visuals use the inherited Node2D/CanvasItem API (get/set_texture via
-	// the multimesh texture, material/z/light/visibility), hence the
-	// qualified calls below.
-	const Ref<Shape2D> old_collision_shape = cached_collision_shape;
-	const Vector2 old_collision_shape_offset = cache_collision_shape_offset;
-	const double old_max_life_time = max_life_time;
-	const double old_current_life_time = current_life_time;
-	const double old_curves_elapsed_time = curves_elapsed_time;
-	const bool old_rotate_only_textures = rotate_only_textures;
-	const Ref<Resource> old_shared_custom_data = shared_bullets_custom_data;
-	const Ref<Material> old_material = get_material();
-	const int old_z_index = get_z_index();
-	const int old_light_mask = get_light_mask();
-	const int old_visibility_layer = get_visibility_layer();
-	const Dictionary old_shader_params = instance_shader_parameters;
-	const Ref<SpriteFrames> old_anim_source = anim_source;
-	const std::vector<Ref<Texture2D>> old_anim_frames = anim_frames;
-	const std::vector<double> old_anim_frame_secs = anim_frame_secs;
-	const StringName old_anim_name = anim_name;
-	const bool old_anim_loop = anim_loop;
-	const int old_anim_frame_index = anim_frame_index;
-	const double old_anim_frame_time_left = anim_frame_time_left;
-	const bool old_anim_paused = anim_paused;
-	const bool old_anim_finished = anim_finished;
-	const Ref<Texture2D> old_texture = get_texture();
-	// Rotation + per-instance state the failed enable reseeds through
-	// set_rotation_data / set_up_bullet_instances / set_up_area: snapshot
-	// the live vectors and scalars so the rollback below restores them.
-	const std::vector<real_t> old_rotation_speed = all_rotation_speed;
-	const std::vector<real_t> old_max_rotation_speed = all_max_rotation_speed;
-	const std::vector<real_t> old_rotation_acceleration = all_rotation_acceleration;
-	const bool old_is_rotation_data_active = is_rotation_data_active;
-	const bool old_use_only_first_rotation_data = use_only_first_rotation_data;
-	const bool old_stop_rotation_when_max_reached = stop_rotation_when_max_reached;
-	const std::vector<Transform2D> old_instance_transforms = all_cached_instance_transforms;
-	const std::vector<Vector2> old_instance_origin = all_cached_instance_origin;
-	const std::vector<Transform2D> old_shape_transforms = all_cached_shape_transforms;
-	const std::vector<Vector2> old_shape_origin = all_cached_shape_origin;
-	const std::vector<int> old_collision_counts = bullets_current_collision_count;
-	const int old_bullet_max_collision_count = bullet_max_collision_count;
-	const std::vector<Ref<Resource>> old_custom_data = all_bullets_custom_data;
-	const bool old_life_time_over_signal_enabled = is_life_time_over_signal_enabled;
-	const bool old_life_time_infinite = is_life_time_infinite;
-	const int old_area_collision_layer = (physics_server != nullptr && area.is_valid()) ? physics_server->area_get_collision_layer(area) : 0;
-	const int old_area_collision_mask = (physics_server != nullptr && area.is_valid()) ? physics_server->area_get_collision_mask(area) : 0;
-	const bool old_monitorable = monitorable;
-	const real_t old_texture_rotation_radians = cache_texture_rotation_radians;
-	// Base ballistic SoA reseeded by subclass custom logic (directional
-	// set_up_movement_data zeroes/overwrites these on wrong-type too).
-	const std::vector<real_t> old_cached_speed = all_cached_speed;
-	const std::vector<real_t> old_cached_max_speed = all_cached_max_speed;
-	const std::vector<real_t> old_cached_acceleration = all_cached_acceleration;
-	const std::vector<Vector2> old_cached_direction = all_cached_direction;
-	const std::vector<Vector2> old_cached_velocity = all_cached_velocity;
-	const Vector2 old_inherited_velocity_offset = inherited_velocity_offset;
-	// Spawn-pose fallback + quad size overwritten by set_up_bullet_instances /
-	// set_up_multimesh: restore so getters don't advertise failed data.
-	const TypedArray<Transform2D> old_texture_transforms = cache_texture_transforms;
-	const Vector2 old_texture_size = texture_size;
-	// Multimesh visual resource recreated by generate_multimesh on fresh
-	// spawns only (enable reuses it): no snapshot needed for enable path.
+
+	// WP-B: one reset owns the whole clean-disabled invariant (owner stamp,
+	// curves/patterns/subclass ballistics, attachment slots, collided hits,
+	// timers, clocks, animation cursor, generation bump, connection scrub).
+	// Spawner ownership is stamped here (before any re-activation below), so
+	// a spawner reuse is never observable as factory-owned. Whoever enables
+	// next stamps anew; 0 keeps the factory-owned default.
+	reset_transient_volley_state(spawner_id, true);
+
+	// A new life never inherits the previous owner's baked animation
+	// (reset kept the frames for same-owner wakes; a reseed always rebuilds,
+	// so blank them here). rebuild only overwrites on success: a failed
+	// rebuild leaves blank state, never the old animation playing.
+	anim_source.unref();
+	anim_frames.clear();
+	anim_frame_secs.clear();
+	set_texture(Ref<Texture2D>());
+	// WP-A: no snapshot/rollback anymore. Wrong-type input was rejected above
+	// before any mutation, and every reseed below fully overwrites the blank
+	// state reset_transient_volley_state() left behind.
 	inherited_velocity_offset = new_inherited_velocity_offset;
 	const PhysicsServer2D::ShapeType old_effective_shape_type = cached_effective_shape_type;
 	cache_collision_shape_typed(data.collision_shape);
@@ -412,124 +418,18 @@ bool MultiMeshBullets2D::enable_multimesh(const MultiMeshBulletsData2D &data, co
 			data.visibility_layer,
 			data.instance_shader_parameters);
 
-	// A pooled instance carries the previous owner's baked animation. rebuild only
-	// overwrites on success, so ALWAYS clear first: a failed rebuild (missing
-	// animation, null frame texture, ...) must leave a blank state, never the
-	// previous owner's animation playing for the new one.
-	anim_source.unref();
-	anim_frames.clear();
-	anim_frame_secs.clear();
-	anim_frame_index = 0;
-	anim_frame_time_left = 0.0;
-	anim_paused = false;
-	anim_finished = false;
-	set_texture(Ref<Texture2D>());
-
 	// Single-error policy: rebuild already reported; blank animation kept on failure.
+	// (Frames were blanked in the prologue; connections scrubbed by the reset.)
 	rebuild_sprite_animation(data.sprite_frames, data.animation);
 
-	// Pooled instances may carry user connections from a previous owner; they must not
-	// fire for the new spawn. Mirrors the homing-signal cleanup in directional enable logic.
-	disconnect_sprite_animation_connections();
-
-	// Wrong data type (e.g. block data on a directional instance): roll back
-	// the mutations above so the caller can re-push a clean disabled
-	// instance instead of one carrying the failed owner's state. Every cache
-	// reseeded between the shape snapshot and here is restored: shape typed
-	// cache + offset, lifetime, appearance/custom/material, animation,
-	// rotation, collision counts/custom/transforms, timers.
+	// Seeding-only subclass step. Unreachable in practice: wrong-type data was
+	// rejected before any mutation (is_data_type_compatible). Defensive
+	// fallback leaves a clean disabled instance for the pool instead of
+	// half-seeded state: reset + deactivate fully blank what the reseed above
+	// wrote, so the next correct enable starts from neutral.
 	if (!custom_additional_enable_logic(data)) {
-		// The failed enable must not leave the new owner's stamp behind: the
-		// recycled disabled instance keeps its previous ownership.
-		owner_spawner_id = old_owner_spawner_id;
-		cached_effective_shape_type = old_effective_shape_type;
-		cache_collision_shape_typed(old_collision_shape);
-		cache_collision_shape_offset = old_collision_shape_offset;
-		// Full side-array reset (not just the slot loop below): the failed
-		// enable may have reseeded pooling ids/offsets/flags that the loop
-		// never touches, and the next owner must not see them.
-		reset_attachment_state_for_reuse();
-		set_all_physics_shapes_enabled_for_area(false);
-		all_bullets_enabled_set.clear();
-		all_collided_bullets.clear();
-		active_bullets_counter = 0;
-		is_active = false;
-		set_visible(false);
-		// Timers armed by attachment on_bullet_spawn/enable callbacks during
-		// the failed enable must not survive on the recycled instance: the
-		// factory timer sweep has no is_active gate and would tick them.
-		multimesh_custom_timers.clear();
-		++multimesh_timers_generation;
-		set_up_life_time_timer(old_max_life_time, old_current_life_time);
-		curves_elapsed_time = old_curves_elapsed_time;
-		// Restore rotation + per-instance state reseeded above: without this
-		// the recycled instance advertises the failed owner's speeds,
-		// transforms, collision counts and area flags via its getters.
-		all_rotation_speed = old_rotation_speed;
-		all_max_rotation_speed = old_max_rotation_speed;
-		all_rotation_acceleration = old_rotation_acceleration;
-		is_rotation_data_active = old_is_rotation_data_active;
-		use_only_first_rotation_data = old_use_only_first_rotation_data;
-		stop_rotation_when_max_reached = old_stop_rotation_when_max_reached;
-		rotate_only_textures = old_rotate_only_textures;
-		all_cached_instance_transforms = old_instance_transforms;
-		all_cached_instance_origin = old_instance_origin;
-		all_cached_shape_transforms = old_shape_transforms;
-		all_cached_shape_origin = old_shape_origin;
-		bullets_current_collision_count = old_collision_counts;
-		bullet_max_collision_count = old_bullet_max_collision_count;
-		all_bullets_custom_data = old_custom_data;
-		is_life_time_over_signal_enabled = old_life_time_over_signal_enabled;
-		is_life_time_infinite = old_life_time_infinite;
-		if (physics_server != nullptr && area.is_valid()) {
-			physics_server->area_set_collision_layer(area, old_area_collision_layer);
-			physics_server->area_set_collision_mask(area, old_area_collision_mask);
-			physics_server->area_set_monitorable(area, old_monitorable);
-		}
-		monitorable = old_monitorable;
-		cache_texture_rotation_radians = old_texture_rotation_radians;
-		// Ballistic SoA zeroed by the subclass neutralize step: restore so a
-		// recycled disabled instance keeps prior-owner ballistics instead of
-		// advertising zeros (next correct enable reseeds anyway).
-		all_cached_speed = old_cached_speed;
-		all_cached_max_speed = old_cached_max_speed;
-		all_cached_acceleration = old_cached_acceleration;
-		all_cached_direction = old_cached_direction;
-		all_cached_velocity = old_cached_velocity;
-		inherited_velocity_offset = old_inherited_velocity_offset;
-		cache_texture_transforms = old_texture_transforms;
-		texture_size = old_texture_size;
-		// Shape RIDs recreated above on a type change belong to the failed
-		// data: without this the recycled instance keeps new-type RIDs under
-		// the restored old-type enum (next correct enable re-detects the
-		// mismatch and self-heals, but the interim is inconsistent).
-		if (cached_effective_shape_type != old_effective_shape_type && physics_server != nullptr && area.is_valid()) {
-			physics_server->area_clear_shapes(area);
-			for (RID &s : physics_shapes) {
-				if (s.is_valid()) {
-					physics_server->free_rid(s);
-				}
-			}
-			physics_shapes.clear();
-			generate_physics_shapes_for_area(amount_bullets);
-		}
-		finalize_set_up(
-				old_shared_custom_data,
-				old_material,
-				old_z_index,
-				old_light_mask,
-				old_visibility_layer,
-				old_shader_params);
-		anim_source = old_anim_source;
-		anim_frames = old_anim_frames;
-		anim_frame_secs = old_anim_frame_secs;
-		anim_name = old_anim_name;
-		anim_loop = old_anim_loop;
-		anim_frame_index = old_anim_frame_index;
-		anim_frame_time_left = old_anim_frame_time_left;
-		anim_paused = old_anim_paused;
-		anim_finished = old_anim_finished;
-		set_texture(old_texture);
+		reset_transient_volley_state(spawner_id, true);
+		deactivate_volley();
 		return false;
 	}
 
@@ -2081,4 +1981,530 @@ void MultiMeshBullets2D::_bind_methods() {
 	ADD_SIGNAL(MethodInfo("sprite_animation_finished",
 			PropertyInfo(Variant::OBJECT, "multimesh_bullets_instance", PROPERTY_HINT_RESOURCE_TYPE, "MultiMeshBullets2D")));
 }
+
+// WP-F: cold paths moved out of the header (per-tick hot paths stay inline).
+// Bodies are unchanged; only the location moved.
+
+void MultiMeshBullets2D::_do_deferred_bullet_disable_attachment(int bullet_index, int expected_generation, uint64_t expected_attachment_id, BulletAttachment2D *expected_attachment) {
+	if (expected_generation != multimesh_generation) {
+		return;
+	}
+	if (!slot_still_holds_attachment(bullet_index, expected_attachment, expected_attachment_id)) {
+		return;
+	}
+	bullet_disable_attachment(bullet_index);
+}
+
+void MultiMeshBullets2D::_do_emit_life_time_over(int expected_generation, uint64_t emitter_instance_id, const StringName &signal_name, const TypedArray<int> &bullet_indexes) {
+	if (expected_generation != multimesh_generation) {
+		return;
+	}
+	if (bullet_indexes.is_empty()) {
+		return;
+	}
+	Object *emitter = ObjectDB::get_instance(ObjectID(emitter_instance_id));
+	if (emitter == nullptr) {
+		return;
+	}
+	// Re-ownership guard: the volley may have been handed to a different
+	// owner without a generation bump (adopt_live_volley re-stamps only).
+	// Never deliver the old life's expiry to the new owner, and never
+	// deliver a spawner life's expiry to the factory. A cleared tag
+	// (owner == 0 after the expiry pooled the instance) still belongs to
+	// the captured emitter, so only a *different live owner* drops here.
+	if (owner_spawner_id != 0 && owner_spawner_id != emitter_instance_id) {
+		return;
+	}
+	emitter->emit_signal(signal_name, this, bullet_indexes);
+}
+
+void MultiMeshBullets2D::_do_emit_sprite_animation_finished(int expected_generation) {
+	if (expected_generation != multimesh_generation) {
+		return;
+	}
+	if (!anim_finished) {
+		return;
+	}
+	emit_signal("sprite_animation_finished", this);
+}
+
+
+// WP-F: cold paths moved out of the header (per-tick hot paths stay inline).
+// Bodies are unchanged; only the location moved.
+
+void MultiMeshBullets2D::reduce_lifetime(double delta) {
+		if (!Math::is_finite(delta) || delta < 0.0) {
+			return;
+		}
+		curves_elapsed_time += delta;
+
+		// If the lifetime is infinite there is no lifetime timer
+		if (is_life_time_infinite) {
+			return;
+		}
+
+		// Life time timer logic
+		current_life_time -= delta;
+
+		// The bullets still have life time left, so don't do anything yet
+		if (current_life_time > 0) {
+			return;
+		}
+
+		std::vector<int> active_copy = all_bullets_enabled_set.get_active_indexes();
+
+		// If the life_time_over signal is not enabled, we can just disable all bullets right away and skip the additional logic
+		if (!is_life_time_over_signal_enabled) {
+			for (int i : active_copy) {
+				if (!all_bullets_enabled_set.contains(i)) {
+					continue;
+				}
+				disable_bullet(i, true);
+			}
+
+			return;
+		}
+
+		// If the life_time_over signal is enabled - collect indexes, disable bullets immediately (consistent with collision path),
+		// but keep attachment disable and signal deferred so handler can still access attachment.
+		// Full-volley expiry additionally detaches the survivors from the disable
+		// sweep: the last disable_bullet() funnels into disable_multimesh(),
+		// whose sweep would otherwise pool every attachment BEFORE the deferred
+		// signal fires (handler would see nullptr). Detaching first keeps the
+		// slots alive for the signal; the deferred disables re-pool them after.
+		TypedArray<int> bullet_indexes;
+
+		// Snapshot the signal owner BEFORE the disable loop below: a full-volley
+		// expiry funnels into disable_multimesh(), which clears owner_spawner_id
+		// and pools the instance. Resolving after would schedule the factory's
+		// life_time_over signal for a spawner-owned volley.
+		Object *lifetime_emitter = resolve_signal_emitter();
+
+		// Caches already hold global-space transforms (spawn data is global and all
+		// movement/homing math is global), so no get_global_transform() compose is
+		// needed anywhere transforms are read (handlers use get_bullet_global_transform()).
+		for (int i : active_copy) {
+			if (!all_bullets_enabled_set.contains(i)) {
+				continue;
+			}
+			bullet_indexes.push_back(i);
+			disable_bullet(i, false); // immediate shape disable, keep attachment for signal
+		}
+
+		// The sweep above pooled every attachment when the last bullet went out
+		// (full-volley expiry always ends there). Reclaim them into the slots so
+		// the deferred signal below observes live attachments again; the
+		// deferred per-bullet disables queued below return them afterwards.
+		// Partial expiry never reaches the sweep, so this is a no-op there
+		// (slots still hold their attachments). Popping is LIFO-safe here:
+		// the sweep just pushed these exact instances, so the bucket top is
+		// ours unless a re-entrant handler stole it (then the slot stays
+		// null and the handler owns that attachment - no double-claim).
+		// Reclaimed slots re-enter the enabled state: without on_bullet_enable
+		// + a transform sync the handler would observe a disabled-state node,
+		// and the deferred disable below would fire on_bullet_disable a
+		// second time with no enable in between.
+		if (!is_active && bullet_indexes.size() > 0 && bullet_factory != nullptr) {
+			for (int k = 0; k < bullet_indexes.size(); ++k) {
+				const int idx = (int)bullet_indexes[k];
+				if (idx < 0 || idx >= amount_bullets || idx >= (int)attachments.size() || idx >= (int)attachment_pooling_ids.size()) {
+					continue;
+				}
+				if (attachments[idx] != nullptr) {
+					continue;
+				}
+				const uint32_t pooling_id = attachment_pooling_ids[idx];
+				if (pooling_id == 0) {
+					continue;
+				}
+			BulletAttachment2D *candidate = bullet_factory->bullet_attachments_pool.pop(pooling_id);
+			if (candidate != nullptr) {
+				// Identity guard shared with the attach path (null expected
+				// scene here: verified as genuine bucket membership instead
+				// of an exact scene match - see the helper's note).
+				if (!is_popped_attachment_from_scene(candidate, Ref<PackedScene>(), pooling_id)) {
+					bullet_factory->bullet_attachments_pool.push(candidate, pooling_id);
+				} else {
+						attachments[idx] = candidate;
+						candidate->owner_multimesh_id = get_instance_id();
+						candidate->owner_bullet_index = idx;
+						if (idx >= 0 && idx < (int)all_cached_instance_transforms.size()) {
+							attachment_transforms[idx] = calculate_attachment_global_transf(idx, all_cached_instance_transforms[idx]);
+							candidate->set_global_transform(attachment_transforms[idx]);
+							candidate->reset_physics_interpolation();
+							if (idx >= 0 && idx < (int)all_previous_attachment_transf.size()) {
+								all_previous_attachment_transf[idx] = attachment_transforms[idx];
+							}
+						}
+						candidate->call_on_bullet_enable();
+					}
+				}
+			}
+		}
+
+	if (bullet_indexes.size() > 0) {
+		// Emit deferred so user code runs outside physics step. Guarded by
+		// spawn generation (not just emitter validity): expiry queues the
+		// emit, then a same-frame pool reuse hands this instance to a new
+		// owner before the flush. The bare call_deferred("emit_signal")
+		// would then deliver the OLD life's indexes to the NEW life.
+		// Uses the pre-disable snapshot above, never a post-disable resolve.
+		Object *emitter = lifetime_emitter;
+		if (emitter != nullptr) {
+			const uint64_t emitter_id = emitter->get_instance_id();
+			if (emitter == bullet_factory) {
+				const char *signal_name = is_class("BlockBullets2D") ? "block_life_time_over" : "directional_life_time_over";
+				call_deferred("_do_emit_life_time_over", multimesh_generation, emitter_id, StringName(signal_name), bullet_indexes);
+			} else {
+				call_deferred("_do_emit_life_time_over", multimesh_generation, emitter_id, StringName("life_time_over"), bullet_indexes);
+			}
+		}
+
+		// Disable attachments after signal (deferred keeps order)
+		for (int i = 0; i < bullet_indexes.size(); ++i) {
+			int idx = bullet_indexes[i];
+			BulletAttachment2D *queued_attachment = attachments[idx];
+			const uint64_t queued_attachment_id = queued_attachment != nullptr ? queued_attachment->get_instance_id() : 0;
+			call_deferred("_do_deferred_bullet_disable_attachment", idx, multimesh_generation, queued_attachment_id, queued_attachment);
+		}
+	}
+	}
+
+void MultiMeshBullets2D::enable_bullet(int bullet_index, int collision_amount, bool should_enable_attachment) {
+		// Wake semantics (contract, keep in sync with the doc XML):
+		// "resume, not respawn" for ballistics (speed/direction/velocity/
+		// position), appearance, custom data and per-bullet movement state -
+		// there is no spawn data to reseed from. Two deliberate exceptions:
+		// (1) an expiry-pooled wake tops up the whole volley's lifetime AND
+		// rewinds the curve clock together (curves sample
+		// curves_elapsed_time/max_life_time, so one without the other would
+		// pin curves at their end sample); (2) per-bullet homing queues and
+		// orbit state are NOT resumed - disable_bullet() clears them, so
+		// re-push targets and re-enable orbit after the wake.
+		// Cross-owner reuse must go through spawn_*()/enable_multimesh(),
+		// which reseed everything from fresh data.
+		if (!validate_bullet_index(bullet_index, "enable_bullet")) {
+			return;
+		}
+		if (bullet_index >= (int)all_cached_instance_transforms.size() || bullet_index >= (int)bullets_current_collision_count.size()) {
+			return;
+		}
+		if (multi.is_null() || !multi.is_valid()) {
+			return;
+		}
+		if (physics_server == nullptr || !area.is_valid()) {
+			return;
+		}
+
+		const bool curr_bullet_status = all_bullets_enabled_set.contains(bullet_index);
+
+		// If the bullet is already enabled, just return
+		if (curr_bullet_status) {
+			return;
+		}
+
+		// A wake from inside the disable sweep (on_bullet_disable handler) would
+		// resurrect the volley while _disable_multimesh_internal() is tearing it
+		// down; the sweep aborts on wake now, but the factory also drops the
+		// re-registration (reactivate fails under the busy flag), leaving a live
+		// volley the factory never ticks. Reject here so the wake is explicit
+		// (call_deferred) instead of silently frozen.
+		if (bullet_factory != nullptr && bullet_factory->get_is_factory_busy()) {
+			UtilityFunctions::push_error("enable_bullet: cannot wake a bullet while the factory is busy (e.g. inside an on_bullet_disable handler during the disable sweep). Use call_deferred to wake after the sweep.");
+			return;
+		}
+
+		// The attachment callback below runs user code that may re-enter
+		// enable_bullet()/disable_bullet() on this volley. Claim the slot (set
+		// + counter) BEFORE it runs, and reject nested enable/disable calls
+		// while the latch is held, so the counter can never drift vs the
+		// sparse set (activate_data dedups, the counter does not).
+		if (_bullet_enable_depth > 0) {
+			UtilityFunctions::push_error("enable_bullet: re-entrant call from inside on_bullet_enable is not allowed. Use call_deferred to change bullet state from that callback.");
+			return;
+		}
+		ReentrancyGuard bullet_enable_guard(_bullet_enable_depth);
+
+		// Full-volley wake coming: the generations must bump BEFORE the
+		// attachment callback below (user on_bullet_enable code) runs, so work
+		// it queues is stamped with the new life instead of being invalidated
+		// right after. Deferred work from the dead life is correctly dropped.
+		// Timers are dropped outright here (not just bumped): disable only
+		// detaches on the full-kill path, so a disable→attach→wake sequence
+		// would otherwise hand the new life timers armed while pooled.
+		const bool will_reactivate_volley = !is_active;
+		if (will_reactivate_volley) {
+			++multimesh_generation;
+			++multimesh_timers_generation;
+			multimesh_custom_timers.clear();
+		}
+
+		all_bullets_enabled_set.activate_data(bullet_index);
+		++active_bullets_counter;
+		if (active_bullets_counter > amount_bullets) {
+			active_bullets_counter = amount_bullets;
+		}
+
+		// A wake is a new life for this slot: stale queued hits from before
+		// the disable must not fire now (same-overlap double count).
+		bump_collision_epoch_for_bullet(bullet_index);
+
+		multi->set_instance_transform_2d(bullet_index, to_local_for_multimesh(all_cached_instance_transforms[bullet_index])); // Start rendering the instance
+
+		physics_server->area_set_shape_disabled(area, bullet_index, false);
+
+		// Woken bullets must not lerp from a stale pre-disable position.
+		// Every other teleport-sentenced path syncs prev==curr; do the same.
+		update_bullet_previous_transform_for_interpolation(bullet_index);
+
+		auto &current_bullet_collision_amount = bullets_current_collision_count[bullet_index];
+
+		// collision_amount is how many hits the bullet has already taken: 0 means fresh
+		// (full hits remaining). Clamp into range so re-enabling can't grant extra hits
+		// or kill the bullet one hit early: values at/above max leave exactly one
+		// hit remaining (max - 1), same as set_bullet_collision_count().
+		if (collision_amount < 0) {
+			current_bullet_collision_amount = 0;
+		} else if (bullet_max_collision_count > 0 && collision_amount >= bullet_max_collision_count) {
+			current_bullet_collision_amount = bullet_max_collision_count - 1;
+		} else {
+			current_bullet_collision_amount = collision_amount;
+		}
+
+		if (should_enable_attachment) {
+			bullet_enable_attachment(bullet_index);
+		}
+
+		if (!is_active) {
+			// Waking a fully pooled multimesh outside the factory pop path: drop it from
+			// the pool first, otherwise the next pop() would hand out this live instance
+			// to a second owner while the first still drives it. The factory also resumes
+			// processing it so woken bullets actually move.
+			// Generations were already bumped above (before user callbacks), so
+			// deferred work from the dead life is gone and anything queued from
+			// here on belongs to this new life.
+			// Only a foreign life (actually pooled) carries the previous
+			// Only a foreign life (actually pooled) carries the previous
+			// owner's volley-wide signal connections. A same-owner revive of
+			// a drained-but-unpooled volley must keep them: disconnecting here
+			// would silence the whole volley because of one bullet's wake.
+			// try_remove_instance returns false when pooling is off or the
+			// instance was never pooled - both mean same-owner revive.
+			const bool was_pooled = (bullets_pool != nullptr) && bullets_pool->try_remove_instance(this, get_pool_key());
+			if (bullet_factory != nullptr) {
+				bullet_factory->reactivate_multimesh_instance(*this);
+			}
+		// A pooled instance carries the previous owner's signal connections; they
+		// must not fire for this wake (same cleanup the pool-pop enable does).
+		// Scoped to foreign lives only (see was_pooled above): same-owner
+		// revives skip the disconnects so sibling notifications survive.
+		if (was_pooled) {
+			disconnect_sprite_animation_connections();
+			// Same for the previous owner's homing forward: without this, the old
+			// spawner would keep retargeting a volley someone else woke manually.
+			// Guarded by has_signal so BlockBullets2D (no homing signal) no-ops.
+			if (has_signal("bullet_homing_target_reached")) {
+				for (const Dictionary &connection : get_signal_connection_list("bullet_homing_target_reached")) {
+					const Callable callable = connection["callable"];
+					disconnect("bullet_homing_target_reached", callable);
+				}
+			}
+		}
+		// Ownership restarts from scratch: whoever woke this re-stamps if it
+		// is a spawner (see BulletSpawner2D::adopt_live_volley). Keeping the
+		// old id would let a foreign spawner steer manual wakes.
+		owner_spawner_id = 0;
+		// A foreign pooled wake is a new owner with stale ballistics: ballistics,
+		// appearance, custom data and patterns still hold the previous owner's
+		// values (only the woken slot's collision count was reseeded above).
+		// Same-owner revives resume them by design; foreign wakes must reseed
+		// through spawn_*/enable_multimesh or adopt_live_volley + manual
+		// re-push, so warn once per wake instead of driving silently stale.
+		if (was_pooled) {
+			UtilityFunctions::push_warning("enable_bullet: woke a pooled volley from the pool outside spawn_*/enable_multimesh. Ballistics, appearance, custom data and patterns still hold the previous owner's values: reseed them (or adopt_live_volley + re-push homing/orbit) before relying on this volley.");
+		}
+			// An expiry-pooled wake would otherwise die again on the next tick with an
+			// exhausted timer. Only top it up when expired; manual-disable wakes keep
+			// their remaining lifetime untouched. Both clocks restart together:
+			// curves sample curves_elapsed_time/max_life_time, so topping up one
+			// without the other would pin curves at their end sample (1.0).
+			if (!is_life_time_infinite && current_life_time <= 0.0) {
+				current_life_time = max_life_time;
+				curves_elapsed_time = 0.0;
+			}
+			is_active = true;
+			set_visible(true);
+			// Keep the interpolator consistent for the whole volley: disabled
+			// bullets are not rendered, but their prev cache is stale. Sync all
+			// so a later enable_bullet() never lerps from a pre-disable pose.
+			// (The woken bullet itself was already synced above.)
+			update_all_previous_transforms_for_interpolation();
+		}
+	}
+
+void MultiMeshBullets2D::disable_bullet(int bullet_index, bool should_disable_attachment) {
+		if (!validate_bullet_index(bullet_index, "disable_bullet")) {
+			return;
+		}
+		// disable_bullet() is a teardown-adjacent path (debug helpers call it on
+		// unspawned instances; PREDELETE frees the area). enable_bullet() guards
+		// these; mirror the guards so a dead multimesh can't null-deref below.
+		if (multi.is_null() || !multi.is_valid()) {
+			return;
+		}
+		if (physics_server == nullptr || !area.is_valid()) {
+			return;
+		}
+
+		// Same re-entrancy latch as enable_bullet(): the attachment callback
+		// below runs user code that may call enable_bullet()/disable_bullet().
+		// A nested enable-then-disable pair inside one outer disable would
+		// otherwise decrement the counter twice for one claimed slot.
+		if (_bullet_enable_depth > 0) {
+			UtilityFunctions::push_error("disable_bullet: re-entrant call from inside on_bullet_enable is not allowed. Use call_deferred to change bullet state from that callback.");
+			return;
+		}
+
+		const bool curr_bullet_status = all_bullets_enabled_set.contains(bullet_index);
+
+		// If the bullet is already disabled, just return
+		if (!curr_bullet_status) {
+			return;
+		}
+
+		all_bullets_enabled_set.disable_data(bullet_index);
+
+		--active_bullets_counter;
+		if (active_bullets_counter < 0) {
+			active_bullets_counter = 0;
+		}
+
+		// Stale queued hits for this slot must not fire after a re-enable:
+		// bump the drain epoch so records queued before this disable
+		// mismatch at emit time.
+		bump_collision_epoch_for_bullet(bullet_index);
+
+		// Drop per-bullet homing/orbit state now (directional override): the tick
+		// only trims active bullets, so without this a disabled bullet's invalid
+		// targets leak counters until the whole multimesh dies. Pattern and curve
+		// state is deliberately kept: a wake resumes the bullet's own movement
+		// (documented wake contract), while homing queues and orbit locks are
+		// re-pushed/re-armed after the wake.
+		on_bullet_disabled(bullet_index);
+
+		multi->set_instance_transform_2d(bullet_index, zero_transform); // Stops rendering the instance
+
+		physics_server->area_set_shape_disabled(area, bullet_index, true);
+
+		if (should_disable_attachment) {
+			bullet_disable_attachment(bullet_index);
+		}
+
+		if (active_bullets_counter <= 0) {
+			disable_multimesh();
+		}
+	}
+
+void MultiMeshBullets2D::handle_bullet_collision(CollisionType collision_type, int bullet_index, int64_t entered_instance_id, uint64_t queued_bullet_epoch) {
+		if (bullet_index < 0 || bullet_index >= amount_bullets) {
+			return;
+		}
+		if (bullet_index >= (int)bullets_current_collision_count.size() || bullet_index >= (int)attachments.size() || bullet_index >= (int)all_cached_instance_transforms.size()) {
+			return;
+		}
+		// Stale record check: a handler earlier in this same drain may have
+		// disabled then re-enabled this slot (epoch bump on both). The queued
+		// stamp no longer matches, so this record describes a dead overlap,
+		// not a new hit - skip it instead of double-counting.
+		if (queued_bullet_epoch != collision_epoch_for_bullet(bullet_index)) {
+			return;
+		}
+		const bool curr_bullet_status = all_bullets_enabled_set.contains(bullet_index);
+
+		// If the bullet is already disabled, just return
+		if (!curr_bullet_status) {
+			return;
+		}
+
+		int &current_bullet_collision_amount = bullets_current_collision_count[bullet_index];
+
+		// Always keep track of how many collisions this bullet had (yes even if the user set bullet_max_collision_count to 0, I just want consistent behavior)
+		++current_bullet_collision_amount;
+
+		const bool bullet_reached_max_collisions = bullet_max_collision_count > 0 && current_bullet_collision_amount >= bullet_max_collision_count;
+
+		// Snapshot the signal owner BEFORE any disable below: the killing blow
+		// funnels into disable_multimesh(), which clears owner_spawner_id and
+		// pools the instance. Resolving after would route a spawner volley's
+		// hit to the factory (or drop it) instead of the owning spawner.
+		Object *emitter = resolve_signal_emitter();
+
+		// Only disable the bullet if the max collision count is greater than 0, otherwise the bullet should never be disabled due to collisions
+		if (bullet_reached_max_collisions) {
+			disable_bullet(bullet_index, false); // Don't disable the attachment yet, first emit the signal for collision so user has access to the attachment and CAN detach it himself inside GDScript
+		}
+
+		// Capture the slot before the signal: the handler runs user code that may
+		// detach, replace, or - through a re-entrant spawn that pops this instance
+		// from the pool - hand the whole multimesh to a new owner.
+		BulletAttachment2D *attachment_at_signal_time = attachments[bullet_index];
+
+		Object *hit_target = ObjectDB::get_instance(entered_instance_id);
+
+		// Typed per-kind signals emit synchronously (Godot-style): the instance
+		// is alive and the slot state valid by construction here, so handlers
+		// run with live data, need no casts, and need no call_deferred for
+		// game logic. Slim payload - custom data and transforms are one
+		// instance call away (bullet_get_custom_data(),
+		// get_bullet_global_transform()).
+		// Possessed by the tagged spawner when there is one, else the factory.
+		// A null emitter (teardown, spawner gone, or both gone) only skips the
+		// notification - cleanup below still runs.
+		if (emitter != nullptr) {
+			if (emitter == bullet_factory) {
+				if (is_class("BlockBullets2D")) {
+					if (collision_type == CollisionType::AREA) {
+						emitter->emit_signal("block_area_entered", hit_target, this, bullet_index);
+					} else if (collision_type == CollisionType::BODY) {
+						emitter->emit_signal("block_body_entered", hit_target, this, bullet_index);
+					}
+				} else {
+					if (collision_type == CollisionType::AREA) {
+						emitter->emit_signal("directional_area_entered", hit_target, this, bullet_index);
+					} else if (collision_type == CollisionType::BODY) {
+						emitter->emit_signal("directional_body_entered", hit_target, this, bullet_index);
+					}
+				}
+			} else {
+				if (collision_type == CollisionType::AREA) {
+					emitter->emit_signal("area_entered", hit_target, this, bullet_index);
+				} else if (collision_type == CollisionType::BODY) {
+					emitter->emit_signal("body_entered", hit_target, this, bullet_index);
+				}
+			}
+		}
+
+		// Disable the bullet attachment if the bullet reached its max collision count and the attachment is still enabled
+		if (bullet_reached_max_collisions) {
+			// The signal above runs user code that may have detached this slot
+			// already (bullet_set_attachment_to_null / bullet_free_attachment /
+			// bullet_set_attachment), or re-assigned it. Only disable the slot if
+			// it still holds what we captured - anything else belongs to whoever
+			// changed it (possibly a new pool owner), and disable_multimesh()'s
+			// sweep catches any survivor that would otherwise leak.
+			// The handler may also have freed THIS multimesh (queue_free during
+			// the sync emit): attachments[]/bullets_current_collision_count[] are
+			// member vectors, so bail before touching them.
+			// The handler may also have freed the captured attachment itself:
+			// compare by instance id (never a raw dangling pointer), and only
+			// after confirming this multimesh is still alive.
+		if (is_queued_for_deletion()) {
+			return;
+		}
+		const uint64_t captured_id = attachment_at_signal_time != nullptr ? attachment_at_signal_time->get_instance_id() : 0;
+		if (slot_still_holds_attachment(bullet_index, attachment_at_signal_time, captured_id)) {
+			bullet_disable_attachment(bullet_index);
+		}
+		}
+	}
 } //namespace BlastBullets2D

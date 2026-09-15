@@ -8,6 +8,7 @@
 
 #include "../debugger/multimesh_bullets_debugger2d.hpp"
 #include "../shared/bullet_attachment2d.hpp"
+#include "../shared/factory_operation_guard2d.hpp"
 #include "../shared/multimesh_object_pool2d.hpp"
 #include "../shared/multimesh_pool_key2d.hpp"
 #include "godot_cpp/classes/global_constants.hpp"
@@ -42,9 +43,7 @@ _ALWAYS_INLINE_ static const PoolKey *resolve_pool_key(const Ref<MultiMeshPoolKe
 	return &storage;
 }
 
-// Validates spawn data before any pool pop or memnew happens, so a bad resource can
-// never leave a half-set-up multimesh behind. Returns false with an error when invalid.
-static bool validate_spawn_data(const Ref<MultiMeshBulletsData2D> &spawn_data, const char *caller_name) {
+bool validate_spawn_data(const Ref<MultiMeshBulletsData2D> &spawn_data, const char *caller_name) {
 	if (spawn_data.is_null() || spawn_data->transforms.size() == 0) {
 		UtilityFunctions::push_error(String("Error when trying to spawn bullets in ") + caller_name + ". No spawn_data or no transforms were provided. Ignoring the request");
 		return false;
@@ -78,6 +77,42 @@ static bool validate_spawn_data(const Ref<MultiMeshBulletsData2D> &spawn_data, c
 		}
 	}
 	return true;
+}
+
+FactoryOperationGuard::FactoryOperationGuard(BulletFactory2D *p_factory, bool p_manage_debuggers, bool p_defer_debugger_restore) :
+		factory(p_factory), manage_debuggers(p_manage_debuggers), defer_debugger_restore(p_defer_debugger_restore) {
+	saved_busy = factory->is_factory_busy;
+	resume_processing = factory->is_factory_processing_bullets;
+	if (manage_debuggers) {
+		saved_debuggers = factory->get_is_debugger_enabled();
+		if (saved_debuggers) {
+			factory->set_is_debugger_enabled(false);
+		}
+	}
+	factory->is_factory_busy = true;
+	factory->set_is_factory_processing_bullets(false);
+}
+
+FactoryOperationGuard::~FactoryOperationGuard() {
+	// Lower busy first: resuming processing while busy is held is rejected
+	// with an error, and restoring the saved flag last keeps a re-entrant
+	// busy (manual-deletion fixup) intact.
+	factory->is_factory_busy = false;
+	if (resume_processing) {
+		factory->set_is_factory_processing_bullets(true);
+	}
+	if (manage_debuggers && saved_debuggers) {
+		// Immediate outside physics processing (no frame of missing
+		// debugger); deferred within it, where tree mutation could race
+		// the debugger tick. Always deferred when the caller runs inside a
+		// PREDELETE notification (immediate rebuild crashes there).
+		if (defer_debugger_restore || Engine::get_singleton()->is_in_physics_frame()) {
+			factory->call_deferred("set_is_debugger_enabled", true);
+		} else {
+			factory->set_is_debugger_enabled(true);
+		}
+	}
+	factory->is_factory_busy = saved_busy;
 }
 
 void BulletFactory2D::_notification(int p_what) {
@@ -146,11 +181,9 @@ void BulletFactory2D::set_use_physics_interpolation_runtime(bool new_use_physics
 		return;
 	}
 
-	is_factory_busy = true;
-
-	bool enable_processing_after_finish = is_factory_processing_bullets;
-
-	set_is_factory_processing_bullets(false);
+	// No debuggers here: this op only flips interpolation state, it never
+	// rebuilds vectors.
+	FactoryOperationGuard op(this, false);
 
 	use_physics_interpolation = new_use_physics_interpolation;
 
@@ -173,11 +206,6 @@ void BulletFactory2D::set_use_physics_interpolation_runtime(bool new_use_physics
 				bullets_multi->update_all_previous_transforms_for_interpolation();
 			}
 		}
-	}
-
-	is_factory_busy = false;
-	if (enable_processing_after_finish) {
-		set_is_factory_processing_bullets(true);
 	}
 }
 
@@ -287,32 +315,7 @@ void BulletFactory2D::_process(double delta) {
 }
 
 void BulletFactory2D::spawn_block_bullets(const Ref<BlockBulletsData2D> &spawn_data, const Vector2 &new_inherited_velocity_offset) {
-	if (is_factory_busy) {
-		UtilityFunctions::push_error("Error when trying to spawn bullets. BulletFactory2D is currently busy. Ignoring the request");
-		return;
-	}
-
-	if (!is_ready) {
-		UtilityFunctions::push_error("spawn_block_bullets: BulletFactory2D is not in the scene tree yet. Add it first, then spawn.");
-		return;
-	}
-
-	if (is_tearing_down) {
-		UtilityFunctions::push_error("spawn_block_bullets: BulletFactory2D is being freed. Ignoring the request.");
-		return;
-	}
-
-	if (!new_inherited_velocity_offset.is_finite()) {
-		UtilityFunctions::push_error("Error in spawn_block_bullets: inherited velocity offset must be finite. Nothing was spawned.");
-		return;
-	}
-
-	if (spawn_data.is_null() || spawn_data->transforms.size() == 0) {
-		UtilityFunctions::push_error("Error when trying to spawn BlockBullets2D. No spawn_data or no transforms were provided. Ignoring the request");
-		return;
-	}
-
-	if (!validate_spawn_data(spawn_data, "spawn_block_bullets")) {
+	if (!validate_spawn_request("spawn_block_bullets", spawn_data, new_inherited_velocity_offset)) {
 		return;
 	}
 
@@ -326,32 +329,7 @@ void BulletFactory2D::spawn_block_bullets(const Ref<BlockBulletsData2D> &spawn_d
 }
 
 void BulletFactory2D::spawn_directional_bullets(const Ref<DirectionalBulletsData2D> &spawn_data, const Vector2 &new_inherited_velocity_offset) {
-	if (is_factory_busy) {
-		UtilityFunctions::push_error("Error when trying to spawn bullets. BulletFactory2D is currently busy. Ignoring the request");
-		return;
-	}
-
-	if (!is_ready) {
-		UtilityFunctions::push_error("spawn_directional_bullets: BulletFactory2D is not in the scene tree yet. Add it first, then spawn.");
-		return;
-	}
-
-	if (is_tearing_down) {
-		UtilityFunctions::push_error("spawn_directional_bullets: BulletFactory2D is being freed. Ignoring the request.");
-		return;
-	}
-
-	if (spawn_data.is_null() || spawn_data->transforms.size() == 0) {
-		UtilityFunctions::push_error("Error when trying to spawn DirectionalBullets2D. No spawn_data or no transforms were provided. Ignoring the request");
-		return;
-	}
-
-	if (!validate_spawn_data(spawn_data, "spawn_directional_bullets")) {
-		return;
-	}
-
-	if (!new_inherited_velocity_offset.is_finite()) {
-		UtilityFunctions::push_error("Error in spawn_directional_bullets: inherited velocity offset must be finite. Nothing was spawned.");
+	if (!validate_spawn_request("spawn_directional_bullets", spawn_data, new_inherited_velocity_offset)) {
 		return;
 	}
 
@@ -365,32 +343,7 @@ void BulletFactory2D::spawn_directional_bullets(const Ref<DirectionalBulletsData
 }
 
 DirectionalBullets2D *BulletFactory2D::spawn_controllable_directional_bullets(const Ref<DirectionalBulletsData2D> &spawn_data, const Vector2 &new_inherited_velocity_offset, uint64_t spawner_id) {
-	if (is_factory_busy) {
-		UtilityFunctions::push_error("Error when trying to spawn bullets. BulletFactory2D is currently busy. Ignoring the request");
-		return nullptr;
-	}
-
-	if (!is_ready) {
-		UtilityFunctions::push_error("spawn_controllable_directional_bullets: BulletFactory2D is not in the scene tree yet. Add it first, then spawn.");
-		return nullptr;
-	}
-
-	if (is_tearing_down) {
-		UtilityFunctions::push_error("spawn_controllable_directional_bullets: BulletFactory2D is being freed. Ignoring the request.");
-		return nullptr;
-	}
-
-	if (spawn_data.is_null() || spawn_data->transforms.size() == 0) {
-		UtilityFunctions::push_error("Error when trying to spawn DirectionalBullets2D. No spawn_data or no transforms were provided. Ignoring the request");
-		return nullptr;
-	}
-
-	if (!validate_spawn_data(spawn_data, "spawn_controllable_directional_bullets")) {
-		return nullptr;
-	}
-
-	if (!new_inherited_velocity_offset.is_finite()) {
-		UtilityFunctions::push_error("Error in spawn_controllable_directional_bullets: inherited velocity offset must be finite. Nothing was spawned.");
+	if (!validate_spawn_request("spawn_controllable_directional_bullets", spawn_data, new_inherited_velocity_offset)) {
 		return nullptr;
 	}
 
@@ -405,14 +358,9 @@ DirectionalBullets2D *BulletFactory2D::spawn_controllable_directional_bullets(co
 }
 
 void BulletFactory2D::reset_factory_state(const PoolKey *key) {
-	// Check if debuggers are enabled
-	bool debugger_curr_enabled = get_is_debugger_enabled();
-
-	// If the debuggers are enabled, disable them completely
-	if (debugger_curr_enabled) {
-		block_bullets_debugger->set_is_debugger_enabled(false);
-		directional_bullets_debugger->set_is_debugger_enabled(false);
-	}
+	// Pure state function: the caller (reset(), under FactoryOperationGuard)
+	// owns busy/processing/debugger state. Debuggers stay powered while the
+	// vectors are rebuilt; the guard restores them afterwards.
 
 	// Free all DirectionalBullets2D, their attachments and the object pool
 	free_all_bullets_helper<DirectionalBullets2D>(all_directional_bullets, directional_bullets_set, directional_bullets_pool, key);
@@ -426,12 +374,6 @@ void BulletFactory2D::reset_factory_state(const PoolKey *key) {
 	// preserve unrelated pooled attachments.
 	if (key == nullptr) {
 		bullet_attachments_pool.free_all_bullet_attachments();
-	}
-
-	// If the debuggers are supposed to be enabled then re-enable them
-	if (debugger_curr_enabled) {
-		block_bullets_debugger->set_is_debugger_enabled(true);
-		directional_bullets_debugger->set_is_debugger_enabled(true);
 	}
 }
 
@@ -450,21 +392,13 @@ void BulletFactory2D::reset(const Ref<MultiMeshPoolKey2D> &key) {
 		return;
 	}
 
-	is_factory_busy = true;
-
-	bool enable_processing_after_finish = is_factory_processing_bullets;
-
-	set_is_factory_processing_bullets(false);
+	FactoryOperationGuard op(this);
 
 	PoolKey resolved;
 	reset_factory_state(resolve_pool_key(key, resolved));
 
-	is_factory_busy = false;
-	if (enable_processing_after_finish) {
-		set_is_factory_processing_bullets(true);
-	}
-
-	// Notify the user that all bullets have been freed/deleted
+	// Notify the user that all bullets have been freed/deleted (before the
+	// guard restores processing state).
 	emit_signal("reset_finished");
 }
 
@@ -483,20 +417,7 @@ void BulletFactory2D::free_active_bullets(const Ref<MultiMeshPoolKey2D> &key) {
 		return;
 	}
 
-	is_factory_busy = true;
-
-	bool enable_processing_after_finish = is_factory_processing_bullets;
-
-	set_is_factory_processing_bullets(false);
-
-	// Check if debuggers are enabled
-	bool debugger_curr_enabled = get_is_debugger_enabled();
-
-	// If the debuggers are enabled, disable them completely
-	if (debugger_curr_enabled) {
-		block_bullets_debugger->set_is_debugger_enabled(false);
-		directional_bullets_debugger->set_is_debugger_enabled(false);
-	}
+	FactoryOperationGuard op(this);
 
 	// Free all ACTIVE DirectionalBullets2D
 	PoolKey resolved;
@@ -505,17 +426,6 @@ void BulletFactory2D::free_active_bullets(const Ref<MultiMeshPoolKey2D> &key) {
 
 	// Free all ACTIVE BlockBullets2D
 	free_only_active_bullets_helper<BlockBullets2D>(all_block_bullets, block_bullets_set, key_ptr);
-
-	// If the debuggers are supposed to be enabled then re-enable them
-	if (debugger_curr_enabled) {
-		block_bullets_debugger->set_is_debugger_enabled(true);
-		directional_bullets_debugger->set_is_debugger_enabled(true);
-	}
-
-	is_factory_busy = false;
-	if (enable_processing_after_finish) {
-		set_is_factory_processing_bullets(true);
-	}
 }
 
 void BulletFactory2D::free_disabled_bullets(const Ref<MultiMeshPoolKey2D> &key) {
@@ -533,15 +443,7 @@ void BulletFactory2D::free_disabled_bullets(const Ref<MultiMeshPoolKey2D> &key) 
 		return;
 	}
 
-	is_factory_busy = true;
-	bool enable_processing_after_finish = is_factory_processing_bullets;
-	set_is_factory_processing_bullets(false);
-
-	bool debugger_curr_enabled = get_is_debugger_enabled();
-	if (debugger_curr_enabled) {
-		block_bullets_debugger->set_is_debugger_enabled(false);
-		directional_bullets_debugger->set_is_debugger_enabled(false);
-	}
+	FactoryOperationGuard op(this);
 
 	PoolKey resolved;
 	const PoolKey *key_ptr = resolve_pool_key(key, resolved);
@@ -557,16 +459,6 @@ void BulletFactory2D::free_disabled_bullets(const Ref<MultiMeshPoolKey2D> &key) 
 			block_bullets_set,
 			block_bullets_pool,
 			key_ptr);
-
-	if (debugger_curr_enabled) {
-		block_bullets_debugger->set_is_debugger_enabled(true);
-		directional_bullets_debugger->set_is_debugger_enabled(true);
-	}
-
-	is_factory_busy = false;
-	if (enable_processing_after_finish) {
-		set_is_factory_processing_bullets(true);
-	}
 }
 
 void BulletFactory2D::handle_manual_user_deletion_of_multimesh_bullets(MultiMeshBullets2D &bullet_multi) {
@@ -585,16 +477,10 @@ void BulletFactory2D::handle_manual_user_deletion_of_multimesh_bullets(MultiMesh
 	// them; the only busy-region entry is a user freeing a multimesh from a script
 	// callback nested in an internal busy region (e.g. a disable sweep). Rejecting
 	// there would strand a dangling pointer in the vec, so the fixup must always run.
-	const bool saved_busy = is_factory_busy;
-	is_factory_busy = true;
-
-	bool enable_processing_after_finish = is_factory_processing_bullets;
-	set_is_factory_processing_bullets(false);
-
-	bool debugger_was_enabled = get_is_debugger_enabled();
-	if (debugger_was_enabled) {
-		set_is_debugger_enabled(false);
-	}
+	// The guard preserves a possibly-nested busy flag and restores processing
+	// afterwards. Debugger restore is always deferred here (it will cause a
+	// crash if re-enabled immediately from a PREDELETE notification).
+	FactoryOperationGuard op(this, true, true);
 
 	DirectionalBullets2D *dir_ptr = Object::cast_to<DirectionalBullets2D>(&bullet_multi);
 	BlockBullets2D *block_ptr = Object::cast_to<BlockBullets2D>(&bullet_multi);
@@ -606,15 +492,6 @@ void BulletFactory2D::handle_manual_user_deletion_of_multimesh_bullets(MultiMesh
 	} else if (block_ptr) {
 		block_bullets_pool.try_remove_instance(block_ptr, pool_key);
 		remove_multimesh_instance_from_vec_and_sparse_set<BlockBullets2D>(all_block_bullets, block_bullets_set, block_ptr);
-	}
-
-	if (debugger_was_enabled) {
-		call_deferred("set_is_debugger_enabled", true); // it will cause a crash if this is not called with call_deferred
-	}
-
-	is_factory_busy = saved_busy;
-	if (enable_processing_after_finish) {
-		set_is_factory_processing_bullets(true);
 	}
 }
 
@@ -660,88 +537,26 @@ void BulletFactory2D::populate_bullets_pool(const Ref<MultiMeshPoolKey2D> &key, 
 		return;
 	}
 
-	is_factory_busy = true;
-
-	bool enable_processing_after_finish = is_factory_processing_bullets;
-	set_is_factory_processing_bullets(false);
-
-	bool debugger_was_enabled = get_is_debugger_enabled();
-	if (debugger_was_enabled) {
-		set_is_debugger_enabled(false);
-	}
+	// From here on every return is state-safe: the guard pauses processing,
+	// powers the debuggers down, and restores everything on scope exit.
+	FactoryOperationGuard op(this);
 
 	if (key.is_null()) {
 		UtilityFunctions::push_error("populate_bullets_pool requires an explicit MultiMeshPoolKey2D (amount_bullets + shape). Null is not allowed.");
-		if (debugger_was_enabled) {
-			// Immediate outside physics processing (no frame of missing
-			// debugger); deferred within it, where tree mutation could race
-			// the debugger tick.
-			if (Engine::get_singleton()->is_in_physics_frame()) {
-				call_deferred("set_is_debugger_enabled", true);
-			} else {
-				set_is_debugger_enabled(true);
-			}
-		}
-		is_factory_busy = false;
-		if (enable_processing_after_finish) {
-			set_is_factory_processing_bullets(true);
-		}
 		return;
 	}
 
 	if (instance_count <= 0) {
 		UtilityFunctions::push_error("Error. You can't populate the bullets pool with instance_count <= 0");
-		if (debugger_was_enabled) {
-			// Immediate outside physics processing (no frame of missing
-			// debugger); deferred within it, where tree mutation could race
-			// the debugger tick.
-			if (Engine::get_singleton()->is_in_physics_frame()) {
-				call_deferred("set_is_debugger_enabled", true);
-			} else {
-				set_is_debugger_enabled(true);
-			}
-		}
-		is_factory_busy = false;
-		if (enable_processing_after_finish) {
-			set_is_factory_processing_bullets(true);
-		}
 		return;
 	}
 
 	if (multimesh_data.is_null() || multimesh_data->transforms.size() == 0) {
 		UtilityFunctions::push_error("Error when trying to pool bullets. No transforms were provided in the spawn data. Ignoring the request");
-		if (debugger_was_enabled) {
-			// Immediate outside physics processing (no frame of missing
-			// debugger); deferred within it, where tree mutation could race
-			// the debugger tick.
-			if (Engine::get_singleton()->is_in_physics_frame()) {
-				call_deferred("set_is_debugger_enabled", true);
-			} else {
-				set_is_debugger_enabled(true);
-			}
-		}
-		is_factory_busy = false;
-		if (enable_processing_after_finish) {
-			set_is_factory_processing_bullets(true);
-		}
 		return;
 	}
 
 	if (!validate_spawn_data(multimesh_data, "populate_bullets_pool")) {
-		if (debugger_was_enabled) {
-			// Immediate outside physics processing (no frame of missing
-			// debugger); deferred within it, where tree mutation could race
-			// the debugger tick.
-			if (Engine::get_singleton()->is_in_physics_frame()) {
-				call_deferred("set_is_debugger_enabled", true);
-			} else {
-				set_is_debugger_enabled(true);
-			}
-		}
-		is_factory_busy = false;
-		if (enable_processing_after_finish) {
-			set_is_factory_processing_bullets(true);
-		}
 		return;
 	}
 
@@ -753,20 +568,6 @@ void BulletFactory2D::populate_bullets_pool(const Ref<MultiMeshPoolKey2D> &key, 
 	const PoolKey expected{ (int)multimesh_data->transforms.size(), effective };
 	if (!(requested == expected)) {
 		UtilityFunctions::push_error(vformat("populate_bullets_pool key mismatch: key is (amount_bullets=%d, shape=%d) but spawn data derives (amount_bullets=%d, shape=%d). No instances were created.", requested.amount_bullets, (int)requested.shape_type, expected.amount_bullets, (int)expected.shape_type));
-		if (debugger_was_enabled) {
-			// Immediate outside physics processing (no frame of missing
-			// debugger); deferred within it, where tree mutation could race
-			// the debugger tick.
-			if (Engine::get_singleton()->is_in_physics_frame()) {
-				call_deferred("set_is_debugger_enabled", true);
-			} else {
-				set_is_debugger_enabled(true);
-			}
-		}
-		is_factory_busy = false;
-		if (enable_processing_after_finish) {
-			set_is_factory_processing_bullets(true);
-		}
 		return;
 	}
 
@@ -777,20 +578,6 @@ void BulletFactory2D::populate_bullets_pool(const Ref<MultiMeshPoolKey2D> &key, 
 		bullet_type = BulletFactory2D::BLOCK_BULLETS;
 	} else {
 		UtilityFunctions::push_error("Error. Unsupported type of MultiMeshBulletsData2D passed to populate_bullets_pool");
-		if (debugger_was_enabled) {
-			// Immediate outside physics processing (no frame of missing
-			// debugger); deferred within it, where tree mutation could race
-			// the debugger tick.
-			if (Engine::get_singleton()->is_in_physics_frame()) {
-				call_deferred("set_is_debugger_enabled", true);
-			} else {
-				set_is_debugger_enabled(true);
-			}
-		}
-		is_factory_busy = false;
-		if (enable_processing_after_finish) {
-			set_is_factory_processing_bullets(true);
-		}
 		return;
 	}
 
@@ -817,22 +604,7 @@ void BulletFactory2D::populate_bullets_pool(const Ref<MultiMeshPoolKey2D> &key, 
 			UtilityFunctions::push_error("Unsupported type of bullet when calling populate_bullets_pool");
 			break;
 	}
-
-	if (debugger_was_enabled) {
-		// Immediate outside physics processing (no frame of missing
-		// debugger); deferred within it, where tree mutation could race
-		// the debugger tick.
-		if (Engine::get_singleton()->is_in_physics_frame()) {
-			call_deferred("set_is_debugger_enabled", true);
-		} else {
-			set_is_debugger_enabled(true);
-		}
-	}
-
-	is_factory_busy = false;
-	if (enable_processing_after_finish) {
-		set_is_factory_processing_bullets(true);
-	}
+	// Debuggers rebuild from the new pool state when the guard restores them.
 }
 
 void BulletFactory2D::free_bullets_pool(BulletType bullet_type, const Ref<MultiMeshPoolKey2D> &key) {
@@ -850,16 +622,7 @@ void BulletFactory2D::free_bullets_pool(BulletType bullet_type, const Ref<MultiM
 		return;
 	}
 
-	is_factory_busy = true;
-
-	bool enable_processing_after_finish = is_factory_processing_bullets;
-	set_is_factory_processing_bullets(false);
-
-	bool debugger_curr_enabled = get_is_debugger_enabled();
-	if (debugger_curr_enabled) {
-		block_bullets_debugger->set_is_debugger_enabled(false);
-		directional_bullets_debugger->set_is_debugger_enabled(false);
-	}
+	FactoryOperationGuard op(this);
 
 	switch (bullet_type) {
 		case BulletFactory2D::DIRECTIONAL_BULLETS: {
@@ -885,17 +648,7 @@ void BulletFactory2D::free_bullets_pool(BulletType bullet_type, const Ref<MultiM
 			UtilityFunctions::push_error("Unsupported type of bullet when calling free_bullets_pool");
 			break;
 	}
-
-	// Re-enable debuggers (they will now build meshes based on the new, correct indices)
-	if (debugger_curr_enabled) {
-		block_bullets_debugger->set_is_debugger_enabled(true);
-		directional_bullets_debugger->set_is_debugger_enabled(true);
-	}
-
-	is_factory_busy = false;
-	if (enable_processing_after_finish) {
-		set_is_factory_processing_bullets(true);
-	}
+	// Debuggers rebuild from the new indices when the guard restores them.
 }
 
 void BulletFactory2D::populate_attachments_pool(const Ref<PackedScene> attachment_scene, int amount_instances) {
@@ -923,16 +676,7 @@ void BulletFactory2D::populate_attachments_pool(const Ref<PackedScene> attachmen
 		return;
 	}
 
-	is_factory_busy = true;
-
-	bool enable_processing_after_finish = is_factory_processing_bullets;
-	set_is_factory_processing_bullets(false);
-
-	bool debugger_enabled = get_is_debugger_enabled();
-	if (debugger_enabled) {
-		block_bullets_debugger->set_is_debugger_enabled(false);
-		directional_bullets_debugger->set_is_debugger_enabled(false);
-	}
+	FactoryOperationGuard op(this);
 
 	Node *inst = attachment_scene->instantiate();
 	BulletAttachment2D *first_attachment = Object::cast_to<BulletAttachment2D>(inst);
@@ -952,16 +696,6 @@ void BulletFactory2D::populate_attachments_pool(const Ref<PackedScene> attachmen
 
 		if (inst) {
 			inst->queue_free();
-		}
-
-		is_factory_busy = false;
-		if (enable_processing_after_finish) {
-			set_is_factory_processing_bullets(true);
-		}
-
-		if (debugger_enabled) {
-			block_bullets_debugger->set_is_debugger_enabled(true);
-			directional_bullets_debugger->set_is_debugger_enabled(true);
 		}
 		return;
 	}
@@ -992,16 +726,6 @@ void BulletFactory2D::populate_attachments_pool(const Ref<PackedScene> attachmen
 		}
 		setup_attachment(a, pooling_key);
 	}
-
-	if (debugger_enabled) {
-		block_bullets_debugger->set_is_debugger_enabled(true);
-		directional_bullets_debugger->set_is_debugger_enabled(true);
-	}
-
-	is_factory_busy = false;
-	if (enable_processing_after_finish) {
-		set_is_factory_processing_bullets(true);
-	}
 }
 
 void BulletFactory2D::free_attachments_pool() {
@@ -1019,28 +743,9 @@ void BulletFactory2D::free_attachments_pool() {
 		return;
 	}
 
-	is_factory_busy = true;
-
-	bool enable_processing_after_finish = is_factory_processing_bullets;
-	set_is_factory_processing_bullets(false);
-
-	bool debugger_was_enabled = get_is_debugger_enabled();
-	if (debugger_was_enabled) {
-		block_bullets_debugger->set_is_debugger_enabled(false);
-		directional_bullets_debugger->set_is_debugger_enabled(false);
-	}
+	FactoryOperationGuard op(this);
 
 	bullet_attachments_pool.free_all_bullet_attachments();
-
-	if (debugger_was_enabled) {
-		block_bullets_debugger->set_is_debugger_enabled(true);
-		directional_bullets_debugger->set_is_debugger_enabled(true);
-	}
-
-	is_factory_busy = false;
-	if (enable_processing_after_finish) {
-		set_is_factory_processing_bullets(true);
-	}
 }
 
 void BulletFactory2D::free_attachments_pool_for_scene(const Ref<PackedScene> &attachment_scene) {
@@ -1063,31 +768,12 @@ void BulletFactory2D::free_attachments_pool_for_scene(const Ref<PackedScene> &at
 		return;
 	}
 
-	is_factory_busy = true;
-
-	bool enable_processing_after_finish = is_factory_processing_bullets;
-	set_is_factory_processing_bullets(false);
-
-	bool debugger_was_enabled = get_is_debugger_enabled();
-	if (debugger_was_enabled) {
-		block_bullets_debugger->set_is_debugger_enabled(false);
-		directional_bullets_debugger->set_is_debugger_enabled(false);
-	}
+	FactoryOperationGuard op(this);
 
 	// Freed via the non-recording key: key_for_scene would permanently mark
 	// even an invalid scene as recognized (changing later error branches),
 	// so derive + free without recording anything.
 	bullet_attachments_pool.free_specific_bullet_attachments(BulletAttachmentObjectPool2D::make_pooling_key_for_scene(attachment_scene));
-
-	if (debugger_was_enabled) {
-		block_bullets_debugger->set_is_debugger_enabled(true);
-		directional_bullets_debugger->set_is_debugger_enabled(true);
-	}
-
-	is_factory_busy = false;
-	if (enable_processing_after_finish) {
-		set_is_factory_processing_bullets(true);
-	}
 }
 
 RID BulletFactory2D::get_physics_space() const {

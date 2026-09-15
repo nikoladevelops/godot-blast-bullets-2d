@@ -2930,6 +2930,8 @@ public:
 	void set_up_movement_data(const TypedArray<BulletSpeedData2D> &new_speed_data);
 	virtual void custom_additional_spawn_logic(const MultiMeshBulletsData2D &data) override final;
 	virtual bool custom_additional_enable_logic(const MultiMeshBulletsData2D &data) override final;
+	virtual bool is_data_type_compatible(const MultiMeshBulletsData2D &data) const override final;
+	virtual void reset_transient_subclass_state(bool drop_stale_work) override final;
 	virtual void custom_additional_disable_logic() override final;
 
 	// Resolves the spawn data's shared movement pattern Path2D and applies its

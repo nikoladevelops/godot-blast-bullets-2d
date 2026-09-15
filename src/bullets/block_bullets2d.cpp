@@ -73,11 +73,22 @@ void BlockBullets2D::custom_additional_spawn_logic(const MultiMeshBulletsData2D 
 	}
 }
 
+bool BlockBullets2D::is_data_type_compatible(const MultiMeshBulletsData2D &data) const {
+	return Object::cast_to<BlockBulletsData2D>(&data) != nullptr;
+}
+
+void BlockBullets2D::reset_transient_subclass_state(bool drop_stale_work) {
+	(void)drop_stale_work;
+	// Neutralize movement SoA + facing so a new life never steers along the
+	// previous owner's ballistics (base reset cannot clear subclass state).
+	set_up_movement_data(*get_default_block_speed_data().ptr());
+	block_rotation_radians = 0.0;
+}
+
 bool BlockBullets2D::custom_additional_enable_logic(const MultiMeshBulletsData2D &data) {
 	const BlockBulletsData2D *block_data = Object::cast_to<BlockBulletsData2D>(&data);
-	// Same defensive sizing as spawn (a wrong-type enable must not leave the
-	// movement SoA empty for the tick path).
-	set_up_movement_data(*get_default_block_speed_data().ptr());
+	// Unreachable in practice (is_data_type_compatible pre-checked): the base
+	// reset above already neutralized movement, so just refuse.
 	if (block_data == nullptr) {
 		UtilityFunctions::push_error("BlockBullets2D::enable got wrong spawn data type, expected BlockBulletsData2D.");
 		return false;
