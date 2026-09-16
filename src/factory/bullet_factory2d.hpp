@@ -3,6 +3,7 @@
 #include <algorithm>
 
 #include <godot_cpp/classes/engine.hpp>
+#include <godot_cpp/classes/image.hpp>
 #include <godot_cpp/classes/node.hpp>
 #include <godot_cpp/classes/node2d.hpp>
 #include <godot_cpp/classes/packed_scene.hpp>
@@ -12,6 +13,8 @@
 #include "../shared/collision_shape_helper2d.hpp"
 #include "../shared/multimesh_object_pool2d.hpp"
 #include "godot_cpp/core/math.hpp"
+#include "godot_cpp/variant/dictionary.hpp"
+#include "godot_cpp/variant/packed_vector2_array.hpp"
 #include "godot_cpp/variant/utility_functions.hpp"
 #include "godot_cpp/variant/vector2.hpp"
 #include "shared/dynamic_sparse_set.hpp"
@@ -114,7 +117,17 @@ public:
 		PATTERN_PRESET_PETAL_STORM,
 		PATTERN_PRESET_TWIN_SPIRAL_COUNTER,
 		PATTERN_PRESET_AIMED_TRAP,
-		PATTERN_PRESET_BLOSSOM_FINALE
+		PATTERN_PRESET_BLOSSOM_FINALE,
+		PATTERN_PRESET_TERRAIN_CREST
+	};
+
+	// Edge spray side: which side of the polyline the normal-direction
+	// falloff extends toward. ALONG offsets along +normal, BEHIND along
+	// -normal, BOTH picks a random side per bullet.
+	enum EdgeSpreadSide {
+		EDGE_SPREAD_ALONG_NORMAL = 0,
+		EDGE_SPREAD_BEHIND_NORMAL = 1,
+		EDGE_SPREAD_BOTH = 2
 	};
 
 	// Whether the factory is currently busy doing something important and it can't handle any other requests
@@ -1081,6 +1094,55 @@ public:
 			bool face_outward = true,
 			real_t facing_offset_degrees = 0.0);
 
+	// Edge normals for a polyline: per-point outward normal from the local
+	// tangent (segment perpendicular, averaged at joints). tangent (1,0)
+	// yields normal (0,-1) (up in Godot 2D). flip negates every normal.
+	// Returns an empty array with an error when fewer than 1 point is given.
+	static PackedVector2Array helper_compute_edge_normals(
+			const PackedVector2Array &edge_points,
+			bool closed = false,
+			bool flip = false);
+
+	// Terrain-edge emitter: slots sampled along a polyline edge (local to
+	// the marker), each facing along the edge normal. Even sampling spreads
+	// uniformly by arc length (open polylines include both endpoints);
+	// random sampling picks uniform arc positions (seed = 0 means
+	// non-deterministic). jitter scatters origins in a disc of that radius.
+	// Normal convention: the normal is the tangent rotated by orthogonal()
+	// (for a left-to-right polyline the normals point UP, -Y); flip swaps
+	// the side. spread adds a one-sided normal-direction falloff cloud (the
+	// terrain crest look): offset = spread * pow(rand, spread_exponent)
+	// along the normal. spread_side: 0 = along +normal, 1 = behind
+	// (-normal), 2 = random side per bullet. tangent_jitter scatters along
+	// the local tangent (softens the crest core, works with or without
+	// spread). Spread defaults (0) preserve the crest-only behavior exactly.
+	static TypedArray<Transform2D> helper_generate_transforms_edge_from_points(
+			int transforms_amount,
+			Transform2D marker_transform,
+			const PackedVector2Array &edge_points,
+			bool closed = false,
+			bool flip_normals = false,
+			bool random_sample = false,
+			real_t jitter = 0.0,
+			real_t facing_offset_degrees = 0.0,
+			uint64_t seed = 0,
+			real_t spread = 0.0,
+			real_t spread_exponent = 2.0,
+			int spread_side = 0,
+			real_t tangent_jitter = 0.0);
+
+	// Bitmap edge extraction: opaque pixels (alpha >= threshold) with a
+	// transparent/out-of-bounds 4-neighbor, sampled every step pixels.
+	// Points are centered (texture center = local origin); normals point
+	// outward (toward transparency). Returns {"points", "normals"}.
+	// quiet = true suppresses errors (editor preview / cache probes).
+	// Images larger than 2048x2048 are rejected to avoid editor stalls.
+	static Dictionary helper_extract_edge_from_image(
+			const Ref<Image> &image,
+			real_t threshold = 0.5,
+			int step = 4,
+			bool quiet = false);
+
 	// Negative space: drops slot indexes from a generated array (carve dodge
 	// doors, write bullet text). Out-of-range entries are ignored with a
 	// single warning; the output shrinks like ELLIPSE_WALL.
@@ -1097,3 +1159,4 @@ public:
 	VARIANT_ENUM_CAST(BlastBullets2D::BulletFactory2D::LineAnchor);
 	VARIANT_ENUM_CAST(BlastBullets2D::BulletFactory2D::EllipseMode);
 	VARIANT_ENUM_CAST(BlastBullets2D::BulletFactory2D::PatternPreset);
+	VARIANT_ENUM_CAST(BlastBullets2D::BulletFactory2D::EdgeSpreadSide);

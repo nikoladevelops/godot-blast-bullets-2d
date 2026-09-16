@@ -8,6 +8,7 @@
 #include "godot_cpp/classes/wrapped.hpp"
 #include "godot_cpp/core/property_info.hpp"
 #include "godot_cpp/variant/node_path.hpp"
+#include "godot_cpp/variant/packed_vector2_array.hpp"
 #include "godot_cpp/variant/transform2d.hpp"
 #include "godot_cpp/variant/typed_array.hpp"
 #include "spawn-data/directional_bullets_data2d.hpp"
@@ -105,7 +106,8 @@ class BulletSpawner2D : public Node2D{
             TRANSFORMS_FROM_HELPER_ROSE,
             TRANSFORMS_FROM_HELPER_COUNTER_SPIRAL,
             TRANSFORMS_FROM_HELPER_CORRIDOR,
-            TRANSFORMS_FROM_HELPER_LISSAJOUS
+            TRANSFORMS_FROM_HELPER_LISSAJOUS,
+            TRANSFORMS_FROM_HELPER_EDGE
         };
 
         // How the spin angle evolves. CONTINUOUS rotates forever at
@@ -122,13 +124,18 @@ class BulletSpawner2D : public Node2D{
         // resolved on demand with a runtime type check (see get_bullet_factory).
         NodePath bullet_factory_path;
         // Runtime cache of the resolved factory. Not a bound property.
+        // bullet_factory_id pairs with it: validate BEFORE dereferencing
+        // (see is_tracked_node_alive). A raw pointer outlives freed nodes.
         mutable BulletFactory2D *bullet_factory = nullptr;
+        mutable uint64_t bullet_factory_id = 0;
         // Plain Node2D reference from the scene tree whose children provide
         // spawn transforms (same NodePath pattern as the factory, but
         // type-filtered to Node2D since native types always match).
         NodePath transforms_generator_path;
         // Runtime cache of the resolved generator. Not a bound property.
+        // transforms_generator_id pairs with it (same dangling guard).
         mutable Node2D *transforms_generator = nullptr;
+        mutable uint64_t transforms_generator_id = 0;
         Ref<DirectionalBulletsData2D> spawn_data;
 
         NodePath get_bullet_factory_path() const;
@@ -260,7 +267,9 @@ class BulletSpawner2D : public Node2D{
         // Same NodePath pattern as the other scene references on this node.
         NodePath helper_aimed_target_path;
         // Runtime cache of the resolved target. Not a bound property.
+        // helper_aimed_target_id pairs with it (same dangling guard).
         mutable Node2D *helper_aimed_target = nullptr;
+        mutable uint64_t helper_aimed_target_id = 0;
         double helper_aimed_spread = 0.3;
         double helper_aimed_step_offset = 0.0;
         bool helper_aimed_centered = true;
@@ -409,6 +418,24 @@ class BulletSpawner2D : public Node2D{
         double helper_lissajous_phase = 0.0;
         bool helper_lissajous_face_outward = true;
         double helper_lissajous_facing_offset_deg = 0.0;
+
+        // EDGE (terrain crest / destructible wall — the reference spray).
+        // Pass a PackedVector2Array (a polygon or polyline, generator-local)
+        // and get one transform per bullet: position = a point along the
+        // edge, direction = the edge normal there. That is the whole feature.
+        // Defaults ARE the reference look out of the box: a demo sine crest,
+        // random arc sampling, and a one-sided exponential falloff below it.
+        PackedVector2Array helper_edge_points = make_default_edge_crest();
+        bool helper_edge_closed = false;
+        bool helper_edge_flip_normals = true;
+        bool helper_edge_random_sample = true;
+        double helper_edge_jitter = 3.0;
+        double helper_edge_facing_offset_deg = 0.0;
+        int helper_edge_seed = 0;
+        double helper_edge_spread = 220.0;
+        double helper_edge_spread_exponent = 2.2;
+        int helper_edge_spread_side = 0; // BulletFactory2D::EdgeSpreadSide
+        double helper_edge_tangent_jitter = 2.0;
 
         // NEGATIVE SPACE (skip slots by index: dodge doors, bullet text).
         PackedInt32Array helper_skip_indices;
@@ -953,6 +980,46 @@ class BulletSpawner2D : public Node2D{
         void set_helper_lissajous_face_outward(bool value);
         double get_helper_lissajous_facing_offset_deg() const;
         void set_helper_lissajous_facing_offset_deg(double value);
+        PackedVector2Array get_helper_edge_points() const;
+        void set_helper_edge_points(const PackedVector2Array &value);
+        bool get_helper_edge_closed() const;
+        void set_helper_edge_closed(bool value);
+        bool get_helper_edge_flip_normals() const;
+        void set_helper_edge_flip_normals(bool value);
+        bool get_helper_edge_random_sample() const;
+        void set_helper_edge_random_sample(bool value);
+        double get_helper_edge_jitter() const;
+        void set_helper_edge_jitter(double value);
+        double get_helper_edge_facing_offset_deg() const;
+        void set_helper_edge_facing_offset_deg(double value);
+        int get_helper_edge_seed() const;
+        void set_helper_edge_seed(int value);
+        double get_helper_edge_spread() const;
+        void set_helper_edge_spread(double value);
+        double get_helper_edge_spread_exponent() const;
+        void set_helper_edge_spread_exponent(double value);
+        int get_helper_edge_spread_side() const;
+        void set_helper_edge_spread_side(int value);
+        double get_helper_edge_tangent_jitter() const;
+        void set_helper_edge_tangent_jitter(double value);
+        int get_edge_point_count() const;
+        // Edge math API: normals of the polyline (same order as the points,
+        // unit length, flipped when helper_edge_flip_normals). Empty when
+        // there are no usable points.
+        PackedVector2Array get_edge_normals() const;
+        // Total arc length of the polyline in pixels (closed loops include
+        // the closing segment). 0 when unusable.
+        double get_edge_total_length() const;
+        // Evenly spaced points along the polyline (arc-length parameterized,
+        // generator-local). Useful for composing custom per-segment patterns
+        // in GDScript. Empty when unusable.
+        PackedVector2Array sample_edge_points(int count) const;
+        // Cheap pre-flight for scripts: true when the polyline currently
+        // holds at least 1 finite point. Never warns or errors.
+        bool has_valid_edge_points() const;
+        // Good API aliases: pass a polygon/polyline, get transforms back.
+        PackedVector2Array get_edge_points() const;
+        void set_edge_points(const PackedVector2Array &value);
         PackedInt32Array get_helper_skip_indices() const;
         void set_helper_skip_indices(const PackedInt32Array &value);
         double get_homing_delay_sec() const;
@@ -1298,11 +1365,22 @@ class BulletSpawner2D : public Node2D{
         int tracked_child_count = -1;
         Transform2D tracked_self_global;
         bool tracked_has_self = false;
+        // Edge preview tracking: snapshot of the polyline for live dirty checks.
+        PackedVector2Array tracked_edge_points;
         // Editor-only pattern preview holder (null at runtime, never saved),
         // plus its two self-repainting _draw layers (dots + arrows).
         Node2D *preview_holder = nullptr;
         PatternPreviewLayer2D *preview_dots_layer = nullptr;
         PatternPreviewLayer2D *preview_arrows_layer = nullptr;
+        // Re-entrancy latch for rebuild_preview(): setters, tree notifications
+        // (child order / transform changed) and the preview loop can all ask
+        // for a rebuild while one is already running (holder add_child fires
+        // NOTIFICATION_CHILD_ORDER_CHANGED synchronously). A nested entry is
+        // always redundant — the outer pass re-reads everything — so it
+        // returns immediately instead of recursing into a stack overflow.
+        // Mutable: rebuilds happen from const setters. Restored on every exit
+        // path (early returns included) so one abort can never wedge preview.
+        mutable bool preview_rebuild_in_progress = false;
 
         bool auto_shooting_active() const;
         // Advances spin_angle_deg by delta according to spin_mode.
@@ -1376,6 +1454,11 @@ class BulletSpawner2D : public Node2D{
         // Fire cone check: true when any resolved target sits within half
         // the fire arc of the spawner's facing. 0 arc = omnidirectional.
         bool fire_arc_covers_targets(const Array &targets) const;
+        // Edge helpers: the polyline IS the feature (generator-local), so the
+        // helpers below are thin readers over helper_edge_points.
+        // make_default_edge_crest() builds the out-of-box demo sine crest so
+        // switching to Edge renders the reference spray with zero user input.
+        static PackedVector2Array make_default_edge_crest();
 
 
 

@@ -6,7 +6,7 @@
 	<description>
 		Assign a [BulletFactory2D], a [DirectionalBulletsData2D], and a [member transforms_source]. Each volley collects one global transform per bullet from the [member transforms_generator] (empty means this node; a generator outside the tree while the spawner is inside also falls back to this node) and spawns it through the factory. It never fires in the editor.
 		Homing quick-start: turn on [member homing_enabled], leave [member homing_target_source] on Node Group, and put your targets (any Node2D) in the [member homing_node_group] group (default "enemies"). Every volley then chases [member homing_target_selection] targets with [member homing_smoothing] turn rate. Set [member homing_target_source] to Mouse to chase the cursor instead, and turn on [member orbiting_enabled] to make bullets ring their target once they arrive. Use [member homing_retarget_mode] so flying volleys keep following fresh targets, and [signal volley_bullet_homing_target_reached] to react when a bullet arrives.
-		Pattern quick-start: pick a [member transforms_source] helper (Ring, Fan, Spiral, Rose, Corridor...) or call [method apply_pattern_preset] for a starter, tune the matching helper_* group, and call [method shoot_once] (or enable [member shooting_enabled] for the auto loop). Add [member transforms_scale] / spin for motion, [member helper_skip_indices] for dodge doors, and [method spawn_pattern_list] for phased sequences. See [member transforms_source] for the full 24-mode list.
+		Pattern quick-start: pick a [member transforms_source] helper (Ring, Fan, Spiral, Rose, Corridor...) or call [method apply_pattern_preset] for a starter, tune the matching helper_* group, and call [method shoot_once] (or enable [member shooting_enabled] for the auto loop). Add [member transforms_scale] / spin for motion, [member helper_skip_indices] for dodge doors, and [method spawn_pattern_list] for phased sequences. See [member transforms_source] for the full 25-mode list.
 	</description>
 	<tutorials>
 	</tutorials>
@@ -22,7 +22,7 @@
 			<return type="void" />
 			<param index="0" name="preset" type="int" />
 			<description>
-				Fills the helper_* properties with a named starter pattern (radial dense/sparse, 3-arm spiral, narrow/wide aimed fan, slow ring, gap wall, rain, 6-petal flower, scatter burst, cross burst, star shell, heart bloom, snake wave, waterfall curtain, petal storm via Rose, twin counter-spiral via Counter Spiral, aimed trap via Corridor, blossom finale via Rose) and switches transforms_source to match. Tunes from there; the preset only writes the properties, nothing fires. Custom (-1) does nothing. Note: the twin counter-spiral preset also turns spin on at -60 deg/sec and the blossom finale preset turns spin on at +30 deg/sec.
+				Fills the helper_* properties with a named starter pattern (radial dense/sparse, 3-arm spiral, narrow/wide aimed fan, slow ring, gap wall, rain, 6-petal flower, scatter burst, cross burst, star shell, heart bloom, snake wave, waterfall curtain, petal storm via Rose, twin counter-spiral via Counter Spiral, aimed trap via Corridor, blossom finale via Rose, terrain crest via Edge) and switches transforms_source to match. Tunes from there; the preset only writes the properties, nothing fires. Custom (-1) does nothing. Note: the twin counter-spiral preset also turns spin on at -60 deg/sec and the blossom finale preset turns spin on at +30 deg/sec.
 			</description>
 		</method>
 		<method name="begin_burst">
@@ -91,6 +91,24 @@
 				Returns the shared aimed target (Aimed cone and Corridor wall), or null when unset.
 			</description>
 		</method>
+		<method name="get_edge_normals" qualifiers="const">
+			<return type="Vector2[]" />
+			<description>
+				Unit normals of helper_edge_points, one per point in point order, flipped when [member helper_edge_flip_normals] is on. Empty when there are no usable points. For a left-to-right polyline the normals point up (-Y).
+			</description>
+		</method>
+		<method name="get_edge_point_count" qualifiers="const">
+			<return type="int" />
+			<description>
+				How many points are in helper_edge_points. 0 means the next Edge volley is skipped.
+			</description>
+		</method>
+		<method name="get_edge_total_length" qualifiers="const">
+			<return type="float" />
+			<description>
+				Total arc length of helper_edge_points in pixels (closed loops include the closing segment). 0 when unusable.
+			</description>
+		</method>
 		<method name="get_live_volley_count" qualifiers="const">
 			<return type="int" />
 			<description>
@@ -137,6 +155,12 @@
 			<return type="bool" />
 			<description>
 				Returns true when [member spin_enabled] is on and the game is running.
+			</description>
+		</method>
+		<method name="has_valid_edge_points" qualifiers="const">
+			<return type="bool" />
+			<description>
+				Cheap pre-flight for scripts: true when helper_edge_points currently holds at least one finite point. Never warns or errors.
 			</description>
 		</method>
 		<method name="next_shoot_interval_sec" qualifiers="const">
@@ -218,6 +242,13 @@
 			<param index="2" name="interval_sec" type="float" default="0.25" />
 			<description>
 				Queues pattern entries: each entry is a Dictionary with optional "preset", "transforms_source", "helper_bullets_amount", "spawn_data" keys. Sequential mode (default) fires one entry per interval_sec through the guarded shoot path; simultaneous mode fires all at once. Returns entries queued (sequential) or volleys fired (simultaneous). Bad entries skip with an error, never abort the list. Sequential mode emits [signal pattern_list_finished] when the queue drains; simultaneous mode does not (it returns the fired count directly).
+			</description>
+		</method>
+		<method name="sample_edge_points" qualifiers="const">
+			<return type="Vector2[]" />
+			<param index="0" name="count" type="int" />
+			<description>
+				Evenly spaced points along helper_edge_points (arc-length parameterized, generator-local): the same distribution the Edge pattern samples before applying spread and jitter. Compose custom per-segment patterns in GDScript from these (e.g. one helper_generate_transforms_line per segment). Empty when unusable.
 			</description>
 		</method>
 		<method name="start_spinning">
@@ -500,6 +531,39 @@
 		</member>
 		<member name="helper_lissajous_size_y" type="float" setter="set_helper_lissajous_size_y" getter="get_helper_lissajous_size_y" default="120.0">
 			Weave half-height in pixels. Must be finite and 0 or more.
+		</member>
+		<member name="helper_edge_points" type="PackedVector2Array" setter="set_helper_edge_points" getter="get_helper_edge_points" default="PackedVector2Array()">
+			Your polygon or polyline in generator-local pixels — this IS the Edge feature: each bullet spawns at a point along it and faces along the normal there. Defaults to a 1200px demo sine crest so switching to Edge renders the reference spray immediately; replace with your own shape. The dense crest + falloff spray comes from helper_edge_random_sample on plus helper_edge_spread / helper_edge_spread_exponent; helper_edge_jitter only adds tiny isotropic softness.
+		</member>
+		<member name="helper_edge_closed" type="bool" setter="set_helper_edge_closed" getter="get_helper_edge_closed" default="false">
+			Closes the polyline into a loop before sampling (normals wrap around the seam).
+		</member>
+		<member name="helper_edge_flip_normals" type="bool" setter="set_helper_edge_flip_normals" getter="get_helper_edge_flip_normals" default="true">
+			Flips every edge normal (bullets face into the wall instead of out of it). Convention: for a left-to-right polyline the normals point up (-Y), so a downward spray like the terrain-crest reference needs this on (or helper_edge_spread_side behind). On by default to match the default demo crest.
+		</member>
+		<member name="helper_edge_random_sample" type="bool" setter="set_helper_edge_random_sample" getter="get_helper_edge_random_sample" default="true">
+			On picks random arc positions per volley (the terrain spray look), off samples evenly by arc length (dotted outline look). Seeded by helper_edge_seed, else pattern_seed; seedless editor previews use a fixed seed so the view stays stable.
+		</member>
+		<member name="helper_edge_jitter" type="float" setter="set_helper_edge_jitter" getter="get_helper_edge_jitter" default="3.0">
+			Random positional jitter in pixels around each sampled edge point (grain softness). Must be finite and 0 or more.
+		</member>
+		<member name="helper_edge_facing_offset_deg" type="float" setter="set_helper_edge_facing_offset_deg" getter="get_helper_edge_facing_offset_deg" default="0.0">
+			Extra facing twist in degrees on top of the edge normal. Must be finite.
+		</member>
+		<member name="helper_edge_seed" type="int" setter="set_helper_edge_seed" getter="get_helper_edge_seed" default="0">
+			Per-pattern random seed for edge sampling (0 falls back to pattern_seed, which itself falls back to non-deterministic).
+		</member>
+		<member name="helper_edge_spread" type="float" setter="set_helper_edge_spread" getter="get_helper_edge_spread" default="220.0">
+			One-sided normal-direction falloff depth in pixels (the terrain-crest spray): each bullet is pushed along the edge normal by spread * pow(rand, helper_edge_spread_exponent). 0 disables the spray (crest line only). Must be finite and 0 or more.
+		</member>
+		<member name="helper_edge_spread_exponent" type="float" setter="set_helper_edge_spread_exponent" getter="get_helper_edge_spread_exponent" default="2.2">
+			Density falloff of the spray: values above 1 cluster bullets near the crest, below 1 push them deeper. Must be finite and 0.01 or more.
+		</member>
+		<member name="helper_edge_spread_side" type="int" setter="set_helper_edge_spread_side" getter="get_helper_edge_spread_side" enum="BulletFactory2D.EdgeSpreadSide" default="0">
+			Which side of the edge the spray extends toward: 0 along +normal, 1 behind (-normal), 2 random side per bullet.
+		</member>
+		<member name="helper_edge_tangent_jitter" type="float" setter="set_helper_edge_tangent_jitter" getter="get_helper_edge_tangent_jitter" default="2.0">
+			Random scatter in pixels along the local edge tangent (softens the crest core, works with or without spread). Must be finite and 0 or more.
 		</member>
 		<member name="helper_multispiral_angle_step" type="float" setter="set_helper_multispiral_angle_step" getter="get_helper_multispiral_angle_step" default="0.6">
 			Angle growth per step along each arm. Must be finite.
@@ -904,7 +968,7 @@
 			Scales the whole pattern around the generator. 1.0 keeps it as is, 0 collapses it onto the generator, negatives mirror it.
 		</member>
 		<member name="transforms_source" type="int" setter="set_transforms_source" getter="get_transforms_source" enum="BulletSpawner2D.TransformsSource" default="0">
-			Where volley transforms come from: children markers (0), this generator itself (1), or one of 22 procedural helper patterns (2-23: Grid, Ring, Fan, Spiral, Line, Aimed, Flower, Ellipse, Rain, Scatter, Polygon, Multi Spiral, Cross, Star, Heart, Wave, Waterfall, Lattice, Rose, Counter Spiral, Corridor, Lissajous). Only the active pattern's options show in the inspector. Pipeline per volley: generate, then spin, then scale, then helper_skip_indices carving (so skip indexes match the preview). Corridor and Ellipse Wall modes return fewer transforms than helper_bullets_amount.
+			Where volley transforms come from: children markers (0), this generator itself (1), or one of 23 procedural helper patterns (2-24: Grid, Ring, Fan, Spiral, Line, Aimed, Flower, Ellipse, Rain, Scatter, Polygon, Multi Spiral, Cross, Star, Heart, Wave, Waterfall, Lattice, Rose, Counter Spiral, Corridor, Lissajous, Edge). Only the active pattern's options show in the inspector. Pipeline per volley: generate, then spin, then scale, then helper_skip_indices carving (so skip indexes match the preview). Corridor and Ellipse Wall modes return fewer transforms than helper_bullets_amount.
 		</member>
 	</members>
 	<signals>
@@ -1148,6 +1212,9 @@
 		</constant>
 		<constant name="TRANSFORMS_FROM_HELPER_LISSAJOUS" value="23" enum="TransformsSource">
 			Figure-8 / weave curtain from the generator (crossing rows with readable doors).
+		</constant>
+		<constant name="TRANSFORMS_FROM_HELPER_EDGE" value="24" enum="TransformsSource">
+			Edge spray: pass a polygon/polyline in helper_edge_points — bullets spawn at points along it and face along the edge normals plus helper_edge_facing_offset_deg. How it works: each slot picks an arc-length position on the polyline (evenly, or randomly when helper_edge_random_sample is on), interpolates the joint-averaged normal there, then pushes the spawn point along the normal by helper_edge_spread * pow(rand, helper_edge_spread_exponent) for the one-sided falloff cloud. Defaults ARE the reference look: a demo sine crest with random sampling and a 220px falloff below it — switch the mode and the spray is already there. One-click full density via apply_pattern_preset(19) (800 bullets). helper_bullets_amount stays 10 globally, so raise it deliberately for the dense image.
 		</constant>
 		<constant name="SPIN_CONTINUOUS" value="0" enum="SpinMode">
 			Spins forever at [member spin_speed_deg_per_sec].

@@ -705,6 +705,18 @@
 		<constant name="PATTERN_PRESET_BLOSSOM_FINALE" value="18" enum="PatternPreset">
 			Preset used by BulletSpawner2D.apply_pattern_preset(): 12-lobe exact rose bloom with slow spin (ending card).
 		</constant>
+		<constant name="PATTERN_PRESET_TERRAIN_CREST" value="19" enum="PatternPreset">
+			Preset used by BulletSpawner2D.apply_pattern_preset(): dense terrain-crest edge spray with one-sided exponential falloff (800 random samples, spread 220 below a left-to-right crest via flipped normals).
+		</constant>
+		<constant name="EDGE_SPREAD_ALONG_NORMAL" value="0" enum="EdgeSpreadSide">
+			Edge spray extends along +normal (outward side).
+		</constant>
+		<constant name="EDGE_SPREAD_BEHIND_NORMAL" value="1" enum="EdgeSpreadSide">
+			Edge spray extends behind the edge (-normal).
+		</constant>
+		<constant name="EDGE_SPREAD_BOTH" value="2" enum="EdgeSpreadSide">
+			Edge spray picks a random side per bullet.
+		</constant>
 		<constant name="DIRECTIONAL_BULLETS" value="0" enum="BulletType">
 			Bullet type for DirectionalBullets2D, bullets that move independently with per-bullet direction, speed and features.
 		</constant>
