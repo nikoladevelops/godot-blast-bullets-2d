@@ -2411,6 +2411,250 @@ TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_lissajous(
 	return generated_transforms;
 }
 
+// Forward: defined below, used by the shape primitives above it.
+static bool compute_edge_normals_quiet(const PackedVector2Array &edge_points, bool closed, bool flip, PackedVector2Array &r_normals);
+
+TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_circle(
+		int transforms_amount,
+		Transform2D marker_transform,
+		real_t radius,
+		bool face_outward,
+		real_t facing_offset_degrees) {
+	if (!danmaku_validate_head("helper_generate_transforms_circle", transforms_amount, marker_transform)) {
+		return TypedArray<Transform2D>();
+	}
+	if (!Math::is_finite(radius) || radius < 0.0 || !Math::is_finite(facing_offset_degrees)) {
+		UtilityFunctions::push_error("helper_generate_transforms_circle: radius must be finite and >= 0, facing_offset_degrees finite.");
+		return TypedArray<Transform2D>();
+	}
+	TypedArray<Transform2D> generated_transforms = danmaku_make_slots(transforms_amount);
+	if (transforms_amount == 0) {
+		return generated_transforms;
+	}
+	const real_t marker_rot = marker_transform.get_rotation();
+	const real_t facing_offset = Math::deg_to_rad(facing_offset_degrees);
+	for (int i = 0; i < transforms_amount; ++i) {
+		const real_t angle = marker_rot + Math::TAU * (real_t)i / (real_t)transforms_amount;
+		const Vector2 local = Vector2(Math::cos(angle), Math::sin(angle)) * radius;
+		real_t facing = marker_rot + angle + facing_offset;
+		if (!face_outward) {
+			facing += Math::PI;
+		}
+		Transform2D slot(facing, marker_transform.xform(local));
+		danmaku_apply_marker_scale(slot, marker_transform);
+		generated_transforms[i] = slot;
+	}
+	return generated_transforms;
+}
+
+TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_rectangle(
+		int transforms_amount,
+		Transform2D marker_transform,
+		const Vector2 &size,
+		bool face_outward,
+		real_t facing_offset_degrees) {
+	if (!danmaku_validate_head("helper_generate_transforms_rectangle", transforms_amount, marker_transform)) {
+		return TypedArray<Transform2D>();
+	}
+	if (!size.is_finite() || size.x < 0.0 || size.y < 0.0 || !Math::is_finite(facing_offset_degrees)) {
+		UtilityFunctions::push_error("helper_generate_transforms_rectangle: size must be finite with sides >= 0, facing_offset_degrees finite.");
+		return TypedArray<Transform2D>();
+	}
+	TypedArray<Transform2D> generated_transforms = danmaku_make_slots(transforms_amount);
+	if (transforms_amount == 0) {
+		return generated_transforms;
+	}
+	// Counter-clockwise outline from top-left; corners double as normals via
+	// the shared edge worker so joints face clean diagonals.
+	const Vector2 hw(size.x * 0.5, size.y * 0.5);
+	PackedVector2Array corners;
+	corners.push_back(Vector2(-hw.x, -hw.y));
+	corners.push_back(Vector2(hw.x, -hw.y));
+	corners.push_back(Vector2(hw.x, hw.y));
+	corners.push_back(Vector2(-hw.x, hw.y));
+	PackedVector2Array normals;
+	if (!compute_edge_normals_quiet(corners, true, !face_outward, normals)) {
+		UtilityFunctions::push_error("helper_generate_transforms_rectangle: degenerate rectangle.");
+		return TypedArray<Transform2D>();
+	}
+	const real_t total = 2.0 * (size.x + size.y);
+	const real_t marker_rot = marker_transform.get_rotation();
+	const real_t facing_offset = Math::deg_to_rad(facing_offset_degrees);
+	if (!(total > 0.0)) {
+		// Zero-size box: every slot stacks at the marker facing outward.
+		for (int i = 0; i < transforms_amount; ++i) {
+			Transform2D slot(marker_rot + facing_offset, marker_transform.get_origin());
+			danmaku_apply_marker_scale(slot, marker_transform);
+			generated_transforms[i] = slot;
+		}
+		return generated_transforms;
+	}
+	for (int i = 0; i < transforms_amount; ++i) {
+		real_t d = total * (real_t)i / (real_t)transforms_amount;
+		if (d >= total) {
+			d = Math::fposmod(d, total);
+		}
+		// Walk the 4 sides: top, right, bottom, left.
+		const real_t lens[4] = { size.x, size.y, size.x, size.y };
+		int side = 0;
+		while (side < 3 && d >= lens[side]) {
+			d -= lens[side];
+			++side;
+		}
+		const real_t t = (lens[side] > 1e-9) ? Math::clamp(d / lens[side], (real_t)0.0, (real_t)1.0) : 0.0;
+		const int ia = side % 4;
+		const int ib = (side + 1) % 4;
+		Vector2 local = corners[ia].lerp(corners[ib], t);
+		Vector2 nrm = normals[ia].lerp(normals[ib], t);
+		if (nrm.length_squared() <= 1e-12) {
+			nrm = normals[ia];
+		}
+		nrm = nrm.normalized();
+		if (!local.is_finite() || !nrm.is_finite()) {
+			local = corners[ia];
+			nrm = normals[ia];
+		}
+		Transform2D slot(marker_rot + nrm.angle() + facing_offset, marker_transform.xform(local));
+		danmaku_apply_marker_scale(slot, marker_transform);
+		generated_transforms[i] = slot;
+	}
+	return generated_transforms;
+}
+
+TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_regular_polygon(
+		int transforms_amount,
+		Transform2D marker_transform,
+		int vertices,
+		real_t radius,
+		real_t base_rotation,
+		bool face_outward,
+		real_t facing_offset_degrees) {
+	if (!danmaku_validate_head("helper_generate_transforms_regular_polygon", transforms_amount, marker_transform)) {
+		return TypedArray<Transform2D>();
+	}
+	if (vertices < 3 || !Math::is_finite(radius) || radius < 0.0 || !Math::is_finite(base_rotation) || !Math::is_finite(facing_offset_degrees)) {
+		UtilityFunctions::push_error("helper_generate_transforms_regular_polygon: vertices must be >= 3, radius finite and >= 0, rotations finite.");
+		return TypedArray<Transform2D>();
+	}
+	TypedArray<Transform2D> generated_transforms = danmaku_make_slots(transforms_amount);
+	if (transforms_amount == 0) {
+		return generated_transforms;
+	}
+	PackedVector2Array corners;
+	for (int k = 0; k < vertices; ++k) {
+		const real_t a = base_rotation + Math::TAU * (real_t)k / (real_t)vertices;
+		corners.push_back(Vector2(Math::cos(a), Math::sin(a)) * radius);
+	}
+	PackedVector2Array normals;
+	if (!compute_edge_normals_quiet(corners, true, !face_outward, normals)) {
+		UtilityFunctions::push_error("helper_generate_transforms_regular_polygon: degenerate polygon.");
+		return TypedArray<Transform2D>();
+	}
+	// Arc-length walk so slots spread evenly even on stretched shapes.
+	real_t total = 0.0;
+	for (int k = 0; k < vertices; ++k) {
+		total += corners[k].distance_to(corners[(k + 1) % vertices]);
+	}
+	const real_t marker_rot = marker_transform.get_rotation();
+	const real_t facing_offset = Math::deg_to_rad(facing_offset_degrees);
+	if (!(total > 0.0) || !Math::is_finite(total)) {
+		for (int i = 0; i < transforms_amount; ++i) {
+			Transform2D slot(marker_rot + facing_offset, marker_transform.get_origin());
+			danmaku_apply_marker_scale(slot, marker_transform);
+			generated_transforms[i] = slot;
+		}
+		return generated_transforms;
+	}
+	int seg = 0;
+	real_t seg_start = 0.0;
+	real_t seg_end = corners[0].distance_to(corners[1 % vertices]);
+	for (int i = 0; i < transforms_amount; ++i) {
+		real_t d = total * (real_t)i / (real_t)transforms_amount;
+		if (d >= total) {
+			d = Math::fposmod(d, total);
+		}
+		while (seg < vertices - 1 && d >= seg_end) {
+			++seg;
+			seg_start = seg_end;
+			seg_end += corners[seg].distance_to(corners[(seg + 1) % vertices]);
+		}
+		const real_t seg_len = seg_end - seg_start;
+		const real_t t = (seg_len > 1e-9) ? Math::clamp((d - seg_start) / seg_len, (real_t)0.0, (real_t)1.0) : 0.0;
+		const int ia = seg % vertices;
+		const int ib = (seg + 1) % vertices;
+		Vector2 local = corners[ia].lerp(corners[ib], t);
+		Vector2 nrm = normals[ia].lerp(normals[ib], t);
+		if (nrm.length_squared() <= 1e-12) {
+			nrm = normals[ia];
+		}
+		nrm = nrm.normalized();
+		if (!local.is_finite() || !nrm.is_finite()) {
+			local = corners[ia];
+			nrm = normals[ia];
+		}
+		Transform2D slot(marker_rot + nrm.angle() + facing_offset, marker_transform.xform(local));
+		danmaku_apply_marker_scale(slot, marker_transform);
+		generated_transforms[i] = slot;
+	}
+	return generated_transforms;
+}
+
+TypedArray<Transform2D> BulletFactory2D::helper_apply_side_spread(
+		const TypedArray<Transform2D> &transforms,
+		int side_mode,
+		real_t spread,
+		real_t spread_exponent,
+		uint64_t seed) {
+	if (side_mode < 0 || side_mode > 3) {
+		UtilityFunctions::push_error("helper_apply_side_spread: side_mode must be 0 (on path), 1 (outside), 2 (inside) or 3 (both).");
+		return TypedArray<Transform2D>();
+	}
+	if (!Math::is_finite(spread) || spread < 0.0 || !Math::is_finite(spread_exponent) || spread_exponent < 0.01) {
+		UtilityFunctions::push_error("helper_apply_side_spread: spread must be finite and >= 0, spread_exponent finite and >= 0.01.");
+		return TypedArray<Transform2D>();
+	}
+	TypedArray<Transform2D> out;
+	out.resize(transforms.size());
+	for (int i = 0; i < transforms.size(); ++i) {
+		out[i] = transforms[i];
+	}
+	if (side_mode == 0 || spread <= 0.0) {
+		return out;
+	}
+	Ref<RandomNumberGenerator> rng = memnew(RandomNumberGenerator);
+	if (seed != 0) {
+		rng->set_seed(seed);
+	} else {
+		rng->randomize();
+	}
+	for (int i = 0; i < out.size(); ++i) {
+		Transform2D t = out[i];
+		if (!t.is_finite()) {
+			continue;
+		}
+		const Vector2 dir = Vector2(1.0, 0.0).rotated(t.get_rotation());
+		if (!dir.is_finite()) {
+			continue;
+		}
+		real_t off = spread * Math::pow(rng->randf(), spread_exponent);
+		if (!Math::is_finite(off)) {
+			continue;
+		}
+		if (side_mode == 3) {
+			off *= (rng->randf() < 0.5) ? -1.0 : 1.0;
+		} else if (side_mode == 2) {
+			off = -off;
+		}
+		const Vector2 origin = t.get_origin() + dir * off;
+		if (!origin.is_finite()) {
+			continue;
+		}
+		t.set_origin(origin);
+		out[i] = t;
+	}
+	return out;
+}
+
 // Quiet worker shared by the bound normal computer and the edge sampler:
 // fills r_normals, returns false (no error spam) when unusable.
 static bool compute_edge_normals_quiet(const PackedVector2Array &edge_points, bool closed, bool flip, PackedVector2Array &r_normals) {
@@ -3306,6 +3550,59 @@ void BulletFactory2D::_bind_methods() {
 								DEFVAL(0.0));
 
 	ClassDB::bind_static_method("BulletFactory2D",
+								D_METHOD("helper_generate_transforms_circle",
+										 "transforms_amount",
+										 "marker_transform",
+										 "radius",
+										 "face_outward",
+										 "facing_offset_degrees"),
+								&BulletFactory2D::helper_generate_transforms_circle,
+								DEFVAL(150.0),
+								DEFVAL(true),
+								DEFVAL(0.0));
+
+	ClassDB::bind_static_method("BulletFactory2D",
+								D_METHOD("helper_generate_transforms_rectangle",
+										 "transforms_amount",
+										 "marker_transform",
+										 "size",
+										 "face_outward",
+										 "facing_offset_degrees"),
+								&BulletFactory2D::helper_generate_transforms_rectangle,
+								DEFVAL(Vector2(300, 200)),
+								DEFVAL(true),
+								DEFVAL(0.0));
+
+	ClassDB::bind_static_method("BulletFactory2D",
+								D_METHOD("helper_generate_transforms_regular_polygon",
+										 "transforms_amount",
+										 "marker_transform",
+										 "vertices",
+										 "radius",
+										 "base_rotation",
+										 "face_outward",
+										 "facing_offset_degrees"),
+								&BulletFactory2D::helper_generate_transforms_regular_polygon,
+								DEFVAL(6),
+								DEFVAL(150.0),
+								DEFVAL(0.0),
+								DEFVAL(true),
+								DEFVAL(0.0));
+
+	ClassDB::bind_static_method("BulletFactory2D",
+								D_METHOD("helper_apply_side_spread",
+										 "transforms",
+										 "side_mode",
+										 "spread",
+										 "spread_exponent",
+										 "seed"),
+								&BulletFactory2D::helper_apply_side_spread,
+								DEFVAL(0),
+								DEFVAL(0.0),
+								DEFVAL(2.0),
+								DEFVAL(0));
+
+	ClassDB::bind_static_method("BulletFactory2D",
 								D_METHOD("helper_compute_edge_normals",
 										 "edge_points",
 										 "closed",
@@ -3387,6 +3684,10 @@ void BulletFactory2D::_bind_methods() {
 	BIND_ENUM_CONSTANT(EDGE_SPREAD_ALONG_NORMAL);
 	BIND_ENUM_CONSTANT(EDGE_SPREAD_BEHIND_NORMAL);
 	BIND_ENUM_CONSTANT(EDGE_SPREAD_BOTH);
+	BIND_ENUM_CONSTANT(SIDE_ON_PATH);
+	BIND_ENUM_CONSTANT(SIDE_OUTSIDE);
+	BIND_ENUM_CONSTANT(SIDE_INSIDE);
+	BIND_ENUM_CONSTANT(SIDE_BOTH);
 
 	//
 

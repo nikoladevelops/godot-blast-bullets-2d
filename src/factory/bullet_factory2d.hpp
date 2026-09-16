@@ -121,9 +121,25 @@ public:
 		PATTERN_PRESET_TERRAIN_CREST
 	};
 
+	// Universal side placement for closed-outline patterns (Ring, Ellipse,
+	// Star, Polygon, Flower, Rose, Lissajous, Custom, and the shape
+	// generators below): where bullets sit relative to the path they were
+	// generated on. ON_PATH is identity (default: every existing scene is
+	// untouched). OUTSIDE/INSIDE push along each slot's facing by
+	// spread * pow(rand, exponent); BOTH picks a random side per bullet.
+	// Positions move; facings never change.
+	enum SideMode {
+		SIDE_ON_PATH = 0,
+		SIDE_OUTSIDE = 1,
+		SIDE_INSIDE = 2,
+		SIDE_BOTH = 3
+	};
+
 	// Edge spray side: which side of the polyline the normal-direction
 	// falloff extends toward. ALONG offsets along +normal, BEHIND along
-	// -normal, BOTH picks a random side per bullet.
+	// -normal, BOTH picks a random side per bullet. (Custom mode now drives
+	// these from its single helper_edge_side knob; callers may still use
+	// them directly.)
 	enum EdgeSpreadSide {
 		EDGE_SPREAD_ALONG_NORMAL = 0,
 		EDGE_SPREAD_BEHIND_NORMAL = 1,
@@ -1094,6 +1110,50 @@ public:
 			bool face_outward = true,
 			real_t facing_offset_degrees = 0.0);
 
+	// Clean circle outline: transforms_amount slots evenly on a radius
+	// circle around the marker, facing outward (or inward). The Ring helper
+	// covers arcs; this is the exact full-loop shape primitive.
+	static TypedArray<Transform2D> helper_generate_transforms_circle(
+			int transforms_amount,
+			Transform2D marker_transform,
+			real_t radius = 150.0,
+			bool face_outward = true,
+			real_t facing_offset_degrees = 0.0);
+
+	// Rectangle perimeter: slots walk the outline of a size-sized box
+	// centered on the marker (counter-clockwise from top-left), facing
+	// outward (or inward). Square = size with equal sides.
+	static TypedArray<Transform2D> helper_generate_transforms_rectangle(
+			int transforms_amount,
+			Transform2D marker_transform,
+			const Vector2 &size = Vector2(300, 200),
+			bool face_outward = true,
+			real_t facing_offset_degrees = 0.0);
+
+	// Regular polygon perimeter: vertices corners on a radius circle from
+	// base_rotation, slots spread evenly by arc length along the outline,
+	// facing outward (or inward).
+	static TypedArray<Transform2D> helper_generate_transforms_regular_polygon(
+			int transforms_amount,
+			Transform2D marker_transform,
+			int vertices = 6,
+			real_t radius = 150.0,
+			real_t base_rotation = 0.0,
+			bool face_outward = true,
+			real_t facing_offset_degrees = 0.0);
+
+	// Universal side pass for closed-outline patterns: returns a copy of
+	// transforms with each origin pushed along its own facing by
+	// spread * pow(rand, spread_exponent). side: 0 = identity copy,
+	// 1 = outward (+facing), 2 = inward (-facing), 3 = random side per
+	// bullet. seed = 0 means non-deterministic. Facings never change.
+	static TypedArray<Transform2D> helper_apply_side_spread(
+			const TypedArray<Transform2D> &transforms,
+			int side_mode = 0,
+			real_t spread = 0.0,
+			real_t spread_exponent = 2.0,
+			uint64_t seed = 0);
+
 	// Edge normals for a polyline: per-point outward normal from the local
 	// tangent (segment perpendicular, averaged at joints). tangent (1,0)
 	// yields normal (0,-1) (up in Godot 2D). flip negates every normal.
@@ -1160,3 +1220,4 @@ public:
 	VARIANT_ENUM_CAST(BlastBullets2D::BulletFactory2D::EllipseMode);
 	VARIANT_ENUM_CAST(BlastBullets2D::BulletFactory2D::PatternPreset);
 	VARIANT_ENUM_CAST(BlastBullets2D::BulletFactory2D::EdgeSpreadSide);
+	VARIANT_ENUM_CAST(BlastBullets2D::BulletFactory2D::SideMode);

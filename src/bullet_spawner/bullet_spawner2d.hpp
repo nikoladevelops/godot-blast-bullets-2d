@@ -107,7 +107,21 @@ class BulletSpawner2D : public Node2D{
             TRANSFORMS_FROM_HELPER_COUNTER_SPIRAL,
             TRANSFORMS_FROM_HELPER_CORRIDOR,
             TRANSFORMS_FROM_HELPER_LISSAJOUS,
-            TRANSFORMS_FROM_HELPER_EDGE
+            TRANSFORMS_FROM_HELPER_CUSTOM,
+            TRANSFORMS_FROM_HELPER_CIRCLE,
+            TRANSFORMS_FROM_HELPER_RECTANGLE,
+            TRANSFORMS_FROM_HELPER_SQUARE,
+            TRANSFORMS_FROM_HELPER_REGULAR_POLYGON,
+            TRANSFORMS_FROM_HELPER_PATH2D
+        };
+
+        // Custom facing: Normal faces along the edge normal (90 degrees),
+        // Tangent faces along the edge direction, Custom faces a fixed
+        // angle (helper_edge_custom_angle_deg, marker-relative).
+        enum CustomFacing {
+            CUSTOM_FACING_NORMAL = 0,
+            CUSTOM_FACING_TANGENT,
+            CUSTOM_FACING_CUSTOM
         };
 
         // How the spin angle evolves. CONTINUOUS rotates forever at
@@ -419,23 +433,62 @@ class BulletSpawner2D : public Node2D{
         bool helper_lissajous_face_outward = true;
         double helper_lissajous_facing_offset_deg = 0.0;
 
-        // EDGE (terrain crest / destructible wall — the reference spray).
-        // Pass a PackedVector2Array (a polygon or polyline, generator-local)
-        // and get one transform per bullet: position = a point along the
-        // edge, direction = the edge normal there. That is the whole feature.
-        // Defaults ARE the reference look out of the box: a demo sine crest,
-        // random arc sampling, and a one-sided exponential falloff below it.
+        // CUSTOM (freeform outline — the reference spray). Pass a polygon or
+        // polyline in helper_edge_points: each bullet spawns at a point along
+        // it, facing per helper_edge_facing (normal = 90 degrees). The
+        // helper_edge_side knob puts the spray outside, inside, or both.
+        // Defaults ARE the reference look out of the box: a demo sine crest
+        // with a one-sided falloff below it.
         PackedVector2Array helper_edge_points = make_default_edge_crest();
+        CustomFacing helper_edge_facing = CUSTOM_FACING_NORMAL;
+        double helper_edge_custom_angle_deg = 0.0;
+        // Which side of the outline the spray lives on. Shared SideMode
+        // values from the factory: 1 = outside, 2 = inside, 3 = both.
+        // (0 = on-path is meaningless here; spread = 0 covers it.)
+        int helper_edge_side = 2;
         bool helper_edge_closed = false;
-        bool helper_edge_flip_normals = true;
         bool helper_edge_random_sample = true;
         double helper_edge_jitter = 3.0;
         double helper_edge_facing_offset_deg = 0.0;
         int helper_edge_seed = 0;
         double helper_edge_spread = 220.0;
         double helper_edge_spread_exponent = 2.2;
-        int helper_edge_spread_side = 0; // BulletFactory2D::EdgeSpreadSide
         double helper_edge_tangent_jitter = 2.0;
+        // CIRCLE (exact loop outline).
+        double helper_circle_radius = 150.0;
+        bool helper_circle_face_outward = true;
+        double helper_circle_facing_offset_deg = 0.0;
+        // RECTANGLE (perimeter walk, centered on the generator).
+        Vector2 helper_rectangle_size = Vector2(300, 200);
+        bool helper_rectangle_face_outward = true;
+        double helper_rectangle_facing_offset_deg = 0.0;
+        // SQUARE (perimeter walk, centered; single side length).
+        double helper_square_size = 300.0;
+        bool helper_square_face_outward = true;
+        double helper_square_facing_offset_deg = 0.0;
+        // REGULAR POLYGON (true perimeter, not star-biased scatter).
+        int helper_regular_polygon_vertices = 6;
+        double helper_regular_polygon_radius = 150.0;
+        double helper_regular_polygon_rotation = 0.0;
+        bool helper_regular_polygon_face_outward = true;
+        double helper_regular_polygon_facing_offset_deg = 0.0;
+        // PATH2D (live curve outline; shares Custom's spray knobs below).
+        NodePath helper_path2d_path;
+        // Runtime cache of the resolved Path2D. Not a bound property. The id
+        // pairs with it: validate BEFORE dereferencing (a raw pointer
+        // outlives freed nodes — see crash history).
+        mutable Node *helper_path2d_cache = nullptr;
+        mutable uint64_t helper_path2d_id = 0;
+        // Universal side pass for the closed-outline modes (Custom owns its
+        // spray via helper_edge_side instead). Identity by default, so
+        // existing scenes never change. Open modes (Children, Self, Grid,
+        // Fan, Spiral, Line, Aimed, Rain, Scatter, MultiSpiral, Cross,
+        // Heart, Wave, Waterfall, Lattice, Counter Spiral, Corridor) reject
+        // it loudly: inside/outside is meaningless without a loop.
+        int helper_side_mode = 0; // BulletFactory2D::SideMode
+        double helper_side_spread = 0.0;
+        double helper_side_spread_exponent = 2.0;
+        int helper_side_seed = 0;
 
         // NEGATIVE SPACE (skip slots by index: dodge doors, bullet text).
         PackedInt32Array helper_skip_indices;
@@ -982,10 +1035,54 @@ class BulletSpawner2D : public Node2D{
         void set_helper_lissajous_facing_offset_deg(double value);
         PackedVector2Array get_helper_edge_points() const;
         void set_helper_edge_points(const PackedVector2Array &value);
+        double get_helper_circle_radius() const;
+        void set_helper_circle_radius(double value);
+        bool get_helper_circle_face_outward() const;
+        void set_helper_circle_face_outward(bool value);
+        double get_helper_circle_facing_offset_deg() const;
+        void set_helper_circle_facing_offset_deg(double value);
+        Vector2 get_helper_rectangle_size() const;
+        void set_helper_rectangle_size(const Vector2 &value);
+        bool get_helper_rectangle_face_outward() const;
+        void set_helper_rectangle_face_outward(bool value);
+        double get_helper_rectangle_facing_offset_deg() const;
+        void set_helper_rectangle_facing_offset_deg(double value);
+        double get_helper_square_size() const;
+        void set_helper_square_size(double value);
+        bool get_helper_square_face_outward() const;
+        void set_helper_square_face_outward(bool value);
+        double get_helper_square_facing_offset_deg() const;
+        void set_helper_square_facing_offset_deg(double value);
+        int get_helper_regular_polygon_vertices() const;
+        void set_helper_regular_polygon_vertices(int value);
+        double get_helper_regular_polygon_radius() const;
+        void set_helper_regular_polygon_radius(double value);
+        double get_helper_regular_polygon_rotation() const;
+        void set_helper_regular_polygon_rotation(double value);
+        bool get_helper_regular_polygon_face_outward() const;
+        void set_helper_regular_polygon_face_outward(bool value);
+        double get_helper_regular_polygon_facing_offset_deg() const;
+        void set_helper_regular_polygon_facing_offset_deg(double value);
+        NodePath get_helper_path2d_path() const;
+        void set_helper_path2d_path(const NodePath &p_path);
+        Node *get_helper_path2d_node() const;
+        void set_helper_path2d_node(Node *node);
+        CustomFacing get_helper_edge_facing() const;
+        void set_helper_edge_facing(CustomFacing value);
+        double get_helper_edge_custom_angle_deg() const;
+        void set_helper_edge_custom_angle_deg(double value);
+        int get_helper_edge_side() const;
+        void set_helper_edge_side(int value);
+        int get_helper_side_mode() const;
+        void set_helper_side_mode(int value);
+        double get_helper_side_spread() const;
+        void set_helper_side_spread(double value);
+        double get_helper_side_spread_exponent() const;
+        void set_helper_side_spread_exponent(double value);
+        int get_helper_side_seed() const;
+        void set_helper_side_seed(int value);
         bool get_helper_edge_closed() const;
         void set_helper_edge_closed(bool value);
-        bool get_helper_edge_flip_normals() const;
-        void set_helper_edge_flip_normals(bool value);
         bool get_helper_edge_random_sample() const;
         void set_helper_edge_random_sample(bool value);
         double get_helper_edge_jitter() const;
@@ -998,14 +1095,12 @@ class BulletSpawner2D : public Node2D{
         void set_helper_edge_spread(double value);
         double get_helper_edge_spread_exponent() const;
         void set_helper_edge_spread_exponent(double value);
-        int get_helper_edge_spread_side() const;
-        void set_helper_edge_spread_side(int value);
         double get_helper_edge_tangent_jitter() const;
         void set_helper_edge_tangent_jitter(double value);
         int get_edge_point_count() const;
-        // Edge math API: normals of the polyline (same order as the points,
-        // unit length, flipped when helper_edge_flip_normals). Empty when
-        // there are no usable points.
+        // Edge math API: normals of the compiled Custom outline (same order
+        // as the points, unit length, flipped when helper_edge_side is
+        // Inside). Empty when there are no usable points.
         PackedVector2Array get_edge_normals() const;
         // Total arc length of the polyline in pixels (closed loops include
         // the closing segment). 0 when unusable.
@@ -1454,11 +1549,14 @@ class BulletSpawner2D : public Node2D{
         // Fire cone check: true when any resolved target sits within half
         // the fire arc of the spawner's facing. 0 arc = omnidirectional.
         bool fire_arc_covers_targets(const Array &targets) const;
-        // Edge helpers: the polyline IS the feature (generator-local), so the
-        // helpers below are thin readers over helper_edge_points.
         // make_default_edge_crest() builds the out-of-box demo sine crest so
-        // switching to Edge renders the reference spray with zero user input.
+        // switching to Custom renders the reference spray with zero input.
         static PackedVector2Array make_default_edge_crest();
+        // Live Path2D outline in generator-local pixels. Empty when unusable;
+        // quiet suppresses warnings (preview).
+        PackedVector2Array sample_path2d_polyline(bool quiet) const;
+        // True for the closed-outline modes the universal side pass supports.
+        static bool supports_side_spread(TransformsSource source);
 
 
 
@@ -1467,6 +1565,7 @@ class BulletSpawner2D : public Node2D{
 
 // Need this in order to expose the enum to Godot Engine
 VARIANT_ENUM_CAST(BlastBullets2D::BulletSpawner2D::TransformsSource);
+VARIANT_ENUM_CAST(BlastBullets2D::BulletSpawner2D::CustomFacing);
 VARIANT_ENUM_CAST(BlastBullets2D::BulletSpawner2D::SpinMode);
 VARIANT_ENUM_CAST(BlastBullets2D::BulletSpawner2D::HomingMode);
 VARIANT_ENUM_CAST(BlastBullets2D::BulletSpawner2D::HomingTargetSource);

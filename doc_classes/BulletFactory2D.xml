@@ -145,6 +145,52 @@
 				Generates a fan of transforms aimed from the marker at [code]target_position[/code]. Same as [method helper_generate_transforms_fan] with the cone centered on the marker to target direction. Useful for aimed bursts and shotgun spreads that track a player. Returns an empty array if the target coincides with the marker.
 			</description>
 		</method>
+		<method name="helper_generate_transforms_circle" qualifiers="static">
+			<return type="Transform2D[]" />
+			<param index="0" name="transforms_amount" type="int" />
+			<param index="1" name="marker_transform" type="Transform2D" />
+			<param index="2" name="radius" type="float" default="150.0" />
+			<param index="3" name="face_outward" type="bool" default="true" />
+			<param index="4" name="facing_offset_degrees" type="float" default="0.0" />
+			<description>
+				Generates an exact circle outline: slots spread evenly around a radius loop centered on the marker, facing outward (or inward). Combine with helper_apply_side_spread() for inner/outer rings.
+			</description>
+		</method>
+		<method name="helper_generate_transforms_rectangle" qualifiers="static">
+			<return type="Transform2D[]" />
+			<param index="0" name="transforms_amount" type="int" />
+			<param index="1" name="marker_transform" type="Transform2D" />
+			<param index="2" name="size" type="Vector2" default="Vector2(300, 200)" />
+			<param index="3" name="face_outward" type="bool" default="true" />
+			<param index="4" name="facing_offset_degrees" type="float" default="0.0" />
+			<description>
+				Generates a rectangle perimeter walk (counter-clockwise from top-left), slots spread evenly by arc length, facing outward (or inward). Square = equal sides. Combine with helper_apply_side_spread() for inner/outer walls.
+			</description>
+		</method>
+		<method name="helper_generate_transforms_regular_polygon" qualifiers="static">
+			<return type="Transform2D[]" />
+			<param index="0" name="transforms_amount" type="int" />
+			<param index="1" name="marker_transform" type="Transform2D" />
+			<param index="2" name="vertices" type="int" default="6" />
+			<param index="3" name="radius" type="float" default="150.0" />
+			<param index="4" name="base_rotation" type="float" default="0.0" />
+			<param index="5" name="face_outward" type="bool" default="true" />
+			<param index="6" name="facing_offset_degrees" type="float" default="0.0" />
+			<description>
+				Generates a regular polygon perimeter (vertices corners on a radius circle from base_rotation), slots spread evenly by arc length, facing outward (or inward). Combine with helper_apply_side_spread() for inner/outer shells.
+			</description>
+		</method>
+		<method name="helper_apply_side_spread" qualifiers="static">
+			<return type="Transform2D[]" />
+			<param index="0" name="transforms" type="Transform2D[]" />
+			<param index="1" name="side_mode" type="int" enum="BulletFactory2D.SideMode" default="0" />
+			<param index="2" name="spread" type="float" default="0.0" />
+			<param index="3" name="spread_exponent" type="float" default="2.0" />
+			<param index="4" name="seed" type="int" default="0" />
+			<description>
+				Universal side pass for closed-outline patterns: returns a copy of transforms with each origin pushed along its own facing by spread * pow(rand, spread_exponent). On Path returns an identity copy; Outside/Inside push along/against the facing; Both picks a random side per bullet. Facings never change. Only meaningful for closed loops (Ring, Ellipse, Polygon, Star, Flower, Rose, Lissajous, Custom, and the shape generators above) — open layouts have no inside to push toward.
+			</description>
+		</method>
 		<method name="helper_generate_transforms_corridor" qualifiers="static">
 			<return type="Transform2D[]" />
 			<param index="0" name="transforms_amount" type="int" />
@@ -716,6 +762,18 @@
 		</constant>
 		<constant name="EDGE_SPREAD_BOTH" value="2" enum="EdgeSpreadSide">
 			Edge spray picks a random side per bullet.
+		</constant>
+		<constant name="SIDE_ON_PATH" value="0" enum="SideMode">
+			helper_apply_side_spread() leaves transforms untouched (default: existing patterns never change).
+		</constant>
+		<constant name="SIDE_OUTSIDE" value="1" enum="SideMode">
+			helper_apply_side_spread() pushes each transform along its facing (outside a closed outline).
+		</constant>
+		<constant name="SIDE_INSIDE" value="2" enum="SideMode">
+			helper_apply_side_spread() pushes each transform against its facing (inside a closed outline).
+		</constant>
+		<constant name="SIDE_BOTH" value="3" enum="SideMode">
+			helper_apply_side_spread() pushes each transform to a random side of the path.
 		</constant>
 		<constant name="DIRECTIONAL_BULLETS" value="0" enum="BulletType">
 			Bullet type for DirectionalBullets2D, bullets that move independently with per-bullet direction, speed and features.
