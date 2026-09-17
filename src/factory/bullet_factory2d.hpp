@@ -94,6 +94,16 @@ public:
 		ELLIPSE_WALL
 	};
 
+	// Triangle kinds for helper_generate_transforms_triangle(): equilateral
+	// (circumradius), isosceles (base + height, apex up) and right-angled
+	// (X/Y legs from the corner, recentered). All corners recentre on the
+	// marker and walk counter-clockwise like the rectangle primitive.
+	enum TriangleType {
+		TRIANGLE_EQUILATERAL = 0,
+		TRIANGLE_ISOSCELES = 1,
+		TRIANGLE_RIGHT = 2
+	};
+
 	// Named pattern presets that fill the spawner's helper_* properties in
 	// one call (discoverability over 40 raw knobs; see
 	// BulletSpawner2D::apply_pattern_preset).
@@ -1332,6 +1342,106 @@ public:
 			int shell_layers = 1,
 			double shell_step = 32.0);
 
+	// Triangle perimeter: equilateral (circumradius size_a), isosceles
+	// (base size_a + height size_b, apex up) or right-angled (legs size_a
+	// along X and size_b along Y, recentered), all rotated by rotation and
+	// centered on the marker. Slots walk the outline evenly by arc length,
+	// facing outward (or inward). Degenerate (zero-area) triangles stack at
+	// the marker like the rectangle primitive.
+	static TypedArray<Transform2D> helper_generate_transforms_triangle(
+			int transforms_amount,
+			Transform2D marker_transform,
+			TriangleType triangle_type = TRIANGLE_EQUILATERAL,
+			real_t size_a = 150.0,
+			real_t size_b = 150.0,
+			real_t rotation = 0.0,
+			bool face_outward = true,
+			real_t facing_offset_degrees = 0.0,
+			// Outline layout (closed-loop placement engine, shared by the loop
+			// shapes): outline_placement picks On Outline (slot loop as
+			// generated), Fill Inside (row-major grid masked to the loop
+			// interior, capped at transforms_amount) or Shell Outside
+			// (concentric outward layers sharing the slot count);
+			// outline_facing rotates each default facing (0 = as generated,
+			// 1 = +90 deg, 2 = -90 deg); outline_reverse mirrors the slot
+			// order; outline_slot_offset rotates which slot becomes bullet 0;
+			// fill_spacing/fill_stagger/fill_margin tune the interior grid;
+			// shell_layers/shell_step tune the outside shells.
+			int outline_placement = 0,
+			int outline_facing = 0,
+			bool outline_reverse = false,
+			int outline_slot_offset = 0,
+			double fill_spacing = 32.0,
+			bool fill_stagger = false,
+			double fill_margin = 0.0,
+			int shell_layers = 1,
+			double shell_step = 32.0);
+
+	// Isosceles trapezoid perimeter: bases base_top/base_bottom with height,
+	// centered on the marker and rotated by rotation. Slots walk the outline
+	// evenly by arc length, facing outward (or inward). A zero top base
+	// degrades gracefully to a triangle; zero-area boxes stack at the marker.
+	static TypedArray<Transform2D> helper_generate_transforms_trapezoid(
+			int transforms_amount,
+			Transform2D marker_transform,
+			real_t base_top = 200.0,
+			real_t base_bottom = 300.0,
+			real_t height = 200.0,
+			real_t rotation = 0.0,
+			bool face_outward = true,
+			real_t facing_offset_degrees = 0.0,
+			// Outline layout (closed-loop placement engine, shared by the loop
+			// shapes): outline_placement picks On Outline (slot loop as
+			// generated), Fill Inside (row-major grid masked to the loop
+			// interior, capped at transforms_amount) or Shell Outside
+			// (concentric outward layers sharing the slot count);
+			// outline_facing rotates each default facing (0 = as generated,
+			// 1 = +90 deg, 2 = -90 deg); outline_reverse mirrors the slot
+			// order; outline_slot_offset rotates which slot becomes bullet 0;
+			// fill_spacing/fill_stagger/fill_margin tune the interior grid;
+			// shell_layers/shell_step tune the outside shells.
+			int outline_placement = 0,
+			int outline_facing = 0,
+			bool outline_reverse = false,
+			int outline_slot_offset = 0,
+			double fill_spacing = 32.0,
+			bool fill_stagger = false,
+			double fill_margin = 0.0,
+			int shell_layers = 1,
+			double shell_step = 32.0);
+
+	// Diamond (rhombus) perimeter: diagonals diagonal_x/diagonal_y, centered
+	// on the marker and rotated by rotation. Slots walk the outline evenly
+	// by arc length, facing outward (or inward). Zero-area diamonds stack at
+	// the marker.
+	static TypedArray<Transform2D> helper_generate_transforms_diamond(
+			int transforms_amount,
+			Transform2D marker_transform,
+			real_t diagonal_x = 200.0,
+			real_t diagonal_y = 300.0,
+			real_t rotation = 0.0,
+			bool face_outward = true,
+			real_t facing_offset_degrees = 0.0,
+			// Outline layout (closed-loop placement engine, shared by the loop
+			// shapes): outline_placement picks On Outline (slot loop as
+			// generated), Fill Inside (row-major grid masked to the loop
+			// interior, capped at transforms_amount) or Shell Outside
+			// (concentric outward layers sharing the slot count);
+			// outline_facing rotates each default facing (0 = as generated,
+			// 1 = +90 deg, 2 = -90 deg); outline_reverse mirrors the slot
+			// order; outline_slot_offset rotates which slot becomes bullet 0;
+			// fill_spacing/fill_stagger/fill_margin tune the interior grid;
+			// shell_layers/shell_step tune the outside shells.
+			int outline_placement = 0,
+			int outline_facing = 0,
+			bool outline_reverse = false,
+			int outline_slot_offset = 0,
+			double fill_spacing = 32.0,
+			bool fill_stagger = false,
+			double fill_margin = 0.0,
+			int shell_layers = 1,
+			double shell_step = 32.0);
+
 	// Universal side pass for closed-outline patterns: returns a copy of
 	// transforms with each origin pushed along its own facing by
 	// spread * pow(rand, spread_exponent). side: 0 = identity copy,
@@ -1408,6 +1518,7 @@ public:
 	VARIANT_ENUM_CAST(BlastBullets2D::BulletFactory2D::SpiralFacingMode);
 	VARIANT_ENUM_CAST(BlastBullets2D::BulletFactory2D::LineAnchor);
 	VARIANT_ENUM_CAST(BlastBullets2D::BulletFactory2D::EllipseMode);
+	VARIANT_ENUM_CAST(BlastBullets2D::BulletFactory2D::TriangleType);
 	VARIANT_ENUM_CAST(BlastBullets2D::BulletFactory2D::PatternPreset);
 	VARIANT_ENUM_CAST(BlastBullets2D::BulletFactory2D::EdgeSpreadSide);
 	VARIANT_ENUM_CAST(BlastBullets2D::BulletFactory2D::SideMode);

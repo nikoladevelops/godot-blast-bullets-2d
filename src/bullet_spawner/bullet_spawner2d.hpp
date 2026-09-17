@@ -125,16 +125,10 @@ class BulletSpawner2D : public Node2D{
             PATTERN_FROM_HELPER_RECTANGLE,
             PATTERN_FROM_HELPER_SQUARE,
             PATTERN_FROM_HELPER_REGULAR_POLYGON,
-            PATTERN_FROM_HELPER_PATH2D
-        };
-
-        // Custom facing: Normal faces along the edge normal (90 degrees),
-        // Tangent faces along the edge direction, Custom faces a fixed
-        // angle (helper_edge_custom_angle_deg, marker-relative).
-        enum CustomFacing {
-            CUSTOM_FACING_NORMAL = 0,
-            CUSTOM_FACING_TANGENT,
-            CUSTOM_FACING_CUSTOM
+            PATTERN_FROM_HELPER_PATH2D,
+            PATTERN_FROM_HELPER_TRIANGLE,
+            PATTERN_FROM_HELPER_TRAPEZOID,
+            PATTERN_FROM_HELPER_DIAMOND
         };
 
         // Path2D layout: how bullets are placed along the baked curve.
@@ -326,7 +320,11 @@ class BulletSpawner2D : public Node2D{
         double helper_line_spacing = 32.0;
         bool helper_line_face_direction = true;
         int helper_line_anchor = 1; // BulletFactory2D::LineAnchor, center
-        bool helper_line_perpendicular = false;
+        // 0 = along the line (as generated), 1 = +90 deg, 2 = -90 deg.
+        int helper_line_facing = 0;
+        bool helper_line_reverse = false;
+        int helper_line_slot_offset = 0;
+        double helper_line_start_offset = 0.0;
 
         // AIMED
         // Scene-tree reference to the target node the aimed cone centers on.
@@ -471,7 +469,6 @@ class BulletSpawner2D : public Node2D{
         // _spacing is reserved (unused) so the signature stays stable.
         Vector2 helper_corridor_aim_direction = Vector2(0, 1);
         double helper_corridor_width = 400.0;
-        double helper_corridor_spacing = 32.0;
         double helper_corridor_gap_width = 96.0;
         bool helper_corridor_face_aim = true;
         double helper_corridor_facing_offset_deg = 0.0;
@@ -485,27 +482,37 @@ class BulletSpawner2D : public Node2D{
         bool helper_lissajous_face_outward = true;
         double helper_lissajous_facing_offset_deg = 0.0;
 
-        // CUSTOM (freeform outline — the reference spray). Pass a polygon or
-        // polyline in helper_edge_points: each bullet spawns at a point along
-        // it, facing per helper_edge_facing (normal = 90 degrees). The
-        // helper_edge_side knob puts the spray outside, inside, or both.
-        // Defaults ARE the reference look out of the box: a demo sine crest
-        // with a one-sided falloff below it.
-        PackedVector2Array helper_edge_points = make_default_edge_crest();
-        CustomFacing helper_edge_facing = CUSTOM_FACING_NORMAL;
-        double helper_edge_custom_angle_deg = 0.0;
-        // Which side of the outline the spray lives on. Shared SideMode
-        // values from the factory: 1 = outside, 2 = inside, 3 = both.
-        // (0 = on-path is meaningless here; spread = 0 covers it.)
-        int helper_edge_side = 2;
-        bool helper_edge_closed = false;
-        bool helper_edge_random_sample = true;
-        double helper_edge_jitter = 3.0;
-        double helper_edge_facing_offset_deg = 0.0;
-        int helper_edge_seed = 0;
-        double helper_edge_spread = 220.0;
-        double helper_edge_spread_exponent = 2.2;
-        double helper_edge_tangent_jitter = 2.0;
+        // CUSTOM (hand-placed transforms). Store any Transform2D array in
+        // helper_custom_transforms (generator-local: composed as
+        // marker * local, so spin and scales keep working): each bullet
+        // spawns exactly there, facing per helper_custom_facing. Reverse and
+        // slot offset reorder the array; the count comes from the array
+        // itself (helper_bullets_amount is ignored).
+        TypedArray<Transform2D> helper_custom_transforms;
+        int helper_custom_facing = 0; // 0 = as stored, 1 = face outward, 2 = face inward, 3 = +90 deg, 4 = -90 deg
+        double helper_custom_facing_offset_deg = 0.0;
+        bool helper_custom_reverse = false;
+        int helper_custom_slot_offset = 0;
+        // TRIANGLE (equilateral / isosceles / right perimeter).
+        int helper_triangle_type = 0; // BulletFactory2D::TriangleType
+        double helper_triangle_size_a = 150.0;
+        double helper_triangle_size_b = 150.0;
+        double helper_triangle_rotation = 0.0;
+        bool helper_triangle_face_outward = true;
+        double helper_triangle_facing_offset_deg = 0.0;
+        // TRAPEZOID (isosceles trapezoid perimeter).
+        double helper_trapezoid_base_top = 200.0;
+        double helper_trapezoid_base_bottom = 300.0;
+        double helper_trapezoid_height = 200.0;
+        double helper_trapezoid_rotation = 0.0;
+        bool helper_trapezoid_face_outward = true;
+        double helper_trapezoid_facing_offset_deg = 0.0;
+        // DIAMOND (rhombus perimeter from its diagonals).
+        double helper_diamond_diagonal_x = 200.0;
+        double helper_diamond_diagonal_y = 300.0;
+        double helper_diamond_rotation = 0.0;
+        bool helper_diamond_face_outward = true;
+        double helper_diamond_facing_offset_deg = 0.0;
         // CIRCLE (exact loop outline).
         double helper_circle_radius = 150.0;
         bool helper_circle_face_outward = true;
@@ -1089,8 +1096,6 @@ class BulletSpawner2D : public Node2D{
         void set_helper_corridor_aim_direction(const Vector2 &value);
         double get_helper_corridor_width() const;
         void set_helper_corridor_width(double value);
-        double get_helper_corridor_spacing() const;
-        void set_helper_corridor_spacing(double value);
         double get_helper_corridor_gap_width() const;
         void set_helper_corridor_gap_width(double value);
         bool get_helper_corridor_face_aim() const;
@@ -1111,8 +1116,50 @@ class BulletSpawner2D : public Node2D{
         void set_helper_lissajous_face_outward(bool value);
         double get_helper_lissajous_facing_offset_deg() const;
         void set_helper_lissajous_facing_offset_deg(double value);
-        PackedVector2Array get_helper_edge_points() const;
-        void set_helper_edge_points(const PackedVector2Array &value);
+        TypedArray<Transform2D> get_helper_custom_transforms() const;
+        void set_helper_custom_transforms(const TypedArray<Transform2D> &value);
+        int get_helper_custom_facing() const;
+        void set_helper_custom_facing(int value);
+        double get_helper_custom_facing_offset_deg() const;
+        void set_helper_custom_facing_offset_deg(double value);
+        bool get_helper_custom_reverse() const;
+        void set_helper_custom_reverse(bool value);
+        int get_helper_custom_slot_offset() const;
+        void set_helper_custom_slot_offset(int value);
+        int get_helper_triangle_type() const;
+        void set_helper_triangle_type(int value);
+        double get_helper_triangle_size_a() const;
+        void set_helper_triangle_size_a(double value);
+        double get_helper_triangle_size_b() const;
+        void set_helper_triangle_size_b(double value);
+        double get_helper_triangle_rotation() const;
+        void set_helper_triangle_rotation(double value);
+        bool get_helper_triangle_face_outward() const;
+        void set_helper_triangle_face_outward(bool value);
+        double get_helper_triangle_facing_offset_deg() const;
+        void set_helper_triangle_facing_offset_deg(double value);
+        double get_helper_trapezoid_base_top() const;
+        void set_helper_trapezoid_base_top(double value);
+        double get_helper_trapezoid_base_bottom() const;
+        void set_helper_trapezoid_base_bottom(double value);
+        double get_helper_trapezoid_height() const;
+        void set_helper_trapezoid_height(double value);
+        double get_helper_trapezoid_rotation() const;
+        void set_helper_trapezoid_rotation(double value);
+        bool get_helper_trapezoid_face_outward() const;
+        void set_helper_trapezoid_face_outward(bool value);
+        double get_helper_trapezoid_facing_offset_deg() const;
+        void set_helper_trapezoid_facing_offset_deg(double value);
+        double get_helper_diamond_diagonal_x() const;
+        void set_helper_diamond_diagonal_x(double value);
+        double get_helper_diamond_diagonal_y() const;
+        void set_helper_diamond_diagonal_y(double value);
+        double get_helper_diamond_rotation() const;
+        void set_helper_diamond_rotation(double value);
+        bool get_helper_diamond_face_outward() const;
+        void set_helper_diamond_face_outward(bool value);
+        double get_helper_diamond_facing_offset_deg() const;
+        void set_helper_diamond_facing_offset_deg(double value);
         double get_helper_circle_radius() const;
         void set_helper_circle_radius(double value);
         bool get_helper_circle_face_outward() const;
@@ -1163,12 +1210,6 @@ class BulletSpawner2D : public Node2D{
         void set_helper_path2d_facing(Path2DFacing value);
         double get_helper_path2d_facing_offset_deg() const;
         void set_helper_path2d_facing_offset_deg(double value);
-        CustomFacing get_helper_edge_facing() const;
-        void set_helper_edge_facing(CustomFacing value);
-        double get_helper_edge_custom_angle_deg() const;
-        void set_helper_edge_custom_angle_deg(double value);
-        int get_helper_edge_side() const;
-        void set_helper_edge_side(int value);
         int get_helper_outline_placement() const;
         void set_helper_outline_placement(int value);
         int get_helper_outline_facing() const;
@@ -1187,40 +1228,6 @@ class BulletSpawner2D : public Node2D{
         void set_helper_outline_shell_layers(int value);
         double get_helper_outline_shell_step() const;
         void set_helper_outline_shell_step(double value);
-        bool get_helper_edge_closed() const;
-        void set_helper_edge_closed(bool value);
-        bool get_helper_edge_random_sample() const;
-        void set_helper_edge_random_sample(bool value);
-        double get_helper_edge_jitter() const;
-        void set_helper_edge_jitter(double value);
-        double get_helper_edge_facing_offset_deg() const;
-        void set_helper_edge_facing_offset_deg(double value);
-        int get_helper_edge_seed() const;
-        void set_helper_edge_seed(int value);
-        double get_helper_edge_spread() const;
-        void set_helper_edge_spread(double value);
-        double get_helper_edge_spread_exponent() const;
-        void set_helper_edge_spread_exponent(double value);
-        double get_helper_edge_tangent_jitter() const;
-        void set_helper_edge_tangent_jitter(double value);
-        int get_edge_point_count() const;
-        // Edge math API: normals of the compiled Custom outline (same order
-        // as the points, unit length, flipped when helper_edge_side is
-        // Inside). Empty when there are no usable points.
-        PackedVector2Array get_edge_normals() const;
-        // Total arc length of the polyline in pixels (closed loops include
-        // the closing segment). 0 when unusable.
-        double get_edge_total_length() const;
-        // Evenly spaced points along the polyline (arc-length parameterized,
-        // generator-local). Useful for composing custom per-segment patterns
-        // in GDScript. Empty when unusable.
-        PackedVector2Array sample_edge_points(int count) const;
-        // Cheap pre-flight for scripts: true when the polyline currently
-        // holds at least 1 finite point. Never warns or errors.
-        bool has_valid_edge_points() const;
-        // Good API aliases: pass a polygon/polyline, get transforms back.
-        PackedVector2Array get_edge_points() const;
-        void set_edge_points(const PackedVector2Array &value);
         PackedInt32Array get_helper_skip_indices() const;
         void set_helper_skip_indices(const PackedInt32Array &value);
         double get_homing_delay_sec() const;
@@ -1430,8 +1437,14 @@ class BulletSpawner2D : public Node2D{
         void set_helper_line_face_direction(bool value);
         int get_helper_line_anchor() const;
         void set_helper_line_anchor(int value);
-        bool get_helper_line_perpendicular() const;
-        void set_helper_line_perpendicular(bool value);
+        int get_helper_line_facing() const;
+        void set_helper_line_facing(int value);
+        bool get_helper_line_reverse() const;
+        void set_helper_line_reverse(bool value);
+        int get_helper_line_slot_offset() const;
+        void set_helper_line_slot_offset(int value);
+        double get_helper_line_start_offset() const;
+        void set_helper_line_start_offset(double value);
 
         NodePath get_helper_aimed_target_path() const;
         void set_helper_aimed_target_path(const NodePath &p_path);
@@ -1573,8 +1586,9 @@ class BulletSpawner2D : public Node2D{
         int tracked_child_count = -1;
         Transform2D tracked_self_global;
         bool tracked_has_self = false;
-        // Edge preview tracking: snapshot of the polyline for live dirty checks.
-        PackedVector2Array tracked_edge_points;
+        // Custom preview tracking: snapshot of the stored array for live
+        // dirty checks (transform compare, no dereference).
+        TypedArray<Transform2D> tracked_custom_transforms;
         // Editor-only pattern preview holder (null at runtime, never saved),
         // plus its two self-repainting _draw layers (dots + arrows).
         Node2D *preview_holder = nullptr;
@@ -1662,9 +1676,6 @@ class BulletSpawner2D : public Node2D{
         // Fire cone check: true when any resolved target sits within half
         // the fire arc of the spawner's facing. 0 arc = omnidirectional.
         bool fire_arc_covers_targets(const Array &targets) const;
-        // make_default_edge_crest() builds the out-of-box demo sine crest so
-        // switching to Custom renders the reference spray with zero input.
-        static PackedVector2Array make_default_edge_crest();
         // Live Path2D outline in generator-local pixels. Empty when unusable;
         // quiet suppresses warnings (preview).
         PackedVector2Array sample_path2d_polyline(bool quiet) const;
@@ -1687,7 +1698,6 @@ class BulletSpawner2D : public Node2D{
 
 // Need this in order to expose the enum to Godot Engine
 VARIANT_ENUM_CAST(BlastBullets2D::BulletSpawner2D::PatternSource);
-VARIANT_ENUM_CAST(BlastBullets2D::BulletSpawner2D::CustomFacing);
 VARIANT_ENUM_CAST(BlastBullets2D::BulletSpawner2D::Path2DDistribution);
 VARIANT_ENUM_CAST(BlastBullets2D::BulletSpawner2D::Path2DOverflow);
 VARIANT_ENUM_CAST(BlastBullets2D::BulletSpawner2D::Path2DAnchor);

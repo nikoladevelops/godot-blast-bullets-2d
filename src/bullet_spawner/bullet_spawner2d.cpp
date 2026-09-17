@@ -262,6 +262,12 @@ static const char *pattern_source_name(BulletSpawner2D::PatternSource source) {
             return "Regular Polygon";
         case BulletSpawner2D::PATTERN_FROM_HELPER_PATH2D:
             return "Path2D";
+        case BulletSpawner2D::PATTERN_FROM_HELPER_TRIANGLE:
+            return "Triangle";
+        case BulletSpawner2D::PATTERN_FROM_HELPER_TRAPEZOID:
+            return "Trapezoid";
+        case BulletSpawner2D::PATTERN_FROM_HELPER_DIAMOND:
+            return "Diamond";
         default:
             return "unknown";
     }
@@ -578,7 +584,7 @@ BulletSpawner2D::PatternSource BulletSpawner2D::get_pattern_source() const {
     return pattern_source;
 }
 void BulletSpawner2D::set_pattern_source(PatternSource value) {
-    if (value < PATTERN_FROM_CHILDREN || value > PATTERN_FROM_HELPER_PATH2D) {
+    if (value < PATTERN_FROM_CHILDREN || value > PATTERN_FROM_HELPER_DIAMOND) {
         UtilityFunctions::push_error("BulletSpawner2D: invalid pattern_source, keeping the old value.");
         return;
     }
@@ -1024,11 +1030,32 @@ void BulletSpawner2D::set_helper_line_anchor(int value) {
     helper_line_anchor = value;
     rebuild_preview();
 }
-bool BulletSpawner2D::get_helper_line_perpendicular() const {
-    return helper_line_perpendicular;
+int BulletSpawner2D::get_helper_line_facing() const { return helper_line_facing; }
+void BulletSpawner2D::set_helper_line_facing(int value) {
+    if (value < 0 || value > 2) {
+        UtilityFunctions::push_error("BulletSpawner2D: helper_line_facing must be 0 (along the line), 1 (+90 deg) or 2 (-90 deg), keeping the old value.");
+        return;
+    }
+    helper_line_facing = value;
+    rebuild_preview();
 }
-void BulletSpawner2D::set_helper_line_perpendicular(bool value) {
-    helper_line_perpendicular = value;
+bool BulletSpawner2D::get_helper_line_reverse() const { return helper_line_reverse; }
+void BulletSpawner2D::set_helper_line_reverse(bool value) {
+    helper_line_reverse = value;
+    rebuild_preview();
+}
+int BulletSpawner2D::get_helper_line_slot_offset() const { return helper_line_slot_offset; }
+void BulletSpawner2D::set_helper_line_slot_offset(int value) {
+    helper_line_slot_offset = value;
+    rebuild_preview();
+}
+double BulletSpawner2D::get_helper_line_start_offset() const { return helper_line_start_offset; }
+void BulletSpawner2D::set_helper_line_start_offset(double value) {
+    if (!Math::is_finite(value) || value < 0.0) {
+        UtilityFunctions::push_error("BulletSpawner2D: helper_line_start_offset must be finite and >= 0, keeping the old value.");
+        return;
+    }
+    helper_line_start_offset = value;
     rebuild_preview();
 }
 bool BulletSpawner2D::get_helper_aimed_centered() const {
@@ -1944,15 +1971,6 @@ void BulletSpawner2D::set_helper_corridor_width(double value) {
     helper_corridor_width = value;
     rebuild_preview();
 }
-double BulletSpawner2D::get_helper_corridor_spacing() const { return helper_corridor_spacing; }
-void BulletSpawner2D::set_helper_corridor_spacing(double value) {
-    if (!Math::is_finite(value) || value <= 0.0) {
-        UtilityFunctions::push_error("BulletSpawner2D: helper_corridor_spacing must be finite and > 0, keeping the old value.");
-        return;
-    }
-    helper_corridor_spacing = value;
-    rebuild_preview();
-}
 double BulletSpawner2D::get_helper_corridor_gap_width() const { return helper_corridor_gap_width; }
 void BulletSpawner2D::set_helper_corridor_gap_width(double value) {
     if (!Math::is_finite(value) || value < 0.0) {
@@ -2039,20 +2057,6 @@ void BulletSpawner2D::set_helper_lissajous_facing_offset_deg(double value) {
     helper_lissajous_facing_offset_deg = value;
     rebuild_preview();
 }
-// EDGE: pass a polygon/polyline, get edge transforms. That is the feature.
-// Demo crest for a fresh Edge mode: 17 points of a gentle sine over 1200px
-// (amplitude 60). Random arc sampling + the default spread turn this into
-// the reference terrain spray with zero user input. Stored only as the
-// member default: scenes that never touch helper_edge_points save nothing.
-PackedVector2Array BulletSpawner2D::make_default_edge_crest() {
-    PackedVector2Array pts;
-    pts.resize(17);
-    for (int i = 0; i < 17; ++i) {
-        const real_t x = -600.0 + 1200.0 * (real_t)i / 16.0;
-        pts[i] = Vector2(x, 60.0 * Math::sin(x / 200.0));
-    }
-    return pts;
-}
 bool BulletSpawner2D::supports_outline_layout(PatternSource source) {
     switch (source) {
         // Polygon is a radial scatter, not a loop: no inside to fill.
@@ -2066,6 +2070,9 @@ bool BulletSpawner2D::supports_outline_layout(PatternSource source) {
         case PATTERN_FROM_HELPER_RECTANGLE:
         case PATTERN_FROM_HELPER_SQUARE:
         case PATTERN_FROM_HELPER_REGULAR_POLYGON:
+        case PATTERN_FROM_HELPER_TRIANGLE:
+        case PATTERN_FROM_HELPER_TRAPEZOID:
+        case PATTERN_FROM_HELPER_DIAMOND:
             return true;
         default:
             return false;
@@ -2345,82 +2352,185 @@ TypedArray<Transform2D> BulletSpawner2D::collect_path2d_transforms(const Transfo
     }
     return out;
 }
-PackedVector2Array BulletSpawner2D::get_helper_edge_points() const { return helper_edge_points; }
-PackedVector2Array BulletSpawner2D::get_edge_points() const { return get_helper_edge_points(); }
-void BulletSpawner2D::set_edge_points(const PackedVector2Array &value) { set_helper_edge_points(value); }
-void BulletSpawner2D::set_helper_edge_points(const PackedVector2Array &value) {
+TypedArray<Transform2D> BulletSpawner2D::get_helper_custom_transforms() const { return helper_custom_transforms; }
+void BulletSpawner2D::set_helper_custom_transforms(const TypedArray<Transform2D> &value) {
     for (int i = 0; i < value.size(); ++i) {
-        if (!value[i].is_finite()) {
-            UtilityFunctions::push_error("BulletSpawner2D: helper_edge_points must be finite, keeping the old value.");
+        if (!((Transform2D)value[i]).is_finite()) {
+            UtilityFunctions::push_error("BulletSpawner2D: helper_custom_transforms must hold finite transforms, keeping the old value.");
             return;
         }
     }
-    helper_edge_points = value;
+    helper_custom_transforms = value;
     rebuild_preview();
 }
-bool BulletSpawner2D::get_helper_edge_closed() const { return helper_edge_closed; }
-void BulletSpawner2D::set_helper_edge_closed(bool value) {
-    helper_edge_closed = value;
-    rebuild_preview();
-}
-bool BulletSpawner2D::get_helper_edge_random_sample() const { return helper_edge_random_sample; }
-void BulletSpawner2D::set_helper_edge_random_sample(bool value) {
-    helper_edge_random_sample = value;
-    rebuild_preview();
-}
-double BulletSpawner2D::get_helper_edge_jitter() const { return helper_edge_jitter; }
-void BulletSpawner2D::set_helper_edge_jitter(double value) {
-    if (!Math::is_finite(value) || value < 0.0) {
-        UtilityFunctions::push_error("BulletSpawner2D: helper_edge_jitter must be finite and >= 0, keeping the old value.");
+int BulletSpawner2D::get_helper_custom_facing() const { return helper_custom_facing; }
+void BulletSpawner2D::set_helper_custom_facing(int value) {
+    if (value < 0 || value > 4) {
+        UtilityFunctions::push_error("BulletSpawner2D: helper_custom_facing must be 0 (as stored), 1 (face outward), 2 (face inward), 3 (+90 deg) or 4 (-90 deg), keeping the old value.");
         return;
     }
-    helper_edge_jitter = value;
+    helper_custom_facing = value;
     rebuild_preview();
 }
-double BulletSpawner2D::get_helper_edge_facing_offset_deg() const { return helper_edge_facing_offset_deg; }
-void BulletSpawner2D::set_helper_edge_facing_offset_deg(double value) {
+double BulletSpawner2D::get_helper_custom_facing_offset_deg() const { return helper_custom_facing_offset_deg; }
+void BulletSpawner2D::set_helper_custom_facing_offset_deg(double value) {
     if (!Math::is_finite(value)) {
-        UtilityFunctions::push_error("BulletSpawner2D: helper_edge_facing_offset_deg must be finite, keeping the old value.");
+        UtilityFunctions::push_error("BulletSpawner2D: helper_custom_facing_offset_deg must be finite, keeping the old value.");
         return;
     }
-    helper_edge_facing_offset_deg = value;
+    helper_custom_facing_offset_deg = value;
     rebuild_preview();
 }
-int BulletSpawner2D::get_helper_edge_seed() const { return helper_edge_seed; }
-void BulletSpawner2D::set_helper_edge_seed(int value) {
-    if (value < 0) {
-        UtilityFunctions::push_error("BulletSpawner2D: helper_edge_seed must be >= 0 (0 = non-deterministic), keeping the old value.");
-        return;
-    }
-    helper_edge_seed = value;
+bool BulletSpawner2D::get_helper_custom_reverse() const { return helper_custom_reverse; }
+void BulletSpawner2D::set_helper_custom_reverse(bool value) {
+    helper_custom_reverse = value;
     rebuild_preview();
 }
-BulletSpawner2D::CustomFacing BulletSpawner2D::get_helper_edge_facing() const { return helper_edge_facing; }
-void BulletSpawner2D::set_helper_edge_facing(CustomFacing value) {
-    if (value < CUSTOM_FACING_NORMAL || value > CUSTOM_FACING_CUSTOM) {
-        UtilityFunctions::push_error("BulletSpawner2D: invalid helper_edge_facing, keeping the old value.");
+int BulletSpawner2D::get_helper_custom_slot_offset() const { return helper_custom_slot_offset; }
+void BulletSpawner2D::set_helper_custom_slot_offset(int value) {
+    helper_custom_slot_offset = value;
+    rebuild_preview();
+}
+int BulletSpawner2D::get_helper_triangle_type() const { return helper_triangle_type; }
+void BulletSpawner2D::set_helper_triangle_type(int value) {
+    if (value < (int)BulletFactory2D::TRIANGLE_EQUILATERAL || value > (int)BulletFactory2D::TRIANGLE_RIGHT) {
+        UtilityFunctions::push_error("BulletSpawner2D: helper_triangle_type must be 0 (equilateral), 1 (isosceles) or 2 (right), keeping the old value.");
         return;
     }
-    helper_edge_facing = value;
+    helper_triangle_type = value;
     notify_property_list_changed();
     rebuild_preview();
 }
-double BulletSpawner2D::get_helper_edge_custom_angle_deg() const { return helper_edge_custom_angle_deg; }
-void BulletSpawner2D::set_helper_edge_custom_angle_deg(double value) {
-    if (!Math::is_finite(value)) {
-        UtilityFunctions::push_error("BulletSpawner2D: helper_edge_custom_angle_deg must be finite, keeping the old value.");
+double BulletSpawner2D::get_helper_triangle_size_a() const { return helper_triangle_size_a; }
+void BulletSpawner2D::set_helper_triangle_size_a(double value) {
+    if (!Math::is_finite(value) || value < 0.0) {
+        UtilityFunctions::push_error("BulletSpawner2D: helper_triangle_size_a must be finite and >= 0, keeping the old value.");
         return;
     }
-    helper_edge_custom_angle_deg = value;
+    helper_triangle_size_a = value;
     rebuild_preview();
 }
-int BulletSpawner2D::get_helper_edge_side() const { return helper_edge_side; }
-void BulletSpawner2D::set_helper_edge_side(int value) {
-    if (value < 1 || value > 3) {
-        UtilityFunctions::push_error("BulletSpawner2D: helper_edge_side must be 1 (outside), 2 (inside) or 3 (both), keeping the old value.");
+double BulletSpawner2D::get_helper_triangle_size_b() const { return helper_triangle_size_b; }
+void BulletSpawner2D::set_helper_triangle_size_b(double value) {
+    if (!Math::is_finite(value) || value < 0.0) {
+        UtilityFunctions::push_error("BulletSpawner2D: helper_triangle_size_b must be finite and >= 0, keeping the old value.");
         return;
     }
-    helper_edge_side = value;
+    helper_triangle_size_b = value;
+    rebuild_preview();
+}
+double BulletSpawner2D::get_helper_triangle_rotation() const { return helper_triangle_rotation; }
+void BulletSpawner2D::set_helper_triangle_rotation(double value) {
+    if (!Math::is_finite(value)) {
+        UtilityFunctions::push_error("BulletSpawner2D: helper_triangle_rotation must be finite, keeping the old value.");
+        return;
+    }
+    helper_triangle_rotation = value;
+    rebuild_preview();
+}
+bool BulletSpawner2D::get_helper_triangle_face_outward() const { return helper_triangle_face_outward; }
+void BulletSpawner2D::set_helper_triangle_face_outward(bool value) {
+    helper_triangle_face_outward = value;
+    rebuild_preview();
+}
+double BulletSpawner2D::get_helper_triangle_facing_offset_deg() const { return helper_triangle_facing_offset_deg; }
+void BulletSpawner2D::set_helper_triangle_facing_offset_deg(double value) {
+    if (!Math::is_finite(value)) {
+        UtilityFunctions::push_error("BulletSpawner2D: helper_triangle_facing_offset_deg must be finite, keeping the old value.");
+        return;
+    }
+    helper_triangle_facing_offset_deg = value;
+    rebuild_preview();
+}
+double BulletSpawner2D::get_helper_trapezoid_base_top() const { return helper_trapezoid_base_top; }
+void BulletSpawner2D::set_helper_trapezoid_base_top(double value) {
+    if (!Math::is_finite(value) || value < 0.0) {
+        UtilityFunctions::push_error("BulletSpawner2D: helper_trapezoid_base_top must be finite and >= 0, keeping the old value.");
+        return;
+    }
+    helper_trapezoid_base_top = value;
+    rebuild_preview();
+}
+double BulletSpawner2D::get_helper_trapezoid_base_bottom() const { return helper_trapezoid_base_bottom; }
+void BulletSpawner2D::set_helper_trapezoid_base_bottom(double value) {
+    if (!Math::is_finite(value) || value < 0.0) {
+        UtilityFunctions::push_error("BulletSpawner2D: helper_trapezoid_base_bottom must be finite and >= 0, keeping the old value.");
+        return;
+    }
+    helper_trapezoid_base_bottom = value;
+    rebuild_preview();
+}
+double BulletSpawner2D::get_helper_trapezoid_height() const { return helper_trapezoid_height; }
+void BulletSpawner2D::set_helper_trapezoid_height(double value) {
+    if (!Math::is_finite(value) || value < 0.0) {
+        UtilityFunctions::push_error("BulletSpawner2D: helper_trapezoid_height must be finite and >= 0, keeping the old value.");
+        return;
+    }
+    helper_trapezoid_height = value;
+    rebuild_preview();
+}
+double BulletSpawner2D::get_helper_trapezoid_rotation() const { return helper_trapezoid_rotation; }
+void BulletSpawner2D::set_helper_trapezoid_rotation(double value) {
+    if (!Math::is_finite(value)) {
+        UtilityFunctions::push_error("BulletSpawner2D: helper_trapezoid_rotation must be finite, keeping the old value.");
+        return;
+    }
+    helper_trapezoid_rotation = value;
+    rebuild_preview();
+}
+bool BulletSpawner2D::get_helper_trapezoid_face_outward() const { return helper_trapezoid_face_outward; }
+void BulletSpawner2D::set_helper_trapezoid_face_outward(bool value) {
+    helper_trapezoid_face_outward = value;
+    rebuild_preview();
+}
+double BulletSpawner2D::get_helper_trapezoid_facing_offset_deg() const { return helper_trapezoid_facing_offset_deg; }
+void BulletSpawner2D::set_helper_trapezoid_facing_offset_deg(double value) {
+    if (!Math::is_finite(value)) {
+        UtilityFunctions::push_error("BulletSpawner2D: helper_trapezoid_facing_offset_deg must be finite, keeping the old value.");
+        return;
+    }
+    helper_trapezoid_facing_offset_deg = value;
+    rebuild_preview();
+}
+double BulletSpawner2D::get_helper_diamond_diagonal_x() const { return helper_diamond_diagonal_x; }
+void BulletSpawner2D::set_helper_diamond_diagonal_x(double value) {
+    if (!Math::is_finite(value) || value < 0.0) {
+        UtilityFunctions::push_error("BulletSpawner2D: helper_diamond_diagonal_x must be finite and >= 0, keeping the old value.");
+        return;
+    }
+    helper_diamond_diagonal_x = value;
+    rebuild_preview();
+}
+double BulletSpawner2D::get_helper_diamond_diagonal_y() const { return helper_diamond_diagonal_y; }
+void BulletSpawner2D::set_helper_diamond_diagonal_y(double value) {
+    if (!Math::is_finite(value) || value < 0.0) {
+        UtilityFunctions::push_error("BulletSpawner2D: helper_diamond_diagonal_y must be finite and >= 0, keeping the old value.");
+        return;
+    }
+    helper_diamond_diagonal_y = value;
+    rebuild_preview();
+}
+double BulletSpawner2D::get_helper_diamond_rotation() const { return helper_diamond_rotation; }
+void BulletSpawner2D::set_helper_diamond_rotation(double value) {
+    if (!Math::is_finite(value)) {
+        UtilityFunctions::push_error("BulletSpawner2D: helper_diamond_rotation must be finite, keeping the old value.");
+        return;
+    }
+    helper_diamond_rotation = value;
+    rebuild_preview();
+}
+bool BulletSpawner2D::get_helper_diamond_face_outward() const { return helper_diamond_face_outward; }
+void BulletSpawner2D::set_helper_diamond_face_outward(bool value) {
+    helper_diamond_face_outward = value;
+    rebuild_preview();
+}
+double BulletSpawner2D::get_helper_diamond_facing_offset_deg() const { return helper_diamond_facing_offset_deg; }
+void BulletSpawner2D::set_helper_diamond_facing_offset_deg(double value) {
+    if (!Math::is_finite(value)) {
+        UtilityFunctions::push_error("BulletSpawner2D: helper_diamond_facing_offset_deg must be finite, keeping the old value.");
+        return;
+    }
+    helper_diamond_facing_offset_deg = value;
     rebuild_preview();
 }
 int BulletSpawner2D::get_helper_outline_placement() const { return helper_outline_placement; }
@@ -2492,33 +2602,6 @@ void BulletSpawner2D::set_helper_outline_shell_step(double value) {
         return;
     }
     helper_outline_shell_step = value;
-    rebuild_preview();
-}
-double BulletSpawner2D::get_helper_edge_spread() const { return helper_edge_spread; }
-void BulletSpawner2D::set_helper_edge_spread(double value) {
-    if (!Math::is_finite(value) || value < 0.0) {
-        UtilityFunctions::push_error("BulletSpawner2D: helper_edge_spread must be finite and >= 0, keeping the old value.");
-        return;
-    }
-    helper_edge_spread = value;
-    rebuild_preview();
-}
-double BulletSpawner2D::get_helper_edge_spread_exponent() const { return helper_edge_spread_exponent; }
-void BulletSpawner2D::set_helper_edge_spread_exponent(double value) {
-    if (!Math::is_finite(value) || value < 0.01) {
-        UtilityFunctions::push_error("BulletSpawner2D: helper_edge_spread_exponent must be finite and >= 0.01, keeping the old value.");
-        return;
-    }
-    helper_edge_spread_exponent = value;
-    rebuild_preview();
-}
-double BulletSpawner2D::get_helper_edge_tangent_jitter() const { return helper_edge_tangent_jitter; }
-void BulletSpawner2D::set_helper_edge_tangent_jitter(double value) {
-    if (!Math::is_finite(value) || value < 0.0) {
-        UtilityFunctions::push_error("BulletSpawner2D: helper_edge_tangent_jitter must be finite and >= 0, keeping the old value.");
-        return;
-    }
-    helper_edge_tangent_jitter = value;
     rebuild_preview();
 }
 double BulletSpawner2D::get_helper_circle_radius() const { return helper_circle_radius; }
@@ -2750,92 +2833,6 @@ void BulletSpawner2D::set_helper_path2d_facing_offset_deg(double value) {
     }
     helper_path2d_facing_offset_deg = value;
     rebuild_preview();
-}
-int BulletSpawner2D::get_edge_point_count() const {
-    return helper_edge_points.size();
-}
-PackedVector2Array BulletSpawner2D::get_edge_normals() const {
-    PackedVector2Array pts = helper_edge_points;
-    if (pts.is_empty()) return PackedVector2Array();
-    for (int i = 0; i < pts.size(); ++i) {
-        if (!pts[i].is_finite()) return PackedVector2Array();
-    }
-    // Pre-validated, so the shared helper cannot hit its error path.
-    // Inside-side flips the normals, matching the collect path.
-    const bool flip = helper_edge_side == (int)BulletFactory2D::SIDE_INSIDE;
-    return BulletFactory2D::helper_compute_edge_normals(pts, helper_edge_closed, flip);
-}
-double BulletSpawner2D::get_edge_total_length() const {
-    PackedVector2Array pts = helper_edge_points;
-    const int n = pts.size();
-    if (n < 2) return 0.0;
-    double total = 0.0;
-    for (int i = 1; i < n; ++i) {
-        const double d = (double)pts[i - 1].distance_to(pts[i]);
-        if (!Math::is_finite(d)) return 0.0;
-        total += d;
-    }
-    if (helper_edge_closed && n > 2) {
-        const double d = (double)pts[n - 1].distance_to(pts[0]);
-        if (!Math::is_finite(d)) return 0.0;
-        total += d;
-    }
-    return total;
-}
-PackedVector2Array BulletSpawner2D::sample_edge_points(int count) const {
-    if (count <= 0) return PackedVector2Array();
-    PackedVector2Array pts = helper_edge_points;
-    const int n = pts.size();
-    if (n == 0) return PackedVector2Array();
-    if (n == 1 || count == 1) {
-        PackedVector2Array out;
-        out.resize(count);
-        for (int i = 0; i < count; ++i) out[i] = pts[0];
-        return out;
-    }
-    // Arc-length table (same convention as the factory sampler).
-    PackedFloat64Array cum;
-    cum.resize(n);
-    cum[0] = 0.0;
-    for (int i = 1; i < n; ++i) cum[i] = cum[i - 1] + (double)pts[i - 1].distance_to(pts[i]);
-    double total = cum[n - 1];
-    if (helper_edge_closed) total += (double)pts[n - 1].distance_to(pts[0]);
-    if (!(total > 0.0) || !Math::is_finite(total)) {
-        PackedVector2Array out;
-        out.resize(count);
-        for (int i = 0; i < count; ++i) out[i] = pts[0];
-        return out;
-    }
-    const int seg_count = helper_edge_closed ? n : n - 1;
-    PackedVector2Array out;
-    out.resize(count);
-    for (int i = 0; i < count; ++i) {
-        double d = (count == 1) ? 0.0 : total * (double)i / (double)(helper_edge_closed ? count : count - 1);
-        if (d >= total) d = Math::fposmod(d, total);
-        int seg = 0;
-        while (seg < seg_count - 1) {
-            const double seg_end = (seg + 1 < n) ? cum[seg + 1] : total;
-            if (d < seg_end) break;
-            ++seg;
-        }
-        const int ia = seg % n;
-        const int ib = (seg + 1) % n;
-        const double seg_start = (seg < n) ? cum[seg] : total;
-        const double seg_end = (seg + 1 < n) ? cum[seg + 1] : total;
-        const double seg_len = seg_end - seg_start;
-        double t = (seg_len > 1e-9) ? (d - seg_start) / seg_len : 0.0;
-        t = Math::clamp(t, 0.0, 1.0);
-        out[i] = pts[ia].lerp(pts[ib], (real_t)t);
-    }
-    return out;
-}
-bool BulletSpawner2D::has_valid_edge_points() const {
-    PackedVector2Array pts = helper_edge_points;
-    if (pts.is_empty()) return false;
-    for (int i = 0; i < pts.size(); ++i) {
-        if (!pts[i].is_finite()) return false;
-    }
-    return true;
 }
 double BulletSpawner2D::get_homing_delay_sec() const { return homing_delay_sec; }
 void BulletSpawner2D::set_homing_delay_sec(double value) {
@@ -3131,7 +3128,6 @@ void BulletSpawner2D::apply_pattern_preset(int preset) {
             helper_bullets_amount = 25;
             helper_corridor_aim_direction = Vector2(0, 1);
             helper_corridor_width = 400.0;
-            helper_corridor_spacing = 32.0;
             helper_corridor_gap_width = 96.0;
             helper_corridor_face_aim = true;
             helper_corridor_facing_offset_deg = 0.0;
@@ -3148,21 +3144,25 @@ void BulletSpawner2D::apply_pattern_preset(int preset) {
             spin_speed_deg_per_sec = 30.0;
             break;
         case BulletFactory2D::PATTERN_PRESET_TERRAIN_CREST:
-            // Dense crest band + one-sided exponential falloff spray (the
-            // reference terrain look): random arc sampling so 800 slots cover
-            // the whole edge, inside-side spray so the cloud falls BELOW a
-            // left-to-right crest (default normals point up).
+            // Baked crest line (the reference terrain look, minus the old
+            // per-volley spray randomness, which cannot live in stored
+            // data): 120 slots along a gentle sine, facing up like the old
+            // edge normals did. Custom counts from the array itself, so edit
+            // helper_custom_transforms (or re-run the preset) to change it.
             pattern_source = PATTERN_FROM_HELPER_CUSTOM;
-            helper_bullets_amount = 800;
-            helper_edge_closed = false;
-            helper_edge_side = 2;
-            helper_edge_facing = CUSTOM_FACING_NORMAL;
-            helper_edge_random_sample = true;
-            helper_edge_jitter = 3.0;
-            helper_edge_spread = 220.0;
-            helper_edge_spread_exponent = 2.2;
-            helper_edge_tangent_jitter = 2.0;
-            helper_edge_facing_offset_deg = 0.0;
+            helper_custom_facing = 0;
+            helper_custom_facing_offset_deg = 0.0;
+            helper_custom_reverse = false;
+            helper_custom_slot_offset = 0;
+            helper_custom_transforms.clear();
+            for (int i = 0; i < 120; ++i) {
+                const real_t x = -600.0 + 1200.0 * (real_t)i / 119.0;
+                const real_t y = 60.0 * Math::sin(x / 200.0);
+                // Sine slope: facing tilts with the curve like an edge
+                // normal would (up on average, -Y in Godot 2D).
+                const real_t slope = 0.3 * Math::cos(x / 200.0);
+                helper_custom_transforms.push_back(Transform2D(Math::atan2(-1.0, -slope), Vector2(x, y)));
+            }
             break;
         case BulletFactory2D::PATTERN_PRESET_CUSTOM:
         default:
@@ -4441,9 +4441,46 @@ TypedArray<Transform2D> BulletSpawner2D::collect_spawn_transforms_impl(bool quie
         case PATTERN_FROM_HELPER_SPIRAL:
             raw = BulletFactory2D::helper_generate_transforms_spiral(helper_bullets_amount, marker, helper_spiral_start_radius, helper_spiral_radius_step, helper_spiral_angle_step, helper_spiral_rotate_with_marker, (BulletFactory2D::SpiralFacingMode)helper_spiral_facing, helper_spiral_facing_offset_deg);
             break;
-        case PATTERN_FROM_HELPER_LINE:
-            raw = BulletFactory2D::helper_generate_transforms_line(helper_bullets_amount, marker, helper_line_direction, helper_line_spacing, helper_line_face_direction, (BulletFactory2D::LineAnchor)helper_line_anchor, helper_line_perpendicular);
+        case PATTERN_FROM_HELPER_LINE: {
+            // helper_line_perpendicular retired: helper_line_facing rotates
+            // the composed facing instead. Order ops mirror/rotate the row,
+            // then the facing turns, then the axis shift applies on top
+            // (direction is global-space, like the generator uses it).
+            TypedArray<Transform2D> line_raw = BulletFactory2D::helper_generate_transforms_line(helper_bullets_amount, marker, helper_line_direction, helper_line_spacing, helper_line_face_direction, (BulletFactory2D::LineAnchor)helper_line_anchor, false);
+            const int ln = line_raw.size();
+            const int facing_sel = (helper_line_facing >= 0 && helper_line_facing <= 2) ? helper_line_facing : 0;
+            const real_t line_sel = facing_sel == 1 ? Math::PI * 0.5 : (facing_sel == 2 ? -Math::PI * 0.5 : 0.0);
+            Vector2 line_axis = Vector2(1, 0);
+            if (helper_line_direction.is_finite() && helper_line_direction.length_squared() > 1e-12) {
+                line_axis = helper_line_direction.normalized();
+            }
+            const Vector2 line_shift = line_axis * (real_t)MAX(helper_line_start_offset, 0.0);
+            for (int i = 0; i < ln; ++i) {
+                int j = helper_line_reverse ? (ln - 1 - i) : i;
+                if (ln > 1) {
+                    int k = helper_line_slot_offset % ln;
+                    if (k < 0) {
+                        k += ln;
+                    }
+                    j = helper_line_reverse ? (ln - 1 - ((i + k) % ln)) : ((i + k) % ln);
+                }
+                Transform2D slot = line_raw[j];
+                if (!slot.is_finite()) {
+                    continue;
+                }
+                const Vector2 shifted = slot.get_origin() + line_shift;
+                if (!shifted.is_finite()) {
+                    continue;
+                }
+                slot.set_origin(shifted);
+                const real_t rot = slot.get_rotation() + line_sel;
+                if (Math::is_finite((double)rot)) {
+                    slot.set_rotation(rot);
+                }
+                raw.push_back(slot);
+            }
             break;
+        }
         case PATTERN_FROM_HELPER_AIMED: {
             Node2D *target = get_helper_aimed_target();
             if (target == nullptr) {
@@ -4531,48 +4568,68 @@ TypedArray<Transform2D> BulletSpawner2D::collect_spawn_transforms_impl(bool quie
                     corridor_aim = to_target.normalized();
                 }
             }
-            raw = BulletFactory2D::helper_generate_transforms_corridor(helper_bullets_amount, marker, corridor_aim, helper_corridor_width, helper_corridor_spacing, helper_corridor_gap_width, helper_corridor_face_aim, helper_corridor_facing_offset_deg);
+            raw = BulletFactory2D::helper_generate_transforms_corridor(helper_bullets_amount, marker, corridor_aim, helper_corridor_width, 32.0, helper_corridor_gap_width, helper_corridor_face_aim, helper_corridor_facing_offset_deg); // spacing reserved (unused) upstream: factory default
             break;
         }
         case PATTERN_FROM_HELPER_LISSAJOUS:
             raw = BulletFactory2D::helper_generate_transforms_lissajous(helper_bullets_amount, marker, helper_lissajous_size_x, helper_lissajous_size_y, helper_lissajous_freq_x, helper_lissajous_freq_y, helper_lissajous_phase, helper_lissajous_face_outward, helper_lissajous_facing_offset_deg, helper_outline_placement, helper_outline_facing, helper_outline_reverse, helper_outline_slot_offset, helper_outline_fill_spacing, helper_outline_fill_stagger, helper_outline_fill_margin, helper_outline_shell_layers, helper_outline_shell_step);
             break;
         case PATTERN_FROM_HELPER_CUSTOM: {
-            // Freeform polyline: position = a point along it, direction =
-            // the edge normal there (per helper_edge_facing), spray =
-            // helper_edge_side. That is the whole feature.
-            if (helper_edge_points.is_empty()) {
-                if (!quiet) UtilityFunctions::push_error("BulletSpawner2D::collect_spawn_transforms: helper_edge_points is empty.");
+            // Hand-placed transforms: every stored slot spawns exactly where
+            // the user put it (generator-local, composed as marker * local so
+            // spin and scales keep working). Order ops mirror/rotate the
+            // array, then the facing selector rewrites rotations. Non-finite
+            // entries can never spawn safely, so they are skipped (the setter
+            // already rejects them wholesale; this is belt-and-braces for
+            // scenes saved by older builds).
+            const int cn = helper_custom_transforms.size();
+            if (cn <= 0) {
+                if (!quiet) UtilityFunctions::push_error("BulletSpawner2D::collect_spawn_transforms: helper_custom_transforms is empty.");
                 break;
             }
-            // Seedless preview collects use a fixed seed so the editor view is
-            // stable across rebuilds (no reshuffle shimmer on every inspector
-            // edit); fired volleys stay live-random. Explicit seeds always win.
-            const uint64_t edge_seed = helper_edge_seed > 0 ? (uint64_t)helper_edge_seed : (pattern_seed > 0 ? (uint64_t)pattern_seed : (quiet ? 7919u : 0u));
-            // helper_edge_side drives the sampler's flip + spread-side pair:
-            // outside = face out + spray out, inside = face in + spray in,
-            // both = face out + spray either side.
-            const bool flip = helper_edge_side == (int)BulletFactory2D::SIDE_INSIDE;
-            const int spread_side = helper_edge_side == (int)BulletFactory2D::SIDE_BOTH ? (int)BulletFactory2D::EDGE_SPREAD_BOTH : (int)BulletFactory2D::EDGE_SPREAD_ALONG_NORMAL;
-            real_t facing_offset = (real_t)helper_edge_facing_offset_deg;
-            if (helper_edge_facing == CUSTOM_FACING_TANGENT) {
-                facing_offset += 90.0;
+            if (!marker.is_finite()) {
+                if (!quiet) UtilityFunctions::push_error("BulletSpawner2D::collect_spawn_transforms: Custom mode marker transform is not finite.");
+                break;
             }
-            raw = BulletFactory2D::helper_generate_transforms_edge_from_points(helper_bullets_amount, marker, helper_edge_points, helper_edge_closed, flip, helper_edge_random_sample, helper_edge_jitter, facing_offset, edge_seed, helper_edge_spread, helper_edge_spread_exponent, spread_side, helper_edge_tangent_jitter);
-            if (helper_edge_facing == CUSTOM_FACING_CUSTOM) {
-                // Fixed marker-relative facing: keep sampler positions, stamp
-                // the rotation (scale preserved, origins untouched).
-                const real_t custom_rot = marker.get_rotation() + Math::deg_to_rad((real_t)helper_edge_custom_angle_deg);
-                for (int i = 0; i < raw.size(); ++i) {
-                    Transform2D t = raw[i];
-                    if (!t.is_finite()) {
-                        continue;
+            const int custom_sel = (helper_custom_facing >= 0 && helper_custom_facing <= 4) ? helper_custom_facing : 0;
+            const real_t custom_offset = Math::is_finite(helper_custom_facing_offset_deg) ? Math::deg_to_rad((real_t)helper_custom_facing_offset_deg) : 0.0;
+            for (int i = 0; i < cn; ++i) {
+                int j = helper_custom_reverse ? (cn - 1 - i) : i;
+                if (cn > 1) {
+                    int k = helper_custom_slot_offset % cn;
+                    if (k < 0) {
+                        k += cn;
                     }
-                    t.set_rotation_and_scale(custom_rot, t.get_scale());
-                    if (t.is_finite()) {
-                        raw[i] = t;
+                    j = helper_custom_reverse ? (cn - 1 - ((i + k) % cn)) : ((i + k) % cn);
+                }
+                Transform2D local = helper_custom_transforms[j];
+                if (!local.is_finite()) {
+                    continue;
+                }
+                real_t rot = local.get_rotation();
+                if (custom_sel != 0) {
+                    const Vector2 radial = local.get_origin();
+                    const double ra = (radial.is_finite() && radial.length_squared() > 1e-12) ? radial.angle() : 0.0;
+                    if (custom_sel == 1) {
+                        rot = (real_t)ra;
+                    } else if (custom_sel == 2) {
+                        rot = (real_t)ra + Math::PI;
+                    } else if (custom_sel == 3) {
+                        rot = local.get_rotation() + Math::PI * 0.5;
+                    } else {
+                        rot = local.get_rotation() - Math::PI * 0.5;
                     }
                 }
+                rot += custom_offset;
+                if (!Math::is_finite((double)rot)) {
+                    continue;
+                }
+                local.set_rotation(rot);
+                Transform2D slot = marker * local;
+                if (!slot.is_finite()) {
+                    continue;
+                }
+                raw.push_back(slot);
             }
             break;
         }
@@ -4587,6 +4644,15 @@ TypedArray<Transform2D> BulletSpawner2D::collect_spawn_transforms_impl(bool quie
             break;
         case PATTERN_FROM_HELPER_REGULAR_POLYGON:
             raw = BulletFactory2D::helper_generate_transforms_regular_polygon(helper_bullets_amount, marker, helper_regular_polygon_vertices, (real_t)helper_regular_polygon_radius, (real_t)helper_regular_polygon_rotation, helper_regular_polygon_face_outward, (real_t)helper_regular_polygon_facing_offset_deg, helper_outline_placement, helper_outline_facing, helper_outline_reverse, helper_outline_slot_offset, helper_outline_fill_spacing, helper_outline_fill_stagger, helper_outline_fill_margin, helper_outline_shell_layers, helper_outline_shell_step);
+            break;
+        case PATTERN_FROM_HELPER_TRIANGLE:
+            raw = BulletFactory2D::helper_generate_transforms_triangle(helper_bullets_amount, marker, (BulletFactory2D::TriangleType)helper_triangle_type, helper_triangle_size_a, helper_triangle_size_b, helper_triangle_rotation, helper_triangle_face_outward, helper_triangle_facing_offset_deg, helper_outline_placement, helper_outline_facing, helper_outline_reverse, helper_outline_slot_offset, helper_outline_fill_spacing, helper_outline_fill_stagger, helper_outline_fill_margin, helper_outline_shell_layers, helper_outline_shell_step);
+            break;
+        case PATTERN_FROM_HELPER_TRAPEZOID:
+            raw = BulletFactory2D::helper_generate_transforms_trapezoid(helper_bullets_amount, marker, helper_trapezoid_base_top, helper_trapezoid_base_bottom, helper_trapezoid_height, helper_trapezoid_rotation, helper_trapezoid_face_outward, helper_trapezoid_facing_offset_deg, helper_outline_placement, helper_outline_facing, helper_outline_reverse, helper_outline_slot_offset, helper_outline_fill_spacing, helper_outline_fill_stagger, helper_outline_fill_margin, helper_outline_shell_layers, helper_outline_shell_step);
+            break;
+        case PATTERN_FROM_HELPER_DIAMOND:
+            raw = BulletFactory2D::helper_generate_transforms_diamond(helper_bullets_amount, marker, helper_diamond_diagonal_x, helper_diamond_diagonal_y, helper_diamond_rotation, helper_diamond_face_outward, helper_diamond_facing_offset_deg, helper_outline_placement, helper_outline_facing, helper_outline_reverse, helper_outline_slot_offset, helper_outline_fill_spacing, helper_outline_fill_stagger, helper_outline_fill_margin, helper_outline_shell_layers, helper_outline_shell_step);
             break;
         case PATTERN_FROM_HELPER_PATH2D: {
             // Standalone live-curve layout (no spray rig): bullets sit ON the
@@ -4688,14 +4754,19 @@ void BulletSpawner2D::snapshot_preview_sources() {
             tracked_has_target_origin = true;
         }
     }
-    // Custom tracking: snapshot the polyline for the dirty check below.
-    // Path2D re-samples live (curve edits and node motion both change the
-    // compiled points, so both are caught).
-    tracked_edge_points.clear();
+    // Custom tracking: snapshot the stored array for the dirty check below
+    // (an inspector edit swaps the whole array, so size + compare catches
+    // it). Path2D re-samples live (curve edits and node motion both change
+    // the compiled points, so both are caught).
+    tracked_custom_transforms.clear();
     if (pattern_source == PATTERN_FROM_HELPER_CUSTOM) {
-        tracked_edge_points = helper_edge_points;
+        tracked_custom_transforms = helper_custom_transforms;
     } else if (pattern_source == PATTERN_FROM_HELPER_PATH2D) {
-        tracked_edge_points = sample_path2d_polyline(true);
+        tracked_custom_transforms.clear();
+        const PackedVector2Array live_pts = sample_path2d_polyline(true);
+        for (int i = 0; i < live_pts.size(); ++i) {
+            tracked_custom_transforms.push_back(Transform2D(0.0, live_pts[i]));
+        }
     }
     tracked_marker_origins.clear();
     tracked_marker_rots.clear();
@@ -5011,17 +5082,25 @@ bool BulletSpawner2D::preview_sources_dirty() {
         return true;
     }
     if (pattern_source == PATTERN_FROM_HELPER_CUSTOM || pattern_source == PATTERN_FROM_HELPER_PATH2D) {
-        PackedVector2Array cur = (pattern_source == PATTERN_FROM_HELPER_CUSTOM) ? helper_edge_points : sample_path2d_polyline(true);
-        if (cur.size() != tracked_edge_points.size()) return true;
+        TypedArray<Transform2D> cur;
+        if (pattern_source == PATTERN_FROM_HELPER_CUSTOM) {
+            cur = helper_custom_transforms;
+        } else {
+            const PackedVector2Array live_pts = sample_path2d_polyline(true);
+            for (int i = 0; i < live_pts.size(); ++i) {
+                cur.push_back(Transform2D(0.0, live_pts[i]));
+            }
+        }
+        if (cur.size() != tracked_custom_transforms.size()) return true;
         for (int i = 0; i < cur.size(); ++i) {
-            const Vector2 &a = cur[i];
-            const Vector2 &b = tracked_edge_points[i];
+            const Transform2D a = cur[i];
+            const Transform2D b = tracked_custom_transforms[i];
             // Finite-safe compare: NaN != NaN would falsely report dirty
             // every frame and thrash the preview rebuild loop.
             if (a.is_finite() != b.is_finite()) return true;
             if (a.is_finite() && a != b) return true;
         }
-    } else if (!tracked_edge_points.is_empty()) {
+    } else if (!tracked_custom_transforms.is_empty()) {
         return true;
     }
     const int count = base->get_child_count();
@@ -5209,14 +5288,18 @@ void BulletSpawner2D::_validate_property(PropertyInfo &p_property) const {
         relevant = pattern_source == PATTERN_FROM_HELPER_CORRIDOR;
     } else if (property_name.begins_with("helper_lissajous_")) {
         relevant = pattern_source == PATTERN_FROM_HELPER_LISSAJOUS;
-    } else if (property_name.begins_with("helper_edge_")) {
-        // Custom-only spray rig (Path2D went standalone): the custom-angle
-        // knob only shows for Custom-Angle facing.
-        if (property_name == "helper_edge_custom_angle_deg") {
-            relevant = pattern_source == PATTERN_FROM_HELPER_CUSTOM && helper_edge_facing == CUSTOM_FACING_CUSTOM;
-        } else {
-            relevant = pattern_source == PATTERN_FROM_HELPER_CUSTOM;
+    } else if (property_name.begins_with("helper_custom_")) {
+        relevant = pattern_source == PATTERN_FROM_HELPER_CUSTOM;
+    } else if (property_name.begins_with("helper_triangle_")) {
+        relevant = pattern_source == PATTERN_FROM_HELPER_TRIANGLE;
+        // size_b is unused by the equilateral kind.
+        if (relevant && property_name == "helper_triangle_size_b") {
+            relevant = helper_triangle_type != (int)BulletFactory2D::TRIANGLE_EQUILATERAL;
         }
+    } else if (property_name.begins_with("helper_trapezoid_")) {
+        relevant = pattern_source == PATTERN_FROM_HELPER_TRAPEZOID;
+    } else if (property_name.begins_with("helper_diamond_")) {
+        relevant = pattern_source == PATTERN_FROM_HELPER_DIAMOND;
     } else if (property_name.begins_with("helper_circle_")) {
         relevant = pattern_source == PATTERN_FROM_HELPER_CIRCLE;
     } else if (property_name.begins_with("helper_rectangle_")) {
@@ -5247,7 +5330,9 @@ void BulletSpawner2D::_validate_property(PropertyInfo &p_property) const {
     } else if (property_name == "helper_skip_indices") {
         relevant = pattern_source >= PATTERN_FROM_HELPER_GRID;
     } else if (property_name == "helper_bullets_amount") {
-        relevant = pattern_source >= PATTERN_FROM_HELPER_GRID;
+        // Custom counts from its stored array, so the shared count would be
+        // a dead knob there: hide it instead of confusing.
+        relevant = pattern_source >= PATTERN_FROM_HELPER_GRID && pattern_source != PATTERN_FROM_HELPER_CUSTOM;
     }
     if (!relevant) {
         p_property.usage &= ~PROPERTY_USAGE_EDITOR;
@@ -5316,6 +5401,17 @@ bool BulletSpawner2D::shoot_once() {
     // Reports as skipped so budget governors can observe the stall.
     if (max_live_bullets > 0 && get_active_live_bullet_count() >= max_live_bullets) {
         return fail_early(nullptr, StringName("over_budget"), true);
+    }
+    // Fire-cone gate (homing only): no target inside half the fire arc means
+    // this volley would chase nothing it can see, so the shot is skipped
+    // BEFORE spawning (never a half-built volley to tear down). Empty
+    // resolutions still fire plain volleys (same as missing-target homing);
+    // the mouse source resolves nothing, so the cone does not apply to it.
+    if (homing_enabled && Math::is_finite(homing_fire_arc_deg) && homing_fire_arc_deg > 0.0) {
+        const Array arc_targets = resolve_homing_targets(true, false);
+        if (!arc_targets.is_empty() && !fire_arc_covers_targets(arc_targets)) {
+            return fail_early(nullptr, StringName("outside_fire_arc"), true);
+        }
     }
     // Configure-then-attach: the spawner id is pre-stamped inside the factory
     // spawn (before physics space, shapes, tree entry, and activation), so the
@@ -5486,7 +5582,7 @@ void BulletSpawner2D::_notification(int p_what) {
         tracked_marker_ids.clear();
         tracked_child_count = -1;
         tracked_has_self = false;
-        tracked_edge_points.clear();
+        tracked_custom_transforms.clear();
         helper_path2d_cache = nullptr;
         helper_path2d_id = 0;
         bullet_factory = nullptr;
@@ -5821,7 +5917,7 @@ bool BulletSpawner2D::apply_pattern_list_entry(const Variant &entry) {
         Variant v = dict[source_key];
         if (v.get_type() == Variant::INT) {
             const int src = (int)v;
-            if (src < (int)PATTERN_FROM_CHILDREN || src > (int)PATTERN_FROM_HELPER_PATH2D) {
+            if (src < (int)PATTERN_FROM_CHILDREN || src > (int)PATTERN_FROM_HELPER_DIAMOND) {
                 UtilityFunctions::push_error("BulletSpawner2D::spawn_pattern_list: entry 'pattern_source' out of range, keeping current.");
             } else {
                 set_pattern_source((PatternSource)src);
@@ -5953,7 +6049,7 @@ void BulletSpawner2D::_bind_methods() {
 
 	ClassDB::bind_method(D_METHOD("get_pattern_source"), &BulletSpawner2D::get_pattern_source);
 	ClassDB::bind_method(D_METHOD("set_pattern_source", "value"), &BulletSpawner2D::set_pattern_source);
-	ADD_PROPERTY(PropertyInfo(Variant::INT, "pattern_source", PROPERTY_HINT_ENUM, "From Children:0,Custom:24,Circle:25,Rectangle:26,Square:27,Regular Polygon:28,Path2D:29,From Self:1,Grid:2,Ring:3,Fan:4,Spiral:5,Line:6,Aimed:7,Flower:8,Ellipse:9,Rain:10,Scatter:11,Polygon:12,Multi Spiral:13,Cross:14,Star:15,Heart:16,Wave:17,Waterfall:18,Lattice:19,Rose:20,Counter Spiral:21,Corridor:22,Lissajous:23"), "set_pattern_source", "get_pattern_source");
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "pattern_source", PROPERTY_HINT_ENUM, "From Children:0,From Self:1,Path2D:29,Custom:24,Circle:25,Square:27,Rectangle:26,Triangle:30,Diamond:32,Trapezoid:31,Regular Polygon:28,Ellipse:9,Ring:3,Star:15,Heart:16,Polygon:12,Flower:8,Rose:20,Lissajous:23,Line:6,Grid:2,Lattice:19,Rain:10,Waterfall:18,Wave:17,Fan:4,Aimed:7,Corridor:22,Spiral:5,Multi Spiral:13,Counter Spiral:21,Cross:14,Scatter:11"), "set_pattern_source", "get_pattern_source");
 
 	ClassDB::bind_method(D_METHOD("get_helper_bullets_amount"), &BulletSpawner2D::get_helper_bullets_amount);
 	ClassDB::bind_method(D_METHOD("set_helper_bullets_amount", "value"), &BulletSpawner2D::set_helper_bullets_amount);
@@ -6115,9 +6211,21 @@ void BulletSpawner2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_helper_line_anchor", "value"), &BulletSpawner2D::set_helper_line_anchor);
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "helper_line_anchor", PROPERTY_HINT_ENUM, "Start,Center,End"), "set_helper_line_anchor", "get_helper_line_anchor");
 
-	ClassDB::bind_method(D_METHOD("get_helper_line_perpendicular"), &BulletSpawner2D::get_helper_line_perpendicular);
-	ClassDB::bind_method(D_METHOD("set_helper_line_perpendicular", "value"), &BulletSpawner2D::set_helper_line_perpendicular);
-	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "helper_line_perpendicular"), "set_helper_line_perpendicular", "get_helper_line_perpendicular");
+	ClassDB::bind_method(D_METHOD("get_helper_line_facing"), &BulletSpawner2D::get_helper_line_facing);
+	ClassDB::bind_method(D_METHOD("set_helper_line_facing", "value"), &BulletSpawner2D::set_helper_line_facing);
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "helper_line_facing", PROPERTY_HINT_ENUM, "Along the Line,+90 Degrees,-90 Degrees"), "set_helper_line_facing", "get_helper_line_facing");
+
+	ClassDB::bind_method(D_METHOD("get_helper_line_reverse"), &BulletSpawner2D::get_helper_line_reverse);
+	ClassDB::bind_method(D_METHOD("set_helper_line_reverse", "value"), &BulletSpawner2D::set_helper_line_reverse);
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "helper_line_reverse"), "set_helper_line_reverse", "get_helper_line_reverse");
+
+	ClassDB::bind_method(D_METHOD("get_helper_line_slot_offset"), &BulletSpawner2D::get_helper_line_slot_offset);
+	ClassDB::bind_method(D_METHOD("set_helper_line_slot_offset", "value"), &BulletSpawner2D::set_helper_line_slot_offset);
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "helper_line_slot_offset"), "set_helper_line_slot_offset", "get_helper_line_slot_offset");
+
+	ClassDB::bind_method(D_METHOD("get_helper_line_start_offset"), &BulletSpawner2D::get_helper_line_start_offset);
+	ClassDB::bind_method(D_METHOD("set_helper_line_start_offset", "value"), &BulletSpawner2D::set_helper_line_start_offset);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_line_start_offset"), "set_helper_line_start_offset", "get_helper_line_start_offset");
 
 	ClassDB::bind_method(D_METHOD("get_helper_aimed_target_path"), &BulletSpawner2D::get_helper_aimed_target_path);
 	ClassDB::bind_method(D_METHOD("set_helper_aimed_target_path", "path"), &BulletSpawner2D::set_helper_aimed_target_path);
@@ -6518,10 +6626,6 @@ void BulletSpawner2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_helper_corridor_width", "value"), &BulletSpawner2D::set_helper_corridor_width);
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_corridor_width"), "set_helper_corridor_width", "get_helper_corridor_width");
 
-	ClassDB::bind_method(D_METHOD("get_helper_corridor_spacing"), &BulletSpawner2D::get_helper_corridor_spacing);
-	ClassDB::bind_method(D_METHOD("set_helper_corridor_spacing", "value"), &BulletSpawner2D::set_helper_corridor_spacing);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_corridor_spacing"), "set_helper_corridor_spacing", "get_helper_corridor_spacing");
-
 	ClassDB::bind_method(D_METHOD("get_helper_corridor_gap_width"), &BulletSpawner2D::get_helper_corridor_gap_width);
 	ClassDB::bind_method(D_METHOD("set_helper_corridor_gap_width", "value"), &BulletSpawner2D::set_helper_corridor_gap_width);
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_corridor_gap_width"), "set_helper_corridor_gap_width", "get_helper_corridor_gap_width");
@@ -6562,9 +6666,93 @@ void BulletSpawner2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_helper_lissajous_facing_offset_deg", "value"), &BulletSpawner2D::set_helper_lissajous_facing_offset_deg);
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_lissajous_facing_offset_deg"), "set_helper_lissajous_facing_offset_deg", "get_helper_lissajous_facing_offset_deg");
 
-	ClassDB::bind_method(D_METHOD("get_helper_edge_points"), &BulletSpawner2D::get_helper_edge_points);
-	ClassDB::bind_method(D_METHOD("set_helper_edge_points", "value"), &BulletSpawner2D::set_helper_edge_points);
-	ADD_PROPERTY(PropertyInfo(Variant::PACKED_VECTOR2_ARRAY, "helper_edge_points"), "set_helper_edge_points", "get_helper_edge_points");
+	ClassDB::bind_method(D_METHOD("get_helper_custom_transforms"), &BulletSpawner2D::get_helper_custom_transforms);
+	ClassDB::bind_method(D_METHOD("set_helper_custom_transforms", "value"), &BulletSpawner2D::set_helper_custom_transforms);
+	ADD_PROPERTY(PropertyInfo(Variant::ARRAY, "helper_custom_transforms", PROPERTY_HINT_ARRAY_TYPE, "Transform2D"), "set_helper_custom_transforms", "get_helper_custom_transforms");
+
+	ClassDB::bind_method(D_METHOD("get_helper_custom_facing"), &BulletSpawner2D::get_helper_custom_facing);
+	ClassDB::bind_method(D_METHOD("set_helper_custom_facing", "value"), &BulletSpawner2D::set_helper_custom_facing);
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "helper_custom_facing", PROPERTY_HINT_ENUM, "As Stored,Face Outward,Face Inward,+90 Degrees,-90 Degrees"), "set_helper_custom_facing", "get_helper_custom_facing");
+
+	ClassDB::bind_method(D_METHOD("get_helper_custom_facing_offset_deg"), &BulletSpawner2D::get_helper_custom_facing_offset_deg);
+	ClassDB::bind_method(D_METHOD("set_helper_custom_facing_offset_deg", "value"), &BulletSpawner2D::set_helper_custom_facing_offset_deg);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_custom_facing_offset_deg"), "set_helper_custom_facing_offset_deg", "get_helper_custom_facing_offset_deg");
+
+	ClassDB::bind_method(D_METHOD("get_helper_custom_reverse"), &BulletSpawner2D::get_helper_custom_reverse);
+	ClassDB::bind_method(D_METHOD("set_helper_custom_reverse", "value"), &BulletSpawner2D::set_helper_custom_reverse);
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "helper_custom_reverse"), "set_helper_custom_reverse", "get_helper_custom_reverse");
+
+	ClassDB::bind_method(D_METHOD("get_helper_custom_slot_offset"), &BulletSpawner2D::get_helper_custom_slot_offset);
+	ClassDB::bind_method(D_METHOD("set_helper_custom_slot_offset", "value"), &BulletSpawner2D::set_helper_custom_slot_offset);
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "helper_custom_slot_offset"), "set_helper_custom_slot_offset", "get_helper_custom_slot_offset");
+
+	ClassDB::bind_method(D_METHOD("get_helper_triangle_type"), &BulletSpawner2D::get_helper_triangle_type);
+	ClassDB::bind_method(D_METHOD("set_helper_triangle_type", "value"), &BulletSpawner2D::set_helper_triangle_type);
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "helper_triangle_type", PROPERTY_HINT_ENUM, "Equilateral,Isosceles,Right"), "set_helper_triangle_type", "get_helper_triangle_type");
+
+	ClassDB::bind_method(D_METHOD("get_helper_triangle_size_a"), &BulletSpawner2D::get_helper_triangle_size_a);
+	ClassDB::bind_method(D_METHOD("set_helper_triangle_size_a", "value"), &BulletSpawner2D::set_helper_triangle_size_a);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_triangle_size_a"), "set_helper_triangle_size_a", "get_helper_triangle_size_a");
+
+	ClassDB::bind_method(D_METHOD("get_helper_triangle_size_b"), &BulletSpawner2D::get_helper_triangle_size_b);
+	ClassDB::bind_method(D_METHOD("set_helper_triangle_size_b", "value"), &BulletSpawner2D::set_helper_triangle_size_b);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_triangle_size_b"), "set_helper_triangle_size_b", "get_helper_triangle_size_b");
+
+	ClassDB::bind_method(D_METHOD("get_helper_triangle_rotation"), &BulletSpawner2D::get_helper_triangle_rotation);
+	ClassDB::bind_method(D_METHOD("set_helper_triangle_rotation", "value"), &BulletSpawner2D::set_helper_triangle_rotation);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_triangle_rotation"), "set_helper_triangle_rotation", "get_helper_triangle_rotation");
+
+	ClassDB::bind_method(D_METHOD("get_helper_triangle_face_outward"), &BulletSpawner2D::get_helper_triangle_face_outward);
+	ClassDB::bind_method(D_METHOD("set_helper_triangle_face_outward", "value"), &BulletSpawner2D::set_helper_triangle_face_outward);
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "helper_triangle_face_outward"), "set_helper_triangle_face_outward", "get_helper_triangle_face_outward");
+
+	ClassDB::bind_method(D_METHOD("get_helper_triangle_facing_offset_deg"), &BulletSpawner2D::get_helper_triangle_facing_offset_deg);
+	ClassDB::bind_method(D_METHOD("set_helper_triangle_facing_offset_deg", "value"), &BulletSpawner2D::set_helper_triangle_facing_offset_deg);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_triangle_facing_offset_deg"), "set_helper_triangle_facing_offset_deg", "get_helper_triangle_facing_offset_deg");
+
+	ClassDB::bind_method(D_METHOD("get_helper_trapezoid_base_top"), &BulletSpawner2D::get_helper_trapezoid_base_top);
+	ClassDB::bind_method(D_METHOD("set_helper_trapezoid_base_top", "value"), &BulletSpawner2D::set_helper_trapezoid_base_top);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_trapezoid_base_top"), "set_helper_trapezoid_base_top", "get_helper_trapezoid_base_top");
+
+	ClassDB::bind_method(D_METHOD("get_helper_trapezoid_base_bottom"), &BulletSpawner2D::get_helper_trapezoid_base_bottom);
+	ClassDB::bind_method(D_METHOD("set_helper_trapezoid_base_bottom", "value"), &BulletSpawner2D::set_helper_trapezoid_base_bottom);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_trapezoid_base_bottom"), "set_helper_trapezoid_base_bottom", "get_helper_trapezoid_base_bottom");
+
+	ClassDB::bind_method(D_METHOD("get_helper_trapezoid_height"), &BulletSpawner2D::get_helper_trapezoid_height);
+	ClassDB::bind_method(D_METHOD("set_helper_trapezoid_height", "value"), &BulletSpawner2D::set_helper_trapezoid_height);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_trapezoid_height"), "set_helper_trapezoid_height", "get_helper_trapezoid_height");
+
+	ClassDB::bind_method(D_METHOD("get_helper_trapezoid_rotation"), &BulletSpawner2D::get_helper_trapezoid_rotation);
+	ClassDB::bind_method(D_METHOD("set_helper_trapezoid_rotation", "value"), &BulletSpawner2D::set_helper_trapezoid_rotation);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_trapezoid_rotation"), "set_helper_trapezoid_rotation", "get_helper_trapezoid_rotation");
+
+	ClassDB::bind_method(D_METHOD("get_helper_trapezoid_face_outward"), &BulletSpawner2D::get_helper_trapezoid_face_outward);
+	ClassDB::bind_method(D_METHOD("set_helper_trapezoid_face_outward", "value"), &BulletSpawner2D::set_helper_trapezoid_face_outward);
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "helper_trapezoid_face_outward"), "set_helper_trapezoid_face_outward", "get_helper_trapezoid_face_outward");
+
+	ClassDB::bind_method(D_METHOD("get_helper_trapezoid_facing_offset_deg"), &BulletSpawner2D::get_helper_trapezoid_facing_offset_deg);
+	ClassDB::bind_method(D_METHOD("set_helper_trapezoid_facing_offset_deg", "value"), &BulletSpawner2D::set_helper_trapezoid_facing_offset_deg);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_trapezoid_facing_offset_deg"), "set_helper_trapezoid_facing_offset_deg", "get_helper_trapezoid_facing_offset_deg");
+
+	ClassDB::bind_method(D_METHOD("get_helper_diamond_diagonal_x"), &BulletSpawner2D::get_helper_diamond_diagonal_x);
+	ClassDB::bind_method(D_METHOD("set_helper_diamond_diagonal_x", "value"), &BulletSpawner2D::set_helper_diamond_diagonal_x);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_diamond_diagonal_x"), "set_helper_diamond_diagonal_x", "get_helper_diamond_diagonal_x");
+
+	ClassDB::bind_method(D_METHOD("get_helper_diamond_diagonal_y"), &BulletSpawner2D::get_helper_diamond_diagonal_y);
+	ClassDB::bind_method(D_METHOD("set_helper_diamond_diagonal_y", "value"), &BulletSpawner2D::set_helper_diamond_diagonal_y);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_diamond_diagonal_y"), "set_helper_diamond_diagonal_y", "get_helper_diamond_diagonal_y");
+
+	ClassDB::bind_method(D_METHOD("get_helper_diamond_rotation"), &BulletSpawner2D::get_helper_diamond_rotation);
+	ClassDB::bind_method(D_METHOD("set_helper_diamond_rotation", "value"), &BulletSpawner2D::set_helper_diamond_rotation);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_diamond_rotation"), "set_helper_diamond_rotation", "get_helper_diamond_rotation");
+
+	ClassDB::bind_method(D_METHOD("get_helper_diamond_face_outward"), &BulletSpawner2D::get_helper_diamond_face_outward);
+	ClassDB::bind_method(D_METHOD("set_helper_diamond_face_outward", "value"), &BulletSpawner2D::set_helper_diamond_face_outward);
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "helper_diamond_face_outward"), "set_helper_diamond_face_outward", "get_helper_diamond_face_outward");
+
+	ClassDB::bind_method(D_METHOD("get_helper_diamond_facing_offset_deg"), &BulletSpawner2D::get_helper_diamond_facing_offset_deg);
+	ClassDB::bind_method(D_METHOD("set_helper_diamond_facing_offset_deg", "value"), &BulletSpawner2D::set_helper_diamond_facing_offset_deg);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_diamond_facing_offset_deg"), "set_helper_diamond_facing_offset_deg", "get_helper_diamond_facing_offset_deg");
 
 	ClassDB::bind_method(D_METHOD("get_helper_path2d_path"), &BulletSpawner2D::get_helper_path2d_path);
 	ClassDB::bind_method(D_METHOD("set_helper_path2d_path", "path"), &BulletSpawner2D::set_helper_path2d_path);
@@ -6664,60 +6852,6 @@ void BulletSpawner2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_helper_regular_polygon_facing_offset_deg"), &BulletSpawner2D::get_helper_regular_polygon_facing_offset_deg);
 	ClassDB::bind_method(D_METHOD("set_helper_regular_polygon_facing_offset_deg", "value"), &BulletSpawner2D::set_helper_regular_polygon_facing_offset_deg);
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_regular_polygon_facing_offset_deg"), "set_helper_regular_polygon_facing_offset_deg", "get_helper_regular_polygon_facing_offset_deg");
-
-	ClassDB::bind_method(D_METHOD("get_helper_edge_facing"), &BulletSpawner2D::get_helper_edge_facing);
-	ClassDB::bind_method(D_METHOD("set_helper_edge_facing", "value"), &BulletSpawner2D::set_helper_edge_facing);
-	ADD_PROPERTY(PropertyInfo(Variant::INT, "helper_edge_facing", PROPERTY_HINT_ENUM, "Normal (90 deg),Tangent,Custom Angle"), "set_helper_edge_facing", "get_helper_edge_facing");
-
-	ClassDB::bind_method(D_METHOD("get_helper_edge_custom_angle_deg"), &BulletSpawner2D::get_helper_edge_custom_angle_deg);
-	ClassDB::bind_method(D_METHOD("set_helper_edge_custom_angle_deg", "value"), &BulletSpawner2D::set_helper_edge_custom_angle_deg);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_edge_custom_angle_deg"), "set_helper_edge_custom_angle_deg", "get_helper_edge_custom_angle_deg");
-
-	ClassDB::bind_method(D_METHOD("get_helper_edge_side"), &BulletSpawner2D::get_helper_edge_side);
-	ClassDB::bind_method(D_METHOD("set_helper_edge_side", "value"), &BulletSpawner2D::set_helper_edge_side);
-	ADD_PROPERTY(PropertyInfo(Variant::INT, "helper_edge_side", PROPERTY_HINT_ENUM, "Outside,Inside,Both"), "set_helper_edge_side", "get_helper_edge_side");
-
-	ClassDB::bind_method(D_METHOD("get_helper_edge_closed"), &BulletSpawner2D::get_helper_edge_closed);
-	ClassDB::bind_method(D_METHOD("set_helper_edge_closed", "value"), &BulletSpawner2D::set_helper_edge_closed);
-	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "helper_edge_closed"), "set_helper_edge_closed", "get_helper_edge_closed");
-
-	ClassDB::bind_method(D_METHOD("get_helper_edge_random_sample"), &BulletSpawner2D::get_helper_edge_random_sample);
-	ClassDB::bind_method(D_METHOD("set_helper_edge_random_sample", "value"), &BulletSpawner2D::set_helper_edge_random_sample);
-	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "helper_edge_random_sample"), "set_helper_edge_random_sample", "get_helper_edge_random_sample");
-
-	ClassDB::bind_method(D_METHOD("get_helper_edge_jitter"), &BulletSpawner2D::get_helper_edge_jitter);
-	ClassDB::bind_method(D_METHOD("set_helper_edge_jitter", "value"), &BulletSpawner2D::set_helper_edge_jitter);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_edge_jitter"), "set_helper_edge_jitter", "get_helper_edge_jitter");
-
-	ClassDB::bind_method(D_METHOD("get_helper_edge_facing_offset_deg"), &BulletSpawner2D::get_helper_edge_facing_offset_deg);
-	ClassDB::bind_method(D_METHOD("set_helper_edge_facing_offset_deg", "value"), &BulletSpawner2D::set_helper_edge_facing_offset_deg);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_edge_facing_offset_deg"), "set_helper_edge_facing_offset_deg", "get_helper_edge_facing_offset_deg");
-
-	ClassDB::bind_method(D_METHOD("get_helper_edge_seed"), &BulletSpawner2D::get_helper_edge_seed);
-	ClassDB::bind_method(D_METHOD("set_helper_edge_seed", "value"), &BulletSpawner2D::set_helper_edge_seed);
-	ADD_PROPERTY(PropertyInfo(Variant::INT, "helper_edge_seed"), "set_helper_edge_seed", "get_helper_edge_seed");
-
-	ClassDB::bind_method(D_METHOD("get_helper_edge_spread"), &BulletSpawner2D::get_helper_edge_spread);
-	ClassDB::bind_method(D_METHOD("set_helper_edge_spread", "value"), &BulletSpawner2D::set_helper_edge_spread);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_edge_spread"), "set_helper_edge_spread", "get_helper_edge_spread");
-
-	ClassDB::bind_method(D_METHOD("get_helper_edge_spread_exponent"), &BulletSpawner2D::get_helper_edge_spread_exponent);
-	ClassDB::bind_method(D_METHOD("set_helper_edge_spread_exponent", "value"), &BulletSpawner2D::set_helper_edge_spread_exponent);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_edge_spread_exponent", PROPERTY_HINT_RANGE, "0.01,8,0.01"), "set_helper_edge_spread_exponent", "get_helper_edge_spread_exponent");
-
-	ClassDB::bind_method(D_METHOD("get_helper_edge_tangent_jitter"), &BulletSpawner2D::get_helper_edge_tangent_jitter);
-	ClassDB::bind_method(D_METHOD("set_helper_edge_tangent_jitter", "value"), &BulletSpawner2D::set_helper_edge_tangent_jitter);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_edge_tangent_jitter"), "set_helper_edge_tangent_jitter", "get_helper_edge_tangent_jitter");
-
-	ClassDB::bind_method(D_METHOD("get_edge_point_count"), &BulletSpawner2D::get_edge_point_count);
-
-	ClassDB::bind_method(D_METHOD("get_edge_normals"), &BulletSpawner2D::get_edge_normals);
-	ClassDB::bind_method(D_METHOD("get_edge_total_length"), &BulletSpawner2D::get_edge_total_length);
-	ClassDB::bind_method(D_METHOD("sample_edge_points", "count"), &BulletSpawner2D::sample_edge_points);
-	ClassDB::bind_method(D_METHOD("has_valid_edge_points"), &BulletSpawner2D::has_valid_edge_points);
-
-	ClassDB::bind_method(D_METHOD("get_edge_points"), &BulletSpawner2D::get_edge_points);
-	ClassDB::bind_method(D_METHOD("set_edge_points", "value"), &BulletSpawner2D::set_edge_points);
 
 	ClassDB::bind_method(D_METHOD("get_helper_skip_indices"), &BulletSpawner2D::get_helper_skip_indices);
 	ClassDB::bind_method(D_METHOD("set_helper_skip_indices", "value"), &BulletSpawner2D::set_helper_skip_indices);
@@ -7184,9 +7318,9 @@ void BulletSpawner2D::_bind_methods() {
 	BIND_ENUM_CONSTANT(PATTERN_FROM_HELPER_SQUARE);
 	BIND_ENUM_CONSTANT(PATTERN_FROM_HELPER_REGULAR_POLYGON);
 	BIND_ENUM_CONSTANT(PATTERN_FROM_HELPER_PATH2D);
-	BIND_ENUM_CONSTANT(CUSTOM_FACING_NORMAL);
-	BIND_ENUM_CONSTANT(CUSTOM_FACING_TANGENT);
-	BIND_ENUM_CONSTANT(CUSTOM_FACING_CUSTOM);
+	BIND_ENUM_CONSTANT(PATTERN_FROM_HELPER_TRIANGLE);
+	BIND_ENUM_CONSTANT(PATTERN_FROM_HELPER_TRAPEZOID);
+	BIND_ENUM_CONSTANT(PATTERN_FROM_HELPER_DIAMOND);
 	BIND_ENUM_CONSTANT(PATH2D_DISTRIBUTION_FIXED_SPACING);
 	BIND_ENUM_CONSTANT(PATH2D_DISTRIBUTION_EVEN);
 	BIND_ENUM_CONSTANT(PATH2D_OVERFLOW_CLAMP);

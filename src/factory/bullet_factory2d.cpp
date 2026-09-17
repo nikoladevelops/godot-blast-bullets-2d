@@ -2961,6 +2961,267 @@ TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_regular_poly
 	return layout_outline_slots("helper_generate_transforms_regular_polygon", marker_transform, loop_points, loop_normals, true, marker_rot, face_outward, facing_offset_degrees, PackedFloat32Array(), outline_placement, outline_facing, outline_reverse, outline_slot_offset, fill_spacing, fill_stagger, fill_margin, shell_layers, shell_step);
 }
 
+
+// Closed-polygon outline sampler shared by the triangle/trapezoid/diamond
+// primitives: arc-length-even loop points + geometric outward normals in
+// marker-local space. Corners must wind like the rectangle primitive
+// (positive shoelace area); callers orientation-fix first. False when
+// degenerate (caller stacks at the marker, rectangle precedent).
+static bool sample_closed_polygon_loop(const PackedVector2Array &corners, int count, PackedVector2Array &r_points, PackedVector2Array &r_normals) {
+	const int n = corners.size();
+	if (n < 3 || count <= 0) {
+		return false;
+	}
+	PackedVector2Array normals;
+	if (!compute_edge_normals_quiet(corners, true, false, normals) || normals.size() != n) {
+		return false;
+	}
+	PackedFloat64Array cum;
+	cum.resize(n + 1);
+	cum[0] = 0.0;
+	for (int k = 0; k < n; ++k) {
+		const double seg = (double)corners[k].distance_to(corners[(k + 1) % n]);
+		if (!Math::is_finite(seg) || seg < 0.0) {
+			return false;
+		}
+		cum[k + 1] = cum[k] + seg;
+	}
+	const double total = cum[n];
+	if (!(total > 0.0) || !Math::is_finite(total)) {
+		return false;
+	}
+	r_points.clear();
+	r_normals.clear();
+	int seg = 0;
+	for (int i = 0; i < count; ++i) {
+		double d = total * (double)i / (double)count;
+		if (d >= total) {
+			d = Math::fposmod(d, total);
+		}
+		while (seg < n - 1 && d >= cum[seg + 1]) {
+			++seg;
+		}
+		if (seg < 0) {
+			seg = 0;
+		}
+		if (seg >= n) {
+			seg = n - 1;
+		}
+		const double seg_len = cum[seg + 1] - cum[seg];
+		double tt = (seg_len > 1e-9) ? (d - cum[seg]) / seg_len : 0.0;
+		tt = Math::clamp(tt, 0.0, 1.0);
+		const int ia = seg % n;
+		const int ib = (seg + 1) % n;
+		Vector2 local = corners[ia].lerp(corners[ib], (real_t)tt);
+		Vector2 nrm = normals[ia].lerp(normals[ib], (real_t)tt);
+		if (nrm.length_squared() <= 1e-12) {
+			nrm = normals[ia];
+		}
+		nrm = nrm.normalized();
+		if (!local.is_finite() || !nrm.is_finite()) {
+			local = corners[ia];
+			nrm = normals[ia];
+		}
+		r_points.push_back(local);
+		r_normals.push_back(nrm);
+	}
+	return r_points.size() == count && r_normals.size() == count;
+}
+
+// Signed shoelace area (> 0 matches the rectangle primitive winding, which
+// the shared edge normals read as outward). Non-finite corners yield NaN.
+static double polygon_signed_area(const PackedVector2Array &corners) {
+	double area = 0.0;
+	const int n = corners.size();
+	for (int k = 0; k < n; ++k) {
+		const Vector2 &a = corners[k];
+		const Vector2 &b = corners[(k + 1) % n];
+		area += (double)a.x * (double)b.y - (double)b.x * (double)a.y;
+	}
+	return area * 0.5;
+}
+
+TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_triangle(
+		int transforms_amount,
+		Transform2D marker_transform,
+		TriangleType triangle_type,
+		real_t size_a,
+		real_t size_b,
+		real_t rotation,
+		bool face_outward,
+		real_t facing_offset_degrees,
+		int outline_placement,
+		int outline_facing,
+		bool outline_reverse,
+		int outline_slot_offset,
+		double fill_spacing,
+		bool fill_stagger,
+		double fill_margin,
+		int shell_layers,
+		double shell_step) {
+	if (!danmaku_validate_head("helper_generate_transforms_triangle", transforms_amount, marker_transform)) {
+		return TypedArray<Transform2D>();
+	}
+	if (triangle_type < TRIANGLE_EQUILATERAL || triangle_type > TRIANGLE_RIGHT) {
+		UtilityFunctions::push_error("helper_generate_transforms_triangle: unknown triangle_type.");
+		return TypedArray<Transform2D>();
+	}
+	if (!Math::is_finite(size_a) || size_a < 0.0 || !Math::is_finite(size_b) || size_b < 0.0 || !Math::is_finite(rotation) || !Math::is_finite(facing_offset_degrees)) {
+		UtilityFunctions::push_error("helper_generate_transforms_triangle: size_a/size_b must be finite and >= 0, rotation and facing_offset_degrees finite.");
+		return TypedArray<Transform2D>();
+	}
+	const real_t rot_cos = Math::cos(rotation);
+	const real_t rot_sin = Math::sin(rotation);
+	auto spin_corner = [&](const Vector2 &c) -> Vector2 {
+		return Vector2(c.x * rot_cos - c.y * rot_sin, c.x * rot_sin + c.y * rot_cos);
+	};
+	PackedVector2Array corners;
+	if (triangle_type == TRIANGLE_EQUILATERAL) {
+		for (int k = 0; k < 3; ++k) {
+			const real_t a = -Math::PI * 0.5 + Math::TAU * (real_t)k / 3.0;
+			corners.push_back(spin_corner(Vector2(Math::cos(a), Math::sin(a)) * size_a));
+		}
+	} else if (triangle_type == TRIANGLE_ISOSCELES) {
+		corners.push_back(spin_corner(Vector2(0.0, -size_b * 0.5)));
+		corners.push_back(spin_corner(Vector2(size_a * 0.5, size_b * 0.5)));
+		corners.push_back(spin_corner(Vector2(-size_a * 0.5, size_b * 0.5)));
+	} else {
+		const Vector2 raw[3] = { Vector2(0, 0), Vector2(size_a, 0), Vector2(0, size_b) };
+		const Vector2 centroid = (raw[0] + raw[1] + raw[2]) / 3.0;
+		for (int k = 0; k < 3; ++k) {
+			corners.push_back(spin_corner(raw[k] - centroid));
+		}
+	}
+	// Orientation fix: keep bullet 0's corner, mirror the rest when the
+	// winding comes out backwards so edge normals point outward.
+	if (corners.size() == 3 && Math::is_finite(polygon_signed_area(corners)) && polygon_signed_area(corners) < 0.0) {
+		const Vector2 tmp = corners[1];
+		corners[1] = corners[2];
+		corners[2] = tmp;
+	}
+	PackedVector2Array loop_points;
+	PackedVector2Array loop_normals;
+	if (!sample_closed_polygon_loop(corners, transforms_amount, loop_points, loop_normals)) {
+		// Degenerate (zero-area) triangle: stack at the marker like the
+		// rectangle primitive instead of emitting garbage.
+		TypedArray<Transform2D> stacked = danmaku_make_slots(transforms_amount);
+		for (int i = 0; i < transforms_amount; ++i) {
+			Transform2D slot(marker_transform.get_rotation() + Math::deg_to_rad(facing_offset_degrees), marker_transform.get_origin());
+			danmaku_apply_marker_scale(slot, marker_transform);
+			stacked[i] = slot;
+		}
+		return stacked;
+	}
+	return layout_outline_slots("helper_generate_transforms_triangle", marker_transform, loop_points, loop_normals, true, marker_transform.get_rotation(), face_outward, facing_offset_degrees, PackedFloat32Array(), outline_placement, outline_facing, outline_reverse, outline_slot_offset, fill_spacing, fill_stagger, fill_margin, shell_layers, shell_step);
+}
+
+TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_trapezoid(
+		int transforms_amount,
+		Transform2D marker_transform,
+		real_t base_top,
+		real_t base_bottom,
+		real_t height,
+		real_t rotation,
+		bool face_outward,
+		real_t facing_offset_degrees,
+		int outline_placement,
+		int outline_facing,
+		bool outline_reverse,
+		int outline_slot_offset,
+		double fill_spacing,
+		bool fill_stagger,
+		double fill_margin,
+		int shell_layers,
+		double shell_step) {
+	if (!danmaku_validate_head("helper_generate_transforms_trapezoid", transforms_amount, marker_transform)) {
+		return TypedArray<Transform2D>();
+	}
+	if (!Math::is_finite(base_top) || base_top < 0.0 || !Math::is_finite(base_bottom) || base_bottom < 0.0 || !Math::is_finite(height) || height < 0.0 || !Math::is_finite(rotation) || !Math::is_finite(facing_offset_degrees)) {
+		UtilityFunctions::push_error("helper_generate_transforms_trapezoid: bases and height must be finite and >= 0, rotation and facing_offset_degrees finite.");
+		return TypedArray<Transform2D>();
+	}
+	const real_t rot_cos = Math::cos(rotation);
+	const real_t rot_sin = Math::sin(rotation);
+	auto spin_corner = [&](const Vector2 &c) -> Vector2 {
+		return Vector2(c.x * rot_cos - c.y * rot_sin, c.x * rot_sin + c.y * rot_cos);
+	};
+	PackedVector2Array corners;
+	corners.push_back(spin_corner(Vector2(-base_top * 0.5, -height * 0.5)));
+	corners.push_back(spin_corner(Vector2(base_top * 0.5, -height * 0.5)));
+	corners.push_back(spin_corner(Vector2(base_bottom * 0.5, height * 0.5)));
+	corners.push_back(spin_corner(Vector2(-base_bottom * 0.5, height * 0.5)));
+	if (Math::is_finite(polygon_signed_area(corners)) && polygon_signed_area(corners) < 0.0) {
+		const Vector2 tmp = corners[1];
+		corners[1] = corners[3];
+		corners[3] = tmp;
+	}
+	PackedVector2Array loop_points;
+	PackedVector2Array loop_normals;
+	if (!sample_closed_polygon_loop(corners, transforms_amount, loop_points, loop_normals)) {
+		TypedArray<Transform2D> stacked = danmaku_make_slots(transforms_amount);
+		for (int i = 0; i < transforms_amount; ++i) {
+			Transform2D slot(marker_transform.get_rotation() + Math::deg_to_rad(facing_offset_degrees), marker_transform.get_origin());
+			danmaku_apply_marker_scale(slot, marker_transform);
+			stacked[i] = slot;
+		}
+		return stacked;
+	}
+	return layout_outline_slots("helper_generate_transforms_trapezoid", marker_transform, loop_points, loop_normals, true, marker_transform.get_rotation(), face_outward, facing_offset_degrees, PackedFloat32Array(), outline_placement, outline_facing, outline_reverse, outline_slot_offset, fill_spacing, fill_stagger, fill_margin, shell_layers, shell_step);
+}
+
+TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_diamond(
+		int transforms_amount,
+		Transform2D marker_transform,
+		real_t diagonal_x,
+		real_t diagonal_y,
+		real_t rotation,
+		bool face_outward,
+		real_t facing_offset_degrees,
+		int outline_placement,
+		int outline_facing,
+		bool outline_reverse,
+		int outline_slot_offset,
+		double fill_spacing,
+		bool fill_stagger,
+		double fill_margin,
+		int shell_layers,
+		double shell_step) {
+	if (!danmaku_validate_head("helper_generate_transforms_diamond", transforms_amount, marker_transform)) {
+		return TypedArray<Transform2D>();
+	}
+	if (!Math::is_finite(diagonal_x) || diagonal_x < 0.0 || !Math::is_finite(diagonal_y) || diagonal_y < 0.0 || !Math::is_finite(rotation) || !Math::is_finite(facing_offset_degrees)) {
+		UtilityFunctions::push_error("helper_generate_transforms_diamond: diagonals must be finite and >= 0, rotation and facing_offset_degrees finite.");
+		return TypedArray<Transform2D>();
+	}
+	const real_t rot_cos = Math::cos(rotation);
+	const real_t rot_sin = Math::sin(rotation);
+	auto spin_corner = [&](const Vector2 &c) -> Vector2 {
+		return Vector2(c.x * rot_cos - c.y * rot_sin, c.x * rot_sin + c.y * rot_cos);
+	};
+	PackedVector2Array corners;
+	corners.push_back(spin_corner(Vector2(0.0, -diagonal_y * 0.5)));
+	corners.push_back(spin_corner(Vector2(diagonal_x * 0.5, 0.0)));
+	corners.push_back(spin_corner(Vector2(0.0, diagonal_y * 0.5)));
+	corners.push_back(spin_corner(Vector2(-diagonal_x * 0.5, 0.0)));
+	if (Math::is_finite(polygon_signed_area(corners)) && polygon_signed_area(corners) < 0.0) {
+		const Vector2 tmp = corners[1];
+		corners[1] = corners[3];
+		corners[3] = tmp;
+	}
+	PackedVector2Array loop_points;
+	PackedVector2Array loop_normals;
+	if (!sample_closed_polygon_loop(corners, transforms_amount, loop_points, loop_normals)) {
+		TypedArray<Transform2D> stacked = danmaku_make_slots(transforms_amount);
+		for (int i = 0; i < transforms_amount; ++i) {
+			Transform2D slot(marker_transform.get_rotation() + Math::deg_to_rad(facing_offset_degrees), marker_transform.get_origin());
+			danmaku_apply_marker_scale(slot, marker_transform);
+			stacked[i] = slot;
+		}
+		return stacked;
+	}
+	return layout_outline_slots("helper_generate_transforms_diamond", marker_transform, loop_points, loop_normals, true, marker_transform.get_rotation(), face_outward, facing_offset_degrees, PackedFloat32Array(), outline_placement, outline_facing, outline_reverse, outline_slot_offset, fill_spacing, fill_stagger, fill_margin, shell_layers, shell_step);
+}
+
 TypedArray<Transform2D> BulletFactory2D::helper_apply_side_spread(
 		const TypedArray<Transform2D> &transforms,
 		int side_mode,
@@ -4114,6 +4375,112 @@ void BulletFactory2D::_bind_methods() {
 								DEFVAL(32.0));
 
 	ClassDB::bind_static_method("BulletFactory2D",
+								D_METHOD("helper_generate_transforms_triangle",
+										"transforms_amount",
+										"marker_transform",
+										"triangle_type",
+										"size_a",
+										"size_b",
+										"rotation",
+										"face_outward",
+										"facing_offset_degrees",
+										"outline_placement",
+										"outline_facing",
+										"outline_reverse",
+										"outline_slot_offset",
+										"fill_spacing",
+										"fill_stagger",
+										"fill_margin",
+										"shell_layers",
+										"shell_step"),
+								&BulletFactory2D::helper_generate_transforms_triangle,
+								DEFVAL(TRIANGLE_EQUILATERAL),
+								DEFVAL(150.0),
+								DEFVAL(150.0),
+								DEFVAL(0.0),
+								DEFVAL(true),
+								DEFVAL(0.0),
+								DEFVAL(0),
+								DEFVAL(0),
+								DEFVAL(false),
+								DEFVAL(0),
+								DEFVAL(32.0),
+								DEFVAL(false),
+								DEFVAL(0.0),
+								DEFVAL(1),
+								DEFVAL(32.0));
+
+	ClassDB::bind_static_method("BulletFactory2D",
+								D_METHOD("helper_generate_transforms_trapezoid",
+										"transforms_amount",
+										"marker_transform",
+										"base_top",
+										"base_bottom",
+										"height",
+										"rotation",
+										"face_outward",
+										"facing_offset_degrees",
+										"outline_placement",
+										"outline_facing",
+										"outline_reverse",
+										"outline_slot_offset",
+										"fill_spacing",
+										"fill_stagger",
+										"fill_margin",
+										"shell_layers",
+										"shell_step"),
+								&BulletFactory2D::helper_generate_transforms_trapezoid,
+								DEFVAL(200.0),
+								DEFVAL(300.0),
+								DEFVAL(200.0),
+								DEFVAL(0.0),
+								DEFVAL(true),
+								DEFVAL(0.0),
+								DEFVAL(0),
+								DEFVAL(0),
+								DEFVAL(false),
+								DEFVAL(0),
+								DEFVAL(32.0),
+								DEFVAL(false),
+								DEFVAL(0.0),
+								DEFVAL(1),
+								DEFVAL(32.0));
+
+	ClassDB::bind_static_method("BulletFactory2D",
+								D_METHOD("helper_generate_transforms_diamond",
+										"transforms_amount",
+										"marker_transform",
+										"diagonal_x",
+										"diagonal_y",
+										"rotation",
+										"face_outward",
+										"facing_offset_degrees",
+										"outline_placement",
+										"outline_facing",
+										"outline_reverse",
+										"outline_slot_offset",
+										"fill_spacing",
+										"fill_stagger",
+										"fill_margin",
+										"shell_layers",
+										"shell_step"),
+								&BulletFactory2D::helper_generate_transforms_diamond,
+								DEFVAL(200.0),
+								DEFVAL(300.0),
+								DEFVAL(0.0),
+								DEFVAL(true),
+								DEFVAL(0.0),
+								DEFVAL(0),
+								DEFVAL(0),
+								DEFVAL(false),
+								DEFVAL(0),
+								DEFVAL(32.0),
+								DEFVAL(false),
+								DEFVAL(0.0),
+								DEFVAL(1),
+								DEFVAL(32.0));
+
+	ClassDB::bind_static_method("BulletFactory2D",
 								D_METHOD("helper_apply_side_spread",
 										 "transforms",
 										 "side_mode",
@@ -4212,6 +4579,9 @@ void BulletFactory2D::_bind_methods() {
 	BIND_ENUM_CONSTANT(SIDE_OUTSIDE);
 	BIND_ENUM_CONSTANT(SIDE_INSIDE);
 	BIND_ENUM_CONSTANT(SIDE_BOTH);
+	BIND_ENUM_CONSTANT(TRIANGLE_EQUILATERAL);
+	BIND_ENUM_CONSTANT(TRIANGLE_ISOSCELES);
+	BIND_ENUM_CONSTANT(TRIANGLE_RIGHT);
 	BIND_ENUM_CONSTANT(OUTLINE_ON_PATH);
 	BIND_ENUM_CONSTANT(OUTLINE_FILL_INSIDE);
 	BIND_ENUM_CONSTANT(OUTLINE_SHELL_OUTSIDE);

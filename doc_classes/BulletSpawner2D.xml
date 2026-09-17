@@ -6,7 +6,7 @@
 	<description>
 		Assign a [BulletFactory2D], a [DirectionalBulletsData2D], and a [member pattern_source]. Each volley collects one global transform per bullet from the [member transforms_generator] (empty means this node; a generator outside the tree while the spawner is inside also falls back to this node) and spawns it through the factory. It never fires in the editor.
 		Homing quick-start: turn on [member homing_enabled], leave [member homing_target_source] on Node Group, and put your targets (any Node2D) in the [member homing_node_group] group (default "enemies"). Every volley then chases [member homing_target_selection] targets with [member homing_smoothing] turn rate. Set [member homing_target_source] to Mouse to chase the cursor instead, and turn on [member orbiting_enabled] to make bullets ring their target once they arrive. Use [member homing_retarget_mode] so flying volleys keep following fresh targets, and [signal volley_bullet_homing_target_reached] to react when a bullet arrives.
-		Pattern quick-start: pick a [member pattern_source] helper (Ring, Fan, Spiral, Rose, Corridor...) or call [method apply_pattern_preset] for a starter, tune the matching helper_* group, and call [method shoot_once] (or enable [member shooting_enabled] for the auto loop). Add [member pattern_scale] / spin for motion, [member helper_skip_indices] for dodge doors, and [method spawn_pattern_list] for phased sequences. See [member pattern_source] for the full 30-mode list.
+		Pattern quick-start: pick a [member pattern_source] helper (Ring, Fan, Spiral, Rose, Corridor...) or call [method apply_pattern_preset] for a starter, tune the matching helper_* group, and call [method shoot_once] (or enable [member shooting_enabled] for the auto loop). Add [member pattern_scale] / spin for motion, [member helper_skip_indices] for dodge doors, and [method spawn_pattern_list] for phased sequences. See [member pattern_source] for the full 33-mode list.
 	</description>
 	<tutorials>
 	</tutorials>
@@ -91,24 +91,9 @@
 				Returns the shared aimed target (Aimed cone and Corridor wall), or null when unset.
 			</description>
 		</method>
-		<method name="get_edge_normals" qualifiers="const">
-			<return type="Vector2[]" />
-			<description>
-				Unit normals of helper_edge_points, one per point in point order, flipped when helper_edge_side is Inside. Empty when there are no usable points. For a left-to-right polyline the normals point up (-Y).
-			</description>
-		</method>
-		<method name="get_edge_point_count" qualifiers="const">
-			<return type="int" />
-			<description>
-				How many points are in helper_edge_points. 0 means the next Edge volley is skipped.
-			</description>
-		</method>
-		<method name="get_edge_total_length" qualifiers="const">
-			<return type="float" />
-			<description>
-				Total arc length of helper_edge_points in pixels (closed loops include the closing segment). 0 when unusable.
-			</description>
-		</method>
+		
+		
+		
 		<method name="get_live_volley_count" qualifiers="const">
 			<return type="int" />
 			<description>
@@ -157,12 +142,7 @@
 				Returns true when [member spin_enabled] is on and the game is running.
 			</description>
 		</method>
-		<method name="has_valid_edge_points" qualifiers="const">
-			<return type="bool" />
-			<description>
-				Cheap pre-flight for scripts: true when helper_edge_points currently holds at least one finite point. Never warns or errors.
-			</description>
-		</method>
+		
 		<method name="next_shoot_interval_sec" qualifiers="const">
 			<return type="float" />
 			<description>
@@ -244,13 +224,7 @@
 				Queues pattern entries: each entry is a Dictionary with optional "preset", "pattern_source", "helper_bullets_amount", "spawn_data" keys. Sequential mode (default) fires one entry per interval_sec through the guarded shoot path; simultaneous mode fires all at once. Returns entries queued (sequential) or volleys fired (simultaneous). Bad entries skip with an error, never abort the list. Sequential mode emits [signal pattern_list_finished] when the queue drains; simultaneous mode does not (it returns the fired count directly).
 			</description>
 		</method>
-		<method name="sample_edge_points" qualifiers="const">
-			<return type="Vector2[]" />
-			<param index="0" name="count" type="int" />
-			<description>
-				Evenly spaced points along the compiled Custom outline (arc-length parameterized, generator-local): the same distribution the Custom pattern samples before applying spread and jitter. Compose custom per-segment patterns in GDScript from these (e.g. one helper_generate_transforms_line per segment). Empty when unusable.
-			</description>
-		</method>
+		
 		<method name="start_spinning">
 			<return type="void" />
 			<description>
@@ -532,8 +506,17 @@
 		<member name="helper_line_face_direction" type="bool" setter="set_helper_line_face_direction" getter="get_helper_line_face_direction" default="true">
 			Face line bullets along the line. Off keeps the generator facing.
 		</member>
-		<member name="helper_line_perpendicular" type="bool" setter="set_helper_line_perpendicular" getter="get_helper_line_perpendicular" default="false">
-			Face line bullets across the line. Needs [member helper_line_face_direction].
+		<member name="helper_line_facing" type="int" setter="set_helper_line_facing" getter="get_helper_line_facing" default="0">
+			Which direction line bullets face: along the line (as generated: axis or marker per helper_line_face_direction), or turned +90/-90 degrees across it. The per-line facing_offset_deg still applies on top. Replaces the old perpendicular toggle.
+		</member>
+		<member name="helper_line_reverse" type="bool" setter="set_helper_line_reverse" getter="get_helper_line_reverse" default="false">
+			Mirrors the line row order: bullet 0 moves to the far end.
+		</member>
+		<member name="helper_line_slot_offset" type="int" setter="set_helper_line_slot_offset" getter="get_helper_line_slot_offset" default="0">
+			Rotates which line slot becomes bullet 0 (wraps both ways).
+		</member>
+		<member name="helper_line_start_offset" type="float" setter="set_helper_line_start_offset" getter="get_helper_line_start_offset" default="0.0">
+			Shifts the whole line row along its axis in pixels, on top of the Start/Center/End anchor. Must be finite and 0 or more.
 		</member>
 		<member name="helper_line_spacing" type="float" setter="set_helper_line_spacing" getter="get_helper_line_spacing" default="32.0">
 			Distance between line bullets.
@@ -559,41 +542,71 @@
 		<member name="helper_lissajous_size_y" type="float" setter="set_helper_lissajous_size_y" getter="get_helper_lissajous_size_y" default="120.0">
 			Weave half-height in pixels. Must be finite and 0 or more.
 		</member>
-		<member name="helper_edge_points" type="PackedVector2Array" setter="set_helper_edge_points" getter="get_helper_edge_points" default="PackedVector2Array()">
-			Your polygon or polyline in generator-local pixels — the Custom feature's hand-drawn shape: each bullet spawns at a point along it and faces per helper_edge_facing. Defaults to a 1200px demo sine crest so switching to Custom renders the reference spray immediately; replace with your own outline. The dense crest + falloff spray comes from helper_edge_random_sample on plus helper_edge_spread / helper_edge_spread_exponent; helper_edge_jitter only adds tiny isotropic softness.
+		<member name="helper_custom_transforms" type="Transform2D[]" setter="set_helper_custom_transforms" getter="get_helper_custom_transforms" default="[]">
+			Hand-placed volley in generator-local pixels: each stored transform spawns exactly one bullet there (composed as marker * local, so spin and scales keep working). Empty by default (Custom draws nothing until you fill it). Every entry must be finite. The count comes from the array itself; helper_bullets_amount is ignored. Apply TERRAIN_CREST once for a starter crest line.
 		</member>
-		<member name="helper_edge_facing" type="int" setter="set_helper_edge_facing" getter="get_helper_edge_facing" enum="BulletSpawner2D.CustomFacing" default="0">
-			Which direction Custom bullets face: Normal (along the edge normal, 90 degrees), Tangent (along the edge), or Custom Angle (helper_edge_custom_angle_deg, marker-relative).
+		<member name="helper_custom_facing" type="int" setter="set_helper_custom_facing" getter="get_helper_custom_facing" default="0">
+			Which direction Custom bullets face: As Stored keeps each transform's rotation, Face Outward/Inward aims radially from the generator, +90/-90 Degrees turn the stored rotation across it. helper_custom_facing_offset_deg still applies on top.
 		</member>
-		<member name="helper_edge_custom_angle_deg" type="float" setter="set_helper_edge_custom_angle_deg" getter="get_helper_edge_custom_angle_deg" default="0.0">
-			Fixed facing in degrees for Custom Angle facing mode, relative to the marker rotation. Must be finite.
+		<member name="helper_custom_facing_offset_deg" type="float" setter="set_helper_custom_facing_offset_deg" getter="get_helper_custom_facing_offset_deg" default="0.0">
+			Extra facing twist in degrees on top of the Custom facing. Must be finite.
 		</member>
-		<member name="helper_edge_side" type="int" setter="set_helper_edge_side" getter="get_helper_edge_side" enum="BulletFactory2D.SideMode" default="2">
-			Which side of the Custom outline bullets live on: Outside (face out + spray out), Inside (face in + spray in), or Both (face out + spray either side). Default Inside reproduces the reference terrain spray below a left-to-right crest.
+		<member name="helper_custom_reverse" type="bool" setter="set_helper_custom_reverse" getter="get_helper_custom_reverse" default="false">
+			Mirrors the Custom array order: bullet 0 moves to the far end.
 		</member>
-		<member name="helper_edge_closed" type="bool" setter="set_helper_edge_closed" getter="get_helper_edge_closed" default="false">
-			Closes the Custom polyline into a loop before sampling (normals wrap around the seam; open polylines keep graceful loose ends).
+		<member name="helper_custom_slot_offset" type="int" setter="set_helper_custom_slot_offset" getter="get_helper_custom_slot_offset" default="0">
+			Rotates which Custom array slot becomes bullet 0 (wraps both ways).
 		</member>
-		<member name="helper_edge_random_sample" type="bool" setter="set_helper_edge_random_sample" getter="get_helper_edge_random_sample" default="true">
-			On picks random arc positions per volley (the terrain spray look), off samples evenly by arc length (dotted outline look). Seeded by helper_edge_seed, else pattern_seed; seedless editor previews use a fixed seed so the view stays stable.
+		<member name="helper_triangle_type" type="int" setter="set_helper_triangle_type" getter="get_helper_triangle_type" enum="BulletFactory2D.TriangleType" default="0">
+			Triangle kind: Equilateral (circumradius helper_triangle_size_a), Isosceles (base helper_triangle_size_a + height helper_triangle_size_b, apex up), Right (legs helper_triangle_size_a along X and helper_triangle_size_b along Y, recentered). All centered on the generator.
 		</member>
-		<member name="helper_edge_jitter" type="float" setter="set_helper_edge_jitter" getter="get_helper_edge_jitter" default="3.0">
-			Random positional jitter in pixels around each sampled edge point (grain softness). Must be finite and 0 or more.
+		<member name="helper_triangle_size_a" type="float" setter="set_helper_triangle_size_a" getter="get_helper_triangle_size_a" default="150.0">
+			Equilateral circumradius / isosceles base width / right X leg in pixels. Must be finite and 0 or more.
 		</member>
-		<member name="helper_edge_facing_offset_deg" type="float" setter="set_helper_edge_facing_offset_deg" getter="get_helper_edge_facing_offset_deg" default="0.0">
-			Extra facing twist in degrees on top of the edge normal. Must be finite.
+		<member name="helper_triangle_size_b" type="float" setter="set_helper_triangle_size_b" getter="get_helper_triangle_size_b" default="150.0">
+			Isosceles height / right Y leg in pixels (unused by Equilateral). Must be finite and 0 or more.
 		</member>
-		<member name="helper_edge_seed" type="int" setter="set_helper_edge_seed" getter="get_helper_edge_seed" default="0">
-			Per-pattern random seed for edge sampling (0 falls back to pattern_seed, which itself falls back to non-deterministic).
+		<member name="helper_triangle_rotation" type="float" setter="set_helper_triangle_rotation" getter="get_helper_triangle_rotation" default="0.0">
+			Triangle base rotation in radians. Must be finite.
 		</member>
-		<member name="helper_edge_spread" type="float" setter="set_helper_edge_spread" getter="get_helper_edge_spread" default="220.0">
-			One-sided normal-direction falloff depth in pixels (the terrain-crest spray): each bullet is pushed along the edge normal by spread * pow(rand, helper_edge_spread_exponent). 0 disables the spray (crest line only). Must be finite and 0 or more.
+		<member name="helper_triangle_face_outward" type="bool" setter="set_helper_triangle_face_outward" getter="get_helper_triangle_face_outward" default="true">
+			Triangle bullets face outward; off faces inward.
 		</member>
-		<member name="helper_edge_spread_exponent" type="float" setter="set_helper_edge_spread_exponent" getter="get_helper_edge_spread_exponent" default="2.2">
-			Density falloff of the spray: values above 1 cluster bullets near the crest, below 1 push them deeper. Must be finite and 0.01 or more.
+		<member name="helper_triangle_facing_offset_deg" type="float" setter="set_helper_triangle_facing_offset_deg" getter="get_helper_triangle_facing_offset_deg" default="0.0">
+			Extra facing twist in degrees on top of the triangle normal. Must be finite.
 		</member>
-		<member name="helper_edge_tangent_jitter" type="float" setter="set_helper_edge_tangent_jitter" getter="get_helper_edge_tangent_jitter" default="2.0">
-			Random scatter in pixels along the local edge tangent (softens the crest core, works with or without spread). Must be finite and 0 or more.
+		<member name="helper_trapezoid_base_top" type="float" setter="set_helper_trapezoid_base_top" getter="get_helper_trapezoid_base_top" default="200.0">
+			Trapezoid top base width in pixels (0 degrades to a triangle). Must be finite and 0 or more.
+		</member>
+		<member name="helper_trapezoid_base_bottom" type="float" setter="set_helper_trapezoid_base_bottom" getter="get_helper_trapezoid_base_bottom" default="300.0">
+			Trapezoid bottom base width in pixels. Must be finite and 0 or more.
+		</member>
+		<member name="helper_trapezoid_height" type="float" setter="set_helper_trapezoid_height" getter="get_helper_trapezoid_height" default="200.0">
+			Trapezoid height in pixels. Must be finite and 0 or more.
+		</member>
+		<member name="helper_trapezoid_rotation" type="float" setter="set_helper_trapezoid_rotation" getter="get_helper_trapezoid_rotation" default="0.0">
+			Trapezoid base rotation in radians. Must be finite.
+		</member>
+		<member name="helper_trapezoid_face_outward" type="bool" setter="set_helper_trapezoid_face_outward" getter="get_helper_trapezoid_face_outward" default="true">
+			Trapezoid bullets face outward; off faces inward.
+		</member>
+		<member name="helper_trapezoid_facing_offset_deg" type="float" setter="set_helper_trapezoid_facing_offset_deg" getter="get_helper_trapezoid_facing_offset_deg" default="0.0">
+			Extra facing twist in degrees on top of the trapezoid normal. Must be finite.
+		</member>
+		<member name="helper_diamond_diagonal_x" type="float" setter="set_helper_diamond_diagonal_x" getter="get_helper_diamond_diagonal_x" default="200.0">
+			Diamond horizontal diagonal in pixels. Must be finite and 0 or more.
+		</member>
+		<member name="helper_diamond_diagonal_y" type="float" setter="set_helper_diamond_diagonal_y" getter="get_helper_diamond_diagonal_y" default="300.0">
+			Diamond vertical diagonal in pixels. Must be finite and 0 or more.
+		</member>
+		<member name="helper_diamond_rotation" type="float" setter="set_helper_diamond_rotation" getter="get_helper_diamond_rotation" default="0.0">
+			Diamond base rotation in radians. Must be finite.
+		</member>
+		<member name="helper_diamond_face_outward" type="bool" setter="set_helper_diamond_face_outward" getter="get_helper_diamond_face_outward" default="true">
+			Diamond bullets face outward; off faces inward.
+		</member>
+		<member name="helper_diamond_facing_offset_deg" type="float" setter="set_helper_diamond_facing_offset_deg" getter="get_helper_diamond_facing_offset_deg" default="0.0">
+			Extra facing twist in degrees on top of the diamond normal. Must be finite.
 		</member>
 		<member name="helper_circle_radius" type="float" setter="set_helper_circle_radius" getter="get_helper_circle_radius" default="150.0">
 			Exact circle loop radius in pixels. Must be finite and 0 or more.
@@ -881,7 +894,7 @@
 			Extra allow-list on top of any source: only targets also in this group are kept. Empty means no filtering.
 		</member>
 		<member name="homing_fire_arc_deg" type="float" setter="set_homing_fire_arc_deg" getter="get_homing_fire_arc_deg" default="0.0">
-			Fire cone in degrees around the spawner facing, for scripts to gate volleys with (compare [method resolve_homing_targets] results against the facing yourself). 0 is omnidirectional. Must be finite and 0 or more. Note: the spawner itself does not skip volleys on this - every collected volley fires.
+			Fire cone in degrees around the spawner facing (homing only): a volley with resolved targets but none inside half this angle is skipped before spawning (volley_skipped "outside_fire_arc"). Empty resolutions still fire plain volleys; the mouse source never resolves, so the cone ignores it. 0 is omnidirectional. Must be finite and 0 or more.
 		</member>
 		<member name="homing_global_position" type="Vector2" setter="set_homing_global_position" getter="get_homing_global_position" default="Vector2(0, 0)">
 			Position chased per volley for the Global Position source. Must be finite.
@@ -1076,7 +1089,7 @@
 			Per-bullet size scale: multiplies each spawn transform's local basis (texture size) without moving its position. 1.0 keeps sizes as generated, 0 hides bullets in place, negatives mirror them. Must be finite.
 		</member>
 		<member name="pattern_source" type="int" setter="set_pattern_source" getter="get_pattern_source" enum="BulletSpawner2D.PatternSource" default="0">
-			Where volley transforms come from: children markers (0), this generator itself (1), or one of 28 procedural helper patterns (2-29: Grid, Ring, Fan, Spiral, Line, Aimed, Flower, Ellipse, Rain, Scatter, Polygon, Multi Spiral, Cross, Star, Heart, Wave, Waterfall, Lattice, Rose, Counter Spiral, Corridor, Lissajous, Custom, Circle, Rectangle, Square, Regular Polygon, Path2D). Only the active pattern's options show in the inspector. Pipeline per volley: generate (with outline placement/fill/shell for the loop shapes), then spin, then pattern/local scale, then helper_skip_indices carving (so skip indexes match the preview). Corridor, Ellipse Wall and outline Fill Inside modes return fewer transforms than helper_bullets_amount.
+			Where volley transforms come from: children markers (0), this generator itself (1), or one of 31 procedural helper patterns (2-32: Grid, Ring, Fan, Spiral, Line, Aimed, Flower, Ellipse, Rain, Scatter, Polygon, Multi Spiral, Cross, Star, Heart, Wave, Waterfall, Lattice, Rose, Counter Spiral, Corridor, Lissajous, Custom, Circle, Rectangle, Square, Regular Polygon, Path2D, Triangle, Trapezoid, Diamond). Order in the inspector groups sources, basic shapes, ornamental loops, then generators. Only the active pattern's options show in the inspector. Pipeline per volley: generate (with outline placement/fill/shell for the loop shapes), then spin, then pattern/local scale, then helper_skip_indices carving (so skip indexes match the preview). Corridor, Ellipse Wall and outline Fill Inside modes return fewer transforms than helper_bullets_amount.
 		</member>
 	</members>
 	<signals>
@@ -1322,7 +1335,7 @@
 			Figure-8 / weave curtain from the generator (crossing rows with readable doors).
 		</constant>
 		<constant name="PATTERN_FROM_HELPER_CUSTOM" value="24" enum="PatternSource">
-			Hand-drawn outline mode (values stay stable for saved scenes): bullets spawn at points along it facing per helper_edge_facing (Normal = 90 degrees), placed per helper_edge_side (Outside/Inside/Both). How it works: every shape compiles to one polyline; each slot picks an arc-length position (evenly, or randomly when helper_edge_random_sample is on), interpolates the joint-averaged normal, then pushes along it by helper_edge_spread * pow(rand, helper_edge_spread_exponent). Defaults ARE the reference terrain spray: a demo sine crest with a 220px falloff below it. One-click full density via apply_pattern_preset(19) (800 bullets). The closed-loop shapes (Ring, Ellipse, Star, Flower, Rose, Lissajous, Circle, Rectangle, Square, Regular Polygon) get structured placement instead through helper_outline_placement (on outline, interior fill, outside shells).
+			Hand-placed transforms: every entry of helper_custom_transforms spawns exactly one bullet where stored (generator-local), facing per helper_custom_facing, in array order (helper_custom_reverse/slot_offset reorder it). The count comes from the array; helper_bullets_amount is ignored. Apply TERRAIN_CREST once for a starter crest line.
 		</constant>
 		<constant name="PATTERN_FROM_HELPER_CIRCLE" value="25" enum="PatternSource">
 			Exact circle loop outline from the generator (radius + outward flip + offset).
@@ -1339,20 +1352,29 @@
 		<constant name="PATTERN_FROM_HELPER_PATH2D" value="29" enum="PatternSource">
 			Live Path2D curve layout (baked points, re-sampled every volley, generator-local). Bullets sit exactly on the curve per helper_path2d_distribution (Fixed Spacing default 32px, or Even over the whole length), facing tangent-first per helper_path2d_facing (Along Path default, Normal +90/-90 across it).
 		</constant>
-
-
-
-
-
-
-		<constant name="CUSTOM_FACING_NORMAL" value="0" enum="CustomFacing">
-			Custom bullets face along the edge normal (90 degrees).
+		<constant name="PATTERN_FROM_HELPER_TRIANGLE" value="30" enum="PatternSource">
+			Triangle perimeter (equilateral/isosceles/right via helper_triangle_type), slots spread evenly by arc length, facing outward (or inward). Full outline-layout support (on outline, interior fill, outside shells).
 		</constant>
-		<constant name="CUSTOM_FACING_TANGENT" value="1" enum="CustomFacing">
-			Custom bullets face along the edge direction.
+		<constant name="PATTERN_FROM_HELPER_TRAPEZOID" value="31" enum="PatternSource">
+			Isosceles trapezoid perimeter, slots spread evenly by arc length, facing outward (or inward). Full outline-layout support.
 		</constant>
-		<constant name="CUSTOM_FACING_CUSTOM" value="2" enum="CustomFacing">
-			Custom bullets face helper_edge_custom_angle_deg (marker-relative).
+		<constant name="PATTERN_FROM_HELPER_DIAMOND" value="32" enum="PatternSource">
+			Diamond (rhombus) perimeter from its diagonals, slots spread evenly by arc length, facing outward (or inward). Full outline-layout support.
+		</constant>
+
+
+
+
+
+
+		<constant name="TRIANGLE_EQUILATERAL" value="0" enum="TriangleType">
+			Triangle from its circumradius (helper_triangle_size_a).
+		</constant>
+		<constant name="TRIANGLE_ISOSCELES" value="1" enum="TriangleType">
+			Triangle from base width + height (helper_triangle_size_a/b), apex up.
+		</constant>
+		<constant name="TRIANGLE_RIGHT" value="2" enum="TriangleType">
+			Right triangle from X/Y legs (helper_triangle_size_a/b), recentered.
 		</constant>
 		<constant name="PATH2D_DISTRIBUTION_FIXED_SPACING" value="0" enum="Path2DDistribution">
 			Path2D bullets are laid helper_path2d_spacing apart.
