@@ -302,6 +302,122 @@
 				Diamond (rhombus) perimeter from its diagonals, slots spread evenly by arc length, facing outward (or inward). Zero-area diamonds stack at the marker.
 			</description>
 		</method>
+<method name="helper_sample_outline_circle" qualifiers="static">
+			<return type="Dictionary" />
+			<param index="0" name="radius" type="float" default="150.0" />
+			<description>
+			Circle loop track in marker-local pixels (adaptive density). Closed.
+			</description>
+</method>
+
+<method name="helper_sample_outline_rectangle" qualifiers="static">
+			<return type="Dictionary" />
+			<param index="0" name="size" type="Vector2" default="Vector2(300, 200)" />
+			<description>
+			Rectangle corners in marker-local pixels, counter-clockwise from top-left. Closed.
+			</description>
+</method>
+
+<method name="helper_sample_outline_triangle" qualifiers="static">
+			<return type="Dictionary" />
+			<param index="0" name="triangle_type" type="int" default="0" />
+			<param index="1" name="size_a" type="float" default="150.0" />
+			<param index="2" name="size_b" type="float" default="150.0" />
+			<param index="3" name="rotation" type="float" default="0.0" />
+			<description>
+			Triangle corners in marker-local pixels. Closed.
+			</description>
+</method>
+
+<method name="helper_sample_outline_trapezoid" qualifiers="static">
+			<return type="Dictionary" />
+			<param index="0" name="base_top" type="float" default="200.0" />
+			<param index="1" name="base_bottom" type="float" default="300.0" />
+			<param index="2" name="height" type="float" default="200.0" />
+			<param index="3" name="rotation" type="float" default="0.0" />
+			<description>
+			Trapezoid corners in marker-local pixels. Closed.
+			</description>
+</method>
+
+<method name="helper_sample_outline_diamond" qualifiers="static">
+			<return type="Dictionary" />
+			<param index="0" name="diagonal_x" type="float" default="200.0" />
+			<param index="1" name="diagonal_y" type="float" default="300.0" />
+			<param index="2" name="rotation" type="float" default="0.0" />
+			<description>
+			Diamond corners in marker-local pixels. Closed.
+			</description>
+</method>
+
+<method name="helper_sample_outline_regular_polygon" qualifiers="static">
+			<return type="Dictionary" />
+			<param index="0" name="vertices" type="int" default="6" />
+			<param index="1" name="radius" type="float" default="150.0" />
+			<param index="2" name="base_rotation" type="float" default="0.0" />
+			<description>
+			Regular polygon corners in marker-local pixels. Closed.
+			</description>
+</method>
+
+<method name="helper_sample_outline_ellipse" qualifiers="static">
+			<return type="Dictionary" />
+			<param index="0" name="radius_x" type="float" default="150.0" />
+			<param index="1" name="radius_y" type="float" default="100.0" />
+			<param index="2" name="ellipse_rotation" type="float" default="0.0" />
+			<param index="3" name="start_angle" type="float" default="0.0" />
+			<param index="4" name="arc" type="float" default="6.283185307179586" />
+			<param index="5" name="mode" type="int" default="0" />
+			<description>
+			Ellipse sweep in marker-local pixels (adaptive density). Closed for full rings; wall mode draws its arc span in full (gaps read from the missing bullets).
+			</description>
+</method>
+
+<method name="helper_sample_outline_ring" qualifiers="static">
+			<return type="Dictionary" />
+			<param index="0" name="radius" type="float" default="150.0" />
+			<param index="1" name="arc" type="float" default="6.283185307179586" />
+			<param index="2" name="y_scale" type="float" default="1.0" />
+			<param index="3" name="start_angle_abs" type="float" default="0.0" />
+			<description>
+			Ring arc sweep in marker-local pixels (adaptive density). Closed for full TAU arcs.
+			</description>
+</method>
+
+<method name="helper_sample_outline_star" qualifiers="static">
+			<return type="Dictionary" />
+			<param index="0" name="points" type="int" default="5" />
+			<param index="1" name="outer_radius" type="float" default="150.0" />
+			<param index="2" name="inner_radius" type="float" default="65.0" />
+			<param index="3" name="base_rotation" type="float" default="0.0" />
+			<description>
+			Star corners in marker-local pixels. Closed.
+			</description>
+</method>
+
+<method name="helper_sample_outline_rose" qualifiers="static">
+			<return type="Dictionary" />
+			<param index="0" name="petals" type="int" default="6" />
+			<param index="1" name="radius" type="float" default="150.0" />
+			<param index="2" name="lobe_sharpness" type="float" default="1.0" />
+			<param index="3" name="base_rotation" type="float" default="0.0" />
+			<description>
+			Rose theta sweep in marker-local pixels (flips included, matching slot order). Closed.
+			</description>
+</method>
+
+<method name="helper_sample_outline_lissajous" qualifiers="static">
+			<return type="Dictionary" />
+			<param index="0" name="size_x" type="float" default="200.0" />
+			<param index="1" name="size_y" type="float" default="120.0" />
+			<param index="2" name="freq_x" type="float" default="3.0" />
+			<param index="3" name="freq_y" type="float" default="2.0" />
+			<param index="4" name="phase" type="float" default="0.0" />
+			<description>
+			Lissajous sweep in marker-local pixels. Closed.
+			</description>
+</method>
+
 <method name="helper_apply_side_spread" qualifiers="static">
 			<return type="Transform2D[]" />
 			<param index="0" name="transforms" type="Transform2D[]" />

@@ -1031,6 +1031,12 @@
 		<member name="preview_dot_radius" type="float" setter="set_preview_dot_radius" getter="get_preview_dot_radius" default="4.0">
 			Preview dot radius in pixels (multiplied by pattern_scale and transforms_scale, so glyphs stay proportional to the layout).
 		</member>
+		<member name="preview_path_color" type="Color" setter="set_preview_path_color" getter="get_preview_path_color" default="Color(0.3, 0.85, 1, 0.55)">
+			Track underlay color: the shape/loop/curve bullets ride on, drawn as segments under the dots so sparse volleys still show the whole track. Distinct from dots, arrows and the first-bullet marker by default.
+		</member>
+		<member name="preview_path_width" type="float" setter="set_preview_path_width" getter="get_preview_path_width" default="2.0">
+			Track underlay line width in pixels (multiplied by nothing: absolute screen-ish size). 0 hides the track. Must be finite and 0 or more.
+		</member>
 		<member name="preview_first_dot_color" type="Color" setter="set_preview_first_dot_color" getter="get_preview_first_dot_color" default="Color(1, 0.85, 0.2, 1)">
 			Emphasis color for bullet 0 in the preview (pattern start: anchor, reverse, loop seam). Drawn bigger on top of the regular dot.
 		</member>

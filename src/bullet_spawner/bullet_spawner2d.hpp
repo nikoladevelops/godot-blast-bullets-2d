@@ -48,12 +48,14 @@ class PatternPreviewLayer2D : public Node2D {
         bool show_first_marker = true;
         Color first_dot_color = Color(1.0, 0.85, 0.2);
         float first_dot_radius_scale = 1.6f;
-        // Faint raw-curve underlay (Path2D mode only): holder-local baked
-        // points so users see WHY bullets sit where they do, even for a
-        // single-bullet volley. Empty for every other mode.
+        // Track underlay: the shape/loop/curve bullets ride on, drawn as
+        // individual segments under the dots so sparse volleys still show
+        // the whole track. Holder-local snapshot; empty when the mode has no
+        // drawable track. Width <= 0 hides it.
         PackedVector2Array path_points;
-        Color path_color = Color(1.0, 0.05, 0.05, 0.3);
-        float path_radius = 2.0f;
+        Color path_color = Color(0.3, 0.85, 1.0, 0.55);
+        float path_width = 2.0f;
+        bool path_closed = false;
         PackedVector2Array arrow_tails;
         PackedVector2Array arrow_dirs;
         Color arrow_color = Color(1.0, 0.05, 0.05);
@@ -64,7 +66,7 @@ class PatternPreviewLayer2D : public Node2D {
 
         void set_dots_data(const PackedVector2Array &p_dots, const Color &p_color, float p_radius);
         void set_first_marker(bool p_show, const Color &p_color, float p_radius_scale);
-        void set_path_data(const PackedVector2Array &p_points, const Color &p_color, float p_radius);
+        void set_path_data(const PackedVector2Array &p_points, const Color &p_color, float p_width, bool p_closed);
         void set_arrows_data(const PackedVector2Array &p_tails, const PackedVector2Array &p_dirs, const Color &p_color, float p_length, float p_width, float p_head_length, float p_head_width);
 
         void _draw() override;
@@ -1333,6 +1335,8 @@ class BulletSpawner2D : public Node2D{
         // Bullet-0 emphasis color (pattern start: anchor / reverse / loop
         // seam). Drawn bigger on top of the regular dot.
         Color preview_first_dot_color = Color(1.0, 0.85, 0.2);
+        Color preview_path_color = Color(0.3, 0.85, 1.0, 0.55);
+        double preview_path_width = 2.0;
         double preview_dot_radius = 4.0;
         // Extra pixels between the dot edge and the arrow tail: the shaft
         // starts at dot_radius + gap so it never hides under the dot.
@@ -1353,6 +1357,10 @@ class BulletSpawner2D : public Node2D{
         void set_preview_arrow_color(const Color &value);
         Color get_preview_first_dot_color() const;
         void set_preview_first_dot_color(const Color &value);
+        Color get_preview_path_color() const;
+        void set_preview_path_color(const Color &value);
+        double get_preview_path_width() const;
+        void set_preview_path_width(double value);
         double get_preview_dot_radius() const;
         void set_preview_dot_radius(double value);
         double get_preview_arrow_gap() const;

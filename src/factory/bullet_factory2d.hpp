@@ -1503,6 +1503,36 @@ public:
 			int step = 4,
 			bool quiet = false);
 
+	// Closed-loop track samplers for the editor preview: marker-local loop
+	// points plus a closed flag, bundled as {"points","closed"}. Densities
+	// are fixed and adaptive (never bullet-count dependent); polygons return
+	// exact corners. Invalid input yields an empty track.
+	static Dictionary helper_sample_outline_rose(int petals = 6, real_t radius = 150.0, real_t lobe_sharpness = 1.0, real_t base_rotation = 0.0);
+	static Dictionary helper_sample_outline_lissajous(real_t size_x = 200.0, real_t size_y = 120.0, real_t freq_x = 3.0, real_t freq_y = 2.0, real_t phase = 0.0);
+	static Dictionary helper_sample_outline_circle(real_t radius = 150.0);
+	static Dictionary helper_sample_outline_rectangle(const Vector2 &size = Vector2(300, 200));
+	static Dictionary helper_sample_outline_triangle(int triangle_type = 0, real_t size_a = 150.0, real_t size_b = 150.0, real_t rotation = 0.0);
+	static Dictionary helper_sample_outline_trapezoid(real_t base_top = 200.0, real_t base_bottom = 300.0, real_t height = 200.0, real_t rotation = 0.0);
+	static Dictionary helper_sample_outline_diamond(real_t diagonal_x = 200.0, real_t diagonal_y = 300.0, real_t rotation = 0.0);
+	static Dictionary helper_sample_outline_regular_polygon(int vertices = 6, real_t radius = 150.0, real_t base_rotation = 0.0);
+	static Dictionary helper_sample_outline_ellipse(real_t radius_x = 150.0, real_t radius_y = 100.0, real_t ellipse_rotation = 0.0, real_t start_angle = 0.0, real_t arc = Math::TAU, int mode = 0);
+	static Dictionary helper_sample_outline_ring(real_t radius = 150.0, real_t arc = Math::TAU, real_t y_scale = 1.0, real_t start_angle_abs = 0.0);
+	static Dictionary helper_sample_outline_star(int points = 5, real_t outer_radius = 150.0, real_t inner_radius = 65.0, real_t base_rotation = 0.0);
+	// Grid-family row-strip track samplers: INF-separated multi-row strips
+	// mirroring each generator's row loop. Fixed/adaptive density, never
+	// bullet-count dependent. Invalid input yields an empty track.
+	static Dictionary helper_sample_outline_grid(int transforms_amount = 0, int rows_per_column = 10, int alignment = 3, real_t column_offset = 150.0, real_t row_offset = 150.0, real_t base_rotation_abs = 0.0, bool rotate_with_marker = true);
+	static Dictionary helper_sample_outline_lattice(int transforms_amount = 0, int columns = 4, int rows = 4, real_t spacing_x = 64.0, real_t spacing_y = 64.0, bool stagger_rows = true);
+	static Dictionary helper_sample_outline_waterfall(int transforms_amount = 0, int columns = 4, real_t column_spacing = 64.0, int rows = 4, real_t row_spacing = 64.0, real_t stagger = 0.0, const Vector2 &rain_direction = Vector2(0, 1));
+	static Dictionary helper_sample_outline_rain(int transforms_amount = 0, real_t band_width = 600.0, const Vector2 &rain_direction = Vector2(0, 1), real_t drop_spacing = 48.0);
+	static Dictionary helper_sample_outline_wave(real_t width = 300.0, real_t amplitude = 50.0, real_t waves = 2.0, const Vector2 &direction = Vector2(1, 0));
+	static Dictionary helper_sample_outline_heart(real_t size = 100.0, real_t base_rotation = 0.0);
+	// Spiral arm-sweep track samplers: single or multi-arm strips (INF-
+	// separated) mirroring each generator's (r, angle) formula.
+	static Dictionary helper_sample_outline_spiral(int transforms_amount = 0, real_t start_radius = 50.0, real_t radius_step = 15.0, real_t angle_step = 0.6, real_t base_rotation_abs = 0.0);
+	static Dictionary helper_sample_outline_multispiral(int transforms_amount = 0, int arms = 3, real_t start_radius = 50.0, real_t radius_step = 15.0, real_t angle_step = 0.6, real_t base_rotation_abs = 0.0, int arm_index_stride = 1);
+	static Dictionary helper_sample_outline_counter_spiral(int transforms_amount = 0, int arms = 4, real_t start_radius = 50.0, real_t radius_step = 15.0, real_t angle_step = 0.6, real_t base_rotation_abs = 0.0, int arm_index_stride = 1, bool mirror_alternate_arms = true);
+
 	// Negative space: drops slot indexes from a generated array (carve dodge
 	// doors, write bullet text). Out-of-range entries are ignored with a
 	// single warning; the output shrinks like ELLIPSE_WALL.

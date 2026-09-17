@@ -134,10 +134,11 @@ void PatternPreviewLayer2D::set_first_marker(bool p_show, const Color &p_color, 
     queue_redraw();
 }
 
-void PatternPreviewLayer2D::set_path_data(const PackedVector2Array &p_points, const Color &p_color, float p_radius) {
+void PatternPreviewLayer2D::set_path_data(const PackedVector2Array &p_points, const Color &p_color, float p_width, bool p_closed) {
     path_points = p_points;
     path_color = p_color;
-    path_radius = p_radius;
+    path_width = p_width;
+    path_closed = p_closed;
     queue_redraw();
 }
 
@@ -154,13 +155,24 @@ void PatternPreviewLayer2D::set_arrows_data(const PackedVector2Array &p_tails, c
 
 void PatternPreviewLayer2D::_draw() {
     if (kind == LAYER_DOTS) {
-        // Underlay first (faint curve), then bullets, then bullet 0 on top.
-        // Every point is finite-checked: NaN/Inf in canvas calls crashes the
-        // editor's rendering server.
-        for (int i = 0; i < path_points.size(); i++) {
-            const Vector2 p = path_points[i];
-            if (p.is_finite() && path_radius > 0.0f) {
-                draw_circle(p, path_radius, path_color);
+        // Track first (segments, so gaps and open ends render truthfully),
+        // then bullets, then bullet 0 on top. Every point is finite-checked:
+        // NaN/Inf in canvas calls crashes the editor's rendering server. A
+        // broken pair only drops its own segment, never the whole track.
+        if (path_width > 0.0f && path_points.size() >= 2) {
+            for (int i = 0; i + 1 < path_points.size(); i++) {
+                const Vector2 a = path_points[i];
+                const Vector2 b = path_points[i + 1];
+                if (a.is_finite() && b.is_finite()) {
+                    draw_line(a, b, path_color, path_width, false);
+                }
+            }
+            if (path_closed && path_points.size() >= 3) {
+                const Vector2 a = path_points[path_points.size() - 1];
+                const Vector2 b = path_points[0];
+                if (a.is_finite() && b.is_finite()) {
+                    draw_line(a, b, path_color, path_width, false);
+                }
             }
         }
         for (int i = 0; i < dots.size(); i++) {
@@ -2378,8 +2390,22 @@ TypedArray<Transform2D> BulletSpawner2D::collect_path2d_transforms(const Transfo
 }
 TypedArray<Transform2D> BulletSpawner2D::get_helper_custom_transforms() const { return helper_custom_transforms; }
 void BulletSpawner2D::set_helper_custom_transforms(const TypedArray<Transform2D> &value) {
+    // One shoot fires this array into transforms + buffers + physics: the
+    // same freeze/OOM rationale as helper_bullets_amount caps it at 10000.
+    if (value.size() > 10000) {
+        UtilityFunctions::push_error("BulletSpawner2D: helper_custom_transforms must hold <= 10000 entries, keeping the old value.");
+        return;
+    }
     for (int i = 0; i < value.size(); ++i) {
-        if (!((Transform2D)value[i]).is_finite()) {
+        // Type first, conversion second: inspector array edits can hand
+        // transient nulls/wrong types across, and a blind Variant cast is
+        // what wedged the editor. Finite check rides on the typed value.
+        const Variant element = value[i];
+        if (element.get_type() != Variant::TRANSFORM2D) {
+            UtilityFunctions::push_error("BulletSpawner2D: helper_custom_transforms must hold only Transform2D entries, keeping the old value.");
+            return;
+        }
+        if (!((Transform2D)element).is_finite()) {
             UtilityFunctions::push_error("BulletSpawner2D: helper_custom_transforms must hold finite transforms, keeping the old value.");
             return;
         }
@@ -3245,6 +3271,24 @@ Color BulletSpawner2D::get_preview_first_dot_color() const {
 }
 void BulletSpawner2D::set_preview_first_dot_color(const Color &value) {
     preview_first_dot_color = value;
+    rebuild_preview();
+}
+Color BulletSpawner2D::get_preview_path_color() const {
+    return preview_path_color;
+}
+void BulletSpawner2D::set_preview_path_color(const Color &value) {
+    preview_path_color = value;
+    rebuild_preview();
+}
+double BulletSpawner2D::get_preview_path_width() const {
+    return preview_path_width;
+}
+void BulletSpawner2D::set_preview_path_width(double value) {
+    if (!Math::is_finite(value) || value < 0.0) {
+        UtilityFunctions::push_error("BulletSpawner2D: preview_path_width must be finite and >= 0 (0 hides the track), keeping the old value.");
+        return;
+    }
+    preview_path_width = value;
     rebuild_preview();
 }
 double BulletSpawner2D::get_preview_dot_radius() const {
@@ -4635,7 +4679,11 @@ TypedArray<Transform2D> BulletSpawner2D::collect_spawn_transforms_impl(bool quie
                     }
                     j = helper_custom_reverse ? (cn - 1 - ((i + k) % cn)) : ((i + k) % cn);
                 }
-                Transform2D local = helper_custom_transforms[j];
+                const Variant stored = (j >= 0 && j < helper_custom_transforms.size()) ? helper_custom_transforms[j] : Variant();
+                if (stored.get_type() != Variant::TRANSFORM2D) {
+                    continue;
+                }
+                Transform2D local = stored;
                 if (!local.is_finite()) {
                     continue;
                 }
@@ -5033,31 +5081,397 @@ void BulletSpawner2D::rebuild_preview() {
     }
     preview_dots_layer->set_dots_data(dots, preview_dot_color, (float)dot_radius);
     preview_dots_layer->set_first_marker(!dots.is_empty(), preview_first_dot_color, 1.6f);
-    // Path2D underlay: the raw baked curve in holder-local pixels, faint dots
-    // so users see the track bullets ride on. Sampled live (curve edits move
-    // it); cleared for every other mode. Capped so a thousand-point curve
-    // cannot spam the canvas: stride to at most 256 underlay dots.
-    if (pattern_source == PATTERN_FROM_HELPER_PATH2D) {
-        PackedVector2Array curve = sample_path2d_polyline(true);
-        if (helper_path2d_closed && curve.size() > 2) {
-            curve.push_back(curve[0]);
-        }
-        PackedVector2Array underlay;
-        // Stride to at most 256 underlay dots so a thousand-point curve
-        // cannot spam the canvas.
-        const int step = curve.size() > 256 ? (int)((curve.size() + 255) / 256) : 1;
-        for (int i = 0; i < curve.size(); i += step) {
-            const Vector2 lp = to_local.xform(curve[i]);
-            if (lp.is_finite()) {
-                underlay.push_back(lp);
+    // Track snapshot: the shape/loop/curve bullets ride on, drawn as
+    // segments under the dots. Geometry-sourced (never bullet dots, except
+    // Custom's explicit order strip), so sparse volleys still show the whole
+    // track. Marker-local loop points run through the same spin/pattern
+    // scale as volley positions, so the track always sits under the dots.
+    PackedVector2Array track;
+    bool track_closed = false;
+    {
+        Node2D *track_base = get_effective_generator();
+        const bool track_live = track_base != nullptr && is_inside_tree() && preview_path_width > 0.0 && Math::is_finite(preview_path_width);
+        const Transform2D track_marker = track_live ? track_base->get_global_transform() : Transform2D();
+        if (track_live && track_marker.is_finite()) {
+            const Vector2 track_origin = track_marker.get_origin();
+            const real_t track_spin = Math::is_finite((double)spin_angle_deg) ? Math::deg_to_rad((real_t)spin_angle_deg) : 0.0;
+            const double track_scale = Math::is_finite(pattern_scale) ? pattern_scale : 1.0;
+            // Global point -> spin/scale around the generator origin (collect
+            // parity) -> holder-local. Bad points drop their segment, never
+            // the whole track.
+            auto push_track_global = [&](const Vector2 &global_pt) {
+                if (!global_pt.is_finite()) {
+                    return;
+                }
+                Vector2 g = track_origin + (global_pt - track_origin).rotated(track_spin);
+                g = track_origin + (g - track_origin) * (real_t)track_scale;
+                const Vector2 h = to_local.xform(g);
+                if (h.is_finite()) {
+                    track.push_back(h);
+                }
+            };
+            auto push_track_local = [&](const Vector2 &local_pt) {
+                if (!local_pt.is_finite()) {
+                    return;
+                }
+                push_track_global(track_marker.xform(local_pt));
+            };
+            // Factory sampler dict ({points, closed}, marker-local) -> track.
+            // Samplers cap density internally; only Path2D curves stride here.
+            auto push_track_dict = [&](const Dictionary &tr) {
+                const Variant pv = tr.get("points", PackedVector2Array());
+                const Variant cv = tr.get("closed", false);
+                if (pv.get_type() != Variant::PACKED_VECTOR2_ARRAY || cv.get_type() != Variant::BOOL) {
+                    return;
+                }
+                const PackedVector2Array pts = pv;
+                track_closed = (bool)cv;
+                for (int i = 0; i < pts.size(); ++i) {
+                    push_track_local(pts[i]);
+                }
+            };
+            switch (pattern_source) {
+                case PATTERN_FROM_HELPER_RING: {
+                    const real_t start_abs = (helper_ring_rotate_with_marker ? track_marker.get_rotation() : 0.0) + (real_t)helper_ring_start_angle;
+                    push_track_dict(BulletFactory2D::helper_sample_outline_ring(helper_ring_radius, helper_ring_arc, helper_ring_y_scale, start_abs));
+                    break;
+                }
+                case PATTERN_FROM_HELPER_ELLIPSE:
+                    push_track_dict(BulletFactory2D::helper_sample_outline_ellipse(helper_ellipse_radius_x, helper_ellipse_radius_y, helper_ellipse_rotation, helper_ellipse_start_angle, helper_ellipse_arc, helper_ellipse_mode));
+                    break;
+                case PATTERN_FROM_HELPER_STAR:
+                    push_track_dict(BulletFactory2D::helper_sample_outline_star(helper_star_points, helper_star_outer_radius, helper_star_inner_radius, helper_star_base_rotation));
+                    break;
+                case PATTERN_FROM_HELPER_ROSE:
+                    push_track_dict(BulletFactory2D::helper_sample_outline_rose(helper_rose_petals, helper_rose_radius, helper_rose_lobe_sharpness, helper_rose_base_rotation));
+                    break;
+                case PATTERN_FROM_HELPER_LISSAJOUS:
+                    push_track_dict(BulletFactory2D::helper_sample_outline_lissajous(helper_lissajous_size_x, helper_lissajous_size_y, helper_lissajous_freq_x, helper_lissajous_freq_y, helper_lissajous_phase));
+                    break;
+                case PATTERN_FROM_HELPER_CIRCLE:
+                    push_track_dict(BulletFactory2D::helper_sample_outline_circle(helper_circle_radius));
+                    break;
+                case PATTERN_FROM_HELPER_RECTANGLE:
+                    push_track_dict(BulletFactory2D::helper_sample_outline_rectangle(helper_rectangle_size));
+                    break;
+                case PATTERN_FROM_HELPER_SQUARE:
+                    push_track_dict(BulletFactory2D::helper_sample_outline_rectangle(Vector2((real_t)helper_square_size, (real_t)helper_square_size)));
+                    break;
+                case PATTERN_FROM_HELPER_TRIANGLE:
+                    push_track_dict(BulletFactory2D::helper_sample_outline_triangle(helper_triangle_type, helper_triangle_size_a, helper_triangle_size_b, helper_triangle_rotation));
+                    break;
+                case PATTERN_FROM_HELPER_TRAPEZOID:
+                    push_track_dict(BulletFactory2D::helper_sample_outline_trapezoid(helper_trapezoid_base_top, helper_trapezoid_base_bottom, helper_trapezoid_height, helper_trapezoid_rotation));
+                    break;
+                case PATTERN_FROM_HELPER_DIAMOND:
+                    push_track_dict(BulletFactory2D::helper_sample_outline_diamond(helper_diamond_diagonal_x, helper_diamond_diagonal_y, helper_diamond_rotation));
+                    break;
+                case PATTERN_FROM_HELPER_REGULAR_POLYGON:
+                    push_track_dict(BulletFactory2D::helper_sample_outline_regular_polygon(helper_regular_polygon_vertices, helper_regular_polygon_radius, helper_regular_polygon_rotation));
+                    break;
+                case PATTERN_FROM_HELPER_PATH2D: {
+                    PackedVector2Array curve = sample_path2d_polyline(true);
+                    track_closed = helper_path2d_closed;
+                    const int step = curve.size() > 256 ? (int)((curve.size() + 255) / 256) : 1;
+                    for (int i = 0; i < curve.size(); i += step) {
+                        push_track_local(curve[i]);
+                    }
+                    break;
+                }
+                case PATTERN_FROM_HELPER_LINE: {
+                    // Row segment from the same formula the generator uses
+                    // (anchor picks the marker seat, start_offset shifts on
+                    // top). Count-independent: a lone bullet still shows its
+                    // rail. Reverse/offset preserve the position set.
+                    const int count = helper_bullets_amount;
+                    Vector2 axis = Vector2(1, 0);
+                    if (helper_line_direction.is_finite() && helper_line_direction.length_squared() > 1e-12) {
+                        axis = helper_line_direction.normalized();
+                    } else {
+                        break;
+                    }
+                    if (count <= 0 || !Math::is_finite(helper_line_spacing)) {
+                        break;
+                    }
+                    double anchor_seat = (double)(count - 1) * 0.5;
+                    if (helper_line_anchor == (int)BulletFactory2D::LINE_ANCHOR_START) {
+                        anchor_seat = 0.0;
+                    } else if (helper_line_anchor == (int)BulletFactory2D::LINE_ANCHOR_END) {
+                        anchor_seat = (double)(count - 1);
+                    }
+                    const double shift = Math::is_finite(helper_line_start_offset) ? MAX(helper_line_start_offset, 0.0) : 0.0;
+                    const Vector2 first = track_origin + axis * (real_t)(helper_line_spacing * (0.0 - anchor_seat) + shift) - axis * (real_t)(helper_line_spacing * 0.5);
+                    const Vector2 last = track_origin + axis * (real_t)(helper_line_spacing * ((double)(count - 1) - anchor_seat) + shift) + axis * (real_t)(helper_line_spacing * 0.5);
+                    if ((last - first).length_squared() > 1e-12) {
+                        push_track_global(first);
+                        push_track_global(last);
+                    }
+                    break;
+                }
+                case PATTERN_FROM_HELPER_CUSTOM: {
+                    // Explicit order strip through the stored slots (finite
+                    // only): visualizes what reverse/offset do. Strided so a
+                    // huge array cannot spam the canvas.
+                    const int step = transforms.size() > 512 ? (int)((transforms.size() + 511) / 512) : 1;
+                    for (int i = 0; i < transforms.size(); i += step) {
+                        const Variant tv = transforms[i];
+                        if (tv.get_type() != Variant::TRANSFORM2D) {
+                            continue;
+                        }
+                        const Transform2D tt = tv;
+                        if (!tt.is_finite()) {
+                            continue;
+                        }
+                        const Vector2 h = to_local.xform(tt.get_origin());
+                        if (h.is_finite()) {
+                            track.push_back(h);
+                        }
+                    }
+                    break;
+                }
+                case PATTERN_FROM_HELPER_GRID: {
+                    // Row strips via the factory sampler (INF-separated). The
+                    // sampler mirrors the generator's rows/columns/alignment;
+                    // rotation carries the marker spin when asked.
+                    const real_t base_rot_abs = (helper_grid_rotate_with_marker ? track_marker.get_rotation() : 0.0);
+                    push_track_dict(BulletFactory2D::helper_sample_outline_grid(helper_bullets_amount, helper_grid_rows_per_column, helper_grid_alignment, (real_t)helper_grid_column_offset, (real_t)helper_grid_row_offset, base_rot_abs, true));
+                    break;
+                }
+                case PATTERN_FROM_HELPER_LATTICE: {
+                    // Same row-strip sampler family as Grid: columns × rows on
+                    // a staggered lattice. No per-row jitter (volley noise).
+                    push_track_dict(BulletFactory2D::helper_sample_outline_lattice(helper_bullets_amount, helper_lattice_columns, helper_lattice_rows, (real_t)helper_lattice_spacing_x, (real_t)helper_lattice_spacing_y, helper_lattice_stagger_rows));
+                    break;
+                }
+                case PATTERN_FROM_HELPER_WATERFALL: {
+                    // Explicit row strips, staggered along the rain direction.
+                    push_track_dict(BulletFactory2D::helper_sample_outline_waterfall(helper_bullets_amount, helper_waterfall_columns, (real_t)helper_waterfall_column_spacing, helper_waterfall_rows, (real_t)helper_waterfall_row_spacing, (real_t)helper_waterfall_stagger, helper_waterfall_rain_direction));
+                    break;
+                }
+                case PATTERN_FROM_HELPER_RAIN: {
+                    // Row strips running along the band; the sampler builds
+                    // the same row grouping as the generator.
+                    push_track_dict(BulletFactory2D::helper_sample_outline_rain(helper_bullets_amount, (real_t)helper_rain_band_width, helper_rain_direction, (real_t)helper_rain_drop_spacing));
+                    break;
+                }
+                case PATTERN_FROM_HELPER_WAVE: {
+                    // The sine sweep itself, at fixed density.
+                    push_track_dict(BulletFactory2D::helper_sample_outline_wave((real_t)helper_wave_width, (real_t)helper_wave_amplitude, (real_t)helper_wave_waves, helper_wave_direction));
+                    break;
+                }
+                case PATTERN_FROM_HELPER_SPIRAL: {
+                    // Arm sweep replicating the generator's (r, angle) formula.
+                    const real_t base_rot_abs = (helper_spiral_rotate_with_marker ? track_marker.get_rotation() : 0.0);
+                    push_track_dict(BulletFactory2D::helper_sample_outline_spiral(helper_bullets_amount, (real_t)helper_spiral_start_radius, (real_t)helper_spiral_radius_step, (real_t)helper_spiral_angle_step, base_rot_abs));
+                    break;
+                }
+                case PATTERN_FROM_HELPER_MULTISPIRAL: {
+                    // One strip per arm (INF-separated), each replicating the
+                    // generator's spiral formula.
+                    const real_t base_rot_abs = (helper_multispiral_rotate_with_marker ? track_marker.get_rotation() : 0.0);
+                    push_track_dict(BulletFactory2D::helper_sample_outline_multispiral(helper_bullets_amount, helper_multispiral_arms, (real_t)helper_multispiral_start_radius, (real_t)helper_multispiral_radius_step, (real_t)helper_multispiral_angle_step, base_rot_abs, helper_multispiral_arm_stride));
+                    break;
+                }
+                case PATTERN_FROM_HELPER_COUNTER_SPIRAL: {
+                    // Mirrored-arm variant of multispiral: same strip-per-arm
+                    // structure, alternate arms wound the other way.
+                    const real_t base_rot_abs = (helper_counter_spiral_rotate_with_marker ? track_marker.get_rotation() : 0.0);
+                    push_track_dict(BulletFactory2D::helper_sample_outline_counter_spiral(helper_bullets_amount, helper_counter_spiral_arms, (real_t)helper_counter_spiral_start_radius, (real_t)helper_counter_spiral_radius_step, (real_t)helper_counter_spiral_angle_step, base_rot_abs, helper_counter_spiral_arm_stride, helper_counter_spiral_mirror_alternate_arms));
+                    break;
+                }
+                case PATTERN_FROM_HELPER_HEART: {
+                    // Parametric sweep of the heart curve.
+                    push_track_dict(BulletFactory2D::helper_sample_outline_heart((real_t)helper_heart_size, (real_t)helper_heart_base_rotation));
+                    break;
+                }
+                case PATTERN_FROM_HELPER_FLOWER: {
+                    // Extent ring at the petal radius: truthfully bounds the
+                    // bloom (per-petal arcs would duplicate the waist profile
+                    // and read as scribble).
+                    push_track_dict(BulletFactory2D::helper_sample_outline_circle((real_t)helper_flower_radius));
+                    break;
+                }
+                case PATTERN_FROM_HELPER_POLYGON: {
+                    // Vertex skeleton: regular polygon through N vertices,
+                    // showing the emphasis frame the bias pulls toward. Same
+                    // sampler/corners the generator uses.
+                    push_track_dict(BulletFactory2D::helper_sample_outline_regular_polygon(helper_polygon_vertices, (real_t)helper_polygon_radius, (real_t)helper_polygon_base_rotation));
+                    break;
+                }
+                case PATTERN_FROM_HELPER_CROSS: {
+                    // Radial arm rays from origin, replicating the generator's
+                    // arm layout (arm_count rays, evenly angled). Each arm is a
+                    // segment origin -> tip; radial density capped.
+                    if (helper_cross_arm_count < 1 || !Math::is_finite(helper_cross_arm_length) || helper_cross_arm_length <= 0.0) {
+                        break;
+                    }
+                    const real_t arm_angle = Math::TAU / (real_t)helper_cross_arm_count;
+                    const real_t base_rot = (real_t)helper_cross_base_rotation;
+                    const int radial_steps = MIN(helper_bullets_amount, 256);
+                    for (int a = 0; a < helper_cross_arm_count; a++) {
+                        const real_t ang = base_rot + arm_angle * (real_t)a;
+                        const Vector2 dir = Vector2(Math::cos(ang), Math::sin(ang));
+                        Vector2 accum;
+                        Vector2 prev = track_origin;
+                        bool first = true;
+                        for (int s = 1; s <= radial_steps; s++) {
+                            const real_t dist = (real_t)helper_cross_spacing * (real_t)s;
+                            if (!Math::is_finite(dist) || dist > (real_t)helper_cross_arm_length) {
+                                break;
+                            }
+                            const Vector2 global = track_origin + dir * dist;
+                            if (!global.is_finite()) {
+                                continue;
+                            }
+                            if (first) {
+                                push_track_global(track_origin);
+                                first = false;
+                            }
+                            push_track_global(global);
+                        }
+                    }
+                    break;
+                }
+                case PATTERN_FROM_HELPER_FAN: {
+                    // Cone: two boundary rays from the origin plus an arc at
+                    // the tip connecting them. Mirrors the generator's spread
+                    // around direction_angle; centered spreads symmetrically.
+                    // The generator stacks every bullet AT the origin (facing
+                    // differs), so the cone is the meaningful shape — its
+                    // radius is a fixed representative length, independent of
+                    // bullet count.
+                    if (!Math::is_finite(helper_fan_spread) || helper_fan_spread <= 0.0) {
+                        break;
+                    }
+                    const real_t half_spread = (real_t)(helper_fan_spread * 0.5);
+                    const real_t dir_ang = (real_t)helper_fan_direction_angle;
+                    const real_t left_ang = dir_ang + half_spread;
+                    const real_t right_ang = dir_ang - half_spread;
+                    const Vector2 left_dir = Vector2(Math::cos(left_ang), Math::sin(left_ang));
+                    const Vector2 right_dir = Vector2(Math::cos(right_ang), Math::sin(right_ang));
+                    const real_t tip_r = 150.0;
+                    const Vector2 left_tip = track_origin + left_dir * tip_r;
+                    const Vector2 right_tip = track_origin + right_dir * tip_r;
+                    // Left ray: origin -> tip.
+                    push_track_global(track_origin);
+                    push_track_global(left_tip);
+                    // Arc from left tip to right tip (across the spread).
+                    const int arc_n = Math::clamp((int)(tip_r * helper_fan_spread / 8.0), 8, 64);
+                    for (int i = 1; i < arc_n; i++) {
+                        const real_t t = (real_t)i / (real_t)arc_n;
+                        const real_t ang = left_ang + (right_ang - left_ang) * t;
+                        const Vector2 p = track_origin + Vector2(Math::cos(ang), Math::sin(ang)) * tip_r;
+                        push_track_global(p);
+                    }
+                    // Right ray: tip -> origin (closes the cone visually).
+                    push_track_global(right_tip);
+                    push_track_global(track_origin);
+                    break;
+                }
+                case PATTERN_FROM_HELPER_AIMED: {
+                    // Cone toward the live target (same shape as FAN). If no
+                    // target is assigned, draw nothing — match the volley
+                    // behavior (quiet break, the dots also draw nothing).
+                    Node2D *target = get_helper_aimed_target();
+                    if (target == nullptr) {
+                        break;
+                    }
+                    Vector2 aim_pos = target->get_global_transform().get_origin();
+                    if (helper_aimed_prediction > 0.0 && helper_aimed_prediction_time > 0.0) {
+                        Vector2 target_vel = Vector2(0, 0);
+                        bool has_vel = false;
+                        if (target->has_method("get_velocity")) {
+                            Variant v = target->call("get_velocity");
+                            if (v.get_type() == Variant::VECTOR2) {
+                                target_vel = v;
+                                has_vel = target_vel.is_finite();
+                            }
+                        }
+                        if (has_vel) {
+                            aim_pos += target_vel * (real_t)(helper_aimed_prediction_time * helper_aimed_prediction);
+                        }
+                    }
+                    const Vector2 to_target = aim_pos - track_origin;
+                    if (!to_target.is_finite() || to_target.length_squared() <= 0.0) {
+                        break;
+                    }
+                    const real_t dir_ang = to_target.angle();
+                    if (!Math::is_finite(helper_aimed_spread) || helper_aimed_spread <= 0.0) {
+                        break;
+                    }
+                    const real_t half_spread = (real_t)(helper_aimed_spread * 0.5);
+                    const real_t left_ang = dir_ang + half_spread;
+                    const real_t right_ang = dir_ang - half_spread;
+                    const Vector2 left_dir = Vector2(Math::cos(left_ang), Math::sin(left_ang));
+                    const Vector2 right_dir = Vector2(Math::cos(right_ang), Math::sin(right_ang));
+                    const real_t tip_r = to_target.length();
+                    if (!Math::is_finite(tip_r) || tip_r <= 0.0) {
+                        break;
+                    }
+                    const Vector2 left_tip = track_origin + left_dir * tip_r;
+                    const Vector2 right_tip = track_origin + right_dir * tip_r;
+                    push_track_global(track_origin);
+                    push_track_global(left_tip);
+                    const int arc_n = Math::clamp((int)(tip_r * helper_aimed_spread / 8.0), 8, 64);
+                    for (int i = 1; i < arc_n; i++) {
+                        const real_t t = (real_t)i / (real_t)arc_n;
+                        const real_t ang = left_ang + (right_ang - left_ang) * t;
+                        const Vector2 p = track_origin + Vector2(Math::cos(ang), Math::sin(ang)) * tip_r;
+                        push_track_global(p);
+                    }
+                    push_track_global(right_tip);
+                    push_track_global(track_origin);
+                    break;
+                }
+                case PATTERN_FROM_HELPER_CORRIDOR: {
+                    // Two wall segments flanking the central gap, running along
+                    // the aim direction. Aim resolves live-target-first, like
+                    // the volley case, then falls back to the static direction.
+                    Vector2 corridor_aim = helper_corridor_aim_direction;
+                    if (Node2D *target = get_helper_aimed_target()) {
+                        const Vector2 to_target = target->get_global_transform().get_origin() - track_origin;
+                        if (to_target.is_finite() && to_target.length_squared() > 0.0) {
+                            corridor_aim = to_target.normalized();
+                        }
+                    }
+                    if (!corridor_aim.is_finite() || corridor_aim.length_squared() <= 0.0) {
+                        break;
+                    }
+                    if (!Math::is_finite(helper_corridor_width) || helper_corridor_width <= 0.0) {
+                        break;
+                    }
+                    const real_t half_width = (real_t)(helper_corridor_width * 0.5);
+                    const real_t half_gap = (real_t)(helper_corridor_gap_width * 0.5);
+                    const real_t wall_offset = half_width - half_gap;
+                    if (wall_offset <= 0.0) {
+                        break;
+                    }
+                    const Vector2 aim = corridor_aim.normalized();
+                    const Vector2 perp = aim.orthogonal();
+                    const real_t per_bullet = (helper_cross_spacing > 0.0) ? (real_t)helper_cross_spacing : 32.0;
+                    const real_t wall_len = (real_t)MAX(helper_bullets_amount, 1) * per_bullet;
+                    if (!Math::is_finite(wall_len) || wall_len <= 0.0) {
+                        break;
+                    }
+                    const Vector2 along = aim * wall_len;
+                    // Left wall.
+                    const Vector2 l1 = track_origin + perp * wall_offset;
+                    const Vector2 l2 = l1 + along;
+                    push_track_global(l1);
+                    push_track_global(l2);
+                    // Right wall.
+                    const Vector2 r1 = track_origin - perp * wall_offset;
+                    const Vector2 r2 = r1 + along;
+                    push_track_global(r1);
+                    push_track_global(r2);
+                    break;
+                }
+                default:
+                    break;
             }
         }
-        Color faint = preview_dot_color;
-        faint.a *= 0.3f;
-        preview_dots_layer->set_path_data(underlay, faint, (float)(dot_radius * 0.45));
-    } else {
-        preview_dots_layer->set_path_data(PackedVector2Array(), preview_dot_color, 0.0f);
     }
+    preview_dots_layer->set_path_data(track, preview_path_color, (float)preview_path_width, track_closed);
     preview_arrows_layer->set_arrows_data(tails, dirs, preview_arrow_color, (float)arrow_length, (float)arrow_width, (float)arrow_head_length, (float)arrow_head_width);
     // The snapshot must match what was just drawn: dirty-checks compare
     // against this, so snap AFTER the collect, not before.
@@ -5126,8 +5540,13 @@ bool BulletSpawner2D::preview_sources_dirty() {
         }
         if (cur.size() != tracked_custom_transforms.size()) return true;
         for (int i = 0; i < cur.size(); ++i) {
-            const Transform2D a = cur[i];
-            const Transform2D b = tracked_custom_transforms[i];
+            // Typed fetch first: a blind Variant cast on a transient
+            // inspector state is what wedged the editor.
+            const Variant va = cur[i];
+            const Variant vb = tracked_custom_transforms[i];
+            if (va.get_type() != Variant::TRANSFORM2D || vb.get_type() != Variant::TRANSFORM2D) return true;
+            const Transform2D a = va;
+            const Transform2D b = vb;
             // Finite-safe compare: NaN != NaN would falsely report dirty
             // every frame and thrash the preview rebuild loop.
             if (a.is_finite() != b.is_finite()) return true;
@@ -7299,6 +7718,14 @@ void BulletSpawner2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_preview_first_dot_color"), &BulletSpawner2D::get_preview_first_dot_color);
 	ClassDB::bind_method(D_METHOD("set_preview_first_dot_color", "value"), &BulletSpawner2D::set_preview_first_dot_color);
 	ADD_PROPERTY(PropertyInfo(Variant::COLOR, "preview_first_dot_color"), "set_preview_first_dot_color", "get_preview_first_dot_color");
+
+	ClassDB::bind_method(D_METHOD("get_preview_path_color"), &BulletSpawner2D::get_preview_path_color);
+	ClassDB::bind_method(D_METHOD("set_preview_path_color", "value"), &BulletSpawner2D::set_preview_path_color);
+	ADD_PROPERTY(PropertyInfo(Variant::COLOR, "preview_path_color"), "set_preview_path_color", "get_preview_path_color");
+
+	ClassDB::bind_method(D_METHOD("get_preview_path_width"), &BulletSpawner2D::get_preview_path_width);
+	ClassDB::bind_method(D_METHOD("set_preview_path_width", "value"), &BulletSpawner2D::set_preview_path_width);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "preview_path_width"), "set_preview_path_width", "get_preview_path_width");
 
 	ClassDB::bind_method(D_METHOD("get_preview_dot_radius"), &BulletSpawner2D::get_preview_dot_radius);
 	ClassDB::bind_method(D_METHOD("set_preview_dot_radius", "value"), &BulletSpawner2D::set_preview_dot_radius);
