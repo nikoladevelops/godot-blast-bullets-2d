@@ -5504,109 +5504,6 @@ void BulletSpawner2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_transforms_source", "value"), &BulletSpawner2D::set_transforms_source);
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "transforms_source", PROPERTY_HINT_ENUM, "From Children:0,Custom:24,Circle:25,Rectangle:26,Square:27,Regular Polygon:28,Path2D:29,From Self:1,Grid:2,Ring:3,Fan:4,Spiral:5,Line:6,Aimed:7,Flower:8,Ellipse:9,Rain:10,Scatter:11,Polygon:12,Multi Spiral:13,Cross:14,Star:15,Heart:16,Wave:17,Waterfall:18,Lattice:19,Rose:20,Counter Spiral:21,Corridor:22,Lissajous:23"), "set_transforms_source", "get_transforms_source");
 
-	// Spawner lifecycle signals. Emitted synchronously where the transition
-	// happens (timer tick, setters, reset, _ready): handlers run with live
-	// state and follow the same contract as the factory collision signals -
-	// game logic is safe directly, structural factory calls must be deferred.
-	// HANDLER CONTRACT (pre_shoot/volley_fired especially): the volley handle
-	// is only valid for the duration of the emission. To destroy it, use
-	// queue_free() (or call_deferred factory free/reset) - never immediate
-	// Object.free(); the shoot path keeps touching the instance after the
-	// emit. shoot_once() itself must not be called nested (rejected); use
-	// shoot_once_deferred() instead.
-	// NOTE: PROPERTY_HINT_RESOURCE_TYPE (not NODE_TYPE) carries the class name
-	// to ClassDB/--doctool; see the note on the factory signals.
-	ADD_SIGNAL(MethodInfo("pre_shoot",
-		PropertyInfo(Variant::OBJECT, "directional_bullets_instance", PROPERTY_HINT_RESOURCE_TYPE, "DirectionalBullets2D"),
-		PropertyInfo(Variant::INT, "volley_index")));
-	ADD_SIGNAL(MethodInfo("volley_fired",
-		PropertyInfo(Variant::OBJECT, "directional_bullets_instance", PROPERTY_HINT_RESOURCE_TYPE, "DirectionalBullets2D"),
-		PropertyInfo(Variant::INT, "volley_index")));
-	ADD_SIGNAL(MethodInfo("volley_skipped",
-		PropertyInfo(Variant::STRING_NAME, "reason")));
-	ADD_SIGNAL(MethodInfo("volley_telegraphed",
-		PropertyInfo(Variant::ARRAY, "aim_transforms")));
-	ADD_SIGNAL(MethodInfo("burst_shot_fired",
-		PropertyInfo(Variant::INT, "shot_index"),
-		PropertyInfo(Variant::BOOL, "mirrored")));
-	ADD_SIGNAL(MethodInfo("burst_finished"));
-	ADD_SIGNAL(MethodInfo("pattern_list_finished"));
-	ADD_SIGNAL(MethodInfo("retarget_applied",
-		PropertyInfo(Variant::INT, "volleys_retargeted")));
-	ADD_SIGNAL(MethodInfo("shooting_started"));
-	ADD_SIGNAL(MethodInfo("shooting_stopped"));
-	ADD_SIGNAL(MethodInfo("shooting_finished"));
-
-	// Collision/lifetime signals possessed by this spawner for the volleys it
-	// spawned (see owner_spawner_id). Same slim payload shape as the factory
-	// typed signals; emitted synchronously (area/body) or deferred
-	// (life_time_over) under the same handler contract. A spawner volley
-	// NEVER fires factory signals: if this spawner is gone, its bullets'
-	// events are dropped instead of falling back to the factory.
-	// NOTE: PROPERTY_HINT_RESOURCE_TYPE (not NODE_TYPE) carries the class name
-	// to ClassDB/--doctool; see the note on the factory signals.
-	ADD_SIGNAL(MethodInfo("area_entered",
-		PropertyInfo(Variant::OBJECT, "hit_target_area"),
-		PropertyInfo(Variant::OBJECT, "directional_bullets_instance", PROPERTY_HINT_RESOURCE_TYPE, "DirectionalBullets2D"),
-		PropertyInfo(Variant::INT, "bullet_index")));
-	ADD_SIGNAL(MethodInfo("body_entered",
-		PropertyInfo(Variant::OBJECT, "hit_target_body"),
-		PropertyInfo(Variant::OBJECT, "directional_bullets_instance", PROPERTY_HINT_RESOURCE_TYPE, "DirectionalBullets2D"),
-		PropertyInfo(Variant::INT, "bullet_index")));
-	ADD_SIGNAL(MethodInfo("life_time_over",
-		PropertyInfo(Variant::OBJECT, "directional_bullets_instance", PROPERTY_HINT_RESOURCE_TYPE, "DirectionalBullets2D"),
-		PropertyInfo(Variant::ARRAY, "bullet_indexes", PROPERTY_HINT_ARRAY_TYPE, "int")));
-
-	ClassDB::bind_method(D_METHOD("get_shooting_enabled"), &BulletSpawner2D::get_shooting_enabled);
-	ClassDB::bind_method(D_METHOD("set_shooting_enabled", "value"), &BulletSpawner2D::set_shooting_enabled);
-	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "shooting_enabled"), "set_shooting_enabled", "get_shooting_enabled");
-
-	ClassDB::bind_method(D_METHOD("get_shoot_interval_sec"), &BulletSpawner2D::get_shoot_interval_sec);
-	ClassDB::bind_method(D_METHOD("set_shoot_interval_sec", "value"), &BulletSpawner2D::set_shoot_interval_sec);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "shoot_interval_sec"), "set_shoot_interval_sec", "get_shoot_interval_sec");
-
-	ClassDB::bind_method(D_METHOD("get_shoot_initial_delay_sec"), &BulletSpawner2D::get_shoot_initial_delay_sec);
-	ClassDB::bind_method(D_METHOD("set_shoot_initial_delay_sec", "value"), &BulletSpawner2D::set_shoot_initial_delay_sec);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "shoot_initial_delay_sec"), "set_shoot_initial_delay_sec", "get_shoot_initial_delay_sec");
-
-	ClassDB::bind_method(D_METHOD("get_max_volleys"), &BulletSpawner2D::get_max_volleys);
-	ClassDB::bind_method(D_METHOD("set_max_volleys", "value"), &BulletSpawner2D::set_max_volleys);
-	ADD_PROPERTY(PropertyInfo(Variant::INT, "max_volleys"), "set_max_volleys", "get_max_volleys");
-
-	ClassDB::bind_method(D_METHOD("get_transforms_scale"), &BulletSpawner2D::get_transforms_scale);
-	ClassDB::bind_method(D_METHOD("set_transforms_scale", "value"), &BulletSpawner2D::set_transforms_scale);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "transforms_scale"), "set_transforms_scale", "get_transforms_scale");
-
-	ClassDB::bind_method(D_METHOD("get_spawn_position_offset"), &BulletSpawner2D::get_spawn_position_offset);
-	ClassDB::bind_method(D_METHOD("set_spawn_position_offset", "value"), &BulletSpawner2D::set_spawn_position_offset);
-	ADD_PROPERTY(PropertyInfo(Variant::VECTOR2, "spawn_position_offset"), "set_spawn_position_offset", "get_spawn_position_offset");
-
-	ClassDB::bind_method(D_METHOD("get_spin_enabled"), &BulletSpawner2D::get_spin_enabled);
-	ClassDB::bind_method(D_METHOD("set_spin_enabled", "value"), &BulletSpawner2D::set_spin_enabled);
-	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "spin_enabled"), "set_spin_enabled", "get_spin_enabled");
-
-	ClassDB::bind_method(D_METHOD("get_spin_speed_deg_per_sec"), &BulletSpawner2D::get_spin_speed_deg_per_sec);
-	ClassDB::bind_method(D_METHOD("set_spin_speed_deg_per_sec", "value"), &BulletSpawner2D::set_spin_speed_deg_per_sec);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "spin_speed_deg_per_sec"), "set_spin_speed_deg_per_sec", "get_spin_speed_deg_per_sec");
-
-	ClassDB::bind_method(D_METHOD("get_spin_mode"), &BulletSpawner2D::get_spin_mode);
-	ClassDB::bind_method(D_METHOD("set_spin_mode", "value"), &BulletSpawner2D::set_spin_mode);
-	ADD_PROPERTY(PropertyInfo(Variant::INT, "spin_mode", PROPERTY_HINT_ENUM, "Continuous,Oscillate"), "set_spin_mode", "get_spin_mode");
-
-	ClassDB::bind_method(D_METHOD("get_spin_amplitude_deg"), &BulletSpawner2D::get_spin_amplitude_deg);
-	ClassDB::bind_method(D_METHOD("set_spin_amplitude_deg", "value"), &BulletSpawner2D::set_spin_amplitude_deg);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "spin_amplitude_deg"), "set_spin_amplitude_deg", "get_spin_amplitude_deg");
-
-	ClassDB::bind_method(D_METHOD("get_spin_frequency_hz"), &BulletSpawner2D::get_spin_frequency_hz);
-	ClassDB::bind_method(D_METHOD("set_spin_frequency_hz", "value"), &BulletSpawner2D::set_spin_frequency_hz);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "spin_frequency_hz"), "set_spin_frequency_hz", "get_spin_frequency_hz");
-
-	ClassDB::bind_method(D_METHOD("get_spin_angle_deg"), &BulletSpawner2D::get_spin_angle_deg);
-	ClassDB::bind_method(D_METHOD("is_spinning"), &BulletSpawner2D::is_spinning);
-	ClassDB::bind_method(D_METHOD("start_spinning"), &BulletSpawner2D::start_spinning);
-	ClassDB::bind_method(D_METHOD("stop_spinning"), &BulletSpawner2D::stop_spinning);
-	ClassDB::bind_method(D_METHOD("reset_spin_angle"), &BulletSpawner2D::reset_spin_angle);
-
 	ClassDB::bind_method(D_METHOD("get_helper_bullets_amount"), &BulletSpawner2D::get_helper_bullets_amount);
 	ClassDB::bind_method(D_METHOD("set_helper_bullets_amount", "value"), &BulletSpawner2D::set_helper_bullets_amount);
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "helper_bullets_amount"), "set_helper_bullets_amount", "get_helper_bullets_amount");
@@ -6318,6 +6215,109 @@ void BulletSpawner2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_helper_skip_indices"), &BulletSpawner2D::get_helper_skip_indices);
 	ClassDB::bind_method(D_METHOD("set_helper_skip_indices", "value"), &BulletSpawner2D::set_helper_skip_indices);
 	ADD_PROPERTY(PropertyInfo(Variant::PACKED_INT32_ARRAY, "helper_skip_indices"), "set_helper_skip_indices", "get_helper_skip_indices");
+
+	// Spawner lifecycle signals. Emitted synchronously where the transition
+	// happens (timer tick, setters, reset, _ready): handlers run with live
+	// state and follow the same contract as the factory collision signals -
+	// game logic is safe directly, structural factory calls must be deferred.
+	// HANDLER CONTRACT (pre_shoot/volley_fired especially): the volley handle
+	// is only valid for the duration of the emission. To destroy it, use
+	// queue_free() (or call_deferred factory free/reset) - never immediate
+	// Object.free(); the shoot path keeps touching the instance after the
+	// emit. shoot_once() itself must not be called nested (rejected); use
+	// shoot_once_deferred() instead.
+	// NOTE: PROPERTY_HINT_RESOURCE_TYPE (not NODE_TYPE) carries the class name
+	// to ClassDB/--doctool; see the note on the factory signals.
+	ADD_SIGNAL(MethodInfo("pre_shoot",
+		PropertyInfo(Variant::OBJECT, "directional_bullets_instance", PROPERTY_HINT_RESOURCE_TYPE, "DirectionalBullets2D"),
+		PropertyInfo(Variant::INT, "volley_index")));
+	ADD_SIGNAL(MethodInfo("volley_fired",
+		PropertyInfo(Variant::OBJECT, "directional_bullets_instance", PROPERTY_HINT_RESOURCE_TYPE, "DirectionalBullets2D"),
+		PropertyInfo(Variant::INT, "volley_index")));
+	ADD_SIGNAL(MethodInfo("volley_skipped",
+		PropertyInfo(Variant::STRING_NAME, "reason")));
+	ADD_SIGNAL(MethodInfo("volley_telegraphed",
+		PropertyInfo(Variant::ARRAY, "aim_transforms")));
+	ADD_SIGNAL(MethodInfo("burst_shot_fired",
+		PropertyInfo(Variant::INT, "shot_index"),
+		PropertyInfo(Variant::BOOL, "mirrored")));
+	ADD_SIGNAL(MethodInfo("burst_finished"));
+	ADD_SIGNAL(MethodInfo("pattern_list_finished"));
+	ADD_SIGNAL(MethodInfo("retarget_applied",
+		PropertyInfo(Variant::INT, "volleys_retargeted")));
+	ADD_SIGNAL(MethodInfo("shooting_started"));
+	ADD_SIGNAL(MethodInfo("shooting_stopped"));
+	ADD_SIGNAL(MethodInfo("shooting_finished"));
+
+	// Collision/lifetime signals possessed by this spawner for the volleys it
+	// spawned (see owner_spawner_id). Same slim payload shape as the factory
+	// typed signals; emitted synchronously (area/body) or deferred
+	// (life_time_over) under the same handler contract. A spawner volley
+	// NEVER fires factory signals: if this spawner is gone, its bullets'
+	// events are dropped instead of falling back to the factory.
+	// NOTE: PROPERTY_HINT_RESOURCE_TYPE (not NODE_TYPE) carries the class name
+	// to ClassDB/--doctool; see the note on the factory signals.
+	ADD_SIGNAL(MethodInfo("area_entered",
+		PropertyInfo(Variant::OBJECT, "hit_target_area"),
+		PropertyInfo(Variant::OBJECT, "directional_bullets_instance", PROPERTY_HINT_RESOURCE_TYPE, "DirectionalBullets2D"),
+		PropertyInfo(Variant::INT, "bullet_index")));
+	ADD_SIGNAL(MethodInfo("body_entered",
+		PropertyInfo(Variant::OBJECT, "hit_target_body"),
+		PropertyInfo(Variant::OBJECT, "directional_bullets_instance", PROPERTY_HINT_RESOURCE_TYPE, "DirectionalBullets2D"),
+		PropertyInfo(Variant::INT, "bullet_index")));
+	ADD_SIGNAL(MethodInfo("life_time_over",
+		PropertyInfo(Variant::OBJECT, "directional_bullets_instance", PROPERTY_HINT_RESOURCE_TYPE, "DirectionalBullets2D"),
+		PropertyInfo(Variant::ARRAY, "bullet_indexes", PROPERTY_HINT_ARRAY_TYPE, "int")));
+
+	ClassDB::bind_method(D_METHOD("get_shooting_enabled"), &BulletSpawner2D::get_shooting_enabled);
+	ClassDB::bind_method(D_METHOD("set_shooting_enabled", "value"), &BulletSpawner2D::set_shooting_enabled);
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "shooting_enabled"), "set_shooting_enabled", "get_shooting_enabled");
+
+	ClassDB::bind_method(D_METHOD("get_shoot_interval_sec"), &BulletSpawner2D::get_shoot_interval_sec);
+	ClassDB::bind_method(D_METHOD("set_shoot_interval_sec", "value"), &BulletSpawner2D::set_shoot_interval_sec);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "shoot_interval_sec"), "set_shoot_interval_sec", "get_shoot_interval_sec");
+
+	ClassDB::bind_method(D_METHOD("get_shoot_initial_delay_sec"), &BulletSpawner2D::get_shoot_initial_delay_sec);
+	ClassDB::bind_method(D_METHOD("set_shoot_initial_delay_sec", "value"), &BulletSpawner2D::set_shoot_initial_delay_sec);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "shoot_initial_delay_sec"), "set_shoot_initial_delay_sec", "get_shoot_initial_delay_sec");
+
+	ClassDB::bind_method(D_METHOD("get_max_volleys"), &BulletSpawner2D::get_max_volleys);
+	ClassDB::bind_method(D_METHOD("set_max_volleys", "value"), &BulletSpawner2D::set_max_volleys);
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "max_volleys"), "set_max_volleys", "get_max_volleys");
+
+	ClassDB::bind_method(D_METHOD("get_transforms_scale"), &BulletSpawner2D::get_transforms_scale);
+	ClassDB::bind_method(D_METHOD("set_transforms_scale", "value"), &BulletSpawner2D::set_transforms_scale);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "transforms_scale"), "set_transforms_scale", "get_transforms_scale");
+
+	ClassDB::bind_method(D_METHOD("get_spawn_position_offset"), &BulletSpawner2D::get_spawn_position_offset);
+	ClassDB::bind_method(D_METHOD("set_spawn_position_offset", "value"), &BulletSpawner2D::set_spawn_position_offset);
+	ADD_PROPERTY(PropertyInfo(Variant::VECTOR2, "spawn_position_offset"), "set_spawn_position_offset", "get_spawn_position_offset");
+
+	ClassDB::bind_method(D_METHOD("get_spin_enabled"), &BulletSpawner2D::get_spin_enabled);
+	ClassDB::bind_method(D_METHOD("set_spin_enabled", "value"), &BulletSpawner2D::set_spin_enabled);
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "spin_enabled"), "set_spin_enabled", "get_spin_enabled");
+
+	ClassDB::bind_method(D_METHOD("get_spin_speed_deg_per_sec"), &BulletSpawner2D::get_spin_speed_deg_per_sec);
+	ClassDB::bind_method(D_METHOD("set_spin_speed_deg_per_sec", "value"), &BulletSpawner2D::set_spin_speed_deg_per_sec);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "spin_speed_deg_per_sec"), "set_spin_speed_deg_per_sec", "get_spin_speed_deg_per_sec");
+
+	ClassDB::bind_method(D_METHOD("get_spin_mode"), &BulletSpawner2D::get_spin_mode);
+	ClassDB::bind_method(D_METHOD("set_spin_mode", "value"), &BulletSpawner2D::set_spin_mode);
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "spin_mode", PROPERTY_HINT_ENUM, "Continuous,Oscillate"), "set_spin_mode", "get_spin_mode");
+
+	ClassDB::bind_method(D_METHOD("get_spin_amplitude_deg"), &BulletSpawner2D::get_spin_amplitude_deg);
+	ClassDB::bind_method(D_METHOD("set_spin_amplitude_deg", "value"), &BulletSpawner2D::set_spin_amplitude_deg);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "spin_amplitude_deg"), "set_spin_amplitude_deg", "get_spin_amplitude_deg");
+
+	ClassDB::bind_method(D_METHOD("get_spin_frequency_hz"), &BulletSpawner2D::get_spin_frequency_hz);
+	ClassDB::bind_method(D_METHOD("set_spin_frequency_hz", "value"), &BulletSpawner2D::set_spin_frequency_hz);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "spin_frequency_hz"), "set_spin_frequency_hz", "get_spin_frequency_hz");
+
+	ClassDB::bind_method(D_METHOD("get_spin_angle_deg"), &BulletSpawner2D::get_spin_angle_deg);
+	ClassDB::bind_method(D_METHOD("is_spinning"), &BulletSpawner2D::is_spinning);
+	ClassDB::bind_method(D_METHOD("start_spinning"), &BulletSpawner2D::start_spinning);
+	ClassDB::bind_method(D_METHOD("stop_spinning"), &BulletSpawner2D::stop_spinning);
+	ClassDB::bind_method(D_METHOD("reset_spin_angle"), &BulletSpawner2D::reset_spin_angle);
 
 	ClassDB::bind_method(D_METHOD("get_homing_delay_sec"), &BulletSpawner2D::get_homing_delay_sec);
 	ClassDB::bind_method(D_METHOD("set_homing_delay_sec", "value"), &BulletSpawner2D::set_homing_delay_sec);
