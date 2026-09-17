@@ -5599,24 +5599,51 @@ void BulletSpawner2D::_process(double delta) {
         set_process(spin_enabled || preview_active() || homing_retarget_active() || burst_shots_left > 0 || telegraph_pending || pattern_list_active);
         return;
     }
+    // Main shooting timer: accumulator with catch-up. Overshoot carries into
+    // the next wait (shoot_time_left += interval) so the average rate stays
+    // exact at any interval, and sub-frame intervals repay every due volley
+    // in the same tick instead of quantizing to whole frames. Same
+    // anti-spiral contract as the bullet animation timer: a bounded number
+    // of pulls per tick, then resync (drop the remaining hitch backlog)
+    // instead of looping forever.
     shoot_time_left -= delta;
-    if (shoot_time_left > 0.0) {
-        return;
+    int pulls = 0;
+    while (auto_shooting_active() && shoot_time_left <= 0.0) {
+        if (++pulls > 8) {
+            // Anti-spiral: resync the timer instead of repaying a huge hitch
+            // backlog in one tick (which would melt signal handlers/physics).
+            shoot_time_left = next_shoot_interval_sec();
+            break;
+        }
+        // Trigger pull: burst mode fans out from here, plain mode fires once.
+        // Telegraph inserts the warning first (fire happens on countdown).
+        // Burst/telegraph arming owns the rest of the tick: their chains run
+        // on their own timers, so the catch-up loop stops here.
+        if (burst_enabled && burst_count > 1) {
+            begin_burst();
+            shoot_time_left += next_shoot_interval_sec();
+            break;
+        }
+        if (telegraph_enabled && telegraph_sec > 0.0 && !telegraph_pending) {
+            begin_telegraph();
+            shoot_time_left += next_shoot_interval_sec();
+            break;
+        }
+        // Plain pull. Errors, if any, are per-attempt (interval-gated, no
+        // spam storm). A skipped/failed/dropped shot stops the catch-up: the
+        // throttle-on-pull rearm below spaces the retry a full interval out,
+        // so a persistently failing shot (busy factory, over budget) can
+        // never hot-loop.
+        const bool fired = shoot_once();
+        // Throttle-on-pull: the interval rearms even when the pull skipped,
+        // failed, or dropped its volley. Throttle-on-success instead would
+        // hot-loop a persistently failing shot (busy factory, over budget)
+        // every frame until it succeeds.
+        shoot_time_left += next_shoot_interval_sec();
+        if (!fired) {
+            break;
+        }
     }
-    // Trigger pull: burst mode fans out from here, plain mode fires once.
-    // Telegraph inserts the warning first (fire happens on countdown).
-    if (burst_enabled && burst_count > 1) {
-        begin_burst();
-    } else if (telegraph_enabled && telegraph_sec > 0.0 && !telegraph_pending) {
-        begin_telegraph();
-    } else {
-        shoot_once(); // errors, if any, are per-attempt (interval-gated, no spam storm)
-    }
-    // Throttle-on-pull: the interval rearms even when the pull skipped,
-    // failed, or dropped its volley. Throttle-on-success instead would
-    // hot-loop a persistently failing shot (busy factory, over budget)
-    // every frame until it succeeds.
-    shoot_time_left = next_shoot_interval_sec();
 }
 
 void BulletSpawner2D::begin_burst() {
@@ -5690,8 +5717,10 @@ void BulletSpawner2D::fire_burst_volley() {
 
 double BulletSpawner2D::next_shoot_interval_sec() const {
     // Reload jitter: +/- uniform jitter around the base interval (seeded by
-    // pattern_seed for replays; non-deterministic at 0). Clamped to a small
-    // positive floor so a huge jitter can never invert or stall the timer.
+    // pattern_seed for replays; non-deterministic at 0). Floored so a huge
+    // jitter can never invert or stall the timer; the floor sits at 1ms so
+    // fast base intervals keep working with jitter on (the per-tick pull cap
+    // in _process absorbs the rest instead of hot-looping).
     if (reload_jitter_sec <= 0.0 || !Math::is_finite(reload_jitter_sec)) {
         return shoot_interval_sec;
     }
@@ -5705,7 +5734,7 @@ double BulletSpawner2D::next_shoot_interval_sec() const {
         rng->randomize();
     }
     const double jitter = rng->randf_range(-reload_jitter_sec, reload_jitter_sec);
-    return Math::max(0.05, shoot_interval_sec + jitter);
+    return Math::max(0.001, shoot_interval_sec + jitter);
 }
 
 int BulletSpawner2D::spawn_pattern_list(const Array &entries, bool simultaneous, double interval_sec) {
@@ -6753,7 +6782,7 @@ void BulletSpawner2D::_bind_methods() {
 
 	ClassDB::bind_method(D_METHOD("get_shoot_interval_sec"), &BulletSpawner2D::get_shoot_interval_sec);
 	ClassDB::bind_method(D_METHOD("set_shoot_interval_sec", "value"), &BulletSpawner2D::set_shoot_interval_sec);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "shoot_interval_sec"), "set_shoot_interval_sec", "get_shoot_interval_sec");
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "shoot_interval_sec", PROPERTY_HINT_RANGE, "0.005,30,0.001,or_greater"), "set_shoot_interval_sec", "get_shoot_interval_sec");
 
 	ClassDB::bind_method(D_METHOD("get_shoot_initial_delay_sec"), &BulletSpawner2D::get_shoot_initial_delay_sec);
 	ClassDB::bind_method(D_METHOD("set_shoot_initial_delay_sec", "value"), &BulletSpawner2D::set_shoot_initial_delay_sec);

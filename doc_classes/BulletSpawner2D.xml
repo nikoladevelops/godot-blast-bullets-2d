@@ -1019,7 +1019,7 @@
 			Emphasis color for bullet 0 in the preview (pattern start: anchor, reverse, loop seam). Drawn bigger on top of the regular dot.
 		</member>
 		<member name="reload_jitter_sec" type="float" setter="set_reload_jitter_sec" getter="get_reload_jitter_sec" default="0.0">
-			Reload jitter in seconds: each auto volley waits shoot_interval_sec +/- uniform jitter (seeded by pattern_seed, floor 0.05s). 0 is exact. Must be finite and 0 or more.
+			Reload jitter in seconds: each auto volley waits shoot_interval_sec +/- uniform jitter (seeded by pattern_seed, floored at 0.001s so fast intervals keep working with jitter on). 0 is exact. Must be finite and 0 or more.
 		</member>
 		<member name="shared_homing_auto_pop_after_target_reached" type="bool" setter="set_shared_homing_auto_pop_after_target_reached" getter="get_shared_homing_auto_pop_after_target_reached" default="false">
 			Advances the shared queue when a target is reached. Only used in Shared mode.
@@ -1028,7 +1028,7 @@
 			Delay before the first volley after (re)arming.
 		</member>
 		<member name="shoot_interval_sec" type="float" setter="set_shoot_interval_sec" getter="get_shoot_interval_sec" default="1.0">
-			Seconds between automatic volleys. Must be above zero.
+			Seconds between automatic volleys. Must be above zero. Runs on an accumulator: overshoot carries over so the average rate is exact at any value (fast intervals repay every due volley in the same tick, up to 8 pulls; hitch backlogs beyond that resync instead of bursting).
 		</member>
 		<member name="shooting_enabled" type="bool" setter="set_shooting_enabled" getter="get_shooting_enabled" default="true">
 			Master switch for automatic shooting. [method shoot_once] works regardless.
