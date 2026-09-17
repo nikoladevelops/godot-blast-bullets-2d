@@ -3220,7 +3220,7 @@ void BulletSpawner2D::apply_pattern_preset(int preset) {
                 // Sine slope: facing tilts with the curve like an edge
                 // normal would (up on average, -Y in Godot 2D).
                 const real_t slope = 0.3 * Math::cos(x / 200.0);
-                helper_custom_transforms.push_back(Transform2D(Math::atan2(-1.0, -slope), Vector2(x, y)));
+                helper_custom_transforms.push_back(Transform2D(Math::atan2((real_t)-1.0, -slope), Vector2(x, y)));
             }
             break;
         case BulletFactory2D::PATTERN_PRESET_CUSTOM:

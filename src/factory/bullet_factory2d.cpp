@@ -3118,7 +3118,7 @@ Dictionary BulletFactory2D::helper_sample_outline_heart(real_t size, real_t base
 	PackedVector2Array pts;
 	for (int i = 0; i < n; ++i) {
 		const real_t tt = Math::TAU * (real_t)i / (real_t)n;
-		const real_t hx = 16.0 * Math::pow(Math::sin(tt), 3.0);
+		const real_t hx = 16.0 * Math::pow((double)Math::sin(tt), 3.0);
 		const real_t hy = 13.0 * Math::cos(tt) - 5.0 * Math::cos(2.0 * tt) - 2.0 * Math::cos(3.0 * tt) - Math::cos(4.0 * tt);
 		Vector2 local = Vector2(hx, -hy) * scale;
 		pts.push_back(Vector2(local.x * rot_cos - local.y * rot_sin, local.x * rot_sin + local.y * rot_cos));
