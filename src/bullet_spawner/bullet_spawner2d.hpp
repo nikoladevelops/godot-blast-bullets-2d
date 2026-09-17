@@ -43,6 +43,17 @@ class PatternPreviewLayer2D : public Node2D {
         PackedVector2Array dots;
         Color dot_color = Color(1.0, 0.05, 0.05);
         float dot_radius = 4.0f;
+        // Bullet-0 emphasis: drawn last, in its own color and bigger, so the
+        // pattern start (anchor / reverse / loop seam) reads at a glance.
+        bool show_first_marker = true;
+        Color first_dot_color = Color(1.0, 0.85, 0.2);
+        float first_dot_radius_scale = 1.6f;
+        // Faint raw-curve underlay (Path2D mode only): holder-local baked
+        // points so users see WHY bullets sit where they do, even for a
+        // single-bullet volley. Empty for every other mode.
+        PackedVector2Array path_points;
+        Color path_color = Color(1.0, 0.05, 0.05, 0.3);
+        float path_radius = 2.0f;
         PackedVector2Array arrow_tails;
         PackedVector2Array arrow_dirs;
         Color arrow_color = Color(1.0, 0.05, 0.05);
@@ -52,6 +63,8 @@ class PatternPreviewLayer2D : public Node2D {
         float arrow_head_width = 10.0f;
 
         void set_dots_data(const PackedVector2Array &p_dots, const Color &p_color, float p_radius);
+        void set_first_marker(bool p_show, const Color &p_color, float p_radius_scale);
+        void set_path_data(const PackedVector2Array &p_points, const Color &p_color, float p_radius);
         void set_arrows_data(const PackedVector2Array &p_tails, const PackedVector2Array &p_dirs, const Color &p_color, float p_length, float p_width, float p_head_length, float p_head_width);
 
         void _draw() override;
@@ -82,37 +95,37 @@ class BulletSpawner2D : public Node2D{
         // Where volley transforms come from. Children/Self read the scene
         // tree; the helper modes call the BulletFactory2D static generators
         // with the properties below, relative to the generator's transform.
-        enum TransformsSource {
-            TRANSFORMS_FROM_CHILDREN = 0,
-            TRANSFORMS_FROM_SELF,
-            TRANSFORMS_FROM_HELPER_GRID,
-            TRANSFORMS_FROM_HELPER_RING,
-            TRANSFORMS_FROM_HELPER_FAN,
-            TRANSFORMS_FROM_HELPER_SPIRAL,
-            TRANSFORMS_FROM_HELPER_LINE,
-            TRANSFORMS_FROM_HELPER_AIMED,
-            TRANSFORMS_FROM_HELPER_FLOWER,
-            TRANSFORMS_FROM_HELPER_ELLIPSE,
-            TRANSFORMS_FROM_HELPER_RAIN,
-            TRANSFORMS_FROM_HELPER_SCATTER,
-            TRANSFORMS_FROM_HELPER_POLYGON,
-            TRANSFORMS_FROM_HELPER_MULTISPIRAL,
-            TRANSFORMS_FROM_HELPER_CROSS,
-            TRANSFORMS_FROM_HELPER_STAR,
-            TRANSFORMS_FROM_HELPER_HEART,
-            TRANSFORMS_FROM_HELPER_WAVE,
-            TRANSFORMS_FROM_HELPER_WATERFALL,
-            TRANSFORMS_FROM_HELPER_LATTICE,
-            TRANSFORMS_FROM_HELPER_ROSE,
-            TRANSFORMS_FROM_HELPER_COUNTER_SPIRAL,
-            TRANSFORMS_FROM_HELPER_CORRIDOR,
-            TRANSFORMS_FROM_HELPER_LISSAJOUS,
-            TRANSFORMS_FROM_HELPER_CUSTOM,
-            TRANSFORMS_FROM_HELPER_CIRCLE,
-            TRANSFORMS_FROM_HELPER_RECTANGLE,
-            TRANSFORMS_FROM_HELPER_SQUARE,
-            TRANSFORMS_FROM_HELPER_REGULAR_POLYGON,
-            TRANSFORMS_FROM_HELPER_PATH2D
+        enum PatternSource {
+            PATTERN_FROM_CHILDREN = 0,
+            PATTERN_FROM_SELF,
+            PATTERN_FROM_HELPER_GRID,
+            PATTERN_FROM_HELPER_RING,
+            PATTERN_FROM_HELPER_FAN,
+            PATTERN_FROM_HELPER_SPIRAL,
+            PATTERN_FROM_HELPER_LINE,
+            PATTERN_FROM_HELPER_AIMED,
+            PATTERN_FROM_HELPER_FLOWER,
+            PATTERN_FROM_HELPER_ELLIPSE,
+            PATTERN_FROM_HELPER_RAIN,
+            PATTERN_FROM_HELPER_SCATTER,
+            PATTERN_FROM_HELPER_POLYGON,
+            PATTERN_FROM_HELPER_MULTISPIRAL,
+            PATTERN_FROM_HELPER_CROSS,
+            PATTERN_FROM_HELPER_STAR,
+            PATTERN_FROM_HELPER_HEART,
+            PATTERN_FROM_HELPER_WAVE,
+            PATTERN_FROM_HELPER_WATERFALL,
+            PATTERN_FROM_HELPER_LATTICE,
+            PATTERN_FROM_HELPER_ROSE,
+            PATTERN_FROM_HELPER_COUNTER_SPIRAL,
+            PATTERN_FROM_HELPER_CORRIDOR,
+            PATTERN_FROM_HELPER_LISSAJOUS,
+            PATTERN_FROM_HELPER_CUSTOM,
+            PATTERN_FROM_HELPER_CIRCLE,
+            PATTERN_FROM_HELPER_RECTANGLE,
+            PATTERN_FROM_HELPER_SQUARE,
+            PATTERN_FROM_HELPER_REGULAR_POLYGON,
+            PATTERN_FROM_HELPER_PATH2D
         };
 
         // Custom facing: Normal faces along the edge normal (90 degrees),
@@ -122,6 +135,40 @@ class BulletSpawner2D : public Node2D{
             CUSTOM_FACING_NORMAL = 0,
             CUSTOM_FACING_TANGENT,
             CUSTOM_FACING_CUSTOM
+        };
+
+        // Path2D layout: how bullets are placed along the baked curve.
+        // FIXED_SPACING lays count bullets run=(count-1)*spacing apart;
+        // EVEN_DISTRIBUTION spreads count bullets over the whole length.
+        enum Path2DDistribution {
+            PATH2D_DISTRIBUTION_FIXED_SPACING = 0,
+            PATH2D_DISTRIBUTION_EVEN
+        };
+
+        // Path2D overflow: what happens when a fixed run does not fit
+        // (run longer than the curve, or shifted past its ends). CLAMP piles
+        // extras at the end, WRAP continues from the start (mod length),
+        // SHRINK_TO_FIT scales spacing down so the run fits exactly.
+        enum Path2DOverflow {
+            PATH2D_OVERFLOW_CLAMP = 0,
+            PATH2D_OVERFLOW_WRAP,
+            PATH2D_OVERFLOW_SHRINK_TO_FIT
+        };
+
+        // Path2D anchor: where a fixed run sits when shorter than the curve.
+        enum Path2DAnchor {
+            PATH2D_ANCHOR_START = 0,
+            PATH2D_ANCHOR_CENTER,
+            PATH2D_ANCHOR_END
+        };
+
+        // Path2D facing: ALONG_PATH aims +X with travel (tangent), the two
+        // NORMAL modes aim across it (+/-90 degrees). facing_offset applies
+        // on top of all three.
+        enum Path2DFacing {
+            PATH2D_FACING_ALONG_PATH = 0,
+            PATH2D_FACING_NORMAL_P90,
+            PATH2D_FACING_NORMAL_M90
         };
 
         // How the spin angle evolves. CONTINUOUS rotates forever at
@@ -163,7 +210,7 @@ class BulletSpawner2D : public Node2D{
 
         Node2D *get_transforms_generator() const;
         void set_transforms_generator(Node2D *generator);
-        // Anchor every transforms_source mode lives on: the assigned generator,
+        // Anchor every pattern_source mode lives on: the assigned generator,
         // or this spawner when unset/unresolvable. Never null inside the tree.
         Node2D *get_effective_generator() const;
 
@@ -184,6 +231,11 @@ class BulletSpawner2D : public Node2D{
         // transforms generator (spread radius and bullet size grow together).
         // 1.0 = identity. Must stay finite (setter rejects the rest); 0
         // collapses the whole volley onto the generator, negatives mirror it.
+        double pattern_scale = 1.0;
+        // Per-transform size scale: multiplies each bullet's local basis
+        // (texture size) without touching its spawn position. 1.0 = identity.
+        // Must stay finite; 0 hides bullets in place, negatives mirror them.
+        // Compose with pattern_scale for big-layout + big-bullet looks.
         double transforms_scale = 1.0;
         // Flat global offset added to every bullet right after spawn (muzzle
         // offsets, spawn-then-nudge, whole-volley follows). (0, 0) disables
@@ -194,7 +246,7 @@ class BulletSpawner2D : public Node2D{
         // SPIN (ROTATE MARKER)
         //
         // Virtual rotation applied to every volley, no matter which
-        // transforms_source is picked: collect_spawn_transforms() rotates each
+        // pattern_source is picked: collect_spawn_transforms() rotates each
         // transform around the generator origin by the current spin angle.
         // The scene tree is never touched (no node is rotated). Runtime only:
         // the angle advances in _process and freezes in the editor.
@@ -229,7 +281,7 @@ class BulletSpawner2D : public Node2D{
         // transform, using helper_bullets_amount bullets and the matching
         // helper_* properties below (only the active mode's group is shown in
         // the inspector - see _validate_property).
-        TransformsSource transforms_source = TRANSFORMS_FROM_CHILDREN;
+        PatternSource pattern_source = PATTERN_FROM_CHILDREN;
         // Bullet count for the helper modes (children/self modes derive the
         // count from the collected transforms instead).
         int helper_bullets_amount = 10;
@@ -472,8 +524,25 @@ class BulletSpawner2D : public Node2D{
         double helper_regular_polygon_rotation = 0.0;
         bool helper_regular_polygon_face_outward = true;
         double helper_regular_polygon_facing_offset_deg = 0.0;
-        // PATH2D (live curve outline; shares Custom's spray knobs below).
+        // PATH2D (live curve layout; standalone, deterministic).
+        // Bullets sit ON the baked curve: FIXED_SPACING places them
+        // helper_path2d_spacing apart (helper_path2d_anchor/overflow decide
+        // placement when the run is shorter/longer than the curve),
+        // EVEN_DISTRIBUTION spreads them over the whole length.
+        // Facing is tangent-first: ALONG_PATH aims +X with travel, the two
+        // NORMAL modes aim across it. helper_path2d_reverse walks end->start
+        // (ALONG_PATH flips with it); helper_path2d_closed includes the
+        // last->first segment for loop paths.
         NodePath helper_path2d_path;
+        Path2DDistribution helper_path2d_distribution = PATH2D_DISTRIBUTION_FIXED_SPACING;
+        double helper_path2d_spacing = 32.0;
+        Path2DOverflow helper_path2d_overflow = PATH2D_OVERFLOW_SHRINK_TO_FIT;
+        Path2DAnchor helper_path2d_anchor = PATH2D_ANCHOR_START;
+        double helper_path2d_start_offset = 0.0;
+        bool helper_path2d_reverse = false;
+        bool helper_path2d_closed = false;
+        Path2DFacing helper_path2d_facing = PATH2D_FACING_ALONG_PATH;
+        double helper_path2d_facing_offset_deg = 0.0;
         // Runtime cache of the resolved Path2D. Not a bound property. The id
         // pairs with it: validate BEFORE dereferencing (a raw pointer
         // outlives freed nodes — see crash history).
@@ -545,7 +614,7 @@ class BulletSpawner2D : public Node2D{
 
         // Where volley homing targets come from. Each source owns its own
         // setting group below (same dropdown-and-details pattern as
-        // transforms_source): only the active source's options show in the
+        // pattern_source): only the active source's options show in the
         // inspector, plus the shared steering block.
         enum HomingTargetSource {
             HOMING_SOURCE_NODE_GROUP = 0, // poll get_nodes_in_group(homing_node_group)
@@ -1067,6 +1136,24 @@ class BulletSpawner2D : public Node2D{
         void set_helper_path2d_path(const NodePath &p_path);
         Node *get_helper_path2d_node() const;
         void set_helper_path2d_node(Node *node);
+        Path2DDistribution get_helper_path2d_distribution() const;
+        void set_helper_path2d_distribution(Path2DDistribution value);
+        double get_helper_path2d_spacing() const;
+        void set_helper_path2d_spacing(double value);
+        Path2DOverflow get_helper_path2d_overflow() const;
+        void set_helper_path2d_overflow(Path2DOverflow value);
+        Path2DAnchor get_helper_path2d_anchor() const;
+        void set_helper_path2d_anchor(Path2DAnchor value);
+        double get_helper_path2d_start_offset() const;
+        void set_helper_path2d_start_offset(double value);
+        bool get_helper_path2d_reverse() const;
+        void set_helper_path2d_reverse(bool value);
+        bool get_helper_path2d_closed() const;
+        void set_helper_path2d_closed(bool value);
+        Path2DFacing get_helper_path2d_facing() const;
+        void set_helper_path2d_facing(Path2DFacing value);
+        double get_helper_path2d_facing_offset_deg() const;
+        void set_helper_path2d_facing_offset_deg(double value);
         CustomFacing get_helper_edge_facing() const;
         void set_helper_edge_facing(CustomFacing value);
         double get_helper_edge_custom_angle_deg() const;
@@ -1203,6 +1290,9 @@ class BulletSpawner2D : public Node2D{
         bool show_preview_during_runtime = false;
         Color preview_dot_color = Color(1.0, 0.05, 0.05);
         Color preview_arrow_color = Color(1.0, 0.05, 0.05);
+        // Bullet-0 emphasis color (pattern start: anchor / reverse / loop
+        // seam). Drawn bigger on top of the regular dot.
+        Color preview_first_dot_color = Color(1.0, 0.85, 0.2);
         double preview_dot_radius = 4.0;
         // Extra pixels between the dot edge and the arrow tail: the shaft
         // starts at dot_radius + gap so it never hides under the dot.
@@ -1221,6 +1311,8 @@ class BulletSpawner2D : public Node2D{
         void set_preview_dot_color(const Color &value);
         Color get_preview_arrow_color() const;
         void set_preview_arrow_color(const Color &value);
+        Color get_preview_first_dot_color() const;
+        void set_preview_first_dot_color(const Color &value);
         double get_preview_dot_radius() const;
         void set_preview_dot_radius(double value);
         double get_preview_arrow_gap() const;
@@ -1243,13 +1335,15 @@ class BulletSpawner2D : public Node2D{
         int get_max_volleys() const;
         void set_max_volleys(int value);
         int get_volleys_fired() const;
+        double get_pattern_scale() const;
+        void set_pattern_scale(double value);
         double get_transforms_scale() const;
         void set_transforms_scale(double value);
         Vector2 get_spawn_position_offset() const;
         void set_spawn_position_offset(const Vector2 &value);
 
-        TransformsSource get_transforms_source() const;
-        void set_transforms_source(TransformsSource value);
+        PatternSource get_pattern_source() const;
+        void set_pattern_source(PatternSource value);
         int get_helper_bullets_amount() const;
         void set_helper_bullets_amount(int value);
 
@@ -1358,7 +1452,7 @@ class BulletSpawner2D : public Node2D{
         void _notification(int p_what);
 
         // Hides the helper_* property groups that don't belong to the active
-        // transforms_source, so the inspector only shows relevant options.
+        // pattern_source, so the inspector only shows relevant options.
         // (Name hiding, picked up by the binding machinery - not an override.)
         void _validate_property(PropertyInfo &p_property) const;
 
@@ -1432,7 +1526,7 @@ class BulletSpawner2D : public Node2D{
         bool telegraph_pending = false;
         // Pattern sequencer (BLAST-style spawn_list): queued entries fired in
         // order (interval apart) or all at once. Runtime state, never stored.
-        // Each entry is a Dictionary: { "transforms_source": int,
+        // Each entry is a Dictionary: { "pattern_source": int,
         // "helper_bullets_amount": int, "spawn_data": Ref, "preset": int }.
         // Only set keys override the live spawner for that shot.
         Array pattern_list_entries;
@@ -1555,8 +1649,14 @@ class BulletSpawner2D : public Node2D{
         // Live Path2D outline in generator-local pixels. Empty when unusable;
         // quiet suppresses warnings (preview).
         PackedVector2Array sample_path2d_polyline(bool quiet) const;
+        // Standalone Path2D layout: arc-length positions + tangent-first
+        // facing along the given generator-local polyline. Never null-safe
+        // issues: every index is bounds-checked, zero-length segments fall
+        // back to the nearest valid tangent, degenerate curves stack at one
+        // point. quiet suppresses errors (preview).
+        TypedArray<Transform2D> collect_path2d_transforms(const Transform2D &marker, const PackedVector2Array &path_pts, int count, bool quiet) const;
         // True for the closed-outline modes the universal side pass supports.
-        static bool supports_side_spread(TransformsSource source);
+        static bool supports_side_spread(PatternSource source);
 
 
 
@@ -1564,8 +1664,12 @@ class BulletSpawner2D : public Node2D{
 } // namespace BlastBullets2D
 
 // Need this in order to expose the enum to Godot Engine
-VARIANT_ENUM_CAST(BlastBullets2D::BulletSpawner2D::TransformsSource);
+VARIANT_ENUM_CAST(BlastBullets2D::BulletSpawner2D::PatternSource);
 VARIANT_ENUM_CAST(BlastBullets2D::BulletSpawner2D::CustomFacing);
+VARIANT_ENUM_CAST(BlastBullets2D::BulletSpawner2D::Path2DDistribution);
+VARIANT_ENUM_CAST(BlastBullets2D::BulletSpawner2D::Path2DOverflow);
+VARIANT_ENUM_CAST(BlastBullets2D::BulletSpawner2D::Path2DAnchor);
+VARIANT_ENUM_CAST(BlastBullets2D::BulletSpawner2D::Path2DFacing);
 VARIANT_ENUM_CAST(BlastBullets2D::BulletSpawner2D::SpinMode);
 VARIANT_ENUM_CAST(BlastBullets2D::BulletSpawner2D::HomingMode);
 VARIANT_ENUM_CAST(BlastBullets2D::BulletSpawner2D::HomingTargetSource);

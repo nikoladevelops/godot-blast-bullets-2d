@@ -4,9 +4,9 @@
 		Fires timed volleys of directional bullets through a [BulletFactory2D].
 	</brief_description>
 	<description>
-		Assign a [BulletFactory2D], a [DirectionalBulletsData2D], and a [member transforms_source]. Each volley collects one global transform per bullet from the [member transforms_generator] (empty means this node; a generator outside the tree while the spawner is inside also falls back to this node) and spawns it through the factory. It never fires in the editor.
+		Assign a [BulletFactory2D], a [DirectionalBulletsData2D], and a [member pattern_source]. Each volley collects one global transform per bullet from the [member transforms_generator] (empty means this node; a generator outside the tree while the spawner is inside also falls back to this node) and spawns it through the factory. It never fires in the editor.
 		Homing quick-start: turn on [member homing_enabled], leave [member homing_target_source] on Node Group, and put your targets (any Node2D) in the [member homing_node_group] group (default "enemies"). Every volley then chases [member homing_target_selection] targets with [member homing_smoothing] turn rate. Set [member homing_target_source] to Mouse to chase the cursor instead, and turn on [member orbiting_enabled] to make bullets ring their target once they arrive. Use [member homing_retarget_mode] so flying volleys keep following fresh targets, and [signal volley_bullet_homing_target_reached] to react when a bullet arrives.
-		Pattern quick-start: pick a [member transforms_source] helper (Ring, Fan, Spiral, Rose, Corridor...) or call [method apply_pattern_preset] for a starter, tune the matching helper_* group, and call [method shoot_once] (or enable [member shooting_enabled] for the auto loop). Add [member transforms_scale] / spin for motion, [member helper_skip_indices] for dodge doors, and [method spawn_pattern_list] for phased sequences. See [member transforms_source] for the full 30-mode list.
+		Pattern quick-start: pick a [member pattern_source] helper (Ring, Fan, Spiral, Rose, Corridor...) or call [method apply_pattern_preset] for a starter, tune the matching helper_* group, and call [method shoot_once] (or enable [member shooting_enabled] for the auto loop). Add [member pattern_scale] / spin for motion, [member helper_skip_indices] for dodge doors, and [method spawn_pattern_list] for phased sequences. See [member pattern_source] for the full 30-mode list.
 	</description>
 	<tutorials>
 	</tutorials>
@@ -22,7 +22,7 @@
 			<return type="void" />
 			<param index="0" name="preset" type="int" />
 			<description>
-				Fills the helper_* properties with a named starter pattern (radial dense/sparse, 3-arm spiral, narrow/wide aimed fan, slow ring, gap wall, rain, 6-petal flower, scatter burst, cross burst, star shell, heart bloom, snake wave, waterfall curtain, petal storm via Rose, twin counter-spiral via Counter Spiral, aimed trap via Corridor, blossom finale via Rose, terrain crest via Edge) and switches transforms_source to match. Tunes from there; the preset only writes the properties, nothing fires. Custom (-1) does nothing. Note: the twin counter-spiral preset also turns spin on at -60 deg/sec and the blossom finale preset turns spin on at +30 deg/sec.
+				Fills the helper_* properties with a named starter pattern (radial dense/sparse, 3-arm spiral, narrow/wide aimed fan, slow ring, gap wall, rain, 6-petal flower, scatter burst, cross burst, star shell, heart bloom, snake wave, waterfall curtain, petal storm via Rose, twin counter-spiral via Counter Spiral, aimed trap via Corridor, blossom finale via Rose, terrain crest via Edge) and switches pattern_source to match. Tunes from there; the preset only writes the properties, nothing fires. Custom (-1) does nothing. Note: the twin counter-spiral preset also turns spin on at -60 deg/sec and the blossom finale preset turns spin on at +30 deg/sec.
 			</description>
 		</method>
 		<method name="begin_burst">
@@ -52,7 +52,7 @@
 		<method name="collect_spawn_transforms" qualifiers="const">
 			<return type="Transform2D[]" />
 			<description>
-				Returns one global transform per bullet for the current [member transforms_source]. Empty [member transforms_generator] means this node. Children mode with no markers falls back to the generator itself. Aimed mode with no target returns an empty array. Corridor mode with no target falls back to [member helper_corridor_aim_direction] so the wall still draws. Corridor and Ellipse Wall modes return fewer transforms than [member helper_bullets_amount] (the carved gaps shrink the array).
+				Returns one global transform per bullet for the current [member pattern_source]. Empty [member transforms_generator] means this node. Children mode with no markers falls back to the generator itself. Aimed mode with no target returns an empty array. Corridor mode with no target falls back to [member helper_corridor_aim_direction] so the wall still draws. Corridor and Ellipse Wall modes return fewer transforms than [member helper_bullets_amount] (the carved gaps shrink the array).
 			</description>
 		</method>
 		<method name="fire_burst_volley">
@@ -241,7 +241,7 @@
 			<param index="1" name="simultaneous" type="bool" default="false" />
 			<param index="2" name="interval_sec" type="float" default="0.25" />
 			<description>
-				Queues pattern entries: each entry is a Dictionary with optional "preset", "transforms_source", "helper_bullets_amount", "spawn_data" keys. Sequential mode (default) fires one entry per interval_sec through the guarded shoot path; simultaneous mode fires all at once. Returns entries queued (sequential) or volleys fired (simultaneous). Bad entries skip with an error, never abort the list. Sequential mode emits [signal pattern_list_finished] when the queue drains; simultaneous mode does not (it returns the fired count directly).
+				Queues pattern entries: each entry is a Dictionary with optional "preset", "pattern_source", "helper_bullets_amount", "spawn_data" keys. Sequential mode (default) fires one entry per interval_sec through the guarded shoot path; simultaneous mode fires all at once. Returns entries queued (sequential) or volleys fired (simultaneous). Bad entries skip with an error, never abort the list. Sequential mode emits [signal pattern_list_finished] when the queue drains; simultaneous mode does not (it returns the fired count directly).
 			</description>
 		</method>
 		<method name="sample_edge_points" qualifiers="const">
@@ -536,16 +536,16 @@
 			Your polygon or polyline in generator-local pixels — the Custom feature's hand-drawn shape: each bullet spawns at a point along it and faces per helper_edge_facing. Defaults to a 1200px demo sine crest so switching to Custom renders the reference spray immediately; replace with your own outline. The dense crest + falloff spray comes from helper_edge_random_sample on plus helper_edge_spread / helper_edge_spread_exponent; helper_edge_jitter only adds tiny isotropic softness.
 		</member>
 		<member name="helper_edge_facing" type="int" setter="set_helper_edge_facing" getter="get_helper_edge_facing" enum="BulletSpawner2D.CustomFacing" default="0">
-			Which direction Custom and Path2D bullets face (shared spray rig): Normal (along the edge normal, 90 degrees), Tangent (along the edge), or Custom Angle (helper_edge_custom_angle_deg, marker-relative).
+			Which direction Custom bullets face: Normal (along the edge normal, 90 degrees), Tangent (along the edge), or Custom Angle (helper_edge_custom_angle_deg, marker-relative).
 		</member>
 		<member name="helper_edge_custom_angle_deg" type="float" setter="set_helper_edge_custom_angle_deg" getter="get_helper_edge_custom_angle_deg" default="0.0">
 			Fixed facing in degrees for Custom Angle facing mode, relative to the marker rotation. Must be finite.
 		</member>
 		<member name="helper_edge_side" type="int" setter="set_helper_edge_side" getter="get_helper_edge_side" enum="BulletFactory2D.SideMode" default="2">
-			Which side of the Custom/Path2D outline bullets live on (shared spray rig): Outside (face out + spray out), Inside (face in + spray in), or Both (face out + spray either side). Default Inside reproduces the reference terrain spray below a left-to-right crest.
+			Which side of the Custom outline bullets live on: Outside (face out + spray out), Inside (face in + spray in), or Both (face out + spray either side). Default Inside reproduces the reference terrain spray below a left-to-right crest.
 		</member>
 		<member name="helper_side_mode" type="int" setter="set_helper_side_mode" getter="get_helper_side_mode" enum="BulletFactory2D.SideMode" default="0">
-			Universal side pass for the closed-outline modes (Ring, Ellipse, Polygon, Star, Flower, Rose, Lissajous, Circle, Rectangle, Square, Regular Polygon): On Path (identity, default), Outside, Inside, or Both. Positions slide along their facing; facings never change. Open modes reject it with an error — without a loop there is no inside. Custom and Path2D ignore it (they own helper_edge_side instead).
+			Universal side pass for the closed-outline modes (Ring, Ellipse, Polygon, Star, Flower, Rose, Lissajous, Circle, Rectangle, Square, Regular Polygon): On Path (identity, default), Outside, Inside, or Both. Positions slide along their facing; facings never change. Open modes reject it with an error — without a loop there is no inside. Custom and Path2D ignore it.
 		</member>
 		<member name="helper_side_spread" type="float" setter="set_helper_side_spread" getter="get_helper_side_spread" default="0.0">
 			Side-pass falloff depth in pixels for the outline modes above. Must be finite and 0 or more.
@@ -557,7 +557,7 @@
 			Per-pattern seed for the side pass (0 falls back to pattern_seed, then non-deterministic; seedless previews use a fixed seed).
 		</member>
 		<member name="helper_edge_closed" type="bool" setter="set_helper_edge_closed" getter="get_helper_edge_closed" default="false">
-			Closes the Custom polyline or Path2D curve into a loop before sampling (normals wrap around the seam; open polylines keep graceful loose ends).
+			Closes the Custom polyline into a loop before sampling (normals wrap around the seam; open polylines keep graceful loose ends).
 		</member>
 		<member name="helper_edge_random_sample" type="bool" setter="set_helper_edge_random_sample" getter="get_helper_edge_random_sample" default="true">
 			On picks random arc positions per volley (the terrain spray look), off samples evenly by arc length (dotted outline look). Seeded by helper_edge_seed, else pattern_seed; seedless editor previews use a fixed seed so the view stays stable.
@@ -623,7 +623,34 @@
 			Extra facing twist in degrees on top of the polygon normal. Must be finite.
 		</member>
 		<member name="helper_path2d_path" type="NodePath" setter="set_helper_path2d_path" getter="get_helper_path2d_path" default="NodePath(&quot;&quot;)">
-			Path2D node to live-sample the outline from (baked curve points, re-resolved every volley, ObjectDB-guarded, expressed in the generator space). Shares Custom spray knobs; closure comes from helper_edge_closed. Empty means no outline.
+			Path2D node to live-sample bullet positions from (baked curve points, re-resolved every volley, ObjectDB-guarded, expressed in the generator space). Bullets sit exactly on the curve per helper_path2d_distribution; empty means no outline.
+		</member>
+		<member name="helper_path2d_distribution" type="int" setter="set_helper_path2d_distribution" getter="get_helper_path2d_distribution" enum="BulletSpawner2D.Path2DDistribution" default="0">
+			How Path2D bullets are placed: Fixed Spacing lays helper_bullets_amount bullets helper_path2d_spacing apart (helper_path2d_anchor/overflow decide placement when the run is shorter/longer than the curve), Spread Evenly covers the whole curve length (both endpoints included on open paths; seamless ring without a duplicated seam bullet on closed loops).
+		</member>
+		<member name="helper_path2d_spacing" type="float" setter="set_helper_path2d_spacing" getter="get_helper_path2d_spacing" default="32.0">
+			Offset in pixels between consecutive Path2D bullets (Fixed Spacing mode only). Must be finite and greater than 0.
+		</member>
+		<member name="helper_path2d_overflow" type="int" setter="set_helper_path2d_overflow" getter="get_helper_path2d_overflow" enum="BulletSpawner2D.Path2DOverflow" default="2">
+			What happens when a fixed Path2D run does not fit (run longer than the curve, or shifted past its ends): Clamp piles extras at the end, Wrap continues from the start, Auto Fit scales spacing down so the run fits exactly (Fixed Spacing mode only).
+		</member>
+		<member name="helper_path2d_anchor" type="int" setter="set_helper_path2d_anchor" getter="get_helper_path2d_anchor" enum="BulletSpawner2D.Path2DAnchor" default="0">
+			Where a fixed Path2D run sits when shorter than the curve: Path Start, Centered, or Path End (Fixed Spacing mode only). helper_path2d_start_offset shifts on top of this.
+		</member>
+		<member name="helper_path2d_start_offset" type="float" setter="set_helper_path2d_start_offset" getter="get_helper_path2d_start_offset" default="0.0">
+			Distance in pixels along the Path2D curve where layout starts (Fixed: first-bullet position on top of the anchor; Spread Evenly: phase-rotates a loop, or pushes an open run toward the end, clamped). Must be finite and 0 or more.
+		</member>
+		<member name="helper_path2d_reverse" type="bool" setter="set_helper_path2d_reverse" getter="get_helper_path2d_reverse" default="false">
+			Walk the Path2D curve end to start (exact mirror: bullet 0 lands on the curve end). Along Path facing flips with it.
+		</member>
+		<member name="helper_path2d_closed" type="bool" setter="set_helper_path2d_closed" getter="get_helper_path2d_closed" default="false">
+			Include the last-to-first stretch when measuring a Path2D curve, so spacing wraps on loop paths. Curves already drawn as loops need nothing extra (no double segment is added); two-point outlines always stay open.
+		</member>
+		<member name="helper_path2d_facing" type="int" setter="set_helper_path2d_facing" getter="get_helper_path2d_facing" enum="BulletSpawner2D.Path2DFacing" default="0">
+			Which direction Path2D bullets face: Along Path (+X with travel, the tangent), Normal +90, or Normal -90. helper_path2d_facing_offset_deg applies on top.
+		</member>
+		<member name="helper_path2d_facing_offset_deg" type="float" setter="set_helper_path2d_facing_offset_deg" getter="get_helper_path2d_facing_offset_deg" default="0.0">
+			Extra facing twist in degrees on top of the Path2D facing. Must be finite.
 		</member>
 		<member name="helper_multispiral_angle_step" type="float" setter="set_helper_multispiral_angle_step" getter="get_helper_multispiral_angle_step" default="0.6">
 			Angle growth per step along each arm. Must be finite.
@@ -902,7 +929,7 @@
 			Which detected nodes become targets: nearest to the spawner, random, tree order, round robin across volleys, or dealt across bullets (Per Bullet mode only).
 		</member>
 		<member name="homing_target_source" type="int" setter="set_homing_target_source" getter="get_homing_target_source" enum="BulletSpawner2D.HomingTargetSource" default="0">
-			Where volley targets come from: a node group, the mouse cursor, a global position snapshot, a node path, a node name, or a node's children. Each source shows its own settings, like the transforms_source helper patterns do.
+			Where volley targets come from: a node group, the mouse cursor, a global position snapshot, a node path, a node name, or a node's children. Each source shows its own settings, like the pattern_source helper patterns do.
 		</member>
 		<member name="homing_update_interval" type="float" setter="set_homing_update_interval" getter="get_homing_update_interval" default="0.0">
 			Seconds between target position refreshes. 0 refreshes every tick.
@@ -962,7 +989,7 @@
 			Preview arrow head width in pixels.
 		</member>
 		<member name="preview_arrow_length" type="float" setter="set_preview_arrow_length" getter="get_preview_arrow_length" default="16.0">
-			Preview arrow length in pixels.
+			Preview arrow length in pixels (multiplied by pattern_scale and transforms_scale, so glyphs stay proportional to the layout).
 		</member>
 		<member name="preview_arrow_width" type="float" setter="set_preview_arrow_width" getter="get_preview_arrow_width" default="2.0">
 			Preview arrow shaft width in pixels.
@@ -971,7 +998,10 @@
 			Preview dot color.
 		</member>
 		<member name="preview_dot_radius" type="float" setter="set_preview_dot_radius" getter="get_preview_dot_radius" default="4.0">
-			Preview dot radius in pixels.
+			Preview dot radius in pixels (multiplied by pattern_scale and transforms_scale, so glyphs stay proportional to the layout).
+		</member>
+		<member name="preview_first_dot_color" type="Color" setter="set_preview_first_dot_color" getter="get_preview_first_dot_color" default="Color(1, 0.85, 0.2, 1)">
+			Emphasis color for bullet 0 in the preview (pattern start: anchor, reverse, loop seam). Drawn bigger on top of the regular dot.
 		</member>
 		<member name="reload_jitter_sec" type="float" setter="set_reload_jitter_sec" getter="get_reload_jitter_sec" default="0.0">
 			Reload jitter in seconds: each auto volley waits shoot_interval_sec +/- uniform jitter (seeded by pattern_seed, floor 0.05s). 0 is exact. Must be finite and 0 or more.
@@ -1024,10 +1054,13 @@
 		<member name="transforms_generator" type="NodePath" setter="set_transforms_generator_path" getter="get_transforms_generator_path" default="NodePath(&quot;&quot;)">
 			Node patterns are built on. Empty means this spawner. Point it at another Node2D to move children markers, helper shapes, spin pivot, scale center, and the preview there.
 		</member>
-		<member name="transforms_scale" type="float" setter="set_transforms_scale" getter="get_transforms_scale" default="1.0">
-			Scales the whole pattern around the generator. 1.0 keeps it as is, 0 collapses it onto the generator, negatives mirror it.
+		<member name="pattern_scale" type="float" setter="set_pattern_scale" getter="get_pattern_scale" default="1.0">
+			Scales the whole pattern around the generator (positions and bullet size grow together). 1.0 keeps it as is, 0 collapses it onto the generator, negatives mirror it. Compose with transforms_scale for big-layout + big-bullet looks.
 		</member>
-		<member name="transforms_source" type="int" setter="set_transforms_source" getter="get_transforms_source" enum="BulletSpawner2D.TransformsSource" default="0">
+		<member name="transforms_scale" type="float" setter="set_transforms_scale" getter="get_transforms_scale" default="1.0">
+			Per-bullet size scale: multiplies each spawn transform's local basis (texture size) without moving its position. 1.0 keeps sizes as generated, 0 hides bullets in place, negatives mirror them. Must be finite.
+		</member>
+		<member name="pattern_source" type="int" setter="set_pattern_source" getter="get_pattern_source" enum="BulletSpawner2D.PatternSource" default="0">
 			Where volley transforms come from: children markers (0), this generator itself (1), or one of 28 procedural helper patterns (2-29: Grid, Ring, Fan, Spiral, Line, Aimed, Flower, Ellipse, Rain, Scatter, Polygon, Multi Spiral, Cross, Star, Heart, Wave, Waterfall, Lattice, Rose, Counter Spiral, Corridor, Lissajous, Custom, Circle, Rectangle, Square, Regular Polygon, Path2D). Only the active pattern's options show in the inspector. Pipeline per volley: generate, then spin, then scale, then helper_skip_indices carving (so skip indexes match the preview). Corridor and Ellipse Wall modes return fewer transforms than helper_bullets_amount.
 		</member>
 	</members>
@@ -1201,95 +1234,95 @@
 		<constant name="HOMING_RETARGET_ON_INTERVAL" value="1" enum="HomingRetargetMode">
 			Flying volleys are re-aimed every [member homing_retarget_interval_sec].
 		</constant>
-		<constant name="TRANSFORMS_FROM_CHILDREN" value="0" enum="TransformsSource">
+		<constant name="PATTERN_FROM_CHILDREN" value="0" enum="PatternSource">
 			One transform per child marker of the generator.
 		</constant>
-		<constant name="TRANSFORMS_FROM_SELF" value="1" enum="TransformsSource">
+		<constant name="PATTERN_FROM_SELF" value="1" enum="PatternSource">
 			Single bullet from the generator itself.
 		</constant>
-		<constant name="TRANSFORMS_FROM_HELPER_GRID" value="2" enum="TransformsSource">
+		<constant name="PATTERN_FROM_HELPER_GRID" value="2" enum="PatternSource">
 			Grid pattern around the generator.
 		</constant>
-		<constant name="TRANSFORMS_FROM_HELPER_RING" value="3" enum="TransformsSource">
+		<constant name="PATTERN_FROM_HELPER_RING" value="3" enum="PatternSource">
 			Ring pattern around the generator.
 		</constant>
-		<constant name="TRANSFORMS_FROM_HELPER_FAN" value="4" enum="TransformsSource">
+		<constant name="PATTERN_FROM_HELPER_FAN" value="4" enum="PatternSource">
 			Fan pattern from the generator.
 		</constant>
-		<constant name="TRANSFORMS_FROM_HELPER_SPIRAL" value="5" enum="TransformsSource">
+		<constant name="PATTERN_FROM_HELPER_SPIRAL" value="5" enum="PatternSource">
 			Spiral pattern from the generator.
 		</constant>
-		<constant name="TRANSFORMS_FROM_HELPER_LINE" value="6" enum="TransformsSource">
+		<constant name="PATTERN_FROM_HELPER_LINE" value="6" enum="PatternSource">
 			Line pattern through the generator.
 		</constant>
-		<constant name="TRANSFORMS_FROM_HELPER_AIMED" value="7" enum="TransformsSource">
+		<constant name="PATTERN_FROM_HELPER_AIMED" value="7" enum="PatternSource">
 			Cone from the generator toward the aimed target.
 		</constant>
-		<constant name="TRANSFORMS_FROM_HELPER_FLOWER" value="8" enum="TransformsSource">
+		<constant name="PATTERN_FROM_HELPER_FLOWER" value="8" enum="PatternSource">
 			Floral blossom pattern from the generator.
 		</constant>
-		<constant name="TRANSFORMS_FROM_HELPER_ELLIPSE" value="9" enum="TransformsSource">
+		<constant name="PATTERN_FROM_HELPER_ELLIPSE" value="9" enum="PatternSource">
 			Ellipse ring, arc, or wall-with-gaps from the generator.
 		</constant>
-		<constant name="TRANSFORMS_FROM_HELPER_RAIN" value="10" enum="TransformsSource">
+		<constant name="PATTERN_FROM_HELPER_RAIN" value="10" enum="PatternSource">
 			Rain curtain from the generator.
 		</constant>
-		<constant name="TRANSFORMS_FROM_HELPER_SCATTER" value="11" enum="TransformsSource">
+		<constant name="PATTERN_FROM_HELPER_SCATTER" value="11" enum="PatternSource">
 			Random disc burst from the generator.
 		</constant>
-		<constant name="TRANSFORMS_FROM_HELPER_POLYGON" value="12" enum="TransformsSource">
+		<constant name="PATTERN_FROM_HELPER_POLYGON" value="12" enum="PatternSource">
 			Star/polygon pattern from the generator.
 		</constant>
-		<constant name="TRANSFORMS_FROM_HELPER_MULTISPIRAL" value="13" enum="TransformsSource">
+		<constant name="PATTERN_FROM_HELPER_MULTISPIRAL" value="13" enum="PatternSource">
 			Multi-arm spiral from the generator.
 		</constant>
-		<constant name="TRANSFORMS_FROM_HELPER_CROSS" value="14" enum="TransformsSource">
+		<constant name="PATTERN_FROM_HELPER_CROSS" value="14" enum="PatternSource">
 			Cross/plus barrage from the generator.
 		</constant>
-		<constant name="TRANSFORMS_FROM_HELPER_STAR" value="15" enum="TransformsSource">
+		<constant name="PATTERN_FROM_HELPER_STAR" value="15" enum="PatternSource">
 			Star shell from the generator.
 		</constant>
-		<constant name="TRANSFORMS_FROM_HELPER_HEART" value="16" enum="TransformsSource">
+		<constant name="PATTERN_FROM_HELPER_HEART" value="16" enum="PatternSource">
 			Heart bloom from the generator.
 		</constant>
-		<constant name="TRANSFORMS_FROM_HELPER_WAVE" value="17" enum="TransformsSource">
+		<constant name="PATTERN_FROM_HELPER_WAVE" value="17" enum="PatternSource">
 			Snake wave row from the generator.
 		</constant>
-		<constant name="TRANSFORMS_FROM_HELPER_WATERFALL" value="18" enum="TransformsSource">
+		<constant name="PATTERN_FROM_HELPER_WATERFALL" value="18" enum="PatternSource">
 			Waterfall curtain from the generator.
 		</constant>
-		<constant name="TRANSFORMS_FROM_HELPER_LATTICE" value="19" enum="TransformsSource">
+		<constant name="PATTERN_FROM_HELPER_LATTICE" value="19" enum="PatternSource">
 			Honeycomb lattice from the generator.
 		</constant>
-		<constant name="TRANSFORMS_FROM_HELPER_ROSE" value="20" enum="TransformsSource">
+		<constant name="PATTERN_FROM_HELPER_ROSE" value="20" enum="PatternSource">
 			Exact rhodonea rose bloom from the generator (petal-storm / blossom-finale flowers).
 		</constant>
-		<constant name="TRANSFORMS_FROM_HELPER_COUNTER_SPIRAL" value="21" enum="TransformsSource">
+		<constant name="PATTERN_FROM_HELPER_COUNTER_SPIRAL" value="21" enum="PatternSource">
 			Twin counter-rotating galaxy arms from the generator (odd arms mirror when enabled).
 		</constant>
-		<constant name="TRANSFORMS_FROM_HELPER_CORRIDOR" value="22" enum="TransformsSource">
+		<constant name="PATTERN_FROM_HELPER_CORRIDOR" value="22" enum="PatternSource">
 			Dense wall perpendicular to the aim axis with a carved center dodge door. Returns at most helper_bullets_amount slots (the gap shrinks the array like Ellipse Wall). Prefers the aimed target when one is assigned, else helper_corridor_aim_direction.
 		</constant>
-		<constant name="TRANSFORMS_FROM_HELPER_LISSAJOUS" value="23" enum="TransformsSource">
+		<constant name="PATTERN_FROM_HELPER_LISSAJOUS" value="23" enum="PatternSource">
 			Figure-8 / weave curtain from the generator (crossing rows with readable doors).
 		</constant>
-		<constant name="TRANSFORMS_FROM_HELPER_CUSTOM" value="24" enum="TransformsSource">
+		<constant name="PATTERN_FROM_HELPER_CUSTOM" value="24" enum="PatternSource">
 			Hand-drawn outline mode (values stay stable for saved scenes): bullets spawn at points along it facing per helper_edge_facing (Normal = 90 degrees), placed per helper_edge_side (Outside/Inside/Both). How it works: every shape compiles to one polyline; each slot picks an arc-length position (evenly, or randomly when helper_edge_random_sample is on), interpolates the joint-averaged normal, then pushes along it by helper_edge_spread * pow(rand, helper_edge_spread_exponent). Defaults ARE the reference terrain spray: a demo sine crest with a 220px falloff below it. One-click full density via apply_pattern_preset(19) (800 bullets). The other closed-outline modes get the same treatment through helper_side_mode.
 		</constant>
-		<constant name="TRANSFORMS_FROM_HELPER_CIRCLE" value="25" enum="TransformsSource">
+		<constant name="PATTERN_FROM_HELPER_CIRCLE" value="25" enum="PatternSource">
 			Exact circle loop outline from the generator (radius + outward flip + offset).
 		</constant>
-		<constant name="TRANSFORMS_FROM_HELPER_RECTANGLE" value="26" enum="TransformsSource">
+		<constant name="PATTERN_FROM_HELPER_RECTANGLE" value="26" enum="PatternSource">
 			Rectangle perimeter walk centered on the generator (size + outward flip + offset).
 		</constant>
-		<constant name="TRANSFORMS_FROM_HELPER_SQUARE" value="27" enum="TransformsSource">
+		<constant name="PATTERN_FROM_HELPER_SQUARE" value="27" enum="PatternSource">
 			Square perimeter walk centered on the generator (single side length + outward flip + offset).
 		</constant>
-		<constant name="TRANSFORMS_FROM_HELPER_REGULAR_POLYGON" value="28" enum="TransformsSource">
+		<constant name="PATTERN_FROM_HELPER_REGULAR_POLYGON" value="28" enum="PatternSource">
 			True regular-polygon perimeter (vertices/radius/rotation + outward flip + offset). Distinct from Polygon mode, which is star-biased scatter.
 		</constant>
-		<constant name="TRANSFORMS_FROM_HELPER_PATH2D" value="29" enum="TransformsSource">
-			Live Path2D curve outline (baked points, re-sampled every volley, generator-local). Shares Custom spray knobs (spread/exponent/jitter/tangent/seed/side/facing); closure comes from helper_edge_closed.
+		<constant name="PATTERN_FROM_HELPER_PATH2D" value="29" enum="PatternSource">
+			Live Path2D curve layout (baked points, re-sampled every volley, generator-local). Bullets sit exactly on the curve per helper_path2d_distribution (Fixed Spacing default 32px, or Even over the whole length), facing tangent-first per helper_path2d_facing (Along Path default, Normal +90/-90 across it).
 		</constant>
 
 
@@ -1305,6 +1338,39 @@
 		</constant>
 		<constant name="CUSTOM_FACING_CUSTOM" value="2" enum="CustomFacing">
 			Custom bullets face helper_edge_custom_angle_deg (marker-relative).
+		</constant>
+		<constant name="PATH2D_DISTRIBUTION_FIXED_SPACING" value="0" enum="Path2DDistribution">
+			Path2D bullets are laid helper_path2d_spacing apart.
+		</constant>
+		<constant name="PATH2D_DISTRIBUTION_EVEN" value="1" enum="Path2DDistribution">
+			Path2D bullets spread evenly over the whole curve length.
+		</constant>
+		<constant name="PATH2D_OVERFLOW_CLAMP" value="0" enum="Path2DOverflow">
+			Oversized Path2D runs pile extras at the curve end.
+		</constant>
+		<constant name="PATH2D_OVERFLOW_WRAP" value="1" enum="Path2DOverflow">
+			Oversized Path2D runs wrap around from the curve start.
+		</constant>
+		<constant name="PATH2D_OVERFLOW_SHRINK_TO_FIT" value="2" enum="Path2DOverflow">
+			Oversized Path2D runs shrink spacing so every bullet fits.
+		</constant>
+		<constant name="PATH2D_ANCHOR_START" value="0" enum="Path2DAnchor">
+			Short Path2D runs hug the curve start.
+		</constant>
+		<constant name="PATH2D_ANCHOR_CENTER" value="1" enum="Path2DAnchor">
+			Short Path2D runs center on the curve.
+		</constant>
+		<constant name="PATH2D_ANCHOR_END" value="2" enum="Path2DAnchor">
+			Short Path2D runs hug the curve end.
+		</constant>
+		<constant name="PATH2D_FACING_ALONG_PATH" value="0" enum="Path2DFacing">
+			Path2D bullets face along travel (+X with the curve tangent).
+		</constant>
+		<constant name="PATH2D_FACING_NORMAL_P90" value="1" enum="Path2DFacing">
+			Path2D bullets face 90 degrees clockwise from travel.
+		</constant>
+		<constant name="PATH2D_FACING_NORMAL_M90" value="2" enum="Path2DFacing">
+			Path2D bullets face 90 degrees counter-clockwise from travel.
 		</constant>
 		<constant name="SPIN_CONTINUOUS" value="0" enum="SpinMode">
 			Spins forever at [member spin_speed_deg_per_sec].
