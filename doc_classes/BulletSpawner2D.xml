@@ -650,6 +650,9 @@
 		<member name="helper_regular_polygon_facing_offset_deg" type="float" setter="set_helper_regular_polygon_facing_offset_deg" getter="get_helper_regular_polygon_facing_offset_deg" default="0.0">
 			Extra facing twist in degrees on top of the polygon normal. Must be finite.
 		</member>
+		<member name="helper_path2d_space" type="int" setter="set_helper_path2d_space" getter="get_helper_path2d_space" enum="BulletSpawner2D.Path2DSpace" default="0">
+			Which frame the Path2D curve is drawn in. Follow Generator (default) copies the curve shape onto the generator with its bounding-box center reset to the origin: only the shape matters, the node's own transform and wherever the curve was drawn are ignored (moving/rotating the Path2D node does nothing), like every other pattern. At Path2D Node keeps the legacy pose: the volley materializes where the node sits in the world. Flip back to this if an existing scene relied on the old default. When the path is a child of the generator at origin, both modes coincide.
+		</member>
 		<member name="helper_path2d_path" type="NodePath" setter="set_helper_path2d_path" getter="get_helper_path2d_path" default="NodePath(&quot;&quot;)">
 			Path2D node to live-sample bullet positions from (baked curve points, re-resolved every volley, ObjectDB-guarded, expressed in the generator space). Bullets sit exactly on the curve per helper_path2d_distribution; empty means no outline.
 		</member>
@@ -1399,6 +1402,12 @@
 		</constant>
 		<constant name="PATH2D_ANCHOR_END" value="2" enum="Path2DAnchor">
 			Short Path2D runs hug the curve end.
+		</constant>
+		<constant name="PATH2D_SPACE_FOLLOW_GENERATOR" value="0" enum="Path2DSpace">
+			Path2D bullets follow the generator: baked curve points are generator-local offsets.
+		</constant>
+		<constant name="PATH2D_SPACE_AT_PATH2D" value="1" enum="Path2DSpace">
+			Path2D bullets appear where the Path2D node sits in the world (legacy behavior).
 		</constant>
 		<constant name="PATH2D_FACING_ALONG_PATH" value="0" enum="Path2DFacing">
 			Path2D bullets face along travel (+X with the curve tangent).

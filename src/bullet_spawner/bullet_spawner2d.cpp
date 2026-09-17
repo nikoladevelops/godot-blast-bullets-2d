@@ -2108,9 +2108,33 @@ PackedVector2Array BulletSpawner2D::sample_path2d_polyline(bool quiet) const {
         if (!quiet) UtilityFunctions::push_warning("BulletSpawner2D: Path2D curve needs at least 2 baked points.");
         return PackedVector2Array();
     }
-    // Curves live in the Path2D's local space: express them in the
-    // generator's space (same anchor every other mode uses). A degenerate
-    // link falls back to raw points instead of NaN.
+    // Follow Generator (default): the curve SHAPE is copied onto the
+    // generator, resettled with its bounding-box center at the origin. Raw
+    // baked points carry wherever they were drawn in path-local space, so
+    // without this the volley would inherit the Path2D's old local offset
+    // instead of blooming around the generator. Only the shape survives;
+    // the node's own transform is ignored outright. Tree membership is
+    // irrelevant on this path.
+    if (helper_path2d_space == PATH2D_SPACE_FOLLOW_GENERATOR) {
+        Vector2 mn = pts[0];
+        Vector2 mx = pts[0];
+        for (int i = 1; i < pts.size(); ++i) {
+            mn.x = MIN(mn.x, pts[i].x);
+            mn.y = MIN(mn.y, pts[i].y);
+            mx.x = MAX(mx.x, pts[i].x);
+            mx.y = MAX(mx.y, pts[i].y);
+        }
+        const Vector2 center = (mn + mx) * 0.5;
+        if (center.is_finite() && center.length_squared() > 0.0) {
+            for (int i = 0; i < pts.size(); ++i) {
+                pts[i] -= center;
+            }
+        }
+        return pts;
+    }
+    // At Path2D (legacy): express the curve in the generator's space, which
+    // lands the volley where the node sits in the world. A degenerate link
+    // falls back to raw points instead of NaN.
     Node2D *base = get_effective_generator();
     Node2D *path_2d = Object::cast_to<Node2D>(node);
     if (base != nullptr && path_2d != nullptr && path_2d != base && is_inside_tree() && path_2d->is_inside_tree()) {
@@ -2727,6 +2751,15 @@ void BulletSpawner2D::set_helper_path2d_path(const NodePath &p_path) {
             if (resolved == nullptr) helper_path2d_cache = nullptr;
         }
     }
+    rebuild_preview();
+}
+BulletSpawner2D::Path2DSpace BulletSpawner2D::get_helper_path2d_space() const { return helper_path2d_space; }
+void BulletSpawner2D::set_helper_path2d_space(Path2DSpace value) {
+    if (value < PATH2D_SPACE_FOLLOW_GENERATOR || value > PATH2D_SPACE_AT_PATH2D) {
+        UtilityFunctions::push_error("BulletSpawner2D: invalid helper_path2d_space, keeping the old value.");
+        return;
+    }
+    helper_path2d_space = value;
     rebuild_preview();
 }
 Node *BulletSpawner2D::get_helper_path2d_node() const {
@@ -6761,6 +6794,10 @@ void BulletSpawner2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_helper_path2d_node"), &BulletSpawner2D::get_helper_path2d_node);
 	ClassDB::bind_method(D_METHOD("set_helper_path2d_node", "node"), &BulletSpawner2D::set_helper_path2d_node);
 
+	ClassDB::bind_method(D_METHOD("get_helper_path2d_space"), &BulletSpawner2D::get_helper_path2d_space);
+	ClassDB::bind_method(D_METHOD("set_helper_path2d_space", "value"), &BulletSpawner2D::set_helper_path2d_space);
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "helper_path2d_space", PROPERTY_HINT_ENUM, "Follow Generator,At Path2D Node"), "set_helper_path2d_space", "get_helper_path2d_space");
+
 	ClassDB::bind_method(D_METHOD("get_helper_path2d_distribution"), &BulletSpawner2D::get_helper_path2d_distribution);
 	ClassDB::bind_method(D_METHOD("set_helper_path2d_distribution", "value"), &BulletSpawner2D::set_helper_path2d_distribution);
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "helper_path2d_distribution", PROPERTY_HINT_ENUM, "Fixed Spacing,Spread Evenly"), "set_helper_path2d_distribution", "get_helper_path2d_distribution");
@@ -7330,6 +7367,8 @@ void BulletSpawner2D::_bind_methods() {
 	BIND_ENUM_CONSTANT(PATH2D_ANCHOR_CENTER);
 	BIND_ENUM_CONSTANT(PATH2D_ANCHOR_END);
 	BIND_ENUM_CONSTANT(PATH2D_FACING_ALONG_PATH);
+	BIND_ENUM_CONSTANT(PATH2D_SPACE_FOLLOW_GENERATOR);
+	BIND_ENUM_CONSTANT(PATH2D_SPACE_AT_PATH2D);
 	BIND_ENUM_CONSTANT(PATH2D_FACING_NORMAL_P90);
 	BIND_ENUM_CONSTANT(PATH2D_FACING_NORMAL_M90);
 

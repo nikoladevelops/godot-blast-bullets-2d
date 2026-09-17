@@ -165,6 +165,17 @@ class BulletSpawner2D : public Node2D{
             PATH2D_FACING_NORMAL_M90
         };
 
+        // Path2D space: which frame the baked curve is drawn in.
+        // FOLLOW_GENERATOR reads the raw baked points as generator-local
+        // offsets (the node's own transform is ignored: only its curve
+        // points matter, like every other pattern). AT_PATH2D keeps the
+        // legacy pose: the volley materializes where the Path2D node sits
+        // in the world.
+        enum Path2DSpace {
+            PATH2D_SPACE_FOLLOW_GENERATOR = 0,
+            PATH2D_SPACE_AT_PATH2D = 1
+        };
+
         // How the spin angle evolves. CONTINUOUS rotates forever at
         // spin_speed_deg_per_sec (signed: positive = clockwise, per the
         // Godot 2D convention); OSCILLATE swings +-spin_amplitude_deg at
@@ -541,6 +552,7 @@ class BulletSpawner2D : public Node2D{
         // (ALONG_PATH flips with it); helper_path2d_closed includes the
         // last->first segment for loop paths.
         NodePath helper_path2d_path;
+        Path2DSpace helper_path2d_space = PATH2D_SPACE_FOLLOW_GENERATOR;
         Path2DDistribution helper_path2d_distribution = PATH2D_DISTRIBUTION_FIXED_SPACING;
         double helper_path2d_spacing = 32.0;
         Path2DOverflow helper_path2d_overflow = PATH2D_OVERFLOW_SHRINK_TO_FIT;
@@ -1190,6 +1202,8 @@ class BulletSpawner2D : public Node2D{
         void set_helper_regular_polygon_facing_offset_deg(double value);
         NodePath get_helper_path2d_path() const;
         void set_helper_path2d_path(const NodePath &p_path);
+        Path2DSpace get_helper_path2d_space() const;
+        void set_helper_path2d_space(Path2DSpace value);
         Node *get_helper_path2d_node() const;
         void set_helper_path2d_node(Node *node);
         Path2DDistribution get_helper_path2d_distribution() const;
@@ -1702,6 +1716,7 @@ VARIANT_ENUM_CAST(BlastBullets2D::BulletSpawner2D::Path2DDistribution);
 VARIANT_ENUM_CAST(BlastBullets2D::BulletSpawner2D::Path2DOverflow);
 VARIANT_ENUM_CAST(BlastBullets2D::BulletSpawner2D::Path2DAnchor);
 VARIANT_ENUM_CAST(BlastBullets2D::BulletSpawner2D::Path2DFacing);
+VARIANT_ENUM_CAST(BlastBullets2D::BulletSpawner2D::Path2DSpace);
 VARIANT_ENUM_CAST(BlastBullets2D::BulletSpawner2D::SpinMode);
 VARIANT_ENUM_CAST(BlastBullets2D::BulletSpawner2D::HomingMode);
 VARIANT_ENUM_CAST(BlastBullets2D::BulletSpawner2D::HomingTargetSource);
