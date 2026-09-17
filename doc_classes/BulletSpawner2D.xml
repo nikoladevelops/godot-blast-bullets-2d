@@ -308,7 +308,34 @@
 			Node the aimed cone points at (also steers the Corridor wall when one is assigned). No target means no bullets in Aimed mode; Corridor falls back to helper_corridor_aim_direction.
 		</member>
 		<member name="helper_bullets_amount" type="int" setter="set_helper_bullets_amount" getter="get_helper_bullets_amount" default="10">
-			Bullet count for helper patterns. Clamped to 1-10000: one volley fans out to transforms, instance buffers and physics shapes, so uncapped values would freeze on a typo.
+			Bullet count for helper patterns. Clamped to 1-10000: one volley fans out to transforms, instance buffers and physics shapes, so uncapped values would freeze on a typo. Outline Fill Inside may return fewer (small shapes run out of grid cells, like Corridor/Ellipse Wall gaps).
+		</member>
+		<member name="helper_outline_placement" type="int" setter="set_helper_outline_placement" getter="get_helper_outline_placement" enum="BulletFactory2D.OutlinePlacement" default="0">
+			Where closed-loop shape bullets live (Ring, Ellipse, Star, Flower, Rose, Lissajous, Circle, Rectangle, Square, Regular Polygon): On Outline keeps the generated slot loop, Fill Inside swaps it for a row-major grid masked to the loop interior, Shell Outside spreads the same slot count over concentric outward layers. On Outline is the identity default.
+		</member>
+		<member name="helper_outline_facing" type="int" setter="set_helper_outline_facing" getter="get_helper_outline_facing" enum="BulletFactory2D.OutlineFacing" default="0">
+			Rotates each closed-loop shape facing: Outline Normal keeps it as generated, +90/-90 Degrees turn it toward the loop tangent. The per-shape facing_offset_deg still applies on top.
+		</member>
+		<member name="helper_outline_reverse" type="bool" setter="set_helper_outline_reverse" getter="get_helper_outline_reverse" default="false">
+			Mirrors the closed-loop slot order (winding flip): bullet 0 moves to the far end of the loop. Outline and shell layouts only.
+		</member>
+		<member name="helper_outline_slot_offset" type="int" setter="set_helper_outline_slot_offset" getter="get_helper_outline_slot_offset" default="0">
+			Rotates which closed-loop slot becomes bullet 0 (wraps both ways). Outline and shell layouts only.
+		</member>
+		<member name="helper_outline_fill_spacing" type="float" setter="set_helper_outline_fill_spacing" getter="get_helper_outline_fill_spacing" default="32.0">
+			Interior grid cell size in pixels for Fill Inside (rows run top-down like the Grid helper). Must be finite and above zero.
+		</member>
+		<member name="helper_outline_fill_stagger" type="bool" setter="set_helper_outline_fill_stagger" getter="get_helper_outline_fill_stagger" default="false">
+			Shifts every other Fill Inside row by half a cell (honeycomb packing).
+		</member>
+		<member name="helper_outline_fill_margin" type="float" setter="set_helper_outline_fill_margin" getter="get_helper_outline_fill_margin" default="0.0">
+			Keep-out distance in pixels from the loop edge for Fill Inside cells. Must be finite and 0 or more.
+		</member>
+		<member name="helper_outline_shell_layers" type="int" setter="set_helper_outline_shell_layers" getter="get_helper_outline_shell_layers" default="1">
+			Concentric outward layers for Shell Outside (bullet i rides layer i % layers, each layer evenly spread). Must be 1 or more.
+		</member>
+		<member name="helper_outline_shell_step" type="float" setter="set_helper_outline_shell_step" getter="get_helper_outline_shell_step" default="32.0">
+			Radial distance in pixels between Shell Outside layers. Must be finite and above zero.
 		</member>
 		<member name="helper_corridor_aim_direction" type="Vector2" setter="set_helper_corridor_aim_direction" getter="get_helper_corridor_aim_direction" default="Vector2(0, 1)">
 			Fallback aim axis (need not be normalized). The live aimed target wins when one is assigned. Must be finite and non-zero.
@@ -543,18 +570,6 @@
 		</member>
 		<member name="helper_edge_side" type="int" setter="set_helper_edge_side" getter="get_helper_edge_side" enum="BulletFactory2D.SideMode" default="2">
 			Which side of the Custom outline bullets live on: Outside (face out + spray out), Inside (face in + spray in), or Both (face out + spray either side). Default Inside reproduces the reference terrain spray below a left-to-right crest.
-		</member>
-		<member name="helper_side_mode" type="int" setter="set_helper_side_mode" getter="get_helper_side_mode" enum="BulletFactory2D.SideMode" default="0">
-			Universal side pass for the closed-outline modes (Ring, Ellipse, Polygon, Star, Flower, Rose, Lissajous, Circle, Rectangle, Square, Regular Polygon): On Path (identity, default), Outside, Inside, or Both. Positions slide along their facing; facings never change. Open modes reject it with an error — without a loop there is no inside. Custom and Path2D ignore it.
-		</member>
-		<member name="helper_side_spread" type="float" setter="set_helper_side_spread" getter="get_helper_side_spread" default="0.0">
-			Side-pass falloff depth in pixels for the outline modes above. Must be finite and 0 or more.
-		</member>
-		<member name="helper_side_spread_exponent" type="float" setter="set_helper_side_spread_exponent" getter="get_helper_side_spread_exponent" default="2.0">
-			Side-pass density falloff (above 1 clusters near the path). Must be finite and 0.01 or more.
-		</member>
-		<member name="helper_side_seed" type="int" setter="set_helper_side_seed" getter="get_helper_side_seed" default="0">
-			Per-pattern seed for the side pass (0 falls back to pattern_seed, then non-deterministic; seedless previews use a fixed seed).
 		</member>
 		<member name="helper_edge_closed" type="bool" setter="set_helper_edge_closed" getter="get_helper_edge_closed" default="false">
 			Closes the Custom polyline into a loop before sampling (normals wrap around the seam; open polylines keep graceful loose ends).
@@ -1061,7 +1076,7 @@
 			Per-bullet size scale: multiplies each spawn transform's local basis (texture size) without moving its position. 1.0 keeps sizes as generated, 0 hides bullets in place, negatives mirror them. Must be finite.
 		</member>
 		<member name="pattern_source" type="int" setter="set_pattern_source" getter="get_pattern_source" enum="BulletSpawner2D.PatternSource" default="0">
-			Where volley transforms come from: children markers (0), this generator itself (1), or one of 28 procedural helper patterns (2-29: Grid, Ring, Fan, Spiral, Line, Aimed, Flower, Ellipse, Rain, Scatter, Polygon, Multi Spiral, Cross, Star, Heart, Wave, Waterfall, Lattice, Rose, Counter Spiral, Corridor, Lissajous, Custom, Circle, Rectangle, Square, Regular Polygon, Path2D). Only the active pattern's options show in the inspector. Pipeline per volley: generate, then spin, then scale, then helper_skip_indices carving (so skip indexes match the preview). Corridor and Ellipse Wall modes return fewer transforms than helper_bullets_amount.
+			Where volley transforms come from: children markers (0), this generator itself (1), or one of 28 procedural helper patterns (2-29: Grid, Ring, Fan, Spiral, Line, Aimed, Flower, Ellipse, Rain, Scatter, Polygon, Multi Spiral, Cross, Star, Heart, Wave, Waterfall, Lattice, Rose, Counter Spiral, Corridor, Lissajous, Custom, Circle, Rectangle, Square, Regular Polygon, Path2D). Only the active pattern's options show in the inspector. Pipeline per volley: generate (with outline placement/fill/shell for the loop shapes), then spin, then pattern/local scale, then helper_skip_indices carving (so skip indexes match the preview). Corridor, Ellipse Wall and outline Fill Inside modes return fewer transforms than helper_bullets_amount.
 		</member>
 	</members>
 	<signals>
@@ -1307,7 +1322,7 @@
 			Figure-8 / weave curtain from the generator (crossing rows with readable doors).
 		</constant>
 		<constant name="PATTERN_FROM_HELPER_CUSTOM" value="24" enum="PatternSource">
-			Hand-drawn outline mode (values stay stable for saved scenes): bullets spawn at points along it facing per helper_edge_facing (Normal = 90 degrees), placed per helper_edge_side (Outside/Inside/Both). How it works: every shape compiles to one polyline; each slot picks an arc-length position (evenly, or randomly when helper_edge_random_sample is on), interpolates the joint-averaged normal, then pushes along it by helper_edge_spread * pow(rand, helper_edge_spread_exponent). Defaults ARE the reference terrain spray: a demo sine crest with a 220px falloff below it. One-click full density via apply_pattern_preset(19) (800 bullets). The other closed-outline modes get the same treatment through helper_side_mode.
+			Hand-drawn outline mode (values stay stable for saved scenes): bullets spawn at points along it facing per helper_edge_facing (Normal = 90 degrees), placed per helper_edge_side (Outside/Inside/Both). How it works: every shape compiles to one polyline; each slot picks an arc-length position (evenly, or randomly when helper_edge_random_sample is on), interpolates the joint-averaged normal, then pushes along it by helper_edge_spread * pow(rand, helper_edge_spread_exponent). Defaults ARE the reference terrain spray: a demo sine crest with a 220px falloff below it. One-click full density via apply_pattern_preset(19) (800 bullets). The closed-loop shapes (Ring, Ellipse, Star, Flower, Rose, Lissajous, Circle, Rectangle, Square, Regular Polygon) get structured placement instead through helper_outline_placement (on outline, interior fill, outside shells).
 		</constant>
 		<constant name="PATTERN_FROM_HELPER_CIRCLE" value="25" enum="PatternSource">
 			Exact circle loop outline from the generator (radius + outward flip + offset).

@@ -152,8 +152,17 @@
 			<param index="2" name="radius" type="float" default="150.0" />
 			<param index="3" name="face_outward" type="bool" default="true" />
 			<param index="4" name="facing_offset_degrees" type="float" default="0.0" />
+			<param index="5" name="outline_placement" type="int" enum="BulletFactory2D.OutlinePlacement" default="0" />
+			<param index="6" name="outline_facing" type="int" enum="BulletFactory2D.OutlineFacing" default="0" />
+			<param index="7" name="outline_reverse" type="bool" default="false" />
+			<param index="8" name="outline_slot_offset" type="int" default="0" />
+			<param index="9" name="fill_spacing" type="float" default="32.0" />
+			<param index="10" name="fill_stagger" type="bool" default="false" />
+			<param index="11" name="fill_margin" type="float" default="0.0" />
+			<param index="12" name="shell_layers" type="int" default="1" />
+			<param index="13" name="shell_step" type="float" default="32.0" />
 			<description>
-				Generates an exact circle outline: slots spread evenly around a radius loop centered on the marker, facing outward (or inward). Combine with helper_apply_side_spread() for inner/outer rings.
+				Generates an exact circle outline: slots spread evenly around a radius loop centered on the marker, facing outward (or inward). The outline_* tail params place slots on the loop, fill its interior, or shell its outside.
 			</description>
 		</method>
 		<method name="helper_generate_transforms_rectangle" qualifiers="static">
@@ -163,8 +172,17 @@
 			<param index="2" name="size" type="Vector2" default="Vector2(300, 200)" />
 			<param index="3" name="face_outward" type="bool" default="true" />
 			<param index="4" name="facing_offset_degrees" type="float" default="0.0" />
+			<param index="5" name="outline_placement" type="int" enum="BulletFactory2D.OutlinePlacement" default="0" />
+			<param index="6" name="outline_facing" type="int" enum="BulletFactory2D.OutlineFacing" default="0" />
+			<param index="7" name="outline_reverse" type="bool" default="false" />
+			<param index="8" name="outline_slot_offset" type="int" default="0" />
+			<param index="9" name="fill_spacing" type="float" default="32.0" />
+			<param index="10" name="fill_stagger" type="bool" default="false" />
+			<param index="11" name="fill_margin" type="float" default="0.0" />
+			<param index="12" name="shell_layers" type="int" default="1" />
+			<param index="13" name="shell_step" type="float" default="32.0" />
 			<description>
-				Generates a rectangle perimeter walk (counter-clockwise from top-left), slots spread evenly by arc length, facing outward (or inward). Square = equal sides. Combine with helper_apply_side_spread() for inner/outer walls.
+				Generates a rectangle perimeter walk (counter-clockwise from top-left), slots spread evenly by arc length, facing outward (or inward). Square = equal sides. The outline_* tail params place slots on the loop, fill its interior, or shell its outside.
 			</description>
 		</method>
 		<method name="helper_generate_transforms_regular_polygon" qualifiers="static">
@@ -176,8 +194,17 @@
 			<param index="4" name="base_rotation" type="float" default="0.0" />
 			<param index="5" name="face_outward" type="bool" default="true" />
 			<param index="6" name="facing_offset_degrees" type="float" default="0.0" />
+			<param index="7" name="outline_placement" type="int" enum="BulletFactory2D.OutlinePlacement" default="0" />
+			<param index="8" name="outline_facing" type="int" enum="BulletFactory2D.OutlineFacing" default="0" />
+			<param index="9" name="outline_reverse" type="bool" default="false" />
+			<param index="10" name="outline_slot_offset" type="int" default="0" />
+			<param index="11" name="fill_spacing" type="float" default="32.0" />
+			<param index="12" name="fill_stagger" type="bool" default="false" />
+			<param index="13" name="fill_margin" type="float" default="0.0" />
+			<param index="14" name="shell_layers" type="int" default="1" />
+			<param index="15" name="shell_step" type="float" default="32.0" />
 			<description>
-				Generates a regular polygon perimeter (vertices corners on a radius circle from base_rotation), slots spread evenly by arc length, facing outward (or inward). Combine with helper_apply_side_spread() for inner/outer shells.
+				Generates a regular polygon perimeter (vertices corners on a radius circle from base_rotation), slots spread evenly by arc length, facing outward (or inward). The outline_* tail params place slots on the loop, fill its interior, or shell its outside.
 			</description>
 		</method>
 		<method name="helper_apply_side_spread" qualifiers="static">
@@ -188,6 +215,7 @@
 			<param index="3" name="spread_exponent" type="float" default="2.0" />
 			<param index="4" name="seed" type="int" default="0" />
 			<description>
+				Deprecated: superseded by the outline_* tail params of the loop generators (deterministic placement/fill/shell). Kept bound for compatibility.
 				Universal side pass for closed-outline patterns: returns a copy of transforms with each origin pushed along its own facing by spread * pow(rand, spread_exponent). On Path returns an identity copy; Outside/Inside push along/against the facing; Both picks a random side per bullet. Facings never change. Only meaningful for closed loops (Ring, Ellipse, Polygon, Star, Flower, Rose, Lissajous, Custom, and the shape generators above) — open layouts have no inside to push toward.
 			</description>
 		</method>
@@ -250,6 +278,15 @@
 			<param index="9" name="gap_width" type="float" default="0.3" />
 			<param index="10" name="face_outward" type="bool" default="true" />
 			<param index="11" name="facing_offset_degrees" type="float" default="0.0" />
+			<param index="12" name="outline_placement" type="int" enum="BulletFactory2D.OutlinePlacement" default="0" />
+			<param index="13" name="outline_facing" type="int" enum="BulletFactory2D.OutlineFacing" default="0" />
+			<param index="14" name="outline_reverse" type="bool" default="false" />
+			<param index="15" name="outline_slot_offset" type="int" default="0" />
+			<param index="16" name="fill_spacing" type="float" default="32.0" />
+			<param index="17" name="fill_stagger" type="bool" default="false" />
+			<param index="18" name="fill_margin" type="float" default="0.0" />
+			<param index="19" name="shell_layers" type="int" default="1" />
+			<param index="20" name="shell_step" type="float" default="32.0" />
 			<description>
 				Generates a true ellipse ring with independent [code]radius_x[/code] / [code]radius_y[/code] semi-axes rotated by [code]ellipse_rotation[/code] (the ring helper's y_scale is only an approximation). Full draws every slot, Arc draws a spaced segment, Wall draws a dense arc with [code]gap_count[/code] carved dodge gaps of [code]gap_width[/code] radians each (danmaku walls with readable escape routes; the array shrinks to the surviving slots). Wall mode with gap_count 0 or gap_width 0 draws the plain arc (no carving). Facings follow the ellipse outward normal. Useful for oval bosses, stadium arenas and gap walls.
 			</description>
@@ -279,6 +316,15 @@
 			<param index="7" name="base_rotation" type="float" default="0.0" />
 			<param index="8" name="face_outward" type="bool" default="true" />
 			<param index="9" name="facing_offset_degrees" type="float" default="0.0" />
+			<param index="10" name="outline_placement" type="int" enum="BulletFactory2D.OutlinePlacement" default="0" />
+			<param index="11" name="outline_facing" type="int" enum="BulletFactory2D.OutlineFacing" default="0" />
+			<param index="12" name="outline_reverse" type="bool" default="false" />
+			<param index="13" name="outline_slot_offset" type="int" default="0" />
+			<param index="14" name="fill_spacing" type="float" default="32.0" />
+			<param index="15" name="fill_stagger" type="bool" default="false" />
+			<param index="16" name="fill_margin" type="float" default="0.0" />
+			<param index="17" name="shell_layers" type="int" default="1" />
+			<param index="18" name="shell_step" type="float" default="32.0" />
 			<description>
 				Generates a floral spell-card pattern: [code]petals[/code] symmetric lobes around the marker, each holding [code]bullets_per_petal[/code] slots spread over [code]petal_spread[/code] radians. [code]petal_sharpness[/code] 0 gives round lobes, higher values pinch the waist into tighter flowers. [code]transforms_amount[/code] sizes the array (fewer slots than petals times per-petal truncates). Useful for boss blossoms and mandala rings.
 			</description>
@@ -349,6 +395,15 @@
 			<param index="6" name="phase" type="float" default="0.0" />
 			<param index="7" name="face_outward" type="bool" default="true" />
 			<param index="8" name="facing_offset_degrees" type="float" default="0.0" />
+			<param index="9" name="outline_placement" type="int" enum="BulletFactory2D.OutlinePlacement" default="0" />
+			<param index="10" name="outline_facing" type="int" enum="BulletFactory2D.OutlineFacing" default="0" />
+			<param index="11" name="outline_reverse" type="bool" default="false" />
+			<param index="12" name="outline_slot_offset" type="int" default="0" />
+			<param index="13" name="fill_spacing" type="float" default="32.0" />
+			<param index="14" name="fill_stagger" type="bool" default="false" />
+			<param index="15" name="fill_margin" type="float" default="0.0" />
+			<param index="16" name="shell_layers" type="int" default="1" />
+			<param index="17" name="shell_step" type="float" default="32.0" />
 			<description>
 				Generates figure-8 / weave openings: slots sweep t over the full turn on the lissajous curve (size_x * sin(freq_x * t + phase), size_y * sin(freq_y * t)) for crossing curtains with readable doors. Recipe: slow spin + lissajous weave = butterfly curtain.
 			</description>
@@ -407,6 +462,15 @@
 			<param index="7" name="face_outward" type="bool" default="true" />
 			<param index="8" name="y_scale" type="float" default="1.0" />
 			<param index="9" name="facing_offset_degrees" type="float" default="0.0" />
+			<param index="10" name="outline_placement" type="int" enum="BulletFactory2D.OutlinePlacement" default="0" />
+			<param index="11" name="outline_facing" type="int" enum="BulletFactory2D.OutlineFacing" default="0" />
+			<param index="12" name="outline_reverse" type="bool" default="false" />
+			<param index="13" name="outline_slot_offset" type="int" default="0" />
+			<param index="14" name="fill_spacing" type="float" default="32.0" />
+			<param index="15" name="fill_stagger" type="bool" default="false" />
+			<param index="16" name="fill_margin" type="float" default="0.0" />
+			<param index="17" name="shell_layers" type="int" default="1" />
+			<param index="18" name="shell_step" type="float" default="32.0" />
 			<description>
 				Generates transforms placed evenly on a ring (or arc, when [code]arc[/code] is smaller than a full turn) around the marker. Every bullet faces outward, so art drawn facing right travels away from the center. Set [code]face_outward[/code] to false for implosion patterns that fly toward the center. [code]y_scale[/code] stretches the ring into an ellipse (facing stays radial, approximate on stretched rings) and [code]facing_offset_degrees[/code] twists every facing. Useful for radial bursts and boss rings.
 			</description>
@@ -421,6 +485,15 @@
 			<param index="5" name="base_rotation" type="float" default="0.0" />
 			<param index="6" name="face_outward" type="bool" default="true" />
 			<param index="7" name="facing_offset_degrees" type="float" default="0.0" />
+			<param index="8" name="outline_placement" type="int" enum="BulletFactory2D.OutlinePlacement" default="0" />
+			<param index="9" name="outline_facing" type="int" enum="BulletFactory2D.OutlineFacing" default="0" />
+			<param index="10" name="outline_reverse" type="bool" default="false" />
+			<param index="11" name="outline_slot_offset" type="int" default="0" />
+			<param index="12" name="fill_spacing" type="float" default="32.0" />
+			<param index="13" name="fill_stagger" type="bool" default="false" />
+			<param index="14" name="fill_margin" type="float" default="0.0" />
+			<param index="15" name="shell_layers" type="int" default="1" />
+			<param index="16" name="shell_step" type="float" default="32.0" />
 			<description>
 				Generates an exact rhodonea rose bloom: slots sweep theta over the full turn and sit at r = R * cos(k * theta) with k = petals. lobe_sharpness 1.0 is the exact rose (0 is round, higher pinches the waist). Recipe: Rose + phase_step_per_bullet + angular wobble = blossom finale. Used by the petal storm and blossom finale presets.
 			</description>
@@ -460,6 +533,15 @@
 			<param index="5" name="base_rotation" type="float" default="0.0" />
 			<param index="6" name="face_outward" type="bool" default="true" />
 			<param index="7" name="facing_offset_degrees" type="float" default="0.0" />
+			<param index="8" name="outline_placement" type="int" enum="BulletFactory2D.OutlinePlacement" default="0" />
+			<param index="9" name="outline_facing" type="int" enum="BulletFactory2D.OutlineFacing" default="0" />
+			<param index="10" name="outline_reverse" type="bool" default="false" />
+			<param index="11" name="outline_slot_offset" type="int" default="0" />
+			<param index="12" name="fill_spacing" type="float" default="32.0" />
+			<param index="13" name="fill_stagger" type="bool" default="false" />
+			<param index="14" name="fill_margin" type="float" default="0.0" />
+			<param index="15" name="shell_layers" type="int" default="1" />
+			<param index="16" name="shell_step" type="float" default="32.0" />
 			<description>
 				Generates a true star shell: points alternating outer/inner vertices around the marker (distinct from the polygon helper's density bias). Boss star bursts and celebratory shells.
 			</description>
@@ -774,6 +856,24 @@
 		</constant>
 		<constant name="SIDE_BOTH" value="3" enum="SideMode">
 			helper_apply_side_spread() pushes each transform to a random side of the path.
+		</constant>
+		<constant name="OUTLINE_ON_PATH" value="0" enum="OutlinePlacement">
+			Loop-generator slots stay on the generated outline loop (default: existing patterns never change).
+		</constant>
+		<constant name="OUTLINE_FILL_INSIDE" value="1" enum="OutlinePlacement">
+			Loop-generator slots are replaced by a row-major grid masked to the loop interior, capped at transforms_amount.
+		</constant>
+		<constant name="OUTLINE_SHELL_OUTSIDE" value="2" enum="OutlinePlacement">
+			Loop-generator slots spread over concentric outward layers (slot i rides layer i % layers).
+		</constant>
+		<constant name="OUTLINE_FACING_NORMAL" value="0" enum="OutlineFacing">
+			Loop-generator facings stay as generated (default: existing patterns never change).
+		</constant>
+		<constant name="OUTLINE_FACING_ALONG_P90" value="1" enum="OutlineFacing">
+			Loop-generator facings turn +90 degrees toward the loop tangent.
+		</constant>
+		<constant name="OUTLINE_FACING_ALONG_M90" value="2" enum="OutlineFacing">
+			Loop-generator facings turn -90 degrees toward the loop tangent.
 		</constant>
 		<constant name="DIRECTIONAL_BULLETS" value="0" enum="BulletType">
 			Bullet type for DirectionalBullets2D, bullets that move independently with per-bullet direction, speed and features.

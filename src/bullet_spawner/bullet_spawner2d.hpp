@@ -548,16 +548,25 @@ class BulletSpawner2D : public Node2D{
         // outlives freed nodes — see crash history).
         mutable Node *helper_path2d_cache = nullptr;
         mutable uint64_t helper_path2d_id = 0;
-        // Universal side pass for the closed-outline modes (Custom owns its
-        // spray via helper_edge_side instead). Identity by default, so
-        // existing scenes never change. Open modes (Children, Self, Grid,
-        // Fan, Spiral, Line, Aimed, Rain, Scatter, MultiSpiral, Cross,
-        // Heart, Wave, Waterfall, Lattice, Counter Spiral, Corridor) reject
-        // it loudly: inside/outside is meaningless without a loop.
-        int helper_side_mode = 0; // BulletFactory2D::SideMode
-        double helper_side_spread = 0.0;
-        double helper_side_spread_exponent = 2.0;
-        int helper_side_seed = 0;
+        // OUTLINE LAYOUT (closed-loop shapes: Ring, Ellipse, Star, Flower,
+        // Rose, Lissajous, Circle, Rectangle, Square, Regular Polygon).
+        // One placement model instead of the old scatter pass: On Outline
+        // keeps the generated slot loop; Fill Inside swaps it for a row-major
+        // grid masked to the loop interior (capped at helper_bullets_amount,
+        // may return fewer on small shapes); Shell Outside spreads the same
+        // slot count over concentric outward layers. Facing rotates each
+        // default facing (Normal = as generated, Along ±90 = toward the loop
+        // tangent); reverse mirrors the slot order; slot_offset rotates which
+        // slot becomes bullet 0. Fill/shell dims only show in their mode.
+        int helper_outline_placement = 0; // BulletFactory2D::OutlinePlacement
+        int helper_outline_facing = 0; // BulletFactory2D::OutlineFacing
+        bool helper_outline_reverse = false;
+        int helper_outline_slot_offset = 0;
+        double helper_outline_fill_spacing = 32.0;
+        bool helper_outline_fill_stagger = false;
+        double helper_outline_fill_margin = 0.0;
+        int helper_outline_shell_layers = 1;
+        double helper_outline_shell_step = 32.0;
 
         // NEGATIVE SPACE (skip slots by index: dodge doors, bullet text).
         PackedInt32Array helper_skip_indices;
@@ -1160,14 +1169,24 @@ class BulletSpawner2D : public Node2D{
         void set_helper_edge_custom_angle_deg(double value);
         int get_helper_edge_side() const;
         void set_helper_edge_side(int value);
-        int get_helper_side_mode() const;
-        void set_helper_side_mode(int value);
-        double get_helper_side_spread() const;
-        void set_helper_side_spread(double value);
-        double get_helper_side_spread_exponent() const;
-        void set_helper_side_spread_exponent(double value);
-        int get_helper_side_seed() const;
-        void set_helper_side_seed(int value);
+        int get_helper_outline_placement() const;
+        void set_helper_outline_placement(int value);
+        int get_helper_outline_facing() const;
+        void set_helper_outline_facing(int value);
+        bool get_helper_outline_reverse() const;
+        void set_helper_outline_reverse(bool value);
+        int get_helper_outline_slot_offset() const;
+        void set_helper_outline_slot_offset(int value);
+        double get_helper_outline_fill_spacing() const;
+        void set_helper_outline_fill_spacing(double value);
+        bool get_helper_outline_fill_stagger() const;
+        void set_helper_outline_fill_stagger(bool value);
+        double get_helper_outline_fill_margin() const;
+        void set_helper_outline_fill_margin(double value);
+        int get_helper_outline_shell_layers() const;
+        void set_helper_outline_shell_layers(int value);
+        double get_helper_outline_shell_step() const;
+        void set_helper_outline_shell_step(double value);
         bool get_helper_edge_closed() const;
         void set_helper_edge_closed(bool value);
         bool get_helper_edge_random_sample() const;
@@ -1655,8 +1674,11 @@ class BulletSpawner2D : public Node2D{
         // back to the nearest valid tangent, degenerate curves stack at one
         // point. quiet suppresses errors (preview).
         TypedArray<Transform2D> collect_path2d_transforms(const Transform2D &marker, const PackedVector2Array &path_pts, int count, bool quiet) const;
-        // True for the closed-outline modes the universal side pass supports.
-        static bool supports_side_spread(PatternSource source);
+        // True for the closed-loop outline modes the outline layout engine
+        // supports (Ring, Ellipse, Star, Flower, Rose, Lissajous, Circle,
+        // Rectangle, Square, Regular Polygon). Scatter/gap modes and open
+        // curves are excluded: without a loop there is no inside.
+        static bool supports_outline_layout(PatternSource source);
 
 
 
