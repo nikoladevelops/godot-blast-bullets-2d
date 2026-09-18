@@ -395,6 +395,16 @@ class BulletSpawner2D : public Node2D{
         double helper_scatter_facing_jitter = 0.4;
         // 0 = non-deterministic, otherwise reproducible (replays, bosses).
         int helper_scatter_seed = 0;
+        // Inner radius of the burst annulus. 0 = full disc; above 0 the
+        // center stays empty (explosion rings). Clamped to burst_radius
+        // at generation, so set order never matters.
+        double helper_scatter_inner_radius = 0.0;
+        // Center of the scatter sector (only when arc < TAU).
+        Vector2 helper_scatter_direction = Vector2(1, 0);
+        // Sector width in radians. TAU or more = full circle.
+        double helper_scatter_arc = 6.283185307179586; // Math::TAU
+        // Bullet facing: 0 = radial outward, 1 = fully random, 2 = inward.
+        int helper_scatter_facing = 0;
 
         // POLYGON (star emphasis: density pulled toward N vertices).
         int helper_polygon_vertices = 5;
@@ -979,6 +989,14 @@ class BulletSpawner2D : public Node2D{
         void set_helper_scatter_facing_jitter(double value);
         int get_helper_scatter_seed() const;
         void set_helper_scatter_seed(int value);
+        double get_helper_scatter_inner_radius() const;
+        void set_helper_scatter_inner_radius(double value);
+        Vector2 get_helper_scatter_direction() const;
+        void set_helper_scatter_direction(const Vector2 &value);
+        double get_helper_scatter_arc() const;
+        void set_helper_scatter_arc(double value);
+        int get_helper_scatter_facing() const;
+        void set_helper_scatter_facing(int value);
         int get_helper_polygon_vertices() const;
         void set_helper_polygon_vertices(int value);
         double get_helper_polygon_radius() const;

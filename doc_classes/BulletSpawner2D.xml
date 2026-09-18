@@ -817,13 +817,25 @@
 			Rose radius in pixels. Must be finite and 0 or more.
 		</member>
 		<member name="helper_scatter_burst_radius" type="float" setter="set_helper_scatter_burst_radius" getter="get_helper_scatter_burst_radius" default="120.0">
-			Burst disc radius in pixels. Must be finite and 0 or more.
+			Outer radius of the burst disc in pixels. Must be finite and 0 or more. Use it for explosions, boss deaths and pops: wide radius with many bullets reads as a blast, small radius as a pop.
 		</member>
 		<member name="helper_scatter_facing_jitter" type="float" setter="set_helper_scatter_facing_jitter" getter="get_helper_scatter_facing_jitter" default="0.4">
-			Random twist on each radial facing in radians. Must be finite and 0 or more.
+			Random twist on each outward/inward facing in radians (ignored by random facing, which is already random). Must be finite and 0 or more. Small values keep the radial look, large values dissolve it into spray.
 		</member>
 		<member name="helper_scatter_seed" type="int" setter="set_helper_scatter_seed" getter="get_helper_scatter_seed" default="0">
-			Scatter seed: 0 is non-deterministic, otherwise reproducible. Falls back to pattern_seed when 0.
+			Scatter-only seed: 0 is non-deterministic, otherwise every volley lands identically (combine with spin for rotating replays). Falls back to [member pattern_seed] when 0.
+		</member>
+		<member name="helper_scatter_inner_radius" type="float" setter="set_helper_scatter_inner_radius" getter="get_helper_scatter_inner_radius" default="0.0">
+			Inner radius of the burst annulus in pixels. 0 is a full disc; above 0 the center stays empty for explosion rings. Clamped to [member helper_scatter_burst_radius] at generation, so set order never matters.
+		</member>
+		<member name="helper_scatter_direction" type="Vector2" setter="set_helper_scatter_direction" getter="get_helper_scatter_direction" default="Vector2(1, 0)">
+			Center of the scatter sector. Only matters when [member helper_scatter_arc] is below TAU. Must be finite and non-zero. Use it for directional blasts and shotgun fans.
+		</member>
+		<member name="helper_scatter_arc" type="float" setter="set_helper_scatter_arc" getter="get_helper_scatter_arc" default="6.2831853">
+			Sector width in radians around [member helper_scatter_direction]. TAU or more is a full circle; narrow it (with a direction) for cones of fire. Must be finite and above 0.
+		</member>
+		<member name="helper_scatter_facing" type="int" setter="set_helper_scatter_facing" getter="get_helper_scatter_facing" default="0">
+			Bullet facing: 0 outward (explosions), 1 random (shotgun spray), 2 inward (implosions).
 		</member>
 		<member name="helper_skip_indices" type="PackedInt32Array" setter="set_helper_skip_indices" getter="get_helper_skip_indices" default="PackedInt32Array()">
 			Slot indexes to drop from any helper layout (dodge doors, bullet text). Out-of-range entries are ignored with a single warning. Applied after spin/scale so indexes match the preview.
@@ -1042,7 +1054,7 @@
 			How bullet textures face while physically orbiting.
 		</member>
 		<member name="pattern_seed" type="int" setter="set_pattern_seed" getter="get_pattern_seed" default="0">
-			Deterministic helper randomness: 0 is non-deterministic, otherwise seeds grid jitter, ring random rotation and target random selection. Replays and boss patterns stay reproducible.
+			Global default seed for helper randomness: 0 is non-deterministic, otherwise it seeds the Scatter fallback, homing random-target selection and reload jitter, so replays and boss patterns stay reproducible. Per-pattern seeds (like [member helper_scatter_seed]) override it where they exist. Bound right after the Scatter group because that is where seed-hunters look, but it is not Scatter-only.
 		</member>
 		<member name="preview_arrow_color" type="Color" setter="set_preview_arrow_color" getter="get_preview_arrow_color" default="Color(1, 0.05, 0.05, 1)">
 			Preview arrow color.

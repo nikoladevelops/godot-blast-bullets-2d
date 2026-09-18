@@ -77,6 +77,15 @@ public:
 		SPIRAL_FACING_KEEP_MARKER
 	};
 
+	// Scatter facing: which way burst bullets look. OUTWARD faces away from
+	// the marker (explosions), RANDOM faces anywhere (shotgun spray),
+	// INWARD faces the marker (implosions).
+	enum ScatterFacingMode {
+		SCATTER_FACING_OUTWARD,
+		SCATTER_FACING_RANDOM,
+		SCATTER_FACING_INWARD
+	};
+
 	// Anchor for the line transform generator: which end of the row the
 	// marker sits at. CENTER (default) preserves the historical behavior.
 	enum LineAnchor {
@@ -1036,7 +1045,11 @@ public:
 			Transform2D marker_transform,
 			real_t burst_radius = 120.0,
 			real_t facing_jitter = 0.4,
-			uint64_t seed = 0);
+			uint64_t seed = 0,
+			real_t inner_radius = 0.0,
+			Vector2 sector_direction = Vector2(1, 0),
+			real_t sector_arc = Math::TAU,
+			ScatterFacingMode facing_mode = SCATTER_FACING_OUTWARD);
 
 	// Star/polygon emphasis: vertices symmetric directions around the marker
 	// with extra density pulled toward each vertex (vertex_bias 0 = even
@@ -1546,6 +1559,7 @@ public:
 	VARIANT_ENUM_CAST(BlastBullets2D::BulletFactory2D::BulletType);
 	VARIANT_ENUM_CAST(BlastBullets2D::BulletFactory2D::Alignment);
 	VARIANT_ENUM_CAST(BlastBullets2D::BulletFactory2D::SpiralFacingMode);
+	VARIANT_ENUM_CAST(BlastBullets2D::BulletFactory2D::ScatterFacingMode);
 	VARIANT_ENUM_CAST(BlastBullets2D::BulletFactory2D::LineAnchor);
 	VARIANT_ENUM_CAST(BlastBullets2D::BulletFactory2D::EllipseMode);
 	VARIANT_ENUM_CAST(BlastBullets2D::BulletFactory2D::TriangleType);

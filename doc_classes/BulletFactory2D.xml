@@ -763,8 +763,12 @@
 			<param index="2" name="burst_radius" type="float" default="120.0" />
 			<param index="3" name="facing_jitter" type="float" default="0.4" />
 			<param index="4" name="seed" type="int" default="0" />
+			<param index="5" name="inner_radius" type="float" default="0.0" />
+			<param index="6" name="sector_direction" type="Vector2" default="Vector2(1, 0)" />
+			<param index="7" name="sector_arc" type="float" default="6.2831853" />
+			<param index="8" name="facing_mode" type="int" enum="BulletFactory2D.ScatterFacingMode" default="0" />
 			<description>
-				Generates a biased-random disc burst: offsets fill the [code]burst_radius[/code] disc with even density (not center-clumped), facings are radial-outward plus [code]facing_jitter[/code]. [code]seed[/code] 0 is non-deterministic, otherwise reproducible (replays, synced bosses). Useful for explosions, boss deaths and petal pops.
+				Generates a biased-random burst: offsets fill the disc (or annulus, see below) with even density (not center-clumped). Use it for explosions, boss deaths and petal pops. [code]seed[/code] 0 is non-deterministic, otherwise reproducible — a seeded call returns bit-identical volleys every time. [code]inner_radius[/code] hollows the center into a ring (0 is a full disc; clamped to [code]burst_radius[/code]). [code]sector_direction[/code] centers a cone of [code]sector_arc[/code] radians for directional blasts and shotgun fans (TAU or more is a full circle; 0 or non-finite falls back to full circle). [code]facing_mode[/code] picks bullet facing: outward faces away from the marker, random faces anywhere, inward faces the marker (implosions); [code]facing_jitter[/code] twists outward/inward facings.
 			</description>
 		</method>
 		<method name="helper_generate_transforms_spiral" qualifiers="static">

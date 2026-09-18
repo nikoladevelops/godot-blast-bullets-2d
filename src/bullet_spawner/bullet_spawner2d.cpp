@@ -1399,6 +1399,54 @@ void BulletSpawner2D::set_helper_scatter_seed(int value) {
     helper_scatter_seed = value;
     rebuild_preview();
 }
+double BulletSpawner2D::get_helper_scatter_inner_radius() const {
+    return helper_scatter_inner_radius;
+}
+void BulletSpawner2D::set_helper_scatter_inner_radius(double value) {
+    if (!Math::is_finite(value) || value < 0.0) {
+        UtilityFunctions::push_error("BulletSpawner2D: helper_scatter_inner_radius must be finite and >= 0 (0 = full disc), keeping the old value.");
+        return;
+    }
+    helper_scatter_inner_radius = value;
+    rebuild_preview();
+}
+Vector2 BulletSpawner2D::get_helper_scatter_direction() const {
+    return helper_scatter_direction;
+}
+void BulletSpawner2D::set_helper_scatter_direction(const Vector2 &value) {
+    if (!value.is_finite()) {
+        UtilityFunctions::push_error("BulletSpawner2D: helper_scatter_direction must be finite, keeping the old value.");
+        return;
+    }
+    if (value.length_squared() <= 0.0) {
+        UtilityFunctions::push_error("BulletSpawner2D: helper_scatter_direction must be non-zero, keeping the old value.");
+        return;
+    }
+    helper_scatter_direction = value;
+    rebuild_preview();
+}
+double BulletSpawner2D::get_helper_scatter_arc() const {
+    return helper_scatter_arc;
+}
+void BulletSpawner2D::set_helper_scatter_arc(double value) {
+    if (!Math::is_finite(value) || !(value > 0.0)) {
+        UtilityFunctions::push_error("BulletSpawner2D: helper_scatter_arc must be finite and > 0 (TAU or more = full circle), keeping the old value.");
+        return;
+    }
+    helper_scatter_arc = value;
+    rebuild_preview();
+}
+int BulletSpawner2D::get_helper_scatter_facing() const {
+    return helper_scatter_facing;
+}
+void BulletSpawner2D::set_helper_scatter_facing(int value) {
+    if (value < 0 || value > 2) {
+        UtilityFunctions::push_error("BulletSpawner2D: helper_scatter_facing must be 0 (outward), 1 (random) or 2 (inward), keeping the old value.");
+        return;
+    }
+    helper_scatter_facing = value;
+    rebuild_preview();
+}
 int BulletSpawner2D::get_helper_polygon_vertices() const {
     return helper_polygon_vertices;
 }
@@ -4683,8 +4731,17 @@ TypedArray<Transform2D> BulletSpawner2D::collect_spawn_transforms_impl(bool quie
         case PATTERN_FROM_HELPER_SCATTER: {
             // pattern_seed is the volley default; the per-pattern seed wins
             // when set (replays pin one pattern without freezing the rest).
-            const uint64_t scatter_seed = helper_scatter_seed > 0 ? (uint64_t)helper_scatter_seed : (pattern_seed > 0 ? (uint64_t)pattern_seed : 0);
-            raw = BulletFactory2D::helper_generate_transforms_scatter(helper_bullets_amount, marker, helper_scatter_burst_radius, helper_scatter_facing_jitter, scatter_seed);
+            uint64_t scatter_seed = helper_scatter_seed > 0 ? (uint64_t)helper_scatter_seed : (pattern_seed > 0 ? (uint64_t)pattern_seed : 0);
+            if (quiet && scatter_seed == 0) {
+                // Preview stability: an unseeded layout re-rolls on every
+                // collect, and the preview re-collects on every tracked
+                // change (spin sweeps included), so a live seed would make
+                // the dots jump chaotically instead of rotating coherently.
+                // Pin the preview to one representative layout; live volleys
+                // keep per-shot randomness.
+                scatter_seed = 0x5CA77E5u;
+            }
+            raw = BulletFactory2D::helper_generate_transforms_scatter(helper_bullets_amount, marker, helper_scatter_burst_radius, helper_scatter_facing_jitter, scatter_seed, helper_scatter_inner_radius, helper_scatter_direction, helper_scatter_arc, (BulletFactory2D::ScatterFacingMode)helper_scatter_facing);
             break;
         }
         case PATTERN_FROM_HELPER_POLYGON:
@@ -5548,6 +5605,26 @@ void BulletSpawner2D::rebuild_preview() {
                     const Vector2 r2 = r1 + along;
                     push_track_global(r1);
                     push_track_global(r2);
+                    break;
+                }
+                case PATTERN_FROM_HELPER_SCATTER: {
+                    // Burst-disc extent ring (dots carry density). A narrowed
+                    // sector draws its arc instead, so the track never
+                    // overstates the cone.
+                    if (helper_scatter_arc < Math::TAU && Math::is_finite(helper_scatter_arc) && helper_scatter_arc > 0.0 &&
+                            helper_scatter_direction.is_finite() && helper_scatter_direction.length_squared() > 1e-12 &&
+                            Math::is_finite(helper_scatter_burst_radius) && helper_scatter_burst_radius > 0.0) {
+                        const real_t base = helper_scatter_direction.normalized().angle();
+                        const real_t half = (real_t)(helper_scatter_arc * 0.5);
+                        const int arc_n = MAX(8, MIN(64, (int)(helper_scatter_arc * 16.0)));
+                        for (int i = 0; i <= arc_n; i++) {
+                            const real_t ang = base - half + (real_t)helper_scatter_arc * (real_t)i / (real_t)arc_n;
+                            push_track_local(Vector2(Math::cos(ang), Math::sin(ang)) * (real_t)helper_scatter_burst_radius);
+                        }
+                        track_closed = false;
+                    } else {
+                        push_track_dict(BulletFactory2D::helper_sample_outline_circle(helper_scatter_burst_radius));
+                    }
                     break;
                 }
                 default:
@@ -6885,6 +6962,30 @@ void BulletSpawner2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_helper_scatter_seed", "value"), &BulletSpawner2D::set_helper_scatter_seed);
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "helper_scatter_seed"), "set_helper_scatter_seed", "get_helper_scatter_seed");
 
+	ClassDB::bind_method(D_METHOD("get_helper_scatter_inner_radius"), &BulletSpawner2D::get_helper_scatter_inner_radius);
+	ClassDB::bind_method(D_METHOD("set_helper_scatter_inner_radius", "value"), &BulletSpawner2D::set_helper_scatter_inner_radius);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_scatter_inner_radius"), "set_helper_scatter_inner_radius", "get_helper_scatter_inner_radius");
+
+	ClassDB::bind_method(D_METHOD("get_helper_scatter_direction"), &BulletSpawner2D::get_helper_scatter_direction);
+	ClassDB::bind_method(D_METHOD("set_helper_scatter_direction", "value"), &BulletSpawner2D::set_helper_scatter_direction);
+	ADD_PROPERTY(PropertyInfo(Variant::VECTOR2, "helper_scatter_direction"), "set_helper_scatter_direction", "get_helper_scatter_direction");
+
+	ClassDB::bind_method(D_METHOD("get_helper_scatter_arc"), &BulletSpawner2D::get_helper_scatter_arc);
+	ClassDB::bind_method(D_METHOD("set_helper_scatter_arc", "value"), &BulletSpawner2D::set_helper_scatter_arc);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_scatter_arc"), "set_helper_scatter_arc", "get_helper_scatter_arc");
+
+	ClassDB::bind_method(D_METHOD("get_helper_scatter_facing"), &BulletSpawner2D::get_helper_scatter_facing);
+	ClassDB::bind_method(D_METHOD("set_helper_scatter_facing", "value"), &BulletSpawner2D::set_helper_scatter_facing);
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "helper_scatter_facing", PROPERTY_HINT_ENUM, "Outward,Random,Inward"), "set_helper_scatter_facing", "get_helper_scatter_facing");
+
+	// Global default seed, bound here so it renders directly underneath the
+	// Scatter group it most often serves. Still global: feeds the Scatter
+	// fallback, homing-random selection, and reload jitter (per-pattern
+	// seeds override it where they exist).
+	ClassDB::bind_method(D_METHOD("get_pattern_seed"), &BulletSpawner2D::get_pattern_seed);
+	ClassDB::bind_method(D_METHOD("set_pattern_seed", "value"), &BulletSpawner2D::set_pattern_seed);
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "pattern_seed"), "set_pattern_seed", "get_pattern_seed");
+
 	ClassDB::bind_method(D_METHOD("get_helper_polygon_vertices"), &BulletSpawner2D::get_helper_polygon_vertices);
 	ClassDB::bind_method(D_METHOD("set_helper_polygon_vertices", "value"), &BulletSpawner2D::set_helper_polygon_vertices);
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "helper_polygon_vertices"), "set_helper_polygon_vertices", "get_helper_polygon_vertices");
@@ -7543,10 +7644,6 @@ void BulletSpawner2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_telegraph_sec"), &BulletSpawner2D::get_telegraph_sec);
 	ClassDB::bind_method(D_METHOD("set_telegraph_sec", "value"), &BulletSpawner2D::set_telegraph_sec);
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "telegraph_sec"), "set_telegraph_sec", "get_telegraph_sec");
-
-	ClassDB::bind_method(D_METHOD("get_pattern_seed"), &BulletSpawner2D::get_pattern_seed);
-	ClassDB::bind_method(D_METHOD("set_pattern_seed", "value"), &BulletSpawner2D::set_pattern_seed);
-	ADD_PROPERTY(PropertyInfo(Variant::INT, "pattern_seed"), "set_pattern_seed", "get_pattern_seed");
 
 	ClassDB::bind_method(D_METHOD("get_max_live_bullets"), &BulletSpawner2D::get_max_live_bullets);
 	ClassDB::bind_method(D_METHOD("set_max_live_bullets", "value"), &BulletSpawner2D::set_max_live_bullets);

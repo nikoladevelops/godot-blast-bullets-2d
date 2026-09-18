@@ -1976,7 +1976,11 @@ TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_scatter(
 		Transform2D marker_transform,
 		real_t burst_radius,
 		real_t facing_jitter,
-		uint64_t seed) {
+		uint64_t seed,
+		real_t inner_radius,
+		Vector2 sector_direction,
+		real_t sector_arc,
+		ScatterFacingMode facing_mode) {
 	if (!danmaku_validate_head("helper_generate_transforms_scatter", transforms_amount, marker_transform)) {
 		return TypedArray<Transform2D>();
 	}
@@ -1988,6 +1992,31 @@ TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_scatter(
 		UtilityFunctions::push_error("helper_generate_transforms_scatter: facing_jitter must be finite and >= 0.");
 		return TypedArray<Transform2D>();
 	}
+	if (!Math::is_finite(inner_radius) || inner_radius < 0.0) {
+		UtilityFunctions::push_error("helper_generate_transforms_scatter: inner_radius must be finite and >= 0.");
+		return TypedArray<Transform2D>();
+	}
+	if (facing_mode < SCATTER_FACING_OUTWARD || facing_mode > SCATTER_FACING_INWARD) {
+		UtilityFunctions::push_error("helper_generate_transforms_scatter: facing_mode out of range.");
+		return TypedArray<Transform2D>();
+	}
+	// Clamp, don't reject: callers set inner/burst in any order, and an
+	// inner edge past the rim just means a thin ring at the rim.
+	const real_t outer = burst_radius;
+	const real_t inner = MIN(MAX(inner_radius, 0.0), outer);
+	// Sector: direction fallback mirrors the line/rain generators (dead knob
+	// degrades to +X, never stalls). Arc >= TAU is a full circle.
+	Vector2 axis = Vector2(1, 0);
+	if (sector_direction.is_finite() && sector_direction.length_squared() > 1e-12) {
+		axis = sector_direction.normalized();
+	}
+	real_t arc = sector_arc;
+	if (!Math::is_finite(arc) || arc <= 0.0) {
+		arc = Math::TAU;
+	} else if (arc > Math::TAU) {
+		arc = Math::TAU;
+	}
+	const real_t base_angle = axis.angle();
 	TypedArray<Transform2D> generated_transforms = danmaku_make_slots(transforms_amount);
 	if (transforms_amount == 0) {
 		return generated_transforms;
@@ -2001,12 +2030,24 @@ TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_scatter(
 	}
 	const Vector2 origin = marker_transform.get_origin();
 	for (int i = 0; i < transforms_amount; ++i) {
-		// sqrt distribution: even disc density instead of center-clumped.
-		const real_t r = burst_radius * Math::sqrt(rng->randf());
-		const real_t a = rng->randf() * Math::TAU;
+		// sqrt distribution over [inner^2, outer^2]: even annulus density
+		// instead of center-clumped (inner = 0 reproduces the old disc).
+		const real_t rr = inner * inner + (outer * outer - inner * inner) * rng->randf();
+		const real_t r = (rr > 0.0) ? Math::sqrt(rr) : 0.0;
+		// Full circle keeps the historical draw (bit-identical sequences for
+		// old seeds); sectors center on the aim direction instead.
+		const real_t a = (arc >= Math::TAU) ? base_angle + rng->randf() * Math::TAU : base_angle + (rng->randf() - 0.5) * arc;
 		const Vector2 offset = Vector2(Math::cos(a), Math::sin(a)) * r;
 		const real_t radial = (offset.length_squared() > 0.0) ? offset.angle() : marker_transform.get_rotation();
-		const real_t facing = radial + rng->randf_range(-facing_jitter, facing_jitter);
+		real_t facing = radial;
+		if (facing_mode == SCATTER_FACING_RANDOM) {
+			facing = rng->randf() * Math::TAU;
+		} else {
+			if (facing_mode == SCATTER_FACING_INWARD) {
+				facing += Math::PI;
+			}
+			facing += rng->randf_range(-facing_jitter, facing_jitter);
+		}
 		Transform2D slot(facing, origin + offset);
 		danmaku_apply_marker_scale(slot, marker_transform);
 		generated_transforms[i] = slot;
@@ -4492,10 +4533,18 @@ void BulletFactory2D::_bind_methods() {
 										 "marker_transform",
 										 "burst_radius",
 										 "facing_jitter",
-										 "seed"),
+										 "seed",
+										 "inner_radius",
+										 "sector_direction",
+										 "sector_arc",
+										 "facing_mode"),
 								&BulletFactory2D::helper_generate_transforms_scatter,
 								DEFVAL(120.0),
 								DEFVAL(0.4),
+								DEFVAL(0),
+								DEFVAL(0.0),
+								DEFVAL(Vector2(1, 0)),
+								DEFVAL(Math::TAU),
 								DEFVAL(0));
 
 	ClassDB::bind_static_method("BulletFactory2D",
@@ -5310,6 +5359,9 @@ void BulletFactory2D::_bind_methods() {
 	BIND_ENUM_CONSTANT(SPIRAL_FACING_RADIAL_OUTWARD);
 	BIND_ENUM_CONSTANT(SPIRAL_FACING_TOWARD_CENTER);
 	BIND_ENUM_CONSTANT(SPIRAL_FACING_KEEP_MARKER);
+	BIND_ENUM_CONSTANT(SCATTER_FACING_OUTWARD);
+	BIND_ENUM_CONSTANT(SCATTER_FACING_RANDOM);
+	BIND_ENUM_CONSTANT(SCATTER_FACING_INWARD);
 	BIND_ENUM_CONSTANT(LINE_ANCHOR_START);
 	BIND_ENUM_CONSTANT(LINE_ANCHOR_CENTER);
 	BIND_ENUM_CONSTANT(LINE_ANCHOR_END);
