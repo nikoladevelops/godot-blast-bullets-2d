@@ -1054,7 +1054,7 @@ public:
 	// Star/polygon emphasis: vertices symmetric directions around the marker
 	// with extra density pulled toward each vertex (vertex_bias 0 = even
 	// ring, higher = sharper star). edges bullets per edge fill the spans.
-	static TypedArray<Transform2D> helper_generate_transforms_polygon(
+	static TypedArray<Transform2D> helper_generate_transforms_star_polygon(
 			int transforms_amount,
 			Transform2D marker_transform,
 			int vertices = 5,
@@ -1324,10 +1324,10 @@ public:
 			int shell_layers = 1,
 			double shell_step = 32.0);
 
-	// Regular polygon perimeter: vertices corners on a radius circle from
+	// Polygon perimeter: vertices corners on a radius circle from
 	// base_rotation, slots spread evenly by arc length along the outline,
 	// facing outward (or inward).
-	static TypedArray<Transform2D> helper_generate_transforms_regular_polygon(
+	static TypedArray<Transform2D> helper_generate_transforms_polygon(
 			int transforms_amount,
 			Transform2D marker_transform,
 			int vertices = 6,
@@ -1527,7 +1527,7 @@ public:
 	static Dictionary helper_sample_outline_triangle(int triangle_type = 0, real_t size_a = 150.0, real_t size_b = 150.0, real_t rotation = 0.0);
 	static Dictionary helper_sample_outline_trapezoid(real_t base_top = 200.0, real_t base_bottom = 300.0, real_t height = 200.0, real_t rotation = 0.0);
 	static Dictionary helper_sample_outline_diamond(real_t diagonal_x = 200.0, real_t diagonal_y = 300.0, real_t rotation = 0.0);
-	static Dictionary helper_sample_outline_regular_polygon(int vertices = 6, real_t radius = 150.0, real_t base_rotation = 0.0);
+	static Dictionary helper_sample_outline_polygon(int vertices = 6, real_t radius = 150.0, real_t base_rotation = 0.0);
 	static Dictionary helper_sample_outline_ellipse(real_t radius_x = 150.0, real_t radius_y = 100.0, real_t ellipse_rotation = 0.0, real_t start_angle = 0.0, real_t arc = Math::TAU, int mode = 0);
 	static Dictionary helper_sample_outline_ring(real_t radius = 150.0, real_t arc = Math::TAU, real_t y_scale = 1.0, real_t start_angle_abs = 0.0);
 	static Dictionary helper_sample_outline_star(int points = 5, real_t outer_radius = 150.0, real_t inner_radius = 65.0, real_t base_rotation = 0.0);

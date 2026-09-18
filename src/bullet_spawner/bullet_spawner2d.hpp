@@ -115,7 +115,7 @@ class BulletSpawner2D : public Node2D{
             PATTERN_FROM_HELPER_ELLIPSE,
             PATTERN_FROM_HELPER_RAIN,
             PATTERN_FROM_HELPER_SCATTER,
-            PATTERN_FROM_HELPER_POLYGON,
+            PATTERN_FROM_HELPER_STAR_POLYGON,
             PATTERN_FROM_HELPER_MULTISPIRAL,
             PATTERN_FROM_HELPER_CROSS,
             PATTERN_FROM_HELPER_STAR,
@@ -131,12 +131,17 @@ class BulletSpawner2D : public Node2D{
             PATTERN_FROM_HELPER_CIRCLE,
             PATTERN_FROM_HELPER_RECTANGLE,
             PATTERN_FROM_HELPER_SQUARE,
-            PATTERN_FROM_HELPER_REGULAR_POLYGON,
+            PATTERN_FROM_HELPER_POLYGON,
             PATTERN_FROM_HELPER_PATH2D,
             PATTERN_FROM_HELPER_TRIANGLE,
             PATTERN_FROM_HELPER_TRAPEZOID,
             PATTERN_FROM_HELPER_DIAMOND
         };
+
+        // Scene compat lock: pattern_source is stored as int in scenes.
+        // Never reorder or renumber (rename only).
+        static_assert((int)PATTERN_FROM_HELPER_STAR_POLYGON == 12, "STAR_POLYGON must stay 12 for saved scenes");
+        static_assert((int)PATTERN_FROM_HELPER_POLYGON == 28, "POLYGON must stay 28 for saved scenes");
 
         // Path2D layout: how bullets are placed along the baked curve.
         // FIXED_SPACING lays count bullets run=(count-1)*spacing apart;
@@ -406,13 +411,14 @@ class BulletSpawner2D : public Node2D{
         // Bullet facing: 0 = radial outward, 1 = fully random, 2 = inward.
         int helper_scatter_facing = 0;
 
-        // POLYGON (star emphasis: density pulled toward N vertices).
-        int helper_polygon_vertices = 5;
-        double helper_polygon_radius = 150.0;
-        double helper_polygon_vertex_bias = 2.0;
-        double helper_polygon_base_rotation = 0.0;
-        bool helper_polygon_face_outward = true;
-        double helper_polygon_facing_offset_deg = 0.0;
+        // STAR POLYGON (vertex emphasis: density pulled toward N vertices of
+        // a star frame; unlike Polygon it is a scatter, not a perimeter).
+        int helper_star_polygon_vertices = 5;
+        double helper_star_polygon_radius = 150.0;
+        double helper_star_polygon_vertex_bias = 2.0;
+        double helper_star_polygon_base_rotation = 0.0;
+        bool helper_star_polygon_face_outward = true;
+        double helper_star_polygon_facing_offset_deg = 0.0;
 
         // MULTISPIRAL (interleaved galaxy/windmill/rose arms).
         int helper_multispiral_arms = 3;
@@ -553,12 +559,12 @@ class BulletSpawner2D : public Node2D{
         double helper_square_size = 300.0;
         bool helper_square_face_outward = true;
         double helper_square_facing_offset_deg = 0.0;
-        // REGULAR POLYGON (true perimeter, not star-biased scatter).
-        int helper_regular_polygon_vertices = 6;
-        double helper_regular_polygon_radius = 150.0;
-        double helper_regular_polygon_rotation = 0.0;
-        bool helper_regular_polygon_face_outward = true;
-        double helper_regular_polygon_facing_offset_deg = 0.0;
+        // POLYGON (true perimeter walk, centered; corner count and radius).
+        int helper_polygon_vertices = 6;
+        double helper_polygon_radius = 150.0;
+        double helper_polygon_rotation = 0.0;
+        bool helper_polygon_face_outward = true;
+        double helper_polygon_facing_offset_deg = 0.0;
         // PATH2D (live curve layout; standalone, deterministic).
         // Bullets sit ON the baked curve: FIXED_SPACING places them
         // helper_path2d_spacing apart (helper_path2d_anchor/overflow decide
@@ -997,18 +1003,18 @@ class BulletSpawner2D : public Node2D{
         void set_helper_scatter_arc(double value);
         int get_helper_scatter_facing() const;
         void set_helper_scatter_facing(int value);
-        int get_helper_polygon_vertices() const;
-        void set_helper_polygon_vertices(int value);
-        double get_helper_polygon_radius() const;
-        void set_helper_polygon_radius(double value);
-        double get_helper_polygon_vertex_bias() const;
-        void set_helper_polygon_vertex_bias(double value);
-        double get_helper_polygon_base_rotation() const;
-        void set_helper_polygon_base_rotation(double value);
-        bool get_helper_polygon_face_outward() const;
-        void set_helper_polygon_face_outward(bool value);
-        double get_helper_polygon_facing_offset_deg() const;
-        void set_helper_polygon_facing_offset_deg(double value);
+        int get_helper_star_polygon_vertices() const;
+        void set_helper_star_polygon_vertices(int value);
+        double get_helper_star_polygon_radius() const;
+        void set_helper_star_polygon_radius(double value);
+        double get_helper_star_polygon_vertex_bias() const;
+        void set_helper_star_polygon_vertex_bias(double value);
+        double get_helper_star_polygon_base_rotation() const;
+        void set_helper_star_polygon_base_rotation(double value);
+        bool get_helper_star_polygon_face_outward() const;
+        void set_helper_star_polygon_face_outward(bool value);
+        double get_helper_star_polygon_facing_offset_deg() const;
+        void set_helper_star_polygon_facing_offset_deg(double value);
         int get_helper_multispiral_arms() const;
         void set_helper_multispiral_arms(int value);
         double get_helper_multispiral_start_radius() const;
@@ -1215,16 +1221,16 @@ class BulletSpawner2D : public Node2D{
         void set_helper_square_face_outward(bool value);
         double get_helper_square_facing_offset_deg() const;
         void set_helper_square_facing_offset_deg(double value);
-        int get_helper_regular_polygon_vertices() const;
-        void set_helper_regular_polygon_vertices(int value);
-        double get_helper_regular_polygon_radius() const;
-        void set_helper_regular_polygon_radius(double value);
-        double get_helper_regular_polygon_rotation() const;
-        void set_helper_regular_polygon_rotation(double value);
-        bool get_helper_regular_polygon_face_outward() const;
-        void set_helper_regular_polygon_face_outward(bool value);
-        double get_helper_regular_polygon_facing_offset_deg() const;
-        void set_helper_regular_polygon_facing_offset_deg(double value);
+        int get_helper_polygon_vertices() const;
+        void set_helper_polygon_vertices(int value);
+        double get_helper_polygon_radius() const;
+        void set_helper_polygon_radius(double value);
+        double get_helper_polygon_rotation() const;
+        void set_helper_polygon_rotation(double value);
+        bool get_helper_polygon_face_outward() const;
+        void set_helper_polygon_face_outward(bool value);
+        double get_helper_polygon_facing_offset_deg() const;
+        void set_helper_polygon_facing_offset_deg(double value);
         NodePath get_helper_path2d_path() const;
         void set_helper_path2d_path(const NodePath &p_path);
         Path2DSpace get_helper_path2d_space() const;
@@ -1753,7 +1759,7 @@ class BulletSpawner2D : public Node2D{
         TypedArray<Transform2D> collect_path2d_transforms(const Transform2D &marker, const PackedVector2Array &path_pts, int count, bool quiet) const;
         // True for the closed-loop outline modes the outline layout engine
         // supports (Ring, Ellipse, Star, Flower, Rose, Lissajous, Circle,
-        // Rectangle, Square, Regular Polygon). Scatter/gap modes and open
+        // Rectangle, Square, Polygon). Scatter/gap modes and open
         // curves are excluded: without a loop there is no inside.
         static bool supports_outline_layout(PatternSource source);
 

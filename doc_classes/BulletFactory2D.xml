@@ -203,7 +203,7 @@
 				Generates a rectangle perimeter walk (counter-clockwise from top-left), slots spread evenly by arc length, facing outward (or inward). Square = equal sides. The outline_* tail params place slots on the loop, fill its interior, or shell its outside.
 			</description>
 		</method>
-		<method name="helper_generate_transforms_regular_polygon" qualifiers="static">
+		<method name="helper_generate_transforms_polygon" qualifiers="static">
 			<return type="Transform2D[]" />
 			<param index="0" name="transforms_amount" type="int" />
 			<param index="1" name="marker_transform" type="Transform2D" />
@@ -231,7 +231,7 @@
 			<param index="14" name="shell_layers" type="int" default="1" />
 			<param index="15" name="shell_step" type="float" default="32.0" />
 			<description>
-				Generates a regular polygon perimeter (vertices corners on a radius circle from base_rotation), slots spread evenly by arc length, facing outward (or inward). The outline_* tail params place slots on the loop, fill its interior, or shell its outside.
+				Generates a polygon perimeter (vertices corners on a radius circle from base_rotation), slots spread evenly by arc length, facing outward (or inward). The outline_* tail params place slots on the loop, fill its interior, or shell its outside.
 			</description>
 		</method>
 				<method name="helper_generate_transforms_triangle" qualifiers="static">
@@ -350,13 +350,13 @@
 			</description>
 </method>
 
-<method name="helper_sample_outline_regular_polygon" qualifiers="static">
+<method name="helper_sample_outline_polygon" qualifiers="static">
 			<return type="Dictionary" />
 			<param index="0" name="vertices" type="int" default="6" />
 			<param index="1" name="radius" type="float" default="150.0" />
 			<param index="2" name="base_rotation" type="float" default="0.0" />
 			<description>
-			Regular polygon corners in marker-local pixels. Closed.
+			Polygon corners in marker-local pixels. Closed.
 			</description>
 </method>
 
@@ -664,7 +664,7 @@
 				Generates a multi-arm spiral: [code]arms[/code] interleaved arms around the marker (galaxy, windmill and rose looks at low bullet counts). [code]arm_index_stride[/code] 1 interleaves consecutive slots across arms, higher values group slots per arm. Same facing modes as the single spiral. Useful for pinwheels, galaxies and rotating boss arms.
 			</description>
 		</method>
-		<method name="helper_generate_transforms_polygon" qualifiers="static">
+		<method name="helper_generate_transforms_star_polygon" qualifiers="static">
 			<return type="Transform2D[]" />
 			<param index="0" name="transforms_amount" type="int" />
 			<param index="1" name="marker_transform" type="Transform2D" />

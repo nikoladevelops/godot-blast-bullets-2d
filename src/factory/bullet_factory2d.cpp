@@ -2055,7 +2055,7 @@ TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_scatter(
 	return generated_transforms;
 }
 
-TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_polygon(
+TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_star_polygon(
 		int transforms_amount,
 		Transform2D marker_transform,
 		int vertices,
@@ -2064,19 +2064,19 @@ TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_polygon(
 		real_t base_rotation,
 		bool face_outward,
 		real_t facing_offset_degrees) {
-	if (!danmaku_validate_head("helper_generate_transforms_polygon", transforms_amount, marker_transform)) {
+	if (!danmaku_validate_head("helper_generate_transforms_star_polygon", transforms_amount, marker_transform)) {
 		return TypedArray<Transform2D>();
 	}
 	if (vertices < 3) {
-		UtilityFunctions::push_error("helper_generate_transforms_polygon: vertices must be >= 3.");
+		UtilityFunctions::push_error("helper_generate_transforms_star_polygon: vertices must be >= 3.");
 		return TypedArray<Transform2D>();
 	}
 	if (!Math::is_finite(radius) || radius < 0.0) {
-		UtilityFunctions::push_error("helper_generate_transforms_polygon: radius must be finite and >= 0.");
+		UtilityFunctions::push_error("helper_generate_transforms_star_polygon: radius must be finite and >= 0.");
 		return TypedArray<Transform2D>();
 	}
 	if (!Math::is_finite(vertex_bias) || vertex_bias < 0.0 || !Math::is_finite(base_rotation) || !Math::is_finite(facing_offset_degrees)) {
-		UtilityFunctions::push_error("helper_generate_transforms_polygon: vertex_bias, base_rotation and facing_offset_degrees must be finite (bias >= 0).");
+		UtilityFunctions::push_error("helper_generate_transforms_star_polygon: vertex_bias, base_rotation and facing_offset_degrees must be finite (bias >= 0).");
 		return TypedArray<Transform2D>();
 	}
 	TypedArray<Transform2D> generated_transforms = danmaku_make_slots(transforms_amount);
@@ -2914,7 +2914,7 @@ TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_rectangle(
 	return layout_outline_slots("helper_generate_transforms_rectangle", marker_transform, loop_points, loop_normals, true, marker_rot, face_outward, facing_offset_degrees, PackedFloat32Array(), outline_placement, outline_facing, outline_reverse, outline_slot_offset, fill_spacing, fill_stagger, fill_margin, shell_layers, shell_step);
 }
 
-TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_regular_polygon(
+TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_polygon(
 		int transforms_amount,
 		Transform2D marker_transform,
 		int vertices,
@@ -2931,11 +2931,11 @@ TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_regular_poly
 		double fill_margin,
 		int shell_layers,
 		double shell_step) {
-	if (!danmaku_validate_head("helper_generate_transforms_regular_polygon", transforms_amount, marker_transform)) {
+	if (!danmaku_validate_head("helper_generate_transforms_polygon", transforms_amount, marker_transform)) {
 		return TypedArray<Transform2D>();
 	}
 	if (vertices < 3 || !Math::is_finite(radius) || radius < 0.0 || !Math::is_finite(base_rotation) || !Math::is_finite(facing_offset_degrees)) {
-		UtilityFunctions::push_error("helper_generate_transforms_regular_polygon: vertices must be >= 3, radius finite and >= 0, rotations finite.");
+		UtilityFunctions::push_error("helper_generate_transforms_polygon: vertices must be >= 3, radius finite and >= 0, rotations finite.");
 		return TypedArray<Transform2D>();
 	}
 	PackedVector2Array corners;
@@ -2945,7 +2945,7 @@ TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_regular_poly
 	}
 	PackedVector2Array normals;
 	if (!compute_edge_normals_quiet(corners, true, false, normals)) {
-		UtilityFunctions::push_error("helper_generate_transforms_regular_polygon: degenerate polygon.");
+		UtilityFunctions::push_error("helper_generate_transforms_polygon: degenerate polygon.");
 		return TypedArray<Transform2D>();
 	}
 	// Arc-length walk so slots spread evenly even on stretched shapes; the
@@ -2999,7 +2999,7 @@ TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_regular_poly
 		loop_points[i] = local;
 		loop_normals[i] = nrm;
 	}
-	return layout_outline_slots("helper_generate_transforms_regular_polygon", marker_transform, loop_points, loop_normals, true, marker_rot, face_outward, facing_offset_degrees, PackedFloat32Array(), outline_placement, outline_facing, outline_reverse, outline_slot_offset, fill_spacing, fill_stagger, fill_margin, shell_layers, shell_step);
+	return layout_outline_slots("helper_generate_transforms_polygon", marker_transform, loop_points, loop_normals, true, marker_rot, face_outward, facing_offset_degrees, PackedFloat32Array(), outline_placement, outline_facing, outline_reverse, outline_slot_offset, fill_spacing, fill_stagger, fill_margin, shell_layers, shell_step);
 }
 
 
@@ -3490,12 +3490,12 @@ Dictionary BulletFactory2D::helper_sample_outline_diamond(real_t diagonal_x, rea
 	return outline_track_result(build_diamond_corners(diagonal_x, diagonal_y, rotation), true);
 }
 
-Dictionary BulletFactory2D::helper_sample_outline_regular_polygon(int vertices, real_t radius, real_t base_rotation) {
+Dictionary BulletFactory2D::helper_sample_outline_polygon(int vertices, real_t radius, real_t base_rotation) {
 	if (vertices < 3 || !Math::is_finite(radius) || radius <= 0.0 || !Math::is_finite(base_rotation)) {
-		UtilityFunctions::push_error("helper_sample_outline_regular_polygon: vertices >= 3, finite radius > 0.");
+		UtilityFunctions::push_error("helper_sample_outline_polygon: vertices >= 3, finite radius > 0.");
 		return outline_track_result(PackedVector2Array(), false);
 	}
-	// Mirrors helper_generate_transforms_regular_polygon corner order.
+	// Mirrors helper_generate_transforms_polygon corner order.
 	PackedVector2Array pts;
 	for (int k = 0; k < vertices; ++k) {
 		const real_t a = base_rotation + Math::TAU * (real_t)k / (real_t)vertices;
@@ -4548,7 +4548,7 @@ void BulletFactory2D::_bind_methods() {
 								DEFVAL(0));
 
 	ClassDB::bind_static_method("BulletFactory2D",
-								D_METHOD("helper_generate_transforms_polygon",
+								D_METHOD("helper_generate_transforms_star_polygon",
 										 "transforms_amount",
 										 "marker_transform",
 										 "vertices",
@@ -4557,7 +4557,7 @@ void BulletFactory2D::_bind_methods() {
 										 "base_rotation",
 										 "face_outward",
 										 "facing_offset_degrees"),
-								&BulletFactory2D::helper_generate_transforms_polygon,
+								&BulletFactory2D::helper_generate_transforms_star_polygon,
 								DEFVAL(5),
 								DEFVAL(150.0),
 								DEFVAL(2.0),
@@ -4897,7 +4897,7 @@ void BulletFactory2D::_bind_methods() {
 								DEFVAL(32.0));
 
 	ClassDB::bind_static_method("BulletFactory2D",
-								D_METHOD("helper_generate_transforms_regular_polygon",
+								D_METHOD("helper_generate_transforms_polygon",
 										 "transforms_amount",
 										 "marker_transform",
 										 "vertices",
@@ -4914,7 +4914,7 @@ void BulletFactory2D::_bind_methods() {
 										"fill_margin",
 										"shell_layers",
 										"shell_step"),
-								&BulletFactory2D::helper_generate_transforms_regular_polygon,
+								&BulletFactory2D::helper_generate_transforms_polygon,
 								DEFVAL(6),
 								DEFVAL(150.0),
 								DEFVAL(0.0),
@@ -5109,11 +5109,11 @@ void BulletFactory2D::_bind_methods() {
 								DEFVAL(0.0));
 
 	ClassDB::bind_static_method("BulletFactory2D",
-								D_METHOD("helper_sample_outline_regular_polygon",
+								D_METHOD("helper_sample_outline_polygon",
 										"vertices",
 										"radius",
 										"base_rotation"),
-								&BulletFactory2D::helper_sample_outline_regular_polygon,
+								&BulletFactory2D::helper_sample_outline_polygon,
 								DEFVAL(6),
 								DEFVAL(150.0),
 								DEFVAL(0.0));

@@ -322,7 +322,7 @@
 			Bullet count for helper patterns. Clamped to 1-10000: one volley fans out to transforms, instance buffers and physics shapes, so uncapped values would freeze on a typo. Outline Fill Inside may return fewer (small shapes run out of grid cells, like Corridor/Ellipse Wall gaps).
 		</member>
 		<member name="helper_outline_placement" type="int" setter="set_helper_outline_placement" getter="get_helper_outline_placement" enum="BulletFactory2D.OutlinePlacement" default="0">
-			Where closed-loop shape bullets live (Ring, Ellipse, Star, Flower, Rose, Lissajous, Circle, Rectangle, Square, Regular Polygon): On Outline keeps the generated slot loop, Fill Inside swaps it for a row-major grid masked to the loop interior, Shell Outside spreads the same slot count over concentric outward layers. On Outline is the identity default.
+			Where closed-loop shape bullets live (Ring, Ellipse, Star, Flower, Rose, Lissajous, Circle, Rectangle, Square, Polygon): On Outline keeps the generated slot loop, Fill Inside swaps it for a row-major grid masked to the loop interior, Shell Outside spreads the same slot count over concentric outward layers. On Outline is the identity default.
 		</member>
 		<member name="helper_outline_facing" type="int" setter="set_helper_outline_facing" getter="get_helper_outline_facing" enum="BulletFactory2D.OutlineFacing" default="0">
 			Rotates each closed-loop shape facing: Outline Normal keeps it as generated, +90/-90 Degrees turn it toward the loop tangent. The per-shape facing_offset_deg still applies on top.
@@ -672,19 +672,19 @@
 		<member name="helper_square_facing_offset_deg" type="float" setter="set_helper_square_facing_offset_deg" getter="get_helper_square_facing_offset_deg" default="0.0">
 			Extra facing twist in degrees on top of the square normal. Must be finite.
 		</member>
-		<member name="helper_regular_polygon_vertices" type="int" setter="set_helper_regular_polygon_vertices" getter="get_helper_regular_polygon_vertices" default="6">
-			Regular-polygon corner count (true perimeter, not the star-biased Polygon scatter mode). Must be 3 or more.
+		<member name="helper_polygon_vertices" type="int" setter="set_helper_polygon_vertices" getter="get_helper_polygon_vertices" default="6">
+			Polygon corner count (true perimeter, not the Star Polygon scatter mode). Must be 3 or more.
 		</member>
-		<member name="helper_regular_polygon_radius" type="float" setter="set_helper_regular_polygon_radius" getter="get_helper_regular_polygon_radius" default="150.0">
-			Regular-polygon corner radius in pixels. Must be finite and 0 or more.
+		<member name="helper_polygon_radius" type="float" setter="set_helper_polygon_radius" getter="get_helper_polygon_radius" default="150.0">
+			Polygon corner radius in pixels. Must be finite and 0 or more.
 		</member>
-		<member name="helper_regular_polygon_rotation" type="float" setter="set_helper_regular_polygon_rotation" getter="get_helper_regular_polygon_rotation" default="0.0">
-			Regular-polygon base rotation in radians. Must be finite.
+		<member name="helper_polygon_rotation" type="float" setter="set_helper_polygon_rotation" getter="get_helper_polygon_rotation" default="0.0">
+			Polygon base rotation in radians. Must be finite.
 		</member>
-		<member name="helper_regular_polygon_face_outward" type="bool" setter="set_helper_regular_polygon_face_outward" getter="get_helper_regular_polygon_face_outward" default="true">
-			Regular-polygon bullets face outward; off faces inward.
+		<member name="helper_polygon_face_outward" type="bool" setter="set_helper_polygon_face_outward" getter="get_helper_polygon_face_outward" default="true">
+			Polygon bullets face outward; off faces inward.
 		</member>
-		<member name="helper_regular_polygon_facing_offset_deg" type="float" setter="set_helper_regular_polygon_facing_offset_deg" getter="get_helper_regular_polygon_facing_offset_deg" default="0.0">
+		<member name="helper_polygon_facing_offset_deg" type="float" setter="set_helper_polygon_facing_offset_deg" getter="get_helper_polygon_facing_offset_deg" default="0.0">
 			Extra facing twist in degrees on top of the polygon normal. Must be finite.
 		</member>
 		<member name="helper_path2d_space" type="int" setter="set_helper_path2d_space" getter="get_helper_path2d_space" enum="BulletSpawner2D.Path2DSpace" default="0">
@@ -744,22 +744,22 @@
 		<member name="helper_multispiral_start_radius" type="float" setter="set_helper_multispiral_start_radius" getter="get_helper_multispiral_start_radius" default="50.0">
 			First-slot radius in pixels. Must be finite and 0 or more.
 		</member>
-		<member name="helper_polygon_base_rotation" type="float" setter="set_helper_polygon_base_rotation" getter="get_helper_polygon_base_rotation" default="0.0">
+		<member name="helper_star_polygon_base_rotation" type="float" setter="set_helper_star_polygon_base_rotation" getter="get_helper_star_polygon_base_rotation" default="0.0">
 			Rotates the whole star. Must be finite.
 		</member>
-		<member name="helper_polygon_face_outward" type="bool" setter="set_helper_polygon_face_outward" getter="get_helper_polygon_face_outward" default="true">
+		<member name="helper_star_polygon_face_outward" type="bool" setter="set_helper_star_polygon_face_outward" getter="get_helper_star_polygon_face_outward" default="true">
 			Face away from the marker. Off faces the marker.
 		</member>
-		<member name="helper_polygon_facing_offset_deg" type="float" setter="set_helper_polygon_facing_offset_deg" getter="get_helper_polygon_facing_offset_deg" default="0.0">
+		<member name="helper_star_polygon_facing_offset_deg" type="float" setter="set_helper_star_polygon_facing_offset_deg" getter="get_helper_star_polygon_facing_offset_deg" default="0.0">
 			Twists every star facing. Must be finite.
 		</member>
-		<member name="helper_polygon_radius" type="float" setter="set_helper_polygon_radius" getter="get_helper_polygon_radius" default="150.0">
+		<member name="helper_star_polygon_radius" type="float" setter="set_helper_star_polygon_radius" getter="get_helper_star_polygon_radius" default="150.0">
 			Star radius in pixels. Must be finite and 0 or more.
 		</member>
-		<member name="helper_polygon_vertex_bias" type="float" setter="set_helper_polygon_vertex_bias" getter="get_helper_polygon_vertex_bias" default="2.0">
+		<member name="helper_star_polygon_vertex_bias" type="float" setter="set_helper_star_polygon_vertex_bias" getter="get_helper_star_polygon_vertex_bias" default="2.0">
 			Star sharpness: 0 is an even ring, higher pulls density toward the vertices. Must be finite and 0 or more.
 		</member>
-		<member name="helper_polygon_vertices" type="int" setter="set_helper_polygon_vertices" getter="get_helper_polygon_vertices" default="5">
+		<member name="helper_star_polygon_vertices" type="int" setter="set_helper_star_polygon_vertices" getter="get_helper_star_polygon_vertices" default="5">
 			Star vertices. Must be 3 or more.
 		</member>
 		<member name="helper_rain_band_width" type="float" setter="set_helper_rain_band_width" getter="get_helper_rain_band_width" default="600.0">
@@ -1147,7 +1147,7 @@
 			Per-bullet size scale: multiplies each spawn transform's local basis (texture size) without moving its position. 1.0 keeps sizes as generated, 0 hides bullets in place, negatives mirror them. Must be finite.
 		</member>
 		<member name="pattern_source" type="int" setter="set_pattern_source" getter="get_pattern_source" enum="BulletSpawner2D.PatternSource" default="0">
-			Where volley transforms come from: children markers (0), this generator itself (1), or one of 31 procedural helper patterns (2-32: Grid, Ring, Fan, Spiral, Line, Aimed, Flower, Ellipse, Rain, Scatter, Polygon, Multi Spiral, Cross, Star, Heart, Wave, Waterfall, Lattice, Rose, Counter Spiral, Corridor, Lissajous, Custom, Circle, Rectangle, Square, Regular Polygon, Path2D, Triangle, Trapezoid, Diamond). Order in the inspector groups sources, basic shapes, ornamental loops, then generators. Only the active pattern's options show in the inspector. Pipeline per volley: generate (with outline placement/fill/shell for the loop shapes), then spin, then pattern/local scale, then helper_skip_indices carving (so skip indexes match the preview). Corridor, Ellipse Wall and outline Fill Inside modes return fewer transforms than helper_bullets_amount.
+			Where volley transforms come from: children markers (0), this generator itself (1), or one of 31 procedural helper patterns (2-32: Grid, Ring, Fan, Spiral, Line, Aimed, Flower, Ellipse, Rain, Scatter, Star Polygon, Multi Spiral, Cross, Star, Heart, Wave, Waterfall, Lattice, Rose, Counter Spiral, Corridor, Lissajous, Custom, Circle, Rectangle, Square, Polygon, Path2D, Triangle, Trapezoid, Diamond). Order in the inspector groups sources, basic shapes, ornamental loops, then generators. Only the active pattern's options show in the inspector. Pipeline per volley: generate (with outline placement/fill/shell for the loop shapes), then spin, then pattern/local scale, then helper_skip_indices carving (so skip indexes match the preview). Corridor, Ellipse Wall and outline Fill Inside modes return fewer transforms than helper_bullets_amount.
 		</member>
 	</members>
 	<signals>
@@ -1356,7 +1356,7 @@
 		<constant name="PATTERN_FROM_HELPER_SCATTER" value="11" enum="PatternSource">
 			Random disc burst from the generator.
 		</constant>
-		<constant name="PATTERN_FROM_HELPER_POLYGON" value="12" enum="PatternSource">
+		<constant name="PATTERN_FROM_HELPER_STAR_POLYGON" value="12" enum="PatternSource">
 			Star/polygon pattern from the generator.
 		</constant>
 		<constant name="PATTERN_FROM_HELPER_MULTISPIRAL" value="13" enum="PatternSource">
@@ -1404,8 +1404,8 @@
 		<constant name="PATTERN_FROM_HELPER_SQUARE" value="27" enum="PatternSource">
 			Square perimeter walk centered on the generator (single side length + outward flip + offset).
 		</constant>
-		<constant name="PATTERN_FROM_HELPER_REGULAR_POLYGON" value="28" enum="PatternSource">
-			True regular-polygon perimeter (vertices/radius/rotation + outward flip + offset). Distinct from Polygon mode, which is star-biased scatter.
+		<constant name="PATTERN_FROM_HELPER_POLYGON" value="28" enum="PatternSource">
+			True polygon perimeter (vertices/radius/rotation + outward flip + offset). Distinct from Star Polygon mode, which is vertex-biased scatter.
 		</constant>
 		<constant name="PATTERN_FROM_HELPER_PATH2D" value="29" enum="PatternSource">
 			Live Path2D curve layout (baked points, re-sampled every volley, generator-local). Bullets sit exactly on the curve per helper_path2d_distribution (Fixed Spacing default 32px, or Even over the whole length), facing tangent-first per helper_path2d_facing (Along Path default, Normal +90/-90 across it).
