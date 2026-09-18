@@ -3226,12 +3226,19 @@ static bool flower_curve_point(int flower_type, int petals, real_t radius, real_
 	(void)petal_spread;
 	const double clamped_inner = Math::clamp(inner_radius_scale, 0.0, 0.999);
 	if (flower_type == BulletFactory2D::FLOWER_FAN) {
-		// Fan has no continuous curve (discrete per-petal fans); the
-		// sampler traces the petal-tip ring so the track bounds the bloom.
-		(void)petals;
-		(void)petal_sharpness;
-		const real_t ang = base_rotation + (real_t)t;
-		r_offset = Vector2(Math::cos(ang), Math::sin(ang)) * radius;
+		// Trace the fan's petal arcs so the preview matches the generator's
+		// per-petal layout: each of `petals` lobes is centered on its lobe
+		// axis and fanned across petal_spread, with the radius pinched
+		// between lobes by the waist term. Sampling the arcs back-to-back
+		// over one revolution reproduces the flower outline.
+		const double pf = ((double)t / Math::TAU) * (double)petals;
+		const int petal_idx = Math::clamp((int)Math::floor(pf), 0, petals - 1);
+		const double frac = pf - (double)petal_idx - 0.5; // -0.5..0.5 within petal
+		const real_t lobe_center = base_rotation + Math::TAU * (real_t)petal_idx / (real_t)petals;
+		const real_t angle = lobe_center + (real_t)(frac * petal_spread);
+		const double sharp = (double)petal_sharpness;
+		const real_t waist = 1.0 - (real_t)(sharp / (1.0 + sharp)) * 0.55 * Math::abs(Math::sin((double)frac * Math::PI));
+		r_offset = Vector2(Math::cos(angle), Math::sin(angle)) * (radius * waist);
 		return r_offset.is_finite();
 	}
 	if (flower_type == BulletFactory2D::FLOWER_RHODONEA) {
