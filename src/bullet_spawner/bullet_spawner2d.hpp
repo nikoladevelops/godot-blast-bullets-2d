@@ -66,7 +66,10 @@ class PatternPreviewLayer2D : public Node2D {
         // Reused draw scratch: _draw runs on every repaint, so member buffers
         // avoid per-repaint allocations. draw_scratch filters the track;
         // head_tri holds one arrow-head triangle (one polygon per draw call).
+        // run_scratch accumulates one finite strip when separators split
+        // the track into runs.
         PackedVector2Array draw_scratch;
+        PackedVector2Array run_scratch;
         PackedVector2Array head_tri;
 
         void set_dots_data(const PackedVector2Array &p_dots, const Color &p_color, float p_radius);

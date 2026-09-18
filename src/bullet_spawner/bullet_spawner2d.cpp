@@ -155,33 +155,60 @@ void PatternPreviewLayer2D::set_arrows_data(const PackedVector2Array &p_tails, c
 
 void PatternPreviewLayer2D::_draw() {
     if (kind == LAYER_DOTS) {
-        // Track as one polyline; non-finite points are filtered into the
-        // reused member scratch (no per-repaint allocation).
+        // Track as polylines split on non-finite separators: samplers emit
+        // INF points between strips (grid rows, spiral arms), and each run
+        // draws separately so rows/arms never bridge. Single runs batch
+        // into one call; run_scratch is reused (no per-repaint allocation).
         if (path_width > 0.0f && path_points.size() >= 2) {
             draw_scratch.clear();
+            bool has_gap = false;
             for (int i = 0; i < path_points.size(); i++) {
                 const Vector2 p = path_points[i];
                 if (p.is_finite()) {
                     draw_scratch.push_back(p);
+                } else {
+                    has_gap = true;
                 }
             }
-            if (draw_scratch.size() >= 2) {
-                if (path_closed && draw_scratch.size() >= 3) {
-                    draw_scratch.push_back(draw_scratch[0]);
+            if (!has_gap) {
+                if (draw_scratch.size() >= 2) {
+                    if (path_closed && draw_scratch.size() >= 3) {
+                        draw_scratch.push_back(draw_scratch[0]);
+                    }
+                    draw_polyline(draw_scratch, path_color, path_width, false);
                 }
-                draw_polyline(draw_scratch, path_color, path_width, false);
+            } else {
+                // Split at the separators: each finite run is its own strip.
+                // Closed loops never emit separators by contract, so runs
+                // here are always open.
+                run_scratch.clear();
+                for (int i = 0; i <= path_points.size(); i++) {
+                    const bool valid = i < path_points.size() && path_points[i].is_finite();
+                    if (valid) {
+                        run_scratch.push_back(path_points[i]);
+                    } else if (run_scratch.size() >= 2) {
+                        draw_polyline(run_scratch, path_color, path_width, false);
+                        run_scratch.clear();
+                    } else {
+                        run_scratch.clear();
+                    }
+                }
             }
         }
+        // Bullets first, first marker last: on closed loops (and stacked
+        // modes) later dots land on bullet 0's position and would bury
+        // the emphasis marker if it drew first.
         for (int i = 0; i < dots.size(); i++) {
             const Vector2 p = dots[i];
             if (!p.is_finite() || dot_radius <= 0.0f) {
                 continue;
             }
-            if (show_first_marker && i == 0 && first_dot_radius_scale > 0.0f) {
-                draw_circle(p, dot_radius, dot_color);
-                draw_circle(p, dot_radius * first_dot_radius_scale, first_dot_color);
-            } else {
-                draw_circle(p, dot_radius, dot_color);
+            draw_circle(p, dot_radius, dot_color);
+        }
+        if (show_first_marker && !dots.is_empty() && first_dot_radius_scale > 0.0f && dot_radius > 0.0f) {
+            const Vector2 p0 = dots[0];
+            if (p0.is_finite()) {
+                draw_circle(p0, dot_radius * first_dot_radius_scale, first_dot_color);
             }
         }
         return;
@@ -5257,8 +5284,14 @@ void BulletSpawner2D::rebuild_preview() {
                 }
                 push_track_global(track_marker.xform(local_pt));
             };
-            // Factory sampler dict ({points, closed}, marker-local) -> track.
-            // Samplers cap density internally; only Path2D curves stride here.
+            // Factory sampler dict ({points, closed}) -> track. All samplers
+            // return marker-relative offsets (never baked globals); the track
+            // applies the same origin-relative math the generators use
+            // (origin + offset, plus marker spin/scale below). The legacy
+            // "local" flag is ignored (grid/others disagree on its meaning).
+            // Samplers cap density internally; only Path2D curves stride
+            // here. INF points are row/arm separators, not bad data: forward
+            // them verbatim so _draw() can split strips instead of bridging.
             auto push_track_dict = [&](const Dictionary &tr) {
                 const Variant pv = tr.get("points", PackedVector2Array());
                 const Variant cv = tr.get("closed", false);
@@ -5268,7 +5301,11 @@ void BulletSpawner2D::rebuild_preview() {
                 const PackedVector2Array pts = pv;
                 track_closed = (bool)cv;
                 for (int i = 0; i < pts.size(); ++i) {
-                    push_track_local(pts[i]);
+                    if (!pts[i].is_finite()) {
+                        track.push_back(pts[i]);
+                        continue;
+                    }
+                    push_track_global(track_origin + pts[i]);
                 }
             };
             switch (pattern_source) {
@@ -5311,6 +5348,9 @@ void BulletSpawner2D::rebuild_preview() {
                     push_track_dict(BulletFactory2D::helper_sample_outline_polygon(helper_polygon_vertices, helper_polygon_radius, helper_polygon_rotation));
                     break;
                 case PATTERN_FROM_HELPER_PATH2D: {
+                    // Generator-local shape points: the collector composes them
+                    // as marker.xform, so the track xforms them identically
+                    // (then spin/scales like every other track point).
                     PackedVector2Array curve = sample_path2d_polyline(true);
                     track_closed = helper_path2d_closed;
                     const int step = curve.size() > 256 ? (int)((curve.size() + 255) / 256) : 1;
@@ -5341,9 +5381,12 @@ void BulletSpawner2D::rebuild_preview() {
                         anchor_seat = (double)(count - 1);
                     }
                     const double shift = Math::is_finite(helper_line_start_offset) ? MAX(helper_line_start_offset, 0.0) : 0.0;
-                    const Vector2 first = track_origin + axis * (real_t)(helper_line_spacing * (0.0 - anchor_seat) + shift) - axis * (real_t)(helper_line_spacing * 0.5);
-                    const Vector2 last = track_origin + axis * (real_t)(helper_line_spacing * ((double)(count - 1) - anchor_seat) + shift) + axis * (real_t)(helper_line_spacing * 0.5);
-                    if ((last - first).length_squared() > 1e-12) {
+                    // Same span the generator fills (first/last slot, shifted):
+                    // no half-spacing overhang past the end bullets. A lone
+                    // bullet is a point (no rail to draw), matching the dots.
+                    const Vector2 first = track_origin + axis * (real_t)(helper_line_spacing * (0.0 - anchor_seat) + shift);
+                    const Vector2 last = track_origin + axis * (real_t)(helper_line_spacing * ((double)(count - 1) - anchor_seat) + shift);
+                    if (count > 1 && (last - first).length_squared() > 1e-12) {
                         push_track_global(first);
                         push_track_global(last);
                     }
@@ -5452,8 +5495,6 @@ void BulletSpawner2D::rebuild_preview() {
                     for (int a = 0; a < helper_cross_arm_count; a++) {
                         const real_t ang = base_rot + arm_angle * (real_t)a;
                         const Vector2 dir = Vector2(Math::cos(ang), Math::sin(ang));
-                        Vector2 accum;
-                        Vector2 prev = track_origin;
                         bool first = true;
                         for (int s = 1; s <= radial_steps; s++) {
                             const real_t dist = (real_t)helper_cross_spacing * (real_t)s;
@@ -5565,9 +5606,11 @@ void BulletSpawner2D::rebuild_preview() {
                     break;
                 }
                 case PATTERN_FROM_HELPER_CORRIDOR: {
-                    // Two wall segments flanking the central gap, running along
-                    // the aim direction. Aim resolves live-target-first, like
-                    // the volley case, then falls back to the static direction.
+                    // The two wall runs flanking the gap, mirroring the
+                    // generator's even spread: slots fill [-w/2, +w/2]
+                    // skipping |x| < gap/2, so the track draws exactly the
+                    // two runs the volley occupies. Two push pairs = two
+                    // strips (no bridge across the dodge door).
                     Vector2 corridor_aim = helper_corridor_aim_direction;
                     if (Node2D *target = get_helper_aimed_target()) {
                         const Vector2 to_target = target->get_global_transform().get_origin() - track_origin;
@@ -5582,35 +5625,27 @@ void BulletSpawner2D::rebuild_preview() {
                         break;
                     }
                     const real_t half_width = (real_t)(helper_corridor_width * 0.5);
-                    const real_t half_gap = (real_t)(helper_corridor_gap_width * 0.5);
-                    const real_t wall_offset = half_width - half_gap;
-                    if (wall_offset <= 0.0) {
+                    const real_t half_gap = Math::is_finite(helper_corridor_gap_width) && helper_corridor_gap_width > 0.0
+                            ? (real_t)(helper_corridor_gap_width * 0.5)
+                            : 0.0;
+                    if (half_gap >= half_width) {
                         break;
                     }
                     const Vector2 aim = corridor_aim.normalized();
                     const Vector2 perp = aim.orthogonal();
-                    const real_t per_bullet = (helper_cross_spacing > 0.0) ? (real_t)helper_cross_spacing : 32.0;
-                    const real_t wall_len = (real_t)MAX(helper_bullets_amount, 1) * per_bullet;
-                    if (!Math::is_finite(wall_len) || wall_len <= 0.0) {
-                        break;
-                    }
-                    const Vector2 along = aim * wall_len;
-                    // Left wall.
-                    const Vector2 l1 = track_origin + perp * wall_offset;
-                    const Vector2 l2 = l1 + along;
-                    push_track_global(l1);
-                    push_track_global(l2);
-                    // Right wall.
-                    const Vector2 r1 = track_origin - perp * wall_offset;
-                    const Vector2 r2 = r1 + along;
-                    push_track_global(r1);
-                    push_track_global(r2);
+                    push_track_global(track_origin - perp * half_width);
+                    push_track_global(track_origin - perp * half_gap);
+                    // Separator: the polyline must not bridge the dodge door.
+                    track.push_back(Vector2(Math::INF, Math::INF));
+                    push_track_global(track_origin + perp * half_gap);
+                    push_track_global(track_origin + perp * half_width);
                     break;
                 }
                 case PATTERN_FROM_HELPER_SCATTER: {
                     // Burst-disc extent ring (dots carry density). A narrowed
                     // sector draws its arc instead, so the track never
-                    // overstates the cone.
+                    // overstates the cone. Both are marker-relative offsets
+                    // like the factory samplers (origin + offset), not locals.
                     if (helper_scatter_arc < Math::TAU && Math::is_finite(helper_scatter_arc) && helper_scatter_arc > 0.0 &&
                             helper_scatter_direction.is_finite() && helper_scatter_direction.length_squared() > 1e-12 &&
                             Math::is_finite(helper_scatter_burst_radius) && helper_scatter_burst_radius > 0.0) {
@@ -5619,7 +5654,7 @@ void BulletSpawner2D::rebuild_preview() {
                         const int arc_n = MAX(8, MIN(64, (int)(helper_scatter_arc * 16.0)));
                         for (int i = 0; i <= arc_n; i++) {
                             const real_t ang = base - half + (real_t)helper_scatter_arc * (real_t)i / (real_t)arc_n;
-                            push_track_local(Vector2(Math::cos(ang), Math::sin(ang)) * (real_t)helper_scatter_burst_radius);
+                            push_track_global(track_origin + Vector2(Math::cos(ang), Math::sin(ang)) * (real_t)helper_scatter_burst_radius);
                         }
                         track_closed = false;
                     } else {
@@ -6657,7 +6692,7 @@ void BulletSpawner2D::_bind_methods() {
 
 	ClassDB::bind_method(D_METHOD("get_pattern_source"), &BulletSpawner2D::get_pattern_source);
 	ClassDB::bind_method(D_METHOD("set_pattern_source", "value"), &BulletSpawner2D::set_pattern_source);
-	ADD_PROPERTY(PropertyInfo(Variant::INT, "pattern_source", PROPERTY_HINT_ENUM, "From Children:0,From Self:1,Path2D:29,Custom:24,Circle:25,Square:27,Rectangle:26,Triangle:30,Diamond:32,Trapezoid:31,Polygon:28,Ellipse:9,Ring:3,Star:15,Heart:16,Star Polygon:12,Flower:8,Rose:20,Lissajous:23,Line:6,Grid:2,Lattice:19,Rain:10,Waterfall:18,Wave:17,Fan:4,Aimed:7,Corridor:22,Spiral:5,Multi Spiral:13,Counter Spiral:21,Cross:14,Scatter:11"), "set_pattern_source", "get_pattern_source");
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "pattern_source", PROPERTY_HINT_ENUM, "From Children:0,From Self:1,Path2D:29,Aimed:7,Custom:24,Circle:25,Square:27,Rectangle:26,Triangle:30,Diamond:32,Trapezoid:31,Polygon:28,Ellipse:9,Ring:3,Star:15,Heart:16,Star Polygon:12,Flower:8,Rose:20,Lissajous:23,Line:6,Grid:2,Lattice:19,Rain:10,Waterfall:18,Wave:17,Fan:4,Corridor:22,Spiral:5,Multi Spiral:13,Counter Spiral:21,Cross:14,Scatter:11"), "set_pattern_source", "get_pattern_source");
 
 	ClassDB::bind_method(D_METHOD("get_helper_bullets_amount"), &BulletSpawner2D::get_helper_bullets_amount);
 	ClassDB::bind_method(D_METHOD("set_helper_bullets_amount", "value"), &BulletSpawner2D::set_helper_bullets_amount);

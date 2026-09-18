@@ -418,6 +418,119 @@
 			</description>
 </method>
 
+<method name="helper_sample_outline_grid" qualifiers="static">
+			<return type="Dictionary" />
+			<param index="0" name="transforms_amount" type="int" default="0" />
+			<param index="1" name="rows_per_column" type="int" default="10" />
+			<param index="2" name="alignment" type="int" default="3" />
+			<param index="3" name="column_offset" type="float" default="150.0" />
+			<param index="4" name="row_offset" type="float" default="150.0" />
+			<param index="5" name="base_rotation_abs" type="float" default="0.0" />
+			<param index="6" name="rotate_with_marker" type="bool" default="true" />
+			<description>
+				Grid row strips with INF separators between rows (open). Ideal structure only.
+			</description>
+</method>
+
+<method name="helper_sample_outline_lattice" qualifiers="static">
+			<return type="Dictionary" />
+			<param index="0" name="transforms_amount" type="int" default="0" />
+			<param index="1" name="columns" type="int" default="4" />
+			<param index="2" name="rows" type="int" default="4" />
+			<param index="3" name="spacing_x" type="float" default="64.0" />
+			<param index="4" name="spacing_y" type="float" default="64.0" />
+			<param index="5" name="stagger_rows" type="bool" default="true" />
+			<description>
+				Lattice row strips with INF separators between rows (open).
+			</description>
+</method>
+
+<method name="helper_sample_outline_waterfall" qualifiers="static">
+			<return type="Dictionary" />
+			<param index="0" name="transforms_amount" type="int" default="0" />
+			<param index="1" name="columns" type="int" default="4" />
+			<param index="2" name="column_spacing" type="float" default="64.0" />
+			<param index="3" name="rows" type="int" default="4" />
+			<param index="4" name="row_spacing" type="float" default="64.0" />
+			<param index="5" name="stagger" type="float" default="0.0" />
+			<param index="6" name="rain_direction" type="Vector2" default="Vector2(0, 1)" />
+			<description>
+				Waterfall row strips with INF separators between rows (open).
+			</description>
+</method>
+
+<method name="helper_sample_outline_rain" qualifiers="static">
+			<return type="Dictionary" />
+			<param index="0" name="transforms_amount" type="int" default="0" />
+			<param index="1" name="band_width" type="float" default="600.0" />
+			<param index="2" name="rain_direction" type="Vector2" default="Vector2(0, 1)" />
+			<param index="3" name="drop_spacing" type="float" default="48.0" />
+			<description>
+				Rain row strips with INF separators between rows (open).
+			</description>
+</method>
+
+<method name="helper_sample_outline_wave" qualifiers="static">
+			<return type="Dictionary" />
+			<param index="0" name="width" type="float" default="300.0" />
+			<param index="1" name="amplitude" type="float" default="50.0" />
+			<param index="2" name="waves" type="float" default="2.0" />
+			<param index="3" name="direction" type="Vector2" default="Vector2(1, 0)" />
+			<description>
+				Sine center-line sweep (open).
+			</description>
+</method>
+
+<method name="helper_sample_outline_heart" qualifiers="static">
+			<return type="Dictionary" />
+			<param index="0" name="size" type="float" default="100.0" />
+			<param index="1" name="base_rotation" type="float" default="0.0" />
+			<description>
+				Parametric heart sweep. Closed.
+			</description>
+</method>
+
+<method name="helper_sample_outline_spiral" qualifiers="static">
+			<return type="Dictionary" />
+			<param index="0" name="transforms_amount" type="int" default="0" />
+			<param index="1" name="start_radius" type="float" default="50.0" />
+			<param index="2" name="radius_step" type="float" default="15.0" />
+			<param index="3" name="angle_step" type="float" default="0.6" />
+			<param index="4" name="base_rotation_abs" type="float" default="0.0" />
+			<description>
+				Spiral arm sweep (open).
+			</description>
+</method>
+
+<method name="helper_sample_outline_multispiral" qualifiers="static">
+			<return type="Dictionary" />
+			<param index="0" name="transforms_amount" type="int" default="0" />
+			<param index="1" name="arms" type="int" default="3" />
+			<param index="2" name="start_radius" type="float" default="50.0" />
+			<param index="3" name="radius_step" type="float" default="15.0" />
+			<param index="4" name="angle_step" type="float" default="0.6" />
+			<param index="5" name="base_rotation_abs" type="float" default="0.0" />
+			<param index="6" name="arm_index_stride" type="int" default="1" />
+			<description>
+				One strip per arm with INF separators between arms (open).
+			</description>
+</method>
+
+<method name="helper_sample_outline_counter_spiral" qualifiers="static">
+			<return type="Dictionary" />
+			<param index="0" name="transforms_amount" type="int" default="0" />
+			<param index="1" name="arms" type="int" default="4" />
+			<param index="2" name="start_radius" type="float" default="50.0" />
+			<param index="3" name="radius_step" type="float" default="15.0" />
+			<param index="4" name="angle_step" type="float" default="0.6" />
+			<param index="5" name="base_rotation_abs" type="float" default="0.0" />
+			<param index="6" name="arm_index_stride" type="int" default="1" />
+			<param index="7" name="mirror_alternate_arms" type="bool" default="true" />
+			<description>
+				Mirrored-arm variant of the multispiral strips with INF separators (open).
+			</description>
+</method>
+
 <method name="helper_apply_side_spread" qualifiers="static">
 			<return type="Transform2D[]" />
 			<param index="0" name="transforms" type="Transform2D[]" />
