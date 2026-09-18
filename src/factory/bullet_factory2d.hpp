@@ -113,6 +113,19 @@ public:
 		TRIANGLE_RIGHT = 2
 	};
 
+	// Flower bloom kinds for helper_generate_transforms_flower(): FAN is the
+	// legacy petal-major fan (byte-identical default); RHODONEA is a
+	// continuous rhodonea sweep; PHYLLOTAXIS is a Vogel golden-angle disc;
+	// SPIROGRAPH is a hypotrochoid lacy bloom; SUPERFORMULA is a simplified
+	// Gielis curve (lobes m + fullness exponent).
+	enum FlowerBloom {
+		FLOWER_FAN = 0,
+		FLOWER_RHODONEA = 1,
+		FLOWER_PHYLLOTAXIS = 2,
+		FLOWER_SPIROGRAPH = 3,
+		FLOWER_SUPERFORMULA = 4
+	};
+
 	// Named pattern presets that fill the spawner's helper_* properties in
 	// one call (discoverability over 40 raw knobs; see
 	// BulletSpawner2D::apply_pattern_preset).
@@ -952,11 +965,24 @@ public:
 			real_t step_offset = 0.0,
 			bool centered = true);
 
-	// Floral spell-card pattern: petals symmetric lobes around the marker,
-	// each petal holding bullets_per_petal slots spread over petal_spread.
+	// Floral spell-card pattern with selectable bloom kinds (see FlowerBloom).
+	// FAN (default, legacy): petals symmetric lobes around the marker, each
+	// petal holding bullets_per_petal slots spread over petal_spread;
 	// petals * bullets_per_petal slots are emitted (transforms_amount sizes
 	// the array; fewer slots than petals * per-petal simply truncates).
 	// petal_sharpness 0 = round lobes, higher = tighter flowers.
+	// RHODONEA: continuous rhodonea sweep r = R*|cos(k*theta/2)|^p; k comes
+	// from petals, p from petal_sharpness, inner_radius_scale carves a core
+	// hole (0 = full bloom, < 1 = ring). bullets_per_petal/petal_spread
+	// are unused.
+	// PHYLLOTAXIS: Vogel golden-angle sunflower disc r = R*sqrt(i/n);
+	// inner_radius_scale sets the disc inner edge (0 = center bloom).
+	// petal-family knobs are unused.
+	// SPIROGRAPH: hypotrochoid lacy bloom from outer radius R, roller
+	// spiro_roller (r > 0) and pen spiro_pen (d >= 0). Petal-family knobs
+	// are unused; the lobe count emerges from the R/r ratio.
+	// SUPERFORMULA: simplified Gielis curve with lobe count super_lobes (m)
+	// and fullness super_fullness. Petal-family knobs are unused.
 	static TypedArray<Transform2D> helper_generate_transforms_flower(
 			int transforms_amount,
 			Transform2D marker_transform,
@@ -986,7 +1012,15 @@ public:
 			bool fill_stagger = false,
 			double fill_margin = 0.0,
 			int shell_layers = 1,
-			double shell_step = 32.0);
+			double shell_step = 32.0,
+			// Bloom-kind selector + per-kind knobs (append-only; old calls are
+			// unaffected). Out-of-range flower_type is rejected loudly.
+			int flower_type = 0,
+			double inner_radius_scale = 0.0,
+			double spiro_roller = 45.0,
+			double spiro_pen = 80.0,
+			double super_lobes = 6.0,
+			double super_fullness = 1.0);
 
 	// True ellipse ring with independent radii and rotation (the ring
 	// helper's y_scale is only an approximation): rx/ry semi-axes rotated by
@@ -1521,6 +1555,9 @@ public:
 	// are fixed and adaptive (never bullet-count dependent); polygons return
 	// exact corners. Invalid input yields an empty track.
 	static Dictionary helper_sample_outline_rose(int petals = 6, real_t radius = 150.0, real_t lobe_sharpness = 1.0, real_t base_rotation = 0.0);
+	// Flower bloom track sampler mirroring helper_generate_transforms_flower
+	// per-type math at fixed density (closed loop). Marker-relative offsets.
+	static Dictionary helper_sample_outline_flower(int flower_type = 0, int petals = 6, real_t radius = 150.0, real_t petal_spread = 0.5, real_t petal_sharpness = 1.0, double inner_radius_scale = 0.0, double spiro_roller = 45.0, double spiro_pen = 80.0, double super_lobes = 6.0, double super_fullness = 1.0, real_t base_rotation = 0.0);
 	static Dictionary helper_sample_outline_lissajous(real_t size_x = 200.0, real_t size_y = 120.0, real_t freq_x = 3.0, real_t freq_y = 2.0, real_t phase = 0.0);
 	static Dictionary helper_sample_outline_circle(real_t radius = 150.0);
 	static Dictionary helper_sample_outline_rectangle(const Vector2 &size = Vector2(300, 200));
@@ -1568,3 +1605,4 @@ public:
 	VARIANT_ENUM_CAST(BlastBullets2D::BulletFactory2D::SideMode);
 	VARIANT_ENUM_CAST(BlastBullets2D::BulletFactory2D::OutlinePlacement);
 	VARIANT_ENUM_CAST(BlastBullets2D::BulletFactory2D::OutlineFacing);
+	VARIANT_ENUM_CAST(BlastBullets2D::BulletFactory2D::FlowerBloom);

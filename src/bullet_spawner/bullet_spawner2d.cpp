@@ -1237,6 +1237,72 @@ void BulletSpawner2D::set_helper_flower_facing_offset_deg(double value) {
     helper_flower_facing_offset_deg = value;
     rebuild_preview();
 }
+int BulletSpawner2D::get_helper_flower_type() const {
+    return helper_flower_type;
+}
+void BulletSpawner2D::set_helper_flower_type(int value) {
+    if (value < 0 || value > 4) {
+        UtilityFunctions::push_error("BulletSpawner2D: helper_flower_type must be in [0, 4] (FlowerBloom), keeping the old value.");
+        return;
+    }
+    helper_flower_type = value;
+    rebuild_preview();
+}
+double BulletSpawner2D::get_helper_flower_inner_radius_scale() const {
+    return helper_flower_inner_radius_scale;
+}
+void BulletSpawner2D::set_helper_flower_inner_radius_scale(double value) {
+    if (!Math::is_finite(value) || value < 0.0 || value >= 1.0) {
+        UtilityFunctions::push_error("BulletSpawner2D: helper_flower_inner_radius_scale must be finite in [0, 1), keeping the old value.");
+        return;
+    }
+    helper_flower_inner_radius_scale = value;
+    rebuild_preview();
+}
+double BulletSpawner2D::get_helper_flower_spiro_roller() const {
+    return helper_flower_spiro_roller;
+}
+void BulletSpawner2D::set_helper_flower_spiro_roller(double value) {
+    if (!Math::is_finite(value) || value <= 0.0) {
+        UtilityFunctions::push_error("BulletSpawner2D: helper_flower_spiro_roller must be finite and > 0, keeping the old value.");
+        return;
+    }
+    helper_flower_spiro_roller = value;
+    rebuild_preview();
+}
+double BulletSpawner2D::get_helper_flower_spiro_pen() const {
+    return helper_flower_spiro_pen;
+}
+void BulletSpawner2D::set_helper_flower_spiro_pen(double value) {
+    if (!Math::is_finite(value) || value < 0.0) {
+        UtilityFunctions::push_error("BulletSpawner2D: helper_flower_spiro_pen must be finite and >= 0, keeping the old value.");
+        return;
+    }
+    helper_flower_spiro_pen = value;
+    rebuild_preview();
+}
+double BulletSpawner2D::get_helper_flower_super_lobes() const {
+    return helper_flower_super_lobes;
+}
+void BulletSpawner2D::set_helper_flower_super_lobes(double value) {
+    if (!Math::is_finite(value) || value < 2.0 || value > 64.0) {
+        UtilityFunctions::push_error("BulletSpawner2D: helper_flower_super_lobes must be finite in [2, 64], keeping the old value.");
+        return;
+    }
+    helper_flower_super_lobes = value;
+    rebuild_preview();
+}
+double BulletSpawner2D::get_helper_flower_super_fullness() const {
+    return helper_flower_super_fullness;
+}
+void BulletSpawner2D::set_helper_flower_super_fullness(double value) {
+    if (!Math::is_finite(value) || value <= 0.0 || value > 8.0) {
+        UtilityFunctions::push_error("BulletSpawner2D: helper_flower_super_fullness must be finite in (0, 8], keeping the old value.");
+        return;
+    }
+    helper_flower_super_fullness = value;
+    rebuild_preview();
+}
 double BulletSpawner2D::get_helper_ellipse_radius_x() const {
     return helper_ellipse_radius_x;
 }
@@ -3216,6 +3282,7 @@ void BulletSpawner2D::apply_pattern_preset(int preset) {
             helper_flower_petals = 6;
             helper_flower_bullets_per_petal = 5;
             helper_flower_radius = 140.0;
+            helper_flower_type = 0; // FAN (legacy default)
             break;
         case BulletFactory2D::PATTERN_PRESET_SCATTER_BURST:
             pattern_source = PATTERN_FROM_HELPER_SCATTER;
@@ -4747,7 +4814,7 @@ TypedArray<Transform2D> BulletSpawner2D::collect_spawn_transforms_impl(bool quie
             break;
         }
         case PATTERN_FROM_HELPER_FLOWER:
-            raw = BulletFactory2D::helper_generate_transforms_flower(helper_bullets_amount, marker, helper_flower_petals, helper_flower_bullets_per_petal, helper_flower_radius, helper_flower_petal_spread, helper_flower_petal_sharpness, helper_flower_base_rotation, helper_flower_face_outward, helper_flower_facing_offset_deg, helper_outline_placement, helper_outline_facing, helper_outline_reverse, helper_outline_slot_offset, helper_outline_fill_spacing, helper_outline_fill_stagger, helper_outline_fill_margin, helper_outline_shell_layers, helper_outline_shell_step);
+            raw = BulletFactory2D::helper_generate_transforms_flower(helper_bullets_amount, marker, helper_flower_petals, helper_flower_bullets_per_petal, helper_flower_radius, helper_flower_petal_spread, helper_flower_petal_sharpness, helper_flower_base_rotation, helper_flower_face_outward, helper_flower_facing_offset_deg, helper_outline_placement, helper_outline_facing, helper_outline_reverse, helper_outline_slot_offset, helper_outline_fill_spacing, helper_outline_fill_stagger, helper_outline_fill_margin, helper_outline_shell_layers, helper_outline_shell_step, helper_flower_type, helper_flower_inner_radius_scale, helper_flower_spiro_roller, helper_flower_spiro_pen, helper_flower_super_lobes, helper_flower_super_fullness);
             break;
         case PATTERN_FROM_HELPER_ELLIPSE:
             raw = BulletFactory2D::helper_generate_transforms_ellipse(helper_bullets_amount, marker, helper_ellipse_radius_x, helper_ellipse_radius_y, helper_ellipse_rotation, helper_ellipse_start_angle, helper_ellipse_arc, (BulletFactory2D::EllipseMode)helper_ellipse_mode, helper_ellipse_gap_count, helper_ellipse_gap_width, helper_ellipse_face_outward, helper_ellipse_facing_offset_deg, helper_outline_placement, helper_outline_facing, helper_outline_reverse, helper_outline_slot_offset, helper_outline_fill_spacing, helper_outline_fill_stagger, helper_outline_fill_margin, helper_outline_shell_layers, helper_outline_shell_step);
@@ -5469,10 +5536,10 @@ void BulletSpawner2D::rebuild_preview() {
                     break;
                 }
                 case PATTERN_FROM_HELPER_FLOWER: {
-                    // Extent ring at the petal radius: truthfully bounds the
-                    // bloom (per-petal arcs would duplicate the waist profile
-                    // and read as scribble).
-                    push_track_dict(BulletFactory2D::helper_sample_outline_circle((real_t)helper_flower_radius));
+                    // Per-type bloom track at fixed density: FAN traces the
+                    // petal-tip ring, RHODONEA/SPIROGRAPH/SUPERFORMULA trace the
+                    // actual curve, PHYLLOTAXIS bounds the Vogel disc rim.
+                    push_track_dict(BulletFactory2D::helper_sample_outline_flower(helper_flower_type, helper_flower_petals, (real_t)helper_flower_radius, (real_t)helper_flower_petal_spread, (real_t)helper_flower_petal_sharpness, helper_flower_inner_radius_scale, helper_flower_spiro_roller, helper_flower_spiro_pen, helper_flower_super_lobes, helper_flower_super_fullness, (real_t)helper_flower_base_rotation));
                     break;
                 }
                 case PATTERN_FROM_HELPER_STAR_POLYGON: {
@@ -5901,6 +5968,36 @@ void BulletSpawner2D::_validate_property(PropertyInfo &p_property) const {
         }
     } else if (property_name.begins_with("helper_flower_")) {
         relevant = pattern_source == PATTERN_FROM_HELPER_FLOWER;
+        if (relevant) {
+            const int ftype = helper_flower_type;
+            // Common bloom knobs (always relevant for FLOWER).
+            if (property_name == "helper_flower_type" ||
+                    property_name == "helper_flower_radius" ||
+                    property_name == "helper_flower_base_rotation" ||
+                    property_name == "helper_flower_face_outward" ||
+                    property_name == "helper_flower_facing_offset_deg") {
+                // keep relevant = true
+            } else if (property_name == "helper_flower_petals" ||
+                    property_name == "helper_flower_bullets_per_petal" ||
+                    property_name == "helper_flower_petal_spread") {
+                relevant = (ftype == BulletFactory2D::FLOWER_FAN);
+            } else if (property_name == "helper_flower_petal_sharpness") {
+                relevant = (ftype == BulletFactory2D::FLOWER_FAN ||
+                        ftype == BulletFactory2D::FLOWER_RHODONEA);
+            } else if (property_name == "helper_flower_inner_radius_scale") {
+                relevant = (ftype == BulletFactory2D::FLOWER_RHODONEA ||
+                        ftype == BulletFactory2D::FLOWER_PHYLLOTAXIS ||
+                        ftype == BulletFactory2D::FLOWER_SUPERFORMULA);
+            } else if (property_name == "helper_flower_spiro_roller" ||
+                    property_name == "helper_flower_spiro_pen") {
+                relevant = (ftype == BulletFactory2D::FLOWER_SPIROGRAPH);
+            } else if (property_name == "helper_flower_super_lobes" ||
+                    property_name == "helper_flower_super_fullness") {
+                relevant = (ftype == BulletFactory2D::FLOWER_SUPERFORMULA);
+            } else {
+                relevant = false;
+            }
+        }
     } else if (property_name.begins_with("helper_ellipse_")) {
         relevant = pattern_source == PATTERN_FROM_HELPER_ELLIPSE;
         // WALL-only knobs: hiding them outside WALL keeps the ellipse group
@@ -6897,25 +6994,16 @@ void BulletSpawner2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_helper_aimed_prediction_time", "value"), &BulletSpawner2D::set_helper_aimed_prediction_time);
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_aimed_prediction_time"), "set_helper_aimed_prediction_time", "get_helper_aimed_prediction_time");
 
-	ClassDB::bind_method(D_METHOD("get_helper_flower_petals"), &BulletSpawner2D::get_helper_flower_petals);
-	ClassDB::bind_method(D_METHOD("set_helper_flower_petals", "value"), &BulletSpawner2D::set_helper_flower_petals);
-	ADD_PROPERTY(PropertyInfo(Variant::INT, "helper_flower_petals"), "set_helper_flower_petals", "get_helper_flower_petals");
-
-	ClassDB::bind_method(D_METHOD("get_helper_flower_bullets_per_petal"), &BulletSpawner2D::get_helper_flower_bullets_per_petal);
-	ClassDB::bind_method(D_METHOD("set_helper_flower_bullets_per_petal", "value"), &BulletSpawner2D::set_helper_flower_bullets_per_petal);
-	ADD_PROPERTY(PropertyInfo(Variant::INT, "helper_flower_bullets_per_petal"), "set_helper_flower_bullets_per_petal", "get_helper_flower_bullets_per_petal");
+	// NOTE: the bloom-kind selector is intentionally FIRST so it is the first
+	// thing a user configures; the per-type knobs grouped right after it are
+	// shown/hidden by _validate_property based on the chosen kind.
+	ClassDB::bind_method(D_METHOD("get_helper_flower_type"), &BulletSpawner2D::get_helper_flower_type);
+	ClassDB::bind_method(D_METHOD("set_helper_flower_type", "value"), &BulletSpawner2D::set_helper_flower_type);
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "helper_flower_type", PropertyHint::PROPERTY_HINT_ENUM, "FAN,RHODONEA,PHYLLOTAXIS,SPIROGRAPH,SUPERFORMULA"), "set_helper_flower_type", "get_helper_flower_type");
 
 	ClassDB::bind_method(D_METHOD("get_helper_flower_radius"), &BulletSpawner2D::get_helper_flower_radius);
 	ClassDB::bind_method(D_METHOD("set_helper_flower_radius", "value"), &BulletSpawner2D::set_helper_flower_radius);
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_flower_radius"), "set_helper_flower_radius", "get_helper_flower_radius");
-
-	ClassDB::bind_method(D_METHOD("get_helper_flower_petal_spread"), &BulletSpawner2D::get_helper_flower_petal_spread);
-	ClassDB::bind_method(D_METHOD("set_helper_flower_petal_spread", "value"), &BulletSpawner2D::set_helper_flower_petal_spread);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_flower_petal_spread"), "set_helper_flower_petal_spread", "get_helper_flower_petal_spread");
-
-	ClassDB::bind_method(D_METHOD("get_helper_flower_petal_sharpness"), &BulletSpawner2D::get_helper_flower_petal_sharpness);
-	ClassDB::bind_method(D_METHOD("set_helper_flower_petal_sharpness", "value"), &BulletSpawner2D::set_helper_flower_petal_sharpness);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_flower_petal_sharpness"), "set_helper_flower_petal_sharpness", "get_helper_flower_petal_sharpness");
 
 	ClassDB::bind_method(D_METHOD("get_helper_flower_base_rotation"), &BulletSpawner2D::get_helper_flower_base_rotation);
 	ClassDB::bind_method(D_METHOD("set_helper_flower_base_rotation", "value"), &BulletSpawner2D::set_helper_flower_base_rotation);
@@ -6928,6 +7016,47 @@ void BulletSpawner2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_helper_flower_facing_offset_deg"), &BulletSpawner2D::get_helper_flower_facing_offset_deg);
 	ClassDB::bind_method(D_METHOD("set_helper_flower_facing_offset_deg", "value"), &BulletSpawner2D::set_helper_flower_facing_offset_deg);
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_flower_facing_offset_deg"), "set_helper_flower_facing_offset_deg", "get_helper_flower_facing_offset_deg");
+
+	// RHODONEA / PHYLLOTAXIS / SUPERFORMULA: core-hole lift.
+	ClassDB::bind_method(D_METHOD("get_helper_flower_inner_radius_scale"), &BulletSpawner2D::get_helper_flower_inner_radius_scale);
+	ClassDB::bind_method(D_METHOD("set_helper_flower_inner_radius_scale", "value"), &BulletSpawner2D::set_helper_flower_inner_radius_scale);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_flower_inner_radius_scale", PropertyHint::PROPERTY_HINT_RANGE, "0,0.999,0.001"), "set_helper_flower_inner_radius_scale", "get_helper_flower_inner_radius_scale");
+
+	// FAN: lobe count + per-lobe fan controls.
+	ClassDB::bind_method(D_METHOD("get_helper_flower_petals"), &BulletSpawner2D::get_helper_flower_petals);
+	ClassDB::bind_method(D_METHOD("set_helper_flower_petals", "value"), &BulletSpawner2D::set_helper_flower_petals);
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "helper_flower_petals"), "set_helper_flower_petals", "get_helper_flower_petals");
+
+	ClassDB::bind_method(D_METHOD("get_helper_flower_bullets_per_petal"), &BulletSpawner2D::get_helper_flower_bullets_per_petal);
+	ClassDB::bind_method(D_METHOD("set_helper_flower_bullets_per_petal", "value"), &BulletSpawner2D::set_helper_flower_bullets_per_petal);
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "helper_flower_bullets_per_petal"), "set_helper_flower_bullets_per_petal", "get_helper_flower_bullets_per_petal");
+
+	ClassDB::bind_method(D_METHOD("get_helper_flower_petal_spread"), &BulletSpawner2D::get_helper_flower_petal_spread);
+	ClassDB::bind_method(D_METHOD("set_helper_flower_petal_spread", "value"), &BulletSpawner2D::set_helper_flower_petal_spread);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_flower_petal_spread"), "set_helper_flower_petal_spread", "get_helper_flower_petal_spread");
+
+	// FAN + RHODONEA: waist pinch between lobes.
+	ClassDB::bind_method(D_METHOD("get_helper_flower_petal_sharpness"), &BulletSpawner2D::get_helper_flower_petal_sharpness);
+	ClassDB::bind_method(D_METHOD("set_helper_flower_petal_sharpness", "value"), &BulletSpawner2D::set_helper_flower_petal_sharpness);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_flower_petal_sharpness"), "set_helper_flower_petal_sharpness", "get_helper_flower_petal_sharpness");
+
+	// SPIROGRAPH: hypotrochoid roller radius r (> 0) and pen offset d (>= 0).
+	ClassDB::bind_method(D_METHOD("get_helper_flower_spiro_roller"), &BulletSpawner2D::get_helper_flower_spiro_roller);
+	ClassDB::bind_method(D_METHOD("set_helper_flower_spiro_roller", "value"), &BulletSpawner2D::set_helper_flower_spiro_roller);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_flower_spiro_roller", PropertyHint::PROPERTY_HINT_RANGE, "0.5,2048,0.5,greater_than,0"), "set_helper_flower_spiro_roller", "get_helper_flower_spiro_roller");
+
+	ClassDB::bind_method(D_METHOD("get_helper_flower_spiro_pen"), &BulletSpawner2D::get_helper_flower_spiro_pen);
+	ClassDB::bind_method(D_METHOD("set_helper_flower_spiro_pen", "value"), &BulletSpawner2D::set_helper_flower_spiro_pen);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_flower_spiro_pen", PropertyHint::PROPERTY_HINT_RANGE, "0,2048,0.5"), "set_helper_flower_spiro_pen", "get_helper_flower_spiro_pen");
+
+	// SUPERFORMULA: lobe count m and fullness exponent.
+	ClassDB::bind_method(D_METHOD("get_helper_flower_super_lobes"), &BulletSpawner2D::get_helper_flower_super_lobes);
+	ClassDB::bind_method(D_METHOD("set_helper_flower_super_lobes", "value"), &BulletSpawner2D::set_helper_flower_super_lobes);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_flower_super_lobes", PropertyHint::PROPERTY_HINT_RANGE, "2,64,1"), "set_helper_flower_super_lobes", "get_helper_flower_super_lobes");
+
+	ClassDB::bind_method(D_METHOD("get_helper_flower_super_fullness"), &BulletSpawner2D::get_helper_flower_super_fullness);
+	ClassDB::bind_method(D_METHOD("set_helper_flower_super_fullness", "value"), &BulletSpawner2D::set_helper_flower_super_fullness);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_flower_super_fullness", PropertyHint::PROPERTY_HINT_RANGE, "0.05,8,0.05,greater_than,0"), "set_helper_flower_super_fullness", "get_helper_flower_super_fullness");
 
 	ClassDB::bind_method(D_METHOD("get_helper_ellipse_radius_x"), &BulletSpawner2D::get_helper_ellipse_radius_x);
 	ClassDB::bind_method(D_METHOD("set_helper_ellipse_radius_x", "value"), &BulletSpawner2D::set_helper_ellipse_radius_x);

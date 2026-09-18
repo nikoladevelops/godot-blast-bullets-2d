@@ -379,6 +379,15 @@ class BulletSpawner2D : public Node2D{
         double helper_flower_base_rotation = 0.0;
         bool helper_flower_face_outward = true;
         double helper_flower_facing_offset_deg = 0.0;
+        // Bloom kind selector (FlowerBloom): 0=FAN (legacy default), 1=RHODONEA,
+        // 2=PHYLLOTAXIS, 3=SPIROGRAPH, 4=SUPERFORMULA. Per-type knobs below are
+        // used only by the matching bloom kind (see bullet_factory2d.hpp doc).
+        int helper_flower_type = 0;
+        double helper_flower_inner_radius_scale = 0.0; // core-hole lift (0 = full bloom)
+        double helper_flower_spiro_roller = 45.0;       // hypotrochoid roller r (> 0)
+        double helper_flower_spiro_pen = 80.0;          // hypotrochoid pen d (>= 0)
+        double helper_flower_super_lobes = 6.0;         // superformula lobe count m
+        double helper_flower_super_fullness = 1.0;      // superformula fullness exponent
 
         // ELLIPSE (true ellipse ring / arc / wall-with-gaps).
         double helper_ellipse_radius_x = 150.0;
@@ -964,6 +973,18 @@ class BulletSpawner2D : public Node2D{
         void set_helper_flower_face_outward(bool value);
         double get_helper_flower_facing_offset_deg() const;
         void set_helper_flower_facing_offset_deg(double value);
+        int get_helper_flower_type() const;
+        void set_helper_flower_type(int value);
+        double get_helper_flower_inner_radius_scale() const;
+        void set_helper_flower_inner_radius_scale(double value);
+        double get_helper_flower_spiro_roller() const;
+        void set_helper_flower_spiro_roller(double value);
+        double get_helper_flower_spiro_pen() const;
+        void set_helper_flower_spiro_pen(double value);
+        double get_helper_flower_super_lobes() const;
+        void set_helper_flower_super_lobes(double value);
+        double get_helper_flower_super_fullness() const;
+        void set_helper_flower_super_fullness(double value);
         double get_helper_ellipse_radius_x() const;
         void set_helper_ellipse_radius_x(double value);
         double get_helper_ellipse_radius_y() const;

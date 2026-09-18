@@ -402,7 +402,25 @@
 			<param index="2" name="lobe_sharpness" type="float" default="1.0" />
 			<param index="3" name="base_rotation" type="float" default="0.0" />
 			<description>
-			Rose theta sweep in marker-local pixels (flips included, matching slot order). Closed.
+		Rose theta sweep in marker-local pixels (flips included, matching slot order). Closed.
+		</description>
+</method>
+
+<method name="helper_sample_outline_flower" qualifiers="static">
+			<return type="Dictionary" />
+			<param index="0" name="flower_type" type="int" default="0" />
+			<param index="1" name="petals" type="int" default="6" />
+			<param index="2" name="radius" type="float" default="150.0" />
+			<param index="3" name="petal_spread" type="float" default="0.5" />
+			<param index="4" name="petal_sharpness" type="float" default="1.0" />
+			<param index="5" name="inner_radius_scale" type="float" default="0.0" />
+			<param index="6" name="spiro_roller" type="float" default="45.0" />
+			<param index="7" name="spiro_pen" type="float" default="80.0" />
+			<param index="8" name="super_lobes" type="float" default="6.0" />
+			<param index="9" name="super_fullness" type="float" default="1.0" />
+			<param index="10" name="base_rotation" type="float" default="0.0" />
+			<description>
+			Flower bloom track sampler in marker-local pixels mirroring [member helper_generate_transforms_flower] per-type math at a fixed density (closed loop). [code]flower_type[/code] selects the bloom kind (see [enum FlowerBloom]): FAN traces the petal-tip ring, RHODONEA and SPIROGRAPH and SUPERFORMULA trace their actual curve, PHYLLOTAXIS bounds the Vogel disc rim. Per-type knobs (spiro_roller, spiro_pen, super_lobes, super_fullness, inner_radius_scale) apply only to their matching bloom kind; unused knobs are ignored.
 			</description>
 </method>
 

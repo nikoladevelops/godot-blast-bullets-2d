@@ -1772,6 +1772,24 @@ static void danmaku_apply_marker_scale(Transform2D &slot, const Transform2D &mar
 	slot.set_scale(marker_transform.get_scale());
 }
 
+// Revolutions a hypotrochoid (spirograph) needs to close: the smallest positive
+// integer m such that k*m is (approximately) an integer, where k = (R - r)/r.
+// The outer term repeats every 2pi; the inner term repeats every 2pi/k; both
+// align only after m full revolutions. Caps at max_m for irrational ratios,
+// which never truly close (the preview then shows an open approximation).
+static int spirograph_revolutions(double k, int max_m = 64) {
+	if (!Math::is_finite(k) || Math::abs(k) < 1e-9) {
+		return 1;
+	}
+	for (int m = 1; m <= max_m; ++m) {
+		const double v = k * (double)m;
+		if (Math::abs(v - Math::round(v)) < 1e-2) {
+			return m;
+		}
+	}
+	return max_m;
+}
+
 TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_flower(
 		int transforms_amount,
 		Transform2D marker_transform,
@@ -1791,8 +1809,18 @@ TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_flower(
 		bool fill_stagger,
 		double fill_margin,
 		int shell_layers,
-		double shell_step) {
+		double shell_step,
+		int flower_type,
+		double inner_radius_scale,
+		double spiro_roller,
+		double spiro_pen,
+		double super_lobes,
+		double super_fullness) {
 	if (!danmaku_validate_head("helper_generate_transforms_flower", transforms_amount, marker_transform)) {
+		return TypedArray<Transform2D>();
+	}
+	if (flower_type < FLOWER_FAN || flower_type > FLOWER_SUPERFORMULA) {
+		UtilityFunctions::push_error("helper_generate_transforms_flower: unknown flower_type.");
 		return TypedArray<Transform2D>();
 	}
 	if (petals < 1) {
@@ -1811,26 +1839,119 @@ TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_flower(
 		UtilityFunctions::push_error("helper_generate_transforms_flower: petal_spread, petal_sharpness, base_rotation and facing_offset_degrees must be finite (spreads/sharpness >= 0).");
 		return TypedArray<Transform2D>();
 	}
-	// Petal-major slot loop plus radial outward normals; the shared outline
+	if (!Math::is_finite(inner_radius_scale) || inner_radius_scale < 0.0 || inner_radius_scale >= 1.0) {
+		UtilityFunctions::push_error("helper_generate_transforms_flower: inner_radius_scale must be finite in [0, 1).");
+		return TypedArray<Transform2D>();
+	}
+	if (!Math::is_finite(spiro_roller) || spiro_roller <= 0.0 || !Math::is_finite(spiro_pen) || spiro_pen < 0.0) {
+		UtilityFunctions::push_error("helper_generate_transforms_flower: spiro_roller must be finite and > 0, spiro_pen finite and >= 0.");
+		return TypedArray<Transform2D>();
+	}
+	if (!Math::is_finite(super_lobes) || super_lobes < 2.0 || super_lobes > 64.0 || !Math::is_finite(super_fullness) || super_fullness <= 0.0 || super_fullness > 8.0) {
+		UtilityFunctions::push_error("helper_generate_transforms_flower: super_lobes must be finite in [2, 64], super_fullness finite in (0, 8].");
+		return TypedArray<Transform2D>();
+	}
+	// Shared golden angle for the phyllotaxis disc.
+	const double golden_angle = Math::PI * (3.0 - Math::sqrt(5.0));
+	// Build loop_points/loop_normals per bloom kind, then the shared outline
 	// worker assembles facings (fill uses the angular-sorted silhouette).
 	PackedVector2Array loop_points;
 	PackedVector2Array loop_normals;
 	loop_points.resize(transforms_amount);
 	loop_normals.resize(transforms_amount);
 	const Vector2 origin = marker_transform.get_origin();
-	const int per_petal = bullets_per_petal;
-	for (int i = 0; i < transforms_amount; ++i) {
-		const int petal = (i / per_petal) % petals;
-		const int slot_in_petal = i % per_petal;
-		// Center each petal on its lobe axis, fan slots across petal_spread.
-		const real_t lobe_center = base_rotation + Math::TAU * (real_t)petal / (real_t)petals;
-		const real_t frac = (per_petal > 1) ? ((real_t)slot_in_petal / (real_t)(per_petal - 1) - 0.5) : 0.0;
-		const real_t angle = lobe_center + frac * petal_spread;
-		// Rhodonea-style radius modulation: sharpness pinches the waist
-		// between lobes so higher values read as tighter flowers.
-		const real_t waist = 1.0 - (petal_sharpness / (1.0 + petal_sharpness)) * 0.55 * Math::abs(Math::sin(frac * Math::PI));
-		loop_points[i] = origin + Vector2(Math::cos(angle), Math::sin(angle)) * (radius * waist);
-		loop_normals[i] = Vector2(Math::cos(angle), Math::sin(angle));
+	const real_t inner_keep = (real_t)(1.0 - inner_radius_scale);
+	if (flower_type == FLOWER_FAN) {
+		// Legacy petal-major slot loop plus radial outward normals
+		// (byte-identical to the pre-refactor behavior).
+		const int per_petal = bullets_per_petal;
+		for (int i = 0; i < transforms_amount; ++i) {
+			const int petal = (i / per_petal) % petals;
+			const int slot_in_petal = i % per_petal;
+			// Center each petal on its lobe axis, fan slots across petal_spread.
+			const real_t lobe_center = base_rotation + Math::TAU * (real_t)petal / (real_t)petals;
+			const real_t frac = (per_petal > 1) ? ((real_t)slot_in_petal / (real_t)(per_petal - 1) - 0.5) : 0.0;
+			const real_t angle = lobe_center + frac * petal_spread;
+			// Rhodonea-style radius modulation: sharpness pinches the waist
+			// between lobes so higher values read as tighter flowers.
+			const real_t waist = 1.0 - (petal_sharpness / (1.0 + petal_sharpness)) * 0.55 * Math::abs(Math::sin(frac * Math::PI));
+			loop_points[i] = origin + Vector2(Math::cos(angle), Math::sin(angle)) * (radius * waist);
+			loop_normals[i] = Vector2(Math::cos(angle), Math::sin(angle));
+		}
+	} else if (flower_type == FLOWER_RHODONEA) {
+		// Continuous rhodonea sweep r = R*|cos(k*theta/2)|^p over the slot
+		// loop; the inner scale lifts the waist into a ring when asked.
+		const real_t sharp = (petal_sharpness < 0.0) ? 0.0 : petal_sharpness;
+		for (int i = 0; i < transforms_amount; ++i) {
+			const real_t theta = Math::TAU * (real_t)i / (real_t)transforms_amount + base_rotation;
+			const real_t cos_k = Math::cos((real_t)petals * theta * 0.5);
+			const real_t mag = Math::pow((double)Math::abs(cos_k), (double)sharp);
+			const real_t r = radius * (real_t)inner_radius_scale + radius * inner_keep * (real_t)mag;
+			loop_points[i] = origin + Vector2(Math::cos(theta), Math::sin(theta)) * r;
+			const Vector2 radial = Vector2(Math::cos(theta), Math::sin(theta));
+			loop_normals[i] = (radial.length_squared() > 1e-12) ? radial : Vector2(1, 0);
+		}
+	} else if (flower_type == FLOWER_PHYLLOTAXIS) {
+		// Vogel golden-angle disc: slot i sits at angle i*GA, radius
+		// R*sqrt((i+0.5)/n) blended from the inner edge outward.
+		for (int i = 0; i < transforms_amount; ++i) {
+			const double frac = (transforms_amount > 0) ? ((double)i + 0.5) / (double)transforms_amount : 0.0;
+			const real_t angle = base_rotation + (real_t)((double)i * golden_angle);
+			const real_t r = radius * (real_t)(inner_radius_scale + (1.0 - inner_radius_scale) * Math::sqrt(Math::clamp(frac, 0.0, 1.0)));
+			loop_points[i] = origin + Vector2(Math::cos(angle), Math::sin(angle)) * r;
+			const Vector2 radial = Vector2(Math::cos(angle), Math::sin(angle));
+			loop_normals[i] = (radial.length_squared() > 1e-12) ? radial : Vector2(1, 0);
+		}
+	} else if (flower_type == FLOWER_SPIROGRAPH) {
+		// Hypotrochoid: x = (R-r)cos t + d cos((R-r)t/r),
+		// y = (R-r)sin t - d sin((R-r)t/r). Clamp wild rollers so huge
+		// values cannot NaN the loop.
+		const double outer_r = (double)radius;
+		double roller = spiro_roller;
+		if (roller < 1.0) {
+			roller = 1.0;
+		}
+		if (roller > Math::max(outer_r * 4.0, 512.0)) {
+			roller = Math::max(outer_r * 4.0, 512.0);
+		}
+		const double diff = outer_r - roller;
+		const double k = diff / roller;
+		// Sweep the full closure: with k = 7/3 (R=150,r=45) the curve only
+		// closes after 3 revolutions, so a single 0..TAU pass draws 1/3 of it.
+		const int revolutions = spirograph_revolutions(k);
+		for (int i = 0; i < transforms_amount; ++i) {
+			const double t = Math::TAU * (double)revolutions * (double)i / (double)transforms_amount;
+			const double px = diff * Math::cos(t) + spiro_pen * Math::cos(k * t);
+			const double py = diff * Math::sin(t) - spiro_pen * Math::sin(k * t);
+			Vector2 local = Vector2((real_t)px, (real_t)py).rotated(base_rotation);
+			if (!local.is_finite()) {
+				local = Vector2(0, 0);
+			}
+			loop_points[i] = origin + local;
+			loop_normals[i] = (local.length_squared() > 1e-12) ? local.normalized() : Vector2(1, 0);
+		}
+	} else {
+		// Simplified Gielis superformula with a = b = 1, n2 = n3 = fullness:
+		// r = (|cos(mt/4)|^f + |sin(mt/4)|^f)^(-1/f). m = super_lobes.
+		const double lobes = Math::clamp(super_lobes, 2.0, 64.0);
+		const double full = Math::clamp(super_fullness, 0.05, 8.0);
+		for (int i = 0; i < transforms_amount; ++i) {
+			const double t = Math::TAU * (double)i / (double)transforms_amount;
+			const double c = Math::abs(Math::cos(lobes * t * 0.25));
+			const double s = Math::abs(Math::sin(lobes * t * 0.25));
+			double r_norm = Math::pow(Math::pow(c, full) + Math::pow(s, full), -1.0 / full);
+			if (!Math::is_finite(r_norm) || r_norm <= 0.0) {
+				r_norm = 1.0;
+			}
+			if (r_norm > 4.0) {
+				r_norm = 4.0;
+			}
+			const real_t r = radius * (real_t)(inner_radius_scale + (1.0 - inner_radius_scale) * (r_norm * 0.5));
+			const real_t ang = base_rotation + (real_t)t;
+			loop_points[i] = origin + Vector2(Math::cos(ang), Math::sin(ang)) * r;
+			const Vector2 radial = Vector2(Math::cos(ang), Math::sin(ang));
+			loop_normals[i] = (radial.length_squared() > 1e-12) ? radial : Vector2(1, 0);
+		}
 	}
 	return layout_outline_slots("helper_generate_transforms_flower", marker_transform, loop_points, loop_normals, false, 0.0, face_outward, facing_offset_degrees, PackedFloat32Array(), outline_placement, outline_facing, outline_reverse, outline_slot_offset, fill_spacing, fill_stagger, fill_margin, shell_layers, shell_step);
 }
@@ -3095,6 +3216,120 @@ static Dictionary outline_track_result(const PackedVector2Array &points, bool cl
 	result["points"] = points;
 	result["closed"] = closed;
 	return result;
+}
+
+// Shared per-type flower curve evaluator: marker-relative offset for
+// parameter t in [0, TAU). Mirrors the generator branches exactly so the
+// preview track and the volley agree. Returns false when the point is
+// unusable (caller falls back to origin).
+static bool flower_curve_point(int flower_type, int petals, real_t radius, real_t petal_spread, real_t petal_sharpness, double inner_radius_scale, double spiro_roller, double spiro_pen, double super_lobes, double super_fullness, real_t base_rotation, double t, Vector2 &r_offset) {
+	(void)petal_spread;
+	const double clamped_inner = Math::clamp(inner_radius_scale, 0.0, 0.999);
+	if (flower_type == BulletFactory2D::FLOWER_FAN) {
+		// Fan has no continuous curve (discrete per-petal fans); the
+		// sampler traces the petal-tip ring so the track bounds the bloom.
+		(void)petals;
+		(void)petal_sharpness;
+		const real_t ang = base_rotation + (real_t)t;
+		r_offset = Vector2(Math::cos(ang), Math::sin(ang)) * radius;
+		return r_offset.is_finite();
+	}
+	if (flower_type == BulletFactory2D::FLOWER_RHODONEA) {
+		const double sharp = Math::clamp((double)petal_sharpness, 0.0, 32.0);
+		const real_t theta = base_rotation + (real_t)t;
+		const real_t cos_k = Math::cos((real_t)petals * theta * 0.5);
+		const real_t mag = Math::pow(Math::abs((double)cos_k), sharp);
+		if (!Math::is_finite((double)mag)) {
+			return false;
+		}
+		const real_t r = radius * (real_t)clamped_inner + radius * (real_t)(1.0 - clamped_inner) * mag;
+		r_offset = Vector2(Math::cos(theta), Math::sin(theta)) * r;
+		return r_offset.is_finite();
+	}
+	if (flower_type == BulletFactory2D::FLOWER_PHYLLOTAXIS) {
+		// Disc has no outline curve; trace the outer rim at full radius.
+		const real_t ang = base_rotation + (real_t)t;
+		r_offset = Vector2(Math::cos(ang), Math::sin(ang)) * radius;
+		return r_offset.is_finite();
+	}
+	if (flower_type == BulletFactory2D::FLOWER_SPIROGRAPH) {
+		const double outer_r = (double)radius;
+		double roller = Math::clamp(spiro_roller, 1.0, Math::max(outer_r * 4.0, 512.0));
+		if (!Math::is_finite(roller) || roller <= 0.0) {
+			return false;
+		}
+		const double diff = outer_r - roller;
+		const double k = diff / roller;
+		if (!Math::is_finite(diff) || !Math::is_finite(k)) {
+			return false;
+		}
+		const double px = diff * Math::cos(t) + spiro_pen * Math::cos(k * t);
+		const double py = diff * Math::sin(t) - spiro_pen * Math::sin(k * t);
+		Vector2 local = Vector2((real_t)px, (real_t)py).rotated(base_rotation);
+		if (!local.is_finite()) {
+			return false;
+		}
+		r_offset = local;
+		return true;
+	}
+	// FLOWER_SUPERFORMULA: simplified Gielis, same clamps as the generator.
+	const double lobes = Math::clamp(super_lobes, 2.0, 64.0);
+	const double full = Math::clamp(super_fullness, 0.05, 8.0);
+	const double c = Math::abs(Math::cos(lobes * t * 0.25));
+	const double s = Math::abs(Math::sin(lobes * t * 0.25));
+	double r_norm = Math::pow(Math::pow(c, full) + Math::pow(s, full), -1.0 / full);
+	if (!Math::is_finite(r_norm) || r_norm <= 0.0) {
+		r_norm = 1.0;
+	}
+	if (r_norm > 4.0) {
+		r_norm = 4.0;
+	}
+	const real_t r = radius * (real_t)(clamped_inner + (1.0 - clamped_inner) * (r_norm * 0.5));
+	const real_t ang = base_rotation + (real_t)t;
+	r_offset = Vector2(Math::cos(ang), Math::sin(ang)) * r;
+	return r_offset.is_finite();
+}
+
+Dictionary BulletFactory2D::helper_sample_outline_flower(int flower_type, int petals, real_t radius, real_t petal_spread, real_t petal_sharpness, double inner_radius_scale, double spiro_roller, double spiro_pen, double super_lobes, double super_fullness, real_t base_rotation) {
+	if (flower_type < FLOWER_FAN || flower_type > FLOWER_SUPERFORMULA) {
+		UtilityFunctions::push_error("helper_sample_outline_flower: unknown flower_type.");
+		return outline_track_result(PackedVector2Array(), false);
+	}
+	if (petals < 1 || !Math::is_finite(radius) || radius <= 0.0 || !Math::is_finite(petal_spread) || petal_spread < 0.0 || !Math::is_finite(petal_sharpness) || petal_sharpness < 0.0 || !Math::is_finite(base_rotation)) {
+		UtilityFunctions::push_error("helper_sample_outline_flower: petals >= 1, finite radius > 0, spreads/sharpness finite and >= 0, base_rotation finite.");
+		return outline_track_result(PackedVector2Array(), false);
+	}
+	if (!Math::is_finite(inner_radius_scale) || inner_radius_scale < 0.0 || inner_radius_scale >= 1.0 || !Math::is_finite(spiro_roller) || spiro_roller <= 0.0 || !Math::is_finite(spiro_pen) || spiro_pen < 0.0 || !Math::is_finite(super_lobes) || super_lobes < 2.0 || super_lobes > 64.0 || !Math::is_finite(super_fullness) || super_fullness <= 0.0 || super_fullness > 8.0) {
+		UtilityFunctions::push_error("helper_sample_outline_flower: bad bloom knob range.");
+		return outline_track_result(PackedVector2Array(), false);
+	}
+	// Spirographs close only after several revolutions (k=(R-r)/r fractional),
+	// so sweep the full closure and scale density to keep the extra winding
+	// from coming out undersampled. Other kinds close in one revolution.
+	int revolutions = 1;
+	if (flower_type == FLOWER_SPIROGRAPH) {
+		double roller = spiro_roller;
+		if (roller < 1.0) {
+			roller = 1.0;
+		}
+		if (roller > Math::max((double)radius * 4.0, 512.0)) {
+			roller = Math::max((double)radius * 4.0, 512.0);
+		}
+		revolutions = spirograph_revolutions(((double)radius - roller) / roller);
+	}
+	const int n = Math::min(160 * revolutions, 2048);
+	PackedVector2Array pts;
+	for (int i = 0; i < n; ++i) {
+		const double t = Math::TAU * (double)revolutions * (double)i / (double)n;
+		Vector2 off;
+		if (flower_curve_point(flower_type, petals, radius, petal_spread, petal_sharpness, inner_radius_scale, spiro_roller, spiro_pen, super_lobes, super_fullness, base_rotation, t, off)) {
+			pts.push_back(off);
+		}
+	}
+	if (pts.size() < 3) {
+		return outline_track_result(PackedVector2Array(), false);
+	}
+	return outline_track_result(pts, true);
 }
 
 Dictionary BulletFactory2D::helper_sample_outline_rose(int petals, real_t radius, real_t lobe_sharpness, real_t base_rotation) {
@@ -5049,6 +5284,32 @@ void BulletFactory2D::_bind_methods() {
 								DEFVAL(0.0));
 
 	ClassDB::bind_static_method("BulletFactory2D",
+								D_METHOD("helper_sample_outline_flower",
+										"flower_type",
+										"petals",
+										"radius",
+										"petal_spread",
+										"petal_sharpness",
+										"inner_radius_scale",
+										"spiro_roller",
+										"spiro_pen",
+										"super_lobes",
+										"super_fullness",
+										"base_rotation"),
+								&BulletFactory2D::helper_sample_outline_flower,
+								DEFVAL(0),
+								DEFVAL(6),
+								DEFVAL(150.0),
+								DEFVAL(0.5),
+								DEFVAL(1.0),
+								DEFVAL(0.0),
+								DEFVAL(45.0),
+								DEFVAL(80.0),
+								DEFVAL(6.0),
+								DEFVAL(1.0),
+								DEFVAL(0.0));
+
+	ClassDB::bind_static_method("BulletFactory2D",
 								D_METHOD("helper_sample_outline_lissajous",
 										"size_x",
 										"size_y",
@@ -5399,6 +5660,11 @@ void BulletFactory2D::_bind_methods() {
 	BIND_ENUM_CONSTANT(TRIANGLE_EQUILATERAL);
 	BIND_ENUM_CONSTANT(TRIANGLE_ISOSCELES);
 	BIND_ENUM_CONSTANT(TRIANGLE_RIGHT);
+	BIND_ENUM_CONSTANT(FLOWER_FAN);
+	BIND_ENUM_CONSTANT(FLOWER_RHODONEA);
+	BIND_ENUM_CONSTANT(FLOWER_PHYLLOTAXIS);
+	BIND_ENUM_CONSTANT(FLOWER_SPIROGRAPH);
+	BIND_ENUM_CONSTANT(FLOWER_SUPERFORMULA);
 	BIND_ENUM_CONSTANT(OUTLINE_ON_PATH);
 	BIND_ENUM_CONSTANT(OUTLINE_FILL_INSIDE);
 	BIND_ENUM_CONSTANT(OUTLINE_SHELL_OUTSIDE);

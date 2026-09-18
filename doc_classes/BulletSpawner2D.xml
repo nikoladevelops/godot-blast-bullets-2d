@@ -480,6 +480,24 @@
 		<member name="helper_flower_radius" type="float" setter="set_helper_flower_radius" getter="get_helper_flower_radius" default="150.0">
 			Flower radius in pixels. Must be finite and 0 or more.
 		</member>
+		<member name="helper_flower_type" type="int" setter="set_helper_flower_type" getter="get_helper_flower_type" default="0">
+			Bloom kind selector (see [enum BulletFactory2D.FlowerBloom]): FAN (legacy default), RHODONEA, PHYLLOTAXIS, SPIROGRAPH, SUPERFORMULA. Per-type knobs below apply only to their matching bloom kind.
+		</member>
+		<member name="helper_flower_inner_radius_scale" type="float" setter="set_helper_flower_inner_radius_scale" getter="get_helper_flower_inner_radius_scale" default="0.0">
+			Core-hole lift for RHODONEA, PHYLLOTAXIS, SUPERFORMULA: 0 is a full bloom, closer to 1 lifts the waist into a ring. Must be finite in [0, 1).
+		</member>
+		<member name="helper_flower_spiro_roller" type="float" setter="set_helper_flower_spiro_roller" getter="get_helper_flower_spiro_roller" default="45.0">
+			SPIROGRAPH only: hypotrochoid roller radius r (&gt; 0). Larger values pull the lacy loops tighter.
+		</member>
+		<member name="helper_flower_spiro_pen" type="float" setter="set_helper_flower_spiro_pen" getter="get_helper_flower_spiro_pen" default="80.0">
+			SPIROGRAPH only: hypotrochoid pen offset d (&gt;= 0). Larger values stretch the loops outward.
+		</member>
+		<member name="helper_flower_super_lobes" type="float" setter="set_helper_flower_super_lobes" getter="get_helper_flower_super_lobes" default="6.0">
+			SUPERFORMULA only: lobe count m of the simplified Gielis curve. Must be finite in [2, 64].
+		</member>
+		<member name="helper_flower_super_fullness" type="float" setter="set_helper_flower_super_fullness" getter="get_helper_flower_super_fullness" default="1.0">
+			SUPERFORMULA only: fullness exponent controlling round vs. pinched petal shape. Must be finite in (0, 8].
+		</member>
 		<member name="helper_grid_alignment" type="int" setter="set_helper_grid_alignment" getter="get_helper_grid_alignment" default="3">
 			Grid anchor, same values as [enum BulletFactory2D.Alignment].
 		</member>
