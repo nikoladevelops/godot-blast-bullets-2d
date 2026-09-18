@@ -72,6 +72,8 @@ script = ExtResource("1_cfubd")
 bullet_factory_path = NodePath("../BulletFactory2D")
 transforms_generator = NodePath(".")
 spawn_data = SubResource("DirectionalBulletsData2D_nkrfg")
+pattern_source = 16
+helper_bullets_amount = 55
 helper_ring_y_scale = 3.0
 helper_fan_spread = 3.0
 helper_scatter_facing_jitter = 1.0
@@ -81,7 +83,6 @@ helper_star_points = 25
 helper_heart_size = 255.0
 helper_diamond_diagonal_x = 255.0
 helper_path2d_path = NodePath("../Paths/Path2D")
-shoot_interval_sec = 0.5
 spin_enabled = true
 burst_enabled = true
 pattern_seed = 5
@@ -94,6 +95,7 @@ orbiting_direction = 1
 orbiting_texture_rotation = 3
 orbiting_radius_linear_enabled = true
 orbiting_radius_start = 350.0
+show_preview_during_runtime = true
 position = Vector2(-390, -28)
 
 [node name="Marker2D" type="Marker2D" parent="BulletSpawner2D" unique_id=1785719658]

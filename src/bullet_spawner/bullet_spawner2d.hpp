@@ -63,6 +63,11 @@ class PatternPreviewLayer2D : public Node2D {
         float arrow_width = 2.0f;
         float arrow_head_length = 8.0f;
         float arrow_head_width = 10.0f;
+        // Reused draw scratch: _draw runs on every repaint, so member buffers
+        // avoid per-repaint allocations. draw_scratch filters the track;
+        // head_tri holds one arrow-head triangle (one polygon per draw call).
+        PackedVector2Array draw_scratch;
+        PackedVector2Array head_tri;
 
         void set_dots_data(const PackedVector2Array &p_dots, const Color &p_color, float p_radius);
         void set_first_marker(bool p_show, const Color &p_color, float p_radius_scale);
@@ -1376,6 +1381,9 @@ class BulletSpawner2D : public Node2D{
 
         bool get_shooting_enabled() const;
         void set_shooting_enabled(bool value);
+        // Effective state: switch on, not paused, cap not reached.
+        // Configured state, not ticking state: true outside the tree too.
+        bool is_shooting_active() const;
         double get_shoot_interval_sec() const;
         void set_shoot_interval_sec(double value);
         double get_shoot_initial_delay_sec() const;
@@ -1498,6 +1506,19 @@ class BulletSpawner2D : public Node2D{
         bool shoot_once_deferred();
         // Zeroes the volley counter and re-arms with the initial delay.
         void reset_shooting();
+        // Fire exactly n more volleys, then pause (one-shot budget counting
+        // every fired volley, auto or manual). max_volleys is never touched,
+        // so unlimited stays unlimited. Replaces any previous budget.
+        // n <= 0 is rejected.
+        void fire_n_volleys(int n);
+        // Pause auto-shooting keeping all counters (unlike shooting_enabled
+        // which is the master switch): resume continues the current wave.
+        void pause_shooting();
+        void resume_shooting();
+        bool is_shooting_paused() const;
+        // Volleys left before max_volleys trips or the one-shot budget runs
+        // out, whichever is smaller. -1 = infinite (no cap, no budget).
+        int volleys_remaining() const;
 
         virtual void _ready() override;
         virtual void _process(double delta) override;
@@ -1519,20 +1540,21 @@ class BulletSpawner2D : public Node2D{
         // Countdown to the next volley; volleys fired since (re)arming.
         double shoot_time_left = 0.0;
         int volleys_fired = 0;
-        // Re-entrancy latch for shoot_once(): the configuring signals emitted
-        // during apply_volley_homing_and_orbiting() AND volley_fired below run
-        // user code synchronously, which must not nest another shoot_once()
-        // (unbounded recursion, counter races, pool double-pop). The latch is
-        // held across apply + emit + the max_volleys cap transition (cleared
-        // after), so nested calls from ANY of those handlers are rejected; use
-        // call_deferred("shoot_once") (or shoot_once_deferred()) instead.
-        // Per-spawner: cross-spawner A->B->A nesting is additionally stopped
-        // by the file-local global depth guard in the .cpp.
+        // Pause latch (pause_shooting/resume_shooting): auto_shooting_active()
+        // stays false while set, but volleys_fired/max_volleys are preserved
+        // so resume continues the current wave instead of restarting it.
+        bool shooting_paused = false;
+        // One-shot budget from fire_n_volleys(n): counts every fired volley
+        // (auto or manual) down to 0, then pauses. -1 = no budget.
+        // Never touches max_volleys, so unlimited (-1) stays unlimited.
+        int oneshot_volleys_left = -1;
+        // Re-entrancy latch for shoot_once(): its emits run user handlers
+        // synchronously, which must not nest another shoot_once(). Held across
+        // apply + emit + cap transition; use shoot_once_deferred() instead.
+        // Cross-spawner A->B->A nesting is stopped by the file-local global
+        // depth guard in the .cpp.
         bool shoot_once_reentrant_guard = false;
-        // Single clear-point for the latch + global depth above. Every abort
-        // and the normal exit go through here so a new early return can never
-        // leak the latch (permanent shoot lockout) or the depth (permanent
-        // cross-spawner lockout).
+        // Single clear-point for the latch + global depth above.
         void clear_shoot_once_latch();
         // Homing/orbiting runtime state (never stored).
         // Tracked-volley registry for interval retargeting. VolleyTracker2D
@@ -1556,6 +1578,10 @@ class BulletSpawner2D : public Node2D{
         // Lazily created RNG for HOMING_SELECT_RANDOM (mutable: used by the
         // const resolve_homing_targets).
         mutable Ref<RandomNumberGenerator> homing_rng;
+        // Dedicated RNG for reload jitter (mutable: used by the const
+        // next_shoot_interval_sec). Separate from homing_rng: jitter reseeds
+        // would otherwise corrupt the homing target sequence.
+        mutable Ref<RandomNumberGenerator> jitter_rng;
         // Spin runtime state (never stored, advances in _process only).
         double spin_angle_deg = 0.0;
         double spin_time_sec = 0.0;

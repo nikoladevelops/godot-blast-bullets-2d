@@ -61,6 +61,13 @@
 				Fires the next volley of the active burst/telegraph chain (auto loop calls this; manual drivers call it on their own timers). Alternate-mirror bursts flip chirality on even shots. Manual shoot_once stays legal any time: a chain never blocks it, the chain only owns the shots it fires itself.
 			</description>
 		</method>
+		<method name="fire_n_volleys">
+			<return type="void" />
+			<param index="0" name="n" type="int" />
+			<description>
+				Arms a one-shot budget of n more volleys, then pauses. Counts every fired volley (auto or manual). [member max_volleys] is never touched, so unlimited stays unlimited. Replaces any previous budget; unpauses a paused spawner. Rejected when n is not above zero. Armed while disabled too: volleys fire once re-enabled. See [method volleys_remaining].
+			</description>
+		</method>
 		<method name="get_active_live_bullet_count" qualifiers="const">
 			<return type="int" />
 			<description>
@@ -136,6 +143,18 @@
 				Whether a pattern list is currently queued/firing.
 			</description>
 		</method>
+		<method name="is_shooting_active" qualifiers="const">
+			<return type="bool" />
+			<description>
+				Effective shooting state: switch on, not paused, cap not reached. This is configured state (true outside the tree too), not whether a tick is imminent.
+			</description>
+		</method>
+		<method name="is_shooting_paused" qualifiers="const">
+			<return type="bool" />
+			<description>
+				Whether [method pause_shooting] is latched. While set, no volley is created (burst, telegraph, pattern-list and timer chains freeze); spin, retargeting and preview keep running.
+			</description>
+		</method>
 		<method name="is_spinning" qualifiers="const">
 			<return type="bool" />
 			<description>
@@ -156,10 +175,16 @@
 				Overwrites velocity on every tracked live volley (wind, knockback). A speed curve overrides direct velocity, so this visibly works only for curve-free volleys. Returns how many volleys were touched. Must be finite.
 			</description>
 		</method>
+		<method name="pause_shooting">
+			<return type="void" />
+			<description>
+				Freezes volley creation keeping all counters: burst, telegraph, pattern-list and timer chains hold where they are and resume on [method resume_shooting]. Spin, retargeting and preview are unaffected. Manual [method shoot_once] and [method fire_burst_volley] still fire. Emits [signal shooting_stopped] on the active-to-idle transition.
+			</description>
+		</method>
 		<method name="reset_shooting">
 			<return type="void" />
 			<description>
-				Resets the volley counter, clears any burst/telegraph chain and pattern-list queue, re-arms the timer with [member shoot_initial_delay_sec] (plus the retarget phase), and emits [signal shooting_started] when auto-shooting resumes.
+				Resets the volley counter, clears pause and any [method fire_n_volleys] budget, clears burst/telegraph chains and the pattern-list queue, re-arms the timer with [member shoot_initial_delay_sec] (plus the retarget phase), and emits [signal shooting_started] when auto-shooting resumes.
 			</description>
 		</method>
 		<method name="reset_spin_angle">
@@ -174,6 +199,12 @@
 			<param index="1" name="advance_round_robin" type="bool" default="true" />
 			<description>
 				Resolves the current homing targets without touching any volley: group members, name matches (case-insensitive unless [member homing_node_name_case_sensitive]), children of the parent path, the node at [member homing_target_path], or the [member homing_global_position] snapshot. The Mouse source returns an empty array (the cursor is pushed live, not resolved). Entries are Node2D or Vector2. Unless quiet is true, an empty result warns once until a resolution succeeds again. With advance_round_robin off, the round-robin pick is resolved without consuming the cursor (retarget passes use this so flying volleys keep stable targets).
+			</description>
+		</method>
+		<method name="resume_shooting">
+			<return type="void" />
+			<description>
+				Clears [method pause_shooting]: frozen chains continue where they held. Emits [signal shooting_started] on the idle-to-active transition.
 			</description>
 		</method>
 		<method name="retarget_live_volleys">
@@ -206,7 +237,7 @@
 		<method name="shoot_once">
 			<return type="bool" />
 			<description>
-				Fires one volley now. Returns false when misconfigured or the factory refuses it. Counts toward [member max_volleys]. Safe to call from _physics_process (same-shape pool reuse applies immediately; only a shape-type change waits for a safe point). Must not be called re-entrantly from inside spawner signal handlers (pre_shoot, homing_targets_resolved, volley_homing_configured, volley_fired, volley_skipped, shooting_finished): nested calls are rejected, use [method shoot_once_deferred] (or call_deferred("shoot_once")) instead. This also means intentional synchronous cascades (a handler firing another spawner immediately) are deferred by one frame by design. If a handler frees or re-homes the volley mid-setup (including pre_shoot, which is validated before configuring), the shot is safely dropped (returns false) instead of emitting volley_fired with a dead instance.
+				Fires one volley now. Returns false when misconfigured or the factory refuses it. Counts toward [member max_volleys] and any [method fire_n_volleys] budget. Safe to call from _physics_process (same-shape pool reuse applies immediately; only a shape-type change waits for a safe point). Must not be called re-entrantly from inside spawner signal handlers (pre_shoot, homing_targets_resolved, volley_homing_configured, volley_fired, volley_skipped, shooting_finished): nested calls are rejected, use [method shoot_once_deferred] (or call_deferred("shoot_once")) instead. This also means intentional synchronous cascades (a handler firing another spawner immediately) are deferred by one frame by design. If a handler frees or re-homes the volley mid-setup (including pre_shoot, which is validated before configuring), the shot is safely dropped (returns false) instead of emitting volley_fired with a dead instance.
 			</description>
 		</method>
 		<method name="shoot_once_deferred">
@@ -241,6 +272,12 @@
 			<return type="void" />
 			<description>
 				Turns [member spin_enabled] off, freezing the angle.
+			</description>
+		</method>
+		<method name="volleys_remaining" qualifiers="const">
+			<return type="int" />
+			<description>
+				Volleys left before [member max_volleys] trips or the [method fire_n_volleys] budget runs out, whichever is smaller. -1 means infinite (no cap, no budget).
 			</description>
 		</method>
 	</methods>
@@ -969,7 +1006,7 @@
 			Soft live-bullet fuse: 0 is unlimited, otherwise firing pauses (volley_skipped "over_budget") while this spawner's live bullets (homing AND plain volleys, counted via the factory) reach this count. Counts actual spawned bullets, so gap-carving modes (Corridor gap, Ellipse Wall, skip indices) consume less budget than helper_bullets_amount. The census is O(factory volleys) per trigger pull: fine for a handful of budgeted spawners, prefer fewer budgeted spawners (or staggered intervals) past ~100 spawners.
 		</member>
 		<member name="max_volleys" type="int" setter="set_max_volleys" getter="get_max_volleys" default="-1">
-			Auto-shooting stops after this many volleys. -1 is infinite, 0 disables auto-shooting ([method shoot_once] still works). Lowering the cap reports nothing by itself: [signal shooting_finished] fires once from the volley that trips the cap, so a volley_fired handler that lowers the cap never double-fires it.
+			Auto-shooting stops after this many volleys. -1 is infinite, 0 disables auto-shooting ([method shoot_once] still works). Lowering the cap below the fired count emits [signal shooting_stopped] (raising it back emits [signal shooting_started]); [signal shooting_finished] fires once from the volley that trips the cap, so a volley_fired handler that lowers the cap never double-fires it. Untouched by [method fire_n_volleys].
 		</member>
 		<member name="orbiting_direction" type="int" setter="set_orbiting_direction" getter="get_orbiting_direction" enum="DirectionalBullets2D.OrbitingDirection" default="2">
 			Orbit direction. DontMove means escort: bullets hold a fixed slot on the ring and follow the target without circling. OrbitRandom rolls OrbitLeft or OrbitRight per bullet when the volley spawns (never DontMove); live volleys keep their rolled direction on retarget passes, so switching to OrbitRandom mid-flight only affects new volleys.

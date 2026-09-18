@@ -22,6 +22,7 @@
 #include "spawn-data/directional_bullets_data2d.hpp"
 #include "spawn-data/multimesh_bullets_data2d.hpp"
 
+#include <algorithm>
 #include <cstdint>
 #include <vector>
 
@@ -117,6 +118,9 @@ protected:
 	std::vector<uint8_t> all_orbiting_status;
 
 	int active_orbiting_count = 0;
+	// Reused per-tick scratch: the orbit-lock snapshot used to keep read to avoid per-tick std::vector
+	// assignment churn in move_bullets.
+	std::vector<uint8_t> orbit_locked_scratch;
 	//
 
 	// HOMING
@@ -406,9 +410,14 @@ public:
 		// Locked-orbit snapshot for the pattern gate below: the orbit lock
 		// state read per bullet must match what phase 7 sees, or the pattern
 		// gate and the orbit displacement disagree for one frame.
-		std::vector<uint8_t> orbit_locked_snapshot;
+		// Reuses the member scratch (no per-tick allocation when sized).
+		std::vector<uint8_t> &orbit_locked_snapshot = orbit_locked_scratch;
 		if (is_orbiting_feature_enabled) {
-			orbit_locked_snapshot.assign(amount_bullets, 0);
+			if ((int)orbit_locked_snapshot.size() != amount_bullets) {
+				orbit_locked_snapshot.assign(amount_bullets, 0);
+			} else {
+				std::fill(orbit_locked_snapshot.begin(), orbit_locked_snapshot.end(), (uint8_t)0);
+			}
 			for (int li : all_bullets_enabled_set.get_active_indexes()) {
 				if (li >= 0 && li < amount_bullets && li < (int)all_orbiting_status.size() && li < (int)all_orbiting_data.size()) {
 					if (all_orbiting_status[li] && all_orbiting_data[li].is_locked_orbiting) {
