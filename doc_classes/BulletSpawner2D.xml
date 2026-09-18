@@ -98,9 +98,11 @@
 				Returns the shared aimed target (Aimed cone and Corridor wall), or null when unset.
 			</description>
 		</method>
-		
-		
-		
+		<method name="get_helper_path2d_node" qualifiers="const">
+			<return type="Node" />
+			<description>
+			</description>
+		</method>
 		<method name="get_live_volley_count" qualifiers="const">
 			<return type="int" />
 			<description>
@@ -161,7 +163,6 @@
 				Returns true when [member spin_enabled] is on and the game is running.
 			</description>
 		</method>
-		
 		<method name="next_shoot_interval_sec" qualifiers="const">
 			<return type="float" />
 			<description>
@@ -227,6 +228,12 @@
 				Assigns the shared aimed target (Aimed cone and Corridor wall) directly. Pass null to clear it.
 			</description>
 		</method>
+		<method name="set_helper_path2d_node">
+			<return type="void" />
+			<param index="0" name="node" type="Node" />
+			<description>
+			</description>
+		</method>
 		<method name="set_transforms_generator">
 			<return type="void" />
 			<param index="0" name="generator" type="Node2D" />
@@ -255,7 +262,6 @@
 				Queues pattern entries: each entry is a Dictionary with optional "preset", "pattern_source", "helper_bullets_amount", "spawn_data" keys. Sequential mode (default) fires one entry per interval_sec through the guarded shoot path; simultaneous mode fires all at once. Returns entries queued (sequential) or volleys fired (simultaneous). Bad entries skip with an error, never abort the list. Sequential mode emits [signal pattern_list_finished] when the queue drains; simultaneous mode does not (it returns the fired count directly).
 			</description>
 		</method>
-		
 		<method name="start_spinning">
 			<return type="void" />
 			<description>
@@ -321,32 +327,14 @@
 		<member name="helper_bullets_amount" type="int" setter="set_helper_bullets_amount" getter="get_helper_bullets_amount" default="10">
 			Bullet count for helper patterns. Clamped to 1-10000: one volley fans out to transforms, instance buffers and physics shapes, so uncapped values would freeze on a typo. Outline Fill Inside may return fewer (small shapes run out of grid cells, like Corridor/Ellipse Wall gaps).
 		</member>
-		<member name="helper_outline_placement" type="int" setter="set_helper_outline_placement" getter="get_helper_outline_placement" enum="BulletFactory2D.OutlinePlacement" default="0">
-			Where closed-loop shape bullets live (Ring, Ellipse, Star, Flower, Rose, Lissajous, Circle, Rectangle, Square, Polygon): On Outline keeps the generated slot loop, Fill Inside swaps it for a row-major grid masked to the loop interior, Shell Outside spreads the same slot count over concentric outward layers. On Outline is the identity default.
+		<member name="helper_circle_face_outward" type="bool" setter="set_helper_circle_face_outward" getter="get_helper_circle_face_outward" default="true">
+			Circle bullets face outward (away from the generator); off faces inward (toward it).
 		</member>
-		<member name="helper_outline_facing" type="int" setter="set_helper_outline_facing" getter="get_helper_outline_facing" enum="BulletFactory2D.OutlineFacing" default="0">
-			Rotates each closed-loop shape facing: Outline Normal keeps it as generated, +90/-90 Degrees turn it toward the loop tangent. The per-shape facing_offset_deg still applies on top.
+		<member name="helper_circle_facing_offset_deg" type="float" setter="set_helper_circle_facing_offset_deg" getter="get_helper_circle_facing_offset_deg" default="0.0">
+			Extra facing twist in degrees on top of the circle normal. Must be finite.
 		</member>
-		<member name="helper_outline_reverse" type="bool" setter="set_helper_outline_reverse" getter="get_helper_outline_reverse" default="false">
-			Mirrors the closed-loop slot order (winding flip): bullet 0 moves to the far end of the loop. Outline and shell layouts only.
-		</member>
-		<member name="helper_outline_slot_offset" type="int" setter="set_helper_outline_slot_offset" getter="get_helper_outline_slot_offset" default="0">
-			Rotates which closed-loop slot becomes bullet 0 (wraps both ways). Outline and shell layouts only.
-		</member>
-		<member name="helper_outline_fill_spacing" type="float" setter="set_helper_outline_fill_spacing" getter="get_helper_outline_fill_spacing" default="32.0">
-			Interior grid cell size in pixels for Fill Inside (rows run top-down like the Grid helper). Must be finite and above zero.
-		</member>
-		<member name="helper_outline_fill_stagger" type="bool" setter="set_helper_outline_fill_stagger" getter="get_helper_outline_fill_stagger" default="false">
-			Shifts every other Fill Inside row by half a cell (honeycomb packing).
-		</member>
-		<member name="helper_outline_fill_margin" type="float" setter="set_helper_outline_fill_margin" getter="get_helper_outline_fill_margin" default="0.0">
-			Keep-out distance in pixels from the loop edge for Fill Inside cells. Must be finite and 0 or more.
-		</member>
-		<member name="helper_outline_shell_layers" type="int" setter="set_helper_outline_shell_layers" getter="get_helper_outline_shell_layers" default="1">
-			Concentric outward layers for Shell Outside (bullet i rides layer i % layers, each layer evenly spread). Must be 1 or more.
-		</member>
-		<member name="helper_outline_shell_step" type="float" setter="set_helper_outline_shell_step" getter="get_helper_outline_shell_step" default="32.0">
-			Radial distance in pixels between Shell Outside layers. Must be finite and above zero.
+		<member name="helper_circle_radius" type="float" setter="set_helper_circle_radius" getter="get_helper_circle_radius" default="150.0">
+			Exact circle loop radius in pixels. Must be finite and 0 or more.
 		</member>
 		<member name="helper_corridor_aim_direction" type="Vector2" setter="set_helper_corridor_aim_direction" getter="get_helper_corridor_aim_direction" default="Vector2(0, 1)">
 			Fallback aim axis (need not be normalized). The live aimed target wins when one is assigned. Must be finite and non-zero.
@@ -359,9 +347,6 @@
 		</member>
 		<member name="helper_corridor_gap_width" type="float" setter="set_helper_corridor_gap_width" getter="get_helper_corridor_gap_width" default="96.0">
 			Carved center dodge door in pixels. The output shrinks to the surviving slots (like Ellipse Wall). Must be finite, 0 or more, and narrower than the width.
-		</member>
-		<member name="helper_corridor_spacing" type="float" setter="set_helper_corridor_spacing" getter="get_helper_corridor_spacing" default="32.0">
-			Reserved slot pitch in pixels (unused: slots spread evenly across helper_corridor_width). Must be finite and above zero.
 		</member>
 		<member name="helper_corridor_width" type="float" setter="set_helper_corridor_width" getter="get_helper_corridor_width" default="400.0">
 			Wall width in pixels across the aim axis. Must be finite, 0 or more, and wider than the gap.
@@ -410,6 +395,36 @@
 		</member>
 		<member name="helper_cross_spacing" type="float" setter="set_helper_cross_spacing" getter="get_helper_cross_spacing" default="32.0">
 			Spacing between slots along each ray. Must be finite and above zero.
+		</member>
+		<member name="helper_custom_facing" type="int" setter="set_helper_custom_facing" getter="get_helper_custom_facing" default="0">
+			Which direction Custom bullets face: As Stored keeps each transform's rotation, Face Outward/Inward aims radially from the generator, +90/-90 Degrees turn the stored rotation across it. helper_custom_facing_offset_deg still applies on top.
+		</member>
+		<member name="helper_custom_facing_offset_deg" type="float" setter="set_helper_custom_facing_offset_deg" getter="get_helper_custom_facing_offset_deg" default="0.0">
+			Extra facing twist in degrees on top of the Custom facing. Must be finite.
+		</member>
+		<member name="helper_custom_reverse" type="bool" setter="set_helper_custom_reverse" getter="get_helper_custom_reverse" default="false">
+			Mirrors the Custom array order: bullet 0 moves to the far end.
+		</member>
+		<member name="helper_custom_slot_offset" type="int" setter="set_helper_custom_slot_offset" getter="get_helper_custom_slot_offset" default="0">
+			Rotates which Custom array slot becomes bullet 0 (wraps both ways).
+		</member>
+		<member name="helper_custom_transforms" type="Transform2D[]" setter="set_helper_custom_transforms" getter="get_helper_custom_transforms" default="[]">
+			Hand-placed volley in generator-local pixels: each stored transform spawns exactly one bullet there (composed as marker * local, so spin and scales keep working). Empty by default (Custom draws nothing until you fill it). Every entry must be finite. The count comes from the array itself; helper_bullets_amount is ignored. Apply TERRAIN_CREST once for a starter crest line.
+		</member>
+		<member name="helper_diamond_diagonal_x" type="float" setter="set_helper_diamond_diagonal_x" getter="get_helper_diamond_diagonal_x" default="200.0">
+			Diamond horizontal diagonal in pixels. Must be finite and 0 or more.
+		</member>
+		<member name="helper_diamond_diagonal_y" type="float" setter="set_helper_diamond_diagonal_y" getter="get_helper_diamond_diagonal_y" default="300.0">
+			Diamond vertical diagonal in pixels. Must be finite and 0 or more.
+		</member>
+		<member name="helper_diamond_face_outward" type="bool" setter="set_helper_diamond_face_outward" getter="get_helper_diamond_face_outward" default="true">
+			Diamond bullets face outward; off faces inward.
+		</member>
+		<member name="helper_diamond_facing_offset_deg" type="float" setter="set_helper_diamond_facing_offset_deg" getter="get_helper_diamond_facing_offset_deg" default="0.0">
+			Extra facing twist in degrees on top of the diamond normal. Must be finite.
+		</member>
+		<member name="helper_diamond_rotation" type="float" setter="set_helper_diamond_rotation" getter="get_helper_diamond_rotation" default="0.0">
+			Diamond base rotation in radians. Must be finite.
 		</member>
 		<member name="helper_ellipse_arc" type="float" setter="set_helper_ellipse_arc" getter="get_helper_ellipse_arc" default="6.2831855">
 			Arc span for Arc/Wall modes (full turn draws the whole ellipse). Must be finite.
@@ -468,6 +483,9 @@
 		<member name="helper_flower_facing_offset_deg" type="float" setter="set_helper_flower_facing_offset_deg" getter="get_helper_flower_facing_offset_deg" default="0.0">
 			Twists every flower facing. Must be finite.
 		</member>
+		<member name="helper_flower_inner_radius_scale" type="float" setter="set_helper_flower_inner_radius_scale" getter="get_helper_flower_inner_radius_scale" default="0.0">
+			Core-hole lift for RHODONEA, PHYLLOTAXIS, SUPERFORMULA: 0 is a full bloom, closer to 1 lifts the waist into a ring. Must be finite in [0, 1).
+		</member>
 		<member name="helper_flower_petal_sharpness" type="float" setter="set_helper_flower_petal_sharpness" getter="get_helper_flower_petal_sharpness" default="1.0">
 			Pinch between lobes: 0 is round, higher is tighter. Must be finite and 0 or more.
 		</member>
@@ -480,23 +498,20 @@
 		<member name="helper_flower_radius" type="float" setter="set_helper_flower_radius" getter="get_helper_flower_radius" default="150.0">
 			Flower radius in pixels. Must be finite and 0 or more.
 		</member>
-		<member name="helper_flower_type" type="int" setter="set_helper_flower_type" getter="get_helper_flower_type" default="0">
-			Bloom kind selector (see [enum BulletFactory2D.FlowerBloom]): FAN (legacy default), RHODONEA, PHYLLOTAXIS, SPIROGRAPH, SUPERFORMULA. Per-type knobs below apply only to their matching bloom kind.
-		</member>
-		<member name="helper_flower_inner_radius_scale" type="float" setter="set_helper_flower_inner_radius_scale" getter="get_helper_flower_inner_radius_scale" default="0.0">
-			Core-hole lift for RHODONEA, PHYLLOTAXIS, SUPERFORMULA: 0 is a full bloom, closer to 1 lifts the waist into a ring. Must be finite in [0, 1).
+		<member name="helper_flower_spiro_pen" type="float" setter="set_helper_flower_spiro_pen" getter="get_helper_flower_spiro_pen" default="80.0">
+			SPIROGRAPH only: hypotrochoid pen offset d (&gt;= 0). Larger values stretch the loops outward.
 		</member>
 		<member name="helper_flower_spiro_roller" type="float" setter="set_helper_flower_spiro_roller" getter="get_helper_flower_spiro_roller" default="45.0">
 			SPIROGRAPH only: hypotrochoid roller radius r (&gt; 0). Larger values pull the lacy loops tighter.
 		</member>
-		<member name="helper_flower_spiro_pen" type="float" setter="set_helper_flower_spiro_pen" getter="get_helper_flower_spiro_pen" default="80.0">
-			SPIROGRAPH only: hypotrochoid pen offset d (&gt;= 0). Larger values stretch the loops outward.
+		<member name="helper_flower_super_fullness" type="float" setter="set_helper_flower_super_fullness" getter="get_helper_flower_super_fullness" default="1.0">
+			SUPERFORMULA only: fullness exponent controlling round vs. pinched petal shape. Must be finite in (0, 8].
 		</member>
 		<member name="helper_flower_super_lobes" type="float" setter="set_helper_flower_super_lobes" getter="get_helper_flower_super_lobes" default="6.0">
 			SUPERFORMULA only: lobe count m of the simplified Gielis curve. Must be finite in [2, 64].
 		</member>
-		<member name="helper_flower_super_fullness" type="float" setter="set_helper_flower_super_fullness" getter="get_helper_flower_super_fullness" default="1.0">
-			SUPERFORMULA only: fullness exponent controlling round vs. pinched petal shape. Must be finite in (0, 8].
+		<member name="helper_flower_type" type="int" setter="set_helper_flower_type" getter="get_helper_flower_type" default="0">
+			Bloom kind selector (see [enum BulletFactory2D.FlowerBloom]): FAN (legacy default), RHODONEA, PHYLLOTAXIS, SPIROGRAPH, SUPERFORMULA. Per-type knobs below apply only to their matching bloom kind.
 		</member>
 		<member name="helper_grid_alignment" type="int" setter="set_helper_grid_alignment" getter="get_helper_grid_alignment" default="3">
 			Grid anchor, same values as [enum BulletFactory2D.Alignment].
@@ -570,11 +585,11 @@
 		<member name="helper_line_slot_offset" type="int" setter="set_helper_line_slot_offset" getter="get_helper_line_slot_offset" default="0">
 			Rotates which line slot becomes bullet 0 (wraps both ways).
 		</member>
-		<member name="helper_line_start_offset" type="float" setter="set_helper_line_start_offset" getter="get_helper_line_start_offset" default="0.0">
-			Shifts the whole line row along its axis in pixels, on top of the Start/Center/End anchor. Must be finite and 0 or more.
-		</member>
 		<member name="helper_line_spacing" type="float" setter="set_helper_line_spacing" getter="get_helper_line_spacing" default="32.0">
 			Distance between line bullets.
+		</member>
+		<member name="helper_line_start_offset" type="float" setter="set_helper_line_start_offset" getter="get_helper_line_start_offset" default="0.0">
+			Shifts the whole line row along its axis in pixels, on top of the Start/Center/End anchor. Must be finite and 0 or more.
 		</member>
 		<member name="helper_lissajous_face_outward" type="bool" setter="set_helper_lissajous_face_outward" getter="get_helper_lissajous_face_outward" default="true">
 			Face away from the curve center. Off faces inward.
@@ -596,147 +611,6 @@
 		</member>
 		<member name="helper_lissajous_size_y" type="float" setter="set_helper_lissajous_size_y" getter="get_helper_lissajous_size_y" default="120.0">
 			Weave half-height in pixels. Must be finite and 0 or more.
-		</member>
-		<member name="helper_custom_transforms" type="Transform2D[]" setter="set_helper_custom_transforms" getter="get_helper_custom_transforms" default="[]">
-			Hand-placed volley in generator-local pixels: each stored transform spawns exactly one bullet there (composed as marker * local, so spin and scales keep working). Empty by default (Custom draws nothing until you fill it). Every entry must be finite. The count comes from the array itself; helper_bullets_amount is ignored. Apply TERRAIN_CREST once for a starter crest line.
-		</member>
-		<member name="helper_custom_facing" type="int" setter="set_helper_custom_facing" getter="get_helper_custom_facing" default="0">
-			Which direction Custom bullets face: As Stored keeps each transform's rotation, Face Outward/Inward aims radially from the generator, +90/-90 Degrees turn the stored rotation across it. helper_custom_facing_offset_deg still applies on top.
-		</member>
-		<member name="helper_custom_facing_offset_deg" type="float" setter="set_helper_custom_facing_offset_deg" getter="get_helper_custom_facing_offset_deg" default="0.0">
-			Extra facing twist in degrees on top of the Custom facing. Must be finite.
-		</member>
-		<member name="helper_custom_reverse" type="bool" setter="set_helper_custom_reverse" getter="get_helper_custom_reverse" default="false">
-			Mirrors the Custom array order: bullet 0 moves to the far end.
-		</member>
-		<member name="helper_custom_slot_offset" type="int" setter="set_helper_custom_slot_offset" getter="get_helper_custom_slot_offset" default="0">
-			Rotates which Custom array slot becomes bullet 0 (wraps both ways).
-		</member>
-		<member name="helper_triangle_type" type="int" setter="set_helper_triangle_type" getter="get_helper_triangle_type" enum="BulletFactory2D.TriangleType" default="0">
-			Triangle kind: Equilateral (circumradius helper_triangle_size_a), Isosceles (base helper_triangle_size_a + height helper_triangle_size_b, apex up), Right (legs helper_triangle_size_a along X and helper_triangle_size_b along Y, recentered). All centered on the generator.
-		</member>
-		<member name="helper_triangle_size_a" type="float" setter="set_helper_triangle_size_a" getter="get_helper_triangle_size_a" default="150.0">
-			Equilateral circumradius / isosceles base width / right X leg in pixels. Must be finite and 0 or more.
-		</member>
-		<member name="helper_triangle_size_b" type="float" setter="set_helper_triangle_size_b" getter="get_helper_triangle_size_b" default="150.0">
-			Isosceles height / right Y leg in pixels (unused by Equilateral). Must be finite and 0 or more.
-		</member>
-		<member name="helper_triangle_rotation" type="float" setter="set_helper_triangle_rotation" getter="get_helper_triangle_rotation" default="0.0">
-			Triangle base rotation in radians. Must be finite.
-		</member>
-		<member name="helper_triangle_face_outward" type="bool" setter="set_helper_triangle_face_outward" getter="get_helper_triangle_face_outward" default="true">
-			Triangle bullets face outward; off faces inward.
-		</member>
-		<member name="helper_triangle_facing_offset_deg" type="float" setter="set_helper_triangle_facing_offset_deg" getter="get_helper_triangle_facing_offset_deg" default="0.0">
-			Extra facing twist in degrees on top of the triangle normal. Must be finite.
-		</member>
-		<member name="helper_trapezoid_base_top" type="float" setter="set_helper_trapezoid_base_top" getter="get_helper_trapezoid_base_top" default="200.0">
-			Trapezoid top base width in pixels (0 degrades to a triangle). Must be finite and 0 or more.
-		</member>
-		<member name="helper_trapezoid_base_bottom" type="float" setter="set_helper_trapezoid_base_bottom" getter="get_helper_trapezoid_base_bottom" default="300.0">
-			Trapezoid bottom base width in pixels. Must be finite and 0 or more.
-		</member>
-		<member name="helper_trapezoid_height" type="float" setter="set_helper_trapezoid_height" getter="get_helper_trapezoid_height" default="200.0">
-			Trapezoid height in pixels. Must be finite and 0 or more.
-		</member>
-		<member name="helper_trapezoid_rotation" type="float" setter="set_helper_trapezoid_rotation" getter="get_helper_trapezoid_rotation" default="0.0">
-			Trapezoid base rotation in radians. Must be finite.
-		</member>
-		<member name="helper_trapezoid_face_outward" type="bool" setter="set_helper_trapezoid_face_outward" getter="get_helper_trapezoid_face_outward" default="true">
-			Trapezoid bullets face outward; off faces inward.
-		</member>
-		<member name="helper_trapezoid_facing_offset_deg" type="float" setter="set_helper_trapezoid_facing_offset_deg" getter="get_helper_trapezoid_facing_offset_deg" default="0.0">
-			Extra facing twist in degrees on top of the trapezoid normal. Must be finite.
-		</member>
-		<member name="helper_diamond_diagonal_x" type="float" setter="set_helper_diamond_diagonal_x" getter="get_helper_diamond_diagonal_x" default="200.0">
-			Diamond horizontal diagonal in pixels. Must be finite and 0 or more.
-		</member>
-		<member name="helper_diamond_diagonal_y" type="float" setter="set_helper_diamond_diagonal_y" getter="get_helper_diamond_diagonal_y" default="300.0">
-			Diamond vertical diagonal in pixels. Must be finite and 0 or more.
-		</member>
-		<member name="helper_diamond_rotation" type="float" setter="set_helper_diamond_rotation" getter="get_helper_diamond_rotation" default="0.0">
-			Diamond base rotation in radians. Must be finite.
-		</member>
-		<member name="helper_diamond_face_outward" type="bool" setter="set_helper_diamond_face_outward" getter="get_helper_diamond_face_outward" default="true">
-			Diamond bullets face outward; off faces inward.
-		</member>
-		<member name="helper_diamond_facing_offset_deg" type="float" setter="set_helper_diamond_facing_offset_deg" getter="get_helper_diamond_facing_offset_deg" default="0.0">
-			Extra facing twist in degrees on top of the diamond normal. Must be finite.
-		</member>
-		<member name="helper_circle_radius" type="float" setter="set_helper_circle_radius" getter="get_helper_circle_radius" default="150.0">
-			Exact circle loop radius in pixels. Must be finite and 0 or more.
-		</member>
-		<member name="helper_circle_face_outward" type="bool" setter="set_helper_circle_face_outward" getter="get_helper_circle_face_outward" default="true">
-			Circle bullets face outward (away from the generator); off faces inward (toward it).
-		</member>
-		<member name="helper_circle_facing_offset_deg" type="float" setter="set_helper_circle_facing_offset_deg" getter="get_helper_circle_facing_offset_deg" default="0.0">
-			Extra facing twist in degrees on top of the circle normal. Must be finite.
-		</member>
-		<member name="helper_rectangle_size" type="Vector2" setter="set_helper_rectangle_size" getter="get_helper_rectangle_size" default="Vector2(300, 200)">
-			Rectangle perimeter size in pixels, centered on the generator. Must be finite with sides 0 or more.
-		</member>
-		<member name="helper_rectangle_face_outward" type="bool" setter="set_helper_rectangle_face_outward" getter="get_helper_rectangle_face_outward" default="true">
-			Rectangle bullets face outward; off faces inward.
-		</member>
-		<member name="helper_rectangle_facing_offset_deg" type="float" setter="set_helper_rectangle_facing_offset_deg" getter="get_helper_rectangle_facing_offset_deg" default="0.0">
-			Extra facing twist in degrees on top of the rectangle normal. Must be finite.
-		</member>
-		<member name="helper_square_size" type="float" setter="set_helper_square_size" getter="get_helper_square_size" default="300.0">
-			Square perimeter side length in pixels, centered on the generator. Must be finite and 0 or more.
-		</member>
-		<member name="helper_square_face_outward" type="bool" setter="set_helper_square_face_outward" getter="get_helper_square_face_outward" default="true">
-			Square bullets face outward; off faces inward.
-		</member>
-		<member name="helper_square_facing_offset_deg" type="float" setter="set_helper_square_facing_offset_deg" getter="get_helper_square_facing_offset_deg" default="0.0">
-			Extra facing twist in degrees on top of the square normal. Must be finite.
-		</member>
-		<member name="helper_polygon_vertices" type="int" setter="set_helper_polygon_vertices" getter="get_helper_polygon_vertices" default="6">
-			Polygon corner count (true perimeter, not the Star Polygon scatter mode). Must be 3 or more.
-		</member>
-		<member name="helper_polygon_radius" type="float" setter="set_helper_polygon_radius" getter="get_helper_polygon_radius" default="150.0">
-			Polygon corner radius in pixels. Must be finite and 0 or more.
-		</member>
-		<member name="helper_polygon_rotation" type="float" setter="set_helper_polygon_rotation" getter="get_helper_polygon_rotation" default="0.0">
-			Polygon base rotation in radians. Must be finite.
-		</member>
-		<member name="helper_polygon_face_outward" type="bool" setter="set_helper_polygon_face_outward" getter="get_helper_polygon_face_outward" default="true">
-			Polygon bullets face outward; off faces inward.
-		</member>
-		<member name="helper_polygon_facing_offset_deg" type="float" setter="set_helper_polygon_facing_offset_deg" getter="get_helper_polygon_facing_offset_deg" default="0.0">
-			Extra facing twist in degrees on top of the polygon normal. Must be finite.
-		</member>
-		<member name="helper_path2d_space" type="int" setter="set_helper_path2d_space" getter="get_helper_path2d_space" enum="BulletSpawner2D.Path2DSpace" default="0">
-			Which frame the Path2D curve is drawn in. Follow Generator (default) copies the curve shape onto the generator with its bounding-box center reset to the origin: only the shape matters, the node's own transform and wherever the curve was drawn are ignored (moving/rotating the Path2D node does nothing), like every other pattern. At Path2D Node keeps the legacy pose: the volley materializes where the node sits in the world. Flip back to this if an existing scene relied on the old default. When the path is a child of the generator at origin, both modes coincide.
-		</member>
-		<member name="helper_path2d_path" type="NodePath" setter="set_helper_path2d_path" getter="get_helper_path2d_path" default="NodePath(&quot;&quot;)">
-			Path2D node to live-sample bullet positions from (baked curve points, re-resolved every volley, ObjectDB-guarded, expressed in the generator space). Bullets sit exactly on the curve per helper_path2d_distribution; empty means no outline.
-		</member>
-		<member name="helper_path2d_distribution" type="int" setter="set_helper_path2d_distribution" getter="get_helper_path2d_distribution" enum="BulletSpawner2D.Path2DDistribution" default="0">
-			How Path2D bullets are placed: Fixed Spacing lays helper_bullets_amount bullets helper_path2d_spacing apart (helper_path2d_anchor/overflow decide placement when the run is shorter/longer than the curve), Spread Evenly covers the whole curve length (both endpoints included on open paths; seamless ring without a duplicated seam bullet on closed loops).
-		</member>
-		<member name="helper_path2d_spacing" type="float" setter="set_helper_path2d_spacing" getter="get_helper_path2d_spacing" default="32.0">
-			Offset in pixels between consecutive Path2D bullets (Fixed Spacing mode only). Must be finite and greater than 0.
-		</member>
-		<member name="helper_path2d_overflow" type="int" setter="set_helper_path2d_overflow" getter="get_helper_path2d_overflow" enum="BulletSpawner2D.Path2DOverflow" default="2">
-			What happens when a fixed Path2D run does not fit (run longer than the curve, or shifted past its ends): Clamp piles extras at the end, Wrap continues from the start, Auto Fit scales spacing down so the run fits exactly (Fixed Spacing mode only).
-		</member>
-		<member name="helper_path2d_anchor" type="int" setter="set_helper_path2d_anchor" getter="get_helper_path2d_anchor" enum="BulletSpawner2D.Path2DAnchor" default="0">
-			Where a fixed Path2D run sits when shorter than the curve: Path Start, Centered, or Path End (Fixed Spacing mode only). helper_path2d_start_offset shifts on top of this.
-		</member>
-		<member name="helper_path2d_start_offset" type="float" setter="set_helper_path2d_start_offset" getter="get_helper_path2d_start_offset" default="0.0">
-			Distance in pixels along the Path2D curve where layout starts (Fixed: first-bullet position on top of the anchor; Spread Evenly: phase-rotates a loop, or pushes an open run toward the end, clamped). Must be finite and 0 or more.
-		</member>
-		<member name="helper_path2d_reverse" type="bool" setter="set_helper_path2d_reverse" getter="get_helper_path2d_reverse" default="false">
-			Walk the Path2D curve end to start (exact mirror: bullet 0 lands on the curve end). Along Path facing flips with it.
-		</member>
-		<member name="helper_path2d_closed" type="bool" setter="set_helper_path2d_closed" getter="get_helper_path2d_closed" default="false">
-			Include the last-to-first stretch when measuring a Path2D curve, so spacing wraps on loop paths. Curves already drawn as loops need nothing extra (no double segment is added); two-point outlines always stay open.
-		</member>
-		<member name="helper_path2d_facing" type="int" setter="set_helper_path2d_facing" getter="get_helper_path2d_facing" enum="BulletSpawner2D.Path2DFacing" default="0">
-			Which direction Path2D bullets face: Along Path (+X with travel, the tangent), Normal +90, or Normal -90. helper_path2d_facing_offset_deg applies on top.
-		</member>
-		<member name="helper_path2d_facing_offset_deg" type="float" setter="set_helper_path2d_facing_offset_deg" getter="get_helper_path2d_facing_offset_deg" default="0.0">
-			Extra facing twist in degrees on top of the Path2D facing. Must be finite.
 		</member>
 		<member name="helper_multispiral_angle_step" type="float" setter="set_helper_multispiral_angle_step" getter="get_helper_multispiral_angle_step" default="0.6">
 			Angle growth per step along each arm. Must be finite.
@@ -762,23 +636,80 @@
 		<member name="helper_multispiral_start_radius" type="float" setter="set_helper_multispiral_start_radius" getter="get_helper_multispiral_start_radius" default="50.0">
 			First-slot radius in pixels. Must be finite and 0 or more.
 		</member>
-		<member name="helper_star_polygon_base_rotation" type="float" setter="set_helper_star_polygon_base_rotation" getter="get_helper_star_polygon_base_rotation" default="0.0">
-			Rotates the whole star. Must be finite.
+		<member name="helper_outline_facing" type="int" setter="set_helper_outline_facing" getter="get_helper_outline_facing" default="0">
+			Rotates each closed-loop shape facing: Outline Normal keeps it as generated, +90/-90 Degrees turn it toward the loop tangent. The per-shape facing_offset_deg still applies on top.
 		</member>
-		<member name="helper_star_polygon_face_outward" type="bool" setter="set_helper_star_polygon_face_outward" getter="get_helper_star_polygon_face_outward" default="true">
-			Face away from the marker. Off faces the marker.
+		<member name="helper_outline_fill_margin" type="float" setter="set_helper_outline_fill_margin" getter="get_helper_outline_fill_margin" default="0.0">
+			Keep-out distance in pixels from the loop edge for Fill Inside cells. Must be finite and 0 or more.
 		</member>
-		<member name="helper_star_polygon_facing_offset_deg" type="float" setter="set_helper_star_polygon_facing_offset_deg" getter="get_helper_star_polygon_facing_offset_deg" default="0.0">
-			Twists every star facing. Must be finite.
+		<member name="helper_outline_fill_spacing" type="float" setter="set_helper_outline_fill_spacing" getter="get_helper_outline_fill_spacing" default="32.0">
+			Interior grid cell size in pixels for Fill Inside (rows run top-down like the Grid helper). Must be finite and above zero.
 		</member>
-		<member name="helper_star_polygon_radius" type="float" setter="set_helper_star_polygon_radius" getter="get_helper_star_polygon_radius" default="150.0">
-			Star radius in pixels. Must be finite and 0 or more.
+		<member name="helper_outline_fill_stagger" type="bool" setter="set_helper_outline_fill_stagger" getter="get_helper_outline_fill_stagger" default="false">
+			Shifts every other Fill Inside row by half a cell (honeycomb packing).
 		</member>
-		<member name="helper_star_polygon_vertex_bias" type="float" setter="set_helper_star_polygon_vertex_bias" getter="get_helper_star_polygon_vertex_bias" default="2.0">
-			Star sharpness: 0 is an even ring, higher pulls density toward the vertices. Must be finite and 0 or more.
+		<member name="helper_outline_placement" type="int" setter="set_helper_outline_placement" getter="get_helper_outline_placement" default="0">
+			Where closed-loop shape bullets live (Ring, Ellipse, Star, Flower, Rose, Lissajous, Circle, Rectangle, Square, Polygon): On Outline keeps the generated slot loop, Fill Inside swaps it for a row-major grid masked to the loop interior, Shell Outside spreads the same slot count over concentric outward layers. On Outline is the identity default.
 		</member>
-		<member name="helper_star_polygon_vertices" type="int" setter="set_helper_star_polygon_vertices" getter="get_helper_star_polygon_vertices" default="5">
-			Star vertices. Must be 3 or more.
+		<member name="helper_outline_reverse" type="bool" setter="set_helper_outline_reverse" getter="get_helper_outline_reverse" default="false">
+			Mirrors the closed-loop slot order (winding flip): bullet 0 moves to the far end of the loop. Outline and shell layouts only.
+		</member>
+		<member name="helper_outline_shell_layers" type="int" setter="set_helper_outline_shell_layers" getter="get_helper_outline_shell_layers" default="1">
+			Concentric outward layers for Shell Outside (bullet i rides layer i % layers, each layer evenly spread). Must be 1 or more.
+		</member>
+		<member name="helper_outline_shell_step" type="float" setter="set_helper_outline_shell_step" getter="get_helper_outline_shell_step" default="32.0">
+			Radial distance in pixels between Shell Outside layers. Must be finite and above zero.
+		</member>
+		<member name="helper_outline_slot_offset" type="int" setter="set_helper_outline_slot_offset" getter="get_helper_outline_slot_offset" default="0">
+			Rotates which closed-loop slot becomes bullet 0 (wraps both ways). Outline and shell layouts only.
+		</member>
+		<member name="helper_path2d_anchor" type="int" setter="set_helper_path2d_anchor" getter="get_helper_path2d_anchor" enum="BulletSpawner2D.Path2DAnchor" default="0">
+			Where a fixed Path2D run sits when shorter than the curve: Path Start, Centered, or Path End (Fixed Spacing mode only). helper_path2d_start_offset shifts on top of this.
+		</member>
+		<member name="helper_path2d_closed" type="bool" setter="set_helper_path2d_closed" getter="get_helper_path2d_closed" default="false">
+			Include the last-to-first stretch when measuring a Path2D curve, so spacing wraps on loop paths. Curves already drawn as loops need nothing extra (no double segment is added); two-point outlines always stay open.
+		</member>
+		<member name="helper_path2d_distribution" type="int" setter="set_helper_path2d_distribution" getter="get_helper_path2d_distribution" enum="BulletSpawner2D.Path2DDistribution" default="0">
+			How Path2D bullets are placed: Fixed Spacing lays helper_bullets_amount bullets helper_path2d_spacing apart (helper_path2d_anchor/overflow decide placement when the run is shorter/longer than the curve), Spread Evenly covers the whole curve length (both endpoints included on open paths; seamless ring without a duplicated seam bullet on closed loops).
+		</member>
+		<member name="helper_path2d_facing" type="int" setter="set_helper_path2d_facing" getter="get_helper_path2d_facing" enum="BulletSpawner2D.Path2DFacing" default="0">
+			Which direction Path2D bullets face: Along Path (+X with travel, the tangent), Normal +90, or Normal -90. helper_path2d_facing_offset_deg applies on top.
+		</member>
+		<member name="helper_path2d_facing_offset_deg" type="float" setter="set_helper_path2d_facing_offset_deg" getter="get_helper_path2d_facing_offset_deg" default="0.0">
+			Extra facing twist in degrees on top of the Path2D facing. Must be finite.
+		</member>
+		<member name="helper_path2d_overflow" type="int" setter="set_helper_path2d_overflow" getter="get_helper_path2d_overflow" enum="BulletSpawner2D.Path2DOverflow" default="2">
+			What happens when a fixed Path2D run does not fit (run longer than the curve, or shifted past its ends): Clamp piles extras at the end, Wrap continues from the start, Auto Fit scales spacing down so the run fits exactly (Fixed Spacing mode only).
+		</member>
+		<member name="helper_path2d_path" type="NodePath" setter="set_helper_path2d_path" getter="get_helper_path2d_path" default="NodePath(&quot;&quot;)">
+			Path2D node to live-sample bullet positions from (baked curve points, re-resolved every volley, ObjectDB-guarded, expressed in the generator space). Bullets sit exactly on the curve per helper_path2d_distribution; empty means no outline.
+		</member>
+		<member name="helper_path2d_reverse" type="bool" setter="set_helper_path2d_reverse" getter="get_helper_path2d_reverse" default="false">
+			Walk the Path2D curve end to start (exact mirror: bullet 0 lands on the curve end). Along Path facing flips with it.
+		</member>
+		<member name="helper_path2d_space" type="int" setter="set_helper_path2d_space" getter="get_helper_path2d_space" enum="BulletSpawner2D.Path2DSpace" default="0">
+			Which frame the Path2D curve is drawn in. Follow Generator (default) copies the curve shape onto the generator with its bounding-box center reset to the origin: only the shape matters, the node's own transform and wherever the curve was drawn are ignored (moving/rotating the Path2D node does nothing), like every other pattern. At Path2D Node keeps the legacy pose: the volley materializes where the node sits in the world. Flip back to this if an existing scene relied on the old default. When the path is a child of the generator at origin, both modes coincide.
+		</member>
+		<member name="helper_path2d_spacing" type="float" setter="set_helper_path2d_spacing" getter="get_helper_path2d_spacing" default="32.0">
+			Offset in pixels between consecutive Path2D bullets (Fixed Spacing mode only). Must be finite and greater than 0.
+		</member>
+		<member name="helper_path2d_start_offset" type="float" setter="set_helper_path2d_start_offset" getter="get_helper_path2d_start_offset" default="0.0">
+			Distance in pixels along the Path2D curve where layout starts (Fixed: first-bullet position on top of the anchor; Spread Evenly: phase-rotates a loop, or pushes an open run toward the end, clamped). Must be finite and 0 or more.
+		</member>
+		<member name="helper_polygon_face_outward" type="bool" setter="set_helper_polygon_face_outward" getter="get_helper_polygon_face_outward" default="true">
+			Polygon bullets face outward; off faces inward.
+		</member>
+		<member name="helper_polygon_facing_offset_deg" type="float" setter="set_helper_polygon_facing_offset_deg" getter="get_helper_polygon_facing_offset_deg" default="0.0">
+			Extra facing twist in degrees on top of the polygon normal. Must be finite.
+		</member>
+		<member name="helper_polygon_radius" type="float" setter="set_helper_polygon_radius" getter="get_helper_polygon_radius" default="150.0">
+			Polygon corner radius in pixels. Must be finite and 0 or more.
+		</member>
+		<member name="helper_polygon_rotation" type="float" setter="set_helper_polygon_rotation" getter="get_helper_polygon_rotation" default="0.0">
+			Polygon base rotation in radians. Must be finite.
+		</member>
+		<member name="helper_polygon_vertices" type="int" setter="set_helper_polygon_vertices" getter="get_helper_polygon_vertices" default="6">
+			Polygon corner count (true perimeter, not the Star Polygon scatter mode). Must be 3 or more.
 		</member>
 		<member name="helper_rain_band_width" type="float" setter="set_helper_rain_band_width" getter="get_helper_rain_band_width" default="600.0">
 			Width of the rain band in pixels. Must be finite and 0 or more.
@@ -791,6 +722,15 @@
 		</member>
 		<member name="helper_rain_jitter" type="float" setter="set_helper_rain_jitter" getter="get_helper_rain_jitter" default="12.0">
 			Random offset per slot in pixels. Must be finite and 0 or more.
+		</member>
+		<member name="helper_rectangle_face_outward" type="bool" setter="set_helper_rectangle_face_outward" getter="get_helper_rectangle_face_outward" default="true">
+			Rectangle bullets face outward; off faces inward.
+		</member>
+		<member name="helper_rectangle_facing_offset_deg" type="float" setter="set_helper_rectangle_facing_offset_deg" getter="get_helper_rectangle_facing_offset_deg" default="0.0">
+			Extra facing twist in degrees on top of the rectangle normal. Must be finite.
+		</member>
+		<member name="helper_rectangle_size" type="Vector2" setter="set_helper_rectangle_size" getter="get_helper_rectangle_size" default="Vector2(300, 200)">
+			Rectangle perimeter size in pixels, centered on the generator. Must be finite with sides 0 or more.
 		</member>
 		<member name="helper_ring_arc" type="float" setter="set_helper_ring_arc" getter="get_helper_ring_arc" default="6.2831855">
 			Ring length in radians. Full circle by default.
@@ -834,26 +774,26 @@
 		<member name="helper_rose_radius" type="float" setter="set_helper_rose_radius" getter="get_helper_rose_radius" default="150.0">
 			Rose radius in pixels. Must be finite and 0 or more.
 		</member>
+		<member name="helper_scatter_arc" type="float" setter="set_helper_scatter_arc" getter="get_helper_scatter_arc" default="6.2831855">
+			Sector width in radians around [member helper_scatter_direction]. TAU or more is a full circle; narrow it (with a direction) for cones of fire. Must be finite and above 0.
+		</member>
 		<member name="helper_scatter_burst_radius" type="float" setter="set_helper_scatter_burst_radius" getter="get_helper_scatter_burst_radius" default="120.0">
 			Outer radius of the burst disc in pixels. Must be finite and 0 or more. Use it for explosions, boss deaths and pops: wide radius with many bullets reads as a blast, small radius as a pop.
-		</member>
-		<member name="helper_scatter_facing_jitter" type="float" setter="set_helper_scatter_facing_jitter" getter="get_helper_scatter_facing_jitter" default="0.4">
-			Random twist on each outward/inward facing in radians (ignored by random facing, which is already random). Must be finite and 0 or more. Small values keep the radial look, large values dissolve it into spray.
-		</member>
-		<member name="helper_scatter_seed" type="int" setter="set_helper_scatter_seed" getter="get_helper_scatter_seed" default="0">
-			Scatter-only seed: 0 is non-deterministic, otherwise every volley lands identically (combine with spin for rotating replays). Falls back to [member pattern_seed] when 0.
-		</member>
-		<member name="helper_scatter_inner_radius" type="float" setter="set_helper_scatter_inner_radius" getter="get_helper_scatter_inner_radius" default="0.0">
-			Inner radius of the burst annulus in pixels. 0 is a full disc; above 0 the center stays empty for explosion rings. Clamped to [member helper_scatter_burst_radius] at generation, so set order never matters.
 		</member>
 		<member name="helper_scatter_direction" type="Vector2" setter="set_helper_scatter_direction" getter="get_helper_scatter_direction" default="Vector2(1, 0)">
 			Center of the scatter sector. Only matters when [member helper_scatter_arc] is below TAU. Must be finite and non-zero. Use it for directional blasts and shotgun fans.
 		</member>
-		<member name="helper_scatter_arc" type="float" setter="set_helper_scatter_arc" getter="get_helper_scatter_arc" default="6.2831853">
-			Sector width in radians around [member helper_scatter_direction]. TAU or more is a full circle; narrow it (with a direction) for cones of fire. Must be finite and above 0.
-		</member>
 		<member name="helper_scatter_facing" type="int" setter="set_helper_scatter_facing" getter="get_helper_scatter_facing" default="0">
 			Bullet facing: 0 outward (explosions), 1 random (shotgun spray), 2 inward (implosions).
+		</member>
+		<member name="helper_scatter_facing_jitter" type="float" setter="set_helper_scatter_facing_jitter" getter="get_helper_scatter_facing_jitter" default="0.4">
+			Random twist on each outward/inward facing in radians (ignored by random facing, which is already random). Must be finite and 0 or more. Small values keep the radial look, large values dissolve it into spray.
+		</member>
+		<member name="helper_scatter_inner_radius" type="float" setter="set_helper_scatter_inner_radius" getter="get_helper_scatter_inner_radius" default="0.0">
+			Inner radius of the burst annulus in pixels. 0 is a full disc; above 0 the center stays empty for explosion rings. Clamped to [member helper_scatter_burst_radius] at generation, so set order never matters.
+		</member>
+		<member name="helper_scatter_seed" type="int" setter="set_helper_scatter_seed" getter="get_helper_scatter_seed" default="0">
+			Scatter-only seed: 0 is non-deterministic, otherwise every volley lands identically (combine with spin for rotating replays). Falls back to [member pattern_seed] when 0.
 		</member>
 		<member name="helper_skip_indices" type="PackedInt32Array" setter="set_helper_skip_indices" getter="get_helper_skip_indices" default="PackedInt32Array()">
 			Slot indexes to drop from any helper layout (dodge doors, bullet text). Out-of-range entries are ignored with a single warning. Applied after spin/scale so indexes match the preview.
@@ -876,6 +816,15 @@
 		<member name="helper_spiral_start_radius" type="float" setter="set_helper_spiral_start_radius" getter="get_helper_spiral_start_radius" default="50.0">
 			Radius of the first spiral bullet.
 		</member>
+		<member name="helper_square_face_outward" type="bool" setter="set_helper_square_face_outward" getter="get_helper_square_face_outward" default="true">
+			Square bullets face outward; off faces inward.
+		</member>
+		<member name="helper_square_facing_offset_deg" type="float" setter="set_helper_square_facing_offset_deg" getter="get_helper_square_facing_offset_deg" default="0.0">
+			Extra facing twist in degrees on top of the square normal. Must be finite.
+		</member>
+		<member name="helper_square_size" type="float" setter="set_helper_square_size" getter="get_helper_square_size" default="300.0">
+			Square perimeter side length in pixels, centered on the generator. Must be finite and 0 or more.
+		</member>
 		<member name="helper_star_base_rotation" type="float" setter="set_helper_star_base_rotation" getter="get_helper_star_base_rotation" default="0.0">
 			Base rotation of the star in radians.
 		</member>
@@ -893,6 +842,60 @@
 		</member>
 		<member name="helper_star_points" type="int" setter="set_helper_star_points" getter="get_helper_star_points" default="5">
 			Star points (alternating outer/inner vertices). Must be 2 or more.
+		</member>
+		<member name="helper_star_polygon_base_rotation" type="float" setter="set_helper_star_polygon_base_rotation" getter="get_helper_star_polygon_base_rotation" default="0.0">
+			Rotates the whole star. Must be finite.
+		</member>
+		<member name="helper_star_polygon_face_outward" type="bool" setter="set_helper_star_polygon_face_outward" getter="get_helper_star_polygon_face_outward" default="true">
+			Face away from the marker. Off faces the marker.
+		</member>
+		<member name="helper_star_polygon_facing_offset_deg" type="float" setter="set_helper_star_polygon_facing_offset_deg" getter="get_helper_star_polygon_facing_offset_deg" default="0.0">
+			Twists every star facing. Must be finite.
+		</member>
+		<member name="helper_star_polygon_radius" type="float" setter="set_helper_star_polygon_radius" getter="get_helper_star_polygon_radius" default="150.0">
+			Star radius in pixels. Must be finite and 0 or more.
+		</member>
+		<member name="helper_star_polygon_vertex_bias" type="float" setter="set_helper_star_polygon_vertex_bias" getter="get_helper_star_polygon_vertex_bias" default="2.0">
+			Star sharpness: 0 is an even ring, higher pulls density toward the vertices. Must be finite and 0 or more.
+		</member>
+		<member name="helper_star_polygon_vertices" type="int" setter="set_helper_star_polygon_vertices" getter="get_helper_star_polygon_vertices" default="5">
+			Star vertices. Must be 3 or more.
+		</member>
+		<member name="helper_trapezoid_base_bottom" type="float" setter="set_helper_trapezoid_base_bottom" getter="get_helper_trapezoid_base_bottom" default="300.0">
+			Trapezoid bottom base width in pixels. Must be finite and 0 or more.
+		</member>
+		<member name="helper_trapezoid_base_top" type="float" setter="set_helper_trapezoid_base_top" getter="get_helper_trapezoid_base_top" default="200.0">
+			Trapezoid top base width in pixels (0 degrades to a triangle). Must be finite and 0 or more.
+		</member>
+		<member name="helper_trapezoid_face_outward" type="bool" setter="set_helper_trapezoid_face_outward" getter="get_helper_trapezoid_face_outward" default="true">
+			Trapezoid bullets face outward; off faces inward.
+		</member>
+		<member name="helper_trapezoid_facing_offset_deg" type="float" setter="set_helper_trapezoid_facing_offset_deg" getter="get_helper_trapezoid_facing_offset_deg" default="0.0">
+			Extra facing twist in degrees on top of the trapezoid normal. Must be finite.
+		</member>
+		<member name="helper_trapezoid_height" type="float" setter="set_helper_trapezoid_height" getter="get_helper_trapezoid_height" default="200.0">
+			Trapezoid height in pixels. Must be finite and 0 or more.
+		</member>
+		<member name="helper_trapezoid_rotation" type="float" setter="set_helper_trapezoid_rotation" getter="get_helper_trapezoid_rotation" default="0.0">
+			Trapezoid base rotation in radians. Must be finite.
+		</member>
+		<member name="helper_triangle_face_outward" type="bool" setter="set_helper_triangle_face_outward" getter="get_helper_triangle_face_outward" default="true">
+			Triangle bullets face outward; off faces inward.
+		</member>
+		<member name="helper_triangle_facing_offset_deg" type="float" setter="set_helper_triangle_facing_offset_deg" getter="get_helper_triangle_facing_offset_deg" default="0.0">
+			Extra facing twist in degrees on top of the triangle normal. Must be finite.
+		</member>
+		<member name="helper_triangle_rotation" type="float" setter="set_helper_triangle_rotation" getter="get_helper_triangle_rotation" default="0.0">
+			Triangle base rotation in radians. Must be finite.
+		</member>
+		<member name="helper_triangle_size_a" type="float" setter="set_helper_triangle_size_a" getter="get_helper_triangle_size_a" default="150.0">
+			Equilateral circumradius / isosceles base width / right X leg in pixels. Must be finite and 0 or more.
+		</member>
+		<member name="helper_triangle_size_b" type="float" setter="set_helper_triangle_size_b" getter="get_helper_triangle_size_b" default="150.0">
+			Isosceles height / right Y leg in pixels (unused by Equilateral). Must be finite and 0 or more.
+		</member>
+		<member name="helper_triangle_type" type="int" setter="set_helper_triangle_type" getter="get_helper_triangle_type" default="0">
+			Triangle kind: Equilateral (circumradius helper_triangle_size_a), Isosceles (base helper_triangle_size_a + height helper_triangle_size_b, apex up), Right (legs helper_triangle_size_a along X and helper_triangle_size_b along Y, recentered). All centered on the generator.
 		</member>
 		<member name="helper_waterfall_column_spacing" type="float" setter="set_helper_waterfall_column_spacing" getter="get_helper_waterfall_column_spacing" default="48.0">
 			Horizontal spacing in pixels. Must be finite and 0 or more.
@@ -1071,8 +1074,14 @@
 		<member name="orbiting_texture_rotation" type="int" setter="set_orbiting_texture_rotation" getter="get_orbiting_texture_rotation" enum="DirectionalBullets2D.OrbitingTextureRotation" default="0">
 			How bullet textures face while physically orbiting.
 		</member>
+		<member name="pattern_scale" type="float" setter="set_pattern_scale" getter="get_pattern_scale" default="1.0">
+			Scales the whole pattern around the generator (positions and bullet size grow together). 1.0 keeps it as is, 0 collapses it onto the generator, negatives mirror it. Compose with transforms_scale for big-layout + big-bullet looks.
+		</member>
 		<member name="pattern_seed" type="int" setter="set_pattern_seed" getter="get_pattern_seed" default="0">
 			Global default seed for helper randomness: 0 is non-deterministic, otherwise it seeds the Scatter fallback, homing random-target selection and reload jitter, so replays and boss patterns stay reproducible. Per-pattern seeds (like [member helper_scatter_seed]) override it where they exist. Bound right after the Scatter group because that is where seed-hunters look, but it is not Scatter-only.
+		</member>
+		<member name="pattern_source" type="int" setter="set_pattern_source" getter="get_pattern_source" enum="BulletSpawner2D.PatternSource" default="0">
+			Where volley transforms come from: children markers (0), this generator itself (1), or one of 31 procedural helper patterns (2-32: Grid, Ring, Fan, Spiral, Line, Aimed, Flower, Ellipse, Rain, Scatter, Star Polygon, Multi Spiral, Cross, Star, Heart, Wave, Waterfall, Lattice, Rose, Counter Spiral, Corridor, Lissajous, Custom, Circle, Rectangle, Square, Polygon, Path2D, Triangle, Trapezoid, Diamond). Order in the inspector groups sources, basic shapes, ornamental loops, then generators. Only the active pattern's options show in the inspector. Pipeline per volley: generate (with outline placement/fill/shell for the loop shapes), then spin, then pattern/local scale, then helper_skip_indices carving (so skip indexes match the preview). Corridor, Ellipse Wall and outline Fill Inside modes return fewer transforms than helper_bullets_amount.
 		</member>
 		<member name="preview_arrow_color" type="Color" setter="set_preview_arrow_color" getter="get_preview_arrow_color" default="Color(1, 0.05, 0.05, 1)">
 			Preview arrow color.
@@ -1098,14 +1107,14 @@
 		<member name="preview_dot_radius" type="float" setter="set_preview_dot_radius" getter="get_preview_dot_radius" default="4.0">
 			Preview dot radius in pixels (multiplied by pattern_scale and transforms_scale, so glyphs stay proportional to the layout).
 		</member>
+		<member name="preview_first_dot_color" type="Color" setter="set_preview_first_dot_color" getter="get_preview_first_dot_color" default="Color(1, 0.85, 0.2, 1)">
+			Emphasis color for bullet 0 in the preview (pattern start: anchor, reverse, loop seam). Drawn bigger on top of the regular dot.
+		</member>
 		<member name="preview_path_color" type="Color" setter="set_preview_path_color" getter="get_preview_path_color" default="Color(0.3, 0.85, 1, 0.55)">
 			Track underlay color: the shape/loop/curve bullets ride on, drawn as segments under the dots so sparse volleys still show the whole track. Distinct from dots, arrows and the first-bullet marker by default.
 		</member>
 		<member name="preview_path_width" type="float" setter="set_preview_path_width" getter="get_preview_path_width" default="2.0">
 			Track underlay line width in pixels (multiplied by nothing: absolute screen-ish size). 0 hides the track. Must be finite and 0 or more.
-		</member>
-		<member name="preview_first_dot_color" type="Color" setter="set_preview_first_dot_color" getter="get_preview_first_dot_color" default="Color(1, 0.85, 0.2, 1)">
-			Emphasis color for bullet 0 in the preview (pattern start: anchor, reverse, loop seam). Drawn bigger on top of the regular dot.
 		</member>
 		<member name="reload_jitter_sec" type="float" setter="set_reload_jitter_sec" getter="get_reload_jitter_sec" default="0.0">
 			Reload jitter in seconds: each auto volley waits shoot_interval_sec +/- uniform jitter (seeded by pattern_seed, floored at 0.001s so fast intervals keep working with jitter on). 0 is exact. Must be finite and 0 or more.
@@ -1158,14 +1167,8 @@
 		<member name="transforms_generator" type="NodePath" setter="set_transforms_generator_path" getter="get_transforms_generator_path" default="NodePath(&quot;&quot;)">
 			Node patterns are built on. Empty means this spawner. Point it at another Node2D to move children markers, helper shapes, spin pivot, scale center, and the preview there.
 		</member>
-		<member name="pattern_scale" type="float" setter="set_pattern_scale" getter="get_pattern_scale" default="1.0">
-			Scales the whole pattern around the generator (positions and bullet size grow together). 1.0 keeps it as is, 0 collapses it onto the generator, negatives mirror it. Compose with transforms_scale for big-layout + big-bullet looks.
-		</member>
 		<member name="transforms_scale" type="float" setter="set_transforms_scale" getter="get_transforms_scale" default="1.0">
 			Per-bullet size scale: multiplies each spawn transform's local basis (texture size) without moving its position. 1.0 keeps sizes as generated, 0 hides bullets in place, negatives mirror them. Must be finite.
-		</member>
-		<member name="pattern_source" type="int" setter="set_pattern_source" getter="get_pattern_source" enum="BulletSpawner2D.PatternSource" default="0">
-			Where volley transforms come from: children markers (0), this generator itself (1), or one of 31 procedural helper patterns (2-32: Grid, Ring, Fan, Spiral, Line, Aimed, Flower, Ellipse, Rain, Scatter, Star Polygon, Multi Spiral, Cross, Star, Heart, Wave, Waterfall, Lattice, Rose, Counter Spiral, Corridor, Lissajous, Custom, Circle, Rectangle, Square, Polygon, Path2D, Triangle, Trapezoid, Diamond). Order in the inspector groups sources, basic shapes, ornamental loops, then generators. Only the active pattern's options show in the inspector. Pipeline per volley: generate (with outline placement/fill/shell for the loop shapes), then spin, then pattern/local scale, then helper_skip_indices carving (so skip indexes match the preview). Corridor, Ellipse Wall and outline Fill Inside modes return fewer transforms than helper_bullets_amount.
 		</member>
 	</members>
 	<signals>
@@ -1437,21 +1440,6 @@
 		<constant name="PATTERN_FROM_HELPER_DIAMOND" value="32" enum="PatternSource">
 			Diamond (rhombus) perimeter from its diagonals, slots spread evenly by arc length, facing outward (or inward). Full outline-layout support.
 		</constant>
-
-
-
-
-
-
-		<constant name="TRIANGLE_EQUILATERAL" value="0" enum="TriangleType">
-			Triangle from its circumradius (helper_triangle_size_a).
-		</constant>
-		<constant name="TRIANGLE_ISOSCELES" value="1" enum="TriangleType">
-			Triangle from base width + height (helper_triangle_size_a/b), apex up.
-		</constant>
-		<constant name="TRIANGLE_RIGHT" value="2" enum="TriangleType">
-			Right triangle from X/Y legs (helper_triangle_size_a/b), recentered.
-		</constant>
 		<constant name="PATH2D_DISTRIBUTION_FIXED_SPACING" value="0" enum="Path2DDistribution">
 			Path2D bullets are laid helper_path2d_spacing apart.
 		</constant>
@@ -1476,14 +1464,14 @@
 		<constant name="PATH2D_ANCHOR_END" value="2" enum="Path2DAnchor">
 			Short Path2D runs hug the curve end.
 		</constant>
+		<constant name="PATH2D_FACING_ALONG_PATH" value="0" enum="Path2DFacing">
+			Path2D bullets face along travel (+X with the curve tangent).
+		</constant>
 		<constant name="PATH2D_SPACE_FOLLOW_GENERATOR" value="0" enum="Path2DSpace">
 			Path2D bullets follow the generator: baked curve points are generator-local offsets.
 		</constant>
 		<constant name="PATH2D_SPACE_AT_PATH2D" value="1" enum="Path2DSpace">
 			Path2D bullets appear where the Path2D node sits in the world (legacy behavior).
-		</constant>
-		<constant name="PATH2D_FACING_ALONG_PATH" value="0" enum="Path2DFacing">
-			Path2D bullets face along travel (+X with the curve tangent).
 		</constant>
 		<constant name="PATH2D_FACING_NORMAL_P90" value="1" enum="Path2DFacing">
 			Path2D bullets face 90 degrees clockwise from travel.

@@ -125,12 +125,41 @@
 				Get the physics world space in which the bullets interact.
 			</description>
 		</method>
+		<method name="helper_apply_side_spread" qualifiers="static">
+			<return type="Transform2D[]" />
+			<param index="0" name="transforms" type="Transform2D[]" />
+			<param index="1" name="side_mode" type="int" default="0" />
+			<param index="2" name="spread" type="float" default="0.0" />
+			<param index="3" name="spread_exponent" type="float" default="2.0" />
+			<param index="4" name="seed" type="int" default="0" />
+			<description>
+				Deprecated: superseded by the outline_* tail params of the loop generators (deterministic placement/fill/shell). Kept bound for compatibility.
+				Universal side pass for closed-outline patterns: returns a copy of transforms with each origin pushed along its own facing by spread * pow(rand, spread_exponent). On Path returns an identity copy; Outside/Inside push along/against the facing; Both picks a random side per bullet. Facings never change. Only meaningful for closed loops (Ring, Ellipse, Polygon, Star, Flower, Rose, Lissajous, Custom, and the shape generators above) — open layouts have no inside to push toward.
+			</description>
+		</method>
 		<method name="helper_apply_skip_indices" qualifiers="static">
 			<return type="Transform2D[]" />
 			<param index="0" name="transforms" type="Transform2D[]" />
 			<param index="1" name="skip_indices" type="PackedInt32Array" />
 			<description>
 				Drops slot indexes from a generated array (dodge doors, bullet text). Out-of-range entries are ignored with one warning; the output shrinks. The spawner applies this automatically via helper_skip_indices.
+			</description>
+		</method>
+		<method name="helper_compute_edge_normals" qualifiers="static">
+			<return type="PackedVector2Array" />
+			<param index="0" name="edge_points" type="PackedVector2Array" />
+			<param index="1" name="closed" type="bool" default="false" />
+			<param index="2" name="flip" type="bool" default="false" />
+			<description>
+			</description>
+		</method>
+		<method name="helper_extract_edge_from_image" qualifiers="static">
+			<return type="Dictionary" />
+			<param index="0" name="image" type="Image" />
+			<param index="1" name="threshold" type="float" default="0.5" />
+			<param index="2" name="step" type="int" default="4" />
+			<param index="3" name="quiet" type="bool" default="false" />
+			<description>
 			</description>
 		</method>
 		<method name="helper_generate_transforms_aimed" qualifiers="static">
@@ -152,17 +181,8 @@
 			<param index="2" name="radius" type="float" default="150.0" />
 			<param index="3" name="face_outward" type="bool" default="true" />
 			<param index="4" name="facing_offset_degrees" type="float" default="0.0" />
-			<param index="5" name="outline_placement" type="int" enum="BulletFactory2D.OutlinePlacement" default="0" />
-			<param index="6" name="outline_facing" type="int" enum="BulletFactory2D.OutlineFacing" default="0" />
-			<param index="7" name="outline_reverse" type="bool" default="false" />
-			<param index="8" name="outline_slot_offset" type="int" default="0" />
-			<param index="9" name="fill_spacing" type="float" default="32.0" />
-			<param index="10" name="fill_stagger" type="bool" default="false" />
-			<param index="11" name="fill_margin" type="float" default="0.0" />
-			<param index="12" name="shell_layers" type="int" default="1" />
-			<param index="13" name="shell_step" type="float" default="32.0" />
-			<param index="5" name="outline_placement" type="int" enum="BulletFactory2D.OutlinePlacement" default="0" />
-			<param index="6" name="outline_facing" type="int" enum="BulletFactory2D.OutlineFacing" default="0" />
+			<param index="5" name="outline_placement" type="int" default="0" />
+			<param index="6" name="outline_facing" type="int" default="0" />
 			<param index="7" name="outline_reverse" type="bool" default="false" />
 			<param index="8" name="outline_slot_offset" type="int" default="0" />
 			<param index="9" name="fill_spacing" type="float" default="32.0" />
@@ -174,393 +194,6 @@
 				Generates an exact circle outline: slots spread evenly around a radius loop centered on the marker, facing outward (or inward). The outline_* tail params place slots on the loop, fill its interior, or shell its outside.
 			</description>
 		</method>
-		<method name="helper_generate_transforms_rectangle" qualifiers="static">
-			<return type="Transform2D[]" />
-			<param index="0" name="transforms_amount" type="int" />
-			<param index="1" name="marker_transform" type="Transform2D" />
-			<param index="2" name="size" type="Vector2" default="Vector2(300, 200)" />
-			<param index="3" name="face_outward" type="bool" default="true" />
-			<param index="4" name="facing_offset_degrees" type="float" default="0.0" />
-			<param index="5" name="outline_placement" type="int" enum="BulletFactory2D.OutlinePlacement" default="0" />
-			<param index="6" name="outline_facing" type="int" enum="BulletFactory2D.OutlineFacing" default="0" />
-			<param index="7" name="outline_reverse" type="bool" default="false" />
-			<param index="8" name="outline_slot_offset" type="int" default="0" />
-			<param index="9" name="fill_spacing" type="float" default="32.0" />
-			<param index="10" name="fill_stagger" type="bool" default="false" />
-			<param index="11" name="fill_margin" type="float" default="0.0" />
-			<param index="12" name="shell_layers" type="int" default="1" />
-			<param index="13" name="shell_step" type="float" default="32.0" />
-			<param index="5" name="outline_placement" type="int" enum="BulletFactory2D.OutlinePlacement" default="0" />
-			<param index="6" name="outline_facing" type="int" enum="BulletFactory2D.OutlineFacing" default="0" />
-			<param index="7" name="outline_reverse" type="bool" default="false" />
-			<param index="8" name="outline_slot_offset" type="int" default="0" />
-			<param index="9" name="fill_spacing" type="float" default="32.0" />
-			<param index="10" name="fill_stagger" type="bool" default="false" />
-			<param index="11" name="fill_margin" type="float" default="0.0" />
-			<param index="12" name="shell_layers" type="int" default="1" />
-			<param index="13" name="shell_step" type="float" default="32.0" />
-			<description>
-				Generates a rectangle perimeter walk (counter-clockwise from top-left), slots spread evenly by arc length, facing outward (or inward). Square = equal sides. The outline_* tail params place slots on the loop, fill its interior, or shell its outside.
-			</description>
-		</method>
-		<method name="helper_generate_transforms_polygon" qualifiers="static">
-			<return type="Transform2D[]" />
-			<param index="0" name="transforms_amount" type="int" />
-			<param index="1" name="marker_transform" type="Transform2D" />
-			<param index="2" name="vertices" type="int" default="6" />
-			<param index="3" name="radius" type="float" default="150.0" />
-			<param index="4" name="base_rotation" type="float" default="0.0" />
-			<param index="5" name="face_outward" type="bool" default="true" />
-			<param index="6" name="facing_offset_degrees" type="float" default="0.0" />
-			<param index="7" name="outline_placement" type="int" enum="BulletFactory2D.OutlinePlacement" default="0" />
-			<param index="8" name="outline_facing" type="int" enum="BulletFactory2D.OutlineFacing" default="0" />
-			<param index="9" name="outline_reverse" type="bool" default="false" />
-			<param index="10" name="outline_slot_offset" type="int" default="0" />
-			<param index="11" name="fill_spacing" type="float" default="32.0" />
-			<param index="12" name="fill_stagger" type="bool" default="false" />
-			<param index="13" name="fill_margin" type="float" default="0.0" />
-			<param index="14" name="shell_layers" type="int" default="1" />
-			<param index="15" name="shell_step" type="float" default="32.0" />
-			<param index="7" name="outline_placement" type="int" enum="BulletFactory2D.OutlinePlacement" default="0" />
-			<param index="8" name="outline_facing" type="int" enum="BulletFactory2D.OutlineFacing" default="0" />
-			<param index="9" name="outline_reverse" type="bool" default="false" />
-			<param index="10" name="outline_slot_offset" type="int" default="0" />
-			<param index="11" name="fill_spacing" type="float" default="32.0" />
-			<param index="12" name="fill_stagger" type="bool" default="false" />
-			<param index="13" name="fill_margin" type="float" default="0.0" />
-			<param index="14" name="shell_layers" type="int" default="1" />
-			<param index="15" name="shell_step" type="float" default="32.0" />
-			<description>
-				Generates a polygon perimeter (vertices corners on a radius circle from base_rotation), slots spread evenly by arc length, facing outward (or inward). The outline_* tail params place slots on the loop, fill its interior, or shell its outside.
-			</description>
-		</method>
-				<method name="helper_generate_transforms_triangle" qualifiers="static">
-			<return type="Transform2D[]" />
-			<param index="0" name="transforms_amount" type="int" />
-			<param index="1" name="marker_transform" type="Transform2D" />
-			<param index="2" name="triangle_type" type="int" enum="BulletFactory2D.TriangleType" default="0" />
-			<param index="3" name="size_a" type="float" default="150.0" />
-			<param index="4" name="size_b" type="float" default="150.0" />
-			<param index="5" name="rotation" type="float" default="0.0" />
-			<param index="6" name="face_outward" type="bool" default="true" />
-			<param index="7" name="facing_offset_degrees" type="float" default="0.0" />
-			<param index="8" name="outline_placement" type="int" enum="BulletFactory2D.OutlinePlacement" default="0" />
-			<param index="9" name="outline_facing" type="int" enum="BulletFactory2D.OutlineFacing" default="0" />
-			<param index="10" name="outline_reverse" type="bool" default="false" />
-			<param index="11" name="outline_slot_offset" type="int" default="0" />
-			<param index="12" name="fill_spacing" type="float" default="32.0" />
-			<param index="13" name="fill_stagger" type="bool" default="false" />
-			<param index="14" name="fill_margin" type="float" default="0.0" />
-			<param index="15" name="shell_layers" type="int" default="1" />
-			<param index="16" name="shell_step" type="float" default="32.0" />
-			<description>
-				Triangle perimeter (equilateral circumradius, isosceles base + height apex-up, right X/Y legs recentered), slots spread evenly by arc length, facing outward (or inward). Degenerate triangles stack at the marker.
-			</description>
-		</method>
-		<method name="helper_generate_transforms_trapezoid" qualifiers="static">
-			<return type="Transform2D[]" />
-			<param index="0" name="transforms_amount" type="int" />
-			<param index="1" name="marker_transform" type="Transform2D" />
-			<param index="2" name="base_top" type="float" default="200.0" />
-			<param index="3" name="base_bottom" type="float" default="300.0" />
-			<param index="4" name="height" type="float" default="200.0" />
-			<param index="5" name="rotation" type="float" default="0.0" />
-			<param index="6" name="face_outward" type="bool" default="true" />
-			<param index="7" name="facing_offset_degrees" type="float" default="0.0" />
-			<param index="8" name="outline_placement" type="int" enum="BulletFactory2D.OutlinePlacement" default="0" />
-			<param index="9" name="outline_facing" type="int" enum="BulletFactory2D.OutlineFacing" default="0" />
-			<param index="10" name="outline_reverse" type="bool" default="false" />
-			<param index="11" name="outline_slot_offset" type="int" default="0" />
-			<param index="12" name="fill_spacing" type="float" default="32.0" />
-			<param index="13" name="fill_stagger" type="bool" default="false" />
-			<param index="14" name="fill_margin" type="float" default="0.0" />
-			<param index="15" name="shell_layers" type="int" default="1" />
-			<param index="16" name="shell_step" type="float" default="32.0" />
-			<description>
-				Isosceles trapezoid perimeter, slots spread evenly by arc length, facing outward (or inward). A zero top base degrades to a triangle; zero-area boxes stack at the marker.
-			</description>
-		</method>
-		<method name="helper_generate_transforms_diamond" qualifiers="static">
-			<return type="Transform2D[]" />
-			<param index="0" name="transforms_amount" type="int" />
-			<param index="1" name="marker_transform" type="Transform2D" />
-			<param index="2" name="diagonal_x" type="float" default="200.0" />
-			<param index="3" name="diagonal_y" type="float" default="300.0" />
-			<param index="4" name="rotation" type="float" default="0.0" />
-			<param index="5" name="face_outward" type="bool" default="true" />
-			<param index="6" name="facing_offset_degrees" type="float" default="0.0" />
-			<param index="8" name="outline_placement" type="int" enum="BulletFactory2D.OutlinePlacement" default="0" />
-			<param index="9" name="outline_facing" type="int" enum="BulletFactory2D.OutlineFacing" default="0" />
-			<param index="10" name="outline_reverse" type="bool" default="false" />
-			<param index="11" name="outline_slot_offset" type="int" default="0" />
-			<param index="12" name="fill_spacing" type="float" default="32.0" />
-			<param index="13" name="fill_stagger" type="bool" default="false" />
-			<param index="14" name="fill_margin" type="float" default="0.0" />
-			<param index="15" name="shell_layers" type="int" default="1" />
-			<param index="16" name="shell_step" type="float" default="32.0" />
-			<description>
-				Diamond (rhombus) perimeter from its diagonals, slots spread evenly by arc length, facing outward (or inward). Zero-area diamonds stack at the marker.
-			</description>
-		</method>
-<method name="helper_sample_outline_circle" qualifiers="static">
-			<return type="Dictionary" />
-			<param index="0" name="radius" type="float" default="150.0" />
-			<description>
-			Circle loop track in marker-local pixels (adaptive density). Closed.
-			</description>
-</method>
-
-<method name="helper_sample_outline_rectangle" qualifiers="static">
-			<return type="Dictionary" />
-			<param index="0" name="size" type="Vector2" default="Vector2(300, 200)" />
-			<description>
-			Rectangle corners in marker-local pixels, counter-clockwise from top-left. Closed.
-			</description>
-</method>
-
-<method name="helper_sample_outline_triangle" qualifiers="static">
-			<return type="Dictionary" />
-			<param index="0" name="triangle_type" type="int" default="0" />
-			<param index="1" name="size_a" type="float" default="150.0" />
-			<param index="2" name="size_b" type="float" default="150.0" />
-			<param index="3" name="rotation" type="float" default="0.0" />
-			<description>
-			Triangle corners in marker-local pixels. Closed.
-			</description>
-</method>
-
-<method name="helper_sample_outline_trapezoid" qualifiers="static">
-			<return type="Dictionary" />
-			<param index="0" name="base_top" type="float" default="200.0" />
-			<param index="1" name="base_bottom" type="float" default="300.0" />
-			<param index="2" name="height" type="float" default="200.0" />
-			<param index="3" name="rotation" type="float" default="0.0" />
-			<description>
-			Trapezoid corners in marker-local pixels. Closed.
-			</description>
-</method>
-
-<method name="helper_sample_outline_diamond" qualifiers="static">
-			<return type="Dictionary" />
-			<param index="0" name="diagonal_x" type="float" default="200.0" />
-			<param index="1" name="diagonal_y" type="float" default="300.0" />
-			<param index="2" name="rotation" type="float" default="0.0" />
-			<description>
-			Diamond corners in marker-local pixels. Closed.
-			</description>
-</method>
-
-<method name="helper_sample_outline_polygon" qualifiers="static">
-			<return type="Dictionary" />
-			<param index="0" name="vertices" type="int" default="6" />
-			<param index="1" name="radius" type="float" default="150.0" />
-			<param index="2" name="base_rotation" type="float" default="0.0" />
-			<description>
-			Polygon corners in marker-local pixels. Closed.
-			</description>
-</method>
-
-<method name="helper_sample_outline_ellipse" qualifiers="static">
-			<return type="Dictionary" />
-			<param index="0" name="radius_x" type="float" default="150.0" />
-			<param index="1" name="radius_y" type="float" default="100.0" />
-			<param index="2" name="ellipse_rotation" type="float" default="0.0" />
-			<param index="3" name="start_angle" type="float" default="0.0" />
-			<param index="4" name="arc" type="float" default="6.283185307179586" />
-			<param index="5" name="mode" type="int" default="0" />
-			<description>
-			Ellipse sweep in marker-local pixels (adaptive density). Closed for full rings; wall mode draws its arc span in full (gaps read from the missing bullets).
-			</description>
-</method>
-
-<method name="helper_sample_outline_ring" qualifiers="static">
-			<return type="Dictionary" />
-			<param index="0" name="radius" type="float" default="150.0" />
-			<param index="1" name="arc" type="float" default="6.283185307179586" />
-			<param index="2" name="y_scale" type="float" default="1.0" />
-			<param index="3" name="start_angle_abs" type="float" default="0.0" />
-			<description>
-			Ring arc sweep in marker-local pixels (adaptive density). Closed for full TAU arcs.
-			</description>
-</method>
-
-<method name="helper_sample_outline_star" qualifiers="static">
-			<return type="Dictionary" />
-			<param index="0" name="points" type="int" default="5" />
-			<param index="1" name="outer_radius" type="float" default="150.0" />
-			<param index="2" name="inner_radius" type="float" default="65.0" />
-			<param index="3" name="base_rotation" type="float" default="0.0" />
-			<description>
-			Star corners in marker-local pixels. Closed.
-			</description>
-</method>
-
-<method name="helper_sample_outline_rose" qualifiers="static">
-			<return type="Dictionary" />
-			<param index="0" name="petals" type="int" default="6" />
-			<param index="1" name="radius" type="float" default="150.0" />
-			<param index="2" name="lobe_sharpness" type="float" default="1.0" />
-			<param index="3" name="base_rotation" type="float" default="0.0" />
-			<description>
-		Rose theta sweep in marker-local pixels (flips included, matching slot order). Closed.
-		</description>
-</method>
-
-<method name="helper_sample_outline_flower" qualifiers="static">
-			<return type="Dictionary" />
-			<param index="0" name="flower_type" type="int" default="0" />
-			<param index="1" name="petals" type="int" default="6" />
-			<param index="2" name="radius" type="float" default="150.0" />
-			<param index="3" name="petal_spread" type="float" default="0.5" />
-			<param index="4" name="petal_sharpness" type="float" default="1.0" />
-			<param index="5" name="inner_radius_scale" type="float" default="0.0" />
-			<param index="6" name="spiro_roller" type="float" default="45.0" />
-			<param index="7" name="spiro_pen" type="float" default="80.0" />
-			<param index="8" name="super_lobes" type="float" default="6.0" />
-			<param index="9" name="super_fullness" type="float" default="1.0" />
-			<param index="10" name="base_rotation" type="float" default="0.0" />
-			<description>
-			Flower bloom track sampler in marker-local pixels mirroring [member helper_generate_transforms_flower] per-type math at a fixed density (closed loop). [code]flower_type[/code] selects the bloom kind (see [enum FlowerBloom]): FAN traces the petal-tip ring, RHODONEA and SPIROGRAPH and SUPERFORMULA trace their actual curve, PHYLLOTAXIS bounds the Vogel disc rim. Per-type knobs (spiro_roller, spiro_pen, super_lobes, super_fullness, inner_radius_scale) apply only to their matching bloom kind; unused knobs are ignored.
-			</description>
-</method>
-
-<method name="helper_sample_outline_lissajous" qualifiers="static">
-			<return type="Dictionary" />
-			<param index="0" name="size_x" type="float" default="200.0" />
-			<param index="1" name="size_y" type="float" default="120.0" />
-			<param index="2" name="freq_x" type="float" default="3.0" />
-			<param index="3" name="freq_y" type="float" default="2.0" />
-			<param index="4" name="phase" type="float" default="0.0" />
-			<description>
-			Lissajous sweep in marker-local pixels. Closed.
-			</description>
-</method>
-
-<method name="helper_sample_outline_grid" qualifiers="static">
-			<return type="Dictionary" />
-			<param index="0" name="transforms_amount" type="int" default="0" />
-			<param index="1" name="rows_per_column" type="int" default="10" />
-			<param index="2" name="alignment" type="int" default="3" />
-			<param index="3" name="column_offset" type="float" default="150.0" />
-			<param index="4" name="row_offset" type="float" default="150.0" />
-			<param index="5" name="base_rotation_abs" type="float" default="0.0" />
-			<param index="6" name="rotate_with_marker" type="bool" default="true" />
-			<description>
-				Grid row strips with INF separators between rows (open). Ideal structure only.
-			</description>
-</method>
-
-<method name="helper_sample_outline_lattice" qualifiers="static">
-			<return type="Dictionary" />
-			<param index="0" name="transforms_amount" type="int" default="0" />
-			<param index="1" name="columns" type="int" default="4" />
-			<param index="2" name="rows" type="int" default="4" />
-			<param index="3" name="spacing_x" type="float" default="64.0" />
-			<param index="4" name="spacing_y" type="float" default="64.0" />
-			<param index="5" name="stagger_rows" type="bool" default="true" />
-			<description>
-				Lattice row strips with INF separators between rows (open).
-			</description>
-</method>
-
-<method name="helper_sample_outline_waterfall" qualifiers="static">
-			<return type="Dictionary" />
-			<param index="0" name="transforms_amount" type="int" default="0" />
-			<param index="1" name="columns" type="int" default="4" />
-			<param index="2" name="column_spacing" type="float" default="64.0" />
-			<param index="3" name="rows" type="int" default="4" />
-			<param index="4" name="row_spacing" type="float" default="64.0" />
-			<param index="5" name="stagger" type="float" default="0.0" />
-			<param index="6" name="rain_direction" type="Vector2" default="Vector2(0, 1)" />
-			<description>
-				Waterfall row strips with INF separators between rows (open).
-			</description>
-</method>
-
-<method name="helper_sample_outline_rain" qualifiers="static">
-			<return type="Dictionary" />
-			<param index="0" name="transforms_amount" type="int" default="0" />
-			<param index="1" name="band_width" type="float" default="600.0" />
-			<param index="2" name="rain_direction" type="Vector2" default="Vector2(0, 1)" />
-			<param index="3" name="drop_spacing" type="float" default="48.0" />
-			<description>
-				Rain row strips with INF separators between rows (open).
-			</description>
-</method>
-
-<method name="helper_sample_outline_wave" qualifiers="static">
-			<return type="Dictionary" />
-			<param index="0" name="width" type="float" default="300.0" />
-			<param index="1" name="amplitude" type="float" default="50.0" />
-			<param index="2" name="waves" type="float" default="2.0" />
-			<param index="3" name="direction" type="Vector2" default="Vector2(1, 0)" />
-			<description>
-				Sine center-line sweep (open).
-			</description>
-</method>
-
-<method name="helper_sample_outline_heart" qualifiers="static">
-			<return type="Dictionary" />
-			<param index="0" name="size" type="float" default="100.0" />
-			<param index="1" name="base_rotation" type="float" default="0.0" />
-			<description>
-				Parametric heart sweep. Closed.
-			</description>
-</method>
-
-<method name="helper_sample_outline_spiral" qualifiers="static">
-			<return type="Dictionary" />
-			<param index="0" name="transforms_amount" type="int" default="0" />
-			<param index="1" name="start_radius" type="float" default="50.0" />
-			<param index="2" name="radius_step" type="float" default="15.0" />
-			<param index="3" name="angle_step" type="float" default="0.6" />
-			<param index="4" name="base_rotation_abs" type="float" default="0.0" />
-			<description>
-				Spiral arm sweep (open).
-			</description>
-</method>
-
-<method name="helper_sample_outline_multispiral" qualifiers="static">
-			<return type="Dictionary" />
-			<param index="0" name="transforms_amount" type="int" default="0" />
-			<param index="1" name="arms" type="int" default="3" />
-			<param index="2" name="start_radius" type="float" default="50.0" />
-			<param index="3" name="radius_step" type="float" default="15.0" />
-			<param index="4" name="angle_step" type="float" default="0.6" />
-			<param index="5" name="base_rotation_abs" type="float" default="0.0" />
-			<param index="6" name="arm_index_stride" type="int" default="1" />
-			<description>
-				One strip per arm with INF separators between arms (open).
-			</description>
-</method>
-
-<method name="helper_sample_outline_counter_spiral" qualifiers="static">
-			<return type="Dictionary" />
-			<param index="0" name="transforms_amount" type="int" default="0" />
-			<param index="1" name="arms" type="int" default="4" />
-			<param index="2" name="start_radius" type="float" default="50.0" />
-			<param index="3" name="radius_step" type="float" default="15.0" />
-			<param index="4" name="angle_step" type="float" default="0.6" />
-			<param index="5" name="base_rotation_abs" type="float" default="0.0" />
-			<param index="6" name="arm_index_stride" type="int" default="1" />
-			<param index="7" name="mirror_alternate_arms" type="bool" default="true" />
-			<description>
-				Mirrored-arm variant of the multispiral strips with INF separators (open).
-			</description>
-</method>
-
-<method name="helper_apply_side_spread" qualifiers="static">
-			<return type="Transform2D[]" />
-			<param index="0" name="transforms" type="Transform2D[]" />
-			<param index="1" name="side_mode" type="int" enum="BulletFactory2D.SideMode" default="0" />
-			<param index="2" name="spread" type="float" default="0.0" />
-			<param index="3" name="spread_exponent" type="float" default="2.0" />
-			<param index="4" name="seed" type="int" default="0" />
-			<description>
-				Deprecated: superseded by the outline_* tail params of the loop generators (deterministic placement/fill/shell). Kept bound for compatibility.
-				Universal side pass for closed-outline patterns: returns a copy of transforms with each origin pushed along its own facing by spread * pow(rand, spread_exponent). On Path returns an identity copy; Outside/Inside push along/against the facing; Both picks a random side per bullet. Facings never change. Only meaningful for closed loops (Ring, Ellipse, Polygon, Star, Flower, Rose, Lissajous, Custom, and the shape generators above) — open layouts have no inside to push toward.
-			</description>
-		</method>
 		<method name="helper_generate_transforms_corridor" qualifiers="static">
 			<return type="Transform2D[]" />
 			<param index="0" name="transforms_amount" type="int" />
@@ -568,7 +201,6 @@
 			<param index="2" name="aim_direction" type="Vector2" />
 			<param index="3" name="width" type="float" default="400.0" />
 			<param index="4" name="spacing" type="float" default="32.0" />
-			<!-- spacing is reserved (unused): slots spread evenly across width -->
 			<param index="5" name="gap_width" type="float" default="96.0" />
 			<param index="6" name="face_aim" type="bool" default="true" />
 			<param index="7" name="facing_offset_degrees" type="float" default="0.0" />
@@ -607,6 +239,46 @@
 				Generates a cross/plus barrage: arm_count rays of evenly spaced slots from the marker out to arm_length. Crossfire and plus-shaped danmaku bursts.
 			</description>
 		</method>
+		<method name="helper_generate_transforms_diamond" qualifiers="static">
+			<return type="Transform2D[]" />
+			<param index="0" name="transforms_amount" type="int" />
+			<param index="1" name="marker_transform" type="Transform2D" />
+			<param index="2" name="diagonal_x" type="float" default="200.0" />
+			<param index="3" name="diagonal_y" type="float" default="300.0" />
+			<param index="4" name="rotation" type="float" default="0.0" />
+			<param index="5" name="face_outward" type="bool" default="true" />
+			<param index="6" name="facing_offset_degrees" type="float" default="0.0" />
+			<param index="7" name="outline_placement" type="int" default="0" />
+			<param index="8" name="outline_facing" type="int" default="0" />
+			<param index="9" name="outline_reverse" type="bool" default="false" />
+			<param index="10" name="outline_slot_offset" type="int" default="0" />
+			<param index="11" name="fill_spacing" type="float" default="32.0" />
+			<param index="12" name="fill_stagger" type="bool" default="false" />
+			<param index="13" name="fill_margin" type="float" default="0.0" />
+			<param index="14" name="shell_layers" type="int" default="1" />
+			<param index="15" name="shell_step" type="float" default="32.0" />
+			<description>
+				Diamond (rhombus) perimeter from its diagonals, slots spread evenly by arc length, facing outward (or inward). Zero-area diamonds stack at the marker.
+			</description>
+		</method>
+		<method name="helper_generate_transforms_edge_from_points" qualifiers="static">
+			<return type="Transform2D[]" />
+			<param index="0" name="transforms_amount" type="int" />
+			<param index="1" name="marker_transform" type="Transform2D" />
+			<param index="2" name="edge_points" type="PackedVector2Array" />
+			<param index="3" name="closed" type="bool" default="false" />
+			<param index="4" name="flip_normals" type="bool" default="false" />
+			<param index="5" name="random_sample" type="bool" default="false" />
+			<param index="6" name="jitter" type="float" default="0.0" />
+			<param index="7" name="facing_offset_degrees" type="float" default="0.0" />
+			<param index="8" name="seed" type="int" default="0" />
+			<param index="9" name="spread" type="float" default="0.0" />
+			<param index="10" name="spread_exponent" type="float" default="2.0" />
+			<param index="11" name="spread_side" type="int" default="0" />
+			<param index="12" name="tangent_jitter" type="float" default="0.0" />
+			<description>
+			</description>
+		</method>
 		<method name="helper_generate_transforms_ellipse" qualifiers="static">
 			<return type="Transform2D[]" />
 			<param index="0" name="transforms_amount" type="int" />
@@ -621,17 +293,8 @@
 			<param index="9" name="gap_width" type="float" default="0.3" />
 			<param index="10" name="face_outward" type="bool" default="true" />
 			<param index="11" name="facing_offset_degrees" type="float" default="0.0" />
-			<param index="12" name="outline_placement" type="int" enum="BulletFactory2D.OutlinePlacement" default="0" />
-			<param index="13" name="outline_facing" type="int" enum="BulletFactory2D.OutlineFacing" default="0" />
-			<param index="14" name="outline_reverse" type="bool" default="false" />
-			<param index="15" name="outline_slot_offset" type="int" default="0" />
-			<param index="16" name="fill_spacing" type="float" default="32.0" />
-			<param index="17" name="fill_stagger" type="bool" default="false" />
-			<param index="18" name="fill_margin" type="float" default="0.0" />
-			<param index="19" name="shell_layers" type="int" default="1" />
-			<param index="20" name="shell_step" type="float" default="32.0" />
-			<param index="12" name="outline_placement" type="int" enum="BulletFactory2D.OutlinePlacement" default="0" />
-			<param index="13" name="outline_facing" type="int" enum="BulletFactory2D.OutlineFacing" default="0" />
+			<param index="12" name="outline_placement" type="int" default="0" />
+			<param index="13" name="outline_facing" type="int" default="0" />
 			<param index="14" name="outline_reverse" type="bool" default="false" />
 			<param index="15" name="outline_slot_offset" type="int" default="0" />
 			<param index="16" name="fill_spacing" type="float" default="32.0" />
@@ -660,32 +323,29 @@
 			<return type="Transform2D[]" />
 			<param index="0" name="transforms_amount" type="int" />
 			<param index="1" name="marker_transform" type="Transform2D" />
-			<param index="2" name="petals" type="int" default="6" />
-			<param index="3" name="bullets_per_petal" type="int" default="5" />
-			<param index="4" name="radius" type="float" default="150.0" />
-			<param index="5" name="petal_spread" type="float" default="0.5" />
-			<param index="6" name="petal_sharpness" type="float" default="1.0" />
-			<param index="7" name="base_rotation" type="float" default="0.0" />
-			<param index="8" name="face_outward" type="bool" default="true" />
-			<param index="9" name="facing_offset_degrees" type="float" default="0.0" />
-			<param index="10" name="outline_placement" type="int" enum="BulletFactory2D.OutlinePlacement" default="0" />
-			<param index="11" name="outline_facing" type="int" enum="BulletFactory2D.OutlineFacing" default="0" />
-			<param index="12" name="outline_reverse" type="bool" default="false" />
-			<param index="13" name="outline_slot_offset" type="int" default="0" />
-			<param index="14" name="fill_spacing" type="float" default="32.0" />
-			<param index="15" name="fill_stagger" type="bool" default="false" />
-			<param index="16" name="fill_margin" type="float" default="0.0" />
-			<param index="17" name="shell_layers" type="int" default="1" />
-			<param index="18" name="shell_step" type="float" default="32.0" />
-			<param index="10" name="outline_placement" type="int" enum="BulletFactory2D.OutlinePlacement" default="0" />
-			<param index="11" name="outline_facing" type="int" enum="BulletFactory2D.OutlineFacing" default="0" />
-			<param index="12" name="outline_reverse" type="bool" default="false" />
-			<param index="13" name="outline_slot_offset" type="int" default="0" />
-			<param index="14" name="fill_spacing" type="float" default="32.0" />
-			<param index="15" name="fill_stagger" type="bool" default="false" />
-			<param index="16" name="fill_margin" type="float" default="0.0" />
-			<param index="17" name="shell_layers" type="int" default="1" />
-			<param index="18" name="shell_step" type="float" default="32.0" />
+			<param index="2" name="petals" type="int" />
+			<param index="3" name="bullets_per_petal" type="int" />
+			<param index="4" name="radius" type="float" />
+			<param index="5" name="petal_spread" type="float" />
+			<param index="6" name="petal_sharpness" type="float" />
+			<param index="7" name="base_rotation" type="float" />
+			<param index="8" name="face_outward" type="bool" default="6" />
+			<param index="9" name="facing_offset_degrees" type="float" default="5" />
+			<param index="10" name="outline_placement" type="int" default="150.0" />
+			<param index="11" name="outline_facing" type="int" default="0.5" />
+			<param index="12" name="outline_reverse" type="bool" default="1.0" />
+			<param index="13" name="outline_slot_offset" type="int" default="0.0" />
+			<param index="14" name="fill_spacing" type="float" default="true" />
+			<param index="15" name="fill_stagger" type="bool" default="0.0" />
+			<param index="16" name="fill_margin" type="float" default="0" />
+			<param index="17" name="shell_layers" type="int" default="0" />
+			<param index="18" name="shell_step" type="float" default="false" />
+			<param index="19" name="_unnamed_arg19" type="int" default="0" />
+			<param index="20" name="_unnamed_arg20" type="float" default="32.0" />
+			<param index="21" name="_unnamed_arg21" type="float" default="false" />
+			<param index="22" name="_unnamed_arg22" type="float" default="0.0" />
+			<param index="23" name="_unnamed_arg23" type="float" default="1" />
+			<param index="24" name="_unnamed_arg24" type="float" default="32.0" />
 			<description>
 				Generates a floral spell-card pattern: [code]petals[/code] symmetric lobes around the marker, each holding [code]bullets_per_petal[/code] slots spread over [code]petal_spread[/code] radians. [code]petal_sharpness[/code] 0 gives round lobes, higher values pinch the waist into tighter flowers. [code]transforms_amount[/code] sizes the array (fewer slots than petals times per-petal truncates). Useful for boss blossoms and mandala rings.
 			</description>
@@ -741,7 +401,6 @@
 			<param index="4" name="face_direction" type="bool" default="true" />
 			<param index="5" name="anchor" type="int" enum="BulletFactory2D.LineAnchor" default="1" />
 			<param index="6" name="perpendicular" type="bool" default="false" />
-			<!-- perpendicular is retired: the spawner LineFacing selector (+90/-90) covers it -->
 			<description>
 				Generates transforms in a straight wall along [code]direction[/code], spaced evenly by [code]spacing[/code]. [code]anchor[/code] picks where the marker sits on the row (start, center, end). Bullets face along the line when [code]face_direction[/code] is true - plus 90 degrees when [code]perpendicular[/code] is set, for strafe walls - otherwise they keep the marker rotation. Useful for walls, curtains and gates. Returns an empty array when the direction is zero.
 			</description>
@@ -757,17 +416,8 @@
 			<param index="6" name="phase" type="float" default="0.0" />
 			<param index="7" name="face_outward" type="bool" default="true" />
 			<param index="8" name="facing_offset_degrees" type="float" default="0.0" />
-			<param index="9" name="outline_placement" type="int" enum="BulletFactory2D.OutlinePlacement" default="0" />
-			<param index="10" name="outline_facing" type="int" enum="BulletFactory2D.OutlineFacing" default="0" />
-			<param index="11" name="outline_reverse" type="bool" default="false" />
-			<param index="12" name="outline_slot_offset" type="int" default="0" />
-			<param index="13" name="fill_spacing" type="float" default="32.0" />
-			<param index="14" name="fill_stagger" type="bool" default="false" />
-			<param index="15" name="fill_margin" type="float" default="0.0" />
-			<param index="16" name="shell_layers" type="int" default="1" />
-			<param index="17" name="shell_step" type="float" default="32.0" />
-			<param index="9" name="outline_placement" type="int" enum="BulletFactory2D.OutlinePlacement" default="0" />
-			<param index="10" name="outline_facing" type="int" enum="BulletFactory2D.OutlineFacing" default="0" />
+			<param index="9" name="outline_placement" type="int" default="0" />
+			<param index="10" name="outline_facing" type="int" default="0" />
 			<param index="11" name="outline_reverse" type="bool" default="false" />
 			<param index="12" name="outline_slot_offset" type="int" default="0" />
 			<param index="13" name="fill_spacing" type="float" default="32.0" />
@@ -795,18 +445,26 @@
 				Generates a multi-arm spiral: [code]arms[/code] interleaved arms around the marker (galaxy, windmill and rose looks at low bullet counts). [code]arm_index_stride[/code] 1 interleaves consecutive slots across arms, higher values group slots per arm. Same facing modes as the single spiral. Useful for pinwheels, galaxies and rotating boss arms.
 			</description>
 		</method>
-		<method name="helper_generate_transforms_star_polygon" qualifiers="static">
+		<method name="helper_generate_transforms_polygon" qualifiers="static">
 			<return type="Transform2D[]" />
 			<param index="0" name="transforms_amount" type="int" />
 			<param index="1" name="marker_transform" type="Transform2D" />
-			<param index="2" name="vertices" type="int" default="5" />
+			<param index="2" name="vertices" type="int" default="6" />
 			<param index="3" name="radius" type="float" default="150.0" />
-			<param index="4" name="vertex_bias" type="float" default="2.0" />
-			<param index="5" name="base_rotation" type="float" default="0.0" />
-			<param index="6" name="face_outward" type="bool" default="true" />
-			<param index="7" name="facing_offset_degrees" type="float" default="0.0" />
+			<param index="4" name="base_rotation" type="float" default="0.0" />
+			<param index="5" name="face_outward" type="bool" default="true" />
+			<param index="6" name="facing_offset_degrees" type="float" default="0.0" />
+			<param index="7" name="outline_placement" type="int" default="0" />
+			<param index="8" name="outline_facing" type="int" default="0" />
+			<param index="9" name="outline_reverse" type="bool" default="false" />
+			<param index="10" name="outline_slot_offset" type="int" default="0" />
+			<param index="11" name="fill_spacing" type="float" default="32.0" />
+			<param index="12" name="fill_stagger" type="bool" default="false" />
+			<param index="13" name="fill_margin" type="float" default="0.0" />
+			<param index="14" name="shell_layers" type="int" default="1" />
+			<param index="15" name="shell_step" type="float" default="32.0" />
 			<description>
-				Generates a star/polygon emphasis pattern: [code]vertices[/code] symmetric directions with extra density pulled toward each vertex. [code]vertex_bias[/code] 0 is an even ring, higher values sharpen the star. Useful for pentagram bosses, shuriken patterns and geometric spell cards.
+				Generates a polygon perimeter (vertices corners on a radius circle from base_rotation), slots spread evenly by arc length, facing outward (or inward). The outline_* tail params place slots on the loop, fill its interior, or shell its outside.
 			</description>
 		</method>
 		<method name="helper_generate_transforms_rain" qualifiers="static">
@@ -821,6 +479,26 @@
 				Generates a rain curtain: slots spread along a horizontal band of [code]band_width[/code] facing [code]rain_direction[/code], with rows staggered by [code]drop_spacing[/code] so the curtain reads as layered sheets, plus random [code]jitter[/code] per slot. Useful for bullet-rain phases, storm walls and descending curtains.
 			</description>
 		</method>
+		<method name="helper_generate_transforms_rectangle" qualifiers="static">
+			<return type="Transform2D[]" />
+			<param index="0" name="transforms_amount" type="int" />
+			<param index="1" name="marker_transform" type="Transform2D" />
+			<param index="2" name="size" type="Vector2" default="Vector2(300, 200)" />
+			<param index="3" name="face_outward" type="bool" default="true" />
+			<param index="4" name="facing_offset_degrees" type="float" default="0.0" />
+			<param index="5" name="outline_placement" type="int" default="0" />
+			<param index="6" name="outline_facing" type="int" default="0" />
+			<param index="7" name="outline_reverse" type="bool" default="false" />
+			<param index="8" name="outline_slot_offset" type="int" default="0" />
+			<param index="9" name="fill_spacing" type="float" default="32.0" />
+			<param index="10" name="fill_stagger" type="bool" default="false" />
+			<param index="11" name="fill_margin" type="float" default="0.0" />
+			<param index="12" name="shell_layers" type="int" default="1" />
+			<param index="13" name="shell_step" type="float" default="32.0" />
+			<description>
+				Generates a rectangle perimeter walk (counter-clockwise from top-left), slots spread evenly by arc length, facing outward (or inward). Square = equal sides. The outline_* tail params place slots on the loop, fill its interior, or shell its outside.
+			</description>
+		</method>
 		<method name="helper_generate_transforms_ring" qualifiers="static">
 			<return type="Transform2D[]" />
 			<param index="0" name="transforms_amount" type="int" />
@@ -833,17 +511,8 @@
 			<param index="7" name="face_outward" type="bool" default="true" />
 			<param index="8" name="y_scale" type="float" default="1.0" />
 			<param index="9" name="facing_offset_degrees" type="float" default="0.0" />
-			<param index="10" name="outline_placement" type="int" enum="BulletFactory2D.OutlinePlacement" default="0" />
-			<param index="11" name="outline_facing" type="int" enum="BulletFactory2D.OutlineFacing" default="0" />
-			<param index="12" name="outline_reverse" type="bool" default="false" />
-			<param index="13" name="outline_slot_offset" type="int" default="0" />
-			<param index="14" name="fill_spacing" type="float" default="32.0" />
-			<param index="15" name="fill_stagger" type="bool" default="false" />
-			<param index="16" name="fill_margin" type="float" default="0.0" />
-			<param index="17" name="shell_layers" type="int" default="1" />
-			<param index="18" name="shell_step" type="float" default="32.0" />
-			<param index="10" name="outline_placement" type="int" enum="BulletFactory2D.OutlinePlacement" default="0" />
-			<param index="11" name="outline_facing" type="int" enum="BulletFactory2D.OutlineFacing" default="0" />
+			<param index="10" name="outline_placement" type="int" default="0" />
+			<param index="11" name="outline_facing" type="int" default="0" />
 			<param index="12" name="outline_reverse" type="bool" default="false" />
 			<param index="13" name="outline_slot_offset" type="int" default="0" />
 			<param index="14" name="fill_spacing" type="float" default="32.0" />
@@ -865,17 +534,8 @@
 			<param index="5" name="base_rotation" type="float" default="0.0" />
 			<param index="6" name="face_outward" type="bool" default="true" />
 			<param index="7" name="facing_offset_degrees" type="float" default="0.0" />
-			<param index="8" name="outline_placement" type="int" enum="BulletFactory2D.OutlinePlacement" default="0" />
-			<param index="9" name="outline_facing" type="int" enum="BulletFactory2D.OutlineFacing" default="0" />
-			<param index="10" name="outline_reverse" type="bool" default="false" />
-			<param index="11" name="outline_slot_offset" type="int" default="0" />
-			<param index="12" name="fill_spacing" type="float" default="32.0" />
-			<param index="13" name="fill_stagger" type="bool" default="false" />
-			<param index="14" name="fill_margin" type="float" default="0.0" />
-			<param index="15" name="shell_layers" type="int" default="1" />
-			<param index="16" name="shell_step" type="float" default="32.0" />
-			<param index="8" name="outline_placement" type="int" enum="BulletFactory2D.OutlinePlacement" default="0" />
-			<param index="9" name="outline_facing" type="int" enum="BulletFactory2D.OutlineFacing" default="0" />
+			<param index="8" name="outline_placement" type="int" default="0" />
+			<param index="9" name="outline_facing" type="int" default="0" />
 			<param index="10" name="outline_reverse" type="bool" default="false" />
 			<param index="11" name="outline_slot_offset" type="int" default="0" />
 			<param index="12" name="fill_spacing" type="float" default="32.0" />
@@ -896,7 +556,7 @@
 			<param index="4" name="seed" type="int" default="0" />
 			<param index="5" name="inner_radius" type="float" default="0.0" />
 			<param index="6" name="sector_direction" type="Vector2" default="Vector2(1, 0)" />
-			<param index="7" name="sector_arc" type="float" default="6.2831853" />
+			<param index="7" name="sector_arc" type="float" default="6.2831855" />
 			<param index="8" name="facing_mode" type="int" enum="BulletFactory2D.ScatterFacingMode" default="0" />
 			<description>
 				Generates a biased-random burst: offsets fill the disc (or annulus, see below) with even density (not center-clumped). Use it for explosions, boss deaths and petal pops. [code]seed[/code] 0 is non-deterministic, otherwise reproducible — a seeded call returns bit-identical volleys every time. [code]inner_radius[/code] hollows the center into a ring (0 is a full disc; clamped to [code]burst_radius[/code]). [code]sector_direction[/code] centers a cone of [code]sector_arc[/code] radians for directional blasts and shotgun fans (TAU or more is a full circle; 0 or non-finite falls back to full circle). [code]facing_mode[/code] picks bullet facing: outward faces away from the marker, random faces anywhere, inward faces the marker (implosions); [code]facing_jitter[/code] twists outward/inward facings.
@@ -926,17 +586,8 @@
 			<param index="5" name="base_rotation" type="float" default="0.0" />
 			<param index="6" name="face_outward" type="bool" default="true" />
 			<param index="7" name="facing_offset_degrees" type="float" default="0.0" />
-			<param index="8" name="outline_placement" type="int" enum="BulletFactory2D.OutlinePlacement" default="0" />
-			<param index="9" name="outline_facing" type="int" enum="BulletFactory2D.OutlineFacing" default="0" />
-			<param index="10" name="outline_reverse" type="bool" default="false" />
-			<param index="11" name="outline_slot_offset" type="int" default="0" />
-			<param index="12" name="fill_spacing" type="float" default="32.0" />
-			<param index="13" name="fill_stagger" type="bool" default="false" />
-			<param index="14" name="fill_margin" type="float" default="0.0" />
-			<param index="15" name="shell_layers" type="int" default="1" />
-			<param index="16" name="shell_step" type="float" default="32.0" />
-			<param index="8" name="outline_placement" type="int" enum="BulletFactory2D.OutlinePlacement" default="0" />
-			<param index="9" name="outline_facing" type="int" enum="BulletFactory2D.OutlineFacing" default="0" />
+			<param index="8" name="outline_placement" type="int" default="0" />
+			<param index="9" name="outline_facing" type="int" default="0" />
 			<param index="10" name="outline_reverse" type="bool" default="false" />
 			<param index="11" name="outline_slot_offset" type="int" default="0" />
 			<param index="12" name="fill_spacing" type="float" default="32.0" />
@@ -946,6 +597,66 @@
 			<param index="16" name="shell_step" type="float" default="32.0" />
 			<description>
 				Generates a true star shell: points alternating outer/inner vertices around the marker (distinct from the polygon helper's density bias). Boss star bursts and celebratory shells.
+			</description>
+		</method>
+		<method name="helper_generate_transforms_star_polygon" qualifiers="static">
+			<return type="Transform2D[]" />
+			<param index="0" name="transforms_amount" type="int" />
+			<param index="1" name="marker_transform" type="Transform2D" />
+			<param index="2" name="vertices" type="int" default="5" />
+			<param index="3" name="radius" type="float" default="150.0" />
+			<param index="4" name="vertex_bias" type="float" default="2.0" />
+			<param index="5" name="base_rotation" type="float" default="0.0" />
+			<param index="6" name="face_outward" type="bool" default="true" />
+			<param index="7" name="facing_offset_degrees" type="float" default="0.0" />
+			<description>
+				Generates a star/polygon emphasis pattern: [code]vertices[/code] symmetric directions with extra density pulled toward each vertex. [code]vertex_bias[/code] 0 is an even ring, higher values sharpen the star. Useful for pentagram bosses, shuriken patterns and geometric spell cards.
+			</description>
+		</method>
+		<method name="helper_generate_transforms_trapezoid" qualifiers="static">
+			<return type="Transform2D[]" />
+			<param index="0" name="transforms_amount" type="int" />
+			<param index="1" name="marker_transform" type="Transform2D" />
+			<param index="2" name="base_top" type="float" default="200.0" />
+			<param index="3" name="base_bottom" type="float" default="300.0" />
+			<param index="4" name="height" type="float" default="200.0" />
+			<param index="5" name="rotation" type="float" default="0.0" />
+			<param index="6" name="face_outward" type="bool" default="true" />
+			<param index="7" name="facing_offset_degrees" type="float" default="0.0" />
+			<param index="8" name="outline_placement" type="int" default="0" />
+			<param index="9" name="outline_facing" type="int" default="0" />
+			<param index="10" name="outline_reverse" type="bool" default="false" />
+			<param index="11" name="outline_slot_offset" type="int" default="0" />
+			<param index="12" name="fill_spacing" type="float" default="32.0" />
+			<param index="13" name="fill_stagger" type="bool" default="false" />
+			<param index="14" name="fill_margin" type="float" default="0.0" />
+			<param index="15" name="shell_layers" type="int" default="1" />
+			<param index="16" name="shell_step" type="float" default="32.0" />
+			<description>
+				Isosceles trapezoid perimeter, slots spread evenly by arc length, facing outward (or inward). A zero top base degrades to a triangle; zero-area boxes stack at the marker.
+			</description>
+		</method>
+		<method name="helper_generate_transforms_triangle" qualifiers="static">
+			<return type="Transform2D[]" />
+			<param index="0" name="transforms_amount" type="int" />
+			<param index="1" name="marker_transform" type="Transform2D" />
+			<param index="2" name="triangle_type" type="int" enum="BulletFactory2D.TriangleType" default="0" />
+			<param index="3" name="size_a" type="float" default="150.0" />
+			<param index="4" name="size_b" type="float" default="150.0" />
+			<param index="5" name="rotation" type="float" default="0.0" />
+			<param index="6" name="face_outward" type="bool" default="true" />
+			<param index="7" name="facing_offset_degrees" type="float" default="0.0" />
+			<param index="8" name="outline_placement" type="int" default="0" />
+			<param index="9" name="outline_facing" type="int" default="0" />
+			<param index="10" name="outline_reverse" type="bool" default="false" />
+			<param index="11" name="outline_slot_offset" type="int" default="0" />
+			<param index="12" name="fill_spacing" type="float" default="32.0" />
+			<param index="13" name="fill_stagger" type="bool" default="false" />
+			<param index="14" name="fill_margin" type="float" default="0.0" />
+			<param index="15" name="shell_layers" type="int" default="1" />
+			<param index="16" name="shell_step" type="float" default="32.0" />
+			<description>
+				Triangle perimeter (equilateral circumradius, isosceles base + height apex-up, right X/Y legs recentered), slots spread evenly by arc length, facing outward (or inward). Degenerate triangles stack at the marker.
 			</description>
 		</method>
 		<method name="helper_generate_transforms_waterfall" qualifiers="static">
@@ -976,6 +687,232 @@
 			<param index="7" name="facing_offset_degrees" type="float" default="0.0" />
 			<description>
 				Generates a snake row along a sine wave of width, amplitude and wave count around the marker axis. Pairs with wobble flight for slithering curtains.
+			</description>
+		</method>
+		<method name="helper_sample_outline_circle" qualifiers="static">
+			<return type="Dictionary" />
+			<param index="0" name="radius" type="float" default="150.0" />
+			<description>
+				Circle loop track in marker-local pixels (adaptive density). Closed.
+			</description>
+		</method>
+		<method name="helper_sample_outline_counter_spiral" qualifiers="static">
+			<return type="Dictionary" />
+			<param index="0" name="transforms_amount" type="int" default="0" />
+			<param index="1" name="arms" type="int" default="4" />
+			<param index="2" name="start_radius" type="float" default="50.0" />
+			<param index="3" name="radius_step" type="float" default="15.0" />
+			<param index="4" name="angle_step" type="float" default="0.6" />
+			<param index="5" name="base_rotation_abs" type="float" default="0.0" />
+			<param index="6" name="arm_index_stride" type="int" default="1" />
+			<param index="7" name="mirror_alternate_arms" type="bool" default="true" />
+			<description>
+				Mirrored-arm variant of the multispiral strips with INF separators (open).
+			</description>
+		</method>
+		<method name="helper_sample_outline_diamond" qualifiers="static">
+			<return type="Dictionary" />
+			<param index="0" name="diagonal_x" type="float" default="200.0" />
+			<param index="1" name="diagonal_y" type="float" default="300.0" />
+			<param index="2" name="rotation" type="float" default="0.0" />
+			<description>
+				Diamond corners in marker-local pixels. Closed.
+			</description>
+		</method>
+		<method name="helper_sample_outline_ellipse" qualifiers="static">
+			<return type="Dictionary" />
+			<param index="0" name="radius_x" type="float" default="150.0" />
+			<param index="1" name="radius_y" type="float" default="100.0" />
+			<param index="2" name="ellipse_rotation" type="float" default="0.0" />
+			<param index="3" name="start_angle" type="float" default="0.0" />
+			<param index="4" name="arc" type="float" default="6.2831855" />
+			<param index="5" name="mode" type="int" default="0" />
+			<description>
+				Ellipse sweep in marker-local pixels (adaptive density). Closed for full rings; wall mode draws its arc span in full (gaps read from the missing bullets).
+			</description>
+		</method>
+		<method name="helper_sample_outline_flower" qualifiers="static">
+			<return type="Dictionary" />
+			<param index="0" name="flower_type" type="int" default="0" />
+			<param index="1" name="petals" type="int" default="6" />
+			<param index="2" name="radius" type="float" default="150.0" />
+			<param index="3" name="petal_spread" type="float" default="0.5" />
+			<param index="4" name="petal_sharpness" type="float" default="1.0" />
+			<param index="5" name="inner_radius_scale" type="float" default="0.0" />
+			<param index="6" name="spiro_roller" type="float" default="45.0" />
+			<param index="7" name="spiro_pen" type="float" default="80.0" />
+			<param index="8" name="super_lobes" type="float" default="6.0" />
+			<param index="9" name="super_fullness" type="float" default="1.0" />
+			<param index="10" name="base_rotation" type="float" default="0.0" />
+			<description>
+				Flower bloom track sampler in marker-local pixels mirroring [member helper_generate_transforms_flower] per-type math at a fixed density (closed loop). [code]flower_type[/code] selects the bloom kind (see [enum FlowerBloom]): FAN traces the petal-tip ring, RHODONEA and SPIROGRAPH and SUPERFORMULA trace their actual curve, PHYLLOTAXIS bounds the Vogel disc rim. Per-type knobs (spiro_roller, spiro_pen, super_lobes, super_fullness, inner_radius_scale) apply only to their matching bloom kind; unused knobs are ignored.
+			</description>
+		</method>
+		<method name="helper_sample_outline_grid" qualifiers="static">
+			<return type="Dictionary" />
+			<param index="0" name="transforms_amount" type="int" default="0" />
+			<param index="1" name="rows_per_column" type="int" default="10" />
+			<param index="2" name="alignment" type="int" default="3" />
+			<param index="3" name="column_offset" type="float" default="150.0" />
+			<param index="4" name="row_offset" type="float" default="150.0" />
+			<param index="5" name="base_rotation_abs" type="float" default="0.0" />
+			<param index="6" name="rotate_with_marker" type="bool" default="true" />
+			<description>
+				Grid row strips with INF separators between rows (open). Ideal structure only.
+			</description>
+		</method>
+		<method name="helper_sample_outline_heart" qualifiers="static">
+			<return type="Dictionary" />
+			<param index="0" name="size" type="float" default="100.0" />
+			<param index="1" name="base_rotation" type="float" default="0.0" />
+			<description>
+				Parametric heart sweep. Closed.
+			</description>
+		</method>
+		<method name="helper_sample_outline_lattice" qualifiers="static">
+			<return type="Dictionary" />
+			<param index="0" name="transforms_amount" type="int" default="0" />
+			<param index="1" name="columns" type="int" default="4" />
+			<param index="2" name="rows" type="int" default="4" />
+			<param index="3" name="spacing_x" type="float" default="64.0" />
+			<param index="4" name="spacing_y" type="float" default="64.0" />
+			<param index="5" name="stagger_rows" type="bool" default="true" />
+			<description>
+				Lattice row strips with INF separators between rows (open).
+			</description>
+		</method>
+		<method name="helper_sample_outline_lissajous" qualifiers="static">
+			<return type="Dictionary" />
+			<param index="0" name="size_x" type="float" default="200.0" />
+			<param index="1" name="size_y" type="float" default="120.0" />
+			<param index="2" name="freq_x" type="float" default="3.0" />
+			<param index="3" name="freq_y" type="float" default="2.0" />
+			<param index="4" name="phase" type="float" default="0.0" />
+			<description>
+				Lissajous sweep in marker-local pixels. Closed.
+			</description>
+		</method>
+		<method name="helper_sample_outline_multispiral" qualifiers="static">
+			<return type="Dictionary" />
+			<param index="0" name="transforms_amount" type="int" default="0" />
+			<param index="1" name="arms" type="int" default="3" />
+			<param index="2" name="start_radius" type="float" default="50.0" />
+			<param index="3" name="radius_step" type="float" default="15.0" />
+			<param index="4" name="angle_step" type="float" default="0.6" />
+			<param index="5" name="base_rotation_abs" type="float" default="0.0" />
+			<param index="6" name="arm_index_stride" type="int" default="1" />
+			<description>
+				One strip per arm with INF separators between arms (open).
+			</description>
+		</method>
+		<method name="helper_sample_outline_polygon" qualifiers="static">
+			<return type="Dictionary" />
+			<param index="0" name="vertices" type="int" default="6" />
+			<param index="1" name="radius" type="float" default="150.0" />
+			<param index="2" name="base_rotation" type="float" default="0.0" />
+			<description>
+				Polygon corners in marker-local pixels. Closed.
+			</description>
+		</method>
+		<method name="helper_sample_outline_rain" qualifiers="static">
+			<return type="Dictionary" />
+			<param index="0" name="transforms_amount" type="int" default="0" />
+			<param index="1" name="band_width" type="float" default="600.0" />
+			<param index="2" name="rain_direction" type="Vector2" default="Vector2(0, 1)" />
+			<param index="3" name="drop_spacing" type="float" default="48.0" />
+			<description>
+				Rain row strips with INF separators between rows (open).
+			</description>
+		</method>
+		<method name="helper_sample_outline_rectangle" qualifiers="static">
+			<return type="Dictionary" />
+			<param index="0" name="size" type="Vector2" default="Vector2(300, 200)" />
+			<description>
+				Rectangle corners in marker-local pixels, counter-clockwise from top-left. Closed.
+			</description>
+		</method>
+		<method name="helper_sample_outline_ring" qualifiers="static">
+			<return type="Dictionary" />
+			<param index="0" name="radius" type="float" default="150.0" />
+			<param index="1" name="arc" type="float" default="6.2831855" />
+			<param index="2" name="y_scale" type="float" default="1.0" />
+			<param index="3" name="start_angle_abs" type="float" default="0.0" />
+			<description>
+				Ring arc sweep in marker-local pixels (adaptive density). Closed for full TAU arcs.
+			</description>
+		</method>
+		<method name="helper_sample_outline_rose" qualifiers="static">
+			<return type="Dictionary" />
+			<param index="0" name="petals" type="int" default="6" />
+			<param index="1" name="radius" type="float" default="150.0" />
+			<param index="2" name="lobe_sharpness" type="float" default="1.0" />
+			<param index="3" name="base_rotation" type="float" default="0.0" />
+			<description>
+				Rose theta sweep in marker-local pixels (flips included, matching slot order). Closed.
+			</description>
+		</method>
+		<method name="helper_sample_outline_spiral" qualifiers="static">
+			<return type="Dictionary" />
+			<param index="0" name="transforms_amount" type="int" default="0" />
+			<param index="1" name="start_radius" type="float" default="50.0" />
+			<param index="2" name="radius_step" type="float" default="15.0" />
+			<param index="3" name="angle_step" type="float" default="0.6" />
+			<param index="4" name="base_rotation_abs" type="float" default="0.0" />
+			<description>
+				Spiral arm sweep (open).
+			</description>
+		</method>
+		<method name="helper_sample_outline_star" qualifiers="static">
+			<return type="Dictionary" />
+			<param index="0" name="points" type="int" default="5" />
+			<param index="1" name="outer_radius" type="float" default="150.0" />
+			<param index="2" name="inner_radius" type="float" default="65.0" />
+			<param index="3" name="base_rotation" type="float" default="0.0" />
+			<description>
+				Star corners in marker-local pixels. Closed.
+			</description>
+		</method>
+		<method name="helper_sample_outline_trapezoid" qualifiers="static">
+			<return type="Dictionary" />
+			<param index="0" name="base_top" type="float" default="200.0" />
+			<param index="1" name="base_bottom" type="float" default="300.0" />
+			<param index="2" name="height" type="float" default="200.0" />
+			<param index="3" name="rotation" type="float" default="0.0" />
+			<description>
+				Trapezoid corners in marker-local pixels. Closed.
+			</description>
+		</method>
+		<method name="helper_sample_outline_triangle" qualifiers="static">
+			<return type="Dictionary" />
+			<param index="0" name="triangle_type" type="int" default="0" />
+			<param index="1" name="size_a" type="float" default="150.0" />
+			<param index="2" name="size_b" type="float" default="150.0" />
+			<param index="3" name="rotation" type="float" default="0.0" />
+			<description>
+				Triangle corners in marker-local pixels. Closed.
+			</description>
+		</method>
+		<method name="helper_sample_outline_waterfall" qualifiers="static">
+			<return type="Dictionary" />
+			<param index="0" name="transforms_amount" type="int" default="0" />
+			<param index="1" name="columns" type="int" default="4" />
+			<param index="2" name="column_spacing" type="float" default="64.0" />
+			<param index="3" name="rows" type="int" default="4" />
+			<param index="4" name="row_spacing" type="float" default="64.0" />
+			<param index="5" name="stagger" type="float" default="0.0" />
+			<param index="6" name="rain_direction" type="Vector2" default="Vector2(0, 1)" />
+			<description>
+				Waterfall row strips with INF separators between rows (open).
+			</description>
+		</method>
+		<method name="helper_sample_outline_wave" qualifiers="static">
+			<return type="Dictionary" />
+			<param index="0" name="width" type="float" default="300.0" />
+			<param index="1" name="amplitude" type="float" default="50.0" />
+			<param index="2" name="waves" type="float" default="2.0" />
+			<param index="3" name="direction" type="Vector2" default="Vector2(1, 0)" />
+			<description>
+				Sine center-line sweep (open).
 			</description>
 		</method>
 		<method name="populate_attachments_pool">
@@ -1157,6 +1094,12 @@
 		<constant name="SPIRAL_FACING_KEEP_MARKER" value="3" enum="SpiralFacingMode">
 			Spiral facing used by helper_generate_transforms_spiral(): every bullet keeps the marker rotation.
 		</constant>
+		<constant name="SCATTER_FACING_OUTWARD" value="0" enum="ScatterFacingMode">
+		</constant>
+		<constant name="SCATTER_FACING_RANDOM" value="1" enum="ScatterFacingMode">
+		</constant>
+		<constant name="SCATTER_FACING_INWARD" value="2" enum="ScatterFacingMode">
+		</constant>
 		<constant name="LINE_ANCHOR_START" value="0" enum="LineAnchor">
 			Line anchor used by helper_generate_transforms_line(): the row grows from the marker in the line direction.
 		</constant>
@@ -1174,15 +1117,6 @@
 		</constant>
 		<constant name="ELLIPSE_WALL" value="2" enum="EllipseMode">
 			Ellipse mode used by helper_generate_transforms_ellipse(): a dense arc with gap_count carved dodge gaps of gap_width radians each. The returned array shrinks to the surviving slots.
-		</constant>
-		<constant name="TRIANGLE_EQUILATERAL" value="0" enum="TriangleType">
-			Triangle from its circumradius.
-		</constant>
-		<constant name="TRIANGLE_ISOSCELES" value="1" enum="TriangleType">
-			Triangle from base width + height, apex up.
-		</constant>
-		<constant name="TRIANGLE_RIGHT" value="2" enum="TriangleType">
-			Right triangle from X/Y legs, recentered.
 		</constant>
 		<constant name="PATTERN_PRESET_CUSTOM" value="-1" enum="PatternPreset">
 			Preset marker used by BulletSpawner2D.apply_pattern_preset(): no preset, the spawner keeps its current helper settings.
@@ -1267,6 +1201,25 @@
 		</constant>
 		<constant name="SIDE_BOTH" value="3" enum="SideMode">
 			helper_apply_side_spread() pushes each transform to a random side of the path.
+		</constant>
+		<constant name="TRIANGLE_EQUILATERAL" value="0" enum="TriangleType">
+			Triangle from its circumradius.
+		</constant>
+		<constant name="TRIANGLE_ISOSCELES" value="1" enum="TriangleType">
+			Triangle from base width + height, apex up.
+		</constant>
+		<constant name="TRIANGLE_RIGHT" value="2" enum="TriangleType">
+			Right triangle from X/Y legs, recentered.
+		</constant>
+		<constant name="FLOWER_FAN" value="0" enum="FlowerBloom">
+		</constant>
+		<constant name="FLOWER_RHODONEA" value="1" enum="FlowerBloom">
+		</constant>
+		<constant name="FLOWER_PHYLLOTAXIS" value="2" enum="FlowerBloom">
+		</constant>
+		<constant name="FLOWER_SPIROGRAPH" value="3" enum="FlowerBloom">
+		</constant>
+		<constant name="FLOWER_SUPERFORMULA" value="4" enum="FlowerBloom">
 		</constant>
 		<constant name="OUTLINE_ON_PATH" value="0" enum="OutlinePlacement">
 			Loop-generator slots stay on the generated outline loop (default: existing patterns never change).
