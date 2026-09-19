@@ -3164,15 +3164,75 @@ void BulletSpawner2D::set_telegraph_sec(double value) {
     }
     telegraph_sec = value;
 }
-int BulletSpawner2D::get_pattern_seed() const {
-    return pattern_seed;
+int BulletSpawner2D::get_reload_jitter_seed() const {
+    return reload_jitter_seed;
 }
-void BulletSpawner2D::set_pattern_seed(int value) {
+void BulletSpawner2D::set_reload_jitter_seed(int value) {
     if (value < 0) {
-        UtilityFunctions::push_error("BulletSpawner2D: pattern_seed must be >= 0 (0 = non-deterministic), keeping the old value.");
+        UtilityFunctions::push_error("BulletSpawner2D: reload_jitter_seed must be >= 0 (0 = non-deterministic), keeping the old value.");
         return;
     }
-    pattern_seed = value;
+    reload_jitter_seed = value;
+}
+int BulletSpawner2D::get_homing_random_seed() const {
+    return homing_random_seed;
+}
+void BulletSpawner2D::set_homing_random_seed(int value) {
+    if (value < 0) {
+        UtilityFunctions::push_error("BulletSpawner2D: homing_random_seed must be >= 0 (0 = non-deterministic), keeping the old value.");
+        return;
+    }
+    homing_random_seed = value;
+}
+int BulletSpawner2D::get_helper_grid_seed() const {
+    return helper_grid_seed;
+}
+void BulletSpawner2D::set_helper_grid_seed(int value) {
+    if (value < 0) {
+        UtilityFunctions::push_error("BulletSpawner2D: helper_grid_seed must be >= 0 (0 = non-deterministic), keeping the old value.");
+        return;
+    }
+    helper_grid_seed = value;
+}
+int BulletSpawner2D::get_helper_ring_seed() const {
+    return helper_ring_seed;
+}
+void BulletSpawner2D::set_helper_ring_seed(int value) {
+    if (value < 0) {
+        UtilityFunctions::push_error("BulletSpawner2D: helper_ring_seed must be >= 0 (0 = non-deterministic), keeping the old value.");
+        return;
+    }
+    helper_ring_seed = value;
+}
+int BulletSpawner2D::get_helper_fan_seed() const {
+    return helper_fan_seed;
+}
+void BulletSpawner2D::set_helper_fan_seed(int value) {
+    if (value < 0) {
+        UtilityFunctions::push_error("BulletSpawner2D: helper_fan_seed must be >= 0 (0 = non-deterministic), keeping the old value.");
+        return;
+    }
+    helper_fan_seed = value;
+}
+int BulletSpawner2D::get_helper_rain_seed() const {
+    return helper_rain_seed;
+}
+void BulletSpawner2D::set_helper_rain_seed(int value) {
+    if (value < 0) {
+        UtilityFunctions::push_error("BulletSpawner2D: helper_rain_seed must be >= 0 (0 = non-deterministic), keeping the old value.");
+        return;
+    }
+    helper_rain_seed = value;
+}
+int BulletSpawner2D::get_helper_waterfall_seed() const {
+    return helper_waterfall_seed;
+}
+void BulletSpawner2D::set_helper_waterfall_seed(int value) {
+    if (value < 0) {
+        UtilityFunctions::push_error("BulletSpawner2D: helper_waterfall_seed must be >= 0 (0 = non-deterministic), keeping the old value.");
+        return;
+    }
+    helper_waterfall_seed = value;
 }
 int BulletSpawner2D::get_max_live_bullets() const {
     return max_live_bullets;
@@ -4216,11 +4276,14 @@ Array BulletSpawner2D::resolve_homing_targets(bool quiet, bool advance_round_rob
         case HOMING_SELECT_RANDOM: {
             if (homing_rng.is_null()) {
                 homing_rng.instantiate();
-                if (pattern_seed > 0) {
-                    homing_rng->set_seed((uint64_t)pattern_seed);
+                if (homing_random_seed > 0) {
+                    homing_rng->set_seed((uint64_t)homing_random_seed);
                 } else {
                     homing_rng->randomize();
                 }
+            } else if (homing_random_seed > 0 && homing_rng->get_seed() != (uint64_t)homing_random_seed) {
+                // Seed changed at runtime: re-seed so the new value takes effect.
+                homing_rng->set_seed((uint64_t)homing_random_seed);
             }
             Array pool = candidates.duplicate();
             for (int k = 0; k < take && !pool.is_empty(); ++k) {
@@ -4733,13 +4796,13 @@ TypedArray<Transform2D> BulletSpawner2D::collect_spawn_transforms_impl(bool quie
             break;
         }
         case PATTERN_FROM_HELPER_GRID:
-            raw = BulletFactory2D::helper_generate_transforms_grid(helper_bullets_amount, marker, helper_grid_rows_per_column, (BulletFactory2D::Alignment)helper_grid_alignment, helper_grid_column_offset, helper_grid_row_offset, helper_grid_rotate_with_marker, helper_grid_random_local_rotation, helper_grid_jitter);
+            raw = BulletFactory2D::helper_generate_transforms_grid(helper_bullets_amount, marker, helper_grid_rows_per_column, (BulletFactory2D::Alignment)helper_grid_alignment, helper_grid_column_offset, helper_grid_row_offset, helper_grid_rotate_with_marker, helper_grid_random_local_rotation, helper_grid_jitter, helper_grid_seed > 0 ? (uint64_t)helper_grid_seed : 0);
             break;
         case PATTERN_FROM_HELPER_RING:
-            raw = BulletFactory2D::helper_generate_transforms_ring(helper_bullets_amount, marker, helper_ring_radius, helper_ring_start_angle, helper_ring_arc, helper_ring_rotate_with_marker, helper_ring_random_rotation, helper_ring_face_outward, helper_ring_y_scale, helper_ring_facing_offset_deg, helper_outline_placement, helper_outline_facing, helper_outline_reverse, helper_outline_slot_offset, helper_outline_fill_spacing, helper_outline_fill_stagger, helper_outline_fill_margin, helper_outline_shell_layers, helper_outline_shell_step);
+            raw = BulletFactory2D::helper_generate_transforms_ring(helper_bullets_amount, marker, helper_ring_radius, helper_ring_start_angle, helper_ring_arc, helper_ring_rotate_with_marker, helper_ring_random_rotation, helper_ring_face_outward, helper_ring_y_scale, helper_ring_facing_offset_deg, helper_outline_placement, helper_outline_facing, helper_outline_reverse, helper_outline_slot_offset, helper_outline_fill_spacing, helper_outline_fill_stagger, helper_outline_fill_margin, helper_outline_shell_layers, helper_outline_shell_step, helper_ring_seed > 0 ? (uint64_t)helper_ring_seed : 0);
             break;
         case PATTERN_FROM_HELPER_FAN:
-            raw = BulletFactory2D::helper_generate_transforms_fan(helper_bullets_amount, marker, helper_fan_spread, helper_fan_direction_angle, helper_fan_step_offset, helper_fan_centered, helper_fan_angle_jitter);
+            raw = BulletFactory2D::helper_generate_transforms_fan(helper_bullets_amount, marker, helper_fan_spread, helper_fan_direction_angle, helper_fan_step_offset, helper_fan_centered, helper_fan_angle_jitter, helper_fan_seed > 0 ? (uint64_t)helper_fan_seed : 0);
             break;
         case PATTERN_FROM_HELPER_SPIRAL:
             raw = BulletFactory2D::helper_generate_transforms_spiral(helper_bullets_amount, marker, helper_spiral_start_radius, helper_spiral_radius_step, helper_spiral_angle_step, helper_spiral_rotate_with_marker, (BulletFactory2D::SpiralFacingMode)helper_spiral_facing, helper_spiral_facing_offset_deg);
@@ -4820,12 +4883,10 @@ TypedArray<Transform2D> BulletSpawner2D::collect_spawn_transforms_impl(bool quie
             raw = BulletFactory2D::helper_generate_transforms_ellipse(helper_bullets_amount, marker, helper_ellipse_radius_x, helper_ellipse_radius_y, helper_ellipse_rotation, helper_ellipse_start_angle, helper_ellipse_arc, (BulletFactory2D::EllipseMode)helper_ellipse_mode, helper_ellipse_gap_count, helper_ellipse_gap_width, helper_ellipse_face_outward, helper_ellipse_facing_offset_deg, helper_outline_placement, helper_outline_facing, helper_outline_reverse, helper_outline_slot_offset, helper_outline_fill_spacing, helper_outline_fill_stagger, helper_outline_fill_margin, helper_outline_shell_layers, helper_outline_shell_step);
             break;
         case PATTERN_FROM_HELPER_RAIN:
-            raw = BulletFactory2D::helper_generate_transforms_rain(helper_bullets_amount, marker, helper_rain_band_width, helper_rain_direction, helper_rain_drop_spacing, helper_rain_jitter);
+            raw = BulletFactory2D::helper_generate_transforms_rain(helper_bullets_amount, marker, helper_rain_band_width, helper_rain_direction, helper_rain_drop_spacing, helper_rain_jitter, helper_rain_seed > 0 ? (uint64_t)helper_rain_seed : 0);
             break;
         case PATTERN_FROM_HELPER_SCATTER: {
-            // pattern_seed is the volley default; the per-pattern seed wins
-            // when set (replays pin one pattern without freezing the rest).
-            uint64_t scatter_seed = helper_scatter_seed > 0 ? (uint64_t)helper_scatter_seed : (pattern_seed > 0 ? (uint64_t)pattern_seed : 0);
+            uint64_t scatter_seed = helper_scatter_seed > 0 ? (uint64_t)helper_scatter_seed : 0;
             if (quiet && scatter_seed == 0) {
                 // Preview stability: an unseeded layout re-rolls on every
                 // collect, and the preview re-collects on every tracked
@@ -4857,7 +4918,7 @@ TypedArray<Transform2D> BulletSpawner2D::collect_spawn_transforms_impl(bool quie
             raw = BulletFactory2D::helper_generate_transforms_wave(helper_bullets_amount, marker, helper_wave_width, helper_wave_amplitude, helper_wave_waves, helper_wave_direction, helper_wave_face_direction, helper_wave_facing_offset_deg);
             break;
         case PATTERN_FROM_HELPER_WATERFALL:
-            raw = BulletFactory2D::helper_generate_transforms_waterfall(helper_bullets_amount, marker, helper_waterfall_columns, helper_waterfall_column_spacing, helper_waterfall_rows, helper_waterfall_row_spacing, helper_waterfall_stagger, helper_waterfall_rain_direction, helper_waterfall_jitter, helper_waterfall_facing_offset_deg);
+            raw = BulletFactory2D::helper_generate_transforms_waterfall(helper_bullets_amount, marker, helper_waterfall_columns, helper_waterfall_column_spacing, helper_waterfall_rows, helper_waterfall_row_spacing, helper_waterfall_stagger, helper_waterfall_rain_direction, helper_waterfall_jitter, helper_waterfall_facing_offset_deg, helper_waterfall_seed > 0 ? (uint64_t)helper_waterfall_seed : 0);
             break;
         case PATTERN_FROM_HELPER_LATTICE:
             raw = BulletFactory2D::helper_generate_transforms_lattice(helper_bullets_amount, marker, helper_lattice_columns, helper_lattice_rows, helper_lattice_spacing_x, helper_lattice_spacing_y, helper_lattice_stagger_rows, helper_lattice_face_outward, helper_lattice_facing_offset_deg);
@@ -5916,6 +5977,8 @@ void BulletSpawner2D::_validate_property(PropertyInfo &p_property) const {
                     show = true;
                 } else if (property_name == "reload_jitter_sec") {
                     show = true;
+                } else if (property_name == "homing_random_seed") {
+                    show = homing_target_selection == HOMING_SELECT_RANDOM;
                 } else if (property_name == "homing_retarget_phase") {
                     show = homing_retarget_mode == HOMING_RETARGET_ON_INTERVAL;
                 }
@@ -6559,7 +6622,7 @@ void BulletSpawner2D::fire_burst_volley() {
 
 double BulletSpawner2D::next_shoot_interval_sec() const {
     // Reload jitter: +/- uniform jitter around the base interval (seeded by
-    // pattern_seed for replays; non-deterministic at 0). Floored so a huge
+    // reload_jitter_seed for replays; non-deterministic at 0). Floored so a huge
     // jitter can never invert or stall the timer; the floor sits at 1ms so
     // fast base intervals keep working with jitter on (the per-tick pull cap
     // in _process absorbs the rest instead of hot-looping).
@@ -6571,8 +6634,8 @@ double BulletSpawner2D::next_shoot_interval_sec() const {
         rng.instantiate();
         jitter_rng = rng;
     }
-    if (pattern_seed != 0) {
-        rng->set_seed((uint64_t)pattern_seed + (uint64_t)volleys_fired);
+    if (reload_jitter_seed != 0) {
+        rng->set_seed((uint64_t)reload_jitter_seed + (uint64_t)volleys_fired);
     } else {
         rng->randomize();
     }
@@ -6858,6 +6921,9 @@ void BulletSpawner2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_helper_grid_jitter"), &BulletSpawner2D::get_helper_grid_jitter);
 	ClassDB::bind_method(D_METHOD("set_helper_grid_jitter", "value"), &BulletSpawner2D::set_helper_grid_jitter);
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_grid_jitter"), "set_helper_grid_jitter", "get_helper_grid_jitter");
+	ClassDB::bind_method(D_METHOD("get_helper_grid_seed"), &BulletSpawner2D::get_helper_grid_seed);
+	ClassDB::bind_method(D_METHOD("set_helper_grid_seed", "value"), &BulletSpawner2D::set_helper_grid_seed);
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "helper_grid_seed"), "set_helper_grid_seed", "get_helper_grid_seed");
 
 	ClassDB::bind_method(D_METHOD("get_helper_ring_radius"), &BulletSpawner2D::get_helper_ring_radius);
 	ClassDB::bind_method(D_METHOD("set_helper_ring_radius", "value"), &BulletSpawner2D::set_helper_ring_radius);
@@ -6878,6 +6944,9 @@ void BulletSpawner2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_helper_ring_random_rotation"), &BulletSpawner2D::get_helper_ring_random_rotation);
 	ClassDB::bind_method(D_METHOD("set_helper_ring_random_rotation", "value"), &BulletSpawner2D::set_helper_ring_random_rotation);
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "helper_ring_random_rotation"), "set_helper_ring_random_rotation", "get_helper_ring_random_rotation");
+	ClassDB::bind_method(D_METHOD("get_helper_ring_seed"), &BulletSpawner2D::get_helper_ring_seed);
+	ClassDB::bind_method(D_METHOD("set_helper_ring_seed", "value"), &BulletSpawner2D::set_helper_ring_seed);
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "helper_ring_seed"), "set_helper_ring_seed", "get_helper_ring_seed");
 
 	ClassDB::bind_method(D_METHOD("get_helper_ring_face_outward"), &BulletSpawner2D::get_helper_ring_face_outward);
 	ClassDB::bind_method(D_METHOD("set_helper_ring_face_outward", "value"), &BulletSpawner2D::set_helper_ring_face_outward);
@@ -6910,6 +6979,9 @@ void BulletSpawner2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_helper_fan_angle_jitter"), &BulletSpawner2D::get_helper_fan_angle_jitter);
 	ClassDB::bind_method(D_METHOD("set_helper_fan_angle_jitter", "value"), &BulletSpawner2D::set_helper_fan_angle_jitter);
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_fan_angle_jitter"), "set_helper_fan_angle_jitter", "get_helper_fan_angle_jitter");
+	ClassDB::bind_method(D_METHOD("get_helper_fan_seed"), &BulletSpawner2D::get_helper_fan_seed);
+	ClassDB::bind_method(D_METHOD("set_helper_fan_seed", "value"), &BulletSpawner2D::set_helper_fan_seed);
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "helper_fan_seed"), "set_helper_fan_seed", "get_helper_fan_seed");
 
 	ClassDB::bind_method(D_METHOD("get_helper_spiral_start_radius"), &BulletSpawner2D::get_helper_spiral_start_radius);
 	ClassDB::bind_method(D_METHOD("set_helper_spiral_start_radius", "value"), &BulletSpawner2D::set_helper_spiral_start_radius);
@@ -7113,6 +7185,9 @@ void BulletSpawner2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_helper_rain_jitter"), &BulletSpawner2D::get_helper_rain_jitter);
 	ClassDB::bind_method(D_METHOD("set_helper_rain_jitter", "value"), &BulletSpawner2D::set_helper_rain_jitter);
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_rain_jitter"), "set_helper_rain_jitter", "get_helper_rain_jitter");
+	ClassDB::bind_method(D_METHOD("get_helper_rain_seed"), &BulletSpawner2D::get_helper_rain_seed);
+	ClassDB::bind_method(D_METHOD("set_helper_rain_seed", "value"), &BulletSpawner2D::set_helper_rain_seed);
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "helper_rain_seed"), "set_helper_rain_seed", "get_helper_rain_seed");
 
 	ClassDB::bind_method(D_METHOD("get_helper_scatter_burst_radius"), &BulletSpawner2D::get_helper_scatter_burst_radius);
 	ClassDB::bind_method(D_METHOD("set_helper_scatter_burst_radius", "value"), &BulletSpawner2D::set_helper_scatter_burst_radius);
@@ -7141,14 +7216,6 @@ void BulletSpawner2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_helper_scatter_facing"), &BulletSpawner2D::get_helper_scatter_facing);
 	ClassDB::bind_method(D_METHOD("set_helper_scatter_facing", "value"), &BulletSpawner2D::set_helper_scatter_facing);
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "helper_scatter_facing", PROPERTY_HINT_ENUM, "Outward,Random,Inward"), "set_helper_scatter_facing", "get_helper_scatter_facing");
-
-	// Global default seed, bound here so it renders directly underneath the
-	// Scatter group it most often serves. Still global: feeds the Scatter
-	// fallback, homing-random selection, and reload jitter (per-pattern
-	// seeds override it where they exist).
-	ClassDB::bind_method(D_METHOD("get_pattern_seed"), &BulletSpawner2D::get_pattern_seed);
-	ClassDB::bind_method(D_METHOD("set_pattern_seed", "value"), &BulletSpawner2D::set_pattern_seed);
-	ADD_PROPERTY(PropertyInfo(Variant::INT, "pattern_seed"), "set_pattern_seed", "get_pattern_seed");
 
 	ClassDB::bind_method(D_METHOD("get_helper_star_polygon_vertices"), &BulletSpawner2D::get_helper_star_polygon_vertices);
 	ClassDB::bind_method(D_METHOD("set_helper_star_polygon_vertices", "value"), &BulletSpawner2D::set_helper_star_polygon_vertices);
@@ -7321,6 +7388,9 @@ void BulletSpawner2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_helper_waterfall_jitter"), &BulletSpawner2D::get_helper_waterfall_jitter);
 	ClassDB::bind_method(D_METHOD("set_helper_waterfall_jitter", "value"), &BulletSpawner2D::set_helper_waterfall_jitter);
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_waterfall_jitter"), "set_helper_waterfall_jitter", "get_helper_waterfall_jitter");
+	ClassDB::bind_method(D_METHOD("get_helper_waterfall_seed"), &BulletSpawner2D::get_helper_waterfall_seed);
+	ClassDB::bind_method(D_METHOD("set_helper_waterfall_seed", "value"), &BulletSpawner2D::set_helper_waterfall_seed);
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "helper_waterfall_seed"), "set_helper_waterfall_seed", "get_helper_waterfall_seed");
 
 	ClassDB::bind_method(D_METHOD("get_helper_waterfall_facing_offset_deg"), &BulletSpawner2D::get_helper_waterfall_facing_offset_deg);
 	ClassDB::bind_method(D_METHOD("set_helper_waterfall_facing_offset_deg", "value"), &BulletSpawner2D::set_helper_waterfall_facing_offset_deg);
@@ -7784,6 +7854,10 @@ void BulletSpawner2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_reload_jitter_sec"), &BulletSpawner2D::get_reload_jitter_sec);
 	ClassDB::bind_method(D_METHOD("set_reload_jitter_sec", "value"), &BulletSpawner2D::set_reload_jitter_sec);
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "reload_jitter_sec"), "set_reload_jitter_sec", "get_reload_jitter_sec");
+	// Seed lives directly under its jitter amount so the pair reads as one feature.
+	ClassDB::bind_method(D_METHOD("get_reload_jitter_seed"), &BulletSpawner2D::get_reload_jitter_seed);
+	ClassDB::bind_method(D_METHOD("set_reload_jitter_seed", "value"), &BulletSpawner2D::set_reload_jitter_seed);
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "reload_jitter_seed"), "set_reload_jitter_seed", "get_reload_jitter_seed");
 
 	ClassDB::bind_method(D_METHOD("get_burst_enabled"), &BulletSpawner2D::get_burst_enabled);
 	ClassDB::bind_method(D_METHOD("set_burst_enabled", "value"), &BulletSpawner2D::set_burst_enabled);
@@ -7872,6 +7946,10 @@ void BulletSpawner2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_homing_target_selection"), &BulletSpawner2D::get_homing_target_selection);
 	ClassDB::bind_method(D_METHOD("set_homing_target_selection", "value"), &BulletSpawner2D::set_homing_target_selection);
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "homing_target_selection", PROPERTY_HINT_ENUM, "Nearest,Random,First,Round Robin,Distribute"), "set_homing_target_selection", "get_homing_target_selection");
+	// Seed lives directly under its selection mode; only shown for Random (see _validate_property).
+	ClassDB::bind_method(D_METHOD("get_homing_random_seed"), &BulletSpawner2D::get_homing_random_seed);
+	ClassDB::bind_method(D_METHOD("set_homing_random_seed", "value"), &BulletSpawner2D::set_homing_random_seed);
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "homing_random_seed"), "set_homing_random_seed", "get_homing_random_seed");
 
 	ClassDB::bind_method(D_METHOD("get_homing_max_targets"), &BulletSpawner2D::get_homing_max_targets);
 	ClassDB::bind_method(D_METHOD("set_homing_max_targets", "value"), &BulletSpawner2D::set_homing_max_targets);

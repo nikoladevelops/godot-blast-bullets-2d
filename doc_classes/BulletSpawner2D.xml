@@ -166,7 +166,7 @@
 		<method name="next_shoot_interval_sec" qualifiers="const">
 			<return type="float" />
 			<description>
-				Next auto-shot interval with reload jitter applied (shoot_interval_sec +/- jitter, seeded by pattern_seed). Poll for HUD reload bars.
+				Next auto-shot interval with reload jitter applied (shoot_interval_sec +/- jitter, seeded by reload_jitter_seed). Poll for HUD reload bars.
 			</description>
 		</method>
 		<method name="override_live_volleys_velocity">
@@ -459,6 +459,9 @@
 		<member name="helper_fan_angle_jitter" type="float" setter="set_helper_fan_angle_jitter" getter="get_helper_fan_angle_jitter" default="0.0">
 			Per-slot random angle variance in radians for shotgun spreads. 0 fires the exact cone. Must be finite and 0 or more.
 		</member>
+		<member name="helper_fan_seed" type="int" setter="set_helper_fan_seed" getter="get_helper_fan_seed" default="0">
+			Seed for fan angle jitter only. 0 is non-deterministic, otherwise every volley lands identically. Does nothing while [member helper_fan_angle_jitter] is 0. Only shown for the Fan pattern.
+		</member>
 		<member name="helper_fan_centered" type="bool" setter="set_helper_fan_centered" getter="get_helper_fan_centered" default="true">
 			Center the fan on its direction. Off starts it to one side.
 		</member>
@@ -521,6 +524,9 @@
 		</member>
 		<member name="helper_grid_jitter" type="float" setter="set_helper_grid_jitter" getter="get_helper_grid_jitter" default="0.0">
 			Random position offset per grid bullet. 0 is off.
+		</member>
+		<member name="helper_grid_seed" type="int" setter="set_helper_grid_seed" getter="get_helper_grid_seed" default="0">
+			Seed for grid jitter and random rotation only. 0 is non-deterministic, otherwise every volley lands identically. Does nothing while [member helper_grid_jitter] is 0 and random rotation is off. Only shown for the Grid pattern.
 		</member>
 		<member name="helper_grid_random_local_rotation" type="bool" setter="set_helper_grid_random_local_rotation" getter="get_helper_grid_random_local_rotation" default="false">
 			Give each grid bullet a random facing.
@@ -723,6 +729,9 @@
 		<member name="helper_rain_jitter" type="float" setter="set_helper_rain_jitter" getter="get_helper_rain_jitter" default="12.0">
 			Random offset per slot in pixels. Must be finite and 0 or more.
 		</member>
+		<member name="helper_rain_seed" type="int" setter="set_helper_rain_seed" getter="get_helper_rain_seed" default="0">
+			Seed for rain jitter only. 0 is non-deterministic, otherwise every volley lands identically. Does nothing while [member helper_rain_jitter] is 0. Only shown for the Rain pattern.
+		</member>
 		<member name="helper_rectangle_face_outward" type="bool" setter="set_helper_rectangle_face_outward" getter="get_helper_rectangle_face_outward" default="true">
 			Rectangle bullets face outward; off faces inward.
 		</member>
@@ -746,6 +755,9 @@
 		</member>
 		<member name="helper_ring_random_rotation" type="bool" setter="set_helper_ring_random_rotation" getter="get_helper_ring_random_rotation" default="false">
 			Give each ring bullet a random facing.
+		</member>
+		<member name="helper_ring_seed" type="int" setter="set_helper_ring_seed" getter="get_helper_ring_seed" default="0">
+			Seed for ring random rotation only. 0 is non-deterministic, otherwise every volley lands identically. Does nothing while [member helper_ring_random_rotation] is off. Only shown for the Ring pattern.
 		</member>
 		<member name="helper_ring_rotate_with_marker" type="bool" setter="set_helper_ring_rotate_with_marker" getter="get_helper_ring_rotate_with_marker" default="true">
 			Rotate the ring with the generator.
@@ -793,7 +805,7 @@
 			Inner radius of the burst annulus in pixels. 0 is a full disc; above 0 the center stays empty for explosion rings. Clamped to [member helper_scatter_burst_radius] at generation, so set order never matters.
 		</member>
 		<member name="helper_scatter_seed" type="int" setter="set_helper_scatter_seed" getter="get_helper_scatter_seed" default="0">
-			Scatter-only seed: 0 is non-deterministic, otherwise every volley lands identically (combine with spin for rotating replays). Falls back to [member pattern_seed] when 0.
+			Scatter-only seed: 0 is non-deterministic, otherwise every volley lands identically (combine with spin for rotating replays). Drives burst positions, sector angles and random facings of this pattern only.
 		</member>
 		<member name="helper_skip_indices" type="PackedInt32Array" setter="set_helper_skip_indices" getter="get_helper_skip_indices" default="PackedInt32Array()">
 			Slot indexes to drop from any helper layout (dodge doors, bullet text). Out-of-range entries are ignored with a single warning. Applied after spin/scale so indexes match the preview.
@@ -908,6 +920,9 @@
 		</member>
 		<member name="helper_waterfall_jitter" type="float" setter="set_helper_waterfall_jitter" getter="get_helper_waterfall_jitter" default="6.0">
 			Random offset per slot in pixels. Must be finite and 0 or more.
+		</member>
+		<member name="helper_waterfall_seed" type="int" setter="set_helper_waterfall_seed" getter="get_helper_waterfall_seed" default="0">
+			Seed for waterfall jitter only. 0 is non-deterministic, otherwise every volley lands identically. Does nothing while [member helper_waterfall_jitter] is 0. Only shown for the Waterfall pattern.
 		</member>
 		<member name="helper_waterfall_rain_direction" type="Vector2" setter="set_helper_waterfall_rain_direction" getter="get_helper_waterfall_rain_direction" default="Vector2(0, 1)">
 			Fall direction (need not be normalized). Must be finite and non-zero.
@@ -1077,8 +1092,11 @@
 		<member name="pattern_scale" type="float" setter="set_pattern_scale" getter="get_pattern_scale" default="1.0">
 			Scales the whole pattern around the generator (positions and bullet size grow together). 1.0 keeps it as is, 0 collapses it onto the generator, negatives mirror it. Compose with transforms_scale for big-layout + big-bullet looks.
 		</member>
-		<member name="pattern_seed" type="int" setter="set_pattern_seed" getter="get_pattern_seed" default="0">
-			Global default seed for helper randomness: 0 is non-deterministic, otherwise it seeds the Scatter fallback, homing random-target selection and reload jitter, so replays and boss patterns stay reproducible. Per-pattern seeds (like [member helper_scatter_seed]) override it where they exist. Bound right after the Scatter group because that is where seed-hunters look, but it is not Scatter-only.
+		<member name="homing_random_seed" type="int" setter="set_homing_random_seed" getter="get_homing_random_seed" default="0">
+			Seed for homing random-target selection ([constant BulletSpawner2D.HOMING_SELECT_RANDOM]) only. 0 is non-deterministic, otherwise picks reproduce. Only shown when that selection is active. Does not affect steering, smoothing, retargeting or any bullet pattern.
+		</member>
+		<member name="reload_jitter_seed" type="int" setter="set_reload_jitter_seed" getter="get_reload_jitter_seed" default="0">
+			Seed for [member reload_jitter_sec] only. 0 is non-deterministic, otherwise the jitter sequence reproduces (seed + volleys fired, so volleys still vary per shot). Does nothing while [member reload_jitter_sec] is 0. Does not affect any bullet pattern or homing pick.
 		</member>
 		<member name="pattern_source" type="int" setter="set_pattern_source" getter="get_pattern_source" enum="BulletSpawner2D.PatternSource" default="0">
 			Where volley transforms come from: children markers (0), this generator itself (1), or one of 31 procedural helper patterns (2-32: Grid, Ring, Fan, Spiral, Line, Aimed, Flower, Ellipse, Rain, Scatter, Star Polygon, Multi Spiral, Cross, Star, Heart, Wave, Waterfall, Lattice, Rose, Counter Spiral, Corridor, Lissajous, Custom, Circle, Rectangle, Square, Polygon, Path2D, Triangle, Trapezoid, Diamond). Order in the inspector groups sources, basic shapes, ornamental loops, then generators. Only the active pattern's options show in the inspector. Pipeline per volley: generate (with outline placement/fill/shell for the loop shapes), then spin, then pattern/local scale, then helper_skip_indices carving (so skip indexes match the preview). Corridor, Ellipse Wall and outline Fill Inside modes return fewer transforms than helper_bullets_amount.
@@ -1117,7 +1135,7 @@
 			Track underlay line width in pixels (multiplied by nothing: absolute screen-ish size). 0 hides the track. Must be finite and 0 or more.
 		</member>
 		<member name="reload_jitter_sec" type="float" setter="set_reload_jitter_sec" getter="get_reload_jitter_sec" default="0.0">
-			Reload jitter in seconds: each auto volley waits shoot_interval_sec +/- uniform jitter (seeded by pattern_seed, floored at 0.001s so fast intervals keep working with jitter on). 0 is exact. Must be finite and 0 or more.
+			Reload jitter in seconds: each auto volley waits shoot_interval_sec +/- uniform jitter (seeded by [member reload_jitter_seed], floored at 0.001s so fast intervals keep working with jitter on). 0 is exact. Must be finite and 0 or more.
 		</member>
 		<member name="shared_homing_auto_pop_after_target_reached" type="bool" setter="set_shared_homing_auto_pop_after_target_reached" getter="get_shared_homing_auto_pop_after_target_reached" default="false">
 			Advances the shared queue when a target is reached. Only used in Shared mode.

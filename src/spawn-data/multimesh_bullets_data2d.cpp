@@ -313,7 +313,7 @@ void MultiMeshBulletsData2D::_bind_methods() {
 
 	ClassDB::bind_method(D_METHOD("get_shared_bullets_custom_data"), &MultiMeshBulletsData2D::get_shared_bullets_custom_data);
 	ClassDB::bind_method(D_METHOD("set_shared_bullets_custom_data", "new_shared_bullets_custom_data"), &MultiMeshBulletsData2D::set_shared_bullets_custom_data);
-	ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "shared_bullets_custom_data"), "set_shared_bullets_custom_data", "get_shared_bullets_custom_data");
+	ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "shared_bullets_custom_data", PROPERTY_HINT_RESOURCE_TYPE, "Resource"), "set_shared_bullets_custom_data", "get_shared_bullets_custom_data");
 
 	ClassDB::bind_method(D_METHOD("get_all_bullets_custom_data"), &MultiMeshBulletsData2D::get_all_bullets_custom_data);
 	ClassDB::bind_method(D_METHOD("set_all_bullets_custom_data", "new_custom_data"), &MultiMeshBulletsData2D::set_all_bullets_custom_data);
@@ -337,11 +337,11 @@ void MultiMeshBulletsData2D::_bind_methods() {
 
 	ClassDB::bind_method(D_METHOD("get_material"), &MultiMeshBulletsData2D::get_material);
 	ClassDB::bind_method(D_METHOD("set_material", "new_material"), &MultiMeshBulletsData2D::set_material);
-	ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "material"), "set_material", "get_material");
+	ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "material", PROPERTY_HINT_RESOURCE_TYPE, "ShaderMaterial,CanvasItemMaterial"), "set_material", "get_material");
 
 	ClassDB::bind_method(D_METHOD("get_mesh"), &MultiMeshBulletsData2D::get_mesh);
 	ClassDB::bind_method(D_METHOD("set_mesh", "new_mesh"), &MultiMeshBulletsData2D::set_mesh);
-	ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "mesh"), "set_mesh", "get_mesh");
+	ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "mesh", PROPERTY_HINT_RESOURCE_TYPE, "Mesh"), "set_mesh", "get_mesh");
 
 	ClassDB::bind_method(D_METHOD("get_all_bullet_rotation_data"), &MultiMeshBulletsData2D::get_all_bullet_rotation_data);
 	ClassDB::bind_method(D_METHOD("set_all_bullet_rotation_data", "new_data"), &MultiMeshBulletsData2D::set_all_bullet_rotation_data);

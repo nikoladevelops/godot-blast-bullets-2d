@@ -86,10 +86,9 @@
 			Note: You can enable the [BulletFactory2D]'s debugger to make collision shapes visible.
 		</member>
 		<member name="instance_shader_parameters" type="Dictionary" setter="set_instance_shader_parameters" getter="get_instance_shader_parameters" default="{}">
-			If you are using shaders with instance uniform variables, then you can pass a [Dictionary] containing them here.
-			[b]KEY[/b] is the name of the shader parameter and the [b]VALUE[/b] is obviously the value you set it to.
-
-			Note: Ensure that the [b]VALUE[/b] is of the same type as your shader instance uniform variable.
+			Per-instance shader overrides, used only when [member material] is a [ShaderMaterial] with [code]instance uniform[/code] declarations. [b]KEY[/b] is the uniform name ([String]), [b]VALUE[/b] is a [Variant] matching that uniform's type (a wrong type warns and skips that key).
+			Applied per bullet instance through [code]set_instance_shader_parameter()[/code] when the volley spawns every live bullet of the multimesh shares the same override set. An empty dictionary disables the pass. Switching to a non-shader material, or spawning with null material, clears the stored dict so pool reuse never leaks stale overrides into the next volley.
+			Example: assign a [ShaderMaterial] with [code]instance uniform vec4 glow_color[/code] and set this to [code]{"glow_color": Color(1, 0.3, 0.1, 1)}[/code]. Global (non-instance) uniforms belong on the material itself, not here.
 		</member>
 		<member name="is_life_time_infinite" type="bool" setter="set_is_life_time_infinite" getter="get_is_life_time_infinite" default="false">
 			If you set to true, then the lifetime will be ignored and bullets will never be destroyed.
@@ -111,13 +110,13 @@
 			Tip: [method set_light_mask_from_array] takes plain layer numbers and builds the bitmask for you.
 		</member>
 		<member name="material" type="Material" setter="set_material" getter="get_material">
-			Feel free to set a [CanvasItemMaterial] or [ShaderMaterial].
+			Bullet material. Pick a [ShaderMaterial] (use [member instance_shader_parameters] for per-volley instance uniforms) or a [CanvasItemMaterial]. Null uses the default canvas material. The inspector filters to these two types.
 		</member>
 		<member name="max_life_time" type="float" setter="set_max_life_time" getter="get_max_life_time" default="2.0">
 			The max time before the bullets get disabled and go in the object pool.
 		</member>
 		<member name="mesh" type="Mesh" setter="set_mesh" getter="get_mesh">
-			If you do not provide a mesh then a [QuadMesh] will be created with the same size as the texture.
+			Custom bullet mesh. If null (default) a [QuadMesh] is auto-built from [member texture_size] (or the first animation frame size). Provide your own [Mesh] only when you handle scaling in the shader. The inspector filters to [Mesh] resources.
 		</member>
 		<member name="monitorable" type="bool" setter="set_monitorable" getter="get_monitorable" default="false">
 			If you want static bodies to be hit by the bullets, you have to set [member monitorable] to true.
@@ -139,7 +138,7 @@
 			Whether the shared attachment sticks while the bullet rotates.
 		</member>
 		<member name="shared_bullets_custom_data" type="Resource" setter="set_shared_bullets_custom_data" getter="get_shared_bullets_custom_data">
-			If you want your bullets to have damage or any other data specific to this type of bullets then you have to provide a custom resource that holds all of these properties.
+			If you want your bullets to have damage or any other data specific to this type of bullets then you have to provide a custom resource that holds all of these properties. Any [Resource] subclass works (script custom classes included); read it back in factory collision callbacks alongside [member all_bullets_custom_data].
 
 			[url=https://www.youtube.com/watch?v=fdRJqnOrz98&amp;t=63s]YouTube Tutorial On Custom Resources[/url]
 		</member>

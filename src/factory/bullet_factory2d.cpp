@@ -985,7 +985,8 @@ TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_grid(
 		real_t row_offset,
 		bool rotate_grid_with_marker,
 		bool random_local_rotation,
-		real_t jitter) {
+		real_t jitter,
+		uint64_t seed) {
 	if (transforms_amount < 0) {
 		UtilityFunctions::push_error("helper_generate_transforms_grid: transforms_amount must be >= 0.");
 		return TypedArray<Transform2D>();
@@ -1083,6 +1084,14 @@ TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_grid(
 	// Counter for spawned transforms
 	int count_spawned = 0;
 
+	// Seeded RNG for jitter + random rotation: seed 0 keeps the legacy
+	// non-deterministic path, otherwise every call reproduces identically.
+	Ref<RandomNumberGenerator> grid_rng;
+	const bool grid_seeded = seed != 0;
+	if (grid_seeded) {
+		grid_rng.instantiate();
+		grid_rng->set_seed(seed);
+	}
 	// Generate transforms in a grid pattern
 	for (int column = 0; column < columns_amount; ++column) {
 		const bool is_last_column = (column == columns_amount - 1);
@@ -1131,14 +1140,16 @@ TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_grid(
 		// Apply random local rotation if enabled (scale preserved: the
 		// rotation-only constructor resets it to 1).
 		if (random_local_rotation) {
-			real_t random_angle = UtilityFunctions::randf() * Math::TAU;
+			real_t random_angle = (grid_seeded ? grid_rng->randf() : UtilityFunctions::randf()) * Math::TAU;
 			new_transform = Transform2D(new_transform.get_rotation() + random_angle, new_transform.get_origin());
 			new_transform.set_scale(marker_transform.get_scale());
 		}
 
 		// Scatter each origin by up to +-jitter on both axes (0 disables it).
 		if (jitter > 0.0) {
-			const Vector2 scatter(UtilityFunctions::randf_range(-jitter, jitter), UtilityFunctions::randf_range(-jitter, jitter));
+			real_t jx = grid_seeded ? grid_rng->randf_range(-jitter, jitter) : UtilityFunctions::randf_range(-jitter, jitter);
+			real_t jy = grid_seeded ? grid_rng->randf_range(-jitter, jitter) : UtilityFunctions::randf_range(-jitter, jitter);
+			const Vector2 scatter(jx, jy);
 			new_transform = Transform2D(new_transform.get_rotation(), new_transform.get_origin() + scatter);
 			new_transform.set_scale(marker_transform.get_scale());
 		}
@@ -1477,7 +1488,8 @@ TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_ring(
 		bool fill_stagger,
 		double fill_margin,
 		int shell_layers,
-		double shell_step) {
+		double shell_step,
+		uint64_t seed) {
 	if (transforms_amount < 0) {
 		UtilityFunctions::push_error("helper_generate_transforms_ring: transforms_amount must be >= 0.");
 		return TypedArray<Transform2D>();
@@ -1514,12 +1526,18 @@ TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_ring(
 	if (random_rotation) {
 		facing_override.resize(transforms_amount);
 	}
+	Ref<RandomNumberGenerator> ring_rng;
+	const bool ring_seeded = seed != 0;
+	if (ring_seeded) {
+		ring_rng.instantiate();
+		ring_rng->set_seed(seed);
+	}
 	for (int i = 0; i < transforms_amount; ++i) {
 		const real_t angle = base_rotation + start_angle + step * (real_t)i;
 		loop_points[i] = marker_transform.get_origin() + Vector2(Math::cos(angle) * radius, Math::sin(angle) * radius * y_scale);
 		loop_normals[i] = Vector2(Math::cos(angle), Math::sin(angle));
 		if (random_rotation) {
-			facing_override[i] = UtilityFunctions::randf() * Math::TAU;
+			facing_override[i] = (ring_seeded ? ring_rng->randf() : UtilityFunctions::randf()) * Math::TAU;
 		}
 	}
 	return layout_outline_slots("helper_generate_transforms_ring", marker_transform, loop_points, loop_normals, false, 0.0, face_outward, facing_offset_degrees, facing_override, outline_placement, outline_facing, outline_reverse, outline_slot_offset, fill_spacing, fill_stagger, fill_margin, shell_layers, shell_step);
@@ -1532,7 +1550,8 @@ TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_fan(
 		real_t direction_angle,
 		real_t step_offset,
 		bool centered,
-		real_t angle_jitter) {
+		real_t angle_jitter,
+		uint64_t seed) {
 	if (transforms_amount < 0) {
 		UtilityFunctions::push_error("helper_generate_transforms_fan: transforms_amount must be >= 0.");
 		return TypedArray<Transform2D>();
@@ -1562,10 +1581,16 @@ TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_fan(
 	// opens toward +spread instead of straddling the center.
 	const real_t first_angle = (transforms_amount > 1 && centered) ? base_rotation - spread * 0.5 : base_rotation;
 	const Vector2 origin = marker_transform.get_origin();
+	Ref<RandomNumberGenerator> fan_rng;
+	const bool fan_seeded = seed != 0;
+	if (fan_seeded) {
+		fan_rng.instantiate();
+		fan_rng->set_seed(seed);
+	}
 	for (int i = 0; i < transforms_amount; ++i) {
 		real_t angle = first_angle + step * (real_t)i;
 		if (angle_jitter > 0.0) {
-			angle += UtilityFunctions::randf_range(-angle_jitter, angle_jitter);
+			angle += fan_seeded ? fan_rng->randf_range(-angle_jitter, angle_jitter) : UtilityFunctions::randf_range(-angle_jitter, angle_jitter);
 		}
 		const Vector2 dir = Vector2(Math::cos(angle), Math::sin(angle));
 		// Stagger origins downrange along each slot's own (possibly
@@ -2051,7 +2076,8 @@ TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_rain(
 		real_t band_width,
 		Vector2 rain_direction,
 		real_t drop_spacing,
-		real_t jitter) {
+		real_t jitter,
+		uint64_t seed) {
 	if (!danmaku_validate_head("helper_generate_transforms_rain", transforms_amount, marker_transform)) {
 		return TypedArray<Transform2D>();
 	}
@@ -2075,6 +2101,12 @@ TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_rain(
 	const Vector2 axis = rain_direction.normalized();
 	const Vector2 across = axis.orthogonal();
 	const real_t facing = axis.angle();
+	Ref<RandomNumberGenerator> rain_rng;
+	const bool rain_seeded = seed != 0;
+	if (rain_seeded) {
+		rain_rng.instantiate();
+		rain_rng->set_seed(seed);
+	}
 	for (int i = 0; i < transforms_amount; ++i) {
 		// Snake along the band, stepping rows every full pass so consecutive
 		// slots form layered sheets instead of one flat row.
@@ -2083,7 +2115,9 @@ TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_rain(
 		const real_t row = (drop_spacing > 0.0) ? Math::floor((real_t)i / cols_per_row) : 0.0;
 		Vector2 pos = origin + across * along - axis * row * drop_spacing;
 		if (jitter > 0.0) {
-			pos += Vector2(UtilityFunctions::randf_range(-jitter, jitter), UtilityFunctions::randf_range(-jitter, jitter));
+			real_t jx = rain_seeded ? rain_rng->randf_range(-jitter, jitter) : UtilityFunctions::randf_range(-jitter, jitter);
+			real_t jy = rain_seeded ? rain_rng->randf_range(-jitter, jitter) : UtilityFunctions::randf_range(-jitter, jitter);
+			pos += Vector2(jx, jy);
 		}
 		Transform2D slot(facing, pos);
 		danmaku_apply_marker_scale(slot, marker_transform);
@@ -2533,7 +2567,8 @@ TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_waterfall(
 		real_t stagger,
 		Vector2 rain_direction,
 		real_t jitter,
-		real_t facing_offset_degrees) {
+		real_t facing_offset_degrees,
+		uint64_t seed) {
 	if (!danmaku_validate_head("helper_generate_transforms_waterfall", transforms_amount, marker_transform)) {
 		return TypedArray<Transform2D>();
 	}
@@ -2564,6 +2599,12 @@ TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_waterfall(
 	const real_t facing = axis.angle() + facing_offset;
 	const int capacity = columns * rows;
 	const int emit = Math::min(transforms_amount, capacity);
+	Ref<RandomNumberGenerator> waterfall_rng;
+	const bool waterfall_seeded = seed != 0;
+	if (waterfall_seeded) {
+		waterfall_rng.instantiate();
+		waterfall_rng->set_seed(seed);
+	}
 	for (int i = 0; i < emit; ++i) {
 		const int row = i / columns;
 		const int col = i % columns;
@@ -2571,7 +2612,9 @@ TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_waterfall(
 		const real_t col_centered = (columns > 1) ? ((real_t)col / (real_t)(columns - 1) - 0.5) : 0.0;
 		Vector2 pos = origin + across * (col_centered * column_spacing * (real_t)(columns - 1) + stagger * column_spacing * row_phase) + axis * ((real_t)row * row_spacing);
 		if (jitter > 0.0) {
-			pos += Vector2(UtilityFunctions::randf_range(-jitter, jitter), UtilityFunctions::randf_range(-jitter, jitter));
+			real_t jx = waterfall_seeded ? waterfall_rng->randf_range(-jitter, jitter) : UtilityFunctions::randf_range(-jitter, jitter);
+			real_t jy = waterfall_seeded ? waterfall_rng->randf_range(-jitter, jitter) : UtilityFunctions::randf_range(-jitter, jitter);
+			pos += Vector2(jx, jy);
 		}
 		Transform2D slot(facing, pos);
 		danmaku_apply_marker_scale(slot, marker_transform);
@@ -2588,7 +2631,9 @@ TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_waterfall(
 		const real_t col_centered = (columns > 1) ? ((real_t)col / (real_t)(columns - 1) - 0.5) : 0.0;
 		Vector2 pos = origin + across * (col_centered * column_spacing * (real_t)(columns - 1) + stagger * column_spacing * extra_phase) + axis * ((real_t)extra_row * row_spacing);
 		if (jitter > 0.0) {
-			pos += Vector2(UtilityFunctions::randf_range(-jitter, jitter), UtilityFunctions::randf_range(-jitter, jitter));
+			real_t jx = waterfall_seeded ? waterfall_rng->randf_range(-jitter, jitter) : UtilityFunctions::randf_range(-jitter, jitter);
+			real_t jy = waterfall_seeded ? waterfall_rng->randf_range(-jitter, jitter) : UtilityFunctions::randf_range(-jitter, jitter);
+			pos += Vector2(jx, jy);
 		}
 		Transform2D slot(facing, pos);
 		danmaku_apply_marker_scale(slot, marker_transform);
@@ -4559,7 +4604,8 @@ void BulletFactory2D::_bind_methods() {
 										 "row_offset",
 										 "rotate_grid_with_marker",
 										 "random_local_rotation",
-										 "jitter"),
+										 "jitter",
+								"seed"),
 								&BulletFactory2D::helper_generate_transforms_grid,
 								DEFVAL(10),
 								DEFVAL(3), // CENTER_LEFT
@@ -4567,7 +4613,8 @@ void BulletFactory2D::_bind_methods() {
 								DEFVAL(150.0),
 								DEFVAL(true),
 								DEFVAL(false),
-								DEFVAL(0.0));
+								DEFVAL(0.0),
+								DEFVAL(0));
 
 	ClassDB::bind_static_method("BulletFactory2D",
 								D_METHOD("helper_generate_transforms_ring",
@@ -4589,7 +4636,8 @@ void BulletFactory2D::_bind_methods() {
 										"fill_stagger",
 										"fill_margin",
 										"shell_layers",
-										"shell_step"),
+										"shell_step",
+								"seed"),
 								&BulletFactory2D::helper_generate_transforms_ring,
 								DEFVAL(150.0),
 								DEFVAL(0.0),
@@ -4607,7 +4655,8 @@ void BulletFactory2D::_bind_methods() {
 								DEFVAL(false),
 								DEFVAL(0.0),
 								DEFVAL(1),
-								DEFVAL(32.0));
+								DEFVAL(32.0),
+								DEFVAL(0));
 
 	ClassDB::bind_static_method("BulletFactory2D",
 								D_METHOD("helper_generate_transforms_fan",
@@ -4617,13 +4666,15 @@ void BulletFactory2D::_bind_methods() {
 										 "direction_angle",
 										 "step_offset",
 										 "centered",
-										 "angle_jitter"),
+										 "angle_jitter",
+								"seed"),
 								&BulletFactory2D::helper_generate_transforms_fan,
 								DEFVAL(0.5),
 								DEFVAL(0.0),
 								DEFVAL(0.0),
 								DEFVAL(true),
-								DEFVAL(0.0));
+								DEFVAL(0.0),
+								DEFVAL(0));
 
 	ClassDB::bind_static_method("BulletFactory2D",
 								D_METHOD("helper_generate_transforms_spiral",
@@ -4691,7 +4742,13 @@ void BulletFactory2D::_bind_methods() {
 										"fill_stagger",
 										"fill_margin",
 										"shell_layers",
-										"shell_step"),
+										"shell_step",
+										"flower_type",
+										"inner_radius_scale",
+										"spiro_roller",
+										"spiro_pen",
+										"super_lobes",
+										"super_fullness"),
 								&BulletFactory2D::helper_generate_transforms_flower,
 								DEFVAL(6),
 								DEFVAL(5),
@@ -4709,7 +4766,13 @@ void BulletFactory2D::_bind_methods() {
 								DEFVAL(false),
 								DEFVAL(0.0),
 								DEFVAL(1),
-								DEFVAL(32.0));
+								DEFVAL(32.0),
+								DEFVAL(0),
+								DEFVAL(0.0),
+								DEFVAL(45.0),
+								DEFVAL(80.0),
+								DEFVAL(6.0),
+								DEFVAL(1.0));
 
 	ClassDB::bind_static_method("BulletFactory2D",
 								D_METHOD("helper_generate_transforms_ellipse",
@@ -4762,12 +4825,14 @@ void BulletFactory2D::_bind_methods() {
 										 "band_width",
 										 "rain_direction",
 										 "drop_spacing",
-										 "jitter"),
+										 "jitter",
+										 "seed"),
 								&BulletFactory2D::helper_generate_transforms_rain,
 								DEFVAL(600.0),
 								DEFVAL(Vector2(0, 1)),
 								DEFVAL(48.0),
-								DEFVAL(12.0));
+								DEFVAL(12.0),
+								DEFVAL(0));
 
 	ClassDB::bind_static_method("BulletFactory2D",
 								D_METHOD("helper_generate_transforms_scatter",
@@ -4932,7 +4997,8 @@ void BulletFactory2D::_bind_methods() {
 										 "stagger",
 										 "rain_direction",
 										 "jitter",
-										 "facing_offset_degrees"),
+										 "facing_offset_degrees",
+										 "seed"),
 								&BulletFactory2D::helper_generate_transforms_waterfall,
 								DEFVAL(12),
 								DEFVAL(48.0),
@@ -4941,7 +5007,8 @@ void BulletFactory2D::_bind_methods() {
 								DEFVAL(0.5),
 								DEFVAL(Vector2(0, 1)),
 								DEFVAL(6.0),
-								DEFVAL(0.0));
+								DEFVAL(0.0),
+								DEFVAL(0));
 
 	ClassDB::bind_static_method("BulletFactory2D",
 								D_METHOD("helper_generate_transforms_lattice",

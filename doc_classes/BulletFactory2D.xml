@@ -315,8 +315,9 @@
 			<param index="4" name="step_offset" type="float" default="0.0" />
 			<param index="5" name="centered" type="bool" default="true" />
 			<param index="6" name="angle_jitter" type="float" default="0.0" />
+			<param index="7" name="seed" type="int" default="0" />
 			<description>
-				Generates a fan of transforms spread evenly across a cone. [code]direction_angle[/code] is the cone center relative to the marker rotation, [code]spread[/code] is the full cone width in radians, and [code]step_offset[/code] staggers origins along the direction so pellets do not stack on top of each other. A single bullet flies straight down the cone center. Set [code]centered[/code] to false for a one-sided fan opening from the center direction toward +spread. [code]angle_jitter[/code] adds per-slot random variance in radians for shotgun spreads (0 fires the exact cone). Useful for shotgun spreads.
+				Generates a fan of transforms spread evenly across a cone. [code]direction_angle[/code] is the cone center relative to the marker rotation, [code]spread[/code] is the full cone width in radians, and [code]step_offset[/code] staggers origins along the direction so pellets do not stack on top of each other. A single bullet flies straight down the cone center. Set [code]centered[/code] to false for a one-sided fan opening from the center direction toward +spread. [code]angle_jitter[/code] adds per-slot random variance in radians for shotgun spreads (0 fires the exact cone). [code]seed[/code] drives the jitter (0 is non-deterministic). Useful for shotgun spreads.
 			</description>
 		</method>
 		<method name="helper_generate_transforms_flower" qualifiers="static">
@@ -329,25 +330,25 @@
 			<param index="5" name="petal_spread" type="float" />
 			<param index="6" name="petal_sharpness" type="float" />
 			<param index="7" name="base_rotation" type="float" />
-			<param index="8" name="face_outward" type="bool" default="6" />
-			<param index="9" name="facing_offset_degrees" type="float" default="5" />
-			<param index="10" name="outline_placement" type="int" default="150.0" />
-			<param index="11" name="outline_facing" type="int" default="0.5" />
-			<param index="12" name="outline_reverse" type="bool" default="1.0" />
-			<param index="13" name="outline_slot_offset" type="int" default="0.0" />
-			<param index="14" name="fill_spacing" type="float" default="true" />
-			<param index="15" name="fill_stagger" type="bool" default="0.0" />
-			<param index="16" name="fill_margin" type="float" default="0" />
-			<param index="17" name="shell_layers" type="int" default="0" />
-			<param index="18" name="shell_step" type="float" default="false" />
-			<param index="19" name="_unnamed_arg19" type="int" default="0" />
-			<param index="20" name="_unnamed_arg20" type="float" default="32.0" />
-			<param index="21" name="_unnamed_arg21" type="float" default="false" />
-			<param index="22" name="_unnamed_arg22" type="float" default="0.0" />
-			<param index="23" name="_unnamed_arg23" type="float" default="1" />
-			<param index="24" name="_unnamed_arg24" type="float" default="32.0" />
+			<param index="8" name="face_outward" type="bool" default="true" />
+			<param index="9" name="facing_offset_degrees" type="float" default="0.0" />
+			<param index="10" name="outline_placement" type="int" default="0" />
+			<param index="11" name="outline_facing" type="int" default="0" />
+			<param index="12" name="outline_reverse" type="bool" default="false" />
+			<param index="13" name="outline_slot_offset" type="int" default="0" />
+			<param index="14" name="fill_spacing" type="float" default="32.0" />
+			<param index="15" name="fill_stagger" type="bool" default="false" />
+			<param index="16" name="fill_margin" type="float" default="0.0" />
+			<param index="17" name="shell_layers" type="int" default="1" />
+			<param index="18" name="shell_step" type="float" default="32.0" />
+			<param index="19" name="flower_type" type="int" default="0" />
+			<param index="20" name="inner_radius_scale" type="float" default="0.0" />
+			<param index="21" name="spiro_roller" type="float" default="45.0" />
+			<param index="22" name="spiro_pen" type="float" default="80.0" />
+			<param index="23" name="super_lobes" type="float" default="6.0" />
+			<param index="24" name="super_fullness" type="float" default="1.0" />
 			<description>
-				Generates a floral spell-card pattern: [code]petals[/code] symmetric lobes around the marker, each holding [code]bullets_per_petal[/code] slots spread over [code]petal_spread[/code] radians. [code]petal_sharpness[/code] 0 gives round lobes, higher values pinch the waist into tighter flowers. [code]transforms_amount[/code] sizes the array (fewer slots than petals times per-petal truncates). Useful for boss blossoms and mandala rings.
+				Generates a floral spell-card pattern: [code]petals[/code] symmetric lobes around the marker, each holding [code]bullets_per_petal[/code] slots spread over [code]petal_spread[/code] radians. [code]petal_sharpness[/code] 0 gives round lobes, higher values pinch the waist into tighter flowers. [code]transforms_amount[/code] sizes the array (fewer slots than petals times per-petal truncates). [code]flower_type[/code] picks the bloom kind (0 FAN legacy, 1 RHODONEA, 2 PHYLLOTAXIS, 3 SPIROGRAPH, 4 SUPERFORMULA); [code]inner_radius_scale[/code], [code]spiro_roller[/code]/[code]spiro_pen[/code] and [code]super_lobes[/code]/[code]super_fullness[/code] tune the matching kind. Useful for boss blossoms and mandala rings.
 			</description>
 		</method>
 		<method name="helper_generate_transforms_grid" qualifiers="static">
@@ -361,8 +362,9 @@
 			<param index="6" name="rotate_grid_with_marker" type="bool" default="true" />
 			<param index="7" name="random_local_rotation" type="bool" default="false" />
 			<param index="8" name="jitter" type="float" default="0.0" />
+			<param index="9" name="seed" type="int" default="0" />
 			<description>
-				Generates a grid of transforms that are positioned relative to the [code]marker_transform[/code]. [code]jitter[/code] scatters each origin by up to +-jitter pixels on both axes (0 disables it).
+				Generates a grid of transforms that are positioned relative to the [code]marker_transform[/code]. [code]jitter[/code] scatters each origin by up to +-jitter pixels on both axes (0 disables it). [code]seed[/code] drives jitter and random rotation (0 is non-deterministic, otherwise reproducible).
 			</description>
 		</method>
 		<method name="helper_generate_transforms_heart" qualifiers="static">
@@ -475,8 +477,9 @@
 			<param index="3" name="rain_direction" type="Vector2" default="Vector2(0, 1)" />
 			<param index="4" name="drop_spacing" type="float" default="48.0" />
 			<param index="5" name="jitter" type="float" default="12.0" />
+			<param index="6" name="seed" type="int" default="0" />
 			<description>
-				Generates a rain curtain: slots spread along a horizontal band of [code]band_width[/code] facing [code]rain_direction[/code], with rows staggered by [code]drop_spacing[/code] so the curtain reads as layered sheets, plus random [code]jitter[/code] per slot. Useful for bullet-rain phases, storm walls and descending curtains.
+				Generates a rain curtain: slots spread along a horizontal band of [code]band_width[/code] facing [code]rain_direction[/code], with rows staggered by [code]drop_spacing[/code] so the curtain reads as layered sheets, plus random [code]jitter[/code] per slot. [code]seed[/code] drives the jitter (0 is non-deterministic). Useful for bullet-rain phases, storm walls and descending curtains.
 			</description>
 		</method>
 		<method name="helper_generate_transforms_rectangle" qualifiers="static">
@@ -520,8 +523,9 @@
 			<param index="16" name="fill_margin" type="float" default="0.0" />
 			<param index="17" name="shell_layers" type="int" default="1" />
 			<param index="18" name="shell_step" type="float" default="32.0" />
+			<param index="19" name="seed" type="int" default="0" />
 			<description>
-				Generates transforms placed evenly on a ring (or arc, when [code]arc[/code] is smaller than a full turn) around the marker. Every bullet faces outward, so art drawn facing right travels away from the center. Set [code]face_outward[/code] to false for implosion patterns that fly toward the center. [code]y_scale[/code] stretches the ring into an ellipse (facing stays radial, approximate on stretched rings) and [code]facing_offset_degrees[/code] twists every facing. Useful for radial bursts and boss rings.
+				Generates transforms placed evenly on a ring (or arc, when [code]arc[/code] is smaller than a full turn) around the marker. Every bullet faces outward, so art drawn facing right travels away from the center. Set [code]face_outward[/code] to false for implosion patterns that fly toward the center. [code]y_scale[/code] stretches the ring into an ellipse (facing stays radial, approximate on stretched rings) and [code]facing_offset_degrees[/code] twists every facing. [code]seed[/code] drives random rotation (0 is non-deterministic). Useful for radial bursts and boss rings.
 			</description>
 		</method>
 		<method name="helper_generate_transforms_rose" qualifiers="static">
@@ -671,8 +675,9 @@
 			<param index="7" name="rain_direction" type="Vector2" default="Vector2(0, 1)" />
 			<param index="8" name="jitter" type="float" default="6.0" />
 			<param index="9" name="facing_offset_degrees" type="float" default="0.0" />
+			<param index="10" name="seed" type="int" default="0" />
 			<description>
-				Generates a staggered waterfall curtain: columns by rows grid with per-row stagger offsets and jitter, firing along rain_direction. Past capacity the curtain keeps growing row by row instead of stacking. Combine with skip indices for readable doors.
+				Generates a staggered waterfall curtain: columns by rows grid with per-row stagger offsets and jitter, firing along rain_direction. [code]seed[/code] drives the jitter (0 is non-deterministic). Past capacity the curtain keeps growing row by row instead of stacking. Combine with skip indices for readable doors.
 			</description>
 		</method>
 		<method name="helper_generate_transforms_wave" qualifiers="static">

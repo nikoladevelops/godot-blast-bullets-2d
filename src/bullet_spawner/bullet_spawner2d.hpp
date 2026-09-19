@@ -314,6 +314,8 @@ class BulletSpawner2D : public Node2D{
         bool helper_grid_rotate_with_marker = true;
         bool helper_grid_random_local_rotation = false;
         double helper_grid_jitter = 0.0;
+        // Seed for grid jitter + random rotation. 0 = non-deterministic, >0 = reproducible.
+        int helper_grid_seed = 0;
 
         // RING
         double helper_ring_radius = 150.0;
@@ -324,6 +326,8 @@ class BulletSpawner2D : public Node2D{
         bool helper_ring_face_outward = true;
         double helper_ring_y_scale = 1.0;
         double helper_ring_facing_offset_deg = 0.0;
+        // Seed for ring random rotation. 0 = non-deterministic, >0 = reproducible.
+        int helper_ring_seed = 0;
 
         // FAN
         double helper_fan_spread = 0.5;
@@ -332,6 +336,8 @@ class BulletSpawner2D : public Node2D{
         bool helper_fan_centered = true;
         // Per-slot random angle variance in radians (shotgun spread, 0 = exact).
         double helper_fan_angle_jitter = 0.0;
+        // Seed for fan angle jitter. 0 = non-deterministic, >0 = reproducible.
+        int helper_fan_seed = 0;
 
         // SPIRAL
         double helper_spiral_start_radius = 50.0;
@@ -406,6 +412,8 @@ class BulletSpawner2D : public Node2D{
         Vector2 helper_rain_direction = Vector2(0, 1);
         double helper_rain_drop_spacing = 48.0;
         double helper_rain_jitter = 12.0;
+        // Seed for rain jitter. 0 = non-deterministic, >0 = reproducible.
+        int helper_rain_seed = 0;
 
         // SCATTER (biased-random burst disc: explosions, deaths, pops).
         double helper_scatter_burst_radius = 120.0;
@@ -481,6 +489,8 @@ class BulletSpawner2D : public Node2D{
         Vector2 helper_waterfall_rain_direction = Vector2(0, 1);
         double helper_waterfall_jitter = 6.0;
         double helper_waterfall_facing_offset_deg = 0.0;
+        // Seed for waterfall jitter. 0 = non-deterministic, >0 = reproducible.
+        int helper_waterfall_seed = 0;
 
         // LATTICE (staggered honeycomb wall).
         int helper_lattice_columns = 8;
@@ -640,10 +650,6 @@ class BulletSpawner2D : public Node2D{
         double telegraph_sec = 0.5;
 
         // PERFORMANCE / REPRODUCIBILITY.
-        // Deterministic helper randomness: 0 = non-deterministic, otherwise
-        // seeds grid jitter, ring random rotation and scatter without an
-        // explicit seed. Replays and boss patterns stay reproducible.
-        int pattern_seed = 0;
         // Soft live-bullet fuse: 0 = unlimited, otherwise auto-shooting and
         // retargeting pause while active live bullets reach this count.
         int max_live_bullets = 0;
@@ -722,6 +728,8 @@ class BulletSpawner2D : public Node2D{
         // targets that are ALSO in this group are kept. Empty = no filtering.
         StringName homing_filter_group;
         HomingTargetSelection homing_target_selection = HOMING_SELECT_NEAREST;
+        // Seed for HOMING_SELECT_RANDOM picks. 0 = non-deterministic, >0 = reproducible.
+        int homing_random_seed = 0;
         // Seconds of straight flight before volley steering starts (0 = steer
         // immediately). Must stay finite and >= 0.
         double homing_delay_sec = 0.0;
@@ -735,9 +743,12 @@ class BulletSpawner2D : public Node2D{
         // target bearing are skipped (0 = omnidirectional). Must stay finite and >= 0.
         double homing_fire_arc_deg = 0.0;
         // Reload jitter: each auto volley waits shoot_interval_sec +/-
-        // random * reload_jitter_sec (seeded by pattern_seed). 0 = exact.
+        // random * reload_jitter_sec (seeded by reload_jitter_seed). 0 = exact.
         // Must stay finite and >= 0.
         double reload_jitter_sec = 0.0;
+        // Seed for reload jitter. 0 = non-deterministic, >0 = reproducible
+        // (seed + volleys_fired, so volleys still vary per shot).
+        int reload_jitter_seed = 0;
         // How many targets enter the queue (1 = classic single-target homing).
         // Only the multi-target sources (node group, node name) use it.
         // Must stay >= 1 (setter rejects the rest).
@@ -946,8 +957,10 @@ class BulletSpawner2D : public Node2D{
         void set_telegraph_enabled(bool value);
         double get_telegraph_sec() const;
         void set_telegraph_sec(double value);
-        int get_pattern_seed() const;
-        void set_pattern_seed(int value);
+        int get_reload_jitter_seed() const;
+        void set_reload_jitter_seed(int value);
+        int get_homing_random_seed() const;
+        void set_homing_random_seed(int value);
         int get_max_live_bullets() const;
         void set_max_live_bullets(int value);
         double get_homing_retarget_phase() const;
@@ -1013,6 +1026,8 @@ class BulletSpawner2D : public Node2D{
         void set_helper_rain_drop_spacing(double value);
         double get_helper_rain_jitter() const;
         void set_helper_rain_jitter(double value);
+        int get_helper_rain_seed() const;
+        void set_helper_rain_seed(int value);
         double get_helper_scatter_burst_radius() const;
         void set_helper_scatter_burst_radius(double value);
         double get_helper_scatter_facing_jitter() const;
@@ -1111,6 +1126,8 @@ class BulletSpawner2D : public Node2D{
         void set_helper_waterfall_stagger(double value);
         Vector2 get_helper_waterfall_rain_direction() const;
         void set_helper_waterfall_rain_direction(const Vector2 &value);
+        int get_helper_waterfall_seed() const;
+        void set_helper_waterfall_seed(int value);
         double get_helper_waterfall_jitter() const;
         void set_helper_waterfall_jitter(double value);
         double get_helper_waterfall_facing_offset_deg() const;
@@ -1463,6 +1480,8 @@ class BulletSpawner2D : public Node2D{
         void set_helper_grid_rotate_with_marker(bool value);
         bool get_helper_grid_random_local_rotation() const;
         void set_helper_grid_random_local_rotation(bool value);
+        int get_helper_grid_seed() const;
+        void set_helper_grid_seed(int value);
         double get_helper_grid_jitter() const;
         void set_helper_grid_jitter(double value);
 
@@ -1474,6 +1493,8 @@ class BulletSpawner2D : public Node2D{
         void set_helper_ring_arc(double value);
         bool get_helper_ring_rotate_with_marker() const;
         void set_helper_ring_rotate_with_marker(bool value);
+        int get_helper_ring_seed() const;
+        void set_helper_ring_seed(int value);
         bool get_helper_ring_random_rotation() const;
         void set_helper_ring_random_rotation(bool value);
         bool get_helper_ring_face_outward() const;
@@ -1491,6 +1512,8 @@ class BulletSpawner2D : public Node2D{
         void set_helper_fan_step_offset(double value);
         bool get_helper_fan_centered() const;
         void set_helper_fan_centered(bool value);
+        int get_helper_fan_seed() const;
+        void set_helper_fan_seed(int value);
         double get_helper_fan_angle_jitter() const;
         void set_helper_fan_angle_jitter(double value);
 

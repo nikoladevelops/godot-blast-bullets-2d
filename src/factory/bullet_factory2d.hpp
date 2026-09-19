@@ -867,7 +867,8 @@ public:
 	// Exposed helper methods (public so BulletSpawner2D can reuse them for transforms_source modes)
 
 public:
-	// Generates a grid of 2D transforms positioned relative to marker_transform
+	// Generates a grid of 2D transforms positioned relative to marker_transform.
+	// seed drives jitter + random rotation (0 = non-deterministic).
 	static TypedArray<Transform2D> helper_generate_transforms_grid(
 			int transforms_amount,
 			Transform2D marker_transform,
@@ -877,12 +878,14 @@ public:
 			real_t row_offset = 150.0,
 			bool rotate_grid_with_marker = true,
 			bool random_local_rotation = false,
-			real_t jitter = 0.0);
+			real_t jitter = 0.0,
+			uint64_t seed = 0);
 
 	// Generates transforms on a ring (or arc) around marker_transform.
 	// Set face_outward to false for implosion patterns that fly toward the center.
 	// y_scale stretches the ring into an ellipse (1.0 = circle); the facing
 	// stays radial, so it is approximate on stretched rings.
+	// seed drives random rotation (0 = non-deterministic).
 	static TypedArray<Transform2D> helper_generate_transforms_ring(
 			int transforms_amount,
 			Transform2D marker_transform,
@@ -912,13 +915,15 @@ public:
 			bool fill_stagger = false,
 			double fill_margin = 0.0,
 			int shell_layers = 1,
-			double shell_step = 32.0);
+			double shell_step = 32.0,
+			uint64_t seed = 0);
 
 	// Generates transforms in an aimed cone (shotgun spread): direction_angle is the cone center,
 	// spread is the full cone width, origins stagger along the direction so pellets
 	// do not stack on top of each other. When centered is false the cone is
 	// one-sided, from the center direction out to +spread.
 	// angle_jitter adds per-slot random variance for shotgun spread.
+	// seed drives the jitter (0 = non-deterministic).
 	static TypedArray<Transform2D> helper_generate_transforms_fan(
 			int transforms_amount,
 			Transform2D marker_transform,
@@ -926,7 +931,8 @@ public:
 			real_t direction_angle = 0.0,
 			real_t step_offset = 0.0,
 			bool centered = true,
-			real_t angle_jitter = 0.0);
+			real_t angle_jitter = 0.0,
+			uint64_t seed = 0);
 
 	// Generates transforms along an expanding spiral around marker_transform.
 	// facing_mode picks the bullet facing (tangent = travel direction);
@@ -1062,13 +1068,15 @@ public:
 	// Rain curtain: slots spread along a horizontal band of band_width above
 	// (or around) the marker, facing rain_direction. drop_spacing staggers
 	// rows so the curtain reads as layered sheets instead of one flat row.
+	// seed drives the jitter (0 = non-deterministic).
 	static TypedArray<Transform2D> helper_generate_transforms_rain(
 			int transforms_amount,
 			Transform2D marker_transform,
 			real_t band_width = 600.0,
 			Vector2 rain_direction = Vector2(0, 1),
 			real_t drop_spacing = 48.0,
-			real_t jitter = 12.0);
+			real_t jitter = 12.0,
+			uint64_t seed = 0);
 
 	// Scatter burst: biased-random disc for explosions, boss deaths, petal
 	// pops. Offsets fill the disc of burst_radius (sqrt distribution, so
@@ -1184,6 +1192,7 @@ public:
 	// Waterfall curtain: staggered rows x columns grid with per-row stagger
 	// offsets and jitter (danmaku curtains with readable doors when combined
 	// with skip_indices). Fires along rain_direction.
+	// seed drives the jitter (0 = non-deterministic).
 	static TypedArray<Transform2D> helper_generate_transforms_waterfall(
 			int transforms_amount,
 			Transform2D marker_transform,
@@ -1194,7 +1203,8 @@ public:
 			real_t stagger = 0.5,
 			Vector2 rain_direction = Vector2(0, 1),
 			real_t jitter = 6.0,
-			real_t facing_offset_degrees = 0.0);
+			real_t facing_offset_degrees = 0.0,
+			uint64_t seed = 0);
 
 	// Lattice honeycomb: staggered hex-style rows for honeycomb walls.
 	static TypedArray<Transform2D> helper_generate_transforms_lattice(

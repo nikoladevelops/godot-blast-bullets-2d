@@ -128,7 +128,11 @@ public:
 	// You can assign a custom material that uses a shader. Note that you may also want to provide a custom mesh as well, but if you do so, then the texture_size property won't be used, instead handle scaling in the shader as well.
 	Ref<Material> material;
 
-	// If you use a ShaderMaterial with instance uniforms, you can pass them here as String - Variant pairs
+	// Per-instance shader overrides for a ShaderMaterial with instance uniforms.
+	// Key = uniform name (String), value = Variant matching the uniform type.
+	// Applied in finalize_set_up() via set_instance_shader_parameter() per bullet
+	// instance; ignored (and cleared on pool reuse) unless material is a
+	// ShaderMaterial. Example: {"glow": Color(1, 0.5, 0), "speed": 2.0}.
 	Dictionary instance_shader_parameters;
 
 	// Custom mesh, if it isn't provided then a Quadmesh will be generated and it will use the texture_size. If you DO provide a mesh then you should handle the scaling of the bullets yourself using a shader for best quality.
