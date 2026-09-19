@@ -167,15 +167,34 @@ public:
 		SIDE_BOTH = 3
 	};
 
-	// Outline placement: where loop-shape bullets live. ON_PATH keeps the
-	// generated slot loop; FILL_INSIDE replaces it with a row-major grid
-	// masked to the loop interior (capped at transforms_amount, may return
-	// fewer on small shapes); SHELL_OUTSIDE spreads the same slot count
-	// over concentric outward layers (bullet i rides layer i % layers).
+	// Outline placement: where loop-shape bullets live. ON_OUTLINE keeps the
+	// generated slot loop exactly (single layer, the default); LAYERS spreads
+	// the same slot count over concentric layers (layer 0 sits exactly on the
+	// outline, extras step inward/outward per OutlineLayerSide); FILL_INSIDE
+	// replaces the loop with a row-major grid masked to the loop interior
+	// (capped at transforms_amount, may return fewer on small shapes).
 	enum OutlinePlacement {
-		OUTLINE_ON_PATH = 0,
-		OUTLINE_FILL_INSIDE = 1,
-		OUTLINE_SHELL_OUTSIDE = 2
+		OUTLINE_ON_OUTLINE = 0,
+		OUTLINE_LAYERS = 1,
+		OUTLINE_FILL_INSIDE = 2
+	};
+
+	// Layer side: which side of the base outline extra layers grow toward.
+	// OUTWARD steps along the slot normals, INWARD against them, BOTH grows
+	// symmetrically (extras land at +spacing, -spacing, +2*spacing, ...).
+	enum OutlineLayerSide {
+		OUTLINE_LAYER_OUTWARD = 0,
+		OUTLINE_LAYER_INWARD = 1,
+		OUTLINE_LAYER_BOTH = 2
+	};
+
+	// Layer fill: how bullets are dealt across layers. INTERLEAVED sends
+	// bullet i to layer (i % layer_count) so the winding order survives;
+	// SEQUENTIAL fills layer 0 first, then layer 1, and so on, so small
+	// volleys still read as the base shape (layer = i * layer_count / n).
+	enum OutlineLayerFill {
+		OUTLINE_LAYER_INTERLEAVED = 0,
+		OUTLINE_LAYER_SEQUENTIAL = 1
 	};
 
 	// Outline facing: rotates each generated default facing. NORMAL keeps it,
@@ -900,13 +919,16 @@ public:
 			// Outline layout (closed-loop placement engine, shared by the loop
 			// shapes): outline_placement picks On Outline (slot loop as
 			// generated), Fill Inside (row-major grid masked to the loop
-			// interior, capped at transforms_amount) or Shell Outside
-			// (concentric outward layers sharing the slot count);
+			// interior, capped at transforms_amount) or Layers
+			// (concentric rings sharing the slot count, layer 0 on outline);
 			// outline_facing rotates each default facing (0 = as generated,
 			// 1 = +90 deg, 2 = -90 deg); outline_reverse mirrors the slot
 			// order; outline_slot_offset rotates which slot becomes bullet 0;
 			// fill_spacing/fill_stagger/fill_margin tune the interior grid;
-			// shell_layers/shell_step tune the outside shells.
+			// layer_count/layer_spacing tune the concentric layers (LAYERS
+			// placement); layer_side picks the growth side, layer_fill how
+			// bullets are dealt across layers, layer_start_offset which
+			// layer sequential filling starts from (wraps, sequential only).
 			int outline_placement = 0,
 			int outline_facing = 0,
 			bool outline_reverse = false,
@@ -914,8 +936,11 @@ public:
 			double fill_spacing = 32.0,
 			bool fill_stagger = false,
 			double fill_margin = 0.0,
-			int shell_layers = 1,
-			double shell_step = 32.0,
+			int layer_count = 1,
+			double layer_spacing = 32.0,
+			int layer_side = 0,
+			int layer_fill = 0,
+			int layer_start_offset = 0,
 			uint64_t seed = 0);
 
 	// Generates transforms in an aimed cone (shotgun spread): direction_angle is the cone center,
@@ -1003,13 +1028,16 @@ public:
 			// Outline layout (closed-loop placement engine, shared by the loop
 			// shapes): outline_placement picks On Outline (slot loop as
 			// generated), Fill Inside (row-major grid masked to the loop
-			// interior, capped at transforms_amount) or Shell Outside
-			// (concentric outward layers sharing the slot count);
+			// interior, capped at transforms_amount) or Layers
+			// (concentric rings sharing the slot count, layer 0 on outline);
 			// outline_facing rotates each default facing (0 = as generated,
 			// 1 = +90 deg, 2 = -90 deg); outline_reverse mirrors the slot
 			// order; outline_slot_offset rotates which slot becomes bullet 0;
 			// fill_spacing/fill_stagger/fill_margin tune the interior grid;
-			// shell_layers/shell_step tune the outside shells.
+			// layer_count/layer_spacing tune the concentric layers (LAYERS
+			// placement); layer_side picks the growth side, layer_fill how
+			// bullets are dealt across layers, layer_start_offset which
+			// layer sequential filling starts from (wraps, sequential only).
 			int outline_placement = 0,
 			int outline_facing = 0,
 			bool outline_reverse = false,
@@ -1017,8 +1045,11 @@ public:
 			double fill_spacing = 32.0,
 			bool fill_stagger = false,
 			double fill_margin = 0.0,
-			int shell_layers = 1,
-			double shell_step = 32.0,
+			int layer_count = 1,
+			double layer_spacing = 32.0,
+			int layer_side = 0,
+			int layer_fill = 0,
+			int layer_start_offset = 0,
 			// Bloom-kind selector + per-kind knobs (append-only; old calls are
 			// unaffected). Out-of-range flower_type is rejected loudly.
 			int flower_type = 0,
@@ -1048,13 +1079,16 @@ public:
 			// Outline layout (closed-loop placement engine, shared by the loop
 			// shapes): outline_placement picks On Outline (slot loop as
 			// generated), Fill Inside (row-major grid masked to the loop
-			// interior, capped at transforms_amount) or Shell Outside
-			// (concentric outward layers sharing the slot count);
+			// interior, capped at transforms_amount) or Layers
+			// (concentric rings sharing the slot count, layer 0 on outline);
 			// outline_facing rotates each default facing (0 = as generated,
 			// 1 = +90 deg, 2 = -90 deg); outline_reverse mirrors the slot
 			// order; outline_slot_offset rotates which slot becomes bullet 0;
 			// fill_spacing/fill_stagger/fill_margin tune the interior grid;
-			// shell_layers/shell_step tune the outside shells.
+			// layer_count/layer_spacing tune the concentric layers (LAYERS
+			// placement); layer_side picks the growth side, layer_fill how
+			// bullets are dealt across layers, layer_start_offset which
+			// layer sequential filling starts from (wraps, sequential only).
 			int outline_placement = 0,
 			int outline_facing = 0,
 			bool outline_reverse = false,
@@ -1062,8 +1096,11 @@ public:
 			double fill_spacing = 32.0,
 			bool fill_stagger = false,
 			double fill_margin = 0.0,
-			int shell_layers = 1,
-			double shell_step = 32.0);
+			int layer_count = 1,
+			double layer_spacing = 32.0,
+			int layer_side = 0,
+			int layer_fill = 0,
+			int layer_start_offset = 0);
 
 	// Rain curtain: slots spread along a horizontal band of band_width above
 	// (or around) the marker, facing rain_direction. drop_spacing staggers
@@ -1149,13 +1186,16 @@ public:
 			// Outline layout (closed-loop placement engine, shared by the loop
 			// shapes): outline_placement picks On Outline (slot loop as
 			// generated), Fill Inside (row-major grid masked to the loop
-			// interior, capped at transforms_amount) or Shell Outside
-			// (concentric outward layers sharing the slot count);
+			// interior, capped at transforms_amount) or Layers
+			// (concentric rings sharing the slot count, layer 0 on outline);
 			// outline_facing rotates each default facing (0 = as generated,
 			// 1 = +90 deg, 2 = -90 deg); outline_reverse mirrors the slot
 			// order; outline_slot_offset rotates which slot becomes bullet 0;
 			// fill_spacing/fill_stagger/fill_margin tune the interior grid;
-			// shell_layers/shell_step tune the outside shells.
+			// layer_count/layer_spacing tune the concentric layers (LAYERS
+			// placement); layer_side picks the growth side, layer_fill how
+			// bullets are dealt across layers, layer_start_offset which
+			// layer sequential filling starts from (wraps, sequential only).
 			int outline_placement = 0,
 			int outline_facing = 0,
 			bool outline_reverse = false,
@@ -1163,8 +1203,11 @@ public:
 			double fill_spacing = 32.0,
 			bool fill_stagger = false,
 			double fill_margin = 0.0,
-			int shell_layers = 1,
-			double shell_step = 32.0);
+			int layer_count = 1,
+			double layer_spacing = 32.0,
+			int layer_side = 0,
+			int layer_fill = 0,
+			int layer_start_offset = 0);
 
 	// Heart bloom: parametric heart outline (boss love attacks, endings).
 	// size scales the classic 16sin^3 / 13cos-5cos2t curve.
@@ -1232,13 +1275,16 @@ public:
 			// Outline layout (closed-loop placement engine, shared by the loop
 			// shapes): outline_placement picks On Outline (slot loop as
 			// generated), Fill Inside (row-major grid masked to the loop
-			// interior, capped at transforms_amount) or Shell Outside
-			// (concentric outward layers sharing the slot count);
+			// interior, capped at transforms_amount) or Layers
+			// (concentric rings sharing the slot count, layer 0 on outline);
 			// outline_facing rotates each default facing (0 = as generated,
 			// 1 = +90 deg, 2 = -90 deg); outline_reverse mirrors the slot
 			// order; outline_slot_offset rotates which slot becomes bullet 0;
 			// fill_spacing/fill_stagger/fill_margin tune the interior grid;
-			// shell_layers/shell_step tune the outside shells.
+			// layer_count/layer_spacing tune the concentric layers (LAYERS
+			// placement); layer_side picks the growth side, layer_fill how
+			// bullets are dealt across layers, layer_start_offset which
+			// layer sequential filling starts from (wraps, sequential only).
 			int outline_placement = 0,
 			int outline_facing = 0,
 			bool outline_reverse = false,
@@ -1246,8 +1292,11 @@ public:
 			double fill_spacing = 32.0,
 			bool fill_stagger = false,
 			double fill_margin = 0.0,
-			int shell_layers = 1,
-			double shell_step = 32.0);
+			int layer_count = 1,
+			double layer_spacing = 32.0,
+			int layer_side = 0,
+			int layer_fill = 0,
+			int layer_start_offset = 0);
 
 	// Twin counter-rotating galaxy: odd arms wind -angle_step, even arms
 	// +angle_step when mirrored (same facing switch as multispiral).
@@ -1293,13 +1342,16 @@ public:
 			// Outline layout (closed-loop placement engine, shared by the loop
 			// shapes): outline_placement picks On Outline (slot loop as
 			// generated), Fill Inside (row-major grid masked to the loop
-			// interior, capped at transforms_amount) or Shell Outside
-			// (concentric outward layers sharing the slot count);
+			// interior, capped at transforms_amount) or Layers
+			// (concentric rings sharing the slot count, layer 0 on outline);
 			// outline_facing rotates each default facing (0 = as generated,
 			// 1 = +90 deg, 2 = -90 deg); outline_reverse mirrors the slot
 			// order; outline_slot_offset rotates which slot becomes bullet 0;
 			// fill_spacing/fill_stagger/fill_margin tune the interior grid;
-			// shell_layers/shell_step tune the outside shells.
+			// layer_count/layer_spacing tune the concentric layers (LAYERS
+			// placement); layer_side picks the growth side, layer_fill how
+			// bullets are dealt across layers, layer_start_offset which
+			// layer sequential filling starts from (wraps, sequential only).
 			int outline_placement = 0,
 			int outline_facing = 0,
 			bool outline_reverse = false,
@@ -1307,8 +1359,11 @@ public:
 			double fill_spacing = 32.0,
 			bool fill_stagger = false,
 			double fill_margin = 0.0,
-			int shell_layers = 1,
-			double shell_step = 32.0);
+			int layer_count = 1,
+			double layer_spacing = 32.0,
+			int layer_side = 0,
+			int layer_fill = 0,
+			int layer_start_offset = 0);
 
 	// Clean circle outline: transforms_amount slots evenly on a radius
 	// circle around the marker, facing outward (or inward). The Ring helper
@@ -1322,13 +1377,16 @@ public:
 			// Outline layout (closed-loop placement engine, shared by the loop
 			// shapes): outline_placement picks On Outline (slot loop as
 			// generated), Fill Inside (row-major grid masked to the loop
-			// interior, capped at transforms_amount) or Shell Outside
-			// (concentric outward layers sharing the slot count);
+			// interior, capped at transforms_amount) or Layers
+			// (concentric rings sharing the slot count, layer 0 on outline);
 			// outline_facing rotates each default facing (0 = as generated,
 			// 1 = +90 deg, 2 = -90 deg); outline_reverse mirrors the slot
 			// order; outline_slot_offset rotates which slot becomes bullet 0;
 			// fill_spacing/fill_stagger/fill_margin tune the interior grid;
-			// shell_layers/shell_step tune the outside shells.
+			// layer_count/layer_spacing tune the concentric layers (LAYERS
+			// placement); layer_side picks the growth side, layer_fill how
+			// bullets are dealt across layers, layer_start_offset which
+			// layer sequential filling starts from (wraps, sequential only).
 			int outline_placement = 0,
 			int outline_facing = 0,
 			bool outline_reverse = false,
@@ -1336,8 +1394,11 @@ public:
 			double fill_spacing = 32.0,
 			bool fill_stagger = false,
 			double fill_margin = 0.0,
-			int shell_layers = 1,
-			double shell_step = 32.0);
+			int layer_count = 1,
+			double layer_spacing = 32.0,
+			int layer_side = 0,
+			int layer_fill = 0,
+			int layer_start_offset = 0);
 
 	// Rectangle perimeter: slots walk the outline of a size-sized box
 	// centered on the marker (counter-clockwise from top-left), facing
@@ -1351,13 +1412,16 @@ public:
 			// Outline layout (closed-loop placement engine, shared by the loop
 			// shapes): outline_placement picks On Outline (slot loop as
 			// generated), Fill Inside (row-major grid masked to the loop
-			// interior, capped at transforms_amount) or Shell Outside
-			// (concentric outward layers sharing the slot count);
+			// interior, capped at transforms_amount) or Layers
+			// (concentric rings sharing the slot count, layer 0 on outline);
 			// outline_facing rotates each default facing (0 = as generated,
 			// 1 = +90 deg, 2 = -90 deg); outline_reverse mirrors the slot
 			// order; outline_slot_offset rotates which slot becomes bullet 0;
 			// fill_spacing/fill_stagger/fill_margin tune the interior grid;
-			// shell_layers/shell_step tune the outside shells.
+			// layer_count/layer_spacing tune the concentric layers (LAYERS
+			// placement); layer_side picks the growth side, layer_fill how
+			// bullets are dealt across layers, layer_start_offset which
+			// layer sequential filling starts from (wraps, sequential only).
 			int outline_placement = 0,
 			int outline_facing = 0,
 			bool outline_reverse = false,
@@ -1365,8 +1429,11 @@ public:
 			double fill_spacing = 32.0,
 			bool fill_stagger = false,
 			double fill_margin = 0.0,
-			int shell_layers = 1,
-			double shell_step = 32.0);
+			int layer_count = 1,
+			double layer_spacing = 32.0,
+			int layer_side = 0,
+			int layer_fill = 0,
+			int layer_start_offset = 0);
 
 	// Polygon perimeter: vertices corners on a radius circle from
 	// base_rotation, slots spread evenly by arc length along the outline,
@@ -1382,13 +1449,16 @@ public:
 			// Outline layout (closed-loop placement engine, shared by the loop
 			// shapes): outline_placement picks On Outline (slot loop as
 			// generated), Fill Inside (row-major grid masked to the loop
-			// interior, capped at transforms_amount) or Shell Outside
-			// (concentric outward layers sharing the slot count);
+			// interior, capped at transforms_amount) or Layers
+			// (concentric rings sharing the slot count, layer 0 on outline);
 			// outline_facing rotates each default facing (0 = as generated,
 			// 1 = +90 deg, 2 = -90 deg); outline_reverse mirrors the slot
 			// order; outline_slot_offset rotates which slot becomes bullet 0;
 			// fill_spacing/fill_stagger/fill_margin tune the interior grid;
-			// shell_layers/shell_step tune the outside shells.
+			// layer_count/layer_spacing tune the concentric layers (LAYERS
+			// placement); layer_side picks the growth side, layer_fill how
+			// bullets are dealt across layers, layer_start_offset which
+			// layer sequential filling starts from (wraps, sequential only).
 			int outline_placement = 0,
 			int outline_facing = 0,
 			bool outline_reverse = false,
@@ -1396,8 +1466,11 @@ public:
 			double fill_spacing = 32.0,
 			bool fill_stagger = false,
 			double fill_margin = 0.0,
-			int shell_layers = 1,
-			double shell_step = 32.0);
+			int layer_count = 1,
+			double layer_spacing = 32.0,
+			int layer_side = 0,
+			int layer_fill = 0,
+			int layer_start_offset = 0);
 
 	// Triangle perimeter: equilateral (circumradius size_a), isosceles
 	// (base size_a + height size_b, apex up) or right-angled (legs size_a
@@ -1417,13 +1490,16 @@ public:
 			// Outline layout (closed-loop placement engine, shared by the loop
 			// shapes): outline_placement picks On Outline (slot loop as
 			// generated), Fill Inside (row-major grid masked to the loop
-			// interior, capped at transforms_amount) or Shell Outside
-			// (concentric outward layers sharing the slot count);
+			// interior, capped at transforms_amount) or Layers
+			// (concentric rings sharing the slot count, layer 0 on outline);
 			// outline_facing rotates each default facing (0 = as generated,
 			// 1 = +90 deg, 2 = -90 deg); outline_reverse mirrors the slot
 			// order; outline_slot_offset rotates which slot becomes bullet 0;
 			// fill_spacing/fill_stagger/fill_margin tune the interior grid;
-			// shell_layers/shell_step tune the outside shells.
+			// layer_count/layer_spacing tune the concentric layers (LAYERS
+			// placement); layer_side picks the growth side, layer_fill how
+			// bullets are dealt across layers, layer_start_offset which
+			// layer sequential filling starts from (wraps, sequential only).
 			int outline_placement = 0,
 			int outline_facing = 0,
 			bool outline_reverse = false,
@@ -1431,8 +1507,11 @@ public:
 			double fill_spacing = 32.0,
 			bool fill_stagger = false,
 			double fill_margin = 0.0,
-			int shell_layers = 1,
-			double shell_step = 32.0);
+			int layer_count = 1,
+			double layer_spacing = 32.0,
+			int layer_side = 0,
+			int layer_fill = 0,
+			int layer_start_offset = 0);
 
 	// Isosceles trapezoid perimeter: bases base_top/base_bottom with height,
 	// centered on the marker and rotated by rotation. Slots walk the outline
@@ -1450,13 +1529,16 @@ public:
 			// Outline layout (closed-loop placement engine, shared by the loop
 			// shapes): outline_placement picks On Outline (slot loop as
 			// generated), Fill Inside (row-major grid masked to the loop
-			// interior, capped at transforms_amount) or Shell Outside
-			// (concentric outward layers sharing the slot count);
+			// interior, capped at transforms_amount) or Layers
+			// (concentric rings sharing the slot count, layer 0 on outline);
 			// outline_facing rotates each default facing (0 = as generated,
 			// 1 = +90 deg, 2 = -90 deg); outline_reverse mirrors the slot
 			// order; outline_slot_offset rotates which slot becomes bullet 0;
 			// fill_spacing/fill_stagger/fill_margin tune the interior grid;
-			// shell_layers/shell_step tune the outside shells.
+			// layer_count/layer_spacing tune the concentric layers (LAYERS
+			// placement); layer_side picks the growth side, layer_fill how
+			// bullets are dealt across layers, layer_start_offset which
+			// layer sequential filling starts from (wraps, sequential only).
 			int outline_placement = 0,
 			int outline_facing = 0,
 			bool outline_reverse = false,
@@ -1464,8 +1546,11 @@ public:
 			double fill_spacing = 32.0,
 			bool fill_stagger = false,
 			double fill_margin = 0.0,
-			int shell_layers = 1,
-			double shell_step = 32.0);
+			int layer_count = 1,
+			double layer_spacing = 32.0,
+			int layer_side = 0,
+			int layer_fill = 0,
+			int layer_start_offset = 0);
 
 	// Diamond (rhombus) perimeter: diagonals diagonal_x/diagonal_y, centered
 	// on the marker and rotated by rotation. Slots walk the outline evenly
@@ -1482,13 +1567,16 @@ public:
 			// Outline layout (closed-loop placement engine, shared by the loop
 			// shapes): outline_placement picks On Outline (slot loop as
 			// generated), Fill Inside (row-major grid masked to the loop
-			// interior, capped at transforms_amount) or Shell Outside
-			// (concentric outward layers sharing the slot count);
+			// interior, capped at transforms_amount) or Layers
+			// (concentric rings sharing the slot count, layer 0 on outline);
 			// outline_facing rotates each default facing (0 = as generated,
 			// 1 = +90 deg, 2 = -90 deg); outline_reverse mirrors the slot
 			// order; outline_slot_offset rotates which slot becomes bullet 0;
 			// fill_spacing/fill_stagger/fill_margin tune the interior grid;
-			// shell_layers/shell_step tune the outside shells.
+			// layer_count/layer_spacing tune the concentric layers (LAYERS
+			// placement); layer_side picks the growth side, layer_fill how
+			// bullets are dealt across layers, layer_start_offset which
+			// layer sequential filling starts from (wraps, sequential only).
 			int outline_placement = 0,
 			int outline_facing = 0,
 			bool outline_reverse = false,
@@ -1496,8 +1584,11 @@ public:
 			double fill_spacing = 32.0,
 			bool fill_stagger = false,
 			double fill_margin = 0.0,
-			int shell_layers = 1,
-			double shell_step = 32.0);
+			int layer_count = 1,
+			double layer_spacing = 32.0,
+			int layer_side = 0,
+			int layer_fill = 0,
+			int layer_start_offset = 0);
 
 	// Universal side pass for closed-outline patterns: returns a copy of
 	// transforms with each origin pushed along its own facing by
@@ -1614,5 +1705,7 @@ public:
 	VARIANT_ENUM_CAST(BlastBullets2D::BulletFactory2D::EdgeSpreadSide);
 	VARIANT_ENUM_CAST(BlastBullets2D::BulletFactory2D::SideMode);
 	VARIANT_ENUM_CAST(BlastBullets2D::BulletFactory2D::OutlinePlacement);
+	VARIANT_ENUM_CAST(BlastBullets2D::BulletFactory2D::OutlineLayerSide);
+	VARIANT_ENUM_CAST(BlastBullets2D::BulletFactory2D::OutlineLayerFill);
 	VARIANT_ENUM_CAST(BlastBullets2D::BulletFactory2D::OutlineFacing);
 	VARIANT_ENUM_CAST(BlastBullets2D::BulletFactory2D::FlowerBloom);

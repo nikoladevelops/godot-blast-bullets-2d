@@ -655,19 +655,28 @@
 			Shifts every other Fill Inside row by half a cell (honeycomb packing).
 		</member>
 		<member name="helper_outline_placement" type="int" setter="set_helper_outline_placement" getter="get_helper_outline_placement" default="0">
-			Where closed-loop shape bullets live (Ring, Ellipse, Star, Flower, Rose, Lissajous, Circle, Rectangle, Square, Polygon): On Outline keeps the generated slot loop, Fill Inside swaps it for a row-major grid masked to the loop interior, Shell Outside spreads the same slot count over concentric outward layers. On Outline is the identity default.
+			Where closed-loop shape bullets live (Ring, Ellipse, Star, Flower, Rose, Lissajous, Circle, Rectangle, Square, Polygon, Triangle, Trapezoid, Diamond): On Outline keeps the generated slot loop exactly (single layer, the default), Layers spreads the same slot count over concentric rings (layer 0 on the outline), Fill Inside swaps it for a row-major grid masked to the loop interior.
 		</member>
 		<member name="helper_outline_reverse" type="bool" setter="set_helper_outline_reverse" getter="get_helper_outline_reverse" default="false">
-			Mirrors the closed-loop slot order (winding flip): bullet 0 moves to the far end of the loop. Outline and shell layouts only.
+			Mirrors the closed-loop slot order (winding flip): bullet 0 moves to the far end of the loop. On-outline and layers layouts only.
 		</member>
-		<member name="helper_outline_shell_layers" type="int" setter="set_helper_outline_shell_layers" getter="get_helper_outline_shell_layers" default="1">
-			Concentric outward layers for Shell Outside (bullet i rides layer i % layers, each layer evenly spread). Must be 1 or more.
+		<member name="helper_outline_layer_count" type="int" setter="set_helper_outline_layer_count" getter="get_helper_outline_layer_count" default="1">
+			How many concentric rings share the volley in Layers placement. 1 is a single exact layer (the default, identical to On Outline). Must be 1 or more.
 		</member>
-		<member name="helper_outline_shell_step" type="float" setter="set_helper_outline_shell_step" getter="get_helper_outline_shell_step" default="32.0">
-			Radial distance in pixels between Shell Outside layers. Must be finite and above zero.
+		<member name="helper_outline_layer_fill" type="int" setter="set_helper_outline_layer_fill" getter="get_helper_outline_layer_fill" enum="BulletFactory2D.OutlineLayerFill" default="0">
+			How bullets are dealt across layers: Interleaved (bullet i rides layer i % count, winding survives) or Sequential (fills contiguous chunks starting from [member helper_outline_layer_start_offset], so small volleys still read as the base shape with offset 0). Layers placement only.
+		</member>
+		<member name="helper_outline_layer_side" type="int" setter="set_helper_outline_layer_side" getter="get_helper_outline_layer_side" enum="BulletFactory2D.OutlineLayerSide" default="0">
+			Which side of the base outline extra layers grow toward: Outward (along slot normals), Inward (against them), or Both (symmetric +spacing, -spacing, +2*spacing, ...). Inward corners follow inverted normals, so deep concavities chamfer at large spacings. Layers placement only.
+		</member>
+		<member name="helper_outline_layer_spacing" type="float" setter="set_helper_outline_layer_spacing" getter="get_helper_outline_layer_spacing" default="32.0">
+			Padding in pixels between adjacent layers. Must be finite and above zero. Layers placement only.
+		</member>
+		<member name="helper_outline_layer_start_offset" type="int" setter="set_helper_outline_layer_start_offset" getter="get_helper_outline_layer_start_offset" default="0">
+			Which layer Sequential filling starts from (wraps around, so 1 starts on the second ring and the outline fills last). 0 starts on the outline. Only shown — and only consumed — in Layers placement with Sequential fill; Interleaved ignores it. Must be 0 or more.
 		</member>
 		<member name="helper_outline_slot_offset" type="int" setter="set_helper_outline_slot_offset" getter="get_helper_outline_slot_offset" default="0">
-			Rotates which closed-loop slot becomes bullet 0 (wraps both ways). Outline and shell layouts only.
+			Rotates which closed-loop slot becomes bullet 0 (wraps both ways). On-outline and layers layouts only.
 		</member>
 		<member name="helper_path2d_anchor" type="int" setter="set_helper_path2d_anchor" getter="get_helper_path2d_anchor" enum="BulletSpawner2D.Path2DAnchor" default="0">
 			Where a fixed Path2D run sits when shorter than the curve: Path Start, Centered, or Path End (Fixed Spacing mode only). helper_path2d_start_offset shifts on top of this.
@@ -1099,7 +1108,7 @@
 			Seed for [member reload_jitter_sec] only. 0 is non-deterministic, otherwise the jitter sequence reproduces (seed + volleys fired, so volleys still vary per shot). Does nothing while [member reload_jitter_sec] is 0. Does not affect any bullet pattern or homing pick.
 		</member>
 		<member name="pattern_source" type="int" setter="set_pattern_source" getter="get_pattern_source" enum="BulletSpawner2D.PatternSource" default="0">
-			Where volley transforms come from: children markers (0), this generator itself (1), or one of 31 procedural helper patterns (2-32: Grid, Ring, Fan, Spiral, Line, Aimed, Flower, Ellipse, Rain, Scatter, Star Polygon, Multi Spiral, Cross, Star, Heart, Wave, Waterfall, Lattice, Rose, Counter Spiral, Corridor, Lissajous, Custom, Circle, Rectangle, Square, Polygon, Path2D, Triangle, Trapezoid, Diamond). Order in the inspector groups sources, basic shapes, ornamental loops, then generators. Only the active pattern's options show in the inspector. Pipeline per volley: generate (with outline placement/fill/shell for the loop shapes), then spin, then pattern/local scale, then helper_skip_indices carving (so skip indexes match the preview). Corridor, Ellipse Wall and outline Fill Inside modes return fewer transforms than helper_bullets_amount.
+			Where volley transforms come from: children markers (0), this generator itself (1), or one of 31 procedural helper patterns (2-32: Grid, Ring, Fan, Spiral, Line, Aimed, Flower, Ellipse, Rain, Scatter, Star Polygon, Multi Spiral, Cross, Star, Heart, Wave, Waterfall, Lattice, Rose, Counter Spiral, Corridor, Lissajous, Custom, Circle, Rectangle, Square, Polygon, Path2D, Triangle, Trapezoid, Diamond). Order in the inspector groups sources, basic shapes, ornamental loops, then generators. Only the active pattern's options show in the inspector. Pipeline per volley: generate (with outline placement/fill/layers for the loop shapes), then spin, then pattern/local scale, then helper_skip_indices carving (so skip indexes match the preview). Corridor, Ellipse Wall and outline Fill Inside modes return fewer transforms than helper_bullets_amount.
 		</member>
 		<member name="preview_arrow_color" type="Color" setter="set_preview_arrow_color" getter="get_preview_arrow_color" default="Color(1, 0.05, 0.05, 1)">
 			Preview arrow color.
@@ -1450,7 +1459,7 @@
 			Live Path2D curve layout (baked points, re-sampled every volley, generator-local). Bullets sit exactly on the curve per helper_path2d_distribution (Fixed Spacing default 32px, or Even over the whole length), facing tangent-first per helper_path2d_facing (Along Path default, Normal +90/-90 across it).
 		</constant>
 		<constant name="PATTERN_FROM_HELPER_TRIANGLE" value="30" enum="PatternSource">
-			Triangle perimeter (equilateral/isosceles/right via helper_triangle_type), slots spread evenly by arc length, facing outward (or inward). Full outline-layout support (on outline, interior fill, outside shells).
+			Triangle perimeter (equilateral/isosceles/right via helper_triangle_type), slots spread evenly by arc length, facing outward (or inward). Full outline-layout support (on outline, concentric layers, interior fill).
 		</constant>
 		<constant name="PATTERN_FROM_HELPER_TRAPEZOID" value="31" enum="PatternSource">
 			Isosceles trapezoid perimeter, slots spread evenly by arc length, facing outward (or inward). Full outline-layout support.

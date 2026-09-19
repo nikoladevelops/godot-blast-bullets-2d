@@ -617,20 +617,30 @@ class BulletSpawner2D : public Node2D{
         // One placement model instead of the old scatter pass: On Outline
         // keeps the generated slot loop; Fill Inside swaps it for a row-major
         // grid masked to the loop interior (capped at helper_bullets_amount,
-        // may return fewer on small shapes); Shell Outside spreads the same
-        // slot count over concentric outward layers. Facing rotates each
+        // may return fewer on small shapes); Layers spreads the same slot
+        // count over concentric rings (layer 0 exactly on the outline). Facing rotates each
         // default facing (Normal = as generated, Along ±90 = toward the loop
         // tangent); reverse mirrors the slot order; slot_offset rotates which
-        // slot becomes bullet 0. Fill/shell dims only show in their mode.
+        // slot becomes bullet 0. Fill/layer dims only show in their mode.
         int helper_outline_placement = 0; // BulletFactory2D::OutlinePlacement
+        // Concentric layers (LAYERS placement): layer 0 sits exactly on the
+        // outline. 1 = single exact layer (default, current behavior).
+        int helper_outline_layer_count = 1;
+        // Padding between adjacent layers in pixels. Must stay finite and > 0.
+        double helper_outline_layer_spacing = 32.0;
+        // Growth side (OutlineLayerSide): 0 outward, 1 inward, 2 both.
+        int helper_outline_layer_side = 0;
+        // Deal order (OutlineLayerFill): 0 interleaved, 1 sequential.
+        int helper_outline_layer_fill = 0;
+        // Sequential start layer: which layer sequential filling begins from
+        // (wraps around). 0 = start on the outline. Sequential mode only.
+        int helper_outline_layer_start_offset = 0;
         int helper_outline_facing = 0; // BulletFactory2D::OutlineFacing
         bool helper_outline_reverse = false;
         int helper_outline_slot_offset = 0;
         double helper_outline_fill_spacing = 32.0;
         bool helper_outline_fill_stagger = false;
         double helper_outline_fill_margin = 0.0;
-        int helper_outline_shell_layers = 1;
-        double helper_outline_shell_step = 32.0;
 
         // NEGATIVE SPACE (skip slots by index: dodge doors, bullet text).
         PackedInt32Array helper_skip_indices;
@@ -1298,6 +1308,16 @@ class BulletSpawner2D : public Node2D{
         void set_helper_path2d_facing_offset_deg(double value);
         int get_helper_outline_placement() const;
         void set_helper_outline_placement(int value);
+        int get_helper_outline_layer_count() const;
+        void set_helper_outline_layer_count(int value);
+        double get_helper_outline_layer_spacing() const;
+        void set_helper_outline_layer_spacing(double value);
+        int get_helper_outline_layer_side() const;
+        void set_helper_outline_layer_side(int value);
+        int get_helper_outline_layer_fill() const;
+        void set_helper_outline_layer_fill(int value);
+        int get_helper_outline_layer_start_offset() const;
+        void set_helper_outline_layer_start_offset(int value);
         int get_helper_outline_facing() const;
         void set_helper_outline_facing(int value);
         bool get_helper_outline_reverse() const;
@@ -1310,10 +1330,6 @@ class BulletSpawner2D : public Node2D{
         void set_helper_outline_fill_stagger(bool value);
         double get_helper_outline_fill_margin() const;
         void set_helper_outline_fill_margin(double value);
-        int get_helper_outline_shell_layers() const;
-        void set_helper_outline_shell_layers(int value);
-        double get_helper_outline_shell_step() const;
-        void set_helper_outline_shell_step(double value);
         PackedInt32Array get_helper_skip_indices() const;
         void set_helper_skip_indices(const PackedInt32Array &value);
         double get_homing_delay_sec() const;

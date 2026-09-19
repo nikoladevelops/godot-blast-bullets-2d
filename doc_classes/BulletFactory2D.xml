@@ -133,7 +133,7 @@
 			<param index="3" name="spread_exponent" type="float" default="2.0" />
 			<param index="4" name="seed" type="int" default="0" />
 			<description>
-				Deprecated: superseded by the outline_* tail params of the loop generators (deterministic placement/fill/shell). Kept bound for compatibility.
+				Deprecated: superseded by the outline_* tail params of the loop generators (deterministic placement/fill/layers). Kept bound for compatibility.
 				Universal side pass for closed-outline patterns: returns a copy of transforms with each origin pushed along its own facing by spread * pow(rand, spread_exponent). On Path returns an identity copy; Outside/Inside push along/against the facing; Both picks a random side per bullet. Facings never change. Only meaningful for closed loops (Ring, Ellipse, Polygon, Star, Flower, Rose, Lissajous, Custom, and the shape generators above) — open layouts have no inside to push toward.
 			</description>
 		</method>
@@ -188,10 +188,13 @@
 			<param index="9" name="fill_spacing" type="float" default="32.0" />
 			<param index="10" name="fill_stagger" type="bool" default="false" />
 			<param index="11" name="fill_margin" type="float" default="0.0" />
-			<param index="12" name="shell_layers" type="int" default="1" />
-			<param index="13" name="shell_step" type="float" default="32.0" />
+			<param index="12" name="layer_count" type="int" default="1" />
+			<param index="13" name="layer_spacing" type="float" default="32.0" />
+			<param index="14" name="layer_side" type="int" default="0" />
+			<param index="15" name="layer_fill" type="int" default="0" />
+			<param index="16" name="layer_start_offset" type="int" default="0" />
 			<description>
-				Generates an exact circle outline: slots spread evenly around a radius loop centered on the marker, facing outward (or inward). The outline_* tail params place slots on the loop, fill its interior, or shell its outside.
+				Generates an exact circle outline: slots spread evenly around a radius loop centered on the marker, facing outward (or inward). The outline_* tail params place slots on the loop, fill its interior, or layer it across concentric rings.
 			</description>
 		</method>
 		<method name="helper_generate_transforms_corridor" qualifiers="static">
@@ -255,8 +258,11 @@
 			<param index="11" name="fill_spacing" type="float" default="32.0" />
 			<param index="12" name="fill_stagger" type="bool" default="false" />
 			<param index="13" name="fill_margin" type="float" default="0.0" />
-			<param index="14" name="shell_layers" type="int" default="1" />
-			<param index="15" name="shell_step" type="float" default="32.0" />
+			<param index="14" name="layer_count" type="int" default="1" />
+			<param index="15" name="layer_spacing" type="float" default="32.0" />
+			<param index="16" name="layer_side" type="int" default="0" />
+			<param index="17" name="layer_fill" type="int" default="0" />
+			<param index="18" name="layer_start_offset" type="int" default="0" />
 			<description>
 				Diamond (rhombus) perimeter from its diagonals, slots spread evenly by arc length, facing outward (or inward). Zero-area diamonds stack at the marker.
 			</description>
@@ -300,8 +306,11 @@
 			<param index="16" name="fill_spacing" type="float" default="32.0" />
 			<param index="17" name="fill_stagger" type="bool" default="false" />
 			<param index="18" name="fill_margin" type="float" default="0.0" />
-			<param index="19" name="shell_layers" type="int" default="1" />
-			<param index="20" name="shell_step" type="float" default="32.0" />
+			<param index="19" name="layer_count" type="int" default="1" />
+			<param index="20" name="layer_spacing" type="float" default="32.0" />
+			<param index="21" name="layer_side" type="int" default="0" />
+			<param index="22" name="layer_fill" type="int" default="0" />
+			<param index="23" name="layer_start_offset" type="int" default="0" />
 			<description>
 				Generates a true ellipse ring with independent [code]radius_x[/code] / [code]radius_y[/code] semi-axes rotated by [code]ellipse_rotation[/code] (the ring helper's y_scale is only an approximation). Full draws every slot, Arc draws a spaced segment, Wall draws a dense arc with [code]gap_count[/code] carved dodge gaps of [code]gap_width[/code] radians each (danmaku walls with readable escape routes; the array shrinks to the surviving slots). Wall mode with gap_count 0 or gap_width 0 draws the plain arc (no carving). Facings follow the ellipse outward normal. Useful for oval bosses, stadium arenas and gap walls.
 			</description>
@@ -339,14 +348,17 @@
 			<param index="14" name="fill_spacing" type="float" default="32.0" />
 			<param index="15" name="fill_stagger" type="bool" default="false" />
 			<param index="16" name="fill_margin" type="float" default="0.0" />
-			<param index="17" name="shell_layers" type="int" default="1" />
-			<param index="18" name="shell_step" type="float" default="32.0" />
-			<param index="19" name="flower_type" type="int" default="0" />
-			<param index="20" name="inner_radius_scale" type="float" default="0.0" />
-			<param index="21" name="spiro_roller" type="float" default="45.0" />
-			<param index="22" name="spiro_pen" type="float" default="80.0" />
-			<param index="23" name="super_lobes" type="float" default="6.0" />
-			<param index="24" name="super_fullness" type="float" default="1.0" />
+			<param index="17" name="layer_count" type="int" default="1" />
+			<param index="18" name="layer_spacing" type="float" default="32.0" />
+			<param index="19" name="layer_side" type="int" default="0" />
+			<param index="20" name="layer_fill" type="int" default="0" />
+			<param index="21" name="layer_start_offset" type="int" default="0" />
+			<param index="22" name="flower_type" type="int" default="0" />
+			<param index="23" name="inner_radius_scale" type="float" default="0.0" />
+			<param index="24" name="spiro_roller" type="float" default="45.0" />
+			<param index="25" name="spiro_pen" type="float" default="80.0" />
+			<param index="26" name="super_lobes" type="float" default="6.0" />
+			<param index="27" name="super_fullness" type="float" default="1.0" />
 			<description>
 				Generates a floral spell-card pattern: [code]petals[/code] symmetric lobes around the marker, each holding [code]bullets_per_petal[/code] slots spread over [code]petal_spread[/code] radians. [code]petal_sharpness[/code] 0 gives round lobes, higher values pinch the waist into tighter flowers. [code]transforms_amount[/code] sizes the array (fewer slots than petals times per-petal truncates). [code]flower_type[/code] picks the bloom kind (0 FAN legacy, 1 RHODONEA, 2 PHYLLOTAXIS, 3 SPIROGRAPH, 4 SUPERFORMULA); [code]inner_radius_scale[/code], [code]spiro_roller[/code]/[code]spiro_pen[/code] and [code]super_lobes[/code]/[code]super_fullness[/code] tune the matching kind. Useful for boss blossoms and mandala rings.
 			</description>
@@ -425,8 +437,11 @@
 			<param index="13" name="fill_spacing" type="float" default="32.0" />
 			<param index="14" name="fill_stagger" type="bool" default="false" />
 			<param index="15" name="fill_margin" type="float" default="0.0" />
-			<param index="16" name="shell_layers" type="int" default="1" />
-			<param index="17" name="shell_step" type="float" default="32.0" />
+			<param index="16" name="layer_count" type="int" default="1" />
+			<param index="17" name="layer_spacing" type="float" default="32.0" />
+			<param index="18" name="layer_side" type="int" default="0" />
+			<param index="19" name="layer_fill" type="int" default="0" />
+			<param index="20" name="layer_start_offset" type="int" default="0" />
 			<description>
 				Generates figure-8 / weave openings: slots sweep t over the full turn on the lissajous curve (size_x * sin(freq_x * t + phase), size_y * sin(freq_y * t)) for crossing curtains with readable doors. Recipe: slow spin + lissajous weave = butterfly curtain.
 			</description>
@@ -463,10 +478,13 @@
 			<param index="11" name="fill_spacing" type="float" default="32.0" />
 			<param index="12" name="fill_stagger" type="bool" default="false" />
 			<param index="13" name="fill_margin" type="float" default="0.0" />
-			<param index="14" name="shell_layers" type="int" default="1" />
-			<param index="15" name="shell_step" type="float" default="32.0" />
+			<param index="14" name="layer_count" type="int" default="1" />
+			<param index="15" name="layer_spacing" type="float" default="32.0" />
+			<param index="16" name="layer_side" type="int" default="0" />
+			<param index="17" name="layer_fill" type="int" default="0" />
+			<param index="18" name="layer_start_offset" type="int" default="0" />
 			<description>
-				Generates a polygon perimeter (vertices corners on a radius circle from base_rotation), slots spread evenly by arc length, facing outward (or inward). The outline_* tail params place slots on the loop, fill its interior, or shell its outside.
+				Generates a polygon perimeter (vertices corners on a radius circle from base_rotation), slots spread evenly by arc length, facing outward (or inward). The outline_* tail params place slots on the loop, fill its interior, or layer it across concentric rings.
 			</description>
 		</method>
 		<method name="helper_generate_transforms_rain" qualifiers="static">
@@ -496,10 +514,13 @@
 			<param index="9" name="fill_spacing" type="float" default="32.0" />
 			<param index="10" name="fill_stagger" type="bool" default="false" />
 			<param index="11" name="fill_margin" type="float" default="0.0" />
-			<param index="12" name="shell_layers" type="int" default="1" />
-			<param index="13" name="shell_step" type="float" default="32.0" />
+			<param index="12" name="layer_count" type="int" default="1" />
+			<param index="13" name="layer_spacing" type="float" default="32.0" />
+			<param index="14" name="layer_side" type="int" default="0" />
+			<param index="15" name="layer_fill" type="int" default="0" />
+			<param index="16" name="layer_start_offset" type="int" default="0" />
 			<description>
-				Generates a rectangle perimeter walk (counter-clockwise from top-left), slots spread evenly by arc length, facing outward (or inward). Square = equal sides. The outline_* tail params place slots on the loop, fill its interior, or shell its outside.
+				Generates a rectangle perimeter walk (counter-clockwise from top-left), slots spread evenly by arc length, facing outward (or inward). Square = equal sides. The outline_* tail params place slots on the loop, fill its interior, or layer it across concentric rings.
 			</description>
 		</method>
 		<method name="helper_generate_transforms_ring" qualifiers="static">
@@ -521,9 +542,12 @@
 			<param index="14" name="fill_spacing" type="float" default="32.0" />
 			<param index="15" name="fill_stagger" type="bool" default="false" />
 			<param index="16" name="fill_margin" type="float" default="0.0" />
-			<param index="17" name="shell_layers" type="int" default="1" />
-			<param index="18" name="shell_step" type="float" default="32.0" />
-			<param index="19" name="seed" type="int" default="0" />
+			<param index="17" name="layer_count" type="int" default="1" />
+			<param index="18" name="layer_spacing" type="float" default="32.0" />
+			<param index="19" name="layer_side" type="int" default="0" />
+			<param index="20" name="layer_fill" type="int" default="0" />
+			<param index="21" name="layer_start_offset" type="int" default="0" />
+			<param index="22" name="seed" type="int" default="0" />
 			<description>
 				Generates transforms placed evenly on a ring (or arc, when [code]arc[/code] is smaller than a full turn) around the marker. Every bullet faces outward, so art drawn facing right travels away from the center. Set [code]face_outward[/code] to false for implosion patterns that fly toward the center. [code]y_scale[/code] stretches the ring into an ellipse (facing stays radial, approximate on stretched rings) and [code]facing_offset_degrees[/code] twists every facing. [code]seed[/code] drives random rotation (0 is non-deterministic). Useful for radial bursts and boss rings.
 			</description>
@@ -545,8 +569,11 @@
 			<param index="12" name="fill_spacing" type="float" default="32.0" />
 			<param index="13" name="fill_stagger" type="bool" default="false" />
 			<param index="14" name="fill_margin" type="float" default="0.0" />
-			<param index="15" name="shell_layers" type="int" default="1" />
-			<param index="16" name="shell_step" type="float" default="32.0" />
+			<param index="15" name="layer_count" type="int" default="1" />
+			<param index="16" name="layer_spacing" type="float" default="32.0" />
+			<param index="17" name="layer_side" type="int" default="0" />
+			<param index="18" name="layer_fill" type="int" default="0" />
+			<param index="19" name="layer_start_offset" type="int" default="0" />
 			<description>
 				Generates an exact rhodonea rose bloom: slots sweep theta over the full turn and sit at r = R * cos(k * theta) with k = petals. lobe_sharpness 1.0 is the exact rose (0 is round, higher pinches the waist). Recipe: Rose + phase_step_per_bullet + angular wobble = blossom finale. Used by the petal storm and blossom finale presets.
 			</description>
@@ -597,8 +624,11 @@
 			<param index="12" name="fill_spacing" type="float" default="32.0" />
 			<param index="13" name="fill_stagger" type="bool" default="false" />
 			<param index="14" name="fill_margin" type="float" default="0.0" />
-			<param index="15" name="shell_layers" type="int" default="1" />
-			<param index="16" name="shell_step" type="float" default="32.0" />
+			<param index="15" name="layer_count" type="int" default="1" />
+			<param index="16" name="layer_spacing" type="float" default="32.0" />
+			<param index="17" name="layer_side" type="int" default="0" />
+			<param index="18" name="layer_fill" type="int" default="0" />
+			<param index="19" name="layer_start_offset" type="int" default="0" />
 			<description>
 				Generates a true star shell: points alternating outer/inner vertices around the marker (distinct from the polygon helper's density bias). Boss star bursts and celebratory shells.
 			</description>
@@ -634,8 +664,11 @@
 			<param index="12" name="fill_spacing" type="float" default="32.0" />
 			<param index="13" name="fill_stagger" type="bool" default="false" />
 			<param index="14" name="fill_margin" type="float" default="0.0" />
-			<param index="15" name="shell_layers" type="int" default="1" />
-			<param index="16" name="shell_step" type="float" default="32.0" />
+			<param index="15" name="layer_count" type="int" default="1" />
+			<param index="16" name="layer_spacing" type="float" default="32.0" />
+			<param index="17" name="layer_side" type="int" default="0" />
+			<param index="18" name="layer_fill" type="int" default="0" />
+			<param index="19" name="layer_start_offset" type="int" default="0" />
 			<description>
 				Isosceles trapezoid perimeter, slots spread evenly by arc length, facing outward (or inward). A zero top base degrades to a triangle; zero-area boxes stack at the marker.
 			</description>
@@ -657,8 +690,11 @@
 			<param index="12" name="fill_spacing" type="float" default="32.0" />
 			<param index="13" name="fill_stagger" type="bool" default="false" />
 			<param index="14" name="fill_margin" type="float" default="0.0" />
-			<param index="15" name="shell_layers" type="int" default="1" />
-			<param index="16" name="shell_step" type="float" default="32.0" />
+			<param index="15" name="layer_count" type="int" default="1" />
+			<param index="16" name="layer_spacing" type="float" default="32.0" />
+			<param index="17" name="layer_side" type="int" default="0" />
+			<param index="18" name="layer_fill" type="int" default="0" />
+			<param index="19" name="layer_start_offset" type="int" default="0" />
 			<description>
 				Triangle perimeter (equilateral circumradius, isosceles base + height apex-up, right X/Y legs recentered), slots spread evenly by arc length, facing outward (or inward). Degenerate triangles stack at the marker.
 			</description>
@@ -1226,14 +1262,29 @@
 		</constant>
 		<constant name="FLOWER_SUPERFORMULA" value="4" enum="FlowerBloom">
 		</constant>
-		<constant name="OUTLINE_ON_PATH" value="0" enum="OutlinePlacement">
-			Loop-generator slots stay on the generated outline loop (default: existing patterns never change).
+		<constant name="OUTLINE_ON_OUTLINE" value="0" enum="OutlinePlacement">
+			Loop-generator slots stay exactly on the generated outline loop (single layer, the default).
 		</constant>
-		<constant name="OUTLINE_FILL_INSIDE" value="1" enum="OutlinePlacement">
+		<constant name="OUTLINE_LAYERS" value="1" enum="OutlinePlacement">
+			Loop-generator slots spread over concentric layers sharing the slot count (layer 0 sits exactly on the outline; extras step per layer_side, dealt per layer_fill).
+		</constant>
+		<constant name="OUTLINE_FILL_INSIDE" value="2" enum="OutlinePlacement">
 			Loop-generator slots are replaced by a row-major grid masked to the loop interior, capped at transforms_amount.
 		</constant>
-		<constant name="OUTLINE_SHELL_OUTSIDE" value="2" enum="OutlinePlacement">
-			Loop-generator slots spread over concentric outward layers (slot i rides layer i % layers).
+		<constant name="OUTLINE_LAYER_OUTWARD" value="0" enum="OutlineLayerSide">
+			Extra layers step outward along the slot normals.
+		</constant>
+		<constant name="OUTLINE_LAYER_INWARD" value="1" enum="OutlineLayerSide">
+			Extra layers step inward against the slot normals.
+		</constant>
+		<constant name="OUTLINE_LAYER_BOTH" value="2" enum="OutlineLayerSide">
+			Extra layers grow symmetrically (+spacing, -spacing, +2*spacing, ...).
+		</constant>
+		<constant name="OUTLINE_LAYER_INTERLEAVED" value="0" enum="OutlineLayerFill">
+			Bullet i rides layer (i % layer_count), preserving the winding order.
+		</constant>
+		<constant name="OUTLINE_LAYER_SEQUENTIAL" value="1" enum="OutlineLayerFill">
+			Layer 0 fills first, then layer 1, so small volleys still read as the base shape. layer_start_offset rotates which layer fills first.
 		</constant>
 		<constant name="OUTLINE_FACING_NORMAL" value="0" enum="OutlineFacing">
 			Loop-generator facings stay as generated (default: existing patterns never change).
