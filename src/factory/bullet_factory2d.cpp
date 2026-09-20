@@ -1290,6 +1290,62 @@ static bool outline_build_boundary(const PackedVector2Array &points, PackedVecto
     return true;
 }
 
+// ---------------------------------------------------------------------------
+// Layer-ring shared math: single source of truth for BOTH the volley
+// (layout_outline_slots below) and the spawner preview (rebuild_preview).
+// Each extra layer re-spawns the selected shape scaled about the loop
+// center (mean of the base slot loop): same figure at every layer, like a
+// second spawner with a bigger shape. Pure functions (no state); identical
+// inputs always give identical outputs, so dots and rings can never drift
+// apart.
+// ---------------------------------------------------------------------------
+
+double BulletFactory2D::helper_layer_scale_factor(int layer_index, double scale_step, int side) {
+	if (layer_index <= 0) {
+		return 1.0;
+	}
+	if (!Math::is_finite(scale_step) || scale_step <= 0.0 || scale_step > 8.0) {
+		UtilityFunctions::push_error("helper_layer_scale_factor: scale_step must be finite in (0, 8].");
+		return 1.0;
+	}
+	if (side == OUTLINE_LAYER_INWARD) {
+		// Reciprocal so inward layers crowd toward the center without ever
+		// crossing through zero and mirroring.
+		return 1.0 / (1.0 + (double)layer_index * scale_step);
+	}
+	if (side == OUTLINE_LAYER_BOTH) {
+		const int k = (layer_index + 1) / 2; // 1,1,2,2,3,3...
+		return (layer_index % 2 == 1) ? (1.0 + (double)k * scale_step) : (1.0 / (1.0 + (double)k * scale_step));
+	}
+	if (side != OUTLINE_LAYER_OUTWARD) {
+		UtilityFunctions::push_error("helper_layer_scale_factor: side must be 0 (outward), 1 (inward) or 2 (both).");
+		return 1.0;
+	}
+	return 1.0 + (double)layer_index * scale_step;
+}
+
+// Deal order shared by the volley layout, the spawner preview and the debug
+// coincidence check, so all three agree on which bullet rides which layer.
+// INTERLEAVED deals round-robin (bullet i rides layer i % count, preserving
+// the winding order); SEQUENTIAL fills contiguous chunks starting from
+// layer_start_offset (wrapping, so 0 keeps the outline-first order and small
+// volleys still read as the base shape). Degenerate inputs yield layer 0.
+int BulletFactory2D::helper_bullet_layer_index(
+		int bullet_index,
+		int slot_count,
+		int layer_count,
+		int layer_fill,
+		int layer_start_offset) {
+	if (layer_count <= 1 || slot_count <= 0 || bullet_index < 0) {
+		return 0;
+	}
+	if (layer_fill == OUTLINE_LAYER_SEQUENTIAL) {
+		const int64_t start = layer_start_offset >= 0 ? (int64_t)layer_start_offset : 0;
+		return (int)(((int64_t)bullet_index * (int64_t)layer_count) / (int64_t)slot_count + start) % (int64_t)layer_count;
+	}
+	return bullet_index % layer_count;
+}
+
 static TypedArray<Transform2D> layout_outline_slots(
         const char *caller_name,
         const Transform2D &marker_transform,
@@ -1308,7 +1364,7 @@ static TypedArray<Transform2D> layout_outline_slots(
         bool fill_stagger,
         double fill_margin,
         int layer_count,
-        double layer_spacing,
+        double layer_scale,
         int layer_side,
         int layer_fill,
         int layer_start_offset) {
@@ -1317,6 +1373,23 @@ static TypedArray<Transform2D> layout_outline_slots(
     if (n <= 0) {
         return out;
     }
+    // Slot-space copy of the loop: the LAYERS rescale below runs in slot
+    // space (local for the xform builders, marker-global otherwise), so
+    // marker translation must not leak into the scale. Conversion back to
+    // global happens once, in place_origin(). Slot space is origin-centered
+    // by construction (every loop generator builds centered shapes), so
+    // layers scale about Vector2(0, 0) — the marker origin — on both the
+    // volley and the preview side, exactly, at any bullet density.
+    PackedVector2Array slot_points;
+    slot_points.resize(n);
+    for (int i = 0; i < n; ++i) {
+        const Vector2 gp = points[i];
+        slot_points[i] = points_are_local ? gp : marker_transform.affine_inverse().xform(gp);
+    }
+    // Loop centroid in slot space: every extra layer rescales the slot loop
+    // about this point, so each ring is the same figure at a different size
+    // (like a second spawner with a bigger shape). Falls back to the
+    // slot-space origin (the marker origin) when degenerate.
     if (normals.size() != n) {
         UtilityFunctions::push_error(String(caller_name) + ": outline points/normals mismatch.");
         return out;
@@ -1345,8 +1418,8 @@ static TypedArray<Transform2D> layout_outline_slots(
         }
     }
     if (outline_placement == BulletFactory2D::OUTLINE_LAYERS) {
-        if (layer_count < 1 || !Math::is_finite(layer_spacing) || layer_spacing <= 0.0) {
-            UtilityFunctions::push_error(String(caller_name) + ": layer_count must be >= 1, layer_spacing finite and > 0.");
+        if (layer_count < 1 || layer_count > 64 || !Math::is_finite(layer_scale) || layer_scale <= 0.0 || layer_scale > 8.0) {
+            UtilityFunctions::push_error(String(caller_name) + ": layer_count must be in [1, 64], layer_scale finite in (0, 8].");
             return out;
         }
         if (layer_side < BulletFactory2D::OUTLINE_LAYER_OUTWARD || layer_side > BulletFactory2D::OUTLINE_LAYER_BOTH) {
@@ -1360,6 +1433,28 @@ static TypedArray<Transform2D> layout_outline_slots(
         if (layer_start_offset < 0) {
             UtilityFunctions::push_error(String(caller_name) + ": layer_start_offset must be >= 0 (0 = start on the outline).");
             return out;
+        }
+        // Collapse precheck: the smallest dealt scale must stay usable,
+        // otherwise deep inward layers would pile onto (or through) the
+        // center. Only layers that receive bullets are tested, so sparse
+        // sequentials never trip on empty rings. Fail loud instead of
+        // spawning a collapsed volley.
+        bool seen[64] = { false };
+        for (int i = 0; i < n; ++i) {
+            const int bl = BulletFactory2D::helper_bullet_layer_index(i, n, layer_count, layer_fill, layer_start_offset);
+            if (bl > 0 && bl < layer_count) {
+                seen[bl] = true;
+            }
+        }
+        for (int L = 1; L < layer_count; ++L) {
+            if (!seen[L]) {
+                continue;
+            }
+            const double s = BulletFactory2D::helper_layer_scale_factor(L, layer_scale, layer_side);
+            if (!Math::is_finite(s) || s < 0.05) {
+                UtilityFunctions::push_error(String(caller_name) + ": inward layers collapse below 5% size (lower the count/step).");
+                return out;
+            }
         }
     }
     const real_t facing_offset = Math::deg_to_rad(facing_offset_degrees);
@@ -1461,38 +1556,44 @@ static TypedArray<Transform2D> layout_outline_slots(
         return out;
     }
     for (int i = 0; i < n; ++i) {
-        const int j = idx[i];
-        const Vector2 base = (j >= 0 && j < points.size()) ? points[j] : marker_transform.get_origin();
-        Vector2 local = base;
+        // Bullet i rides the (possibly reverse/offset-edited) slot loop in
+        // order: the loop IS the figure, so layers only rescale that slot's
+        // point about the loop center and never reseat bullets onto other
+        // slots. (Interleaved vs sequential only choose WHICH layer the slot
+        // rides: round-robin vs the contiguous-chunk deal.)
+        const int j = (i >= 0 && i < idx.size()) ? idx[i] : ((n > 0) ? (i % n) : 0);
+        const Vector2 slot_base = (j >= 0 && j < slot_points.size()) ? slot_points[j] : Vector2(0, 0);
+        Vector2 local = slot_base;
         if (outline_placement == BulletFactory2D::OUTLINE_LAYERS) {
-            // Layer assignment: INTERLEAVED deals bullet i to (i % count) so
-            // the winding order survives; SEQUENTIAL fills layer 0 first
-            // (layer = i * count / n) so small volleys still read as the
-            // base shape. Layer 0 always sits exactly on the outline.
-            // Sequential deals contiguous chunks starting from layer_start_offset
-            // (wrapping around, so 0 keeps the old outline-first order); the
-            // modulo is safe: layer_count >= 1 was validated above.
-            const int bullet_layer = (layer_fill == BulletFactory2D::OUTLINE_LAYER_SEQUENTIAL && n > 0)
-                ? (int)(((int64_t)i * (int64_t)layer_count) / (int64_t)n + (int64_t)layer_start_offset) % layer_count
-                : (layer_count > 0 ? (i % layer_count) : 0);
-            double signed_dist = 0.0;
+            // Layer 0 always sits exactly on the outline. Higher layers
+            // re-spawn the same slot scaled about the loop center, so every
+            // layer is the identical figure at a different size. Facings
+            // still use the slot normals below and never change across
+            // layers. Scale and deal come from the shared helpers so the
+            // preview (which scales identically) can never disagree with
+            // the volley.
+            // NOTE: slot_points are already in slot space (local for the
+            // xform builders, marker-global otherwise), which is
+            // origin-centered by construction, so scale here and convert to
+            // global once below: translation can never leak into the scale,
+            // at any marker position.
+            const int bullet_layer = BulletFactory2D::helper_bullet_layer_index(i, n, layer_count, layer_fill, layer_start_offset);
             if (bullet_layer > 0) {
-                if (layer_side == BulletFactory2D::OUTLINE_LAYER_INWARD) {
-                    signed_dist = -((double)bullet_layer * layer_spacing);
-                } else if (layer_side == BulletFactory2D::OUTLINE_LAYER_BOTH) {
-                    const int k = (bullet_layer + 1) / 2; // 1,1,2,2,3,3...
-                    signed_dist = (bullet_layer % 2 == 1) ? ((double)k * layer_spacing) : (-(double)k * layer_spacing);
-                } else {
-                    signed_dist = (double)bullet_layer * layer_spacing;
+                const double layer_s = BulletFactory2D::helper_layer_scale_factor(bullet_layer, layer_scale, layer_side);
+                if (Math::is_finite(layer_s) && layer_s >= 0.05) {
+                    const Vector2 scaled = local * (real_t)layer_s;
+                    if (scaled.is_finite()) {
+                        local = scaled;
+                    }
                 }
             }
-            Vector2 outward = (j >= 0 && j < normals.size()) ? normals[j] : Vector2(1, 0);
-            if (!outward.is_finite() || outward.length_squared() <= 1e-12) {
-                outward = Vector2(1, 0);
-            }
-            outward = outward.normalized();
-            const Vector2 pushed = base + outward * (real_t)signed_dist;
-            local = pushed.is_finite() ? pushed : base;
+        }
+        // Slot-space -> global: local builders xform through place_origin;
+        // global builders stored origin-relative slots that must be composed
+        // back onto the marker (place_origin passes those through untouched).
+        if (!points_are_local && local.is_finite()) {
+            const Vector2 back = marker_transform.xform(local);
+            local = back.is_finite() ? back : marker_transform.get_origin();
         }
         Transform2D slot(compose_facing(j), place_origin(local));
         slot.set_scale(marker_scale);
@@ -1524,7 +1625,7 @@ TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_ring(
 		bool fill_stagger,
 		double fill_margin,
 		int layer_count,
-		double layer_spacing,
+		double layer_scale,
 		int layer_side,
 		int layer_fill,
 		int layer_start_offset,
@@ -1579,7 +1680,7 @@ TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_ring(
 			facing_override[i] = (ring_seeded ? ring_rng->randf() : UtilityFunctions::randf()) * Math::TAU;
 		}
 	}
-	return layout_outline_slots("helper_generate_transforms_ring", marker_transform, loop_points, loop_normals, false, 0.0, face_outward, facing_offset_degrees, facing_override, outline_placement, outline_facing, outline_reverse, outline_slot_offset, fill_spacing, fill_stagger, fill_margin, layer_count, layer_spacing, layer_side, layer_fill, layer_start_offset);
+	return layout_outline_slots("helper_generate_transforms_ring", marker_transform, loop_points, loop_normals, false, 0.0, face_outward, facing_offset_degrees, facing_override, outline_placement, outline_facing, outline_reverse, outline_slot_offset, fill_spacing, fill_stagger, fill_margin, layer_count, layer_scale, layer_side, layer_fill, layer_start_offset);
 }
 
 TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_fan(
@@ -1873,7 +1974,7 @@ TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_flower(
 		bool fill_stagger,
 		double fill_margin,
 		int layer_count,
-		double layer_spacing,
+		double layer_scale,
 		int layer_side,
 		int layer_fill,
 		int layer_start_offset,
@@ -2020,7 +2121,7 @@ TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_flower(
 			loop_normals[i] = (radial.length_squared() > 1e-12) ? radial : Vector2(1, 0);
 		}
 	}
-	return layout_outline_slots("helper_generate_transforms_flower", marker_transform, loop_points, loop_normals, false, 0.0, face_outward, facing_offset_degrees, PackedFloat32Array(), outline_placement, outline_facing, outline_reverse, outline_slot_offset, fill_spacing, fill_stagger, fill_margin, layer_count, layer_spacing, layer_side, layer_fill, layer_start_offset);
+	return layout_outline_slots("helper_generate_transforms_flower", marker_transform, loop_points, loop_normals, false, 0.0, face_outward, facing_offset_degrees, PackedFloat32Array(), outline_placement, outline_facing, outline_reverse, outline_slot_offset, fill_spacing, fill_stagger, fill_margin, layer_count, layer_scale, layer_side, layer_fill, layer_start_offset);
 }
 
 TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_ellipse(
@@ -2044,7 +2145,7 @@ TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_ellipse(
 		bool fill_stagger,
 		double fill_margin,
 		int layer_count,
-		double layer_spacing,
+		double layer_scale,
 		int layer_side,
 		int layer_fill,
 		int layer_start_offset) {
@@ -2112,7 +2213,7 @@ TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_ellipse(
 		}
 		loop_normals.push_back(normal.normalized());
 	}
-	return layout_outline_slots("helper_generate_transforms_ellipse", marker_transform, loop_points, loop_normals, false, 0.0, face_outward, facing_offset_degrees, PackedFloat32Array(), outline_placement, outline_facing, outline_reverse, outline_slot_offset, fill_spacing, fill_stagger, fill_margin, layer_count, layer_spacing, layer_side, layer_fill, layer_start_offset);
+	return layout_outline_slots("helper_generate_transforms_ellipse", marker_transform, loop_points, loop_normals, false, 0.0, face_outward, facing_offset_degrees, PackedFloat32Array(), outline_placement, outline_facing, outline_reverse, outline_slot_offset, fill_spacing, fill_stagger, fill_margin, layer_count, layer_scale, layer_side, layer_fill, layer_start_offset);
 }
 
 TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_rain(
@@ -2474,7 +2575,7 @@ TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_star(
 		bool fill_stagger,
 		double fill_margin,
 		int layer_count,
-		double layer_spacing,
+		double layer_scale,
 		int layer_side,
 		int layer_fill,
 		int layer_start_offset) {
@@ -2515,7 +2616,7 @@ TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_star(
 		loop_points[i] = origin + Vector2(Math::cos(angle), Math::sin(angle)) * r;
 		loop_normals[i] = Vector2(Math::cos(angle), Math::sin(angle));
 	}
-	return layout_outline_slots("helper_generate_transforms_star", marker_transform, loop_points, loop_normals, false, 0.0, face_outward, facing_offset_degrees, PackedFloat32Array(), outline_placement, outline_facing, outline_reverse, outline_slot_offset, fill_spacing, fill_stagger, fill_margin, layer_count, layer_spacing, layer_side, layer_fill, layer_start_offset);
+	return layout_outline_slots("helper_generate_transforms_star", marker_transform, loop_points, loop_normals, false, 0.0, face_outward, facing_offset_degrees, PackedFloat32Array(), outline_placement, outline_facing, outline_reverse, outline_slot_offset, fill_spacing, fill_stagger, fill_margin, layer_count, layer_scale, layer_side, layer_fill, layer_start_offset);
 }
 
 TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_heart(
@@ -2524,7 +2625,19 @@ TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_heart(
 		real_t size,
 		real_t base_rotation,
 		bool face_outward,
-		real_t facing_offset_degrees) {
+		real_t facing_offset_degrees,
+		int outline_placement,
+		int outline_facing,
+		bool outline_reverse,
+		int outline_slot_offset,
+		double fill_spacing,
+		bool fill_stagger,
+		double fill_margin,
+		int layer_count,
+		double layer_scale,
+		int layer_side,
+		int layer_fill,
+		int layer_start_offset) {
 	if (!danmaku_validate_head("helper_generate_transforms_heart", transforms_amount, marker_transform)) {
 		return TypedArray<Transform2D>();
 	}
@@ -2536,12 +2649,20 @@ TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_heart(
 		UtilityFunctions::push_error("helper_generate_transforms_heart: base_rotation and facing_offset_degrees must be finite.");
 		return TypedArray<Transform2D>();
 	}
-	TypedArray<Transform2D> generated_transforms = danmaku_make_slots(transforms_amount);
-	if (transforms_amount == 0) {
-		return generated_transforms;
-	}
+	// Slot loop in global space plus center-radial outward normals; layer
+	// offsets run radially so every ring keeps the heart figure. Facings
+	// ride a per-slot override holding the legacy radial facings byte-exact
+	// (the shared worker only adds the outline_facing selector on top), so
+	// on-outline output is unchanged by the layout routing.
+	PackedVector2Array loop_points;
+	PackedVector2Array loop_normals;
+	PackedFloat32Array facing_override;
+	loop_points.resize(transforms_amount);
+	loop_normals.resize(transforms_amount);
+	facing_override.resize(transforms_amount);
 	const Vector2 origin = marker_transform.get_origin();
 	const real_t facing_offset = Math::deg_to_rad(facing_offset_degrees);
+	const Vector2 fallback_dir = Vector2(Math::cos(base_rotation), Math::sin(base_rotation));
 	const real_t scale = size / 32.0;
 	for (int i = 0; i < transforms_amount; ++i) {
 		const real_t t = Math::TAU * (real_t)i / (real_t)transforms_amount;
@@ -2549,14 +2670,15 @@ TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_heart(
 		const real_t hy = 13.0 * Math::cos(t) - 5.0 * Math::cos(2.0 * t) - 2.0 * Math::cos(3.0 * t) - Math::cos(4.0 * t);
 		Vector2 local = Vector2(hx, -hy) * scale;
 		local = local.rotated(base_rotation);
-		const Vector2 pos = origin + local;
+		if (!local.is_finite()) {
+			local = Vector2(0, 0);
+		}
+		loop_points[i] = origin + local;
+		loop_normals[i] = (local.length_squared() > 1e-12) ? local.normalized() : fallback_dir;
 		const real_t radial = (local.length_squared() > 0.0) ? local.angle() : base_rotation;
-		real_t facing = face_outward ? radial : radial + Math::PI;
-		Transform2D slot(facing + facing_offset, pos);
-		danmaku_apply_marker_scale(slot, marker_transform);
-		generated_transforms[i] = slot;
+		facing_override[i] = (face_outward ? radial : radial + Math::PI) + facing_offset;
 	}
-	return generated_transforms;
+	return layout_outline_slots("helper_generate_transforms_heart", marker_transform, loop_points, loop_normals, false, 0.0, face_outward, facing_offset_degrees, facing_override, outline_placement, outline_facing, outline_reverse, outline_slot_offset, fill_spacing, fill_stagger, fill_margin, layer_count, layer_scale, layer_side, layer_fill, layer_start_offset);
 }
 
 TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_wave(
@@ -2770,7 +2892,7 @@ TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_rose(
 		bool fill_stagger,
 		double fill_margin,
 		int layer_count,
-		double layer_spacing,
+		double layer_scale,
 		int layer_side,
 		int layer_fill,
 		int layer_start_offset) {
@@ -2808,7 +2930,7 @@ TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_rose(
 		const real_t shape_angle = (cos_k >= 0.0) ? theta : theta + Math::PI;
 		loop_normals[i] = Vector2(Math::cos(shape_angle), Math::sin(shape_angle));
 	}
-	return layout_outline_slots("helper_generate_transforms_rose", marker_transform, loop_points, loop_normals, false, 0.0, face_outward, facing_offset_degrees, PackedFloat32Array(), outline_placement, outline_facing, outline_reverse, outline_slot_offset, fill_spacing, fill_stagger, fill_margin, layer_count, layer_spacing, layer_side, layer_fill, layer_start_offset);
+	return layout_outline_slots("helper_generate_transforms_rose", marker_transform, loop_points, loop_normals, false, 0.0, face_outward, facing_offset_degrees, PackedFloat32Array(), outline_placement, outline_facing, outline_reverse, outline_slot_offset, fill_spacing, fill_stagger, fill_margin, layer_count, layer_scale, layer_side, layer_fill, layer_start_offset);
 }
 
 TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_counter_spiral(
@@ -2971,7 +3093,7 @@ TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_lissajous(
 		bool fill_stagger,
 		double fill_margin,
 		int layer_count,
-		double layer_spacing,
+		double layer_scale,
 		int layer_side,
 		int layer_fill,
 		int layer_start_offset) {
@@ -3005,7 +3127,7 @@ TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_lissajous(
 		loop_points[i] = origin + offset;
 		loop_normals[i] = (offset.length_squared() > 0.0) ? offset.normalized() : Vector2(Math::cos(marker_rot), Math::sin(marker_rot));
 	}
-	return layout_outline_slots("helper_generate_transforms_lissajous", marker_transform, loop_points, loop_normals, false, 0.0, face_outward, facing_offset_degrees, PackedFloat32Array(), outline_placement, outline_facing, outline_reverse, outline_slot_offset, fill_spacing, fill_stagger, fill_margin, layer_count, layer_spacing, layer_side, layer_fill, layer_start_offset);
+	return layout_outline_slots("helper_generate_transforms_lissajous", marker_transform, loop_points, loop_normals, false, 0.0, face_outward, facing_offset_degrees, PackedFloat32Array(), outline_placement, outline_facing, outline_reverse, outline_slot_offset, fill_spacing, fill_stagger, fill_margin, layer_count, layer_scale, layer_side, layer_fill, layer_start_offset);
 }
 
 // Forward: defined below, used by the shape primitives above it.
@@ -3025,7 +3147,7 @@ TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_circle(
 		bool fill_stagger,
 		double fill_margin,
 		int layer_count,
-		double layer_spacing,
+		double layer_scale,
 		int layer_side,
 		int layer_fill,
 		int layer_start_offset) {
@@ -3049,7 +3171,7 @@ TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_circle(
 		loop_points[i] = Vector2(Math::cos(angle), Math::sin(angle)) * radius;
 		loop_normals[i] = Vector2(Math::cos(angle), Math::sin(angle));
 	}
-	return layout_outline_slots("helper_generate_transforms_circle", marker_transform, loop_points, loop_normals, true, marker_rot, face_outward, facing_offset_degrees, PackedFloat32Array(), outline_placement, outline_facing, outline_reverse, outline_slot_offset, fill_spacing, fill_stagger, fill_margin, layer_count, layer_spacing, layer_side, layer_fill, layer_start_offset);
+	return layout_outline_slots("helper_generate_transforms_circle", marker_transform, loop_points, loop_normals, true, marker_rot, face_outward, facing_offset_degrees, PackedFloat32Array(), outline_placement, outline_facing, outline_reverse, outline_slot_offset, fill_spacing, fill_stagger, fill_margin, layer_count, layer_scale, layer_side, layer_fill, layer_start_offset);
 }
 
 TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_rectangle(
@@ -3066,7 +3188,7 @@ TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_rectangle(
 		bool fill_stagger,
 		double fill_margin,
 		int layer_count,
-		double layer_spacing,
+		double layer_scale,
 		int layer_side,
 		int layer_fill,
 		int layer_start_offset) {
@@ -3125,7 +3247,21 @@ TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_rectangle(
 		const int ia = side % 4;
 		const int ib = (side + 1) % 4;
 		Vector2 local = corners[ia].lerp(corners[ib], t);
-		Vector2 nrm = normals[ia].lerp(normals[ib], t);
+		// Edge-constant normals everywhere on the edge (same orientation
+		// rule): corner-exact slots face along the edge they start, so
+		// bullet 0 faces straight instead of diagonally.
+		const Vector2 seg = corners[ib] - corners[ia];
+		Vector2 edge_n = seg.length_squared() > 1e-12 ? seg.orthogonal().normalized() : Vector2(0, 0);
+		const Vector2 ref = normals[ia].length_squared() > 1e-12 ? normals[ia] : normals[ib];
+		if (edge_n.length_squared() > 1e-12 && ref.length_squared() > 1e-12 && edge_n.dot(ref) < 0.0) {
+			edge_n = -edge_n;
+		}
+		Vector2 nrm;
+		if (t > (real_t)1e-4 && t < (real_t)1.0 - (real_t)1e-4) {
+			nrm = edge_n.length_squared() > 1e-12 ? edge_n : normals[ia];
+		} else {
+			nrm = edge_n.length_squared() > 1e-12 ? edge_n : (t < (real_t)0.5 ? normals[ia] : normals[ib]);
+		}
 		if (nrm.length_squared() <= 1e-12) {
 			nrm = normals[ia];
 		}
@@ -3137,7 +3273,7 @@ TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_rectangle(
 		loop_points[i] = local;
 		loop_normals[i] = nrm;
 	}
-	return layout_outline_slots("helper_generate_transforms_rectangle", marker_transform, loop_points, loop_normals, true, marker_rot, face_outward, facing_offset_degrees, PackedFloat32Array(), outline_placement, outline_facing, outline_reverse, outline_slot_offset, fill_spacing, fill_stagger, fill_margin, layer_count, layer_spacing, layer_side, layer_fill, layer_start_offset);
+	return layout_outline_slots("helper_generate_transforms_rectangle", marker_transform, loop_points, loop_normals, true, marker_rot, face_outward, facing_offset_degrees, PackedFloat32Array(), outline_placement, outline_facing, outline_reverse, outline_slot_offset, fill_spacing, fill_stagger, fill_margin, layer_count, layer_scale, layer_side, layer_fill, layer_start_offset);
 }
 
 TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_polygon(
@@ -3156,7 +3292,7 @@ TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_polygon(
 		bool fill_stagger,
 		double fill_margin,
 		int layer_count,
-		double layer_spacing,
+		double layer_scale,
 		int layer_side,
 		int layer_fill,
 		int layer_start_offset) {
@@ -3216,7 +3352,21 @@ TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_polygon(
 		const int ia = seg % vertices;
 		const int ib = (seg + 1) % vertices;
 		Vector2 local = corners[ia].lerp(corners[ib], t);
-		Vector2 nrm = normals[ia].lerp(normals[ib], t);
+		// Edge-constant normals everywhere on the edge (same orientation
+		// rule): corner-exact slots face along the edge they start, so
+		// bullet 0 faces straight instead of diagonally.
+		const Vector2 segd = corners[ib] - corners[ia];
+		Vector2 edge_n = segd.length_squared() > 1e-12 ? segd.orthogonal().normalized() : Vector2(0, 0);
+		const Vector2 ref = normals[ia].length_squared() > 1e-12 ? normals[ia] : normals[ib];
+		if (edge_n.length_squared() > 1e-12 && ref.length_squared() > 1e-12 && edge_n.dot(ref) < 0.0) {
+			edge_n = -edge_n;
+		}
+		Vector2 nrm;
+		if (t > (real_t)1e-4 && t < (real_t)1.0 - (real_t)1e-4) {
+			nrm = edge_n.length_squared() > 1e-12 ? edge_n : normals[ia];
+		} else {
+			nrm = edge_n.length_squared() > 1e-12 ? edge_n : (t < (real_t)0.5 ? normals[ia] : normals[ib]);
+		}
 		if (nrm.length_squared() <= 1e-12) {
 			nrm = normals[ia];
 		}
@@ -3228,7 +3378,7 @@ TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_polygon(
 		loop_points[i] = local;
 		loop_normals[i] = nrm;
 	}
-	return layout_outline_slots("helper_generate_transforms_polygon", marker_transform, loop_points, loop_normals, true, marker_rot, face_outward, facing_offset_degrees, PackedFloat32Array(), outline_placement, outline_facing, outline_reverse, outline_slot_offset, fill_spacing, fill_stagger, fill_margin, layer_count, layer_spacing, layer_side, layer_fill, layer_start_offset);
+	return layout_outline_slots("helper_generate_transforms_polygon", marker_transform, loop_points, loop_normals, true, marker_rot, face_outward, facing_offset_degrees, PackedFloat32Array(), outline_placement, outline_facing, outline_reverse, outline_slot_offset, fill_spacing, fill_stagger, fill_margin, layer_count, layer_scale, layer_side, layer_fill, layer_start_offset);
 }
 
 
@@ -3329,8 +3479,11 @@ static Dictionary outline_track_result(const PackedVector2Array &points, bool cl
 // Shared per-type flower curve evaluator: marker-relative offset for
 // parameter t in [0, TAU). Mirrors the generator branches exactly so the
 // preview track and the volley agree. Returns false when the point is
-// unusable (caller falls back to origin).
-static bool flower_curve_point(int flower_type, int petals, real_t radius, real_t petal_spread, real_t petal_sharpness, double inner_radius_scale, double spiro_roller, double spiro_pen, double super_lobes, double super_fullness, real_t base_rotation, double t, Vector2 &r_offset) {
+// unusable (caller falls back to origin). petal_override/frac_override pin
+// a FAN evaluation to an explicit (petal, frac) slot (-1/2.0 = derive from
+// t): the arc endpoint frac = +0.5 maps to the next petal's t, so exact
+// endpoints are only reachable through the override.
+static bool flower_curve_point(int flower_type, int petals, real_t radius, real_t petal_spread, real_t petal_sharpness, double inner_radius_scale, double spiro_roller, double spiro_pen, double super_lobes, double super_fullness, real_t base_rotation, double t, Vector2 &r_offset, int petal_override = -1, double frac_override = 2.0) {
 	(void)petal_spread;
 	const double clamped_inner = Math::clamp(inner_radius_scale, 0.0, 0.999);
 	if (flower_type == BulletFactory2D::FLOWER_FAN) {
@@ -3340,8 +3493,12 @@ static bool flower_curve_point(int flower_type, int petals, real_t radius, real_
 		// between lobes by the waist term. Sampling the arcs back-to-back
 		// over one revolution reproduces the flower outline.
 		const double pf = ((double)t / Math::TAU) * (double)petals;
-		const int petal_idx = Math::clamp((int)Math::floor(pf), 0, petals - 1);
-		const double frac = pf - (double)petal_idx - 0.5; // -0.5..0.5 within petal
+		int petal_idx = Math::clamp((int)Math::floor(pf), 0, petals - 1);
+		double frac = pf - (double)petal_idx - 0.5; // -0.5..0.5 within petal
+		if (petal_override >= 0 && petal_override < petals && frac_override >= -0.5 && frac_override <= 0.5) {
+			petal_idx = petal_override;
+			frac = frac_override;
+		}
 		const real_t lobe_center = base_rotation + Math::TAU * (real_t)petal_idx / (real_t)petals;
 		const real_t angle = lobe_center + (real_t)(frac * petal_spread);
 		const double sharp = (double)petal_sharpness;
@@ -3434,6 +3591,30 @@ Dictionary BulletFactory2D::helper_sample_outline_flower(int flower_type, int pe
 	}
 	const int n = Math::min(160 * revolutions, 2048);
 	PackedVector2Array pts;
+	// FAN traces back-to-back petal arcs that jump discontinuously at petal
+	// boundaries: sample each petal separately (exact arc endpoints, INF
+	// separators between) so tracks and rings draw per-petal arcs instead
+	// of bridging spokes, and volley slots at the arc ends sit on ring
+	// vertices instead of past the last sample.
+	if (flower_type == FLOWER_FAN && petals >= 1) {
+		const int per = Math::max(n / petals, 4);
+		for (int k = 0; k < petals; ++k) {
+			for (int j = 0; j <= per; ++j) {
+				const double frac = (double)j / (double)per - 0.5;
+				const double t = Math::TAU * ((double)k + frac + 0.5) / (double)petals;
+				Vector2 off;
+				if (flower_curve_point(flower_type, petals, radius, petal_spread, petal_sharpness, inner_radius_scale, spiro_roller, spiro_pen, super_lobes, super_fullness, base_rotation, t, off, k, frac)) {
+					pts.push_back(off);
+				}
+			}
+			pts.push_back(Vector2(Math::INF, Math::INF));
+		}
+		if (pts.size() < 3) {
+			return outline_track_result(PackedVector2Array(), false);
+		}
+		return outline_track_result(pts, true);
+	}
+	int prev_petal = -1;
 	for (int i = 0; i < n; ++i) {
 		const double t = Math::TAU * (double)revolutions * (double)i / (double)n;
 		Vector2 off;
@@ -3967,7 +4148,21 @@ static bool sample_closed_polygon_loop(const PackedVector2Array &corners, int co
 		const int ia = seg % n;
 		const int ib = (seg + 1) % n;
 		Vector2 local = corners[ia].lerp(corners[ib], (real_t)tt);
-		Vector2 nrm = normals[ia].lerp(normals[ib], (real_t)tt);
+		// Edge-constant normals everywhere on the edge (same orientation
+		// rule): corner-exact slots face along the edge they start, so
+		// bullet 0 faces straight instead of diagonally.
+		const Vector2 segd = corners[ib] - corners[ia];
+		Vector2 edge_n = segd.length_squared() > 1e-12 ? segd.orthogonal().normalized() : Vector2(0, 0);
+		const Vector2 ref = normals[ia].length_squared() > 1e-12 ? normals[ia] : normals[ib];
+		if (edge_n.length_squared() > 1e-12 && ref.length_squared() > 1e-12 && edge_n.dot(ref) < 0.0) {
+			edge_n = -edge_n;
+		}
+		Vector2 nrm;
+		if (tt > 1e-4 && tt < 1.0 - 1e-4) {
+			nrm = edge_n.length_squared() > 1e-12 ? edge_n : normals[ia];
+		} else {
+			nrm = edge_n.length_squared() > 1e-12 ? edge_n : (tt < 0.5 ? normals[ia] : normals[ib]);
+		}
 		if (nrm.length_squared() <= 1e-12) {
 			nrm = normals[ia];
 		}
@@ -4012,7 +4207,7 @@ TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_triangle(
 		bool fill_stagger,
 		double fill_margin,
 		int layer_count,
-		double layer_spacing,
+		double layer_scale,
 		int layer_side,
 		int layer_fill,
 		int layer_start_offset) {
@@ -4041,7 +4236,7 @@ TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_triangle(
 		}
 		return stacked;
 	}
-	return layout_outline_slots("helper_generate_transforms_triangle", marker_transform, loop_points, loop_normals, true, marker_transform.get_rotation(), face_outward, facing_offset_degrees, PackedFloat32Array(), outline_placement, outline_facing, outline_reverse, outline_slot_offset, fill_spacing, fill_stagger, fill_margin, layer_count, layer_spacing, layer_side, layer_fill, layer_start_offset);
+	return layout_outline_slots("helper_generate_transforms_triangle", marker_transform, loop_points, loop_normals, true, marker_transform.get_rotation(), face_outward, facing_offset_degrees, PackedFloat32Array(), outline_placement, outline_facing, outline_reverse, outline_slot_offset, fill_spacing, fill_stagger, fill_margin, layer_count, layer_scale, layer_side, layer_fill, layer_start_offset);
 }
 
 TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_trapezoid(
@@ -4061,7 +4256,7 @@ TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_trapezoid(
 		bool fill_stagger,
 		double fill_margin,
 		int layer_count,
-		double layer_spacing,
+		double layer_scale,
 		int layer_side,
 		int layer_fill,
 		int layer_start_offset) {
@@ -4084,7 +4279,7 @@ TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_trapezoid(
 		}
 		return stacked;
 	}
-	return layout_outline_slots("helper_generate_transforms_trapezoid", marker_transform, loop_points, loop_normals, true, marker_transform.get_rotation(), face_outward, facing_offset_degrees, PackedFloat32Array(), outline_placement, outline_facing, outline_reverse, outline_slot_offset, fill_spacing, fill_stagger, fill_margin, layer_count, layer_spacing, layer_side, layer_fill, layer_start_offset);
+	return layout_outline_slots("helper_generate_transforms_trapezoid", marker_transform, loop_points, loop_normals, true, marker_transform.get_rotation(), face_outward, facing_offset_degrees, PackedFloat32Array(), outline_placement, outline_facing, outline_reverse, outline_slot_offset, fill_spacing, fill_stagger, fill_margin, layer_count, layer_scale, layer_side, layer_fill, layer_start_offset);
 }
 
 TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_diamond(
@@ -4103,7 +4298,7 @@ TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_diamond(
 		bool fill_stagger,
 		double fill_margin,
 		int layer_count,
-		double layer_spacing,
+		double layer_scale,
 		int layer_side,
 		int layer_fill,
 		int layer_start_offset) {
@@ -4126,7 +4321,7 @@ TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_diamond(
 		}
 		return stacked;
 	}
-	return layout_outline_slots("helper_generate_transforms_diamond", marker_transform, loop_points, loop_normals, true, marker_transform.get_rotation(), face_outward, facing_offset_degrees, PackedFloat32Array(), outline_placement, outline_facing, outline_reverse, outline_slot_offset, fill_spacing, fill_stagger, fill_margin, layer_count, layer_spacing, layer_side, layer_fill, layer_start_offset);
+	return layout_outline_slots("helper_generate_transforms_diamond", marker_transform, loop_points, loop_normals, true, marker_transform.get_rotation(), face_outward, facing_offset_degrees, PackedFloat32Array(), outline_placement, outline_facing, outline_reverse, outline_slot_offset, fill_spacing, fill_stagger, fill_margin, layer_count, layer_scale, layer_side, layer_fill, layer_start_offset);
 }
 
 TypedArray<Transform2D> BulletFactory2D::helper_apply_side_spread(
@@ -4708,7 +4903,7 @@ void BulletFactory2D::_bind_methods() {
 										"fill_stagger",
 										"fill_margin",
 										"layer_count",
-										"layer_spacing",
+										"layer_scale",
 										"layer_side",
 										"layer_fill",
 								"layer_start_offset",
@@ -4730,7 +4925,7 @@ void BulletFactory2D::_bind_methods() {
 								DEFVAL(false),
 								DEFVAL(0.0),
 								DEFVAL(1),
-								DEFVAL(32.0),
+								DEFVAL(0.2),
 								DEFVAL(0),
 								DEFVAL(0),
 								DEFVAL(0),
@@ -4820,7 +5015,7 @@ void BulletFactory2D::_bind_methods() {
 										"fill_stagger",
 										"fill_margin",
 										"layer_count",
-										"layer_spacing",
+										"layer_scale",
 										"layer_side",
 										"layer_fill",
 										"layer_start_offset",
@@ -4847,7 +5042,7 @@ void BulletFactory2D::_bind_methods() {
 								DEFVAL(false),
 								DEFVAL(0.0),
 								DEFVAL(1),
-								DEFVAL(32.0),
+								DEFVAL(0.2),
 								DEFVAL(0),
 								DEFVAL(0),
 								DEFVAL(0),
@@ -4880,7 +5075,7 @@ void BulletFactory2D::_bind_methods() {
 										"fill_stagger",
 										"fill_margin",
 										"layer_count",
-										"layer_spacing",
+										"layer_scale",
 										"layer_side",
 										"layer_fill",
 										"layer_start_offset"),
@@ -4903,7 +5098,7 @@ void BulletFactory2D::_bind_methods() {
 								DEFVAL(false),
 								DEFVAL(0.0),
 								DEFVAL(1),
-								DEFVAL(32.0),
+								DEFVAL(0.2),
 								DEFVAL(0),
 								DEFVAL(0),
 								DEFVAL(0));
@@ -4991,6 +5186,15 @@ void BulletFactory2D::_bind_methods() {
 								&BulletFactory2D::helper_apply_skip_indices);
 
 	ClassDB::bind_static_method("BulletFactory2D",
+								D_METHOD("helper_layer_scale_factor",
+										 "layer_index",
+										 "scale_step",
+										 "side"),
+								&BulletFactory2D::helper_layer_scale_factor,
+								DEFVAL(0.2),
+								DEFVAL(0));
+
+	ClassDB::bind_static_method("BulletFactory2D",
 								D_METHOD("helper_generate_transforms_cross",
 										 "transforms_amount",
 										 "marker_transform",
@@ -5007,6 +5211,20 @@ void BulletFactory2D::_bind_methods() {
 								DEFVAL(0.0),
 								DEFVAL(true),
 								DEFVAL(0.0));
+
+	ClassDB::bind_static_method("BulletFactory2D",
+								D_METHOD("helper_bullet_layer_index",
+										 "bullet_index",
+										 "slot_count",
+										 "layer_count",
+										 "layer_fill",
+										 "layer_start_offset"),
+								&BulletFactory2D::helper_bullet_layer_index,
+								DEFVAL(0),
+								DEFVAL(0),
+								DEFVAL(1),
+								DEFVAL(0),
+								DEFVAL(0));
 
 	ClassDB::bind_static_method("BulletFactory2D",
 								D_METHOD("helper_generate_transforms_star",
@@ -5026,7 +5244,7 @@ void BulletFactory2D::_bind_methods() {
 										"fill_stagger",
 										"fill_margin",
 										"layer_count",
-										"layer_spacing",
+										"layer_scale",
 										"layer_side",
 										"layer_fill",
 										"layer_start_offset"),
@@ -5045,7 +5263,7 @@ void BulletFactory2D::_bind_methods() {
 								DEFVAL(false),
 								DEFVAL(0.0),
 								DEFVAL(1),
-								DEFVAL(32.0),
+								DEFVAL(0.2),
 								DEFVAL(0),
 								DEFVAL(0),
 								DEFVAL(0));
@@ -5057,12 +5275,36 @@ void BulletFactory2D::_bind_methods() {
 										 "size",
 										 "base_rotation",
 										 "face_outward",
-										 "facing_offset_degrees"),
+										 "facing_offset_degrees",
+										"outline_placement",
+										"outline_facing",
+										"outline_reverse",
+										"outline_slot_offset",
+										"fill_spacing",
+										"fill_stagger",
+										"fill_margin",
+										"layer_count",
+										"layer_scale",
+										"layer_side",
+										"layer_fill",
+										"layer_start_offset"),
 								&BulletFactory2D::helper_generate_transforms_heart,
 								DEFVAL(150.0),
 								DEFVAL(0.0),
 								DEFVAL(true),
-								DEFVAL(0.0));
+								DEFVAL(0.0),
+								DEFVAL(0),
+								DEFVAL(0),
+								DEFVAL(false),
+								DEFVAL(0),
+								DEFVAL(32.0),
+								DEFVAL(false),
+								DEFVAL(0.0),
+								DEFVAL(1),
+								DEFVAL(0.2),
+								DEFVAL(0),
+								DEFVAL(0),
+								DEFVAL(0));
 
 	ClassDB::bind_static_method("BulletFactory2D",
 								D_METHOD("helper_generate_transforms_wave",
@@ -5144,7 +5386,7 @@ void BulletFactory2D::_bind_methods() {
 										"fill_stagger",
 										"fill_margin",
 										"layer_count",
-										"layer_spacing",
+										"layer_scale",
 										"layer_side",
 										"layer_fill",
 										"layer_start_offset"),
@@ -5163,7 +5405,7 @@ void BulletFactory2D::_bind_methods() {
 								DEFVAL(false),
 								DEFVAL(0.0),
 								DEFVAL(1),
-								DEFVAL(32.0),
+								DEFVAL(0.2),
 								DEFVAL(0),
 								DEFVAL(0),
 								DEFVAL(0));
@@ -5228,7 +5470,7 @@ void BulletFactory2D::_bind_methods() {
 										"fill_stagger",
 										"fill_margin",
 										"layer_count",
-										"layer_spacing",
+										"layer_scale",
 										"layer_side",
 										"layer_fill",
 										"layer_start_offset"),
@@ -5248,7 +5490,7 @@ void BulletFactory2D::_bind_methods() {
 								DEFVAL(false),
 								DEFVAL(0.0),
 								DEFVAL(1),
-								DEFVAL(32.0),
+								DEFVAL(0.2),
 								DEFVAL(0),
 								DEFVAL(0),
 								DEFVAL(0));
@@ -5268,7 +5510,7 @@ void BulletFactory2D::_bind_methods() {
 										"fill_stagger",
 										"fill_margin",
 										"layer_count",
-										"layer_spacing",
+										"layer_scale",
 										"layer_side",
 										"layer_fill",
 										"layer_start_offset"),
@@ -5284,7 +5526,7 @@ void BulletFactory2D::_bind_methods() {
 								DEFVAL(false),
 								DEFVAL(0.0),
 								DEFVAL(1),
-								DEFVAL(32.0),
+								DEFVAL(0.2),
 								DEFVAL(0),
 								DEFVAL(0),
 								DEFVAL(0));
@@ -5304,12 +5546,12 @@ void BulletFactory2D::_bind_methods() {
 										"fill_stagger",
 										"fill_margin",
 										"layer_count",
-										"layer_spacing",
+										"layer_scale",
 										"layer_side",
 										"layer_fill",
 										"layer_start_offset"),
 								&BulletFactory2D::helper_generate_transforms_rectangle,
-								DEFVAL(Vector2(300, 200)),
+								DEFVAL(Vector2(300.0, 200.0)),
 								DEFVAL(true),
 								DEFVAL(0.0),
 								DEFVAL(0),
@@ -5320,7 +5562,7 @@ void BulletFactory2D::_bind_methods() {
 								DEFVAL(false),
 								DEFVAL(0.0),
 								DEFVAL(1),
-								DEFVAL(32.0),
+								DEFVAL(0.2),
 								DEFVAL(0),
 								DEFVAL(0),
 								DEFVAL(0));
@@ -5342,7 +5584,7 @@ void BulletFactory2D::_bind_methods() {
 										"fill_stagger",
 										"fill_margin",
 										"layer_count",
-										"layer_spacing",
+										"layer_scale",
 										"layer_side",
 										"layer_fill",
 										"layer_start_offset"),
@@ -5360,7 +5602,7 @@ void BulletFactory2D::_bind_methods() {
 								DEFVAL(false),
 								DEFVAL(0.0),
 								DEFVAL(1),
-								DEFVAL(32.0),
+								DEFVAL(0.2),
 								DEFVAL(0),
 								DEFVAL(0),
 								DEFVAL(0));
@@ -5383,7 +5625,7 @@ void BulletFactory2D::_bind_methods() {
 										"fill_stagger",
 										"fill_margin",
 										"layer_count",
-										"layer_spacing",
+										"layer_scale",
 										"layer_side",
 										"layer_fill",
 										"layer_start_offset"),
@@ -5402,7 +5644,7 @@ void BulletFactory2D::_bind_methods() {
 								DEFVAL(false),
 								DEFVAL(0.0),
 								DEFVAL(1),
-								DEFVAL(32.0),
+								DEFVAL(0.2),
 								DEFVAL(0),
 								DEFVAL(0),
 								DEFVAL(0));
@@ -5425,7 +5667,7 @@ void BulletFactory2D::_bind_methods() {
 										"fill_stagger",
 										"fill_margin",
 										"layer_count",
-										"layer_spacing",
+										"layer_scale",
 										"layer_side",
 										"layer_fill",
 										"layer_start_offset"),
@@ -5444,7 +5686,7 @@ void BulletFactory2D::_bind_methods() {
 								DEFVAL(false),
 								DEFVAL(0.0),
 								DEFVAL(1),
-								DEFVAL(32.0),
+								DEFVAL(0.2),
 								DEFVAL(0),
 								DEFVAL(0),
 								DEFVAL(0));
@@ -5466,7 +5708,7 @@ void BulletFactory2D::_bind_methods() {
 										"fill_stagger",
 										"fill_margin",
 										"layer_count",
-										"layer_spacing",
+										"layer_scale",
 										"layer_side",
 										"layer_fill",
 										"layer_start_offset"),
@@ -5484,7 +5726,7 @@ void BulletFactory2D::_bind_methods() {
 								DEFVAL(false),
 								DEFVAL(0.0),
 								DEFVAL(1),
-								DEFVAL(32.0),
+								DEFVAL(0.2),
 								DEFVAL(0),
 								DEFVAL(0),
 								DEFVAL(0));
@@ -5551,7 +5793,7 @@ void BulletFactory2D::_bind_methods() {
 								D_METHOD("helper_sample_outline_rectangle",
 										"size"),
 								&BulletFactory2D::helper_sample_outline_rectangle,
-								DEFVAL(Vector2(300, 200)));
+								DEFVAL(Vector2(300.0, 200.0)));
 
 	ClassDB::bind_static_method("BulletFactory2D",
 								D_METHOD("helper_sample_outline_triangle",

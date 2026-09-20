@@ -109,6 +109,19 @@
 				How many spawned volleys are currently tracked for retargeting.
 			</description>
 		</method>
+		<method name="debug_check_layer_coincidence" qualifiers="const">
+			<return type="Dictionary" />
+			<param index="0" name="tolerance_px" type="float" default="1.0" />
+			<description>
+				Verifies every layered preview dot sits on its yellow ring (same center-scale rule and same fill deal on both sides). Returns checked/layers/max_deviation_px/mean_deviation_px/ok. Empty preview returns checked=false. Point-to-segment match: exact on sharp shapes, sub-pixel on dense sweeps.
+			</description>
+		</method>
+		<method name="debug_get_layer_rings" qualifiers="const">
+			<return type="Array" />
+			<description>
+				Debug readout of the yellow preview rings: one PackedVector2Array per extra outline layer, exactly as drawn (holder-local; runs INF-separated with a closing duplicate per closed run). Empty when layers are inactive. Lets scripts and tests verify bullets sit on their rings without screenshotting the editor.
+			</description>
+		</method>
 		<method name="get_live_volleys" qualifiers="const">
 			<return type="Array" />
 			<description>
@@ -655,22 +668,22 @@
 			Shifts every other Fill Inside row by half a cell (honeycomb packing).
 		</member>
 		<member name="helper_outline_placement" type="int" setter="set_helper_outline_placement" getter="get_helper_outline_placement" default="0">
-			Where closed-loop shape bullets live (Ring, Ellipse, Star, Flower, Rose, Lissajous, Circle, Rectangle, Square, Polygon, Triangle, Trapezoid, Diamond): On Outline keeps the generated slot loop exactly (single layer, the default), Layers spreads the same slot count over concentric rings (layer 0 on the outline), Fill Inside swaps it for a row-major grid masked to the loop interior.
+			Where closed-loop shape bullets live (Ring, Ellipse, Star, Flower, Rose, Lissajous, Circle, Rectangle, Square, Polygon, Triangle, Trapezoid, Diamond, Heart): On Outline keeps the generated slot loop exactly (single layer, the default), Layers re-spawns the same slot loop scaled about the loop center (layer 0 on the outline: the identical figure at a different size per layer), Fill Inside swaps it for a row-major grid masked to the loop interior.
 		</member>
 		<member name="helper_outline_reverse" type="bool" setter="set_helper_outline_reverse" getter="get_helper_outline_reverse" default="false">
 			Mirrors the closed-loop slot order (winding flip): bullet 0 moves to the far end of the loop. On-outline and layers layouts only.
 		</member>
 		<member name="helper_outline_layer_count" type="int" setter="set_helper_outline_layer_count" getter="get_helper_outline_layer_count" default="1">
-			How many concentric rings share the volley in Layers placement. 1 is a single exact layer (the default, identical to On Outline). Must be 1 or more.
+			How many concentric rings share the volley in Layers placement. 1 is a single exact layer (the default, identical to On Outline). Must be in [1, 64].
 		</member>
 		<member name="helper_outline_layer_fill" type="int" setter="set_helper_outline_layer_fill" getter="get_helper_outline_layer_fill" enum="BulletFactory2D.OutlineLayerFill" default="0">
 			How bullets are dealt across layers: Interleaved (bullet i rides layer i % count, winding survives) or Sequential (fills contiguous chunks starting from [member helper_outline_layer_start_offset], so small volleys still read as the base shape with offset 0). Layers placement only.
 		</member>
 		<member name="helper_outline_layer_side" type="int" setter="set_helper_outline_layer_side" getter="get_helper_outline_layer_side" enum="BulletFactory2D.OutlineLayerSide" default="0">
-			Which side of the base outline extra layers grow toward: Outward (along slot normals), Inward (against them), or Both (symmetric +spacing, -spacing, +2*spacing, ...). Inward corners follow inverted normals, so deep concavities chamfer at large spacings. Layers placement only.
+			Which side of the base outline extra layers grow toward: Outward (each ring bigger), Inward (rings crowd toward the center), or Both (alternating bigger/smaller). Layers placement only.
 		</member>
-		<member name="helper_outline_layer_spacing" type="float" setter="set_helper_outline_layer_spacing" getter="get_helper_outline_layer_spacing" default="32.0">
-			Padding in pixels between adjacent layers. Must be finite and above zero. Layers placement only.
+		<member name="helper_outline_layer_scale" type="float" setter="set_helper_outline_layer_scale" getter="get_helper_outline_layer_scale" default="0.2">
+			Fractional growth per layer: each extra ring rescales the shape about the loop center (0.2 = 20% bigger per layer outward). Must be finite in (0, 8]. Layers placement only.
 		</member>
 		<member name="helper_outline_layer_start_offset" type="int" setter="set_helper_outline_layer_start_offset" getter="get_helper_outline_layer_start_offset" default="0">
 			Which layer Sequential filling starts from (wraps around, so 1 starts on the second ring and the outline fills last). 0 starts on the outline. Only shown — and only consumed — in Layers placement with Sequential fill; Interleaved ignores it. Must be 0 or more.
@@ -1139,6 +1152,9 @@
 		</member>
 		<member name="preview_path_color" type="Color" setter="set_preview_path_color" getter="get_preview_path_color" default="Color(0.3, 0.85, 1, 0.55)">
 			Track underlay color: the shape/loop/curve bullets ride on, drawn as segments under the dots so sparse volleys still show the whole track. Distinct from dots, arrows and the first-bullet marker by default.
+		</member>
+		<member name="preview_layer_path_color" type="Color" setter="set_preview_layer_path_color" getter="get_preview_layer_path_color" default="Color(1, 1, 0, 0.55)">
+			Extra outline-layer ring color (Layers placement only): one yellow closed ring per ring beyond the base outline, drawn under the dots with the same width as the base track and never antialiased. Same alpha as the base track by default. Empty unless layers are active (count above 1 with valid spacing).
 		</member>
 		<member name="preview_path_width" type="float" setter="set_preview_path_width" getter="get_preview_path_width" default="2.0">
 			Track underlay line width in pixels (multiplied by nothing: absolute screen-ish size). 0 hides the track. Must be finite and 0 or more.

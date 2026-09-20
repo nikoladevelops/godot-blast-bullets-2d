@@ -169,8 +169,9 @@ public:
 
 	// Outline placement: where loop-shape bullets live. ON_OUTLINE keeps the
 	// generated slot loop exactly (single layer, the default); LAYERS spreads
-	// the same slot count over concentric layers (layer 0 sits exactly on the
-	// outline, extras step inward/outward per OutlineLayerSide); FILL_INSIDE
+	// the same slot count over scaled repeats of the loop about its center
+	// (same figure at every layer; layer 0 sits exactly on the outline,
+	// extras grow inward/outward per OutlineLayerSide); FILL_INSIDE
 	// replaces the loop with a row-major grid masked to the loop interior
 	// (capped at transforms_amount, may return fewer on small shapes).
 	enum OutlinePlacement {
@@ -180,8 +181,8 @@ public:
 	};
 
 	// Layer side: which side of the base outline extra layers grow toward.
-	// OUTWARD steps along the slot normals, INWARD against them, BOTH grows
-	// symmetrically (extras land at +spacing, -spacing, +2*spacing, ...).
+	// OUTWARD scales each ring up, INWARD scales down toward the center,
+	// BOTH alternates (up, down, further up, ...).
 	enum OutlineLayerSide {
 		OUTLINE_LAYER_OUTWARD = 0,
 		OUTLINE_LAYER_INWARD = 1,
@@ -218,6 +219,23 @@ public:
 
 	// Whether the factory is currently busy doing something important and it can't handle any other requests
 	bool get_is_factory_busy() const;
+
+	// ---- Layer-ring shared math (single source of truth) ----
+	// Each extra concentric outline layer re-spawns the selected shape
+	// scaled about the loop center (mean of the base slot loop): same
+	// figure at every layer, like a second spawner with a bigger shape.
+	// The volley layout (layout_outline_slots) and the spawner preview
+	// share the two helpers below, so dots and rings can never drift apart.
+	// helper_layer_scale_factor maps a layer index to its scale (1.0 for
+	// layer 0 = the outline itself); helper_bullet_layer_index maps a
+	// bullet index to its layer under the active fill deal, so volley,
+	// preview and debug all deal identically.
+	static int helper_bullet_layer_index(
+			int bullet_index,
+			int slot_count,
+			int layer_count,
+			int layer_fill,
+			int layer_start_offset);
 
 	// Internal re-entrancy guard for MultiMeshBullets2D teardown: a multimesh's disable
 	// sweep fires user script callbacks, and a handler calling reset()/free_*/populate
@@ -925,7 +943,7 @@ public:
 			// 1 = +90 deg, 2 = -90 deg); outline_reverse mirrors the slot
 			// order; outline_slot_offset rotates which slot becomes bullet 0;
 			// fill_spacing/fill_stagger/fill_margin tune the interior grid;
-			// layer_count/layer_spacing tune the concentric layers (LAYERS
+			// layer_count/layer_scale tune the concentric layers (LAYERS
 			// placement); layer_side picks the growth side, layer_fill how
 			// bullets are dealt across layers, layer_start_offset which
 			// layer sequential filling starts from (wraps, sequential only).
@@ -937,7 +955,7 @@ public:
 			bool fill_stagger = false,
 			double fill_margin = 0.0,
 			int layer_count = 1,
-			double layer_spacing = 32.0,
+			double layer_scale = 0.2,
 			int layer_side = 0,
 			int layer_fill = 0,
 			int layer_start_offset = 0,
@@ -1034,7 +1052,7 @@ public:
 			// 1 = +90 deg, 2 = -90 deg); outline_reverse mirrors the slot
 			// order; outline_slot_offset rotates which slot becomes bullet 0;
 			// fill_spacing/fill_stagger/fill_margin tune the interior grid;
-			// layer_count/layer_spacing tune the concentric layers (LAYERS
+			// layer_count/layer_scale tune the concentric layers (LAYERS
 			// placement); layer_side picks the growth side, layer_fill how
 			// bullets are dealt across layers, layer_start_offset which
 			// layer sequential filling starts from (wraps, sequential only).
@@ -1046,7 +1064,7 @@ public:
 			bool fill_stagger = false,
 			double fill_margin = 0.0,
 			int layer_count = 1,
-			double layer_spacing = 32.0,
+			double layer_scale = 0.2,
 			int layer_side = 0,
 			int layer_fill = 0,
 			int layer_start_offset = 0,
@@ -1085,7 +1103,7 @@ public:
 			// 1 = +90 deg, 2 = -90 deg); outline_reverse mirrors the slot
 			// order; outline_slot_offset rotates which slot becomes bullet 0;
 			// fill_spacing/fill_stagger/fill_margin tune the interior grid;
-			// layer_count/layer_spacing tune the concentric layers (LAYERS
+			// layer_count/layer_scale tune the concentric layers (LAYERS
 			// placement); layer_side picks the growth side, layer_fill how
 			// bullets are dealt across layers, layer_start_offset which
 			// layer sequential filling starts from (wraps, sequential only).
@@ -1097,7 +1115,7 @@ public:
 			bool fill_stagger = false,
 			double fill_margin = 0.0,
 			int layer_count = 1,
-			double layer_spacing = 32.0,
+			double layer_scale = 0.2,
 			int layer_side = 0,
 			int layer_fill = 0,
 			int layer_start_offset = 0);
@@ -1192,7 +1210,7 @@ public:
 			// 1 = +90 deg, 2 = -90 deg); outline_reverse mirrors the slot
 			// order; outline_slot_offset rotates which slot becomes bullet 0;
 			// fill_spacing/fill_stagger/fill_margin tune the interior grid;
-			// layer_count/layer_spacing tune the concentric layers (LAYERS
+			// layer_count/layer_scale tune the concentric layers (LAYERS
 			// placement); layer_side picks the growth side, layer_fill how
 			// bullets are dealt across layers, layer_start_offset which
 			// layer sequential filling starts from (wraps, sequential only).
@@ -1204,20 +1222,35 @@ public:
 			bool fill_stagger = false,
 			double fill_margin = 0.0,
 			int layer_count = 1,
-			double layer_spacing = 32.0,
+			double layer_scale = 0.2,
 			int layer_side = 0,
 			int layer_fill = 0,
 			int layer_start_offset = 0);
 
 	// Heart bloom: parametric heart outline (boss love attacks, endings).
-	// size scales the classic 16sin^3 / 13cos-5cos2t curve.
+	// size scales the classic 16sin^3 / 13cos-5cos2t curve. Full
+	// outline-layout support (on outline, concentric layers, interior fill);
+	// layer offsets run along center-radial normals, facings stay radial
+	// like the legacy loop.
 	static TypedArray<Transform2D> helper_generate_transforms_heart(
 			int transforms_amount,
 			Transform2D marker_transform,
 			real_t size = 150.0,
 			real_t base_rotation = 0.0,
 			bool face_outward = true,
-			real_t facing_offset_degrees = 0.0);
+			real_t facing_offset_degrees = 0.0,
+			int outline_placement = 0,
+			int outline_facing = 0,
+			bool outline_reverse = false,
+			int outline_slot_offset = 0,
+			double fill_spacing = 32.0,
+			bool fill_stagger = false,
+			double fill_margin = 0.0,
+			int layer_count = 1,
+			double layer_scale = 0.2,
+			int layer_side = 0,
+			int layer_fill = 0,
+			int layer_start_offset = 0);
 
 	// Snake row: slots along a sine wave of width, amplitude and wave count
 	// around the marker axis (direction need not be normalized). Pairs with
@@ -1281,7 +1314,7 @@ public:
 			// 1 = +90 deg, 2 = -90 deg); outline_reverse mirrors the slot
 			// order; outline_slot_offset rotates which slot becomes bullet 0;
 			// fill_spacing/fill_stagger/fill_margin tune the interior grid;
-			// layer_count/layer_spacing tune the concentric layers (LAYERS
+			// layer_count/layer_scale tune the concentric layers (LAYERS
 			// placement); layer_side picks the growth side, layer_fill how
 			// bullets are dealt across layers, layer_start_offset which
 			// layer sequential filling starts from (wraps, sequential only).
@@ -1293,7 +1326,7 @@ public:
 			bool fill_stagger = false,
 			double fill_margin = 0.0,
 			int layer_count = 1,
-			double layer_spacing = 32.0,
+			double layer_scale = 0.2,
 			int layer_side = 0,
 			int layer_fill = 0,
 			int layer_start_offset = 0);
@@ -1348,7 +1381,7 @@ public:
 			// 1 = +90 deg, 2 = -90 deg); outline_reverse mirrors the slot
 			// order; outline_slot_offset rotates which slot becomes bullet 0;
 			// fill_spacing/fill_stagger/fill_margin tune the interior grid;
-			// layer_count/layer_spacing tune the concentric layers (LAYERS
+			// layer_count/layer_scale tune the concentric layers (LAYERS
 			// placement); layer_side picks the growth side, layer_fill how
 			// bullets are dealt across layers, layer_start_offset which
 			// layer sequential filling starts from (wraps, sequential only).
@@ -1360,7 +1393,7 @@ public:
 			bool fill_stagger = false,
 			double fill_margin = 0.0,
 			int layer_count = 1,
-			double layer_spacing = 32.0,
+			double layer_scale = 0.2,
 			int layer_side = 0,
 			int layer_fill = 0,
 			int layer_start_offset = 0);
@@ -1383,7 +1416,7 @@ public:
 			// 1 = +90 deg, 2 = -90 deg); outline_reverse mirrors the slot
 			// order; outline_slot_offset rotates which slot becomes bullet 0;
 			// fill_spacing/fill_stagger/fill_margin tune the interior grid;
-			// layer_count/layer_spacing tune the concentric layers (LAYERS
+			// layer_count/layer_scale tune the concentric layers (LAYERS
 			// placement); layer_side picks the growth side, layer_fill how
 			// bullets are dealt across layers, layer_start_offset which
 			// layer sequential filling starts from (wraps, sequential only).
@@ -1395,7 +1428,7 @@ public:
 			bool fill_stagger = false,
 			double fill_margin = 0.0,
 			int layer_count = 1,
-			double layer_spacing = 32.0,
+			double layer_scale = 0.2,
 			int layer_side = 0,
 			int layer_fill = 0,
 			int layer_start_offset = 0);
@@ -1418,7 +1451,7 @@ public:
 			// 1 = +90 deg, 2 = -90 deg); outline_reverse mirrors the slot
 			// order; outline_slot_offset rotates which slot becomes bullet 0;
 			// fill_spacing/fill_stagger/fill_margin tune the interior grid;
-			// layer_count/layer_spacing tune the concentric layers (LAYERS
+			// layer_count/layer_scale tune the concentric layers (LAYERS
 			// placement); layer_side picks the growth side, layer_fill how
 			// bullets are dealt across layers, layer_start_offset which
 			// layer sequential filling starts from (wraps, sequential only).
@@ -1430,7 +1463,7 @@ public:
 			bool fill_stagger = false,
 			double fill_margin = 0.0,
 			int layer_count = 1,
-			double layer_spacing = 32.0,
+			double layer_scale = 0.2,
 			int layer_side = 0,
 			int layer_fill = 0,
 			int layer_start_offset = 0);
@@ -1455,7 +1488,7 @@ public:
 			// 1 = +90 deg, 2 = -90 deg); outline_reverse mirrors the slot
 			// order; outline_slot_offset rotates which slot becomes bullet 0;
 			// fill_spacing/fill_stagger/fill_margin tune the interior grid;
-			// layer_count/layer_spacing tune the concentric layers (LAYERS
+			// layer_count/layer_scale tune the concentric layers (LAYERS
 			// placement); layer_side picks the growth side, layer_fill how
 			// bullets are dealt across layers, layer_start_offset which
 			// layer sequential filling starts from (wraps, sequential only).
@@ -1467,7 +1500,7 @@ public:
 			bool fill_stagger = false,
 			double fill_margin = 0.0,
 			int layer_count = 1,
-			double layer_spacing = 32.0,
+			double layer_scale = 0.2,
 			int layer_side = 0,
 			int layer_fill = 0,
 			int layer_start_offset = 0);
@@ -1496,7 +1529,7 @@ public:
 			// 1 = +90 deg, 2 = -90 deg); outline_reverse mirrors the slot
 			// order; outline_slot_offset rotates which slot becomes bullet 0;
 			// fill_spacing/fill_stagger/fill_margin tune the interior grid;
-			// layer_count/layer_spacing tune the concentric layers (LAYERS
+			// layer_count/layer_scale tune the concentric layers (LAYERS
 			// placement); layer_side picks the growth side, layer_fill how
 			// bullets are dealt across layers, layer_start_offset which
 			// layer sequential filling starts from (wraps, sequential only).
@@ -1508,7 +1541,7 @@ public:
 			bool fill_stagger = false,
 			double fill_margin = 0.0,
 			int layer_count = 1,
-			double layer_spacing = 32.0,
+			double layer_scale = 0.2,
 			int layer_side = 0,
 			int layer_fill = 0,
 			int layer_start_offset = 0);
@@ -1535,7 +1568,7 @@ public:
 			// 1 = +90 deg, 2 = -90 deg); outline_reverse mirrors the slot
 			// order; outline_slot_offset rotates which slot becomes bullet 0;
 			// fill_spacing/fill_stagger/fill_margin tune the interior grid;
-			// layer_count/layer_spacing tune the concentric layers (LAYERS
+			// layer_count/layer_scale tune the concentric layers (LAYERS
 			// placement); layer_side picks the growth side, layer_fill how
 			// bullets are dealt across layers, layer_start_offset which
 			// layer sequential filling starts from (wraps, sequential only).
@@ -1547,7 +1580,7 @@ public:
 			bool fill_stagger = false,
 			double fill_margin = 0.0,
 			int layer_count = 1,
-			double layer_spacing = 32.0,
+			double layer_scale = 0.2,
 			int layer_side = 0,
 			int layer_fill = 0,
 			int layer_start_offset = 0);
@@ -1573,7 +1606,7 @@ public:
 			// 1 = +90 deg, 2 = -90 deg); outline_reverse mirrors the slot
 			// order; outline_slot_offset rotates which slot becomes bullet 0;
 			// fill_spacing/fill_stagger/fill_margin tune the interior grid;
-			// layer_count/layer_spacing tune the concentric layers (LAYERS
+			// layer_count/layer_scale tune the concentric layers (LAYERS
 			// placement); layer_side picks the growth side, layer_fill how
 			// bullets are dealt across layers, layer_start_offset which
 			// layer sequential filling starts from (wraps, sequential only).
@@ -1585,7 +1618,7 @@ public:
 			bool fill_stagger = false,
 			double fill_margin = 0.0,
 			int layer_count = 1,
-			double layer_spacing = 32.0,
+			double layer_scale = 0.2,
 			int layer_side = 0,
 			int layer_fill = 0,
 			int layer_start_offset = 0);
@@ -1601,6 +1634,17 @@ public:
 			real_t spread = 0.0,
 			real_t spread_exponent = 2.0,
 			uint64_t seed = 0);
+
+	// Scale factor for one outline layer: how much bigger (or smaller) ring
+	// layer_index is than the base outline (1.0 for layer 0). Outward grows
+	// multiplicatively, inward crowds toward the center reciprocally, both
+	// alternates (+step, 1/(1+step), +2*step, ...). Single source of truth
+	// shared by the generators and the preview, so rings can never disagree
+	// with bullets. Out-of-range side warns and yields 1.0.
+	static double helper_layer_scale_factor(
+			int layer_index,
+			double scale_step,
+			int side = 0);
 
 	// Edge normals for a polyline: per-point outward normal from the local
 	// tangent (segment perpendicular, averaged at joints). tangent (1,0)

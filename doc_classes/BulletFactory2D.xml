@@ -137,6 +137,26 @@
 				Universal side pass for closed-outline patterns: returns a copy of transforms with each origin pushed along its own facing by spread * pow(rand, spread_exponent). On Path returns an identity copy; Outside/Inside push along/against the facing; Both picks a random side per bullet. Facings never change. Only meaningful for closed loops (Ring, Ellipse, Polygon, Star, Flower, Rose, Lissajous, Custom, and the shape generators above) — open layouts have no inside to push toward.
 			</description>
 		</method>
+		<method name="helper_layer_scale_factor" qualifiers="static">
+			<return type="float" />
+			<param index="0" name="layer_index" type="int" />
+			<param index="1" name="scale_step" type="float" default="0.2" />
+			<param index="2" name="side" type="int" default="0" />
+			<description>
+				Scale factor for one outline layer (1.0 for layer 0): Outward grows multiplicatively, Inward crowds toward the center reciprocally, Both alternates. Shared by the generators and the spawner preview so rings can never disagree with bullets. Warns and returns 1.0 on bad scale_step/side.
+			</description>
+		</method>
+		<method name="helper_bullet_layer_index" qualifiers="static">
+			<return type="int" />
+			<param index="0" name="bullet_index" type="int" />
+			<param index="1" name="slot_count" type="int" />
+			<param index="2" name="layer_count" type="int" default="1" />
+			<param index="3" name="layer_fill" type="int" default="0" />
+			<param index="4" name="layer_start_offset" type="int" default="0" />
+			<description>
+				Which concentric layer bullet [code]bullet_index[/code] rides (0 = the base outline). Interleaved deals round-robin ([code]i % count[/code], winding survives); Sequential fills contiguous chunks from [code]layer_start_offset[/code] (wrapping), so small volleys still read as the base shape. Shared by the volley layout, the spawner preview and the debug coincidence check so all three deal identically. Degenerate inputs yield 0.
+			</description>
+		</method>
 		<method name="helper_apply_skip_indices" qualifiers="static">
 			<return type="Transform2D[]" />
 			<param index="0" name="transforms" type="Transform2D[]" />
@@ -189,12 +209,12 @@
 			<param index="10" name="fill_stagger" type="bool" default="false" />
 			<param index="11" name="fill_margin" type="float" default="0.0" />
 			<param index="12" name="layer_count" type="int" default="1" />
-			<param index="13" name="layer_spacing" type="float" default="32.0" />
+			<param index="13" name="layer_scale" type="float" default="0.2" />
 			<param index="14" name="layer_side" type="int" default="0" />
 			<param index="15" name="layer_fill" type="int" default="0" />
 			<param index="16" name="layer_start_offset" type="int" default="0" />
 			<description>
-				Generates an exact circle outline: slots spread evenly around a radius loop centered on the marker, facing outward (or inward). The outline_* tail params place slots on the loop, fill its interior, or layer it across concentric rings.
+				Generates an exact circle outline: slots spread evenly around a radius loop centered on the marker, facing outward (or inward). The outline_* tail params place slots on the loop, fill its interior, or layer it across scaled repeats about the loop center.
 			</description>
 		</method>
 		<method name="helper_generate_transforms_corridor" qualifiers="static">
@@ -259,7 +279,7 @@
 			<param index="12" name="fill_stagger" type="bool" default="false" />
 			<param index="13" name="fill_margin" type="float" default="0.0" />
 			<param index="14" name="layer_count" type="int" default="1" />
-			<param index="15" name="layer_spacing" type="float" default="32.0" />
+			<param index="15" name="layer_scale" type="float" default="0.2" />
 			<param index="16" name="layer_side" type="int" default="0" />
 			<param index="17" name="layer_fill" type="int" default="0" />
 			<param index="18" name="layer_start_offset" type="int" default="0" />
@@ -307,7 +327,7 @@
 			<param index="17" name="fill_stagger" type="bool" default="false" />
 			<param index="18" name="fill_margin" type="float" default="0.0" />
 			<param index="19" name="layer_count" type="int" default="1" />
-			<param index="20" name="layer_spacing" type="float" default="32.0" />
+			<param index="20" name="layer_scale" type="float" default="0.2" />
 			<param index="21" name="layer_side" type="int" default="0" />
 			<param index="22" name="layer_fill" type="int" default="0" />
 			<param index="23" name="layer_start_offset" type="int" default="0" />
@@ -349,7 +369,7 @@
 			<param index="15" name="fill_stagger" type="bool" default="false" />
 			<param index="16" name="fill_margin" type="float" default="0.0" />
 			<param index="17" name="layer_count" type="int" default="1" />
-			<param index="18" name="layer_spacing" type="float" default="32.0" />
+			<param index="18" name="layer_scale" type="float" default="0.2" />
 			<param index="19" name="layer_side" type="int" default="0" />
 			<param index="20" name="layer_fill" type="int" default="0" />
 			<param index="21" name="layer_start_offset" type="int" default="0" />
@@ -387,8 +407,20 @@
 			<param index="3" name="base_rotation" type="float" default="0.0" />
 			<param index="4" name="face_outward" type="bool" default="true" />
 			<param index="5" name="facing_offset_degrees" type="float" default="0.0" />
+			<param index="6" name="outline_placement" type="int" default="0" />
+			<param index="7" name="outline_facing" type="int" default="0" />
+			<param index="8" name="outline_reverse" type="bool" default="false" />
+			<param index="9" name="outline_slot_offset" type="int" default="0" />
+			<param index="10" name="fill_spacing" type="float" default="32.0" />
+			<param index="11" name="fill_stagger" type="bool" default="false" />
+			<param index="12" name="fill_margin" type="float" default="0.0" />
+			<param index="13" name="layer_count" type="int" default="1" />
+			<param index="14" name="layer_scale" type="float" default="0.2" />
+			<param index="15" name="layer_side" type="int" default="0" />
+			<param index="16" name="layer_fill" type="int" default="0" />
+			<param index="17" name="layer_start_offset" type="int" default="0" />
 			<description>
-				Generates a parametric heart outline (classic 16sin^3 curve) scaled by size. Boss love attacks and ending cards.
+				Generates a parametric heart outline (classic 16sin^3 curve) scaled by size. Boss love attacks and ending cards. The outline_* tail params place slots on the loop, fill its interior, or layer it across scaled repeats about the loop center.
 			</description>
 		</method>
 		<method name="helper_generate_transforms_lattice" qualifiers="static">
@@ -438,7 +470,7 @@
 			<param index="14" name="fill_stagger" type="bool" default="false" />
 			<param index="15" name="fill_margin" type="float" default="0.0" />
 			<param index="16" name="layer_count" type="int" default="1" />
-			<param index="17" name="layer_spacing" type="float" default="32.0" />
+			<param index="17" name="layer_scale" type="float" default="0.2" />
 			<param index="18" name="layer_side" type="int" default="0" />
 			<param index="19" name="layer_fill" type="int" default="0" />
 			<param index="20" name="layer_start_offset" type="int" default="0" />
@@ -479,12 +511,12 @@
 			<param index="12" name="fill_stagger" type="bool" default="false" />
 			<param index="13" name="fill_margin" type="float" default="0.0" />
 			<param index="14" name="layer_count" type="int" default="1" />
-			<param index="15" name="layer_spacing" type="float" default="32.0" />
+			<param index="15" name="layer_scale" type="float" default="0.2" />
 			<param index="16" name="layer_side" type="int" default="0" />
 			<param index="17" name="layer_fill" type="int" default="0" />
 			<param index="18" name="layer_start_offset" type="int" default="0" />
 			<description>
-				Generates a polygon perimeter (vertices corners on a radius circle from base_rotation), slots spread evenly by arc length, facing outward (or inward). The outline_* tail params place slots on the loop, fill its interior, or layer it across concentric rings.
+				Generates a polygon perimeter (vertices corners on a radius circle from base_rotation), slots spread evenly by arc length, facing outward (or inward). The outline_* tail params place slots on the loop, fill its interior, or layer it across scaled repeats about the loop center.
 			</description>
 		</method>
 		<method name="helper_generate_transforms_rain" qualifiers="static">
@@ -515,12 +547,12 @@
 			<param index="10" name="fill_stagger" type="bool" default="false" />
 			<param index="11" name="fill_margin" type="float" default="0.0" />
 			<param index="12" name="layer_count" type="int" default="1" />
-			<param index="13" name="layer_spacing" type="float" default="32.0" />
+			<param index="13" name="layer_scale" type="float" default="0.2" />
 			<param index="14" name="layer_side" type="int" default="0" />
 			<param index="15" name="layer_fill" type="int" default="0" />
 			<param index="16" name="layer_start_offset" type="int" default="0" />
 			<description>
-				Generates a rectangle perimeter walk (counter-clockwise from top-left), slots spread evenly by arc length, facing outward (or inward). Square = equal sides. The outline_* tail params place slots on the loop, fill its interior, or layer it across concentric rings.
+				Generates a rectangle perimeter walk (counter-clockwise from top-left), slots spread evenly by arc length, facing outward (or inward). Square = equal sides. The outline_* tail params place slots on the loop, fill its interior, or layer it across scaled repeats about the loop center.
 			</description>
 		</method>
 		<method name="helper_generate_transforms_ring" qualifiers="static">
@@ -543,7 +575,7 @@
 			<param index="15" name="fill_stagger" type="bool" default="false" />
 			<param index="16" name="fill_margin" type="float" default="0.0" />
 			<param index="17" name="layer_count" type="int" default="1" />
-			<param index="18" name="layer_spacing" type="float" default="32.0" />
+			<param index="18" name="layer_scale" type="float" default="0.2" />
 			<param index="19" name="layer_side" type="int" default="0" />
 			<param index="20" name="layer_fill" type="int" default="0" />
 			<param index="21" name="layer_start_offset" type="int" default="0" />
@@ -570,7 +602,7 @@
 			<param index="13" name="fill_stagger" type="bool" default="false" />
 			<param index="14" name="fill_margin" type="float" default="0.0" />
 			<param index="15" name="layer_count" type="int" default="1" />
-			<param index="16" name="layer_spacing" type="float" default="32.0" />
+			<param index="16" name="layer_scale" type="float" default="0.2" />
 			<param index="17" name="layer_side" type="int" default="0" />
 			<param index="18" name="layer_fill" type="int" default="0" />
 			<param index="19" name="layer_start_offset" type="int" default="0" />
@@ -625,7 +657,7 @@
 			<param index="13" name="fill_stagger" type="bool" default="false" />
 			<param index="14" name="fill_margin" type="float" default="0.0" />
 			<param index="15" name="layer_count" type="int" default="1" />
-			<param index="16" name="layer_spacing" type="float" default="32.0" />
+			<param index="16" name="layer_scale" type="float" default="0.2" />
 			<param index="17" name="layer_side" type="int" default="0" />
 			<param index="18" name="layer_fill" type="int" default="0" />
 			<param index="19" name="layer_start_offset" type="int" default="0" />
@@ -665,7 +697,7 @@
 			<param index="13" name="fill_stagger" type="bool" default="false" />
 			<param index="14" name="fill_margin" type="float" default="0.0" />
 			<param index="15" name="layer_count" type="int" default="1" />
-			<param index="16" name="layer_spacing" type="float" default="32.0" />
+			<param index="16" name="layer_scale" type="float" default="0.2" />
 			<param index="17" name="layer_side" type="int" default="0" />
 			<param index="18" name="layer_fill" type="int" default="0" />
 			<param index="19" name="layer_start_offset" type="int" default="0" />
@@ -691,7 +723,7 @@
 			<param index="13" name="fill_stagger" type="bool" default="false" />
 			<param index="14" name="fill_margin" type="float" default="0.0" />
 			<param index="15" name="layer_count" type="int" default="1" />
-			<param index="16" name="layer_spacing" type="float" default="32.0" />
+			<param index="16" name="layer_scale" type="float" default="0.2" />
 			<param index="17" name="layer_side" type="int" default="0" />
 			<param index="18" name="layer_fill" type="int" default="0" />
 			<param index="19" name="layer_start_offset" type="int" default="0" />
@@ -1266,19 +1298,19 @@
 			Loop-generator slots stay exactly on the generated outline loop (single layer, the default).
 		</constant>
 		<constant name="OUTLINE_LAYERS" value="1" enum="OutlinePlacement">
-			Loop-generator slots spread over concentric layers sharing the slot count (layer 0 sits exactly on the outline; extras step per layer_side, dealt per layer_fill).
+			Loop-generator slots spread over scaled repeats of the loop about its center, sharing the slot count (layer 0 sits exactly on the outline; extras scale per layer_side, dealt per layer_fill).
 		</constant>
 		<constant name="OUTLINE_FILL_INSIDE" value="2" enum="OutlinePlacement">
 			Loop-generator slots are replaced by a row-major grid masked to the loop interior, capped at transforms_amount.
 		</constant>
 		<constant name="OUTLINE_LAYER_OUTWARD" value="0" enum="OutlineLayerSide">
-			Extra layers step outward along the slot normals.
+			Extra layers scale up from the base outline.
 		</constant>
 		<constant name="OUTLINE_LAYER_INWARD" value="1" enum="OutlineLayerSide">
-			Extra layers step inward against the slot normals.
+			Extra layers scale down toward the loop center.
 		</constant>
 		<constant name="OUTLINE_LAYER_BOTH" value="2" enum="OutlineLayerSide">
-			Extra layers grow symmetrically (+spacing, -spacing, +2*spacing, ...).
+			Extra layers alternate scaling up and down.
 		</constant>
 		<constant name="OUTLINE_LAYER_INTERLEAVED" value="0" enum="OutlineLayerFill">
 			Bullet i rides layer (i % layer_count), preserving the winding order.

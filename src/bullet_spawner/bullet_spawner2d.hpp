@@ -56,6 +56,18 @@ class PatternPreviewLayer2D : public Node2D {
         Color path_color = Color(0.3, 0.85, 1.0, 0.55);
         float path_width = 2.0f;
         bool path_closed = false;
+        // Layer rings: one closed run per extra outline layer (LAYERS
+        // placement), INF-separated like the track strips above. Centroid-
+        // scaled copies of the blue track via the factory's shared helpers
+        // (same center + same R + same distance math as the volley), so
+        // every ring matches the dots exactly; straight edges stay straight
+        // and corners stay sharp. Runs are pre-closed at build time (first
+        // point appended), so the open-run drawing path renders them
+        // correctly. Empty unless layers are active. Drawn in
+        // layer_path_color with the same path_width, always without
+        // antialiasing.
+        PackedVector2Array layer_path_points;
+        Color layer_path_color = Color(1.0, 1.0, 0.0, 0.55);
         PackedVector2Array arrow_tails;
         PackedVector2Array arrow_dirs;
         Color arrow_color = Color(1.0, 0.05, 0.05);
@@ -75,6 +87,7 @@ class PatternPreviewLayer2D : public Node2D {
         void set_dots_data(const PackedVector2Array &p_dots, const Color &p_color, float p_radius);
         void set_first_marker(bool p_show, const Color &p_color, float p_radius_scale);
         void set_path_data(const PackedVector2Array &p_points, const Color &p_color, float p_width, bool p_closed);
+        void set_layer_path_data(const PackedVector2Array &p_points, const Color &p_color);
         void set_arrows_data(const PackedVector2Array &p_tails, const PackedVector2Array &p_dirs, const Color &p_color, float p_length, float p_width, float p_head_length, float p_head_width);
 
         void _draw() override;
@@ -613,21 +626,26 @@ class BulletSpawner2D : public Node2D{
         mutable Node *helper_path2d_cache = nullptr;
         mutable uint64_t helper_path2d_id = 0;
         // OUTLINE LAYOUT (closed-loop shapes: Ring, Ellipse, Star, Flower,
-        // Rose, Lissajous, Circle, Rectangle, Square, Regular Polygon).
+        // Rose, Lissajous, Circle, Rectangle, Square, Regular Polygon,
+        // Triangle, Trapezoid, Diamond, Heart).
         // One placement model instead of the old scatter pass: On Outline
         // keeps the generated slot loop; Fill Inside swaps it for a row-major
         // grid masked to the loop interior (capped at helper_bullets_amount,
-        // may return fewer on small shapes); Layers spreads the same slot
-        // count over concentric rings (layer 0 exactly on the outline). Facing rotates each
-        // default facing (Normal = as generated, Along ±90 = toward the loop
-        // tangent); reverse mirrors the slot order; slot_offset rotates which
-        // slot becomes bullet 0. Fill/layer dims only show in their mode.
+        // may return fewer on small shapes); Layers re-spawns the same slot
+        // loop scaled about the loop center (layer 0 exactly on the outline:
+        // the identical figure at a different size per layer).
+        // Facing rotates each default facing (Normal = as generated,
+        // Along ±90 = toward the loop tangent); reverse mirrors the slot
+        // order; slot_offset rotates which slot becomes bullet 0.
+        // Fill/layer dims only show in their mode.
         int helper_outline_placement = 0; // BulletFactory2D::OutlinePlacement
         // Concentric layers (LAYERS placement): layer 0 sits exactly on the
         // outline. 1 = single exact layer (default, current behavior).
+        // Capped at 64.
         int helper_outline_layer_count = 1;
-        // Padding between adjacent layers in pixels. Must stay finite and > 0.
-        double helper_outline_layer_spacing = 32.0;
+        // Fractional growth per layer (0.2 = each ring 20% bigger than the
+        // previous). Must stay finite in (0, 8].
+        double helper_outline_layer_scale = 0.2;
         // Growth side (OutlineLayerSide): 0 outward, 1 inward, 2 both.
         int helper_outline_layer_side = 0;
         // Deal order (OutlineLayerFill): 0 interleaved, 1 sequential.
@@ -1310,8 +1328,8 @@ class BulletSpawner2D : public Node2D{
         void set_helper_outline_placement(int value);
         int get_helper_outline_layer_count() const;
         void set_helper_outline_layer_count(int value);
-        double get_helper_outline_layer_spacing() const;
-        void set_helper_outline_layer_spacing(double value);
+        double get_helper_outline_layer_scale() const;
+        void set_helper_outline_layer_scale(double value);
         int get_helper_outline_layer_side() const;
         void set_helper_outline_layer_side(int value);
         int get_helper_outline_layer_fill() const;
@@ -1379,6 +1397,17 @@ class BulletSpawner2D : public Node2D{
         Array get_live_volleys() const;
         // Forgets all tracked volleys (they keep flying untouched).
         void clear_live_volleys();
+        // Debug readout of the yellow preview rings: one PackedVector2Array
+        // per extra outline layer, exactly as drawn (holder-local). Empty
+        // when layers are inactive. Lets scripts/tests verify bullets sit
+        // on their rings without screenshotting the editor.
+        Array debug_get_layer_rings() const;
+        // Debug coincidence check: verifies every preview dot sits on its
+        // yellow ring (same center + same R + same distance math on both
+        // sides). Returns { checked, layers, max_deviation_px,
+        // mean_deviation_px, ok }. ok = max deviation <= tolerance_px.
+        // Empty/unavailable preview (no dots, no rings) returns checked=false.
+        Dictionary debug_check_layer_coincidence(double tolerance_px = 1.0) const;
         // Begins a burst chain / telegraph warning / fires the next burst
         // volley. Public so waves and boss phases can drive phrasing by hand
         // (begin + fire on timers) instead of only through the auto loop.
@@ -1422,6 +1451,9 @@ class BulletSpawner2D : public Node2D{
         // seam). Drawn bigger on top of the regular dot.
         Color preview_first_dot_color = Color(1.0, 0.85, 0.2);
         Color preview_path_color = Color(0.3, 0.85, 1.0, 0.55);
+        // Extra outline-layer rings (LAYERS placement): yellow, same alpha
+        // as the base track, always drawn without antialiasing.
+        Color preview_layer_path_color = Color(1.0, 1.0, 0.0, 0.55);
         double preview_path_width = 2.0;
         double preview_dot_radius = 4.0;
         // Extra pixels between the dot edge and the arrow tail: the shaft
@@ -1445,6 +1477,8 @@ class BulletSpawner2D : public Node2D{
         void set_preview_first_dot_color(const Color &value);
         Color get_preview_path_color() const;
         void set_preview_path_color(const Color &value);
+        Color get_preview_layer_path_color() const;
+        void set_preview_layer_path_color(const Color &value);
         double get_preview_path_width() const;
         void set_preview_path_width(double value);
         double get_preview_dot_radius() const;
@@ -1729,6 +1763,11 @@ class BulletSpawner2D : public Node2D{
         Node2D *preview_holder = nullptr;
         PatternPreviewLayer2D *preview_dots_layer = nullptr;
         PatternPreviewLayer2D *preview_arrows_layer = nullptr;
+        // Last built layer rings (one PackedVector2Array per extra layer,
+        // holder-local, exactly what the yellow pass draws: runs
+        // INF-separated with a closing duplicate per closed run). Debug
+        // readout for scripts/tests; empty when layers are inactive.
+        Array preview_last_layer_rings;
         // Re-entrancy latch for rebuild_preview(): setters, tree notifications
         // (child order / transform changed) and the preview loop can all ask
         // for a rebuild while one is already running (holder add_child fires
