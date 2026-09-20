@@ -14,6 +14,7 @@
 #include "../shared/multimesh_object_pool2d.hpp"
 #include "godot_cpp/core/math.hpp"
 #include "godot_cpp/variant/dictionary.hpp"
+#include "godot_cpp/variant/packed_float32_array.hpp"
 #include "godot_cpp/variant/packed_vector2_array.hpp"
 #include "godot_cpp/variant/utility_functions.hpp"
 #include "godot_cpp/variant/vector2.hpp"
@@ -192,10 +193,22 @@ public:
 	// Layer fill: how bullets are dealt across layers. INTERLEAVED sends
 	// bullet i to layer (i % layer_count) so the winding order survives;
 	// SEQUENTIAL fills layer 0 first, then layer 1, and so on, so small
-	// volleys still read as the base shape (layer = i * layer_count / n).
+	// volleys still read as the base shape (layer = i * layer_count / n);
+	// OUTER_FIRST fills from the outermost ring inward (implosion readings);
+	// PINGPONG waves 0,1,..,last,..,1 (pairs with spin).
 	enum OutlineLayerFill {
 		OUTLINE_LAYER_INTERLEAVED = 0,
-		OUTLINE_LAYER_SEQUENTIAL = 1
+		OUTLINE_LAYER_SEQUENTIAL = 1,
+		OUTLINE_LAYER_OUTER_FIRST = 2,
+		OUTLINE_LAYER_PINGPONG = 3
+	};
+
+	// Layer scale curve: how ring sizes progress. LINEAR steps evenly
+	// (1+step per layer); EXPONENTIAL compounds ((1+step)^L, mirrored
+	// reciprocally inward). A non-empty custom scale list overrides both.
+	enum OutlineLayerScaleCurve {
+		OUTLINE_LAYER_CURVE_LINEAR = 0,
+		OUTLINE_LAYER_CURVE_EXPONENTIAL = 1
 	};
 
 	// Outline facing: rotates each generated default facing. NORMAL keeps it,
@@ -959,6 +972,10 @@ public:
 			int layer_side = 0,
 			int layer_fill = 0,
 			int layer_start_offset = 0,
+			int layer_scale_curve = 0,
+			const PackedFloat32Array &layer_custom_scales = PackedFloat32Array(),
+			int layer_twist = 0,
+			int layer_max_dots = 0,
 			uint64_t seed = 0);
 
 	// Generates transforms in an aimed cone (shotgun spread): direction_angle is the cone center,
@@ -1068,6 +1085,10 @@ public:
 			int layer_side = 0,
 			int layer_fill = 0,
 			int layer_start_offset = 0,
+			int layer_scale_curve = 0,
+			const PackedFloat32Array &layer_custom_scales = PackedFloat32Array(),
+			int layer_twist = 0,
+			int layer_max_dots = 0,
 			// Bloom-kind selector + per-kind knobs (append-only; old calls are
 			// unaffected). Out-of-range flower_type is rejected loudly.
 			int flower_type = 0,
@@ -1118,7 +1139,11 @@ public:
 			double layer_scale = 0.2,
 			int layer_side = 0,
 			int layer_fill = 0,
-			int layer_start_offset = 0);
+			int layer_start_offset = 0,
+			int layer_scale_curve = 0,
+			const PackedFloat32Array &layer_custom_scales = PackedFloat32Array(),
+			int layer_twist = 0,
+			int layer_max_dots = 0);
 
 	// Rain curtain: slots spread along a horizontal band of band_width above
 	// (or around) the marker, facing rain_direction. drop_spacing staggers
@@ -1225,7 +1250,11 @@ public:
 			double layer_scale = 0.2,
 			int layer_side = 0,
 			int layer_fill = 0,
-			int layer_start_offset = 0);
+			int layer_start_offset = 0,
+			int layer_scale_curve = 0,
+			const PackedFloat32Array &layer_custom_scales = PackedFloat32Array(),
+			int layer_twist = 0,
+			int layer_max_dots = 0);
 
 	// Heart bloom: parametric heart outline (boss love attacks, endings).
 	// size scales the classic 16sin^3 / 13cos-5cos2t curve. Full
@@ -1250,7 +1279,11 @@ public:
 			double layer_scale = 0.2,
 			int layer_side = 0,
 			int layer_fill = 0,
-			int layer_start_offset = 0);
+			int layer_start_offset = 0,
+			int layer_scale_curve = 0,
+			const PackedFloat32Array &layer_custom_scales = PackedFloat32Array(),
+			int layer_twist = 0,
+			int layer_max_dots = 0);
 
 	// Snake row: slots along a sine wave of width, amplitude and wave count
 	// around the marker axis (direction need not be normalized). Pairs with
@@ -1329,7 +1362,11 @@ public:
 			double layer_scale = 0.2,
 			int layer_side = 0,
 			int layer_fill = 0,
-			int layer_start_offset = 0);
+			int layer_start_offset = 0,
+			int layer_scale_curve = 0,
+			const PackedFloat32Array &layer_custom_scales = PackedFloat32Array(),
+			int layer_twist = 0,
+			int layer_max_dots = 0);
 
 	// Twin counter-rotating galaxy: odd arms wind -angle_step, even arms
 	// +angle_step when mirrored (same facing switch as multispiral).
@@ -1396,7 +1433,11 @@ public:
 			double layer_scale = 0.2,
 			int layer_side = 0,
 			int layer_fill = 0,
-			int layer_start_offset = 0);
+			int layer_start_offset = 0,
+			int layer_scale_curve = 0,
+			const PackedFloat32Array &layer_custom_scales = PackedFloat32Array(),
+			int layer_twist = 0,
+			int layer_max_dots = 0);
 
 	// Clean circle outline: transforms_amount slots evenly on a radius
 	// circle around the marker, facing outward (or inward). The Ring helper
@@ -1431,7 +1472,11 @@ public:
 			double layer_scale = 0.2,
 			int layer_side = 0,
 			int layer_fill = 0,
-			int layer_start_offset = 0);
+			int layer_start_offset = 0,
+			int layer_scale_curve = 0,
+			const PackedFloat32Array &layer_custom_scales = PackedFloat32Array(),
+			int layer_twist = 0,
+			int layer_max_dots = 0);
 
 	// Rectangle perimeter: slots walk the outline of a size-sized box
 	// centered on the marker (counter-clockwise from top-left), facing
@@ -1466,7 +1511,11 @@ public:
 			double layer_scale = 0.2,
 			int layer_side = 0,
 			int layer_fill = 0,
-			int layer_start_offset = 0);
+			int layer_start_offset = 0,
+			int layer_scale_curve = 0,
+			const PackedFloat32Array &layer_custom_scales = PackedFloat32Array(),
+			int layer_twist = 0,
+			int layer_max_dots = 0);
 
 	// Polygon perimeter: vertices corners on a radius circle from
 	// base_rotation, slots spread evenly by arc length along the outline,
@@ -1503,7 +1552,11 @@ public:
 			double layer_scale = 0.2,
 			int layer_side = 0,
 			int layer_fill = 0,
-			int layer_start_offset = 0);
+			int layer_start_offset = 0,
+			int layer_scale_curve = 0,
+			const PackedFloat32Array &layer_custom_scales = PackedFloat32Array(),
+			int layer_twist = 0,
+			int layer_max_dots = 0);
 
 	// Triangle perimeter: equilateral (circumradius size_a), isosceles
 	// (base size_a + height size_b, apex up) or right-angled (legs size_a
@@ -1544,7 +1597,11 @@ public:
 			double layer_scale = 0.2,
 			int layer_side = 0,
 			int layer_fill = 0,
-			int layer_start_offset = 0);
+			int layer_start_offset = 0,
+			int layer_scale_curve = 0,
+			const PackedFloat32Array &layer_custom_scales = PackedFloat32Array(),
+			int layer_twist = 0,
+			int layer_max_dots = 0);
 
 	// Isosceles trapezoid perimeter: bases base_top/base_bottom with height,
 	// centered on the marker and rotated by rotation. Slots walk the outline
@@ -1583,7 +1640,11 @@ public:
 			double layer_scale = 0.2,
 			int layer_side = 0,
 			int layer_fill = 0,
-			int layer_start_offset = 0);
+			int layer_start_offset = 0,
+			int layer_scale_curve = 0,
+			const PackedFloat32Array &layer_custom_scales = PackedFloat32Array(),
+			int layer_twist = 0,
+			int layer_max_dots = 0);
 
 	// Diamond (rhombus) perimeter: diagonals diagonal_x/diagonal_y, centered
 	// on the marker and rotated by rotation. Slots walk the outline evenly
@@ -1621,7 +1682,11 @@ public:
 			double layer_scale = 0.2,
 			int layer_side = 0,
 			int layer_fill = 0,
-			int layer_start_offset = 0);
+			int layer_start_offset = 0,
+			int layer_scale_curve = 0,
+			const PackedFloat32Array &layer_custom_scales = PackedFloat32Array(),
+			int layer_twist = 0,
+			int layer_max_dots = 0);
 
 	// Universal side pass for closed-outline patterns: returns a copy of
 	// transforms with each origin pushed along its own facing by
@@ -1636,15 +1701,18 @@ public:
 			uint64_t seed = 0);
 
 	// Scale factor for one outline layer: how much bigger (or smaller) ring
-	// layer_index is than the base outline (1.0 for layer 0). Outward grows
-	// multiplicatively, inward crowds toward the center reciprocally, both
-	// alternates (+step, 1/(1+step), +2*step, ...). Single source of truth
-	// shared by the generators and the preview, so rings can never disagree
-	// with bullets. Out-of-range side warns and yields 1.0.
+	// layer_index is than the base outline (1.0 for layer 0). A non-empty
+	// custom_scales list wins outright (entry layer_index % size); otherwise
+	// Outward grows (linearly or compounded per scale_curve), Inward crowds
+	// toward the center reciprocally, Both alternates. Single source of
+	// truth shared by the generators and the preview, so rings can never
+	// disagree with bullets. Bad inputs warn and yield 1.0.
 	static double helper_layer_scale_factor(
 			int layer_index,
 			double scale_step,
-			int side = 0);
+			int side = 0,
+			int scale_curve = 0,
+			const PackedFloat32Array &custom_scales = PackedFloat32Array());
 
 	// Edge normals for a polyline: per-point outward normal from the local
 	// tangent (segment perpendicular, averaged at joints). tangent (1,0)
@@ -1751,5 +1819,6 @@ public:
 	VARIANT_ENUM_CAST(BlastBullets2D::BulletFactory2D::OutlinePlacement);
 	VARIANT_ENUM_CAST(BlastBullets2D::BulletFactory2D::OutlineLayerSide);
 	VARIANT_ENUM_CAST(BlastBullets2D::BulletFactory2D::OutlineLayerFill);
+	VARIANT_ENUM_CAST(BlastBullets2D::BulletFactory2D::OutlineLayerScaleCurve);
 	VARIANT_ENUM_CAST(BlastBullets2D::BulletFactory2D::OutlineFacing);
 	VARIANT_ENUM_CAST(BlastBullets2D::BulletFactory2D::FlowerBloom);

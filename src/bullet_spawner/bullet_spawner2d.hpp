@@ -648,8 +648,20 @@ class BulletSpawner2D : public Node2D{
         double helper_outline_layer_scale = 0.2;
         // Growth side (OutlineLayerSide): 0 outward, 1 inward, 2 both.
         int helper_outline_layer_side = 0;
-        // Deal order (OutlineLayerFill): 0 interleaved, 1 sequential.
+        // Deal order (OutlineLayerFill): 0 interleaved, 1 sequential,
+        // 2 outer-first, 3 ping-pong.
         int helper_outline_layer_fill = 0;
+        // Ring-size progression (OutlineLayerScaleCurve): 0 linear steps,
+        // 1 compounding. A non-empty custom scale list overrides both.
+        int helper_outline_layer_scale_curve = 0;
+        // Explicit per-layer scales (entry L % size); empty = formula.
+        PackedFloat32Array helper_outline_layer_scales;
+        // Per-layer slot rotation for rings above the outline (0 = off):
+        // stacked rings interleave angularly instead of sitting in spokes.
+        int helper_outline_layer_twist = 0;
+        // Max bullets kept per extra layer (0 = unlimited): overflow is
+        // dropped, first-kept in bullet order. Layer 0 is never capped.
+        int helper_outline_layer_max_dots = 0;
         // Sequential start layer: which layer sequential filling begins from
         // (wraps around). 0 = start on the outline. Sequential mode only.
         int helper_outline_layer_start_offset = 0;
@@ -1334,6 +1346,14 @@ class BulletSpawner2D : public Node2D{
         void set_helper_outline_layer_side(int value);
         int get_helper_outline_layer_fill() const;
         void set_helper_outline_layer_fill(int value);
+        int get_helper_outline_layer_scale_curve() const;
+        void set_helper_outline_layer_scale_curve(int value);
+        PackedFloat32Array get_helper_outline_layer_scales() const;
+        void set_helper_outline_layer_scales(const PackedFloat32Array &value);
+        int get_helper_outline_layer_twist() const;
+        void set_helper_outline_layer_twist(int value);
+        int get_helper_outline_layer_max_dots() const;
+        void set_helper_outline_layer_max_dots(int value);
         int get_helper_outline_layer_start_offset() const;
         void set_helper_outline_layer_start_offset(int value);
         int get_helper_outline_facing() const;
@@ -1402,11 +1422,11 @@ class BulletSpawner2D : public Node2D{
         // when layers are inactive. Lets scripts/tests verify bullets sit
         // on their rings without screenshotting the editor.
         Array debug_get_layer_rings() const;
-        // Debug coincidence check: verifies every preview dot sits on its
-        // yellow ring (same center + same R + same distance math on both
-        // sides). Returns { checked, layers, max_deviation_px,
-        // mean_deviation_px, ok }. ok = max deviation <= tolerance_px.
-        // Empty/unavailable preview (no dots, no rings) returns checked=false.
+        // Debug coincidence check: verifies every preview dot sits on the
+        // drawn geometry (base track or yellow rings). Returns { checked,
+        // layers, max_deviation_px, mean_deviation_px, ok }. ok = max
+        // deviation <= tolerance_px. Empty/unavailable preview (no dots)
+        // returns checked=false.
         Dictionary debug_check_layer_coincidence(double tolerance_px = 1.0) const;
         // Begins a burst chain / telegraph warning / fires the next burst
         // volley. Public so waves and boss phases can drive phrasing by hand

@@ -66,6 +66,38 @@ func _initialize() -> void:
 	await process_frame
 	var res2: Dictionary = spawner.debug_check_layer_coincidence(2.0)
 	_check(res2.get("checked", false) and bool(res2.get("ok", false)), "circle sequential+inward ok")
+	# New deals coincide too (debug pairs geometrically, deal-agnostic).
+	spawner.helper_outline_layer_fill = 2
+	spawner.helper_outline_layer_side = 0
+	await process_frame
+	var res3: Dictionary = spawner.debug_check_layer_coincidence(2.0)
+	_check(res3.get("checked", false) and bool(res3.get("ok", false)), "circle outer-first ok")
+	spawner.helper_outline_layer_fill = 3
+	await process_frame
+	var res4: Dictionary = spawner.debug_check_layer_coincidence(2.0)
+	_check(res4.get("checked", false) and bool(res4.get("ok", false)), "circle pingpong ok")
+	# Twist, caps, custom scales and exponential curve only move dots along
+	# the same rings.
+	spawner.helper_outline_layer_fill = 0
+	spawner.helper_outline_layer_twist = 3
+	await process_frame
+	var res5: Dictionary = spawner.debug_check_layer_coincidence(2.0)
+	_check(res5.get("checked", false) and bool(res5.get("ok", false)), "circle twist ok")
+	spawner.helper_outline_layer_twist = 0
+	spawner.helper_outline_layer_max_dots = 2
+	await process_frame
+	var res6: Dictionary = spawner.debug_check_layer_coincidence(2.0)
+	_check(res6.get("checked", false) and bool(res6.get("ok", false)), "circle capped ok")
+	spawner.helper_outline_layer_max_dots = 0
+	spawner.helper_outline_layer_scales = PackedFloat32Array([1.0, 1.5, 1.6])
+	await process_frame
+	var res7: Dictionary = spawner.debug_check_layer_coincidence(2.0)
+	_check(res7.get("checked", false) and bool(res7.get("ok", false)), "circle custom scales ok")
+	spawner.helper_outline_layer_scales = PackedFloat32Array()
+	spawner.helper_outline_layer_scale_curve = 1
+	await process_frame
+	var res8: Dictionary = spawner.debug_check_layer_coincidence(2.0)
+	_check(res8.get("checked", false) and bool(res8.get("ok", false)), "circle exponential ok")
 	print("----")
 	if failures == 0:
 		print("ALL PREVIEW COINCIDENCE TESTS PASSED")

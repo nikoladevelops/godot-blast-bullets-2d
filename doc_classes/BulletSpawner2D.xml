@@ -677,7 +677,7 @@
 			How many concentric rings share the volley in Layers placement. 1 is a single exact layer (the default, identical to On Outline). Must be in [1, 64].
 		</member>
 		<member name="helper_outline_layer_fill" type="int" setter="set_helper_outline_layer_fill" getter="get_helper_outline_layer_fill" enum="BulletFactory2D.OutlineLayerFill" default="0">
-			How bullets are dealt across layers: Interleaved (bullet i rides layer i % count, winding survives) or Sequential (fills contiguous chunks starting from [member helper_outline_layer_start_offset], so small volleys still read as the base shape with offset 0). Layers placement only.
+			How bullets are dealt across layers: Interleaved (bullet i rides layer i % count, winding survives), Sequential (fills contiguous chunks starting from [member helper_outline_layer_start_offset], so small volleys still read as the base shape with offset 0), Outer First (sequential from the outermost ring inward) or Ping Pong (waves 0..last..0, pairs with spin). Layers placement only.
 		</member>
 		<member name="helper_outline_layer_side" type="int" setter="set_helper_outline_layer_side" getter="get_helper_outline_layer_side" enum="BulletFactory2D.OutlineLayerSide" default="0">
 			Which side of the base outline extra layers grow toward: Outward (each ring bigger), Inward (rings crowd toward the center), or Both (alternating bigger/smaller). Layers placement only.
@@ -686,7 +686,19 @@
 			Fractional growth per layer: each extra ring rescales the shape about the loop center (0.2 = 20% bigger per layer outward). Must be finite in (0, 8]. Layers placement only.
 		</member>
 		<member name="helper_outline_layer_start_offset" type="int" setter="set_helper_outline_layer_start_offset" getter="get_helper_outline_layer_start_offset" default="0">
-			Which layer Sequential filling starts from (wraps around, so 1 starts on the second ring and the outline fills last). 0 starts on the outline. Only shown — and only consumed — in Layers placement with Sequential fill; Interleaved ignores it. Must be 0 or more.
+			Which layer Sequential-family filling starts from (wraps around, so 1 starts on the second ring and the outline fills last). 0 starts on the outline. Only shown — and only consumed — in Layers placement with Sequential or Outer First fill; Interleaved and Ping Pong ignore it. Must be 0 or more.
+		</member>
+		<member name="helper_outline_layer_scale_curve" type="int" setter="set_helper_outline_layer_scale_curve" getter="get_helper_outline_layer_scale_curve" enum="BulletFactory2D.OutlineLayerScaleCurve" default="0">
+			Ring-size progression: Linear steps evenly, Exponential compounds ((1 + step)^L, mirrored reciprocally inward). A non-empty [member helper_outline_layer_scales] overrides both. Layers placement only.
+		</member>
+		<member name="helper_outline_layer_scales" type="PackedFloat32Array" setter="set_helper_outline_layer_scales" getter="get_helper_outline_layer_scales" default="PackedFloat32Array()">
+			Explicit per-layer scales, entry L % size (e.g. [1.0, 1.5, 1.6] for a tight outer pair). Empty means the formula above. Each entry must be finite in [0.05, 64], at most 64 entries. Layers placement only.
+		</member>
+		<member name="helper_outline_layer_twist" type="int" setter="set_helper_outline_layer_twist" getter="get_helper_outline_layer_twist" default="0">
+			Slot rotation per successive layered ring (0 = off, negatives wrap): stacked rings interleave angularly instead of sitting in spokes. Layer 0 is never twisted. Layers placement only.
+		</member>
+		<member name="helper_outline_layer_max_dots" type="int" setter="set_helper_outline_layer_max_dots" getter="get_helper_outline_layer_max_dots" default="0">
+			Max bullets kept per extra layer (0 = unlimited): overflow is dropped, first-kept in bullet order, so the volley may shrink below helper_bullets_amount. Layer 0 is never capped. Layers placement only.
 		</member>
 		<member name="helper_outline_slot_offset" type="int" setter="set_helper_outline_slot_offset" getter="get_helper_outline_slot_offset" default="0">
 			Rotates which closed-loop slot becomes bullet 0 (wraps both ways). On-outline and layers layouts only.

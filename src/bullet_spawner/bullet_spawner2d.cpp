@@ -2856,13 +2856,52 @@ void BulletSpawner2D::set_helper_outline_layer_side(int value) {
 }
 int BulletSpawner2D::get_helper_outline_layer_fill() const { return helper_outline_layer_fill; }
 void BulletSpawner2D::set_helper_outline_layer_fill(int value) {
-    if (value < (int)BulletFactory2D::OUTLINE_LAYER_INTERLEAVED || value > (int)BulletFactory2D::OUTLINE_LAYER_SEQUENTIAL) {
-        UtilityFunctions::push_error("BulletSpawner2D: helper_outline_layer_fill must be 0 (interleaved) or 1 (sequential), keeping the old value.");
+    if (value < (int)BulletFactory2D::OUTLINE_LAYER_INTERLEAVED || value > (int)BulletFactory2D::OUTLINE_LAYER_PINGPONG) {
+        UtilityFunctions::push_error("BulletSpawner2D: helper_outline_layer_fill must be 0 (interleaved), 1 (sequential), 2 (outer first) or 3 (ping-pong), keeping the old value.");
         return;
     }
     helper_outline_layer_fill = value;
-    // Sequential reveals the start-offset control in the inspector.
+    // Sequential-family reveals the start-offset control in the inspector.
     notify_property_list_changed();
+    rebuild_preview();
+}
+int BulletSpawner2D::get_helper_outline_layer_scale_curve() const { return helper_outline_layer_scale_curve; }
+void BulletSpawner2D::set_helper_outline_layer_scale_curve(int value) {
+    if (value < (int)BulletFactory2D::OUTLINE_LAYER_CURVE_LINEAR || value > (int)BulletFactory2D::OUTLINE_LAYER_CURVE_EXPONENTIAL) {
+        UtilityFunctions::push_error("BulletSpawner2D: helper_outline_layer_scale_curve must be 0 (linear) or 1 (exponential), keeping the old value.");
+        return;
+    }
+    helper_outline_layer_scale_curve = value;
+    rebuild_preview();
+}
+PackedFloat32Array BulletSpawner2D::get_helper_outline_layer_scales() const { return helper_outline_layer_scales; }
+void BulletSpawner2D::set_helper_outline_layer_scales(const PackedFloat32Array &value) {
+    if (value.size() > 64) {
+        UtilityFunctions::push_error("BulletSpawner2D: helper_outline_layer_scales holds at most 64 entries, keeping the old value.");
+        return;
+    }
+    for (int i = 0; i < value.size(); ++i) {
+        const double s = (double)value[i];
+        if (!Math::is_finite(s) || s < 0.05 || s > 64.0) {
+            UtilityFunctions::push_error("BulletSpawner2D: helper_outline_layer_scales entries must be finite in [0.05, 64], keeping the old value.");
+            return;
+        }
+    }
+    helper_outline_layer_scales = value;
+    rebuild_preview();
+}
+int BulletSpawner2D::get_helper_outline_layer_twist() const { return helper_outline_layer_twist; }
+void BulletSpawner2D::set_helper_outline_layer_twist(int value) {
+    helper_outline_layer_twist = value;
+    rebuild_preview();
+}
+int BulletSpawner2D::get_helper_outline_layer_max_dots() const { return helper_outline_layer_max_dots; }
+void BulletSpawner2D::set_helper_outline_layer_max_dots(int value) {
+    if (value < 0) {
+        UtilityFunctions::push_error("BulletSpawner2D: helper_outline_layer_max_dots must be >= 0 (0 = unlimited), keeping the old value.");
+        return;
+    }
+    helper_outline_layer_max_dots = value;
     rebuild_preview();
 }
 int BulletSpawner2D::get_helper_outline_layer_start_offset() const { return helper_outline_layer_start_offset; }
@@ -4433,11 +4472,12 @@ Array BulletSpawner2D::debug_get_layer_rings() const {
     return preview_last_layer_rings.duplicate();
 }
 
-// Debugging function: proves dots sit on the yellow rings (same center-scale
-// rule + same deal math on both sides). Point-to-segment match against the drawn
-// holder-local rings: exact on sharp shapes, sub-pixel on dense sweeps.
-// Large deviation = factory/preview disagree (stale snapshot). Only layered
-// bullets (layer > 0) are checked; layer 0 rides the base track, not a ring.
+// Debugging function: proves dots sit on the drawn geometry (base track or
+// yellow rings — same center-scale rule on both sides). Point-to-segment
+// match against the holder-local base track plus every stored ring: exact on
+// sharp shapes, sub-pixel on dense sweeps. Because pairing is purely
+// geometric, twist, caps and fill deals can never confuse it. Large
+// deviation = factory/preview disagree (stale snapshot).
 Dictionary BulletSpawner2D::debug_check_layer_coincidence(double tolerance_px) const {
     Dictionary out;
     out["checked"] = false;
@@ -4445,7 +4485,7 @@ Dictionary BulletSpawner2D::debug_check_layer_coincidence(double tolerance_px) c
     out["max_deviation_px"] = -1.0;
     out["mean_deviation_px"] = -1.0;
     out["ok"] = false;
-    if (preview_dots_layer == nullptr || preview_last_layer_rings.is_empty()) {
+    if (preview_dots_layer == nullptr) {
         return out;
     }
     const PackedVector2Array dots = preview_dots_layer->dots;
@@ -4456,29 +4496,62 @@ Dictionary BulletSpawner2D::debug_check_layer_coincidence(double tolerance_px) c
             || helper_outline_placement != (int)BulletFactory2D::OUTLINE_LAYERS) {
         return out;
     }
-    const int n = dots.size();
-    const int layer_count = MAX(helper_outline_layer_count, 1);
+    // Candidate segments: base track runs plus every stored ring run.
+    // Runs split on INF separators; a run closes only when it is the sole
+    // run and the track is flagged closed (multi-run tracks like flower
+    // petals stay open). Every run boundary gets an explicit separator so
+    // no phantom segment can bridge base into rings (or rings into each
+    // other) and fake a near-match.
+    PackedVector2Array guides;
+    {
+        const PackedVector2Array base = preview_dots_layer->path_points;
+        Array base_runs;
+        {
+            PackedVector2Array cur;
+            for (int k = 0; k < base.size(); ++k) {
+                if (!base[k].is_finite()) {
+                    if (cur.size() >= 1) {
+                        base_runs.push_back(cur);
+                    }
+                    cur.clear();
+                    continue;
+                }
+                cur.push_back(base[k]);
+            }
+            if (cur.size() >= 1) {
+                base_runs.push_back(cur);
+            }
+        }
+        const bool close_base = preview_dots_layer->path_closed && base_runs.size() == 1;
+        for (int r = 0; r < base_runs.size(); ++r) {
+            const PackedVector2Array run = base_runs[r];
+            for (int k = 0; k < run.size(); ++k) {
+                guides.push_back(run[k]);
+            }
+            if (close_base && run.size() >= 2 && run[0].is_finite()) {
+                guides.push_back(run[0]);
+            }
+            guides.push_back(Vector2(Math::INF, Math::INF));
+        }
+    }
+    for (int i = 0; i < preview_last_layer_rings.size(); ++i) {
+        const PackedVector2Array ring = preview_last_layer_rings[i];
+        for (int k = 0; k < ring.size(); ++k) {
+            guides.push_back(ring[k]);
+        }
+        guides.push_back(Vector2(Math::INF, Math::INF));
+    }
     double max_dev = 0.0;
     double sum_dev = 0.0;
     int counted = 0;
-    for (int i = 0; i < n; ++i) {
+    for (int i = 0; i < dots.size(); ++i) {
         if (!dots[i].is_finite()) {
             continue;
         }
-        const int bullet_layer = BulletFactory2D::helper_bullet_layer_index(i, n, layer_count, helper_outline_layer_fill, helper_outline_layer_start_offset);
-        if (bullet_layer <= 0 || bullet_layer > preview_last_layer_rings.size()) {
-            continue;
-        }
-        const PackedVector2Array ring = preview_last_layer_rings[bullet_layer - 1];
-        if (ring.size() < 2) {
-            continue;
-        }
-        // Stored rings carry INF run separators and closing duplicates
-        // (mirroring the drawn track): plain consecutive pairs, no wrap.
         double best_d2 = 1e30;
-        for (int k = 0; k + 1 < ring.size(); ++k) {
-            const Vector2 a = ring[k];
-            const Vector2 b = ring[k + 1];
+        for (int k = 0; k + 1 < guides.size(); ++k) {
+            const Vector2 a = guides[k];
+            const Vector2 b = guides[k + 1];
             if (!a.is_finite() || !b.is_finite()) {
                 continue;
             }
@@ -4941,7 +5014,7 @@ TypedArray<Transform2D> BulletSpawner2D::collect_spawn_transforms_impl(bool quie
             raw = BulletFactory2D::helper_generate_transforms_grid(helper_bullets_amount, marker, helper_grid_rows_per_column, (BulletFactory2D::Alignment)helper_grid_alignment, helper_grid_column_offset, helper_grid_row_offset, helper_grid_rotate_with_marker, helper_grid_random_local_rotation, helper_grid_jitter, helper_grid_seed > 0 ? (uint64_t)helper_grid_seed : 0);
             break;
         case PATTERN_FROM_HELPER_RING:
-            raw = BulletFactory2D::helper_generate_transforms_ring(helper_bullets_amount, marker, helper_ring_radius, helper_ring_start_angle, helper_ring_arc, helper_ring_rotate_with_marker, helper_ring_random_rotation, helper_ring_face_outward, helper_ring_y_scale, helper_ring_facing_offset_deg, helper_outline_placement, helper_outline_facing, helper_outline_reverse, helper_outline_slot_offset, helper_outline_fill_spacing, helper_outline_fill_stagger, helper_outline_fill_margin, helper_outline_layer_count, helper_outline_layer_scale, helper_outline_layer_side, helper_outline_layer_fill, helper_outline_layer_start_offset, helper_ring_seed > 0 ? (uint64_t)helper_ring_seed : 0);
+            raw = BulletFactory2D::helper_generate_transforms_ring(helper_bullets_amount, marker, helper_ring_radius, helper_ring_start_angle, helper_ring_arc, helper_ring_rotate_with_marker, helper_ring_random_rotation, helper_ring_face_outward, helper_ring_y_scale, helper_ring_facing_offset_deg, helper_outline_placement, helper_outline_facing, helper_outline_reverse, helper_outline_slot_offset, helper_outline_fill_spacing, helper_outline_fill_stagger, helper_outline_fill_margin, helper_outline_layer_count, helper_outline_layer_scale, helper_outline_layer_side, helper_outline_layer_fill, helper_outline_layer_start_offset, helper_outline_layer_scale_curve, helper_outline_layer_scales, helper_outline_layer_twist, helper_outline_layer_max_dots, helper_ring_seed > 0 ? (uint64_t)helper_ring_seed : 0);
             break;
         case PATTERN_FROM_HELPER_FAN:
             raw = BulletFactory2D::helper_generate_transforms_fan(helper_bullets_amount, marker, helper_fan_spread, helper_fan_direction_angle, helper_fan_step_offset, helper_fan_centered, helper_fan_angle_jitter, helper_fan_seed > 0 ? (uint64_t)helper_fan_seed : 0);
@@ -5019,10 +5092,10 @@ TypedArray<Transform2D> BulletSpawner2D::collect_spawn_transforms_impl(bool quie
             break;
         }
         case PATTERN_FROM_HELPER_FLOWER:
-            raw = BulletFactory2D::helper_generate_transforms_flower(helper_bullets_amount, marker, helper_flower_petals, helper_flower_bullets_per_petal, helper_flower_radius, helper_flower_petal_spread, helper_flower_petal_sharpness, helper_flower_base_rotation, helper_flower_face_outward, helper_flower_facing_offset_deg, helper_outline_placement, helper_outline_facing, helper_outline_reverse, helper_outline_slot_offset, helper_outline_fill_spacing, helper_outline_fill_stagger, helper_outline_fill_margin, helper_outline_layer_count, helper_outline_layer_scale, helper_outline_layer_side, helper_outline_layer_fill, helper_outline_layer_start_offset, helper_flower_type, helper_flower_inner_radius_scale, helper_flower_spiro_roller, helper_flower_spiro_pen, helper_flower_super_lobes, helper_flower_super_fullness);
+            raw = BulletFactory2D::helper_generate_transforms_flower(helper_bullets_amount, marker, helper_flower_petals, helper_flower_bullets_per_petal, helper_flower_radius, helper_flower_petal_spread, helper_flower_petal_sharpness, helper_flower_base_rotation, helper_flower_face_outward, helper_flower_facing_offset_deg, helper_outline_placement, helper_outline_facing, helper_outline_reverse, helper_outline_slot_offset, helper_outline_fill_spacing, helper_outline_fill_stagger, helper_outline_fill_margin, helper_outline_layer_count, helper_outline_layer_scale, helper_outline_layer_side, helper_outline_layer_fill, helper_outline_layer_start_offset, helper_outline_layer_scale_curve, helper_outline_layer_scales, helper_outline_layer_twist, helper_outline_layer_max_dots, helper_flower_type, helper_flower_inner_radius_scale, helper_flower_spiro_roller, helper_flower_spiro_pen, helper_flower_super_lobes, helper_flower_super_fullness);
             break;
         case PATTERN_FROM_HELPER_ELLIPSE:
-            raw = BulletFactory2D::helper_generate_transforms_ellipse(helper_bullets_amount, marker, helper_ellipse_radius_x, helper_ellipse_radius_y, helper_ellipse_rotation, helper_ellipse_start_angle, helper_ellipse_arc, (BulletFactory2D::EllipseMode)helper_ellipse_mode, helper_ellipse_gap_count, helper_ellipse_gap_width, helper_ellipse_face_outward, helper_ellipse_facing_offset_deg, helper_outline_placement, helper_outline_facing, helper_outline_reverse, helper_outline_slot_offset, helper_outline_fill_spacing, helper_outline_fill_stagger, helper_outline_fill_margin, helper_outline_layer_count, helper_outline_layer_scale, helper_outline_layer_side, helper_outline_layer_fill, helper_outline_layer_start_offset);
+            raw = BulletFactory2D::helper_generate_transforms_ellipse(helper_bullets_amount, marker, helper_ellipse_radius_x, helper_ellipse_radius_y, helper_ellipse_rotation, helper_ellipse_start_angle, helper_ellipse_arc, (BulletFactory2D::EllipseMode)helper_ellipse_mode, helper_ellipse_gap_count, helper_ellipse_gap_width, helper_ellipse_face_outward, helper_ellipse_facing_offset_deg, helper_outline_placement, helper_outline_facing, helper_outline_reverse, helper_outline_slot_offset, helper_outline_fill_spacing, helper_outline_fill_stagger, helper_outline_fill_margin, helper_outline_layer_count, helper_outline_layer_scale, helper_outline_layer_side, helper_outline_layer_fill, helper_outline_layer_start_offset, helper_outline_layer_scale_curve, helper_outline_layer_scales, helper_outline_layer_twist, helper_outline_layer_max_dots);
             break;
         case PATTERN_FROM_HELPER_RAIN:
             raw = BulletFactory2D::helper_generate_transforms_rain(helper_bullets_amount, marker, helper_rain_band_width, helper_rain_direction, helper_rain_drop_spacing, helper_rain_jitter, helper_rain_seed > 0 ? (uint64_t)helper_rain_seed : 0);
@@ -5051,10 +5124,10 @@ TypedArray<Transform2D> BulletSpawner2D::collect_spawn_transforms_impl(bool quie
             raw = BulletFactory2D::helper_generate_transforms_cross(helper_bullets_amount, marker, helper_cross_arm_count, helper_cross_arm_length, helper_cross_spacing, helper_cross_base_rotation, helper_cross_face_outward, helper_cross_facing_offset_deg);
             break;
         case PATTERN_FROM_HELPER_STAR:
-            raw = BulletFactory2D::helper_generate_transforms_star(helper_bullets_amount, marker, helper_star_points, helper_star_outer_radius, helper_star_inner_radius, helper_star_base_rotation, helper_star_face_outward, helper_star_facing_offset_deg, helper_outline_placement, helper_outline_facing, helper_outline_reverse, helper_outline_slot_offset, helper_outline_fill_spacing, helper_outline_fill_stagger, helper_outline_fill_margin, helper_outline_layer_count, helper_outline_layer_scale, helper_outline_layer_side, helper_outline_layer_fill, helper_outline_layer_start_offset);
+            raw = BulletFactory2D::helper_generate_transforms_star(helper_bullets_amount, marker, helper_star_points, helper_star_outer_radius, helper_star_inner_radius, helper_star_base_rotation, helper_star_face_outward, helper_star_facing_offset_deg, helper_outline_placement, helper_outline_facing, helper_outline_reverse, helper_outline_slot_offset, helper_outline_fill_spacing, helper_outline_fill_stagger, helper_outline_fill_margin, helper_outline_layer_count, helper_outline_layer_scale, helper_outline_layer_side, helper_outline_layer_fill, helper_outline_layer_start_offset, helper_outline_layer_scale_curve, helper_outline_layer_scales, helper_outline_layer_twist, helper_outline_layer_max_dots);
             break;
         case PATTERN_FROM_HELPER_HEART:
-            raw = BulletFactory2D::helper_generate_transforms_heart(helper_bullets_amount, marker, helper_heart_size, helper_heart_base_rotation, helper_heart_face_outward, helper_heart_facing_offset_deg, helper_outline_placement, helper_outline_facing, helper_outline_reverse, helper_outline_slot_offset, helper_outline_fill_spacing, helper_outline_fill_stagger, helper_outline_fill_margin, helper_outline_layer_count, helper_outline_layer_scale, helper_outline_layer_side, helper_outline_layer_fill, helper_outline_layer_start_offset);
+            raw = BulletFactory2D::helper_generate_transforms_heart(helper_bullets_amount, marker, helper_heart_size, helper_heart_base_rotation, helper_heart_face_outward, helper_heart_facing_offset_deg, helper_outline_placement, helper_outline_facing, helper_outline_reverse, helper_outline_slot_offset, helper_outline_fill_spacing, helper_outline_fill_stagger, helper_outline_fill_margin, helper_outline_layer_count, helper_outline_layer_scale, helper_outline_layer_side, helper_outline_layer_fill, helper_outline_layer_start_offset, helper_outline_layer_scale_curve, helper_outline_layer_scales, helper_outline_layer_twist, helper_outline_layer_max_dots);
             break;
         case PATTERN_FROM_HELPER_WAVE:
             raw = BulletFactory2D::helper_generate_transforms_wave(helper_bullets_amount, marker, helper_wave_width, helper_wave_amplitude, helper_wave_waves, helper_wave_direction, helper_wave_face_direction, helper_wave_facing_offset_deg);
@@ -5066,7 +5139,7 @@ TypedArray<Transform2D> BulletSpawner2D::collect_spawn_transforms_impl(bool quie
             raw = BulletFactory2D::helper_generate_transforms_lattice(helper_bullets_amount, marker, helper_lattice_columns, helper_lattice_rows, helper_lattice_spacing_x, helper_lattice_spacing_y, helper_lattice_stagger_rows, helper_lattice_face_outward, helper_lattice_facing_offset_deg);
             break;
         case PATTERN_FROM_HELPER_ROSE:
-            raw = BulletFactory2D::helper_generate_transforms_rose(helper_bullets_amount, marker, helper_rose_petals, helper_rose_radius, helper_rose_lobe_sharpness, helper_rose_base_rotation, helper_rose_face_outward, helper_rose_facing_offset_deg, helper_outline_placement, helper_outline_facing, helper_outline_reverse, helper_outline_slot_offset, helper_outline_fill_spacing, helper_outline_fill_stagger, helper_outline_fill_margin, helper_outline_layer_count, helper_outline_layer_scale, helper_outline_layer_side, helper_outline_layer_fill, helper_outline_layer_start_offset);
+            raw = BulletFactory2D::helper_generate_transforms_rose(helper_bullets_amount, marker, helper_rose_petals, helper_rose_radius, helper_rose_lobe_sharpness, helper_rose_base_rotation, helper_rose_face_outward, helper_rose_facing_offset_deg, helper_outline_placement, helper_outline_facing, helper_outline_reverse, helper_outline_slot_offset, helper_outline_fill_spacing, helper_outline_fill_stagger, helper_outline_fill_margin, helper_outline_layer_count, helper_outline_layer_scale, helper_outline_layer_side, helper_outline_layer_fill, helper_outline_layer_start_offset, helper_outline_layer_scale_curve, helper_outline_layer_scales, helper_outline_layer_twist, helper_outline_layer_max_dots);
             break;
         case PATTERN_FROM_HELPER_COUNTER_SPIRAL:
             raw = BulletFactory2D::helper_generate_transforms_counter_spiral(helper_bullets_amount, marker, helper_counter_spiral_arms, helper_counter_spiral_start_radius, helper_counter_spiral_radius_step, helper_counter_spiral_angle_step, helper_counter_spiral_rotate_with_marker, (BulletFactory2D::SpiralFacingMode)helper_counter_spiral_facing, helper_counter_spiral_facing_offset_deg, helper_counter_spiral_arm_stride, helper_counter_spiral_mirror_alternate_arms);
@@ -5087,7 +5160,7 @@ TypedArray<Transform2D> BulletSpawner2D::collect_spawn_transforms_impl(bool quie
             break;
         }
         case PATTERN_FROM_HELPER_LISSAJOUS:
-            raw = BulletFactory2D::helper_generate_transforms_lissajous(helper_bullets_amount, marker, helper_lissajous_size_x, helper_lissajous_size_y, helper_lissajous_freq_x, helper_lissajous_freq_y, helper_lissajous_phase, helper_lissajous_face_outward, helper_lissajous_facing_offset_deg, helper_outline_placement, helper_outline_facing, helper_outline_reverse, helper_outline_slot_offset, helper_outline_fill_spacing, helper_outline_fill_stagger, helper_outline_fill_margin, helper_outline_layer_count, helper_outline_layer_scale, helper_outline_layer_side, helper_outline_layer_fill, helper_outline_layer_start_offset);
+            raw = BulletFactory2D::helper_generate_transforms_lissajous(helper_bullets_amount, marker, helper_lissajous_size_x, helper_lissajous_size_y, helper_lissajous_freq_x, helper_lissajous_freq_y, helper_lissajous_phase, helper_lissajous_face_outward, helper_lissajous_facing_offset_deg, helper_outline_placement, helper_outline_facing, helper_outline_reverse, helper_outline_slot_offset, helper_outline_fill_spacing, helper_outline_fill_stagger, helper_outline_fill_margin, helper_outline_layer_count, helper_outline_layer_scale, helper_outline_layer_side, helper_outline_layer_fill, helper_outline_layer_start_offset, helper_outline_layer_scale_curve, helper_outline_layer_scales, helper_outline_layer_twist, helper_outline_layer_max_dots);
             break;
         case PATTERN_FROM_HELPER_CUSTOM: {
             // Hand-placed transforms: every stored slot spawns exactly where
@@ -5153,25 +5226,25 @@ TypedArray<Transform2D> BulletSpawner2D::collect_spawn_transforms_impl(bool quie
             break;
         }
         case PATTERN_FROM_HELPER_CIRCLE:
-            raw = BulletFactory2D::helper_generate_transforms_circle(helper_bullets_amount, marker, (real_t)helper_circle_radius, helper_circle_face_outward, (real_t)helper_circle_facing_offset_deg, helper_outline_placement, helper_outline_facing, helper_outline_reverse, helper_outline_slot_offset, helper_outline_fill_spacing, helper_outline_fill_stagger, helper_outline_fill_margin, helper_outline_layer_count, helper_outline_layer_scale, helper_outline_layer_side, helper_outline_layer_fill, helper_outline_layer_start_offset);
+            raw = BulletFactory2D::helper_generate_transforms_circle(helper_bullets_amount, marker, (real_t)helper_circle_radius, helper_circle_face_outward, (real_t)helper_circle_facing_offset_deg, helper_outline_placement, helper_outline_facing, helper_outline_reverse, helper_outline_slot_offset, helper_outline_fill_spacing, helper_outline_fill_stagger, helper_outline_fill_margin, helper_outline_layer_count, helper_outline_layer_scale, helper_outline_layer_side, helper_outline_layer_fill, helper_outline_layer_start_offset, helper_outline_layer_scale_curve, helper_outline_layer_scales, helper_outline_layer_twist, helper_outline_layer_max_dots);
             break;
         case PATTERN_FROM_HELPER_RECTANGLE:
-            raw = BulletFactory2D::helper_generate_transforms_rectangle(helper_bullets_amount, marker, helper_rectangle_size, helper_rectangle_face_outward, (real_t)helper_rectangle_facing_offset_deg, helper_outline_placement, helper_outline_facing, helper_outline_reverse, helper_outline_slot_offset, helper_outline_fill_spacing, helper_outline_fill_stagger, helper_outline_fill_margin, helper_outline_layer_count, helper_outline_layer_scale, helper_outline_layer_side, helper_outline_layer_fill, helper_outline_layer_start_offset);
+            raw = BulletFactory2D::helper_generate_transforms_rectangle(helper_bullets_amount, marker, helper_rectangle_size, helper_rectangle_face_outward, (real_t)helper_rectangle_facing_offset_deg, helper_outline_placement, helper_outline_facing, helper_outline_reverse, helper_outline_slot_offset, helper_outline_fill_spacing, helper_outline_fill_stagger, helper_outline_fill_margin, helper_outline_layer_count, helper_outline_layer_scale, helper_outline_layer_side, helper_outline_layer_fill, helper_outline_layer_start_offset, helper_outline_layer_scale_curve, helper_outline_layer_scales, helper_outline_layer_twist, helper_outline_layer_max_dots);
             break;
         case PATTERN_FROM_HELPER_SQUARE:
-            raw = BulletFactory2D::helper_generate_transforms_rectangle(helper_bullets_amount, marker, Vector2((real_t)helper_square_size, (real_t)helper_square_size), helper_square_face_outward, (real_t)helper_square_facing_offset_deg, helper_outline_placement, helper_outline_facing, helper_outline_reverse, helper_outline_slot_offset, helper_outline_fill_spacing, helper_outline_fill_stagger, helper_outline_fill_margin, helper_outline_layer_count, helper_outline_layer_scale, helper_outline_layer_side, helper_outline_layer_fill, helper_outline_layer_start_offset);
+            raw = BulletFactory2D::helper_generate_transforms_rectangle(helper_bullets_amount, marker, Vector2((real_t)helper_square_size, (real_t)helper_square_size), helper_square_face_outward, (real_t)helper_square_facing_offset_deg, helper_outline_placement, helper_outline_facing, helper_outline_reverse, helper_outline_slot_offset, helper_outline_fill_spacing, helper_outline_fill_stagger, helper_outline_fill_margin, helper_outline_layer_count, helper_outline_layer_scale, helper_outline_layer_side, helper_outline_layer_fill, helper_outline_layer_start_offset, helper_outline_layer_scale_curve, helper_outline_layer_scales, helper_outline_layer_twist, helper_outline_layer_max_dots);
             break;
         case PATTERN_FROM_HELPER_POLYGON:
-            raw = BulletFactory2D::helper_generate_transforms_polygon(helper_bullets_amount, marker, helper_polygon_vertices, (real_t)helper_polygon_radius, (real_t)helper_polygon_rotation, helper_polygon_face_outward, (real_t)helper_polygon_facing_offset_deg, helper_outline_placement, helper_outline_facing, helper_outline_reverse, helper_outline_slot_offset, helper_outline_fill_spacing, helper_outline_fill_stagger, helper_outline_fill_margin, helper_outline_layer_count, helper_outline_layer_scale, helper_outline_layer_side, helper_outline_layer_fill, helper_outline_layer_start_offset);
+            raw = BulletFactory2D::helper_generate_transforms_polygon(helper_bullets_amount, marker, helper_polygon_vertices, (real_t)helper_polygon_radius, (real_t)helper_polygon_rotation, helper_polygon_face_outward, (real_t)helper_polygon_facing_offset_deg, helper_outline_placement, helper_outline_facing, helper_outline_reverse, helper_outline_slot_offset, helper_outline_fill_spacing, helper_outline_fill_stagger, helper_outline_fill_margin, helper_outline_layer_count, helper_outline_layer_scale, helper_outline_layer_side, helper_outline_layer_fill, helper_outline_layer_start_offset, helper_outline_layer_scale_curve, helper_outline_layer_scales, helper_outline_layer_twist, helper_outline_layer_max_dots);
             break;
         case PATTERN_FROM_HELPER_TRIANGLE:
-            raw = BulletFactory2D::helper_generate_transforms_triangle(helper_bullets_amount, marker, (BulletFactory2D::TriangleType)helper_triangle_type, helper_triangle_size_a, helper_triangle_size_b, helper_triangle_rotation, helper_triangle_face_outward, helper_triangle_facing_offset_deg, helper_outline_placement, helper_outline_facing, helper_outline_reverse, helper_outline_slot_offset, helper_outline_fill_spacing, helper_outline_fill_stagger, helper_outline_fill_margin, helper_outline_layer_count, helper_outline_layer_scale, helper_outline_layer_side, helper_outline_layer_fill, helper_outline_layer_start_offset);
+            raw = BulletFactory2D::helper_generate_transforms_triangle(helper_bullets_amount, marker, (BulletFactory2D::TriangleType)helper_triangle_type, helper_triangle_size_a, helper_triangle_size_b, helper_triangle_rotation, helper_triangle_face_outward, helper_triangle_facing_offset_deg, helper_outline_placement, helper_outline_facing, helper_outline_reverse, helper_outline_slot_offset, helper_outline_fill_spacing, helper_outline_fill_stagger, helper_outline_fill_margin, helper_outline_layer_count, helper_outline_layer_scale, helper_outline_layer_side, helper_outline_layer_fill, helper_outline_layer_start_offset, helper_outline_layer_scale_curve, helper_outline_layer_scales, helper_outline_layer_twist, helper_outline_layer_max_dots);
             break;
         case PATTERN_FROM_HELPER_TRAPEZOID:
-            raw = BulletFactory2D::helper_generate_transforms_trapezoid(helper_bullets_amount, marker, helper_trapezoid_base_top, helper_trapezoid_base_bottom, helper_trapezoid_height, helper_trapezoid_rotation, helper_trapezoid_face_outward, helper_trapezoid_facing_offset_deg, helper_outline_placement, helper_outline_facing, helper_outline_reverse, helper_outline_slot_offset, helper_outline_fill_spacing, helper_outline_fill_stagger, helper_outline_fill_margin, helper_outline_layer_count, helper_outline_layer_scale, helper_outline_layer_side, helper_outline_layer_fill, helper_outline_layer_start_offset);
+            raw = BulletFactory2D::helper_generate_transforms_trapezoid(helper_bullets_amount, marker, helper_trapezoid_base_top, helper_trapezoid_base_bottom, helper_trapezoid_height, helper_trapezoid_rotation, helper_trapezoid_face_outward, helper_trapezoid_facing_offset_deg, helper_outline_placement, helper_outline_facing, helper_outline_reverse, helper_outline_slot_offset, helper_outline_fill_spacing, helper_outline_fill_stagger, helper_outline_fill_margin, helper_outline_layer_count, helper_outline_layer_scale, helper_outline_layer_side, helper_outline_layer_fill, helper_outline_layer_start_offset, helper_outline_layer_scale_curve, helper_outline_layer_scales, helper_outline_layer_twist, helper_outline_layer_max_dots);
             break;
         case PATTERN_FROM_HELPER_DIAMOND:
-            raw = BulletFactory2D::helper_generate_transforms_diamond(helper_bullets_amount, marker, helper_diamond_diagonal_x, helper_diamond_diagonal_y, helper_diamond_rotation, helper_diamond_face_outward, helper_diamond_facing_offset_deg, helper_outline_placement, helper_outline_facing, helper_outline_reverse, helper_outline_slot_offset, helper_outline_fill_spacing, helper_outline_fill_stagger, helper_outline_fill_margin, helper_outline_layer_count, helper_outline_layer_scale, helper_outline_layer_side, helper_outline_layer_fill, helper_outline_layer_start_offset);
+            raw = BulletFactory2D::helper_generate_transforms_diamond(helper_bullets_amount, marker, helper_diamond_diagonal_x, helper_diamond_diagonal_y, helper_diamond_rotation, helper_diamond_face_outward, helper_diamond_facing_offset_deg, helper_outline_placement, helper_outline_facing, helper_outline_reverse, helper_outline_slot_offset, helper_outline_fill_spacing, helper_outline_fill_stagger, helper_outline_fill_margin, helper_outline_layer_count, helper_outline_layer_scale, helper_outline_layer_side, helper_outline_layer_fill, helper_outline_layer_start_offset, helper_outline_layer_scale_curve, helper_outline_layer_scales, helper_outline_layer_twist, helper_outline_layer_max_dots);
             break;
         case PATTERN_FROM_HELPER_PATH2D: {
             // Standalone live-curve layout (no spray rig): bullets sit ON the
@@ -5954,15 +6027,30 @@ void BulletSpawner2D::rebuild_preview() {
             // reference radius). Only loop shapes with outline support draw
             // rings; anything else keeps dots only.
             preview_last_layer_rings.clear();
-            if (supports_outline_layout(pattern_source)
+            // Quiet validation mirror of the factory: rings draw only for
+            // settings the volley accepts (custom scales checked entry-wise).
+            bool layers_ok = supports_outline_layout(pattern_source)
                     && helper_outline_placement == (int)BulletFactory2D::OUTLINE_LAYERS
                     && helper_outline_layer_count > 1
                     && Math::is_finite(helper_outline_layer_scale) && helper_outline_layer_scale > 0.0 && helper_outline_layer_scale <= 8.0
                     && helper_outline_layer_side >= (int)BulletFactory2D::OUTLINE_LAYER_OUTWARD
                     && helper_outline_layer_side <= (int)BulletFactory2D::OUTLINE_LAYER_BOTH
                     && helper_outline_layer_fill >= (int)BulletFactory2D::OUTLINE_LAYER_INTERLEAVED
-                    && helper_outline_layer_fill <= (int)BulletFactory2D::OUTLINE_LAYER_SEQUENTIAL
-                    && helper_outline_layer_start_offset >= 0) {
+                    && helper_outline_layer_fill <= (int)BulletFactory2D::OUTLINE_LAYER_PINGPONG
+                    && helper_outline_layer_start_offset >= 0
+                    && helper_outline_layer_scale_curve >= (int)BulletFactory2D::OUTLINE_LAYER_CURVE_LINEAR
+                    && helper_outline_layer_scale_curve <= (int)BulletFactory2D::OUTLINE_LAYER_CURVE_EXPONENTIAL
+                    && helper_outline_layer_scales.size() <= 64;
+            if (layers_ok) {
+                for (int ci = 0; ci < helper_outline_layer_scales.size(); ++ci) {
+                    const double cs = (double)helper_outline_layer_scales[ci];
+                    if (!Math::is_finite(cs) || cs < 0.05 || cs > 64.0) {
+                        layers_ok = false;
+                        break;
+                    }
+                }
+            }
+            if (layers_ok) {
                 // Ring builder: the same center-scaling the volley layout
                 // applies (see layout_outline_slots), so dots and rings share
                 // one rule and can never drift apart: each extra layer
@@ -6009,7 +6097,7 @@ void BulletSpawner2D::rebuild_preview() {
                 }
                 const int extra_layers = MIN(helper_outline_layer_count - 1, 64);
                 for (int L = 1; L <= extra_layers; ++L) {
-                    const double layer_s = BulletFactory2D::helper_layer_scale_factor(L, helper_outline_layer_scale, helper_outline_layer_side);
+                    const double layer_s = BulletFactory2D::helper_layer_scale_factor(L, helper_outline_layer_scale, helper_outline_layer_side, helper_outline_layer_scale_curve, helper_outline_layer_scales);
                     if (!Math::is_finite(layer_s) || layer_s < 0.05) {
                         continue;
                     }
@@ -6396,10 +6484,10 @@ void BulletSpawner2D::_validate_property(PropertyInfo &p_property) const {
         relevant = supports_outline_layout(pattern_source);
         if (relevant && (property_name == "helper_outline_fill_spacing" || property_name == "helper_outline_fill_stagger" || property_name == "helper_outline_fill_margin")) {
             relevant = helper_outline_placement == (int)BulletFactory2D::OUTLINE_FILL_INSIDE;
-        } else if (relevant && (property_name == "helper_outline_layer_count" || property_name == "helper_outline_layer_scale" || property_name == "helper_outline_layer_side" || property_name == "helper_outline_layer_fill")) {
+        } else if (relevant && (property_name == "helper_outline_layer_count" || property_name == "helper_outline_layer_scale" || property_name == "helper_outline_layer_side" || property_name == "helper_outline_layer_fill" || property_name == "helper_outline_layer_scale_curve" || property_name == "helper_outline_layer_scales" || property_name == "helper_outline_layer_twist" || property_name == "helper_outline_layer_max_dots")) {
             relevant = helper_outline_placement == (int)BulletFactory2D::OUTLINE_LAYERS;
         } else if (property_name == "helper_outline_layer_start_offset") {
-            relevant = helper_outline_placement == (int)BulletFactory2D::OUTLINE_LAYERS && helper_outline_layer_fill == (int)BulletFactory2D::OUTLINE_LAYER_SEQUENTIAL;
+            relevant = helper_outline_placement == (int)BulletFactory2D::OUTLINE_LAYERS && (helper_outline_layer_fill == (int)BulletFactory2D::OUTLINE_LAYER_SEQUENTIAL || helper_outline_layer_fill == (int)BulletFactory2D::OUTLINE_LAYER_OUTER_FIRST);
         } else if (relevant && (property_name == "helper_outline_reverse" || property_name == "helper_outline_slot_offset")) {
             relevant = helper_outline_placement == (int)BulletFactory2D::OUTLINE_ON_OUTLINE || helper_outline_placement == (int)BulletFactory2D::OUTLINE_LAYERS;
         }
@@ -7144,7 +7232,19 @@ void BulletSpawner2D::_bind_methods() {
 
 	ClassDB::bind_method(D_METHOD("get_helper_outline_layer_fill"), &BulletSpawner2D::get_helper_outline_layer_fill);
 	ClassDB::bind_method(D_METHOD("set_helper_outline_layer_fill", "value"), &BulletSpawner2D::set_helper_outline_layer_fill);
-	ADD_PROPERTY(PropertyInfo(Variant::INT, "helper_outline_layer_fill", PROPERTY_HINT_ENUM, "Interleaved,Sequential"), "set_helper_outline_layer_fill", "get_helper_outline_layer_fill");
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "helper_outline_layer_fill", PROPERTY_HINT_ENUM, "Interleaved,Sequential,Outer First,Ping Pong"), "set_helper_outline_layer_fill", "get_helper_outline_layer_fill");
+	ClassDB::bind_method(D_METHOD("get_helper_outline_layer_scale_curve"), &BulletSpawner2D::get_helper_outline_layer_scale_curve);
+	ClassDB::bind_method(D_METHOD("set_helper_outline_layer_scale_curve", "value"), &BulletSpawner2D::set_helper_outline_layer_scale_curve);
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "helper_outline_layer_scale_curve", PROPERTY_HINT_ENUM, "Linear,Exponential"), "set_helper_outline_layer_scale_curve", "get_helper_outline_layer_scale_curve");
+	ClassDB::bind_method(D_METHOD("get_helper_outline_layer_scales"), &BulletSpawner2D::get_helper_outline_layer_scales);
+	ClassDB::bind_method(D_METHOD("set_helper_outline_layer_scales", "value"), &BulletSpawner2D::set_helper_outline_layer_scales);
+	ADD_PROPERTY(PropertyInfo(Variant::PACKED_FLOAT32_ARRAY, "helper_outline_layer_scales"), "set_helper_outline_layer_scales", "get_helper_outline_layer_scales");
+	ClassDB::bind_method(D_METHOD("get_helper_outline_layer_twist"), &BulletSpawner2D::get_helper_outline_layer_twist);
+	ClassDB::bind_method(D_METHOD("set_helper_outline_layer_twist", "value"), &BulletSpawner2D::set_helper_outline_layer_twist);
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "helper_outline_layer_twist"), "set_helper_outline_layer_twist", "get_helper_outline_layer_twist");
+	ClassDB::bind_method(D_METHOD("get_helper_outline_layer_max_dots"), &BulletSpawner2D::get_helper_outline_layer_max_dots);
+	ClassDB::bind_method(D_METHOD("set_helper_outline_layer_max_dots", "value"), &BulletSpawner2D::set_helper_outline_layer_max_dots);
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "helper_outline_layer_max_dots"), "set_helper_outline_layer_max_dots", "get_helper_outline_layer_max_dots");
 	ClassDB::bind_method(D_METHOD("get_helper_outline_layer_start_offset"), &BulletSpawner2D::get_helper_outline_layer_start_offset);
 	ClassDB::bind_method(D_METHOD("set_helper_outline_layer_start_offset", "value"), &BulletSpawner2D::set_helper_outline_layer_start_offset);
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "helper_outline_layer_start_offset"), "set_helper_outline_layer_start_offset", "get_helper_outline_layer_start_offset");

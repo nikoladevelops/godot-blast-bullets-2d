@@ -142,8 +142,10 @@
 			<param index="0" name="layer_index" type="int" />
 			<param index="1" name="scale_step" type="float" default="0.2" />
 			<param index="2" name="side" type="int" default="0" />
+			<param index="3" name="scale_curve" type="int" default="0" />
+			<param index="4" name="custom_scales" type="PackedFloat32Array" />
 			<description>
-				Scale factor for one outline layer (1.0 for layer 0): Outward grows multiplicatively, Inward crowds toward the center reciprocally, Both alternates. Shared by the generators and the spawner preview so rings can never disagree with bullets. Warns and returns 1.0 on bad scale_step/side.
+				Scale factor for one outline layer (1.0 for layer 0). A non-empty [code]custom_scales[/code] list wins outright (entry [code]layer_index % size[/code]); otherwise Outward grows (linearly, or compounded per [code]scale_curve[/code]), Inward crowds toward the center reciprocally, Both alternates. Shared by the generators and the spawner preview so rings can never disagree with bullets. Warns and returns 1.0 on bad inputs.
 			</description>
 		</method>
 		<method name="helper_bullet_layer_index" qualifiers="static">
@@ -154,7 +156,7 @@
 			<param index="3" name="layer_fill" type="int" default="0" />
 			<param index="4" name="layer_start_offset" type="int" default="0" />
 			<description>
-				Which concentric layer bullet [code]bullet_index[/code] rides (0 = the base outline). Interleaved deals round-robin ([code]i % count[/code], winding survives); Sequential fills contiguous chunks from [code]layer_start_offset[/code] (wrapping), so small volleys still read as the base shape. Shared by the volley layout, the spawner preview and the debug coincidence check so all three deal identically. Degenerate inputs yield 0.
+				Which concentric layer bullet [code]bullet_index[/code] rides (0 = the base outline). Interleaved deals round-robin ([code]i % count[/code], winding survives); Sequential fills contiguous chunks from [code]layer_start_offset[/code] (wrapping), so small volleys still read as the base shape; Outer First fills from the outermost ring inward; Ping Pong waves 0..last..0 ([code]layer_start_offset[/code] is ignored there). Degenerate inputs yield 0.
 			</description>
 		</method>
 		<method name="helper_apply_skip_indices" qualifiers="static">
@@ -213,6 +215,10 @@
 			<param index="14" name="layer_side" type="int" default="0" />
 			<param index="15" name="layer_fill" type="int" default="0" />
 			<param index="16" name="layer_start_offset" type="int" default="0" />
+			<param index="17" name="layer_scale_curve" type="int" default="0" />
+			<param index="18" name="layer_custom_scales" type="PackedFloat32Array" />
+			<param index="19" name="layer_twist" type="int" default="0" />
+			<param index="20" name="layer_max_dots" type="int" default="0" />
 			<description>
 				Generates an exact circle outline: slots spread evenly around a radius loop centered on the marker, facing outward (or inward). The outline_* tail params place slots on the loop, fill its interior, or layer it across scaled repeats about the loop center.
 			</description>
@@ -283,6 +289,10 @@
 			<param index="16" name="layer_side" type="int" default="0" />
 			<param index="17" name="layer_fill" type="int" default="0" />
 			<param index="18" name="layer_start_offset" type="int" default="0" />
+			<param index="19" name="layer_scale_curve" type="int" default="0" />
+			<param index="20" name="layer_custom_scales" type="PackedFloat32Array" />
+			<param index="21" name="layer_twist" type="int" default="0" />
+			<param index="22" name="layer_max_dots" type="int" default="0" />
 			<description>
 				Diamond (rhombus) perimeter from its diagonals, slots spread evenly by arc length, facing outward (or inward). Zero-area diamonds stack at the marker.
 			</description>
@@ -331,6 +341,10 @@
 			<param index="21" name="layer_side" type="int" default="0" />
 			<param index="22" name="layer_fill" type="int" default="0" />
 			<param index="23" name="layer_start_offset" type="int" default="0" />
+			<param index="24" name="layer_scale_curve" type="int" default="0" />
+			<param index="25" name="layer_custom_scales" type="PackedFloat32Array" />
+			<param index="26" name="layer_twist" type="int" default="0" />
+			<param index="27" name="layer_max_dots" type="int" default="0" />
 			<description>
 				Generates a true ellipse ring with independent [code]radius_x[/code] / [code]radius_y[/code] semi-axes rotated by [code]ellipse_rotation[/code] (the ring helper's y_scale is only an approximation). Full draws every slot, Arc draws a spaced segment, Wall draws a dense arc with [code]gap_count[/code] carved dodge gaps of [code]gap_width[/code] radians each (danmaku walls with readable escape routes; the array shrinks to the surviving slots). Wall mode with gap_count 0 or gap_width 0 draws the plain arc (no carving). Facings follow the ellipse outward normal. Useful for oval bosses, stadium arenas and gap walls.
 			</description>
@@ -373,12 +387,16 @@
 			<param index="19" name="layer_side" type="int" default="0" />
 			<param index="20" name="layer_fill" type="int" default="0" />
 			<param index="21" name="layer_start_offset" type="int" default="0" />
-			<param index="22" name="flower_type" type="int" default="0" />
-			<param index="23" name="inner_radius_scale" type="float" default="0.0" />
-			<param index="24" name="spiro_roller" type="float" default="45.0" />
-			<param index="25" name="spiro_pen" type="float" default="80.0" />
-			<param index="26" name="super_lobes" type="float" default="6.0" />
-			<param index="27" name="super_fullness" type="float" default="1.0" />
+			<param index="22" name="layer_scale_curve" type="int" default="0" />
+			<param index="23" name="layer_custom_scales" type="PackedFloat32Array" />
+			<param index="24" name="layer_twist" type="int" default="0" />
+			<param index="25" name="layer_max_dots" type="int" default="0" />
+			<param index="26" name="flower_type" type="int" default="0" />
+			<param index="27" name="inner_radius_scale" type="float" default="0.0" />
+			<param index="28" name="spiro_roller" type="float" default="45.0" />
+			<param index="29" name="spiro_pen" type="float" default="80.0" />
+			<param index="30" name="super_lobes" type="float" default="6.0" />
+			<param index="31" name="super_fullness" type="float" default="1.0" />
 			<description>
 				Generates a floral spell-card pattern: [code]petals[/code] symmetric lobes around the marker, each holding [code]bullets_per_petal[/code] slots spread over [code]petal_spread[/code] radians. [code]petal_sharpness[/code] 0 gives round lobes, higher values pinch the waist into tighter flowers. [code]transforms_amount[/code] sizes the array (fewer slots than petals times per-petal truncates). [code]flower_type[/code] picks the bloom kind (0 FAN legacy, 1 RHODONEA, 2 PHYLLOTAXIS, 3 SPIROGRAPH, 4 SUPERFORMULA); [code]inner_radius_scale[/code], [code]spiro_roller[/code]/[code]spiro_pen[/code] and [code]super_lobes[/code]/[code]super_fullness[/code] tune the matching kind. Useful for boss blossoms and mandala rings.
 			</description>
@@ -419,6 +437,10 @@
 			<param index="15" name="layer_side" type="int" default="0" />
 			<param index="16" name="layer_fill" type="int" default="0" />
 			<param index="17" name="layer_start_offset" type="int" default="0" />
+			<param index="18" name="layer_scale_curve" type="int" default="0" />
+			<param index="19" name="layer_custom_scales" type="PackedFloat32Array" />
+			<param index="20" name="layer_twist" type="int" default="0" />
+			<param index="21" name="layer_max_dots" type="int" default="0" />
 			<description>
 				Generates a parametric heart outline (classic 16sin^3 curve) scaled by size. Boss love attacks and ending cards. The outline_* tail params place slots on the loop, fill its interior, or layer it across scaled repeats about the loop center.
 			</description>
@@ -474,6 +496,10 @@
 			<param index="18" name="layer_side" type="int" default="0" />
 			<param index="19" name="layer_fill" type="int" default="0" />
 			<param index="20" name="layer_start_offset" type="int" default="0" />
+			<param index="21" name="layer_scale_curve" type="int" default="0" />
+			<param index="22" name="layer_custom_scales" type="PackedFloat32Array" />
+			<param index="23" name="layer_twist" type="int" default="0" />
+			<param index="24" name="layer_max_dots" type="int" default="0" />
 			<description>
 				Generates figure-8 / weave openings: slots sweep t over the full turn on the lissajous curve (size_x * sin(freq_x * t + phase), size_y * sin(freq_y * t)) for crossing curtains with readable doors. Recipe: slow spin + lissajous weave = butterfly curtain.
 			</description>
@@ -515,6 +541,10 @@
 			<param index="16" name="layer_side" type="int" default="0" />
 			<param index="17" name="layer_fill" type="int" default="0" />
 			<param index="18" name="layer_start_offset" type="int" default="0" />
+			<param index="19" name="layer_scale_curve" type="int" default="0" />
+			<param index="20" name="layer_custom_scales" type="PackedFloat32Array" />
+			<param index="21" name="layer_twist" type="int" default="0" />
+			<param index="22" name="layer_max_dots" type="int" default="0" />
 			<description>
 				Generates a polygon perimeter (vertices corners on a radius circle from base_rotation), slots spread evenly by arc length, facing outward (or inward). The outline_* tail params place slots on the loop, fill its interior, or layer it across scaled repeats about the loop center.
 			</description>
@@ -551,6 +581,10 @@
 			<param index="14" name="layer_side" type="int" default="0" />
 			<param index="15" name="layer_fill" type="int" default="0" />
 			<param index="16" name="layer_start_offset" type="int" default="0" />
+			<param index="17" name="layer_scale_curve" type="int" default="0" />
+			<param index="18" name="layer_custom_scales" type="PackedFloat32Array" />
+			<param index="19" name="layer_twist" type="int" default="0" />
+			<param index="20" name="layer_max_dots" type="int" default="0" />
 			<description>
 				Generates a rectangle perimeter walk (counter-clockwise from top-left), slots spread evenly by arc length, facing outward (or inward). Square = equal sides. The outline_* tail params place slots on the loop, fill its interior, or layer it across scaled repeats about the loop center.
 			</description>
@@ -579,7 +613,11 @@
 			<param index="19" name="layer_side" type="int" default="0" />
 			<param index="20" name="layer_fill" type="int" default="0" />
 			<param index="21" name="layer_start_offset" type="int" default="0" />
-			<param index="22" name="seed" type="int" default="0" />
+			<param index="22" name="layer_scale_curve" type="int" default="0" />
+			<param index="23" name="layer_custom_scales" type="PackedFloat32Array" />
+			<param index="24" name="layer_twist" type="int" default="0" />
+			<param index="25" name="layer_max_dots" type="int" default="0" />
+			<param index="26" name="seed" type="int" default="0" />
 			<description>
 				Generates transforms placed evenly on a ring (or arc, when [code]arc[/code] is smaller than a full turn) around the marker. Every bullet faces outward, so art drawn facing right travels away from the center. Set [code]face_outward[/code] to false for implosion patterns that fly toward the center. [code]y_scale[/code] stretches the ring into an ellipse (facing stays radial, approximate on stretched rings) and [code]facing_offset_degrees[/code] twists every facing. [code]seed[/code] drives random rotation (0 is non-deterministic). Useful for radial bursts and boss rings.
 			</description>
@@ -606,6 +644,10 @@
 			<param index="17" name="layer_side" type="int" default="0" />
 			<param index="18" name="layer_fill" type="int" default="0" />
 			<param index="19" name="layer_start_offset" type="int" default="0" />
+			<param index="20" name="layer_scale_curve" type="int" default="0" />
+			<param index="21" name="layer_custom_scales" type="PackedFloat32Array" />
+			<param index="22" name="layer_twist" type="int" default="0" />
+			<param index="23" name="layer_max_dots" type="int" default="0" />
 			<description>
 				Generates an exact rhodonea rose bloom: slots sweep theta over the full turn and sit at r = R * cos(k * theta) with k = petals. lobe_sharpness 1.0 is the exact rose (0 is round, higher pinches the waist). Recipe: Rose + phase_step_per_bullet + angular wobble = blossom finale. Used by the petal storm and blossom finale presets.
 			</description>
@@ -661,6 +703,10 @@
 			<param index="17" name="layer_side" type="int" default="0" />
 			<param index="18" name="layer_fill" type="int" default="0" />
 			<param index="19" name="layer_start_offset" type="int" default="0" />
+			<param index="20" name="layer_scale_curve" type="int" default="0" />
+			<param index="21" name="layer_custom_scales" type="PackedFloat32Array" />
+			<param index="22" name="layer_twist" type="int" default="0" />
+			<param index="23" name="layer_max_dots" type="int" default="0" />
 			<description>
 				Generates a true star shell: points alternating outer/inner vertices around the marker (distinct from the polygon helper's density bias). Boss star bursts and celebratory shells.
 			</description>
@@ -701,6 +747,10 @@
 			<param index="17" name="layer_side" type="int" default="0" />
 			<param index="18" name="layer_fill" type="int" default="0" />
 			<param index="19" name="layer_start_offset" type="int" default="0" />
+			<param index="20" name="layer_scale_curve" type="int" default="0" />
+			<param index="21" name="layer_custom_scales" type="PackedFloat32Array" />
+			<param index="22" name="layer_twist" type="int" default="0" />
+			<param index="23" name="layer_max_dots" type="int" default="0" />
 			<description>
 				Isosceles trapezoid perimeter, slots spread evenly by arc length, facing outward (or inward). A zero top base degrades to a triangle; zero-area boxes stack at the marker.
 			</description>
@@ -727,6 +777,10 @@
 			<param index="17" name="layer_side" type="int" default="0" />
 			<param index="18" name="layer_fill" type="int" default="0" />
 			<param index="19" name="layer_start_offset" type="int" default="0" />
+			<param index="20" name="layer_scale_curve" type="int" default="0" />
+			<param index="21" name="layer_custom_scales" type="PackedFloat32Array" />
+			<param index="22" name="layer_twist" type="int" default="0" />
+			<param index="23" name="layer_max_dots" type="int" default="0" />
 			<description>
 				Triangle perimeter (equilateral circumradius, isosceles base + height apex-up, right X/Y legs recentered), slots spread evenly by arc length, facing outward (or inward). Degenerate triangles stack at the marker.
 			</description>
@@ -1317,6 +1371,18 @@
 		</constant>
 		<constant name="OUTLINE_LAYER_SEQUENTIAL" value="1" enum="OutlineLayerFill">
 			Layer 0 fills first, then layer 1, so small volleys still read as the base shape. layer_start_offset rotates which layer fills first.
+		</constant>
+		<constant name="OUTLINE_LAYER_OUTER_FIRST" value="2" enum="OutlineLayerFill">
+			Contiguous chunks fill from the outermost ring inward (implosion readings). layer_start_offset rotates the start ring.
+		</constant>
+		<constant name="OUTLINE_LAYER_PINGPONG" value="3" enum="OutlineLayerFill">
+			Bullets wave across layers 0..last..0 (pairs with spin). layer_start_offset is ignored.
+		</constant>
+		<constant name="OUTLINE_LAYER_CURVE_LINEAR" value="0" enum="OutlineLayerScaleCurve">
+			Ring sizes step evenly (1 + step per layer outward).
+		</constant>
+		<constant name="OUTLINE_LAYER_CURVE_EXPONENTIAL" value="1" enum="OutlineLayerScaleCurve">
+			Ring sizes compound ((1 + step)^L outward, mirrored reciprocally inward).
 		</constant>
 		<constant name="OUTLINE_FACING_NORMAL" value="0" enum="OutlineFacing">
 			Loop-generator facings stay as generated (default: existing patterns never change).
