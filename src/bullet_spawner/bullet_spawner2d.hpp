@@ -1870,6 +1870,18 @@ class BulletSpawner2D : public Node2D{
         bool homing_retarget_active() const;
         // Wakes _process when retargeting becomes active (runtime only).
         void update_homing_process_state();
+        // Canonical keep-awake predicate for _process: shooting, spinning,
+        // retargeting, previewing, bursting, telegraphing or sequencing.
+        // Every setter uses refresh_process_state() instead of spelling the
+        // set out (the members had drifted: some sites forgot burst,
+        // telegraph, pattern_list or retarget and could sleep _process while
+        // work was pending). The _process sleep path intentionally omits
+        // auto_shooting_active (it only runs when auto is off) and is the
+        // single exception.
+        bool needs_process() const;
+        void refresh_process_state();
+        // Same, skipped in the editor where the preview owns processing.
+        void refresh_process_state_editor_guarded();
         // Remembers a fresh volley for retargeting (deduped: pooled instances
         // reuse ids) and prunes dead/foreign entries via the tracker.
         void track_live_volley(DirectionalBullets2D *bullets);
@@ -1892,6 +1904,12 @@ class BulletSpawner2D : public Node2D{
         // fan) onto a volley. Shared by volley setup and retarget passes so
         // runtime tuning reaches flying volleys instead of only new ones.
         void apply_steering_to_volley(DirectionalBullets2D *volley) const;
+        // Predictive lead for the aimed target, shared by the aimed volley
+        // and its preview cone so both agree on where the target will be.
+        Vector2 predict_target_pos(Node2D *target) const;
+        // Corridor aim resolution, shared by the corridor volley and its
+        // preview wall: live aimed target when usable, else the fallback.
+        Vector2 resolve_corridor_aim(const Vector2 &fallback, const Vector2 &origin) const;
         // Enables or refreshes orbiting on a volley: bullets whose orbit is
         // not yet enabled get enabled, the rest get radius/direction/texture
         // updated in place (re-enabling would warn and keep stale values).

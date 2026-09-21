@@ -47,6 +47,37 @@ static void assign_node_to_path(const Node *self, T *node, NodePath &r_path, T *
     }
 }
 
+// Validates a cached node pointer against its stored instance id, then falls
+// back to the stored path. Every cached node getter (factory, generator,
+// aimed target, Path2D node) shares this exact shape: a stale cache is
+// cleared and reported as missing WITHOUT consulting the path (the path may
+// since resolve elsewhere), while an empty cache resolves through the path.
+// ObjectDB is consulted before any dereference, so a freed node can never be
+// touched here.
+template <typename T>
+static T *validate_cached_node(const Node *self, const NodePath &p_path, T *&r_cache, uint64_t &r_id) {
+    if (r_cache != nullptr) {
+        if (r_id == 0 || !UtilityFunctions::is_instance_id_valid(r_id)) {
+            r_cache = nullptr;
+            r_id = 0;
+        } else if (ObjectDB::get_instance(ObjectID(r_id)) != (Object *)r_cache) {
+            r_cache = nullptr;
+            r_id = 0;
+        }
+        if (r_cache == nullptr) {
+            return nullptr;
+        }
+    }
+    T *resolved = resolve_node_path(self, p_path, r_cache);
+    if (resolved == nullptr) {
+        r_cache = nullptr;
+        r_id = 0;
+        return nullptr;
+    }
+    r_id = resolved->get_instance_id();
+    return resolved;
+}
+
 // Rotates a spawn transform around an origin, so a spinning emitter orbits
 // bullet positions and turns facings together. Scale is preserved: only the
 // rotation and the origin offset move. Zero rotation is a no-op.
@@ -75,6 +106,17 @@ static Transform2D scale_spawn_transform(const Transform2D &t, const Vector2 &ba
 // it as internal. The holder is owner-less: never saved, never exported.
 static const char *PREVIEW_META_KEY = "blastbullets_pattern_preview";
 static const char *PREVIEW_HOLDER_NAME = "~BlastBulletsPatternPreview";
+
+// Shared limits (single definition so validation, generation and preview
+// agree; the inspector hint strings in _bind_methods mirror these).
+static constexpr int kMaxBulletsPerVolley = 10000; // helper_bullets_amount + helper_custom_transforms
+static constexpr int kMaxHomingTargets = 10000; // homing_max_targets scene-scan bound
+static constexpr int kMaxHomingDequeTargets = 256; // engine queue cap per volley
+static constexpr int kMaxOutlineLayers = 64; // helper_outline_layer_count + helper_outline_layer_scales
+static constexpr int kMaxPreviewTrackPoints = 256; // path/cross track decimation stride target
+static constexpr int kMaxCrossTrackSteps = 256; // cross arm radial density cap
+static constexpr int kPreviewZIndex = 4000; // dots + arrows layers
+static constexpr float kFirstDotRadiusScale = 1.6f; // bullet-0 emphasis marker
 
 // Global shoot_once() nesting depth across ALL spawners sharing this module.
 // The per-spawner latch stops self-recursion; this stops A->B->A ping-pong
@@ -274,78 +316,101 @@ void PatternPreviewLayer2D::_draw() {
     }
 }
 
+// Cone strip shared by the fan/aimed preview tracks: two boundary rays from
+// the origin plus the tip arc connecting them, closed back at the origin.
+// Appends marker-GLOBAL points in draw order; the caller feeds each through
+// the spin/scale pipeline. Preconditions (checked by callers): finite spread
+// > 0 and tip_radius > 0.
+static void build_cone_strip(const Vector2 &origin, real_t dir_angle, real_t half_spread, real_t tip_radius, real_t spread, PackedVector2Array &r_out) {
+    const real_t left_ang = dir_angle + half_spread;
+    const real_t right_ang = dir_angle - half_spread;
+    const Vector2 left_dir = Vector2(Math::cos(left_ang), Math::sin(left_ang));
+    const Vector2 right_dir = Vector2(Math::cos(right_ang), Math::sin(right_ang));
+    const Vector2 left_tip = origin + left_dir * tip_radius;
+    const Vector2 right_tip = origin + right_dir * tip_radius;
+    // Left ray: origin -> tip.
+    r_out.push_back(origin);
+    r_out.push_back(left_tip);
+    // Arc from left tip to right tip (across the spread).
+    const int arc_n = Math::clamp((int)(tip_radius * spread / 8.0), 8, 64);
+    for (int i = 1; i < arc_n; i++) {
+        const real_t t = (real_t)i / (real_t)arc_n;
+        const real_t ang = left_ang + (right_ang - left_ang) * t;
+        r_out.push_back(origin + Vector2(Math::cos(ang), Math::sin(ang)) * tip_radius);
+    }
+    // Right ray: tip -> origin (closes the cone visually).
+    r_out.push_back(right_tip);
+    r_out.push_back(origin);
+}
+
+// Single source of truth for pattern-source metadata: the inspector hint
+// string, pattern_source_name() and both supports_* predicates all read this
+// table, so display names, ids and shape capabilities can never drift apart.
+// Row order matches the historical hint string (not enum order) to keep the
+// inspector and saved scenes byte-identical.
+struct PatternSourceInfo {
+    BulletSpawner2D::PatternSource id;
+    const char *name;
+    bool outline;
+    bool corners;
+};
+static const PatternSourceInfo kPatternSources[] = {
+    { BulletSpawner2D::PATTERN_FROM_CHILDREN, "From Children", false, false },
+    { BulletSpawner2D::PATTERN_FROM_SELF, "From Self", false, false },
+    { BulletSpawner2D::PATTERN_FROM_HELPER_PATH2D, "Path2D", false, false },
+    { BulletSpawner2D::PATTERN_FROM_HELPER_AIMED, "Aimed", false, false },
+    { BulletSpawner2D::PATTERN_FROM_HELPER_CUSTOM, "Custom", false, false },
+    { BulletSpawner2D::PATTERN_FROM_HELPER_CIRCLE, "Circle", true, false },
+    { BulletSpawner2D::PATTERN_FROM_HELPER_SQUARE, "Square", true, true },
+    { BulletSpawner2D::PATTERN_FROM_HELPER_RECTANGLE, "Rectangle", true, true },
+    { BulletSpawner2D::PATTERN_FROM_HELPER_TRIANGLE, "Triangle", true, true },
+    { BulletSpawner2D::PATTERN_FROM_HELPER_DIAMOND, "Diamond", true, true },
+    { BulletSpawner2D::PATTERN_FROM_HELPER_TRAPEZOID, "Trapezoid", true, true },
+    { BulletSpawner2D::PATTERN_FROM_HELPER_POLYGON, "Polygon", true, true },
+    { BulletSpawner2D::PATTERN_FROM_HELPER_ELLIPSE, "Ellipse", true, false },
+    { BulletSpawner2D::PATTERN_FROM_HELPER_RING, "Ring", true, false },
+    { BulletSpawner2D::PATTERN_FROM_HELPER_STAR, "Star", true, true },
+    { BulletSpawner2D::PATTERN_FROM_HELPER_HEART, "Heart", true, false },
+    { BulletSpawner2D::PATTERN_FROM_HELPER_STAR_POLYGON, "Star Polygon", false, false },
+    { BulletSpawner2D::PATTERN_FROM_HELPER_FLOWER, "Flower", true, false },
+    { BulletSpawner2D::PATTERN_FROM_HELPER_ROSE, "Rose", true, false },
+    { BulletSpawner2D::PATTERN_FROM_HELPER_LISSAJOUS, "Lissajous", true, false },
+    { BulletSpawner2D::PATTERN_FROM_HELPER_LINE, "Line", false, false },
+    { BulletSpawner2D::PATTERN_FROM_HELPER_GRID, "Grid", false, false },
+    { BulletSpawner2D::PATTERN_FROM_HELPER_LATTICE, "Lattice", false, false },
+    { BulletSpawner2D::PATTERN_FROM_HELPER_RAIN, "Rain", false, false },
+    { BulletSpawner2D::PATTERN_FROM_HELPER_WATERFALL, "Waterfall", false, false },
+    { BulletSpawner2D::PATTERN_FROM_HELPER_WAVE, "Wave", false, false },
+    { BulletSpawner2D::PATTERN_FROM_HELPER_FAN, "Fan", false, false },
+    { BulletSpawner2D::PATTERN_FROM_HELPER_CORRIDOR, "Corridor", false, false },
+    { BulletSpawner2D::PATTERN_FROM_HELPER_SPIRAL, "Spiral", false, false },
+    { BulletSpawner2D::PATTERN_FROM_HELPER_MULTISPIRAL, "Multi Spiral", false, false },
+    { BulletSpawner2D::PATTERN_FROM_HELPER_COUNTER_SPIRAL, "Counter Spiral", false, false },
+    { BulletSpawner2D::PATTERN_FROM_HELPER_CROSS, "Cross", false, false },
+    { BulletSpawner2D::PATTERN_FROM_HELPER_SCATTER, "Scatter", false, false },
+};
+
 // Human-readable mode name for error messages (mirrors the pattern_source enum hint).
 static const char *pattern_source_name(BulletSpawner2D::PatternSource source) {
-    switch (source) {
-        case BulletSpawner2D::PATTERN_FROM_CHILDREN:
-            return "From Children";
-        case BulletSpawner2D::PATTERN_FROM_SELF:
-            return "From Self";
-        case BulletSpawner2D::PATTERN_FROM_HELPER_GRID:
-            return "Grid";
-        case BulletSpawner2D::PATTERN_FROM_HELPER_RING:
-            return "Ring";
-        case BulletSpawner2D::PATTERN_FROM_HELPER_FAN:
-            return "Fan";
-        case BulletSpawner2D::PATTERN_FROM_HELPER_SPIRAL:
-            return "Spiral";
-        case BulletSpawner2D::PATTERN_FROM_HELPER_LINE:
-            return "Line";
-        case BulletSpawner2D::PATTERN_FROM_HELPER_AIMED:
-            return "Aimed";
-        case BulletSpawner2D::PATTERN_FROM_HELPER_FLOWER:
-            return "Flower";
-        case BulletSpawner2D::PATTERN_FROM_HELPER_ELLIPSE:
-            return "Ellipse";
-        case BulletSpawner2D::PATTERN_FROM_HELPER_RAIN:
-            return "Rain";
-        case BulletSpawner2D::PATTERN_FROM_HELPER_SCATTER:
-            return "Scatter";
-        case BulletSpawner2D::PATTERN_FROM_HELPER_STAR_POLYGON:
-            return "Star Polygon";
-        case BulletSpawner2D::PATTERN_FROM_HELPER_MULTISPIRAL:
-            return "Multi Spiral";
-        case BulletSpawner2D::PATTERN_FROM_HELPER_CROSS:
-            return "Cross";
-        case BulletSpawner2D::PATTERN_FROM_HELPER_STAR:
-            return "Star";
-        case BulletSpawner2D::PATTERN_FROM_HELPER_HEART:
-            return "Heart";
-        case BulletSpawner2D::PATTERN_FROM_HELPER_WAVE:
-            return "Wave";
-        case BulletSpawner2D::PATTERN_FROM_HELPER_WATERFALL:
-            return "Waterfall";
-        case BulletSpawner2D::PATTERN_FROM_HELPER_LATTICE:
-            return "Lattice";
-        case BulletSpawner2D::PATTERN_FROM_HELPER_ROSE:
-            return "Rose";
-        case BulletSpawner2D::PATTERN_FROM_HELPER_COUNTER_SPIRAL:
-            return "Counter Spiral";
-        case BulletSpawner2D::PATTERN_FROM_HELPER_CORRIDOR:
-            return "Corridor";
-        case BulletSpawner2D::PATTERN_FROM_HELPER_LISSAJOUS:
-            return "Lissajous";
-        case BulletSpawner2D::PATTERN_FROM_HELPER_CUSTOM:
-            return "Custom";
-        case BulletSpawner2D::PATTERN_FROM_HELPER_CIRCLE:
-            return "Circle";
-        case BulletSpawner2D::PATTERN_FROM_HELPER_RECTANGLE:
-            return "Rectangle";
-        case BulletSpawner2D::PATTERN_FROM_HELPER_SQUARE:
-            return "Square";
-        case BulletSpawner2D::PATTERN_FROM_HELPER_POLYGON:
-            return "Polygon";
-        case BulletSpawner2D::PATTERN_FROM_HELPER_PATH2D:
-            return "Path2D";
-        case BulletSpawner2D::PATTERN_FROM_HELPER_TRIANGLE:
-            return "Triangle";
-        case BulletSpawner2D::PATTERN_FROM_HELPER_TRAPEZOID:
-            return "Trapezoid";
-        case BulletSpawner2D::PATTERN_FROM_HELPER_DIAMOND:
-            return "Diamond";
-        default:
-            return "unknown";
+    for (const PatternSourceInfo &info : kPatternSources) {
+        if (info.id == source) {
+            return info.name;
+        }
     }
+    return "unknown";
+}
+
+// Inspector hint built from the same table, so the dropdown can never list
+// a different set than the name lookup and predicates above.
+static String pattern_source_hint() {
+    String out;
+    for (const PatternSourceInfo &info : kPatternSources) {
+        if (!out.is_empty()) {
+            out += ",";
+        }
+        out += String(info.name) + ":" + itos((int)info.id);
+    }
+    return out;
 }
 
 NodePath BulletSpawner2D::get_bullet_factory_path() const {
@@ -372,26 +437,7 @@ BulletFactory2D *BulletSpawner2D::get_bullet_factory() const {
     // Validate the stale cache BEFORE touching it: with an empty path or
     // outside the tree, resolve_node_path() returns the pointer untouched
     // and it may dangle after the node was freed.
-    if (bullet_factory != nullptr) {
-        if (bullet_factory_id == 0 || !UtilityFunctions::is_instance_id_valid(bullet_factory_id)) {
-            bullet_factory = nullptr;
-            bullet_factory_id = 0;
-        } else if (ObjectDB::get_instance(ObjectID(bullet_factory_id)) != (Object *)bullet_factory) {
-            bullet_factory = nullptr;
-            bullet_factory_id = 0;
-        }
-        if (bullet_factory == nullptr) {
-            return nullptr;
-        }
-    }
-    BulletFactory2D *resolved = resolve_node_path(this, bullet_factory_path, bullet_factory);
-    if (resolved == nullptr) {
-        bullet_factory = nullptr;
-        bullet_factory_id = 0;
-        return nullptr;
-    }
-    bullet_factory_id = resolved->get_instance_id();
-    return resolved;
+    return validate_cached_node(this, bullet_factory_path, bullet_factory, bullet_factory_id);
 }
 
 void BulletSpawner2D::set_bullet_factory(BulletFactory2D *factory) {
@@ -422,26 +468,7 @@ void BulletSpawner2D::set_transforms_generator_path(const NodePath &p_path) {
 }
 
 Node2D *BulletSpawner2D::get_transforms_generator() const {
-    if (transforms_generator != nullptr) {
-        if (transforms_generator_id == 0 || !UtilityFunctions::is_instance_id_valid(transforms_generator_id)) {
-            transforms_generator = nullptr;
-            transforms_generator_id = 0;
-        } else if (ObjectDB::get_instance(ObjectID(transforms_generator_id)) != (Object *)transforms_generator) {
-            transforms_generator = nullptr;
-            transforms_generator_id = 0;
-        }
-        if (transforms_generator == nullptr) {
-            return nullptr;
-        }
-    }
-    Node2D *resolved = resolve_node_path(this, transforms_generator_path, transforms_generator);
-    if (resolved == nullptr) {
-        transforms_generator = nullptr;
-        transforms_generator_id = 0;
-        return nullptr;
-    }
-    transforms_generator_id = resolved->get_instance_id();
-    return resolved;
+    return validate_cached_node(this, transforms_generator_path, transforms_generator, transforms_generator_id);
 }
 
 void BulletSpawner2D::set_transforms_generator(Node2D *generator) {
@@ -488,7 +515,7 @@ void BulletSpawner2D::set_shooting_enabled(bool value) {
     shooting_enabled = value;
     const bool now_active = auto_shooting_active();
     if (is_inside_tree()) {
-        set_process(now_active || spin_enabled || homing_retarget_active() || preview_active() || burst_shots_left > 0 || telegraph_pending || pattern_list_active);
+        refresh_process_state();
     }
     if (!was_active && now_active) {
         emit_signal("shooting_started");
@@ -533,7 +560,7 @@ void BulletSpawner2D::set_max_volleys(int value) {
     max_volleys = value;
     const bool now_active = auto_shooting_active();
     if (is_inside_tree()) {
-        set_process(now_active || spin_enabled || homing_retarget_active() || preview_active() || burst_shots_left > 0 || telegraph_pending || pattern_list_active);
+        refresh_process_state();
     }
     // The shoot_once() cap path emits shooting_finished for the volley that
     // trips the cap. When this setter crosses the same boundary (e.g. a
@@ -592,7 +619,7 @@ void BulletSpawner2D::set_spin_enabled(bool value) {
     spin_enabled = value;
     if (!Engine::get_singleton()->is_editor_hint() && is_inside_tree()) {
         // Spinning needs _process even when auto-shooting is off.
-        set_process(spin_enabled || auto_shooting_active() || homing_retarget_active() || preview_active() || burst_shots_left > 0 || telegraph_pending || pattern_list_active);
+        refresh_process_state_editor_guarded();
     }
 }
 double BulletSpawner2D::get_spin_speed_deg_per_sec() const {
@@ -695,7 +722,7 @@ void BulletSpawner2D::set_helper_bullets_amount(int value) {
     }
     // One shoot_once() fans this out to transforms + SoA vectors + physics
     // RIDs: an unchecked typo would freeze/OOM in a single call.
-    if (value > 10000) {
+    if (value > kMaxBulletsPerVolley) {
         UtilityFunctions::push_error("BulletSpawner2D: helper_bullets_amount must be <= 10000, keeping the old value.");
         return;
     }
@@ -992,26 +1019,7 @@ void BulletSpawner2D::set_helper_aimed_target_path(const NodePath &p_path) {
 }
 
 Node2D *BulletSpawner2D::get_helper_aimed_target() const {
-    if (helper_aimed_target != nullptr) {
-        if (helper_aimed_target_id == 0 || !UtilityFunctions::is_instance_id_valid(helper_aimed_target_id)) {
-            helper_aimed_target = nullptr;
-            helper_aimed_target_id = 0;
-        } else if (ObjectDB::get_instance(ObjectID(helper_aimed_target_id)) != (Object *)helper_aimed_target) {
-            helper_aimed_target = nullptr;
-            helper_aimed_target_id = 0;
-        }
-        if (helper_aimed_target == nullptr) {
-            return nullptr;
-        }
-    }
-    Node2D *resolved = resolve_node_path(this, helper_aimed_target_path, helper_aimed_target);
-    if (resolved == nullptr) {
-        helper_aimed_target = nullptr;
-        helper_aimed_target_id = 0;
-        return nullptr;
-    }
-    helper_aimed_target_id = resolved->get_instance_id();
-    return resolved;
+    return validate_cached_node(this, helper_aimed_target_path, helper_aimed_target, helper_aimed_target_id);
 }
 
 void BulletSpawner2D::set_helper_aimed_target(Node2D *target) {
@@ -2260,44 +2268,24 @@ void BulletSpawner2D::set_helper_lissajous_facing_offset_deg(double value) {
     rebuild_preview();
 }
 bool BulletSpawner2D::supports_outline_layout(PatternSource source) {
-    switch (source) {
-        // Star Polygon is a radial scatter, not a loop: no inside to fill.
-        case PATTERN_FROM_HELPER_RING:
-        case PATTERN_FROM_HELPER_ELLIPSE:
-        case PATTERN_FROM_HELPER_STAR:
-        case PATTERN_FROM_HELPER_FLOWER:
-        case PATTERN_FROM_HELPER_ROSE:
-        case PATTERN_FROM_HELPER_LISSAJOUS:
-        case PATTERN_FROM_HELPER_CIRCLE:
-        case PATTERN_FROM_HELPER_RECTANGLE:
-        case PATTERN_FROM_HELPER_SQUARE:
-        case PATTERN_FROM_HELPER_POLYGON:
-        case PATTERN_FROM_HELPER_TRIANGLE:
-        case PATTERN_FROM_HELPER_TRAPEZOID:
-        case PATTERN_FROM_HELPER_DIAMOND:
-        case PATTERN_FROM_HELPER_HEART:
-            return true;
-        default:
-            return false;
+    for (const PatternSourceInfo &info : kPatternSources) {
+        if (info.id == source) {
+            return info.outline;
+        }
     }
+    return false;
 }
 
 // Corner-anchored polygon loops: the only shapes with shared corner dots
 // (rectangle, square, polygon, triangle, trapezoid, diamond, star). Corner
-// priority/mode/margin knobs show for these only.
+// priority/mode/margin/facing knobs show for these only.
 static bool supports_corner_layout(BulletSpawner2D::PatternSource source) {
-    switch (source) {
-        case BulletSpawner2D::PATTERN_FROM_HELPER_STAR:
-        case BulletSpawner2D::PATTERN_FROM_HELPER_RECTANGLE:
-        case BulletSpawner2D::PATTERN_FROM_HELPER_SQUARE:
-        case BulletSpawner2D::PATTERN_FROM_HELPER_POLYGON:
-        case BulletSpawner2D::PATTERN_FROM_HELPER_TRIANGLE:
-        case BulletSpawner2D::PATTERN_FROM_HELPER_TRAPEZOID:
-        case BulletSpawner2D::PATTERN_FROM_HELPER_DIAMOND:
-            return true;
-        default:
-            return false;
+    for (const PatternSourceInfo &info : kPatternSources) {
+        if (info.id == source) {
+            return info.corners;
+        }
     }
+    return false;
 }
 PackedVector2Array BulletSpawner2D::sample_path2d_polyline(bool quiet) const {
     Node *node = get_helper_path2d_node();
@@ -2601,7 +2589,7 @@ TypedArray<Transform2D> BulletSpawner2D::get_helper_custom_transforms() const { 
 void BulletSpawner2D::set_helper_custom_transforms(const TypedArray<Transform2D> &value) {
     // One shoot fires this array into transforms + buffers + physics: the
     // same freeze/OOM rationale as helper_bullets_amount caps it at 10000.
-    if (value.size() > 10000) {
+    if (value.size() > kMaxBulletsPerVolley) {
         UtilityFunctions::push_error("BulletSpawner2D: helper_custom_transforms must hold <= 10000 entries, keeping the old value.");
         return;
     }
@@ -2847,7 +2835,7 @@ void BulletSpawner2D::set_helper_outline_fill_margin(double value) {
 }
 int BulletSpawner2D::get_helper_outline_layer_count() const { return helper_outline_layer_count; }
 void BulletSpawner2D::set_helper_outline_layer_count(int value) {
-    if (value < 1 || value > 64) {
+    if (value < 1 || value > kMaxOutlineLayers) {
         UtilityFunctions::push_error("BulletSpawner2D: helper_outline_layer_count must be in [1, 64] (1 = single exact layer), keeping the old value.");
         return;
     }
@@ -2894,7 +2882,7 @@ void BulletSpawner2D::set_helper_outline_layer_scale_curve(int value) {
 }
 PackedFloat32Array BulletSpawner2D::get_helper_outline_layer_scales() const { return helper_outline_layer_scales; }
 void BulletSpawner2D::set_helper_outline_layer_scales(const PackedFloat32Array &value) {
-    if (value.size() > 64) {
+    if (value.size() > kMaxOutlineLayers) {
         UtilityFunctions::push_error("BulletSpawner2D: helper_outline_layer_scales holds at most 64 entries, keeping the old value.");
         return;
     }
@@ -3124,26 +3112,7 @@ void BulletSpawner2D::set_helper_path2d_space(Path2DSpace value) {
 Node *BulletSpawner2D::get_helper_path2d_node() const {
     // ObjectDB-first validation: with an empty path or outside the tree the
     // resolve returns the cache untouched, which may dangle after a free.
-    if (helper_path2d_cache != nullptr) {
-        if (helper_path2d_id == 0 || !UtilityFunctions::is_instance_id_valid(helper_path2d_id)) {
-            helper_path2d_cache = nullptr;
-            helper_path2d_id = 0;
-        } else if (ObjectDB::get_instance(ObjectID(helper_path2d_id)) != (Object *)helper_path2d_cache) {
-            helper_path2d_cache = nullptr;
-            helper_path2d_id = 0;
-        }
-        if (helper_path2d_cache == nullptr) {
-            return nullptr;
-        }
-    }
-    Node *resolved = resolve_node_path(this, helper_path2d_path, helper_path2d_cache);
-    if (resolved == nullptr) {
-        helper_path2d_cache = nullptr;
-        helper_path2d_id = 0;
-        return nullptr;
-    }
-    helper_path2d_id = resolved->get_instance_id();
-    return resolved;
+    return validate_cached_node(this, helper_path2d_path, helper_path2d_cache, helper_path2d_id);
 }
 void BulletSpawner2D::set_helper_path2d_node(Node *node) {
     assign_node_to_path(this, node, helper_path2d_path, helper_path2d_cache);
@@ -3641,7 +3610,7 @@ void BulletSpawner2D::set_show_preview_during_runtime(bool value) {
     // it mid-game while that loop sleeps must wake it, or the preview builds
     // once here and never refreshes marker moves afterwards.
     if (!Engine::get_singleton()->is_editor_hint() && is_inside_tree()) {
-        set_process(auto_shooting_active() || spin_enabled || homing_retarget_active() || preview_active());
+        refresh_process_state();
     }
     update_preview_process_state();
     rebuild_preview();
@@ -3779,7 +3748,7 @@ void BulletSpawner2D::reset_shooting() {
     // into a reset wave would fire another wave's pattern entries.
     stop_pattern_list();
     if (is_inside_tree()) {
-        set_process(auto_shooting_active() || spin_enabled || homing_retarget_active() || preview_active());
+        refresh_process_state();
     }
     // An explicit restart counts as a (re)start whenever it arms shooting.
     if (auto_shooting_active()) {
@@ -3800,7 +3769,7 @@ void BulletSpawner2D::fire_n_volleys(int n) {
     const bool was_active = auto_shooting_active();
     shooting_paused = false;
     if (is_inside_tree()) {
-        set_process(auto_shooting_active() || spin_enabled || homing_retarget_active() || preview_active() || burst_shots_left > 0 || telegraph_pending || pattern_list_active);
+        refresh_process_state();
     }
     if (!was_active && auto_shooting_active()) {
         emit_signal("shooting_started");
@@ -3811,7 +3780,7 @@ void BulletSpawner2D::pause_shooting() {
     const bool was_active = auto_shooting_active();
     shooting_paused = true;
     if (is_inside_tree()) {
-        set_process(auto_shooting_active() || spin_enabled || homing_retarget_active() || preview_active() || burst_shots_left > 0 || telegraph_pending || pattern_list_active);
+        refresh_process_state();
     }
     if (was_active && !auto_shooting_active()) {
         emit_signal("shooting_stopped");
@@ -3822,7 +3791,7 @@ void BulletSpawner2D::resume_shooting() {
     const bool was_active = auto_shooting_active();
     shooting_paused = false;
     if (is_inside_tree()) {
-        set_process(auto_shooting_active() || spin_enabled || homing_retarget_active() || preview_active() || burst_shots_left > 0 || telegraph_pending || pattern_list_active);
+        refresh_process_state();
     }
     if (!was_active && auto_shooting_active()) {
         emit_signal("shooting_started");
@@ -3909,7 +3878,7 @@ void BulletSpawner2D::set_homing_max_targets(int value) {
     // Bounded like helper_bullets_amount: the name scan + NEAREST selection
     // run per volley and per retarget pass, so an unbounded value turns a
     // huge scene into a per-interval hitch.
-    if (value > 10000) {
+    if (value > kMaxHomingTargets) {
         UtilityFunctions::push_error("BulletSpawner2D: homing_max_targets must be <= 10000, keeping the old value.");
         return;
     }
@@ -4102,7 +4071,7 @@ void BulletSpawner2D::set_orbiting_enabled(bool value) {
     // Orbiting rides on homing targets: toggling it must not leave _process
     // asleep. Editor-guarded: the preview owns processing in the editor.
     if (!Engine::get_singleton()->is_editor_hint() && is_inside_tree()) {
-        set_process(auto_shooting_active() || spin_enabled || homing_retarget_active() || preview_active() || burst_shots_left > 0 || telegraph_pending || pattern_list_active);
+        refresh_process_state();
     }
 }
 double BulletSpawner2D::get_orbiting_radius() const {
@@ -4212,10 +4181,26 @@ void BulletSpawner2D::update_homing_process_state() {
         // zero phase stays due-now for immediate refresh.
         homing_retarget_time_left = homing_retarget_phase;
         set_process(true);
-    } else if (!Engine::get_singleton()->is_editor_hint() && is_inside_tree()) {
+    } else {
         // Sleep when nothing needs the loop. Mirrors the shooting setters so
         // disabling retarget can actually stop _process.
-        set_process(auto_shooting_active() || spin_enabled || preview_active() || burst_shots_left > 0 || telegraph_pending || pattern_list_active);
+        refresh_process_state_editor_guarded();
+    }
+}
+
+bool BulletSpawner2D::needs_process() const {
+    return auto_shooting_active() || spin_enabled || homing_retarget_active() || preview_active() || burst_shots_left > 0 || telegraph_pending || pattern_list_active;
+}
+
+void BulletSpawner2D::refresh_process_state() {
+    if (is_inside_tree()) {
+        set_process(needs_process());
+    }
+}
+
+void BulletSpawner2D::refresh_process_state_editor_guarded() {
+    if (!Engine::get_singleton()->is_editor_hint() && is_inside_tree()) {
+        set_process(needs_process());
     }
 }
 
@@ -4435,7 +4420,7 @@ Array BulletSpawner2D::resolve_homing_targets(bool quiet, bool advance_round_rob
     // the take there too, otherwise a huge max_targets fans thousands of
     // rejected pushes (one error each) every volley and every retarget pass.
     // DISTRIBUTE is unaffected (exactly one target per bullet).
-    const int take = MIN(MIN(homing_max_targets, (int)candidates.size()), 256);
+    const int take = MIN(MIN(homing_max_targets, (int)candidates.size()), kMaxHomingDequeTargets);
     // DISTRIBUTE deals one target per bullet across the volley (cycling), so
     // the resolution order here does not matter: spawn and retarget build
     // the deal with i % pool themselves. NEAREST order is returned, same as
@@ -5047,6 +5032,44 @@ void BulletSpawner2D::apply_volley_homing_and_orbiting(DirectionalBullets2D *bul
     emit_signal("volley_homing_configured", bullets, volleys_fired + 1);
 }
 
+// Predictive lead shared by the aimed volley and its preview cone: blends
+// the live position toward where the target will be after prediction_time at
+// its current velocity (CharacterBody2D-style get_velocity; anything else
+// aims live). Both paths must agree or the preview cone would point
+// somewhere the volley never flies.
+Vector2 BulletSpawner2D::predict_target_pos(Node2D *target) const {
+    Vector2 aim_pos = target->get_global_transform().get_origin();
+    if (helper_aimed_prediction > 0.0 && helper_aimed_prediction_time > 0.0) {
+        Vector2 target_vel = Vector2(0, 0);
+        bool has_vel = false;
+        if (target->has_method("get_velocity")) {
+            Variant v = target->call("get_velocity");
+            if (v.get_type() == Variant::VECTOR2) {
+                target_vel = v;
+                has_vel = target_vel.is_finite();
+            }
+        }
+        if (has_vel) {
+            aim_pos += target_vel * (real_t)(helper_aimed_prediction_time * helper_aimed_prediction);
+        }
+    }
+    return aim_pos;
+}
+
+// Corridor aim resolution shared by the corridor volley and its preview
+// wall: prefers the live aimed target (like the Aimed case), falls back to
+// the static aim direction when no target is assigned. Callers validate the
+// fallback themselves, exactly as before.
+Vector2 BulletSpawner2D::resolve_corridor_aim(const Vector2 &fallback, const Vector2 &origin) const {
+    if (Node2D *target = get_helper_aimed_target()) {
+        const Vector2 to_target = target->get_global_transform().get_origin() - origin;
+        if (to_target.is_finite() && to_target.length_squared() > 0.0) {
+            return to_target.normalized();
+        }
+    }
+    return fallback;
+}
+
 TypedArray<Transform2D> BulletSpawner2D::collect_spawn_transforms() const {
     return collect_spawn_transforms_impl(false);
 }
@@ -5144,24 +5167,9 @@ TypedArray<Transform2D> BulletSpawner2D::collect_spawn_transforms_impl(bool quie
                 }
                 break;
             }
-            // Predictive lead: blend the live position toward where the
-            // target will be after prediction_time at its current velocity
-            // (CharacterBody2D-style get_velocity; anything else aims live).
-            Vector2 aim_pos = target->get_global_transform().get_origin();
-            if (helper_aimed_prediction > 0.0 && helper_aimed_prediction_time > 0.0) {
-                Vector2 target_vel = Vector2(0, 0);
-                bool has_vel = false;
-                if (target->has_method("get_velocity")) {
-                    Variant v = target->call("get_velocity");
-                    if (v.get_type() == Variant::VECTOR2) {
-                        target_vel = v;
-                        has_vel = target_vel.is_finite();
-                    }
-                }
-                if (has_vel) {
-                    aim_pos += target_vel * (real_t)(helper_aimed_prediction_time * helper_aimed_prediction);
-                }
-            }
+            // Predictive lead via the shared helper so the volley and the
+            // preview cone always agree on where the target will be.
+            Vector2 aim_pos = predict_target_pos(target);
             raw = BulletFactory2D::helper_generate_transforms_aimed(helper_bullets_amount, marker, aim_pos, helper_aimed_spread, helper_aimed_step_offset, helper_aimed_centered);
             break;
         }
@@ -5223,13 +5231,7 @@ TypedArray<Transform2D> BulletSpawner2D::collect_spawn_transforms_impl(bool quie
             // here): prefer the live target like the Aimed case, fall back to
             // the static aim direction when no target is assigned or the
             // spawner runs outside the tree (preview still shows the wall).
-            Vector2 corridor_aim = helper_corridor_aim_direction;
-            if (Node2D *target = get_helper_aimed_target()) {
-                const Vector2 to_target = target->get_global_transform().get_origin() - marker.get_origin();
-                if (to_target.is_finite() && to_target.length_squared() > 0.0) {
-                    corridor_aim = to_target.normalized();
-                }
-            }
+            const Vector2 corridor_aim = resolve_corridor_aim(helper_corridor_aim_direction, marker.get_origin());
             raw = BulletFactory2D::helper_generate_transforms_corridor(helper_bullets_amount, marker, corridor_aim, helper_corridor_width, 32.0, helper_corridor_gap_width, helper_corridor_face_aim, helper_corridor_facing_offset_deg); // spacing reserved (unused) upstream: factory default
             break;
         }
@@ -5585,7 +5587,7 @@ void BulletSpawner2D::rebuild_preview() {
         preview_dots_layer = memnew(PatternPreviewLayer2D);
         preview_dots_layer->set_name("Dots");
         preview_dots_layer->kind = PatternPreviewLayer2D::LAYER_DOTS;
-        preview_dots_layer->set_z_index(4000);
+        preview_dots_layer->set_z_index(kPreviewZIndex);
         preview_holder->add_child(preview_dots_layer);
     }
     preview_arrows_layer = Object::cast_to<PatternPreviewLayer2D>(preview_holder->get_node_or_null(NodePath("Arrows")));
@@ -5599,7 +5601,7 @@ void BulletSpawner2D::rebuild_preview() {
         preview_arrows_layer = memnew(PatternPreviewLayer2D);
         preview_arrows_layer->set_name("Arrows");
         preview_arrows_layer->kind = PatternPreviewLayer2D::LAYER_ARROWS;
-        preview_arrows_layer->set_z_index(4000);
+        preview_arrows_layer->set_z_index(kPreviewZIndex);
         preview_holder->add_child(preview_arrows_layer);
     }
     // Quiet collect: the preview must visualize, never scold (e.g. aimed
@@ -5665,7 +5667,7 @@ void BulletSpawner2D::rebuild_preview() {
         dirs.push_back(dir);
     }
     preview_dots_layer->set_dots_data(dots, preview_dot_color, (float)dot_radius);
-    preview_dots_layer->set_first_marker(!dots.is_empty(), preview_first_dot_color, 1.6f);
+    preview_dots_layer->set_first_marker(!dots.is_empty(), preview_first_dot_color, kFirstDotRadiusScale);
     // Track snapshot: the shape/loop/curve bullets ride on, drawn as
     // segments under the dots. Geometry-sourced (never bullet dots, except
     // Custom's explicit order strip), so sparse volleys still show the whole
@@ -5783,7 +5785,7 @@ void BulletSpawner2D::rebuild_preview() {
                     // (then spin/scales like every other track point).
                     PackedVector2Array curve = sample_path2d_polyline(true);
                     track_closed = helper_path2d_closed;
-                    const int step = curve.size() > 256 ? (int)((curve.size() + 255) / 256) : 1;
+                    const int step = curve.size() > kMaxPreviewTrackPoints ? (int)((curve.size() + kMaxPreviewTrackPoints - 1) / kMaxPreviewTrackPoints) : 1;
                     for (int i = 0; i < curve.size(); i += step) {
                         push_track_local(curve[i]);
                     }
@@ -5921,7 +5923,7 @@ void BulletSpawner2D::rebuild_preview() {
                     }
                     const real_t arm_angle = Math::TAU / (real_t)helper_cross_arm_count;
                     const real_t base_rot = (real_t)helper_cross_base_rotation;
-                    const int radial_steps = MIN(helper_bullets_amount, 256);
+                    const int radial_steps = MIN(helper_bullets_amount, kMaxCrossTrackSteps);
                     for (int a = 0; a < helper_cross_arm_count; a++) {
                         const real_t ang = base_rot + arm_angle * (real_t)a;
                         const Vector2 dir = Vector2(Math::cos(ang), Math::sin(ang));
@@ -5955,29 +5957,11 @@ void BulletSpawner2D::rebuild_preview() {
                     if (!Math::is_finite(helper_fan_spread) || helper_fan_spread <= 0.0) {
                         break;
                     }
-                    const real_t half_spread = (real_t)(helper_fan_spread * 0.5);
-                    const real_t dir_ang = (real_t)helper_fan_direction_angle;
-                    const real_t left_ang = dir_ang + half_spread;
-                    const real_t right_ang = dir_ang - half_spread;
-                    const Vector2 left_dir = Vector2(Math::cos(left_ang), Math::sin(left_ang));
-                    const Vector2 right_dir = Vector2(Math::cos(right_ang), Math::sin(right_ang));
-                    const real_t tip_r = 150.0;
-                    const Vector2 left_tip = track_origin + left_dir * tip_r;
-                    const Vector2 right_tip = track_origin + right_dir * tip_r;
-                    // Left ray: origin -> tip.
-                    push_track_global(track_origin);
-                    push_track_global(left_tip);
-                    // Arc from left tip to right tip (across the spread).
-                    const int arc_n = Math::clamp((int)(tip_r * helper_fan_spread / 8.0), 8, 64);
-                    for (int i = 1; i < arc_n; i++) {
-                        const real_t t = (real_t)i / (real_t)arc_n;
-                        const real_t ang = left_ang + (right_ang - left_ang) * t;
-                        const Vector2 p = track_origin + Vector2(Math::cos(ang), Math::sin(ang)) * tip_r;
-                        push_track_global(p);
+                    PackedVector2Array cone;
+                    build_cone_strip(track_origin, (real_t)helper_fan_direction_angle, (real_t)(helper_fan_spread * 0.5), 150.0, (real_t)helper_fan_spread, cone);
+                    for (int i = 0; i < cone.size(); ++i) {
+                        push_track_global(cone[i]);
                     }
-                    // Right ray: tip -> origin (closes the cone visually).
-                    push_track_global(right_tip);
-                    push_track_global(track_origin);
                     break;
                 }
                 case PATTERN_FROM_HELPER_AIMED: {
@@ -5988,21 +5972,7 @@ void BulletSpawner2D::rebuild_preview() {
                     if (target == nullptr) {
                         break;
                     }
-                    Vector2 aim_pos = target->get_global_transform().get_origin();
-                    if (helper_aimed_prediction > 0.0 && helper_aimed_prediction_time > 0.0) {
-                        Vector2 target_vel = Vector2(0, 0);
-                        bool has_vel = false;
-                        if (target->has_method("get_velocity")) {
-                            Variant v = target->call("get_velocity");
-                            if (v.get_type() == Variant::VECTOR2) {
-                                target_vel = v;
-                                has_vel = target_vel.is_finite();
-                            }
-                        }
-                        if (has_vel) {
-                            aim_pos += target_vel * (real_t)(helper_aimed_prediction_time * helper_aimed_prediction);
-                        }
-                    }
+                    const Vector2 aim_pos = predict_target_pos(target);
                     const Vector2 to_target = aim_pos - track_origin;
                     if (!to_target.is_finite() || to_target.length_squared() <= 0.0) {
                         break;
@@ -6011,28 +5981,15 @@ void BulletSpawner2D::rebuild_preview() {
                     if (!Math::is_finite(helper_aimed_spread) || helper_aimed_spread <= 0.0) {
                         break;
                     }
-                    const real_t half_spread = (real_t)(helper_aimed_spread * 0.5);
-                    const real_t left_ang = dir_ang + half_spread;
-                    const real_t right_ang = dir_ang - half_spread;
-                    const Vector2 left_dir = Vector2(Math::cos(left_ang), Math::sin(left_ang));
-                    const Vector2 right_dir = Vector2(Math::cos(right_ang), Math::sin(right_ang));
                     const real_t tip_r = to_target.length();
                     if (!Math::is_finite(tip_r) || tip_r <= 0.0) {
                         break;
                     }
-                    const Vector2 left_tip = track_origin + left_dir * tip_r;
-                    const Vector2 right_tip = track_origin + right_dir * tip_r;
-                    push_track_global(track_origin);
-                    push_track_global(left_tip);
-                    const int arc_n = Math::clamp((int)(tip_r * helper_aimed_spread / 8.0), 8, 64);
-                    for (int i = 1; i < arc_n; i++) {
-                        const real_t t = (real_t)i / (real_t)arc_n;
-                        const real_t ang = left_ang + (right_ang - left_ang) * t;
-                        const Vector2 p = track_origin + Vector2(Math::cos(ang), Math::sin(ang)) * tip_r;
-                        push_track_global(p);
+                    PackedVector2Array cone;
+                    build_cone_strip(track_origin, dir_ang, (real_t)(helper_aimed_spread * 0.5), tip_r, (real_t)helper_aimed_spread, cone);
+                    for (int i = 0; i < cone.size(); ++i) {
+                        push_track_global(cone[i]);
                     }
-                    push_track_global(right_tip);
-                    push_track_global(track_origin);
                     break;
                 }
                 case PATTERN_FROM_HELPER_CORRIDOR: {
@@ -6041,13 +5998,7 @@ void BulletSpawner2D::rebuild_preview() {
                     // skipping |x| < gap/2, so the track draws exactly the
                     // two runs the volley occupies. Two push pairs = two
                     // strips (no bridge across the dodge door).
-                    Vector2 corridor_aim = helper_corridor_aim_direction;
-                    if (Node2D *target = get_helper_aimed_target()) {
-                        const Vector2 to_target = target->get_global_transform().get_origin() - track_origin;
-                        if (to_target.is_finite() && to_target.length_squared() > 0.0) {
-                            corridor_aim = to_target.normalized();
-                        }
-                    }
+                    const Vector2 corridor_aim = resolve_corridor_aim(helper_corridor_aim_direction, track_origin);
                     if (!corridor_aim.is_finite() || corridor_aim.length_squared() <= 0.0) {
                         break;
                     }
@@ -6169,7 +6120,7 @@ void BulletSpawner2D::rebuild_preview() {
                         }
                     }
                 }
-                const int extra_layers = MIN(helper_outline_layer_count - 1, 64);
+                const int extra_layers = MIN(helper_outline_layer_count - 1, kMaxOutlineLayers);
                 for (int L = 1; L <= extra_layers; ++L) {
                     const double layer_s = BulletFactory2D::helper_layer_scale_factor(L, helper_outline_layer_scale, helper_outline_layer_side, helper_outline_layer_scale_curve, helper_outline_layer_scales);
                     if (!Math::is_finite(layer_s) || layer_s < 0.05) {
@@ -6781,7 +6732,7 @@ void BulletSpawner2D::_ready() {
     if (preview_active()) {
         set_process(true);
     } else {
-        set_process(auto_shooting_active() || spin_enabled || homing_retarget_active());
+        refresh_process_state();
     }
     if (auto_shooting_active()) {
         emit_signal("shooting_started");
@@ -7051,7 +7002,7 @@ void BulletSpawner2D::fire_burst_volley() {
     burst_telegraph_done = false;
     burst_mirror_next = false;
     shoot_once();
-    set_process(auto_shooting_active() || spin_enabled || homing_retarget_active() || preview_active() || pattern_list_active);
+    refresh_process_state();
 }
 
 double BulletSpawner2D::next_shoot_interval_sec() const {
@@ -7130,7 +7081,7 @@ void BulletSpawner2D::stop_pattern_list() {
     pattern_list_entries.clear();
     pattern_list_cursor = 0;
     pattern_list_time_left = 0.0;
-    set_process(auto_shooting_active() || spin_enabled || homing_retarget_active() || preview_active() || burst_shots_left > 0 || telegraph_pending);
+    refresh_process_state();
 }
 
 bool BulletSpawner2D::is_pattern_list_active() const {
@@ -7286,7 +7237,7 @@ void BulletSpawner2D::_bind_methods() {
 
 	ClassDB::bind_method(D_METHOD("get_pattern_source"), &BulletSpawner2D::get_pattern_source);
 	ClassDB::bind_method(D_METHOD("set_pattern_source", "value"), &BulletSpawner2D::set_pattern_source);
-	ADD_PROPERTY(PropertyInfo(Variant::INT, "pattern_source", PROPERTY_HINT_ENUM, "From Children:0,From Self:1,Path2D:29,Aimed:7,Custom:24,Circle:25,Square:27,Rectangle:26,Triangle:30,Diamond:32,Trapezoid:31,Polygon:28,Ellipse:9,Ring:3,Star:15,Heart:16,Star Polygon:12,Flower:8,Rose:20,Lissajous:23,Line:6,Grid:2,Lattice:19,Rain:10,Waterfall:18,Wave:17,Fan:4,Corridor:22,Spiral:5,Multi Spiral:13,Counter Spiral:21,Cross:14,Scatter:11"), "set_pattern_source", "get_pattern_source");
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "pattern_source", PROPERTY_HINT_ENUM, pattern_source_hint()), "set_pattern_source", "get_pattern_source");
 
 	ClassDB::bind_method(D_METHOD("get_helper_bullets_amount"), &BulletSpawner2D::get_helper_bullets_amount);
 	ClassDB::bind_method(D_METHOD("set_helper_bullets_amount", "value"), &BulletSpawner2D::set_helper_bullets_amount);
