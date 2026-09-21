@@ -377,7 +377,7 @@ void MultiMeshBulletsData2D::_bind_methods() {
 	ADD_PROPERTY(PropertyInfo(Variant::DICTIONARY, "instance_shader_parameters", PROPERTY_HINT_TYPE_STRING, "String:Variant"), "set_instance_shader_parameters", "get_instance_shader_parameters");
 
 	ClassDB::bind_method(D_METHOD("get_is_life_time_over_signal_enabled"), &MultiMeshBulletsData2D::get_is_life_time_over_signal_enabled);
-	ClassDB::bind_method(D_METHOD("set_is_life_time_over_signal_enabled"), &MultiMeshBulletsData2D::set_is_life_time_over_signal_enabled);
+	ClassDB::bind_method(D_METHOD("set_is_life_time_over_signal_enabled", "value"), &MultiMeshBulletsData2D::set_is_life_time_over_signal_enabled);
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "is_life_time_over_signal_enabled"), "set_is_life_time_over_signal_enabled", "get_is_life_time_over_signal_enabled");
 
 	ClassDB::bind_method(D_METHOD("get_is_life_time_infinite"), &MultiMeshBulletsData2D::get_is_life_time_infinite);
@@ -385,7 +385,7 @@ void MultiMeshBulletsData2D::_bind_methods() {
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "is_life_time_infinite"), "set_is_life_time_infinite", "get_is_life_time_infinite");
 
 	ClassDB::bind_method(D_METHOD("get_stop_rotation_when_max_reached"), &MultiMeshBulletsData2D::get_stop_rotation_when_max_reached);
-	ClassDB::bind_method(D_METHOD("set_stop_rotation_when_max_reached"), &MultiMeshBulletsData2D::set_stop_rotation_when_max_reached);
+	ClassDB::bind_method(D_METHOD("set_stop_rotation_when_max_reached", "value"), &MultiMeshBulletsData2D::set_stop_rotation_when_max_reached);
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "stop_rotation_when_max_reached"), "set_stop_rotation_when_max_reached", "get_stop_rotation_when_max_reached");
 
 	ClassDB::bind_method(D_METHOD("get_bullet_max_collision_count"), &MultiMeshBulletsData2D::get_bullet_max_collision_count);

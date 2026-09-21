@@ -19,6 +19,15 @@
 	<tutorials>
 	</tutorials>
 	<methods>
+		<method name="debug_describe_outline" qualifiers="static">
+			<return type="Dictionary" />
+			<param index="0" name="shape" type="int" />
+			<param index="1" name="count" type="int" />
+			<param index="2" name="params" type="Dictionary" default="{}" />
+			<description>
+				Marker-local outline report for one closed shape (see DebugOutlineShape ids): rebuilds the exact slot loop the volley generators use and returns points, facings, edge_ids, corner_flags, corner_index, edge_histogram, corners, gaps, facing deviations and a settings echo. Pure math, no scene tree needed. params carries shape knobs (size, radius, vertices, ...) plus outline_distribution, outline_corner_priority, outline_corner_mode, outline_edge_margin, outline_corner_facing; missing keys fall back to helper defaults.
+			</description>
+		</method>
 		<method name="debug_get_active_attachments_amount">
 			<return type="int" />
 			<description>
@@ -69,6 +78,35 @@
 			<param index="0" name="bullet_type" type="int" enum="BulletFactory2D.BulletType" />
 			<description>
 				Get the total amount of bullet multimeshes of a specific type in the scene tree.
+			</description>
+		</method>
+		<method name="debug_outline_quotas" qualifiers="static">
+			<return type="Dictionary" />
+			<param index="0" name="shape" type="int" />
+			<param index="1" name="count" type="int" />
+			<param index="2" name="params" type="Dictionary" default="{}" />
+			<description>
+				Per-edge dot quotas plus an optimality verdict against the length-proportional largest-remainder optimum (every edge within &lt; 1 slot of its exact share). Returns edge_counts, geometric interiors, exact_shares, optimal, worst_pair_spread (opposite-edge equality on even corner counts) and the settings echo. Corner-anchored polygonal shapes only.
+			</description>
+		</method>
+		<method name="debug_verify_volley" qualifiers="static">
+			<return type="Dictionary" />
+			<param index="0" name="volley" type="Transform2D[]" />
+			<param index="1" name="shape" type="int" />
+			<param index="2" name="marker" type="Transform2D" />
+			<param index="3" name="count" type="int" />
+			<param index="4" name="params" type="Dictionary" default="{}" />
+			<param index="5" name="tolerance_px" type="float" default="1.0" />
+			<param index="6" name="tolerance_rad" type="float" default="0.02" />
+			<description>
+				Regenerates the expected marker-local loop via debug_describe_outline and compares every single-ring (ON_OUTLINE) volley slot: origins within tolerance_px after the marker transform, facings within tolerance_rad. Returns checked count, worst deviations and the first bad index (ok stays false with an error string when sizes disagree).
+			</description>
+		</method>
+		<method name="debug_volley_gaps" qualifiers="static">
+			<return type="Dictionary" />
+			<param index="0" name="volley" type="Transform2D[]" />
+			<description>
+				Shape-agnostic gap metrics over an emitted transform array: consecutive origin distances in volley order plus the last-to-first closure (count, gaps, min/max/mean_gap, gap_ratio). Pass one ring's transforms to audit a single ring.
 			</description>
 		</method>
 		<method name="free_active_bullets">
@@ -133,30 +171,7 @@
 			<param index="3" name="spread_exponent" type="float" default="2.0" />
 			<param index="4" name="seed" type="int" default="0" />
 			<description>
-				Deprecated: superseded by the outline_* tail params of the loop generators (deterministic placement/fill/layers). Kept bound for compatibility.
-				Universal side pass for closed-outline patterns: returns a copy of transforms with each origin pushed along its own facing by spread * pow(rand, spread_exponent). On Path returns an identity copy; Outside/Inside push along/against the facing; Both picks a random side per bullet. Facings never change. Only meaningful for closed loops (Ring, Ellipse, Polygon, Star, Flower, Rose, Lissajous, Custom, and the shape generators above) — open layouts have no inside to push toward.
-			</description>
-		</method>
-		<method name="helper_layer_scale_factor" qualifiers="static">
-			<return type="float" />
-			<param index="0" name="layer_index" type="int" />
-			<param index="1" name="scale_step" type="float" default="0.2" />
-			<param index="2" name="side" type="int" default="0" />
-			<param index="3" name="scale_curve" type="int" default="0" />
-			<param index="4" name="custom_scales" type="PackedFloat32Array" />
-			<description>
-				Scale factor for one outline layer (1.0 for layer 0). A non-empty [code]custom_scales[/code] list wins outright (entry [code]layer_index % size[/code]); otherwise Outward grows (linearly, or compounded per [code]scale_curve[/code]), Inward crowds toward the center reciprocally, Both alternates. Shared by the generators and the spawner preview so rings can never disagree with bullets. Warns and returns 1.0 on bad inputs.
-			</description>
-		</method>
-		<method name="helper_bullet_layer_index" qualifiers="static">
-			<return type="int" />
-			<param index="0" name="bullet_index" type="int" />
-			<param index="1" name="slot_count" type="int" />
-			<param index="2" name="layer_count" type="int" default="1" />
-			<param index="3" name="layer_fill" type="int" default="0" />
-			<param index="4" name="layer_start_offset" type="int" default="0" />
-			<description>
-				Which concentric layer bullet [code]bullet_index[/code] rides (0 = the base outline). Interleaved deals round-robin ([code]i % count[/code], winding survives); Sequential fills contiguous chunks from [code]layer_start_offset[/code] (wrapping), so small volleys still read as the base shape; Outer First fills from the outermost ring inward; Ping Pong waves 0..last..0 ([code]layer_start_offset[/code] is ignored there). Degenerate inputs yield 0.
+				Side pass for closed-outline patterns: returns a copy of transforms with each origin pushed along its own facing by spread * pow(rand, spread_exponent). [param side_mode] 0 returns an identity copy, 1 pushes outward (+facing), 2 pushes inward (-facing), 3 picks a random side per bullet. Facings never change. [param seed] 0 is non-deterministic, otherwise reproducible. Only meaningful for closed loops (Ring, Ellipse, Polygon, Star, Flower, Rose, Lissajous, Custom, and the shape generators above) — open layouts have no inside to push toward.
 			</description>
 		</method>
 		<method name="helper_apply_skip_indices" qualifiers="static">
@@ -167,12 +182,24 @@
 				Drops slot indexes from a generated array (dodge doors, bullet text). Out-of-range entries are ignored with one warning; the output shrinks. The spawner applies this automatically via helper_skip_indices.
 			</description>
 		</method>
+		<method name="helper_bullet_layer_index" qualifiers="static">
+			<return type="int" />
+			<param index="0" name="bullet_index" type="int" default="0" />
+			<param index="1" name="slot_count" type="int" default="0" />
+			<param index="2" name="layer_count" type="int" default="1" />
+			<param index="3" name="layer_fill" type="int" default="0" />
+			<param index="4" name="layer_start_offset" type="int" default="0" />
+			<description>
+				Which concentric layer bullet [code]bullet_index[/code] rides (0 = the base outline). Interleaved deals round-robin ([code]i % count[/code], winding survives); Sequential fills contiguous chunks from [code]layer_start_offset[/code] (wrapping), so small volleys still read as the base shape; Outer First fills from the outermost ring inward; Ping Pong waves 0..last..0 ([code]layer_start_offset[/code] is ignored there). Degenerate inputs yield 0.
+			</description>
+		</method>
 		<method name="helper_compute_edge_normals" qualifiers="static">
 			<return type="PackedVector2Array" />
 			<param index="0" name="edge_points" type="PackedVector2Array" />
 			<param index="1" name="closed" type="bool" default="false" />
 			<param index="2" name="flip" type="bool" default="false" />
 			<description>
+				Computes one outward normal per point of a polyline, from the local tangent (averaged at joints). Use it to preview which way [method helper_generate_transforms_edge_from_points] bullets will face. A left-to-right line returns up normals ([code]Vector2(0, -1)[/code] in Godot 2D); set [param flip] to negate them. Set [param closed] for loops so the last point joins the first. Returns an empty array and logs an error when [param edge_points] is empty or not finite.
 			</description>
 		</method>
 		<method name="helper_extract_edge_from_image" qualifiers="static">
@@ -182,6 +209,9 @@
 			<param index="2" name="step" type="int" default="4" />
 			<param index="3" name="quiet" type="bool" default="false" />
 			<description>
+				Extracts the outline of a sprite as edge points plus normals. Opaque pixels (alpha at or above [param threshold]) that touch a transparent neighbor are sampled every [param step] pixels. Returns a [Dictionary] with [code]points[/code] (centered so the texture center is the local origin, ready for [method helper_generate_transforms_edge_from_points]) and [code]normals[/code] (pointing outward, toward transparency). Set [param quiet] to true to silence errors during editor previews. Images larger than 2048x2048 are rejected to avoid stalls.
+				[codeblock]var edge = BulletFactory2D.helper_extract_edge_from_image(my_texture.get_image())
+var volley = BulletFactory2D.helper_generate_transforms_edge_from_points(60, marker.global_transform, edge["points"])[/codeblock]
 			</description>
 		</method>
 		<method name="helper_generate_transforms_aimed" qualifiers="static">
@@ -216,7 +246,7 @@
 			<param index="15" name="layer_fill" type="int" default="0" />
 			<param index="16" name="layer_start_offset" type="int" default="0" />
 			<param index="17" name="layer_scale_curve" type="int" default="0" />
-			<param index="18" name="layer_custom_scales" type="PackedFloat32Array" />
+			<param index="18" name="layer_custom_scales" type="PackedFloat32Array" default="PackedFloat32Array()" />
 			<param index="19" name="layer_twist" type="int" default="0" />
 			<param index="20" name="layer_max_dots" type="int" default="0" />
 			<param index="21" name="layer_layout" type="int" default="1" />
@@ -291,7 +321,7 @@
 			<param index="17" name="layer_fill" type="int" default="0" />
 			<param index="18" name="layer_start_offset" type="int" default="0" />
 			<param index="19" name="layer_scale_curve" type="int" default="0" />
-			<param index="20" name="layer_custom_scales" type="PackedFloat32Array" />
+			<param index="20" name="layer_custom_scales" type="PackedFloat32Array" default="PackedFloat32Array()" />
 			<param index="21" name="layer_twist" type="int" default="0" />
 			<param index="22" name="layer_max_dots" type="int" default="0" />
 			<param index="23" name="outline_distribution" type="int" default="1" />
@@ -320,6 +350,7 @@
 			<param index="11" name="spread_side" type="int" default="0" />
 			<param index="12" name="tangent_jitter" type="float" default="0.0" />
 			<description>
+				Spawns bullets along a polyline edge (local to [param marker_transform]), each facing along the edge normal. Even sampling spreads slots uniformly by arc length (open lines include both endpoints); set [param random_sample] to pick random arc positions instead. Set [param closed] for loops and [param flip_normals] to face the other side. [param seed] 0 is non-deterministic, any other value reproduces the same volley. [param jitter] scatters origins in a disc of that radius, [param tangent_jitter] scatters them along the edge, and [param spread] adds a normal-direction cloud with [param spread_exponent] falloff on [param spread_side] (0 = along, 1 = behind, 2 = random side per bullet). Build [param edge_points] from a sprite with [method helper_extract_edge_from_image], or preview facings with [method helper_compute_edge_normals].
 			</description>
 		</method>
 		<method name="helper_generate_transforms_ellipse" qualifiers="static">
@@ -349,7 +380,7 @@
 			<param index="22" name="layer_fill" type="int" default="0" />
 			<param index="23" name="layer_start_offset" type="int" default="0" />
 			<param index="24" name="layer_scale_curve" type="int" default="0" />
-			<param index="25" name="layer_custom_scales" type="PackedFloat32Array" />
+			<param index="25" name="layer_custom_scales" type="PackedFloat32Array" default="PackedFloat32Array()" />
 			<param index="26" name="layer_twist" type="int" default="0" />
 			<param index="27" name="layer_max_dots" type="int" default="0" />
 			<param index="28" name="layer_layout" type="int" default="1" />
@@ -375,12 +406,12 @@
 			<return type="Transform2D[]" />
 			<param index="0" name="transforms_amount" type="int" />
 			<param index="1" name="marker_transform" type="Transform2D" />
-			<param index="2" name="petals" type="int" />
-			<param index="3" name="bullets_per_petal" type="int" />
-			<param index="4" name="radius" type="float" />
-			<param index="5" name="petal_spread" type="float" />
-			<param index="6" name="petal_sharpness" type="float" />
-			<param index="7" name="base_rotation" type="float" />
+			<param index="2" name="petals" type="int" default="6" />
+			<param index="3" name="bullets_per_petal" type="int" default="5" />
+			<param index="4" name="radius" type="float" default="150.0" />
+			<param index="5" name="petal_spread" type="float" default="0.5" />
+			<param index="6" name="petal_sharpness" type="float" default="1.0" />
+			<param index="7" name="base_rotation" type="float" default="0.0" />
 			<param index="8" name="face_outward" type="bool" default="true" />
 			<param index="9" name="facing_offset_degrees" type="float" default="0.0" />
 			<param index="10" name="outline_placement" type="int" default="0" />
@@ -396,7 +427,7 @@
 			<param index="20" name="layer_fill" type="int" default="0" />
 			<param index="21" name="layer_start_offset" type="int" default="0" />
 			<param index="22" name="layer_scale_curve" type="int" default="0" />
-			<param index="23" name="layer_custom_scales" type="PackedFloat32Array" />
+			<param index="23" name="layer_custom_scales" type="PackedFloat32Array" default="PackedFloat32Array()" />
 			<param index="24" name="layer_twist" type="int" default="0" />
 			<param index="25" name="layer_max_dots" type="int" default="0" />
 			<param index="26" name="flower_type" type="int" default="0" />
@@ -407,7 +438,7 @@
 			<param index="31" name="super_fullness" type="float" default="1.0" />
 			<param index="32" name="layer_layout" type="int" default="1" />
 			<description>
-				Generates a floral spell-card pattern: [code]petals[/code] symmetric lobes around the marker, each holding [code]bullets_per_petal[/code] slots spread over [code]petal_spread[/code] radians. [code]petal_sharpness[/code] 0 gives round lobes, higher values pinch the waist into tighter flowers. [code]transforms_amount[/code] sizes the array (fewer slots than petals times per-petal truncates). [code]flower_type[/code] picks the bloom kind (0 FAN legacy, 1 RHODONEA, 2 PHYLLOTAXIS, 3 SPIROGRAPH, 4 SUPERFORMULA); [code]inner_radius_scale[/code], [code]spiro_roller[/code]/[code]spiro_pen[/code] and [code]super_lobes[/code]/[code]super_fullness[/code] tune the matching kind. Useful for boss blossoms and mandala rings.
+				Generates a floral spell-card pattern: [code]petals[/code] symmetric lobes around the marker, each holding [code]bullets_per_petal[/code] slots spread over [code]petal_spread[/code] radians. [code]petal_sharpness[/code] 0 gives round lobes, higher values pinch the waist into tighter flowers. [code]transforms_amount[/code] sizes the array (fewer slots than petals times per-petal truncates). [code]flower_type[/code] picks the bloom kind (0 FAN, 1 RHODONEA, 2 PHYLLOTAXIS, 3 SPIROGRAPH, 4 SUPERFORMULA); [code]inner_radius_scale[/code], [code]spiro_roller[/code]/[code]spiro_pen[/code] and [code]super_lobes[/code]/[code]super_fullness[/code] tune the matching kind. Useful for boss blossoms and mandala rings.
 			</description>
 		</method>
 		<method name="helper_generate_transforms_grid" qualifiers="static">
@@ -447,7 +478,7 @@
 			<param index="16" name="layer_fill" type="int" default="0" />
 			<param index="17" name="layer_start_offset" type="int" default="0" />
 			<param index="18" name="layer_scale_curve" type="int" default="0" />
-			<param index="19" name="layer_custom_scales" type="PackedFloat32Array" />
+			<param index="19" name="layer_custom_scales" type="PackedFloat32Array" default="PackedFloat32Array()" />
 			<param index="20" name="layer_twist" type="int" default="0" />
 			<param index="21" name="layer_max_dots" type="int" default="0" />
 			<param index="22" name="layer_layout" type="int" default="1" />
@@ -507,7 +538,7 @@
 			<param index="19" name="layer_fill" type="int" default="0" />
 			<param index="20" name="layer_start_offset" type="int" default="0" />
 			<param index="21" name="layer_scale_curve" type="int" default="0" />
-			<param index="22" name="layer_custom_scales" type="PackedFloat32Array" />
+			<param index="22" name="layer_custom_scales" type="PackedFloat32Array" default="PackedFloat32Array()" />
 			<param index="23" name="layer_twist" type="int" default="0" />
 			<param index="24" name="layer_max_dots" type="int" default="0" />
 			<param index="25" name="layer_layout" type="int" default="1" />
@@ -553,7 +584,7 @@
 			<param index="17" name="layer_fill" type="int" default="0" />
 			<param index="18" name="layer_start_offset" type="int" default="0" />
 			<param index="19" name="layer_scale_curve" type="int" default="0" />
-			<param index="20" name="layer_custom_scales" type="PackedFloat32Array" />
+			<param index="20" name="layer_custom_scales" type="PackedFloat32Array" default="PackedFloat32Array()" />
 			<param index="21" name="layer_twist" type="int" default="0" />
 			<param index="22" name="layer_max_dots" type="int" default="0" />
 			<param index="23" name="outline_distribution" type="int" default="1" />
@@ -599,7 +630,7 @@
 			<param index="15" name="layer_fill" type="int" default="0" />
 			<param index="16" name="layer_start_offset" type="int" default="0" />
 			<param index="17" name="layer_scale_curve" type="int" default="0" />
-			<param index="18" name="layer_custom_scales" type="PackedFloat32Array" />
+			<param index="18" name="layer_custom_scales" type="PackedFloat32Array" default="PackedFloat32Array()" />
 			<param index="19" name="layer_twist" type="int" default="0" />
 			<param index="20" name="layer_max_dots" type="int" default="0" />
 			<param index="21" name="outline_distribution" type="int" default="1" />
@@ -637,7 +668,7 @@
 			<param index="20" name="layer_fill" type="int" default="0" />
 			<param index="21" name="layer_start_offset" type="int" default="0" />
 			<param index="22" name="layer_scale_curve" type="int" default="0" />
-			<param index="23" name="layer_custom_scales" type="PackedFloat32Array" />
+			<param index="23" name="layer_custom_scales" type="PackedFloat32Array" default="PackedFloat32Array()" />
 			<param index="24" name="layer_twist" type="int" default="0" />
 			<param index="25" name="layer_max_dots" type="int" default="0" />
 			<param index="26" name="seed" type="int" default="0" />
@@ -669,7 +700,7 @@
 			<param index="18" name="layer_fill" type="int" default="0" />
 			<param index="19" name="layer_start_offset" type="int" default="0" />
 			<param index="20" name="layer_scale_curve" type="int" default="0" />
-			<param index="21" name="layer_custom_scales" type="PackedFloat32Array" />
+			<param index="21" name="layer_custom_scales" type="PackedFloat32Array" default="PackedFloat32Array()" />
 			<param index="22" name="layer_twist" type="int" default="0" />
 			<param index="23" name="layer_max_dots" type="int" default="0" />
 			<param index="24" name="layer_layout" type="int" default="1" />
@@ -729,7 +760,7 @@
 			<param index="18" name="layer_fill" type="int" default="0" />
 			<param index="19" name="layer_start_offset" type="int" default="0" />
 			<param index="20" name="layer_scale_curve" type="int" default="0" />
-			<param index="21" name="layer_custom_scales" type="PackedFloat32Array" />
+			<param index="21" name="layer_custom_scales" type="PackedFloat32Array" default="PackedFloat32Array()" />
 			<param index="22" name="layer_twist" type="int" default="0" />
 			<param index="23" name="layer_max_dots" type="int" default="0" />
 			<param index="24" name="outline_distribution" type="int" default="1" />
@@ -779,7 +810,7 @@
 			<param index="18" name="layer_fill" type="int" default="0" />
 			<param index="19" name="layer_start_offset" type="int" default="0" />
 			<param index="20" name="layer_scale_curve" type="int" default="0" />
-			<param index="21" name="layer_custom_scales" type="PackedFloat32Array" />
+			<param index="21" name="layer_custom_scales" type="PackedFloat32Array" default="PackedFloat32Array()" />
 			<param index="22" name="layer_twist" type="int" default="0" />
 			<param index="23" name="layer_max_dots" type="int" default="0" />
 			<param index="24" name="outline_distribution" type="int" default="1" />
@@ -815,7 +846,7 @@
 			<param index="18" name="layer_fill" type="int" default="0" />
 			<param index="19" name="layer_start_offset" type="int" default="0" />
 			<param index="20" name="layer_scale_curve" type="int" default="0" />
-			<param index="21" name="layer_custom_scales" type="PackedFloat32Array" />
+			<param index="21" name="layer_custom_scales" type="PackedFloat32Array" default="PackedFloat32Array()" />
 			<param index="22" name="layer_twist" type="int" default="0" />
 			<param index="23" name="layer_max_dots" type="int" default="0" />
 			<param index="24" name="outline_distribution" type="int" default="1" />
@@ -857,6 +888,17 @@
 			<param index="7" name="facing_offset_degrees" type="float" default="0.0" />
 			<description>
 				Generates a snake row along a sine wave of width, amplitude and wave count around the marker axis. Pairs with wobble flight for slithering curtains.
+			</description>
+		</method>
+		<method name="helper_layer_scale_factor" qualifiers="static">
+			<return type="float" />
+			<param index="0" name="layer_index" type="int" />
+			<param index="1" name="scale_step" type="float" default="0.2" />
+			<param index="2" name="side" type="int" default="0" />
+			<param index="3" name="scale_curve" type="int" default="0" />
+			<param index="4" name="custom_scales" type="PackedFloat32Array" default="PackedFloat32Array()" />
+			<description>
+				Scale factor for one outline layer (1.0 for layer 0). A non-empty [code]custom_scales[/code] list wins outright (entry [code]layer_index % size[/code]); otherwise Outward grows (linearly, or compounded per [code]scale_curve[/code]), Inward crowds toward the center reciprocally, Both alternates. Shared by the generators and the spawner preview so rings can never disagree with bullets. Warns and returns 1.0 on bad inputs.
 			</description>
 		</method>
 		<method name="helper_sample_outline_circle" qualifiers="static">
@@ -1167,44 +1209,6 @@
 				To control these bullets individually, use the [method spawn_controllable_directional_bullets] function instead.
 			</description>
 		</method>
-		<method name="debug_describe_outline" qualifiers="static">
-			<return type="Dictionary" />
-			<param index="0" name="shape" type="int" />
-			<param index="1" name="count" type="int" />
-			<param index="2" name="params" type="Dictionary" default="{}" />
-			<description>
-				Marker-local outline report for one closed shape (see DebugOutlineShape ids): rebuilds the exact slot loop the volley generators use and returns points, facings, edge_ids, corner_flags, corner_index, edge_histogram, corners, gaps, facing deviations and a settings echo. Pure math, no scene tree needed. params carries shape knobs (size, radius, vertices, ...) plus outline_distribution, outline_corner_priority, outline_corner_mode, outline_edge_margin, outline_corner_facing; missing keys fall back to helper defaults.
-			</description>
-		</method>
-		<method name="debug_volley_gaps" qualifiers="static">
-			<return type="Dictionary" />
-			<param index="0" name="volley" type="Transform2D[]" />
-			<description>
-				Shape-agnostic gap metrics over an emitted transform array: consecutive origin distances in volley order plus the last-to-first closure (count, gaps, min/max/mean_gap, gap_ratio). Pass one ring's transforms to audit a single ring.
-			</description>
-		</method>
-		<method name="debug_outline_quotas" qualifiers="static">
-			<return type="Dictionary" />
-			<param index="0" name="shape" type="int" />
-			<param index="1" name="count" type="int" />
-			<param index="2" name="params" type="Dictionary" default="{}" />
-			<description>
-				Per-edge dot quotas plus an optimality verdict against the length-proportional largest-remainder optimum (every edge within &lt; 1 slot of its exact share). Returns edge_counts, geometric interiors, exact_shares, optimal, worst_pair_spread (opposite-edge equality on even corner counts) and the settings echo. Corner-anchored polygonal shapes only.
-			</description>
-		</method>
-		<method name="debug_verify_volley" qualifiers="static">
-			<return type="Dictionary" />
-			<param index="0" name="volley" type="Transform2D[]" />
-			<param index="1" name="shape" type="int" />
-			<param index="2" name="marker" type="Transform2D" />
-			<param index="3" name="count" type="int" />
-			<param index="4" name="params" type="Dictionary" default="{}" />
-			<param index="5" name="tolerance_px" type="float" default="1.0" />
-			<param index="6" name="tolerance_rad" type="float" default="0.02" />
-			<description>
-				Regenerates the expected marker-local loop via debug_describe_outline and compares every single-ring (ON_OUTLINE) volley slot: origins within tolerance_px after the marker transform, facings within tolerance_rad. Returns checked count, worst deviations and the first bad index (ok stays false with an error string when sizes disagree).
-			</description>
-		</method>
 		<method name="teleport_shift_all_bullets">
 			<return type="void" />
 			<param index="0" name="shift_amount" type="Vector2" />
@@ -1303,10 +1307,13 @@
 			Spiral facing used by helper_generate_transforms_spiral(): every bullet keeps the marker rotation.
 		</constant>
 		<constant name="SCATTER_FACING_OUTWARD" value="0" enum="ScatterFacingMode">
+			Scatter facing used by helper_generate_transforms_scatter(): each bullet faces away from the marker (explosions, bursts).
 		</constant>
 		<constant name="SCATTER_FACING_RANDOM" value="1" enum="ScatterFacingMode">
+			Scatter facing used by helper_generate_transforms_scatter(): each bullet faces a random direction (shotgun spray, debris).
 		</constant>
 		<constant name="SCATTER_FACING_INWARD" value="2" enum="ScatterFacingMode">
+			Scatter facing used by helper_generate_transforms_scatter(): each bullet faces the marker (implosions).
 		</constant>
 		<constant name="LINE_ANCHOR_START" value="0" enum="LineAnchor">
 			Line anchor used by helper_generate_transforms_line(): the row grows from the marker in the line direction.
@@ -1420,14 +1427,19 @@
 			Right triangle from X/Y legs, recentered.
 		</constant>
 		<constant name="FLOWER_FAN" value="0" enum="FlowerBloom">
+			Flower bloom used by helper_generate_transforms_flower(): classic petal fan with petal count, spread, and sharpness controls.
 		</constant>
 		<constant name="FLOWER_RHODONEA" value="1" enum="FlowerBloom">
+			Flower bloom used by helper_generate_transforms_flower(): continuous rose-curve sweep.
 		</constant>
 		<constant name="FLOWER_PHYLLOTAXIS" value="2" enum="FlowerBloom">
+			Flower bloom used by helper_generate_transforms_flower(): golden-angle disc packing (sunflower seed layout).
 		</constant>
 		<constant name="FLOWER_SPIROGRAPH" value="3" enum="FlowerBloom">
+			Flower bloom used by helper_generate_transforms_flower(): lacy hypotrochoid bloom with roller and pen controls.
 		</constant>
 		<constant name="FLOWER_SUPERFORMULA" value="4" enum="FlowerBloom">
+			Flower bloom used by helper_generate_transforms_flower(): rounded superformula bloom with lobe count and fullness controls.
 		</constant>
 		<constant name="OUTLINE_ON_OUTLINE" value="0" enum="OutlinePlacement">
 			Loop-generator slots stay exactly on the generated outline loop (single layer, the default).
@@ -1474,42 +1486,6 @@
 		<constant name="OUTLINE_CORNER_FACING_SMOOTH" value="2" enum="OutlineCornerFacing">
 			Every dot uses averaged loop normals (coherent on high-frequency outlines like many-pointed stars).
 		</constant>
-		<constant name="OUTLINE_LAYER_OUTWARD" value="0" enum="OutlineLayerSide">
-			Extra layers scale up from the base outline.
-		</constant>
-		<constant name="OUTLINE_LAYER_INWARD" value="1" enum="OutlineLayerSide">
-			Extra layers scale down toward the loop center.
-		</constant>
-		<constant name="OUTLINE_LAYER_BOTH" value="2" enum="OutlineLayerSide">
-			Extra layers alternate scaling up and down.
-		</constant>
-		<constant name="OUTLINE_LAYER_INTERLEAVED" value="0" enum="OutlineLayerFill">
-			Bullet i rides layer (i % layer_count), preserving the winding order.
-		</constant>
-		<constant name="OUTLINE_LAYER_SEQUENTIAL" value="1" enum="OutlineLayerFill">
-			Layer 0 fills first, then layer 1, so small volleys still read as the base shape. layer_start_offset rotates which layer fills first.
-		</constant>
-		<constant name="OUTLINE_LAYER_OUTER_FIRST" value="2" enum="OutlineLayerFill">
-			Contiguous chunks fill from the outermost ring inward (implosion readings). layer_start_offset rotates the start ring.
-		</constant>
-		<constant name="OUTLINE_LAYER_PINGPONG" value="3" enum="OutlineLayerFill">
-			Bullets wave across layers 0..last..0 (pairs with spin). layer_start_offset is ignored.
-		</constant>
-		<constant name="OUTLINE_LAYER_CURVE_LINEAR" value="0" enum="OutlineLayerScaleCurve">
-			Ring sizes step evenly (1 + step per layer outward).
-		</constant>
-		<constant name="OUTLINE_LAYER_CURVE_EXPONENTIAL" value="1" enum="OutlineLayerScaleCurve">
-			Ring sizes compound ((1 + step)^L outward, mirrored reciprocally inward).
-		</constant>
-		<constant name="OUTLINE_FACING_NORMAL" value="0" enum="OutlineFacing">
-			Loop-generator facings stay as generated (default: existing patterns never change).
-		</constant>
-		<constant name="OUTLINE_FACING_ALONG_P90" value="1" enum="OutlineFacing">
-			Loop-generator facings turn +90 degrees toward the loop tangent.
-		</constant>
-		<constant name="OUTLINE_FACING_ALONG_M90" value="2" enum="OutlineFacing">
-			Loop-generator facings turn -90 degrees toward the loop tangent.
-		</constant>
 		<constant name="DEBUG_SHAPE_CIRCLE" value="0" enum="DebugOutlineShape">
 			Shape id for the debug outline inspectors.
 		</constant>
@@ -1551,6 +1527,42 @@
 		</constant>
 		<constant name="DEBUG_SHAPE_LISSAJOUS" value="13" enum="DebugOutlineShape">
 			Shape id for the debug outline inspectors.
+		</constant>
+		<constant name="OUTLINE_LAYER_OUTWARD" value="0" enum="OutlineLayerSide">
+			Extra layers scale up from the base outline.
+		</constant>
+		<constant name="OUTLINE_LAYER_INWARD" value="1" enum="OutlineLayerSide">
+			Extra layers scale down toward the loop center.
+		</constant>
+		<constant name="OUTLINE_LAYER_BOTH" value="2" enum="OutlineLayerSide">
+			Extra layers alternate scaling up and down.
+		</constant>
+		<constant name="OUTLINE_LAYER_INTERLEAVED" value="0" enum="OutlineLayerFill">
+			Bullet i rides layer (i % layer_count), preserving the winding order.
+		</constant>
+		<constant name="OUTLINE_LAYER_SEQUENTIAL" value="1" enum="OutlineLayerFill">
+			Layer 0 fills first, then layer 1, so small volleys still read as the base shape. layer_start_offset rotates which layer fills first.
+		</constant>
+		<constant name="OUTLINE_LAYER_OUTER_FIRST" value="2" enum="OutlineLayerFill">
+			Contiguous chunks fill from the outermost ring inward (implosion readings). layer_start_offset rotates the start ring.
+		</constant>
+		<constant name="OUTLINE_LAYER_PINGPONG" value="3" enum="OutlineLayerFill">
+			Bullets wave across layers 0..last..0 (pairs with spin). layer_start_offset is ignored.
+		</constant>
+		<constant name="OUTLINE_LAYER_CURVE_LINEAR" value="0" enum="OutlineLayerScaleCurve">
+			Ring sizes step evenly (1 + step per layer outward).
+		</constant>
+		<constant name="OUTLINE_LAYER_CURVE_EXPONENTIAL" value="1" enum="OutlineLayerScaleCurve">
+			Ring sizes compound ((1 + step)^L outward, mirrored reciprocally inward).
+		</constant>
+		<constant name="OUTLINE_FACING_NORMAL" value="0" enum="OutlineFacing">
+			Loop-generator facings stay as generated (default: existing patterns never change).
+		</constant>
+		<constant name="OUTLINE_FACING_ALONG_P90" value="1" enum="OutlineFacing">
+			Loop-generator facings turn +90 degrees toward the loop tangent.
+		</constant>
+		<constant name="OUTLINE_FACING_ALONG_M90" value="2" enum="OutlineFacing">
+			Loop-generator facings turn -90 degrees toward the loop tangent.
 		</constant>
 		<constant name="DIRECTIONAL_BULLETS" value="0" enum="BulletType">
 			Bullet type for DirectionalBullets2D, bullets that move independently with per-bullet direction, speed and features.

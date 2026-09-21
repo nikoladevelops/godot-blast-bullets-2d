@@ -55,6 +55,19 @@
 				Returns one global transform per bullet for the current [member pattern_source]. Empty [member transforms_generator] means this node. Children mode with no markers falls back to the generator itself. Aimed mode with no target returns an empty array. Corridor mode with no target falls back to [member helper_corridor_aim_direction] so the wall still draws. Corridor and Ellipse Wall modes return fewer transforms than [member helper_bullets_amount] (the carved gaps shrink the array).
 			</description>
 		</method>
+		<method name="debug_check_layer_coincidence" qualifiers="const">
+			<return type="Dictionary" />
+			<param index="0" name="tolerance_px" type="float" default="1.0" />
+			<description>
+				Verifies every layered preview dot sits on its yellow ring (same center-scale rule and same fill deal on both sides). Returns checked/layers/max_deviation_px/mean_deviation_px/ok. Empty preview returns checked=false. Point-to-segment match: exact on sharp shapes, sub-pixel on dense sweeps.
+			</description>
+		</method>
+		<method name="debug_get_layer_rings" qualifiers="const">
+			<return type="Array" />
+			<description>
+				Debug readout of the yellow preview rings: one PackedVector2Array per extra outline layer, exactly as drawn (holder-local; runs INF-separated with a closing duplicate per closed run). Empty when layers are inactive. Lets scripts and tests verify bullets sit on their rings without screenshotting the editor.
+			</description>
+		</method>
 		<method name="fire_burst_volley">
 			<return type="void" />
 			<description>
@@ -101,6 +114,7 @@
 		<method name="get_helper_path2d_node" qualifiers="const">
 			<return type="Node" />
 			<description>
+				Returns the Path2D node used by the Path2D pattern layout, resolved from [member helper_path2d_path]. Returns null when no path is set or the node is gone. Prefer setting [member helper_path2d_path] in the inspector; this accessor is for runtime lookups.
 			</description>
 		</method>
 		<method name="get_live_volley_count" qualifiers="const">
@@ -109,23 +123,10 @@
 				How many spawned volleys are currently tracked for retargeting.
 			</description>
 		</method>
-		<method name="debug_check_layer_coincidence" qualifiers="const">
-			<return type="Dictionary" />
-			<param index="0" name="tolerance_px" type="float" default="1.0" />
-			<description>
-				Verifies every layered preview dot sits on its yellow ring (same center-scale rule and same fill deal on both sides). Returns checked/layers/max_deviation_px/mean_deviation_px/ok. Empty preview returns checked=false. Point-to-segment match: exact on sharp shapes, sub-pixel on dense sweeps.
-			</description>
-		</method>
-		<method name="debug_get_layer_rings" qualifiers="const">
-			<return type="Array" />
-			<description>
-				Debug readout of the yellow preview rings: one PackedVector2Array per extra outline layer, exactly as drawn (holder-local; runs INF-separated with a closing duplicate per closed run). Empty when layers are inactive. Lets scripts and tests verify bullets sit on their rings without screenshotting the editor.
-			</description>
-		</method>
 		<method name="get_live_volleys" qualifiers="const">
 			<return type="Array" />
 			<description>
-				The tracked live volley instances (pruned first), so scripts can call the full DirectionalBullets2D API on each volley directly. Inspect-only handles: a volley can be pooled and reused for a new owner while you still hold it, so always check [method DirectionalBullets2D.is_bullet_status_enabled] and ownership before steering a held volley. Use [method adopt_live_volley] to take ownership of a manually-woken volley.
+				The tracked live volley instances (pruned first), so scripts can call the full DirectionalBullets2D API on each volley directly. Inspect-only handles: a volley can be pooled and reused for a new owner while you still hold it, so always check [method MultiMeshBullets2D.is_bullet_status_enabled] and ownership before steering a held volley. Use [method adopt_live_volley] to take ownership of a manually-woken volley.
 			</description>
 		</method>
 		<method name="get_pooled_volley_count" qualifiers="const">
@@ -245,6 +246,7 @@
 			<return type="void" />
 			<param index="0" name="node" type="Node" />
 			<description>
+				Assigns the Path2D node used by the Path2D pattern layout. Updates [member helper_path2d_path] to point at it and refreshes the editor preview. Pass null to clear it.
 			</description>
 		</method>
 		<method name="set_transforms_generator">
@@ -472,14 +474,14 @@
 		<member name="helper_fan_angle_jitter" type="float" setter="set_helper_fan_angle_jitter" getter="get_helper_fan_angle_jitter" default="0.0">
 			Per-slot random angle variance in radians for shotgun spreads. 0 fires the exact cone. Must be finite and 0 or more.
 		</member>
-		<member name="helper_fan_seed" type="int" setter="set_helper_fan_seed" getter="get_helper_fan_seed" default="0">
-			Seed for fan angle jitter only. 0 is non-deterministic, otherwise every volley lands identically. Does nothing while [member helper_fan_angle_jitter] is 0. Only shown for the Fan pattern.
-		</member>
 		<member name="helper_fan_centered" type="bool" setter="set_helper_fan_centered" getter="get_helper_fan_centered" default="true">
 			Center the fan on its direction. Off starts it to one side.
 		</member>
 		<member name="helper_fan_direction_angle" type="float" setter="set_helper_fan_direction_angle" getter="get_helper_fan_direction_angle" default="0.0">
 			Fan center direction in radians.
+		</member>
+		<member name="helper_fan_seed" type="int" setter="set_helper_fan_seed" getter="get_helper_fan_seed" default="0">
+			Seed for fan angle jitter only. 0 is non-deterministic, otherwise every volley lands identically. Does nothing while [member helper_fan_angle_jitter] is 0. Only shown for the Fan pattern.
 		</member>
 		<member name="helper_fan_spread" type="float" setter="set_helper_fan_spread" getter="get_helper_fan_spread" default="0.5">
 			Fan width in radians.
@@ -527,19 +529,16 @@
 			SUPERFORMULA only: lobe count m of the simplified Gielis curve. Must be finite in [2, 64].
 		</member>
 		<member name="helper_flower_type" type="int" setter="set_helper_flower_type" getter="get_helper_flower_type" default="0">
-			Bloom kind selector (see [enum BulletFactory2D.FlowerBloom]): FAN (legacy default), RHODONEA, PHYLLOTAXIS, SPIROGRAPH, SUPERFORMULA. Per-type knobs below apply only to their matching bloom kind.
+			Bloom kind selector (0 FAN, 1 RHODONEA, 2 PHYLLOTAXIS, 3 SPIROGRAPH, 4 SUPERFORMULA). Per-type knobs below apply only to their matching bloom kind.
 		</member>
 		<member name="helper_grid_alignment" type="int" setter="set_helper_grid_alignment" getter="get_helper_grid_alignment" default="3">
-			Grid anchor, same values as [enum BulletFactory2D.Alignment].
+			Grid anchor, same values as [constant BulletFactory2D.CENTER] (0 TOP_LEFT through 8 BOTTOM_RIGHT).
 		</member>
 		<member name="helper_grid_column_offset" type="float" setter="set_helper_grid_column_offset" getter="get_helper_grid_column_offset" default="150.0">
 			Grid horizontal spacing.
 		</member>
 		<member name="helper_grid_jitter" type="float" setter="set_helper_grid_jitter" getter="get_helper_grid_jitter" default="0.0">
 			Random position offset per grid bullet. 0 is off.
-		</member>
-		<member name="helper_grid_seed" type="int" setter="set_helper_grid_seed" getter="get_helper_grid_seed" default="0">
-			Seed for grid jitter and random rotation only. 0 is non-deterministic, otherwise every volley lands identically. Does nothing while [member helper_grid_jitter] is 0 and random rotation is off. Only shown for the Grid pattern.
 		</member>
 		<member name="helper_grid_random_local_rotation" type="bool" setter="set_helper_grid_random_local_rotation" getter="get_helper_grid_random_local_rotation" default="false">
 			Give each grid bullet a random facing.
@@ -552,6 +551,9 @@
 		</member>
 		<member name="helper_grid_rows_per_column" type="int" setter="set_helper_grid_rows_per_column" getter="get_helper_grid_rows_per_column" default="10">
 			Grid rows per column.
+		</member>
+		<member name="helper_grid_seed" type="int" setter="set_helper_grid_seed" getter="get_helper_grid_seed" default="0">
+			Seed for grid jitter and random rotation only. 0 is non-deterministic, otherwise every volley lands identically. Does nothing while [member helper_grid_jitter] is 0 and random rotation is off. Only shown for the Grid pattern.
 		</member>
 		<member name="helper_heart_base_rotation" type="float" setter="set_helper_heart_base_rotation" getter="get_helper_heart_base_rotation" default="0.0">
 			Base rotation of the heart in radians.
@@ -587,7 +589,7 @@
 			Offset odd rows by half spacing for the honeycomb look.
 		</member>
 		<member name="helper_line_anchor" type="int" setter="set_helper_line_anchor" getter="get_helper_line_anchor" default="1">
-			Where the generator sits on the line, same values as [enum BulletFactory2D.LineAnchor].
+			Where the generator sits on the line, same values as [constant BulletFactory2D.LINE_ANCHOR_CENTER] (0 START, 1 CENTER, 2 END).
 		</member>
 		<member name="helper_line_direction" type="Vector2" setter="set_helper_line_direction" getter="get_helper_line_direction" default="Vector2(1, 0)">
 			Line axis. Does not need to be normalized.
@@ -655,6 +657,21 @@
 		<member name="helper_multispiral_start_radius" type="float" setter="set_helper_multispiral_start_radius" getter="get_helper_multispiral_start_radius" default="50.0">
 			First-slot radius in pixels. Must be finite and 0 or more.
 		</member>
+		<member name="helper_outline_corner_facing" type="int" setter="set_helper_outline_corner_facing" getter="get_helper_outline_corner_facing" default="0">
+			Which normal a corner-seated dot uses on corner-anchored shapes: Side (owning side's edge normal, stable default), Miter (angle bisector: triangle apexes face UP), Smooth (averaged loop normals everywhere: coherent on spiky stars). Corner shapes only.
+		</member>
+		<member name="helper_outline_corner_mode" type="int" setter="set_helper_outline_corner_mode" getter="get_helper_outline_corner_mode" default="0">
+			Pin Corners seats a dot on every corner (interiors spread per edge); Even Arc spreads purely evenly by arc length from corner 0 (corners coincide only when the count aligns; best for dense volleys). Corner shapes only.
+		</member>
+		<member name="helper_outline_corner_priority" type="int" setter="set_helper_outline_corner_priority" getter="get_helper_outline_corner_priority" default="0">
+			Which adjoining side owns a shared corner dot on corner-anchored shapes (Rectangle, Square, Polygon, Triangle, Trapezoid, Diamond, Star): Horizontal Sides (top/bottom own corners, so a top-right dot faces UP), Vertical Sides (left/right own them), Balanced (outgoing edge owns, previous behavior). On-outline and layers layouts only.
+		</member>
+		<member name="helper_outline_distribution" type="int" setter="set_helper_outline_distribution" getter="get_helper_outline_distribution" default="1">
+			How corner-anchored polygon loops (Rectangle, Square, Polygon, Triangle, Trapezoid, Diamond, Star) spread leftover slots: Legacy fills the first edges in winding order (equal sides can differ), Symmetric pairs opposite edges so opposite sides stay equal.
+		</member>
+		<member name="helper_outline_edge_margin" type="float" setter="set_helper_outline_edge_margin" getter="get_helper_outline_edge_margin" default="0.0">
+			Interior dots keep at least this many pixels of clearance from corners along their edge (clamped per edge; corners stay pinned). Only shown in Pin Corners mode. Must be finite and 0 or more.
+		</member>
 		<member name="helper_outline_facing" type="int" setter="set_helper_outline_facing" getter="get_helper_outline_facing" default="0">
 			Rotates each closed-loop shape facing: Outline Normal keeps it as generated, +90/-90 Degrees turn it toward the loop tangent. The per-shape facing_offset_deg still applies on top.
 		</member>
@@ -667,56 +684,41 @@
 		<member name="helper_outline_fill_stagger" type="bool" setter="set_helper_outline_fill_stagger" getter="get_helper_outline_fill_stagger" default="false">
 			Shifts every other Fill Inside row by half a cell (honeycomb packing).
 		</member>
-		<member name="helper_outline_placement" type="int" setter="set_helper_outline_placement" getter="get_helper_outline_placement" default="0">
-			Where closed-loop shape bullets live (Ring, Ellipse, Star, Flower, Rose, Lissajous, Circle, Rectangle, Square, Polygon, Triangle, Trapezoid, Diamond, Heart): On Outline keeps the generated slot loop exactly (single layer, the default), Layers re-spawns the same slot loop scaled about the loop center (layer 0 on the outline: the identical figure at a different size per layer), Fill Inside swaps it for a row-major grid masked to the loop interior.
-		</member>
-		<member name="helper_outline_reverse" type="bool" setter="set_helper_outline_reverse" getter="get_helper_outline_reverse" default="false">
-			Mirrors the closed-loop slot order (winding flip): bullet 0 moves to the far end of the loop. On-outline and layers layouts only.
-		</member>
 		<member name="helper_outline_layer_count" type="int" setter="set_helper_outline_layer_count" getter="get_helper_outline_layer_count" default="1">
 			How many concentric rings share the volley in Layers placement. 1 is a single exact layer (the default, identical to On Outline). Must be in [1, 64].
 		</member>
-		<member name="helper_outline_layer_fill" type="int" setter="set_helper_outline_layer_fill" getter="get_helper_outline_layer_fill" enum="BulletFactory2D.OutlineLayerFill" default="0">
+		<member name="helper_outline_layer_fill" type="int" setter="set_helper_outline_layer_fill" getter="get_helper_outline_layer_fill" default="0">
 			How bullets are dealt across layers: Interleaved (bullet i rides layer i % count, winding survives), Sequential (fills contiguous chunks starting from [member helper_outline_layer_start_offset], so small volleys still read as the base shape with offset 0), Outer First (sequential from the outermost ring inward) or Ping Pong (waves 0..last..0, pairs with spin). Layers placement only.
 		</member>
-		<member name="helper_outline_layer_side" type="int" setter="set_helper_outline_layer_side" getter="get_helper_outline_layer_side" enum="BulletFactory2D.OutlineLayerSide" default="0">
-			Which side of the base outline extra layers grow toward: Outward (each ring bigger), Inward (rings crowd toward the center), or Both (alternating bigger/smaller). Layers placement only.
+		<member name="helper_outline_layer_layout" type="int" setter="set_helper_outline_layer_layout" getter="get_helper_outline_layer_layout" default="1">
+			How Layers placement assigns polygon bullets to rings: Shared Loop decimates one loop (outer rings miss corners), Even Per Layer rebuilds an even symmetric loop per ring (corners on every ring). Layers placement only.
+		</member>
+		<member name="helper_outline_layer_max_dots" type="int" setter="set_helper_outline_layer_max_dots" getter="get_helper_outline_layer_max_dots" default="0">
+			Max bullets kept per extra layer (0 = unlimited): overflow is dropped, first-kept in bullet order, so the volley may shrink below helper_bullets_amount. Layer 0 is never capped. Layers placement only.
 		</member>
 		<member name="helper_outline_layer_scale" type="float" setter="set_helper_outline_layer_scale" getter="get_helper_outline_layer_scale" default="0.2">
 			Fractional growth per layer: each extra ring rescales the shape about the loop center (0.2 = 20% bigger per layer outward). Must be finite in (0, 8]. Layers placement only.
 		</member>
-		<member name="helper_outline_layer_start_offset" type="int" setter="set_helper_outline_layer_start_offset" getter="get_helper_outline_layer_start_offset" default="0">
-			Which layer Sequential-family filling starts from (wraps around, so 1 starts on the second ring and the outline fills last). 0 starts on the outline. Only shown — and only consumed — in Layers placement with Sequential or Outer First fill; Interleaved and Ping Pong ignore it. Must be 0 or more.
-		</member>
-		<member name="helper_outline_distribution" type="int" setter="set_helper_outline_distribution" getter="get_helper_outline_distribution" enum="BulletFactory2D.OutlineDistribution" default="1">
-			How corner-anchored polygon loops (Rectangle, Square, Polygon, Triangle, Trapezoid, Diamond, Star) spread leftover slots: Legacy fills the first edges in winding order (equal sides can differ), Symmetric pairs opposite edges so opposite sides stay equal.
-		</member>
-		<member name="helper_outline_layer_layout" type="int" setter="set_helper_outline_layer_layout" getter="get_helper_outline_layer_layout" enum="BulletFactory2D.OutlineLayerLayout" default="1">
-			How Layers placement assigns polygon bullets to rings: Shared Loop decimates one loop (outer rings miss corners), Even Per Layer rebuilds an even symmetric loop per ring (corners on every ring). Layers placement only.
-		</member>
-		<member name="helper_outline_corner_priority" type="int" setter="set_helper_outline_corner_priority" getter="get_helper_outline_corner_priority" enum="BulletFactory2D.OutlineCornerPriority" default="0">
-			Which adjoining side owns a shared corner dot on corner-anchored shapes (Rectangle, Square, Polygon, Triangle, Trapezoid, Diamond, Star): Horizontal Sides (top/bottom own corners, so a top-right dot faces UP), Vertical Sides (left/right own them), Balanced (outgoing edge owns, previous behavior). On-outline and layers layouts only.
-		</member>
-		<member name="helper_outline_corner_mode" type="int" setter="set_helper_outline_corner_mode" getter="get_helper_outline_corner_mode" enum="BulletFactory2D.OutlineCornerMode" default="0">
-			Pin Corners seats a dot on every corner (interiors spread per edge); Even Arc spreads purely evenly by arc length from corner 0 (corners coincide only when the count aligns; best for dense volleys). Corner shapes only.
-		</member>
-		<member name="helper_outline_edge_margin" type="float" setter="set_helper_outline_edge_margin" getter="get_helper_outline_edge_margin" default="0.0">
-			Interior dots keep at least this many pixels of clearance from corners along their edge (clamped per edge; corners stay pinned). Only shown in Pin Corners mode. Must be finite and 0 or more.
-		</member>
-		<member name="helper_outline_corner_facing" type="int" setter="set_helper_outline_corner_facing" getter="get_helper_outline_corner_facing" enum="BulletFactory2D.OutlineCornerFacing" default="0">
-			Which normal a corner-seated dot uses on corner-anchored shapes: Side (owning side's edge normal, stable default), Miter (angle bisector: triangle apexes face UP), Smooth (averaged loop normals everywhere: coherent on spiky stars). Corner shapes only.
-		</member>
-		<member name="helper_outline_layer_scale_curve" type="int" setter="set_helper_outline_layer_scale_curve" getter="get_helper_outline_layer_scale_curve" enum="BulletFactory2D.OutlineLayerScaleCurve" default="0">
+		<member name="helper_outline_layer_scale_curve" type="int" setter="set_helper_outline_layer_scale_curve" getter="get_helper_outline_layer_scale_curve" default="0">
 			Ring-size progression: Linear steps evenly, Exponential compounds ((1 + step)^L, mirrored reciprocally inward). A non-empty [member helper_outline_layer_scales] overrides both. Layers placement only.
 		</member>
 		<member name="helper_outline_layer_scales" type="PackedFloat32Array" setter="set_helper_outline_layer_scales" getter="get_helper_outline_layer_scales" default="PackedFloat32Array()">
 			Explicit per-layer scales, entry L % size (e.g. [1.0, 1.5, 1.6] for a tight outer pair). Empty means the formula above. Each entry must be finite in [0.05, 64], at most 64 entries. Layers placement only.
 		</member>
+		<member name="helper_outline_layer_side" type="int" setter="set_helper_outline_layer_side" getter="get_helper_outline_layer_side" default="0">
+			Which side of the base outline extra layers grow toward: Outward (each ring bigger), Inward (rings crowd toward the center), or Both (alternating bigger/smaller). Layers placement only.
+		</member>
+		<member name="helper_outline_layer_start_offset" type="int" setter="set_helper_outline_layer_start_offset" getter="get_helper_outline_layer_start_offset" default="0">
+			Which layer Sequential-family filling starts from (wraps around, so 1 starts on the second ring and the outline fills last). 0 starts on the outline. Only shown — and only consumed — in Layers placement with Sequential or Outer First fill; Interleaved and Ping Pong ignore it. Must be 0 or more.
+		</member>
 		<member name="helper_outline_layer_twist" type="int" setter="set_helper_outline_layer_twist" getter="get_helper_outline_layer_twist" default="0">
 			Slot rotation per successive layered ring (0 = off, negatives wrap): stacked rings interleave angularly instead of sitting in spokes. Layer 0 is never twisted. Layers placement only.
 		</member>
-		<member name="helper_outline_layer_max_dots" type="int" setter="set_helper_outline_layer_max_dots" getter="get_helper_outline_layer_max_dots" default="0">
-			Max bullets kept per extra layer (0 = unlimited): overflow is dropped, first-kept in bullet order, so the volley may shrink below helper_bullets_amount. Layer 0 is never capped. Layers placement only.
+		<member name="helper_outline_placement" type="int" setter="set_helper_outline_placement" getter="get_helper_outline_placement" default="0">
+			Where closed-loop shape bullets live (Ring, Ellipse, Star, Flower, Rose, Lissajous, Circle, Rectangle, Square, Polygon, Triangle, Trapezoid, Diamond, Heart): On Outline keeps the generated slot loop exactly (single layer, the default), Layers re-spawns the same slot loop scaled about the loop center (layer 0 on the outline: the identical figure at a different size per layer), Fill Inside swaps it for a row-major grid masked to the loop interior.
+		</member>
+		<member name="helper_outline_reverse" type="bool" setter="set_helper_outline_reverse" getter="get_helper_outline_reverse" default="false">
+			Mirrors the closed-loop slot order (winding flip): bullet 0 moves to the far end of the loop. On-outline and layers layouts only.
 		</member>
 		<member name="helper_outline_slot_offset" type="int" setter="set_helper_outline_slot_offset" getter="get_helper_outline_slot_offset" default="0">
 			Rotates which closed-loop slot becomes bullet 0 (wraps both ways). On-outline and layers layouts only.
@@ -808,11 +810,11 @@
 		<member name="helper_ring_random_rotation" type="bool" setter="set_helper_ring_random_rotation" getter="get_helper_ring_random_rotation" default="false">
 			Give each ring bullet a random facing.
 		</member>
-		<member name="helper_ring_seed" type="int" setter="set_helper_ring_seed" getter="get_helper_ring_seed" default="0">
-			Seed for ring random rotation only. 0 is non-deterministic, otherwise every volley lands identically. Does nothing while [member helper_ring_random_rotation] is off. Only shown for the Ring pattern.
-		</member>
 		<member name="helper_ring_rotate_with_marker" type="bool" setter="set_helper_ring_rotate_with_marker" getter="get_helper_ring_rotate_with_marker" default="true">
 			Rotate the ring with the generator.
+		</member>
+		<member name="helper_ring_seed" type="int" setter="set_helper_ring_seed" getter="get_helper_ring_seed" default="0">
+			Seed for ring random rotation only. 0 is non-deterministic, otherwise every volley lands identically. Does nothing while [member helper_ring_random_rotation] is off. Only shown for the Ring pattern.
 		</member>
 		<member name="helper_ring_start_angle" type="float" setter="set_helper_ring_start_angle" getter="get_helper_ring_start_angle" default="0.0">
 			Angle in radians where the ring starts.
@@ -866,7 +868,7 @@
 			Angle step in radians per spiral bullet.
 		</member>
 		<member name="helper_spiral_facing" type="int" setter="set_helper_spiral_facing" getter="get_helper_spiral_facing" default="0">
-			Spiral facing, same values as [enum BulletFactory2D.SpiralFacingMode].
+			Spiral facing, same values as [constant BulletFactory2D.SPIRAL_FACING_TANGENT] (0 TANGENT, 1 RADIAL_OUTWARD, 2 TOWARD_CENTER, 3 KEEP_MARKER).
 		</member>
 		<member name="helper_spiral_facing_offset_deg" type="float" setter="set_helper_spiral_facing_offset_deg" getter="get_helper_spiral_facing_offset_deg" default="0.0">
 			Twists every spiral facing by this many degrees.
@@ -973,9 +975,6 @@
 		<member name="helper_waterfall_jitter" type="float" setter="set_helper_waterfall_jitter" getter="get_helper_waterfall_jitter" default="6.0">
 			Random offset per slot in pixels. Must be finite and 0 or more.
 		</member>
-		<member name="helper_waterfall_seed" type="int" setter="set_helper_waterfall_seed" getter="get_helper_waterfall_seed" default="0">
-			Seed for waterfall jitter only. 0 is non-deterministic, otherwise every volley lands identically. Does nothing while [member helper_waterfall_jitter] is 0. Only shown for the Waterfall pattern.
-		</member>
 		<member name="helper_waterfall_rain_direction" type="Vector2" setter="set_helper_waterfall_rain_direction" getter="get_helper_waterfall_rain_direction" default="Vector2(0, 1)">
 			Fall direction (need not be normalized). Must be finite and non-zero.
 		</member>
@@ -984,6 +983,9 @@
 		</member>
 		<member name="helper_waterfall_rows" type="int" setter="set_helper_waterfall_rows" getter="get_helper_waterfall_rows" default="3">
 			Curtain rows. Must be 1 or more.
+		</member>
+		<member name="helper_waterfall_seed" type="int" setter="set_helper_waterfall_seed" getter="get_helper_waterfall_seed" default="0">
+			Seed for waterfall jitter only. 0 is non-deterministic, otherwise every volley lands identically. Does nothing while [member helper_waterfall_jitter] is 0. Only shown for the Waterfall pattern.
 		</member>
 		<member name="helper_waterfall_stagger" type="float" setter="set_helper_waterfall_stagger" getter="get_helper_waterfall_stagger" default="0.5">
 			Per-row stagger factor. Must be finite.
@@ -1066,6 +1068,9 @@
 		<member name="homing_per_bullet_smoothing_enabled" type="bool" setter="set_homing_per_bullet_smoothing_enabled" getter="get_homing_per_bullet_smoothing_enabled" default="false">
 			Fans smoothing out per bullet: bullet i steers with start + step times i.
 		</member>
+		<member name="homing_random_seed" type="int" setter="set_homing_random_seed" getter="get_homing_random_seed" default="0">
+			Seed for homing random-target selection ([constant BulletSpawner2D.HOMING_SELECT_RANDOM]) only. 0 is non-deterministic, otherwise picks reproduce. Only shown when that selection is active. Does not affect steering, smoothing, retargeting or any bullet pattern.
+		</member>
 		<member name="homing_retarget_interval_sec" type="float" setter="set_homing_retarget_interval_sec" getter="get_homing_retarget_interval_sec" default="0.5">
 			Seconds between automatic retarget passes. Must be above zero.
 		</member>
@@ -1144,12 +1149,6 @@
 		<member name="pattern_scale" type="float" setter="set_pattern_scale" getter="get_pattern_scale" default="1.0">
 			Scales the whole pattern around the generator (positions and bullet size grow together). 1.0 keeps it as is, 0 collapses it onto the generator, negatives mirror it. Compose with transforms_scale for big-layout + big-bullet looks.
 		</member>
-		<member name="homing_random_seed" type="int" setter="set_homing_random_seed" getter="get_homing_random_seed" default="0">
-			Seed for homing random-target selection ([constant BulletSpawner2D.HOMING_SELECT_RANDOM]) only. 0 is non-deterministic, otherwise picks reproduce. Only shown when that selection is active. Does not affect steering, smoothing, retargeting or any bullet pattern.
-		</member>
-		<member name="reload_jitter_seed" type="int" setter="set_reload_jitter_seed" getter="get_reload_jitter_seed" default="0">
-			Seed for [member reload_jitter_sec] only. 0 is non-deterministic, otherwise the jitter sequence reproduces (seed + volleys fired, so volleys still vary per shot). Does nothing while [member reload_jitter_sec] is 0. Does not affect any bullet pattern or homing pick.
-		</member>
 		<member name="pattern_source" type="int" setter="set_pattern_source" getter="get_pattern_source" enum="BulletSpawner2D.PatternSource" default="0">
 			Where volley transforms come from: children markers (0), this generator itself (1), or one of 31 procedural helper patterns (2-32: Grid, Ring, Fan, Spiral, Line, Aimed, Flower, Ellipse, Rain, Scatter, Star Polygon, Multi Spiral, Cross, Star, Heart, Wave, Waterfall, Lattice, Rose, Counter Spiral, Corridor, Lissajous, Custom, Circle, Rectangle, Square, Polygon, Path2D, Triangle, Trapezoid, Diamond). Order in the inspector groups sources, basic shapes, ornamental loops, then generators. Only the active pattern's options show in the inspector. Pipeline per volley: generate (with outline placement/fill/layers for the loop shapes), then spin, then pattern/local scale, then helper_skip_indices carving (so skip indexes match the preview). Corridor, Ellipse Wall and outline Fill Inside modes return fewer transforms than helper_bullets_amount.
 		</member>
@@ -1180,17 +1179,20 @@
 		<member name="preview_first_dot_color" type="Color" setter="set_preview_first_dot_color" getter="get_preview_first_dot_color" default="Color(1, 0.85, 0.2, 1)">
 			Emphasis color for bullet 0 in the preview (pattern start: anchor, reverse, loop seam). Drawn bigger on top of the regular dot.
 		</member>
-		<member name="preview_path_color" type="Color" setter="set_preview_path_color" getter="get_preview_path_color" default="Color(0.3, 0.85, 1, 0.55)">
-			Track underlay color: the shape/loop/curve bullets ride on, drawn as segments under the dots so sparse volleys still show the whole track. Distinct from dots, arrows and the first-bullet marker by default.
-		</member>
 		<member name="preview_layer_path_color" type="Color" setter="set_preview_layer_path_color" getter="get_preview_layer_path_color" default="Color(1, 1, 0, 0.55)">
 			Extra outline-layer ring color (Layers placement only): one yellow closed ring per ring beyond the base outline, drawn under the dots with the same width as the base track and never antialiased. Same alpha as the base track by default. Empty unless layers are active (count above 1 with valid spacing).
+		</member>
+		<member name="preview_path_color" type="Color" setter="set_preview_path_color" getter="get_preview_path_color" default="Color(0.3, 0.85, 1, 0.55)">
+			Track underlay color: the shape/loop/curve bullets ride on, drawn as segments under the dots so sparse volleys still show the whole track. Distinct from dots, arrows and the first-bullet marker by default.
 		</member>
 		<member name="preview_path_width" type="float" setter="set_preview_path_width" getter="get_preview_path_width" default="2.0">
 			Track underlay line width in pixels (multiplied by nothing: absolute screen-ish size). 0 hides the track. Must be finite and 0 or more.
 		</member>
 		<member name="reload_jitter_sec" type="float" setter="set_reload_jitter_sec" getter="get_reload_jitter_sec" default="0.0">
 			Reload jitter in seconds: each auto volley waits shoot_interval_sec +/- uniform jitter (seeded by [member reload_jitter_seed], floored at 0.001s so fast intervals keep working with jitter on). 0 is exact. Must be finite and 0 or more.
+		</member>
+		<member name="reload_jitter_seed" type="int" setter="set_reload_jitter_seed" getter="get_reload_jitter_seed" default="0">
+			Seed for [member reload_jitter_sec] only. 0 is non-deterministic, otherwise the jitter sequence reproduces (seed + volleys fired, so volleys still vary per shot). Does nothing while [member reload_jitter_sec] is 0. Does not affect any bullet pattern or homing pick.
 		</member>
 		<member name="shared_homing_auto_pop_after_target_reached" type="bool" setter="set_shared_homing_auto_pop_after_target_reached" getter="get_shared_homing_auto_pop_after_target_reached" default="false">
 			Advances the shared queue when a target is reached. Only used in Shared mode.

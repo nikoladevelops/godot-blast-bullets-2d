@@ -8,7 +8,7 @@
 
 		Warning: Never use [code]get_tree().create_timer()[/code] or any other godot timers with this class. It will cause issues with the internal timing of the bullets. If you need timers, use [method MultiMeshBullets2D.multimesh_attach_time_based_function] instead.
 
-		Warning: When editing runtime properties or calling methods that edit the multimesh, only structural factory calls ([method BulletFactory2D.reset], [method BulletFactory2D.free_active_bullets], [method BulletFactory2D.free_disabled_bullets], [method BulletFactory2D.free_bullets_pool], [method BulletFactory2D.populate_bullets_pool], and [method MultiMeshBullets2D.enable_multimesh] with a shape change) must use [method Object.call_deferred] when called from physics callbacks or collision/lifetime signal handlers. Per-bullet edits apply immediately. The only exception to this are callables attached via [method MultiMeshBullets2D.multimesh_attach_time_based_function], since those are executed at the end of the frame by default for safety.
+		Warning: When editing runtime properties or calling methods that edit the multimesh, only structural factory calls ([method BulletFactory2D.reset], [method BulletFactory2D.free_active_bullets], [method BulletFactory2D.free_disabled_bullets], [method BulletFactory2D.free_bullets_pool], [method BulletFactory2D.populate_bullets_pool], and the spawn methods with a shape change) must use [method Object.call_deferred] when called from physics callbacks or collision/lifetime signal handlers. Per-bullet edits apply immediately. The only exception to this are callables attached via [method MultiMeshBullets2D.multimesh_attach_time_based_function], since those are executed at the end of the frame by default for safety.
 
 		Warning: Homing functionality can be done in two ways - either using [b]per-bullet homing deques[/b] (each bullet has its own deque of homing targets) or a [b]shared homing deque[/b] (each bullet shares the same shared deque). Both are supported and if both are used then the shared deque takes precedence over the per-bullet ones. Meaning that if the shared deque has any targets in it then all bullets will follow that one instead of their own individual targets. Any method or property that mentions "shared" is related to the shared deque.
 
@@ -16,7 +16,7 @@
 
 		Note: Bullets can orbit around their current homing target if enabled (see [method bullet_enable_orbiting], [method all_bullets_enable_orbiting]). Orbiting requires having a valid homing target to orbit around. Be aware that orbiting does not care about the difference between a shared homing deque or a per bullet deque, as long as there is a target to orbit around it will work.
 
-		Note: Feature mixing has a fixed precedence each tick: homing steers the direction, direction curves adjust it (shared wins ties, per-bullet fills gaps), rotation spins only the visual, adjust_direction_based_on_rotation feeds the visual back into ballistics (skipped when rotate_only_textures is on, since that spin is rendering-only), movement patterns steer the displacement (skipped while a locked orbit owns the bullet, so non-repeating patterns never finish invisibly on the ring), and a locked orbit owns the final displacement. Homing smoothing has no effect while a movement pattern or rotation data drives the direction (the direction snaps instead). Teleporting a locked bullet re-aims its ring slot from the new position instead of snapping back. [member MultiMeshBullets2D.get_bullet_velocity] reports the logical velocity (direction times speed plus wind), excluding pattern and orbit displacement.
+		Note: Feature mixing has a fixed precedence each tick: homing steers the direction, direction curves adjust it (shared wins ties, per-bullet fills gaps), rotation spins only the visual, adjust_direction_based_on_rotation feeds the visual back into ballistics (skipped when rotate_only_textures is on, since that spin is rendering-only), movement patterns steer the displacement (skipped while a locked orbit owns the bullet, so non-repeating patterns never finish invisibly on the ring), and a locked orbit owns the final displacement. Homing smoothing has no effect while a movement pattern or rotation data drives the direction (the direction snaps instead). Teleporting a locked bullet re-aims its ring slot from the new position instead of snapping back. [method MultiMeshBullets2D.get_bullet_velocity] reports the logical velocity (direction times speed plus wind), excluding pattern and orbit displacement.
 
 		Note: Instead of [BulletSpeedData2D] with [method MultiMeshBullets2D.set_bullet_speed_data] you can take advantage of [BulletCurvesData2D] by using [method MultiMeshBullets2D.bullet_set_curves_data], [method MultiMeshBullets2D.all_bullets_set_curves_data] or [member MultiMeshBullets2D.shared_bullet_curves_data] if you want a shared curve for all bullets.
 
@@ -24,7 +24,7 @@
 
 		Note: For bullet attachments (particles, lights, etc...) use [BulletAttachment2D] and attach them via [method MultiMeshBullets2D.bullet_set_attachment] or [method MultiMeshBullets2D.all_bullets_set_attachment].
 
-			Note: For initial velocity/inertia use [member MultiMeshBullets2D.inherited_velocity_offset].
+			Note: For initial velocity/inertia use [member inherited_velocity_offset].
 
 			Note: For custom data that the multimesh should carry use [member MultiMeshBullets2D.shared_bullets_custom_data] - used for damage or anything else custom that is available in collision callbacks inside [BulletFactory2D].
 
@@ -677,7 +677,7 @@
 		<method name="get_is_wobble_enabled" qualifiers="const">
 			<return type="bool" />
 			<description>
-				Whether any wobble entry is currently enabled on this volley (shared or per-bullet). Set wobble data with [method MultiMeshBullets2D.bullet_set_wobble_data], [method MultiMeshBullets2D.all_bullets_set_wobble_data], or [member MultiMeshBullets2D.shared_bullet_wobble_data].
+				Whether any wobble entry is currently enabled on this volley (shared or per-bullet). Set wobble data through [member DirectionalBulletsData2D.shared_bullet_wobble_data] or [member DirectionalBulletsData2D.all_bullet_wobble_data] before spawning.
 			</description>
 		</method>
 		<method name="has_shared_bullet_rotation_data" qualifiers="const">
