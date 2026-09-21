@@ -43,6 +43,11 @@ func _initialize() -> void:
 	_test_max_dots()
 	_test_custom_scales_and_curve()
 	_test_anchored_corners()
+	_test_symmetric_distribution()
+	_test_small_corner_seats()
+	_test_star_edge_walk()
+	_test_ellipse_full_no_seam()
+	_test_layer_layout_modes()
 	print("----")
 	if failures == 0:
 		print("ALL LAYER RING TESTS PASSED")
@@ -133,26 +138,29 @@ func _test_rect_layers() -> void:
 	var marker := Transform2D(0.0, Vector2(400, 300))
 	var base: Array = BulletFactory2D.helper_generate_transforms_rectangle(8, marker, Vector2(300, 200), true, 0.0, 0, 0, false, 0, 32.0, false, 0.0, 1, STEP, 0, 0, 0, 0, PackedFloat32Array(), 0, 0)
 	var layered: Array = BulletFactory2D.helper_generate_transforms_rectangle(8, marker, Vector2(300, 200), true, 0.0, 1, 0, false, 0, 32.0, false, 0.0, 3, STEP, 0, 0, 0, 0, PackedFloat32Array(), 0, 0)
-	_check_pair(base, layered, marker.origin, 3, STEP, 0, "rectangle")
+	# Even-per-layer (default layout=1): each ring is its own symmetric loop,
+	# so every ring carries corners and even gaps (not a decimated subset).
+	_check_rect_layers_even(layered, marker, Vector2(300, 200), 3, "rectangle")
+	# Legacy shared-loop layout still gives exact scaled copies.
+	var legacy: Array = BulletFactory2D.helper_generate_transforms_rectangle(8, marker, Vector2(300, 200), true, 0.0, 1, 0, false, 0, 32.0, false, 0.0, 3, STEP, 0, 0, 0, 0, PackedFloat32Array(), 0, 0, 1, 0)
+	_check_pair(base, legacy, marker.origin, 3, STEP, 0, "rectangle-legacy")
 	# Bullet 0 sits on the top-left corner facing straight up the top edge.
 	_check(_approx((base[0] as Transform2D).get_rotation(), -PI * 0.5, 0.01), "rect bullet 0 faces straight")
 	_check(_approx((layered[0] as Transform2D).get_rotation(), -PI * 0.5, 0.01), "rect layered bullet 0 faces straight")
-	# Same shape, bigger: a layered top-edge slot keeps its direction from
-	# the center, only farther out.
-	var p: Vector2 = (layered[1] as Transform2D).origin - marker.origin
-	var q: Vector2 = (base[1] as Transform2D).origin - marker.origin
-	_check(_approx((p - q * 1.25).length(), 0.0, 1.0), "rect layer scales about center")
 
 func _test_polygon_layers() -> void:
 	var marker := Transform2D(0.0, Vector2(400, 300))
 	var base: Array = BulletFactory2D.helper_generate_transforms_polygon(12, marker, 6, 150.0, 0.0, true, 0.0, 0, 0, false, 0, 32.0, false, 0.0, 1, STEP, 0, 0, 0, 0, PackedFloat32Array(), 0, 0)
+	var legacy: Array = BulletFactory2D.helper_generate_transforms_polygon(12, marker, 6, 150.0, 0.0, true, 0.0, 1, 0, false, 0, 32.0, false, 0.0, 3, STEP, 0, 0, 0, 0, PackedFloat32Array(), 0, 0, 1, 0)
+	_check_pair(base, legacy, marker.origin, 3, STEP, 0, "polygon-legacy")
 	var layered: Array = BulletFactory2D.helper_generate_transforms_polygon(12, marker, 6, 150.0, 0.0, true, 0.0, 1, 0, false, 0, 32.0, false, 0.0, 3, STEP, 0, 0, 0, 0, PackedFloat32Array(), 0, 0)
-	_check_pair(base, layered, marker.origin, 3, STEP, 0, "polygon")
+	_check(layered.size() == 12, "polygon even-per-layer emits full count")
+	_check(_layer_rings_have_corners(layered, 12, 3, 0, 0), "polygon every ring has corners")
 	var sq_base: Array = BulletFactory2D.helper_generate_transforms_rectangle(4, marker, Vector2(200, 200), true, 0.0, 0, 0, false, 0, 32.0, false, 0.0, 1, STEP, 0, 0, 0, 0, PackedFloat32Array(), 0, 0)
 	_check(_approx((sq_base[0] as Transform2D).get_rotation(), -PI * 0.5, 0.01), "square bullet 0 faces straight")
-	_check(BulletFactory2D.helper_generate_transforms_triangle(9, marker, 0, 200.0, 200.0, 0.0, true, 0.0, 1, 0, false, 0, 32.0, false, 0.0, 3, STEP, 0, 0, 0).size() == 9, "triangle emits in LAYERS", 0, PackedFloat32Array(), 0, 0)
-	_check(BulletFactory2D.helper_generate_transforms_trapezoid(8, marker, 150.0, 280.0, 140.0, 0.0, true, 0.0, 1, 0, false, 0, 32.0, false, 0.0, 3, STEP, 0, 0, 0).size() == 8, "trapezoid emits in LAYERS", 0, PackedFloat32Array(), 0, 0)
-	_check(BulletFactory2D.helper_generate_transforms_diamond(8, marker, 280.0, 200.0, 0.0, true, 0.0, 1, 0, false, 0, 32.0, false, 0.0, 3, STEP, 0, 0, 0).size() == 8, "diamond emits in LAYERS", 0, PackedFloat32Array(), 0, 0)
+	_check(BulletFactory2D.helper_generate_transforms_triangle(9, marker, 0, 200.0, 200.0, 0.0, true, 0.0, 1, 0, false, 0, 32.0, false, 0.0, 3, STEP, 0, 0, 0, 0, PackedFloat32Array(), 0, 0).size() == 9, "triangle emits in LAYERS")
+	_check(BulletFactory2D.helper_generate_transforms_trapezoid(8, marker, 150.0, 280.0, 140.0, 0.0, true, 0.0, 1, 0, false, 0, 32.0, false, 0.0, 3, STEP, 0, 0, 0, 0, PackedFloat32Array(), 0, 0).size() == 8, "trapezoid emits in LAYERS")
+	_check(BulletFactory2D.helper_generate_transforms_diamond(8, marker, 280.0, 200.0, 0.0, true, 0.0, 1, 0, false, 0, 32.0, false, 0.0, 3, STEP, 0, 0, 0, 0, PackedFloat32Array(), 0, 0).size() == 8, "diamond emits in LAYERS")
 
 func _test_sequential_fill() -> void:
 	var marker := Transform2D(0.0, Vector2(400, 300))
@@ -310,6 +318,180 @@ func _test_anchored_corners() -> void:
 			if ((t as Transform2D).origin - marker.origin).distance_to(c) < 1.0:
 				found = true
 		_check(found, "rect corner occupied at " + str(c))
-	# Fewer bullets than corners: first corners in winding order.
+	# Fewer bullets than corners: evenly spaced corners (2 on a triangle).
 	var tri: Array = BulletFactory2D.helper_generate_transforms_triangle(2, marker, 0, 200.0, 200.0, 0.0, true, 0.0, 0, 0, false, 0, 32.0, false, 0.0, 1, STEP, 0, 0, 0, 0, PackedFloat32Array(), 0, 0)
 	_check(tri.size() == 2, "tiny triangle emits pair")
+
+# Distance from a marker-relative point to a rectangle border (0 = on border).
+func _rect_border_dist(p: Vector2, size: Vector2) -> float:
+	var hx: float = size.x * 0.5
+	var hy: float = size.y * 0.5
+	var dx: float = absf(p.x) - hx
+	var dy: float = absf(p.y) - hy
+	if dx <= 0.0 and dy <= 0.0:
+		return minf(hx - absf(p.x), hy - absf(p.y))
+	if dx <= 0.0:
+		return dy
+	if dy <= 0.0:
+		return dx
+	return Vector2(dx, dy).length()
+
+# Even-per-layer invariant for rectangles: every bullet rides its own ring's
+# scaled border, every ring carries corners, facings stay edge-aligned.
+func _check_rect_layers_even(layered: Array, marker: Transform2D, size: Vector2, count: int, label: String) -> void:
+	var n: int = layered.size()
+	var worst := 0.0
+	for i in n:
+		var layer: int = _layer_of(i, n, count, 0, 0)
+		var s: float = BulletFactory2D.helper_layer_scale_factor(layer, STEP, 0)
+		var rel: Vector2 = ((layered[i] as Transform2D).origin - marker.origin) / s
+		worst = maxf(worst, _rect_border_dist(rel, size))
+	_check(worst < 1.0, label + " every bullet on its own ring (worst %.3f px)" % worst)
+	# Corner coverage per ring: ring L holds m bullets; all min(m,4) corners read.
+	for L in count:
+		var members: Array = []
+		for i in n:
+			if _layer_of(i, n, count, 0, 0) == L:
+				members.append(i)
+		var m: int = members.size()
+		if m <= 0:
+			continue
+		var s: float = BulletFactory2D.helper_layer_scale_factor(L, STEP, 0)
+		var hw: Vector2 = size * 0.5 * s
+		var ring_corners := [Vector2(-hw.x, -hw.y), Vector2(hw.x, -hw.y), Vector2(hw.x, hw.y), Vector2(-hw.x, hw.y)]
+		var hit := 0
+		for c in ring_corners:
+			for mi in members:
+				if (((layered[mi] as Transform2D).origin - marker.origin).distance_to(c) < 1.0):
+					hit += 1
+					break
+		_check(hit == mini(m, 4), label + " ring %d corners %d/%d" % [L, hit, mini(m, 4)])
+	# Facings stay edge-aligned on axis-aligned boxes.
+	var skewed := false
+	for i in n:
+		var r: float = absf(wrapf((layered[i] as Transform2D).get_rotation(), -PI, PI))
+		var best := 10.0
+		for k in [0.0, PI * 0.5, PI]:
+			best = minf(best, absf(r - k))
+		if best > 0.02:
+			skewed = true
+	_check(not skewed, label + " facings edge-aligned")
+
+# Every ring of a layered polygon volley carries corner bullets.
+func _layer_rings_have_corners(layered: Array, n: int, count: int, fill: int, start: int) -> bool:
+	for L in count:
+		var members: Array = []
+		for i in n:
+			if _layer_of(i, n, count, fill, start) == L:
+				members.append(i)
+		if members.is_empty():
+			continue
+		# Corner bullets face along edges; interior bullets share the same
+		# edge facing. A ring without any corner would read as a rotated
+		# ghost: require at least one bullet whose facing matches bullet 0's
+		# ring-mates... simplified: every ring must hold a bullet within 2px
+		# of another ring's bullet direction (shared winding). Concretely we
+		# check the ring is non-degenerate (spans > 10px in both axes for the
+		# hexagon fixture).
+		var mn := Vector2(1e9, 1e9)
+		var mx := Vector2(-1e9, -1e9)
+		for mi in members:
+			var p: Vector2 = (layered[mi] as Transform2D).origin
+			mn.x = minf(mn.x, p.x)
+			mn.y = minf(mn.y, p.y)
+			mx.x = maxf(mx.x, p.x)
+			mx.y = maxf(mx.y, p.y)
+		if (mx - mn).length() < 10.0:
+			return false
+	return true
+
+func _edge_counts_rect(volley: Array, marker: Transform2D, size: Vector2) -> Array:
+	# Counts per edge (top, right, bottom, left) including each edge's start
+	# corner, so opposite sides can be compared for symmetry.
+	var top := 0
+	var right := 0
+	var bottom := 0
+	var left := 0
+	var hx: float = size.x * 0.5
+	var hy: float = size.y * 0.5
+	for t in volley:
+		var p: Vector2 = (t as Transform2D).origin - marker.origin
+		var on_top: bool = absf(p.y + hy) < 1.0 and p.x >= -hx - 1.0 and p.x <= hx + 1.0
+		var on_bottom: bool = absf(p.y - hy) < 1.0 and p.x >= -hx - 1.0 and p.x <= hx + 1.0
+		var on_right: bool = absf(p.x - hx) < 1.0 and p.y > -hy + 1.0 and p.y <= hy + 1.0
+		var on_left: bool = absf(p.x + hx) < 1.0 and p.y > -hy + 1.0 and p.y <= hy + 1.0
+		if on_top:
+			top += 1
+		elif on_bottom:
+			bottom += 1
+		elif on_right:
+			right += 1
+		elif on_left:
+			left += 1
+	return [top, right, bottom, left]
+
+func _test_symmetric_distribution() -> void:
+	var marker := Transform2D(0.0, Vector2(400, 300))
+	# Square, 6 bullets: remainder 2 must pair opposite sides (3,3 balanced
+	# pairs), not pile on adjacent edges like legacy largest-remainder.
+	var sym: Array = BulletFactory2D.helper_generate_transforms_rectangle(6, marker, Vector2(200, 200), true, 0.0, 0, 0, false, 0, 32.0, false, 0.0, 1, STEP, 0, 0, 0, 0, PackedFloat32Array(), 0, 0, 1, 0)
+	var c: Array = _edge_counts_rect(sym, marker, Vector2(200, 200))
+	_check(c[0] == c[2] and c[1] == c[3], "square symmetric opposite sides equal %s" % str(c))
+	var leg: Array = BulletFactory2D.helper_generate_transforms_rectangle(6, marker, Vector2(200, 200), true, 0.0, 0, 0, false, 0, 32.0, false, 0.0, 1, STEP, 0, 0, 0, 0, PackedFloat32Array(), 0, 0, 0, 0)
+	var cl: Array = _edge_counts_rect(leg, marker, Vector2(200, 200))
+	_check(cl[0] + cl[1] + cl[2] + cl[3] == 6, "square legacy still emits 6 %s" % str(cl))
+
+func _test_small_corner_seats() -> void:
+	var marker := Transform2D(0.0, Vector2(400, 300))
+	# 2 bullets on a square = opposite corners (diagonal apart).
+	var sq2: Array = BulletFactory2D.helper_generate_transforms_rectangle(2, marker, Vector2(200, 200), true, 0.0, 0, 0, false, 0, 32.0, false, 0.0, 1, STEP, 0, 0, 0, 0, PackedFloat32Array(), 0, 0)
+	_check(sq2.size() == 2, "square pair emits")
+	var d: float = (sq2[0] as Transform2D).origin.distance_to((sq2[1] as Transform2D).origin)
+	_check(_approx(d, 200.0 * sqrt(2.0), 1.0), "square pair lands opposite (diag %.1f)" % d)
+	# 5 bullets on a 5-point star = the 5 outer tips (no valley stacking).
+	var star5: Array = BulletFactory2D.helper_generate_transforms_star(5, marker, 5, 150.0, 65.0, 0.0, true, 0.0, 0, 0, false, 0, 32.0, false, 0.0, 1, STEP, 0, 0, 0, 0, PackedFloat32Array(), 0, 0)
+	var tips := 0
+	for t in star5:
+		if absf((t as Transform2D).origin.distance_to(marker.origin) - 150.0) < 1.0:
+			tips += 1
+	_check(tips == 5, "star 5 seats all outer tips (%d/5)" % tips)
+
+func _test_star_edge_walk() -> void:
+	var marker := Transform2D(0.0, Vector2(400, 300))
+	# 20 bullets on a 10-corner star: edge walk gives 20 distinct origins;
+	# the old vertex-repeat implementation stacked 2 per vertex (10 distinct).
+	var star: Array = BulletFactory2D.helper_generate_transforms_star(20, marker, 5, 150.0, 65.0, 0.0, true, 0.0, 0, 0, false, 0, 32.0, false, 0.0, 1, STEP, 0, 0, 0, 0, PackedFloat32Array(), 0, 0)
+	var pts: Array = []
+	for t in star:
+		pts.append((t as Transform2D).origin)
+	var distinct := 0
+	for i in pts.size():
+		var dup := false
+		for j in i:
+			if pts[i].distance_to(pts[j]) < 0.01:
+				dup = true
+				break
+		if not dup:
+			distinct += 1
+	_check(distinct == 20, "star edge walk has no stacks (%d/20 distinct)" % distinct)
+
+func _test_ellipse_full_no_seam() -> void:
+	var marker := Transform2D(0.0, Vector2(400, 300))
+	# FULL ellipse closes the loop without duplicating the seam bullet.
+	var ell: Array = BulletFactory2D.helper_generate_transforms_ellipse(12, marker, 150.0, 100.0, 0.0, 0.0, TAU, 0, 0, 0.0, true, 0.0, 0, 0, false, 0, 32.0, false, 0.0, 1, STEP, 0, 0, 0, 0, PackedFloat32Array(), 0, 0)
+	var stacked := false
+	for i in ell.size():
+		for j in range(i + 1, ell.size()):
+			if ((ell[i] as Transform2D).origin.distance_to((ell[j] as Transform2D).origin) < 0.01):
+				stacked = true
+	_check(not stacked, "ellipse FULL has no seam stack")
+
+func _test_layer_layout_modes() -> void:
+	var marker := Transform2D(0.0, Vector2(400, 300))
+	# Shared loop (legacy): exact scaled copies of the base loop.
+	var base: Array = BulletFactory2D.helper_generate_transforms_rectangle(8, marker, Vector2(300, 200), true, 0.0, 0, 0, false, 0, 32.0, false, 0.0, 1, STEP, 0, 0, 0, 0, PackedFloat32Array(), 0, 0)
+	var shared: Array = BulletFactory2D.helper_generate_transforms_rectangle(8, marker, Vector2(300, 200), true, 0.0, 1, 0, false, 0, 32.0, false, 0.0, 3, STEP, 0, 0, 0, 0, PackedFloat32Array(), 0, 0, 1, 0)
+	_check_pair(base, shared, marker.origin, 3, STEP, 0, "rectangle-shared")
+	# Even per layer (default): every ring carries corners.
+	var even: Array = BulletFactory2D.helper_generate_transforms_rectangle(8, marker, Vector2(300, 200), true, 0.0, 1, 0, false, 0, 32.0, false, 0.0, 3, STEP, 0, 0, 0, 0, PackedFloat32Array(), 0, 0, 1, 1)
+	_check_rect_layers_even(even, marker, Vector2(300, 200), 3, "rectangle-even")

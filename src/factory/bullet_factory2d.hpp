@@ -219,6 +219,28 @@ public:
 		OUTLINE_FACING_ALONG_M90 = 2
 	};
 
+	// Outline distribution: how corner-anchored polygon loops (rectangle,
+	// square, polygon, triangle, trapezoid, diamond, star) spread interior
+	// slots across edges. LEGACY is largest-remainder in winding order (first
+	// edges win ties, so equal sides can differ); SYMMETRIC pairs opposite
+	// edges so opposite sides stay equal (a single leftover dot breaks one
+	// pair by exactly one, which is unavoidable for odd remainders).
+	enum OutlineDistribution {
+		OUTLINE_DISTRIBUTION_LEGACY = 0,
+		OUTLINE_DISTRIBUTION_SYMMETRIC = 1
+	};
+
+	// Outline layer layout: how LAYERS placement assigns bullets to rings.
+	// SHARED_LOOP decimates one n-point loop (bullet i scales its own slot,
+	// so outer rings miss corners and open arcs miss endpoints on some
+	// layers); EVEN_PER_LAYER rebuilds an even symmetric loop per ring, so
+	// every ring has corners/endpoints and even gaps. SEQUENTIAL-family
+	// deals only choose which bullets ride which ring; positions stay even.
+	enum OutlineLayerLayout {
+		OUTLINE_LAYER_LAYOUT_SHARED_LOOP = 0,
+		OUTLINE_LAYER_LAYOUT_EVEN_PER_LAYER = 1
+	};
+
 	// Edge spray side: which side of the polyline the normal-direction
 	// falloff extends toward. ALONG offsets along +normal, BEHIND along
 	// -normal, BOTH picks a random side per bullet. (Custom mode now drives
@@ -1254,7 +1276,9 @@ public:
 			int layer_scale_curve = 0,
 			const PackedFloat32Array &layer_custom_scales = PackedFloat32Array(),
 			int layer_twist = 0,
-			int layer_max_dots = 0);
+			int layer_max_dots = 0,
+			int outline_distribution = 1,
+			int layer_layout = 1);
 
 	// Heart bloom: parametric heart outline (boss love attacks, endings).
 	// size scales the classic 16sin^3 / 13cos-5cos2t curve. Full
@@ -1515,7 +1539,9 @@ public:
 			int layer_scale_curve = 0,
 			const PackedFloat32Array &layer_custom_scales = PackedFloat32Array(),
 			int layer_twist = 0,
-			int layer_max_dots = 0);
+			int layer_max_dots = 0,
+			int outline_distribution = 1,
+			int layer_layout = 1);
 
 	// Polygon perimeter: vertices corners on a radius circle from
 	// base_rotation, slots spread evenly by arc length along the outline,
@@ -1556,7 +1582,9 @@ public:
 			int layer_scale_curve = 0,
 			const PackedFloat32Array &layer_custom_scales = PackedFloat32Array(),
 			int layer_twist = 0,
-			int layer_max_dots = 0);
+			int layer_max_dots = 0,
+			int outline_distribution = 1,
+			int layer_layout = 1);
 
 	// Triangle perimeter: equilateral (circumradius size_a), isosceles
 	// (base size_a + height size_b, apex up) or right-angled (legs size_a
@@ -1601,7 +1629,9 @@ public:
 			int layer_scale_curve = 0,
 			const PackedFloat32Array &layer_custom_scales = PackedFloat32Array(),
 			int layer_twist = 0,
-			int layer_max_dots = 0);
+			int layer_max_dots = 0,
+			int outline_distribution = 1,
+			int layer_layout = 1);
 
 	// Isosceles trapezoid perimeter: bases base_top/base_bottom with height,
 	// centered on the marker and rotated by rotation. Slots walk the outline
@@ -1644,7 +1674,9 @@ public:
 			int layer_scale_curve = 0,
 			const PackedFloat32Array &layer_custom_scales = PackedFloat32Array(),
 			int layer_twist = 0,
-			int layer_max_dots = 0);
+			int layer_max_dots = 0,
+			int outline_distribution = 1,
+			int layer_layout = 1);
 
 	// Diamond (rhombus) perimeter: diagonals diagonal_x/diagonal_y, centered
 	// on the marker and rotated by rotation. Slots walk the outline evenly
@@ -1686,7 +1718,9 @@ public:
 			int layer_scale_curve = 0,
 			const PackedFloat32Array &layer_custom_scales = PackedFloat32Array(),
 			int layer_twist = 0,
-			int layer_max_dots = 0);
+			int layer_max_dots = 0,
+			int outline_distribution = 1,
+			int layer_layout = 1);
 
 	// Universal side pass for closed-outline patterns: returns a copy of
 	// transforms with each origin pushed along its own facing by
@@ -1817,6 +1851,8 @@ public:
 	VARIANT_ENUM_CAST(BlastBullets2D::BulletFactory2D::EdgeSpreadSide);
 	VARIANT_ENUM_CAST(BlastBullets2D::BulletFactory2D::SideMode);
 	VARIANT_ENUM_CAST(BlastBullets2D::BulletFactory2D::OutlinePlacement);
+	VARIANT_ENUM_CAST(BlastBullets2D::BulletFactory2D::OutlineDistribution);
+	VARIANT_ENUM_CAST(BlastBullets2D::BulletFactory2D::OutlineLayerLayout);
 	VARIANT_ENUM_CAST(BlastBullets2D::BulletFactory2D::OutlineLayerSide);
 	VARIANT_ENUM_CAST(BlastBullets2D::BulletFactory2D::OutlineLayerFill);
 	VARIANT_ENUM_CAST(BlastBullets2D::BulletFactory2D::OutlineLayerScaleCurve);

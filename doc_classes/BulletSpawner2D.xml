@@ -688,6 +688,12 @@
 		<member name="helper_outline_layer_start_offset" type="int" setter="set_helper_outline_layer_start_offset" getter="get_helper_outline_layer_start_offset" default="0">
 			Which layer Sequential-family filling starts from (wraps around, so 1 starts on the second ring and the outline fills last). 0 starts on the outline. Only shown — and only consumed — in Layers placement with Sequential or Outer First fill; Interleaved and Ping Pong ignore it. Must be 0 or more.
 		</member>
+		<member name="helper_outline_distribution" type="int" setter="set_helper_outline_distribution" getter="get_helper_outline_distribution" enum="BulletFactory2D.OutlineDistribution" default="1">
+			How corner-anchored polygon loops (Rectangle, Square, Polygon, Triangle, Trapezoid, Diamond, Star) spread leftover slots: Legacy fills the first edges in winding order (equal sides can differ), Symmetric pairs opposite edges so opposite sides stay equal.
+		</member>
+		<member name="helper_outline_layer_layout" type="int" setter="set_helper_outline_layer_layout" getter="get_helper_outline_layer_layout" enum="BulletFactory2D.OutlineLayerLayout" default="1">
+			How Layers placement assigns polygon bullets to rings: Shared Loop decimates one loop (outer rings miss corners), Even Per Layer rebuilds an even symmetric loop per ring (corners on every ring). Layers placement only.
+		</member>
 		<member name="helper_outline_layer_scale_curve" type="int" setter="set_helper_outline_layer_scale_curve" getter="get_helper_outline_layer_scale_curve" enum="BulletFactory2D.OutlineLayerScaleCurve" default="0">
 			Ring-size progression: Linear steps evenly, Exponential compounds ((1 + step)^L, mirrored reciprocally inward). A non-empty [member helper_outline_layer_scales] overrides both. Layers placement only.
 		</member>

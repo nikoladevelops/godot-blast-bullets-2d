@@ -665,6 +665,15 @@ class BulletSpawner2D : public Node2D{
         // Sequential start layer: which layer sequential filling begins from
         // (wraps around). 0 = start on the outline. Sequential mode only.
         int helper_outline_layer_start_offset = 0;
+        // Corner distribution (OutlineDistribution) for the corner-anchored
+        // polygon loops (rectangle, square, polygon, triangle, trapezoid,
+        // diamond, star): 0 legacy winding-order leftovers (first edges win),
+        // 1 symmetric opposite-pair leftovers (default: opposite sides equal).
+        int helper_outline_distribution = 1;
+        // Ring layout (OutlineLayerLayout): 0 decimates one shared loop
+        // (outer rings miss corners), 1 rebuilds an even symmetric loop per
+        // ring (default: corners on every ring, even gaps).
+        int helper_outline_layer_layout = 1;
         int helper_outline_facing = 0; // BulletFactory2D::OutlineFacing
         bool helper_outline_reverse = false;
         int helper_outline_slot_offset = 0;
@@ -1356,6 +1365,10 @@ class BulletSpawner2D : public Node2D{
         void set_helper_outline_layer_max_dots(int value);
         int get_helper_outline_layer_start_offset() const;
         void set_helper_outline_layer_start_offset(int value);
+        int get_helper_outline_distribution() const;
+        void set_helper_outline_distribution(int value);
+        int get_helper_outline_layer_layout() const;
+        void set_helper_outline_layer_layout(int value);
         int get_helper_outline_facing() const;
         void set_helper_outline_facing(int value);
         bool get_helper_outline_reverse() const;

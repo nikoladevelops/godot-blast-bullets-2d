@@ -293,6 +293,8 @@
 			<param index="20" name="layer_custom_scales" type="PackedFloat32Array" />
 			<param index="21" name="layer_twist" type="int" default="0" />
 			<param index="22" name="layer_max_dots" type="int" default="0" />
+			<param index="23" name="outline_distribution" type="int" default="1" />
+			<param index="24" name="layer_layout" type="int" default="1" />
 			<description>
 				Diamond (rhombus) perimeter from its diagonals, slots spread evenly by arc length, facing outward (or inward). Zero-area diamonds stack at the marker.
 			</description>
@@ -545,6 +547,8 @@
 			<param index="20" name="layer_custom_scales" type="PackedFloat32Array" />
 			<param index="21" name="layer_twist" type="int" default="0" />
 			<param index="22" name="layer_max_dots" type="int" default="0" />
+			<param index="23" name="outline_distribution" type="int" default="1" />
+			<param index="24" name="layer_layout" type="int" default="1" />
 			<description>
 				Generates a polygon perimeter (vertices corners on a radius circle from base_rotation), slots spread evenly by arc length, facing outward (or inward). The outline_* tail params place slots on the loop, fill its interior, or layer it across scaled repeats about the loop center.
 			</description>
@@ -585,6 +589,8 @@
 			<param index="18" name="layer_custom_scales" type="PackedFloat32Array" />
 			<param index="19" name="layer_twist" type="int" default="0" />
 			<param index="20" name="layer_max_dots" type="int" default="0" />
+			<param index="21" name="outline_distribution" type="int" default="1" />
+			<param index="22" name="layer_layout" type="int" default="1" />
 			<description>
 				Generates a rectangle perimeter walk (counter-clockwise from top-left), slots spread evenly by arc length, facing outward (or inward). Square = equal sides. The outline_* tail params place slots on the loop, fill its interior, or layer it across scaled repeats about the loop center.
 			</description>
@@ -707,6 +713,8 @@
 			<param index="21" name="layer_custom_scales" type="PackedFloat32Array" />
 			<param index="22" name="layer_twist" type="int" default="0" />
 			<param index="23" name="layer_max_dots" type="int" default="0" />
+			<param index="24" name="outline_distribution" type="int" default="1" />
+			<param index="25" name="layer_layout" type="int" default="1" />
 			<description>
 				Generates a true star shell: points alternating outer/inner vertices around the marker (distinct from the polygon helper's density bias). Boss star bursts and celebratory shells.
 			</description>
@@ -751,6 +759,8 @@
 			<param index="21" name="layer_custom_scales" type="PackedFloat32Array" />
 			<param index="22" name="layer_twist" type="int" default="0" />
 			<param index="23" name="layer_max_dots" type="int" default="0" />
+			<param index="24" name="outline_distribution" type="int" default="1" />
+			<param index="25" name="layer_layout" type="int" default="1" />
 			<description>
 				Isosceles trapezoid perimeter, slots spread evenly by arc length, facing outward (or inward). A zero top base degrades to a triangle; zero-area boxes stack at the marker.
 			</description>
@@ -781,6 +791,8 @@
 			<param index="21" name="layer_custom_scales" type="PackedFloat32Array" />
 			<param index="22" name="layer_twist" type="int" default="0" />
 			<param index="23" name="layer_max_dots" type="int" default="0" />
+			<param index="24" name="outline_distribution" type="int" default="1" />
+			<param index="25" name="layer_layout" type="int" default="1" />
 			<description>
 				Triangle perimeter (equilateral circumradius, isosceles base + height apex-up, right X/Y legs recentered), slots spread evenly by arc length, facing outward (or inward). Degenerate triangles stack at the marker.
 			</description>
@@ -1356,6 +1368,18 @@
 		</constant>
 		<constant name="OUTLINE_FILL_INSIDE" value="2" enum="OutlinePlacement">
 			Loop-generator slots are replaced by a row-major grid masked to the loop interior, capped at transforms_amount.
+		</constant>
+		<constant name="OUTLINE_DISTRIBUTION_LEGACY" value="0" enum="OutlineDistribution">
+			Corner-anchored polygon leftovers go to the first edges in winding order (equal sides can differ by a slot).
+		</constant>
+		<constant name="OUTLINE_DISTRIBUTION_SYMMETRIC" value="1" enum="OutlineDistribution">
+			Corner-anchored polygon leftovers pair opposite edges, so opposite sides stay equal (one odd leftover breaks a single pair by exactly one).
+		</constant>
+		<constant name="OUTLINE_LAYER_LAYOUT_SHARED_LOOP" value="0" enum="OutlineLayerLayout">
+			Layers decimate one shared n-point loop (outer rings miss corners; exact scaled copies of the base loop).
+		</constant>
+		<constant name="OUTLINE_LAYER_LAYOUT_EVEN_PER_LAYER" value="1" enum="OutlineLayerLayout">
+			Each ring rebuilds its own even symmetric loop (corners on every ring, even gaps; sequential deals only choose membership).
 		</constant>
 		<constant name="OUTLINE_LAYER_OUTWARD" value="0" enum="OutlineLayerSide">
 			Extra layers scale up from the base outline.
