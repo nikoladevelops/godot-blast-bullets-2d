@@ -48,6 +48,11 @@ func _initialize() -> void:
 	_test_star_edge_walk()
 	_test_ellipse_full_no_seam()
 	_test_layer_layout_modes()
+	_test_corner_priority()
+	_test_corner_mode_margin()
+	_test_ellipse_arc_even()
+	_test_circle_screenshot_settings()
+	_test_debug_verify()
 	print("----")
 	if failures == 0:
 		print("ALL LAYER RING TESTS PASSED")
@@ -113,11 +118,24 @@ func _check_pair(base: Array, layered: Array, center: Vector2, count: int, step:
 	_check(worst_pos < 1.0, label + " scaled copies exact (worst %.3f px)" % worst_pos)
 	_check(worst_face < 0.001, label + " facings unchanged")
 
+func _ring_gaps_ok(layered: Array, n: int, count: int, fill: int, start: int, ratio: float) -> bool:
+	# Per-ring gap uniformity for layered smooth volleys (volley order within
+	# each ring is winding order, so consecutive members give ring gaps).
+	for L in count:
+		var ring: Array = []
+		for i in n:
+			if _layer_of(i, n, count, fill, start) == L:
+				ring.append(layered[i])
+		if ring.size() < 2:
+			continue
+		var stats: Dictionary = BulletFactory2D.debug_volley_gaps(ring)
+		if float(stats.get("gap_ratio", 99.0)) > ratio:
+			return false
+	return true
+
 func _test_circle_layers() -> void:
 	var marker := Transform2D(0.0, Vector2(400, 300))
-	var base: Array = BulletFactory2D.helper_generate_transforms_circle(12, marker, 150.0, true, 0.0, 0, 0, false, 0, 32.0, false, 0.0, 1, STEP, 0, 0, 0, 0, PackedFloat32Array(), 0, 0)
 	var layered: Array = BulletFactory2D.helper_generate_transforms_circle(12, marker, 150.0, true, 0.0, 1, 0, false, 0, 32.0, false, 0.0, 3, STEP, 0, 0, 0, 0, PackedFloat32Array(), 0, 0)
-	_check_pair(base, layered, marker.origin, 3, STEP, 0, "circle")
 	# Scaled figure: outward layers grow the radius by the scale factor.
 	var worst := 0.0
 	for i in layered.size():
@@ -125,12 +143,20 @@ func _test_circle_layers() -> void:
 		var layer: int = _layer_of(i, layered.size(), 3, 0, 0)
 		worst = maxf(worst, absf(p.distance_to(marker.origin) - 150.0 * (1.0 + STEP * layer)))
 	_check(worst < 1.0, "circle radii scale uniformly (worst %.3f px)" % worst)
+	# Even per ring: no decimated seam gap next to bullet 0.
+	_check(_ring_gaps_ok(layered, 12, 3, 0, 0, 1.05), "circle rings even")
+	# Facings stay radial on every ring.
+	var dev := 0.0
+	for i in layered.size():
+		var t: Transform2D = layered[i]
+		var radial: float = (t.origin - marker.origin).angle()
+		dev = maxf(dev, absf(wrapf(t.get_rotation() - radial, -PI, PI)))
+	_check(dev < 0.02, "circle facings radial (worst %.4f)" % dev)
 
 func _test_ring_layers() -> void:
 	var marker := Transform2D(0.0, Vector2(400, 300))
-	var base: Array = BulletFactory2D.helper_generate_transforms_ring(12, marker, 150.0, 0.0, TAU, true, false, true, 1.0, 0.0, 0, 0, false, 0, 32.0, false, 0.0, 1, STEP, 0, 0, 0, 0, PackedFloat32Array(), 0, 0)
 	var layered: Array = BulletFactory2D.helper_generate_transforms_ring(12, marker, 150.0, 0.0, TAU, true, false, true, 1.0, 0.0, 1, 0, false, 0, 32.0, false, 0.0, 3, STEP, 0, 0, 0, 0, PackedFloat32Array(), 0, 0)
-	_check_pair(base, layered, marker.origin, 3, STEP, 0, "ring")
+	_check(_ring_gaps_ok(layered, 12, 3, 0, 0, 1.05), "ring rings even")
 	# Ring volleys live around the marker, never around the world origin.
 	_check((layered[0] as Transform2D).origin.distance_to(marker.origin + Vector2(150, 0)) < 1.0, "ring sits at the marker")
 
@@ -201,7 +227,7 @@ func _test_star_heart_emit() -> void:
 	_check(star.size() == 20, "star emits in LAYERS")
 	var base_rose: Array = BulletFactory2D.helper_generate_transforms_rose(24, marker, 6, 150.0, 1.0, 0.0, true, 0.0, 0, 0, false, 0, 32.0, false, 0.0, 1, STEP, 0, 0, 0, 0, PackedFloat32Array(), 0, 0)
 	var layered_rose: Array = BulletFactory2D.helper_generate_transforms_rose(24, marker, 6, 150.0, 1.0, 0.0, true, 0.0, 1, 0, false, 0, 32.0, false, 0.0, 3, STEP, 0, 0, 0, 0, PackedFloat32Array(), 0, 0)
-	_check_pair(base_rose, layered_rose, marker.origin, 3, STEP, 0, "rose")
+	_check(_ring_gaps_ok(layered_rose, 24, 3, 0, 0, 1.3), "rose rings even")
 	var ok := true
 	for t in star:
 		if not (t as Transform2D).is_finite():
@@ -209,8 +235,10 @@ func _test_star_heart_emit() -> void:
 	_check(ok, "star layered transforms finite")
 	var heart: Array = BulletFactory2D.helper_generate_transforms_heart(40, marker, 150.0, 0.0, true, 0.0, 1, 0, false, 0, 32.0, false, 0.0, 3, STEP, 0, 0, 0, 0, PackedFloat32Array(), 0, 0)
 	_check(heart.size() == 40, "heart emits in LAYERS (was missing)")
-	var base_heart: Array = BulletFactory2D.helper_generate_transforms_heart(40, marker, 150.0, 0.0, true, 0.0, 0, 0, false, 0, 32.0, false, 0.0, 1, STEP, 0, 0, 0, 0, PackedFloat32Array(), 0, 0)
-	_check_pair(base_heart, heart, marker.origin, 3, STEP, 0, "heart")
+	# Heart bottom is a true cusp (param speed vanishes at t=PI), so an
+	# odd-count ring must straddle it: even-count rings read uniform, odd
+	# rings carry exactly one short chord across the tip itself.
+	_check(_heart_rings_cusp_ok(heart, marker.origin, 40), "heart cusp rings ok")
 
 func _test_translation_and_collapse() -> void:
 	# Global-space builders must compose back onto the marker: a ring around
@@ -495,3 +523,162 @@ func _test_layer_layout_modes() -> void:
 	# Even per layer (default): every ring carries corners.
 	var even: Array = BulletFactory2D.helper_generate_transforms_rectangle(8, marker, Vector2(300, 200), true, 0.0, 1, 0, false, 0, 32.0, false, 0.0, 3, STEP, 0, 0, 0, 0, PackedFloat32Array(), 0, 0, 1, 1)
 	_check_rect_layers_even(even, marker, Vector2(300, 200), 3, "rectangle-even")
+
+func _tr_facing(shape: int, count: int, params: Dictionary) -> float:
+	# Facing of the top-right corner dot (corner index 1 on rectangles).
+	var rep: Dictionary = BulletFactory2D.debug_describe_outline(shape, count, params)
+	_check(bool(rep.get("ok", false)), "describe ok for TR facing")
+	var ci: PackedInt32Array = rep["corner_index"]
+	var fa: PackedFloat32Array = rep["facings"]
+	for i in ci.size():
+		if ci[i] == 1:
+			return fa[i]
+	return NAN
+
+func _test_corner_priority() -> void:
+	# Image 3/4 repro: top-right corner dot ownership is user-chosen now.
+	var base_params := {"size": Vector2(300, 200)}
+	var f_h: float = _tr_facing(BulletFactory2D.DEBUG_SHAPE_RECTANGLE, 8, base_params)
+	_check(_approx(f_h, -PI * 0.5, 0.02), "rect TR faces UP by default (horizontal, %.3f)" % f_h)
+	var f_v: float = _tr_facing(BulletFactory2D.DEBUG_SHAPE_RECTANGLE, 8, {"size": Vector2(300, 200), "outline_corner_priority": 1})
+	_check(_approx(f_v, 0.0, 0.02), "rect TR faces +X under vertical (%.3f)" % f_v)
+	var f_b: float = _tr_facing(BulletFactory2D.DEBUG_SHAPE_RECTANGLE, 8, {"size": Vector2(300, 200), "outline_corner_priority": 2})
+	_check(_approx(f_b, 0.0, 0.02), "rect TR faces +X under balanced/outgoing (%.3f)" % f_b)
+	# Same verdict straight from a real volley (not just describe).
+	var marker := Transform2D(0.0, Vector2(400, 300))
+	var volley: Array = BulletFactory2D.helper_generate_transforms_rectangle(8, marker, Vector2(300, 200), true, 0.0, 0, 0, false, 0, 32.0, false, 0.0, 1, STEP, 0, 0, 0, 0, PackedFloat32Array(), 0, 0, 1, 1, 0, 0, 0.0)
+	var found_up := false
+	for t in volley:
+		var p: Vector2 = (t as Transform2D).origin
+		if p.distance_to(marker.origin + Vector2(150, -100)) < 1.0:
+			found_up = _approx((t as Transform2D).get_rotation(), -PI * 0.5, 0.02)
+	_check(found_up, "real volley TR corner faces UP by default")
+	# Settings echo matches what was asked for.
+	var rep: Dictionary = BulletFactory2D.debug_describe_outline(BulletFactory2D.DEBUG_SHAPE_RECTANGLE, 8, {"size": Vector2(300, 200), "outline_corner_priority": 1})
+	var echo: Dictionary = rep["settings"]
+	_check(int(echo.get("outline_corner_priority", -1)) == 1, "settings digest echoes priority")
+
+func _test_corner_mode_margin() -> void:
+	# EVEN_ARC: uniform gaps, no pinning distortion on a dense rectangle.
+	var dense: Dictionary = BulletFactory2D.debug_describe_outline(BulletFactory2D.DEBUG_SHAPE_RECTANGLE, 40, {"size": Vector2(300, 200), "outline_corner_mode": 1})
+	_check(bool(dense.get("ok", false)), "dense even-arc describes")
+	var gaps: PackedFloat32Array = dense["gaps"]
+	var mn := 1e9
+	var mx := 0.0
+	for g in gaps:
+		mn = minf(mn, g)
+		mx = maxf(mx, g)
+	_check(mx / mn < 1.05, "even-arc gaps uniform (ratio %.3f)" % (mx / mn))
+	# PIN (default) keeps every corner occupied.
+	var pinned: Dictionary = BulletFactory2D.debug_describe_outline(BulletFactory2D.DEBUG_SHAPE_RECTANGLE, 40, {"size": Vector2(300, 200)})
+	var flags: PackedInt32Array = pinned["corner_flags"]
+	var corner_dots := 0
+	for f in flags:
+		corner_dots += f
+	_check(corner_dots >= 4, "pin mode keeps all 4 corners (%d)" % corner_dots)
+	# Edge margin: interiors keep clearance from corners along their edge.
+	var margined: Dictionary = BulletFactory2D.debug_describe_outline(BulletFactory2D.DEBUG_SHAPE_RECTANGLE, 8, {"size": Vector2(300, 200), "outline_edge_margin": 20.0})
+	var pts: PackedVector2Array = margined["points"]
+	var ci: PackedInt32Array = margined["corner_index"]
+	var ok := true
+	for i in pts.size():
+		if ci[i] >= 0:
+			continue
+		# Interior dot: nearest corner along the loop must be >= margin away.
+		var best := 1e9
+		for k in pts.size():
+			if ci[k] >= 0:
+				best = minf(best, pts[i].distance_to(pts[k]))
+		if best < 20.0 - 1.0:
+			ok = false
+	_check(ok, "edge margin keeps 20px corner clearance")
+
+func _test_ellipse_arc_even() -> void:
+	# rx=150/ry=100 at 55 slots: angle-even bunches ~1.35x at the ends,
+	# arc-even must read ~1.0.
+	var rep: Dictionary = BulletFactory2D.debug_describe_outline(BulletFactory2D.DEBUG_SHAPE_ELLIPSE, 55, {"radius_x": 150.0, "radius_y": 100.0})
+	_check(bool(rep.get("ok", false)), "ellipse describes")
+	var gaps: PackedFloat32Array = rep["gaps"]
+	var mn := 1e9
+	var mx := 0.0
+	for g in gaps:
+		mn = minf(mn, g)
+		mx = maxf(mx, g)
+	_check(mx / mn < 1.15, "ellipse arc-even gaps uniform (ratio %.3f)" % (mx / mn))
+	# Radial facings stay exact after resampling.
+	_check(float(rep.get("worst_facing_deviation", 9.0)) < 0.02, "ellipse facings radial (worst %.4f)" % float(rep.get("worst_facing_deviation", 9.0)))
+
+func _test_circle_screenshot_settings() -> void:
+	# Exact inspector settings from the circle bug report: 55 bullets,
+	# Layers x3, scale 0.5, outward, interleaved, symmetric, even-per-layer.
+	var marker := Transform2D(0.0, Vector2(400, 300))
+	var volley: Array = BulletFactory2D.helper_generate_transforms_circle(55, marker, 150.0, true, 0.0, 1, 0, false, 0, 32.0, false, 0.0, 3, 0.5, 0, 0, 0, 0, PackedFloat32Array(), 0, 0)
+	_check(volley.size() == 55, "circle screenshot volley emits 55")
+	# Per-ring uniformity: split by dealt layer, measure each ring's gaps.
+	for L in 3:
+		var ring: Array = []
+		for i in volley.size():
+			if BulletFactory2D.helper_bullet_layer_index(i, 55, 3, 0, 0) == L:
+				ring.append(volley[i])
+		var stats: Dictionary = BulletFactory2D.debug_volley_gaps(ring)
+		_check(float(stats.get("gap_ratio", 99.0)) < 1.05, "circle ring %d even (ratio %.3f, n=%d)" % [L, float(stats.get("gap_ratio", 99.0)), ring.size()])
+	# Mathematical conformance of a single-ring volley against describe.
+	var plain: Array = BulletFactory2D.helper_generate_transforms_circle(55, marker, 150.0, true, 0.0, 0, 0, false, 0, 32.0, false, 0.0, 1, STEP, 0, 0, 0, 0, PackedFloat32Array(), 0, 0)
+	var ok: Dictionary = BulletFactory2D.debug_verify_volley(plain, BulletFactory2D.DEBUG_SHAPE_CIRCLE, marker, 55, {})
+	_check(bool(ok.get("ok", false)), "circle volley verifies (worst %.3f px)" % float(ok.get("worst_pos_px", -1.0)))
+
+func _heart_rings_cusp_ok(volley: Array, marker: Vector2, n: int) -> bool:
+	# Even-count rings: uniform gaps. Odd-count rings: exactly one short
+	# chord, and it must sit on the cusp tip (lowest point of the heart).
+	for L in 3:
+		var ring: Array = []
+		for i in n:
+			if _layer_of(i, n, 3, 0, 0) == L:
+				ring.append((volley[i] as Transform2D).origin)
+		if ring.size() < 2:
+			continue
+		var gaps: Array = []
+		for k in ring.size():
+			gaps.append((ring[k] as Vector2).distance_to(ring[(k + 1) % ring.size()]))
+		var mean := 0.0
+		for g in gaps:
+			mean += g
+		mean /= gaps.size()
+		if ring.size() % 2 == 0:
+			for g in gaps:
+				if g < mean * 0.8 or g > mean * 1.2:
+					return false
+		else:
+			var short := 0
+			var short_k := -1
+			for k in gaps.size():
+				if gaps[k] < mean * 0.6:
+					short += 1
+					short_k = k
+				elif gaps[k] < mean * 0.8 or gaps[k] > mean * 1.2:
+					return false
+			if short != 1:
+				return false
+			var mid: Vector2 = ((ring[short_k] as Vector2) + (ring[(short_k + 1) % ring.size()] as Vector2)) * 0.5
+			for pt in ring:
+				if (pt as Vector2).y > mid.y + 5.0:
+					return false
+	return true
+
+func _test_debug_verify() -> void:
+	var marker := Transform2D(0.0, Vector2(400, 300))
+	# Rectangle under every priority: real volley matches describe exactly.
+	for pri in [0, 1, 2]:
+		var volley: Array = BulletFactory2D.helper_generate_transforms_rectangle(12, marker, Vector2(300, 200), true, 0.0, 0, 0, false, 0, 32.0, false, 0.0, 1, STEP, 0, 0, 0, 0, PackedFloat32Array(), 0, 0, 1, 1, pri, 0, 0.0)
+		var ok: Dictionary = BulletFactory2D.debug_verify_volley(volley, BulletFactory2D.DEBUG_SHAPE_RECTANGLE, marker, 12, {"size": Vector2(300, 200), "outline_corner_priority": pri})
+		_check(bool(ok.get("ok", false)), "rect verify priority %d (worst %.3f px, %.4f rad)" % [pri, float(ok.get("worst_pos_px", -1.0)), float(ok.get("worst_face_rad", -1.0))])
+	# Star + triangle conformance under defaults.
+	var star: Array = BulletFactory2D.helper_generate_transforms_star(20, marker, 5, 150.0, 65.0, 0.0, true, 0.0, 0, 0, false, 0, 32.0, false, 0.0, 1, STEP, 0, 0, 0, 0, PackedFloat32Array(), 0, 0)
+	var sok: Dictionary = BulletFactory2D.debug_verify_volley(star, BulletFactory2D.DEBUG_SHAPE_STAR, marker, 20, {"points": 5, "outer_radius": 150.0, "inner_radius": 65.0})
+	_check(bool(sok.get("ok", false)), "star verify ok")
+	var tri: Array = BulletFactory2D.helper_generate_transforms_triangle(9, marker, 0, 200.0, 200.0, 0.0, true, 0.0, 0, 0, false, 0, 32.0, false, 0.0, 1, STEP, 0, 0, 0, 0, PackedFloat32Array(), 0, 0)
+	var tok: Dictionary = BulletFactory2D.debug_verify_volley(tri, BulletFactory2D.DEBUG_SHAPE_TRIANGLE, marker, 9, {"triangle_type": 0, "size_a": 200.0, "size_b": 200.0})
+	_check(bool(tok.get("ok", false)), "triangle verify ok")
+	# Unknown shape + bad count fail loudly, not silently.
+	var bad: Dictionary = BulletFactory2D.debug_describe_outline(99, 8, {})
+	_check(not bool(bad.get("ok", true)), "unknown shape describes as not-ok")

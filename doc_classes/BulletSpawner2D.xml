@@ -694,6 +694,15 @@
 		<member name="helper_outline_layer_layout" type="int" setter="set_helper_outline_layer_layout" getter="get_helper_outline_layer_layout" enum="BulletFactory2D.OutlineLayerLayout" default="1">
 			How Layers placement assigns polygon bullets to rings: Shared Loop decimates one loop (outer rings miss corners), Even Per Layer rebuilds an even symmetric loop per ring (corners on every ring). Layers placement only.
 		</member>
+		<member name="helper_outline_corner_priority" type="int" setter="set_helper_outline_corner_priority" getter="get_helper_outline_corner_priority" enum="BulletFactory2D.OutlineCornerPriority" default="0">
+			Which adjoining side owns a shared corner dot on corner-anchored shapes (Rectangle, Square, Polygon, Triangle, Trapezoid, Diamond, Star): Horizontal Sides (top/bottom own corners, so a top-right dot faces UP), Vertical Sides (left/right own them), Balanced (outgoing edge owns, previous behavior). On-outline and layers layouts only.
+		</member>
+		<member name="helper_outline_corner_mode" type="int" setter="set_helper_outline_corner_mode" getter="get_helper_outline_corner_mode" enum="BulletFactory2D.OutlineCornerMode" default="0">
+			Pin Corners seats a dot on every corner (interiors spread per edge); Even Arc spreads purely evenly by arc length from corner 0 (corners coincide only when the count aligns; best for dense volleys). Corner shapes only.
+		</member>
+		<member name="helper_outline_edge_margin" type="float" setter="set_helper_outline_edge_margin" getter="get_helper_outline_edge_margin" default="0.0">
+			Interior dots keep at least this many pixels of clearance from corners along their edge (clamped per edge; corners stay pinned). Only shown in Pin Corners mode. Must be finite and 0 or more.
+		</member>
 		<member name="helper_outline_layer_scale_curve" type="int" setter="set_helper_outline_layer_scale_curve" getter="get_helper_outline_layer_scale_curve" enum="BulletFactory2D.OutlineLayerScaleCurve" default="0">
 			Ring-size progression: Linear steps evenly, Exponential compounds ((1 + step)^L, mirrored reciprocally inward). A non-empty [member helper_outline_layer_scales] overrides both. Layers placement only.
 		</member>

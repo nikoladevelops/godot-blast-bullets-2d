@@ -674,6 +674,20 @@ class BulletSpawner2D : public Node2D{
         // (outer rings miss corners), 1 rebuilds an even symmetric loop per
         // ring (default: corners on every ring, even gaps).
         int helper_outline_layer_layout = 1;
+        // Corner priority (OutlineCornerPriority): which adjoining side owns
+        // a shared corner dot. 0 horizontal (default: top/bottom own corners,
+        // so a top-right dot faces UP with the top side), 1 vertical
+        // (left/right own them), 2 balanced (outgoing edge owns, previous
+        // behavior). Classification runs in shape-local space.
+        int helper_outline_corner_priority = 0;
+        // Corner mode (OutlineCornerMode): 0 pins a dot on every corner
+        // (default), 1 spreads purely evenly by arc length (corners coincide
+        // only when the count aligns; best for dense volleys).
+        int helper_outline_corner_mode = 0;
+        // Edge margin in px: interior dots keep at least this clearance from
+        // corners along their edge (clamped per edge, corners stay pinned).
+        // 0 disables (default: even split of the full edge).
+        double helper_outline_edge_margin = 0.0;
         int helper_outline_facing = 0; // BulletFactory2D::OutlineFacing
         bool helper_outline_reverse = false;
         int helper_outline_slot_offset = 0;
@@ -1369,6 +1383,12 @@ class BulletSpawner2D : public Node2D{
         void set_helper_outline_distribution(int value);
         int get_helper_outline_layer_layout() const;
         void set_helper_outline_layer_layout(int value);
+        int get_helper_outline_corner_priority() const;
+        void set_helper_outline_corner_priority(int value);
+        int get_helper_outline_corner_mode() const;
+        void set_helper_outline_corner_mode(int value);
+        double get_helper_outline_edge_margin() const;
+        void set_helper_outline_edge_margin(double value);
         int get_helper_outline_facing() const;
         void set_helper_outline_facing(int value);
         bool get_helper_outline_reverse() const;

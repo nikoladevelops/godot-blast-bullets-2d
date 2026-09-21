@@ -241,6 +241,29 @@ public:
 		OUTLINE_LAYER_LAYOUT_EVEN_PER_LAYER = 1
 	};
 
+	// Outline corner priority: which adjoining side owns a shared corner dot
+	// on corner-anchored polygon loops (rectangle, square, polygon, triangle,
+	// trapezoid, diamond, star). Classification runs in shape-local space
+	// (before rotation), so it stays stable when the shape spins.
+	// HORIZONTAL_SIDES (default): top/bottom edges own corners (a top-right
+	// corner dot faces UP with the top side); VERTICAL_SIDES: left/right own
+	// them (faces +X with the right side); BALANCED: keeps the outgoing-edge
+	// owner (previous behavior) with symmetric opposite-pair leftovers.
+	enum OutlineCornerPriority {
+		OUTLINE_CORNER_PRIORITY_HORIZONTAL = 0,
+		OUTLINE_CORNER_PRIORITY_VERTICAL = 1,
+		OUTLINE_CORNER_PRIORITY_BALANCED = 2
+	};
+
+	// Outline corner mode: PIN_CORNERS (default) always seats a dot exactly
+	// on every corner; EVEN_ARC spreads dots purely evenly by arc length
+	// (corners only coincide when the count aligns). Pair with
+	// outline_edge_margin to un-cram dense sides.
+	enum OutlineCornerMode {
+		OUTLINE_CORNER_MODE_PIN_CORNERS = 0,
+		OUTLINE_CORNER_MODE_EVEN_ARC = 1
+	};
+
 	// Edge spray side: which side of the polyline the normal-direction
 	// falloff extends toward. ALONG offsets along +normal, BEHIND along
 	// -normal, BOTH picks a random side per bullet. (Custom mode now drives
@@ -1278,7 +1301,10 @@ public:
 			int layer_twist = 0,
 			int layer_max_dots = 0,
 			int outline_distribution = 1,
-			int layer_layout = 1);
+			int layer_layout = 1,
+			int outline_corner_priority = 0,
+			int outline_corner_mode = 0,
+			double outline_edge_margin = 0.0);
 
 	// Heart bloom: parametric heart outline (boss love attacks, endings).
 	// size scales the classic 16sin^3 / 13cos-5cos2t curve. Full
@@ -1541,7 +1567,10 @@ public:
 			int layer_twist = 0,
 			int layer_max_dots = 0,
 			int outline_distribution = 1,
-			int layer_layout = 1);
+			int layer_layout = 1,
+			int outline_corner_priority = 0,
+			int outline_corner_mode = 0,
+			double outline_edge_margin = 0.0);
 
 	// Polygon perimeter: vertices corners on a radius circle from
 	// base_rotation, slots spread evenly by arc length along the outline,
@@ -1584,7 +1613,10 @@ public:
 			int layer_twist = 0,
 			int layer_max_dots = 0,
 			int outline_distribution = 1,
-			int layer_layout = 1);
+			int layer_layout = 1,
+			int outline_corner_priority = 0,
+			int outline_corner_mode = 0,
+			double outline_edge_margin = 0.0);
 
 	// Triangle perimeter: equilateral (circumradius size_a), isosceles
 	// (base size_a + height size_b, apex up) or right-angled (legs size_a
@@ -1631,7 +1663,10 @@ public:
 			int layer_twist = 0,
 			int layer_max_dots = 0,
 			int outline_distribution = 1,
-			int layer_layout = 1);
+			int layer_layout = 1,
+			int outline_corner_priority = 0,
+			int outline_corner_mode = 0,
+			double outline_edge_margin = 0.0);
 
 	// Isosceles trapezoid perimeter: bases base_top/base_bottom with height,
 	// centered on the marker and rotated by rotation. Slots walk the outline
@@ -1676,7 +1711,10 @@ public:
 			int layer_twist = 0,
 			int layer_max_dots = 0,
 			int outline_distribution = 1,
-			int layer_layout = 1);
+			int layer_layout = 1,
+			int outline_corner_priority = 0,
+			int outline_corner_mode = 0,
+			double outline_edge_margin = 0.0);
 
 	// Diamond (rhombus) perimeter: diagonals diagonal_x/diagonal_y, centered
 	// on the marker and rotated by rotation. Slots walk the outline evenly
@@ -1720,7 +1758,10 @@ public:
 			int layer_twist = 0,
 			int layer_max_dots = 0,
 			int outline_distribution = 1,
-			int layer_layout = 1);
+			int layer_layout = 1,
+			int outline_corner_priority = 0,
+			int outline_corner_mode = 0,
+			double outline_edge_margin = 0.0);
 
 	// Universal side pass for closed-outline patterns: returns a copy of
 	// transforms with each origin pushed along its own facing by
@@ -1747,6 +1788,51 @@ public:
 			int side = 0,
 			int scale_curve = 0,
 			const PackedFloat32Array &custom_scales = PackedFloat32Array());
+
+	// Closed outline shapes addressable by the debug inspectors below. Values
+	// mirror BulletSpawner2D::PatternSource for these shapes only.
+	enum DebugOutlineShape {
+		DEBUG_SHAPE_CIRCLE = 0,
+		DEBUG_SHAPE_RING = 1,
+		DEBUG_SHAPE_ELLIPSE = 2,
+		DEBUG_SHAPE_RECTANGLE = 3,
+		DEBUG_SHAPE_SQUARE = 4,
+		DEBUG_SHAPE_POLYGON = 5,
+		DEBUG_SHAPE_TRIANGLE = 6,
+		DEBUG_SHAPE_TRAPEZOID = 7,
+		DEBUG_SHAPE_DIAMOND = 8,
+		DEBUG_SHAPE_STAR = 9,
+		DEBUG_SHAPE_HEART = 10,
+		DEBUG_SHAPE_FLOWER = 11,
+		DEBUG_SHAPE_ROSE = 12,
+		DEBUG_SHAPE_LISSAJOUS = 13
+	};
+
+	// Marker-local outline report for one closed shape: rebuilds the exact
+	// slot loop the volley generators use (same builders, same knobs) and
+	// returns {ok, error, points, facings, edge_ids, corner_flags, gaps,
+	// settings}. points/facings are marker-local (marker at origin, identity
+	// rotation); gaps holds consecutive origin distances including the seam
+	// closure; corner_flags marks corner-seated slots; settings echoes the
+	// resolved distribution/priority/mode/margin/layout values. params
+	// carries shape knobs as documented per shape (missing keys fall back to
+	// the helper defaults); unrecognized shapes return ok=false. Pure math:
+	// no tree, no RNG beyond the caller's seed entries.
+	static Dictionary debug_describe_outline(int shape, int count, const Dictionary &params = Dictionary());
+
+	// Shape-agnostic volley metrics over an emitted transform array (e.g. a
+	// helper_generate_transforms_* result): {count, gaps, min_gap, max_gap,
+	// mean_gap, gap_ratio (max/min, 1.0 = perfectly even), seam_gap}. Gaps
+	// are consecutive origin distances in volley order plus the last->first
+	// closure. Works per ring too (pass one ring's transforms).
+	static Dictionary debug_volley_gaps(const TypedArray<Transform2D> &volley);
+
+	// Mathematical conformance check: regenerates the expected marker-local
+	// loop via debug_describe_outline and compares every volley slot
+	// (origins within tolerance_px after the marker transform, facings
+	// within tolerance_rad). Covers ON_OUTLINE placement (single ring).
+	// Returns {ok, checked, worst_pos_px, worst_face_rad, bad_index}.
+	static Dictionary debug_verify_volley(const TypedArray<Transform2D> &volley, int shape, const Transform2D &marker, int count, const Dictionary &params = Dictionary(), double tolerance_px = 1.0, double tolerance_rad = 0.02);
 
 	// Edge normals for a polyline: per-point outward normal from the local
 	// tangent (segment perpendicular, averaged at joints). tangent (1,0)
@@ -1853,6 +1939,9 @@ public:
 	VARIANT_ENUM_CAST(BlastBullets2D::BulletFactory2D::OutlinePlacement);
 	VARIANT_ENUM_CAST(BlastBullets2D::BulletFactory2D::OutlineDistribution);
 	VARIANT_ENUM_CAST(BlastBullets2D::BulletFactory2D::OutlineLayerLayout);
+	VARIANT_ENUM_CAST(BlastBullets2D::BulletFactory2D::OutlineCornerPriority);
+	VARIANT_ENUM_CAST(BlastBullets2D::BulletFactory2D::OutlineCornerMode);
+	VARIANT_ENUM_CAST(BlastBullets2D::BulletFactory2D::DebugOutlineShape);
 	VARIANT_ENUM_CAST(BlastBullets2D::BulletFactory2D::OutlineLayerSide);
 	VARIANT_ENUM_CAST(BlastBullets2D::BulletFactory2D::OutlineLayerFill);
 	VARIANT_ENUM_CAST(BlastBullets2D::BulletFactory2D::OutlineLayerScaleCurve);

@@ -295,6 +295,9 @@
 			<param index="22" name="layer_max_dots" type="int" default="0" />
 			<param index="23" name="outline_distribution" type="int" default="1" />
 			<param index="24" name="layer_layout" type="int" default="1" />
+			<param index="25" name="outline_corner_priority" type="int" default="0" />
+			<param index="26" name="outline_corner_mode" type="int" default="0" />
+			<param index="27" name="outline_edge_margin" type="float" default="0.0" />
 			<description>
 				Diamond (rhombus) perimeter from its diagonals, slots spread evenly by arc length, facing outward (or inward). Zero-area diamonds stack at the marker.
 			</description>
@@ -549,6 +552,9 @@
 			<param index="22" name="layer_max_dots" type="int" default="0" />
 			<param index="23" name="outline_distribution" type="int" default="1" />
 			<param index="24" name="layer_layout" type="int" default="1" />
+			<param index="25" name="outline_corner_priority" type="int" default="0" />
+			<param index="26" name="outline_corner_mode" type="int" default="0" />
+			<param index="27" name="outline_edge_margin" type="float" default="0.0" />
 			<description>
 				Generates a polygon perimeter (vertices corners on a radius circle from base_rotation), slots spread evenly by arc length, facing outward (or inward). The outline_* tail params place slots on the loop, fill its interior, or layer it across scaled repeats about the loop center.
 			</description>
@@ -591,6 +597,9 @@
 			<param index="20" name="layer_max_dots" type="int" default="0" />
 			<param index="21" name="outline_distribution" type="int" default="1" />
 			<param index="22" name="layer_layout" type="int" default="1" />
+			<param index="23" name="outline_corner_priority" type="int" default="0" />
+			<param index="24" name="outline_corner_mode" type="int" default="0" />
+			<param index="25" name="outline_edge_margin" type="float" default="0.0" />
 			<description>
 				Generates a rectangle perimeter walk (counter-clockwise from top-left), slots spread evenly by arc length, facing outward (or inward). Square = equal sides. The outline_* tail params place slots on the loop, fill its interior, or layer it across scaled repeats about the loop center.
 			</description>
@@ -715,6 +724,9 @@
 			<param index="23" name="layer_max_dots" type="int" default="0" />
 			<param index="24" name="outline_distribution" type="int" default="1" />
 			<param index="25" name="layer_layout" type="int" default="1" />
+			<param index="26" name="outline_corner_priority" type="int" default="0" />
+			<param index="27" name="outline_corner_mode" type="int" default="0" />
+			<param index="28" name="outline_edge_margin" type="float" default="0.0" />
 			<description>
 				Generates a true star shell: points alternating outer/inner vertices around the marker (distinct from the polygon helper's density bias). Boss star bursts and celebratory shells.
 			</description>
@@ -761,6 +773,9 @@
 			<param index="23" name="layer_max_dots" type="int" default="0" />
 			<param index="24" name="outline_distribution" type="int" default="1" />
 			<param index="25" name="layer_layout" type="int" default="1" />
+			<param index="26" name="outline_corner_priority" type="int" default="0" />
+			<param index="27" name="outline_corner_mode" type="int" default="0" />
+			<param index="28" name="outline_edge_margin" type="float" default="0.0" />
 			<description>
 				Isosceles trapezoid perimeter, slots spread evenly by arc length, facing outward (or inward). A zero top base degrades to a triangle; zero-area boxes stack at the marker.
 			</description>
@@ -793,6 +808,9 @@
 			<param index="23" name="layer_max_dots" type="int" default="0" />
 			<param index="24" name="outline_distribution" type="int" default="1" />
 			<param index="25" name="layer_layout" type="int" default="1" />
+			<param index="26" name="outline_corner_priority" type="int" default="0" />
+			<param index="27" name="outline_corner_mode" type="int" default="0" />
+			<param index="28" name="outline_edge_margin" type="float" default="0.0" />
 			<description>
 				Triangle perimeter (equilateral circumradius, isosceles base + height apex-up, right X/Y legs recentered), slots spread evenly by arc length, facing outward (or inward). Degenerate triangles stack at the marker.
 			</description>
@@ -1136,6 +1154,35 @@
 				To control these bullets individually, use the [method spawn_controllable_directional_bullets] function instead.
 			</description>
 		</method>
+		<method name="debug_describe_outline" qualifiers="static">
+			<return type="Dictionary" />
+			<param index="0" name="shape" type="int" />
+			<param index="1" name="count" type="int" />
+			<param index="2" name="params" type="Dictionary" default="{}" />
+			<description>
+				Marker-local outline report for one closed shape (see DebugOutlineShape ids): rebuilds the exact slot loop the volley generators use and returns points, facings, edge_ids, corner_flags, corner_index, gaps, facing deviations and a settings echo. Pure math, no scene tree needed. params carries shape knobs (size, radius, vertices, ...) plus outline_distribution, outline_corner_priority, outline_corner_mode, outline_edge_margin; missing keys fall back to helper defaults.
+			</description>
+		</method>
+		<method name="debug_volley_gaps" qualifiers="static">
+			<return type="Dictionary" />
+			<param index="0" name="volley" type="Transform2D[]" />
+			<description>
+				Shape-agnostic gap metrics over an emitted transform array: consecutive origin distances in volley order plus the last-to-first closure (count, gaps, min/max/mean_gap, gap_ratio). Pass one ring's transforms to audit a single ring.
+			</description>
+		</method>
+		<method name="debug_verify_volley" qualifiers="static">
+			<return type="Dictionary" />
+			<param index="0" name="volley" type="Transform2D[]" />
+			<param index="1" name="shape" type="int" />
+			<param index="2" name="marker" type="Transform2D" />
+			<param index="3" name="count" type="int" />
+			<param index="4" name="params" type="Dictionary" default="{}" />
+			<param index="5" name="tolerance_px" type="float" default="1.0" />
+			<param index="6" name="tolerance_rad" type="float" default="0.02" />
+			<description>
+				Regenerates the expected marker-local loop via debug_describe_outline and compares every single-ring (ON_OUTLINE) volley slot: origins within tolerance_px after the marker transform, facings within tolerance_rad. Returns checked count, worst deviations and the first bad index (ok stays false with an error string when sizes disagree).
+			</description>
+		</method>
 		<method name="teleport_shift_all_bullets">
 			<return type="void" />
 			<param index="0" name="shift_amount" type="Vector2" />
@@ -1381,6 +1428,21 @@
 		<constant name="OUTLINE_LAYER_LAYOUT_EVEN_PER_LAYER" value="1" enum="OutlineLayerLayout">
 			Each ring rebuilds its own even symmetric loop (corners on every ring, even gaps; sequential deals only choose membership).
 		</constant>
+		<constant name="OUTLINE_CORNER_PRIORITY_HORIZONTAL" value="0" enum="OutlineCornerPriority">
+			Top/bottom edges own shared corner dots (a top-right dot faces UP with the top side). Default.
+		</constant>
+		<constant name="OUTLINE_CORNER_PRIORITY_VERTICAL" value="1" enum="OutlineCornerPriority">
+			Left/right edges own shared corner dots (a top-right dot faces +X with the right side).
+		</constant>
+		<constant name="OUTLINE_CORNER_PRIORITY_BALANCED" value="2" enum="OutlineCornerPriority">
+			Corners ride their outgoing edge (previous behavior), leftovers pair opposite sides.
+		</constant>
+		<constant name="OUTLINE_CORNER_MODE_PIN_CORNERS" value="0" enum="OutlineCornerMode">
+			Every corner carries a dot; interiors spread per edge. Default.
+		</constant>
+		<constant name="OUTLINE_CORNER_MODE_EVEN_ARC" value="1" enum="OutlineCornerMode">
+			Dots spread purely evenly by arc length from corner 0 (corners coincide only when the count aligns).
+		</constant>
 		<constant name="OUTLINE_LAYER_OUTWARD" value="0" enum="OutlineLayerSide">
 			Extra layers scale up from the base outline.
 		</constant>
@@ -1416,6 +1478,48 @@
 		</constant>
 		<constant name="OUTLINE_FACING_ALONG_M90" value="2" enum="OutlineFacing">
 			Loop-generator facings turn -90 degrees toward the loop tangent.
+		</constant>
+		<constant name="DEBUG_SHAPE_CIRCLE" value="0" enum="DebugOutlineShape">
+			Shape id for the debug outline inspectors.
+		</constant>
+		<constant name="DEBUG_SHAPE_RING" value="1" enum="DebugOutlineShape">
+			Shape id for the debug outline inspectors.
+		</constant>
+		<constant name="DEBUG_SHAPE_ELLIPSE" value="2" enum="DebugOutlineShape">
+			Shape id for the debug outline inspectors.
+		</constant>
+		<constant name="DEBUG_SHAPE_RECTANGLE" value="3" enum="DebugOutlineShape">
+			Shape id for the debug outline inspectors.
+		</constant>
+		<constant name="DEBUG_SHAPE_SQUARE" value="4" enum="DebugOutlineShape">
+			Shape id for the debug outline inspectors.
+		</constant>
+		<constant name="DEBUG_SHAPE_POLYGON" value="5" enum="DebugOutlineShape">
+			Shape id for the debug outline inspectors.
+		</constant>
+		<constant name="DEBUG_SHAPE_TRIANGLE" value="6" enum="DebugOutlineShape">
+			Shape id for the debug outline inspectors.
+		</constant>
+		<constant name="DEBUG_SHAPE_TRAPEZOID" value="7" enum="DebugOutlineShape">
+			Shape id for the debug outline inspectors.
+		</constant>
+		<constant name="DEBUG_SHAPE_DIAMOND" value="8" enum="DebugOutlineShape">
+			Shape id for the debug outline inspectors.
+		</constant>
+		<constant name="DEBUG_SHAPE_STAR" value="9" enum="DebugOutlineShape">
+			Shape id for the debug outline inspectors.
+		</constant>
+		<constant name="DEBUG_SHAPE_HEART" value="10" enum="DebugOutlineShape">
+			Shape id for the debug outline inspectors.
+		</constant>
+		<constant name="DEBUG_SHAPE_FLOWER" value="11" enum="DebugOutlineShape">
+			Shape id for the debug outline inspectors.
+		</constant>
+		<constant name="DEBUG_SHAPE_ROSE" value="12" enum="DebugOutlineShape">
+			Shape id for the debug outline inspectors.
+		</constant>
+		<constant name="DEBUG_SHAPE_LISSAJOUS" value="13" enum="DebugOutlineShape">
+			Shape id for the debug outline inspectors.
 		</constant>
 		<constant name="DIRECTIONAL_BULLETS" value="0" enum="BulletType">
 			Bullet type for DirectionalBullets2D, bullets that move independently with per-bullet direction, speed and features.

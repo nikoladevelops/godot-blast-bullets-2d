@@ -980,7 +980,7 @@ Dictionary BulletFactory2D::debug_get_attachments_pool_info() {
 // star helper below (defined after the smooth-shape helpers).
 static bool compute_edge_normals_quiet(const PackedVector2Array &edge_points, bool closed, bool flip, PackedVector2Array &r_normals);
 static PackedInt32Array even_corner_seats(int corner_count, int count);
-static bool build_symmetric_polygon_loop(const PackedVector2Array &corners, const PackedVector2Array &corner_normals, int count, int distribution, PackedVector2Array &r_points, PackedVector2Array &r_normals);
+static bool build_symmetric_polygon_loop(const PackedVector2Array &corners, const PackedVector2Array &corner_normals, int count, int distribution, PackedVector2Array &r_points, PackedVector2Array &r_normals, int corner_priority = 0, int corner_mode = 0, double edge_margin = 0.0);
 
 TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_grid(
 		int transforms_amount,
@@ -1382,6 +1382,104 @@ int BulletFactory2D::helper_bullet_layer_index(
 	return bullet_index % layer_count;
 }
 
+// Even arc-length resample of a slot-space polyline into m points (plus
+// interpolated parallel normals/override facings). Closed loops wrap around
+// (no seam duplicate, so decimated subsets can never strand a 1-step seam
+// gap next to bullet 0); open polylines pin both endpoints. Override angles
+// interpolate along the shortest arc. Degenerate input yields copies of the
+// first point so callers always get exactly m outputs.
+static void resample_loop_even(const PackedVector2Array &pts, const PackedVector2Array &nrms, const PackedFloat32Array &ovr, int m, bool closed, PackedVector2Array &r_pts, PackedVector2Array &r_nrms, PackedFloat32Array &r_ovr) {
+	r_pts.clear();
+	r_nrms.clear();
+	r_ovr.clear();
+	const int n = pts.size();
+	if (n <= 0 || m <= 0) {
+		return;
+	}
+	const Vector2 fallback_n = (!nrms.is_empty() && nrms[0].is_finite()) ? nrms[0] : Vector2(1, 0);
+	const real_t fallback_o = !ovr.is_empty() ? ovr[0] : 0.0f;
+	if (n == 1 || m == 1) {
+		const Vector2 anchor = pts[0].is_finite() ? pts[0] : Vector2(0, 0);
+		for (int k = 0; k < m; ++k) {
+			r_pts.push_back(anchor);
+			r_nrms.push_back(fallback_n);
+			if (!ovr.is_empty()) {
+				r_ovr.push_back(fallback_o);
+			}
+		}
+		return;
+	}
+	const int segs = closed ? n : n - 1;
+	PackedFloat64Array cum;
+	cum.resize(segs + 1);
+	cum[0] = 0.0;
+	for (int s = 0; s < segs; ++s) {
+		const Vector2 a = pts[s % n];
+		const Vector2 b = pts[(s + 1) % n];
+		double seg = 0.0;
+		if (a.is_finite() && b.is_finite()) {
+			seg = (double)a.distance_to(b);
+		}
+		cum[s + 1] = cum[s] + (Math::is_finite(seg) && seg > 0.0 ? seg : 0.0);
+	}
+	const double total = cum[segs];
+	if (!(total > 0.0) || !Math::is_finite(total)) {
+		const Vector2 anchor = pts[0].is_finite() ? pts[0] : Vector2(0, 0);
+		for (int k = 0; k < m; ++k) {
+			r_pts.push_back(anchor);
+			r_nrms.push_back(fallback_n);
+			if (!ovr.is_empty()) {
+				r_ovr.push_back(fallback_o);
+			}
+		}
+		return;
+	}
+	const bool use_nrms = nrms.size() == n;
+	const bool use_ovr = !ovr.is_empty() && ovr.size() == n;
+	int seg = 0;
+	for (int k = 0; k < m; ++k) {
+		const double target = closed ? (total * (double)k / (double)m)
+									 : (total * (double)k / (double)(m - 1));
+		while (seg < segs - 1 && cum[seg + 1] < target) {
+			++seg;
+		}
+		const double seg_len = cum[seg + 1] - cum[seg];
+		double t = (seg_len > 1e-12) ? (target - cum[seg]) / seg_len : 0.0;
+		t = Math::clamp(t, 0.0, 1.0);
+		const int ia = seg % n;
+		const int ib = (seg + 1) % n;
+		const Vector2 a = pts[ia].is_finite() ? pts[ia] : pts[0];
+		const Vector2 b = pts[ib].is_finite() ? pts[ib] : a;
+		r_pts.push_back(a.lerp(b, (real_t)t));
+		if (use_nrms) {
+			Vector2 nm = nrms[ia].lerp(nrms[ib], (real_t)t);
+			if (nm.length_squared() <= 1e-12 || !nm.is_finite()) {
+				nm = nrms[ia].length_squared() > 1e-12 ? nrms[ia] : fallback_n;
+			}
+			r_nrms.push_back(nm.normalized());
+		} else {
+			r_nrms.push_back(fallback_n);
+		}
+		if (use_ovr) {
+			const double oa = (double)ovr[ia];
+			double ob = (double)ovr[ib];
+			if (Math::is_finite(oa) && Math::is_finite(ob)) {
+				while (ob - oa > Math::PI) {
+					ob -= Math::TAU;
+				}
+				while (ob - oa < -Math::PI) {
+					ob += Math::TAU;
+				}
+				r_ovr.push_back((real_t)(oa + (ob - oa) * t));
+			} else if (Math::is_finite(oa)) {
+				r_ovr.push_back((real_t)oa);
+			} else {
+				r_ovr.push_back(fallback_o);
+			}
+		}
+	}
+}
+
 static TypedArray<Transform2D> layout_outline_slots(
         const char *caller_name,
         const Transform2D &marker_transform,
@@ -1410,7 +1508,12 @@ static TypedArray<Transform2D> layout_outline_slots(
         int layer_max_dots,
         int outline_distribution = 1,
         int layer_layout = 0,
-        const PackedVector2Array &polygon_corners = PackedVector2Array()) {
+        const PackedVector2Array &polygon_corners = PackedVector2Array(),
+        int corner_priority = 0,
+        int corner_mode = 0,
+        double edge_margin = 0.0,
+        bool loop_closed = true,
+        bool allow_resample = true) {
     const int n = points.size();
     TypedArray<Transform2D> out;
     if (n <= 0) {
@@ -1502,6 +1605,18 @@ static TypedArray<Transform2D> layout_outline_slots(
         }
         if (outline_distribution < 0 || outline_distribution > 1) {
             UtilityFunctions::push_error(String(caller_name) + ": outline_distribution must be 0 (legacy) or 1 (symmetric).");
+            return out;
+        }
+        if (corner_priority < 0 || corner_priority > 2) {
+            UtilityFunctions::push_error(String(caller_name) + ": corner_priority must be 0 (horizontal), 1 (vertical) or 2 (balanced).");
+            return out;
+        }
+        if (corner_mode < 0 || corner_mode > 1) {
+            UtilityFunctions::push_error(String(caller_name) + ": corner_mode must be 0 (pin corners) or 1 (even arc).");
+            return out;
+        }
+        if (!Math::is_finite(edge_margin) || edge_margin < 0.0) {
+            UtilityFunctions::push_error(String(caller_name) + ": edge_margin must be finite and >= 0.");
             return out;
         }
         // Collapse precheck: the smallest dealt scale must stay usable,
@@ -1628,7 +1743,8 @@ static TypedArray<Transform2D> layout_outline_slots(
     // Even-per-layer layout for corner-anchored polygons: each ring gets its
     // own symmetric loop (corners on every ring, even gaps), instead of
     // decimating one shared loop (which strands corners on a single ring).
-    // Smooth shapes pass empty corners and always use the shared loop below.
+    // The smooth-loop sibling below handles star-free shapes (circle, ring,
+    // ellipse, heart, flower, rose, lissajous) by arc-length resampling.
     if (outline_placement == BulletFactory2D::OUTLINE_LAYERS && layer_layout == BulletFactory2D::OUTLINE_LAYER_LAYOUT_EVEN_PER_LAYER && !polygon_corners.is_empty()) {
         // Corners in slot space (same conversion as slot_points above).
         PackedVector2Array corner_slot;
@@ -1710,7 +1826,7 @@ static TypedArray<Transform2D> layout_outline_slots(
                 use_corners = mc;
                 use_normals = mn;
             }
-            if (!build_symmetric_polygon_loop(use_corners, use_normals, layer_keep[L], outline_distribution, lp, ln)) {
+            if (!build_symmetric_polygon_loop(use_corners, use_normals, layer_keep[L], outline_distribution, lp, ln, corner_priority, corner_mode, edge_margin)) {
                 continue;
             }
             // Per-layer offset/twist: rotate each ring so stacked rings
@@ -1773,6 +1889,165 @@ static TypedArray<Transform2D> layout_outline_slots(
             real_t rot = rot_add + (real_t)na + (face_outward ? 0.0f : Math::PI) + selector + facing_offset;
             if (!Math::is_finite((double)rot)) {
                 rot = rot_add;
+            }
+            if (!points_are_local && local.is_finite()) {
+                const Vector2 back = marker_transform.xform(local);
+                local = back.is_finite() ? back : marker_transform.get_origin();
+            }
+            Transform2D slot(rot, place_origin(local));
+            slot.set_scale(marker_scale);
+            if (!slot.is_finite()) {
+                slot = Transform2D(rot_add, marker_transform.get_origin());
+                slot.set_scale(marker_scale);
+            }
+            out.push_back(slot);
+        }
+        return out;
+    }
+    // Even-per-layer layout for smooth loops (no corners): each ring resamples
+    // the shared base loop evenly by arc length, so decimated subsets can
+    // never strand a 1-step seam gap next to bullet 0 (the circle-55 defect).
+    // Open arcs pin both endpoints per ring; closed loops wrap seamlessly.
+    // Always active for multi-ring layers (smooth loops have no corner
+    // policy to tune); single-ring output stays exactly the base loop.
+    // Non-loop slot orders (flower FAN/PHYLLOTAXIS) opt out via allow_resample.
+    if (outline_placement == BulletFactory2D::OUTLINE_LAYERS && layer_count > 1 && polygon_corners.is_empty() && allow_resample) {
+        PackedVector2Array base_nrms;
+        if (normals.size() == n) {
+            base_nrms = normals;
+        } else {
+            for (int i = 0; i < n; ++i) {
+                base_nrms.push_back(Vector2(1, 0));
+            }
+        }
+        PackedInt32Array bullet_layer_of;
+        bullet_layer_of.resize(n);
+        int layer_counts[64] = { 0 };
+        for (int i = 0; i < n; ++i) {
+            const int bl = BulletFactory2D::helper_bullet_layer_index(i, n, layer_count, layer_fill, layer_start_offset);
+            bullet_layer_of[i] = bl;
+            if (bl >= 0 && bl < 64) {
+                layer_counts[bl]++;
+            }
+        }
+        int layer_keep[64] = { 0 };
+        for (int L = 0; L < 64 && L < layer_count; ++L) {
+            layer_keep[L] = layer_counts[L];
+            if (L > 0 && layer_max_dots > 0 && layer_keep[L] > layer_max_dots) {
+                layer_keep[L] = layer_max_dots;
+            }
+        }
+        PackedByteArray dropped;
+        dropped.resize(n);
+        int layer_seen[64] = { 0 };
+        for (int i = 0; i < n; ++i) {
+            const int bl = bullet_layer_of[i];
+            dropped[i] = 0;
+            if (bl > 0 && bl < 64 && layer_max_dots > 0) {
+                if (layer_seen[bl] >= layer_max_dots) {
+                    dropped[i] = 1;
+                }
+                layer_seen[bl]++;
+            }
+        }
+        struct SmoothRing {
+            PackedVector2Array pts;
+            PackedVector2Array nrms;
+            PackedFloat32Array ovr;
+        };
+        SmoothRing rings[64];
+        for (int L = 0; L < layer_count && L < 64; ++L) {
+            if (layer_keep[L] <= 0) {
+                continue;
+            }
+            PackedVector2Array lp;
+            PackedVector2Array ln;
+            PackedFloat32Array lo;
+            resample_loop_even(slot_points, base_nrms, facing_override, layer_keep[L], loop_closed, lp, ln, lo);
+            if (outline_reverse && lp.size() > 1) {
+                PackedVector2Array rp;
+                PackedVector2Array rn;
+                PackedFloat32Array ro;
+                const bool has_ovr = lo.size() == lp.size();
+                for (int k = (int)lp.size() - 1; k >= 0; --k) {
+                    rp.push_back(lp[k]);
+                    rn.push_back(ln[k]);
+                    if (has_ovr) {
+                        ro.push_back(lo[k]);
+                    }
+                }
+                lp = rp;
+                ln = rn;
+                lo = ro;
+            }
+            int rot = 0;
+            if (lp.size() > 1) {
+                int off = outline_slot_offset % (int)lp.size();
+                if (off < 0) {
+                    off += (int)lp.size();
+                }
+                rot = off;
+                if (L > 0 && layer_twist != 0) {
+                    int64_t tw = ((int64_t)L * (int64_t)layer_twist) % (int64_t)lp.size();
+                    rot = (int)(((int64_t)rot + tw) % (int64_t)lp.size());
+                }
+            }
+            if (rot != 0 && lp.size() > 1) {
+                PackedVector2Array rp;
+                PackedVector2Array rn;
+                PackedFloat32Array ro;
+                const bool has_ovr = lo.size() == lp.size();
+                for (int k = 0; k < (int)lp.size(); ++k) {
+                    rp.push_back(lp[(k + rot) % (int)lp.size()]);
+                    rn.push_back(ln[(k + rot) % (int)ln.size()]);
+                    if (has_ovr) {
+                        ro.push_back(lo[(k + rot) % (int)lo.size()]);
+                    }
+                }
+                lp = rp;
+                ln = rn;
+                lo = ro;
+            }
+            const double layer_s = (L == 0) ? 1.0 : BulletFactory2D::helper_layer_scale_factor(L, layer_scale, layer_side, layer_scale_curve, layer_custom_scales);
+            if (L > 0 && (!Math::is_finite(layer_s) || layer_s < 0.05)) {
+                continue;
+            }
+            if (L > 0) {
+                for (int k = 0; k < lp.size(); ++k) {
+                    const Vector2 s = lp[k] * (real_t)layer_s;
+                    lp[k] = s.is_finite() ? s : lp[k];
+                }
+            }
+            rings[L].pts = lp;
+            rings[L].nrms = ln;
+            rings[L].ovr = lo;
+        }
+        int layer_cursor[64] = { 0 };
+        const bool has_ovr = !facing_override.is_empty() && facing_override.size() == n;
+        for (int i = 0; i < n; ++i) {
+            if (dropped[i]) {
+                continue;
+            }
+            const int bl = bullet_layer_of[i];
+            if (bl < 0 || bl >= 64 || bl >= layer_count) {
+                continue;
+            }
+            const int k = layer_cursor[bl]++;
+            if (k < 0 || k >= rings[bl].pts.size()) {
+                continue;
+            }
+            Vector2 local = rings[bl].pts[k];
+            real_t rot;
+            if (has_ovr && k < rings[bl].ovr.size()) {
+                const real_t o = rings[bl].ovr[k];
+                rot = Math::is_finite((double)o) ? o + selector : rot_add + selector;
+            } else {
+                const Vector2 snrm = (k < rings[bl].nrms.size()) ? rings[bl].nrms[k] : Vector2(1, 0);
+                const double na = (snrm.is_finite() && snrm.length_squared() > 1e-12) ? snrm.angle() : 0.0;
+                rot = rot_add + (real_t)na + (face_outward ? 0.0f : Math::PI) + selector + facing_offset;
+                if (!Math::is_finite((double)rot)) {
+                    rot = rot_add;
+                }
             }
             if (!points_are_local && local.is_finite()) {
                 const Vector2 back = marker_transform.xform(local);
@@ -1862,6 +2137,59 @@ static TypedArray<Transform2D> layout_outline_slots(
     return out;
 }
 
+// Even arc-length parameters for an axis-aligned ellipse arc
+// (cos(t)*rx, sin(t)*ry), t in [start, start+span]. A dense chord table
+// (720 samples) is walked uniformly: closed loops divide by n (no seam
+// duplicate), open arcs pin both endpoints (divide by n-1 in ARC LENGTH, so
+// endpoints stay exact while interior gaps stay even). For circles
+// (rx == ry) this reproduces angle-even placement exactly.
+static void even_ellipse_params(real_t start, real_t span, bool closed, int count, real_t rx, real_t ry, PackedFloat64Array &r_ts) {
+	r_ts.clear();
+	if (count <= 0) {
+		return;
+	}
+	if (count == 1) {
+		r_ts.push_back((double)start);
+		return;
+	}
+	const int dense = 720;
+	PackedFloat64Array cum;
+	cum.resize(dense + 1);
+	cum[0] = 0.0;
+	double prev_x = (double)rx * Math::cos((double)start);
+	double prev_y = (double)ry * Math::sin((double)start);
+	for (int k = 1; k <= dense; ++k) {
+		const double tt = (double)start + (double)span * (double)k / (double)dense;
+		const double px = (double)rx * Math::cos(tt);
+		const double py = (double)ry * Math::sin(tt);
+		const double dx = px - prev_x;
+		const double dy = py - prev_y;
+		const double seg = Math::sqrt(dx * dx + dy * dy);
+		cum[k] = cum[k - 1] + (Math::is_finite(seg) ? seg : 0.0);
+		prev_x = px;
+		prev_y = py;
+	}
+	const double total = cum[dense];
+	if (!(total > 0.0) || !Math::is_finite(total)) {
+		for (int i = 0; i < count; ++i) {
+			r_ts.push_back((double)start);
+		}
+		return;
+	}
+	int seg = 0;
+	for (int i = 0; i < count; ++i) {
+		const double target = closed ? (total * (double)i / (double)count)
+									 : (total * (double)i / (double)(count - 1));
+		while (seg < dense - 1 && cum[seg + 1] < target) {
+			++seg;
+		}
+		const double seg_len = cum[seg + 1] - cum[seg];
+		double f = (seg_len > 1e-12) ? (target - cum[seg]) / seg_len : 0.0;
+		f = Math::clamp(f, 0.0, 1.0);
+		r_ts.push_back((double)start + (double)span * ((double)seg + f) / (double)dense);
+	}
+}
+
 TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_ring(
 		int transforms_amount,
 		Transform2D marker_transform,
@@ -1913,8 +2241,12 @@ TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_ring(
 	const real_t base_rotation = rotate_with_marker ? marker_transform.get_rotation() : 0.0;
 	// Closed ring (arc ~= TAU): divide by n so first/last don't stack on the same
 	// spot. Open arcs keep the n-1 divisor so the endpoints land on start/arc end.
+	// Placement is even by ARC LENGTH (even_ellipse_params), so stretched rings
+	// (y_scale != 1) keep uniform gaps instead of bunching at the flanks;
+	// circles reproduce angle-even placement exactly.
 	const bool is_closed_ring = Math::abs(Math::abs(arc) - Math::TAU) < 0.0001;
-	const real_t step = (transforms_amount > 1) ? arc / (real_t)(is_closed_ring ? transforms_amount : (transforms_amount - 1)) : 0.0;
+	PackedFloat64Array ring_ts;
+	even_ellipse_params(start_angle, arc, is_closed_ring, transforms_amount, radius, radius * y_scale, ring_ts);
 	// Slot loop in global space plus geometric (radial) outward normals; the
 	// shared outline worker assembles facings so placement/fill/shell stay
 	// uniform. Random rotation survives as a per-slot facing override.
@@ -1933,14 +2265,14 @@ TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_ring(
 		ring_rng->set_seed(seed);
 	}
 	for (int i = 0; i < transforms_amount; ++i) {
-		const real_t angle = base_rotation + start_angle + step * (real_t)i;
+		const real_t angle = base_rotation + (i < ring_ts.size() ? (real_t)ring_ts[i] : start_angle);
 		loop_points[i] = marker_transform.get_origin() + Vector2(Math::cos(angle) * radius, Math::sin(angle) * radius * y_scale);
 		loop_normals[i] = Vector2(Math::cos(angle), Math::sin(angle));
 		if (random_rotation) {
 			facing_override[i] = (ring_seeded ? ring_rng->randf() : UtilityFunctions::randf()) * Math::TAU;
 		}
 	}
-	return layout_outline_slots("helper_generate_transforms_ring", marker_transform, loop_points, loop_normals, false, 0.0, face_outward, facing_offset_degrees, facing_override, outline_placement, outline_facing, outline_reverse, outline_slot_offset, fill_spacing, fill_stagger, fill_margin, layer_count, layer_scale, layer_side, layer_fill, layer_start_offset, layer_scale_curve, layer_custom_scales, layer_twist, layer_max_dots);
+	return layout_outline_slots("helper_generate_transforms_ring", marker_transform, loop_points, loop_normals, false, 0.0, face_outward, facing_offset_degrees, facing_override, outline_placement, outline_facing, outline_reverse, outline_slot_offset, fill_spacing, fill_stagger, fill_margin, layer_count, layer_scale, layer_side, layer_fill, layer_start_offset, layer_scale_curve, layer_custom_scales, layer_twist, layer_max_dots, 1, 0, PackedVector2Array(), 0, 0, 0.0, is_closed_ring);
 }
 
 TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_fan(
@@ -2287,10 +2619,11 @@ TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_flower(
 	const double golden_angle = Math::PI * (3.0 - Math::sqrt(5.0));
 	// Build loop_points/loop_normals per bloom kind, then the shared outline
 	// worker assembles facings (fill uses the angular-sorted silhouette).
+	// Continuous sweeps (RHODONEA/SPIROGRAPH/SUPERFORMULA) build arc-even
+	// from a dense ideal sweep; FAN/PHYLLOTAXIS keep their legacy slot order
+	// (petal-major fan, golden-angle disc: not spatial loops).
 	PackedVector2Array loop_points;
 	PackedVector2Array loop_normals;
-	loop_points.resize(transforms_amount);
-	loop_normals.resize(transforms_amount);
 	const Vector2 origin = marker_transform.get_origin();
 	const real_t inner_keep = (real_t)(1.0 - inner_radius_scale);
 	if (flower_type == FLOWER_FAN) {
@@ -2307,21 +2640,33 @@ TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_flower(
 			// Rhodonea-style radius modulation: sharpness pinches the waist
 			// between lobes so higher values read as tighter flowers.
 			const real_t waist = 1.0 - (petal_sharpness / (1.0 + petal_sharpness)) * 0.55 * Math::abs(Math::sin(frac * Math::PI));
-			loop_points[i] = origin + Vector2(Math::cos(angle), Math::sin(angle)) * (radius * waist);
-			loop_normals[i] = Vector2(Math::cos(angle), Math::sin(angle));
+			loop_points.push_back(origin + Vector2(Math::cos(angle), Math::sin(angle)) * (radius * waist));
+			loop_normals.push_back(Vector2(Math::cos(angle), Math::sin(angle)));
 		}
 	} else if (flower_type == FLOWER_RHODONEA) {
 		// Continuous rhodonea sweep r = R*|cos(k*theta/2)|^p over the slot
 		// loop; the inner scale lifts the waist into a ring when asked.
+		// Arc-even from a dense ideal sweep so dots sit exactly on the
+		// curve with even gaps (param sweeps bunch where the curve runs slow).
 		const real_t sharp = (petal_sharpness < 0.0) ? 0.0 : petal_sharpness;
-		for (int i = 0; i < transforms_amount; ++i) {
-			const real_t theta = Math::TAU * (real_t)i / (real_t)transforms_amount + base_rotation;
+		PackedVector2Array dense_pts;
+		PackedVector2Array dense_nrms;
+		for (int k = 0; k < 720; ++k) {
+			const real_t theta = Math::TAU * (real_t)k / 720.0 + base_rotation;
 			const real_t cos_k = Math::cos((real_t)petals * theta * 0.5);
 			const real_t mag = Math::pow((double)Math::abs(cos_k), (double)sharp);
 			const real_t r = radius * (real_t)inner_radius_scale + radius * inner_keep * (real_t)mag;
-			loop_points[i] = origin + Vector2(Math::cos(theta), Math::sin(theta)) * r;
+			dense_pts.push_back(Vector2(Math::cos(theta), Math::sin(theta)) * r);
 			const Vector2 radial = Vector2(Math::cos(theta), Math::sin(theta));
-			loop_normals[i] = (radial.length_squared() > 1e-12) ? radial : Vector2(1, 0);
+			dense_nrms.push_back((radial.length_squared() > 1e-12) ? radial : Vector2(1, 0));
+		}
+		PackedVector2Array even_local;
+		PackedVector2Array even_nrms;
+		PackedFloat32Array even_ovr;
+		resample_loop_even(dense_pts, dense_nrms, PackedFloat32Array(), transforms_amount, true, even_local, even_nrms, even_ovr);
+		for (int i = 0; i < even_local.size(); ++i) {
+			loop_points.push_back(origin + even_local[i]);
+			loop_normals.push_back(even_nrms[i]);
 		}
 	} else if (flower_type == FLOWER_PHYLLOTAXIS) {
 		// Vogel golden-angle disc: slot i sits at angle i*GA, radius
@@ -2330,9 +2675,9 @@ TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_flower(
 			const double frac = (transforms_amount > 0) ? ((double)i + 0.5) / (double)transforms_amount : 0.0;
 			const real_t angle = base_rotation + (real_t)((double)i * golden_angle);
 			const real_t r = radius * (real_t)(inner_radius_scale + (1.0 - inner_radius_scale) * Math::sqrt(Math::clamp(frac, 0.0, 1.0)));
-			loop_points[i] = origin + Vector2(Math::cos(angle), Math::sin(angle)) * r;
+			loop_points.push_back(origin + Vector2(Math::cos(angle), Math::sin(angle)) * r);
 			const Vector2 radial = Vector2(Math::cos(angle), Math::sin(angle));
-			loop_normals[i] = (radial.length_squared() > 1e-12) ? radial : Vector2(1, 0);
+			loop_normals.push_back((radial.length_squared() > 1e-12) ? radial : Vector2(1, 0));
 		}
 	} else if (flower_type == FLOWER_SPIROGRAPH) {
 		// Hypotrochoid: x = (R-r)cos t + d cos((R-r)t/r),
@@ -2351,24 +2696,38 @@ TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_flower(
 		// Sweep the full closure: with k = 7/3 (R=150,r=45) the curve only
 		// closes after 3 revolutions, so a single 0..TAU pass draws 1/3 of it.
 		const int revolutions = spirograph_revolutions(k);
-		for (int i = 0; i < transforms_amount; ++i) {
-			const double t = Math::TAU * (double)revolutions * (double)i / (double)transforms_amount;
+		// Arc-even from a dense ideal sweep (multi-turn closure included).
+		PackedVector2Array dense_pts;
+		PackedVector2Array dense_nrms;
+		for (int q = 0; q < 720; ++q) {
+			const double t = Math::TAU * (double)revolutions * (double)q / 720.0;
 			const double px = diff * Math::cos(t) + spiro_pen * Math::cos(k * t);
 			const double py = diff * Math::sin(t) - spiro_pen * Math::sin(k * t);
 			Vector2 local = Vector2((real_t)px, (real_t)py).rotated(base_rotation);
 			if (!local.is_finite()) {
 				local = Vector2(0, 0);
 			}
-			loop_points[i] = origin + local;
-			loop_normals[i] = (local.length_squared() > 1e-12) ? local.normalized() : Vector2(1, 0);
+			dense_pts.push_back(local);
+			dense_nrms.push_back((local.length_squared() > 1e-12) ? local.normalized() : Vector2(1, 0));
+		}
+		PackedVector2Array even_local;
+		PackedVector2Array even_nrms;
+		PackedFloat32Array even_ovr;
+		resample_loop_even(dense_pts, dense_nrms, PackedFloat32Array(), transforms_amount, true, even_local, even_nrms, even_ovr);
+		for (int i = 0; i < even_local.size(); ++i) {
+			loop_points.push_back(origin + even_local[i]);
+			loop_normals.push_back(even_nrms[i]);
 		}
 	} else {
 		// Simplified Gielis superformula with a = b = 1, n2 = n3 = fullness:
 		// r = (|cos(mt/4)|^f + |sin(mt/4)|^f)^(-1/f). m = super_lobes.
 		const double lobes = Math::clamp(super_lobes, 2.0, 64.0);
 		const double full = Math::clamp(super_fullness, 0.05, 8.0);
-		for (int i = 0; i < transforms_amount; ++i) {
-			const double t = Math::TAU * (double)i / (double)transforms_amount;
+		// Arc-even from a dense ideal sweep.
+		PackedVector2Array dense_pts;
+		PackedVector2Array dense_nrms;
+		for (int q = 0; q < 720; ++q) {
+			const double t = Math::TAU * (double)q / 720.0;
 			const double c = Math::abs(Math::cos(lobes * t * 0.25));
 			const double s = Math::abs(Math::sin(lobes * t * 0.25));
 			double r_norm = Math::pow(Math::pow(c, full) + Math::pow(s, full), -1.0 / full);
@@ -2380,12 +2739,20 @@ TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_flower(
 			}
 			const real_t r = radius * (real_t)(inner_radius_scale + (1.0 - inner_radius_scale) * (r_norm * 0.5));
 			const real_t ang = base_rotation + (real_t)t;
-			loop_points[i] = origin + Vector2(Math::cos(ang), Math::sin(ang)) * r;
+			dense_pts.push_back(Vector2(Math::cos(ang), Math::sin(ang)) * r);
 			const Vector2 radial = Vector2(Math::cos(ang), Math::sin(ang));
-			loop_normals[i] = (radial.length_squared() > 1e-12) ? radial : Vector2(1, 0);
+			dense_nrms.push_back((radial.length_squared() > 1e-12) ? radial : Vector2(1, 0));
+		}
+		PackedVector2Array even_local;
+		PackedVector2Array even_nrms;
+		PackedFloat32Array even_ovr;
+		resample_loop_even(dense_pts, dense_nrms, PackedFloat32Array(), transforms_amount, true, even_local, even_nrms, even_ovr);
+		for (int i = 0; i < even_local.size(); ++i) {
+			loop_points.push_back(origin + even_local[i]);
+			loop_normals.push_back(even_nrms[i]);
 		}
 	}
-	return layout_outline_slots("helper_generate_transforms_flower", marker_transform, loop_points, loop_normals, false, 0.0, face_outward, facing_offset_degrees, PackedFloat32Array(), outline_placement, outline_facing, outline_reverse, outline_slot_offset, fill_spacing, fill_stagger, fill_margin, layer_count, layer_scale, layer_side, layer_fill, layer_start_offset, layer_scale_curve, layer_custom_scales, layer_twist, layer_max_dots);
+	return layout_outline_slots("helper_generate_transforms_flower", marker_transform, loop_points, loop_normals, false, 0.0, face_outward, facing_offset_degrees, PackedFloat32Array(), outline_placement, outline_facing, outline_reverse, outline_slot_offset, fill_spacing, fill_stagger, fill_margin, layer_count, layer_scale, layer_side, layer_fill, layer_start_offset, layer_scale_curve, layer_custom_scales, layer_twist, layer_max_dots, 1, 0, PackedVector2Array(), 0, 0, 0.0, true, flower_type != FLOWER_FAN && flower_type != FLOWER_PHYLLOTAXIS);
 }
 
 TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_ellipse(
@@ -2451,16 +2818,16 @@ TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_ellipse(
 	// WALL mode needs dense coverage to resolve gaps: map slots evenly over
 	// the arc, then drop the ones landing inside a gap. FULL closes the loop
 	// (divide by n, no duplicated seam bullet like the old n-1 divisor);
-	// ARC/WALL keep endpoints (divide by n-1).
+	// ARC/WALL keep endpoints (divide by n-1 in arc length). Placement is
+	// even by ARC LENGTH, so non-circular ellipses keep uniform gaps instead
+	// of bunching at the major-axis ends.
 	const bool is_wall = (mode == ELLIPSE_WALL && gap_count > 0 && gap_width > 0.0);
 	const bool is_closed = (mode == ELLIPSE_FULL);
 	const real_t span = is_closed ? Math::TAU : arc;
+	PackedFloat64Array ell_ts;
+	even_ellipse_params(start_angle, span, is_closed, transforms_amount, radius_x, radius_y, ell_ts);
 	for (int i = 0; i < transforms_amount; ++i) {
-		real_t t = start_angle;
-		if (transforms_amount > 1) {
-			t = is_closed ? (start_angle + span * (real_t)i / (real_t)transforms_amount)
-						  : (start_angle + span * (real_t)i / (real_t)(transforms_amount - 1));
-		}
+		const real_t t = (i < ell_ts.size()) ? (real_t)ell_ts[i] : start_angle;
 		if (is_wall) {
 			// Gap k centers on start + span * (k + 0.5) / gap_count.
 			bool in_gap = false;
@@ -2488,7 +2855,7 @@ TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_ellipse(
 		}
 		loop_normals.push_back(normal.normalized());
 	}
-	return layout_outline_slots("helper_generate_transforms_ellipse", marker_transform, loop_points, loop_normals, false, 0.0, face_outward, facing_offset_degrees, PackedFloat32Array(), outline_placement, outline_facing, outline_reverse, outline_slot_offset, fill_spacing, fill_stagger, fill_margin, layer_count, layer_scale, layer_side, layer_fill, layer_start_offset, layer_scale_curve, layer_custom_scales, layer_twist, layer_max_dots);
+	return layout_outline_slots("helper_generate_transforms_ellipse", marker_transform, loop_points, loop_normals, false, 0.0, face_outward, facing_offset_degrees, PackedFloat32Array(), outline_placement, outline_facing, outline_reverse, outline_slot_offset, fill_spacing, fill_stagger, fill_margin, layer_count, layer_scale, layer_side, layer_fill, layer_start_offset, layer_scale_curve, layer_custom_scales, layer_twist, layer_max_dots, 1, 0, PackedVector2Array(), 0, 0, 0.0, is_closed);
 }
 
 TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_rain(
@@ -2859,7 +3226,10 @@ TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_star(
 		int layer_twist,
 		int layer_max_dots,
 		int outline_distribution,
-		int layer_layout) {
+		int layer_layout,
+		int outline_corner_priority,
+		int outline_corner_mode,
+		double outline_edge_margin) {
 	if (!danmaku_validate_head("helper_generate_transforms_star", transforms_amount, marker_transform)) {
 		return TypedArray<Transform2D>();
 	}
@@ -2883,9 +3253,22 @@ TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_star(
 		UtilityFunctions::push_error("helper_generate_transforms_star: layer_layout must be 0 (shared loop) or 1 (even per layer).");
 		return TypedArray<Transform2D>();
 	}
+	if (outline_corner_priority < 0 || outline_corner_priority > 2) {
+		UtilityFunctions::push_error("helper_generate_transforms_star: outline_corner_priority must be 0 (horizontal), 1 (vertical) or 2 (balanced).");
+		return TypedArray<Transform2D>();
+	}
+	if (outline_corner_mode < 0 || outline_corner_mode > 1) {
+		UtilityFunctions::push_error("helper_generate_transforms_star: outline_corner_mode must be 0 (pin corners) or 1 (even arc).");
+		return TypedArray<Transform2D>();
+	}
+	if (!Math::is_finite(outline_edge_margin) || outline_edge_margin < 0.0) {
+		UtilityFunctions::push_error("helper_generate_transforms_star: outline_edge_margin must be finite and >= 0.");
+		return TypedArray<Transform2D>();
+	}
 	const Vector2 origin = marker_transform.get_origin();
 	// Star outline corners in winding order (alternating outer/inner), built
-	// in marker-global space like the legacy loop. Slots walk the outline
+	// in marker-global space like the legacy loop (marker rotation does not
+	// spin star volleys, only base_rotation does). Slots walk the outline
 	// edges (not just the vertices), so every tip/valley carries a bullet
 	// and the rest spread evenly along the edges instead of stacking on
 	// vertices when the count exceeds the corner count.
@@ -2911,11 +3294,11 @@ TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_star(
 	}
 	PackedVector2Array loop_points;
 	PackedVector2Array loop_normals;
-	if (!build_symmetric_polygon_loop(corners, corner_normals, transforms_amount, outline_distribution, loop_points, loop_normals)) {
+	if (!build_symmetric_polygon_loop(corners, corner_normals, transforms_amount, outline_distribution, loop_points, loop_normals, outline_corner_priority, outline_corner_mode, outline_edge_margin)) {
 		UtilityFunctions::push_error("helper_generate_transforms_star: degenerate star.");
 		return TypedArray<Transform2D>();
 	}
-	return layout_outline_slots("helper_generate_transforms_star", marker_transform, loop_points, loop_normals, false, 0.0, face_outward, facing_offset_degrees, PackedFloat32Array(), outline_placement, outline_facing, outline_reverse, outline_slot_offset, fill_spacing, fill_stagger, fill_margin, layer_count, layer_scale, layer_side, layer_fill, layer_start_offset, layer_scale_curve, layer_custom_scales, layer_twist, layer_max_dots, outline_distribution, layer_layout, corners);
+	return layout_outline_slots("helper_generate_transforms_star", marker_transform, loop_points, loop_normals, false, 0.0, face_outward, facing_offset_degrees, PackedFloat32Array(), outline_placement, outline_facing, outline_reverse, outline_slot_offset, fill_spacing, fill_stagger, fill_margin, layer_count, layer_scale, layer_side, layer_fill, layer_start_offset, layer_scale_curve, layer_custom_scales, layer_twist, layer_max_dots, outline_distribution, layer_layout, corners, outline_corner_priority, outline_corner_mode, outline_edge_margin);
 }
 
 TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_heart(
@@ -2952,23 +3335,23 @@ TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_heart(
 		UtilityFunctions::push_error("helper_generate_transforms_heart: base_rotation and facing_offset_degrees must be finite.");
 		return TypedArray<Transform2D>();
 	}
-	// Slot loop in global space plus center-radial outward normals; layer
-	// offsets run radially so every ring keeps the heart figure. Facings
-	// ride a per-slot override holding the legacy radial facings byte-exact
-	// (the shared worker only adds the outline_facing selector on top), so
-	// on-outline output is unchanged by the layout routing.
-	PackedVector2Array loop_points;
-	PackedVector2Array loop_normals;
-	PackedFloat32Array facing_override;
-	loop_points.resize(transforms_amount);
-	loop_normals.resize(transforms_amount);
-	facing_override.resize(transforms_amount);
+	// Slot loop plus center-radial outward normals; layer offsets run
+	// radially so every ring keeps the heart figure. Facings ride a per-slot
+	// override holding the legacy radial facings byte-exact (the shared
+	// worker only adds the outline_facing selector on top), so on-outline
+	// output is unchanged by the layout routing. The base loop is arc-even
+	// from a dense ideal sweep (param sweeps bunch where the curve runs
+	// slow/fast, e.g. near the cusp), so dots sit exactly on the curve with
+	// even gaps at any count.
+	PackedVector2Array dense_pts;
+	PackedVector2Array dense_nrms;
+	PackedFloat32Array dense_ovr;
 	const Vector2 origin = marker_transform.get_origin();
 	const real_t facing_offset = Math::deg_to_rad(facing_offset_degrees);
 	const Vector2 fallback_dir = Vector2(Math::cos(base_rotation), Math::sin(base_rotation));
 	const real_t scale = size / 32.0;
-	for (int i = 0; i < transforms_amount; ++i) {
-		const real_t t = Math::TAU * (real_t)i / (real_t)transforms_amount;
+	for (int k = 0; k < 720; ++k) {
+		const real_t t = Math::TAU * (real_t)k / 720.0;
 		const real_t hx = (real_t)16.0 * Math::pow((double)Math::sin(t), 3.0);
 		const real_t hy = 13.0 * Math::cos(t) - 5.0 * Math::cos(2.0 * t) - 2.0 * Math::cos(3.0 * t) - Math::cos(4.0 * t);
 		Vector2 local = Vector2(hx, -hy) * scale;
@@ -2976,10 +3359,22 @@ TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_heart(
 		if (!local.is_finite()) {
 			local = Vector2(0, 0);
 		}
-		loop_points[i] = origin + local;
-		loop_normals[i] = (local.length_squared() > 1e-12) ? local.normalized() : fallback_dir;
+		dense_pts.push_back(local);
+		dense_nrms.push_back((local.length_squared() > 1e-12) ? local.normalized() : fallback_dir);
 		const real_t radial = (local.length_squared() > 0.0) ? local.angle() : base_rotation;
-		facing_override[i] = (face_outward ? radial : radial + Math::PI) + facing_offset;
+		dense_ovr.push_back((face_outward ? radial : radial + Math::PI) + facing_offset);
+	}
+	PackedVector2Array loop_points;
+	PackedVector2Array loop_normals;
+	PackedFloat32Array facing_override;
+	PackedVector2Array even_local;
+	PackedVector2Array even_nrms;
+	PackedFloat32Array even_ovr;
+	resample_loop_even(dense_pts, dense_nrms, dense_ovr, transforms_amount, true, even_local, even_nrms, even_ovr);
+	for (int i = 0; i < even_local.size(); ++i) {
+		loop_points.push_back(origin + even_local[i]);
+		loop_normals.push_back(even_nrms[i]);
+		facing_override.push_back(even_ovr[i]);
 	}
 	return layout_outline_slots("helper_generate_transforms_heart", marker_transform, loop_points, loop_normals, false, 0.0, face_outward, facing_offset_degrees, facing_override, outline_placement, outline_facing, outline_reverse, outline_slot_offset, fill_spacing, fill_stagger, fill_margin, layer_count, layer_scale, layer_side, layer_fill, layer_start_offset, layer_scale_curve, layer_custom_scales, layer_twist, layer_max_dots);
 }
@@ -3219,23 +3614,29 @@ TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_rose(
 		return TypedArray<Transform2D>();
 	}
 	// Theta sweep plus petal-axis outward normals (coherent across the flip);
-	// the shared outline worker assembles facings.
-	PackedVector2Array loop_points;
-	PackedVector2Array loop_normals;
-	loop_points.resize(transforms_amount);
-	loop_normals.resize(transforms_amount);
+	// the shared outline worker assembles facings. Arc-even from a dense
+	// ideal sweep so dots sit exactly on the petals with even gaps.
+	PackedVector2Array dense_pts;
+	PackedVector2Array dense_nrms;
 	const Vector2 origin = marker_transform.get_origin();
-	for (int i = 0; i < transforms_amount; ++i) {
-		const real_t theta = Math::TAU * (real_t)i / (real_t)transforms_amount + base_rotation;
+	for (int k = 0; k < 720; ++k) {
+		const real_t theta = Math::TAU * (real_t)k / 720.0 + base_rotation;
 		const real_t cos_k = Math::cos((real_t)petals * theta);
-		// lobe_sharpness pinches the waist between lobes; 1.0 is the exact rose.
 		const real_t mag = Math::pow((double)Math::abs(cos_k), (double)lobe_sharpness);
 		const real_t r = radius * ((cos_k >= 0.0) ? (real_t)mag : -(real_t)mag);
-		loop_points[i] = origin + Vector2(Math::cos(theta), Math::sin(theta)) * r;
-		// Petals flip to the far side when cos(k*theta) < 0; the outward
-		// normal follows the petal axis so facings stay coherent.
+		dense_pts.push_back(Vector2(Math::cos(theta), Math::sin(theta)) * r);
 		const real_t shape_angle = (cos_k >= 0.0) ? theta : theta + Math::PI;
-		loop_normals[i] = Vector2(Math::cos(shape_angle), Math::sin(shape_angle));
+		dense_nrms.push_back(Vector2(Math::cos(shape_angle), Math::sin(shape_angle)));
+	}
+	PackedVector2Array loop_points;
+	PackedVector2Array loop_normals;
+	PackedVector2Array even_local;
+	PackedVector2Array even_nrms;
+	PackedFloat32Array even_ovr;
+	resample_loop_even(dense_pts, dense_nrms, PackedFloat32Array(), transforms_amount, true, even_local, even_nrms, even_ovr);
+	for (int i = 0; i < even_local.size(); ++i) {
+		loop_points.push_back(origin + even_local[i]);
+		loop_normals.push_back(even_nrms[i]);
 	}
 	return layout_outline_slots("helper_generate_transforms_rose", marker_transform, loop_points, loop_normals, false, 0.0, face_outward, facing_offset_degrees, PackedFloat32Array(), outline_placement, outline_facing, outline_reverse, outline_slot_offset, fill_spacing, fill_stagger, fill_margin, layer_count, layer_scale, layer_side, layer_fill, layer_start_offset, layer_scale_curve, layer_custom_scales, layer_twist, layer_max_dots);
 }
@@ -3425,18 +3826,27 @@ TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_lissajous(
 	}
 	// Weave sweep plus center-radial outward normals (marker rotation when a
 	// sample lands exactly on the center); the shared outline worker
-	// assembles facings.
-	PackedVector2Array loop_points;
-	PackedVector2Array loop_normals;
-	loop_points.resize(transforms_amount);
-	loop_normals.resize(transforms_amount);
+	// assembles facings. Arc-even from a dense ideal sweep so dots sit
+	// exactly on the weave with even gaps.
+	PackedVector2Array dense_pts;
+	PackedVector2Array dense_nrms;
 	const Vector2 origin = marker_transform.get_origin();
 	const real_t marker_rot = marker_transform.get_rotation();
-	for (int i = 0; i < transforms_amount; ++i) {
-		const real_t t = Math::TAU * (real_t)i / (real_t)transforms_amount;
+	for (int k = 0; k < 720; ++k) {
+		const real_t t = Math::TAU * (real_t)k / 720.0;
 		const Vector2 offset = Vector2(size_x * Math::sin(freq_x * t + phase), size_y * Math::sin(freq_y * t));
-		loop_points[i] = origin + offset;
-		loop_normals[i] = (offset.length_squared() > 0.0) ? offset.normalized() : Vector2(Math::cos(marker_rot), Math::sin(marker_rot));
+		dense_pts.push_back(offset);
+		dense_nrms.push_back((offset.length_squared() > 0.0) ? offset.normalized() : Vector2(Math::cos(marker_rot), Math::sin(marker_rot)));
+	}
+	PackedVector2Array loop_points;
+	PackedVector2Array loop_normals;
+	PackedVector2Array even_local;
+	PackedVector2Array even_nrms;
+	PackedFloat32Array even_ovr;
+	resample_loop_even(dense_pts, dense_nrms, PackedFloat32Array(), transforms_amount, true, even_local, even_nrms, even_ovr);
+	for (int i = 0; i < even_local.size(); ++i) {
+		loop_points.push_back(origin + even_local[i]);
+		loop_normals.push_back(even_nrms[i]);
 	}
 	return layout_outline_slots("helper_generate_transforms_lissajous", marker_transform, loop_points, loop_normals, false, 0.0, face_outward, facing_offset_degrees, PackedFloat32Array(), outline_placement, outline_facing, outline_reverse, outline_slot_offset, fill_spacing, fill_stagger, fill_margin, layer_count, layer_scale, layer_side, layer_fill, layer_start_offset, layer_scale_curve, layer_custom_scales, layer_twist, layer_max_dots);
 }
@@ -3501,6 +3911,57 @@ static Vector2 oriented_edge_normal(const Vector2 &a, const Vector2 &b, const Ve
 	return edge_n;
 }
 
+// True when the directed edge a -> b runs more along X than Y (horizontal-ish
+// in shape-local space). Used by corner priority: HORIZONTAL lets the
+// horizontal adjoining edge own a shared corner, VERTICAL the vertical one.
+// Near-diagonal edges (|dx| ~= |dy|) count as horizontal so the default stays
+// deterministic.
+static bool edge_is_horizontal(const Vector2 &a, const Vector2 &b) {
+	const Vector2 seg = b - a;
+	return Math::abs(seg.x) >= Math::abs(seg.y);
+}
+
+// Resolves which adjoining edge owns corner `c` (between incoming edge
+// prev -> c and outgoing edge c -> next) under a corner priority, and returns
+// that edge's outward normal (via oriented_edge_normal against ref).
+// HORIZONTAL: the horizontal adjoining edge wins (ties go outgoing, i.e. the
+// previous behavior); VERTICAL: the vertical one wins; BALANCED: always the
+// outgoing edge (previous behavior exactly).
+static Vector2 corner_owner_normal(const PackedVector2Array &corners, int c, const Vector2 &ref, int corner_priority) {
+	const int n = corners.size();
+	const Vector2 prev = corners[(c - 1 + n) % n];
+	const Vector2 cur = corners[c];
+	const Vector2 next = corners[(c + 1) % n];
+	const bool in_h = edge_is_horizontal(prev, cur);
+	const bool out_h = edge_is_horizontal(cur, next);
+	int use_outgoing = 1;
+	if (corner_priority == BlastBullets2D::BulletFactory2D::OUTLINE_CORNER_PRIORITY_HORIZONTAL) {
+		if (in_h && !out_h) {
+			use_outgoing = 0;
+		} else {
+			use_outgoing = 1;
+		}
+	} else if (corner_priority == BlastBullets2D::BulletFactory2D::OUTLINE_CORNER_PRIORITY_VERTICAL) {
+		if (!in_h && out_h) {
+			use_outgoing = 0;
+		} else {
+			use_outgoing = 1;
+		}
+	} else {
+		use_outgoing = 1;
+	}
+	Vector2 edge_n;
+	if (use_outgoing) {
+		edge_n = oriented_edge_normal(cur, next, ref);
+	} else {
+		edge_n = oriented_edge_normal(prev, cur, ref);
+	}
+	if (edge_n.length_squared() <= 1e-12) {
+		edge_n = ref;
+	}
+	return edge_n.length_squared() > 1e-12 ? edge_n.normalized() : Vector2(0, -1);
+}
+
 // Symmetric largest-remainder apportionment of (count - corners) interior
 // slots across polygon edges by length, so every corner always carries a
 // bullet and the rest spread proportionally with opposite sides kept equal.
@@ -3537,7 +3998,19 @@ static void apportion_polygon_slots(const PackedVector2Array &corners, int count
 	int assigned = 0;
 	for (int e = 0; e < n; ++e) {
 		const double exact = (double)rest * (double)corners[e].distance_to(corners[(e + 1) % n]) / total;
-		const int base = (exact > 0.0 && Math::is_finite(exact)) ? (int)Math::floor(exact) : 0;
+		// Snap near-integers: single-precision lengths measured in global
+		// coordinates can round exact integer shares (e.g. 1.0 on a regular
+		// star) to 0.9999999, which would floor a slot away and deal it
+		// elsewhere. Anything within 1e-4 of an integer is float noise.
+		int base = 0;
+		if (exact > 0.0 && Math::is_finite(exact)) {
+			const double snapped = Math::round(exact);
+			if (Math::abs(exact - snapped) < 0.0001) {
+				base = (int)snapped;
+			} else {
+				base = (int)Math::floor(exact);
+			}
+		}
 		r_interior[e] = base;
 		frac[e] = exact - (double)base;
 		assigned += base;
@@ -3694,26 +4167,75 @@ static PackedInt32Array even_corner_seats(int corner_count, int count) {
 // Shared corner-anchored polygon loop builder: every corner carries a slot
 // and interiors spread per edge via apportion_polygon_slots, each slot riding
 // its edge-constant outward normal (built from corners + averaged corner
-// normals). count <= corners seats evenly spaced corners. Returns false when
-// degenerate (caller stacks at the marker).
-static bool build_symmetric_polygon_loop(const PackedVector2Array &corners, const PackedVector2Array &corner_normals, int count, int distribution, PackedVector2Array &r_points, PackedVector2Array &r_normals) {
+// normals). count <= corners seats evenly spaced corners. corner_priority
+// picks which adjoining edge owns a shared corner dot (HORIZONTAL default:
+// top/bottom own it; VERTICAL: left/right; BALANCED: outgoing edge, i.e. the
+// previous behavior). corner_mode EVEN_ARC skips corner pinning and spreads
+// purely evenly by arc length from corner 0. edge_margin keeps interior dots
+// at least that many px away from corners along their edge (clamped per
+// edge). Returns false when degenerate (caller stacks at the marker).
+static bool build_symmetric_polygon_loop(const PackedVector2Array &corners, const PackedVector2Array &corner_normals, int count, int distribution, PackedVector2Array &r_points, PackedVector2Array &r_normals, int corner_priority, int corner_mode, double edge_margin) {
 	const int n = corners.size();
 	r_points.clear();
 	r_normals.clear();
 	if (n < 3 || count <= 0 || corner_normals.size() != n) {
 		return false;
 	}
+	if (corner_priority < 0 || corner_priority > 2) {
+		corner_priority = 0;
+	}
+	if (edge_margin < 0.0 || !Math::is_finite(edge_margin)) {
+		edge_margin = 0.0;
+	}
+	if (corner_mode == BlastBullets2D::BulletFactory2D::OUTLINE_CORNER_MODE_EVEN_ARC) {
+		// Pure arc-length walk from corner 0: uniform gaps everywhere, corners
+		// coincide only when the count aligns (no pinning distortion).
+		PackedFloat64Array cum;
+		cum.resize(n + 1);
+		cum[0] = 0.0;
+		for (int e = 0; e < n; ++e) {
+			const double seg = (double)corners[e].distance_to(corners[(e + 1) % n]);
+			cum[e + 1] = cum[e] + (Math::is_finite(seg) && seg > 0.0 ? seg : 0.0);
+		}
+		const double total = cum[n];
+		if (!(total > 0.0) || !Math::is_finite(total)) {
+			return false;
+		}
+		const double step = total / (double)count;
+		int seg = 0;
+		for (int i = 0; i < count; ++i) {
+			double d = step * (double)i;
+			while (seg < n - 1 && d >= cum[seg + 1]) {
+				++seg;
+			}
+			const double seg_len = cum[seg + 1] - cum[seg];
+			double t = (seg_len > 1e-9) ? (d - cum[seg]) / seg_len : 0.0;
+			t = Math::clamp(t, 0.0, 1.0);
+			const int ia = seg % n;
+			const int ib = (seg + 1) % n;
+			const Vector2 ref = corner_normals[ia];
+			Vector2 edge_n = oriented_edge_normal(corners[ia], corners[ib], ref);
+			if (edge_n.length_squared() <= 1e-12) {
+				edge_n = ref;
+			}
+			// A sample landing exactly on a corner inherits the priority
+			// owner so facings never guess.
+			if (t <= 1e-9) {
+				edge_n = corner_owner_normal(corners, ia, ref, corner_priority);
+			}
+			r_points.push_back(corners[ia].lerp(corners[ib], (real_t)t));
+			r_normals.push_back(edge_n.length_squared() > 1e-12 ? edge_n.normalized() : Vector2(0, -1));
+		}
+		return r_points.size() == count && r_normals.size() == count;
+	}
 	if (count <= n) {
 		const PackedInt32Array seats = even_corner_seats(n, count);
 		for (int s = 0; s < seats.size(); ++s) {
 			const int c = seats[s];
 			const Vector2 ref = corner_normals[c];
-			Vector2 edge_n = oriented_edge_normal(corners[c], corners[(c + 1) % n], ref);
-			if (edge_n.length_squared() <= 1e-12) {
-				edge_n = ref;
-			}
+			const Vector2 edge_n = corner_owner_normal(corners, c, ref, corner_priority);
 			r_points.push_back(corners[c]);
-			r_normals.push_back(edge_n.length_squared() > 1e-12 ? edge_n.normalized() : Vector2(0, -1));
+			r_normals.push_back(edge_n);
 		}
 		return r_points.size() == count;
 	}
@@ -3728,11 +4250,20 @@ static bool build_symmetric_polygon_loop(const PackedVector2Array &corners, cons
 			edge_n = corner_normals[ia];
 		}
 		edge_n = edge_n.length_squared() > 1e-12 ? edge_n.normalized() : Vector2(0, -1);
+		// Corner dot faces with its priority owner, not blindly outgoing.
+		const Vector2 corner_n = corner_owner_normal(corners, ia, corner_normals[ia], corner_priority);
 		r_points.push_back(corners[ia]);
-		r_normals.push_back(edge_n);
+		r_normals.push_back(corner_n);
 		++made;
+		const double edge_len = (double)corners[ia].distance_to(corners[ib]);
+		const double eff_margin = (edge_len > 0.0 && Math::is_finite(edge_len)) ? MIN(edge_margin, edge_len * 0.5) : 0.0;
 		for (int m = 0; m < interior[e] && made < count; ++m) {
-			r_points.push_back(corners[ia].lerp(corners[ib], (real_t)(m + 1) / (real_t)(interior[e] + 1)));
+			double t = (double)(m + 1) / (double)(interior[e] + 1);
+			if (eff_margin > 0.0 && edge_len > 0.0) {
+				t = (eff_margin + (edge_len - 2.0 * eff_margin) * (double)(m + 1) / (double)(interior[e] + 1)) / edge_len;
+				t = Math::clamp(t, 0.0, 1.0);
+			}
+			r_points.push_back(corners[ia].lerp(corners[ib], (real_t)t));
 			r_normals.push_back(edge_n);
 			++made;
 		}
@@ -3768,7 +4299,10 @@ TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_rectangle(
 		int layer_twist,
 		int layer_max_dots,
 		int outline_distribution,
-		int layer_layout) {
+		int layer_layout,
+		int outline_corner_priority,
+		int outline_corner_mode,
+		double outline_edge_margin) {
 	if (!danmaku_validate_head("helper_generate_transforms_rectangle", transforms_amount, marker_transform)) {
 		return TypedArray<Transform2D>();
 	}
@@ -3782,6 +4316,18 @@ TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_rectangle(
 	}
 	if (layer_layout < 0 || layer_layout > 1) {
 		UtilityFunctions::push_error("helper_generate_transforms_rectangle: layer_layout must be 0 (shared loop) or 1 (even per layer).");
+		return TypedArray<Transform2D>();
+	}
+	if (outline_corner_priority < 0 || outline_corner_priority > 2) {
+		UtilityFunctions::push_error("helper_generate_transforms_rectangle: outline_corner_priority must be 0 (horizontal), 1 (vertical) or 2 (balanced).");
+		return TypedArray<Transform2D>();
+	}
+	if (outline_corner_mode < 0 || outline_corner_mode > 1) {
+		UtilityFunctions::push_error("helper_generate_transforms_rectangle: outline_corner_mode must be 0 (pin corners) or 1 (even arc).");
+		return TypedArray<Transform2D>();
+	}
+	if (!Math::is_finite(outline_edge_margin) || outline_edge_margin < 0.0) {
+		UtilityFunctions::push_error("helper_generate_transforms_rectangle: outline_edge_margin must be finite and >= 0.");
 		return TypedArray<Transform2D>();
 	}
 	// Counter-clockwise outline from top-left; corners double as normals via
@@ -3819,11 +4365,11 @@ TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_rectangle(
 	// straight along the top edge.
 	PackedVector2Array loop_points;
 	PackedVector2Array loop_normals;
-	if (!build_symmetric_polygon_loop(corners, normals, transforms_amount, outline_distribution, loop_points, loop_normals)) {
+	if (!build_symmetric_polygon_loop(corners, normals, transforms_amount, outline_distribution, loop_points, loop_normals, outline_corner_priority, outline_corner_mode, outline_edge_margin)) {
 		UtilityFunctions::push_error("helper_generate_transforms_rectangle: degenerate rectangle.");
 		return TypedArray<Transform2D>();
 	}
-	return layout_outline_slots("helper_generate_transforms_rectangle", marker_transform, loop_points, loop_normals, true, marker_rot, face_outward, facing_offset_degrees, PackedFloat32Array(), outline_placement, outline_facing, outline_reverse, outline_slot_offset, fill_spacing, fill_stagger, fill_margin, layer_count, layer_scale, layer_side, layer_fill, layer_start_offset, layer_scale_curve, layer_custom_scales, layer_twist, layer_max_dots, outline_distribution, layer_layout, corners);
+	return layout_outline_slots("helper_generate_transforms_rectangle", marker_transform, loop_points, loop_normals, true, marker_rot, face_outward, facing_offset_degrees, PackedFloat32Array(), outline_placement, outline_facing, outline_reverse, outline_slot_offset, fill_spacing, fill_stagger, fill_margin, layer_count, layer_scale, layer_side, layer_fill, layer_start_offset, layer_scale_curve, layer_custom_scales, layer_twist, layer_max_dots, outline_distribution, layer_layout, corners, outline_corner_priority, outline_corner_mode, outline_edge_margin);
 }
 
 TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_polygon(
@@ -3851,7 +4397,10 @@ TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_polygon(
 		int layer_twist,
 		int layer_max_dots,
 		int outline_distribution,
-		int layer_layout) {
+		int layer_layout,
+		int outline_corner_priority,
+		int outline_corner_mode,
+		double outline_edge_margin) {
 	if (!danmaku_validate_head("helper_generate_transforms_polygon", transforms_amount, marker_transform)) {
 		return TypedArray<Transform2D>();
 	}
@@ -3865,6 +4414,18 @@ TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_polygon(
 	}
 	if (layer_layout < 0 || layer_layout > 1) {
 		UtilityFunctions::push_error("helper_generate_transforms_polygon: layer_layout must be 0 (shared loop) or 1 (even per layer).");
+		return TypedArray<Transform2D>();
+	}
+	if (outline_corner_priority < 0 || outline_corner_priority > 2) {
+		UtilityFunctions::push_error("helper_generate_transforms_polygon: outline_corner_priority must be 0 (horizontal), 1 (vertical) or 2 (balanced).");
+		return TypedArray<Transform2D>();
+	}
+	if (outline_corner_mode < 0 || outline_corner_mode > 1) {
+		UtilityFunctions::push_error("helper_generate_transforms_polygon: outline_corner_mode must be 0 (pin corners) or 1 (even arc).");
+		return TypedArray<Transform2D>();
+	}
+	if (!Math::is_finite(outline_edge_margin) || outline_edge_margin < 0.0) {
+		UtilityFunctions::push_error("helper_generate_transforms_polygon: outline_edge_margin must be finite and >= 0.");
 		return TypedArray<Transform2D>();
 	}
 	PackedVector2Array corners;
@@ -3898,11 +4459,11 @@ TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_polygon(
 	// counts seat evenly spaced corners, opposite sides stay equal.
 	PackedVector2Array loop_points;
 	PackedVector2Array loop_normals;
-	if (!build_symmetric_polygon_loop(corners, normals, transforms_amount, outline_distribution, loop_points, loop_normals)) {
+	if (!build_symmetric_polygon_loop(corners, normals, transforms_amount, outline_distribution, loop_points, loop_normals, outline_corner_priority, outline_corner_mode, outline_edge_margin)) {
 		UtilityFunctions::push_error("helper_generate_transforms_polygon: degenerate polygon.");
 		return TypedArray<Transform2D>();
 	}
-	return layout_outline_slots("helper_generate_transforms_polygon", marker_transform, loop_points, loop_normals, true, marker_rot, face_outward, facing_offset_degrees, PackedFloat32Array(), outline_placement, outline_facing, outline_reverse, outline_slot_offset, fill_spacing, fill_stagger, fill_margin, layer_count, layer_scale, layer_side, layer_fill, layer_start_offset, layer_scale_curve, layer_custom_scales, layer_twist, layer_max_dots, outline_distribution, layer_layout, corners);
+	return layout_outline_slots("helper_generate_transforms_polygon", marker_transform, loop_points, loop_normals, true, marker_rot, face_outward, facing_offset_degrees, PackedFloat32Array(), outline_placement, outline_facing, outline_reverse, outline_slot_offset, fill_spacing, fill_stagger, fill_margin, layer_count, layer_scale, layer_side, layer_fill, layer_start_offset, layer_scale_curve, layer_custom_scales, layer_twist, layer_max_dots, outline_distribution, layer_layout, corners, outline_corner_priority, outline_corner_mode, outline_edge_margin);
 }
 
 
@@ -4622,12 +5183,11 @@ Dictionary BulletFactory2D::helper_sample_outline_star(int points, real_t outer_
 }
 
 // Closed-polygon outline sampler shared by the triangle/trapezoid/diamond
-// primitives: corner-anchored loop points (every corner carries a slot, the
-// rest spread per edge by length) + geometric outward normals in marker-local
-// space. Corners must wind like the rectangle primitive (positive shoelace
-// area); callers orientation-fix first. False when degenerate (caller stacks
-// at the marker, rectangle precedent).
-static bool sample_closed_polygon_loop(const PackedVector2Array &corners, int count, PackedVector2Array &r_points, PackedVector2Array &r_normals, int distribution = 1) {
+// primitives: delegates to build_symmetric_polygon_loop (corner ownership,
+// mode and margin honored). Corners must wind like the rectangle primitive
+// (positive shoelace area); callers orientation-fix first. False when
+// degenerate (caller stacks at the marker, rectangle precedent).
+static bool sample_closed_polygon_loop(const PackedVector2Array &corners, int count, PackedVector2Array &r_points, PackedVector2Array &r_normals, int distribution = 1, int corner_priority = 0, int corner_mode = 0, double edge_margin = 0.0) {
 	const int n = corners.size();
 	if (n < 3 || count <= 0) {
 		return false;
@@ -4649,49 +5209,7 @@ static bool sample_closed_polygon_loop(const PackedVector2Array &corners, int co
 	}
 	r_points.clear();
 	r_normals.clear();
-	// Corner-anchored walk: every corner always carries a bullet and the rest
-	// spread per edge by length (largest remainder). All slots ride
-	// edge-constant normals, so bullet 0 faces straight along its edge.
-	if (count <= n) {
-		// Fewer bullets than corners: seat evenly spaced corners so small
-		// counts still read (2 bullets = opposite corners on a square).
-		const PackedInt32Array seats = even_corner_seats(n, count);
-		for (int s = 0; s < seats.size(); ++s) {
-			const int c = seats[s];
-			const Vector2 ref = (c >= 0 && c < normals.size()) ? normals[c] : Vector2(0, -1);
-			Vector2 edge_n = oriented_edge_normal(corners[c], corners[(c + 1) % n], ref);
-			r_points.push_back(corners[c]);
-			r_normals.push_back(edge_n.length_squared() > 1e-12 ? edge_n.normalized() : (ref.length_squared() > 1e-12 ? ref.normalized() : Vector2(0, -1)));
-		}
-		return r_points.size() == count && r_normals.size() == count;
-	}
-	PackedInt32Array interior;
-	apportion_polygon_slots(corners, count, interior, distribution);
-	int i = 0;
-	for (int e = 0; e < n && i < count; ++e) {
-		const int ia = e % n;
-		const int ib = (e + 1) % n;
-		Vector2 edge_n = oriented_edge_normal(corners[ia], corners[ib], normals[ia]);
-		if (edge_n.length_squared() <= 1e-12) {
-			edge_n = normals[ia];
-		}
-		edge_n = edge_n.length_squared() > 1e-12 ? edge_n.normalized() : Vector2(0, -1);
-		r_points.push_back(corners[ia]);
-		r_normals.push_back(edge_n);
-		++i;
-		for (int m = 0; m < interior[e] && i < count; ++m) {
-			r_points.push_back(corners[ia].lerp(corners[ib], (real_t)(m + 1) / (real_t)(interior[e] + 1)));
-			r_normals.push_back(edge_n);
-			++i;
-		}
-	}
-	// Safety net: degenerate length tables must still fill every slot.
-	while (i < count) {
-		r_points.push_back(corners[0]);
-		r_normals.push_back((!normals.is_empty() && normals[0].length_squared() > 1e-12) ? normals[0].normalized() : Vector2(0, -1));
-		++i;
-	}
-	return r_points.size() == count && r_normals.size() == count;
+	return build_symmetric_polygon_loop(corners, normals, count, distribution, r_points, r_normals, corner_priority, corner_mode, edge_margin);
 }
 
 // Signed shoelace area (> 0 matches the rectangle primitive winding, which
@@ -4733,7 +5251,10 @@ TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_triangle(
 		int layer_twist,
 		int layer_max_dots,
 		int outline_distribution,
-		int layer_layout) {
+		int layer_layout,
+		int outline_corner_priority,
+		int outline_corner_mode,
+		double outline_edge_margin) {
 	if (!danmaku_validate_head("helper_generate_transforms_triangle", transforms_amount, marker_transform)) {
 		return TypedArray<Transform2D>();
 	}
@@ -4753,10 +5274,22 @@ TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_triangle(
 		UtilityFunctions::push_error("helper_generate_transforms_triangle: layer_layout must be 0 (shared loop) or 1 (even per layer).");
 		return TypedArray<Transform2D>();
 	}
+	if (outline_corner_priority < 0 || outline_corner_priority > 2) {
+		UtilityFunctions::push_error("helper_generate_transforms_triangle: outline_corner_priority must be 0 (horizontal), 1 (vertical) or 2 (balanced).");
+		return TypedArray<Transform2D>();
+	}
+	if (outline_corner_mode < 0 || outline_corner_mode > 1) {
+		UtilityFunctions::push_error("helper_generate_transforms_triangle: outline_corner_mode must be 0 (pin corners) or 1 (even arc).");
+		return TypedArray<Transform2D>();
+	}
+	if (!Math::is_finite(outline_edge_margin) || outline_edge_margin < 0.0) {
+		UtilityFunctions::push_error("helper_generate_transforms_triangle: outline_edge_margin must be finite and >= 0.");
+		return TypedArray<Transform2D>();
+	}
 	PackedVector2Array corners = build_triangle_corners(triangle_type, size_a, size_b, rotation);
 	PackedVector2Array loop_points;
 	PackedVector2Array loop_normals;
-	if (!sample_closed_polygon_loop(corners, transforms_amount, loop_points, loop_normals, outline_distribution)) {
+	if (!sample_closed_polygon_loop(corners, transforms_amount, loop_points, loop_normals, outline_distribution, outline_corner_priority, outline_corner_mode, outline_edge_margin)) {
 		// Degenerate (zero-area) triangle: stack at the marker like the
 		// rectangle primitive instead of emitting garbage.
 		TypedArray<Transform2D> stacked = danmaku_make_slots(transforms_amount);
@@ -4767,7 +5300,7 @@ TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_triangle(
 		}
 		return stacked;
 	}
-	return layout_outline_slots("helper_generate_transforms_triangle", marker_transform, loop_points, loop_normals, true, marker_transform.get_rotation(), face_outward, facing_offset_degrees, PackedFloat32Array(), outline_placement, outline_facing, outline_reverse, outline_slot_offset, fill_spacing, fill_stagger, fill_margin, layer_count, layer_scale, layer_side, layer_fill, layer_start_offset, layer_scale_curve, layer_custom_scales, layer_twist, layer_max_dots, outline_distribution, layer_layout, corners);
+	return layout_outline_slots("helper_generate_transforms_triangle", marker_transform, loop_points, loop_normals, true, marker_transform.get_rotation(), face_outward, facing_offset_degrees, PackedFloat32Array(), outline_placement, outline_facing, outline_reverse, outline_slot_offset, fill_spacing, fill_stagger, fill_margin, layer_count, layer_scale, layer_side, layer_fill, layer_start_offset, layer_scale_curve, layer_custom_scales, layer_twist, layer_max_dots, outline_distribution, layer_layout, corners, outline_corner_priority, outline_corner_mode, outline_edge_margin);
 }
 
 TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_trapezoid(
@@ -4796,7 +5329,10 @@ TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_trapezoid(
 		int layer_twist,
 		int layer_max_dots,
 		int outline_distribution,
-		int layer_layout) {
+		int layer_layout,
+		int outline_corner_priority,
+		int outline_corner_mode,
+		double outline_edge_margin) {
 	if (!danmaku_validate_head("helper_generate_transforms_trapezoid", transforms_amount, marker_transform)) {
 		return TypedArray<Transform2D>();
 	}
@@ -4812,10 +5348,22 @@ TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_trapezoid(
 		UtilityFunctions::push_error("helper_generate_transforms_trapezoid: layer_layout must be 0 (shared loop) or 1 (even per layer).");
 		return TypedArray<Transform2D>();
 	}
+	if (outline_corner_priority < 0 || outline_corner_priority > 2) {
+		UtilityFunctions::push_error("helper_generate_transforms_trapezoid: outline_corner_priority must be 0 (horizontal), 1 (vertical) or 2 (balanced).");
+		return TypedArray<Transform2D>();
+	}
+	if (outline_corner_mode < 0 || outline_corner_mode > 1) {
+		UtilityFunctions::push_error("helper_generate_transforms_trapezoid: outline_corner_mode must be 0 (pin corners) or 1 (even arc).");
+		return TypedArray<Transform2D>();
+	}
+	if (!Math::is_finite(outline_edge_margin) || outline_edge_margin < 0.0) {
+		UtilityFunctions::push_error("helper_generate_transforms_trapezoid: outline_edge_margin must be finite and >= 0.");
+		return TypedArray<Transform2D>();
+	}
 	PackedVector2Array corners = build_trapezoid_corners(base_top, base_bottom, height, rotation);
 	PackedVector2Array loop_points;
 	PackedVector2Array loop_normals;
-	if (!sample_closed_polygon_loop(corners, transforms_amount, loop_points, loop_normals, outline_distribution)) {
+	if (!sample_closed_polygon_loop(corners, transforms_amount, loop_points, loop_normals, outline_distribution, outline_corner_priority, outline_corner_mode, outline_edge_margin)) {
 		TypedArray<Transform2D> stacked = danmaku_make_slots(transforms_amount);
 		for (int i = 0; i < transforms_amount; ++i) {
 			Transform2D slot(marker_transform.get_rotation() + Math::deg_to_rad(facing_offset_degrees), marker_transform.get_origin());
@@ -4824,7 +5372,7 @@ TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_trapezoid(
 		}
 		return stacked;
 	}
-	return layout_outline_slots("helper_generate_transforms_trapezoid", marker_transform, loop_points, loop_normals, true, marker_transform.get_rotation(), face_outward, facing_offset_degrees, PackedFloat32Array(), outline_placement, outline_facing, outline_reverse, outline_slot_offset, fill_spacing, fill_stagger, fill_margin, layer_count, layer_scale, layer_side, layer_fill, layer_start_offset, layer_scale_curve, layer_custom_scales, layer_twist, layer_max_dots, outline_distribution, layer_layout, corners);
+	return layout_outline_slots("helper_generate_transforms_trapezoid", marker_transform, loop_points, loop_normals, true, marker_transform.get_rotation(), face_outward, facing_offset_degrees, PackedFloat32Array(), outline_placement, outline_facing, outline_reverse, outline_slot_offset, fill_spacing, fill_stagger, fill_margin, layer_count, layer_scale, layer_side, layer_fill, layer_start_offset, layer_scale_curve, layer_custom_scales, layer_twist, layer_max_dots, outline_distribution, layer_layout, corners, outline_corner_priority, outline_corner_mode, outline_edge_margin);
 }
 
 TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_diamond(
@@ -4852,7 +5400,10 @@ TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_diamond(
 		int layer_twist,
 		int layer_max_dots,
 		int outline_distribution,
-		int layer_layout) {
+		int layer_layout,
+		int outline_corner_priority,
+		int outline_corner_mode,
+		double outline_edge_margin) {
 	if (!danmaku_validate_head("helper_generate_transforms_diamond", transforms_amount, marker_transform)) {
 		return TypedArray<Transform2D>();
 	}
@@ -4868,10 +5419,22 @@ TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_diamond(
 		UtilityFunctions::push_error("helper_generate_transforms_diamond: layer_layout must be 0 (shared loop) or 1 (even per layer).");
 		return TypedArray<Transform2D>();
 	}
+	if (outline_corner_priority < 0 || outline_corner_priority > 2) {
+		UtilityFunctions::push_error("helper_generate_transforms_diamond: outline_corner_priority must be 0 (horizontal), 1 (vertical) or 2 (balanced).");
+		return TypedArray<Transform2D>();
+	}
+	if (outline_corner_mode < 0 || outline_corner_mode > 1) {
+		UtilityFunctions::push_error("helper_generate_transforms_diamond: outline_corner_mode must be 0 (pin corners) or 1 (even arc).");
+		return TypedArray<Transform2D>();
+	}
+	if (!Math::is_finite(outline_edge_margin) || outline_edge_margin < 0.0) {
+		UtilityFunctions::push_error("helper_generate_transforms_diamond: outline_edge_margin must be finite and >= 0.");
+		return TypedArray<Transform2D>();
+	}
 	PackedVector2Array corners = build_diamond_corners(diagonal_x, diagonal_y, rotation);
 	PackedVector2Array loop_points;
 	PackedVector2Array loop_normals;
-	if (!sample_closed_polygon_loop(corners, transforms_amount, loop_points, loop_normals, outline_distribution)) {
+	if (!sample_closed_polygon_loop(corners, transforms_amount, loop_points, loop_normals, outline_distribution, outline_corner_priority, outline_corner_mode, outline_edge_margin)) {
 		TypedArray<Transform2D> stacked = danmaku_make_slots(transforms_amount);
 		for (int i = 0; i < transforms_amount; ++i) {
 			Transform2D slot(marker_transform.get_rotation() + Math::deg_to_rad(facing_offset_degrees), marker_transform.get_origin());
@@ -4880,7 +5443,7 @@ TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_diamond(
 		}
 		return stacked;
 	}
-	return layout_outline_slots("helper_generate_transforms_diamond", marker_transform, loop_points, loop_normals, true, marker_transform.get_rotation(), face_outward, facing_offset_degrees, PackedFloat32Array(), outline_placement, outline_facing, outline_reverse, outline_slot_offset, fill_spacing, fill_stagger, fill_margin, layer_count, layer_scale, layer_side, layer_fill, layer_start_offset, layer_scale_curve, layer_custom_scales, layer_twist, layer_max_dots, outline_distribution, layer_layout, corners);
+	return layout_outline_slots("helper_generate_transforms_diamond", marker_transform, loop_points, loop_normals, true, marker_transform.get_rotation(), face_outward, facing_offset_degrees, PackedFloat32Array(), outline_placement, outline_facing, outline_reverse, outline_slot_offset, fill_spacing, fill_stagger, fill_margin, layer_count, layer_scale, layer_side, layer_fill, layer_start_offset, layer_scale_curve, layer_custom_scales, layer_twist, layer_max_dots, outline_distribution, layer_layout, corners, outline_corner_priority, outline_corner_mode, outline_edge_margin);
 }
 
 TypedArray<Transform2D> BulletFactory2D::helper_apply_side_spread(
@@ -5326,6 +5889,439 @@ Dictionary BulletFactory2D::helper_extract_edge_from_image(
 	result["points"] = points;
 	result["normals"] = normals;
 	return result;
+}
+
+// ---- Outline debug inspectors (mathematical conformance framework) ----
+
+static real_t debug_param_real(const Dictionary &p, const StringName &k, real_t fallback) {
+	if (!p.has(k)) {
+		return fallback;
+	}
+	const Variant v = p[k];
+	if (v.get_type() == Variant::FLOAT || v.get_type() == Variant::INT) {
+		const double d = (double)v;
+		return Math::is_finite(d) ? (real_t)d : fallback;
+	}
+	return fallback;
+}
+
+static int debug_param_int(const Dictionary &p, const StringName &k, int fallback) {
+	if (!p.has(k)) {
+		return fallback;
+	}
+	const Variant v = p[k];
+	if (v.get_type() == Variant::FLOAT || v.get_type() == Variant::INT) {
+		return (int)v;
+	}
+	if (v.get_type() == Variant::BOOL) {
+		return (bool)v ? 1 : 0;
+	}
+	return fallback;
+}
+
+static bool debug_param_bool(const Dictionary &p, const StringName &k, bool fallback) {
+	if (!p.has(k)) {
+		return fallback;
+	}
+	const Variant v = p[k];
+	if (v.get_type() == Variant::BOOL) {
+		return (bool)v;
+	}
+	if (v.get_type() == Variant::FLOAT || v.get_type() == Variant::INT) {
+		return (int)v != 0;
+	}
+	return fallback;
+}
+
+static Vector2 debug_param_v2(const Dictionary &p, const StringName &k, const Vector2 &fallback) {
+	if (!p.has(k)) {
+		return fallback;
+	}
+	const Variant v = p[k];
+	if (v.get_type() == Variant::VECTOR2) {
+		const Vector2 w = v;
+		return w.is_finite() ? w : fallback;
+	}
+	return fallback;
+}
+
+static real_t debug_wrap_angle(real_t a) {
+	while (a > Math::PI) {
+		a -= Math::TAU;
+	}
+	while (a < -Math::PI) {
+		a += Math::TAU;
+	}
+	return a;
+}
+
+Dictionary BulletFactory2D::debug_describe_outline(int shape, int count, const Dictionary &params) {
+	Dictionary out;
+	out["ok"] = false;
+	out["error"] = String("unknown shape");
+	out["points"] = PackedVector2Array();
+	out["facings"] = PackedFloat32Array();
+	out["edge_ids"] = PackedInt32Array();
+	out["corner_flags"] = PackedInt32Array();
+	out["corner_index"] = PackedInt32Array();
+	out["gaps"] = PackedFloat32Array();
+	out["settings"] = Dictionary();
+	if (count <= 0) {
+		out["error"] = String("count must be > 0");
+		return out;
+	}
+	// Common knobs (helper-matching defaults).
+	const bool face_outward = debug_param_bool(params, "face_outward", true);
+	const real_t facing_offset_deg = debug_param_real(params, "facing_offset_degrees", 0.0);
+	const int outline_facing = debug_param_int(params, "outline_facing", 0);
+	const bool outline_reverse = debug_param_bool(params, "outline_reverse", false);
+	const int outline_slot_offset = debug_param_int(params, "outline_slot_offset", 0);
+	const int distribution = debug_param_int(params, "outline_distribution", 1);
+	const int corner_priority = debug_param_int(params, "outline_corner_priority", 0);
+	const int corner_mode = debug_param_int(params, "outline_corner_mode", 0);
+	const double edge_margin = (double)debug_param_real(params, "outline_edge_margin", 0.0);
+	const Transform2D identity;
+	TypedArray<Transform2D> volley;
+	PackedVector2Array corners; // marker-local corners for polygonal shapes
+	bool has_corners = false;
+	bool radial_facings = true;
+	switch (shape) {
+		case DEBUG_SHAPE_CIRCLE: {
+			const real_t radius = debug_param_real(params, "radius", 150.0);
+			volley = helper_generate_transforms_circle(count, identity, radius, face_outward, facing_offset_deg, 0, outline_facing, outline_reverse, outline_slot_offset, 32.0, false, 0.0, 1, 0.2, 0, 0, 0, 0, PackedFloat32Array(), 0, 0);
+			break;
+		}
+		case DEBUG_SHAPE_RING: {
+			const real_t radius = debug_param_real(params, "radius", 150.0);
+			const real_t start_angle = debug_param_real(params, "start_angle", 0.0);
+			const real_t arc = debug_param_real(params, "arc", Math::TAU);
+			const real_t y_scale = debug_param_real(params, "y_scale", 1.0);
+			volley = helper_generate_transforms_ring(count, identity, radius, start_angle, arc, true, false, face_outward, y_scale, facing_offset_deg, 0, outline_facing, outline_reverse, outline_slot_offset, 32.0, false, 0.0, 1, 0.2, 0, 0, 0, 0, PackedFloat32Array(), 0, 0, (uint64_t)debug_param_int(params, "seed", 0));
+			break;
+		}
+		case DEBUG_SHAPE_ELLIPSE: {
+			const real_t rx = debug_param_real(params, "radius_x", 150.0);
+			const real_t ry = debug_param_real(params, "radius_y", 100.0);
+			volley = helper_generate_transforms_ellipse(count, identity, rx, ry, debug_param_real(params, "rotation", 0.0), debug_param_real(params, "start_angle", 0.0), debug_param_real(params, "arc", Math::TAU), (EllipseMode)debug_param_int(params, "mode", 0), debug_param_int(params, "gap_count", 0), debug_param_real(params, "gap_width", 0.0), face_outward, facing_offset_deg, 0, outline_facing, outline_reverse, outline_slot_offset, 32.0, false, 0.0, 1, 0.2, 0, 0, 0, 0, PackedFloat32Array(), 0, 0);
+			break;
+		}
+		case DEBUG_SHAPE_RECTANGLE: {
+			const Vector2 size = debug_param_v2(params, "size", Vector2(300, 200));
+			volley = helper_generate_transforms_rectangle(count, identity, size, face_outward, facing_offset_deg, 0, outline_facing, outline_reverse, outline_slot_offset, 32.0, false, 0.0, 1, 0.2, 0, 0, 0, 0, PackedFloat32Array(), 0, 0, distribution, 1, corner_priority, corner_mode, (double)edge_margin);
+			const Vector2 hw(size.x * 0.5, size.y * 0.5);
+			corners.push_back(Vector2(-hw.x, -hw.y));
+			corners.push_back(Vector2(hw.x, -hw.y));
+			corners.push_back(Vector2(hw.x, hw.y));
+			corners.push_back(Vector2(-hw.x, hw.y));
+			has_corners = true;
+			radial_facings = false;
+			break;
+		}
+		case DEBUG_SHAPE_SQUARE: {
+			const real_t s = debug_param_real(params, "size", 150.0);
+			volley = helper_generate_transforms_rectangle(count, identity, Vector2(s, s), face_outward, facing_offset_deg, 0, outline_facing, outline_reverse, outline_slot_offset, 32.0, false, 0.0, 1, 0.2, 0, 0, 0, 0, PackedFloat32Array(), 0, 0, distribution, 1, corner_priority, corner_mode, (double)edge_margin);
+			const Vector2 hw(s * 0.5, s * 0.5);
+			corners.push_back(Vector2(-hw.x, -hw.y));
+			corners.push_back(Vector2(hw.x, -hw.y));
+			corners.push_back(Vector2(hw.x, hw.y));
+			corners.push_back(Vector2(-hw.x, hw.y));
+			has_corners = true;
+			radial_facings = false;
+			break;
+		}
+		case DEBUG_SHAPE_POLYGON: {
+			const int vertices = debug_param_int(params, "vertices", 6);
+			const real_t radius = debug_param_real(params, "radius", 150.0);
+			const real_t rotation = debug_param_real(params, "rotation", 0.0);
+			volley = helper_generate_transforms_polygon(count, identity, vertices, radius, rotation, face_outward, facing_offset_deg, 0, outline_facing, outline_reverse, outline_slot_offset, 32.0, false, 0.0, 1, 0.2, 0, 0, 0, 0, PackedFloat32Array(), 0, 0, distribution, 1, corner_priority, corner_mode, (double)edge_margin);
+			if (vertices >= 3) {
+				for (int k = 0; k < vertices; ++k) {
+					const real_t a = rotation + Math::TAU * (real_t)k / (real_t)vertices;
+					corners.push_back(Vector2(Math::cos(a), Math::sin(a)) * radius);
+				}
+				has_corners = true;
+			}
+			radial_facings = false;
+			break;
+		}
+		case DEBUG_SHAPE_TRIANGLE: {
+			const int ttype = debug_param_int(params, "triangle_type", 0);
+			const real_t sa = debug_param_real(params, "size_a", 150.0);
+			const real_t sb = debug_param_real(params, "size_b", 150.0);
+			const real_t rotation = debug_param_real(params, "rotation", 0.0);
+			volley = helper_generate_transforms_triangle(count, identity, (TriangleType)ttype, sa, sb, rotation, face_outward, facing_offset_deg, 0, outline_facing, outline_reverse, outline_slot_offset, 32.0, false, 0.0, 1, 0.2, 0, 0, 0, 0, PackedFloat32Array(), 0, 0, distribution, 1, corner_priority, corner_mode, (double)edge_margin);
+			corners = build_triangle_corners(ttype, sa, sb, rotation);
+			has_corners = corners.size() == 3;
+			radial_facings = false;
+			break;
+		}
+		case DEBUG_SHAPE_TRAPEZOID: {
+			const real_t top = debug_param_real(params, "base_top", 200.0);
+			const real_t bottom = debug_param_real(params, "base_bottom", 300.0);
+			const real_t height = debug_param_real(params, "height", 200.0);
+			const real_t rotation = debug_param_real(params, "rotation", 0.0);
+			volley = helper_generate_transforms_trapezoid(count, identity, top, bottom, height, rotation, face_outward, facing_offset_deg, 0, outline_facing, outline_reverse, outline_slot_offset, 32.0, false, 0.0, 1, 0.2, 0, 0, 0, 0, PackedFloat32Array(), 0, 0, distribution, 1, corner_priority, corner_mode, (double)edge_margin);
+			corners = build_trapezoid_corners(top, bottom, height, rotation);
+			has_corners = corners.size() == 4;
+			radial_facings = false;
+			break;
+		}
+		case DEBUG_SHAPE_DIAMOND: {
+			const real_t dx = debug_param_real(params, "diagonal_x", 200.0);
+			const real_t dy = debug_param_real(params, "diagonal_y", 300.0);
+			const real_t rotation = debug_param_real(params, "rotation", 0.0);
+			volley = helper_generate_transforms_diamond(count, identity, dx, dy, rotation, face_outward, facing_offset_deg, 0, outline_facing, outline_reverse, outline_slot_offset, 32.0, false, 0.0, 1, 0.2, 0, 0, 0, 0, PackedFloat32Array(), 0, 0, distribution, 1, corner_priority, corner_mode, (double)edge_margin);
+			corners = build_diamond_corners(dx, dy, rotation);
+			has_corners = corners.size() == 4;
+			radial_facings = false;
+			break;
+		}
+		case DEBUG_SHAPE_STAR: {
+			const int points = debug_param_int(params, "points", 5);
+			const real_t outer = debug_param_real(params, "outer_radius", 150.0);
+			const real_t inner = debug_param_real(params, "inner_radius", 65.0);
+			const real_t rotation = debug_param_real(params, "rotation", 0.0);
+			volley = helper_generate_transforms_star(count, identity, points, outer, inner, rotation, face_outward, facing_offset_deg, 0, outline_facing, outline_reverse, outline_slot_offset, 32.0, false, 0.0, 1, 0.2, 0, 0, 0, 0, PackedFloat32Array(), 0, 0, distribution, 1, corner_priority, corner_mode, (double)edge_margin);
+			if (points >= 2) {
+				const int cn = points * 2;
+				for (int c = 0; c < cn; ++c) {
+					const real_t a = rotation + Math::TAU * (real_t)c / (real_t)cn;
+					corners.push_back(Vector2(Math::cos(a), Math::sin(a)) * ((c % 2 == 0) ? outer : inner));
+				}
+				has_corners = true;
+			}
+			radial_facings = false;
+			break;
+		}
+		case DEBUG_SHAPE_HEART: {
+			volley = helper_generate_transforms_heart(count, identity, debug_param_real(params, "size", 150.0), debug_param_real(params, "rotation", 0.0), face_outward, facing_offset_deg, 0, outline_facing, outline_reverse, outline_slot_offset, 32.0, false, 0.0, 1, 0.2, 0, 0, 0, 0, PackedFloat32Array(), 0, 0);
+			break;
+		}
+		case DEBUG_SHAPE_FLOWER: {
+			volley = helper_generate_transforms_flower(count, identity, debug_param_int(params, "petals", 6), debug_param_int(params, "bullets_per_petal", 5), debug_param_real(params, "radius", 150.0), debug_param_real(params, "petal_spread", 0.5), debug_param_real(params, "petal_sharpness", 1.0), debug_param_real(params, "rotation", 0.0), face_outward, facing_offset_deg, 0, outline_facing, outline_reverse, outline_slot_offset, 32.0, false, 0.0, 1, 0.2, 0, 0, 0, 0, PackedFloat32Array(), 0, 0, debug_param_int(params, "flower_type", 0), (double)debug_param_real(params, "inner_radius_scale", 0.0), (double)debug_param_real(params, "spiro_roller", 45.0), (double)debug_param_real(params, "spiro_pen", 80.0), (double)debug_param_real(params, "super_lobes", 6.0), (double)debug_param_real(params, "super_fullness", 1.0));
+			break;
+		}
+		case DEBUG_SHAPE_ROSE: {
+			volley = helper_generate_transforms_rose(count, identity, debug_param_int(params, "petals", 6), debug_param_real(params, "radius", 150.0), debug_param_real(params, "lobe_sharpness", 1.0), debug_param_real(params, "rotation", 0.0), face_outward, facing_offset_deg, 0, outline_facing, outline_reverse, outline_slot_offset, 32.0, false, 0.0, 1, 0.2, 0, 0, 0, 0, PackedFloat32Array(), 0, 0);
+			break;
+		}
+		case DEBUG_SHAPE_LISSAJOUS: {
+			volley = helper_generate_transforms_lissajous(count, identity, debug_param_real(params, "size_x", 200.0), debug_param_real(params, "size_y", 120.0), debug_param_real(params, "freq_x", 3.0), debug_param_real(params, "freq_y", 2.0), debug_param_real(params, "phase", 0.0), face_outward, facing_offset_deg, 0, outline_facing, outline_reverse, outline_slot_offset, 32.0, false, 0.0, 1, 0.2, 0, 0, 0, 0, PackedFloat32Array(), 0, 0);
+			break;
+		}
+		default: {
+			return out;
+		}
+	}
+	const int m = volley.size();
+	if (m <= 0) {
+		out["error"] = String("generator emitted no slots");
+		return out;
+	}
+	// Edge outward normals for ownership matching (polygonal shapes).
+	PackedVector2Array edge_normals;
+	if (has_corners) {
+		PackedVector2Array averaged;
+		if (!compute_edge_normals_quiet(corners, true, false, averaged) || averaged.size() != corners.size()) {
+			has_corners = false;
+		} else {
+			const int cn = corners.size();
+			for (int e = 0; e < cn; ++e) {
+				Vector2 en = oriented_edge_normal(corners[e], corners[(e + 1) % cn], averaged[e]);
+				if (en.length_squared() <= 1e-12) {
+					en = averaged[e];
+				}
+				edge_normals.push_back(en.length_squared() > 1e-12 ? en.normalized() : Vector2(0, -1));
+			}
+		}
+	}
+	const real_t selector = outline_facing == 1 ? Math::PI * 0.5 : (outline_facing == 2 ? -Math::PI * 0.5 : 0.0);
+	const real_t facing_offset = Math::deg_to_rad(facing_offset_deg);
+	const real_t flip = face_outward ? 0.0f : Math::PI;
+	PackedVector2Array pts;
+	PackedFloat32Array facings;
+	PackedInt32Array edge_ids;
+	PackedInt32Array corner_flags;
+	PackedInt32Array corner_index;
+	PackedFloat32Array facing_dev;
+	PackedFloat32Array gaps;
+	double worst_dev = 0.0;
+	int worst_at = -1;
+	// Ellipse/ring-with-yscale facings follow the analytic gradient, not the
+	// radial direction (they coincide only on circles/axes).
+	const bool gradient_ref = (shape == DEBUG_SHAPE_ELLIPSE);
+	const real_t grad_rx = debug_param_real(params, "radius_x", 150.0);
+	const real_t grad_ry = debug_param_real(params, "radius_y", 100.0);
+	const real_t grad_rot = debug_param_real(params, "rotation", 0.0);
+	const real_t grad_cos = Math::cos(grad_rot);
+	const real_t grad_sin = Math::sin(grad_rot);
+	for (int i = 0; i < m; ++i) {
+		const Transform2D t = volley[i];
+		const Vector2 p = t.get_origin();
+		const real_t f = t.get_rotation();
+		pts.push_back(p);
+		facings.push_back(f);
+		const real_t base = f - flip - selector - facing_offset;
+		if (has_corners) {
+			const int cn = corners.size();
+			int ci = -1;
+			for (int c = 0; c < cn; ++c) {
+				if (p.distance_to(corners[c]) <= 1e-4) {
+					ci = c;
+					break;
+				}
+			}
+			corner_index.push_back(ci);
+			corner_flags.push_back(ci >= 0 ? 1 : 0);
+			int best_e = 0;
+			double best_d = 1e30;
+			for (int e = 0; e < cn; ++e) {
+				const double dev = Math::abs((double)debug_wrap_angle(base - edge_normals[e].angle()));
+				if (dev < best_d) {
+					best_d = dev;
+					best_e = e;
+				}
+			}
+			edge_ids.push_back(best_e);
+			facing_dev.push_back((real_t)best_d);
+			if (best_d > worst_dev) {
+				worst_dev = best_d;
+				worst_at = i;
+			}
+		} else {
+			edge_ids.push_back(-1);
+			corner_index.push_back(-1);
+			corner_flags.push_back(0);
+			double dev = 0.0;
+			if (gradient_ref) {
+				// Expected facing = ellipse gradient at the dot's own
+				// position (exact for on-ellipse points, independent of the
+				// generator's sampling).
+				const double ux = (double)p.x * (double)grad_cos + (double)p.y * (double)grad_sin;
+				const double uy = -(double)p.x * (double)grad_sin + (double)p.y * (double)grad_cos;
+				const double rx2 = Math::max((double)grad_rx * (double)grad_rx, 0.0001);
+				const double ry2 = Math::max((double)grad_ry * (double)grad_ry, 0.0001);
+				Vector2 g = Vector2((real_t)(ux / rx2), (real_t)(uy / ry2));
+				if (g.length_squared() > 1e-12) {
+					g = g.normalized().rotated(grad_rot);
+					dev = Math::abs((double)debug_wrap_angle(base - g.angle()));
+				}
+			} else {
+				const Vector2 radial = p;
+				if (radial.length_squared() > 1e-12) {
+					dev = Math::abs((double)debug_wrap_angle(base - radial.angle()));
+				}
+			}
+			facing_dev.push_back((real_t)dev);
+			if (dev > worst_dev) {
+				worst_dev = dev;
+				worst_at = i;
+			}
+		}
+	}
+	for (int i = 0; i < m; ++i) {
+		gaps.push_back(pts[i].distance_to(pts[(i + 1) % m]));
+	}
+	Dictionary settings;
+	settings["shape"] = shape;
+	settings["count"] = count;
+	settings["emitted"] = m;
+	settings["face_outward"] = face_outward;
+	settings["facing_offset_degrees"] = (double)facing_offset_deg;
+	settings["outline_facing"] = outline_facing;
+	settings["outline_reverse"] = outline_reverse;
+	settings["outline_slot_offset"] = outline_slot_offset;
+	settings["outline_distribution"] = distribution;
+	settings["outline_corner_priority"] = corner_priority;
+	settings["outline_corner_mode"] = corner_mode;
+	settings["outline_edge_margin"] = edge_margin;
+	out["ok"] = true;
+	out["error"] = String("");
+	out["points"] = pts;
+	out["facings"] = facings;
+	out["edge_ids"] = edge_ids;
+	out["corner_flags"] = corner_flags;
+	out["corner_index"] = corner_index;
+	out["facing_deviations"] = facing_dev;
+	out["worst_facing_deviation"] = worst_dev;
+	out["worst_facing_index"] = worst_at;
+	out["gaps"] = gaps;
+	out["settings"] = settings;
+	return out;
+}
+
+Dictionary BulletFactory2D::debug_volley_gaps(const TypedArray<Transform2D> &volley) {
+	Dictionary out;
+	const int m = volley.size();
+	PackedFloat32Array gaps;
+	double mn = 1e30;
+	double mx = 0.0;
+	double sum = 0.0;
+	for (int i = 0; i < m; ++i) {
+		const Transform2D a = volley[i];
+		const Transform2D b = volley[(i + 1) % MAX(m, 1)];
+		const double g = (m > 0 && a.is_finite() && b.is_finite()) ? (double)a.get_origin().distance_to(b.get_origin()) : 0.0;
+		gaps.push_back((real_t)g);
+		mn = MIN(mn, g);
+		mx = MAX(mx, g);
+		sum += g;
+	}
+	out["count"] = m;
+	out["gaps"] = gaps;
+	out["min_gap"] = m > 0 ? mn : 0.0;
+	out["max_gap"] = m > 0 ? mx : 0.0;
+	out["mean_gap"] = m > 0 ? sum / (double)m : 0.0;
+	out["gap_ratio"] = (m > 0 && mn > 1e-9) ? mx / mn : 0.0;
+	return out;
+}
+
+Dictionary BulletFactory2D::debug_verify_volley(const TypedArray<Transform2D> &volley, int shape, const Transform2D &marker, int count, const Dictionary &params, double tolerance_px, double tolerance_rad) {
+	Dictionary out;
+	out["ok"] = false;
+	out["checked"] = 0;
+	out["worst_pos_px"] = -1.0;
+	out["worst_face_rad"] = -1.0;
+	out["bad_index"] = -1;
+	const Dictionary ref = debug_describe_outline(shape, count, params);
+	if (!(bool)ref.get("ok", false)) {
+		out["error"] = String("describe failed: ") + String(ref.get("error", ""));
+		return out;
+	}
+	const PackedVector2Array exp_pts = ref["points"];
+	const PackedFloat32Array exp_fac = ref["facings"];
+	if (exp_pts.size() != volley.size() || exp_fac.size() != volley.size()) {
+		out["error"] = String("size mismatch");
+		return out;
+	}
+	if (!marker.is_finite()) {
+		out["error"] = String("marker not finite");
+		return out;
+	}
+	const real_t marker_rot = marker.get_rotation();
+	double worst_p = 0.0;
+	double worst_f = 0.0;
+	int bad = -1;
+	for (int i = 0; i < volley.size(); ++i) {
+		const Transform2D t = volley[i];
+		const Vector2 expect_p = marker.xform(exp_pts[i]);
+		const double dp = (double)t.get_origin().distance_to(expect_p);
+		const double df = Math::abs((double)debug_wrap_angle(t.get_rotation() - (exp_fac[i] + marker_rot)));
+		if (dp > worst_p) {
+			worst_p = dp;
+		}
+		if (df > worst_f) {
+			worst_f = df;
+		}
+		if ((dp > tolerance_px || df > tolerance_rad) && bad < 0) {
+			bad = i;
+		}
+	}
+	out["checked"] = volley.size();
+	out["worst_pos_px"] = worst_p;
+	out["worst_face_rad"] = worst_f;
+	out["bad_index"] = bad;
+	out["ok"] = bad < 0;
+	return out;
 }
 
 void BulletFactory2D::teleport_shift_all_bullets(const Vector2 &shift_amount) {
@@ -5840,7 +6836,10 @@ void BulletFactory2D::_bind_methods() {
 										"layer_twist",
 										"layer_max_dots",
 										 "outline_distribution",
-										 "layer_layout"),
+										 "layer_layout",
+										 "outline_corner_priority",
+										 "outline_corner_mode",
+										 "outline_edge_margin"),
 								&BulletFactory2D::helper_generate_transforms_star,
 								DEFVAL(5),
 								DEFVAL(150.0),
@@ -5865,7 +6864,10 @@ void BulletFactory2D::_bind_methods() {
 								DEFVAL(0),
 								DEFVAL(0),
 								DEFVAL(1),
-								DEFVAL(1));
+								DEFVAL(1),
+								DEFVAL(0),
+								DEFVAL(0),
+								DEFVAL(0.0));
 
 	ClassDB::bind_static_method("BulletFactory2D",
 								D_METHOD("helper_generate_transforms_heart",
@@ -6186,7 +7188,10 @@ void BulletFactory2D::_bind_methods() {
 										"layer_twist",
 										"layer_max_dots",
 										 "outline_distribution",
-										 "layer_layout"),
+										 "layer_layout",
+										 "outline_corner_priority",
+										 "outline_corner_mode",
+										 "outline_edge_margin"),
 								&BulletFactory2D::helper_generate_transforms_rectangle,
 								DEFVAL(Vector2(300.0, 200.0)),
 								DEFVAL(true),
@@ -6208,7 +7213,10 @@ void BulletFactory2D::_bind_methods() {
 								DEFVAL(0),
 								DEFVAL(0),
 								DEFVAL(1),
-								DEFVAL(1));
+								DEFVAL(1),
+								DEFVAL(0),
+								DEFVAL(0),
+								DEFVAL(0.0));
 
 	ClassDB::bind_static_method("BulletFactory2D",
 								D_METHOD("helper_generate_transforms_polygon",
@@ -6236,7 +7244,10 @@ void BulletFactory2D::_bind_methods() {
 										"layer_twist",
 										"layer_max_dots",
 										 "outline_distribution",
-										 "layer_layout"),
+										 "layer_layout",
+										 "outline_corner_priority",
+										 "outline_corner_mode",
+										 "outline_edge_margin"),
 								&BulletFactory2D::helper_generate_transforms_polygon,
 								DEFVAL(6),
 								DEFVAL(150.0),
@@ -6260,7 +7271,10 @@ void BulletFactory2D::_bind_methods() {
 								DEFVAL(0),
 								DEFVAL(0),
 								DEFVAL(1),
-								DEFVAL(1));
+								DEFVAL(1),
+								DEFVAL(0),
+								DEFVAL(0),
+								DEFVAL(0.0));
 
 	ClassDB::bind_static_method("BulletFactory2D",
 								D_METHOD("helper_generate_transforms_triangle",
@@ -6289,7 +7303,10 @@ void BulletFactory2D::_bind_methods() {
 										"layer_twist",
 										"layer_max_dots",
 										 "outline_distribution",
-										 "layer_layout"),
+										 "layer_layout",
+										 "outline_corner_priority",
+										 "outline_corner_mode",
+										 "outline_edge_margin"),
 								&BulletFactory2D::helper_generate_transforms_triangle,
 								DEFVAL(TRIANGLE_EQUILATERAL),
 								DEFVAL(150.0),
@@ -6314,7 +7331,10 @@ void BulletFactory2D::_bind_methods() {
 								DEFVAL(0),
 								DEFVAL(0),
 								DEFVAL(1),
-								DEFVAL(1));
+								DEFVAL(1),
+								DEFVAL(0),
+								DEFVAL(0),
+								DEFVAL(0.0));
 
 	ClassDB::bind_static_method("BulletFactory2D",
 								D_METHOD("helper_generate_transforms_trapezoid",
@@ -6343,7 +7363,10 @@ void BulletFactory2D::_bind_methods() {
 										"layer_twist",
 										"layer_max_dots",
 										 "outline_distribution",
-										 "layer_layout"),
+										 "layer_layout",
+										 "outline_corner_priority",
+										 "outline_corner_mode",
+										 "outline_edge_margin"),
 								&BulletFactory2D::helper_generate_transforms_trapezoid,
 								DEFVAL(200.0),
 								DEFVAL(300.0),
@@ -6368,7 +7391,10 @@ void BulletFactory2D::_bind_methods() {
 								DEFVAL(0),
 								DEFVAL(0),
 								DEFVAL(1),
-								DEFVAL(1));
+								DEFVAL(1),
+								DEFVAL(0),
+								DEFVAL(0),
+								DEFVAL(0.0));
 
 	ClassDB::bind_static_method("BulletFactory2D",
 								D_METHOD("helper_generate_transforms_diamond",
@@ -6396,7 +7422,10 @@ void BulletFactory2D::_bind_methods() {
 										"layer_twist",
 										"layer_max_dots",
 										 "outline_distribution",
-										 "layer_layout"),
+										 "layer_layout",
+										 "outline_corner_priority",
+										 "outline_corner_mode",
+										 "outline_edge_margin"),
 								&BulletFactory2D::helper_generate_transforms_diamond,
 								DEFVAL(200.0),
 								DEFVAL(300.0),
@@ -6420,7 +7449,10 @@ void BulletFactory2D::_bind_methods() {
 								DEFVAL(0),
 								DEFVAL(0),
 								DEFVAL(1),
-								DEFVAL(1));
+								DEFVAL(1),
+								DEFVAL(0),
+								DEFVAL(0),
+								DEFVAL(0.0));
 
 	ClassDB::bind_static_method("BulletFactory2D",
 								D_METHOD("helper_sample_outline_rose",
@@ -6728,6 +7760,34 @@ void BulletFactory2D::_bind_methods() {
 								DEFVAL(false),
 								DEFVAL(false));
 
+	// Outline debug inspectors: mathematical conformance framework for every
+	// closed shape (dot positions, gaps, corner ownership, facing deviations,
+	// settings echo). Pure math, no scene tree needed.
+	ClassDB::bind_static_method("BulletFactory2D",
+								D_METHOD("debug_describe_outline",
+										 "shape",
+										 "count",
+										 "params"),
+								&BulletFactory2D::debug_describe_outline,
+								DEFVAL(Dictionary()));
+	ClassDB::bind_static_method("BulletFactory2D",
+								D_METHOD("debug_volley_gaps",
+										 "volley"),
+								&BulletFactory2D::debug_volley_gaps);
+	ClassDB::bind_static_method("BulletFactory2D",
+								D_METHOD("debug_verify_volley",
+										 "volley",
+										 "shape",
+										 "marker",
+										 "count",
+										 "params",
+										 "tolerance_px",
+										 "tolerance_rad"),
+								&BulletFactory2D::debug_verify_volley,
+								DEFVAL(Dictionary()),
+								DEFVAL(1.0),
+								DEFVAL(0.02));
+
 	ClassDB::bind_static_method("BulletFactory2D",
 								D_METHOD("helper_generate_transforms_edge_from_points",
 										 "transforms_amount",
@@ -6823,6 +7883,25 @@ void BulletFactory2D::_bind_methods() {
 	BIND_ENUM_CONSTANT(OUTLINE_DISTRIBUTION_SYMMETRIC);
 	BIND_ENUM_CONSTANT(OUTLINE_LAYER_LAYOUT_SHARED_LOOP);
 	BIND_ENUM_CONSTANT(OUTLINE_LAYER_LAYOUT_EVEN_PER_LAYER);
+	BIND_ENUM_CONSTANT(OUTLINE_CORNER_PRIORITY_HORIZONTAL);
+	BIND_ENUM_CONSTANT(OUTLINE_CORNER_PRIORITY_VERTICAL);
+	BIND_ENUM_CONSTANT(OUTLINE_CORNER_PRIORITY_BALANCED);
+	BIND_ENUM_CONSTANT(OUTLINE_CORNER_MODE_PIN_CORNERS);
+	BIND_ENUM_CONSTANT(OUTLINE_CORNER_MODE_EVEN_ARC);
+	BIND_ENUM_CONSTANT(DEBUG_SHAPE_CIRCLE);
+	BIND_ENUM_CONSTANT(DEBUG_SHAPE_RING);
+	BIND_ENUM_CONSTANT(DEBUG_SHAPE_ELLIPSE);
+	BIND_ENUM_CONSTANT(DEBUG_SHAPE_RECTANGLE);
+	BIND_ENUM_CONSTANT(DEBUG_SHAPE_SQUARE);
+	BIND_ENUM_CONSTANT(DEBUG_SHAPE_POLYGON);
+	BIND_ENUM_CONSTANT(DEBUG_SHAPE_TRIANGLE);
+	BIND_ENUM_CONSTANT(DEBUG_SHAPE_TRAPEZOID);
+	BIND_ENUM_CONSTANT(DEBUG_SHAPE_DIAMOND);
+	BIND_ENUM_CONSTANT(DEBUG_SHAPE_STAR);
+	BIND_ENUM_CONSTANT(DEBUG_SHAPE_HEART);
+	BIND_ENUM_CONSTANT(DEBUG_SHAPE_FLOWER);
+	BIND_ENUM_CONSTANT(DEBUG_SHAPE_ROSE);
+	BIND_ENUM_CONSTANT(DEBUG_SHAPE_LISSAJOUS);
 	BIND_ENUM_CONSTANT(OUTLINE_LAYER_OUTWARD);
 	BIND_ENUM_CONSTANT(OUTLINE_LAYER_INWARD);
 	BIND_ENUM_CONSTANT(OUTLINE_LAYER_BOTH);
