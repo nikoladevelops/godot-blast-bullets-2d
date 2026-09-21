@@ -211,7 +211,7 @@
 			<description>
 				Extracts the outline of a sprite as edge points plus normals. Opaque pixels (alpha at or above [param threshold]) that touch a transparent neighbor are sampled every [param step] pixels. Returns a [Dictionary] with [code]points[/code] (centered so the texture center is the local origin, ready for [method helper_generate_transforms_edge_from_points]) and [code]normals[/code] (pointing outward, toward transparency). Set [param quiet] to true to silence errors during editor previews. Images larger than 2048x2048 are rejected to avoid stalls.
 				[codeblock]var edge = BulletFactory2D.helper_extract_edge_from_image(my_texture.get_image())
-var volley = BulletFactory2D.helper_generate_transforms_edge_from_points(60, marker.global_transform, edge["points"])[/codeblock]
+				var volley = BulletFactory2D.helper_generate_transforms_edge_from_points(60, marker.global_transform, edge["points"])[/codeblock]
 			</description>
 		</method>
 		<method name="helper_generate_transforms_aimed" qualifiers="static">
