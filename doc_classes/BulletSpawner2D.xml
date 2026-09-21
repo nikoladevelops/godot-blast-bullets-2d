@@ -703,6 +703,9 @@
 		<member name="helper_outline_edge_margin" type="float" setter="set_helper_outline_edge_margin" getter="get_helper_outline_edge_margin" default="0.0">
 			Interior dots keep at least this many pixels of clearance from corners along their edge (clamped per edge; corners stay pinned). Only shown in Pin Corners mode. Must be finite and 0 or more.
 		</member>
+		<member name="helper_outline_corner_facing" type="int" setter="set_helper_outline_corner_facing" getter="get_helper_outline_corner_facing" enum="BulletFactory2D.OutlineCornerFacing" default="0">
+			Which normal a corner-seated dot uses on corner-anchored shapes: Side (owning side's edge normal, stable default), Miter (angle bisector: triangle apexes face UP), Smooth (averaged loop normals everywhere: coherent on spiky stars). Corner shapes only.
+		</member>
 		<member name="helper_outline_layer_scale_curve" type="int" setter="set_helper_outline_layer_scale_curve" getter="get_helper_outline_layer_scale_curve" enum="BulletFactory2D.OutlineLayerScaleCurve" default="0">
 			Ring-size progression: Linear steps evenly, Exponential compounds ((1 + step)^L, mirrored reciprocally inward). A non-empty [member helper_outline_layer_scales] overrides both. Layers placement only.
 		</member>

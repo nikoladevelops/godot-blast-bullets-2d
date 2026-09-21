@@ -48,8 +48,19 @@ func _initialize() -> void:
 	_test_star_edge_walk()
 	_test_ellipse_full_no_seam()
 	_test_layer_layout_modes()
+	_test_corner_facing()
+	_test_quotas_optimal()
+	_test_layers_props_matrix()
+	_test_mix_match()
 	_test_corner_priority()
 	_test_corner_mode_margin()
+	_test_fuzz_closed_shapes()
+	_test_wall_gaps_layers()
+	_test_open_arc_endpoints()
+	_test_single_bullet_rings()
+	_test_huge_margin()
+	_test_rotated_marker_verify()
+	_test_smooth_layout_flag()
 	_test_ellipse_arc_even()
 	_test_circle_screenshot_settings()
 	_test_debug_verify()
@@ -476,6 +487,15 @@ func _test_small_corner_seats() -> void:
 	_check(sq2.size() == 2, "square pair emits")
 	var d: float = (sq2[0] as Transform2D).origin.distance_to((sq2[1] as Transform2D).origin)
 	_check(_approx(d, 200.0 * sqrt(2.0), 1.0), "square pair lands opposite (diag %.1f)" % d)
+	# Small-count facings follow priority too: TL owned by top (UP), BR by
+	# bottom (DOWN) under horizontal; left/right edges under vertical.
+	var f0: float = (sq2[0] as Transform2D).get_rotation()
+	var f1: float = (sq2[1] as Transform2D).get_rotation()
+	_check(_approx(f0, -PI * 0.5, 0.03) and _approx(f1, PI * 0.5, 0.03), "square pair faces outward (%.3f, %.3f)" % [f0, f1])
+	var sq2v: Array = BulletFactory2D.helper_generate_transforms_rectangle(2, marker, Vector2(200, 200), true, 0.0, 0, 0, false, 0, 32.0, false, 0.0, 1, STEP, 0, 0, 0, 0, PackedFloat32Array(), 0, 0, 1, 1, 1, 0, 0.0, 0)
+	var g0: float = (sq2v[0] as Transform2D).get_rotation()
+	var g1: float = (sq2v[1] as Transform2D).get_rotation()
+	_check(_approx(g0, PI, 0.03) and _approx(g1, 0.0, 0.03), "square pair vertical owns sides (%.3f, %.3f)" % [g0, g1])
 	# 5 bullets on a 5-point star = the 5 outer tips (no valley stacking).
 	var star5: Array = BulletFactory2D.helper_generate_transforms_star(5, marker, 5, 150.0, 65.0, 0.0, true, 0.0, 0, 0, false, 0, 32.0, false, 0.0, 1, STEP, 0, 0, 0, 0, PackedFloat32Array(), 0, 0)
 	var tips := 0
@@ -682,3 +702,263 @@ func _test_debug_verify() -> void:
 	# Unknown shape + bad count fail loudly, not silently.
 	var bad: Dictionary = BulletFactory2D.debug_describe_outline(99, 8, {})
 	_check(not bool(bad.get("ok", true)), "unknown shape describes as not-ok")
+
+func _corner_facing(shape: int, count: int, corner: int, params: Dictionary) -> float:
+	# Facing of one corner dot (-PI..PI) from describe.
+	var rep: Dictionary = BulletFactory2D.debug_describe_outline(shape, count, params)
+	_check(bool(rep.get("ok", false)), "describe ok for corner facing")
+	var ci: PackedInt32Array = rep["corner_index"]
+	var fa: PackedFloat32Array = rep["facings"]
+	for i in ci.size():
+		if ci[i] == corner:
+			return fa[i]
+	return NAN
+
+func _test_corner_facing() -> void:
+	# Triangle apex (corner 0, top): SIDE inherits an edge (diagonal),
+	# MITER faces the bisector = straight UP.
+	var tri_side: float = _corner_facing(BulletFactory2D.DEBUG_SHAPE_TRIANGLE, 12, 0, {"size_a": 200.0, "size_b": 200.0})
+	_check(absf(tri_side) > 0.2, "triangle apex SIDE is diagonal (%.3f)" % tri_side)
+	var tri_miter: float = _corner_facing(BulletFactory2D.DEBUG_SHAPE_TRIANGLE, 12, 0, {"size_a": 200.0, "size_b": 200.0, "outline_corner_facing": 1})
+	_check(_approx(tri_miter, -PI * 0.5, 0.03), "triangle apex MITER faces UP (%.3f)" % tri_miter)
+	# Diamond top (corner 0): same story.
+	var dia_miter: float = _corner_facing(BulletFactory2D.DEBUG_SHAPE_DIAMOND, 12, 0, {"diagonal_x": 200.0, "diagonal_y": 300.0, "outline_corner_facing": 1})
+	_check(_approx(dia_miter, -PI * 0.5, 0.03), "diamond top MITER faces UP (%.3f)" % dia_miter)
+	# Square TR (corner 1): SIDE follows priority, MITER bisects to -45deg.
+	var sq_side: float = _corner_facing(BulletFactory2D.DEBUG_SHAPE_RECTANGLE, 8, 1, {"size": Vector2(200, 200)})
+	_check(_approx(sq_side, -PI * 0.5, 0.03), "square TR SIDE+H follows top (%.3f)" % sq_side)
+	var sq_vert: float = _corner_facing(BulletFactory2D.DEBUG_SHAPE_RECTANGLE, 8, 1, {"size": Vector2(200, 200), "outline_corner_priority": 1})
+	_check(_approx(sq_vert, 0.0, 0.03), "square TR SIDE+V follows right (%.3f)" % sq_vert)
+	var sq_miter: float = _corner_facing(BulletFactory2D.DEBUG_SHAPE_RECTANGLE, 8, 1, {"size": Vector2(200, 200), "outline_corner_facing": 1})
+	_check(_approx(sq_miter, -PI * 0.25, 0.03), "square TR MITER bisects (%.3f)" % sq_miter)
+	# Star tips (even corners) under MITER/SMOOTH read radial; interiors stay sane.
+	for mode in [1, 2]:
+		var rep: Dictionary = BulletFactory2D.debug_describe_outline(BulletFactory2D.DEBUG_SHAPE_STAR, 20, {"points": 5, "outer_radius": 150.0, "inner_radius": 65.0, "outline_corner_facing": mode})
+		var pts: PackedVector2Array = rep["points"]
+		var fa: PackedFloat32Array = rep["facings"]
+		var ci: PackedInt32Array = rep["corner_index"]
+		var worst := 0.0
+		for i in pts.size():
+			if ci[i] % 2 == 0 and ci[i] >= 0:
+				var radial: float = pts[i].angle()
+				worst = maxf(worst, absf(wrapf(fa[i] - radial, -PI, PI)))
+		_check(worst < 0.05, "star tips radial under facing %d (worst %.4f)" % [mode, worst])
+	# Real volley conformance under every facing policy.
+	var marker := Transform2D(0.0, Vector2(400, 300))
+	for facing in [0, 1, 2]:
+		var volley: Array = BulletFactory2D.helper_generate_transforms_triangle(12, marker, 0, 200.0, 200.0, 0.0, true, 0.0, 0, 0, false, 0, 32.0, false, 0.0, 1, STEP, 0, 0, 0, 0, PackedFloat32Array(), 0, 0, 1, 1, 0, 0, 0.0, facing)
+		var ok: Dictionary = BulletFactory2D.debug_verify_volley(volley, BulletFactory2D.DEBUG_SHAPE_TRIANGLE, marker, 12, {"triangle_type": 0, "size_a": 200.0, "size_b": 200.0, "outline_corner_facing": facing})
+		_check(bool(ok.get("ok", false)), "triangle verify facing %d" % facing)
+
+func _test_quotas_optimal() -> void:
+	# Every closed polygon: quotas optimal (within <1 of exact shares),
+	# opposite pairs within 1 (SYMMETRIC), across counts incl. screenshot scale.
+	# Per-case pair bound: equal opposites (rect/square/regular polygon/
+	# diamond/star) stay within 1; trapezoid top/bottom can never be equal
+	# (unequal lengths), so only optimality applies there.
+	var cases: Array = [
+		[BulletFactory2D.DEBUG_SHAPE_RECTANGLE, {"size": Vector2(300, 200)}, [8, 12, 55], 1.0],
+		[BulletFactory2D.DEBUG_SHAPE_SQUARE, {"size": 200.0}, [6, 8, 55], 1.0],
+		[BulletFactory2D.DEBUG_SHAPE_POLYGON, {"vertices": 6, "radius": 150.0}, [7, 12, 30], 1.0],
+		[BulletFactory2D.DEBUG_SHAPE_TRIANGLE, {"triangle_type": 0, "size_a": 200.0, "size_b": 200.0}, [5, 12, 40], -1.0],
+		[BulletFactory2D.DEBUG_SHAPE_TRAPEZOID, {"base_top": 150.0, "base_bottom": 280.0, "height": 140.0}, [8, 20], -1.0],
+		[BulletFactory2D.DEBUG_SHAPE_DIAMOND, {"diagonal_x": 280.0, "diagonal_y": 200.0}, [8, 20, 55], 1.0],
+		[BulletFactory2D.DEBUG_SHAPE_STAR, {"points": 5, "outer_radius": 150.0, "inner_radius": 65.0}, [10, 20, 55], 1.0],
+		[BulletFactory2D.DEBUG_SHAPE_STAR, {"points": 25, "outer_radius": 150.0, "inner_radius": 65.0}, [55], 1.0],
+	]
+	for c in cases:
+		for n in c[2]:
+			for dist in [0, 1]:
+				var p: Dictionary = (c[1] as Dictionary).duplicate()
+				p["outline_distribution"] = dist
+				var q: Dictionary = BulletFactory2D.debug_outline_quotas(int(c[0]), int(n), p)
+				_check(bool(q.get("ok", false)) and bool(q.get("optimal", false)), "quotas optimal shape=%d n=%d dist=%d" % [int(c[0]), int(n), dist])
+				if float(c[3]) >= 0.0:
+					_check(float(q.get("worst_pair_spread", 99.0)) <= float(c[3]), "shape=%d n=%d dist=%d pairs within %.0f (worst %.1f)" % [int(c[0]), int(n), dist, float(c[3]), float(q.get("worst_pair_spread", 99.0))])
+
+func _test_layers_props_matrix() -> void:
+	# Every layers-related knob on rect/circle/star: deal counts, radii,
+	# caps, twist, per-ring evenness. count x scales x sides x fills.
+	var marker := Transform2D(0.0, Vector2(400, 300))
+	for lc in [1, 2, 4]:
+		for side in [0, 1, 2]:
+			for fill in [0, 1, 2, 3]:
+				var v: Array = BulletFactory2D.helper_generate_transforms_circle(12, marker, 150.0, true, 0.0, 1, 0, false, 0, 32.0, false, 0.0, lc, STEP, side, fill, 0, 0, PackedFloat32Array(), 0, 0)
+				_check(v.size() == 12, "circle lc=%d side=%d fill=%d emits 12" % [lc, side, fill])
+				var worst := 0.0
+				for i in v.size():
+					var layer: int = BulletFactory2D.helper_bullet_layer_index(i, 12, lc, fill, 0)
+					var s: float = BulletFactory2D.helper_layer_scale_factor(layer, STEP, side)
+					worst = maxf(worst, absf((v[i] as Transform2D).origin.distance_to(marker.origin) - 150.0 * s))
+				_check(worst < 1.0, "circle lc=%d side=%d fill=%d radii ok (%.3f)" % [lc, side, fill, worst])
+				_check(_ring_gaps_ok(v, 12, lc, fill, 0, 1.1), "circle lc=%d side=%d fill=%d rings even" % [lc, side, fill])
+	# Twist rotates outer rings; caps trim them; custom scales place them.
+	var tw: Array = BulletFactory2D.helper_generate_transforms_rectangle(12, marker, Vector2(300, 200), true, 0.0, 1, 0, false, 0, 32.0, false, 0.0, 3, STEP, 0, 0, 0, 0, PackedFloat32Array(), 5, 0)
+	var pl: Array = BulletFactory2D.helper_generate_transforms_rectangle(12, marker, Vector2(300, 200), true, 0.0, 1, 0, false, 0, 32.0, false, 0.0, 3, STEP, 0, 0, 0, 0, PackedFloat32Array(), 0, 0)
+	var moved := false
+	for i in tw.size():
+		if ((tw[i] as Transform2D).origin.distance_to((pl[i] as Transform2D).origin) > 1.0):
+			moved = true
+	_check(moved, "twist staggers rings")
+	var capped: Array = BulletFactory2D.helper_generate_transforms_star(20, marker, 5, 150.0, 65.0, 0.0, true, 0.0, 1, 0, false, 0, 32.0, false, 0.0, 3, STEP, 0, 0, 0, 0, PackedFloat32Array(), 0, 2)
+	# 20 over 3 interleaved deals 7/7/6; the cap keeps the base ring whole.
+	_check(capped.size() == 7 + 2 + 2, "star cap trims outer rings (%d)" % capped.size())
+	var cust: Array = BulletFactory2D.helper_generate_transforms_circle(9, marker, 100.0, true, 0.0, 1, 0, false, 0, 32.0, false, 0.0, 3, STEP, 0, 0, 0, 1, PackedFloat32Array([1.0, 2.0, 3.0]), 0, 0)
+	var cw := 0.0
+	for i in cust.size():
+		var layer: int = BulletFactory2D.helper_bullet_layer_index(i, 9, 3, 0, 0)
+		cw = maxf(cw, absf((cust[i] as Transform2D).origin.distance_to(marker.origin) - 100.0 * [1.0, 2.0, 3.0][layer]))
+	_check(cw < 1.0, "custom scales place rings (%.3f)" % cw)
+
+func _test_mix_match() -> void:
+	# Corner knobs cross product on rectangle: every combo verifies
+	# mathematically and keeps corners owned + gaps sane.
+	var marker := Transform2D(0.0, Vector2(400, 300))
+	var combos := 0
+	for pri in [0, 1, 2]:
+		for facing in [0, 1, 2]:
+			for mode in [0, 1]:
+				for margin in [0.0, 20.0]:
+					for dist in [0, 1]:
+						for layout in [0, 1]:
+							if mode == 1 and margin > 0.0:
+								continue # margin only applies pinned; skip dupes
+							var n := 12
+							var volley: Array = BulletFactory2D.helper_generate_transforms_rectangle(n, marker, Vector2(300, 200), true, 0.0, 0, 0, false, 0, 32.0, false, 0.0, 1, STEP, 0, 0, 0, 0, PackedFloat32Array(), 0, 0, dist, layout, pri, mode, margin, facing)
+							var params := {"size": Vector2(300, 200), "outline_distribution": dist, "outline_corner_priority": pri, "outline_corner_mode": mode, "outline_edge_margin": margin, "outline_corner_facing": facing}
+							var ok: Dictionary = BulletFactory2D.debug_verify_volley(volley, BulletFactory2D.DEBUG_SHAPE_RECTANGLE, marker, n, params)
+							if not bool(ok.get("ok", false)):
+								_check(false, "mix pri=%d fac=%d mode=%d margin=%.0f dist=%d layout=%d (worst %.2fpx)" % [pri, facing, mode, margin, dist, layout, float(ok.get("worst_pos_px", -1.0))])
+							combos += 1
+	_check(combos > 60, "mix matrix ran %d combos" % combos)
+
+func _fuzz_volley_finite(volley: Array) -> bool:
+	for t in volley:
+		var tr: Transform2D = t
+		if not tr.is_finite():
+			return false
+		if not tr.origin.is_finite():
+			return false
+	return true
+
+func _test_fuzz_closed_shapes() -> void:
+	# Every closed shape x small-to-large counts x facings: exact counts,
+	# finite math, verify-ok, optimal quotas. Catches crashes and drops.
+	var marker := Transform2D(0.0, Vector2(400, 300))
+	var counts := [0, 1, 2, 3, 4, 5, 7, 8, 9, 11, 12, 13, 19, 20, 24, 40, 55, 100]
+	for n in counts:
+		var sq: Array = BulletFactory2D.helper_generate_transforms_rectangle(n, marker, Vector2(300, 200), true, 0.0, 0, 0, false, 0, 32.0, false, 0.0, 1, STEP, 0, 0, 0, 0, PackedFloat32Array(), 0, 0)
+		_check(sq.size() == n, "rect n=%d emits %d" % [n, n])
+		_check(_fuzz_volley_finite(sq), "rect n=%d finite" % n)
+		if n > 0:
+			var ok: Dictionary = BulletFactory2D.debug_verify_volley(sq, BulletFactory2D.DEBUG_SHAPE_RECTANGLE, marker, n, {"size": Vector2(300, 200)})
+			_check(bool(ok.get("ok", false)), "rect n=%d verifies" % n)
+			var q: Dictionary = BulletFactory2D.debug_outline_quotas(BulletFactory2D.DEBUG_SHAPE_RECTANGLE, n, {"size": Vector2(300, 200)})
+			_check(bool(q.get("optimal", false)) or n <= 4, "rect n=%d optimal" % n)
+		for facing in [0, 1, 2]:
+			var tri: Array = BulletFactory2D.helper_generate_transforms_triangle(n, marker, 0, 200.0, 200.0, 0.0, true, 0.0, 0, 0, false, 0, 32.0, false, 0.0, 1, STEP, 0, 0, 0, 0, PackedFloat32Array(), 0, 0, 1, 1, 0, 0, 0.0, facing)
+			_check(tri.size() == n and _fuzz_volley_finite(tri), "tri n=%d facing=%d sane" % [n, facing])
+		var star: Array = BulletFactory2D.helper_generate_transforms_star(n, marker, 5, 150.0, 65.0, 0.0, true, 0.0, 0, 0, false, 0, 32.0, false, 0.0, 1, STEP, 0, 0, 0, 0, PackedFloat32Array(), 0, 0)
+		_check(star.size() == n and _fuzz_volley_finite(star), "star n=%d sane" % n)
+		var dia: Array = BulletFactory2D.helper_generate_transforms_diamond(n, marker, 200.0, 300.0, 0.0, true, 0.0, 0, 0, false, 0, 32.0, false, 0.0, 1, STEP, 0, 0, 0, 0, PackedFloat32Array(), 0, 0)
+		_check(dia.size() == n and _fuzz_volley_finite(dia), "diamond n=%d sane" % n)
+		var tra: Array = BulletFactory2D.helper_generate_transforms_trapezoid(n, marker, 150.0, 280.0, 140.0, 0.0, true, 0.0, 0, 0, false, 0, 32.0, false, 0.0, 1, STEP, 0, 0, 0, 0, PackedFloat32Array(), 0, 0)
+		_check(tra.size() == n and _fuzz_volley_finite(tra), "trapezoid n=%d sane" % n)
+		var pol: Array = BulletFactory2D.helper_generate_transforms_polygon(n, marker, 6, 150.0, 0.0, true, 0.0, 0, 0, false, 0, 32.0, false, 0.0, 1, STEP, 0, 0, 0, 0, PackedFloat32Array(), 0, 0)
+		_check(pol.size() == n and _fuzz_volley_finite(pol), "polygon n=%d sane" % n)
+		var cir: Array = BulletFactory2D.helper_generate_transforms_circle(n, marker, 150.0, true, 0.0, 0, 0, false, 0, 32.0, false, 0.0, 1, STEP, 0, 0, 0, 0, PackedFloat32Array(), 0, 0)
+		_check(cir.size() == n and _fuzz_volley_finite(cir), "circle n=%d sane" % n)
+		if n > 1:
+			var st: Dictionary = BulletFactory2D.debug_volley_gaps(cir)
+			_check(float(st.get("gap_ratio", 99.0)) < 1.05, "circle n=%d even (%.3f)" % [n, float(st.get("gap_ratio", 99.0))])
+
+func _test_wall_gaps_layers() -> void:
+	# WALL dodge gaps stay empty on every ring (resampling must not pave them).
+	var marker := Transform2D(0.0, Vector2(400, 300))
+	var wall: Array = BulletFactory2D.helper_generate_transforms_ellipse(40, marker, 150.0, 100.0, 0.0, 0.0, TAU, 2, 2, 0.5, true, 0.0, 1, 0, false, 0, 32.0, false, 0.0, 3, STEP, 0, 0, 0, 0, PackedFloat32Array(), 0, 0)
+	_check(wall.size() > 0 and wall.size() <= 40, "wall emits survivors (%d)" % wall.size())
+	var centers := [TAU * 0.25, TAU * 0.75]
+	for t in wall:
+		var p: Vector2 = ((t as Transform2D).origin - marker.origin)
+		var ang: float = atan2(p.y / 100.0, p.x / 150.0)
+		if ang < 0.0:
+			ang += TAU
+		for gc in centers:
+			var d: float = absf(wrapf(ang - gc, -PI, PI))
+			_check(d >= 0.25 - 1e-3, "wall dot outside gap (d=%.3f)" % d)
+
+func _test_open_arc_endpoints() -> void:
+	# Open arcs pin both endpoints on the base loop and on every ring.
+	var marker := Transform2D(0.0, Vector2(400, 300))
+	var ring: Array = BulletFactory2D.helper_generate_transforms_ring(10, marker, 150.0, 0.5, 2.0, true, false, true, 1.0, 0.0, 1, 0, false, 0, 32.0, false, 0.0, 3, STEP, 0, 0, 0, 0, PackedFloat32Array(), 0, 0)
+	for L in 3:
+		var members: Array = []
+		for i in ring.size():
+			if BulletFactory2D.helper_bullet_layer_index(i, 10, 3, 0, 0) == L:
+				members.append(ring[i])
+		if members.is_empty():
+			continue
+		var s: float = BulletFactory2D.helper_layer_scale_factor(L, STEP, 0)
+		var e0: Vector2 = marker.origin + Vector2(cos(0.5), sin(0.5)) * 150.0 * s
+		var e1: Vector2 = marker.origin + Vector2(cos(2.5), sin(2.5)) * 150.0 * s
+		var near0 := false
+		var near1 := false
+		for m in members:
+			if ((m as Transform2D).origin.distance_to(e0) < 1.0):
+				near0 = true
+			if ((m as Transform2D).origin.distance_to(e1) < 1.0):
+				near1 = true
+		_check(near0 and near1, "ring arc layer %d pins endpoints" % L)
+
+func _test_single_bullet_rings() -> void:
+	var marker := Transform2D(0.0, Vector2(400, 300))
+	for fill in [0, 1, 2, 3]:
+		var one: Array = BulletFactory2D.helper_generate_transforms_circle(1, marker, 150.0, true, 0.0, 1, 0, false, 0, 32.0, false, 0.0, 3, STEP, 0, fill, 0, 0, PackedFloat32Array(), 0, 0)
+		_check(one.size() == 1 and _fuzz_volley_finite(one), "circle single bullet fill=%d" % fill)
+		var layer: int = BulletFactory2D.helper_bullet_layer_index(0, 1, 3, fill, 0)
+		var s: float = BulletFactory2D.helper_layer_scale_factor(layer, STEP, 0)
+		_check(absf((one[0] as Transform2D).origin.distance_to(marker.origin) - 150.0 * s) < 1.0, "single rides dealt ring %d" % layer)
+	var rsq: Array = BulletFactory2D.helper_generate_transforms_rectangle(1, marker, Vector2(300, 200), true, 0.0, 1, 0, false, 0, 32.0, false, 0.0, 3, STEP, 0, 0, 0, 0, PackedFloat32Array(), 0, 0)
+	_check(rsq.size() == 1, "rect single emits")
+	_check((rsq[0] as Transform2D).origin.distance_to(marker.origin + Vector2(-150, -100)) < 1.0, "rect single sits corner 0")
+
+func _test_huge_margin() -> void:
+	# Margin bigger than the edge collapses interiors to midpoints: counts
+	# survive, math stays finite and verifiable.
+	var marker := Transform2D(0.0, Vector2(400, 300))
+	var v: Array = BulletFactory2D.helper_generate_transforms_rectangle(12, marker, Vector2(300, 200), true, 0.0, 0, 0, false, 0, 32.0, false, 0.0, 1, STEP, 0, 0, 0, 0, PackedFloat32Array(), 0, 0, 1, 1, 0, 0, 10000.0, 0)
+	_check(v.size() == 12 and _fuzz_volley_finite(v), "huge margin keeps 12 finite")
+	var ok: Dictionary = BulletFactory2D.debug_verify_volley(v, BulletFactory2D.DEBUG_SHAPE_RECTANGLE, marker, 12, {"size": Vector2(300, 200), "outline_edge_margin": 10000.0})
+	_check(bool(ok.get("ok", false)), "huge margin verifies")
+
+func _test_rotated_marker_verify() -> void:
+	var marker := Transform2D(PI * 0.5, Vector2(-100, 200))
+	var sq: Array = BulletFactory2D.helper_generate_transforms_rectangle(8, marker, Vector2(200, 200), true, 0.0, 0, 0, false, 0, 32.0, false, 0.0, 1, STEP, 0, 0, 0, 0, PackedFloat32Array(), 0, 0)
+	var ok: Dictionary = BulletFactory2D.debug_verify_volley(sq, BulletFactory2D.DEBUG_SHAPE_RECTANGLE, marker, 8, {"size": Vector2(200, 200)})
+	_check(bool(ok.get("ok", false)), "rotated marker rect verifies")
+	var star: Array = BulletFactory2D.helper_generate_transforms_star(15, marker, 5, 150.0, 65.0, 0.0, true, 0.0, 0, 0, false, 0, 32.0, false, 0.0, 1, STEP, 0, 0, 0, 0, PackedFloat32Array(), 0, 0)
+	var sok: Dictionary = BulletFactory2D.debug_verify_volley(star, BulletFactory2D.DEBUG_SHAPE_STAR, marker, 15, {"points": 5, "outer_radius": 150.0, "inner_radius": 65.0})
+	_check(bool(sok.get("ok", false)), "rotated marker star verifies")
+
+func _test_smooth_layout_flag() -> void:
+	# layout=0 keeps legacy decimation (seam defect documented); layout=1
+	# (default) resamples every ring even. Circle 55/3 proves the difference.
+	var marker := Transform2D(0.0, Vector2(400, 300))
+	var legacy: Array = BulletFactory2D.helper_generate_transforms_circle(55, marker, 150.0, true, 0.0, 1, 0, false, 0, 32.0, false, 0.0, 3, STEP, 0, 0, 0, 0, PackedFloat32Array(), 0, 0, 0)
+	var ring0: Array = []
+	for i in legacy.size():
+		if BulletFactory2D.helper_bullet_layer_index(i, 55, 3, 0, 0) == 0:
+			ring0.append(legacy[i])
+	var st: Dictionary = BulletFactory2D.debug_volley_gaps(ring0)
+	_check(float(st.get("gap_ratio", 0.0)) > 2.0, "legacy shared loop keeps seam defect (%.2f)" % float(st.get("gap_ratio", 0.0)))
+	var even: Array = BulletFactory2D.helper_generate_transforms_circle(55, marker, 150.0, true, 0.0, 1, 0, false, 0, 32.0, false, 0.0, 3, STEP, 0, 0, 0, 0, PackedFloat32Array(), 0, 0, 1)
+	var ring0e: Array = []
+	for i in even.size():
+		if BulletFactory2D.helper_bullet_layer_index(i, 55, 3, 0, 0) == 0:
+			ring0e.append(even[i])
+	var ste: Dictionary = BulletFactory2D.debug_volley_gaps(ring0e)
+	_check(float(ste.get("gap_ratio", 99.0)) < 1.05, "even layout heals seam (%.3f)" % float(ste.get("gap_ratio", 99.0)))
+	# No-op check: corner facing knob means nothing on smooth shapes.
+	var a: Dictionary = BulletFactory2D.debug_describe_outline(BulletFactory2D.DEBUG_SHAPE_CIRCLE, 12, {})
+	var b: Dictionary = BulletFactory2D.debug_describe_outline(BulletFactory2D.DEBUG_SHAPE_CIRCLE, 12, {"outline_corner_facing": 2})
+	_check((a["points"] as PackedVector2Array) == (b["points"] as PackedVector2Array), "corner facing no-op on circle")

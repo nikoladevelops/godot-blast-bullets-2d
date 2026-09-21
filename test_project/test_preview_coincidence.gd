@@ -98,6 +98,85 @@ func _initialize() -> void:
 	await process_frame
 	var res8: Dictionary = spawner.debug_check_layer_coincidence(2.0)
 	_check(res8.get("checked", false) and bool(res8.get("ok", false)), "circle exponential ok")
+	# Every layers-related knob keeps dots on rings (rect + star + circle).
+	spawner.helper_outline_layer_scale_curve = 0
+	spawner.helper_outline_layer_count = 4
+	spawner.helper_outline_layer_scale = 0.2
+	for src in [26, 15, 25]:
+		spawner.pattern_source = src
+		await process_frame
+		for side in [0, 1, 2]:
+			spawner.helper_outline_layer_side = side
+			await process_frame
+			var rsd: Dictionary = spawner.debug_check_layer_coincidence(2.0)
+			_check(rsd.get("checked", false) and bool(rsd.get("ok", false)), "src %d side %d ok" % [src, side])
+	spawner.helper_outline_layer_side = 0
+	spawner.helper_outline_layer_count = 3
+	for start_off in [0, 2]:
+		spawner.helper_outline_layer_start_offset = start_off
+		await process_frame
+		var rso: Dictionary = spawner.debug_check_layer_coincidence(2.0)
+		_check(rso.get("checked", false) and bool(rso.get("ok", false)), "rect start_offset %d ok" % start_off)
+	spawner.helper_outline_layer_start_offset = 0
+	for layout in [0, 1]:
+		spawner.helper_outline_layer_layout = layout
+		await process_frame
+		var rlo: Dictionary = spawner.debug_check_layer_coincidence(2.0)
+		_check(rlo.get("checked", false) and bool(rlo.get("ok", false)), "rect layout %d ok" % layout)
+	spawner.helper_outline_layer_layout = 1
+	for dist in [0, 1]:
+		spawner.helper_outline_distribution = dist
+		await process_frame
+		var rdi: Dictionary = spawner.debug_check_layer_coincidence(2.0)
+		_check(rdi.get("checked", false) and bool(rdi.get("ok", false)), "rect distribution %d ok" % dist)
+	spawner.helper_outline_distribution = 1
+	# Corner knobs (priority/mode/facing/margin) never move dots off rings.
+	spawner.pattern_source = 26
+	for pri in [0, 1, 2]:
+		spawner.helper_outline_corner_priority = pri
+		await process_frame
+		var rpr: Dictionary = spawner.debug_check_layer_coincidence(2.0)
+		_check(rpr.get("checked", false) and bool(rpr.get("ok", false)), "rect priority %d ok" % pri)
+	spawner.helper_outline_corner_priority = 0
+	for facing in [0, 1, 2]:
+		spawner.helper_outline_corner_facing = facing
+		await process_frame
+		var rfa: Dictionary = spawner.debug_check_layer_coincidence(2.0)
+		_check(rfa.get("checked", false) and bool(rfa.get("ok", false)), "rect facing %d ok" % facing)
+	spawner.helper_outline_corner_facing = 0
+	for mode in [0, 1]:
+		spawner.helper_outline_corner_mode = mode
+		await process_frame
+		var rmo: Dictionary = spawner.debug_check_layer_coincidence(2.0)
+		_check(rmo.get("checked", false) and bool(rmo.get("ok", false)), "rect corner mode %d ok" % mode)
+	spawner.helper_outline_corner_mode = 0
+	spawner.helper_outline_edge_margin = 20.0
+	await process_frame
+	var rma: Dictionary = spawner.debug_check_layer_coincidence(2.0)
+	_check(rma.get("checked", false) and bool(rma.get("ok", false)), "rect margin ok")
+	spawner.helper_outline_edge_margin = 0.0
+	# Triangle apex MITER + star SMOOTH still coincide (facings don't move dots).
+	spawner.pattern_source = 30
+	spawner.helper_outline_corner_facing = 1
+	await process_frame
+	var rtm: Dictionary = spawner.debug_check_layer_coincidence(2.0)
+	_check(rtm.get("checked", false) and bool(rtm.get("ok", false)), "triangle miter ok")
+	spawner.helper_outline_corner_facing = 0
+	spawner.pattern_source = 15
+	spawner.helper_outline_corner_facing = 2
+	await process_frame
+	var rss: Dictionary = spawner.debug_check_layer_coincidence(2.5)
+	_check(rss.get("checked", false) and bool(rss.get("ok", false)), "star smooth ok")
+	spawner.helper_outline_corner_facing = 0
+	# User-reported star density (25 points, 55 bullets, layers): dense
+	# starburst outline still coincides.
+	spawner.helper_star_points = 25
+	spawner.helper_bullets_amount = 55
+	await process_frame
+	var rstar: Dictionary = spawner.debug_check_layer_coincidence(2.5)
+	_check(rstar.get("checked", false) and bool(rstar.get("ok", false)), "star 25pt dense ok (worst %.3f)" % float(rstar.get("max_deviation_px", -1.0)))
+	spawner.helper_star_points = 5
+	spawner.helper_bullets_amount = 24
 	print("----")
 	if failures == 0:
 		print("ALL PREVIEW COINCIDENCE TESTS PASSED")

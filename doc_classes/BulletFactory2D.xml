@@ -219,6 +219,7 @@
 			<param index="18" name="layer_custom_scales" type="PackedFloat32Array" />
 			<param index="19" name="layer_twist" type="int" default="0" />
 			<param index="20" name="layer_max_dots" type="int" default="0" />
+			<param index="21" name="layer_layout" type="int" default="1" />
 			<description>
 				Generates an exact circle outline: slots spread evenly around a radius loop centered on the marker, facing outward (or inward). The outline_* tail params place slots on the loop, fill its interior, or layer it across scaled repeats about the loop center.
 			</description>
@@ -298,6 +299,7 @@
 			<param index="25" name="outline_corner_priority" type="int" default="0" />
 			<param index="26" name="outline_corner_mode" type="int" default="0" />
 			<param index="27" name="outline_edge_margin" type="float" default="0.0" />
+			<param index="28" name="outline_corner_facing" type="int" default="0" />
 			<description>
 				Diamond (rhombus) perimeter from its diagonals, slots spread evenly by arc length, facing outward (or inward). Zero-area diamonds stack at the marker.
 			</description>
@@ -350,6 +352,7 @@
 			<param index="25" name="layer_custom_scales" type="PackedFloat32Array" />
 			<param index="26" name="layer_twist" type="int" default="0" />
 			<param index="27" name="layer_max_dots" type="int" default="0" />
+			<param index="28" name="layer_layout" type="int" default="1" />
 			<description>
 				Generates a true ellipse ring with independent [code]radius_x[/code] / [code]radius_y[/code] semi-axes rotated by [code]ellipse_rotation[/code] (the ring helper's y_scale is only an approximation). Full draws every slot, Arc draws a spaced segment, Wall draws a dense arc with [code]gap_count[/code] carved dodge gaps of [code]gap_width[/code] radians each (danmaku walls with readable escape routes; the array shrinks to the surviving slots). Wall mode with gap_count 0 or gap_width 0 draws the plain arc (no carving). Facings follow the ellipse outward normal. Useful for oval bosses, stadium arenas and gap walls.
 			</description>
@@ -402,6 +405,7 @@
 			<param index="29" name="spiro_pen" type="float" default="80.0" />
 			<param index="30" name="super_lobes" type="float" default="6.0" />
 			<param index="31" name="super_fullness" type="float" default="1.0" />
+			<param index="32" name="layer_layout" type="int" default="1" />
 			<description>
 				Generates a floral spell-card pattern: [code]petals[/code] symmetric lobes around the marker, each holding [code]bullets_per_petal[/code] slots spread over [code]petal_spread[/code] radians. [code]petal_sharpness[/code] 0 gives round lobes, higher values pinch the waist into tighter flowers. [code]transforms_amount[/code] sizes the array (fewer slots than petals times per-petal truncates). [code]flower_type[/code] picks the bloom kind (0 FAN legacy, 1 RHODONEA, 2 PHYLLOTAXIS, 3 SPIROGRAPH, 4 SUPERFORMULA); [code]inner_radius_scale[/code], [code]spiro_roller[/code]/[code]spiro_pen[/code] and [code]super_lobes[/code]/[code]super_fullness[/code] tune the matching kind. Useful for boss blossoms and mandala rings.
 			</description>
@@ -446,6 +450,7 @@
 			<param index="19" name="layer_custom_scales" type="PackedFloat32Array" />
 			<param index="20" name="layer_twist" type="int" default="0" />
 			<param index="21" name="layer_max_dots" type="int" default="0" />
+			<param index="22" name="layer_layout" type="int" default="1" />
 			<description>
 				Generates a parametric heart outline (classic 16sin^3 curve) scaled by size. Boss love attacks and ending cards. The outline_* tail params place slots on the loop, fill its interior, or layer it across scaled repeats about the loop center.
 			</description>
@@ -505,6 +510,7 @@
 			<param index="22" name="layer_custom_scales" type="PackedFloat32Array" />
 			<param index="23" name="layer_twist" type="int" default="0" />
 			<param index="24" name="layer_max_dots" type="int" default="0" />
+			<param index="25" name="layer_layout" type="int" default="1" />
 			<description>
 				Generates figure-8 / weave openings: slots sweep t over the full turn on the lissajous curve (size_x * sin(freq_x * t + phase), size_y * sin(freq_y * t)) for crossing curtains with readable doors. Recipe: slow spin + lissajous weave = butterfly curtain.
 			</description>
@@ -555,6 +561,7 @@
 			<param index="25" name="outline_corner_priority" type="int" default="0" />
 			<param index="26" name="outline_corner_mode" type="int" default="0" />
 			<param index="27" name="outline_edge_margin" type="float" default="0.0" />
+			<param index="28" name="outline_corner_facing" type="int" default="0" />
 			<description>
 				Generates a polygon perimeter (vertices corners on a radius circle from base_rotation), slots spread evenly by arc length, facing outward (or inward). The outline_* tail params place slots on the loop, fill its interior, or layer it across scaled repeats about the loop center.
 			</description>
@@ -600,6 +607,7 @@
 			<param index="23" name="outline_corner_priority" type="int" default="0" />
 			<param index="24" name="outline_corner_mode" type="int" default="0" />
 			<param index="25" name="outline_edge_margin" type="float" default="0.0" />
+			<param index="26" name="outline_corner_facing" type="int" default="0" />
 			<description>
 				Generates a rectangle perimeter walk (counter-clockwise from top-left), slots spread evenly by arc length, facing outward (or inward). Square = equal sides. The outline_* tail params place slots on the loop, fill its interior, or layer it across scaled repeats about the loop center.
 			</description>
@@ -633,6 +641,7 @@
 			<param index="24" name="layer_twist" type="int" default="0" />
 			<param index="25" name="layer_max_dots" type="int" default="0" />
 			<param index="26" name="seed" type="int" default="0" />
+			<param index="27" name="layer_layout" type="int" default="1" />
 			<description>
 				Generates transforms placed evenly on a ring (or arc, when [code]arc[/code] is smaller than a full turn) around the marker. Every bullet faces outward, so art drawn facing right travels away from the center. Set [code]face_outward[/code] to false for implosion patterns that fly toward the center. [code]y_scale[/code] stretches the ring into an ellipse (facing stays radial, approximate on stretched rings) and [code]facing_offset_degrees[/code] twists every facing. [code]seed[/code] drives random rotation (0 is non-deterministic). Useful for radial bursts and boss rings.
 			</description>
@@ -663,6 +672,7 @@
 			<param index="21" name="layer_custom_scales" type="PackedFloat32Array" />
 			<param index="22" name="layer_twist" type="int" default="0" />
 			<param index="23" name="layer_max_dots" type="int" default="0" />
+			<param index="24" name="layer_layout" type="int" default="1" />
 			<description>
 				Generates an exact rhodonea rose bloom: slots sweep theta over the full turn and sit at r = R * cos(k * theta) with k = petals. lobe_sharpness 1.0 is the exact rose (0 is round, higher pinches the waist). Recipe: Rose + phase_step_per_bullet + angular wobble = blossom finale. Used by the petal storm and blossom finale presets.
 			</description>
@@ -727,6 +737,7 @@
 			<param index="26" name="outline_corner_priority" type="int" default="0" />
 			<param index="27" name="outline_corner_mode" type="int" default="0" />
 			<param index="28" name="outline_edge_margin" type="float" default="0.0" />
+			<param index="29" name="outline_corner_facing" type="int" default="0" />
 			<description>
 				Generates a true star shell: points alternating outer/inner vertices around the marker (distinct from the polygon helper's density bias). Boss star bursts and celebratory shells.
 			</description>
@@ -776,6 +787,7 @@
 			<param index="26" name="outline_corner_priority" type="int" default="0" />
 			<param index="27" name="outline_corner_mode" type="int" default="0" />
 			<param index="28" name="outline_edge_margin" type="float" default="0.0" />
+			<param index="29" name="outline_corner_facing" type="int" default="0" />
 			<description>
 				Isosceles trapezoid perimeter, slots spread evenly by arc length, facing outward (or inward). A zero top base degrades to a triangle; zero-area boxes stack at the marker.
 			</description>
@@ -811,6 +823,7 @@
 			<param index="26" name="outline_corner_priority" type="int" default="0" />
 			<param index="27" name="outline_corner_mode" type="int" default="0" />
 			<param index="28" name="outline_edge_margin" type="float" default="0.0" />
+			<param index="29" name="outline_corner_facing" type="int" default="0" />
 			<description>
 				Triangle perimeter (equilateral circumradius, isosceles base + height apex-up, right X/Y legs recentered), slots spread evenly by arc length, facing outward (or inward). Degenerate triangles stack at the marker.
 			</description>
@@ -1160,7 +1173,7 @@
 			<param index="1" name="count" type="int" />
 			<param index="2" name="params" type="Dictionary" default="{}" />
 			<description>
-				Marker-local outline report for one closed shape (see DebugOutlineShape ids): rebuilds the exact slot loop the volley generators use and returns points, facings, edge_ids, corner_flags, corner_index, gaps, facing deviations and a settings echo. Pure math, no scene tree needed. params carries shape knobs (size, radius, vertices, ...) plus outline_distribution, outline_corner_priority, outline_corner_mode, outline_edge_margin; missing keys fall back to helper defaults.
+				Marker-local outline report for one closed shape (see DebugOutlineShape ids): rebuilds the exact slot loop the volley generators use and returns points, facings, edge_ids, corner_flags, corner_index, edge_histogram, corners, gaps, facing deviations and a settings echo. Pure math, no scene tree needed. params carries shape knobs (size, radius, vertices, ...) plus outline_distribution, outline_corner_priority, outline_corner_mode, outline_edge_margin, outline_corner_facing; missing keys fall back to helper defaults.
 			</description>
 		</method>
 		<method name="debug_volley_gaps" qualifiers="static">
@@ -1168,6 +1181,15 @@
 			<param index="0" name="volley" type="Transform2D[]" />
 			<description>
 				Shape-agnostic gap metrics over an emitted transform array: consecutive origin distances in volley order plus the last-to-first closure (count, gaps, min/max/mean_gap, gap_ratio). Pass one ring's transforms to audit a single ring.
+			</description>
+		</method>
+		<method name="debug_outline_quotas" qualifiers="static">
+			<return type="Dictionary" />
+			<param index="0" name="shape" type="int" />
+			<param index="1" name="count" type="int" />
+			<param index="2" name="params" type="Dictionary" default="{}" />
+			<description>
+				Per-edge dot quotas plus an optimality verdict against the length-proportional largest-remainder optimum (every edge within &lt; 1 slot of its exact share). Returns edge_counts, geometric interiors, exact_shares, optimal, worst_pair_spread (opposite-edge equality on even corner counts) and the settings echo. Corner-anchored polygonal shapes only.
 			</description>
 		</method>
 		<method name="debug_verify_volley" qualifiers="static">
@@ -1442,6 +1464,15 @@
 		</constant>
 		<constant name="OUTLINE_CORNER_MODE_EVEN_ARC" value="1" enum="OutlineCornerMode">
 			Dots spread purely evenly by arc length from corner 0 (corners coincide only when the count aligns).
+		</constant>
+		<constant name="OUTLINE_CORNER_FACING_SIDE" value="0" enum="OutlineCornerFacing">
+			Corner dots use the owning side's edge normal (stable default; rectangles stay edge-aligned).
+		</constant>
+		<constant name="OUTLINE_CORNER_FACING_MITER" value="1" enum="OutlineCornerFacing">
+			Corner dots face the angle bisector (triangle apexes and diamond tops face UP, star tips read radial).
+		</constant>
+		<constant name="OUTLINE_CORNER_FACING_SMOOTH" value="2" enum="OutlineCornerFacing">
+			Every dot uses averaged loop normals (coherent on high-frequency outlines like many-pointed stars).
 		</constant>
 		<constant name="OUTLINE_LAYER_OUTWARD" value="0" enum="OutlineLayerSide">
 			Extra layers scale up from the base outline.

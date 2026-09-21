@@ -688,6 +688,12 @@ class BulletSpawner2D : public Node2D{
         // corners along their edge (clamped per edge, corners stay pinned).
         // 0 disables (default: even split of the full edge).
         double helper_outline_edge_margin = 0.0;
+        // Corner facing (OutlineCornerFacing): which normal a corner-seated
+        // dot uses. 0 side (default: owning side's edge normal, stable),
+        // 1 miter (angle bisector: triangle apexes face UP, star tips read
+        // radial), 2 smooth (averaged loop normals everywhere: coherent on
+        // high-frequency outlines where even mid-edge normals swing wildly).
+        int helper_outline_corner_facing = 0;
         int helper_outline_facing = 0; // BulletFactory2D::OutlineFacing
         bool helper_outline_reverse = false;
         int helper_outline_slot_offset = 0;
@@ -1389,6 +1395,8 @@ class BulletSpawner2D : public Node2D{
         void set_helper_outline_corner_mode(int value);
         double get_helper_outline_edge_margin() const;
         void set_helper_outline_edge_margin(double value);
+        int get_helper_outline_corner_facing() const;
+        void set_helper_outline_corner_facing(int value);
         int get_helper_outline_facing() const;
         void set_helper_outline_facing(int value);
         bool get_helper_outline_reverse() const;

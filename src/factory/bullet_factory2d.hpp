@@ -264,6 +264,20 @@ public:
 		OUTLINE_CORNER_MODE_EVEN_ARC = 1
 	};
 
+	// Outline corner facing: which normal a corner-seated dot uses. SIDE
+	// (default) keeps the owning side's edge normal (stable: rectangles and
+	// squares never change); MITER faces the angle bisector of the adjoining
+	// edges (triangle apexes and diamond tops face UP, star tips radial);
+	// SMOOTH uses averaged loop normals everywhere (coherent on
+	// high-frequency outlines like many-pointed stars, where even mid-edge
+	// normals swing wildly). Interiors always keep their edge normal except
+	// under SMOOTH, which interpolates the averaged normals along the edge.
+	enum OutlineCornerFacing {
+		OUTLINE_CORNER_FACING_SIDE = 0,
+		OUTLINE_CORNER_FACING_MITER = 1,
+		OUTLINE_CORNER_FACING_SMOOTH = 2
+	};
+
 	// Edge spray side: which side of the polyline the normal-direction
 	// falloff extends toward. ALONG offsets along +normal, BEHIND along
 	// -normal, BOTH picks a random side per bullet. (Custom mode now drives
@@ -1021,7 +1035,8 @@ public:
 			const PackedFloat32Array &layer_custom_scales = PackedFloat32Array(),
 			int layer_twist = 0,
 			int layer_max_dots = 0,
-			uint64_t seed = 0);
+			uint64_t seed = 0,
+			int layer_layout = 1);
 
 	// Generates transforms in an aimed cone (shotgun spread): direction_angle is the cone center,
 	// spread is the full cone width, origins stagger along the direction so pellets
@@ -1141,7 +1156,8 @@ public:
 			double spiro_roller = 45.0,
 			double spiro_pen = 80.0,
 			double super_lobes = 6.0,
-			double super_fullness = 1.0);
+			double super_fullness = 1.0,
+			int layer_layout = 1);
 
 	// True ellipse ring with independent radii and rotation (the ring
 	// helper's y_scale is only an approximation): rx/ry semi-axes rotated by
@@ -1188,7 +1204,8 @@ public:
 			int layer_scale_curve = 0,
 			const PackedFloat32Array &layer_custom_scales = PackedFloat32Array(),
 			int layer_twist = 0,
-			int layer_max_dots = 0);
+			int layer_max_dots = 0,
+			int layer_layout = 1);
 
 	// Rain curtain: slots spread along a horizontal band of band_width above
 	// (or around) the marker, facing rain_direction. drop_spacing staggers
@@ -1304,7 +1321,8 @@ public:
 			int layer_layout = 1,
 			int outline_corner_priority = 0,
 			int outline_corner_mode = 0,
-			double outline_edge_margin = 0.0);
+			double outline_edge_margin = 0.0,
+			int outline_corner_facing = 0);
 
 	// Heart bloom: parametric heart outline (boss love attacks, endings).
 	// size scales the classic 16sin^3 / 13cos-5cos2t curve. Full
@@ -1333,7 +1351,8 @@ public:
 			int layer_scale_curve = 0,
 			const PackedFloat32Array &layer_custom_scales = PackedFloat32Array(),
 			int layer_twist = 0,
-			int layer_max_dots = 0);
+			int layer_max_dots = 0,
+			int layer_layout = 1);
 
 	// Snake row: slots along a sine wave of width, amplitude and wave count
 	// around the marker axis (direction need not be normalized). Pairs with
@@ -1416,7 +1435,8 @@ public:
 			int layer_scale_curve = 0,
 			const PackedFloat32Array &layer_custom_scales = PackedFloat32Array(),
 			int layer_twist = 0,
-			int layer_max_dots = 0);
+			int layer_max_dots = 0,
+			int layer_layout = 1);
 
 	// Twin counter-rotating galaxy: odd arms wind -angle_step, even arms
 	// +angle_step when mirrored (same facing switch as multispiral).
@@ -1487,7 +1507,8 @@ public:
 			int layer_scale_curve = 0,
 			const PackedFloat32Array &layer_custom_scales = PackedFloat32Array(),
 			int layer_twist = 0,
-			int layer_max_dots = 0);
+			int layer_max_dots = 0,
+			int layer_layout = 1);
 
 	// Clean circle outline: transforms_amount slots evenly on a radius
 	// circle around the marker, facing outward (or inward). The Ring helper
@@ -1526,7 +1547,8 @@ public:
 			int layer_scale_curve = 0,
 			const PackedFloat32Array &layer_custom_scales = PackedFloat32Array(),
 			int layer_twist = 0,
-			int layer_max_dots = 0);
+			int layer_max_dots = 0,
+			int layer_layout = 1);
 
 	// Rectangle perimeter: slots walk the outline of a size-sized box
 	// centered on the marker (counter-clockwise from top-left), facing
@@ -1570,7 +1592,8 @@ public:
 			int layer_layout = 1,
 			int outline_corner_priority = 0,
 			int outline_corner_mode = 0,
-			double outline_edge_margin = 0.0);
+			double outline_edge_margin = 0.0,
+			int outline_corner_facing = 0);
 
 	// Polygon perimeter: vertices corners on a radius circle from
 	// base_rotation, slots spread evenly by arc length along the outline,
@@ -1616,7 +1639,8 @@ public:
 			int layer_layout = 1,
 			int outline_corner_priority = 0,
 			int outline_corner_mode = 0,
-			double outline_edge_margin = 0.0);
+			double outline_edge_margin = 0.0,
+			int outline_corner_facing = 0);
 
 	// Triangle perimeter: equilateral (circumradius size_a), isosceles
 	// (base size_a + height size_b, apex up) or right-angled (legs size_a
@@ -1666,7 +1690,8 @@ public:
 			int layer_layout = 1,
 			int outline_corner_priority = 0,
 			int outline_corner_mode = 0,
-			double outline_edge_margin = 0.0);
+			double outline_edge_margin = 0.0,
+			int outline_corner_facing = 0);
 
 	// Isosceles trapezoid perimeter: bases base_top/base_bottom with height,
 	// centered on the marker and rotated by rotation. Slots walk the outline
@@ -1714,7 +1739,8 @@ public:
 			int layer_layout = 1,
 			int outline_corner_priority = 0,
 			int outline_corner_mode = 0,
-			double outline_edge_margin = 0.0);
+			double outline_edge_margin = 0.0,
+			int outline_corner_facing = 0);
 
 	// Diamond (rhombus) perimeter: diagonals diagonal_x/diagonal_y, centered
 	// on the marker and rotated by rotation. Slots walk the outline evenly
@@ -1761,7 +1787,8 @@ public:
 			int layer_layout = 1,
 			int outline_corner_priority = 0,
 			int outline_corner_mode = 0,
-			double outline_edge_margin = 0.0);
+			double outline_edge_margin = 0.0,
+			int outline_corner_facing = 0);
 
 	// Universal side pass for closed-outline patterns: returns a copy of
 	// transforms with each origin pushed along its own facing by
@@ -1833,6 +1860,15 @@ public:
 	// within tolerance_rad). Covers ON_OUTLINE placement (single ring).
 	// Returns {ok, checked, worst_pos_px, worst_face_rad, bad_index}.
 	static Dictionary debug_verify_volley(const TypedArray<Transform2D> &volley, int shape, const Transform2D &marker, int count, const Dictionary &params = Dictionary(), double tolerance_px = 1.0, double tolerance_rad = 0.02);
+
+	// Per-edge dot quotas plus an optimality verdict against the
+	// length-proportional largest-remainder optimum: every edge must sit
+	// within < 1 slot of its exact share (both LEGACY and SYMMETRIC satisfy
+	// this; they differ only in tie-breaks). Returns {ok, edge_counts,
+	// interiors, exact_shares, optimal, worst_pair_spread (opposite-edge
+	// equality on even corner counts), settings}. Corner-anchored polygonal
+	// shapes only; anything else reports ok=false.
+	static Dictionary debug_outline_quotas(int shape, int count, const Dictionary &params = Dictionary());
 
 	// Edge normals for a polyline: per-point outward normal from the local
 	// tangent (segment perpendicular, averaged at joints). tangent (1,0)
@@ -1941,6 +1977,7 @@ public:
 	VARIANT_ENUM_CAST(BlastBullets2D::BulletFactory2D::OutlineLayerLayout);
 	VARIANT_ENUM_CAST(BlastBullets2D::BulletFactory2D::OutlineCornerPriority);
 	VARIANT_ENUM_CAST(BlastBullets2D::BulletFactory2D::OutlineCornerMode);
+	VARIANT_ENUM_CAST(BlastBullets2D::BulletFactory2D::OutlineCornerFacing);
 	VARIANT_ENUM_CAST(BlastBullets2D::BulletFactory2D::DebugOutlineShape);
 	VARIANT_ENUM_CAST(BlastBullets2D::BulletFactory2D::OutlineLayerSide);
 	VARIANT_ENUM_CAST(BlastBullets2D::BulletFactory2D::OutlineLayerFill);
