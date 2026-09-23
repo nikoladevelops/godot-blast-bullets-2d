@@ -1864,8 +1864,13 @@ static TypedArray<Transform2D> layout_outline_slots(
                 }
                 rot = off;
                 if (L > 0 && layer_twist != 0) {
-                    int64_t tw = ((int64_t)L * (int64_t)layer_twist) % (int64_t)lp.size();
-                    rot = (int)(((int64_t)rot + tw) % (int64_t)lp.size());
+                    const int64_t ring_size = (int64_t)lp.size();
+                    const int64_t tw = ((int64_t)L * (int64_t)layer_twist) % ring_size;
+                    // Normalize into [0, ring_size): C++ % keeps the
+                    // dividend's sign, so a negative twist would index
+                    // before the buffer (hard crash). Same wrap rule as
+                    // the shared-loop branch below.
+                    rot = (int)(((int64_t)rot + tw) % ring_size + ring_size) % (int)ring_size;
                 }
             }
             if (rot != 0 && lp.size() > 1) {
@@ -1987,8 +1992,13 @@ static TypedArray<Transform2D> layout_outline_slots(
                 }
                 rot = off;
                 if (L > 0 && layer_twist != 0) {
-                    int64_t tw = ((int64_t)L * (int64_t)layer_twist) % (int64_t)lp.size();
-                    rot = (int)(((int64_t)rot + tw) % (int64_t)lp.size());
+                    const int64_t ring_size = (int64_t)lp.size();
+                    const int64_t tw = ((int64_t)L * (int64_t)layer_twist) % ring_size;
+                    // Normalize into [0, ring_size): C++ % keeps the
+                    // dividend's sign, so a negative twist would index
+                    // before the buffer (hard crash). Same wrap rule as
+                    // the shared-loop branch below.
+                    rot = (int)(((int64_t)rot + tw) % ring_size + ring_size) % (int)ring_size;
                 }
             }
             if (rot != 0 && lp.size() > 1) {

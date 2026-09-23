@@ -40,6 +40,7 @@ func _initialize() -> void:
 	_test_outer_first_volley()
 	_test_pingpong_volley()
 	_test_twist()
+	_test_negative_twist()
 	_test_max_dots()
 	_test_custom_scales_and_curve()
 	_test_anchored_corners()
@@ -302,6 +303,56 @@ func _test_twist() -> void:
 		if ((plain[i] as Transform2D).origin.distance_to((twisted[i] as Transform2D).origin) > 1.0):
 			moved = true
 	_check(moved, "twist staggers outer rings")
+
+func _test_negative_twist() -> void:
+	# Regression: a negative layer_twist used to index before the ring
+	# buffer (hard SIGSEGV) in both even-per-layer branches. Negative
+	# twists must wrap exactly like positive ones: every bullet stays on
+	# its own ring, and twist -k matches twist +(size-k) as a point set.
+	var marker := Transform2D(0.0, Vector2(400, 300))
+	# Smooth branch (ring has no corners): radii must match the dealt layer.
+	for twist in [-1, -3, -17]:
+		var volley: Array = BulletFactory2D.helper_generate_transforms_ring(
+			24, marker, 150.0, 0.0, TAU, true, false, true, 1.0, 0.0,
+			1, 0, false, 0, 32.0, false, 0.0,
+			3, STEP, 0, 0, 0, 0, PackedFloat32Array(), twist, 0, 0, 1)
+		_check(volley.size() == 24, "neg twist ring emits 24 (twist=%d)" % twist)
+		var worst := 0.0
+		for i in volley.size():
+			var p: Vector2 = (volley[i] as Transform2D).origin
+			var layer: int = _layer_of(i, 24, 3, 0, 0)
+			worst = maxf(worst, absf(p.distance_to(marker.origin) - 150.0 * (1.0 + STEP * layer)))
+		_check(worst < 1.0, "neg twist ring stays on rings (twist=%d, worst %.3f px)" % [twist, worst])
+		_check(_fuzz_volley_finite(volley), "neg twist ring finite (twist=%d)" % twist)
+	# Polygon branch (rectangle has corners): every bullet on its own ring border.
+	for twist in [-1, -5]:
+		var rect: Array = BulletFactory2D.helper_generate_transforms_rectangle(
+			12, marker, Vector2(300, 200), true, 0.0,
+			1, 0, false, 0, 32.0, false, 0.0,
+			3, STEP, 0, 0, 0, 0, PackedFloat32Array(), twist, 0)
+		_check(rect.size() == 12, "neg twist rect emits 12 (twist=%d)" % twist)
+		_check_rect_layers_even(rect, marker, Vector2(300, 200), 3, "neg twist rect (twist=%d)" % twist)
+	# Wrap parity: 8 bullets per ring, so twist -1 must equal twist +7
+	# as a point multiset (same rotation, never garbage).
+	var neg: Array = BulletFactory2D.helper_generate_transforms_ring(
+		24, marker, 150.0, 0.0, TAU, true, false, true, 1.0, 0.0,
+		1, 0, false, 0, 32.0, false, 0.0,
+		3, STEP, 0, 0, 0, 0, PackedFloat32Array(), -1, 0, 0, 1)
+	var pos: Array = BulletFactory2D.helper_generate_transforms_ring(
+		24, marker, 150.0, 0.0, TAU, true, false, true, 1.0, 0.0,
+		1, 0, false, 0, 32.0, false, 0.0,
+		3, STEP, 0, 0, 0, 0, PackedFloat32Array(), 7, 0, 0, 1)
+	var parity := neg.size() == pos.size()
+	for t in neg:
+		var p: Vector2 = (t as Transform2D).origin
+		var found := false
+		for u in pos:
+			if ((u as Transform2D).origin.distance_to(p) < 0.01):
+				found = true
+				break
+		if not found:
+			parity = false
+	_check(parity, "neg twist wraps like positive (multiset parity)")
 
 func _test_max_dots() -> void:
 	var marker := Transform2D(0.0, Vector2(400, 300))

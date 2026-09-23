@@ -4222,7 +4222,9 @@ void BulletSpawner2D::collect_homing_candidates_by_name(Node *p_node, Array &r_c
         Node2D *as_2d = Object::cast_to<Node2D>(node);
         // Never chase ourselves or our own markers: the spawner (and any Node2D
         // markers under it) would otherwise match a broad pattern like "Node2D".
-        if (as_2d != nullptr && as_2d != this) {
+        // Never the preview holder either: it is visualization only (same
+        // exclusion as the children spawn markers in the collect path).
+        if (as_2d != nullptr && as_2d != this && !as_2d->has_meta(PREVIEW_META_KEY)) {
             String node_name = String(as_2d->get_name());
             String pattern = homing_node_name;
             if (!homing_node_name_case_sensitive) {
@@ -4275,7 +4277,9 @@ void BulletSpawner2D::collect_homing_candidates_from_children(Node *p_parent, bo
         Node2D *as_2d = Object::cast_to<Node2D>(child);
         // Never the spawner itself (a parent pointing at our own node would
         // otherwise make the volley chase its emitter).
-        if (as_2d != nullptr && as_2d != this) {
+        // Same preview-holder exclusion as the name scan above: the gizmo
+        // must never become a homing target.
+        if (as_2d != nullptr && as_2d != this && !as_2d->has_meta(PREVIEW_META_KEY)) {
             if (homing_filter_group.is_empty() || as_2d->is_in_group(homing_filter_group)) {
                 r_candidates.push_back(as_2d);
             }
@@ -5428,7 +5432,12 @@ void BulletSpawner2D::snapshot_preview_sources() {
     // the compiled points, so both are caught).
     tracked_custom_transforms.clear();
     if (pattern_source == PATTERN_FROM_HELPER_CUSTOM) {
-        tracked_custom_transforms = helper_custom_transforms;
+        // Deep copy, never an assignment: TypedArray assignment only shares
+        // (COW), and Array::clear() does NOT duplicate before wiping, so a
+        // shared snapshot would let the clear() above destroy the user's
+        // placed transforms on the next rebuild (silent data loss + dead
+        // spawner). Bounded by the setter cap, so the copy stays cheap.
+        tracked_custom_transforms = helper_custom_transforms.duplicate();
     } else if (pattern_source == PATTERN_FROM_HELPER_PATH2D) {
         tracked_custom_transforms.clear();
         const PackedVector2Array live_pts = sample_path2d_polyline(true);
