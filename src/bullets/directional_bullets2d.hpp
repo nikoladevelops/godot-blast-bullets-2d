@@ -224,6 +224,15 @@ protected:
 	// coefficient (speed -= speed * drag * delta). Both default to off.
 	Vector2 gravity = Vector2(0, 0);
 	real_t linear_drag = 0.0;
+	// Per-bullet gravity vectors (resolved at spawn/enable from shared gravity
+	// + all_bullet_gravity spawn data, same fallback rule as speed data).
+	// The tick integrates these (see all_gravity_velocity); all zero = off.
+	std::vector<Vector2> all_gravity;
+	// Gravity time window over volley life (seconds since spawn, read on
+	// curves_elapsed_time): integrates only inside [delay, delay + duration].
+	// delay 0 = immediate; duration 0 = infinite. Zeroed with the vectors.
+	double gravity_delay_sec = 0.0;
+	double gravity_duration_sec = 0.0;
 	// Per-bullet integrated gravity velocity (semi-implicit Euler: v += g*dt
 	// each tick, p += v*dt). Zeroed on every new life (spawn/enable/reset)
 	// and whenever set_gravity starts a new regime, so pooled reuse never
@@ -731,14 +740,23 @@ public:
 		// the ballistic step and the offset drifts the result (matches the
 		// documented velocity composition direction * speed + offset).
 		velocity_delta += inherited_velocity_offset * (real_t)delta;
-		// Gravity: true constant acceleration (semi-implicit Euler). The
-		// per-bullet integrated velocity accumulates g*dt every tick and
-		// drives the step; the old single 0.5*g*dt^2 positional term alone
-		// never integrated, so gravity read as a ~2px/s drift no matter the
-		// value. Zeroed on every new life and on set_gravity (new regime).
-		if (gravity.length_squared() > 0.0 && i >= 0 && i < (int)all_gravity_velocity.size()) {
-			all_gravity_velocity[i] += gravity * (real_t)delta;
-			velocity_delta += all_gravity_velocity[i] * (real_t)delta;
+		// Gravity: per-bullet acceleration inside its time window, scaled by the
+		// gravity strength curve when present. Default (zero vectors, zero
+		// windows beyond immediate) reproduces straight top-down flight:
+		// all_gravity reads zero and the window short-circuits below.
+		// Zeroed on every new life and on set_gravity (new regime).
+		if (i >= 0 && i < (int)all_gravity.size() && i < (int)all_gravity_velocity.size()) {
+			const Vector2 base_g = all_gravity[i];
+			if (base_g.length_squared() > 0.0 && gravity_window_open()) {
+				const BulletCurvesData2D *grav_shared = shared_bullet_curves_data.is_valid() ? shared_bullet_curves_data.ptr() : nullptr;
+				const BulletCurvesData2D *grav_per = (is_per_bullet_curves_valid && per_bullet_curves_data != nullptr) ? per_bullet_curves_data : nullptr;
+				const real_t scale = gravity_strength_scale_for_bullet(grav_shared, grav_per);
+				const Vector2 g = base_g * scale;
+				if (g.is_finite()) {
+					all_gravity_velocity[i] += g * (real_t)delta;
+					velocity_delta += all_gravity_velocity[i] * (real_t)delta;
+				}
+			}
 		}
 		if (is_wobble_feature_enabled && i >= 0 && i < (int)wobble_distance_traveled.size()) {
 			wobble_distance_traveled[i] += velocity_delta.length();
@@ -2988,6 +3006,10 @@ public:
 		return 0;
 	}
 
+	// Gravity introspection for tests/support: {vector, fall_speed,
+	// window_active, curve_scale}. Never mutates.
+	Dictionary debug_get_gravity_info(int bullet_index) const;
+
 	// Seeds per-bullet curves/patterns from spawn data through the regular
 	// per-bullet helpers (null entries skipped). Called from the custom
 	// spawn/enable logic alongside the shared application; storage is
@@ -2995,6 +3017,37 @@ public:
 	void apply_per_bullet_curves_from_data(const DirectionalBulletsData2D &directional_data);
 	void apply_per_bullet_movement_patterns_from_data(const DirectionalBulletsData2D &directional_data);
 	void apply_wobble_from_data(const DirectionalBulletsData2D &directional_data);
+	void apply_gravity_from_data(const DirectionalBulletsData2D &directional_data);
+
+	// Gravity time window over volley life (seconds since spawn, read on
+	// curves_elapsed_time): integrates only inside [delay, delay + duration].
+	bool gravity_window_open() const {
+		if (curves_elapsed_time < gravity_delay_sec) {
+			return false;
+		}
+		if (gravity_duration_sec > 0.0 && curves_elapsed_time >= gravity_delay_sec + gravity_duration_sec) {
+			return false;
+		}
+		return true;
+	}
+
+	// Gravity strength scale for one bullet from shared/per-bullet curves
+	// (per-bullet wins when valid, like direction curves). Null curves read
+	// 1.0; a non-finite sample reads 1.0 (neutral) so a broken curve can
+	// never brick or invert the fall.
+	real_t gravity_strength_scale_for_bullet(const BulletCurvesData2D *shared, const BulletCurvesData2D *per_bullet) const {
+		const BulletCurvesData2D *src = nullptr;
+		if (per_bullet != nullptr && per_bullet->gravity_strength_curve.is_valid()) {
+			src = per_bullet;
+		} else if (shared != nullptr && shared->gravity_strength_curve.is_valid()) {
+			src = shared;
+		} else {
+			return 1.0;
+		}
+		const bool use_unit = src->gravity_use_unit_curve && !is_life_time_infinite;
+		const real_t sampled = src->gravity_strength_curve->sample_baked(curve_get_input_value(use_unit));
+		return Math::is_finite(sampled) ? sampled : 1.0;
+	}
 
 	// WOBBLE / GRAVITY / DRAG / HOMING-GATE RUNTIME API (spawn-data
 	// equivalents, editable live on the instance). Wobble entries resolve
@@ -3046,9 +3099,71 @@ public:
 			return;
 		}
 		gravity = value;
-		// New regime, new fall speed: without this a mid-flight gravity
-		// change would add onto stale integrated velocity (discontinuity).
+		// Shared write fans out to every slot (same as the spawn-data shared
+		// fallback). New regime, new fall speed: without this a mid-flight
+		// gravity change would add onto stale integrated velocity.
+		all_gravity.assign(amount_bullets, value);
 		all_gravity_velocity.assign(amount_bullets, Vector2(0, 0));
+	}
+	Vector2 bullet_get_gravity(int bullet_index) const {
+		if (!validate_bullet_index(bullet_index, "bullet_get_gravity")) {
+			return Vector2(0, 0);
+		}
+		if (bullet_index < 0 || bullet_index >= (int)all_gravity.size()) {
+			return Vector2(0, 0);
+		}
+		return all_gravity[bullet_index];
+	}
+	void bullet_set_gravity(int bullet_index, const Vector2 &value) {
+		if (!validate_bullet_index(bullet_index, "bullet_set_gravity")) {
+			return;
+		}
+		if (!value.is_finite()) {
+			UtilityFunctions::push_error("DirectionalBullets2D.bullet_set_gravity: value must be finite, keeping the old value.");
+			return;
+		}
+		if (bullet_index < 0 || bullet_index >= (int)all_gravity.size() || bullet_index >= (int)all_gravity_velocity.size()) {
+			return;
+		}
+		all_gravity[bullet_index] = value;
+		all_gravity_velocity[bullet_index] = Vector2(0, 0);
+	}
+	void all_bullets_set_gravity(const Vector2 &value, int bullet_index_start = 0, int bullet_index_end_inclusive = -1) {
+		if (!value.is_finite()) {
+			UtilityFunctions::push_error("DirectionalBullets2D.all_bullets_set_gravity: value must be finite, keeping old values.");
+			return;
+		}
+		ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_set_gravity");
+		for (int i = bullet_index_start; i <= bullet_index_end_inclusive; ++i) {
+			bullet_set_gravity(i, value);
+		}
+	}
+	double get_gravity_delay_sec() const { return gravity_delay_sec; }
+	void set_gravity_delay_sec(double value) {
+		if (!Math::is_finite(value) || value < 0.0) {
+			UtilityFunctions::push_error("DirectionalBullets2D.set_gravity_delay_sec: value must be finite and >= 0, keeping the old value.");
+			return;
+		}
+		gravity_delay_sec = value;
+	}
+	double get_gravity_duration_sec() const { return gravity_duration_sec; }
+	void set_gravity_duration_sec(double value) {
+		if (!Math::is_finite(value) || value < 0.0) {
+			UtilityFunctions::push_error("DirectionalBullets2D.set_gravity_duration_sec: value must be finite and >= 0 (0 = infinite), keeping the old value.");
+			return;
+		}
+		gravity_duration_sec = value;
+	}
+	// Fall speed magnitude of one bullet (integrated fall velocity length).
+	// 0 when gravity never integrated for that slot.
+	real_t bullet_get_fall_speed(int bullet_index) const {
+		if (!validate_bullet_index(bullet_index, "bullet_get_fall_speed")) {
+			return 0.0;
+		}
+		if (bullet_index < 0 || bullet_index >= (int)all_gravity_velocity.size()) {
+			return 0.0;
+		}
+		return all_gravity_velocity[bullet_index].length();
 	}
 	real_t get_linear_drag() const { return linear_drag; }
 	void set_linear_drag(real_t value) {

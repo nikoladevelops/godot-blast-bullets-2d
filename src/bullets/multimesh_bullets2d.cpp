@@ -148,6 +148,26 @@ Dictionary MultiMeshBullets2D::debug_get_shape_state() const {
 	return d;
 }
 
+Dictionary MultiMeshBullets2D::debug_get_attachment_info(int bullet_index) const {
+	Dictionary d;
+	d["has_attachment"] = false;
+	d["pooling_id"] = 0;
+	d["owner_match"] = false;
+	if (bullet_index < 0 || bullet_index >= amount_bullets || bullet_index >= (int)attachments.size() || bullet_index >= (int)attachment_pooling_ids.size()) {
+		return d;
+	}
+	BulletAttachment2D *a = attachments[bullet_index];
+	if (a == nullptr) {
+		return d;
+	}
+	d["has_attachment"] = true;
+	d["pooling_id"] = (int64_t)attachment_pooling_ids[bullet_index];
+	// Owner ids must point back here; a stale owner after pool reuse fails.
+	// Never dereferences a: ids are plain values, compared by value.
+	d["owner_match"] = a->owner_multimesh_id == get_instance_id() && a->owner_bullet_index == bullet_index;
+	return d;
+}
+
 void MultiMeshBullets2D::reset_attachment_state_for_reuse() {
 	// Force-disable any surviving slot first. Deferred attachment disables can be
 	// dropped by a generation bump (e.g. lifetime expiry pooled this instance and a
@@ -1905,6 +1925,7 @@ void MultiMeshBullets2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("debug_get_volley_info"), &MultiMeshBullets2D::debug_get_volley_info);
 	ClassDB::bind_method(D_METHOD("debug_get_timer_count"), &MultiMeshBullets2D::debug_get_timer_count);
 	ClassDB::bind_method(D_METHOD("debug_get_shape_state"), &MultiMeshBullets2D::debug_get_shape_state);
+	ClassDB::bind_method(D_METHOD("debug_get_attachment_info", "bullet_index"), &MultiMeshBullets2D::debug_get_attachment_info);
 
 	ClassDB::bind_method(D_METHOD("bullet_free_attachment", "bullet_index"), &MultiMeshBullets2D::bullet_free_attachment);
 	ClassDB::bind_method(D_METHOD("bullet_disable_attachment", "bullet_index"), &MultiMeshBullets2D::bullet_disable_attachment);
@@ -1959,6 +1980,12 @@ void MultiMeshBullets2D::_bind_methods() {
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "is_attachments_auto_pooling_enabled"), "set_is_attachments_auto_pooling_enabled", "get_is_attachments_auto_pooling_enabled");
 
 	ClassDB::bind_method(D_METHOD("reset_pooling_flags_to_default"), &MultiMeshBullets2D::reset_pooling_flags_to_default);
+	// Manual-pooling reseed: reactivates a fully-disabled volley with fresh
+	// spawn data (same amount_bullets required; same-shape only inside physics
+	// sweeps, shape-type changes need idle via call_deferred). Fully validated:
+	// refuses on active/queued/wrong-type/NaN-offset input without touching
+	// state. This is the cross-owner reuse path for manual poolers.
+	ClassDB::bind_method(D_METHOD("enable_multimesh", "data", "inherited_velocity_offset", "spawner_id"), &MultiMeshBullets2D::enable_multimesh_for_script, DEFVAL(Vector2(0, 0)), DEFVAL(0));
 
 	// Collision
 	ClassDB::bind_method(D_METHOD("get_bullet_max_collision_count"), &MultiMeshBullets2D::get_bullet_max_collision_count);

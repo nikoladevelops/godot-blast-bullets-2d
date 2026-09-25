@@ -373,6 +373,21 @@
 				Collision shape state: valid, type, circle_radius, rect_size, capsule_radius, capsule_height, rid_count. Asserts set_collision_shape_runtime same-type vs type-change paths.
 			</description>
 		</method>
+		<method name="debug_get_attachment_info" qualifiers="const">
+			<return type="Dictionary" />
+			<description>
+				Attachment slot introspection: has_attachment, pooling_id, owner_match. owner_match verifies the attachment's owner ids point back at this volley + index (stale ownership after reuse fails here).
+			</description>
+		</method>
+		<method name="enable_multimesh">
+			<return type="bool" />
+			<param index="0" name="data" type="MultiMeshBulletsData2D" />
+			<param index="1" name="inherited_velocity_offset" type="Vector2" default="Vector2(0, 0)" />
+			<param index="2" name="spawner_id" type="int" default="0" />
+			<description>
+				Manual-pooling reseed: reactivates a fully-disabled volley with fresh data (same amount_bullets required; same-shape only inside physics sweeps, shape-type changes need idle via call_deferred). Refuses on active/queued/wrong-type/null/NaN-offset input without touching state. This is the cross-owner reuse path for manual poolers; same-owner revive uses enable_bullet/wake_bullet.
+			</description>
+		</method>
 		<method name="get_all_bullets_status">
 			<return type="bool[]" />
 			<description>
@@ -451,7 +466,7 @@
 			<return type="Vector2" />
 			<param index="0" name="bullet_index" type="int" />
 			<description>
-				Logical velocity of a specific bullet (direction x speed + inherited offset). Excludes per-tick pattern/orbit displacement, which steers the movement delta after this value is computed. Use this for gameplay logic such as splitting bullets or speed checks.
+				Logical velocity of a specific bullet (direction x speed + inherited offset + integrated gravity fall speed when gravity is active). Excludes per-tick pattern/orbit displacement, which steers the movement delta after this value is computed. Use this for gameplay logic such as splitting bullets or speed checks.
 			</description>
 		</method>
 		<method name="get_collision_layer" qualifiers="const">

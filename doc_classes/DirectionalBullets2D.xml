@@ -602,6 +602,44 @@
 				Sets the homing turn agility for the specified bullet. Enables per-bullet mode for the whole multimesh (see [method all_bullets_set_homing_smoothing]). Non-finite or negative values are rejected.
 			</description>
 		</method>
+		<method name="bullet_get_gravity">
+			<return type="Vector2" />
+			<param index="0" name="bullet_index" type="int" />
+			<description>
+				Per-bullet gravity acceleration vector for the specified bullet. Invalid indexes read (0, 0).
+			</description>
+		</method>
+		<method name="bullet_set_gravity">
+			<return type="void" />
+			<param index="0" name="bullet_index" type="int" />
+			<param index="1" name="value" type="Vector2" />
+			<description>
+				Sets the gravity acceleration for one bullet and restarts its fall speed (new regime). Non-finite values are rejected.
+			</description>
+		</method>
+		<method name="all_bullets_set_gravity">
+			<return type="void" />
+			<param index="0" name="value" type="Vector2" />
+			<param index="1" name="bullet_index_start" type="int" default="0" />
+			<param index="2" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<description>
+				Sets the gravity acceleration for a bullet range (default all), restarting each fall speed. Non-finite values are rejected.
+			</description>
+		</method>
+		<method name="bullet_get_fall_speed">
+			<return type="float" />
+			<param index="0" name="bullet_index" type="int" />
+			<description>
+				Integrated fall speed magnitude for the specified bullet. 0 when gravity never integrated there.
+			</description>
+		</method>
+		<method name="debug_get_gravity_info">
+			<return type="Dictionary" />
+			<param index="0" name="bullet_index" type="int" />
+			<description>
+				Gravity introspection: vector, fall_speed, window_active, curve_scale. Never mutates.
+			</description>
+		</method>
 		<method name="bullet_set_orbiting_center">
 			<return type="void" />
 			<param index="0" name="bullet_index" type="int" />
@@ -908,7 +946,13 @@
 			If you want this behavior for the shared deque, use [member shared_homing_deque_auto_pop_after_target_reached] instead.
 		</member>
 		<member name="gravity" type="Vector2" setter="set_gravity" getter="get_gravity" default="Vector2(0, 0)">
-			Constant acceleration in px/s^2 added to every bullet each tick (2D sideview arcs, tower-defense shells). (0, 0) disables.
+			Shared gravity acceleration in px/s^2, fanning out to every bullet (2D sideview arcs, tower-defense shells). (0, 0) disables — top-down default. Writing it starts a new regime: per-bullet vectors and integrated fall speeds reset. Prefer [method bullet_set_gravity] for single slots.
+		</member>
+		<member name="gravity_delay_sec" type="float" setter="set_gravity_delay_sec" getter="get_gravity_delay_sec" default="0.0">
+			Seconds of straight flight before gravity starts integrating. 0 falls immediately.
+		</member>
+		<member name="gravity_duration_sec" type="float" setter="set_gravity_duration_sec" getter="get_gravity_duration_sec" default="0.0">
+			Seconds of falling before gravity stops integrating (volley glides on with frozen fall speed). 0 = infinite.
 		</member>
 		<member name="homing_delay_sec" type="float" setter="set_homing_delay_sec" getter="get_homing_delay_sec" default="0.0">
 			Seconds of straight flight before steering starts (classic aimed-then-homing). 0 steers immediately.

@@ -1332,6 +1332,13 @@
 				Structural consistency check: {ok, error, directional_total, block_total}. Verifies vec/pool/sparse-set agreement (no nulls, sparse ids match indexes, active ids live). Never mutates. For crash-suite invariants after every destructive section.
 			</description>
 		</method>
+		<method name="debug_get_pool_bucket">
+			<return type="MultiMeshPoolKey2D" />
+			<param index="0" name="volley" type="Node" />
+			<description>
+				Live pool bucket (amount + shape) of one volley, for per-bucket free/reset assertions in multi-spawner tests. Returns null on null input.
+			</description>
+		</method>
 	</methods>
 	<members>
 		<member name="block_bullets_debugger_color" type="Color" setter="set_block_bullets_debugger_color" getter="get_block_bullets_debugger_color" default="Color(0, 0, 1, 0.8)">

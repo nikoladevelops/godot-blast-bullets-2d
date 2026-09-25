@@ -174,6 +174,64 @@ void DirectionalBullets2D::apply_per_bullet_movement_patterns_from_data(const Di
 	}
 }
 
+Dictionary DirectionalBullets2D::debug_get_gravity_info(int bullet_index) const {
+	Dictionary d;
+	d["vector"] = Vector2(0, 0);
+	d["fall_speed"] = 0.0;
+	d["window_active"] = false;
+	d["curve_scale"] = 1.0;
+	if (bullet_index < 0 || bullet_index >= amount_bullets) {
+		return d;
+	}
+	if (bullet_index >= 0 && bullet_index < (int)all_gravity.size()) {
+		d["vector"] = all_gravity[bullet_index];
+	}
+	if (bullet_index >= 0 && bullet_index < (int)all_gravity_velocity.size()) {
+		d["fall_speed"] = all_gravity_velocity[bullet_index].length();
+	}
+	d["window_active"] = gravity_window_open();
+	const BulletCurvesData2D *grav_shared = shared_bullet_curves_data.is_valid() ? shared_bullet_curves_data.ptr() : nullptr;
+	const BulletCurvesData2D *grav_per = (bullet_index >= 0 && bullet_index < (int)all_bullet_curves_data.size() && all_bullet_curves_data[bullet_index].is_valid()) ? all_bullet_curves_data[bullet_index].ptr() : nullptr;
+	d["curve_scale"] = gravity_strength_scale_for_bullet(grav_shared, grav_per);
+	return d;
+}
+
+void DirectionalBullets2D::apply_gravity_from_data(const DirectionalBulletsData2D &directional_data) {	all_gravity.assign(amount_bullets, Vector2(0, 0));
+	all_gravity_velocity.assign(amount_bullets, Vector2(0, 0));
+	gravity_delay_sec = 0.0;
+	gravity_duration_sec = 0.0;
+	// Windows validate like their homing twins; bad values keep 0 (off/immediate).
+	if (Math::is_finite(directional_data.gravity_delay_sec) && directional_data.gravity_delay_sec >= 0.0) {
+		gravity_delay_sec = (real_t)directional_data.gravity_delay_sec;
+	} else {
+		UtilityFunctions::push_error("DirectionalBulletsData2D gravity_delay_sec must be finite and >= 0, using 0 (immediate).");
+	}
+	if (Math::is_finite(directional_data.gravity_duration_sec) && directional_data.gravity_duration_sec >= 0.0) {
+		gravity_duration_sec = (real_t)directional_data.gravity_duration_sec;
+	} else {
+		UtilityFunctions::push_error("DirectionalBulletsData2D gravity_duration_sec must be finite and >= 0 (0 = infinite), using 0 (infinite).");
+	}
+	gravity = directional_data.gravity;
+	if (!gravity.is_finite()) {
+		UtilityFunctions::push_error("DirectionalBulletsData2D gravity must be finite, using (0, 0).");
+		gravity = Vector2(0, 0);
+	}
+	for (int i = 0; i < amount_bullets; ++i) {
+		const int entry = resolve_per_bullet_data_index(directional_data.all_bullet_gravity.size(), i);
+		Vector2 g = gravity;
+		if (entry >= 0 && entry < directional_data.all_bullet_gravity.size()) {
+			const Vector2 candidate = directional_data.all_bullet_gravity[entry];
+			if (candidate.is_finite()) {
+				g = candidate;
+			} else {
+				UtilityFunctions::push_error("DirectionalBulletsData2D all_bullet_gravity[" + String::num_int64(entry) + "] is not finite, using (0, 0) for bullet index " + String::num_int64(i) + ".");
+				g = Vector2(0, 0);
+			}
+		}
+		all_gravity[i] = g;
+	}
+}
+
 void DirectionalBullets2D::apply_wobble_from_data(const DirectionalBulletsData2D &directional_data) {
 	all_bullet_wobble.assign(amount_bullets, WobbleSeed());
 	wobble_distance_traveled.assign(amount_bullets, 0.0);
@@ -293,6 +351,7 @@ void DirectionalBullets2D::custom_additional_spawn_logic(const MultiMeshBulletsD
 	populate_shared_curves_related_data(directional_data->shared_bullet_curves_data);
 	apply_shared_movement_pattern_from_data(*directional_data);
 	apply_wobble_from_data(*directional_data);
+	apply_gravity_from_data(*directional_data);
 
 	// Homing steering seeds from the same spawn data (direct factory users
 	// keep it on fresh spawns too, matching the enable path).
@@ -303,7 +362,6 @@ void DirectionalBullets2D::custom_additional_spawn_logic(const MultiMeshBulletsD
 	homing_distance_before_reached = (real_t)directional_data->homing_distance_before_reached;
 	bullet_homing_auto_pop_after_target_reached = directional_data->bullet_homing_auto_pop_after_target_reached;
 	shared_homing_deque_auto_pop_after_target_reached = directional_data->shared_homing_deque_auto_pop_after_target_reached;
-	gravity = directional_data->gravity;
 	linear_drag = (real_t)directional_data->linear_drag;
 	homing_delay_sec = (real_t)directional_data->homing_delay_sec;
 	homing_duration_sec = (real_t)directional_data->homing_duration_sec;
@@ -328,6 +386,10 @@ void DirectionalBullets2D::reset_transient_subclass_state(bool drop_stale_work) 
 	wobble_distance_traveled.assign(amount_bullets, 0.0);
 	is_wobble_feature_enabled = false;
 	gravity = Vector2(0, 0);
+	all_gravity.assign(amount_bullets, Vector2(0, 0));
+	all_gravity_velocity.assign(amount_bullets, Vector2(0, 0));
+	gravity_delay_sec = 0.0;
+	gravity_duration_sec = 0.0;
 	linear_drag = 0.0;
 	homing_delay_sec = 0.0;
 	homing_duration_sec = 0.0;
@@ -387,6 +449,7 @@ bool DirectionalBullets2D::custom_additional_enable_logic(const MultiMeshBullets
 	populate_shared_curves_related_data(directional_data->shared_bullet_curves_data);
 	apply_shared_movement_pattern_from_data(*directional_data);
 	apply_wobble_from_data(*directional_data);
+	apply_gravity_from_data(*directional_data);
 
 	// Vectors are sized in spawn, but a wrong-type spawn early-returns before
 	// sizing. Resize defensively (base reset already blanked them, so no
@@ -413,7 +476,8 @@ bool DirectionalBullets2D::custom_additional_enable_logic(const MultiMeshBullets
 	homing_distance_before_reached = (real_t)directional_data->homing_distance_before_reached;
 	bullet_homing_auto_pop_after_target_reached = directional_data->bullet_homing_auto_pop_after_target_reached;
 	shared_homing_deque_auto_pop_after_target_reached = directional_data->shared_homing_deque_auto_pop_after_target_reached;
-	gravity = directional_data->gravity;
+	// Gravity fully seeded by apply_gravity_from_data above (vectors +
+	// windows); the shared member mirrors it for the runtime getter.
 	linear_drag = (real_t)directional_data->linear_drag;
 	homing_delay_sec = (real_t)directional_data->homing_delay_sec;
 	homing_duration_sec = (real_t)directional_data->homing_duration_sec;
@@ -544,6 +608,21 @@ void DirectionalBullets2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_gravity"), &DirectionalBullets2D::get_gravity);
 	ClassDB::bind_method(D_METHOD("set_gravity", "value"), &DirectionalBullets2D::set_gravity);
 	ADD_PROPERTY(PropertyInfo(Variant::VECTOR2, "gravity"), "set_gravity", "get_gravity");
+
+	ClassDB::bind_method(D_METHOD("bullet_get_gravity", "bullet_index"), &DirectionalBullets2D::bullet_get_gravity);
+	ClassDB::bind_method(D_METHOD("bullet_set_gravity", "bullet_index", "value"), &DirectionalBullets2D::bullet_set_gravity);
+	ClassDB::bind_method(D_METHOD("all_bullets_set_gravity", "value", "bullet_index_start", "bullet_index_end_inclusive"), &DirectionalBullets2D::all_bullets_set_gravity, DEFVAL(0), DEFVAL(-1));
+
+	ClassDB::bind_method(D_METHOD("get_gravity_delay_sec"), &DirectionalBullets2D::get_gravity_delay_sec);
+	ClassDB::bind_method(D_METHOD("set_gravity_delay_sec", "value"), &DirectionalBullets2D::set_gravity_delay_sec);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "gravity_delay_sec"), "set_gravity_delay_sec", "get_gravity_delay_sec");
+
+	ClassDB::bind_method(D_METHOD("get_gravity_duration_sec"), &DirectionalBullets2D::get_gravity_duration_sec);
+	ClassDB::bind_method(D_METHOD("set_gravity_duration_sec", "value"), &DirectionalBullets2D::set_gravity_duration_sec);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "gravity_duration_sec"), "set_gravity_duration_sec", "get_gravity_duration_sec");
+
+	ClassDB::bind_method(D_METHOD("bullet_get_fall_speed", "bullet_index"), &DirectionalBullets2D::bullet_get_fall_speed);
+	ClassDB::bind_method(D_METHOD("debug_get_gravity_info", "bullet_index"), &DirectionalBullets2D::debug_get_gravity_info);
 
 	ClassDB::bind_method(D_METHOD("get_linear_drag"), &DirectionalBullets2D::get_linear_drag);
 	ClassDB::bind_method(D_METHOD("set_linear_drag", "value"), &DirectionalBullets2D::set_linear_drag);

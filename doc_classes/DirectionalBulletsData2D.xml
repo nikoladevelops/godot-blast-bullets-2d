@@ -39,7 +39,16 @@
 			Per-bullet queue: pop the front target when the owning bullet reaches it. Pooled reuse re-seeds this from the spawn data, so direct [BulletFactory2D] spawns keep it without a spawner.
 		</member>
 		<member name="gravity" type="Vector2" setter="set_gravity" getter="get_gravity" default="Vector2(0, 0)">
-			Constant acceleration in px/s^2 added to every bullet each tick (2D sideview arcs, tower-defense shells). (0, 0) disables. Must stay finite.
+			Constant acceleration in px/s^2 fanning out to every bullet each tick (2D sideview arcs, tower-defense shells). (0, 0) disables — top-down default. Must stay finite. Per-bullet [member all_bullet_gravity] overrides per slot when provided.
+		</member>
+		<member name="all_bullet_gravity" type="Vector2[]" setter="set_all_bullet_gravity" getter="get_all_bullet_gravity" default="[]">
+			Per-bullet gravity vectors applied at spawn time (and on pool reuse). Same fallback rule as [member all_bullet_speed_data]: empty uses [member gravity] for all bullets, 1 entry fans out, matching size maps per bullet. Non-finite entries fail open to zero for that slot.
+		</member>
+		<member name="gravity_delay_sec" type="float" setter="set_gravity_delay_sec" getter="get_gravity_delay_sec" default="0.0">
+			Seconds of straight flight before gravity starts integrating (shells that glide first, then drop). 0 falls immediately.
+		</member>
+		<member name="gravity_duration_sec" type="float" setter="set_gravity_duration_sec" getter="get_gravity_duration_sec" default="0.0">
+			Seconds of falling before gravity stops integrating (shells that drop, then glide on with frozen fall speed). 0 = infinite.
 		</member>
 		<member name="homing_delay_sec" type="float" setter="set_homing_delay_sec" getter="get_homing_delay_sec" default="0.0">
 			Seconds of straight flight before homing steering starts (classic aimed-then-homing). 0 steers immediately.

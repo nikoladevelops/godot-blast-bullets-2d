@@ -71,6 +71,14 @@
 			If [code]true[/code], the X-axis of the curve is normalized (0 start of life to 1 end of life) based on the bullet's lifetime. 
 			If [code]false[/code], the X-axis represents absolute time values (at exactly X lifetime have THIS Y DIRECTION value).
 		</member>
+		<member name="gravity_strength_curve" type="Curve" setter="set_gravity_strength_curve" getter="get_gravity_strength_curve">
+			Scales the per-bullet gravity vector over life (multiplied each tick). Null means full strength always. A non-finite sample reads as 1.0 (neutral), so a broken curve can never brick the fall. Use a 0-to-1 ramp for shells that glide first, then drop.
+		</member>
+		<member name="gravity_use_unit_curve" type="bool" setter="set_gravity_use_unit_curve" getter="get_gravity_use_unit_curve" default="true">
+			Whether to use a unit curve for the gravity strength curve.
+			If [code]true[/code], the X-axis of the curve is normalized (0 start of life to 1 end of life) based on the bullet's lifetime.
+			If [code]false[/code], the X-axis represents absolute time values (at exactly X lifetime have THIS STRENGTH value).
+		</member>
 	</members>
 	<constants>
 		<constant name="Additive" value="0" enum="DirectionCurveMode">

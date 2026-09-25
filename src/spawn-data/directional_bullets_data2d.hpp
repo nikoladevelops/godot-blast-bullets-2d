@@ -95,6 +95,20 @@ public:
 	// (0, 0) disables. Must stay finite.
 	Vector2 gravity = Vector2(0, 0);
 
+	// Per-bullet gravity vectors (same shared fallback rule as speed data:
+	// empty = off and the shared gravity above drives every bullet; 1 entry
+	// fans out; N entries map per bullet). Non-finite entries fail open to
+	// zero for that slot. Top-down default stays (0, 0) = disabled.
+	TypedArray<Vector2> all_bullet_gravity;
+
+	// Gravity time window over volley life (seconds since spawn, measured on
+	// curves_elapsed_time): gravity only integrates inside
+	// [delay, delay + duration]. delay 0 = immediate; duration 0 = infinite.
+	// Lets shells fly straight first, then drop (or drop, then glide).
+	// Both must stay finite and >= 0.
+	double gravity_delay_sec = 0.0;
+	double gravity_duration_sec = 0.0;
+
 	// Linear drag applied to speed each tick: speed -= speed * drag * delta.
 	// 0 disables. Must stay finite and >= 0.
 	double linear_drag = 0.0;
@@ -201,6 +215,15 @@ public:
 
 	Vector2 get_gravity() const;
 	void set_gravity(const Vector2 &value);
+
+	TypedArray<Vector2> get_all_bullet_gravity() const;
+	void set_all_bullet_gravity(const TypedArray<Vector2> &new_data);
+
+	double get_gravity_delay_sec() const;
+	void set_gravity_delay_sec(double value);
+
+	double get_gravity_duration_sec() const;
+	void set_gravity_duration_sec(double value);
 
 	double get_linear_drag() const;
 	void set_linear_drag(double value);

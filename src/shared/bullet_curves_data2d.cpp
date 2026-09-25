@@ -145,6 +145,24 @@ void BulletCurvesData2D::set_y_direction_curve_mode(DirectionCurveMode mode) {
 	y_direction_curve_mode = mode;
 }
 
+Ref<Curve> BulletCurvesData2D::get_gravity_strength_curve() const {
+	return gravity_strength_curve;
+}
+void BulletCurvesData2D::set_gravity_strength_curve(const Ref<Curve> &curve) {
+	if (curve.is_valid()) {
+		curve->bake();
+	}
+
+	gravity_strength_curve = curve;
+}
+
+bool BulletCurvesData2D::get_gravity_use_unit_curve() const {
+	return gravity_use_unit_curve;
+}
+void BulletCurvesData2D::set_gravity_use_unit_curve(bool value) {
+	gravity_use_unit_curve = value;
+}
+
 void BulletCurvesData2D::_bind_methods() {
 	// Movement Speed Curve
 
@@ -219,6 +237,20 @@ void BulletCurvesData2D::_bind_methods() {
 	ADD_PROPERTY(
 			PropertyInfo(Variant::INT, "y_direction_curve_mode", PROPERTY_HINT_ENUM, "Additive,Override"),
 			"set_y_direction_curve_mode", "get_y_direction_curve_mode");
+
+	//
+
+	// Gravity Strength Curve (scales the per-bullet gravity vector over life)
+
+	ClassDB::bind_method(D_METHOD("get_gravity_strength_curve"), &BulletCurvesData2D::get_gravity_strength_curve);
+	ClassDB::bind_method(D_METHOD("set_gravity_strength_curve", "curve"), &BulletCurvesData2D::set_gravity_strength_curve);
+	ADD_PROPERTY(
+			PropertyInfo(Variant::OBJECT, "gravity_strength_curve", PROPERTY_HINT_RESOURCE_TYPE, "Curve"),
+			"set_gravity_strength_curve", "get_gravity_strength_curve");
+
+	ClassDB::bind_method(D_METHOD("get_gravity_use_unit_curve"), &BulletCurvesData2D::get_gravity_use_unit_curve);
+	ClassDB::bind_method(D_METHOD("set_gravity_use_unit_curve", "value"), &BulletCurvesData2D::set_gravity_use_unit_curve);
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "gravity_use_unit_curve"), "set_gravity_use_unit_curve", "get_gravity_use_unit_curve");
 
 	//
 

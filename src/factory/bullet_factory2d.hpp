@@ -474,6 +474,9 @@ public:
 	// agreement (no nulls, sparse ids match indexes, active ids in range,
 	// pooled instances inactive). Returns {ok, error}. Never mutates.
 	Dictionary debug_assert_no_dangling();
+	// Live pool bucket of one volley (for per-bucket free/reset assertions in
+	// multi-spawner tests). Returns null with an error for null/outside nodes.
+	Ref<MultiMeshPoolKey2D> debug_get_pool_bucket(MultiMeshBullets2D *volley);
 
 	// Live-bullet census attributed by spawner ownership. Sums
 	// active_bullets_counter over every ACTIVE directional volley whose

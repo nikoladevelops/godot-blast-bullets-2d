@@ -32,6 +32,13 @@ public:
 	real_t y_direction_curve_strength = 1.0;
 	DirectionCurveMode y_direction_curve_mode = DirectionCurveMode::Additive;
 
+	// Gravity strength scale over the volley life (multiplies the per-bullet
+	// gravity vector each tick). Null = full strength always. Follows the same
+	// unit/absolute sampling as the other curves; a non-finite sample reads
+	// as 1.0 (neutral) so a broken curve can never brick the fall.
+	Ref<Curve> gravity_strength_curve;
+	bool gravity_use_unit_curve = true;
+
 	bool rotate_towards_adjusted_direction = true;
 	real_t direction_curve_rotation_speed = 18.0f;
 
@@ -67,6 +74,12 @@ public:
 
 	Ref<Curve> get_y_direction_curve() const;
 	void set_y_direction_curve(const Ref<Curve> &curve);
+
+	Ref<Curve> get_gravity_strength_curve() const;
+	void set_gravity_strength_curve(const Ref<Curve> &curve);
+
+	bool get_gravity_use_unit_curve() const;
+	void set_gravity_use_unit_curve(bool value);
 
 	bool get_y_direction_use_unit_curve() const;
 	void set_y_direction_use_unit_curve(bool value);

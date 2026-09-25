@@ -16,6 +16,8 @@ or a real bug — investigate before shipping.
 - `volley/test_volley_orbiting.gd` — arming without targets, setters (clamp vs reject), linear shells, rigid follow, disable.
 - `volley/test_volley_curves_wobble.gd` — shared/per-bullet curves, ownership guards, Path2D/Curve2D patterns, gravity acceleration, shared speed/rotation, wobble.
 - `volley/test_volley_runtime_mutation.gd` — custom data separation, layers, shape runtime, 64-timer cap, enable/disable, animation guards.
+- `volley/test_volley_gravity_feature.gd` — opt-in gravity: default-off, shared/per-bullet seeding, delay/duration windows, strength curves, rejects, reuse neutrality, homing mix, spawner seeding.
+- `volley/test_volley_math_edges.gd` — quantitative tick identities: drag decay band, rotation clamp, wobble boundedness, smoothing clamps.
 - `volley/test_block_volleys.gd` — rigid volleys: spawn, teleport, pooling, expiry.
 - `spawner/test_spawner_patterns.gd` — all 30 sources, cap, order ops, spin/scales, skip carve, presets.
 - `spawner/test_spawner_homing_orbit.gd` — 6 target sources, cache, fire-arc gate, retarget, fuse, stagger.
@@ -30,3 +32,14 @@ or a real bug — investigate before shipping.
 - Timer attach/detach counts only read fresh on idle frames (they defer in physics).
 - `factory.debug_assert_no_dangling()` after every destructive section.
 - Legacy root-level suites (`test_edge_fuzz.gd`, …) still run unchanged.
+
+## Pooling (`pooling/`)
+
+The no-leak proof for object reuse. One shared factory stressed by N spawners
+plus direct `spawn_controllable_*`, asserting owner attribution, per-bucket
+isolation, full state reset (homing/orbit/curves/wobble/pattern/custom-data/
+timers/rotation/gravity/fall-speed/flags/owner/generation), key-validity
+(hit/miss, never silent reuse), attachment lifecycle via the `AttachmentProbe2D`
+fixture (`scenes/attachment_probe.gd`, packed in code so suites stay
+self-contained), and cross-owner handover (adopt, foreign-wake warn + reseed,
+deferred free inside collision handlers).

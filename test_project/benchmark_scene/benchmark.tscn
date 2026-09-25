@@ -31,6 +31,7 @@ animations = [{
 [sub_resource type="DirectionalBulletsData2D" id="DirectionalBulletsData2D_nkrfg"]
 shared_bullet_speed_data = SubResource("BulletSpeedData2D_mouoi")
 shared_movement_pattern_face_movement_direction = true
+all_bullet_gravity = Array[Vector2]([Vector2(0, 300), Vector2(0, 700)])
 sprite_frames = SubResource("SpriteFrames_y4v7i")
 texture_size = Vector2(120, 120)
 collision_layer = 2
@@ -82,7 +83,6 @@ helper_diamond_diagonal_x = 255.0
 helper_path2d_path = NodePath("../Paths/Path2D")
 spin_enabled = true
 burst_enabled = true
-homing_enabled = true
 homing_node_group = &"player"
 homing_target_path = NodePath("../Player")
 shared_homing_auto_pop_after_target_reached = true

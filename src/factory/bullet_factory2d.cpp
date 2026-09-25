@@ -1102,6 +1102,19 @@ Ref<MultiMeshPoolKey2D> BulletFactory2D::debug_expected_pool_key(const Ref<Multi
 	return out;
 }
 
+Ref<MultiMeshPoolKey2D> BulletFactory2D::debug_get_pool_bucket(MultiMeshBullets2D *volley) {
+	Ref<MultiMeshPoolKey2D> out;
+	if (volley == nullptr) {
+		UtilityFunctions::push_error("debug_get_pool_bucket: volley is null.");
+		return out;
+	}
+	const PoolKey k = volley->get_pool_key();
+	out.instantiate();
+	out->set_amount_bullets(k.amount_bullets);
+	out->set_shape_type((int)k.shape_type);
+	return out;
+}
+
 Dictionary BulletFactory2D::debug_assert_no_dangling() {
 	Dictionary d;
 	d["ok"] = true;
@@ -7141,6 +7154,7 @@ void BulletFactory2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("debug_get_live_volley_ids", "owner_spawner_id"), &BulletFactory2D::debug_get_live_volley_ids);
 	ClassDB::bind_static_method("BulletFactory2D", D_METHOD("debug_expected_pool_key", "spawn_data"), &BulletFactory2D::debug_expected_pool_key);
 	ClassDB::bind_method(D_METHOD("debug_assert_no_dangling"), &BulletFactory2D::debug_assert_no_dangling);
+	ClassDB::bind_method(D_METHOD("debug_get_pool_bucket", "volley"), &BulletFactory2D::debug_get_pool_bucket);
 
 	ClassDB::bind_method(D_METHOD("get_debugger_max_providers"), &BulletFactory2D::get_debugger_max_providers);
 	ClassDB::bind_method(D_METHOD("set_debugger_max_providers", "max_providers"), &BulletFactory2D::set_debugger_max_providers);

@@ -170,6 +170,35 @@ void DirectionalBulletsData2D::set_gravity(const Vector2 &value) {
 	gravity = value;
 }
 
+TypedArray<Vector2> DirectionalBulletsData2D::get_all_bullet_gravity() const {
+	return all_bullet_gravity;
+}
+void DirectionalBulletsData2D::set_all_bullet_gravity(const TypedArray<Vector2> &new_data) {
+	all_bullet_gravity = new_data;
+}
+
+double DirectionalBulletsData2D::get_gravity_delay_sec() const {
+	return gravity_delay_sec;
+}
+void DirectionalBulletsData2D::set_gravity_delay_sec(double value) {
+	if (!Math::is_finite(value) || value < 0.0) {
+		UtilityFunctions::push_error("DirectionalBulletsData2D: gravity_delay_sec must be finite and >= 0, keeping the old value.");
+		return;
+	}
+	gravity_delay_sec = value;
+}
+
+double DirectionalBulletsData2D::get_gravity_duration_sec() const {
+	return gravity_duration_sec;
+}
+void DirectionalBulletsData2D::set_gravity_duration_sec(double value) {
+	if (!Math::is_finite(value) || value < 0.0) {
+		UtilityFunctions::push_error("DirectionalBulletsData2D: gravity_duration_sec must be finite and >= 0 (0 = infinite), keeping the old value.");
+		return;
+	}
+	gravity_duration_sec = value;
+}
+
 double DirectionalBulletsData2D::get_linear_drag() const {
 	return linear_drag;
 }
@@ -298,6 +327,18 @@ void DirectionalBulletsData2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_gravity"), &DirectionalBulletsData2D::get_gravity);
 	ClassDB::bind_method(D_METHOD("set_gravity", "value"), &DirectionalBulletsData2D::set_gravity);
 	ADD_PROPERTY(PropertyInfo(Variant::VECTOR2, "gravity"), "set_gravity", "get_gravity");
+
+	ClassDB::bind_method(D_METHOD("get_all_bullet_gravity"), &DirectionalBulletsData2D::get_all_bullet_gravity);
+	ClassDB::bind_method(D_METHOD("set_all_bullet_gravity", "new_data"), &DirectionalBulletsData2D::set_all_bullet_gravity);
+	ADD_PROPERTY(PropertyInfo(Variant::ARRAY, "all_bullet_gravity", PROPERTY_HINT_ARRAY_TYPE, "Vector2"), "set_all_bullet_gravity", "get_all_bullet_gravity");
+
+	ClassDB::bind_method(D_METHOD("get_gravity_delay_sec"), &DirectionalBulletsData2D::get_gravity_delay_sec);
+	ClassDB::bind_method(D_METHOD("set_gravity_delay_sec", "value"), &DirectionalBulletsData2D::set_gravity_delay_sec);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "gravity_delay_sec"), "set_gravity_delay_sec", "get_gravity_delay_sec");
+
+	ClassDB::bind_method(D_METHOD("get_gravity_duration_sec"), &DirectionalBulletsData2D::get_gravity_duration_sec);
+	ClassDB::bind_method(D_METHOD("set_gravity_duration_sec", "value"), &DirectionalBulletsData2D::set_gravity_duration_sec);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "gravity_duration_sec"), "set_gravity_duration_sec", "get_gravity_duration_sec");
 
 	ClassDB::bind_method(D_METHOD("get_linear_drag"), &DirectionalBulletsData2D::get_linear_drag);
 	ClassDB::bind_method(D_METHOD("set_linear_drag", "value"), &DirectionalBulletsData2D::set_linear_drag);

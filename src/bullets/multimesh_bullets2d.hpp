@@ -112,6 +112,15 @@ public:
 	// when the spawn data is incompatible, so the pool owner can re-push it.
 	// spawner_id works like spawn()'s: stamped before re-activation.
 	bool enable_multimesh(const MultiMeshBulletsData2D &data, const Vector2 &new_inherited_velocity_offset, uint64_t spawner_id = 0);
+	// GDScript entry for enable_multimesh (Ref-based; native callers use the
+	// reference overload directly). Returns false on null data without touching state.
+	bool enable_multimesh_for_script(const Ref<MultiMeshBulletsData2D> &data, const Vector2 &new_inherited_velocity_offset = Vector2(0, 0), uint64_t spawner_id = 0) {
+		if (data.is_null()) {
+			UtilityFunctions::push_error("enable_multimesh: spawn data is null.");
+			return false;
+		}
+		return enable_multimesh(*data.ptr(), new_inherited_velocity_offset, spawner_id);
+	}
 
 	// Clears homing state (target deques + counters) on teardown so global mouse-target
 	// accounting can't leak. Base version is a no-op (only directional bullets home).
@@ -1341,8 +1350,14 @@ public:
 
 		real_t acceleration = all_cached_acceleration[bullet_index] * delta;
 		real_t new_speed = curr_bullet_speed + acceleration;
+		// max_speed <= 0 means unlimited (matches max_collision_count = 0 and
+		// the resource default of 0): a default-constructed BulletSpeedData2D
+		// must fly at constant speed, not freeze after one tick. The 0 floor
+		// for deceleration still applies (speed is a magnitude).
 		if (acceleration >= 0.0) {
-			new_speed = Math::min(new_speed, curr_max_bullet_speed);
+			if (curr_max_bullet_speed > 0.0) {
+				new_speed = Math::min(new_speed, curr_max_bullet_speed);
+			}
 		} else {
 			new_speed = Math::max(new_speed, (real_t)0.0);
 		}
@@ -1366,10 +1381,14 @@ public:
 
 		// Clamp by motion direction, not just acceleration sign: with zero
 		// acceleration a negative overspeed must still decay toward -max
-		// (min(-5, max) would freeze it at -5 forever).
+		// (min(-5, max) would freeze it at -5 forever). max <= 0 means
+		// unlimited (same convention as linear speed): default-constructed
+		// rotation data spins freely instead of freezing.
 		real_t acceleration = all_rotation_acceleration[bullet_index] * delta;
 		real_t new_speed = curr_bullet_rotation_speed + acceleration;
-		if (acceleration > 0.0 || (acceleration == 0.0 && new_speed > 0.0)) {
+		if (curr_max_rotation_speed <= 0.0) {
+			// Unlimited: keep integrated speed as-is.
+		} else if (acceleration > 0.0 || (acceleration == 0.0 && new_speed > 0.0)) {
 			new_speed = Math::min(new_speed, curr_max_rotation_speed);
 		} else {
 			new_speed = Math::max(new_speed, -curr_max_rotation_speed);
@@ -1881,7 +1900,15 @@ public:
 		// collided hits, timers, clocks, animation cursor). No generation bump
 		// and no connection scrub: the dying life's deferred emits must still
 		// flush, and same-owner wakes keep their connections.
+		// Pooling flags are PRESERVED here (not reset): reset_transient_volley_state
+		// defaults them for new lives, but this is a dying life — the owner's
+		// explicit "don't pool" must survive to the gate below, otherwise a
+		// pooling-off volley would resurrect pooling mid-sweep and pool itself.
+		const bool saved_auto_pool = is_multimesh_auto_pooling_enabled;
+		const bool saved_auto_pool_attachments = is_attachments_auto_pooling_enabled;
 		reset_transient_volley_state(0, false);
+		is_multimesh_auto_pooling_enabled = saved_auto_pool;
+		is_attachments_auto_pooling_enabled = saved_auto_pool_attachments;
 
 		custom_additional_disable_logic();
 
@@ -1924,6 +1951,10 @@ public:
 	// capsule_radius, capsule_height, rid_count}. For tests asserting
 	// set_collision_shape_runtime same-type vs type-change paths.
 	Dictionary debug_get_shape_state() const;
+	// Attachment slot introspection: {has_attachment, pooling_id,
+	// owner_match}. owner_match verifies the attachment's owner ids point
+	// back at this volley + index (stale ownership after reuse fails here).
+	Dictionary debug_get_attachment_info(int bullet_index) const;
 
 	// Disables a single bullet: removes it from the live set, hides the visual,
 	// disables its physics shape, and (unless told otherwise) returns its

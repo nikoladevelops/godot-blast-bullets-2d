@@ -75,6 +75,22 @@ func _initialize() -> void:
 	var shape: Dictionary = v.debug_get_shape_state()
 	_check(shape.get("valid", false) == true and (shape.get("rid_count", 0) as int) == 3, "shape state valid, 3 RIDs")
 
+	printerr("DIR-CORE T5 default speed resource flies (max 0 = unlimited)")
+	var plain_data := DirectionalBulletsData2D.new()
+	plain_data.transforms = [Transform2D.IDENTITY]
+	var plain_sp := BulletSpeedData2D.new()
+	plain_sp.speed = 300.0
+	# NOTE: max_speed left at default 0 = unlimited (not a brake).
+	plain_data.all_bullet_speed_data = [plain_sp]
+	plain_data.max_life_time = 10.0
+	plain_data.texture_size = Vector2(16, 16)
+	var pv: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(plain_data)
+	var pp0: Vector2 = pv.get_bullet_global_transform(0).origin
+	for i in 10:
+		await physics_frame
+	var pp1: Vector2 = pv.get_bullet_global_transform(0).origin
+	_check(pp1.x > pp0.x + 20.0, "default max_speed flies straight (dx=%.1f)" % (pp1.x - pp0.x))
+
 	printerr("DIR-CORE T4 texture rotation")
 	v.set_bullet_texture_rotation_radians(0, PI * 0.5)
 	_check(absf(v.get_bullet_texture_rotation_radians(0) - PI * 0.5) < 0.2, "texture rotation set")
