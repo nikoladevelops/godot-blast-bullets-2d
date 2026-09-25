@@ -346,6 +346,33 @@
 				You can also provide a [code]collision_amount[/code], which is how many hits this bullet has already taken: 0 (default) means fresh with full hits remaining. Values below 0 count as 0, values at or above [member bullet_max_collision_count] grant a single remaining hit (same clamp as [method set_bullet_collision_count]).
 			</description>
 		</method>
+		<method name="wake_bullet">
+			<return type="void" />
+			<param index="0" name="bullet_index" type="int" />
+			<param index="1" name="collision_amount" type="int" default="0" />
+			<param index="2" name="enable_attachment" type="bool" default="true" />
+			<description>
+				Alias for [method enable_bullet] with unambiguous naming: revives one pooled or manually-disabled slot with its current appearance/ballistics intact (same-owner re-enable). Cross-owner reuse must go through the factory spawn methods or enable_multimesh(), which reseed appearance, custom data, speeds and patterns.
+			</description>
+		</method>
+		<method name="debug_get_volley_info" qualifiers="const">
+			<return type="Dictionary" />
+			<description>
+				Stability introspection: amount_bullets, active_bullets, generation, owner_spawner_id, is_active, is_pooled, pool_amount, pool_shape, auto_pool_multimesh, auto_pool_attachments.
+			</description>
+		</method>
+		<method name="debug_get_timer_count" qualifiers="const">
+			<return type="int" />
+			<description>
+				Attached timer count (0 = no per-tick timer cost). Asserts the 64-timer cap and detach-during-fire behavior.
+			</description>
+		</method>
+		<method name="debug_get_shape_state" qualifiers="const">
+			<return type="Dictionary" />
+			<description>
+				Collision shape state: valid, type, circle_radius, rect_size, capsule_radius, capsule_height, rid_count. Asserts set_collision_shape_runtime same-type vs type-change paths.
+			</description>
+		</method>
 		<method name="get_all_bullets_status">
 			<return type="bool[]" />
 			<description>

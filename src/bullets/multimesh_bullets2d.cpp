@@ -120,6 +120,34 @@ int MultiMeshBullets2D::get_amount_active_attachments() const {
 	return amount_active_attachments;
 }
 
+Dictionary MultiMeshBullets2D::debug_get_volley_info() const {
+	Dictionary d;
+	d["amount_bullets"] = amount_bullets;
+	d["active_bullets"] = active_bullets_counter;
+	d["generation"] = multimesh_generation;
+	d["owner_spawner_id"] = (int64_t)owner_spawner_id;
+	d["is_active"] = is_active;
+	d["is_pooled"] = is_pooled_in_pool;
+	const PoolKey k = get_pool_key();
+	d["pool_amount"] = k.amount_bullets;
+	d["pool_shape"] = (int)k.shape_type;
+	d["auto_pool_multimesh"] = is_multimesh_auto_pooling_enabled;
+	d["auto_pool_attachments"] = is_attachments_auto_pooling_enabled;
+	return d;
+}
+
+Dictionary MultiMeshBullets2D::debug_get_shape_state() const {
+	Dictionary d;
+	d["valid"] = physics_server != nullptr && area.is_valid() && (int)physics_shapes.size() == amount_bullets;
+	d["type"] = (int)cached_effective_shape_type;
+	d["circle_radius"] = cached_circle_radius;
+	d["rect_size"] = cached_rect_size;
+	d["capsule_radius"] = cached_capsule_radius;
+	d["capsule_height"] = cached_capsule_height;
+	d["rid_count"] = (int)physics_shapes.size();
+	return d;
+}
+
 void MultiMeshBullets2D::reset_attachment_state_for_reuse() {
 	// Force-disable any surviving slot first. Deferred attachment disables can be
 	// dropped by a generation bump (e.g. lifetime expiry pooled this instance and a
@@ -258,6 +286,11 @@ void MultiMeshBullets2D::reset_transient_volley_state(uint64_t new_owner_spawner
 	// Blank attachment state: a reused instance must never carry the previous
 	// owner's attachment slots into the next life.
 	reset_attachment_state_for_reuse();
+	// P0-4: pooling flags are per-new-life defaults, not sticky owner state.
+	// A volley that disabled pooling to take manual ownership must not strand
+	// the next pooled reuse with "don't pool". Users that want manual control
+	// set the flags explicitly after every spawn/enable (documented).
+	reset_pooling_flags_to_default();
 	if (drop_stale_work) {
 		// New life: stale deferred emits/disables (scheduled before a pool
 		// reuse) carry the old generation and no-op at flush time, and the
@@ -1868,6 +1901,10 @@ void MultiMeshBullets2D::_bind_methods() {
 
 	ClassDB::bind_method(D_METHOD("disable_bullet", "bullet_index", "disable_bullet_attachment"), &MultiMeshBullets2D::disable_bullet, DEFVAL(true));
 	ClassDB::bind_method(D_METHOD("enable_bullet", "bullet_index", "collision_amount", "enable_attachment"), &MultiMeshBullets2D::enable_bullet, DEFVAL(0), DEFVAL(true));
+	ClassDB::bind_method(D_METHOD("wake_bullet", "bullet_index", "collision_amount", "enable_attachment"), &MultiMeshBullets2D::wake_bullet, DEFVAL(0), DEFVAL(true));
+	ClassDB::bind_method(D_METHOD("debug_get_volley_info"), &MultiMeshBullets2D::debug_get_volley_info);
+	ClassDB::bind_method(D_METHOD("debug_get_timer_count"), &MultiMeshBullets2D::debug_get_timer_count);
+	ClassDB::bind_method(D_METHOD("debug_get_shape_state"), &MultiMeshBullets2D::debug_get_shape_state);
 
 	ClassDB::bind_method(D_METHOD("bullet_free_attachment", "bullet_index"), &MultiMeshBullets2D::bullet_free_attachment);
 	ClassDB::bind_method(D_METHOD("bullet_disable_attachment", "bullet_index"), &MultiMeshBullets2D::bullet_disable_attachment);

@@ -366,6 +366,30 @@ public:
 	// Frees only the pooled attachments that came from the given scene.
 	void free_attachments_pool_for_scene(const Ref<PackedScene> &attachment_scene);
 
+	// ---- Deferred structural wrappers (safe from any callback) ----
+	// Structural ops reject inside physics frames / sweeps (see
+	// reject_when_iterating). These validate cheaply now and run the real op
+	// deferred, so collision / lifetime / timer / spawner-signal handlers can
+	// call them without call_deferred boilerplate. No-ops with an error when
+	// the factory is tearing down.
+	void reset_deferred(const Ref<MultiMeshPoolKey2D> &key = Ref<MultiMeshPoolKey2D>());
+	void free_active_bullets_deferred(const Ref<MultiMeshPoolKey2D> &key = Ref<MultiMeshPoolKey2D>());
+	void free_disabled_bullets_deferred(const Ref<MultiMeshPoolKey2D> &key = Ref<MultiMeshPoolKey2D>());
+	void free_bullets_pool_deferred(BulletType bullet_type, const Ref<MultiMeshPoolKey2D> &key = Ref<MultiMeshPoolKey2D>());
+	void populate_bullets_pool_deferred(const Ref<MultiMeshPoolKey2D> &key, const Ref<MultiMeshBulletsData2D> &multimesh_data, int instance_count);
+	void free_attachments_pool_deferred();
+	void free_attachments_pool_for_scene_deferred(const Ref<PackedScene> &attachment_scene);
+	// Safe single-volley free from any callback. Never calls free()/force_delete
+	// synchronously; uses queue_free() which is always safe mid-sweep.
+	// Use this instead of free() on a volley inside signal handlers.
+	void free_volley_deferred(Node *volley);
+
+	// Ensures factory containers exist even when a GDScript _ready() overrode
+	// the native _ready() without super._ready(). Called lazily from every
+	// spawn/populate entry via validate_spawn_request(). Emits a loud error
+	// once telling the user to call super._ready(). Returns is_ready.
+	bool ensure_factory_initialized();
+
 	//
 
 	// BULLET ATTACHMENT RELATED
@@ -398,6 +422,13 @@ public:
 	// touching half-destroyed state (e.g. re-pooling attachments into a dying pool).
 	bool get_is_tearing_down() const { return is_tearing_down; }
 
+	// P1-12 debugger budget passthrough (applies to both debuggers).
+	// max_providers 0 = unlimited (default, preserves always-draw behavior).
+	int get_debugger_max_providers() const;
+	void set_debugger_max_providers(int v);
+	bool get_debugger_draw_inactive() const;
+	void set_debugger_draw_inactive(bool v);
+
 	//
 
 	// ADDITIONAL METHODS FOR DEBUGGING PURPOSES
@@ -413,6 +444,36 @@ public:
 	int debug_get_attachments_pool_amount();
 
 	Dictionary debug_get_attachments_pool_info();
+
+	// ---- Stability / observability debug API (bound, const where possible) ----
+	// Snapshot of factory lifecycle state. Keys: is_ready, is_busy,
+	// is_iterating, is_tearing_down, processing, directional_total,
+	// block_total, directional_pooled, block_pooled, attachments_pooled.
+	Dictionary debug_get_factory_state();
+	// Pool hit/miss counters for spawn reuse (pop hit vs allocate-new miss).
+	// Keys: directional_hits, directional_misses, block_hits, block_misses.
+	// Misses are normal on first spawn / key change; a 0% hit rate with a
+	// pre-populated pool means the spawn key never matches (e.g. skip indices
+	// shrank transforms after populate). Use debug_expected_pool_key() to compare.
+	Dictionary debug_get_pool_hit_stats() const;
+	void debug_reset_pool_stats();
+	// Non-mutating validation of spawn data. Returns {ok, error}. Never spawns,
+	// never touches the pool. Use from crash-fuzz tests before spawn_*().
+	static Dictionary debug_validate_spawn_data(const Ref<MultiMeshBulletsData2D> &spawn_data);
+	// Interpolation status. Keys: factory_enabled, project_enabled_2d,
+	// project_enabled_3d, mismatch (bool), hint. Mismatch = bullets look
+	// steppy despite the factory flag, or vice versa.
+	Dictionary debug_check_interpolation_status();
+	// Live volley ids owned by a spawner (for teardown tests). Empty when none.
+	PackedInt64Array debug_get_live_volley_ids(uint64_t owner_spawner_id);
+	// Derives the exact pool bucket a spawn would use without spawning.
+	// Returns null (with an error) when spawn_data has no transforms.
+	// Compare with debug_get_bullets_pool_info() keys to diagnose 0% pool hits.
+	static Ref<MultiMeshPoolKey2D> debug_expected_pool_key(const Ref<MultiMeshBulletsData2D> &spawn_data);
+	// Structural consistency check for tests: verifies vec/pool/sparse-set
+	// agreement (no nulls, sparse ids match indexes, active ids in range,
+	// pooled instances inactive). Returns {ok, error}. Never mutates.
+	Dictionary debug_assert_no_dangling();
 
 	// Live-bullet census attributed by spawner ownership. Sums
 	// active_bullets_counter over every ACTIVE directional volley whose
@@ -506,6 +567,16 @@ public:
 	std::vector<int> directional_iteration_scratch;
 	std::vector<int> block_iteration_scratch;
 
+	// Pool reuse observability (P1-9). Incremented only on spawn pop/allocate
+	// paths (never in the per-bullet tick), so zero hot-path cost.
+	// Mutable so const debug getters can report without breaking constness.
+	mutable uint64_t directional_pool_hits = 0;
+	mutable uint64_t directional_pool_misses = 0;
+	mutable uint64_t block_pool_hits = 0;
+	mutable uint64_t block_pool_misses = 0;
+	// Once-only _ready-missing warning (P0-1 lazy init path).
+	bool ready_missing_super_warned = false;
+
 	// Errors (once per call) when a structural operation runs while mutation
 	// is unsafe: mid-iteration, or inside any physics frame (server flush
 	// locks apply to RIDs the operation would free). E.g. reset()/free_*()/
@@ -539,8 +610,14 @@ public:
 			UtilityFunctions::push_error("Error when trying to spawn bullets. BulletFactory2D is currently busy. Ignoring the request");
 			return false;
 		}
+		// Lazy init (P0-1): a GDScript _ready() without super._ready() leaves
+		// containers null and is_ready false. Recover + warn loudly instead of
+		// shipping a dead factory.
 		if (!is_ready) {
-			UtilityFunctions::push_error(String(caller_name) + ": BulletFactory2D is not in the scene tree yet. Add it first, then spawn.");
+			ensure_factory_initialized();
+		}
+		if (!is_ready) {
+			UtilityFunctions::push_error(String(caller_name) + ": BulletFactory2D is not in the scene tree yet. Add it first, then spawn. If you attached a script with _ready() to the factory, call super._ready() first.");
 			return false;
 		}
 		if (is_tearing_down) {
@@ -624,6 +701,10 @@ public:
 
 	// Cache the setting before the factory is ready in the scene tree. / Whenever you see something similar, just know I am doing this to avoid bugs with the editor - keeps state consistent
 	bool use_physics_interpolation_cached_before_ready = false;
+
+	// P1-12 budget caches before ready (same pattern as debugger enabled flag).
+	int debugger_max_providers_cached_before_ready = 0;
+	bool debugger_draw_inactive_cached_before_ready = true;
 
 	bool get_use_physics_interpolation() const;
 	void set_use_physics_interpolation_runtime(bool new_use_physics_interpolation);
@@ -879,6 +960,13 @@ public:
 		// Try to get a TBullet from the pool first
 		TBullet *bullets = static_cast<TBullet *>(bullets_pool.pop(key));
 		if (bullets != nullptr) {
+			// Pool-hit accounting (P1-9). Discriminated at compile time by the
+			// pooled type; never touches the per-bullet tick.
+			if constexpr (std::is_same_v<TBullet, DirectionalBullets2D>) {
+				++directional_pool_hits;
+			} else {
+				++block_pool_hits;
+			}
 			if (!bullets->enable_multimesh(*spawn_data.ptr(), new_inherited_velocity_offset, spawner_id)) {
 				// enable_multimesh rolls its own mutations back on failure, so the
 				// instance is a clean disabled one here: just file it back under
@@ -911,6 +999,13 @@ public:
 
 		// Generate new id according to how many ids there are in the sparse set
 		int sparse_set_id = bullets_vec.size();
+
+		// Pool miss (P1-9): no reusable instance, allocating new.
+		if constexpr (std::is_same_v<TBullet, DirectionalBullets2D>) {
+			++directional_pool_misses;
+		} else {
+			++block_pool_misses;
+		}
 
 		// If there was no TBullet in the pool, create a brand new one and spawn it
 		bullets = memnew(TBullet);

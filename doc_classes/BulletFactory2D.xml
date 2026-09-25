@@ -1217,6 +1217,121 @@
 				Warning (shared factories): this moves EVERY spawner's live volleys at once - there is no per-spawner or per-bucket variant.
 			</description>
 		</method>
+		<method name="ensure_factory_initialized">
+			<return type="bool" />
+			<description>
+				Lazy recovery for a GDScript _ready() that skipped super._ready(): builds missing containers/debuggers and returns whether the factory is ready. Called automatically by every spawn/populate entry; call it manually after _ready if you override _ready in a script (better: call super._ready() first). Warns once when recovery runs.
+			</description>
+		</method>
+		<method name="reset_deferred">
+			<return type="void" />
+			<param index="0" name="key" type="MultiMeshPoolKey2D" default="null" />
+			<description>
+				Deferred [method reset]: safe from collision, lifetime, timer and spawner-signal handlers. Validates cheaply now, runs the real op after the physics step.
+			</description>
+		</method>
+		<method name="free_active_bullets_deferred">
+			<return type="void" />
+			<param index="0" name="key" type="MultiMeshPoolKey2D" default="null" />
+			<description>
+				Deferred [method free_active_bullets]: safe from any callback. Use this instead of free() on volleys inside handlers (free() mid-sweep corrupts iteration; queue_free() via [method free_volley_deferred] is the single-volley equivalent).
+			</description>
+		</method>
+		<method name="free_disabled_bullets_deferred">
+			<return type="void" />
+			<param index="0" name="key" type="MultiMeshPoolKey2D" default="null" />
+			<description>
+				Deferred [method free_disabled_bullets]: safe from any callback.
+			</description>
+		</method>
+		<method name="free_bullets_pool_deferred">
+			<return type="void" />
+			<param index="0" name="bullet_type" type="int" enum="BulletFactory2D.BulletType" />
+			<param index="1" name="key" type="MultiMeshPoolKey2D" default="null" />
+			<description>
+				Deferred [method free_bullets_pool]: safe from any callback.
+			</description>
+		</method>
+		<method name="populate_bullets_pool_deferred">
+			<return type="void" />
+			<param index="0" name="key" type="MultiMeshPoolKey2D" />
+			<param index="1" name="multimesh_data" type="MultiMeshBulletsData2D" />
+			<param index="2" name="instance_count" type="int" />
+			<description>
+				Deferred [method populate_bullets_pool]: safe from any callback. Null key, null data and instance_count &lt;= 0 are rejected immediately without queuing.
+			</description>
+		</method>
+		<method name="free_attachments_pool_deferred">
+			<return type="void" />
+			<description>
+				Deferred [method free_attachments_pool]: safe from any callback.
+			</description>
+		</method>
+		<method name="free_attachments_pool_for_scene_deferred">
+			<return type="void" />
+			<param index="0" name="attachment_scene" type="PackedScene" />
+			<description>
+				Deferred [method free_attachments_pool_for_scene]: safe from any callback.
+			</description>
+		</method>
+		<method name="free_volley_deferred">
+			<return type="void" />
+			<param index="0" name="volley" type="Node" />
+			<description>
+				Safe single-volley free from any callback: uses queue_free(), never free()/force_delete(). Use this inside directional_area_entered and other handlers instead of freeing the volley directly.
+			</description>
+		</method>
+		<method name="debug_get_factory_state">
+			<return type="Dictionary" />
+			<description>
+				Lifecycle snapshot: is_ready, is_busy, is_iterating, is_tearing_down, processing, directional_total, block_total, directional_pooled, block_pooled, attachments_pooled.
+			</description>
+		</method>
+		<method name="debug_get_pool_hit_stats">
+			<return type="Dictionary" />
+			<description>
+				Pool reuse counters: directional_hits, directional_misses, block_hits, block_misses. A 0% hit rate with a pre-populated pool means the spawn key never matches (e.g. helper_skip_indices shrank transforms after populate); compare [method debug_expected_pool_key] against [method debug_get_bullets_pool_info] keys.
+			</description>
+		</method>
+		<method name="debug_reset_pool_stats">
+			<return type="void" />
+			<description>
+				Resets the pool hit/miss counters from [method debug_get_pool_hit_stats].
+			</description>
+		</method>
+		<method name="debug_validate_spawn_data">
+			<return type="Dictionary" />
+			<param index="0" name="spawn_data" type="MultiMeshBulletsData2D" />
+			<description>
+				Non-mutating validation: {ok, error, warning}. Never spawns, never touches the pool. The warning fires for invisible bullets (no sprite_frames/mesh/texture_size); art must face Vector2.RIGHT (cannot be auto-detected).
+			</description>
+		</method>
+		<method name="debug_check_interpolation_status">
+			<return type="Dictionary" />
+			<description>
+				Interpolation agreement check: factory_enabled, project_enabled_2d, mismatch, hint. Enable both the factory flag and ProjectSettings physics/common/physics_interpolation for smooth high-refresh bullets.
+			</description>
+		</method>
+		<method name="debug_get_live_volley_ids">
+			<return type="PackedInt64Array" />
+			<param index="0" name="owner_spawner_id" type="int" />
+			<description>
+				Instance ids of active directional volleys owned by a spawner. For teardown tests.
+			</description>
+		</method>
+		<method name="debug_expected_pool_key">
+			<return type="MultiMeshPoolKey2D" />
+			<param index="0" name="spawn_data" type="MultiMeshBulletsData2D" />
+			<description>
+				Derives the exact pool bucket a spawn would use without spawning. Returns null on empty data.
+			</description>
+		</method>
+		<method name="debug_assert_no_dangling">
+			<return type="Dictionary" />
+			<description>
+				Structural consistency check: {ok, error, directional_total, block_total}. Verifies vec/pool/sparse-set agreement (no nulls, sparse ids match indexes, active ids live). Never mutates. For crash-suite invariants after every destructive section.
+			</description>
+		</method>
 	</methods>
 	<members>
 		<member name="block_bullets_debugger_color" type="Color" setter="set_block_bullets_debugger_color" getter="get_block_bullets_debugger_color" default="Color(0, 0, 1, 0.8)">
@@ -1236,6 +1351,12 @@
 			Determines whether physics interpolation is enabled or not. The setter is for the editor only.
 
 			Instead always use [method set_use_physics_interpolation_runtime] if you are doing changes during runtime.
+		</member>
+		<member name="debugger_max_providers" type="int" setter="set_debugger_max_providers" getter="get_debugger_max_providers" default="0">
+			Max debugger providers drawn per tick (0 = unlimited). Beyond the cap extra volleys are hidden, oldest first. Lower this on 10k-bullet demos where the always-draw debugger costs frames.
+		</member>
+		<member name="debugger_draw_inactive" type="bool" setter="set_debugger_draw_inactive" getter="get_debugger_draw_inactive" default="true">
+			When false, pooled/frozen volleys are hidden in the debugger instead of drawn frozen. Default true preserves always-draw behavior.
 		</member>
 	</members>
 	<signals>

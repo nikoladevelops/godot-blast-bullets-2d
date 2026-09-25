@@ -33,6 +33,9 @@ void DirectionalBullets2D::set_up_movement_data(const TypedArray<BulletSpeedData
 		all_cached_direction.resize(amount_bullets);
 		all_cached_velocity.resize(amount_bullets);
 	}
+	// New ballistic regime every time movement is (re)seeded: pooled reuse
+	// must not inherit fall speed from a previous owner's gravity.
+	all_gravity_velocity.assign(amount_bullets, Vector2(0, 0));
 
 	// In case not enough speed data was provided, we will use the first element as fallback for all bullets
 	bool use_per_bullet = (speed_data_size == amount_bullets);

@@ -1,9 +1,12 @@
 #include "bullet_spawner2d.hpp"
 #include "bullets/directional_bullets2d.hpp"
+#include "godot_cpp/classes/capsule_shape2d.hpp"
+#include "godot_cpp/classes/circle_shape2d.hpp"
 #include "godot_cpp/classes/engine.hpp"
 #include "godot_cpp/classes/global_constants.hpp"
 #include "godot_cpp/classes/curve2d.hpp"
 #include "godot_cpp/classes/path2d.hpp"
+#include "godot_cpp/classes/rectangle_shape2d.hpp"
 #include "godot_cpp/classes/scene_tree.hpp"
 #include "godot_cpp/classes/window.hpp"
 #include "godot_cpp/core/class_db.hpp"
@@ -201,6 +204,13 @@ void PatternPreviewLayer2D::set_arrows_data(const PackedVector2Array &p_tails, c
     queue_redraw();
 }
 
+void PatternPreviewLayer2D::set_rings_data(float p_radius, const Color &p_color, float p_width) {
+    ring_radius = p_radius;
+    ring_color = p_color;
+    ring_width = p_width;
+    queue_redraw();
+}
+
 void PatternPreviewLayer2D::_draw() {
     if (kind == LAYER_DOTS) {
         // Track as polylines split on non-finite separators: samplers emit
@@ -275,6 +285,17 @@ void PatternPreviewLayer2D::_draw() {
             const Vector2 p0 = dots[0];
             if (p0.is_finite()) {
                 draw_circle(p0, dot_radius * first_dot_radius_scale, first_dot_color);
+            }
+        }
+        // Collision-ring overlay (P2): bounding-radius outline per dot so the
+        // editor shows hitbox vs visual. Snapshot radius; <= 0 hides.
+        if (ring_radius > 0.0f && ring_width > 0.0f) {
+            for (int i = 0; i < dots.size(); i++) {
+                const Vector2 p = dots[i];
+                if (!p.is_finite()) {
+                    continue;
+                }
+                draw_arc(p, ring_radius, 0.0f, Math::TAU, 24, ring_color, ring_width, false);
             }
         }
         return;
@@ -497,7 +518,31 @@ Ref<DirectionalBulletsData2D> BulletSpawner2D::get_spawn_data() const {
     return spawn_data;
 }
 void BulletSpawner2D::set_spawn_data(const Ref<DirectionalBulletsData2D> &new_data) {
-    spawn_data = new_data;
+	if (spawn_data.is_valid() && spawn_data->is_connected("changed", Callable(this, "_on_spawn_data_changed"))) {
+		spawn_data->disconnect("changed", Callable(this, "_on_spawn_data_changed"));
+	}
+	spawn_data = new_data;
+	// P1-7: new resource invalidates the duplicate cache (see header).
+	cached_volley_template.unref();
+	cached_spawn_data_id = 0;
+	if (spawn_data.is_valid()) {
+		spawn_data->connect("changed", Callable(this, "_on_spawn_data_changed"));
+	}
+}
+
+void BulletSpawner2D::_on_spawn_data_changed() {
+	// In-place edit of the user's resource: drop the cached duplicate so the
+	// next shoot_once() re-duplicates fresh data instead of stale template.
+	cached_volley_template.unref();
+	cached_spawn_data_id = 0;
+}
+
+Dictionary BulletSpawner2D::debug_get_cache_state() const {
+	Dictionary d;
+	d["template_valid"] = cached_volley_template.is_valid();
+	uint64_t live_id = spawn_data.is_valid() ? spawn_data->get_instance_id() : 0;
+	d["spawn_id_match"] = cached_volley_template.is_valid() && cached_spawn_data_id == live_id && live_id != 0;
+	return d;
 }
 
 bool BulletSpawner2D::auto_shooting_active() const {
@@ -3727,6 +3772,31 @@ void BulletSpawner2D::set_preview_arrow_head_width(double value) {
     preview_arrow_head_width = value;
     rebuild_preview();
 }
+bool BulletSpawner2D::get_preview_draw_collision_rings() const {
+    return preview_draw_collision_rings;
+}
+void BulletSpawner2D::set_preview_draw_collision_rings(bool value) {
+    preview_draw_collision_rings = value;
+    rebuild_preview();
+}
+Color BulletSpawner2D::get_preview_collision_ring_color() const {
+    return preview_collision_ring_color;
+}
+void BulletSpawner2D::set_preview_collision_ring_color(const Color &value) {
+    preview_collision_ring_color = value;
+    rebuild_preview();
+}
+double BulletSpawner2D::get_preview_collision_ring_width() const {
+    return preview_collision_ring_width;
+}
+void BulletSpawner2D::set_preview_collision_ring_width(double value) {
+    if (!Math::is_finite(value) || value < 0.0) {
+        UtilityFunctions::push_error("BulletSpawner2D: preview_collision_ring_width must be finite and >= 0, keeping the old value.");
+        return;
+    }
+    preview_collision_ring_width = value;
+    rebuild_preview();
+}
 
 void BulletSpawner2D::reset_shooting() {
     volleys_fired = 0;
@@ -5677,6 +5747,34 @@ void BulletSpawner2D::rebuild_preview() {
     }
     preview_dots_layer->set_dots_data(dots, preview_dot_color, (float)dot_radius);
     preview_dots_layer->set_first_marker(!dots.is_empty(), preview_first_dot_color, kFirstDotRadiusScale);
+    // P2 collision-ring overlay: bounding radius from the volley's shape so
+    // the editor shows hitbox vs visual. Off by default; invalid shapes hide.
+    {
+        float ring_r = 0.0f;
+        if (preview_draw_collision_rings && spawn_data.is_valid() && spawn_data->collision_shape.is_valid()) {
+            if (const CircleShape2D *c = Object::cast_to<CircleShape2D>(spawn_data->collision_shape.ptr())) {
+                const float r = c->get_radius();
+                if (r > 0.0f && Math::is_finite(r)) {
+                    ring_r = r;
+                }
+            } else if (const RectangleShape2D *rc = Object::cast_to<RectangleShape2D>(spawn_data->collision_shape.ptr())) {
+                const Vector2 s = rc->get_size();
+                if (s.x > 0.0f && s.y > 0.0f && s.is_finite()) {
+                    ring_r = 0.5f * (float)Math::min(s.x, s.y);
+                }
+            } else if (const CapsuleShape2D *cap = Object::cast_to<CapsuleShape2D>(spawn_data->collision_shape.ptr())) {
+                const float h = cap->get_height();
+                if (h > 0.0f && Math::is_finite(h)) {
+                    ring_r = 0.5f * h;
+                }
+            }
+            ring_r = (float)(ring_r * glyph_scale);
+            if (!(ring_r > 0.0f) || !Math::is_finite(ring_r)) {
+                ring_r = 0.0f;
+            }
+        }
+        preview_dots_layer->set_rings_data(ring_r, preview_collision_ring_color, (float)preview_collision_ring_width);
+    }
     // Track snapshot: the shape/loop/curve bullets ride on, drawn as
     // segments under the dots. Geometry-sourced (never bullet dots, except
     // Custom's explicit order strip), so sparse volleys still show the whole
@@ -6572,9 +6670,21 @@ bool BulletSpawner2D::shoot_once() {
     }
     // Duplicate per volley: the user's resource must never be mutated (its
     // transforms get overwritten below), so shared .tres files stay safe.
-    Ref<DirectionalBulletsData2D> volley_data(Object::cast_to<DirectionalBulletsData2D>(spawn_data->duplicate().ptr()));
-    if (volley_data.is_null()) {
-        return fail_early("BulletSpawner2D::shoot_once: could not duplicate spawn_data.", StringName(), false);
+    // P1-7 cache: first shot with a resource duplicates once into the
+    // spawner-owned template; later shots reuse it (transforms overwritten
+    // below). In-place edits invalidate via _on_spawn_data_changed, resource
+    // swaps via set_spawn_data, so reuse is always fresh.
+    Ref<DirectionalBulletsData2D> volley_data;
+    const uint64_t spawn_id = spawn_data->get_instance_id();
+    if (cached_volley_template.is_valid() && cached_spawn_data_id == spawn_id) {
+        volley_data = cached_volley_template;
+    } else {
+        volley_data = Ref<DirectionalBulletsData2D>(Object::cast_to<DirectionalBulletsData2D>(spawn_data->duplicate().ptr()));
+        if (volley_data.is_null()) {
+            return fail_early("BulletSpawner2D::shoot_once: could not duplicate spawn_data.", StringName(), false);
+        }
+        cached_volley_template = volley_data;
+        cached_spawn_data_id = spawn_id;
     }
     volley_data->set_transforms(collect_spawn_transforms());
     if (volley_data->get_transforms().is_empty()) {
@@ -6738,6 +6848,17 @@ void BulletSpawner2D::_ready() {
     shooting_paused = false;
     oneshot_volleys_left = -1;
     shoot_time_left = shoot_initial_delay_sec;
+    // P1-8 retarget stagger: an explicit phase is respected verbatim; the
+    // default 0 staggers deterministically by instance id so N spawners with
+    // the same interval don't group-scan on the same tick. First-pass delay
+    // is benign (volley-time resolution already armed each shot).
+    if (homing_retarget_phase > 0.0) {
+        homing_retarget_time_left = homing_retarget_phase;
+    } else if (homing_retarget_interval_sec > 0.0) {
+        homing_retarget_time_left = Math::fposmod((double)get_instance_id() * 0.137, homing_retarget_interval_sec);
+    } else {
+        homing_retarget_time_left = 0.0;
+    }
     if (preview_active()) {
         set_process(true);
     } else {
@@ -6782,6 +6903,8 @@ void BulletSpawner2D::_notification(int p_what) {
         tracked_custom_transforms.clear();
         helper_path2d_cache = nullptr;
         helper_path2d_id = 0;
+        cached_volley_template.unref();
+        cached_spawn_data_id = 0;
         bullet_factory = nullptr;
         bullet_factory_id = 0;
         transforms_generator = nullptr;
@@ -7243,6 +7366,7 @@ void BulletSpawner2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_spawn_data"), &BulletSpawner2D::get_spawn_data);
 	ClassDB::bind_method(D_METHOD("set_spawn_data", "new_spawn_data"), &BulletSpawner2D::set_spawn_data);
 	ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "spawn_data", PROPERTY_HINT_RESOURCE_TYPE, "DirectionalBulletsData2D"), "set_spawn_data", "get_spawn_data");
+	ClassDB::bind_method(D_METHOD("_on_spawn_data_changed"), &BulletSpawner2D::_on_spawn_data_changed);
 
 	ClassDB::bind_method(D_METHOD("get_pattern_source"), &BulletSpawner2D::get_pattern_source);
 	ClassDB::bind_method(D_METHOD("set_pattern_source", "value"), &BulletSpawner2D::set_pattern_source);
@@ -8536,6 +8660,8 @@ void BulletSpawner2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("clear_live_volleys"), &BulletSpawner2D::clear_live_volleys);
 	ClassDB::bind_method(D_METHOD("debug_get_layer_rings"), &BulletSpawner2D::debug_get_layer_rings);
 	ClassDB::bind_method(D_METHOD("debug_check_layer_coincidence", "tolerance_px"), &BulletSpawner2D::debug_check_layer_coincidence, DEFVAL(1.0));
+	ClassDB::bind_method(D_METHOD("debug_get_cache_state"), &BulletSpawner2D::debug_get_cache_state);
+	ClassDB::bind_method(D_METHOD("debug_get_retarget_countdown"), &BulletSpawner2D::debug_get_retarget_countdown);
 	ClassDB::bind_method(D_METHOD("adopt_live_volley", "directional_bullets_instance"), &BulletSpawner2D::adopt_live_volley);
 	ClassDB::bind_method(D_METHOD("clear_live_volleys_homing"), &BulletSpawner2D::clear_live_volleys_homing);
 	ClassDB::bind_method(D_METHOD("override_live_volleys_velocity", "new_velocity"), &BulletSpawner2D::override_live_volleys_velocity);
@@ -8617,6 +8743,16 @@ void BulletSpawner2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_preview_arrow_head_width"), &BulletSpawner2D::get_preview_arrow_head_width);
 	ClassDB::bind_method(D_METHOD("set_preview_arrow_head_width", "value"), &BulletSpawner2D::set_preview_arrow_head_width);
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "preview_arrow_head_width"), "set_preview_arrow_head_width", "get_preview_arrow_head_width");
+
+	ClassDB::bind_method(D_METHOD("get_preview_draw_collision_rings"), &BulletSpawner2D::get_preview_draw_collision_rings);
+	ClassDB::bind_method(D_METHOD("set_preview_draw_collision_rings", "value"), &BulletSpawner2D::set_preview_draw_collision_rings);
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "preview_draw_collision_rings"), "set_preview_draw_collision_rings", "get_preview_draw_collision_rings");
+	ClassDB::bind_method(D_METHOD("get_preview_collision_ring_color"), &BulletSpawner2D::get_preview_collision_ring_color);
+	ClassDB::bind_method(D_METHOD("set_preview_collision_ring_color", "value"), &BulletSpawner2D::set_preview_collision_ring_color);
+	ADD_PROPERTY(PropertyInfo(Variant::COLOR, "preview_collision_ring_color"), "set_preview_collision_ring_color", "get_preview_collision_ring_color");
+	ClassDB::bind_method(D_METHOD("get_preview_collision_ring_width"), &BulletSpawner2D::get_preview_collision_ring_width);
+	ClassDB::bind_method(D_METHOD("set_preview_collision_ring_width", "value"), &BulletSpawner2D::set_preview_collision_ring_width);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "preview_collision_ring_width"), "set_preview_collision_ring_width", "get_preview_collision_ring_width");
 
 	// Need this in order to expose the enum constants to Godot Engine
 	BIND_ENUM_CONSTANT(PATTERN_FROM_CHILDREN);

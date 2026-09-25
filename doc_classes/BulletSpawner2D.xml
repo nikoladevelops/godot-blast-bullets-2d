@@ -68,6 +68,18 @@
 				Debug readout of the yellow preview rings: one PackedVector2Array per extra outline layer, exactly as drawn (holder-local; runs INF-separated with a closing duplicate per closed run). Empty when layers are inactive. Lets scripts and tests verify bullets sit on their rings without screenshotting the editor.
 			</description>
 		</method>
+		<method name="debug_get_cache_state" qualifiers="const">
+			<return type="Dictionary" />
+			<description>
+				Duplicate-cache introspection: template_valid, spawn_id_match. Proves shoot_once() reuses the spawner-owned template; resource swaps and in-place edits invalidate it.
+			</description>
+		</method>
+		<method name="debug_get_retarget_countdown" qualifiers="const">
+			<return type="float" />
+			<description>
+				Seconds until the next interval retarget pass. Deterministically staggered per spawner so N spawners never group-scan on the same tick.
+			</description>
+		</method>
 		<method name="fire_burst_volley">
 			<return type="void" />
 			<description>
@@ -1163,6 +1175,15 @@
 		</member>
 		<member name="preview_arrow_head_width" type="float" setter="set_preview_arrow_head_width" getter="get_preview_arrow_head_width" default="10.0">
 			Preview arrow head width in pixels.
+		</member>
+		<member name="preview_draw_collision_rings" type="bool" setter="set_preview_draw_collision_rings" getter="get_preview_draw_collision_rings" default="false">
+			When true and spawn_data carries a valid collision shape, the dots layer also draws one outline circle per dot with the shape's bounding radius (circle r, rect min/2, capsule height/2). Compare hitbox vs visual directly in the editor.
+		</member>
+		<member name="preview_collision_ring_color" type="Color" setter="set_preview_collision_ring_color" getter="get_preview_collision_ring_color" default="Color(1, 1, 1, 0.7)">
+			Collision-ring overlay color.
+		</member>
+		<member name="preview_collision_ring_width" type="float" setter="set_preview_collision_ring_width" getter="get_preview_collision_ring_width" default="1.5">
+			Collision-ring overlay line width in pixels.
 		</member>
 		<member name="preview_arrow_length" type="float" setter="set_preview_arrow_length" getter="get_preview_arrow_length" default="16.0">
 			Preview arrow length in pixels (multiplied by pattern_scale and transforms_scale, so glyphs stay proportional to the layout).

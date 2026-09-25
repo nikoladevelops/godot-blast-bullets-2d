@@ -224,6 +224,11 @@ protected:
 	// coefficient (speed -= speed * drag * delta). Both default to off.
 	Vector2 gravity = Vector2(0, 0);
 	real_t linear_drag = 0.0;
+	// Per-bullet integrated gravity velocity (semi-implicit Euler: v += g*dt
+	// each tick, p += v*dt). Zeroed on every new life (spawn/enable/reset)
+	// and whenever set_gravity starts a new regime, so pooled reuse never
+	// inherits fall speed. Sized with the movement SoA below.
+	std::vector<Vector2> all_gravity_velocity;
 
 	// HOMING GATING (seeded from spawn data; editable live below).
 	// delay = straight-flight seconds before steering starts; duration =
@@ -676,7 +681,7 @@ public:
 
 			// 5. VELOCITY CALCULATION (ONLY IF DIRECTION GOT UPDATED) - use temp to avoid mutating cached velocity
 			if (direction_got_updated) {
-				all_cached_velocity[i] = curr_bullet_direction * all_cached_speed[i] + inherited_velocity_offset;
+				all_cached_velocity[i] = curr_bullet_direction * all_cached_speed[i] + inherited_velocity_offset + ((i >= 0 && i < (int)all_gravity_velocity.size()) ? all_gravity_velocity[i] : Vector2(0, 0));
 			}
 			// Wind-free base: the inherited offset rides along AFTER pattern
 			// steering below. advance_movement_pattern measures advance_dist =
@@ -726,12 +731,14 @@ public:
 		// the ballistic step and the offset drifts the result (matches the
 		// documented velocity composition direction * speed + offset).
 		velocity_delta += inherited_velocity_offset * (real_t)delta;
-		// Gravity: constant world-space acceleration folded into the step
-		// (0.5 * g * dt^2 positional term; the velocity term lands in the
-		// speed/drag phase below through all_cached_velocity). Drag trims
-		// speed there. Distance-phased wobble measures true travel below.
-		if (gravity.length_squared() > 0.0) {
-			velocity_delta += gravity * (real_t)(0.5 * delta * delta);
+		// Gravity: true constant acceleration (semi-implicit Euler). The
+		// per-bullet integrated velocity accumulates g*dt every tick and
+		// drives the step; the old single 0.5*g*dt^2 positional term alone
+		// never integrated, so gravity read as a ~2px/s drift no matter the
+		// value. Zeroed on every new life and on set_gravity (new regime).
+		if (gravity.length_squared() > 0.0 && i >= 0 && i < (int)all_gravity_velocity.size()) {
+			all_gravity_velocity[i] += gravity * (real_t)delta;
+			velocity_delta += all_gravity_velocity[i] * (real_t)delta;
 		}
 		if (is_wobble_feature_enabled && i >= 0 && i < (int)wobble_distance_traveled.size()) {
 			wobble_distance_traveled[i] += velocity_delta.length();
@@ -964,7 +971,7 @@ public:
 			// Linear drag trims speed after curves/accel so TD shells decay.
 			if (shared_curves_acceleration_curve_valid) {
 				all_cached_speed[i] = shared_movement_speed_val;
-				all_cached_velocity[i] = all_cached_direction[i] * shared_movement_speed_val + inherited_velocity_offset + gravity * (real_t)delta;
+				all_cached_velocity[i] = all_cached_direction[i] * shared_movement_speed_val + inherited_velocity_offset + ((i >= 0 && i < (int)all_gravity_velocity.size()) ? all_gravity_velocity[i] : Vector2(0, 0));
 			} else if (is_per_bullet_curves_valid && per_bullet_curves_data->movement_speed_curve.is_valid()) {
 				bullet_accelerate_speed_using_curve(i, delta, per_bullet_curves_data);
 			} else {
@@ -973,9 +980,9 @@ public:
 			if (linear_drag > 0.0 && Math::is_finite(linear_drag)) {
 				const real_t keep = Math::max((real_t)0.0, (real_t)1.0 - linear_drag * (real_t)delta);
 				all_cached_speed[i] *= keep;
-				all_cached_velocity[i] = all_cached_direction[i] * all_cached_speed[i] + inherited_velocity_offset + gravity * (real_t)delta;
+				all_cached_velocity[i] = all_cached_direction[i] * all_cached_speed[i] + inherited_velocity_offset + ((i >= 0 && i < (int)all_gravity_velocity.size()) ? all_gravity_velocity[i] : Vector2(0, 0));
 			} else if (gravity.length_squared() > 0.0) {
-				all_cached_velocity[i] = all_cached_direction[i] * all_cached_speed[i] + inherited_velocity_offset + gravity * (real_t)delta;
+				all_cached_velocity[i] = all_cached_direction[i] * all_cached_speed[i] + inherited_velocity_offset + ((i >= 0 && i < (int)all_gravity_velocity.size()) ? all_gravity_velocity[i] : Vector2(0, 0));
 			}
 		}
 		if (!is_using_physics_interpolation) {
@@ -3039,6 +3046,9 @@ public:
 			return;
 		}
 		gravity = value;
+		// New regime, new fall speed: without this a mid-flight gravity
+		// change would add onto stale integrated velocity (discontinuity).
+		all_gravity_velocity.assign(amount_bullets, Vector2(0, 0));
 	}
 	real_t get_linear_drag() const { return linear_drag; }
 	void set_linear_drag(real_t value) {

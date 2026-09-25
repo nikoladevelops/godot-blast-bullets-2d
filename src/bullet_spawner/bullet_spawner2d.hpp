@@ -89,6 +89,14 @@ class PatternPreviewLayer2D : public Node2D {
         void set_path_data(const PackedVector2Array &p_points, const Color &p_color, float p_width, bool p_closed);
         void set_layer_path_data(const PackedVector2Array &p_points, const Color &p_color);
         void set_arrows_data(const PackedVector2Array &p_tails, const PackedVector2Array &p_dirs, const Color &p_color, float p_length, float p_width, float p_head_length, float p_head_width);
+        // P2 collision-ring overlay: per-dot outline circle approximating the
+        // volley hitbox (bounding radius from spawn_data's shape). Snapshot
+        // like dots; radius <= 0 hides. Lets users compare visual vs hitbox
+        // directly in the editor instead of misjudging dots.
+        float ring_radius = 0.0f;
+        Color ring_color = Color(1.0, 1.0, 1.0, 0.7f);
+        float ring_width = 1.5f;
+        void set_rings_data(float p_radius, const Color &p_color, float p_width);
 
         void _draw() override;
 
@@ -1469,6 +1477,14 @@ class BulletSpawner2D : public Node2D{
         // deviation <= tolerance_px. Empty/unavailable preview (no dots)
         // returns checked=false.
         Dictionary debug_check_layer_coincidence(double tolerance_px = 1.0) const;
+        // Duplicate-cache introspection for tests: {template_valid,
+        // spawn_id_match}. Proves shoot_once() reuses the spawner-owned
+        // template instead of duplicating per volley, and that resource
+        // swaps / in-place edits invalidate it.
+        Dictionary debug_get_cache_state() const;
+        // Current retarget countdown in seconds (time until the next interval
+        // pass). For tests asserting deterministic stagger across spawners.
+        double debug_get_retarget_countdown() const { return homing_retarget_time_left; }
         // Begins a burst chain / telegraph warning / fires the next burst
         // volley. Public so waves and boss phases can drive phrasing by hand
         // (begin + fire on timers) instead of only through the auto loop.
@@ -1525,6 +1541,13 @@ class BulletSpawner2D : public Node2D{
         double preview_arrow_width = 2.0;
         double preview_arrow_head_length = 8.0;
         double preview_arrow_head_width = 10.0;
+        // P2 collision-ring overlay: when true and spawn_data carries a valid
+        // collision shape, the dots layer also draws one outline circle per
+        // dot with the shape's bounding radius (circle r, rect min/2,
+        // capsule height/2). Default false preserves the classic dots look.
+        bool preview_draw_collision_rings = false;
+        Color preview_collision_ring_color = Color(1.0, 1.0, 1.0, 0.7);
+        double preview_collision_ring_width = 1.5;
 
         bool get_show_pattern_preview() const;
         void set_show_pattern_preview(bool value);
@@ -1554,6 +1577,12 @@ class BulletSpawner2D : public Node2D{
         void set_preview_arrow_head_length(double value);
         double get_preview_arrow_head_width() const;
         void set_preview_arrow_head_width(double value);
+        bool get_preview_draw_collision_rings() const;
+        void set_preview_draw_collision_rings(bool value);
+        Color get_preview_collision_ring_color() const;
+        void set_preview_collision_ring_color(const Color &value);
+        double get_preview_collision_ring_width() const;
+        void set_preview_collision_ring_width(double value);
 
         bool get_shooting_enabled() const;
         void set_shooting_enabled(bool value);
@@ -1764,6 +1793,16 @@ class BulletSpawner2D : public Node2D{
         // next_shoot_interval_sec). Separate from homing_rng: jitter reseeds
         // would otherwise corrupt the homing target sequence.
         mutable Ref<RandomNumberGenerator> jitter_rng;
+        // P1-7 duplicate cache: shoot_once() must never mutate the user's
+        // spawn_data (transforms are overwritten per volley), so the first
+        // shot duplicates it and later shots with the same resource reuse the
+        // spawner-owned template (transforms overwritten each shot). Cleared
+        // on set_spawn_data() and on the resource's changed signal, so
+        // in-place inspector edits re-duplicate instead of driving stale data.
+        // Mutable: shoot_once() is non-const but resolve paths also touch it.
+        mutable Ref<DirectionalBulletsData2D> cached_volley_template;
+        mutable uint64_t cached_spawn_data_id = 0;
+        void _on_spawn_data_changed();
         // Spin runtime state (never stored, advances in _process only).
         double spin_angle_deg = 0.0;
         double spin_time_sec = 0.0;

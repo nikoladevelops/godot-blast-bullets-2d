@@ -464,10 +464,11 @@ public:
 	bool get_is_attachments_auto_pooling_enabled() const { return is_attachments_auto_pooling_enabled; }
 	void set_is_attachments_auto_pooling_enabled(bool value) { is_attachments_auto_pooling_enabled = value; }
 
-	// Pooling flags are per-instance state, not spawn data: a pooled instance
-	// keeps the previous owner's flags across reuse (reset to defaults only
-	// at spawn). Documented here because it surprises: queue_free-vs-pool
-	// behavior follows the previous owner until you set the flags again.
+	// Pooling flags reset to defaults on every new life (spawn/enable via
+	// reset_transient_volley_state): a pooled reuse never inherits "don't pool"
+	// from a previous manual owner. Set the flags explicitly after every
+	// spawn/enable when you want manual ownership. Same-owner enable_bullet()
+	// wakes keep flags by design (no new life starts).
 	void reset_pooling_flags_to_default() {
 		is_multimesh_auto_pooling_enabled = true;
 		is_attachments_auto_pooling_enabled = true;
@@ -1900,6 +1901,29 @@ public:
 	}
 
 	void enable_bullet(int bullet_index, int collision_amount = 0, bool should_enable_attachment = true);
+
+	// P0-5 alias with unambiguous naming: wake_bullet() revives ONE pooled or
+	// manually-disabled slot with its current appearance/ballistics intact
+	// (same-owner re-enable). Cross-owner reuse must go through
+	// spawn_*()/enable_multimesh() which reseed appearance, custom data,
+	// speeds and patterns. Calling wake on a foreign pooled volley warns (see
+	// enable_bullet) instead of silently driving stale state.
+	void wake_bullet(int bullet_index, int collision_amount = 0, bool should_enable_attachment = true) {
+		enable_bullet(bullet_index, collision_amount, should_enable_attachment);
+	}
+
+	// Stability introspection for tests and support (bound below).
+	// Keys: amount_bullets, active_bullets, generation, owner_spawner_id,
+	// is_active, is_pooled, pool_amount, pool_shape, auto_pool_multimesh,
+	// auto_pool_attachments.
+	Dictionary debug_get_volley_info() const;
+	// Attached timer count (0 = no per-tick timer cost). For tests asserting
+	// the 64-timer cap and detach-during-fire behavior.
+	int debug_get_timer_count() const { return (int)multimesh_custom_timers.size(); }
+	// Collision shape state: {valid, type, circle_radius, rect_size,
+	// capsule_radius, capsule_height, rid_count}. For tests asserting
+	// set_collision_shape_runtime same-type vs type-change paths.
+	Dictionary debug_get_shape_state() const;
 
 	// Disables a single bullet: removes it from the live set, hides the visual,
 	// disables its physics shape, and (unless told otherwise) returns its
