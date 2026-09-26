@@ -151,7 +151,7 @@ protected:
 	// segment (reset on spawn/enable). See move_bullets homing branch.
 	bool homing_inert_warning_issued = false;
 
-	// Ownership stamp for deferred homing work (reached-emits, auto-pops).
+	// Stamp so homing callbacks scheduled by a dead volley no-op instead of firing into the new owner.
 	// The volley-wide generation is bumped on every spawn/enable/disable: a
 	// deferred call scheduled by a previous life carries a stale generation
 	// and no-ops instead of eating the new life's targets or emitting ghost
@@ -180,18 +180,23 @@ protected:
 	// whose distance reached the curve length (no extra flag needed).
 	std::vector<real_t> shared_movement_pattern_distances;
 
-	// SHARED SPEED / ROTATION (from spawn data or the runtime API below;
-	// mirrors the data so getters stay truthful across pool reuse). When set
-	// they take precedence over the per-bullet arrays; null hands control back
-	// (already-seeded values persist - re-spawn or re-set to change them).
+	// SHARED SPEED / ROTATION / WOBBLE (from spawn data or the runtime API
+	// below; mirrors the data so getters stay truthful across pool reuse).
+	// Unified precedence: shared is the fallback default, per-bullet wins
+	// per slot; null disables the fallback (current ballistics persist).
 	Ref<BulletSpeedData2D> shared_bullet_speed_data;
 	Ref<BulletRotationData2D> shared_bullet_rotation_data;
+	Ref<BulletWobbleData2D> shared_bullet_wobble_data;
+	// Live per-bullet wobble resources (mirrors the curves runtime API:
+	// bullet_get_wobble_data returns the effective per-bullet resource, or
+	// null when the slot runs on the shared fallback / inactive).
+	std::vector<Ref<BulletWobbleData2D>> all_bullet_wobble_data;
 
 	// WOBBLE (sine/cos flight modulation, seeded from spawn data; editable
-	// live below). Per-bullet entries resolve with the shared fallback rule
-	// (empty = off, size == amount = entry i, else first drives all); null
-	// entries and disabled entries are skipped per bullet. Shared wobble
-	// takes precedence when set and enabled. Phase seeds fan out per bullet
+	// live below). Unified precedence: per-bullet seeds win per slot, shared
+	// is the fallback for slots without a valid per-bullet seed. Null
+	// entries and disabled entries fall back to shared per bullet. Phase
+	// seeds fan out per bullet
 	// (phase + step * i) so one resource makes snakes/petals, not sync waves.
 	struct WobbleSeed {
 		bool active = false;
@@ -204,6 +209,8 @@ protected:
 		real_t damping_per_sec = 0.0;
 		real_t delay_sec = 0.0;
 		real_t duration_sec = 0.0;
+		bool face_movement_direction = true;
+		real_t face_rotation_speed = 18.0;
 	};
 
 	// Single evaluation point for the wobble waveform so the now/prev tick
@@ -225,7 +232,7 @@ protected:
 	Vector2 gravity = Vector2(0, 0);
 	real_t linear_drag = 0.0;
 	// Per-bullet gravity vectors (resolved at spawn/enable from shared gravity
-	// + all_bullet_gravity spawn data, same fallback rule as speed data).
+	// + all_bullet_gravity spawn data under the unified tiling rule).
 	// The tick integrates these (see all_gravity_velocity); all zero = off.
 	std::vector<Vector2> all_gravity;
 	// Gravity time window over volley life (seconds since spawn, read on
@@ -320,7 +327,10 @@ public:
 
 		bool homing_interval_reached = false;
 
-		bool shared_homing_deque_enabled = !shared_homing_deque.empty();
+		// Unified precedence: per-bullet deque wins for its bullet. The shared
+	// deque is the broadcast fallback, used only when the bullet's own
+	// deque is empty. Either deque steering the bullet marks homing active.
+	bool shared_homing_deque_enabled = !shared_homing_deque.empty();
 		const bool is_per_bullet_homing_enabled = (active_homing_count > 0);
 
 		// If homing is enabled (either shared or per-bullet) update the timer and cache mouse position if needed
@@ -422,7 +432,7 @@ public:
 		}
 
 		// Locked-orbit snapshot for the pattern gate below: the orbit lock
-		// state read per bullet must match what phase 7 sees, or the pattern
+		// state read per bullet must match what the orbit section below sees, or the pattern
 		// gate and the orbit displacement disagree for one frame.
 		// Reuses the member scratch (no per-tick allocation when sized).
 		std::vector<uint8_t> &orbit_locked_snapshot = orbit_locked_scratch;
@@ -441,7 +451,7 @@ public:
 			}
 		}
 
-		// Usability guard: homing targets without steering is a silent no-op (direction only
+		// Shout when homing can't visibly do anything (no steering, no pattern, no spin, no ring) - usually a forgotten take-control flag.
 		// changes via rotate_to_target, movement patterns, rotation data, or orbiting).
 		// Warn once.
 		if (!homing_inert_warning_issued && (shared_homing_deque_enabled || is_per_bullet_homing_enabled) && !homing_take_control_of_texture_rotation && !is_rotation_data_active && active_orbiting_count == 0) {
@@ -483,7 +493,7 @@ public:
 			if (i >= (int)all_cached_instance_transforms.size() || i >= (int)all_cached_direction.size() || i >= (int)all_cached_velocity.size()) {
 				continue;
 			}
-			// Defense-in-depth: speed SoA is invariant-sized by set_up_movement_data,
+			// The speed arrays should always fit by now, but double-check in the hot loop - a crash here would take the whole game down.
 			// but every consumer below indexes it - never trust the invariant in a hot loop.
 			if (i >= (int)all_cached_speed.size() || i >= (int)all_cached_max_speed.size() || i >= (int)all_cached_acceleration.size()) {
 				continue;
@@ -492,65 +502,74 @@ public:
 			HomingTargetDeque *target_deque_used_for_orbiting = nullptr;
 
 			// 1. STANDARD HOMING PHASE
-			// Reached-signal timing runs AFTER steering below (see phase 7b):
+			// Reached-signal timing runs AFTER steering below (see the reached-signal section):
 			// orbit, pattern and curve steering rewrite the velocity, so the
 			// reached test must predict with the final velocity_delta, not
 			// the pre-steer cached velocity.
-			if (shared_homing_deque_enabled) { // Handle homing towards shared deque (takes precedence over per-bullet homing)
-				update_homing(shared_homing_deque, i, delta, homing_bullet_pos, homing_target_pos);
-				direction_got_updated = true;
-				target_deque_used_for_orbiting = &shared_homing_deque;
-			} else if (is_per_bullet_homing_enabled) { // Handle per-bullet homing
-				// Whether the deque has any targets
-				if (i < 0 || i >= (int)all_homing_count.size() || i >= (int)all_bullet_homing_targets.size()) {
-					// Vectors out of sync, skip homing for this bullet this frame.
-				} else {
-				auto &curr_homing_count = all_homing_count[i];
+			if (is_per_bullet_homing_enabled || shared_homing_deque_enabled) { // Per-bullet deque wins per bullet; shared is the broadcast fallback
+				// Whether this bullet has its own targets (non-empty per-bullet deque)
+				bool bullet_has_own_targets = false;
+				if (i >= 0 && i < (int)all_homing_count.size() && i < (int)all_bullet_homing_targets.size()) {
+					bullet_has_own_targets = all_homing_count[i] > 0 && !all_bullet_homing_targets[i].empty();
+				}
+				if (bullet_has_own_targets) { // Handle per-bullet homing (wins over shared)
+					auto &curr_homing_count = all_homing_count[i];
 
-				if (curr_homing_count > 0) {
-					auto &curr_homing_deque = all_bullet_homing_targets[i];
+					if (curr_homing_count > 0) {
+						auto &curr_homing_deque = all_bullet_homing_targets[i];
 
-					// Trim the invalid ones
-					int trimmed_count = curr_homing_deque.bullet_homing_trim_front_invalid_targets(cached_mouse_global_position, curr_homing_count);
+						// Drop freed targets off the front
+						int trimmed_count = curr_homing_deque.bullet_homing_trim_front_invalid_targets(cached_mouse_global_position, curr_homing_count);
 
-					// Very important to keep track of the amount of targets after trimming
-					curr_homing_count -= trimmed_count; // count for the deque
-					active_homing_count -= trimmed_count; // global count across all bullets that determines whether the per-bullet homing feature is even active
-					if (curr_homing_count < 0) {
-						curr_homing_count = 0;
-					}
-					if (active_homing_count < 0) {
-						active_homing_count = 0;
-					}
-					// Upper resync like the pop paths: a counter above the live
-					// deque size would phantom-home a stale cache.
-					const int live_after_trim = curr_homing_deque.get_homing_targets_amount();
-					if (curr_homing_count > live_after_trim) {
-						active_homing_count -= (curr_homing_count - live_after_trim);
+						// Keep the counters honest after trimming so the tick below sees the real queue
+						curr_homing_count -= trimmed_count; // this deque lost some
+						active_homing_count -= trimmed_count; // ...and so did the volley-wide total
+						if (curr_homing_count < 0) {
+							curr_homing_count = 0;
+						}
 						if (active_homing_count < 0) {
 							active_homing_count = 0;
 						}
-						curr_homing_count = live_after_trim;
-					}
-
-					// A trim that exposes a live deque whose front changed is a
-					// front change like a pop: route the lock policy so a new
-					// front target never inherits a stale center.
-					if (trimmed_count > 0) {
-						orbit_route_front_change_for_bullet(i, curr_homing_deque);
-					}
-
-					if (curr_homing_count > 0 && !curr_homing_deque.empty()) {
-						// If per bullet homing is indeed active, then refresh the cache if interval has been reached
-						if (homing_interval_reached) {
-							curr_homing_deque.refresh_cached_front_target_global_position(cached_mouse_global_position);
+						// If the counter somehow runs ahead of the real queue, pull it back - otherwise bullets would home on ghosts.
+						const int live_after_trim = curr_homing_deque.get_homing_targets_amount();
+						if (curr_homing_count > live_after_trim) {
+							active_homing_count -= (curr_homing_count - live_after_trim);
+							if (active_homing_count < 0) {
+								active_homing_count = 0;
+							}
+							curr_homing_count = live_after_trim;
 						}
 
-						update_homing(curr_homing_deque, i, delta, homing_bullet_pos, homing_target_pos);
+						// Trimming exposed a new front target - treat it like a pop so orbit rings re-lock cleanly.
+						if (trimmed_count > 0) {
+							orbit_route_front_change_for_bullet(i, curr_homing_deque);
+						}
+
+						if (curr_homing_count > 0 && !curr_homing_deque.empty()) {
+							// Refresh the cached target position on the interval so moving targets don't leave stale positions behind
+							if (homing_interval_reached) {
+								curr_homing_deque.refresh_cached_front_target_global_position(cached_mouse_global_position);
+							}
+
+							update_homing(curr_homing_deque, i, delta, homing_bullet_pos, homing_target_pos);
+							direction_got_updated = true;
+							target_deque_used_for_orbiting = &curr_homing_deque;
+						} else if (shared_homing_deque_enabled) {
+							// Per-bullet deque drained this tick: fall back to
+							// the shared broadcast deque for this bullet.
+							update_homing(shared_homing_deque, i, delta, homing_bullet_pos, homing_target_pos);
+							direction_got_updated = true;
+							target_deque_used_for_orbiting = &shared_homing_deque;
+						}
+					} else if (shared_homing_deque_enabled) {
+						update_homing(shared_homing_deque, i, delta, homing_bullet_pos, homing_target_pos);
 						direction_got_updated = true;
-						target_deque_used_for_orbiting = &curr_homing_deque;
+						target_deque_used_for_orbiting = &shared_homing_deque;
 					}
-				}
+				} else if (shared_homing_deque_enabled) { // Shared broadcast fallback (only when the bullet has no own targets)
+					update_homing(shared_homing_deque, i, delta, homing_bullet_pos, homing_target_pos);
+					direction_got_updated = true;
+					target_deque_used_for_orbiting = &shared_homing_deque;
 				}
 			}
 
@@ -558,15 +577,19 @@ public:
 			auto &curr_bullet_direction = all_cached_direction[i];
 
 			// 2. DIRECTION CURVES - shared sampled once before loop
-		// Per-bullet curves resolve regardless of shared data so individual channels
-		// can fill gaps left by a partially specified shared resource (shared wins ties).
+		// Unified precedence: per-bullet channels win over shared per
+		// channel. A bullet with its own x curve uses it even when shared
+		// also defines x; shared only covers channels the bullet lacks.
 		is_per_bullet_curves_valid = (i >= 0 && i < (int)all_bullet_curves_data.size() && all_bullet_curves_data[i].is_valid());
 		per_bullet_curves_data = is_per_bullet_curves_valid ? all_bullet_curves_data[i].ptr() : nullptr; // O(1) vector index, borrows - valid until vector reassigned
 		const bool per_bullet_x_curve_valid = is_per_bullet_curves_valid && per_bullet_curves_data->x_direction_curve.is_valid();
 		const bool per_bullet_y_curve_valid = is_per_bullet_curves_valid && per_bullet_curves_data->y_direction_curve.is_valid();
 
 		const BulletCurvesData2D *direction_curves_for_texture = nullptr;
-		if (shared_curves_x_direction_curve_valid) {
+		if (per_bullet_x_curve_valid) {
+			apply_x_direction_curve(curr_bullet_direction, per_bullet_curves_data);
+			direction_curves_for_texture = per_bullet_curves_data;
+		} else if (shared_curves_x_direction_curve_valid) {
 			const Vector2 before_x = curr_bullet_direction;
 			if (shared_x_mode == DirectionCurveMode::Additive) {
 				curr_bullet_direction.x += shared_x_offset * shared_x_strength;
@@ -582,12 +605,14 @@ public:
 				curr_bullet_direction = curr_bullet_direction.normalized();
 			}
 			direction_curves_for_texture = shared_curves_ptr;
-		} else if (per_bullet_x_curve_valid) {
-			apply_x_direction_curve(curr_bullet_direction, per_bullet_curves_data);
-			direction_curves_for_texture = per_bullet_curves_data;
 		}
 
-		if (shared_curves_y_direction_curve_valid) {
+		if (per_bullet_y_curve_valid) {
+			apply_y_direction_curve(curr_bullet_direction, per_bullet_curves_data);
+			if (direction_curves_for_texture == nullptr) {
+				direction_curves_for_texture = per_bullet_curves_data;
+			}
+		} else if (shared_curves_y_direction_curve_valid) {
 			const Vector2 before_y = curr_bullet_direction;
 			if (shared_y_mode == DirectionCurveMode::Additive) {
 				curr_bullet_direction.y += shared_y_offset * shared_y_strength;
@@ -600,11 +625,6 @@ public:
 				curr_bullet_direction = curr_bullet_direction.normalized();
 			}
 			direction_curves_for_texture = shared_curves_ptr;
-		} else if (per_bullet_y_curve_valid) {
-			apply_y_direction_curve(curr_bullet_direction, per_bullet_curves_data);
-			if (direction_curves_for_texture == nullptr) {
-				direction_curves_for_texture = per_bullet_curves_data;
-			}
 		}
 
 		if (direction_curves_for_texture != nullptr) {
@@ -619,6 +639,12 @@ public:
 		// offset) so pausing/teleporting never jumps the bullet. Disabled
 		// entries cost one bool check per bullet; fully disabled volleys
 		// skip the loop via the hoisted flag below.
+		// Texture follow: with face_movement_direction the visual slews
+		// toward the steered heading (same contract as direction curves:
+		// skipped while rotation data drives the visual). Angular mode
+		// already rotates the heading; the follow keeps the sprite glued
+		// to it. Lateral mode steers the heading too, so the same follow
+		// points snakes along their path.
 		if (is_wobble_feature_enabled && i >= 0 && i < (int)all_bullet_wobble.size() && all_bullet_wobble[i].active) {
 			const WobbleSeed &w = all_bullet_wobble[i];
 			const real_t t = (real_t)curves_elapsed_time;
@@ -651,20 +677,43 @@ public:
 					} else {
 						if (curr_bullet_direction.length_squared() > 0.00000001) {
 							const Vector2 perp = Vector2(-curr_bullet_direction.y, curr_bullet_direction.x).normalized();
-							curr_bullet_direction = (curr_bullet_direction + perp * (frame_delta * 0.01)).normalized();
+							const Vector2 steered = curr_bullet_direction + perp * (frame_delta * 0.01);
+							// A pathological frame_delta (~100x amplitude)
+							// could cancel the heading to zero; hold the old
+							// heading instead of snapping to angle 0.
+							if (steered.length_squared() > 0.00000001) {
+								curr_bullet_direction = steered.normalized();
+							}
 						}
 					}
 					direction_got_updated = true;
+					// Texture follow (see 2b header): slew the visual toward
+					// the steered heading so snakes point along their path.
+					// Same skip rule as direction curves: rotation data owns
+					// the visual then. Snap when face_rotation_speed <= 0.
+					if (w.face_movement_direction && !is_rotation_data_active && delta > 0.0) {
+						const real_t target = curr_bullet_direction.angle();
+						const real_t current = curr_bullet_transf.get_rotation();
+						const real_t diff = Math::fposmod(target - current + static_cast<real_t>(Math::PI), static_cast<real_t>(Math::TAU)) - static_cast<real_t>(Math::PI);
+						if (Math::is_finite(diff) && Math::abs(diff) > 0.00001) {
+							if (w.face_rotation_speed <= 0.0) {
+								rotate_transform_locally(curr_bullet_transf, diff);
+							} else {
+								const real_t step = Math::abs(w.face_rotation_speed) * (real_t)delta;
+								rotate_transform_locally(curr_bullet_transf, Math::clamp(diff, -step, step));
+							}
+						}
+					}
 				}
 			}
 		}
 
-			// 3. ROTATION - shared sampled once before loop
-			if (shared_curves_rotation_curve_valid) {
-				all_rotation_speed[i] = shared_rotation_speed_val;
-				update_rotation_using_curve(i, delta);
-			} else if (is_per_bullet_curves_valid && per_bullet_curves_data->rotation_speed_curve.is_valid()) {
+			// 3. ROTATION - per-bullet curve wins per bullet, shared is fallback
+			if (is_per_bullet_curves_valid && per_bullet_curves_data->rotation_speed_curve.is_valid()) {
 				bullet_accelerate_rotation_speed_using_curve(i, delta, per_bullet_curves_data);
+				update_rotation_using_curve(i, delta);
+			} else if (shared_curves_rotation_curve_valid) {
+				all_rotation_speed[i] = shared_rotation_speed_val;
 				update_rotation_using_curve(i, delta);
 			} else if (is_rotation_data_active) {
 				bullet_accelerate_rotation_speed(i, delta);
@@ -700,25 +749,22 @@ public:
 			Vector2 velocity_delta = (curr_bullet_direction * all_cached_speed[i]) * (real_t)delta;
 
 		// 6. MOVEMENT PATTERNS (RELYING ON CURVES AND PATH2D)
-		// Per-bullet entries are exclusively runtime-owned; the spawn-data
-		// shared pattern lives in the shared slot with a per-bullet distance
-		// ledger. Shared wins while active (consistent with shared curves and
-		// the shared homing deque); per-bullet runs only when no shared
-		// pattern is set - or once a non-repeating shared run finished.
-		// A locked orbit owns the displacement: the pattern advance (and its
-		// distance ledger) is skipped so a non-repeating pattern cannot finish
-		// invisibly while the ring drives the bullet. Unlocked bullets run
-		// patterns normally, including the fly-to-ring approach. The gate reads
-		// the pre-tick snapshot above so it agrees with phase 7 even when the
-		// deque empties mid-tick.
+		// Unified precedence: per-bullet entries win per bullet; the shared
+		// slot is the broadcast fallback for bullets without their own
+		// pattern. A locked orbit owns the displacement: the pattern advance
+		// (and its distance ledger) is skipped so a non-repeating pattern
+		// cannot finish invisibly while the ring drives the bullet. The gate
+		// reads the pre-tick snapshot above so it agrees with the orbit section even
+		// when the deque empties mid-tick.
 		const bool orbit_locked_this_bullet = is_orbiting_feature_enabled && i >= 0 && i < amount_bullets && i < (int)orbit_locked_snapshot.size() && orbit_locked_snapshot[i] && target_deque_used_for_orbiting != nullptr && !target_deque_used_for_orbiting->empty();
+		const bool has_per_bullet_pattern = !orbit_locked_this_bullet && check_exists_bullet_movement_pattern_data(i);
 		bool use_shared_pattern = false;
-		if (!orbit_locked_this_bullet) {
+		if (!orbit_locked_this_bullet && !has_per_bullet_pattern) {
 			if (shared_pattern_curve_valid && shared_pattern_len >= 0.001 && i >= 0 && i < (int)shared_movement_pattern_distances.size()) {
 				use_shared_pattern = shared_movement_pattern_repeat || shared_movement_pattern_distances[i] < shared_pattern_len;
 			}
 		}
-		const bool use_per_bullet_pattern = !orbit_locked_this_bullet && !use_shared_pattern && check_exists_bullet_movement_pattern_data(i);
+		const bool use_per_bullet_pattern = has_per_bullet_pattern;
 		if (use_shared_pattern || use_per_bullet_pattern) {
 			if (use_shared_pattern) {
 				if (!advance_movement_pattern(shared_movement_pattern_curve, shared_movement_pattern_face_movement_direction, shared_movement_pattern_repeat, shared_movement_pattern_distances[i], velocity_delta, curr_bullet_direction, curr_bullet_transf, shared_pattern_len)) {
@@ -791,7 +837,12 @@ public:
 					// FollowDeadzone pins until the target walks out of the
 					// deadzone, Anchored freezes at the lock point. Unlocked
 					// bullets always fly toward the live target so they can
-					// still reach the ring.
+					// still reach the ring. A non-finite deque cache (freed
+					// Node2D target between trim and tick) holds the bullet
+					// still this frame instead of poisoning ballistics.
+					if (!homing_target_pos.is_finite()) {
+						velocity_delta = Vector2(0, 0);
+					} else {
 					const Vector2 orbit_center = orbiting_data->is_locked_orbiting ? orbit_effective_center(*orbiting_data, homing_target_pos) : homing_target_pos;
 					const Vector2 to_center = curr_bullet_origin - orbit_center;
 					const real_t current_dist = to_center.length();
@@ -910,34 +961,40 @@ public:
 					// DontMove escorts still face the target (FaceTarget /
 					// FaceOppositeTarget); tangential modes are skipped - an
 					// escort has no direction of travel.
-				if (is_physically_orbiting_this_frame && (orbiting_data->direction != DontMove || (orbiting_data->texture_rotation != FaceOrbitingDirection && orbiting_data->texture_rotation != FaceOppositeOrbitingDirection))) {
-					Vector2 look_dir = Vector2();
-					Vector2 radial_vec = (curr_bullet_origin - orbit_center).normalized();
+					if (is_physically_orbiting_this_frame && (orbiting_data->direction != DontMove || (orbiting_data->texture_rotation != FaceOrbitingDirection && orbiting_data->texture_rotation != FaceOppositeOrbitingDirection))) {
+						Vector2 look_dir = Vector2();
+						// Zero-radius guard: a bullet sitting exactly on the orbit
+						// center has no defined facing; keep the old yaw instead
+						// of normalizing a zero vector into a stall (angle 0 snap).
+						if ((curr_bullet_origin - orbit_center).length_squared() >= 0.000001) {
+							Vector2 radial_vec = (curr_bullet_origin - orbit_center).normalized();
 
-					switch (orbiting_data->texture_rotation) {
-						case FaceTarget:
-							look_dir = -radial_vec;
-							break;
-						case FaceOppositeTarget:
-							look_dir = radial_vec;
-							break;
-						case FaceOrbitingDirection:
-							look_dir = (orbiting_data->direction == OrbitRight) ? Vector2(-radial_vec.y, radial_vec.x) : Vector2(radial_vec.y, -radial_vec.x);
-							break;
-						case FaceOppositeOrbitingDirection:
-							look_dir = (orbiting_data->direction == OrbitRight) ? Vector2(radial_vec.y, -radial_vec.x) : Vector2(-radial_vec.y, radial_vec.x);
-							break;
-						default:
-							break;
-					}
+							switch (orbiting_data->texture_rotation) {
+								case FaceTarget:
+									look_dir = -radial_vec;
+									break;
+								case FaceOppositeTarget:
+									look_dir = radial_vec;
+									break;
+								case FaceOrbitingDirection:
+									look_dir = (orbiting_data->direction == OrbitRight) ? Vector2(-radial_vec.y, radial_vec.x) : Vector2(radial_vec.y, -radial_vec.x);
+									break;
+								case FaceOppositeOrbitingDirection:
+									look_dir = (orbiting_data->direction == OrbitRight) ? Vector2(radial_vec.y, -radial_vec.x) : Vector2(-radial_vec.y, radial_vec.x);
+									break;
+								default:
+									break;
+							}
 
-						if (look_dir != Vector2()) {
-							// Orbiting owns its texture rotation: it must not require the
-							// homing_take_control_of_texture_rotation flag (an undocumented
-							// cross-feature dependency that left Face* modes silently dead).
-							rotate_to_target_preserve_interpolation(i, look_dir, false);
+							if (look_dir != Vector2()) {
+								// Orbiting owns its texture rotation: it must not require the
+								// homing_take_control_of_texture_rotation flag (an undocumented
+								// cross-feature dependency that left Face* modes silently dead).
+								rotate_to_target_preserve_interpolation(i, look_dir, false);
+							}
 						}
 					}
+					} // end non-finite orbit-center guard
 				}
 			}
 
@@ -971,14 +1028,15 @@ public:
 			// 7b. REACHED SIGNAL (after all steering): tests the post-move
 			// position directly. The transform was already advanced above, so
 			// predicting again with velocity_delta would test two ticks
-			// ahead. Queued behind a shared deque the per-bullet branch never
+			// ahead. A bullet that followed the shared deque this tick has no per-bullet signal data - skip it.
 			// ran: homing_target_pos below is only valid when this bullet
 			// actually homed this tick.
 			if (target_deque_used_for_orbiting != nullptr && !target_deque_used_for_orbiting->empty() && homing_target_pos.is_finite()) {
 				try_to_emit_bullet_homing_target_reached_signal(*target_deque_used_for_orbiting, shared_homing_deque_enabled, i, curr_bullet_origin, homing_target_pos, Vector2(0, 0));
 			}
 
-			// 9. MOVEMENT SPEED ACCELERATION - shared sampled once before loop.
+			// 9. MOVEMENT SPEED ACCELERATION - per-bullet curve wins per
+			// bullet, shared is the fallback; plain ballistics otherwise.
 			// NOTE: unlike BlockBullets2D (which accelerates ALL entries so a
 			// re-enabled bullet rejoins at the volley's current speed),
 			// directional freezes disabled bullets at their disable-time speed:
@@ -987,11 +1045,11 @@ public:
 			// Gravity steers velocity directly (no uphill slowdown model here:
 			// speed magnitude stays ballistic, the step already curved above).
 			// Linear drag trims speed after curves/accel so TD shells decay.
-			if (shared_curves_acceleration_curve_valid) {
+			if (is_per_bullet_curves_valid && per_bullet_curves_data->movement_speed_curve.is_valid()) {
+				bullet_accelerate_speed_using_curve(i, delta, per_bullet_curves_data);
+			} else if (shared_curves_acceleration_curve_valid) {
 				all_cached_speed[i] = shared_movement_speed_val;
 				all_cached_velocity[i] = all_cached_direction[i] * shared_movement_speed_val + inherited_velocity_offset + ((i >= 0 && i < (int)all_gravity_velocity.size()) ? all_gravity_velocity[i] : Vector2(0, 0));
-			} else if (is_per_bullet_curves_valid && per_bullet_curves_data->movement_speed_curve.is_valid()) {
-				bullet_accelerate_speed_using_curve(i, delta, per_bullet_curves_data);
 			} else {
 				bullet_accelerate_speed(i, delta);
 			}
@@ -1007,11 +1065,7 @@ public:
 			batch_flush_instance_transforms();
 		}
 
-		// Handle collisions safely after all physics processing logic is done.
-		// Swap into a local first: handle_bullet_collision can funnel into
-		// disable_multimesh() (last bullet out), which clears the member vector.
-		// Iterating the member directly would invalidate iterators mid-loop and
-		// silently drop the remaining collisions of this frame.
+		// Collisions last: a handler can kill the whole volley mid-drain, so work on a copy - the live list may vanish under us.
 		// Self-liveness token (same pattern as handle_bullet_collision): a
 		// handler that immediately frees this volley leaves every member
 		// access below as use-after-free. ObjectDB validates the id without
@@ -1023,11 +1077,8 @@ public:
 			collision_scratch.swap(all_collided_bullets);
 			for (auto &data : collision_scratch) {
 				handle_bullet_collision(data.collision_type, data.bullet_index, data.collided_instance_id, data.queue_bullet_epoch);
-				// handle_bullet_collision emits synchronously into user code, and a
-				// handler may free THIS multimesh mid-drain. Liveness FIRST (see
-				// token above): no member touch - not even is_queued_for_deletion -
-				// when the volley is gone. queue_free is the sanctioned kill path
-				// and is caught by the second check (direct free() paths already
+				// handle_bullet_collision calls straight into user code, and that code may free this very volley, so
+				// check we're still alive before touching anything below (queue_free is caught by the second check).
 				// reject via the factory guards).
 				if (ObjectDB::get_instance(ObjectID(drain_self_id)) != this) {
 					collision_scratch.clear();
@@ -1041,7 +1092,7 @@ public:
 		}
 	}
 
-	// Identity used by the RelockOnTargetChange policy: the front target the
+	// Fingerprint of the current front target, so the ring knows when the target actually changed.
 	// bullet locked onto last. Node2D = instance id, Vector2 = bit hash of
 	// the snapshot namespaced away from the mouse sentinel, mouse = 1 (it
 	// has no stable address).
@@ -1076,21 +1127,22 @@ public:
 		}
 	}
 
-	// Locked bullet's live deque (shared wins, same precedence as the tick):
-	// the center getter needs the unlocked fallback without duplicating it.
+	// Locked bullet's live deque (per-bullet wins, same precedence as the
+	// tick): the center getter needs the unlocked fallback without
+	// duplicating it. A bullet with its own non-empty deque reports that
+	// deque; otherwise it reports the shared broadcast deque.
 	_ALWAYS_INLINE_ bool orbit_live_deque_for_bullet(int bullet_index, const HomingTargetDeque *&r_deque) const {
+		if (bullet_index >= 0 && bullet_index < (int)all_bullet_homing_targets.size() && bullet_index < (int)all_homing_count.size()) {
+			if (all_homing_count[bullet_index] > 0 && !all_bullet_homing_targets[bullet_index].empty()) {
+				r_deque = &all_bullet_homing_targets[bullet_index];
+				return true;
+			}
+		}
 		if (!shared_homing_deque.empty()) {
 			r_deque = &shared_homing_deque;
 			return true;
 		}
-		if (bullet_index < 0 || bullet_index >= (int)all_bullet_homing_targets.size() || bullet_index >= (int)all_homing_count.size()) {
-			return false;
-		}
-		if (all_homing_count[bullet_index] <= 0 || all_bullet_homing_targets[bullet_index].empty()) {
-			return false;
-		}
-		r_deque = &all_bullet_homing_targets[bullet_index];
-		return true;
+		return false;
 	}
 
 	_ALWAYS_INLINE_ HomingType orbit_target_type(const HomingTargetDeque &deque) const {
@@ -1486,13 +1538,20 @@ public:
 	}
 
 	// Concentric-ring enable: bullet (start + k) orbits at radius_start + radius_step * k.
-	// Invalid enums are rejected per bullet by bullet_enable_orbiting (already-enabled
-	// bullets keep their radius with a warning instead of erroring the whole range).
+	// Re-arming an already-orbiting bullet updates its radius (and other
+	// params) instead of warning + skipping: ranges like
+	// all_bullets_enable_orbiting_linear must be re-runnable on armed volleys.
+	// Invalid enums are still rejected per bullet by bullet_enable_orbiting.
 	_ALWAYS_INLINE_ void all_bullets_enable_orbiting_linear(real_t radius_start, real_t radius_step, OrbitingDirection orbiting_direction = OrbitRight, OrbitingTextureRotation orbiting_texture_rotation = FaceTarget, int bullet_index_start = 0, int bullet_index_end_inclusive = -1, OrbitingFollowMode orbiting_follow_mode = FollowTarget, real_t orbiting_follow_deadzone = 0.0f, OrbitingLockPolicy orbiting_lock_policy = RelockAlways, bool orbiting_rigid_follow = true) {
 		ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_enable_orbiting_linear");
 
 		for (int i = bullet_index_start; i <= bullet_index_end_inclusive; ++i) {
-			bullet_enable_orbiting(i, radius_start + radius_step * (real_t)(i - bullet_index_start), orbiting_direction, orbiting_texture_rotation, orbiting_follow_mode, orbiting_follow_deadzone, orbiting_lock_policy, orbiting_rigid_follow);
+			const real_t want_radius = radius_start + radius_step * (real_t)(i - bullet_index_start);
+			if (i >= 0 && i < (int)all_orbiting_status.size() && all_orbiting_status[i] == 1) {
+				bullet_set_orbiting_radius(i, want_radius);
+				continue;
+			}
+			bullet_enable_orbiting(i, want_radius, orbiting_direction, orbiting_texture_rotation, orbiting_follow_mode, orbiting_follow_deadzone, orbiting_lock_policy, orbiting_rigid_follow);
 		}
 	}
 
@@ -1680,6 +1739,97 @@ public:
 		PackedFloat32Array arr;
 		for (int i = bullet_index_start; i <= bullet_index_end_inclusive; ++i) {
 			arr.push_back(bullet_get_orbiting_radius(i));
+		}
+
+		return arr;
+	}
+
+	// Bulk center reads (same per-bullet warnings as bullet_get_orbiting_center).
+	// Example: var centers = bullets.all_bullets_get_orbiting_center().
+	_ALWAYS_INLINE_ PackedVector2Array all_bullets_get_orbiting_center(int bullet_index_start = 0, int bullet_index_end_inclusive = -1) {
+		ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_get_orbiting_center");
+
+		PackedVector2Array arr;
+		for (int i = bullet_index_start; i <= bullet_index_end_inclusive; ++i) {
+			arr.push_back(bullet_get_orbiting_center(i));
+		}
+
+		return arr;
+	}
+
+	// Bulk ring-slot reads (same per-bullet warnings as bullet_get_orbiting_angle).
+	_ALWAYS_INLINE_ PackedFloat32Array all_bullets_get_orbiting_angle(int bullet_index_start = 0, int bullet_index_end_inclusive = -1) {
+		ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_get_orbiting_angle");
+
+		PackedFloat32Array arr;
+		for (int i = bullet_index_start; i <= bullet_index_end_inclusive; ++i) {
+			arr.push_back(bullet_get_orbiting_angle(i));
+		}
+
+		return arr;
+	}
+
+	// Which deque feeds each bullet ("per", "shared", or "none"): per-bullet
+	// wins, shared is the fallback, matching the steering tick.
+	// Example: var info = bullets.debug_get_orbiting_info(0); print(info["deque_src"]).
+	Dictionary debug_get_orbiting_info(int bullet_index) const {
+		Dictionary d;
+		d["valid"] = false;
+		d["enabled"] = false;
+		d["locked"] = false;
+		d["center"] = Vector2(0, 0);
+		d["angle"] = 0.0;
+		d["radius"] = 0.0;
+		d["direction"] = 0;
+		d["texture_rotation"] = 0;
+		d["follow_mode"] = 0;
+		d["deadzone"] = 0.0;
+		d["lock_policy"] = 0;
+		d["rigid_follow"] = false;
+		d["deque_src"] = "none";
+		if (bullet_index < 0 || bullet_index >= amount_bullets) {
+			return d;
+		}
+		d["valid"] = true;
+		if (bullet_index >= 0 && bullet_index < (int)all_orbiting_status.size()) {
+			d["enabled"] = all_orbiting_status[bullet_index] != 0;
+		}
+		if (bullet_index >= 0 && bullet_index < (int)all_orbiting_data.size()) {
+			const OrbitingData &o = all_orbiting_data[bullet_index];
+			d["locked"] = o.is_locked_orbiting;
+			d["center"] = o.locked_center;
+			d["angle"] = o.angle;
+			d["radius"] = o.radius;
+			d["direction"] = (int)o.direction;
+			d["texture_rotation"] = (int)o.texture_rotation;
+			d["follow_mode"] = (int)o.follow_mode;
+			d["deadzone"] = o.follow_deadzone;
+			d["lock_policy"] = (int)o.lock_policy;
+			d["rigid_follow"] = o.rigid_follow;
+			if (o.is_locked_orbiting) {
+				d["deque_src"] = "locked";
+				return d;
+			}
+		}
+		const HomingTargetDeque *live_deque = nullptr;
+		bool is_per = false;
+		if (bullet_index >= 0 && bullet_index < (int)all_bullet_homing_targets.size() && bullet_index < (int)all_homing_count.size()) {
+			is_per = all_homing_count[bullet_index] > 0 && !all_bullet_homing_targets[bullet_index].empty();
+		}
+		if (orbit_live_deque_for_bullet(bullet_index, live_deque) && live_deque != nullptr) {
+			d["deque_src"] = is_per ? "per" : "shared";
+			d["center"] = live_deque->get_cached_front_target_global_position();
+		}
+		return d;
+	}
+
+	// Bulk homing-queue depths. Example: var n = bullets.all_bullets_get_homing_targets_amount().
+	_ALWAYS_INLINE_ PackedInt32Array all_bullets_get_homing_targets_amount(int bullet_index_start = 0, int bullet_index_end_inclusive = -1) {
+		ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_get_homing_targets_amount");
+
+		PackedInt32Array arr;
+		for (int i = bullet_index_start; i <= bullet_index_end_inclusive; ++i) {
+			arr.push_back(bullet_homing_check_targets_amount(i));
 		}
 
 		return arr;
@@ -2980,9 +3130,23 @@ public:
 		}
 		use_per_bullet_homing_smoothing = true;
 	}
+	// Effective per-bullet smoothing over a range (mirrors all_bullets_get_velocity).
+	TypedArray<real_t> all_bullets_get_homing_smoothing(int bullet_index_start = 0, int bullet_index_end_inclusive = -1) const {
+		ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_get_homing_smoothing");
+		TypedArray<real_t> arr;
+		for (int i = bullet_index_start; i <= bullet_index_end_inclusive; ++i) {
+			arr.push_back(bullet_get_homing_smoothing(i));
+		}
+		return arr;
+	}
+	// Clears per-bullet smoothing mode: the shared homing_smoothing drives
+	// every bullet again. No-op when per-bullet mode was never enabled.
+	void clear_per_bullet_homing_smoothing() {
+		use_per_bullet_homing_smoothing = false;
+	}
 
 	// Virtual methods
-	void set_up_movement_data(const TypedArray<BulletSpeedData2D> &new_speed_data);
+	void set_up_movement_data(const TypedArray<BulletSpeedData2D> &new_speed_data, bool tile_short_arrays = false);
 	virtual void custom_additional_spawn_logic(const MultiMeshBulletsData2D &data) override final;
 	virtual bool custom_additional_enable_logic(const MultiMeshBulletsData2D &data) override final;
 	virtual bool is_data_type_compatible(const MultiMeshBulletsData2D &data) const override final;
@@ -2993,17 +3157,42 @@ public:
 	// Curve2D to every bullet through the existing helpers. Empty path = off.
 	void apply_shared_movement_pattern_from_data(const DirectionalBulletsData2D &directional_data);
 
-	// Shared fallback rule for per-bullet spawn-data arrays (same as
-	// all_bullet_speed_data): empty = off (-1), size == amount = entry i,
-	// otherwise the first entry drives all bullets.
-	int resolve_per_bullet_data_index(int array_size, int bullet_index) const {
+	// Strict per-bullet indexing (used by every shared-vs-per-bullet
+	// spawn-data array: speed, rotation, curves, wobble, gravity, movement
+	// pattern paths, custom data, collision counts). Entry i belongs to
+	// bullet i and nobody else:
+	// size <= 0 → -1 (feature off for the per-bullet side / shared drives),
+	// i < size → i, otherwise -1 (fall back to shared, then the default).
+	// Longer arrays ignore the extras. Callers warn once per spawn call on
+	// size != N (and != 0). Opt-in tiling lives in resolve_tiled_data_index.
+	int resolve_strict_data_index(int array_size, int bullet_index) const {
 		if (array_size <= 0) {
 			return -1;
 		}
-		if (array_size == amount_bullets) {
+		if (bullet_index >= 0 && bullet_index < array_size) {
 			return bullet_index;
 		}
-		return 0;
+		return -1;
+	}
+	// Opt-in wrap-around for one array when its tile_* checkbox is checked:
+	// slot i reads entry (i % size), so 2 entries fan across 10 bullets as
+	// A,B,A,B... Invalid entries still fall back per slot. Empty → -1.
+	int resolve_tiled_data_index(int array_size, int bullet_index) const {
+		if (array_size <= 0) {
+			return -1;
+		}
+		if (bullet_index < 0) {
+			return -1;
+		}
+		return bullet_index % array_size;
+	}
+	// Legacy alias kept for internal call sites not yet migrated.
+	int resolve_unified_data_index(int array_size, int bullet_index) const {
+		return resolve_strict_data_index(array_size, bullet_index);
+	}
+	// Legacy alias kept for internal call sites not yet migrated.
+	int resolve_per_bullet_data_index(int array_size, int bullet_index) const {
+		return resolve_strict_data_index(array_size, bullet_index);
 	}
 
 	// Gravity introspection for tests/support: {vector, fall_speed,
@@ -3018,6 +3207,12 @@ public:
 	void apply_per_bullet_movement_patterns_from_data(const DirectionalBulletsData2D &directional_data);
 	void apply_wobble_from_data(const DirectionalBulletsData2D &directional_data);
 	void apply_gravity_from_data(const DirectionalBulletsData2D &directional_data);
+	// Shared-as-fallback gap fillers (unified precedence: per-bullet wins).
+	// Only slots holding invalid ballistics (non-finite speed triple or
+	// inactive rotation) are overwritten from shared; valid per-bullet
+	// slots are never touched.
+	void apply_shared_speed_fallback(const Ref<BulletSpeedData2D> &shared);
+	void apply_shared_rotation_fallback(const Ref<BulletRotationData2D> &shared, bool new_rotate_only_textures);
 
 	// Gravity time window over volley life (seconds since spawn, read on
 	// curves_elapsed_time): integrates only inside [delay, delay + duration].
@@ -3050,8 +3245,7 @@ public:
 	}
 
 	// WOBBLE / GRAVITY / DRAG / HOMING-GATE RUNTIME API (spawn-data
-	// equivalents, editable live on the instance). Wobble entries resolve
-	// with the shared fallback rule; setters validate like spawn data.
+	// equivalents, editable live on the instance).
 	WobbleSeed make_wobble_seed(const Ref<BulletWobbleData2D> &wobble, int bullet_index) const {
 		WobbleSeed seed;
 		BulletWobbleData2D *w = wobble.ptr();
@@ -3067,6 +3261,9 @@ public:
 		if (!Math::is_finite(w->delay_sec) || w->delay_sec < 0.0 || !Math::is_finite(w->duration_sec) || w->duration_sec < 0.0) {
 			return seed;
 		}
+		if (!Math::is_finite(w->face_rotation_speed) || w->face_rotation_speed < 0.0) {
+			return seed;
+		}
 		seed.active = true;
 		seed.mode = (w->mode == BulletWobbleData2D::WOBBLE_ANGULAR) ? 1 : 0;
 		seed.waveform = (w->waveform == BulletWobbleData2D::WOBBLE_COSINE) ? 1 : 0;
@@ -3077,6 +3274,8 @@ public:
 		seed.damping_per_sec = w->damping_per_sec;
 		seed.delay_sec = w->delay_sec;
 		seed.duration_sec = w->duration_sec;
+		seed.face_movement_direction = w->face_movement_direction;
+		seed.face_rotation_speed = w->face_rotation_speed;
 		return seed;
 	}
 	void refresh_wobble_feature_flag() {
@@ -3092,6 +3291,131 @@ public:
 		}
 	}
 	bool get_is_wobble_enabled() const { return is_wobble_feature_enabled; }
+	// Effective wobble amplitude of one bullet (seeded amplitude, 0 when inactive).
+	real_t bullet_get_wobble_amplitude(int bullet_index) const {
+		if (!validate_bullet_index(bullet_index, "bullet_get_wobble_amplitude")) {
+			return 0.0;
+		}
+		if (bullet_index < 0 || bullet_index >= (int)all_bullet_wobble.size()) {
+			return 0.0;
+		}
+		const WobbleSeed &w = all_bullet_wobble[bullet_index];
+		return w.active ? w.amplitude : 0.0;
+	}
+	// Effective per-channel curves winner for one bullet: "per", "shared",
+	// or "none". Lets you prove which resource drives x / y / rotation /
+	// speed / gravity-strength without reading the tick.
+	Dictionary debug_get_curves_info(int bullet_index) const {
+		Dictionary d;
+		d["valid"] = false;
+		d["x_src"] = "none";
+		d["y_src"] = "none";
+		d["rot_src"] = "none";
+		d["speed_src"] = "none";
+		d["gravity_src"] = "none";
+		d["has_per_bullet_resource"] = false;
+		d["has_shared_fallback"] = shared_bullet_curves_data.is_valid();
+		if (bullet_index < 0 || bullet_index >= amount_bullets) {
+			return d;
+		}
+		d["valid"] = true;
+		const BulletCurvesData2D *per = (bullet_index >= 0 && bullet_index < (int)all_bullet_curves_data.size() && all_bullet_curves_data[bullet_index].is_valid()) ? all_bullet_curves_data[bullet_index].ptr() : nullptr;
+		const BulletCurvesData2D *shared = shared_bullet_curves_data.is_valid() ? shared_bullet_curves_data.ptr() : nullptr;
+		d["has_per_bullet_resource"] = per != nullptr;
+		auto pick = [](const BulletCurvesData2D *p, const BulletCurvesData2D *s, bool p_has, bool s_has) -> String {
+			if (p_has) {
+				return "per";
+			}
+			if (s_has) {
+				return "shared";
+			}
+			(void)p;
+			(void)s;
+			return "none";
+		};
+		d["x_src"] = pick(per, shared, per != nullptr && per->x_direction_curve.is_valid(), shared != nullptr && shared->x_direction_curve.is_valid());
+		d["y_src"] = pick(per, shared, per != nullptr && per->y_direction_curve.is_valid(), shared != nullptr && shared->y_direction_curve.is_valid());
+		d["rot_src"] = pick(per, shared, per != nullptr && per->rotation_speed_curve.is_valid(), shared != nullptr && shared->rotation_speed_curve.is_valid());
+		d["speed_src"] = pick(per, shared, per != nullptr && per->movement_speed_curve.is_valid(), shared != nullptr && shared->movement_speed_curve.is_valid());
+		d["gravity_src"] = pick(per, shared, per != nullptr && per->gravity_strength_curve.is_valid(), shared != nullptr && shared->gravity_strength_curve.is_valid());
+		return d;
+	}
+	// Effective movement-pattern state for one bullet: which side drives it,
+	// its flags, and how far along it is. Finished shared parks at length;
+	// finished per-bullet clears to no-pattern.
+	Dictionary debug_get_pattern_info(int bullet_index) const {
+		Dictionary d;
+		d["valid"] = false;
+		d["src"] = "none";
+		d["face"] = false;
+		d["repeat"] = true;
+		d["distance"] = 0.0;
+		d["length"] = 0.0;
+		d["finished"] = false;
+		d["has_shared_fallback"] = shared_movement_pattern_curve.is_valid();
+		if (bullet_index < 0 || bullet_index >= amount_bullets) {
+			return d;
+		}
+		d["valid"] = true;
+		if (bullet_index >= 0 && bullet_index < (int)all_movement_pattern_data.size() && all_movement_pattern_data[bullet_index].path_curve.is_valid()) {
+			const auto &p = all_movement_pattern_data[bullet_index];
+			d["src"] = "per";
+			d["face"] = p.face_movement_direction;
+			d["repeat"] = p.repeat_pattern;
+			d["distance"] = p.distance_traveled;
+			const real_t len = p.path_curve->get_baked_length();
+			d["length"] = Math::is_finite(len) ? len : 0.0;
+			d["finished"] = false;
+			return d;
+		}
+		if (shared_movement_pattern_curve.is_valid() && bullet_index >= 0 && bullet_index < (int)shared_movement_pattern_distances.size()) {
+			const real_t len = shared_movement_pattern_curve->get_baked_length();
+			const real_t safe_len = Math::is_finite(len) ? len : 0.0;
+			const real_t dist = shared_movement_pattern_distances[bullet_index];
+			d["src"] = "shared";
+			d["face"] = shared_movement_pattern_face_movement_direction;
+			d["repeat"] = shared_movement_pattern_repeat;
+			d["distance"] = dist;
+			d["length"] = safe_len;
+			d["finished"] = !shared_movement_pattern_repeat && safe_len >= 0.001 && dist >= safe_len;
+			return d;
+		}
+		return d;
+	}
+	// Effective wobble face flag of one bullet (seeded value; false when
+	// inactive). Use debug_get_wobble_info for the full seed incl. mode,
+	// waveform, phase, damping, delay and duration.
+	bool bullet_get_wobble_face_movement_direction(int bullet_index) const {
+		if (!validate_bullet_index(bullet_index, "bullet_get_wobble_face_movement_direction")) {
+			return false;
+		}
+		if (bullet_index < 0 || bullet_index >= (int)all_bullet_wobble.size()) {
+			return false;
+		}
+		return all_bullet_wobble[bullet_index].active && all_bullet_wobble[bullet_index].face_movement_direction;
+	}
+	real_t bullet_get_wobble_face_rotation_speed(int bullet_index) const {
+		if (!validate_bullet_index(bullet_index, "bullet_get_wobble_face_rotation_speed")) {
+			return 0.0;
+		}
+		if (bullet_index < 0 || bullet_index >= (int)all_bullet_wobble.size()) {
+			return 0.0;
+		}
+		const WobbleSeed &w = all_bullet_wobble[bullet_index];
+		return w.active ? w.face_rotation_speed : 0.0;
+	}
+	// Live wobble seeding (mirrors the curves runtime API). Per-bullet wins
+	// over shared at seed time; null clears that slot back to the shared
+	// fallback (or inactive when no shared fallback is set).
+	void bullet_set_wobble_data(int bullet_index, const Ref<BulletWobbleData2D> &wobble_data);
+	void all_bullets_set_wobble_data(const Ref<BulletWobbleData2D> &wobble_data, int bullet_index_start = 0, int bullet_index_end_inclusive = -1);
+	Ref<BulletWobbleData2D> bullet_get_wobble_data(int bullet_index) const;
+	TypedArray<BulletWobbleData2D> all_bullets_get_wobble_data(int bullet_index_start = 0, int bullet_index_end_inclusive = -1);
+	void set_shared_bullet_wobble_data(const Ref<BulletWobbleData2D> &new_wobble_data);
+	Ref<BulletWobbleData2D> get_shared_bullet_wobble_data() const { return shared_bullet_wobble_data; }
+	bool has_shared_bullet_wobble_data() const { return shared_bullet_wobble_data.is_valid(); }
+	void remove_shared_bullet_wobble_data();
+	Dictionary debug_get_wobble_info(int bullet_index) const;
 	Vector2 get_gravity() const { return gravity; }
 	void set_gravity(const Vector2 &value) {
 		if (!value.is_finite()) {
@@ -3129,14 +3453,23 @@ public:
 		all_gravity_velocity[bullet_index] = Vector2(0, 0);
 	}
 	void all_bullets_set_gravity(const Vector2 &value, int bullet_index_start = 0, int bullet_index_end_inclusive = -1) {
+		ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_set_gravity");
 		if (!value.is_finite()) {
 			UtilityFunctions::push_error("DirectionalBullets2D.all_bullets_set_gravity: value must be finite, keeping old values.");
 			return;
 		}
-		ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_set_gravity");
 		for (int i = bullet_index_start; i <= bullet_index_end_inclusive; ++i) {
 			bullet_set_gravity(i, value);
 		}
+	}
+	// Per-bullet gravity vectors over a range (mirrors all_bullets_get_velocity).
+	TypedArray<Vector2> all_bullets_get_gravity(int bullet_index_start = 0, int bullet_index_end_inclusive = -1) const {
+		ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_get_gravity");
+		TypedArray<Vector2> arr;
+		for (int i = bullet_index_start; i <= bullet_index_end_inclusive; ++i) {
+			arr.push_back(bullet_get_gravity(i));
+		}
+		return arr;
 	}
 	double get_gravity_delay_sec() const { return gravity_delay_sec; }
 	void set_gravity_delay_sec(double value) {
@@ -3165,6 +3498,21 @@ public:
 		}
 		return all_gravity_velocity[bullet_index].length();
 	}
+	// Fall speeds over a range (mirrors all_bullets_get_velocity).
+	TypedArray<real_t> all_bullets_get_fall_speed(int bullet_index_start = 0, int bullet_index_end_inclusive = -1) const {
+		ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_get_fall_speed");
+		TypedArray<real_t> arr;
+		for (int i = bullet_index_start; i <= bullet_index_end_inclusive; ++i) {
+			arr.push_back(bullet_get_fall_speed(i));
+		}
+		return arr;
+	}
+	// Full per-bullet steering snapshot for tests/support: {index, active,
+	// direction, velocity, speed, gravity, fall_speed, wobble_active,
+	// wobble_amplitude, has_homing_targets, homing_targets_amount,
+	// homing_smoothing, orbiting_enabled, orbiting_locked, pattern,
+	// shared_pattern_active, rotation_speed}. Never mutates.
+	Dictionary debug_get_bullet_info(int bullet_index) const;
 	real_t get_linear_drag() const { return linear_drag; }
 	void set_linear_drag(real_t value) {
 		if (!Math::is_finite(value) || value < 0.0) {
@@ -3199,9 +3547,10 @@ public:
 	}
 
 	// SHARED MOVEMENT PATTERN RUNTIME API (spawn-data equivalent, editable live
-	// on the instance; per-bullet helpers stay in the base class). While a
-	// shared pattern is set it takes precedence over per-bullet patterns;
-	// clearing it (null curve) hands control back to them.
+	// on the instance; per-bullet helpers stay in the base class). Unified
+	// precedence: per-bullet patterns win per bullet; the shared curve is
+	// the broadcast fallback for bullets without their own pattern.
+	// Clearing it (null curve) removes the fallback.
 	Ref<Curve2D> get_shared_movement_pattern_curve() const { return shared_movement_pattern_curve; }
 	void set_shared_movement_pattern_curve(const Ref<Curve2D> &new_curve) {
 		shared_movement_pattern_curve = new_curve;
@@ -3225,18 +3574,17 @@ public:
 	void remove_shared_movement_pattern() { set_shared_movement_pattern_curve(Ref<Curve2D>()); }
 
 	// SHARED SPEED / ROTATION RUNTIME API (spawn-data equivalent, editable live
-	// on the instance). While set they take precedence over the per-bullet
-	// arrays; clearing them (null) hands control back, keeping already-seeded
-	// values - re-spawn or re-set to change those.
+	// on the instance). Unified precedence: shared is the fallback default,
+	// per-bullet ballistics win per slot. Setting shared fills only the
+	// invalid-entry gaps (fully-zero triples); clearing it (null) keeps the
+	// current ballistics (already resolved per bullet at seed time).
 	Ref<BulletSpeedData2D> get_shared_bullet_speed_data() const { return shared_bullet_speed_data; }
 	void set_shared_bullet_speed_data(const Ref<BulletSpeedData2D> &new_speed_data) {
 		shared_bullet_speed_data = new_speed_data;
 		if (new_speed_data.is_null()) {
 			return;
 		}
-		TypedArray<BulletSpeedData2D> single_speed;
-		single_speed.push_back(new_speed_data);
-		set_up_movement_data(single_speed);
+		apply_shared_speed_fallback(new_speed_data);
 	}
 	bool has_shared_bullet_speed_data() const { return shared_bullet_speed_data.is_valid(); }
 	void remove_shared_bullet_speed_data() { set_shared_bullet_speed_data(Ref<BulletSpeedData2D>()); }
@@ -3247,9 +3595,7 @@ public:
 		if (new_rotation_data.is_null()) {
 			return;
 		}
-		TypedArray<BulletRotationData2D> single_rotation;
-		single_rotation.push_back(new_rotation_data);
-		set_rotation_data(single_rotation, rotate_only_textures);
+		apply_shared_rotation_fallback(new_rotation_data, rotate_only_textures);
 	}
 	bool has_shared_bullet_rotation_data() const { return shared_bullet_rotation_data.is_valid(); }
 	void remove_shared_bullet_rotation_data() { set_shared_bullet_rotation_data(Ref<BulletRotationData2D>()); }
@@ -3350,11 +3696,12 @@ public:
 		}
 	}
 
-protected:
-	// Updates homing behavior for a bullet. Zero-delta ticks steer nothing:
-	// with no time passing any direction or texture change would be motion
-	// without movement, so the bullet holds its pose.
-	_ALWAYS_INLINE_ void update_homing(HomingTargetDeque &homing_deque, int bullet_index, double delta, Vector2 &bullet_pos, Vector2 &target_pos) {
+ protected:
+ 	// Updates homing behavior for a bullet. Zero-delta ticks steer nothing:
+ 	// with no time passing any direction or texture change would be motion
+ 	// without movement, so the bullet holds its pose. A zero heading
+ 	// (unseeded ballistics) also holds: steering it would snap to angle 0.
+ 	_ALWAYS_INLINE_ void update_homing(HomingTargetDeque &homing_deque, int bullet_index, double delta, Vector2 &bullet_pos, Vector2 &target_pos) {
 		if (bullet_index < 0 || bullet_index >= (int)all_cached_instance_origin.size() || bullet_index >= (int)all_cached_direction.size() || bullet_index >= (int)all_cached_instance_transforms.size()) {
 			return;
 		}
@@ -3388,6 +3735,8 @@ protected:
 			return;
 		}
 
+		// Steering gains. A zero heading (unseeded ballistics) holds: any
+		// steering below would normalize it into an angle-0 snap.
 		real_t max_turn = homing_smoothing * delta;
 		if (use_per_bullet_homing_smoothing && bullet_index >= 0 && bullet_index < (int)all_bullet_homing_smoothing.size()) {
 			max_turn = all_bullet_homing_smoothing[bullet_index] * delta;
@@ -3397,6 +3746,9 @@ protected:
 		}
 
 		Vector2 &current_direction = all_cached_direction[bullet_index];
+		if (current_direction.length_squared() < 0.00000001) {
+			return;
+		}
 
 		auto &curr_transf = all_cached_instance_transforms[bullet_index];
 		// If rotation is controlled via movement pattern (per-bullet or shared)
@@ -3445,7 +3797,7 @@ protected:
 		real_t delta_rot = Math::atan2(cross, dot);
 		normalize_angle(delta_rot);
 
-		bool use_smoothing = max_turn > 0.0; // Hoist for clamp
+		bool use_smoothing = max_turn > 0.0; // Snap when there's no turn budget
 
 		// Apply smoothing clamp
 		if (use_smoothing) {
@@ -3455,17 +3807,13 @@ protected:
 		// Rotate locally
 		rotate_transform_locally(all_cached_instance_transforms[bullet_index], delta_rot);
 
-		// Snap only (no smoothing): collapse the rotation lerp so the visual
-		// doesn't trail. Orbiting calls here every frame with max_turn 0 and
-		// needs continuous interpolation, so it snapshots/restores around the
-		// call (see orbit block) instead of resetting here.
+	// No smoothing means snap: reset the interpolation cache so the sprite doesn't lag a frame behind. Orbiting preserves it separately to stay smooth.
 		if (!use_smoothing) {
 			update_bullet_previous_transform_for_interpolation(bullet_index);
 		}
 	}
 
-	// Orbit-safe wrapper: rotate without collapsing the interpolation cache,
-	// so orbiters keep smooth rotation instead of jittering every frame.
+	// Rotate without touching the interpolation cache, so orbiters stay smooth instead of jittering every frame.
 	_ALWAYS_INLINE_ void rotate_to_target_preserve_interpolation(int bullet_index, const Vector2 &diff, bool require_homing_flag = true) {
 		if (bullet_index < 0 || bullet_index >= (int)all_cached_instance_transforms.size() || bullet_index >= (int)all_previous_instance_transf.size()) {
 			return;
@@ -3475,15 +3823,14 @@ protected:
 		all_previous_instance_transf[bullet_index] = prev;
 	}
 
-	// Updates bullet rotation based on rotation speed
+	// Spin one bullet's sprite by its rotation speed for this tick
 	_ALWAYS_INLINE_ void update_rotation(int bullet_index, double delta) {
 		real_t cache_rotation_speed = all_rotation_speed[bullet_index];
 		real_t rot_delta = cache_rotation_speed * (real_t)delta;
 
-		// Apply rotation if active or speed > 0
+		// Skip standing still - rotating by 0 would just add float noise
 		if (cache_rotation_speed != 0.0f) {
-			// Symmetric check: rotation_speed may be negative (CCW), max is
-			// always >= 0. Without abs(), negative spin never triggers the stop.
+			// Spin works both ways, but max is always positive - compare absolute values so reverse spin stops too.
 			bool max_reached = Math::abs(cache_rotation_speed) >= all_max_rotation_speed[bullet_index];
 
 			if (!(max_reached && stop_rotation_when_max_reached)) {
@@ -3492,7 +3839,7 @@ protected:
 		}
 	}
 
-	// Updates bullet rotation based on rotation speed using a curve
+	// Spin one bullet's sprite by its rotation speed for this tick using a curve
 	_ALWAYS_INLINE_ void update_rotation_using_curve(int bullet_index, double delta) {
 		real_t cache_rotation_speed = all_rotation_speed[bullet_index];
 		real_t rot_delta = cache_rotation_speed * (real_t)delta;
@@ -3520,13 +3867,10 @@ protected:
 		}
 	}
 
-	// Coalesced auto-pop: set while a deferred shared-deque pop is in flight so N
-	// bullets reaching in one tick queue exactly one pop instead of draining the deque.
+	// One shared pop per tick no matter how many bullets arrive at once - otherwise a full volley would eat the whole queue in a frame.
 	bool shared_auto_pop_queued = false;
 
-	// Generation-guarded deferred emit: the target travels as an instance id
-	// and is resolved at fire time (null when freed) instead of carrying a
-	// possibly-dangling raw pointer across the frame.
+	// The signal fires a frame later, so carry the target as an id and look it up then - the raw pointer may be dead by now.
 	_ALWAYS_INLINE_ void _do_emit_homing_target_reached(uint64_t p_generation, int p_bullet_index, uint64_t p_bullet_epoch, uint64_t p_target_instance_id, const Vector2 &p_target_global_position) {
 		if (p_generation != homing_operation_generation) {
 			return; // Scheduled by a previous life (pool reuse before the flush).
@@ -3554,7 +3898,7 @@ protected:
 		orbit_route_shared_front_change();
 	}
 
-	// Generation-guarded deferred per-bullet pop: a stale call no-ops instead
+	// Same trick for per-bullet pops: stale calls from a dead volley just no-op.
 	// of eating the new life's front target. Guards both the volley
 	// generation (pool reuse) and the per-bullet epoch (single-bullet
 	// disable/enable + fresh push before the flush).

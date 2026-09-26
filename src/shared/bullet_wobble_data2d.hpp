@@ -31,6 +31,17 @@ public:
 	real_t damping_per_sec = 0.0;
 	real_t delay_sec = 0.0;
 	real_t duration_sec = 0.0;
+	// Texture follow for wobble-steered bullets (mirrors the direction-curve
+	// rotate_towards_adjusted_direction contract, but opt-in per wobble
+	// entry instead of global). true (default) rotates the bullet visual
+	// toward the wobble-steered heading each tick, so snakes point along
+	// their path out of the box; false keeps the old heading-only behavior
+	// (visual yaw untouched, position still snakes). Skipped while rotation
+	// data drives the visual (same rule as direction curves).
+	bool face_movement_direction = true;
+	// Slew limit for the follow above (radians per second, 18 matches
+	// direction curves). <= 0 snaps instantly; negative is rejected.
+	real_t face_rotation_speed = 18.0;
 
 	static TypedArray<BulletWobbleData2D> generate_random_data(
 			int amount_to_generate,
@@ -71,6 +82,12 @@ public:
 
 	real_t get_duration_sec() const;
 	void set_duration_sec(real_t value);
+
+	bool get_face_movement_direction() const;
+	void set_face_movement_direction(bool value);
+
+	real_t get_face_rotation_speed() const;
+	void set_face_rotation_speed(real_t value);
 
 protected:
 	static void _bind_methods();

@@ -13,11 +13,15 @@ static func make_directional_data(n: int = 4, speed: float = 200.0, lifetime: fl
 	for i in n:
 		arr.append(Transform2D(0.0, Vector2(24.0 * i, 0.0)))
 	data.transforms = arr
-	var sp := BulletSpeedData2D.new()
-	sp.speed = speed
-	sp.max_speed = 3000.0
-	sp.acceleration = 0.0
-	data.all_bullet_speed_data = [sp]
+	# Strict indexing: one speed entry per bullet (entry i drives bullet i).
+	var speeds: Array = []
+	for i in n:
+		var sp := BulletSpeedData2D.new()
+		sp.speed = speed
+		sp.max_speed = 3000.0
+		sp.acceleration = 0.0
+		speeds.append(sp)
+	data.all_bullet_speed_data = speeds
 	data.max_life_time = lifetime
 	data.texture_size = Vector2(16, 16)
 	data.set_collision_layer_from_array([2])

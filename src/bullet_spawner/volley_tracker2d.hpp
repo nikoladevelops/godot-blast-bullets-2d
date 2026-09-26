@@ -7,8 +7,8 @@
 namespace BlastBullets2D {
 using namespace godot;
 
-// Owns one spawner's tracked-volley id list with the prune-before-touch
-// invariant made structural (item 6).
+// Owns one spawner's tracked-volley id list. Prune-before-touch is built
+// into every reader, so the list shape itself enforces the rule.
 //
 // The list only ever holds plain instance ids — no ownership, no node
 // pointers — so a freed, pooled, or re-homed volley can never be touched

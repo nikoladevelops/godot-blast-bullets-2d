@@ -38,6 +38,8 @@ TypedArray<BulletWobbleData2D> BulletWobbleData2D::generate_random_data(
 		wobble->enabled = true;
 		wobble->amplitude = rand_gen->randf_range(amplitude_MIN, amplitude_MAX);
 		wobble->frequency_hz = rand_gen->randf_range(frequency_MIN, frequency_MAX);
+		wobble->face_movement_direction = true;
+		wobble->face_rotation_speed = 18.0;
 		data[i] = wobble;
 	}
 	return data;
@@ -130,6 +132,18 @@ void BulletWobbleData2D::set_duration_sec(real_t value) {
 	duration_sec = value;
 }
 
+bool BulletWobbleData2D::get_face_movement_direction() const { return face_movement_direction; }
+void BulletWobbleData2D::set_face_movement_direction(bool value) { face_movement_direction = value; }
+
+real_t BulletWobbleData2D::get_face_rotation_speed() const { return face_rotation_speed; }
+void BulletWobbleData2D::set_face_rotation_speed(real_t value) {
+	if (!Math::is_finite(value) || value < 0.0) {
+		UtilityFunctions::push_error("BulletWobbleData2D.face_rotation_speed must be finite and >= 0 (0 = snap instantly).");
+		return;
+	}
+	face_rotation_speed = value;
+}
+
 void BulletWobbleData2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_enabled"), &BulletWobbleData2D::get_enabled);
 	ClassDB::bind_method(D_METHOD("set_enabled", "value"), &BulletWobbleData2D::set_enabled);
@@ -174,6 +188,14 @@ void BulletWobbleData2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_duration_sec"), &BulletWobbleData2D::get_duration_sec);
 	ClassDB::bind_method(D_METHOD("set_duration_sec", "value"), &BulletWobbleData2D::set_duration_sec);
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "duration_sec"), "set_duration_sec", "get_duration_sec");
+
+	ClassDB::bind_method(D_METHOD("get_face_movement_direction"), &BulletWobbleData2D::get_face_movement_direction);
+	ClassDB::bind_method(D_METHOD("set_face_movement_direction", "value"), &BulletWobbleData2D::set_face_movement_direction);
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "face_movement_direction"), "set_face_movement_direction", "get_face_movement_direction");
+
+	ClassDB::bind_method(D_METHOD("get_face_rotation_speed"), &BulletWobbleData2D::get_face_rotation_speed);
+	ClassDB::bind_method(D_METHOD("set_face_rotation_speed", "value"), &BulletWobbleData2D::set_face_rotation_speed);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "face_rotation_speed"), "set_face_rotation_speed", "get_face_rotation_speed");
 
 	ClassDB::bind_static_method(
 			"BulletWobbleData2D",

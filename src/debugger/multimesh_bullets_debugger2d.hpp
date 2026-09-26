@@ -37,7 +37,7 @@ public:
 	// Sets the debugger color to another color
 	void set_debugger_color(const Color &new_color);
 
-	// P1-12 budget: max providers drawn per tick (0 = unlimited, default).
+	// Provider budget: max providers drawn per tick (0 = unlimited, default).
 	// Beyond the cap extra providers are hidden (visible=false), oldest first.
 	// Prevents the always-draw-everything debugger from melting on 10k-bullet
 	// demos while keeping default behavior unchanged.
@@ -97,7 +97,7 @@ private:
 	// A pointer to the physics server
 	PhysicsServer2D *physics_server = nullptr;
 
-	// P1-12 budget state (see public setters). Zero = unlimited.
+	// Provider budget state (see public setters). Zero = unlimited.
 	int max_debug_providers = 0;
 	bool draw_inactive_shapes = true;
 

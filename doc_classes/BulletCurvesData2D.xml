@@ -5,6 +5,7 @@
 	</brief_description>
 	<description>
 		Drive speed, rotation, and direction from [Curve] resources instead of fixed numbers. Each aspect has its own curve plus a use_unit_curve toggle: on means the horizontal axis runs 0 to 1 over the bullet lifetime, off means it runs in seconds. Direction offsets blend additively or override per axis, with adjustable strength. When any curve is present it takes precedence over [BulletSpeedData2D] and [BulletRotationData2D].
+		Per-bullet vs shared: put one entry per bullet in [DirectionalBulletsData2D.all_bullet_curves_data] — entry [code]i[/code] drives bullet [code]i[/code] only, resolved per channel (a bullet with its own x-curve uses it even when [DirectionalBulletsData2D.shared_bullet_curves_data] also defines x; shared covers only the channels the bullet lacks). Negative speed samples are legal and fly backwards, like negative [BulletSpeedData2D.speed]. NaN samples read as 0 for that tick.
 	</description>
 	<tutorials>
 	</tutorials>

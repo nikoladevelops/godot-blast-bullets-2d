@@ -102,6 +102,14 @@
 				Warning: You have to take care of the returned attachments yourself.
 			</description>
 		</method>
+		<method name="all_bullets_clear_curves_data">
+			<return type="void" />
+			<param index="0" name="bullet_index_start" type="int" default="0" />
+			<param index="1" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<description>
+				Clears per-bullet curves over a range (default all) back to the shared fallback (or no curves when unset), mirroring [method clear_per_bullet_homing_smoothing]. Example: [code]bullets.all_bullets_clear_curves_data(); print(bullets.debug_get_curves_info(0)["speed_src"])[/code] prints "shared" or "none".
+			</description>
+		</method>
 		<method name="all_bullets_set_curves_data">
 			<return type="void" />
 			<param index="0" name="curves_data" type="BulletCurvesData2D" />
@@ -310,9 +318,16 @@
 			<param index="0" name="bullet_index" type="int" />
 			<param index="1" name="data" type="BulletCurvesData2D" />
 			<description>
-				Sets the curves data of a specific bullet. Curves data is a [BulletCurvesData2D] resource that can contain multiple curves used to control different aspects of the bullet's behavior over time, such as movement speed, rotation speed, direction adjustment, etc... Not supported on [BlockBullets2D].
+				Sets the curves data of a specific bullet. Curves data is a [BulletCurvesData2D] resource that can contain multiple curves used to control different aspects of the bullet's behavior over time, such as movement speed, rotation speed, direction adjustment, etc... Not supported on [BlockBullets2D]. Pass null to clear back to the shared fallback (see [method clear_per_bullet_curves_data]). Example: [code]bullets.bullet_set_curves_data(0, my_curves); print(bullets.debug_get_curves_info(0)["speed_src"])[/code] prints "per".
 
 				Note: If you want to set or get the curves data of multiple bullets at once, use [method all_bullets_set_curves_data] or [method all_bullets_get_curves_data].
+			</description>
+		</method>
+		<method name="clear_per_bullet_curves_data">
+			<return type="void" />
+			<param index="0" name="bullet_index" type="int" />
+			<description>
+				Clears one bullet's per-bullet curves back to the shared fallback (or no curves when unset). Same as [method bullet_set_curves_data] with null, kept for symmetry with [method clear_per_bullet_homing_smoothing].
 			</description>
 		</method>
 		<method name="bullet_set_custom_data">
@@ -375,8 +390,9 @@
 		</method>
 		<method name="debug_get_attachment_info" qualifiers="const">
 			<return type="Dictionary" />
+			<param index="0" name="bullet_index" type="int" />
 			<description>
-				Attachment slot introspection: has_attachment, pooling_id, owner_match. owner_match verifies the attachment's owner ids point back at this volley + index (stale ownership after reuse fails here).
+				Attachment slot introspection: has_attachment, pooling_id, owner_match. owner_match verifies the attachment's owner ids point back at this volley + index (stale ownership after reuse fails here). No range variant exists; loop bullet indices instead.
 			</description>
 		</method>
 		<method name="enable_multimesh">
@@ -413,6 +429,18 @@
 				Get how many times a specific bullet has collided so far. See [method set_bullet_collision_count] for writing it.
 			</description>
 		</method>
+		<method name="get_bullets_current_collision_count" qualifiers="const">
+			<return type="int[]" />
+			<description>
+				Per-bullet collision counters for the whole volley (same order as bullets). Write via the [member bullets_current_collision_count] property: empty seeds zeros, entry [code]i[/code] belongs to bullet [code]i[/code], uncovered bullets start at 0 (or wrap with [member MultiMeshBulletsData2D.tile_bullets_current_collision_count]). Values clamp like [method set_bullet_collision_count].
+			</description>
+		</method>
+		<method name="get_curves_elapsed_time" qualifiers="const">
+			<return type="float" />
+			<description>
+				Volley clock in seconds since spawn (drives curves, wobble, gravity/homing windows). See [member curves_elapsed_time] for writing it.
+			</description>
+		</method>
 		<method name="get_bullet_direction" qualifiers="const">
 			<return type="Vector2" />
 			<param index="0" name="bullet_index" type="int" />
@@ -439,6 +467,19 @@
 			<param index="0" name="bullet_index" type="int" />
 			<description>
 				Get the speed data of a specific bullet. Returns a [BulletSpeedData2D] resource.
+			</description>
+		</method>
+		<method name="clear_bullet_rotation_data">
+			<return type="void" />
+			<description>
+				Turns rotation off for the whole volley (same as seeding an empty array). Re-seed with spawn/enable or [method set_bullet_rotation_data] to spin again.
+			</description>
+		</method>
+		<method name="get_bullet_rotation_data" qualifiers="const">
+			<return type="BulletRotationData2D" />
+			<param index="0" name="bullet_index" type="int" />
+			<description>
+				Live rotation triple of a specific bullet (rotation/max/accel). Read, tweak, and write back with [method set_bullet_rotation_data]. Out-of-range reads return a zeroed resource.
 			</description>
 		</method>
 		<method name="get_bullet_texture_rotation_degrees" qualifiers="const">
@@ -642,12 +683,56 @@
 				Unfreezes frame advancement.
 			</description>
 		</method>
+		<method name="all_bullets_get_rotation_data" qualifiers="const">
+			<return type="BulletRotationData2D[]" />
+			<param index="0" name="bullet_index_start" type="int" default="0" />
+			<param index="1" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<description>
+				Rotation triples over a range (live values, mirrors [method all_bullets_get_speed_data]).
+			</description>
+		</method>
+		<method name="all_bullets_set_rotation_data">
+			<return type="void" />
+			<param index="0" name="new_bullet_rotation_data" type="BulletRotationData2D" />
+			<param index="1" name="bullet_index_start" type="int" default="0" />
+			<param index="2" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<description>
+				Fans one rotation triple over a range (null and non-finite values rejected). Mirrors [method all_bullets_set_speed_data].
+			</description>
+		</method>
+		<method name="bullet_get_rotation_speed" qualifiers="const">
+			<return type="float" />
+			<param index="0" name="bullet_index" type="int" />
+			<description>
+				Effective per-bullet rotation speed (seeded value, live-updated by the tick). 0 when inactive or out of range.
+			</description>
+		</method>
+		<method name="is_rotation_data_active" qualifiers="const">
+			<return type="bool" />
+			<description>
+				Whether rotation data is currently driving the volley (any seeded rotation array, shared or per-bullet).
+			</description>
+		</method>
 		<method name="set_bullet_collision_count">
 			<return type="void" />
 			<param index="0" name="bullet_index" type="int" />
 			<param index="1" name="value" type="int" />
 			<description>
 				Set how many times a specific bullet has collided so far. Negative values become 0, values at or above [member bullet_max_collision_count] become max - 1 (exactly one hit remaining, when the max is above 0). Same clamp as [method enable_bullet]'s wake top-up. See [method get_bullet_collision_count] for reading it.
+			</description>
+		</method>
+		<method name="set_bullets_current_collision_count_no_return">
+			<return type="void" />
+			<param index="0" name="arr" type="int[]" />
+			<description>
+				Editor/property setter behind [member bullets_current_collision_count] (property setters must return void): empty seeds zeros, entry [code]i[/code] belongs to bullet [code]i[/code], uncovered bullets start at 0, values clamp like [method set_bullet_collision_count]. The resource-level [member MultiMeshBulletsData2D.tile_bullets_current_collision_count] checkbox wraps short arrays on the spawn path instead. Read back with [method get_bullets_current_collision_count].
+			</description>
+		</method>
+		<method name="set_curves_elapsed_time">
+			<return type="void" />
+			<param index="0" name="new_time" type="float" />
+			<description>
+				Writes the volley clock (see [member curves_elapsed_time]): drives curves, wobble, and gravity/homing windows. Reset to 0 on every spawn/enable.
 			</description>
 		</method>
 		<method name="set_bullet_direction">
@@ -681,7 +766,7 @@
 			<param index="2" name="face_movement_direction" type="bool" default="false" />
 			<param index="3" name="repeat_pattern" type="bool" default="true" />
 			<description>
-				Set a [Curve2D] drawn movement pattern to a specific bullet. The bullet will follow the shape of the curve as it moves. Not supported on [BlockBullets2D].
+				Set a [Curve2D] drawn movement pattern to a specific bullet. The bullet will follow the shape of the curve as it moves. Not supported on [BlockBullets2D]. Per-bullet patterns always win over the shared fallback; null clears back to shared (or no pattern). Example: [code]bullets.set_bullet_movement_pattern_from_curve(0, my_curve, true); print(bullets.debug_get_pattern_info(0)["src"])[/code] prints "per".
 
 				If [code]face_movement_direction[/code] is set to true, the bullet will also rotate to face the direction it is moving along the curve.
 
@@ -715,7 +800,15 @@
 			<param index="0" name="bullet_index" type="int" />
 			<param index="1" name="new_bullet_speed_data" type="BulletSpeedData2D" />
 			<description>
-				Set the speed data of a specific bullet.
+				Set the speed data of a specific bullet (null and non-finite values rejected; a winning movement-speed curve blocks the write until cleared). Example: [code]var s = BulletSpeedData2D.new(); s.speed = 200.0; bullets.set_bullet_speed_data(0, s)[/code].
+			</description>
+		</method>
+		<method name="set_bullet_rotation_data">
+			<return type="void" />
+			<param index="0" name="bullet_index" type="int" />
+			<param index="1" name="new_bullet_rotation_data" type="BulletRotationData2D" />
+			<description>
+				Live per-bullet rotation write (null and non-finite values rejected). Mirrors [method set_bullet_speed_data].
 			</description>
 		</method>
 		<method name="set_bullet_texture_rotation_degrees">

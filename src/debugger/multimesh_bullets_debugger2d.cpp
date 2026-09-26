@@ -507,13 +507,13 @@ void MultiMeshBulletsDebugger2D::_physics_process(double delta) {
 			mesh_instance.set_visible(false);
 			continue;
 		}
-		// P1-12: optionally hide frozen inactive providers (pooled volleys).
+		// Optionally hide frozen inactive providers (pooled volleys).
 		const bool provider_active_early = provider->is_active_for_debugging();
 		if (!draw_inactive_shapes && !provider_active_early) {
 			mesh_instance.set_visible(false);
 			continue;
 		}
-		// P1-12 budget: cap visible providers per tick (oldest first).
+		// Provider budget: cap visible providers per tick (oldest first).
 		// Counted here (not precomputed) so dead/skipped providers never
 		// consume the budget.
 		if (max_debug_providers > 0 && drawn_providers >= max_debug_providers) {

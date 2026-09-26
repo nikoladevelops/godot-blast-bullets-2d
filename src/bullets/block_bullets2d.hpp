@@ -68,12 +68,10 @@ public:
 			return;
 		}
 		real_t cache_first_rotation_result = 0.0;
-		// Accelerate only the first bullet rotation speed
+		// The whole block shares one spin, so only bullet 0 integrates - the rest copy it
 		if (is_rotation_data_active) {
 			if (use_only_first_rotation_data) {
-				// Frozen while its slot is disabled: the cached sweep below
-				// must come from a live bullet, or a disabled bullet 0 drives
-				// the whole volley's spin from stale state.
+				// Skip this while bullet 0 is asleep, or its stale spin would drive the whole block.
 				if (all_bullets_enabled_set.contains(0)) {
 					bullet_accelerate_rotation_speed(0, delta); // accelerate only the first one once
 					cache_first_rotation_result = all_rotation_speed[0] * delta;
@@ -93,8 +91,7 @@ public:
 			if (i < 0 || i >= amount_bullets || i >= (int)all_cached_instance_transforms.size() || i >= (int)all_cached_shape_transforms.size() || i >= (int)all_cached_velocity.size()) {
 				continue;
 			}
-			// Per-bullet velocity (same shared values by default, so block motion
-			// is unchanged, but per-bullet overrides via the setters are honored).
+			// Each block bullet keeps its own velocity slot (usually identical, but the setters can split them).
 			const Vector2 velocity_delta = all_cached_velocity[i] * (real_t)delta;
 			Transform2D &curr_instance_transf = all_cached_instance_transforms[i];
 			Transform2D &curr_shape_transf = all_cached_shape_transforms[i];
@@ -122,8 +119,7 @@ public:
 			}
 
 			curr_instance_transf.set_origin(curr_instance_origin);
-			// Rotation changes the offset basis, so re-derive the shape origin
-			// instead of translating the stale one.
+			// Rotation moves the offset with it, so rebuild the shape position from scratch instead of shifting the old one.
 			if (cache_collision_shape_offset != Vector2(0, 0)) {
 				curr_shape_origin = curr_instance_origin + cache_collision_shape_offset.rotated(curr_shape_transf.get_rotation());
 			} else {
@@ -139,11 +135,7 @@ public:
 			batch_flush_instance_transforms();
 		}
 
-		// Accelerate only live entries (matching DirectionalBullets2D, which
-		// freezes disabled bullets at their disable-time speed): accelerating
-		// disabled entries made a re-enabled bullet rejoin at the volley's
-		// current speed instead of resuming where it left off (see
-		// enable_bullet's "resume, not respawn" contract).
+		// Only live bullets gain speed - sleepers resume where they left off when woken, they don't jump to the volley's current speed.
 		for (int i = 0; i < amount_bullets && i < (int)all_cached_speed.size(); ++i) {
 			if (!all_bullets_enabled_set.contains(i)) {
 				continue;
@@ -151,23 +143,15 @@ public:
 			bullet_accelerate_speed(i, delta);
 		}
 
-		// Swap into a local first: handle_bullet_collision can funnel into
-		// disable_multimesh() (last bullet out), which clears the member vector.
-		// Iterating the member directly would invalidate iterators mid-loop and
-		// silently drop the remaining collisions of this frame.
-		// Self-liveness token (same pattern as handle_bullet_collision): a
-		// handler that immediately frees this volley leaves every member
-		// access below as use-after-free. ObjectDB validates the id without
-		// touching the object, so a freed volley breaks safely instead of
-		// crashing (misuse is still prohibited by the handler contract).
+		// Collisions last: a handler can kill the whole volley mid-drain, so work on a copy - the live list may vanish under us.
+		// Remember who we are before calling user code - it may free this volley, and then every member read below would be garbage.
 		const uint64_t drain_self_id = get_instance_id();
 		if (!all_collided_bullets.empty()) {
 			collision_scratch.clear();
 			collision_scratch.swap(all_collided_bullets);
 			for (auto &data : collision_scratch) {
 				handle_bullet_collision(data.collision_type, data.bullet_index, data.collided_instance_id, data.queue_bullet_epoch);
-				// Liveness FIRST (see token above): no member touch - not even
-				// is_queued_for_deletion - when the handler freed this volley.
+				// the handler may have freed us mid-drain - check we're still alive before touching anything.
 				if (ObjectDB::get_instance(ObjectID(drain_self_id)) != this) {
 					collision_scratch.clear();
 					break;

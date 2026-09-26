@@ -4,7 +4,11 @@
 		Contains spawn data for the [DirectionalBullets2D].
 	</brief_description>
 	<description>
-		Ensure that the [member MultiMeshBulletsData2D.transforms] and [member all_bullet_speed_data] are set, otherwise spawning fails with an error and no bullets are created (an empty speed array fails; a short array falls back to its first entry for all bullets).
+		Ensure that the [member MultiMeshBulletsData2D.transforms] and [member all_bullet_speed_data] are set, otherwise spawning fails with an error and no bullets are created (an empty speed array fails; give one entry per bullet).
+		[b]How per-bullet and shared work together:[/b] every [code]all_bullet_*[/code] array is indexed by bullet: entry [code]i[/code] belongs to bullet [code]i[/code] and nobody else. Each bullet resolves on its own: a valid per-bullet entry wins for that bullet; otherwise the matching [code]shared_*[/code] value fills in when it is set; otherwise the feature default applies (speed 0, no spin, no curves, straight flight, no gravity, null custom data). A short array only covers its own indices — the remaining bullets fall back. A long array ignores the extras. Size mismatches warn once per spawn but never block it.
+		[b]Invalid entries[/b] never poison their siblings: null entries, wrong-typed resources, NaN/Inf numbers, disabled wobble seeds, and unresolvable pattern paths each fall back for that bullet only.
+		[b]Tiling (opt-in):[/b] every array below has a [code]tile_*[/code] checkbox next to it in the inspector (off by default). When checked, a short array wraps around the volley for that array only: bullet [code]i[/code] reads entry [code]i % size[/code], so 2 entries fan across 10 bullets as A,B,A,B... Invalid entries still fall back per bullet.
+		[b]Migration:[/b] older setups that relied on a single entry covering every bullet no longer get that for free. Either provide one entry per bullet, set the [code]shared_*[/code] value (it covers every bullet the array leaves out), or check the [code]tile_*[/code] box for that array.
 		Check [MultiMeshBulletsData2D]'s documentation for the rest of the properties.
 	</description>
 	<tutorials>
@@ -14,35 +18,55 @@
 			If enabled, the bullets will adjust their direction when rotating, instead of only spinning in place.
 		</member>
 		<member name="all_bullet_curves_data" type="BulletCurvesData2D[]" setter="set_all_bullet_curves_data" getter="get_all_bullet_curves_data" default="[]">
-			Per-bullet curves applied at spawn time (and on pool reuse). Same fallback rule as [member all_bullet_speed_data]: empty disables the feature, matching size means per bullet, otherwise the first entry drives all bullets. Null entries are skipped per bullet. Shared curves still win ties per tick.
+			Curves for each bullet, applied at spawn time (and on pool reuse). Entry [code]i[/code] drives bullet [code]i[/code] only. Bullets without an entry (short array) or with a null entry use [member shared_bullet_curves_data] per channel, or plain ballistics when that is unset too. Invalid means: null entry. Example: 4 bullets, entries [A, null] → bullets 0 and 1 use A and the shared fallback, bullets 2 and 3 use the shared fallback only.
+		</member>
+		<member name="tile_all_bullet_curves_data" type="bool" setter="set_tile_all_bullet_curves_data" getter="get_tile_all_bullet_curves_data" default="false">
+			When on, a short [member all_bullet_curves_data] wraps around the volley (bullet [code]i[/code] reads entry [code]i % size[/code]) instead of leaving the tail bullets on the fallback. Off by default. Example: 2 entries across 10 bullets fan as A,B,A,B...
 		</member>
 		<member name="all_bullet_movement_pattern_face_movement_directions" type="bool[]" setter="set_all_bullet_movement_pattern_face_movement_directions" getter="get_all_bullet_movement_pattern_face_movement_directions" default="[]">
-			Per-bullet face flags for [member all_bullet_movement_pattern_paths]. Matching size means per bullet, otherwise the shared [member shared_movement_pattern_face_movement_direction] flag drives.
+			Face flag for each bullet's own pattern. Entry [code]i[/code] belongs to bullet [code]i[/code]; bullets without an entry use [member shared_movement_pattern_face_movement_direction]. Has its own [member tile_all_bullet_movement_pattern_face_movement_directions] checkbox.
+		</member>
+		<member name="tile_all_bullet_movement_pattern_face_movement_directions" type="bool" setter="set_tile_all_bullet_movement_pattern_face_movement_directions" getter="get_tile_all_bullet_movement_pattern_face_movement_directions" default="false">
+			When on, a short face-flag array wraps around the volley instead of leaving the tail bullets on the shared flag. Off by default.
 		</member>
 		<member name="all_bullet_movement_pattern_paths" type="NodePath[]" setter="set_all_bullet_movement_pattern_paths" getter="get_all_bullet_movement_pattern_paths" default="[]">
-			Per-bullet paths to [Path2D] nodes applied at spawn time (and on pool reuse), same fallback rule as above. Each path's curve is extracted when the volley spawns. Empty or bad entries are skipped per bullet. A set shared pattern takes precedence while active.
+			Pattern path for each bullet, applied at spawn time (and on pool reuse). Each entry must point at a [Path2D]; its [Curve2D] is extracted when the volley spawns. Entry [code]i[/code] drives bullet [code]i[/code] only. A bullet with its own valid pattern always uses it; [member shared_movement_pattern_path] only covers bullets without one. Empty or bad entries fall back per bullet. Example: give bullet 0 a loop curve and leave the rest empty → only bullet 0 loops, the rest fly the shared pattern (or straight when that is empty too).
+		</member>
+		<member name="tile_all_bullet_movement_pattern_paths" type="bool" setter="set_tile_all_bullet_movement_pattern_paths" getter="get_tile_all_bullet_movement_pattern_paths" default="false">
+			When on, short pattern-path arrays wrap around the volley instead of leaving the tail bullets on the shared pattern. Off by default.
 		</member>
 		<member name="all_bullet_movement_pattern_repeats" type="bool[]" setter="set_all_bullet_movement_pattern_repeats" getter="get_all_bullet_movement_pattern_repeats" default="[]">
-			Per-bullet repeat flags for [member all_bullet_movement_pattern_paths]. Matching size means per bullet, otherwise the shared [member shared_movement_pattern_repeat] flag drives.
+			Repeat flag for each bullet's own pattern. Entry [code]i[/code] belongs to bullet [code]i[/code]; bullets without an entry use [member shared_movement_pattern_repeat]. Has its own [member tile_all_bullet_movement_pattern_repeats] checkbox.
+		</member>
+		<member name="tile_all_bullet_movement_pattern_repeats" type="bool" setter="set_tile_all_bullet_movement_pattern_repeats" getter="get_tile_all_bullet_movement_pattern_repeats" default="false">
+			When on, a short repeat-flag array wraps around the volley instead of leaving the tail bullets on the shared flag. Off by default.
 		</member>
 		<member name="all_bullet_speed_data" type="BulletSpeedData2D[]" setter="set_all_bullet_speed_data" getter="get_all_bullet_speed_data" default="[]">
 			[b]MANDATORY[/b]
-			You can provide [BulletSpeedData2D] for every single bullet - meaning that it should contain the same amount of data as the [member MultiMeshBulletsData2D.transforms].
-
-			Warning: If you provide less [BulletSpeedData2D] than the amount of bullets (same as amount of transforms), ALL bullets will use only the first provided speed data.
+			Speed for each bullet — entry [code]i[/code] drives bullet [code]i[/code] only, so give one entry per bullet (same size as [member MultiMeshBulletsData2D.transforms]). Bullets without a valid entry fall back to [member shared_bullet_speed_data], or fly at speed 0 when that is unset. Invalid means: null entry, or NaN/Inf speed, max_speed or acceleration (that bullet reads 0/0/0, its siblings are untouched). Negative speed is legal and flies backwards along the heading.
+			Example: 3 bullets, speeds [200, null, 200] with shared 150 → bullets fly at 200, 150, 200.
 			Note: [BulletSpeedData2D] has a helper static method that you can use to generate random speed data - [method BulletSpeedData2D.generate_random_data()].
 		</member>
+		<member name="tile_all_bullet_speed_data" type="bool" setter="set_tile_all_bullet_speed_data" getter="get_tile_all_bullet_speed_data" default="false">
+			When on, a short [member all_bullet_speed_data] wraps around the volley (bullet [code]i[/code] reads entry [code]i % size[/code]) instead of falling back. Off by default. Example: 2 entries across 10 bullets fan as A,B,A,B... Use it for alternating spreads without writing 10 entries.
+		</member>
 		<member name="all_bullet_wobble_data" type="BulletWobbleData2D[]" setter="set_all_bullet_wobble_data" getter="get_all_bullet_wobble_data" default="[]">
-			Per-bullet wobble applied at spawn time (and on pool reuse). Same fallback rule as [member all_bullet_speed_data]: empty disables the feature, matching size means per bullet, otherwise the first entry drives all bullets. Null and disabled entries are skipped per bullet.
+			Wobble seed for each bullet, applied at spawn time (and on pool reuse). Entry [code]i[/code] affects bullet [code]i[/code] only; a live seed always beats [member shared_bullet_wobble_data] for its bullet. Null entries and entries with [code]enabled = false[/code] fall back to shared for that bullet. Example: shared gentle weave plus one strong seed on bullet 2 → bullet 2 snakes hard, the rest weave gently.
+		</member>
+		<member name="tile_all_bullet_wobble_data" type="bool" setter="set_tile_all_bullet_wobble_data" getter="get_tile_all_bullet_wobble_data" default="false">
+			When on, a short [member all_bullet_wobble_data] wraps around the volley instead of leaving the tail bullets on the shared fallback. Off by default.
 		</member>
 		<member name="bullet_homing_auto_pop_after_target_reached" type="bool" setter="set_bullet_homing_auto_pop_after_target_reached" getter="get_bullet_homing_auto_pop_after_target_reached" default="false">
 			Per-bullet queue: pop the front target when the owning bullet reaches it. Pooled reuse re-seeds this from the spawn data, so direct [BulletFactory2D] spawns keep it without a spawner.
 		</member>
 		<member name="gravity" type="Vector2" setter="set_gravity" getter="get_gravity" default="Vector2(0, 0)">
-			Constant acceleration in px/s^2 fanning out to every bullet each tick (2D sideview arcs, tower-defense shells). (0, 0) disables — top-down default. Must stay finite. Per-bullet [member all_bullet_gravity] overrides per slot when provided.
+			Fallback gravity in px/s^2 for bullets without their own [member all_bullet_gravity] entry (2D sideview arcs, tower-defense shells). (0, 0) disables — top-down default. Must stay finite. Example: shared (0, 1000) plus per-bullet [(0,0), (800,0)] on 3 bullets → bullet 0 hovers, bullet 1 drifts right, bullet 2 falls.
 		</member>
 		<member name="all_bullet_gravity" type="Vector2[]" setter="set_all_bullet_gravity" getter="get_all_bullet_gravity" default="[]">
-			Per-bullet gravity vectors applied at spawn time (and on pool reuse). Same fallback rule as [member all_bullet_speed_data]: empty uses [member gravity] for all bullets, 1 entry fans out, matching size maps per bullet. Non-finite entries fail open to zero for that slot.
+			Gravity for each bullet. Entry [code]i[/code] pulls bullet [code]i[/code] only. Empty (default) means every bullet uses [member gravity]. A non-finite entry reads as (0, 0) for that bullet only.
+		</member>
+		<member name="tile_all_bullet_gravity" type="bool" setter="set_tile_all_bullet_gravity" getter="get_tile_all_bullet_gravity" default="false">
+			When on, a short [member all_bullet_gravity] wraps around the volley instead of leaving the tail bullets on [member gravity]. Off by default.
 		</member>
 		<member name="gravity_delay_sec" type="float" setter="set_gravity_delay_sec" getter="get_gravity_delay_sec" default="0.0">
 			Seconds of straight flight before gravity starts integrating (shells that glide first, then drop). 0 falls immediately.
@@ -75,28 +99,28 @@
 			Linear drag trimming speed each tick (speed -= speed * drag * delta). 0 disables. Must be finite and &gt;= 0.
 		</member>
 		<member name="shared_bullet_curves_data" type="BulletCurvesData2D" setter="set_shared_bullet_curves_data" getter="get_shared_bullet_curves_data">
-			Shared curves applied to every bullet at spawn time (and on pool reuse). Tick precedence is unchanged: shared channels win ties, per-bullet curves fill gaps, plain speed data covers the rest.
+			Fallback curves, resolved per channel at spawn time (and on pool reuse). A bullet that carries its own x-curve uses it even when this also defines x; this only covers the channels the bullet lacks. Null (default) means no fallback — uncovered channels fly plain ballistics. Example: shared defines x-drift plus a speed ramp, bullet 2 carries only a y-curve → bullet 2 flies with its own y plus the shared x and speed.
 		</member>
 		<member name="shared_bullet_rotation_data" type="BulletRotationData2D" setter="set_shared_bullet_rotation_data" getter="get_shared_bullet_rotation_data">
-			Shared rotation applied to every bullet at spawn time (and on pool reuse), taking precedence over per-bullet rotation data when set. Null (default) disables the feature and the rotation array drives instead.
+			Fallback spin for bullets whose own rotation entry is missing or invalid (null, or NaN/Inf values), applied at spawn time (and on pool reuse). A valid per-bullet entry always wins for its bullet. Null (default) means no fallback — uncovered bullets don't rotate. Example: rotation entries [1.0, null] with shared 5.0 → bullet 0 spins at 1.0, bullet 1 at 5.0.
 		</member>
 		<member name="shared_bullet_speed_data" type="BulletSpeedData2D" setter="set_shared_bullet_speed_data" getter="get_shared_bullet_speed_data">
-			Shared speed applied to every bullet at spawn time (and on pool reuse), taking precedence over [member all_bullet_speed_data] when set. Null (default) disables the feature and the array drives instead. Note: shared movement-speed curves still outrank it per tick.
+			Fallback speed for bullets whose own speed entry is missing or invalid (null, or NaN/Inf values), applied at spawn time (and on pool reuse). A valid per-bullet entry always wins for its bullet. Null (default) means no fallback — uncovered bullets fly at speed 0. Example: speeds [200, null, 200] with shared 150 → bullets fly at 200, 150, 200. Note: shared movement-speed curves still outrank it per tick.
 		</member>
 		<member name="shared_bullet_wobble_data" type="BulletWobbleData2D" setter="set_shared_bullet_wobble_data" getter="get_shared_bullet_wobble_data">
-			Shared sine/cosine wobble applied to every bullet at spawn time (and on pool reuse), taking precedence over [member all_bullet_wobble_data] when set and enabled. Phase fans out per bullet so one resource makes snakes and petals; pick Sine vs Cosine on the resource's waveform. Null (default) disables the feature and the array drives instead.
+			Fallback wobble for bullets whose own entry is missing, null, or disabled, applied at spawn time (and on pool reuse). A bullet with an active per-bullet seed always uses it. Null (default) means no fallback — uncovered bullets fly straight. Phase fans out per bullet so one resource makes snakes and petals; pick Sine vs Cosine on the resource's waveform.
 		</member>
 		<member name="shared_homing_deque_auto_pop_after_target_reached" type="bool" setter="set_shared_homing_deque_auto_pop_after_target_reached" getter="get_shared_homing_deque_auto_pop_after_target_reached" default="false">
 			Shared queue: one deferred pop when any bullet reaches the front target. Locked orbit rings follow the lock policy on the new front instead of holding a stale center.
 		</member>
 		<member name="shared_movement_pattern_face_movement_direction" type="bool" setter="set_shared_movement_pattern_face_movement_direction" getter="get_shared_movement_pattern_face_movement_direction" default="false">
-			Whether the shared movement pattern rotates bullets to face their direction of travel.
+			Fallback face flag for bullets without their own entry in [member all_bullet_movement_pattern_face_movement_directions]. Whether those bullets rotate to face their direction of travel along the pattern.
 		</member>
 		<member name="shared_movement_pattern_path" type="NodePath" setter="set_shared_movement_pattern_path" getter="get_shared_movement_pattern_path" default="NodePath(&quot;&quot;)">
-			Path to a [Path2D] in the scene tree whose curve is applied as the movement pattern of every bullet at spawn time (and on pool reuse). Resolved relative to the [BulletFactory2D] with a scene-root fallback; absolute paths always work. Empty (default) disables the feature.
+			Fallback pattern for bullets without their own entry in [member all_bullet_movement_pattern_paths]: the [Path2D] in the scene tree whose curve those bullets follow at spawn time (and on pool reuse). Resolved relative to the [BulletFactory2D] with a scene-root fallback; absolute paths always work. Empty (default) means no fallback. Example: shared S-curve plus bullet 0 carrying its own loop → bullet 0 loops, the rest fly the S.
 		</member>
 		<member name="shared_movement_pattern_repeat" type="bool" setter="set_shared_movement_pattern_repeat" getter="get_shared_movement_pattern_repeat" default="true">
-			Whether the shared movement pattern repeats instead of stopping at the end of the curve.
+			Fallback repeat flag for bullets without their own entry in [member all_bullet_movement_pattern_repeats]. Whether those bullets loop the pattern instead of stopping at the end of the curve.
 		</member>
 	</members>
 </class>

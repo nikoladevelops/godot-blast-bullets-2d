@@ -422,7 +422,7 @@ public:
 	// touching half-destroyed state (e.g. re-pooling attachments into a dying pool).
 	bool get_is_tearing_down() const { return is_tearing_down; }
 
-	// P1-12 debugger budget passthrough (applies to both debuggers).
+	// Debugger provider budget passthrough (applies to both debuggers).
 	// max_providers 0 = unlimited (default, preserves always-draw behavior).
 	int get_debugger_max_providers() const;
 	void set_debugger_max_providers(int v);
@@ -570,14 +570,14 @@ public:
 	std::vector<int> directional_iteration_scratch;
 	std::vector<int> block_iteration_scratch;
 
-	// Pool reuse observability (P1-9). Incremented only on spawn pop/allocate
+	// Pool reuse counters. Incremented only on spawn pop/allocate
 	// paths (never in the per-bullet tick), so zero hot-path cost.
 	// Mutable so const debug getters can report without breaking constness.
 	mutable uint64_t directional_pool_hits = 0;
 	mutable uint64_t directional_pool_misses = 0;
 	mutable uint64_t block_pool_hits = 0;
 	mutable uint64_t block_pool_misses = 0;
-	// Once-only _ready-missing warning (P0-1 lazy init path).
+	// Once-only _ready-missing warning (lazy init when _ready ran without super).
 	bool ready_missing_super_warned = false;
 
 	// Errors (once per call) when a structural operation runs while mutation
@@ -603,7 +603,7 @@ public:
 
 	void reset_factory_state(const PoolKey *key = nullptr);
 
-	// Single validation pipeline for every spawn entry point (WP-E). Runs all
+	// Single validation pipeline for every spawn entry point. Runs all
 	// gates BEFORE any pool pop or memnew, so a rejected request can never
 	// leave a half-set-up multimesh behind. Returns false (with an error
 	// already reported) when the caller must abort.
@@ -613,7 +613,7 @@ public:
 			UtilityFunctions::push_error("Error when trying to spawn bullets. BulletFactory2D is currently busy. Ignoring the request");
 			return false;
 		}
-		// Lazy init (P0-1): a GDScript _ready() without super._ready() leaves
+		// Lazy init: a GDScript _ready() without super._ready() leaves
 		// containers null and is_ready false. Recover + warn loudly instead of
 		// shipping a dead factory.
 		if (!is_ready) {
@@ -705,7 +705,7 @@ public:
 	// Cache the setting before the factory is ready in the scene tree. / Whenever you see something similar, just know I am doing this to avoid bugs with the editor - keeps state consistent
 	bool use_physics_interpolation_cached_before_ready = false;
 
-	// P1-12 budget caches before ready (same pattern as debugger enabled flag).
+	// Budget caches before ready (same pattern as debugger enabled flag).
 	int debugger_max_providers_cached_before_ready = 0;
 	bool debugger_draw_inactive_cached_before_ready = true;
 
@@ -752,7 +752,7 @@ public:
 			bullets_vec.emplace_back(bullets);
 		}
 	}
-	// Shared primitives for all free_* helpers (WP-E). Ownership rule everywhere:
+	// Shared primitives for all free_* helpers. Ownership rule everywhere:
 	// bullets_vec is the source of truth; the pool holds a subset (disabled only).
 
 	// Unlinks one instance from the pool (no-op when absent: pooling off or
@@ -963,7 +963,7 @@ public:
 		// Try to get a TBullet from the pool first
 		TBullet *bullets = static_cast<TBullet *>(bullets_pool.pop(key));
 		if (bullets != nullptr) {
-			// Pool-hit accounting (P1-9). Discriminated at compile time by the
+			// Pool-hit accounting. Discriminated at compile time by the
 			// pooled type; never touches the per-bullet tick.
 			if constexpr (std::is_same_v<TBullet, DirectionalBullets2D>) {
 				++directional_pool_hits;
@@ -1003,7 +1003,7 @@ public:
 		// Generate new id according to how many ids there are in the sparse set
 		int sparse_set_id = bullets_vec.size();
 
-		// Pool miss (P1-9): no reusable instance, allocating new.
+		// Pool miss: no reusable instance, allocating new.
 		if constexpr (std::is_same_v<TBullet, DirectionalBullets2D>) {
 			++directional_pool_misses;
 		} else {

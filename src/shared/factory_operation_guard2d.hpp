@@ -1,6 +1,6 @@
 #pragma once
 
-// RAII guard for BulletFactory2D structural operations (WP-D).
+// RAII guard for BulletFactory2D structural operations.
 //
 // Every structural factory op (reset/free_*/populate_*, interpolation toggles,
 // manual-deletion fixup) used to hand-roll the same prologue/epilogue:

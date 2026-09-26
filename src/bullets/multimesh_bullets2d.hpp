@@ -619,10 +619,7 @@ public:
 	void set_monitorable(bool value);
 
 	Ref<Shape2D> get_collision_shape() const { return cached_collision_shape; }
-	// Explicit runtime shape change. Size-only changes apply immediately through the
-	// PhysicsServer for every bullet (same bucket, no re-bucketing needed). Effective-type
-	// changes additionally recreate the RIDs and re-bucket pooled instances. The visual
-	// QuadMesh is texture-driven and intentionally untouched by shape edits.
+	// Swap the collision shape mid-flight. Resizing the same shape type is instant; switching shape types rebuilds physics and can move pool buckets. The sprite quad never changes here - it only cares about textures.
 	void set_collision_shape_runtime(const Ref<Shape2D> &new_shape);
 	PoolKey get_pool_key() const { return PoolKey{ amount_bullets, cached_effective_shape_type }; }
 	static void _bind_methods();
@@ -633,14 +630,13 @@ public:
 
 	bool is_attachments_auto_pooling_enabled = true;
 
-	// Maintained by MultiMeshObjectPool (push/pop/try_remove_instance) so duplicate
-	// pool pushes are an O(1) check instead of an O(n) bucket scan.
+	// Set by the pool itself - tells us at a glance whether this volley is sitting in a bucket right now.
 	bool is_pooled_in_pool = false;
 
-	// Counts all active bullets
+	// How many bullets are currently flying
 	int active_bullets_counter = 0;
 
-	// Used to store all bullets active state and enable fast lookups and removals
+	// Which bullets are still alive (fast add/remove/lookup while the tick runs)
 	DynamicSparseSet all_bullets_enabled_set;
 
 	BulletFactory2D *bullet_factory = nullptr;
@@ -672,10 +668,38 @@ public:
 	// If set to false it will also rotate the collision shapes
 	bool rotate_only_textures = false;
 
-	// Important. Determines if there was valid rotation data passed, if its true it means the rotation logic will work
+	// True once any rotation data was seeded - the tick only spins bullets while this is on
 	bool is_rotation_data_active = false;
+	bool get_is_rotation_data_active() const { return is_rotation_data_active; }
+	// Effective per-bullet rotation speed (seeded value, live-updated by the tick).
+	real_t bullet_get_rotation_speed(int bullet_index) const {
+		if (!validate_bullet_index(bullet_index, "bullet_get_rotation_speed")) {
+			return 0.0;
+		}
+		if (bullet_index < 0 || bullet_index >= (int)all_rotation_speed.size()) {
+			return 0.0;
+		}
+		return all_rotation_speed[bullet_index];
+	}
+	// Full per-bullet rotation triple, mirroring get_bullet_speed_data: a
+	// fresh resource carrying this bullet's live rotation/max/accel values.
+	// Lets you read one bullet's spin, tweak it, and write it back with
+	// set_bullet_rotation_data. Out-of-range reads return a zeroed resource.
+	Ref<BulletRotationData2D> get_bullet_rotation_data(int bullet_index) const;
+	// Live per-bullet rotation write (mirrors set_bullet_speed_data). Null
+	// entries are rejected; non-finite values are rejected; max/accel follow
+	// the same unlimited-when-max<=0 convention as the tick.
+	void set_bullet_rotation_data(int bullet_index, const Ref<BulletRotationData2D> &new_bullet_rotation_data);
+	// Rotation triples over a range (mirrors all_bullets_get_speed_data).
+	TypedArray<BulletRotationData2D> all_bullets_get_rotation_data(int bullet_index_start = 0, int bullet_index_end_inclusive = -1) const;
+	// One rotation triple fanned over a range (mirrors all_bullets_set_speed_data).
+	void all_bullets_set_rotation_data(const Ref<BulletRotationData2D> &new_bullet_rotation_data, int bullet_index_start = 0, int bullet_index_end_inclusive = -1);
+	// Turns rotation off for the whole volley (same as seeding an empty
+	// array). Re-seed with spawn/enable or set_bullet_rotation_data to spin
+	// again.
+	void clear_bullet_rotation_data();
 
-	// If true it means that only a single BulletRotationData2D was provided, so it will be used for each bullet. If false it means that we have BulletRotationData2D for each bullet. It is determined by the amount of BulletRotationData2D passed to spawn()
+	// True when the rotation array didn't match the bullet count, so every bullet shares entry 0 (tiling keeps exact-size arrays per-bullet)
 	bool use_only_first_rotation_data = false;
 
 	// If set to true, it will stop the rotation when the max rotation speed is reached
@@ -724,14 +748,16 @@ public:
 	// The amount of bullets the multimesh has
 	int amount_bullets = 0;
 
-	// Pointer to the multimesh instead of always calling the get method
+	// Cached handle so the hot loop doesn't call get_multimesh() per bullet
 	Ref<MultiMesh> multi = nullptr;
 
-	// Reusable buffer for batch uploads (avoid per-frame alloc)
+	// Scratch space for uploading all transforms at once (no per-frame allocations)
 	mutable PackedFloat32Array batch_buffer;
 
 	// The user can pass any custom data they desire and have access to it in the area_entered and body_entered function callbacks.
-	// Per-bullet overrides via all_bullets_custom_data; bullet_get_custom_data() returns the effective (per-bullet if set, else this shared) value.
+	// Per-bullet overrides via all_bullets_custom_data; strictly separate from
+	// this shared value (bullet_get_custom_data returns null when no
+	// per-bullet value is set, never this shared value).
 	Ref<Resource> shared_bullets_custom_data;
 
 	// Per-bullet custom data, seeded from spawn data. Kept strictly separate
@@ -988,7 +1014,7 @@ public:
 	}
 
 	// Sync shape transform from instance transform (shared logic for teleport/set_transform)
-	// Matches the tick convention (directional/block step 8): the instance rotation
+	// Matches the movement-tick convention: the instance rotation
 	// includes the texture rotation for rendering, but the physics shape must use the
 	// logical (un-textured) rotation when shapes follow rotation. With
 	// rotate_only_textures=true the shape keeps its previous orientation (origin-only sync).
@@ -1050,8 +1076,13 @@ public:
 		// can gain a rotation curve AFTER this call. move_bullets then reads all_rotation_speed
 		// by bullet index whenever the curve is valid - an undersized/empty vector here would
 		// become an OOB write in the tick. Reset to 0.0 so no previous owner's speeds leak.
+		// All three rotation vectors must match: set_shared_bullet_rotation_data
+		// indexes max/accel beside speed, and a curves-seeded resize of speed
+		// alone would leave them short -> OOB read on the next shared write.
 		if ((int)all_rotation_speed.size() != amount_bullets) {
-			all_rotation_speed.resize(amount_bullets, 0.0);
+			all_rotation_speed.assign(amount_bullets, 0.0);
+			all_max_rotation_speed.assign(amount_bullets, 0.0);
+			all_rotation_acceleration.assign(amount_bullets, 0.0);
 		}
 
 		// Block has single speed/dir - handle separately to avoid OOB
@@ -1070,18 +1101,29 @@ public:
 			}
 		} else {
 			for (int i = 0; i < amount_bullets; ++i) {
-				if (is_movement_curve_valid) {
+				// Skip bullets carrying their own curves: shared channels only
+				// cover channels the bullet lacks (same rule as the tick).
+				// Without this, spawning with both set would show shared
+				// values in get_bullet_speed_data/direction until the first
+				// tick corrected them.
+				const bool has_own = (i >= 0 && i < (int)all_bullet_curves_data.size() && all_bullet_curves_data[i].is_valid());
+				const BulletCurvesData2D *own = has_own ? all_bullet_curves_data[i].ptr() : nullptr;
+				if (is_movement_curve_valid && (own == nullptr || !own->movement_speed_curve.is_valid())) {
 					all_cached_speed[i] = get_bullet_curves_movement_speed(shared_bullet_curves_data.ptr());
 				}
 
-				if (is_rotation_curve_valid) {
+				if (is_rotation_curve_valid && (own == nullptr || !own->rotation_speed_curve.is_valid())) {
 					all_rotation_speed[i] = get_bullet_curves_rotation_speed(shared_bullet_curves_data.ptr());
 				}
 
 				auto &current_direction = all_cached_direction[i];
 
-				apply_x_direction_curve(current_direction, shared_bullet_curves_data.ptr());
-				apply_y_direction_curve(current_direction, shared_bullet_curves_data.ptr());
+				if (is_x_direction_curve_valid && (own == nullptr || !own->x_direction_curve.is_valid())) {
+					apply_x_direction_curve(current_direction, shared_bullet_curves_data.ptr());
+				}
+				if (is_y_direction_curve_valid && (own == nullptr || !own->y_direction_curve.is_valid())) {
+					apply_y_direction_curve(current_direction, shared_bullet_curves_data.ptr());
+				}
 
 				if (is_movement_curve_valid || is_x_direction_curve_valid || is_y_direction_curve_valid) {
 					all_cached_velocity[i] = all_cached_direction[i] * all_cached_speed[i] + inherited_velocity_offset;
@@ -1107,10 +1149,12 @@ public:
 		const bool is_x_direction_curve_valid = curr_curves->x_direction_curve.is_valid();
 		const bool is_y_direction_curve_valid = curr_curves->y_direction_curve.is_valid();
 
-		// Same unconditional sizing as populate_shared_curves_related_data: a per-bullet
-		// rotation curve can also appear on a vector that was never rotation-sized.
+		// Size this even when there's no rotation curve yet - someone can add one later and the tick reads it every frame.
+		// All three rotation vectors must match (see populate_shared above).
 		if ((int)all_rotation_speed.size() != amount_bullets) {
-			all_rotation_speed.resize(amount_bullets, 0.0);
+			all_rotation_speed.assign(amount_bullets, 0.0);
+			all_max_rotation_speed.assign(amount_bullets, 0.0);
+			all_rotation_acceleration.assign(amount_bullets, 0.0);
 		}
 
 		if (is_rotation_curve_valid) {
@@ -1341,9 +1385,27 @@ public:
 		return arr;
 	}
 
-	////////////
+	// Clear one bullet's per-bullet curves back to the shared fallback (or
+	// no curves when unset). Mirrors bullet_set_wobble_data(null): the slot
+	// stops steering on its own curves and the tick resolves shared again.
+	_ALWAYS_INLINE_ void clear_per_bullet_curves_data(int bullet_index) {
+		bullet_set_curves_data(bullet_index, Ref<BulletCurvesData2D>());
+	}
 
-	// Accelerates bullet speed
+	// Clear a range of per-bullet curves (default all) back to shared/none.
+	_ALWAYS_INLINE_ void all_bullets_clear_curves_data(int bullet_index_start = 0, int bullet_index_end_inclusive = -1) {
+		ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_clear_curves_data");
+
+		for (int i = bullet_index_start; i <= bullet_index_end_inclusive; ++i) {
+			bullet_set_curves_data(i, Ref<BulletCurvesData2D>());
+		}
+	}
+
+	// Speed up (or slow down) one bullet for this tick. Negative speed is
+	// legal and flies backwards along the heading (velocity = direction *
+	// speed). max_speed <= 0 means unlimited; otherwise speed clamps
+	// symmetrically to [-max, max] so reverse flight survives instead of
+	// snapping to 0 the way the old deceleration floor did.
 	_ALWAYS_INLINE_ void bullet_accelerate_speed(int bullet_index, double delta) {
 		real_t &curr_bullet_speed = all_cached_speed[bullet_index];
 		real_t curr_max_bullet_speed = all_cached_max_speed[bullet_index];
@@ -1352,21 +1414,17 @@ public:
 		real_t new_speed = curr_bullet_speed + acceleration;
 		// max_speed <= 0 means unlimited (matches max_collision_count = 0 and
 		// the resource default of 0): a default-constructed BulletSpeedData2D
-		// must fly at constant speed, not freeze after one tick. The 0 floor
-		// for deceleration still applies (speed is a magnitude).
-		if (acceleration >= 0.0) {
-			if (curr_max_bullet_speed > 0.0) {
-				new_speed = Math::min(new_speed, curr_max_bullet_speed);
-			}
-		} else {
-			new_speed = Math::max(new_speed, (real_t)0.0);
+		// must fly at constant speed, not freeze after one tick.
+		if (curr_max_bullet_speed > 0.0) {
+			new_speed = Math::clamp(new_speed, -curr_max_bullet_speed, curr_max_bullet_speed);
 		}
 		curr_bullet_speed = new_speed;
 
 		all_cached_velocity[bullet_index] = all_cached_direction[bullet_index] * curr_bullet_speed + inherited_velocity_offset;
 	}
 
-	// Accelerates bullet speed using a curve
+	// Same, but the speed comes straight from this bullet's curve sample
+	// (negative samples fly backwards, same as negative speed above).
 	_ALWAYS_INLINE_ void bullet_accelerate_speed_using_curve(int bullet_index, double delta, const BulletCurvesData2D *curves_data) {
 		real_t &curr_bullet_speed = all_cached_speed[bullet_index];
 		curr_bullet_speed = get_bullet_curves_movement_speed(curves_data);
@@ -1374,7 +1432,7 @@ public:
 		all_cached_velocity[bullet_index] = all_cached_direction[bullet_index] * curr_bullet_speed + inherited_velocity_offset;
 	}
 
-	// Accelerates bullet rotation speed
+	// Spin one bullet faster/slower for this tick, clamped to its max
 	_ALWAYS_INLINE_ void bullet_accelerate_rotation_speed(int bullet_index, double delta) {
 		real_t &curr_bullet_rotation_speed = all_rotation_speed[bullet_index];
 		real_t curr_max_rotation_speed = all_max_rotation_speed[bullet_index];
@@ -1396,7 +1454,7 @@ public:
 		curr_bullet_rotation_speed = new_speed;
 	}
 
-	// Accelerates bullet rotation speed using a curve
+	// Same as above, but the target speed is sampled from this bullet's curve
 	_ALWAYS_INLINE_ void bullet_accelerate_rotation_speed_using_curve(int bullet_index, double delta, const BulletCurvesData2D *curves_data) {
 		real_t &curr_bullet_rotation_speed = all_rotation_speed[bullet_index];
 
@@ -1434,7 +1492,7 @@ public:
 		return attachments[bullet_index];
 	}
 
-	// WP-C: single owner-tracking primitive. Detaching an attachment always
+	// Owner tracking: detaching an attachment always
 	// clears both fields together, which is what makes its later PREDELETE a
 	// no-op for the slot it left behind.
 	static void clear_attachment_owner_fields(BulletAttachment2D *attachment) {
@@ -1444,7 +1502,7 @@ public:
 		}
 	}
 
-	// WP-C: single "is this slot still mine" predicate. Liveness is checked
+	// Slot liveness: the "is this slot still mine" check runs liveness first:
 	// BEFORE the pointer compare: comparing a dangling pointer first would
 	// touch freed memory when the id was recycled (memdelete + allocator ABA).
 	bool slot_still_holds_attachment(int bullet_index, BulletAttachment2D *expected_attachment, uint64_t expected_attachment_id) const {
@@ -1457,7 +1515,7 @@ public:
 		return bullet_index >= 0 && bullet_index < (int)attachments.size() && attachments[bullet_index] == expected_attachment;
 	}
 
-	// WP-C: unified popped-attachment identity verifier. Pooling is keyed by a
+	// Pooled-attachment check: pooling is keyed by a
 	// 32-bit scene hash that can theoretically collide across two different
 	// scenes, so every pop is verified. With a known expected scene (attach
 	// path) the candidate must come from that exact scene; without one
@@ -1895,7 +1953,7 @@ public:
 				return;
 			}
 		}
-		// WP-B: one reset owns the rest of the clean-disabled invariant (owner 0
+		// One reset owns the rest of the clean-disabled state (owner 0
 		// for pool neutrality, curves/patterns/subclass state, attachment blanks,
 		// collided hits, timers, clocks, animation cursor). No generation bump
 		// and no connection scrub: the dying life's deferred emits must still
@@ -1929,7 +1987,7 @@ public:
 
 	void enable_bullet(int bullet_index, int collision_amount = 0, bool should_enable_attachment = true);
 
-	// P0-5 alias with unambiguous naming: wake_bullet() revives ONE pooled or
+	// Clearly-named alias: wake_bullet() revives ONE pooled or
 	// manually-disabled slot with its current appearance/ballistics intact
 	// (same-owner re-enable). Cross-owner reuse must go through
 	// spawn_*()/enable_multimesh() which reseed appearance, custom data,
@@ -2124,12 +2182,16 @@ public:
 		return arr;
 	}
 
-	bool set_bullets_current_collision_count(const TypedArray<int> &arr) {
+	bool set_bullets_current_collision_count(const TypedArray<int> &arr, bool tile_short_arrays = false) {
 		int arr_size = arr.size();
 
+		if (arr_size <= 0) {
+			bullets_current_collision_count.clear();
+			bullets_current_collision_count.resize(amount_bullets, 0);
+			return true;
+		}
 		if (arr_size != amount_bullets) {
-			UtilityFunctions::push_error("You need to provide collisions amount for each bullet (same amount as the transforms array amount) when calling set_bullets_current_collision_count. Make sure the amount is not less/more than the amount of bullets available");
-			return false;
+			UtilityFunctions::push_warning("MultiMeshBullets2D: bullets_current_collision_count size (" + String::num_int64(arr_size) + ") != bullets (" + String::num_int64(amount_bullets) + "); uncovered bullets start at 0" + String(tile_short_arrays ? " (tiling on: wrapping short array)." : " (check tile_bullets_current_collision_count to wrap, or provide one entry per bullet)."));
 		}
 
 		bullets_current_collision_count.clear();
@@ -2137,7 +2199,10 @@ public:
 
 		// Same clamp as enable_bullet()/set_bullet_collision_count(): at/above max
 		// leaves exactly one hit remaining (max - 1), never a pinned kill.
-		for (int collision_count : arr) {
+		// Strict: slot i reads entry i. With the tile checkbox, wraps (i % size).
+		for (int i = 0; i < amount_bullets; ++i) {
+			const int src = tile_short_arrays ? (i % arr_size) : i;
+			const int collision_count = (src >= 0 && src < arr_size) ? (int)arr[src] : 0;
 			if (collision_count < 0) {
 				bullets_current_collision_count.push_back(0);
 				continue;
@@ -2153,6 +2218,8 @@ public:
 	}
 
 	// Void wrapper for the editor property (property setters must return void).
+	// Strict indexing (uncovered bullets start at 0); the data resource
+	// threads its own tile box through the spawn path instead.
 	void set_bullets_current_collision_count_no_return(const TypedArray<int> &arr) {
 		(void)set_bullets_current_collision_count(arr);
 	}
@@ -2165,7 +2232,7 @@ public:
 	// without activating, so a mismatched reuse never goes live half-seeded.
 	virtual bool custom_additional_enable_logic(const MultiMeshBulletsData2D &data) { return true; }
 
-	// WP-A: pure type-compatibility probe, runs BEFORE any mutation in
+	// Type check first: pure type-compatibility probe, runs BEFORE any mutation in
 	// enable_multimesh(). Subclasses reject foreign spawn data here so a
 	// mismatched reuse is refused without touching state (no rollback needed).
 	// custom_additional_enable_logic() keeps its own check as unreachable
@@ -2175,7 +2242,7 @@ public:
 		return true;
 	}
 
-	// WP-B: single owner of the clean-disabled invariant. Clears ALL transient
+	// Single owner of the clean-disabled state. Clears ALL transient
 	// volley state (owner stamp, curves/patterns/subclass ballistics via the
 	// virtual below, attachment slots, collided hits, timers, clocks, baked
 	// animation) so pooled reuse can never inherit a previous owner's state.
@@ -2206,7 +2273,7 @@ protected:
 	// Internal setup helpers (also usable by subclasses, e.g. DirectionalBullets2D
 	// applies shared spawn-data through set_rotation_data). Not bound to scripts.
 	// Reserves enough memory and populates all needed data structures keeping track of rotation data
-	void set_rotation_data(const TypedArray<BulletRotationData2D> &rotation_data, bool new_rotate_only_textures);
+	void set_rotation_data(const TypedArray<BulletRotationData2D> &rotation_data, bool new_rotate_only_textures, bool tile_short_arrays = false);
 
 	// Guarantees no attachment slot survives into a new owner: force-disables any
 	// live slot and blanks all five attachment arrays plus the interpolation cache.

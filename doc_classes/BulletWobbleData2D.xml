@@ -5,6 +5,7 @@
 	</brief_description>
 	<description>
 		Attach as [member DirectionalBulletsData2D.shared_bullet_wobble_data] (one resource fans out per bullet via [member phase_step_per_bullet]) or per bullet via [member DirectionalBulletsData2D.all_bullet_wobble_data]. Lateral mode weaves perpendicular to flight; Angular mode oscillates the heading. Set [member enabled] to true, otherwise the entry is skipped. Pick the shape with [member waveform]: Sine starts at zero offset (smooth weave away from center), Cosine starts at full offset (bullets fan out immediately) — both work in either mode and combine freely with homing, curves, rotation, speed, gravity, and drag.
+		With [member face_movement_direction] (default on) the bullet texture slews toward the wobble-steered heading at [member face_rotation_speed] rad/s, so snakes point along their path with no extra setup — the easy alternative to wiring direction curves by hand. Disable it to keep the old heading-only behavior. Skipped while rotation data drives the visual (same rule as direction curves).
 	</description>
 	<tutorials>
 	</tutorials>
@@ -39,6 +40,12 @@
 		</member>
 		<member name="enabled" type="bool" setter="set_enabled" getter="get_enabled" default="false">
 			Master switch for this entry. Disabled entries are skipped per bullet.
+		</member>
+		<member name="face_movement_direction" type="bool" setter="set_face_movement_direction" getter="get_face_movement_direction" default="true">
+			Rotate the bullet texture toward the wobble-steered heading each tick, so snakes point along their path. Slewed at [member face_rotation_speed] rad/s (0 snaps instantly). Skipped while rotation data drives the visual. Disable for heading-only wobble (position snakes, yaw untouched).
+		</member>
+		<member name="face_rotation_speed" type="float" setter="set_face_rotation_speed" getter="get_face_rotation_speed" default="18.0">
+			Slew limit for [member face_movement_direction] in radians per second (18 matches direction curves). 0 snaps instantly. Must be finite and &gt;= 0.
 		</member>
 		<member name="frequency_hz" type="float" setter="set_frequency_hz" getter="get_frequency_hz" default="2.0">
 			Oscillations per second. Must be finite and &gt;= 0.

@@ -22,7 +22,7 @@ DirectionalBullets2D::~DirectionalBullets2D() {
 	shared_homing_deque.clear_homing_targets(cached_mouse_global_position);
 }
 
-void DirectionalBullets2D::set_up_movement_data(const TypedArray<BulletSpeedData2D> &new_speed_data) {
+void DirectionalBullets2D::set_up_movement_data(const TypedArray<BulletSpeedData2D> &new_speed_data, bool tile_short_arrays) {
 	int speed_data_size = new_speed_data.size();
 
 	// Ensure vectors are the correct size before we start indexing
@@ -33,17 +33,22 @@ void DirectionalBullets2D::set_up_movement_data(const TypedArray<BulletSpeedData
 		all_cached_direction.resize(amount_bullets);
 		all_cached_velocity.resize(amount_bullets);
 	}
-	// New ballistic regime every time movement is (re)seeded: pooled reuse
-	// must not inherit fall speed from a previous owner's gravity.
+	// Fresh ballistics every seed - leftover fall speed from the last owner would make the new volley drop instantly.
 	all_gravity_velocity.assign(amount_bullets, Vector2(0, 0));
 
-	// In case not enough speed data was provided, we will use the first element as fallback for all bullets
-	bool use_per_bullet = (speed_data_size == amount_bullets);
+	// Strict rule: entry i drives bullet i only. Slots past the end keep
+	// zeros here and fall back to shared afterwards (see the gap filler
+	// below). With the tile checkbox, short arrays wrap (i % size).
+	const bool exact_speed = (speed_data_size == amount_bullets);
+	const bool tiled_speed = tile_short_arrays && speed_data_size > 0 && !exact_speed;
 	Ref<BulletSpeedData2D> fallback_data;
 
-	if (!use_per_bullet) {
-		if (speed_data_size > 0) {
+	if (!exact_speed) {
+		if (tiled_speed && speed_data_size > 0) {
 			fallback_data = new_speed_data[0];
+		}
+		if (speed_data_size != 0 && !exact_speed) {
+			UtilityFunctions::push_warning("DirectionalBullets2D: all_bullet_speed_data size (" + String::num_int64(speed_data_size) + ") != bullets (" + String::num_int64(amount_bullets) + "); uncovered bullets fall back to shared/default" + String(tile_short_arrays ? " (tiling on: wrapping short array)." : " (check tile_all_bullet_speed_data to wrap, or provide one entry per bullet)."));
 		}
 
 		// In case no speed data was provided at all, create a default one (everything set to 0 by default)
@@ -57,7 +62,11 @@ void DirectionalBullets2D::set_up_movement_data(const TypedArray<BulletSpeedData
 
 		Ref<BulletSpeedData2D> data = fallback_data;
 
-		if (use_per_bullet) {
+		if (exact_speed) {
+			data = new_speed_data[i];
+		} else if (tiled_speed && speed_data_size > 0) {
+			data = new_speed_data[i % speed_data_size];
+		} else if (i >= 0 && i < speed_data_size) {
 			data = new_speed_data[i];
 		}
 
@@ -89,16 +98,102 @@ void DirectionalBullets2D::set_up_movement_data(const TypedArray<BulletSpeedData
 	}
 }
 
+void DirectionalBullets2D::apply_shared_speed_fallback(const Ref<BulletSpeedData2D> &shared) {
+	if (shared.is_null() || !Math::is_finite(shared->speed) || !Math::is_finite(shared->max_speed) || !Math::is_finite(shared->acceleration)) {
+		UtilityFunctions::push_error("DirectionalBullets2D shared_bullet_speed_data contains NaN/Inf, ignoring shared fallback.");
+		return;
+	}
+	if ((int)all_cached_speed.size() != amount_bullets) {
+		return;
+	}
+	for (int i = 0; i < amount_bullets; ++i) {
+		// Gap = slot seeded from an invalid (null/non-finite) per-bullet
+		// entry. Valid per-bullet slots (including deliberate zeros) stay.
+		// Heuristic: per-bullet seeding zeroes the whole triple on invalid
+		// entries, so a fully-zero triple is the gap marker. Shared all-zero
+		// would be a no-op anyway, so skip the write then.
+		if (all_cached_speed[i] != 0.0 || all_cached_max_speed[i] != 0.0 || all_cached_acceleration[i] != 0.0) {
+			continue;
+		}
+		if (shared->speed == 0.0 && shared->max_speed == 0.0 && shared->acceleration == 0.0) {
+			continue;
+		}
+		all_cached_speed[i] = shared->speed;
+		all_cached_max_speed[i] = shared->max_speed;
+		all_cached_acceleration[i] = shared->acceleration;
+		const real_t rot = (i >= 0 && i < (int)all_cached_shape_transforms.size()) ? all_cached_shape_transforms[i].get_rotation() : 0.0;
+		Vector2 dir = Vector2(Math::cos(rot), Math::sin(rot));
+		all_cached_direction[i] = dir;
+		all_cached_velocity[i] = (dir * shared->speed) + inherited_velocity_offset;
+	}
+}
+
+void DirectionalBullets2D::apply_shared_rotation_fallback(const Ref<BulletRotationData2D> &shared, bool new_rotate_only_textures) {
+	if (shared.is_null() || !Math::is_finite(shared->rotation_speed) || !Math::is_finite(shared->max_rotation_speed) || !Math::is_finite(shared->rotation_acceleration)) {
+		UtilityFunctions::push_error("DirectionalBullets2D shared_bullet_rotation_data contains NaN/Inf, ignoring shared fallback.");
+		return;
+	}
+	// No rotation seeded at all (empty array path): shared seeds everything.
+	// Fan out to all N slots directly (a 1-entry set_rotation_data call
+	// would only cover slot 0 under strict indexing). This also activates
+	// rotation so the tick spins every slot, not just slot 0.
+	if (!is_rotation_data_active) {
+		if ((int)all_rotation_speed.size() != amount_bullets) {
+			all_rotation_speed.assign(amount_bullets, 0.0);
+			all_max_rotation_speed.assign(amount_bullets, 0.0);
+			all_rotation_acceleration.assign(amount_bullets, 0.0);
+		}
+		for (int i = 0; i < amount_bullets; ++i) {
+			all_rotation_speed[i] = shared->rotation_speed;
+			all_max_rotation_speed[i] = shared->max_rotation_speed;
+			all_rotation_acceleration[i] = shared->rotation_acceleration;
+		}
+		is_rotation_data_active = true;
+		use_only_first_rotation_data = false;
+		rotate_only_textures = new_rotate_only_textures;
+		return;
+	}
+	// Rotation active from per-bullet seeding: only fill slots that hold a
+	// fully-zero triple (the invalid-entry gap marker). Valid per-bullet
+	// slots, including deliberate zeros mixed with non-zero siblings, stay.
+	if ((int)all_rotation_speed.size() != amount_bullets) {
+		return;
+	}
+	bool filled_any = false;
+	for (int i = 0; i < amount_bullets; ++i) {
+		if (all_rotation_speed[i] != 0.0 || all_max_rotation_speed[i] != 0.0 || all_rotation_acceleration[i] != 0.0) {
+			continue;
+		}
+		if (shared->rotation_speed == 0.0 && shared->max_rotation_speed == 0.0 && shared->rotation_acceleration == 0.0) {
+			continue;
+		}
+		all_rotation_speed[i] = shared->rotation_speed;
+		all_max_rotation_speed[i] = shared->max_rotation_speed;
+		all_rotation_acceleration[i] = shared->rotation_acceleration;
+		filled_any = true;
+	}
+	// Visual follow mode only changes when the fallback actually filled
+	// something; flipping it on a no-op write would silently re-target
+	// shapes mid-flight.
+	if (filled_any) {
+		rotate_only_textures = new_rotate_only_textures;
+	}
+}
+
 void DirectionalBullets2D::apply_per_bullet_curves_from_data(const DirectionalBulletsData2D &directional_data) {
-	// Seatbelt: base spawn() sizes this before the custom logic runs, and
-	// enable preserves the size - but never index an unsized vector.
+	// This vector should already fit the volley, but make sure before indexing - a wrong-type spawn can skip sizing.
 	if ((int)all_bullet_curves_data.size() != amount_bullets) {
 		all_bullet_curves_data.assign(amount_bullets, Ref<BulletCurvesData2D>());
 	}
+	const int curves_size = directional_data.all_bullet_curves_data.size();
+	const bool tile = directional_data.tile_all_bullet_curves_data;
+	if (curves_size != 0 && curves_size != amount_bullets) {
+		UtilityFunctions::push_warning("DirectionalBullets2D: all_bullet_curves_data size (" + String::num_int64(curves_size) + ") != bullets (" + String::num_int64(amount_bullets) + "); uncovered bullets use shared/default" + String(tile ? " (tiling on: wrapping short array)." : " (check tile_all_bullet_curves_data to wrap, or provide one entry per bullet)."));
+	}
 	for (int i = 0; i < amount_bullets; ++i) {
-		const int entry = resolve_per_bullet_data_index(directional_data.all_bullet_curves_data.size(), i);
+		const int entry = tile ? resolve_tiled_data_index(curves_size, i) : resolve_strict_data_index(curves_size, i);
 		if (entry < 0) {
-			return; // empty = off
+			continue; // empty or uncovered = off for this bullet
 		}
 		Ref<BulletCurvesData2D> curves = directional_data.all_bullet_curves_data[entry];
 		if (curves.is_null()) {
@@ -150,10 +245,25 @@ static Ref<Curve2D> resolve_movement_pattern_curve(Node *p_factory, const NodePa
 }
 
 void DirectionalBullets2D::apply_per_bullet_movement_patterns_from_data(const DirectionalBulletsData2D &directional_data) {
+	const int paths_size = directional_data.all_bullet_movement_pattern_paths.size();
+	const bool tile_paths = directional_data.tile_all_bullet_movement_pattern_paths;
+	if (paths_size != 0 && paths_size != amount_bullets) {
+		UtilityFunctions::push_warning("DirectionalBullets2D: all_bullet_movement_pattern_paths size (" + String::num_int64(paths_size) + ") != bullets (" + String::num_int64(amount_bullets) + "); uncovered bullets use the shared pattern" + String(tile_paths ? " (tiling on: wrapping short array)." : " (check tile_all_bullet_movement_pattern_paths to wrap, or provide one entry per bullet)."));
+	}
+	const int face_size = directional_data.all_bullet_movement_pattern_face_movement_directions.size();
+	const bool tile_face = directional_data.tile_all_bullet_movement_pattern_face_movement_directions;
+	if (face_size != 0 && face_size != amount_bullets) {
+		UtilityFunctions::push_warning("DirectionalBullets2D: all_bullet_movement_pattern_face_movement_directions size (" + String::num_int64(face_size) + ") != bullets (" + String::num_int64(amount_bullets) + "); uncovered bullets use the shared face flag" + String(tile_face ? " (tiling on)." : " (check its tile box or provide one entry per bullet)."));
+	}
+	const int repeat_size = directional_data.all_bullet_movement_pattern_repeats.size();
+	const bool tile_repeat = directional_data.tile_all_bullet_movement_pattern_repeats;
+	if (repeat_size != 0 && repeat_size != amount_bullets) {
+		UtilityFunctions::push_warning("DirectionalBullets2D: all_bullet_movement_pattern_repeats size (" + String::num_int64(repeat_size) + ") != bullets (" + String::num_int64(amount_bullets) + "); uncovered bullets use the shared repeat flag" + String(tile_repeat ? " (tiling on)." : " (check its tile box or provide one entry per bullet)."));
+	}
 	for (int i = 0; i < amount_bullets; ++i) {
-		const int entry = resolve_per_bullet_data_index(directional_data.all_bullet_movement_pattern_paths.size(), i);
+		const int entry = tile_paths ? resolve_tiled_data_index(paths_size, i) : resolve_strict_data_index(paths_size, i);
 		if (entry < 0) {
-			return; // empty = off
+			continue; // empty or uncovered = shared pattern (if any) for this bullet
 		}
 		const NodePath entry_path = directional_data.all_bullet_movement_pattern_paths[entry];
 		if (entry_path.is_empty()) {
@@ -163,12 +273,14 @@ void DirectionalBullets2D::apply_per_bullet_movement_patterns_from_data(const Di
 		if (curve.is_null()) {
 			continue;
 		}
-		// Flags resolve per bullet when sized, otherwise the shared flags drive.
-		const bool face = (directional_data.all_bullet_movement_pattern_face_movement_directions.size() == amount_bullets)
-				? (bool)directional_data.all_bullet_movement_pattern_face_movement_directions[i]
+		// Each flag array resolves on its own: entry i, else the shared flag.
+		const int face_entry = tile_face ? resolve_tiled_data_index(face_size, i) : resolve_strict_data_index(face_size, i);
+		const bool face = (face_entry >= 0 && face_entry < face_size)
+				? (bool)directional_data.all_bullet_movement_pattern_face_movement_directions[face_entry]
 				: directional_data.shared_movement_pattern_face_movement_direction;
-		const bool repeat = (directional_data.all_bullet_movement_pattern_repeats.size() == amount_bullets)
-				? (bool)directional_data.all_bullet_movement_pattern_repeats[i]
+		const int repeat_entry = tile_repeat ? resolve_tiled_data_index(repeat_size, i) : resolve_strict_data_index(repeat_size, i);
+		const bool repeat = (repeat_entry >= 0 && repeat_entry < repeat_size)
+				? (bool)directional_data.all_bullet_movement_pattern_repeats[repeat_entry]
 				: directional_data.shared_movement_pattern_repeat;
 		set_bullet_movement_pattern_from_curve(i, curve, face, repeat);
 	}
@@ -196,7 +308,8 @@ Dictionary DirectionalBullets2D::debug_get_gravity_info(int bullet_index) const 
 	return d;
 }
 
-void DirectionalBullets2D::apply_gravity_from_data(const DirectionalBulletsData2D &directional_data) {	all_gravity.assign(amount_bullets, Vector2(0, 0));
+void DirectionalBullets2D::apply_gravity_from_data(const DirectionalBulletsData2D &directional_data) {
+	all_gravity.assign(amount_bullets, Vector2(0, 0));
 	all_gravity_velocity.assign(amount_bullets, Vector2(0, 0));
 	gravity_delay_sec = 0.0;
 	gravity_duration_sec = 0.0;
@@ -216,8 +329,15 @@ void DirectionalBullets2D::apply_gravity_from_data(const DirectionalBulletsData2
 		UtilityFunctions::push_error("DirectionalBulletsData2D gravity must be finite, using (0, 0).");
 		gravity = Vector2(0, 0);
 	}
+	// Strict: entry i pulls bullet i only. Uncovered bullets keep the
+	// shared gravity above. Tile checkbox wraps short arrays.
+	const int grav_size = directional_data.all_bullet_gravity.size();
+	const bool tile_grav = directional_data.tile_all_bullet_gravity;
+	if (grav_size != 0 && grav_size != amount_bullets) {
+		UtilityFunctions::push_warning("DirectionalBullets2D: all_bullet_gravity size (" + String::num_int64(grav_size) + ") != bullets (" + String::num_int64(amount_bullets) + "); uncovered bullets use gravity" + String(tile_grav ? " (tiling on: wrapping short array)." : " (check tile_all_bullet_gravity to wrap, or provide one entry per bullet)."));
+	}
 	for (int i = 0; i < amount_bullets; ++i) {
-		const int entry = resolve_per_bullet_data_index(directional_data.all_bullet_gravity.size(), i);
+		const int entry = tile_grav ? resolve_tiled_data_index(grav_size, i) : resolve_strict_data_index(grav_size, i);
 		Vector2 g = gravity;
 		if (entry >= 0 && entry < directional_data.all_bullet_gravity.size()) {
 			const Vector2 candidate = directional_data.all_bullet_gravity[entry];
@@ -234,24 +354,223 @@ void DirectionalBullets2D::apply_gravity_from_data(const DirectionalBulletsData2
 
 void DirectionalBullets2D::apply_wobble_from_data(const DirectionalBulletsData2D &directional_data) {
 	all_bullet_wobble.assign(amount_bullets, WobbleSeed());
+	all_bullet_wobble_data.assign(amount_bullets, Ref<BulletWobbleData2D>());
 	wobble_distance_traveled.assign(amount_bullets, 0.0);
 	is_wobble_feature_enabled = false;
-	const bool use_shared = directional_data.shared_bullet_wobble_data.is_valid() && directional_data.shared_bullet_wobble_data->enabled;
+	shared_bullet_wobble_data = directional_data.shared_bullet_wobble_data;
+	// Strict: entry i seeds bullet i only, and a live seed always beats
+	// shared for its bullet. Missing/null/disabled entries fall back to
+	// shared per bullet. Tile checkbox wraps short arrays.
+	const int wobble_size = directional_data.all_bullet_wobble_data.size();
+	const bool tile_wobble = directional_data.tile_all_bullet_wobble_data;
+	if (wobble_size != 0 && wobble_size != amount_bullets) {
+		UtilityFunctions::push_warning("DirectionalBullets2D: all_bullet_wobble_data size (" + String::num_int64(wobble_size) + ") != bullets (" + String::num_int64(amount_bullets) + "); uncovered bullets use shared wobble" + String(tile_wobble ? " (tiling on: wrapping short array)." : " (check tile_all_bullet_wobble_data to wrap, or provide one entry per bullet)."));
+	}
 	for (int i = 0; i < amount_bullets; ++i) {
-		if (use_shared) {
-			all_bullet_wobble[i] = make_wobble_seed(directional_data.shared_bullet_wobble_data, i);
-			continue;
+		const int entry = tile_wobble ? resolve_tiled_data_index(wobble_size, i) : resolve_strict_data_index(wobble_size, i);
+		if (entry >= 0 && entry < wobble_size) {
+			const Ref<BulletWobbleData2D> res = directional_data.all_bullet_wobble_data[entry];
+			WobbleSeed seed = make_wobble_seed(res, i);
+			if (seed.active) {
+				all_bullet_wobble[i] = seed;
+				all_bullet_wobble_data[i] = res;
+				continue;
+			}
+		} else if (entry < 0 && wobble_size == 0) {
+			// empty array: fall through to shared below
 		}
-		const int entry = resolve_per_bullet_data_index(directional_data.all_bullet_wobble_data.size(), i);
-		if (entry < 0) {
-			return; // empty = off
+		if (shared_bullet_wobble_data.is_valid()) {
+			all_bullet_wobble[i] = make_wobble_seed(shared_bullet_wobble_data, i);
 		}
-		if (entry < 0 || entry >= directional_data.all_bullet_wobble_data.size()) {
-			continue;
-		}
-		all_bullet_wobble[i] = make_wobble_seed(directional_data.all_bullet_wobble_data[entry], i);
 	}
 	refresh_wobble_feature_flag();
+}
+
+void DirectionalBullets2D::bullet_set_wobble_data(int bullet_index, const Ref<BulletWobbleData2D> &wobble_data) {
+	if (!validate_bullet_index(bullet_index, "bullet_set_wobble_data")) {
+		return;
+	}
+	if ((int)all_bullet_wobble.size() != amount_bullets || (int)all_bullet_wobble_data.size() != amount_bullets) {
+		UtilityFunctions::push_error("bullet_set_wobble_data: wobble storage is not set up for this multimesh.");
+		return;
+	}
+	if (wobble_data.is_null()) {
+		// Clear back to the shared fallback (or inactive when unset).
+		all_bullet_wobble_data[bullet_index].unref();
+		if (shared_bullet_wobble_data.is_valid()) {
+			all_bullet_wobble[bullet_index] = make_wobble_seed(shared_bullet_wobble_data, bullet_index);
+		} else {
+			all_bullet_wobble[bullet_index] = WobbleSeed();
+		}
+		refresh_wobble_feature_flag();
+		return;
+	}
+	WobbleSeed seed = make_wobble_seed(wobble_data, bullet_index);
+	if (!seed.active) {
+		UtilityFunctions::push_error("bullet_set_wobble_data: wobble data is disabled or invalid, slot cleared to the shared fallback.");
+		all_bullet_wobble_data[bullet_index].unref();
+		if (shared_bullet_wobble_data.is_valid()) {
+			all_bullet_wobble[bullet_index] = make_wobble_seed(shared_bullet_wobble_data, bullet_index);
+		} else {
+			all_bullet_wobble[bullet_index] = WobbleSeed();
+		}
+		refresh_wobble_feature_flag();
+		return;
+	}
+	all_bullet_wobble[bullet_index] = seed;
+	all_bullet_wobble_data[bullet_index] = wobble_data;
+	refresh_wobble_feature_flag();
+}
+
+void DirectionalBullets2D::all_bullets_set_wobble_data(const Ref<BulletWobbleData2D> &wobble_data, int bullet_index_start, int bullet_index_end_inclusive) {
+	ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_set_wobble_data");
+	for (int i = bullet_index_start; i <= bullet_index_end_inclusive; ++i) {
+		bullet_set_wobble_data(i, wobble_data);
+	}
+}
+
+Ref<BulletWobbleData2D> DirectionalBullets2D::bullet_get_wobble_data(int bullet_index) const {
+	if (!validate_bullet_index(bullet_index, "bullet_get_wobble_data")) {
+		return Ref<BulletWobbleData2D>();
+	}
+	if (bullet_index < 0 || bullet_index >= (int)all_bullet_wobble_data.size()) {
+		return Ref<BulletWobbleData2D>();
+	}
+	return all_bullet_wobble_data[bullet_index];
+}
+
+TypedArray<BulletWobbleData2D> DirectionalBullets2D::all_bullets_get_wobble_data(int bullet_index_start, int bullet_index_end_inclusive) {
+	ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_get_wobble_data");
+	TypedArray<BulletWobbleData2D> arr;
+	for (int i = bullet_index_start; i <= bullet_index_end_inclusive; ++i) {
+		arr.push_back(bullet_get_wobble_data(i));
+	}
+	return arr;
+}
+
+void DirectionalBullets2D::set_shared_bullet_wobble_data(const Ref<BulletWobbleData2D> &new_wobble_data) {
+	shared_bullet_wobble_data = new_wobble_data;
+	if ((int)all_bullet_wobble.size() != amount_bullets || (int)all_bullet_wobble_data.size() != amount_bullets) {
+		return;
+	}
+	// Shared is the fallback: re-seed only slots without a live per-bullet
+	// resource. Clearing shared (null) deactivates exactly those slots.
+	for (int i = 0; i < amount_bullets; ++i) {
+		if (all_bullet_wobble_data[i].is_valid()) {
+			continue;
+		}
+		if (new_wobble_data.is_valid()) {
+			all_bullet_wobble[i] = make_wobble_seed(new_wobble_data, i);
+		} else {
+			all_bullet_wobble[i] = WobbleSeed();
+		}
+	}
+	refresh_wobble_feature_flag();
+}
+
+void DirectionalBullets2D::remove_shared_bullet_wobble_data() {
+	set_shared_bullet_wobble_data(Ref<BulletWobbleData2D>());
+}
+
+Dictionary DirectionalBullets2D::debug_get_wobble_info(int bullet_index) const {
+	Dictionary d;
+	d["active"] = false;
+	d["amplitude"] = 0.0;
+	d["frequency_hz"] = 0.0;
+	d["mode"] = 0;
+	d["waveform"] = 0;
+	d["phase"] = 0.0;
+	d["damping_per_sec"] = 0.0;
+	d["delay_sec"] = 0.0;
+	d["duration_sec"] = 0.0;
+	d["face_movement_direction"] = false;
+	d["face_rotation_speed"] = 0.0;
+	d["has_per_bullet_resource"] = false;
+	d["has_shared_fallback"] = shared_bullet_wobble_data.is_valid();
+	if (bullet_index < 0 || bullet_index >= amount_bullets) {
+		return d;
+	}
+	if (bullet_index >= 0 && bullet_index < (int)all_bullet_wobble.size()) {
+		const WobbleSeed &w = all_bullet_wobble[bullet_index];
+		d["active"] = w.active;
+		d["amplitude"] = w.active ? w.amplitude : 0.0;
+		d["frequency_hz"] = w.active ? w.frequency_hz : 0.0;
+		d["mode"] = w.active ? w.mode : 0;
+		d["waveform"] = w.active ? w.waveform : 0;
+		d["phase"] = w.active ? w.phase : 0.0;
+		d["damping_per_sec"] = w.active ? w.damping_per_sec : 0.0;
+		d["delay_sec"] = w.active ? w.delay_sec : 0.0;
+		d["duration_sec"] = w.active ? w.duration_sec : 0.0;
+		d["face_movement_direction"] = w.active && w.face_movement_direction;
+		d["face_rotation_speed"] = w.active ? w.face_rotation_speed : 0.0;
+	}
+	if (bullet_index >= 0 && bullet_index < (int)all_bullet_wobble_data.size()) {
+		d["has_per_bullet_resource"] = all_bullet_wobble_data[bullet_index].is_valid();
+	}
+	return d;
+}
+
+Dictionary DirectionalBullets2D::debug_get_bullet_info(int bullet_index) const {
+	Dictionary d;
+	d["index"] = bullet_index;
+	d["valid"] = false;
+	d["active"] = false;
+	d["direction"] = Vector2(0, 0);
+	d["velocity"] = Vector2(0, 0);
+	d["speed"] = 0.0;
+	d["gravity"] = Vector2(0, 0);
+	d["fall_speed"] = 0.0;
+	d["wobble_active"] = false;
+	d["wobble_amplitude"] = 0.0;
+	d["has_homing_targets"] = false;
+	d["homing_targets_amount"] = 0;
+	d["homing_smoothing"] = 0.0;
+	d["orbiting_enabled"] = false;
+	d["orbiting_locked"] = false;
+	d["pattern"] = false;
+	d["shared_pattern_active"] = shared_movement_pattern_curve.is_valid();
+	d["rotation_speed"] = 0.0;
+	if (bullet_index < 0 || bullet_index >= amount_bullets) {
+		return d;
+	}
+	d["valid"] = true;
+	d["active"] = all_bullets_enabled_set.contains(bullet_index);
+	if (bullet_index >= 0 && bullet_index < (int)all_cached_direction.size()) {
+		d["direction"] = all_cached_direction[bullet_index];
+	}
+	if (bullet_index >= 0 && bullet_index < (int)all_cached_velocity.size()) {
+		d["velocity"] = all_cached_velocity[bullet_index];
+	}
+	if (bullet_index >= 0 && bullet_index < (int)all_cached_speed.size()) {
+		d["speed"] = all_cached_speed[bullet_index];
+	}
+	if (bullet_index >= 0 && bullet_index < (int)all_gravity.size()) {
+		d["gravity"] = all_gravity[bullet_index];
+	}
+	if (bullet_index >= 0 && bullet_index < (int)all_gravity_velocity.size()) {
+		d["fall_speed"] = all_gravity_velocity[bullet_index].length();
+	}
+	if (bullet_index >= 0 && bullet_index < (int)all_bullet_wobble.size()) {
+		const WobbleSeed &w = all_bullet_wobble[bullet_index];
+		d["wobble_active"] = w.active;
+		d["wobble_amplitude"] = w.active ? w.amplitude : 0.0;
+	}
+	if (bullet_index >= 0 && bullet_index < (int)all_bullet_homing_targets.size() && bullet_index < (int)all_homing_count.size()) {
+		d["has_homing_targets"] = all_homing_count[bullet_index] > 0 && !all_bullet_homing_targets[bullet_index].empty();
+		d["homing_targets_amount"] = all_homing_count[bullet_index];
+	}
+	d["homing_smoothing"] = bullet_get_homing_smoothing(bullet_index);
+	if (bullet_index >= 0 && bullet_index < (int)all_orbiting_status.size()) {
+		d["orbiting_enabled"] = all_orbiting_status[bullet_index] != 0;
+	}
+	if (bullet_index >= 0 && bullet_index < (int)all_orbiting_data.size()) {
+		d["orbiting_locked"] = all_orbiting_data[bullet_index].is_locked_orbiting;
+	}
+	d["pattern"] = check_exists_bullet_movement_pattern_data(bullet_index);
+	if (bullet_index >= 0 && bullet_index < (int)all_rotation_speed.size()) {
+		d["rotation_speed"] = all_rotation_speed[bullet_index];
+	}
+	return d;
 }
 
 void DirectionalBullets2D::apply_shared_movement_pattern_from_data(const DirectionalBulletsData2D &directional_data) {
@@ -283,12 +602,20 @@ void DirectionalBullets2D::custom_additional_spawn_logic(const MultiMeshBulletsD
 	const DirectionalBulletsData2D *directional_data = Object::cast_to<DirectionalBulletsData2D>(&data);
 	// Size movement/homing/orbit SoA up front: the tick path indexes them
 	// unconditionally, so even a wrong-type early-return must leave them sized.
+	// Gravity vectors/velocities sized here too (same invariant as movement).
 	set_up_movement_data(TypedArray<BulletSpeedData2D>());
 	adjust_direction_based_on_rotation = false;
+	homing_update_timer = 0.0;
 	all_bullet_wobble.assign(amount_bullets, WobbleSeed());
+	all_bullet_wobble_data.assign(amount_bullets, Ref<BulletWobbleData2D>());
 	wobble_distance_traveled.assign(amount_bullets, 0.0);
 	is_wobble_feature_enabled = false;
+	shared_bullet_wobble_data.unref();
 	gravity = Vector2(0, 0);
+	all_gravity.assign(amount_bullets, Vector2(0, 0));
+	all_gravity_velocity.assign(amount_bullets, Vector2(0, 0));
+	gravity_delay_sec = 0.0;
+	gravity_duration_sec = 0.0;
 	linear_drag = 0.0;
 	homing_delay_sec = 0.0;
 	homing_duration_sec = 0.0;
@@ -301,14 +628,11 @@ void DirectionalBullets2D::custom_additional_spawn_logic(const MultiMeshBulletsD
 	all_orbiting_status.assign(amount_bullets, 0);
 	all_shared_homing_reached.resize(amount_bullets);
 	homing_inert_warning_issued = false;
-	// Parity with custom_additional_enable_logic: spawn must not inherit counters or
-	// the mouse cache from a previous owner either (defensive - fresh instances start
-	// zeroed, but the invariant belongs here in one place).
+	// Like enable: a fresh volley starts with zeroed homing/orbit counters and no cached mouse position.
 	active_homing_count = 0;
 	active_orbiting_count = 0;
 	cached_mouse_global_position = Vector2(0, 0);
-	// New life: stale deferred emits/pops (scheduled before a pool reuse)
-	// carry the old generation and no-op at flush time.
+	// Calls scheduled by the previous owner no-op when they finally run - they carry the old generation stamp.
 	++homing_operation_generation;
 	bullet_homing_epochs.assign(amount_bullets, 0);
 	shared_auto_pop_queued = false;
@@ -317,26 +641,21 @@ void DirectionalBullets2D::custom_additional_spawn_logic(const MultiMeshBulletsD
 		return;
 	}
 
-	set_up_movement_data(directional_data->all_bullet_speed_data);
+	set_up_movement_data(directional_data->all_bullet_speed_data, directional_data->tile_all_bullet_speed_data);
 
 	adjust_direction_based_on_rotation = directional_data->adjust_direction_based_on_rotation;
 
-	// Shared spawn-data speed/rotation take precedence over the arrays when
-	// set (a single entry fans out to every bullet through the same
-	// machinery). Null hands control back to the arrays (vectors were just
-	// re-seeded above), and the members mirror the data so the runtime
-	// getters stay truthful across pool reuse.
+	// Unified precedence: per-bullet wins over shared. Seed per-bullet
+	// first, then fill only the gaps left by invalid entries (null or
+	// non-finite) from shared. Shared is the fallback default, never an
+	// override. Members mirror the data so runtime getters stay truthful.
 	shared_bullet_speed_data = directional_data->shared_bullet_speed_data;
 	if (shared_bullet_speed_data.is_valid()) {
-		TypedArray<BulletSpeedData2D> single_speed;
-		single_speed.push_back(shared_bullet_speed_data);
-		set_up_movement_data(single_speed);
+		apply_shared_speed_fallback(shared_bullet_speed_data);
 	}
 	shared_bullet_rotation_data = directional_data->shared_bullet_rotation_data;
 	if (shared_bullet_rotation_data.is_valid()) {
-		TypedArray<BulletRotationData2D> single_rotation;
-		single_rotation.push_back(shared_bullet_rotation_data);
-		set_rotation_data(single_rotation, data.rotate_only_textures);
+		apply_shared_rotation_fallback(shared_bullet_rotation_data, data.rotate_only_textures);
 	}
 
 	// Per-bullet spawn-data curves/patterns first, then the shared features
@@ -378,13 +697,17 @@ void DirectionalBullets2D::reset_transient_subclass_state(bool drop_stale_work) 
 	set_up_movement_data(TypedArray<BulletSpeedData2D>());
 	shared_bullet_speed_data.unref();
 	shared_bullet_rotation_data.unref();
+	adjust_direction_based_on_rotation = false;
+	homing_update_timer = 0.0;
 	shared_movement_pattern_curve.unref();
 	shared_movement_pattern_face_movement_direction = false;
 	shared_movement_pattern_repeat = true;
 	shared_movement_pattern_distances.assign(amount_bullets, 0.0);
 	all_bullet_wobble.assign(amount_bullets, WobbleSeed());
+	all_bullet_wobble_data.assign(amount_bullets, Ref<BulletWobbleData2D>());
 	wobble_distance_traveled.assign(amount_bullets, 0.0);
 	is_wobble_feature_enabled = false;
+	shared_bullet_wobble_data.unref();
 	gravity = Vector2(0, 0);
 	all_gravity.assign(amount_bullets, Vector2(0, 0));
 	all_gravity_velocity.assign(amount_bullets, Vector2(0, 0));
@@ -396,9 +719,7 @@ void DirectionalBullets2D::reset_transient_subclass_state(bool drop_stale_work) 
 	homing_lose_range_px = 0.0;
 	clear_homing_state_for_teardown();
 	if (drop_stale_work) {
-		// New life only: the previous owner's homing forwarder must not fire
-		// again, and stale deferred emits/pops no-op at flush time. Disabled
-		// (unpooled) volleys keep them for same-owner wakes.
+		// New pooled life only: drop the last owner's signal connections. A plain wake keeps them - same owner, same listeners.
 		for (const Dictionary &connection : get_signal_connection_list("bullet_homing_target_reached")) {
 			const Callable callable = connection["callable"];
 			disconnect("bullet_homing_target_reached", callable);
@@ -411,31 +732,26 @@ void DirectionalBullets2D::reset_transient_subclass_state(bool drop_stale_work) 
 
 bool DirectionalBullets2D::custom_additional_enable_logic(const MultiMeshBulletsData2D &data) {
 	const DirectionalBulletsData2D *directional_data = Object::cast_to<DirectionalBulletsData2D>(&data);
-	// Unreachable in practice (is_data_type_compatible pre-checked): the base
-	// reset above already neutralized everything, so just refuse.
+	// Wrong data type here means something bypassed the type check - refuse without going live half-seeded.
 	if (directional_data == nullptr) {
 		UtilityFunctions::push_error("DirectionalBullets2D::enable got wrong spawn data type, expected DirectionalBulletsData2D.");
 		return false;
 	}
 
 	// Seeding-only from here: base reset left blank ballistics/homing/orbit.
-	set_up_movement_data(directional_data->all_bullet_speed_data);
+	set_up_movement_data(directional_data->all_bullet_speed_data, directional_data->tile_all_bullet_speed_data);
 
 	adjust_direction_based_on_rotation = directional_data->adjust_direction_based_on_rotation;
 
-	// Shared spawn-data speed/rotation (same as spawn; enable runs on every
-	// pool reuse). Members mirror the data so runtime getters stay truthful.
+	// Unified precedence (same as spawn; enable runs on every pool reuse):
+	// per-bullet wins, shared fills only invalid-entry gaps.
 	shared_bullet_speed_data = directional_data->shared_bullet_speed_data;
 	if (shared_bullet_speed_data.is_valid()) {
-		TypedArray<BulletSpeedData2D> single_speed;
-		single_speed.push_back(shared_bullet_speed_data);
-		set_up_movement_data(single_speed);
+		apply_shared_speed_fallback(shared_bullet_speed_data);
 	}
 	shared_bullet_rotation_data = directional_data->shared_bullet_rotation_data;
 	if (shared_bullet_rotation_data.is_valid()) {
-		TypedArray<BulletRotationData2D> single_rotation;
-		single_rotation.push_back(shared_bullet_rotation_data);
-		set_rotation_data(single_rotation, data.rotate_only_textures);
+		apply_shared_rotation_fallback(shared_bullet_rotation_data, data.rotate_only_textures);
 	}
 
 	// Per-bullet spawn-data curves/patterns first, then the shared features
@@ -453,8 +769,10 @@ bool DirectionalBullets2D::custom_additional_enable_logic(const MultiMeshBullets
 
 	// Vectors are sized in spawn, but a wrong-type spawn early-returns before
 	// sizing. Resize defensively (base reset already blanked them, so no
-	// clears are needed here anymore).
+	// clears are needed here anymore). Epochs re-assigned (not resized) so
+	// a shrunken-then-regrown volley never keeps stale per-bullet epochs.
 	all_bullet_wobble.resize(amount_bullets);
+	all_bullet_wobble_data.resize(amount_bullets);
 	wobble_distance_traveled.resize(amount_bullets, 0.0);
 	all_bullet_homing_targets.resize(amount_bullets);
 	all_homing_count.resize(amount_bullets, 0);
@@ -462,7 +780,8 @@ bool DirectionalBullets2D::custom_additional_enable_logic(const MultiMeshBullets
 	all_orbiting_data.resize(amount_bullets);
 	all_orbiting_status.resize(amount_bullets, 0);
 	all_shared_homing_reached.resize(amount_bullets);
-	bullet_homing_epochs.resize(amount_bullets, 0);
+	bullet_homing_epochs.assign(amount_bullets, 0);
+	shared_auto_pop_queued = false;
 
 	// Homing steering seeds from spawn data (direct factory users keep it
 	// across pool reuse now) and is always overwritten by the spawner
@@ -596,6 +915,8 @@ void DirectionalBullets2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("bullet_get_homing_smoothing", "bullet_index"), &DirectionalBullets2D::bullet_get_homing_smoothing);
 	ClassDB::bind_method(D_METHOD("bullet_set_homing_smoothing", "bullet_index", "value"), &DirectionalBullets2D::bullet_set_homing_smoothing);
 	ClassDB::bind_method(D_METHOD("all_bullets_set_homing_smoothing", "value", "bullet_index_start", "bullet_index_end_inclusive"), &DirectionalBullets2D::all_bullets_set_homing_smoothing, DEFVAL(0), DEFVAL(-1));
+	ClassDB::bind_method(D_METHOD("all_bullets_get_homing_smoothing", "bullet_index_start", "bullet_index_end_inclusive"), &DirectionalBullets2D::all_bullets_get_homing_smoothing, DEFVAL(0), DEFVAL(-1));
+	ClassDB::bind_method(D_METHOD("clear_per_bullet_homing_smoothing"), &DirectionalBullets2D::clear_per_bullet_homing_smoothing);
 
 	ClassDB::bind_method(D_METHOD("get_homing_update_interval"), &DirectionalBullets2D::get_homing_update_interval);
 	ClassDB::bind_method(D_METHOD("set_homing_update_interval", "value"), &DirectionalBullets2D::set_homing_update_interval);
@@ -612,6 +933,7 @@ void DirectionalBullets2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("bullet_get_gravity", "bullet_index"), &DirectionalBullets2D::bullet_get_gravity);
 	ClassDB::bind_method(D_METHOD("bullet_set_gravity", "bullet_index", "value"), &DirectionalBullets2D::bullet_set_gravity);
 	ClassDB::bind_method(D_METHOD("all_bullets_set_gravity", "value", "bullet_index_start", "bullet_index_end_inclusive"), &DirectionalBullets2D::all_bullets_set_gravity, DEFVAL(0), DEFVAL(-1));
+	ClassDB::bind_method(D_METHOD("all_bullets_get_gravity", "bullet_index_start", "bullet_index_end_inclusive"), &DirectionalBullets2D::all_bullets_get_gravity, DEFVAL(0), DEFVAL(-1));
 
 	ClassDB::bind_method(D_METHOD("get_gravity_delay_sec"), &DirectionalBullets2D::get_gravity_delay_sec);
 	ClassDB::bind_method(D_METHOD("set_gravity_delay_sec", "value"), &DirectionalBullets2D::set_gravity_delay_sec);
@@ -622,7 +944,9 @@ void DirectionalBullets2D::_bind_methods() {
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "gravity_duration_sec"), "set_gravity_duration_sec", "get_gravity_duration_sec");
 
 	ClassDB::bind_method(D_METHOD("bullet_get_fall_speed", "bullet_index"), &DirectionalBullets2D::bullet_get_fall_speed);
+	ClassDB::bind_method(D_METHOD("all_bullets_get_fall_speed", "bullet_index_start", "bullet_index_end_inclusive"), &DirectionalBullets2D::all_bullets_get_fall_speed, DEFVAL(0), DEFVAL(-1));
 	ClassDB::bind_method(D_METHOD("debug_get_gravity_info", "bullet_index"), &DirectionalBullets2D::debug_get_gravity_info);
+	ClassDB::bind_method(D_METHOD("debug_get_bullet_info", "bullet_index"), &DirectionalBullets2D::debug_get_bullet_info);
 
 	ClassDB::bind_method(D_METHOD("get_linear_drag"), &DirectionalBullets2D::get_linear_drag);
 	ClassDB::bind_method(D_METHOD("set_linear_drag", "value"), &DirectionalBullets2D::set_linear_drag);
@@ -641,6 +965,19 @@ void DirectionalBullets2D::_bind_methods() {
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "homing_lose_range_px"), "set_homing_lose_range_px", "get_homing_lose_range_px");
 
 	ClassDB::bind_method(D_METHOD("get_is_wobble_enabled"), &DirectionalBullets2D::get_is_wobble_enabled);
+	ClassDB::bind_method(D_METHOD("bullet_get_wobble_amplitude", "bullet_index"), &DirectionalBullets2D::bullet_get_wobble_amplitude);
+	ClassDB::bind_method(D_METHOD("bullet_get_wobble_face_movement_direction", "bullet_index"), &DirectionalBullets2D::bullet_get_wobble_face_movement_direction);
+	ClassDB::bind_method(D_METHOD("bullet_get_wobble_face_rotation_speed", "bullet_index"), &DirectionalBullets2D::bullet_get_wobble_face_rotation_speed);
+	ClassDB::bind_method(D_METHOD("bullet_set_wobble_data", "bullet_index", "wobble_data"), &DirectionalBullets2D::bullet_set_wobble_data);
+	ClassDB::bind_method(D_METHOD("all_bullets_set_wobble_data", "wobble_data", "bullet_index_start", "bullet_index_end_inclusive"), &DirectionalBullets2D::all_bullets_set_wobble_data, DEFVAL(0), DEFVAL(-1));
+	ClassDB::bind_method(D_METHOD("bullet_get_wobble_data", "bullet_index"), &DirectionalBullets2D::bullet_get_wobble_data);
+	ClassDB::bind_method(D_METHOD("all_bullets_get_wobble_data", "bullet_index_start", "bullet_index_end_inclusive"), &DirectionalBullets2D::all_bullets_get_wobble_data, DEFVAL(0), DEFVAL(-1));
+	ClassDB::bind_method(D_METHOD("get_shared_bullet_wobble_data"), &DirectionalBullets2D::get_shared_bullet_wobble_data);
+	ClassDB::bind_method(D_METHOD("set_shared_bullet_wobble_data", "new_wobble_data"), &DirectionalBullets2D::set_shared_bullet_wobble_data);
+	ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "shared_bullet_wobble_data", PROPERTY_HINT_RESOURCE_TYPE, "BulletWobbleData2D"), "set_shared_bullet_wobble_data", "get_shared_bullet_wobble_data");
+	ClassDB::bind_method(D_METHOD("has_shared_bullet_wobble_data"), &DirectionalBullets2D::has_shared_bullet_wobble_data);
+	ClassDB::bind_method(D_METHOD("remove_shared_bullet_wobble_data"), &DirectionalBullets2D::remove_shared_bullet_wobble_data);
+	ClassDB::bind_method(D_METHOD("debug_get_wobble_info", "bullet_index"), &DirectionalBullets2D::debug_get_wobble_info);
 
 	// ORBITING RELATED
 
@@ -679,6 +1016,12 @@ void DirectionalBullets2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("all_bullets_enable_orbiting", "orbiting_radius", "orbiting_direction", "orbiting_texture_rotation", "bullet_index_start", "bullet_index_end_inclusive", "orbiting_follow_mode", "orbiting_follow_deadzone", "orbiting_lock_policy", "orbiting_rigid_follow"), &DirectionalBullets2D::all_bullets_enable_orbiting, DEFVAL(OrbitRight), DEFVAL(FaceTarget), DEFVAL(0), DEFVAL(-1), DEFVAL(FollowTarget), DEFVAL(0.0), DEFVAL(RelockAlways), DEFVAL(true));
 	ClassDB::bind_method(D_METHOD("all_bullets_enable_orbiting_linear", "radius_start", "radius_step", "orbiting_direction", "orbiting_texture_rotation", "bullet_index_start", "bullet_index_end_inclusive", "orbiting_follow_mode", "orbiting_follow_deadzone", "orbiting_lock_policy", "orbiting_rigid_follow"), &DirectionalBullets2D::all_bullets_enable_orbiting_linear, DEFVAL(OrbitRight), DEFVAL(FaceTarget), DEFVAL(0), DEFVAL(-1), DEFVAL(FollowTarget), DEFVAL(0.0), DEFVAL(RelockAlways), DEFVAL(true));
 	ClassDB::bind_method(D_METHOD("all_bullets_get_orbiting_radius", "bullet_index_start", "bullet_index_end_inclusive"), &DirectionalBullets2D::all_bullets_get_orbiting_radius, DEFVAL(0), DEFVAL(-1));
+	ClassDB::bind_method(D_METHOD("all_bullets_get_orbiting_center", "bullet_index_start", "bullet_index_end_inclusive"), &DirectionalBullets2D::all_bullets_get_orbiting_center, DEFVAL(0), DEFVAL(-1));
+	ClassDB::bind_method(D_METHOD("all_bullets_get_orbiting_angle", "bullet_index_start", "bullet_index_end_inclusive"), &DirectionalBullets2D::all_bullets_get_orbiting_angle, DEFVAL(0), DEFVAL(-1));
+	ClassDB::bind_method(D_METHOD("debug_get_orbiting_info", "bullet_index"), &DirectionalBullets2D::debug_get_orbiting_info);
+	ClassDB::bind_method(D_METHOD("all_bullets_get_homing_targets_amount", "bullet_index_start", "bullet_index_end_inclusive"), &DirectionalBullets2D::all_bullets_get_homing_targets_amount, DEFVAL(0), DEFVAL(-1));
+	ClassDB::bind_method(D_METHOD("debug_get_curves_info", "bullet_index"), &DirectionalBullets2D::debug_get_curves_info);
+	ClassDB::bind_method(D_METHOD("debug_get_pattern_info", "bullet_index"), &DirectionalBullets2D::debug_get_pattern_info);
 	ClassDB::bind_method(D_METHOD("all_bullets_is_orbiting_enabled", "bullet_index_start", "bullet_index_end_inclusive"), &DirectionalBullets2D::all_bullets_is_orbiting_enabled, DEFVAL(0), DEFVAL(-1));
 	ClassDB::bind_method(D_METHOD("all_bullets_is_orbiting_locked", "bullet_index_start", "bullet_index_end_inclusive"), &DirectionalBullets2D::all_bullets_is_orbiting_locked, DEFVAL(0), DEFVAL(-1));
 	ClassDB::bind_method(D_METHOD("all_bullets_disable_orbiting", "bullet_index_start", "bullet_index_end_inclusive"), &DirectionalBullets2D::all_bullets_disable_orbiting, DEFVAL(0), DEFVAL(-1));

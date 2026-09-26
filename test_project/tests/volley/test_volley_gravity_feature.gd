@@ -171,8 +171,14 @@ func _initialize() -> void:
 	var fb := _still_data(3)
 	fb.all_bullet_gravity = [Vector2(500, 0), Vector2(0, 500)]
 	var vf: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(fb)
-	_check(vf.bullet_get_gravity(0) == Vector2(500, 0), "short array fans out entry 0")
-	_check(vf.bullet_get_gravity(2) == Vector2(500, 0), "short array fans entry 0 to slot 2")
+	_check(vf.bullet_get_gravity(0) == Vector2(500, 0), "strict slot 0 reads entry 0")
+	_check(vf.bullet_get_gravity(1) == Vector2(0, 500), "strict slot 1 reads entry 1")
+	_check(vf.bullet_get_gravity(2) == Vector2(0, 0), "strict slot 2 uncovered reads default (no shared set)")
+	var fbt := _still_data(3)
+	fbt.all_bullet_gravity = [Vector2(500, 0), Vector2(0, 500)]
+	fbt.tile_all_bullet_gravity = true
+	var vft: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(fbt)
+	_check(vft.bullet_get_gravity(2) == Vector2(500, 0), "tiled slot 2 wraps to entry 0")
 	spawner.queue_free()
 
 	_check(factory.debug_assert_no_dangling().get("ok", false) == true, "no dangling at end")

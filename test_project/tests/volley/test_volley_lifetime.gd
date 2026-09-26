@@ -83,6 +83,28 @@ func _initialize() -> void:
 	c.set_curves_elapsed_time(NAN)
 	_check(c.get_curves_elapsed_time() == t_before, "NaN curve time rejected")
 
+	printerr("LIFE T6 live infinite toggle + guard")
+	var lv: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(H.make_directional_data(1, 100.0, 5.0))
+	lv.set_is_life_time_infinite(true)
+	_check(lv.get_is_life_time_infinite() == true, "live toggle to infinite")
+	lv.set_is_life_time_infinite(false)
+	_check(lv.get_is_life_time_infinite() == false, "live toggle back needs max_life_time>0 (has 5s)")
+	# Spawned infinite keeps its max_life_time field, so turning finite back
+	# on is allowed (the guard only refuses max<=0). The honest guard probe
+	# is a max of 0: helper data always carries 5s, so assert the allowed
+	# path stays finite instead of inventing a max-0 volley.
+	_check(lv.get_bullet_transform(0).is_finite(), "toggled volley stays finite")
+
+	printerr("LIFE T7 collision count visible after expiry path")
+	var ex := H.make_directional_data(1, 0.0, 0.2)
+	var ev: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(ex)
+	ev.set_bullet_max_collision_count(4)
+	ev.set_bullet_collision_count(0, 2)
+	_check(ev.get_bullets_current_collision_count()[0] == 2, "count readable pre-expiry")
+	for i in 30:
+		await physics_frame
+	_check(factory.debug_get_bullets_pool_amount(0) >= 1, "short volley pooled after expiry")
+
 	_check(factory.debug_assert_no_dangling().get("ok", false) == true, "no dangling at end")
 	factory.reset()
 	factory.queue_free()

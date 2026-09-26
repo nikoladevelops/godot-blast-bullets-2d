@@ -57,6 +57,29 @@ func _initialize() -> void:
 	# (other long-life block volleys from T1/T3 may still be alive; assert pool grew instead)
 	_check(factory.debug_get_bullets_pool_amount(1) >= 1, "expired block volley pooled")
 
+	printerr("BLOCK T5 block path ignores curves/patterns by construction")
+	# BlockBulletsData2D has no curves/pattern members at all (only
+	# block_speed + block_rotation_radians), and spawn_block_bullets returns
+	# void, so there is no per-instance handle to smuggle them through.
+	# Prove the construction: block data exposes no curves surface, and a
+	# block spawn with rotation still drifts + spins without crashing.
+	var bd := H.make_block_data(2, 100.0, 5.0)
+	_check(not ("all_bullet_curves_data" in bd), "block data has no curves array")
+	_check(not ("shared_movement_pattern_path" in bd), "block data has no pattern path")
+	factory.spawn_block_bullets(bd)
+	await physics_frame
+	_check(factory.debug_get_active_bullets_amount(1) >= 1, "block spawn with rotation alive")
+	# Null-pattern clear on a directional volley (same code path blocks use
+	# for teardown) never crashes and holds finite flight.
+	var dir_probe: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(H.make_directional_data(2, 100.0))
+	dir_probe.set_bullet_movement_pattern_from_curve(0, null)
+	_check(not dir_probe.has_bullet_movement_pattern(0), "null pattern clears cleanly")
+	_check(dir_probe.get_bullet_transform(0).is_finite(), "post-clear flight finite")
+
+	printerr("BLOCK T6 block spawn stays alive for pool accounting")
+	factory.spawn_block_bullets(H.make_block_data(1, 100.0, 5.0))
+	_check(factory.debug_get_active_bullets_amount(1) >= 1, "block volley alive for toggle probe")
+
 	await process_frame
 	await process_frame
 	factory.reset()

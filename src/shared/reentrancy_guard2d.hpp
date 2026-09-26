@@ -1,6 +1,6 @@
 #pragma once
 
-// Tiny RAII re-entrancy latch (WP-C/WP-D).
+// Tiny RAII re-entrancy latch.
 //
 // Script callbacks (on_bullet_enable/disable/spawn, collision/lifetime signal
 // handlers) run user code that may re-enter the function that fired them.

@@ -89,7 +89,7 @@ class PatternPreviewLayer2D : public Node2D {
         void set_path_data(const PackedVector2Array &p_points, const Color &p_color, float p_width, bool p_closed);
         void set_layer_path_data(const PackedVector2Array &p_points, const Color &p_color);
         void set_arrows_data(const PackedVector2Array &p_tails, const PackedVector2Array &p_dirs, const Color &p_color, float p_length, float p_width, float p_head_length, float p_head_width);
-        // P2 collision-ring overlay: per-dot outline circle approximating the
+        // Collision-ring overlay: per-dot outline circle approximating the
         // volley hitbox (bounding radius from spawn_data's shape). Snapshot
         // like dots; radius <= 0 hides. Lets users compare visual vs hitbox
         // directly in the editor instead of misjudging dots.
@@ -1541,7 +1541,7 @@ class BulletSpawner2D : public Node2D{
         double preview_arrow_width = 2.0;
         double preview_arrow_head_length = 8.0;
         double preview_arrow_head_width = 10.0;
-        // P2 collision-ring overlay: when true and spawn_data carries a valid
+        // Collision-ring overlay: when true and spawn_data carries a valid
         // collision shape, the dots layer also draws one outline circle per
         // dot with the shape's bounding radius (circle r, rect min/2,
         // capsule height/2). Default false preserves the classic dots look.
@@ -1793,7 +1793,7 @@ class BulletSpawner2D : public Node2D{
         // next_shoot_interval_sec). Separate from homing_rng: jitter reseeds
         // would otherwise corrupt the homing target sequence.
         mutable Ref<RandomNumberGenerator> jitter_rng;
-        // P1-7 duplicate cache: shoot_once() must never mutate the user's
+        // Duplicate cache: shoot_once() must never mutate the user's
         // spawn_data (transforms are overwritten per volley), so the first
         // shot duplicates it and later shots with the same resource reuse the
         // spawner-owned template (transforms overwritten each shot). Cleared

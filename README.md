@@ -99,6 +99,24 @@ relative to their direction (allows zig zag patterns and any other creative patt
 
 - **....AND SO MUCH MORE** - Download the plugin and experiment with it right away! There is also a test_project.zip available where you can check out some of the features and benchmark against a normal Godot Area2D bullet implementation.
 
+---
+
+## Advanced Data Model: Per-Bullet vs Shared vs Default
+
+Every steering feature (speed, rotation, curves, movement patterns, wobble, gravity, homing smoothing, custom data, collision counts) resolves with **one rule, everywhere**:
+
+> **per-bullet (valid) > shared (valid) > feature default.** Entry `i` drives **bullet `i` only** — never its siblings.
+
+- **Per-bullet** — one array entry per bullet in the spawn data (`all_bullet_speed_data`, `all_bullet_rotation_data`, `all_bullet_curves_data`, `all_bullet_movement_pattern_paths`, `all_bullet_wobble_data`, `all_bullet_gravity`, `all_bullets_custom_data`, ...). A short array covers only its own indices; the rest fall back. A null/wrong-type/non-finite entry is invalid and falls back for that slot only. Long-array extras are ignored.
+- **Shared** — the single fallback value (`shared_bullet_speed_data`, `shared_bullet_rotation_data`, `shared_bullet_curves_data`, `shared_movement_pattern_curve`, `shared_bullet_wobble_data`, `gravity`, ...). It fills only the gaps per-bullet left behind — valid per-bullet slots always win. Live setters (`set_shared_*`) fill once at call time; clearing shared keeps current ballistics.
+- **Default** — what a bullet does with neither: speed 0 ballistics, no curves/pattern/wobble/gravity, per-bullet homing empty, collision counts 0, custom data null (custom data **never** falls back to shared — by design).
+- **`tile_*` checkboxes (off by default)** — one opt-in box per array (`tile_all_bullet_speed_data`, `tile_all_bullet_rotation_data`, `tile_all_bullet_curves_data`, `tile_all_bullet_movement_pattern_paths/_face.../_repeats`, `tile_all_bullet_wobble_data`, `tile_all_bullet_gravity`, `tile_all_bullets_custom_data`, `tile_bullets_current_collision_count`). Checked wraps the short array (`slot i reads entry i % size`); unchecked keeps strict indexing. Invalid entries still fall back per slot even when tiling.
+- **Negative speed is legal** — negative `BulletSpeedData2D.speed` (or negative curve samples) flies backwards along the heading, clamped symmetrically to `[-max_speed, max_speed]`. NaN/Inf is always rejected. Note: Godot's `Curve` clamps points to `[min_value, max_value]`, so widen the range *before* adding negative points.
+- **Documented limits** — a fully-zero speed/rotation triple reads as an invalid-entry gap (shared fills it); all-zero shared is a silent no-op; non-finite shared aborts the fallback for the whole volley with an error; shared speed/rotation curves outrank ballistics per tick; per-bullet smoothing latches (later shared writes need `clear_per_bullet_homing_smoothing`); finished non-repeating shared patterns park at the end while finished per-bullet runs clear.
+- **Prove it live** — `debug_get_curves_info(i)` names the per-channel winner (`per`/`shared`/`none`), `debug_get_pattern_info(i)` names the pattern source plus distance/finish, `debug_get_orbiting_info(i)` names the deque source, `debug_get_wobble_info(i)` exposes the full seed, `all_bullets_get_orbiting_center/angle` and `all_bullets_get_homing_targets_amount` bulk-read ranges, and `clear_per_bullet_curves_data` / `all_bullets_clear_curves_data` mirror the smoothing clears.
+
+Example — a 4-bullet volley where slot 0 is special and the rest share: give `all_bullet_speed_data` one entry (fast, slot 0), set `shared_bullet_speed_data` (cruise, slots 1–3). Or check `tile_all_bullet_speed_data` with two entries to alternate fast/slow/fast/slow.
+
 <details>
 <summary><b>⚠️ When Not To Use BlastBullets2D</b></summary>
 

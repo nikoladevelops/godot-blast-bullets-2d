@@ -50,8 +50,15 @@ public:
 
 	// BULLET ROTATION RELATED
 
-	// Stores optional BulletRotationData2D for each bullet. If you want the bullets to rotate, you HAVE to provide AT LEAST 1 BulletRotationData2D that will be used for every single bullet. If you want to have bullets that rotate differently then you need to provide the same amount of BulletRotationData2D as the .size() of the transforms (in other words for every bullet). If you provide less than .size() only the first data will be used for all bullets. Note that BulletRotationData2D has a helper static method that you can use to generate random rotation data - BulletRotationData2D.generate_random_data()
+	// Spin for each bullet. Entry i rotates bullet i only. Give one entry
+	// per bullet (same size as transforms), or leave empty for no rotation.
+	// A null or NaN/Inf entry reads as zero spin for that bullet.
+	// Note that BulletRotationData2D has a helper static method that you can use to generate random rotation data - BulletRotationData2D.generate_random_data()
 	TypedArray<BlastBullets2D::BulletRotationData2D> all_bullet_rotation_data;
+
+	// Wrap short rotation arrays around the volley (slot i reads entry
+	// i % size). Off by default.
+	bool tile_all_bullet_rotation_data = false;
 
 	// If set to false, it will also rotate the collision shapes according to the BulletRotationData2D that was provided (it might decrease performance a little bit)
 	bool rotate_only_textures = true;
@@ -66,6 +73,11 @@ public:
 
 	// Each bullets collision amount - it can only be set to a value that is <= bullet_max_collision_count (excluding 0 and negative numbers)
 	TypedArray<int> bullets_current_collision_count;
+
+	// Wrap short collision-count arrays around the volley. Off by default:
+	// bullets without their own entry start at 0 hits. Values still clamp
+	// (negatives to 0, at/above max to max - 1).
+	bool tile_bullets_current_collision_count = false;
 
 	// The collision layer that all bullets share. Note: pass a bitmask, it's not just a simple int. Use the calculate_bitmask function.
 	int collision_layer = 1;
@@ -89,11 +101,13 @@ public:
 
 	// Custom data carried per bullet, readable in the factory collision
 	// callbacks through the instance (bullet_get_custom_data) alongside the
-	// shared value above. Same fallback rule as all_bullet_speed_data: empty
-	// = none, size == amount = per bullet, otherwise the first entry drives
-	// all bullets. Stays strictly separate from shared_bullets_custom_data:
-	// null entries read as null, never as the shared value.
+	// shared value above. Entry i belongs to bullet i and nobody else.
+	// Stays strictly separate from shared_bullets_custom_data: bullets
+	// without an entry read as null, never as the shared value.
 	TypedArray<Resource> all_bullets_custom_data;
+
+	// Wrap short custom-data arrays around the volley. Off by default.
+	bool tile_all_bullets_custom_data = false;
 
 	// BULLET ATTACHMENT RELATED
 
@@ -184,6 +198,9 @@ public:
 	TypedArray<Resource> get_all_bullets_custom_data() const;
 	void set_all_bullets_custom_data(const TypedArray<Resource> &new_custom_data);
 
+	bool get_tile_all_bullets_custom_data() const;
+	void set_tile_all_bullets_custom_data(bool value);
+
 	Ref<PackedScene> get_shared_bullet_attachment() const;
 	void set_shared_bullet_attachment(const Ref<PackedScene> &new_attachment);
 
@@ -204,6 +221,9 @@ public:
 
 	TypedArray<BulletRotationData2D> get_all_bullet_rotation_data() const;
 	void set_all_bullet_rotation_data(const TypedArray<BulletRotationData2D> &new_data);
+
+	bool get_tile_all_bullet_rotation_data() const;
+	void set_tile_all_bullet_rotation_data(bool value);
 
 	bool get_rotate_only_textures() const;
 	void set_rotate_only_textures(bool new_rotate_only_textures);
@@ -236,6 +256,9 @@ public:
 
 	TypedArray<int> get_bullets_current_collision_count() const;
 	void set_bullets_current_collision_count(const TypedArray<int> &arr);
+
+	bool get_tile_bullets_current_collision_count() const;
+	void set_tile_bullets_current_collision_count(bool value);
 
 protected:
 	static void _bind_methods();

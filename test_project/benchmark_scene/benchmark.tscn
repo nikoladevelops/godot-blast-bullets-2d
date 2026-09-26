@@ -17,6 +17,8 @@ speed = 500.0
 max_speed = 200.0
 acceleration = 20.0
 
+[sub_resource type="BulletWobbleData2D" id="BulletWobbleData2D_mouoi"]
+
 [sub_resource type="SpriteFrames" id="SpriteFrames_y4v7i"]
 animations = [{
 "frames": [{
@@ -31,7 +33,7 @@ animations = [{
 [sub_resource type="DirectionalBulletsData2D" id="DirectionalBulletsData2D_nkrfg"]
 shared_bullet_speed_data = SubResource("BulletSpeedData2D_mouoi")
 shared_movement_pattern_face_movement_direction = true
-all_bullet_gravity = Array[Vector2]([Vector2(0, 300), Vector2(0, 700)])
+shared_bullet_wobble_data = SubResource("BulletWobbleData2D_mouoi")
 sprite_frames = SubResource("SpriteFrames_y4v7i")
 texture_size = Vector2(120, 120)
 collision_layer = 2
@@ -73,8 +75,11 @@ script = ExtResource("1_cfubd")
 bullet_factory_path = NodePath("../BulletFactory2D")
 transforms_generator = NodePath(".")
 spawn_data = SubResource("DirectionalBulletsData2D_nkrfg")
-pattern_source = 25
-helper_bullets_amount = 25
+pattern_source = 30
+helper_bullets_amount = 55
+helper_outline_placement = 1
+helper_outline_layer_count = 5
+helper_outline_corner_facing = 2
 helper_ring_y_scale = 3.0
 helper_fan_spread = 3.0
 helper_aimed_target = NodePath("../Level/Area2D")
@@ -83,10 +88,10 @@ helper_diamond_diagonal_x = 255.0
 helper_path2d_path = NodePath("../Paths/Path2D")
 spin_enabled = true
 burst_enabled = true
+homing_enabled = true
 homing_node_group = &"player"
 homing_target_path = NodePath("../Player")
 shared_homing_auto_pop_after_target_reached = true
-orbiting_enabled = true
 orbiting_radius = 300.0
 orbiting_radius_start = 350.0
 orbiting_follow_mode = 1

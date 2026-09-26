@@ -52,9 +52,12 @@ bool validate_spawn_data(const Ref<MultiMeshBulletsData2D> &spawn_data, const ch
 		return false;
 	}
 	const int bullet_count = spawn_data->transforms.size();
-	if (spawn_data->bullets_current_collision_count.size() != 0 && spawn_data->bullets_current_collision_count.size() != bullet_count) {
-		UtilityFunctions::push_error(String("Error in ") + caller_name + ": bullets_current_collision_count must be empty or match transforms size.");
-		return false;
+	// Unified tiling rule: every per-bullet array tiles modulo, so any size
+	// is accepted here. Empty collision counts seed zeros downstream.
+	if (spawn_data->bullets_current_collision_count.size() > 0 &&
+			spawn_data->bullets_current_collision_count.size() != bullet_count &&
+			spawn_data->bullets_current_collision_count.size() != 1) {
+		UtilityFunctions::push_warning(String("Warning in ") + caller_name + ": bullets_current_collision_count size (" + String::num_int64(spawn_data->bullets_current_collision_count.size()) + ") != transforms size (" + String::num_int64(bullet_count) + "); tiling modulo across the volley.");
 	}
 	// A non-positive finite lifetime would die on the first tick; fail open with an error instead of a silent vanish.
 	// NaN must be rejected explicitly: NaN <= 0.0 is false, so it would slip through and never expire.
@@ -79,8 +82,7 @@ bool validate_spawn_data(const Ref<MultiMeshBulletsData2D> &spawn_data, const ch
 			return false;
 		}
 	}
-	// P1-11 invisible-bullet lint (warning only, never rejects): null frames +
-	// zero override + null mesh renders nothing. Art must face Vector2.RIGHT.
+	// Heads-up, not an error: with no sprite frames, no mesh and no texture size the bullets will be invisible. (Sprite art should face Vector2.RIGHT.)
 	if (spawn_data->sprite_frames.is_null() && spawn_data->mesh.is_null() && spawn_data->texture_size == Vector2(0, 0)) {
 		UtilityFunctions::push_warning(String("Warning in ") + caller_name + ": no sprite_frames/mesh/texture_size — bullets will be invisible. Assign SpriteFrames with art facing Vector2.RIGHT, or set texture_size/mesh.");
 	}
@@ -102,9 +104,7 @@ FactoryOperationGuard::FactoryOperationGuard(BulletFactory2D *p_factory, bool p_
 }
 
 FactoryOperationGuard::~FactoryOperationGuard() {
-	// Lower busy first: resuming processing while busy is held is rejected
-	// with an error, and restoring the saved flag last keeps a re-entrant
-	// busy (manual-deletion fixup) intact.
+	// Drop the busy flag before resuming anything - resuming while busy errors out, and doing it in this order keeps a nested busy state intact.
 	factory->is_factory_busy = false;
 	if (resume_processing) {
 		factory->set_is_factory_processing_bullets(true);
@@ -140,7 +140,7 @@ void BulletFactory2D::_ready() {
 		return;
 	}
 
-	// Guard against double-init via ensure_factory_initialized() (P0-1 lazy
+	// Guard against double-init via ensure_factory_initialized() (lazy init
 	// path may have already built containers when a script _ready() ran first
 	// without super and a spawn happened before the native _ready).
 	if (is_ready) {
@@ -182,7 +182,7 @@ void BulletFactory2D::_ready() {
 
 	is_ready = true;
 
-	// P1-10: warn when the factory flag disagrees with the project setting.
+	// Interpolation mismatch warning: warn when the factory flag disagrees with the project setting.
 	// Bullets look steppy on >60Hz displays when project interpolation is off
 	// but the factory flag is on, and vice versa wastes previous-frame memory.
 	if (use_physics_interpolation) {
@@ -900,7 +900,7 @@ void BulletFactory2D::free_attachments_pool_for_scene(const Ref<PackedScene> &at
 	bullet_attachments_pool.free_specific_bullet_attachments(BulletAttachmentObjectPool2D::make_pooling_key_for_scene(attachment_scene));
 }
 
-// ---- Deferred structural wrappers (P0-2/P0-3) ----
+// ---- Deferred structural wrappers ----
 // Each validates cheaply now (teardown/null only) and defers the real op so
 // physics-frame / sweep callers never hit reject_when_iterating(). The
 // deferred call re-runs full validation at flush time.
@@ -1048,7 +1048,7 @@ Dictionary BulletFactory2D::debug_validate_spawn_data(const Ref<MultiMeshBullets
 		d["error"] = "validate_spawn_data rejected the data (see error log).";
 	} else {
 		d["error"] = "";
-		// P1-11: invisible-bullet lint. Null frames + zero override + no mesh
+		// Invisible-bullet lint. Null frames + zero override + no mesh
 		// means nothing renders; warn loudly in tests before shipping invisible volleys.
 		// Note: texture facing (RIGHT) cannot be detected automatically; the
 		// docs + spawn warning below are the lint for that.
@@ -1402,6 +1402,45 @@ static bool compute_edge_normals_quiet(const PackedVector2Array &edge_points, bo
 static PackedInt32Array even_corner_seats(int corner_count, int count);
 static bool build_symmetric_polygon_loop(const PackedVector2Array &corners, const PackedVector2Array &corner_normals, int count, int distribution, PackedVector2Array &r_points, PackedVector2Array &r_normals, int corner_priority = 0, int corner_mode = 0, double edge_margin = 0.0, int corner_facing = 0);
 
+// Cap for every helper_generate_transforms_* call: each one allocates O(n)
+// slots, so an unbounded count (a typo'd 1000000, let alone INT_MAX) would
+// freeze or OOM the game. Batch huge volleys into several calls instead.
+// Matches BulletSpawner2D::kMaxBulletsPerVolley (10000): the spawner fans
+// helper_bullets_amount straight into these generators, and its own cap test
+// collects a 10000-volley. A lower static cap here would break that contract.
+static constexpr int HELPER_MAX_TRANSFORMS = 10000;
+
+// Clamp finished slot arrays into a sane world box: huge-but-finite inputs
+// (1e30 spacing on an 8k volley) overflow slot math to Inf/NaN, which would
+// poison the whole volley downstream. Slots that blew out land at the clamped
+// edge, valid slots pass through untouched. Warns once when it fires.
+static void danmaku_clamp_slots_finite(const char *caller_name, TypedArray<Transform2D> &slots) {
+	const double BOUND = 400000.0;
+	bool clamped = false;
+	for (int i = 0; i < slots.size(); ++i) {
+		Transform2D t = slots[i];
+		Vector2 o = t.get_origin();
+		real_t r = t.get_rotation();
+		bool bad = !o.is_finite() || !Math::is_finite(r);
+		if (!bad && (Math::abs(o.x) > BOUND || Math::abs(o.y) > BOUND)) {
+			bad = true;
+		}
+		if (!bad) {
+			continue;
+		}
+		clamped = true;
+		real_t cx = Math::is_finite(o.x) ? (real_t)Math::clamp((double)o.x, -BOUND, BOUND) : 0.0;
+		real_t cy = Math::is_finite(o.y) ? (real_t)Math::clamp((double)o.y, -BOUND, BOUND) : 0.0;
+		real_t cr = Math::is_finite(r) ? r : 0.0;
+		t.set_rotation_and_scale(cr, t.get_scale());
+		t.set_origin(Vector2(cx, cy));
+		slots[i] = t;
+	}
+	if (clamped) {
+		UtilityFunctions::push_warning(String(caller_name) + ": some slots overflowed to Inf/NaN or left the world box and were clamped to its edge; shrink the spacing/radius.");
+	}
+}
+
 TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_grid(
 		int transforms_amount,
 		Transform2D marker_transform,
@@ -1413,8 +1452,8 @@ TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_grid(
 		bool random_local_rotation,
 		real_t jitter,
 		uint64_t seed) {
-	if (transforms_amount < 0) {
-		UtilityFunctions::push_error("helper_generate_transforms_grid: transforms_amount must be >= 0.");
+	if (transforms_amount < 0 || transforms_amount > HELPER_MAX_TRANSFORMS) {
+		UtilityFunctions::push_error("helper_generate_transforms_grid: transforms_amount must be between 0 and " + String::num_int64(HELPER_MAX_TRANSFORMS) + ".");
 		return TypedArray<Transform2D>();
 	}
 	if (!Math::is_finite(column_offset) || !Math::is_finite(row_offset)) {
@@ -1586,6 +1625,7 @@ TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_grid(
 		}
 	}
 
+	danmaku_clamp_slots_finite("helper_generate_transforms_grid", generated_transforms);
 	return generated_transforms;
 }
 
@@ -1730,6 +1770,13 @@ double BulletFactory2D::helper_layer_scale_factor(int layer_index, double scale_
 	if (layer_index <= 0) {
 		return 1.0;
 	}
+	// pow() overflows to Inf on absurd layers (1.5^100000): let it stay Inf
+	// so the collapse precheck below (and volley sizing) still sees the true
+	// magnitude. Callers that need a drawable size clamp it themselves; the
+	// documented [0.05, 64] band applies to stored custom_scales entries,
+	// not to this computed growth factor.
+	// (clamp_band removed: it masked sub-5% inward collapses as 0.05 and
+	// broke the loud collapse rejection the layer tests rely on.)
 	// Explicit per-layer scales win when present (shared with the preview so
 	// custom rhythms coincide exactly).
 	if (!custom_scales.is_empty()) {
@@ -2652,8 +2699,8 @@ TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_ring(
 		UtilityFunctions::push_error("helper_generate_transforms_ring: layer_layout must be 0 (shared loop) or 1 (even per layer).");
 		return TypedArray<Transform2D>();
 	}
-	if (transforms_amount < 0) {
-		UtilityFunctions::push_error("helper_generate_transforms_ring: transforms_amount must be >= 0.");
+	if (transforms_amount < 0 || transforms_amount > HELPER_MAX_TRANSFORMS) {
+		UtilityFunctions::push_error("helper_generate_transforms_ring: transforms_amount must be between 0 and " + String::num_int64(HELPER_MAX_TRANSFORMS) + ".");
 		return TypedArray<Transform2D>();
 	}
 	if (!Math::is_finite(radius) || !Math::is_finite(start_angle) || !Math::is_finite(arc)) {
@@ -2718,8 +2765,8 @@ TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_fan(
 		bool centered,
 		real_t angle_jitter,
 		uint64_t seed) {
-	if (transforms_amount < 0) {
-		UtilityFunctions::push_error("helper_generate_transforms_fan: transforms_amount must be >= 0.");
+	if (transforms_amount < 0 || transforms_amount > HELPER_MAX_TRANSFORMS) {
+		UtilityFunctions::push_error("helper_generate_transforms_fan: transforms_amount must be between 0 and " + String::num_int64(HELPER_MAX_TRANSFORMS) + ".");
 		return TypedArray<Transform2D>();
 	}
 	if (!Math::is_finite(spread) || !Math::is_finite(direction_angle) || !Math::is_finite(step_offset)) {
@@ -2767,6 +2814,7 @@ TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_fan(
 		fan_transf.set_scale(marker_transform.get_scale());
 		generated_transforms[i] = fan_transf;
 	}
+	danmaku_clamp_slots_finite("helper_generate_transforms_fan", generated_transforms);
 	return generated_transforms;
 }
 
@@ -2779,8 +2827,8 @@ TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_spiral(
 		bool rotate_with_marker,
 		SpiralFacingMode facing_mode,
 		real_t facing_offset_degrees) {
-	if (transforms_amount < 0) {
-		UtilityFunctions::push_error("helper_generate_transforms_spiral: transforms_amount must be >= 0.");
+	if (transforms_amount < 0 || transforms_amount > HELPER_MAX_TRANSFORMS) {
+		UtilityFunctions::push_error("helper_generate_transforms_spiral: transforms_amount must be between 0 and " + String::num_int64(HELPER_MAX_TRANSFORMS) + ".");
 		return TypedArray<Transform2D>();
 	}
 	if (!Math::is_finite(start_radius) || !Math::is_finite(radius_step) || !Math::is_finite(angle_step)) {
@@ -2842,6 +2890,7 @@ TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_spiral(
 		spiral_transf.set_scale(marker_transform.get_scale());
 		generated_transforms[i] = spiral_transf;
 	}
+	danmaku_clamp_slots_finite("helper_generate_transforms_spiral", generated_transforms);
 	return generated_transforms;
 }
 
@@ -2853,8 +2902,8 @@ TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_line(
 		bool face_direction,
 		LineAnchor anchor,
 		bool perpendicular) {
-	if (transforms_amount < 0) {
-		UtilityFunctions::push_error("helper_generate_transforms_line: transforms_amount must be >= 0.");
+	if (transforms_amount < 0 || transforms_amount > HELPER_MAX_TRANSFORMS) {
+		UtilityFunctions::push_error("helper_generate_transforms_line: transforms_amount must be between 0 and " + String::num_int64(HELPER_MAX_TRANSFORMS) + ".");
 		return TypedArray<Transform2D>();
 	}
 	if (!direction.is_finite() || !Math::is_finite(spacing)) {
@@ -2901,6 +2950,7 @@ TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_line(
 		line_transf.set_scale(marker_transform.get_scale());
 		generated_transforms[i] = line_transf;
 	}
+	danmaku_clamp_slots_finite("helper_generate_transforms_line", generated_transforms);
 	return generated_transforms;
 }
 
@@ -2911,8 +2961,8 @@ TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_aimed(
 		real_t spread,
 		real_t step_offset,
 		bool centered) {
-	if (transforms_amount < 0) {
-		UtilityFunctions::push_error("helper_generate_transforms_aimed: transforms_amount must be >= 0.");
+	if (transforms_amount < 0 || transforms_amount > HELPER_MAX_TRANSFORMS) {
+		UtilityFunctions::push_error("helper_generate_transforms_aimed: transforms_amount must be between 0 and " + String::num_int64(HELPER_MAX_TRANSFORMS) + ".");
 		return TypedArray<Transform2D>();
 	}
 	if (!Math::is_finite(spread) || !Math::is_finite(step_offset)) {
@@ -2937,11 +2987,13 @@ TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_aimed(
 	return helper_generate_transforms_fan(transforms_amount, marker_transform, spread, direction_angle, step_offset, centered);
 }
 
-// Shared validation prelude for the danmaku generators below: amount and
-// marker finiteness. Returns true when the caller may proceed.
 static bool danmaku_validate_head(const char *caller_name, int transforms_amount, const Transform2D &marker_transform) {
 	if (transforms_amount < 0) {
 		UtilityFunctions::push_error(String(caller_name) + ": transforms_amount must be >= 0.");
+		return false;
+	}
+	if (transforms_amount > HELPER_MAX_TRANSFORMS) {
+		UtilityFunctions::push_error(String(caller_name) + ": transforms_amount (" + String::num_int64(transforms_amount) + ") exceeds the cap of " + String::num_int64(HELPER_MAX_TRANSFORMS) + " per call; split it into batches.");
 		return false;
 	}
 	if (!marker_transform.get_origin().is_finite() || !Math::is_finite(marker_transform.get_rotation()) || !marker_transform.get_scale().is_finite()) {
@@ -2951,8 +3003,6 @@ static bool danmaku_validate_head(const char *caller_name, int transforms_amount
 	return true;
 }
 
-// Shared tail for the danmaku generators below: empty fast path + marker
-// scale carry-over (scaled generators scale their bullets).
 static TypedArray<Transform2D> danmaku_make_slots(int transforms_amount) {
 	TypedArray<Transform2D> generated_transforms;
 	generated_transforms.resize(transforms_amount);
@@ -3247,6 +3297,13 @@ TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_ellipse(
 		UtilityFunctions::push_error("helper_generate_transforms_ellipse: gap_count must be >= 0.");
 		return TypedArray<Transform2D>();
 	}
+	// Uncapped gap_count turns the per-bullet gap loop below into O(n*gap):
+	// n=1000 with gap=INT_MAX would hang for hours. Walls don't need more
+	// gaps than bullets anyway.
+	if (gap_count > HELPER_MAX_TRANSFORMS) {
+		UtilityFunctions::push_error("helper_generate_transforms_ellipse: gap_count is absurdly large; keep it near the bullet count.");
+		return TypedArray<Transform2D>();
+	}
 	if (gap_width < 0.0) {
 		UtilityFunctions::push_error("helper_generate_transforms_ellipse: gap_width must be >= 0.");
 		return TypedArray<Transform2D>();
@@ -3358,6 +3415,7 @@ TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_rain(
 		danmaku_apply_marker_scale(slot, marker_transform);
 		generated_transforms[i] = slot;
 	}
+	danmaku_clamp_slots_finite("helper_generate_transforms_rain", generated_transforms);
 	return generated_transforms;
 }
 
@@ -3442,6 +3500,7 @@ TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_scatter(
 		danmaku_apply_marker_scale(slot, marker_transform);
 		generated_transforms[i] = slot;
 	}
+	danmaku_clamp_slots_finite("helper_generate_transforms_scatter", generated_transforms);
 	return generated_transforms;
 }
 
@@ -3490,6 +3549,7 @@ TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_star_polygon
 		danmaku_apply_marker_scale(slot, marker_transform);
 		generated_transforms[i] = slot;
 	}
+	danmaku_clamp_slots_finite("helper_generate_transforms_star_polygon", generated_transforms);
 	return generated_transforms;
 }
 
@@ -3563,6 +3623,7 @@ TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_multispiral(
 		danmaku_apply_marker_scale(slot, marker_transform);
 		generated_transforms[i] = slot;
 	}
+	danmaku_clamp_slots_finite("helper_generate_transforms_multispiral", generated_transforms);
 	return generated_transforms;
 }
 
@@ -3644,6 +3705,7 @@ TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_cross(
 		danmaku_apply_marker_scale(slot, marker_transform);
 		generated_transforms[i] = slot;
 	}
+	danmaku_clamp_slots_finite("helper_generate_transforms_cross", generated_transforms);
 	return generated_transforms;
 }
 
@@ -3683,6 +3745,12 @@ TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_star(
 	}
 	if (points < 2) {
 		UtilityFunctions::push_error("helper_generate_transforms_star: points must be >= 2.");
+		return TypedArray<Transform2D>();
+	}
+	// points*2 corners get built below: cap points so a hostile value can't
+	// turn the corner loop into a multi-GB hang (and INT_MAX/2 can't wrap).
+	if (points > HELPER_MAX_TRANSFORMS) {
+		UtilityFunctions::push_error("helper_generate_transforms_star: points is absurdly large; keep it near the bullet count.");
 		return TypedArray<Transform2D>();
 	}
 	if (!Math::is_finite(outer_radius) || outer_radius < 0.0 || !Math::is_finite(inner_radius) || inner_radius < 0.0) {
@@ -3880,6 +3948,7 @@ TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_wave(
 		danmaku_apply_marker_scale(slot, marker_transform);
 		generated_transforms[i] = slot;
 	}
+	danmaku_clamp_slots_finite("helper_generate_transforms_wave", generated_transforms);
 	return generated_transforms;
 }
 
@@ -3900,6 +3969,13 @@ TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_waterfall(
 	}
 	if (columns < 1 || rows < 1) {
 		UtilityFunctions::push_error("helper_generate_transforms_waterfall: columns and rows must be >= 1.");
+		return TypedArray<Transform2D>();
+	}
+	// columns*rows in 64-bit: 32-bit int math would wrap to negative on
+	// hostile input (100000x100000), turning the emit loop below into a
+	// billion-iteration hang. Reject absurd grids up front.
+	if ((int64_t)columns * (int64_t)rows > (int64_t)HELPER_MAX_TRANSFORMS * 4) {
+		UtilityFunctions::push_error("helper_generate_transforms_waterfall: columns*rows is absurdly large; keep the grid reasonable.");
 		return TypedArray<Transform2D>();
 	}
 	if (!Math::is_finite(column_spacing) || column_spacing < 0.0 || !Math::is_finite(row_spacing) || row_spacing < 0.0) {
@@ -3965,6 +4041,7 @@ TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_waterfall(
 		danmaku_apply_marker_scale(slot, marker_transform);
 		generated_transforms[i] = slot;
 	}
+	danmaku_clamp_slots_finite("helper_generate_transforms_waterfall", generated_transforms);
 	return generated_transforms;
 }
 
@@ -3983,6 +4060,12 @@ TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_lattice(
 	}
 	if (columns < 1 || rows < 1) {
 		UtilityFunctions::push_error("helper_generate_transforms_lattice: columns and rows must be >= 1.");
+		return TypedArray<Transform2D>();
+	}
+	// Same 64-bit guard as waterfall: hostile columns*rows would wrap a
+	// 32-bit int and hang the emit loop below.
+	if ((int64_t)columns * (int64_t)rows > (int64_t)HELPER_MAX_TRANSFORMS * 4) {
+		UtilityFunctions::push_error("helper_generate_transforms_lattice: columns*rows is absurdly large; keep the grid reasonable.");
 		return TypedArray<Transform2D>();
 	}
 	if (!Math::is_finite(spacing_x) || spacing_x < 0.0 || !Math::is_finite(spacing_y) || spacing_y < 0.0) {
@@ -4028,6 +4111,7 @@ TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_lattice(
 		danmaku_apply_marker_scale(slot, marker_transform);
 		generated_transforms[i] = slot;
 	}
+	danmaku_clamp_slots_finite("helper_generate_transforms_lattice", generated_transforms);
 	return generated_transforms;
 }
 
@@ -4176,6 +4260,7 @@ TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_counter_spir
 		danmaku_apply_marker_scale(slot, marker_transform);
 		generated_transforms[i] = slot;
 	}
+	danmaku_clamp_slots_finite("helper_generate_transforms_counter_spiral", generated_transforms);
 	return generated_transforms;
 }
 
@@ -4243,6 +4328,7 @@ TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_corridor(
 		}
 	}
 	generated_transforms.resize(placed);
+	danmaku_clamp_slots_finite("helper_generate_transforms_corridor", generated_transforms);
 	return generated_transforms;
 }
 
@@ -4936,6 +5022,12 @@ TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_polygon(
 	}
 	if (vertices < 3 || !Math::is_finite(radius) || radius < 0.0 || !Math::is_finite(base_rotation) || !Math::is_finite(facing_offset_degrees)) {
 		UtilityFunctions::push_error("helper_generate_transforms_polygon: vertices must be >= 3, radius finite and >= 0, rotations finite.");
+		return TypedArray<Transform2D>();
+	}
+	// The corner loop below builds `vertices` corners: cap it like star's
+	// points so hostile input can't hang the game.
+	if (vertices > HELPER_MAX_TRANSFORMS) {
+		UtilityFunctions::push_error("helper_generate_transforms_polygon: vertices is absurdly large; keep it near the bullet count.");
 		return TypedArray<Transform2D>();
 	}
 	if (outline_distribution < 0 || outline_distribution > 1) {

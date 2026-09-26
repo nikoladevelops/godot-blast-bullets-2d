@@ -47,14 +47,17 @@
 	</methods>
 	<members>
 		<member name="all_bullet_rotation_data" type="BulletRotationData2D[]" setter="set_all_bullet_rotation_data" getter="get_all_bullet_rotation_data" default="[]">
-			Provide [BulletRotationData2D] if you want your bullets to rotate.
-
-			Note: If you want each bullet to have its own rotation data then make sure that the amount of rotation data you provide is the same amount of data inside the [member transforms] property.
-			    	Note: If the rotation data is less than the amount of [Transform2D] saved in the [member transforms] property, then only the first bullet rotation data will be shared for all bullets.
-			Note: [BulletRotationData2D] has a helper static method that you can use to generate random rotation data - [method BulletRotationData2D.generate_random_data].
+			Spin for each bullet. Entry [code]i[/code] rotates bullet [code]i[/code] only — give one entry per bullet (same size as [member transforms]), or leave empty for no rotation. Bullets without a valid entry read zero spin (or the [DirectionalBulletsData2D.shared_bullet_rotation_data] fallback on Directional volleys). Invalid means: null entry, or NaN/Inf rotation values (that bullet reads zeros, its siblings are untouched). Example: entries [2.0, null] → bullet 0 spins at 2.0, bullet 1 holds still.
+			    	Note: [BulletRotationData2D] has a helper static method that you can use to generate random rotation data - [method BulletRotationData2D.generate_random_data].
+		</member>
+		<member name="tile_all_bullet_rotation_data" type="bool" setter="set_tile_all_bullet_rotation_data" getter="get_tile_all_bullet_rotation_data" default="false">
+			When on, a short [member all_bullet_rotation_data] wraps around the volley (bullet [code]i[/code] reads entry [code]i % size[/code]) instead of leaving the tail bullets at zero spin. Off by default.
 		</member>
 		<member name="all_bullets_custom_data" type="Resource[]" setter="set_all_bullets_custom_data" getter="get_all_bullets_custom_data" default="[]">
-			Custom data carried per bullet, readable in the factory collision callbacks through [method MultiMeshBullets2D.bullet_get_custom_data]. Same fallback rule as the speed data: empty means none, matching size means per bullet, otherwise the first entry drives all bullets. Stays strictly separate from [member shared_bullets_custom_data]: null entries read as null.
+			Custom data carried per bullet, readable in the factory collision callbacks through [method MultiMeshBullets2D.bullet_get_custom_data]. Entry [code]i[/code] belongs to bullet [code]i[/code] and nobody else; bullets without an entry read null. Stays strictly separate from [member shared_bullets_custom_data]: per-bullet data never falls back to shared. Example: tag bullet 0 with a fire resource and bullet 2 with ice → bullet 1 reads null.
+		</member>
+		<member name="tile_all_bullets_custom_data" type="bool" setter="set_tile_all_bullets_custom_data" getter="get_tile_all_bullets_custom_data" default="false">
+			When on, a short [member all_bullets_custom_data] wraps around the volley instead of leaving the tail bullets at null. Off by default.
 		</member>
 		<member name="animation" type="StringName" setter="set_animation" getter="get_animation" default="&amp;&quot;default&quot;">
 			Which SpriteFrames animation to play. Empty or "default" auto-resolves silently ("default" if present, else first animation). Explicit wrong names fall back to the first animation with one error. The whole multimesh batch shares one frame at a time; timing uses animation speed (fps), per-frame durations, and loop flag.
@@ -63,7 +66,10 @@
 			How many times a bullet can collide before it gets disabled. If you set to 0, then the bullet will NEVER get disabled due to collisions.
 		</member>
 		<member name="bullets_current_collision_count" type="int[]" setter="set_bullets_current_collision_count" getter="get_bullets_current_collision_count" default="[]">
-			Per-bullet collision counters, one entry per bullet. Leave empty to start every bullet at zero. Values are clamped into range (negatives become 0, values at or above [member bullet_max_collision_count] become max - 1, exactly one hit remaining, when the max is above 0); only a wrong array size is rejected with an error.
+			Starting hit count for each bullet. Entry [code]i[/code] belongs to bullet [code]i[/code]; bullets without an entry start at 0. Leave empty to start every bullet fresh. Values are clamped into range (negatives become 0, values at or above [member bullet_max_collision_count] become max - 1, exactly one hit remaining, when the max is above 0).
+		</member>
+		<member name="tile_bullets_current_collision_count" type="bool" setter="set_tile_bullets_current_collision_count" getter="get_tile_bullets_current_collision_count" default="false">
+			When on, a short [member bullets_current_collision_count] wraps around the volley instead of starting the tail bullets at 0. Off by default.
 		</member>
 		<member name="collision_layer" type="int" setter="set_collision_layer" getter="get_collision_layer" default="1">
 			The bitmask for the collision layer.

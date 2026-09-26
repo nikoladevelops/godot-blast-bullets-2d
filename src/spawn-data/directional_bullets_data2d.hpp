@@ -16,27 +16,49 @@ class DirectionalBulletsData2D : public MultiMeshBulletsData2D {
 	GDCLASS(DirectionalBulletsData2D, MultiMeshBulletsData2D)
 
 public:
-	// You are required to pass AT LEAST 1 BulletSpeedData2D in order for the bullets to work. If you want each bullet to have different data (different speed/max speed/ acceleration for each bullet), you would provide the same amount of BulletSpeedData2D as the .size() of the transforms. If you provide less than .size(), the bullets will use only the first BulletSpeedData2D. Note that BulletSpeedData2D has a helper static method that you can use to generate random speed data - BulletSpeedData2D.generate_random_data()
+	// How per-bullet arrays resolve. Entry i belongs to bullet i and nobody
+	// else. Each bullet falls back independently: a valid per-bullet entry
+	// wins for that bullet, otherwise the shared value fills in when it is
+	// set, otherwise the feature default (off, zero, null — see each array).
+	// An array shorter than the volley only covers its own indices; the rest
+	// fall back. Longer arrays ignore the extras. Mismatches warn once per
+	// spawn. Each array has its own tile_* checkbox (off by default) that
+	// restores the old wrap-around (slot i reads entry i % size) for that
+	// array only.
+
+	// Speed for each bullet. The array MUST have one entry per bullet
+	// (same size as transforms) unless you use shared_bullet_speed_data or
+	// tile_all_bullet_speed_data. Entry i drives bullet i only.
+	// Note that BulletSpeedData2D has a helper static method that you can use to generate random speed data - BulletSpeedData2D.generate_random_data(). Negative speed flies backwards on purpose.
 	TypedArray<BulletSpeedData2D> all_bullet_speed_data;
+
+	// Wrap short speed arrays around the volley (slot i reads entry
+	// i % size). Off by default. Check it to fan 2 entries across 10
+	// bullets as A,B,A,B... instead of covering only bullets 0 and 1.
+	bool tile_all_bullet_speed_data = false;
 
 	// Whether each bullet's direction should be adjusted based on the rotation data provided by the user (bullet rotates, so it now moves in that direction)
 	bool adjust_direction_based_on_rotation = false;
 
 	// SHARED SPEED / ROTATION RELATED
 
-	// Shared speed applied to every bullet at spawn/enable time, taking
-	// precedence over all_bullet_speed_data when set. Null (default) disables
-	// the feature and the array drives instead.
+	// Fallback speed for bullets whose own entry is missing or invalid
+	// (null entry, or NaN/Inf values). A valid per-bullet entry always wins
+	// for its bullet; this only fills the gaps. Null (default) means no
+	// fallback — uncovered bullets fly at speed 0.
+	// Example: volley of 3, speeds [200, null, 200], shared 150 → bullets
+	// fly at 200, 150, 200.
 	Ref<BulletSpeedData2D> shared_bullet_speed_data;
 
-	// Shared rotation applied to every bullet at spawn/enable time, taking
-	// precedence over all_bullet_rotation_data when set. Null (default)
-	// disables the feature and the array drives instead.
+	// Same fallback deal as shared speed, for spin. Null (default) means no
+	// fallback — uncovered bullets don't rotate.
 	Ref<BulletRotationData2D> shared_bullet_rotation_data;
 
-	// Shared curves applied to every bullet at spawn/enable time, before any
-	// per-bullet curves. Null (default) disables the feature. Tick precedence
-	// (shared wins ties, per-bullet fills gaps) is unchanged.
+	// Fallback curves, resolved per channel. A bullet that carries its own
+	// x-curve uses it even when this also defines x; this only covers the
+	// channels the bullet lacks. Null (default) means no fallback.
+	// Example: shared defines x + speed, bullet 2 carries only a y-curve →
+	// bullet 2 steers with its own y plus the shared x and speed.
 	Ref<BulletCurvesData2D> shared_bullet_curves_data;
 
 	// SHARED MOVEMENT PATTERN RELATED
@@ -55,51 +77,74 @@ public:
 	bool shared_movement_pattern_repeat = true;
 
 	// PER-BULLET CURVES / PATTERNS (runtime-owned; this data seeds them here).
-	// Same fallback rule as all_bullet_speed_data: empty = off, size ==
-	// amount = per bullet, otherwise the first entry drives all bullets.
-	// Null entries are skipped per bullet.
+	// Entry i seeds bullet i only. A null entry means "no curves for this
+	// bullet" — it falls back to shared_bullet_curves_data per channel.
 
-	// Per-bullet curves applied at spawn/enable time through the regular
-	// per-bullet machinery (shared curves still win ties per tick).
+	// Curves for each bullet, applied at spawn/enable time. Entry i affects
+	// bullet i only. Short arrays leave the tail bullets on the shared
+	// fallback (or plain ballistics when that is unset too).
 	TypedArray<BulletCurvesData2D> all_bullet_curves_data;
+
+	// Wrap short curve arrays around the volley. Off by default.
+	bool tile_all_bullet_curves_data = false;
 
 	// PER-BULLET MOVEMENT PATTERN RELATED
 
-	// Per-bullet movement pattern paths applied at spawn/enable time. Each
-	// entry must point at a Path2D; its Curve2D is extracted when the volley
-	// spawns. Same fallback rule as above. The face/repeat flags below
-	// resolve per bullet when sized to the amount, otherwise the shared
-	// flags drive. Bad entries are skipped per bullet.
+	// Pattern path for each bullet, applied at spawn/enable time. Each entry
+	// must point at a Path2D; its Curve2D is extracted when the volley
+	// spawns. Entry i drives bullet i only. A bullet with its own valid
+	// pattern always uses it; the shared path only covers bullets without
+	// one. Empty or bad entries fall back per bullet.
+	// The face/repeat flags below follow their own arrays (same rule).
 	TypedArray<NodePath> all_bullet_movement_pattern_paths;
 
-	// Per-bullet face flags for the curves above.
+	// Wrap short pattern-path arrays around the volley. Off by default.
+	bool tile_all_bullet_movement_pattern_paths = false;
+
+	// Face flag for each bullet's own pattern. Entry i belongs to bullet i;
+	// bullets without an entry use shared_movement_pattern_face_movement_direction.
 	TypedArray<bool> all_bullet_movement_pattern_face_movement_directions;
 
-	// Per-bullet repeat flags for the curves above.
+	// Wrap short face-flag arrays around the volley. Off by default.
+	bool tile_all_bullet_movement_pattern_face_movement_directions = false;
+
+	// Repeat flag for each bullet's own pattern. Entry i belongs to bullet i;
+	// bullets without an entry use shared_movement_pattern_repeat.
 	TypedArray<bool> all_bullet_movement_pattern_repeats;
 
+	// Wrap short repeat-flag arrays around the volley. Off by default.
+	bool tile_all_bullet_movement_pattern_repeats = false;
+
 	// WOBBLE (sine/cos flight modulation; editor-friendly danmaku staple).
-	// Shared wobble applied to every bullet at spawn/enable time, taking
-	// precedence over all_bullet_wobble_data when set and enabled. Null
-	// (default) disables the feature and the array drives instead.
+	// Fallback wobble for bullets whose own entry is missing, null, or
+	// disabled. A bullet with an active per-bullet seed always uses it.
+	// Null (default) means no fallback — uncovered bullets fly straight.
+	// Example: shared gentle weave + one strong per-bullet seed on bullet 2
+	// → bullet 2 snakes hard, the rest weave gently.
 	Ref<BulletWobbleData2D> shared_bullet_wobble_data;
 
-	// Per-bullet wobble applied at spawn/enable time through the per-bullet
-	// machinery (same fallback rule as speed data: empty = off, size ==
-	// amount = per bullet, otherwise the first entry drives all bullets).
-	// Null entries and entries with enabled = false are skipped per bullet.
+	// Wobble seed for each bullet, applied at spawn/enable time. Entry i
+	// affects bullet i only. Null entries and entries with enabled = false
+	// fall back to shared_bullet_wobble_data for that bullet.
 	TypedArray<BulletWobbleData2D> all_bullet_wobble_data;
+
+	// Wrap short wobble arrays around the volley. Off by default.
+	bool tile_all_bullet_wobble_data = false;
 
 	// GRAVITY / DRAG (2D sideview + tower-defense shells).
 	// Constant acceleration added to every bullet each tick (px/s^2).
 	// (0, 0) disables. Must stay finite.
 	Vector2 gravity = Vector2(0, 0);
 
-	// Per-bullet gravity vectors (same shared fallback rule as speed data:
-	// empty = off and the shared gravity above drives every bullet; 1 entry
-	// fans out; N entries map per bullet). Non-finite entries fail open to
-	// zero for that slot. Top-down default stays (0, 0) = disabled.
+	// Per-bullet gravity for each bullet. Entry i pulls bullet i only.
+	// Empty array (default) means every bullet uses gravity above.
+	// A non-finite entry is treated as (0, 0) for that bullet only.
+	// Example: gravity (0, 1000) + entries [(0,0), (800,0)] on 3 bullets →
+	// bullet 0 falls, bullet 1 drifts right, bullet 2 falls (no entry 2).
 	TypedArray<Vector2> all_bullet_gravity;
+
+	// Wrap short gravity arrays around the volley. Off by default.
+	bool tile_all_bullet_gravity = false;
 
 	// Gravity time window over volley life (seconds since spawn, measured on
 	// curves_elapsed_time): gravity only integrates inside
@@ -174,6 +219,9 @@ public:
 	TypedArray<BulletSpeedData2D> get_all_bullet_speed_data() const;
 	void set_all_bullet_speed_data(const TypedArray<BulletSpeedData2D> &new_data);
 
+	bool get_tile_all_bullet_speed_data() const;
+	void set_tile_all_bullet_speed_data(bool value);
+
 	bool get_adjust_direction_based_on_rotation() const;
 	void set_adjust_direction_based_on_rotation(bool new_adjust_direction_based_on_rotation);
 
@@ -198,14 +246,26 @@ public:
 	TypedArray<BulletCurvesData2D> get_all_bullet_curves_data() const;
 	void set_all_bullet_curves_data(const TypedArray<BulletCurvesData2D> &new_data);
 
+	bool get_tile_all_bullet_curves_data() const;
+	void set_tile_all_bullet_curves_data(bool value);
+
 	TypedArray<NodePath> get_all_bullet_movement_pattern_paths() const;
 	void set_all_bullet_movement_pattern_paths(const TypedArray<NodePath> &new_paths);
+
+	bool get_tile_all_bullet_movement_pattern_paths() const;
+	void set_tile_all_bullet_movement_pattern_paths(bool value);
 
 	TypedArray<bool> get_all_bullet_movement_pattern_face_movement_directions() const;
 	void set_all_bullet_movement_pattern_face_movement_directions(const TypedArray<bool> &new_flags);
 
+	bool get_tile_all_bullet_movement_pattern_face_movement_directions() const;
+	void set_tile_all_bullet_movement_pattern_face_movement_directions(bool value);
+
 	TypedArray<bool> get_all_bullet_movement_pattern_repeats() const;
 	void set_all_bullet_movement_pattern_repeats(const TypedArray<bool> &new_flags);
+
+	bool get_tile_all_bullet_movement_pattern_repeats() const;
+	void set_tile_all_bullet_movement_pattern_repeats(bool value);
 
 	Ref<BulletWobbleData2D> get_shared_bullet_wobble_data() const;
 	void set_shared_bullet_wobble_data(const Ref<BulletWobbleData2D> &new_wobble_data);
@@ -213,11 +273,17 @@ public:
 	TypedArray<BulletWobbleData2D> get_all_bullet_wobble_data() const;
 	void set_all_bullet_wobble_data(const TypedArray<BulletWobbleData2D> &new_data);
 
+	bool get_tile_all_bullet_wobble_data() const;
+	void set_tile_all_bullet_wobble_data(bool value);
+
 	Vector2 get_gravity() const;
 	void set_gravity(const Vector2 &value);
 
 	TypedArray<Vector2> get_all_bullet_gravity() const;
 	void set_all_bullet_gravity(const TypedArray<Vector2> &new_data);
+
+	bool get_tile_all_bullet_gravity() const;
+	void set_tile_all_bullet_gravity(bool value);
 
 	double get_gravity_delay_sec() const;
 	void set_gravity_delay_sec(double value);

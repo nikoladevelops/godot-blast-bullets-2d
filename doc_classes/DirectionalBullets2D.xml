@@ -10,13 +10,13 @@
 
 		Warning: When editing runtime properties or calling methods that edit the multimesh, only structural factory calls ([method BulletFactory2D.reset], [method BulletFactory2D.free_active_bullets], [method BulletFactory2D.free_disabled_bullets], [method BulletFactory2D.free_bullets_pool], [method BulletFactory2D.populate_bullets_pool], and the spawn methods with a shape change) must use [method Object.call_deferred] when called from physics callbacks or collision/lifetime signal handlers. Per-bullet edits apply immediately. The only exception to this are callables attached via [method MultiMeshBullets2D.multimesh_attach_time_based_function], since those are executed at the end of the frame by default for safety.
 
-		Warning: Homing functionality can be done in two ways - either using [b]per-bullet homing deques[/b] (each bullet has its own deque of homing targets) or a [b]shared homing deque[/b] (each bullet shares the same shared deque). Both are supported and if both are used then the shared deque takes precedence over the per-bullet ones. Meaning that if the shared deque has any targets in it then all bullets will follow that one instead of their own individual targets. Any method or property that mentions "shared" is related to the shared deque.
+		Warning: Homing functionality can be done in two ways - either using [b]per-bullet homing deques[/b] (each bullet has its own deque of homing targets) or a [b]shared homing deque[/b] (broadcast fallback for bullets without their own targets). Both are supported and per-bullet deques always win per bullet: a bullet with its own non-empty deque follows it, otherwise it follows the shared deque. If a per-bullet deque drains mid-flight the bullet falls back to the shared deque. Any method or property that mentions "shared" is related to the shared deque.
 
 		Note: Deque means double ended queue (you can push and pop from both ends), the homing target at the front is always the one being followed.
 
 		Note: Bullets can orbit around their current homing target if enabled (see [method bullet_enable_orbiting], [method all_bullets_enable_orbiting]). Orbiting requires having a valid homing target to orbit around. Be aware that orbiting does not care about the difference between a shared homing deque or a per bullet deque, as long as there is a target to orbit around it will work.
 
-		Note: Feature mixing has a fixed precedence each tick: homing steers the direction, direction curves adjust it (shared wins ties, per-bullet fills gaps), rotation spins only the visual, adjust_direction_based_on_rotation feeds the visual back into ballistics (skipped when rotate_only_textures is on, since that spin is rendering-only), movement patterns steer the displacement (skipped while a locked orbit owns the bullet, so non-repeating patterns never finish invisibly on the ring), and a locked orbit owns the final displacement. Homing smoothing has no effect while a movement pattern or rotation data drives the direction (the direction snaps instead). Teleporting a locked bullet re-aims its ring slot from the new position instead of snapping back. [method MultiMeshBullets2D.get_bullet_velocity] reports the logical velocity (direction times speed plus wind), excluding pattern and orbit displacement.
+		Note: Feature mixing has a fixed precedence each tick: homing steers the direction (per-bullet deque wins per bullet, shared is the fallback), direction curves adjust it (per-bullet channels win per channel, shared covers the rest), rotation spins only the visual, adjust_direction_based_on_rotation feeds the visual back into ballistics (skipped when rotate_only_textures is on, since that spin is rendering-only), movement patterns steer the displacement (per-bullet patterns win per bullet, shared is the fallback; skipped while a locked orbit owns the bullet, so non-repeating patterns never finish invisibly on the ring), and a locked orbit owns the final displacement. Homing smoothing has no effect while a movement pattern or rotation data drives the direction (the direction snaps instead). Teleporting a locked bullet re-aims its ring slot from the new position instead of snapping back. [method MultiMeshBullets2D.get_bullet_velocity] reports the logical velocity (direction times speed plus wind), excluding pattern and orbit displacement.
 
 		Note: Instead of [BulletSpeedData2D] with [method MultiMeshBullets2D.set_bullet_speed_data] you can take advantage of [BulletCurvesData2D] by using [method MultiMeshBullets2D.bullet_set_curves_data], [method MultiMeshBullets2D.all_bullets_set_curves_data] or [member MultiMeshBullets2D.shared_bullet_curves_data] if you want a shared curve for all bullets.
 
@@ -95,6 +95,30 @@
 			<param index="9" name="orbiting_rigid_follow" type="bool" default="true" />
 			<description>
 				Enables orbiting with concentric radii: bullet (start + k) orbits at radius_start + radius_step * k. Useful for shield rings. Bullets that already orbit keep their radius with a warning.
+			</description>
+		</method>
+		<method name="all_bullets_get_homing_targets_amount">
+			<return type="PackedInt32Array" />
+			<param index="0" name="bullet_index_start" type="int" default="0" />
+			<param index="1" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<description>
+				Returns the per-bullet homing queue depth of each bullet in the range (shared deque excluded; read it via [method shared_homing_deque_check_homing_targets_amount]). Example: after [method all_bullets_push_back_homing_target], depths are 1 per bullet.
+			</description>
+		</method>
+		<method name="all_bullets_get_orbiting_angle">
+			<return type="PackedFloat32Array" />
+			<param index="0" name="bullet_index_start" type="int" default="0" />
+			<param index="1" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<description>
+				Returns the locked ring angle (radians) of each bullet in the range. Same per-bullet warnings as [method bullet_get_orbiting_angle].
+			</description>
+		</method>
+		<method name="all_bullets_get_orbiting_center">
+			<return type="Vector2[]" />
+			<param index="0" name="bullet_index_start" type="int" default="0" />
+			<param index="1" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<description>
+				Returns the orbit center of each bullet in the range: the locked ring point once locked, else the live deque front (per-bullet deque wins, shared is the fallback). Same per-bullet warnings as [method bullet_get_orbiting_center]. Example: [code]var centers = bullets.all_bullets_get_orbiting_center()[/code].
 			</description>
 		</method>
 		<method name="all_bullets_get_orbiting_radius">
@@ -381,6 +405,8 @@
 				The follow mode controls how the locked ring tracks a moving target (FollowTarget, FollowDeadzone with a pixel deadzone, or Anchored), the lock policy controls what drops the lock (RelockAlways, StayLocked, or RelockOnTargetChange), and rigid follow controls whether circling bullets translate 1:1 with the target like escorts (on) or chase the ring and trail behind fast targets (off).
 
 				Note that orbiting relies on having a homing target to orbit around. Push targets only onto enabled bullets for the same reason; the spawner retarget pass skips disabled slots automatically.
+
+				Example: [code]bullets.bullet_enable_orbiting(0, 90.0, 2); bullets.bullet_homing_push_back_global_position_target(0, boss.global_position)[/code], then read [method debug_get_orbiting_info].
 			</description>
 		</method>
 		<method name="bullet_get_current_homing_target" qualifiers="const">
@@ -503,7 +529,7 @@
 			<param index="0" name="bullet_index" type="int" />
 			<param index="1" name="global_position" type="Vector2" />
 			<description>
-				Pushes a global position target to the back of the specified bullet's per-bullet deque. Returns true on success (bullet enabled/valid index).
+				Pushes a global position target to the back of the specified bullet's per-bullet deque. Returns true on success (bullet enabled/valid index). Per-bullet deque wins over the shared deque per bullet; a drained per-bullet deque falls back to shared. Example: [code]bullets.bullet_homing_push_back_global_position_target(0, boss.global_position)[/code].
 
 				If you want to push back a target to the shared deque, use [method shared_homing_deque_push_back_global_position_target] instead.
 			</description>
@@ -614,7 +640,7 @@
 			<param index="0" name="bullet_index" type="int" />
 			<param index="1" name="value" type="Vector2" />
 			<description>
-				Sets the gravity acceleration for one bullet and restarts its fall speed (new regime). Non-finite values are rejected.
+				Sets the gravity acceleration for one bullet and restarts its fall speed (new regime). Non-finite values are rejected. Example: [code]bullets.bullet_set_gravity(0, Vector2(0, 400)); print(bullets.debug_get_gravity_info(0)["vector"])[/code].
 			</description>
 		</method>
 		<method name="all_bullets_set_gravity">
@@ -633,11 +659,32 @@
 				Integrated fall speed magnitude for the specified bullet. 0 when gravity never integrated there.
 			</description>
 		</method>
+		<method name="debug_get_curves_info" qualifiers="const">
+			<return type="Dictionary" />
+			<param index="0" name="bullet_index" type="int" />
+			<description>
+				Per-channel curves winner for one bullet: {valid, x_src, y_src, rot_src, speed_src, gravity_src, has_per_bullet_resource, has_shared_fallback}, where each *_src is "per", "shared" or "none". Example: with shared x + per-bullet y, x_src is "shared" and y_src is "per". Never mutates; invalid index returns valid=false.
+			</description>
+		</method>
 		<method name="debug_get_gravity_info">
 			<return type="Dictionary" />
 			<param index="0" name="bullet_index" type="int" />
 			<description>
 				Gravity introspection: vector, fall_speed, window_active, curve_scale. Never mutates.
+			</description>
+		</method>
+		<method name="debug_get_orbiting_info" qualifiers="const">
+			<return type="Dictionary" />
+			<param index="0" name="bullet_index" type="int" />
+			<description>
+				Orbiting introspection for one bullet: {valid, enabled, locked, center, angle, radius, direction, texture_rotation, follow_mode, deadzone, lock_policy, rigid_follow, deque_src}, where deque_src is "locked" once the ring locks, else "per" when the bullet has its own deque, "shared" when it falls back to the shared deque, or "none". Per-bullet deque wins over shared, same as the steering tick. Example: [code]var info = bullets.debug_get_orbiting_info(0); print(info["deque_src"])[/code]. Never mutates; invalid index returns valid=false.
+			</description>
+		</method>
+		<method name="debug_get_pattern_info" qualifiers="const">
+			<return type="Dictionary" />
+			<param index="0" name="bullet_index" type="int" />
+			<description>
+				Movement-pattern state for one bullet: {valid, src, face, repeat, distance, length, finished, has_shared_fallback}, where src is "per", "shared" or "none". Finished shared parks at length; finished per-bullet clears back to src "none". Never mutates; invalid index returns valid=false.
 			</description>
 		</method>
 		<method name="bullet_set_orbiting_center">
@@ -712,10 +759,145 @@
 				Sets the exact velocity of the specified bullet (wind, knockback, split inheritance). See [method all_bullets_set_velocity] for details.
 			</description>
 		</method>
+		<method name="all_bullets_get_gravity" qualifiers="const">
+			<return type="Vector2[]" />
+			<param index="0" name="bullet_index_start" type="int" default="0" />
+			<param index="1" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<description>
+				Per-bullet gravity vectors over a range.
+			</description>
+		</method>
+		<method name="all_bullets_get_homing_smoothing" qualifiers="const">
+			<return type="float[]" />
+			<param index="0" name="bullet_index_start" type="int" default="0" />
+			<param index="1" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<description>
+				Effective per-bullet homing smoothing over a range (per-bullet value where set, else shared).
+			</description>
+		</method>
+		<method name="all_bullets_get_fall_speed" qualifiers="const">
+			<return type="float[]" />
+			<param index="0" name="bullet_index_start" type="int" default="0" />
+			<param index="1" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<description>
+				Integrated fall-speed magnitudes over a range (0 where gravity never integrated).
+			</description>
+		</method>
+		<method name="all_bullets_get_wobble_data" qualifiers="const">
+			<return type="BulletWobbleData2D[]" />
+			<param index="0" name="bullet_index_start" type="int" default="0" />
+			<param index="1" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<description>
+				Per-bullet wobble resources over a range (null where the slot runs on the shared fallback or is inactive).
+			</description>
+		</method>
+		<method name="all_bullets_set_wobble_data">
+			<return type="void" />
+			<param index="0" name="wobble_data" type="BulletWobbleData2D" />
+			<param index="1" name="bullet_index_start" type="int" default="0" />
+			<param index="2" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<description>
+				Seeds wobble live over a range (null clears each slot back to the shared fallback). Per-bullet wins over shared.
+			</description>
+		</method>
+		<method name="bullet_get_rotation_speed" qualifiers="const">
+			<return type="float" />
+			<param index="0" name="bullet_index" type="int" />
+			<description>
+				Effective per-bullet rotation speed (seeded value, live-updated by the tick). 0 when inactive or out of range.
+			</description>
+		</method>
+		<method name="bullet_get_wobble_amplitude" qualifiers="const">
+			<return type="float" />
+			<param index="0" name="bullet_index" type="int" />
+			<description>
+				Effective wobble amplitude of one bullet (seeded amplitude, 0 when inactive).
+			</description>
+		</method>
+		<method name="bullet_get_wobble_data" qualifiers="const">
+			<return type="BulletWobbleData2D" />
+			<param index="0" name="bullet_index" type="int" />
+			<description>
+				Per-bullet wobble resource of one bullet (null when the slot runs on the shared fallback or is inactive).
+			</description>
+		</method>
+		<method name="bullet_get_wobble_face_movement_direction" qualifiers="const">
+			<return type="bool" />
+			<param index="0" name="bullet_index" type="int" />
+			<description>
+				Whether the bullet's wobble visual follows the steered heading (seeded face flag, false when inactive).
+			</description>
+		</method>
+		<method name="bullet_get_wobble_face_rotation_speed" qualifiers="const">
+			<return type="float" />
+			<param index="0" name="bullet_index" type="int" />
+			<description>
+				Slew limit of the bullet's wobble texture follow in rad/s (seeded value, 0 when inactive).
+			</description>
+		</method>
+		<method name="bullet_set_wobble_data">
+			<return type="void" />
+			<param index="0" name="bullet_index" type="int" />
+			<param index="1" name="wobble_data" type="BulletWobbleData2D" />
+			<description>
+				Seeds wobble live for one bullet (null clears it back to the shared fallback, or inactive when unset). Invalid data errors and clears to the fallback. Example: [code]bullets.bullet_set_wobble_data(1, my_wobble); print(bullets.debug_get_wobble_info(1)["active"])[/code].
+			</description>
+		</method>
+		<method name="clear_per_bullet_homing_smoothing">
+			<return type="void" />
+			<description>
+				Clears per-bullet smoothing mode: the shared [member homing_smoothing] drives every bullet again. No-op when per-bullet mode was never enabled.
+			</description>
+		</method>
+		<method name="debug_get_bullet_info" qualifiers="const">
+			<return type="Dictionary" />
+			<param index="0" name="bullet_index" type="int" />
+			<description>
+				Full per-bullet steering snapshot: {index, valid, active, direction, velocity, speed, gravity, fall_speed, wobble_active, wobble_amplitude, has_homing_targets, homing_targets_amount, homing_smoothing, orbiting_enabled, orbiting_locked, pattern, shared_pattern_active, rotation_speed}. Never mutates; invalid index returns valid=false with zeroed fields.
+			</description>
+		</method>
+		<method name="debug_get_wobble_info" qualifiers="const">
+			<return type="Dictionary" />
+			<param index="0" name="bullet_index" type="int" />
+			<description>
+				Wobble introspection for tests/support: {active, amplitude, frequency_hz, mode, waveform, phase, damping_per_sec, delay_sec, duration_sec, face_movement_direction, face_rotation_speed, has_per_bullet_resource, has_shared_fallback}. Example: [code]var w = bullets.debug_get_wobble_info(0); print(w["amplitude"])[/code]. Never mutates.
+			</description>
+		</method>
 		<method name="get_is_wobble_enabled" qualifiers="const">
 			<return type="bool" />
 			<description>
-				Whether any wobble entry is currently enabled on this volley (shared or per-bullet). Set wobble data through [member DirectionalBulletsData2D.shared_bullet_wobble_data] or [member DirectionalBulletsData2D.all_bullet_wobble_data] before spawning.
+				Whether any wobble entry is currently enabled on this volley (shared or per-bullet). Set wobble data through [member DirectionalBulletsData2D.shared_bullet_wobble_data] or [member DirectionalBulletsData2D.all_bullet_wobble_data] before spawning, or live via [method bullet_set_wobble_data] / [method set_shared_bullet_wobble_data].
+			</description>
+		</method>
+		<method name="get_shared_bullet_wobble_data" qualifiers="const">
+			<return type="BulletWobbleData2D" />
+			<description>
+				Shared wobble fallback resource (null when unset). Per-bullet seeds win per slot; setting shared re-seeds only slots without a live per-bullet resource.
+			</description>
+		</method>
+		<method name="has_shared_bullet_wobble_data" qualifiers="const">
+			<return type="bool" />
+			<description>
+				Whether a shared wobble fallback is currently set.
+			</description>
+		</method>
+		<method name="is_rotation_data_active" qualifiers="const">
+			<return type="bool" />
+			<description>
+				Whether rotation data is currently driving the volley (any seeded rotation array, shared or per-bullet).
+			</description>
+		</method>
+		<method name="remove_shared_bullet_wobble_data">
+			<return type="void" />
+			<description>
+				Clears the shared wobble fallback; slots without a live per-bullet resource go inactive.
+			</description>
+		</method>
+		<method name="set_shared_bullet_wobble_data">
+			<return type="void" />
+			<param index="0" name="new_wobble_data" type="BulletWobbleData2D" />
+			<description>
+				Sets the shared wobble fallback live (null clears it). Only slots without a live per-bullet resource are re-seeded; per-bullet seeds always win. Example: [code]bullets.set_shared_bullet_wobble_data(wobble)[/code] sways every plain bullet while custom per-bullet seeds keep theirs.
 			</description>
 		</method>
 		<method name="has_shared_bullet_rotation_data" qualifiers="const">
@@ -946,7 +1128,7 @@
 			If you want this behavior for the shared deque, use [member shared_homing_deque_auto_pop_after_target_reached] instead.
 		</member>
 		<member name="gravity" type="Vector2" setter="set_gravity" getter="get_gravity" default="Vector2(0, 0)">
-			Shared gravity acceleration in px/s^2, fanning out to every bullet (2D sideview arcs, tower-defense shells). (0, 0) disables — top-down default. Writing it starts a new regime: per-bullet vectors and integrated fall speeds reset. Prefer [method bullet_set_gravity] for single slots.
+			Shared gravity acceleration in px/s^2, fanning out to every bullet (2D sideview arcs, tower-defense shells). (0, 0) disables — top-down default. Writing it starts a new regime: per-bullet vectors and integrated fall speeds reset. Spawn-time per-bullet vectors plus the [code]tile_all_bullet_gravity[/code] checkbox live on [member DirectionalBulletsData2D.all_bullet_gravity_vectors]. Prefer [method bullet_set_gravity] for single slots.
 		</member>
 		<member name="gravity_delay_sec" type="float" setter="set_gravity_delay_sec" getter="get_gravity_delay_sec" default="0.0">
 			Seconds of straight flight before gravity starts integrating. 0 falls immediately.
@@ -969,7 +1151,7 @@
 			Steering pauses while the bullet is farther than this from its target. 0 is unlimited.
 		</member>
 		<member name="homing_smoothing" type="float" setter="set_homing_smoothing" getter="get_homing_smoothing" default="0.0">
-			Adjust this value for natural smooth turning. Test with values [code]0.00-20.00[/code] or even bigger.
+			Adjust this value for natural smooth turning. Test with values [code]0.00-20.00[/code] or even bigger. Latch note: the first per-bullet write ([method bullet_set_homing_smoothing]) snapshots every sibling at the current shared value, so later shared writes only affect never-latched volleys — call [method clear_per_bullet_homing_smoothing] to hand control back to shared. The spawner equivalent fans [code]homing_smoothing_start + homing_smoothing_step * i[/code] per slot.
 		</member>
 		<member name="homing_take_control_of_texture_rotation" type="bool" setter="set_homing_take_control_of_texture_rotation" getter="get_homing_take_control_of_texture_rotation" default="false">
 			If you set to true then the texture of the bullets will start facing the direction in which it is moving while homing towards a target. Leave it off and homing targets will not steer bullets at all (unless a movement pattern or rotation data does), and you get one warning about it.
@@ -984,10 +1166,10 @@
 			Linear drag trimming speed each tick. 0 disables.
 		</member>
 		<member name="shared_bullet_rotation_data" type="BulletRotationData2D" setter="set_shared_bullet_rotation_data" getter="get_shared_bullet_rotation_data">
-			Shared rotation applied to every bullet, taking precedence over per-bullet rotation data while set. Clearing it (null) hands control back, keeping already-seeded values - re-spawn or re-set to change those.
+			Fallback spin for bullets whose own rotation entry is missing or invalid, set live. Only fully-zero triples (the invalid-entry gap marker) are filled; bullets with any non-zero value keep it. Live writes fill once at call time (order matters: per-zero then shared fills, shared then per-zero stays zero). All-zero shared is a silent no-op; non-finite shared aborts the whole fallback with an error. Clearing it (null) keeps the current ballistics. Configure the spawn-time equivalent (plus its [code]tile_*[/code] checkbox) on [DirectionalBulletsData2D]. Negative spin is legal and clamps symmetrically to [-max, max].
 		</member>
 		<member name="shared_bullet_speed_data" type="BulletSpeedData2D" setter="set_shared_bullet_speed_data" getter="get_shared_bullet_speed_data">
-			Shared speed applied to every bullet, taking precedence over per-bullet speed data while set. Clearing it (null) hands control back, keeping already-seeded values - re-spawn or re-set to change those. Note: shared movement-speed curves still outrank it per tick.
+			Fallback speed for bullets whose own speed entry is missing or invalid, set live. Only fully-zero triples (the invalid-entry gap marker) are filled; bullets with any non-zero value keep it. Live writes fill once at call time (order matters: per-zero then shared fills, shared then per-zero stays zero). All-zero shared is a silent no-op; non-finite shared aborts the whole fallback with an error. Clearing it (null) keeps the current ballistics. Configure the spawn-time equivalent (plus its [code]tile_*[/code] checkbox) on [DirectionalBulletsData2D]. Note: shared movement-speed curves still outrank it per tick. Negative speed flies backwards, clamped to [-max, max].
 		</member>
 		<member name="shared_homing_deque_auto_pop_after_target_reached" type="bool" setter="set_shared_homing_deque_auto_pop_after_target_reached" getter="get_shared_homing_deque_auto_pop_after_target_reached" default="false">
 			Whether the current homing target should be automatically popped from the deque once it gets reached by a bullet (shared deque only).
@@ -998,8 +1180,11 @@
 
 			If you want this behavior for the per-bullet deques, use [member bullet_homing_auto_pop_after_target_reached] instead.
 		</member>
+		<member name="shared_bullet_wobble_data" type="BulletWobbleData2D" setter="set_shared_bullet_wobble_data" getter="get_shared_bullet_wobble_data">
+			Fallback wobble for bullets without a live per-bullet wobble resource, set live. Setting it re-seeds only those slots; clearing it (null) deactivates exactly those slots. Spawn-time equivalent (plus its [code]tile_all_bullet_wobble_data[/code] checkbox) lives on [member DirectionalBulletsData2D.shared_bullet_wobble_data]. Example: [code]bullets.set_shared_bullet_wobble_data(wobble)[/code] adds sway to every plain bullet while custom per-bullet seeds keep theirs.
+		</member>
 		<member name="shared_movement_pattern_curve" type="Curve2D" setter="set_shared_movement_pattern_curve" getter="get_shared_movement_pattern_curve">
-			Shared movement pattern curve applied to every bullet. While set it takes precedence over per-bullet patterns. Null (default) disables the feature; per-bullet patterns, if any, take over.
+			Fallback pattern for bullets without their own per-bullet pattern, set live. Bullets with a valid per-bullet pattern always use it. Null (default) means no fallback. A locked orbit still owns the displacement while locked. Spawn-time flags plus the [code]tile_all_bullet_movement_pattern_paths / _face... / _repeats[/code] checkboxes live on [DirectionalBulletsData2D].
 		</member>
 		<member name="shared_movement_pattern_face_movement_direction" type="bool" setter="set_shared_movement_pattern_face_movement_direction" getter="get_shared_movement_pattern_face_movement_direction" default="false">
 			Whether the shared movement pattern rotates bullets to face their direction of travel.

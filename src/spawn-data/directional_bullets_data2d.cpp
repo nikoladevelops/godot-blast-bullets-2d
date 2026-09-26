@@ -13,6 +13,13 @@ void DirectionalBulletsData2D::set_all_bullet_speed_data(const TypedArray<Bullet
 	all_bullet_speed_data = new_data;
 }
 
+bool DirectionalBulletsData2D::get_tile_all_bullet_speed_data() const {
+	return tile_all_bullet_speed_data;
+}
+void DirectionalBulletsData2D::set_tile_all_bullet_speed_data(bool value) {
+	tile_all_bullet_speed_data = value;
+}
+
 bool DirectionalBulletsData2D::get_adjust_direction_based_on_rotation() const {
 	return adjust_direction_based_on_rotation;
 }
@@ -70,11 +77,25 @@ void DirectionalBulletsData2D::set_all_bullet_curves_data(const TypedArray<Bulle
 	all_bullet_curves_data = new_data;
 }
 
+bool DirectionalBulletsData2D::get_tile_all_bullet_curves_data() const {
+	return tile_all_bullet_curves_data;
+}
+void DirectionalBulletsData2D::set_tile_all_bullet_curves_data(bool value) {
+	tile_all_bullet_curves_data = value;
+}
+
 TypedArray<NodePath> DirectionalBulletsData2D::get_all_bullet_movement_pattern_paths() const {
 	return all_bullet_movement_pattern_paths;
 }
 void DirectionalBulletsData2D::set_all_bullet_movement_pattern_paths(const TypedArray<NodePath> &new_paths) {
 	all_bullet_movement_pattern_paths = new_paths;
+}
+
+bool DirectionalBulletsData2D::get_tile_all_bullet_movement_pattern_paths() const {
+	return tile_all_bullet_movement_pattern_paths;
+}
+void DirectionalBulletsData2D::set_tile_all_bullet_movement_pattern_paths(bool value) {
+	tile_all_bullet_movement_pattern_paths = value;
 }
 
 TypedArray<bool> DirectionalBulletsData2D::get_all_bullet_movement_pattern_face_movement_directions() const {
@@ -84,11 +105,25 @@ void DirectionalBulletsData2D::set_all_bullet_movement_pattern_face_movement_dir
 	all_bullet_movement_pattern_face_movement_directions = new_flags;
 }
 
+bool DirectionalBulletsData2D::get_tile_all_bullet_movement_pattern_face_movement_directions() const {
+	return tile_all_bullet_movement_pattern_face_movement_directions;
+}
+void DirectionalBulletsData2D::set_tile_all_bullet_movement_pattern_face_movement_directions(bool value) {
+	tile_all_bullet_movement_pattern_face_movement_directions = value;
+}
+
 TypedArray<bool> DirectionalBulletsData2D::get_all_bullet_movement_pattern_repeats() const {
 	return all_bullet_movement_pattern_repeats;
 }
 void DirectionalBulletsData2D::set_all_bullet_movement_pattern_repeats(const TypedArray<bool> &new_flags) {
 	all_bullet_movement_pattern_repeats = new_flags;
+}
+
+bool DirectionalBulletsData2D::get_tile_all_bullet_movement_pattern_repeats() const {
+	return tile_all_bullet_movement_pattern_repeats;
+}
+void DirectionalBulletsData2D::set_tile_all_bullet_movement_pattern_repeats(bool value) {
+	tile_all_bullet_movement_pattern_repeats = value;
 }
 
 double DirectionalBulletsData2D::get_homing_smoothing() const {
@@ -159,6 +194,13 @@ void DirectionalBulletsData2D::set_all_bullet_wobble_data(const TypedArray<Bulle
 	all_bullet_wobble_data = new_data;
 }
 
+bool DirectionalBulletsData2D::get_tile_all_bullet_wobble_data() const {
+	return tile_all_bullet_wobble_data;
+}
+void DirectionalBulletsData2D::set_tile_all_bullet_wobble_data(bool value) {
+	tile_all_bullet_wobble_data = value;
+}
+
 Vector2 DirectionalBulletsData2D::get_gravity() const {
 	return gravity;
 }
@@ -175,6 +217,13 @@ TypedArray<Vector2> DirectionalBulletsData2D::get_all_bullet_gravity() const {
 }
 void DirectionalBulletsData2D::set_all_bullet_gravity(const TypedArray<Vector2> &new_data) {
 	all_bullet_gravity = new_data;
+}
+
+bool DirectionalBulletsData2D::get_tile_all_bullet_gravity() const {
+	return tile_all_bullet_gravity;
+}
+void DirectionalBulletsData2D::set_tile_all_bullet_gravity(bool value) {
+	tile_all_bullet_gravity = value;
 }
 
 double DirectionalBulletsData2D::get_gravity_delay_sec() const {
@@ -248,6 +297,10 @@ void DirectionalBulletsData2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_all_bullet_speed_data", "new_data"), &DirectionalBulletsData2D::set_all_bullet_speed_data);
 	ADD_PROPERTY(PropertyInfo(Variant::ARRAY, "all_bullet_speed_data", PROPERTY_HINT_ARRAY_TYPE, "BulletSpeedData2D"), "set_all_bullet_speed_data", "get_all_bullet_speed_data");
 
+	ClassDB::bind_method(D_METHOD("get_tile_all_bullet_speed_data"), &DirectionalBulletsData2D::get_tile_all_bullet_speed_data);
+	ClassDB::bind_method(D_METHOD("set_tile_all_bullet_speed_data", "value"), &DirectionalBulletsData2D::set_tile_all_bullet_speed_data);
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "tile_all_bullet_speed_data"), "set_tile_all_bullet_speed_data", "get_tile_all_bullet_speed_data");
+
 	ClassDB::bind_method(D_METHOD("get_adjust_direction_based_on_rotation"), &DirectionalBulletsData2D::get_adjust_direction_based_on_rotation);
 	ClassDB::bind_method(D_METHOD("set_adjust_direction_based_on_rotation", "new_adjust_direction_based_on_rotation"), &DirectionalBulletsData2D::set_adjust_direction_based_on_rotation);
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "adjust_direction_based_on_rotation"), "set_adjust_direction_based_on_rotation", "get_adjust_direction_based_on_rotation");
@@ -280,17 +333,33 @@ void DirectionalBulletsData2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_all_bullet_curves_data", "new_data"), &DirectionalBulletsData2D::set_all_bullet_curves_data);
 	ADD_PROPERTY(PropertyInfo(Variant::ARRAY, "all_bullet_curves_data", PROPERTY_HINT_ARRAY_TYPE, "BulletCurvesData2D"), "set_all_bullet_curves_data", "get_all_bullet_curves_data");
 
+	ClassDB::bind_method(D_METHOD("get_tile_all_bullet_curves_data"), &DirectionalBulletsData2D::get_tile_all_bullet_curves_data);
+	ClassDB::bind_method(D_METHOD("set_tile_all_bullet_curves_data", "value"), &DirectionalBulletsData2D::set_tile_all_bullet_curves_data);
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "tile_all_bullet_curves_data"), "set_tile_all_bullet_curves_data", "get_tile_all_bullet_curves_data");
+
 	ClassDB::bind_method(D_METHOD("get_all_bullet_movement_pattern_paths"), &DirectionalBulletsData2D::get_all_bullet_movement_pattern_paths);
 	ClassDB::bind_method(D_METHOD("set_all_bullet_movement_pattern_paths", "new_paths"), &DirectionalBulletsData2D::set_all_bullet_movement_pattern_paths);
 	ADD_PROPERTY(PropertyInfo(Variant::ARRAY, "all_bullet_movement_pattern_paths", PROPERTY_HINT_ARRAY_TYPE, vformat("%s/%s:%s", Variant::NODE_PATH, PROPERTY_HINT_NODE_PATH_VALID_TYPES, "Path2D")), "set_all_bullet_movement_pattern_paths", "get_all_bullet_movement_pattern_paths");
+
+	ClassDB::bind_method(D_METHOD("get_tile_all_bullet_movement_pattern_paths"), &DirectionalBulletsData2D::get_tile_all_bullet_movement_pattern_paths);
+	ClassDB::bind_method(D_METHOD("set_tile_all_bullet_movement_pattern_paths", "value"), &DirectionalBulletsData2D::set_tile_all_bullet_movement_pattern_paths);
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "tile_all_bullet_movement_pattern_paths"), "set_tile_all_bullet_movement_pattern_paths", "get_tile_all_bullet_movement_pattern_paths");
 
 	ClassDB::bind_method(D_METHOD("get_all_bullet_movement_pattern_face_movement_directions"), &DirectionalBulletsData2D::get_all_bullet_movement_pattern_face_movement_directions);
 	ClassDB::bind_method(D_METHOD("set_all_bullet_movement_pattern_face_movement_directions", "new_flags"), &DirectionalBulletsData2D::set_all_bullet_movement_pattern_face_movement_directions);
 	ADD_PROPERTY(PropertyInfo(Variant::ARRAY, "all_bullet_movement_pattern_face_movement_directions", PROPERTY_HINT_ARRAY_TYPE, "bool"), "set_all_bullet_movement_pattern_face_movement_directions", "get_all_bullet_movement_pattern_face_movement_directions");
 
+	ClassDB::bind_method(D_METHOD("get_tile_all_bullet_movement_pattern_face_movement_directions"), &DirectionalBulletsData2D::get_tile_all_bullet_movement_pattern_face_movement_directions);
+	ClassDB::bind_method(D_METHOD("set_tile_all_bullet_movement_pattern_face_movement_directions", "value"), &DirectionalBulletsData2D::set_tile_all_bullet_movement_pattern_face_movement_directions);
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "tile_all_bullet_movement_pattern_face_movement_directions"), "set_tile_all_bullet_movement_pattern_face_movement_directions", "get_tile_all_bullet_movement_pattern_face_movement_directions");
+
 	ClassDB::bind_method(D_METHOD("get_all_bullet_movement_pattern_repeats"), &DirectionalBulletsData2D::get_all_bullet_movement_pattern_repeats);
 	ClassDB::bind_method(D_METHOD("set_all_bullet_movement_pattern_repeats", "new_flags"), &DirectionalBulletsData2D::set_all_bullet_movement_pattern_repeats);
 	ADD_PROPERTY(PropertyInfo(Variant::ARRAY, "all_bullet_movement_pattern_repeats", PROPERTY_HINT_ARRAY_TYPE, "bool"), "set_all_bullet_movement_pattern_repeats", "get_all_bullet_movement_pattern_repeats");
+
+	ClassDB::bind_method(D_METHOD("get_tile_all_bullet_movement_pattern_repeats"), &DirectionalBulletsData2D::get_tile_all_bullet_movement_pattern_repeats);
+	ClassDB::bind_method(D_METHOD("set_tile_all_bullet_movement_pattern_repeats", "value"), &DirectionalBulletsData2D::set_tile_all_bullet_movement_pattern_repeats);
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "tile_all_bullet_movement_pattern_repeats"), "set_tile_all_bullet_movement_pattern_repeats", "get_tile_all_bullet_movement_pattern_repeats");
 
 	ClassDB::bind_method(D_METHOD("get_homing_smoothing"), &DirectionalBulletsData2D::get_homing_smoothing);
 	ClassDB::bind_method(D_METHOD("set_homing_smoothing", "value"), &DirectionalBulletsData2D::set_homing_smoothing);
@@ -324,6 +393,10 @@ void DirectionalBulletsData2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_all_bullet_wobble_data", "new_data"), &DirectionalBulletsData2D::set_all_bullet_wobble_data);
 	ADD_PROPERTY(PropertyInfo(Variant::ARRAY, "all_bullet_wobble_data", PROPERTY_HINT_ARRAY_TYPE, "BulletWobbleData2D"), "set_all_bullet_wobble_data", "get_all_bullet_wobble_data");
 
+	ClassDB::bind_method(D_METHOD("get_tile_all_bullet_wobble_data"), &DirectionalBulletsData2D::get_tile_all_bullet_wobble_data);
+	ClassDB::bind_method(D_METHOD("set_tile_all_bullet_wobble_data", "value"), &DirectionalBulletsData2D::set_tile_all_bullet_wobble_data);
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "tile_all_bullet_wobble_data"), "set_tile_all_bullet_wobble_data", "get_tile_all_bullet_wobble_data");
+
 	ClassDB::bind_method(D_METHOD("get_gravity"), &DirectionalBulletsData2D::get_gravity);
 	ClassDB::bind_method(D_METHOD("set_gravity", "value"), &DirectionalBulletsData2D::set_gravity);
 	ADD_PROPERTY(PropertyInfo(Variant::VECTOR2, "gravity"), "set_gravity", "get_gravity");
@@ -331,6 +404,10 @@ void DirectionalBulletsData2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_all_bullet_gravity"), &DirectionalBulletsData2D::get_all_bullet_gravity);
 	ClassDB::bind_method(D_METHOD("set_all_bullet_gravity", "new_data"), &DirectionalBulletsData2D::set_all_bullet_gravity);
 	ADD_PROPERTY(PropertyInfo(Variant::ARRAY, "all_bullet_gravity", PROPERTY_HINT_ARRAY_TYPE, "Vector2"), "set_all_bullet_gravity", "get_all_bullet_gravity");
+
+	ClassDB::bind_method(D_METHOD("get_tile_all_bullet_gravity"), &DirectionalBulletsData2D::get_tile_all_bullet_gravity);
+	ClassDB::bind_method(D_METHOD("set_tile_all_bullet_gravity", "value"), &DirectionalBulletsData2D::set_tile_all_bullet_gravity);
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "tile_all_bullet_gravity"), "set_tile_all_bullet_gravity", "get_tile_all_bullet_gravity");
 
 	ClassDB::bind_method(D_METHOD("get_gravity_delay_sec"), &DirectionalBulletsData2D::get_gravity_delay_sec);
 	ClassDB::bind_method(D_METHOD("set_gravity_delay_sec", "value"), &DirectionalBulletsData2D::set_gravity_delay_sec);

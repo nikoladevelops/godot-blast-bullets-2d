@@ -231,7 +231,7 @@ void MultiMeshBullets2D::spawn(const MultiMeshBulletsData2D &data, MultiMeshObje
 	// reset_attachment_state_for_reuse is a no-op here but keeps the invariant in one place).
 	reset_attachment_state_for_reuse();
 
-	set_rotation_data(data.all_bullet_rotation_data, data.rotate_only_textures);
+	set_rotation_data(data.all_bullet_rotation_data, data.rotate_only_textures, data.tile_all_bullet_rotation_data);
 
 	all_previous_instance_transf.resize(amount_bullets);
 	all_previous_attachment_transf.resize(amount_bullets);
@@ -306,10 +306,7 @@ void MultiMeshBullets2D::reset_transient_volley_state(uint64_t new_owner_spawner
 	// Blank attachment state: a reused instance must never carry the previous
 	// owner's attachment slots into the next life.
 	reset_attachment_state_for_reuse();
-	// P0-4: pooling flags are per-new-life defaults, not sticky owner state.
-	// A volley that disabled pooling to take manual ownership must not strand
-	// the next pooled reuse with "don't pool". Users that want manual control
-	// set the flags explicitly after every spawn/enable (documented).
+	// Pooling flags reset every life - if you turned pooling off to hold a volley manually, the next pooled reuse still pools normally unless you turn it off again.
 	reset_pooling_flags_to_default();
 	if (drop_stale_work) {
 		// New life: stale deferred emits/disables (scheduled before a pool
@@ -320,13 +317,10 @@ void MultiMeshBullets2D::reset_transient_volley_state(uint64_t new_owner_spawner
 		++multimesh_generation;
 		disconnect_sprite_animation_connections();
 	}
-	// Fresh lifetime must not inherit stale hits or timers from the previous
-	// owner. disable_multimesh() clears these when pooling is on, but an
-	// instance woken with pooling off (or a direct enable) would leak them.
+	// A fresh volley starts with zero hits and no timers, no matter how the last one died.
 	all_collided_bullets.clear();
 	_do_detach_all_time_based_functions(multimesh_timers_generation);
-	// Same reason: a woken instance that never went through disable_multimesh()
-	// would keep counting curve time from the previous owner.
+	// Same for the volley clock - waking an old instance must not resume the previous owner's curve time.
 	curves_elapsed_time = 0.0;
 	// Animation cursor restarts; baked frames are kept so a same-owner wake
 	// resumes them. New-life paths blank the frames before rebuilding.
@@ -348,15 +342,13 @@ void MultiMeshBullets2D::deactivate_volley() {
 
 // Activates the multimesh
 bool MultiMeshBullets2D::enable_multimesh(const MultiMeshBulletsData2D &data, const Vector2 &new_inherited_velocity_offset, uint64_t spawner_id) {
-	// Pool buckets are keyed by amount, but a direct GDScript call can hand a
-	// mismatched array. set_up_bullet_instances indexes data.transforms by
-	// amount_bullets, so reject early without touching state.
+	// The pool sorts volleys by bullet count, so a wrong-size array here would read past the end - bail before touching anything.
 	if (data.transforms.size() != amount_bullets) {
 		UtilityFunctions::push_error("enable_multimesh: transforms size (" + String::num_int64(data.transforms.size()) + ") must match amount_bullets (" + String::num_int64(amount_bullets) + ").");
 		return false;
 	}
 
-	// Narrow guard: same-shape reuse only rewrites transforms, re-enables
+	// Fast path: same shape and count means we just rewrite transforms instead of rebuilding physics.
 	// shapes and reseeds SoA vectors (no RID alloc/free), so it is safe from
 	// ordinary physics callbacks such as _physics_process shooting. Only a
 	// shape-TYPE change performs structural RID work (area_clear_shapes /
@@ -389,9 +381,9 @@ bool MultiMeshBullets2D::enable_multimesh(const MultiMeshBulletsData2D &data, co
 		return false;
 	}
 
-	// WP-A: two-phase enable. Phase 1 (validate everything) runs before the
+	// Validate everything before touching state; reset + reseed only runs on
 	// first mutation, so a reject below leaves zero state behind and no
-	// rollback is needed. Phase 2 (reset + reseed) only runs on valid input.
+	// valid input, so a rejected enable never needs a rollback.
 	// Wrong-type data is refused here: custom_additional_enable_logic() is
 	// seeding-only now and its own check is unreachable defense-in-depth.
 	if (!is_data_type_compatible(data)) {
@@ -408,7 +400,7 @@ bool MultiMeshBullets2D::enable_multimesh(const MultiMeshBulletsData2D &data, co
 		return false;
 	}
 
-	// WP-B: one reset owns the whole clean-disabled invariant (owner stamp,
+	// One reset owns the whole clean-disabled state (owner stamp,
 	// curves/patterns/subclass ballistics, attachment slots, collided hits,
 	// timers, clocks, animation cursor, generation bump, connection scrub).
 	// Spawner ownership is stamped here (before any re-activation below), so
@@ -424,7 +416,7 @@ bool MultiMeshBullets2D::enable_multimesh(const MultiMeshBulletsData2D &data, co
 	anim_frames.clear();
 	anim_frame_secs.clear();
 	set_texture(Ref<Texture2D>());
-	// WP-A: no snapshot/rollback anymore. Wrong-type input was rejected above
+	// No snapshot/rollback needed. Wrong-type input was rejected above
 	// before any mutation, and every reseed below fully overwrites the blank
 	// state reset_transient_volley_state() left behind.
 	inherited_velocity_offset = new_inherited_velocity_offset;
@@ -451,14 +443,11 @@ bool MultiMeshBullets2D::enable_multimesh(const MultiMeshBulletsData2D &data, co
 
 	++multimesh_generation;
 
-	// Fresh lifetime must not inherit stale hits or timers from the previous
-	// owner. disable_multimesh() clears these when pooling is on, but an
-	// instance woken with pooling off (or a direct enable) would leak them.
+	// A fresh volley starts with zero hits and no timers, no matter how the last one died.
 	all_collided_bullets.clear();
 	_do_detach_all_time_based_functions(multimesh_timers_generation);
 
-	// Same reason: a woken instance that never went through disable_multimesh()
-	// would keep counting curve time from the previous owner.
+	// Same for the volley clock - waking an old instance must not resume the previous owner's curve time.
 	curves_elapsed_time = 0.0;
 
 	set_up_life_time_timer(data.max_life_time, data.max_life_time);
@@ -473,7 +462,7 @@ bool MultiMeshBullets2D::enable_multimesh(const MultiMeshBulletsData2D &data, co
 	// for pooled reuse with new data.
 	apply_shared_bullet_attachment_from_data(data);
 
-	set_rotation_data(data.all_bullet_rotation_data, data.rotate_only_textures);
+	set_rotation_data(data.all_bullet_rotation_data, data.rotate_only_textures, data.tile_all_bullet_rotation_data);
 
 	move_to_front(); // Pooled instances render behind newer ones without this; moving to front emulates fresh spawn order.
 
@@ -519,26 +508,25 @@ void MultiMeshBullets2D::set_up_bullet_instances(const MultiMeshBulletsData2D &d
 		bullets_current_collision_count.clear();
 		bullets_current_collision_count.resize(amount_bullets, 0);
 	} else {
-		bool success = set_bullets_current_collision_count(data.bullets_current_collision_count);
-		if (!success) {
-			// set_* already reported the mismatch; fall back to zeros explicitly so
-			// the vector can't be left half-cleared below by the size check inside.
-			bullets_current_collision_count.clear();
-			bullets_current_collision_count.resize(amount_bullets, 0);
-		}
+		// Always succeeds (fills + warns); uncovered bullets start at 0.
+		set_bullets_current_collision_count(data.bullets_current_collision_count, data.tile_bullets_current_collision_count);
 	}
 
-	// Per-bullet custom data (same fallback rule as speed data; null entries
-	// fall back to the shared value when read).
+	// Per-bullet custom data (strict indexing; strictly separate from
+	// shared_bullets_custom_data - bullets without an entry read null, never
+	// the shared value). Empty = all null, size == N = entry i for bullet i,
+	// short = tail bullets null, long = extras ignored. With the tile
+	// checkbox, short arrays wrap (i % size).
 	all_bullets_custom_data.assign(amount_bullets, Ref<Resource>());
-	if (data.all_bullets_custom_data.size() == amount_bullets) {
-		for (int i = 0; i < amount_bullets; ++i) {
-			all_bullets_custom_data[i] = data.all_bullets_custom_data[i];
+	if (data.all_bullets_custom_data.size() > 0) {
+		const int custom_size = data.all_bullets_custom_data.size();
+		const bool tile_custom = data.tile_all_bullets_custom_data;
+		if (custom_size != amount_bullets) {
+			UtilityFunctions::push_warning("MultiMeshBullets2D: all_bullets_custom_data size (" + String::num_int64(custom_size) + ") != bullets (" + String::num_int64(amount_bullets) + "); uncovered bullets read null" + String(tile_custom ? " (tiling on: wrapping short array)." : " (check tile_all_bullets_custom_data to wrap, or provide one entry per bullet)."));
 		}
-	} else if (data.all_bullets_custom_data.size() > 0) {
-		Ref<Resource> first_custom_data = data.all_bullets_custom_data[0];
 		for (int i = 0; i < amount_bullets; ++i) {
-			all_bullets_custom_data[i] = first_custom_data;
+			const int src = tile_custom ? (i % custom_size) : i;
+			all_bullets_custom_data[i] = (src >= 0 && src < custom_size) ? Ref<Resource>(data.all_bullets_custom_data[src]) : Ref<Resource>();
 		}
 	}
 
@@ -553,8 +541,7 @@ void MultiMeshBullets2D::set_up_bullet_instances(const MultiMeshBulletsData2D &d
 	cache_collision_shape_offset = data.collision_shape_offset;
 
 	if (all_cached_instance_transforms.size() != 0) {
-		// Enabling a pooled multimesh: drop old frame data. Capacity stays put and the
-		// pool always reuses the original amount_bullets, so no reallocation happens here.
+		// Waking a pooled volley: drop last life's frames. The buffers keep their size since the bullet count never changes on reuse.
 		all_cached_instance_transforms.clear();
 		all_cached_instance_origin.clear();
 		all_cached_shape_transforms.clear();
@@ -613,15 +600,7 @@ void MultiMeshBullets2D::set_up_multimesh(int new_instance_count, const Ref<Mesh
 	// with different data cannot inherit a stale quad size.
 	texture_size = new_texture_size;
 
-	// Bullets scatter across the whole level, but frustum culling is tested
-	// once per MultiMeshInstance2D node against the MultiMesh AABB. Without a
-	// custom AABB the box is single-quad-sized at the node origin, so zooming
-	// a Camera2D in culls the ENTIRE volley the moment that tiny box leaves
-	// the frustum. A huge box effectively disables culling for this node
-	// (always drawn); overdraw stays cheap because disabled bullets write
-	// scale-0 transforms. Must live here (not spawn()/ctor): generate_multimesh()
-	// recreates the resource on every fresh spawn.
-	// AABB is Vector3-based even for TRANSFORM_2D, so z must be non-degenerate.
+	// One huge bounding box so the camera can never cull the whole volley by mistake (bullets live all over the level). Hidden bullets cost nothing - they're written as zero-scale.
 	multi->set_custom_aabb(AABB(Vector3(-100000, -100000, -1000), Vector3(200000, 200000, 2000)));
 
 	multi->set_instance_count(new_instance_count);
@@ -851,13 +830,12 @@ void MultiMeshBullets2D::finalize_set_up(
 
 // OTHER
 
-void MultiMeshBullets2D::set_rotation_data(const TypedArray<BulletRotationData2D> &rotation_data, bool new_rotate_only_textures) {
+void MultiMeshBullets2D::set_rotation_data(const TypedArray<BulletRotationData2D> &rotation_data, bool new_rotate_only_textures, bool tile_short_arrays) {
 	int amount_rotation_data = rotation_data.size();
 
-	// If the amount of rotation data is:
-	// 0 -> rotation is disabled
-	// Same as the amount of bullets -> rotation is enabled and each provided rotation data will be used for the corresponding bullet
-	// Otherwise -> rotation is enabled, but only the first data is used
+	// Strict rule: entry i rotates bullet i only. Slots past the end keep
+	// zeros (shared rotation fills those gaps afterwards on Directional).
+	// With the tile checkbox, short arrays wrap (i % size).
 	if (amount_rotation_data == 0) {
 		is_rotation_data_active = false;
 		use_only_first_rotation_data = false;
@@ -873,38 +851,20 @@ void MultiMeshBullets2D::set_rotation_data(const TypedArray<BulletRotationData2D
 
 	is_rotation_data_active = true;
 
-	if (amount_rotation_data == amount_bullets) {
-		use_only_first_rotation_data = false;
-	} else {
-		use_only_first_rotation_data = true;
+	use_only_first_rotation_data = (amount_rotation_data != amount_bullets);
+	if (amount_rotation_data != amount_bullets) {
+		UtilityFunctions::push_warning("MultiMeshBullets2D: all_bullet_rotation_data size (" + String::num_int64(amount_rotation_data) + ") != bullets (" + String::num_int64(amount_bullets) + "); uncovered bullets get zero spin (shared fills gaps on Directional)" + String(tile_short_arrays ? " (tiling on: wrapping short array)." : " (check tile_all_bullet_rotation_data to wrap, or provide one entry per bullet)."));
 	}
 
-	// Validate every element we are about to read. A null or wrong-typed entry would
-	// crash on dereference below, so fail open to no-rotation instead.
-	// Non-finite values would poison the tick path (INF rotation never heals and
-	// NaNs the transform), so they fail open the same way.
-	const int validate_count = use_only_first_rotation_data ? 1 : amount_rotation_data;
-	for (int i = 0; i < validate_count; ++i) {
+	// Validate every element we are about to read. Null/wrong-type entries
+	// seed zeros for that bullet only — never for its siblings. Non-finite
+	// values fail open the same way.
+	for (int i = 0; i < amount_rotation_data; ++i) {
 		BulletRotationData2D *entry = Object::cast_to<BulletRotationData2D>(rotation_data[i]);
 		if (entry == nullptr) {
-			UtilityFunctions::push_error("Invalid rotation data at index " + String::num_int64(i) + ": expected BulletRotationData2D. Ignoring all rotation data.");
-			is_rotation_data_active = false;
-			use_only_first_rotation_data = false;
-			all_rotation_speed.clear();
-			all_max_rotation_speed.clear();
-			all_rotation_acceleration.clear();
-			rotate_only_textures = new_rotate_only_textures;
-			return;
-		}
-		if (!Math::is_finite(entry->rotation_speed) || !Math::is_finite(entry->max_rotation_speed) || !Math::is_finite(entry->rotation_acceleration)) {
-			UtilityFunctions::push_error("Non-finite rotation data at index " + String::num_int64(i) + ": rotation values must be finite. Ignoring all rotation data.");
-			is_rotation_data_active = false;
-			use_only_first_rotation_data = false;
-			all_rotation_speed.clear();
-			all_max_rotation_speed.clear();
-			all_rotation_acceleration.clear();
-			rotate_only_textures = new_rotate_only_textures;
-			return;
+			UtilityFunctions::push_error("Invalid rotation data at index " + String::num_int64(i) + ": expected BulletRotationData2D. Using zeros for that bullet.");
+		} else if (!Math::is_finite(entry->rotation_speed) || !Math::is_finite(entry->max_rotation_speed) || !Math::is_finite(entry->rotation_acceleration)) {
+			UtilityFunctions::push_error("Non-finite rotation data at index " + String::num_int64(i) + ": rotation values must be finite. Using zeros for that bullet.");
 		}
 	}
 
@@ -915,34 +875,121 @@ void MultiMeshBullets2D::set_rotation_data(const TypedArray<BulletRotationData2D
 	all_max_rotation_speed.clear();
 	all_rotation_acceleration.clear();
 
-	if (use_only_first_rotation_data) {
-		// Single rotation data provided but amount_bullets is N -> expand to N identical entries to avoid OOB when consumers index by bullet_index
-		BulletRotationData2D &single_data = *Object::cast_to<BulletRotationData2D>(rotation_data[0]);
-		if (amount_bullets > (int)all_rotation_speed.capacity()) {
-			all_rotation_speed.reserve(amount_bullets);
-			all_max_rotation_speed.reserve(amount_bullets);
-			all_rotation_acceleration.reserve(amount_bullets);
-		}
-		for (int i = 0; i < amount_bullets; ++i) {
-			all_rotation_speed.emplace_back(single_data.rotation_speed);
-			all_max_rotation_speed.emplace_back(single_data.max_rotation_speed);
-			all_rotation_acceleration.emplace_back(single_data.rotation_acceleration);
-		}
-	} else {
-		// Per-bullet data: size must equal amount_bullets
-		if (amount_rotation_data > (int)all_rotation_speed.capacity()) {
-			all_rotation_speed.reserve(amount_rotation_data);
-			all_max_rotation_speed.reserve(amount_rotation_data);
-			all_rotation_acceleration.reserve(amount_rotation_data);
-		}
-		for (int i = 0; i < amount_rotation_data; ++i) {
-			BulletRotationData2D &curr_bullet_data = *Object::cast_to<BulletRotationData2D>(rotation_data[i]);
-
-			all_rotation_speed.emplace_back(curr_bullet_data.rotation_speed);
-			all_max_rotation_speed.emplace_back(curr_bullet_data.max_rotation_speed);
-			all_rotation_acceleration.emplace_back(curr_bullet_data.rotation_acceleration);
-		}
+	if (amount_bullets > (int)all_rotation_speed.capacity()) {
+		all_rotation_speed.reserve(amount_bullets);
+		all_max_rotation_speed.reserve(amount_bullets);
+		all_rotation_acceleration.reserve(amount_bullets);
 	}
+	// Strict: slot i reads entry i. Uncovered slots seed zeros so the
+	// shared-rotation fallback can fill those gaps afterwards. With the tile
+	// checkbox, short arrays wrap (i % size).
+	for (int i = 0; i < amount_bullets; ++i) {
+		const int src = tile_short_arrays ? (i % amount_rotation_data) : i;
+		BulletRotationData2D *entry = (src >= 0 && src < amount_rotation_data) ? Object::cast_to<BulletRotationData2D>(rotation_data[src]) : nullptr;
+		if (entry == nullptr || !Math::is_finite(entry->rotation_speed) || !Math::is_finite(entry->max_rotation_speed) || !Math::is_finite(entry->rotation_acceleration)) {
+			all_rotation_speed.emplace_back(0.0);
+			all_max_rotation_speed.emplace_back(0.0);
+			all_rotation_acceleration.emplace_back(0.0);
+			continue;
+		}
+		all_rotation_speed.emplace_back(entry->rotation_speed);
+		all_max_rotation_speed.emplace_back(entry->max_rotation_speed);
+		all_rotation_acceleration.emplace_back(entry->rotation_acceleration);
+	}
+}
+
+Ref<BulletRotationData2D> MultiMeshBullets2D::get_bullet_rotation_data(int bullet_index) const {
+	Ref<BulletRotationData2D> rotation_data = memnew(BulletRotationData2D);
+
+	if (!validate_bullet_index(bullet_index, "get_bullet_rotation_data")) {
+		return rotation_data;
+	}
+
+	// BlockBullets keeps single entry for rotation - map any index to 0
+	int eff = (all_rotation_speed.size() == 1) ? 0 : bullet_index;
+	if (eff < 0 || eff >= (int)all_rotation_speed.size() || eff >= (int)all_max_rotation_speed.size() || eff >= (int)all_rotation_acceleration.size()) {
+		return rotation_data;
+	}
+	rotation_data->rotation_speed = all_rotation_speed[eff];
+	rotation_data->max_rotation_speed = all_max_rotation_speed[eff];
+	rotation_data->rotation_acceleration = all_rotation_acceleration[eff];
+
+	return rotation_data;
+}
+
+void MultiMeshBullets2D::set_bullet_rotation_data(int bullet_index, const Ref<BulletRotationData2D> &new_bullet_rotation_data) {
+	if (!validate_bullet_index(bullet_index, "set_bullet_rotation_data")) {
+		return;
+	}
+
+	if (new_bullet_rotation_data.is_null()) {
+		UtilityFunctions::push_error("set_bullet_rotation_data: new_bullet_rotation_data is null.");
+		return;
+	}
+
+	if (!Math::is_finite(new_bullet_rotation_data->rotation_speed) || !Math::is_finite(new_bullet_rotation_data->max_rotation_speed) || !Math::is_finite(new_bullet_rotation_data->rotation_acceleration)) {
+		UtilityFunctions::push_error("set_bullet_rotation_data: rotation values must be finite.");
+		return;
+	}
+
+	// Block keeps single entry
+	if (all_rotation_speed.size() == 1) {
+		bullet_index = 0;
+	}
+
+	// A rotation-less volley (empty seed path) has empty vectors: size them
+	// here so a live write wakes rotation instead of silently no-op'ing.
+	// amount_bullets is fixed for the volley's life, so resize is exact.
+	if (all_rotation_speed.empty() || all_max_rotation_speed.empty() || all_rotation_acceleration.empty()) {
+		all_rotation_speed.assign(amount_bullets, 0.0);
+		all_max_rotation_speed.assign(amount_bullets, 0.0);
+		all_rotation_acceleration.assign(amount_bullets, 0.0);
+	}
+
+	if (bullet_index < 0 || bullet_index >= (int)all_rotation_speed.size() || bullet_index >= (int)all_max_rotation_speed.size() || bullet_index >= (int)all_rotation_acceleration.size()) {
+		return;
+	}
+
+	all_rotation_speed[bullet_index] = new_bullet_rotation_data->rotation_speed;
+	all_max_rotation_speed[bullet_index] = new_bullet_rotation_data->max_rotation_speed;
+	all_rotation_acceleration[bullet_index] = new_bullet_rotation_data->rotation_acceleration;
+	// A live write on a rotation-less volley must wake the tick branch:
+	// set_rotation_data only flips this on spawn/enable seeds. Exact-size
+	// writes are per-bullet; anything else fans out like the seed path.
+	is_rotation_data_active = true;
+	use_only_first_rotation_data = false;
+}
+
+TypedArray<BulletRotationData2D> MultiMeshBullets2D::all_bullets_get_rotation_data(int bullet_index_start, int bullet_index_end_inclusive) const {
+	ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_get_rotation_data");
+
+	TypedArray<BulletRotationData2D> arr;
+	for (int i = bullet_index_start; i <= bullet_index_end_inclusive; ++i) {
+		arr.push_back(get_bullet_rotation_data(i));
+	}
+
+	return arr;
+}
+
+void MultiMeshBullets2D::all_bullets_set_rotation_data(const Ref<BulletRotationData2D> &new_bullet_rotation_data, int bullet_index_start, int bullet_index_end_inclusive) {
+	ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_set_rotation_data");
+
+	if (new_bullet_rotation_data.is_null()) {
+		UtilityFunctions::push_error("all_bullets_set_rotation_data: new_bullet_rotation_data is null.");
+		return;
+	}
+
+	for (int i = bullet_index_start; i <= bullet_index_end_inclusive; ++i) {
+		set_bullet_rotation_data(i, new_bullet_rotation_data);
+	}
+}
+
+void MultiMeshBullets2D::clear_bullet_rotation_data() {
+	is_rotation_data_active = false;
+	use_only_first_rotation_data = false;
+	all_rotation_speed.clear();
+	all_max_rotation_speed.clear();
+	all_rotation_acceleration.clear();
 }
 
 Transform2D MultiMeshBullets2D::generate_texture_transform(Transform2D transf, bool is_texture_rotation_permanent, real_t texture_rotation_radians, int bullet_index) {
@@ -1542,7 +1589,12 @@ void MultiMeshBullets2D::set_bullet_texture_rotation_towards_position(int bullet
 	Transform2D &transf = all_cached_instance_transforms[bullet_index];
 
 	Vector2 pos = all_cached_instance_origin[bullet_index];
-	Vector2 dir = (target_position - pos).normalized();
+	const Vector2 to_target = target_position - pos;
+	if (to_target.length_squared() < 0.000001) {
+		UtilityFunctions::push_error("set_bullet_texture_rotation_towards_position: bullet is already at the target position, keeping the old rotation.");
+		return;
+	}
+	Vector2 dir = to_target.normalized();
 	real_t angle = Math::atan2(dir.y, dir.x);
 
 	// Compose with the volley-wide texture offset like the spawn path does
@@ -1767,11 +1819,11 @@ bool MultiMeshBullets2D::get_monitorable() const {
 }
 
 void MultiMeshBullets2D::set_monitorable(bool value) {
-	monitorable = value;
 	if (physics_server == nullptr || !area.is_valid()) {
 		UtilityFunctions::push_error("set_monitorable: multimesh was never spawned through BulletFactory2D.");
 		return;
 	}
+	monitorable = value;
 	physics_server->area_set_monitorable(area, monitorable);
 }
 
@@ -1871,6 +1923,11 @@ void MultiMeshBullets2D::set_bullet_collision_count(int bullet_index, int value)
 void MultiMeshBullets2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_bullet_speed_data", "bullet_index"), &MultiMeshBullets2D::get_bullet_speed_data);
 	ClassDB::bind_method(D_METHOD("set_bullet_speed_data", "bullet_index", "new_bullet_speed_data"), &MultiMeshBullets2D::set_bullet_speed_data);
+	ClassDB::bind_method(D_METHOD("get_bullet_rotation_data", "bullet_index"), &MultiMeshBullets2D::get_bullet_rotation_data);
+	ClassDB::bind_method(D_METHOD("set_bullet_rotation_data", "bullet_index", "new_bullet_rotation_data"), &MultiMeshBullets2D::set_bullet_rotation_data);
+	ClassDB::bind_method(D_METHOD("all_bullets_get_rotation_data", "bullet_index_start", "bullet_index_end_inclusive"), &MultiMeshBullets2D::all_bullets_get_rotation_data, DEFVAL(0), DEFVAL(-1));
+	ClassDB::bind_method(D_METHOD("all_bullets_set_rotation_data", "new_bullet_rotation_data", "bullet_index_start", "bullet_index_end_inclusive"), &MultiMeshBullets2D::all_bullets_set_rotation_data, DEFVAL(0), DEFVAL(-1));
+	ClassDB::bind_method(D_METHOD("clear_bullet_rotation_data"), &MultiMeshBullets2D::clear_bullet_rotation_data);
 	ClassDB::bind_method(D_METHOD("all_bullets_get_speed_data", "bullet_index_start", "bullet_index_end_inclusive"), &MultiMeshBullets2D::all_bullets_get_speed_data, DEFVAL(0), DEFVAL(-1));
 	ClassDB::bind_method(D_METHOD("all_bullets_set_speed_data", "new_bullet_speed_data", "bullet_index_start", "bullet_index_end_inclusive"), &MultiMeshBullets2D::all_bullets_set_speed_data, DEFVAL(0), DEFVAL(-1));
 
@@ -1998,6 +2055,9 @@ void MultiMeshBullets2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_bullets_current_collision_count_no_return", "arr"), &MultiMeshBullets2D::set_bullets_current_collision_count_no_return);
 	ADD_PROPERTY(PropertyInfo(Variant::ARRAY, "bullets_current_collision_count", PROPERTY_HINT_ARRAY_TYPE, "int"), "set_bullets_current_collision_count_no_return", "get_bullets_current_collision_count");
 
+	ClassDB::bind_method(D_METHOD("is_rotation_data_active"), &MultiMeshBullets2D::get_is_rotation_data_active);
+	ClassDB::bind_method(D_METHOD("bullet_get_rotation_speed", "bullet_index"), &MultiMeshBullets2D::bullet_get_rotation_speed);
+
 	ClassDB::bind_method(D_METHOD("get_collision_layer"), &MultiMeshBullets2D::get_collision_layer);
 	ClassDB::bind_method(D_METHOD("set_collision_layer", "new_collision_layer"), &MultiMeshBullets2D::set_collision_layer);
 
@@ -2035,8 +2095,10 @@ void MultiMeshBullets2D::_bind_methods() {
 
 	ClassDB::bind_method(D_METHOD("bullet_set_curves_data", "bullet_index", "data"), &MultiMeshBullets2D::bullet_set_curves_data);
 	ClassDB::bind_method(D_METHOD("bullet_get_curves_data", "bullet_index"), &MultiMeshBullets2D::bullet_get_curves_data);
+	ClassDB::bind_method(D_METHOD("clear_per_bullet_curves_data", "bullet_index"), &MultiMeshBullets2D::clear_per_bullet_curves_data);
 	ClassDB::bind_method(D_METHOD("all_bullets_get_curves_data", "bullet_index_start", "bullet_index_end_inclusive"), &MultiMeshBullets2D::all_bullets_get_curves_data, DEFVAL(0), DEFVAL(-1));
 	ClassDB::bind_method(D_METHOD("all_bullets_set_curves_data", "curves_data", "bullet_index_start", "bullet_index_end_inclusive"), &MultiMeshBullets2D::all_bullets_set_curves_data, DEFVAL(0), DEFVAL(-1));
+	ClassDB::bind_method(D_METHOD("all_bullets_clear_curves_data", "bullet_index_start", "bullet_index_end_inclusive"), &MultiMeshBullets2D::all_bullets_clear_curves_data, DEFVAL(0), DEFVAL(-1));
 
 	ClassDB::bind_method(D_METHOD("get_curves_elapsed_time"), &MultiMeshBullets2D::get_curves_elapsed_time);
 	ClassDB::bind_method(D_METHOD("set_curves_elapsed_time", "new_time"), &MultiMeshBullets2D::set_curves_elapsed_time);
@@ -2062,8 +2124,7 @@ void MultiMeshBullets2D::_bind_methods() {
 			PropertyInfo(Variant::OBJECT, "multimesh_bullets_instance", PROPERTY_HINT_RESOURCE_TYPE, "MultiMeshBullets2D")));
 }
 
-// WP-F: cold paths moved out of the header (per-tick hot paths stay inline).
-// Bodies are unchanged; only the location moved.
+// Cold paths live here; per-tick hot paths stay inline in the header.
 
 void MultiMeshBullets2D::_do_deferred_bullet_disable_attachment(int bullet_index, int expected_generation, uint64_t expected_attachment_id, BulletAttachment2D *expected_attachment) {
 	if (expected_generation != multimesh_generation) {
@@ -2109,8 +2170,7 @@ void MultiMeshBullets2D::_do_emit_sprite_animation_finished(int expected_generat
 }
 
 
-// WP-F: cold paths moved out of the header (per-tick hot paths stay inline).
-// Bodies are unchanged; only the location moved.
+// Cold paths live here; per-tick hot paths stay inline in the header.
 
 void MultiMeshBullets2D::reduce_lifetime(double delta) {
 		if (!Math::is_finite(delta) || delta < 0.0) {

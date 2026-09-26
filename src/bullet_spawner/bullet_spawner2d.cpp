@@ -287,7 +287,7 @@ void PatternPreviewLayer2D::_draw() {
                 draw_circle(p0, dot_radius * first_dot_radius_scale, first_dot_color);
             }
         }
-        // Collision-ring overlay (P2): bounding-radius outline per dot so the
+        // Collision-ring overlay: bounding-radius outline per dot so the
         // editor shows hitbox vs visual. Snapshot radius; <= 0 hides.
         if (ring_radius > 0.0f && ring_width > 0.0f) {
             for (int i = 0; i < dots.size(); i++) {
@@ -522,7 +522,7 @@ void BulletSpawner2D::set_spawn_data(const Ref<DirectionalBulletsData2D> &new_da
 		spawn_data->disconnect("changed", Callable(this, "_on_spawn_data_changed"));
 	}
 	spawn_data = new_data;
-	// P1-7: new resource invalidates the duplicate cache (see header).
+	// A new resource invalidates the duplicate cache (see header).
 	cached_volley_template.unref();
 	cached_spawn_data_id = 0;
 	if (spawn_data.is_valid()) {
@@ -5747,7 +5747,7 @@ void BulletSpawner2D::rebuild_preview() {
     }
     preview_dots_layer->set_dots_data(dots, preview_dot_color, (float)dot_radius);
     preview_dots_layer->set_first_marker(!dots.is_empty(), preview_first_dot_color, kFirstDotRadiusScale);
-    // P2 collision-ring overlay: bounding radius from the volley's shape so
+    // Collision-ring overlay: bounding radius from the volley's shape so
     // the editor shows hitbox vs visual. Off by default; invalid shapes hide.
     {
         float ring_r = 0.0f;
@@ -6670,7 +6670,7 @@ bool BulletSpawner2D::shoot_once() {
     }
     // Duplicate per volley: the user's resource must never be mutated (its
     // transforms get overwritten below), so shared .tres files stay safe.
-    // P1-7 cache: first shot with a resource duplicates once into the
+    // Duplicate cache: first shot with a resource duplicates once into the
     // spawner-owned template; later shots reuse it (transforms overwritten
     // below). In-place edits invalidate via _on_spawn_data_changed, resource
     // swaps via set_spawn_data, so reuse is always fresh.
@@ -6848,7 +6848,7 @@ void BulletSpawner2D::_ready() {
     shooting_paused = false;
     oneshot_volleys_left = -1;
     shoot_time_left = shoot_initial_delay_sec;
-    // P1-8 retarget stagger: an explicit phase is respected verbatim; the
+    // Retarget stagger: an explicit phase is respected verbatim; the
     // default 0 staggers deterministically by instance id so N spawners with
     // the same interval don't group-scan on the same tick. First-pass delay
     // is benign (volley-time resolution already armed each shot).
