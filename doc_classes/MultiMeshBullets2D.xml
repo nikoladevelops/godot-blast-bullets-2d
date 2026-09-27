@@ -11,132 +11,88 @@
 	<methods>
 		<method name="all_bullets_clear_curves_data">
 			<return type="void" />
-			<param index="0" name="bullet_index_start" type="int" default="0" >
-				First bullet index in the range (inclusive).
-			</param>
-			<param index="1" name="bullet_index_end_inclusive" type="int" default="-1" >
-				Last bullet index in the range (inclusive; -1 means the final bullet).
-			</param>
+			<param index="0" name="bullet_index_start" type="int" default="0" />
+			<param index="1" name="bullet_index_end_inclusive" type="int" default="-1" />
 			<description>
 				Clears per-bullet curves over a range (default all) back to the shared fallback (or no curves when unset), mirroring [method clear_per_bullet_homing_smoothing]. Example: [code]bullets.all_bullets_clear_curves_data(); print(bullets.debug_get_curves_info(0)["speed_src"])[/code] prints "shared" or "none".
 			</description>
 		</method>
 		<method name="all_bullets_get_attachments">
 			<return type="BulletAttachment2D[]" />
-			<param index="0" name="bullet_index_start" type="int" default="0" >
-				First bullet index in the range (inclusive).
-			</param>
-			<param index="1" name="bullet_index_end_inclusive" type="int" default="-1" >
-				Last bullet index in the range (inclusive; -1 means the final bullet).
-			</param>
+			<param index="0" name="bullet_index_start" type="int" default="0" />
+			<param index="1" name="bullet_index_end_inclusive" type="int" default="-1" />
 			<description>
 				Get the attachments of all bullets in the specified range. Returns an array of [BulletAttachment2D], which can be null if a bullet doesn't have an attachment.
 			</description>
 		</method>
 		<method name="all_bullets_get_curves_data">
 			<return type="BulletCurvesData2D[]" />
-			<param index="0" name="bullet_index_start" type="int" default="0" >
-				First bullet index in the range (inclusive).
-			</param>
-			<param index="1" name="bullet_index_end_inclusive" type="int" default="-1" >
-				Last bullet index in the range (inclusive; -1 means the final bullet).
-			</param>
+			<param index="0" name="bullet_index_start" type="int" default="0" />
+			<param index="1" name="bullet_index_end_inclusive" type="int" default="-1" />
 			<description>
 				Get the curves data of all bullets in the specified range. Returns an array of [BulletCurvesData2D], which can be null if a bullet doesn't have curves data assigned.
 			</description>
 		</method>
 		<method name="all_bullets_get_custom_data">
 			<return type="Resource[]" />
-			<param index="0" name="bullet_index_start" type="int" default="0" >
-				First bullet index in the range (inclusive).
-			</param>
-			<param index="1" name="bullet_index_end_inclusive" type="int" default="-1" >
-				Last bullet index in the range (inclusive; -1 means the final bullet).
-			</param>
+			<param index="0" name="bullet_index_start" type="int" default="0" />
+			<param index="1" name="bullet_index_end_inclusive" type="int" default="-1" />
 			<description>
 				Get the per-bullet custom data of all bullets in the specified range. Returns an array of [Resource], null where a bullet has none set. Strictly separate from [member shared_bullets_custom_data].
 			</description>
 		</method>
 		<method name="all_bullets_get_direction" qualifiers="const">
 			<return type="Vector2[]" />
-			<param index="0" name="bullet_index_start" type="int" default="0" >
-				First bullet index in the range (inclusive).
-			</param>
-			<param index="1" name="bullet_index_end_inclusive" type="int" default="-1" >
-				Last bullet index in the range (inclusive; -1 means the final bullet).
-			</param>
+			<param index="0" name="bullet_index_start" type="int" default="0" />
+			<param index="1" name="bullet_index_end_inclusive" type="int" default="-1" />
 			<description>
 				Get the direction of all bullets in the specified range. Returns an array of [Vector2] directions.
 			</description>
 		</method>
 		<method name="all_bullets_get_rotation_data" qualifiers="const">
 			<return type="BulletRotationData2D[]" />
-			<param index="0" name="bullet_index_start" type="int" default="0" >
-				First bullet index in the range (inclusive).
-			</param>
-			<param index="1" name="bullet_index_end_inclusive" type="int" default="-1" >
-				Last bullet index in the range (inclusive; -1 means the final bullet).
-			</param>
+			<param index="0" name="bullet_index_start" type="int" default="0" />
+			<param index="1" name="bullet_index_end_inclusive" type="int" default="-1" />
 			<description>
 				Rotation triples over a range (live values, mirrors [method all_bullets_get_speed_data]).
 			</description>
 		</method>
 		<method name="all_bullets_get_speed_data" qualifiers="const">
 			<return type="BulletSpeedData2D[]" />
-			<param index="0" name="bullet_index_start" type="int" default="0" >
-				First bullet index in the range (inclusive).
-			</param>
-			<param index="1" name="bullet_index_end_inclusive" type="int" default="-1" >
-				Last bullet index in the range (inclusive; -1 means the final bullet).
-			</param>
+			<param index="0" name="bullet_index_start" type="int" default="0" />
+			<param index="1" name="bullet_index_end_inclusive" type="int" default="-1" />
 			<description>
 				Get the speed data of all bullets in the specified range. Returns an array of [BulletSpeedData2D].
 			</description>
 		</method>
 		<method name="all_bullets_get_texture_rotation_degrees" qualifiers="const">
 			<return type="float[]" />
-			<param index="0" name="bullet_index_start" type="int" default="0" >
-				First bullet index in the range (inclusive).
-			</param>
-			<param index="1" name="bullet_index_end_inclusive" type="int" default="-1" >
-				Last bullet index in the range (inclusive; -1 means the final bullet).
-			</param>
+			<param index="0" name="bullet_index_start" type="int" default="0" />
+			<param index="1" name="bullet_index_end_inclusive" type="int" default="-1" />
 			<description>
 				Get the texture rotation in degrees of all bullets in the specified range. Returns an array of floats representing the rotation in degrees.
 			</description>
 		</method>
 		<method name="all_bullets_get_texture_rotation_radians" qualifiers="const">
 			<return type="float[]" />
-			<param index="0" name="bullet_index_start" type="int" default="0" >
-				First bullet index in the range (inclusive).
-			</param>
-			<param index="1" name="bullet_index_end_inclusive" type="int" default="-1" >
-				Last bullet index in the range (inclusive; -1 means the final bullet).
-			</param>
+			<param index="0" name="bullet_index_start" type="int" default="0" />
+			<param index="1" name="bullet_index_end_inclusive" type="int" default="-1" />
 			<description>
 				Get the texture rotation in radians of all bullets in the specified range. Returns an array of floats representing the rotation in radians.
 			</description>
 		</method>
 		<method name="all_bullets_get_transforms" qualifiers="const">
 			<return type="Transform2D[]" />
-			<param index="0" name="bullet_index_start" type="int" default="0" >
-				First bullet index in the range (inclusive).
-			</param>
-			<param index="1" name="bullet_index_end_inclusive" type="int" default="-1" >
-				Last bullet index in the range (inclusive; -1 means the final bullet).
-			</param>
+			<param index="0" name="bullet_index_start" type="int" default="0" />
+			<param index="1" name="bullet_index_end_inclusive" type="int" default="-1" />
 			<description>
 				Get the transforms of all bullets in the specified range. Returns an array of [Transform2D].
 			</description>
 		</method>
 		<method name="all_bullets_remove_movement_pattern">
 			<return type="void" />
-			<param index="0" name="start_index" type="int" default="0" >
-				First bullet index in the range (inclusive).
-			</param>
-			<param index="1" name="end_index_inclusive" type="int" default="-1" >
-				Last bullet index in the range (inclusive; -1 means the final bullet).
-			</param>
+			<param index="0" name="start_index" type="int" default="0" />
+			<param index="1" name="end_index_inclusive" type="int" default="-1" />
 			<description>
 				Removes the movement pattern from all bullets in the specified range, making them lose any [Path2D] or [Curve2D] drawn pattern they had and move solely based on their direction and speed data.
 			</description>
@@ -146,24 +102,16 @@
 			<param index="0" name="attachment_scene" type="PackedScene" />
 			<param index="1" name="bullet_attachment_offset" type="Vector2" />
 			<param index="2" name="stick_relative_to_bullet" type="bool" default="true" />
-			<param index="3" name="bullet_index_start" type="int" default="0" >
-				First bullet index in the range (inclusive).
-			</param>
-			<param index="4" name="bullet_index_end_inclusive" type="int" default="-1" >
-				Last bullet index in the range (inclusive; -1 means the final bullet).
-			</param>
+			<param index="3" name="bullet_index_start" type="int" default="0" />
+			<param index="4" name="bullet_index_end_inclusive" type="int" default="-1" />
 			<description>
 				Spawns the same attachment to all bullets in the specified range. An attachment is a [BulletAttachment2D] that can contain a [Node2D] with particles, lights, etc... that will be attached to the bullet and follow it around. You can use the [BulletAttachment2D] properties to control how the attachment behaves and is positioned relative to the bullet. Pooling is keyed by the scene itself, so every loader of the same scene shares one pool bucket.
 			</description>
 		</method>
 		<method name="all_bullets_set_attachment_to_null">
 			<return type="BulletAttachment2D[]" />
-			<param index="0" name="bullet_index_start" type="int" default="0" >
-				First bullet index in the range (inclusive).
-			</param>
-			<param index="1" name="bullet_index_end_inclusive" type="int" default="-1" >
-				Last bullet index in the range (inclusive; -1 means the final bullet).
-			</param>
+			<param index="0" name="bullet_index_start" type="int" default="0" />
+			<param index="1" name="bullet_index_end_inclusive" type="int" default="-1" />
 			<description>
 				Removes the attachments of all bullets in the specified range by setting them to null. Returns an array of the removed [BulletAttachment2D] attachments, which can be useful if you want to reuse them as they are not freed, just detached from the bullets.
 
@@ -173,12 +121,8 @@
 		<method name="all_bullets_set_curves_data">
 			<return type="void" />
 			<param index="0" name="curves_data" type="BulletCurvesData2D" />
-			<param index="1" name="bullet_index_start" type="int" default="0" >
-				First bullet index in the range (inclusive).
-			</param>
-			<param index="2" name="bullet_index_end_inclusive" type="int" default="-1" >
-				Last bullet index in the range (inclusive; -1 means the final bullet).
-			</param>
+			<param index="1" name="bullet_index_start" type="int" default="0" />
+			<param index="2" name="bullet_index_end_inclusive" type="int" default="-1" />
 			<description>
 				Sets the same curves data to all bullets in the specified range. Curves data is a [BulletCurvesData2D] resource that can contain multiple curves used to control different aspects of the bullet's behavior over time, such as movement speed, rotation speed, direction adjustment, etc... Not supported on [BlockBullets2D].
 			</description>
@@ -186,12 +130,8 @@
 		<method name="all_bullets_set_custom_data">
 			<return type="void" />
 			<param index="0" name="new_custom_data" type="Resource" />
-			<param index="1" name="bullet_index_start" type="int" default="0" >
-				First bullet index in the range (inclusive).
-			</param>
-			<param index="2" name="bullet_index_end_inclusive" type="int" default="-1" >
-				Last bullet index in the range (inclusive; -1 means the final bullet).
-			</param>
+			<param index="1" name="bullet_index_start" type="int" default="0" />
+			<param index="2" name="bullet_index_end_inclusive" type="int" default="-1" />
 			<description>
 				Sets the same custom data to all bullets in the specified range. Pass null to clear the per-bullet values (they read as null afterwards, never as the shared value).
 			</description>
@@ -199,12 +139,8 @@
 		<method name="all_bullets_set_direction">
 			<return type="void" />
 			<param index="0" name="new_direction" type="Vector2" />
-			<param index="1" name="bullet_index_start" type="int" default="0" >
-				First bullet index in the range (inclusive).
-			</param>
-			<param index="2" name="bullet_index_end_inclusive" type="int" default="-1" >
-				Last bullet index in the range (inclusive; -1 means the final bullet).
-			</param>
+			<param index="1" name="bullet_index_start" type="int" default="0" />
+			<param index="2" name="bullet_index_end_inclusive" type="int" default="-1" />
 			<description>
 				Sets the direction of all bullets in the specified range to a new direction. The direction gets normalized automatically.
 			</description>
@@ -212,12 +148,8 @@
 		<method name="all_bullets_set_direction_towards_node2d">
 			<return type="void" />
 			<param index="0" name="target_node" type="Node2D" />
-			<param index="1" name="bullet_index_start" type="int" default="0" >
-				First bullet index in the range (inclusive).
-			</param>
-			<param index="2" name="bullet_index_end_inclusive" type="int" default="-1" >
-				Last bullet index in the range (inclusive; -1 means the final bullet).
-			</param>
+			<param index="1" name="bullet_index_start" type="int" default="0" />
+			<param index="2" name="bullet_index_end_inclusive" type="int" default="-1" />
 			<description>
 				Sets the direction of all bullets in the specified range towards a target [Node2D]. The direction gets normalized automatically.
 			</description>
@@ -225,12 +157,8 @@
 		<method name="all_bullets_set_direction_towards_position">
 			<return type="void" />
 			<param index="0" name="target_position" type="Vector2" />
-			<param index="1" name="bullet_index_start" type="int" default="0" >
-				First bullet index in the range (inclusive).
-			</param>
-			<param index="2" name="bullet_index_end_inclusive" type="int" default="-1" >
-				Last bullet index in the range (inclusive; -1 means the final bullet).
-			</param>
+			<param index="1" name="bullet_index_start" type="int" default="0" />
+			<param index="2" name="bullet_index_end_inclusive" type="int" default="-1" />
 			<description>
 				Sets the direction of all bullets in the specified range towards a target global position. The direction gets normalized automatically.
 			</description>
@@ -240,12 +168,8 @@
 			<param index="0" name="curve_pattern" type="Curve2D" />
 			<param index="1" name="face_movement_direction" type="bool" default="false" />
 			<param index="2" name="repeat_pattern" type="bool" default="true" />
-			<param index="3" name="start_index" type="int" default="0" >
-				First bullet index in the range (inclusive).
-			</param>
-			<param index="4" name="end_index_inclusive" type="int" default="-1" >
-				Last bullet index in the range (inclusive; -1 means the final bullet).
-			</param>
+			<param index="3" name="start_index" type="int" default="0" />
+			<param index="4" name="end_index_inclusive" type="int" default="-1" />
 			<description>
 				Sets a [Curve2D] drawn movement pattern to all bullets in the specified range. The bullets will follow the shape of the curve as they move. Not supported on [BlockBullets2D].
 
@@ -259,12 +183,8 @@
 			<param index="0" name="path_holding_pattern" type="Path2D" />
 			<param index="1" name="face_movement_direction" type="bool" default="false" />
 			<param index="2" name="repeat_pattern" type="bool" default="true" />
-			<param index="3" name="start_index" type="int" default="0" >
-				First bullet index in the range (inclusive).
-			</param>
-			<param index="4" name="end_index_inclusive" type="int" default="-1" >
-				Last bullet index in the range (inclusive; -1 means the final bullet).
-			</param>
+			<param index="3" name="start_index" type="int" default="0" />
+			<param index="4" name="end_index_inclusive" type="int" default="-1" />
 			<description>
 				Sets a [Path2D] drawn movement pattern to all bullets in the specified range. The bullets will follow the shape of the path as they move. Not supported on [BlockBullets2D].
 
@@ -276,12 +196,8 @@
 		<method name="all_bullets_set_rotation_data">
 			<return type="void" />
 			<param index="0" name="new_bullet_rotation_data" type="BulletRotationData2D" />
-			<param index="1" name="bullet_index_start" type="int" default="0" >
-				First bullet index in the range (inclusive).
-			</param>
-			<param index="2" name="bullet_index_end_inclusive" type="int" default="-1" >
-				Last bullet index in the range (inclusive; -1 means the final bullet).
-			</param>
+			<param index="1" name="bullet_index_start" type="int" default="0" />
+			<param index="2" name="bullet_index_end_inclusive" type="int" default="-1" />
 			<description>
 				Fans one rotation triple over a range (null and non-finite values rejected). Mirrors [method all_bullets_set_speed_data].
 			</description>
@@ -289,12 +205,8 @@
 		<method name="all_bullets_set_speed_data">
 			<return type="void" />
 			<param index="0" name="new_bullet_speed_data" type="BulletSpeedData2D" />
-			<param index="1" name="bullet_index_start" type="int" default="0" >
-				First bullet index in the range (inclusive).
-			</param>
-			<param index="2" name="bullet_index_end_inclusive" type="int" default="-1" >
-				Last bullet index in the range (inclusive; -1 means the final bullet).
-			</param>
+			<param index="1" name="bullet_index_start" type="int" default="0" />
+			<param index="2" name="bullet_index_end_inclusive" type="int" default="-1" />
 			<description>
 				Sets the same speed data to all bullets in the specified range. Speed data is a [BulletSpeedData2D] resource that can contain multiple properties used to control different aspects of the bullet's speed behavior, such as initial speed, acceleration, deceleration, max speed, etc...
 			</description>
@@ -302,12 +214,8 @@
 		<method name="all_bullets_set_texture_rotation_degrees">
 			<return type="void" />
 			<param index="0" name="new_rotation_degrees" type="float" />
-			<param index="1" name="bullet_index_start" type="int" default="0" >
-				First bullet index in the range (inclusive).
-			</param>
-			<param index="2" name="bullet_index_end_inclusive" type="int" default="-1" >
-				Last bullet index in the range (inclusive; -1 means the final bullet).
-			</param>
+			<param index="1" name="bullet_index_start" type="int" default="0" />
+			<param index="2" name="bullet_index_end_inclusive" type="int" default="-1" />
 			<description>
 				Sets the same texture rotation in degrees to all bullets in the specified range.
 			</description>
@@ -315,12 +223,8 @@
 		<method name="all_bullets_set_texture_rotation_radians">
 			<return type="void" />
 			<param index="0" name="new_rotation_radians" type="float" />
-			<param index="1" name="bullet_index_start" type="int" default="0" >
-				First bullet index in the range (inclusive).
-			</param>
-			<param index="2" name="bullet_index_end_inclusive" type="int" default="-1" >
-				Last bullet index in the range (inclusive; -1 means the final bullet).
-			</param>
+			<param index="1" name="bullet_index_start" type="int" default="0" />
+			<param index="2" name="bullet_index_end_inclusive" type="int" default="-1" />
 			<description>
 				Sets the same texture rotation in radians to all bullets in the specified range.
 			</description>
@@ -328,12 +232,8 @@
 		<method name="all_bullets_set_texture_rotation_towards_node2d">
 			<return type="void" />
 			<param index="0" name="target_node" type="Node2D" />
-			<param index="1" name="bullet_index_start" type="int" default="0" >
-				First bullet index in the range (inclusive).
-			</param>
-			<param index="2" name="bullet_index_end_inclusive" type="int" default="-1" >
-				Last bullet index in the range (inclusive; -1 means the final bullet).
-			</param>
+			<param index="1" name="bullet_index_start" type="int" default="0" />
+			<param index="2" name="bullet_index_end_inclusive" type="int" default="-1" />
 			<description>
 				Sets the texture rotation of all bullets in the specified range towards a target [Node2D].
 				The rotation will be set so that the bullet's texture faces towards the target node.
@@ -342,12 +242,8 @@
 		<method name="all_bullets_set_texture_rotation_towards_position">
 			<return type="void" />
 			<param index="0" name="target_position" type="Vector2" />
-			<param index="1" name="bullet_index_start" type="int" default="0" >
-				First bullet index in the range (inclusive).
-			</param>
-			<param index="2" name="bullet_index_end_inclusive" type="int" default="-1" >
-				Last bullet index in the range (inclusive; -1 means the final bullet).
-			</param>
+			<param index="1" name="bullet_index_start" type="int" default="0" />
+			<param index="2" name="bullet_index_end_inclusive" type="int" default="-1" />
 			<description>
 				Sets the texture rotation of all bullets in the specified range towards a target global position.
 				The rotation will be set so that the bullet's texture faces towards the target position.
@@ -357,12 +253,8 @@
 			<return type="void" />
 			<param index="0" name="new_transform" type="Transform2D" />
 			<param index="1" name="set_direction_based_on_transform" type="bool" default="false" />
-			<param index="2" name="bullet_index_start" type="int" default="0" >
-				First bullet index in the range (inclusive).
-			</param>
-			<param index="3" name="bullet_index_end_inclusive" type="int" default="-1" >
-				Last bullet index in the range (inclusive; -1 means the final bullet).
-			</param>
+			<param index="2" name="bullet_index_start" type="int" default="0" />
+			<param index="3" name="bullet_index_end_inclusive" type="int" default="-1" />
 			<description>
 				Sets the same transform to all bullets in the specified range. A transform is a [Transform2D] that contains the bullet's position, rotation and scale. If you want to set them separately, use [method all_bullets_set_direction], [method all_bullets_set_texture_rotation_degrees], [method all_bullets_set_texture_rotation_radians] or [method all_bullets_set_speed_data].
 
@@ -373,27 +265,21 @@
 		</method>
 		<method name="bullet_disable_attachment">
 			<return type="void" />
-			<param index="0" name="bullet_index" type="int" >
-				Zero-based index of the bullet.
-			</param>
+			<param index="0" name="bullet_index" type="int" />
 			<description>
 				Disables the attachment of a specific bullet by calling its virtual function [method BulletAttachment2D.on_bullet_disable].
 			</description>
 		</method>
 		<method name="bullet_enable_attachment">
 			<return type="void" />
-			<param index="0" name="bullet_index" type="int" >
-				Zero-based index of the bullet.
-			</param>
+			<param index="0" name="bullet_index" type="int" />
 			<description>
 				Enables the attachment of a specific bullet, if it has one.
 			</description>
 		</method>
 		<method name="bullet_free_attachment">
 			<return type="void" />
-			<param index="0" name="bullet_index" type="int" >
-				Zero-based index of the bullet.
-			</param>
+			<param index="0" name="bullet_index" type="int" />
 			<description>
 				Frees the attachment of a specific bullet, removing it from the scene tree and freeing the memory it occupies. Use this if you want to permanently remove an attachment from a bullet and free its resources, instead of just disabling it with [method bullet_disable_attachment].
 
@@ -402,18 +288,14 @@
 		</method>
 		<method name="bullet_get_attachment">
 			<return type="BulletAttachment2D" />
-			<param index="0" name="bullet_index" type="int" >
-				Zero-based index of the bullet.
-			</param>
+			<param index="0" name="bullet_index" type="int" />
 			<description>
 				Gets the attachment of a specific bullet. Returns a [BulletAttachment2D], which can be null if the bullet doesn't have an attachment.
 			</description>
 		</method>
 		<method name="bullet_get_curves_data" qualifiers="const">
 			<return type="BulletCurvesData2D" />
-			<param index="0" name="bullet_index" type="int" >
-				Zero-based index of the bullet.
-			</param>
+			<param index="0" name="bullet_index" type="int" />
 			<description>
 				Gets the curves data of a specific bullet. Returns a [BulletCurvesData2D], which can be null if the bullet doesn't have curves data assigned.
 				Curves data is a [BulletCurvesData2D] resource that can contain multiple curves used to control different aspects of the bullet's behavior over time, such as movement speed, rotation speed, direction adjustment, etc...
@@ -422,27 +304,21 @@
 		</method>
 		<method name="bullet_get_custom_data" qualifiers="const">
 			<return type="Resource" />
-			<param index="0" name="bullet_index" type="int" >
-				Zero-based index of the bullet.
-			</param>
+			<param index="0" name="bullet_index" type="int" />
 			<description>
 				Gets the per-bullet custom data of a specific bullet, null when none is set. Strictly separate from [member shared_bullets_custom_data] - read that member for the shared value.
 			</description>
 		</method>
 		<method name="bullet_get_rotation_speed" qualifiers="const">
 			<return type="float" />
-			<param index="0" name="bullet_index" type="int" >
-				Zero-based index of the bullet.
-			</param>
+			<param index="0" name="bullet_index" type="int" />
 			<description>
 				Effective per-bullet rotation speed (seeded value, live-updated by the tick). 0 when inactive or out of range.
 			</description>
 		</method>
 		<method name="bullet_set_attachment">
 			<return type="void" />
-			<param index="0" name="bullet_index" type="int" >
-				Zero-based index of the bullet.
-			</param>
+			<param index="0" name="bullet_index" type="int" />
 			<param index="1" name="attachment_scene" type="PackedScene" />
 			<param index="2" name="bullet_attachment_offset" type="Vector2" default="Vector2(0, 0)" />
 			<param index="3" name="stick_relative_to_bullet" type="bool" default="true" />
@@ -452,9 +328,7 @@
 		</method>
 		<method name="bullet_set_attachment_to_null">
 			<return type="BulletAttachment2D" />
-			<param index="0" name="bullet_index" type="int" >
-				Zero-based index of the bullet.
-			</param>
+			<param index="0" name="bullet_index" type="int" />
 			<description>
 				Removes the attachment of a specific bullet by setting it to null. Returns the removed [BulletAttachment2D] attachment, which can be useful if you want to reuse it as it is not freed, just detached from the bullet.
 
@@ -465,9 +339,7 @@
 		</method>
 		<method name="bullet_set_curves_data">
 			<return type="void" />
-			<param index="0" name="bullet_index" type="int" >
-				Zero-based index of the bullet.
-			</param>
+			<param index="0" name="bullet_index" type="int" />
 			<param index="1" name="data" type="BulletCurvesData2D" />
 			<description>
 				Sets the curves data of a specific bullet. Curves data is a [BulletCurvesData2D] resource that can contain multiple curves used to control different aspects of the bullet's behavior over time, such as movement speed, rotation speed, direction adjustment, etc... Not supported on [BlockBullets2D]. Pass null to clear back to the shared fallback (see [method clear_per_bullet_curves_data]). Example: [code]bullets.bullet_set_curves_data(0, my_curves); print(bullets.debug_get_curves_info(0)["speed_src"])[/code] prints "per".
@@ -477,9 +349,7 @@
 		</method>
 		<method name="bullet_set_custom_data">
 			<return type="void" />
-			<param index="0" name="bullet_index" type="int" >
-				Zero-based index of the bullet.
-			</param>
+			<param index="0" name="bullet_index" type="int" />
 			<param index="1" name="new_custom_data" type="Resource" />
 			<description>
 				Sets the custom data of a specific bullet. Pass null to clear it (reads as null afterwards, never as the shared value).
@@ -493,18 +363,14 @@
 		</method>
 		<method name="clear_per_bullet_curves_data">
 			<return type="void" />
-			<param index="0" name="bullet_index" type="int" >
-				Zero-based index of the bullet.
-			</param>
+			<param index="0" name="bullet_index" type="int" />
 			<description>
 				Clears one bullet's per-bullet curves back to the shared fallback (or no curves when unset). Same as [method bullet_set_curves_data] with null, kept for symmetry with [method clear_per_bullet_homing_smoothing].
 			</description>
 		</method>
 		<method name="debug_get_attachment_info" qualifiers="const">
 			<return type="Dictionary" />
-			<param index="0" name="bullet_index" type="int" >
-				Zero-based index of the bullet.
-			</param>
+			<param index="0" name="bullet_index" type="int" />
 			<description>
 				Attachment slot introspection: has_attachment, pooling_id, owner_match. owner_match verifies the attachment's owner ids point back at this volley + index (stale ownership after reuse fails here). No range variant exists; loop bullet indices instead.
 			</description>
@@ -529,9 +395,7 @@
 		</method>
 		<method name="disable_bullet">
 			<return type="void" />
-			<param index="0" name="bullet_index" type="int" >
-				Zero-based index of the bullet.
-			</param>
+			<param index="0" name="bullet_index" type="int" />
 			<param index="1" name="disable_bullet_attachment" type="bool" default="true" />
 			<description>
 				Disable a specific bullet from the multimesh
@@ -539,9 +403,7 @@
 		</method>
 		<method name="enable_bullet">
 			<return type="void" />
-			<param index="0" name="bullet_index" type="int" >
-				Zero-based index of the bullet.
-			</param>
+			<param index="0" name="bullet_index" type="int" />
 			<param index="1" name="collision_amount" type="int" default="0" />
 			<param index="2" name="enable_attachment" type="bool" default="true" />
 			<description>
@@ -583,101 +445,74 @@
 		</method>
 		<method name="get_bullet_collision_count" qualifiers="const">
 			<return type="int" />
-			<param index="0" name="bullet_index" type="int" >
-				Zero-based index of the bullet.
-			</param>
+			<param index="0" name="bullet_index" type="int" />
 			<description>
 				Get how many times a specific bullet has collided so far. See [method set_bullet_collision_count] for writing it.
 			</description>
 		</method>
 		<method name="get_bullet_direction" qualifiers="const">
 			<return type="Vector2" />
-			<param index="0" name="bullet_index" type="int" >
-				Zero-based index of the bullet.
-			</param>
+			<param index="0" name="bullet_index" type="int" />
 			<description>
 				Get the direction of a specific bullet. Returns a [Vector2] direction.
 			</description>
 		</method>
 		<method name="get_bullet_global_transform" qualifiers="const">
 			<return type="Transform2D" />
-			<param index="0" name="bullet_index" type="int" >
-				Zero-based index of the bullet.
-			</param>
+			<param index="0" name="bullet_index" type="int" />
 			<description>
 				Get a specific bullet's transform in global space (the caches already hold global-space transforms). Use this when you need world coordinates, for example to spawn child bullets exactly where a bullet died. [method get_bullet_transform] returns the same transform instead.
 			</description>
 		</method>
 		<method name="get_bullet_movement_pattern_curve" qualifiers="const">
 			<return type="Curve2D" />
-			<param index="0" name="bullet_index" type="int" >
-				Zero-based index of the bullet.
-			</param>
+			<param index="0" name="bullet_index" type="int" />
 			<description>
 				Get the movement pattern curve of a specific bullet.
 			</description>
 		</method>
 		<method name="get_bullet_rotation_data" qualifiers="const">
 			<return type="BulletRotationData2D" />
-			<param index="0" name="bullet_index" type="int" >
-				Zero-based index of the bullet.
-			</param>
+			<param index="0" name="bullet_index" type="int" />
 			<description>
 				Live rotation triple of a specific bullet (rotation/max/accel). Read, tweak, and write back with [method set_bullet_rotation_data]. Out-of-range reads return a zeroed resource.
 			</description>
 		</method>
 		<method name="get_bullet_speed_data" qualifiers="const">
 			<return type="BulletSpeedData2D" />
-			<param index="0" name="bullet_index" type="int" >
-				Zero-based index of the bullet.
-			</param>
+			<param index="0" name="bullet_index" type="int" />
 			<description>
 				Get the speed data of a specific bullet. Returns a [BulletSpeedData2D] resource.
 			</description>
 		</method>
 		<method name="get_bullet_texture_rotation_degrees" qualifiers="const">
 			<return type="float" />
-			<param index="0" name="bullet_index" type="int" >
-				Zero-based index of the bullet.
-			</param>
+			<param index="0" name="bullet_index" type="int" />
 			<description>
 				Get the texture rotation in degrees of a specific bullet. Returns a float representing the rotation in degrees.
 			</description>
 		</method>
 		<method name="get_bullet_texture_rotation_radians" qualifiers="const">
 			<return type="float" />
-			<param index="0" name="bullet_index" type="int" >
-				Zero-based index of the bullet.
-			</param>
+			<param index="0" name="bullet_index" type="int" />
 			<description>
 				Get the texture rotation in radians of a specific bullet. Returns a float representing the rotation in radians.
 			</description>
 		</method>
 		<method name="get_bullet_transform" qualifiers="const">
 			<return type="Transform2D" />
-			<param index="0" name="bullet_index" type="int" >
-				Zero-based index of the bullet.
-			</param>
+			<param index="0" name="bullet_index" type="int" />
 			<description>
 				Get the transform of a specific bullet in global space (the same space as [method set_bullet_transform] and [method get_bullet_global_transform]). Returns a [Transform2D] containing the bullet's position, rotation and scale.
 			</description>
 		</method>
 		<method name="get_bullet_velocity" qualifiers="const">
 			<return type="Vector2" />
-			<param index="0" name="bullet_index" type="int" >
-				Zero-based index of the bullet.
-			</param>
+			<param index="0" name="bullet_index" type="int" />
 			<description>
 				Logical velocity of a specific bullet (direction x speed + inherited offset + integrated gravity fall speed when gravity is active). Excludes per-tick pattern/orbit displacement, which steers the movement delta after this value is computed. Use this for gameplay logic such as splitting bullets or speed checks.
 			</description>
 		</method>
-		<method name="get_bullets_current_collision_count" qualifiers="const">
-			<return type="int[]" />
-			<description>
-				Per-bullet collision counters for the whole volley (same order as bullets). Write via the [member bullets_current_collision_count] property: empty seeds zeros, entry [code]i[/code] belongs to bullet [code]i[/code], uncovered bullets start at 0 (or wrap with [member MultiMeshBulletsData2D.tile_bullets_current_collision_count]). Values clamp like [method set_bullet_collision_count].
-			</description>
-		</method>
-
 		<method name="get_collision_layer" qualifiers="const">
 			<return type="int" />
 			<description>
@@ -696,13 +531,6 @@
 				The collision shape currently cached for this multimesh.
 			</description>
 		</method>
-		<method name="get_curves_elapsed_time" qualifiers="const">
-			<return type="float" />
-			<description>
-				Volley clock in seconds since spawn (drives curves, wobble, gravity/homing windows). See [member curves_elapsed_time] for writing it.
-			</description>
-		</method>
-
 		<method name="get_inherited_velocity_offset" qualifiers="const">
 			<return type="Vector2" />
 			<description>
@@ -741,9 +569,7 @@
 		</method>
 		<method name="has_bullet_movement_pattern" qualifiers="const">
 			<return type="bool" />
-			<param index="0" name="bullet_index" type="int" >
-				Zero-based index of the bullet.
-			</param>
+			<param index="0" name="bullet_index" type="int" />
 			<description>
 				Check if a specific bullet has a movement pattern assigned to it, either from a [Path2D] or a [Curve2D].
 				Returns true if the bullet has a movement pattern, false if it doesn't.
@@ -758,9 +584,7 @@
 		</method>
 		<method name="is_bullet_status_enabled">
 			<return type="bool" />
-			<param index="0" name="bullet_index" type="int" >
-				Zero-based index of the bullet.
-			</param>
+			<param index="0" name="bullet_index" type="int" />
 			<description>
 				Check the status of a specific bullet - whether it is enabled (active and visible on screen) or disabled (inactive and invisible)
 			</description>
@@ -837,9 +661,7 @@
 		</method>
 		<method name="remove_bullet_movement_pattern">
 			<return type="void" />
-			<param index="0" name="bullet_index" type="int" >
-				Zero-based index of the bullet.
-			</param>
+			<param index="0" name="bullet_index" type="int" />
 			<description>
 				Removes the movement pattern from a specific bullet, making it lose any [Path2D] or [Curve2D] drawn pattern it had and move solely based on its direction and speed data.
 				Note: If you want to remove the movement pattern from multiple bullets at once, use [method all_bullets_remove_movement_pattern].
@@ -872,9 +694,7 @@
 		</method>
 		<method name="set_bullet_collision_count">
 			<return type="void" />
-			<param index="0" name="bullet_index" type="int" >
-				Zero-based index of the bullet.
-			</param>
+			<param index="0" name="bullet_index" type="int" />
 			<param index="1" name="value" type="int" />
 			<description>
 				Set how many times a specific bullet has collided so far. Negative values become 0, values at or above [member bullet_max_collision_count] become max - 1 (exactly one hit remaining, when the max is above 0). Same clamp as [method enable_bullet]'s wake top-up. See [method get_bullet_collision_count] for reading it.
@@ -882,9 +702,7 @@
 		</method>
 		<method name="set_bullet_direction">
 			<return type="void" />
-			<param index="0" name="bullet_index" type="int" >
-				Zero-based index of the bullet.
-			</param>
+			<param index="0" name="bullet_index" type="int" />
 			<param index="1" name="new_direction" type="Vector2" />
 			<description>
 				Set the direction of a specific bullet to a new direction. The direction gets normalized automatically.
@@ -892,9 +710,7 @@
 		</method>
 		<method name="set_bullet_direction_towards_node2d">
 			<return type="void" />
-			<param index="0" name="bullet_index" type="int" >
-				Zero-based index of the bullet.
-			</param>
+			<param index="0" name="bullet_index" type="int" />
 			<param index="1" name="target_node" type="Node2D" />
 			<description>
 				Set the direction of a specific bullet towards a target [Node2D]. The direction gets normalized automatically.
@@ -902,9 +718,7 @@
 		</method>
 		<method name="set_bullet_direction_towards_position">
 			<return type="void" />
-			<param index="0" name="bullet_index" type="int" >
-				Zero-based index of the bullet.
-			</param>
+			<param index="0" name="bullet_index" type="int" />
 			<param index="1" name="target_position" type="Vector2" />
 			<description>
 				Set the direction of a specific bullet towards a target global position. The direction gets normalized automatically.
@@ -912,9 +726,7 @@
 		</method>
 		<method name="set_bullet_movement_pattern_from_curve">
 			<return type="void" />
-			<param index="0" name="bullet_index" type="int" >
-				Zero-based index of the bullet.
-			</param>
+			<param index="0" name="bullet_index" type="int" />
 			<param index="1" name="curve_pattern" type="Curve2D" />
 			<param index="2" name="face_movement_direction" type="bool" default="false" />
 			<param index="3" name="repeat_pattern" type="bool" default="true" />
@@ -931,9 +743,7 @@
 		</method>
 		<method name="set_bullet_movement_pattern_from_path">
 			<return type="void" />
-			<param index="0" name="bullet_index" type="int" >
-				Zero-based index of the bullet.
-			</param>
+			<param index="0" name="bullet_index" type="int" />
 			<param index="1" name="path_holding_pattern" type="Path2D" />
 			<param index="2" name="face_movement_direction" type="bool" default="false" />
 			<param index="3" name="repeat_pattern" type="bool" default="true" />
@@ -952,9 +762,7 @@
 		</method>
 		<method name="set_bullet_rotation_data">
 			<return type="void" />
-			<param index="0" name="bullet_index" type="int" >
-				Zero-based index of the bullet.
-			</param>
+			<param index="0" name="bullet_index" type="int" />
 			<param index="1" name="new_bullet_rotation_data" type="BulletRotationData2D" />
 			<description>
 				Live per-bullet rotation write (null and non-finite values rejected). Mirrors [method set_bullet_speed_data].
@@ -962,9 +770,7 @@
 		</method>
 		<method name="set_bullet_speed_data">
 			<return type="void" />
-			<param index="0" name="bullet_index" type="int" >
-				Zero-based index of the bullet.
-			</param>
+			<param index="0" name="bullet_index" type="int" />
 			<param index="1" name="new_bullet_speed_data" type="BulletSpeedData2D" />
 			<description>
 				Set the speed data of a specific bullet (null and non-finite values rejected; a winning movement-speed curve blocks the write until cleared). Example: [code]var s = BulletSpeedData2D.new(); s.speed = 200.0; bullets.set_bullet_speed_data(0, s)[/code].
@@ -972,9 +778,7 @@
 		</method>
 		<method name="set_bullet_texture_rotation_degrees">
 			<return type="void" />
-			<param index="0" name="bullet_index" type="int" >
-				Zero-based index of the bullet.
-			</param>
+			<param index="0" name="bullet_index" type="int" />
 			<param index="1" name="new_rotation_degrees" type="float" />
 			<description>
 				Set the texture rotation in degrees of a specific bullet.
@@ -982,9 +786,7 @@
 		</method>
 		<method name="set_bullet_texture_rotation_radians">
 			<return type="void" />
-			<param index="0" name="bullet_index" type="int" >
-				Zero-based index of the bullet.
-			</param>
+			<param index="0" name="bullet_index" type="int" />
 			<param index="1" name="new_rotation_radians" type="float" />
 			<description>
 				Set the texture rotation in radians of a specific bullet. Composes with the volley-wide texture offset, so direction math that strips the offset stays exact. Stick-relative attachments follow immediately.
@@ -992,9 +794,7 @@
 		</method>
 		<method name="set_bullet_texture_rotation_towards_node2d">
 			<return type="void" />
-			<param index="0" name="bullet_index" type="int" >
-				Zero-based index of the bullet.
-			</param>
+			<param index="0" name="bullet_index" type="int" />
 			<param index="1" name="target_node" type="Node2D" />
 			<description>
 				Set the texture rotation of a specific bullet towards a target [Node2D].
@@ -1003,9 +803,7 @@
 		</method>
 		<method name="set_bullet_texture_rotation_towards_position">
 			<return type="void" />
-			<param index="0" name="bullet_index" type="int" >
-				Zero-based index of the bullet.
-			</param>
+			<param index="0" name="bullet_index" type="int" />
 			<param index="1" name="target_position" type="Vector2" />
 			<description>
 				Set the texture rotation of a specific bullet towards a target global position.
@@ -1014,23 +812,13 @@
 		</method>
 		<method name="set_bullet_transform">
 			<return type="void" />
-			<param index="0" name="bullet_index" type="int" >
-				Zero-based index of the bullet.
-			</param>
+			<param index="0" name="bullet_index" type="int" />
 			<param index="1" name="new_transform" type="Transform2D" />
 			<param index="2" name="set_direction_based_on_transform" type="bool" default="false" />
 			<description>
 				Set the transform of a specific bullet, in global space (matching [method get_bullet_transform] and [method get_bullet_global_transform]). Zero-scale and non-finite transforms are rejected. With set_direction_based_on_transform, the logical direction is derived from the transform with the volley-wide texture offset stripped (same convention as the tick), unless a direction curve owns the direction.
 			</description>
 		</method>
-		<method name="set_bullets_current_collision_count_no_return">
-			<return type="void" />
-			<param index="0" name="arr" type="int[]" />
-			<description>
-				Editor/property setter behind [member bullets_current_collision_count] (property setters must return void): empty seeds zeros, entry [code]i[/code] belongs to bullet [code]i[/code], uncovered bullets start at 0, values clamp like [method set_bullet_collision_count]. The resource-level [member MultiMeshBulletsData2D.tile_bullets_current_collision_count] checkbox wraps short arrays on the spawn path instead. Read back with [method get_bullets_current_collision_count].
-			</description>
-		</method>
-
 		<method name="set_collision_layer">
 			<return type="void" />
 			<param index="0" name="new_collision_layer" type="int" />
@@ -1068,14 +856,6 @@
 				Note: cannot run while bullets are being processed or inside a physics frame (same contract as the factory structural methods) - use call_deferred() then.
 			</description>
 		</method>
-		<method name="set_curves_elapsed_time">
-			<return type="void" />
-			<param index="0" name="new_time" type="float" />
-			<description>
-				Writes the volley clock (see [member curves_elapsed_time]): drives curves, wobble, and gravity/homing windows. Reset to 0 on every spawn/enable.
-			</description>
-		</method>
-
 		<method name="set_inherited_velocity_offset">
 			<return type="void" />
 			<param index="0" name="new_offset" type="Vector2" />
@@ -1098,9 +878,7 @@
 		</method>
 		<method name="wake_bullet">
 			<return type="void" />
-			<param index="0" name="bullet_index" type="int" >
-				Zero-based index of the bullet.
-			</param>
+			<param index="0" name="bullet_index" type="int" />
 			<param index="1" name="collision_amount" type="int" default="0" />
 			<param index="2" name="enable_attachment" type="bool" default="true" />
 			<description>

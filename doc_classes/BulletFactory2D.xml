@@ -290,9 +290,7 @@
 		</method>
 		<method name="helper_bullet_layer_index" qualifiers="static">
 			<return type="int" />
-			<param index="0" name="bullet_index" type="int" default="0" >
-				Zero-based index of the bullet.
-			</param>
+			<param index="0" name="bullet_index" type="int" default="0" />
 			<param index="1" name="slot_count" type="int" default="0" />
 			<param index="2" name="layer_count" type="int" default="1" />
 			<param index="3" name="layer_fill" type="int" default="0" />
@@ -1372,9 +1370,7 @@
 		<signal name="block_area_entered">
 			<param index="0" name="hit_target_area" type="Object" />
 			<param index="1" name="block_bullets_instance" type="BlockBullets2D" />
-			<param index="2" name="bullet_index" type="int" >
-				Zero-based index of the bullet.
-			</param>
+			<param index="2" name="bullet_index" type="int" />
 			<description>
 				Emitted synchronously in the physics tick when a block bullet enters a physics area. Same handler contract as [signal directional_area_entered].
 			</description>
@@ -1382,9 +1378,7 @@
 		<signal name="block_body_entered">
 			<param index="0" name="hit_target_body" type="Object" />
 			<param index="1" name="block_bullets_instance" type="BlockBullets2D" />
-			<param index="2" name="bullet_index" type="int" >
-				Zero-based index of the bullet.
-			</param>
+			<param index="2" name="bullet_index" type="int" />
 			<description>
 				Emitted synchronously in the physics tick when a block bullet enters a physics body. Same handler contract as [signal directional_body_entered].
 			</description>
@@ -1399,9 +1393,7 @@
 		<signal name="directional_area_entered">
 			<param index="0" name="hit_target_area" type="Object" />
 			<param index="1" name="directional_bullets_instance" type="DirectionalBullets2D" />
-			<param index="2" name="bullet_index" type="int" >
-				Zero-based index of the bullet.
-			</param>
+			<param index="2" name="bullet_index" type="int" />
 			<description>
 				Emitted synchronously in the physics tick when a directional bullet enters a physics area. Handlers run with live instance state (no casts needed); custom data and transforms are one instance call away (bullet_get_custom_data(), get_bullet_global_transform()). Only structural factory calls (reset/free_*/populate_*) must be deferred - the error message says so when it happens.
 			</description>
@@ -1409,9 +1401,7 @@
 		<signal name="directional_body_entered">
 			<param index="0" name="hit_target_body" type="Object" />
 			<param index="1" name="directional_bullets_instance" type="DirectionalBullets2D" />
-			<param index="2" name="bullet_index" type="int" >
-				Zero-based index of the bullet.
-			</param>
+			<param index="2" name="bullet_index" type="int" />
 			<description>
 				Emitted synchronously in the physics tick when a directional bullet enters a physics body.
 
@@ -1421,9 +1411,7 @@
 		<signal name="directional_bounce_area_entered">
 			<param index="0" name="hit_target_area" type="Object" />
 			<param index="1" name="directional_bullets_instance" type="DirectionalBullets2D" />
-			<param index="2" name="bullet_index" type="int" >
-				Zero-based index of the bullet.
-			</param>
+			<param index="2" name="bullet_index" type="int" />
 			<description>
 				Emitted synchronously in the physics tick when a directional bullet bounces off a physics area (the target's layer matched the volley's bounce mask). Same handler contract as [signal directional_area_entered]. A bounce that also consumes the hit ([member DirectionalBulletsData2D.bounce_hit_consumed]) emits BOTH this signal and [signal directional_area_entered].
 			</description>
@@ -1431,9 +1419,7 @@
 		<signal name="directional_bounce_body_entered">
 			<param index="0" name="hit_target_body" type="Object" />
 			<param index="1" name="directional_bullets_instance" type="DirectionalBullets2D" />
-			<param index="2" name="bullet_index" type="int" >
-				Zero-based index of the bullet.
-			</param>
+			<param index="2" name="bullet_index" type="int" />
 			<description>
 				Emitted synchronously in the physics tick when a directional bullet bounces off a physics body (the target's layer matched the volley's bounce mask). Same handler contract as [signal directional_body_entered]. A bounce that also consumes the hit ([member DirectionalBulletsData2D.bounce_hit_consumed]) emits BOTH this signal and [signal directional_body_entered].
 			</description>

@@ -16,9 +16,7 @@
 	<methods>
 		<method name="set_bounce_mask_from_array">
 			<return type="void" />
-			<param index="0" name="array_of_masks" type="int[]">
-				Collision layer numbers (1-32) that trigger a bounce. Entries outside 1-32 are skipped with an error.
-			</param>
+			<param index="0" name="array_of_masks" type="int[]" />
 			<description>
 				Builds [member bounce_mask] from layer numbers instead of raw bits. Example: [code]set_bounce_mask_from_array([4])[/code] bounces off layer-4 targets. The resulting bits must overlap [member MultiMeshBulletsData2D.collision_mask], otherwise those targets are never detected at all.
 			</description>
