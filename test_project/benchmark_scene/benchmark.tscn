@@ -18,6 +18,7 @@ max_speed = 200.0
 acceleration = 20.0
 
 [sub_resource type="BulletWobbleData2D" id="BulletWobbleData2D_mouoi"]
+enabled = true
 
 [sub_resource type="SpriteFrames" id="SpriteFrames_y4v7i"]
 animations = [{
@@ -33,14 +34,13 @@ animations = [{
 [sub_resource type="DirectionalBulletsData2D" id="DirectionalBulletsData2D_nkrfg"]
 shared_bullet_speed_data = SubResource("BulletSpeedData2D_mouoi")
 shared_bullet_wobble_data = SubResource("BulletWobbleData2D_mouoi")
-shared_movement_pattern_face_movement_direction = true
 bounce_mask = 1
-bounce_strength = 2.0
-bounce_rotation_smooth = 10.0
+bounce_strength = 5.0
+shared_movement_pattern_face_movement_direction = true
 sprite_frames = SubResource("SpriteFrames_y4v7i")
 texture_size = Vector2(127, 127)
-collision_layer = 2
 max_life_time = 10.0
+collision_layer = 2
 
 [sub_resource type="Gradient" id="Gradient_rfik0"]
 colors = PackedColorArray(0.215686, 0.215686, 0.215686, 1, 0.215686, 0.215686, 0.215686, 1)
@@ -90,11 +90,9 @@ helper_star_points = 25
 helper_diamond_diagonal_x = 255.0
 helper_path2d_path = NodePath("../Paths/Path2D")
 burst_enabled = true
-homing_enabled = true
 homing_node_group = &"player"
 homing_target_path = NodePath("../Player")
 shared_homing_auto_pop_after_target_reached = true
-orbiting_enabled = true
 orbiting_radius = 300.0
 orbiting_radius_start = 350.0
 orbiting_follow_mode = 1

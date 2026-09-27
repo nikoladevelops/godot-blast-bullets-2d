@@ -296,6 +296,15 @@ protected:
 	// Monotonic tick id for the one-bounce-per-bullet-per-tick guard (a
 	// target carrying both a body and an area would otherwise double-flip).
 	uint64_t bounce_tick_counter = 0;
+	// Per-bullet bounce speed multiplier. Curves, acceleration and drag
+	// rewrite all_cached_speed every tick, which would erase a bounce boost
+	// on the very next frame. The multiplier re-applies below so an uncapped
+	// strength persists (1.0 = untouched). Reset on every new life/wake.
+	std::vector<real_t> all_bounce_speed_multiplier;
+	// Volley latch: true once any bullet carries a multiplier != 1. Sticky
+	// on purpose (per-bullet exact check does the real work); cleared on
+	// new life, teardown and disarm.
+	bool bounce_speed_scaled = false;
 	// Last physics delta, used to size the first smooth step at bounce time.
 	double bounce_last_delta = 0.016;
 	// Once-flag so the mask-mismatch footgun warns once per life instead of
@@ -315,6 +324,8 @@ protected:
 			all_bounce_last_tick.clear();
 			bounce_visual_pending.clear();
 			bounce_visual_target.clear();
+			all_bounce_speed_multiplier.clear();
+			bounce_speed_scaled = false;
 			return;
 		}
 		if ((int)all_bounce_count.size() != amount_bullets) {
@@ -331,6 +342,9 @@ protected:
 		}
 		if ((int)bounce_visual_target.size() != amount_bullets) {
 			bounce_visual_target.assign(amount_bullets, Vector2(1, 0));
+		}
+		if ((int)all_bounce_speed_multiplier.size() != amount_bullets) {
+			all_bounce_speed_multiplier.assign(amount_bullets, 1.0);
 		}
 	}
 
@@ -1174,6 +1188,21 @@ public:
 				all_cached_velocity[i] = all_cached_direction[i] * shared_movement_speed_val + inherited_velocity_offset + ((i >= 0 && i < (int)all_gravity_velocity.size()) ? all_gravity_velocity[i] : Vector2(0, 0));
 			} else {
 				bullet_accelerate_speed(i, delta);
+			}
+			// Bounce boost vs curve overwrite: curves rewrite speed every
+			// tick, which would erase a bounce boost on the next frame, so
+			// re-apply this bullet's cumulative multiplier on curve-driven
+			// ticks. Plain accel needs no rescale (the boost rides inside
+			// the cached speed and the bounce-time ceiling raise keeps its
+			// clamp away); drag below then decays the scaled total.
+			if ((is_per_bullet_curves_valid && per_bullet_curves_data != nullptr && per_bullet_curves_data->movement_speed_curve.is_valid()) || shared_curves_acceleration_curve_valid) {
+				if (bounce_speed_scaled && i >= 0 && i < (int)all_bounce_speed_multiplier.size()) {
+					const real_t bmult = all_bounce_speed_multiplier[i];
+					if (Math::is_finite((double)bmult) && bmult != (real_t)1.0) {
+						all_cached_speed[i] *= bmult;
+						all_cached_velocity[i] = all_cached_direction[i] * all_cached_speed[i] + inherited_velocity_offset + ((i >= 0 && i < (int)all_gravity_velocity.size()) ? all_gravity_velocity[i] : Vector2(0, 0));
+					}
+				}
 			}
 			if (linear_drag > 0.0 && Math::is_finite(linear_drag)) {
 				const real_t keep = Math::max((real_t)0.0, (real_t)1.0 - linear_drag * (real_t)delta);
@@ -3415,13 +3444,16 @@ public:
 			all_bounce_last_tick.assign(amount_bullets, 0);
 			bounce_visual_pending.assign(amount_bullets, 0);
 			bounce_visual_target.assign(amount_bullets, Vector2(1, 0));
+			all_bounce_speed_multiplier.assign(amount_bullets, 1.0);
 		} else {
 			all_bounce_count.clear();
 			all_bounce_cooldown.clear();
 			all_bounce_last_tick.clear();
 			bounce_visual_pending.clear();
 			bounce_visual_target.clear();
+			all_bounce_speed_multiplier.clear();
 		}
+		bounce_speed_scaled = false;
 		bounce_mask_warning_issued = false;
 		// The #1 silent misconfiguration: bounce layers the bullet can never
 		// detect because its collision_mask does not cover them. Warn once
@@ -3965,6 +3997,8 @@ public:
 		all_bounce_last_tick.clear();
 		bounce_visual_pending.clear();
 		bounce_visual_target.clear();
+		all_bounce_speed_multiplier.clear();
+		bounce_speed_scaled = false;
 		bounce_mask_warning_issued = false;
 	}
 
@@ -3996,6 +4030,12 @@ public:
 		}
 		if (bullet_index < (int)bounce_visual_pending.size()) {
 			bounce_visual_pending[bullet_index] = 0;
+		}
+		// A wake starts fresh like every other bounce ledger entry: without
+		// this a re-enabled bullet would keep scaling curve/accel ticks by
+		// a stale boost from its previous life.
+		if (bullet_index < (int)all_bounce_speed_multiplier.size()) {
+			all_bounce_speed_multiplier[bullet_index] = 1.0;
 		}
 		if (bullet_index >= (int)all_bullet_homing_targets.size()) {
 			return;

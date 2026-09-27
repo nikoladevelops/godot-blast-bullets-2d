@@ -1225,7 +1225,7 @@
 			Bitmask of target collision layers that trigger a bounce, set live. Takes precedence over the normal collision path. 0 (default) disables bouncing. Spawn-time equivalent lives on [member DirectionalBulletsData2D.bounce_mask] (reseeded on every pool reuse).
 		</member>
 		<member name="bounce_strength" type="float" setter="set_bounce_strength" getter="get_bounce_strength" default="1.0">
-			Speed multiplier applied on every bounce, set live (finite, 0 or more, no upper cap). 1.0 is perfectly elastic, 0 dead-stops.
+			Speed multiplier applied on every bounce, set live (finite, 0 or more, no upper cap). 1.0 is perfectly elastic, 0 dead-stops. The boost sticks: the bounce raises the bullet's cached max speed to the new speed and a per-bullet multiplier persists across speed-curve overwrites.
 		</member>
 		<member name="bounce_hit_consumed" type="bool" setter="set_bounce_hit_consumed" getter="get_bounce_hit_consumed" default="false">
 			Whether a bounce also counts as a normal hit, set live. False (default) means free bounces. A consumed bounce emits BOTH the bounce signal and the matching area/body signal.

@@ -2005,6 +2005,7 @@ void MultiMeshBullets2D::_bind_methods() {
 
 	ClassDB::bind_method(D_METHOD("get_shared_bullets_custom_data"), &MultiMeshBullets2D::get_shared_bullets_custom_data);
 	ClassDB::bind_method(D_METHOD("set_shared_bullets_custom_data", "new_shared_bullets_custom_data"), &MultiMeshBullets2D::set_shared_bullets_custom_data);
+	ADD_GROUP("Custom Data", "");
 	ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "shared_bullets_custom_data"), "set_shared_bullets_custom_data", "get_shared_bullets_custom_data");
 
 	ClassDB::bind_method(D_METHOD("bullet_get_custom_data", "bullet_index"), &MultiMeshBullets2D::bullet_get_custom_data);
@@ -2014,6 +2015,7 @@ void MultiMeshBullets2D::_bind_methods() {
 
 	ClassDB::bind_method(D_METHOD("get_is_life_time_infinite"), &MultiMeshBullets2D::get_is_life_time_infinite);
 	ClassDB::bind_method(D_METHOD("set_is_life_time_infinite", "value"), &MultiMeshBullets2D::set_is_life_time_infinite);
+	ADD_GROUP("Lifetime", "");
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "is_life_time_infinite"), "set_is_life_time_infinite", "get_is_life_time_infinite");
 
 	// Time based functions
@@ -2030,6 +2032,7 @@ void MultiMeshBullets2D::_bind_methods() {
 
 	ClassDB::bind_method(D_METHOD("get_is_multimesh_auto_pooling_enabled"), &MultiMeshBullets2D::get_is_multimesh_auto_pooling_enabled);
 	ClassDB::bind_method(D_METHOD("set_is_multimesh_auto_pooling_enabled", "value"), &MultiMeshBullets2D::set_is_multimesh_auto_pooling_enabled);
+	ADD_GROUP("Pooling", "");
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "is_multimesh_auto_pooling_enabled"), "set_is_multimesh_auto_pooling_enabled", "get_is_multimesh_auto_pooling_enabled");
 
 	ClassDB::bind_method(D_METHOD("get_is_attachments_auto_pooling_enabled"), &MultiMeshBullets2D::get_is_attachments_auto_pooling_enabled);
@@ -2047,6 +2050,7 @@ void MultiMeshBullets2D::_bind_methods() {
 	// Collision
 	ClassDB::bind_method(D_METHOD("get_bullet_max_collision_count"), &MultiMeshBullets2D::get_bullet_max_collision_count);
 	ClassDB::bind_method(D_METHOD("set_bullet_max_collision_count", "value"), &MultiMeshBullets2D::set_bullet_max_collision_count);
+	ADD_GROUP("Collision", "");
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "bullet_max_collision_count"), "set_bullet_max_collision_count", "get_bullet_max_collision_count");
 
 	ClassDB::bind_method(D_METHOD("get_bullet_collision_count", "bullet_index"), &MultiMeshBullets2D::get_bullet_collision_count);
@@ -2086,6 +2090,7 @@ void MultiMeshBullets2D::_bind_methods() {
 
 	ClassDB::bind_method(D_METHOD("set_shared_bullet_curves_data", "data"), &MultiMeshBullets2D::set_shared_bullet_curves_data);
 	ClassDB::bind_method(D_METHOD("get_shared_bullet_curves_data"), &MultiMeshBullets2D::get_shared_bullet_curves_data);
+	ADD_GROUP("Curves", "");
 	ADD_PROPERTY(
 			PropertyInfo(Variant::OBJECT, "shared_bullet_curves_data", PROPERTY_HINT_RESOURCE_TYPE, "BulletCurvesData2D"),
 			"set_shared_bullet_curves_data", "get_shared_bullet_curves_data");

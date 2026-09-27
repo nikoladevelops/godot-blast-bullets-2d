@@ -19,6 +19,7 @@ void BlockBulletsData2D::set_block_speed(const Ref<BulletSpeedData2D> &new_block
 }
 
 void BlockBulletsData2D::_bind_methods() {
+	ADD_GROUP("Block Bullets", "");
 	ClassDB::bind_method(D_METHOD("get_block_rotation_radians"), &BlockBulletsData2D::get_block_rotation_radians);
 	ClassDB::bind_method(D_METHOD("set_block_rotation_radians", "new_block_rotation_radians"), &BlockBulletsData2D::set_block_rotation_radians);
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "block_rotation_radians"), "set_block_rotation_radians", "get_block_rotation_radians");

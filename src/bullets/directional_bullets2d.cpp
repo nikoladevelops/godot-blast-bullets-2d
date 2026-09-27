@@ -1054,9 +1054,24 @@ int DirectionalBullets2D::try_handle_bounce(CollisionType collision_type, int bu
 	if (!new_dir.is_finite()) {
 		new_dir = dir;
 	}
-	if (bullet_index < (int)all_cached_max_speed.size() && all_cached_max_speed[bullet_index] > 0.0 && new_speed > all_cached_max_speed[bullet_index]) {
-		new_speed = all_cached_max_speed[bullet_index];
-		refl = new_dir * new_speed;
+	// Strength is uncapped by design: a strong bounce raises the cached
+	// ceiling instead of clamping back down, so the boost survives the
+	// next tick's acceleration clamp. The per-bullet multiplier carries
+	// the same boost across curve overwrites (curves rewrite speed every
+	// tick, see the speed section); plain accel carries it inside the
+	// cached speed. Multipliers accumulate across bounces in one life.
+	if (Math::is_finite((double)new_speed)) {
+		if (bullet_index < (int)all_cached_max_speed.size() && all_cached_max_speed[bullet_index] > 0.0 && new_speed > all_cached_max_speed[bullet_index]) {
+			all_cached_max_speed[bullet_index] = new_speed;
+		}
+		if (bullet_index < 0 || bullet_index >= (int)all_bounce_speed_multiplier.size()) {
+			ensure_bounce_vectors();
+		}
+		if (bullet_index >= 0 && bullet_index < (int)all_bounce_speed_multiplier.size()) {
+			const real_t updated = all_bounce_speed_multiplier[bullet_index] * bounce_strength;
+			all_bounce_speed_multiplier[bullet_index] = Math::is_finite((double)updated) ? updated : (real_t)1.0;
+			bounce_speed_scaled = true;
+		}
 	}
 	// A non-StayLocked lock breaks: the bullet left the ring by definition.
 	if (bullet_index < (int)all_orbiting_status.size() && bullet_index < (int)all_orbiting_data.size() && all_orbiting_status[bullet_index] && all_orbiting_data[bullet_index].is_locked_orbiting) {
@@ -1221,7 +1236,7 @@ void DirectionalBullets2D::_bind_methods() {
 	// gets them too); only the property is declared here.
 	ADD_PROPERTY(PropertyInfo(Variant::VECTOR2, "inherited_velocity_offset"), "set_inherited_velocity_offset", "get_inherited_velocity_offset");
 
-	ADD_GROUP("Rotation", "");
+	ADD_GROUP("Bullet Rotation", "");
 
 	ClassDB::bind_method(D_METHOD("get_adjust_direction_based_on_rotation"), &DirectionalBullets2D::get_adjust_direction_based_on_rotation);
 	ClassDB::bind_method(D_METHOD("set_adjust_direction_based_on_rotation", "value"), &DirectionalBullets2D::set_adjust_direction_based_on_rotation);
@@ -1231,7 +1246,13 @@ void DirectionalBullets2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_shared_bullet_rotation_data", "new_rotation_data"), &DirectionalBullets2D::set_shared_bullet_rotation_data);
 	ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "shared_bullet_rotation_data", PROPERTY_HINT_RESOURCE_TYPE, "BulletRotationData2D"), "set_shared_bullet_rotation_data", "get_shared_bullet_rotation_data");
 
-	ADD_GROUP("Gravity and Drag", "");
+	ADD_GROUP("Wobble", "");
+	ClassDB::bind_method(D_METHOD("get_shared_bullet_wobble_data"), &DirectionalBullets2D::get_shared_bullet_wobble_data);
+	ClassDB::bind_method(D_METHOD("set_shared_bullet_wobble_data", "new_wobble_data"), &DirectionalBullets2D::set_shared_bullet_wobble_data);
+	ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "shared_bullet_wobble_data", PROPERTY_HINT_RESOURCE_TYPE, "BulletWobbleData2D"), "set_shared_bullet_wobble_data", "get_shared_bullet_wobble_data");
+
+
+	ADD_GROUP("Gravity", "");
 	ClassDB::bind_method(D_METHOD("get_gravity"), &DirectionalBullets2D::get_gravity);
 	ClassDB::bind_method(D_METHOD("set_gravity", "value"), &DirectionalBullets2D::set_gravity);
 	ADD_PROPERTY(PropertyInfo(Variant::VECTOR2, "gravity"), "set_gravity", "get_gravity");
@@ -1257,6 +1278,38 @@ void DirectionalBullets2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_linear_drag"), &DirectionalBullets2D::get_linear_drag);
 	ClassDB::bind_method(D_METHOD("set_linear_drag", "value"), &DirectionalBullets2D::set_linear_drag);
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "linear_drag"), "set_linear_drag", "get_linear_drag");
+
+	ADD_GROUP("Bounce and Ricochet", "");
+	// BOUNCE / RICOCHET RUNTIME API (spawn-data equivalents, editable live).
+	ClassDB::bind_method(D_METHOD("get_bounce_mask"), &DirectionalBullets2D::get_bounce_mask);
+	ClassDB::bind_method(D_METHOD("set_bounce_mask", "value"), &DirectionalBullets2D::set_bounce_mask);
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "bounce_mask", PROPERTY_HINT_LAYERS_2D_PHYSICS), "set_bounce_mask", "get_bounce_mask");
+	ClassDB::bind_method(D_METHOD("set_bounce_mask_from_array", "array_of_masks"), &DirectionalBullets2D::set_bounce_mask_from_array);
+	ClassDB::bind_method(D_METHOD("get_bounce_strength"), &DirectionalBullets2D::get_bounce_strength);
+	ClassDB::bind_method(D_METHOD("set_bounce_strength", "value"), &DirectionalBullets2D::set_bounce_strength);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "bounce_strength"), "set_bounce_strength", "get_bounce_strength");
+	ClassDB::bind_method(D_METHOD("get_bounce_hit_consumed"), &DirectionalBullets2D::get_bounce_hit_consumed);
+	ClassDB::bind_method(D_METHOD("set_bounce_hit_consumed", "value"), &DirectionalBullets2D::set_bounce_hit_consumed);
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "bounce_hit_consumed"), "set_bounce_hit_consumed", "get_bounce_hit_consumed");
+	ClassDB::bind_method(D_METHOD("get_bounce_max_count"), &DirectionalBullets2D::get_bounce_max_count);
+	ClassDB::bind_method(D_METHOD("set_bounce_max_count", "value"), &DirectionalBullets2D::set_bounce_max_count);
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "bounce_max_count", PROPERTY_HINT_RANGE, "0,1000000,1"), "set_bounce_max_count", "get_bounce_max_count");
+	ClassDB::bind_method(D_METHOD("get_bounce_mode"), &DirectionalBullets2D::get_bounce_mode);
+	ClassDB::bind_method(D_METHOD("set_bounce_mode", "value"), &DirectionalBullets2D::set_bounce_mode);
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "bounce_mode", PROPERTY_HINT_ENUM, "Simple Radial,Precise Shape"), "set_bounce_mode", "get_bounce_mode");
+	ClassDB::bind_method(D_METHOD("get_bounce_rotate_texture"), &DirectionalBullets2D::get_bounce_rotate_texture);
+	ClassDB::bind_method(D_METHOD("set_bounce_rotate_texture", "value"), &DirectionalBullets2D::set_bounce_rotate_texture);
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "bounce_rotate_texture"), "set_bounce_rotate_texture", "get_bounce_rotate_texture");
+	ClassDB::bind_method(D_METHOD("get_bounce_rotation_smooth"), &DirectionalBullets2D::get_bounce_rotation_smooth);
+	ClassDB::bind_method(D_METHOD("set_bounce_rotation_smooth", "value"), &DirectionalBullets2D::set_bounce_rotation_smooth);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "bounce_rotation_smooth"), "set_bounce_rotation_smooth", "get_bounce_rotation_smooth");
+	ClassDB::bind_method(D_METHOD("get_bounce_randomness_deg"), &DirectionalBullets2D::get_bounce_randomness_deg);
+	ClassDB::bind_method(D_METHOD("set_bounce_randomness_deg", "value"), &DirectionalBullets2D::set_bounce_randomness_deg);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "bounce_randomness_deg", PROPERTY_HINT_RANGE, "0,180,0.1"), "set_bounce_randomness_deg", "get_bounce_randomness_deg");
+	ClassDB::bind_method(D_METHOD("get_bounce_cooldown_sec"), &DirectionalBullets2D::get_bounce_cooldown_sec);
+	ClassDB::bind_method(D_METHOD("set_bounce_cooldown_sec", "value"), &DirectionalBullets2D::set_bounce_cooldown_sec);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "bounce_cooldown_sec"), "set_bounce_cooldown_sec", "get_bounce_cooldown_sec");
+
 	ClassDB::bind_method(D_METHOD("bullet_get_bounce_count", "bullet_index"), &DirectionalBullets2D::bullet_get_bounce_count);
 	ClassDB::bind_method(D_METHOD("all_bullets_get_bounce_count", "bullet_index_start", "bullet_index_end_inclusive"), &DirectionalBullets2D::all_bullets_get_bounce_count, DEFVAL(0), DEFVAL(-1));
 	ClassDB::bind_method(D_METHOD("debug_get_bounce_info", "bullet_index"), &DirectionalBullets2D::debug_get_bounce_info);
@@ -1270,10 +1323,6 @@ void DirectionalBullets2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("all_bullets_set_wobble_data", "wobble_data", "bullet_index_start", "bullet_index_end_inclusive"), &DirectionalBullets2D::all_bullets_set_wobble_data, DEFVAL(0), DEFVAL(-1));
 	ClassDB::bind_method(D_METHOD("bullet_get_wobble_data", "bullet_index"), &DirectionalBullets2D::bullet_get_wobble_data);
 	ClassDB::bind_method(D_METHOD("all_bullets_get_wobble_data", "bullet_index_start", "bullet_index_end_inclusive"), &DirectionalBullets2D::all_bullets_get_wobble_data, DEFVAL(0), DEFVAL(-1));
-	ADD_GROUP("Wobble", "");
-	ClassDB::bind_method(D_METHOD("get_shared_bullet_wobble_data"), &DirectionalBullets2D::get_shared_bullet_wobble_data);
-	ClassDB::bind_method(D_METHOD("set_shared_bullet_wobble_data", "new_wobble_data"), &DirectionalBullets2D::set_shared_bullet_wobble_data);
-	ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "shared_bullet_wobble_data", PROPERTY_HINT_RESOURCE_TYPE, "BulletWobbleData2D"), "set_shared_bullet_wobble_data", "get_shared_bullet_wobble_data");
 	ClassDB::bind_method(D_METHOD("has_shared_bullet_wobble_data"), &DirectionalBullets2D::has_shared_bullet_wobble_data);
 	ClassDB::bind_method(D_METHOD("remove_shared_bullet_wobble_data"), &DirectionalBullets2D::remove_shared_bullet_wobble_data);
 	ClassDB::bind_method(D_METHOD("debug_get_wobble_info", "bullet_index"), &DirectionalBullets2D::debug_get_wobble_info);
@@ -1344,7 +1393,7 @@ void DirectionalBullets2D::_bind_methods() {
 	// SHARED MOVEMENT PATTERN RUNTIME API (spawn-data equivalent, editable live).
 
 	// SHARED MOVEMENT PATTERN RUNTIME API (spawn-data equivalent, editable live).
-	ADD_GROUP("Movement Patterns", "");
+	ADD_GROUP("Movement Pattern Paths", "");
 	ClassDB::bind_method(D_METHOD("get_shared_movement_pattern_curve"), &DirectionalBullets2D::get_shared_movement_pattern_curve);
 	ClassDB::bind_method(D_METHOD("set_shared_movement_pattern_curve", "new_curve"), &DirectionalBullets2D::set_shared_movement_pattern_curve);
 	ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "shared_movement_pattern_curve", PROPERTY_HINT_RESOURCE_TYPE, "Curve2D"), "set_shared_movement_pattern_curve", "get_shared_movement_pattern_curve");
@@ -1434,37 +1483,6 @@ void DirectionalBullets2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_homing_lose_range_px"), &DirectionalBullets2D::get_homing_lose_range_px);
 	ClassDB::bind_method(D_METHOD("set_homing_lose_range_px", "value"), &DirectionalBullets2D::set_homing_lose_range_px);
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "homing_lose_range_px"), "set_homing_lose_range_px", "get_homing_lose_range_px");
-
-	ADD_GROUP("Bounce and Ricochet", "");
-	// BOUNCE / RICOCHET RUNTIME API (spawn-data equivalents, editable live).
-	ClassDB::bind_method(D_METHOD("get_bounce_mask"), &DirectionalBullets2D::get_bounce_mask);
-	ClassDB::bind_method(D_METHOD("set_bounce_mask", "value"), &DirectionalBullets2D::set_bounce_mask);
-	ADD_PROPERTY(PropertyInfo(Variant::INT, "bounce_mask", PROPERTY_HINT_LAYERS_2D_PHYSICS), "set_bounce_mask", "get_bounce_mask");
-	ClassDB::bind_method(D_METHOD("set_bounce_mask_from_array", "array_of_masks"), &DirectionalBullets2D::set_bounce_mask_from_array);
-	ClassDB::bind_method(D_METHOD("get_bounce_strength"), &DirectionalBullets2D::get_bounce_strength);
-	ClassDB::bind_method(D_METHOD("set_bounce_strength", "value"), &DirectionalBullets2D::set_bounce_strength);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "bounce_strength", PROPERTY_HINT_RANGE, "0,8,0.01,or_greater"), "set_bounce_strength", "get_bounce_strength");
-	ClassDB::bind_method(D_METHOD("get_bounce_hit_consumed"), &DirectionalBullets2D::get_bounce_hit_consumed);
-	ClassDB::bind_method(D_METHOD("set_bounce_hit_consumed", "value"), &DirectionalBullets2D::set_bounce_hit_consumed);
-	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "bounce_hit_consumed"), "set_bounce_hit_consumed", "get_bounce_hit_consumed");
-	ClassDB::bind_method(D_METHOD("get_bounce_max_count"), &DirectionalBullets2D::get_bounce_max_count);
-	ClassDB::bind_method(D_METHOD("set_bounce_max_count", "value"), &DirectionalBullets2D::set_bounce_max_count);
-	ADD_PROPERTY(PropertyInfo(Variant::INT, "bounce_max_count", PROPERTY_HINT_RANGE, "0,1000000,1"), "set_bounce_max_count", "get_bounce_max_count");
-	ClassDB::bind_method(D_METHOD("get_bounce_mode"), &DirectionalBullets2D::get_bounce_mode);
-	ClassDB::bind_method(D_METHOD("set_bounce_mode", "value"), &DirectionalBullets2D::set_bounce_mode);
-	ADD_PROPERTY(PropertyInfo(Variant::INT, "bounce_mode", PROPERTY_HINT_ENUM, "Simple Radial,Precise Shape"), "set_bounce_mode", "get_bounce_mode");
-	ClassDB::bind_method(D_METHOD("get_bounce_rotate_texture"), &DirectionalBullets2D::get_bounce_rotate_texture);
-	ClassDB::bind_method(D_METHOD("set_bounce_rotate_texture", "value"), &DirectionalBullets2D::set_bounce_rotate_texture);
-	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "bounce_rotate_texture"), "set_bounce_rotate_texture", "get_bounce_rotate_texture");
-	ClassDB::bind_method(D_METHOD("get_bounce_rotation_smooth"), &DirectionalBullets2D::get_bounce_rotation_smooth);
-	ClassDB::bind_method(D_METHOD("set_bounce_rotation_smooth", "value"), &DirectionalBullets2D::set_bounce_rotation_smooth);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "bounce_rotation_smooth"), "set_bounce_rotation_smooth", "get_bounce_rotation_smooth");
-	ClassDB::bind_method(D_METHOD("get_bounce_randomness_deg"), &DirectionalBullets2D::get_bounce_randomness_deg);
-	ClassDB::bind_method(D_METHOD("set_bounce_randomness_deg", "value"), &DirectionalBullets2D::set_bounce_randomness_deg);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "bounce_randomness_deg", PROPERTY_HINT_RANGE, "0,180,0.1"), "set_bounce_randomness_deg", "get_bounce_randomness_deg");
-	ClassDB::bind_method(D_METHOD("get_bounce_cooldown_sec"), &DirectionalBullets2D::get_bounce_cooldown_sec);
-	ClassDB::bind_method(D_METHOD("set_bounce_cooldown_sec", "value"), &DirectionalBullets2D::set_bounce_cooldown_sec);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "bounce_cooldown_sec"), "set_bounce_cooldown_sec", "get_bounce_cooldown_sec");
 
 
 

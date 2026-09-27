@@ -292,6 +292,7 @@ void MultiMeshBulletsData2D::set_tile_bullets_current_collision_count(bool value
 }
 
 void MultiMeshBulletsData2D::_bind_methods() {
+	ADD_GROUP("Bullets", "");
 	ClassDB::bind_method(D_METHOD("set_transforms", "new_transforms"), &MultiMeshBulletsData2D::set_transforms);
 	ClassDB::bind_method(D_METHOD("get_transforms"), &MultiMeshBulletsData2D::get_transforms);
 	ADD_PROPERTY(PropertyInfo(Variant::ARRAY, "transforms", PROPERTY_HINT_ARRAY_TYPE, "Transform2D"), "set_transforms", "get_transforms");
@@ -312,6 +313,38 @@ void MultiMeshBulletsData2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_texture_rotation_radians"), &MultiMeshBulletsData2D::get_texture_rotation_radians);
 	ClassDB::bind_method(D_METHOD("set_texture_rotation_radians", "new_texture_rotation_radians"), &MultiMeshBulletsData2D::set_texture_rotation_radians);
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "texture_rotation_radians"), "set_texture_rotation_radians", "get_texture_rotation_radians");
+
+	ClassDB::bind_method(D_METHOD("get_rotate_only_textures"), &MultiMeshBulletsData2D::get_rotate_only_textures);
+	ClassDB::bind_method(D_METHOD("set_rotate_only_textures", "new_rotate_only_textures"), &MultiMeshBulletsData2D::set_rotate_only_textures);
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "rotate_only_textures"), "set_rotate_only_textures", "get_rotate_only_textures");
+
+	ClassDB::bind_method(D_METHOD("get_is_texture_rotation_permanent"), &MultiMeshBulletsData2D::get_is_texture_rotation_permanent);
+	ClassDB::bind_method(D_METHOD("set_is_texture_rotation_permanent", "new_is_texture_rotation_permanent"), &MultiMeshBulletsData2D::set_is_texture_rotation_permanent);
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "is_texture_rotation_permanent"), "set_is_texture_rotation_permanent", "get_is_texture_rotation_permanent");
+
+	ClassDB::bind_method(D_METHOD("get_max_life_time"), &MultiMeshBulletsData2D::get_max_life_time);
+	ClassDB::bind_method(D_METHOD("set_max_life_time", "new_max_life_time"), &MultiMeshBulletsData2D::set_max_life_time);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "max_life_time"), "set_max_life_time", "get_max_life_time");
+
+	ClassDB::bind_method(D_METHOD("get_is_life_time_over_signal_enabled"), &MultiMeshBulletsData2D::get_is_life_time_over_signal_enabled);
+	ClassDB::bind_method(D_METHOD("set_is_life_time_over_signal_enabled", "value"), &MultiMeshBulletsData2D::set_is_life_time_over_signal_enabled);
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "is_life_time_over_signal_enabled"), "set_is_life_time_over_signal_enabled", "get_is_life_time_over_signal_enabled");
+
+	ClassDB::bind_method(D_METHOD("get_is_life_time_infinite"), &MultiMeshBulletsData2D::get_is_life_time_infinite);
+	ClassDB::bind_method(D_METHOD("set_is_life_time_infinite", "value"), &MultiMeshBulletsData2D::set_is_life_time_infinite);
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "is_life_time_infinite"), "set_is_life_time_infinite", "get_is_life_time_infinite");
+
+	ClassDB::bind_method(D_METHOD("get_z_index"), &MultiMeshBulletsData2D::get_z_index);
+	ClassDB::bind_method(D_METHOD("set_z_index", "new_z_index"), &MultiMeshBulletsData2D::set_z_index);
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "z_index"), "set_z_index", "get_z_index");
+
+	ClassDB::bind_method(D_METHOD("get_light_mask"), &MultiMeshBulletsData2D::get_light_mask);
+	ClassDB::bind_method(D_METHOD("set_light_mask", "new_light_mask"), &MultiMeshBulletsData2D::set_light_mask);
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "light_mask", PROPERTY_HINT_LAYERS_2D_RENDER), "set_light_mask", "get_light_mask");
+
+	ClassDB::bind_method(D_METHOD("get_visibility_layer"), &MultiMeshBulletsData2D::get_visibility_layer);
+	ClassDB::bind_method(D_METHOD("set_visibility_layer", "new_visibility_layer"), &MultiMeshBulletsData2D::set_visibility_layer);
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "visibility_layer", PROPERTY_HINT_LAYERS_2D_RENDER), "set_visibility_layer", "get_visibility_layer");
 
 	ADD_GROUP("Collision", "");
 	ClassDB::bind_method(D_METHOD("get_collision_layer"), &MultiMeshBulletsData2D::get_collision_layer);
@@ -346,8 +379,6 @@ void MultiMeshBulletsData2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_tile_bullets_current_collision_count", "value"), &MultiMeshBulletsData2D::set_tile_bullets_current_collision_count);
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "tile_bullets_current_collision_count"), "set_tile_bullets_current_collision_count", "get_tile_bullets_current_collision_count");
 
-	ADD_GROUP("Custom Data", "");
-
 	ClassDB::bind_method(D_METHOD("get_shared_bullets_custom_data"), &MultiMeshBulletsData2D::get_shared_bullets_custom_data);
 	ClassDB::bind_method(D_METHOD("set_shared_bullets_custom_data", "new_shared_bullets_custom_data"), &MultiMeshBulletsData2D::set_shared_bullets_custom_data);
 	ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "shared_bullets_custom_data", PROPERTY_HINT_RESOURCE_TYPE, "Resource"), "set_shared_bullets_custom_data", "get_shared_bullets_custom_data");
@@ -373,33 +404,7 @@ void MultiMeshBulletsData2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_shared_bullet_attachment_stick_relative_to_bullet", "value"), &MultiMeshBulletsData2D::set_shared_bullet_attachment_stick_relative_to_bullet);
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "shared_bullet_attachment_stick_relative_to_bullet"), "set_shared_bullet_attachment_stick_relative_to_bullet", "get_shared_bullet_attachment_stick_relative_to_bullet");
 
-	ADD_GROUP("Lifetime and Visibility", "");
-	ClassDB::bind_method(D_METHOD("get_max_life_time"), &MultiMeshBulletsData2D::get_max_life_time);
-	ClassDB::bind_method(D_METHOD("set_max_life_time", "new_max_life_time"), &MultiMeshBulletsData2D::set_max_life_time);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "max_life_time"), "set_max_life_time", "get_max_life_time");
-
-	ClassDB::bind_method(D_METHOD("get_is_life_time_over_signal_enabled"), &MultiMeshBulletsData2D::get_is_life_time_over_signal_enabled);
-	ClassDB::bind_method(D_METHOD("set_is_life_time_over_signal_enabled", "value"), &MultiMeshBulletsData2D::set_is_life_time_over_signal_enabled);
-	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "is_life_time_over_signal_enabled"), "set_is_life_time_over_signal_enabled", "get_is_life_time_over_signal_enabled");
-
-	ClassDB::bind_method(D_METHOD("get_is_life_time_infinite"), &MultiMeshBulletsData2D::get_is_life_time_infinite);
-	ClassDB::bind_method(D_METHOD("set_is_life_time_infinite", "value"), &MultiMeshBulletsData2D::set_is_life_time_infinite);
-	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "is_life_time_infinite"), "set_is_life_time_infinite", "get_is_life_time_infinite");
-
-	ClassDB::bind_method(D_METHOD("get_z_index"), &MultiMeshBulletsData2D::get_z_index);
-	ClassDB::bind_method(D_METHOD("set_z_index", "new_z_index"), &MultiMeshBulletsData2D::set_z_index);
-	ADD_PROPERTY(PropertyInfo(Variant::INT, "z_index"), "set_z_index", "get_z_index");
-
-	ClassDB::bind_method(D_METHOD("get_light_mask"), &MultiMeshBulletsData2D::get_light_mask);
-	ClassDB::bind_method(D_METHOD("set_light_mask", "new_light_mask"), &MultiMeshBulletsData2D::set_light_mask);
-	ADD_PROPERTY(PropertyInfo(Variant::INT, "light_mask", PROPERTY_HINT_LAYERS_2D_RENDER), "set_light_mask", "get_light_mask");
-
-	ClassDB::bind_method(D_METHOD("get_visibility_layer"), &MultiMeshBulletsData2D::get_visibility_layer);
-	ClassDB::bind_method(D_METHOD("set_visibility_layer", "new_visibility_layer"), &MultiMeshBulletsData2D::set_visibility_layer);
-	ADD_PROPERTY(PropertyInfo(Variant::INT, "visibility_layer", PROPERTY_HINT_LAYERS_2D_RENDER), "set_visibility_layer", "get_visibility_layer");
-
-
-	ADD_GROUP("Rotation", "");
+	ADD_GROUP("Per-Bullet Rotation", "");
 
 	ClassDB::bind_method(D_METHOD("get_all_bullet_rotation_data"), &MultiMeshBulletsData2D::get_all_bullet_rotation_data);
 	ClassDB::bind_method(D_METHOD("set_all_bullet_rotation_data", "new_data"), &MultiMeshBulletsData2D::set_all_bullet_rotation_data);
@@ -408,14 +413,6 @@ void MultiMeshBulletsData2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_tile_all_bullet_rotation_data"), &MultiMeshBulletsData2D::get_tile_all_bullet_rotation_data);
 	ClassDB::bind_method(D_METHOD("set_tile_all_bullet_rotation_data", "value"), &MultiMeshBulletsData2D::set_tile_all_bullet_rotation_data);
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "tile_all_bullet_rotation_data"), "set_tile_all_bullet_rotation_data", "get_tile_all_bullet_rotation_data");
-
-	ClassDB::bind_method(D_METHOD("get_rotate_only_textures"), &MultiMeshBulletsData2D::get_rotate_only_textures);
-	ClassDB::bind_method(D_METHOD("set_rotate_only_textures", "new_rotate_only_textures"), &MultiMeshBulletsData2D::set_rotate_only_textures);
-	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "rotate_only_textures"), "set_rotate_only_textures", "get_rotate_only_textures");
-
-	ClassDB::bind_method(D_METHOD("get_is_texture_rotation_permanent"), &MultiMeshBulletsData2D::get_is_texture_rotation_permanent);
-	ClassDB::bind_method(D_METHOD("set_is_texture_rotation_permanent", "new_is_texture_rotation_permanent"), &MultiMeshBulletsData2D::set_is_texture_rotation_permanent);
-	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "is_texture_rotation_permanent"), "set_is_texture_rotation_permanent", "get_is_texture_rotation_permanent");
 
 	ClassDB::bind_method(D_METHOD("get_stop_rotation_when_max_reached"), &MultiMeshBulletsData2D::get_stop_rotation_when_max_reached);
 	ClassDB::bind_method(D_METHOD("set_stop_rotation_when_max_reached", "value"), &MultiMeshBulletsData2D::set_stop_rotation_when_max_reached);
@@ -439,7 +436,6 @@ void MultiMeshBulletsData2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_visibility_layer_from_array", "array_of_visibility_layers"), &MultiMeshBulletsData2D::set_visibility_layer_from_array);
 
 	ClassDB::bind_static_method("MultiMeshBulletsData2D", D_METHOD("calculate_bitmask", "numbers"), &MultiMeshBulletsData2D::calculate_bitmask);
-
 
 }
 } //namespace BlastBullets2D

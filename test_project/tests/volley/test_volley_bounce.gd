@@ -1,7 +1,7 @@
 extends SceneTree
 ## Volley bounce suite: REAL physics (no mocks).
 ## Covers: defaults-off, free bounce vs wall (precedence over normal path),
-## consumed bounce, strength scaling (incl. uncapped + max_speed clamp),
+## strength scaling (incl. uncapped, no clamp, curve persistence),
 ## max-count ping-pong between two walls, mask precedence, spawner ownership,
 ## precise-vs-radial normals, capsule precise branch, smooth visual pursuit,
 ## render continuity across snap (prev-origin proof), teleport-into-wall,
@@ -368,6 +368,9 @@ func _initialize() -> void:
 	_check(dr.bounce_strength == keep_strength, "negative strength rejected")
 	dr.set_bounce_strength(5.0)
 	_check(dr.bounce_strength == 5.0, "strength uncapped (5.0 accepted)")
+	for p in dr.get_property_list():
+		if str(p.get("name", "")) == "bounce_strength":
+			_check(int(p.get("hint", -1)) == PROPERTY_HINT_NONE, "no editor cap on strength (plain float, user decides)")
 	var keep_mask: int = dr.bounce_mask
 	dr.set_bounce_mask(-1)
 	_check(dr.bounce_mask == keep_mask, "negative mask rejected")
@@ -399,7 +402,7 @@ func _initialize() -> void:
 	_check(plain2.bullet_get_bounce_count(0) == 0, "pooled reuse zeroes bounce ledger")
 	_check(factory.debug_assert_no_dangling().get("ok", false) == true, "no dangling after bounce churn")
 
-	printerr("BOUNCE T11 uncapped strength: 5x reflection, 50x clamps finite")
+	printerr("BOUNCE T11 uncapped strength: 5x reflection, 50x never clamps")
 	await _settle(factory)
 	var d11 := _bounce_data(Vector2.ZERO, 0.0, 300.0, [4], [4])
 	d11.bounce_strength = 5.0
@@ -410,6 +413,11 @@ func _initialize() -> void:
 			break
 	var spd11: float = v11.get_bullet_velocity(0).length()
 	_check(absf(spd11 - 1500.0) < 120.0, "strength 5 scales speed 5x")
+	_check(v11.get_bullet_speed_data(0).max_speed >= 1500.0 - 120.0, "bounce raises cached max_speed to the new speed")
+	for i in 60:
+		await physics_frame
+	var spd11_late: float = v11.get_bullet_velocity(0).length()
+	_check(absf(spd11_late - 1500.0) < 150.0, "strength 5 boost persists (no tick erosion)")
 	await _settle(factory)
 	var d11b := _bounce_data(Vector2.ZERO, 0.0, 300.0, [4], [4])
 	d11b.bounce_strength = 50.0
@@ -420,7 +428,35 @@ func _initialize() -> void:
 			break
 	var spd11b: float = v11b.get_bullet_velocity(0).length()
 	_check(v11b.get_bullet_velocity(0).is_finite(), "strength 50 stays finite")
-	_check(absf(spd11b - 3000.0) < 100.0, "strength 50 clamps at max_speed")
+	_check(absf(spd11b - 15000.0) < 1500.0, "strength 50 never clamps (15000, uncapped)")
+	_check(v11b.get_bullet_speed_data(0).max_speed >= 15000.0 - 1500.0, "strength 50 raises max_speed too")
+
+	printerr("BOUNCE T11b boost survives speed-curve overwrite")
+	await _settle(factory)
+	var d11c := _bounce_data(Vector2.ZERO, 0.0, 300.0, [4], [4])
+	d11c.bounce_strength = 2.0
+	var v11c: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d11c)
+	for i in 120:
+		await physics_frame
+		if _bounce_body.size() >= 1:
+			break
+	_check(absf(v11c.get_bullet_velocity(0).length() - 600.0) < 60.0, "strength 2 doubles speed")
+	var flat := BulletCurvesData2D.new()
+	var flat_curve := Curve.new()
+	flat_curve.min_value = 0.0
+	flat_curve.max_value = 2000.0
+	flat_curve.add_point(Vector2(0, 300))
+	flat_curve.add_point(Vector2(1, 300))
+	flat.movement_speed_curve = flat_curve
+	flat.movement_use_unit_curve = false
+	v11c.set_shared_bullet_curves_data(flat)
+	for i in 30:
+		await physics_frame
+	_check(absf(v11c.get_bullet_velocity(0).length() - 600.0) < 90.0, "curve rewrite keeps the x2 boost")
+	v11c.remove_shared_bullet_curves_data()
+	for i in 10:
+		await physics_frame
+	_check(absf(v11c.get_bullet_velocity(0).length() - 600.0) < 90.0, "boost survives curve removal")
 
 	printerr("BOUNCE T12 cooldown vs consumed: pair counts once, re-hit counts")
 	await _settle(factory)
@@ -664,16 +700,33 @@ func _initialize() -> void:
 				data_groups.append(pname)
 		elif pname != "":
 			data_group_of[pname] = data_current
-	var want_data_groups := ["Movement Speed", "Rotation", "Gravity and Drag", "Wobble", "Movement Patterns", "Homing", "Bounce and Ricochet"]
+	var want_data_groups := ["Movement Speed", "Bullet Rotation", "Wobble", "Gravity", "Bounce and Ricochet", "Movement Pattern Paths", "Homing"]
 	_check(data_groups.slice(0, want_data_groups.size()) == want_data_groups, "data group order matches workflow")
+	# Group titles must be unique across the FULL list (derived + base):
+	# two sections with one name is exactly the confusion being removed.
+	var seen_groups := {}
+	var duplicate_groups: Array = []
+	for p in props20:
+		if (int(p.get("usage", 0)) & PROPERTY_USAGE_GROUP) != 0:
+			var gname := str(p.get("name", ""))
+			if seen_groups.has(gname):
+				duplicate_groups.append(gname)
+			seen_groups[gname] = true
+	_check(duplicate_groups.is_empty(), "no duplicate group titles on the resource")
+	# Rotation triplet is split across classes BY DESIGN: the per-bullet
+	# arrays live on the base (BlockBullets spins from the shared base spawn
+	# path), the shared fallback lives here. Moving them together would break
+	# BlockBullets. Pin the split so nobody "fixes" it into a regression.
+	_check(str(data_group_of.get("shared_bullet_rotation_data", "")) == "Bullet Rotation", "shared rotation grouped with steering")
+	_check(str(data_group_of.get("all_bullet_rotation_data", "")) == "Per-Bullet Rotation", "per-bullet rotation grouped with arrays")
 	var triplet_families := [
-		["all_bullet_speed_data", "tile_all_bullet_speed_data", "shared_bullet_speed_data"],
-		["all_bullet_curves_data", "tile_all_bullet_curves_data", "shared_bullet_curves_data"],
+		["shared_bullet_speed_data", "all_bullet_speed_data", "tile_all_bullet_speed_data"],
+		["shared_bullet_curves_data", "all_bullet_curves_data", "tile_all_bullet_curves_data"],
 		["shared_bullet_wobble_data", "all_bullet_wobble_data", "tile_all_bullet_wobble_data"],
 		["gravity", "all_bullet_gravity", "tile_all_bullet_gravity"],
-		["all_bullet_movement_pattern_paths", "tile_all_bullet_movement_pattern_paths"],
-		["all_bullet_movement_pattern_face_movement_directions", "tile_all_bullet_movement_pattern_face_movement_directions"],
-		["all_bullet_movement_pattern_repeats", "tile_all_bullet_movement_pattern_repeats"],
+		["shared_movement_pattern_path", "all_bullet_movement_pattern_paths", "tile_all_bullet_movement_pattern_paths"],
+		["shared_movement_pattern_face_movement_direction", "all_bullet_movement_pattern_face_movement_directions", "tile_all_bullet_movement_pattern_face_movement_directions"],
+		["shared_movement_pattern_repeat", "all_bullet_movement_pattern_repeats", "tile_all_bullet_movement_pattern_repeats"],
 	]
 	var triplet_ok := true
 	for fam in triplet_families:
@@ -720,7 +773,22 @@ func _initialize() -> void:
 			base_current = pname
 			if not base_groups.has(pname):
 				base_groups.append(pname)
-	_check(base_groups.slice(0, 7) == ["Appearance", "Collision", "Custom Data", "Attachments", "Lifetime and Visibility", "Rotation", "Rendering and Material"], "base group order matches workflow")
+	_check(base_groups.slice(0, 6) == ["Bullets", "Appearance", "Collision", "Attachments", "Per-Bullet Rotation", "Rendering and Material"], "base group order matches workflow")
+	var base_group_of := {}
+	var base_cur := ""
+	for p in base_props:
+		var pname := str(p.get("name", ""))
+		var pusage: int = int(p.get("usage", 0))
+		if (pusage & PROPERTY_USAGE_GROUP) != 0:
+			base_cur = pname
+		elif pname != "":
+			base_group_of[pname] = base_cur
+	_check(base_group_of.get("max_life_time", "") == "Appearance", "lifetime lives with Appearance")
+	_check(base_group_of.get("z_index", "") == "Appearance", "z-index lives with Appearance")
+	_check(base_group_of.get("shared_bullets_custom_data", "") == "Collision", "custom data lives with Collision")
+	_check(base_group_of.get("rotate_only_textures", "") == "Appearance", "rotate-only flag lives with Appearance")
+	_check(base_group_of.get("is_texture_rotation_permanent", "") == "Appearance", "permanent rotation flag lives with Appearance")
+	_check(base_group_of.get("stop_rotation_when_max_reached", "") == "Per-Bullet Rotation", "stop flag lives with rotation")
 	# Live instance mirrors the data workflow order.
 	var vinst: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(_bounce_data(Vector2(0, 9000), 0.0, 1.0, [], [4]))
 	var inst_groups: Array = []
@@ -729,7 +797,34 @@ func _initialize() -> void:
 		var pusage: int = int(p.get("usage", 0))
 		if (pusage & PROPERTY_USAGE_GROUP) != 0 and not inst_groups.has(pname):
 			inst_groups.append(pname)
-	_check(inst_groups.slice(0, 7) == ["Movement Speed", "Rotation", "Gravity and Drag", "Wobble", "Movement Patterns", "Homing", "Bounce and Ricochet"], "instance group order mirrors data")
+	_check(inst_groups.slice(0, 7) == ["Movement Speed", "Bullet Rotation", "Wobble", "Gravity", "Bounce and Ricochet", "Movement Pattern Paths", "Homing"], "instance group order mirrors data")
+	# No dangling: base props must never fall into the last derived group.
+	# Tracks the current header across the FULL list (derived + base).
+	var full_current := ""
+	var danglers: Array = []
+	for p in props20:
+		var pname := str(p.get("name", ""))
+		var pusage: int = int(p.get("usage", 0))
+		if (pusage & PROPERTY_USAGE_GROUP) != 0:
+			full_current = pname
+		elif pname == "transforms" and full_current != "Bullets":
+			danglers.append(pname)
+	_check(danglers.is_empty(), "transforms grouped under Bullets, not Bounce")
+	# Base instance props on a live volley group under their own headers.
+	var vgroups := {}
+	var vcurrent := ""
+	for p in vinst.get_property_list():
+		var pname := str(p.get("name", ""))
+		var pusage: int = int(p.get("usage", 0))
+		if (pusage & PROPERTY_USAGE_GROUP) != 0:
+			vcurrent = pname
+		elif pname != "":
+			vgroups[pname] = vcurrent
+	_check(vgroups.get("shared_bullets_custom_data", "") == "Custom Data", "volley custom data grouped")
+	_check(vgroups.get("is_multimesh_auto_pooling_enabled", "") == "Pooling", "volley pooling grouped")
+	_check(vgroups.get("bullet_max_collision_count", "") == "Collision", "volley collision grouped")
+	_check(vgroups.get("is_life_time_infinite", "") == "Lifetime", "volley lifetime grouped")
+	_check(vgroups.get("shared_bullet_curves_data", "") == "Curves", "volley curves grouped")
 	var spawner20 := BulletSpawner2D.new()
 	get_root().add_child(spawner20)
 	await process_frame
@@ -741,6 +836,25 @@ func _initialize() -> void:
 			groups_found[gname] = true
 			if not spawner_group_order.has(gname):
 				spawner_group_order.append(gname)
+	# Unique titles on every inspector surface (volley, spawner, block data).
+	for entry in [[vinst, "volley"], [spawner20, "spawner"]]:
+		var seen := {}
+		var dups: Array = []
+		for p in (entry[0] as Object).get_property_list():
+			if (int(p.get("usage", 0)) & PROPERTY_USAGE_GROUP) != 0:
+				var gname := str(p.get("name", ""))
+				if seen.has(gname):
+					dups.append(gname)
+				seen[gname] = true
+		_check(dups.is_empty(), "no duplicate group titles on " + str(entry[1]))
+	var block20 := BlockBulletsData2D.new()
+	var block_groups: Array = []
+	for p in block20.get_property_list():
+		if (int(p.get("usage", 0)) & PROPERTY_USAGE_GROUP) != 0:
+			var gname := str(p.get("name", ""))
+			if not block_groups.has(gname):
+				block_groups.append(gname)
+	_check(block_groups.slice(0, 1) == ["Block Bullets"], "block data leads with its own group")
 	_check(groups_found.has("Shooting"), "spawner Shooting group present")
 	_check(groups_found.has("Homing"), "spawner Homing group present")
 	_check(groups_found.has("Orbiting"), "spawner Orbiting group present")
