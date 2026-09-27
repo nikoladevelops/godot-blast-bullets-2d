@@ -12,6 +12,7 @@ or a real bug — investigate before shipping.
 - `volley/test_directional_core.gd` — speed/direction/transform/velocity/rotation get/set + rejects.
 - `volley/test_volley_lifetime.gd` — finite/infinite/invalid lifetimes, live infinite toggle + max<=0 guard refusal, expiry pooling, collision-count reads, deferred signal, collision-max interplay.
 - `volley/test_volley_collision.gd` — REAL physics vs StaticBody2D + Area2D wall: slim payloads, max counts, epoch guard.
+- `volley/test_volley_bounce.gd` — REAL physics ricochet: defaults-off, free/consumed bounces, strength scaling, wall ping-pong with max_count, mask precedence, spawner ownership, radial vs precise normals, smooth visual pursuit, homing/wobble/gravity mixes, rejects, pool-reuse neutrality.
 - `volley/test_volley_homing.gd` — deques, target types, steering convergence, freed targets, delay/duration/lose, reached signal.
 - `volley/test_volley_orbiting.gd` — arming without targets, setters (clamp vs reject), linear shells, rigid follow, disable.
 - `volley/test_volley_curves_wobble.gd` — shared/per-bullet curves, curves tile wrap + strict twin, rotation_speed_curve spin, per-bullet gravity_strength scaling, wobble angular/cosine/phase-fan/distance-phased/damping/windows, negative-speed-under-gravity, ownership guards, Path2D/Curve2D patterns, shared speed/rotation.

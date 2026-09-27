@@ -2043,6 +2043,19 @@ public:
 
 	void handle_bullet_collision(CollisionType collision_type, int bullet_index, int64_t entered_instance_id, uint64_t queued_bullet_epoch);
 
+	// Bounce decision hook for one queued collision record. Runs BEFORE the
+	// hit counter increments so a bounce can take precedence over the normal
+	// path. Returns 0 = not a bounce (normal path), 1 = bounced and fully
+	// handled (return), 2 = bounced but the hit is consumed too (fall
+	// through into normal counting/signals). Base is a no-op (only
+	// DirectionalBullets2D bounces); BlockBullets2D never overrides it.
+	virtual int try_handle_bounce(CollisionType collision_type, int bullet_index, int64_t entered_instance_id) {
+		(void)collision_type;
+		(void)bullet_index;
+		(void)entered_instance_id;
+		return 0;
+	}
+
 	/// COLLISION DETECTION METHODS
 
 	_ALWAYS_INLINE_ void area_entered_func(PhysicsServer2D::AreaBodyStatus status, RID entered_rid, int64_t entered_instance_id, int entered_shape_index, int bullet_shape_index) {

@@ -2598,6 +2598,14 @@ void MultiMeshBullets2D::handle_bullet_collision(CollisionType collision_type, i
 			return;
 		}
 
+		// Bounce precedence: a bounce-eligible hit ricochets here and never
+		// reaches the counter below (unless the volley asked to consume the
+		// hit too, decision 2). The hook owns its signals + self-liveness.
+		const int bounce_decision = try_handle_bounce(collision_type, bullet_index, entered_instance_id);
+		if (bounce_decision == 1) {
+			return;
+		}
+
 		int &current_bullet_collision_amount = bullets_current_collision_count[bullet_index];
 
 		// Always keep track of how many collisions this bullet had (yes even if the user set bullet_max_collision_count to 0, I just want consistent behavior)

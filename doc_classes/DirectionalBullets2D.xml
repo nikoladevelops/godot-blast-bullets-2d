@@ -1192,6 +1192,33 @@
 		<member name="shared_movement_pattern_repeat" type="bool" setter="set_shared_movement_pattern_repeat" getter="get_shared_movement_pattern_repeat" default="true">
 			Whether the shared movement pattern repeats instead of stopping at the end of the curve.
 		</member>
+		<member name="bounce_mask" type="int" setter="set_bounce_mask" getter="get_bounce_mask" default="0">
+			Bitmask of target collision layers that trigger a bounce, set live. Takes precedence over the normal collision path. 0 (default) disables bouncing. Spawn-time equivalent lives on [member DirectionalBulletsData2D.bounce_mask] (reseeded on every pool reuse).
+		</member>
+		<member name="bounce_strength" type="float" setter="set_bounce_strength" getter="get_bounce_strength" default="1.0">
+			Speed multiplier applied on every bounce, set live (finite in [0, 2]). 1.0 is perfectly elastic, 0 dead-stops.
+		</member>
+		<member name="bounce_hit_consumed" type="bool" setter="set_bounce_hit_consumed" getter="get_bounce_hit_consumed" default="false">
+			Whether a bounce also counts as a normal hit, set live. False (default) means free bounces. A consumed bounce emits BOTH the bounce signal and the matching area/body signal.
+		</member>
+		<member name="bounce_max_count" type="int" setter="set_bounce_max_count" getter="get_bounce_max_count" default="0">
+			How many times a single bullet may bounce before bounces stop for it, set live. 0 (default) = unlimited. Read per-bullet progress with [method bullet_get_bounce_count].
+		</member>
+		<member name="bounce_mode" type="int" setter="set_bounce_mode" getter="get_bounce_mode" default="0">
+			Which surface normal to reflect across, set live: 0 Simple Radial, 1 Precise Shape (falls back to radial without a usable target shape).
+		</member>
+		<member name="bounce_rotate_texture" type="bool" setter="set_bounce_rotate_texture" getter="get_bounce_rotate_texture" default="true">
+			Whether a bounce re-aims the bullet visual at the reflected heading, set live.
+		</member>
+		<member name="bounce_rotation_smooth" type="float" setter="set_bounce_rotation_smooth" getter="get_bounce_rotation_smooth" default="0.0">
+			Max visual turn rate in radians/sec toward the reflected heading, set live. 0 snaps instantly; above 0 only the sprite slews. Ignored while [member adjust_direction_based_on_rotation] is on.
+		</member>
+		<member name="bounce_randomness_deg" type="float" setter="set_bounce_randomness_deg" getter="get_bounce_randomness_deg" default="0.0">
+			Random scatter in degrees around the reflected heading per bounce, set live (finite in [0, 180]).
+		</member>
+		<member name="bounce_cooldown_sec" type="float" setter="set_bounce_cooldown_sec" getter="get_bounce_cooldown_sec" default="0.05">
+			Quiet period in seconds after a bounce, set live (finite in [0, 1]).
+		</member>
 	</members>
 	<signals>
 		<signal name="bullet_homing_target_reached">

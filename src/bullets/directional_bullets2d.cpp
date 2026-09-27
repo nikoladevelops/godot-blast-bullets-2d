@@ -1,6 +1,11 @@
 #include "directional_bullets2d.hpp"
 
 #include "../spawn-data/directional_bullets_data2d.hpp"
+#include "godot_cpp/classes/capsule_shape2d.hpp"
+#include "godot_cpp/classes/circle_shape2d.hpp"
+#include "godot_cpp/classes/collision_shape2d.hpp"
+#include "godot_cpp/classes/node.hpp"
+#include "godot_cpp/classes/rectangle_shape2d.hpp"
 #include "godot_cpp/classes/scene_tree.hpp"
 #include "godot_cpp/core/class_db.hpp"
 #include "godot_cpp/core/object.hpp"
@@ -685,6 +690,7 @@ void DirectionalBullets2D::custom_additional_spawn_logic(const MultiMeshBulletsD
 	homing_delay_sec = (real_t)directional_data->homing_delay_sec;
 	homing_duration_sec = (real_t)directional_data->homing_duration_sec;
 	homing_lose_range_px = (real_t)directional_data->homing_lose_range_px;
+	apply_bounce_from_data(*directional_data, data.collision_mask);
 }
 
 bool DirectionalBullets2D::is_data_type_compatible(const MultiMeshBulletsData2D &data) const {
@@ -717,6 +723,21 @@ void DirectionalBullets2D::reset_transient_subclass_state(bool drop_stale_work) 
 	homing_delay_sec = 0.0;
 	homing_duration_sec = 0.0;
 	homing_lose_range_px = 0.0;
+	bounce_mask = 0;
+	bounce_strength = 1.0;
+	bounce_hit_consumed = false;
+	bounce_max_count = 0;
+	bounce_mode = 0;
+	bounce_rotate_texture = true;
+	bounce_rotation_smooth = 0.0;
+	bounce_randomness_deg = 0.0;
+	bounce_cooldown_sec = 0.05;
+	all_bounce_count.assign(amount_bullets, 0);
+	all_bounce_cooldown.assign(amount_bullets, 0.0);
+	all_bounce_last_tick.assign(amount_bullets, 0);
+	bounce_visual_pending.assign(amount_bullets, 0);
+	bounce_visual_target.assign(amount_bullets, Vector2(1, 0));
+	bounce_mask_warning_issued = false;
 	clear_homing_state_for_teardown();
 	if (drop_stale_work) {
 		// New pooled life only: drop the last owner's signal connections. A plain wake keeps them - same owner, same listeners.
@@ -801,6 +822,7 @@ bool DirectionalBullets2D::custom_additional_enable_logic(const MultiMeshBullets
 	homing_delay_sec = (real_t)directional_data->homing_delay_sec;
 	homing_duration_sec = (real_t)directional_data->homing_duration_sec;
 	homing_lose_range_px = (real_t)directional_data->homing_lose_range_px;
+	apply_bounce_from_data(*directional_data, data.collision_mask);
 	return true;
 }
 
@@ -811,6 +833,304 @@ void DirectionalBullets2D::custom_additional_disable_logic() {
 	if (bullet_factory != nullptr) {
 		bullet_factory->directional_bullets_set.disable_data(sparse_set_id);
 	}
+}
+
+// Analytic surface normal from the collided target's first usable
+// CollisionShape2D child (rect/circle/capsule). Drain-safe: pure math, no
+// physics-server queries. Returns false when there is no usable shape (the
+// caller falls back to the radial normal).
+static bool bounce_precise_normal_from_target(Object *hit_target, const Vector2 &bullet_pos, Vector2 &r_normal) {
+	Node *target_node = Object::cast_to<Node>(hit_target);
+	if (target_node == nullptr || !bullet_pos.is_finite()) {
+		return false;
+	}
+	TypedArray<Node> children = target_node->get_children();
+	for (int k = 0; k < children.size(); ++k) {
+		CollisionShape2D *cs = Object::cast_to<CollisionShape2D>(children[k]);
+		if (cs == nullptr || cs->is_queued_for_deletion()) {
+			continue;
+		}
+		Ref<Shape2D> shape = cs->get_shape();
+		if (shape.is_null()) {
+			continue;
+		}
+		const Transform2D shape_global = cs->get_global_transform();
+		if (!shape_global.is_finite()) {
+			continue;
+		}
+		if (RectangleShape2D *rect = Object::cast_to<RectangleShape2D>(shape.ptr())) {
+			const Vector2 size = rect->get_size();
+			if (!size.is_finite() || size.x <= 0.0 || size.y <= 0.0) {
+				continue;
+			}
+			const Vector2 local = shape_global.affine_inverse().xform(bullet_pos);
+			if (!local.is_finite()) {
+				continue;
+			}
+			const Vector2 half = size * 0.5;
+			const Vector2 clamped(Math::clamp(local.x, -half.x, half.x), Math::clamp(local.y, -half.y, half.y));
+			const Vector2 diff = local - clamped;
+			Vector2 local_n;
+			if (diff.length_squared() > 0.00000001) {
+				local_n = diff.normalized();
+			} else {
+				// Bullet center inside the box: push along min-penetration axis.
+				const real_t px = half.x - Math::abs(local.x);
+				const real_t py = half.y - Math::abs(local.y);
+				local_n = (px < py) ? Vector2(local.x >= 0.0 ? 1.0 : -1.0, 0.0) : Vector2(0.0, local.y >= 0.0 ? 1.0 : -1.0);
+			}
+			const Vector2 world_n = shape_global.basis_xform(local_n);
+			if (world_n.is_finite() && world_n.length_squared() > 0.00000001) {
+				r_normal = world_n.normalized();
+				return true;
+			}
+			return false;
+		}
+		if (CircleShape2D *circle = Object::cast_to<CircleShape2D>(shape.ptr())) {
+			const real_t r = circle->get_radius();
+			if (!Math::is_finite((double)r) || r <= 0.0) {
+				continue;
+			}
+			const Vector2 diff = bullet_pos - shape_global.get_origin();
+			if (diff.is_finite() && diff.length_squared() > 0.00000001) {
+				r_normal = diff.normalized();
+				return true;
+			}
+			return false;
+		}
+		if (CapsuleShape2D *cap = Object::cast_to<CapsuleShape2D>(shape.ptr())) {
+			const real_t r = cap->get_radius();
+			const real_t h = cap->get_height();
+			if (!Math::is_finite((double)r) || !Math::is_finite((double)h) || r <= 0.0 || h <= 0.0) {
+				continue;
+			}
+			// Godot capsules run along local Y: segment between the cap centers.
+			const Vector2 local = shape_global.affine_inverse().xform(bullet_pos);
+			if (!local.is_finite()) {
+				continue;
+			}
+			const real_t half_seg = Math::max(0.0, h * 0.5 - r);
+			const Vector2 closest(0.0, Math::clamp(local.y, (real_t)-half_seg, (real_t)half_seg));
+			const Vector2 diff = local - closest;
+			Vector2 local_n = (diff.length_squared() > 0.00000001) ? diff.normalized() : Vector2(local.x >= 0.0 ? 1.0 : -1.0, 0.0);
+			const Vector2 world_n = shape_global.basis_xform(local_n);
+			if (world_n.is_finite() && world_n.length_squared() > 0.00000001) {
+				r_normal = world_n.normalized();
+				return true;
+			}
+			return false;
+		}
+	}
+	return false;
+}
+
+int DirectionalBullets2D::try_handle_bounce(CollisionType collision_type, int bullet_index, int64_t entered_instance_id) {
+	if (bounce_mask == 0) {
+		return 0;
+	}
+	if (bullet_index < 0 || bullet_index >= amount_bullets) {
+		return 0;
+	}
+	if (bullet_index >= (int)all_cached_direction.size() || bullet_index >= (int)all_cached_speed.size() || bullet_index >= (int)all_cached_velocity.size() || bullet_index >= (int)all_cached_instance_origin.size() || bullet_index >= (int)all_cached_instance_transforms.size()) {
+		return 0;
+	}
+	if (!all_bullets_enabled_set.contains(bullet_index)) {
+		return 0;
+	}
+	// Bounce budget exhausted: take the normal collision path instead.
+	if (bullet_index < (int)all_bounce_count.size() && bounce_max_count > 0 && all_bounce_count[bullet_index] >= bounce_max_count) {
+		return 0;
+	}
+	// One bounce per bullet per tick: a target carrying both a body and an
+	// area queues two records for one overlap; the second would flip the
+	// just-reflected heading straight back. Swallow it (fully handled).
+	if (bullet_index < (int)all_bounce_last_tick.size() && all_bounce_last_tick[bullet_index] == bounce_tick_counter) {
+		return 1;
+	}
+	// Cooldown swallow: lets the bullet escape the overlap it just left.
+	if (bullet_index < (int)all_bounce_cooldown.size() && all_bounce_cooldown[bullet_index] > 0.0) {
+		return 1;
+	}
+	Object *hit_target = ObjectDB::get_instance(entered_instance_id);
+	if (hit_target == nullptr) {
+		return 0;
+	}
+	// Bounce eligibility reads the TARGET's layer (Area2D/PhysicsBody2D both
+	// expose collision_layer; anything else can never match).
+	int target_layer = 0;
+	const Variant layer_v = hit_target->get(StringName("collision_layer"));
+	if (layer_v.get_type() == Variant::INT) {
+		target_layer = (int)layer_v;
+	}
+	if (target_layer == 0 || (target_layer & bounce_mask) == 0) {
+		return 0;
+	}
+	// A StayLocked orbit owns the displacement: bouncing would fight the
+	// ring every tick, so the orbit wins and the hit takes the normal path.
+	if (bullet_index < (int)all_orbiting_status.size() && bullet_index < (int)all_orbiting_data.size() && all_orbiting_status[bullet_index] && all_orbiting_data[bullet_index].is_locked_orbiting && all_orbiting_data[bullet_index].lock_policy == StayLocked) {
+		return 0;
+	}
+	const Vector2 origin = all_cached_instance_origin[bullet_index];
+	if (!origin.is_finite()) {
+		return 0;
+	}
+	Vector2 dir = all_cached_direction[bullet_index];
+	if (!dir.is_finite() || dir.length_squared() < 0.00000001) {
+		// Zero heading (unseeded ballistics): recover from velocity, else
+		// there is nothing meaningful to reflect.
+		Vector2 v0 = all_cached_velocity[bullet_index] - inherited_velocity_offset;
+		if (v0.is_finite() && v0.length_squared() > 0.00000001) {
+			dir = v0.normalized();
+		} else {
+			return 0;
+		}
+	} else {
+		dir = dir.normalized();
+	}
+	real_t speed = all_cached_speed[bullet_index];
+	if (!Math::is_finite((double)speed) || speed < 0.0) {
+		speed = 0.0;
+	}
+	// Surface normal: precise shape-analytic when asked (falls back), else
+	// radial from the target center. Head-on fallback when neither resolves.
+	Vector2 surface_n(0, 0);
+	bool have_normal = false;
+	if (bounce_mode == 1) {
+		have_normal = bounce_precise_normal_from_target(hit_target, origin, surface_n);
+	}
+	if (!have_normal) {
+		if (Node2D *target_n2d = Object::cast_to<Node2D>(hit_target)) {
+			const Vector2 target_pos = target_n2d->get_global_position();
+			if (target_pos.is_finite()) {
+				const Vector2 radial = origin - target_pos;
+				if (radial.is_finite() && radial.length_squared() > 0.00000001) {
+					surface_n = radial.normalized();
+					have_normal = true;
+				}
+			}
+		}
+	}
+	if (!have_normal) {
+		surface_n = -dir;
+	}
+	if (!surface_n.is_finite() || surface_n.length_squared() < 0.00000001) {
+		return 0;
+	}
+	surface_n = surface_n.normalized();
+	// Reflect, scatter, scale. Dead-stop (strength 0) keeps the old heading
+	// with zero speed instead of normalizing a zero vector into a stall.
+	Vector2 refl = (dir * speed).bounce(surface_n);
+	if (bounce_randomness_deg > 0.0 && Math::is_finite((double)bounce_randomness_deg)) {
+		const real_t jitter = UtilityFunctions::randf_range(-bounce_randomness_deg, bounce_randomness_deg);
+		if (Math::is_finite((double)jitter)) {
+			refl = refl.rotated(Math::deg_to_rad(jitter));
+		}
+	}
+	refl *= bounce_strength;
+	if (!refl.is_finite()) {
+		return 0;
+	}
+	real_t new_speed = refl.length();
+	Vector2 new_dir = (new_speed > 0.0001) ? (refl / new_speed) : dir;
+	if (!new_dir.is_finite()) {
+		new_dir = dir;
+	}
+	if (bullet_index < (int)all_cached_max_speed.size() && all_cached_max_speed[bullet_index] > 0.0 && new_speed > all_cached_max_speed[bullet_index]) {
+		new_speed = all_cached_max_speed[bullet_index];
+		refl = new_dir * new_speed;
+	}
+	// A non-StayLocked lock breaks: the bullet left the ring by definition.
+	if (bullet_index < (int)all_orbiting_status.size() && bullet_index < (int)all_orbiting_data.size() && all_orbiting_status[bullet_index] && all_orbiting_data[bullet_index].is_locked_orbiting) {
+		all_orbiting_data[bullet_index].is_locked_orbiting = false;
+	}
+	// Commit ballistics. Gravity fall speed reflects too so arcs continue
+	// naturally; the inherited wind offset rides along untouched.
+	all_cached_direction[bullet_index] = new_dir;
+	all_cached_speed[bullet_index] = new_speed;
+	if (bullet_index < (int)all_gravity_velocity.size()) {
+		const Vector2 gv = all_gravity_velocity[bullet_index];
+		if (gv.is_finite() && gv.length_squared() > 0.0) {
+			const Vector2 gr = gv.bounce(surface_n) * bounce_strength;
+			all_gravity_velocity[bullet_index] = gr.is_finite() ? gr : Vector2(0, 0);
+		}
+		all_cached_velocity[bullet_index] = new_dir * new_speed + inherited_velocity_offset + all_gravity_velocity[bullet_index];
+	} else {
+		all_cached_velocity[bullet_index] = new_dir * new_speed + inherited_velocity_offset;
+	}
+	// Nudge out of the overlap along the normal so the next tick starts
+	// clean (no immediate re-hit). Position continuity is preserved for
+	// interpolation (prev untouched: the render lerps out of the wall).
+	real_t bound_radius = cached_circle_radius;
+	if (cached_effective_shape_type == PhysicsServer2D::SHAPE_RECTANGLE) {
+		bound_radius = MIN(cached_rect_size.x, cached_rect_size.y) * 0.5;
+	} else if (cached_effective_shape_type == PhysicsServer2D::SHAPE_CAPSULE) {
+		bound_radius = cached_capsule_height * 0.5;
+	}
+	if (!Math::is_finite((double)bound_radius) || bound_radius <= 0.0) {
+		bound_radius = 8.0;
+	}
+	const Vector2 new_origin = origin + surface_n * (bound_radius + 2.0);
+	if (new_origin.is_finite()) {
+		const Vector2 shift = new_origin - origin;
+		all_cached_instance_origin[bullet_index] = new_origin;
+		all_cached_instance_transforms[bullet_index].set_origin(new_origin);
+		sync_shape_transform_from_instance(bullet_index, all_cached_instance_transforms[bullet_index]);
+		carry_attachment_with_transform(bullet_index, all_cached_instance_transforms[bullet_index], shift);
+	}
+	// Visual follows the reflection. Snap now (same contract as homing:
+	// prev synced so the sprite never lags a frame), or arm the smooth
+	// pursuit that the movement tick slews toward. adjust_direction owns
+	// ballistics through the visual, so it must snap.
+	if (bounce_rotate_texture) {
+		if (bounce_rotation_smooth > 0.0 && Math::is_finite((double)bounce_rotation_smooth) && !adjust_direction_based_on_rotation) {
+			if (bullet_index < (int)bounce_visual_pending.size() && bullet_index < (int)bounce_visual_target.size()) {
+				bounce_visual_pending[bullet_index] = 1;
+				bounce_visual_target[bullet_index] = new_dir;
+				if (bounce_last_delta > 0.0) {
+					rotate_to_target(bullet_index, new_dir, bounce_rotation_smooth * (real_t)bounce_last_delta, false);
+				}
+			}
+		} else {
+			rotate_to_target(bullet_index, new_dir, 0.0, false);
+		}
+	}
+	if (bullet_index < (int)all_bounce_count.size()) {
+		++all_bounce_count[bullet_index];
+	}
+	if (bullet_index < (int)all_bounce_cooldown.size()) {
+		all_bounce_cooldown[bullet_index] = bounce_cooldown_sec;
+	}
+	if (bullet_index < (int)all_bounce_last_tick.size()) {
+		all_bounce_last_tick[bullet_index] = bounce_tick_counter;
+	}
+	// Slim bounce signal, same ownership routing as collisions: spawner
+	// volleys report to their spawner, the rest to the factory. Snapshot the
+	// emitter first (a consumed hit below may pool the volley), guard the
+	// post-emit with the self-liveness token like the normal path.
+	Object *emitter = resolve_signal_emitter();
+	const uint64_t self_id = get_instance_id();
+	if (emitter != nullptr) {
+		if (emitter == bullet_factory) {
+			if (collision_type == CollisionType::AREA) {
+				emitter->emit_signal("directional_bounce_area_entered", hit_target, this, bullet_index);
+			} else {
+				emitter->emit_signal("directional_bounce_body_entered", hit_target, this, bullet_index);
+			}
+		} else {
+			if (collision_type == CollisionType::AREA) {
+				emitter->emit_signal("bounce_area_entered", hit_target, this, bullet_index);
+			} else {
+				emitter->emit_signal("bounce_body_entered", hit_target, this, bullet_index);
+			}
+		}
+	}
+	// A handler that freed this volley leaves every member access below as
+	// use-after-free: swallow the record so the base path returns instantly
+	// without touching members (misuse is still prohibited by contract).
+	if (ObjectDB::get_instance(ObjectID(self_id)) != this || is_queued_for_deletion()) {
+		return 1;
+	}
+	return bounce_hit_consumed ? 2 : 1;
 }
 
 void DirectionalBullets2D::_bind_methods() {
@@ -963,6 +1283,38 @@ void DirectionalBullets2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_homing_lose_range_px"), &DirectionalBullets2D::get_homing_lose_range_px);
 	ClassDB::bind_method(D_METHOD("set_homing_lose_range_px", "value"), &DirectionalBullets2D::set_homing_lose_range_px);
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "homing_lose_range_px"), "set_homing_lose_range_px", "get_homing_lose_range_px");
+
+	// BOUNCE / RICOCHET RUNTIME API (spawn-data equivalents, editable live).
+	ClassDB::bind_method(D_METHOD("get_bounce_mask"), &DirectionalBullets2D::get_bounce_mask);
+	ClassDB::bind_method(D_METHOD("set_bounce_mask", "value"), &DirectionalBullets2D::set_bounce_mask);
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "bounce_mask", PROPERTY_HINT_LAYERS_2D_PHYSICS), "set_bounce_mask", "get_bounce_mask");
+	ClassDB::bind_method(D_METHOD("set_bounce_mask_from_array", "array_of_masks"), &DirectionalBullets2D::set_bounce_mask_from_array);
+	ClassDB::bind_method(D_METHOD("get_bounce_strength"), &DirectionalBullets2D::get_bounce_strength);
+	ClassDB::bind_method(D_METHOD("set_bounce_strength", "value"), &DirectionalBullets2D::set_bounce_strength);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "bounce_strength", PROPERTY_HINT_RANGE, "0,2,0.01"), "set_bounce_strength", "get_bounce_strength");
+	ClassDB::bind_method(D_METHOD("get_bounce_hit_consumed"), &DirectionalBullets2D::get_bounce_hit_consumed);
+	ClassDB::bind_method(D_METHOD("set_bounce_hit_consumed", "value"), &DirectionalBullets2D::set_bounce_hit_consumed);
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "bounce_hit_consumed"), "set_bounce_hit_consumed", "get_bounce_hit_consumed");
+	ClassDB::bind_method(D_METHOD("get_bounce_max_count"), &DirectionalBullets2D::get_bounce_max_count);
+	ClassDB::bind_method(D_METHOD("set_bounce_max_count", "value"), &DirectionalBullets2D::set_bounce_max_count);
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "bounce_max_count", PROPERTY_HINT_RANGE, "0,1000000,1"), "set_bounce_max_count", "get_bounce_max_count");
+	ClassDB::bind_method(D_METHOD("get_bounce_mode"), &DirectionalBullets2D::get_bounce_mode);
+	ClassDB::bind_method(D_METHOD("set_bounce_mode", "value"), &DirectionalBullets2D::set_bounce_mode);
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "bounce_mode", PROPERTY_HINT_ENUM, "Simple Radial,Precise Shape"), "set_bounce_mode", "get_bounce_mode");
+	ClassDB::bind_method(D_METHOD("get_bounce_rotate_texture"), &DirectionalBullets2D::get_bounce_rotate_texture);
+	ClassDB::bind_method(D_METHOD("set_bounce_rotate_texture", "value"), &DirectionalBullets2D::set_bounce_rotate_texture);
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "bounce_rotate_texture"), "set_bounce_rotate_texture", "get_bounce_rotate_texture");
+	ClassDB::bind_method(D_METHOD("get_bounce_rotation_smooth"), &DirectionalBullets2D::get_bounce_rotation_smooth);
+	ClassDB::bind_method(D_METHOD("set_bounce_rotation_smooth", "value"), &DirectionalBullets2D::set_bounce_rotation_smooth);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "bounce_rotation_smooth"), "set_bounce_rotation_smooth", "get_bounce_rotation_smooth");
+	ClassDB::bind_method(D_METHOD("get_bounce_randomness_deg"), &DirectionalBullets2D::get_bounce_randomness_deg);
+	ClassDB::bind_method(D_METHOD("set_bounce_randomness_deg", "value"), &DirectionalBullets2D::set_bounce_randomness_deg);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "bounce_randomness_deg", PROPERTY_HINT_RANGE, "0,180,0.1"), "set_bounce_randomness_deg", "get_bounce_randomness_deg");
+	ClassDB::bind_method(D_METHOD("get_bounce_cooldown_sec"), &DirectionalBullets2D::get_bounce_cooldown_sec);
+	ClassDB::bind_method(D_METHOD("set_bounce_cooldown_sec", "value"), &DirectionalBullets2D::set_bounce_cooldown_sec);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "bounce_cooldown_sec"), "set_bounce_cooldown_sec", "get_bounce_cooldown_sec");
+	ClassDB::bind_method(D_METHOD("bullet_get_bounce_count", "bullet_index"), &DirectionalBullets2D::bullet_get_bounce_count);
+	ClassDB::bind_method(D_METHOD("debug_get_bounce_info", "bullet_index"), &DirectionalBullets2D::debug_get_bounce_info);
 
 	ClassDB::bind_method(D_METHOD("get_is_wobble_enabled"), &DirectionalBullets2D::get_is_wobble_enabled);
 	ClassDB::bind_method(D_METHOD("bullet_get_wobble_amplitude", "bullet_index"), &DirectionalBullets2D::bullet_get_wobble_amplitude);

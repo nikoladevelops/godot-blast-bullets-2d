@@ -1284,6 +1284,22 @@
 				Fired when one of this spawner's bullets hits a body.
 			</description>
 		</signal>
+		<signal name="bounce_area_entered">
+			<param index="0" name="hit_target_area" type="Object" />
+			<param index="1" name="directional_bullets_instance" type="DirectionalBullets2D" />
+			<param index="2" name="bullet_index" type="int" />
+			<description>
+				Fired when one of this spawner's bullets bounces off an area. A consumed bounce fires both this and [signal area_entered].
+			</description>
+		</signal>
+		<signal name="bounce_body_entered">
+			<param index="0" name="hit_target_body" type="Object" />
+			<param index="1" name="directional_bullets_instance" type="DirectionalBullets2D" />
+			<param index="2" name="bullet_index" type="int" />
+			<description>
+				Fired when one of this spawner's bullets bounces off a body. A consumed bounce fires both this and [signal body_entered].
+			</description>
+		</signal>
 		<signal name="burst_finished">
 			<description>
 				Fired when the last shot of a burst chain fires.

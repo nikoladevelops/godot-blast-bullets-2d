@@ -1415,6 +1415,22 @@
 				Emitted (deferred, outside the physics step) when a directional bullet multimesh's lifetime is over, but only if the [MultiMeshBulletsData2D]'s [member MultiMeshBulletsData2D.is_life_time_over_signal_enabled] is set to [code]true[/code].
 			</description>
 		</signal>
+		<signal name="directional_bounce_area_entered">
+			<param index="0" name="hit_target_area" type="Object" />
+			<param index="1" name="directional_bullets_instance" type="DirectionalBullets2D" />
+			<param index="2" name="bullet_index" type="int" />
+			<description>
+				Emitted synchronously in the physics tick when a directional bullet bounces off a physics area (the target's layer matched the volley's bounce mask). Same handler contract as [signal directional_area_entered]. A bounce that also consumes the hit ([member DirectionalBulletsData2D.bounce_hit_consumed]) emits BOTH this signal and [signal directional_area_entered].
+			</description>
+		</signal>
+		<signal name="directional_bounce_body_entered">
+			<param index="0" name="hit_target_body" type="Object" />
+			<param index="1" name="directional_bullets_instance" type="DirectionalBullets2D" />
+			<param index="2" name="bullet_index" type="int" />
+			<description>
+				Emitted synchronously in the physics tick when a directional bullet bounces off a physics body (the target's layer matched the volley's bounce mask). Same handler contract as [signal directional_body_entered]. A bounce that also consumes the hit ([member DirectionalBulletsData2D.bounce_hit_consumed]) emits BOTH this signal and [signal directional_body_entered].
+			</description>
+		</signal>
 		<signal name="reset_finished">
 			<description>
 				Emitted when the [method reset] method finishes.

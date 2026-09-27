@@ -292,6 +292,104 @@ void DirectionalBulletsData2D::set_homing_lose_range_px(double value) {
 	homing_lose_range_px = value;
 }
 
+int DirectionalBulletsData2D::get_bounce_mask() const {
+	return bounce_mask;
+}
+void DirectionalBulletsData2D::set_bounce_mask(int value) {
+	if (value < 0) {
+		UtilityFunctions::push_error("DirectionalBulletsData2D: bounce_mask must be >= 0 (0 = bouncing disabled), keeping the old value.");
+		return;
+	}
+	bounce_mask = value;
+}
+void DirectionalBulletsData2D::set_bounce_mask_from_array(const TypedArray<int> &numbers) {
+	int bitmask = MultiMeshBulletsData2D::calculate_bitmask(numbers);
+	if (bitmask < 0) {
+		return;
+	}
+	bounce_mask = bitmask;
+}
+
+double DirectionalBulletsData2D::get_bounce_strength() const {
+	return bounce_strength;
+}
+void DirectionalBulletsData2D::set_bounce_strength(double value) {
+	if (!Math::is_finite(value) || value < 0.0 || value > 2.0) {
+		UtilityFunctions::push_error("DirectionalBulletsData2D: bounce_strength must be finite in [0, 2] (1 = elastic), keeping the old value.");
+		return;
+	}
+	bounce_strength = value;
+}
+
+bool DirectionalBulletsData2D::get_bounce_hit_consumed() const {
+	return bounce_hit_consumed;
+}
+void DirectionalBulletsData2D::set_bounce_hit_consumed(bool value) {
+	bounce_hit_consumed = value;
+}
+
+int DirectionalBulletsData2D::get_bounce_max_count() const {
+	return bounce_max_count;
+}
+void DirectionalBulletsData2D::set_bounce_max_count(int value) {
+	if (value < 0) {
+		UtilityFunctions::push_error("DirectionalBulletsData2D: bounce_max_count must be >= 0 (0 = unlimited), keeping the old value.");
+		return;
+	}
+	bounce_max_count = value;
+}
+
+int DirectionalBulletsData2D::get_bounce_mode() const {
+	return bounce_mode;
+}
+void DirectionalBulletsData2D::set_bounce_mode(int value) {
+	if (value != BOUNCE_SIMPLE_RADIAL && value != BOUNCE_PRECISE_SHAPE) {
+		UtilityFunctions::push_error("DirectionalBulletsData2D: bounce_mode must be 0 (radial) or 1 (precise shape), keeping the old value.");
+		return;
+	}
+	bounce_mode = value;
+}
+
+bool DirectionalBulletsData2D::get_bounce_rotate_texture() const {
+	return bounce_rotate_texture;
+}
+void DirectionalBulletsData2D::set_bounce_rotate_texture(bool value) {
+	bounce_rotate_texture = value;
+}
+
+double DirectionalBulletsData2D::get_bounce_rotation_smooth() const {
+	return bounce_rotation_smooth;
+}
+void DirectionalBulletsData2D::set_bounce_rotation_smooth(double value) {
+	if (!Math::is_finite(value) || value < 0.0) {
+		UtilityFunctions::push_error("DirectionalBulletsData2D: bounce_rotation_smooth must be finite and >= 0 (0 = instant snap), keeping the old value.");
+		return;
+	}
+	bounce_rotation_smooth = value;
+}
+
+double DirectionalBulletsData2D::get_bounce_randomness_deg() const {
+	return bounce_randomness_deg;
+}
+void DirectionalBulletsData2D::set_bounce_randomness_deg(double value) {
+	if (!Math::is_finite(value) || value < 0.0 || value > 180.0) {
+		UtilityFunctions::push_error("DirectionalBulletsData2D: bounce_randomness_deg must be finite in [0, 180], keeping the old value.");
+		return;
+	}
+	bounce_randomness_deg = value;
+}
+
+double DirectionalBulletsData2D::get_bounce_cooldown_sec() const {
+	return bounce_cooldown_sec;
+}
+void DirectionalBulletsData2D::set_bounce_cooldown_sec(double value) {
+	if (!Math::is_finite(value) || value < 0.0 || value > 1.0) {
+		UtilityFunctions::push_error("DirectionalBulletsData2D: bounce_cooldown_sec must be finite in [0, 1], keeping the old value.");
+		return;
+	}
+	bounce_cooldown_sec = value;
+}
+
 void DirectionalBulletsData2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_all_bullet_speed_data"), &DirectionalBulletsData2D::get_all_bullet_speed_data);
 	ClassDB::bind_method(D_METHOD("set_all_bullet_speed_data", "new_data"), &DirectionalBulletsData2D::set_all_bullet_speed_data);
@@ -432,5 +530,45 @@ void DirectionalBulletsData2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_homing_lose_range_px"), &DirectionalBulletsData2D::get_homing_lose_range_px);
 	ClassDB::bind_method(D_METHOD("set_homing_lose_range_px", "value"), &DirectionalBulletsData2D::set_homing_lose_range_px);
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "homing_lose_range_px"), "set_homing_lose_range_px", "get_homing_lose_range_px");
+
+	ClassDB::bind_method(D_METHOD("get_bounce_mask"), &DirectionalBulletsData2D::get_bounce_mask);
+	ClassDB::bind_method(D_METHOD("set_bounce_mask", "value"), &DirectionalBulletsData2D::set_bounce_mask);
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "bounce_mask", PROPERTY_HINT_LAYERS_2D_PHYSICS), "set_bounce_mask", "get_bounce_mask");
+	ClassDB::bind_method(D_METHOD("set_bounce_mask_from_array", "array_of_masks"), &DirectionalBulletsData2D::set_bounce_mask_from_array);
+
+	ClassDB::bind_method(D_METHOD("get_bounce_strength"), &DirectionalBulletsData2D::get_bounce_strength);
+	ClassDB::bind_method(D_METHOD("set_bounce_strength", "value"), &DirectionalBulletsData2D::set_bounce_strength);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "bounce_strength", PROPERTY_HINT_RANGE, "0,2,0.01"), "set_bounce_strength", "get_bounce_strength");
+
+	ClassDB::bind_method(D_METHOD("get_bounce_hit_consumed"), &DirectionalBulletsData2D::get_bounce_hit_consumed);
+	ClassDB::bind_method(D_METHOD("set_bounce_hit_consumed", "value"), &DirectionalBulletsData2D::set_bounce_hit_consumed);
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "bounce_hit_consumed"), "set_bounce_hit_consumed", "get_bounce_hit_consumed");
+
+	ClassDB::bind_method(D_METHOD("get_bounce_max_count"), &DirectionalBulletsData2D::get_bounce_max_count);
+	ClassDB::bind_method(D_METHOD("set_bounce_max_count", "value"), &DirectionalBulletsData2D::set_bounce_max_count);
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "bounce_max_count", PROPERTY_HINT_RANGE, "0,1000000,1"), "set_bounce_max_count", "get_bounce_max_count");
+
+	ClassDB::bind_method(D_METHOD("get_bounce_mode"), &DirectionalBulletsData2D::get_bounce_mode);
+	ClassDB::bind_method(D_METHOD("set_bounce_mode", "value"), &DirectionalBulletsData2D::set_bounce_mode);
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "bounce_mode", PROPERTY_HINT_ENUM, "Simple Radial,Precise Shape"), "set_bounce_mode", "get_bounce_mode");
+
+	ClassDB::bind_method(D_METHOD("get_bounce_rotate_texture"), &DirectionalBulletsData2D::get_bounce_rotate_texture);
+	ClassDB::bind_method(D_METHOD("set_bounce_rotate_texture", "value"), &DirectionalBulletsData2D::set_bounce_rotate_texture);
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "bounce_rotate_texture"), "set_bounce_rotate_texture", "get_bounce_rotate_texture");
+
+	ClassDB::bind_method(D_METHOD("get_bounce_rotation_smooth"), &DirectionalBulletsData2D::get_bounce_rotation_smooth);
+	ClassDB::bind_method(D_METHOD("set_bounce_rotation_smooth", "value"), &DirectionalBulletsData2D::set_bounce_rotation_smooth);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "bounce_rotation_smooth"), "set_bounce_rotation_smooth", "get_bounce_rotation_smooth");
+
+	ClassDB::bind_method(D_METHOD("get_bounce_randomness_deg"), &DirectionalBulletsData2D::get_bounce_randomness_deg);
+	ClassDB::bind_method(D_METHOD("set_bounce_randomness_deg", "value"), &DirectionalBulletsData2D::set_bounce_randomness_deg);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "bounce_randomness_deg", PROPERTY_HINT_RANGE, "0,180,0.1"), "set_bounce_randomness_deg", "get_bounce_randomness_deg");
+
+	ClassDB::bind_method(D_METHOD("get_bounce_cooldown_sec"), &DirectionalBulletsData2D::get_bounce_cooldown_sec);
+	ClassDB::bind_method(D_METHOD("set_bounce_cooldown_sec", "value"), &DirectionalBulletsData2D::set_bounce_cooldown_sec);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "bounce_cooldown_sec"), "set_bounce_cooldown_sec", "get_bounce_cooldown_sec");
+
+	BIND_ENUM_CONSTANT(BOUNCE_SIMPLE_RADIAL);
+	BIND_ENUM_CONSTANT(BOUNCE_PRECISE_SHAPE);
 }
 } //namespace BlastBullets2D

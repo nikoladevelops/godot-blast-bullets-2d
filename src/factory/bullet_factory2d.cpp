@@ -8831,6 +8831,22 @@ void BulletFactory2D::_bind_methods() {
 						  PropertyInfo(Variant::OBJECT, "block_bullets_instance", PROPERTY_HINT_RESOURCE_TYPE, "BlockBullets2D"),
 						  PropertyInfo(Variant::ARRAY, "bullet_indexes", PROPERTY_HINT_ARRAY_TYPE, "int")));
 
+	// Bounce notifications: slim payload like the collision signals (custom
+	// data and transforms stay one instance call away). Emitted synchronously
+	// from the physics tick under the same handler contract (queue_free /
+	// call_deferred factory calls only, never immediate free()). A bounce
+	// that also consumes the hit (bounce_hit_consumed) emits BOTH the bounce
+	// signal here and the matching directional_area/body_entered signal.
+	ADD_SIGNAL(MethodInfo("directional_bounce_area_entered",
+						  PropertyInfo(Variant::OBJECT, "hit_target_area"),
+						  PropertyInfo(Variant::OBJECT, "directional_bullets_instance", PROPERTY_HINT_RESOURCE_TYPE, "DirectionalBullets2D"),
+						  PropertyInfo(Variant::INT, "bullet_index")));
+
+	ADD_SIGNAL(MethodInfo("directional_bounce_body_entered",
+						  PropertyInfo(Variant::OBJECT, "hit_target_body"),
+						  PropertyInfo(Variant::OBJECT, "directional_bullets_instance", PROPERTY_HINT_RESOURCE_TYPE, "DirectionalBullets2D"),
+						  PropertyInfo(Variant::INT, "bullet_index")));
+
 	ADD_SIGNAL(MethodInfo("reset_finished"));
 
 	// Need this in order to expose the enum constants to Godot Engine

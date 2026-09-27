@@ -254,6 +254,40 @@ protected:
 	real_t homing_duration_sec = 0.0;
 	real_t homing_lose_range_px = 0.0;
 
+	// BOUNCE / RICOCHET (seeded from DirectionalBulletsData2D; editable live
+	// below). bounce_mask == 0 disables the whole feature (zero tick cost:
+	// only the collision drain checks it). On a bounce-eligible hit the
+	// bullet reflects across the surface normal and keeps flying; the hit
+	// only consumes collision budget when bounce_hit_consumed is true.
+	int bounce_mask = 0;
+	real_t bounce_strength = 1.0;
+	bool bounce_hit_consumed = false;
+	int bounce_max_count = 0;
+	int bounce_mode = 0; // DirectionalBulletsData2D::BounceMode
+	bool bounce_rotate_texture = true;
+	real_t bounce_rotation_smooth = 0.0;
+	real_t bounce_randomness_deg = 0.0;
+	real_t bounce_cooldown_sec = 0.05;
+	// Per-bullet bounce ledger. Sized to amount_bullets at spawn/enable;
+	// zeroed on every new life and on single-bullet disable (same rule as
+	// homing/orbit: a wake starts fresh).
+	std::vector<int> all_bounce_count;
+	std::vector<real_t> all_bounce_cooldown;
+	std::vector<uint64_t> all_bounce_last_tick;
+	// Smooth visual pursuit: ballistics always reflect instantly, but with
+	// bounce_rotation_smooth > 0 the sprite slews toward the reflected
+	// heading over several ticks (same contract as homing smoothing).
+	std::vector<uint8_t> bounce_visual_pending;
+	std::vector<Vector2> bounce_visual_target;
+	// Monotonic tick id for the one-bounce-per-bullet-per-tick guard (a
+	// target carrying both a body and an area would otherwise double-flip).
+	uint64_t bounce_tick_counter = 0;
+	// Last physics delta, used to size the first smooth step at bounce time.
+	double bounce_last_delta = 0.016;
+	// Once-flag so the mask-mismatch footgun warns once per life instead of
+	// spamming (bounce bits outside collision_mask can never be detected).
+	bool bounce_mask_warning_issued = false;
+
 public:
 	// Advances one bullet along a movement-pattern curve for this tick.
 	// distance_traveled is updated in place. Returns false when the pattern is
@@ -320,6 +354,8 @@ public:
 		if (!Math::is_finite(delta) || delta < 0.0) {
 			return;
 		}
+		++bounce_tick_counter;
+		bounce_last_delta = delta;
 		const bool is_using_physics_interpolation = bullet_factory != nullptr && bullet_factory->use_physics_interpolation;
 		if (is_using_physics_interpolation) {
 			update_all_previous_transforms_for_interpolation();
@@ -489,6 +525,15 @@ public:
 		for (int i : active_bullet_indexes) {
 			if (i < 0 || i >= amount_bullets) {
 				continue;
+			}
+			// Bounce cooldown ticks down so the bullet can escape the overlap
+			// it just bounced out of (a body+area pair on one target would
+			// otherwise double-flip it in place).
+			if (i >= 0 && i < (int)all_bounce_cooldown.size() && all_bounce_cooldown[i] > 0.0) {
+				all_bounce_cooldown[i] -= (real_t)delta;
+				if (all_bounce_cooldown[i] < 0.0) {
+					all_bounce_cooldown[i] = 0.0;
+				}
 			}
 			if (i >= (int)all_cached_instance_transforms.size() || i >= (int)all_cached_direction.size() || i >= (int)all_cached_velocity.size()) {
 				continue;
@@ -736,6 +781,26 @@ public:
 				}
 				direction_got_updated = true;
 			}
+
+		// 4b. BOUNCE VISUAL PURSUIT (smooth ricochet facing). Ballistics
+		// always reflect instantly in the collision drain; with
+		// bounce_rotation_smooth > 0 only the sprite slews toward the
+		// reflected heading over several ticks. Visual-only: the logical
+		// direction is never touched here. Skipped while
+		// adjust_direction_based_on_rotation owns ballistics (the visual
+		// owns movement there, so it snapped at bounce time instead).
+		if (bounce_rotate_texture && bounce_rotation_smooth > 0.0 && !adjust_direction_based_on_rotation && i >= 0 && i < (int)bounce_visual_pending.size() && bounce_visual_pending[i] && i < (int)bounce_visual_target.size()) {
+			const Vector2 want = bounce_visual_target[i];
+			if (want.length_squared() > 0.00000001 && Math::is_finite((double)bounce_rotation_smooth) && delta > 0.0) {
+				rotate_to_target(i, want, bounce_rotation_smooth * (real_t)delta, false);
+				const Vector2 fwd = all_cached_instance_transforms[i][0].rotated(-cache_texture_rotation_radians);
+				if (fwd.length_squared() > 0.00000001 && fwd.normalized().dot(want.normalized()) > 0.9999) {
+					bounce_visual_pending[i] = 0;
+				}
+			} else {
+				bounce_visual_pending[i] = 0;
+			}
+		}
 
 			// 5. VELOCITY CALCULATION (ONLY IF DIRECTION GOT UPDATED) - use temp to avoid mutating cached velocity
 			if (direction_got_updated) {
@@ -3145,6 +3210,159 @@ public:
 		use_per_bullet_homing_smoothing = false;
 	}
 
+	// BOUNCE / RICOCHET RUNTIME API (spawn-data equivalents, editable live).
+	int get_bounce_mask() const { return bounce_mask; }
+	void set_bounce_mask(int value) {
+		if (value < 0) {
+			UtilityFunctions::push_error("DirectionalBullets2D.set_bounce_mask: value must be >= 0 (0 = bouncing disabled), keeping the old value.");
+			return;
+		}
+		bounce_mask = value;
+		bounce_mask_warning_issued = false;
+	}
+	void set_bounce_mask_from_array(const TypedArray<int> &numbers) {
+		int bitmask = 0;
+		for (int k = 0; k < numbers.size(); ++k) {
+			const Variant v = numbers[k];
+			if (v.get_type() != Variant::INT) {
+				UtilityFunctions::push_error("DirectionalBullets2D.set_bounce_mask_from_array: all entries must be positive layer numbers.");
+				return;
+			}
+			const int layer = (int)v;
+			if (layer < 1 || layer > 32) {
+				UtilityFunctions::push_error("DirectionalBullets2D.set_bounce_mask_from_array: layer numbers must be in [1, 32].");
+				return;
+			}
+			bitmask |= (1 << (layer - 1));
+		}
+		bounce_mask = bitmask;
+		bounce_mask_warning_issued = false;
+	}
+	real_t get_bounce_strength() const { return bounce_strength; }
+	void set_bounce_strength(real_t value) {
+		if (!Math::is_finite(value) || value < 0.0 || value > 2.0) {
+			UtilityFunctions::push_error("DirectionalBullets2D.set_bounce_strength: value must be finite in [0, 2] (1 = elastic), keeping the old value.");
+			return;
+		}
+		bounce_strength = value;
+	}
+	bool get_bounce_hit_consumed() const { return bounce_hit_consumed; }
+	void set_bounce_hit_consumed(bool value) { bounce_hit_consumed = value; }
+	int get_bounce_max_count() const { return bounce_max_count; }
+	void set_bounce_max_count(int value) {
+		if (value < 0) {
+			UtilityFunctions::push_error("DirectionalBullets2D.set_bounce_max_count: value must be >= 0 (0 = unlimited), keeping the old value.");
+			return;
+		}
+		bounce_max_count = value;
+	}
+	int get_bounce_mode() const { return bounce_mode; }
+	void set_bounce_mode(int value) {
+		if (value != 0 && value != 1) {
+			UtilityFunctions::push_error("DirectionalBullets2D.set_bounce_mode: value must be 0 (radial) or 1 (precise shape), keeping the old value.");
+			return;
+		}
+		bounce_mode = value;
+	}
+	bool get_bounce_rotate_texture() const { return bounce_rotate_texture; }
+	void set_bounce_rotate_texture(bool value) { bounce_rotate_texture = value; }
+	real_t get_bounce_rotation_smooth() const { return bounce_rotation_smooth; }
+	void set_bounce_rotation_smooth(real_t value) {
+		if (!Math::is_finite(value) || value < 0.0) {
+			UtilityFunctions::push_error("DirectionalBullets2D.set_bounce_rotation_smooth: value must be finite and >= 0 (0 = instant snap), keeping the old value.");
+			return;
+		}
+		bounce_rotation_smooth = value;
+	}
+	real_t get_bounce_randomness_deg() const { return bounce_randomness_deg; }
+	void set_bounce_randomness_deg(real_t value) {
+		if (!Math::is_finite(value) || value < 0.0 || value > 180.0) {
+			UtilityFunctions::push_error("DirectionalBullets2D.set_bounce_randomness_deg: value must be finite in [0, 180], keeping the old value.");
+			return;
+		}
+		bounce_randomness_deg = value;
+	}
+	real_t get_bounce_cooldown_sec() const { return bounce_cooldown_sec; }
+	void set_bounce_cooldown_sec(real_t value) {
+		if (!Math::is_finite(value) || value < 0.0 || value > 1.0) {
+			UtilityFunctions::push_error("DirectionalBullets2D.set_bounce_cooldown_sec: value must be finite in [0, 1], keeping the old value.");
+			return;
+		}
+		bounce_cooldown_sec = value;
+	}
+	// How many times one bullet has bounced in its current life.
+	int bullet_get_bounce_count(int bullet_index) const {
+		if (!validate_bullet_index(bullet_index, "bullet_get_bounce_count")) {
+			return 0;
+		}
+		if (bullet_index < 0 || bullet_index >= (int)all_bounce_count.size()) {
+			return 0;
+		}
+		return all_bounce_count[bullet_index];
+	}
+	// Bounce introspection for tests/support: counts, config echo, pending
+	// visual state. Never mutates.
+	Dictionary debug_get_bounce_info(int bullet_index) const {
+		Dictionary d;
+		d["valid"] = false;
+		d["bounce_count"] = 0;
+		d["bounce_mask"] = bounce_mask;
+		d["bounce_strength"] = bounce_strength;
+		d["bounce_hit_consumed"] = bounce_hit_consumed;
+		d["bounce_max_count"] = bounce_max_count;
+		d["bounce_mode"] = bounce_mode;
+		d["bounce_enabled"] = bounce_mask != 0;
+		d["visual_pending"] = false;
+		d["cooldown"] = 0.0;
+		if (bullet_index < 0 || bullet_index >= amount_bullets) {
+			return d;
+		}
+		d["valid"] = true;
+		if (bullet_index >= 0 && bullet_index < (int)all_bounce_count.size()) {
+			d["bounce_count"] = all_bounce_count[bullet_index];
+		}
+		if (bullet_index >= 0 && bullet_index < (int)bounce_visual_pending.size()) {
+			d["visual_pending"] = bounce_visual_pending[bullet_index] != 0;
+		}
+		if (bullet_index >= 0 && bullet_index < (int)all_bounce_cooldown.size()) {
+			d["cooldown"] = all_bounce_cooldown[bullet_index];
+		}
+		return d;
+	}
+	// Seeds bounce config + zeroes the per-bullet ledger from spawn data.
+	// Called from the custom spawn/enable logic alongside wobble/gravity.
+	void apply_bounce_from_data(const DirectionalBulletsData2D &directional_data, int data_collision_mask) {
+		bounce_mask = directional_data.bounce_mask;
+		bounce_strength = (real_t)directional_data.bounce_strength;
+		bounce_hit_consumed = directional_data.bounce_hit_consumed;
+		bounce_max_count = directional_data.bounce_max_count;
+		bounce_mode = directional_data.bounce_mode;
+		bounce_rotate_texture = directional_data.bounce_rotate_texture;
+		bounce_rotation_smooth = (real_t)directional_data.bounce_rotation_smooth;
+		bounce_randomness_deg = (real_t)directional_data.bounce_randomness_deg;
+		bounce_cooldown_sec = (real_t)directional_data.bounce_cooldown_sec;
+		all_bounce_count.assign(amount_bullets, 0);
+		all_bounce_cooldown.assign(amount_bullets, 0.0);
+		all_bounce_last_tick.assign(amount_bullets, 0);
+		bounce_visual_pending.assign(amount_bullets, 0);
+		bounce_visual_target.assign(amount_bullets, Vector2(1, 0));
+		bounce_mask_warning_issued = false;
+		// The #1 silent misconfiguration: bounce layers the bullet can never
+		// detect because its collision_mask does not cover them. Warn once
+		// per life instead of bouncing nothing forever.
+		if (bounce_mask != 0 && (data_collision_mask & bounce_mask) != bounce_mask) {
+			UtilityFunctions::push_warning("DirectionalBullets2D: bounce_mask has bits outside collision_mask, those targets will never be detected (no bounce). Add the bounce layers to collision_mask.");
+			bounce_mask_warning_issued = true;
+		}
+	}
+	// Bounce decision for one queued collision record. Called from the base
+	// handle_bullet_collision() BEFORE the hit counter increments.
+	// Returns 0 = not a bounce (take the normal path), 1 = bounced and the
+	// record is fully handled (return), 2 = bounced but the hit is consumed
+	// too (fall through into normal counting/signals). Implemented in the
+	// .cpp (needs scene-tree + shape classes).
+	int try_handle_bounce(CollisionType collision_type, int bullet_index, int64_t entered_instance_id) override;
+
 	// Virtual methods
 	void set_up_movement_data(const TypedArray<BulletSpeedData2D> &new_speed_data, bool tile_short_arrays = false);
 	virtual void custom_additional_spawn_logic(const MultiMeshBulletsData2D &data) override final;
@@ -3652,6 +3870,23 @@ public:
 		shared_movement_pattern_distances.assign(shared_movement_pattern_distances.size(), 0.0);
 		shared_bullet_speed_data.unref();
 		shared_bullet_rotation_data.unref();
+		// Bounce is per-owner runtime state like homing: a pooled instance
+		// must not ricochet the next owner off stale layers.
+		bounce_mask = 0;
+		bounce_strength = 1.0;
+		bounce_hit_consumed = false;
+		bounce_max_count = 0;
+		bounce_mode = 0;
+		bounce_rotate_texture = true;
+		bounce_rotation_smooth = 0.0;
+		bounce_randomness_deg = 0.0;
+		bounce_cooldown_sec = 0.05;
+		all_bounce_count.assign(all_bounce_count.size(), 0);
+		all_bounce_cooldown.assign(all_bounce_cooldown.size(), 0.0);
+		all_bounce_last_tick.assign(all_bounce_last_tick.size(), 0);
+		bounce_visual_pending.assign(bounce_visual_pending.size(), 0);
+		bounce_visual_target.assign(bounce_visual_target.size(), Vector2(1, 0));
+		bounce_mask_warning_issued = false;
 	}
 
 	// Single-bullet hook called from disable_bullet(): the tick only trims
@@ -3693,6 +3928,21 @@ public:
 		}
 		if (bullet_index >= 0 && bullet_index < (int)all_orbiting_data.size()) {
 			all_orbiting_data[bullet_index] = OrbitingData();
+		}
+		// A disabled bullet owns no bounce state either: counts, cooldown,
+		// per-tick guard and smooth-visual pursuit all restart on wake so a
+		// re-enabled bullet never inherits a stale ricochet.
+		if (bullet_index >= 0 && bullet_index < (int)all_bounce_count.size()) {
+			all_bounce_count[bullet_index] = 0;
+		}
+		if (bullet_index >= 0 && bullet_index < (int)all_bounce_cooldown.size()) {
+			all_bounce_cooldown[bullet_index] = 0.0;
+		}
+		if (bullet_index >= 0 && bullet_index < (int)all_bounce_last_tick.size()) {
+			all_bounce_last_tick[bullet_index] = 0;
+		}
+		if (bullet_index >= 0 && bullet_index < (int)bounce_visual_pending.size()) {
+			bounce_visual_pending[bullet_index] = 0;
 		}
 	}
 

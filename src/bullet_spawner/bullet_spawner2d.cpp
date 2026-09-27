@@ -8345,6 +8345,19 @@ void BulletSpawner2D::_bind_methods() {
 	ADD_SIGNAL(MethodInfo("life_time_over",
 		PropertyInfo(Variant::OBJECT, "directional_bullets_instance", PROPERTY_HINT_RESOURCE_TYPE, "DirectionalBullets2D"),
 		PropertyInfo(Variant::ARRAY, "bullet_indexes", PROPERTY_HINT_ARRAY_TYPE, "int")));
+	// Bounce notifications possessed by this spawner for the volleys it
+	// spawned (same routing as area_entered/body_entered above: a spawner
+	// volley NEVER fires factory signals). Same slim payload and handler
+	// contract. A consumed bounce (bounce_hit_consumed) emits BOTH the
+	// bounce signal here and the matching area/body_entered signal.
+	ADD_SIGNAL(MethodInfo("bounce_area_entered",
+		PropertyInfo(Variant::OBJECT, "hit_target_area"),
+		PropertyInfo(Variant::OBJECT, "directional_bullets_instance", PROPERTY_HINT_RESOURCE_TYPE, "DirectionalBullets2D"),
+		PropertyInfo(Variant::INT, "bullet_index")));
+	ADD_SIGNAL(MethodInfo("bounce_body_entered",
+		PropertyInfo(Variant::OBJECT, "hit_target_body"),
+		PropertyInfo(Variant::OBJECT, "directional_bullets_instance", PROPERTY_HINT_RESOURCE_TYPE, "DirectionalBullets2D"),
+		PropertyInfo(Variant::INT, "bullet_index")));
 
 	ClassDB::bind_method(D_METHOD("get_shooting_enabled"), &BulletSpawner2D::get_shooting_enabled);
 	ClassDB::bind_method(D_METHOD("set_shooting_enabled", "value"), &BulletSpawner2D::set_shooting_enabled);

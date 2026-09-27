@@ -56,6 +56,8 @@ The main advantages to using this custom built plugin:
 
 - **Orbiting Bullets** - Each bullet can begin orbiting a homing target at a custom radius while also moving in a circle around it. Imagine a swarm of bullets orbiting your mouse as you move it, while the radius increases or decreases then some of them go and orbit another target, this is the type of behavior you can implement on the go.
 
+- **Bouncing Bullets (Ricochet)** - Pick bounce layers and bullets reflect off those targets automatically with configurable strength (elastic, damped, dead-stop, super-elastic), optional hit consumption, bounce budgets, radial or shape-accurate normals, instant or smooth visual turn, scatter randomness and overlap cooldown. Full signals (`directional_bounce_area/body_entered` on the factory, `bounce_area/body_entered` on the spawner) included.
+
 - **Path2D Movement Patterns** - Draw a Path2D in your scene and suddenly the bullets possess that movement behavior
 relative to their direction (allows zig zag patterns and any other creative pattern you can think about). Example: A bullet gets spawned with a zig zag pattern (that might or might not repeat), then you can swap it with another pattern during runtime or even have homing bullets with custom movement patterns - very powerful.
 

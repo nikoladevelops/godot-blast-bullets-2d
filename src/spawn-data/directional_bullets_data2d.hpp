@@ -198,6 +198,69 @@ public:
 	// Must stay finite and >= 0.
 	double homing_lose_range_px = 0.0;
 
+	// BOUNCE / RICOCHET (spawn-time seed; every value below also exists as a
+	// live DirectionalBullets2D property for runtime tuning). Pool reuse
+	// re-seeds these on every enable, so direct BulletFactory2D.spawn_* users
+	// keep bouncing across reuses without a spawner.
+
+	// Bounce behavior kinds. SIMPLE_RADIAL reflects across the radial axis
+	// (bullet pos minus target pos): cheap, robust, looks right on round
+	// targets. PRECISE_SHAPE resolves the target's CollisionShape2D and
+	// reflects across the analytic surface normal (flat walls bounce flat):
+	// slightly costlier, runs only on bounce ticks, falls back to radial
+	// when the target has no usable shape.
+	enum BounceMode {
+		BOUNCE_SIMPLE_RADIAL = 0,
+		BOUNCE_PRECISE_SHAPE = 1
+	};
+
+	// Bitmask of target collision layers that trigger a bounce. Checked
+	// against the collided object's collision_layer and takes precedence
+	// over the normal collision path. 0 (default) disables bouncing.
+	// NOTE: these bits must overlap collision_mask, otherwise the bullet
+	// never detects those targets at all (warned once per spawn).
+	int bounce_mask = 0;
+
+	// Speed multiplier applied on every bounce. 1.0 (default) is perfectly
+	// elastic, < 1 damps (0.5 halves the speed), 0 dead-stops the bullet in
+	// place (still alive), > 1 is super-elastic. Clamped to [0, 2].
+	double bounce_strength = 1.0;
+
+	// Whether a bounce also counts as a normal hit (increments the collision
+	// counter and can disable the bullet at bullet_max_collision_count).
+	// False (default) means free bounces that never kill the bullet.
+	bool bounce_hit_consumed = false;
+
+	// How many times a single bullet may bounce before bounces stop working
+	// for it (further hits take the normal collision path). 0 (default) =
+	// unlimited (lifetime still bounds it). Must stay >= 0.
+	int bounce_max_count = 0;
+
+	// Which normal estimator to use (see BounceMode). Default radial.
+	int bounce_mode = BOUNCE_SIMPLE_RADIAL;
+
+	// Whether a bounce re-aims the bullet visual at the reflected heading.
+	// Turn off when something else owns the facing (rotation data, patterns).
+	bool bounce_rotate_texture = true;
+
+	// Max visual turn rate in radians/sec toward the reflected heading.
+	// 0 (default) snaps instantly (right for bullets); > 0 slews smoothly
+	// like homing_smoothing. Ballistics always reflect instantly, only the
+	// visual lags. Ignored while adjust_direction_based_on_rotation is on
+	// (the visual owns ballistics there, so it must snap).
+	double bounce_rotation_smooth = 0.0;
+
+	// Random scatter in degrees applied symmetrically around the reflected
+	// heading (+/- randomness per bounce). 0 (default) = exact reflection.
+	// Must stay finite in [0, 180].
+	double bounce_randomness_deg = 0.0;
+
+	// Quiet period in seconds after a bounce during which further bounce
+	// records for that bullet are swallowed (lets it escape the overlap).
+	// Prevents double-flip when a target carries both a body and an area.
+	// Must stay finite in [0, 1]. Default 0.05.
+	double bounce_cooldown_sec = 0.05;
+
 	double get_homing_smoothing() const;
 	void set_homing_smoothing(double value);
 
@@ -303,7 +366,37 @@ public:
 	double get_homing_lose_range_px() const;
 	void set_homing_lose_range_px(double value);
 
+	int get_bounce_mask() const;
+	void set_bounce_mask(int value);
+	void set_bounce_mask_from_array(const TypedArray<int> &numbers);
+
+	double get_bounce_strength() const;
+	void set_bounce_strength(double value);
+
+	bool get_bounce_hit_consumed() const;
+	void set_bounce_hit_consumed(bool value);
+
+	int get_bounce_max_count() const;
+	void set_bounce_max_count(int value);
+
+	int get_bounce_mode() const;
+	void set_bounce_mode(int value);
+
+	bool get_bounce_rotate_texture() const;
+	void set_bounce_rotate_texture(bool value);
+
+	double get_bounce_rotation_smooth() const;
+	void set_bounce_rotation_smooth(double value);
+
+	double get_bounce_randomness_deg() const;
+	void set_bounce_randomness_deg(double value);
+
+	double get_bounce_cooldown_sec() const;
+	void set_bounce_cooldown_sec(double value);
+
 protected:
 	static void _bind_methods();
 };
 } //namespace BlastBullets2D
+
+VARIANT_ENUM_CAST(BlastBullets2D::DirectionalBulletsData2D::BounceMode);

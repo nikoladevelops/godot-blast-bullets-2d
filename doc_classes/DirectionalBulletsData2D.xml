@@ -122,5 +122,32 @@
 		<member name="shared_movement_pattern_repeat" type="bool" setter="set_shared_movement_pattern_repeat" getter="get_shared_movement_pattern_repeat" default="true">
 			Fallback repeat flag for bullets without their own entry in [member all_bullet_movement_pattern_repeats]. Whether those bullets loop the pattern instead of stopping at the end of the curve.
 		</member>
+		<member name="bounce_mask" type="int" setter="set_bounce_mask" getter="get_bounce_mask" default="0">
+			Bitmask of target collision layers that trigger a bounce, applied at spawn time (and on pool reuse). Checked against the collided object's collision_layer and takes precedence over the normal collision path. 0 (default) disables bouncing. NOTE: these bits must overlap [member MultiMeshBulletsData2D.collision_mask], otherwise the bullet never detects those targets at all (warned once per spawn). Use [method set_bounce_mask_from_array] to build it from layer numbers.
+		</member>
+		<member name="bounce_strength" type="float" setter="set_bounce_strength" getter="get_bounce_strength" default="1.0">
+			Speed multiplier applied on every bounce (finite in [0, 2]). 1.0 (default) is perfectly elastic, below 1 damps, 0 dead-stops the bullet in place (still alive when [member bounce_hit_consumed] is false), above 1 is super-elastic.
+		</member>
+		<member name="bounce_hit_consumed" type="bool" setter="set_bounce_hit_consumed" getter="get_bounce_hit_consumed" default="false">
+			Whether a bounce also counts as a normal hit (increments the collision counter and can disable the bullet at [member MultiMeshBulletsData2D.bullet_max_collision_count]). False (default) means free bounces that never kill the bullet. A consumed bounce emits BOTH the bounce signal and the matching area/body signal.
+		</member>
+		<member name="bounce_max_count" type="int" setter="set_bounce_max_count" getter="get_bounce_max_count" default="0">
+			How many times a single bullet may bounce before bounces stop working for it (further hits take the normal collision path). 0 (default) = unlimited (lifetime still bounds it). Stops wall-to-wall ping-pong from living forever.
+		</member>
+		<member name="bounce_mode" type="int" setter="set_bounce_mode" getter="get_bounce_mode" default="0">
+			Which surface normal to reflect across: 0 Simple Radial (cheap default, reflects across bullet-minus-target-center, right for round targets), 1 Precise Shape (resolves the target's CollisionShape2D and reflects across the analytic face normal, so flat walls bounce flat; falls back to radial when the target has no usable shape).
+		</member>
+		<member name="bounce_rotate_texture" type="bool" setter="set_bounce_rotate_texture" getter="get_bounce_rotate_texture" default="true">
+			Whether a bounce re-aims the bullet visual at the reflected heading. Turn off when something else owns the facing (rotation data, movement patterns).
+		</member>
+		<member name="bounce_rotation_smooth" type="float" setter="set_bounce_rotation_smooth" getter="get_bounce_rotation_smooth" default="0.0">
+			Max visual turn rate in radians/sec toward the reflected heading. 0 (default) snaps instantly (right for bullets); above 0 only the sprite slews while ballistics reflect instantly. Ignored while [member adjust_direction_based_on_rotation] is on (the visual owns ballistics there, so it must snap).
+		</member>
+		<member name="bounce_randomness_deg" type="float" setter="set_bounce_randomness_deg" getter="get_bounce_randomness_deg" default="0.0">
+			Random scatter in degrees applied symmetrically around the reflected heading per bounce (finite in [0, 180]). 0 (default) = exact reflection.
+		</member>
+		<member name="bounce_cooldown_sec" type="float" setter="set_bounce_cooldown_sec" getter="get_bounce_cooldown_sec" default="0.05">
+			Quiet period in seconds after a bounce during which further bounce records for that bullet are swallowed (lets it escape the overlap; a target carrying both a body and an area would otherwise double-flip it). Finite in [0, 1].
+		</member>
 	</members>
 </class>
