@@ -1,10 +1,15 @@
 extends SceneTree
 ## Volley bounce suite: REAL physics (no mocks).
 ## Covers: defaults-off, free bounce vs wall (precedence over normal path),
-## consumed bounce, strength scaling, max-count ping-pong between two walls,
-## mask precedence, spawner ownership, precise-vs-radial normals, smooth
-## visual pursuit, feature mixes (homing/wobble/gravity/orbit/curves),
-## rejects + fuzz, pool-reuse neutrality.
+## consumed bounce, strength scaling (incl. uncapped + max_speed clamp),
+## max-count ping-pong between two walls, mask precedence, spawner ownership,
+## precise-vs-radial normals, capsule precise branch, smooth visual pursuit,
+## render continuity across snap (prev-origin proof), teleport-into-wall,
+## attachment nudge tracking, cooldown-vs-consumed semantics, lifetime expiry
+## inside cooldown, spawner retarget preservation, bulk bounce counts,
+## inspector group coherence, runtime arm/disarm, gravity flag refresh,
+## feature mixes (homing/wobble/gravity/orbit/curves), rejects + fuzz,
+## pool-reuse neutrality.
 ## Run: godot --headless --path test_project --script tests/volley/test_volley_bounce.gd
 ## Exit code 0 = all pass.
 
@@ -38,6 +43,11 @@ func _on_spawner_bounce(_t: Object, _v: DirectionalBullets2D, _i: int) -> void:
 
 func _on_factory_bounce(_t: Object, _v: DirectionalBullets2D, _i: int) -> void:
 	_factory_bounce.append(1)
+
+var _bounce_capture: Array = []
+
+func _on_bounce_capture(_body: Object, volley: DirectionalBullets2D, idx: int) -> void:
+	_bounce_capture.append([volley.debug_get_previous_origin(idx), volley.get_bullet_global_transform(idx).origin])
 
 # Bullet data aimed at +X (or given angle) from a start pos.
 # Bounce walls live on layer 4 (value 8); plain walls on layer 5 (value 16).
@@ -80,6 +90,7 @@ func _clear_signals() -> void:
 	_norm_body.clear()
 	_spawner_bounce.clear()
 	_factory_bounce.clear()
+	_bounce_capture.clear()
 
 # Park on idle, wipe every flying volley, clear signal buckets: each phase
 # then observes ONLY the volley it spawns (stray infinite-lifetime volleys
@@ -266,6 +277,8 @@ func _initialize() -> void:
 
 	printerr("BOUNCE T7 precise mode on 45-degree wall reflects across face")
 	await _settle(factory)
+	wall.position.x = 2000.0
+	await physics_frame
 	var diag := _make_wall(Vector2(200, 0), 8, Vector2(20, 400), PI / 4.0)
 	await physics_frame
 	var d7 := _bounce_data(Vector2.ZERO, 0.0, 300.0, [4], [4])
@@ -278,6 +291,7 @@ func _initialize() -> void:
 	var dir7: Vector2 = v7.get_bullet_direction(0)
 	_check(absf(dir7.y) > 0.85 and absf(dir7.x) < 0.4, "precise face normal turns +X into vertical")
 	diag.queue_free()
+	wall.position.x = 200.0
 	await process_frame
 	await _settle(factory)
 	var v7b: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(_bounce_data(Vector2.ZERO, 0.0, 300.0, [4], [4]))
@@ -350,8 +364,10 @@ func _initialize() -> void:
 	var keep_strength: float = dr.bounce_strength
 	dr.set_bounce_strength(NAN)
 	_check(dr.bounce_strength == keep_strength, "NaN strength rejected")
+	dr.set_bounce_strength(-1.0)
+	_check(dr.bounce_strength == keep_strength, "negative strength rejected")
 	dr.set_bounce_strength(5.0)
-	_check(dr.bounce_strength == keep_strength, "strength > 2 rejected")
+	_check(dr.bounce_strength == 5.0, "strength uncapped (5.0 accepted)")
 	var keep_mask: int = dr.bounce_mask
 	dr.set_bounce_mask(-1)
 	_check(dr.bounce_mask == keep_mask, "negative mask rejected")
@@ -382,6 +398,457 @@ func _initialize() -> void:
 	_check(plain2.get_bounce_mask() == 0, "pooled reuse reseeds bounce off")
 	_check(plain2.bullet_get_bounce_count(0) == 0, "pooled reuse zeroes bounce ledger")
 	_check(factory.debug_assert_no_dangling().get("ok", false) == true, "no dangling after bounce churn")
+
+	printerr("BOUNCE T11 uncapped strength: 5x reflection, 50x clamps finite")
+	await _settle(factory)
+	var d11 := _bounce_data(Vector2.ZERO, 0.0, 300.0, [4], [4])
+	d11.bounce_strength = 5.0
+	var v11: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d11)
+	for i in 120:
+		await physics_frame
+		if _bounce_body.size() >= 1:
+			break
+	var spd11: float = v11.get_bullet_velocity(0).length()
+	_check(absf(spd11 - 1500.0) < 120.0, "strength 5 scales speed 5x")
+	await _settle(factory)
+	var d11b := _bounce_data(Vector2.ZERO, 0.0, 300.0, [4], [4])
+	d11b.bounce_strength = 50.0
+	var v11b: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d11b)
+	for i in 120:
+		await physics_frame
+		if _bounce_body.size() >= 1:
+			break
+	var spd11b: float = v11b.get_bullet_velocity(0).length()
+	_check(v11b.get_bullet_velocity(0).is_finite(), "strength 50 stays finite")
+	_check(absf(spd11b - 3000.0) < 100.0, "strength 50 clamps at max_speed")
+
+	printerr("BOUNCE T12 cooldown vs consumed: pair counts once, re-hit counts")
+	await _settle(factory)
+	var eye2 := Area2D.new()
+	eye2.position = Vector2(200, 0)
+	eye2.collision_layer = 8
+	eye2.monitoring = true
+	eye2.monitorable = true
+	var ecol2 := CollisionShape2D.new()
+	var ebox2 := RectangleShape2D.new()
+	ebox2.size = Vector2(20, 400)
+	ecol2.shape = ebox2
+	eye2.add_child(ecol2)
+	get_root().add_child(eye2)
+	await physics_frame
+	var d12 := _bounce_data(Vector2.ZERO, 0.0, 300.0, [4], [4])
+	d12.bounce_hit_consumed = true
+	d12.set_bullet_max_collision_count(10)
+	var v12: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d12)
+	for i in 120:
+		await physics_frame
+		if _bounce_body.size() >= 1:
+			break
+	_check(v12.bullet_get_bounce_count(0) == 1, "pair consumed: exactly one bounce")
+	_check(v12.get_bullet_collision_count(0) == 1, "pair consumed: exactly one hit (no double count)")
+	eye2.queue_free()
+	await process_frame
+	await _settle(factory)
+	var d12b := _bounce_data(Vector2.ZERO, 0.0, 300.0, [4], [4])
+	d12b.bounce_hit_consumed = true
+	d12b.set_bullet_max_collision_count(10)
+	d12b.bounce_cooldown_sec = 5.0
+	var v12b: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d12b)
+	for i in 120:
+		await physics_frame
+		if _bounce_body.size() >= 1:
+			break
+	_check(v12b.bullet_get_bounce_count(0) == 1, "first bounce recorded")
+	v12b.teleport_bullet(0, Vector2(195, 0))
+	for i in 40:
+		await physics_frame
+	_check(v12b.bullet_get_bounce_count(0) == 1, "cooldown re-hit does not re-bounce")
+	_check(v12b.get_bullet_collision_count(0) >= 2, "cooldown re-hit still counts when consumed")
+
+	printerr("BOUNCE T13 snap keeps render position continuous")
+	await _settle(factory)
+	factory.set_use_physics_interpolation_runtime(true)
+	factory.directional_bounce_body_entered.connect(_on_bounce_capture)
+	var v13: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(_bounce_data(Vector2.ZERO, 0.0, 300.0, [4], [4]))
+	for i in 5:
+		await physics_frame
+	for i in 120:
+		await physics_frame
+		if _bounce_body.size() >= 1:
+			break
+	# Captured inside the bounce emission (drain time): prev must still hold
+	# the tick-start origin while current already carries the escape nudge.
+	# A snap that overwrote prev with current would read a zero gap here.
+	_check(_bounce_capture.size() >= 1, "bounce capture recorded at emit time")
+	if _bounce_capture.size() >= 1:
+		var cap_prev: Vector2 = _bounce_capture[0][0]
+		var cap_cur: Vector2 = _bounce_capture[0][1]
+		var cap_gap: float = cap_cur.x - cap_prev.x
+		# Gap = one tick of +X travel (~+5px) plus the escape nudge (~-8px):
+		# about -3px. Zero would mean the snap overwrote prev with current.
+		_check(cap_gap < -0.5 and cap_gap > -8.0, "prev origin preserved across snap (render lerps)")
+		_check(cap_prev.is_finite() and cap_cur.is_finite(), "prev/current finite")
+	factory.directional_bounce_body_entered.disconnect(_on_bounce_capture)
+	factory.set_use_physics_interpolation_runtime(false)
+
+	printerr("BOUNCE T14 precise mode on capsule wall uses cap normal")
+	await _settle(factory)
+	wall.position.x = 2000.0
+	await physics_frame
+	var cap_wall := StaticBody2D.new()
+	cap_wall.position = Vector2(200, 0)
+	cap_wall.collision_layer = 8
+	cap_wall.collision_mask = 2
+	var capcol := CollisionShape2D.new()
+	var capshape := CapsuleShape2D.new()
+	capshape.radius = 20.0
+	capshape.height = 200.0
+	capcol.shape = capshape
+	cap_wall.add_child(capcol)
+	get_root().add_child(cap_wall)
+	await physics_frame
+	var d14 := _bounce_data(Vector2.ZERO, 0.0, 300.0, [4], [4])
+	d14.bounce_mode = 1
+	var v14: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d14)
+	for i in 120:
+		await physics_frame
+		if _bounce_body.size() >= 1:
+			break
+	var dir14: Vector2 = v14.get_bullet_direction(0)
+	_check(_bounce_body.size() >= 1, "capsule wall bounces in precise mode")
+	_check(dir14.x < -0.9 and absf(dir14.y) < 0.3, "capsule side normal reflects to -X")
+	cap_wall.queue_free()
+	wall.position.x = 200.0
+	await process_frame
+
+	printerr("BOUNCE T15 teleport into wall bounces fresh overlap")
+	await _settle(factory)
+	var v15: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(_bounce_data(Vector2.ZERO, 0.0, 300.0, [4], [4]))
+	v15.teleport_bullet(0, Vector2(195, 0))
+	for i in 60:
+		await physics_frame
+		if _bounce_body.size() >= 1:
+			break
+	_check(_bounce_body.size() >= 1, "teleported overlap bounces")
+	_check(v15.bullet_get_bounce_count(0) >= 1, "teleport bounce counted")
+	_check(v15.get_bullet_direction(0).x < -0.5, "teleport bounce heads out")
+
+	printerr("BOUNCE T16 attachment rides the escape nudge")
+	await _settle(factory)
+	var Probe := preload("res://tests/scenes/attachment_probe.gd")
+	var probe_node := BulletAttachment2D.new()
+	probe_node.set_script(Probe)
+	var pack := PackedScene.new()
+	_check(pack.pack(probe_node) == OK, "probe scene packs")
+	probe_node.queue_free()
+	var v16: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(_bounce_data(Vector2.ZERO, 0.0, 300.0, [4], [4]))
+	v16.bullet_set_attachment(0, pack, Vector2.ZERO, true)
+	for i in 120:
+		await physics_frame
+		if _bounce_body.size() >= 1:
+			break
+	for i in 5:
+		await physics_frame
+	var att16: BulletAttachment2D = v16.bullet_get_attachment(0) as BulletAttachment2D
+	_check(att16 != null, "attachment present after bounce")
+	if att16 != null:
+		var miss16: float = att16.global_position.distance_to(v16.get_bullet_global_transform(0).origin)
+		_check(miss16 < 5.0, "attachment tracks nudged bullet")
+
+	printerr("BOUNCE T17 lifetime expiry inside cooldown is clean")
+	await _settle(factory)
+	var d17 := _bounce_data(Vector2.ZERO, 0.0, 600.0, [4], [4])
+	d17.bounce_cooldown_sec = 5.0
+	d17.max_life_time = 0.5
+	var v17: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d17)
+	for i in 120:
+		await physics_frame
+		if _bounce_body.size() >= 1:
+			break
+	_check(_bounce_body.size() >= 1, "fast bullet bounces before expiry")
+	for i in 90:
+		await physics_frame
+		if not v17.is_bullet_status_enabled(0):
+			break
+	_check(not v17.is_bullet_status_enabled(0), "bullet expires inside cooldown window")
+	_check(factory.debug_assert_no_dangling().get("ok", false) == true, "no dangling after cooldown expiry")
+
+	printerr("BOUNCE T18 spawner retarget keeps bounce config live")
+	await _settle(factory)
+	var sp18 := BulletSpawner2D.new()
+	sp18.bullet_factory_path = factory.get_path()
+	sp18.shooting_enabled = false
+	sp18.pattern_source = BulletSpawner2D.PATTERN_FROM_SELF
+	sp18.position = Vector2.ZERO
+	sp18.homing_enabled = true
+	sp18.homing_target_source = BulletSpawner2D.HOMING_SOURCE_GLOBAL_POSITION
+	sp18.homing_global_position = Vector2(400, 0)
+	get_root().add_child(sp18)
+	await process_frame
+	sp18.spawn_data = _bounce_data(Vector2.ZERO, 0.0, 300.0, [4], [4])
+	_check(sp18.shoot_once(), "homing spawner volley fired")
+	var live18: Array = sp18.get_live_volleys()
+	_check(live18.size() >= 1, "volley tracked")
+	sp18.retarget_live_volleys()
+	var rv18: DirectionalBullets2D = live18[0] as DirectionalBullets2D
+	_check(rv18.get_bounce_mask() == 8, "retarget keeps bounce mask")
+	_check(rv18.debug_get_bounce_info(0).get("bounce_enabled", false) == true, "retarget keeps bounce armed")
+	sp18.bounce_body_entered.connect(_on_spawner_bounce)
+	for i in 150:
+		await physics_frame
+		if _spawner_bounce.size() >= 1:
+			break
+	_check(_spawner_bounce.size() >= 1, "retargeted volley still bounces")
+	sp18.queue_free()
+	await process_frame
+
+	printerr("BOUNCE T19 bulk bounce counts")
+	await _settle(factory)
+	var d19 := DirectionalBulletsData2D.new()
+	d19.transforms = [Transform2D(0.0, Vector2.ZERO), Transform2D(0.0, Vector2(0, 24)), Transform2D(0.0, Vector2(0, 48))]
+	var speeds19: Array = []
+	for i in 3:
+		var sp19 := BulletSpeedData2D.new()
+		sp19.speed = 300.0
+		sp19.max_speed = 3000.0
+		speeds19.append(sp19)
+	d19.all_bullet_speed_data = speeds19
+	d19.max_life_time = 8.0
+	d19.texture_size = Vector2(16, 16)
+	d19.monitorable = true
+	d19.set_collision_layer_from_array([2])
+	d19.set_collision_mask_from_array([4])
+	d19.set_bounce_mask_from_array([4])
+	var shape19 := CircleShape2D.new()
+	shape19.radius = 6.0
+	d19.collision_shape = shape19
+	var v19: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d19)
+	var counts19_init: Array = v19.all_bullets_get_bounce_count()
+	_check(counts19_init.size() == 3 and int(counts19_init[0]) == 0 and int(counts19_init[1]) == 0 and int(counts19_init[2]) == 0, "bulk counts start at zero")
+	for i in 150:
+		await physics_frame
+		if v19.bullet_get_bounce_count(0) >= 1 and v19.bullet_get_bounce_count(1) >= 1 and v19.bullet_get_bounce_count(2) >= 1:
+			break
+	var counts19: Array = v19.all_bullets_get_bounce_count()
+	_check(counts19.size() == 3 and int(counts19[0]) == 1 and int(counts19[1]) == 1 and int(counts19[2]) == 1, "bulk counts track every bullet")
+
+	printerr("BOUNCE T20 inspector groups stay coherent")
+	var data20 := DirectionalBulletsData2D.new()
+	var props20: Array = data20.get_property_list()
+	var bounce_group_at := -1
+	var first_bounce_at := -1
+	var collision_at := -1
+	for i in props20.size():
+		var pname := str(props20[i].get("name", ""))
+		var usage: int = int(props20[i].get("usage", 0))
+		if (usage & PROPERTY_USAGE_GROUP) != 0 and pname == "Bounce and Ricochet":
+			bounce_group_at = i
+		if first_bounce_at < 0 and pname == "bounce_mask":
+			first_bounce_at = i
+		if pname == "collision_mask":
+			collision_at = i
+	_check(bounce_group_at >= 0, "bounce group header registered")
+	_check(first_bounce_at > bounce_group_at, "bounce props follow their group")
+	# Data class: exact group order follows the setup workflow, and every
+	# related shared/per-bullet/tile triplet sticks together with nothing
+	# foreign interleaved between its members.
+	var data_groups: Array = []
+	var data_group_of := {}
+	var data_current := ""
+	for p in props20:
+		var pname := str(p.get("name", ""))
+		var pusage: int = int(p.get("usage", 0))
+		if (pusage & PROPERTY_USAGE_GROUP) != 0:
+			data_current = pname
+			if not data_groups.has(pname):
+				data_groups.append(pname)
+		elif pname != "":
+			data_group_of[pname] = data_current
+	var want_data_groups := ["Movement Speed", "Rotation", "Gravity and Drag", "Wobble", "Movement Patterns", "Homing", "Bounce and Ricochet"]
+	_check(data_groups.slice(0, want_data_groups.size()) == want_data_groups, "data group order matches workflow")
+	var triplet_families := [
+		["all_bullet_speed_data", "tile_all_bullet_speed_data", "shared_bullet_speed_data"],
+		["all_bullet_curves_data", "tile_all_bullet_curves_data", "shared_bullet_curves_data"],
+		["shared_bullet_wobble_data", "all_bullet_wobble_data", "tile_all_bullet_wobble_data"],
+		["gravity", "all_bullet_gravity", "tile_all_bullet_gravity"],
+		["all_bullet_movement_pattern_paths", "tile_all_bullet_movement_pattern_paths"],
+		["all_bullet_movement_pattern_face_movement_directions", "tile_all_bullet_movement_pattern_face_movement_directions"],
+		["all_bullet_movement_pattern_repeats", "tile_all_bullet_movement_pattern_repeats"],
+	]
+	var triplet_ok := true
+	for fam in triplet_families:
+		var idxs: Array = []
+		for pname in props20:
+			var sname := str(pname.get("name", ""))
+			if fam.has(sname):
+				idxs.append(props20.find(pname))
+		idxs.sort()
+		for k in range(1, idxs.size()):
+			if int(idxs[k]) != int(idxs[k - 1]) + 1:
+				triplet_ok = false
+		var fgroup := ""
+		for sname in fam:
+			var gname := str(data_group_of.get(sname, "?"))
+			if fgroup == "":
+				fgroup = gname
+			elif gname != fgroup:
+				triplet_ok = false
+	_check(triplet_ok, "related triplets stick together in one group")
+	# Base data groups: Collision header precedes the collision props.
+	var base20 := MultiMeshBulletsData2D.new()
+	var base_props: Array = base20.get_property_list()
+	var collision_group_idx := -1
+	var layer_idx := -1
+	var mask_idx := -1
+	for i in base_props.size():
+		var pname := str(base_props[i].get("name", ""))
+		var usage: int = int(base_props[i].get("usage", 0))
+		if (usage & PROPERTY_USAGE_GROUP) != 0 and pname == "Collision" and collision_group_idx < 0:
+			collision_group_idx = i
+		if pname == "collision_layer" and layer_idx < 0:
+			layer_idx = i
+		if pname == "collision_mask" and mask_idx < 0:
+			mask_idx = i
+	_check(collision_group_idx >= 0 and collision_group_idx < layer_idx and layer_idx < mask_idx, "base Collision group precedes layer props")
+	# Base class: exact group order follows the setup workflow, material last.
+	var base_groups: Array = []
+	var base_current := ""
+	for p in base_props:
+		var pname := str(p.get("name", ""))
+		var pusage: int = int(p.get("usage", 0))
+		if (pusage & PROPERTY_USAGE_GROUP) != 0:
+			base_current = pname
+			if not base_groups.has(pname):
+				base_groups.append(pname)
+	_check(base_groups.slice(0, 7) == ["Appearance", "Collision", "Custom Data", "Attachments", "Lifetime and Visibility", "Rotation", "Rendering and Material"], "base group order matches workflow")
+	# Live instance mirrors the data workflow order.
+	var vinst: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(_bounce_data(Vector2(0, 9000), 0.0, 1.0, [], [4]))
+	var inst_groups: Array = []
+	for p in vinst.get_property_list():
+		var pname := str(p.get("name", ""))
+		var pusage: int = int(p.get("usage", 0))
+		if (pusage & PROPERTY_USAGE_GROUP) != 0 and not inst_groups.has(pname):
+			inst_groups.append(pname)
+	_check(inst_groups.slice(0, 7) == ["Movement Speed", "Rotation", "Gravity and Drag", "Wobble", "Movement Patterns", "Homing", "Bounce and Ricochet"], "instance group order mirrors data")
+	var spawner20 := BulletSpawner2D.new()
+	get_root().add_child(spawner20)
+	await process_frame
+	var groups_found := {}
+	var spawner_group_order: Array = []
+	for p in spawner20.get_property_list():
+		if (int(p.get("usage", 0)) & PROPERTY_USAGE_GROUP) != 0:
+			var gname := str(p.get("name", ""))
+			groups_found[gname] = true
+			if not spawner_group_order.has(gname):
+				spawner_group_order.append(gname)
+	_check(groups_found.has("Shooting"), "spawner Shooting group present")
+	_check(groups_found.has("Homing"), "spawner Homing group present")
+	_check(groups_found.has("Orbiting"), "spawner Orbiting group present")
+	_check(groups_found.has("Preview"), "spawner Preview group present")
+	_check(groups_found.has("Bullet Patterns"), "spawner Bullet Patterns group present")
+	_check(not groups_found.has("Transform Generation"), "old Transform Generation name gone")
+	_check(not groups_found.has("Burst and Telegraph"), "Burst group merged away")
+	_check(spawner_group_order.slice(0, 6) == ["Bullet Patterns", "Shooting", "Spin", "Homing", "Orbiting", "Preview"], "spawner group order: patterns, shooting, spin, homing, orbit, preview")
+	spawner20.pattern_source = BulletSpawner2D.PATTERN_FROM_HELPER_GRID
+	await process_frame
+	var ring_visible_grid := false
+	var fan_visible_grid := false
+	for p in spawner20.get_property_list():
+		var pname := str(p.get("name", ""))
+		var shown := (int(p.get("usage", 0)) & PROPERTY_USAGE_EDITOR) != 0
+		if pname == "helper_ring_radius" and shown:
+			ring_visible_grid = true
+		if pname == "helper_fan_spread" and shown:
+			fan_visible_grid = true
+	_check(not ring_visible_grid and not fan_visible_grid, "grid mode hides other families")
+	spawner20.pattern_source = BulletSpawner2D.PATTERN_FROM_HELPER_RING
+	await process_frame
+	var ring_visible_ring := false
+	for p in spawner20.get_property_list():
+		if str(p.get("name", "")) == "helper_ring_radius" and (int(p.get("usage", 0)) & PROPERTY_USAGE_EDITOR) != 0:
+			ring_visible_ring = true
+	_check(ring_visible_ring, "ring mode reveals ring knobs")
+	# Group placement: every property must sit under its family header.
+	# Tracks the current ADD_GROUP header while walking the list in order.
+	var prop_group := {}
+	var current_group := ""
+	for p in spawner20.get_property_list():
+		var pname := str(p.get("name", ""))
+		var pusage: int = int(p.get("usage", 0))
+		if (pusage & PROPERTY_USAGE_GROUP) != 0:
+			current_group = pname
+		elif pname != "":
+			prop_group[pname] = current_group
+	_check(prop_group.get("pattern_source", "") == "Bullet Patterns", "pattern_source grouped under Bullet Patterns")
+	_check(prop_group.get("helper_ring_radius", "") == "Bullet Patterns", "helpers grouped under Bullet Patterns")
+	_check(prop_group.get("helper_skip_indices", "") == "Bullet Patterns", "skip indices grouped under Bullet Patterns")
+	_check(prop_group.get("pattern_scale", "") == "Bullet Patterns", "pattern_scale grouped under Bullet Patterns")
+	_check(prop_group.get("transforms_scale", "") == "Bullet Patterns", "transforms_scale grouped under Bullet Patterns")
+	_check(prop_group.get("spawn_position_offset", "") == "Bullet Patterns", "spawn offset grouped under Bullet Patterns")
+	_check(prop_group.get("shooting_enabled", "") == "Shooting", "shooting master grouped")
+	_check(prop_group.get("reload_jitter_sec", "") == "Shooting", "reload jitter moved to Shooting")
+	_check(prop_group.get("reload_jitter_seed", "") == "Shooting", "reload seed moved to Shooting")
+	_check(prop_group.get("max_live_bullets", "") == "Shooting", "max_live_bullets moved to Shooting")
+	_check(prop_group.get("spin_enabled", "") == "Spin", "spin master grouped")
+	_check(prop_group.get("homing_delay_sec", "") == "Homing", "homing gates moved to Homing")
+	_check(prop_group.get("homing_duration_sec", "") == "Homing", "homing duration moved to Homing")
+	_check(prop_group.get("homing_lose_range_px", "") == "Homing", "homing lose range moved to Homing")
+	_check(prop_group.get("homing_fire_arc_deg", "") == "Homing", "fire arc moved to Homing")
+	_check(prop_group.get("homing_retarget_phase", "") == "Homing", "retarget phase moved to Homing")
+	_check(prop_group.get("burst_enabled", "") == "Shooting", "burst merged into Shooting")
+	_check(prop_group.get("burst_count", "") == "Shooting", "burst count merged into Shooting")
+	_check(prop_group.get("telegraph_enabled", "") == "Shooting", "telegraph merged into Shooting")
+	_check(prop_group.get("telegraph_sec", "") == "Shooting", "telegraph seconds merged into Shooting")
+	_check(prop_group.get("telegraph_sec", "") == "Shooting", "telegraph seconds merged into Shooting")
+	_check(prop_group.get("orbiting_enabled", "") == "Orbiting", "orbiting master grouped")
+	_check(prop_group.get("show_pattern_preview", "") == "Preview", "preview master grouped")
+	var stray_homing := []
+	for pname in prop_group.keys():
+		var gname := str(prop_group[pname])
+		if (pname.begins_with("homing_") or pname == "adjust_direction_based_on_rotation") and gname != "Homing":
+			stray_homing.append(pname)
+		if pname.begins_with("reload_jitter") and gname != "Shooting":
+			stray_homing.append(pname)
+		if pname == "max_live_bullets" and gname != "Shooting":
+			stray_homing.append(pname)
+	_check(stray_homing.is_empty(), "no homing/reload/budget prop leaks into Spin or Burst")
+	spawner20.queue_free()
+	await process_frame
+
+	printerr("BOUNCE T21 runtime toggles and gravity flag refresh")
+	await _settle(factory)
+	var v21: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(_bounce_data(Vector2.ZERO, 0.0, 300.0, [], [4]))
+	_check(v21.debug_get_bounce_info(0).get("bounce_enabled", true) == false, "starts disarmed")
+	v21.set_bounce_mask(8)
+	_check(v21.debug_get_bounce_info(0).get("bounce_enabled", false) == true, "runtime arm sizes ledger")
+	for i in 120:
+		await physics_frame
+		if _bounce_body.size() >= 1:
+			break
+	_check(_bounce_body.size() >= 1, "runtime-armed volley bounces")
+	v21.set_bounce_mask(0)
+	_check(v21.debug_get_bounce_info(0).get("bounce_enabled", true) == false, "runtime disarm clears armed state")
+	v21.set_bounce_mask(8)
+	_check(v21.debug_get_bounce_info(0).get("bounce_enabled", false) == true, "re-arm works after disarm")
+	await _settle(factory)
+	var v21c: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(_bounce_data(Vector2.ZERO, 0.0, 300.0, [4], [4]))
+	v21c.set_bounce_mask(0)
+	for i in 120:
+		await physics_frame
+		if not v21c.is_bullet_status_enabled(0):
+			break
+	_check(_bounce_body.is_empty(), "runtime disarm flies through clean")
+	_check(not v21c.is_bullet_status_enabled(0), "disarmed bullet dies normally")
+	await _settle(factory)
+	var v21g: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(_bounce_data(Vector2.ZERO, 0.0, 0.0, [], [4]))
+	v21g.set_gravity(Vector2(0, 500.0))
+	for i in 45:
+		await physics_frame
+	_check(v21g.bullet_get_fall_speed(0) > 20.0, "runtime gravity engages fall")
+	v21g.bullet_set_gravity(0, Vector2(0, 0))
+	for i in 30:
+		await physics_frame
+	_check(v21g.bullet_get_fall_speed(0) < 5.0, "zeroed gravity holds fall speed")
 
 	factory.directional_bounce_body_entered.disconnect(_on_bounce_body)
 	factory.directional_bounce_area_entered.disconnect(_on_bounce_area)

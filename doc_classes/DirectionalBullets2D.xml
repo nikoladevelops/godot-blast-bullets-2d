@@ -635,6 +635,35 @@
 				Per-bullet gravity acceleration vector for the specified bullet. Invalid indexes read (0, 0).
 			</description>
 		</method>
+		<method name="bullet_get_bounce_count">
+			<return type="int" />
+			<param index="0" name="bullet_index" type="int" />
+			<description>
+				How many times the specified bullet has bounced in its current life. Invalid indexes read 0. Cleared on disable and on every pool reuse.
+			</description>
+		</method>
+		<method name="all_bullets_get_bounce_count">
+			<return type="int[]" />
+			<param index="0" name="bullet_index_start" type="int" default="0" />
+			<param index="1" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<description>
+				Bounce counts over a bullet range (mirrors [method bullet_get_bounce_count]). Inverted ranges are rejected.
+			</description>
+		</method>
+		<method name="debug_get_bounce_info">
+			<return type="Dictionary" />
+			<param index="0" name="bullet_index" type="int" />
+			<description>
+				Bounce introspection for one bullet: counts, config echo (mask, strength, mode, max), whether bouncing is armed, pending smooth-visual state and cooldown. Never mutates. Out-of-range indexes report valid = false.
+			</description>
+		</method>
+		<method name="debug_get_previous_origin">
+			<return type="Vector2" />
+			<param index="0" name="bullet_index" type="int" />
+			<description>
+				Previous-tick origin used by physics interpolation. Lets tests prove the render path stays continuous across teleports and bounces (rotation may snap while position keeps lerping).
+			</description>
+		</method>
 		<method name="bullet_set_gravity">
 			<return type="void" />
 			<param index="0" name="bullet_index" type="int" />
@@ -1196,7 +1225,7 @@
 			Bitmask of target collision layers that trigger a bounce, set live. Takes precedence over the normal collision path. 0 (default) disables bouncing. Spawn-time equivalent lives on [member DirectionalBulletsData2D.bounce_mask] (reseeded on every pool reuse).
 		</member>
 		<member name="bounce_strength" type="float" setter="set_bounce_strength" getter="get_bounce_strength" default="1.0">
-			Speed multiplier applied on every bounce, set live (finite in [0, 2]). 1.0 is perfectly elastic, 0 dead-stops.
+			Speed multiplier applied on every bounce, set live (finite, 0 or more, no upper cap). 1.0 is perfectly elastic, 0 dead-stops.
 		</member>
 		<member name="bounce_hit_consumed" type="bool" setter="set_bounce_hit_consumed" getter="get_bounce_hit_consumed" default="false">
 			Whether a bounce also counts as a normal hit, set live. False (default) means free bounces. A consumed bounce emits BOTH the bounce signal and the matching area/body signal.

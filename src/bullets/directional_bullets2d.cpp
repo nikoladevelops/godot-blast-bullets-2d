@@ -355,6 +355,7 @@ void DirectionalBullets2D::apply_gravity_from_data(const DirectionalBulletsData2
 		}
 		all_gravity[i] = g;
 	}
+	refresh_gravity_active();
 }
 
 void DirectionalBullets2D::apply_wobble_from_data(const DirectionalBulletsData2D &directional_data) {
@@ -717,6 +718,7 @@ void DirectionalBullets2D::reset_transient_subclass_state(bool drop_stale_work) 
 	gravity = Vector2(0, 0);
 	all_gravity.assign(amount_bullets, Vector2(0, 0));
 	all_gravity_velocity.assign(amount_bullets, Vector2(0, 0));
+	refresh_gravity_active();
 	gravity_delay_sec = 0.0;
 	gravity_duration_sec = 0.0;
 	linear_drag = 0.0;
@@ -732,11 +734,11 @@ void DirectionalBullets2D::reset_transient_subclass_state(bool drop_stale_work) 
 	bounce_rotation_smooth = 0.0;
 	bounce_randomness_deg = 0.0;
 	bounce_cooldown_sec = 0.05;
-	all_bounce_count.assign(amount_bullets, 0);
-	all_bounce_cooldown.assign(amount_bullets, 0.0);
-	all_bounce_last_tick.assign(amount_bullets, 0);
-	bounce_visual_pending.assign(amount_bullets, 0);
-	bounce_visual_target.assign(amount_bullets, Vector2(1, 0));
+	all_bounce_count.clear();
+	all_bounce_cooldown.clear();
+	all_bounce_last_tick.clear();
+	bounce_visual_pending.clear();
+	bounce_visual_target.clear();
 	bounce_mask_warning_issued = false;
 	clear_homing_state_for_teardown();
 	if (drop_stale_work) {
@@ -835,90 +837,103 @@ void DirectionalBullets2D::custom_additional_disable_logic() {
 	}
 }
 
-// Analytic surface normal from the collided target's first usable
+// Analytic surface normal from the collided target's first usable direct
 // CollisionShape2D child (rect/circle/capsule). Drain-safe: pure math, no
-// physics-server queries. Returns false when there is no usable shape (the
-// caller falls back to the radial normal).
+// physics-server queries. Shapes must be direct children (a Godot physics
+// requirement: deeper nesting never registers, so it can never collide).
+// Returns false when there is no usable shape (the caller falls back to
+// the radial normal).
+static bool bounce_normal_from_shape_node(CollisionShape2D *cs, const Vector2 &bullet_pos, Vector2 &r_normal) {
+	if (cs == nullptr || cs->is_queued_for_deletion()) {
+		return false;
+	}
+	Ref<Shape2D> shape = cs->get_shape();
+	if (shape.is_null()) {
+		return false;
+	}
+	const Transform2D shape_global = cs->get_global_transform();
+	if (!shape_global.is_finite()) {
+		return false;
+	}
+	if (RectangleShape2D *rect = Object::cast_to<RectangleShape2D>(shape.ptr())) {
+		const Vector2 size = rect->get_size();
+		if (!size.is_finite() || size.x <= 0.0 || size.y <= 0.0) {
+			return false;
+		}
+		const Vector2 local = shape_global.affine_inverse().xform(bullet_pos);
+		if (!local.is_finite()) {
+			return false;
+		}
+		const Vector2 half = size * 0.5;
+		const Vector2 clamped(Math::clamp(local.x, -half.x, half.x), Math::clamp(local.y, -half.y, half.y));
+		const Vector2 diff = local - clamped;
+		Vector2 local_n;
+		if (diff.length_squared() > 0.00000001) {
+			local_n = diff.normalized();
+		} else {
+			// Bullet center inside the box: push along min-penetration axis.
+			const real_t px = half.x - Math::abs(local.x);
+			const real_t py = half.y - Math::abs(local.y);
+			local_n = (px < py) ? Vector2(local.x >= 0.0 ? 1.0 : -1.0, 0.0) : Vector2(0.0, local.y >= 0.0 ? 1.0 : -1.0);
+		}
+		const Vector2 world_n = shape_global.basis_xform(local_n);
+		if (world_n.is_finite() && world_n.length_squared() > 0.00000001) {
+			r_normal = world_n.normalized();
+			return true;
+		}
+		return false;
+	}
+	if (CircleShape2D *circle = Object::cast_to<CircleShape2D>(shape.ptr())) {
+		const real_t r = circle->get_radius();
+		if (!Math::is_finite((double)r) || r <= 0.0) {
+			return false;
+		}
+		const Vector2 diff = bullet_pos - shape_global.get_origin();
+		if (diff.is_finite() && diff.length_squared() > 0.00000001) {
+			r_normal = diff.normalized();
+			return true;
+		}
+		return false;
+	}
+	if (CapsuleShape2D *cap = Object::cast_to<CapsuleShape2D>(shape.ptr())) {
+		const real_t r = cap->get_radius();
+		const real_t h = cap->get_height();
+		if (!Math::is_finite((double)r) || !Math::is_finite((double)h) || r <= 0.0 || h <= 0.0) {
+			return false;
+		}
+		// Godot capsules run along local Y: segment between the cap centers.
+		const Vector2 local = shape_global.affine_inverse().xform(bullet_pos);
+		if (!local.is_finite()) {
+			return false;
+		}
+		const real_t half_seg = Math::max(0.0, h * 0.5 - r);
+		const Vector2 closest(0.0, Math::clamp(local.y, (real_t)-half_seg, (real_t)half_seg));
+		const Vector2 diff = local - closest;
+		Vector2 local_n = (diff.length_squared() > 0.00000001) ? diff.normalized() : Vector2(local.x >= 0.0 ? 1.0 : -1.0, 0.0);
+		const Vector2 world_n = shape_global.basis_xform(local_n);
+		if (world_n.is_finite() && world_n.length_squared() > 0.00000001) {
+			r_normal = world_n.normalized();
+			return true;
+		}
+		return false;
+	}
+	return false;
+}
+
 static bool bounce_precise_normal_from_target(Object *hit_target, const Vector2 &bullet_pos, Vector2 &r_normal) {
 	Node *target_node = Object::cast_to<Node>(hit_target);
 	if (target_node == nullptr || !bullet_pos.is_finite()) {
 		return false;
 	}
+	// Direct children only: Godot only registers CollisionShape2D nodes that
+	// are direct children of the body/area, so deeper nesting can never
+	// produce a collision record in the first place.
 	TypedArray<Node> children = target_node->get_children();
 	for (int k = 0; k < children.size(); ++k) {
-		CollisionShape2D *cs = Object::cast_to<CollisionShape2D>(children[k]);
-		if (cs == nullptr || cs->is_queued_for_deletion()) {
-			continue;
-		}
-		Ref<Shape2D> shape = cs->get_shape();
-		if (shape.is_null()) {
-			continue;
-		}
-		const Transform2D shape_global = cs->get_global_transform();
-		if (!shape_global.is_finite()) {
-			continue;
-		}
-		if (RectangleShape2D *rect = Object::cast_to<RectangleShape2D>(shape.ptr())) {
-			const Vector2 size = rect->get_size();
-			if (!size.is_finite() || size.x <= 0.0 || size.y <= 0.0) {
-				continue;
-			}
-			const Vector2 local = shape_global.affine_inverse().xform(bullet_pos);
-			if (!local.is_finite()) {
-				continue;
-			}
-			const Vector2 half = size * 0.5;
-			const Vector2 clamped(Math::clamp(local.x, -half.x, half.x), Math::clamp(local.y, -half.y, half.y));
-			const Vector2 diff = local - clamped;
-			Vector2 local_n;
-			if (diff.length_squared() > 0.00000001) {
-				local_n = diff.normalized();
-			} else {
-				// Bullet center inside the box: push along min-penetration axis.
-				const real_t px = half.x - Math::abs(local.x);
-				const real_t py = half.y - Math::abs(local.y);
-				local_n = (px < py) ? Vector2(local.x >= 0.0 ? 1.0 : -1.0, 0.0) : Vector2(0.0, local.y >= 0.0 ? 1.0 : -1.0);
-			}
-			const Vector2 world_n = shape_global.basis_xform(local_n);
-			if (world_n.is_finite() && world_n.length_squared() > 0.00000001) {
-				r_normal = world_n.normalized();
+		if (CollisionShape2D *cs = Object::cast_to<CollisionShape2D>(children[k])) {
+			if (bounce_normal_from_shape_node(cs, bullet_pos, r_normal)) {
 				return true;
 			}
-			return false;
-		}
-		if (CircleShape2D *circle = Object::cast_to<CircleShape2D>(shape.ptr())) {
-			const real_t r = circle->get_radius();
-			if (!Math::is_finite((double)r) || r <= 0.0) {
-				continue;
-			}
-			const Vector2 diff = bullet_pos - shape_global.get_origin();
-			if (diff.is_finite() && diff.length_squared() > 0.00000001) {
-				r_normal = diff.normalized();
-				return true;
-			}
-			return false;
-		}
-		if (CapsuleShape2D *cap = Object::cast_to<CapsuleShape2D>(shape.ptr())) {
-			const real_t r = cap->get_radius();
-			const real_t h = cap->get_height();
-			if (!Math::is_finite((double)r) || !Math::is_finite((double)h) || r <= 0.0 || h <= 0.0) {
-				continue;
-			}
-			// Godot capsules run along local Y: segment between the cap centers.
-			const Vector2 local = shape_global.affine_inverse().xform(bullet_pos);
-			if (!local.is_finite()) {
-				continue;
-			}
-			const real_t half_seg = Math::max(0.0, h * 0.5 - r);
-			const Vector2 closest(0.0, Math::clamp(local.y, (real_t)-half_seg, (real_t)half_seg));
-			const Vector2 diff = local - closest;
-			Vector2 local_n = (diff.length_squared() > 0.00000001) ? diff.normalized() : Vector2(local.x >= 0.0 ? 1.0 : -1.0, 0.0);
-			const Vector2 world_n = shape_global.basis_xform(local_n);
-			if (world_n.is_finite() && world_n.length_squared() > 0.00000001) {
-				r_normal = world_n.normalized();
-				return true;
-			}
-			return false;
 		}
 	}
 	return false;
@@ -947,9 +962,13 @@ int DirectionalBullets2D::try_handle_bounce(CollisionType collision_type, int bu
 	if (bullet_index < (int)all_bounce_last_tick.size() && all_bounce_last_tick[bullet_index] == bounce_tick_counter) {
 		return 1;
 	}
-	// Cooldown swallow: lets the bullet escape the overlap it just left.
+	// Cooldown: lets the bullet escape the overlap it just left. A free
+	// bounce swallows the record (fully handled); a consumed hit still
+	// counts through the normal path so wall contact inside the window is
+	// never silently dropped (the per-tick guard above already stops the
+	// body+area pair from double counting).
 	if (bullet_index < (int)all_bounce_cooldown.size() && all_bounce_cooldown[bullet_index] > 0.0) {
-		return 1;
+		return bounce_hit_consumed ? 0 : 1;
 	}
 	Object *hit_target = ObjectDB::get_instance(entered_instance_id);
 	if (hit_target == nullptr) {
@@ -1091,7 +1110,19 @@ int DirectionalBullets2D::try_handle_bounce(CollisionType collision_type, int bu
 				}
 			}
 		} else {
+			// Snap now. rotate_to_target syncs the whole previous transform,
+			// which would also snap the render position to the nudged origin;
+			// restore the previous origin so position keeps lerping while
+			// only the rotation snaps.
+			Vector2 prev_origin(0, 0);
+			bool have_prev = bullet_index >= 0 && bullet_index < (int)all_previous_instance_transf.size();
+			if (have_prev) {
+				prev_origin = all_previous_instance_transf[bullet_index].get_origin();
+			}
 			rotate_to_target(bullet_index, new_dir, 0.0, false);
+			if (have_prev && bullet_index < (int)all_previous_instance_transf.size()) {
+				all_previous_instance_transf[bullet_index].set_origin(prev_origin);
+			}
 		}
 	}
 	if (bullet_index < (int)all_bounce_count.size()) {
@@ -1181,71 +1212,26 @@ void DirectionalBullets2D::_bind_methods() {
 
 	ClassDB::bind_method(D_METHOD("bullet_get_current_homing_target", "bullet_index"), &DirectionalBullets2D::bullet_get_current_homing_target);
 
-	ClassDB::bind_method(D_METHOD("get_bullet_homing_auto_pop_after_target_reached"), &DirectionalBullets2D::get_bullet_homing_auto_pop_after_target_reached);
-	ClassDB::bind_method(D_METHOD("set_bullet_homing_auto_pop_after_target_reached", "value"), &DirectionalBullets2D::set_bullet_homing_auto_pop_after_target_reached);
-	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "bullet_homing_auto_pop_after_target_reached"), "set_bullet_homing_auto_pop_after_target_reached", "get_bullet_homing_auto_pop_after_target_reached");
+	ADD_GROUP("Movement Speed", "");
+	ClassDB::bind_method(D_METHOD("get_shared_bullet_speed_data"), &DirectionalBullets2D::get_shared_bullet_speed_data);
+	ClassDB::bind_method(D_METHOD("set_shared_bullet_speed_data", "new_speed_data"), &DirectionalBullets2D::set_shared_bullet_speed_data);
+	ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "shared_bullet_speed_data", PROPERTY_HINT_RESOURCE_TYPE, "BulletSpeedData2D"), "set_shared_bullet_speed_data", "get_shared_bullet_speed_data");
 
-	// SHARED HOMING DEQUE POP METHODS
-	ClassDB::bind_method(D_METHOD("shared_homing_deque_pop_front_target"), &DirectionalBullets2D::shared_homing_deque_pop_front_target);
-	ClassDB::bind_method(D_METHOD("shared_homing_deque_pop_back_target"), &DirectionalBullets2D::shared_homing_deque_pop_back_target);
-	ClassDB::bind_method(D_METHOD("_do_shared_auto_pop_front_target", "operation_generation"), &DirectionalBullets2D::_do_shared_auto_pop_front_target);
-	ClassDB::bind_method(D_METHOD("_do_auto_pop_front_target", "operation_generation", "bullet_index", "bullet_epoch"), &DirectionalBullets2D::_do_auto_pop_front_target);
-	ClassDB::bind_method(D_METHOD("_do_emit_homing_target_reached", "operation_generation", "bullet_index", "bullet_epoch", "target_instance_id", "target_global_position"), &DirectionalBullets2D::_do_emit_homing_target_reached);
+	// Get/set methods live on the base class (bound there so BlockBullets2D
+	// gets them too); only the property is declared here.
+	ADD_PROPERTY(PropertyInfo(Variant::VECTOR2, "inherited_velocity_offset"), "set_inherited_velocity_offset", "get_inherited_velocity_offset");
 
-	// SHARED HOMING DEQUE PUSH METHODS
-	ClassDB::bind_method(D_METHOD("shared_homing_deque_push_front_mouse_position_target"), &DirectionalBullets2D::shared_homing_deque_push_front_mouse_position_target);
-	ClassDB::bind_method(D_METHOD("shared_homing_deque_push_front_node2d_target", "new_homing_target"), &DirectionalBullets2D::shared_homing_deque_push_front_node2d_target);
-	ClassDB::bind_method(D_METHOD("shared_homing_deque_push_front_global_position_target", "global_position"), &DirectionalBullets2D::shared_homing_deque_push_front_global_position_target);
+	ADD_GROUP("Rotation", "");
 
-	ClassDB::bind_method(D_METHOD("shared_homing_deque_push_back_mouse_position_target"), &DirectionalBullets2D::shared_homing_deque_push_back_mouse_position_target);
-	ClassDB::bind_method(D_METHOD("shared_homing_deque_push_back_node2d_target", "new_homing_target"), &DirectionalBullets2D::shared_homing_deque_push_back_node2d_target);
-	ClassDB::bind_method(D_METHOD("shared_homing_deque_push_back_global_position_target", "global_position"), &DirectionalBullets2D::shared_homing_deque_push_back_global_position_target);
+	ClassDB::bind_method(D_METHOD("get_adjust_direction_based_on_rotation"), &DirectionalBullets2D::get_adjust_direction_based_on_rotation);
+	ClassDB::bind_method(D_METHOD("set_adjust_direction_based_on_rotation", "value"), &DirectionalBullets2D::set_adjust_direction_based_on_rotation);
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "adjust_direction_based_on_rotation"), "set_adjust_direction_based_on_rotation", "get_adjust_direction_based_on_rotation");
 
-	// SHARED HOMING DEQUE HELPERS
-	ClassDB::bind_method(D_METHOD("shared_homing_deque_push_front_homing_targets_array", "node2ds_or_global_positions_array"), &DirectionalBullets2D::shared_homing_deque_push_front_homing_targets_array);
-	ClassDB::bind_method(D_METHOD("shared_homing_deque_push_back_homing_targets_array", "node2ds_or_global_positions_array"), &DirectionalBullets2D::shared_homing_deque_push_back_homing_targets_array);
+	ClassDB::bind_method(D_METHOD("get_shared_bullet_rotation_data"), &DirectionalBullets2D::get_shared_bullet_rotation_data);
+	ClassDB::bind_method(D_METHOD("set_shared_bullet_rotation_data", "new_rotation_data"), &DirectionalBullets2D::set_shared_bullet_rotation_data);
+	ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "shared_bullet_rotation_data", PROPERTY_HINT_RESOURCE_TYPE, "BulletRotationData2D"), "set_shared_bullet_rotation_data", "get_shared_bullet_rotation_data");
 
-	ClassDB::bind_method(D_METHOD("shared_homing_deque_replace_homing_targets_with_new_target", "node2d_or_global_position"), &DirectionalBullets2D::shared_homing_deque_replace_homing_targets_with_new_target);
-	ClassDB::bind_method(D_METHOD("shared_homing_deque_replace_homing_targets_with_new_target_array", "node2ds_or_global_positions_array"), &DirectionalBullets2D::shared_homing_deque_replace_homing_targets_with_new_target_array);
-
-	ClassDB::bind_method(D_METHOD("shared_homing_deque_clear_homing_targets"), &DirectionalBullets2D::shared_homing_deque_clear_homing_targets);
-
-	ClassDB::bind_method(D_METHOD("shared_homing_deque_check_homing_targets_amount"), &DirectionalBullets2D::shared_homing_deque_check_homing_targets_amount);
-
-	ClassDB::bind_method(D_METHOD("shared_homing_deque_check_has_homing_targets"), &DirectionalBullets2D::shared_homing_deque_check_has_homing_targets);
-
-	ClassDB::bind_method(D_METHOD("shared_homing_deque_check_current_target_type"), &DirectionalBullets2D::shared_homing_deque_check_current_target_type);
-
-	ClassDB::bind_method(D_METHOD("shared_homing_deque_get_current_homing_target"), &DirectionalBullets2D::shared_homing_deque_get_current_homing_target);
-
-	ClassDB::bind_method(D_METHOD("get_shared_homing_deque_auto_pop_after_target_reached"), &DirectionalBullets2D::get_shared_homing_deque_auto_pop_after_target_reached);
-	ClassDB::bind_method(D_METHOD("set_shared_homing_deque_auto_pop_after_target_reached", "value"), &DirectionalBullets2D::set_shared_homing_deque_auto_pop_after_target_reached);
-	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "shared_homing_deque_auto_pop_after_target_reached"), "set_shared_homing_deque_auto_pop_after_target_reached", "get_shared_homing_deque_auto_pop_after_target_reached");
-
-	// OTHER HOMING RELATED
-
-	ClassDB::bind_method(D_METHOD("get_homing_distance_before_reached"), &DirectionalBullets2D::get_homing_distance_before_reached);
-	ClassDB::bind_method(D_METHOD("set_homing_distance_before_reached", "value"), &DirectionalBullets2D::set_homing_distance_before_reached);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "homing_distance_before_reached"), "set_homing_distance_before_reached", "get_homing_distance_before_reached");
-
-	ClassDB::bind_method(D_METHOD("get_homing_smoothing"), &DirectionalBullets2D::get_homing_smoothing);
-	ClassDB::bind_method(D_METHOD("set_homing_smoothing", "value"), &DirectionalBullets2D::set_homing_smoothing);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "homing_smoothing"), "set_homing_smoothing", "get_homing_smoothing");
-
-	ClassDB::bind_method(D_METHOD("bullet_get_homing_smoothing", "bullet_index"), &DirectionalBullets2D::bullet_get_homing_smoothing);
-	ClassDB::bind_method(D_METHOD("bullet_set_homing_smoothing", "bullet_index", "value"), &DirectionalBullets2D::bullet_set_homing_smoothing);
-	ClassDB::bind_method(D_METHOD("all_bullets_set_homing_smoothing", "value", "bullet_index_start", "bullet_index_end_inclusive"), &DirectionalBullets2D::all_bullets_set_homing_smoothing, DEFVAL(0), DEFVAL(-1));
-	ClassDB::bind_method(D_METHOD("all_bullets_get_homing_smoothing", "bullet_index_start", "bullet_index_end_inclusive"), &DirectionalBullets2D::all_bullets_get_homing_smoothing, DEFVAL(0), DEFVAL(-1));
-	ClassDB::bind_method(D_METHOD("clear_per_bullet_homing_smoothing"), &DirectionalBullets2D::clear_per_bullet_homing_smoothing);
-
-	ClassDB::bind_method(D_METHOD("get_homing_update_interval"), &DirectionalBullets2D::get_homing_update_interval);
-	ClassDB::bind_method(D_METHOD("set_homing_update_interval", "value"), &DirectionalBullets2D::set_homing_update_interval);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "homing_update_interval"), "set_homing_update_interval", "get_homing_update_interval");
-
-	ClassDB::bind_method(D_METHOD("get_homing_take_control_of_texture_rotation"), &DirectionalBullets2D::get_homing_take_control_of_texture_rotation);
-	ClassDB::bind_method(D_METHOD("set_homing_take_control_of_texture_rotation", "value"), &DirectionalBullets2D::set_homing_take_control_of_texture_rotation);
-	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "homing_take_control_of_texture_rotation"), "set_homing_take_control_of_texture_rotation", "get_homing_take_control_of_texture_rotation");
-
+	ADD_GROUP("Gravity and Drag", "");
 	ClassDB::bind_method(D_METHOD("get_gravity"), &DirectionalBullets2D::get_gravity);
 	ClassDB::bind_method(D_METHOD("set_gravity", "value"), &DirectionalBullets2D::set_gravity);
 	ADD_PROPERTY(PropertyInfo(Variant::VECTOR2, "gravity"), "set_gravity", "get_gravity");
@@ -1271,50 +1257,10 @@ void DirectionalBullets2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_linear_drag"), &DirectionalBullets2D::get_linear_drag);
 	ClassDB::bind_method(D_METHOD("set_linear_drag", "value"), &DirectionalBullets2D::set_linear_drag);
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "linear_drag"), "set_linear_drag", "get_linear_drag");
-
-	ClassDB::bind_method(D_METHOD("get_homing_delay_sec"), &DirectionalBullets2D::get_homing_delay_sec);
-	ClassDB::bind_method(D_METHOD("set_homing_delay_sec", "value"), &DirectionalBullets2D::set_homing_delay_sec);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "homing_delay_sec"), "set_homing_delay_sec", "get_homing_delay_sec");
-
-	ClassDB::bind_method(D_METHOD("get_homing_duration_sec"), &DirectionalBullets2D::get_homing_duration_sec);
-	ClassDB::bind_method(D_METHOD("set_homing_duration_sec", "value"), &DirectionalBullets2D::set_homing_duration_sec);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "homing_duration_sec"), "set_homing_duration_sec", "get_homing_duration_sec");
-
-	ClassDB::bind_method(D_METHOD("get_homing_lose_range_px"), &DirectionalBullets2D::get_homing_lose_range_px);
-	ClassDB::bind_method(D_METHOD("set_homing_lose_range_px", "value"), &DirectionalBullets2D::set_homing_lose_range_px);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "homing_lose_range_px"), "set_homing_lose_range_px", "get_homing_lose_range_px");
-
-	// BOUNCE / RICOCHET RUNTIME API (spawn-data equivalents, editable live).
-	ClassDB::bind_method(D_METHOD("get_bounce_mask"), &DirectionalBullets2D::get_bounce_mask);
-	ClassDB::bind_method(D_METHOD("set_bounce_mask", "value"), &DirectionalBullets2D::set_bounce_mask);
-	ADD_PROPERTY(PropertyInfo(Variant::INT, "bounce_mask", PROPERTY_HINT_LAYERS_2D_PHYSICS), "set_bounce_mask", "get_bounce_mask");
-	ClassDB::bind_method(D_METHOD("set_bounce_mask_from_array", "array_of_masks"), &DirectionalBullets2D::set_bounce_mask_from_array);
-	ClassDB::bind_method(D_METHOD("get_bounce_strength"), &DirectionalBullets2D::get_bounce_strength);
-	ClassDB::bind_method(D_METHOD("set_bounce_strength", "value"), &DirectionalBullets2D::set_bounce_strength);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "bounce_strength", PROPERTY_HINT_RANGE, "0,2,0.01"), "set_bounce_strength", "get_bounce_strength");
-	ClassDB::bind_method(D_METHOD("get_bounce_hit_consumed"), &DirectionalBullets2D::get_bounce_hit_consumed);
-	ClassDB::bind_method(D_METHOD("set_bounce_hit_consumed", "value"), &DirectionalBullets2D::set_bounce_hit_consumed);
-	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "bounce_hit_consumed"), "set_bounce_hit_consumed", "get_bounce_hit_consumed");
-	ClassDB::bind_method(D_METHOD("get_bounce_max_count"), &DirectionalBullets2D::get_bounce_max_count);
-	ClassDB::bind_method(D_METHOD("set_bounce_max_count", "value"), &DirectionalBullets2D::set_bounce_max_count);
-	ADD_PROPERTY(PropertyInfo(Variant::INT, "bounce_max_count", PROPERTY_HINT_RANGE, "0,1000000,1"), "set_bounce_max_count", "get_bounce_max_count");
-	ClassDB::bind_method(D_METHOD("get_bounce_mode"), &DirectionalBullets2D::get_bounce_mode);
-	ClassDB::bind_method(D_METHOD("set_bounce_mode", "value"), &DirectionalBullets2D::set_bounce_mode);
-	ADD_PROPERTY(PropertyInfo(Variant::INT, "bounce_mode", PROPERTY_HINT_ENUM, "Simple Radial,Precise Shape"), "set_bounce_mode", "get_bounce_mode");
-	ClassDB::bind_method(D_METHOD("get_bounce_rotate_texture"), &DirectionalBullets2D::get_bounce_rotate_texture);
-	ClassDB::bind_method(D_METHOD("set_bounce_rotate_texture", "value"), &DirectionalBullets2D::set_bounce_rotate_texture);
-	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "bounce_rotate_texture"), "set_bounce_rotate_texture", "get_bounce_rotate_texture");
-	ClassDB::bind_method(D_METHOD("get_bounce_rotation_smooth"), &DirectionalBullets2D::get_bounce_rotation_smooth);
-	ClassDB::bind_method(D_METHOD("set_bounce_rotation_smooth", "value"), &DirectionalBullets2D::set_bounce_rotation_smooth);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "bounce_rotation_smooth"), "set_bounce_rotation_smooth", "get_bounce_rotation_smooth");
-	ClassDB::bind_method(D_METHOD("get_bounce_randomness_deg"), &DirectionalBullets2D::get_bounce_randomness_deg);
-	ClassDB::bind_method(D_METHOD("set_bounce_randomness_deg", "value"), &DirectionalBullets2D::set_bounce_randomness_deg);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "bounce_randomness_deg", PROPERTY_HINT_RANGE, "0,180,0.1"), "set_bounce_randomness_deg", "get_bounce_randomness_deg");
-	ClassDB::bind_method(D_METHOD("get_bounce_cooldown_sec"), &DirectionalBullets2D::get_bounce_cooldown_sec);
-	ClassDB::bind_method(D_METHOD("set_bounce_cooldown_sec", "value"), &DirectionalBullets2D::set_bounce_cooldown_sec);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "bounce_cooldown_sec"), "set_bounce_cooldown_sec", "get_bounce_cooldown_sec");
 	ClassDB::bind_method(D_METHOD("bullet_get_bounce_count", "bullet_index"), &DirectionalBullets2D::bullet_get_bounce_count);
+	ClassDB::bind_method(D_METHOD("all_bullets_get_bounce_count", "bullet_index_start", "bullet_index_end_inclusive"), &DirectionalBullets2D::all_bullets_get_bounce_count, DEFVAL(0), DEFVAL(-1));
 	ClassDB::bind_method(D_METHOD("debug_get_bounce_info", "bullet_index"), &DirectionalBullets2D::debug_get_bounce_info);
+	ClassDB::bind_method(D_METHOD("debug_get_previous_origin", "bullet_index"), &DirectionalBullets2D::debug_get_previous_origin);
 
 	ClassDB::bind_method(D_METHOD("get_is_wobble_enabled"), &DirectionalBullets2D::get_is_wobble_enabled);
 	ClassDB::bind_method(D_METHOD("bullet_get_wobble_amplitude", "bullet_index"), &DirectionalBullets2D::bullet_get_wobble_amplitude);
@@ -1324,6 +1270,7 @@ void DirectionalBullets2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("all_bullets_set_wobble_data", "wobble_data", "bullet_index_start", "bullet_index_end_inclusive"), &DirectionalBullets2D::all_bullets_set_wobble_data, DEFVAL(0), DEFVAL(-1));
 	ClassDB::bind_method(D_METHOD("bullet_get_wobble_data", "bullet_index"), &DirectionalBullets2D::bullet_get_wobble_data);
 	ClassDB::bind_method(D_METHOD("all_bullets_get_wobble_data", "bullet_index_start", "bullet_index_end_inclusive"), &DirectionalBullets2D::all_bullets_get_wobble_data, DEFVAL(0), DEFVAL(-1));
+	ADD_GROUP("Wobble", "");
 	ClassDB::bind_method(D_METHOD("get_shared_bullet_wobble_data"), &DirectionalBullets2D::get_shared_bullet_wobble_data);
 	ClassDB::bind_method(D_METHOD("set_shared_bullet_wobble_data", "new_wobble_data"), &DirectionalBullets2D::set_shared_bullet_wobble_data);
 	ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "shared_bullet_wobble_data", PROPERTY_HINT_RESOURCE_TYPE, "BulletWobbleData2D"), "set_shared_bullet_wobble_data", "get_shared_bullet_wobble_data");
@@ -1394,12 +1341,10 @@ void DirectionalBullets2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("all_bullets_set_velocity", "new_velocity", "bullet_index_start", "bullet_index_end_inclusive"), &DirectionalBullets2D::all_bullets_set_velocity, DEFVAL(0), DEFVAL(-1));
 	ClassDB::bind_method(D_METHOD("all_bullets_get_velocity", "bullet_index_start", "bullet_index_end_inclusive"), &DirectionalBullets2D::all_bullets_get_velocity, DEFVAL(0), DEFVAL(-1));
 
-	// The get/set methods live on the base class (bound there so BlockBullets2D
-	// gets them too). Re-binding the same names here trips a duplicate-method
-	// error at startup, so only the property is declared on top of them.
-	ADD_PROPERTY(PropertyInfo(Variant::VECTOR2, "inherited_velocity_offset"), "set_inherited_velocity_offset", "get_inherited_velocity_offset");
+	// SHARED MOVEMENT PATTERN RUNTIME API (spawn-data equivalent, editable live).
 
 	// SHARED MOVEMENT PATTERN RUNTIME API (spawn-data equivalent, editable live).
+	ADD_GROUP("Movement Patterns", "");
 	ClassDB::bind_method(D_METHOD("get_shared_movement_pattern_curve"), &DirectionalBullets2D::get_shared_movement_pattern_curve);
 	ClassDB::bind_method(D_METHOD("set_shared_movement_pattern_curve", "new_curve"), &DirectionalBullets2D::set_shared_movement_pattern_curve);
 	ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "shared_movement_pattern_curve", PROPERTY_HINT_RESOURCE_TYPE, "Curve2D"), "set_shared_movement_pattern_curve", "get_shared_movement_pattern_curve");
@@ -1412,27 +1357,127 @@ void DirectionalBullets2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_shared_movement_pattern_repeat", "value"), &DirectionalBullets2D::set_shared_movement_pattern_repeat);
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "shared_movement_pattern_repeat"), "set_shared_movement_pattern_repeat", "get_shared_movement_pattern_repeat");
 
+	ADD_GROUP("Homing", "");
+	ClassDB::bind_method(D_METHOD("get_bullet_homing_auto_pop_after_target_reached"), &DirectionalBullets2D::get_bullet_homing_auto_pop_after_target_reached);
+	ClassDB::bind_method(D_METHOD("set_bullet_homing_auto_pop_after_target_reached", "value"), &DirectionalBullets2D::set_bullet_homing_auto_pop_after_target_reached);
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "bullet_homing_auto_pop_after_target_reached"), "set_bullet_homing_auto_pop_after_target_reached", "get_bullet_homing_auto_pop_after_target_reached");
+
+	// SHARED HOMING DEQUE POP METHODS
+	ClassDB::bind_method(D_METHOD("shared_homing_deque_pop_front_target"), &DirectionalBullets2D::shared_homing_deque_pop_front_target);
+	ClassDB::bind_method(D_METHOD("shared_homing_deque_pop_back_target"), &DirectionalBullets2D::shared_homing_deque_pop_back_target);
+	ClassDB::bind_method(D_METHOD("_do_shared_auto_pop_front_target", "operation_generation"), &DirectionalBullets2D::_do_shared_auto_pop_front_target);
+	ClassDB::bind_method(D_METHOD("_do_auto_pop_front_target", "operation_generation", "bullet_index", "bullet_epoch"), &DirectionalBullets2D::_do_auto_pop_front_target);
+	ClassDB::bind_method(D_METHOD("_do_emit_homing_target_reached", "operation_generation", "bullet_index", "bullet_epoch", "target_instance_id", "target_global_position"), &DirectionalBullets2D::_do_emit_homing_target_reached);
+
+	// SHARED HOMING DEQUE PUSH METHODS
+	ClassDB::bind_method(D_METHOD("shared_homing_deque_push_front_mouse_position_target"), &DirectionalBullets2D::shared_homing_deque_push_front_mouse_position_target);
+	ClassDB::bind_method(D_METHOD("shared_homing_deque_push_front_node2d_target", "new_homing_target"), &DirectionalBullets2D::shared_homing_deque_push_front_node2d_target);
+	ClassDB::bind_method(D_METHOD("shared_homing_deque_push_front_global_position_target", "global_position"), &DirectionalBullets2D::shared_homing_deque_push_front_global_position_target);
+
+	ClassDB::bind_method(D_METHOD("shared_homing_deque_push_back_mouse_position_target"), &DirectionalBullets2D::shared_homing_deque_push_back_mouse_position_target);
+	ClassDB::bind_method(D_METHOD("shared_homing_deque_push_back_node2d_target", "new_homing_target"), &DirectionalBullets2D::shared_homing_deque_push_back_node2d_target);
+	ClassDB::bind_method(D_METHOD("shared_homing_deque_push_back_global_position_target", "global_position"), &DirectionalBullets2D::shared_homing_deque_push_back_global_position_target);
+
+	// SHARED HOMING DEQUE HELPERS
+	ClassDB::bind_method(D_METHOD("shared_homing_deque_push_front_homing_targets_array", "node2ds_or_global_positions_array"), &DirectionalBullets2D::shared_homing_deque_push_front_homing_targets_array);
+	ClassDB::bind_method(D_METHOD("shared_homing_deque_push_back_homing_targets_array", "node2ds_or_global_positions_array"), &DirectionalBullets2D::shared_homing_deque_push_back_homing_targets_array);
+
+	ClassDB::bind_method(D_METHOD("shared_homing_deque_replace_homing_targets_with_new_target", "node2d_or_global_position"), &DirectionalBullets2D::shared_homing_deque_replace_homing_targets_with_new_target);
+	ClassDB::bind_method(D_METHOD("shared_homing_deque_replace_homing_targets_with_new_target_array", "node2ds_or_global_positions_array"), &DirectionalBullets2D::shared_homing_deque_replace_homing_targets_with_new_target_array);
+
+	ClassDB::bind_method(D_METHOD("shared_homing_deque_clear_homing_targets"), &DirectionalBullets2D::shared_homing_deque_clear_homing_targets);
+
+	ClassDB::bind_method(D_METHOD("shared_homing_deque_check_homing_targets_amount"), &DirectionalBullets2D::shared_homing_deque_check_homing_targets_amount);
+
+	ClassDB::bind_method(D_METHOD("shared_homing_deque_check_has_homing_targets"), &DirectionalBullets2D::shared_homing_deque_check_has_homing_targets);
+
+	ClassDB::bind_method(D_METHOD("shared_homing_deque_check_current_target_type"), &DirectionalBullets2D::shared_homing_deque_check_current_target_type);
+
+	ClassDB::bind_method(D_METHOD("shared_homing_deque_get_current_homing_target"), &DirectionalBullets2D::shared_homing_deque_get_current_homing_target);
+
+	ClassDB::bind_method(D_METHOD("get_shared_homing_deque_auto_pop_after_target_reached"), &DirectionalBullets2D::get_shared_homing_deque_auto_pop_after_target_reached);
+	ClassDB::bind_method(D_METHOD("set_shared_homing_deque_auto_pop_after_target_reached", "value"), &DirectionalBullets2D::set_shared_homing_deque_auto_pop_after_target_reached);
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "shared_homing_deque_auto_pop_after_target_reached"), "set_shared_homing_deque_auto_pop_after_target_reached", "get_shared_homing_deque_auto_pop_after_target_reached");
+
+	// OTHER HOMING RELATED
+
+	ClassDB::bind_method(D_METHOD("get_homing_distance_before_reached"), &DirectionalBullets2D::get_homing_distance_before_reached);
+	ClassDB::bind_method(D_METHOD("set_homing_distance_before_reached", "value"), &DirectionalBullets2D::set_homing_distance_before_reached);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "homing_distance_before_reached"), "set_homing_distance_before_reached", "get_homing_distance_before_reached");
+
+	ClassDB::bind_method(D_METHOD("get_homing_smoothing"), &DirectionalBullets2D::get_homing_smoothing);
+	ClassDB::bind_method(D_METHOD("set_homing_smoothing", "value"), &DirectionalBullets2D::set_homing_smoothing);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "homing_smoothing"), "set_homing_smoothing", "get_homing_smoothing");
+
+	ClassDB::bind_method(D_METHOD("bullet_get_homing_smoothing", "bullet_index"), &DirectionalBullets2D::bullet_get_homing_smoothing);
+	ClassDB::bind_method(D_METHOD("bullet_set_homing_smoothing", "bullet_index", "value"), &DirectionalBullets2D::bullet_set_homing_smoothing);
+	ClassDB::bind_method(D_METHOD("all_bullets_set_homing_smoothing", "value", "bullet_index_start", "bullet_index_end_inclusive"), &DirectionalBullets2D::all_bullets_set_homing_smoothing, DEFVAL(0), DEFVAL(-1));
+	ClassDB::bind_method(D_METHOD("all_bullets_get_homing_smoothing", "bullet_index_start", "bullet_index_end_inclusive"), &DirectionalBullets2D::all_bullets_get_homing_smoothing, DEFVAL(0), DEFVAL(-1));
+	ClassDB::bind_method(D_METHOD("clear_per_bullet_homing_smoothing"), &DirectionalBullets2D::clear_per_bullet_homing_smoothing);
+
+	ClassDB::bind_method(D_METHOD("get_homing_update_interval"), &DirectionalBullets2D::get_homing_update_interval);
+	ClassDB::bind_method(D_METHOD("set_homing_update_interval", "value"), &DirectionalBullets2D::set_homing_update_interval);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "homing_update_interval"), "set_homing_update_interval", "get_homing_update_interval");
+
+	ClassDB::bind_method(D_METHOD("get_homing_take_control_of_texture_rotation"), &DirectionalBullets2D::get_homing_take_control_of_texture_rotation);
+	ClassDB::bind_method(D_METHOD("set_homing_take_control_of_texture_rotation", "value"), &DirectionalBullets2D::set_homing_take_control_of_texture_rotation);
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "homing_take_control_of_texture_rotation"), "set_homing_take_control_of_texture_rotation", "get_homing_take_control_of_texture_rotation");
+
+	ClassDB::bind_method(D_METHOD("get_homing_delay_sec"), &DirectionalBullets2D::get_homing_delay_sec);
+	ClassDB::bind_method(D_METHOD("set_homing_delay_sec", "value"), &DirectionalBullets2D::set_homing_delay_sec);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "homing_delay_sec"), "set_homing_delay_sec", "get_homing_delay_sec");
+
+	ClassDB::bind_method(D_METHOD("get_homing_duration_sec"), &DirectionalBullets2D::get_homing_duration_sec);
+	ClassDB::bind_method(D_METHOD("set_homing_duration_sec", "value"), &DirectionalBullets2D::set_homing_duration_sec);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "homing_duration_sec"), "set_homing_duration_sec", "get_homing_duration_sec");
+
+	ClassDB::bind_method(D_METHOD("get_homing_lose_range_px"), &DirectionalBullets2D::get_homing_lose_range_px);
+	ClassDB::bind_method(D_METHOD("set_homing_lose_range_px", "value"), &DirectionalBullets2D::set_homing_lose_range_px);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "homing_lose_range_px"), "set_homing_lose_range_px", "get_homing_lose_range_px");
+
+	ADD_GROUP("Bounce and Ricochet", "");
+	// BOUNCE / RICOCHET RUNTIME API (spawn-data equivalents, editable live).
+	ClassDB::bind_method(D_METHOD("get_bounce_mask"), &DirectionalBullets2D::get_bounce_mask);
+	ClassDB::bind_method(D_METHOD("set_bounce_mask", "value"), &DirectionalBullets2D::set_bounce_mask);
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "bounce_mask", PROPERTY_HINT_LAYERS_2D_PHYSICS), "set_bounce_mask", "get_bounce_mask");
+	ClassDB::bind_method(D_METHOD("set_bounce_mask_from_array", "array_of_masks"), &DirectionalBullets2D::set_bounce_mask_from_array);
+	ClassDB::bind_method(D_METHOD("get_bounce_strength"), &DirectionalBullets2D::get_bounce_strength);
+	ClassDB::bind_method(D_METHOD("set_bounce_strength", "value"), &DirectionalBullets2D::set_bounce_strength);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "bounce_strength", PROPERTY_HINT_RANGE, "0,8,0.01,or_greater"), "set_bounce_strength", "get_bounce_strength");
+	ClassDB::bind_method(D_METHOD("get_bounce_hit_consumed"), &DirectionalBullets2D::get_bounce_hit_consumed);
+	ClassDB::bind_method(D_METHOD("set_bounce_hit_consumed", "value"), &DirectionalBullets2D::set_bounce_hit_consumed);
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "bounce_hit_consumed"), "set_bounce_hit_consumed", "get_bounce_hit_consumed");
+	ClassDB::bind_method(D_METHOD("get_bounce_max_count"), &DirectionalBullets2D::get_bounce_max_count);
+	ClassDB::bind_method(D_METHOD("set_bounce_max_count", "value"), &DirectionalBullets2D::set_bounce_max_count);
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "bounce_max_count", PROPERTY_HINT_RANGE, "0,1000000,1"), "set_bounce_max_count", "get_bounce_max_count");
+	ClassDB::bind_method(D_METHOD("get_bounce_mode"), &DirectionalBullets2D::get_bounce_mode);
+	ClassDB::bind_method(D_METHOD("set_bounce_mode", "value"), &DirectionalBullets2D::set_bounce_mode);
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "bounce_mode", PROPERTY_HINT_ENUM, "Simple Radial,Precise Shape"), "set_bounce_mode", "get_bounce_mode");
+	ClassDB::bind_method(D_METHOD("get_bounce_rotate_texture"), &DirectionalBullets2D::get_bounce_rotate_texture);
+	ClassDB::bind_method(D_METHOD("set_bounce_rotate_texture", "value"), &DirectionalBullets2D::set_bounce_rotate_texture);
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "bounce_rotate_texture"), "set_bounce_rotate_texture", "get_bounce_rotate_texture");
+	ClassDB::bind_method(D_METHOD("get_bounce_rotation_smooth"), &DirectionalBullets2D::get_bounce_rotation_smooth);
+	ClassDB::bind_method(D_METHOD("set_bounce_rotation_smooth", "value"), &DirectionalBullets2D::set_bounce_rotation_smooth);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "bounce_rotation_smooth"), "set_bounce_rotation_smooth", "get_bounce_rotation_smooth");
+	ClassDB::bind_method(D_METHOD("get_bounce_randomness_deg"), &DirectionalBullets2D::get_bounce_randomness_deg);
+	ClassDB::bind_method(D_METHOD("set_bounce_randomness_deg", "value"), &DirectionalBullets2D::set_bounce_randomness_deg);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "bounce_randomness_deg", PROPERTY_HINT_RANGE, "0,180,0.1"), "set_bounce_randomness_deg", "get_bounce_randomness_deg");
+	ClassDB::bind_method(D_METHOD("get_bounce_cooldown_sec"), &DirectionalBullets2D::get_bounce_cooldown_sec);
+	ClassDB::bind_method(D_METHOD("set_bounce_cooldown_sec", "value"), &DirectionalBullets2D::set_bounce_cooldown_sec);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "bounce_cooldown_sec"), "set_bounce_cooldown_sec", "get_bounce_cooldown_sec");
+
+
+
 	ClassDB::bind_method(D_METHOD("has_shared_movement_pattern"), &DirectionalBullets2D::has_shared_movement_pattern);
 	ClassDB::bind_method(D_METHOD("remove_shared_movement_pattern"), &DirectionalBullets2D::remove_shared_movement_pattern);
 
 	// SHARED SPEED / ROTATION RUNTIME API.
-	ClassDB::bind_method(D_METHOD("get_shared_bullet_speed_data"), &DirectionalBullets2D::get_shared_bullet_speed_data);
-	ClassDB::bind_method(D_METHOD("set_shared_bullet_speed_data", "new_speed_data"), &DirectionalBullets2D::set_shared_bullet_speed_data);
-	ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "shared_bullet_speed_data", PROPERTY_HINT_RESOURCE_TYPE, "BulletSpeedData2D"), "set_shared_bullet_speed_data", "get_shared_bullet_speed_data");
 
 	ClassDB::bind_method(D_METHOD("has_shared_bullet_speed_data"), &DirectionalBullets2D::has_shared_bullet_speed_data);
 	ClassDB::bind_method(D_METHOD("remove_shared_bullet_speed_data"), &DirectionalBullets2D::remove_shared_bullet_speed_data);
 
-	ClassDB::bind_method(D_METHOD("get_shared_bullet_rotation_data"), &DirectionalBullets2D::get_shared_bullet_rotation_data);
-	ClassDB::bind_method(D_METHOD("set_shared_bullet_rotation_data", "new_rotation_data"), &DirectionalBullets2D::set_shared_bullet_rotation_data);
-	ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "shared_bullet_rotation_data", PROPERTY_HINT_RESOURCE_TYPE, "BulletRotationData2D"), "set_shared_bullet_rotation_data", "get_shared_bullet_rotation_data");
-
 	ClassDB::bind_method(D_METHOD("has_shared_bullet_rotation_data"), &DirectionalBullets2D::has_shared_bullet_rotation_data);
 	ClassDB::bind_method(D_METHOD("remove_shared_bullet_rotation_data"), &DirectionalBullets2D::remove_shared_bullet_rotation_data);
-
-	ClassDB::bind_method(D_METHOD("get_adjust_direction_based_on_rotation"), &DirectionalBullets2D::get_adjust_direction_based_on_rotation);
-	ClassDB::bind_method(D_METHOD("set_adjust_direction_based_on_rotation", "value"), &DirectionalBullets2D::set_adjust_direction_based_on_rotation);
-	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "adjust_direction_based_on_rotation"), "set_adjust_direction_based_on_rotation", "get_adjust_direction_based_on_rotation");
 
 	BIND_ENUM_CONSTANT(GlobalPositionTarget);
 	BIND_ENUM_CONSTANT(Node2DTarget);

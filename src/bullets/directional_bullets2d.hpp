@@ -245,6 +245,19 @@ protected:
 	// and whenever set_gravity starts a new regime, so pooled reuse never
 	// inherits fall speed. Sized with the movement SoA below.
 	std::vector<Vector2> all_gravity_velocity;
+	// Volley-level gravity switch, refreshed by refresh_gravity_active()
+	// after every seed/write/reset. Lets the tick skip the whole gravity
+	// block (window math included) when no bullet pulls anywhere.
+	bool gravity_active = false;
+	void refresh_gravity_active() {
+		gravity_active = false;
+		for (const Vector2 &g : all_gravity) {
+			if (g.length_squared() > 0.0) {
+				gravity_active = true;
+				break;
+			}
+		}
+	}
 
 	// HOMING GATING (seeded from spawn data; editable live below).
 	// delay = straight-flight seconds before steering starts; duration =
@@ -268,9 +281,10 @@ protected:
 	real_t bounce_rotation_smooth = 0.0;
 	real_t bounce_randomness_deg = 0.0;
 	real_t bounce_cooldown_sec = 0.05;
-	// Per-bullet bounce ledger. Sized to amount_bullets at spawn/enable;
-	// zeroed on every new life and on single-bullet disable (same rule as
-	// homing/orbit: a wake starts fresh).
+	// Per-bullet bounce ledger. Sized to amount_bullets only while bouncing
+	// is armed (see ensure_bounce_vectors); empty otherwise so a plain
+	// volley pays no per-tick bounce work. Zeroed on every new life and on
+	// single-bullet disable (same rule as homing/orbit: a wake starts fresh).
 	std::vector<int> all_bounce_count;
 	std::vector<real_t> all_bounce_cooldown;
 	std::vector<uint64_t> all_bounce_last_tick;
@@ -287,6 +301,38 @@ protected:
 	// Once-flag so the mask-mismatch footgun warns once per life instead of
 	// spamming (bounce bits outside collision_mask can never be detected).
 	bool bounce_mask_warning_issued = false;
+	// Volley-level bounce switch. True exactly when bounce_mask != 0; the
+	// tick gates cooldown/visual work behind it.
+	bool bounce_enabled() const { return bounce_mask != 0; }
+	// Sizes (or clears) the bounce ledger to match amount_bullets. Sized only
+	// while bouncing is armed; cleared when disarmed so disabled features
+	// cost nothing per tick. Every reader bounds-checks, so the empty state
+	// is always safe.
+	void ensure_bounce_vectors() {
+		if (!bounce_enabled()) {
+			all_bounce_count.clear();
+			all_bounce_cooldown.clear();
+			all_bounce_last_tick.clear();
+			bounce_visual_pending.clear();
+			bounce_visual_target.clear();
+			return;
+		}
+		if ((int)all_bounce_count.size() != amount_bullets) {
+			all_bounce_count.assign(amount_bullets, 0);
+		}
+		if ((int)all_bounce_cooldown.size() != amount_bullets) {
+			all_bounce_cooldown.assign(amount_bullets, 0.0);
+		}
+		if ((int)all_bounce_last_tick.size() != amount_bullets) {
+			all_bounce_last_tick.assign(amount_bullets, 0);
+		}
+		if ((int)bounce_visual_pending.size() != amount_bullets) {
+			bounce_visual_pending.assign(amount_bullets, 0);
+		}
+		if ((int)bounce_visual_target.size() != amount_bullets) {
+			bounce_visual_target.assign(amount_bullets, Vector2(1, 0));
+		}
+	}
 
 public:
 	// Advances one bullet along a movement-pattern curve for this tick.
@@ -354,8 +400,11 @@ public:
 		if (!Math::is_finite(delta) || delta < 0.0) {
 			return;
 		}
-		++bounce_tick_counter;
-		bounce_last_delta = delta;
+		// Bounce bookkeeping runs only while armed; plain volleys skip it.
+		if (bounce_enabled()) {
+			++bounce_tick_counter;
+			bounce_last_delta = delta;
+		}
 		const bool is_using_physics_interpolation = bullet_factory != nullptr && bullet_factory->use_physics_interpolation;
 		if (is_using_physics_interpolation) {
 			update_all_previous_transforms_for_interpolation();
@@ -467,6 +516,11 @@ public:
 			}
 		}
 
+		// Gravity time window sampled once (same for all bullets). Combined
+		// with gravity_active below, a volley with no pull skips the gravity
+		// block for every bullet.
+		const bool gravity_window = gravity_window_open();
+
 		// Locked-orbit snapshot for the pattern gate below: the orbit lock
 		// state read per bullet must match what the orbit section below sees, or the pattern
 		// gate and the orbit displacement disagree for one frame.
@@ -528,8 +582,9 @@ public:
 			}
 			// Bounce cooldown ticks down so the bullet can escape the overlap
 			// it just bounced out of (a body+area pair on one target would
-			// otherwise double-flip it in place).
-			if (i >= 0 && i < (int)all_bounce_cooldown.size() && all_bounce_cooldown[i] > 0.0) {
+			// otherwise double-flip it in place). Skipped entirely unless
+			// bouncing is armed.
+			if (bounce_enabled() && i >= 0 && i < (int)all_bounce_cooldown.size() && all_bounce_cooldown[i] > 0.0) {
 				all_bounce_cooldown[i] -= (real_t)delta;
 				if (all_bounce_cooldown[i] < 0.0) {
 					all_bounce_cooldown[i] = 0.0;
@@ -789,7 +844,7 @@ public:
 		// direction is never touched here. Skipped while
 		// adjust_direction_based_on_rotation owns ballistics (the visual
 		// owns movement there, so it snapped at bounce time instead).
-		if (bounce_rotate_texture && bounce_rotation_smooth > 0.0 && !adjust_direction_based_on_rotation && i >= 0 && i < (int)bounce_visual_pending.size() && bounce_visual_pending[i] && i < (int)bounce_visual_target.size()) {
+		if (bounce_enabled() && bounce_rotate_texture && bounce_rotation_smooth > 0.0 && !adjust_direction_based_on_rotation && i >= 0 && i < (int)bounce_visual_pending.size() && bounce_visual_pending[i] && i < (int)bounce_visual_target.size()) {
 			const Vector2 want = bounce_visual_target[i];
 			if (want.length_squared() > 0.00000001 && Math::is_finite((double)bounce_rotation_smooth) && delta > 0.0) {
 				rotate_to_target(i, want, bounce_rotation_smooth * (real_t)delta, false);
@@ -856,9 +911,11 @@ public:
 		// windows beyond immediate) reproduces straight top-down flight:
 		// all_gravity reads zero and the window short-circuits below.
 		// Zeroed on every new life and on set_gravity (new regime).
-		if (i >= 0 && i < (int)all_gravity.size() && i < (int)all_gravity_velocity.size()) {
+		// Both gates hoist out of the loop (gravity_active, gravity_window):
+		// a volley with no pull anywhere skips the block for every bullet.
+		if (gravity_active && gravity_window && i >= 0 && i < (int)all_gravity.size() && i < (int)all_gravity_velocity.size()) {
 			const Vector2 base_g = all_gravity[i];
-			if (base_g.length_squared() > 0.0 && gravity_window_open()) {
+			if (base_g.length_squared() > 0.0) {
 				const BulletCurvesData2D *grav_shared = shared_bullet_curves_data.is_valid() ? shared_bullet_curves_data.ptr() : nullptr;
 				const BulletCurvesData2D *grav_per = (is_per_bullet_curves_valid && per_bullet_curves_data != nullptr) ? per_bullet_curves_data : nullptr;
 				const real_t scale = gravity_strength_scale_for_bullet(grav_shared, grav_per);
@@ -3219,29 +3276,17 @@ public:
 		}
 		bounce_mask = value;
 		bounce_mask_warning_issued = false;
+		ensure_bounce_vectors();
 	}
 	void set_bounce_mask_from_array(const TypedArray<int> &numbers) {
-		int bitmask = 0;
-		for (int k = 0; k < numbers.size(); ++k) {
-			const Variant v = numbers[k];
-			if (v.get_type() != Variant::INT) {
-				UtilityFunctions::push_error("DirectionalBullets2D.set_bounce_mask_from_array: all entries must be positive layer numbers.");
-				return;
-			}
-			const int layer = (int)v;
-			if (layer < 1 || layer > 32) {
-				UtilityFunctions::push_error("DirectionalBullets2D.set_bounce_mask_from_array: layer numbers must be in [1, 32].");
-				return;
-			}
-			bitmask |= (1 << (layer - 1));
-		}
-		bounce_mask = bitmask;
+		bounce_mask = MultiMeshBulletsData2D::calculate_bitmask(numbers);
 		bounce_mask_warning_issued = false;
+		ensure_bounce_vectors();
 	}
 	real_t get_bounce_strength() const { return bounce_strength; }
 	void set_bounce_strength(real_t value) {
-		if (!Math::is_finite(value) || value < 0.0 || value > 2.0) {
-			UtilityFunctions::push_error("DirectionalBullets2D.set_bounce_strength: value must be finite in [0, 2] (1 = elastic), keeping the old value.");
+		if (!Math::is_finite(value) || value < 0.0) {
+			UtilityFunctions::push_error("DirectionalBullets2D.set_bounce_strength: value must be finite and >= 0 (1 = elastic), keeping the old value.");
 			return;
 		}
 		bounce_strength = value;
@@ -3300,6 +3345,26 @@ public:
 		}
 		return all_bounce_count[bullet_index];
 	}
+	// Bounce counts over a range (mirrors all_bullets_get_velocity).
+	TypedArray<int> all_bullets_get_bounce_count(int bullet_index_start = 0, int bullet_index_end_inclusive = -1) const {
+		ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_get_bounce_count");
+		TypedArray<int> arr;
+		for (int i = bullet_index_start; i <= bullet_index_end_inclusive; ++i) {
+			arr.push_back(bullet_get_bounce_count(i));
+		}
+		return arr;
+	}
+	// Previous-tick origin used by physics interpolation. Lets tests prove
+	// the render path stays continuous across teleports and bounces.
+	Vector2 debug_get_previous_origin(int bullet_index) const {
+		if (!validate_bullet_index(bullet_index, "debug_get_previous_origin")) {
+			return Vector2(0, 0);
+		}
+		if (bullet_index < 0 || bullet_index >= (int)all_previous_instance_transf.size()) {
+			return Vector2(0, 0);
+		}
+		return all_previous_instance_transf[bullet_index].get_origin();
+	}
 	// Bounce introspection for tests/support: counts, config echo, pending
 	// visual state. Never mutates.
 	Dictionary debug_get_bounce_info(int bullet_index) const {
@@ -3341,11 +3406,22 @@ public:
 		bounce_rotation_smooth = (real_t)directional_data.bounce_rotation_smooth;
 		bounce_randomness_deg = (real_t)directional_data.bounce_randomness_deg;
 		bounce_cooldown_sec = (real_t)directional_data.bounce_cooldown_sec;
-		all_bounce_count.assign(amount_bullets, 0);
-		all_bounce_cooldown.assign(amount_bullets, 0.0);
-		all_bounce_last_tick.assign(amount_bullets, 0);
-		bounce_visual_pending.assign(amount_bullets, 0);
-		bounce_visual_target.assign(amount_bullets, Vector2(1, 0));
+		// Fresh life, fresh ledger. assign() both sizes and zeroes when
+		// armed; clear() drops the vectors when disarmed so plain volleys
+		// carry no bounce state at all.
+		if (bounce_enabled()) {
+			all_bounce_count.assign(amount_bullets, 0);
+			all_bounce_cooldown.assign(amount_bullets, 0.0);
+			all_bounce_last_tick.assign(amount_bullets, 0);
+			bounce_visual_pending.assign(amount_bullets, 0);
+			bounce_visual_target.assign(amount_bullets, Vector2(1, 0));
+		} else {
+			all_bounce_count.clear();
+			all_bounce_cooldown.clear();
+			all_bounce_last_tick.clear();
+			bounce_visual_pending.clear();
+			bounce_visual_target.clear();
+		}
 		bounce_mask_warning_issued = false;
 		// The #1 silent misconfiguration: bounce layers the bullet can never
 		// detect because its collision_mask does not cover them. Warn once
@@ -3646,6 +3722,7 @@ public:
 		// gravity change would add onto stale integrated velocity.
 		all_gravity.assign(amount_bullets, value);
 		all_gravity_velocity.assign(amount_bullets, Vector2(0, 0));
+		refresh_gravity_active();
 	}
 	Vector2 bullet_get_gravity(int bullet_index) const {
 		if (!validate_bullet_index(bullet_index, "bullet_get_gravity")) {
@@ -3669,6 +3746,7 @@ public:
 		}
 		all_gravity[bullet_index] = value;
 		all_gravity_velocity[bullet_index] = Vector2(0, 0);
+		refresh_gravity_active();
 	}
 	void all_bullets_set_gravity(const Vector2 &value, int bullet_index_start = 0, int bullet_index_end_inclusive = -1) {
 		ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_set_gravity");
@@ -3871,7 +3949,8 @@ public:
 		shared_bullet_speed_data.unref();
 		shared_bullet_rotation_data.unref();
 		// Bounce is per-owner runtime state like homing: a pooled instance
-		// must not ricochet the next owner off stale layers.
+		// must not ricochet the next owner off stale layers. Vectors drop
+		// entirely while disarmed (see ensure_bounce_vectors).
 		bounce_mask = 0;
 		bounce_strength = 1.0;
 		bounce_hit_consumed = false;
@@ -3881,11 +3960,11 @@ public:
 		bounce_rotation_smooth = 0.0;
 		bounce_randomness_deg = 0.0;
 		bounce_cooldown_sec = 0.05;
-		all_bounce_count.assign(all_bounce_count.size(), 0);
-		all_bounce_cooldown.assign(all_bounce_cooldown.size(), 0.0);
-		all_bounce_last_tick.assign(all_bounce_last_tick.size(), 0);
-		bounce_visual_pending.assign(bounce_visual_pending.size(), 0);
-		bounce_visual_target.assign(bounce_visual_target.size(), Vector2(1, 0));
+		all_bounce_count.clear();
+		all_bounce_cooldown.clear();
+		all_bounce_last_tick.clear();
+		bounce_visual_pending.clear();
+		bounce_visual_target.clear();
 		bounce_mask_warning_issued = false;
 	}
 
@@ -3899,7 +3978,26 @@ public:
 	// volley-wide generation is intentionally NOT bumped here - that would
 	// invalidate every sibling's legitimately queued work.
 	virtual void on_bullet_disabled(int bullet_index) override {
-		if (bullet_index < 0 || bullet_index >= (int)all_bullet_homing_targets.size()) {
+		if (bullet_index < 0 || bullet_index >= amount_bullets) {
+			return;
+		}
+		// Bounce cleanup first and independent: a disabled bullet owns no
+		// bounce state (counts, cooldown, per-tick guard, smooth-visual
+		// pursuit all restart on wake), and this must run even if the
+		// homing vectors below are ever sized differently.
+		if (bullet_index < (int)all_bounce_count.size()) {
+			all_bounce_count[bullet_index] = 0;
+		}
+		if (bullet_index < (int)all_bounce_cooldown.size()) {
+			all_bounce_cooldown[bullet_index] = 0.0;
+		}
+		if (bullet_index < (int)all_bounce_last_tick.size()) {
+			all_bounce_last_tick[bullet_index] = 0;
+		}
+		if (bullet_index < (int)bounce_visual_pending.size()) {
+			bounce_visual_pending[bullet_index] = 0;
+		}
+		if (bullet_index >= (int)all_bullet_homing_targets.size()) {
 			return;
 		}
 		if (bullet_index >= 0 && bullet_index < (int)bullet_homing_epochs.size()) {
@@ -3928,21 +4026,6 @@ public:
 		}
 		if (bullet_index >= 0 && bullet_index < (int)all_orbiting_data.size()) {
 			all_orbiting_data[bullet_index] = OrbitingData();
-		}
-		// A disabled bullet owns no bounce state either: counts, cooldown,
-		// per-tick guard and smooth-visual pursuit all restart on wake so a
-		// re-enabled bullet never inherits a stale ricochet.
-		if (bullet_index >= 0 && bullet_index < (int)all_bounce_count.size()) {
-			all_bounce_count[bullet_index] = 0;
-		}
-		if (bullet_index >= 0 && bullet_index < (int)all_bounce_cooldown.size()) {
-			all_bounce_cooldown[bullet_index] = 0.0;
-		}
-		if (bullet_index >= 0 && bullet_index < (int)all_bounce_last_tick.size()) {
-			all_bounce_last_tick[bullet_index] = 0;
-		}
-		if (bullet_index >= 0 && bullet_index < (int)bounce_visual_pending.size()) {
-			bounce_visual_pending[bullet_index] = 0;
 		}
 	}
 

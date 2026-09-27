@@ -126,7 +126,7 @@
 			Bitmask of target collision layers that trigger a bounce, applied at spawn time (and on pool reuse). Checked against the collided object's collision_layer and takes precedence over the normal collision path. 0 (default) disables bouncing. NOTE: these bits must overlap [member MultiMeshBulletsData2D.collision_mask], otherwise the bullet never detects those targets at all (warned once per spawn). Use [method set_bounce_mask_from_array] to build it from layer numbers.
 		</member>
 		<member name="bounce_strength" type="float" setter="set_bounce_strength" getter="get_bounce_strength" default="1.0">
-			Speed multiplier applied on every bounce (finite in [0, 2]). 1.0 (default) is perfectly elastic, below 1 damps, 0 dead-stops the bullet in place (still alive when [member bounce_hit_consumed] is false), above 1 is super-elastic.
+			Speed multiplier applied on every bounce (finite, 0 or more, no upper cap). 1.0 (default) is perfectly elastic, below 1 damps, 0 dead-stops the bullet in place (still alive when [member bounce_hit_consumed] is false), above 1 is super-elastic. Very high values tunnel through thin walls (collision is point-sampled); the per-bullet max speed still clamps the result.
 		</member>
 		<member name="bounce_hit_consumed" type="bool" setter="set_bounce_hit_consumed" getter="get_bounce_hit_consumed" default="false">
 			Whether a bounce also counts as a normal hit (increments the collision counter and can disable the bullet at [member MultiMeshBulletsData2D.bullet_max_collision_count]). False (default) means free bounces that never kill the bullet. A consumed bounce emits BOTH the bounce signal and the matching area/body signal.
