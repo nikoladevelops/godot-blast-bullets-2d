@@ -12,15 +12,21 @@
 		<method name="teleport_shift_all_bullets">
 			<return type="void" />
 			<param index="0" name="shift_value" type="Vector2" />
-			<param index="1" name="bullet_index_start" type="int" default="0" />
-			<param index="2" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<param index="1" name="bullet_index_start" type="int" default="0" >
+				First bullet index in the range (inclusive).
+			</param>
+			<param index="2" name="bullet_index_end_inclusive" type="int" default="-1" >
+				Last bullet index in the range (inclusive; -1 means the final bullet).
+			</param>
 			<description>
 				Shifts the whole block volley (or an index range) rigidly, syncing shapes, attachments and interpolation state per bullet. Used by [method BulletFactory2D.teleport_shift_all_bullets].
 			</description>
 		</method>
 		<method name="teleport_shift_bullet">
 			<return type="void" />
-			<param index="0" name="bullet_index" type="int" />
+			<param index="0" name="bullet_index" type="int" >
+				Zero-based index of the bullet.
+			</param>
 			<param index="1" name="shift_value" type="Vector2" />
 			<description>
 				Shifts one bullet of the block volley by a Vector2 offset, syncing shape, attachment and interpolation state. The volley otherwise moves rigidly as a whole.

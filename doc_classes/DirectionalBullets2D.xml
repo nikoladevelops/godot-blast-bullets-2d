@@ -40,16 +40,24 @@
 		<method name="all_bullets_assign_homing_targets_array">
 			<return type="void" />
 			<param index="0" name="node2ds_or_global_positions_array" type="Array" />
-			<param index="1" name="bullet_index_start" type="int" default="0" />
-			<param index="2" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<param index="1" name="bullet_index_start" type="int" default="0" >
+				First bullet index in the range (inclusive).
+			</param>
+			<param index="2" name="bullet_index_end_inclusive" type="int" default="-1" >
+				Last bullet index in the range (inclusive; -1 means the final bullet).
+			</param>
 			<description>
 				Pushes one homing target per bullet: array element i goes to bullet (start + i), pushed to the back of its per-bullet deque. The array size must match the range size, and every element must be a Node2D or Vector2, otherwise nothing is pushed. Useful for scatter-to-enemies spreads.
 			</description>
 		</method>
 		<method name="all_bullets_clear_homing_targets">
 			<return type="void" />
-			<param index="0" name="bullet_index_start" type="int" default="0" />
-			<param index="1" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<param index="0" name="bullet_index_start" type="int" default="0" >
+				First bullet index in the range (inclusive).
+			</param>
+			<param index="1" name="bullet_index_end_inclusive" type="int" default="-1" >
+				Last bullet index in the range (inclusive; -1 means the final bullet).
+			</param>
 			<description>
 				Clears all homing targets for the specified range of bullets (per-bullet deques only; shared deque unaffected).
 
@@ -58,8 +66,12 @@
 		</method>
 		<method name="all_bullets_disable_orbiting">
 			<return type="void" />
-			<param index="0" name="bullet_index_start" type="int" default="0" />
-			<param index="1" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<param index="0" name="bullet_index_start" type="int" default="0" >
+				First bullet index in the range (inclusive).
+			</param>
+			<param index="1" name="bullet_index_end_inclusive" type="int" default="-1" >
+				Last bullet index in the range (inclusive; -1 means the final bullet).
+			</param>
 			<description>
 				Disables orbiting for the specified range of bullets.
 			</description>
@@ -69,8 +81,12 @@
 			<param index="0" name="orbiting_radius" type="float" />
 			<param index="1" name="orbiting_direction" type="int" enum="DirectionalBullets2D.OrbitingDirection" default="2" />
 			<param index="2" name="orbiting_texture_rotation" type="int" enum="DirectionalBullets2D.OrbitingTextureRotation" default="0" />
-			<param index="3" name="bullet_index_start" type="int" default="0" />
-			<param index="4" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<param index="3" name="bullet_index_start" type="int" default="0" >
+				First bullet index in the range (inclusive).
+			</param>
+			<param index="4" name="bullet_index_end_inclusive" type="int" default="-1" >
+				Last bullet index in the range (inclusive; -1 means the final bullet).
+			</param>
 			<param index="5" name="orbiting_follow_mode" type="int" enum="DirectionalBullets2D.OrbitingFollowMode" default="0" />
 			<param index="6" name="orbiting_follow_deadzone" type="float" default="0.0" />
 			<param index="7" name="orbiting_lock_policy" type="int" enum="DirectionalBullets2D.OrbitingLockPolicy" default="0" />
@@ -87,8 +103,12 @@
 			<param index="1" name="radius_step" type="float" />
 			<param index="2" name="orbiting_direction" type="int" enum="DirectionalBullets2D.OrbitingDirection" default="2" />
 			<param index="3" name="orbiting_texture_rotation" type="int" enum="DirectionalBullets2D.OrbitingTextureRotation" default="0" />
-			<param index="4" name="bullet_index_start" type="int" default="0" />
-			<param index="5" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<param index="4" name="bullet_index_start" type="int" default="0" >
+				First bullet index in the range (inclusive).
+			</param>
+			<param index="5" name="bullet_index_end_inclusive" type="int" default="-1" >
+				Last bullet index in the range (inclusive; -1 means the final bullet).
+			</param>
 			<param index="6" name="orbiting_follow_mode" type="int" enum="DirectionalBullets2D.OrbitingFollowMode" default="0" />
 			<param index="7" name="orbiting_follow_deadzone" type="float" default="0.0" />
 			<param index="8" name="orbiting_lock_policy" type="int" enum="DirectionalBullets2D.OrbitingLockPolicy" default="0" />
@@ -97,66 +117,158 @@
 				Enables orbiting with concentric radii: bullet (start + k) orbits at radius_start + radius_step * k. Useful for shield rings. Bullets that already orbit keep their radius with a warning.
 			</description>
 		</method>
+		<method name="all_bullets_get_bounce_count" qualifiers="const">
+			<return type="int[]" />
+			<param index="0" name="bullet_index_start" type="int" default="0" >
+				First bullet index in the range (inclusive).
+			</param>
+			<param index="1" name="bullet_index_end_inclusive" type="int" default="-1" >
+				Last bullet index in the range (inclusive; -1 means the final bullet).
+			</param>
+			<description>
+				Bounce counts over a bullet range (mirrors [method bullet_get_bounce_count]). Inverted ranges are rejected.
+			</description>
+		</method>
+		<method name="all_bullets_get_fall_speed" qualifiers="const">
+			<return type="float[]" />
+			<param index="0" name="bullet_index_start" type="int" default="0" >
+				First bullet index in the range (inclusive).
+			</param>
+			<param index="1" name="bullet_index_end_inclusive" type="int" default="-1" >
+				Last bullet index in the range (inclusive; -1 means the final bullet).
+			</param>
+			<description>
+				Integrated fall-speed magnitudes over a range (0 where gravity never integrated).
+			</description>
+		</method>
+		<method name="all_bullets_get_gravity" qualifiers="const">
+			<return type="Vector2[]" />
+			<param index="0" name="bullet_index_start" type="int" default="0" >
+				First bullet index in the range (inclusive).
+			</param>
+			<param index="1" name="bullet_index_end_inclusive" type="int" default="-1" >
+				Last bullet index in the range (inclusive; -1 means the final bullet).
+			</param>
+			<description>
+				Per-bullet gravity vectors over a range.
+			</description>
+		</method>
+		<method name="all_bullets_get_homing_smoothing" qualifiers="const">
+			<return type="float[]" />
+			<param index="0" name="bullet_index_start" type="int" default="0" >
+				First bullet index in the range (inclusive).
+			</param>
+			<param index="1" name="bullet_index_end_inclusive" type="int" default="-1" >
+				Last bullet index in the range (inclusive; -1 means the final bullet).
+			</param>
+			<description>
+				Effective per-bullet homing smoothing over a range (per-bullet value where set, else shared).
+			</description>
+		</method>
 		<method name="all_bullets_get_homing_targets_amount">
 			<return type="PackedInt32Array" />
-			<param index="0" name="bullet_index_start" type="int" default="0" />
-			<param index="1" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<param index="0" name="bullet_index_start" type="int" default="0" >
+				First bullet index in the range (inclusive).
+			</param>
+			<param index="1" name="bullet_index_end_inclusive" type="int" default="-1" >
+				Last bullet index in the range (inclusive; -1 means the final bullet).
+			</param>
 			<description>
 				Returns the per-bullet homing queue depth of each bullet in the range (shared deque excluded; read it via [method shared_homing_deque_check_homing_targets_amount]). Example: after [method all_bullets_push_back_homing_target], depths are 1 per bullet.
 			</description>
 		</method>
 		<method name="all_bullets_get_orbiting_angle">
 			<return type="PackedFloat32Array" />
-			<param index="0" name="bullet_index_start" type="int" default="0" />
-			<param index="1" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<param index="0" name="bullet_index_start" type="int" default="0" >
+				First bullet index in the range (inclusive).
+			</param>
+			<param index="1" name="bullet_index_end_inclusive" type="int" default="-1" >
+				Last bullet index in the range (inclusive; -1 means the final bullet).
+			</param>
 			<description>
 				Returns the locked ring angle (radians) of each bullet in the range. Same per-bullet warnings as [method bullet_get_orbiting_angle].
 			</description>
 		</method>
 		<method name="all_bullets_get_orbiting_center">
-			<return type="Vector2[]" />
-			<param index="0" name="bullet_index_start" type="int" default="0" />
-			<param index="1" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<return type="PackedVector2Array" />
+			<param index="0" name="bullet_index_start" type="int" default="0" >
+				First bullet index in the range (inclusive).
+			</param>
+			<param index="1" name="bullet_index_end_inclusive" type="int" default="-1" >
+				Last bullet index in the range (inclusive; -1 means the final bullet).
+			</param>
 			<description>
 				Returns the orbit center of each bullet in the range: the locked ring point once locked, else the live deque front (per-bullet deque wins, shared is the fallback). Same per-bullet warnings as [method bullet_get_orbiting_center]. Example: [code]var centers = bullets.all_bullets_get_orbiting_center()[/code].
 			</description>
 		</method>
 		<method name="all_bullets_get_orbiting_radius">
 			<return type="PackedFloat32Array" />
-			<param index="0" name="bullet_index_start" type="int" default="0" />
-			<param index="1" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<param index="0" name="bullet_index_start" type="int" default="0" >
+				First bullet index in the range (inclusive).
+			</param>
+			<param index="1" name="bullet_index_end_inclusive" type="int" default="-1" >
+				Last bullet index in the range (inclusive; -1 means the final bullet).
+			</param>
 			<description>
 				Returns the orbiting radius of all bullets in the range.
 			</description>
 		</method>
 		<method name="all_bullets_get_velocity" qualifiers="const">
 			<return type="Vector2[]" />
-			<param index="0" name="bullet_index_start" type="int" default="0" />
-			<param index="1" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<param index="0" name="bullet_index_start" type="int" default="0" >
+				First bullet index in the range (inclusive).
+			</param>
+			<param index="1" name="bullet_index_end_inclusive" type="int" default="-1" >
+				Last bullet index in the range (inclusive; -1 means the final bullet).
+			</param>
 			<description>
 				Returns the logical velocities of all bullets in the range (direction x speed + inherited offset), excluding per-tick pattern/orbit displacement. Pair with [method BulletFactory2D.helper_generate_transforms_fan] for split patterns.
 			</description>
 		</method>
+		<method name="all_bullets_get_wobble_data">
+			<return type="BulletWobbleData2D[]" />
+			<param index="0" name="bullet_index_start" type="int" default="0" >
+				First bullet index in the range (inclusive).
+			</param>
+			<param index="1" name="bullet_index_end_inclusive" type="int" default="-1" >
+				Last bullet index in the range (inclusive; -1 means the final bullet).
+			</param>
+			<description>
+				Per-bullet wobble resources over a range (null where the slot runs on the shared fallback or is inactive).
+			</description>
+		</method>
 		<method name="all_bullets_is_orbiting_enabled">
 			<return type="bool[]" />
-			<param index="0" name="bullet_index_start" type="int" default="0" />
-			<param index="1" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<param index="0" name="bullet_index_start" type="int" default="0" >
+				First bullet index in the range (inclusive).
+			</param>
+			<param index="1" name="bullet_index_end_inclusive" type="int" default="-1" >
+				Last bullet index in the range (inclusive; -1 means the final bullet).
+			</param>
 			<description>
 				Returns whether orbiting is enabled for each bullet in the range.
 			</description>
 		</method>
 		<method name="all_bullets_is_orbiting_locked">
 			<return type="bool[]" />
-			<param index="0" name="bullet_index_start" type="int" default="0" />
-			<param index="1" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<param index="0" name="bullet_index_start" type="int" default="0" >
+				First bullet index in the range (inclusive).
+			</param>
+			<param index="1" name="bullet_index_end_inclusive" type="int" default="-1" >
+				Last bullet index in the range (inclusive; -1 means the final bullet).
+			</param>
 			<description>
 				Returns whether each bullet in the range is currently locked onto its orbit ring (as opposed to merely enabled but still flying to the ring).
 			</description>
 		</method>
 		<method name="all_bullets_pop_back_target">
 			<return type="Array" />
-			<param index="0" name="bullet_index_start" type="int" default="0" />
-			<param index="1" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<param index="0" name="bullet_index_start" type="int" default="0" >
+				First bullet index in the range (inclusive).
+			</param>
+			<param index="1" name="bullet_index_end_inclusive" type="int" default="-1" >
+				Last bullet index in the range (inclusive; -1 means the final bullet).
+			</param>
 			<description>
 				Pops a homing target from the back of the deque for all bullets in the range (per-bullet deques only).
 
@@ -165,8 +277,12 @@
 		</method>
 		<method name="all_bullets_pop_front_target">
 			<return type="Array" />
-			<param index="0" name="bullet_index_start" type="int" default="0" />
-			<param index="1" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<param index="0" name="bullet_index_start" type="int" default="0" >
+				First bullet index in the range (inclusive).
+			</param>
+			<param index="1" name="bullet_index_end_inclusive" type="int" default="-1" >
+				Last bullet index in the range (inclusive; -1 means the final bullet).
+			</param>
 			<description>
 				Pops a homing target from the front of the deque for all bullets in the range (per-bullet deques only).
 
@@ -176,8 +292,12 @@
 		<method name="all_bullets_push_back_homing_target">
 			<return type="void" />
 			<param index="0" name="node2d_or_global_position" type="Variant" />
-			<param index="1" name="bullet_index_start" type="int" default="0" />
-			<param index="2" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<param index="1" name="bullet_index_start" type="int" default="0" >
+				First bullet index in the range (inclusive).
+			</param>
+			<param index="2" name="bullet_index_end_inclusive" type="int" default="-1" >
+				Last bullet index in the range (inclusive; -1 means the final bullet).
+			</param>
 			<description>
 				This is a helper that allows you to push a single homing target(Node2D or Vector2 global position) to the back of the deque for all bullets in the range (per-bullet deques only).
 
@@ -187,8 +307,12 @@
 		<method name="all_bullets_push_back_homing_targets_array">
 			<return type="void" />
 			<param index="0" name="node2ds_or_global_positions_array" type="Array" />
-			<param index="1" name="bullet_index_start" type="int" default="0" />
-			<param index="2" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<param index="1" name="bullet_index_start" type="int" default="0" >
+				First bullet index in the range (inclusive).
+			</param>
+			<param index="2" name="bullet_index_end_inclusive" type="int" default="-1" >
+				Last bullet index in the range (inclusive; -1 means the final bullet).
+			</param>
 			<description>
 				Pushes an array of homing targets (mix of Node2D and Vector2) to the back of the deque for all bullets in the range (per-bullet deques only).
 
@@ -197,8 +321,12 @@
 		</method>
 		<method name="all_bullets_push_back_mouse_position_target">
 			<return type="void" />
-			<param index="0" name="bullet_index_start" type="int" default="0" />
-			<param index="1" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<param index="0" name="bullet_index_start" type="int" default="0" >
+				First bullet index in the range (inclusive).
+			</param>
+			<param index="1" name="bullet_index_end_inclusive" type="int" default="-1" >
+				Last bullet index in the range (inclusive; -1 means the final bullet).
+			</param>
 			<description>
 				Pushes the current mouse global position as a homing target to the back of the deque for all bullets in the range (per-bullet deques only).
 
@@ -208,8 +336,12 @@
 		<method name="all_bullets_push_front_homing_target">
 			<return type="void" />
 			<param index="0" name="node2d_or_global_position" type="Variant" />
-			<param index="1" name="bullet_index_start" type="int" default="0" />
-			<param index="2" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<param index="1" name="bullet_index_start" type="int" default="0" >
+				First bullet index in the range (inclusive).
+			</param>
+			<param index="2" name="bullet_index_end_inclusive" type="int" default="-1" >
+				Last bullet index in the range (inclusive; -1 means the final bullet).
+			</param>
 			<description>
 				Pushes a single homing target (Node2D or Vector2 global position) to the front of the deque for all bullets in the range (per-bullet deques only).
 
@@ -221,8 +353,12 @@
 		<method name="all_bullets_push_front_homing_targets_array">
 			<return type="void" />
 			<param index="0" name="node2ds_or_global_positions_array" type="Array" />
-			<param index="1" name="bullet_index_start" type="int" default="0" />
-			<param index="2" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<param index="1" name="bullet_index_start" type="int" default="0" >
+				First bullet index in the range (inclusive).
+			</param>
+			<param index="2" name="bullet_index_end_inclusive" type="int" default="-1" >
+				Last bullet index in the range (inclusive; -1 means the final bullet).
+			</param>
 			<description>
 				Pushes an array of homing targets to the front of the deque for all bullets in the range (per-bullet deques only).
 
@@ -233,8 +369,12 @@
 		</method>
 		<method name="all_bullets_push_front_mouse_position_target">
 			<return type="void" />
-			<param index="0" name="bullet_index_start" type="int" default="0" />
-			<param index="1" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<param index="0" name="bullet_index_start" type="int" default="0" >
+				First bullet index in the range (inclusive).
+			</param>
+			<param index="1" name="bullet_index_end_inclusive" type="int" default="-1" >
+				Last bullet index in the range (inclusive; -1 means the final bullet).
+			</param>
 			<description>
 				Pushes the current mouse global position to the front of the deque for all bullets in the range (per-bullet deques only).
 
@@ -245,8 +385,12 @@
 		</method>
 		<method name="all_bullets_replace_homing_targets_with_mouse">
 			<return type="void" />
-			<param index="0" name="bullet_index_start" type="int" default="0" />
-			<param index="1" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<param index="0" name="bullet_index_start" type="int" default="0" >
+				First bullet index in the range (inclusive).
+			</param>
+			<param index="1" name="bullet_index_end_inclusive" type="int" default="-1" >
+				Last bullet index in the range (inclusive; -1 means the final bullet).
+			</param>
 			<description>
 				Each homing target gets cleared and replaced with the Mouse as the target for all bullets in the range (per-bullet deques only). Locked orbit rings follow the lock policy ([method bullet_set_orbiting_lock_policy]); explicit clears still always unlock unless the policy is StayLocked.
 			</description>
@@ -254,8 +398,12 @@
 		<method name="all_bullets_replace_homing_targets_with_new_target">
 			<return type="void" />
 			<param index="0" name="node2d_or_global_position" type="Variant" />
-			<param index="1" name="bullet_index_start" type="int" default="0" />
-			<param index="2" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<param index="1" name="bullet_index_start" type="int" default="0" >
+				First bullet index in the range (inclusive).
+			</param>
+			<param index="2" name="bullet_index_end_inclusive" type="int" default="-1" >
+				Last bullet index in the range (inclusive; -1 means the final bullet).
+			</param>
 			<description>
 				Clears then pushes a single homing target to the back for all bullets in the range (per-bullet deques only). Locked orbit rings are kept or re-acquired per the lock policy instead of always dropping: same target keeps angle and center, a different target re-locks.
 
@@ -265,19 +413,40 @@
 		<method name="all_bullets_replace_homing_targets_with_new_target_array">
 			<return type="void" />
 			<param index="0" name="node2ds_or_global_positions_array" type="Array" />
-			<param index="1" name="bullet_index_start" type="int" default="0" />
-			<param index="2" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<param index="1" name="bullet_index_start" type="int" default="0" >
+				First bullet index in the range (inclusive).
+			</param>
+			<param index="2" name="bullet_index_end_inclusive" type="int" default="-1" >
+				Last bullet index in the range (inclusive; -1 means the final bullet).
+			</param>
 			<description>
 				Clears then pushes an array of homing targets to the back for all bullets in the range (per-bullet deques only). Locked orbit rings are kept or re-acquired per the lock policy ([method bullet_set_orbiting_lock_policy]).
 
 				If you want to clear then push an array of targets to the shared deque, use [method shared_homing_deque_replace_homing_targets_with_new_target_array] instead.
 			</description>
 		</method>
+		<method name="all_bullets_set_gravity">
+			<return type="void" />
+			<param index="0" name="value" type="Vector2" />
+			<param index="1" name="bullet_index_start" type="int" default="0" >
+				First bullet index in the range (inclusive).
+			</param>
+			<param index="2" name="bullet_index_end_inclusive" type="int" default="-1" >
+				Last bullet index in the range (inclusive; -1 means the final bullet).
+			</param>
+			<description>
+				Sets the gravity acceleration for a bullet range (default all), restarting each fall speed. Non-finite values are rejected.
+			</description>
+		</method>
 		<method name="all_bullets_set_homing_smoothing">
 			<return type="void" />
 			<param index="0" name="value" type="float" />
-			<param index="1" name="bullet_index_start" type="int" default="0" />
-			<param index="2" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<param index="1" name="bullet_index_start" type="int" default="0" >
+				First bullet index in the range (inclusive).
+			</param>
+			<param index="2" name="bullet_index_end_inclusive" type="int" default="-1" >
+				Last bullet index in the range (inclusive; -1 means the final bullet).
+			</param>
 			<description>
 				Sets the homing turn agility for each bullet in the range. Setting any per-bullet value enables per-bullet mode, after which the shared [member homing_smoothing] is ignored. Useful for mixed volleys with fast and drifting homers.
 			</description>
@@ -285,8 +454,12 @@
 		<method name="all_bullets_set_orbiting_center">
 			<return type="void" />
 			<param index="0" name="new_center" type="Vector2" />
-			<param index="1" name="bullet_index_start" type="int" default="0" />
-			<param index="2" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<param index="1" name="bullet_index_start" type="int" default="0" >
+				First bullet index in the range (inclusive).
+			</param>
+			<param index="2" name="bullet_index_end_inclusive" type="int" default="-1" >
+				Last bullet index in the range (inclusive; -1 means the final bullet).
+			</param>
 			<description>
 				Re-pins the locked ring center for each locked bullet in the range without unlocking. Unlocked or disabled bullets warn and are skipped.
 			</description>
@@ -294,8 +467,12 @@
 		<method name="all_bullets_set_orbiting_direction">
 			<return type="void" />
 			<param index="0" name="new_direction" type="int" enum="DirectionalBullets2D.OrbitingDirection" />
-			<param index="1" name="bullet_index_start" type="int" default="0" />
-			<param index="2" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<param index="1" name="bullet_index_start" type="int" default="0" >
+				First bullet index in the range (inclusive).
+			</param>
+			<param index="2" name="bullet_index_end_inclusive" type="int" default="-1" >
+				Last bullet index in the range (inclusive; -1 means the final bullet).
+			</param>
 			<description>
 				Sets the orbiting direction for all bullets in the range. Passing OrbitRandom re-rolls OrbitLeft or OrbitRight per bullet (never DontMove).
 			</description>
@@ -303,8 +480,12 @@
 		<method name="all_bullets_set_orbiting_follow_deadzone">
 			<return type="void" />
 			<param index="0" name="new_deadzone" type="float" />
-			<param index="1" name="bullet_index_start" type="int" default="0" />
-			<param index="2" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<param index="1" name="bullet_index_start" type="int" default="0" >
+				First bullet index in the range (inclusive).
+			</param>
+			<param index="2" name="bullet_index_end_inclusive" type="int" default="-1" >
+				Last bullet index in the range (inclusive; -1 means the final bullet).
+			</param>
 			<description>
 				Sets the follow deadzone in pixels for all bullets in the range. Only meaningful with FollowDeadzone mode; non-finite or negative values are rejected.
 			</description>
@@ -312,8 +493,12 @@
 		<method name="all_bullets_set_orbiting_follow_mode">
 			<return type="void" />
 			<param index="0" name="new_follow_mode" type="int" enum="DirectionalBullets2D.OrbitingFollowMode" />
-			<param index="1" name="bullet_index_start" type="int" default="0" />
-			<param index="2" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<param index="1" name="bullet_index_start" type="int" default="0" >
+				First bullet index in the range (inclusive).
+			</param>
+			<param index="2" name="bullet_index_end_inclusive" type="int" default="-1" >
+				Last bullet index in the range (inclusive; -1 means the final bullet).
+			</param>
 			<description>
 				Sets how the locked ring follows a moving target for all bullets in the range: FollowTarget tracks 1:1, FollowDeadzone pins the center inside the deadzone, Anchored freezes the ring where it locked.
 			</description>
@@ -321,8 +506,12 @@
 		<method name="all_bullets_set_orbiting_lock_policy">
 			<return type="void" />
 			<param index="0" name="new_lock_policy" type="int" enum="DirectionalBullets2D.OrbitingLockPolicy" />
-			<param index="1" name="bullet_index_start" type="int" default="0" />
-			<param index="2" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<param index="1" name="bullet_index_start" type="int" default="0" >
+				First bullet index in the range (inclusive).
+			</param>
+			<param index="2" name="bullet_index_end_inclusive" type="int" default="-1" >
+				Last bullet index in the range (inclusive; -1 means the final bullet).
+			</param>
 			<description>
 				Sets what drops the orbit lock for all bullets in the range: RelockAlways re-acquires on every retarget, StayLocked never unlocks on retarget/empty, RelockOnTargetChange unlocks only when the front target changes identity.
 			</description>
@@ -330,8 +519,12 @@
 		<method name="all_bullets_set_orbiting_radius">
 			<return type="void" />
 			<param index="0" name="new_radius" type="float" />
-			<param index="1" name="bullet_index_start" type="int" default="0" />
-			<param index="2" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<param index="1" name="bullet_index_start" type="int" default="0" >
+				First bullet index in the range (inclusive).
+			</param>
+			<param index="2" name="bullet_index_end_inclusive" type="int" default="-1" >
+				Last bullet index in the range (inclusive; -1 means the final bullet).
+			</param>
 			<description>
 				Sets the orbiting radius for all bullets in the range.
 			</description>
@@ -339,8 +532,12 @@
 		<method name="all_bullets_set_orbiting_rigid_follow">
 			<return type="void" />
 			<param index="0" name="new_rigid_follow" type="bool" />
-			<param index="1" name="bullet_index_start" type="int" default="0" />
-			<param index="2" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<param index="1" name="bullet_index_start" type="int" default="0" >
+				First bullet index in the range (inclusive).
+			</param>
+			<param index="2" name="bullet_index_end_inclusive" type="int" default="-1" >
+				Last bullet index in the range (inclusive; -1 means the final bullet).
+			</param>
 			<description>
 				Sets rigid follow for all bullets in the range. When on, locked bullets translate 1:1 with the target while circling, exactly like DontMove escorts. When off, locked bullets chase the ring clamped to speed times delta and trail behind fast targets.
 			</description>
@@ -348,8 +545,12 @@
 		<method name="all_bullets_set_orbiting_texture_rotation">
 			<return type="void" />
 			<param index="0" name="new_rotation" type="int" enum="DirectionalBullets2D.OrbitingTextureRotation" />
-			<param index="1" name="bullet_index_start" type="int" default="0" />
-			<param index="2" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<param index="1" name="bullet_index_start" type="int" default="0" >
+				First bullet index in the range (inclusive).
+			</param>
+			<param index="2" name="bullet_index_end_inclusive" type="int" default="-1" >
+				Last bullet index in the range (inclusive; -1 means the final bullet).
+			</param>
 			<description>
 				Sets the orbiting texture rotation for all bullets in the range.
 			</description>
@@ -357,15 +558,34 @@
 		<method name="all_bullets_set_velocity">
 			<return type="void" />
 			<param index="0" name="new_velocity" type="Vector2" />
-			<param index="1" name="bullet_index_start" type="int" default="0" />
-			<param index="2" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<param index="1" name="bullet_index_start" type="int" default="0" >
+				First bullet index in the range (inclusive).
+			</param>
+			<param index="2" name="bullet_index_end_inclusive" type="int" default="-1" >
+				Last bullet index in the range (inclusive; -1 means the final bullet).
+			</param>
 			<description>
 				Sets the exact velocity of all bullets in the range (wind, knockback, slow fields). Decomposes into direction and speed so the integrator keeps producing it. Non-finite input is rejected.
 			</description>
 		</method>
+		<method name="all_bullets_set_wobble_data">
+			<return type="void" />
+			<param index="0" name="wobble_data" type="BulletWobbleData2D" />
+			<param index="1" name="bullet_index_start" type="int" default="0" >
+				First bullet index in the range (inclusive).
+			</param>
+			<param index="2" name="bullet_index_end_inclusive" type="int" default="-1" >
+				Last bullet index in the range (inclusive; -1 means the final bullet).
+			</param>
+			<description>
+				Seeds wobble live over a range (null clears each slot back to the shared fallback). Per-bullet wins over shared.
+			</description>
+		</method>
 		<method name="bullet_check_has_homing_targets" qualifiers="const">
 			<return type="bool" />
-			<param index="0" name="bullet_index" type="int" />
+			<param index="0" name="bullet_index" type="int" >
+				Zero-based index of the bullet.
+			</param>
 			<description>
 				Returns true if the specified bullet has any homing targets in its per-bullet deque.
 
@@ -374,7 +594,9 @@
 		</method>
 		<method name="bullet_clear_homing_targets">
 			<return type="void" />
-			<param index="0" name="bullet_index" type="int" />
+			<param index="0" name="bullet_index" type="int" >
+				Zero-based index of the bullet.
+			</param>
 			<description>
 				Clears all homing targets from the specified bullet's per-bullet deque. Resets individual path; shared unaffected.
 
@@ -383,14 +605,18 @@
 		</method>
 		<method name="bullet_disable_orbiting">
 			<return type="void" />
-			<param index="0" name="bullet_index" type="int" />
+			<param index="0" name="bullet_index" type="int" >
+				Zero-based index of the bullet.
+			</param>
 			<description>
 				Disables orbiting for the specified bullet.
 			</description>
 		</method>
 		<method name="bullet_enable_orbiting">
 			<return type="void" />
-			<param index="0" name="bullet_index" type="int" />
+			<param index="0" name="bullet_index" type="int" >
+				Zero-based index of the bullet.
+			</param>
 			<param index="1" name="orbiting_radius" type="float" />
 			<param index="2" name="orbiting_direction" type="int" enum="DirectionalBullets2D.OrbitingDirection" default="2" />
 			<param index="3" name="orbiting_texture_rotation" type="int" enum="DirectionalBullets2D.OrbitingTextureRotation" default="0" />
@@ -409,88 +635,185 @@
 				Example: [code]bullets.bullet_enable_orbiting(0, 90.0, 2); bullets.bullet_homing_push_back_global_position_target(0, boss.global_position)[/code], then read [method debug_get_orbiting_info].
 			</description>
 		</method>
+		<method name="bullet_get_bounce_count" qualifiers="const">
+			<return type="int" />
+			<param index="0" name="bullet_index" type="int" >
+				Zero-based index of the bullet.
+			</param>
+			<description>
+				How many times the specified bullet has bounced in its current life. Invalid indexes read 0. Cleared on disable and on every pool reuse.
+			</description>
+		</method>
 		<method name="bullet_get_current_homing_target" qualifiers="const">
 			<return type="Variant" />
-			<param index="0" name="bullet_index" type="int" />
+			<param index="0" name="bullet_index" type="int" >
+				Zero-based index of the bullet.
+			</param>
 			<description>
 				Returns the current (front) homing target for the specified bullet's per-bullet deque as Variant (Node2D or Vector2; nullptr if invalid/empty).
 
 				If you want to get the current target from the shared deque, use [method shared_homing_deque_get_current_homing_target] instead.
 			</description>
 		</method>
+		<method name="bullet_get_fall_speed" qualifiers="const">
+			<return type="float" />
+			<param index="0" name="bullet_index" type="int" >
+				Zero-based index of the bullet.
+			</param>
+			<description>
+				Integrated fall speed magnitude for the specified bullet. 0 when gravity never integrated there.
+			</description>
+		</method>
+		<method name="bullet_get_gravity" qualifiers="const">
+			<return type="Vector2" />
+			<param index="0" name="bullet_index" type="int" >
+				Zero-based index of the bullet.
+			</param>
+			<description>
+				Per-bullet gravity acceleration vector for the specified bullet. Invalid indexes read (0, 0).
+			</description>
+		</method>
 		<method name="bullet_get_homing_smoothing" qualifiers="const">
 			<return type="float" />
-			<param index="0" name="bullet_index" type="int" />
+			<param index="0" name="bullet_index" type="int" >
+				Zero-based index of the bullet.
+			</param>
 			<description>
 				Returns the effective homing turn agility for the specified bullet: its per-bullet value when per-bullet mode is active, otherwise the shared [member homing_smoothing].
 			</description>
 		</method>
 		<method name="bullet_get_orbiting_angle">
 			<return type="float" />
-			<param index="0" name="bullet_index" type="int" />
+			<param index="0" name="bullet_index" type="int" >
+				Zero-based index of the bullet.
+			</param>
 			<description>
 				Returns the locked ring angle in radians for the specified bullet (the slot it holds on the ring).
 			</description>
 		</method>
 		<method name="bullet_get_orbiting_center">
 			<return type="Vector2" />
-			<param index="0" name="bullet_index" type="int" />
+			<param index="0" name="bullet_index" type="int" >
+				Zero-based index of the bullet.
+			</param>
 			<description>
 				Returns the current ring center for the specified bullet: the locked center when locked, otherwise the live front-target position.
 			</description>
 		</method>
 		<method name="bullet_get_orbiting_direction">
 			<return type="int" enum="DirectionalBullets2D.OrbitingDirection" />
-			<param index="0" name="bullet_index" type="int" />
+			<param index="0" name="bullet_index" type="int" >
+				Zero-based index of the bullet.
+			</param>
 			<description>
 				Returns the orbiting direction for the specified bullet.
 			</description>
 		</method>
 		<method name="bullet_get_orbiting_follow_deadzone">
 			<return type="float" />
-			<param index="0" name="bullet_index" type="int" />
+			<param index="0" name="bullet_index" type="int" >
+				Zero-based index of the bullet.
+			</param>
 			<description>
 				Returns the follow deadzone in pixels for the specified bullet.
 			</description>
 		</method>
 		<method name="bullet_get_orbiting_follow_mode">
 			<return type="int" enum="DirectionalBullets2D.OrbitingFollowMode" />
-			<param index="0" name="bullet_index" type="int" />
+			<param index="0" name="bullet_index" type="int" >
+				Zero-based index of the bullet.
+			</param>
 			<description>
 				Returns how the locked ring follows a moving target for the specified bullet.
 			</description>
 		</method>
 		<method name="bullet_get_orbiting_lock_policy">
 			<return type="int" enum="DirectionalBullets2D.OrbitingLockPolicy" />
-			<param index="0" name="bullet_index" type="int" />
+			<param index="0" name="bullet_index" type="int" >
+				Zero-based index of the bullet.
+			</param>
 			<description>
 				Returns what drops the orbit lock for the specified bullet.
 			</description>
 		</method>
 		<method name="bullet_get_orbiting_radius">
 			<return type="float" />
-			<param index="0" name="bullet_index" type="int" />
+			<param index="0" name="bullet_index" type="int" >
+				Zero-based index of the bullet.
+			</param>
 			<description>
 				Returns the orbiting radius for the specified bullet.
 			</description>
 		</method>
 		<method name="bullet_get_orbiting_rigid_follow">
 			<return type="bool" />
-			<param index="0" name="bullet_index" type="int" />
+			<param index="0" name="bullet_index" type="int" >
+				Zero-based index of the bullet.
+			</param>
 			<description>
 				Returns whether the specified bullet uses rigid follow (locked bullets translate 1:1 with the target while circling).
 			</description>
 		</method>
 		<method name="bullet_get_orbiting_texture_rotation">
 			<return type="int" enum="DirectionalBullets2D.OrbitingTextureRotation" />
-			<param index="0" name="bullet_index" type="int" />
+			<param index="0" name="bullet_index" type="int" >
+				Zero-based index of the bullet.
+			</param>
 			<description>
 				Returns the orbiting texture rotation for the specified bullet.
 			</description>
 		</method>
+		<method name="bullet_get_rotation_speed" qualifiers="const">
+			<return type="float" />
+			<param index="0" name="bullet_index" type="int" >
+				Zero-based index of the bullet.
+			</param>
+			<description>
+				Effective per-bullet rotation speed (seeded value, live-updated by the tick). 0 when inactive or out of range.
+			</description>
+		</method>
+
+		<method name="bullet_get_wobble_amplitude" qualifiers="const">
+			<return type="float" />
+			<param index="0" name="bullet_index" type="int" >
+				Zero-based index of the bullet.
+			</param>
+			<description>
+				Effective wobble amplitude of one bullet (seeded amplitude, 0 when inactive).
+			</description>
+		</method>
+		<method name="bullet_get_wobble_data" qualifiers="const">
+			<return type="BulletWobbleData2D" />
+			<param index="0" name="bullet_index" type="int" >
+				Zero-based index of the bullet.
+			</param>
+			<description>
+				Per-bullet wobble resource of one bullet (null when the slot runs on the shared fallback or is inactive).
+			</description>
+		</method>
+		<method name="bullet_get_wobble_face_movement_direction" qualifiers="const">
+			<return type="bool" />
+			<param index="0" name="bullet_index" type="int" >
+				Zero-based index of the bullet.
+			</param>
+			<description>
+				Whether the bullet's wobble visual follows the steered heading (seeded face flag, false when inactive).
+			</description>
+		</method>
+		<method name="bullet_get_wobble_face_rotation_speed" qualifiers="const">
+			<return type="float" />
+			<param index="0" name="bullet_index" type="int" >
+				Zero-based index of the bullet.
+			</param>
+			<description>
+				Slew limit of the bullet's wobble texture follow in rad/s (seeded value, 0 when inactive).
+			</description>
+		</method>
 		<method name="bullet_homing_check_current_target_type" qualifiers="const">
 			<return type="int" enum="BlastBullets2D.HomingType" />
-			<param index="0" name="bullet_index" type="int" />
+			<param index="0" name="bullet_index" type="int" >
+				Zero-based index of the bullet.
+			</param>
 			<description>
 				Returns the type of the current (front) homing target for the specified bullet's per-bullet deque (NotHoming if empty).
 
@@ -499,7 +822,9 @@
 		</method>
 		<method name="bullet_homing_check_targets_amount" qualifiers="const">
 			<return type="int" />
-			<param index="0" name="bullet_index" type="int" />
+			<param index="0" name="bullet_index" type="int" >
+				Zero-based index of the bullet.
+			</param>
 			<description>
 				Returns the number of homing targets in the specified bullet's per-bullet deque.
 
@@ -508,7 +833,9 @@
 		</method>
 		<method name="bullet_homing_pop_back_target">
 			<return type="Variant" />
-			<param index="0" name="bullet_index" type="int" />
+			<param index="0" name="bullet_index" type="int" >
+				Zero-based index of the bullet.
+			</param>
 			<description>
 				Pops and returns the back homing target from the specified bullet's per-bullet deque (Variant: Node2D or Vector2; nullptr if invalid/empty).
 
@@ -517,7 +844,9 @@
 		</method>
 		<method name="bullet_homing_pop_front_target">
 			<return type="Variant" />
-			<param index="0" name="bullet_index" type="int" />
+			<param index="0" name="bullet_index" type="int" >
+				Zero-based index of the bullet.
+			</param>
 			<description>
 				Pops and returns the front (current) homing target from the specified bullet's per-bullet deque (Variant: Node2D or Vector2; nullptr if invalid/empty).
 
@@ -526,7 +855,9 @@
 		</method>
 		<method name="bullet_homing_push_back_global_position_target">
 			<return type="bool" />
-			<param index="0" name="bullet_index" type="int" />
+			<param index="0" name="bullet_index" type="int" >
+				Zero-based index of the bullet.
+			</param>
 			<param index="1" name="global_position" type="Vector2" />
 			<description>
 				Pushes a global position target to the back of the specified bullet's per-bullet deque. Returns true on success (bullet enabled/valid index). Per-bullet deque wins over the shared deque per bullet; a drained per-bullet deque falls back to shared. Example: [code]bullets.bullet_homing_push_back_global_position_target(0, boss.global_position)[/code].
@@ -536,7 +867,9 @@
 		</method>
 		<method name="bullet_homing_push_back_homing_target">
 			<return type="bool" />
-			<param index="0" name="bullet_index" type="int" />
+			<param index="0" name="bullet_index" type="int" >
+				Zero-based index of the bullet.
+			</param>
 			<param index="1" name="node2d_or_global_position" type="Variant" />
 			<description>
 				Pushes a Node2D or Vector2 target to the back of the specified bullet's per-bullet deque. Returns false with an error on invalid index or target type, pushing nothing.
@@ -544,7 +877,9 @@
 		</method>
 		<method name="bullet_homing_push_back_mouse_position_target">
 			<return type="bool" />
-			<param index="0" name="bullet_index" type="int" />
+			<param index="0" name="bullet_index" type="int" >
+				Zero-based index of the bullet.
+			</param>
 			<description>
 				Pushes the current mouse global position to the back of the specified bullet's per-bullet deque. Returns true on success; caches for perf.
 
@@ -553,7 +888,9 @@
 		</method>
 		<method name="bullet_homing_push_back_node2d_target">
 			<return type="bool" />
-			<param index="0" name="bullet_index" type="int" />
+			<param index="0" name="bullet_index" type="int" >
+				Zero-based index of the bullet.
+			</param>
 			<param index="1" name="new_homing_target" type="Node2D" />
 			<description>
 				Pushes a Node2D target to the back of the specified bullet's per-bullet deque. Returns true on success (bullet enabled/valid index/target).
@@ -563,7 +900,9 @@
 		</method>
 		<method name="bullet_homing_push_front_global_position_target">
 			<return type="bool" />
-			<param index="0" name="bullet_index" type="int" />
+			<param index="0" name="bullet_index" type="int" >
+				Zero-based index of the bullet.
+			</param>
 			<param index="1" name="global_position" type="Vector2" />
 			<description>
 				Pushes a global position target to the front of the specified bullet's per-bullet deque. Returns true on success (bullet enabled/valid index).
@@ -573,7 +912,9 @@
 		</method>
 		<method name="bullet_homing_push_front_homing_target">
 			<return type="bool" />
-			<param index="0" name="bullet_index" type="int" />
+			<param index="0" name="bullet_index" type="int" >
+				Zero-based index of the bullet.
+			</param>
 			<param index="1" name="node2d_or_global_position" type="Variant" />
 			<description>
 				Pushes a Node2D or Vector2 target to the front of the specified bullet's per-bullet deque. Returns false with an error on invalid index or target type, pushing nothing.
@@ -581,7 +922,9 @@
 		</method>
 		<method name="bullet_homing_push_front_mouse_position_target">
 			<return type="bool" />
-			<param index="0" name="bullet_index" type="int" />
+			<param index="0" name="bullet_index" type="int" >
+				Zero-based index of the bullet.
+			</param>
 			<description>
 				Pushes the current mouse global position to the front of the specified bullet's per-bullet deque. Returns true on success.
 
@@ -590,7 +933,9 @@
 		</method>
 		<method name="bullet_homing_push_front_node2d_target">
 			<return type="bool" />
-			<param index="0" name="bullet_index" type="int" />
+			<param index="0" name="bullet_index" type="int" >
+				Zero-based index of the bullet.
+			</param>
 			<param index="1" name="new_homing_target" type="Node2D" />
 			<description>
 				Pushes a Node2D target to the front of the specified bullet's per-bullet deque. Returns true on success (bullet enabled/valid index/target).
@@ -600,125 +945,57 @@
 		</method>
 		<method name="bullet_is_orbiting_enabled">
 			<return type="bool" />
-			<param index="0" name="bullet_index" type="int" />
+			<param index="0" name="bullet_index" type="int" >
+				Zero-based index of the bullet.
+			</param>
 			<description>
 				Whether orbiting is currently enabled for the specified bullet.
 			</description>
 		</method>
 		<method name="bullet_is_orbiting_locked">
 			<return type="bool" />
-			<param index="0" name="bullet_index" type="int" />
+			<param index="0" name="bullet_index" type="int" >
+				Zero-based index of the bullet.
+			</param>
 			<description>
 				Returns whether the specified bullet is currently locked onto its orbit ring (as opposed to merely enabled but still flying to the ring).
 			</description>
 		</method>
 		<method name="bullet_replace_homing_targets_with_new_target">
 			<return type="bool" />
-			<param index="0" name="bullet_index" type="int" />
+			<param index="0" name="bullet_index" type="int" >
+				Zero-based index of the bullet.
+			</param>
 			<param index="1" name="node2d_or_global_position" type="Variant" />
 			<description>
 				Replaces the specified bullet's per-bullet homing queue with a single new target (Node2D or Vector2) while preserving the orbit lock under StayLocked and RelockOnTargetChange (same front target keeps angle and center). Returns true when replaced; false when the slot is disabled or the target is invalid (nothing changed).
 			</description>
 		</method>
-		<method name="bullet_set_homing_smoothing">
-			<return type="void" />
-			<param index="0" name="bullet_index" type="int" />
-			<param index="1" name="value" type="float" />
-			<description>
-				Sets the homing turn agility for the specified bullet. Enables per-bullet mode for the whole multimesh (see [method all_bullets_set_homing_smoothing]). Non-finite or negative values are rejected.
-			</description>
-		</method>
-		<method name="bullet_get_gravity">
-			<return type="Vector2" />
-			<param index="0" name="bullet_index" type="int" />
-			<description>
-				Per-bullet gravity acceleration vector for the specified bullet. Invalid indexes read (0, 0).
-			</description>
-		</method>
-		<method name="bullet_get_bounce_count">
-			<return type="int" />
-			<param index="0" name="bullet_index" type="int" />
-			<description>
-				How many times the specified bullet has bounced in its current life. Invalid indexes read 0. Cleared on disable and on every pool reuse.
-			</description>
-		</method>
-		<method name="all_bullets_get_bounce_count">
-			<return type="int[]" />
-			<param index="0" name="bullet_index_start" type="int" default="0" />
-			<param index="1" name="bullet_index_end_inclusive" type="int" default="-1" />
-			<description>
-				Bounce counts over a bullet range (mirrors [method bullet_get_bounce_count]). Inverted ranges are rejected.
-			</description>
-		</method>
-		<method name="debug_get_bounce_info">
-			<return type="Dictionary" />
-			<param index="0" name="bullet_index" type="int" />
-			<description>
-				Bounce introspection for one bullet: counts, config echo (mask, strength, mode, max), whether bouncing is armed, pending smooth-visual state and cooldown. Never mutates. Out-of-range indexes report valid = false.
-			</description>
-		</method>
-		<method name="debug_get_previous_origin">
-			<return type="Vector2" />
-			<param index="0" name="bullet_index" type="int" />
-			<description>
-				Previous-tick origin used by physics interpolation. Lets tests prove the render path stays continuous across teleports and bounces (rotation may snap while position keeps lerping).
-			</description>
-		</method>
 		<method name="bullet_set_gravity">
 			<return type="void" />
-			<param index="0" name="bullet_index" type="int" />
+			<param index="0" name="bullet_index" type="int" >
+				Zero-based index of the bullet.
+			</param>
 			<param index="1" name="value" type="Vector2" />
 			<description>
 				Sets the gravity acceleration for one bullet and restarts its fall speed (new regime). Non-finite values are rejected. Example: [code]bullets.bullet_set_gravity(0, Vector2(0, 400)); print(bullets.debug_get_gravity_info(0)["vector"])[/code].
 			</description>
 		</method>
-		<method name="all_bullets_set_gravity">
+		<method name="bullet_set_homing_smoothing">
 			<return type="void" />
-			<param index="0" name="value" type="Vector2" />
-			<param index="1" name="bullet_index_start" type="int" default="0" />
-			<param index="2" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<param index="0" name="bullet_index" type="int" >
+				Zero-based index of the bullet.
+			</param>
+			<param index="1" name="value" type="float" />
 			<description>
-				Sets the gravity acceleration for a bullet range (default all), restarting each fall speed. Non-finite values are rejected.
-			</description>
-		</method>
-		<method name="bullet_get_fall_speed">
-			<return type="float" />
-			<param index="0" name="bullet_index" type="int" />
-			<description>
-				Integrated fall speed magnitude for the specified bullet. 0 when gravity never integrated there.
-			</description>
-		</method>
-		<method name="debug_get_curves_info" qualifiers="const">
-			<return type="Dictionary" />
-			<param index="0" name="bullet_index" type="int" />
-			<description>
-				Per-channel curves winner for one bullet: {valid, x_src, y_src, rot_src, speed_src, gravity_src, has_per_bullet_resource, has_shared_fallback}, where each *_src is "per", "shared" or "none". Example: with shared x + per-bullet y, x_src is "shared" and y_src is "per". Never mutates; invalid index returns valid=false.
-			</description>
-		</method>
-		<method name="debug_get_gravity_info">
-			<return type="Dictionary" />
-			<param index="0" name="bullet_index" type="int" />
-			<description>
-				Gravity introspection: vector, fall_speed, window_active, curve_scale. Never mutates.
-			</description>
-		</method>
-		<method name="debug_get_orbiting_info" qualifiers="const">
-			<return type="Dictionary" />
-			<param index="0" name="bullet_index" type="int" />
-			<description>
-				Orbiting introspection for one bullet: {valid, enabled, locked, center, angle, radius, direction, texture_rotation, follow_mode, deadzone, lock_policy, rigid_follow, deque_src}, where deque_src is "locked" once the ring locks, else "per" when the bullet has its own deque, "shared" when it falls back to the shared deque, or "none". Per-bullet deque wins over shared, same as the steering tick. Example: [code]var info = bullets.debug_get_orbiting_info(0); print(info["deque_src"])[/code]. Never mutates; invalid index returns valid=false.
-			</description>
-		</method>
-		<method name="debug_get_pattern_info" qualifiers="const">
-			<return type="Dictionary" />
-			<param index="0" name="bullet_index" type="int" />
-			<description>
-				Movement-pattern state for one bullet: {valid, src, face, repeat, distance, length, finished, has_shared_fallback}, where src is "per", "shared" or "none". Finished shared parks at length; finished per-bullet clears back to src "none". Never mutates; invalid index returns valid=false.
+				Sets the homing turn agility for the specified bullet. Enables per-bullet mode for the whole multimesh (see [method all_bullets_set_homing_smoothing]). Non-finite or negative values are rejected.
 			</description>
 		</method>
 		<method name="bullet_set_orbiting_center">
 			<return type="void" />
-			<param index="0" name="bullet_index" type="int" />
+			<param index="0" name="bullet_index" type="int" >
+				Zero-based index of the bullet.
+			</param>
 			<param index="1" name="new_center" type="Vector2" />
 			<description>
 				Re-pins the locked ring center for the specified bullet without unlocking. Rejected when orbiting is disabled or the bullet never locked.
@@ -726,7 +1003,9 @@
 		</method>
 		<method name="bullet_set_orbiting_direction">
 			<return type="void" />
-			<param index="0" name="bullet_index" type="int" />
+			<param index="0" name="bullet_index" type="int" >
+				Zero-based index of the bullet.
+			</param>
 			<param index="1" name="new_direction" type="int" enum="DirectionalBullets2D.OrbitingDirection" />
 			<description>
 				Sets the orbiting direction for the specified bullet. Invalid values are rejected with an error and the direction stays unchanged. Passing OrbitRandom rolls OrbitLeft or OrbitRight (never DontMove).
@@ -734,7 +1013,9 @@
 		</method>
 		<method name="bullet_set_orbiting_follow_deadzone">
 			<return type="void" />
-			<param index="0" name="bullet_index" type="int" />
+			<param index="0" name="bullet_index" type="int" >
+				Zero-based index of the bullet.
+			</param>
 			<param index="1" name="new_deadzone" type="float" />
 			<description>
 				Sets the follow deadzone in pixels for the specified bullet. Only meaningful with FollowDeadzone mode; non-finite or negative values are rejected.
@@ -742,7 +1023,9 @@
 		</method>
 		<method name="bullet_set_orbiting_follow_mode">
 			<return type="void" />
-			<param index="0" name="bullet_index" type="int" />
+			<param index="0" name="bullet_index" type="int" >
+				Zero-based index of the bullet.
+			</param>
 			<param index="1" name="new_follow_mode" type="int" enum="DirectionalBullets2D.OrbitingFollowMode" />
 			<description>
 				Sets how the locked ring follows a moving target for the specified bullet: FollowTarget tracks 1:1, FollowDeadzone pins the center inside the deadzone, Anchored freezes the ring where it locked.
@@ -750,7 +1033,9 @@
 		</method>
 		<method name="bullet_set_orbiting_lock_policy">
 			<return type="void" />
-			<param index="0" name="bullet_index" type="int" />
+			<param index="0" name="bullet_index" type="int" >
+				Zero-based index of the bullet.
+			</param>
 			<param index="1" name="new_lock_policy" type="int" enum="DirectionalBullets2D.OrbitingLockPolicy" />
 			<description>
 				Sets what drops the orbit lock for the specified bullet: RelockAlways re-acquires on every retarget, StayLocked never unlocks on retarget/empty, RelockOnTargetChange unlocks only when the front target changes identity.
@@ -758,7 +1043,9 @@
 		</method>
 		<method name="bullet_set_orbiting_radius">
 			<return type="void" />
-			<param index="0" name="bullet_index" type="int" />
+			<param index="0" name="bullet_index" type="int" >
+				Zero-based index of the bullet.
+			</param>
 			<param index="1" name="new_radius" type="float" />
 			<description>
 				Sets the orbiting radius for the specified bullet. Writing the current value keeps the lock; a changed value re-locks.
@@ -766,7 +1053,9 @@
 		</method>
 		<method name="bullet_set_orbiting_rigid_follow">
 			<return type="void" />
-			<param index="0" name="bullet_index" type="int" />
+			<param index="0" name="bullet_index" type="int" >
+				Zero-based index of the bullet.
+			</param>
 			<param index="1" name="new_rigid_follow" type="bool" />
 			<description>
 				Sets rigid follow for the specified bullet without dropping the lock. When on, locked bullets translate 1:1 with the target while circling, exactly like DontMove escorts. When off, locked bullets chase the ring clamped to speed times delta and trail behind fast targets.
@@ -774,7 +1063,9 @@
 		</method>
 		<method name="bullet_set_orbiting_texture_rotation">
 			<return type="void" />
-			<param index="0" name="bullet_index" type="int" />
+			<param index="0" name="bullet_index" type="int" >
+				Zero-based index of the bullet.
+			</param>
 			<param index="1" name="new_texture_rotation" type="int" enum="DirectionalBullets2D.OrbitingTextureRotation" />
 			<description>
 				Sets the orbiting texture rotation for the specified bullet. Invalid values are rejected with an error and the rotation stays unchanged.
@@ -782,91 +1073,19 @@
 		</method>
 		<method name="bullet_set_velocity">
 			<return type="void" />
-			<param index="0" name="bullet_index" type="int" />
+			<param index="0" name="bullet_index" type="int" >
+				Zero-based index of the bullet.
+			</param>
 			<param index="1" name="new_velocity" type="Vector2" />
 			<description>
 				Sets the exact velocity of the specified bullet (wind, knockback, split inheritance). See [method all_bullets_set_velocity] for details.
 			</description>
 		</method>
-		<method name="all_bullets_get_gravity" qualifiers="const">
-			<return type="Vector2[]" />
-			<param index="0" name="bullet_index_start" type="int" default="0" />
-			<param index="1" name="bullet_index_end_inclusive" type="int" default="-1" />
-			<description>
-				Per-bullet gravity vectors over a range.
-			</description>
-		</method>
-		<method name="all_bullets_get_homing_smoothing" qualifiers="const">
-			<return type="float[]" />
-			<param index="0" name="bullet_index_start" type="int" default="0" />
-			<param index="1" name="bullet_index_end_inclusive" type="int" default="-1" />
-			<description>
-				Effective per-bullet homing smoothing over a range (per-bullet value where set, else shared).
-			</description>
-		</method>
-		<method name="all_bullets_get_fall_speed" qualifiers="const">
-			<return type="float[]" />
-			<param index="0" name="bullet_index_start" type="int" default="0" />
-			<param index="1" name="bullet_index_end_inclusive" type="int" default="-1" />
-			<description>
-				Integrated fall-speed magnitudes over a range (0 where gravity never integrated).
-			</description>
-		</method>
-		<method name="all_bullets_get_wobble_data" qualifiers="const">
-			<return type="BulletWobbleData2D[]" />
-			<param index="0" name="bullet_index_start" type="int" default="0" />
-			<param index="1" name="bullet_index_end_inclusive" type="int" default="-1" />
-			<description>
-				Per-bullet wobble resources over a range (null where the slot runs on the shared fallback or is inactive).
-			</description>
-		</method>
-		<method name="all_bullets_set_wobble_data">
-			<return type="void" />
-			<param index="0" name="wobble_data" type="BulletWobbleData2D" />
-			<param index="1" name="bullet_index_start" type="int" default="0" />
-			<param index="2" name="bullet_index_end_inclusive" type="int" default="-1" />
-			<description>
-				Seeds wobble live over a range (null clears each slot back to the shared fallback). Per-bullet wins over shared.
-			</description>
-		</method>
-		<method name="bullet_get_rotation_speed" qualifiers="const">
-			<return type="float" />
-			<param index="0" name="bullet_index" type="int" />
-			<description>
-				Effective per-bullet rotation speed (seeded value, live-updated by the tick). 0 when inactive or out of range.
-			</description>
-		</method>
-		<method name="bullet_get_wobble_amplitude" qualifiers="const">
-			<return type="float" />
-			<param index="0" name="bullet_index" type="int" />
-			<description>
-				Effective wobble amplitude of one bullet (seeded amplitude, 0 when inactive).
-			</description>
-		</method>
-		<method name="bullet_get_wobble_data" qualifiers="const">
-			<return type="BulletWobbleData2D" />
-			<param index="0" name="bullet_index" type="int" />
-			<description>
-				Per-bullet wobble resource of one bullet (null when the slot runs on the shared fallback or is inactive).
-			</description>
-		</method>
-		<method name="bullet_get_wobble_face_movement_direction" qualifiers="const">
-			<return type="bool" />
-			<param index="0" name="bullet_index" type="int" />
-			<description>
-				Whether the bullet's wobble visual follows the steered heading (seeded face flag, false when inactive).
-			</description>
-		</method>
-		<method name="bullet_get_wobble_face_rotation_speed" qualifiers="const">
-			<return type="float" />
-			<param index="0" name="bullet_index" type="int" />
-			<description>
-				Slew limit of the bullet's wobble texture follow in rad/s (seeded value, 0 when inactive).
-			</description>
-		</method>
 		<method name="bullet_set_wobble_data">
 			<return type="void" />
-			<param index="0" name="bullet_index" type="int" />
+			<param index="0" name="bullet_index" type="int" >
+				Zero-based index of the bullet.
+			</param>
 			<param index="1" name="wobble_data" type="BulletWobbleData2D" />
 			<description>
 				Seeds wobble live for one bullet (null clears it back to the shared fallback, or inactive when unset). Invalid data errors and clears to the fallback. Example: [code]bullets.bullet_set_wobble_data(1, my_wobble); print(bullets.debug_get_wobble_info(1)["active"])[/code].
@@ -878,16 +1097,74 @@
 				Clears per-bullet smoothing mode: the shared [member homing_smoothing] drives every bullet again. No-op when per-bullet mode was never enabled.
 			</description>
 		</method>
+		<method name="debug_get_bounce_info" qualifiers="const">
+			<return type="Dictionary" />
+			<param index="0" name="bullet_index" type="int" >
+				Zero-based index of the bullet.
+			</param>
+			<description>
+				Bounce introspection for one bullet: counts, config echo (mask, strength, mode, max), whether bouncing is armed, pending smooth-visual state and cooldown. Never mutates. Out-of-range indexes report valid = false.
+			</description>
+		</method>
 		<method name="debug_get_bullet_info" qualifiers="const">
 			<return type="Dictionary" />
-			<param index="0" name="bullet_index" type="int" />
+			<param index="0" name="bullet_index" type="int" >
+				Zero-based index of the bullet.
+			</param>
 			<description>
 				Full per-bullet steering snapshot: {index, valid, active, direction, velocity, speed, gravity, fall_speed, wobble_active, wobble_amplitude, has_homing_targets, homing_targets_amount, homing_smoothing, orbiting_enabled, orbiting_locked, pattern, shared_pattern_active, rotation_speed}. Never mutates; invalid index returns valid=false with zeroed fields.
 			</description>
 		</method>
+		<method name="debug_get_curves_info" qualifiers="const">
+			<return type="Dictionary" />
+			<param index="0" name="bullet_index" type="int" >
+				Zero-based index of the bullet.
+			</param>
+			<description>
+				Per-channel curves winner for one bullet: {valid, x_src, y_src, rot_src, speed_src, gravity_src, has_per_bullet_resource, has_shared_fallback}, where each *_src is "per", "shared" or "none". Example: with shared x + per-bullet y, x_src is "shared" and y_src is "per". Never mutates; invalid index returns valid=false.
+			</description>
+		</method>
+		<method name="debug_get_gravity_info" qualifiers="const">
+			<return type="Dictionary" />
+			<param index="0" name="bullet_index" type="int" >
+				Zero-based index of the bullet.
+			</param>
+			<description>
+				Gravity introspection: vector, fall_speed, window_active, curve_scale. Never mutates.
+			</description>
+		</method>
+		<method name="debug_get_orbiting_info" qualifiers="const">
+			<return type="Dictionary" />
+			<param index="0" name="bullet_index" type="int" >
+				Zero-based index of the bullet.
+			</param>
+			<description>
+				Orbiting introspection for one bullet: {valid, enabled, locked, center, angle, radius, direction, texture_rotation, follow_mode, deadzone, lock_policy, rigid_follow, deque_src}, where deque_src is "locked" once the ring locks, else "per" when the bullet has its own deque, "shared" when it falls back to the shared deque, or "none". Per-bullet deque wins over shared, same as the steering tick. Example: [code]var info = bullets.debug_get_orbiting_info(0); print(info["deque_src"])[/code]. Never mutates; invalid index returns valid=false.
+			</description>
+		</method>
+		<method name="debug_get_pattern_info" qualifiers="const">
+			<return type="Dictionary" />
+			<param index="0" name="bullet_index" type="int" >
+				Zero-based index of the bullet.
+			</param>
+			<description>
+				Movement-pattern state for one bullet: {valid, src, face, repeat, distance, length, finished, has_shared_fallback}, where src is "per", "shared" or "none". Finished shared parks at length; finished per-bullet clears back to src "none". Never mutates; invalid index returns valid=false.
+			</description>
+		</method>
+		<method name="debug_get_previous_origin" qualifiers="const">
+			<return type="Vector2" />
+			<param index="0" name="bullet_index" type="int" >
+				Zero-based index of the bullet.
+			</param>
+			<description>
+				Previous-tick origin used by physics interpolation. Lets tests prove the render path stays continuous across teleports and bounces (rotation may snap while position keeps lerping).
+			</description>
+		</method>
 		<method name="debug_get_wobble_info" qualifiers="const">
 			<return type="Dictionary" />
-			<param index="0" name="bullet_index" type="int" />
+			<param index="0" name="bullet_index" type="int" >
+				Zero-based index of the bullet.
+			</param>
 			<description>
 				Wobble introspection for tests/support: {active, amplitude, frequency_hz, mode, waveform, phase, damping_per_sec, delay_sec, duration_sec, face_movement_direction, face_rotation_speed, has_per_bullet_resource, has_shared_fallback}. Example: [code]var w = bullets.debug_get_wobble_info(0); print(w["amplitude"])[/code]. Never mutates.
 			</description>
@@ -904,31 +1181,7 @@
 				Shared wobble fallback resource (null when unset). Per-bullet seeds win per slot; setting shared re-seeds only slots without a live per-bullet resource.
 			</description>
 		</method>
-		<method name="has_shared_bullet_wobble_data" qualifiers="const">
-			<return type="bool" />
-			<description>
-				Whether a shared wobble fallback is currently set.
-			</description>
-		</method>
-		<method name="is_rotation_data_active" qualifiers="const">
-			<return type="bool" />
-			<description>
-				Whether rotation data is currently driving the volley (any seeded rotation array, shared or per-bullet).
-			</description>
-		</method>
-		<method name="remove_shared_bullet_wobble_data">
-			<return type="void" />
-			<description>
-				Clears the shared wobble fallback; slots without a live per-bullet resource go inactive.
-			</description>
-		</method>
-		<method name="set_shared_bullet_wobble_data">
-			<return type="void" />
-			<param index="0" name="new_wobble_data" type="BulletWobbleData2D" />
-			<description>
-				Sets the shared wobble fallback live (null clears it). Only slots without a live per-bullet resource are re-seeded; per-bullet seeds always win. Example: [code]bullets.set_shared_bullet_wobble_data(wobble)[/code] sways every plain bullet while custom per-bullet seeds keep theirs.
-			</description>
-		</method>
+
 		<method name="has_shared_bullet_rotation_data" qualifiers="const">
 			<return type="bool" />
 			<description>
@@ -941,12 +1194,25 @@
 				Whether a shared speed is currently set.
 			</description>
 		</method>
+		<method name="has_shared_bullet_wobble_data" qualifiers="const">
+			<return type="bool" />
+			<description>
+				Whether a shared wobble fallback is currently set.
+			</description>
+		</method>
 		<method name="has_shared_movement_pattern" qualifiers="const">
 			<return type="bool" />
 			<description>
 				Whether a shared movement pattern curve is currently set.
 			</description>
 		</method>
+		<method name="is_rotation_data_active" qualifiers="const">
+			<return type="bool" />
+			<description>
+				Whether rotation data is currently driving the volley (any seeded rotation array, shared or per-bullet).
+			</description>
+		</method>
+
 		<method name="remove_shared_bullet_rotation_data">
 			<return type="void" />
 			<description>
@@ -959,12 +1225,35 @@
 				Removes the shared speed (same as setting null). Per-bullet speed data, if any, takes over.
 			</description>
 		</method>
+		<method name="remove_shared_bullet_wobble_data">
+			<return type="void" />
+			<description>
+				Clears the shared wobble fallback; slots without a live per-bullet resource go inactive.
+			</description>
+		</method>
 		<method name="remove_shared_movement_pattern">
 			<return type="void" />
 			<description>
 				Removes the shared movement pattern (same as setting a null curve). Per-bullet patterns, if any, take over.
 			</description>
 		</method>
+		<method name="set_bounce_mask_from_array">
+			<return type="void" />
+			<param index="0" name="array_of_masks" type="int[]">
+				Collision layer numbers (1-32) that trigger a bounce. Entries outside 1-32 are skipped with an error.
+			</param>
+			<description>
+				Rebuilds [member bounce_mask] live from layer numbers instead of raw bits, through the same path as [method set_bounce_mask] (ledger re-armed, or fully disarmed when the result is 0). Example: [code]set_bounce_mask_from_array([4])[/code] bounces off layer-4 targets.
+			</description>
+		</method>
+		<method name="set_shared_bullet_wobble_data">
+			<return type="void" />
+			<param index="0" name="new_wobble_data" type="BulletWobbleData2D" />
+			<description>
+				Sets the shared wobble fallback live (null clears it). Only slots without a live per-bullet resource are re-seeded; per-bullet seeds always win. Example: [code]bullets.set_shared_bullet_wobble_data(wobble)[/code] sways every plain bullet while custom per-bullet seeds keep theirs.
+			</description>
+		</method>
+
 		<method name="shared_homing_deque_check_current_target_type" qualifiers="const">
 			<return type="int" enum="BlastBullets2D.HomingType" />
 			<description>
@@ -1119,7 +1408,9 @@
 		</method>
 		<method name="teleport_bullet">
 			<return type="void" />
-			<param index="0" name="bullet_index" type="int" />
+			<param index="0" name="bullet_index" type="int" >
+				Zero-based index of the bullet.
+			</param>
 			<param index="1" name="new_global_pos" type="Vector2" />
 			<description>
 				Teleports the specified bullet to a new global position.
@@ -1128,15 +1419,21 @@
 		<method name="teleport_shift_all_bullets">
 			<return type="void" />
 			<param index="0" name="shift_value" type="Vector2" />
-			<param index="1" name="bullet_index_start" type="int" default="0" />
-			<param index="2" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<param index="1" name="bullet_index_start" type="int" default="0" >
+				First bullet index in the range (inclusive).
+			</param>
+			<param index="2" name="bullet_index_end_inclusive" type="int" default="-1" >
+				Last bullet index in the range (inclusive; -1 means the final bullet).
+			</param>
 			<description>
 				Shifts the position of all bullets in the specified range by the given offset.
 			</description>
 		</method>
 		<method name="teleport_shift_bullet">
 			<return type="void" />
-			<param index="0" name="bullet_index" type="int" />
+			<param index="0" name="bullet_index" type="int" >
+				Zero-based index of the bullet.
+			</param>
 			<param index="1" name="shift_value" type="Vector2" />
 			<description>
 				Shifts the position of the specified bullet by the given offset.
@@ -1146,6 +1443,33 @@
 	<members>
 		<member name="adjust_direction_based_on_rotation" type="bool" setter="set_adjust_direction_based_on_rotation" getter="get_adjust_direction_based_on_rotation" default="false">
 			Whether each bullet's direction is adjusted based on rotation data (the bullet moves where it faces). Mirrors the spawn data flag; pool reuse re-applies the data value.
+		</member>
+		<member name="bounce_cooldown_sec" type="float" setter="set_bounce_cooldown_sec" getter="get_bounce_cooldown_sec" default="0.05">
+			Quiet period in seconds after a bounce, set live (finite in [0, 1]).
+		</member>
+		<member name="bounce_hit_consumed" type="bool" setter="set_bounce_hit_consumed" getter="get_bounce_hit_consumed" default="false">
+			Whether a bounce also counts as a normal hit, set live. False (default) means free bounces. A consumed bounce emits BOTH the bounce signal and the matching area/body signal.
+		</member>
+		<member name="bounce_mask" type="int" setter="set_bounce_mask" getter="get_bounce_mask" default="0">
+			Bitmask of target collision layers that trigger a bounce, set live. Takes precedence over the normal collision path. 0 (default) disables bouncing. Spawn-time equivalent lives on [member DirectionalBulletsData2D.bounce_mask] (reseeded on every pool reuse).
+		</member>
+		<member name="bounce_max_count" type="int" setter="set_bounce_max_count" getter="get_bounce_max_count" default="0">
+			How many times a single bullet may bounce before bounces stop for it, set live. 0 (default) = unlimited. Read per-bullet progress with [method bullet_get_bounce_count].
+		</member>
+		<member name="bounce_mode" type="int" setter="set_bounce_mode" getter="get_bounce_mode" default="0">
+			Which surface normal to reflect across, set live: 0 Simple Radial, 1 Precise Shape (falls back to radial without a usable target shape).
+		</member>
+		<member name="bounce_randomness_deg" type="float" setter="set_bounce_randomness_deg" getter="get_bounce_randomness_deg" default="0.0">
+			Random scatter in degrees around the reflected heading per bounce, set live (finite in [0, 180]).
+		</member>
+		<member name="bounce_rotate_texture" type="bool" setter="set_bounce_rotate_texture" getter="get_bounce_rotate_texture" default="true">
+			Whether a bounce re-aims the bullet visual at the reflected heading, set live.
+		</member>
+		<member name="bounce_rotation_smooth" type="float" setter="set_bounce_rotation_smooth" getter="get_bounce_rotation_smooth" default="0.0">
+			Max visual turn rate in radians/sec toward the reflected heading, set live. 0 snaps instantly; above 0 only the sprite slews. Ignored while [member adjust_direction_based_on_rotation] is on.
+		</member>
+		<member name="bounce_strength" type="float" setter="set_bounce_strength" getter="get_bounce_strength" default="1.0">
+			Speed multiplier applied on every bounce, set live (finite, 0 or more, no upper cap). 1.0 is perfectly elastic, 0 dead-stops. The boost sticks: the bounce raises the bullet's cached max speed to the new speed and a per-bullet multiplier persists across speed-curve overwrites.
 		</member>
 		<member name="bullet_homing_auto_pop_after_target_reached" type="bool" setter="set_bullet_homing_auto_pop_after_target_reached" getter="get_bullet_homing_auto_pop_after_target_reached" default="false">
 			Whether the current homing target should be automatically popped from the deque once it gets reached by a bullet (per-bullet deques only).
@@ -1200,6 +1524,9 @@
 		<member name="shared_bullet_speed_data" type="BulletSpeedData2D" setter="set_shared_bullet_speed_data" getter="get_shared_bullet_speed_data">
 			Fallback speed for bullets whose own speed entry is missing or invalid, set live. Only fully-zero triples (the invalid-entry gap marker) are filled; bullets with any non-zero value keep it. Live writes fill once at call time (order matters: per-zero then shared fills, shared then per-zero stays zero). All-zero shared is a silent no-op; non-finite shared aborts the whole fallback with an error. Clearing it (null) keeps the current ballistics. Configure the spawn-time equivalent (plus its [code]tile_*[/code] checkbox) on [DirectionalBulletsData2D]. Note: shared movement-speed curves still outrank it per tick. Negative speed flies backwards, clamped to [-max, max].
 		</member>
+		<member name="shared_bullet_wobble_data" type="BulletWobbleData2D" setter="set_shared_bullet_wobble_data" getter="get_shared_bullet_wobble_data">
+			Fallback wobble for bullets without a live per-bullet wobble resource, set live. Setting it re-seeds only those slots; clearing it (null) deactivates exactly those slots. Spawn-time equivalent (plus its [code]tile_all_bullet_wobble_data[/code] checkbox) lives on [member DirectionalBulletsData2D.shared_bullet_wobble_data]. Example: [code]bullets.set_shared_bullet_wobble_data(wobble)[/code] adds sway to every plain bullet while custom per-bullet seeds keep theirs.
+		</member>
 		<member name="shared_homing_deque_auto_pop_after_target_reached" type="bool" setter="set_shared_homing_deque_auto_pop_after_target_reached" getter="get_shared_homing_deque_auto_pop_after_target_reached" default="false">
 			Whether the current homing target should be automatically popped from the deque once it gets reached by a bullet (shared deque only).
 
@@ -1208,9 +1535,6 @@
 			The signal [signal bullet_homing_target_reached] is emitted when a target is reached.
 
 			If you want this behavior for the per-bullet deques, use [member bullet_homing_auto_pop_after_target_reached] instead.
-		</member>
-		<member name="shared_bullet_wobble_data" type="BulletWobbleData2D" setter="set_shared_bullet_wobble_data" getter="get_shared_bullet_wobble_data">
-			Fallback wobble for bullets without a live per-bullet wobble resource, set live. Setting it re-seeds only those slots; clearing it (null) deactivates exactly those slots. Spawn-time equivalent (plus its [code]tile_all_bullet_wobble_data[/code] checkbox) lives on [member DirectionalBulletsData2D.shared_bullet_wobble_data]. Example: [code]bullets.set_shared_bullet_wobble_data(wobble)[/code] adds sway to every plain bullet while custom per-bullet seeds keep theirs.
 		</member>
 		<member name="shared_movement_pattern_curve" type="Curve2D" setter="set_shared_movement_pattern_curve" getter="get_shared_movement_pattern_curve">
 			Fallback pattern for bullets without their own per-bullet pattern, set live. Bullets with a valid per-bullet pattern always use it. Null (default) means no fallback. A locked orbit still owns the displacement while locked. Spawn-time flags plus the [code]tile_all_bullet_movement_pattern_paths / _face... / _repeats[/code] checkboxes live on [DirectionalBulletsData2D].
@@ -1221,38 +1545,13 @@
 		<member name="shared_movement_pattern_repeat" type="bool" setter="set_shared_movement_pattern_repeat" getter="get_shared_movement_pattern_repeat" default="true">
 			Whether the shared movement pattern repeats instead of stopping at the end of the curve.
 		</member>
-		<member name="bounce_mask" type="int" setter="set_bounce_mask" getter="get_bounce_mask" default="0">
-			Bitmask of target collision layers that trigger a bounce, set live. Takes precedence over the normal collision path. 0 (default) disables bouncing. Spawn-time equivalent lives on [member DirectionalBulletsData2D.bounce_mask] (reseeded on every pool reuse).
-		</member>
-		<member name="bounce_strength" type="float" setter="set_bounce_strength" getter="get_bounce_strength" default="1.0">
-			Speed multiplier applied on every bounce, set live (finite, 0 or more, no upper cap). 1.0 is perfectly elastic, 0 dead-stops. The boost sticks: the bounce raises the bullet's cached max speed to the new speed and a per-bullet multiplier persists across speed-curve overwrites.
-		</member>
-		<member name="bounce_hit_consumed" type="bool" setter="set_bounce_hit_consumed" getter="get_bounce_hit_consumed" default="false">
-			Whether a bounce also counts as a normal hit, set live. False (default) means free bounces. A consumed bounce emits BOTH the bounce signal and the matching area/body signal.
-		</member>
-		<member name="bounce_max_count" type="int" setter="set_bounce_max_count" getter="get_bounce_max_count" default="0">
-			How many times a single bullet may bounce before bounces stop for it, set live. 0 (default) = unlimited. Read per-bullet progress with [method bullet_get_bounce_count].
-		</member>
-		<member name="bounce_mode" type="int" setter="set_bounce_mode" getter="get_bounce_mode" default="0">
-			Which surface normal to reflect across, set live: 0 Simple Radial, 1 Precise Shape (falls back to radial without a usable target shape).
-		</member>
-		<member name="bounce_rotate_texture" type="bool" setter="set_bounce_rotate_texture" getter="get_bounce_rotate_texture" default="true">
-			Whether a bounce re-aims the bullet visual at the reflected heading, set live.
-		</member>
-		<member name="bounce_rotation_smooth" type="float" setter="set_bounce_rotation_smooth" getter="get_bounce_rotation_smooth" default="0.0">
-			Max visual turn rate in radians/sec toward the reflected heading, set live. 0 snaps instantly; above 0 only the sprite slews. Ignored while [member adjust_direction_based_on_rotation] is on.
-		</member>
-		<member name="bounce_randomness_deg" type="float" setter="set_bounce_randomness_deg" getter="get_bounce_randomness_deg" default="0.0">
-			Random scatter in degrees around the reflected heading per bounce, set live (finite in [0, 180]).
-		</member>
-		<member name="bounce_cooldown_sec" type="float" setter="set_bounce_cooldown_sec" getter="get_bounce_cooldown_sec" default="0.05">
-			Quiet period in seconds after a bounce, set live (finite in [0, 1]).
-		</member>
 	</members>
 	<signals>
 		<signal name="bullet_homing_target_reached">
 			<param index="0" name="multimesh_instance" type="DirectionalBullets2D" />
-			<param index="1" name="bullet_index" type="int" />
+			<param index="1" name="bullet_index" type="int" >
+				Zero-based index of the bullet.
+			</param>
 			<param index="2" name="target" type="Node2D" />
 			<param index="3" name="target_global_position" type="Vector2" />
 			<description>

@@ -13,6 +13,17 @@
 	</description>
 	<tutorials>
 	</tutorials>
+	<methods>
+		<method name="set_bounce_mask_from_array">
+			<return type="void" />
+			<param index="0" name="array_of_masks" type="int[]">
+				Collision layer numbers (1-32) that trigger a bounce. Entries outside 1-32 are skipped with an error.
+			</param>
+			<description>
+				Builds [member bounce_mask] from layer numbers instead of raw bits. Example: [code]set_bounce_mask_from_array([4])[/code] bounces off layer-4 targets. The resulting bits must overlap [member MultiMeshBulletsData2D.collision_mask], otherwise those targets are never detected at all.
+			</description>
+		</method>
+	</methods>
 	<members>
 		<member name="adjust_direction_based_on_rotation" type="bool" setter="set_adjust_direction_based_on_rotation" getter="get_adjust_direction_based_on_rotation" default="false">
 			If enabled, the bullets will adjust their direction when rotating, instead of only spinning in place.
@@ -20,26 +31,17 @@
 		<member name="all_bullet_curves_data" type="BulletCurvesData2D[]" setter="set_all_bullet_curves_data" getter="get_all_bullet_curves_data" default="[]">
 			Curves for each bullet, applied at spawn time (and on pool reuse). Entry [code]i[/code] drives bullet [code]i[/code] only. Bullets without an entry (short array) or with a null entry use [member shared_bullet_curves_data] per channel, or plain ballistics when that is unset too. Invalid means: null entry. Example: 4 bullets, entries [A, null] → bullets 0 and 1 use A and the shared fallback, bullets 2 and 3 use the shared fallback only.
 		</member>
-		<member name="tile_all_bullet_curves_data" type="bool" setter="set_tile_all_bullet_curves_data" getter="get_tile_all_bullet_curves_data" default="false">
-			When on, a short [member all_bullet_curves_data] wraps around the volley (bullet [code]i[/code] reads entry [code]i % size[/code]) instead of leaving the tail bullets on the fallback. Off by default. Example: 2 entries across 10 bullets fan as A,B,A,B...
+		<member name="all_bullet_gravity" type="Vector2[]" setter="set_all_bullet_gravity" getter="get_all_bullet_gravity" default="[]">
+			Gravity for each bullet. Entry [code]i[/code] pulls bullet [code]i[/code] only. Empty (default) means every bullet uses [member gravity]. A non-finite entry reads as (0, 0) for that bullet only.
 		</member>
 		<member name="all_bullet_movement_pattern_face_movement_directions" type="bool[]" setter="set_all_bullet_movement_pattern_face_movement_directions" getter="get_all_bullet_movement_pattern_face_movement_directions" default="[]">
 			Face flag for each bullet's own pattern. Entry [code]i[/code] belongs to bullet [code]i[/code]; bullets without an entry use [member shared_movement_pattern_face_movement_direction]. Has its own [member tile_all_bullet_movement_pattern_face_movement_directions] checkbox.
 		</member>
-		<member name="tile_all_bullet_movement_pattern_face_movement_directions" type="bool" setter="set_tile_all_bullet_movement_pattern_face_movement_directions" getter="get_tile_all_bullet_movement_pattern_face_movement_directions" default="false">
-			When on, a short face-flag array wraps around the volley instead of leaving the tail bullets on the shared flag. Off by default.
-		</member>
 		<member name="all_bullet_movement_pattern_paths" type="NodePath[]" setter="set_all_bullet_movement_pattern_paths" getter="get_all_bullet_movement_pattern_paths" default="[]">
 			Pattern path for each bullet, applied at spawn time (and on pool reuse). Each entry must point at a [Path2D]; its [Curve2D] is extracted when the volley spawns. Entry [code]i[/code] drives bullet [code]i[/code] only. A bullet with its own valid pattern always uses it; [member shared_movement_pattern_path] only covers bullets without one. Empty or bad entries fall back per bullet. Example: give bullet 0 a loop curve and leave the rest empty → only bullet 0 loops, the rest fly the shared pattern (or straight when that is empty too).
 		</member>
-		<member name="tile_all_bullet_movement_pattern_paths" type="bool" setter="set_tile_all_bullet_movement_pattern_paths" getter="get_tile_all_bullet_movement_pattern_paths" default="false">
-			When on, short pattern-path arrays wrap around the volley instead of leaving the tail bullets on the shared pattern. Off by default.
-		</member>
 		<member name="all_bullet_movement_pattern_repeats" type="bool[]" setter="set_all_bullet_movement_pattern_repeats" getter="get_all_bullet_movement_pattern_repeats" default="[]">
 			Repeat flag for each bullet's own pattern. Entry [code]i[/code] belongs to bullet [code]i[/code]; bullets without an entry use [member shared_movement_pattern_repeat]. Has its own [member tile_all_bullet_movement_pattern_repeats] checkbox.
-		</member>
-		<member name="tile_all_bullet_movement_pattern_repeats" type="bool" setter="set_tile_all_bullet_movement_pattern_repeats" getter="get_tile_all_bullet_movement_pattern_repeats" default="false">
-			When on, a short repeat-flag array wraps around the volley instead of leaving the tail bullets on the shared flag. Off by default.
 		</member>
 		<member name="all_bullet_speed_data" type="BulletSpeedData2D[]" setter="set_all_bullet_speed_data" getter="get_all_bullet_speed_data" default="[]">
 			[b]MANDATORY[/b]
@@ -47,26 +49,41 @@
 			Example: 3 bullets, speeds [200, null, 200] with shared 150 → bullets fly at 200, 150, 200.
 			Note: [BulletSpeedData2D] has a helper static method that you can use to generate random speed data - [method BulletSpeedData2D.generate_random_data()].
 		</member>
-		<member name="tile_all_bullet_speed_data" type="bool" setter="set_tile_all_bullet_speed_data" getter="get_tile_all_bullet_speed_data" default="false">
-			When on, a short [member all_bullet_speed_data] wraps around the volley (bullet [code]i[/code] reads entry [code]i % size[/code]) instead of falling back. Off by default. Example: 2 entries across 10 bullets fan as A,B,A,B... Use it for alternating spreads without writing 10 entries.
-		</member>
 		<member name="all_bullet_wobble_data" type="BulletWobbleData2D[]" setter="set_all_bullet_wobble_data" getter="get_all_bullet_wobble_data" default="[]">
 			Wobble seed for each bullet, applied at spawn time (and on pool reuse). Entry [code]i[/code] affects bullet [code]i[/code] only; a live seed always beats [member shared_bullet_wobble_data] for its bullet. Null entries and entries with [code]enabled = false[/code] fall back to shared for that bullet. Example: shared gentle weave plus one strong seed on bullet 2 → bullet 2 snakes hard, the rest weave gently.
 		</member>
-		<member name="tile_all_bullet_wobble_data" type="bool" setter="set_tile_all_bullet_wobble_data" getter="get_tile_all_bullet_wobble_data" default="false">
-			When on, a short [member all_bullet_wobble_data] wraps around the volley instead of leaving the tail bullets on the shared fallback. Off by default.
+		<member name="bounce_cooldown_sec" type="float" setter="set_bounce_cooldown_sec" getter="get_bounce_cooldown_sec" default="0.05">
+			Quiet period in seconds after a bounce during which further bounce records for that bullet are swallowed (lets it escape the overlap; a target carrying both a body and an area would otherwise double-flip it). Finite in [0, 1].
+		</member>
+		<member name="bounce_hit_consumed" type="bool" setter="set_bounce_hit_consumed" getter="get_bounce_hit_consumed" default="false">
+			Whether a bounce also counts as a normal hit (increments the collision counter and can disable the bullet at [member MultiMeshBulletsData2D.bullet_max_collision_count]). False (default) means free bounces that never kill the bullet. A consumed bounce emits BOTH the bounce signal and the matching area/body signal.
+		</member>
+		<member name="bounce_mask" type="int" setter="set_bounce_mask" getter="get_bounce_mask" default="0">
+			Bitmask of target collision layers that trigger a bounce, applied at spawn time (and on pool reuse). Checked against the collided object's collision_layer and takes precedence over the normal collision path. 0 (default) disables bouncing. NOTE: these bits must overlap [member MultiMeshBulletsData2D.collision_mask], otherwise the bullet never detects those targets at all (warned once per spawn). Use [method set_bounce_mask_from_array] to build it from layer numbers.
+		</member>
+		<member name="bounce_max_count" type="int" setter="set_bounce_max_count" getter="get_bounce_max_count" default="0">
+			How many times a single bullet may bounce before bounces stop working for it (further hits take the normal collision path). 0 (default) = unlimited (lifetime still bounds it). Stops wall-to-wall ping-pong from living forever.
+		</member>
+		<member name="bounce_mode" type="int" setter="set_bounce_mode" getter="get_bounce_mode" default="0">
+			Which surface normal to reflect across: 0 Simple Radial (cheap default, reflects across bullet-minus-target-center, right for round targets), 1 Precise Shape (resolves the target's CollisionShape2D and reflects across the analytic face normal, so flat walls bounce flat; falls back to radial when the target has no usable shape).
+		</member>
+		<member name="bounce_randomness_deg" type="float" setter="set_bounce_randomness_deg" getter="get_bounce_randomness_deg" default="0.0">
+			Random scatter in degrees applied symmetrically around the reflected heading per bounce (finite in [0, 180]). 0 (default) = exact reflection.
+		</member>
+		<member name="bounce_rotate_texture" type="bool" setter="set_bounce_rotate_texture" getter="get_bounce_rotate_texture" default="true">
+			Whether a bounce re-aims the bullet visual at the reflected heading. Turn off when something else owns the facing (rotation data, movement patterns).
+		</member>
+		<member name="bounce_rotation_smooth" type="float" setter="set_bounce_rotation_smooth" getter="get_bounce_rotation_smooth" default="0.0">
+			Max visual turn rate in radians/sec toward the reflected heading. 0 (default) snaps instantly (right for bullets); above 0 only the sprite slews while ballistics reflect instantly. Ignored while [member adjust_direction_based_on_rotation] is on (the visual owns ballistics there, so it must snap).
+		</member>
+		<member name="bounce_strength" type="float" setter="set_bounce_strength" getter="get_bounce_strength" default="1.0">
+			Speed multiplier applied on every bounce (finite, 0 or more, no upper cap). 1.0 (default) is perfectly elastic, below 1 damps, 0 dead-stops the bullet in place (still alive when [member bounce_hit_consumed] is false), above 1 is super-elastic. The boost sticks: the bounce raises the bullet's cached max speed to the new speed so later acceleration never clamps it back down, and a per-bullet multiplier re-applies across speed-curve overwrites (curves rewrite speed every tick). Multipliers accumulate across bounces in one life and reset on every new life or wake. Very high values tunnel through thin walls (collision is point-sampled).
 		</member>
 		<member name="bullet_homing_auto_pop_after_target_reached" type="bool" setter="set_bullet_homing_auto_pop_after_target_reached" getter="get_bullet_homing_auto_pop_after_target_reached" default="false">
 			Per-bullet queue: pop the front target when the owning bullet reaches it. Pooled reuse re-seeds this from the spawn data, so direct [BulletFactory2D] spawns keep it without a spawner.
 		</member>
 		<member name="gravity" type="Vector2" setter="set_gravity" getter="get_gravity" default="Vector2(0, 0)">
 			Fallback gravity in px/s^2 for bullets without their own [member all_bullet_gravity] entry (2D sideview arcs, tower-defense shells). (0, 0) disables — top-down default. Must stay finite. Example: shared (0, 1000) plus per-bullet [(0,0), (800,0)] on 3 bullets → bullet 0 hovers, bullet 1 drifts right, bullet 2 falls.
-		</member>
-		<member name="all_bullet_gravity" type="Vector2[]" setter="set_all_bullet_gravity" getter="get_all_bullet_gravity" default="[]">
-			Gravity for each bullet. Entry [code]i[/code] pulls bullet [code]i[/code] only. Empty (default) means every bullet uses [member gravity]. A non-finite entry reads as (0, 0) for that bullet only.
-		</member>
-		<member name="tile_all_bullet_gravity" type="bool" setter="set_tile_all_bullet_gravity" getter="get_tile_all_bullet_gravity" default="false">
-			When on, a short [member all_bullet_gravity] wraps around the volley instead of leaving the tail bullets on [member gravity]. Off by default.
 		</member>
 		<member name="gravity_delay_sec" type="float" setter="set_gravity_delay_sec" getter="get_gravity_delay_sec" default="0.0">
 			Seconds of straight flight before gravity starts integrating (shells that glide first, then drop). 0 falls immediately.
@@ -122,32 +139,34 @@
 		<member name="shared_movement_pattern_repeat" type="bool" setter="set_shared_movement_pattern_repeat" getter="get_shared_movement_pattern_repeat" default="true">
 			Fallback repeat flag for bullets without their own entry in [member all_bullet_movement_pattern_repeats]. Whether those bullets loop the pattern instead of stopping at the end of the curve.
 		</member>
-		<member name="bounce_mask" type="int" setter="set_bounce_mask" getter="get_bounce_mask" default="0">
-			Bitmask of target collision layers that trigger a bounce, applied at spawn time (and on pool reuse). Checked against the collided object's collision_layer and takes precedence over the normal collision path. 0 (default) disables bouncing. NOTE: these bits must overlap [member MultiMeshBulletsData2D.collision_mask], otherwise the bullet never detects those targets at all (warned once per spawn). Use [method set_bounce_mask_from_array] to build it from layer numbers.
+		<member name="tile_all_bullet_curves_data" type="bool" setter="set_tile_all_bullet_curves_data" getter="get_tile_all_bullet_curves_data" default="false">
+			When on, a short [member all_bullet_curves_data] wraps around the volley (bullet [code]i[/code] reads entry [code]i % size[/code]) instead of leaving the tail bullets on the fallback. Off by default. Example: 2 entries across 10 bullets fan as A,B,A,B...
 		</member>
-		<member name="bounce_strength" type="float" setter="set_bounce_strength" getter="get_bounce_strength" default="1.0">
-			Speed multiplier applied on every bounce (finite, 0 or more, no upper cap). 1.0 (default) is perfectly elastic, below 1 damps, 0 dead-stops the bullet in place (still alive when [member bounce_hit_consumed] is false), above 1 is super-elastic. The boost sticks: the bounce raises the bullet's cached max speed to the new speed so later acceleration never clamps it back down, and a per-bullet multiplier re-applies across speed-curve overwrites (curves rewrite speed every tick). Multipliers accumulate across bounces in one life and reset on every new life or wake. Very high values tunnel through thin walls (collision is point-sampled).
+		<member name="tile_all_bullet_gravity" type="bool" setter="set_tile_all_bullet_gravity" getter="get_tile_all_bullet_gravity" default="false">
+			When on, a short [member all_bullet_gravity] wraps around the volley instead of leaving the tail bullets on [member gravity]. Off by default.
 		</member>
-		<member name="bounce_hit_consumed" type="bool" setter="set_bounce_hit_consumed" getter="get_bounce_hit_consumed" default="false">
-			Whether a bounce also counts as a normal hit (increments the collision counter and can disable the bullet at [member MultiMeshBulletsData2D.bullet_max_collision_count]). False (default) means free bounces that never kill the bullet. A consumed bounce emits BOTH the bounce signal and the matching area/body signal.
+		<member name="tile_all_bullet_movement_pattern_face_movement_directions" type="bool" setter="set_tile_all_bullet_movement_pattern_face_movement_directions" getter="get_tile_all_bullet_movement_pattern_face_movement_directions" default="false">
+			When on, a short face-flag array wraps around the volley instead of leaving the tail bullets on the shared flag. Off by default.
 		</member>
-		<member name="bounce_max_count" type="int" setter="set_bounce_max_count" getter="get_bounce_max_count" default="0">
-			How many times a single bullet may bounce before bounces stop working for it (further hits take the normal collision path). 0 (default) = unlimited (lifetime still bounds it). Stops wall-to-wall ping-pong from living forever.
+		<member name="tile_all_bullet_movement_pattern_paths" type="bool" setter="set_tile_all_bullet_movement_pattern_paths" getter="get_tile_all_bullet_movement_pattern_paths" default="false">
+			When on, short pattern-path arrays wrap around the volley instead of leaving the tail bullets on the shared pattern. Off by default.
 		</member>
-		<member name="bounce_mode" type="int" setter="set_bounce_mode" getter="get_bounce_mode" default="0">
-			Which surface normal to reflect across: 0 Simple Radial (cheap default, reflects across bullet-minus-target-center, right for round targets), 1 Precise Shape (resolves the target's CollisionShape2D and reflects across the analytic face normal, so flat walls bounce flat; falls back to radial when the target has no usable shape).
+		<member name="tile_all_bullet_movement_pattern_repeats" type="bool" setter="set_tile_all_bullet_movement_pattern_repeats" getter="get_tile_all_bullet_movement_pattern_repeats" default="false">
+			When on, a short repeat-flag array wraps around the volley instead of leaving the tail bullets on the shared flag. Off by default.
 		</member>
-		<member name="bounce_rotate_texture" type="bool" setter="set_bounce_rotate_texture" getter="get_bounce_rotate_texture" default="true">
-			Whether a bounce re-aims the bullet visual at the reflected heading. Turn off when something else owns the facing (rotation data, movement patterns).
+		<member name="tile_all_bullet_speed_data" type="bool" setter="set_tile_all_bullet_speed_data" getter="get_tile_all_bullet_speed_data" default="false">
+			When on, a short [member all_bullet_speed_data] wraps around the volley (bullet [code]i[/code] reads entry [code]i % size[/code]) instead of falling back. Off by default. Example: 2 entries across 10 bullets fan as A,B,A,B... Use it for alternating spreads without writing 10 entries.
 		</member>
-		<member name="bounce_rotation_smooth" type="float" setter="set_bounce_rotation_smooth" getter="get_bounce_rotation_smooth" default="0.0">
-			Max visual turn rate in radians/sec toward the reflected heading. 0 (default) snaps instantly (right for bullets); above 0 only the sprite slews while ballistics reflect instantly. Ignored while [member adjust_direction_based_on_rotation] is on (the visual owns ballistics there, so it must snap).
-		</member>
-		<member name="bounce_randomness_deg" type="float" setter="set_bounce_randomness_deg" getter="get_bounce_randomness_deg" default="0.0">
-			Random scatter in degrees applied symmetrically around the reflected heading per bounce (finite in [0, 180]). 0 (default) = exact reflection.
-		</member>
-		<member name="bounce_cooldown_sec" type="float" setter="set_bounce_cooldown_sec" getter="get_bounce_cooldown_sec" default="0.05">
-			Quiet period in seconds after a bounce during which further bounce records for that bullet are swallowed (lets it escape the overlap; a target carrying both a body and an area would otherwise double-flip it). Finite in [0, 1].
+		<member name="tile_all_bullet_wobble_data" type="bool" setter="set_tile_all_bullet_wobble_data" getter="get_tile_all_bullet_wobble_data" default="false">
+			When on, a short [member all_bullet_wobble_data] wraps around the volley instead of leaving the tail bullets on the shared fallback. Off by default.
 		</member>
 	</members>
+	<constants>
+		<constant name="BOUNCE_SIMPLE_RADIAL" value="0" enum="BounceMode">
+			Reflect across the radial axis (bullet position minus target center). Cheap default, looks right on round targets. See [member bounce_mode].
+		</constant>
+		<constant name="BOUNCE_PRECISE_SHAPE" value="1" enum="BounceMode">
+			Resolve the target's CollisionShape2D and reflect across the analytic face normal, so flat walls bounce flat. Falls back to radial when the target has no usable shape. See [member bounce_mode].
+		</constant>
+	</constants>
 </class>

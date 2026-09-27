@@ -62,16 +62,16 @@
 				Verifies every layered preview dot sits on its yellow ring (same center-scale rule and same fill deal on both sides). Returns checked/layers/max_deviation_px/mean_deviation_px/ok. Empty preview returns checked=false. Point-to-segment match: exact on sharp shapes, sub-pixel on dense sweeps.
 			</description>
 		</method>
-		<method name="debug_get_layer_rings" qualifiers="const">
-			<return type="Array" />
-			<description>
-				Debug readout of the yellow preview rings: one PackedVector2Array per extra outline layer, exactly as drawn (holder-local; runs INF-separated with a closing duplicate per closed run). Empty when layers are inactive. Lets scripts and tests verify bullets sit on their rings without screenshotting the editor.
-			</description>
-		</method>
 		<method name="debug_get_cache_state" qualifiers="const">
 			<return type="Dictionary" />
 			<description>
 				Duplicate-cache introspection: template_valid, spawn_id_match. Proves shoot_once() reuses the spawner-owned template; resource swaps and in-place edits invalidate it.
+			</description>
+		</method>
+		<method name="debug_get_layer_rings" qualifiers="const">
+			<return type="Array" />
+			<description>
+				Debug readout of the yellow preview rings: one PackedVector2Array per extra outline layer, exactly as drawn (holder-local; runs INF-separated with a closing duplicate per closed run). Empty when layers are inactive. Lets scripts and tests verify bullets sit on their rings without screenshotting the editor.
 			</description>
 		</method>
 		<method name="debug_get_retarget_countdown" qualifiers="const">
@@ -1176,8 +1176,11 @@
 		<member name="preview_arrow_head_width" type="float" setter="set_preview_arrow_head_width" getter="get_preview_arrow_head_width" default="10.0">
 			Preview arrow head width in pixels.
 		</member>
-		<member name="preview_draw_collision_rings" type="bool" setter="set_preview_draw_collision_rings" getter="get_preview_draw_collision_rings" default="false">
-			When true and spawn_data carries a valid collision shape, the dots layer also draws one outline circle per dot with the shape's bounding radius (circle r, rect min/2, capsule height/2). Compare hitbox vs visual directly in the editor.
+		<member name="preview_arrow_length" type="float" setter="set_preview_arrow_length" getter="get_preview_arrow_length" default="16.0">
+			Preview arrow length in pixels (multiplied by pattern_scale and transforms_scale, so glyphs stay proportional to the layout).
+		</member>
+		<member name="preview_arrow_width" type="float" setter="set_preview_arrow_width" getter="get_preview_arrow_width" default="2.0">
+			Preview arrow shaft width in pixels.
 		</member>
 		<member name="preview_collision_ring_color" type="Color" setter="set_preview_collision_ring_color" getter="get_preview_collision_ring_color" default="Color(1, 1, 1, 0.7)">
 			Collision-ring overlay color.
@@ -1185,17 +1188,14 @@
 		<member name="preview_collision_ring_width" type="float" setter="set_preview_collision_ring_width" getter="get_preview_collision_ring_width" default="1.5">
 			Collision-ring overlay line width in pixels.
 		</member>
-		<member name="preview_arrow_length" type="float" setter="set_preview_arrow_length" getter="get_preview_arrow_length" default="16.0">
-			Preview arrow length in pixels (multiplied by pattern_scale and transforms_scale, so glyphs stay proportional to the layout).
-		</member>
-		<member name="preview_arrow_width" type="float" setter="set_preview_arrow_width" getter="get_preview_arrow_width" default="2.0">
-			Preview arrow shaft width in pixels.
-		</member>
 		<member name="preview_dot_color" type="Color" setter="set_preview_dot_color" getter="get_preview_dot_color" default="Color(1, 0.05, 0.05, 1)">
 			Preview dot color.
 		</member>
 		<member name="preview_dot_radius" type="float" setter="set_preview_dot_radius" getter="get_preview_dot_radius" default="4.0">
 			Preview dot radius in pixels (multiplied by pattern_scale and transforms_scale, so glyphs stay proportional to the layout).
+		</member>
+		<member name="preview_draw_collision_rings" type="bool" setter="set_preview_draw_collision_rings" getter="get_preview_draw_collision_rings" default="false">
+			When true and spawn_data carries a valid collision shape, the dots layer also draws one outline circle per dot with the shape's bounding radius (circle r, rect min/2, capsule height/2). Compare hitbox vs visual directly in the editor.
 		</member>
 		<member name="preview_first_dot_color" type="Color" setter="set_preview_first_dot_color" getter="get_preview_first_dot_color" default="Color(1, 0.85, 0.2, 1)">
 			Emphasis color for bullet 0 in the preview (pattern start: anchor, reverse, loop seam). Drawn bigger on top of the regular dot.
@@ -1271,7 +1271,9 @@
 		<signal name="area_entered">
 			<param index="0" name="hit_target_area" type="Object" />
 			<param index="1" name="directional_bullets_instance" type="DirectionalBullets2D" />
-			<param index="2" name="bullet_index" type="int" />
+			<param index="2" name="bullet_index" type="int" >
+				Zero-based index of the bullet.
+			</param>
 			<description>
 				Fired when one of this spawner's bullets enters an area.
 			</description>
@@ -1279,7 +1281,9 @@
 		<signal name="body_entered">
 			<param index="0" name="hit_target_body" type="Object" />
 			<param index="1" name="directional_bullets_instance" type="DirectionalBullets2D" />
-			<param index="2" name="bullet_index" type="int" />
+			<param index="2" name="bullet_index" type="int" >
+				Zero-based index of the bullet.
+			</param>
 			<description>
 				Fired when one of this spawner's bullets hits a body.
 			</description>
@@ -1287,7 +1291,9 @@
 		<signal name="bounce_area_entered">
 			<param index="0" name="hit_target_area" type="Object" />
 			<param index="1" name="directional_bullets_instance" type="DirectionalBullets2D" />
-			<param index="2" name="bullet_index" type="int" />
+			<param index="2" name="bullet_index" type="int" >
+				Zero-based index of the bullet.
+			</param>
 			<description>
 				Fired when one of this spawner's bullets bounces off an area. A consumed bounce fires both this and [signal area_entered].
 			</description>
@@ -1295,7 +1301,9 @@
 		<signal name="bounce_body_entered">
 			<param index="0" name="hit_target_body" type="Object" />
 			<param index="1" name="directional_bullets_instance" type="DirectionalBullets2D" />
-			<param index="2" name="bullet_index" type="int" />
+			<param index="2" name="bullet_index" type="int" >
+				Zero-based index of the bullet.
+			</param>
 			<description>
 				Fired when one of this spawner's bullets bounces off a body. A consumed bounce fires both this and [signal body_entered].
 			</description>
@@ -1361,7 +1369,9 @@
 		</signal>
 		<signal name="volley_bullet_homing_target_reached">
 			<param index="0" name="directional_bullets_instance" type="DirectionalBullets2D" />
-			<param index="1" name="bullet_index" type="int" />
+			<param index="1" name="bullet_index" type="int" >
+				Zero-based index of the bullet.
+			</param>
 			<param index="2" name="target" type="Node2D" />
 			<param index="3" name="target_global_position" type="Vector2" />
 			<description>
