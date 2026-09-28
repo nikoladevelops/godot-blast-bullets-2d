@@ -28,6 +28,7 @@ animations = [{
 }]
 
 [sub_resource type="BulletEffectLayerData2D" id="BulletEffectLayerData2D_g0agp"]
+trigger = 3
 sprite_frames = SubResource("SpriteFrames_mouoi")
 color_ramp = SubResource("Gradient_7gbxi")
 offset = Vector2(-70, 0)

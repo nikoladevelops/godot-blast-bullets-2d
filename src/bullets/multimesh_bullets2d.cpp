@@ -320,8 +320,21 @@ bool MultiMeshBullets2D::has_trail_effects() const {
 	return !fx_trail_bakes.empty();
 }
 
+bool MultiMeshBullets2D::fx_has_trail_layer(int layer_index) const {
+	for (size_t b = 0; b < fx_trail_bakes.size(); ++b) {
+		if (fx_trail_bakes[b].layer_index == layer_index) {
+			return true;
+		}
+	}
+	return false;
+}
+
 void MultiMeshBullets2D::bullet_set_trail_enabled(int layer_index, int bullet_index, bool trail_on) {
 	if (!validate_bullet_index(bullet_index, "bullet_set_trail_enabled")) {
+		return;
+	}
+	if (!fx_has_trail_layer(layer_index)) {
+		UtilityFunctions::push_error("bullet_set_trail_enabled: no baked trail layer " + String::num_int64(layer_index) + " on this volley.");
 		return;
 	}
 	for (size_t b = 0; b < fx_trail_bakes.size(); ++b) {
@@ -343,6 +356,11 @@ void MultiMeshBullets2D::bullet_set_trail_enabled(int layer_index, int bullet_in
 
 void MultiMeshBullets2D::all_bullets_set_trail_enabled(int layer_index, bool trail_on, int bullet_index_start, int bullet_index_end_inclusive) {
 	ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_set_trail_enabled");
+	// Single error for the whole range instead of one per bullet below.
+	if (!fx_has_trail_layer(layer_index)) {
+		UtilityFunctions::push_error("all_bullets_set_trail_enabled: no baked trail layer " + String::num_int64(layer_index) + " on this volley.");
+		return;
+	}
 	for (int i = bullet_index_start; i <= bullet_index_end_inclusive; ++i) {
 		bullet_set_trail_enabled(layer_index, i, trail_on);
 	}
@@ -366,6 +384,13 @@ bool MultiMeshBullets2D::play_effect_animation(int layer_index, const StringName
 		}
 		for (size_t s = 0; s < bake.shards.size(); ++s) {
 			if (bake.shards[s] != nullptr) {
+				// Zero first: a queued-free node still renders this frame.
+				Ref<MultiMesh> mm = bake.shards[s]->get_multimesh();
+				if (mm.is_valid()) {
+					for (int i = 0; i < mm->get_instance_count(); ++i) {
+						mm->set_instance_transform_2d(i, zero_transform);
+					}
+				}
 				bake.shards[s]->queue_free();
 			}
 		}
@@ -2522,7 +2547,17 @@ void MultiMeshBullets2D::reduce_lifetime(double delta) {
 				if (!all_bullets_enabled_set.contains(i)) {
 					continue;
 				}
+				// Lifetime expiry visuals fire here (not on collision kills):
+				// capture the pose first, the disable below never moves it.
+				Transform2D fx_expire_transf;
+				bool fx_have_pose = i >= 0 && i < (int)all_cached_instance_transforms.size();
+				if (fx_have_pose) {
+					fx_expire_transf = all_cached_instance_transforms[i];
+				}
 				disable_bullet(i, true);
+				if (fx_have_pose) {
+					fx_fire_oneshot(EFFECT_ON_LIFETIME_OVER, i, fx_expire_transf);
+				}
 			}
 
 			return;
@@ -2551,7 +2586,15 @@ void MultiMeshBullets2D::reduce_lifetime(double delta) {
 				continue;
 			}
 			bullet_indexes.push_back(i);
+			Transform2D fx_expire_transf;
+			const bool fx_have_pose = i >= 0 && i < (int)all_cached_instance_transforms.size();
+			if (fx_have_pose) {
+				fx_expire_transf = all_cached_instance_transforms[i];
+			}
 			disable_bullet(i, false); // immediate shape disable, keep attachment for signal
+			if (fx_have_pose) {
+				fx_fire_oneshot(EFFECT_ON_LIFETIME_OVER, i, fx_expire_transf);
+			}
 		}
 
 		// The sweep above pooled every attachment when the last bullet went out

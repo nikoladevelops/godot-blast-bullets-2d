@@ -7,6 +7,7 @@
 		Put layers in [MultiMeshBulletsData2D.effect_layers] — as many as you want. Each layer renders through its own per-frame shards (one extra draw call per animation frame while anything is visible, zero when idle), so layers never fight each other and every instance can show a different animation frame.
 		Upload [member sprite_frames] per layer (a layer with null frames is inert). Use [BulletAttachment2D] scenes instead when you need particles or scripted nodes; use layers for plain sprites.
 		One texture per layer is shared by all its instances (the performance bargain), so per-bullet different textures are not supported — vary instances with [member random_start_frame], [member randomize_rotation], [member random_scale_min]/[member random_scale_max] and [member trigger_chance] instead. Tint with [member self_modulate], or over life with [member color_ramp].
+		Bakes are snapshots: editing a layer's frames mid-life does not refresh live volleys or factory bakes — call [method MultiMeshBullets2D.set_effect_layers] (or [method MultiMeshBullets2D.play_effect_animation] for trails) to apply edits.
 	</description>
 	<tutorials>
 	</tutorials>
@@ -62,7 +63,7 @@
 			Frames to play (required: null frames leave the layer inert with a single bake-time warning, never a crash).
 		</member>
 		<member name="trigger" type="int" setter="set_trigger" getter="get_trigger" default="0">
-			What this layer does: 0 Trail Follow (sticks to its bullet every tick, and follows physics interpolation exactly like the bullet), 1 On Spawn (muzzle flash at every bullet's spawn pose), 2 On Hit (sparks on counted hits), 3 On Destroy (explosion on collision-kill only, never on lifetime expiry or manual disable), 4 On Bounce (sparks on ricochet; a consumed bounce fires this once, not the hit spark).
+			What this layer does: 0 Trail Follow (sticks to its bullet every tick, and follows physics interpolation exactly like the bullet), 1 On Spawn (muzzle flash at every bullet's spawn pose), 2 On Hit (sparks on counted hits), 3 On Destroy (explosion on collision-kill only, never on lifetime expiry or manual disable), 4 On Bounce (sparks on ricochet; a consumed bounce fires this once, not the hit spark), 5 On Lifetime Over (fizzle at expiry, on both the silent and the signalled expiry path).
 		</member>
 		<member name="trigger_chance" type="float" setter="set_trigger_chance" getter="get_trigger_chance" default="1.0">
 			Fire probability per event. Stack three explosion layers at 0.5 and every kill looks different. 0 never fires, 1 always fires.
@@ -92,6 +93,9 @@
 		</constant>
 		<constant name="EFFECT_ON_BOUNCE" value="4" enum="EffectTrigger">
 			One-shot fired on every ricochet (directional volleys only).
+		</constant>
+		<constant name="EFFECT_ON_LIFETIME_OVER" value="5" enum="EffectTrigger">
+			One-shot fired at each bullet's death pose on lifetime expiry (both the silent and the signalled path), even as the volley pools underneath it.
 		</constant>
 	</constants>
 </class>

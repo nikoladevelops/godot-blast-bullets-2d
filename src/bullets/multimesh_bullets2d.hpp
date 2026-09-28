@@ -898,20 +898,37 @@ public:
 		}
 	}
 
-	// Hides one bullet across every trail shard (disable path). The next
-	// write re-shows it; no shard visibility bookkeeping needed here since a
-	// hidden bullet owns no frame.
+	// Hides one bullet across every trail shard (disable path). Retires a
+	// shard's visibility when nothing tracks it anymore, so a fully
+	// hidden trail costs zero draw calls (empty shards must not stay
+	// visible). The next write re-shows it.
 	_ALWAYS_INLINE_ void hide_trail_instances(int bullet_index) {
 		if (fx_trail_bakes.empty() || bullet_index < 0 || bullet_index >= amount_bullets) {
 			return;
 		}
 		for (auto &bake : fx_trail_bakes) {
-			if (bullet_index < (int)bake.bullet_shard.size()) {
-				const int prev = bake.bullet_shard[bullet_index];
-				if (prev >= 0 && prev < (int)bake.shards.size() && bake.shards[prev] != nullptr) {
-					bake.shards[prev]->get_multimesh()->set_instance_transform_2d(bullet_index, zero_transform);
+			if (bullet_index < 0 || bullet_index >= (int)bake.bullet_shard.size()) {
+				continue;
+			}
+			const int prev = bake.bullet_shard[bullet_index];
+			if (prev >= 0 && prev < (int)bake.shards.size() && bake.shards[prev] != nullptr) {
+				bake.shards[prev]->get_multimesh()->set_instance_transform_2d(bullet_index, zero_transform);
+			}
+			bake.bullet_shard[bullet_index] = -1;
+			if (prev >= 0 && prev < (int)bake.shard_visible.size()) {
+				bool any_left = false;
+				for (size_t i = 0; i < bake.bullet_shard.size(); ++i) {
+					if (bake.bullet_shard[(int)i] == prev) {
+						any_left = true;
+						break;
+					}
 				}
-				bake.bullet_shard[bullet_index] = -1;
+				if (!any_left) {
+					bake.shard_visible[prev] = 0;
+					if (prev < (int)bake.shards.size() && bake.shards[prev] != nullptr) {
+						bake.shards[prev]->set_visible(false);
+					}
+				}
 			}
 		}
 	}
@@ -927,6 +944,9 @@ public:
 	void fx_fire_spawn_layers();
 
 	bool has_trail_effects() const;
+	// Layer-index guard shared by the per-bullet toggles (single error for
+	// range calls instead of one per bullet).
+	bool fx_has_trail_layer(int layer_index) const;
 	void bullet_set_trail_enabled(int layer_index, int bullet_index, bool trail_on);
 	void all_bullets_set_trail_enabled(int layer_index, bool trail_on, int bullet_index_start = 0, int bullet_index_end_inclusive = -1);
 	bool play_effect_animation(int layer_index, const StringName &animation);

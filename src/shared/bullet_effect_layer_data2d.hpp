@@ -24,7 +24,8 @@ enum EffectTrigger {
 	EFFECT_ON_SPAWN,
 	EFFECT_ON_HIT,
 	EFFECT_ON_DESTROY,
-	EFFECT_ON_BOUNCE
+	EFFECT_ON_BOUNCE,
+	EFFECT_ON_LIFETIME_OVER
 };
 
 class BulletEffectLayerData2D : public Resource {

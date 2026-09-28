@@ -108,8 +108,8 @@ int BulletEffectLayerData2D::get_trigger() const {
 	return trigger;
 }
 void BulletEffectLayerData2D::set_trigger(int value) {
-	if (value != EFFECT_TRAIL_FOLLOW && value != EFFECT_ON_SPAWN && value != EFFECT_ON_HIT && value != EFFECT_ON_DESTROY && value != EFFECT_ON_BOUNCE) {
-		UtilityFunctions::push_error("BulletEffectLayerData2D: trigger must be 0 (Trail Follow), 1 (On Spawn), 2 (On Hit), 3 (On Destroy) or 4 (On Bounce), keeping the old value.");
+	if (value != EFFECT_TRAIL_FOLLOW && value != EFFECT_ON_SPAWN && value != EFFECT_ON_HIT && value != EFFECT_ON_DESTROY && value != EFFECT_ON_BOUNCE && value != EFFECT_ON_LIFETIME_OVER) {
+		UtilityFunctions::push_error("BulletEffectLayerData2D: trigger must be 0 (Trail Follow), 1 (On Spawn), 2 (On Hit), 3 (On Destroy), 4 (On Bounce) or 5 (On Lifetime Over), keeping the old value.");
 		return;
 	}
 	trigger = value;
@@ -289,7 +289,7 @@ void BulletEffectLayerData2D::_bind_methods() {
 
 	ClassDB::bind_method(D_METHOD("get_trigger"), &BulletEffectLayerData2D::get_trigger);
 	ClassDB::bind_method(D_METHOD("set_trigger", "value"), &BulletEffectLayerData2D::set_trigger);
-	ADD_PROPERTY(PropertyInfo(Variant::INT, "trigger", PROPERTY_HINT_ENUM, "Trail Follow,On Spawn,On Hit,On Destroy,On Bounce"), "set_trigger", "get_trigger");
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "trigger", PROPERTY_HINT_ENUM, "Trail Follow,On Spawn,On Hit,On Destroy,On Bounce,On Lifetime Over"), "set_trigger", "get_trigger");
 
 	ClassDB::bind_method(D_METHOD("get_sprite_frames"), &BulletEffectLayerData2D::get_sprite_frames);
 	ClassDB::bind_method(D_METHOD("set_sprite_frames", "new_frames"), &BulletEffectLayerData2D::set_sprite_frames);
@@ -372,6 +372,7 @@ void BulletEffectLayerData2D::_bind_methods() {
 	BIND_ENUM_CONSTANT(EFFECT_ON_HIT);
 	BIND_ENUM_CONSTANT(EFFECT_ON_DESTROY);
 	BIND_ENUM_CONSTANT(EFFECT_ON_BOUNCE);
+	BIND_ENUM_CONSTANT(EFFECT_ON_LIFETIME_OVER);
 }
 } //namespace BlastBullets2D
 

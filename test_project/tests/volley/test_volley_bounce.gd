@@ -49,6 +49,16 @@ var _bounce_capture: Array = []
 func _on_bounce_capture(_body: Object, volley: DirectionalBullets2D, idx: int) -> void:
 	_bounce_capture.append([volley.debug_get_previous_origin(idx), volley.get_bullet_global_transform(idx).origin])
 
+func _finite_volley(v: DirectionalBullets2D) -> bool:
+	for i in v.get_amount_bullets():
+		if not v.get_bullet_transform(i).is_finite():
+			return false
+		if not v.get_bullet_direction(i).is_finite():
+			return false
+		if not v.get_bullet_velocity(i).is_finite():
+			return false
+	return true
+
 # Bullet data aimed at +X (or given angle) from a start pos.
 # Bounce walls live on layer 4 (value 8); plain walls on layer 5 (value 16).
 func _bounce_data(from: Vector2, angle: float, speed: float, bounce_layers: Array, mask_layers: Array, lifetime: float = 8.0) -> DirectionalBulletsData2D:
@@ -1037,6 +1047,7 @@ func _initialize() -> void:
 	pusher.collision_mask = 0
 	pusher.gravity_scale = 0.0
 	pusher.linear_damp = 0.0
+	pusher.linear_damp_mode = RigidBody2D.DAMP_MODE_REPLACE
 	pusher.can_sleep = false
 	pusher.linear_velocity = Vector2(500, 0)
 	var pcol := CollisionShape2D.new()
@@ -1056,7 +1067,7 @@ func _initialize() -> void:
 	var push_dir: Vector2 = v23.get_bullet_direction(0)
 	var push_spd: float = v23.get_bullet_velocity(0).length()
 	_check(push_dir.x > 0.5, "pushed bullet keeps flying forward, never reverses (dir %s)" % str(push_dir))
-	_check(push_spd > 500.0 and push_spd < 1300.0, "pusher surge reflects relative velocity (~900, got %.0f)" % push_spd)
+	_check(absf(push_spd - 900.0) < 80.0, "pusher surge reflects relative velocity (~900, got %.0f)" % push_spd)
 	pusher.queue_free()
 	await process_frame
 	await _settle(factory)
@@ -1066,6 +1077,7 @@ func _initialize() -> void:
 	charger.collision_mask = 0
 	charger.gravity_scale = 0.0
 	charger.linear_damp = 0.0
+	charger.linear_damp_mode = RigidBody2D.DAMP_MODE_REPLACE
 	charger.can_sleep = false
 	charger.linear_velocity = Vector2(-400, 0)
 	var ccol := CollisionShape2D.new()
@@ -1083,7 +1095,7 @@ func _initialize() -> void:
 			break
 	var head_spd: float = v23b.get_bullet_velocity(0).length()
 	_check(v23b.get_bullet_direction(0).x < -0.5, "head-on wall reflects backwards")
-	_check(head_spd > 500.0 and head_spd < 1300.0, "head-on impact amplifies (~900, got %.0f)" % head_spd)
+	_check(absf(head_spd - 900.0) < 80.0, "head-on impact amplifies (~900, got %.0f)" % head_spd)
 	charger.queue_free()
 	await process_frame
 	printerr("BOUNCE T23b separating repeats never re-bounce")
@@ -1140,6 +1152,7 @@ func _initialize() -> void:
 	arcade.collision_mask = 0
 	arcade.gravity_scale = 0.0
 	arcade.linear_damp = 0.0
+	arcade.linear_damp_mode = RigidBody2D.DAMP_MODE_REPLACE
 	arcade.can_sleep = false
 	arcade.linear_velocity = Vector2(500, 0)
 	var acol := CollisionShape2D.new()
@@ -1159,7 +1172,7 @@ func _initialize() -> void:
 	_check(v24.bullet_get_bounce_count(0) >= 1, "unassisted bounce still fires")
 	_check(v24.get_bullet_direction(0).x < -0.5, "push assist off reverses (no surge)")
 	var arcade_spd: float = v24.get_bullet_velocity(0).length()
-	_check(arcade_spd > 50.0 and arcade_spd < 200.0, "push assist off keeps plain speed (~100, got %.0f)" % arcade_spd)
+	_check(absf(arcade_spd - 100.0) < 30.0, "push assist off keeps plain speed (~100, got %.0f)" % arcade_spd)
 	arcade.queue_free()
 	await process_frame
 	await _settle(factory)
@@ -1171,6 +1184,7 @@ func _initialize() -> void:
 	charger2.collision_mask = 0
 	charger2.gravity_scale = 0.0
 	charger2.linear_damp = 0.0
+	charger2.linear_damp_mode = RigidBody2D.DAMP_MODE_REPLACE
 	charger2.can_sleep = false
 	charger2.linear_velocity = Vector2(-400, 0)
 	var c2col := CollisionShape2D.new()
@@ -1188,7 +1202,7 @@ func _initialize() -> void:
 			break
 	_check(v24b.get_bullet_direction(0).x < -0.5, "charge amplify off still reflects")
 	var plain_spd: float = v24b.get_bullet_velocity(0).length()
-	_check(plain_spd > 50.0 and plain_spd < 200.0, "charge amplify off keeps plain speed (~100, got %.0f)" % plain_spd)
+	_check(absf(plain_spd - 100.0) < 30.0, "charge amplify off keeps plain speed (~100, got %.0f)" % plain_spd)
 	charger2.queue_free()
 	await process_frame
 	await _settle(factory)
@@ -1201,6 +1215,7 @@ func _initialize() -> void:
 	arcade2.collision_mask = 0
 	arcade2.gravity_scale = 0.0
 	arcade2.linear_damp = 0.0
+	arcade2.linear_damp_mode = RigidBody2D.DAMP_MODE_REPLACE
 	arcade2.can_sleep = false
 	arcade2.linear_velocity = Vector2(500, 0)
 	var a2col := CollisionShape2D.new()
@@ -1244,7 +1259,7 @@ func _initialize() -> void:
 	_check(v25.bullet_get_bounce_count(0) >= 1, "CharacterBody velocity read without motion")
 	_check(v25.get_bullet_direction(0).x > 0.5, "CharacterBody push surges forward")
 	var char_spd: float = v25.get_bullet_velocity(0).length()
-	_check(char_spd > 600.0 and char_spd < 1200.0, "CharacterBody surge magnitude (~900, got %.0f)" % char_spd)
+	_check(absf(char_spd - 900.0) < 80.0, "CharacterBody surge magnitude (~900, got %.0f)" % char_spd)
 	charlie.queue_free()
 	await process_frame
 	await _settle(factory)
@@ -1304,6 +1319,7 @@ func _initialize() -> void:
 	pusher0.collision_mask = 0
 	pusher0.gravity_scale = 0.0
 	pusher0.linear_damp = 0.0
+	pusher0.linear_damp_mode = RigidBody2D.DAMP_MODE_REPLACE
 	pusher0.can_sleep = false
 	pusher0.linear_velocity = Vector2(500, 0)
 	var p0col := CollisionShape2D.new()
@@ -1322,7 +1338,7 @@ func _initialize() -> void:
 			break
 	_check(v25d.get_bullet_direction(0).x > 0.5, "dead-stop vs pusher rides the wall")
 	var stick_spd: float = v25d.get_bullet_velocity(0).length()
-	_check(stick_spd > 350.0 and stick_spd < 650.0, "dead-stop adopts wall speed (~500, got %.0f)" % stick_spd)
+	_check(absf(stick_spd - 500.0) < 40.0, "dead-stop adopts wall speed (~500, got %.0f)" % stick_spd)
 	pusher0.queue_free()
 	await process_frame
 	await _settle(factory)
@@ -1332,6 +1348,7 @@ func _initialize() -> void:
 	pusher1.collision_mask = 0
 	pusher1.gravity_scale = 0.0
 	pusher1.linear_damp = 0.0
+	pusher1.linear_damp_mode = RigidBody2D.DAMP_MODE_REPLACE
 	pusher1.can_sleep = false
 	pusher1.linear_velocity = Vector2(500, 0)
 	var p1col := CollisionShape2D.new()
@@ -1350,7 +1367,7 @@ func _initialize() -> void:
 			break
 	_check(v25e.get_bullet_direction(0).x > 0.5, "precise mode surges too")
 	var precise_spd: float = v25e.get_bullet_velocity(0).length()
-	_check(precise_spd > 600.0 and precise_spd < 1200.0, "precise surge magnitude (~900, got %.0f)" % precise_spd)
+	_check(absf(precise_spd - 900.0) < 80.0, "precise surge magnitude (~900, got %.0f)" % precise_spd)
 	pusher1.queue_free()
 	await process_frame
 	printerr("BOUNCE T25c knob independence + pool ghost-boost")
@@ -1363,6 +1380,7 @@ func _initialize() -> void:
 	charger3.collision_mask = 0
 	charger3.gravity_scale = 0.0
 	charger3.linear_damp = 0.0
+	charger3.linear_damp_mode = RigidBody2D.DAMP_MODE_REPLACE
 	charger3.can_sleep = false
 	charger3.linear_velocity = Vector2(-400, 0)
 	var c3col := CollisionShape2D.new()
@@ -1378,7 +1396,7 @@ func _initialize() -> void:
 		if v25f.bullet_get_bounce_count(0) >= 1:
 			break
 	var cross_spd: float = v25f.get_bullet_velocity(0).length()
-	_check(cross_spd > 600.0 and cross_spd < 1200.0, "charge works while push is off (~900, got %.0f)" % cross_spd)
+	_check(absf(cross_spd - 900.0) < 80.0, "charge works while push is off (~900, got %.0f)" % cross_spd)
 	charger3.queue_free()
 	await process_frame
 	await _settle(factory)
@@ -1390,6 +1408,7 @@ func _initialize() -> void:
 	pusher2.collision_mask = 0
 	pusher2.gravity_scale = 0.0
 	pusher2.linear_damp = 0.0
+	pusher2.linear_damp_mode = RigidBody2D.DAMP_MODE_REPLACE
 	pusher2.can_sleep = false
 	pusher2.linear_velocity = Vector2(500, 0)
 	var p2col := CollisionShape2D.new()
@@ -1406,7 +1425,7 @@ func _initialize() -> void:
 			break
 	var surge_spd: float = v25g.get_bullet_velocity(0).length()
 	_check(v25g.get_bullet_direction(0).x > 0.5, "push works while charge is off")
-	_check(surge_spd > 600.0 and surge_spd < 1200.0, "push surge intact (~900, got %.0f)" % surge_spd)
+	_check(absf(surge_spd - 900.0) < 80.0, "push surge intact (~900, got %.0f)" % surge_spd)
 	pusher2.queue_free()
 	await process_frame
 	await _settle(factory)
@@ -1438,6 +1457,424 @@ func _initialize() -> void:
 		await physics_frame
 	var wake_spd: float = v25h.get_bullet_velocity(0).length()
 	_check(absf(wake_spd - 300.0) < 80.0, "wake has no ghost boost from the dead life (got %.0f)" % wake_spd)
+
+	printerr("BOUNCE T26 reset semantics, multi-bullet, gravity arc, area routing")
+	await _settle(factory)
+	var d26 := _bounce_data(Vector2.ZERO, 0.0, 300.0, [4], [4])
+	var v26: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d26)
+	for i in 120:
+		await physics_frame
+		if v26.bullet_get_bounce_count(0) >= 1:
+			break
+	_check(v26.bullet_get_bounce_count(0) >= 1, "baseline bounce counted")
+	v26.disable_bullet(0)
+	_check(v26.bullet_get_bounce_count(0) == 0, "disable zeroes the bounce count")
+	v26.enable_bullet(0)
+	_check(v26.bullet_get_bounce_count(0) == 0, "wake restarts the ledger")
+	_check(v26.is_bullet_status_enabled(0), "wake revives the bullet")
+	await _settle(factory)
+	var dd26 := DirectionalBulletsData2D.new()
+	dd26.transforms = [Transform2D(0.0, Vector2.ZERO), Transform2D(0.0, Vector2.ZERO)]
+	var s26: Array = []
+	for i in 2:
+		var sp26 := BulletSpeedData2D.new()
+		sp26.speed = 300.0
+		sp26.max_speed = 3000.0
+		s26.append(sp26)
+	dd26.all_bullet_speed_data = s26
+	dd26.max_life_time = 8.0
+	dd26.texture_size = Vector2(16, 16)
+	dd26.monitorable = true
+	dd26.set_collision_layer_from_array([2])
+	dd26.set_collision_mask_from_array([4])
+	dd26.set_bounce_mask_from_array([4])
+	var cc := CircleShape2D.new()
+	cc.radius = 6.0
+	dd26.collision_shape = cc
+	var v26b: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(dd26)
+	for i in 150:
+		await physics_frame
+		if v26b.bullet_get_bounce_count(0) >= 1 and v26b.bullet_get_bounce_count(1) >= 1:
+			break
+	_check(v26b.bullet_get_bounce_count(0) == 1 and v26b.bullet_get_bounce_count(1) == 1, "both bullets bounce independently")
+	_check(v26b.get_bullet_direction(0).x < -0.5 and v26b.get_bullet_direction(1).x < -0.5, "both bullets reflect")
+	await _settle(factory)
+	var d26c := _bounce_data(Vector2.ZERO, 0.0, 300.0, [4], [4])
+	d26c.gravity = Vector2(0, 200.0)
+	var v26c: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d26c)
+	for i in 120:
+		await physics_frame
+		if v26c.bullet_get_bounce_count(0) >= 1:
+			break
+	_check(v26c.bullet_get_bounce_count(0) >= 1, "gravity volley bounces")
+	_check(v26c.get_bullet_direction(0).x < 1.0 - 0.05, "arcing impact deflects off head-on")
+	_check(v26c.get_bullet_velocity(0).y > 20.0, "fall continues downward after the bounce")
+	_check(v26c.get_bullet_velocity(0).is_finite(), "post-bounce gravity state finite")
+	await _settle(factory)
+	var eye26 := Area2D.new()
+	eye26.position = Vector2(200, 300)
+	eye26.collision_layer = 8
+	eye26.monitoring = true
+	eye26.monitorable = true
+	var e26col := CollisionShape2D.new()
+	var e26box := RectangleShape2D.new()
+	e26box.size = Vector2(20, 400)
+	e26col.shape = e26box
+	eye26.add_child(e26col)
+	get_root().add_child(eye26)
+	await physics_frame
+	var d26d := _bounce_data(Vector2.ZERO, 0.0, 100.0, [4], [4])
+	var v26d: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d26d)
+	v26d.set_bullet_transform(0, Transform2D(0.0, Vector2(200, 300)))
+	for i in 60:
+		await physics_frame
+		if v26d.bullet_get_bounce_count(0) >= 1:
+			break
+	_check(v26d.bullet_get_bounce_count(0) >= 1, "pure area overlap bounces")
+	_check(_bounce_area.size() >= 1, "area bounce routes to the area signal")
+	_check(_bounce_body.is_empty(), "area bounce never touches the body signal")
+	eye26.queue_free()
+	await process_frame
+	await _settle(factory)
+	var d26e := _bounce_data(Vector2.ZERO, 0.0, 200.0, [4], [4])
+	d26e.bounce_push_assist = false
+	d26e.bounce_charge_amplify = false
+	var v26e: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d26e)
+	_check(v26e.get_bounce_push_assist() == false and v26e.get_bounce_charge_amplify() == false, "knobs-off mirrors reseeded")
+	factory.free_active_bullets()
+	await process_frame
+	await process_frame
+	var v26f: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(_bounce_data(Vector2.ZERO, 0.0, 200.0, [4], [4]))
+	_check(v26f.get_bounce_push_assist() == true and v26f.get_bounce_charge_amplify() == true, "respawn reseeds knobs to defaults")
+
+	printerr("BOUNCE T27 curves beat surge, guard ignores knobs, degenerate config")
+	await _settle(factory)
+	var flat27 := BulletCurvesData2D.new()
+	var flat27_curve := Curve.new()
+	flat27_curve.min_value = 0.0
+	flat27_curve.max_value = 2000.0
+	flat27_curve.add_point(Vector2(0, 300))
+	flat27_curve.add_point(Vector2(1, 300))
+	flat27.movement_speed_curve = flat27_curve
+	flat27.movement_use_unit_curve = false
+	var push27 := RigidBody2D.new()
+	push27.position = Vector2(-150, 300)
+	push27.collision_layer = 8
+	push27.collision_mask = 0
+	push27.gravity_scale = 0.0
+	push27.linear_damp = 0.0
+	push27.linear_damp_mode = RigidBody2D.DAMP_MODE_REPLACE
+	push27.can_sleep = false
+	push27.linear_velocity = Vector2(500, 0)
+	var p27col := CollisionShape2D.new()
+	var p27box := RectangleShape2D.new()
+	p27box.size = Vector2(20, 400)
+	p27col.shape = p27box
+	push27.add_child(p27col)
+	get_root().add_child(push27)
+	await physics_frame
+	var d27 := _bounce_data(Vector2(0, 300), 0.0, 100.0, [4], [4])
+	var v27: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d27)
+	v27.set_shared_bullet_curves_data(flat27)
+	for i in 150:
+		await physics_frame
+		if v27.bullet_get_bounce_count(0) >= 1:
+			break
+	_check(v27.get_bullet_velocity(0).length() > 600.0, "curved bullet still surges at the drain")
+	for i in 3:
+		await physics_frame
+	_check(absf(v27.get_bullet_velocity(0).length() - 300.0) < 80.0, "curves reclaim the surge next tick")
+	push27.queue_free()
+	await process_frame
+	await _settle(factory)
+	var d27b := _bounce_data(Vector2(100, 0), 0.0, 300.0, [4], [4])
+	d27b.bounce_cooldown_sec = 0.0
+	d27b.bounce_debounce_sec = 0.05
+	d27b.bounce_push_assist = false
+	d27b.bounce_charge_amplify = false
+	var v27b: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d27b)
+	for i in 40:
+		if i % 8 < 4:
+			if i % 8 == 0:
+				v27b.set_bullet_transform(0, Transform2D(0.0, Vector2(205, 0)))
+				v27b.set_bullet_direction(0, Vector2(1, 0))
+		else:
+			if i % 8 == 4:
+				v27b.set_bullet_transform(0, Transform2D(0.0, Vector2(100, 0)))
+		await physics_frame
+	_check(v27b.bullet_get_bounce_count(0) <= 2, "repeat guard holds with both knobs off (got %d)" % v27b.bullet_get_bounce_count(0))
+	await _settle(factory)
+	var wall27b := _make_wall(Vector2(-200, 0), 8)
+	await physics_frame
+	var d27c := _bounce_data(Vector2(100, 0), 0.0, 0.0, [4], [4])
+	d27c.bounce_cooldown_sec = 0.0
+	d27c.bounce_debounce_sec = 0.0
+	var v27c: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d27c)
+	for i in 20:
+		if i % 2 == 0:
+			v27c.set_bullet_transform(0, Transform2D(0.0, Vector2(200, 0)))
+		else:
+			v27c.set_bullet_transform(0, Transform2D(0.0, Vector2(-200, 0)))
+		await physics_frame
+	_check(v27c.bullet_get_bounce_count(0) >= 16, "zero guards bounce every detected entry (got %d)" % v27c.bullet_get_bounce_count(0))
+	wall27b.queue_free()
+	await process_frame
+
+	printerr("BOUNCE T28 hostile: freed walls, NaN motion, overflow, starvation")
+	await _settle(factory)
+	# T28a: freed wall mid-overlap freezes counts, volley stays finite.
+	var d28 := _bounce_data(Vector2.ZERO, 0.0, 300.0, [4], [4])
+	var v28: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d28)
+	for i in 120:
+		await physics_frame
+		if v28.bullet_get_bounce_count(0) >= 1:
+			break
+	_check(v28.bullet_get_bounce_count(0) >= 1, "hostile baseline bounced")
+	var frozen28: int = v28.bullet_get_bounce_count(0)
+	wall.queue_free()
+	await process_frame
+	await process_frame
+	for i in 30:
+		await physics_frame
+	_check(v28.bullet_get_bounce_count(0) == frozen28, "freed wall freezes bounce counts")
+	_check(_finite_volley(v28), "volley finite after wall freed mid-flight")
+	_check(factory.debug_assert_no_dangling().get("ok", false) == true, "no dangling after wall freed mid-flight")
+	wall = _make_wall(Vector2(200, 0), 8)
+	await physics_frame
+	# T28b: NaN wall velocity falls back to static, never crashes.
+	await _settle(factory)
+	var nan28 := RigidBody2D.new()
+	nan28.position = Vector2(200, 0)
+	nan28.collision_layer = 8
+	nan28.collision_mask = 0
+	nan28.gravity_scale = 0.0
+	nan28.linear_damp = 0.0
+	nan28.linear_damp_mode = RigidBody2D.DAMP_MODE_REPLACE
+	nan28.can_sleep = false
+	nan28.linear_velocity = Vector2(NAN, 0.0)
+	var nan28col := CollisionShape2D.new()
+	var nan28box := RectangleShape2D.new()
+	nan28box.size = Vector2(20, 400)
+	nan28col.shape = nan28box
+	nan28.add_child(nan28col)
+	get_root().add_child(nan28)
+	await physics_frame
+	var d28b := _bounce_data(Vector2.ZERO, 0.0, 300.0, [4], [4])
+	var v28b: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d28b)
+	for i in 120:
+		await physics_frame
+		if v28b.bullet_get_bounce_count(0) >= 1:
+			break
+	_check(v28b.bullet_get_bounce_count(0) >= 1, "NaN-velocity wall still bounces (static fallback)")
+	_check(v28b.get_bullet_velocity(0).is_finite(), "velocity finite after NaN-velocity bounce")
+	nan28.queue_free()
+	await process_frame
+	# T28c: absurd-finite strength refuses the bounce instead of poisoning.
+	await _settle(factory)
+	var d28c := _bounce_data(Vector2.ZERO, 0.0, 300.0, [4], [4])
+	d28c.bounce_strength = 1e30
+	var v28c: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d28c)
+	for i in 10:
+		await physics_frame
+	_check(_finite_volley(v28c), "1e30 strength never poisons the volley")
+	_check(v28c.bullet_get_bounce_count(0) <= 1, "overflow bounce refused, not counted")
+	# T28d: empty transforms with bounce armed refuse or spawn empty.
+	await _settle(factory)
+	var d28d := _bounce_data(Vector2.ZERO, 0.0, 300.0, [4], [4])
+	d28d.transforms = []
+	var v28d: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d28d)
+	_check(v28d == null or v28d.get_amount_bullets() == 0, "empty transforms refused-or-empty with bounce armed")
+	# T28e: subnormal strength is a finite dead-stop, heading preserved.
+	await _settle(factory)
+	var d28e := _bounce_data(Vector2.ZERO, 0.0, 300.0, [4], [4])
+	d28e.bounce_strength = 1e-30
+	var v28e: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d28e)
+	for i in 120:
+		await physics_frame
+		if v28e.bullet_get_bounce_count(0) >= 1:
+			break
+	_check(v28e.bullet_get_bounce_count(0) >= 1, "subnormal strength still bounces")
+	_check(v28e.get_bullet_velocity(0).is_finite(), "subnormal bounce stays finite")
+	_check(v28e.get_bullet_velocity(0).length() < 0.01, "subnormal strength dead-stops")
+	# T28f: spawner shoot_once rejects null data and bad factory paths.
+	# NOTE: set_bullet_factory(null) then shoot_once() would exercise the
+	# no-factory path, but assigning the spawner under a live factory via
+	# set_bullet_factory hits path-resolution edge cases headless; the
+	# null-data path below plus the spawner suites' factory-missing
+	# coverage (test_spawner_tree T: bare spawner, failed shot uncounted)
+	# pin the fail-early contract without flaking the runner.
+	await _settle(factory)
+	var spawner28 := BulletSpawner2D.new()
+	get_root().add_child(spawner28)
+	await process_frame
+	spawner28.set_bullet_factory(factory)
+	spawner28.set_spawn_data(null)
+	var fired28: int = spawner28.get_volleys_fired()
+	_check(spawner28.shoot_once() == false, "shoot_once with null data returns false")
+	_check(spawner28.get_volleys_fired() == fired28, "failed shot not counted")
+	spawner28.queue_free()
+	await process_frame
+	# No-factory path: a spawner with data but no factory refuses cleanly.
+	var lonely28 := BulletSpawner2D.new()
+	get_root().add_child(lonely28)
+	await process_frame
+	lonely28.set_spawn_data(_bounce_data(Vector2.ZERO, 0.0, 300.0, [4], [4]))
+	var lonely_fired: int = lonely28.get_volleys_fired()
+	_check(lonely28.shoot_once() == false, "shoot_once with no factory returns false")
+	_check(lonely28.get_volleys_fired() == lonely_fired, "factory-less shot not counted")
+	lonely28.queue_free()
+	await process_frame
+	# T28g: two bullets vs one pusher stay independent in motion.
+	await _settle(factory)
+	var push28 := RigidBody2D.new()
+	push28.position = Vector2(-150, 300)
+	push28.collision_layer = 8
+	push28.collision_mask = 0
+	push28.gravity_scale = 0.0
+	push28.linear_damp = 0.0
+	push28.linear_damp_mode = RigidBody2D.DAMP_MODE_REPLACE
+	push28.can_sleep = false
+	push28.linear_velocity = Vector2(500, 0)
+	var push28col := CollisionShape2D.new()
+	var push28box := RectangleShape2D.new()
+	push28box.size = Vector2(20, 400)
+	push28col.shape = push28box
+	push28.add_child(push28col)
+	get_root().add_child(push28)
+	await physics_frame
+	var d28g := _bounce_data(Vector2(0, 300), 0.0, 100.0, [4], [4])
+	d28g.transforms = [Transform2D(0.0, Vector2(0, 300)), Transform2D(0.0, Vector2(0, 340))]
+	var sg28 := BulletSpeedData2D.new()
+	sg28.speed = 100.0
+	sg28.max_speed = 3000.0
+	sg28.acceleration = 0.0
+	d28g.all_bullet_speed_data = [sg28, sg28]
+	var v28g: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d28g)
+	for i in 150:
+		await physics_frame
+		if v28g.bullet_get_bounce_count(0) >= 1 and v28g.bullet_get_bounce_count(1) >= 1:
+			break
+	_check(v28g.bullet_get_bounce_count(0) >= 1 and v28g.bullet_get_bounce_count(1) >= 1, "both bullets bounce off the shared pusher")
+	_check(_finite_volley(v28g), "both bullets finite after shared-pusher bounce")
+	push28.queue_free()
+	await process_frame
+	# T28h: StayLocked orbit wins over the pusher (zero bounces).
+	await _settle(factory)
+	var orbit28 := Node2D.new()
+	orbit28.position = Vector2(400, 0)
+	get_root().add_child(orbit28)
+	await process_frame
+	var lock28 := RigidBody2D.new()
+	lock28.position = Vector2(300, 0)
+	lock28.collision_layer = 8
+	lock28.collision_mask = 0
+	lock28.gravity_scale = 0.0
+	lock28.linear_damp = 0.0
+	lock28.linear_damp_mode = RigidBody2D.DAMP_MODE_REPLACE
+	lock28.can_sleep = false
+	lock28.linear_velocity = Vector2(500, 0)
+	var lock28col := CollisionShape2D.new()
+	var lock28box := RectangleShape2D.new()
+	lock28box.size = Vector2(20, 400)
+	lock28col.shape = lock28box
+	lock28.add_child(lock28col)
+	get_root().add_child(lock28)
+	await physics_frame
+	var d28h := _bounce_data(Vector2.ZERO, 0.0, 300.0, [4], [4])
+	var v28h: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d28h)
+	# OrbitRight=2, FaceTarget=0, FollowTarget=0, StayLocked=1.
+	v28h.bullet_homing_push_back_homing_target(0, orbit28)
+	v28h.bullet_enable_orbiting(0, 60.0, 2, 0, 0, 0.0, 1, true)
+	for i in 120:
+		await physics_frame
+		if v28h.bullet_is_orbiting_locked(0):
+			break
+	_check(v28h.bullet_is_orbiting_locked(0), "orbiter locked before the pusher arrives")
+	_clear_signals()
+	for i in 60:
+		await physics_frame
+	_check(v28h.bullet_get_bounce_count(0) == 0, "StayLocked orbit takes zero bounces")
+	_check(v28h.bullet_is_orbiting_locked(0), "StayLocked ring survives the pusher")
+	orbit28.queue_free()
+	lock28.queue_free()
+	await process_frame
+
+	printerr("BOUNCE T29 precise-mode degenerate shapes fall back to radial")
+	await _settle(factory)
+	var zero29 := StaticBody2D.new()
+	zero29.position = Vector2(200, 0)
+	zero29.collision_layer = 8
+	zero29.collision_mask = 2
+	var zero29col := CollisionShape2D.new()
+	var zero29box := RectangleShape2D.new()
+	zero29box.size = Vector2(0, 0)
+	zero29col.shape = zero29box
+	zero29.add_child(zero29col)
+	get_root().add_child(zero29)
+	await physics_frame
+	var d29 := _bounce_data(Vector2.ZERO, 0.0, 300.0, [4], [4])
+	d29.bounce_mode = 1
+	var v29: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d29)
+	for i in 120:
+		await physics_frame
+		if v29.bullet_get_bounce_count(0) >= 1:
+			break
+	_check(v29.bullet_get_bounce_count(0) >= 1, "zero-size rect falls back to radial and bounces")
+	_check(_finite_volley(v29), "volley finite after degenerate-shape bounce")
+	zero29.queue_free()
+	await process_frame
+	await _settle(factory)
+	var null29 := StaticBody2D.new()
+	null29.position = Vector2(200, 0)
+	null29.collision_layer = 8
+	null29.collision_mask = 2
+	var null29col := CollisionShape2D.new()
+	null29.add_child(null29col)
+	get_root().add_child(null29)
+	await physics_frame
+	var v29b: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d29)
+	for i in 120:
+		await physics_frame
+		if v29b.bullet_get_bounce_count(0) >= 1:
+			break
+	_check(v29b.bullet_get_bounce_count(0) >= 1, "null-shape wall falls back to radial and bounces")
+	_check(_finite_volley(v29b), "volley finite after null-shape bounce")
+	null29.queue_free()
+	await process_frame
+
+	printerr("BOUNCE T30 consumed bounces spark once and still count")
+	await _settle(factory)
+	var d30 := _bounce_data(Vector2.ZERO, 0.0, 300.0, [4], [4])
+	d30.bounce_hit_consumed = true
+	d30.bounce_max_count = 2
+	var v30: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d30)
+	for i in 120:
+		await physics_frame
+		if v30.bullet_get_bounce_count(0) >= 1:
+			break
+	_check(v30.bullet_get_bounce_count(0) == 1, "consumed bounce counted once")
+	_check(v30.get_bullet_collision_count(0) == 1, "consumed bounce also consumes one hit")
+	_check(_finite_volley(v30), "volley finite after consumed bounce")
+
+	printerr("BOUNCE T31 setter rejects keep old values")
+	var d31 := _bounce_data(Vector2.ZERO, 0.0, 300.0, [4], [4])
+	d31.set_bounce_strength(NAN)
+	_check(absf(d31.bounce_strength - 1.0) < 0.0001, "NaN strength rejected")
+	d31.set_bounce_strength(-1.0)
+	_check(absf(d31.bounce_strength - 1.0) < 0.0001, "negative strength rejected")
+	d31.set_bounce_mask(-1)
+	_check(d31.bounce_mask == 8, "negative mask rejected")
+	d31.set_bounce_max_count(-1)
+	_check(d31.bounce_max_count == 0, "negative max count rejected")
+	d31.set_bounce_cooldown_sec(5.0)
+	_check(absf(d31.bounce_cooldown_sec - 0.05) < 0.0001, "over-range cooldown rejected")
+	d31.set_bounce_randomness_deg(999.0)
+	_check(absf(d31.bounce_randomness_deg) < 0.0001, "over-range randomness rejected")
+	var v31: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(_bounce_data(Vector2.ZERO, 0.0, 300.0, [4], [4]))
+	v31.set_bounce_strength(NAN)
+	_check(absf(v31.get_bounce_strength() - 1.0) < 0.0001, "live NaN strength rejected")
+	v31.set_bounce_mask(-1)
+	_check(v31.get_bounce_mask() == 8, "live negative mask rejected")
 
 	factory.directional_bounce_body_entered.disconnect(_on_bounce_body)
 	factory.directional_bounce_area_entered.disconnect(_on_bounce_area)

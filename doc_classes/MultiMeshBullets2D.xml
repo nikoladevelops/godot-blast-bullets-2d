@@ -976,7 +976,7 @@
 			The elapsed time used for the bullets' curves. This is the time that gets passed to the curves assigned to the bullets, you can manipulate it freely.
 		</member>
 		<member name="effect_layers" type="BulletEffectLayerData2D[]" setter="set_effect_layers" getter="get_effect_layers" default="[]">
-			Stackable sprite-effect layers (trails, spawn flashes, hit sparks, destroy explosions, bounce sparks). Each entry renders through its own per-frame shards: one extra draw call per animation frame while anything is visible, zero when idle. Empty (default) disables the whole feature. Use [BulletEffectLayerData2D] presets for zero-art effects, or assign custom SpriteFrames per layer.
+			Stackable sprite-effect layers (trails, spawn flashes, hit sparks, destroy explosions, bounce sparks, lifetime fizzles). Each entry renders through its own per-frame shards: one extra draw call per animation frame while anything is visible, zero when idle. Empty (default) disables the whole feature. Assign custom SpriteFrames per layer. Cost scales with art (frames), bullets, and active one-shots, not with layer count alone.
 		</member>
 
 		<member name="is_attachments_auto_pooling_enabled" type="bool" setter="set_is_attachments_auto_pooling_enabled" getter="get_is_attachments_auto_pooling_enabled" default="true">

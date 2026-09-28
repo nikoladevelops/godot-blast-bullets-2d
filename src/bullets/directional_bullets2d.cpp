@@ -1139,6 +1139,13 @@ int DirectionalBullets2D::try_handle_bounce(CollisionType collision_type, int bu
 		}
 	}
 	real_t new_speed = refl.length();
+	// Length can overflow to +Inf even when the components are finite
+	// (float Vector2: ~1e38 components overflow the hypotenuse). Refuse
+	// the bounce instead of storing an Inf speed that poisons every later
+	// tick's movement, curves, and interpolation.
+	if (!Math::is_finite((double)new_speed)) {
+		return 0;
+	}
 	Vector2 new_dir = (new_speed > 0.0001) ? (refl / new_speed) : dir;
 	if (!new_dir.is_finite()) {
 		new_dir = dir;
@@ -1149,27 +1156,22 @@ int DirectionalBullets2D::try_handle_bounce(CollisionType collision_type, int bu
 	// the same boost across curve overwrites (curves rewrite speed every
 	// tick, see the speed section); plain accel carries it inside the
 	// cached speed. Multipliers accumulate across bounces in one life.
-	if (Math::is_finite((double)new_speed)) {
-		if (bullet_index < (int)all_cached_max_speed.size() && all_cached_max_speed[bullet_index] > 0.0 && new_speed > all_cached_max_speed[bullet_index]) {
-			all_cached_max_speed[bullet_index] = new_speed;
-		}
-		if (bullet_index < 0 || bullet_index >= (int)all_bounce_speed_multiplier.size()) {
-			ensure_bounce_vectors();
-		}
-		if (bullet_index >= 0 && bullet_index < (int)all_bounce_speed_multiplier.size()) {
-			const real_t updated = all_bounce_speed_multiplier[bullet_index] * bounce_strength;
-			all_bounce_speed_multiplier[bullet_index] = Math::is_finite((double)updated) ? updated : (real_t)1.0;
-			bounce_speed_scaled = true;
-		}
-	}
+	// Deferred until the velocity commit below proves finite (see the
+	// overflow guard there): a refused bounce must not raise ceilings.
+	const real_t pending_ceiling_raise = (bullet_index < (int)all_cached_max_speed.size() && all_cached_max_speed[bullet_index] > 0.0 && new_speed > all_cached_max_speed[bullet_index]) ? new_speed : (real_t)-1.0;
 	// A non-StayLocked lock breaks: the bullet left the ring by definition.
 	if (bullet_index < (int)all_orbiting_status.size() && bullet_index < (int)all_orbiting_data.size() && all_orbiting_status[bullet_index] && all_orbiting_data[bullet_index].is_locked_orbiting) {
 		all_orbiting_data[bullet_index].is_locked_orbiting = false;
 	}
 	// Commit ballistics. Gravity fall speed reflects too so arcs continue
 	// naturally; the inherited wind offset rides along untouched.
-	all_cached_direction[bullet_index] = new_dir;
-	all_cached_speed[bullet_index] = new_speed;
+	// The composed velocity is guarded as a whole BEFORE any write:
+	// individually finite parts (unit direction, huge speed, wind, gravity)
+	// can still overflow their SUM (float Vector2 saturates near ~3.4e38).
+	// A non-finite total refuses the bounce with ballistics untouched, so
+	// no Inf speed/velocity ever poisons movement, curves, or
+	// interpolation for the rest of the volley's life.
+	Vector2 commit_gravity = Vector2(0, 0);
 	if (bullet_index < (int)all_gravity_velocity.size()) {
 		const Vector2 gv = all_gravity_velocity[bullet_index];
 		if (gv.is_finite() && gv.length_squared() > 0.0) {
@@ -1177,12 +1179,37 @@ int DirectionalBullets2D::try_handle_bounce(CollisionType collision_type, int bu
 			// not contact motion): relativizing it would fling arcs near
 			// fast targets instead of continuing them naturally.
 			const Vector2 gr = gv.bounce(surface_n) * bounce_strength;
-			all_gravity_velocity[bullet_index] = gr.is_finite() ? gr : Vector2(0, 0);
+			commit_gravity = gr.is_finite() ? gr : Vector2(0, 0);
+		} else if (gv.is_finite()) {
+			commit_gravity = gv;
 		}
-		all_cached_velocity[bullet_index] = new_dir * new_speed + inherited_velocity_offset + all_gravity_velocity[bullet_index];
-	} else {
-		all_cached_velocity[bullet_index] = new_dir * new_speed + inherited_velocity_offset;
 	}
+	const Vector2 commit_velocity = new_dir * new_speed + inherited_velocity_offset + commit_gravity;
+	if (!commit_velocity.is_finite()) {
+		return 0;
+	}
+	all_cached_direction[bullet_index] = new_dir;
+	all_cached_speed[bullet_index] = new_speed;
+	// Ceiling raise lands only on a committed bounce: an overflowing hit
+	// must not lift the clamp for later ticks (acceleration would then
+	// chase an unreachable ceiling forever).
+	if (pending_ceiling_raise > 0.0 && bullet_index < (int)all_cached_max_speed.size()) {
+		all_cached_max_speed[bullet_index] = pending_ceiling_raise;
+	}
+	if (bullet_index >= 0) {
+		if (bullet_index >= (int)all_bounce_speed_multiplier.size()) {
+			ensure_bounce_vectors();
+		}
+		if (bullet_index < (int)all_bounce_speed_multiplier.size()) {
+			const real_t updated = all_bounce_speed_multiplier[bullet_index] * bounce_strength;
+			all_bounce_speed_multiplier[bullet_index] = Math::is_finite((double)updated) ? updated : (real_t)1.0;
+			bounce_speed_scaled = true;
+		}
+	}
+	if (bullet_index < (int)all_gravity_velocity.size()) {
+		all_gravity_velocity[bullet_index] = commit_gravity;
+	}
+	all_cached_velocity[bullet_index] = commit_velocity;
 	// Nudge out of the overlap along the normal so the next tick starts
 	// clean (no immediate re-hit). Position continuity is preserved for
 	// interpolation (prev untouched: the render lerps out of the wall).
