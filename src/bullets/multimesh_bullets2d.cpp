@@ -50,6 +50,16 @@ void MultiMeshBullets2D::_notification(int p_what) {
 
 			clear_homing_state_for_teardown();
 
+			// Sprite effect teardown first: factory one-shot bakes keyed by
+			// this volley die here (in-flight visuals stop), trail shard
+			// children are freed with the node below. Safe during factory
+			// teardown too (its vectors were already cleared, unregister
+			// no-ops, and our own children are still alive).
+			if (bullet_factory != nullptr) {
+				bullet_factory->fx_unregister_volley(get_instance_id());
+			}
+			fx_clear_trail_layers();
+
 			if (physics_server && area.is_valid()) {
 				// Disable the area's shapes (ALL OF THEM no matter their bullets_enabled_status).
 				// Bounds-checked: never let a desynced attachments vector take down PREDELETE.
@@ -133,6 +143,7 @@ Dictionary MultiMeshBullets2D::debug_get_volley_info() const {
 	d["pool_shape"] = (int)k.shape_type;
 	d["auto_pool_multimesh"] = is_multimesh_auto_pooling_enabled;
 	d["auto_pool_attachments"] = is_attachments_auto_pooling_enabled;
+	d["self_modulate"] = get_self_modulate();
 	return d;
 }
 
@@ -187,6 +198,284 @@ void MultiMeshBullets2D::reset_attachment_state_for_reuse() {
 	attachment_local_transforms.assign(count, Transform2D());
 	attachment_stick_relative_to_bullet.assign(count, 1);
 	all_previous_attachment_transf.assign(count, Transform2D());
+}
+
+//// SPRITE EFFECT (FX LAYER) TRAILS ////
+
+// Bakes one trail layer's frames and builds one shard node per frame
+// (children of the volley: pooling hides them, freeing is automatic, and
+// relative z tracks the volley). Shard textures never change, so per-tick
+// work is a single instance write into the current frame's shard.
+void MultiMeshBullets2D::fx_rebuild_trail_layers(const TypedArray<BulletEffectLayerData2D> &layers) {
+	fx_clear_trail_layers();
+	if (amount_bullets <= 0) {
+		return;
+	}
+	for (int li = 0; li < layers.size(); ++li) {
+		Ref<BulletEffectLayerData2D> layer = layers[li];
+		if (layer.is_null() || !layer->enabled) {
+			continue;
+		}
+		if (layer->trigger != EFFECT_TRAIL_FOLLOW) {
+			continue;
+		}
+		FXTrailBake bake;
+		if (!layer->bake_effect_frames(layer->animation, bake.frames, bake.secs, bake.total)) {
+			continue;
+		}
+		bake.layer = layer;
+		bake.layer_index = li;
+		for (size_t f = 0; f < bake.frames.size(); ++f) {
+			MultiMeshInstance2D *shard = BulletFactory2D::fx_create_shard(this, bake.frames[f], BulletFactory2D::fx_quad_size_for_texture(bake.frames[f]), layer->material, layer->self_modulate, layer->z_index, layer->z_as_relative, layer->visibility_layer, layer->light_mask, amount_bullets, true);
+			bake.shards.push_back(shard);
+		}
+		bake.shard_visible.assign(bake.shards.size(), 0);
+		bake.phase.assign(amount_bullets, 0.0);
+		if (layer->random_start_frame && bake.total > 0.0) {
+			for (int i = 0; i < amount_bullets; ++i) {
+				bake.phase[i] = (double)UtilityFunctions::randf_range(0.0f, (float)bake.total);
+			}
+		}
+		bake.bullet_on.assign(amount_bullets, 1);
+		bake.bullet_shard.assign(amount_bullets, -1);
+		bake.bullet_trail_transf.assign(amount_bullets, Transform2D());
+		bake.bullet_trail_tint.assign(amount_bullets, Color(1, 1, 1, 1));
+		fx_trail_bakes.push_back(bake);
+	}
+}
+
+void MultiMeshBullets2D::fx_clear_trail_layers() {
+	for (size_t b = 0; b < fx_trail_bakes.size(); ++b) {
+		for (size_t s = 0; s < fx_trail_bakes[b].shards.size(); ++s) {
+			MultiMeshInstance2D *shard = fx_trail_bakes[b].shards[s];
+			if (shard == nullptr) {
+				continue;
+			}
+			// Zero first: a queued-free node still renders this frame.
+			Ref<MultiMesh> mm = shard->get_multimesh();
+			if (mm.is_valid()) {
+				for (int i = 0; i < mm->get_instance_count(); ++i) {
+					mm->set_instance_transform_2d(i, zero_transform);
+				}
+			}
+			shard->queue_free();
+		}
+	}
+	fx_trail_bakes.clear();
+}
+
+// Full reseed from a layer list: retains it for trigger routing, rebuilds
+// trail shards, and re-registers factory one-shot bakes (erasing the
+// previous life's). fire_spawn flashes ON_SPAWN layers at every bullet.
+void MultiMeshBullets2D::fx_reseed_from_data(const TypedArray<BulletEffectLayerData2D> &layers, bool fire_spawn) {
+	fx_data_layers = layers;
+	fx_rebuild_trail_layers(layers);
+	if (bullet_factory != nullptr) {
+		bullet_factory->fx_unregister_volley(get_instance_id());
+		for (int li = 0; li < layers.size(); ++li) {
+			Ref<BulletEffectLayerData2D> layer = layers[li];
+			if (layer.is_null() || !layer->enabled) {
+				continue;
+			}
+			if (layer->trigger == EFFECT_TRAIL_FOLLOW) {
+				continue;
+			}
+			bullet_factory->fx_register_volley_bake(get_instance_id(), li, layer, amount_bullets);
+		}
+	}
+	if (fire_spawn) {
+		fx_fire_spawn_layers();
+	}
+}
+
+void MultiMeshBullets2D::fx_fire_spawn_layers() {
+	if (bullet_factory == nullptr || (int)all_cached_instance_transforms.size() != amount_bullets) {
+		return;
+	}
+	for (int i = 0; i < amount_bullets; ++i) {
+		fx_fire_oneshot(EFFECT_ON_SPAWN, i, all_cached_instance_transforms[i]);
+	}
+}
+
+void MultiMeshBullets2D::fx_fire_oneshot(int trigger, int bullet_index, const Transform2D &at) {
+	if (bullet_factory == nullptr || bullet_index < 0 || bullet_index >= amount_bullets) {
+		return;
+	}
+	if (!at.get_origin().is_finite() || !Math::is_finite(at.get_rotation())) {
+		return;
+	}
+	for (int li = 0; li < fx_data_layers.size(); ++li) {
+		Ref<BulletEffectLayerData2D> layer = fx_data_layers[li];
+		if (layer.is_null() || !layer->enabled) {
+			continue;
+		}
+		if (layer->trigger != trigger) {
+			continue;
+		}
+		bullet_factory->fx_fire(get_instance_id(), li, at);
+	}
+}
+
+bool MultiMeshBullets2D::has_trail_effects() const {
+	return !fx_trail_bakes.empty();
+}
+
+void MultiMeshBullets2D::bullet_set_trail_enabled(int layer_index, int bullet_index, bool trail_on) {
+	if (!validate_bullet_index(bullet_index, "bullet_set_trail_enabled")) {
+		return;
+	}
+	for (size_t b = 0; b < fx_trail_bakes.size(); ++b) {
+		if (fx_trail_bakes[b].layer_index != layer_index) {
+			continue;
+		}
+		if (bullet_index < 0 || bullet_index >= (int)fx_trail_bakes[b].bullet_on.size()) {
+			return;
+		}
+		fx_trail_bakes[b].bullet_on[bullet_index] = trail_on ? 1 : 0;
+		if (!trail_on) {
+			hide_trail_instances(bullet_index);
+		} else {
+			write_trail_instances(bullet_index);
+		}
+		return;
+	}
+}
+
+void MultiMeshBullets2D::all_bullets_set_trail_enabled(int layer_index, bool trail_on, int bullet_index_start, int bullet_index_end_inclusive) {
+	ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_set_trail_enabled");
+	for (int i = bullet_index_start; i <= bullet_index_end_inclusive; ++i) {
+		bullet_set_trail_enabled(layer_index, i, trail_on);
+	}
+}
+
+// Switches one trail layer to another baked animation (same frames for the
+// next reseed; one-shot layers switch through their layer resource +
+// set_effect_layers). Shard nodes are rebuilt: counts follow the new frame
+// list, per-bullet phase/toggles survive.
+bool MultiMeshBullets2D::play_effect_animation(int layer_index, const StringName &animation) {
+	for (size_t b = 0; b < fx_trail_bakes.size(); ++b) {
+		FXTrailBake &bake = fx_trail_bakes[b];
+		if (bake.layer_index != layer_index || bake.layer.is_null()) {
+			continue;
+		}
+		std::vector<Ref<Texture2D>> frames;
+		std::vector<double> secs;
+		double total = 0.0;
+		if (!bake.layer->bake_effect_frames(animation, frames, secs, total)) {
+			return false;
+		}
+		for (size_t s = 0; s < bake.shards.size(); ++s) {
+			if (bake.shards[s] != nullptr) {
+				bake.shards[s]->queue_free();
+			}
+		}
+		bake.shards.clear();
+		bake.shard_visible.clear();
+		bake.frames = frames;
+		bake.secs = secs;
+		bake.total = total;
+		for (size_t f = 0; f < frames.size(); ++f) {
+			MultiMeshInstance2D *shard = BulletFactory2D::fx_create_shard(this, frames[f], BulletFactory2D::fx_quad_size_for_texture(frames[f]), bake.layer->material, bake.layer->self_modulate, bake.layer->z_index, bake.layer->z_as_relative, bake.layer->visibility_layer, bake.layer->light_mask, amount_bullets, true);
+			bake.shards.push_back(shard);
+		}
+		bake.shard_visible.assign(bake.shards.size(), 0);
+		bake.bullet_shard.assign(amount_bullets, -1);
+		bake.bullet_trail_transf.assign(amount_bullets, Transform2D());
+		bake.bullet_trail_tint.assign(amount_bullets, Color(1, 1, 1, 1));
+		if ((int)bake.phase.size() != amount_bullets) {
+			bake.phase.assign(amount_bullets, 0.0);
+		}
+		if ((int)bake.bullet_on.size() != amount_bullets) {
+			bake.bullet_on.assign(amount_bullets, 1);
+		}
+		return true;
+	}
+	return false;
+}
+
+TypedArray<BulletEffectLayerData2D> MultiMeshBullets2D::get_effect_layers() const {
+	return fx_data_layers;
+}
+
+void MultiMeshBullets2D::set_effect_layers(const TypedArray<BulletEffectLayerData2D> &new_layers) {
+	// Live rebake without a spawn flash (edits must not detonate): trigger
+	// routing, trail shards and factory bakes all follow the new list.
+	fx_reseed_from_data(new_layers, false);
+}
+
+Dictionary MultiMeshBullets2D::debug_get_effect_layers_info() const {
+	Dictionary d;
+	d["data_layer_count"] = fx_data_layers.size();
+	d["trail_bake_count"] = (int)fx_trail_bakes.size();
+	Array bakes;
+	for (size_t b = 0; b < fx_trail_bakes.size(); ++b) {
+		const FXTrailBake &bake = fx_trail_bakes[b];
+		Dictionary e;
+		e["layer_index"] = bake.layer_index;
+		e["frames"] = (int)bake.frames.size();
+		e["shards"] = (int)bake.shards.size();
+		if (!bake.shards.empty() && bake.shards[0] != nullptr) {
+			e["z_index"] = bake.shards[0]->get_z_index();
+			e["z_as_relative"] = bake.shards[0]->is_z_relative();
+			e["modulate"] = bake.shards[0]->get_modulate();
+			e["shard_texture_valid"] = bake.shards[0]->get_texture().is_valid();
+			e["visibility_layer"] = bake.shards[0]->get_visibility_layer();
+			e["light_mask"] = bake.shards[0]->get_light_mask();
+		}
+		int shown = 0;
+		for (size_t s = 0; s < bake.shard_visible.size(); ++s) {
+			if (bake.shard_visible[s]) {
+				++shown;
+			}
+		}
+		e["shards_visible"] = shown;
+		int tracked = 0;
+		for (size_t i = 0; i < bake.bullet_shard.size(); ++i) {
+			if (bake.bullet_shard[i] >= 0) {
+				++tracked;
+			}
+		}
+		e["bullets_tracked"] = tracked;
+		Array live_trails;
+		for (size_t i = 0; i < bake.bullet_shard.size() && i < bake.bullet_trail_tint.size(); ++i) {
+			if (bake.bullet_shard[i] < 0) {
+				continue;
+			}
+			Dictionary row;
+			row["bullet"] = (int)i;
+			row["shard"] = bake.bullet_shard[i];
+			row["tint"] = bake.bullet_trail_tint[i];
+			live_trails.push_back(row);
+		}
+		e["live_trails"] = live_trails;
+		bakes.push_back(e);
+	}
+	d["trail_bakes"] = bakes;
+	return d;
+}
+
+Transform2D MultiMeshBullets2D::debug_get_trail_transform(int layer_index, int bullet_index) const {
+	if (!validate_bullet_index(bullet_index, "debug_get_trail_transform")) {
+		return Transform2D();
+	}
+	for (size_t b = 0; b < fx_trail_bakes.size(); ++b) {
+		const FXTrailBake &bake = fx_trail_bakes[b];
+		if (bake.layer_index != layer_index) {
+			continue;
+		}
+		if (bullet_index < 0 || bullet_index >= (int)bake.bullet_shard.size()) {
+			return Transform2D();
+		}
+		const int frame = bake.bullet_shard[bullet_index];
+		if (frame < 0 || frame >= (int)bake.shards.size() || bake.shards[frame] == nullptr) {
+			return Transform2D();
+		}
+		if (bullet_index < 0 || bullet_index >= (int)bake.bullet_trail_transf.size()) {
+			return Transform2D();
+		}
+		return bake.bullet_trail_transf[bullet_index];
+	}
+	return Transform2D();
 }
 
 // Used to spawn brand new bullets.
@@ -244,6 +533,7 @@ void MultiMeshBullets2D::spawn(const MultiMeshBulletsData2D &data, MultiMeshObje
 			data.z_index,
 			data.light_mask,
 			data.visibility_layer,
+			data.self_modulate,
 			data.instance_shader_parameters);
 
 	// Single-error policy: rebuild_sprite_animation already reported the cause;
@@ -276,6 +566,9 @@ void MultiMeshBullets2D::spawn(const MultiMeshBulletsData2D &data, MultiMeshObje
 	// applies the data when the instance is popped instead.
 	if (!spawn_in_pool) {
 		apply_shared_bullet_attachment_from_data(data);
+		// Sprite effect layers reseed here too (trail shards rebuilt, factory
+		// one-shot bakes registered, spawn flashes fired at every bullet).
+		fx_reseed_from_data(data.effect_layers, true);
 	}
 }
 
@@ -474,6 +767,7 @@ bool MultiMeshBullets2D::enable_multimesh(const MultiMeshBulletsData2D &data, co
 			data.z_index,
 			data.light_mask,
 			data.visibility_layer,
+			data.self_modulate,
 			data.instance_shader_parameters);
 
 	// Single-error policy: rebuild already reported; blank animation kept on failure.
@@ -490,6 +784,10 @@ bool MultiMeshBullets2D::enable_multimesh(const MultiMeshBulletsData2D &data, co
 		deactivate_volley();
 		return false;
 	}
+
+	// Sprite effect layers reseed from the new data (previous life's bakes
+	// die here, trail shards rebuild, spawn flashes fire at every bullet).
+	fx_reseed_from_data(data.effect_layers, true);
 
 	set_visible(true);
 
@@ -788,6 +1086,7 @@ void MultiMeshBullets2D::finalize_set_up(
 		int new_z_index,
 		int new_light_mask,
 		int new_visibility_layer,
+		const Color &new_self_modulate,
 		const Dictionary &new_instance_shader_parameters) {
 	// Bullets custom data. Always assigned (null clears) so pool reuse never leaks
 	// the previous owner's data into a new spawn.
@@ -826,6 +1125,10 @@ void MultiMeshBullets2D::finalize_set_up(
 
 	// Visibility layer
 	set_visibility_layer(new_visibility_layer);
+
+	// Whole-volley tint. Always assigned (white clears) so pool reuse never
+	// leaks the previous owner's color into a new spawn.
+	set_self_modulate(new_self_modulate);
 }
 
 // OTHER
@@ -1983,7 +2286,7 @@ void MultiMeshBullets2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("debug_get_timer_count"), &MultiMeshBullets2D::debug_get_timer_count);
 	ClassDB::bind_method(D_METHOD("debug_get_shape_state"), &MultiMeshBullets2D::debug_get_shape_state);
 	ClassDB::bind_method(D_METHOD("debug_get_attachment_info", "bullet_index"), &MultiMeshBullets2D::debug_get_attachment_info);
-
+	ClassDB::bind_method(D_METHOD("debug_run_interpolation_pass"), &MultiMeshBullets2D::debug_run_interpolation_pass);
 	ClassDB::bind_method(D_METHOD("bullet_free_attachment", "bullet_index"), &MultiMeshBullets2D::bullet_free_attachment);
 	ClassDB::bind_method(D_METHOD("bullet_disable_attachment", "bullet_index"), &MultiMeshBullets2D::bullet_disable_attachment);
 	ClassDB::bind_method(D_METHOD("bullet_enable_attachment", "bullet_index"), &MultiMeshBullets2D::bullet_enable_attachment);
@@ -2121,6 +2424,21 @@ void MultiMeshBullets2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("all_bullets_remove_movement_pattern", "start_index", "end_index_inclusive"), &MultiMeshBullets2D::all_bullets_remove_movement_pattern, DEFVAL(0), DEFVAL(-1));
 
 	ClassDB::bind_method(D_METHOD("has_bullet_movement_pattern", "bullet_index"), &MultiMeshBullets2D::check_exists_bullet_movement_pattern_data);
+
+	// Sprite effect layers (stackable trails + one-shot spawn/hit/destroy/
+	// bounce visuals). Configured on the spawn data, mirrored live here:
+	// editing the array rebakes without a spawn flash.
+	ADD_GROUP("Sprite Effects", "");
+	ClassDB::bind_method(D_METHOD("get_effect_layers"), &MultiMeshBullets2D::get_effect_layers);
+	ClassDB::bind_method(D_METHOD("set_effect_layers", "new_layers"), &MultiMeshBullets2D::set_effect_layers);
+	ADD_PROPERTY(PropertyInfo(Variant::ARRAY, "effect_layers", PROPERTY_HINT_ARRAY_TYPE, "BulletEffectLayerData2D"), "set_effect_layers", "get_effect_layers");
+
+	ClassDB::bind_method(D_METHOD("has_trail_effects"), &MultiMeshBullets2D::has_trail_effects);
+	ClassDB::bind_method(D_METHOD("bullet_set_trail_enabled", "layer_index", "bullet_index", "trail_on"), &MultiMeshBullets2D::bullet_set_trail_enabled);
+	ClassDB::bind_method(D_METHOD("all_bullets_set_trail_enabled", "layer_index", "trail_on", "bullet_index_start", "bullet_index_end_inclusive"), &MultiMeshBullets2D::all_bullets_set_trail_enabled, DEFVAL(0), DEFVAL(-1));
+	ClassDB::bind_method(D_METHOD("play_effect_animation", "layer_index", "animation"), &MultiMeshBullets2D::play_effect_animation);
+	ClassDB::bind_method(D_METHOD("debug_get_effect_layers_info"), &MultiMeshBullets2D::debug_get_effect_layers_info);
+	ClassDB::bind_method(D_METHOD("debug_get_trail_transform", "layer_index", "bullet_index"), &MultiMeshBullets2D::debug_get_trail_transform);
 
 	// NOTE: signal args use PROPERTY_HINT_RESOURCE_TYPE (not NODE_TYPE) so the
 	// class name reaches ClassDB and --doctool; see the note on the factory
@@ -2414,6 +2732,7 @@ void MultiMeshBullets2D::enable_bullet(int bullet_index, int collision_amount, b
 		bump_collision_epoch_for_bullet(bullet_index);
 
 		multi->set_instance_transform_2d(bullet_index, to_local_for_multimesh(all_cached_instance_transforms[bullet_index])); // Start rendering the instance
+		write_trail_instances(bullet_index); // Wake resumes the trail with the bullet
 
 		physics_server->area_set_shape_disabled(area, bullet_index, false);
 
@@ -2570,6 +2889,7 @@ void MultiMeshBullets2D::disable_bullet(int bullet_index, bool should_disable_at
 		on_bullet_disabled(bullet_index);
 
 		multi->set_instance_transform_2d(bullet_index, zero_transform); // Stops rendering the instance
+		hide_trail_instances(bullet_index); // Trail dies with its bullet, same frame
 
 		physics_server->area_set_shape_disabled(area, bullet_index, true);
 
@@ -2618,6 +2938,10 @@ void MultiMeshBullets2D::handle_bullet_collision(CollisionType collision_type, i
 
 		const bool bullet_reached_max_collisions = bullet_max_collision_count > 0 && current_bullet_collision_amount >= bullet_max_collision_count;
 
+		// Effect pose captured before any disable below (disable never moves
+		// the bullet, but the handler at the signal below may).
+		const Transform2D fx_hit_transf = all_cached_instance_transforms[bullet_index];
+
 		// Snapshot the signal owner BEFORE any disable below: the killing blow
 		// funnels into disable_multimesh(), which clears owner_spawner_id and
 		// pools the instance. Resolving after would route a spawner volley's
@@ -2627,6 +2951,18 @@ void MultiMeshBullets2D::handle_bullet_collision(CollisionType collision_type, i
 		// Only disable the bullet if the max collision count is greater than 0, otherwise the bullet should never be disabled due to collisions
 		if (bullet_reached_max_collisions) {
 			disable_bullet(bullet_index, false); // Don't disable the attachment yet, first emit the signal for collision so user has access to the attachment and CAN detach it himself inside GDScript
+			// Destroy explosion only (never the hit spark too): the killing
+			// blow gets one visual. Lifetime/manual disables never reach
+			// here, so timeouts don't detonate.
+			fx_fire_oneshot(EFFECT_ON_DESTROY, bullet_index, fx_hit_transf);
+		} else {
+			// Hit sparks for counted hits (free-bounce records never arrive:
+			// the bounce branch above returns before the counter; consumed
+			// bounces already fired the bounce spark, so they stay silent
+			// here instead of doubling the visual).
+			if (bounce_decision != 2) {
+				fx_fire_oneshot(EFFECT_ON_HIT, bullet_index, fx_hit_transf);
+			}
 		}
 
 		// Capture the slot before the signal: the handler runs user code that may

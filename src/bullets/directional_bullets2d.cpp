@@ -1165,6 +1165,9 @@ int DirectionalBullets2D::try_handle_bounce(CollisionType collision_type, int bu
 	if (bullet_index < (int)all_bounce_last_tick.size()) {
 		all_bounce_last_tick[bullet_index] = bounce_tick_counter;
 	}
+	// Bounce sparks own this record (a consumed bounce falls through to the
+	// counter below, but must not double-fire the hit spark there).
+	fx_fire_oneshot(EFFECT_ON_BOUNCE, bullet_index, all_cached_instance_transforms[bullet_index]);
 	// Arm the same-target debounce: further records against THIS object
 	// inside the window never re-bounce (see the check above).
 	if (bullet_index < (int)all_bounce_last_target.size()) {

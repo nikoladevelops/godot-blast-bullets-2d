@@ -249,6 +249,17 @@
 				The rotation will be set so that the bullet's texture faces towards the target position.
 			</description>
 		</method>
+		<method name="all_bullets_set_trail_enabled">
+			<return type="void" />
+			<param index="0" name="layer_index" type="int" />
+			<param index="1" name="trail_on" type="bool" />
+			<param index="2" name="bullet_index_start" type="int" default="0" />
+			<param index="3" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<description>
+				Toggles one trail layer over a bullet range. Hidden bullets show no trail; re-enabling resumes it on the next tick.
+			</description>
+		</method>
+
 		<method name="all_bullets_set_transforms">
 			<return type="void" />
 			<param index="0" name="new_transform" type="Transform2D" />
@@ -355,6 +366,16 @@
 				Sets the custom data of a specific bullet. Pass null to clear it (reads as null afterwards, never as the shared value).
 			</description>
 		</method>
+		<method name="bullet_set_trail_enabled">
+			<return type="void" />
+			<param index="0" name="layer_index" type="int" />
+			<param index="1" name="bullet_index" type="int" />
+			<param index="2" name="trail_on" type="bool" />
+			<description>
+				Toggles one trail layer for one bullet. Takes effect immediately (no tick wait).
+			</description>
+		</method>
+
 		<method name="clear_bullet_rotation_data">
 			<return type="void" />
 			<description>
@@ -375,6 +396,13 @@
 				Attachment slot introspection: has_attachment, pooling_id, owner_match. owner_match verifies the attachment's owner ids point back at this volley + index (stale ownership after reuse fails here). No range variant exists; loop bullet indices instead.
 			</description>
 		</method>
+		<method name="debug_get_effect_layers_info" qualifiers="const">
+			<return type="Dictionary" />
+			<description>
+				Baked trail-layer state: data layer count, and per bake the layer index, frame/shard counts, applied z_index/z_as_relative/modulate/visibility_layer/light_mask, visible shards, tracked bullets, and live trail rows (bullet, shard, tint).
+			</description>
+		</method>
+
 		<method name="debug_get_shape_state" qualifiers="const">
 			<return type="Dictionary" />
 			<description>
@@ -387,12 +415,28 @@
 				Attached timer count (0 = no per-tick timer cost). Asserts the 64-timer cap and detach-during-fire behavior.
 			</description>
 		</method>
+		<method name="debug_get_trail_transform" qualifiers="const">
+			<return type="Transform2D" />
+			<param index="0" name="layer_index" type="int" />
+			<param index="1" name="bullet_index" type="int" />
+			<description>
+				Last written local trail instance transform for one bullet (zero Transform2D when it has no visible trail instance on that layer).
+			</description>
+		</method>
+
 		<method name="debug_get_volley_info" qualifiers="const">
 			<return type="Dictionary" />
 			<description>
 				Stability introspection: amount_bullets, active_bullets, generation, owner_spawner_id, is_active, is_pooled, pool_amount, pool_shape, auto_pool_multimesh, auto_pool_attachments.
 			</description>
 		</method>
+		<method name="debug_run_interpolation_pass">
+			<return type="void" />
+			<description>
+				Runs the render interpolation pass on demand (same code the factory _process drives): lets tests prove trail shards follow the lerped bullet pose with zero physics ticks in between. No-op unless the factory has use_physics_interpolation on.
+			</description>
+		</method>
+
 		<method name="disable_bullet">
 			<return type="void" />
 			<param index="0" name="bullet_index" type="int" />
@@ -531,6 +575,13 @@
 				The collision shape currently cached for this multimesh.
 			</description>
 		</method>
+		<method name="get_effect_layers" qualifiers="const">
+			<return type="BulletEffectLayerData2D[]" />
+			<description>
+				Live layer list (retained from the last spawn/enable/set).
+			</description>
+		</method>
+
 		<method name="get_inherited_velocity_offset" qualifiers="const">
 			<return type="Vector2" />
 			<description>
@@ -582,6 +633,13 @@
 				Whether shared bullet curves are currently set.
 			</description>
 		</method>
+		<method name="has_trail_effects" qualifiers="const">
+			<return type="bool" />
+			<description>
+				Whether any trail layer is currently baked on this volley.
+			</description>
+		</method>
+
 		<method name="is_bullet_status_enabled">
 			<return type="bool" />
 			<param index="0" name="bullet_index" type="int" />
@@ -644,6 +702,15 @@
 				was previously saved in a variable or defined as a normal Godot function.
 			</description>
 		</method>
+		<method name="play_effect_animation">
+			<return type="bool" />
+			<param index="0" name="layer_index" type="int" />
+			<param index="1" name="animation" type="StringName" />
+			<description>
+				Switches one trail layer to another baked animation (shard nodes rebuild; per-bullet phase and toggles survive). One-shot layers switch through their layer resource plus [method set_effect_layers]. Returns false when the layer or animation is missing.
+			</description>
+		</method>
+
 		<method name="play_sprite_animation">
 			<return type="bool" />
 			<param index="0" name="sprite_frames" type="SpriteFrames" />
@@ -856,6 +923,14 @@
 				Note: cannot run while bullets are being processed or inside a physics frame (same contract as the factory structural methods) - use call_deferred() then.
 			</description>
 		</method>
+		<method name="set_effect_layers">
+			<return type="void" />
+			<param index="0" name="new_layers" type="BulletEffectLayerData2D[]" />
+			<description>
+				Live layer rebake without a spawn flash: trigger routing, trail shards, and factory one-shot bakes all follow the new list.
+			</description>
+		</method>
+
 		<method name="set_inherited_velocity_offset">
 			<return type="void" />
 			<param index="0" name="new_offset" type="Vector2" />
@@ -900,6 +975,10 @@
 		<member name="curves_elapsed_time" type="float" setter="set_curves_elapsed_time" getter="get_curves_elapsed_time" default="0.0">
 			The elapsed time used for the bullets' curves. This is the time that gets passed to the curves assigned to the bullets, you can manipulate it freely.
 		</member>
+		<member name="effect_layers" type="BulletEffectLayerData2D[]" setter="set_effect_layers" getter="get_effect_layers" default="[]">
+			Stackable sprite-effect layers (trails, spawn flashes, hit sparks, destroy explosions, bounce sparks). Each entry renders through its own per-frame shards: one extra draw call per animation frame while anything is visible, zero when idle. Empty (default) disables the whole feature. Use [BulletEffectLayerData2D] presets for zero-art effects, or assign custom SpriteFrames per layer.
+		</member>
+
 		<member name="is_attachments_auto_pooling_enabled" type="bool" setter="set_is_attachments_auto_pooling_enabled" getter="get_is_attachments_auto_pooling_enabled" default="true">
 			Whether the attachments auto pooling is enabled or not.
 

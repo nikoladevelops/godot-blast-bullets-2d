@@ -773,7 +773,7 @@ func _initialize() -> void:
 			base_current = pname
 			if not base_groups.has(pname):
 				base_groups.append(pname)
-	_check(base_groups.slice(0, 6) == ["Bullets", "Appearance", "Collision", "Attachments", "Per-Bullet Rotation", "Rendering and Material"], "base group order matches workflow")
+	_check(base_groups.slice(0, 7) == ["Bullets", "Appearance", "Collision", "Attachments", "Sprite Effects", "Per-Bullet Rotation", "Rendering and Material"], "base group order matches workflow")
 	var base_group_of := {}
 	var base_cur := ""
 	for p in base_props:

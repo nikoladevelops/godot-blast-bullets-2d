@@ -82,6 +82,10 @@
 
 			Note: You can enable the [BulletFactory2D]'s debugger to make collision shapes visible.
 		</member>
+		<member name="effect_layers" type="BulletEffectLayerData2D[]" setter="set_effect_layers" getter="get_effect_layers" default="[]">
+			Stackable sprite-effect layers (trails, spawn flashes, hit sparks, destroy explosions, bounce sparks). Each entry renders through its own per-frame shards: one extra draw call per animation frame while anything is visible, zero when idle. Empty (default) disables the whole feature. Use [BulletEffectLayerData2D] presets for zero-art effects, or assign custom SpriteFrames per layer.
+		</member>
+
 		<member name="instance_shader_parameters" type="Dictionary" setter="set_instance_shader_parameters" getter="get_instance_shader_parameters" default="{}">
 			Per-instance shader overrides, used only when [member material] is a [ShaderMaterial] with [code]instance uniform[/code] declarations. [b]KEY[/b] is the uniform name ([String]), [b]VALUE[/b] is a [Variant] matching that uniform's type (a wrong type warns and skips that key).
 			Applied per bullet instance through [code]set_instance_shader_parameter()[/code] when the volley spawns every live bullet of the multimesh shares the same override set. An empty dictionary disables the pass. Switching to a non-shader material, or spawning with null material, clears the stored dict so pool reuse never leaks stale overrides into the next volley.
@@ -124,6 +128,9 @@
 			If you set this to [code]false[/code], then the collision shapes will also rotate along with the bullet's texture.
 
 			Note: You can enable the [BulletFactory2D]'s debugger to make collision shapes visible.
+		</member>
+		<member name="self_modulate" type="Color" setter="set_self_modulate" getter="get_self_modulate" default="Color(1, 1, 1, 1)">
+			Whole-volley tint, exactly like CanvasItem self_modulate (multiplies every bullet instance). White (default) renders untouched. Spawn one volley per color for different-colored bullets; reseeded from data on every spawn and enable, so pool reuse never leaks the previous tint. Live volleys also accept the engine set_self_modulate directly.
 		</member>
 		<member name="shared_bullet_attachment" type="PackedScene" setter="set_shared_bullet_attachment" getter="get_shared_bullet_attachment">
 			Shared attachment scene applied to every bullet at spawn time (and on pool reuse). The scene must contain a [BulletAttachment2D]. Null (default) disables the feature; use the runtime [method MultiMeshBullets2D.bullet_set_attachment] methods for per-bullet attachments instead.

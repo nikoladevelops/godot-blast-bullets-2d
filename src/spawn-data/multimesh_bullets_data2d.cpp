@@ -142,6 +142,13 @@ void MultiMeshBulletsData2D::set_shared_bullet_attachment_stick_relative_to_bull
 	shared_bullet_attachment_stick_relative_to_bullet = value;
 }
 
+TypedArray<BulletEffectLayerData2D> MultiMeshBulletsData2D::get_effect_layers() const {
+	return effect_layers;
+}
+void MultiMeshBulletsData2D::set_effect_layers(const TypedArray<BulletEffectLayerData2D> &new_layers) {
+	effect_layers = new_layers;
+}
+
 double MultiMeshBulletsData2D::get_max_life_time() const {
 	return max_life_time;
 }
@@ -231,6 +238,13 @@ void MultiMeshBulletsData2D::set_visibility_layer(int new_visibility_layer) {
 void MultiMeshBulletsData2D::set_visibility_layer_from_array(const TypedArray<int> &numbers) {
 	int bitmask = calculate_bitmask(numbers);
 	visibility_layer = bitmask;
+}
+
+Color MultiMeshBulletsData2D::get_self_modulate() const {
+	return self_modulate;
+}
+void MultiMeshBulletsData2D::set_self_modulate(const Color &new_self_modulate) {
+	self_modulate = new_self_modulate;
 }
 
 Dictionary MultiMeshBulletsData2D::get_instance_shader_parameters() const {
@@ -346,6 +360,10 @@ void MultiMeshBulletsData2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_visibility_layer", "new_visibility_layer"), &MultiMeshBulletsData2D::set_visibility_layer);
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "visibility_layer", PROPERTY_HINT_LAYERS_2D_RENDER), "set_visibility_layer", "get_visibility_layer");
 
+	ClassDB::bind_method(D_METHOD("get_self_modulate"), &MultiMeshBulletsData2D::get_self_modulate);
+	ClassDB::bind_method(D_METHOD("set_self_modulate", "new_self_modulate"), &MultiMeshBulletsData2D::set_self_modulate);
+	ADD_PROPERTY(PropertyInfo(Variant::COLOR, "self_modulate"), "set_self_modulate", "get_self_modulate");
+
 	ADD_GROUP("Collision", "");
 	ClassDB::bind_method(D_METHOD("get_collision_layer"), &MultiMeshBulletsData2D::get_collision_layer);
 	ClassDB::bind_method(D_METHOD("set_collision_layer", "new_collision_layer"), &MultiMeshBulletsData2D::set_collision_layer);
@@ -403,6 +421,11 @@ void MultiMeshBulletsData2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_shared_bullet_attachment_stick_relative_to_bullet"), &MultiMeshBulletsData2D::get_shared_bullet_attachment_stick_relative_to_bullet);
 	ClassDB::bind_method(D_METHOD("set_shared_bullet_attachment_stick_relative_to_bullet", "value"), &MultiMeshBulletsData2D::set_shared_bullet_attachment_stick_relative_to_bullet);
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "shared_bullet_attachment_stick_relative_to_bullet"), "set_shared_bullet_attachment_stick_relative_to_bullet", "get_shared_bullet_attachment_stick_relative_to_bullet");
+
+	ADD_GROUP("Sprite Effects", "");
+	ClassDB::bind_method(D_METHOD("get_effect_layers"), &MultiMeshBulletsData2D::get_effect_layers);
+	ClassDB::bind_method(D_METHOD("set_effect_layers", "new_layers"), &MultiMeshBulletsData2D::set_effect_layers);
+	ADD_PROPERTY(PropertyInfo(Variant::ARRAY, "effect_layers", PROPERTY_HINT_ARRAY_TYPE, "BulletEffectLayerData2D"), "set_effect_layers", "get_effect_layers");
 
 	ADD_GROUP("Per-Bullet Rotation", "");
 

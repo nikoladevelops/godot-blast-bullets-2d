@@ -4,12 +4,16 @@
 
 #include <godot_cpp/classes/engine.hpp>
 #include <godot_cpp/classes/image.hpp>
+#include <godot_cpp/classes/multi_mesh.hpp>
+#include <godot_cpp/classes/multi_mesh_instance2d.hpp>
 #include <godot_cpp/classes/node.hpp>
 #include <godot_cpp/classes/node2d.hpp>
 #include <godot_cpp/classes/packed_scene.hpp>
+#include <godot_cpp/classes/quad_mesh.hpp>
 #include <utility>
 
 #include "../shared/bullet_attachment_object_pool2d.hpp"
+#include "../shared/bullet_effect_layer_data2d.hpp"
 #include "../shared/collision_shape_helper2d.hpp"
 #include "../shared/multimesh_object_pool2d.hpp"
 #include "godot_cpp/core/math.hpp"
@@ -399,6 +403,98 @@ public:
 
 	// Contains all BulletAttachment2D in the scene tree
 	Node *bullet_attachments_container = nullptr;
+
+	//
+
+	// SPRITE EFFECT (ONE-SHOT) MANAGER
+	//
+	// Fire-and-forget visuals (spawn flashes, hit sparks, destroy/bounce
+	// effects) render here so they outlive their volley: a destroy
+	// explosion keeps playing after its bullet (and volley) is pooled.
+	// One bake per (volley, layer) with per-frame shard nodes (children of
+	// the container below); slots form a ring per bake, oldest recycled.
+	// Trail layers never register here (they follow bullets on the volley
+	// itself). Bakes die on volley teardown, data reseed, manual clear, or
+	// factory reset - never on pool push, so in-flight effects survive it.
+	struct FXOneShotSlot {
+		bool active = false;
+		Transform2D fixed;
+		double birth = 0.0;
+		double duration = 0.0;
+		double start_age = 0.0;
+		int last_shard = -1;
+		// Last written instance tint (multimesh color readback is as
+		// unreliable headless as transform readback: debug reads this).
+		Color tint = Color(1, 1, 1, 1);
+		// Last written rotation in radians (base pose plus spin at the
+		// slot's age): debug mirror for spin verification.
+		float last_angle = 0.0f;
+	};
+	struct FXOneShotBake {
+		uint64_t volley_id = 0;
+		int layer_index = -1;
+		Ref<BulletEffectLayerData2D> layer;
+		std::vector<Ref<Texture2D>> frames;
+		std::vector<double> secs;
+		double total = 0.0;
+		std::vector<MultiMeshInstance2D *> shards;
+		std::vector<FXOneShotSlot> slots;
+		int ring_cursor = 0;
+		int active_count = 0;
+	};
+	std::vector<FXOneShotBake> fx_bakes;
+	// Manual-hatch bakes (spawn_layer_effect): owned by the factory itself,
+	// keyed separately so volley teardown never touches them. One bake per
+	// distinct layer (capped, oldest dropped) so mixed manual effects
+	// coexist instead of rebaking each other away.
+	std::vector<FXOneShotBake> fx_manual_bakes;
+	double fx_clock = 0.0;
+	// Contains all one-shot effect shard nodes in the scene tree.
+	Node2D *sprite_effects_container = nullptr;
+
+	// Shared shard helpers (volleys reuse these for trail shards): per-frame
+	// node owning one baked texture, sized from that texture. with_colors
+	// enables the per-instance color array (ramp sampling needs it);
+	// instances start white so untinted layers render untouched.
+	static Vector2 fx_quad_size_for_texture(const Ref<Texture2D> &tex);
+	static MultiMeshInstance2D *fx_create_shard(Node *parent, const Ref<Texture2D> &tex, const Vector2 &quad_size, const Ref<Material> &mat, const Color &col, int z, bool z_rel, int vis, int light, int instance_count, bool with_colors);
+	static int fx_frame_for_age(const std::vector<double> &secs, double total, double age);
+
+	void fx_ensure_effects_container();
+	// Frees one bake's shard nodes (zeroed first so this frame never renders
+	// stale) and drops the record.
+	void fx_erase_bake(FXOneShotBake &bake);
+	// Erases every bake of one volley, optionally a single layer index
+	// (-1 erases all of the volley's layers).
+	void fx_unregister_volley_bake(uint64_t volley_id, int layer_index);
+	// Registers (or re-registers) one one-shot layer bake for a volley.
+	// amount_bullets sizes the ring when the layer leaves max_instances on
+	// auto (0). False when the layer is inert (disabled, trail trigger,
+	// null, frames missing, zero playable time): warn-once happens inside.
+	bool fx_register_volley_bake(uint64_t volley_id, int layer_index, const Ref<BulletEffectLayerData2D> &layer, int amount_bullets);
+	// Erases every bake of one volley (teardown, data reseed). In-flight
+	// visuals of that volley stop; other volleys are untouched.
+	void fx_unregister_volley(uint64_t volley_id);
+	// Erases every bake (factory reset/teardown).
+	void fx_unregister_all_bakes();
+	// Fires one slot of a registered bake at a global pose. Silent no-op
+	// when the bake is missing (volley reseeded without effects).
+	void fx_fire(uint64_t volley_id, int layer_index, const Transform2D &at);
+	// Ages every active slot (called from _physics_process, so pausing the
+	// factory freezes effects exactly like bullets).
+	void age_fx_effects(double delta);
+	// Single-bake aging shared by the volley bakes and the manual bake.
+	void age_fx_bake(FXOneShotBake &bake);
+	// Shared fire path for volley triggers and the manual hatch.
+	int fx_fire_into_bake(FXOneShotBake &bake, const Transform2D &at);
+	int get_active_effect_count() const;
+	// Manual one-shot hatch: plays any layer once at a pose, owned by the
+	// factory (survives volleys). Returns the slot index, or -1 when inert.
+	int spawn_layer_effect(const Ref<BulletEffectLayerData2D> &layer, const Transform2D &at);
+	// Stops every active visual (volley bakes keep their configs, the manual
+	// bake is dropped entirely).
+	void clear_sprite_effects();
+	Dictionary debug_get_effect_state() const;
 
 	//
 

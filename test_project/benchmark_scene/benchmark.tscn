@@ -12,6 +12,27 @@
 [ext_resource type="PackedScene" uid="uid://3dxd6rfhxqym" path="res://shared/enemies/enemy_ship/enemy_ship.tscn" id="8_yyku6"]
 [ext_resource type="PackedScene" uid="uid://bqi8tdtf1dh4n" path="res://shared/moving_target.tscn" id="10_nkrfg"]
 
+[sub_resource type="Gradient" id="Gradient_7gbxi"]
+offsets = PackedFloat32Array(0, 0.486747, 1)
+colors = PackedColorArray(0, 0, 0, 1, 0.88136345, 0, 0.440892, 1, 1, 1, 1, 1)
+
+[sub_resource type="SpriteFrames" id="SpriteFrames_mouoi"]
+animations = [{
+"frames": [{
+"duration": 1.0,
+"texture": ExtResource("3_1inld")
+}],
+"loop": 1,
+"name": &"default",
+"speed": 5.0
+}]
+
+[sub_resource type="BulletEffectLayerData2D" id="BulletEffectLayerData2D_g0agp"]
+sprite_frames = SubResource("SpriteFrames_mouoi")
+color_ramp = SubResource("Gradient_7gbxi")
+offset = Vector2(-70, 0)
+scale = Vector2(0.2, 0.2)
+
 [sub_resource type="BulletSpeedData2D" id="BulletSpeedData2D_mouoi"]
 speed = 500.0
 max_speed = 200.0
@@ -32,11 +53,13 @@ animations = [{
 shared_bullet_speed_data = SubResource("BulletSpeedData2D_mouoi")
 bounce_mask = 1
 bounce_strength = 5.0
+bounce_mode = 1
 shared_movement_pattern_face_movement_direction = true
 sprite_frames = SubResource("SpriteFrames_y4v7i")
 texture_size = Vector2(127, 127)
 max_life_time = 10.0
 collision_layer = 2
+effect_layers = Array[BulletEffectLayerData2D]([SubResource("BulletEffectLayerData2D_g0agp")])
 
 [sub_resource type="Gradient" id="Gradient_rfik0"]
 colors = PackedColorArray(0.215686, 0.215686, 0.215686, 1, 0.215686, 0.215686, 0.215686, 1)

@@ -130,6 +130,7 @@ public:
 			physics_server->area_set_shape_transform(area, i, curr_shape_transf);
 
 			move_bullet_attachment(velocity_delta, i);
+			write_trail_instances(i);
 		}
 		if (!is_using_physics_interpolation) {
 			batch_flush_instance_transforms();

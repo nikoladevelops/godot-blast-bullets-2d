@@ -1,5 +1,6 @@
 #pragma once
 
+#include "../shared/bullet_effect_layer_data2d.hpp"
 #include "../shared/bullet_rotation_data2d.hpp"
 #include "godot_cpp/variant/typed_array.hpp"
 
@@ -122,6 +123,16 @@ public:
 	// Whether the shared attachment sticks while the bullet rotates.
 	bool shared_bullet_attachment_stick_relative_to_bullet = true;
 
+	// SPRITE EFFECT LAYERS
+
+	// Stackable sprite-effect layers (trails, spawn flashes, hit sparks,
+	// destroy explosions, bounce sparks). Each entry renders through its
+	// own per-frame shards: one extra draw call per animation frame while
+	// anything is visible, zero when idle. Empty (default) disables the
+	// whole feature. Use BulletEffectLayerData2D.make_*() presets for
+	// zero-art effects, or assign custom SpriteFrames per layer.
+	TypedArray<BlastBullets2D::BulletEffectLayerData2D> effect_layers;
+
 	// OTHER
 
 	// Light mask. Note: pass a bitmask, it's not just a simple int. Use the calculate_bitmask function.
@@ -129,6 +140,12 @@ public:
 
 	// Visibility layer. Note: pass a bitmask, it's not just a simple int. Use the calculate_bitmask function.
 	int visibility_layer = 1;
+
+	// Whole-volley tint, exactly like CanvasItem self_modulate (multiplies
+	// every bullet instance). White (default) renders untouched. Spawn one
+	// volley per color for different-colored bullets; reseeded from data on
+	// every spawn/enable, so pool reuse never leaks the previous tint.
+	Color self_modulate = Color(1, 1, 1, 1);
 
 	// How long will the bullets last, before being disabled. Depending on whether the bullets pool has reached its limit, it will either add the bullets to the pool or it will queue_free them.
 	double max_life_time = 2.0f;
@@ -210,6 +227,9 @@ public:
 	bool get_shared_bullet_attachment_stick_relative_to_bullet() const;
 	void set_shared_bullet_attachment_stick_relative_to_bullet(bool value);
 
+	TypedArray<BlastBullets2D::BulletEffectLayerData2D> get_effect_layers() const;
+	void set_effect_layers(const TypedArray<BlastBullets2D::BulletEffectLayerData2D> &new_layers);
+
 	double get_max_life_time() const;
 	void set_max_life_time(double new_max_life_time);
 
@@ -241,6 +261,9 @@ public:
 	int get_visibility_layer() const;
 	void set_visibility_layer(int new_visibility_layer);
 	void set_visibility_layer_from_array(const TypedArray<int> &numbers);
+
+	Color get_self_modulate() const;
+	void set_self_modulate(const Color &new_self_modulate);
 
 	Dictionary get_instance_shader_parameters() const;
 	void set_instance_shader_parameters(const Dictionary &new_instance_shader_parameters);

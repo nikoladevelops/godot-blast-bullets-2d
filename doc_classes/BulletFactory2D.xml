@@ -19,6 +19,13 @@
 	<tutorials>
 	</tutorials>
 	<methods>
+		<method name="clear_sprite_effects">
+			<return type="void" />
+			<description>
+				Stops every active sprite visual. Volley bakes keep their configs (triggers keep working); the manual hatch bakes are dropped entirely.
+			</description>
+		</method>
+
 		<method name="debug_assert_no_dangling">
 			<return type="Dictionary" />
 			<description>
@@ -86,6 +93,13 @@
 				Get the whole information about the bullet multimeshes object pool of a specific type. Returns a [Dictionary] containing [MultiMeshPoolKey2D] as the KEY (one per exact amount_bullets + shape bucket) and the amount of pooled multimeshes in that bucket as the VALUE.
 			</description>
 		</method>
+		<method name="debug_get_effect_state" qualifiers="const">
+			<return type="Dictionary" />
+			<description>
+				One-shot manager state: effect clock, bake count, total active slots, manual-bake actives and bake count, container validity, and per-bake volley/layer/active/slots/z/visibility/light/shards_busy/live_slots rows.
+			</description>
+		</method>
+
 		<method name="debug_get_factory_state">
 			<return type="Dictionary" />
 			<description>
@@ -251,6 +265,13 @@
 				Safe single-volley free from any callback: uses queue_free(), never free()/force_delete(). Use this inside directional_area_entered and other handlers instead of freeing the volley directly.
 			</description>
 		</method>
+		<method name="get_active_effect_count" qualifiers="const">
+			<return type="int" />
+			<description>
+				Total live one-shot effect slots across all bakes (plus the manual hatch).
+			</description>
+		</method>
+
 		<method name="get_is_factory_busy" qualifiers="const">
 			<return type="bool" />
 			<description>
@@ -1331,6 +1352,15 @@
 				To control these bullets individually, use the [method spawn_controllable_directional_bullets] function instead.
 			</description>
 		</method>
+		<method name="spawn_layer_effect">
+			<return type="int" />
+			<param index="0" name="layer" type="BulletEffectLayerData2D" />
+			<param index="1" name="at" type="Transform2D" />
+			<description>
+				Manual one-shot hatch: plays any layer once at a global pose, owned by the factory (survives volleys). Distinct layers coexist (up to 8 manual bakes, oldest dropped). Returns the slot index, or -1 when the layer is inert.
+			</description>
+		</method>
+
 		<method name="teleport_shift_all_bullets">
 			<return type="void" />
 			<param index="0" name="shift_amount" type="Vector2" />

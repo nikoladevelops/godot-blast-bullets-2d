@@ -4,6 +4,7 @@
 #include "../factory/bullet_factory2d.hpp"
 #include "../shared/bullet_attachment2d.hpp"
 #include "../shared/bullet_attachment_object_pool2d.hpp"
+#include "../shared/bullet_effect_layer_data2d.hpp"
 #include "../shared/bullet_rotation_data2d.hpp"
 #include "../shared/reentrancy_guard2d.hpp"
 #include "../spawn-data/multimesh_bullets_data2d.hpp"
@@ -208,6 +209,19 @@ public:
 				continue;
 			const Transform2D &at = get_interpolated_transform(attachment_transforms[i], all_previous_attachment_transf[i], fraction);
 			attachments[i]->set_global_transform(at);
+		}
+		// Trail shards follow the lerped bullet pose (same derivation as the
+		// physics tick, so trails never lag the rendered bullets by a step).
+		// Frame routing still keys off the physics clock (discrete, no lerp
+		// needed); one-shot shards are static and need nothing here.
+		if (!fx_trail_bakes.empty() && (int)all_cached_instance_transforms.size() == amount_bullets && (int)all_previous_instance_transf.size() == amount_bullets) {
+			for (int i : active_bullet_indexes) {
+				if (i < 0 || i >= amount_bullets) {
+					continue;
+				}
+				const Transform2D lerped_global = get_interpolated_transform(all_cached_instance_transforms[i], all_previous_instance_transf[i], fraction);
+				write_trail_from_global(i, lerped_global);
+			}
 		}
 	}
 
@@ -738,6 +752,195 @@ public:
 	// Whether the attachment should stick while the bullet is rotating
 	std::vector<uint8_t> attachment_stick_relative_to_bullet;
 
+	///
+
+	/// SPRITE EFFECT (FX LAYER) RELATED
+
+	// One baked trail layer: per-frame shard nodes (children of the volley,
+	// so pooling hides them, freeing is automatic, and relative z tracks the
+	// volley), baked textures, and per-bullet phase/toggle state. Shards are
+	// rebuilt on spawn/enable reseed and freed on reset/teardown, never per
+	// frame. One-shot layers bake at the factory instead (they outlive the
+	// volley); this volley only keeps the layer list for trigger routing.
+	struct FXTrailBake {
+		Ref<BulletEffectLayerData2D> layer;
+		int layer_index = -1;
+		std::vector<Ref<Texture2D>> frames;
+		std::vector<double> secs;
+		double total = 0.0;
+		std::vector<MultiMeshInstance2D *> shards;
+		std::vector<uint8_t> shard_visible;
+		std::vector<double> phase;
+		std::vector<uint8_t> bullet_on;
+		std::vector<int> bullet_shard;
+		// Last local transform written per bullet (MultiMesh instance
+		// readback is unreliable headless: set_ marks dirty without updating
+		// the readable store, so debug reads this mirror instead).
+		std::vector<Transform2D> bullet_trail_transf;
+		// Last written per-bullet tint (same readback caveat as above).
+		std::vector<Color> bullet_trail_tint;
+	};
+	std::vector<FXTrailBake> fx_trail_bakes;
+
+	// Layer list retained from the last reseed (spawn/enable/live set), used
+	// to route trigger events to the factory one-shot bakes.
+	TypedArray<BulletEffectLayerData2D> fx_data_layers;
+
+	// Hot trail write for one bullet: picks the frame from the volley clock
+	// plus the bullet's random phase, composes the follow transform, moves
+	// shards when the frame changes. Called from both move_bullets loops
+	// after the instance transform is final, and from enable_bullet wakes.
+	_ALWAYS_INLINE_ void write_trail_instances(int bullet_index) {
+		if (fx_trail_bakes.empty()) {
+			return;
+		}
+		if (bullet_index < 0 || bullet_index >= amount_bullets) {
+			return;
+		}
+		if (bullet_index >= (int)all_cached_instance_transforms.size()) {
+			return;
+		}
+		if (!all_bullets_enabled_set.contains(bullet_index)) {
+			return;
+		}
+		write_trail_from_global(bullet_index, all_cached_instance_transforms[bullet_index]);
+	}
+
+	// Core trail write from an explicit global pose (physics cache above,
+	// lerped pose from the interpolation pass below). Frame, shard routing
+	// and per-instance ramp sampling live here so both paths stay identical.
+	_ALWAYS_INLINE_ void write_trail_from_global(int bullet_index, const Transform2D &bullet_transf) {
+		if (bullet_index < 0 || bullet_index >= amount_bullets) {
+			return;
+		}
+		if (!bullet_transf.get_origin().is_finite() || !Math::is_finite(bullet_transf.get_rotation())) {
+			return;
+		}
+		for (auto &bake : fx_trail_bakes) {
+			if (bake.layer.is_null() || bake.frames.empty() || bake.shards.empty()) {
+				continue;
+			}
+			if (bullet_index >= (int)bake.bullet_on.size() || bullet_index >= (int)bake.phase.size() || bullet_index >= (int)bake.bullet_shard.size()) {
+				continue;
+			}
+			if (!bake.bullet_on[bullet_index]) {
+				continue;
+			}
+			if (!(bake.total > 0.0) || !Math::is_finite(curves_elapsed_time)) {
+				continue;
+			}
+			double age = curves_elapsed_time + bake.phase[bullet_index];
+			age = age - Math::floor(age / bake.total) * bake.total;
+			double acc = 0.0;
+			int frame = 0;
+			for (int f = 0; f < (int)bake.secs.size(); ++f) {
+				acc += bake.secs[f];
+				if (age < acc) {
+					frame = f;
+					break;
+				}
+				frame = f;
+			}
+			if (frame < 0 || frame >= (int)bake.shards.size()) {
+				continue;
+			}
+			Transform2D trail_transf(bullet_transf.get_rotation(), bullet_transf.get_origin() + bake.layer->offset.rotated(bullet_transf.get_rotation()));
+			if (bake.layer->scale != Vector2(1, 1) && bake.layer->scale.is_finite()) {
+				trail_transf = trail_transf.scaled_local(bake.layer->scale);
+			}
+			// Static rotation offset plus continuous spin. Spin reads the
+			// unwrapped clock (rotation is periodic, so fposmod keeps it
+			// precise over long sessions); pooled reuse restarts the clock,
+			// hence the spin, with it.
+			double extra_rot = 0.0;
+			if (Math::is_finite(bake.layer->rotation_degrees)) {
+				extra_rot += bake.layer->rotation_degrees * Math::PI / 180.0;
+			}
+			const double raw_age = curves_elapsed_time + bake.phase[bullet_index];
+			if (bake.layer->spin_degrees_per_sec != 0.0 && Math::is_finite(bake.layer->spin_degrees_per_sec) && Math::is_finite(raw_age)) {
+				extra_rot += bake.layer->spin_degrees_per_sec * Math::PI / 180.0 * raw_age;
+			}
+			if (extra_rot != 0.0) {
+				trail_transf = trail_transf.rotated_local(Math::fposmod(extra_rot, Math::TAU));
+			}
+			const Transform2D local = to_local_for_multimesh(trail_transf);
+			if (!local.get_origin().is_finite()) {
+				continue;
+			}
+			if (bake.bullet_shard[bullet_index] != frame) {
+				const int prev = bake.bullet_shard[bullet_index];
+				if (prev >= 0 && prev < (int)bake.shards.size() && bake.shards[prev] != nullptr) {
+					bake.shards[prev]->get_multimesh()->set_instance_transform_2d(bullet_index, zero_transform);
+				}
+				bake.bullet_shard[bullet_index] = frame;
+			}
+			MultiMeshInstance2D *shard = bake.shards[frame];
+			if (shard == nullptr) {
+				continue;
+			}
+			shard->get_multimesh()->set_instance_transform_2d(bullet_index, local);
+			if (bullet_index < (int)bake.bullet_trail_transf.size()) {
+				bake.bullet_trail_transf[bullet_index] = local;
+			}
+			if (bake.layer->color_ramp.is_valid()) {
+				const Color tint = bake.layer->color_ramp->sample((float)(age / bake.total));
+				shard->get_multimesh()->set_instance_color(bullet_index, tint);
+				if (bullet_index < (int)bake.bullet_trail_tint.size()) {
+					bake.bullet_trail_tint[bullet_index] = tint;
+				}
+			}
+			if (frame >= (int)bake.shard_visible.size() || !bake.shard_visible[frame]) {
+				if (frame < (int)bake.shard_visible.size()) {
+					bake.shard_visible[frame] = 1;
+				}
+				shard->set_visible(true);
+			}
+		}
+	}
+
+	// Hides one bullet across every trail shard (disable path). The next
+	// write re-shows it; no shard visibility bookkeeping needed here since a
+	// hidden bullet owns no frame.
+	_ALWAYS_INLINE_ void hide_trail_instances(int bullet_index) {
+		if (fx_trail_bakes.empty() || bullet_index < 0 || bullet_index >= amount_bullets) {
+			return;
+		}
+		for (auto &bake : fx_trail_bakes) {
+			if (bullet_index < (int)bake.bullet_shard.size()) {
+				const int prev = bake.bullet_shard[bullet_index];
+				if (prev >= 0 && prev < (int)bake.shards.size() && bake.shards[prev] != nullptr) {
+					bake.shards[prev]->get_multimesh()->set_instance_transform_2d(bullet_index, zero_transform);
+				}
+				bake.bullet_shard[bullet_index] = -1;
+			}
+		}
+	}
+
+	// Rebuilds trail shards from a layer list (spawn/enable/live set).
+	// One-shot layers in the same list register at the factory instead.
+	void fx_rebuild_trail_layers(const TypedArray<BulletEffectLayerData2D> &layers);
+	// Frees trail shard nodes and drops trail state (reset/teardown).
+	void fx_clear_trail_layers();
+	// Routes one trigger event for one bullet to the factory one-shot bakes.
+	void fx_fire_oneshot(int trigger, int bullet_index, const Transform2D &at);
+	// Fires ON_SPAWN layers for every bullet (spawn/enable activation).
+	void fx_fire_spawn_layers();
+
+	bool has_trail_effects() const;
+	void bullet_set_trail_enabled(int layer_index, int bullet_index, bool trail_on);
+	void all_bullets_set_trail_enabled(int layer_index, bool trail_on, int bullet_index_start = 0, int bullet_index_end_inclusive = -1);
+	bool play_effect_animation(int layer_index, const StringName &animation);
+	// Full reseed from a layer list (spawn/enable/live set): retains it for
+	// trigger routing, rebuilds trail shards, re-registers factory one-shot
+	// bakes. fire_spawn flashes ON_SPAWN layers (activation only, never on
+	// live edits or single-bullet wakes).
+	void fx_reseed_from_data(const TypedArray<BulletEffectLayerData2D> &layers, bool fire_spawn);
+	TypedArray<BulletEffectLayerData2D> get_effect_layers() const;
+	void set_effect_layers(const TypedArray<BulletEffectLayerData2D> &new_layers);
+	Dictionary debug_get_effect_layers_info() const;
+	// Local-space trail instance transform for tests (zero Transform2D when
+	// the bullet has no visible trail instance on that layer).
+	Transform2D debug_get_trail_transform(int layer_index, int bullet_index) const;
 	///
 
 	/// OTHER
@@ -2000,7 +2203,7 @@ public:
 	// Stability introspection for tests and support (bound below).
 	// Keys: amount_bullets, active_bullets, generation, owner_spawner_id,
 	// is_active, is_pooled, pool_amount, pool_shape, auto_pool_multimesh,
-	// auto_pool_attachments.
+	// auto_pool_attachments, self_modulate.
 	Dictionary debug_get_volley_info() const;
 	// Attached timer count (0 = no per-tick timer cost). For tests asserting
 	// the 64-timer cap and detach-during-fire behavior.
@@ -2013,6 +2216,11 @@ public:
 	// owner_match}. owner_match verifies the attachment's owner ids point
 	// back at this volley + index (stale ownership after reuse fails here).
 	Dictionary debug_get_attachment_info(int bullet_index) const;
+	// Runs the render interpolation pass on demand (same code the factory
+	// _process drives): lets tests prove trail shards follow the lerped
+	// bullet pose with zero physics ticks in between. No-op unless the
+	// factory has use_physics_interpolation on.
+	void debug_run_interpolation_pass() { interpolate_bullet_visuals(); }
 
 	// Disables a single bullet: removes it from the live set, hides the visual,
 	// disables its physics shape, and (unless told otherwise) returns its
@@ -2338,6 +2546,7 @@ protected:
 			int new_z_index,
 			int new_light_mask,
 			int new_visibility_layer,
+			const Color &new_self_modulate,
 			const Dictionary &new_instance_shader_parameters);
 
 	///
