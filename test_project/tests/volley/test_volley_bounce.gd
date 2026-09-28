@@ -719,6 +719,14 @@ func _initialize() -> void:
 	# BlockBullets. Pin the split so nobody "fixes" it into a regression.
 	_check(str(data_group_of.get("shared_bullet_rotation_data", "")) == "Bullet Rotation", "shared rotation grouped with steering")
 	_check(str(data_group_of.get("all_bullet_rotation_data", "")) == "Per-Bullet Rotation", "per-bullet rotation grouped with arrays")
+	# Every bounce knob lives in the Bounce group (all 12, both classes):
+	# a stray bounce prop in Movement Speed would confuse setup order.
+	var bounce_props := ["bounce_mask", "bounce_strength", "bounce_push_assist", "bounce_charge_amplify", "bounce_hit_consumed", "bounce_max_count", "bounce_mode", "bounce_rotate_texture", "bounce_rotation_smooth", "bounce_randomness_deg", "bounce_cooldown_sec", "bounce_debounce_sec"]
+	var bounce_homed := true
+	for bname in bounce_props:
+		if str(data_group_of.get(bname, "")) != "Bounce and Ricochet":
+			bounce_homed = false
+	_check(bounce_homed, "all 12 bounce props grouped with Bounce")
 	var triplet_families := [
 		["shared_bullet_speed_data", "all_bullet_speed_data", "tile_all_bullet_speed_data"],
 		["shared_bullet_curves_data", "all_bullet_curves_data", "tile_all_bullet_curves_data"],
@@ -825,6 +833,12 @@ func _initialize() -> void:
 	_check(vgroups.get("bullet_max_collision_count", "") == "Collision", "volley collision grouped")
 	_check(vgroups.get("is_life_time_infinite", "") == "Lifetime", "volley lifetime grouped")
 	_check(vgroups.get("shared_bullet_curves_data", "") == "Curves", "volley curves grouped")
+	# Live mirrors keep the same Bounce home as the data (all 12).
+	var vbounced := true
+	for bname in ["bounce_mask", "bounce_strength", "bounce_push_assist", "bounce_charge_amplify", "bounce_hit_consumed", "bounce_max_count", "bounce_mode", "bounce_rotate_texture", "bounce_rotation_smooth", "bounce_randomness_deg", "bounce_cooldown_sec", "bounce_debounce_sec"]:
+		if str(vgroups.get(bname, "")) != "Bounce and Ricochet":
+			vbounced = false
+	_check(vbounced, "all 12 live bounce props grouped with Bounce")
 	var spawner20 := BulletSpawner2D.new()
 	get_root().add_child(spawner20)
 	await process_frame
@@ -1014,6 +1028,416 @@ func _initialize() -> void:
 	_check(v22c.bullet_get_bounce_count(0) >= 16, "new target each hit bounces despite debounce (got %d)" % v22c.bullet_get_bounce_count(0))
 	wall_b.queue_free()
 	await process_frame
+
+	printerr("BOUNCE T23 moving targets: push surges, head-on amplifies, separating swallows")
+	await _settle(factory)
+	var pusher := RigidBody2D.new()
+	pusher.position = Vector2(-150, 0)
+	pusher.collision_layer = 8
+	pusher.collision_mask = 0
+	pusher.gravity_scale = 0.0
+	pusher.linear_damp = 0.0
+	pusher.can_sleep = false
+	pusher.linear_velocity = Vector2(500, 0)
+	var pcol := CollisionShape2D.new()
+	var pbox := RectangleShape2D.new()
+	pbox.size = Vector2(20, 400)
+	pcol.shape = pbox
+	pusher.add_child(pcol)
+	get_root().add_child(pusher)
+	await physics_frame
+	var d23 := _bounce_data(Vector2.ZERO, 0.0, 100.0, [4], [4])
+	var v23: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d23)
+	for i in 150:
+		await physics_frame
+		if v23.bullet_get_bounce_count(0) >= 1:
+			break
+	_check(v23.bullet_get_bounce_count(0) >= 1, "pusher wall bounced the bullet")
+	var push_dir: Vector2 = v23.get_bullet_direction(0)
+	var push_spd: float = v23.get_bullet_velocity(0).length()
+	_check(push_dir.x > 0.5, "pushed bullet keeps flying forward, never reverses (dir %s)" % str(push_dir))
+	_check(push_spd > 500.0 and push_spd < 1300.0, "pusher surge reflects relative velocity (~900, got %.0f)" % push_spd)
+	pusher.queue_free()
+	await process_frame
+	await _settle(factory)
+	var charger := RigidBody2D.new()
+	charger.position = Vector2(400, 0)
+	charger.collision_layer = 8
+	charger.collision_mask = 0
+	charger.gravity_scale = 0.0
+	charger.linear_damp = 0.0
+	charger.can_sleep = false
+	charger.linear_velocity = Vector2(-400, 0)
+	var ccol := CollisionShape2D.new()
+	var cbox := RectangleShape2D.new()
+	cbox.size = Vector2(20, 400)
+	ccol.shape = cbox
+	charger.add_child(ccol)
+	get_root().add_child(charger)
+	await physics_frame
+	var d23b := _bounce_data(Vector2.ZERO, 0.0, 100.0, [4], [4])
+	var v23b: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d23b)
+	for i in 150:
+		await physics_frame
+		if v23b.bullet_get_bounce_count(0) >= 1:
+			break
+	var head_spd: float = v23b.get_bullet_velocity(0).length()
+	_check(v23b.get_bullet_direction(0).x < -0.5, "head-on wall reflects backwards")
+	_check(head_spd > 500.0 and head_spd < 1300.0, "head-on impact amplifies (~900, got %.0f)" % head_spd)
+	charger.queue_free()
+	await process_frame
+	printerr("BOUNCE T23b separating repeats never re-bounce")
+	await _settle(factory)
+	var d23c := _bounce_data(Vector2(100, 0), 0.0, 300.0, [4], [4])
+	d23c.bounce_cooldown_sec = 0.0
+	d23c.bounce_debounce_sec = 0.05
+	var v23c: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d23c)
+	# First contact bounces (fresh overlaps keep the historical bounce).
+	# Each 8-frame cycle below re-enters the SAME wall while separating
+	# from it (detection lands mid-block, long after the 0.05 debounce);
+	# the repeat guard must silence every cycle after the first.
+	for i in 40:
+		if i % 8 < 4:
+			if i % 8 == 0:
+				v23c.set_bullet_transform(0, Transform2D(0.0, Vector2(205, 0)))
+				v23c.set_bullet_direction(0, Vector2(1, 0))
+		else:
+			if i % 8 == 4:
+				v23c.set_bullet_transform(0, Transform2D(0.0, Vector2(100, 0)))
+		await physics_frame
+	var repeat_count: int = v23c.bullet_get_bounce_count(0)
+	_check(repeat_count >= 1, "first separating contact still bounces")
+	_check(repeat_count <= 2, "separating repeats never re-bounce (got %d)" % repeat_count)
+	await _settle(factory)
+	var d23d := _bounce_data(Vector2(100, 0), 0.0, 300.0, [4], [4])
+	d23d.bounce_hit_consumed = true
+	d23d.set_bullet_max_collision_count(0)
+	d23d.bounce_cooldown_sec = 0.0
+	d23d.bounce_debounce_sec = 0.05
+	var v23d: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d23d)
+	for i in 40:
+		if i % 8 < 4:
+			if i % 8 == 0:
+				v23d.set_bullet_transform(0, Transform2D(0.0, Vector2(205, 0)))
+				v23d.set_bullet_direction(0, Vector2(1, 0))
+		else:
+			if i % 8 == 4:
+				v23d.set_bullet_transform(0, Transform2D(0.0, Vector2(100, 0)))
+		await physics_frame
+	_check(v23d.bullet_get_bounce_count(0) <= 2, "consumed repeats never re-bounce (got %d)" % v23d.bullet_get_bounce_count(0))
+	_check(v23d.get_bullet_collision_count(0) >= 5, "consumed repeats still count through the normal path")
+	_check(v23d.is_bullet_status_enabled(0), "max 0 never kills")
+
+	printerr("BOUNCE T24 push/charge knobs: each side opts out separately")
+	await _settle(factory)
+	var d24 := _bounce_data(Vector2.ZERO, 0.0, 100.0, [4], [4])
+	_check(d24.bounce_push_assist == true, "push assist defaults true")
+	_check(d24.bounce_charge_amplify == true, "charge amplify defaults true")
+	d24.bounce_push_assist = false
+	var arcade := RigidBody2D.new()
+	arcade.position = Vector2(-150, 0)
+	arcade.collision_layer = 8
+	arcade.collision_mask = 0
+	arcade.gravity_scale = 0.0
+	arcade.linear_damp = 0.0
+	arcade.can_sleep = false
+	arcade.linear_velocity = Vector2(500, 0)
+	var acol := CollisionShape2D.new()
+	var abox := RectangleShape2D.new()
+	abox.size = Vector2(20, 400)
+	acol.shape = abox
+	arcade.add_child(acol)
+	get_root().add_child(arcade)
+	await physics_frame
+	var v24: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d24)
+	_check(v24.get_bounce_push_assist() == false, "live mirror reseeds push off")
+	_check(v24.get_bounce_charge_amplify() == true, "live mirror reseeds charge on")
+	for i in 150:
+		await physics_frame
+		if v24.bullet_get_bounce_count(0) >= 1:
+			break
+	_check(v24.bullet_get_bounce_count(0) >= 1, "unassisted bounce still fires")
+	_check(v24.get_bullet_direction(0).x < -0.5, "push assist off reverses (no surge)")
+	var arcade_spd: float = v24.get_bullet_velocity(0).length()
+	_check(arcade_spd > 50.0 and arcade_spd < 200.0, "push assist off keeps plain speed (~100, got %.0f)" % arcade_spd)
+	arcade.queue_free()
+	await process_frame
+	await _settle(factory)
+	var d24b := _bounce_data(Vector2.ZERO, 0.0, 100.0, [4], [4])
+	d24b.bounce_charge_amplify = false
+	var charger2 := RigidBody2D.new()
+	charger2.position = Vector2(400, 0)
+	charger2.collision_layer = 8
+	charger2.collision_mask = 0
+	charger2.gravity_scale = 0.0
+	charger2.linear_damp = 0.0
+	charger2.can_sleep = false
+	charger2.linear_velocity = Vector2(-400, 0)
+	var c2col := CollisionShape2D.new()
+	var c2box := RectangleShape2D.new()
+	c2box.size = Vector2(20, 400)
+	c2col.shape = c2box
+	charger2.add_child(c2col)
+	get_root().add_child(charger2)
+	await physics_frame
+	var v24b: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d24b)
+	_check(v24b.get_bounce_charge_amplify() == false, "live mirror reseeds charge off")
+	for i in 150:
+		await physics_frame
+		if v24b.bullet_get_bounce_count(0) >= 1:
+			break
+	_check(v24b.get_bullet_direction(0).x < -0.5, "charge amplify off still reflects")
+	var plain_spd: float = v24b.get_bullet_velocity(0).length()
+	_check(plain_spd > 50.0 and plain_spd < 200.0, "charge amplify off keeps plain speed (~100, got %.0f)" % plain_spd)
+	charger2.queue_free()
+	await process_frame
+	await _settle(factory)
+	var d24c := _bounce_data(Vector2.ZERO, 0.0, 100.0, [4], [4])
+	d24c.bounce_push_assist = false
+	d24c.bounce_charge_amplify = false
+	var arcade2 := RigidBody2D.new()
+	arcade2.position = Vector2(-150, 0)
+	arcade2.collision_layer = 8
+	arcade2.collision_mask = 0
+	arcade2.gravity_scale = 0.0
+	arcade2.linear_damp = 0.0
+	arcade2.can_sleep = false
+	arcade2.linear_velocity = Vector2(500, 0)
+	var a2col := CollisionShape2D.new()
+	var a2box := RectangleShape2D.new()
+	a2box.size = Vector2(20, 400)
+	a2col.shape = a2box
+	arcade2.add_child(a2col)
+	get_root().add_child(arcade2)
+	await physics_frame
+	var v24c: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d24c)
+	for i in 150:
+		await physics_frame
+		if v24c.bullet_get_bounce_count(0) >= 1:
+			break
+	_check(v24c.get_bullet_direction(0).x < -0.5, "both off reverses like legacy")
+	_check(v24c.get_bullet_velocity(0).length() < 200.0, "both off keeps plain speed")
+	arcade2.queue_free()
+	await process_frame
+
+	printerr("BOUNCE T25 velocity sources: CharacterBody reads, Area2D stays static")
+	await _settle(factory)
+	var charlie := CharacterBody2D.new()
+	charlie.position = Vector2(200, 300)
+	charlie.collision_layer = 8
+	charlie.collision_mask = 0
+	charlie.velocity = Vector2(500, 0)
+	var chcol := CollisionShape2D.new()
+	var chbox := RectangleShape2D.new()
+	chbox.size = Vector2(20, 400)
+	chcol.shape = chbox
+	charlie.add_child(chcol)
+	get_root().add_child(charlie)
+	await physics_frame
+	var d25 := _bounce_data(Vector2.ZERO, 0.0, 100.0, [4], [4])
+	var v25: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d25)
+	v25.set_bullet_transform(0, Transform2D(0.0, Vector2(200, 300)))
+	for i in 30:
+		await physics_frame
+		if v25.bullet_get_bounce_count(0) >= 1:
+			break
+	_check(v25.bullet_get_bounce_count(0) >= 1, "CharacterBody velocity read without motion")
+	_check(v25.get_bullet_direction(0).x > 0.5, "CharacterBody push surges forward")
+	var char_spd: float = v25.get_bullet_velocity(0).length()
+	_check(char_spd > 600.0 and char_spd < 1200.0, "CharacterBody surge magnitude (~900, got %.0f)" % char_spd)
+	charlie.queue_free()
+	await process_frame
+	await _settle(factory)
+	var eye25 := Area2D.new()
+	eye25.position = Vector2(200, 300)
+	eye25.collision_layer = 8
+	eye25.monitoring = true
+	eye25.monitorable = true
+	var ecol25 := CollisionShape2D.new()
+	var ebox25 := RectangleShape2D.new()
+	ebox25.size = Vector2(20, 400)
+	ecol25.shape = ebox25
+	eye25.add_child(ecol25)
+	get_root().add_child(eye25)
+	await physics_frame
+	var d25b := _bounce_data(Vector2.ZERO, 0.0, 100.0, [4], [4])
+	var v25b: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d25b)
+	v25b.set_bullet_transform(0, Transform2D(0.0, Vector2(200, 300)))
+	for i in 30:
+		await physics_frame
+		if v25b.bullet_get_bounce_count(0) >= 1:
+			break
+	_check(v25b.bullet_get_bounce_count(0) >= 1, "areas bounce too")
+	_check(v25b.get_bullet_direction(0).x < -0.5, "static area reverses")
+	eye25.queue_free()
+	await process_frame
+	await _settle(factory)
+	var runner := Area2D.new()
+	runner.position = Vector2(-150, 300)
+	runner.collision_layer = 8
+	runner.monitoring = true
+	runner.monitorable = true
+	var rcol := CollisionShape2D.new()
+	var rbox := RectangleShape2D.new()
+	rbox.size = Vector2(20, 400)
+	rcol.shape = rbox
+	runner.add_child(rcol)
+	get_root().add_child(runner)
+	await physics_frame
+	var d25c := _bounce_data(Vector2(100, 300), 0.0, 100.0, [4], [4])
+	var v25c: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d25c)
+	for i in 150:
+		runner.position.x += 500.0 / 60.0
+		await physics_frame
+		if v25c.bullet_get_bounce_count(0) >= 1:
+			break
+	_check(v25c.bullet_get_bounce_count(0) >= 1, "moved area still bounces")
+	_check(v25c.get_bullet_direction(0).x < -0.5, "moved area counts as static (documented limit, no surge)")
+	_check(v25c.get_bullet_velocity(0).length() < 250.0, "moved area adds no boost")
+	runner.queue_free()
+	await process_frame
+	printerr("BOUNCE T25b strength 0 vs pusher sticks, precise moves too")
+	await _settle(factory)
+	var pusher0 := RigidBody2D.new()
+	pusher0.position = Vector2(-150, 0)
+	pusher0.collision_layer = 8
+	pusher0.collision_mask = 0
+	pusher0.gravity_scale = 0.0
+	pusher0.linear_damp = 0.0
+	pusher0.can_sleep = false
+	pusher0.linear_velocity = Vector2(500, 0)
+	var p0col := CollisionShape2D.new()
+	var p0box := RectangleShape2D.new()
+	p0box.size = Vector2(20, 400)
+	p0col.shape = p0box
+	pusher0.add_child(p0col)
+	get_root().add_child(pusher0)
+	await physics_frame
+	var d25d := _bounce_data(Vector2.ZERO, 0.0, 100.0, [4], [4])
+	d25d.bounce_strength = 0.0
+	var v25d: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d25d)
+	for i in 150:
+		await physics_frame
+		if v25d.bullet_get_bounce_count(0) >= 1:
+			break
+	_check(v25d.get_bullet_direction(0).x > 0.5, "dead-stop vs pusher rides the wall")
+	var stick_spd: float = v25d.get_bullet_velocity(0).length()
+	_check(stick_spd > 350.0 and stick_spd < 650.0, "dead-stop adopts wall speed (~500, got %.0f)" % stick_spd)
+	pusher0.queue_free()
+	await process_frame
+	await _settle(factory)
+	var pusher1 := RigidBody2D.new()
+	pusher1.position = Vector2(-150, 0)
+	pusher1.collision_layer = 8
+	pusher1.collision_mask = 0
+	pusher1.gravity_scale = 0.0
+	pusher1.linear_damp = 0.0
+	pusher1.can_sleep = false
+	pusher1.linear_velocity = Vector2(500, 0)
+	var p1col := CollisionShape2D.new()
+	var p1box := RectangleShape2D.new()
+	p1box.size = Vector2(20, 400)
+	p1col.shape = p1box
+	pusher1.add_child(p1col)
+	get_root().add_child(pusher1)
+	await physics_frame
+	var d25e := _bounce_data(Vector2.ZERO, 0.0, 100.0, [4], [4])
+	d25e.bounce_mode = 1
+	var v25e: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d25e)
+	for i in 150:
+		await physics_frame
+		if v25e.bullet_get_bounce_count(0) >= 1:
+			break
+	_check(v25e.get_bullet_direction(0).x > 0.5, "precise mode surges too")
+	var precise_spd: float = v25e.get_bullet_velocity(0).length()
+	_check(precise_spd > 600.0 and precise_spd < 1200.0, "precise surge magnitude (~900, got %.0f)" % precise_spd)
+	pusher1.queue_free()
+	await process_frame
+	printerr("BOUNCE T25c knob independence + pool ghost-boost")
+	await _settle(factory)
+	var d25f := _bounce_data(Vector2.ZERO, 0.0, 100.0, [4], [4])
+	d25f.bounce_push_assist = false
+	var charger3 := RigidBody2D.new()
+	charger3.position = Vector2(400, 0)
+	charger3.collision_layer = 8
+	charger3.collision_mask = 0
+	charger3.gravity_scale = 0.0
+	charger3.linear_damp = 0.0
+	charger3.can_sleep = false
+	charger3.linear_velocity = Vector2(-400, 0)
+	var c3col := CollisionShape2D.new()
+	var c3box := RectangleShape2D.new()
+	c3box.size = Vector2(20, 400)
+	c3col.shape = c3box
+	charger3.add_child(c3col)
+	get_root().add_child(charger3)
+	await physics_frame
+	var v25f: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d25f)
+	for i in 150:
+		await physics_frame
+		if v25f.bullet_get_bounce_count(0) >= 1:
+			break
+	var cross_spd: float = v25f.get_bullet_velocity(0).length()
+	_check(cross_spd > 600.0 and cross_spd < 1200.0, "charge works while push is off (~900, got %.0f)" % cross_spd)
+	charger3.queue_free()
+	await process_frame
+	await _settle(factory)
+	var d25g := _bounce_data(Vector2.ZERO, 0.0, 100.0, [4], [4])
+	d25g.bounce_charge_amplify = false
+	var pusher2 := RigidBody2D.new()
+	pusher2.position = Vector2(-150, 0)
+	pusher2.collision_layer = 8
+	pusher2.collision_mask = 0
+	pusher2.gravity_scale = 0.0
+	pusher2.linear_damp = 0.0
+	pusher2.can_sleep = false
+	pusher2.linear_velocity = Vector2(500, 0)
+	var p2col := CollisionShape2D.new()
+	var p2box := RectangleShape2D.new()
+	p2box.size = Vector2(20, 400)
+	p2col.shape = p2box
+	pusher2.add_child(p2col)
+	get_root().add_child(pusher2)
+	await physics_frame
+	var v25g: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d25g)
+	for i in 150:
+		await physics_frame
+		if v25g.bullet_get_bounce_count(0) >= 1:
+			break
+	var surge_spd: float = v25g.get_bullet_velocity(0).length()
+	_check(v25g.get_bullet_direction(0).x > 0.5, "push works while charge is off")
+	_check(surge_spd > 600.0 and surge_spd < 1200.0, "push surge intact (~900, got %.0f)" % surge_spd)
+	pusher2.queue_free()
+	await process_frame
+	await _settle(factory)
+	var d25h := _bounce_data(Vector2.ZERO, 0.0, 300.0, [4], [4])
+	d25h.bounce_strength = 2.0
+	d25h.max_life_time = 2.0
+	var v25h: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d25h)
+	for i in 120:
+		await physics_frame
+		if v25h.bullet_get_bounce_count(0) >= 1:
+			break
+	_check(absf(v25h.get_bullet_velocity(0).length() - 600.0) < 80.0, "strength 2 doubles before pooling")
+	for i in 200:
+		await physics_frame
+		if not v25h.is_bullet_status_enabled(0):
+			break
+	_check(not v25h.is_bullet_status_enabled(0), "expiry pooled the volley")
+	v25h.enable_bullet(0)
+	var flat25 := BulletCurvesData2D.new()
+	var flat25_curve := Curve.new()
+	flat25_curve.min_value = 0.0
+	flat25_curve.max_value = 2000.0
+	flat25_curve.add_point(Vector2(0, 300))
+	flat25_curve.add_point(Vector2(1, 300))
+	flat25.movement_speed_curve = flat25_curve
+	flat25.movement_use_unit_curve = false
+	v25h.set_shared_bullet_curves_data(flat25)
+	for i in 10:
+		await physics_frame
+	var wake_spd: float = v25h.get_bullet_velocity(0).length()
+	_check(absf(wake_spd - 300.0) < 80.0, "wake has no ghost boost from the dead life (got %.0f)" % wake_spd)
 
 	factory.directional_bounce_body_entered.disconnect(_on_bounce_body)
 	factory.directional_bounce_area_entered.disconnect(_on_bounce_area)

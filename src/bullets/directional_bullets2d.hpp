@@ -274,6 +274,8 @@ protected:
 	// only consumes collision budget when bounce_hit_consumed is true.
 	int bounce_mask = 0;
 	real_t bounce_strength = 1.0;
+	bool bounce_push_assist = true;
+	bool bounce_charge_amplify = true;
 	bool bounce_hit_consumed = false;
 	int bounce_max_count = 0;
 	int bounce_mode = 0; // DirectionalBulletsData2D::BounceMode
@@ -3341,6 +3343,10 @@ public:
 		}
 		bounce_strength = value;
 	}
+	bool get_bounce_push_assist() const { return bounce_push_assist; }
+	void set_bounce_push_assist(bool value) { bounce_push_assist = value; }
+	bool get_bounce_charge_amplify() const { return bounce_charge_amplify; }
+	void set_bounce_charge_amplify(bool value) { bounce_charge_amplify = value; }
 	bool get_bounce_hit_consumed() const { return bounce_hit_consumed; }
 	void set_bounce_hit_consumed(bool value) { bounce_hit_consumed = value; }
 	int get_bounce_max_count() const { return bounce_max_count; }
@@ -3470,6 +3476,8 @@ public:
 	void apply_bounce_from_data(const DirectionalBulletsData2D &directional_data, int data_collision_mask) {
 		bounce_mask = directional_data.bounce_mask;
 		bounce_strength = (real_t)directional_data.bounce_strength;
+		bounce_push_assist = directional_data.bounce_push_assist;
+		bounce_charge_amplify = directional_data.bounce_charge_amplify;
 		bounce_hit_consumed = directional_data.bounce_hit_consumed;
 		bounce_max_count = directional_data.bounce_max_count;
 		bounce_mode = directional_data.bounce_mode;
@@ -4032,6 +4040,8 @@ public:
 		// entirely while disarmed (see ensure_bounce_vectors).
 		bounce_mask = 0;
 		bounce_strength = 1.0;
+		bounce_push_assist = true;
+		bounce_charge_amplify = true;
 		bounce_hit_consumed = false;
 		bounce_max_count = 0;
 		bounce_mode = 0;
@@ -4087,6 +4097,9 @@ public:
 		}
 		if (bullet_index < (int)bounce_visual_pending.size()) {
 			bounce_visual_pending[bullet_index] = 0;
+		}
+		if (bullet_index < (int)bounce_visual_target.size()) {
+			bounce_visual_target[bullet_index] = Vector2(1, 0);
 		}
 		// A wake starts fresh like every other bounce ledger entry: without
 		// this a re-enabled bullet would keep scaling curve/accel ticks by

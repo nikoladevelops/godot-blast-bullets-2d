@@ -727,6 +727,8 @@ void DirectionalBullets2D::reset_transient_subclass_state(bool drop_stale_work) 
 	homing_lose_range_px = 0.0;
 	bounce_mask = 0;
 	bounce_strength = 1.0;
+	bounce_push_assist = true;
+	bounce_charge_amplify = true;
 	bounce_hit_consumed = false;
 	bounce_max_count = 0;
 	bounce_mode = 0;
@@ -742,6 +744,8 @@ void DirectionalBullets2D::reset_transient_subclass_state(bool drop_stale_work) 
 	all_bounce_last_time.clear();
 	bounce_visual_pending.clear();
 	bounce_visual_target.clear();
+	all_bounce_speed_multiplier.clear();
+	bounce_speed_scaled = false;
 	bounce_mask_warning_issued = false;
 	clear_homing_state_for_teardown();
 	if (drop_stale_work) {
@@ -1052,9 +1056,70 @@ int DirectionalBullets2D::try_handle_bounce(CollisionType collision_type, int bu
 		return 0;
 	}
 	surface_n = surface_n.normalized();
+	// Target motion: a pusher running into the bullet from behind must shove
+	// it forward, never U-turn it. Read the target's velocity when it has
+	// one (RigidBody2D linear_velocity, CharacterBody2D velocity); Area2D,
+	// static and animatable bodies report none and count as static.
+	// Non-finite values fail safe to zero.
+	Vector2 target_v(0, 0);
+	{
+		const Variant linear_v = hit_target->get(StringName("linear_velocity"));
+		if (linear_v.get_type() == Variant::VECTOR2) {
+			target_v = (Vector2)linear_v;
+		} else {
+			const Variant vel_v = hit_target->get(StringName("velocity"));
+			if (vel_v.get_type() == Variant::VECTOR2) {
+				target_v = (Vector2)vel_v;
+			}
+		}
+		if (!target_v.is_finite()) {
+			target_v = Vector2(0, 0);
+		}
+	}
+	// Branch the influence by alignment: same-direction motion is a push
+	// (surge allowed iff bounce_push_assist), opposing motion is a charge
+	// (amplified iff bounce_charge_amplify). A zero target lands push-side
+	// with identical math either way. Grazing flips are invisible: the
+	// branch difference scales with the aligned motion, which vanishes at
+	// the boundary. Everything below runs on the effective velocity, so a
+	// disabled side behaves exactly as if the target stood still.
+	const bool push_side = dir.dot(target_v) >= 0.0;
+	Vector2 t_eff(0, 0);
+	if ((push_side && bounce_push_assist) || (!push_side && bounce_charge_amplify)) {
+		t_eff = target_v;
+	}
+	// Reflect the RELATIVE velocity, then ride the target back on. A static
+	// target (or a disabled side) reduces to the absolute path exactly; a
+	// pusher catching the bullet from behind surges it forward, and a
+	// head-on charger amplifies the rebound. A degenerate relative motion
+	// (co-moving touch, dead-stop bullet) falls through to the absolute
+	// path, which reproduces the historical behavior for it (strength 0
+	// keeps heading at zero speed).
+	Vector2 incoming = dir * speed;
+	bool use_relative = false;
+	const Vector2 rel = dir * speed - t_eff;
+	// A disabled side zeroes its effective velocity above, so this block
+	// needs no further gating: off means the absolute bounce below.
+	if (rel.is_finite() && rel.length_squared() >= 0.00000001) {
+		// Separating repeat contact (tunneled and still inside, sliding
+		// along, steered back in) is no impact at all: free bounces swallow
+		// the record, consumed hits still count through the normal path
+		// (same contract as the cooldown above). First contacts skip this
+		// on purpose: a fresh overlap (teleport, spawn, tunnel entry) keeps
+		// the historical bounce, so the guard can only ever silence a
+		// target the bullet already bounced off, never a new one. Ping-pong
+		// between two walls is untouched (each hit is a new target there).
+		if (bullet_index >= 0 && bullet_index < (int)all_bounce_last_target.size() && all_bounce_last_target[bullet_index] == entered_instance_id) {
+			if (rel.dot(surface_n) >= 0.0) {
+				return bounce_hit_consumed ? 0 : 1;
+			}
+		}
+		incoming = rel;
+		use_relative = true;
+	}
 	// Reflect, scatter, scale. Dead-stop (strength 0) keeps the old heading
 	// with zero speed instead of normalizing a zero vector into a stall.
-	Vector2 refl = (dir * speed).bounce(surface_n);
+	Vector2 refl = incoming.bounce(surface_n);
 	if (bounce_randomness_deg > 0.0 && Math::is_finite((double)bounce_randomness_deg)) {
 		const real_t jitter = UtilityFunctions::randf_range(-bounce_randomness_deg, bounce_randomness_deg);
 		if (Math::is_finite((double)jitter)) {
@@ -1064,6 +1129,14 @@ int DirectionalBullets2D::try_handle_bounce(CollisionType collision_type, int bu
 	refl *= bounce_strength;
 	if (!refl.is_finite()) {
 		return 0;
+	}
+	if (use_relative) {
+		// Ride the target back on (see above): the surge on a push, the
+		// extra kick on a head-on charge. Rejects a cancelled reflection.
+		refl += t_eff;
+		if (!refl.is_finite()) {
+			return 0;
+		}
 	}
 	real_t new_speed = refl.length();
 	Vector2 new_dir = (new_speed > 0.0001) ? (refl / new_speed) : dir;
@@ -1100,6 +1173,9 @@ int DirectionalBullets2D::try_handle_bounce(CollisionType collision_type, int bu
 	if (bullet_index < (int)all_gravity_velocity.size()) {
 		const Vector2 gv = all_gravity_velocity[bullet_index];
 		if (gv.is_finite() && gv.length_squared() > 0.0) {
+			// Gravity stays absolute on purpose (it is environmental fall,
+			// not contact motion): relativizing it would fling arcs near
+			// fast targets instead of continuing them naturally.
 			const Vector2 gr = gv.bounce(surface_n) * bounce_strength;
 			all_gravity_velocity[bullet_index] = gr.is_finite() ? gr : Vector2(0, 0);
 		}
@@ -1315,6 +1391,12 @@ void DirectionalBullets2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_bounce_strength"), &DirectionalBullets2D::get_bounce_strength);
 	ClassDB::bind_method(D_METHOD("set_bounce_strength", "value"), &DirectionalBullets2D::set_bounce_strength);
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "bounce_strength"), "set_bounce_strength", "get_bounce_strength");
+	ClassDB::bind_method(D_METHOD("get_bounce_push_assist"), &DirectionalBullets2D::get_bounce_push_assist);
+	ClassDB::bind_method(D_METHOD("set_bounce_push_assist", "value"), &DirectionalBullets2D::set_bounce_push_assist);
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "bounce_push_assist"), "set_bounce_push_assist", "get_bounce_push_assist");
+	ClassDB::bind_method(D_METHOD("get_bounce_charge_amplify"), &DirectionalBullets2D::get_bounce_charge_amplify);
+	ClassDB::bind_method(D_METHOD("set_bounce_charge_amplify", "value"), &DirectionalBullets2D::set_bounce_charge_amplify);
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "bounce_charge_amplify"), "set_bounce_charge_amplify", "get_bounce_charge_amplify");
 	ClassDB::bind_method(D_METHOD("get_bounce_hit_consumed"), &DirectionalBullets2D::get_bounce_hit_consumed);
 	ClassDB::bind_method(D_METHOD("set_bounce_hit_consumed", "value"), &DirectionalBullets2D::set_bounce_hit_consumed);
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "bounce_hit_consumed"), "set_bounce_hit_consumed", "get_bounce_hit_consumed");

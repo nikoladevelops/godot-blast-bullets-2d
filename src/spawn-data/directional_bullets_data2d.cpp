@@ -321,6 +321,20 @@ void DirectionalBulletsData2D::set_bounce_strength(double value) {
 	bounce_strength = value;
 }
 
+bool DirectionalBulletsData2D::get_bounce_push_assist() const {
+	return bounce_push_assist;
+}
+void DirectionalBulletsData2D::set_bounce_push_assist(bool value) {
+	bounce_push_assist = value;
+}
+
+bool DirectionalBulletsData2D::get_bounce_charge_amplify() const {
+	return bounce_charge_amplify;
+}
+void DirectionalBulletsData2D::set_bounce_charge_amplify(bool value) {
+	bounce_charge_amplify = value;
+}
+
 bool DirectionalBulletsData2D::get_bounce_hit_consumed() const {
 	return bounce_hit_consumed;
 }
@@ -489,6 +503,14 @@ void DirectionalBulletsData2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_bounce_strength"), &DirectionalBulletsData2D::get_bounce_strength);
 	ClassDB::bind_method(D_METHOD("set_bounce_strength", "value"), &DirectionalBulletsData2D::set_bounce_strength);
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "bounce_strength"), "set_bounce_strength", "get_bounce_strength");
+
+	ClassDB::bind_method(D_METHOD("get_bounce_push_assist"), &DirectionalBulletsData2D::get_bounce_push_assist);
+	ClassDB::bind_method(D_METHOD("set_bounce_push_assist", "value"), &DirectionalBulletsData2D::set_bounce_push_assist);
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "bounce_push_assist"), "set_bounce_push_assist", "get_bounce_push_assist");
+
+	ClassDB::bind_method(D_METHOD("get_bounce_charge_amplify"), &DirectionalBulletsData2D::get_bounce_charge_amplify);
+	ClassDB::bind_method(D_METHOD("set_bounce_charge_amplify", "value"), &DirectionalBulletsData2D::set_bounce_charge_amplify);
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "bounce_charge_amplify"), "set_bounce_charge_amplify", "get_bounce_charge_amplify");
 
 	ClassDB::bind_method(D_METHOD("get_bounce_hit_consumed"), &DirectionalBulletsData2D::get_bounce_hit_consumed);
 	ClassDB::bind_method(D_METHOD("set_bounce_hit_consumed", "value"), &DirectionalBulletsData2D::set_bounce_hit_consumed);

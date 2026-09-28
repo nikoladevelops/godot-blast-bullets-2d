@@ -226,6 +226,18 @@ public:
 	// place (still alive), > 1 is super-elastic. Clamped to [0, 2].
 	double bounce_strength = 1.0;
 
+	// Whether a moving target feeds its velocity into the bounce, split by
+	// how it moves relative to the bullet. Same-direction targets (a
+	// pusher catching the bullet from behind) surge it forward when
+	// bounce_push_assist is on; oncoming targets (a head-on charger)
+	// amplify the rebound through relative reflection when
+	// bounce_charge_amplify is on. Both true (default) is the full smart
+	// physics; turning either off falls back to the absolute reflection
+	// for its case, so bounce_strength alone decides that outcome no
+	// matter how the target moves. The repeat guard always applies.
+	bool bounce_push_assist = true;
+	bool bounce_charge_amplify = true;
+
 	// Whether a bounce also counts as a normal hit (increments the collision
 	// counter and can disable the bullet at bullet_max_collision_count).
 	// False (default) means free bounces that never kill the bullet.
@@ -380,6 +392,12 @@ public:
 
 	double get_bounce_strength() const;
 	void set_bounce_strength(double value);
+
+	bool get_bounce_push_assist() const;
+	void set_bounce_push_assist(bool value);
+
+	bool get_bounce_charge_amplify() const;
+	void set_bounce_charge_amplify(bool value);
 
 	bool get_bounce_hit_consumed() const;
 	void set_bounce_hit_consumed(bool value);
