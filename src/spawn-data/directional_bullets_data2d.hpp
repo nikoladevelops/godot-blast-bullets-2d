@@ -261,6 +261,14 @@ public:
 	// Must stay finite in [0, 1]. Default 0.05.
 	double bounce_cooldown_sec = 0.05;
 
+	// Same-target debounce window in seconds, applied at spawn time (and
+	// on pool reuse). Cooldown only buys escape time, so a bullet still
+	// touching the same object when it expires would bounce again and
+	// again. Inside this window a re-hit against the just-bounced object
+	// never re-bounces (other targets bounce freely). 0 disables it.
+	// Must stay finite and >= 0. Default 0.15.
+	double bounce_debounce_sec = 0.15;
+
 	double get_homing_smoothing() const;
 	void set_homing_smoothing(double value);
 
@@ -393,6 +401,9 @@ public:
 
 	double get_bounce_cooldown_sec() const;
 	void set_bounce_cooldown_sec(double value);
+
+	double get_bounce_debounce_sec() const;
+	void set_bounce_debounce_sec(double value);
 
 protected:
 	static void _bind_methods();

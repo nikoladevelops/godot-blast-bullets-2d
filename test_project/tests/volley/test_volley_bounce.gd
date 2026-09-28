@@ -964,6 +964,57 @@ func _initialize() -> void:
 		await physics_frame
 	_check(v21g.bullet_get_fall_speed(0) < 5.0, "zeroed gravity holds fall speed")
 
+	printerr("BOUNCE T22 same-target debounce: stuck bullet bounces once per window")
+	await _settle(factory)
+	var d22 := _bounce_data(Vector2(100, 0), 0.0, 0.0, [4], [4])
+	_check(d22.bounce_debounce_sec == 0.15, "debounce defaults 0.15")
+	var keep_deb: float = d22.bounce_debounce_sec
+	d22.set_bounce_debounce_sec(NAN)
+	_check(d22.bounce_debounce_sec == keep_deb, "NaN debounce rejected")
+	d22.set_bounce_debounce_sec(-1.0)
+	_check(d22.bounce_debounce_sec == keep_deb, "negative debounce rejected")
+	d22.bounce_cooldown_sec = 0.0
+	var v22: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d22)
+	_check(absf(v22.get_bounce_debounce_sec() - 0.15) < 0.0001, "live mirror reseeds debounce")
+	for i in 30:
+		if i % 2 == 0:
+			v22.set_bullet_transform(0, Transform2D(0.0, Vector2(200, 0)))
+		else:
+			v22.set_bullet_transform(0, Transform2D(0.0, Vector2(100, 0)))
+		await physics_frame
+	var stuck_count: int = v22.bullet_get_bounce_count(0)
+	_check(stuck_count <= 5, "same wall re-hits debounced, not machine-gunned (got %d)" % stuck_count)
+	_check(stuck_count >= 1, "first contact still bounces")
+	_check(float(v22.debug_get_bounce_info(0).get("debounce", -1.0)) >= 0.0, "debug info reports debounce window")
+	await _settle(factory)
+	var d22b := _bounce_data(Vector2(100, 0), 0.0, 0.0, [4], [4])
+	d22b.bounce_cooldown_sec = 0.0
+	d22b.bounce_debounce_sec = 0.0
+	var v22b: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d22b)
+	for i in 30:
+		if i % 2 == 0:
+			v22b.set_bullet_transform(0, Transform2D(0.0, Vector2(200, 0)))
+		else:
+			v22b.set_bullet_transform(0, Transform2D(0.0, Vector2(100, 0)))
+		await physics_frame
+	_check(v22b.bullet_get_bounce_count(0) >= 12, "debounce 0 bounces every re-entry (got %d)" % v22b.bullet_get_bounce_count(0))
+	printerr("BOUNCE T22b debounce is per-target: alternating walls bounce freely")
+	await _settle(factory)
+	var wall_b := _make_wall(Vector2(-200, 0), 8)
+	await physics_frame
+	var d22c := _bounce_data(Vector2(100, 0), 0.0, 0.0, [4], [4])
+	d22c.bounce_cooldown_sec = 0.0
+	var v22c: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d22c)
+	for i in 20:
+		if i % 2 == 0:
+			v22c.set_bullet_transform(0, Transform2D(0.0, Vector2(200, 0)))
+		else:
+			v22c.set_bullet_transform(0, Transform2D(0.0, Vector2(-200, 0)))
+		await physics_frame
+	_check(v22c.bullet_get_bounce_count(0) >= 16, "new target each hit bounces despite debounce (got %d)" % v22c.bullet_get_bounce_count(0))
+	wall_b.queue_free()
+	await process_frame
+
 	factory.directional_bounce_body_entered.disconnect(_on_bounce_body)
 	factory.directional_bounce_area_entered.disconnect(_on_bounce_area)
 	factory.directional_body_entered.disconnect(_on_norm_body)

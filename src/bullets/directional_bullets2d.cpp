@@ -734,9 +734,12 @@ void DirectionalBullets2D::reset_transient_subclass_state(bool drop_stale_work) 
 	bounce_rotation_smooth = 0.0;
 	bounce_randomness_deg = 0.0;
 	bounce_cooldown_sec = 0.05;
+	bounce_debounce_sec = 0.15;
 	all_bounce_count.clear();
 	all_bounce_cooldown.clear();
 	all_bounce_last_tick.clear();
+	all_bounce_last_target.clear();
+	all_bounce_last_time.clear();
 	bounce_visual_pending.clear();
 	bounce_visual_target.clear();
 	bounce_mask_warning_issued = false;
@@ -984,6 +987,19 @@ int DirectionalBullets2D::try_handle_bounce(CollisionType collision_type, int bu
 	if (target_layer == 0 || (target_layer & bounce_mask) == 0) {
 		return 0;
 	}
+	// Same-target debounce: re-hits against the object just bounced off
+	// (still overlapping it, sliding along it, steered straight back into
+	// it) must not machine-gun the bullet. A free bounce swallows the
+	// record; a consumed hit still counts through the normal path, same
+	// contract as the cooldown above. Other targets bounce freely.
+	if (bounce_debounce_sec > 0.0 && Math::is_finite((double)bounce_debounce_sec)
+			&& bullet_index < (int)all_bounce_last_target.size() && bullet_index < (int)all_bounce_last_time.size()
+			&& all_bounce_last_target[bullet_index] == entered_instance_id && Math::is_finite(curves_elapsed_time)) {
+		const double since_bounce = curves_elapsed_time - all_bounce_last_time[bullet_index];
+		if (Math::is_finite(since_bounce) && since_bounce >= 0.0 && since_bounce < (double)bounce_debounce_sec) {
+			return bounce_hit_consumed ? 0 : 1;
+		}
+	}
 	// A StayLocked orbit owns the displacement: bouncing would fight the
 	// ring every tick, so the orbit wins and the hit takes the normal path.
 	if (bullet_index < (int)all_orbiting_status.size() && bullet_index < (int)all_orbiting_data.size() && all_orbiting_status[bullet_index] && all_orbiting_data[bullet_index].is_locked_orbiting && all_orbiting_data[bullet_index].lock_policy == StayLocked) {
@@ -1149,6 +1165,14 @@ int DirectionalBullets2D::try_handle_bounce(CollisionType collision_type, int bu
 	if (bullet_index < (int)all_bounce_last_tick.size()) {
 		all_bounce_last_tick[bullet_index] = bounce_tick_counter;
 	}
+	// Arm the same-target debounce: further records against THIS object
+	// inside the window never re-bounce (see the check above).
+	if (bullet_index < (int)all_bounce_last_target.size()) {
+		all_bounce_last_target[bullet_index] = entered_instance_id;
+	}
+	if (bullet_index < (int)all_bounce_last_time.size() && Math::is_finite(curves_elapsed_time)) {
+		all_bounce_last_time[bullet_index] = curves_elapsed_time;
+	}
 	// Slim bounce signal, same ownership routing as collisions: spawner
 	// volleys report to their spawner, the rest to the factory. Snapshot the
 	// emitter first (a consumed hit below may pool the volley), guard the
@@ -1309,6 +1333,9 @@ void DirectionalBullets2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_bounce_cooldown_sec"), &DirectionalBullets2D::get_bounce_cooldown_sec);
 	ClassDB::bind_method(D_METHOD("set_bounce_cooldown_sec", "value"), &DirectionalBullets2D::set_bounce_cooldown_sec);
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "bounce_cooldown_sec"), "set_bounce_cooldown_sec", "get_bounce_cooldown_sec");
+	ClassDB::bind_method(D_METHOD("get_bounce_debounce_sec"), &DirectionalBullets2D::get_bounce_debounce_sec);
+	ClassDB::bind_method(D_METHOD("set_bounce_debounce_sec", "value"), &DirectionalBullets2D::set_bounce_debounce_sec);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "bounce_debounce_sec"), "set_bounce_debounce_sec", "get_bounce_debounce_sec");
 
 	ClassDB::bind_method(D_METHOD("bullet_get_bounce_count", "bullet_index"), &DirectionalBullets2D::bullet_get_bounce_count);
 	ClassDB::bind_method(D_METHOD("all_bullets_get_bounce_count", "bullet_index_start", "bullet_index_end_inclusive"), &DirectionalBullets2D::all_bullets_get_bounce_count, DEFVAL(0), DEFVAL(-1));

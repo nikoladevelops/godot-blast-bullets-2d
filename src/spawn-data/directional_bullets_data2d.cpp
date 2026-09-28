@@ -390,6 +390,17 @@ void DirectionalBulletsData2D::set_bounce_cooldown_sec(double value) {
 	bounce_cooldown_sec = value;
 }
 
+double DirectionalBulletsData2D::get_bounce_debounce_sec() const {
+	return bounce_debounce_sec;
+}
+void DirectionalBulletsData2D::set_bounce_debounce_sec(double value) {
+	if (!Math::is_finite(value) || value < 0.0) {
+		UtilityFunctions::push_error("DirectionalBulletsData2D: bounce_debounce_sec must be finite and >= 0 (0 = off), keeping the old value.");
+		return;
+	}
+	bounce_debounce_sec = value;
+}
+
 void DirectionalBulletsData2D::_bind_methods() {
 	ADD_GROUP("Movement Speed", "");
 
@@ -506,6 +517,10 @@ void DirectionalBulletsData2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_bounce_cooldown_sec"), &DirectionalBulletsData2D::get_bounce_cooldown_sec);
 	ClassDB::bind_method(D_METHOD("set_bounce_cooldown_sec", "value"), &DirectionalBulletsData2D::set_bounce_cooldown_sec);
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "bounce_cooldown_sec"), "set_bounce_cooldown_sec", "get_bounce_cooldown_sec");
+
+	ClassDB::bind_method(D_METHOD("get_bounce_debounce_sec"), &DirectionalBulletsData2D::get_bounce_debounce_sec);
+	ClassDB::bind_method(D_METHOD("set_bounce_debounce_sec", "value"), &DirectionalBulletsData2D::set_bounce_debounce_sec);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "bounce_debounce_sec"), "set_bounce_debounce_sec", "get_bounce_debounce_sec");
 
 
 	ADD_GROUP("Movement Pattern Paths", "");

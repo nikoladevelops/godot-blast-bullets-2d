@@ -1129,7 +1129,10 @@
 			Whether each bullet's direction is adjusted based on rotation data (the bullet moves where it faces). Mirrors the spawn data flag; pool reuse re-applies the data value.
 		</member>
 		<member name="bounce_cooldown_sec" type="float" setter="set_bounce_cooldown_sec" getter="get_bounce_cooldown_sec" default="0.05">
-			Quiet period in seconds after a bounce, set live (finite in [0, 1]).
+			Quiet period in seconds after a bounce, set live (finite in [0, 1]). Swallows further bounce records whatever they hit, so keep it small and use [member bounce_debounce_sec] for repeat suppression. Example: bullet clips two walls 0.03 s apart with cooldown 0.05: the first touch bounces, the second is swallowed.
+		</member>
+		<member name="bounce_debounce_sec" type="float" setter="set_bounce_debounce_sec" getter="get_bounce_debounce_sec" default="0.15">
+			Same-target debounce window in seconds, set live (finite, 0 or more, no upper cap). Inside the window a re-hit against the just-bounced object never re-bounces; other targets bounce freely (unlike [member bounce_cooldown_sec], which swallows every target). 0 disables it. Example: bullet slides along one wall with debounce 0.15: it bounces once, ignores that wall for 0.15 s, but still bounces off a second wall touched in between.
 		</member>
 		<member name="bounce_hit_consumed" type="bool" setter="set_bounce_hit_consumed" getter="get_bounce_hit_consumed" default="false">
 			Whether a bounce also counts as a normal hit, set live. False (default) means free bounces. A consumed bounce emits BOTH the bounce signal and the matching area/body signal.

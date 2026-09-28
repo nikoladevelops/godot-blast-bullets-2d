@@ -281,6 +281,13 @@ protected:
 	real_t bounce_rotation_smooth = 0.0;
 	real_t bounce_randomness_deg = 0.0;
 	real_t bounce_cooldown_sec = 0.05;
+	// Same-target debounce window in seconds. Cooldown only buys escape
+	// time, so a bullet still touching the same object when it expires
+	// (deep overlap, sliding contact, steered straight back in) would
+	// bounce again and again. Debounce keys on the target instance: a
+	// re-hit against the just-bounced object inside this window never
+	// re-bounces. 0 (allowed) disables it. Default 0.15.
+	real_t bounce_debounce_sec = 0.15;
 	// Per-bullet bounce ledger. Sized to amount_bullets only while bouncing
 	// is armed (see ensure_bounce_vectors); empty otherwise so a plain
 	// volley pays no per-tick bounce work. Zeroed on every new life and on
@@ -288,6 +295,11 @@ protected:
 	std::vector<int> all_bounce_count;
 	std::vector<real_t> all_bounce_cooldown;
 	std::vector<uint64_t> all_bounce_last_tick;
+	// Same-target debounce ledger: which object each bullet last bounced
+	// off, and when (volley clock). Sized with the rest of the ledger;
+	// target id 0 means none yet (instance ids are never 0).
+	std::vector<int64_t> all_bounce_last_target;
+	std::vector<double> all_bounce_last_time;
 	// Smooth visual pursuit: ballistics always reflect instantly, but with
 	// bounce_rotation_smooth > 0 the sprite slews toward the reflected
 	// heading over several ticks (same contract as homing smoothing).
@@ -322,6 +334,8 @@ protected:
 			all_bounce_count.clear();
 			all_bounce_cooldown.clear();
 			all_bounce_last_tick.clear();
+			all_bounce_last_target.clear();
+			all_bounce_last_time.clear();
 			bounce_visual_pending.clear();
 			bounce_visual_target.clear();
 			all_bounce_speed_multiplier.clear();
@@ -336,6 +350,12 @@ protected:
 		}
 		if ((int)all_bounce_last_tick.size() != amount_bullets) {
 			all_bounce_last_tick.assign(amount_bullets, 0);
+		}
+		if ((int)all_bounce_last_target.size() != amount_bullets) {
+			all_bounce_last_target.assign(amount_bullets, 0);
+		}
+		if ((int)all_bounce_last_time.size() != amount_bullets) {
+			all_bounce_last_time.assign(amount_bullets, 0.0);
 		}
 		if ((int)bounce_visual_pending.size() != amount_bullets) {
 			bounce_visual_pending.assign(amount_bullets, 0);
@@ -3364,6 +3384,14 @@ public:
 		}
 		bounce_cooldown_sec = value;
 	}
+	real_t get_bounce_debounce_sec() const { return bounce_debounce_sec; }
+	void set_bounce_debounce_sec(real_t value) {
+		if (!Math::is_finite(value) || value < 0.0) {
+			UtilityFunctions::push_error("DirectionalBullets2D.set_bounce_debounce_sec: value must be finite and >= 0 (0 = off), keeping the old value.");
+			return;
+		}
+		bounce_debounce_sec = value;
+	}
 	// How many times one bullet has bounced in its current life.
 	int bullet_get_bounce_count(int bullet_index) const {
 		if (!validate_bullet_index(bullet_index, "bullet_get_bounce_count")) {
@@ -3421,6 +3449,19 @@ public:
 		if (bullet_index >= 0 && bullet_index < (int)all_bounce_cooldown.size()) {
 			d["cooldown"] = all_bounce_cooldown[bullet_index];
 		}
+		// Seconds left before this bullet may bounce off the SAME target
+		// again (0 when the window is over, disarmed, or never bounced).
+		double debounce_left = 0.0;
+		if (bounce_debounce_sec > 0.0 && Math::is_finite((double)bounce_debounce_sec)
+				&& bullet_index >= 0 && bullet_index < (int)all_bounce_last_target.size()
+				&& bullet_index < (int)all_bounce_last_time.size()
+				&& all_bounce_last_target[bullet_index] != 0 && Math::is_finite(curves_elapsed_time)) {
+			const double anchor = all_bounce_last_time[bullet_index];
+			if (Math::is_finite(anchor)) {
+				debounce_left = Math::max(0.0, (double)bounce_debounce_sec - (curves_elapsed_time - anchor));
+			}
+		}
+		d["debounce"] = debounce_left;
 		return d;
 	}
 	// Seeds bounce config + zeroes the per-bullet ledger from spawn data.
@@ -3435,6 +3476,7 @@ public:
 		bounce_rotation_smooth = (real_t)directional_data.bounce_rotation_smooth;
 		bounce_randomness_deg = (real_t)directional_data.bounce_randomness_deg;
 		bounce_cooldown_sec = (real_t)directional_data.bounce_cooldown_sec;
+		bounce_debounce_sec = (real_t)directional_data.bounce_debounce_sec;
 		// Fresh life, fresh ledger. assign() both sizes and zeroes when
 		// armed; clear() drops the vectors when disarmed so plain volleys
 		// carry no bounce state at all.
@@ -3442,6 +3484,8 @@ public:
 			all_bounce_count.assign(amount_bullets, 0);
 			all_bounce_cooldown.assign(amount_bullets, 0.0);
 			all_bounce_last_tick.assign(amount_bullets, 0);
+			all_bounce_last_target.assign(amount_bullets, 0);
+			all_bounce_last_time.assign(amount_bullets, 0.0);
 			bounce_visual_pending.assign(amount_bullets, 0);
 			bounce_visual_target.assign(amount_bullets, Vector2(1, 0));
 			all_bounce_speed_multiplier.assign(amount_bullets, 1.0);
@@ -3449,6 +3493,8 @@ public:
 			all_bounce_count.clear();
 			all_bounce_cooldown.clear();
 			all_bounce_last_tick.clear();
+			all_bounce_last_target.clear();
+			all_bounce_last_time.clear();
 			bounce_visual_pending.clear();
 			bounce_visual_target.clear();
 			all_bounce_speed_multiplier.clear();
@@ -3992,9 +4038,12 @@ public:
 		bounce_rotation_smooth = 0.0;
 		bounce_randomness_deg = 0.0;
 		bounce_cooldown_sec = 0.05;
+		bounce_debounce_sec = 0.15;
 		all_bounce_count.clear();
 		all_bounce_cooldown.clear();
 		all_bounce_last_tick.clear();
+		all_bounce_last_target.clear();
+		all_bounce_last_time.clear();
 		bounce_visual_pending.clear();
 		bounce_visual_target.clear();
 		all_bounce_speed_multiplier.clear();
@@ -4027,6 +4076,13 @@ public:
 		}
 		if (bullet_index < (int)all_bounce_last_tick.size()) {
 			all_bounce_last_tick[bullet_index] = 0;
+		}
+		// A wake forgets who it bounced off last, same as counts above.
+		if (bullet_index < (int)all_bounce_last_target.size()) {
+			all_bounce_last_target[bullet_index] = 0;
+		}
+		if (bullet_index < (int)all_bounce_last_time.size()) {
+			all_bounce_last_time[bullet_index] = 0.0;
 		}
 		if (bullet_index < (int)bounce_visual_pending.size()) {
 			bounce_visual_pending[bullet_index] = 0;

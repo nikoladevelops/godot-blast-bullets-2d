@@ -17,9 +17,6 @@ speed = 500.0
 max_speed = 200.0
 acceleration = 20.0
 
-[sub_resource type="BulletWobbleData2D" id="BulletWobbleData2D_mouoi"]
-enabled = true
-
 [sub_resource type="SpriteFrames" id="SpriteFrames_y4v7i"]
 animations = [{
 "frames": [{
@@ -33,7 +30,6 @@ animations = [{
 
 [sub_resource type="DirectionalBulletsData2D" id="DirectionalBulletsData2D_nkrfg"]
 shared_bullet_speed_data = SubResource("BulletSpeedData2D_mouoi")
-shared_bullet_wobble_data = SubResource("BulletWobbleData2D_mouoi")
 bounce_mask = 1
 bounce_strength = 5.0
 shared_movement_pattern_face_movement_direction = true
