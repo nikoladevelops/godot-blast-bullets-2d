@@ -96,6 +96,9 @@ func _initialize() -> void:
 	var info_before: Dictionary = v.debug_get_volley_info()
 	var wrong := _shaped_data(5, circ)
 	# Direct GDScript enable with mismatched size must refuse without touching state.
+	# Park on idle first: right after `await physics_frame` we resume mid-step,
+	# where the frame-phase guard (not the size check) would reject instead.
+	await _idle()
 	_check(v.enable_multimesh(wrong, Vector2.ZERO, 0) == false, "mismatched enable returns false")
 	var info_after: Dictionary = v.debug_get_volley_info()
 	_check(info_after.get("amount_bullets", -1) == info_before.get("amount_bullets", -2), "amount unchanged after refused enable")

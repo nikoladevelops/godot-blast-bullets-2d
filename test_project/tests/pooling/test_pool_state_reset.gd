@@ -133,6 +133,7 @@ func _initialize() -> void:
 	_check(stats.get("directional_misses", 0) >= 1, "new amount allocates (miss)")
 
 	target.queue_free()
+	await process_frame
 	factory.reset()
 	_check(factory.debug_assert_no_dangling().get("ok", false) == true, "no dangling at end")
 	factory.queue_free()

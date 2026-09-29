@@ -268,6 +268,7 @@ func _initialize() -> void:
 	_check(v15s.get_bullet_transform(0).is_finite() and v15p.get_bullet_transform(0).is_finite(), "post-finish flight finite")
 
 	_check(factory.debug_assert_no_dangling().get("ok", false) == true, "no dangling at end")
+	await process_frame
 	factory.reset()
 	factory.queue_free()
 	await process_frame

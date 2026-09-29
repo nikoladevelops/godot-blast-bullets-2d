@@ -850,6 +850,13 @@ int BulletFactory2D::spawn_layer_effect(const Ref<BulletEffectLayerData2D> &laye
 		return -1;
 	}
 	for (size_t i = 0; i < fx_manual_bakes.size(); ++i) {
+		// Same resource, edited content: the stored generation trails the
+		// layer's, so drop the stale bake and rebuild below.
+		if (fx_manual_bakes[i].layer == layer && fx_manual_bakes[i].layer_version != layer->get_bake_version()) {
+			fx_erase_bake(fx_manual_bakes[i]);
+			fx_manual_bakes.erase(fx_manual_bakes.begin() + i);
+			break;
+		}
 		if (fx_manual_bakes[i].layer == layer) {
 			return fx_fire_into_bake(fx_manual_bakes[i], at);
 		}
@@ -875,6 +882,7 @@ int BulletFactory2D::spawn_layer_effect(const Ref<BulletEffectLayerData2D> &laye
 	bake.volley_id = 0;
 	bake.layer_index = -1;
 	bake.layer = layer;
+	bake.layer_version = layer->get_bake_version();
 	bake.frames = frames;
 	bake.secs = secs;
 	bake.total = total;
@@ -923,10 +931,13 @@ Dictionary BulletFactory2D::debug_get_effect_state() const {
 	d["bake_count"] = (int)fx_bakes.size();
 	d["active_total"] = get_active_effect_count();
 	int manual_active = 0;
+	int manual_frames = 0;
 	for (size_t i = 0; i < fx_manual_bakes.size(); ++i) {
 		manual_active += fx_manual_bakes[i].active_count;
+		manual_frames += (int)fx_manual_bakes[i].frames.size();
 	}
 	d["manual_active"] = manual_active;
+	d["manual_frames"] = manual_frames;
 	d["manual_bakes"] = (int)fx_manual_bakes.size();
 	d["container_valid"] = sprite_effects_container != nullptr;
 	Array bakes;
@@ -1703,6 +1714,13 @@ Dictionary BulletFactory2D::debug_check_interpolation_status() {
 PackedInt64Array BulletFactory2D::debug_get_live_volley_ids(uint64_t owner_spawner_id) {
 	PackedInt64Array ids;
 	for (const DirectionalBullets2D *volley : all_directional_bullets) {
+		if (volley != nullptr && volley->is_active && volley->owner_spawner_id == owner_spawner_id) {
+			ids.push_back((int64_t)volley->get_instance_id());
+		}
+	}
+	// Block volleys carry the same ownership stamp through the base class:
+	// skipping them silently undercounts spawner-owned block fire.
+	for (const BlockBullets2D *volley : all_block_bullets) {
 		if (volley != nullptr && volley->is_active && volley->owner_spawner_id == owner_spawner_id) {
 			ids.push_back((int64_t)volley->get_instance_id());
 		}

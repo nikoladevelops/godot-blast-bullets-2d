@@ -14,6 +14,7 @@ static const int EFFECT_MAX_BAKE_FRAMES = 24;
 void BulletEffectLayerData2D::invalidate_bake() const {
 	bake_valid = false;
 	bake_anim = StringName();
+	++bake_version;
 	bake_frames.clear();
 	bake_secs.clear();
 	bake_total = 0.0;

@@ -1063,10 +1063,20 @@ public:
 								if (delta > 0.0) {
 									orbiting_data->angle += (orbit_speed / safe_radius) * dir_multiplier * (real_t)delta;
 								}
+								// Long-session guard: the angle feeds rotated()
+								// only (periodic), so wrap it once float
+								// precision could degrade. Threshold form keeps
+								// every sane-session read bit-identical.
+								if (orbiting_data->angle > 1000000.0 || orbiting_data->angle < -1000000.0) {
+									orbiting_data->angle = Math::fposmod(orbiting_data->angle, (real_t)Math::TAU);
+								}
 								velocity_delta = (orbit_center + Vector2(orbiting_data->radius, 0).rotated(orbiting_data->angle)) - curr_bullet_origin;
 							} else if (orbit_can_move) {
 								real_t angular_speed = (orbit_speed / safe_radius) * dir_multiplier;
 								orbiting_data->angle += angular_speed * delta;
+								if (orbiting_data->angle > 1000000.0 || orbiting_data->angle < -1000000.0) {
+									orbiting_data->angle = Math::fposmod(orbiting_data->angle, (real_t)Math::TAU);
+								}
 								Vector2 target_pos = orbit_center + Vector2(orbiting_data->radius, 0).rotated(orbiting_data->angle);
 								Vector2 snap_delta = target_pos - curr_bullet_origin;
 								real_t max_step = orbit_speed * (real_t)delta;

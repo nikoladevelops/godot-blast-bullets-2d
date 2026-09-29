@@ -232,6 +232,7 @@ func _initialize() -> void:
 	spa2.queue_free()
 	spb2.queue_free()
 	spf.queue_free()
+	await process_frame
 	factory.reset()
 	factory.queue_free()
 	await process_frame

@@ -434,6 +434,9 @@ public:
 		uint64_t volley_id = 0;
 		int layer_index = -1;
 		Ref<BulletEffectLayerData2D> layer;
+		// Layer content generation at bake time; a mismatch means the user
+		// edited the layer since (manual hatch path re-bakes on it).
+		uint64_t layer_version = 0;
 		std::vector<Ref<Texture2D>> frames;
 		std::vector<double> secs;
 		double total = 0.0;

@@ -292,6 +292,7 @@ func _initialize() -> void:
 	_check(v14.get_bullet_transform(0).is_finite(), "curve reverse flight finite")
 
 	_check(factory.debug_assert_no_dangling().get("ok", false) == true, "no dangling at end")
+	await process_frame
 	factory.reset()
 	factory.queue_free()
 	await process_frame

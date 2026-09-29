@@ -1541,6 +1541,7 @@ func _initialize() -> void:
 	d26e.bounce_charge_amplify = false
 	var v26e: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d26e)
 	_check(v26e.get_bounce_push_assist() == false and v26e.get_bounce_charge_amplify() == false, "knobs-off mirrors reseeded")
+	await process_frame
 	factory.free_active_bullets()
 	await process_frame
 	await process_frame
@@ -1758,14 +1759,19 @@ func _initialize() -> void:
 	_check(_finite_volley(v28g), "both bullets finite after shared-pusher bounce")
 	push28.queue_free()
 	await process_frame
-	# T28h: StayLocked orbit wins over the pusher (zero bounces).
+	# T28h: StayLocked orbit wins over the pusher (zero bounces). The whole
+	# rig lives on the y=300 lane: the suite wall at (200, 0) would
+	# otherwise intercept the flight, and a RigidBody pusher would crash
+	# into it physically. Spawn sits past the wall with a clean run to the
+	# ring; the pusher is teleported onto the locked bullet for guaranteed
+	# overlap (its velocity still feeds the bounce math, which orbit skips).
 	await _settle(factory)
 	var orbit28 := Node2D.new()
-	orbit28.position = Vector2(400, 0)
+	orbit28.position = Vector2(400, 300)
 	get_root().add_child(orbit28)
 	await process_frame
 	var lock28 := RigidBody2D.new()
-	lock28.position = Vector2(300, 0)
+	lock28.position = Vector2(100, 300)
 	lock28.collision_layer = 8
 	lock28.collision_mask = 0
 	lock28.gravity_scale = 0.0
@@ -1780,20 +1786,24 @@ func _initialize() -> void:
 	lock28.add_child(lock28col)
 	get_root().add_child(lock28)
 	await physics_frame
-	var d28h := _bounce_data(Vector2.ZERO, 0.0, 300.0, [4], [4])
+	var d28h := _bounce_data(Vector2(250, 300), 0.0, 300.0, [4], [4])
+	d28h.set_bullet_max_collision_count(0)
 	var v28h: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d28h)
 	# OrbitRight=2, FaceTarget=0, FollowTarget=0, StayLocked=1.
 	v28h.bullet_homing_push_back_homing_target(0, orbit28)
 	v28h.bullet_enable_orbiting(0, 60.0, 2, 0, 0, 0.0, 1, true)
-	for i in 120:
+	for i in 150:
 		await physics_frame
 		if v28h.bullet_is_orbiting_locked(0):
 			break
 	_check(v28h.bullet_is_orbiting_locked(0), "orbiter locked before the pusher arrives")
 	_clear_signals()
-	for i in 60:
-		await physics_frame
+	for k in 3:
+		lock28.position = v28h.get_bullet_transform(0).origin
+		for i in 10:
+			await physics_frame
 	_check(v28h.bullet_get_bounce_count(0) == 0, "StayLocked orbit takes zero bounces")
+	_check(v28h.get_bullet_collision_count(0) >= 1, "locked hits still count normally")
 	_check(v28h.bullet_is_orbiting_locked(0), "StayLocked ring survives the pusher")
 	orbit28.queue_free()
 	lock28.queue_free()
@@ -1847,6 +1857,7 @@ func _initialize() -> void:
 	var d30 := _bounce_data(Vector2.ZERO, 0.0, 300.0, [4], [4])
 	d30.bounce_hit_consumed = true
 	d30.bounce_max_count = 2
+	d30.set_bullet_max_collision_count(2)
 	var v30: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d30)
 	for i in 120:
 		await physics_frame
@@ -1876,9 +1887,274 @@ func _initialize() -> void:
 	v31.set_bounce_mask(-1)
 	_check(v31.get_bounce_mask() == 8, "live negative mask rejected")
 
+	printerr("BOUNCE T32 mover switching, gravity push, unlocked orbit, spawner routing")
+	await _settle(factory)
+	var push32 := RigidBody2D.new()
+	push32.position = Vector2(-150, 300)
+	push32.collision_layer = 8
+	push32.collision_mask = 0
+	push32.gravity_scale = 0.0
+	push32.linear_damp = 0.0
+	push32.linear_damp_mode = RigidBody2D.DAMP_MODE_REPLACE
+	push32.can_sleep = false
+	push32.linear_velocity = Vector2(500, 0)
+	var p32col := CollisionShape2D.new()
+	var p32box := RectangleShape2D.new()
+	p32box.size = Vector2(20, 400)
+	p32col.shape = p32box
+	push32.add_child(p32col)
+	get_root().add_child(push32)
+	var charge32 := RigidBody2D.new()
+	charge32.position = Vector2(600, 300)
+	charge32.collision_layer = 8
+	charge32.collision_mask = 0
+	charge32.gravity_scale = 0.0
+	charge32.linear_damp = 0.0
+	charge32.linear_damp_mode = RigidBody2D.DAMP_MODE_REPLACE
+	charge32.can_sleep = false
+	charge32.linear_velocity = Vector2(-400, 0)
+	var c32col := CollisionShape2D.new()
+	var c32box := RectangleShape2D.new()
+	c32box.size = Vector2(20, 400)
+	c32col.shape = c32box
+	charge32.add_child(c32col)
+	get_root().add_child(charge32)
+	await physics_frame
+	var d32 := _bounce_data(Vector2(0, 300), 0.0, 100.0, [4], [4])
+	var v32: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d32)
+	for i in 200:
+		await physics_frame
+		if v32.bullet_get_bounce_count(0) >= 2:
+			break
+	_check(v32.bullet_get_bounce_count(0) >= 2, "push then charge both bounce")
+	_check(v32.get_bullet_direction(0).x < -0.5, "charger wins the second exchange")
+	_check(v32.get_bullet_velocity(0).is_finite(), "mover switching stays finite")
+	push32.queue_free()
+	charge32.queue_free()
+	await process_frame
+	await _settle(factory)
+	var d32b := _bounce_data(Vector2(0, 300), 0.0, 200.0, [4], [4])
+	d32b.gravity = Vector2(0, 50.0)
+	var push32b := RigidBody2D.new()
+	push32b.position = Vector2(-150, 300)
+	push32b.collision_layer = 8
+	push32b.collision_mask = 0
+	push32b.gravity_scale = 0.0
+	push32b.linear_damp = 0.0
+	push32b.linear_damp_mode = RigidBody2D.DAMP_MODE_REPLACE
+	push32b.can_sleep = false
+	push32b.linear_velocity = Vector2(500, 0)
+	var p32bcol := CollisionShape2D.new()
+	var p32bbox := RectangleShape2D.new()
+	p32bbox.size = Vector2(20, 400)
+	p32bcol.shape = p32bbox
+	push32b.add_child(p32bcol)
+	get_root().add_child(push32b)
+	await physics_frame
+	var v32b: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d32b)
+	for i in 200:
+		await physics_frame
+		if v32b.bullet_get_bounce_count(0) >= 1:
+			break
+	_check(v32b.get_bullet_direction(0).x > 0.0, "gravity push keeps forward motion")
+	_check(v32b.get_bullet_velocity(0).length() > 400.0, "gravity push still surges")
+	_check(v32b.get_bullet_velocity(0).y > 0.0, "fall continues after a moving bounce")
+	push32b.queue_free()
+	await process_frame
+	await _settle(factory)
+	var moon32 := Node2D.new()
+	moon32.position = Vector2(600, 300)
+	get_root().add_child(moon32)
+	var ringwall := _make_wall(Vector2(600, 300), 8)
+	await physics_frame
+	var d32c := _bounce_data(Vector2(500, 300), 0.0, 200.0, [4], [4])
+	d32c.set_bullet_max_collision_count(0)
+	var v32c: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d32c)
+	v32c.shared_homing_deque_push_back_node2d_target(moon32)
+	v32c.bullet_enable_orbiting(0, 64.0, 2, 0)
+	for i in 150:
+		await physics_frame
+		if v32c.bullet_get_bounce_count(0) >= 1:
+			break
+	_check(v32c.bullet_get_bounce_count(0) >= 1, "unlocked orbit never blocks wall contact")
+	_check(v32c.get_bullet_transform(0).is_finite(), "unlocked orbit flight finite")
+	moon32.queue_free()
+	ringwall.queue_free()
+	await process_frame
+	await _settle(factory)
+	var spawner32 := BulletSpawner2D.new()
+	spawner32.bullet_factory_path = factory.get_path()
+	spawner32.shooting_enabled = false
+	spawner32.pattern_source = BulletSpawner2D.PATTERN_FROM_SELF
+	spawner32.position = Vector2(0, 300)
+	get_root().add_child(spawner32)
+	await process_frame
+	var push32d := RigidBody2D.new()
+	push32d.position = Vector2(-150, 300)
+	push32d.collision_layer = 8
+	push32d.collision_mask = 0
+	push32d.gravity_scale = 0.0
+	push32d.linear_damp = 0.0
+	push32d.linear_damp_mode = RigidBody2D.DAMP_MODE_REPLACE
+	push32d.can_sleep = false
+	push32d.linear_velocity = Vector2(500, 0)
+	var p32dcol := CollisionShape2D.new()
+	var p32dbox := RectangleShape2D.new()
+	p32dbox.size = Vector2(20, 400)
+	p32dcol.shape = p32dbox
+	push32d.add_child(p32dcol)
+	get_root().add_child(push32d)
+	await physics_frame
+	spawner32.bounce_body_entered.connect(_on_spawner_bounce)
+	spawner32.spawn_data = _bounce_data(Vector2(0, 300), 0.0, 100.0, [4], [4])
+	_check(spawner32.shoot_once(), "spawner push volley fired")
+	for i in 200:
+		await physics_frame
+		if _spawner_bounce.size() >= 1:
+			break
+	_check(_spawner_bounce.size() >= 1, "spawner routes the push bounce")
+	_check(_factory_bounce.is_empty(), "factory silent on spawner push")
+	spawner32.queue_free()
+	push32d.queue_free()
+	await process_frame
+
+	printerr("BOUNCE T33 unspawned instances never crash")
+	await _settle(factory)
+	var bare := DirectionalBullets2D.new()
+	get_root().add_child(bare)
+	await process_frame
+	var empty_data := DirectionalBulletsData2D.new()
+	empty_data.transforms = []
+	_check(bare.enable_multimesh(empty_data, Vector2.ZERO, 0) == false, "enable on never-spawned volley refuses cleanly")
+	_check(bare.get_amount_bullets() == 0, "fresh volley holds zero bullets")
+	_check(bare.bullet_get_bounce_count(0) == 0, "bounce count OOB reads 0")
+	_check(bare.get_bullet_direction(0) == Vector2(), "direction OOB reads zero")
+	_check(bare.get_bullet_velocity(0) == Vector2(), "velocity OOB reads zero")
+	_check(bare.get_bullet_transform(0) == Transform2D(), "transform OOB reads identity")
+	_check(not bare.has_trail_effects(), "no trails without a bake")
+	_check(bare.debug_get_effect_layers_info().get("trail_bake_count", -1) == 0, "effect debug empty")
+	_check(bare.debug_get_bounce_info(0).get("valid", true) == false, "bounce debug OOB invalid")
+	bare.disable_bullet(0)
+	bare.enable_bullet(0)
+	bare.set_bullet_transform(0, Transform2D.IDENTITY)
+	bare.set_bullet_direction(0, Vector2(1, 0))
+	bare.set_bullet_speed_data(0, BulletSpeedData2D.new())
+	bare.bullet_set_gravity(0, Vector2(0, 1))
+	bare.bullet_set_trail_enabled(0, 0, true)
+	bare.play_effect_animation(0, "x")
+	_check(bare.get_bullet_transform(0) == Transform2D(), "hostile storm leaves identity")
+	_check(bare.debug_get_volley_info().get("amount_bullets", -1) == 0, "volley info zeroed")
+	bare.queue_free()
+	await process_frame
+	var bare_block := BlockBullets2D.new()
+	get_root().add_child(bare_block)
+	await process_frame
+	var empty_block := BlockBulletsData2D.new()
+	empty_block.transforms = []
+	_check(bare_block.enable_multimesh(empty_block, Vector2.ZERO, 0) == false, "block enable on fresh instance refuses cleanly")
+	bare_block.queue_free()
+	await process_frame
+
+	printerr("BOUNCE T34 teleport matrix + interpolation mixing")
+	await _settle(factory)
+	factory.set_use_physics_interpolation_runtime(false)
+	var d34 := _bounce_data(Vector2.ZERO, 0.0, 300.0, [4], [4])
+	var v34: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d34)
+	v34.set_bullet_transform(0, Transform2D(0.0, Vector2(100, 0)))
+	factory.set_is_factory_processing_bullets(false)
+	for i in 10:
+		await physics_frame
+	_check(v34.bullet_get_bounce_count(0) == 0, "paused teleport never bounces")
+	_check(v34.get_bullet_transform(0).origin.distance_to(Vector2(100, 0)) < 0.01, "paused teleport holds still")
+	factory.set_is_factory_processing_bullets(true)
+	for i in 120:
+		await physics_frame
+		if v34.bullet_get_bounce_count(0) >= 1:
+			break
+	_check(v34.bullet_get_bounce_count(0) >= 1, "resume bounces the teleported overlap")
+	await _settle(factory)
+	factory.set_use_physics_interpolation_runtime(true)
+	var hunter34 := Node2D.new()
+	hunter34.position = Vector2(400, 0)
+	get_root().add_child(hunter34)
+	var d34b := _bounce_data(Vector2.ZERO, 0.0, 300.0, [], [4])
+	var v34b: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d34b)
+	v34b.shared_homing_deque_push_back_node2d_target(hunter34)
+	v34b.set_homing_distance_before_reached(64.0)
+	var reached34: Array = []
+	var on_reached := func(_v: DirectionalBullets2D, _i: int, _t: Object, _p: Vector2) -> void:
+		reached34.append(1)
+	v34b.bullet_homing_target_reached.connect(on_reached)
+	for i in 3:
+		await physics_frame
+	v34b.set_bullet_transform(0, Transform2D(0.0, Vector2(400, 0)))
+	for i in 30:
+		await physics_frame
+		if reached34.size() >= 1:
+			break
+	_check(reached34.size() >= 1, "teleport onto homing target fires reached")
+	_check(v34b.get_bullet_transform(0).is_finite(), "post-teleport homing flight finite")
+	v34b.bullet_homing_target_reached.disconnect(on_reached)
+	hunter34.queue_free()
+	await process_frame
+	await _settle(factory)
+	var d34c := _bounce_data(Vector2.ZERO, 0.0, 0.0, [4], [4])
+	var v34c: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d34c)
+	for i in 5:
+		await physics_frame
+		v34c.set_bullet_transform(0, Transform2D(0.3 * i, Vector2(20 * i, 0)))
+		v34c.debug_run_interpolation_pass()
+		_check(v34c.get_bullet_transform(0).is_finite(), "teleport storm stays finite with interp")
+	factory.set_use_physics_interpolation_runtime(false)
+
+	printerr("BOUNCE T35 orbit endurance, block census, telegraph-zero, helper hostility")
+	await _settle(factory)
+	var moon35 := Node2D.new()
+	moon35.position = Vector2(600, 300)
+	get_root().add_child(moon35)
+	var d35 := _bounce_data(Vector2(500, 300), 0.0, 200.0, [], [4], 30.0)
+	var v35: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d35)
+	v35.shared_homing_deque_push_back_node2d_target(moon35)
+	v35.bullet_enable_orbiting(0, 64.0, 2, 0)
+	for i in 720:
+		await physics_frame
+	_check(v35.get_bullet_transform(0).is_finite() and v35.get_bullet_velocity(0).is_finite(), "720-frame orbit never NaNs")
+	_check(absf(v35.bullet_get_orbiting_radius(0) - 64.0) < 2.0, "ring radius stable over 720 frames")
+	_check(v35.is_bullet_status_enabled(0), "orbiter alive after endurance run")
+	moon35.queue_free()
+	await process_frame
+	await _settle(factory)
+	factory.spawn_block_bullets(H.make_block_data(2, 150.0, 10.0))
+	await physics_frame
+	_check(factory.debug_get_live_volley_ids(0).size() >= 1, "factory census includes block volleys")
+	await _settle(factory)
+	var tsp := BulletSpawner2D.new()
+	get_root().add_child(tsp)
+	tsp.set_bullet_factory(factory)
+	tsp.set_spawn_data(H.make_directional_data(2, 200.0))
+	tsp.set_shooting_enabled(false)
+	tsp.set_telegraph_enabled(true)
+	tsp.set_telegraph_sec(0.0)
+	var fired35: int = tsp.get_volleys_fired()
+	_check(tsp.shoot_once(), "telegraph-zero shot accepted")
+	for i in 30:
+		await physics_frame
+		if tsp.get_volleys_fired() > fired35:
+			break
+	_check(tsp.get_volleys_fired() > fired35, "telegraph-zero fires without hanging")
+	tsp.queue_free()
+	await process_frame
+	await _settle(factory)
+	_check(BulletFactory2D.helper_generate_transforms_grid(-1, Transform2D.IDENTITY, 2).is_empty(), "negative grid amount refused")
+	_check(BulletFactory2D.helper_generate_transforms_grid(0, Transform2D.IDENTITY, 2).is_empty(), "zero grid amount yields empty")
+	_check(BulletFactory2D.helper_generate_transforms_grid(8, Transform2D.IDENTITY, 0).is_empty(), "zero grid rows refused")
+	_check(BulletFactory2D.helper_generate_transforms_rain(8, Transform2D.IDENTITY, 600.0, Vector2.ZERO, 48.0, 0.0, 1).is_empty(), "zero rain direction refused")
+	_check(BulletFactory2D.helper_generate_transforms_rain(4, Transform2D.IDENTITY).size() == 4, "rain defaults still generate")
+
 	factory.directional_bounce_body_entered.disconnect(_on_bounce_body)
 	factory.directional_bounce_area_entered.disconnect(_on_bounce_area)
 	factory.directional_body_entered.disconnect(_on_norm_body)
+	await process_frame
 	factory.reset()
 	wall.queue_free()
 	factory.queue_free()

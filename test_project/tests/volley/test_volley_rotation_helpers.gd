@@ -197,6 +197,7 @@ func _initialize() -> void:
 	_check(absf(v6.bullet_get_rotation_speed(0)) < 0.01, "reuse speed zeroed")
 
 	_check(factory.debug_assert_no_dangling().get("ok", false) == true, "no dangling at end")
+	await process_frame
 	factory.reset()
 	factory.queue_free()
 	await process_frame

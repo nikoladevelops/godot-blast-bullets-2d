@@ -112,6 +112,7 @@ func _initialize() -> void:
 	_check(absf(f.bullet_get_homing_smoothing(0) - 3.0) < 0.01, "all_bullets smoothing fans out")
 
 	target.queue_free()
+	await process_frame
 	factory.reset()
 	_check(factory.debug_assert_no_dangling().get("ok", false) == true, "no dangling at end")
 	factory.queue_free()

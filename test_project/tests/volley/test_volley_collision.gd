@@ -120,6 +120,7 @@ func _initialize() -> void:
 
 	factory.directional_body_entered.disconnect(_on_body)
 	factory.directional_area_entered.disconnect(_on_area)
+	await process_frame
 	factory.reset()
 	wall.queue_free()
 	eye.queue_free()

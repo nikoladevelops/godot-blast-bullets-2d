@@ -709,6 +709,14 @@ bool MultiMeshBullets2D::enable_multimesh(const MultiMeshBulletsData2D &data, co
 		return false;
 	}
 
+	// Never-spawned instances hold no multimesh handle (generate_multimesh
+	// runs in spawn() only): reseeding one would null-deref below. Pool
+	// pops always carry theirs, so this rejects misuse only.
+	if (multi.is_null() || !multi.is_valid()) {
+		UtilityFunctions::push_error("enable_multimesh: multimesh was never spawned through BulletFactory2D (no bullet storage). Spawn it first.");
+		return false;
+	}
+
 	// The factory spawn_* paths validate finiteness, but a direct
 	// enable_multimesh() call bypasses them: a NaN/Inf offset here would
 	// poison every bullet's velocity for the whole volley. Checked before any

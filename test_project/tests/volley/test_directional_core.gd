@@ -99,6 +99,7 @@ func _initialize() -> void:
 	v.set_bullet_texture_rotation_radians(0, NAN)
 	_check(v.get_bullet_texture_rotation_radians(0) < 1.0, "NaN rotation rejected")
 
+	await process_frame
 	factory.reset()
 	await process_frame
 	_check(factory.debug_assert_no_dangling().get("ok", false) == true, "no dangling after reset")

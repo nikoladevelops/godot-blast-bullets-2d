@@ -124,6 +124,7 @@ func _initialize() -> void:
 
 	_check(factory.debug_assert_no_dangling().get("ok", false) == true, "no dangling at end")
 	spawner.queue_free()
+	await process_frame
 	factory.reset()
 	factory.queue_free()
 	await process_frame

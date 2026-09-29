@@ -68,6 +68,7 @@ func _initialize() -> void:
 	_check(a.shoot_once(), "spawner fires before reset")
 	for i in 5:
 		await physics_frame
+	await process_frame
 	factory.reset()
 	await process_frame
 	await physics_frame
@@ -81,6 +82,7 @@ func _initialize() -> void:
 	_check(b.shoot_once() and c.shoot_once(), "fire before free_active")
 	for i in 5:
 		await physics_frame
+	await process_frame
 	factory.free_active_bullets()
 	await process_frame
 	_check(factory.debug_assert_no_dangling().get("ok", false) == true, "no dangling after free_active")
@@ -140,6 +142,7 @@ func _initialize() -> void:
 	a.queue_free()
 	b.queue_free()
 	c.queue_free()
+	await process_frame
 	factory.reset()
 	_check(factory.debug_assert_no_dangling().get("ok", false) == true, "no dangling at end")
 	factory.queue_free()

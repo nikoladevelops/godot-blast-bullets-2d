@@ -269,12 +269,16 @@ func _initialize() -> void:
 
 	printerr("FX T8 pool reuse reseeds + caps hold (explicit + auto)")
 	await _settle(factory)
-	var v8: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(_fx_data(Vector2.ZERO, 200.0, [_make_layer(1, 4), _make_layer(0, 1)]))
+	var d8 := _fx_data(Vector2.ZERO, 200.0, [_make_layer(1, 4), _make_layer(0, 1)])
+	d8.max_life_time = 0.3
+	var v8: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d8)
 	await physics_frame
 	_check(factory.get_active_effect_count() >= 1, "first life flashes")
-	factory.free_active_bullets()
-	await process_frame
-	await process_frame
+	for i in 60:
+		await physics_frame
+		if not v8.is_bullet_status_enabled(0):
+			break
+	_check(not v8.is_bullet_status_enabled(0), "expiry pooled the volley")
 	var v8b: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(_fx_data(Vector2.ZERO, 200.0, [_make_layer(1, 4)]))
 	await physics_frame
 	_check(factory.get_active_effect_count() >= 1, "pooled reuse flashes again")
@@ -437,11 +441,14 @@ func _initialize() -> void:
 	await _settle(factory)
 	var d13 := _fx_data(Vector2.ZERO, 200.0, [], false)
 	d13.self_modulate = Color(1, 0.2, 0.2)
+	d13.max_life_time = 0.3
 	var v13: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d13)
 	_check(v13.debug_get_volley_info().get("self_modulate", Color(0, 0, 0, 0)).is_equal_approx(Color(1, 0.2, 0.2)), "volley tint applied from data")
-	factory.free_active_bullets()
-	await process_frame
-	await process_frame
+	for i in 60:
+		await physics_frame
+		if not v13.is_bullet_status_enabled(0):
+			break
+	_check(not v13.is_bullet_status_enabled(0), "tinted volley expired into the pool")
 	var d13b := _fx_data(Vector2.ZERO, 200.0, [], false)
 	var v13b: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d13b)
 	_check(v13b.debug_get_volley_info().get("self_modulate", Color(0, 0, 0, 0)).is_equal_approx(Color(1, 1, 1, 1)), "pool reuse resets tint to white")
@@ -630,6 +637,10 @@ func _initialize() -> void:
 	var live18e: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(_fx_data(Vector2.ZERO, 300.0, [_make_layer(1, 4)], false))
 	await physics_frame
 	_check(factory.get_active_effect_count() >= 1, "one-shot live before reset")
+	# Structural calls reject inside the physics step: awaiting
+	# physics_frame resumes mid-step, so park on idle first (same reason
+	# _settle uses process_frame before factory mutations).
+	await process_frame
 	factory.reset()
 	_check(factory.get_active_effect_count() == 0, "reset zeroes live effects")
 	# T18f: play_effect_animation rejects one-shot layers and unknown indexes.
@@ -705,6 +716,94 @@ func _initialize() -> void:
 		await physics_frame
 	_check(factory.get_active_effect_count() == 0, "infinite life never fizzles")
 
+	printerr("FX T19 stacked trails, offset, live one-shot swap, pause freeze")
+	await _settle(factory)
+	var t19a := _make_layer(0, 1)
+	var t19b := _make_layer(0, 1)
+	t19b.offset = Vector2(24, 0)
+	var v19: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(_fx_data(Vector2.ZERO, 200.0, [t19a, t19b], false))
+	for i in 5:
+		await physics_frame
+	_check(v19.debug_get_trail_transform(0, 0).origin.distance_to(v19.get_bullet_transform(0).origin) < 0.01, "first trail sits on the bullet")
+	_check(absf(v19.debug_get_trail_transform(1, 0).origin.distance_to(v19.get_bullet_transform(0).origin) - 24.0) < 0.5, "offset trail rides 24px ahead")
+	await _settle(factory)
+	var swap_hit := _make_layer(2, 4)
+	var swap_boom := _make_layer(3, 4)
+	var v19b: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(_fx_data(Vector2.ZERO, 200.0, [swap_hit], false))
+	v19b.set_effect_layers([swap_boom])
+	_check(not v19b.has_trail_effects(), "live swap keeps trail state accurate")
+	await _settle(factory)
+	var stream := _make_layer(0, 1)
+	var v19c: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(_fx_data(Vector2.ZERO, 200.0, [stream], false))
+	for i in 3:
+		await physics_frame
+	var pre_pause: Vector2 = v19c.debug_get_trail_transform(0, 0).origin
+	factory.set_is_factory_processing_bullets(false)
+	for i in 10:
+		await physics_frame
+	_check(v19c.debug_get_trail_transform(0, 0).origin.distance_to(pre_pause) < 0.01, "paused factory freezes trails")
+	_check(factory.get_active_effect_count() == 0, "no stray one-shots while paused")
+	factory.set_is_factory_processing_bullets(true)
+	for i in 3:
+		await physics_frame
+	_check(v19c.debug_get_trail_transform(0, 0).origin.distance_to(v19c.get_bullet_transform(0).origin) < 0.01, "unpaused trails resume")
+
+	printerr("FX T20 hostile configs never crash")
+	await _settle(factory)
+	var zeroanim := BulletEffectLayerData2D.new()
+	zeroanim.trigger = 1
+	var empty_sf := SpriteFrames.new()
+	zeroanim.sprite_frames = empty_sf
+	_check(factory.spawn_layer_effect(zeroanim, Transform2D.IDENTITY) == -1, "zero-frame animation inert, no crash")
+	var wronganim := BulletEffectLayerData2D.new()
+	wronganim.trigger = 1
+	wronganim.sprite_frames = _make_frames(2)
+	wronganim.animation = &"nope"
+	_check(factory.spawn_layer_effect(wronganim, Transform2D.IDENTITY) == -1, "wrong animation name inert, no crash")
+	var dup_a := _make_layer(0, 1)
+	var v20: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(_fx_data(Vector2.ZERO, 200.0, [dup_a, dup_a], false))
+	for i in 5:
+		await physics_frame
+	_check(v20.debug_get_trail_transform(0, 0).origin.distance_to(v20.get_bullet_transform(0).origin) < 0.01, "duplicate layer refs both follow")
+	_check(factory.get_active_effect_count() == 0, "no stray one-shots from trail-only volley")
+
+	printerr("FX T21 interp teleports, scale, paused manual hatch")
+	await _settle(factory)
+	factory.set_use_physics_interpolation_runtime(true)
+	var big21 := _make_layer(0, 1)
+	big21.scale = Vector2(2, 2)
+	var v21: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(_fx_data(Vector2.ZERO, 0.0, [big21], false))
+	v21.set_bullet_transform(0, Transform2D(0.0, Vector2(100, 0)))
+	v21.debug_run_interpolation_pass()
+	_check(v21.debug_get_trail_transform(0, 0).origin.distance_to(Vector2(100, 0)) < 0.01, "interp trail glued after teleport")
+	_check(v21.debug_get_trail_transform(0, 0).get_scale().distance_to(Vector2(2, 2)) < 0.01, "trail carries layer scale")
+	factory.set_use_physics_interpolation_runtime(false)
+	await _settle(factory)
+	var held := _make_layer(3, 4)
+	factory.set_is_factory_processing_bullets(false)
+	var slot21: int = factory.spawn_layer_effect(held, Transform2D(0.0, Vector2(50, 0)))
+	_check(slot21 >= 0, "manual hatch fires while paused")
+	for i in 10:
+		await physics_frame
+	_check(factory.get_active_effect_count() >= 1, "paused one-shot held, not expired")
+	factory.set_is_factory_processing_bullets(true)
+	for i in 40:
+		await physics_frame
+	_check(factory.get_active_effect_count() == 0, "resumed one-shot expires on schedule")
+
+	printerr("FX T22 manual hatch rebakes on layer edits")
+	await _settle(factory)
+	var vedit := _make_layer(3, 2)
+	_check(factory.spawn_layer_effect(vedit, Transform2D(0.0, Vector2(60, 0))) >= 0, "manual hatch fires")
+	_check(int(factory.debug_get_effect_state().get("manual_frames", -1)) == 2, "manual bake holds 2 frames")
+	vedit.sprite_frames = _make_frames(5)
+	_check(factory.spawn_layer_effect(vedit, Transform2D(0.0, Vector2(70, 0))) >= 0, "manual hatch fires after edit")
+	_check(int(factory.debug_get_effect_state().get("manual_frames", -1)) == 5, "manual rebake picks up 5 frames")
+	for i in 60:
+		await physics_frame
+	_check(factory.get_active_effect_count() == 0, "edited manual effects expire")
+
+	await process_frame
 	factory.reset()
 	wall.queue_free()
 	factory.queue_free()

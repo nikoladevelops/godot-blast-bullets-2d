@@ -207,6 +207,7 @@ func _initialize() -> void:
 	_check(_finite_volley(vm), "64-bullet full-stack finite")
 	_check(factory.debug_assert_no_dangling().get("ok", false) == true, "no dangling at end")
 
+	await process_frame
 	factory.reset()
 	factory.queue_free()
 	await process_frame

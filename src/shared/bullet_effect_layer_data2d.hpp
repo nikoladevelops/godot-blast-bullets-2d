@@ -120,6 +120,9 @@ public:
 	// animation); setters clear the cache. Returns false (with one error)
 	// when the layer can never render.
 	bool bake_effect_frames(const StringName &anim, std::vector<Ref<Texture2D>> &out_frames, std::vector<double> &out_secs, double &out_total) const;
+	// Content generation, bumped on every invalidation: consumers holding
+	// baked output detect layer edits through it.
+	uint64_t get_bake_version() const { return bake_version; }
 
 	bool get_enabled() const;
 	void set_enabled(bool value);
@@ -194,6 +197,10 @@ private:
 	// its life (play_effect_animation), so a stale animation never serves.
 	mutable bool bake_valid = false;
 	mutable StringName bake_anim;
+	// Content generation: bumped on every invalidation so consumers holding
+	// baked output (manual hatch) can detect layer edits and rebake instead
+	// of serving stale frames.
+	mutable uint64_t bake_version = 0;
 	mutable std::vector<Ref<Texture2D>> bake_frames;
 	mutable std::vector<double> bake_secs;
 	mutable double bake_total = 0.0;
