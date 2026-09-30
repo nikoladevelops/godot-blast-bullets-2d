@@ -113,5 +113,7 @@
 		<constant name="EFFECT_ON_LIFETIME_OVER" value="5" enum="EffectTrigger">
 			One-shot fired at each bullet's death pose on lifetime expiry (both the silent and the signalled path), even as the volley pools underneath it.
 		</constant>
+		<constant name="EFFECT_ON_CLEAR" value="6" enum="EffectTrigger">
+		</constant>
 	</constants>
 </class>

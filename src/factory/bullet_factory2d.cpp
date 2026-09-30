@@ -66,6 +66,28 @@ bool validate_spawn_data(const Ref<MultiMeshBulletsData2D> &spawn_data, const ch
 		UtilityFunctions::push_error(String("Error in ") + caller_name + ": max_life_time must be a finite value > 0 when lifetime is not infinite.");
 		return false;
 	}
+	// Second line of defence, for state the setters cannot cover: a caller can
+	// write the public members directly from C++, or a resource loaded from
+	// disk can carry a bad value. These fields are added to (or offset onto)
+	// EVERY bullet's transform, so a single NaN here silently produces a
+	// fully-NaN volley that the per-transform loop above cannot see.
+	if (!Math::is_finite(spawn_data->texture_rotation_radians)) {
+		UtilityFunctions::push_error(String("Error in ") + caller_name + ": texture_rotation_radians must be finite (it is added to every bullet rotation). Nothing was spawned.");
+		return false;
+	}
+	if (!spawn_data->texture_size.is_finite()) {
+		UtilityFunctions::push_error(String("Error in ") + caller_name + ": texture_size must be finite. Nothing was spawned.");
+		return false;
+	}
+	if (!spawn_data->collision_shape_offset.is_finite()) {
+		UtilityFunctions::push_error(String("Error in ") + caller_name + ": collision_shape_offset must be finite. Nothing was spawned.");
+		return false;
+	}
+	if (!Math::is_finite(spawn_data->self_modulate.r) || !Math::is_finite(spawn_data->self_modulate.g) ||
+			!Math::is_finite(spawn_data->self_modulate.b) || !Math::is_finite(spawn_data->self_modulate.a)) {
+		UtilityFunctions::push_error(String("Error in ") + caller_name + ": self_modulate must be finite. Nothing was spawned.");
+		return false;
+	}
 	// NaN/Inf origins or rotations would poison movement, physics and the
 	// pool key. Zero/near-zero scale would split visual vs collision (the
 	// texture path heals the basis, the shape path preserves it) and poison
@@ -693,7 +715,12 @@ int BulletFactory2D::fx_fire_into_bake(FXOneShotBake &bake, const Transform2D &a
 		if (sprite_effects_container != nullptr) {
 			const Transform2D node_global = sprite_effects_container->get_global_transform();
 			if (node_global.get_scale().length_squared() >= 0.00000001) {
-				local = node_global.affine_inverse() * t;
+				// MUST convert the SPUN pose, matching the aging path
+				// (fx_apply_slot_spin). Converting the unspun base here wrote a
+				// pose that disagreed with slot.last_angle and with every
+				// later frame, so a spinning one-shot visibly snapped by
+				// spin * start_age on its second frame.
+				local = node_global.affine_inverse() * spun;
 			}
 		}
 		if (local.get_origin().is_finite()) {

@@ -84,6 +84,37 @@ class PatternPreviewLayer2D : public Node2D {
         PackedVector2Array run_scratch;
         PackedVector2Array head_tri;
 
+        // POSE, applied at draw time instead of baking it into the geometry.
+        // dots/paths are snapshotted with spin = 0, so an advancing spin angle
+        // only has to set this float and queue a repaint - no 10k-element
+        // rebuild per frame. Radians; 0 disables the rotation.
+        real_t spin_radians = 0.0;
+
+        void set_spin_radians(real_t p_radians) {
+            if (!Math::is_finite(p_radians) || Math::is_equal_approx((double)p_radians, (double)spin_radians)) {
+                return;
+            }
+            spin_radians = p_radians;
+            queue_redraw();
+        }
+
+        // Rotates a holder-local point by the current spin pose. Rotation is
+        // about the holder origin, which is exactly what the spawner does to
+        // the raw transforms (see collect_spawn_transforms_impl's
+        // rotate_spawn_transform), so the preview matches the volley.
+        _ALWAYS_INLINE_ Vector2 posed(const Vector2 &p) const {
+            if (spin_radians == 0.0) {
+                return p;
+            }
+            return p.rotated(spin_radians);
+        }
+        _ALWAYS_INLINE_ Vector2 posed_dir(const Vector2 &p) const {
+            if (spin_radians == 0.0) {
+                return p;
+            }
+            return p.rotated(spin_radians);
+        }
+
         void set_dots_data(const PackedVector2Array &p_dots, const Color &p_color, float p_radius);
         void set_first_marker(bool p_show, const Color &p_color, float p_radius_scale);
         void set_path_data(const PackedVector2Array &p_points, const Color &p_color, float p_width, bool p_closed);
@@ -126,44 +157,55 @@ class BulletSpawner2D : public Node2D{
         // Where volley transforms come from. Children/Self read the scene
         // tree; the helper modes call the BulletFactory2D static generators
         // with the properties below, relative to the generator's transform.
+        //
+        // SCENE COMPAT LOCK: pattern_source is serialized as a plain int in
+        // .tscn files, so every value is written out EXPLICITLY. An implicit
+        // sequence would silently renumber every later entry if one were
+        // inserted, quietly repointing saved scenes at the wrong generator -
+        // and only the two static_asserts below would notice, so slots they
+        // do not cover (1..11, 29..32) were entirely unguarded. Never
+        // renumber: append new sources at the end with the next free integer.
         enum PatternSource {
             PATTERN_FROM_CHILDREN = 0,
-            PATTERN_FROM_SELF,
-            PATTERN_FROM_HELPER_GRID,
-            PATTERN_FROM_HELPER_RING,
-            PATTERN_FROM_HELPER_FAN,
-            PATTERN_FROM_HELPER_SPIRAL,
-            PATTERN_FROM_HELPER_LINE,
-            PATTERN_FROM_HELPER_AIMED,
-            PATTERN_FROM_HELPER_FLOWER,
-            PATTERN_FROM_HELPER_ELLIPSE,
-            PATTERN_FROM_HELPER_RAIN,
-            PATTERN_FROM_HELPER_SCATTER,
-            PATTERN_FROM_HELPER_STAR_POLYGON,
-            PATTERN_FROM_HELPER_MULTISPIRAL,
-            PATTERN_FROM_HELPER_CROSS,
-            PATTERN_FROM_HELPER_STAR,
-            PATTERN_FROM_HELPER_HEART,
-            PATTERN_FROM_HELPER_WAVE,
-            PATTERN_FROM_HELPER_WATERFALL,
-            PATTERN_FROM_HELPER_LATTICE,
-            PATTERN_FROM_HELPER_ROSE,
-            PATTERN_FROM_HELPER_COUNTER_SPIRAL,
-            PATTERN_FROM_HELPER_CORRIDOR,
-            PATTERN_FROM_HELPER_LISSAJOUS,
-            PATTERN_FROM_HELPER_CUSTOM,
-            PATTERN_FROM_HELPER_CIRCLE,
-            PATTERN_FROM_HELPER_RECTANGLE,
-            PATTERN_FROM_HELPER_SQUARE,
-            PATTERN_FROM_HELPER_POLYGON,
-            PATTERN_FROM_HELPER_PATH2D,
-            PATTERN_FROM_HELPER_TRIANGLE,
-            PATTERN_FROM_HELPER_TRAPEZOID,
-            PATTERN_FROM_HELPER_DIAMOND
+            PATTERN_FROM_SELF = 1,
+            PATTERN_FROM_HELPER_GRID = 2,
+            PATTERN_FROM_HELPER_RING = 3,
+            PATTERN_FROM_HELPER_FAN = 4,
+            PATTERN_FROM_HELPER_SPIRAL = 5,
+            PATTERN_FROM_HELPER_LINE = 6,
+            PATTERN_FROM_HELPER_AIMED = 7,
+            PATTERN_FROM_HELPER_FLOWER = 8,
+            PATTERN_FROM_HELPER_ELLIPSE = 9,
+            PATTERN_FROM_HELPER_RAIN = 10,
+            PATTERN_FROM_HELPER_SCATTER = 11,
+            PATTERN_FROM_HELPER_STAR_POLYGON = 12,
+            PATTERN_FROM_HELPER_MULTISPIRAL = 13,
+            PATTERN_FROM_HELPER_CROSS = 14,
+            PATTERN_FROM_HELPER_STAR = 15,
+            PATTERN_FROM_HELPER_HEART = 16,
+            PATTERN_FROM_HELPER_WAVE = 17,
+            PATTERN_FROM_HELPER_WATERFALL = 18,
+            PATTERN_FROM_HELPER_LATTICE = 19,
+            PATTERN_FROM_HELPER_ROSE = 20,
+            PATTERN_FROM_HELPER_COUNTER_SPIRAL = 21,
+            PATTERN_FROM_HELPER_CORRIDOR = 22,
+            PATTERN_FROM_HELPER_LISSAJOUS = 23,
+            PATTERN_FROM_HELPER_CUSTOM = 24,
+            PATTERN_FROM_HELPER_CIRCLE = 25,
+            PATTERN_FROM_HELPER_RECTANGLE = 26,
+            PATTERN_FROM_HELPER_SQUARE = 27,
+            PATTERN_FROM_HELPER_POLYGON = 28,
+            PATTERN_FROM_HELPER_PATH2D = 29,
+            PATTERN_FROM_HELPER_TRIANGLE = 30,
+            PATTERN_FROM_HELPER_TRAPEZOID = 31,
+            PATTERN_FROM_HELPER_DIAMOND = 32
         };
 
-        // Scene compat lock: pattern_source is stored as int in scenes.
-        // Never reorder or renumber (rename only).
+        // Belt-and-braces anchors: an explicit enum above already makes an
+        // accidental renumber a code review error, but these two long-standing
+        // pins are the historical tripwire - keep them, and note that
+        // tests/spawner/test_spawner_pattern_source_lock.gd pins ALL of them
+        // from the script side as well.
         static_assert((int)PATTERN_FROM_HELPER_STAR_POLYGON == 12, "STAR_POLYGON must stay 12 for saved scenes");
         static_assert((int)PATTERN_FROM_HELPER_POLYGON == 28, "POLYGON must stay 28 for saved scenes");
 
@@ -723,8 +765,13 @@ class BulletSpawner2D : public Node2D{
         int burst_count = 3;
         // Seconds between burst shots. Must stay > 0.
         double burst_interval_sec = 0.15;
-        // Mirror every other burst volley (fan/spiral chirality flip): the
-        // classic reverse-the-angle rhythm without scripting.
+        // Mirror every other burst volley: the classic reverse-the-angle
+        // rhythm without scripting. A mirrored shot negates BOTH the emitter
+        // spin and the spiral-family winding (spiral / multispiral /
+        // counter-spiral angle_step), so the arms genuinely sweep the other
+        // way. BEHAVIOR CHANGE: earlier this only negated the emitter spin, so
+        // a mirrored spiral wound identically and merely pointed backwards.
+        // Non-spiral patterns are unaffected (they have no winding to flip).
         bool burst_alternate_mirror = false;
         // Telegraph: warn before each burst volley fires.
         bool telegraph_enabled = false;
@@ -834,7 +881,13 @@ class BulletSpawner2D : public Node2D{
         // How many targets enter the queue (1 = classic single-target homing).
         // Only the multi-target sources (node group, node name) use it.
         // Must stay >= 1 (setter rejects the rest).
+        // NOTE: DISTRIBUTE needs 2+ to actually spread targets across the
+        // volley. At 1 (this default) the deal is `pool[i % 1] == pool[0]` for
+        // every bullet, so DISTRIBUTE behaves exactly like SHARED and warns.
         int homing_max_targets = 1;
+        // One-shot latch for that DISTRIBUTE-degenerates warning; re-armed
+        // when the selection leaves DISTRIBUTE (see resolve_homing_targets).
+        mutable bool homing_distribute_degenerate_warned = false;
         // Detection radius around the spawner for the multi-target sources
         // (node group, node name). 0 = unlimited. Must stay finite and >= 0.
         double homing_max_detection_range = 0.0;
@@ -1882,6 +1935,12 @@ class BulletSpawner2D : public Node2D{
         // Mutable: rebuilds happen from const setters. Restored on every exit
         // path (early returns included) so one abort can never wedge preview.
         mutable bool preview_rebuild_in_progress = false;
+        // Set only around the preview's collect_spawn_transforms_impl() call so
+        // the snapshotted gizmo geometry is spin-free. The layer then applies
+        // spin_angle_deg at draw time, which is what keeps an advancing spin
+        // from forcing a full rebuild (and a 10k-element reallocation) every
+        // frame. Mutable because the collect path is const.
+        mutable bool preview_suppress_spin = false;
 
         bool auto_shooting_active() const;
         // Advances spin_angle_deg by delta according to spin_mode.
@@ -1891,6 +1950,12 @@ class BulletSpawner2D : public Node2D{
         bool preview_allowed_here() const;
         // Whether the preview refresh loop must run: allowed + toggled on.
         bool preview_active() const;
+        // Re-poses the cached preview snapshot for a new spin angle without
+        // regenerating geometry. Returns nothing; a non-finite angle is
+        // ignored (the caller falls back to a full rebuild). Keeps
+        // tracked_spin_angle in step so the next rebuild is not treated as
+        // stale geometry.
+        void set_preview_pose(double spin_angle_degrees);
         // Snapshots the currently observed source nodes (validated ids +
         // global transforms) without touching the preview itself.
         void snapshot_preview_sources();

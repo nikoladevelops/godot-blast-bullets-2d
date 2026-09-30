@@ -79,6 +79,10 @@ void MultiMeshBullets2D::_notification(int p_what) {
 							// script must see an empty slot.
 							BulletAttachment2D *detaching = attachments[i];
 							attachments[i] = nullptr;
+							// Every ownership change bumps the slot epoch, including
+							// this teardown path, so the "bumped on every change"
+							// invariant holds without exceptions.
+							bump_attachment_epoch(i);
 							// Owner tracking cleared like bullet_disable_attachment:
 							// attachments outlive this multimesh (siblings in the
 							// container), and a stale owner id would make their
@@ -195,6 +199,10 @@ void MultiMeshBullets2D::reset_attachment_state_for_reuse() {
 	const int count = amount_bullets;
 	attachment_pooling_ids.assign(count, 0);
 	attachments.assign(count, nullptr);
+	// New life, new assignment history: stale deferred disables (which carry
+	// the old epoch) can never match the fresh slots.
+	attachment_assignment_epochs.assign(count, 0);
+	signal_protected_attachment_slot = -1;
 	attachment_transforms.assign(count, Transform2D());
 	attachment_offsets.assign(count, Vector2());
 	attachment_local_transforms.assign(count, Transform2D());
@@ -641,6 +649,8 @@ void MultiMeshBullets2D::reset_transient_volley_state(uint64_t new_owner_spawner
 	}
 	// A fresh volley starts with zero hits and no timers, no matter how the last one died.
 	all_collided_bullets.clear();
+	// The dedup keys mirror all_collided_bullets, so they reset with it.
+	clear_collision_dedup_keys();
 	_do_detach_all_time_based_functions(multimesh_timers_generation);
 	// Same for the volley clock - waking an old instance must not resume the previous owner's curve time.
 	curves_elapsed_time = 0.0;
@@ -775,6 +785,8 @@ bool MultiMeshBullets2D::enable_multimesh(const MultiMeshBulletsData2D &data, co
 
 	// A fresh volley starts with zero hits and no timers, no matter how the last one died.
 	all_collided_bullets.clear();
+	// The dedup keys mirror all_collided_bullets, so they reset with it.
+	clear_collision_dedup_keys();
 	_do_detach_all_time_based_functions(multimesh_timers_generation);
 
 	// Same for the volley clock - waking an old instance must not resume the previous owner's curve time.
@@ -1138,7 +1150,7 @@ bool MultiMeshBullets2D::rebuild_sprite_animation(const Ref<SpriteFrames> &p_spr
 		return false;
 	}
 	double fps = p_sprite_frames->get_animation_speed(anim);
-	if (fps <= 0.0) {
+	if (!Math::is_finite(fps) || fps <= 0.0) {
 		UtilityFunctions::push_error("MultiMeshBullets2D: animation '" + String(anim) + "' has invalid speed, using 1 fps.");
 		fps = 1.0;
 	}
@@ -1154,6 +1166,9 @@ bool MultiMeshBullets2D::rebuild_sprite_animation(const Ref<SpriteFrames> &p_spr
 			return false; // previous cache untouched (swap only on success below)
 		}
 		const float dur = p_sprite_frames->get_frame_duration(anim, i);
+		if (!Math::is_finite((double)dur)) {
+			UtilityFunctions::push_error("MultiMeshBullets2D: animation '" + String(anim) + "' frame " + String::num_int64(i) + " has non-finite duration, using 0.");
+		}
 		if (anim_override_frame_color) {
 			// Exact-color bullets: whitened copy (alpha preserved) so the
 			// volley tint reads exactly. Same fallback contract as the
@@ -1175,7 +1190,7 @@ bool MultiMeshBullets2D::rebuild_sprite_animation(const Ref<SpriteFrames> &p_spr
 		} else {
 			frames.push_back(tex);
 		}
-		secs.push_back((dur <= 0.0f ? 0.0 : (double)dur / fps));
+		secs.push_back((!Math::is_finite((double)dur) || dur <= 0.0f) ? 0.0 : (double)dur / fps);
 	}
 	anim_source = p_sprite_frames;
 	anim_name = anim;
@@ -1223,8 +1238,11 @@ bool MultiMeshBullets2D::restart_sprite_animation() {
 }
 
 Vector2 MultiMeshBullets2D::resolve_quad_size(const Ref<SpriteFrames> &p_sprite_frames, const StringName &p_animation, Vector2 override_size) {
-	if (override_size.x > 0.0f && override_size.y > 0.0f) {
+	if (override_size.is_finite() && override_size.x > 0.0f && override_size.y > 0.0f) {
 		return override_size;
+	}
+	if (override_size != Vector2(0, 0) && (!override_size.is_finite() || override_size.x <= 0.0f || override_size.y <= 0.0f)) {
+		UtilityFunctions::push_warning("MultiMeshBullets2D: texture_size override is non-finite or non-positive, deriving size from the first frame.");
 	}
 	// Silent fallback: rebuild_sprite_animation owns all error reporting (spawn calls
 	// both, so resolving loudly here would print every failure twice).
@@ -1235,12 +1253,12 @@ Vector2 MultiMeshBullets2D::resolve_quad_size(const Ref<SpriteFrames> &p_sprite_
 		if (const Ref<Texture2D> tex = p_sprite_frames->get_frame_texture(anim, 0); tex.is_valid()) {
 			if (const Ref<AtlasTexture> atlas = tex; atlas.is_valid()) {
 				const Vector2 region = atlas->get_region().size;
-				if (region.x > 0.0f && region.y > 0.0f) {
+				if (region.is_finite() && region.x > 0.0f && region.y > 0.0f) {
 					return region;
 				}
 			}
 			const Vector2 size = tex->get_size();
-			if (size.x > 0.0f && size.y > 0.0f) {
+			if (size.is_finite() && size.x > 0.0f && size.y > 0.0f) {
 				return size;
 			}
 		}
@@ -1265,23 +1283,38 @@ void MultiMeshBullets2D::finalize_set_up(
 		godot::Ref<ShaderMaterial> shader_material = new_material;
 		// If a shader material was passed and the user has provided instance shader parameters
 		if (shader_material.is_valid() && new_instance_shader_parameters.is_empty() == false) {
+			// Keys removed since the last life must be reset on the CanvasItem:
+			// clearing only the C++ dict leaves stale GPU overrides behind.
+			for (const String &old_key : applied_instance_shader_keys) {
+				if (!old_key.is_empty() && !new_instance_shader_parameters.has(old_key)) {
+					set_instance_shader_parameter(old_key, Variant());
+				}
+			}
+			applied_instance_shader_keys.clear();
 			instance_shader_parameters = new_instance_shader_parameters;
 
 			const Array &keys = new_instance_shader_parameters.keys();
 			for (int i = 0; i < keys.size(); ++i) {
-				const String &key = keys[i];
+				const String key = keys[i];
+				if (key.is_empty()) {
+					continue;
+				}
 				const Variant &value = new_instance_shader_parameters[key];
 
 				set_instance_shader_parameter(key, value);
+				applied_instance_shader_keys.push_back(key);
 			}
 		} else {
 			// Shader without params (or non-shader material handled below): drop the
-			// previous owner's dict so pool reuse can't leak stale entries into it.
+			// previous owner's dict AND its live CanvasItem overrides so pool
+			// reuse can't leak stale entries into the next volley.
+			clear_applied_instance_shader_overrides();
 			instance_shader_parameters.clear();
 		}
 
 		set_material(new_material);
 	} else {
+		clear_applied_instance_shader_overrides();
 		instance_shader_parameters.clear();
 		set_material(nullptr);
 	}
@@ -1314,6 +1347,9 @@ void MultiMeshBullets2D::set_rotation_data(const TypedArray<BulletRotationData2D
 		all_rotation_speed.clear();
 		all_max_rotation_speed.clear();
 		all_rotation_acceleration.clear();
+		// Rotation is off entirely, so no slot is seeded: a later
+		// set_shared_bullet_rotation_data full-seeds every slot instead.
+		reset_per_bullet_rotation_presence();
 		// The flag must follow the new data even when rotation is disabled:
 		// otherwise a dead owner's texture/shape-follow mode leaks into the
 		// next life (e.g. set_shared_bullet_rotation_data reuses this flag).
@@ -1346,6 +1382,11 @@ void MultiMeshBullets2D::set_rotation_data(const TypedArray<BulletRotationData2D
 	all_rotation_speed.clear();
 	all_max_rotation_speed.clear();
 	all_rotation_acceleration.clear();
+	// Fresh seed: every slot below is re-derived from its own entry, so the
+	// presence bit resets to all-zero and the shared fallback may fill the gaps
+	// again. DirectionalBullets2D overrides this hook to keep its copy in sync
+	// (the base has no knowledge of the subclass bit).
+	reset_per_bullet_rotation_presence();
 
 	if (amount_bullets > (int)all_rotation_speed.capacity()) {
 		all_rotation_speed.reserve(amount_bullets);
@@ -1362,11 +1403,17 @@ void MultiMeshBullets2D::set_rotation_data(const TypedArray<BulletRotationData2D
 			all_rotation_speed.emplace_back(0.0);
 			all_max_rotation_speed.emplace_back(0.0);
 			all_rotation_acceleration.emplace_back(0.0);
+			// Out-of-range slot (no entry covers it) or an invalid entry: a
+			// genuine gap, so the shared fallback may fill it.
+			mark_per_bullet_rotation_presence(i, false);
 			continue;
 		}
 		all_rotation_speed.emplace_back(entry->rotation_speed);
 		all_max_rotation_speed.emplace_back(entry->max_rotation_speed);
 		all_rotation_acceleration.emplace_back(entry->rotation_acceleration);
+		// The user authored an entry for this slot (an all-zero "no spin"
+		// included): shared rotation must not touch it.
+		mark_per_bullet_rotation_presence(i, true);
 	}
 }
 
@@ -1421,6 +1468,10 @@ void MultiMeshBullets2D::set_bullet_rotation_data(int bullet_index, const Ref<Bu
 	if (bullet_index < 0 || bullet_index >= (int)all_rotation_speed.size() || bullet_index >= (int)all_max_rotation_speed.size() || bullet_index >= (int)all_rotation_acceleration.size()) {
 		return;
 	}
+
+	// A direct per-bullet write is as authoritative as a seeded entry: shared
+	// rotation must never overwrite it, including the all-zero "no spin" case.
+	mark_per_bullet_rotation_presence(bullet_index, true);
 
 	all_rotation_speed[bullet_index] = new_bullet_rotation_data->rotation_speed;
 	all_max_rotation_speed[bullet_index] = new_bullet_rotation_data->max_rotation_speed;
@@ -1605,6 +1656,9 @@ void MultiMeshBullets2D::set_bullet_speed_data(int bullet_index, const Ref<Bulle
 	all_cached_max_speed[bullet_index] = new_bullet_speed_data->max_speed;
 	all_cached_acceleration[bullet_index] = new_bullet_speed_data->acceleration;
 	all_cached_velocity[bullet_index] = all_cached_direction[bullet_index] * new_bullet_speed_data->speed + inherited_velocity_offset;
+	// A direct per-bullet write is as authoritative as a seeded entry: the
+	// shared fallback must never overwrite it, including an all-zero "freeze".
+	mark_per_bullet_speed_presence(bullet_index, true);
 }
 
 TypedArray<BulletSpeedData2D> MultiMeshBullets2D::all_bullets_get_speed_data(int bullet_index_start, int bullet_index_end_inclusive) const {
@@ -2454,6 +2508,9 @@ void MultiMeshBullets2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("enable_bullet", "bullet_index", "collision_amount", "enable_attachment"), &MultiMeshBullets2D::enable_bullet, DEFVAL(0), DEFVAL(true));
 	ClassDB::bind_method(D_METHOD("wake_bullet", "bullet_index", "collision_amount", "enable_attachment"), &MultiMeshBullets2D::wake_bullet, DEFVAL(0), DEFVAL(true));
 	ClassDB::bind_method(D_METHOD("debug_get_volley_info"), &MultiMeshBullets2D::debug_get_volley_info);
+	ClassDB::bind_method(D_METHOD("get_collision_dedup_by_object"), &MultiMeshBullets2D::get_collision_dedup_by_object);
+	ClassDB::bind_method(D_METHOD("set_collision_dedup_by_object", "value"), &MultiMeshBullets2D::set_collision_dedup_by_object);
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "collision_dedup_by_object"), "set_collision_dedup_by_object", "get_collision_dedup_by_object");
 	ClassDB::bind_method(D_METHOD("debug_get_timer_count"), &MultiMeshBullets2D::debug_get_timer_count);
 	ClassDB::bind_method(D_METHOD("debug_get_shape_state"), &MultiMeshBullets2D::debug_get_shape_state);
 	ClassDB::bind_method(D_METHOD("debug_get_attachment_info", "bullet_index"), &MultiMeshBullets2D::debug_get_attachment_info);
@@ -2462,7 +2519,7 @@ void MultiMeshBullets2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("bullet_disable_attachment", "bullet_index"), &MultiMeshBullets2D::bullet_disable_attachment);
 	ClassDB::bind_method(D_METHOD("bullet_enable_attachment", "bullet_index"), &MultiMeshBullets2D::bullet_enable_attachment);
 	ClassDB::bind_method(D_METHOD("get_amount_active_attachments"), &MultiMeshBullets2D::get_amount_active_attachments);
-	ClassDB::bind_method(D_METHOD("_do_deferred_bullet_disable_attachment", "bullet_index", "expected_generation", "expected_attachment_id", "expected_attachment"), &MultiMeshBullets2D::_do_deferred_bullet_disable_attachment);
+	ClassDB::bind_method(D_METHOD("_do_deferred_bullet_disable_attachment", "bullet_index", "expected_generation", "expected_attachment_id", "expected_attachment", "expected_attachment_epoch"), &MultiMeshBullets2D::_do_deferred_bullet_disable_attachment);
 	ClassDB::bind_method(D_METHOD("_do_emit_life_time_over", "expected_generation", "emitter_instance_id", "signal_name", "bullet_indexes"), &MultiMeshBullets2D::_do_emit_life_time_over);
 	ClassDB::bind_method(D_METHOD("_do_emit_sprite_animation_finished", "expected_generation"), &MultiMeshBullets2D::_do_emit_sprite_animation_finished);
 
@@ -2516,7 +2573,7 @@ void MultiMeshBullets2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("multimesh_detach_all_time_based_functions"), &MultiMeshBullets2D::multimesh_detach_all_time_based_functions);
 	ClassDB::bind_method(D_METHOD("_do_detach_all_time_based_functions", "expected_timers_generation"), &MultiMeshBullets2D::_do_detach_all_time_based_functions);
 
-	ClassDB::bind_method(D_METHOD("_do_execute_stored_callable_safely", "_callback", "_execute_only_if_multimesh_is_active", "expected_timers_generation"), &MultiMeshBullets2D::_do_execute_stored_callable_safely);
+	ClassDB::bind_method(D_METHOD("_do_execute_stored_callable_safely", "_callback", "_execute_only_if_multimesh_is_active", "expected_timers_generation", "expected_timer_id"), &MultiMeshBullets2D::_do_execute_stored_callable_safely);
 
 	ClassDB::bind_method(D_METHOD("get_is_multimesh_auto_pooling_enabled"), &MultiMeshBullets2D::get_is_multimesh_auto_pooling_enabled);
 	ClassDB::bind_method(D_METHOD("set_is_multimesh_auto_pooling_enabled", "value"), &MultiMeshBullets2D::set_is_multimesh_auto_pooling_enabled);
@@ -2634,11 +2691,11 @@ void MultiMeshBullets2D::_bind_methods() {
 
 // Cold paths live here; per-tick hot paths stay inline in the header.
 
-void MultiMeshBullets2D::_do_deferred_bullet_disable_attachment(int bullet_index, int expected_generation, uint64_t expected_attachment_id, BulletAttachment2D *expected_attachment) {
+void MultiMeshBullets2D::_do_deferred_bullet_disable_attachment(int bullet_index, int expected_generation, uint64_t expected_attachment_id, BulletAttachment2D *expected_attachment, uint64_t expected_attachment_epoch) {
 	if (expected_generation != multimesh_generation) {
 		return;
 	}
-	if (!slot_still_holds_attachment(bullet_index, expected_attachment, expected_attachment_id)) {
+	if (!slot_still_holds_attachment(bullet_index, expected_attachment, expected_attachment_id, expected_attachment_epoch)) {
 		return;
 	}
 	bullet_disable_attachment(bullet_index);
@@ -2805,6 +2862,11 @@ void MultiMeshBullets2D::reduce_lifetime(double delta) {
 					bullet_factory->bullet_attachments_pool.push(candidate, pooling_id);
 				} else {
 						attachments[idx] = candidate;
+						// Reclaim is an ownership change like any other: without
+						// the bump a deferred disable queued for the PREVIOUS
+						// owner of this slot would still match generation +
+						// pointer + id and could pool this candidate away.
+						bump_attachment_epoch(idx);
 						candidate->owner_multimesh_id = get_instance_id();
 						candidate->owner_bullet_index = idx;
 						if (idx >= 0 && idx < (int)all_cached_instance_transforms.size()) {
@@ -2839,12 +2901,14 @@ void MultiMeshBullets2D::reduce_lifetime(double delta) {
 			}
 		}
 
-		// Disable attachments after signal (deferred keeps order)
+		// Disable attachments after signal (deferred keeps order). The per-slot
+		// assignment epoch travels with the request so a same-life ABA reuse
+		// (pool returns the same node to the same slot) cannot match stale.
 		for (int i = 0; i < bullet_indexes.size(); ++i) {
 			int idx = bullet_indexes[i];
-			BulletAttachment2D *queued_attachment = attachments[idx];
+			BulletAttachment2D *queued_attachment = (idx >= 0 && idx < (int)attachments.size()) ? attachments[idx] : nullptr;
 			const uint64_t queued_attachment_id = queued_attachment != nullptr ? queued_attachment->get_instance_id() : 0;
-			call_deferred("_do_deferred_bullet_disable_attachment", idx, multimesh_generation, queued_attachment_id, queued_attachment);
+			call_deferred("_do_deferred_bullet_disable_attachment", idx, multimesh_generation, queued_attachment_id, queued_attachment, attachment_epoch_for(idx));
 		}
 	}
 	}
@@ -3142,7 +3206,7 @@ int MultiMeshBullets2D::clear_all_bullets() {
 		return cleared;
 	}
 
-void MultiMeshBullets2D::handle_bullet_collision(CollisionType collision_type, int bullet_index, int64_t entered_instance_id, uint64_t queued_bullet_epoch, Vector2 queued_target_velocity, bool queued_velocity_valid) {
+void MultiMeshBullets2D::handle_bullet_collision(CollisionType collision_type, int bullet_index, int64_t entered_instance_id, uint64_t queued_bullet_epoch, Vector2 queued_target_velocity, bool queued_velocity_valid, Vector2 queued_target_position, bool queue_position_valid) {
 		if (bullet_index < 0 || bullet_index >= amount_bullets) {
 			return;
 		}
@@ -3166,7 +3230,7 @@ void MultiMeshBullets2D::handle_bullet_collision(CollisionType collision_type, i
 		// Bounce precedence: a bounce-eligible hit ricochets here and never
 		// reaches the counter below (unless the volley asked to consume the
 		// hit too, decision 2). The hook owns its signals + self-liveness.
-		const int bounce_decision = try_handle_bounce(collision_type, bullet_index, entered_instance_id, queued_target_velocity, queued_velocity_valid);
+		const int bounce_decision = try_handle_bounce(collision_type, bullet_index, entered_instance_id, queued_target_velocity, queued_velocity_valid, queued_target_position, queue_position_valid);
 		if (bounce_decision == 1) {
 			return;
 		}
@@ -3189,8 +3253,24 @@ void MultiMeshBullets2D::handle_bullet_collision(CollisionType collision_type, i
 		Object *emitter = resolve_signal_emitter();
 
 		// Only disable the bullet if the max collision count is greater than 0, otherwise the bullet should never be disabled due to collisions
+		// Killing blow: guard the attachment slot across the disable below.
+		// disable_bullet() on the last live bullet funnels into
+		// disable_multimesh(), whose sweep would pool every attachment BEFORE
+		// the collision signal fires (handler would see nullptr). The lifetime
+		// path reclaims attachments for exactly this reason; do the same here.
+		// Note the guard covers the disable (where the sweep runs), not the
+		// signal emit that follows it.
 		if (bullet_reached_max_collisions) {
+			// Save/restore, not plain set/clear: disable_bullet runs user code
+			// (on_bullet_disabled), which could re-enter this handler for a
+			// different slot. The inner frame would clear the outer guard and
+			// leave the outer sweep unprotected.
+			const int saved_protected_slot = signal_protected_attachment_slot;
+			if (bullet_index >= 0 && bullet_index < (int)attachments.size() && attachments[bullet_index] != nullptr) {
+				signal_protected_attachment_slot = bullet_index;
+			}
 			disable_bullet(bullet_index, false); // Don't disable the attachment yet, first emit the signal for collision so user has access to the attachment and CAN detach it himself inside GDScript
+			signal_protected_attachment_slot = saved_protected_slot;
 			// Destroy explosion only (never the hit spark too): the killing
 			// blow gets one visual. Lifetime/manual disables never reach
 			// here, so timeouts don't detonate.
@@ -3205,10 +3285,13 @@ void MultiMeshBullets2D::handle_bullet_collision(CollisionType collision_type, i
 			}
 		}
 
-		// Capture the slot before the signal: the handler runs user code that may
-		// detach, replace, or - through a re-entrant spawn that pops this instance
-		// from the pool - hand the whole multimesh to a new owner.
-		BulletAttachment2D *attachment_at_signal_time = attachments[bullet_index];
+		// Capture the slot AND its assignment epoch before the signal: the
+		// handler runs user code that may detach, replace, or - through a
+		// re-entrant spawn that pops this instance from the pool - hand the
+		// whole multimesh to a new owner. The post-signal disable below must
+		// only fire when the slot still holds the SAME assignment.
+		BulletAttachment2D *attachment_at_signal_time = (bullet_index >= 0 && bullet_index < (int)attachments.size()) ? attachments[bullet_index] : nullptr;
+		const uint64_t attachment_epoch_at_signal_time = attachment_epoch_for(bullet_index);
 
 		Object *hit_target = ObjectDB::get_instance(entered_instance_id);
 
@@ -3281,7 +3364,7 @@ void MultiMeshBullets2D::handle_bullet_collision(CollisionType collision_type, i
 			return;
 		}
 		const uint64_t captured_id = attachment_at_signal_time != nullptr ? attachment_at_signal_time->get_instance_id() : 0;
-		if (slot_still_holds_attachment(bullet_index, attachment_at_signal_time, captured_id)) {
+		if (slot_still_holds_attachment(bullet_index, attachment_at_signal_time, captured_id, attachment_epoch_at_signal_time)) {
 			bullet_disable_attachment(bullet_index);
 		}
 		}

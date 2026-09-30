@@ -91,7 +91,6 @@
 		<member name="fade_out_sec" type="float" setter="set_fade_out_sec" getter="get_fade_out_sec" default="0.0">
 			Fade-out seconds before expiry (0 disables). Needs a finite lifetime: infinite volleys never expire, so fade_out is ignored there.
 		</member>
-
 		<member name="instance_shader_parameters" type="Dictionary" setter="set_instance_shader_parameters" getter="get_instance_shader_parameters" default="{}">
 			Per-instance shader overrides, used only when [member material] is a [ShaderMaterial] with [code]instance uniform[/code] declarations. [b]KEY[/b] is the uniform name ([String]), [b]VALUE[/b] is a [Variant] matching that uniform's type (a wrong type warns and skips that key).
 			Applied per bullet instance through [code]set_instance_shader_parameter()[/code] when the volley spawns every live bullet of the multimesh shares the same override set. An empty dictionary disables the pass. Switching to a non-shader material, or spawning with null material, clears the stored dict so pool reuse never leaks stale overrides into the next volley.

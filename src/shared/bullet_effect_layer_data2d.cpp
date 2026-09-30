@@ -167,6 +167,15 @@ Color BulletEffectLayerData2D::get_self_modulate() const {
 	return self_modulate;
 }
 void BulletEffectLayerData2D::set_self_modulate(const Color &new_color) {
+	// Multiplied into every effect instance tint by fx_refresh_slot_color, so a
+	// NaN channel would spread across the layer. The float/vector setters in
+	// this file all guard; this color setter was the odd one out.
+	// godot-cpp's Color has no is_finite(), so check the channels directly.
+	if (!Math::is_finite(new_color.r) || !Math::is_finite(new_color.g) ||
+			!Math::is_finite(new_color.b) || !Math::is_finite(new_color.a)) {
+		UtilityFunctions::push_error("BulletEffectLayerData2D: self_modulate must be finite, keeping the old value.");
+		return;
+	}
 	self_modulate = new_color;
 }
 

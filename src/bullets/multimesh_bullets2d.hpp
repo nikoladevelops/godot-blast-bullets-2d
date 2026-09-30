@@ -149,7 +149,7 @@ public:
 	// multimesh buffer.
 	_ALWAYS_INLINE_ Transform2D to_local_for_multimesh(const Transform2D &global_transf) const {
 		const Transform2D node_global = get_global_transform();
-		if (node_global.get_scale().length_squared() < 0.00000001) {
+		if (!is_transform_invertible_safe(node_global)) {
 			return global_transf;
 		}
 		return node_global.affine_inverse() * global_transf;
@@ -758,6 +758,168 @@ public:
 
 	/// BULLET ATTACHMENT RELATED
 
+	// Per-slot attachment assignment epoch: bumped on EVERY ownership change
+	// (attach, detach, disable, free, reclaim, reuse-blank). The deferred
+	// disable carries (generation + attachment id + pointer + epoch); the
+	// flush must match all four. Generation alone cannot catch same-life
+	// reuse: the pool can return the SAME node to the SAME slot in the SAME
+	// generation (classic ABA), and pointer+id then match a stale request.
+	// Sized to amount_bullets at spawn; reset on reuse.
+	std::vector<uint64_t> attachment_assignment_epochs;
+
+	_ALWAYS_INLINE_ void bump_attachment_epoch(int bullet_index) {
+		if (bullet_index >= 0 && bullet_index < (int)attachment_assignment_epochs.size()) {
+			++attachment_assignment_epochs[bullet_index];
+		}
+	}
+
+	_ALWAYS_INLINE_ uint64_t attachment_epoch_for(int bullet_index) const {
+		if (bullet_index < 0 || bullet_index >= (int)attachment_assignment_epochs.size()) {
+			return 0;
+		}
+		return attachment_assignment_epochs[bullet_index];
+	}
+
+	// Slot guarded across the collision-signal emit on a killing blow: the
+	// final disable funnels into disable_multimesh(), whose sweep would pool
+	// every attachment BEFORE the signal fires (handler would see nullptr).
+	// Set to the dying slot before disable_bullet(); the sweep skips it, the
+	// post-signal cleanup disables it normally. -1 = no guard.
+	int signal_protected_attachment_slot = -1;
+
+	// Object-level collision dedup (default ON): one logical hit per
+	// (bullet, target) per drain window. The physics server reports per
+	// SHAPE (body+area pair or multi-shape target queues N records for one
+	// overlap); without this the counter/signals/bounce fire N times. When
+	// false, every shape record is delivered (legacy shape-level).
+	bool collision_dedup_by_object = true;
+
+	// Packed (bullet_index, instance_id) keys of everything already queued this
+	// drain window. The dedup used to scan all_collided_bullets linearly, which
+	// is O(n^2) per physics step: 10k bullets overlapping one target cost ~50M
+	// comparisons in a single frame. This open-addressed set makes each insert
+	// O(1). Cleared wherever all_collided_bullets is drained or reset.
+	std::vector<uint64_t> collision_dedup_slots;
+	uint32_t collision_dedup_slot_mask = 0;
+	uint32_t collision_dedup_slot_used = 0;
+
+	// FNV-1a over the two halves; the result is never 0, which is what lets 0
+	// mean "empty slot" in the open-addressed table below.
+	static uint64_t collision_dedup_key(int bullet_index, int64_t instance_id) {
+		uint32_t h = (uint32_t)bullet_index * 0x9E3779B1u;
+		uint64_t b = (uint64_t)instance_id;
+		for (int i = 0; i < 8; ++i) {
+			h ^= (uint32_t)((b >> (i * 8)) & 0xFF);
+			h *= 0x01000193u;
+			h ^= h >> 15;
+		}
+		h ^= (uint32_t)(b >> 32) * 0x85EBCA6Bu;
+		h *= 0xC2B2AE35u;
+		h ^= h >> 16;
+		return h == 0 ? 1 : (uint64_t)h;
+	}
+
+	_ALWAYS_INLINE_ bool collision_already_queued(int bullet_index, int64_t entered_instance_id) {
+		if (!collision_dedup_by_object || collision_dedup_slots.empty()) {
+			return false;
+		}
+		const uint64_t key = collision_dedup_key(bullet_index, entered_instance_id);
+		uint32_t idx = (uint32_t)key & collision_dedup_slot_mask;
+		for (uint32_t probe = 0; probe <= collision_dedup_slot_mask; ++probe) {
+			const uint64_t slot = collision_dedup_slots[idx];
+			if (slot == 0) {
+				return false; // empty run: key is absent
+			}
+			if (slot == key) {
+				return true;
+			}
+			idx = (idx + 1) & collision_dedup_slot_mask;
+		}
+		return false;
+	}
+
+	_ALWAYS_INLINE_ void mark_collision_queued(int bullet_index, int64_t entered_instance_id) {
+		if (!collision_dedup_by_object) {
+			return;
+		}
+		// Grow at >= 50% load so probe runs stay short.
+		if (collision_dedup_slot_mask == 0 || (collision_dedup_slot_used + 1) * 2 > (uint32_t)collision_dedup_slots.size()) {
+			// Power-of-two sizing keeps the (size - 1) mask trick valid.
+			size_t new_size = 64;
+			while (new_size < (size_t)(collision_dedup_slot_used + 1) * 4) {
+				new_size *= 2;
+			}
+			collision_dedup_slots.assign(new_size, 0);
+			collision_dedup_slot_mask = (uint32_t)(new_size - 1);
+			collision_dedup_slot_used = 0;
+		}
+		const uint64_t key = collision_dedup_key(bullet_index, entered_instance_id);
+		uint32_t idx = (uint32_t)key & collision_dedup_slot_mask;
+		for (uint32_t probe = 0; probe <= collision_dedup_slot_mask; ++probe) {
+			const uint64_t slot = collision_dedup_slots[idx];
+			if (slot == 0) {
+				collision_dedup_slots[idx] = key;
+				++collision_dedup_slot_used;
+				return;
+			}
+			if (slot == key) {
+				return;
+			}
+			idx = (idx + 1) & collision_dedup_slot_mask;
+		}
+	}
+
+	void clear_collision_dedup_keys() {
+		for (uint64_t &slot : collision_dedup_slots) {
+			slot = 0;
+		}
+		collision_dedup_slot_used = 0;
+	}
+
+	// Bound so both dedup modes are reachable and testable. Default true (one
+	// logical hit per bullet/target per frame). Set false to restore the legacy
+	// per-SHAPE delivery, where a 3-shape target counts three hits.
+	bool get_collision_dedup_by_object() const { return collision_dedup_by_object; }
+	void set_collision_dedup_by_object(bool value) {
+		if (collision_dedup_by_object == value) {
+			return;
+		}
+		collision_dedup_by_object = value;
+		// Keys from the old mode must not gate the new one (or vice versa).
+		clear_collision_dedup_keys();
+	}
+
+	// Central transform-invertibility check. get_scale().length_squared()
+	// alone accepts singular bases like scale (0,1) (det == 0) whose
+	// affine_inverse() is garbage. All conversion/validation paths use this.
+	static bool is_transform_invertible_safe(const Transform2D &t) {
+		if (!t.is_finite()) {
+			return false;
+		}
+		const Vector2 x = t.columns[0];
+		const Vector2 y = t.columns[1];
+		if (!x.is_finite() || !y.is_finite()) {
+			return false;
+		}
+		const real_t det = x.x * y.y - x.y * y.x;
+		return Math::is_finite(det) && Math::abs(det) > (real_t)1e-8;
+	}
+
+	// Per-instance shader keys applied via set_instance_shader_parameter().
+	// Clearing the C++ Dictionary does NOT clear the CanvasItem overrides,
+	// so pooled reuse (A with params -> B without) would leak A's visuals.
+	// finalize_set_up() resets every previously applied key on the empty path.
+	std::vector<String> applied_instance_shader_keys;
+
+	void clear_applied_instance_shader_overrides() {
+		for (const String &key : applied_instance_shader_keys) {
+			if (!key.is_empty()) {
+				set_instance_shader_parameter(key, Variant());
+			}
+		}
+		applied_instance_shader_keys.clear();
+	}
+
 	// Stores each bullet's attachment pooling id
 	std::vector<uint32_t> attachment_pooling_ids;
 
@@ -1187,6 +1349,19 @@ public:
 		// (static/area targets read live as zero either way).
 		Vector2 queue_target_velocity = Vector2(0, 0);
 		bool queue_target_velocity_valid = false;
+		// Queue-time target pose for the velocity-less estimate (see the
+		// drain): Area2D hurtboxes, tweened bosses and position-moved
+		// statics expose no velocity property, so the drain compares this
+		// pose against the live one over the queue-to-drain window.
+		// Stamped in PHYSICS FRAME counts, not seconds: the drain runs at
+		// the tail of move_bullets while reduce_lifetime advances the age
+		// clock afterwards, so a clock stamp would read identical at queue
+		// and drain (zero window, estimate dead). Frame counts are global
+		// and monotonic, so base queue funcs (which cannot see the
+		// directional tick counter) still stamp a usable window. Pooled
+		// reuse clears the record vector, so lifetimes can never mix.
+		Vector2 queue_target_position = Vector2(0, 0);
+		bool queue_target_position_valid = false;
 
 		BulletCollisionData2D() = default;
 
@@ -1728,19 +1903,14 @@ public:
 		real_t &curr_bullet_rotation_speed = all_rotation_speed[bullet_index];
 		real_t curr_max_rotation_speed = all_max_rotation_speed[bullet_index];
 
-		// Clamp by motion direction, not just acceleration sign: with zero
-		// acceleration a negative overspeed must still decay toward -max
-		// (min(-5, max) would freeze it at -5 forever). max <= 0 means
-		// unlimited (same convention as linear speed): default-constructed
-		// rotation data spins freely instead of freezing.
+		// max <= 0 means unlimited (same convention as linear speed).
+		// Otherwise clamp symmetrically to [-max, max]: once the speed is
+		// already outside the band (e.g. seeded by a curve), acceleration in
+		// either direction recovers toward the band instead of freezing.
 		real_t acceleration = all_rotation_acceleration[bullet_index] * delta;
 		real_t new_speed = curr_bullet_rotation_speed + acceleration;
-		if (curr_max_rotation_speed <= 0.0) {
-			// Unlimited: keep integrated speed as-is.
-		} else if (acceleration > 0.0 || (acceleration == 0.0 && new_speed > 0.0)) {
-			new_speed = Math::min(new_speed, curr_max_rotation_speed);
-		} else {
-			new_speed = Math::max(new_speed, -curr_max_rotation_speed);
+		if (curr_max_rotation_speed > 0.0) {
+			new_speed = Math::clamp(new_speed, -curr_max_rotation_speed, curr_max_rotation_speed);
 		}
 		curr_bullet_rotation_speed = new_speed;
 	}
@@ -1796,15 +1966,23 @@ public:
 	// Slot liveness: the "is this slot still mine" check runs liveness first:
 	// BEFORE the pointer compare: comparing a dangling pointer first would
 	// touch freed memory when the id was recycled (memdelete + allocator ABA).
-	bool slot_still_holds_attachment(int bullet_index, BulletAttachment2D *expected_attachment, uint64_t expected_attachment_id) const {
+	bool slot_still_holds_attachment(int bullet_index, BulletAttachment2D *expected_attachment, uint64_t expected_attachment_id, uint64_t expected_attachment_epoch) const {
 		if (expected_attachment == nullptr || expected_attachment_id == 0) {
 			return false;
 		}
 		if (ObjectDB::get_instance(ObjectID(expected_attachment_id)) != expected_attachment) {
 			return false;
 		}
-		return bullet_index >= 0 && bullet_index < (int)attachments.size() && attachments[bullet_index] == expected_attachment;
+		if (bullet_index < 0 || bullet_index >= (int)attachments.size() || attachments[bullet_index] != expected_attachment) {
+			return false;
+		}
+		return attachment_epoch_for(bullet_index) == expected_attachment_epoch;
 	}
+
+	// NOTE: there is deliberately NO 3-argument (no-epoch) overload of this
+	// check. It would silently accept a slot that was re-assigned to the same
+	// node within the same generation - the classic ABA case the epoch exists
+	// to catch. Callers that cannot supply an epoch must not use this at all.
 
 	// Pooled-attachment check: pooling is keyed by a
 	// 32-bit scene hash that can theoretically collide across two different
@@ -1845,6 +2023,7 @@ public:
 		clear_attachment_owner_fields(temp);
 
 		curr_attachment = nullptr;
+		bump_attachment_epoch(bullet_index);
 		return temp;
 	}
 
@@ -1857,6 +2036,7 @@ public:
 		}
 		if (attachments[bullet_index] == attachment) {
 			attachments[bullet_index] = nullptr;
+			bump_attachment_epoch(bullet_index);
 		}
 	}
 
@@ -1912,6 +2092,11 @@ public:
 
 		if (bullet_factory == nullptr) {
 			UtilityFunctions::push_error("bullet_set_attachment: multimesh was never spawned through BulletFactory2D.");
+			return false;
+		}
+
+		if (bullet_factory->get_is_tearing_down()) {
+			UtilityFunctions::push_error("bullet_set_attachment: cannot attach while the factory is tearing down. The scene is being freed.");
 			return false;
 		}
 
@@ -1979,6 +2164,7 @@ public:
 		// holding the slot keeps re-entrant API reads and the owner-tracking PREDELETE
 		// hook consistent from the first moment.
 		attachments[bullet_index] = attachment_instance;
+		bump_attachment_epoch(bullet_index);
 
 		// Stamp the source scene alongside the pooling key: the key is only a
 		// 32-bit hash, so the pop path verifies identity against this exact
@@ -2078,6 +2264,7 @@ public:
 		}
 		auto temp = attachment_ptr;
 		attachment_ptr = nullptr;
+		bump_attachment_epoch(bullet_index);
 
 		// Being freed outright: clear owner tracking first so its PREDELETE skip
 		// path can't race with this deletion.
@@ -2107,6 +2294,7 @@ public:
 		// the null, any re-entrant call on this slot sees a clean, empty slot.
 		BulletAttachment2D *detaching = attachment_ptr;
 		attachment_ptr = nullptr;
+		bump_attachment_epoch(bullet_index);
 
 		// Owner tracking cleared before the callback: if the handler frees the
 		// attachment itself, its PREDELETE hook then finds nothing left to do.
@@ -2139,15 +2327,17 @@ public:
 	}
 
 	// Deferred attachment disable carrying the spawn generation, the slot's
-	// attachment id AND the exact pointer. Lifetime expiry queues disables that
-	// flush after the tick; if the slot was detached or re-assigned in a
-	// handler, we must not pool the new owner's attachment by index alone. The
-	// id re-resolves at flush so a memdelete + allocator reuse at the same
-	// address (ABA) can never falsely match a new owner's attachment.
+	// attachment id, the exact pointer AND the per-slot assignment epoch.
+	// Lifetime expiry queues disables that flush after the tick; if the slot
+	// was detached or re-assigned in a handler, we must not pool the new
+	// owner's attachment by index alone. The id re-resolves at flush so a
+	// memdelete + allocator reuse at the same address (ABA) cannot falsely
+	// match; the epoch catches the subtler same-life ABA where the pool
+	// returns the SAME node to the SAME slot in the SAME generation.
 	// Liveness is checked BEFORE the pointer compare: comparing a dangling
 	// pointer first would touch freed memory when the id was recycled.
 	// Cold path: defined in multimesh_bullets2d.cpp.
-	void _do_deferred_bullet_disable_attachment(int bullet_index, int expected_generation, uint64_t expected_attachment_id, BulletAttachment2D *expected_attachment);
+	void _do_deferred_bullet_disable_attachment(int bullet_index, int expected_generation, uint64_t expected_attachment_id, BulletAttachment2D *expected_attachment, uint64_t expected_attachment_epoch);
 
 	// Generation-guarded deferred life_time_over emit (see schedule site in
 	// reduce_lifetime): drops stale emissions when the instance was pooled
@@ -2237,6 +2427,12 @@ public:
 		// bumps the counter/generations, so the trailing steps below (which belong
 		// to the dying life) must not run over the fresh life - abort instead.
 		for (int i = 0; i < (int)attachments.size(); ++i) {
+			// The collision killing-blow path guards one slot across the
+			// signal emit: its attachment must survive the sweep so the
+			// handler can inspect/detach it. Post-signal cleanup disables it.
+			if (i == signal_protected_attachment_slot) {
+				continue;
+			}
 			if (attachments[i] != nullptr) {
 				bullet_disable_attachment(i);
 			}
@@ -2352,7 +2548,7 @@ public:
 		return bullet_factory;
 	}
 
-	void handle_bullet_collision(CollisionType collision_type, int bullet_index, int64_t entered_instance_id, uint64_t queued_bullet_epoch, Vector2 queued_target_velocity, bool queued_velocity_valid);
+	void handle_bullet_collision(CollisionType collision_type, int bullet_index, int64_t entered_instance_id, uint64_t queued_bullet_epoch, Vector2 queued_target_velocity, bool queued_velocity_valid, Vector2 queued_target_position, bool queue_position_valid);
 
 	// Bounce decision hook for one queued collision record. Runs BEFORE the
 	// hit counter increments so a bounce can take precedence over the normal
@@ -2360,12 +2556,14 @@ public:
 	// handled (return), 2 = bounced but the hit is consumed too (fall
 	// through into normal counting/signals). Base is a no-op (only
 	// DirectionalBullets2D bounces); BlockBullets2D never overrides it.
-	virtual int try_handle_bounce(CollisionType collision_type, int bullet_index, int64_t entered_instance_id, Vector2 queued_target_velocity, bool queued_velocity_valid) {
+	virtual int try_handle_bounce(CollisionType collision_type, int bullet_index, int64_t entered_instance_id, Vector2 queued_target_velocity, bool queued_velocity_valid, Vector2 queued_target_position, bool queue_position_valid) {
 		(void)collision_type;
 		(void)bullet_index;
 		(void)entered_instance_id;
 		(void)queued_target_velocity;
 		(void)queued_velocity_valid;
+		(void)queued_target_position;
+		(void)queue_position_valid;
 		return 0;
 	}
 
@@ -2373,8 +2571,9 @@ public:
 
 	// Queue-time target velocity for the bounce math (see the record
 	// above): same read as the drain path (RigidBody2D linear_velocity,
-	// CharacterBody2D velocity), false when the target exposes none or is
-	// already gone (the drain then falls back to its live read).
+	// CharacterBody2D velocity, AnimatableBody2D constant_linear_velocity),
+	// false when the target exposes none or is already gone (the drain
+	// then falls back to its live read).
 	static bool read_queued_target_velocity(int64_t entered_instance_id, Vector2 &out_velocity) {
 		out_velocity = Vector2(0, 0);
 		Object *hit_target = ObjectDB::get_instance(entered_instance_id);
@@ -2397,11 +2596,47 @@ public:
 				out_velocity = v;
 				return true;
 			}
+			return false;
+		}
+		// AnimatableBody2D platforms expose neither of the above: their
+		// motion lives in constant_linear_velocity (with sync_to_physics).
+		// Without this a ramming crusher reads as standing still.
+		const Variant const_v = hit_target->get(StringName("constant_linear_velocity"));
+		if (const_v.get_type() == Variant::VECTOR2) {
+			const Vector2 v = (Vector2)const_v;
+			if (v.is_finite()) {
+				out_velocity = v;
+				return true;
+			}
 		}
 		return false;
 	}
 
+	// Queue-time target pose for the velocity-less estimate. Unconditional
+	// (cheap: one cast + one position read); the drain uses it only when
+	// no velocity property exists.
+	static void read_queued_target_pose(int64_t entered_instance_id, Vector2 &out_position, bool &out_valid) {
+		out_position = Vector2(0, 0);
+		out_valid = false;
+		Object *hit_target = ObjectDB::get_instance(entered_instance_id);
+		if (hit_target == nullptr) {
+			return;
+		}
+		Node2D *target_n2d = Object::cast_to<Node2D>(hit_target);
+		if (target_n2d == nullptr) {
+			return;
+		}
+		const Vector2 pos = target_n2d->get_global_position();
+		if (!pos.is_finite()) {
+			return;
+		}
+		out_position = pos;
+		out_valid = true;
+	}
+
 	_ALWAYS_INLINE_ void area_entered_func(PhysicsServer2D::AreaBodyStatus status, RID entered_rid, int64_t entered_instance_id, int entered_shape_index, int bullet_shape_index) {
+		(void)entered_rid;
+		(void)entered_shape_index;
 		if (status == PhysicsServer2D::AREA_BODY_ADDED) {
 			// Paused factory stops draining (no _physics_process) but the
 			// physics server keeps firing: without this gate the vector grows
@@ -2412,13 +2647,28 @@ public:
 			if (bullet_shape_index < 0 || bullet_shape_index >= amount_bullets) {
 				return;
 			}
+			// Object-level dedup: a multi-shape target (or body+area pair on
+			// one node) queues one record per shape for a single overlap.
+			// Default collapses to one logical hit per (bullet, target) per
+			// drain window; shape-level opt-out preserves legacy behavior.
+			if (collision_dedup_by_object) {
+				// O(1) hash lookup instead of a linear scan over every queued
+				// record: at 10k bullets the scan was ~50M comparisons per frame.
+				if (collision_already_queued(bullet_shape_index, entered_instance_id)) {
+					return;
+				}
+				mark_collision_queued(bullet_shape_index, entered_instance_id);
+			}
 			BulletCollisionData2D record(bullet_shape_index, entered_instance_id, CollisionType::AREA);
 			record.queue_bullet_epoch = collision_epoch_for_bullet(bullet_shape_index);
 			record.queue_target_velocity_valid = read_queued_target_velocity(entered_instance_id, record.queue_target_velocity);
+			read_queued_target_pose(entered_instance_id, record.queue_target_position, record.queue_target_position_valid);
 			all_collided_bullets.push_back(record);
 		}
 	}
 	_ALWAYS_INLINE_ void body_entered_func(PhysicsServer2D::AreaBodyStatus status, RID entered_rid, int64_t entered_instance_id, int entered_shape_index, int bullet_shape_index) {
+		(void)entered_rid;
+		(void)entered_shape_index;
 		if (status == PhysicsServer2D::AREA_BODY_ADDED) {
 			if (bullet_factory != nullptr && bullet_factory->is_bullet_processing_paused()) {
 				return;
@@ -2426,9 +2676,17 @@ public:
 			if (bullet_shape_index < 0 || bullet_shape_index >= amount_bullets) {
 				return;
 			}
+			// Same object-level dedup as the area path above.
+			if (collision_dedup_by_object) {
+				if (collision_already_queued(bullet_shape_index, entered_instance_id)) {
+					return;
+				}
+				mark_collision_queued(bullet_shape_index, entered_instance_id);
+			}
 			BulletCollisionData2D record(bullet_shape_index, entered_instance_id, CollisionType::BODY);
 			record.queue_bullet_epoch = collision_epoch_for_bullet(bullet_shape_index);
 			record.queue_target_velocity_valid = read_queued_target_velocity(entered_instance_id, record.queue_target_velocity);
+			read_queued_target_pose(entered_instance_id, record.queue_target_position, record.queue_target_position_valid);
 			all_collided_bullets.push_back(record);
 		}
 	}
@@ -2633,6 +2891,28 @@ protected:
 	// Reserves enough memory and populates all needed data structures keeping track of rotation data
 	void set_rotation_data(const TypedArray<BulletRotationData2D> &rotation_data, bool new_rotate_only_textures, bool tile_short_arrays = false);
 
+	// Per-bullet rotation PRESENCE hooks. set_rotation_data seeds the rotation
+	// SoA from a user array, and the seed knows something the values cannot
+	// express: whether a slot came from a valid entry (possibly a deliberate
+	// all-zero "no spin") or from an invalid/absent one (a gap the shared
+	// fallback may fill). The base class has no presence vector of its own, so
+	// it reports through these no-op hooks and DirectionalBullets2D - which owns
+	// has_per_bullet_rotation_data - overrides them. Keeping the knowledge in
+	// one place avoids the base reaching into subclass state.
+	virtual void reset_per_bullet_rotation_presence() {}
+	virtual void mark_per_bullet_rotation_presence(int bullet_index, bool present) {
+		(void)bullet_index;
+		(void)present;
+	}
+
+	// Same contract for the linear ballistics SoA (all_cached_speed /
+	// max_speed / acceleration). set_bullet_speed_data claims presence for the
+	// slot it writes so a later set_shared_bullet_speed_data cannot undo it.
+	virtual void mark_per_bullet_speed_presence(int bullet_index, bool present) {
+		(void)bullet_index;
+		(void)present;
+	}
+
 	// Guarantees no attachment slot survives into a new owner: force-disables any
 	// live slot and blanks all five attachment arrays plus the interpolation cache.
 	// Used by spawn() and enable_multimesh() so pooled reuse can't inherit stale
@@ -2730,23 +3010,109 @@ public:
 		double _initial_time;
 		bool _repeating;
 		bool _execute_only_if_multimesh_is_active;
+		// Unique per attach, never reused within a life. The deferred execute
+		// carries it so a detach landing between the queue and the flush
+		// cancels that exact request. The volley-wide timers generation
+		// cannot do this: it is bumped only by a full detach/wake, so a
+		// single detach_time_based_function(callable) used to leave an
+		// already-queued callback live and it still fired.
+		uint64_t _id = 0;
 
-		CustomTimer(const godot::Callable &callback, double initial_time, bool repeating, bool execute_only_if_multimesh_is_active) :
-				_callback(callback), _current_time(initial_time), _initial_time(initial_time), _repeating(repeating), _execute_only_if_multimesh_is_active(execute_only_if_multimesh_is_active) {};
+		CustomTimer(const godot::Callable &callback, double initial_time, bool repeating, bool execute_only_if_multimesh_is_active, uint64_t id) :
+				_callback(callback), _current_time(initial_time), _initial_time(initial_time), _repeating(repeating), _execute_only_if_multimesh_is_active(execute_only_if_multimesh_is_active), _id(id) {};
 	};
 
-	void execute_stored_callable_safely(const Callable &_callback, bool execute_only_if_multimesh_is_active) {
+	// Monotonic, never reset: a stale id must not match a later attach.
+	uint64_t next_custom_timer_id() { return ++custom_timer_id_counter; }
+
+	// True while any live timer still owns this id.
+	bool has_custom_timer_with_id(uint64_t timer_id) const {
+		if (timer_id == 0) {
+			return false;
+		}
+		for (const CustomTimer &timer : multimesh_custom_timers) {
+			if (timer._id == timer_id) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	// A deferred fire that has been queued but not yet flushed. The callable is
+	// stored alongside the id because a non-repeating timer is erased from the
+	// timer vector on the very tick it fires, so a detach that has to cancel
+	// this request can no longer find it there.
+	struct PendingCustomTimerFire {
+		uint64_t id = 0;
+		Callable callback;
+	};
+
+	// True while the id is still attached or its fire is still queued.
+	bool custom_timer_request_still_valid(uint64_t timer_id) const {
+		if (timer_id == 0) {
+			return false;
+		}
+		if (has_custom_timer_with_id(timer_id)) {
+			return true;
+		}
+		for (const PendingCustomTimerFire &pending : pending_custom_timer_fires) {
+			if (pending.id == timer_id) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	void retire_pending_custom_timer_fire(uint64_t timer_id) {
+		for (auto it = pending_custom_timer_fires.begin(); it != pending_custom_timer_fires.end();) {
+			if (it->id == timer_id) {
+				it = pending_custom_timer_fires.erase(it);
+			} else {
+				++it;
+			}
+		}
+	}
+
+	// Cancel every queued fire belonging to this callable, plus its timers.
+	void cancel_pending_custom_timer_fires_for(const Callable &callback) {
+		for (auto it = pending_custom_timer_fires.begin(); it != pending_custom_timer_fires.end();) {
+			if (it->callback == callback) {
+				it = pending_custom_timer_fires.erase(it);
+			} else {
+				++it;
+			}
+		}
+	}
+
+	void clear_pending_custom_timer_fires() { pending_custom_timer_fires.clear(); }
+
+	void execute_stored_callable_safely(const Callable &_callback, bool execute_only_if_multimesh_is_active, uint64_t timer_id) {
 		// Stamp the timers generation: between this deferred queue and its execution the
 		// multimesh can be disabled, pooled and re-enabled for a NEW owner - the stale
 		// owner's callback must not fire then (execute_only_if_multimesh_is_active alone
-		// can't catch it, since the new owner is active too).
-		call_deferred("_do_execute_stored_callable_safely", _callback, execute_only_if_multimesh_is_active, multimesh_timers_generation);
+		// can't catch it, since the new owner is active too). The per-timer id
+		// additionally catches a single detach, which does NOT bump the
+		// generation.
+		call_deferred("_do_execute_stored_callable_safely", _callback, execute_only_if_multimesh_is_active, multimesh_timers_generation, timer_id);
 	}
 
-	void _do_execute_stored_callable_safely(const Callable &_callback, bool execute_only_if_multimesh_is_active, int expected_timers_generation) {
+	void _do_execute_stored_callable_safely(const Callable &_callback, bool execute_only_if_multimesh_is_active, int expected_timers_generation, uint64_t expected_timer_id) {
+		// Retire the id on every exit path: whether we run, bail on generation,
+		// bail on detach, or bail on a dead callable, this request is consumed
+		// and must not stay valid for a later flush.
 		if (expected_timers_generation != multimesh_timers_generation) {
+			retire_pending_custom_timer_fire(expected_timer_id);
 			return;
 		}
+		// The timer this request came from must still be valid. Without this,
+		// detaching a callable between the queue and this flush left the
+		// callback live: the generation is only bumped by a full detach/wake,
+		// so a targeted multimesh_detach_time_based_function() could not stop
+		// an already-scheduled fire.
+		if (!custom_timer_request_still_valid(expected_timer_id)) {
+			return;
+		}
+		retire_pending_custom_timer_fire(expected_timer_id);
 
 		// If the user wants to execute the callable only if the multimesh is active, check for that
 		if (execute_only_if_multimesh_is_active && !is_active) {
@@ -2807,7 +3173,7 @@ public:
 			return;
 		}
 
-		multimesh_custom_timers.emplace_back(callable, time, repeat, execute_only_if_multimesh_is_active);
+		multimesh_custom_timers.emplace_back(callable, time, repeat, execute_only_if_multimesh_is_active, next_custom_timer_id());
 	}
 
 	_ALWAYS_INLINE_ void multimesh_detach_time_based_function(const Callable &callable) {
@@ -2832,6 +3198,13 @@ public:
 			UtilityFunctions::push_error("Cannot modify attached timers while bullets are being processed (e.g. inside a timer callback or collision handler). Use multimesh_detach_time_based_function() instead of the _do_* implementation.");
 			return;
 		}
+		// Cancel queued fires for this callable FIRST and unconditionally. A
+		// one-shot is erased from the vector on the tick it fires, so by the
+		// time a detach runs its fire may no longer be in the vector at all -
+		// matching inside the loop below would miss it and the detached
+		// callable would still run once. That is the bug the per-timer id
+		// exists to prevent.
+		cancel_pending_custom_timer_fires_for(callable);
 		for (auto it = multimesh_custom_timers.begin(); it != multimesh_custom_timers.end();) {
 			if (it->_callback == callable) {
 				it = multimesh_custom_timers.erase(it); // Order-preserving
@@ -2873,7 +3246,14 @@ public:
 		for (auto it = multimesh_custom_timers.begin(); it != multimesh_custom_timers.end();) {
 			it->_current_time -= delta;
 			if (it->_current_time <= 0.0) {
-				execute_stored_callable_safely(it->_callback, it->_execute_only_if_multimesh_is_active);
+				// Record BEFORE the (deferred) call: a one-shot is erased from
+				// the vector on this same line, so the flush could not find it
+				// there. Bounded by the 64-timer cap.
+				PendingCustomTimerFire pending;
+				pending.id = it->_id;
+				pending.callback = it->_callback;
+				pending_custom_timer_fires.push_back(pending);
+				execute_stored_callable_safely(it->_callback, it->_execute_only_if_multimesh_is_active, it->_id);
 
 				if (it->_repeating) {
 					it->_current_time = it->_initial_time;
@@ -2889,5 +3269,11 @@ public:
 
 	// Stores a bunch of timers for the multimesh that should execute
 	std::vector<CustomTimer> multimesh_custom_timers;
+	// Source of the per-timer ids above. Deliberately never reset: reusing an
+	// id would let a stale deferred request match a brand new timer.
+	uint64_t custom_timer_id_counter = 0;
+	// Ids of one-shot fires whose deferred request is still in flight. Bounded
+	// by the 64-timer cap; each entry is retired when its flush runs.
+	std::vector<PendingCustomTimerFire> pending_custom_timer_fires;
 };
 } //namespace BlastBullets2D

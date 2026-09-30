@@ -117,13 +117,25 @@ func _initialize() -> void:
 	z.max_speed = 0.0
 	o2.set_bullet_speed_data(0, z)
 	o2.set_shared_bullet_speed_data(_speed(400.0))
-	_check(absf(o2.get_bullet_speed_data(0).speed - 400.0) < 0.01, "per-zero then shared fills")
+	# BEHAVIOR CHANGE (presence bit): an explicit all-zero per-bullet entry is
+	# INTENT ("this bullet must not move"), not absence. It now wins no matter
+	# when shared is applied, so this matches the "shared then per-zero" case
+	# below. Previously the result flipped purely on call order, which meant the
+	# same author intent produced different behavior depending on sequencing.
+	_check(absf(o2.get_bullet_speed_data(0).speed) < 0.01, "per-zero then shared does NOT fill (order-independent now)")
 	var e6c := H.make_directional_data(2, 0.0)
 	e6c.all_bullet_speed_data = []
 	var o3: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(e6c)
 	o3.set_shared_bullet_speed_data(_speed(400.0))
 	o3.set_bullet_speed_data(0, z)
 	_check(absf(o3.get_bullet_speed_data(0).speed) < 0.01, "shared then per-zero stays zero (fill-once)")
+	# The pair above is now symmetric: both orders honor the explicit zero.
+	# Absence is still absence: with NO per-bullet entry at all, shared fills.
+	var e6d := H.make_directional_data(2, 0.0)
+	e6d.all_bullet_speed_data = []
+	var o4: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(e6d)
+	o4.set_shared_bullet_speed_data(_speed(400.0))
+	_check(absf(o4.get_bullet_speed_data(1).speed - 400.0) < 0.01, "unseeded slot still falls back to shared (absence != deliberate zero)")
 
 	printerr("GAP T7 tiled array with an invalid entry still falls back per slot")
 	var g7 := H.make_directional_data(4, 0.0)

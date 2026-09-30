@@ -8,6 +8,13 @@ real_t BlockBulletsData2D::get_block_rotation_radians() const {
 	return block_rotation_radians;
 }
 void BlockBulletsData2D::set_block_rotation_radians(real_t new_block_rotation_radians) {
+	// Applied to every block transform at spawn, so a non-finite value would
+	// NaN-poison the whole volley (validate_spawn_data only checks
+	// transforms[], never this field).
+	if (!Math::is_finite(new_block_rotation_radians)) {
+		UtilityFunctions::push_error("BlockBulletsData2D: block_rotation_radians must be finite, keeping the old value.");
+		return;
+	}
 	block_rotation_radians = new_block_rotation_radians;
 }
 

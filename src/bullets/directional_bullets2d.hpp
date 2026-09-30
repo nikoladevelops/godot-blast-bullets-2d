@@ -142,6 +142,23 @@ protected:
 	// set (use_per_bullet_homing_smoothing), in which case update_homing reads
 	// the per-bullet value and the shared homing_smoothing is ignored.
 	std::vector<real_t> all_bullet_homing_smoothing;
+	// Per-bullet seed PRESENCE, not values. all_cached_speed / all_rotation_speed
+	// are a single effective store the tick integrates and curves overwrite in
+	// place; there is no separate "base" copy to re-derive from. These bits are
+	// what let the shared fallbacks tell the two zero-cases apart:
+	//   bit 1 -> a VALID per-bullet entry seeded this slot (including a
+	//            deliberate all-zero "don't move" / "no spin"). Shared must not
+	//            touch it, or an intentional freeze silently starts moving.
+	//   bit 0 -> the slot was seeded from an invalid entry (null, wrong type, or
+	//            non-finite), so it is a genuine gap and shared may fill it.
+	// Without the bit the fallback compared the triple against 0, which cannot
+	// distinguish those two cases.
+	// INVARIANT: bit 0 must also mean "not yet filled by shared", so a slot the
+	// fallback fills gets its bit set to 1 (fill-once). That keeps a later
+	// set_shared_* from re-filling, which is the documented fill-once order
+	// rule, while a deliberate zero seeded by the user still wins.
+	std::vector<uint8_t> has_per_bullet_speed_data;
+	std::vector<uint8_t> has_per_bullet_rotation_data;
 	bool use_per_bullet_homing_smoothing = false;
 
 	// Tracks how many bullets are currently homing in TOTAL (per-bullet homing, NOT shared) - basically determines whether the per-bullet homing feature is even turned on
@@ -274,6 +291,7 @@ protected:
 	// only consumes collision budget when bounce_hit_consumed is true.
 	int bounce_mask = 0;
 	real_t bounce_strength = 1.0;
+	bool bounce_tilemap_layers = false;
 	bool bounce_push_assist = true;
 	bool bounce_charge_amplify = true;
 	bool bounce_hit_consumed = false;
@@ -302,6 +320,11 @@ protected:
 	// target id 0 means none yet (instance ids are never 0).
 	std::vector<int64_t> all_bounce_last_target;
 	std::vector<double> all_bounce_last_time;
+	// Last-bounce forensics for debug_get_bounce_info (and the tests that
+	// pin it): the contact normal and target velocity the last bounce
+	// committed with. Zeroed everywhere the rest of the ledger is.
+	std::vector<Vector2> all_bounce_last_normal;
+	std::vector<Vector2> all_bounce_last_target_velocity;
 	// Smooth visual pursuit: ballistics always reflect instantly, but with
 	// bounce_rotation_smooth > 0 the sprite slews toward the reflected
 	// heading over several ticks (same contract as homing smoothing).
@@ -338,6 +361,8 @@ protected:
 			all_bounce_last_tick.clear();
 			all_bounce_last_target.clear();
 			all_bounce_last_time.clear();
+			all_bounce_last_normal.clear();
+			all_bounce_last_target_velocity.clear();
 			bounce_visual_pending.clear();
 			bounce_visual_target.clear();
 			all_bounce_speed_multiplier.clear();
@@ -358,6 +383,12 @@ protected:
 		}
 		if ((int)all_bounce_last_time.size() != amount_bullets) {
 			all_bounce_last_time.assign(amount_bullets, 0.0);
+		}
+		if ((int)all_bounce_last_normal.size() != amount_bullets) {
+			all_bounce_last_normal.assign(amount_bullets, Vector2(0, 0));
+		}
+		if ((int)all_bounce_last_target_velocity.size() != amount_bullets) {
+			all_bounce_last_target_velocity.assign(amount_bullets, Vector2(0, 0));
 		}
 		if ((int)bounce_visual_pending.size() != amount_bullets) {
 			bounce_visual_pending.assign(amount_bullets, 0);
@@ -1259,8 +1290,13 @@ public:
 		if (!all_collided_bullets.empty()) {
 			collision_scratch.clear();
 			collision_scratch.swap(all_collided_bullets);
+			// The dedup keys describe exactly this drain window. Clearing them
+			// here (not at the end) is safe: the physics server only queues from
+			// callbacks that run outside the drain, and any overlap that starts
+			// re-filling mid-drain must be able to queue again next frame.
+			clear_collision_dedup_keys();
 			for (auto &data : collision_scratch) {
-				handle_bullet_collision(data.collision_type, data.bullet_index, data.collided_instance_id, data.queue_bullet_epoch, data.queue_target_velocity, data.queue_target_velocity_valid);
+				handle_bullet_collision(data.collision_type, data.bullet_index, data.collided_instance_id, data.queue_bullet_epoch, data.queue_target_velocity, data.queue_target_velocity_valid, data.queue_target_position, data.queue_target_position_valid);
 				// handle_bullet_collision calls straight into user code, and that code may free this very volley, so
 				// check we're still alive before touching anything below (queue_free is caught by the second check).
 				// reject via the factory guards).
@@ -3345,6 +3381,10 @@ public:
 		bounce_mask_warning_issued = false;
 		ensure_bounce_vectors();
 	}
+	bool get_bounce_tilemap_layers() const { return bounce_tilemap_layers; }
+	void set_bounce_tilemap_layers(bool value) {
+		bounce_tilemap_layers = value;
+	}
 	real_t get_bounce_strength() const { return bounce_strength; }
 	void set_bounce_strength(real_t value) {
 		if (!Math::is_finite(value) || value < 0.0) {
@@ -3450,15 +3490,24 @@ public:
 		d["bounce_hit_consumed"] = bounce_hit_consumed;
 		d["bounce_max_count"] = bounce_max_count;
 		d["bounce_mode"] = bounce_mode;
+		d["bounce_tilemap_layers"] = bounce_tilemap_layers;
 		d["bounce_enabled"] = bounce_mask != 0;
 		d["visual_pending"] = false;
 		d["cooldown"] = 0.0;
+		d["last_normal"] = Vector2(0, 0);
+		d["last_target_velocity"] = Vector2(0, 0);
 		if (bullet_index < 0 || bullet_index >= amount_bullets) {
 			return d;
 		}
 		d["valid"] = true;
 		if (bullet_index >= 0 && bullet_index < (int)all_bounce_count.size()) {
 			d["bounce_count"] = all_bounce_count[bullet_index];
+		}
+		if (bullet_index >= 0 && bullet_index < (int)all_bounce_last_normal.size()) {
+			d["last_normal"] = all_bounce_last_normal[bullet_index];
+		}
+		if (bullet_index >= 0 && bullet_index < (int)all_bounce_last_target_velocity.size()) {
+			d["last_target_velocity"] = all_bounce_last_target_velocity[bullet_index];
 		}
 		if (bullet_index >= 0 && bullet_index < (int)bounce_visual_pending.size()) {
 			d["visual_pending"] = bounce_visual_pending[bullet_index] != 0;
@@ -3485,6 +3534,7 @@ public:
 	// Called from the custom spawn/enable logic alongside wobble/gravity.
 	void apply_bounce_from_data(const DirectionalBulletsData2D &directional_data, int data_collision_mask) {
 		bounce_mask = directional_data.bounce_mask;
+		bounce_tilemap_layers = directional_data.bounce_tilemap_layers;
 		bounce_strength = (real_t)directional_data.bounce_strength;
 		bounce_push_assist = directional_data.bounce_push_assist;
 		bounce_charge_amplify = directional_data.bounce_charge_amplify;
@@ -3505,6 +3555,8 @@ public:
 			all_bounce_last_tick.assign(amount_bullets, 0);
 			all_bounce_last_target.assign(amount_bullets, 0);
 			all_bounce_last_time.assign(amount_bullets, 0.0);
+			all_bounce_last_normal.assign(amount_bullets, Vector2(0, 0));
+			all_bounce_last_target_velocity.assign(amount_bullets, Vector2(0, 0));
 			bounce_visual_pending.assign(amount_bullets, 0);
 			bounce_visual_target.assign(amount_bullets, Vector2(1, 0));
 			all_bounce_speed_multiplier.assign(amount_bullets, 1.0);
@@ -3514,6 +3566,8 @@ public:
 			all_bounce_last_tick.clear();
 			all_bounce_last_target.clear();
 			all_bounce_last_time.clear();
+			all_bounce_last_normal.clear();
+			all_bounce_last_target_velocity.clear();
 			bounce_visual_pending.clear();
 			bounce_visual_target.clear();
 			all_bounce_speed_multiplier.clear();
@@ -3534,10 +3588,39 @@ public:
 	// record is fully handled (return), 2 = bounced but the hit is consumed
 	// too (fall through into normal counting/signals). Implemented in the
 	// .cpp (needs scene-tree + shape classes).
-	int try_handle_bounce(CollisionType collision_type, int bullet_index, int64_t entered_instance_id, Vector2 queued_target_velocity, bool queued_velocity_valid) override;
+	int try_handle_bounce(CollisionType collision_type, int bullet_index, int64_t entered_instance_id, Vector2 queued_target_velocity, bool queued_velocity_valid, Vector2 queued_target_position, bool queue_position_valid) override;
 
 	// Virtual methods
 	void set_up_movement_data(const TypedArray<BulletSpeedData2D> &new_speed_data, bool tile_short_arrays = false);
+	// Owns has_per_bullet_rotation_data, so it implements the base seed hooks
+	// (see MultiMeshBullets2D::set_rotation_data). Directional is the only
+	// subclass with a per-bullet/shared rotation split, so BlockBullets2D
+	// correctly keeps the base no-ops.
+	virtual void reset_per_bullet_rotation_presence() override {
+		has_per_bullet_rotation_data.assign(amount_bullets, 0);
+	}
+	virtual void mark_per_bullet_rotation_presence(int bullet_index, bool present) override {
+		if (bullet_index < 0 || bullet_index >= (int)has_per_bullet_rotation_data.size()) {
+			// Grow on demand: the seed loop marks before anything sized the
+			// vector, and a late mark must not silently vanish.
+			if (bullet_index >= 0 && bullet_index < amount_bullets) {
+				has_per_bullet_rotation_data.resize(amount_bullets, 0);
+			} else {
+				return;
+			}
+		}
+		has_per_bullet_rotation_data[bullet_index] = present ? 1 : 0;
+	}
+	virtual void mark_per_bullet_speed_presence(int bullet_index, bool present) override {
+		if (bullet_index < 0 || bullet_index >= (int)has_per_bullet_speed_data.size()) {
+			if (bullet_index >= 0 && bullet_index < amount_bullets) {
+				has_per_bullet_speed_data.resize(amount_bullets, 0);
+			} else {
+				return;
+			}
+		}
+		has_per_bullet_speed_data[bullet_index] = present ? 1 : 0;
+	}
 	virtual void custom_additional_spawn_logic(const MultiMeshBulletsData2D &data) override final;
 	virtual bool custom_additional_enable_logic(const MultiMeshBulletsData2D &data) override final;
 	virtual bool is_data_type_compatible(const MultiMeshBulletsData2D &data) const override final;
@@ -4050,6 +4133,7 @@ public:
 		// entirely while disarmed (see ensure_bounce_vectors).
 		bounce_mask = 0;
 		bounce_strength = 1.0;
+		bounce_tilemap_layers = false;
 		bounce_push_assist = true;
 		bounce_charge_amplify = true;
 		bounce_hit_consumed = false;
@@ -4104,6 +4188,12 @@ public:
 		}
 		if (bullet_index < (int)all_bounce_last_time.size()) {
 			all_bounce_last_time[bullet_index] = 0.0;
+		}
+		if (bullet_index < (int)all_bounce_last_normal.size()) {
+			all_bounce_last_normal[bullet_index] = Vector2(0, 0);
+		}
+		if (bullet_index < (int)all_bounce_last_target_velocity.size()) {
+			all_bounce_last_target_velocity[bullet_index] = Vector2(0, 0);
 		}
 		if (bullet_index < (int)bounce_visual_pending.size()) {
 			bounce_visual_pending[bullet_index] = 0;
@@ -4283,8 +4373,11 @@ public:
 
 		// Skip standing still - rotating by 0 would just add float noise
 		if (cache_rotation_speed != 0.0f) {
-			// Spin works both ways, but max is always positive - compare absolute values so reverse spin stops too.
-			bool max_reached = Math::abs(cache_rotation_speed) >= all_max_rotation_speed[bullet_index];
+			// max <= 0 means unlimited (same convention as linear speed):
+			// without the gate, max == 0 makes abs(speed) >= 0 always true
+			// and the stop flag freezes default-constructed rotation data.
+			const real_t max_speed = (bullet_index >= 0 && bullet_index < (int)all_max_rotation_speed.size()) ? all_max_rotation_speed[bullet_index] : 0.0;
+			const bool max_reached = max_speed > 0.0 && Math::abs(cache_rotation_speed) >= max_speed;
 
 			if (!(max_reached && stop_rotation_when_max_reached)) {
 				rotate_transform_locally(all_cached_instance_transforms[bullet_index], rot_delta);
@@ -4292,7 +4385,9 @@ public:
 		}
 	}
 
-	// Spin one bullet's sprite by its rotation speed for this tick using a curve
+	// Spin one bullet's sprite by its rotation speed for this tick using a curve.
+	// Curve spin bypasses the max/stop gate by design (the curve IS the speed
+	// program); documented so a stop flag under curves never surprises.
 	_ALWAYS_INLINE_ void update_rotation_using_curve(int bullet_index, double delta) {
 		real_t cache_rotation_speed = all_rotation_speed[bullet_index];
 		real_t rot_delta = cache_rotation_speed * (real_t)delta;
@@ -4313,11 +4408,27 @@ public:
 	};
 	std::vector<SharedHomingReachedState> all_shared_homing_reached;
 
+	// Bumped by EVERY mutation of the shared deque's FRONT (push_front /
+	// pop_front / clear / replace). The deferred auto-pop stamps the value it
+	// saw, so a manual edit landing between the queue and the flush cancels
+	// the stale pop instead of eating whatever the user pushed in the meantime.
+	// This is the shared-deque counterpart of bullet_homing_epochs: without it
+	// the only guard is the volley generation, which a manual edit on a live
+	// volley does not bump.
+	uint64_t shared_homing_front_epoch = 0;
+
+	_ALWAYS_INLINE_ void bump_shared_homing_front_epoch() { ++shared_homing_front_epoch; }
+
+	// Re-arms every bullet for the new front target. Called by EVERY shared
+	// front mutation (push_front, pop_front, clear, replace), so bumping the
+	// front epoch here gives one choke point that cannot be missed by a future
+	// mutator - unlike a bump per call site.
 	_ALWAYS_INLINE_ void reset_shared_homing_reached_state() {
 		for (SharedHomingReachedState &state : all_shared_homing_reached) {
 			state.front_target = nullptr;
 			state.fired = false;
 		}
+		bump_shared_homing_front_epoch();
 	}
 
 	// One shared pop per tick no matter how many bullets arrive at once - otherwise a full volley would eat the whole queue in a frame.
@@ -4342,12 +4453,23 @@ public:
 		emit_signal("bullet_homing_target_reached", this, p_bullet_index, target, p_target_global_position);
 	}
 
-	_ALWAYS_INLINE_ void _do_shared_auto_pop_front_target(uint64_t p_generation) {
+	_ALWAYS_INLINE_ void _do_shared_auto_pop_front_target(uint64_t p_generation, uint64_t p_front_epoch) {
 		if (p_generation != homing_operation_generation) {
 			return; // Never touch the flag: it belongs to the new life now.
 		}
+		// The deque's front changed since this pop was queued, so a manual
+		// push/pop/clear already superseded it. Unlatch (so a later real reach
+		// can queue again) but do NOT pop: popping here would eat the target
+		// the user just queued deliberately.
+		if (p_front_epoch != shared_homing_front_epoch) {
+			shared_auto_pop_queued = false;
+			return;
+		}
 		shared_auto_pop_queued = false;
 		shared_homing_deque.pop_front_target(cached_mouse_global_position);
+		// orbit_route_shared_front_change() calls reset_shared_homing_reached_state(),
+		// which is the single place that bumps shared_homing_front_epoch - so the
+		// pop itself does not need (and must not add) a second bump.
 		orbit_route_shared_front_change();
 	}
 
@@ -4446,11 +4568,12 @@ public:
 				// user pushed. Per-bullet deques pop their own deque per bullet - no
 				// storm there.
 				if (is_using_shared_homing_deque) {
-					// Both pops carry the generation: a pool reuse before the flush
-					// no-ops instead of eating the new life's targets.
+					// Both the generation and the shared front epoch travel with
+					// the pop: a pool reuse no-ops, and a manual shared-deque edit
+					// landing before the flush cancels this stale pop.
 					if (shared_homing_deque_auto_pop_after_target_reached && !shared_auto_pop_queued) {
 						shared_auto_pop_queued = true;
-						call_deferred("_do_shared_auto_pop_front_target", homing_operation_generation);
+						call_deferred("_do_shared_auto_pop_front_target", homing_operation_generation, shared_homing_front_epoch);
 					}
 				} else {
 					if (bullet_homing_auto_pop_after_target_reached) {

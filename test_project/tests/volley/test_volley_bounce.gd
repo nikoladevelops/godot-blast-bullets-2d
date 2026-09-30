@@ -9,7 +9,10 @@ extends SceneTree
 ## inside cooldown, spawner retarget preservation, bulk bounce counts,
 ## inspector group coherence, runtime arm/disarm, gravity flag refresh,
 ## feature mixes (homing/wobble/gravity/orbit/curves), rejects + fuzz,
-## pool-reuse neutrality.
+## pool-reuse neutrality, stale-velocity guard + queue snapshot (T36),
+## cross-type matrix: platforms, slopes, boundaries, convex fallback,
+## rigid awake/sleeping, static/dashing areas, tilemap opt-in (T37),
+## bounce forensics + multiplier reuse + shared walls + tilemap budgets.
 ## Run: godot --headless --path test_project --script tests/volley/test_volley_bounce.gd
 ## Exit code 0 = all pass.
 
@@ -102,6 +105,28 @@ func _make_wall(pos: Vector2, layer_value: int, size: Vector2 = Vector2(20, 400)
 	wall.add_child(col)
 	get_root().add_child(wall)
 	return wall
+
+func _make_tile_layer() -> TileMapLayer:
+	var img := Image.create_empty(32, 32, false, Image.FORMAT_RGBA8)
+	img.fill(Color(1, 1, 1, 1))
+	var ts := TileSet.new()
+	ts.tile_shape = TileSet.TILE_SHAPE_SQUARE
+	ts.tile_size = Vector2i(32, 32)
+	ts.add_physics_layer(0)
+	ts.set_physics_layer_collision_layer(0, 8)
+	var src := TileSetAtlasSource.new()
+	src.texture = ImageTexture.create_from_image(img)
+	src.texture_region_size = Vector2i(32, 32)
+	src.create_tile(Vector2i(0, 0))
+	ts.add_source(src)
+	var td: TileData = src.get_tile_data(Vector2i(0, 0), 0)
+	td.set_collision_polygons_count(0, 1)
+	td.set_collision_polygon_points(0, 0, PackedVector2Array([Vector2(-16, -16), Vector2(16, -16), Vector2(16, 16), Vector2(-16, 16)]))
+	var layer := TileMapLayer.new()
+	layer.tile_set = ts
+	get_root().add_child(layer)
+	layer.set_cell(Vector2i(7, 9), ts.get_source_id(0), Vector2i(0, 0))
+	return layer
 
 func _clear_signals() -> void:
 	_bounce_body.clear()
@@ -1316,8 +1341,8 @@ func _initialize() -> void:
 		if v25c.bullet_get_bounce_count(0) >= 1:
 			break
 	_check(v25c.bullet_get_bounce_count(0) >= 1, "moved area still bounces")
-	_check(v25c.get_bullet_direction(0).x < -0.5, "moved area counts as static (documented limit, no surge)")
-	_check(v25c.get_bullet_velocity(0).length() < 250.0, "moved area adds no boost")
+	_check(v25c.get_bullet_direction(0).x > 0.5, "moved area surges forward (position estimate feeds the push)")
+	_check(v25c.get_bullet_velocity(0).length() > 500.0, "moved area adds push boost")
 	runner.queue_free()
 	await process_frame
 	printerr("BOUNCE T25b strength 0 vs pusher sticks, precise moves too")
@@ -2284,6 +2309,384 @@ func _initialize() -> void:
 		_check(bv.length() > 500.0, "mutated-drain bullet " + str(bi) + " keeps queue-time charge energy")
 	mut36.queue_free()
 	_t36_body = null
+	await process_frame
+
+	printerr("BOUNCE T37 cross-type matrix: platforms, slopes, edges, areas, tilemaps")
+	await _settle(factory)
+	var crush37 := AnimatableBody2D.new()
+	crush37.position = Vector2(250, 300)
+	crush37.collision_layer = 8
+	crush37.collision_mask = 0
+	crush37.sync_to_physics = false
+	crush37.constant_linear_velocity = Vector2(-400, 0)
+	var cr37col := CollisionShape2D.new()
+	var cr37circ := CircleShape2D.new()
+	cr37circ.radius = 12.0
+	cr37col.shape = cr37circ
+	crush37.add_child(cr37col)
+	get_root().add_child(crush37)
+	await physics_frame
+	var d37a := _bounce_data(Vector2(100, 300), 0.0, 200.0, [4], [4])
+	var v37a: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d37a)
+	for i in 150:
+		await physics_frame
+		if v37a.bullet_get_bounce_count(0) >= 1:
+			break
+	_check(v37a.bullet_get_bounce_count(0) >= 1, "crusher platform bounces")
+	var vel37a: Vector2 = v37a.get_bullet_velocity(0)
+	_check(vel37a.is_finite(), "crusher post-bounce finite")
+	_check(vel37a.x < -500.0, "crusher amplifies through constant velocity")
+	crush37.queue_free()
+	await process_frame
+
+	await _settle(factory)
+	var slope37 := StaticBody2D.new()
+	slope37.position = Vector2(250, 300)
+	slope37.collision_layer = 8
+	slope37.collision_mask = 0
+	var s37col := CollisionShape2D.new()
+	var s37seg := SegmentShape2D.new()
+	s37seg.a = Vector2(-100, 100)
+	s37seg.b = Vector2(100, -100)
+	s37col.shape = s37seg
+	slope37.add_child(s37col)
+	get_root().add_child(slope37)
+	await physics_frame
+	var d37b := _bounce_data(Vector2(100, 300), 0.0, 200.0, [4], [4])
+	d37b.bounce_mode = 1
+	var v37b: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d37b)
+	for i in 150:
+		await physics_frame
+		if v37b.bullet_get_bounce_count(0) >= 1:
+			break
+	_check(v37b.bullet_get_bounce_count(0) >= 1, "slope bounces in precise mode")
+	var vel37b: Vector2 = v37b.get_bullet_velocity(0)
+	_check(vel37b.is_finite(), "slope post-bounce finite")
+	_check(vel37b.y < -100.0 and absf(vel37b.x) < 60.0, "slope reflects up off the 45-degree face")
+	slope37.queue_free()
+	await process_frame
+
+	await _settle(factory)
+	var edge37 := StaticBody2D.new()
+	edge37.position = Vector2(250, 300)
+	edge37.rotation = PI / 4.0
+	edge37.collision_layer = 8
+	edge37.collision_mask = 0
+	var e37col := CollisionShape2D.new()
+	var e37bound := WorldBoundaryShape2D.new()
+	e37bound.normal = Vector2(-1, 0)
+	e37bound.distance = 0.0
+	e37col.shape = e37bound
+	edge37.add_child(e37col)
+	get_root().add_child(edge37)
+	await physics_frame
+	var d37c := _bounce_data(Vector2(100, 300), 0.0, 200.0, [4], [4])
+	d37c.bounce_mode = 1
+	var v37c: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d37c)
+	for i in 150:
+		await physics_frame
+		if v37c.bullet_get_bounce_count(0) >= 1:
+			break
+	_check(v37c.bullet_get_bounce_count(0) >= 1, "boundary plane bounces in precise mode")
+	var vel37c: Vector2 = v37c.get_bullet_velocity(0)
+	_check(vel37c.is_finite(), "boundary post-bounce finite")
+	_check(vel37c.y < -100.0, "boundary uses the stored normal, not radial")
+	edge37.queue_free()
+	await process_frame
+
+	await _settle(factory)
+	var poly37 := StaticBody2D.new()
+	poly37.position = Vector2(250, 300)
+	poly37.collision_layer = 8
+	poly37.collision_mask = 0
+	var p37col := CollisionShape2D.new()
+	var p37poly := ConvexPolygonShape2D.new()
+	p37poly.points = PackedVector2Array([Vector2(-20, -20), Vector2(20, -20), Vector2(20, 20), Vector2(-20, 20)])
+	p37col.shape = p37poly
+	poly37.add_child(p37col)
+	get_root().add_child(poly37)
+	await physics_frame
+	var d37d := _bounce_data(Vector2(100, 300), 0.0, 200.0, [4], [4])
+	d37d.bounce_mode = 1
+	var v37d: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d37d)
+	for i in 150:
+		await physics_frame
+		if v37d.bullet_get_bounce_count(0) >= 1:
+			break
+	_check(v37d.bullet_get_bounce_count(0) >= 1, "convex falls back and bounces")
+	var vel37d: Vector2 = v37d.get_bullet_velocity(0)
+	_check(vel37d.is_finite(), "convex post-bounce finite")
+	_check(vel37d.x < 0.0, "convex radial fallback separates")
+	poly37.queue_free()
+	await process_frame
+
+	await _settle(factory)
+	var awake37 := RigidBody2D.new()
+	awake37.position = Vector2(250, 300)
+	awake37.collision_layer = 8
+	awake37.collision_mask = 0
+	awake37.gravity_scale = 0.0
+	awake37.linear_damp = 0.0
+	awake37.linear_damp_mode = RigidBody2D.DAMP_MODE_REPLACE
+	awake37.can_sleep = false
+	awake37.linear_velocity = Vector2(-400, 0)
+	var a37col := CollisionShape2D.new()
+	var a37circ := CircleShape2D.new()
+	a37circ.radius = 12.0
+	a37col.shape = a37circ
+	awake37.add_child(a37col)
+	get_root().add_child(awake37)
+	await physics_frame
+	var d37e := _bounce_data(Vector2(100, 300), 0.0, 200.0, [4], [4])
+	var v37e: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d37e)
+	for i in 150:
+		await physics_frame
+		if v37e.bullet_get_bounce_count(0) >= 1:
+			break
+	_check(v37e.bullet_get_bounce_count(0) >= 1, "awake rigid charger bounces")
+	var vel37e: Vector2 = v37e.get_bullet_velocity(0)
+	_check(vel37e.is_finite(), "awake rigid post-bounce finite")
+	_check(vel37e.x < -500.0, "awake rigid amplifies")
+	awake37.queue_free()
+	await process_frame
+
+	await _settle(factory)
+	var sleep37 := RigidBody2D.new()
+	sleep37.position = Vector2(250, 300)
+	sleep37.collision_layer = 8
+	sleep37.collision_mask = 0
+	sleep37.gravity_scale = 0.0
+	sleep37.linear_damp = 0.0
+	sleep37.linear_damp_mode = RigidBody2D.DAMP_MODE_REPLACE
+	sleep37.linear_velocity = Vector2(-400, 0)
+	var sl37col := CollisionShape2D.new()
+	var sl37circ := CircleShape2D.new()
+	sl37circ.radius = 12.0
+	sl37col.shape = sl37circ
+	sleep37.add_child(sl37col)
+	get_root().add_child(sleep37)
+	sleep37.sleeping = true
+	await physics_frame
+	var d37f := _bounce_data(Vector2(100, 300), 0.0, 200.0, [4], [4])
+	var v37f: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d37f)
+	for i in 150:
+		await physics_frame
+		if v37f.bullet_get_bounce_count(0) >= 1:
+			break
+	_check(v37f.bullet_get_bounce_count(0) >= 1, "sleeping rigid bounces")
+	var vel37f: Vector2 = v37f.get_bullet_velocity(0)
+	_check(vel37f.is_finite(), "sleeping rigid post-bounce finite")
+	_check(vel37f.x < 0.0, "sleeping rigid separates either way")
+	sleep37.queue_free()
+	await process_frame
+
+	await _settle(factory)
+	var still37 := Area2D.new()
+	still37.position = Vector2(250, 300)
+	still37.collision_layer = 8
+	still37.collision_mask = 0
+	var st37col := CollisionShape2D.new()
+	var st37circ := CircleShape2D.new()
+	st37circ.radius = 12.0
+	st37col.shape = st37circ
+	still37.add_child(st37col)
+	get_root().add_child(still37)
+	await physics_frame
+	var d37g := _bounce_data(Vector2(100, 300), 0.0, 200.0, [4], [4])
+	var v37g: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d37g)
+	for i in 150:
+		await physics_frame
+		if v37g.bullet_get_bounce_count(0) >= 1:
+			break
+	_check(v37g.bullet_get_bounce_count(0) >= 1, "static area bounces")
+	var vel37g: Vector2 = v37g.get_bullet_velocity(0)
+	_check(vel37g.is_finite(), "static area post-bounce finite")
+	_check(absf(vel37g.x + 200.0) < 50.0, "static area reflects exactly")
+	still37.queue_free()
+	await process_frame
+
+	await _settle(factory)
+	var dash37 := Area2D.new()
+	dash37.position = Vector2(250, 300)
+	dash37.collision_layer = 8
+	dash37.collision_mask = 0
+	var da37col := CollisionShape2D.new()
+	var da37circ := CircleShape2D.new()
+	da37circ.radius = 12.0
+	da37col.shape = da37circ
+	dash37.add_child(da37col)
+	get_root().add_child(dash37)
+	await physics_frame
+	var d37h := _bounce_data(Vector2(100, 300), 0.0, 200.0, [4], [4])
+	var v37h: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d37h)
+	for i in 60:
+		dash37.position.x -= 5.0
+		await physics_frame
+		if v37h.bullet_get_bounce_count(0) >= 1:
+			break
+	_check(v37h.bullet_get_bounce_count(0) >= 1, "dashing area bounces")
+	var vel37h: Vector2 = v37h.get_bullet_velocity(0)
+	_check(vel37h.is_finite(), "dashing area post-bounce finite")
+	_check(vel37h.x < -400.0, "dash estimate amplifies beyond static")
+	dash37.queue_free()
+	await process_frame
+
+	await _settle(factory)
+	var tiles37 := _make_tile_layer()
+	await physics_frame
+	var d37i := _bounce_data(Vector2(100, 300), 0.0, 200.0, [4], [4])
+	var v37i: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d37i)
+	for i in 150:
+		await physics_frame
+		if v37i.bullet_get_bounce_count(0) >= 1 or not v37i.is_bullet_status_enabled(0):
+			break
+	_check(v37i.bullet_get_bounce_count(0) == 0, "tilemap stays lethal by default (no layer to match)")
+	_check(not v37i.is_bullet_status_enabled(0), "tilemap kill takes the normal path")
+	tiles37.queue_free()
+	await process_frame
+
+	await _settle(factory)
+	var tiles37b := _make_tile_layer()
+	await physics_frame
+	var d37j := _bounce_data(Vector2(100, 300), 0.0, 200.0, [4], [4])
+	d37j.bounce_tilemap_layers = true
+	_check(d37j.bounce_tilemap_layers == true, "tilemap opt-in defaults off, sets on")
+	var v37j: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d37j)
+	_check(v37j.get_bounce_tilemap_layers() == true, "live mirror reseeds the opt-in")
+	for i in 150:
+		await physics_frame
+		if v37j.bullet_get_bounce_count(0) >= 1:
+			break
+	_check(v37j.bullet_get_bounce_count(0) >= 1, "tilemap bounces when opted in")
+	var vel37j: Vector2 = v37j.get_bullet_velocity(0)
+	_check(vel37j.is_finite(), "tilemap post-bounce finite")
+	_check(vel37j.x < 0.0, "tilemap head-on reflection separates")
+	tiles37b.queue_free()
+	await process_frame
+
+	printerr("BOUNCE T38 forensics, reuse energy, shared walls, tilemap budgets")
+	await _settle(factory)
+	var wall38 := _make_wall(Vector2(200, 300), 8)
+	await physics_frame
+	var d38a := _bounce_data(Vector2(100, 300), 0.0, 200.0, [4], [4])
+	var v38a: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d38a)
+	for i in 150:
+		await physics_frame
+		if v38a.bullet_get_bounce_count(0) >= 1:
+			break
+	var info38: Dictionary = v38a.debug_get_bounce_info(0)
+	_check(info38.get("valid", false), "forensics valid after bounce")
+	_check((info38.get("last_normal", Vector2.ZERO) as Vector2).x < -0.9, "forensics normal faces the wall")
+	_check((info38.get("last_target_velocity", Vector2(9, 9)) as Vector2).length() < 1.0, "forensics static target reads zero")
+	_check(info38.get("bounce_tilemap_layers", true) == false, "forensics tilemap flag defaults off")
+	wall38.queue_free()
+	await process_frame
+
+	await _settle(factory)
+	var rig38 := CharacterBody2D.new()
+	rig38.position = Vector2(250, 300)
+	rig38.collision_layer = 8
+	rig38.collision_mask = 0
+	rig38.velocity = Vector2(-400, 0)
+	var rg38col := CollisionShape2D.new()
+	var rg38circ := CircleShape2D.new()
+	rg38circ.radius = 12.0
+	rg38col.shape = rg38circ
+	rig38.add_child(rg38col)
+	get_root().add_child(rig38)
+	await physics_frame
+	var d38b := _bounce_data(Vector2(100, 300), 0.0, 200.0, [4], [4])
+	var v38b: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d38b)
+	for i in 150:
+		await physics_frame
+		if v38b.bullet_get_bounce_count(0) >= 1:
+			break
+	var info38b: Dictionary = v38b.debug_get_bounce_info(0)
+	_check((info38b.get("last_target_velocity", Vector2.ZERO) as Vector2).x < -300.0, "forensics charger velocity captured")
+	rig38.queue_free()
+	await process_frame
+
+	await _settle(factory)
+	var wall38b := _make_wall(Vector2(200, 300), 8)
+	await physics_frame
+	var d38c := _bounce_data(Vector2(100, 300), 0.0, 200.0, [4], [4])
+	d38c.bounce_strength = 2.0
+	var v38c: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d38c)
+	for i in 150:
+		await physics_frame
+		if v38c.bullet_get_bounce_count(0) >= 1:
+			break
+	_check(v38c.get_bullet_velocity(0).length() > 300.0, "strength 2 boosts")
+	await _settle(factory)
+	var wall38c := _make_wall(Vector2(200, 300), 8)
+	await physics_frame
+	var d38d := _bounce_data(Vector2(100, 300), 0.0, 200.0, [4], [4])
+	d38d.bounce_strength = 1.0
+	var v38d: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d38d)
+	_check((v38d.debug_get_bounce_info(0).get("last_normal", Vector2(9, 9)) as Vector2) == Vector2(0, 0), "reuse zeroes forensic ledger")
+	for i in 150:
+		await physics_frame
+		if v38d.bullet_get_bounce_count(0) >= 1:
+			break
+	_check(v38d.bullet_get_bounce_count(0) >= 1, "reused volley bounces fresh")
+	_check(v38d.get_bullet_velocity(0).length() < 300.0, "reuse drops the old multiplier")
+	wall38b.queue_free()
+	wall38c.queue_free()
+	await process_frame
+
+	await _settle(factory)
+	var shared38 := _make_wall(Vector2(200, 300), 8)
+	await physics_frame
+	var vans: Array = []
+	for k in 3:
+		var dk := _bounce_data(Vector2(100, 300), 0.0, 200.0, [4], [4])
+		vans.append(factory.spawn_controllable_directional_bullets(dk))
+	for i in 150:
+		await physics_frame
+		var done := true
+		for vv in vans:
+			if (vv as DirectionalBullets2D).bullet_get_bounce_count(0) < 1:
+				done = false
+		if done:
+			break
+	for k in 3:
+		var vk: DirectionalBullets2D = vans[k]
+		_check(vk.bullet_get_bounce_count(0) >= 1, "shared wall bounces volley " + str(k))
+		_check(vk.get_bullet_velocity(0).x < 0.0, "shared wall separates volley " + str(k))
+	shared38.queue_free()
+	await process_frame
+
+	await _settle(factory)
+	var tiles38 := _make_tile_layer()
+	await physics_frame
+	var d38e := _bounce_data(Vector2(100, 300), 0.0, 200.0, [4], [4])
+	d38e.bounce_tilemap_layers = true
+	d38e.bounce_hit_consumed = true
+	d38e.set_bullet_max_collision_count(2)
+	var v38e: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d38e)
+	for i in 150:
+		await physics_frame
+		if v38e.bullet_get_bounce_count(0) >= 1:
+			break
+	_check(v38e.bullet_get_bounce_count(0) >= 1, "tilemap consumed bounces")
+	_check(v38e.get_bullet_collision_count(0) == 1, "tilemap consumed counts the hit")
+	_check((v38e.debug_get_bounce_info(0).get("last_normal", Vector2.ZERO) as Vector2).x < -0.9, "tilemap forensics head-on")
+	tiles38.queue_free()
+	await process_frame
+
+	await _settle(factory)
+	var tiles38b := _make_tile_layer()
+	await physics_frame
+	var d38f := _bounce_data(Vector2(100, 300), 0.0, 200.0, [4], [4])
+	d38f.bounce_tilemap_layers = true
+	d38f.bounce_max_count = 1
+	var v38f: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d38f)
+	for i in 150:
+		await physics_frame
+		if v38f.bullet_get_bounce_count(0) >= 1:
+			break
+	_check(v38f.bullet_get_bounce_count(0) == 1, "tilemap budget counts exactly once")
+	tiles38b.queue_free()
 	await process_frame
 
 	factory.directional_bounce_body_entered.disconnect(_on_bounce_body)

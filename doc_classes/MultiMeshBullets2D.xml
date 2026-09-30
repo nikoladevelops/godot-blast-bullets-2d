@@ -259,7 +259,6 @@
 				Toggles one trail layer over a bullet range. Hidden bullets show no trail; re-enabling resumes it on the next tick.
 			</description>
 		</method>
-
 		<method name="all_bullets_set_transforms">
 			<return type="void" />
 			<param index="0" name="new_transform" type="Transform2D" />
@@ -375,20 +374,6 @@
 				Toggles one trail layer for one bullet. Takes effect immediately (no tick wait).
 			</description>
 		</method>
-
-		<method name="clear_bullet_rotation_data">
-			<return type="void" />
-			<description>
-				Turns rotation off for the whole volley (same as seeding an empty array). Re-seed with spawn/enable or [method set_bullet_rotation_data] to spin again.
-			</description>
-		</method>
-		<method name="clear_per_bullet_curves_data">
-			<return type="void" />
-			<param index="0" name="bullet_index" type="int" />
-			<description>
-				Clears one bullet's per-bullet curves back to the shared fallback (or no curves when unset). Same as [method bullet_set_curves_data] with null, kept for symmetry with [method clear_per_bullet_homing_smoothing].
-			</description>
-		</method>
 		<method name="clear_all_bullets">
 			<return type="int" />
 			<description>
@@ -400,6 +385,19 @@
 			<param index="0" name="bullet_index" type="int" />
 			<description>
 				Manual clear with visuals: disables the bullet and fires On Clear effect layers at its death pose. Already-dead or invalid slots return false and stay silent (no double fire). Collision kills fire On Destroy and timeouts fire On Lifetime Over through their own paths, never On Clear.
+			</description>
+		</method>
+		<method name="clear_bullet_rotation_data">
+			<return type="void" />
+			<description>
+				Turns rotation off for the whole volley (same as seeding an empty array). Re-seed with spawn/enable or [method set_bullet_rotation_data] to spin again.
+			</description>
+		</method>
+		<method name="clear_per_bullet_curves_data">
+			<return type="void" />
+			<param index="0" name="bullet_index" type="int" />
+			<description>
+				Clears one bullet's per-bullet curves back to the shared fallback (or no curves when unset). Same as [method bullet_set_curves_data] with null, kept for symmetry with [method clear_per_bullet_homing_smoothing].
 			</description>
 		</method>
 		<method name="debug_get_attachment_info" qualifiers="const">
@@ -415,7 +413,6 @@
 				Baked trail-layer state: data layer count, and per bake the layer index, frame/shard counts, applied z_index/z_as_relative/modulate/visibility_layer/light_mask, visible shards, tracked bullets, and live trail rows (bullet, shard, tint).
 			</description>
 		</method>
-
 		<method name="debug_get_shape_state" qualifiers="const">
 			<return type="Dictionary" />
 			<description>
@@ -436,7 +433,6 @@
 				Last written local trail instance transform for one bullet (zero Transform2D when it has no visible trail instance on that layer).
 			</description>
 		</method>
-
 		<method name="debug_get_volley_info" qualifiers="const">
 			<return type="Dictionary" />
 			<description>
@@ -449,7 +445,6 @@
 				Runs the render interpolation pass on demand (same code the factory _process drives): lets tests prove trail shards follow the lerped bullet pose with zero physics ticks in between. No-op unless the factory has use_physics_interpolation on.
 			</description>
 		</method>
-
 		<method name="disable_bullet">
 			<return type="void" />
 			<param index="0" name="bullet_index" type="int" />
@@ -588,19 +583,12 @@
 				The collision shape currently cached for this multimesh.
 			</description>
 		</method>
-		<method name="get_effect_layers" qualifiers="const">
-			<return type="BulletEffectLayerData2D[]" />
-			<description>
-				Live layer list (retained from the last spawn/enable/set).
-			</description>
-		</method>
 		<method name="get_fade_base_modulate" qualifiers="const">
 			<return type="Color" />
 			<description>
 				Base tint the fade tick multiplies. Snapshotted from spawn data on every spawn/enable; change it here at runtime (not through the CanvasItem setter, which the next fade tick would overwrite while any fade is configured).
 			</description>
 		</method>
-
 		<method name="get_inherited_velocity_offset" qualifiers="const">
 			<return type="Vector2" />
 			<description>
@@ -658,7 +646,6 @@
 				Whether any trail layer is currently baked on this volley.
 			</description>
 		</method>
-
 		<method name="is_bullet_status_enabled">
 			<return type="bool" />
 			<param index="0" name="bullet_index" type="int" />
@@ -729,7 +716,6 @@
 				Switches one trail layer to another baked animation (shard nodes rebuild; per-bullet phase and toggles survive). One-shot layers switch through their layer resource plus [method set_effect_layers]. Returns false when the layer or animation is missing.
 			</description>
 		</method>
-
 		<method name="play_sprite_animation">
 			<return type="bool" />
 			<param index="0" name="sprite_frames" type="SpriteFrames" />
@@ -942,13 +928,6 @@
 				Note: cannot run while bullets are being processed or inside a physics frame (same contract as the factory structural methods) - use call_deferred() then.
 			</description>
 		</method>
-		<method name="set_effect_layers">
-			<return type="void" />
-			<param index="0" name="new_layers" type="BulletEffectLayerData2D[]" />
-			<description>
-				Live layer rebake without a spawn flash: trigger routing, trail shards, and factory one-shot bakes all follow the new list.
-			</description>
-		</method>
 		<method name="set_fade_base_modulate">
 			<return type="void" />
 			<param index="0" name="value" type="Color" />
@@ -956,7 +935,6 @@
 				Retints the fade base at runtime and re-arms the fade tick so the next frame writes even when the value matches the stale snapshot.
 			</description>
 		</method>
-
 		<method name="set_inherited_velocity_offset">
 			<return type="void" />
 			<param index="0" name="new_offset" type="Vector2" />
@@ -998,6 +976,8 @@
 
 			You can use this property to keep track of how many times each bullet has collided, and you can also set it to update the collision counts as needed.
 		</member>
+		<member name="collision_dedup_by_object" type="bool" setter="set_collision_dedup_by_object" getter="get_collision_dedup_by_object" default="true">
+		</member>
 		<member name="curves_elapsed_time" type="float" setter="set_curves_elapsed_time" getter="get_curves_elapsed_time" default="0.0">
 			The elapsed time used for the bullets' curves. This is the time that gets passed to the curves assigned to the bullets, you can manipulate it freely.
 		</member>
@@ -1010,13 +990,6 @@
 		<member name="fade_out_sec" type="float" setter="set_fade_out_sec" getter="get_fade_out_sec" default="0.0">
 			Fade-out seconds before expiry (0 disables). Needs a finite lifetime: infinite volleys ignore it.
 		</member>
-		<member name="modulate_ramp" type="Gradient" setter="set_modulate_ramp" getter="get_modulate_ramp">
-			Live tint-over-life gradient, sampled by lifetime fraction and multiplied with the fade base and fades. Reseeded from spawn data on every spawn/enable. Null disables it.
-		</member>
-		<member name="override_frame_color" type="bool" setter="set_override_frame_color" getter="get_override_frame_color" default="false">
-			Live bullet whiten override: toggling rebuilds the cached animation frames whitened (alpha preserved) or restores the art. Reseeded from spawn data on every spawn/enable.
-		</member>
-
 		<member name="is_attachments_auto_pooling_enabled" type="bool" setter="set_is_attachments_auto_pooling_enabled" getter="get_is_attachments_auto_pooling_enabled" default="true">
 			Whether the attachments auto pooling is enabled or not.
 
@@ -1037,6 +1010,12 @@
 			If you are going to save your multimesh bullets in an array, then it's probably best to disable auto pooling and manage the instances yourself.
 
 			Note: both pooling flags are per-instance state, not spawn data. A pooled instance keeps the previous owner's flags across reuse (defaults reset only at spawn). Call [method reset_pooling_flags_to_default] if you need a clean slate.
+		</member>
+		<member name="modulate_ramp" type="Gradient" setter="set_modulate_ramp" getter="get_modulate_ramp">
+			Live tint-over-life gradient, sampled by lifetime fraction and multiplied with the fade base and fades. Reseeded from spawn data on every spawn/enable. Null disables it.
+		</member>
+		<member name="override_frame_color" type="bool" setter="set_override_frame_color" getter="get_override_frame_color" default="false">
+			Live bullet whiten override: toggling rebuilds the cached animation frames whitened (alpha preserved) or restores the art. Reseeded from spawn data on every spawn/enable.
 		</member>
 		<member name="shared_bullet_curves_data" type="BulletCurvesData2D" setter="set_shared_bullet_curves_data" getter="get_shared_bullet_curves_data">
 			A shared [BulletCurvesData2D] resource that can be assigned to all bullets in the multimesh. This is useful for saving memory if you have a lot of bullets that share the same curves data, since you can assign the same resource to all of them instead of creating a new one for each bullet. Not supported on [BlockBullets2D] (setting it there errors and is ignored). Values are copied at set time: editing the resource in place afterwards changes nothing until you set it again. Direction channels never park the direction at zero: an Override result near zero keeps the incoming direction.

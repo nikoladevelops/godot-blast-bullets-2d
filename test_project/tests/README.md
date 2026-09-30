@@ -7,6 +7,14 @@ or a real bug — investigate before shipping.
 
 ## Layout (mirrors `src/`)
 
+- `volley/test_volley_presence_bits.gd` — per-bullet seed PRESENCE: a valid all-zero speed/rotation entry is intent and survives a shared fallback (no travel, no spin), null/absent entries still fall back, direct per-bullet writes claim presence, fill-once, rejected-NaN degrades to a valid zero, pool-reuse neutrality.
+- `volley/test_volley_timer_identity.gd` — per-timer ids: a targeted detach cancels a queued one-shot fire (the volley-wide generation could not), repeat timers stop cleanly, a sibling timer survives, re-attach works, pool-reuse neutrality, 64-timer cap.
+- `volley/test_volley_shared_homing_epoch.gd` — shared deque front epoch: a manual push/clear/pop between the auto-pop queue and its flush cancels the stale pop, a back-push on a non-empty deque does not, the latch is released after a cancellation.
+- `volley/test_volley_collision_dedup.gd` — object-level collision dedup: a 3-shape target counts once per overlap, the legacy per-shape mode is reachable via `collision_dedup_by_object`, both bullets against one target count independently, the dedup window resets between drains.
+- `factory/test_factory_spawn_data_guards.gd` — spawn-data finiteness: `texture_rotation_radians` / `collision_shape_offset` / `texture_size` / `self_modulate` / `block_rotation_radians` reject NaN/Inf and keep the old value, while a valid volley with a non-zero texture rotation stays finite.
+- `spawner/test_spawner_pattern_source_lock.gd` — every PatternSource keeps its serialized integer (the enum is fully explicit now, so a renumber would repoint saved scenes), the inspector hint pins all 33, the setter accepts 0..32 and refuses the rest.
+- `spawner/test_spawner_burst_mirror.gd` — burst alternate-mirror: the flag alternates every other shot, a mirrored SPIRAL / MULTISPIRAL actually reverses its winding (this was the bug: only the emitter spin flipped), non-spiral patterns are unaffected, DISTRIBUTE with the default `homing_max_targets=1` runs (and warns) while 2+ spreads.
+- `spawner/test_spawner_property_visibility.gd` — inspector-visibility coverage: no `helper_*` property is invisible in all 33 pattern modes (the safety net for the untyped `begins_with` chain), aimed-target sharing between AIMED and CORRIDOR, homing knobs gated on `homing_enabled`.
 - `factory/test_factory_lifecycle.gd` — init recovery, spawn validation, deferred wrappers, flag reset, wake alias, NaN atomicity, teardown.
 - `factory/test_factory_pooling.gd` — duplicate cache, retarget stagger, debugger budget, preview rings, pool hit/miss.
 - `volley/test_directional_core.gd` — speed/direction/transform/velocity/rotation get/set + rejects.
@@ -45,6 +53,22 @@ or a real bug — investigate before shipping.
 - `factory.debug_assert_no_dangling()` after every destructive section.
 - Legacy root-level suites (`test_edge_fuzz.gd`, …) still run unchanged.
 
+## Running
+
+```
+python3 tools/run_tests.py                  # every suite, summary table
+python3 tools/run_tests.py --suite volley   # substring filter
+python3 tools/run_tests.py --changed-only   # suites plausibly affected
+python3 tools/run_tests.py --list           # discover without running
+```
+
+A suite is only green when it exits 0 **and** prints its own completion marker
+(`ALL ... TESTS PASSED` / `GROUP_DONE`). A suite that exits 0 without printing
+one is reported as CRASH, not PASS — that is the check which catches a stale
+`.so` (an unloaded extension makes `debug_get_*` assertions pass against
+defaults). `test_edge_fuzz.gd` is multi-group: the runner sets `CASE` and runs
+each group in its own process.
+
 ## Strict indexing + migration
 
 - Per-bullet entry `i` drives bullet `i` only. Fallback per bullet:
@@ -53,6 +77,14 @@ or a real bug — investigate before shipping.
   default) restores wrap-around for its array only.
 - Coming from 1-entry-broadcast or short-array tiling: provide one entry per
   bullet, set the `shared_*` value, or check the `tile_*` box.
+- **Presence, not zeros.** A per-bullet entry that exists and is all-zero is
+  INTENT ("this bullet must not move / spin"), not absence, so the shared
+  fallback leaves it alone. Only a slot with no entry, a null entry, or an
+  entry the resource setter rejected counts as a gap that shared may fill.
+  This is order-independent: writing the explicit zero before *or* after
+  `set_shared_bullet_*` produces the same result. (Behavior change — it used
+  to depend purely on call order, so the same intent behaved differently
+  depending on sequencing.)
 
 ## Pooling (`pooling/`)
 

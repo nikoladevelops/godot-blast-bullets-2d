@@ -310,6 +310,13 @@ void DirectionalBulletsData2D::set_bounce_mask_from_array(const TypedArray<int> 
 	bounce_mask = bitmask;
 }
 
+bool DirectionalBulletsData2D::get_bounce_tilemap_layers() const {
+	return bounce_tilemap_layers;
+}
+void DirectionalBulletsData2D::set_bounce_tilemap_layers(bool value) {
+	bounce_tilemap_layers = value;
+}
+
 double DirectionalBulletsData2D::get_bounce_strength() const {
 	return bounce_strength;
 }
@@ -499,6 +506,10 @@ void DirectionalBulletsData2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_bounce_mask", "value"), &DirectionalBulletsData2D::set_bounce_mask);
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "bounce_mask", PROPERTY_HINT_LAYERS_2D_PHYSICS), "set_bounce_mask", "get_bounce_mask");
 	ClassDB::bind_method(D_METHOD("set_bounce_mask_from_array", "array_of_masks"), &DirectionalBulletsData2D::set_bounce_mask_from_array);
+
+	ClassDB::bind_method(D_METHOD("get_bounce_tilemap_layers"), &DirectionalBulletsData2D::get_bounce_tilemap_layers);
+	ClassDB::bind_method(D_METHOD("set_bounce_tilemap_layers", "value"), &DirectionalBulletsData2D::set_bounce_tilemap_layers);
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "bounce_tilemap_layers"), "set_bounce_tilemap_layers", "get_bounce_tilemap_layers");
 
 	ClassDB::bind_method(D_METHOD("get_bounce_strength"), &DirectionalBulletsData2D::get_bounce_strength);
 	ClassDB::bind_method(D_METHOD("set_bounce_strength", "value"), &DirectionalBulletsData2D::set_bounce_strength);

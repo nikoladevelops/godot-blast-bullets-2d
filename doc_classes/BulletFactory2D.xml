@@ -25,7 +25,6 @@
 				Stops every active sprite visual. Volley bakes keep their configs (triggers keep working); the manual hatch bakes are dropped entirely.
 			</description>
 		</method>
-
 		<method name="debug_assert_no_dangling">
 			<return type="Dictionary" />
 			<description>
@@ -99,7 +98,6 @@
 				One-shot manager state: effect clock, bake count, total active slots, manual-bake actives and bake count, container validity, and per-bake volley/layer/active/slots/z/visibility/light/shards_busy/live_slots rows.
 			</description>
 		</method>
-
 		<method name="debug_get_factory_state">
 			<return type="Dictionary" />
 			<description>
@@ -271,7 +269,6 @@
 				Total live one-shot effect slots across all bakes (plus the manual hatch).
 			</description>
 		</method>
-
 		<method name="get_is_factory_busy" qualifiers="const">
 			<return type="bool" />
 			<description>
@@ -1360,7 +1357,6 @@
 				Manual one-shot hatch: plays any layer once at a global pose, owned by the factory (survives volleys). Distinct layers coexist (up to 8 manual bakes, oldest dropped). Returns the slot index, or -1 when the layer is inert.
 			</description>
 		</method>
-
 		<method name="teleport_shift_all_bullets">
 			<return type="void" />
 			<param index="0" name="shift_amount" type="Vector2" />

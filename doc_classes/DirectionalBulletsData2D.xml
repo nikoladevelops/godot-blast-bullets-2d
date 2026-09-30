@@ -53,7 +53,6 @@
 		<member name="bounce_charge_amplify" type="bool" setter="set_bounce_charge_amplify" getter="get_bounce_charge_amplify" default="true">
 			Whether an oncoming target amplifies the rebound through relative reflection. True (default) enables the extra kick; false reflects absolutely, so bounce_strength alone decides head-on outcomes.
 		</member>
-
 		<member name="bounce_cooldown_sec" type="float" setter="set_bounce_cooldown_sec" getter="get_bounce_cooldown_sec" default="0.05">
 			Quiet period in seconds after a bounce during which further bounce records for that bullet are swallowed, whatever they hit (lets the bullet escape the overlap it just left; a consumed bounce still counts the hit, see [member bounce_hit_consumed]). Finite in [0, 1]. This is the short escape window, not the repeat guard: it also swallows legitimate hits against other targets, so keep it small and use [member bounce_debounce_sec] to stop the same object re-bouncing the bullet. Example: cooldown 0.05, bullet clips two walls 0.03 s apart: the first touch bounces, the second is swallowed.
 		</member>
@@ -70,12 +69,11 @@
 			How many times a single bullet may bounce before bounces stop working for it (further hits take the normal collision path). 0 (default) = unlimited (lifetime still bounds it). Stops wall-to-wall ping-pong from living forever.
 		</member>
 		<member name="bounce_mode" type="int" setter="set_bounce_mode" getter="get_bounce_mode" default="0">
-			Which surface normal to reflect across: 0 Simple Radial (cheap default, reflects across bullet-minus-target-center, right for round targets), 1 Precise Shape (resolves the target's CollisionShape2D and reflects across the analytic face normal, so flat walls bounce flat; falls back to radial when the target has no usable shape).
+			Which surface normal to reflect across: 0 Simple Radial (cheap default, reflects across bullet-minus-target-center, right for round targets), 1 Precise Shape (resolves the target's CollisionShape2D and reflects across the analytic face normal, so flat walls bounce flat; supports rectangle, circle, capsule, segment slopes and world-boundary planes, falls back to radial for convex polygons and targets with no usable shape).
 		</member>
 		<member name="bounce_push_assist" type="bool" setter="set_bounce_push_assist" getter="get_bounce_push_assist" default="true">
 			Whether a same-direction target feeds its velocity into the bounce: a pusher catching the bullet from behind surges it forward instead of reversing it. True (default) enables the surge; false reflects absolutely, so bounce_strength alone decides push outcomes.
 		</member>
-
 		<member name="bounce_randomness_deg" type="float" setter="set_bounce_randomness_deg" getter="get_bounce_randomness_deg" default="0.0">
 			Random scatter in degrees applied symmetrically around the reflected heading per bounce (finite in [0, 180]). 0 (default) = exact reflection.
 		</member>
@@ -87,7 +85,10 @@
 		</member>
 		<member name="bounce_strength" type="float" setter="set_bounce_strength" getter="get_bounce_strength" default="1.0">
 			Speed multiplier applied on every bounce (finite, 0 or more, no upper cap). 1.0 (default) is perfectly elastic, below 1 damps, 0 dead-stops the bullet in place (still alive when [member bounce_hit_consumed] is false), above 1 is super-elastic. The boost sticks: the bounce raises the bullet's cached max speed to the new speed so later acceleration never clamps it back down, and a per-bullet multiplier re-applies across speed-curve overwrites (curves rewrite speed every tick). Multipliers accumulate across bounces in one life and reset on every new life or wake. Very high values tunnel through thin walls (collision is point-sampled).
-			Moving targets contribute their velocity ([member bounce_push_assist] for same-direction pushers, [member bounce_charge_amplify] for oncoming chargers): the reflection runs on the velocity relative to the target, so a pusher catching the bullet from behind surges it forward instead of reversing it, and a head-on charger amplifies the rebound (RigidBody2D linear_velocity, CharacterBody2D velocity; Area2D, static and animatable bodies count as static). A repeat hit against the same target while moving away from it along the normal never re-bounces; first contacts always bounce.
+			Moving targets contribute their velocity ([member bounce_push_assist] for same-direction pushers, [member bounce_charge_amplify] for oncoming chargers): the reflection runs on the velocity relative to the target, so a pusher catching the bullet from behind surges it forward instead of reversing it, and a head-on charger amplifies the rebound. Motion sources, in order: RigidBody2D linear_velocity, CharacterBody2D velocity, AnimatableBody2D constant_linear_velocity (sampled when the overlap is queued, so scripts changing it before the drain cannot corrupt the bounce); targets with none of these (Area2D hurtboxes, tweened bosses, position-moved statics) use a clamped position-over-time estimate instead of reading as static. A repeat hit against the same target while moving away from it along the normal never re-bounces; first contacts always bounce.
+		</member>
+		<member name="bounce_tilemap_layers" type="bool" setter="set_bounce_tilemap_layers" getter="get_bounce_tilemap_layers" default="false">
+			Bounce off TileMapLayer walls. Tilemaps report no collision_layer (their physics bodies are internal), so they never match [member bounce_mask] and take the normal path by default. True opts them in: any non-zero bounce_mask then bounces off tilemap cells with a head-on reflection (the exact cell surface is unknowable from the record, so the radial normal would misread far cells). False (default) keeps them lethal.
 		</member>
 		<member name="bullet_homing_auto_pop_after_target_reached" type="bool" setter="set_bullet_homing_auto_pop_after_target_reached" getter="get_bullet_homing_auto_pop_after_target_reached" default="false">
 			Per-bullet queue: pop the front target when the owning bullet reaches it. Pooled reuse re-seeds this from the spawn data, so direct [BulletFactory2D] spawns keep it without a spawner.

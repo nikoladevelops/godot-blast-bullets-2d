@@ -45,6 +45,13 @@ Vector2 MultiMeshBulletsData2D::get_texture_size() const {
 	return texture_size;
 }
 void MultiMeshBulletsData2D::set_texture_size(Vector2 new_texture_size) {
+	// texture_size is fed straight into the multimesh mesh buffer, so a
+	// non-finite value would poison every instance transform. Guard here as
+	// well as in resolve_quad_size (which also covers hand-built state).
+	if (!new_texture_size.is_finite() || new_texture_size.x < 0.0 || new_texture_size.y < 0.0) {
+		UtilityFunctions::push_error("MultiMeshBulletsData2D: texture_size must be finite and >= 0, keeping the old value.");
+		return;
+	}
 	texture_size = new_texture_size;
 }
 
@@ -52,6 +59,14 @@ real_t MultiMeshBulletsData2D::get_texture_rotation_radians() const {
 	return texture_rotation_radians;
 }
 void MultiMeshBulletsData2D::set_texture_rotation_radians(real_t new_texture_rotation_radians) {
+	// Highest-impact guard in this file: this value is added to EVERY bullet's
+	// transform rotation in generate_texture_transform, so a NaN here makes
+	// the whole volley NaN - and validate_spawn_data only inspects
+	// transforms[], so the spawn used to succeed and produce broken bullets.
+	if (!Math::is_finite(new_texture_rotation_radians)) {
+		UtilityFunctions::push_error("MultiMeshBulletsData2D: texture_rotation_radians must be finite, keeping the old value.");
+		return;
+	}
 	texture_rotation_radians = new_texture_rotation_radians;
 }
 
@@ -90,6 +105,13 @@ Vector2 MultiMeshBulletsData2D::get_collision_shape_offset() const {
 	return collision_shape_offset;
 }
 void MultiMeshBulletsData2D::set_collision_shape_offset(const Vector2 &new_collision_shape_offset) {
+	// Offsets every shape transform in generate_collision_shape_transform_for_area,
+	// so a non-finite value poisons the physics shape exactly like a bad
+	// texture_rotation does the visuals.
+	if (!new_collision_shape_offset.is_finite()) {
+		UtilityFunctions::push_error("MultiMeshBulletsData2D: collision_shape_offset must be finite, keeping the old value.");
+		return;
+	}
 	collision_shape_offset = new_collision_shape_offset;
 }
 
@@ -244,6 +266,15 @@ Color MultiMeshBulletsData2D::get_self_modulate() const {
 	return self_modulate;
 }
 void MultiMeshBulletsData2D::set_self_modulate(const Color &new_self_modulate) {
+	// Multiplied into every instance tint (fx_refresh_slot_color /
+	// set_instance_color), so a NaN channel would spread across the whole
+	// volley. Peers in this file (offset, scale, fade_*) already guard.
+	// godot-cpp's Color has no is_finite(), so check the channels directly.
+	if (!Math::is_finite(new_self_modulate.r) || !Math::is_finite(new_self_modulate.g) ||
+			!Math::is_finite(new_self_modulate.b) || !Math::is_finite(new_self_modulate.a)) {
+		UtilityFunctions::push_error("MultiMeshBulletsData2D: self_modulate must be finite, keeping the old value.");
+		return;
+	}
 	self_modulate = new_self_modulate;
 }
 bool MultiMeshBulletsData2D::get_override_frame_color() const {

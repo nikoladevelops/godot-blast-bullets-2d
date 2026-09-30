@@ -664,10 +664,24 @@ public:
 	// Spawning only appends, so it stays allowed.
 	bool is_iterating_bullets = false;
 
-	// Reusable per-frame iteration buffers (dense-index copies). Avoid 2-4 heap
+	// Reusable per-frame iteration buffers (dense-index + the pointer that
+	// occupied that index when the snapshot was taken). Avoid 2-4 heap
 	// allocations every physics/render frame; only used on the main thread.
-	std::vector<int> directional_iteration_scratch;
-	std::vector<int> block_iteration_scratch;
+	// The pointer half is load-bearing: see handle_bullet_behavior.
+
+	// One dense slot captured at the start of a frame's iteration: the index
+	// plus whatever object occupied it THEN. The index alone is not enough:
+	// a user calling free() from a collision handler triggers a swap-remove
+	// that moves the last live volley into the freed index, and that index is
+	// already in the snapshot - so the swapped-in volley would be simulated a
+	// second time this frame (double-advancing its age, lifetime and curve
+	// clock). Re-verifying the pointer makes that impossible.
+	struct VolleyIterationEntry {
+		int index = -1;
+		const void *instance = nullptr;
+	};
+	std::vector<VolleyIterationEntry> directional_iteration_scratch;
+	std::vector<VolleyIterationEntry> block_iteration_scratch;
 
 	// Pool reuse counters. Incremented only on spawn pop/allocate
 	// paths (never in the per-bullet tick), so zero hot-path cost.
@@ -1123,24 +1137,41 @@ public:
 	// scratch is a reusable buffer (avoids a per-frame heap alloc for the dense copy);
 	// only touched from _physics_process/_process on the main thread.
 	template <typename TBullet>
-	void handle_bullet_behavior(const std::vector<TBullet *> &bullets_vec, const DynamicSparseSet &bullets_set, double delta, std::vector<int> &scratch) {
+	void handle_bullet_behavior(const std::vector<TBullet *> &bullets_vec, const DynamicSparseSet &bullets_set, double delta, std::vector<VolleyIterationEntry> &scratch) {
 		if (!Math::is_finite(delta) || delta < 0.0) {
 			return;
 		}
 		const std::vector<int> &dense = bullets_set.get_active_indexes();
-		scratch.assign(dense.begin(), dense.end());
+		scratch.clear();
+		scratch.reserve(dense.size());
+		for (int index : dense) {
+			// Snapshot the OCCUPANT alongside the index. A bounds check alone
+			// cannot catch a swap-remove: a user calling free() (not
+			// queue_free) inside a collision handler legitimately moves the
+			// last live volley into the freed index, and that index is already
+			// in this snapshot - so without the identity check the swapped-in
+			// volley would run move_bullets/advance_sprite_animation/
+			// reduce_lifetime twice this frame, double-advancing its age,
+			// max_life_time and curves_elapsed_time.
+			VolleyIterationEntry entry;
+			entry.index = index;
+			entry.instance = (index >= 0 && index < (int)bullets_vec.size()) ? (const void *)bullets_vec[index] : nullptr;
+			scratch.push_back(entry);
+		}
 
-		for (auto index : scratch) {
-			// Bounds re-check: a user calling free() (not queue_free) inside a collision
-			// handler legitimately removes a multimesh from this vec mid-iteration, so
-			// scratch can hold indexes that are stale or now out of range. Skip them
-			// instead of reading out of bounds; a swapped-in element may simulate twice
-			// for one frame in that rare edge, which is benign.
+		for (const VolleyIterationEntry &entry : scratch) {
+			const int index = entry.index;
 			if (index < 0 || index >= (int)bullets_vec.size()) {
 				continue;
 			}
 			auto *multi = bullets_vec[index];
-			if (multi == nullptr || !multi->is_active) {
+			// Identity re-check: skip a slot whose occupant changed since the
+			// snapshot (swap-remove). It is still simulated exactly once, via
+			// its own snapshot entry at the old index.
+			if (multi == nullptr || (const void *)multi != entry.instance) {
+				continue;
+			}
+			if (!multi->is_active) {
 				continue;
 			}
 
@@ -1152,18 +1183,31 @@ public:
 
 	// Handles rendering with physics interpolation
 	template <typename TBullet>
-	void handle_bullet_rendering_interpolation(std::vector<TBullet *> &bullets_vec, const DynamicSparseSet &bullets_set, std::vector<int> &scratch) {
-		// Copy: interpolate only reads, but a re-entrant free/reset mid-loop
-		// would otherwise mutate the vec under iteration.
+	void handle_bullet_rendering_interpolation(std::vector<TBullet *> &bullets_vec, const DynamicSparseSet &bullets_set, std::vector<VolleyIterationEntry> &scratch) {
+		// Copy index AND occupant: interpolate only reads, but a re-entrant
+		// free/reset mid-loop mutates the vec under iteration, and the
+		// identity check keeps a swap-remove from rendering one volley twice
+		// in a frame (same reasoning as handle_bullet_behavior).
 		const std::vector<int> &dense = bullets_set.get_active_indexes();
-		scratch.assign(dense.begin(), dense.end());
+		scratch.clear();
+		scratch.reserve(dense.size());
+		for (int index : dense) {
+			VolleyIterationEntry entry;
+			entry.index = index;
+			entry.instance = (index >= 0 && index < (int)bullets_vec.size()) ? (const void *)bullets_vec[index] : nullptr;
+			scratch.push_back(entry);
+		}
 
-		for (auto index : scratch) {
+		for (const VolleyIterationEntry &entry : scratch) {
+			const int index = entry.index;
 			if (index < 0 || index >= (int)bullets_vec.size()) {
 				continue;
 			}
 			auto *multi = bullets_vec[index];
-			if (multi == nullptr || !multi->is_active) {
+			if (multi == nullptr || (const void *)multi != entry.instance) {
+				continue;
+			}
+			if (!multi->is_active) {
 				continue;
 			}
 			multi->interpolate_bullet_visuals();

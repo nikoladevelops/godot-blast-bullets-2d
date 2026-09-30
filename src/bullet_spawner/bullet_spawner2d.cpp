@@ -223,7 +223,7 @@ void PatternPreviewLayer2D::_draw() {
             for (int i = 0; i < path_points.size(); i++) {
                 const Vector2 p = path_points[i];
                 if (p.is_finite()) {
-                    draw_scratch.push_back(p);
+                    draw_scratch.push_back(posed(p));
                 } else {
                     has_gap = true;
                 }
@@ -243,7 +243,7 @@ void PatternPreviewLayer2D::_draw() {
                 for (int i = 0; i <= path_points.size(); i++) {
                     const bool valid = i < path_points.size() && path_points[i].is_finite();
                     if (valid) {
-                        run_scratch.push_back(path_points[i]);
+                        run_scratch.push_back(posed(path_points[i]));
                     } else if (run_scratch.size() >= 2) {
                         draw_polyline(run_scratch, path_color, path_width, false);
                         run_scratch.clear();
@@ -262,7 +262,7 @@ void PatternPreviewLayer2D::_draw() {
             for (int i = 0; i <= layer_path_points.size(); i++) {
                 const bool valid = i < layer_path_points.size() && layer_path_points[i].is_finite();
                 if (valid) {
-                    run_scratch.push_back(layer_path_points[i]);
+                    run_scratch.push_back(posed(layer_path_points[i]));
                 } else if (run_scratch.size() >= 2) {
                     draw_polyline(run_scratch, layer_path_color, path_width, false);
                     run_scratch.clear();
@@ -274,15 +274,17 @@ void PatternPreviewLayer2D::_draw() {
         // Bullets first, first marker last: on closed loops (and stacked
         // modes) later dots land on bullet 0's position and would bury
         // the emphasis marker if it drew first.
+        // posed() applies the draw-time spin so the snapshot can stay
+        // unspun (an advancing spin must not force a geometry rebuild).
         for (int i = 0; i < dots.size(); i++) {
-            const Vector2 p = dots[i];
+            const Vector2 p = posed(dots[i]);
             if (!p.is_finite() || dot_radius <= 0.0f) {
                 continue;
             }
             draw_circle(p, dot_radius, dot_color);
         }
         if (show_first_marker && !dots.is_empty() && first_dot_radius_scale > 0.0f && dot_radius > 0.0f) {
-            const Vector2 p0 = dots[0];
+            const Vector2 p0 = posed(dots[0]);
             if (p0.is_finite()) {
                 draw_circle(p0, dot_radius * first_dot_radius_scale, first_dot_color);
             }
@@ -291,7 +293,7 @@ void PatternPreviewLayer2D::_draw() {
         // editor shows hitbox vs visual. Snapshot radius; <= 0 hides.
         if (ring_radius > 0.0f && ring_width > 0.0f) {
             for (int i = 0; i < dots.size(); i++) {
-                const Vector2 p = dots[i];
+                const Vector2 p = posed(dots[i]);
                 if (!p.is_finite()) {
                     continue;
                 }
@@ -312,8 +314,8 @@ void PatternPreviewLayer2D::_draw() {
         head_tri.resize(3);
     }
     for (int i = 0; i < count; i++) {
-        const Vector2 dir = arrow_dirs[i];
-        const Vector2 tail = arrow_tails[i];
+        const Vector2 dir = posed_dir(arrow_dirs[i]);
+        const Vector2 tail = posed(arrow_tails[i]);
         if (!dir.is_finite() || !tail.is_finite() || dir.length_squared() < 0.00000001) {
             continue;
         }
@@ -4502,6 +4504,22 @@ Array BulletSpawner2D::resolve_homing_targets(bool quiet, bool advance_round_rob
     // the resolution order here does not matter: spawn and retarget build
     // the deal with i % pool themselves. NEAREST order is returned, same as
     // the default selection.
+    //
+    // With homing_max_targets == 1 (the DEFAULT) the pool is a single target,
+    // so the deal `pool[i % pool.size()]` is `pool[0]` for EVERY bullet and
+    // DISTRIBUTE degenerates to HOMING_SHARED - no spreading at all. That is
+    // a silent no-op the user cannot see, so warn once. Deliberately NOT
+    // auto-bumped: silently changing the pool size would alter targeting for
+    // everyone who set DISTRIBUTE with the default.
+    if (homing_target_selection == HOMING_SELECT_DISTRIBUTE && homing_max_targets < 2) {
+        if (!homing_distribute_degenerate_warned) {
+            homing_distribute_degenerate_warned = true;
+            UtilityFunctions::push_warning("BulletSpawner2D: homing_target_selection is DISTRIBUTE but homing_max_targets is " + String::num_int64(homing_max_targets) + ", so every bullet chases the same target (identical to SHARED). Raise homing_max_targets to 2+ to spread targets across the volley.");
+        }
+    } else if (homing_target_selection != HOMING_SELECT_DISTRIBUTE) {
+        // Re-arm so switching back into DISTRIBUTE warns again.
+        homing_distribute_degenerate_warned = false;
+    }
     switch (homing_target_selection) {
         case HOMING_SELECT_FIRST: {
             for (int k = 0; k < take; ++k) {
@@ -5165,6 +5183,14 @@ TypedArray<Transform2D> BulletSpawner2D::collect_spawn_transforms_impl(bool quie
     }
     const Vector2 base_origin = base->get_global_transform().get_origin();
     const Transform2D marker = base->get_global_transform();
+    // Burst mirror sign, applied to the generators' WINDING (angle_step) as
+    // well as the emitter spin below. -1 reverses a spiral/multispiral/
+    // counter-spiral so the arms sweep the other way, which is what
+    // "mirror" actually promises; the previous code only negated the spin, so
+    // a mirrored spiral wound identically and merely pointed the opposite
+    // way. Always 1 outside a mirrored burst shot, so every other path is
+    // bit-identical to before.
+    const real_t mirror_sign = (burst_alternate_mirror && burst_mirror_next) ? (real_t)-1.0 : (real_t)1.0;
     TypedArray<Transform2D> raw;
     switch (pattern_source) {
         case PATTERN_FROM_SELF:
@@ -5196,7 +5222,10 @@ TypedArray<Transform2D> BulletSpawner2D::collect_spawn_transforms_impl(bool quie
             raw = BulletFactory2D::helper_generate_transforms_fan(helper_bullets_amount, marker, helper_fan_spread, helper_fan_direction_angle, helper_fan_step_offset, helper_fan_centered, helper_fan_angle_jitter, helper_fan_seed > 0 ? (uint64_t)helper_fan_seed : 0);
             break;
         case PATTERN_FROM_HELPER_SPIRAL:
-            raw = BulletFactory2D::helper_generate_transforms_spiral(helper_bullets_amount, marker, helper_spiral_start_radius, helper_spiral_radius_step, helper_spiral_angle_step, helper_spiral_rotate_with_marker, (BulletFactory2D::SpiralFacingMode)helper_spiral_facing, helper_spiral_facing_offset_deg);
+            // True chirality: negating angle_step winds the spiral the other
+            // way, which is what "mirror" promises. The old code only negated
+            // the emitter spin, so a mirrored spiral still wound identically.
+            raw = BulletFactory2D::helper_generate_transforms_spiral(helper_bullets_amount, marker, helper_spiral_start_radius, helper_spiral_radius_step, helper_spiral_angle_step * mirror_sign, helper_spiral_rotate_with_marker, (BulletFactory2D::SpiralFacingMode)helper_spiral_facing, helper_spiral_facing_offset_deg);
             break;
         case PATTERN_FROM_HELPER_LINE: {
             // helper_line_perpendicular retired: helper_line_facing rotates
@@ -5279,7 +5308,7 @@ TypedArray<Transform2D> BulletSpawner2D::collect_spawn_transforms_impl(bool quie
             raw = BulletFactory2D::helper_generate_transforms_star_polygon(helper_bullets_amount, marker, helper_star_polygon_vertices, helper_star_polygon_radius, helper_star_polygon_vertex_bias, helper_star_polygon_base_rotation, helper_star_polygon_face_outward, helper_star_polygon_facing_offset_deg);
             break;
         case PATTERN_FROM_HELPER_MULTISPIRAL:
-            raw = BulletFactory2D::helper_generate_transforms_multispiral(helper_bullets_amount, marker, helper_multispiral_arms, helper_multispiral_start_radius, helper_multispiral_radius_step, helper_multispiral_angle_step, helper_multispiral_rotate_with_marker, (BulletFactory2D::SpiralFacingMode)helper_multispiral_facing, helper_multispiral_facing_offset_deg, helper_multispiral_arm_stride);
+            raw = BulletFactory2D::helper_generate_transforms_multispiral(helper_bullets_amount, marker, helper_multispiral_arms, helper_multispiral_start_radius, helper_multispiral_radius_step, helper_multispiral_angle_step * mirror_sign, helper_multispiral_rotate_with_marker, (BulletFactory2D::SpiralFacingMode)helper_multispiral_facing, helper_multispiral_facing_offset_deg, helper_multispiral_arm_stride);
             break;
         case PATTERN_FROM_HELPER_CROSS:
             raw = BulletFactory2D::helper_generate_transforms_cross(helper_bullets_amount, marker, helper_cross_arm_count, helper_cross_arm_length, helper_cross_spacing, helper_cross_base_rotation, helper_cross_face_outward, helper_cross_facing_offset_deg);
@@ -5303,7 +5332,7 @@ TypedArray<Transform2D> BulletSpawner2D::collect_spawn_transforms_impl(bool quie
             raw = BulletFactory2D::helper_generate_transforms_rose(helper_bullets_amount, marker, helper_rose_petals, helper_rose_radius, helper_rose_lobe_sharpness, helper_rose_base_rotation, helper_rose_face_outward, helper_rose_facing_offset_deg, helper_outline_placement, helper_outline_facing, helper_outline_reverse, helper_outline_slot_offset, helper_outline_fill_spacing, helper_outline_fill_stagger, helper_outline_fill_margin, helper_outline_layer_count, helper_outline_layer_scale, helper_outline_layer_side, helper_outline_layer_fill, helper_outline_layer_start_offset, helper_outline_layer_scale_curve, helper_outline_layer_scales, helper_outline_layer_twist, helper_outline_layer_max_dots, helper_outline_layer_layout);
             break;
         case PATTERN_FROM_HELPER_COUNTER_SPIRAL:
-            raw = BulletFactory2D::helper_generate_transforms_counter_spiral(helper_bullets_amount, marker, helper_counter_spiral_arms, helper_counter_spiral_start_radius, helper_counter_spiral_radius_step, helper_counter_spiral_angle_step, helper_counter_spiral_rotate_with_marker, (BulletFactory2D::SpiralFacingMode)helper_counter_spiral_facing, helper_counter_spiral_facing_offset_deg, helper_counter_spiral_arm_stride, helper_counter_spiral_mirror_alternate_arms);
+            raw = BulletFactory2D::helper_generate_transforms_counter_spiral(helper_bullets_amount, marker, helper_counter_spiral_arms, helper_counter_spiral_start_radius, helper_counter_spiral_radius_step, helper_counter_spiral_angle_step * mirror_sign, helper_counter_spiral_rotate_with_marker, (BulletFactory2D::SpiralFacingMode)helper_counter_spiral_facing, helper_counter_spiral_facing_offset_deg, helper_counter_spiral_arm_stride, helper_counter_spiral_mirror_alternate_arms);
             break;
         case PATTERN_FROM_HELPER_CORRIDOR: {
             // Corridor is aimed by design (AIMED_TRAP preset flows through
@@ -5430,9 +5459,17 @@ TypedArray<Transform2D> BulletSpawner2D::collect_spawn_transforms_impl(bool quie
     // Burst mirror flips chirality every other burst volley (fan/spiral
     // rhythm without scripting): negate the spin contribution for this
     // volley only — the stored spin_angle_deg keeps advancing untouched.
-    real_t spin_radians = Math::deg_to_rad((real_t)spin_angle_deg);
-    if (burst_alternate_mirror && burst_mirror_next) {
-        spin_radians = -spin_radians;
+    // preview_suppress_spin is set while snapshotting the gizmo so the
+    // geometry is stored unspun and the layer can apply the angle at draw
+    // time instead (see PatternPreviewLayer2D::posed). Without this, an
+    // advancing spin angle changed the geometry every frame and forced a
+    // full 10k-element rebuild per frame.
+    real_t spin_radians = 0.0;
+    if (!preview_suppress_spin) {
+        spin_radians = Math::deg_to_rad((real_t)spin_angle_deg);
+        if (burst_alternate_mirror && burst_mirror_next) {
+            spin_radians = -spin_radians;
+        }
     }
     // Finite-guarded: a corrupted scale degrades to identity instead of
     // NaN-poisoning the whole volley (setters reject non-finite values, this
@@ -5471,6 +5508,28 @@ bool BulletSpawner2D::preview_allowed_here() const {
 
 bool BulletSpawner2D::preview_active() const {
     return show_pattern_preview && preview_allowed_here();
+}
+
+// Re-poses the existing preview snapshot for a new spin angle. This is the
+// cheap path an advancing spin takes instead of rebuild_preview(): the
+// geometry is unchanged, only its rotation changed, so the layers just need a
+// redraw. Burst mirror never reaches here (a mirrored volley is a real shot,
+// and the flag is only set around the firing path), so the plain angle is
+// correct for the gizmo.
+void BulletSpawner2D::set_preview_pose(double spin_angle_degrees) {
+    if (!Math::is_finite(spin_angle_degrees)) {
+        return;
+    }
+    const real_t radians = Math::deg_to_rad((real_t)spin_angle_degrees);
+    if (preview_dots_layer != nullptr) {
+        preview_dots_layer->set_spin_radians(radians);
+    }
+    if (preview_arrows_layer != nullptr) {
+        preview_arrows_layer->set_spin_radians(radians);
+    }
+    // Keep the snapshot in step so a later rebuild reproduces the same pose
+    // instead of treating the current angle as fresh geometry.
+    tracked_spin_angle = spin_angle_degrees;
 }
 
 // Snapshots the effective generator (same fallback as the collect path) plus
@@ -5690,7 +5749,12 @@ void BulletSpawner2D::rebuild_preview() {
     }
     // Quiet collect: the preview must visualize, never scold (e.g. aimed
     // without a target simply draws nothing instead of erroring per rebuild).
+    // Snapshot the geometry UNSPUN; the layer applies spin_angle_deg at draw
+    // time, so an advancing spin only re-poses the cached points instead of
+    // rebuilding every transform (which at 10k bullets is a per-frame cliff).
+    preview_suppress_spin = true;
     const TypedArray<Transform2D> transforms = collect_spawn_transforms_impl(true);
+    preview_suppress_spin = false;
     const Transform2D holder_global = preview_holder->get_global_transform();
     if (!holder_global.is_finite()) {
         preview_rebuild_in_progress = false;
@@ -5752,6 +5816,10 @@ void BulletSpawner2D::rebuild_preview() {
     }
     preview_dots_layer->set_dots_data(dots, preview_dot_color, (float)dot_radius);
     preview_dots_layer->set_first_marker(!dots.is_empty(), preview_first_dot_color, kFirstDotRadiusScale);
+    // The snapshot above is spin-free, so the rebuilt gizmo must be re-posed
+    // to the current angle here (otherwise a rebuild during spin would snap
+    // back to 0 until the next advance_spin).
+    set_preview_pose(spin_angle_deg);
     // Collision-ring overlay: bounding radius from the volley's shape so
     // the editor shows hitbox vs visual. Off by default; invalid shapes hide.
     {
@@ -5799,7 +5867,14 @@ void BulletSpawner2D::rebuild_preview() {
         const Transform2D track_marker = track_live ? track_base->get_global_transform() : Transform2D();
         if (track_live && track_marker.is_finite()) {
             const Vector2 track_origin = track_marker.get_origin();
-            const real_t track_spin = Math::is_finite((double)spin_angle_deg) ? Math::deg_to_rad((real_t)spin_angle_deg) : 0.0;
+            const real_t track_spin = preview_suppress_spin ? 0.0 : (Math::is_finite((double)spin_angle_deg) ? Math::deg_to_rad((real_t)spin_angle_deg) : 0.0);
+            // Track strips are snapshotted spin-free like the dots, so the
+            // layer's draw-time pose rotates them. Mirroring is a per-burst-shot
+            // property of a REAL volley and never applies to the persistent
+            // gizmo, so the samplers always use +1 here (a preview built
+            // mid-burst shows the unmirrored pattern, which is the state the
+            // next non-mirrored shot will use).
+            const real_t preview_mirror_sign = (real_t)1.0;
             const double track_scale = Math::is_finite(pattern_scale) ? pattern_scale : 1.0;
             // Global point -> spin/scale around the generator origin (collect
             // parity) -> holder-local. Bad points drop their segment, never
@@ -5990,21 +6065,21 @@ void BulletSpawner2D::rebuild_preview() {
                 case PATTERN_FROM_HELPER_SPIRAL: {
                     // Arm sweep replicating the generator's (r, angle) formula.
                     const real_t base_rot_abs = (helper_spiral_rotate_with_marker ? track_marker.get_rotation() : 0.0);
-                    push_track_dict(BulletFactory2D::helper_sample_outline_spiral(helper_bullets_amount, (real_t)helper_spiral_start_radius, (real_t)helper_spiral_radius_step, (real_t)helper_spiral_angle_step, base_rot_abs));
+                    push_track_dict(BulletFactory2D::helper_sample_outline_spiral(helper_bullets_amount, (real_t)helper_spiral_start_radius, (real_t)helper_spiral_radius_step, (real_t)helper_spiral_angle_step * preview_mirror_sign, base_rot_abs));
                     break;
                 }
                 case PATTERN_FROM_HELPER_MULTISPIRAL: {
                     // One strip per arm (INF-separated), each replicating the
                     // generator's spiral formula.
                     const real_t base_rot_abs = (helper_multispiral_rotate_with_marker ? track_marker.get_rotation() : 0.0);
-                    push_track_dict(BulletFactory2D::helper_sample_outline_multispiral(helper_bullets_amount, helper_multispiral_arms, (real_t)helper_multispiral_start_radius, (real_t)helper_multispiral_radius_step, (real_t)helper_multispiral_angle_step, base_rot_abs, helper_multispiral_arm_stride));
+                    push_track_dict(BulletFactory2D::helper_sample_outline_multispiral(helper_bullets_amount, helper_multispiral_arms, (real_t)helper_multispiral_start_radius, (real_t)helper_multispiral_radius_step, (real_t)helper_multispiral_angle_step * preview_mirror_sign, base_rot_abs, helper_multispiral_arm_stride));
                     break;
                 }
                 case PATTERN_FROM_HELPER_COUNTER_SPIRAL: {
                     // Mirrored-arm variant of multispiral: same strip-per-arm
                     // structure, alternate arms wound the other way.
                     const real_t base_rot_abs = (helper_counter_spiral_rotate_with_marker ? track_marker.get_rotation() : 0.0);
-                    push_track_dict(BulletFactory2D::helper_sample_outline_counter_spiral(helper_bullets_amount, helper_counter_spiral_arms, (real_t)helper_counter_spiral_start_radius, (real_t)helper_counter_spiral_radius_step, (real_t)helper_counter_spiral_angle_step, base_rot_abs, helper_counter_spiral_arm_stride, helper_counter_spiral_mirror_alternate_arms));
+                    push_track_dict(BulletFactory2D::helper_sample_outline_counter_spiral(helper_bullets_amount, helper_counter_spiral_arms, (real_t)helper_counter_spiral_start_radius, (real_t)helper_counter_spiral_radius_step, (real_t)helper_counter_spiral_angle_step * preview_mirror_sign, base_rot_abs, helper_counter_spiral_arm_stride, helper_counter_spiral_mirror_alternate_arms));
                     break;
                 }
                 case PATTERN_FROM_HELPER_HEART: {
@@ -6322,7 +6397,22 @@ bool BulletSpawner2D::preview_sources_dirty() {
         return true;
     }
     if (spin_angle_deg != tracked_spin_angle) {
-        return true;
+        // Spin is POSE, not geometry. advance_spin changes the angle every
+        // frame, so treating it as dirt forced a full rebuild_preview() - which
+        // regenerates every transform and reallocates the whole dot/arrow
+        // arrays - on every single frame. At helper_bullets_amount = 10000
+        // that is a 10k-element rebuild per frame, which is exactly the trap
+        // the re-entrancy latch never covered (it only stops nested calls).
+        //
+        // A spinning emitter's pattern is the same shape rotated, so just
+        // repaint the existing snapshot with the new angle. _draw() already
+        // re-applies this rotation to the cached points, and the layer
+        // repaints every frame anyway, so the visual is identical.
+        if (Math::is_finite(spin_angle_deg)) {
+            set_preview_pose(spin_angle_deg);
+            return false;
+        }
+        // Non-finite spin falls through to a real rebuild.
     }
     if (pattern_source == PATTERN_FROM_HELPER_AIMED || pattern_source == PATTERN_FROM_HELPER_CORRIDOR) {
         Node2D *target = get_helper_aimed_target();
@@ -7198,9 +7288,17 @@ int BulletSpawner2D::spawn_pattern_list(const Array &entries, bool simultaneous,
                     ++fired;
                 }
             }
-            pattern_source = saved_source;
-            helper_bullets_amount = saved_amount;
-            spawn_data = saved_data;
+            // Through the setters so the validation and the
+            // notify_property_list_changed()/rebuild_preview() side effects run
+            // once, in the right order. The raw writes this replaced had to be
+            // compensated for by hand further down.
+            set_pattern_source(saved_source);
+            set_helper_bullets_amount(saved_amount);
+            // Restoring through the setter re-points the "changed" connection
+            // back at the base resource. A raw write left the spawner bound to
+            // the LAST override with no connection, so later base-resource
+            // edits stopped invalidating the cache.
+            set_spawn_data(saved_data);
         }
         pattern_list_active = false;
         pattern_list_entries.clear();
@@ -7270,7 +7368,12 @@ bool BulletSpawner2D::apply_pattern_list_entry(const Variant &entry) {
         Variant v = dict["spawn_data"];
         Ref<DirectionalBulletsData2D> override_data = v;
         if (override_data.is_valid()) {
-            spawn_data = override_data;
+            // Through the setter, not a raw member write: the setter swaps the
+            // "changed" connection to the override resource and invalidates the
+            // duplicate cache. A raw assignment left the OLD resource still
+            // connected (so its edits kept invalidating our cache) and the
+            // override with NO connection (so its runtime edits were invisible).
+            set_spawn_data(override_data);
         } else {
             UtilityFunctions::push_error("BulletSpawner2D::spawn_pattern_list: entry 'spawn_data' must be a DirectionalBulletsData2D, keeping current.");
         }
@@ -7295,8 +7398,8 @@ void BulletSpawner2D::fire_pattern_list_entry() {
     if (entry_ok) {
         shoot_once();
     }
-    spawn_data = saved_data;
-    helper_bullets_amount = saved_amount;
+    set_spawn_data(saved_data);
+    set_helper_bullets_amount(saved_amount);
     if (pattern_list_cursor >= pattern_list_entries.size()) {
         // Keep the last entry's source (phase advanced), drop the queue.
         stop_pattern_list();
@@ -7304,9 +7407,9 @@ void BulletSpawner2D::fire_pattern_list_entry() {
         rebuild_preview();
         emit_signal("pattern_list_finished");
     } else {
-        pattern_source = saved_source;
-        notify_property_list_changed();
-        rebuild_preview();
+        // Setters carry their own notify/rebuild, so the manual pair this
+        // replaces is gone - it used to double-fire on every queued entry.
+        set_pattern_source(saved_source);
     }
 }
 

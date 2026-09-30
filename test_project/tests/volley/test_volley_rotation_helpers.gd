@@ -163,7 +163,11 @@ func _initialize() -> void:
 	var sh9 := _rot(9.0, 100.0, 0.0)
 	o1.set_bullet_rotation_data(0, z)
 	o1.set_shared_bullet_rotation_data(sh9)
-	_check(absf(o1.bullet_get_rotation_speed(0) - 9.0) < 0.01, "per-zero then shared fills rotation gap")
+	# BEHAVIOR CHANGE (presence bit): an explicit all-zero per-bullet entry is
+	# INTENT ("this bullet must not spin"), not absence. It now wins no matter
+	# when shared is applied, matching the "shared then per-zero" case below.
+	# Previously the outcome flipped purely on call order.
+	_check(absf(o1.bullet_get_rotation_speed(0)) < 0.01, "per-zero then shared does NOT fill rotation (order-independent now)")
 	var e2 := H.make_directional_data(2, 100.0)
 	e2.all_bullet_rotation_data = []
 	var o2: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(e2)

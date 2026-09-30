@@ -7,6 +7,9 @@
 #include "godot_cpp/classes/node.hpp"
 #include "godot_cpp/classes/rectangle_shape2d.hpp"
 #include "godot_cpp/classes/scene_tree.hpp"
+#include "godot_cpp/classes/segment_shape2d.hpp"
+#include "godot_cpp/classes/tile_map_layer.hpp"
+#include "godot_cpp/classes/world_boundary_shape2d.hpp"
 #include "godot_cpp/core/class_db.hpp"
 #include "godot_cpp/core/object.hpp"
 #include "godot_cpp/variant/dictionary.hpp"
@@ -38,6 +41,7 @@ void DirectionalBullets2D::set_up_movement_data(const TypedArray<BulletSpeedData
 		all_cached_direction.resize(amount_bullets);
 		all_cached_velocity.resize(amount_bullets);
 	}
+	has_per_bullet_speed_data.assign(amount_bullets, 0);
 	// Fresh ballistics every seed - leftover fall speed from the last owner would make the new volley drop instantly.
 	all_gravity_velocity.assign(amount_bullets, Vector2(0, 0));
 
@@ -66,13 +70,22 @@ void DirectionalBullets2D::set_up_movement_data(const TypedArray<BulletSpeedData
 		const real_t rot = all_cached_shape_transforms[i].get_rotation();
 
 		Ref<BulletSpeedData2D> data = fallback_data;
+		// True only when this slot reads an entry the USER authored (exact,
+		// tiled, or in-range short array). A synthesized default below is not
+		// a user intent, so it must not claim presence - otherwise a volley
+		// with no per-bullet speed data at all would freeze permanently
+		// instead of picking up shared speed.
+		bool user_authored_entry = false;
 
 		if (exact_speed) {
 			data = new_speed_data[i];
+			user_authored_entry = true;
 		} else if (tiled_speed && speed_data_size > 0) {
 			data = new_speed_data[i % speed_data_size];
+			user_authored_entry = true;
 		} else if (i >= 0 && i < speed_data_size) {
 			data = new_speed_data[i];
+			user_authored_entry = true;
 		}
 
 		// Extract values with null safety
@@ -85,17 +98,22 @@ void DirectionalBullets2D::set_up_movement_data(const TypedArray<BulletSpeedData
 		}
 
 		// Non-finite values would poison the tick path, so fail open to zeros like a missing entry.
+		bool valid_entry = user_authored_entry && data.is_valid();
 		if (!Math::is_finite(s) || !Math::is_finite(m) || !Math::is_finite(acc)) {
 			UtilityFunctions::push_error("DirectionalBullets2D movement data contains NaN/Inf, using zeros for bullet index " + String::num_int64(i) + ".");
 			s = 0.0;
 			m = 0.0;
 			acc = 0.0;
+			valid_entry = false;
 		}
 
 		// Overwrite existing memory slots
 		all_cached_speed[i] = s;
 		all_cached_max_speed[i] = m;
 		all_cached_acceleration[i] = acc;
+		// Explicit presence: a VALID entry (even all-zero "don't move") must
+		// never be mistaken for a gap by the shared fallback below.
+		has_per_bullet_speed_data[i] = valid_entry ? 1 : 0;
 
 		Vector2 dir = Vector2(Math::cos(rot), Math::sin(rot));
 		all_cached_direction[i] = dir;
@@ -111,13 +129,18 @@ void DirectionalBullets2D::apply_shared_speed_fallback(const Ref<BulletSpeedData
 	if ((int)all_cached_speed.size() != amount_bullets) {
 		return;
 	}
+	// The vector is sized in set_up_movement_data, but the fallback can also
+	// run on a volley whose movement data was never seeded (or was cleared), so
+	// normalize the size here rather than trusting the seed path.
+	if ((int)has_per_bullet_speed_data.size() != amount_bullets) {
+		has_per_bullet_speed_data.assign(amount_bullets, 0);
+	}
 	for (int i = 0; i < amount_bullets; ++i) {
-		// Gap = slot seeded from an invalid (null/non-finite) per-bullet
-		// entry. Valid per-bullet slots (including deliberate zeros) stay.
-		// Heuristic: per-bullet seeding zeroes the whole triple on invalid
-		// entries, so a fully-zero triple is the gap marker. Shared all-zero
-		// would be a no-op anyway, so skip the write then.
-		if (all_cached_speed[i] != 0.0 || all_cached_max_speed[i] != 0.0 || all_cached_acceleration[i] != 0.0) {
+		// Presence, not a zero-triple test. Bit 1 covers BOTH a valid per-bullet
+		// entry and a slot this fallback already filled, so shared data never
+		// overwrites a deliberate all-zero ("don't move") and never re-fills.
+		// Bit 0 is a genuine gap (invalid entry, or never seeded).
+		if (has_per_bullet_speed_data[i]) {
 			continue;
 		}
 		if (shared->speed == 0.0 && shared->max_speed == 0.0 && shared->acceleration == 0.0) {
@@ -126,6 +149,8 @@ void DirectionalBullets2D::apply_shared_speed_fallback(const Ref<BulletSpeedData
 		all_cached_speed[i] = shared->speed;
 		all_cached_max_speed[i] = shared->max_speed;
 		all_cached_acceleration[i] = shared->acceleration;
+		// Fill-once: mark the slot so a later set_shared_* does not re-apply.
+		has_per_bullet_speed_data[i] = 1;
 		const real_t rot = (i >= 0 && i < (int)all_cached_shape_transforms.size()) ? all_cached_shape_transforms[i].get_rotation() : 0.0;
 		Vector2 dir = Vector2(Math::cos(rot), Math::sin(rot));
 		all_cached_direction[i] = dir;
@@ -148,6 +173,7 @@ void DirectionalBullets2D::apply_shared_rotation_fallback(const Ref<BulletRotati
 			all_max_rotation_speed.assign(amount_bullets, 0.0);
 			all_rotation_acceleration.assign(amount_bullets, 0.0);
 		}
+		has_per_bullet_rotation_data.assign(amount_bullets, 1);
 		for (int i = 0; i < amount_bullets; ++i) {
 			all_rotation_speed[i] = shared->rotation_speed;
 			all_max_rotation_speed[i] = shared->max_rotation_speed;
@@ -158,15 +184,19 @@ void DirectionalBullets2D::apply_shared_rotation_fallback(const Ref<BulletRotati
 		rotate_only_textures = new_rotate_only_textures;
 		return;
 	}
-	// Rotation active from per-bullet seeding: only fill slots that hold a
-	// fully-zero triple (the invalid-entry gap marker). Valid per-bullet
-	// slots, including deliberate zeros mixed with non-zero siblings, stay.
+	// Rotation active from per-bullet seeding: only fill slots the seed marked
+	// as gaps. Presence, not a zero-triple test - a valid all-zero entry
+	// ("no spin") must survive, and a slot this fallback already filled must
+	// not be re-filled.
 	if ((int)all_rotation_speed.size() != amount_bullets) {
 		return;
 	}
+	if ((int)has_per_bullet_rotation_data.size() != amount_bullets) {
+		has_per_bullet_rotation_data.assign(amount_bullets, 0);
+	}
 	bool filled_any = false;
 	for (int i = 0; i < amount_bullets; ++i) {
-		if (all_rotation_speed[i] != 0.0 || all_max_rotation_speed[i] != 0.0 || all_rotation_acceleration[i] != 0.0) {
+		if (has_per_bullet_rotation_data[i]) {
 			continue;
 		}
 		if (shared->rotation_speed == 0.0 && shared->max_rotation_speed == 0.0 && shared->rotation_acceleration == 0.0) {
@@ -175,6 +205,7 @@ void DirectionalBullets2D::apply_shared_rotation_fallback(const Ref<BulletRotati
 		all_rotation_speed[i] = shared->rotation_speed;
 		all_max_rotation_speed[i] = shared->max_rotation_speed;
 		all_rotation_acceleration[i] = shared->rotation_acceleration;
+		has_per_bullet_rotation_data[i] = 1;
 		filled_any = true;
 	}
 	// Visual follow mode only changes when the fallback actually filled
@@ -701,7 +732,11 @@ bool DirectionalBullets2D::is_data_type_compatible(const MultiMeshBulletsData2D 
 void DirectionalBullets2D::reset_transient_subclass_state(bool drop_stale_work) {
 	// Neutralize ballistics/shared/homing so a new life never inherits the
 	// previous owner's values (base reset cannot clear subclass state).
+	// set_up_movement_data re-seeds has_per_bullet_speed_data; the rotation
+	// seed lives in the base set_rotation_data, so clear its bit here to keep
+	// pooled reuse from inheriting the previous owner's presence decisions.
 	set_up_movement_data(TypedArray<BulletSpeedData2D>());
+	reset_per_bullet_rotation_presence();
 	shared_bullet_speed_data.unref();
 	shared_bullet_rotation_data.unref();
 	adjust_direction_based_on_rotation = false;
@@ -727,6 +762,7 @@ void DirectionalBullets2D::reset_transient_subclass_state(bool drop_stale_work) 
 	homing_lose_range_px = 0.0;
 	bounce_mask = 0;
 	bounce_strength = 1.0;
+	bounce_tilemap_layers = false;
 	bounce_push_assist = true;
 	bounce_charge_amplify = true;
 	bounce_hit_consumed = false;
@@ -742,6 +778,8 @@ void DirectionalBullets2D::reset_transient_subclass_state(bool drop_stale_work) 
 	all_bounce_last_tick.clear();
 	all_bounce_last_target.clear();
 	all_bounce_last_time.clear();
+	all_bounce_last_normal.clear();
+	all_bounce_last_target_velocity.clear();
 	bounce_visual_pending.clear();
 	bounce_visual_target.clear();
 	all_bounce_speed_multiplier.clear();
@@ -845,11 +883,11 @@ void DirectionalBullets2D::custom_additional_disable_logic() {
 }
 
 // Analytic surface normal from the collided target's first usable direct
-// CollisionShape2D child (rect/circle/capsule). Drain-safe: pure math, no
-// physics-server queries. Shapes must be direct children (a Godot physics
-// requirement: deeper nesting never registers, so it can never collide).
-// Returns false when there is no usable shape (the caller falls back to
-// the radial normal).
+// CollisionShape2D child (rect/circle/capsule/segment/world boundary).
+// Drain-safe: pure math, no physics-server queries. Shapes must be direct
+// children (a Godot physics requirement: deeper nesting never registers,
+// so it can never collide). Returns false when there is no usable shape
+// (the caller falls back to the radial normal).
 static bool bounce_normal_from_shape_node(CollisionShape2D *cs, const Vector2 &bullet_pos, Vector2 &r_normal) {
 	if (cs == nullptr || cs->is_queued_for_deletion()) {
 		return false;
@@ -924,6 +962,56 @@ static bool bounce_normal_from_shape_node(CollisionShape2D *cs, const Vector2 &b
 		}
 		return false;
 	}
+	if (SegmentShape2D *seg = Object::cast_to<SegmentShape2D>(shape.ptr())) {
+		// Sloped static ground: the normal is the segment perpendicular on
+		// the bullet's side (orientation-agnostic, so winding never matters).
+		const Vector2 a = seg->get_a();
+		const Vector2 b = seg->get_b();
+		if (!a.is_finite() || !b.is_finite()) {
+			return false;
+		}
+		const Vector2 along = b - a;
+		if (!along.is_finite() || along.length_squared() < 0.00000001) {
+			return false;
+		}
+		const Vector2 local = shape_global.affine_inverse().xform(bullet_pos);
+		if (!local.is_finite()) {
+			return false;
+		}
+		const Vector2 mid = (a + b) * 0.5;
+		if (!mid.is_finite()) {
+			return false;
+		}
+		Vector2 local_n(-along.y, along.x);
+		if (!local_n.is_finite() || local_n.length_squared() < 0.00000001) {
+			return false;
+		}
+		local_n = local_n.normalized();
+		if (local_n.dot(local - mid) < 0.0) {
+			local_n = -local_n;
+		}
+		const Vector2 world_n = shape_global.basis_xform(local_n);
+		if (world_n.is_finite() && world_n.length_squared() > 0.00000001) {
+			r_normal = world_n.normalized();
+			return true;
+		}
+		return false;
+	}
+	if (WorldBoundaryShape2D *boundary = Object::cast_to<WorldBoundaryShape2D>(shape.ptr())) {
+		// Screen-edge planes store their normal outright: rotate it by the
+		// shape node (translation-independent, so the plane offset needs
+		// no handling here).
+		const Vector2 stored = boundary->get_normal();
+		if (!stored.is_finite() || stored.length_squared() < 0.00000001) {
+			return false;
+		}
+		const Vector2 world_n = shape_global.basis_xform(stored.normalized());
+		if (world_n.is_finite() && world_n.length_squared() > 0.00000001) {
+			r_normal = world_n.normalized();
+			return true;
+		}
+		return false;
+	}
 	return false;
 }
 
@@ -946,7 +1034,7 @@ static bool bounce_precise_normal_from_target(Object *hit_target, const Vector2 
 	return false;
 }
 
-int DirectionalBullets2D::try_handle_bounce(CollisionType collision_type, int bullet_index, int64_t entered_instance_id, Vector2 queued_target_velocity, bool queued_velocity_valid) {
+int DirectionalBullets2D::try_handle_bounce(CollisionType collision_type, int bullet_index, int64_t entered_instance_id, Vector2 queued_target_velocity, bool queued_velocity_valid, Vector2 queued_target_position, bool queue_position_valid) {
 	if (bounce_mask == 0) {
 		return 0;
 	}
@@ -988,7 +1076,13 @@ int DirectionalBullets2D::try_handle_bounce(CollisionType collision_type, int bu
 	if (layer_v.get_type() == Variant::INT) {
 		target_layer = (int)layer_v;
 	}
-	if (target_layer == 0 || (target_layer & bounce_mask) == 0) {
+	// TileMapLayer walls report no collision_layer (internal bodies),
+	// so they never match the mask above. Opt-in only: the exact cell
+	// surface is unknowable from the record, so the normal section
+	// below reflects head-on instead of guessing radial from the
+	// (possibly far) layer origin. Default off keeps them lethal.
+	const bool tilemap_head_on = target_layer == 0 && bounce_tilemap_layers && bounce_mask != 0 && Object::cast_to<TileMapLayer>(hit_target) != nullptr;
+	if ((target_layer == 0 || (target_layer & bounce_mask) == 0) && !tilemap_head_on) {
 		return 0;
 	}
 	// Same-target debounce: re-hits against the object just bounced off
@@ -1034,7 +1128,10 @@ int DirectionalBullets2D::try_handle_bounce(CollisionType collision_type, int bu
 	// radial from the target center. Head-on fallback when neither resolves.
 	Vector2 surface_n(0, 0);
 	bool have_normal = false;
-	if (bounce_mode == 1) {
+	if (tilemap_head_on) {
+		surface_n = -dir;
+		have_normal = true;
+	} else if (bounce_mode == 1) {
 		have_normal = bounce_precise_normal_from_target(hit_target, origin, surface_n);
 	}
 	if (!have_normal) {
@@ -1069,17 +1166,54 @@ int DirectionalBullets2D::try_handle_bounce(CollisionType collision_type, int bu
 	if (queued_velocity_valid && queued_target_velocity.is_finite()) {
 		target_v = queued_target_velocity;
 	} else {
+		bool has_velocity_property = false;
 		const Variant linear_v = hit_target->get(StringName("linear_velocity"));
 		if (linear_v.get_type() == Variant::VECTOR2) {
 			target_v = (Vector2)linear_v;
+			has_velocity_property = true;
 		} else {
 			const Variant vel_v = hit_target->get(StringName("velocity"));
 			if (vel_v.get_type() == Variant::VECTOR2) {
 				target_v = (Vector2)vel_v;
+				has_velocity_property = true;
+			} else {
+				// AnimatableBody2D platforms expose neither of the above:
+				// their motion lives in constant_linear_velocity (same
+				// fallback as the queue-time reader above).
+				const Variant const_v = hit_target->get(StringName("constant_linear_velocity"));
+				if (const_v.get_type() == Variant::VECTOR2) {
+					target_v = (Vector2)const_v;
+					has_velocity_property = true;
+				}
 			}
 		}
 		if (!target_v.is_finite()) {
 			target_v = Vector2(0, 0);
+		}
+		// Velocity-less estimate: Area2D hurtboxes, tweened bosses and
+		// position-moved statics expose no motion property, so compare the
+		// queue-time pose against the live one over one tick (records
+		// queue during the physics flush and drain on the next volley
+		// tick by construction; same-tick body+area pairs carry zero
+		// displacement and self-neutralize). Divided by the last tick
+		// delta so custom physics rates stay exact. Clamped: a blink
+		// across the screen must not yield a 1e5 px/s phantom kick, and
+		// any unusually stale record is bounded the same way.
+		if (!has_velocity_property && queue_position_valid && queued_target_position.is_finite() && Math::is_finite((double)bounce_last_delta) && bounce_last_delta > 0.0) {
+			Node2D *target_n2d = Object::cast_to<Node2D>(hit_target);
+			if (target_n2d != nullptr) {
+				const Vector2 now_pos = target_n2d->get_global_position();
+				if (now_pos.is_finite()) {
+					Vector2 estimate = (now_pos - queued_target_position) / (real_t)bounce_last_delta;
+					if (estimate.is_finite()) {
+						const real_t estimate_len = estimate.length();
+						if (estimate_len > 4000.0) {
+							estimate = estimate.normalized() * 4000.0;
+						}
+						target_v = estimate;
+					}
+				}
+			}
 		}
 	}
 	// Branch the influence by alignment: same-direction motion is a push
@@ -1285,6 +1419,16 @@ int DirectionalBullets2D::try_handle_bounce(CollisionType collision_type, int bu
 	if (bullet_index < (int)all_bounce_count.size()) {
 		++all_bounce_count[bullet_index];
 	}
+	// Forensics for debug_get_bounce_info: the normal and target motion
+	// this bounce committed with (size-checked like every ledger write).
+	if (bullet_index >= 0) {
+		if (bullet_index < (int)all_bounce_last_normal.size()) {
+			all_bounce_last_normal[bullet_index] = surface_n;
+		}
+		if (bullet_index < (int)all_bounce_last_target_velocity.size()) {
+			all_bounce_last_target_velocity[bullet_index] = target_v;
+		}
+	}
 	if (bullet_index < (int)all_bounce_cooldown.size()) {
 		all_bounce_cooldown[bullet_index] = bounce_cooldown_sec;
 	}
@@ -1438,6 +1582,9 @@ void DirectionalBullets2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_bounce_mask", "value"), &DirectionalBullets2D::set_bounce_mask);
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "bounce_mask", PROPERTY_HINT_LAYERS_2D_PHYSICS), "set_bounce_mask", "get_bounce_mask");
 	ClassDB::bind_method(D_METHOD("set_bounce_mask_from_array", "array_of_masks"), &DirectionalBullets2D::set_bounce_mask_from_array);
+	ClassDB::bind_method(D_METHOD("get_bounce_tilemap_layers"), &DirectionalBullets2D::get_bounce_tilemap_layers);
+	ClassDB::bind_method(D_METHOD("set_bounce_tilemap_layers", "value"), &DirectionalBullets2D::set_bounce_tilemap_layers);
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "bounce_tilemap_layers"), "set_bounce_tilemap_layers", "get_bounce_tilemap_layers");
 	ClassDB::bind_method(D_METHOD("get_bounce_strength"), &DirectionalBullets2D::get_bounce_strength);
 	ClassDB::bind_method(D_METHOD("set_bounce_strength", "value"), &DirectionalBullets2D::set_bounce_strength);
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "bounce_strength"), "set_bounce_strength", "get_bounce_strength");
@@ -1576,7 +1723,7 @@ void DirectionalBullets2D::_bind_methods() {
 	// SHARED HOMING DEQUE POP METHODS
 	ClassDB::bind_method(D_METHOD("shared_homing_deque_pop_front_target"), &DirectionalBullets2D::shared_homing_deque_pop_front_target);
 	ClassDB::bind_method(D_METHOD("shared_homing_deque_pop_back_target"), &DirectionalBullets2D::shared_homing_deque_pop_back_target);
-	ClassDB::bind_method(D_METHOD("_do_shared_auto_pop_front_target", "operation_generation"), &DirectionalBullets2D::_do_shared_auto_pop_front_target);
+	ClassDB::bind_method(D_METHOD("_do_shared_auto_pop_front_target", "operation_generation", "front_epoch"), &DirectionalBullets2D::_do_shared_auto_pop_front_target);
 	ClassDB::bind_method(D_METHOD("_do_auto_pop_front_target", "operation_generation", "bullet_index", "bullet_epoch"), &DirectionalBullets2D::_do_auto_pop_front_target);
 	ClassDB::bind_method(D_METHOD("_do_emit_homing_target_reached", "operation_generation", "bullet_index", "bullet_epoch", "target_instance_id", "target_global_position"), &DirectionalBullets2D::_do_emit_homing_target_reached);
 

@@ -221,9 +221,18 @@ public:
 	// never detects those targets at all (warned once per spawn).
 	int bounce_mask = 0;
 
+	// Bounce off TileMapLayer walls. Tilemaps report no collision_layer
+	// (their physics bodies are internal), so they never match bounce_mask
+	// and take the normal path by default. True opts them in: any non-zero
+	// bounce_mask then bounces off tilemap cells with a head-on reflection
+	// (the exact cell surface is unknowable from the record, so the radial
+	// normal would misread far cells). False (default) keeps them lethal.
+	bool bounce_tilemap_layers = false;
+
 	// Speed multiplier applied on every bounce. 1.0 (default) is perfectly
 	// elastic, < 1 damps (0.5 halves the speed), 0 dead-stops the bullet in
-	// place (still alive), > 1 is super-elastic. Clamped to [0, 2].
+	// place (still alive), > 1 is super-elastic, with no upper cap (the
+	// overflow guards refuse the bounce instead of storing Inf).
 	double bounce_strength = 1.0;
 
 	// Whether a moving target feeds its velocity into the bounce, split by
@@ -389,6 +398,8 @@ public:
 	int get_bounce_mask() const;
 	void set_bounce_mask(int value);
 	void set_bounce_mask_from_array(const TypedArray<int> &numbers);
+	bool get_bounce_tilemap_layers() const;
+	void set_bounce_tilemap_layers(bool value);
 
 	double get_bounce_strength() const;
 	void set_bounce_strength(double value);

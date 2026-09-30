@@ -150,8 +150,11 @@ public:
 		if (!all_collided_bullets.empty()) {
 			collision_scratch.clear();
 			collision_scratch.swap(all_collided_bullets);
+			// The dedup keys belong to this drain window only (see the
+			// DirectionalBullets2D twin for the reasoning).
+			clear_collision_dedup_keys();
 			for (auto &data : collision_scratch) {
-				handle_bullet_collision(data.collision_type, data.bullet_index, data.collided_instance_id, data.queue_bullet_epoch, data.queue_target_velocity, data.queue_target_velocity_valid);
+				handle_bullet_collision(data.collision_type, data.bullet_index, data.collided_instance_id, data.queue_bullet_epoch, data.queue_target_velocity, data.queue_target_velocity_valid, data.queue_target_position, data.queue_target_position_valid);
 				// the handler may have freed us mid-drain - check we're still alive before touching anything.
 				if (ObjectDB::get_instance(ObjectID(drain_self_id)) != this) {
 					collision_scratch.clear();
