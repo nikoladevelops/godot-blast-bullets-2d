@@ -83,6 +83,66 @@ func _initialize() -> void:
 	v.bullet_disable_orbiting(1)
 	_check(factory.debug_assert_no_dangling().get("ok", false) == true, "no dangling after orbit ops")
 
+	printerr("ORBIT T6 freed target never crashes, lock follows policy")
+	var dying := Node2D.new()
+	dying.position = Vector2(300, 0)
+	get_root().add_child(dying)
+	await process_frame
+	var w: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(H.make_directional_data(2, 250.0, 30.0))
+	w.set_homing_smoothing(6.0)
+	w.set_homing_take_control_of_texture_rotation(true)
+	w.all_bullets_push_back_homing_target(dying)
+	w.all_bullets_enable_orbiting(64.0, 2, 0)
+	for i in 60:
+		await physics_frame
+		if w.bullet_is_orbiting_locked(0):
+			break
+	_check(w.bullet_is_orbiting_locked(0), "ring locks before target death")
+	dying.queue_free()
+	await process_frame
+	for i in 5:
+		await physics_frame
+	_check(w.get_bullet_transform(0).is_finite() and w.get_bullet_velocity(0).is_finite(), "RelockAlways volley finite after target freed")
+	_check(not w.bullet_is_orbiting_locked(0), "RelockAlways unlocks on empty queue")
+	_check(w.bullet_is_orbiting_enabled(0), "RelockAlways stays armed for next target")
+
+	var anchor2 := Node2D.new()
+	anchor2.position = Vector2(300, 50)
+	get_root().add_child(anchor2)
+	await process_frame
+	var s: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(H.make_directional_data(1, 250.0, 30.0))
+	s.set_homing_smoothing(6.0)
+	s.set_homing_take_control_of_texture_rotation(true)
+	s.bullet_homing_push_back_node2d_target(0, anchor2)
+	s.bullet_enable_orbiting(0, 64.0, 2, 0, 0, 8.0, 1, true)
+	for i in 60:
+		await physics_frame
+		if s.bullet_is_orbiting_locked(0):
+			break
+	_check(s.bullet_is_orbiting_locked(0), "StayLocked ring locks before target death")
+	var held_center: Vector2 = s.bullet_get_orbiting_center(0)
+	anchor2.queue_free()
+	await process_frame
+	for i in 5:
+		await physics_frame
+	_check(s.get_bullet_transform(0).is_finite(), "StayLocked volley finite after target freed")
+	_check(s.bullet_is_orbiting_locked(0), "StayLocked holds lock across the gap")
+	_check(s.bullet_get_orbiting_center(0).distance_to(held_center) < 8.0, "StayLocked center rides out the gap")
+
+	printerr("ORBIT T7 spawner is_orbit_armed matches config")
+	var sp := BulletSpawner2D.new()
+	get_root().add_child(sp)
+	await process_frame
+	sp.set_bullet_factory(factory)
+	sp.set_spawn_data(H.make_directional_data(2, 200.0, 5.0))
+	_check(not sp.is_orbit_armed(), "unarmed with both switches off")
+	sp.set_orbiting_enabled(true)
+	_check(not sp.is_orbit_armed(), "orbiting alone is not armed")
+	sp.set_homing_enabled(true)
+	_check(sp.is_orbit_armed(), "homing plus orbiting is armed")
+	sp.queue_free()
+	await process_frame
+
 	target.queue_free()
 	await process_frame
 	factory.reset()

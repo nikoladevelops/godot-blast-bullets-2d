@@ -165,6 +165,12 @@
 				Volleys fired since the last (re)arm. Reset with [method reset_shooting].
 			</description>
 		</method>
+		<method name="is_orbit_armed" qualifiers="const">
+			<return type="bool" />
+			<description>
+				Returns true when both [member homing_enabled] and [member orbiting_enabled] are on. This is configured state, not the live ring: each volley still needs at least one resolvable target at spawn time, and a freed target trims out of the queue without crashing (RelockAlways and RelockOnTargetChange unlock and chase the next live target, StayLocked holds angle and center until a target returns).
+			</description>
+		</method>
 		<method name="is_pattern_list_active" qualifiers="const">
 			<return type="bool" />
 			<description>
@@ -1129,7 +1135,7 @@
 			Orbit direction. DontMove means escort: bullets hold a fixed slot on the ring and follow the target without circling. OrbitRandom rolls OrbitLeft or OrbitRight per bullet when the volley spawns (never DontMove); live volleys keep their rolled direction on retarget passes, so switching to OrbitRandom mid-flight only affects new volleys.
 		</member>
 		<member name="orbiting_enabled" type="bool" setter="set_orbiting_enabled" getter="get_orbiting_enabled" default="false">
-			Bullets ring their homing target once they arrive. Needs [member homing_enabled]: orbiting without a homing target does nothing.
+			Bullets ring their homing target once they arrive. Needs [member homing_enabled]: orbiting without a homing target does nothing (the volley flies straight and a warning names the volley instance id). A freed mid-flight target never crashes: dead entries trim out of the queue, non-finite frames hold the bullet still for one tick, and the lock follows [member orbiting_lock_policy]. Use [method is_orbit_armed] to assert the configuration before firing.
 		</member>
 		<member name="orbiting_follow_deadzone" type="float" setter="set_orbiting_follow_deadzone" getter="get_orbiting_follow_deadzone" default="8.0">
 			Deadzone radius in pixels, used only when [member orbiting_follow_mode] is FollowDeadzone. The ring center stays pinned while the target moves within this distance of the lock point, then re-pins to the target.
@@ -1138,7 +1144,7 @@
 			How the locked ring follows a moving target. FollowTarget tracks the target 1:1. FollowDeadzone pins the ring center until the target walks farther than [member orbiting_follow_deadzone] from it, absorbing jitter. Anchored freezes the ring where it locked and ignores target motion entirely.
 		</member>
 		<member name="orbiting_lock_policy" type="int" setter="set_orbiting_lock_policy" getter="get_orbiting_lock_policy" enum="DirectionalBullets2D.OrbitingLockPolicy" default="0">
-			What drops the orbit lock. RelockAlways re-acquires the radius on every retarget. StayLocked never unlocks on retarget or empty queues: once locked, bullets keep their angle and center until you explicitly disable orbiting, clear targets, or the target is freed. RelockOnTargetChange unlocks only when the front target is a different target than the one the bullet locked onto, so the same moving Node2D never breaks the ring. For a bodyguard ring on a moving Node2D use StayLocked with FollowTarget (or FollowDeadzone) and a stationary retarget mode.
+			What drops the orbit lock. RelockAlways re-acquires the radius on every retarget. StayLocked never unlocks on retarget or empty queues: once locked, bullets keep their angle and center until you explicitly disable orbiting, clear targets, or the target is freed. RelockOnTargetChange unlocks only when the front target is a different target than the one the bullet locked onto, so the same moving Node2D never breaks the ring. A freed target trims out of the queue instead of crashing: RelockAlways and RelockOnTargetChange fly toward the next live target, StayLocked rides out the gap and re-pins silently when a target returns. For a bodyguard ring on a moving Node2D use StayLocked with FollowTarget (or FollowDeadzone) and a stationary retarget mode.
 		</member>
 		<member name="orbiting_radius" type="float" setter="set_orbiting_radius" getter="get_orbiting_radius" default="64.0">
 			Orbit ring radius in pixels. Must be at least 0.01.

@@ -421,10 +421,17 @@ static void fx_apply_slot_spin(BulletFactory2D::FXOneShotBake &bake, int slot_in
 	slot.last_angle = spun.get_rotation();
 }
 
-// Per-instance ramp sampling (no-op without a ramp): tint-over-life for
-// one-shots, loop-phase tint for trails. Shard self_modulate multiplies on
-// top, exactly like CanvasItem modulate chains.
-static void fx_refresh_slot_color(BulletFactory2D::FXOneShotBake &bake, int slot_index, double age) {	if (bake.layer.is_null() || bake.layer->color_ramp.is_null() || !(bake.total > 0.0)) {
+// Per-instance ramp sampling plus fade envelope (no-op without either):
+// tint-over-life for one-shots, loop-phase tint for trails. Shard
+// self_modulate multiplies on top, exactly like CanvasItem modulate chains.
+// Trails never reach here with fades (their layers ignore the knobs, so a
+// trail tick stays the pure ramp path it always was).
+static void fx_refresh_slot_color(BulletFactory2D::FXOneShotBake &bake, int slot_index, double age) {	if (bake.layer.is_null()) {
+		return;
+	}
+	const bool has_ramp = !bake.layer->color_ramp.is_null() && bake.total > 0.0;
+	const bool has_fade = (bake.layer->fade_in_sec > 0.0 || bake.layer->fade_out_sec > 0.0) && Math::is_finite(age) && bake.total > 0.0;
+	if (!has_ramp && !has_fade) {
 		return;
 	}
 	if (slot_index < 0 || slot_index >= (int)bake.slots.size()) {
@@ -434,7 +441,24 @@ static void fx_refresh_slot_color(BulletFactory2D::FXOneShotBake &bake, int slot
 	if (!slot.active || slot.last_shard < 0 || slot.last_shard >= (int)bake.shards.size() || bake.shards[slot.last_shard] == nullptr) {
 		return;
 	}
-	const Color tint = bake.layer->color_ramp->sample((float)fx_clamp01(age / bake.total));
+	Color tint(1, 1, 1, 1);
+	if (has_ramp) {
+		tint = bake.layer->color_ramp->sample((float)fx_clamp01(age / bake.total));
+	}
+	if (has_fade) {
+		double alpha = 1.0;
+		if (bake.layer->fade_in_sec > 0.0 && age < bake.layer->fade_in_sec) {
+			alpha = age / bake.layer->fade_in_sec;
+		}
+		const double remaining = bake.total - age;
+		if (bake.layer->fade_out_sec > 0.0 && remaining < bake.layer->fade_out_sec) {
+			const double out_alpha = remaining / bake.layer->fade_out_sec;
+			if (out_alpha < alpha) {
+				alpha = out_alpha;
+			}
+		}
+		tint.a *= (float)Math::clamp(alpha, 0.0, 1.0);
+	}
 	bake.shards[slot.last_shard]->get_multimesh()->set_instance_color(slot_index, tint);
 	slot.tint = tint;
 }

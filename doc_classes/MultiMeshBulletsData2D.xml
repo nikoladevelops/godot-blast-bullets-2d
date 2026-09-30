@@ -83,7 +83,13 @@
 			Note: You can enable the [BulletFactory2D]'s debugger to make collision shapes visible.
 		</member>
 		<member name="effect_layers" type="BulletEffectLayerData2D[]" setter="set_effect_layers" getter="get_effect_layers" default="[]">
-			Stackable sprite-effect layers (trails, spawn flashes, hit sparks, destroy explosions, bounce sparks, lifetime fizzles). Each entry renders through its own per-frame shards: one extra draw call per animation frame while anything is visible, zero when idle. Empty (default) disables the whole feature. Assign custom SpriteFrames per layer. Cost scales with art (frames), bullets, and active one-shots, not with layer count alone.
+			Stackable sprite-effect layers (trails, spawn flashes, hit sparks, destroy explosions, bounce sparks, lifetime fizzles, manual-clear puffs). Each entry renders through its own per-frame shards: one extra draw call per animation frame while anything is visible, zero when idle. Empty (default) disables the whole feature. Assign custom SpriteFrames per layer. Cost scales with art (frames), bullets, and active one-shots, not with layer count alone.
+		</member>
+		<member name="fade_in_sec" type="float" setter="set_fade_in_sec" getter="get_fade_in_sec" default="0.0">
+			Fade-in seconds after spawn (0 disables). The volley starts at transparent base tint and reaches full tint at fade_in_sec. Works with infinite lifetimes (age since spawn).
+		</member>
+		<member name="fade_out_sec" type="float" setter="set_fade_out_sec" getter="get_fade_out_sec" default="0.0">
+			Fade-out seconds before expiry (0 disables). Needs a finite lifetime: infinite volleys never expire, so fade_out is ignored there.
 		</member>
 
 		<member name="instance_shader_parameters" type="Dictionary" setter="set_instance_shader_parameters" getter="get_instance_shader_parameters" default="{}">
@@ -119,10 +125,16 @@
 		<member name="mesh" type="Mesh" setter="set_mesh" getter="get_mesh">
 			Custom bullet mesh. If null (default) a [QuadMesh] is auto-built from [member texture_size] (or the first animation frame size). Provide your own [Mesh] only when you handle scaling in the shader. The inspector filters to [Mesh] resources.
 		</member>
+		<member name="modulate_ramp" type="Gradient" setter="set_modulate_ramp" getter="get_modulate_ramp">
+			Tint-over-life gradient, sampled by lifetime fraction (0 at spawn, 1 at expiry) and multiplied with the base tint and [member fade_in_sec]/[member fade_out_sec]. Null (default) disables it. Infinite lifetimes ignore it (no fraction exists).
+		</member>
 		<member name="monitorable" type="bool" setter="set_monitorable" getter="get_monitorable" default="false">
 			If you want static bodies to be hit by the bullets, you have to set [member monitorable] to true.
 
 			Note: This is at the cost of performance, so a better workaround is to attach an [Area2D] to those static bodies and detect that instead.
+		</member>
+		<member name="override_frame_color" type="bool" setter="set_override_frame_color" getter="get_override_frame_color" default="false">
+			Bullet whiten override (both bullet types share the animation rebuild): bullet frames bake whitened (alpha preserved), so [member self_modulate] tints bullets to the exact dialed color instead of multiplying the source art. Unreadable frames keep the original art with one warning per rebuild, never a blank.
 		</member>
 		<member name="rotate_only_textures" type="bool" setter="set_rotate_only_textures" getter="get_rotate_only_textures" default="true">
 			If you set this to [code]false[/code], then the collision shapes will also rotate along with the bullet's texture.

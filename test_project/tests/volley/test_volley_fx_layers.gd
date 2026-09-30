@@ -8,7 +8,11 @@ extends SceneTree
 ## auto), 24-frame bake cap, applied z/tint/texture/visibility/light,
 ## bounce sparks, block-volley trails, spawner integration, manual hatch +
 ## clear, interpolation agreement, ramp tints, volley self_modulate,
-## rotation offsets + spin (trail + one-shot).
+## rotation offsets + spin (trail + one-shot), On Clear manual visuals,
+## volley fade in/out + tint-over-life ramp, inspector trigger hint,
+## layer fades (one-shot envelope + trail volley-age envelope),
+## whiten override (exact-color frames, alpha preserved, fallback),
+## bullet whiten override (exact tint, toggle, reuse).
 ## Run: godot --headless --path test_project --script tests/volley/test_volley_fx_layers.gd
 ## Exit code 0 = all pass.
 
@@ -61,7 +65,7 @@ func _settle(factory: BulletFactory2D) -> void:
 	factory.clear_sprite_effects()
 	await physics_frame
 
-func _make_frames(count: int, anims: Array = ["default"]) -> SpriteFrames:
+func _make_frames(count: int, anims: Array = ["default"], col: Color = Color(1, 1, 1, 1)) -> SpriteFrames:
 	var sf := SpriteFrames.new()
 	for a in anims:
 		if not sf.has_animation(a):
@@ -70,7 +74,7 @@ func _make_frames(count: int, anims: Array = ["default"]) -> SpriteFrames:
 		sf.set_animation_loop(a, false)
 		for i in count:
 			var img := Image.create_empty(8, 8, false, Image.FORMAT_RGBA8)
-			img.fill(Color(1, 1, 1, 1))
+			img.fill(col)
 			sf.add_frame(a, ImageTexture.create_from_image(img))
 	return sf
 
@@ -79,6 +83,28 @@ func _make_layer(trigger: int, count: int = 4, anims: Array = ["default"]) -> Bu
 	l.trigger = trigger
 	l.sprite_frames = _make_frames(count, anims)
 	return l
+
+func _fx_live_tint(factory: BulletFactory2D, layer: int) -> Color:
+	var st: Dictionary = factory.debug_get_effect_state()
+	var bakes: Array = st.get("bakes", [])
+	for b in bakes:
+		if int(b.get("layer", -1)) != layer:
+			continue
+		var live: Array = b.get("live_slots", [])
+		if live.is_empty():
+			continue
+		return live[0].get("tint", Color(-1, -1, -1, -1))
+	return Color(-1, -1, -1, -1)
+
+func _fx_trail_tint(v: DirectionalBullets2D) -> Color:
+	var info: Dictionary = v.debug_get_effect_layers_info()
+	var bakes: Array = info.get("trail_bakes", [])
+	if bakes.is_empty():
+		return Color(-1, -1, -1, -1)
+	var live: Array = bakes[0].get("live_trails", [])
+	if live.is_empty():
+		return Color(-1, -1, -1, -1)
+	return live[0].get("tint", Color(-1, -1, -1, -1))
 
 func _initialize() -> void:
 	var factory := BulletFactory2D.new()
@@ -802,6 +828,272 @@ func _initialize() -> void:
 	for i in 60:
 		await physics_frame
 	_check(factory.get_active_effect_count() == 0, "edited manual effects expire")
+
+	printerr("FX T23 On Clear fires on manual clear only")
+	await _settle(factory)
+	var clear_ok := BulletEffectLayerData2D.new()
+	clear_ok.trigger = 6
+	_check(clear_ok.trigger == 6, "trigger 6 (On Clear) accepted")
+	var d23 := _fx_data(Vector2.ZERO, 0.0, [_make_layer(6, 4)], false)
+	d23.transforms = [Transform2D(0.0, Vector2.ZERO), Transform2D(0.0, Vector2(32, 0))]
+	var v23: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d23)
+	_check(v23.clear_bullet(0), "clear_bullet live slot returns true")
+	for i in 3:
+		await physics_frame
+	_check(factory.get_active_effect_count() >= 1, "manual clear fires On Clear")
+	var count_after: int = factory.get_active_effect_count()
+	_check(not v23.clear_bullet(0), "double clear stays silent")
+	_check(factory.get_active_effect_count() == count_after, "no second visual for dead slot")
+	_check(not v23.clear_bullet(99), "clear invalid index refused")
+	_check(v23.clear_all_bullets() == 1, "clear_all drains the last live bullet")
+	for i in 60:
+		await physics_frame
+	_check(factory.get_active_effect_count() == 0, "clear visuals expire")
+	await _settle(factory)
+	var d23k := _fx_data(Vector2.ZERO, 300.0, [_make_layer(6, 4)], false)
+	d23k.set_bullet_max_collision_count(1)
+	var v23k: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d23k)
+	for i in 120:
+		await physics_frame
+		if not v23k.is_bullet_status_enabled(0):
+			break
+	_check(not v23k.is_bullet_status_enabled(0), "wall killed the clear-layer bullet")
+	for i in 3:
+		await physics_frame
+	_check(factory.get_active_effect_count() == 0, "kill does not fire On Clear (Destroy owns it)")
+	await _settle(factory)
+	var d23e := _fx_data(Vector2.ZERO, 0.0, [_make_layer(6, 4)], false)
+	d23e.max_life_time = 0.2
+	var v23e: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d23e)
+	for i in 60:
+		await physics_frame
+	_check(factory.get_active_effect_count() == 0, "timeout does not fire On Clear (Lifetime Over owns it)")
+	_check(not v23e.is_bullet_status_enabled(0), "expiry volley drained")
+
+	printerr("FX T24 volley fades: in, out, ramp, infinite, reuse")
+	await _settle(factory)
+	var d24 := _fx_data(Vector2.ZERO, 0.0, [], false)
+	d24.fade_in_sec = 0.5
+	d24.max_life_time = 8.0
+	var v24: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d24)
+	for i in 2:
+		await physics_frame
+	_check(v24.self_modulate.a < 1.0, "fade-in starts transparent")
+	_check(v24.self_modulate.a > 0.0, "fade-in already ramping")
+	for i in 60:
+		await physics_frame
+	_check(absf(v24.self_modulate.a - 1.0) < 0.05, "fade-in reaches full tint")
+	await _settle(factory)
+	var d24o := _fx_data(Vector2.ZERO, 0.0, [], false)
+	d24o.fade_out_sec = 0.5
+	d24o.max_life_time = 1.0
+	var v24o: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d24o)
+	for i in 45:
+		await physics_frame
+	_check(v24o.self_modulate.a < 0.9, "fade-out dims before expiry")
+	_check(v24o.is_bullet_status_enabled(0), "volley alive mid fade-out")
+	for i in 60:
+		await physics_frame
+	_check(not v24o.is_bullet_status_enabled(0), "fade-out volley still expires")
+	await _settle(factory)
+	var d24i := _fx_data(Vector2.ZERO, 0.0, [], false)
+	d24i.is_life_time_infinite = true
+	d24i.fade_in_sec = 0.3
+	d24i.fade_out_sec = 5.0
+	var v24i: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d24i)
+	for i in 120:
+		await physics_frame
+	_check(absf(v24i.self_modulate.a - 1.0) < 0.05, "infinite volley ignores fade-out, holds full tint")
+	await _settle(factory)
+	var vol_ramp := Gradient.new()
+	vol_ramp.set_color(0, Color(1, 1, 1, 1))
+	vol_ramp.set_color(1, Color(1, 1, 1, 0))
+	var d24r := _fx_data(Vector2.ZERO, 0.0, [], false)
+	d24r.max_life_time = 2.0
+	d24r.modulate_ramp = vol_ramp
+	var v24r: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d24r)
+	for i in 60:
+		await physics_frame
+	_check(absf(v24r.self_modulate.a - 0.5) < 0.15, "ramp samples lifetime fraction")
+	await _settle(factory)
+	var d24n := _fx_data(Vector2.ZERO, 0.0, [], false)
+	d24n.fade_in_sec = NAN
+	_check(d24n.fade_in_sec == 0.0, "NaN fade-in rejected")
+	d24n.fade_out_sec = -1.0
+	_check(d24n.fade_out_sec == 0.0, "negative fade-out rejected")
+	d24n.fade_in_sec = 0.5
+	d24n.max_life_time = 8.0
+	var v24a: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d24n)
+	for i in 70:
+		await physics_frame
+	var v24b: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d24n)
+	for i in 2:
+		await physics_frame
+	_check(v24b.self_modulate.a < 1.0, "second life restarts transparent (no tint leak)")
+
+	printerr("FX T25 On Clear visible in the inspector dropdown")
+	await _settle(factory)
+	var hint_found := false
+	var order: Dictionary = {}
+	for p in BulletEffectLayerData2D.new().get_property_list():
+		var pname: String = p.get("name", "")
+		if pname == "trigger":
+			hint_found = String(p.get("hint_string", "")).contains("On Clear")
+		if pname in ["self_modulate", "color_ramp", "fade_in_sec", "fade_out_sec", "override_frame_color"]:
+			order[pname] = order.size()
+	_check(hint_found, "trigger hint lists On Clear")
+	_check(order.get("color_ramp", 99) == order.get("self_modulate", -1) + 1, "color_ramp sits with self_modulate")
+	_check(order.get("fade_in_sec", 99) == order.get("color_ramp", -1) + 1, "fade_in sits with colors")
+	_check(order.get("fade_out_sec", 99) == order.get("fade_in_sec", -1) + 1, "fade_out sits with colors")
+	_check(order.get("override_frame_color", 99) == order.get("fade_out_sec", -1) + 1, "override sits with colors")
+	var dorder: Dictionary = {}
+	for p in DirectionalBulletsData2D.new().get_property_list():
+		var pname2: String = p.get("name", "")
+		if pname2 in ["self_modulate", "override_frame_color"]:
+			dorder[pname2] = dorder.size()
+	_check(dorder.get("override_frame_color", 99) == dorder.get("self_modulate", -1) + 1, "bullet override sits with self_modulate")
+
+	printerr("FX T26 layer fades: envelope on one-shots, trails ignore")
+	await _settle(factory)
+	var d26a := _fx_data(Vector2.ZERO, 0.0, [], false)
+	var lin := _make_layer(1, 4)
+	lin.fade_in_sec = 0.2
+	d26a.effect_layers = [lin]
+	var v26a: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d26a)
+	for i in 2:
+		await physics_frame
+	var tint_in: Color = _fx_live_tint(factory, 0)
+	_check(tint_in.a < 1.0 and tint_in.a > 0.0, "fade-in slot starts transparent")
+	for i in 30:
+		await physics_frame
+	_check(factory.get_active_effect_count() == 0, "fade-in slot still expires on schedule")
+	await _settle(factory)
+	var d26b := _fx_data(Vector2.ZERO, 0.0, [], false)
+	var lout := _make_layer(1, 4)
+	lout.fade_out_sec = 0.2
+	d26b.effect_layers = [lout]
+	var v26b: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d26b)
+	for i in 2:
+		await physics_frame
+	_check(_fx_live_tint(factory, 0).a > 0.95, "fade-out slot starts solid")
+	for i in 13:
+		await physics_frame
+	_check(_fx_live_tint(factory, 0).a < 0.95, "fade-out dims before the end")
+	for i in 30:
+		await physics_frame
+	_check(factory.get_active_effect_count() == 0, "fade-out slot still expires")
+	await _settle(factory)
+	var d26c := _fx_data(Vector2.ZERO, 0.0, [], false)
+	var llong := _make_layer(1, 4)
+	llong.fade_out_sec = 5.0
+	d26c.effect_layers = [llong]
+	var v26c: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d26c)
+	for i in 15:
+		await physics_frame
+	_check(_fx_live_tint(factory, 0).a < 0.5, "oversized fade-out dims proportionally, never sticks at full")
+	for i in 30:
+		await physics_frame
+	_check(factory.get_active_effect_count() == 0, "oversized fade-out still expires")
+	await _settle(factory)
+	var d26t := _fx_data(Vector2.ZERO, 0.0, [], false)
+	d26t.max_life_time = 8.0
+	var ltrail := _make_layer(0, 1)
+	ltrail.fade_in_sec = 0.5
+	d26t.effect_layers = [ltrail]
+	var v26t: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d26t)
+	for i in 2:
+		await physics_frame
+	_check(_fx_trail_tint(v26t).a < 1.0, "trail fade-in starts transparent")
+	for i in 40:
+		await physics_frame
+	_check(absf(_fx_trail_tint(v26t).a - 1.0) < 0.05, "trail fade-in reaches solid")
+	_check(v26t.is_bullet_status_enabled(0), "faded trail volley alive")
+	await _settle(factory)
+	var d26to := _fx_data(Vector2.ZERO, 0.0, [], false)
+	d26to.max_life_time = 1.0
+	var ltrout := _make_layer(0, 1)
+	ltrout.fade_out_sec = 0.5
+	d26to.effect_layers = [ltrout]
+	var v26to: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d26to)
+	for i in 45:
+		await physics_frame
+	_check(_fx_trail_tint(v26to).a < 0.9, "trail fade-out dims with the volley")
+	_check(v26to.is_bullet_status_enabled(0), "trail volley alive mid fade-out")
+	await _settle(factory)
+	var d26n := _make_layer(1, 4)
+	d26n.fade_in_sec = NAN
+	_check(d26n.fade_in_sec == 0.0, "NaN layer fade-in rejected")
+	d26n.fade_out_sec = -2.0
+	_check(d26n.fade_out_sec == 0.0, "negative layer fade-out rejected")
+
+	printerr("FX T27 whiten override: pixels, rebake, fallback")
+	var red := Image.create_empty(4, 4, false, Image.FORMAT_RGBA8)
+	red.fill(Color(1, 0, 0, 1))
+	red.set_pixel(1, 1, Color(1, 0, 0, 0.5))
+	var white: Image = BulletEffectLayerData2D.whiten_image_copy(red)
+	_check(white != null and white.get_pixel(0, 0) == Color(1, 1, 1, 1), "red bakes to white")
+	_check(white != null and absf(white.get_pixel(1, 1).a - 0.5) < 0.01 and white.get_pixel(1, 1).r > 0.9, "alpha preserved under white")
+	_check(BulletEffectLayerData2D.whiten_image_copy(Image.new()) == null, "empty image refused")
+	_check(BulletEffectLayerData2D.whiten_image_copy(Image.create_empty(600, 8, false, Image.FORMAT_RGBA8)) == null, "oversized image refused")
+	await _settle(factory)
+	var d27 := _fx_data(Vector2.ZERO, 0.0, [], false)
+	var lwhite := _make_layer(1, 4)
+	d27.effect_layers = [lwhite]
+	var v27: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d27)
+	for i in 3:
+		await physics_frame
+	_check(factory.get_active_effect_count() >= 1, "plain layer fires before override")
+	lwhite.override_frame_color = true
+	var v27b: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d27)
+	for i in 3:
+		await physics_frame
+	_check(factory.get_active_effect_count() >= 1, "whitened layer fires after rebake")
+	for i in 60:
+		await physics_frame
+	_check(factory.get_active_effect_count() == 0, "whitened slots expire")
+	await _settle(factory)
+	var sf_bad := SpriteFrames.new()
+	if not sf_bad.has_animation("default"):
+		sf_bad.add_animation("default")
+	sf_bad.set_animation_speed("default", 10.0)
+	sf_bad.set_animation_loop("default", false)
+	sf_bad.add_frame("default", AtlasTexture.new())
+	var lfb := BulletEffectLayerData2D.new()
+	lfb.trigger = 1
+	lfb.sprite_frames = sf_bad
+	lfb.override_frame_color = true
+	var d27b := _fx_data(Vector2.ZERO, 0.0, [lfb], false)
+	var v27c: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d27b)
+	for i in 3:
+		await physics_frame
+	_check(factory.get_active_effect_count() >= 1, "unreadable frame falls back, still fires")
+	for i in 30:
+		await physics_frame
+
+	printerr("FX T28 bullet whiten override: exact tint, toggle, reuse")
+	await _settle(factory)
+	var d28 := _fx_data(Vector2.ZERO, 0.0, [], false)
+	d28.sprite_frames = _make_frames(2, ["default"], Color(1, 0, 0, 1))
+	d28.self_modulate = Color(0, 0, 1, 1)
+	d28.override_frame_color = true
+	var v28: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d28)
+	_check(v28.get_texture().get_image().get_pixel(0, 0).r > 0.9, "red bullet art bakes white")
+	_check(v28.get_texture().get_image().get_pixel(0, 0).g > 0.9, "white keeps all channels")
+	_check(v28.is_bullet_status_enabled(0), "whitened volley alive")
+	await _settle(factory)
+	var d28b := _fx_data(Vector2.ZERO, 0.0, [], false)
+	d28b.sprite_frames = _make_frames(2, ["default"], Color(1, 0, 0, 1))
+	var v28b: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d28b)
+	_check(v28b.get_texture().get_image().get_pixel(0, 0).r > 0.9, "plain art starts red")
+	v28b.set_override_frame_color(true)
+	_check(v28b.get_texture().get_image().get_pixel(0, 0).r > 0.9 and v28b.get_texture().get_image().get_pixel(0, 0).g > 0.9, "live toggle whitens")
+	v28b.set_override_frame_color(false)
+	_check(v28b.get_texture().get_image().get_pixel(0, 0).g < 0.1, "live toggle restores art")
+	await _settle(factory)
+	var v28c: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d28)
+	_check(v28c.get_texture().get_image().get_pixel(0, 0).g > 0.9, "pooled reuse honors override")
+	var v28d: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d28b)
+	_check(v28d.get_texture().get_image().get_pixel(0, 0).g < 0.1, "reuse without override restores art")
 
 	await process_frame
 	factory.reset()

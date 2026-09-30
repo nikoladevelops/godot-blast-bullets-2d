@@ -14,6 +14,8 @@
 #include "shared/bullet_movement_pattern_data2d.hpp"
 #include "shared/collision_shape_helper2d.hpp"
 #include <godot_cpp/classes/atlas_texture.hpp>
+#include <godot_cpp/classes/image.hpp>
+#include <godot_cpp/classes/image_texture.hpp>
 #include <godot_cpp/classes/physics_server2d.hpp>
 #include <godot_cpp/classes/random_number_generator.hpp>
 #include <godot_cpp/classes/scene_state.hpp>
@@ -563,13 +565,15 @@ void MultiMeshBullets2D::spawn(const MultiMeshBulletsData2D &data, MultiMeshObje
 
 	// Single-error policy: rebuild_sprite_animation already reported the cause;
 	// no wrapper error here. Failure leaves previous texture/cache untouched.
+	// Appearance snapshot first: the rebuild below whitens frames when the
+	// data asks for it, and the fade half starts transparent when fading in.
+	snapshot_appearance_from_data(data);
 	rebuild_sprite_animation(data.sprite_frames, data.animation);
 
 	custom_additional_spawn_logic(data);
 
 	set_process(false);
 	set_physics_process(false);
-
 	if (spawn_in_pool) {
 		set_visible(false);
 		is_active = false;
@@ -805,6 +809,8 @@ bool MultiMeshBullets2D::enable_multimesh(const MultiMeshBulletsData2D &data, co
 
 	// Single-error policy: rebuild already reported; blank animation kept on failure.
 	// (Frames were blanked in the prologue; connections scrubbed by the reset.)
+	// Appearance snapshot first (same ordering as spawn above).
+	snapshot_appearance_from_data(data);
 	rebuild_sprite_animation(data.sprite_frames, data.animation);
 
 	// Seeding-only subclass step. Unreachable in practice: wrong-type data was
@@ -943,6 +949,115 @@ void MultiMeshBullets2D::set_up_life_time_timer(double new_max_life_time, double
 	current_life_time = new_current_life_time;
 }
 
+double MultiMeshBullets2D::get_fade_in_sec() const {
+	return fade_in_sec;
+}
+void MultiMeshBullets2D::set_fade_in_sec(double value) {
+	if (!Math::is_finite(value) || value < 0.0) {
+		UtilityFunctions::push_error("MultiMeshBullets2D: fade_in_sec must be finite and >= 0, keeping the old value.");
+		return;
+	}
+	fade_in_sec = value;
+}
+double MultiMeshBullets2D::get_fade_out_sec() const {
+	return fade_out_sec;
+}
+void MultiMeshBullets2D::set_fade_out_sec(double value) {
+	if (!Math::is_finite(value) || value < 0.0) {
+		UtilityFunctions::push_error("MultiMeshBullets2D: fade_out_sec must be finite and >= 0, keeping the old value.");
+		return;
+	}
+	fade_out_sec = value;
+}
+Ref<Gradient> MultiMeshBullets2D::get_modulate_ramp() const {
+	return fade_modulate_ramp;
+}
+void MultiMeshBullets2D::set_modulate_ramp(const Ref<Gradient> &value) {
+	fade_modulate_ramp = value;
+}
+Color MultiMeshBullets2D::get_fade_base_modulate() const {
+	return fade_base_modulate;
+}
+void MultiMeshBullets2D::set_fade_base_modulate(const Color &value) {
+	fade_base_modulate = value;
+	// Re-arm the change detector so the next tick writes even if the value
+	// happens to equal the stale applied snapshot.
+	fade_applied = Color(-1, -1, -1, -1);
+}
+bool MultiMeshBullets2D::get_override_frame_color() const {
+	return anim_override_frame_color;
+}
+void MultiMeshBullets2D::set_override_frame_color(bool value) {
+	if (anim_override_frame_color == value) {
+		return;
+	}
+	anim_override_frame_color = value;
+	// Live toggle rebuilds the cached frames from the stored source (same
+	// path as play_sprite_animation_name). No source yet means nothing to
+	// rebuild: the next spawn/enable applies it through the snapshot.
+	if (!anim_source.is_null()) {
+		rebuild_sprite_animation(anim_source, anim_name);
+	}
+}
+
+void MultiMeshBullets2D::snapshot_appearance_from_data(const MultiMeshBulletsData2D &data) {
+	fade_base_modulate = data.self_modulate;
+	fade_in_sec = data.fade_in_sec;
+	fade_out_sec = data.fade_out_sec;
+	fade_modulate_ramp = data.modulate_ramp;
+	anim_override_frame_color = data.override_frame_color;
+	if (fade_in_sec > 0.0) {
+		// No full-alpha flash before the first tick: start transparent now,
+		// the tick below ramps up from here.
+		Color start = fade_base_modulate;
+		start.a = 0.0;
+		set_self_modulate(start);
+		fade_applied = start;
+	} else {
+		fade_applied = fade_base_modulate;
+	}
+}
+
+void MultiMeshBullets2D::tick_volley_fade() {
+	if (fade_in_sec <= 0.0 && fade_out_sec <= 0.0 && fade_modulate_ramp.is_null()) {
+		return;
+	}
+	if (!Math::is_finite(curves_elapsed_time)) {
+		return;
+	}
+	const double age = curves_elapsed_time;
+	double alpha = 1.0;
+	if (fade_in_sec > 0.0 && age < fade_in_sec) {
+		alpha = age / fade_in_sec;
+	}
+	Color target = fade_base_modulate;
+	// Fade-out and the ramp need a lifetime fraction: infinite volleys
+	// never expire, so only fade-in applies there (documented).
+	if (!is_life_time_infinite && max_life_time > 0.0 && Math::is_finite(current_life_time)) {
+		if (fade_out_sec > 0.0 && current_life_time < fade_out_sec) {
+			const double out_alpha = current_life_time / fade_out_sec;
+			if (out_alpha < alpha) {
+				alpha = out_alpha;
+			}
+		}
+		if (fade_modulate_ramp.is_valid()) {
+			const double pos = Math::clamp(age / max_life_time, 0.0, 1.0);
+			target = fade_base_modulate * fade_modulate_ramp->sample((float)pos);
+		}
+	}
+	if (alpha < 0.0) {
+		alpha = 0.0;
+	} else if (alpha > 1.0) {
+		alpha = 1.0;
+	}
+	target.a *= (float)alpha;
+	if (target == fade_applied) {
+		return;
+	}
+	set_self_modulate(target);
+	fade_applied = target;
+}
+
 static bool resolve_sprite_animation_impl(const Ref<SpriteFrames> &p_sprite_frames, const StringName &p_requested, StringName &out_anim, bool silent) {
 	if (p_sprite_frames.is_null()) {
 		if (!silent) {
@@ -1031,6 +1146,7 @@ bool MultiMeshBullets2D::rebuild_sprite_animation(const Ref<SpriteFrames> &p_spr
 	std::vector<double> secs;
 	frames.reserve(count);
 	secs.reserve(count);
+	bool whiten_warned = false;
 	for (int i = 0; i < count; ++i) {
 		Ref<Texture2D> tex = p_sprite_frames->get_frame_texture(anim, i);
 		if (tex.is_null()) {
@@ -1038,7 +1154,27 @@ bool MultiMeshBullets2D::rebuild_sprite_animation(const Ref<SpriteFrames> &p_spr
 			return false; // previous cache untouched (swap only on success below)
 		}
 		const float dur = p_sprite_frames->get_frame_duration(anim, i);
-		frames.push_back(tex);
+		if (anim_override_frame_color) {
+			// Exact-color bullets: whitened copy (alpha preserved) so the
+			// volley tint reads exactly. Same fallback contract as the
+			// effect-layer override: unreadable frames keep the original
+			// art with one warning per rebuild, never a blank.
+			Ref<Image> white = BulletEffectLayerData2D::whiten_image_copy(BulletEffectLayerData2D::read_frame_image(tex));
+			if (white.is_valid()) {
+				Ref<ImageTexture> white_tex;
+				white_tex.instantiate();
+				white_tex->set_image(white);
+				frames.push_back(white_tex);
+			} else {
+				if (!whiten_warned) {
+					whiten_warned = true;
+					UtilityFunctions::push_warning("MultiMeshBullets2D: override_frame_color could not read a frame of '" + String(anim) + "', keeping the original art for unreadable frames.");
+				}
+				frames.push_back(tex);
+			}
+		} else {
+			frames.push_back(tex);
+		}
 		secs.push_back((dur <= 0.0f ? 0.0 : (double)dur / fps));
 	}
 	anim_source = p_sprite_frames;
@@ -2313,6 +2449,8 @@ void MultiMeshBullets2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_sprite_frame_count"), &MultiMeshBullets2D::get_sprite_frame_count);
 
 	ClassDB::bind_method(D_METHOD("disable_bullet", "bullet_index", "disable_bullet_attachment"), &MultiMeshBullets2D::disable_bullet, DEFVAL(true));
+	ClassDB::bind_method(D_METHOD("clear_bullet", "bullet_index"), &MultiMeshBullets2D::clear_bullet);
+	ClassDB::bind_method(D_METHOD("clear_all_bullets"), &MultiMeshBullets2D::clear_all_bullets);
 	ClassDB::bind_method(D_METHOD("enable_bullet", "bullet_index", "collision_amount", "enable_attachment"), &MultiMeshBullets2D::enable_bullet, DEFVAL(0), DEFVAL(true));
 	ClassDB::bind_method(D_METHOD("wake_bullet", "bullet_index", "collision_amount", "enable_attachment"), &MultiMeshBullets2D::wake_bullet, DEFVAL(0), DEFVAL(true));
 	ClassDB::bind_method(D_METHOD("debug_get_volley_info"), &MultiMeshBullets2D::debug_get_volley_info);
@@ -2350,6 +2488,20 @@ void MultiMeshBullets2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("all_bullets_set_custom_data", "new_custom_data", "bullet_index_start", "bullet_index_end_inclusive"), &MultiMeshBullets2D::all_bullets_set_custom_data, DEFVAL(0), DEFVAL(-1));
 
 	ClassDB::bind_method(D_METHOD("get_is_life_time_infinite"), &MultiMeshBullets2D::get_is_life_time_infinite);
+	ClassDB::bind_method(D_METHOD("get_fade_in_sec"), &MultiMeshBullets2D::get_fade_in_sec);
+	ClassDB::bind_method(D_METHOD("set_fade_in_sec", "value"), &MultiMeshBullets2D::set_fade_in_sec);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "fade_in_sec", PROPERTY_HINT_RANGE, "0,10,0.01,or_greater"), "set_fade_in_sec", "get_fade_in_sec");
+	ClassDB::bind_method(D_METHOD("get_fade_out_sec"), &MultiMeshBullets2D::get_fade_out_sec);
+	ClassDB::bind_method(D_METHOD("set_fade_out_sec", "value"), &MultiMeshBullets2D::set_fade_out_sec);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "fade_out_sec", PROPERTY_HINT_RANGE, "0,10,0.01,or_greater"), "set_fade_out_sec", "get_fade_out_sec");
+	ClassDB::bind_method(D_METHOD("get_modulate_ramp"), &MultiMeshBullets2D::get_modulate_ramp);
+	ClassDB::bind_method(D_METHOD("set_modulate_ramp", "value"), &MultiMeshBullets2D::set_modulate_ramp);
+	ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "modulate_ramp", PROPERTY_HINT_RESOURCE_TYPE, "Gradient"), "set_modulate_ramp", "get_modulate_ramp");
+	ClassDB::bind_method(D_METHOD("get_fade_base_modulate"), &MultiMeshBullets2D::get_fade_base_modulate);
+	ClassDB::bind_method(D_METHOD("set_fade_base_modulate", "value"), &MultiMeshBullets2D::set_fade_base_modulate);
+	ClassDB::bind_method(D_METHOD("get_override_frame_color"), &MultiMeshBullets2D::get_override_frame_color);
+	ClassDB::bind_method(D_METHOD("set_override_frame_color", "value"), &MultiMeshBullets2D::set_override_frame_color);
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "override_frame_color"), "set_override_frame_color", "get_override_frame_color");
 	ClassDB::bind_method(D_METHOD("set_is_life_time_infinite", "value"), &MultiMeshBullets2D::set_is_life_time_infinite);
 	ADD_GROUP("Lifetime", "");
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "is_life_time_infinite"), "set_is_life_time_infinite", "get_is_life_time_infinite");
@@ -2533,6 +2685,7 @@ void MultiMeshBullets2D::reduce_lifetime(double delta) {
 			return;
 		}
 		curves_elapsed_time += delta;
+		tick_volley_fade();
 
 		// If the lifetime is infinite there is no lifetime timer
 		if (is_life_time_infinite) {
@@ -2951,6 +3104,42 @@ void MultiMeshBullets2D::disable_bullet(int bullet_index, bool should_disable_at
 		if (active_bullets_counter <= 0) {
 			disable_multimesh();
 		}
+	}
+
+bool MultiMeshBullets2D::clear_bullet(int bullet_index) {
+		if (!validate_bullet_index(bullet_index, "clear_bullet")) {
+			return false;
+		}
+		// Already-dead slots stay silent: without this a double clear would
+		// fire a second visual for a bullet that is already gone.
+		if (!all_bullets_enabled_set.contains(bullet_index)) {
+			return false;
+		}
+		// Pose captured before the disable below (disable never moves the
+		// bullet, but the last-bullet disable funnels into disable_multimesh
+		// which pools the instance; the DESTROY path fires the same way).
+		Transform2D fx_clear_transf;
+		const bool fx_have_pose = bullet_index >= 0 && bullet_index < (int)all_cached_instance_transforms.size();
+		if (fx_have_pose) {
+			fx_clear_transf = all_cached_instance_transforms[bullet_index];
+		}
+		disable_bullet(bullet_index, true);
+		if (fx_have_pose) {
+			fx_fire_oneshot(EFFECT_ON_CLEAR, bullet_index, fx_clear_transf);
+		}
+		return true;
+	}
+
+int MultiMeshBullets2D::clear_all_bullets() {
+		// Snapshot first: each clear mutates the live set below.
+		std::vector<int> live = all_bullets_enabled_set.get_active_indexes();
+		int cleared = 0;
+		for (int i : live) {
+			if (clear_bullet(i)) {
+				++cleared;
+			}
+		}
+		return cleared;
 	}
 
 void MultiMeshBullets2D::handle_bullet_collision(CollisionType collision_type, int bullet_index, int64_t entered_instance_id, uint64_t queued_bullet_epoch) {

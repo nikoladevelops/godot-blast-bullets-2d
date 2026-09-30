@@ -713,6 +713,9 @@ double BulletSpawner2D::get_spin_angle_deg() const {
 bool BulletSpawner2D::is_spinning() const {
     return spin_enabled && !Engine::get_singleton()->is_editor_hint();
 }
+bool BulletSpawner2D::is_orbit_armed() const {
+    return homing_enabled && orbiting_enabled;
+}
 void BulletSpawner2D::start_spinning() {
     set_spin_enabled(true);
 }
@@ -5001,8 +5004,10 @@ void BulletSpawner2D::apply_volley_homing_and_orbiting(DirectionalBullets2D *bul
     }
     // Orbiting locks onto a homing target: without homing there is nothing
     // to orbit, so skip it outright instead of arming a dead feature.
+    // The volley instance id names the affected volley: with several
+    // spawners firing, a bare warning cannot tell which volley flew straight.
     if (orbiting_enabled && !homing_enabled) {
-        UtilityFunctions::push_warning("BulletSpawner2D: orbiting_enabled needs homing_enabled (orbiting locks onto a homing target). Volley flies without orbiting.");
+        UtilityFunctions::push_warning(String("BulletSpawner2D: orbiting_enabled needs homing_enabled (orbiting locks onto a homing target). Volley ") + String::num_int64((int64_t)bullets->get_instance_id()) + String(" flies without orbiting."));
     }
     // Flat post-spawn nudge (muzzle offsets, whole-volley follows). Runs FIRST,
     // before homing/orbit seeding: orbit locks and homing caches then form at
@@ -8448,6 +8453,7 @@ void BulletSpawner2D::_bind_methods() {
 
 	ClassDB::bind_method(D_METHOD("get_spin_angle_deg"), &BulletSpawner2D::get_spin_angle_deg);
 	ClassDB::bind_method(D_METHOD("is_spinning"), &BulletSpawner2D::is_spinning);
+	ClassDB::bind_method(D_METHOD("is_orbit_armed"), &BulletSpawner2D::is_orbit_armed);
 	ClassDB::bind_method(D_METHOD("start_spinning"), &BulletSpawner2D::start_spinning);
 	ClassDB::bind_method(D_METHOD("stop_spinning"), &BulletSpawner2D::stop_spinning);
 	ClassDB::bind_method(D_METHOD("reset_spin_angle"), &BulletSpawner2D::reset_spin_angle);

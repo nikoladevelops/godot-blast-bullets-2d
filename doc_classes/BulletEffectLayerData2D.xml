@@ -12,6 +12,13 @@
 	<tutorials>
 	</tutorials>
 	<methods>
+		<method name="whiten_image_copy" qualifiers="static">
+			<return type="Image" />
+			<param index="0" name="src" type="Image" />
+			<description>
+				Pure pixel step of [member override_frame_color]: returns a copy with white RGB and identical alpha. Null, empty, or over-512px input returns null with one error.
+			</description>
+		</method>
 	</methods>
 	<members>
 		<member name="animation" type="StringName" setter="set_animation" getter="get_animation" default="&amp;&quot;default&quot;">
@@ -22,6 +29,12 @@
 		</member>
 		<member name="enabled" type="bool" setter="set_enabled" getter="get_enabled" default="true">
 			Master switch: toggle a layer without removing it from the array.
+		</member>
+		<member name="fade_in_sec" type="float" setter="set_fade_in_sec" getter="get_fade_in_sec" default="0.0">
+			Opacity ramp-up after the slot fires (0 disables). Multiplies with [member self_modulate] and [member color_ramp]. One-shot slots key it off slot age; trails key it off volley age and remaining lifetime. A fade longer than the life dims the whole life proportionally.
+		</member>
+		<member name="fade_out_sec" type="float" setter="set_fade_out_sec" getter="get_fade_out_sec" default="0.0">
+			Opacity ramp-down before the slot ends (0 disables). Same multiplication and keying as [member fade_in_sec]. Infinite volley lifetimes skip trail fade-out (volley fade-out is skipped there too).
 		</member>
 		<member name="light_mask" type="int" setter="set_light_mask" getter="get_light_mask" default="1">
 			Light mask bitmask for this layer's shards (same numbering as the bullet light_mask). Lets effects opt out of 2D lights.
@@ -34,6 +47,9 @@
 		</member>
 		<member name="offset" type="Vector2" setter="set_offset" getter="get_offset" default="Vector2(0, 0)">
 			Trail follow offset from the bullet origin, rotated with the bullet. One-shots add it (rotated by the event orientation) to the event pose.
+		</member>
+		<member name="override_frame_color" type="bool" setter="set_override_frame_color" getter="get_override_frame_color" default="false">
+			Exact-color mode: the bake replaces every frame's RGB with white (alpha preserved), so [member self_modulate] and [member color_ramp] produce the exact dialed color instead of multiplying the source art. Atlas frames are clipped from the base image; unreadable frames fall back to the original art with one warning. Costs roughly double texture memory for the layer while on. Toggling rebakes (manual-hatch outputs refresh through the layer version).
 		</member>
 		<member name="random_scale_max" type="float" setter="set_random_scale_max" getter="get_random_scale_max" default="1.0">
 			Upper end of the random uniform scale range per fired one-shot slot. Must stay finite and above [member random_scale_min].
@@ -63,7 +79,7 @@
 			Frames to play (required: null frames leave the layer inert with a single bake-time warning, never a crash).
 		</member>
 		<member name="trigger" type="int" setter="set_trigger" getter="get_trigger" default="0">
-			What this layer does: 0 Trail Follow (sticks to its bullet every tick, and follows physics interpolation exactly like the bullet), 1 On Spawn (muzzle flash at every bullet's spawn pose), 2 On Hit (sparks on counted hits), 3 On Destroy (explosion on collision-kill only, never on lifetime expiry or manual disable), 4 On Bounce (sparks on ricochet; a consumed bounce fires this once, not the hit spark), 5 On Lifetime Over (fizzle at expiry, on both the silent and the signalled expiry path).
+			What this layer does: 0 Trail Follow (sticks to its bullet every tick, and follows physics interpolation exactly like the bullet), 1 On Spawn (muzzle flash at every bullet's spawn pose), 2 On Hit (sparks on counted hits), 3 On Destroy (explosion on collision-kill only, never on lifetime expiry or manual disable), 4 On Bounce (sparks on ricochet; a consumed bounce fires this once, not the hit spark), 5 On Lifetime Over (fizzle at expiry, on both the silent and the signalled expiry path), 6 On Clear (dismissal puff fired by clear_bullet()/clear_all_bullets() only; kills and timeouts never fire it, teardown stays silent).
 		</member>
 		<member name="trigger_chance" type="float" setter="set_trigger_chance" getter="get_trigger_chance" default="1.0">
 			Fire probability per event. Stack three explosion layers at 0.5 and every kill looks different. 0 never fires, 1 always fires.

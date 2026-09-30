@@ -310,6 +310,11 @@ class BulletSpawner2D : public Node2D{
         // Current spin angle in degrees (runtime state, not stored).
         double get_spin_angle_deg() const;
         bool is_spinning() const;
+        // Config-level orbit readiness: both switches on. Per-volley lock
+        // still needs a resolvable target at spawn time (empty resolution
+        // flies straight and a later retarget pass can still pick it up),
+        // so this answers "did I configure orbiting" not "is the ring up".
+        bool is_orbit_armed() const;
         void start_spinning();
         void stop_spinning();
         void reset_spin_angle();

@@ -21,6 +21,21 @@ animations = [{
 "frames": [{
 "duration": 1.0,
 "texture": ExtResource("3_1inld")
+}, {
+"duration": 1.0,
+"texture": ExtResource("3_1inld")
+}, {
+"duration": 1.0,
+"texture": ExtResource("3_1inld")
+}, {
+"duration": 1.0,
+"texture": ExtResource("3_1inld")
+}, {
+"duration": 1.0,
+"texture": ExtResource("3_1inld")
+}, {
+"duration": 1.0,
+"texture": ExtResource("3_1inld")
 }],
 "loop": 1,
 "name": &"default",
@@ -28,9 +43,9 @@ animations = [{
 }]
 
 [sub_resource type="BulletEffectLayerData2D" id="BulletEffectLayerData2D_g0agp"]
-trigger = 5
 sprite_frames = SubResource("SpriteFrames_mouoi")
 color_ramp = SubResource("Gradient_7gbxi")
+override_frame_color = true
 offset = Vector2(-70, 0)
 scale = Vector2(0.2, 0.2)
 

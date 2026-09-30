@@ -389,6 +389,19 @@
 				Clears one bullet's per-bullet curves back to the shared fallback (or no curves when unset). Same as [method bullet_set_curves_data] with null, kept for symmetry with [method clear_per_bullet_homing_smoothing].
 			</description>
 		</method>
+		<method name="clear_all_bullets">
+			<return type="int" />
+			<description>
+				Clears every live bullet through [method clear_bullet]. Mass clears recycle the oldest one-shot slots past the layer ring, so hundreds of bullets never spawn hundreds of live effects. Returns how many bullets were cleared.
+			</description>
+		</method>
+		<method name="clear_bullet">
+			<return type="bool" />
+			<param index="0" name="bullet_index" type="int" />
+			<description>
+				Manual clear with visuals: disables the bullet and fires On Clear effect layers at its death pose. Already-dead or invalid slots return false and stay silent (no double fire). Collision kills fire On Destroy and timeouts fire On Lifetime Over through their own paths, never On Clear.
+			</description>
+		</method>
 		<method name="debug_get_attachment_info" qualifiers="const">
 			<return type="Dictionary" />
 			<param index="0" name="bullet_index" type="int" />
@@ -442,7 +455,7 @@
 			<param index="0" name="bullet_index" type="int" />
 			<param index="1" name="disable_bullet_attachment" type="bool" default="true" />
 			<description>
-				Disable a specific bullet from the multimesh
+				Disable a specific bullet from the multimesh. Silent (no effect layer fires): use [method clear_bullet] when the disappearance should read on screen.
 			</description>
 		</method>
 		<method name="enable_bullet">
@@ -579,6 +592,12 @@
 			<return type="BulletEffectLayerData2D[]" />
 			<description>
 				Live layer list (retained from the last spawn/enable/set).
+			</description>
+		</method>
+		<method name="get_fade_base_modulate" qualifiers="const">
+			<return type="Color" />
+			<description>
+				Base tint the fade tick multiplies. Snapshotted from spawn data on every spawn/enable; change it here at runtime (not through the CanvasItem setter, which the next fade tick would overwrite while any fade is configured).
 			</description>
 		</method>
 
@@ -930,6 +949,13 @@
 				Live layer rebake without a spawn flash: trigger routing, trail shards, and factory one-shot bakes all follow the new list.
 			</description>
 		</method>
+		<method name="set_fade_base_modulate">
+			<return type="void" />
+			<param index="0" name="value" type="Color" />
+			<description>
+				Retints the fade base at runtime and re-arms the fade tick so the next frame writes even when the value matches the stale snapshot.
+			</description>
+		</method>
 
 		<method name="set_inherited_velocity_offset">
 			<return type="void" />
@@ -976,7 +1002,19 @@
 			The elapsed time used for the bullets' curves. This is the time that gets passed to the curves assigned to the bullets, you can manipulate it freely.
 		</member>
 		<member name="effect_layers" type="BulletEffectLayerData2D[]" setter="set_effect_layers" getter="get_effect_layers" default="[]">
-			Stackable sprite-effect layers (trails, spawn flashes, hit sparks, destroy explosions, bounce sparks, lifetime fizzles). Each entry renders through its own per-frame shards: one extra draw call per animation frame while anything is visible, zero when idle. Empty (default) disables the whole feature. Assign custom SpriteFrames per layer. Cost scales with art (frames), bullets, and active one-shots, not with layer count alone.
+			Stackable sprite-effect layers (trails, spawn flashes, hit sparks, destroy explosions, bounce sparks, lifetime fizzles, manual-clear puffs). Each entry renders through its own per-frame shards: one extra draw call per animation frame while anything is visible, zero when idle. Empty (default) disables the whole feature. Assign custom SpriteFrames per layer. Cost scales with art (frames), bullets, and active one-shots, not with layer count alone.
+		</member>
+		<member name="fade_in_sec" type="float" setter="set_fade_in_sec" getter="get_fade_in_sec" default="0.0">
+			Fade-in seconds after spawn (0 disables). The volley starts at transparent base tint and reaches full tint at fade_in_sec. Works with infinite lifetimes. While any fade is configured the tick owns self_modulate: retint through [method set_fade_base_modulate], not the CanvasItem setter.
+		</member>
+		<member name="fade_out_sec" type="float" setter="set_fade_out_sec" getter="get_fade_out_sec" default="0.0">
+			Fade-out seconds before expiry (0 disables). Needs a finite lifetime: infinite volleys ignore it.
+		</member>
+		<member name="modulate_ramp" type="Gradient" setter="set_modulate_ramp" getter="get_modulate_ramp">
+			Live tint-over-life gradient, sampled by lifetime fraction and multiplied with the fade base and fades. Reseeded from spawn data on every spawn/enable. Null disables it.
+		</member>
+		<member name="override_frame_color" type="bool" setter="set_override_frame_color" getter="get_override_frame_color" default="false">
+			Live bullet whiten override: toggling rebuilds the cached animation frames whitened (alpha preserved) or restores the art. Reseeded from spawn data on every spawn/enable.
 		</member>
 
 		<member name="is_attachments_auto_pooling_enabled" type="bool" setter="set_is_attachments_auto_pooling_enabled" getter="get_is_attachments_auto_pooling_enabled" default="true">

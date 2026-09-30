@@ -147,6 +147,22 @@ public:
 	// every spawn/enable, so pool reuse never leaks the previous tint.
 	Color self_modulate = Color(1, 1, 1, 1);
 
+	// Bullet whiten override (both bullet types: directional and block
+	// share the animation rebuild below). When true, bullet frames bake
+	// whitened (alpha preserved), so self_modulate tints bullets to the
+	// exact dialed color instead of multiplying the source art. Same
+	// fallback contract as the effect-layer override: unreadable frames
+	// keep the original art with one warning, never a blank.
+	bool override_frame_color = false;
+
+	// Fade-in seconds after spawn. 0 (default) disables it.
+	double fade_in_sec = 0.0;
+	// Fade-out seconds before expiry. 0 (default) disables it. Ignored
+	// with infinite lifetimes (nothing expires).
+	double fade_out_sec = 0.0;
+	// Tint-over-life gradient, sampled by lifetime fraction. Null disables.
+	Ref<Gradient> modulate_ramp;
+
 	// How long will the bullets last, before being disabled. Depending on whether the bullets pool has reached its limit, it will either add the bullets to the pool or it will queue_free them.
 	double max_life_time = 2.0f;
 
@@ -264,6 +280,28 @@ public:
 
 	Color get_self_modulate() const;
 	void set_self_modulate(const Color &new_self_modulate);
+
+	bool get_override_frame_color() const;
+	void set_override_frame_color(bool value);
+
+	// Fade-in seconds after spawn (0 disables). The volley starts at
+	// transparent base tint and reaches full tint at fade_in_sec. Must be
+	// finite and >= 0. Works with infinite lifetimes (age since spawn).
+	double get_fade_in_sec() const;
+	void set_fade_in_sec(double value);
+
+	// Fade-out seconds before expiry (0 disables). Needs a finite lifetime:
+	// infinite volleys never expire, so fade_out is ignored there
+	// (documented, no warning). Must be finite and >= 0.
+	double get_fade_out_sec() const;
+	void set_fade_out_sec(double value);
+
+	// Tint-over-life gradient, sampled by lifetime fraction (0 at spawn,
+	// 1 at expiry) and multiplied with the base tint and the fades above.
+	// Null (default) disables it. Infinite lifetimes ignore it (no
+	// fraction exists); use fade_in_sec for endless volleys.
+	Ref<Gradient> get_modulate_ramp() const;
+	void set_modulate_ramp(const Ref<Gradient> &value);
 
 	Dictionary get_instance_shader_parameters() const;
 	void set_instance_shader_parameters(const Dictionary &new_instance_shader_parameters);

@@ -246,6 +246,38 @@ Color MultiMeshBulletsData2D::get_self_modulate() const {
 void MultiMeshBulletsData2D::set_self_modulate(const Color &new_self_modulate) {
 	self_modulate = new_self_modulate;
 }
+bool MultiMeshBulletsData2D::get_override_frame_color() const {
+	return override_frame_color;
+}
+void MultiMeshBulletsData2D::set_override_frame_color(bool value) {
+	override_frame_color = value;
+}
+double MultiMeshBulletsData2D::get_fade_in_sec() const {
+	return fade_in_sec;
+}
+void MultiMeshBulletsData2D::set_fade_in_sec(double value) {
+	if (!Math::is_finite(value) || value < 0.0) {
+		UtilityFunctions::push_error("MultiMeshBulletsData2D: fade_in_sec must be finite and >= 0, keeping the old value.");
+		return;
+	}
+	fade_in_sec = value;
+}
+double MultiMeshBulletsData2D::get_fade_out_sec() const {
+	return fade_out_sec;
+}
+void MultiMeshBulletsData2D::set_fade_out_sec(double value) {
+	if (!Math::is_finite(value) || value < 0.0) {
+		UtilityFunctions::push_error("MultiMeshBulletsData2D: fade_out_sec must be finite and >= 0, keeping the old value.");
+		return;
+	}
+	fade_out_sec = value;
+}
+Ref<Gradient> MultiMeshBulletsData2D::get_modulate_ramp() const {
+	return modulate_ramp;
+}
+void MultiMeshBulletsData2D::set_modulate_ramp(const Ref<Gradient> &value) {
+	modulate_ramp = value;
+}
 
 Dictionary MultiMeshBulletsData2D::get_instance_shader_parameters() const {
 	return instance_shader_parameters;
@@ -363,6 +395,22 @@ void MultiMeshBulletsData2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_self_modulate"), &MultiMeshBulletsData2D::get_self_modulate);
 	ClassDB::bind_method(D_METHOD("set_self_modulate", "new_self_modulate"), &MultiMeshBulletsData2D::set_self_modulate);
 	ADD_PROPERTY(PropertyInfo(Variant::COLOR, "self_modulate"), "set_self_modulate", "get_self_modulate");
+
+	ClassDB::bind_method(D_METHOD("get_override_frame_color"), &MultiMeshBulletsData2D::get_override_frame_color);
+	ClassDB::bind_method(D_METHOD("set_override_frame_color", "value"), &MultiMeshBulletsData2D::set_override_frame_color);
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "override_frame_color"), "set_override_frame_color", "get_override_frame_color");
+
+	ClassDB::bind_method(D_METHOD("get_fade_in_sec"), &MultiMeshBulletsData2D::get_fade_in_sec);
+	ClassDB::bind_method(D_METHOD("set_fade_in_sec", "value"), &MultiMeshBulletsData2D::set_fade_in_sec);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "fade_in_sec", PROPERTY_HINT_RANGE, "0,10,0.01,or_greater"), "set_fade_in_sec", "get_fade_in_sec");
+
+	ClassDB::bind_method(D_METHOD("get_fade_out_sec"), &MultiMeshBulletsData2D::get_fade_out_sec);
+	ClassDB::bind_method(D_METHOD("set_fade_out_sec", "value"), &MultiMeshBulletsData2D::set_fade_out_sec);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "fade_out_sec", PROPERTY_HINT_RANGE, "0,10,0.01,or_greater"), "set_fade_out_sec", "get_fade_out_sec");
+
+	ClassDB::bind_method(D_METHOD("get_modulate_ramp"), &MultiMeshBulletsData2D::get_modulate_ramp);
+	ClassDB::bind_method(D_METHOD("set_modulate_ramp", "value"), &MultiMeshBulletsData2D::set_modulate_ramp);
+	ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "modulate_ramp", PROPERTY_HINT_RESOURCE_TYPE, "Gradient"), "set_modulate_ramp", "get_modulate_ramp");
 
 	ADD_GROUP("Collision", "");
 	ClassDB::bind_method(D_METHOD("get_collision_layer"), &MultiMeshBulletsData2D::get_collision_layer);

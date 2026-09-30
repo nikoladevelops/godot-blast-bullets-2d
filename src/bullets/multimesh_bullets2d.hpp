@@ -597,6 +597,41 @@ public:
 	real_t get_curves_elapsed_time() const;
 	void set_curves_elapsed_time(real_t new_time);
 
+	// Volley fade state (spawn-data fade_in_sec/fade_out_sec/modulate_ramp,
+	// snapshotted per life so pool reuse never leaks the previous tint).
+	// The tick owns CanvasItem self_modulate while any fade is configured;
+	// change the base through set_fade_base_modulate(), not the CanvasItem
+	// setter (which the next tick would overwrite).
+	Color fade_base_modulate = Color(1, 1, 1, 1);
+	double fade_in_sec = 0.0;
+	double fade_out_sec = 0.0;
+	Ref<Gradient> fade_modulate_ramp;
+	// Bullet whiten override, snapshotted per life like the fade knobs
+	// above. Live toggle rebuilds through set_override_frame_color().
+	bool anim_override_frame_color = false;
+	bool get_override_frame_color() const;
+	void set_override_frame_color(bool value);
+	// Last modulate written by the fade tick: compared before writing so
+	// settled volleys skip the CanvasItem call entirely.
+	Color fade_applied = Color(1, 1, 1, 1);
+	double get_fade_in_sec() const;
+	void set_fade_in_sec(double value);
+	double get_fade_out_sec() const;
+	void set_fade_out_sec(double value);
+	Ref<Gradient> get_modulate_ramp() const;
+	void set_modulate_ramp(const Ref<Gradient> &value);
+	Color get_fade_base_modulate() const;
+	void set_fade_base_modulate(const Color &value);
+	// Copies base tint + fade knobs + whiten flag from spawn data (called on
+	// every spawn/enable, before the animation rebuild so whitening applies
+	// to the fresh frames). Starts transparent immediately when fade-in is
+	// on so no full-alpha frame flashes before the first tick.
+	void snapshot_appearance_from_data(const MultiMeshBulletsData2D &data);
+	// One fade step, driven by curves_elapsed_time (the volley age clock).
+	// No-op unless a fade is configured. Per-volley O(1): one CanvasItem
+	// write at most, only while the value actually changes.
+	void tick_volley_fade();
+
 	// Bullet movement pattern
 
 	_ALWAYS_INLINE_ bool check_exists_bullet_movement_pattern_data(int bullet_index) const {
@@ -882,8 +917,32 @@ public:
 			if (bullet_index < (int)bake.bullet_trail_transf.size()) {
 				bake.bullet_trail_transf[bullet_index] = local;
 			}
-			if (bake.layer->color_ramp.is_valid()) {
-				const Color tint = bake.layer->color_ramp->sample((float)(age / bake.total));
+			// Trail tint: ramp sample when set, plus the layer fade envelope
+			// when configured. Trails key the envelope off volley age and
+			// remaining lifetime (per-bullet birth is untracked by design):
+			// fade-in covers spawn, fade-out the volley end. Infinite
+			// lifetimes skip fade-out like the volley tick does. Costs one
+			// color write per bullet per tick, so it runs only when a fade
+			// is actually configured.
+			const bool trail_has_fade = (bake.layer->fade_in_sec > 0.0 || bake.layer->fade_out_sec > 0.0) && Math::is_finite(curves_elapsed_time);
+			if (bake.layer->color_ramp.is_valid() || trail_has_fade) {
+				Color tint(1, 1, 1, 1);
+				if (bake.layer->color_ramp.is_valid()) {
+					tint = bake.layer->color_ramp->sample((float)(age / bake.total));
+				}
+				if (trail_has_fade) {
+					double alpha = 1.0;
+					if (bake.layer->fade_in_sec > 0.0 && curves_elapsed_time < bake.layer->fade_in_sec) {
+						alpha = curves_elapsed_time / bake.layer->fade_in_sec;
+					}
+					if (!is_life_time_infinite && bake.layer->fade_out_sec > 0.0 && Math::is_finite(current_life_time) && current_life_time < bake.layer->fade_out_sec) {
+						const double out_alpha = current_life_time / bake.layer->fade_out_sec;
+						if (out_alpha < alpha) {
+							alpha = out_alpha;
+						}
+					}
+					tint.a *= (float)Math::clamp(alpha, 0.0, 1.0);
+				}
 				shard->get_multimesh()->set_instance_color(bullet_index, tint);
 				if (bullet_index < (int)bake.bullet_trail_tint.size()) {
 					bake.bullet_trail_tint[bullet_index] = tint;
@@ -2254,6 +2313,21 @@ public:
 	// state alongside the sparse-set removal (base version only handles core).
 	virtual void on_bullet_disabled(int bullet_index) {}
 	void disable_bullet(int bullet_index, bool should_disable_attachment = true);
+	// Manual clear with visuals: captures the death pose, runs the silent
+	// disable_bullet() above, then fires EFFECT_ON_CLEAR one-shots. Use
+	// this instead of disable_bullet() when the disappearance should read
+	// on screen (dismissals, wave clears, boss deaths). Collision kills
+	// fire On Destroy and timeouts fire On Lifetime Over through their own
+	// paths, so those never double with a clear layer; teardown
+	// (factory reset/free) stays silent and never calls here. Already-dead
+	// slots are a no-op false (no double fire). Returns true when a live
+	// bullet was cleared.
+	bool clear_bullet(int bullet_index);
+	// Clears every live bullet through clear_bullet() above (snapshot the
+	// live set first: each disable mutates it). Mass clears recycle the
+	// oldest one-shot slots past the layer ring, so 500 bullets never
+	// spawn 500 live effects. Returns how many bullets were cleared.
+	int clear_all_bullets();
 
 	// Resolves who owns the collision/lifetime signals for this multimesh: the
 	// tagged BulletSpawner2D while it is alive, else the BulletFactory2D.

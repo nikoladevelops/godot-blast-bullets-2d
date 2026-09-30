@@ -1,6 +1,7 @@
 #pragma once
 
 #include <godot_cpp/classes/gradient.hpp>
+#include <godot_cpp/classes/image.hpp>
 #include <godot_cpp/classes/material.hpp>
 #include <godot_cpp/classes/resource.hpp>
 #include <godot_cpp/classes/sprite_frames.hpp>
@@ -25,7 +26,12 @@ enum EffectTrigger {
 	EFFECT_ON_HIT,
 	EFFECT_ON_DESTROY,
 	EFFECT_ON_BOUNCE,
-	EFFECT_ON_LIFETIME_OVER
+	EFFECT_ON_LIFETIME_OVER,
+	// Manual-clear visuals: fired by clear_bullet()/clear_all_bullets()
+	// only. Collision kills fire On Destroy, timeouts fire On Lifetime
+	// Over, teardown (reset/free) stays silent, so a clear layer never
+	// doubles another trigger and never spawns effects while dying.
+	EFFECT_ON_CLEAR
 };
 
 class BulletEffectLayerData2D : public Resource {
@@ -58,6 +64,25 @@ public:
 	// or loop phase (trails), exactly like particle color ramps. Multiplies
 	// with self_modulate. Null (default) keeps every instance solid.
 	Ref<Gradient> color_ramp;
+
+	// Opacity envelope, multiplied with self_modulate and the color ramp.
+	// One-shot slots key it off slot age; trails key it off volley age and
+	// remaining lifetime (per-bullet birth is untracked by design), so
+	// fade-in covers spawn and fade-out the volley end. Infinite lifetimes
+	// skip fade-out everywhere. 0 disables each side. A fade longer than
+	// the life dims the whole life proportionally (rate envelope, never
+	// normalized). Trail fades cost one color write per bullet per tick,
+	// so they run only while configured.
+	// Must stay finite and >= 0.
+	double fade_in_sec = 0.0;
+	double fade_out_sec = 0.0;
+
+	// Whiten override: when true the bake replaces every frame's RGB with
+	// white (alpha preserved), so self_modulate and the color ramp produce
+	// the exact dialed color instead of multiplying the source art. Costs
+	// roughly double texture memory for the layer while on. Off (default)
+	// renders the art untouched.
+	bool override_frame_color = false;
 
 	// Draw order of this layer's shards. Trail shards are children of the
 	// volley, so with z_as_relative (default) the offset tracks the volley
@@ -123,6 +148,9 @@ public:
 	// Content generation, bumped on every invalidation: consumers holding
 	// baked output detect layer edits through it.
 	uint64_t get_bake_version() const { return bake_version; }
+	// Pure pixel step of the whiten override (test seam): white RGB, same
+	// alpha. Null/empty/oversized input returns null with one error.
+	static Ref<Image> whiten_image_copy(const Ref<Image> &src);
 
 	bool get_enabled() const;
 	void set_enabled(bool value);
@@ -144,6 +172,15 @@ public:
 
 	Ref<Gradient> get_color_ramp() const;
 	void set_color_ramp(const Ref<Gradient> &new_ramp);
+
+	double get_fade_in_sec() const;
+	void set_fade_in_sec(double value);
+
+	double get_fade_out_sec() const;
+	void set_fade_out_sec(double value);
+
+	bool get_override_frame_color() const;
+	void set_override_frame_color(bool value);
 
 	int get_z_index() const;
 	void set_z_index(int value);
@@ -183,6 +220,10 @@ public:
 
 	real_t get_trigger_chance() const;
 	void set_trigger_chance(real_t value);
+
+	// Reads frame pixels for the whiten override (atlas-aware). Null when
+	// unreachable; the caller falls back to the original frame.
+	static Ref<Image> read_frame_image(const Ref<Texture2D> &tex);
 
 	int get_max_instances() const;
 	void set_max_instances(int value);

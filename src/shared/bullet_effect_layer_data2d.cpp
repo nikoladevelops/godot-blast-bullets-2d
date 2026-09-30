@@ -1,5 +1,8 @@
 #include "./bullet_effect_layer_data2d.hpp"
 
+#include <godot_cpp/classes/atlas_texture.hpp>
+#include <godot_cpp/classes/image.hpp>
+#include <godot_cpp/classes/image_texture.hpp>
 #include <godot_cpp/core/math.hpp>
 #include <godot_cpp/variant/utility_functions.hpp>
 
@@ -66,6 +69,7 @@ bool BulletEffectLayerData2D::bake_effect_frames(const StringName &anim, std::ve
 	if (count > EFFECT_MAX_BAKE_FRAMES) {
 		UtilityFunctions::push_warning("BulletEffectLayerData2D: animation '" + String(use_anim) + "' has " + String::num_int64(count) + " frames, baking the first 24 (one shard node per frame).");
 	}
+	bool whiten_warned = false;
 	std::vector<Ref<Texture2D>> out_f;
 	std::vector<double> out_s;
 	out_f.reserve(kept);
@@ -77,9 +81,29 @@ bool BulletEffectLayerData2D::bake_effect_frames(const StringName &anim, std::ve
 			UtilityFunctions::push_error("BulletEffectLayerData2D: animation '" + String(use_anim) + "' frame " + String::num_int64(i) + " has null texture.");
 			return false;
 		}
-		const float dur = frames->get_frame_duration(use_anim, i);
+	const float dur = frames->get_frame_duration(use_anim, i);
 		const double sec = (dur <= 0.0f ? 0.0 : (double)dur / fps);
-		out_f.push_back(tex);
+		if (override_frame_color) {
+			// Exact-color mode: whitened copy (alpha preserved) so the
+			// layer tint reads exactly. Unreadable frames fall back to
+			// the original with one warning per bake, never a blank.
+			Ref<Image> pixels = read_frame_image(tex);
+			Ref<Image> white = whiten_image_copy(pixels);
+			if (white.is_valid()) {
+				Ref<ImageTexture> white_tex;
+				white_tex.instantiate();
+				white_tex->set_image(white);
+				out_f.push_back(white_tex);
+			} else {
+				if (!whiten_warned) {
+					whiten_warned = true;
+					UtilityFunctions::push_warning("BulletEffectLayerData2D: override_frame_color could not read a frame of '" + String(use_anim) + "', keeping the original art for unreadable frames.");
+				}
+				out_f.push_back(tex);
+			}
+		} else {
+			out_f.push_back(tex);
+		}
 		out_s.push_back(sec);
 		total += sec;
 	}
@@ -109,8 +133,8 @@ int BulletEffectLayerData2D::get_trigger() const {
 	return trigger;
 }
 void BulletEffectLayerData2D::set_trigger(int value) {
-	if (value != EFFECT_TRAIL_FOLLOW && value != EFFECT_ON_SPAWN && value != EFFECT_ON_HIT && value != EFFECT_ON_DESTROY && value != EFFECT_ON_BOUNCE && value != EFFECT_ON_LIFETIME_OVER) {
-		UtilityFunctions::push_error("BulletEffectLayerData2D: trigger must be 0 (Trail Follow), 1 (On Spawn), 2 (On Hit), 3 (On Destroy), 4 (On Bounce) or 5 (On Lifetime Over), keeping the old value.");
+	if (value != EFFECT_TRAIL_FOLLOW && value != EFFECT_ON_SPAWN && value != EFFECT_ON_HIT && value != EFFECT_ON_DESTROY && value != EFFECT_ON_BOUNCE && value != EFFECT_ON_LIFETIME_OVER && value != EFFECT_ON_CLEAR) {
+		UtilityFunctions::push_error("BulletEffectLayerData2D: trigger must be 0 (Trail Follow), 1 (On Spawn), 2 (On Hit), 3 (On Destroy), 4 (On Bounce), 5 (On Lifetime Over) or 6 (On Clear), keeping the old value.");
 		return;
 	}
 	trigger = value;
@@ -283,6 +307,110 @@ void BulletEffectLayerData2D::set_max_instances(int value) {
 	max_instances = value;
 }
 
+double BulletEffectLayerData2D::get_fade_in_sec() const {
+	return fade_in_sec;
+}
+void BulletEffectLayerData2D::set_fade_in_sec(double value) {
+	if (!Math::is_finite(value) || value < 0.0) {
+		UtilityFunctions::push_error("BulletEffectLayerData2D.fade_in_sec must be finite and >= 0, keeping the old value.");
+		return;
+	}
+	fade_in_sec = value;
+}
+double BulletEffectLayerData2D::get_fade_out_sec() const {
+	return fade_out_sec;
+}
+void BulletEffectLayerData2D::set_fade_out_sec(double value) {
+	if (!Math::is_finite(value) || value < 0.0) {
+		UtilityFunctions::push_error("BulletEffectLayerData2D.fade_out_sec must be finite and >= 0, keeping the old value.");
+		return;
+	}
+	fade_out_sec = value;
+}
+bool BulletEffectLayerData2D::get_override_frame_color() const {
+	return override_frame_color;
+}
+void BulletEffectLayerData2D::set_override_frame_color(bool value) {
+	if (override_frame_color == value) {
+		return;
+	}
+	override_frame_color = value;
+	// Whitening changes the baked textures themselves, so consumers
+	// holding baked output must rebake (bumps the manual-hatch version).
+	invalidate_bake();
+}
+
+// Whiten override cap: per-pixel loop over huge sheets would stall the
+// baking frame. Over the cap the original frame is kept with one warning.
+static const int EFFECT_WHITEN_MAX_SIDE = 512;
+
+Ref<Image> BulletEffectLayerData2D::whiten_image_copy(const Ref<Image> &src) {
+	Ref<Image> out;
+	if (src.is_null() || src->is_empty()) {
+		UtilityFunctions::push_error("BulletEffectLayerData2D.whiten_image_copy: source image is null or empty.");
+		return out;
+	}
+	if (src->get_width() > EFFECT_WHITEN_MAX_SIDE || src->get_height() > EFFECT_WHITEN_MAX_SIDE) {
+		UtilityFunctions::push_error("BulletEffectLayerData2D.whiten_image_copy: image exceeds 512px per side, refusing.");
+		return out;
+	}
+	Ref<Image> rgba = src->duplicate();
+	if (rgba.is_null()) {
+		UtilityFunctions::push_error("BulletEffectLayerData2D.whiten_image_copy: could not duplicate source image.");
+		return out;
+	}
+	rgba->convert(Image::FORMAT_RGBA8);
+	const int w = rgba->get_width();
+	const int h = rgba->get_height();
+	for (int y = 0; y < h; ++y) {
+		for (int x = 0; x < w; ++x) {
+			const Color px = rgba->get_pixel(x, y);
+			rgba->set_pixel(x, y, Color(1, 1, 1, px.a));
+		}
+	}
+	return rgba;
+}
+
+// Reads frame pixels for the whiten override: plain textures directly,
+// atlas frames through the base image plus region blit. Returns null when
+// the pixels are unreachable (caller falls back to the original frame).
+Ref<Image> BulletEffectLayerData2D::read_frame_image(const Ref<Texture2D> &tex) {
+	Ref<Image> out;
+	if (tex.is_null()) {
+		return out;
+	}
+	if (const Ref<AtlasTexture> atlas = tex; atlas.is_valid()) {
+		const Ref<Texture2D> base = atlas->get_atlas();
+		if (base.is_null()) {
+			return out;
+		}
+		Ref<Image> base_img = base->get_image();
+		if (base_img.is_null() || base_img->is_empty()) {
+			return out;
+		}
+		const Rect2 region = atlas->get_region();
+		const int x = (int)Math::round(region.position.x);
+		const int y = (int)Math::round(region.position.y);
+		const int w = (int)Math::round(region.size.x);
+		const int h = (int)Math::round(region.size.y);
+		if (w <= 0 || h <= 0 || x < 0 || y < 0 || x + w > base_img->get_width() || y + h > base_img->get_height()) {
+			return out;
+		}
+		base_img = base_img->duplicate();
+		if (base_img.is_null()) {
+			return out;
+		}
+		base_img->convert(Image::FORMAT_RGBA8);
+		Ref<Image> clip = Image::create_empty(w, h, false, Image::FORMAT_RGBA8);
+		if (clip.is_null()) {
+			return out;
+		}
+		clip->blit_rect(base_img, Rect2i(x, y, w, h), Vector2i(0, 0));
+		return clip;
+	}
+	return tex->get_image();
+}
+
 void BulletEffectLayerData2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_enabled"), &BulletEffectLayerData2D::get_enabled);
 	ClassDB::bind_method(D_METHOD("set_enabled", "value"), &BulletEffectLayerData2D::set_enabled);
@@ -290,7 +418,7 @@ void BulletEffectLayerData2D::_bind_methods() {
 
 	ClassDB::bind_method(D_METHOD("get_trigger"), &BulletEffectLayerData2D::get_trigger);
 	ClassDB::bind_method(D_METHOD("set_trigger", "value"), &BulletEffectLayerData2D::set_trigger);
-	ADD_PROPERTY(PropertyInfo(Variant::INT, "trigger", PROPERTY_HINT_ENUM, "Trail Follow,On Spawn,On Hit,On Destroy,On Bounce,On Lifetime Over"), "set_trigger", "get_trigger");
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "trigger", PROPERTY_HINT_ENUM, "Trail Follow,On Spawn,On Hit,On Destroy,On Bounce,On Lifetime Over,On Clear"), "set_trigger", "get_trigger");
 
 	ClassDB::bind_method(D_METHOD("get_sprite_frames"), &BulletEffectLayerData2D::get_sprite_frames);
 	ClassDB::bind_method(D_METHOD("set_sprite_frames", "new_frames"), &BulletEffectLayerData2D::set_sprite_frames);
@@ -311,6 +439,18 @@ void BulletEffectLayerData2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_color_ramp"), &BulletEffectLayerData2D::get_color_ramp);
 	ClassDB::bind_method(D_METHOD("set_color_ramp", "new_ramp"), &BulletEffectLayerData2D::set_color_ramp);
 	ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "color_ramp", PROPERTY_HINT_RESOURCE_TYPE, "Gradient"), "set_color_ramp", "get_color_ramp");
+
+	ClassDB::bind_method(D_METHOD("get_fade_in_sec"), &BulletEffectLayerData2D::get_fade_in_sec);
+	ClassDB::bind_method(D_METHOD("set_fade_in_sec", "value"), &BulletEffectLayerData2D::set_fade_in_sec);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "fade_in_sec", PROPERTY_HINT_RANGE, "0,10,0.01,or_greater"), "set_fade_in_sec", "get_fade_in_sec");
+
+	ClassDB::bind_method(D_METHOD("get_fade_out_sec"), &BulletEffectLayerData2D::get_fade_out_sec);
+	ClassDB::bind_method(D_METHOD("set_fade_out_sec", "value"), &BulletEffectLayerData2D::set_fade_out_sec);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "fade_out_sec", PROPERTY_HINT_RANGE, "0,10,0.01,or_greater"), "set_fade_out_sec", "get_fade_out_sec");
+
+	ClassDB::bind_method(D_METHOD("get_override_frame_color"), &BulletEffectLayerData2D::get_override_frame_color);
+	ClassDB::bind_method(D_METHOD("set_override_frame_color", "value"), &BulletEffectLayerData2D::set_override_frame_color);
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "override_frame_color"), "set_override_frame_color", "get_override_frame_color");
 
 	ClassDB::bind_method(D_METHOD("get_z_index"), &BulletEffectLayerData2D::get_z_index);
 	ClassDB::bind_method(D_METHOD("set_z_index", "value"), &BulletEffectLayerData2D::set_z_index);
@@ -368,12 +508,15 @@ void BulletEffectLayerData2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_max_instances", "value"), &BulletEffectLayerData2D::set_max_instances);
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "max_instances", PROPERTY_HINT_RANGE, "0,512,1"), "set_max_instances", "get_max_instances");
 
+	ClassDB::bind_static_method("BulletEffectLayerData2D", D_METHOD("whiten_image_copy", "src"), &BulletEffectLayerData2D::whiten_image_copy);
+
 	BIND_ENUM_CONSTANT(EFFECT_TRAIL_FOLLOW);
 	BIND_ENUM_CONSTANT(EFFECT_ON_SPAWN);
 	BIND_ENUM_CONSTANT(EFFECT_ON_HIT);
 	BIND_ENUM_CONSTANT(EFFECT_ON_DESTROY);
 	BIND_ENUM_CONSTANT(EFFECT_ON_BOUNCE);
 	BIND_ENUM_CONSTANT(EFFECT_ON_LIFETIME_OVER);
+	BIND_ENUM_CONSTANT(EFFECT_ON_CLEAR);
 }
 } //namespace BlastBullets2D
 
