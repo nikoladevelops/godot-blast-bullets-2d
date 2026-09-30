@@ -1129,7 +1129,7 @@
 			Whether each bullet's direction is adjusted based on rotation data (the bullet moves where it faces). Mirrors the spawn data flag; pool reuse re-applies the data value.
 		</member>
 		<member name="bounce_charge_amplify" type="bool" setter="set_bounce_charge_amplify" getter="get_bounce_charge_amplify" default="true">
-			Whether an oncoming target amplifies the rebound through relative reflection, set live. True (default) enables the extra kick; false reflects absolutely.
+			Whether an oncoming target amplifies the rebound through relative reflection, set live. True (default) enables the extra kick; false reflects absolutely. Outcome guarantee: the committed reflection always separates along the contact normal. Target velocity is sampled when the overlap is queued (scripts changing it before the drain cannot corrupt the bounce), and any stale or degenerate relative frame falls back to the absolute reflection, so target motion can only add energy, never send the bullet through the target.
 		</member>
 
 		<member name="bounce_cooldown_sec" type="float" setter="set_bounce_cooldown_sec" getter="get_bounce_cooldown_sec" default="0.05">
@@ -1151,7 +1151,7 @@
 			Which surface normal to reflect across, set live: 0 Simple Radial, 1 Precise Shape (falls back to radial without a usable target shape).
 		</member>
 		<member name="bounce_push_assist" type="bool" setter="set_bounce_push_assist" getter="get_bounce_push_assist" default="true">
-			Whether a same-direction target feeds its velocity into the bounce, set live. True (default) surges pushed bullets forward instead of reversing them; false reflects absolutely.
+			Whether a same-direction target feeds its velocity into the bounce, set live. True (default) surges pushed bullets forward instead of reversing them; false reflects absolutely. Same outcome guarantee as [member bounce_charge_amplify]: separation along the contact normal always holds.
 		</member>
 
 		<member name="bounce_randomness_deg" type="float" setter="set_bounce_randomness_deg" getter="get_bounce_randomness_deg" default="0.0">

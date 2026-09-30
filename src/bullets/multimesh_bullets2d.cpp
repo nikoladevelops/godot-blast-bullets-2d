@@ -3142,7 +3142,7 @@ int MultiMeshBullets2D::clear_all_bullets() {
 		return cleared;
 	}
 
-void MultiMeshBullets2D::handle_bullet_collision(CollisionType collision_type, int bullet_index, int64_t entered_instance_id, uint64_t queued_bullet_epoch) {
+void MultiMeshBullets2D::handle_bullet_collision(CollisionType collision_type, int bullet_index, int64_t entered_instance_id, uint64_t queued_bullet_epoch, Vector2 queued_target_velocity, bool queued_velocity_valid) {
 		if (bullet_index < 0 || bullet_index >= amount_bullets) {
 			return;
 		}
@@ -3166,7 +3166,7 @@ void MultiMeshBullets2D::handle_bullet_collision(CollisionType collision_type, i
 		// Bounce precedence: a bounce-eligible hit ricochets here and never
 		// reaches the counter below (unless the volley asked to consume the
 		// hit too, decision 2). The hook owns its signals + self-liveness.
-		const int bounce_decision = try_handle_bounce(collision_type, bullet_index, entered_instance_id);
+		const int bounce_decision = try_handle_bounce(collision_type, bullet_index, entered_instance_id, queued_target_velocity, queued_velocity_valid);
 		if (bounce_decision == 1) {
 			return;
 		}

@@ -1260,7 +1260,7 @@ public:
 			collision_scratch.clear();
 			collision_scratch.swap(all_collided_bullets);
 			for (auto &data : collision_scratch) {
-				handle_bullet_collision(data.collision_type, data.bullet_index, data.collided_instance_id, data.queue_bullet_epoch);
+				handle_bullet_collision(data.collision_type, data.bullet_index, data.collided_instance_id, data.queue_bullet_epoch, data.queue_target_velocity, data.queue_target_velocity_valid);
 				// handle_bullet_collision calls straight into user code, and that code may free this very volley, so
 				// check we're still alive before touching anything below (queue_free is caught by the second check).
 				// reject via the factory guards).
@@ -3534,7 +3534,7 @@ public:
 	// record is fully handled (return), 2 = bounced but the hit is consumed
 	// too (fall through into normal counting/signals). Implemented in the
 	// .cpp (needs scene-tree + shape classes).
-	int try_handle_bounce(CollisionType collision_type, int bullet_index, int64_t entered_instance_id) override;
+	int try_handle_bounce(CollisionType collision_type, int bullet_index, int64_t entered_instance_id, Vector2 queued_target_velocity, bool queued_velocity_valid) override;
 
 	// Virtual methods
 	void set_up_movement_data(const TypedArray<BulletSpeedData2D> &new_speed_data, bool tile_short_arrays = false);

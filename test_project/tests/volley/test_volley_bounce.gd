@@ -21,6 +21,12 @@ var _bounce_area: Array = []
 var _norm_body: Array = []
 var _spawner_bounce: Array = []
 var _factory_bounce: Array = []
+# T36 mid-drain mutation rig: when armed, the first bounce signal flips the
+# target velocity, so the second record in the same drain must still use its
+# queue-time snapshot. Disarmed by default: zero impact on other phases.
+var _t36_mutate := false
+var _t36_done := false
+var _t36_body: CharacterBody2D = null
 
 func _check(cond: bool, label: String) -> void:
 	if cond:
@@ -31,6 +37,9 @@ func _check(cond: bool, label: String) -> void:
 
 func _on_bounce_body(body: Object, volley: DirectionalBullets2D, idx: int) -> void:
 	_bounce_body.append([body, volley, idx])
+	if _t36_mutate and not _t36_done and body == _t36_body and _t36_body != null:
+		_t36_done = true
+		_t36_body.velocity = Vector2(400, 0)
 
 func _on_bounce_area(area: Object, volley: DirectionalBullets2D, idx: int) -> void:
 	_bounce_area.append([area, volley, idx])
@@ -2150,6 +2159,132 @@ func _initialize() -> void:
 	_check(BulletFactory2D.helper_generate_transforms_grid(8, Transform2D.IDENTITY, 0).is_empty(), "zero grid rows refused")
 	_check(BulletFactory2D.helper_generate_transforms_rain(8, Transform2D.IDENTITY, 600.0, Vector2.ZERO, 48.0, 0.0, 1).is_empty(), "zero rain direction refused")
 	_check(BulletFactory2D.helper_generate_transforms_rain(4, Transform2D.IDENTITY).size() == 4, "rain defaults still generate")
+
+	printerr("BOUNCE T36 stale target velocity never steers the bounce")
+	await _settle(factory)
+	var back36 := CharacterBody2D.new()
+	back36.position = Vector2(250, 300)
+	back36.collision_layer = 8
+	back36.collision_mask = 0
+	back36.velocity = Vector2(400, 0)
+	var b36col := CollisionShape2D.new()
+	var b36circ := CircleShape2D.new()
+	b36circ.radius = 12.0
+	b36col.shape = b36circ
+	back36.add_child(b36col)
+	get_root().add_child(back36)
+	await physics_frame
+	var d36a := _bounce_data(Vector2(100, 300), 0.0, 200.0, [4], [4])
+	var v36a: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d36a)
+	for i in 150:
+		await physics_frame
+		if v36a.bullet_get_bounce_count(0) >= 1:
+			break
+	_check(v36a.bullet_get_bounce_count(0) >= 1, "back-off overlap bounces")
+	var vel36a: Vector2 = v36a.get_bullet_velocity(0)
+	_check(vel36a.is_finite(), "back-off post-bounce finite")
+	_check(vel36a.x < 0.0, "back-off sends the bullet back -X, never through (+X)")
+	back36.queue_free()
+	await process_frame
+
+	printerr("BOUNCE T36b knob matrix: every mix separates, stays finite")
+	await _settle(factory)
+	var mix_vels: Array = [Vector2(-400, 0), Vector2(0, 0), Vector2(100, 0), Vector2(400, 0)]
+	var mix_names: Array = ["charge", "static", "slow back-off", "fast back-off"]
+	var mix_setups: Array = [
+		["default", {}],
+		["push off", {"bpush": false}],
+		["charge off", {"bcharge": false}],
+		["strength 2", {"bstr": 2.0}],
+		["precise", {"bmode": 1}],
+		["consumed", {"bconsumed": true}],
+		["scatter 10", {"brand": 10.0}],
+	]
+	for s in mix_setups:
+		for vi in mix_vels.size():
+			await _settle(factory)
+			var mover := CharacterBody2D.new()
+			mover.position = Vector2(250, 300)
+			mover.collision_layer = 8
+			mover.collision_mask = 0
+			mover.velocity = mix_vels[vi]
+			var mcol := CollisionShape2D.new()
+			var mcirc := CircleShape2D.new()
+			mcirc.radius = 12.0
+			mcol.shape = mcirc
+			mover.add_child(mcol)
+			get_root().add_child(mover)
+			await physics_frame
+			var dd := _bounce_data(Vector2(100, 300), 0.0, 200.0, [4], [4])
+			var cfg: Dictionary = s[1]
+			if cfg.get("bpush", true) == false:
+				dd.bounce_push_assist = false
+			if cfg.get("bcharge", true) == false:
+				dd.bounce_charge_amplify = false
+			if cfg.has("bstr"):
+				dd.bounce_strength = cfg["bstr"]
+			if cfg.has("bmode"):
+				dd.bounce_mode = cfg["bmode"]
+			if cfg.get("bconsumed", false):
+				dd.bounce_hit_consumed = true
+				dd.set_bullet_max_collision_count(2)
+			if cfg.has("brand"):
+				dd.bounce_randomness_deg = cfg["brand"]
+			var vv: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(dd)
+			for i in 150:
+				await physics_frame
+				if vv.bullet_get_bounce_count(0) >= 1:
+					break
+			var tag: String = str(s[0]) + " vs " + str(mix_names[vi])
+			_check(vv.bullet_get_bounce_count(0) >= 1, tag + " bounces")
+			var vel: Vector2 = vv.get_bullet_velocity(0)
+			_check(vel.is_finite() and vv.get_bullet_transform(0).is_finite(), tag + " stays finite")
+			_check(vel.x <= 1.0, tag + " never moves forward (+X)")
+			if cfg.get("bconsumed", false):
+				_check(vv.get_bullet_collision_count(0) == 1, tag + " consumes exactly one hit")
+			mover.queue_free()
+			await process_frame
+
+	printerr("BOUNCE T36c queue-time snapshot wins over mid-drain mutation")
+	await _settle(factory)
+	var mut36 := CharacterBody2D.new()
+	mut36.position = Vector2(250, 308)
+	mut36.collision_layer = 8
+	mut36.collision_mask = 0
+	mut36.velocity = Vector2(-400, 0)
+	var mu36col := CollisionShape2D.new()
+	var mu36circ := CircleShape2D.new()
+	mu36circ.radius = 16.0
+	mu36col.shape = mu36circ
+	mut36.add_child(mu36col)
+	get_root().add_child(mut36)
+	await physics_frame
+	var d36c := _bounce_data(Vector2(100, 300), 0.0, 200.0, [4], [4])
+	d36c.transforms = [Transform2D(0.0, Vector2(100, 300)), Transform2D(0.0, Vector2(100, 316))]
+	var sp36c := BulletSpeedData2D.new()
+	sp36c.speed = 200.0
+	sp36c.max_speed = 3000.0
+	sp36c.acceleration = 0.0
+	d36c.all_bullet_speed_data = [d36c.all_bullet_speed_data[0], sp36c]
+	var v36c: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d36c)
+	_t36_body = mut36
+	_t36_done = false
+	_t36_mutate = true
+	for i in 150:
+		await physics_frame
+		if v36c.bullet_get_bounce_count(0) >= 1 and v36c.bullet_get_bounce_count(1) >= 1:
+			break
+	_t36_mutate = false
+	_check(_t36_done, "mutation handler ran mid-drain")
+	_check(v36c.bullet_get_bounce_count(0) >= 1 and v36c.bullet_get_bounce_count(1) >= 1, "both records bounce")
+	for bi in [0, 1]:
+		var bv: Vector2 = v36c.get_bullet_velocity(bi)
+		_check(bv.is_finite(), "mutated-drain bullet " + str(bi) + " finite")
+		_check(bv.x < 0.0, "mutated-drain bullet " + str(bi) + " heads -X")
+		_check(bv.length() > 500.0, "mutated-drain bullet " + str(bi) + " keeps queue-time charge energy")
+	mut36.queue_free()
+	_t36_body = null
+	await process_frame
 
 	factory.directional_bounce_body_entered.disconnect(_on_bounce_body)
 	factory.directional_bounce_area_entered.disconnect(_on_bounce_area)

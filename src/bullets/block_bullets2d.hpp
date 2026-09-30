@@ -151,7 +151,7 @@ public:
 			collision_scratch.clear();
 			collision_scratch.swap(all_collided_bullets);
 			for (auto &data : collision_scratch) {
-				handle_bullet_collision(data.collision_type, data.bullet_index, data.collided_instance_id, data.queue_bullet_epoch);
+				handle_bullet_collision(data.collision_type, data.bullet_index, data.collided_instance_id, data.queue_bullet_epoch, data.queue_target_velocity, data.queue_target_velocity_valid);
 				// the handler may have freed us mid-drain - check we're still alive before touching anything.
 				if (ObjectDB::get_instance(ObjectID(drain_self_id)) != this) {
 					collision_scratch.clear();

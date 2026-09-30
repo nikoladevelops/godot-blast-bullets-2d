@@ -946,7 +946,7 @@ static bool bounce_precise_normal_from_target(Object *hit_target, const Vector2 
 	return false;
 }
 
-int DirectionalBullets2D::try_handle_bounce(CollisionType collision_type, int bullet_index, int64_t entered_instance_id) {
+int DirectionalBullets2D::try_handle_bounce(CollisionType collision_type, int bullet_index, int64_t entered_instance_id, Vector2 queued_target_velocity, bool queued_velocity_valid) {
 	if (bounce_mask == 0) {
 		return 0;
 	}
@@ -1057,12 +1057,18 @@ int DirectionalBullets2D::try_handle_bounce(CollisionType collision_type, int bu
 	}
 	surface_n = surface_n.normalized();
 	// Target motion: a pusher running into the bullet from behind must shove
-	// it forward, never U-turn it. Read the target's velocity when it has
-	// one (RigidBody2D linear_velocity, CharacterBody2D velocity); Area2D,
-	// static and animatable bodies report none and count as static.
+	// it forward, never U-turn it. Prefer the queue-time snapshot: the
+	// overlap is detected by the physics server but drained later in the
+	// volley tick, and scripts can change the target's velocity in between
+	// (a charger backing off reads as a pusher at drain and flips the
+	// bounce forward through the target). Fall back to the live read when
+	// the target exposed no velocity at queue time. Area2D, static and
+	// animatable bodies report none and count as static either way.
 	// Non-finite values fail safe to zero.
 	Vector2 target_v(0, 0);
-	{
+	if (queued_velocity_valid && queued_target_velocity.is_finite()) {
+		target_v = queued_target_velocity;
+	} else {
 		const Variant linear_v = hit_target->get(StringName("linear_velocity"));
 		if (linear_v.get_type() == Variant::VECTOR2) {
 			target_v = (Vector2)linear_v;
@@ -1116,6 +1122,17 @@ int DirectionalBullets2D::try_handle_bounce(CollisionType collision_type, int bu
 		}
 		incoming = rel;
 		use_relative = true;
+		// Fresh overlap already separating in the relative frame (a target
+		// that changed motion between contact and drain, e.g. backing off
+		// faster than the bullet): reflecting it would flip the bounce
+		// into the target and accelerate the bullet through it. The
+		// absolute path below still separates correctly, so drop the
+		// relative frame here. Repeat contacts never reach this: the
+		// separating guard above already swallowed them.
+		if (rel.dot(surface_n) > 0.0) {
+			incoming = dir * speed;
+			use_relative = false;
+		}
 	}
 	// Reflect, scatter, scale. Dead-stop (strength 0) keeps the old heading
 	// with zero speed instead of normalizing a zero vector into a stall.
@@ -1133,7 +1150,13 @@ int DirectionalBullets2D::try_handle_bounce(CollisionType collision_type, int bu
 	if (use_relative) {
 		// Ride the target back on (see above): the surge on a push, the
 		// extra kick on a head-on charge. Rejects a cancelled reflection.
-		refl += t_eff;
+		// The ride must never point the outcome back into the target (a
+		// faster co-directional target would otherwise flip the bounce
+		// forward through it): drop the ride and keep the reflection.
+		const Vector2 ridden = refl + t_eff;
+		if (ridden.is_finite() && ridden.dot(surface_n) >= 0.0) {
+			refl = ridden;
+		}
 		if (!refl.is_finite()) {
 			return 0;
 		}

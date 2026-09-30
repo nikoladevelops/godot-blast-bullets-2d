@@ -1178,6 +1178,15 @@ public:
 		// bumps its epoch, so the stale second record for the same overlap
 		// mismatches and is skipped at emit time instead of double-firing.
 		uint64_t queue_bullet_epoch = 0;
+		// Queue-time target velocity for the bounce math: the overlap is
+		// detected by the physics server but drained later in the volley
+		// tick, and scripts can change the target's velocity in between
+		// (a charger backing off reads as a pusher at drain and flips the
+		// bounce forward through the target). Sampling here keeps the
+		// impact-time motion. Invalid when the target exposes no velocity
+		// (static/area targets read live as zero either way).
+		Vector2 queue_target_velocity = Vector2(0, 0);
+		bool queue_target_velocity_valid = false;
 
 		BulletCollisionData2D() = default;
 
@@ -2343,7 +2352,7 @@ public:
 		return bullet_factory;
 	}
 
-	void handle_bullet_collision(CollisionType collision_type, int bullet_index, int64_t entered_instance_id, uint64_t queued_bullet_epoch);
+	void handle_bullet_collision(CollisionType collision_type, int bullet_index, int64_t entered_instance_id, uint64_t queued_bullet_epoch, Vector2 queued_target_velocity, bool queued_velocity_valid);
 
 	// Bounce decision hook for one queued collision record. Runs BEFORE the
 	// hit counter increments so a bounce can take precedence over the normal
@@ -2351,14 +2360,46 @@ public:
 	// handled (return), 2 = bounced but the hit is consumed too (fall
 	// through into normal counting/signals). Base is a no-op (only
 	// DirectionalBullets2D bounces); BlockBullets2D never overrides it.
-	virtual int try_handle_bounce(CollisionType collision_type, int bullet_index, int64_t entered_instance_id) {
+	virtual int try_handle_bounce(CollisionType collision_type, int bullet_index, int64_t entered_instance_id, Vector2 queued_target_velocity, bool queued_velocity_valid) {
 		(void)collision_type;
 		(void)bullet_index;
 		(void)entered_instance_id;
+		(void)queued_target_velocity;
+		(void)queued_velocity_valid;
 		return 0;
 	}
 
 	/// COLLISION DETECTION METHODS
+
+	// Queue-time target velocity for the bounce math (see the record
+	// above): same read as the drain path (RigidBody2D linear_velocity,
+	// CharacterBody2D velocity), false when the target exposes none or is
+	// already gone (the drain then falls back to its live read).
+	static bool read_queued_target_velocity(int64_t entered_instance_id, Vector2 &out_velocity) {
+		out_velocity = Vector2(0, 0);
+		Object *hit_target = ObjectDB::get_instance(entered_instance_id);
+		if (hit_target == nullptr) {
+			return false;
+		}
+		const Variant linear_v = hit_target->get(StringName("linear_velocity"));
+		if (linear_v.get_type() == Variant::VECTOR2) {
+			const Vector2 v = (Vector2)linear_v;
+			if (v.is_finite()) {
+				out_velocity = v;
+				return true;
+			}
+			return false;
+		}
+		const Variant vel_v = hit_target->get(StringName("velocity"));
+		if (vel_v.get_type() == Variant::VECTOR2) {
+			const Vector2 v = (Vector2)vel_v;
+			if (v.is_finite()) {
+				out_velocity = v;
+				return true;
+			}
+		}
+		return false;
+	}
 
 	_ALWAYS_INLINE_ void area_entered_func(PhysicsServer2D::AreaBodyStatus status, RID entered_rid, int64_t entered_instance_id, int entered_shape_index, int bullet_shape_index) {
 		if (status == PhysicsServer2D::AREA_BODY_ADDED) {
@@ -2373,6 +2414,7 @@ public:
 			}
 			BulletCollisionData2D record(bullet_shape_index, entered_instance_id, CollisionType::AREA);
 			record.queue_bullet_epoch = collision_epoch_for_bullet(bullet_shape_index);
+			record.queue_target_velocity_valid = read_queued_target_velocity(entered_instance_id, record.queue_target_velocity);
 			all_collided_bullets.push_back(record);
 		}
 	}
@@ -2386,6 +2428,7 @@ public:
 			}
 			BulletCollisionData2D record(bullet_shape_index, entered_instance_id, CollisionType::BODY);
 			record.queue_bullet_epoch = collision_epoch_for_bullet(bullet_shape_index);
+			record.queue_target_velocity_valid = read_queued_target_velocity(entered_instance_id, record.queue_target_velocity);
 			all_collided_bullets.push_back(record);
 		}
 	}
