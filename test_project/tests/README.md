@@ -26,6 +26,15 @@ or a real bug — investigate before shipping.
 - `spawner/test_spawner_preset_burst.gd` — spin presets advance from idle; failed burst shots retry (never silently consumed), permanent failure aborts with burst_finished.
 - `volley/test_volley_singular_transforms.gd` — zero/singular scales rejected at spawn and setters via the central invertibility check.
 - `volley/test_volley_curves_baseline.gd` — pins current curve semantics: clear freezes last sample, Additive direction accumulates (characterized, not changed).
+- `spawner/test_spawner_flower_parity.gd` — rings never bridge petal arcs/rows (INF separators captured in shape_loop), dots on track, inward/outward layers.
+- `factory/test_factory_singular_marker.gd` — inverting generators reject singular markers loudly; non-inverting ones degrade to finite zero-size.
+- `spawner/test_spawner_path2d_singular_base.gd` — AT_PATH2D linker falls back to raw points on a singular base.
+- `spawner/test_spawner_max_volleys_edge.gd` — cap trip emits finished once; lowering onto the count emits stopped only.
+- `volley/test_volley_bounce_scaled_shape.gd` — degenerate shapes bounce finite via radial fallback (never double-counted); slivers separate; sane shapes precise.
+- `spawner/test_spawner_lifecycle_signals.gd` — transitions report exactly once: pre-tree setters silent, load emits one started, toggles/caps report in-tree only.
+- `spawner/test_spawner_terrain_crest.gd` — crest normals tilt with the slope (up-right ascending, up-left descending), all finite.
+- `spawner/test_spawner_preview_state.gd` — dead track drops rings (dots survive); seed setters rebuild the gizmo.
+- `spawner/test_spawner_path2d_gating.gd` — gated resampling: node motion reflects in frames, curve edits within the staleness bound.
 - `spawner/test_spawner_pattern_source_lock.gd` — every PatternSource keeps its serialized integer (the enum is fully explicit now, so a renumber would repoint saved scenes), the inspector hint pins all 33, the setter accepts 0..32 and refuses the rest.
 - `spawner/test_spawner_burst_mirror.gd` — burst alternate-mirror: the flag alternates every other shot, a mirrored SPIRAL / MULTISPIRAL actually reverses its winding (this was the bug: only the emitter spin flipped), non-spiral patterns are unaffected, DISTRIBUTE with the default `homing_max_targets=1` runs (and warns) while 2+ spreads.
 - `spawner/test_spawner_property_visibility.gd` — inspector-visibility coverage: no `helper_*` property is invisible in all 33 pattern modes (the safety net for the untyped `begins_with` chain), aimed-target sharing between AIMED and CORRIDOR, homing knobs gated on `homing_enabled`.

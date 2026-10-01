@@ -993,8 +993,9 @@ public:
 				const real_t scale = gravity_strength_scale_for_bullet(grav_shared, grav_per);
 				const Vector2 g = base_g * scale;
 				if (g.is_finite()) {
-					all_gravity_velocity[i] += g * (real_t)delta;
-					velocity_delta += all_gravity_velocity[i] * (real_t)delta;
+					Vector2 &gv = all_gravity_velocity[i];
+					gv += g * (real_t)delta;
+					velocity_delta += gv * (real_t)delta;
 				}
 			}
 		}

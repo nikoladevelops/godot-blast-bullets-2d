@@ -147,6 +147,21 @@ func _initialize() -> void:
 	sp4.queue_free()
 	await process_frame
 
+	# ---------------------------------------------------------------
+	printerr("PRESETBURST T5 out-of-range preset rejected loudly")
+	var sp5 := BulletSpawner2D.new()
+	get_root().add_child(sp5)
+	sp5.set_bullet_factory(factory)
+	sp5.set_spawn_data(_data())
+	sp5.set_shooting_enabled(false)
+	sp5.pattern_source = BulletSpawner2D.PATTERN_FROM_HELPER_RING
+	sp5.apply_pattern_preset(999)
+	_check(sp5.pattern_source == BulletSpawner2D.PATTERN_FROM_HELPER_RING, "T5 bad preset keeps the old source")
+	sp5.apply_pattern_preset(-5)
+	_check(sp5.pattern_source == BulletSpawner2D.PATTERN_FROM_HELPER_RING, "T5 negative preset keeps the old source")
+	sp5.queue_free()
+	await process_frame
+
 	_check(factory.debug_assert_no_dangling().get("ok", false) == true, "no dangling at end")
 
 	factory.reset()

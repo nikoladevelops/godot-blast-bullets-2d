@@ -6,6 +6,7 @@
 #include "godot_cpp/classes/node2d.hpp"
 #include "godot_cpp/classes/random_number_generator.hpp"
 #include "godot_cpp/classes/wrapped.hpp"
+#include "godot_cpp/core/object.hpp"
 #include "godot_cpp/core/property_info.hpp"
 #include "godot_cpp/variant/node_path.hpp"
 #include "godot_cpp/variant/packed_vector2_array.hpp"
@@ -141,16 +142,19 @@ class BulletSpawner2D : public Node2D{
     // Crash-safety for preview source tracking: a raw Node* cached across
     // frames may dangle after the node is freed (stale object id: the memory
     // can even be reused by an unrelated object). The ONLY safe pattern is:
-    // store the pointer AND its instance id, then validate with
-    // is_instance_id_valid() + id equality BEFORE touching the pointer.
-    // A failed check means "gone": never dereference, just treat as dirty so
-    // the next rebuild re-resolves from the tree. Same idea as
+    // store the pointer AND its instance id, then resolve the id through
+    // ObjectDB and compare POINTERS without ever dereferencing the stored
+    // one. is_instance_id_valid() + id equality is NOT enough: a recycled id
+    // passes both while the stored pointer dangles (UAF read). A failed
+    // check means "gone": never dereference, just treat as dirty so the next
+    // rebuild re-resolves from the tree. Same idea as
     // homing_target_deque's is_homing_target_valid().
     static bool is_tracked_node_alive(const Node *node, uint64_t cached_id) {
-        if (node == nullptr || !godot::UtilityFunctions::is_instance_id_valid(cached_id)) {
+        if (node == nullptr || cached_id == 0) {
             return false;
         }
-        return node->get_instance_id() == cached_id;
+        const Object *live = ObjectDB::get_instance(ObjectID(cached_id));
+        return live == static_cast<const Object *>(node);
     }
 
     public:
@@ -198,7 +202,12 @@ class BulletSpawner2D : public Node2D{
             PATTERN_FROM_HELPER_PATH2D = 29,
             PATTERN_FROM_HELPER_TRIANGLE = 30,
             PATTERN_FROM_HELPER_TRAPEZOID = 31,
-            PATTERN_FROM_HELPER_DIAMOND = 32
+            PATTERN_FROM_HELPER_DIAMOND = 32,
+            // Sentinel: one past the last real source. Range checks use it
+            // instead of naming DIAMOND, so appending a new source cannot
+            // silently fall outside validation. Never serialized (values
+            // stop at DIAMOND), never a valid pattern_source.
+            PATTERN_FROM_LAST = 33
         };
 
         // Belt-and-braces anchors: an explicit enum above already makes an
@@ -1855,9 +1864,13 @@ class BulletSpawner2D : public Node2D{
         mutable Ref<RandomNumberGenerator> homing_rng;
         // Reusable per-resolve scratch (mutable: used by the const
         // resolve_homing_targets + collectors). Cleared at each entry; never
-        // nested (collectors run once per resolve, pool is consumed inside
-        // its own selection branch), so sharing is safe. Saves 2-4 Array
-        // allocations every volley and every retarget pass.
+        // nested in practice (collectors run once per resolve and neither
+        // they nor the selection branch emit or call anything user-
+        // overridable, and every bound entry runs sequentially on the main
+        // thread), so sharing is safe. Saves 2-4 Array allocations every
+        // volley and every retarget pass. If a future change lets user code
+        // run mid-resolve, add a reentrancy latch here instead of silently
+        // corrupting the outer pass.
         mutable Array homing_candidates_scratch;
         mutable Array homing_pool_scratch;
         mutable Array homing_scan_stack;
@@ -1937,6 +1950,15 @@ class BulletSpawner2D : public Node2D{
         // Custom preview tracking: snapshot of the stored array for live
         // dirty checks (transform compare, no dereference).
         TypedArray<Transform2D> tracked_custom_transforms;
+        // Path2D preview gating: curve baking every tick is the priciest
+        // dirty check, so the full resample runs on node change or every
+        // 15th tick (~0.25 s staleness bound for in-place curve edits);
+        // node identity + transform compare every tick (cheap). Mutable:
+        // the dirty check runs from const _process.
+        mutable int preview_path2d_sample_cooldown = 0;
+        mutable uint64_t tracked_path2d_node_id = 0;
+        mutable Transform2D tracked_path2d_node_global;
+        mutable bool tracked_has_path2d_node_global = false;
         // Editor-only pattern preview holder (null at runtime, never saved),
         // plus its two self-repainting _draw layers (dots + arrows).
         Node2D *preview_holder = nullptr;

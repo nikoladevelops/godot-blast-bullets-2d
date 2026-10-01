@@ -897,7 +897,7 @@ static bool bounce_normal_from_shape_node(CollisionShape2D *cs, const Vector2 &b
 		return false;
 	}
 	const Transform2D shape_global = cs->get_global_transform();
-	if (!shape_global.is_finite()) {
+	if (!MultiMeshBullets2D::is_transform_invertible_safe(shape_global)) {
 		return false;
 	}
 	if (RectangleShape2D *rect = Object::cast_to<RectangleShape2D>(shape.ptr())) {

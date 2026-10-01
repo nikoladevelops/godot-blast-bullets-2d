@@ -564,6 +564,12 @@ void BulletSpawner2D::set_shooting_enabled(bool value) {
     if (is_inside_tree()) {
         refresh_process_state();
     }
+    // Transitions report only inside the tree: the scene loader invokes
+    // setters for stored values before _ready, and _ready emits the start
+    // itself — emitting here too would double-fire shooting_started on load.
+    if (!is_inside_tree()) {
+        return;
+    }
     if (!was_active && now_active) {
         emit_signal("shooting_started");
     } else if (was_active && !now_active) {
@@ -614,7 +620,11 @@ void BulletSpawner2D::set_max_volleys(int value) {
     // volley_fired handler lowering the cap onto the just-fired count),
     // emitting here too would fire the signal twice for one volley, so the
     // setter only reports start/stop transitions and leaves the finish report
-    // to the shooting path.
+    // to the shooting path. Transitions report only inside the tree (same
+    // scene-load double-emit guard as set_shooting_enabled).
+    if (!is_inside_tree()) {
+        return;
+    }
     if (!was_active && now_active) {
         emit_signal("shooting_started");
     } else if (was_active && !now_active) {
@@ -749,7 +759,7 @@ BulletSpawner2D::PatternSource BulletSpawner2D::get_pattern_source() const {
     return pattern_source;
 }
 void BulletSpawner2D::set_pattern_source(PatternSource value) {
-    if (value < PATTERN_FROM_CHILDREN || value > PATTERN_FROM_HELPER_DIAMOND) {
+    if (value < PATTERN_FROM_CHILDREN || value >= PATTERN_FROM_LAST) {
         UtilityFunctions::push_error("BulletSpawner2D: invalid pattern_source, keeping the old value.");
         return;
     }
@@ -2393,10 +2403,11 @@ PackedVector2Array BulletSpawner2D::sample_path2d_polyline(bool quiet) const {
     }
     // At Path2D (legacy): express the curve in the generator's space, which
     // lands the volley where the node sits in the world. A degenerate link
-    // falls back to raw points instead of NaN.
+    // (including a singular generator whose inverse is garbage) falls back
+    // to raw points instead of NaN.
     Node2D *base = get_effective_generator();
     Node2D *path_2d = Object::cast_to<Node2D>(node);
-    if (base != nullptr && path_2d != nullptr && path_2d != base && is_inside_tree() && path_2d->is_inside_tree()) {
+    if (base != nullptr && path_2d != nullptr && path_2d != base && is_inside_tree() && path_2d->is_inside_tree() && MultiMeshBullets2D::is_transform_invertible_safe(base->get_global_transform())) {
         const Transform2D base_inv = base->get_global_transform().affine_inverse();
         const Transform2D node_global = path_2d->get_global_transform();
         if (base_inv.is_finite() && node_global.is_finite()) {
@@ -3380,6 +3391,9 @@ void BulletSpawner2D::set_helper_grid_seed(int value) {
         return;
     }
     helper_grid_seed = value;
+    // Seeds feed the samplers (and pin the scatter preview), so a
+    // changed seed must refresh the gizmo like every other knob.
+    rebuild_preview();
 }
 int BulletSpawner2D::get_helper_ring_seed() const {
     return helper_ring_seed;
@@ -3390,6 +3404,9 @@ void BulletSpawner2D::set_helper_ring_seed(int value) {
         return;
     }
     helper_ring_seed = value;
+    // Seeds feed the samplers (and pin the scatter preview), so a
+    // changed seed must refresh the gizmo like every other knob.
+    rebuild_preview();
 }
 int BulletSpawner2D::get_helper_fan_seed() const {
     return helper_fan_seed;
@@ -3400,6 +3417,9 @@ void BulletSpawner2D::set_helper_fan_seed(int value) {
         return;
     }
     helper_fan_seed = value;
+    // Seeds feed the samplers (and pin the scatter preview), so a
+    // changed seed must refresh the gizmo like every other knob.
+    rebuild_preview();
 }
 int BulletSpawner2D::get_helper_rain_seed() const {
     return helper_rain_seed;
@@ -3410,6 +3430,9 @@ void BulletSpawner2D::set_helper_rain_seed(int value) {
         return;
     }
     helper_rain_seed = value;
+    // Seeds feed the samplers (and pin the scatter preview), so a
+    // changed seed must refresh the gizmo like every other knob.
+    rebuild_preview();
 }
 int BulletSpawner2D::get_helper_waterfall_seed() const {
     return helper_waterfall_seed;
@@ -3420,6 +3443,9 @@ void BulletSpawner2D::set_helper_waterfall_seed(int value) {
         return;
     }
     helper_waterfall_seed = value;
+    // Seeds feed the samplers (and pin the scatter preview), so a
+    // changed seed must refresh the gizmo like every other knob.
+    rebuild_preview();
 }
 int BulletSpawner2D::get_max_live_bullets() const {
     return max_live_bullets;
@@ -3464,6 +3490,12 @@ int BulletSpawner2D::get_pooled_volley_count() const {
     return factory->debug_get_bullets_pool_amount(BulletFactory2D::DIRECTIONAL_BULLETS);
 }
 void BulletSpawner2D::apply_pattern_preset(int preset) {
+    // Out-of-range presets used to fall into `default:` and silently no-op.
+    // Fail loud instead so a typo'd sequence entry is visible immediately.
+    if (preset < (int)BulletFactory2D::PATTERN_PRESET_CUSTOM || preset > (int)BulletFactory2D::PATTERN_PRESET_TERRAIN_CREST) {
+        UtilityFunctions::push_error("BulletSpawner2D::apply_pattern_preset: preset out of range, nothing applied.");
+        return;
+    }
     switch (preset) {
         case BulletFactory2D::PATTERN_PRESET_RADIAL_DENSE:
             pattern_source = PATTERN_FROM_HELPER_RING;
@@ -3632,9 +3664,10 @@ void BulletSpawner2D::apply_pattern_preset(int preset) {
                 const real_t x = -600.0 + 1200.0 * (real_t)i / 119.0;
                 const real_t y = 60.0 * Math::sin(x / 200.0);
                 // Sine slope: facing tilts with the curve like an edge
-                // normal would (up on average, -Y in Godot 2D).
+                // normal would (up on average, -Y in Godot 2D). The tangent
+                // is (1, slope), so the up normal is (slope, -1).
                 const real_t slope = 0.3 * Math::cos(x / 200.0);
-                helper_custom_transforms.push_back(Transform2D(Math::atan2((real_t)-1.0, -slope), Vector2(x, y)));
+                helper_custom_transforms.push_back(Transform2D(Math::atan2((real_t)-1.0, slope), Vector2(x, y)));
             }
             break;
         case BulletFactory2D::PATTERN_PRESET_CUSTOM:
@@ -5602,6 +5635,17 @@ void BulletSpawner2D::snapshot_preview_sources() {
         for (int i = 0; i < live_pts.size(); ++i) {
             tracked_custom_transforms.push_back(Transform2D(0.0, live_pts[i]));
         }
+        // Node identity + transform for the gated dirty check below (it
+        // resamples sparingly and compares the cheap node state in between).
+        Node *path_node = get_helper_path2d_node();
+        tracked_path2d_node_id = path_node != nullptr ? path_node->get_instance_id() : 0;
+        if (Node2D *path_2d = Object::cast_to<Node2D>(path_node)) {
+            tracked_path2d_node_global = path_2d->get_global_transform();
+            tracked_has_path2d_node_global = true;
+        } else {
+            tracked_has_path2d_node_global = false;
+        }
+        preview_path2d_sample_cooldown = 0;
     }
     tracked_marker_origins.clear();
     tracked_marker_rots.clear();
@@ -5679,6 +5723,11 @@ void BulletSpawner2D::rebuild_preview() {
             return false;
         }
         parent->remove_child(live);
+        // memdelete (not queue_free) is REQUIRED here: the caller recreates
+        // the holder under the same name immediately below, and a queued
+        // node would still resolve by name until the flush (name clash +
+        // reuse of a dying holder). This runs on the preview path only
+        // (never physics callbacks), so immediate deletion is safe.
         memdelete(live);
         return true;
     };
@@ -5885,6 +5934,11 @@ void BulletSpawner2D::rebuild_preview() {
     // identical spin/scale pipeline as the dots.
     PackedVector2Array shape_loop;
     const bool capture_shape_loop = supports_outline_layout(pattern_source);
+    // Stale-ring guard: cleared on EVERY rebuild, not just when the track
+    // below builds. A dead generator / zero path width skips the block but
+    // must not serve the previous rebuild's rings to debug_get_layer_rings()
+    // and the coincidence check (which would then lie about dots on rings).
+    preview_last_layer_rings.clear();
     {
         Node2D *track_base = get_effective_generator();
         const bool track_live = track_base != nullptr && is_inside_tree() && preview_path_width > 0.0 && Math::is_finite(preview_path_width);
@@ -5948,7 +6002,14 @@ void BulletSpawner2D::rebuild_preview() {
                 track_closed = (bool)cv;
                 for (int i = 0; i < pts.size(); ++i) {
                     if (!pts[i].is_finite()) {
+                        // INF points are strip separators (petal arcs, grid
+                        // rows, spiral arms): both the drawn track AND the
+                        // shape loop (which feeds the layer rings) must split
+                        // here, or rings bridge strips the volley never flies.
                         track.push_back(pts[i]);
+                        if (capture_shape_loop) {
+                            shape_loop.push_back(pts[i]);
+                        }
                         continue;
                     }
                     if (capture_shape_loop) {
@@ -6276,8 +6337,10 @@ void BulletSpawner2D::rebuild_preview() {
             // about the loop center, so every ring is the same figure the
             // volley uses (the factory scales identically around the same
             // reference radius). Only loop shapes with outline support draw
-            // rings; anything else keeps dots only.
-            preview_last_layer_rings.clear();
+            // rings; anything else keeps dots only. (Cleared unconditionally
+            // above, so reaching here with layers_ok == false still drops
+            // the previous rebuild's rings.)
+            // Quiet validation mirror of the factory: rings draw only for
             // Quiet validation mirror of the factory: rings draw only for
             // settings the volley accepts (custom scales checked entry-wise).
             bool layers_ok = supports_outline_layout(pattern_source)
@@ -6473,14 +6536,43 @@ bool BulletSpawner2D::preview_sources_dirty() {
         return true;
     }
     if (pattern_source == PATTERN_FROM_HELPER_CUSTOM || pattern_source == PATTERN_FROM_HELPER_PATH2D) {
+        bool skip_path2d_sample = false;
+        if (pattern_source == PATTERN_FROM_HELPER_PATH2D) {
+            // Curve baking + heap traffic every tick is the most expensive
+            // dirty check in the preview loop. Gate it: node identity and
+            // transform compare every tick (cheap), full resample only on
+            // node change or every 15th tick (~0.25 s staleness bound for
+            // in-place curve edits, gizmo-only).
+            Node *path_node = get_helper_path2d_node();
+            const uint64_t path_id = path_node != nullptr ? path_node->get_instance_id() : 0;
+            bool node_moved = (path_id != tracked_path2d_node_id);
+            if (!node_moved && path_node != nullptr) {
+                if (Node2D *path_2d = Object::cast_to<Node2D>(path_node)) {
+                    node_moved = !tracked_has_path2d_node_global || path_2d->get_global_transform() != tracked_path2d_node_global;
+                } else if (tracked_has_path2d_node_global) {
+                    node_moved = true;
+                }
+            } else if (path_node == nullptr && (tracked_path2d_node_id != 0 || tracked_has_path2d_node_global)) {
+                node_moved = true;
+            }
+            if (node_moved || ++preview_path2d_sample_cooldown >= 15) {
+                preview_path2d_sample_cooldown = 0;
+            } else {
+                skip_path2d_sample = true;
+            }
+        }
         TypedArray<Transform2D> cur;
         if (pattern_source == PATTERN_FROM_HELPER_CUSTOM) {
             cur = helper_custom_transforms;
-        } else {
+        } else if (!skip_path2d_sample) {
             const PackedVector2Array live_pts = sample_path2d_polyline(true);
             for (int i = 0; i < live_pts.size(); ++i) {
                 cur.push_back(Transform2D(0.0, live_pts[i]));
             }
+        } else {
+            // Gated tick: reuse the snapshot comparison (equal -> clean).
+            // Any node change above already forced a resample.
+            cur = tracked_custom_transforms.duplicate();
         }
         if (cur.size() != tracked_custom_transforms.size()) return true;
         for (int i = 0; i < cur.size(); ++i) {
@@ -7040,6 +7132,9 @@ void BulletSpawner2D::_notification(int p_what) {
         tracked_child_count = -1;
         tracked_has_self = false;
         tracked_custom_transforms.clear();
+        preview_path2d_sample_cooldown = 0;
+        tracked_path2d_node_id = 0;
+        tracked_has_path2d_node_global = false;
         helper_path2d_cache = nullptr;
         helper_path2d_id = 0;
         // Homing scratch Arrays can retain references to freed scene nodes
@@ -7133,7 +7228,9 @@ void BulletSpawner2D::_process(double delta) {
             fire_burst_volley();
         }
         // Telegraph never sleeps the loop: the countdown owns it.
-        set_process(true);
+        if (!is_processing()) {
+            set_process(true);
+        }
         return;
     }
     // Burst chain countdown: frozen while paused like the telegraph above.
@@ -7143,7 +7240,9 @@ void BulletSpawner2D::_process(double delta) {
         if (burst_time_left <= 0.0) {
             fire_burst_volley();
         }
-        set_process(true);
+        if (!is_processing()) {
+            set_process(true);
+        }
         return;
     }
     // Pattern-list sequencer: frozen while paused like burst/telegraph.
@@ -7156,7 +7255,9 @@ void BulletSpawner2D::_process(double delta) {
                 pattern_list_time_left = pattern_list_interval_sec;
             }
         }
-        set_process(true);
+        if (!is_processing()) {
+            set_process(true);
+        }
         return;
     }
     if (!auto_shooting_active()) {
@@ -7408,7 +7509,7 @@ bool BulletSpawner2D::apply_pattern_list_entry(const Variant &entry) {
         Variant v = dict[source_key];
         if (v.get_type() == Variant::INT) {
             const int src = (int)v;
-            if (src < (int)PATTERN_FROM_CHILDREN || src > (int)PATTERN_FROM_HELPER_DIAMOND) {
+            if (src < (int)PATTERN_FROM_CHILDREN || src >= (int)PATTERN_FROM_LAST) {
                 UtilityFunctions::push_error("BulletSpawner2D::spawn_pattern_list: entry 'pattern_source' out of range, keeping current.");
             } else {
                 set_pattern_source((PatternSource)src);
@@ -8979,6 +9080,7 @@ void BulletSpawner2D::_bind_methods() {
 	BIND_ENUM_CONSTANT(PATTERN_FROM_HELPER_TRIANGLE);
 	BIND_ENUM_CONSTANT(PATTERN_FROM_HELPER_TRAPEZOID);
 	BIND_ENUM_CONSTANT(PATTERN_FROM_HELPER_DIAMOND);
+	BIND_ENUM_CONSTANT(PATTERN_FROM_LAST);
 	BIND_ENUM_CONSTANT(PATH2D_DISTRIBUTION_FIXED_SPACING);
 	BIND_ENUM_CONSTANT(PATH2D_DISTRIBUTION_EVEN);
 	BIND_ENUM_CONSTANT(PATH2D_OVERFLOW_CLAMP);

@@ -762,66 +762,10 @@ void BulletFactory2D::age_fx_effects(double delta) {
 	// user code never runs here, but manual-hatch registration can append
 	// bakes from any GDScript context, so never hold a reference across it.
 	for (size_t b = 0; b < fx_bakes.size(); ++b) {
-		FXOneShotBake &bake = fx_bakes[b];
-		if (bake.active_count <= 0 || bake.slots.empty() || bake.shards.empty()) {
-			continue;
-		}
-		for (size_t s = 0; s < bake.slots.size(); ++s) {
-			FXOneShotSlot &slot = bake.slots[s];
-			if (!slot.active) {
-				continue;
-			}
-			const double age = slot.start_age + (fx_clock - slot.birth);
-			if (!Math::is_finite(age) || age >= slot.duration) {
-				if (slot.last_shard >= 0 && slot.last_shard < (int)bake.shards.size() && bake.shards[slot.last_shard] != nullptr) {
-					bake.shards[slot.last_shard]->get_multimesh()->set_instance_transform_2d((int)s, FX_HIDDEN_TRANSF);
-				}
-				slot.active = false;
-				slot.last_shard = -1;
-				--bake.active_count;
-				if (bake.active_count < 0) {
-					bake.active_count = 0;
-				}
-				continue;
-			}
-			if (age < 0.0) {
-				continue;
-			}
-			fx_refresh_slot_color(bake, (int)s, age);
-			fx_apply_slot_spin(bake, (int)s, age, sprite_effects_container);
-			const int frame = fx_frame_for_age(bake.frame_starts, bake.total, age);
-			if (frame != slot.last_shard && frame >= 0 && frame < (int)bake.shards.size()) {
-				if (slot.last_shard >= 0 && slot.last_shard < (int)bake.shards.size() && bake.shards[slot.last_shard] != nullptr) {
-					bake.shards[slot.last_shard]->get_multimesh()->set_instance_transform_2d((int)s, FX_HIDDEN_TRANSF);
-				}
-				slot.last_shard = frame;
-				if (bake.shards[frame] != nullptr) {
-					Transform2D local = slot.fixed;
-					if (sprite_effects_container != nullptr) {
-						const Transform2D node_global = sprite_effects_container->get_global_transform();
-						if (MultiMeshBullets2D::is_transform_invertible_safe(node_global)) {
-							local = node_global.affine_inverse() * slot.fixed;
-						}
-					}
-					if (local.get_origin().is_finite()) {
-						bake.shards[frame]->get_multimesh()->set_instance_transform_2d((int)s, local);
-						bake.shards[frame]->set_visible(true);
-					}
-				}
-			}
-		}
-		// Shard visibility follows occupancy: empty shards cost nothing.
-		std::vector<int> occupancy(bake.shards.size(), 0);
-		for (size_t s = 0; s < bake.slots.size(); ++s) {
-			if (bake.slots[s].active && bake.slots[s].last_shard >= 0 && bake.slots[s].last_shard < (int)occupancy.size()) {
-				++occupancy[bake.slots[s].last_shard];
-			}
-		}
-		for (size_t s = 0; s < bake.shards.size(); ++s) {
-			if (bake.shards[s] != nullptr) {
-				bake.shards[s]->set_visible(occupancy[s] > 0);
-			}
-		}
+		// Shared worker with the manual bakes below: one maintenance point
+		// for slot aging + occupancy. Index loop (not a reference held
+		// across calls): aging never grows the vector itself.
+		age_fx_bake(fx_bakes[b]);
 	}
 	for (size_t m = 0; m < fx_manual_bakes.size(); ++m) {
 		age_fx_bake(fx_manual_bakes[m]);
@@ -876,7 +820,8 @@ void BulletFactory2D::age_fx_bake(FXOneShotBake &bake) {
 			}
 		}
 	}
-	std::vector<int> occupancy(bake.shards.size(), 0);
+	fx_occupancy_scratch.assign(bake.shards.size(), 0);
+	std::vector<int> &occupancy = fx_occupancy_scratch;
 	for (size_t s = 0; s < bake.slots.size(); ++s) {
 		if (bake.slots[s].active && bake.slots[s].last_shard >= 0 && bake.slots[s].last_shard < (int)occupancy.size()) {
 			++occupancy[bake.slots[s].last_shard];
@@ -3487,6 +3432,13 @@ TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_ring(
 		UtilityFunctions::push_error("helper_generate_transforms_ring: marker_transform contains NaN/Inf.");
 		return TypedArray<Transform2D>();
 	}
+	// The outline layout inverts the marker (global loop -> slot space):
+	// a singular marker would poison every slot, so reject it here like
+	// danmaku_validate_head does for the other layout users.
+	if (!MultiMeshBullets2D::is_transform_invertible_safe(marker_transform)) {
+		UtilityFunctions::push_error("helper_generate_transforms_ring: marker_transform is singular (zero or degenerate scale); volley skipped.");
+		return TypedArray<Transform2D>();
+	}
 	if (radius < 0.0) {
 		UtilityFunctions::push_error("helper_generate_transforms_ring: radius must be >= 0.");
 		return TypedArray<Transform2D>();
@@ -3770,6 +3722,14 @@ static bool danmaku_validate_head(const char *caller_name, int transforms_amount
 	}
 	if (!marker_transform.get_origin().is_finite() || !Math::is_finite(marker_transform.get_rotation()) || !marker_transform.get_scale().is_finite()) {
 		UtilityFunctions::push_error(String(caller_name) + ": marker_transform contains NaN/Inf.");
+		return false;
+	}
+	// Singular markers (e.g. (0, 1) scale: determinant 0) pass every finite
+	// check but their affine_inverse() is garbage, which layout_outline_slots
+	// and the slot math consume unconditionally. Reject loudly instead of
+	// emitting clamped-garbage volleys.
+	if (!MultiMeshBullets2D::is_transform_invertible_safe(marker_transform)) {
+		UtilityFunctions::push_error(String(caller_name) + ": marker_transform is singular (zero or degenerate scale); volley skipped.");
 		return false;
 	}
 	return true;

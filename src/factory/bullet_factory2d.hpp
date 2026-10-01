@@ -479,6 +479,10 @@ public:
 	// coexist instead of rebaking each other away.
 	std::vector<FXOneShotBake> fx_manual_bakes;
 	double fx_clock = 0.0;
+	// Reusable per-tick scratch for the shard-occupancy pass in age_fx_bake:
+	// allocating it fresh per bake per tick was heap churn on every physics
+	// frame. Sized per use via assign (no preservation needed).
+	std::vector<int> fx_occupancy_scratch;
 	// Contains all one-shot effect shard nodes in the scene tree.
 	Node2D *sprite_effects_container = nullptr;
 
