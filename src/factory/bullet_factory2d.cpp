@@ -16,6 +16,7 @@
 #include "godot_cpp/classes/random_number_generator.hpp"
 #include "godot_cpp/variant/dictionary.hpp"
 #include "godot_cpp/core/class_db.hpp"
+#include "godot_cpp/core/object.hpp"
 #include "godot_cpp/core/math.hpp"
 #include "godot_cpp/core/math_defs.hpp"
 #include "godot_cpp/variant/vector2.hpp"
@@ -1235,6 +1236,70 @@ void BulletFactory2D::free_active_bullets(const Ref<MultiMeshPoolKey2D> &key) {
 	free_only_active_bullets_helper<BlockBullets2D>(all_block_bullets, block_bullets_set, key_ptr);
 }
 
+int BulletFactory2D::clear_active_bullets(const Ref<MultiMeshPoolKey2D> &key) {
+	if (is_factory_busy) {
+		UtilityFunctions::push_error("Error when trying to clear active bullets. BulletFactory2D is currently busy. Ignoring the request");
+		return 0;
+	}
+
+	if (reject_when_iterating("clear_active_bullets")) {
+		return 0;
+	}
+
+	if (!is_ready || is_tearing_down) {
+		UtilityFunctions::push_error("clear_active_bullets: BulletFactory2D is not ready or is being freed. Ignoring the request.");
+		return 0;
+	}
+
+	FactoryOperationGuard op(this);
+
+	// Snapshot first: each clear mutates live sets below (the last cleared
+	// bullet funnels its volley into the pool).
+	std::vector<DirectionalBullets2D *> directional_snapshot = all_directional_bullets;
+	std::vector<BlockBullets2D *> block_snapshot = all_block_bullets;
+
+	PoolKey resolved;
+	const PoolKey *key_ptr = resolve_pool_key(key, resolved);
+
+	int cleared = 0;
+	for (DirectionalBullets2D *volley : directional_snapshot) {
+		if (volley == nullptr) {
+			continue;
+		}
+		// An earlier clear ran user callbacks (on_bullet_disable) that may
+		// have freed a volley later in this snapshot: validate via ObjectDB
+		// (no dereference) instead of trusting the raw pointer.
+		const uint64_t volley_id = volley->get_instance_id();
+		if (ObjectDB::get_instance(ObjectID(volley_id)) != volley) {
+			continue;
+		}
+		if (!volley->is_active) {
+			continue;
+		}
+		if (key_ptr != nullptr && !(volley->get_pool_key() == *key_ptr)) {
+			continue;
+		}
+		cleared += volley->clear_all_bullets();
+	}
+	for (BlockBullets2D *volley : block_snapshot) {
+		if (volley == nullptr) {
+			continue;
+		}
+		const uint64_t volley_id = volley->get_instance_id();
+		if (ObjectDB::get_instance(ObjectID(volley_id)) != volley) {
+			continue;
+		}
+		if (!volley->is_active) {
+			continue;
+		}
+		if (key_ptr != nullptr && !(volley->get_pool_key() == *key_ptr)) {
+			continue;
+		}
+		cleared += volley->clear_all_bullets();
+	}
+	return cleared;
+}
+
 void BulletFactory2D::free_disabled_bullets(const Ref<MultiMeshPoolKey2D> &key) {
 	if (is_factory_busy) {
 		UtilityFunctions::push_error("BulletFactory2D is busy. Ignoring free_disabled_bullets request.");
@@ -1602,6 +1667,14 @@ void BulletFactory2D::free_active_bullets_deferred(const Ref<MultiMeshPoolKey2D>
 		return;
 	}
 	call_deferred("free_active_bullets", key);
+}
+
+void BulletFactory2D::clear_active_bullets_deferred(const Ref<MultiMeshPoolKey2D> &key) {
+	if (is_tearing_down) {
+		UtilityFunctions::push_error("clear_active_bullets_deferred: BulletFactory2D is being freed. Ignoring the request.");
+		return;
+	}
+	call_deferred("clear_active_bullets", key);
 }
 
 void BulletFactory2D::free_disabled_bullets_deferred(const Ref<MultiMeshPoolKey2D> &key) {
@@ -7905,11 +7978,13 @@ void BulletFactory2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("free_attachments_pool_for_scene", "attachment_scene"), &BulletFactory2D::free_attachments_pool_for_scene);
 
 	ClassDB::bind_method(D_METHOD("free_active_bullets", "key"), &BulletFactory2D::free_active_bullets, DEFVAL(Ref<MultiMeshPoolKey2D>()));
+	ClassDB::bind_method(D_METHOD("clear_active_bullets", "key"), &BulletFactory2D::clear_active_bullets, DEFVAL(Ref<MultiMeshPoolKey2D>()));
 	ClassDB::bind_method(D_METHOD("free_disabled_bullets", "key"), &BulletFactory2D::free_disabled_bullets, DEFVAL(Ref<MultiMeshPoolKey2D>()));
 
 	// Deferred structural wrappers: safe from physics callbacks / sweeps.
 	ClassDB::bind_method(D_METHOD("reset_deferred", "key"), &BulletFactory2D::reset_deferred, DEFVAL(Ref<MultiMeshPoolKey2D>()));
 	ClassDB::bind_method(D_METHOD("free_active_bullets_deferred", "key"), &BulletFactory2D::free_active_bullets_deferred, DEFVAL(Ref<MultiMeshPoolKey2D>()));
+	ClassDB::bind_method(D_METHOD("clear_active_bullets_deferred", "key"), &BulletFactory2D::clear_active_bullets_deferred, DEFVAL(Ref<MultiMeshPoolKey2D>()));
 	ClassDB::bind_method(D_METHOD("free_disabled_bullets_deferred", "key"), &BulletFactory2D::free_disabled_bullets_deferred, DEFVAL(Ref<MultiMeshPoolKey2D>()));
 	ClassDB::bind_method(D_METHOD("free_bullets_pool_deferred", "bullet_type", "key"), &BulletFactory2D::free_bullets_pool_deferred, DEFVAL(Ref<MultiMeshPoolKey2D>()));
 	ClassDB::bind_method(D_METHOD("populate_bullets_pool_deferred", "key", "multimesh_data", "instance_count"), &BulletFactory2D::populate_bullets_pool_deferred);

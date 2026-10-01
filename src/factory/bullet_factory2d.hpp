@@ -346,6 +346,14 @@ public:
 	// Frees all active bullets (null key = all buckets, else exact PoolKey match)
 	void free_active_bullets(const Ref<MultiMeshPoolKey2D> &key = Ref<MultiMeshPoolKey2D>());
 
+	// Clears all live bullets with dismissal visuals (null key = all buckets,
+	// else exact PoolKey match). Unlike free_active_bullets() (silent
+	// deletion) this runs each volley's clear_all_bullets(), so EFFECT_ON_CLEAR
+	// layers fire and the emptied volleys park in the pool instead of being
+	// freed. Returns how many bullets were cleared. reset()/free_* stay
+	// silent teardown and never fire effect layers.
+	int clear_active_bullets(const Ref<MultiMeshPoolKey2D> &key = Ref<MultiMeshPoolKey2D>());
+
 	void free_disabled_bullets(const Ref<MultiMeshPoolKey2D> &key = Ref<MultiMeshPoolKey2D>());
 
 	// OBJECT POOLING RELATED
@@ -378,6 +386,7 @@ public:
 	// the factory is tearing down.
 	void reset_deferred(const Ref<MultiMeshPoolKey2D> &key = Ref<MultiMeshPoolKey2D>());
 	void free_active_bullets_deferred(const Ref<MultiMeshPoolKey2D> &key = Ref<MultiMeshPoolKey2D>());
+	void clear_active_bullets_deferred(const Ref<MultiMeshPoolKey2D> &key = Ref<MultiMeshPoolKey2D>());
 	void free_disabled_bullets_deferred(const Ref<MultiMeshPoolKey2D> &key = Ref<MultiMeshPoolKey2D>());
 	void free_bullets_pool_deferred(BulletType bullet_type, const Ref<MultiMeshPoolKey2D> &key = Ref<MultiMeshPoolKey2D>());
 	void populate_bullets_pool_deferred(const Ref<MultiMeshPoolKey2D> &key, const Ref<MultiMeshBulletsData2D> &multimesh_data, int instance_count);

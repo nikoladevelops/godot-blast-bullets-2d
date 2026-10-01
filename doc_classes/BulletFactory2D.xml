@@ -200,6 +200,20 @@
 				Deferred [method free_active_bullets]: safe from any callback. Use this instead of free() on volleys inside handlers (free() mid-sweep corrupts iteration; queue_free() via [method free_volley_deferred] is the single-volley equivalent).
 			</description>
 		</method>
+		<method name="clear_active_bullets">
+			<return type="int" />
+			<param index="0" name="key" type="MultiMeshPoolKey2D" default="null" />
+			<description>
+				Clears every live bullet with dismissal visuals: runs each active volley's [method MultiMeshBullets2D.clear_all_bullets], so On Clear effect layers fire, and emptied volleys park in the pool. Returns how many bullets were cleared. Pass [code]null[/code] (default) for all buckets, or a [MultiMeshPoolKey2D] for one exact bucket. Unlike [method free_active_bullets] (silent deletion) and [method reset] (silent teardown), this is the wave-clear path that reads on screen.
+			</description>
+		</method>
+		<method name="clear_active_bullets_deferred">
+			<return type="void" />
+			<param index="0" name="key" type="MultiMeshPoolKey2D" default="null" />
+			<description>
+				Deferred [method clear_active_bullets]: safe from any callback.
+			</description>
+		</method>
 		<method name="free_attachments_pool">
 			<return type="void" />
 			<description>

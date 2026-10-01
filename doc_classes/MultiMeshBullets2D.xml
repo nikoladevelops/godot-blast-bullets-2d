@@ -419,6 +419,39 @@
 				Collision shape state: valid, type, circle_radius, rect_size, capsule_radius, capsule_height, rid_count. Asserts set_collision_shape_runtime same-type vs type-change paths.
 			</description>
 		</method>
+		<method name="debug_dedup_find_collision">
+			<return type="Dictionary" />
+			<param index="0" name="probe_count" type="int" />
+			<description>
+				Brute-force key-collision search over probe_count deterministic distinct pairs. Returns collided and probes. Test-only: pins the 64-bit dedup key against birthday collisions.
+			</description>
+		</method>
+		<method name="debug_dedup_mark">
+			<param index="0" name="bullet_index" type="int" />
+			<param index="1" name="target_instance_id" type="int" />
+			<description>
+				Marks one (bullet, target) pair as queued in the live dedup table. Test-only: call on an idle volley with no overlaps in flight.
+			</description>
+		</method>
+		<method name="debug_dedup_probe">
+			<return type="bool" />
+			<param index="0" name="bullet_index" type="int" />
+			<param index="1" name="target_instance_id" type="int" />
+			<description>
+				Whether one (bullet, target) pair is already queued in the live dedup table. Test-only: call on an idle volley with no overlaps in flight.
+			</description>
+		</method>
+		<method name="debug_dedup_reset">
+			<description>
+				Clears the live dedup table (same clear the drain runs, including the cold-table shrink). Test-only: call on an idle volley with no overlaps in flight.
+			</description>
+		</method>
+		<method name="debug_dedup_stats" qualifiers="const">
+			<return type="Dictionary" />
+			<description>
+				Dedup table introspection: used pairs, slot capacity, and the collision_dedup_by_object mode.
+			</description>
+		</method>
 		<method name="debug_get_timer_count" qualifiers="const">
 			<return type="int" />
 			<description>

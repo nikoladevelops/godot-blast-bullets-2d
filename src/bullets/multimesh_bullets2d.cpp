@@ -2511,6 +2511,11 @@ void MultiMeshBullets2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_collision_dedup_by_object"), &MultiMeshBullets2D::get_collision_dedup_by_object);
 	ClassDB::bind_method(D_METHOD("set_collision_dedup_by_object", "value"), &MultiMeshBullets2D::set_collision_dedup_by_object);
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "collision_dedup_by_object"), "set_collision_dedup_by_object", "get_collision_dedup_by_object");
+	ClassDB::bind_method(D_METHOD("debug_dedup_reset"), &MultiMeshBullets2D::debug_dedup_reset);
+	ClassDB::bind_method(D_METHOD("debug_dedup_probe", "bullet_index", "target_instance_id"), &MultiMeshBullets2D::debug_dedup_probe);
+	ClassDB::bind_method(D_METHOD("debug_dedup_mark", "bullet_index", "target_instance_id"), &MultiMeshBullets2D::debug_dedup_mark);
+	ClassDB::bind_method(D_METHOD("debug_dedup_stats"), &MultiMeshBullets2D::debug_dedup_stats);
+	ClassDB::bind_method(D_METHOD("debug_dedup_find_collision", "probe_count"), &MultiMeshBullets2D::debug_dedup_find_collision);
 	ClassDB::bind_method(D_METHOD("debug_get_timer_count"), &MultiMeshBullets2D::debug_get_timer_count);
 	ClassDB::bind_method(D_METHOD("debug_get_shape_state"), &MultiMeshBullets2D::debug_get_shape_state);
 	ClassDB::bind_method(D_METHOD("debug_get_attachment_info", "bullet_index"), &MultiMeshBullets2D::debug_get_attachment_info);

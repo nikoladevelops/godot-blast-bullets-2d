@@ -37,6 +37,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <algorithm>
 #include <godot_cpp/classes/atlas_texture.hpp>
 #include <godot_cpp/classes/engine.hpp>
 #include <godot_cpp/classes/mesh.hpp>
@@ -803,20 +804,24 @@ public:
 	uint32_t collision_dedup_slot_mask = 0;
 	uint32_t collision_dedup_slot_used = 0;
 
-	// FNV-1a over the two halves; the result is never 0, which is what lets 0
-	// mean "empty slot" in the open-addressed table below.
+	// 64-bit FNV-1a over both fields; the result is never 0, which is what
+	// lets 0 mean "empty slot" in the open-addressed table below. 64 bits,
+	// not 32: at 10k entries a 32-bit key collides with ~1% probability and
+	// silently merges two unrelated pairs (a real hit gets dropped); at
+	// 64 bits that probability is ~5e-12.
 	static uint64_t collision_dedup_key(int bullet_index, int64_t instance_id) {
-		uint32_t h = (uint32_t)bullet_index * 0x9E3779B1u;
-		uint64_t b = (uint64_t)instance_id;
-		for (int i = 0; i < 8; ++i) {
-			h ^= (uint32_t)((b >> (i * 8)) & 0xFF);
-			h *= 0x01000193u;
-			h ^= h >> 15;
+		uint64_t h = 14695981039346656037ull;
+		const uint32_t a = (uint32_t)bullet_index;
+		for (int i = 0; i < 4; ++i) {
+			h ^= (uint64_t)((a >> (i * 8)) & 0xFFu);
+			h *= 1099511628211ull;
 		}
-		h ^= (uint32_t)(b >> 32) * 0x85EBCA6Bu;
-		h *= 0xC2B2AE35u;
-		h ^= h >> 16;
-		return h == 0 ? 1 : (uint64_t)h;
+		const uint64_t b = (uint64_t)instance_id;
+		for (int i = 0; i < 8; ++i) {
+			h ^= (b >> (i * 8)) & 0xFFull;
+			h *= 1099511628211ull;
+		}
+		return h == 0 ? 1 : h;
 	}
 
 	_ALWAYS_INLINE_ bool collision_already_queued(int bullet_index, int64_t entered_instance_id) {
@@ -849,9 +854,30 @@ public:
 			while (new_size < (size_t)(collision_dedup_slot_used + 1) * 4) {
 				new_size *= 2;
 			}
+			// Rehash, never drop: assigning a fresh vector here used to
+			// forget every pair queued so far in the window (the first 32
+			// pairs stopped being deduped the moment the 33rd arrived, so
+			// multi-shape targets double-counted again at scale).
+			std::vector<uint64_t> old_keys;
+			old_keys.swap(collision_dedup_slots);
 			collision_dedup_slots.assign(new_size, 0);
 			collision_dedup_slot_mask = (uint32_t)(new_size - 1);
 			collision_dedup_slot_used = 0;
+			for (uint64_t old_key : old_keys) {
+				if (old_key == 0) {
+					continue;
+				}
+				uint32_t idx = (uint32_t)old_key & collision_dedup_slot_mask;
+				// Terminates: new_size >= (old_used + 1) * 4 keeps load < 50%.
+				for (uint32_t probe = 0; probe <= collision_dedup_slot_mask; ++probe) {
+					if (collision_dedup_slots[idx] == 0) {
+						collision_dedup_slots[idx] = old_key;
+						++collision_dedup_slot_used;
+						break;
+					}
+					idx = (idx + 1) & collision_dedup_slot_mask;
+				}
+			}
 		}
 		const uint64_t key = collision_dedup_key(bullet_index, entered_instance_id);
 		uint32_t idx = (uint32_t)key & collision_dedup_slot_mask;
@@ -870,6 +896,17 @@ public:
 	}
 
 	void clear_collision_dedup_keys() {
+		// A cold window must not pin a huge table from a one-off spike: when
+		// almost nothing was queued, drop back to 64 slots. A hot window
+		// keeps its capacity so a sustained spike does not regrow+rehash on
+		// every drain.
+		const size_t table_size = collision_dedup_slots.size();
+		if (table_size > 1024 && (size_t)collision_dedup_slot_used * 16 < table_size) {
+			collision_dedup_slots.assign(64, 0);
+			collision_dedup_slot_mask = 63;
+			collision_dedup_slot_used = 0;
+			return;
+		}
 		for (uint64_t &slot : collision_dedup_slots) {
 			slot = 0;
 		}
@@ -887,6 +924,51 @@ public:
 		collision_dedup_by_object = value;
 		// Keys from the old mode must not gate the new one (or vice versa).
 		clear_collision_dedup_keys();
+	}
+
+	// Table-level introspection for tests (test_volley_dedup_table.gd). These
+	// operate on the LIVE dedup table, not a shadow copy, so call them on an
+	// idle volley with no overlaps in flight.
+	void debug_dedup_reset() { clear_collision_dedup_keys(); }
+	bool debug_dedup_probe(int bullet_index, int64_t target_instance_id) {
+		return collision_already_queued(bullet_index, target_instance_id);
+	}
+	void debug_dedup_mark(int bullet_index, int64_t target_instance_id) {
+		mark_collision_queued(bullet_index, target_instance_id);
+	}
+	Dictionary debug_dedup_stats() const {
+		Dictionary d;
+		d["used"] = (int64_t)collision_dedup_slot_used;
+		d["capacity"] = (int64_t)collision_dedup_slots.size();
+		d["dedup_by_object"] = collision_dedup_by_object;
+		return d;
+	}
+	// Brute-force key-collision search over deterministic distinct pairs.
+	// Returns {collided: bool, probes: int}. A 32-bit key finds a collision
+	// within a few hundred thousand probes with near certainty; a 64-bit
+	// key will not. Cold path: only tests call this.
+	Dictionary debug_dedup_find_collision(int probe_count) const {
+		Dictionary d;
+		d["collided"] = false;
+		d["probes"] = 0;
+		if (probe_count <= 1) {
+			return d;
+		}
+		std::vector<uint64_t> keys;
+		keys.reserve((size_t)probe_count);
+		for (int i = 0; i < probe_count; ++i) {
+			keys.push_back(collision_dedup_key(i, (int64_t)1000003 + (int64_t)i * (int64_t)7919));
+		}
+		std::sort(keys.begin(), keys.end());
+		for (size_t i = 1; i < keys.size(); ++i) {
+			if (keys[i] == keys[i - 1]) {
+				d["collided"] = true;
+				d["probes"] = (int64_t)(i + 1);
+				return d;
+			}
+		}
+		d["probes"] = (int64_t)probe_count;
+		return d;
 	}
 
 	// Central transform-invertibility check. get_scale().length_squared()

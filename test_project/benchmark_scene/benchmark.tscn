@@ -5,12 +5,21 @@
 [ext_resource type="Texture2D" uid="uid://4gdgni3y4km7" path="res://icon.svg" id="3_1inld"]
 [ext_resource type="PackedScene" uid="uid://bv1i7q8bxfe2c" path="res://benchmark_scene/player/player.tscn" id="3_hsp4v"]
 [ext_resource type="Texture2D" uid="uid://hyg3pm8cmfij" path="res://extremely_important_never_delete_or_it_will_explode.jpg" id="3_rfik0"]
+[ext_resource type="Texture2D" uid="uid://b4ea1fdniop2s" path="res://shared/art/player_bullets/2.png" id="4_46wrg"]
 [ext_resource type="PackedScene" uid="uid://cud5bunpvk1hb" path="res://benchmark_scene/benchmark_ui.tscn" id="4_wr2si"]
+[ext_resource type="Texture2D" uid="uid://tuheuh0unwfj" path="res://shared/art/player_bullets/3.png" id="5_jbfhk"]
+[ext_resource type="Texture2D" uid="uid://c8uinnqjkqm36" path="res://shared/art/player_bullets/4.png" id="6_8p66i"]
 [ext_resource type="PackedScene" uid="uid://cropisiqwmq6" path="res://shared/enemies/enemy_spawner/enemy_spawner.tscn" id="6_fj0yo"]
+[ext_resource type="Texture2D" uid="uid://dfte4vi7e63y3" path="res://shared/art/player_bullets/5.png" id="7_3oxbl"]
 [ext_resource type="Script" uid="uid://jssweshd8v73" path="res://benchmark_scene/bullet_factory_2d.gd" id="7_6fsjh"]
 [ext_resource type="PackedScene" uid="uid://cjrcvxa7bnus" path="res://shared/enemies/enemy_turret/enemy_turret.tscn" id="7_n3lca"]
+[ext_resource type="Texture2D" uid="uid://dfsthpgoe72e6" path="res://shared/art/player_bullets/6.png" id="8_y8tde"]
 [ext_resource type="PackedScene" uid="uid://3dxd6rfhxqym" path="res://shared/enemies/enemy_ship/enemy_ship.tscn" id="8_yyku6"]
+[ext_resource type="Texture2D" uid="uid://utwcy3ouuwq2" path="res://shared/art/player_bullets/7.png" id="9_rxnfr"]
+[ext_resource type="Texture2D" uid="uid://yxnghs5h272e" path="res://shared/art/player_bullets/8.png" id="10_ln7qt"]
 [ext_resource type="PackedScene" uid="uid://bqi8tdtf1dh4n" path="res://shared/moving_target.tscn" id="10_nkrfg"]
+[ext_resource type="Texture2D" uid="uid://dwtaxuaickco" path="res://shared/art/player_bullets/9.png" id="11_polqn"]
+[ext_resource type="Texture2D" uid="uid://dbhqsxhfkdrh7" path="res://shared/art/player_bullets/10.png" id="12_b1gms"]
 
 [sub_resource type="Gradient" id="Gradient_7gbxi"]
 offsets = PackedFloat32Array(0, 0.486747, 1)
@@ -43,6 +52,7 @@ animations = [{
 }]
 
 [sub_resource type="BulletEffectLayerData2D" id="BulletEffectLayerData2D_g0agp"]
+trigger = 5
 sprite_frames = SubResource("SpriteFrames_mouoi")
 color_ramp = SubResource("Gradient_7gbxi")
 override_frame_color = true
@@ -57,8 +67,35 @@ acceleration = 20.0
 [sub_resource type="SpriteFrames" id="SpriteFrames_y4v7i"]
 animations = [{
 "frames": [{
-"duration": 1.0,
+"duration": 0.5,
 "texture": ExtResource("2_mouoi")
+}, {
+"duration": 0.5,
+"texture": ExtResource("4_46wrg")
+}, {
+"duration": 0.5,
+"texture": ExtResource("5_jbfhk")
+}, {
+"duration": 0.5,
+"texture": ExtResource("6_8p66i")
+}, {
+"duration": 0.5,
+"texture": ExtResource("7_3oxbl")
+}, {
+"duration": 0.5,
+"texture": ExtResource("8_y8tde")
+}, {
+"duration": 0.5,
+"texture": ExtResource("9_rxnfr")
+}, {
+"duration": 0.5,
+"texture": ExtResource("10_ln7qt")
+}, {
+"duration": 0.5,
+"texture": ExtResource("11_polqn")
+}, {
+"duration": 0.5,
+"texture": ExtResource("12_b1gms")
 }],
 "loop": 1,
 "name": &"default",
@@ -111,10 +148,11 @@ script = ExtResource("1_cfubd")
 bullet_factory_path = NodePath("../BulletFactory2D")
 transforms_generator = NodePath(".")
 spawn_data = SubResource("DirectionalBulletsData2D_nkrfg")
-pattern_source = 25
+pattern_source = 32
 helper_bullets_amount = 55
 helper_outline_placement = 1
 helper_outline_layer_count = 5
+helper_outline_layer_side = 2
 helper_outline_corner_facing = 2
 helper_ring_y_scale = 3.0
 helper_fan_spread = 3.0
