@@ -1529,6 +1529,12 @@ class BulletSpawner2D : public Node2D{
         // when layers are inactive. Lets scripts/tests verify bullets sit
         // on their rings without screenshotting the editor.
         Array debug_get_layer_rings() const;
+        // Debug readouts of the preview snapshot (holder-local, exactly as
+        // drawn): bullet dots and the base track polyline. Empty when the
+        // preview is off. Lets tests prove dots sit on the track (rotation
+        // parity between volley geometry and gizmo) without an editor.
+        PackedVector2Array debug_get_preview_dot_points() const;
+        PackedVector2Array debug_get_preview_track_points() const;
         // Debug coincidence check: verifies every preview dot sits on the
         // drawn geometry (base track or yellow rings). Returns { checked,
         // layers, max_deviation_px, mean_deviation_px, ok }. ok = max
@@ -1847,6 +1853,14 @@ class BulletSpawner2D : public Node2D{
         // Lazily created RNG for HOMING_SELECT_RANDOM (mutable: used by the
         // const resolve_homing_targets).
         mutable Ref<RandomNumberGenerator> homing_rng;
+        // Reusable per-resolve scratch (mutable: used by the const
+        // resolve_homing_targets + collectors). Cleared at each entry; never
+        // nested (collectors run once per resolve, pool is consumed inside
+        // its own selection branch), so sharing is safe. Saves 2-4 Array
+        // allocations every volley and every retarget pass.
+        mutable Array homing_candidates_scratch;
+        mutable Array homing_pool_scratch;
+        mutable Array homing_scan_stack;
         // Dedicated RNG for reload jitter (mutable: used by the const
         // next_shoot_interval_sec). Separate from homing_rng: jitter reseeds
         // would otherwise corrupt the homing target sequence.
@@ -1871,6 +1885,13 @@ class BulletSpawner2D : public Node2D{
         double burst_time_left = 0.0;
         double telegraph_time_left = 0.0;
         bool burst_mirror_next = false;
+        // Consecutive shoot_once() failures inside the current burst chain.
+        // A failed shot is retried (not consumed), so transient hitches never
+        // eat burst shots; after a full burst's worth of consecutive failures
+        // the failure is permanent (bad config, hard over-budget) and the
+        // chain aborts with burst_finished instead of retrying forever.
+        // Reset on every success and every new chain.
+        int burst_consecutive_failures = 0;
         // True once the current burst chain has shown its telegraph: stops
         // the expiry re-firing the warning in a loop instead of firing.
         bool burst_telegraph_done = false;

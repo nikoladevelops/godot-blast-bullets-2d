@@ -74,6 +74,18 @@
 				Debug readout of the yellow preview rings: one PackedVector2Array per extra outline layer, exactly as drawn (holder-local; runs INF-separated with a closing duplicate per closed run). Empty when layers are inactive. Lets scripts and tests verify bullets sit on their rings without screenshotting the editor.
 			</description>
 		</method>
+		<method name="debug_get_preview_dot_points" qualifiers="const">
+			<return type="PackedVector2Array" />
+			<description>
+				Preview bullet dots exactly as drawn (holder-local). Empty when the preview is off. Lets tests prove dots sit on the preview track.
+			</description>
+		</method>
+		<method name="debug_get_preview_track_points" qualifiers="const">
+			<return type="PackedVector2Array" />
+			<description>
+				Preview base track polyline exactly as drawn (holder-local, INF-separated runs). Empty when the preview is off. Lets tests prove the track rotates with the marker like the volley does.
+			</description>
+		</method>
 		<method name="debug_get_retarget_countdown" qualifiers="const">
 			<return type="float" />
 			<description>
@@ -1308,7 +1320,7 @@
 		</signal>
 		<signal name="burst_finished">
 			<description>
-				Fired when the last shot of a burst chain fires.
+				Fired when the last shot of a burst chain fires, or when the chain aborts after a full burst's worth of consecutive failed shots (a failed shot is retried, never silently consumed; each attempt reports through volley_skipped).
 			</description>
 		</signal>
 		<signal name="burst_shot_fired">

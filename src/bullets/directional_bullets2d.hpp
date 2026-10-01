@@ -634,9 +634,14 @@ public:
 		// BulletCurvesData2D is a mutable shared Resource: a user can gain a rotation
 		// curve AFTER the multimesh was spawned/enabled, when populate_* had no reason
 		// to size all_rotation_speed. Enforce the invariant once per tick so the
-		// rotation branches below can never index out of bounds.
-		if ((int)all_rotation_speed.size() != amount_bullets) {
+		// rotation branches below can never index out of bounds. All three
+		// vectors travel together (max/accel are indexed beside speed), so a
+		// future path that desyncs one must not leave the others short.
+		// resize (not assign): existing speeds survive, only gaps fill with 0.
+		if ((int)all_rotation_speed.size() != amount_bullets || (int)all_max_rotation_speed.size() != amount_bullets || (int)all_rotation_acceleration.size() != amount_bullets) {
 			all_rotation_speed.resize(amount_bullets, 0.0);
+			all_max_rotation_speed.resize(amount_bullets, 0.0);
+			all_rotation_acceleration.resize(amount_bullets, 0.0);
 		}
 		// Same invariant for the shared-deque reached states (H5 fix storage).
 		if ((int)all_shared_homing_reached.size() != amount_bullets) {
@@ -3200,11 +3205,13 @@ public:
 			UtilityFunctions::push_error("bullet_set_velocity: new_velocity must be finite.");
 			return;
 		}
-		// Near-zero basis = degenerate transform (e.g. zero-scale teleport):
-		// normalizing it would silently stall the bullet at the inherited
-		// offset. Reject like set_bullet_transform does instead.
-		if (all_cached_instance_transforms[bullet_index].columns[0].length_squared() < 0.00000001) {
-			UtilityFunctions::push_error("bullet_set_velocity: bullet transform has near-zero scale, direction is undefined. Fix the transform first (set_bullet_transform).");
+		// Near-zero or singular basis = degenerate transform (e.g. zero-scale
+		// teleport): normalizing it would silently stall the bullet at the
+		// inherited offset. A (0, 1) scale passes a columns[0] length check
+		// but has determinant 0, so centralise on the invertibility check.
+		// Reject like set_bullet_transform does instead.
+		if (!is_transform_invertible_safe(all_cached_instance_transforms[bullet_index])) {
+			UtilityFunctions::push_error("bullet_set_velocity: bullet transform is degenerate (zero or singular scale), direction is undefined. Fix the transform first (set_bullet_transform).");
 			return;
 		}
 
@@ -3577,7 +3584,7 @@ public:
 		// The #1 silent misconfiguration: bounce layers the bullet can never
 		// detect because its collision_mask does not cover them. Warn once
 		// per life instead of bouncing nothing forever.
-		if (bounce_mask != 0 && (data_collision_mask & bounce_mask) != bounce_mask) {
+		if (!bounce_mask_warning_issued && bounce_mask != 0 && (data_collision_mask & bounce_mask) != bounce_mask) {
 			UtilityFunctions::push_warning("DirectionalBullets2D: bounce_mask has bits outside collision_mask, those targets will never be detected (no bounce). Add the bounce layers to collision_mask.");
 			bounce_mask_warning_issued = true;
 		}

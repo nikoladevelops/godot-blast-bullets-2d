@@ -3295,6 +3295,7 @@ void BulletSpawner2D::set_burst_enabled(bool value) {
     burst_enabled = value;
     if (!value) {
         burst_shots_left = 0;
+        burst_consecutive_failures = 0;
         burst_time_left = 0.0;
         telegraph_pending = false;
         telegraph_time_left = 0.0;
@@ -3642,6 +3643,12 @@ void BulletSpawner2D::apply_pattern_preset(int preset) {
     }
     notify_property_list_changed();
     rebuild_preview();
+    // Presets write members raw (batched: per-write setters would rebuild the
+    // preview ~20 times). The one side effect that cannot wait is process
+    // state: spin presets must wake _process, or the spin never advances on
+    // an otherwise idle spawner. Editor-guarded: the preview owns processing
+    // in the editor.
+    refresh_process_state_editor_guarded();
 }
 bool BulletSpawner2D::get_show_pattern_preview() const {
     return show_pattern_preview;
@@ -3814,6 +3821,7 @@ void BulletSpawner2D::reset_shooting() {
     // Burst/telegraph chains never survive a restart: a stale mid-burst
     // countdown firing into a reset wave would double-fire volleys.
     burst_shots_left = 0;
+    burst_consecutive_failures = 0;
     burst_time_left = 0.0;
     burst_mirror_next = false;
     burst_telegraph_done = false;
@@ -4287,7 +4295,8 @@ void BulletSpawner2D::collect_homing_candidates_by_name(Node *p_node, Array &r_c
     // deep and this runs per volley plus per retarget pass. Children are
     // pushed in reverse so they pop in tree order (FIRST selection stays
     // deterministic).
-    Array stack;
+    homing_scan_stack.clear();
+    Array &stack = homing_scan_stack;
     stack.push_back(p_node);
     while (!stack.is_empty()) {
         Node *node = Object::cast_to<Node>(stack.pop_back());
@@ -4340,7 +4349,8 @@ void BulletSpawner2D::collect_homing_candidates_from_children(Node *p_parent, bo
     // collect_homing_candidates_by_name): trees can be arbitrarily deep and
     // this runs per volley plus per retarget pass. Reverse-push keeps
     // depth-first pre-order identical to the old recursive walk.
-    Array stack;
+    homing_scan_stack.clear();
+    Array &stack = homing_scan_stack;
     for (int i = p_parent->get_child_count() - 1; i >= 0; --i) {
         stack.push_back(p_parent->get_child(i));
     }
@@ -4419,8 +4429,9 @@ Array BulletSpawner2D::resolve_homing_targets(bool quiet, bool advance_round_rob
     }
     // Multi-target sources (group, name, children) share one tail below
     // (range cull, empty check, selection): each branch only fills
-    // `candidates`.
-    Array candidates;
+    // `candidates` (member scratch: cleared here, consumed below).
+    homing_candidates_scratch.clear();
+    Array &candidates = homing_candidates_scratch;
     if (homing_target_source == HOMING_SOURCE_NODE_CHILDREN) {
         if (homing_children_parent_path.is_empty()) {
             warn_empty_homing_targets_once("BulletSpawner2D::resolve_homing_targets: Node Children source needs homing_children_parent_path, volley flies without homing.", quiet);
@@ -4539,7 +4550,8 @@ Array BulletSpawner2D::resolve_homing_targets(bool quiet, bool advance_round_rob
                 // Seed changed at runtime: re-seed so the new value takes effect.
                 homing_rng->set_seed((uint64_t)homing_random_seed);
             }
-            Array pool = candidates.duplicate();
+            homing_pool_scratch = candidates.duplicate();
+            Array &pool = homing_pool_scratch;
             for (int k = 0; k < take && !pool.is_empty(); ++k) {
                 const int idx = (int)homing_rng->randi_range(0, pool.size() - 1);
                 targets.push_back(pool[idx]);
@@ -4564,7 +4576,8 @@ Array BulletSpawner2D::resolve_homing_targets(bool quiet, bool advance_round_rob
             // Repeated min-extraction: take is tiny (usually 1), so O(n*k)
             // beats sorting and needs no extra includes.
             const Vector2 origin = get_global_position();
-            Array pool = candidates.duplicate();
+            homing_pool_scratch = candidates.duplicate();
+            Array &pool = homing_pool_scratch;
             for (int k = 0; k < take && !pool.is_empty(); ++k) {
                 int best = -1;
                 real_t best_dist = 0.0;
@@ -4624,6 +4637,18 @@ Array BulletSpawner2D::get_live_volleys() const {
 }
 Array BulletSpawner2D::debug_get_layer_rings() const {
     return preview_last_layer_rings.duplicate();
+}
+PackedVector2Array BulletSpawner2D::debug_get_preview_dot_points() const {
+    if (preview_dots_layer == nullptr) {
+        return PackedVector2Array();
+    }
+    return preview_dots_layer->dots;
+}
+PackedVector2Array BulletSpawner2D::debug_get_preview_track_points() const {
+    if (preview_dots_layer == nullptr) {
+        return PackedVector2Array();
+    }
+    return preview_dots_layer->path_points;
 }
 
 // Debugging function: proves dots sit on the drawn geometry (base track or
@@ -5020,6 +5045,9 @@ void BulletSpawner2D::apply_volley_homing_and_orbiting(DirectionalBullets2D *bul
     if (!homing_enabled && !orbiting_enabled) {
         return;
     }
+    // NOTE: spawn_position_offset is applied by shoot_once() for EVERY volley
+    // (not here): it used to live below, so plain non-homing, non-orbiting
+    // spawners silently ignored the muzzle offset.
     // Orbiting locks onto a homing target: without homing there is nothing
     // to orbit, so skip it outright instead of arming a dead feature.
     // The volley instance id names the affected volley: with several
@@ -5027,14 +5055,10 @@ void BulletSpawner2D::apply_volley_homing_and_orbiting(DirectionalBullets2D *bul
     if (orbiting_enabled && !homing_enabled) {
         UtilityFunctions::push_warning(String("BulletSpawner2D: orbiting_enabled needs homing_enabled (orbiting locks onto a homing target). Volley ") + String::num_int64((int64_t)bullets->get_instance_id()) + String(" flies without orbiting."));
     }
-    // Flat post-spawn nudge (muzzle offsets, whole-volley follows). Runs FIRST,
-    // before homing/orbit seeding: orbit locks and homing caches then form at
-    // the volley's final positions instead of locking pre-displacement and
-    // re-converging on the first tick. Runs through the engine teleport path
-    // so shapes, attachments, and interpolation stay consistent.
-    if (spawn_position_offset != Vector2(0, 0)) {
-        bullets->teleport_shift_all_bullets(spawn_position_offset);
-    }
+    // Flat post-spawn nudge (muzzle offsets, whole-volley follows) moved to
+    // shoot_once() so it applies to every volley, not just homing/orbiting
+    // ones. Kept FIRST there (before homing/orbit seeding) so orbit locks
+    // and homing caches form at the final positions.
     Array resolved_targets;
     if (homing_enabled) {
         apply_steering_to_volley(bullets);
@@ -5900,15 +5924,21 @@ void BulletSpawner2D::rebuild_preview() {
                 }
                 push_track_global(track_marker.xform(local_pt));
             };
-            // Factory sampler dict ({points, closed}) -> track. All samplers
+            // Factory sampler dict ({points, closed}) -> track. Most samplers
             // return marker-relative offsets (never baked globals); the track
             // applies the same origin-relative math the generators use
-            // (origin + offset, plus marker spin/scale below). The legacy
-            // "local" flag is ignored (grid/others disagree on its meaning).
+            // (origin + offset, plus marker spin/scale below). Shapes whose
+            // generator treats the loop as marker-LOCAL (rectangle, square,
+            // polygon, triangle, trapezoid, diamond, star: points_are_local
+            // with rot_add = marker rotation) pass local_points = true, so
+            // the track composes track_marker.xform like the volley does -
+            // otherwise rotating the marker spins the dots but not the track.
+            // The legacy "local" flag is ignored (grid/others disagree on its
+            // meaning).
             // Samplers cap density internally; only Path2D curves stride
             // here. INF points are row/arm separators, not bad data: forward
             // them verbatim so _draw() can split strips instead of bridging.
-            auto push_track_dict = [&](const Dictionary &tr) {
+            auto push_track_dict = [&](const Dictionary &tr, bool local_points = false) {
                 const Variant pv = tr.get("points", PackedVector2Array());
                 const Variant cv = tr.get("closed", false);
                 if (pv.get_type() != Variant::PACKED_VECTOR2_ARRAY || cv.get_type() != Variant::BOOL) {
@@ -5922,9 +5952,16 @@ void BulletSpawner2D::rebuild_preview() {
                         continue;
                     }
                     if (capture_shape_loop) {
-                        shape_loop.push_back(track_origin + pts[i]);
+                        // Layer rings scale this loop about the generator
+                        // origin: capture the same marker-composed global the
+                        // track draws, so rings rotate with the marker too.
+                        shape_loop.push_back(local_points ? track_marker.xform(pts[i]) : track_origin + pts[i]);
                     }
-                    push_track_global(track_origin + pts[i]);
+                    if (local_points) {
+                        push_track_local(pts[i]);
+                    } else {
+                        push_track_global(track_origin + pts[i]);
+                    }
                 }
             };
             switch (pattern_source) {
@@ -5937,7 +5974,7 @@ void BulletSpawner2D::rebuild_preview() {
                     push_track_dict(BulletFactory2D::helper_sample_outline_ellipse(helper_ellipse_radius_x, helper_ellipse_radius_y, helper_ellipse_rotation, helper_ellipse_start_angle, helper_ellipse_arc, helper_ellipse_mode));
                     break;
                 case PATTERN_FROM_HELPER_STAR:
-                    push_track_dict(BulletFactory2D::helper_sample_outline_star(helper_star_points, helper_star_outer_radius, helper_star_inner_radius, helper_star_base_rotation));
+                    push_track_dict(BulletFactory2D::helper_sample_outline_star(helper_star_points, helper_star_outer_radius, helper_star_inner_radius, helper_star_base_rotation), true);
                     break;
                 case PATTERN_FROM_HELPER_ROSE:
                     push_track_dict(BulletFactory2D::helper_sample_outline_rose(helper_rose_petals, helper_rose_radius, helper_rose_lobe_sharpness, helper_rose_base_rotation));
@@ -5949,22 +5986,22 @@ void BulletSpawner2D::rebuild_preview() {
                     push_track_dict(BulletFactory2D::helper_sample_outline_circle(helper_circle_radius));
                     break;
                 case PATTERN_FROM_HELPER_RECTANGLE:
-                    push_track_dict(BulletFactory2D::helper_sample_outline_rectangle(helper_rectangle_size));
+                    push_track_dict(BulletFactory2D::helper_sample_outline_rectangle(helper_rectangle_size), true);
                     break;
                 case PATTERN_FROM_HELPER_SQUARE:
-                    push_track_dict(BulletFactory2D::helper_sample_outline_rectangle(Vector2((real_t)helper_square_size, (real_t)helper_square_size)));
+                    push_track_dict(BulletFactory2D::helper_sample_outline_rectangle(Vector2((real_t)helper_square_size, (real_t)helper_square_size)), true);
                     break;
                 case PATTERN_FROM_HELPER_TRIANGLE:
-                    push_track_dict(BulletFactory2D::helper_sample_outline_triangle(helper_triangle_type, helper_triangle_size_a, helper_triangle_size_b, helper_triangle_rotation));
+                    push_track_dict(BulletFactory2D::helper_sample_outline_triangle(helper_triangle_type, helper_triangle_size_a, helper_triangle_size_b, helper_triangle_rotation), true);
                     break;
                 case PATTERN_FROM_HELPER_TRAPEZOID:
-                    push_track_dict(BulletFactory2D::helper_sample_outline_trapezoid(helper_trapezoid_base_top, helper_trapezoid_base_bottom, helper_trapezoid_height, helper_trapezoid_rotation));
+                    push_track_dict(BulletFactory2D::helper_sample_outline_trapezoid(helper_trapezoid_base_top, helper_trapezoid_base_bottom, helper_trapezoid_height, helper_trapezoid_rotation), true);
                     break;
                 case PATTERN_FROM_HELPER_DIAMOND:
-                    push_track_dict(BulletFactory2D::helper_sample_outline_diamond(helper_diamond_diagonal_x, helper_diamond_diagonal_y, helper_diamond_rotation));
+                    push_track_dict(BulletFactory2D::helper_sample_outline_diamond(helper_diamond_diagonal_x, helper_diamond_diagonal_y, helper_diamond_rotation), true);
                     break;
                 case PATTERN_FROM_HELPER_POLYGON:
-                    push_track_dict(BulletFactory2D::helper_sample_outline_polygon(helper_polygon_vertices, helper_polygon_radius, helper_polygon_rotation));
+                    push_track_dict(BulletFactory2D::helper_sample_outline_polygon(helper_polygon_vertices, helper_polygon_radius, helper_polygon_rotation), true);
                     break;
                 case PATTERN_FROM_HELPER_PATH2D: {
                     // Generator-local shape points: the collector composes them
@@ -6136,7 +6173,9 @@ void BulletSpawner2D::rebuild_preview() {
                 case PATTERN_FROM_HELPER_FAN: {
                     // Cone: two boundary rays from the origin plus an arc at
                     // the tip connecting them. Mirrors the generator's spread
-                    // around direction_angle; centered spreads symmetrically.
+                    // around marker rotation + direction_angle (the generator
+                    // composes base_rotation = marker rotation + direction);
+                    // centered spreads symmetrically.
                     // The generator stacks every bullet AT the origin (facing
                     // differs), so the cone is the meaningful shape — its
                     // radius is a fixed representative length, independent of
@@ -6145,7 +6184,7 @@ void BulletSpawner2D::rebuild_preview() {
                         break;
                     }
                     PackedVector2Array cone;
-                    build_cone_strip(track_origin, (real_t)helper_fan_direction_angle, (real_t)(helper_fan_spread * 0.5), 150.0, (real_t)helper_fan_spread, cone);
+                    build_cone_strip(track_origin, track_marker.get_rotation() + (real_t)helper_fan_direction_angle, (real_t)(helper_fan_spread * 0.5), 150.0, (real_t)helper_fan_spread, cone);
                     for (int i = 0; i < cone.size(); ++i) {
                         push_track_global(cone[i]);
                     }
@@ -6556,8 +6595,6 @@ void BulletSpawner2D::_validate_property(PropertyInfo &p_property) const {
                     show = homing_retarget_mode == HOMING_RETARGET_ON_INTERVAL;
                 } else if (property_name == "homing_delay_sec" || property_name == "homing_duration_sec" || property_name == "homing_lose_range_px" || property_name == "homing_fire_arc_deg") {
                     show = true;
-                } else if (property_name == "reload_jitter_sec") {
-                    show = true;
                 } else if (property_name == "homing_random_seed") {
                     show = homing_target_selection == HOMING_SELECT_RANDOM;
                 } else if (property_name == "homing_retarget_phase") {
@@ -6848,6 +6885,13 @@ bool BulletSpawner2D::shoot_once() {
     // configured before volley_fired, so handlers observe live behavior.
     // The latch stays up through volley_fired below (not just the configuring
     // signals): every emit on this path runs user code synchronously.
+    // Muzzle offset first (every volley, even plain ones): runs through the
+    // engine teleport path so shapes, attachments, and interpolation stay
+    // consistent, and before homing/orbit seeding so locks form at the final
+    // positions instead of re-converging on the first tick.
+    if (spawn_position_offset != Vector2(0, 0)) {
+        bullets->teleport_shift_all_bullets(spawn_position_offset);
+    }
     apply_volley_homing_and_orbiting(bullets);
     // Re-validate: handlers of homing_targets_resolved/volley_homing_configured
     // ran above and may have freed this volley or handed it to another owner.
@@ -6998,6 +7042,11 @@ void BulletSpawner2D::_notification(int p_what) {
         tracked_custom_transforms.clear();
         helper_path2d_cache = nullptr;
         helper_path2d_id = 0;
+        // Homing scratch Arrays can retain references to freed scene nodes
+        // (candidates/scan results): drop them with the rest of the caches.
+        homing_candidates_scratch.clear();
+        homing_pool_scratch.clear();
+        homing_scan_stack.clear();
         cached_volley_template.unref();
         cached_spawn_data_id = 0;
         bullet_factory = nullptr;
@@ -7020,6 +7069,7 @@ void BulletSpawner2D::_notification(int p_what) {
         // Burst/telegraph never survive a tree exit: countdowns firing after
         // re-entry would double-fire into the new scene.
         burst_shots_left = 0;
+        burst_consecutive_failures = 0;
         burst_time_left = 0.0;
     burst_mirror_next = false;
     burst_telegraph_done = false;
@@ -7170,6 +7220,7 @@ void BulletSpawner2D::begin_burst() {
     telegraph_pending = false;
     telegraph_time_left = 0.0;
     burst_telegraph_done = false;
+    burst_consecutive_failures = 0;
     if (!burst_enabled || burst_count <= 1) {
         burst_shots_left = 0;
         fire_burst_volley();
@@ -7208,14 +7259,24 @@ void BulletSpawner2D::fire_burst_volley() {
         const bool mirrored = burst_alternate_mirror && (burst_shots_left % 2 == 0);
         burst_mirror_next = mirrored;
         const bool fired = shoot_once();
+        burst_mirror_next = false;
         if (fired) {
             emit_signal("burst_shot_fired", burst_count - burst_shots_left + 1, mirrored);
+            burst_consecutive_failures = 0;
+            --burst_shots_left;
+        } else if (++burst_consecutive_failures >= burst_count) {
+            // Persistent failure (bad config, permanent over-budget): end the
+            // chain instead of retrying forever. Each attempt already reported
+            // through volley_skipped, so nothing fails silently.
+            burst_shots_left = 0;
+            burst_consecutive_failures = 0;
         }
-        burst_mirror_next = false;
-        --burst_shots_left;
+        // On a transient failure the shot is retried next interval (no
+        // decrement above), so the mirror rhythm and shot indexes stay stable.
         burst_time_left = burst_interval_sec;
         if (burst_shots_left <= 0) {
             burst_telegraph_done = false;
+            burst_consecutive_failures = 0;
             emit_signal("burst_finished");
         }
         set_process(true);
@@ -8786,6 +8847,8 @@ void BulletSpawner2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_live_volleys"), &BulletSpawner2D::get_live_volleys);
 	ClassDB::bind_method(D_METHOD("clear_live_volleys"), &BulletSpawner2D::clear_live_volleys);
 	ClassDB::bind_method(D_METHOD("debug_get_layer_rings"), &BulletSpawner2D::debug_get_layer_rings);
+	ClassDB::bind_method(D_METHOD("debug_get_preview_dot_points"), &BulletSpawner2D::debug_get_preview_dot_points);
+	ClassDB::bind_method(D_METHOD("debug_get_preview_track_points"), &BulletSpawner2D::debug_get_preview_track_points);
 	ClassDB::bind_method(D_METHOD("debug_check_layer_coincidence", "tolerance_px"), &BulletSpawner2D::debug_check_layer_coincidence, DEFVAL(1.0));
 	ClassDB::bind_method(D_METHOD("debug_get_cache_state"), &BulletSpawner2D::debug_get_cache_state);
 	ClassDB::bind_method(D_METHOD("debug_get_retarget_countdown"), &BulletSpawner2D::debug_get_retarget_countdown);

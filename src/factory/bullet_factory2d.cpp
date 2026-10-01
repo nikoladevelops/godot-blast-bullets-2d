@@ -101,8 +101,8 @@ bool validate_spawn_data(const Ref<MultiMeshBulletsData2D> &spawn_data, const ch
 			UtilityFunctions::push_error(String("Error in ") + caller_name + ": transforms[" + String::num_int64(i) + "] contains NaN/Inf. Nothing was spawned.");
 			return false;
 		}
-		if (t.get_scale().length_squared() < 0.00000001) {
-			UtilityFunctions::push_error(String("Error in ") + caller_name + ": transforms[" + String::num_int64(i) + "] has zero scale. Nothing was spawned.");
+		if (t.get_scale().length_squared() < 0.00000001 || !MultiMeshBullets2D::is_transform_invertible_safe(t)) {
+			UtilityFunctions::push_error(String("Error in ") + caller_name + ": transforms[" + String::num_int64(i) + "] has zero or singular scale. Nothing was spawned.");
 			return false;
 		}
 	}
@@ -433,7 +433,7 @@ static void fx_apply_slot_spin(BulletFactory2D::FXOneShotBake &bake, int slot_in
 	Transform2D local = spun;
 	if (container != nullptr) {
 		const Transform2D node_global = container->get_global_transform();
-		if (node_global.get_scale().length_squared() >= 0.00000001) {
+		if (MultiMeshBullets2D::is_transform_invertible_safe(node_global)) {
 			local = node_global.affine_inverse() * spun;
 		}
 	}
@@ -538,21 +538,27 @@ MultiMeshInstance2D *BulletFactory2D::fx_create_shard(Node *parent, const Ref<Te
 	return shard;
 }
 
-int BulletFactory2D::fx_frame_for_age(const std::vector<double> &secs, double total, double age) {
-	if (secs.empty() || !(total > 0.0) || !Math::is_finite(age)) {
+int BulletFactory2D::fx_frame_for_age(const std::vector<double> &starts, double total, double age) {
+	if (starts.empty() || !(total > 0.0) || !Math::is_finite(age)) {
 		return 0;
 	}
-	double t = age - Math::floor(age / total) * total;
-	double acc = 0.0;
-	int frame = 0;
-	for (int f = 0; f < (int)secs.size(); ++f) {
-		acc += secs[f];
-		if (t < acc) {
-			return f;
+	const double t = age - Math::floor(age / total) * total;
+	// First frame whose end boundary passes t (bit-identical to the old
+	// linear accumulation); past the end (float error) holds the last frame.
+	size_t lo = 0;
+	size_t hi = starts.size();
+	while (lo < hi) {
+		const size_t mid = lo + (hi - lo) / 2;
+		if (t < starts[mid]) {
+			hi = mid;
+		} else {
+			lo = mid + 1;
 		}
-		frame = f;
 	}
-	return frame;
+	if (lo >= starts.size()) {
+		return (int)starts.size() - 1;
+	}
+	return (int)lo;
 }
 
 void BulletFactory2D::fx_ensure_effects_container() {
@@ -586,6 +592,7 @@ void BulletFactory2D::fx_erase_bake(FXOneShotBake &bake) {
 	bake.slots.clear();
 	bake.frames.clear();
 	bake.secs.clear();
+	bake.frame_starts.clear();
 	bake.active_count = 0;
 	bake.ring_cursor = 0;
 }
@@ -615,6 +622,7 @@ bool BulletFactory2D::fx_register_volley_bake(uint64_t volley_id, int layer_inde
 	bake.layer = layer;
 	bake.frames = frames;
 	bake.secs = secs;
+	bake.frame_starts = fx_prefix_sums(secs);
 	bake.total = total;
 	const int ring = fx_ring_size_for_layer(layer, amount_bullets);
 	bake.slots.assign(ring, FXOneShotSlot());
@@ -702,7 +710,7 @@ int BulletFactory2D::fx_fire_into_bake(FXOneShotBake &bake, const Transform2D &a
 	slot.duration = bake.total;
 	slot.start_age = (layer->random_start_frame && bake.total > 0.0) ? (double)UtilityFunctions::randf_range(0.0f, (float)bake.total) : 0.0;
 	slot.active = true;
-	const int frame = fx_frame_for_age(bake.secs, bake.total, slot.start_age);
+	const int frame = fx_frame_for_age(bake.frame_starts, bake.total, slot.start_age);
 	slot.last_shard = frame;
 	// Spin starts at the slot's own age (usually 0): the written pose is
 	// the base spun forward, and last_angle mirrors it for debug.
@@ -715,7 +723,7 @@ int BulletFactory2D::fx_fire_into_bake(FXOneShotBake &bake, const Transform2D &a
 		Transform2D local = spun;
 		if (sprite_effects_container != nullptr) {
 			const Transform2D node_global = sprite_effects_container->get_global_transform();
-			if (node_global.get_scale().length_squared() >= 0.00000001) {
+			if (MultiMeshBullets2D::is_transform_invertible_safe(node_global)) {
 				// MUST convert the SPUN pose, matching the aging path
 				// (fx_apply_slot_spin). Converting the unspun base here wrote a
 				// pose that disagreed with slot.last_angle and with every
@@ -781,7 +789,7 @@ void BulletFactory2D::age_fx_effects(double delta) {
 			}
 			fx_refresh_slot_color(bake, (int)s, age);
 			fx_apply_slot_spin(bake, (int)s, age, sprite_effects_container);
-			const int frame = fx_frame_for_age(bake.secs, bake.total, age);
+			const int frame = fx_frame_for_age(bake.frame_starts, bake.total, age);
 			if (frame != slot.last_shard && frame >= 0 && frame < (int)bake.shards.size()) {
 				if (slot.last_shard >= 0 && slot.last_shard < (int)bake.shards.size() && bake.shards[slot.last_shard] != nullptr) {
 					bake.shards[slot.last_shard]->get_multimesh()->set_instance_transform_2d((int)s, FX_HIDDEN_TRANSF);
@@ -791,7 +799,7 @@ void BulletFactory2D::age_fx_effects(double delta) {
 					Transform2D local = slot.fixed;
 					if (sprite_effects_container != nullptr) {
 						const Transform2D node_global = sprite_effects_container->get_global_transform();
-						if (node_global.get_scale().length_squared() >= 0.00000001) {
+						if (MultiMeshBullets2D::is_transform_invertible_safe(node_global)) {
 							local = node_global.affine_inverse() * slot.fixed;
 						}
 					}
@@ -847,7 +855,7 @@ void BulletFactory2D::age_fx_bake(FXOneShotBake &bake) {
 		}
 		fx_refresh_slot_color(bake, (int)s, age);
 		fx_apply_slot_spin(bake, (int)s, age, sprite_effects_container);
-		const int frame = fx_frame_for_age(bake.secs, bake.total, age);
+		const int frame = fx_frame_for_age(bake.frame_starts, bake.total, age);
 		if (frame != slot.last_shard && frame >= 0 && frame < (int)bake.shards.size()) {
 			if (slot.last_shard >= 0 && slot.last_shard < (int)bake.shards.size() && bake.shards[slot.last_shard] != nullptr) {
 				bake.shards[slot.last_shard]->get_multimesh()->set_instance_transform_2d((int)s, FX_HIDDEN_TRANSF);
@@ -857,7 +865,7 @@ void BulletFactory2D::age_fx_bake(FXOneShotBake &bake) {
 				Transform2D local = slot.fixed;
 				if (sprite_effects_container != nullptr) {
 					const Transform2D node_global = sprite_effects_container->get_global_transform();
-					if (node_global.get_scale().length_squared() >= 0.00000001) {
+					if (MultiMeshBullets2D::is_transform_invertible_safe(node_global)) {
 						local = node_global.affine_inverse() * slot.fixed;
 					}
 				}
@@ -937,6 +945,7 @@ int BulletFactory2D::spawn_layer_effect(const Ref<BulletEffectLayerData2D> &laye
 	bake.layer_version = layer->get_bake_version();
 	bake.frames = frames;
 	bake.secs = secs;
+	bake.frame_starts = fx_prefix_sums(secs);
 	bake.total = total;
 	const int ring = fx_ring_size_for_layer(layer, 32);
 	bake.slots.assign(ring, FXOneShotSlot());

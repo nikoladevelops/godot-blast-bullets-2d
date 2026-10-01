@@ -233,6 +233,15 @@ void MultiMeshBullets2D::fx_rebuild_trail_layers(const TypedArray<BulletEffectLa
 		if (!layer->bake_effect_frames(layer->animation, bake.frames, bake.secs, bake.total)) {
 			continue;
 		}
+		bake.frame_starts.clear();
+		bake.frame_starts.reserve(bake.secs.size());
+		{
+			double acc = 0.0;
+			for (double s : bake.secs) {
+				acc += s;
+				bake.frame_starts.push_back(acc);
+			}
+		}
 		bake.layer = layer;
 		bake.layer_index = li;
 		for (size_t f = 0; f < bake.frames.size(); ++f) {
@@ -240,6 +249,7 @@ void MultiMeshBullets2D::fx_rebuild_trail_layers(const TypedArray<BulletEffectLa
 			bake.shards.push_back(shard);
 		}
 		bake.shard_visible.assign(bake.shards.size(), 0);
+		bake.shard_refcount.assign(bake.shards.size(), 0);
 		bake.phase.assign(amount_bullets, 0.0);
 		if (layer->random_start_frame && bake.total > 0.0) {
 			for (int i = 0; i < amount_bullets; ++i) {
@@ -406,14 +416,25 @@ bool MultiMeshBullets2D::play_effect_animation(int layer_index, const StringName
 		}
 		bake.shards.clear();
 		bake.shard_visible.clear();
+		bake.shard_refcount.clear();
 		bake.frames = frames;
 		bake.secs = secs;
+		bake.frame_starts.clear();
+		bake.frame_starts.reserve(secs.size());
+		{
+			double acc = 0.0;
+			for (double s : secs) {
+				acc += s;
+				bake.frame_starts.push_back(acc);
+			}
+		}
 		bake.total = total;
 		for (size_t f = 0; f < frames.size(); ++f) {
 			MultiMeshInstance2D *shard = BulletFactory2D::fx_create_shard(this, frames[f], BulletFactory2D::fx_quad_size_for_texture(frames[f]), bake.layer->material, bake.layer->self_modulate, bake.layer->z_index, bake.layer->z_as_relative, bake.layer->visibility_layer, bake.layer->light_mask, amount_bullets, true);
 			bake.shards.push_back(shard);
 		}
 		bake.shard_visible.assign(bake.shards.size(), 0);
+		bake.shard_refcount.assign(bake.shards.size(), 0);
 		bake.bullet_shard.assign(amount_bullets, -1);
 		bake.bullet_trail_transf.assign(amount_bullets, Transform2D());
 		bake.bullet_trail_tint.assign(amount_bullets, Color(1, 1, 1, 1));
@@ -1513,6 +1534,10 @@ void MultiMeshBullets2D::clear_bullet_rotation_data() {
 	all_rotation_speed.clear();
 	all_max_rotation_speed.clear();
 	all_rotation_acceleration.clear();
+	// Presence must go with the values: without this, Directional keeps stale
+	// per-bullet bits and a later shared fallback skips slots that are now
+	// genuine gaps (rotation cleared means "no seed", not "authored zero").
+	reset_per_bullet_rotation_presence();
 }
 
 Transform2D MultiMeshBullets2D::generate_texture_transform(Transform2D transf, bool is_texture_rotation_permanent, real_t texture_rotation_radians, int bullet_index) {
@@ -1920,12 +1945,14 @@ void MultiMeshBullets2D::set_bullet_transform(int bullet_index, const Transform2
 		UtilityFunctions::push_error("set_bullet_transform: new_transform must be finite, keeping the old transform.");
 		return;
 	}
-	// A degenerate (near-zero) scale collapses columns[0] to zero, which silently
+	// A degenerate (near-zero or singular) scale collapses columns[0] to zero, which silently
 	// zeroes the movement direction wherever it is derived from the transform
 	// (adjust_direction_based_on_rotation tick path -> velocity falls back to
-	// the inherited offset only). Reject instead of storing a poisoned basis.
-	if (new_transform.get_scale().length_squared() < 0.00000001) {
-		UtilityFunctions::push_error("set_bullet_transform: scale must be non-zero, keeping the old transform.");
+	// the inherited offset only). A (0, 1) scale passes a length check but has
+	// determinant 0, so centralise on the invertibility check. Reject instead
+	// of storing a poisoned basis.
+	if (new_transform.get_scale().length_squared() < 0.00000001 || !is_transform_invertible_safe(new_transform)) {
+		UtilityFunctions::push_error("set_bullet_transform: scale must be non-zero and non-singular, keeping the old transform.");
 		return;
 	}
 	if (bullet_index >= (int)all_cached_instance_transforms.size() || bullet_index >= (int)all_cached_instance_origin.size()) {
@@ -3128,11 +3155,13 @@ void MultiMeshBullets2D::disable_bullet(int bullet_index, bool should_disable_at
 		// Same re-entrancy latch as enable_bullet(): the attachment callback
 		// below runs user code that may call enable_bullet()/disable_bullet().
 		// A nested enable-then-disable pair inside one outer disable would
-		// otherwise decrement the counter twice for one claimed slot.
+		// otherwise decrement the counter twice for one claimed slot, and a
+		// nested disable inside the sweep below would pool the instance twice.
 		if (_bullet_enable_depth > 0) {
-			UtilityFunctions::push_error("disable_bullet: re-entrant call from inside on_bullet_enable is not allowed. Use call_deferred to change bullet state from that callback.");
+			UtilityFunctions::push_error("disable_bullet: re-entrant call from inside on_bullet_enable/on_bullet_disable is not allowed. Use call_deferred to change bullet state from that callback.");
 			return;
 		}
+		ReentrancyGuard bullet_disable_guard(_bullet_enable_depth);
 
 		const bool curr_bullet_status = all_bullets_enabled_set.contains(bullet_index);
 

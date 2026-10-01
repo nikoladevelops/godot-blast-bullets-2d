@@ -174,7 +174,7 @@ public:
 		// Degenerate node global (zero scale) has no inverse: skip the frame
 		// instead of writing a non-finite buffer (see to_local_for_multimesh).
 		const Transform2D node_global = get_global_transform();
-		if (node_global.get_scale().length_squared() < 0.00000001) {
+		if (!is_transform_invertible_safe(node_global)) {
 			return;
 		}
 		const Transform2D multimesh_inv = node_global.affine_inverse();
@@ -240,7 +240,7 @@ public:
 	// Same degenerate-global guard as interpolate_bullet_visuals: never
 	// write a non-finite inverse into the buffer.
 	const Transform2D node_global = get_global_transform();
-	if (node_global.get_scale().length_squared() < 0.00000001) {
+	if (!is_transform_invertible_safe(node_global)) {
 		return;
 	}
 	const Transform2D multimesh_inv = node_global.affine_inverse();
@@ -1046,9 +1046,20 @@ public:
 		int layer_index = -1;
 		std::vector<Ref<Texture2D>> frames;
 		std::vector<double> secs;
+		// Prefix sums of secs (see FXOneShotBake::frame_starts): the per-tick
+		// frame lookup binary searches this instead of re-accumulating.
+		// Rebuilt wherever secs is assigned.
+		std::vector<double> frame_starts;
 		double total = 0.0;
 		std::vector<MultiMeshInstance2D *> shards;
 		std::vector<uint8_t> shard_visible;
+		// Live bullets per shard. hide_trail_instances() used to rescan every
+		// slot to decide whether a shard could hide (O(N) per disabled bullet,
+		// O(N^2) for a full-volley expiry); the count makes it O(1) with
+		// identical hide semantics. Maintained at the two assignment sites
+		// (frame transition in write_trail_from_global, release in
+		// hide_trail_instances) and reset wherever bullet_shard is.
+		std::vector<int> shard_refcount;
 		std::vector<double> phase;
 		std::vector<uint8_t> bullet_on;
 		std::vector<int> bullet_shard;
@@ -1110,15 +1121,21 @@ public:
 			}
 			double age = curves_elapsed_time + bake.phase[bullet_index];
 			age = age - Math::floor(age / bake.total) * bake.total;
-			double acc = 0.0;
+			// First frame whose end boundary passes age (prefix sums make this
+			// O(log F) instead of re-accumulating per bullet per tick).
 			int frame = 0;
-			for (int f = 0; f < (int)bake.secs.size(); ++f) {
-				acc += bake.secs[f];
-				if (age < acc) {
-					frame = f;
-					break;
+			if (!bake.frame_starts.empty()) {
+				size_t lo = 0;
+				size_t hi = bake.frame_starts.size();
+				while (lo < hi) {
+					const size_t mid = lo + (hi - lo) / 2;
+					if (age < bake.frame_starts[mid]) {
+						hi = mid;
+					} else {
+						lo = mid + 1;
+					}
 				}
-				frame = f;
+				frame = (lo < bake.frame_starts.size()) ? (int)lo : (int)bake.frame_starts.size() - 1;
 			}
 			if (frame < 0 || frame >= (int)bake.shards.size()) {
 				continue;
@@ -1150,8 +1167,20 @@ public:
 				const int prev = bake.bullet_shard[bullet_index];
 				if (prev >= 0 && prev < (int)bake.shards.size() && bake.shards[prev] != nullptr) {
 					bake.shards[prev]->get_multimesh()->set_instance_transform_2d(bullet_index, zero_transform);
+					// Leaving shard: hide it now when nobody else rides it
+					// (previously it stayed flagged visible until an
+					// unrelated hide scan happened to notice).
+					if (prev < (int)bake.shard_refcount.size() && bake.shard_refcount[prev] > 0) {
+						if (--bake.shard_refcount[prev] == 0 && prev < (int)bake.shard_visible.size()) {
+							bake.shard_visible[prev] = 0;
+							bake.shards[prev]->set_visible(false);
+						}
+					}
 				}
 				bake.bullet_shard[bullet_index] = frame;
+				if (frame >= 0 && frame < (int)bake.shard_refcount.size()) {
+					++bake.shard_refcount[frame];
+				}
 			}
 			MultiMeshInstance2D *shard = bake.shards[frame];
 			if (shard == nullptr) {
@@ -1218,15 +1247,10 @@ public:
 				bake.shards[prev]->get_multimesh()->set_instance_transform_2d(bullet_index, zero_transform);
 			}
 			bake.bullet_shard[bullet_index] = -1;
-			if (prev >= 0 && prev < (int)bake.shard_visible.size()) {
-				bool any_left = false;
-				for (size_t i = 0; i < bake.bullet_shard.size(); ++i) {
-					if (bake.bullet_shard[(int)i] == prev) {
-						any_left = true;
-						break;
-					}
-				}
-				if (!any_left) {
+			// O(1) hide decision via the live-bullet count (same semantics as
+			// the old full-slot scan: hide exactly when nobody rides it).
+			if (prev >= 0 && prev < (int)bake.shard_refcount.size() && bake.shard_refcount[prev] > 0) {
+				if (--bake.shard_refcount[prev] == 0 && prev < (int)bake.shard_visible.size()) {
 					bake.shard_visible[prev] = 0;
 					if (prev < (int)bake.shards.size() && bake.shards[prev] != nullptr) {
 						bake.shards[prev]->set_visible(false);

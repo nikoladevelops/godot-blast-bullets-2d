@@ -448,12 +448,30 @@ public:
 		uint64_t layer_version = 0;
 		std::vector<Ref<Texture2D>> frames;
 		std::vector<double> secs;
+		// Prefix sums of secs (frame end boundaries). fx_frame_for_age binary
+		// searches this instead of re-accumulating per bullet per tick.
+		// Rebuilt wherever secs is assigned; cleared with it.
+		std::vector<double> frame_starts;
 		double total = 0.0;
 		std::vector<MultiMeshInstance2D *> shards;
 		std::vector<FXOneShotSlot> slots;
 		int ring_cursor = 0;
 		int active_count = 0;
 	};
+
+	// Prefix sums for binary frame lookup (see frame_starts above).
+	// Accumulated raw like the old linear scan, so lookup results are
+	// bit-identical to the accumulation loop this replaces.
+	static std::vector<double> fx_prefix_sums(const std::vector<double> &secs) {
+		std::vector<double> starts;
+		starts.reserve(secs.size());
+		double acc = 0.0;
+		for (double s : secs) {
+			acc += s;
+			starts.push_back(acc);
+		}
+		return starts;
+	}
 	std::vector<FXOneShotBake> fx_bakes;
 	// Manual-hatch bakes (spawn_layer_effect): owned by the factory itself,
 	// keyed separately so volley teardown never touches them. One bake per
@@ -470,7 +488,7 @@ public:
 	// instances start white so untinted layers render untouched.
 	static Vector2 fx_quad_size_for_texture(const Ref<Texture2D> &tex);
 	static MultiMeshInstance2D *fx_create_shard(Node *parent, const Ref<Texture2D> &tex, const Vector2 &quad_size, const Ref<Material> &mat, const Color &col, int z, bool z_rel, int vis, int light, int instance_count, bool with_colors);
-	static int fx_frame_for_age(const std::vector<double> &secs, double total, double age);
+	static int fx_frame_for_age(const std::vector<double> &starts, double total, double age);
 
 	void fx_ensure_effects_container();
 	// Frees one bake's shard nodes (zeroed first so this frame never renders
