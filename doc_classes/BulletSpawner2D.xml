@@ -697,7 +697,7 @@
 			Which adjoining side owns a shared corner dot on corner-anchored shapes (Rectangle, Square, Polygon, Triangle, Trapezoid, Diamond, Star): Horizontal Sides (top/bottom own corners, so a top-right dot faces UP), Vertical Sides (left/right own them), Balanced (outgoing edge owns, previous behavior). On-outline and layers layouts only.
 		</member>
 		<member name="helper_outline_distribution" type="int" setter="set_helper_outline_distribution" getter="get_helper_outline_distribution" default="1">
-			How corner-anchored polygon loops (Rectangle, Square, Polygon, Triangle, Trapezoid, Diamond, Star) spread leftover slots: Legacy fills the first edges in winding order (equal sides can differ), Symmetric pairs opposite edges so opposite sides stay equal.
+			How corner-anchored polygon loops (Rectangle, Square, Polygon, Triangle, Trapezoid, Diamond, Star) spread leftover slots: Legacy fills the first edges in winding order (equal sides can differ), Symmetric pairs opposite edges so opposite sides stay equal. Smooth loops (Circle, Ellipse and the non-polygon generators) resample evenly regardless, so this knob is hidden there — it is a dead setting on those shapes, not a missing feature.
 		</member>
 		<member name="helper_outline_edge_margin" type="float" setter="set_helper_outline_edge_margin" getter="get_helper_outline_edge_margin" default="0.0">
 			Interior dots keep at least this many pixels of clearance from corners along their edge (clamped per edge; corners stay pinned). Only shown in Pin Corners mode. Must be finite and 0 or more.

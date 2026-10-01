@@ -1107,19 +1107,20 @@ public:
 		// Try to get a TBullet from the pool first
 		TBullet *bullets = static_cast<TBullet *>(bullets_pool.pop(key));
 		if (bullets != nullptr) {
-			// Pool-hit accounting. Discriminated at compile time by the
-			// pooled type; never touches the per-bullet tick.
-			if constexpr (std::is_same_v<TBullet, DirectionalBullets2D>) {
-				++directional_pool_hits;
-			} else {
-				++block_pool_hits;
-			}
 			if (!bullets->enable_multimesh(*spawn_data.ptr(), new_inherited_velocity_offset, spawner_id)) {
 				// enable_multimesh rolls its own mutations back on failure, so the
 				// instance is a clean disabled one here: just file it back under
 				// the live key (not the spawn key) and do not activate it.
 				bullets_pool.push(bullets, bullets->get_pool_key());
 				return nullptr;
+			}
+			// Pool-hit accounting lands only on success: a popped-but-rejected
+			// reuse must not skew debug_get_pool_hit_stats. Discriminated at
+			// compile time by the pooled type; never touches the per-bullet tick.
+			if constexpr (std::is_same_v<TBullet, DirectionalBullets2D>) {
+				++directional_pool_hits;
+			} else {
+				++block_pool_hits;
 			}
 			// Identity-checked: a stale pooled id must never activate a foreign entry.
 			// Pooled instances normally stay in the vec, so this is just a safe lookup.

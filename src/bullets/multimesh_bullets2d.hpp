@@ -2681,12 +2681,16 @@ public:
 	// false when the target exposes none or is already gone (the drain
 	// then falls back to its live read).
 	static bool read_queued_target_velocity(int64_t entered_instance_id, Vector2 &out_velocity) {
+		// Cached once (same rationale as the bounce drain below).
+		static const StringName prop_linear_velocity("linear_velocity");
+		static const StringName prop_velocity("velocity");
+		static const StringName prop_constant_linear_velocity("constant_linear_velocity");
 		out_velocity = Vector2(0, 0);
 		Object *hit_target = ObjectDB::get_instance(entered_instance_id);
 		if (hit_target == nullptr) {
 			return false;
 		}
-		const Variant linear_v = hit_target->get(StringName("linear_velocity"));
+		const Variant linear_v = hit_target->get(prop_linear_velocity);
 		if (linear_v.get_type() == Variant::VECTOR2) {
 			const Vector2 v = (Vector2)linear_v;
 			if (v.is_finite()) {
@@ -2695,7 +2699,7 @@ public:
 			}
 			return false;
 		}
-		const Variant vel_v = hit_target->get(StringName("velocity"));
+		const Variant vel_v = hit_target->get(prop_velocity);
 		if (vel_v.get_type() == Variant::VECTOR2) {
 			const Vector2 v = (Vector2)vel_v;
 			if (v.is_finite()) {
@@ -2707,7 +2711,7 @@ public:
 		// AnimatableBody2D platforms expose neither of the above: their
 		// motion lives in constant_linear_velocity (with sync_to_physics).
 		// Without this a ramming crusher reads as standing still.
-		const Variant const_v = hit_target->get(StringName("constant_linear_velocity"));
+		const Variant const_v = hit_target->get(prop_constant_linear_velocity);
 		if (const_v.get_type() == Variant::VECTOR2) {
 			const Vector2 v = (Vector2)const_v;
 			if (v.is_finite()) {

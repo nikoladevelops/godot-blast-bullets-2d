@@ -252,6 +252,11 @@ protected:
 	// + all_bullet_gravity spawn data under the unified tiling rule).
 	// The tick integrates these (see all_gravity_velocity); all zero = off.
 	std::vector<Vector2> all_gravity;
+	// Per-bullet gravity PRESENCE, same contract as the speed/rotation bits:
+	// 1 = user-authored per-bullet entry (seed or bullet_set_gravity, even a
+	// deliberate zero), so set_gravity() fills only genuine gaps instead of
+	// silently destroying per-bullet tuning. Reset with the vectors.
+	std::vector<uint8_t> has_per_bullet_gravity;
 	// Gravity time window over volley life (seconds since spawn, read on
 	// curves_elapsed_time): integrates only inside [delay, delay + duration].
 	// delay 0 = immediate; duration 0 = infinite. Zeroed with the vectors.
@@ -1764,10 +1769,11 @@ public:
 	}
 
 	// Concentric-ring enable: bullet (start + k) orbits at radius_start + radius_step * k.
-	// Re-arming an already-orbiting bullet updates its radius (and other
-	// params) instead of warning + skipping: ranges like
-	// all_bullets_enable_orbiting_linear must be re-runnable on armed volleys.
-	// Invalid enums are still rejected per bullet by bullet_enable_orbiting.
+	// Re-arming an already-orbiting bullet updates every passed param (not
+	// just the radius): ranges like all_bullets_enable_orbiting_linear must
+	// be re-runnable on armed volleys. OrbitRandom keeps each bullet's rolled
+	// direction (re-setting it would re-roll mid-flight); the rest applies.
+	// Invalid enums are still rejected per bullet by the individual setters.
 	_ALWAYS_INLINE_ void all_bullets_enable_orbiting_linear(real_t radius_start, real_t radius_step, OrbitingDirection orbiting_direction = OrbitRight, OrbitingTextureRotation orbiting_texture_rotation = FaceTarget, int bullet_index_start = 0, int bullet_index_end_inclusive = -1, OrbitingFollowMode orbiting_follow_mode = FollowTarget, real_t orbiting_follow_deadzone = 0.0f, OrbitingLockPolicy orbiting_lock_policy = RelockAlways, bool orbiting_rigid_follow = true) {
 		ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_enable_orbiting_linear");
 
@@ -1775,6 +1781,14 @@ public:
 			const real_t want_radius = radius_start + radius_step * (real_t)(i - bullet_index_start);
 			if (i >= 0 && i < (int)all_orbiting_status.size() && all_orbiting_status[i] == 1) {
 				bullet_set_orbiting_radius(i, want_radius);
+				if (orbiting_direction != OrbitRandom) {
+					bullet_set_orbiting_direction(i, orbiting_direction);
+				}
+				bullet_set_orbiting_texture_rotation(i, orbiting_texture_rotation);
+				bullet_set_orbiting_follow_mode(i, orbiting_follow_mode);
+				bullet_set_orbiting_follow_deadzone(i, orbiting_follow_deadzone);
+				bullet_set_orbiting_lock_policy(i, orbiting_lock_policy);
+				bullet_set_orbiting_rigid_follow(i, orbiting_rigid_follow);
 				continue;
 			}
 			bullet_enable_orbiting(i, want_radius, orbiting_direction, orbiting_texture_rotation, orbiting_follow_mode, orbiting_follow_deadzone, orbiting_lock_policy, orbiting_rigid_follow);
@@ -3905,11 +3919,30 @@ public:
 			return;
 		}
 		gravity = value;
-		// Shared write fans out to every slot (same as the spawn-data shared
-		// fallback). New regime, new fall speed: without this a mid-flight
-		// gravity change would add onto stale integrated velocity.
-		all_gravity.assign(amount_bullets, value);
-		all_gravity_velocity.assign(amount_bullets, Vector2(0, 0));
+		// Fill-gaps semantics (same contract as the speed/rotation shared
+		// setters): slots with a user-authored per-bullet entry keep it;
+		// only genuine gaps take the shared value. Changed slots restart
+		// their integrated fall speed (new regime); untouched slots keep
+		// integrating (no regime change for them). A slot that took the
+		// shared value stays a gap (bit clear): the NEXT shared write must
+		// still reach it, otherwise only the first set_gravity() works.
+		// Same-value writes only refresh the member, never the fall speed.
+		if ((int)has_per_bullet_gravity.size() != amount_bullets) {
+			has_per_bullet_gravity.assign(amount_bullets, 0);
+		}
+		if ((int)all_gravity.size() != amount_bullets || (int)all_gravity_velocity.size() != amount_bullets) {
+			all_gravity.assign(amount_bullets, Vector2(0, 0));
+			all_gravity_velocity.assign(amount_bullets, Vector2(0, 0));
+		}
+		for (int i = 0; i < amount_bullets; ++i) {
+			if (has_per_bullet_gravity[i]) {
+				continue;
+			}
+			if (all_gravity[i] != value) {
+				all_gravity_velocity[i] = Vector2(0, 0);
+			}
+			all_gravity[i] = value;
+		}
 		refresh_gravity_active();
 	}
 	Vector2 bullet_get_gravity(int bullet_index) const {
@@ -3934,6 +3967,12 @@ public:
 		}
 		all_gravity[bullet_index] = value;
 		all_gravity_velocity[bullet_index] = Vector2(0, 0);
+		// A direct per-bullet write claims presence like a seeded entry, so
+		// a later set_gravity() cannot silently undo it.
+		if ((int)has_per_bullet_gravity.size() != amount_bullets) {
+			has_per_bullet_gravity.assign(amount_bullets, 0);
+		}
+		has_per_bullet_gravity[bullet_index] = 1;
 		refresh_gravity_active();
 	}
 	void all_bullets_set_gravity(const Vector2 &value, int bullet_index_start = 0, int bullet_index_end_inclusive = -1) {

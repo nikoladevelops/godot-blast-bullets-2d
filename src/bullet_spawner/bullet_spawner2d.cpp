@@ -3466,6 +3466,11 @@ void BulletSpawner2D::set_homing_retarget_phase(double value) {
         return;
     }
     homing_retarget_phase = value;
+    // A re-tuned phase takes effect on the pending countdown immediately:
+    // the phase IS the pending countdown for an armed-but-waiting pass
+    // (mirrors update_homing_process_state's reset arm). Stagger is only
+    // flattened when the user edits the phase itself, never by unrelated
+    // setters (those snapshot was_active and skip the reset).
     homing_retarget_time_left = value;
 }
 int BulletSpawner2D::get_burst_shots_left() const {
@@ -3701,6 +3706,13 @@ void BulletSpawner2D::set_show_preview_during_runtime(bool value) {
     // once here and never refreshes marker moves afterwards.
     if (!Engine::get_singleton()->is_editor_hint() && is_inside_tree()) {
         refresh_process_state();
+        // Fast path for marker moves: without transform notifications the
+        // runtime gizmo relies solely on the _process dirty check. Always
+        // on once touched (matching _ready): clearing it here would drop
+        // the editor-armed notification for spawners constructed there.
+        if (value) {
+            set_notify_transform(true);
+        }
     }
     update_preview_process_state();
     rebuild_preview();
@@ -3935,9 +3947,10 @@ bool BulletSpawner2D::get_homing_enabled() const {
     return homing_enabled;
 }
 void BulletSpawner2D::set_homing_enabled(bool value) {
+    const bool was_active = homing_retarget_active();
     homing_enabled = value;
     notify_property_list_changed();
-    update_homing_process_state();
+    update_homing_process_state(!was_active);
 }
 BulletSpawner2D::HomingMode BulletSpawner2D::get_homing_mode() const {
     return homing_mode;
@@ -4157,9 +4170,10 @@ void BulletSpawner2D::set_homing_retarget_mode(HomingRetargetMode value) {
         UtilityFunctions::push_error("BulletSpawner2D: invalid homing_retarget_mode, keeping the old value.");
         return;
     }
+    const bool was_active = homing_retarget_active();
     homing_retarget_mode = value;
     notify_property_list_changed();
-    update_homing_process_state();
+    update_homing_process_state(!was_active);
 }
 double BulletSpawner2D::get_homing_retarget_interval_sec() const {
     return homing_retarget_interval_sec;
@@ -4170,6 +4184,13 @@ void BulletSpawner2D::set_homing_retarget_interval_sec(double value) {
         return;
     }
     homing_retarget_interval_sec = value;
+    // A longer period than the pending countdown leaves a pass scheduled
+    // past the new period: clamp it so the next retarget honors the new
+    // interval now instead of one stale (long) wait later. A shorter-or-equal
+    // period never touches the pending pass (no stagger flattening).
+    if (homing_retarget_active() && homing_retarget_time_left > value) {
+        homing_retarget_time_left = value;
+    }
 }
 bool BulletSpawner2D::get_homing_retarget_previous_volleys() const {
     return homing_retarget_previous_volleys;
@@ -4291,11 +4312,15 @@ bool BulletSpawner2D::homing_retarget_active() const {
     return homing_enabled && homing_retarget_mode == HOMING_RETARGET_ON_INTERVAL && !Engine::get_singleton()->is_editor_hint() && is_inside_tree();
 }
 
-void BulletSpawner2D::update_homing_process_state() {
+void BulletSpawner2D::update_homing_process_state(bool reset_countdown) {
     if (homing_retarget_active()) {
         // Phase-stagger the first pass so N spawners don't scene-scan together;
-        // zero phase stays due-now for immediate refresh.
-        homing_retarget_time_left = homing_retarget_phase;
+        // zero phase stays due-now for immediate refresh. Reset only when
+        // retargeting just armed: re-running it on every setter call would
+        // flatten the stagger phases of already-running spawners.
+        if (reset_countdown) {
+            homing_retarget_time_left = homing_retarget_phase;
+        }
         set_process(true);
     } else {
         // Sleep when nothing needs the loop. Mirrors the shooting setters so
@@ -4973,12 +4998,15 @@ int BulletSpawner2D::retarget_live_volleys() {
                 // Re-deal like at spawn: per-bullet replace (not clear +
                 // assign) so locked rings survive per the lock policy instead
                 // of unlocking on every pass. Skips disabled slots silently.
+                // Own index name (not the outer volley-loop i it shadows):
+                // shadowing compiles today but invites a real bug on the
+                // next edit touching either loop.
                 const int bullet_count = volley->get_amount_bullets();
-                for (int i = 0; i < bullet_count; ++i) {
-                    if (!volley->is_bullet_status_enabled(i)) {
+                for (int bi = 0; bi < bullet_count; ++bi) {
+                    if (!volley->is_bullet_status_enabled(bi)) {
                         continue;
                     }
-                    volley->bullet_replace_homing_targets_with_new_target(i, volley_targets[i % volley_targets.size()]);
+                    volley->bullet_replace_homing_targets_with_new_target(bi, volley_targets[bi % volley_targets.size()]);
                 }
             } else {
                 volley->all_bullets_replace_homing_targets_with_new_target_array(volley_targets);
@@ -6742,7 +6770,9 @@ void BulletSpawner2D::_validate_property(PropertyInfo &p_property) const {
     } else if (property_name.begins_with("helper_flower_")) {
         relevant = pattern_source == PATTERN_FROM_HELPER_FLOWER;
         if (relevant) {
-            const int ftype = helper_flower_type;
+            // Clamped defensively: the setter validates, but a raw/desynced
+            // value must degrade to hiding knobs, never to a silent wrong set.
+            const int ftype = Math::clamp(helper_flower_type, 0, 4);
             // Common bloom knobs (always relevant for FLOWER).
             if (property_name == "helper_flower_type" ||
                     property_name == "helper_flower_radius" ||
@@ -6844,8 +6874,13 @@ void BulletSpawner2D::_validate_property(PropertyInfo &p_property) const {
             relevant = helper_outline_placement == (int)BulletFactory2D::OUTLINE_LAYERS;
         } else if (property_name == "helper_outline_layer_start_offset") {
             relevant = helper_outline_placement == (int)BulletFactory2D::OUTLINE_LAYERS && (helper_outline_layer_fill == (int)BulletFactory2D::OUTLINE_LAYER_SEQUENTIAL || helper_outline_layer_fill == (int)BulletFactory2D::OUTLINE_LAYER_OUTER_FIRST);
-        } else if (relevant && (property_name == "helper_outline_reverse" || property_name == "helper_outline_slot_offset" || property_name == "helper_outline_distribution")) {
+        } else if (relevant && (property_name == "helper_outline_reverse" || property_name == "helper_outline_slot_offset")) {
             relevant = helper_outline_placement == (int)BulletFactory2D::OUTLINE_ON_OUTLINE || helper_outline_placement == (int)BulletFactory2D::OUTLINE_LAYERS;
+        } else if (relevant && property_name == "helper_outline_distribution") {
+            // Distribution only steers corner-anchored apportionment (smooth
+            // loops resample evenly regardless): hide it where it is a dead
+            // knob instead of implying control it does not have.
+            relevant = (helper_outline_placement == (int)BulletFactory2D::OUTLINE_ON_OUTLINE || helper_outline_placement == (int)BulletFactory2D::OUTLINE_LAYERS) && supports_corner_layout(pattern_source);
         } else if (relevant && (property_name == "helper_outline_corner_priority" || property_name == "helper_outline_corner_mode")) {
             relevant = (helper_outline_placement == (int)BulletFactory2D::OUTLINE_ON_OUTLINE || helper_outline_placement == (int)BulletFactory2D::OUTLINE_LAYERS) && supports_corner_layout(pattern_source);
         } else if (relevant && property_name == "helper_outline_edge_margin") {
@@ -7188,10 +7223,7 @@ void BulletSpawner2D::_process(double delta) {
     if (Engine::get_singleton()->is_editor_hint()) {
         return;
     }
-    if (!Math::is_finite(delta) || delta < 0.0) {
-        return;
-    }
-    if (delta <= 0.0) {
+    if (!Math::is_finite(delta) || delta <= 0.0) {
         return;
     }
     if (delta > 0.5) {
@@ -7582,8 +7614,16 @@ bool BulletSpawner2D::fire_arc_covers_targets(const Array &targets) const {
     if (targets.is_empty() || !is_inside_tree()) {
         return false;
     }
-    const Vector2 origin = get_global_position();
-    const real_t facing = get_global_rotation();
+    // Origin and facing come from the EFFECTIVE GENERATOR (the volley's
+    // actual muzzle), not the spawner node: with an external
+    // transforms_generator the two differ, and gating on the spawner frame
+    // would skip valid shots or admit invalid ones.
+    Node2D *base = get_effective_generator();
+    if (base == nullptr || !is_inside_tree()) {
+        return false;
+    }
+    const Vector2 origin = base->get_global_position();
+    const real_t facing = base->get_global_rotation();
     const real_t half_arc = Math::deg_to_rad((real_t)homing_fire_arc_deg) * 0.5;
     for (int i = 0; i < targets.size(); ++i) {
         Vector2 pos = Vector2(0, 0);

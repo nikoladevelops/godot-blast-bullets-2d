@@ -372,19 +372,25 @@ void DirectionalBullets2D::apply_gravity_from_data(const DirectionalBulletsData2
 	if (grav_size != 0 && grav_size != amount_bullets) {
 		UtilityFunctions::push_warning("DirectionalBullets2D: all_bullet_gravity size (" + String::num_int64(grav_size) + ") != bullets (" + String::num_int64(amount_bullets) + "); uncovered bullets use gravity" + String(tile_grav ? " (tiling on: wrapping short array)." : " (check tile_all_bullet_gravity to wrap, or provide one entry per bullet)."));
 	}
+	// Fresh seed: presence re-derived per slot below (authored entries claim
+	// it, even deliberate zeros; gaps stay fillable by set_gravity).
+	has_per_bullet_gravity.assign(amount_bullets, 0);
 	for (int i = 0; i < amount_bullets; ++i) {
 		const int entry = tile_grav ? resolve_tiled_data_index(grav_size, i) : resolve_strict_data_index(grav_size, i);
 		Vector2 g = gravity;
+		bool authored = false;
 		if (entry >= 0 && entry < directional_data.all_bullet_gravity.size()) {
 			const Vector2 candidate = directional_data.all_bullet_gravity[entry];
 			if (candidate.is_finite()) {
 				g = candidate;
+				authored = true;
 			} else {
 				UtilityFunctions::push_error("DirectionalBulletsData2D all_bullet_gravity[" + String::num_int64(entry) + "] is not finite, using (0, 0) for bullet index " + String::num_int64(i) + ".");
 				g = Vector2(0, 0);
 			}
 		}
 		all_gravity[i] = g;
+		has_per_bullet_gravity[i] = authored ? 1 : 0;
 	}
 	refresh_gravity_active();
 }
@@ -651,6 +657,7 @@ void DirectionalBullets2D::custom_additional_spawn_logic(const MultiMeshBulletsD
 	gravity = Vector2(0, 0);
 	all_gravity.assign(amount_bullets, Vector2(0, 0));
 	all_gravity_velocity.assign(amount_bullets, Vector2(0, 0));
+	has_per_bullet_gravity.assign(amount_bullets, 0);
 	gravity_delay_sec = 0.0;
 	gravity_duration_sec = 0.0;
 	linear_drag = 0.0;
@@ -733,10 +740,17 @@ void DirectionalBullets2D::reset_transient_subclass_state(bool drop_stale_work) 
 	// Neutralize ballistics/shared/homing so a new life never inherits the
 	// previous owner's values (base reset cannot clear subclass state).
 	// set_up_movement_data re-seeds has_per_bullet_speed_data; the rotation
-	// seed lives in the base set_rotation_data, so clear its bit here to keep
-	// pooled reuse from inheriting the previous owner's presence decisions.
+	// presence is handled below (kept across plain disables, reset only for
+	// new pooled lives).
 	set_up_movement_data(TypedArray<BulletSpeedData2D>());
-	reset_per_bullet_rotation_presence();
+	// Rotation presence follows the VALUES: rotation speeds survive a plain
+	// disable (for same-owner wakes), so their presence decisions must too —
+	// otherwise a later shared write would clobber authored entries the wake
+	// meant to resume. Only a new pooled life (drop_stale_work) resets the
+	// decisions (the seed below re-derives them anyway).
+	if (drop_stale_work) {
+		reset_per_bullet_rotation_presence();
+	}
 	shared_bullet_speed_data.unref();
 	shared_bullet_rotation_data.unref();
 	adjust_direction_based_on_rotation = false;
@@ -753,6 +767,7 @@ void DirectionalBullets2D::reset_transient_subclass_state(bool drop_stale_work) 
 	gravity = Vector2(0, 0);
 	all_gravity.assign(amount_bullets, Vector2(0, 0));
 	all_gravity_velocity.assign(amount_bullets, Vector2(0, 0));
+	has_per_bullet_gravity.assign(amount_bullets, 0);
 	refresh_gravity_active();
 	gravity_delay_sec = 0.0;
 	gravity_duration_sec = 0.0;
@@ -1035,6 +1050,11 @@ static bool bounce_precise_normal_from_target(Object *hit_target, const Vector2 
 }
 
 int DirectionalBullets2D::try_handle_bounce(CollisionType collision_type, int bullet_index, int64_t entered_instance_id, Vector2 queued_target_velocity, bool queued_velocity_valid, Vector2 queued_target_position, bool queue_position_valid) {
+	// Cached once: hit_target->get() with a fresh StringName per call pays
+	// an interning lookup on every bounce drain.
+	static const StringName prop_linear_velocity("linear_velocity");
+	static const StringName prop_velocity("velocity");
+	static const StringName prop_constant_linear_velocity("constant_linear_velocity");
 	if (bounce_mask == 0) {
 		return 0;
 	}
@@ -1167,12 +1187,12 @@ int DirectionalBullets2D::try_handle_bounce(CollisionType collision_type, int bu
 		target_v = queued_target_velocity;
 	} else {
 		bool has_velocity_property = false;
-		const Variant linear_v = hit_target->get(StringName("linear_velocity"));
+		const Variant linear_v = hit_target->get(prop_linear_velocity);
 		if (linear_v.get_type() == Variant::VECTOR2) {
 			target_v = (Vector2)linear_v;
 			has_velocity_property = true;
 		} else {
-			const Variant vel_v = hit_target->get(StringName("velocity"));
+			const Variant vel_v = hit_target->get(prop_velocity);
 			if (vel_v.get_type() == Variant::VECTOR2) {
 				target_v = (Vector2)vel_v;
 				has_velocity_property = true;
@@ -1180,7 +1200,7 @@ int DirectionalBullets2D::try_handle_bounce(CollisionType collision_type, int bu
 				// AnimatableBody2D platforms expose neither of the above:
 				// their motion lives in constant_linear_velocity (same
 				// fallback as the queue-time reader above).
-				const Variant const_v = hit_target->get(StringName("constant_linear_velocity"));
+				const Variant const_v = hit_target->get(prop_constant_linear_velocity);
 				if (const_v.get_type() == Variant::VECTOR2) {
 					target_v = (Vector2)const_v;
 					has_velocity_property = true;

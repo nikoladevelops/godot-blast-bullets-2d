@@ -2021,7 +2021,7 @@ class BulletSpawner2D : public Node2D{
         // + retarget armed + inside the tree at runtime.
         bool homing_retarget_active() const;
         // Wakes _process when retargeting becomes active (runtime only).
-        void update_homing_process_state();
+        void update_homing_process_state(bool reset_countdown);
         // Canonical keep-awake predicate for _process: shooting, spinning,
         // retargeting, previewing, bursting, telegraphing or sequencing.
         // Every setter uses refresh_process_state() instead of spelling the
