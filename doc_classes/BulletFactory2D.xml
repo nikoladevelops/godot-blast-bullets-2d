@@ -121,7 +121,7 @@
 		<method name="debug_get_pool_hit_stats" qualifiers="const">
 			<return type="Dictionary" />
 			<description>
-				Pool reuse counters: directional_hits, directional_misses, block_hits, block_misses. A 0% hit rate with a pre-populated pool means the spawn key never matches (e.g. helper_skip_indices shrank transforms after populate); compare [method debug_expected_pool_key] against [method debug_get_bullets_pool_info] keys.
+				Pool reuse counters (64-bit): directional_hits, directional_misses, block_hits, block_misses. A spawn from inside a volley's own collision handler never reuses that volley (it is mid-tick), so it is served by another pooled instance or a fresh allocation and still succeeds. A 0% hit rate with a pre-populated pool means the spawn key never matches (e.g. helper_skip_indices shrank transforms after populate); compare [method debug_expected_pool_key] against [method debug_get_bullets_pool_info] keys.
 			</description>
 		</method>
 		<method name="debug_get_total_attachments_amount">
@@ -274,7 +274,7 @@
 			<return type="void" />
 			<param index="0" name="volley" type="Node" />
 			<description>
-				Safe single-volley free from any callback: uses queue_free(), never free()/force_delete(). Use this inside directional_area_entered and other handlers instead of freeing the volley directly.
+				Safe single-volley free from any callback: uses queue_free(), never free()/force_delete(). Use this inside directional_area_entered and other handlers instead of freeing the volley directly. Only bullet volleys ([MultiMeshBullets2D]) are accepted; any other node is rejected with an error and left alone.
 			</description>
 		</method>
 		<method name="get_active_effect_count" qualifiers="const">
@@ -1427,7 +1427,7 @@
 			<param index="0" name="block_bullets_instance" type="BlockBullets2D" />
 			<param index="1" name="bullet_indexes" type="int[]" />
 			<description>
-				Emitted (deferred, outside the physics step) when a block bullet multimesh's lifetime is over, but only if the [MultiMeshBulletsData2D]'s [member MultiMeshBulletsData2D.is_life_time_over_signal_enabled] is set to [code]true[/code].
+				Emitted (deferred, outside the physics step) when a block bullet multimesh's lifetime is over, but only if the [MultiMeshBulletsData2D]'s [member MultiMeshBulletsData2D.is_life_time_over_signal_enabled] is set to [code]true[/code]. Until the signal has been delivered the expired volley stays out of the pool and keeps its attachments, so handlers can inspect [method MultiMeshBullets2D.bullet_get_attachment] and a same-frame spawn can never reuse (and silence) it; attachments are released and the volley pooled right after.
 			</description>
 		</signal>
 		<signal name="directional_area_entered">
@@ -1468,7 +1468,7 @@
 			<param index="0" name="directional_bullets_instance" type="DirectionalBullets2D" />
 			<param index="1" name="bullet_indexes" type="int[]" />
 			<description>
-				Emitted (deferred, outside the physics step) when a directional bullet multimesh's lifetime is over, but only if the [MultiMeshBulletsData2D]'s [member MultiMeshBulletsData2D.is_life_time_over_signal_enabled] is set to [code]true[/code].
+				Emitted (deferred, outside the physics step) when a directional bullet multimesh's lifetime is over, but only if the [MultiMeshBulletsData2D]'s [member MultiMeshBulletsData2D.is_life_time_over_signal_enabled] is set to [code]true[/code]. Until the signal has been delivered the expired volley stays out of the pool and keeps its attachments, so handlers can inspect [method MultiMeshBullets2D.bullet_get_attachment] and a same-frame spawn can never reuse (and silence) it; attachments are released and the volley pooled right after.
 			</description>
 		</signal>
 		<signal name="reset_finished">

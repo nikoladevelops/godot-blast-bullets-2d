@@ -22,6 +22,29 @@ using namespace godot;
 
 namespace BlastBullets2D {
 
+// Scopes one candidate-pool reuse window (one shot or one retarget pass):
+// resolve_homing_targets collects the pool on the first call and only
+// re-selects afterwards. Restores the previous state on every exit path.
+struct HomingCandidatePass {
+    bool &active;
+    bool &filled;
+    bool saved_active;
+    bool saved_filled;
+    HomingCandidatePass(bool &p_active, bool &p_filled) :
+            active(p_active), filled(p_filled), saved_active(p_active), saved_filled(p_filled) {
+        if (!saved_active) {
+            active = true;
+            filled = false;
+        }
+    }
+    ~HomingCandidatePass() {
+        active = saved_active;
+        filled = saved_active ? filled : saved_filled;
+    }
+    HomingCandidatePass(const HomingCandidatePass &) = delete;
+    HomingCandidatePass &operator=(const HomingCandidatePass &) = delete;
+};
+
 // Resolves a stored NodePath to a typed node. When inside the tree the path is
 // authoritative: a missing target clears the cache instead of serving a stale
 // pointer. Outside the tree the previously cached pointer is returned.
@@ -43,7 +66,11 @@ static T *resolve_node_path(const Node *self, const NodePath &p_path, T *&r_cach
 template <typename T>
 static void assign_node_to_path(const Node *self, T *node, NodePath &r_path, T *&r_cache) {
     r_cache = node;
-    if (node != nullptr && self->is_inside_tree() && node->is_inside_tree()) {
+    // Path updates only when both ends share one tree: get_path_to across
+    // trees errors (or yields a path that later resolves elsewhere), and an
+    // out-of-tree assignment must not keep a stale path that would silently
+    // replace this node on re-entry (see validate_cached_node).
+    if (node != nullptr && self->is_inside_tree() && node->is_inside_tree() && self->get_tree() == node->get_tree()) {
         r_path = self->get_path_to(node);
     } else if (node == nullptr) {
         r_path = NodePath();
@@ -66,6 +93,14 @@ static T *validate_cached_node(const Node *self, const NodePath &p_path, T *&r_c
         } else if (ObjectDB::get_instance(ObjectID(r_id)) != (Object *)r_cache) {
             r_cache = nullptr;
             r_id = 0;
+        } else {
+            // Validated cache wins outright: re-resolving the path here
+            // would let a stale path silently replace a manually assigned
+            // node (assign_node_to_path deliberately leaves the path behind
+            // out-of-tree assignments). Setters clear the cache, so a live
+            // cache always agrees with the path. This also skips the
+            // string-parse + tree walk on every getter call.
+            return r_cache;
         }
         if (r_cache == nullptr) {
             return nullptr;
@@ -81,26 +116,40 @@ static T *validate_cached_node(const Node *self, const NodePath &p_path, T *&r_c
     return resolved;
 }
 
-// Rotates a spawn transform around an origin, so a spinning emitter orbits
-// bullet positions and turns facings together. Scale is preserved: only the
-// rotation and the origin offset move. Zero rotation is a no-op.
-static Transform2D rotate_spawn_transform(const Transform2D &t, const Vector2 &origin, real_t radians) {
-    if (radians == 0.0) {
-        return t;
-    }
-    const Vector2 rotated_offset = (t.get_origin() - origin).rotated(radians);
-    Transform2D out(t.get_rotation() + radians, origin + rotated_offset);
-    out.set_scale(t.get_scale());
-    return out;
+// Trivial (identity) case for the folded matrix: no spin and unit scale.
+static bool spin_is_trivial(real_t radians, real_t scale) {
+    return radians == 0.0 && scale == 1.0f;
 }
-// Uniformly scales a spawn transform relative to the generator origin, so
-// marker offsets (spread radius) and basis (bullet size) grow together while
-// rotation is preserved. Scale 1.0 returns the transform untouched.
-static Transform2D scale_spawn_transform(const Transform2D &t, const Vector2 &base_origin, real_t scale) {
-    if (scale == 1.0) {
-        return t;
+// Spin + pattern-scale folded into ONE matrix about the generator origin.
+// The old code rotated per bullet (recomputing the shared angle's trig N
+// times) and rebuilt each basis from its angle — which silently destroyed
+// mirroring (negative determinant: get_rotation() cannot represent a
+// reflection) and shear (set_scale normalizes). M = S(s)·R(r) applied as a
+// plain matrix multiply is exact for every determinant and costs ~18
+// flops/bullet with zero trig, zero sqrt. Built once per volley by
+// make_spin_scale_matrix(); identity (spin 0, scale 1) returns t untouched.
+static Transform2D make_spin_scale_matrix(const Vector2 &origin, real_t radians, real_t scale, bool &r_valid) {
+    r_valid = false;
+    if (spin_is_trivial(radians, scale)) {
+        r_valid = true;
+        return Transform2D();
     }
-    return Transform2D(t.columns[0] * scale, t.columns[1] * scale, base_origin + (t.columns[2] - base_origin) * scale);
+    const real_t c = Math::cos(radians);
+    const real_t s = Math::sin(radians);
+    if (!Math::is_finite(c) || !Math::is_finite(s) || !Math::is_finite(scale) || !origin.is_finite()) {
+        return Transform2D();
+    }
+    // A = s·R: columns of the combined basis.
+    const Vector2 ax = Vector2(c, s) * scale;
+    const Vector2 ay = Vector2(-s, c) * scale;
+    // Origin offset o − A·o, so out = M·t matches rotate-then-scale exactly.
+    const Vector2 ao = Vector2(ax.x * origin.x + ay.x * origin.y, ax.y * origin.x + ay.y * origin.y);
+    const Vector2 off = origin - ao;
+    if (!ax.is_finite() || !ay.is_finite() || !off.is_finite()) {
+        return Transform2D();
+    }
+    r_valid = true;
+    return Transform2D(ax, ay, off);
 }
 
 // Metadata tag + node name for the editor-only pattern preview holder.
@@ -313,6 +362,13 @@ void PatternPreviewLayer2D::_draw() {
     if (head_tri.size() != 3) {
         head_tri.resize(3);
     }
+    // One canvas call for every shaft: draw_multiline over consecutive point
+    // pairs renders exactly what N draw_line calls would (same color, width,
+    // no antialiasing), but the 10k-arrow editor case drops from 10k+ canvas
+    // items to one. Heads stay per-arrow polygons (varying triangles cannot
+    // batch). draw_scratch is free here (dots branch only).
+    draw_scratch.clear();
+    const bool want_shafts = arrow_length > 0.0f && arrow_width > 0.0f;
     for (int i = 0; i < count; i++) {
         const Vector2 dir = posed_dir(arrow_dirs[i]);
         const Vector2 tail = posed(arrow_tails[i]);
@@ -322,20 +378,25 @@ void PatternPreviewLayer2D::_draw() {
         const Vector2 tip = tail + dir * arrow_length;
         const float head_len = MIN(arrow_head_length, arrow_length);
         if (!(head_len > 0.0f) || !(arrow_head_width > 0.0f)) {
-            if (arrow_length > 0.0f && arrow_width > 0.0f) {
-                draw_line(tail, tip, arrow_color, arrow_width, false);
+            if (want_shafts) {
+                draw_scratch.push_back(tail);
+                draw_scratch.push_back(tip);
             }
             continue;
         }
         const Vector2 head_base = tip - dir * head_len;
-        if (arrow_length > 0.0f && arrow_width > 0.0f) {
-            draw_line(tail, head_base, arrow_color, arrow_width, false);
+        if (want_shafts) {
+            draw_scratch.push_back(tail);
+            draw_scratch.push_back(head_base);
         }
         const Vector2 perp = dir.orthogonal() * (arrow_head_width * 0.5f);
         head_tri[0] = tip;
         head_tri[1] = head_base + perp;
         head_tri[2] = head_base - perp;
         draw_colored_polygon(head_tri, arrow_color);
+    }
+    if (want_shafts && draw_scratch.size() >= 2) {
+        draw_multiline(draw_scratch, arrow_color, arrow_width, false);
     }
 }
 
@@ -445,14 +506,16 @@ void BulletSpawner2D::set_bullet_factory_path(const NodePath &p_path) {
     bullet_factory = nullptr;
     bullet_factory_id = 0;
     if (!bullet_factory_path.is_empty() && is_inside_tree()) {
-        Node *node = get_node_or_null(bullet_factory_path);
-        if (node != nullptr && Object::cast_to<BulletFactory2D>(node) == nullptr) {
+        // Single lookup: resolve_node_path already fetches through the path,
+        // so pre-checking with a second get_node_or_null only doubles the
+        // tree walk. Type-check the resolved node instead.
+        BulletFactory2D *resolved = resolve_node_path(this, bullet_factory_path, bullet_factory);
+        if (resolved == nullptr && get_node_or_null(bullet_factory_path) != nullptr) {
             UtilityFunctions::push_warning("BulletSpawner2D: assigned bullet_factory node is not a BulletFactory2D.");
-        } else {
-            BulletFactory2D *resolved = resolve_node_path(this, bullet_factory_path, bullet_factory);
-            bullet_factory_id = resolved != nullptr ? resolved->get_instance_id() : 0;
-            if (resolved == nullptr) bullet_factory = nullptr;
+            bullet_factory = nullptr;
         }
+        bullet_factory_id = resolved != nullptr ? resolved->get_instance_id() : 0;
+        if (resolved == nullptr) bullet_factory = nullptr;
     }
 }
 
@@ -478,14 +541,15 @@ void BulletSpawner2D::set_transforms_generator_path(const NodePath &p_path) {
     transforms_generator = nullptr;
     transforms_generator_id = 0;
     if (!transforms_generator_path.is_empty() && is_inside_tree()) {
-        Node *node = get_node_or_null(transforms_generator_path);
-        if (node != nullptr && Object::cast_to<Node2D>(node) == nullptr) {
+        // Single lookup (see set_bullet_factory_path): resolve first, then
+        // distinguish a missing node (silent) from a wrong-typed one (warn).
+        Node2D *resolved = resolve_node_path(this, transforms_generator_path, transforms_generator);
+        if (resolved == nullptr && get_node_or_null(transforms_generator_path) != nullptr) {
             UtilityFunctions::push_warning("BulletSpawner2D: assigned transforms generator node is not a Node2D.");
-        } else {
-            Node2D *resolved = resolve_node_path(this, transforms_generator_path, transforms_generator);
-            transforms_generator_id = resolved != nullptr ? resolved->get_instance_id() : 0;
-            if (resolved == nullptr) transforms_generator = nullptr;
+            transforms_generator = nullptr;
         }
+        transforms_generator_id = resolved != nullptr ? resolved->get_instance_id() : 0;
+        if (resolved == nullptr) transforms_generator = nullptr;
     }
     rebuild_preview();
 }
@@ -1066,14 +1130,14 @@ void BulletSpawner2D::set_helper_aimed_target_path(const NodePath &p_path) {
     helper_aimed_target = nullptr;
     helper_aimed_target_id = 0;
     if (!helper_aimed_target_path.is_empty() && is_inside_tree()) {
-        Node *node = get_node_or_null(helper_aimed_target_path);
-        if (node != nullptr && Object::cast_to<Node2D>(node) == nullptr) {
+        // Single lookup (see set_bullet_factory_path).
+        Node2D *resolved = resolve_node_path(this, helper_aimed_target_path, helper_aimed_target);
+        if (resolved == nullptr && get_node_or_null(helper_aimed_target_path) != nullptr) {
             UtilityFunctions::push_warning("BulletSpawner2D: assigned aimed target node is not a Node2D.");
-        } else {
-            Node2D *resolved = resolve_node_path(this, helper_aimed_target_path, helper_aimed_target);
-            helper_aimed_target_id = resolved != nullptr ? resolved->get_instance_id() : 0;
-            if (resolved == nullptr) helper_aimed_target = nullptr;
+            helper_aimed_target = nullptr;
         }
+        helper_aimed_target_id = resolved != nullptr ? resolved->get_instance_id() : 0;
+        if (resolved == nullptr) helper_aimed_target = nullptr;
     }
     rebuild_preview();
 }
@@ -4356,9 +4420,18 @@ void BulletSpawner2D::collect_homing_candidates_by_name(Node *p_node, Array &r_c
     homing_scan_stack.clear();
     Array &stack = homing_scan_stack;
     stack.push_back(p_node);
+    // Pattern folded once per scan, not once per visited node.
+    const String pattern = homing_node_name_case_sensitive ? homing_node_name : homing_node_name.to_lower();
     while (!stack.is_empty()) {
         Node *node = Object::cast_to<Node>(stack.pop_back());
         if (node == nullptr) {
+            continue;
+        }
+        // Never descend into a bullet factory: its containers hold every
+        // volley, attachment and effect shard (thousands of nodes in a busy
+        // scene), none of which is a homing target, and walking them made
+        // every name scan scale with the live bullet count.
+        if (Object::cast_to<BulletFactory2D>(node) != nullptr) {
             continue;
         }
         Node2D *as_2d = Object::cast_to<Node2D>(node);
@@ -4368,10 +4441,8 @@ void BulletSpawner2D::collect_homing_candidates_by_name(Node *p_node, Array &r_c
         // exclusion as the children spawn markers in the collect path).
         if (as_2d != nullptr && as_2d != this && !as_2d->has_meta(PREVIEW_META_KEY)) {
             String node_name = String(as_2d->get_name());
-            String pattern = homing_node_name;
             if (!homing_node_name_case_sensitive) {
                 node_name = node_name.to_lower();
-                pattern = pattern.to_lower();
             }
             bool match = false;
             switch (homing_node_name_match_mode) {
@@ -4488,8 +4559,16 @@ Array BulletSpawner2D::resolve_homing_targets(bool quiet, bool advance_round_rob
     // Multi-target sources (group, name, children) share one tail below
     // (range cull, empty check, selection): each branch only fills
     // `candidates` (member scratch: cleared here, consumed below).
-    homing_candidates_scratch.clear();
     Array &candidates = homing_candidates_scratch;
+    // Inside one shot / one retarget pass the candidate pool cannot change
+    // in a way that matters (no user code runs between the resolves), so
+    // collect it once and only re-run the per-volley selection below. The
+    // group poll / scene scan was paid per volley before.
+    const bool reuse_pass_pool = homing_candidate_pass_active && homing_candidate_pass_filled;
+    if (reuse_pass_pool) {
+        // candidates already hold this pass's range-culled pool.
+    } else {
+    homing_candidates_scratch.clear();
     if (homing_target_source == HOMING_SOURCE_NODE_CHILDREN) {
         if (homing_children_parent_path.is_empty()) {
             warn_empty_homing_targets_once("BulletSpawner2D::resolve_homing_targets: Node Children source needs homing_children_parent_path, volley flies without homing.", quiet);
@@ -4540,9 +4619,16 @@ Array BulletSpawner2D::resolve_homing_targets(bool quiet, bool advance_round_rob
             }
         }
     }
+    } // !reuse_pass_pool
     // Detection range culls all multi-target sources around the spawner.
+    // Range and NEAREST measure from the effective generator (the volley's
+    // actual muzzle), same as the fire-arc gate: with an external
+    // transforms_generator the spawner node can sit far from where bullets
+    // spawn.
+    Node2D *muzzle = get_effective_generator();
+    const Vector2 muzzle_origin = muzzle != nullptr ? muzzle->get_global_position() : get_global_position();
     if (homing_max_detection_range > 0.0 && !candidates.is_empty()) {
-        const Vector2 origin = get_global_position();
+        const Vector2 origin = muzzle_origin;
         const real_t max_dist_sq = (real_t)(homing_max_detection_range * homing_max_detection_range);
         Array in_range;
         for (int i = 0; i < candidates.size(); ++i) {
@@ -4552,6 +4638,9 @@ Array BulletSpawner2D::resolve_homing_targets(bool quiet, bool advance_round_rob
             }
         }
         candidates = in_range;
+    }
+    if (homing_candidate_pass_active) {
+        homing_candidate_pass_filled = true;
     }
     if (candidates.is_empty()) {
         if (homing_target_source == HOMING_SOURCE_NODE_NAME) {
@@ -4633,7 +4722,7 @@ Array BulletSpawner2D::resolve_homing_targets(bool quiet, bool advance_round_rob
         default: {
             // Repeated min-extraction: take is tiny (usually 1), so O(n*k)
             // beats sorting and needs no extra includes.
-            const Vector2 origin = get_global_position();
+            const Vector2 origin = muzzle_origin;
             homing_pool_scratch = candidates.duplicate();
             Array &pool = homing_pool_scratch;
             for (int k = 0; k < take && !pool.is_empty(); ++k) {
@@ -4912,6 +5001,9 @@ int BulletSpawner2D::retarget_live_volleys() {
     if (!homing_enabled || !is_inside_tree() || tracked_ids.is_empty()) {
         return 0;
     }
+    // One candidate pool for the whole pass; per-volley modes (random,
+    // round-robin, distribute) only re-run the selection.
+    HomingCandidatePass candidate_pass(homing_candidate_pass_active, homing_candidate_pass_filled);
     const bool use_mouse = homing_target_source == HOMING_SOURCE_MOUSE;
     // RANDOM rolls, ROUND_ROBIN rotates, and DISTRIBUTE deals per volley at
     // spawn time; a single shared array would hand every volley an identical
@@ -5561,15 +5653,28 @@ TypedArray<Transform2D> BulletSpawner2D::collect_spawn_transforms_impl(bool quie
     // covers hand-built state).
     const real_t pattern_factor = Math::is_finite(pattern_scale) ? (real_t)pattern_scale : 1.0f;
     const real_t local_factor = Math::is_finite(transforms_scale) ? (real_t)transforms_scale : 1.0f;
+    // Spin + pattern scale folded into one matrix (see make_spin_scale_matrix):
+    // one trig pair per volley, exact for mirrored/sheared bases. Trivial
+    // or degenerate inputs leave the slot raw: trivial is already correct,
+    // and degenerate inputs stay visible to the downstream finite guards
+    // (which fail loud) instead of being silently rewritten.
+    bool spin_scale_ok = false;
+    const Transform2D spin_scale_mx = make_spin_scale_matrix(base_origin, spin_radians, pattern_factor, spin_scale_ok);
+    const bool use_spin_scale_mx = spin_scale_ok && !spin_is_trivial(spin_radians, pattern_factor);
     TypedArray<Transform2D> transforms;
     for (int i = 0; i < raw.size(); ++i) {
         Transform2D t = raw[i];
-        t = rotate_spawn_transform(t, base_origin, spin_radians);
-        t = scale_spawn_transform(t, base_origin, pattern_factor);
+        if (use_spin_scale_mx) {
+            t = spin_scale_mx * t;
+        }
         // Per-bullet size last: basis only, origins untouched, so skipped
         // indexes below still match the preview.
+        // Plain column scaling: set_scale(get_scale() * f) normalizes the
+        // columns and re-applies a signed y scale, which flips mirrored
+        // (det < 0) bases back and drops shear.
         if (local_factor != 1.0f) {
-            t.set_scale(t.get_scale() * local_factor);
+            t.columns[0] *= local_factor;
+            t.columns[1] *= local_factor;
         }
         transforms.push_back(t);
     }
@@ -5620,6 +5725,18 @@ void BulletSpawner2D::set_preview_pose(double spin_angle_degrees) {
 // Snapshots the effective generator (same fallback as the collect path) plus
 // the aimed target, storing ids and global transforms. Never assumes an old
 // pointer: everything is freshly resolved from paths here.
+// Deferred flush for editor-coalesced rebuilds (see rebuild_preview): runs
+// the build synchronously exactly once, bypassing re-queue.
+void BulletSpawner2D::_do_queued_preview_rebuild() {
+    preview_rebuild_queued = false;
+    if (!preview_allowed_here()) {
+        return;
+    }
+    preview_sync_rebuild = true;
+    rebuild_preview();
+    preview_sync_rebuild = false;
+}
+
 void BulletSpawner2D::snapshot_preview_sources() {
     tracked_self_global = get_global_transform();
     tracked_has_self = true;
@@ -5713,6 +5830,19 @@ void BulletSpawner2D::rebuild_preview() {
     // when the user opted in via show_preview_during_runtime. Never before
     // the node is inside the tree (scene load sets properties first).
     if (!preview_allowed_here()) {
+        return;
+    }
+    // Editor coalescing: slider drags and scene-load restoration fire dozens
+    // of setter rebuilds (up to 10k dots each) per second. In the editor
+    // only, collapse them to one deferred rebuild per frame. Runtime stays
+    // synchronous so script readback after a setter is exact the same frame.
+    // The bypass flag below lets the deferred flush build immediately
+    // instead of re-queuing forever.
+    if (Engine::get_singleton()->is_editor_hint() && is_inside_tree() && !preview_rebuild_in_progress && !preview_sync_rebuild) {
+        if (!preview_rebuild_queued) {
+            preview_rebuild_queued = true;
+            call_deferred("_do_queued_preview_rebuild");
+        }
         return;
     }
     // Nested entry (holder/layer add_child firing NOTIFICATION_CHILD_ORDER_CHANGED
@@ -8990,6 +9120,7 @@ void BulletSpawner2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("debug_get_layer_rings"), &BulletSpawner2D::debug_get_layer_rings);
 	ClassDB::bind_method(D_METHOD("debug_get_preview_dot_points"), &BulletSpawner2D::debug_get_preview_dot_points);
 	ClassDB::bind_method(D_METHOD("debug_get_preview_track_points"), &BulletSpawner2D::debug_get_preview_track_points);
+	ClassDB::bind_method(D_METHOD("_do_queued_preview_rebuild"), &BulletSpawner2D::_do_queued_preview_rebuild);
 	ClassDB::bind_method(D_METHOD("debug_check_layer_coincidence", "tolerance_px"), &BulletSpawner2D::debug_check_layer_coincidence, DEFVAL(1.0));
 	ClassDB::bind_method(D_METHOD("debug_get_cache_state"), &BulletSpawner2D::debug_get_cache_state);
 	ClassDB::bind_method(D_METHOD("debug_get_retarget_countdown"), &BulletSpawner2D::debug_get_retarget_countdown);

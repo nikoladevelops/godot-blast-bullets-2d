@@ -1508,6 +1508,9 @@ class BulletSpawner2D : public Node2D{
         // Live introspection for waves, budgets and debug.
         int get_burst_shots_left() const;
         int get_active_live_bullet_count() const;
+        // Factory-wide directional pool size (shared across every spawner on
+        // this factory), not per-spawner: use get_active_live_bullet_count()
+        // for this spawner's own live census.
         int get_pooled_volley_count() const;
 
         // Resolves the current homing targets without touching any volley:
@@ -1872,6 +1875,11 @@ class BulletSpawner2D : public Node2D{
         // run mid-resolve, add a reentrancy latch here instead of silently
         // corrupting the outer pass.
         mutable Array homing_candidates_scratch;
+        // Candidate-pool reuse across the resolves of ONE shot or ONE
+        // retarget pass (see resolve_homing_targets). Scoped by
+        // HomingCandidatePass in the .cpp; never left active.
+        mutable bool homing_candidate_pass_active = false;
+        mutable bool homing_candidate_pass_filled = false;
         mutable Array homing_pool_scratch;
         mutable Array homing_scan_stack;
         // Dedicated RNG for reload jitter (mutable: used by the const
@@ -1978,6 +1986,12 @@ class BulletSpawner2D : public Node2D{
         // Mutable: rebuilds happen from const setters. Restored on every exit
         // path (early returns included) so one abort can never wedge preview.
         mutable bool preview_rebuild_in_progress = false;
+        // Editor coalescing state for rebuild_preview(): a queued deferred
+        // flush plus the one-shot bypass that lets it build instead of
+        // re-queueing. Runtime path never touches either (synchronous).
+        mutable bool preview_rebuild_queued = false;
+        mutable bool preview_sync_rebuild = false;
+        void _do_queued_preview_rebuild();
         // Set only around the preview's collect_spawn_transforms_impl() call so
         // the snapshotted gizmo geometry is spin-free. The layer then applies
         // spin_angle_deg at draw time, which is what keeps an advancing spin

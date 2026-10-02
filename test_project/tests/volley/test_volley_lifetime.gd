@@ -1,118 +1,80 @@
-extends SceneTree
-## Volley lifetime suite: finite / infinite / zero lifetimes, curve-clock sync,
-## expiry pooling + wake top-up, life_time_over deferred signal, max collision
-## count interplay (0 = infinite). Uses real physics frames so timers tick.
-## Run: godot --headless --path test_project --script tests/volley/test_volley_lifetime.gd
-## Exit code 0 = all pass.
+extends BlastTest
+## Lifetimes: a short finite lifetime expires, signals (deferred) and pools;
+## infinite never expires while the curve clock advances; invalid lifetimes
+## are rejected at the resource setter; max collisions 0 = infinite; the
+## curve clock rejects NaN; the live infinite toggle; counts readable before
+## an expiry.
 
-const H := preload("res://tests/common/blast_test_helpers.gd")
 
-var failures := 0
-var _lifetime_hits: Array = []
-
-func _check(cond: bool, label: String) -> void:
-	if cond:
-		print("PASS  ", label)
-	else:
-		failures += 1
-		printerr("FAIL  ", label)
-
-func _on_lifetime(_volley, indexes: Array) -> void:
-	_lifetime_hits.append(indexes.duplicate())
-
-func _initialize() -> void:
-	var factory := BulletFactory2D.new()
-	get_root().add_child(factory)
-	await process_frame
-	await process_frame
-
-	printerr("LIFE T1 short lifetime expires and pools")
+func test_short_lifetime_expires_signals_and_pools() -> void:
 	var quick := H.make_directional_data(2, 300.0, 0.15)
 	quick.is_life_time_over_signal_enabled = true
+	watch_signals(factory)
 	var q: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(quick)
-	_check(q != null, "short-life spawn ok")
-	if q != null:
-		factory.directional_life_time_over.connect(_on_lifetime)
-		for i in 30:
-			await physics_frame
-			if not q.is_bullet_status_enabled(0) and not q.is_bullet_status_enabled(1):
-				break
-		_check(not q.is_bullet_status_enabled(0), "bullet 0 expired")
-		_check(_lifetime_hits.size() >= 1, "life_time_over emitted deferred")
-		_check(factory.debug_get_bullets_pool_amount(0) >= 1, "expired volley pooled")
-		factory.directional_life_time_over.disconnect(_on_lifetime)
-		_lifetime_hits.clear()
+	for i in 30:
+		await physics()
+		if not q.is_bullet_status_enabled(0) and not q.is_bullet_status_enabled(1):
+			break
+	assert_false(q.is_bullet_status_enabled(0), "bullet 0 expired")
+	await idle(1)
+	assert_signal_emit_count(factory, "directional_life_time_over", 1, "life_time_over emitted once (deferred)")
+	assert_eq(factory.debug_get_bullets_pool_amount(0), 1, "expired volley pooled after the signal")
 
-	printerr("LIFE T2 infinite lifetime never expires")
+
+func test_infinite_never_expires() -> void:
 	var inf := H.make_directional_data(2, 300.0, 5.0)
 	inf.is_life_time_infinite = true
 	var w: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(inf)
-	for i in 10:
-		await physics_frame
-	_check(w.is_bullet_status_enabled(0), "infinite volley still alive")
-	_check(w.get_curves_elapsed_time() > 0.0, "curve clock advances while infinite")
+	await physics(10)
+	assert_true(w.is_bullet_status_enabled(0), "infinite volley still alive")
+	assert_gt(w.get_curves_elapsed_time(), 0.0, "curve clock advances while infinite")
 
-	printerr("LIFE T3 invalid lifetimes fail safe at the resource setter")
-	# The data resource itself rejects non-positive finite lifetimes (keeps the
-	# previous value), so an invalid lifetime can never reach the spawn gate
-	# through setters — defense in depth, asserted here end to end.
-	var zero := H.make_directional_data(2, 100.0, 5.0)
-	zero.max_life_time = 0.0
-	_check(zero.max_life_time > 0.0, "zero lifetime rejected at setter, old kept")
-	var total_before: int = factory.debug_get_total_bullets_amount(0)
-	factory.spawn_directional_bullets(zero)
-	await process_frame
-	_check(factory.debug_get_total_bullets_amount(0) == total_before + 1, "spawn uses kept valid lifetime")
-	zero.max_life_time = NAN
-	_check(zero.max_life_time > 0.0, "NaN lifetime rejected at setter, old kept")
 
-	printerr("LIFE T4 max collisions: 0 = infinite")
-	var tank := H.make_directional_data(1, 0.0, 30.0)
-	var t: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(tank)
+func test_invalid_lifetimes_rejected_at_setter() -> void:
+	var data := H.make_directional_data(2, 100.0, 5.0)
+	data.max_life_time = 0.0
+	expect_any_error()
+	assert_eq(data.max_life_time, 5.0, "zero lifetime rejected, old kept")
+	data.max_life_time = NAN
+	expect_any_error()
+	assert_eq(data.max_life_time, 5.0, "NaN lifetime rejected, old kept")
+	factory.spawn_directional_bullets(data)
+	assert_eq(factory.debug_get_total_bullets_amount(0), 1, "spawn uses the kept valid lifetime")
+
+
+func test_max_collisions_zero_is_infinite() -> void:
+	var t: DirectionalBullets2D = spawn_dir(1, 0.0, 30.0)
 	t.set_bullet_max_collision_count(0)
-	t.set_bullet_collision_count(0, 0)
-	_check(t.get_bullet_max_collision_count() == 0, "max 0 stored (infinite)")
+	assert_eq(t.get_bullet_max_collision_count(), 0, "max 0 stored (infinite)")
 	t.set_bullet_collision_count(0, 5)
-	_check(t.get_bullet_collision_count(0) == 5, "count tracked even when infinite")
+	assert_eq(t.get_bullet_collision_count(0), 5, "count tracked even when infinite")
 	t.set_bullet_max_collision_count(-1)
-	_check(t.get_bullet_max_collision_count() == 0, "negative max rejected")
+	expect_any_error()
+	assert_eq(t.get_bullet_max_collision_count(), 0, "negative max rejected")
 
-	printerr("LIFE T5 curves clock rejects NaN")
-	var c: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(H.make_directional_data(1, 100.0, 5.0))
-	var t_before: float = c.get_curves_elapsed_time()
+
+func test_curve_clock_rejects_nan() -> void:
+	var c: DirectionalBullets2D = spawn_dir(1, 100.0, 5.0)
+	var before: float = c.get_curves_elapsed_time()
 	c.set_curves_elapsed_time(NAN)
-	_check(c.get_curves_elapsed_time() == t_before, "NaN curve time rejected")
+	expect_any_error()
+	assert_eq(c.get_curves_elapsed_time(), before, "NaN curve time rejected")
 
-	printerr("LIFE T6 live infinite toggle + guard")
-	var lv: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(H.make_directional_data(1, 100.0, 5.0))
+
+func test_live_infinite_toggle() -> void:
+	var lv: DirectionalBullets2D = spawn_dir(1, 100.0, 5.0)
 	lv.set_is_life_time_infinite(true)
-	_check(lv.get_is_life_time_infinite() == true, "live toggle to infinite")
+	assert_true(lv.get_is_life_time_infinite(), "toggle to infinite")
 	lv.set_is_life_time_infinite(false)
-	_check(lv.get_is_life_time_infinite() == false, "live toggle back needs max_life_time>0 (has 5s)")
-	# Spawned infinite keeps its max_life_time field, so turning finite back
-	# on is allowed (the guard only refuses max<=0). The honest guard probe
-	# is a max of 0: helper data always carries 5s, so assert the allowed
-	# path stays finite instead of inventing a max-0 volley.
-	_check(lv.get_bullet_transform(0).is_finite(), "toggled volley stays finite")
+	assert_false(lv.get_is_life_time_infinite(), "toggle back (max_life_time 5 s > 0)")
+	assert_true(lv.get_bullet_transform(0).is_finite())
 
-	printerr("LIFE T7 collision count visible after expiry path")
-	var ex := H.make_directional_data(1, 0.0, 0.2)
-	var ev: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(ex)
+
+func test_counts_readable_then_expiry_pools() -> void:
+	var ev: DirectionalBullets2D = spawn_dir(1, 0.0, 0.2)
 	ev.set_bullet_max_collision_count(4)
 	ev.set_bullet_collision_count(0, 2)
-	_check(ev.get_bullets_current_collision_count()[0] == 2, "count readable pre-expiry")
-	for i in 30:
-		await physics_frame
-	_check(factory.debug_get_bullets_pool_amount(0) >= 1, "short volley pooled after expiry")
-
-	_check(factory.debug_assert_no_dangling().get("ok", false) == true, "no dangling at end")
-	await process_frame
-	factory.reset()
-	factory.queue_free()
-	await process_frame
-	print("----")
-	if failures == 0:
-		print("ALL LIFETIME TESTS PASSED")
-	else:
-		printerr(str(failures) + " TEST(S) FAILED")
-	quit(failures)
+	assert_eq(ev.get_bullets_current_collision_count()[0], 2, "count readable pre-expiry")
+	await physics(30)
+	await idle(1)
+	assert_eq(factory.debug_get_bullets_pool_amount(0), 1, "short volley pooled after expiry")

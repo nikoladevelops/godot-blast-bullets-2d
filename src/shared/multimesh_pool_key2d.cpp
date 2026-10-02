@@ -52,7 +52,7 @@ void MultiMeshPoolKey2D::_bind_methods() {
 
 	ClassDB::bind_method(D_METHOD("get_shape_type"), &MultiMeshPoolKey2D::get_shape_type);
 	ClassDB::bind_method(D_METHOD("set_shape_type", "shape_type"), &MultiMeshPoolKey2D::set_shape_type);
-	ADD_PROPERTY(PropertyInfo(Variant::INT, "shape_type", PROPERTY_HINT_ENUM, "Circle,Rectangle,Capsule"), "set_shape_type", "get_shape_type");
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "shape_type", PROPERTY_HINT_ENUM, "Circle:3,Rectangle:4,Capsule:5"), "set_shape_type", "get_shape_type");
 
 	ClassDB::bind_static_method("MultiMeshPoolKey2D", D_METHOD("make", "amount_bullets", "shape_type"), &MultiMeshPoolKey2D::make);
 }

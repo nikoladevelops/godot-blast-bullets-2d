@@ -903,6 +903,15 @@ void DirectionalBullets2D::custom_additional_disable_logic() {
 // children (a Godot physics requirement: deeper nesting never registers,
 // so it can never collide). Returns false when there is no usable shape
 // (the caller falls back to the radial normal).
+// Local-space surface normal -> world space. Normals transform by the
+// inverse-transpose of the basis, not the basis itself: under non-uniform
+// node scale (stretched walls, scaled ramps) basis_xform tilts slopes and
+// rounded corners away from the true perpendicular. Identical to
+// basis_xform for rotation + uniform scale. Caller checks invertibility.
+static Vector2 bounce_local_normal_to_world(const Transform2D &shape_global, const Vector2 &local_n) {
+	return shape_global.affine_inverse().basis_xform_inv(local_n);
+}
+
 static bool bounce_normal_from_shape_node(CollisionShape2D *cs, const Vector2 &bullet_pos, Vector2 &r_normal) {
 	if (cs == nullptr || cs->is_queued_for_deletion()) {
 		return false;
@@ -932,11 +941,13 @@ static bool bounce_normal_from_shape_node(CollisionShape2D *cs, const Vector2 &b
 			local_n = diff.normalized();
 		} else {
 			// Bullet center inside the box: push along min-penetration axis.
-			const real_t px = half.x - Math::abs(local.x);
-			const real_t py = half.y - Math::abs(local.y);
+			// Compare penetrations in world units: under non-uniform scale
+			// a local-unit compare picks the wrong (deeper) axis.
+			const real_t px = (half.x - Math::abs(local.x)) * shape_global.columns[0].length();
+			const real_t py = (half.y - Math::abs(local.y)) * shape_global.columns[1].length();
 			local_n = (px < py) ? Vector2(local.x >= 0.0 ? 1.0 : -1.0, 0.0) : Vector2(0.0, local.y >= 0.0 ? 1.0 : -1.0);
 		}
-		const Vector2 world_n = shape_global.basis_xform(local_n);
+		const Vector2 world_n = bounce_local_normal_to_world(shape_global, local_n);
 		if (world_n.is_finite() && world_n.length_squared() > 0.00000001) {
 			r_normal = world_n.normalized();
 			return true;
@@ -970,7 +981,7 @@ static bool bounce_normal_from_shape_node(CollisionShape2D *cs, const Vector2 &b
 		const Vector2 closest(0.0, Math::clamp(local.y, (real_t)-half_seg, (real_t)half_seg));
 		const Vector2 diff = local - closest;
 		Vector2 local_n = (diff.length_squared() > 0.00000001) ? diff.normalized() : Vector2(local.x >= 0.0 ? 1.0 : -1.0, 0.0);
-		const Vector2 world_n = shape_global.basis_xform(local_n);
+		const Vector2 world_n = bounce_local_normal_to_world(shape_global, local_n);
 		if (world_n.is_finite() && world_n.length_squared() > 0.00000001) {
 			r_normal = world_n.normalized();
 			return true;
@@ -1005,7 +1016,7 @@ static bool bounce_normal_from_shape_node(CollisionShape2D *cs, const Vector2 &b
 		if (local_n.dot(local - mid) < 0.0) {
 			local_n = -local_n;
 		}
-		const Vector2 world_n = shape_global.basis_xform(local_n);
+		const Vector2 world_n = bounce_local_normal_to_world(shape_global, local_n);
 		if (world_n.is_finite() && world_n.length_squared() > 0.00000001) {
 			r_normal = world_n.normalized();
 			return true;
@@ -1020,7 +1031,7 @@ static bool bounce_normal_from_shape_node(CollisionShape2D *cs, const Vector2 &b
 		if (!stored.is_finite() || stored.length_squared() < 0.00000001) {
 			return false;
 		}
-		const Vector2 world_n = shape_global.basis_xform(stored.normalized());
+		const Vector2 world_n = bounce_local_normal_to_world(shape_global, stored.normalized());
 		if (world_n.is_finite() && world_n.length_squared() > 0.00000001) {
 			r_normal = world_n.normalized();
 			return true;
@@ -1052,9 +1063,9 @@ static bool bounce_precise_normal_from_target(Object *hit_target, const Vector2 
 int DirectionalBullets2D::try_handle_bounce(CollisionType collision_type, int bullet_index, int64_t entered_instance_id, Vector2 queued_target_velocity, bool queued_velocity_valid, Vector2 queued_target_position, bool queue_position_valid) {
 	// Cached once: hit_target->get() with a fresh StringName per call pays
 	// an interning lookup on every bounce drain.
-	static const StringName prop_linear_velocity("linear_velocity");
-	static const StringName prop_velocity("velocity");
-	static const StringName prop_constant_linear_velocity("constant_linear_velocity");
+	const StringName &prop_linear_velocity = CachedStringNames2D::get().linear_velocity;
+	const StringName &prop_velocity = CachedStringNames2D::get().velocity;
+	const StringName &prop_constant_linear_velocity = CachedStringNames2D::get().constant_linear_velocity;
 	if (bounce_mask == 0) {
 		return 0;
 	}

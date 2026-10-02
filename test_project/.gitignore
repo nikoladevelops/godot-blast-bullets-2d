@@ -30,3 +30,6 @@ export_presets.cfg
 
 # Addon-specific
 .addons/BlastBullets2D/bin/
+# GUT test outputs
+.gut_results*.xml
+test_results/

@@ -71,8 +71,11 @@ public:
 		// The whole block shares one spin, so only bullet 0 integrates - the rest copy it
 		if (is_rotation_data_active) {
 			if (use_only_first_rotation_data) {
-				// Skip this while bullet 0 is asleep, or its stale spin would drive the whole block.
-				if (all_bullets_enabled_set.contains(0)) {
+				// Slot 0 holds the block's SHARED spin, not bullet 0's own: it
+				// integrates whenever any bullet is live. Gating on bullet 0
+				// being alive froze the whole block's spin the moment bullet 0
+				// was hit first.
+				if (!all_rotation_speed.empty() && all_bullets_enabled_set.size() > 0) {
 					bullet_accelerate_rotation_speed(0, delta); // accelerate only the first one once
 					cache_first_rotation_result = all_rotation_speed[0] * delta;
 				}
@@ -87,6 +90,8 @@ public:
 
 		const auto &active_bullet_indexes = all_bullets_enabled_set.get_active_indexes();
 
+		{ // One node inverse for the whole movement loop (trail writes convert per bullet); no user code runs inside.
+		NodeInverseScope tick_inverse_scope(this);
 		for (int i : active_bullet_indexes) {
 			if (i < 0 || i >= amount_bullets || i >= (int)all_cached_instance_transforms.size() || i >= (int)all_cached_shape_transforms.size() || i >= (int)all_cached_velocity.size()) {
 				continue;
@@ -132,6 +137,7 @@ public:
 			move_bullet_attachment(velocity_delta, i);
 			write_trail_instances(i);
 		}
+		} // tick_inverse_scope
 		if (!is_using_physics_interpolation) {
 			batch_flush_instance_transforms();
 		}
@@ -157,8 +163,9 @@ public:
 				handle_bullet_collision(data.collision_type, data.bullet_index, data.collided_instance_id, data.queue_bullet_epoch, data.queue_target_velocity, data.queue_target_velocity_valid, data.queue_target_position, data.queue_target_position_valid);
 				// the handler may have freed us mid-drain - check we're still alive before touching anything.
 				if (ObjectDB::get_instance(ObjectID(drain_self_id)) != this) {
-					collision_scratch.clear();
-					break;
+					// Freed: every member (collision_scratch included) is gone,
+					// so touching anything here would be use-after-free.
+					return;
 				}
 				if (is_queued_for_deletion()) {
 					collision_scratch.clear();

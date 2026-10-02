@@ -369,14 +369,18 @@ Ref<Image> BulletEffectLayerData2D::whiten_image_copy(const Ref<Image> &src) {
 		return out;
 	}
 	rgba->convert(Image::FORMAT_RGBA8);
-	const int w = rgba->get_width();
-	const int h = rgba->get_height();
-	for (int y = 0; y < h; ++y) {
-		for (int x = 0; x < w; ++x) {
-			const Color px = rgba->get_pixel(x, y);
-			rgba->set_pixel(x, y, Color(1, 1, 1, px.a));
-		}
+	// One pass over the raw RGBA8 bytes (mip levels included) instead of a
+	// get_pixel/set_pixel extension call pair per pixel (~500k calls for a
+	// 512x512 frame). Alpha bytes are untouched.
+	PackedByteArray data = rgba->get_data();
+	uint8_t *bytes = data.ptrw();
+	const int64_t byte_count = data.size();
+	for (int64_t k = 0; k + 3 < byte_count; k += 4) {
+		bytes[k] = 255;
+		bytes[k + 1] = 255;
+		bytes[k + 2] = 255;
 	}
+	rgba->set_data(rgba->get_width(), rgba->get_height(), rgba->has_mipmaps(), Image::FORMAT_RGBA8, data);
 	return rgba;
 }
 

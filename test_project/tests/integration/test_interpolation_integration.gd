@@ -1,83 +1,54 @@
-extends SceneTree
-## Integration suite: interpolation agreement + factory pause + scene churn.
-## Covers: debug_check_interpolation_status shape + mismatch hint, mid-game
-## interpolation toggle reseeds prev caches (no lerp pop), factory pause stops
-## motion and drops queued collisions (no resume hitch), scene churn (spawner
-## freed with tracked volleys, factory reset with live volleys), two factories
-## in one tree stay independent.
-## Run: godot --headless --path test_project --script tests/integration/test_interpolation_integration.gd
-## Exit code 0 = all pass.
+extends BlastTest
+## Integration: interpolation status + live toggle, factory pause freezes
+## motion, churn (spawner freed with tracked volleys), two independent
+## factories in one tree.
 
-const H := preload("res://tests/common/blast_test_helpers.gd")
 
-var failures := 0
-
-func _check(cond: bool, label: String) -> void:
-	if cond:
-		print("PASS  ", label)
-	else:
-		failures += 1
-		printerr("FAIL  ", label)
-
-func _initialize() -> void:
-	var factory := BulletFactory2D.new()
-	get_root().add_child(factory)
-	await process_frame
-	await process_frame
-
-	printerr("INT T1 interpolation status + toggle")
+func test_interpolation_status_and_toggle() -> void:
 	var st: Dictionary = factory.debug_check_interpolation_status()
-	_check(st.has("mismatch") and st.has("hint"), "status shape")
+	assert_has(st, "mismatch")
+	assert_has(st, "hint")
 	factory.set_use_physics_interpolation_editor(true)
-	await process_frame
-	var st2: Dictionary = factory.debug_check_interpolation_status()
-	_check(st2.get("factory_enabled", false) == true, "factory flag on")
+	await idle(1)
+	assert_true(factory.debug_check_interpolation_status().get("factory_enabled", false), "factory flag on")
 	var v: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(H.make_directional_data(2, 200.0))
-	for i in 5:
-		await physics_frame
-	_check(v.get_bullet_transform(0).is_finite(), "volley ticks with interpolation on")
+	await physics(5)
+	assert_true(v.get_bullet_transform(0).is_finite(), "volley ticks with interpolation on")
+	await idle(1)
 	factory.set_use_physics_interpolation_editor(false)
+	assert_false(factory.debug_check_interpolation_status().get("factory_enabled", true), "factory flag off")
 
-	printerr("INT T2 pause freezes + drops backlog")
+
+func test_pause_freezes_motion() -> void:
+	var v: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(H.make_directional_data(2, 200.0))
+	await physics(2)
 	var p0: Vector2 = v.get_bullet_global_transform(0).origin
 	factory.set_is_factory_processing_bullets(false)
-	for i in 10:
-		await physics_frame
-	var p1: Vector2 = v.get_bullet_global_transform(0).origin
-	_check(p1.distance_to(p0) < 0.5, "paused volley frozen")
+	await physics(10)
+	assert_almost_eq(v.get_bullet_global_transform(0).origin, p0, Vector2(0.5, 0.5), "paused volley frozen")
 	factory.set_is_factory_processing_bullets(true)
-	await physics_frame
-	_check(v.get_bullet_global_transform(0).is_finite(), "resumed volley sane")
+	await physics(2)
+	assert_gt(v.get_bullet_global_transform(0).origin.x, p0.x, "resumed volley moves again")
 
-	printerr("INT T3 churn: spawner freed, factory reset, two factories")
-	var spawner := BulletSpawner2D.new()
-	get_root().add_child(spawner)
-	await process_frame
-	spawner.set_bullet_factory(factory)
-	spawner.set_spawn_data(H.make_directional_data(2))
-	spawner.set_shooting_enabled(false)
+
+func test_spawner_freed_with_tracked_volleys() -> void:
+	var spawner := make_spawner(H.make_directional_data(2), BulletSpawner2D.PATTERN_FROM_HELPER_RING, 2)
 	spawner.set_homing_enabled(true)
-	spawner.set_homing_target_source(2)
+	spawner.set_homing_target_source(BulletSpawner2D.HOMING_SOURCE_GLOBAL_POSITION)
 	spawner.set_homing_global_position(Vector2(400, 0))
-	_check(spawner.shoot_once(), "tracked shot fires")
+	await idle(1)
+	assert_true(spawner.shoot_once(), "tracked shot fires")
 	spawner.queue_free()
-	await process_frame
-	_check(factory.debug_assert_no_dangling().get("ok", false) == true, "no dangling after spawner freed")
-	var f2 := BulletFactory2D.new()
-	get_root().add_child(f2)
-	await process_frame
-	await process_frame
+	await idle(1)
+	assert_true(factory.debug_assert_no_dangling().get("ok", false), "no dangling after the spawner was freed")
+	await physics(3)
+	assert_eq(factory.debug_get_active_bullets_amount(0), 1, "orphaned volley keeps flying")
+
+
+func test_two_factories_are_independent() -> void:
+	var f2: BulletFactory2D = add(BulletFactory2D.new())
+	await idle()
 	f2.spawn_directional_bullets(H.make_directional_data(2, 150.0))
-	_check(f2.debug_get_total_bullets_amount(0) == 1, "second factory independent")
-	_check(factory.debug_assert_no_dangling().get("ok", false) == true, "first factory clean")
-	factory.reset()
+	assert_eq(f2.debug_get_total_bullets_amount(0), 1, "second factory holds its own volley")
+	assert_eq(factory.debug_get_total_bullets_amount(0), 0, "first factory untouched")
 	f2.reset()
-	f2.queue_free()
-	factory.queue_free()
-	await process_frame
-	print("----")
-	if failures == 0:
-		print("ALL INTEGRATION TESTS PASSED")
-	else:
-		printerr(str(failures) + " TEST(S) FAILED")
-	quit(failures)

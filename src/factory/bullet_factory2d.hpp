@@ -1,5 +1,7 @@
 #pragma once
 
+#include <unordered_map>
+
 #include <algorithm>
 
 #include <godot_cpp/classes/engine.hpp>
@@ -397,6 +399,10 @@ public:
 	// Use this instead of free() on a volley inside signal handlers.
 	void free_volley_deferred(Node *volley);
 
+	// Runs queued *_deferred structural calls on the next idle frame (see
+	// queue_structural_call in the .cpp). Bound for the not-in-tree fallback.
+	void _flush_structural_calls();
+
 	// Ensures factory containers exist even when a GDScript _ready() overrode
 	// the native _ready() without super._ready(). Called lazily from every
 	// spawn/populate entry via validate_spawn_request(). Emits a loud error
@@ -483,6 +489,26 @@ public:
 	// allocating it fresh per bake per tick was heap churn on every physics
 	// frame. Sized per use via assign (no preservation needed).
 	std::vector<int> fx_occupancy_scratch;
+
+	// Structural calls queued by the *_deferred wrappers, flushed together on
+	// the next SceneTree process_frame (idle, outside the physics step).
+	std::vector<Callable> pending_structural_calls;
+	bool structural_flush_connected = false;
+	void queue_structural_call(const Callable &call);
+
+	// Whitened bullet frames (override_frame_color), keyed by the source
+	// texture's instance id (ids are never reused within a session). The
+	// whiten reads pixels back from the GPU: without the cache every
+	// spawn/pool reuse of such a volley paid that readback per frame.
+	// A null entry remembers an unreadable frame (the caller keeps the
+	// original art). Bounded: cleared wholesale past the cap.
+	std::unordered_map<uint64_t, Ref<Texture2D>> whitened_frame_cache;
+
+	// Returns the cached whitened copy of a bullet frame, building it once.
+	// Null when the frame's pixels cannot be read (caller keeps the original).
+	Ref<Texture2D> get_whitened_frame(const Ref<Texture2D> &source);
+	void clear_whitened_frame_cache() { whitened_frame_cache.clear(); }
+
 	// Contains all one-shot effect shard nodes in the scene tree.
 	Node2D *sprite_effects_container = nullptr;
 
@@ -730,7 +756,8 @@ public:
 	// populate_*() called from inside a collision or lifetime handler
 	// (directional_area_entered, block_body_entered,
 	// directional_life_time_over, ...) or from a native flush callback.
-	// Wrap the call in call_deferred() to run it after the physics step.
+	// Use the *_deferred() wrappers: they run on the next idle frame (a plain
+	// call_deferred() from a physics callback still flushes inside physics).
 	// Game logic (spawning same-shape volleys, homing, teleporting,
 	// attachments, custom data) is always safe to touch directly.
 	// Returns true when the caller must abort.
@@ -769,6 +796,13 @@ public:
 		}
 		if (is_tearing_down) {
 			UtilityFunctions::push_error(String(caller_name) + ": BulletFactory2D is being freed. Ignoring the request.");
+			return false;
+		}
+		// A factory removed from the tree (but kept alive) still holds a
+		// valid physics space: spawning would create bullets that collide
+		// but never render. Refuse loudly instead.
+		if (!is_inside_tree()) {
+			UtilityFunctions::push_error(String(caller_name) + ": BulletFactory2D is not inside the scene tree. Ignoring the request.");
 			return false;
 		}
 		if (!inherited_velocity_offset.is_finite()) {
@@ -1110,10 +1144,14 @@ public:
 			if (!bullets->enable_multimesh(*spawn_data.ptr(), new_inherited_velocity_offset, spawner_id)) {
 				// enable_multimesh rolls its own mutations back on failure, so the
 				// instance is a clean disabled one here: just file it back under
-				// the live key (not the spawn key) and do not activate it.
+				// the live key (not the spawn key) and fall through to a fresh
+				// allocation: a refused reuse must never turn a valid spawn
+				// request into a silent null.
 				bullets_pool.push(bullets, bullets->get_pool_key());
-				return nullptr;
+				bullets = nullptr;
 			}
+		}
+		if (bullets != nullptr) {
 			// Pool-hit accounting lands only on success: a popped-but-rejected
 			// reuse must not skew debug_get_pool_hit_stats. Discriminated at
 			// compile time by the pooled type; never touches the per-bullet tick.
@@ -1207,9 +1245,23 @@ public:
 				continue;
 			}
 
+			// Flag the volley for its whole tick: handlers fired from inside
+			// (collision drain, attachment callbacks) may spawn, and the pool
+			// must never hand out the volley whose drain is still running.
+			// Liveness re-checked between steps: a handler that free()s the
+			// volley (against the contract) must not crash the sweep.
+			const uint64_t multi_id = multi->get_instance_id();
+			multi->is_being_ticked = true;
 			multi->move_bullets(delta);
+			if (ObjectDB::get_instance(ObjectID(multi_id)) != multi) {
+				continue;
+			}
 			multi->advance_sprite_animation(delta);
 			multi->reduce_lifetime(delta);
+			if (ObjectDB::get_instance(ObjectID(multi_id)) != multi) {
+				continue;
+			}
+			multi->is_being_ticked = false;
 		}
 	}
 

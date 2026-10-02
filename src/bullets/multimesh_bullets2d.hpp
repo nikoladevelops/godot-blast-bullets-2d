@@ -6,6 +6,7 @@
 #include "../shared/bullet_attachment_object_pool2d.hpp"
 #include "../shared/bullet_effect_layer_data2d.hpp"
 #include "../shared/bullet_rotation_data2d.hpp"
+#include "../shared/cached_string_names2d.hpp"
 #include "../shared/reentrancy_guard2d.hpp"
 #include "../spawn-data/multimesh_bullets_data2d.hpp"
 #include "godot_cpp/classes/curve.hpp"
@@ -98,6 +99,22 @@ public:
 
 	bool marked_for_internal_deletion = false;
 
+	// True while the factory runs this volley's tick (move_bullets, its
+	// collision drain, animation, reduce_lifetime). User code fired from
+	// inside (collision handlers, attachment callbacks) may spawn: the pool
+	// skips a volley mid-tick, and enable_multimesh refuses it, so the
+	// drain can never be pulled out from under itself. Every OTHER pooled
+	// volley stays reusable mid-sweep (same-key spawns from handlers work).
+	bool is_being_ticked = false;
+
+	// Set when an expiry with life_time_over signals drains the volley:
+	// the volley keeps its attachment slots and stays OUT of the pool until
+	// the deferred signal (and its attachment releases) have flushed. Pooling
+	// at once let a same-frame spawn pop the volley, bump the generation and
+	// silently drop the signal, and the disable sweep released attachments
+	// before the handler could see them. _do_finish_lifetime_hold() pools.
+	bool lifetime_flush_pending = false;
+
 	// Gets the total amount of bullets that the multimesh always holds
 	_ALWAYS_INLINE_ int get_amount_bullets() const { return amount_bullets; };
 
@@ -148,7 +165,39 @@ public:
 	// A degenerate (zero-scale) node global has no inverse: fall back to the
 	// raw global transform instead of writing a non-finite inverse into the
 	// multimesh buffer.
+	// Scoped cache of the node inverse: get_global_transform() crosses the
+	// extension boundary, and loops that convert every bullet (tick trails,
+	// spawn setup) would otherwise pay it per bullet. Only valid while a
+	// NodeInverseScope is alive (no user code may move the node inside).
+	mutable bool node_inverse_scope_active = false;
+	mutable bool node_inverse_scope_valid = false;
+	mutable Transform2D node_inverse_scope;
+
+	struct NodeInverseScope {
+		const MultiMeshBullets2D *owner;
+		bool saved_active;
+		bool saved_valid;
+		Transform2D saved_inverse;
+		explicit NodeInverseScope(const MultiMeshBullets2D *p_owner) :
+				owner(p_owner), saved_active(p_owner->node_inverse_scope_active), saved_valid(p_owner->node_inverse_scope_valid), saved_inverse(p_owner->node_inverse_scope) {
+			const Transform2D node_global = owner->get_global_transform();
+			owner->node_inverse_scope_valid = is_transform_invertible_safe(node_global);
+			owner->node_inverse_scope = owner->node_inverse_scope_valid ? node_global.affine_inverse() : Transform2D();
+			owner->node_inverse_scope_active = true;
+		}
+		~NodeInverseScope() {
+			owner->node_inverse_scope_active = saved_active;
+			owner->node_inverse_scope_valid = saved_valid;
+			owner->node_inverse_scope = saved_inverse;
+		}
+		NodeInverseScope(const NodeInverseScope &) = delete;
+		NodeInverseScope &operator=(const NodeInverseScope &) = delete;
+	};
+
 	_ALWAYS_INLINE_ Transform2D to_local_for_multimesh(const Transform2D &global_transf) const {
+		if (node_inverse_scope_active) {
+			return node_inverse_scope_valid ? node_inverse_scope * global_transf : global_transf;
+		}
 		const Transform2D node_global = get_global_transform();
 		if (!is_transform_invertible_safe(node_global)) {
 			return global_transf;
@@ -216,6 +265,7 @@ public:
 		// Frame routing still keys off the physics clock (discrete, no lerp
 		// needed); one-shot shards are static and need nothing here.
 		if (!fx_trail_bakes.empty() && (int)all_cached_instance_transforms.size() == amount_bullets && (int)all_previous_instance_transf.size() == amount_bullets) {
+			NodeInverseScope trail_inverse_scope(this);
 			for (int i : active_bullet_indexes) {
 				if (i < 0 || i >= amount_bullets) {
 					continue;
@@ -330,6 +380,14 @@ public:
 	}
 
 	_ALWAYS_INLINE_ Transform2D get_interpolated_transform(const Transform2D &curr_transf, const Transform2D &prev_transf, double fraction) {
+		// Fast path: an unchanged basis (no spin/steer this tick - most
+		// bullets) only needs the origin lerped. Exact, and skips 2 atan2,
+		// ~6 sqrt and a sincos per bullet per rendered frame.
+		if (curr_transf.columns[0] == prev_transf.columns[0] && curr_transf.columns[1] == prev_transf.columns[1]) {
+			Transform2D out = curr_transf;
+			out.columns[2] = prev_transf.columns[2].lerp(curr_transf.columns[2], fraction);
+			return out;
+		}
 		// Interpolate position
 		Vector2 prev_pos = prev_transf.get_origin();
 		Vector2 curr_pos = curr_transf.get_origin();
@@ -1044,6 +1102,9 @@ public:
 	struct FXTrailBake {
 		Ref<BulletEffectLayerData2D> layer;
 		int layer_index = -1;
+		// Set by play_effect_animation: the shards hold another animation's
+		// frames, so a reuse must rebuild from the layer instead.
+		bool animation_override = false;
 		std::vector<Ref<Texture2D>> frames;
 		std::vector<double> secs;
 		// Prefix sums of secs (see FXOneShotBake::frame_starts): the per-tick
@@ -1052,6 +1113,9 @@ public:
 		std::vector<double> frame_starts;
 		double total = 0.0;
 		std::vector<MultiMeshInstance2D *> shards;
+		// Parallel to shards: each shard's MultiMesh, cached so the per-bullet
+		// trail writes skip a get_multimesh() extension call (and Ref churn).
+		std::vector<Ref<MultiMesh>> shard_multimeshes;
 		std::vector<uint8_t> shard_visible;
 		// Live bullets per shard. hide_trail_instances() used to rescan every
 		// slot to decide whether a shard could hide (O(N) per disabled bullet,
@@ -1069,12 +1133,64 @@ public:
 		std::vector<Transform2D> bullet_trail_transf;
 		// Last written per-bullet tint (same readback caveat as above).
 		std::vector<Color> bullet_trail_tint;
+
+		// Cached shard MultiMesh (falls back to the node when the cache is
+		// short, e.g. a shard list rebuilt elsewhere).
+		_ALWAYS_INLINE_ Ref<MultiMesh> shard_multimesh(int shard_index) const {
+			if (shard_index >= 0 && shard_index < (int)shard_multimeshes.size() && shard_multimeshes[shard_index].is_valid()) {
+				return shard_multimeshes[shard_index];
+			}
+			return shards[shard_index]->get_multimesh();
+		}
 	};
 	std::vector<FXTrailBake> fx_trail_bakes;
 
 	// Layer list retained from the last reseed (spawn/enable/live set), used
 	// to route trigger events to the factory one-shot bakes.
 	TypedArray<BulletEffectLayerData2D> fx_data_layers;
+	// Bake version per layer index at the last full reseed (0 = null/disabled
+	// slot). A pooled reuse with the same layer resources at the same
+	// versions soft-resets instead of rebuilding shard nodes and factory
+	// bakes (see fx_reseed_from_data).
+	// Everything a shard node or factory bake freezes at build time, per
+	// layer: a mismatch in any field forces the full rebuild.
+	struct FXLayerSnapshot {
+		bool present = false;
+		uint64_t bake_version = 0;
+		int trigger = 0;
+		uint64_t material_id = 0;
+		Color self_modulate;
+		int z_index = 0;
+		bool z_as_relative = true;
+		int visibility_layer = 0;
+		int light_mask = 0;
+		int max_instances = 0;
+		bool operator==(const FXLayerSnapshot &o) const {
+			return present == o.present && bake_version == o.bake_version && trigger == o.trigger && material_id == o.material_id && self_modulate == o.self_modulate && z_index == o.z_index && z_as_relative == o.z_as_relative && visibility_layer == o.visibility_layer && light_mask == o.light_mask && max_instances == o.max_instances;
+		}
+	};
+	static FXLayerSnapshot fx_snapshot_layer(const Ref<BulletEffectLayerData2D> &layer) {
+		FXLayerSnapshot snap;
+		if (layer.is_null() || !layer->enabled) {
+			return snap;
+		}
+		snap.present = true;
+		snap.bake_version = layer->get_bake_version();
+		snap.trigger = layer->trigger;
+		snap.material_id = layer->material.is_valid() ? (uint64_t)layer->material->get_instance_id() : 0;
+		snap.self_modulate = layer->self_modulate;
+		snap.z_index = layer->z_index;
+		snap.z_as_relative = layer->z_as_relative;
+		snap.visibility_layer = layer->visibility_layer;
+		snap.light_mask = layer->light_mask;
+		snap.max_instances = layer->max_instances;
+		return snap;
+	}
+	std::vector<FXLayerSnapshot> fx_seeded_snapshots;
+	bool fx_layers_match_seeded(const TypedArray<BulletEffectLayerData2D> &layers) const;
+	// Hides every live trail instance and rewinds per-bullet trail state,
+	// keeping the shard nodes (pooled-reuse fast path).
+	void fx_soft_reset_trail_layers();
 
 	// Hot trail write for one bullet: picks the frame from the volley clock
 	// plus the bullet's random phase, composes the follow transform, moves
@@ -1166,7 +1282,7 @@ public:
 			if (bake.bullet_shard[bullet_index] != frame) {
 				const int prev = bake.bullet_shard[bullet_index];
 				if (prev >= 0 && prev < (int)bake.shards.size() && bake.shards[prev] != nullptr) {
-					bake.shards[prev]->get_multimesh()->set_instance_transform_2d(bullet_index, zero_transform);
+					bake.shard_multimesh(prev)->set_instance_transform_2d(bullet_index, zero_transform);
 					// Leaving shard: hide it now when nobody else rides it
 					// (previously it stayed flagged visible until an
 					// unrelated hide scan happened to notice).
@@ -1186,7 +1302,7 @@ public:
 			if (shard == nullptr) {
 				continue;
 			}
-			shard->get_multimesh()->set_instance_transform_2d(bullet_index, local);
+			bake.shard_multimesh(frame)->set_instance_transform_2d(bullet_index, local);
 			if (bullet_index < (int)bake.bullet_trail_transf.size()) {
 				bake.bullet_trail_transf[bullet_index] = local;
 			}
@@ -1216,7 +1332,7 @@ public:
 					}
 					tint.a *= (float)Math::clamp(alpha, 0.0, 1.0);
 				}
-				shard->get_multimesh()->set_instance_color(bullet_index, tint);
+				bake.shard_multimesh(frame)->set_instance_color(bullet_index, tint);
 				if (bullet_index < (int)bake.bullet_trail_tint.size()) {
 					bake.bullet_trail_tint[bullet_index] = tint;
 				}
@@ -1244,7 +1360,7 @@ public:
 			}
 			const int prev = bake.bullet_shard[bullet_index];
 			if (prev >= 0 && prev < (int)bake.shards.size() && bake.shards[prev] != nullptr) {
-				bake.shards[prev]->get_multimesh()->set_instance_transform_2d(bullet_index, zero_transform);
+				bake.shard_multimesh(prev)->set_instance_transform_2d(bullet_index, zero_transform);
 			}
 			bake.bullet_shard[bullet_index] = -1;
 			// O(1) hide decision via the live-bullet count (same semantics as
@@ -1300,6 +1416,10 @@ public:
 
 	// Cached handle so the hot loop doesn't call get_multimesh() per bullet
 	Ref<MultiMesh> multi = nullptr;
+
+	// The volley's own quad (used when spawn data has no custom mesh):
+	// kept across pool reuse and resized in place instead of reallocated.
+	Ref<QuadMesh> owned_quad_mesh;
 
 	// Scratch space for uploading all transforms at once (no per-frame allocations)
 	mutable PackedFloat32Array batch_buffer;
@@ -1514,15 +1634,24 @@ public:
 	// Note: If you wish to debug these functions with the debugger, remove the _ALWAYS_INLINE_ temporarily
 
 	// Validates bullet index and logs error if invalid
-	_ALWAYS_INLINE_ bool validate_bullet_index(int bullet_index, const String &function_name) const {
+	// const char*, not String: this runs on every disable/hit and most
+	// per-bullet API calls, and a String parameter heap-allocated a copy of
+	// the name on every call. The String is built only on the error path.
+	_ALWAYS_INLINE_ bool validate_bullet_index(int bullet_index, const char *function_name) const {
 		if (bullet_index < 0 || bullet_index >= amount_bullets) {
-			UtilityFunctions::push_error("Invalid bullet index in " + function_name);
+			UtilityFunctions::push_error(String("Invalid bullet index in ") + function_name);
 			return false;
 		}
 		return true;
 	}
 
-	_ALWAYS_INLINE_ void ensure_indexes_match_amount_bullets_range(int &bullet_index_start, int &bullet_index_end_inclusive, const String &function_name) const {
+	_ALWAYS_INLINE_ void ensure_indexes_match_amount_bullets_range(int &bullet_index_start, int &bullet_index_end_inclusive, const char *function_name) const {
+		// Unspawned / empty volley: an empty range, not a user error.
+		if (amount_bullets <= 0) {
+			bullet_index_start = 0;
+			bullet_index_end_inclusive = -1;
+			return;
+		}
 		if (bullet_index_start < 0 || bullet_index_start >= amount_bullets) {
 			bullet_index_start = 0;
 		}
@@ -1533,7 +1662,7 @@ public:
 			// Clamp the inverted range to empty instead of silently expanding to
 			// "everything": start==end could no-op, but widening to the full
 			// multimesh on a typo'd range is how users nuke state they didn't mean to.
-			UtilityFunctions::push_error("Invalid index range in " + function_name + " (start > end). Nothing was applied.");
+			UtilityFunctions::push_error(String("Invalid index range in ") + function_name + " (start > end). Nothing was applied.");
 			bullet_index_end_inclusive = bullet_index_start - 1;
 		}
 	}
@@ -2376,10 +2505,16 @@ public:
 		// path can't race with this deletion.
 		clear_attachment_owner_fields(temp);
 
-		if (temp->get_parent()) {
-			temp->get_parent()->remove_child(temp);
+		// queue_free, never memdelete: this is script-callable, and an
+		// immediate delete from inside the attachment's own _process or a
+		// signal it emitted would free the node under the caller's feet.
+		// The slot is already empty and the owner fields cleared, so the
+		// node is fully detached from this volley; hide it so the frame
+		// until the flush shows nothing.
+		if (!temp->is_queued_for_deletion()) {
+			temp->set_visible(false);
+			temp->queue_free();
 		}
-		memdelete(temp);
 	}
 
 	_ALWAYS_INLINE_ void bullet_disable_attachment(int bullet_index) {
@@ -2532,7 +2667,10 @@ public:
 		// may wake a bullet again via enable_bullet(). The wake sets is_active and
 		// bumps the counter/generations, so the trailing steps below (which belong
 		// to the dying life) must not run over the fresh life - abort instead.
-		for (int i = 0; i < (int)attachments.size(); ++i) {
+		// A held expiry keeps every slot for its deferred handler: the
+		// releases are queued behind the signal (see reduce_lifetime).
+		const bool hold_for_lifetime_flush = lifetime_flush_pending;
+		for (int i = 0; i < (int)attachments.size() && !hold_for_lifetime_flush; ++i) {
 			// The collision killing-blow path guards one slot across the
 			// signal emit: its attachment must survive the sweep so the
 			// handler can inspect/detach it. Post-signal cleanup disables it.
@@ -2557,7 +2695,7 @@ public:
 		// pooling-off volley would resurrect pooling mid-sweep and pool itself.
 		const bool saved_auto_pool = is_multimesh_auto_pooling_enabled;
 		const bool saved_auto_pool_attachments = is_attachments_auto_pooling_enabled;
-		reset_transient_volley_state(0, false);
+		reset_transient_volley_state(0, false, hold_for_lifetime_flush);
 		is_multimesh_auto_pooling_enabled = saved_auto_pool;
 		is_attachments_auto_pooling_enabled = saved_auto_pool_attachments;
 
@@ -2566,6 +2704,11 @@ public:
 		deactivate_volley();
 
 		if (!is_multimesh_auto_pooling_enabled) {
+			return;
+		}
+
+		// Held expiry: _do_finish_lifetime_hold() pools after the flush.
+		if (hold_for_lifetime_flush) {
 			return;
 		}
 
@@ -2662,6 +2805,10 @@ public:
 	// handled (return), 2 = bounced but the hit is consumed too (fall
 	// through into normal counting/signals). Base is a no-op (only
 	// DirectionalBullets2D bounces); BlockBullets2D never overrides it.
+	// Whether queued collision records need the target's velocity/pose
+	// (bounce math only). Base never bounces.
+	virtual bool wants_queued_target_motion() const { return false; }
+
 	virtual int try_handle_bounce(CollisionType collision_type, int bullet_index, int64_t entered_instance_id, Vector2 queued_target_velocity, bool queued_velocity_valid, Vector2 queued_target_position, bool queue_position_valid) {
 		(void)collision_type;
 		(void)bullet_index;
@@ -2682,9 +2829,9 @@ public:
 	// then falls back to its live read).
 	static bool read_queued_target_velocity(int64_t entered_instance_id, Vector2 &out_velocity) {
 		// Cached once (same rationale as the bounce drain below).
-		static const StringName prop_linear_velocity("linear_velocity");
-		static const StringName prop_velocity("velocity");
-		static const StringName prop_constant_linear_velocity("constant_linear_velocity");
+		const StringName &prop_linear_velocity = CachedStringNames2D::get().linear_velocity;
+		const StringName &prop_velocity = CachedStringNames2D::get().velocity;
+		const StringName &prop_constant_linear_velocity = CachedStringNames2D::get().constant_linear_velocity;
 		out_velocity = Vector2(0, 0);
 		Object *hit_target = ObjectDB::get_instance(entered_instance_id);
 		if (hit_target == nullptr) {
@@ -2771,8 +2918,13 @@ public:
 			}
 			BulletCollisionData2D record(bullet_shape_index, entered_instance_id, CollisionType::AREA);
 			record.queue_bullet_epoch = collision_epoch_for_bullet(bullet_shape_index);
-			record.queue_target_velocity_valid = read_queued_target_velocity(entered_instance_id, record.queue_target_velocity);
-			read_queued_target_pose(entered_instance_id, record.queue_target_position, record.queue_target_position_valid);
+			// Target motion only feeds the bounce math: skip the property
+			// lookups (up to 3 Object::get per record, which can run user
+			// _get) on volleys that never bounce.
+			if (wants_queued_target_motion()) {
+				record.queue_target_velocity_valid = read_queued_target_velocity(entered_instance_id, record.queue_target_velocity);
+				read_queued_target_pose(entered_instance_id, record.queue_target_position, record.queue_target_position_valid);
+			}
 			all_collided_bullets.push_back(record);
 		}
 	}
@@ -2795,8 +2947,13 @@ public:
 			}
 			BulletCollisionData2D record(bullet_shape_index, entered_instance_id, CollisionType::BODY);
 			record.queue_bullet_epoch = collision_epoch_for_bullet(bullet_shape_index);
-			record.queue_target_velocity_valid = read_queued_target_velocity(entered_instance_id, record.queue_target_velocity);
-			read_queued_target_pose(entered_instance_id, record.queue_target_position, record.queue_target_position_valid);
+			// Target motion only feeds the bounce math: skip the property
+			// lookups (up to 3 Object::get per record, which can run user
+			// _get) on volleys that never bounce.
+			if (wants_queued_target_motion()) {
+				record.queue_target_velocity_valid = read_queued_target_velocity(entered_instance_id, record.queue_target_velocity);
+				read_queued_target_pose(entered_instance_id, record.queue_target_position, record.queue_target_position_valid);
+			}
 			all_collided_bullets.push_back(record);
 		}
 	}
@@ -2976,7 +3133,18 @@ public:
 	// signal connections: pass true when starting a NEW life (enable), false
 	// when the volley is dying but its deferred emits must still flush
 	// (disable) or when same-owner wakes must keep their connections.
-	void reset_transient_volley_state(uint64_t new_owner_spawner_id, bool drop_stale_work);
+	// keep_attachment_slots: the lifetime hold (see lifetime_flush_pending)
+	// keeps slots alive for the deferred handler; everything else resets.
+	void reset_transient_volley_state(uint64_t new_owner_spawner_id, bool drop_stale_work, bool keep_attachment_slots = false);
+
+	// Deferred tail of a held expiry (queued after the signal and the
+	// per-slot attachment releases): releases any slot still held, then
+	// pools the volley exactly like a normal full disable would have.
+	void _do_finish_lifetime_hold(int expected_generation);
+
+	// Ends a lifetime hold early (wake before the flush): releases held
+	// attachment slots so the new life starts with blank slots.
+	void release_lifetime_hold_attachments();
 
 	// Subclass half of the reset above: neutralize subclass-only ballistics
 	// (movement SoA, wobble, gravity/drag, homing/orbit) without reseeding.
@@ -3033,7 +3201,28 @@ protected:
 	Transform2D generate_texture_transform(Transform2D transf, bool is_texture_rotation_permanent, real_t texture_rotation_radians, int bullet_index);
 
 	// Generates a collision shape transform for a particular bullet and attaches it to the area
-	Transform2D generate_collision_shape_transform_for_area(Transform2D transf, const RID &shape, const Vector2 &collision_shape_offset, int bullet_index);
+	Transform2D generate_collision_shape_transform_for_area(Transform2D transf, const RID &shape, const Vector2 &collision_shape_offset, int bullet_index, bool apply_shape_data = true);
+
+	// Shape data last pushed to every RID in physics_shapes. Pool reuse with
+	// an identical shape skips N shape_set_data server calls. Invalidated
+	// whenever RIDs are (re)created.
+	bool shape_data_applied = false;
+	PhysicsServer2D::ShapeType applied_shape_type = PhysicsServer2D::SHAPE_CIRCLE;
+	Vector2 applied_rect_size;
+	float applied_circle_radius = 0.0f;
+	float applied_capsule_radius = 0.0f;
+	float applied_capsule_height = 0.0f;
+	bool shape_data_matches_applied() const {
+		return shape_data_applied && applied_shape_type == cached_effective_shape_type && applied_rect_size == cached_rect_size && applied_circle_radius == cached_circle_radius && applied_capsule_radius == cached_capsule_radius && applied_capsule_height == cached_capsule_height;
+	}
+	void mark_shape_data_applied() {
+		shape_data_applied = true;
+		applied_shape_type = cached_effective_shape_type;
+		applied_rect_size = cached_rect_size;
+		applied_circle_radius = cached_circle_radius;
+		applied_capsule_radius = cached_capsule_radius;
+		applied_capsule_height = cached_capsule_height;
+	}
 
 	// Sets up the area correctly with collision related data
 	void set_up_area(const int collision_layer, const int collision_mask, bool new_monitorable, const RID &physics_space);
@@ -3366,7 +3555,15 @@ public:
 				execute_stored_callable_safely(it->_callback, it->_execute_only_if_multimesh_is_active, it->_id);
 
 				if (it->_repeating) {
-					it->_current_time = it->_initial_time;
+					// Carry the overshoot so the average period stays exact
+					// (resetting dropped up to one tick per period: a 0.1s
+					// timer at 60 Hz fired every 7 ticks). Anti-spiral: a
+					// period shorter than the tick fires once per tick and
+					// resyncs instead of banking an ever-growing debt.
+					it->_current_time += it->_initial_time;
+					if (it->_current_time <= 0.0) {
+						it->_current_time = it->_initial_time;
+					}
 					++it;
 				} else {
 					it = multimesh_custom_timers.erase(it);

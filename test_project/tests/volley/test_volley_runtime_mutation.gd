@@ -1,119 +1,101 @@
-extends SceneTree
-## Volley runtime-mutation suite: every live edit path + deferred discipline.
-## Covers: teleport/shift (shape+attachment+interp sync), custom data shared vs
-## per-bullet (strictly separated), collision layer/mask/monitorable, shape
-## runtime same-type resize (immediate) vs type change in physics (reject) and
-## idle (re-bucket), timers attach/detach/64-cap/detach-during-fire/repeat,
-## enable/disable single bullets + counters, sprite animation play/restart.
-## Run: godot --headless --path test_project --script tests/volley/test_volley_runtime_mutation.gd
-## Exit code 0 = all pass.
+extends BlastTest
+## Live edit paths: custom data shared vs per-bullet (strict), collision
+## layer/mask/monitorable, runtime shape resize (same type) vs type change
+## (re-bucket), timers attach/fire/detach/64-cap/zero-time, single-bullet
+## enable/disable, sprite animation guards.
 
-const H := preload("res://tests/common/blast_test_helpers.gd")
-
-var failures := 0
+var v: DirectionalBullets2D
 var _timer_fires := 0
 
-func _check(cond: bool, label: String) -> void:
-	if cond:
-		print("PASS  ", label)
-	else:
-		failures += 1
-		printerr("FAIL  ", label)
 
 func _on_timer() -> void:
 	_timer_fires += 1
 
-func _initialize() -> void:
-	var factory := BulletFactory2D.new()
-	get_root().add_child(factory)
-	await process_frame
-	await process_frame
 
-	printerr("MUT T1 custom data separation")
-	var v: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(H.make_directional_data(2, 200.0))
+func before_each() -> void:
+	await super()
+	_timer_fires = 0
+	v = spawn_dir(2, 200.0)
+
+
+func test_custom_data_separation() -> void:
 	var shared := Resource.new()
 	v.set_shared_bullets_custom_data(shared)
-	_check(v.get_shared_bullets_custom_data() == shared, "shared stored")
-	_check(v.bullet_get_custom_data(0) == null, "per-bullet reads null, never shared (strict)")
+	assert_eq(v.get_shared_bullets_custom_data(), shared, "shared stored")
+	assert_null(v.bullet_get_custom_data(0), "per-bullet reads null, never shared")
 	var per := Resource.new()
 	v.bullet_set_custom_data(0, per)
-	_check(v.bullet_get_custom_data(0) == per, "per-bullet stored")
-	_check(v.bullet_get_custom_data(1) == null, "sibling unaffected")
+	assert_eq(v.bullet_get_custom_data(0), per, "per-bullet stored")
+	assert_null(v.bullet_get_custom_data(1), "sibling unaffected")
 	v.bullet_set_custom_data(-1, per)
 	v.bullet_set_custom_data(99, per)
-	_check(v.bullet_get_custom_data(1) == null, "OOB custom-data no-op")
+	expect_errors_containing("Invalid bullet index", 2)
+	assert_null(v.bullet_get_custom_data(1), "OOB writes are no-ops")
 
-	printerr("MUT T2 layers/mask/monitorable")
+
+func test_layers_mask_monitorable() -> void:
 	v.set_collision_layer(8)
-	_check(v.get_collision_layer() == 8, "layer set")
+	assert_eq(v.get_collision_layer(), 8)
 	v.set_collision_mask(16)
-	_check(v.get_collision_mask() == 16, "mask set")
+	assert_eq(v.get_collision_mask(), 16)
 	v.set_monitorable(true)
-	_check(v.get_monitorable() == true, "monitorable set")
+	assert_true(v.get_monitorable())
 
-	printerr("MUT T3 shape runtime: same-type immediate, type-change deferred")
+
+func test_runtime_shape_resize_and_type_change() -> void:
 	var before_type: int = v.debug_get_shape_state().get("type", -1)
-	var same := CircleShape2D.new()
-	same.radius = 12.0
-	await process_frame
-	await process_frame
-	v.set_collision_shape_runtime(same)
-	await process_frame
-	_check(v.debug_get_shape_state().get("type", -1) == before_type, "same-type resize keeps bucket")
+	v.set_collision_shape_runtime(H.make_circle_shape(12.0))
+	assert_eq(v.debug_get_shape_state().get("type", -1), before_type, "same-type resize keeps the type")
+	assert_almost_eq(float(v.debug_get_shape_state().get("circle_radius", 0.0)), 12.0, 0.01, "radius applied")
 	var rect := RectangleShape2D.new()
 	rect.size = Vector2(20, 10)
-	v.set_collision_shape_runtime(rect) # idle frames: applies immediately
-	await process_frame
-	_check(v.debug_get_shape_state().get("type", -1) != before_type, "type change re-buckets outside physics")
-	_check(v.debug_get_shape_state().get("type", -1) == 4, "RECTANGLE type stored (PhysicsServer2D SHAPE_RECTANGLE=4)")
-	_check(v.debug_get_shape_state().get("valid", false) == true, "shape RIDs valid after change")
+	v.set_collision_shape_runtime(rect)
+	assert_eq(v.debug_get_shape_state().get("type", -1), PhysicsServer2D.SHAPE_RECTANGLE, "type change applied at idle")
+	assert_true(v.debug_get_shape_state().get("valid", false), "shape RIDs valid after the change")
 
-	printerr("MUT T4 timers: attach/fire/detach/cap")
-	_check(v.debug_get_timer_count() == 0, "no timers initially")
+
+func test_runtime_type_change_refused_inside_physics() -> void:
+	await physics()
+	var rect := RectangleShape2D.new()
+	rect.size = Vector2(20, 10)
+	v.set_collision_shape_runtime(rect)
+	expect_error("cannot run while bullets are being processed or inside a physics frame")
+	assert_eq(v.debug_get_shape_state().get("type", -1), PhysicsServer2D.SHAPE_CIRCLE, "type unchanged")
+
+
+func test_timers_attach_fire_detach_cap() -> void:
+	assert_eq(v.debug_get_timer_count(), 0, "no timers initially")
 	v.multimesh_attach_time_based_function(0.05, _on_timer)
-	_check(v.debug_get_timer_count() == 1, "timer attached")
-	for i in 15:
-		await physics_frame
-	_check(_timer_fires >= 1, "timer fired")
+	assert_eq(v.debug_get_timer_count(), 1, "timer attached")
+	await physics(15)
+	assert_gte(_timer_fires, 1, "timer fired")
+	await idle(1)
 	v.multimesh_detach_all_time_based_functions()
-	_check(v.debug_get_timer_count() == 0, "detach all clears")
-	# Timer attach/detach defer while inside physics; park on idle so counts read fresh.
-	await process_frame
-	await process_frame
+	assert_eq(v.debug_get_timer_count(), 0, "detach all clears")
 	for i in 70:
-		var cb := func() -> void: pass
-		v.multimesh_attach_time_based_function(10.0, cb)
-	_check(v.debug_get_timer_count() == 64, "timer cap is 64")
-	v.multimesh_attach_time_based_function(10.0, func() -> void: pass)
-	_check(v.debug_get_timer_count() == 64, "65th timer rejected")
+		v.multimesh_attach_time_based_function(10.0, func() -> void: pass)
+	assert_eq(v.debug_get_timer_count(), 64, "timer cap is 64")
+	expect_errors_containing("timer limit", 6)
 	v.multimesh_detach_all_time_based_functions()
 	v.multimesh_attach_time_based_function(0.0, _on_timer)
-	_check(v.debug_get_timer_count() == 0, "zero-time timer rejected")
+	expect_error("time value that is above 0")
+	assert_eq(v.debug_get_timer_count(), 0, "zero-time timer rejected")
 
-	printerr("MUT T5 enable/disable + counters")
+
+func test_single_bullet_enable_disable() -> void:
 	v.disable_bullet(0)
-	_check(not v.is_bullet_status_enabled(0), "disable holds")
-	_check(v.is_bullet_status_enabled(1), "sibling stays live")
+	assert_false(v.is_bullet_status_enabled(0), "disable holds")
+	assert_true(v.is_bullet_status_enabled(1), "sibling stays live")
 	v.wake_bullet(0)
-	_check(v.is_bullet_status_enabled(0), "wake revives")
+	assert_true(v.is_bullet_status_enabled(0), "wake revives")
 	v.disable_bullet(0)
 	v.disable_bullet(0)
-	_check(factory.debug_assert_no_dangling().get("ok", false) == true, "double disable safe")
+	assert_true(factory.debug_assert_no_dangling().get("ok", false), "double disable safe")
 
-	printerr("MUT T6 sprite animation guards")
-	_check(v.restart_sprite_animation() == false, "restart with no frames fails loud")
-	_check(v.play_sprite_animation_name("nope") == false, "play cached with no source fails loud")
-	_check(v.play_sprite_animation(null) == false, "play null frames fails loud")
 
-	await process_frame
-	await process_frame
-	factory.reset()
-	_check(factory.debug_assert_no_dangling().get("ok", false) == true, "no dangling at end")
-	factory.queue_free()
-	await process_frame
-	print("----")
-	if failures == 0:
-		print("ALL RUNTIME MUTATION TESTS PASSED")
-	else:
-		printerr(str(failures) + " TEST(S) FAILED")
-	quit(failures)
+func test_sprite_animation_guards() -> void:
+	assert_true(v.restart_sprite_animation(), "restart works with baked frames")
+	assert_true(v.play_sprite_animation_name("nope"), "unknown animation falls back to the first one")
+	expect_error("missing animation 'nope'")
+	assert_false(v.play_sprite_animation(null), "null frames fail loud")
+	expect_error("is null")

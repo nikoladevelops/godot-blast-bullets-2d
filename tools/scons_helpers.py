@@ -9,6 +9,18 @@ from paths import PROJECT_ROOT, TOOLS_DIR
 BuildTarget = Literal["template_debug", "template_release"]
 
 
+def is_noninteractive() -> bool:
+    """True when GODOTPP_NONINTERACTIVE=1 (CI, scripts, AI agents): prompts are
+    skipped, the screen is not cleared, and failures exit with a non-zero code."""
+    return os.environ.get("GODOTPP_NONINTERACTIVE", "") not in ("", "0", "false", "no")
+
+
+def pause(message: str = "\nPress Enter to continue...") -> None:
+    """input() that is a no-op in non-interactive mode."""
+    if not is_noninteractive():
+        input(message)
+
+
 def run_tool_script(script_filename):
     """Run a script from the tools folder and handle errors/output."""
     script_path = TOOLS_DIR / script_filename
@@ -16,10 +28,12 @@ def run_tool_script(script_filename):
 
     if result.returncode != 0:
         print(result.stderr or "An error occurred.")
-        input("Press Enter to continue...")
+        pause("Press Enter to continue...")
 
 def clear_screen() -> None:
     """Clear the terminal screen cross-platform using subprocess."""
+    if is_noninteractive():
+        return
     cmd = "cls" if os.name == "nt" else "clear"
     subprocess.run([cmd], check=False)
 
@@ -40,7 +54,7 @@ def run_scons_build(target: BuildTarget) -> None:
 
     if not godot_version:
         print("Error: No Godot version set in config.json.")
-        input("\nPress Enter to continue...")
+        pause()
         sys.exit(1)
 
     scons_args = [
@@ -63,6 +77,7 @@ def run_scons_build(target: BuildTarget) -> None:
 
     print(f"Executing: {' '.join(scons_args)}\n" + "-" * 50 + "\n")
 
+    succeeded = False
     try:
         process = subprocess.Popen(
             scons_args,
@@ -92,6 +107,7 @@ def run_scons_build(target: BuildTarget) -> None:
             stderr_lines.append(remaining_err)
 
         if process.returncode == 0:
+            succeeded = True
             print("\n" + "=" * 50)
             print(f"Compilation finished successfully ({mode_label} Build).")
             print(f"Target API: Godot {godot_version} | LTO: {lto_mode} | Debug Symbols: {debug_symbols}")
@@ -107,7 +123,9 @@ def run_scons_build(target: BuildTarget) -> None:
     except (subprocess.SubprocessError, OSError) as e:
         print(f"An unexpected execution error occurred: {e}")
 
-    input("\nPress Enter to continue...")
+    pause()
+    if not succeeded and is_noninteractive():
+        sys.exit(1)
 
 def run_scons_clean() -> None:
     """

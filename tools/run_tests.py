@@ -1,131 +1,116 @@
 #!/usr/bin/env python3
-"""Headless test runner for the BlastBullets2D suites.
+"""Headless GUT test runner for BlastBullets2D (leak-checked).
 
-Every suite is a `SceneTree` script run as
-    godot --headless --path test_project --script <path>
-and calls `quit(failures)`, so the process exit code IS the failure count.
+Every test file runs in its own headless Godot process, in parallel:
 
-A zero exit code is NOT sufficient to call a suite green: a stale or missing
-GDExtension .so makes Godot abort at startup, and a suite that dies mid-run can
-still exit 0 in some crash modes. So each suite must also print its own
-completion marker. Suites that print no marker are reported as CRASH, which is
-what catches "the binary was never rebuilt" - the failure mode that silently
-turns `debug_get_*` assertions into assertions against defaults.
+    godot --headless --verbose -d --path test_project \\
+          -s addons/gut/gut_cmdln.gd -gconfig= -gtest=<file> -gexit \\
+          -gjunit_xml_file=<tmp>
+
+A file is green only when ALL of these hold:
+  1. the process exits 0,
+  2. GUT wrote its JUnit report with 0 failures (a missing report means the
+     extension or GUT never loaded - reported as CRASH, never as PASS),
+  3. the --verbose exit report shows no leaks (ObjectDB instances, leaked
+     RIDs, resources still in use, orphan StringNames),
+  4. no SCRIPT ERROR / parse error was printed.
+
+GUT itself fails a test on any unexpected engine error or push_error
+(strict mode), and the BlastTest base class asserts zero new orphans and a
+dangling-free factory after every test.
 
 Usage:
-    python3 tools/run_tests.py                    # every suite
-    python3 tools/run_tests.py --suite 'volley/*' # substring/glob filter
-    python3 tools/run_tests.py --list             # show discovered suites
-    python3 tools/run_tests.py --changed-only     # suites touching changed C++
-    python3 tools/run_tests.py --keep-going       # do not stop at the first failure
-    python3 tools/run_tests.py --timeout 300      # per-suite wall clock seconds
+    python3 tools/run_tests.py                 # every test file
+    python3 tools/run_tests.py --suite volley  # substring/glob filter (repeatable)
+    python3 tools/run_tests.py --list          # discover only
+    python3 tools/run_tests.py --changed-only  # files plausibly affected by uncommitted changes
+    python3 tools/run_tests.py --jobs 4        # parallel processes (default: CPU count)
+    python3 tools/run_tests.py --fail-fast     # stop scheduling after the first red file
+    python3 tools/run_tests.py --no-leaks      # skip --verbose leak checking (faster, not "green")
+    python3 tools/run_tests.py --verbose       # print full output of red files
+    python3 tools/run_tests.py --self-test     # prove failure + leak detection still fire
+    python3 tools/run_tests.py --allow-stale   # run even if src/ is newer than the built .so
+
+Godot binary: $GODOT_BIN, else tools/config.json "godotActivePath", else `godot`.
 """
 
 import argparse
+import concurrent.futures
 import fnmatch
-import glob
+import json
 import os
 import re
 import subprocess
 import sys
+import tempfile
 import time
+import xml.etree.ElementTree as ET
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PROJECT = os.path.join(REPO_ROOT, "test_project")
-GODOT = os.environ.get("GODOT_BIN", "godot")
+TESTS_DIR = os.path.join(PROJECT, "tests")
+META_DIR = os.path.join(PROJECT, "tests_meta")
+GUT_CLI = "addons/gut/gut_cmdln.gd"
+ADDON_BIN_DIR = os.path.join(PROJECT, "addons", "blastbullets2d", "bin")
 
-# test_edge_fuzz.gd is a multi-group suite: it reads the CASE env var and
-# quits(2) on an unknown value, so running it once without CASE is a false
-# failure. Each group runs as its own process - a crash kills only its group,
-# and the missing GROUP_DONE line attributes it.
-EDGE_FUZZ_SUITE = "test_edge_fuzz.gd"
-EDGE_FUZZ_GROUPS = (
-    "counts",
-    "degenerate",
-    "nan",
-    "twist_extreme",
-    "slots_offsets",
-    "scales",
-    "edge_image",
-    "side_spread_skip",
-    "semantics",
-)
+# Godot 4.5+ exit-time leak report lines (printed with --verbose; the summary
+# lines appear even without it). Any match makes the file red.
+LEAK_PATTERNS = [
+    re.compile(r"ObjectDB instances (?:were )?leaked at exit"),
+    re.compile(r"^Leaked instance:", re.M),
+    re.compile(r"RID allocations of type .* were leaked at exit"),
+    re.compile(r"RIDs? of type .* (?:was|were) leaked"),
+    re.compile(r"resources? still in use at exit", re.I),
+    re.compile(r"Orphan StringName", re.I),
+]
+SCRIPT_ERROR_PATTERNS = [
+    re.compile(r"SCRIPT ERROR"),
+    re.compile(r"Parse Error"),
+    re.compile(r"Failed to load script"),
+]
 
-# A suite is only green if it emits its own done-marker. The house style is
-# "ALL <NAME> TESTS PASSED"; the legacy root-level suites use GROUP_DONE.
-DONE_MARKERS = ("TESTS PASSED", "GROUP_DONE", "ALL TESTS PASSED")
-
-# C++ sources whose changes can invalidate a given suite. Deliberately coarse:
-# anything shared touches everything, so map the volatile areas broadly.
-VOLATILE_SUFFIXES = (
-    "multimesh_bullets2d",
-    "directional_bullets2d",
-    "block_bullets2d",
-    "bullet_factory2d",
-    "bullet_spawner2d",
-    "bullet_attachment2d",
-    "multimesh_object_pool2d",
-    "bullet_effect_layer_data2d",
-    "bullet_speed_data2d",
-    "bullet_rotation_data2d",
-    "bullet_wobble_data2d",
-    "bullet_curves_data2d",
-    "bullet_deque2d",
-    "bullet_homing",
-    "multimesh_pool_key2d",
-    "register_types",
-)
+# C++ stems -> test areas, for --changed-only. Deliberately coarse.
+AREA_BY_STEM = {
+    "bullet_spawner2d": ("spawner", "integration"),
+    "volley_tracker2d": ("spawner",),
+    "bullet_factory2d": ("factory", "pooling", "spawner", "volley", "integration", "fuzz"),
+    "multimesh_object_pool2d": ("pooling", "factory"),
+    "multimesh_pool_key2d": ("pooling",),
+    "bullet_attachment": ("pooling", "volley"),
+}
 
 
-def is_suite_script(path):
-    """A suite is a SceneTree script. This deliberately skips the shared
-    helper (tests/common) and the attachment fixture (tests/scenes), which
-    live under tests/ but are libraries, not runnable suites."""
+def godot_binary():
+    env = os.environ.get("GODOT_BIN")
+    if env:
+        return env
     try:
-        with open(path, "r", encoding="utf-8", errors="replace") as handle:
-            head = handle.read(4096)
-    except OSError:
-        return False
-    return re.search(r"^\s*extends\s+SceneTree\b", head, re.M) is not None
+        with open(os.path.join(REPO_ROOT, "tools", "config.json"), encoding="utf-8") as handle:
+            path = json.load(handle).get("godotActivePath")
+        if path and os.path.exists(path):
+            return path
+    except (OSError, ValueError):
+        pass
+    return "godot"
 
 
-def discover():
-    """Every suite: tests/** plus the legacy root-level scripts."""
-    suites = []
-    candidates = sorted(glob.glob(os.path.join(PROJECT, "tests", "**", "*.gd"), recursive=True))
-    candidates += sorted(glob.glob(os.path.join(PROJECT, "*.gd")))
-    for path in candidates:
-        if not is_suite_script(path):
-            continue
-        rel = os.path.relpath(path, PROJECT)
-        if rel == EDGE_FUZZ_SUITE:
-            # One entry per group, so each runs in its own process with CASE set.
-            for group in EDGE_FUZZ_GROUPS:
-                suites.append(f"{rel}::{group}")
-            continue
-        suites.append(rel)
-    return suites
+def discover(root=TESTS_DIR):
+    found = []
+    for dirpath, _, files in os.walk(root):
+        for name in files:
+            if name.startswith("test_") and name.endswith(".gd"):
+                found.append(os.path.relpath(os.path.join(dirpath, name), PROJECT).replace(os.sep, "/"))
+    return sorted(found)
 
 
-def split_suite(entry):
-    """-> (script_path, env_overrides)"""
-    if "::" in entry:
-        script, group = entry.split("::", 1)
-        return script, {"CASE": group}
-    return entry, {}
-
-
-def changed_cpp_files():
+def changed_files():
     try:
-        out = subprocess.run(
-            ["git", "status", "--porcelain", "--", "src", "test_project"],
-            cwd=REPO_ROOT, capture_output=True, text=True, timeout=30,
-        ).stdout
+        out = subprocess.run(["git", "status", "--porcelain", "--", "src", "test_project/tests"],
+                             cwd=REPO_ROOT, capture_output=True, text=True, timeout=30).stdout
     except (OSError, subprocess.SubprocessError):
         return set()
     files = set()
     for line in out.splitlines():
-        # porcelain: XY path  (rename entries carry "old -> new")
         if len(line) < 4:
             continue
         rel = line[3:].strip().strip('"')
@@ -135,182 +120,261 @@ def changed_cpp_files():
     return files
 
 
-def volatile_prefixes(changed):
-    """Distinctive stems touched by the change (empty set = everything is suspect)."""
-    hits = set()
-    for rel in changed:
-        stem = os.path.splitext(os.path.basename(rel))[0]
-        for suffix in VOLATILE_SUFFIXES:
-            if stem == suffix or stem.startswith(suffix):
-                hits.add(suffix)
-    return hits
-
-
-def is_suite_affected(entry, changed, prefixes):
-    """Conservative: assume a touched C++ area can affect any suite that
-    references its class name, and that a touched .gd only affects itself."""
+def filter_changed(tests):
+    changed = changed_files()
     if not changed:
-        return True
-    suite = entry.split("::", 1)[0]
-    if suite in changed:
-        return True
-    haystack = suite.replace("/", "_")
-    for prefix in prefixes:
-        if prefix in haystack:
-            return True
-    return False
+        print("note: no uncommitted changes under src/ or tests/; running everything")
+        return tests
+    areas = set()
+    for rel in changed:
+        if rel.startswith("src/"):
+            stem = os.path.splitext(os.path.basename(rel))[0]
+            hit = [a for s, a in AREA_BY_STEM.items() if stem.startswith(s)]
+            if not hit:
+                return tests  # shared/core code: everything is suspect
+            for group in hit:
+                areas.update(group)
+    picked = [t for t in tests
+              if ("test_project/" + t) in changed or any(f"/{a}/" in t or t.startswith(f"tests/{a}/") for a in areas)]
+    print(f"note: {len(changed)} changed file(s); {len(tests)} test file(s) narrowed to {len(picked)}")
+    return picked
 
 
-def run_suite(entry, timeout):
-    script, env_overrides = split_suite(entry)
-    cmd = [GODOT, "--headless", "--path", PROJECT, "--script", script]
-    env = dict(os.environ)
-    env.update(env_overrides)
-    start = time.monotonic()
+def newest_mtime(root, exts):
+    newest = 0.0
+    for dirpath, _, files in os.walk(root):
+        for name in files:
+            if name.endswith(exts):
+                newest = max(newest, os.path.getmtime(os.path.join(dirpath, name)))
+    return newest
+
+
+def stale_binary_reason():
+    built = newest_mtime(ADDON_BIN_DIR, (".so", ".dll", ".dylib"))
+    if built == 0.0:
+        return "no compiled extension found in test_project/addons/blastbullets2d/bin"
+    source = newest_mtime(os.path.join(REPO_ROOT, "src"), (".cpp", ".hpp", ".h"))
+    if source > built:
+        return "src/ is newer than the compiled extension (rebuild: GODOTPP_NONINTERACTIVE=1 python3 tools/compile_debug_build.py)"
+    return None
+
+
+def refresh_class_cache(godot):
+    """New/renamed `class_name` scripts (BlastTest, GutTest, fixtures) only
+    resolve after Godot rebuilds .godot/global_script_class_cache.cfg. A
+    headless --import does that; run it whenever any project script is newer
+    than the cache (cheap check, slow-ish import only when needed)."""
+    cache = os.path.join(PROJECT, ".godot", "global_script_class_cache.cfg")
+    cache_mtime = os.path.getmtime(cache) if os.path.exists(cache) else 0.0
+    newest = 0.0
+    for sub in ("tests", "tests_meta", "addons", "shared"):
+        root = os.path.join(PROJECT, sub)
+        if os.path.isdir(root):
+            newest = max(newest, newest_mtime(root, (".gd",)))
+    if newest <= cache_mtime:
+        return True
+    print("note: scripts changed since the last import; refreshing the class cache (godot --import)")
+    proc = subprocess.run([godot, "--headless", "--path", PROJECT, "--import"],
+                          cwd=REPO_ROOT, capture_output=True, text=True, errors="replace", timeout=600)
+    if proc.returncode != 0:
+        print(proc.stdout[-2000:] + proc.stderr[-2000:])
+        return False
+    # Touch so an import that rewrote nothing still marks the cache fresh.
+    if os.path.exists(cache):
+        os.utime(cache, None)
+    return True
+
+
+def parse_junit(path):
+    """-> (tests, failures, [(test_name, message)]) or None when missing/unreadable."""
     try:
-        proc = subprocess.run(
-            cmd, cwd=REPO_ROOT, capture_output=True, text=True,
-            timeout=timeout, errors="replace", env=env,
-        )
-        stdout, stderr, code = proc.stdout, proc.stderr, proc.returncode
-    except subprocess.TimeoutExpired:
-        return {
-            "suite": entry, "status": "TIMEOUT", "code": None,
-            "elapsed": time.monotonic() - start, "output": "",
-        }
-    except OSError as exc:
-        return {
-            "suite": entry, "status": "ERROR", "code": None,
-            "elapsed": time.monotonic() - start, "output": str(exc),
-        }
-    elapsed = time.monotonic() - start
-    blob = stdout + stderr
-    saw_done = any(marker in blob for marker in DONE_MARKERS)
+        root = ET.parse(path).getroot()
+    except (OSError, ET.ParseError):
+        return None
+    tests = failures = 0
+    details = []
+    for case in root.iter("testcase"):
+        tests += 1
+        failure = case.find("failure")
+        error = case.find("error")
+        node = failure if failure is not None else error
+        if node is not None or case.get("status") == "fail":
+            failures += 1
+            text = (node.text or node.get("message") or "failed").strip() if node is not None else "failed"
+            details.append((case.get("name", "?"), " ".join(text.split())[:400]))
+    return tests, failures, details
 
-    if code == 0 and saw_done:
-        status = "PASS"
-    elif code == 0 and not saw_done:
-        # Exited clean but never announced completion: the binary probably
-        # never loaded, or the script died before its tail. NOT a pass.
-        status = "CRASH"
-    elif code is not None and code < 0:
-        status = "CRASH"
+
+def run_file(godot, test, timeout, check_leaks):
+    with tempfile.TemporaryDirectory(prefix="blast_gut_") as tmp:
+        junit = os.path.join(tmp, "results.xml")
+        cmd = [godot, "--headless"]
+        if check_leaks:
+            cmd.append("--verbose")
+        # No "-d": the local debugger would stop on the first script error
+        # and wait for stdin forever (a hang, not a failure).
+        cmd += ["--path", PROJECT, "-s", GUT_CLI, "-gconfig=", f"-gtest=res://{test}",
+                "-gexit", "-gdisable_colors", f"-gjunit_xml_file={junit}"]
+        start = time.monotonic()
+        try:
+            proc = subprocess.run(cmd, cwd=REPO_ROOT, capture_output=True, text=True,
+                                  errors="replace", timeout=timeout)
+            output, code = proc.stdout + proc.stderr, proc.returncode
+        except subprocess.TimeoutExpired as exc:
+            out = (exc.stdout or b"") + (exc.stderr or b"")
+            output = out.decode("utf-8", "replace") if isinstance(out, bytes) else out
+            return {"test": test, "status": "TIMEOUT", "elapsed": time.monotonic() - start,
+                    "tests": 0, "failures": 0, "details": [], "leaks": [], "script_errors": [], "output": output}
+        elapsed = time.monotonic() - start
+        report = parse_junit(junit)
+
+    leaks = []
+    if check_leaks:
+        for line in output.splitlines():
+            if any(p.search(line) for p in LEAK_PATTERNS):
+                leaks.append(line.strip())
+    script_errors = [ln.strip() for ln in output.splitlines() if any(p.search(ln) for p in SCRIPT_ERROR_PATTERNS)]
+
+    if report is None:
+        status, tests, failures, details = "CRASH", 0, 0, []
     else:
-        status = "FAIL"
+        tests, failures, details = report
+        if failures or code != 0:
+            status = "FAIL"
+        elif tests == 0:
+            status = "EMPTY"
+        elif leaks:
+            status = "LEAK"
+        elif script_errors:
+            status = "SCRIPT"
+        else:
+            status = "PASS"
+    return {"test": test, "status": status, "elapsed": elapsed, "tests": tests, "failures": failures,
+            "details": details, "leaks": leaks, "script_errors": script_errors, "output": output, "code": code}
 
-    return {
-        "suite": entry, "status": status, "code": code,
-        "elapsed": elapsed, "output": blob,
-    }
+
+def run_many(godot, tests, jobs, timeout, check_leaks, fail_fast, verbose):
+    results = []
+    stop = False
+    with concurrent.futures.ThreadPoolExecutor(max_workers=jobs) as pool:
+        pending = {}
+        queue = list(tests)
+        while queue or pending:
+            while queue and len(pending) < jobs and not stop:
+                test = queue.pop(0)
+                pending[pool.submit(run_file, godot, test, timeout, check_leaks)] = test
+            if not pending:
+                break
+            done, _ = concurrent.futures.wait(pending, return_when=concurrent.futures.FIRST_COMPLETED)
+            for fut in done:
+                pending.pop(fut)
+                r = fut.result()
+                results.append(r)
+                extra = ""
+                if r["failures"]:
+                    extra = f"{r['failures']} failed"
+                elif r["leaks"]:
+                    extra = f"{len(r['leaks'])} leak line(s)"
+                print(f"[{len(results):>3}/{len(tests)}] {r['status']:<7} {r['elapsed']:>6.1f}s  "
+                      f"{r['test']}  ({r['tests']} tests) {extra}".rstrip(), flush=True)
+                if verbose and r["status"] != "PASS":
+                    print(r["output"])
+                if r["status"] != "PASS" and fail_fast:
+                    stop = True
+                    queue.clear()
+    return results
 
 
-def summarise(result):
-    lines = result["output"].splitlines()
-    fails = [ln for ln in lines if ln.startswith("FAIL")]
-    tail = [ln for ln in lines if ln.strip()][-14:]
-    return fails, tail
+def report(results):
+    print("-" * 72)
+    counts = {}
+    for r in results:
+        counts[r["status"]] = counts.get(r["status"], 0) + 1
+    for status in ("PASS", "FAIL", "LEAK", "SCRIPT", "CRASH", "TIMEOUT", "EMPTY"):
+        if status in counts:
+            print(f"{status:<8} {counts[status]}")
+    total_tests = sum(r["tests"] for r in results)
+    print(f"tests    {total_tests}")
+    broken = [r for r in results if r["status"] != "PASS"]
+    if broken:
+        print("=" * 72)
+        for r in sorted(broken, key=lambda x: x["test"]):
+            print(f"\n### {r['status']}  {r['test']}  (exit={r.get('code')}, {r['elapsed']:.1f}s)")
+            for name, msg in r["details"][:40]:
+                print(f"  FAIL {name}: {msg}")
+            for line in r["leaks"][:20]:
+                print(f"  LEAK {line}")
+            for line in r["script_errors"][:10]:
+                print(f"  SCRIPT {line}")
+            if r["status"] in ("CRASH", "TIMEOUT", "EMPTY"):
+                tail = [ln for ln in r["output"].splitlines() if ln.strip()][-15:]
+                for ln in tail:
+                    print(f"  | {ln}")
+        print("=" * 72)
+        print(f"\n{len(broken)} file(s) not green")
+        return 1
+    print(f"\nALL {len(results)} TEST FILES PASSED ({total_tests} tests, no leaks)")
+    return 0
+
+
+def self_test(godot, timeout):
+    """The canaries in tests_meta/ MUST be detected: a failing assert, an
+    unexpected push_error, and leaked Object/Node/RID at exit."""
+    ok = True
+    fail = run_file(godot, "tests_meta/test_fail_canary.gd", timeout, True)
+    if fail["status"] != "FAIL" or fail["failures"] < 2:
+        print(f"SELF-TEST BROKEN: failure canary reported {fail['status']} ({fail['failures']} failures)")
+        ok = False
+    leak = run_file(godot, "tests_meta/test_leak_canary.gd", timeout, True)
+    if leak["status"] != "LEAK" or not leak["leaks"]:
+        print(f"SELF-TEST BROKEN: leak canary reported {leak['status']}")
+        ok = False
+    print("SELF-TEST OK: failures and leaks are detected" if ok else "SELF-TEST FAILED")
+    return 0 if ok else 1
 
 
 def main():
-    ap = argparse.ArgumentParser(description="Run the headless BlastBullets2D suites.")
-    ap.add_argument("--suite", action="append", default=None,
-                    help="only suites whose path contains this (repeatable)")
-    ap.add_argument("--list", action="store_true", help="list suites and exit")
-    ap.add_argument("--changed-only", action="store_true",
-                    help="only suites plausibly affected by uncommitted changes")
-    ap.add_argument("--keep-going", action="store_true", default=True,
-                    help="run every suite even after a failure (default)")
-    ap.add_argument("--fail-fast", dest="keep_going", action="store_false",
-                    help="stop at the first failing suite")
-    ap.add_argument("--timeout", type=int, default=600, help="per-suite seconds")
-    ap.add_argument("--verbose", action="store_true", help="print full output")
+    ap = argparse.ArgumentParser(description="Run the BlastBullets2D GUT suites headless with leak checks.")
+    ap.add_argument("--suite", action="append", help="only test files whose path contains/matches this (repeatable)")
+    ap.add_argument("--list", action="store_true", help="list test files and exit")
+    ap.add_argument("--changed-only", action="store_true", help="only files plausibly affected by uncommitted changes")
+    ap.add_argument("--jobs", type=int, default=max(1, os.cpu_count() or 1), help="parallel Godot processes")
+    ap.add_argument("--timeout", type=int, default=600, help="per-file wall clock seconds")
+    ap.add_argument("--fail-fast", action="store_true", help="stop scheduling after the first red file")
+    ap.add_argument("--no-leaks", action="store_true", help="skip --verbose leak checking")
+    ap.add_argument("--verbose", action="store_true", help="print full output of red files")
+    ap.add_argument("--self-test", action="store_true", help="verify failure and leak detection, then exit")
+    ap.add_argument("--allow-stale", action="store_true", help="run even when src/ is newer than the built extension")
     args = ap.parse_args()
 
-    suites = discover()
+    godot = godot_binary()
+    if not refresh_class_cache(godot):
+        print("class cache refresh (godot --import) failed")
+        return 2
+    if args.self_test:
+        return self_test(godot, args.timeout)
 
+    tests = discover()
     if args.suite:
-        patterns = args.suite
-        suites = [
-            s for s in suites
-            if any(p in s or fnmatch.fnmatch(s, p) for p in patterns)
-        ]
-
+        tests = [t for t in tests if any(p in t or fnmatch.fnmatch(t, p) for p in args.suite)]
     if args.changed_only:
-        changed = changed_cpp_files()
-        prefixes = volatile_prefixes(changed)
-        if not changed:
-            print("note: no uncommitted changes under src/ or test_project/; running everything")
-            suites = discover()
-        else:
-            before = len(suites)
-            suites = [s for s in suites if is_suite_affected(s, changed, prefixes)]
-            print(f"note: {len(changed)} changed file(s), stems={sorted(prefixes) or ['(none)']}")
-            print(f"note: {before} suite(s) narrowed to {len(suites)}")
-        if args.suite:
-            pass
-
+        tests = filter_changed(tests)
     if args.list:
-        for s in suites:
-            print(s)
+        print("\n".join(tests))
         return 0
-
-    if not suites:
-        print("no suites matched")
+    if not tests:
+        print("no test files matched")
         return 1
+    stale = stale_binary_reason()
+    if stale and not args.allow_stale:
+        print(f"refusing to run: {stale}\n(pass --allow-stale to run anyway)")
+        return 2
 
-    print(f"godot      : {GODOT}")
-    print(f"project    : {os.path.relpath(PROJECT, REPO_ROOT)}")
-    print(f"suites     : {len(suites)}")
+    print(f"godot   : {godot}")
+    print(f"files   : {len(tests)}   jobs: {args.jobs}   leak check: {'off' if args.no_leaks else 'on (--verbose)'}")
     print("-" * 72)
-
-    results = []
-    for i, suite in enumerate(suites, 1):
-        result = run_suite(suite, args.timeout)
-        results.append(result)
-        fails, _ = summarise(result)
-        detail = f"{len(fails)} failed" if fails else ""
-        if result["status"] == "FAIL" and not detail:
-            detail = f"exit {result['code']}"
-        print(f"[{i:>2}/{len(suites)}] {result['status']:<7} {result['elapsed']:>6.1f}s  "
-              f"{suite}  {detail}".rstrip())
-        sys.stdout.flush()
-        if args.verbose:
-            print(result["output"])
-        if result["status"] != "PASS" and not args.keep_going:
-            print("stopping (--fail-fast)")
-            break
-
-    print("-" * 72)
-    by_status = {}
-    for r in results:
-        by_status.setdefault(r["status"], []).append(r["suite"])
-
-    for status in ("PASS", "FAIL", "CRASH", "TIMEOUT", "ERROR"):
-        if status in by_status:
-            print(f"{status:<8} {len(by_status[status])}")
-
-    broken = [r for r in results if r["status"] != "PASS"]
-    if broken:
-        print()
-        print("=" * 72)
-        for r in broken:
-            fails, tail = summarise(r)
-            print(f"\n### {r['status']}  {r['suite']}  (exit={r['code']}, {r['elapsed']:.1f}s)")
-            if fails:
-                print(f"  {len(fails)} FAIL line(s):")
-                for ln in fails[:40]:
-                    print(f"    {ln}")
-            for ln in tail:
-                print(f"  | {ln}")
-        print("=" * 72)
-
-    total_fails = sum(len(summarise(r)[0]) for r in results)
-    print()
-    if not broken and total_fails == 0:
-        print(f"ALL {len(results)} SUITES PASSED")
-        return 0
-    print(f"{len(broken)} suite(s) not green, {total_fails} individual FAIL line(s)")
-    return 1
+    results = run_many(godot, tests, args.jobs, args.timeout, not args.no_leaks, args.fail_fast, args.verbose)
+    return report(results)
 
 
 if __name__ == "__main__":

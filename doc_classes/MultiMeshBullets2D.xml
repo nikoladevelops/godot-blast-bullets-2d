@@ -291,7 +291,7 @@
 			<return type="void" />
 			<param index="0" name="bullet_index" type="int" />
 			<description>
-				Frees the attachment of a specific bullet, removing it from the scene tree and freeing the memory it occupies. Use this if you want to permanently remove an attachment from a bullet and free its resources, instead of just disabling it with [method bullet_disable_attachment].
+				Frees the attachment of a specific bullet: the slot is cleared at once, the node is hidden and queue_free()d (deleted at the end of the frame), so this is safe to call from the attachment's own callbacks. Use this if you want to permanently remove an attachment from a bullet and free its resources, instead of just disabling it with [method bullet_disable_attachment].
 
 				Warning: Once you free an attachment, you can't reuse it anymore.
 			</description>
@@ -581,7 +581,7 @@
 			<return type="float" />
 			<param index="0" name="bullet_index" type="int" />
 			<description>
-				Get the texture rotation in radians of a specific bullet. Returns a float representing the rotation in radians.
+				Get the texture rotation in radians of a specific bullet, in the same space [method set_bullet_texture_rotation_radians] writes: the volley-wide spawn-data [code]texture_rotation_radians[/code] offset is excluded, so [code]set(get())[/code] is a no-op. Wrapped to [-PI, PI] when an offset is set.
 			</description>
 		</method>
 		<method name="get_bullet_transform" qualifiers="const">
@@ -625,7 +625,7 @@
 		<method name="get_inherited_velocity_offset" qualifiers="const">
 			<return type="Vector2" />
 			<description>
-				Returns the extra velocity offset that gets added to every bullet's movement each physics frame. Set it at spawn time or through set_inherited_velocity_offset().
+				Returns the extra velocity offset that gets added to every bullet's movement each physics frame. Set it at spawn time or through set_inherited_velocity_offset(). The setter is bound on the base class while the inspector property lives on DirectionalBullets2D only: BlockBullets2D scripts call the method (same value, no property row).
 			</description>
 		</method>
 		<method name="get_monitorable" qualifiers="const">

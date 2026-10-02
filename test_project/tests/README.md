@@ -31,6 +31,17 @@ or a real bug — investigate before shipping.
 - `spawner/test_spawner_path2d_singular_base.gd` — AT_PATH2D linker falls back to raw points on a singular base.
 - `spawner/test_spawner_max_volleys_edge.gd` — cap trip emits finished once; lowering onto the count emits stopped only.
 - `volley/test_volley_bounce_scaled_shape.gd` — degenerate shapes bounce finite via radial fallback (never double-counted); slivers separate; sane shapes precise.
+- `spawner/test_spawner_spin_matrix.gd` — spin is one shared matrix: spun ring equals rotated unspun ring, mirrored generators and sheared customs survive spin exactly.
+- `spawner/test_spawner_node_cache.gd` — validated manual assignment wins over stale paths; out-of-tree nodes stay assigned.
+- `spawner/test_spawner_fire_arc_generator.gd` — fire-arc gate reads the muzzle frame, not the spawner node.
+- `volley/test_volley_rotation_wake_presence.gd` — same-owner wakes keep presence decisions; new lives reset them.
+- `spawner/test_spawner_retarget_stagger.gd` — unrelated knob changes never re-arm the retarget countdown.
+- `volley/test_volley_gravity_presence.gd` — shared gravity fills gaps only; seeded/per-bullet values survive.
+- `volley/test_volley_orbit_rearm.gd` — linear re-arm updates every parameter; Random never re-rolls.
+- `spawner/test_spawner_outline_visibility.gd` — distribution knob hidden for smooth loops, shown for corner shapes.
+- `factory/test_factory_spawn_in_handler.gd` — same-key spawns from a killing-blow handler succeed (never the draining volley; pooled instances reused mid-sweep).
+- `volley/test_volley_lifetime_signal_reuse.gd` — expiry signals survive same-frame pool reuse (physics-tick and call_deferred spawns); handlers see attachments; one disable per expiry, no enable churn.
+- `volley/test_audit_regressions.gd` — audit pins: texture-rotation round-trip with offset, timer period carry, block spin after bullet 0 dies, pool-key enum ids, mirrored transforms_scale, scaled-slope bounce normal, free_volley_deferred type gate, bounded distance-phased wobble.
 - `spawner/test_spawner_lifecycle_signals.gd` — transitions report exactly once: pre-tree setters silent, load emits one started, toggles/caps report in-tree only.
 - `spawner/test_spawner_terrain_crest.gd` — crest normals tilt with the slope (up-right ascending, up-left descending), all finite.
 - `spawner/test_spawner_preview_state.gd` — dead track drops rings (dots survive); seed setters rebuild the gizmo.

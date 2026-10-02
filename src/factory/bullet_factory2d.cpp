@@ -13,6 +13,8 @@
 #include "../shared/multimesh_pool_key2d.hpp"
 #include "godot_cpp/classes/global_constants.hpp"
 #include "godot_cpp/classes/image.hpp"
+#include "godot_cpp/classes/image_texture.hpp"
+#include "../shared/bullet_effect_layer_data2d.hpp"
 #include "godot_cpp/classes/random_number_generator.hpp"
 #include "godot_cpp/variant/dictionary.hpp"
 #include "godot_cpp/core/class_db.hpp"
@@ -207,6 +209,7 @@ void BulletFactory2D::_ready() {
 	directional_bullets_debugger->set_draw_inactive_shapes(debugger_draw_inactive_cached_before_ready);
 
 	use_physics_interpolation = use_physics_interpolation_cached_before_ready;
+	set_process(is_factory_processing_bullets && use_physics_interpolation);
 
 	is_ready = true;
 
@@ -308,6 +311,7 @@ bool BulletFactory2D::ensure_factory_initialized() {
 		block_bullets_debugger->set_draw_inactive_shapes(debugger_draw_inactive_cached_before_ready);
 	}
 	use_physics_interpolation = use_physics_interpolation_cached_before_ready;
+	set_process(is_factory_processing_bullets && use_physics_interpolation);
 	is_ready = true;
 	if (!ready_missing_super_warned) {
 		ready_missing_super_warned = true;
@@ -559,6 +563,30 @@ int BulletFactory2D::fx_frame_for_age(const std::vector<double> &starts, double 
 		return (int)starts.size() - 1;
 	}
 	return (int)lo;
+}
+
+Ref<Texture2D> BulletFactory2D::get_whitened_frame(const Ref<Texture2D> &source) {
+	if (source.is_null()) {
+		return Ref<Texture2D>();
+	}
+	const uint64_t key = (uint64_t)source->get_instance_id();
+	auto it = whitened_frame_cache.find(key);
+	if (it != whitened_frame_cache.end()) {
+		return it->second;
+	}
+	if (whitened_frame_cache.size() >= 4096) {
+		whitened_frame_cache.clear();
+	}
+	Ref<Texture2D> result;
+	Ref<Image> white = BulletEffectLayerData2D::whiten_image_copy(BulletEffectLayerData2D::read_frame_image(source));
+	if (white.is_valid()) {
+		Ref<ImageTexture> white_tex;
+		white_tex.instantiate();
+		white_tex->set_image(white);
+		result = white_tex;
+	}
+	whitened_frame_cache[key] = result;
+	return result;
 }
 
 void BulletFactory2D::fx_ensure_effects_container() {
@@ -1018,7 +1046,9 @@ void BulletFactory2D::set_is_factory_processing_bullets(bool is_processing_enabl
 	is_factory_processing_bullets = is_processing_enabled;
 
 	set_physics_process(is_processing_enabled);
-	set_process(is_processing_enabled);
+	// _process only drives the interpolation pass: idle it otherwise
+	// instead of paying an empty virtual call every rendered frame.
+	set_process(is_processing_enabled && use_physics_interpolation);
 }
 
 void BulletFactory2D::_physics_process(double delta) {
@@ -1128,6 +1158,8 @@ void BulletFactory2D::reset_factory_state(const PoolKey *key) {
 	// preserve living volleys' bakes, or their triggers would go silent.
 	if (key == nullptr) {
 		fx_unregister_all_bakes();
+		// Full reset: also drop whitened frames so edited art re-bakes.
+		clear_whitened_frame_cache();
 	}
 
 	// Attachments of freed multis are already handled per-multi via force_delete ->
@@ -1603,6 +1635,40 @@ void BulletFactory2D::free_attachments_pool_for_scene(const Ref<PackedScene> &at
 }
 
 // ---- Deferred structural wrappers ----
+// Structural ops must run on an IDLE frame: Godot flushes call_deferred()
+// queued during the physics step while still inside that physics frame, so a
+// plain call_deferred from a collision handler hit reject_when_iterating() and
+// was silently refused. These wrappers queue onto the next SceneTree
+// process_frame instead (idle, after the physics step), in call order.
+
+void BulletFactory2D::queue_structural_call(const Callable &call) {
+	pending_structural_calls.push_back(call);
+	if (structural_flush_connected) {
+		return;
+	}
+	SceneTree *tree = is_inside_tree() ? get_tree() : nullptr;
+	if (tree != nullptr) {
+		tree->connect("process_frame", callable_mp(this, &BulletFactory2D::_flush_structural_calls), CONNECT_ONE_SHOT);
+	} else {
+		call_deferred("_flush_structural_calls");
+	}
+	structural_flush_connected = true;
+}
+
+void BulletFactory2D::_flush_structural_calls() {
+	structural_flush_connected = false;
+	std::vector<Callable> calls;
+	calls.swap(pending_structural_calls);
+	for (const Callable &call : calls) {
+		if (is_tearing_down) {
+			return;
+		}
+		if (call.is_valid()) {
+			call.call();
+		}
+	}
+}
+
 // Each validates cheaply now (teardown/null only) and defers the real op so
 // physics-frame / sweep callers never hit reject_when_iterating(). The
 // deferred call re-runs full validation at flush time.
@@ -1612,7 +1678,7 @@ void BulletFactory2D::reset_deferred(const Ref<MultiMeshPoolKey2D> &key) {
 		UtilityFunctions::push_error("reset_deferred: BulletFactory2D is being freed. Ignoring the request.");
 		return;
 	}
-	call_deferred("reset", key);
+	queue_structural_call(Callable(this, "reset").bind(key));
 }
 
 void BulletFactory2D::free_active_bullets_deferred(const Ref<MultiMeshPoolKey2D> &key) {
@@ -1620,7 +1686,7 @@ void BulletFactory2D::free_active_bullets_deferred(const Ref<MultiMeshPoolKey2D>
 		UtilityFunctions::push_error("free_active_bullets_deferred: BulletFactory2D is being freed. Ignoring the request.");
 		return;
 	}
-	call_deferred("free_active_bullets", key);
+	queue_structural_call(Callable(this, "free_active_bullets").bind(key));
 }
 
 void BulletFactory2D::clear_active_bullets_deferred(const Ref<MultiMeshPoolKey2D> &key) {
@@ -1628,7 +1694,7 @@ void BulletFactory2D::clear_active_bullets_deferred(const Ref<MultiMeshPoolKey2D
 		UtilityFunctions::push_error("clear_active_bullets_deferred: BulletFactory2D is being freed. Ignoring the request.");
 		return;
 	}
-	call_deferred("clear_active_bullets", key);
+	queue_structural_call(Callable(this, "clear_active_bullets").bind(key));
 }
 
 void BulletFactory2D::free_disabled_bullets_deferred(const Ref<MultiMeshPoolKey2D> &key) {
@@ -1636,7 +1702,7 @@ void BulletFactory2D::free_disabled_bullets_deferred(const Ref<MultiMeshPoolKey2
 		UtilityFunctions::push_error("free_disabled_bullets_deferred: BulletFactory2D is being freed. Ignoring the request.");
 		return;
 	}
-	call_deferred("free_disabled_bullets", key);
+	queue_structural_call(Callable(this, "free_disabled_bullets").bind(key));
 }
 
 void BulletFactory2D::free_bullets_pool_deferred(BulletType bullet_type, const Ref<MultiMeshPoolKey2D> &key) {
@@ -1648,7 +1714,7 @@ void BulletFactory2D::free_bullets_pool_deferred(BulletType bullet_type, const R
 		UtilityFunctions::push_error("free_bullets_pool_deferred: unsupported bullet_type.");
 		return;
 	}
-	call_deferred("free_bullets_pool", bullet_type, key);
+	queue_structural_call(Callable(this, "free_bullets_pool").bind(bullet_type, key));
 }
 
 void BulletFactory2D::populate_bullets_pool_deferred(const Ref<MultiMeshPoolKey2D> &key, const Ref<MultiMeshBulletsData2D> &multimesh_data, int instance_count) {
@@ -1668,7 +1734,7 @@ void BulletFactory2D::populate_bullets_pool_deferred(const Ref<MultiMeshPoolKey2
 		UtilityFunctions::push_error("populate_bullets_pool_deferred: instance_count must be > 0. Nothing was queued.");
 		return;
 	}
-	call_deferred("populate_bullets_pool", key, multimesh_data, instance_count);
+	queue_structural_call(Callable(this, "populate_bullets_pool").bind(key, multimesh_data, instance_count));
 }
 
 void BulletFactory2D::free_attachments_pool_deferred() {
@@ -1676,7 +1742,7 @@ void BulletFactory2D::free_attachments_pool_deferred() {
 		UtilityFunctions::push_error("free_attachments_pool_deferred: BulletFactory2D is being freed. Ignoring the request.");
 		return;
 	}
-	call_deferred("free_attachments_pool");
+	queue_structural_call(Callable(this, "free_attachments_pool"));
 }
 
 void BulletFactory2D::free_attachments_pool_for_scene_deferred(const Ref<PackedScene> &attachment_scene) {
@@ -1688,12 +1754,18 @@ void BulletFactory2D::free_attachments_pool_for_scene_deferred(const Ref<PackedS
 		UtilityFunctions::push_error("free_attachments_pool_for_scene_deferred: attachment_scene is null. Nothing was queued.");
 		return;
 	}
-	call_deferred("free_attachments_pool_for_scene", attachment_scene);
+	queue_structural_call(Callable(this, "free_attachments_pool_for_scene").bind(attachment_scene));
 }
 
 void BulletFactory2D::free_volley_deferred(Node *volley) {
 	if (volley == nullptr) {
 		UtilityFunctions::push_error("free_volley_deferred: volley is null. Nothing was queued.");
+		return;
+	}
+	// Volleys only: this is a bullet API, and queue_freeing an arbitrary
+	// node passed by mistake (a target, the factory itself) is never right.
+	if (Object::cast_to<MultiMeshBullets2D>(volley) == nullptr) {
+		UtilityFunctions::push_error("free_volley_deferred: node is not a bullet volley (MultiMeshBullets2D). Nothing was queued.");
 		return;
 	}
 	if (!volley->is_inside_tree()) {
@@ -1723,10 +1795,10 @@ Dictionary BulletFactory2D::debug_get_factory_state() {
 
 Dictionary BulletFactory2D::debug_get_pool_hit_stats() const {
 	Dictionary d;
-	d["directional_hits"] = (int)directional_pool_hits;
-	d["directional_misses"] = (int)directional_pool_misses;
-	d["block_hits"] = (int)block_pool_hits;
-	d["block_misses"] = (int)block_pool_misses;
+	d["directional_hits"] = (int64_t)directional_pool_hits;
+	d["directional_misses"] = (int64_t)directional_pool_misses;
+	d["block_hits"] = (int64_t)block_pool_hits;
+	d["block_misses"] = (int64_t)block_pool_misses;
 	return d;
 }
 
@@ -7952,6 +8024,7 @@ void BulletFactory2D::_bind_methods() {
 
 	// Deferred structural wrappers: safe from physics callbacks / sweeps.
 	ClassDB::bind_method(D_METHOD("reset_deferred", "key"), &BulletFactory2D::reset_deferred, DEFVAL(Ref<MultiMeshPoolKey2D>()));
+	ClassDB::bind_method(D_METHOD("_flush_structural_calls"), &BulletFactory2D::_flush_structural_calls);
 	ClassDB::bind_method(D_METHOD("free_active_bullets_deferred", "key"), &BulletFactory2D::free_active_bullets_deferred, DEFVAL(Ref<MultiMeshPoolKey2D>()));
 	ClassDB::bind_method(D_METHOD("clear_active_bullets_deferred", "key"), &BulletFactory2D::clear_active_bullets_deferred, DEFVAL(Ref<MultiMeshPoolKey2D>()));
 	ClassDB::bind_method(D_METHOD("free_disabled_bullets_deferred", "key"), &BulletFactory2D::free_disabled_bullets_deferred, DEFVAL(Ref<MultiMeshPoolKey2D>()));

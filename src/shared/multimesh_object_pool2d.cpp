@@ -37,28 +37,39 @@ MultiMeshBullets2D *MultiMeshObjectPool::pop(const PoolKey &key) {
 	// Skip any entries that can never be reused: null leftovers (bad push) and
 	// instances the user queue_free'd while pooled. Handing out a dying instance
 	// would silently lose the caller's volley when the deferred deletion lands.
-	while (!it->second.empty()) {
-		MultiMeshBullets2D *candidate = it->second.back();
+	std::vector<MultiMeshBullets2D *> &bucket = it->second;
+	while (!bucket.empty()) {
+		MultiMeshBullets2D *candidate = bucket.back();
 		if (candidate == nullptr || candidate->is_queued_for_deletion()) {
 			if (candidate != nullptr) {
 				candidate->is_pooled_in_pool = false;
 			}
-			it->second.pop_back();
+			bucket.pop_back();
 			continue;
 		}
 		break;
 	}
-	if (it->second.empty()) {
+	if (bucket.empty()) {
 		pool.erase(it);
 		return nullptr;
 	}
 
-	// Get the one at the back (doesn't really matter which)
-	MultiMeshBullets2D *found_multimesh = it->second.back();
-	it->second.pop_back();
+	// Newest first (back), but never a volley whose own tick is still
+	// running (it pooled itself mid-drain, e.g. a killing blow, and a
+	// handler is spawning right now): it stays pooled for the next caller.
+	int pick = (int)bucket.size() - 1;
+	while (pick >= 0 && bucket[pick] != nullptr && bucket[pick]->is_being_ticked) {
+		--pick;
+	}
+	if (pick < 0 || bucket[pick] == nullptr) {
+		return nullptr;
+	}
+	MultiMeshBullets2D *found_multimesh = bucket[pick];
+	bucket[pick] = bucket.back();
+	bucket.pop_back();
 	found_multimesh->is_pooled_in_pool = false;
 
-	if (it->second.empty()) {
+	if (bucket.empty()) {
 		pool.erase(it);
 	}
 

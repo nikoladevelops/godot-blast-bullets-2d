@@ -1,107 +1,84 @@
-extends SceneTree
-## Debug-API suite: every new introspection/range helper proven per bullet,
-## including OOB (-1/99), inverted ranges, dict shapes, and the fixed
-## per-bullet-wins center precedence (per deque + shared -> center from per).
-## Run: godot --headless --path test_project --script tests/volley/test_volley_debug_api.gd
-## Exit code 0 = all pass.
+extends BlastTest
+## Introspection helpers per bullet: orbiting ranges + info (incl. OOB and
+## inverted ranges), per-deque-wins orbit center, homing amount ranges,
+## curves / pattern / wobble info shapes and sources, attachment info shape.
 
-const H := preload("res://tests/common/blast_test_helpers.gd")
 
-var failures := 0
-
-func _check(cond: bool, label: String) -> void:
-	if cond:
-		print("PASS  ", label)
-	else:
-		failures += 1
-		printerr("FAIL  ", label)
-
-func _initialize() -> void:
-	var factory := BulletFactory2D.new()
-	get_root().add_child(factory)
-	await process_frame
-	await process_frame
-
-	printerr("DBG T1 orbiting ranges + OOB")
-	var v: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(H.make_directional_data(3, 200.0))
+func test_orbiting_ranges_and_oob() -> void:
+	var v: DirectionalBullets2D = spawn_dir(3, 200.0)
 	v.all_bullets_enable_orbiting(60.0)
-	var centers: Array = v.all_bullets_get_orbiting_center()
-	_check(centers.size() == 3, "center range size 3")
-	var angles: Array = v.all_bullets_get_orbiting_angle()
-	_check(angles.size() == 3, "angle range size 3")
-	var inv: Array = v.all_bullets_get_orbiting_center(2, 1)
-	_check(inv.is_empty(), "inverted center range reads empty")
-	var deep: Array = v.all_bullets_get_orbiting_angle(1, 1)
-	_check(deep.size() == 1, "single-slot angle range size 1")
+	assert_eq(v.all_bullets_get_orbiting_center().size(), 3, "center range size 3")
+	assert_eq(v.all_bullets_get_orbiting_angle().size(), 3, "angle range size 3")
+	assert_true(v.all_bullets_get_orbiting_center(2, 1).is_empty(), "inverted range reads empty")
+	expect_any_error()
+	assert_eq(v.all_bullets_get_orbiting_angle(1, 1).size(), 1, "single-slot range")
 	var oi: Dictionary = v.debug_get_orbiting_info(0)
-	_check(bool(oi["valid"]) and bool(oi["enabled"]) and str(oi["deque_src"]) == "none", "orbit info shape, no deque yet (none)")
-	var oob: Dictionary = v.debug_get_orbiting_info(99)
-	_check(not bool(oob["valid"]), "OOB orbit info valid=false")
-	var oobn: Dictionary = v.debug_get_orbiting_info(-1)
-	_check(not bool(oobn["valid"]), "negative orbit info valid=false")
+	assert_true(oi["valid"] and oi["enabled"], "orbit info valid + enabled")
+	assert_eq(str(oi["deque_src"]), "none", "no deque yet")
+	assert_false(v.debug_get_orbiting_info(99)["valid"], "OOB invalid")
+	assert_false(v.debug_get_orbiting_info(-1)["valid"], "negative invalid")
 
-	printerr("DBG T2 center precedence: per deque wins over shared")
-	var v2: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(H.make_directional_data(2, 0.0))
-	v2.all_bullets_enable_orbiting(60.0)
-	v2.bullet_homing_push_back_global_position_target(0, Vector2(-900, 0))
-	v2.shared_homing_deque_push_back_global_position_target(Vector2(900, 0))
-	var i0: Dictionary = v2.debug_get_orbiting_info(0)
-	var i1: Dictionary = v2.debug_get_orbiting_info(1)
-	_check(str(i0["deque_src"]) == "per", "slot 0 deque_src per (own deque wins)")
-	_check(str(i1["deque_src"]) == "shared", "slot 1 deque_src shared (fallback)")
-	var c0: Vector2 = v2.bullet_get_orbiting_center(0)
-	_check(c0.distance_to(Vector2(-900, 0)) < 1.0, "center from per deque (%.1f, %.1f)" % [c0.x, c0.y])
-	var c1: Vector2 = v2.bullet_get_orbiting_center(1)
-	_check(c1.distance_to(Vector2(900, 0)) < 1.0, "center from shared deque (%.1f, %.1f)" % [c1.x, c1.y])
 
-	printerr("DBG T3 homing amount range matches per-bullet reads")
-	v2.bullet_homing_push_back_global_position_target(1, Vector2(10, 10))
-	var amounts: Array = v2.all_bullets_get_homing_targets_amount()
-	_check(int(amounts[0]) == 1 and int(amounts[1]) == 1, "amount range [1,1]")
-	v2.bullet_clear_homing_targets(1)
-	var amounts2: Array = v2.all_bullets_get_homing_targets_amount()
-	_check(int(amounts2[0]) == 1 and int(amounts2[1]) == 0, "amount range [1,0] after clear")
-	var invh: Array = v2.all_bullets_get_homing_targets_amount(0, 0)
-	_check(invh.size() == 1 and int(invh[0]) == 1, "single-slot homing range size 1")
+func test_center_precedence_and_homing_amounts() -> void:
+	var v: DirectionalBullets2D = spawn_dir(2, 0.0)
+	v.all_bullets_enable_orbiting(60.0)
+	v.bullet_homing_push_back_global_position_target(0, Vector2(-900, 0))
+	v.shared_homing_deque_push_back_global_position_target(Vector2(900, 0))
+	assert_eq(str(v.debug_get_orbiting_info(0)["deque_src"]), "per", "own deque wins")
+	assert_eq(str(v.debug_get_orbiting_info(1)["deque_src"]), "shared", "shared fallback")
+	assert_almost_eq(v.bullet_get_orbiting_center(0), Vector2(-900, 0), Vector2(1, 1), "center from the per deque")
+	assert_almost_eq(v.bullet_get_orbiting_center(1), Vector2(900, 0), Vector2(1, 1), "center from the shared deque")
+	v.bullet_homing_push_back_global_position_target(1, Vector2(10, 10))
+	assert_eq(Array(v.all_bullets_get_homing_targets_amount()), [1, 1], "amount range [1, 1]")
+	v.bullet_clear_homing_targets(1)
+	assert_eq(Array(v.all_bullets_get_homing_targets_amount()), [1, 0], "amount range [1, 0] after clear")
+	assert_eq(Array(v.all_bullets_get_homing_targets_amount(0, 0)), [1], "single-slot range")
 
-	printerr("DBG T4 curves info: none state + per/shared + OOB")
-	var v4: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(H.make_directional_data(2, 200.0))
-	var n4: Dictionary = v4.debug_get_curves_info(0)
-	_check(bool(n4["valid"]) and str(n4["speed_src"]) == "none" and not bool(n4["has_per_bullet_resource"]) and not bool(n4["has_shared_fallback"]), "virgin curves info all-none")
+
+func test_curves_info_sources() -> void:
+	var v: DirectionalBullets2D = spawn_dir(2, 200.0)
+	var n: Dictionary = v.debug_get_curves_info(0)
+	assert_true(n["valid"])
+	assert_eq(str(n["speed_src"]), "none")
+	assert_false(n["has_per_bullet_resource"])
+	assert_false(n["has_shared_fallback"])
 	var gx := BulletCurvesData2D.new()
-	var cx := Curve.new()
-	cx.add_point(Vector2(0, 0.2))
-	cx.add_point(Vector2(1, 0.2))
-	gx.x_direction_curve = cx
+	gx.x_direction_curve = H.make_flat_curve(0.2)
 	var gy := BulletCurvesData2D.new()
-	var cy := Curve.new()
-	cy.add_point(Vector2(0, 0.3))
-	cy.add_point(Vector2(1, 0.3))
-	gy.y_direction_curve = cy
-	v4.set_shared_bullet_curves_data(gx)
-	v4.bullet_set_curves_data(0, gy)
-	var m4: Dictionary = v4.debug_get_curves_info(0)
-	_check(str(m4["x_src"]) == "shared" and str(m4["y_src"]) == "per" and bool(m4["has_per_bullet_resource"]) and bool(m4["has_shared_fallback"]), "mixed curves info x=shared y=per")
-	var oobc: Dictionary = v4.debug_get_curves_info(99)
-	_check(not bool(oobc["valid"]) and str(oobc["x_src"]) == "none", "OOB curves info valid=false")
+	gy.y_direction_curve = H.make_flat_curve(0.3)
+	v.set_shared_bullet_curves_data(gx)
+	v.bullet_set_curves_data(0, gy)
+	var m: Dictionary = v.debug_get_curves_info(0)
+	assert_eq(str(m["x_src"]), "shared", "x from shared")
+	assert_eq(str(m["y_src"]), "per", "y from per-bullet")
+	assert_true(m["has_per_bullet_resource"] and m["has_shared_fallback"])
+	var oob: Dictionary = v.debug_get_curves_info(99)
+	assert_false(oob["valid"])
+	assert_eq(str(oob["x_src"]), "none")
 
-	printerr("DBG T5 pattern info: none + per + shared + finished + OOB")
-	var v5: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(H.make_directional_data(2, 200.0))
-	var n5: Dictionary = v5.debug_get_pattern_info(0)
-	_check(bool(n5["valid"]) and str(n5["src"]) == "none" and not bool(n5["finished"]), "virgin pattern info none/unfinished")
+
+func test_pattern_info_sources() -> void:
+	var v: DirectionalBullets2D = spawn_dir(2, 200.0)
+	var n: Dictionary = v.debug_get_pattern_info(0)
+	assert_true(n["valid"])
+	assert_eq(str(n["src"]), "none")
+	assert_false(n["finished"])
 	var pc := Curve2D.new()
 	pc.add_point(Vector2(0, 0))
 	pc.add_point(Vector2(400, 0))
-	v5.set_shared_movement_pattern_curve(pc)
-	var s5: Dictionary = v5.debug_get_pattern_info(0)
-	_check(str(s5["src"]) == "shared" and bool(s5["face"]) == false and bool(s5["repeat"]) == true, "shared pattern info shape")
-	v5.set_bullet_movement_pattern_from_curve(1, pc, true, true)
-	var p5: Dictionary = v5.debug_get_pattern_info(1)
-	_check(str(p5["src"]) == "per" and bool(p5["face"]) == true, "per pattern info face on")
-	var oobp: Dictionary = v5.debug_get_pattern_info(-1)
-	_check(not bool(oobp["valid"]), "OOB pattern info valid=false")
+	v.set_shared_movement_pattern_curve(pc)
+	var s: Dictionary = v.debug_get_pattern_info(0)
+	assert_eq(str(s["src"]), "shared")
+	assert_false(s["face"])
+	assert_true(s["repeat"])
+	v.set_bullet_movement_pattern_from_curve(1, pc, true, true)
+	var p: Dictionary = v.debug_get_pattern_info(1)
+	assert_eq(str(p["src"]), "per")
+	assert_true(p["face"])
+	assert_false(v.debug_get_pattern_info(-1)["valid"], "OOB invalid")
 
-	printerr("DBG T6 wobble info full seed + curves-clear symmetry")
+
+func test_wobble_info_and_attachment_info() -> void:
 	var w := BulletWobbleData2D.new()
 	w.enabled = true
 	w.mode = BulletWobbleData2D.WOBBLE_LATERAL
@@ -109,29 +86,21 @@ func _initialize() -> void:
 	w.frequency_hz = 2.5
 	w.face_movement_direction = true
 	w.face_rotation_speed = 9.0
-	var v6: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(H.make_directional_data(2, 200.0))
-	v6.bullet_set_wobble_data(0, w)
-	var wi: Dictionary = v6.debug_get_wobble_info(0)
-	_check(bool(wi["active"]) and absf(float(wi["amplitude"]) - 30.0) < 0.01 and absf(float(wi["frequency_hz"]) - 2.5) < 0.01, "wobble seed fields live")
-	_check(int(wi["mode"]) == 0 and int(wi["waveform"]) == 0 and absf(float(wi["face_rotation_speed"]) - 9.0) < 0.01, "wobble mode/waveform/slew live")
-	_check(bool(wi["has_per_bullet_resource"]) and not bool(v6.debug_get_wobble_info(1)["has_per_bullet_resource"]), "per-resource flag per slot")
-	var woob: Dictionary = v6.debug_get_wobble_info(99)
-	_check(not bool(woob["active"]) and not bool(woob["has_per_bullet_resource"]), "OOB wobble info inactive")
-	_check(v6.has_method("clear_per_bullet_curves_data") and v6.has_method("all_bullets_clear_curves_data"), "curves-clear helpers bound")
-	v6.bullet_set_wobble_data(0, null)
-	_check(not bool(v6.debug_get_wobble_info(0)["active"]), "wobble null clears to inactive")
-
-	printerr("DBG T7 attachment info needs its index (doc fix proof)")
-	var a0: Dictionary = v6.debug_get_attachment_info(0)
-	_check(a0.has("has_attachment") and a0.has("pooling_id") and a0.has("owner_match"), "attachment info shape intact")
-
-	_check(factory.debug_assert_no_dangling().get("ok", false) == true, "no dangling at end")
-	factory.reset()
-	factory.queue_free()
-	await process_frame
-	print("----")
-	if failures == 0:
-		print("ALL DEBUG-API TESTS PASSED")
-	else:
-		printerr(str(failures) + " TEST(S) FAILED")
-	quit(failures)
+	var v: DirectionalBullets2D = spawn_dir(2, 200.0)
+	v.bullet_set_wobble_data(0, w)
+	var wi: Dictionary = v.debug_get_wobble_info(0)
+	assert_true(wi["active"])
+	assert_almost_eq(float(wi["amplitude"]), 30.0, 0.01)
+	assert_almost_eq(float(wi["frequency_hz"]), 2.5, 0.01)
+	assert_eq(int(wi["mode"]), 0)
+	assert_eq(int(wi["waveform"]), 0)
+	assert_almost_eq(float(wi["face_rotation_speed"]), 9.0, 0.01)
+	assert_true(wi["has_per_bullet_resource"])
+	assert_false(v.debug_get_wobble_info(1)["has_per_bullet_resource"], "per-resource flag per slot")
+	var woob: Dictionary = v.debug_get_wobble_info(99)
+	assert_false(woob["active"] or woob["has_per_bullet_resource"], "OOB inactive")
+	v.bullet_set_wobble_data(0, null)
+	assert_false(v.debug_get_wobble_info(0)["active"], "null clears to inactive")
+	var a0: Dictionary = v.debug_get_attachment_info(0)
+	for key in ["has_attachment", "pooling_id", "owner_match"]:
+		assert_has(a0, key)

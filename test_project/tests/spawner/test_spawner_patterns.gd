@@ -1,125 +1,99 @@
-extends SceneTree
-## Spawner patterns suite: every PatternSource collects sane volleys.
-## Covers: all 30 pattern sources (finite, non-empty where targets exist),
-## aimed/corridor without target (empty, loud once), custom compose/reverse/
-## offset order, line reverse/offset, 10k cap boundary, invalid source reject,
-## spin + scales compose (origins move, count stable), skip-indices carve,
-## apply_pattern_preset one-call set + preview rings coincidence spot-check.
-## Run: godot --headless --path test_project --script tests/spawner/test_spawner_patterns.gd
-## Exit code 0 = all pass.
+extends BlastTest
+## Every PatternSource collects a sane volley (finite, non-empty unless it
+## needs a target/input), invalid sources and the 10k cap reject, custom
+## order ops (reverse, slot offset), spin + scales compose, skip indices carve,
+## presets apply in one call, aimed needs a target.
 
-const H := preload("res://tests/common/blast_test_helpers.gd")
+var sp: BulletSpawner2D
+const EMPTY_WITHOUT_INPUT := [
+	BulletSpawner2D.PATTERN_FROM_HELPER_AIMED,
+	BulletSpawner2D.PATTERN_FROM_HELPER_CUSTOM,
+	BulletSpawner2D.PATTERN_FROM_HELPER_PATH2D,
+]
 
-var failures := 0
 
-func _check(cond: bool, label: String) -> void:
-	if cond:
-		print("PASS  ", label)
-	else:
-		failures += 1
-		printerr("FAIL  ", label)
+func before_each() -> void:
+	await super()
+	sp = make_spawner(H.make_directional_data(4), BulletSpawner2D.PATTERN_FROM_HELPER_RING, 6)
 
-func _initialize() -> void:
-	var factory := BulletFactory2D.new()
-	get_root().add_child(factory)
-	await process_frame
-	await process_frame
-	var spawner := BulletSpawner2D.new()
-	get_root().add_child(spawner)
-	await process_frame
-	spawner.set_bullet_factory(factory)
-	spawner.set_spawn_data(H.make_directional_data(4))
-	spawner.set_shooting_enabled(false)
 
-	printerr("PAT T1 all sources collect")
-	spawner.helper_bullets_amount = 6
-	var empty_ok := {7: true, 24: true, 29: true} # aimed / custom-empty / path2d-empty
-	for src in range(33):
-		spawner.pattern_source = src
-		var tf: Array = spawner.collect_spawn_transforms()
-		if empty_ok.has(src):
-			_check(tf.is_empty(), "src %d targetless is empty" % src)
+func test_all_sources_collect() -> void:
+	for src in range(BulletSpawner2D.PATTERN_FROM_LAST):
+		sp.pattern_source = src
+		var tf: Array = sp.collect_spawn_transforms()
+		if src in EMPTY_WITHOUT_INPUT:
+			assert_true(tf.is_empty(), "source %d without input is empty" % src)
+			expect_any_error("source %d fails loud without input" % src)
 		else:
-			_check(tf.size() >= 1 and H.finite_volley(tf), "src %d sane (n=%d)" % [src, tf.size()])
+			assert_gte(tf.size(), 1, "source %d emits" % src)
+			assert_true(H.finite_volley(tf), "source %d finite" % src)
 
-	printerr("PAT T2 invalid source + cap")
-	var src0: int = spawner.get_pattern_source()
-	spawner.pattern_source = 99
-	_check(spawner.get_pattern_source() == src0, "source 99 rejected")
-	spawner.helper_bullets_amount = 10000
-	_check(spawner.get_helper_bullets_amount() == 10000, "cap accepts 10000")
-	spawner.helper_bullets_amount = 10001
-	_check(spawner.get_helper_bullets_amount() == 10000, "10001 rejected")
-	spawner.helper_bullets_amount = 6
 
-	printerr("PAT T3 custom order ops")
-	spawner.pattern_source = 24
-	spawner.set_helper_custom_transforms([Transform2D(0.0, Vector2(10, 0)), Transform2D(0.0, Vector2(0, 20)), Transform2D(0.0, Vector2(-5, -5))])
-	_check(spawner.collect_spawn_transforms().size() == 3, "custom collects all")
-	spawner.set_helper_custom_reverse(true)
-	var rev: Array = spawner.collect_spawn_transforms()
-	_check(rev.size() == 3 and (rev[0] as Transform2D).origin.distance_to(Vector2(-5, -5)) < 0.01, "custom reverse flips")
-	spawner.set_helper_custom_reverse(false)
-	spawner.set_helper_custom_slot_offset(1)
-	var off: Array = spawner.collect_spawn_transforms()
-	_check(off.size() == 3 and (off[0] as Transform2D).origin.distance_to(Vector2(0, 20)) < 0.01, "custom slot offset rotates")
-	spawner.set_helper_custom_slot_offset(0)
+func test_invalid_source_and_amount_cap() -> void:
+	var src0: int = sp.get_pattern_source()
+	sp.pattern_source = 99
+	expect_any_error()
+	assert_eq(sp.get_pattern_source(), src0, "source 99 rejected")
+	sp.helper_bullets_amount = 10000
+	assert_eq(sp.get_helper_bullets_amount(), 10000, "cap accepts 10000")
+	sp.helper_bullets_amount = 10001
+	expect_any_error()
+	assert_eq(sp.get_helper_bullets_amount(), 10000, "10001 rejected")
 
-	printerr("PAT T4 spin + scales compose")
-	spawner.pattern_source = 3
-	spawner.helper_bullets_amount = 5
-	var plain: Array = spawner.collect_spawn_transforms()
-	spawner.set_spin_enabled(true)
-	spawner.set_spin_speed_deg_per_sec(360.0)
-	for i in 15:
-		await process_frame
-	_check(spawner.get_spin_angle_deg() > 1.0, "spin advances angle")
-	var spun: Array = spawner.collect_spawn_transforms()
-	_check(spun.size() == plain.size(), "spin keeps count")
+
+func test_custom_order_ops() -> void:
+	sp.pattern_source = BulletSpawner2D.PATTERN_FROM_HELPER_CUSTOM
+	sp.set_helper_custom_transforms([Transform2D(0.0, Vector2(10, 0)), Transform2D(0.0, Vector2(0, 20)), Transform2D(0.0, Vector2(-5, -5))])
+	assert_eq(sp.collect_spawn_transforms().size(), 3, "custom collects all")
+	sp.set_helper_custom_reverse(true)
+	var rev: Array = sp.collect_spawn_transforms()
+	assert_almost_eq((rev[0] as Transform2D).origin, Vector2(-5, -5), Vector2(0.01, 0.01), "reverse flips the order")
+	sp.set_helper_custom_reverse(false)
+	sp.set_helper_custom_slot_offset(1)
+	var off: Array = sp.collect_spawn_transforms()
+	assert_almost_eq((off[0] as Transform2D).origin, Vector2(0, 20), Vector2(0.01, 0.01), "slot offset rotates the order")
+
+
+func test_spin_and_scales_compose() -> void:
+	sp.helper_bullets_amount = 5
+	var plain: Array = sp.collect_spawn_transforms()
+	sp.set_spin_enabled(true)
+	sp.set_spin_speed_deg_per_sec(360.0)
+	await idle(15)
+	assert_gt(sp.get_spin_angle_deg(), 1.0, "spin advances the angle")
+	var spun: Array = sp.collect_spawn_transforms()
+	assert_eq(spun.size(), plain.size(), "spin keeps the count")
 	var moved := false
 	for i in plain.size():
 		if ((plain[i] as Transform2D).origin - (spun[i] as Transform2D).origin).length() > 1.0:
 			moved = true
-	_check(moved, "spin moves origins")
-	spawner.set_spin_enabled(false)
-	spawner.reset_spin_angle()
-	_check(spawner.get_spin_angle_deg() == 0.0, "spin reset")
-	spawner.set_pattern_scale(2.0)
-	var scaled: Array = spawner.collect_spawn_transforms()
-	_check(scaled.size() == plain.size(), "scale keeps count")
-	spawner.set_pattern_scale(1.0)
+	assert_true(moved, "spin moves origins")
+	sp.set_spin_enabled(false)
+	sp.reset_spin_angle()
+	assert_eq(sp.get_spin_angle_deg(), 0.0, "spin reset")
+	sp.set_pattern_scale(2.0)
+	assert_eq(sp.collect_spawn_transforms().size(), plain.size(), "scale keeps the count")
 
-	printerr("PAT T5 skip indices + presets")
-	spawner.helper_skip_indices = PackedInt32Array([0, 2])
-	var carved: Array = spawner.collect_spawn_transforms()
-	_check(carved.size() == 3, "skip carves 2 of 5")
-	spawner.helper_skip_indices = PackedInt32Array()
-	spawner.apply_pattern_preset(0)
-	_check(spawner.get_pattern_source() == 3, "radial-dense preset selects ring")
-	_check(spawner.collect_spawn_transforms().size() == 36, "preset amount applied")
-	spawner.apply_pattern_preset(19)
-	_check(spawner.collect_spawn_transforms().size() >= 1, "blossom finale collects")
 
-	printerr("PAT T6 aimed needs target, corridor falls back")
-	var tgt := Node2D.new()
+func test_skip_indices_and_presets() -> void:
+	sp.helper_bullets_amount = 5
+	sp.helper_skip_indices = PackedInt32Array([0, 2])
+	assert_eq(sp.collect_spawn_transforms().size(), 3, "skip carves 2 of 5")
+	sp.helper_skip_indices = PackedInt32Array()
+	sp.apply_pattern_preset(0)
+	assert_eq(sp.get_pattern_source(), BulletSpawner2D.PATTERN_FROM_HELPER_RING, "radial-dense preset selects ring")
+	assert_eq(sp.collect_spawn_transforms().size(), 36, "preset amount applied")
+	sp.apply_pattern_preset(19)
+	assert_gte(sp.collect_spawn_transforms().size(), 1, "blossom finale collects")
+
+
+func test_aimed_needs_target() -> void:
+	var tgt: Node2D = add(Node2D.new())
 	tgt.position = Vector2(300, 0)
-	get_root().add_child(tgt)
-	spawner.pattern_source = 7
-	spawner.helper_bullets_amount = 5
-	spawner.set_helper_aimed_target(tgt)
-	_check(spawner.collect_spawn_transforms().size() == 5, "aimed collects with target")
-	spawner.set_helper_aimed_target(null)
-	_check(spawner.collect_spawn_transforms().is_empty(), "aimed empty without target")
-	tgt.queue_free()
-
-	_check(factory.debug_assert_no_dangling().get("ok", false) == true, "no dangling at end")
-	spawner.queue_free()
-	factory.reset()
-	factory.queue_free()
-	await process_frame
-	print("----")
-	if failures == 0:
-		print("ALL SPAWNER PATTERN TESTS PASSED")
-	else:
-		printerr(str(failures) + " TEST(S) FAILED")
-	quit(failures)
+	sp.pattern_source = BulletSpawner2D.PATTERN_FROM_HELPER_AIMED
+	sp.helper_bullets_amount = 5
+	sp.set_helper_aimed_target(tgt)
+	assert_eq(sp.collect_spawn_transforms().size(), 5, "aimed collects with a target")
+	sp.set_helper_aimed_target(null)
+	assert_true(sp.collect_spawn_transforms().is_empty(), "aimed empty without a target")
+	expect_error("no aimed target")

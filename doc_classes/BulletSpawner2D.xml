@@ -223,7 +223,7 @@
 		<method name="pause_shooting">
 			<return type="void" />
 			<description>
-				Freezes volley creation keeping all counters: burst, telegraph, pattern-list and timer chains hold where they are and resume on [method resume_shooting]. Spin, retargeting and preview are unaffected. Manual [method shoot_once] and [method fire_burst_volley] still fire. Emits [signal shooting_stopped] on the active-to-idle transition.
+				Freezes volley creation keeping all counters: burst, telegraph, pattern-list and timer chains hold where they are and resume on [method resume_shooting]. Spin, retargeting and preview are unaffected. Manual [method shoot_once] and [method fire_burst_volley] still fire. Emits [signal shooting_stopped] on the active-to-idle transition. Unlike the shooting_enabled/max_volleys setters (tree-gated), these explicit calls report even before entering the tree.
 			</description>
 		</method>
 		<method name="reset_shooting">
@@ -1075,7 +1075,7 @@
 			Volley steering pauses while the bullet is farther than this from its target. 0 is unlimited. Must be finite and 0 or more.
 		</member>
 		<member name="homing_max_detection_range" type="float" setter="set_homing_max_detection_range" getter="get_homing_max_detection_range" default="0.0">
-			Detection radius around the spawner for the node group, node name, and node children sources. 0 is unlimited.
+			Detection radius around the effective generator (the volley's muzzle: [member transforms_generator_path] when set, else the spawner) for the node group, node name, and node children sources. Nearest selection measures from the same point. 0 is unlimited.
 		</member>
 		<member name="homing_max_targets" type="int" setter="set_homing_max_targets" getter="get_homing_max_targets" default="1">
 			How many targets enter the queue. 1 is classic single-target homing. Only the node group, node name, and node children sources use it. Valid range is 1-10000; each homing queue caps at 256 entries, so larger resolutions are clamped to 256 per queue.
@@ -1087,7 +1087,7 @@
 			Polled group for the Node Group source. Only Node2D members can be chased, the rest are skipped.
 		</member>
 		<member name="homing_node_name" type="String" setter="set_homing_node_name" getter="get_homing_node_name" default="&quot;Player&quot;">
-			Name pattern chased for the Node Name source. The whole scene is scanned, so dynamically spawned enemies are found with no group setup. The spawner itself never matches.
+			Name pattern chased for the Node Name source. The whole scene is scanned, so dynamically spawned enemies are found with no group setup. The spawner itself never matches, and [BulletFactory2D] subtrees (volleys, attachments, effects) are never scanned. Prefer the Node Group source in large scenes: the scan visits every node once per volley.
 		</member>
 		<member name="homing_node_name_case_sensitive" type="bool" setter="set_homing_node_name_case_sensitive" getter="get_homing_node_name_case_sensitive" default="false">
 			Compares node names strictly. Off (default) matches "Player" against "PlAyEr".
@@ -1341,7 +1341,7 @@
 			<param index="0" name="directional_bullets_instance" type="DirectionalBullets2D" />
 			<param index="1" name="bullet_indexes" type="int[]" />
 			<description>
-				Fired when this spawner's bullets expire. Needs the lifetime signal enabled in the bullet data.
+				Fired when this spawner's bullets expire. Needs the lifetime signal enabled in the bullet data. Deferred; until it is delivered the volley keeps its attachments and stays out of the pool (same contract as [signal BulletFactory2D.directional_life_time_over]).
 			</description>
 		</signal>
 		<signal name="pattern_list_finished">
@@ -1353,7 +1353,7 @@
 			<param index="0" name="directional_bullets_instance" type="DirectionalBullets2D" />
 			<param index="1" name="volley_index" type="int" />
 			<description>
-				Last-chance hook fired after the volley instance is stamped but before homing/orbiting is configured and before volley_fired. Handlers may tweak the duplicated volley data (speed ramp, difficulty scale). Same handler contract as volley_fired: never call shoot_once from here (use shoot_once_deferred).
+				Last-chance hook fired after the volley has spawned and been stamped, but before homing/orbiting is configured and before volley_fired. Handlers may tweak the live volley through its API (speed ramp, difficulty scale); the spawn data has already been consumed at this point. Same handler contract as volley_fired: never call shoot_once from here (use shoot_once_deferred).
 			</description>
 		</signal>
 		<signal name="retarget_applied">

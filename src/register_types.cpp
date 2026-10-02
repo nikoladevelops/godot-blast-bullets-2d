@@ -11,6 +11,7 @@
 #include "shared/bullet_speed_data2d.hpp"
 #include "shared/bullet_wobble_data2d.hpp"
 #include "shared/multimesh_pool_key2d.hpp"
+#include "shared/cached_string_names2d.hpp"
 
 // Factory
 #include "factory/bullet_factory2d.hpp"
@@ -84,12 +85,15 @@ void initialize_blast_bullets_2d_module(ModuleInitializationLevel p_level) {
 	// Bullet Spawner
 	GDREGISTER_CLASS(BulletSpawner2D)
 	GDREGISTER_CLASS(PatternPreviewLayer2D)
+
+	CachedStringNames2D::create();
 }
 
 void uninitialize_blast_bullets_2d_module(ModuleInitializationLevel p_level) {
 	if (p_level != MODULE_INITIALIZATION_LEVEL_SCENE) {
 		return;
 	}
+	CachedStringNames2D::destroy();
 }
 
 extern "C" {

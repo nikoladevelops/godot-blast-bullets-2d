@@ -4,7 +4,7 @@ from pathlib import Path
 
 from config_manager import config
 from paths import DOCS_SOURCE_DIR, PROJECT_ROOT, get_godot_project_dir
-from scons_helpers import clear_screen
+from scons_helpers import clear_screen, is_noninteractive, pause
 
 TOOL_HEADER = "Tool For Generating XML Editor Documentation By @realNikich"
 GODOT_DOCS_URL = "https://docs.godotengine.org/en/stable/tutorials/scripting/cpp/gdextension_docs_system.html"
@@ -31,6 +31,8 @@ def display_warning() -> None:
     print(f"\nTarget Godot Project Directory: {project_dir}")
     print(f"{'!' * 80}")
 
+    if is_noninteractive():
+        return
     choice = input("\nPress Enter to continue, or type 'q' to cancel: ").strip().lower()
     if choice == "q":
         print("\nOperation cancelled by user.")
@@ -129,12 +131,13 @@ def main() -> None:
         print("\n[!] ERROR: No active Godot Engine executable path found in configuration.")
         print("Please run option ('Select Godot Engine Executable Path') from the main setup menu first")
         print("to configure and select a valid Godot executable before generating documentation.")
-        input("\nPress Enter to exit...")
-        return
+        pause("\nPress Enter to exit...")
+        sys.exit(1 if is_noninteractive() else 0)
 
     display_warning()
 
-    if generate_docs(godot_executable, project_dir):
+    succeeded = generate_docs(godot_executable, project_dir)
+    if succeeded:
         print(f"\nDone! Check the '{DOCS_SOURCE_DIR}' folder and customize your XML files.")
         print_documentation_guide()
         print(f"Official Documentation Reference: {GODOT_DOCS_URL}")
@@ -142,7 +145,9 @@ def main() -> None:
     else:
         print("\nDocumentation generation process failed.")
 
-    input("\nPress Enter to exit...")
+    pause("\nPress Enter to exit...")
+    if not succeeded and is_noninteractive():
+        sys.exit(1)
 
 
 if __name__ == "__main__":

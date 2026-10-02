@@ -1,113 +1,97 @@
-extends SceneTree
-## Directional core suite: speed / direction / transform / velocity get/set.
-## Covers: per-bullet + all_bullets_ variants, NaN/zero rejects (old value kept),
-## direction-curve ownership warnings, set_bullet_transform derive-direction,
-## teleport paths, get_bullet_global_transform round-trip, debug shape state.
-## Run: godot --headless --path test_project --script tests/volley/test_directional_core.gd
-## Exit code 0 = all pass. Any FAIL = behavior drift or half-applied mutation.
+extends BlastTest
+## Directional core API: speed / direction / transform / velocity / texture
+## rotation get-set, per-bullet and all_bullets_ variants, NaN / zero / null /
+## OOB rejects keep the old value, derive-direction from a transform,
+## teleport carry, shape state, default max_speed 0 = unlimited.
 
-const H := preload("res://tests/common/blast_test_helpers.gd")
+var v: DirectionalBullets2D
 
-var failures := 0
 
-func _check(cond: bool, label: String) -> void:
-	if cond:
-		print("PASS  ", label)
-	else:
-		failures += 1
-		printerr("FAIL  ", label)
+func before_each() -> void:
+	await super()
+	v = spawn_dir(3, 200.0)
 
-func _initialize() -> void:
-	var factory := BulletFactory2D.new()
-	get_root().add_child(factory)
-	await process_frame
-	await process_frame
 
-	printerr("DIR-CORE T1 speed data")
-	var v: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(H.make_directional_data(3, 200.0))
-	_check(v != null, "spawn ok")
-	if v == null:
-		quit(1)
-		return
-	_check(absf(v.get_bullet_speed_data(0).speed - 200.0) < 0.01, "speed seeded 200")
-	var fast := BulletSpeedData2D.new()
-	fast.speed = 500.0
-	fast.max_speed = 3000.0
-	v.set_bullet_speed_data(1, fast)
-	_check(absf(v.get_bullet_speed_data(1).speed - 500.0) < 0.01, "per-bullet speed set")
-	_check(absf(v.get_bullet_speed_data(0).speed - 200.0) < 0.01, "sibling speed untouched")
+func test_speed_data() -> void:
+	assert_almost_eq(v.get_bullet_speed_data(0).speed, 200.0, 0.01, "speed seeded")
+	v.set_bullet_speed_data(1, H.make_speed(500.0))
+	assert_almost_eq(v.get_bullet_speed_data(1).speed, 500.0, 0.01, "per-bullet speed set")
+	assert_almost_eq(v.get_bullet_speed_data(0).speed, 200.0, 0.01, "sibling untouched")
 	var bad_sp := BulletSpeedData2D.new()
 	bad_sp.speed = NAN
-	_check(bad_sp.speed == 0.0, "resource setter rejects NaN speed, keeps default")
+	expect_any_error()
+	assert_eq(bad_sp.speed, 0.0, "resource setter rejects NaN, keeps default")
 	v.set_bullet_speed_data(0, null)
-	_check(absf(v.get_bullet_speed_data(0).speed - 200.0) < 0.01, "null speed data rejected, old kept")
-	v.set_bullet_speed_data(-1, fast)
-	v.set_bullet_speed_data(99, fast)
-	_check(absf(v.get_bullet_speed_data(1).speed - 500.0) < 0.01, "OOB speed index no-op")
-	_check(factory.debug_assert_no_dangling().get("ok", false) == true, "no dangling after speed edits")
+	expect_error("is null")
+	assert_almost_eq(v.get_bullet_speed_data(0).speed, 200.0, 0.01, "null speed data rejected")
+	v.set_bullet_speed_data(-1, H.make_speed(500.0))
+	v.set_bullet_speed_data(99, H.make_speed(500.0))
+	expect_errors_containing("Invalid bullet index", 2)
 
-	printerr("DIR-CORE T2 direction")
+
+func test_direction() -> void:
 	v.set_bullet_direction(0, Vector2(0, 1))
-	_check(v.get_bullet_direction(0).distance_to(Vector2(0, 1)) < 0.01, "direction set down")
+	assert_almost_eq(v.get_bullet_direction(0), Vector2(0, 1), Vector2(0.01, 0.01), "direction set")
 	v.set_bullet_direction(0, Vector2.ZERO)
-	_check(v.get_bullet_direction(0).distance_to(Vector2(0, 1)) < 0.01, "zero direction rejected")
+	expect_error("direction is zero")
 	v.set_bullet_direction(0, Vector2(NAN, 0))
-	_check(v.get_bullet_direction(0).distance_to(Vector2(0, 1)) < 0.01, "NaN direction rejected")
+	expect_error("must be finite")
+	assert_almost_eq(v.get_bullet_direction(0), Vector2(0, 1), Vector2(0.01, 0.01), "zero and NaN rejected")
 	var vel: Vector2 = v.get_bullet_velocity(0)
-	_check(vel.is_finite() and vel.length() > 1.0, "velocity finite and live")
+	assert_true(vel.is_finite() and vel.length() > 1.0, "velocity finite and live")
 	v.all_bullets_set_direction(Vector2(1, 0))
-	_check(v.get_bullet_direction(2).distance_to(Vector2(1, 0)) < 0.01, "all_bullets direction fans out")
+	assert_almost_eq(v.get_bullet_direction(2), Vector2(1, 0), Vector2(0.01, 0.01), "all_bullets direction fans out")
 
-	printerr("DIR-CORE T3 transforms + teleport")
+
+func test_transforms_and_teleport() -> void:
 	var t0: Transform2D = v.get_bullet_transform(0)
-	_check(t0.is_finite(), "transform finite")
-	_check(v.get_bullet_global_transform(0) == t0, "global transform round-trips cache")
-	var moved := Transform2D(0.0, Vector2(300, 400))
-	v.set_bullet_transform(0, moved, true)
-	_check(v.get_bullet_transform(0).origin.distance_to(Vector2(300, 400)) < 0.01, "set transform moves")
-	_check(v.get_bullet_direction(0).distance_to(Vector2(1, 0)) < 0.5, "derive-direction follows transform")
+	assert_true(t0.is_finite())
+	assert_eq(v.get_bullet_global_transform(0), t0, "global transform round-trips the cache")
+	v.set_bullet_transform(0, Transform2D(0.0, Vector2(300, 400)), true)
+	assert_almost_eq(v.get_bullet_transform(0).origin, Vector2(300, 400), Vector2(0.01, 0.01), "set transform moves")
+	assert_almost_eq(v.get_bullet_direction(0), Vector2(1, 0), Vector2(0.5, 0.5), "derive-direction follows the transform")
 	v.set_bullet_transform(1, Transform2D(0.0, Vector2(NAN, 0)))
-	_check(v.get_bullet_transform(1).is_finite(), "NaN transform rejected, old kept")
+	expect_error("must be finite")
 	v.set_bullet_transform(1, Transform2D.IDENTITY.scaled(Vector2(0, 0)))
-	_check(v.get_bullet_transform(1).is_finite(), "zero-scale transform rejected")
+	expect_any_error()
+	assert_true(v.get_bullet_transform(1).is_finite(), "bad transforms rejected")
 	v.teleport_shift_all_bullets(Vector2(10, 0))
-	_check(v.get_bullet_transform(0).origin.distance_to(Vector2(310, 400)) < 0.01, "volley shift carries")
+	assert_almost_eq(v.get_bullet_transform(0).origin, Vector2(310, 400), Vector2(0.01, 0.01), "volley shift carries")
 	var shape: Dictionary = v.debug_get_shape_state()
-	_check(shape.get("valid", false) == true and (shape.get("rid_count", 0) as int) == 3, "shape state valid, 3 RIDs")
+	assert_true(shape.get("valid", false), "shape state valid")
+	assert_eq(int(shape.get("rid_count", 0)), 3, "3 shape RIDs")
 
-	printerr("DIR-CORE T5 default speed resource flies (max 0 = unlimited)")
-	var plain_data := DirectionalBulletsData2D.new()
-	plain_data.transforms = [Transform2D.IDENTITY]
-	var plain_sp := BulletSpeedData2D.new()
-	plain_sp.speed = 300.0
-	# NOTE: max_speed left at default 0 = unlimited (not a brake).
-	plain_data.all_bullet_speed_data = [plain_sp]
-	plain_data.max_life_time = 10.0
-	plain_data.texture_size = Vector2(16, 16)
-	var pv: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(plain_data)
-	var pp0: Vector2 = pv.get_bullet_global_transform(0).origin
-	for i in 10:
-		await physics_frame
-	var pp1: Vector2 = pv.get_bullet_global_transform(0).origin
-	_check(pp1.x > pp0.x + 20.0, "default max_speed flies straight (dx=%.1f)" % (pp1.x - pp0.x))
 
-	printerr("DIR-CORE T4 texture rotation")
+func test_default_max_speed_is_unlimited() -> void:
+	var d := H.make_directional_data(1, 300.0, 10.0)
+	var sp := BulletSpeedData2D.new()
+	sp.speed = 300.0 # max_speed left at 0 = unlimited, not a brake
+	d.all_bullet_speed_data = [sp]
+	var pv: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d)
+	var x0: float = pv.get_bullet_global_transform(0).origin.x
+	await physics(10)
+	assert_gt(pv.get_bullet_global_transform(0).origin.x, x0 + 20.0, "default max_speed flies")
+
+
+func test_texture_rotation() -> void:
 	v.set_bullet_texture_rotation_radians(0, PI * 0.5)
-	_check(absf(v.get_bullet_texture_rotation_radians(0) - PI * 0.5) < 0.2, "texture rotation set")
+	assert_almost_eq(v.get_bullet_texture_rotation_radians(0), PI * 0.5, 0.001, "texture rotation set")
 	v.set_bullet_texture_rotation_degrees(0, 0.0)
-	_check(absf(v.get_bullet_texture_rotation_degrees(0)) < 5.0, "texture rotation degrees set")
+	assert_almost_eq(v.get_bullet_texture_rotation_degrees(0), 0.0, 0.01, "degrees set")
 	v.set_bullet_texture_rotation_radians(0, NAN)
-	_check(v.get_bullet_texture_rotation_radians(0) < 1.0, "NaN rotation rejected")
+	expect_error("must be finite")
+	assert_almost_eq(v.get_bullet_texture_rotation_radians(0), 0.0, 0.001, "NaN rejected")
 
-	await process_frame
-	factory.reset()
-	await process_frame
-	_check(factory.debug_assert_no_dangling().get("ok", false) == true, "no dangling after reset")
-	factory.queue_free()
-	await process_frame
-	print("----")
-	if failures == 0:
-		print("ALL DIRECTIONAL CORE TESTS PASSED")
-	else:
-		printerr(str(failures) + " TEST(S) FAILED")
-	quit(failures)
+
+func test_texture_rotation_round_trip_with_offset() -> void:
+	var d := H.make_directional_data(1, 0.0)
+	d.texture_rotation_radians = 0.7
+	var w: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d)
+	var r0: float = w.get_bullet_texture_rotation_radians(0)
+	assert_almost_eq(r0, 0.0, 0.001, "fresh bullet reads 0 (volley offset excluded)")
+	w.set_bullet_texture_rotation_radians(0, w.get_bullet_texture_rotation_radians(0))
+	w.set_bullet_texture_rotation_radians(0, w.get_bullet_texture_rotation_radians(0))
+	assert_almost_eq(w.get_bullet_texture_rotation_radians(0), r0, 0.001, "set(get()) is a no-op")
+	w.set_bullet_texture_rotation_degrees(0, 30.0)
+	assert_almost_eq(w.get_bullet_texture_rotation_degrees(0), 30.0, 0.01, "degrees round-trip")
+	assert_almost_eq(angle_difference(w.get_bullet_transform(0).get_rotation(), deg_to_rad(30.0) + 0.7), 0.0, 0.001, "instance still carries the offset")

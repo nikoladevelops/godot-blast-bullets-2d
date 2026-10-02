@@ -4,8 +4,17 @@ extends RefCounted
 ## Every suite is a SceneTree script; include this via preload and call the
 ## static makers so spawn data stays identical across suites (same speeds,
 ## layers, texture_size) and failures mean real regressions, not drift.
-## NOTE: sprite_frames is intentionally left null (error path is covered by
-## the engine); texture_size keeps volleys visible-sized for the debugger.
+## Every builder assigns a real 1x1 SpriteFrames, so a normal spawn emits no
+## errors (GUT strict mode fails tests on unexpected errors). texture_size
+## keeps volleys visible-sized for the debugger.
+
+## Minimal valid art: one 1x1 white frame in the "default" animation.
+static func make_sprite_frames() -> SpriteFrames:
+	var img := Image.create_empty(1, 1, false, Image.FORMAT_RGBA8)
+	img.fill(Color.WHITE)
+	var sf := SpriteFrames.new()
+	sf.add_frame("default", ImageTexture.create_from_image(img))
+	return sf
 
 static func make_directional_data(n: int = 4, speed: float = 200.0, lifetime: float = 5.0) -> DirectionalBulletsData2D:
 	var data := DirectionalBulletsData2D.new()
@@ -24,6 +33,7 @@ static func make_directional_data(n: int = 4, speed: float = 200.0, lifetime: fl
 	data.all_bullet_speed_data = speeds
 	data.max_life_time = lifetime
 	data.texture_size = Vector2(16, 16)
+	data.sprite_frames = make_sprite_frames()
 	data.set_collision_layer_from_array([2])
 	data.set_collision_mask_from_array([4])
 	return data
@@ -42,6 +52,7 @@ static func make_block_data(n: int = 4, speed: float = 200.0, lifetime: float = 
 	data.block_rotation_radians = 0.0
 	data.max_life_time = lifetime
 	data.texture_size = Vector2(16, 16)
+	data.sprite_frames = make_sprite_frames()
 	data.set_collision_layer_from_array([2])
 	data.set_collision_mask_from_array([4])
 	return data
@@ -55,4 +66,58 @@ static func finite_volley(v: Array) -> bool:
 static func make_circle_shape(radius: float = 8.0) -> CircleShape2D:
 	var c := CircleShape2D.new()
 	c.radius = radius
+	return c
+
+## Stationary volley used by many state suites: n bullets 16 px apart, speed
+## 0, 60 s life, circle r6, infinite collisions, mask layer 3.
+static func make_still_data(n: int = 2) -> DirectionalBulletsData2D:
+	var d := make_directional_data(n, 0.0, 60.0)
+	var arr: Array = []
+	for i in n:
+		arr.append(Transform2D(0.0, Vector2(16.0 * i, 0.0)))
+	d.transforms = arr
+	d.set_collision_mask_from_array([3])
+	d.collision_shape = make_circle_shape(6.0)
+	d.bullet_max_collision_count = 0
+	return d
+
+static func make_rotation(speed: float, max_speed: float = 100.0, accel: float = 0.0) -> BulletRotationData2D:
+	var r := BulletRotationData2D.new()
+	r.rotation_speed = speed
+	r.max_rotation_speed = max_speed
+	r.rotation_acceleration = accel
+	return r
+
+static func make_speed(speed: float, max_speed: float = 3000.0, accel: float = 0.0) -> BulletSpeedData2D:
+	var s := BulletSpeedData2D.new()
+	s.speed = speed
+	s.max_speed = max_speed
+	s.acceleration = accel
+	return s
+
+## SpriteFrames with `frames` 8x8 white frames at `fps`, non-looping.
+static func make_effect_frames(frames: int = 1, fps: float = 10.0) -> SpriteFrames:
+	var sf := SpriteFrames.new()
+	sf.set_animation_speed("default", fps)
+	sf.set_animation_loop("default", false)
+	for i in frames:
+		var img := Image.create_empty(8, 8, false, Image.FORMAT_RGBA8)
+		img.fill(Color.WHITE)
+		sf.add_frame("default", ImageTexture.create_from_image(img))
+	return sf
+
+## Effect layer with `trigger` (BulletEffectLayerData2D.EFFECT_*).
+static func make_effect_layer(trigger: int, frames: int = 1) -> BulletEffectLayerData2D:
+	var l := BulletEffectLayerData2D.new()
+	l.trigger = trigger
+	l.sprite_frames = make_effect_frames(frames)
+	return l
+
+## Flat Curve at `value` with a wide value range (Curve clamps to [0, 1] by default).
+static func make_flat_curve(value: float) -> Curve:
+	var c := Curve.new()
+	c.min_value = -10000.0
+	c.max_value = 10000.0
+	c.add_point(Vector2(0, value))
+	c.add_point(Vector2(1, value))
 	return c

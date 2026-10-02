@@ -228,6 +228,15 @@ protected:
 		real_t duration_sec = 0.0;
 		bool face_movement_direction = true;
 		real_t face_rotation_speed = 18.0;
+		// Last applied offset + the volley clock it was sampled at. The tick
+		// applies (now - last) so the per-frame deltas telescope exactly; a
+		// reconstructed "previous" sample drifted for distance-phased waves
+		// (the ledger also grows by wind/gravity/acceleration). Any reseed
+		// resets has_last, and a clock jump (wake rewind, manual
+		// set_curves_elapsed_time) falls back to the analytic previous.
+		bool has_last = false;
+		real_t last_offset = 0.0;
+		double last_time = 0.0;
 	};
 
 	// Single evaluation point for the wobble waveform so the now/prev tick
@@ -435,12 +444,15 @@ public:
 		const real_t s2 = Math::fmod(clamped_dist, len);
 		const int64_t l1 = (int64_t)(prev_dist / len);
 		const int64_t l2 = (int64_t)(clamped_dist / len);
-		const Vector2 start = curve->sample_baked(0.0);
-		const Vector2 end = curve->sample_baked(len * 0.9999);
-		const Vector2 disp = end - start;
-		const Vector2 p1 = l1 * disp + (curve->sample_baked(s1) - start);
-		const Vector2 p2 = l2 * disp + (curve->sample_baked(s2) - start);
-		Vector2 local_delta = p2 - p1;
+		// p2 - p1 = (l2 - l1) * disp + sample(s2) - sample(s1): the curve
+		// start cancels, and the lap displacement only matters on the tick a
+		// lap boundary is crossed. Two sample_baked calls per bullet per tick
+		// instead of four.
+		Vector2 local_delta = curve->sample_baked(s2) - curve->sample_baked(s1);
+		if (l2 != l1) {
+			const Vector2 disp = curve->sample_baked(len * 0.9999) - curve->sample_baked(0.0);
+			local_delta += (real_t)(l2 - l1) * disp;
+		}
 		// Reuse advance_dist (== |velocity_delta|, unchanged since entry) instead
 		// of a second length() sqrt per bullet per tick.
 		if (advance_dist > 0.0001 && local_delta.length_squared() > 0.00000001) {
@@ -653,6 +665,15 @@ public:
 			all_shared_homing_reached.resize(amount_bullets);
 		}
 
+		// Texture-rotation strip for the physics shape, hoisted: rotated_local
+		// recomputed the same sin/cos for every bullet every tick.
+		const bool strip_texture_rotation = cache_texture_rotation_radians != 0.0;
+		const real_t strip_cos = strip_texture_rotation ? (real_t)Math::cos(-cache_texture_rotation_radians) : (real_t)1.0;
+		const real_t strip_sin = strip_texture_rotation ? (real_t)Math::sin(-cache_texture_rotation_radians) : (real_t)0.0;
+		const bool has_shape_offset = cache_collision_shape_offset != Vector2(0, 0);
+
+		{ // One node inverse for the whole movement loop (trail writes convert per bullet); no user code runs inside.
+		NodeInverseScope tick_inverse_scope(this);
 		for (int i : active_bullet_indexes) {
 			if (i < 0 || i >= amount_bullets) {
 				continue;
@@ -823,9 +844,14 @@ public:
 		// to it. Lateral mode steers the heading too, so the same follow
 		// points snakes along their path.
 		if (is_wobble_feature_enabled && i >= 0 && i < (int)all_bullet_wobble.size() && all_bullet_wobble[i].active) {
-			const WobbleSeed &w = all_bullet_wobble[i];
+			WobbleSeed &w = all_bullet_wobble[i];
 			const real_t t = (real_t)curves_elapsed_time;
 			bool in_window = t >= w.delay_sec && (w.duration_sec <= 0.0 || t < w.delay_sec + w.duration_sec);
+			if (!in_window) {
+				// Leaving (or not yet in) the window: the next entry starts
+				// from the analytic baseline, exactly as before.
+				w.has_last = false;
+			}
 			if (in_window && w.frequency_hz >= 0.0 && w.amplitude >= 0.0) {
 				const real_t phase_base = w.distance_phased && i >= 0 && i < (int)wobble_distance_traveled.size()
 						? wobble_distance_traveled[i] * 0.02
@@ -835,7 +861,11 @@ public:
 				const real_t prev_t = t - (real_t)delta;
 				const bool prev_in = prev_t >= w.delay_sec && (w.duration_sec <= 0.0 || prev_t < w.delay_sec + w.duration_sec);
 				real_t prev_off = 0.0;
-				if (prev_in && delta > 0.0) {
+				const bool clock_continuous = w.has_last && Math::abs((curves_elapsed_time - delta) - w.last_time) < 1e-6;
+				if (clock_continuous) {
+					// Exact: the offset actually applied last tick.
+					prev_off = w.last_offset;
+				} else if (prev_in && delta > 0.0) {
 					const real_t prev_base = w.distance_phased && i >= 0 && i < (int)wobble_distance_traveled.size()
 							? (wobble_distance_traveled[i] - (curr_bullet_direction * all_cached_speed[i]).length() * (real_t)delta) * 0.02
 							: prev_t;
@@ -843,6 +873,13 @@ public:
 					prev_off = w.amplitude * prev_damp * evaluate_wobble_waveform(w.waveform, Math::TAU * w.frequency_hz * prev_base + w.phase);
 				}
 				const real_t frame_delta = now_off - prev_off;
+				if (Math::is_finite(now_off)) {
+					w.has_last = true;
+					w.last_offset = now_off;
+					w.last_time = curves_elapsed_time;
+				} else {
+					w.has_last = false;
+				}
 				if (Math::is_finite(frame_delta) && Math::abs(frame_delta) > 0.00001) {
 					if (w.mode == 1) {
 						curr_bullet_direction = curr_bullet_direction.rotated(Math::deg_to_rad(frame_delta));
@@ -1221,13 +1258,26 @@ public:
 			// strip the texture-only offset.
 			if (!rotate_only_textures) {
 				curr_shape_transf = curr_bullet_transf;
-				if (cache_texture_rotation_radians != 0.0) {
-					curr_shape_transf = curr_shape_transf.rotated_local(-cache_texture_rotation_radians);
+				if (strip_texture_rotation) {
+					// Same as rotated_local(-texture_rotation): basis * R.
+					const Vector2 c0 = curr_shape_transf.columns[0];
+					const Vector2 c1 = curr_shape_transf.columns[1];
+					curr_shape_transf.columns[0] = c0 * strip_cos + c1 * strip_sin;
+					curr_shape_transf.columns[1] = c1 * strip_cos - c0 * strip_sin;
 				}
 			}
 			Vector2 rotated_offset = Vector2(0, 0);
-			if (cache_collision_shape_offset != Vector2(0, 0)) {
-				rotated_offset = cache_collision_shape_offset.rotated(curr_shape_transf.get_rotation());
+			if (has_shape_offset) {
+				// Rotate by the shape's facing (column 0 direction) without
+				// atan2 + sin/cos: same result as rotated(get_rotation()).
+				const Vector2 facing = curr_shape_transf.columns[0];
+				const real_t facing_len = facing.length();
+				if (facing_len > (real_t)0.0) {
+					const Vector2 f = facing / facing_len;
+					rotated_offset = Vector2(f.x * cache_collision_shape_offset.x - f.y * cache_collision_shape_offset.y, f.y * cache_collision_shape_offset.x + f.x * cache_collision_shape_offset.y);
+				} else {
+					rotated_offset = cache_collision_shape_offset;
+				}
 			}
 			curr_shape_origin = curr_bullet_origin + rotated_offset;
 			curr_shape_transf.set_origin(curr_shape_origin);
@@ -1287,6 +1337,7 @@ public:
 				all_cached_velocity[i] = all_cached_direction[i] * all_cached_speed[i] + inherited_velocity_offset + ((i >= 0 && i < (int)all_gravity_velocity.size()) ? all_gravity_velocity[i] : Vector2(0, 0));
 			}
 		}
+		} // tick_inverse_scope
 		if (!is_using_physics_interpolation) {
 			batch_flush_instance_transforms();
 		}
@@ -1312,8 +1363,9 @@ public:
 				// check we're still alive before touching anything below (queue_free is caught by the second check).
 				// reject via the factory guards).
 				if (ObjectDB::get_instance(ObjectID(drain_self_id)) != this) {
-					collision_scratch.clear();
-					break;
+					// Freed: every member (collision_scratch included) is gone,
+					// so touching anything here would be use-after-free.
+					return;
 				}
 				if (is_queued_for_deletion()) {
 					collision_scratch.clear();
@@ -3610,6 +3662,9 @@ public:
 	// record is fully handled (return), 2 = bounced but the hit is consumed
 	// too (fall through into normal counting/signals). Implemented in the
 	// .cpp (needs scene-tree + shape classes).
+	// Queue-time target motion is only needed while bouncing is armed (a
+	// later arm falls back to the drain's live read).
+	bool wants_queued_target_motion() const override { return bounce_enabled(); }
 	int try_handle_bounce(CollisionType collision_type, int bullet_index, int64_t entered_instance_id, Vector2 queued_target_velocity, bool queued_velocity_valid, Vector2 queued_target_position, bool queue_position_valid) override;
 
 	// Virtual methods
