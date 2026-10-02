@@ -166,6 +166,7 @@ helper_diamond_diagonal_x = 255.0
 helper_path2d_path = NodePath("../Paths/Path2D")
 burst_enabled = true
 spin_enabled = true
+spin_mode = 1
 homing_node_group = &"player"
 homing_target_path = NodePath("../Player")
 shared_homing_auto_pop_after_target_reached = true

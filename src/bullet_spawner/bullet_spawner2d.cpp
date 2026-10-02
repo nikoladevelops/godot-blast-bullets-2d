@@ -168,6 +168,14 @@ static constexpr int kMaxOutlineLayers = 64; // helper_outline_layer_count + hel
 static constexpr int kMaxPreviewTrackPoints = 256; // path/cross track decimation stride target
 static constexpr int kMaxCrossTrackSteps = 256; // cross arm radial density cap
 static constexpr int kPreviewZIndex = 4000; // dots + arrows layers
+static constexpr int kPreviewDenseDots = 500; // LOD gate: above this many
+// dots _draw() strides dots/rings and drops arrowheads (per-item canvas
+// calls scale linearly; a spinning 1500-dot runtime preview repainting
+// 1500 circles + 1500 head polygons + arcs every frame is the observed
+// spin-pose frame cliff). Budget: ~500 simple glyphs keeps the gizmo under
+// ~2ms/frame; below it every glyph draws exactly as before, so all
+// coincidence/rotation suites (tens of dots) are blind to the gate. Stride
+// is deterministic (every k-th dot from 0).
 static constexpr float kFirstDotRadiusScale = 1.6f; // bullet-0 emphasis marker
 
 // Global shoot_once() nesting depth across ALL spawners sharing this module.
@@ -325,7 +333,10 @@ void PatternPreviewLayer2D::_draw() {
         // the emphasis marker if it drew first.
         // posed() applies the draw-time spin so the snapshot can stay
         // unspun (an advancing spin must not force a geometry rebuild).
-        for (int i = 0; i < dots.size(); i++) {
+        // Dense LOD (see kPreviewDenseDots): deterministic stride, same
+        // glyphs, ~2k items max instead of N.
+        const int dot_stride = (dots.size() > kPreviewDenseDots) ? (int)((dots.size() + kPreviewDenseDots - 1) / kPreviewDenseDots) : 1;
+        for (int i = 0; i < dots.size(); i += dot_stride) {
             const Vector2 p = posed(dots[i]);
             if (!p.is_finite() || dot_radius <= 0.0f) {
                 continue;
@@ -340,8 +351,10 @@ void PatternPreviewLayer2D::_draw() {
         }
         // Collision-ring overlay: bounding-radius outline per dot so the
         // editor shows hitbox vs visual. Snapshot radius; <= 0 hides.
+        // Same dense stride as the dots so shown rings match shown dots
+        // (a full 24-seg arc per dot is the single most expensive glyph).
         if (ring_radius > 0.0f && ring_width > 0.0f) {
-            for (int i = 0; i < dots.size(); i++) {
+            for (int i = 0; i < dots.size(); i += dot_stride) {
                 const Vector2 p = posed(dots[i]);
                 if (!p.is_finite()) {
                     continue;
@@ -366,9 +379,12 @@ void PatternPreviewLayer2D::_draw() {
     // pairs renders exactly what N draw_line calls would (same color, width,
     // no antialiasing), but the 10k-arrow editor case drops from 10k+ canvas
     // items to one. Heads stay per-arrow polygons (varying triangles cannot
-    // batch). draw_scratch is free here (dots branch only).
+    // batch) below the dense gate; above it heads drop and shafts alone
+    // carry the direction (same kPreviewDenseDots rule as the dots branch).
+    // draw_scratch is free here (dots branch only).
     draw_scratch.clear();
     const bool want_shafts = arrow_length > 0.0f && arrow_width > 0.0f;
+    const bool want_heads = count <= kPreviewDenseDots && arrow_head_length > 0.0f && arrow_head_width > 0.0f;
     for (int i = 0; i < count; i++) {
         const Vector2 dir = posed_dir(arrow_dirs[i]);
         const Vector2 tail = posed(arrow_tails[i]);
@@ -377,7 +393,7 @@ void PatternPreviewLayer2D::_draw() {
         }
         const Vector2 tip = tail + dir * arrow_length;
         const float head_len = MIN(arrow_head_length, arrow_length);
-        if (!(head_len > 0.0f) || !(arrow_head_width > 0.0f)) {
+        if (!want_heads || !(head_len > 0.0f) || !(arrow_head_width > 0.0f)) {
             if (want_shafts) {
                 draw_scratch.push_back(tail);
                 draw_scratch.push_back(tip);

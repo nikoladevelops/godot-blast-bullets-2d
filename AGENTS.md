@@ -236,6 +236,11 @@ pause/resume with overlaps in flight; 10k cap boundaries (10000 ok, 10001
 rejected); maxed queues/timers (64); same-frame expiry+respawn; deferred
 calls from collision handlers; teleport-into-wall; coincident aim/target;
 zero-radius orbit; negative speeds under curves.
+- First-spawn hitch: a cold 1500-bullet shot costs ~50ms (full area/RID
+  alloc), pooled re-shots ~1ms. Pre-warm startup-critical patterns with
+  `populate_bullets_pool(BulletFactory2D.debug_expected_pool_key(data),
+  data, n)`; `free_active_bullets()` DESTROYS (cold again), only
+  clear/expiry park. Spin itself costs ~0 (pinned in test_spawner_spin_bench).
 
 ## 14. Performance rules (tick code is sacred)
 

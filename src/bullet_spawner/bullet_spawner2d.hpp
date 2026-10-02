@@ -90,12 +90,21 @@ class PatternPreviewLayer2D : public Node2D {
         // only has to set this float and queue a repaint - no 10k-element
         // rebuild per frame. Radians; 0 disables the rotation.
         real_t spin_radians = 0.0;
+        // Cached trig for the pose below: posed()/posed_dir() run per point
+        // per repaint (dots + tails + dirs = 3xN sin/cos pairs at N dots),
+        // so the setter folds sin/cos once here. Same rotation as
+        // Vector2::rotated() (x*c - y*s, x*s + y*c); coincidence tests run
+        // at pixel tolerance, far above any ulp reorder.
+        real_t spin_cos = 1.0;
+        real_t spin_sin = 0.0;
 
         void set_spin_radians(real_t p_radians) {
             if (!Math::is_finite(p_radians) || Math::is_equal_approx((double)p_radians, (double)spin_radians)) {
                 return;
             }
             spin_radians = p_radians;
+            spin_cos = Math::cos(spin_radians);
+            spin_sin = Math::sin(spin_radians);
             queue_redraw();
         }
 
@@ -107,13 +116,13 @@ class PatternPreviewLayer2D : public Node2D {
             if (spin_radians == 0.0) {
                 return p;
             }
-            return p.rotated(spin_radians);
+            return Vector2(p.x * spin_cos - p.y * spin_sin, p.x * spin_sin + p.y * spin_cos);
         }
         _ALWAYS_INLINE_ Vector2 posed_dir(const Vector2 &p) const {
             if (spin_radians == 0.0) {
                 return p;
             }
-            return p.rotated(spin_radians);
+            return Vector2(p.x * spin_cos - p.y * spin_sin, p.x * spin_sin + p.y * spin_cos);
         }
 
         void set_dots_data(const PackedVector2Array &p_dots, const Color &p_color, float p_radius);
