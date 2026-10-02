@@ -138,15 +138,27 @@ func _settle(factory: BulletFactory2D) -> void:
 
 
 
-func _preamble() -> void:
+func _connect_signals() -> void:
+	_clear_signals()
 	factory.directional_bounce_body_entered.connect(_on_bounce_body)
 	factory.directional_bounce_area_entered.connect(_on_bounce_area)
 	factory.directional_body_entered.connect(_on_norm_body)
 
 
-func test_defaults_feature_off_normal_path_intact() -> void:
-	_preamble()
+## Shared arena for the T1..T28 tests (split out of one 1,700-line test):
+## the signal buckets plus T0's bounce wall (layer value 8) at (200, 0) that
+## every section implicitly relied on. Returns the wall for the sections that
+## move it.
+func _arena() -> StaticBody2D:
+	_connect_signals()
+	var wall := _make_wall(Vector2(200, 0), 8)
+	await physics()
+	return wall
+
+
+func test_t0_defaults_feature_off_normal_path_intact() -> void:
 	# BOUNCE T0 defaults: feature off, normal path intact
+	_connect_signals()
 	var d0 := _bounce_data(Vector2.ZERO, 0.0, 300.0, [], [4])
 	assert_true(d0.bounce_mask == 0, "bounce_mask defaults 0")
 	assert_true(d0.bounce_strength == 1.0, "bounce_strength defaults 1")
@@ -171,8 +183,12 @@ func test_defaults_feature_off_normal_path_intact() -> void:
 	assert_true(v0.debug_get_bounce_info(0).get("bounce_enabled", true) == false, "debug info reports disabled")
 	assert_true(v0.debug_get_bounce_info(99).get("valid", true) == false, "debug info OOB invalid")
 	assert_true(v0.bullet_get_bounce_count(99) == 0, "bounce count OOB reads 0")
+	expect_error_sequence(["Invalid bullet index in bullet_get_bounce_count"])
 
+
+func test_t1_free_bounce_wall_reflects_bullet_lives_no_hit_consumed() -> void:
 	# BOUNCE T1 free bounce: wall reflects, bullet lives, no hit consumed
+	await _arena()
 	await _settle(factory)
 	var d1 := _bounce_data(Vector2.ZERO, 0.0, 300.0, [4], [4])
 	var v1: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d1)
@@ -193,7 +209,10 @@ func test_defaults_feature_off_normal_path_intact() -> void:
 	assert_true(absf(spd1 - 300.0) < 30.0, "elastic strength preserves speed")
 	assert_true(v1.get_bullet_velocity(0).is_finite() and v1.get_bullet_transform(0).is_finite(), "post-bounce state finite")
 
+
+func test_t1b_body_area_pair_on_one_target_single_bounce_no_double_flip() -> void:
 	# BOUNCE T1b body+area pair on one target: single bounce, no double-flip
+	await _arena()
 	await _settle(factory)
 	var eye := Area2D.new()
 	eye.position = Vector2(200, 0)
@@ -219,7 +238,10 @@ func test_defaults_feature_off_normal_path_intact() -> void:
 	eye.queue_free()
 	await idle(1)
 
+
+func test_t2_consumed_bounce_bounce_normal_fire_bullet_dies_at_max_1() -> void:
 	# BOUNCE T2 consumed bounce: bounce + normal fire, bullet dies at max 1
+	await _arena()
 	await _settle(factory)
 	var d2 := _bounce_data(Vector2.ZERO, 0.0, 300.0, [4], [4])
 	d2.bounce_hit_consumed = true
@@ -233,7 +255,10 @@ func test_defaults_feature_off_normal_path_intact() -> void:
 	assert_true(not v2.is_bullet_status_enabled(0), "consumed bounce kills at max 1")
 	assert_true(v2.get_bullet_collision_count(0) >= 1, "consumed hit counted")
 
+
+func test_t3_strength_scaling() -> void:
 	# BOUNCE T3 strength scaling
+	await _arena()
 	await _settle(factory)
 	var d3 := _bounce_data(Vector2.ZERO, 0.0, 300.0, [4], [4])
 	d3.bounce_strength = 0.5
@@ -255,7 +280,10 @@ func test_defaults_feature_off_normal_path_intact() -> void:
 	assert_true(v3b.get_bullet_velocity(0).length() < 5.0, "strength 0 dead-stops")
 	assert_true(v3b.is_bullet_status_enabled(0), "dead-stop bullet stays alive (free)")
 
+
+func test_t4_ping_pong_between_two_walls_max_count_gates_back_to_normal() -> void:
 	# BOUNCE T4 ping-pong between two walls, max_count gates back to normal
+	await _arena()
 	await _settle(factory)
 	var wall_l := _make_wall(Vector2(-200, 0), 8)
 	await physics()
@@ -273,7 +301,10 @@ func test_defaults_feature_off_normal_path_intact() -> void:
 	wall_l.queue_free()
 	await idle(1)
 
+
+func test_t5_mask_precedence_bounce_layer_wins_plain_layer_stays_normal() -> void:
 	# BOUNCE T5 mask precedence: bounce layer wins, plain layer stays normal
+	var wall := await _arena()
 	await _settle(factory)
 	var plain := _make_wall(Vector2(200, 220), 16, Vector2(20, 120))
 	await physics()
@@ -287,7 +318,10 @@ func test_defaults_feature_off_normal_path_intact() -> void:
 	plain.queue_free()
 	await idle(1)
 
+
+func test_t6_spawner_ownership_spawner_signal_only_factory_silent() -> void:
 	# BOUNCE T6 spawner ownership: spawner signal only, factory silent
+	await _arena()
 	await _settle(factory)
 	factory.directional_bounce_body_entered.connect(_on_factory_bounce)
 	var spawner := BulletSpawner2D.new()
@@ -309,7 +343,10 @@ func test_defaults_feature_off_normal_path_intact() -> void:
 	spawner.queue_free()
 	await idle(1)
 
+
+func test_t7_precise_mode_on_45_degree_wall_reflects_across_face() -> void:
 	# BOUNCE T7 precise mode on 45-degree wall reflects across face
+	var wall := await _arena()
 	await _settle(factory)
 	wall.position.x = 2000.0
 	await physics()
@@ -336,7 +373,10 @@ func test_defaults_feature_off_normal_path_intact() -> void:
 	var dir7b: Vector2 = v7b.get_bullet_direction(0)
 	assert_true(dir7b.x < -0.9, "radial mode on flat wall still reflects to -X")
 
+
+func test_t8_smooth_visual_pursuit_lags_then_converges() -> void:
 	# BOUNCE T8 smooth visual pursuit lags then converges
+	await _arena()
 	await _settle(factory)
 	var d8 := _bounce_data(Vector2.ZERO, 0.0, 300.0, [4], [4])
 	d8.bounce_rotation_smooth = 3.0
@@ -359,7 +399,10 @@ func test_defaults_feature_off_normal_path_intact() -> void:
 	assert_true(lag2 < 0.15, "smooth visual converges onto heading")
 	assert_true(v8.debug_get_bounce_info(0).get("visual_pending", true) == false, "pursuit flag clears on arrival")
 
+
+func test_t9_mixes_homing_wobble_gravity_curves_stay_finite() -> void:
 	# BOUNCE T9 mixes: homing + wobble + gravity + curves stay finite
+	await _arena()
 	await _settle(factory)
 	var hunter := Node2D.new()
 	# Ahead of the wall: homing drives the bullet INTO the wall (a target
@@ -393,12 +436,17 @@ func test_defaults_feature_off_normal_path_intact() -> void:
 			break
 	assert_true(_bounce_body.size() >= 1, "rotate_texture=false still bounces ballistically")
 
+
+func test_t10_rejects_fuzz_pool_reuse_neutrality() -> void:
 	# BOUNCE T10 rejects + fuzz + pool-reuse neutrality
+	await _arena()
 	var dr := _bounce_data(Vector2.ZERO, 0.0, 300.0, [4], [4])
 	var keep_strength: float = dr.bounce_strength
 	dr.set_bounce_strength(NAN)
+	expect_error_sequence(["DirectionalBulletsData2D: bounce_strength must be finite and >= 0"])
 	assert_true(dr.bounce_strength == keep_strength, "NaN strength rejected")
 	dr.set_bounce_strength(-1.0)
+	expect_error_sequence(["DirectionalBulletsData2D: bounce_strength must be finite and >= 0"])
 	assert_true(dr.bounce_strength == keep_strength, "negative strength rejected")
 	dr.set_bounce_strength(5.0)
 	assert_true(dr.bounce_strength == 5.0, "strength uncapped (5.0 accepted)")
@@ -407,14 +455,19 @@ func test_defaults_feature_off_normal_path_intact() -> void:
 			assert_true(int(p.get("hint", -1)) == PROPERTY_HINT_NONE, "no editor cap on strength (plain float, user decides)")
 	var keep_mask: int = dr.bounce_mask
 	dr.set_bounce_mask(-1)
+	expect_error_sequence(["DirectionalBulletsData2D: bounce_mask must be >= 0"])
 	assert_true(dr.bounce_mask == keep_mask, "negative mask rejected")
 	dr.set_bounce_mode(7)
+	expect_error_sequence(["DirectionalBulletsData2D: bounce_mode must be"])
 	assert_true(dr.bounce_mode == 0, "bad mode rejected")
 	dr.set_bounce_randomness_deg(999.0)
+	expect_error_sequence(["DirectionalBulletsData2D: bounce_randomness_deg must be finite"])
 	assert_true(dr.bounce_randomness_deg == 0.0, "randomness > 180 rejected")
 	dr.set_bounce_cooldown_sec(9.0)
+	expect_error_sequence(["DirectionalBulletsData2D: bounce_cooldown_sec must be finite in [0, 1]"])
 	assert_true(dr.bounce_cooldown_sec == 0.05, "cooldown > 1 rejected")
 	dr.set_bounce_max_count(-3)
+	expect_error_sequence(["DirectionalBulletsData2D: bounce_max_count must be"])
 	assert_true(dr.bounce_max_count == 0, "negative max count rejected")
 	await _settle(factory)
 	var vr: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(dr)
@@ -436,7 +489,10 @@ func test_defaults_feature_off_normal_path_intact() -> void:
 	assert_true(plain2.bullet_get_bounce_count(0) == 0, "pooled reuse zeroes bounce ledger")
 	assert_true(factory.debug_assert_no_dangling().get("ok", false) == true, "no dangling after bounce churn")
 
+
+func test_t11_uncapped_strength_5x_reflection_50x_never_clamps() -> void:
 	# BOUNCE T11 uncapped strength: 5x reflection, 50x never clamps
+	await _arena()
 	await _settle(factory)
 	var d11 := _bounce_data(Vector2.ZERO, 0.0, 300.0, [4], [4])
 	d11.bounce_strength = 5.0
@@ -465,7 +521,10 @@ func test_defaults_feature_off_normal_path_intact() -> void:
 	assert_true(absf(spd11b - 15000.0) < 1500.0, "strength 50 never clamps (15000, uncapped)")
 	assert_true(v11b.get_bullet_speed_data(0).max_speed >= 15000.0 - 1500.0, "strength 50 raises max_speed too")
 
+
+func test_t11b_boost_survives_speed_curve_overwrite() -> void:
 	# BOUNCE T11b boost survives speed-curve overwrite
+	await _arena()
 	await _settle(factory)
 	var d11c := _bounce_data(Vector2.ZERO, 0.0, 300.0, [4], [4])
 	d11c.bounce_strength = 2.0
@@ -492,7 +551,10 @@ func test_defaults_feature_off_normal_path_intact() -> void:
 		await physics()
 	assert_true(absf(v11c.get_bullet_velocity(0).length() - 600.0) < 90.0, "boost survives curve removal")
 
+
+func test_t12_cooldown_vs_consumed_pair_counts_once_re_hit_counts() -> void:
 	# BOUNCE T12 cooldown vs consumed: pair counts once, re-hit counts
+	await _arena()
 	await _settle(factory)
 	var eye2 := Area2D.new()
 	eye2.position = Vector2(200, 0)
@@ -522,7 +584,9 @@ func test_defaults_feature_off_normal_path_intact() -> void:
 	var d12b := _bounce_data(Vector2.ZERO, 0.0, 300.0, [4], [4])
 	d12b.bounce_hit_consumed = true
 	d12b.set_bullet_max_collision_count(10)
-	d12b.bounce_cooldown_sec = 5.0
+	# Legal maximum (range [0, 1]): this used to say 5.0, which the setter
+	# rejected, so the test silently ran with the 0.05 default cooldown.
+	d12b.bounce_cooldown_sec = 1.0
 	var v12b: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d12b)
 	for i in 120:
 		await physics()
@@ -535,7 +599,10 @@ func test_defaults_feature_off_normal_path_intact() -> void:
 	assert_true(v12b.bullet_get_bounce_count(0) == 1, "cooldown re-hit does not re-bounce")
 	assert_true(v12b.get_bullet_collision_count(0) >= 2, "cooldown re-hit still counts when consumed")
 
+
+func test_t13_snap_keeps_render_position_continuous() -> void:
 	# BOUNCE T13 snap keeps render position continuous
+	await _arena()
 	await _settle(factory)
 	factory.set_use_physics_interpolation_runtime(true)
 	factory.directional_bounce_body_entered.connect(_on_bounce_capture)
@@ -560,7 +627,10 @@ func test_defaults_feature_off_normal_path_intact() -> void:
 		assert_true(cap_prev.is_finite() and cap_cur.is_finite(), "prev/current finite")
 	factory.set_use_physics_interpolation_runtime(false)
 
+
+func test_t14_precise_mode_on_capsule_wall_uses_cap_normal() -> void:
 	# BOUNCE T14 precise mode on capsule wall uses cap normal
+	var wall := await _arena()
 	await _settle(factory)
 	wall.position.x = 2000.0
 	await physics()
@@ -590,7 +660,10 @@ func test_defaults_feature_off_normal_path_intact() -> void:
 	wall.position.x = 200.0
 	await idle(1)
 
+
+func test_t15_teleport_into_wall_bounces_fresh_overlap() -> void:
 	# BOUNCE T15 teleport into wall bounces fresh overlap
+	await _arena()
 	await _settle(factory)
 	var v15: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(_bounce_data(Vector2.ZERO, 0.0, 300.0, [4], [4]))
 	v15.teleport_bullet(0, Vector2(195, 0))
@@ -602,7 +675,10 @@ func test_defaults_feature_off_normal_path_intact() -> void:
 	assert_true(v15.bullet_get_bounce_count(0) >= 1, "teleport bounce counted")
 	assert_true(v15.get_bullet_direction(0).x < -0.5, "teleport bounce heads out")
 
+
+func test_t16_attachment_rides_the_escape_nudge() -> void:
 	# BOUNCE T16 attachment rides the escape nudge
+	await _arena()
 	await _settle(factory)
 	var Probe := preload("res://tests/scenes/attachment_probe.gd")
 	var probe_node := BulletAttachment2D.new()
@@ -624,10 +700,15 @@ func test_defaults_feature_off_normal_path_intact() -> void:
 		var miss16: float = att16.global_position.distance_to(v16.get_bullet_global_transform(0).origin)
 		assert_true(miss16 < 5.0, "attachment tracks nudged bullet")
 
+
+func test_t17_lifetime_expiry_inside_cooldown_is_clean() -> void:
 	# BOUNCE T17 lifetime expiry inside cooldown is clean
+	await _arena()
 	await _settle(factory)
 	var d17 := _bounce_data(Vector2.ZERO, 0.0, 600.0, [4], [4])
-	d17.bounce_cooldown_sec = 5.0
+	# Legal maximum (range [0, 1]): this used to say 5.0, which the setter
+	# rejected, so the test silently ran with the 0.05 default cooldown.
+	d17.bounce_cooldown_sec = 1.0
 	d17.max_life_time = 0.5
 	var v17: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d17)
 	for i in 120:
@@ -642,7 +723,10 @@ func test_defaults_feature_off_normal_path_intact() -> void:
 	assert_true(not v17.is_bullet_status_enabled(0), "bullet expires inside cooldown window")
 	assert_true(factory.debug_assert_no_dangling().get("ok", false) == true, "no dangling after cooldown expiry")
 
+
+func test_t18_spawner_retarget_keeps_bounce_config_live() -> void:
 	# BOUNCE T18 spawner retarget keeps bounce config live
+	await _arena()
 	await _settle(factory)
 	var sp18 := BulletSpawner2D.new()
 	sp18.bullet_factory_path = factory.get_path()
@@ -671,7 +755,10 @@ func test_defaults_feature_off_normal_path_intact() -> void:
 	sp18.queue_free()
 	await idle(1)
 
+
+func test_t19_bulk_bounce_counts() -> void:
 	# BOUNCE T19 bulk bounce counts
+	await _arena()
 	await _settle(factory)
 	var d19 := DirectionalBulletsData2D.new()
 	d19.sprite_frames = H.make_sprite_frames()
@@ -702,7 +789,10 @@ func test_defaults_feature_off_normal_path_intact() -> void:
 	var counts19: Array = v19.all_bullets_get_bounce_count()
 	assert_true(counts19.size() == 3 and int(counts19[0]) == 1 and int(counts19[1]) == 1 and int(counts19[2]) == 1, "bulk counts track every bullet")
 
+
+func test_t20_inspector_groups_stay_coherent() -> void:
 	# BOUNCE T20 inspector groups stay coherent
+	await _arena()
 	var data20 := DirectionalBulletsData2D.new()
 	data20.sprite_frames = H.make_sprite_frames()
 	var props20: Array = data20.get_property_list()
@@ -875,6 +965,7 @@ func test_defaults_feature_off_normal_path_intact() -> void:
 			vbounced = false
 	assert_true(vbounced, "all 12 live bounce props grouped with Bounce")
 	var spawner20 := BulletSpawner2D.new()
+	spawner20.set_shooting_enabled(false) # inspector-only fixture: never auto-fire
 	add(spawner20)
 	await idle(1)
 	var groups_found := {}
@@ -979,7 +1070,10 @@ func test_defaults_feature_off_normal_path_intact() -> void:
 	spawner20.queue_free()
 	await idle(1)
 
+
+func test_t21_runtime_toggles_and_gravity_flag_refresh() -> void:
 	# BOUNCE T21 runtime toggles and gravity flag refresh
+	await _arena()
 	await _settle(factory)
 	var v21: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(_bounce_data(Vector2.ZERO, 0.0, 300.0, [], [4]))
 	assert_true(v21.debug_get_bounce_info(0).get("bounce_enabled", true) == false, "starts disarmed")
@@ -1014,14 +1108,19 @@ func test_defaults_feature_off_normal_path_intact() -> void:
 		await physics()
 	assert_true(v21g.bullet_get_fall_speed(0) < 5.0, "zeroed gravity holds fall speed")
 
+
+func test_t22_same_target_debounce_stuck_bullet_bounces_once_per_window() -> void:
 	# BOUNCE T22 same-target debounce: stuck bullet bounces once per window
+	var wall := await _arena()
 	await _settle(factory)
 	var d22 := _bounce_data(Vector2(100, 0), 0.0, 0.0, [4], [4])
 	assert_true(d22.bounce_debounce_sec == 0.15, "debounce defaults 0.15")
 	var keep_deb: float = d22.bounce_debounce_sec
 	d22.set_bounce_debounce_sec(NAN)
+	expect_error_sequence(["DirectionalBulletsData2D: bounce_debounce_sec must be finite and >= 0"])
 	assert_true(d22.bounce_debounce_sec == keep_deb, "NaN debounce rejected")
 	d22.set_bounce_debounce_sec(-1.0)
+	expect_error_sequence(["DirectionalBulletsData2D: bounce_debounce_sec must be finite and >= 0"])
 	assert_true(d22.bounce_debounce_sec == keep_deb, "negative debounce rejected")
 	d22.bounce_cooldown_sec = 0.0
 	var v22: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d22)
@@ -1049,7 +1148,10 @@ func test_defaults_feature_off_normal_path_intact() -> void:
 		await physics()
 	assert_true(v22b.bullet_get_bounce_count(0) >= 12, "debounce 0 bounces every re-entry (got %d)" % v22b.bullet_get_bounce_count(0))
 
+
+func test_t22b_debounce_is_per_target_alternating_walls_bounce_freely() -> void:
 	# BOUNCE T22b debounce is per-target: alternating walls bounce freely
+	await _arena()
 	await _settle(factory)
 	var wall_b := _make_wall(Vector2(-200, 0), 8)
 	await physics()
@@ -1066,7 +1168,10 @@ func test_defaults_feature_off_normal_path_intact() -> void:
 	wall_b.queue_free()
 	await idle(1)
 
+
+func test_t23_moving_targets_push_surges_head_on_amplifies_separating_swal() -> void:
 	# BOUNCE T23 moving targets: push surges, head-on amplifies, separating swallows
+	var wall := await _arena()
 	await _settle(factory)
 	var pusher := RigidBody2D.new()
 	pusher.position = Vector2(-150, 0)
@@ -1126,7 +1231,10 @@ func test_defaults_feature_off_normal_path_intact() -> void:
 	charger.queue_free()
 	await idle(1)
 
+
+func test_t23b_separating_repeats_never_re_bounce() -> void:
 	# BOUNCE T23b separating repeats never re-bounce
+	await _arena()
 	await _settle(factory)
 	var d23c := _bounce_data(Vector2(100, 0), 0.0, 300.0, [4], [4])
 	d23c.bounce_cooldown_sec = 0.0
@@ -1168,7 +1276,10 @@ func test_defaults_feature_off_normal_path_intact() -> void:
 	assert_true(v23d.get_bullet_collision_count(0) >= 5, "consumed repeats still count through the normal path")
 	assert_true(v23d.is_bullet_status_enabled(0), "max 0 never kills")
 
+
+func test_t24_push_charge_knobs_each_side_opts_out_separately() -> void:
 	# BOUNCE T24 push/charge knobs: each side opts out separately
+	await _arena()
 	await _settle(factory)
 	var d24 := _bounce_data(Vector2.ZERO, 0.0, 100.0, [4], [4])
 	assert_true(d24.bounce_push_assist == true, "push assist defaults true")
@@ -1263,7 +1374,10 @@ func test_defaults_feature_off_normal_path_intact() -> void:
 	arcade2.queue_free()
 	await idle(1)
 
+
+func test_t25_velocity_sources_characterbody_reads_area2d_stays_static() -> void:
 	# BOUNCE T25 velocity sources: CharacterBody reads, Area2D stays static
+	await _arena()
 	await _settle(factory)
 	var charlie := CharacterBody2D.new()
 	charlie.position = Vector2(200, 300)
@@ -1340,7 +1454,10 @@ func test_defaults_feature_off_normal_path_intact() -> void:
 	runner.queue_free()
 	await idle(1)
 
+
+func test_t25b_strength_0_vs_pusher_sticks_precise_moves_too() -> void:
 	# BOUNCE T25b strength 0 vs pusher sticks, precise moves too
+	var wall := await _arena()
 	await _settle(factory)
 	var pusher0 := RigidBody2D.new()
 	pusher0.position = Vector2(-150, 0)
@@ -1400,7 +1517,10 @@ func test_defaults_feature_off_normal_path_intact() -> void:
 	pusher1.queue_free()
 	await idle(1)
 
+
+func test_t25c_knob_independence_pool_ghost_boost() -> void:
 	# BOUNCE T25c knob independence + pool ghost-boost
+	await _arena()
 	await _settle(factory)
 	var d25f := _bounce_data(Vector2.ZERO, 0.0, 100.0, [4], [4])
 	d25f.bounce_push_assist = false
@@ -1488,7 +1608,10 @@ func test_defaults_feature_off_normal_path_intact() -> void:
 	var wake_spd: float = v25h.get_bullet_velocity(0).length()
 	assert_true(absf(wake_spd - 300.0) < 80.0, "wake has no ghost boost from the dead life (got %.0f)" % wake_spd)
 
+
+func test_t26_reset_semantics_multi_bullet_gravity_arc_area_routing() -> void:
 	# BOUNCE T26 reset semantics, multi-bullet, gravity arc, area routing
+	await _arena()
 	await _settle(factory)
 	var d26 := _bounce_data(Vector2.ZERO, 0.0, 300.0, [4], [4])
 	var v26: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d26)
@@ -1579,7 +1702,10 @@ func test_defaults_feature_off_normal_path_intact() -> void:
 	var v26f: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(_bounce_data(Vector2.ZERO, 0.0, 200.0, [4], [4]))
 	assert_true(v26f.get_bounce_push_assist() == true and v26f.get_bounce_charge_amplify() == true, "respawn reseeds knobs to defaults")
 
+
+func test_t27_curves_beat_surge_guard_ignores_knobs_degenerate_config() -> void:
 	# BOUNCE T27 curves beat surge, guard ignores knobs, degenerate config
+	await _arena()
 	await _settle(factory)
 	var flat27 := BulletCurvesData2D.new()
 	var flat27_curve := Curve.new()
@@ -1652,7 +1778,10 @@ func test_defaults_feature_off_normal_path_intact() -> void:
 	wall27b.queue_free()
 	await idle(1)
 
+
+func test_t28_hostile_freed_walls_nan_motion_overflow_starvation() -> void:
 	# BOUNCE T28 hostile: freed walls, NaN motion, overflow, starvation
+	var wall := await _arena()
 	await _settle(factory)
 	# T28a: freed wall mid-overlap freezes counts, volley stays finite.
 	var d28 := _bounce_data(Vector2.ZERO, 0.0, 300.0, [4], [4])
@@ -1715,7 +1844,8 @@ func test_defaults_feature_off_normal_path_intact() -> void:
 	var d28d := _bounce_data(Vector2.ZERO, 0.0, 300.0, [4], [4])
 	d28d.transforms = []
 	var v28d: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d28d)
-	assert_true(v28d == null or v28d.get_amount_bullets() == 0, "empty transforms refused-or-empty with bounce armed")
+	expect_error_sequence(["No spawn_data or no transforms were provided"])
+	assert_null(v28d, "empty transforms refused with bounce armed")
 	# T28e: subnormal strength is a finite dead-stop, heading preserved.
 	await _settle(factory)
 	var d28e := _bounce_data(Vector2.ZERO, 0.0, 300.0, [4], [4])
@@ -1737,22 +1867,26 @@ func test_defaults_feature_off_normal_path_intact() -> void:
 	# pin the fail-early contract without flaking the runner.
 	await _settle(factory)
 	var spawner28 := BulletSpawner2D.new()
+	spawner28.set_shooting_enabled(false) # manual shots only (no auto-fire spam)
 	add(spawner28)
 	await idle(1)
 	spawner28.set_bullet_factory(factory)
 	spawner28.set_spawn_data(null)
 	var fired28: int = spawner28.get_volleys_fired()
 	assert_true(spawner28.shoot_once() == false, "shoot_once with null data returns false")
+	expect_error_sequence(["BulletSpawner2D::shoot_once: no spawn_data assigned"])
 	assert_true(spawner28.get_volleys_fired() == fired28, "failed shot not counted")
 	spawner28.queue_free()
 	await idle(1)
 	# No-factory path: a spawner with data but no factory refuses cleanly.
 	var lonely28 := BulletSpawner2D.new()
+	lonely28.set_shooting_enabled(false) # manual shots only (no auto-fire spam)
 	add(lonely28)
 	await idle(1)
 	lonely28.set_spawn_data(_bounce_data(Vector2.ZERO, 0.0, 300.0, [4], [4]))
 	var lonely_fired: int = lonely28.get_volleys_fired()
 	assert_true(lonely28.shoot_once() == false, "shoot_once with no factory returns false")
+	expect_error_sequence(["BulletSpawner2D::shoot_once: no BulletFactory2D assigned"])
 	assert_true(lonely28.get_volleys_fired() == lonely_fired, "factory-less shot not counted")
 	lonely28.queue_free()
 	await idle(1)
@@ -1839,21 +1973,9 @@ func test_defaults_feature_off_normal_path_intact() -> void:
 	orbit28.queue_free()
 	lock28.queue_free()
 	await idle(1)
-	expect_errors_containing("Invalid bullet index in bullet_get_bounce_count", 1, "OOB bounce count fails loud")
-	expect_errors_containing("bounce_strength must be finite", 2, "bad strength fails loud")
-	expect_errors_containing("bounce_mask must be", 1, "bad mask fails loud")
-	expect_errors_containing("bounce_mode must be", 1, "bad mode fails loud")
-	expect_errors_containing("bounce_randomness_deg must be finite", 1, "bad randomness fails loud")
-	expect_errors_containing("bounce_cooldown_sec must be finite", 3, "bad cooldown fails loud")
-	expect_errors_containing("bounce_max_count must be", 1, "bad max count fails loud")
-	expect_errors_containing("no BulletFactory2D assigned", 1, "factory-less shot fails loud")
-	expect_errors_containing("bounce_debounce_sec must be finite", 2, "bad debounce fails loud")
-	expect_errors_containing("No spawn_data or no transforms were provided", 1, "empty spawn fails loud")
-	expect_errors_containing("no spawn_data assigned", 2, "dataless shots fail loud")
-
 
 func test_precise_mode_degenerate_shapes_fall_back_to_radial() -> void:
-	_preamble()
+	_connect_signals()
 	# BOUNCE T29 precise-mode degenerate shapes fall back to radial
 	await _settle(factory)
 	var zero29 := StaticBody2D.new()
@@ -1903,7 +2025,7 @@ func test_precise_mode_degenerate_shapes_fall_back_to_radial() -> void:
 
 
 func test_consumed_bounces_spark_once_and_still_count() -> void:
-	_preamble()
+	_connect_signals()
 	# BOUNCE T30 consumed bounces spark once and still count
 	await _settle(factory)
 	var wall30 := _make_wall(Vector2(200, 0), 8)
@@ -1922,7 +2044,7 @@ func test_consumed_bounces_spark_once_and_still_count() -> void:
 
 
 func test_setter_rejects_keep_old_values() -> void:
-	_preamble()
+	_connect_signals()
 	# BOUNCE T31 setter rejects keep old values
 	var d31 := _bounce_data(Vector2.ZERO, 0.0, 300.0, [4], [4])
 	d31.set_bounce_strength(NAN)
@@ -1952,7 +2074,7 @@ func test_setter_rejects_keep_old_values() -> void:
 
 
 func test_mover_switching_gravity_push_unlocked_orbit_spawner_routing() -> void:
-	_preamble()
+	_connect_signals()
 	# BOUNCE T32 mover switching, gravity push, unlocked orbit, spawner routing
 	await _settle(factory)
 	var push32 := RigidBody2D.new()
@@ -2086,7 +2208,7 @@ func test_mover_switching_gravity_push_unlocked_orbit_spawner_routing() -> void:
 
 
 func test_unspawned_instances_never_crash() -> void:
-	_preamble()
+	_connect_signals()
 	# BOUNCE T33 unspawned instances never crash
 	await _settle(factory)
 	var bare := DirectionalBullets2D.new()
@@ -2130,7 +2252,7 @@ func test_unspawned_instances_never_crash() -> void:
 
 
 func test_teleport_matrix_interpolation_mixing() -> void:
-	_preamble()
+	_connect_signals()
 	# BOUNCE T34 teleport matrix + interpolation mixing
 	await _settle(factory)
 	factory.set_use_physics_interpolation_runtime(false)
@@ -2186,7 +2308,7 @@ func test_teleport_matrix_interpolation_mixing() -> void:
 
 
 func test_paused_steady_overlap_drops_records_by_design() -> void:
-	_preamble()
+	_connect_signals()
 	# BOUNCE T34b pause gate: area/body callbacks drop overlap records while
 	# the factory is paused (anti-hitch by design: is_bullet_processing_paused
 	# gate in area/body_entered_func). A steady overlap held across the pause
@@ -2213,7 +2335,7 @@ func test_paused_steady_overlap_drops_records_by_design() -> void:
 
 
 func test_orbit_endurance_block_census_telegraph_zero_helper_hostility() -> void:
-	_preamble()
+	_connect_signals()
 	# BOUNCE T35 orbit endurance, block census, telegraph-zero, helper hostility
 	await _settle(factory)
 	var moon35 := Node2D.new()
@@ -2263,7 +2385,7 @@ func test_orbit_endurance_block_census_telegraph_zero_helper_hostility() -> void
 
 
 func test_stale_target_velocity_never_steers_the_bounce() -> void:
-	_preamble()
+	_connect_signals()
 	# BOUNCE T36 stale target velocity never steers the bounce
 	await _settle(factory)
 	var back36 := CharacterBody2D.new()
@@ -2293,7 +2415,7 @@ func test_stale_target_velocity_never_steers_the_bounce() -> void:
 
 
 func test_knob_matrix_every_mix_separates_stays_finite() -> void:
-	_preamble()
+	_connect_signals()
 	# BOUNCE T36b knob matrix: every mix separates, stays finite
 	await _settle(factory)
 	var mix_vels: Array = [Vector2(-400, 0), Vector2(0, 0), Vector2(100, 0), Vector2(400, 0)]
@@ -2354,7 +2476,7 @@ func test_knob_matrix_every_mix_separates_stays_finite() -> void:
 
 
 func test_queue_time_snapshot_wins_over_mid_drain_mutation() -> void:
-	_preamble()
+	_connect_signals()
 	# BOUNCE T36c queue-time snapshot wins over mid-drain mutation
 	await _settle(factory)
 	var mut36 := CharacterBody2D.new()
@@ -2398,7 +2520,7 @@ func test_queue_time_snapshot_wins_over_mid_drain_mutation() -> void:
 
 
 func test_cross_type_matrix_platforms_slopes_edges_areas_tilemaps() -> void:
-	_preamble()
+	_connect_signals()
 	# BOUNCE T37 cross-type matrix: platforms, slopes, edges, areas, tilemaps
 	await _settle(factory)
 	var crush37 := AnimatableBody2D.new()
@@ -2654,7 +2776,7 @@ func test_cross_type_matrix_platforms_slopes_edges_areas_tilemaps() -> void:
 
 
 func test_forensics_reuse_energy_shared_walls_tilemap_budgets() -> void:
-	_preamble()
+	_connect_signals()
 	# BOUNCE T38 forensics, reuse energy, shared walls, tilemap budgets
 	await _settle(factory)
 	var wall38 := _make_wall(Vector2(200, 300), 8)

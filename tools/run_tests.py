@@ -3,9 +3,12 @@
 
 Every test file runs in its own headless Godot process, in parallel:
 
-    godot --headless --verbose -d --path test_project \\
+    godot --headless --verbose --fixed-fps 60 --path test_project \\
           -s addons/gut/gut_cmdln.gd -gconfig= -gtest=<file> -gexit \\
           -gjunit_xml_file=<tmp>
+
+(no -d: the local debugger would block on stdin at the first script error;
+--fixed-fps 60: simulated time, frame-identical and ~10x faster.)
 
 A file is green only when ALL of these hold:
   1. the process exits 0,
@@ -30,6 +33,9 @@ Usage:
     python3 tools/run_tests.py --verbose       # print full output of red files
     python3 tools/run_tests.py --self-test     # prove failure + leak detection still fire
     python3 tools/run_tests.py --allow-stale   # run even if src/ is newer than the built .so
+    python3 tools/run_tests.py --report        # write test_project/test_results/summary.json
+    python3 tools/run_tests.py --realtime      # real-time pacing (default: simulated --fixed-fps 60)
+    python3 tools/run_tests.py --no-lint       # skip tools/lint_tests.py (not green)
 
 Godot binary: $GODOT_BIN, else tools/config.json "godotActivePath", else `godot`.
 """
@@ -205,12 +211,17 @@ def parse_junit(path):
     return tests, failures, details
 
 
-def run_file(godot, test, timeout, check_leaks):
+def run_file(godot, test, timeout, check_leaks, fixed_fps=60):
     with tempfile.TemporaryDirectory(prefix="blast_gut_") as tmp:
         junit = os.path.join(tmp, "results.xml")
         cmd = [godot, "--headless"]
         if check_leaks:
             cmd.append("--verbose")
+        # Simulated time: every frame advances exactly 1/fixed_fps seconds and
+        # the main loop runs as fast as the CPU allows (no real-time pacing).
+        # Frame-counted tests behave identically, wall time drops ~10x.
+        if fixed_fps > 0:
+            cmd += ["--fixed-fps", str(fixed_fps)]
         # No "-d": the local debugger would stop on the first script error
         # and wait for stdin forever (a hang, not a failure).
         cmd += ["--path", PROJECT, "-s", GUT_CLI, "-gconfig=", f"-gtest=res://{test}",
@@ -253,7 +264,7 @@ def run_file(godot, test, timeout, check_leaks):
             "details": details, "leaks": leaks, "script_errors": script_errors, "output": output, "code": code}
 
 
-def run_many(godot, tests, jobs, timeout, check_leaks, fail_fast, verbose):
+def run_many(godot, tests, jobs, timeout, check_leaks, fail_fast, verbose, fixed_fps=60):
     results = []
     stop = False
     with concurrent.futures.ThreadPoolExecutor(max_workers=jobs) as pool:
@@ -262,7 +273,7 @@ def run_many(godot, tests, jobs, timeout, check_leaks, fail_fast, verbose):
         while queue or pending:
             while queue and len(pending) < jobs and not stop:
                 test = queue.pop(0)
-                pending[pool.submit(run_file, godot, test, timeout, check_leaks)] = test
+                pending[pool.submit(run_file, godot, test, timeout, check_leaks, fixed_fps)] = test
             if not pending:
                 break
             done, _ = concurrent.futures.wait(pending, return_when=concurrent.futures.FIRST_COMPLETED)
@@ -317,10 +328,31 @@ def report(results):
     return 0
 
 
+def write_report(path, results, fixed_fps):
+    """Machine-readable run summary (slowest files first) for agents/CI."""
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    rows = [{"file": r["test"], "status": r["status"], "seconds": round(r["elapsed"], 3),
+             "tests": r["tests"], "failures": [{"test": n, "message": m} for n, m in r["details"]],
+             "leaks": r["leaks"][:20]} for r in sorted(results, key=lambda x: -x["elapsed"])]
+    payload = {"generated_unix": int(time.time()), "fixed_fps": fixed_fps,
+               "files": len(results), "tests": sum(r["tests"] for r in results),
+               "green": all(r["status"] == "PASS" for r in results), "results": rows}
+    with open(path, "w", encoding="utf-8") as handle:
+        json.dump(payload, handle, indent=2)
+    print(f"report  : {path}")
+
+
 def self_test(godot, timeout):
     """The canaries in tests_meta/ MUST be detected: a failing assert, an
-    unexpected push_error, and leaked Object/Node/RID at exit."""
+    unexpected push_error, leaked Object/Node/RID at exit, and every precise
+    error helper (expect_error_sequence / exact expect_errors_containing /
+    expect_no_errors) failing on a mismatch."""
     ok = True
+    strict = run_file(godot, "tests_meta/test_strict_helpers_canary.gd", timeout, True)
+    if strict["status"] != "FAIL" or strict["failures"] != strict["tests"] or strict["tests"] < 5:
+        print(f"SELF-TEST BROKEN: strict-helper canary reported {strict['status']} "
+              f"({strict['failures']}/{strict['tests']} failing; every test must fail)")
+        ok = False
     fail = run_file(godot, "tests_meta/test_fail_canary.gd", timeout, True)
     if fail["status"] != "FAIL" or fail["failures"] < 2:
         print(f"SELF-TEST BROKEN: failure canary reported {fail['status']} ({fail['failures']} failures)")
@@ -329,7 +361,7 @@ def self_test(godot, timeout):
     if leak["status"] != "LEAK" or not leak["leaks"]:
         print(f"SELF-TEST BROKEN: leak canary reported {leak['status']}")
         ok = False
-    print("SELF-TEST OK: failures and leaks are detected" if ok else "SELF-TEST FAILED")
+    print("SELF-TEST OK: failures, strict-helper mismatches and leaks are detected" if ok else "SELF-TEST FAILED")
     return 0 if ok else 1
 
 
@@ -345,7 +377,14 @@ def main():
     ap.add_argument("--verbose", action="store_true", help="print full output of red files")
     ap.add_argument("--self-test", action="store_true", help="verify failure and leak detection, then exit")
     ap.add_argument("--allow-stale", action="store_true", help="run even when src/ is newer than the built extension")
+    ap.add_argument("--no-lint", action="store_true", help="skip tools/lint_tests.py (NOT green)")
+    ap.add_argument("--realtime", action="store_true",
+                    help="real-time frame pacing instead of simulated --fixed-fps time (slow; for timing-sensitive debugging)")
+    ap.add_argument("--fixed-fps", type=int, default=60, help="simulated frames per second (default 60 = physics tick rate)")
+    ap.add_argument("--report", metavar="PATH", nargs="?", const=os.path.join(PROJECT, "test_results", "summary.json"),
+                    help="write per-file/per-test durations + statuses as JSON (default test_project/test_results/summary.json)")
     args = ap.parse_args()
+    fixed_fps = 0 if args.realtime else max(0, args.fixed_fps)
 
     godot = godot_binary()
     if not refresh_class_cache(godot):
@@ -365,15 +404,25 @@ def main():
     if not tests:
         print("no test files matched")
         return 1
+    if not args.no_lint and not args.list:
+        lint = subprocess.run([sys.executable, os.path.join(REPO_ROOT, "tools", "lint_tests.py")],
+                              cwd=REPO_ROOT, capture_output=True, text=True)
+        if lint.returncode != 0:
+            print(lint.stdout + lint.stderr)
+            print("refusing to run: test lint failed (fix the violations above; --no-lint skips, but the run is not green)")
+            return 3
     stale = stale_binary_reason()
     if stale and not args.allow_stale:
         print(f"refusing to run: {stale}\n(pass --allow-stale to run anyway)")
         return 2
 
     print(f"godot   : {godot}")
-    print(f"files   : {len(tests)}   jobs: {args.jobs}   leak check: {'off' if args.no_leaks else 'on (--verbose)'}")
+    print(f"files   : {len(tests)}   jobs: {args.jobs}   leak check: {'off' if args.no_leaks else 'on (--verbose)'}"
+          f"   time: {'real-time' if fixed_fps == 0 else f'simulated --fixed-fps {fixed_fps}'}")
     print("-" * 72)
-    results = run_many(godot, tests, args.jobs, args.timeout, not args.no_leaks, args.fail_fast, args.verbose)
+    results = run_many(godot, tests, args.jobs, args.timeout, not args.no_leaks, args.fail_fast, args.verbose, fixed_fps)
+    if args.report:
+        write_report(args.report, results, fixed_fps)
     return report(results)
 
 

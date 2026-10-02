@@ -1,8 +1,8 @@
 extends BlastTest
 ## Outline-layer design proofs: each extra layer re-spawns the selected shape
 ## scaled about the loop center, facings/quotas/corners exact per ring.
-## Pure static-generator math. Rejections are loud by design, so each test
-## swallows the expected errors at its end.
+## Pure static-generator math (valid inputs never error; the one rejection
+## below is pinned with expect_error_sequence).
 const STEP := 0.25
 
 func _approx(a: float, b: float, eps: float = 0.0001) -> bool:
@@ -16,7 +16,6 @@ func test_scale_factor() -> void:
 	assert_true(_approx(BulletFactory2D.helper_layer_scale_factor(1, STEP, 2), 1.25), "scale both L1=+")
 	assert_true(_approx(BulletFactory2D.helper_layer_scale_factor(2, STEP, 2), 1.0 / 1.25), "scale both L2=-")
 	assert_true(_approx(BulletFactory2D.helper_layer_scale_factor(3, STEP, 2), 1.5), "scale both L3=+2")
-	swallow_errors()
 
 func _layer_of(i: int, n: int, count: int, fill: int, start: int) -> int:
 	return BulletFactory2D.helper_bullet_layer_index(i, n, count, fill, start)
@@ -50,7 +49,6 @@ func test_layer_index() -> void:
 # Universal invariants for one (base, layered) volley pair: layer 0 coincides
 # with the outline, and every layered bullet is its base slot scaled about
 # the marker origin. Facings never change across layers.
-	swallow_errors()
 
 func _check_pair(base: Array, layered: Array, center: Vector2, count: int, step: float, side: int, label: String) -> void:
 	assert_true(base.size() == layered.size(), label + " sizes match")
@@ -104,7 +102,6 @@ func test_circle_layers() -> void:
 		var radial: float = (t.origin - marker.origin).angle()
 		dev = maxf(dev, absf(wrapf(t.get_rotation() - radial, -PI, PI)))
 	assert_true(dev < 0.02, "circle facings radial (worst %.4f)" % dev)
-	swallow_errors()
 
 func test_ring_layers() -> void:
 	var marker := Transform2D(0.0, Vector2(400, 300))
@@ -112,7 +109,6 @@ func test_ring_layers() -> void:
 	assert_true(_ring_gaps_ok(layered, 12, 3, 0, 0, 1.05), "ring rings even")
 	# Ring volleys live around the marker, never around the world origin.
 	assert_true((layered[0] as Transform2D).origin.distance_to(marker.origin + Vector2(150, 0)) < 1.0, "ring sits at the marker")
-	swallow_errors()
 
 func test_rect_layers() -> void:
 	var marker := Transform2D(0.0, Vector2(400, 300))
@@ -127,7 +123,6 @@ func test_rect_layers() -> void:
 	# Bullet 0 sits on the top-left corner facing straight up the top edge.
 	assert_true(_approx((base[0] as Transform2D).get_rotation(), -PI * 0.5, 0.01), "rect bullet 0 faces straight")
 	assert_true(_approx((layered[0] as Transform2D).get_rotation(), -PI * 0.5, 0.01), "rect layered bullet 0 faces straight")
-	swallow_errors()
 
 func test_polygon_layers() -> void:
 	var marker := Transform2D(0.0, Vector2(400, 300))
@@ -142,7 +137,6 @@ func test_polygon_layers() -> void:
 	assert_true(BulletFactory2D.helper_generate_transforms_triangle(9, marker, 0, 200.0, 200.0, 0.0, true, 0.0, 1, 0, false, 0, 32.0, false, 0.0, 3, STEP, 0, 0, 0, 0, PackedFloat32Array(), 0, 0).size() == 9, "triangle emits in LAYERS")
 	assert_true(BulletFactory2D.helper_generate_transforms_trapezoid(8, marker, 150.0, 280.0, 140.0, 0.0, true, 0.0, 1, 0, false, 0, 32.0, false, 0.0, 3, STEP, 0, 0, 0, 0, PackedFloat32Array(), 0, 0).size() == 8, "trapezoid emits in LAYERS")
 	assert_true(BulletFactory2D.helper_generate_transforms_diamond(8, marker, 280.0, 200.0, 0.0, true, 0.0, 1, 0, false, 0, 32.0, false, 0.0, 3, STEP, 0, 0, 0, 0, PackedFloat32Array(), 0, 0).size() == 8, "diamond emits in LAYERS")
-	swallow_errors()
 
 func test_sequential_fill() -> void:
 	var marker := Transform2D(0.0, Vector2(400, 300))
@@ -155,7 +149,6 @@ func test_sequential_fill() -> void:
 		var layer: int = _layer_of(i, 12, 3, 1, 0)
 		worst = maxf(worst, absf(p.distance_to(marker.origin) - 150.0 * (1.0 + STEP * layer)))
 	assert_true(worst < 1.0, "sequential fills layer-first (worst %.3f px)" % worst)
-	swallow_errors()
 
 func test_inward_and_both() -> void:
 	var marker := Transform2D(0.0, Vector2(400, 300))
@@ -174,7 +167,6 @@ func test_inward_and_both() -> void:
 		var s: float = BulletFactory2D.helper_layer_scale_factor(layer, STEP, 2)
 		worst = maxf(worst, absf(p.distance_to(marker.origin) - 150.0 * s))
 	assert_true(worst < 1.0, "both alternates sides (worst %.3f px)" % worst)
-	swallow_errors()
 
 func test_star_heart_emit() -> void:
 	var marker := Transform2D(0.0, Vector2(400, 300))
@@ -197,7 +189,6 @@ func test_star_heart_emit() -> void:
 	# odd-count ring must straddle it: even-count rings read uniform, odd
 	# rings carry exactly one short chord across the tip itself.
 	assert_true(_heart_rings_cusp_ok(heart, marker.origin, 40), "heart cusp rings ok")
-	swallow_errors()
 
 func test_translation_and_collapse() -> void:
 	# Global-space builders must compose back onto the marker: a ring around
@@ -208,7 +199,7 @@ func test_translation_and_collapse() -> void:
 	# Collapsed inward stacks are rejected loudly instead of spawning.
 	var flat: Array = BulletFactory2D.helper_generate_transforms_circle(12, marker, 150.0, true, 0.0, 1, 0, false, 0, 32.0, false, 0.0, 64, 8.0, 1, 0, 0, 0, PackedFloat32Array(), 0, 0)
 	assert_true(flat.is_empty(), "collapsed inward volley rejected")
-	swallow_errors()
+	expect_error_sequence(["helper_generate_transforms_circle: inward layers collapse below 5% size"])
 
 func test_outer_first_volley() -> void:
 	var marker := Transform2D(0.0, Vector2(400, 300))
@@ -222,7 +213,6 @@ func test_outer_first_volley() -> void:
 		worst = maxf(worst, absf(p.distance_to(marker.origin) - 150.0 * (1.0 + STEP * layer)))
 	assert_true(worst < 1.0, "outer first fills outside-in (worst %.3f px)" % worst)
 	assert_almost_eq((layered[0] as Transform2D).origin.distance_to(marker.origin), 150.0 * 1.5, 1.0, "outer first bullet rides outermost")
-	swallow_errors()
 
 func test_pingpong_volley() -> void:
 	var marker := Transform2D(0.0, Vector2(400, 300))
@@ -234,7 +224,6 @@ func test_pingpong_volley() -> void:
 		var layer: int = _layer_of(i, 12, 3, 3, 0)
 		worst = maxf(worst, absf(p.distance_to(marker.origin) - 150.0 * (1.0 + STEP * layer)))
 	assert_true(worst < 1.0, "pingpong waves layers (worst %.3f px)" % worst)
-	swallow_errors()
 
 func test_twist() -> void:
 	var marker := Transform2D(0.0, Vector2(400, 300))
@@ -253,7 +242,6 @@ func test_twist() -> void:
 		if ((plain[i] as Transform2D).origin.distance_to((twisted[i] as Transform2D).origin) > 1.0):
 			moved = true
 	assert_true(moved, "twist staggers outer rings")
-	swallow_errors()
 
 func test_negative_twist() -> void:
 	# Regression: a negative layer_twist used to index before the ring
@@ -304,7 +292,6 @@ func test_negative_twist() -> void:
 		if not found:
 			parity = false
 	assert_true(parity, "neg twist wraps like positive (multiset parity)")
-	swallow_errors()
 
 func test_max_dots() -> void:
 	var marker := Transform2D(0.0, Vector2(400, 300))
@@ -327,7 +314,6 @@ func test_max_dots() -> void:
 		if ((capped[i] as Transform2D).origin.distance_to((again[i] as Transform2D).origin) > 0.001):
 			same = false
 	assert_true(same, "cap deal deterministic")
-	swallow_errors()
 
 func test_custom_scales_and_curve() -> void:
 	var marker := Transform2D(0.0, Vector2(400, 300))
@@ -349,7 +335,6 @@ func test_custom_scales_and_curve() -> void:
 		var layer: int = _layer_of(i, 9, 3, 0, 0)
 		worst = maxf(worst, absf(p.distance_to(marker.origin) - 100.0 * pow(1.5, layer)))
 	assert_true(worst < 1.0, "exponential compounds (worst %.3f px)" % worst)
-	swallow_errors()
 
 func test_anchored_corners() -> void:
 	var marker := Transform2D(0.0, Vector2(400, 300))
@@ -367,7 +352,6 @@ func test_anchored_corners() -> void:
 	assert_true(tri.size() == 2, "tiny triangle emits pair")
 
 # Distance from a marker-relative point to a rectangle border (0 = on border).
-	swallow_errors()
 
 func _rect_border_dist(p: Vector2, size: Vector2) -> float:
 	var hx: float = size.x * 0.5
@@ -486,7 +470,6 @@ func test_symmetric_distribution() -> void:
 	var leg: Array = BulletFactory2D.helper_generate_transforms_rectangle(6, marker, Vector2(200, 200), true, 0.0, 0, 0, false, 0, 32.0, false, 0.0, 1, STEP, 0, 0, 0, 0, PackedFloat32Array(), 0, 0, 0, 0)
 	var cl: Array = _edge_counts_rect(leg, marker, Vector2(200, 200))
 	assert_true(cl[0] + cl[1] + cl[2] + cl[3] == 6, "square legacy still emits 6 %s" % str(cl))
-	swallow_errors()
 
 func test_small_corner_seats() -> void:
 	var marker := Transform2D(0.0, Vector2(400, 300))
@@ -511,7 +494,6 @@ func test_small_corner_seats() -> void:
 		if absf((t as Transform2D).origin.distance_to(marker.origin) - 150.0) < 1.0:
 			tips += 1
 	assert_true(tips == 5, "star 5 seats all outer tips (%d/5)" % tips)
-	swallow_errors()
 
 func test_star_edge_walk() -> void:
 	var marker := Transform2D(0.0, Vector2(400, 300))
@@ -531,7 +513,6 @@ func test_star_edge_walk() -> void:
 		if not dup:
 			distinct += 1
 	assert_true(distinct == 20, "star edge walk has no stacks (%d/20 distinct)" % distinct)
-	swallow_errors()
 
 func test_ellipse_full_no_seam() -> void:
 	var marker := Transform2D(0.0, Vector2(400, 300))
@@ -543,7 +524,6 @@ func test_ellipse_full_no_seam() -> void:
 			if ((ell[i] as Transform2D).origin.distance_to((ell[j] as Transform2D).origin) < 0.01):
 				stacked = true
 	assert_true(not stacked, "ellipse FULL has no seam stack")
-	swallow_errors()
 
 func test_layer_layout_modes() -> void:
 	var marker := Transform2D(0.0, Vector2(400, 300))
@@ -554,7 +534,6 @@ func test_layer_layout_modes() -> void:
 	# Even per layer (default): every ring carries corners.
 	var even: Array = BulletFactory2D.helper_generate_transforms_rectangle(8, marker, Vector2(300, 200), true, 0.0, 1, 0, false, 0, 32.0, false, 0.0, 3, STEP, 0, 0, 0, 0, PackedFloat32Array(), 0, 0, 1, 1)
 	_check_rect_layers_even(even, marker, Vector2(300, 200), 3, "rectangle-even")
-	swallow_errors()
 
 func _tr_facing(shape: int, count: int, params: Dictionary) -> float:
 	# Facing of the top-right corner dot (corner index 1 on rectangles).
@@ -589,7 +568,6 @@ func test_corner_priority() -> void:
 	var rep: Dictionary = BulletFactory2D.debug_describe_outline(BulletFactory2D.DEBUG_SHAPE_RECTANGLE, 8, {"size": Vector2(300, 200), "outline_corner_priority": 1})
 	var echo: Dictionary = rep["settings"]
 	assert_true(int(echo.get("outline_corner_priority", -1)) == 1, "settings digest echoes priority")
-	swallow_errors()
 
 func test_corner_mode_margin() -> void:
 	# EVEN_ARC: uniform gaps, no pinning distortion on a dense rectangle.
@@ -625,7 +603,6 @@ func test_corner_mode_margin() -> void:
 		if best < 20.0 - 1.0:
 			ok = false
 	assert_true(ok, "edge margin keeps 20px corner clearance")
-	swallow_errors()
 
 func test_ellipse_arc_even() -> void:
 	# rx=150/ry=100 at 55 slots: angle-even bunches ~1.35x at the ends,
@@ -641,7 +618,6 @@ func test_ellipse_arc_even() -> void:
 	assert_true(mx / mn < 1.15, "ellipse arc-even gaps uniform (ratio %.3f)" % (mx / mn))
 	# Radial facings stay exact after resampling.
 	assert_true(float(rep.get("worst_facing_deviation", 9.0)) < 0.02, "ellipse facings radial (worst %.4f)" % float(rep.get("worst_facing_deviation", 9.0)))
-	swallow_errors()
 
 func test_circle_screenshot_settings() -> void:
 	# Exact inspector settings from the circle bug report: 55 bullets,
@@ -661,7 +637,6 @@ func test_circle_screenshot_settings() -> void:
 	var plain: Array = BulletFactory2D.helper_generate_transforms_circle(55, marker, 150.0, true, 0.0, 0, 0, false, 0, 32.0, false, 0.0, 1, STEP, 0, 0, 0, 0, PackedFloat32Array(), 0, 0)
 	var ok: Dictionary = BulletFactory2D.debug_verify_volley(plain, BulletFactory2D.DEBUG_SHAPE_CIRCLE, marker, 55, {})
 	assert_true(bool(ok.get("ok", false)), "circle volley verifies (worst %.3f px)" % float(ok.get("worst_pos_px", -1.0)))
-	swallow_errors()
 
 func _heart_rings_cusp_ok(volley: Array, marker: Vector2, n: int) -> bool:
 	# Even-count rings: uniform gaps. Odd-count rings: exactly one short
@@ -718,7 +693,6 @@ func test_debug_verify() -> void:
 	# Unknown shape + bad count fail loudly, not silently.
 	var bad: Dictionary = BulletFactory2D.debug_describe_outline(99, 8, {})
 	assert_true(not bool(bad.get("ok", true)), "unknown shape describes as not-ok")
-	swallow_errors()
 
 func _corner_facing(shape: int, count: int, corner: int, params: Dictionary) -> float:
 	# Facing of one corner dot (-PI..PI) from describe.
@@ -766,7 +740,6 @@ func test_corner_facing() -> void:
 		var volley: Array = BulletFactory2D.helper_generate_transforms_triangle(12, marker, 0, 200.0, 200.0, 0.0, true, 0.0, 0, 0, false, 0, 32.0, false, 0.0, 1, STEP, 0, 0, 0, 0, PackedFloat32Array(), 0, 0, 1, 1, 0, 0, 0.0, facing)
 		var ok: Dictionary = BulletFactory2D.debug_verify_volley(volley, BulletFactory2D.DEBUG_SHAPE_TRIANGLE, marker, 12, {"triangle_type": 0, "size_a": 200.0, "size_b": 200.0, "outline_corner_facing": facing})
 		assert_true(bool(ok.get("ok", false)), "triangle verify facing %d" % facing)
-	swallow_errors()
 
 func test_quotas_optimal() -> void:
 	# Every closed polygon: quotas optimal (within <1 of exact shares),
@@ -793,7 +766,6 @@ func test_quotas_optimal() -> void:
 				assert_true(bool(q.get("ok", false)) and bool(q.get("optimal", false)), "quotas optimal shape=%d n=%d dist=%d" % [int(c[0]), int(n), dist])
 				if float(c[3]) >= 0.0:
 					assert_true(float(q.get("worst_pair_spread", 99.0)) <= float(c[3]), "shape=%d n=%d dist=%d pairs within %.0f (worst %.1f)" % [int(c[0]), int(n), dist, float(c[3]), float(q.get("worst_pair_spread", 99.0))])
-	swallow_errors()
 
 func test_layers_props_matrix() -> void:
 	# Every layers-related knob on rect/circle/star: deal counts, radii,
@@ -828,7 +800,6 @@ func test_layers_props_matrix() -> void:
 		var layer: int = BulletFactory2D.helper_bullet_layer_index(i, 9, 3, 0, 0)
 		cw = maxf(cw, absf((cust[i] as Transform2D).origin.distance_to(marker.origin) - 100.0 * [1.0, 2.0, 3.0][layer]))
 	assert_true(cw < 1.0, "custom scales place rings (%.3f)" % cw)
-	swallow_errors()
 
 func test_mix_match() -> void:
 	# Corner knobs cross product on rectangle: every combo verifies
@@ -851,7 +822,6 @@ func test_mix_match() -> void:
 								assert_true(false, "mix pri=%d fac=%d mode=%d margin=%.0f dist=%d layout=%d (worst %.2fpx)" % [pri, facing, mode, margin, dist, layout, float(ok.get("worst_pos_px", -1.0))])
 							combos += 1
 	assert_true(combos > 60, "mix matrix ran %d combos" % combos)
-	swallow_errors()
 
 func _fuzz_volley_finite(volley: Array) -> bool:
 	for t in volley:
@@ -892,7 +862,6 @@ func test_fuzz_closed_shapes() -> void:
 		if n > 1:
 			var st: Dictionary = BulletFactory2D.debug_volley_gaps(cir)
 			assert_true(float(st.get("gap_ratio", 99.0)) < 1.05, "circle n=%d even (%.3f)" % [n, float(st.get("gap_ratio", 99.0))])
-	swallow_errors()
 
 func test_wall_gaps_layers() -> void:
 	# WALL dodge gaps stay empty on every ring (resampling must not pave them).
@@ -908,7 +877,6 @@ func test_wall_gaps_layers() -> void:
 		for gc in centers:
 			var d: float = absf(wrapf(ang - gc, -PI, PI))
 			assert_true(d >= 0.25 - 1e-3, "wall dot outside gap (d=%.3f)" % d)
-	swallow_errors()
 
 func test_open_arc_endpoints() -> void:
 	# Open arcs pin both endpoints on the base loop and on every ring.
@@ -932,7 +900,6 @@ func test_open_arc_endpoints() -> void:
 			if ((m as Transform2D).origin.distance_to(e1) < 1.0):
 				near1 = true
 		assert_true(near0 and near1, "ring arc layer %d pins endpoints" % L)
-	swallow_errors()
 
 func test_single_bullet_rings() -> void:
 	var marker := Transform2D(0.0, Vector2(400, 300))
@@ -945,7 +912,6 @@ func test_single_bullet_rings() -> void:
 	var rsq: Array = BulletFactory2D.helper_generate_transforms_rectangle(1, marker, Vector2(300, 200), true, 0.0, 1, 0, false, 0, 32.0, false, 0.0, 3, STEP, 0, 0, 0, 0, PackedFloat32Array(), 0, 0)
 	assert_true(rsq.size() == 1, "rect single emits")
 	assert_true((rsq[0] as Transform2D).origin.distance_to(marker.origin + Vector2(-150, -100)) < 1.0, "rect single sits corner 0")
-	swallow_errors()
 
 func test_huge_margin() -> void:
 	# Margin bigger than the edge collapses interiors to midpoints: counts
@@ -955,7 +921,6 @@ func test_huge_margin() -> void:
 	assert_true(v.size() == 12 and _fuzz_volley_finite(v), "huge margin keeps 12 finite")
 	var ok: Dictionary = BulletFactory2D.debug_verify_volley(v, BulletFactory2D.DEBUG_SHAPE_RECTANGLE, marker, 12, {"size": Vector2(300, 200), "outline_edge_margin": 10000.0})
 	assert_true(bool(ok.get("ok", false)), "huge margin verifies")
-	swallow_errors()
 
 func test_rotated_marker_verify() -> void:
 	var marker := Transform2D(PI * 0.5, Vector2(-100, 200))
@@ -965,7 +930,6 @@ func test_rotated_marker_verify() -> void:
 	var star: Array = BulletFactory2D.helper_generate_transforms_star(15, marker, 5, 150.0, 65.0, 0.0, true, 0.0, 0, 0, false, 0, 32.0, false, 0.0, 1, STEP, 0, 0, 0, 0, PackedFloat32Array(), 0, 0)
 	var sok: Dictionary = BulletFactory2D.debug_verify_volley(star, BulletFactory2D.DEBUG_SHAPE_STAR, marker, 15, {"points": 5, "outer_radius": 150.0, "inner_radius": 65.0})
 	assert_true(bool(sok.get("ok", false)), "rotated marker star verifies")
-	swallow_errors()
 
 func test_smooth_layout_flag() -> void:
 	# layout=0 keeps legacy decimation (seam defect documented); layout=1
@@ -989,4 +953,3 @@ func test_smooth_layout_flag() -> void:
 	var a: Dictionary = BulletFactory2D.debug_describe_outline(BulletFactory2D.DEBUG_SHAPE_CIRCLE, 12, {})
 	var b: Dictionary = BulletFactory2D.debug_describe_outline(BulletFactory2D.DEBUG_SHAPE_CIRCLE, 12, {"outline_corner_facing": 2})
 	assert_true((a["points"] as PackedVector2Array) == (b["points"] as PackedVector2Array), "corner facing no-op on circle")
-	swallow_errors()

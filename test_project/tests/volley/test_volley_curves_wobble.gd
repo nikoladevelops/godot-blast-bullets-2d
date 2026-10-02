@@ -31,7 +31,6 @@ func test_shared_curves_attach_and_override_guard() -> void:
 	var keep := BulletSpeedData2D.new()
 	keep.speed = 999.0
 	v.set_bullet_speed_data(0, keep)
-	swallow_errors() # speed write under a curve warns; the curve keeps control
 	v.remove_shared_bullet_curves_data()
 	assert_false(v.has_shared_bullet_curves_data(), "shared curves removed")
 	v.set_bullet_speed_data(0, keep)
@@ -69,7 +68,6 @@ func test_movement_patterns() -> void:
 	v.all_bullets_remove_movement_pattern()
 	assert_false(v.has_bullet_movement_pattern(1), "all patterns removed")
 	v.set_bullet_movement_pattern_from_path(0, null)
-	swallow_errors()
 	assert_false(v.has_bullet_movement_pattern(0), "null path clears")
 
 

@@ -4619,6 +4619,11 @@ TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_star(
 	}
 	PackedVector2Array loop_points;
 	PackedVector2Array loop_normals;
+	// Zero bullets is a valid empty request (every other generator returns
+	// [] silently); only a real geometry failure below is "degenerate".
+	if (transforms_amount == 0) {
+		return TypedArray<Transform2D>();
+	}
 	if (!build_symmetric_polygon_loop(corners, corner_normals, transforms_amount, outline_distribution, loop_points, loop_normals, outline_corner_priority, outline_corner_mode, outline_edge_margin, outline_corner_facing)) {
 		UtilityFunctions::push_error("helper_generate_transforms_star: degenerate star.");
 		return TypedArray<Transform2D>();
@@ -5784,6 +5789,11 @@ TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_rectangle(
 	// straight along the top edge.
 	PackedVector2Array loop_points;
 	PackedVector2Array loop_normals;
+	// Zero bullets is a valid empty request (every other generator returns
+	// [] silently); only a real geometry failure below is "degenerate".
+	if (transforms_amount == 0) {
+		return TypedArray<Transform2D>();
+	}
 	if (!build_symmetric_polygon_loop(corners, normals, transforms_amount, outline_distribution, loop_points, loop_normals, outline_corner_priority, outline_corner_mode, outline_edge_margin, outline_corner_facing)) {
 		UtilityFunctions::push_error("helper_generate_transforms_rectangle: degenerate rectangle.");
 		return TypedArray<Transform2D>();
@@ -5889,6 +5899,11 @@ TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_polygon(
 	// counts seat evenly spaced corners, opposite sides stay equal.
 	PackedVector2Array loop_points;
 	PackedVector2Array loop_normals;
+	// Zero bullets is a valid empty request (every other generator returns
+	// [] silently); only a real geometry failure below is "degenerate".
+	if (transforms_amount == 0) {
+		return TypedArray<Transform2D>();
+	}
 	if (!build_symmetric_polygon_loop(corners, normals, transforms_amount, outline_distribution, loop_points, loop_normals, outline_corner_priority, outline_corner_mode, outline_edge_margin, outline_corner_facing)) {
 		UtilityFunctions::push_error("helper_generate_transforms_polygon: degenerate polygon.");
 		return TypedArray<Transform2D>();

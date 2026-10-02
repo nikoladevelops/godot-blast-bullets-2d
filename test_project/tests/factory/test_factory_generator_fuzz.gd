@@ -4,9 +4,9 @@ const MARKER := Transform2D.IDENTITY
 ## Crash-fuzz for every BulletFactory2D generator: hostile counts, degenerate
 ## geometry, NaN inputs, extreme twists/offsets, oversized scales, edge-image
 ## extraction, side-spread/skip contracts, and exact-geometry semantics.
-## Rejections are loud by design (and asserted via empty returns), so each
-## group swallows the expected errors at the end; survival + finiteness is
-## the contract under test.
+## Contract: every rejection returns [] AND fails loud with ONE error naming
+## the generator (pinned with expect_error_sequence right after the call);
+## valid input never errors (strict mode).
 
 func _finite_volley(v: Array) -> bool:
 	for t in v:
@@ -89,6 +89,37 @@ func _gen_args(id: int, amount: int) -> Array:
 	return []
 
 const GEN_COUNT := 29
+const GEN_NAMES := [
+	"helper_generate_transforms_grid",
+	"helper_generate_transforms_ring",
+	"helper_generate_transforms_fan",
+	"helper_generate_transforms_spiral",
+	"helper_generate_transforms_line",
+	"helper_generate_transforms_aimed",
+	"helper_generate_transforms_flower",
+	"helper_generate_transforms_ellipse",
+	"helper_generate_transforms_rain",
+	"helper_generate_transforms_scatter",
+	"helper_generate_transforms_star_polygon",
+	"helper_generate_transforms_multispiral",
+	"helper_generate_transforms_cross",
+	"helper_generate_transforms_star",
+	"helper_generate_transforms_heart",
+	"helper_generate_transforms_wave",
+	"helper_generate_transforms_waterfall",
+	"helper_generate_transforms_lattice",
+	"helper_generate_transforms_rose",
+	"helper_generate_transforms_counter_spiral",
+	"helper_generate_transforms_corridor",
+	"helper_generate_transforms_lissajous",
+	"helper_generate_transforms_circle",
+	"helper_generate_transforms_rectangle",
+	"helper_generate_transforms_polygon",
+	"helper_generate_transforms_triangle",
+	"helper_generate_transforms_trapezoid",
+	"helper_generate_transforms_diamond",
+	"helper_generate_transforms_edge_from_points",
+]
 
 func _gen_call(id: int, args: Array) -> Array:
 	var c: Callable = _funcs()[id]
@@ -104,11 +135,25 @@ func test_counts() -> void:
 	for id in GEN_COUNT:
 		for amount in [-1, 0, 1]:
 			var v: Array = _gen(id, amount)
-			if amount < 0 or amount == 0:
-				assert_true(v.size() == 0, "gen %d amount %d rejected" % [id, amount])
+			if amount < 0:
+				assert_true(v.size() == 0, "gen %d amount -1 rejected" % id)
+				expect_error_sequence(["%s: transforms_amount" % GEN_NAMES[id]], "gen %d amount -1" % id)
+			elif amount == 0:
+				# Zero bullets is a valid empty request: [] and NO error.
+				assert_true(v.size() == 0, "gen %d amount 0 empty" % id)
+				expect_no_errors("gen %d amount 0 is silent" % id)
 			else:
 				assert_true(v.size() <= 1 and _finite_volley(v), "gen %d amount 1 sane (n=%d)" % [id, v.size()])
-	swallow_errors()
+				expect_no_errors("gen %d amount 1 is silent" % id)
+
+
+func test_count_cap_10000_every_generator() -> void:
+	# The documented per-call cap (HELPER_MAX_TRANSFORMS) holds for EVERY
+	# generator: 10001 is rejected loudly instead of allocating.
+	for id in GEN_COUNT:
+		var v: Array = _gen(id, 10001)
+		assert_true(v.is_empty(), "gen %d amount 10001 rejected" % id)
+		expect_error_sequence(["%s: transforms_amount" % GEN_NAMES[id]], "gen %d cap" % id)
 func test_degenerate() -> void:
 	var m := MARKER
 	# Zero sizes: degenerate loops stack, never crash, always finite.
@@ -141,28 +186,47 @@ func test_degenerate() -> void:
 		_gen_call(12, [8, m, 4, 0.0, 32.0, 0.0, true, 0.0]),
 	]:
 		assert_true(_finite_volley(v), "degenerate volley finite (n=%d)" % v.size())
+	# Only heart rejects a zero size (size must be > 0); every other zero
+	# size stacks silently.
+	expect_error_sequence(["helper_generate_transforms_heart: size must be finite and > 0"])
 	# Documented rejections: invalid counts/directions eat the whole request.
 	# (Heart size 0 is rejected, not stacked: size must be > 0.)
 	assert_true(_gen_call(14, [8, m, 0.0, 0.0, true, 0.0, 0, 0, false, 0, 32.0, false, 0.0, 1, 0.2, 0, 0, 0, 0, PackedFloat32Array(), 0, 0]).is_empty(), "heart size 0 rejected")
+	expect_error_sequence(["helper_generate_transforms_heart: size must be finite and > 0"])
 	assert_true(_gen_call(20, [8, m, Vector2(0, 1), 0.0, 32.0, 0.0, true, 0.0]).is_empty(), "corridor gap==width rejected")
+	expect_error_sequence(["helper_generate_transforms_corridor: gap_width eats the whole wall"])
 	assert_true(_gen_call(11, [8, m, 0, 50.0, 15.0, 0.6, true, 0, 0.0, 1]).is_empty(), "multispiral arms=0 rejected")
+	expect_error_sequence(["helper_generate_transforms_multispiral: arms must be >= 1"])
 	assert_true(_gen_call(19, [8, m, 1, 50.0, 15.0, 0.6, true, 0, 0.0, 1, true]).is_empty(), "counter arms=1 rejected")
+	expect_error_sequence(["helper_generate_transforms_counter_spiral: arms must be >= 2"])
 	assert_true(_gen_call(10, [8, m, 2, 150.0, 2.0, 0.0, true, 0.0]).is_empty(), "star_polygon vertices=2 rejected")
+	expect_error_sequence(["helper_generate_transforms_star_polygon: vertices must be >= 3"])
 	assert_true(_gen_call(6, [8, m, 0, 5, 150.0, 0.5, 1.0, 0.0, true, 0.0, 0, 0, false, 0, 32.0, false, 0.0, 1, 0.2, 0, 0, 0, 0, PackedFloat32Array(), 0, 0, 0, 0.0, 45.0, 80.0, 6.0, 1.0]).is_empty(), "flower petals=0 rejected")
+	expect_error_sequence(["helper_generate_transforms_flower: petals must be >= 1"])
 	assert_true(_gen_call(18, [8, m, 1, 150.0, 1.0, 0.0, true, 0.0, 0, 0, false, 0, 32.0, false, 0.0, 1, 0.2, 0, 0, 0, 0, PackedFloat32Array(), 0, 0]).is_empty(), "rose petals=1 rejected")
+	expect_error_sequence(["helper_generate_transforms_rose: petals must be >= 2"])
 	assert_true(_gen_call(16, [8, m, 0, 64.0, 4, 64.0, 0.5, Vector2(0, 1), 0.0, 0.0, 0]).is_empty(), "waterfall columns=0 rejected")
+	expect_error_sequence(["helper_generate_transforms_waterfall: columns and rows must be >= 1"])
 	assert_true(_gen_call(17, [8, m, 4, 0, 64.0, 64.0, true, true, 0.0]).is_empty(), "lattice rows=0 rejected")
+	expect_error_sequence(["helper_generate_transforms_lattice: columns and rows must be >= 1"])
 	assert_true(_gen_call(0, [8, m, 0, 4, 150.0, 150.0, true, false, 0.0, 0]).is_empty(), "grid rows=0 rejected")
+	expect_error_sequence(["helper_generate_transforms_grid: rows_per_column must be > 0"])
 	assert_true(_gen_call(12, [8, m, 0, 150.0, 32.0, 0.0, true, 0.0]).is_empty(), "cross arms=0 rejected")
+	expect_error_sequence(["helper_generate_transforms_cross: arm_count must be >= 1"])
 	assert_true(_gen_call(4, [8, m, Vector2(0, 0), 32.0, true, 1, false]).is_empty(), "line zero direction rejected")
+	expect_error_sequence(["helper_generate_transforms_line: direction must not be zero"])
 	assert_true(_gen_call(5, [8, m, Vector2(0, 0), 0.3, 0.0, true]).is_empty(), "aimed coincident target rejected")
+	expect_error_sequence(["helper_generate_transforms_aimed: target coincides with the marker"])
 	assert_true(_gen_call(8, [8, m, 600.0, Vector2(0, 0), 48.0, 0.0, 0]).is_empty(), "rain zero direction rejected")
+	expect_error_sequence(["helper_generate_transforms_rain: rain_direction must be finite and non-zero"])
 	assert_true(_gen_call(20, [8, m, Vector2(0, 0), 400.0, 32.0, 96.0, true, 0.0]).is_empty(), "corridor zero aim rejected")
+	expect_error_sequence(["helper_generate_transforms_corridor: aim_direction must be finite and non-zero"])
 	assert_true(_gen_call(16, [8, m, 4, 64.0, 4, 64.0, 0.5, Vector2(0, 0), 0.0, 0.0, 0]).is_empty(), "waterfall zero rain rejected")
+	expect_error_sequence(["helper_generate_transforms_waterfall: rain_direction must be finite and non-zero"])
 	# Dead-knob degradation (documented): zero sector direction falls back to +X.
 	var sz: Array = _gen_call(9, [8, m, 120.0, 0.4, 0, 0.0, Vector2(0, 0), TAU, 0])
 	assert_true(sz.size() == 8 and _finite_volley(sz), "scatter zero sector degrades")
-	swallow_errors()
+	expect_no_errors("scatter zero sector degrades silently")
 
 # id -> [arg index, kind]: kind 0 = float NAN, 1 = Vector2(NAN,NAN), 2 = single-NAN point array.
 const NAN_IDXS := {
@@ -187,14 +251,16 @@ func test_nan() -> void:
 		args[spec[0]] = _nan_arg(spec[1])
 		var v: Array = _gen_call(id, args)
 		assert_true(v.is_empty(), "gen %d NAN rejected" % id)
+		expect_error_sequence([GEN_NAMES[id] + ":"], "gen %d NAN fails loud" % id)
 	# NAN marker origin is rejected everywhere too.
 	var bad_m := Transform2D(0.0, Vector2(NAN, 0))
 	var vm: Array = BulletFactory2D.helper_generate_transforms_ring(8, bad_m, 150.0, 0.0, TAU, true, false, true, 1.0, 0.0, 0, 0, false, 0, 32.0, false, 0.0, 1, 0.2, 0, 0, 0, 0, PackedFloat32Array(), 0, 0, 0, 1)
 	assert_true(vm.is_empty(), "NAN marker rejected")
+	expect_error_sequence(["helper_generate_transforms_ring: marker_transform contains NaN/Inf"])
 	# NAN direction is rejected by the strict generators (line/rain).
 	var dl: Array = BulletFactory2D.helper_generate_transforms_line(8, MARKER, Vector2(NAN, 0), 32.0, true, 1, false)
 	assert_true(dl.is_empty(), "line NAN direction rejected")
-	swallow_errors()
+	expect_error_sequence(["helper_generate_transforms_line: direction and spacing must be finite"])
 func test_twist_extreme() -> void:
 	var m := MARKER
 	for twist in [-2147483648, -1000000, 1000000, 2147483647]:
@@ -214,7 +280,6 @@ func test_twist_extreme() -> void:
 		64, m, 50.0, true, 0.0, 1, 0, false, 0, 32.0, false, 0.0,
 		64, 0.2, 0, 0, 0, 0, PackedFloat32Array(), -2147483648, 0, 1)
 	assert_true(big.size() == 64 and _finite_volley(big), "64 layers INT_MIN twist survives")
-	swallow_errors()
 func test_slots_offsets() -> void:
 	var m := MARKER
 	for off in [-1, -5, -1000000, 1000000, 2147483647]:
@@ -229,6 +294,7 @@ func test_slots_offsets() -> void:
 		1, 0, false, 0, 32.0, false, 0.0,
 		3, 0.2, 0, 1, -1, 0, PackedFloat32Array(), 0, 0, 0, 1)
 	assert_true(bad_start.is_empty(), "layer_start_offset negative rejected")
+	expect_error_sequence(["helper_generate_transforms_ring: layer_start_offset must be >= 0"])
 	var huge_start: Array = BulletFactory2D.helper_generate_transforms_ring(
 		12, m, 150.0, 0.0, TAU, true, false, true, 1.0, 0.0,
 		1, 0, false, 0, 32.0, false, 0.0,
@@ -249,25 +315,33 @@ func test_slots_offsets() -> void:
 		0, 0, false, -1, 32.0, false, 0.0,
 		1, 0.2, 0, 0, 0, 0, PackedFloat32Array(), 0, 0, 0, 1)
 	assert_true((rotneg[0] as Transform2D).origin.distance_to((plain[11] as Transform2D).origin) < 0.01, "slot_offset -1 wraps")
-	swallow_errors()
 func test_scales() -> void:
 	var m := MARKER
 	var big := PackedFloat32Array()
 	big.resize(65)
 	big.fill(1.0)
 	assert_true(BulletFactory2D.helper_generate_transforms_circle(12, m, 150.0, true, 0.0, 1, 0, false, 0, 32.0, false, 0.0, 3, 0.2, 0, 0, 0, 0, big, 0, 0, 1).is_empty(), "65 custom scales rejected")
+	expect_error_sequence(["helper_generate_transforms_circle: layer_custom_scales holds at most 64 entries"])
 	assert_true(BulletFactory2D.helper_generate_transforms_circle(12, m, 150.0, true, 0.0, 1, 0, false, 0, 32.0, false, 0.0, 3, 0.2, 0, 0, 0, 0, PackedFloat32Array([0.04]), 0, 0, 1).is_empty(), "custom scale 0.04 rejected")
+	expect_error_sequence(["helper_generate_transforms_circle: layer_custom_scales entries must be finite in [0.05, 64]"])
 	assert_true(BulletFactory2D.helper_generate_transforms_circle(12, m, 150.0, true, 0.0, 1, 0, false, 0, 32.0, false, 0.0, 3, 0.2, 0, 0, 0, 0, PackedFloat32Array([64.1]), 0, 0, 1).is_empty(), "custom scale 64.1 rejected")
+	expect_error_sequence(["helper_generate_transforms_circle: layer_custom_scales entries must be finite in [0.05, 64]"])
 	assert_true(BulletFactory2D.helper_generate_transforms_circle(12, m, 150.0, true, 0.0, 1, 0, false, 0, 32.0, false, 0.0, 3, 0.2, 0, 0, 0, 0, PackedFloat32Array([NAN]), 0, 0, 1).is_empty(), "custom scale NAN rejected")
+	expect_error_sequence(["helper_generate_transforms_circle: layer_custom_scales entries must be finite in [0.05, 64]"])
 	var ok_scales: Array = BulletFactory2D.helper_generate_transforms_circle(12, m, 150.0, true, 0.0, 1, 0, false, 0, 32.0, false, 0.0, 3, 0.2, 0, 0, 0, 0, PackedFloat32Array([1.0, 1.5, 1.6]), 0, 0, 1)
 	assert_true(ok_scales.size() == 12 and _finite_volley(ok_scales), "valid custom scales accepted")
 	assert_true(BulletFactory2D.helper_generate_transforms_circle(12, m, 150.0, true, 0.0, 1, 0, false, 0, 32.0, false, 0.0, 3, 0.0, 0, 0, 0, 0, PackedFloat32Array(), 0, 0, 1).is_empty(), "layer_scale 0 rejected")
+	expect_error_sequence(["helper_generate_transforms_circle: layer_count must be in [1, 64], layer_scale finite in (0, 8]"])
 	assert_true(BulletFactory2D.helper_generate_transforms_circle(12, m, 150.0, true, 0.0, 1, 0, false, 0, 32.0, false, 0.0, 0, 0.2, 0, 0, 0, 0, PackedFloat32Array(), 0, 0, 1).is_empty(), "layer_count 0 rejected")
+	expect_error_sequence(["helper_generate_transforms_circle: layer_count must be in [1, 64], layer_scale finite in (0, 8]"])
 	assert_true(BulletFactory2D.helper_generate_transforms_circle(12, m, 150.0, true, 0.0, 1, 0, false, 0, 32.0, false, 0.0, 65, 0.2, 0, 0, 0, 0, PackedFloat32Array(), 0, 0, 1).is_empty(), "layer_count 65 rejected")
+	expect_error_sequence(["helper_generate_transforms_circle: layer_count must be in [1, 64], layer_scale finite in (0, 8]"])
 	assert_true(BulletFactory2D.helper_generate_transforms_circle(12, m, 150.0, true, 0.0, 1, 0, false, 0, 32.0, false, 0.0, 3, 0.2, 0, 0, 0, 0, PackedFloat32Array(), 0, -1, 1).is_empty(), "max_dots -1 rejected")
+	expect_error_sequence(["helper_generate_transforms_circle: layer_max_dots must be >= 0"])
 	assert_true(BulletFactory2D.helper_generate_transforms_circle(12, m, 150.0, true, 0.0, 1, 3, false, 0, 32.0, false, 0.0, 3, 0.2, 0, 0, 0, 0, PackedFloat32Array(), 0, 0, 1).is_empty(), "outline_facing 3 rejected")
+	expect_error_sequence(["helper_generate_transforms_circle: outline_facing must be 0 (normal), 1 (+90 deg) or 2 (-90 deg)"])
 	assert_true(BulletFactory2D.helper_generate_transforms_circle(12, m, 150.0, true, 0.0, 3, 0, false, 0, 32.0, false, 0.0, 3, 0.2, 0, 0, 0, 0, PackedFloat32Array(), 0, 0, 1).is_empty(), "placement 3 rejected")
-	swallow_errors()
+	expect_error_sequence(["helper_generate_transforms_circle: outline_placement must be 0 (on outline), 1 (layers) or 2 (fill inside)"])
 func test_edge_image() -> void:
 	var m := MARKER
 	assert_true((BulletFactory2D.helper_extract_edge_from_image(null, 0.5, 4, true) as Dictionary).get("points", PackedVector2Array()).is_empty(), "null image rejected")
@@ -288,19 +362,23 @@ func test_edge_image() -> void:
 		var v: Array = BulletFactory2D.helper_generate_transforms_edge_from_points(12, m, pts, closed, false, true, 2.0, 0.0, 7, 3.0, 2.0, 2, 1.0)
 		assert_true(v.size() == 12 and _finite_volley(v), "extracted edge samples (closed=%s)" % str(closed))
 	assert_true(BulletFactory2D.helper_generate_transforms_edge_from_points(8, m, PackedVector2Array(), false, false, false, 0.0, 0.0, 0, 0.0, 2.0, 0, 0.0).is_empty(), "empty edge rejected")
+	expect_error_sequence(["helper_generate_transforms_edge_from_points: edge_points must contain at least 1 point"])
 	var solo: Array = BulletFactory2D.helper_generate_transforms_edge_from_points(4, m, PackedVector2Array([Vector2(10, 20)]), false, true, false, 0.0, 0.0, 0, 0.0, 2.0, 0, 0.0)
 	assert_true(solo.size() == 4 and _finite_volley(solo), "single-point edge stacks")
 	var coinc: Array = BulletFactory2D.helper_generate_transforms_edge_from_points(4, m, PackedVector2Array([Vector2(5, 5), Vector2(5, 5), Vector2(5, 5)]), true, false, false, 0.0, 0.0, 0, 0.0, 2.0, 0, 0.0)
 	assert_true(coinc.size() == 4 and _finite_volley(coinc), "coincident edge stacks")
-	swallow_errors()
 func test_side_spread_skip() -> void:
 	var m := MARKER
 	var base: Array = BulletFactory2D.helper_generate_transforms_circle(6, m, 150.0, true, 0.0, 0, 0, false, 0, 32.0, false, 0.0, 1, 0.2, 0, 0, 0, 0, PackedFloat32Array(), 0, 0, 1)
 	assert_true(base.size() == 6, "spread fixture emits 6")
 	assert_true(BulletFactory2D.helper_apply_side_spread(base, -1, 5.0, 2.0, 0).is_empty(), "side_mode -1 rejected")
+	expect_error_sequence(["helper_apply_side_spread: side_mode must be 0 (on path), 1 (outside), 2 (inside) or 3 (both)"])
 	assert_true(BulletFactory2D.helper_apply_side_spread(base, 4, 5.0, 2.0, 0).is_empty(), "side_mode 4 rejected")
+	expect_error_sequence(["helper_apply_side_spread: side_mode must be 0 (on path), 1 (outside), 2 (inside) or 3 (both)"])
 	assert_true(BulletFactory2D.helper_apply_side_spread(base, 1, -1.0, 2.0, 0).is_empty(), "spread -1 rejected")
+	expect_error_sequence(["helper_apply_side_spread: spread must be finite and >= 0"])
 	assert_true(BulletFactory2D.helper_apply_side_spread(base, 1, 5.0, 0.0, 0).is_empty(), "exponent 0 rejected")
+	expect_error_sequence(["helper_apply_side_spread: spread must be finite and >= 0, spread_exponent finite and >= 0.01"])
 	for mode in [0, 1, 2, 3]:
 		for spread in [0.0, 5.0]:
 			var v: Array = BulletFactory2D.helper_apply_side_spread(base, mode, spread, 2.0, 7)
@@ -316,7 +394,6 @@ func test_side_spread_skip() -> void:
 	assert_true(BulletFactory2D.helper_apply_skip_indices(base, PackedInt32Array([-1, 99, 2147483647])).size() == 6, "skip OOB ignored")
 	assert_true(BulletFactory2D.helper_apply_skip_indices(base, PackedInt32Array([0, 1, 2, 3, 4, 5])).is_empty(), "skip all drops all")
 	assert_true(BulletFactory2D.helper_apply_skip_indices(base, PackedInt32Array([2, 2, 2])).size() == 5, "skip dupes drop once")
-	swallow_errors()
 
 func _approx(a: float, b: float, eps: float = 0.001) -> bool:
 	return absf(a - b) <= eps
@@ -465,4 +542,3 @@ func test_semantics() -> void:
 		if not _approx(((t as Transform2D).origin - m.origin).length(), 150.0, 0.01):
 			ok_sp = false
 	assert_true(ok_sp, "star_polygon bias 0 is an even ring")
-	swallow_errors()

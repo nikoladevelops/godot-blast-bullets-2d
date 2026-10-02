@@ -158,9 +158,8 @@ func test_live_order_remove_and_getters() -> void:
 	assert_eq(o3.get_shared_bullet_rotation_data(), shs, "shared getter returns the stored resource")
 	assert_null(o3.get_shared_bullet_speed_data(), "shared speed getter null when unset")
 	assert_true(o3.all_bullets_get_rotation_data(1, 0).is_empty(), "inverted range reads empty")
-	swallow_errors()
+	expect_error_sequence(["Invalid index range in all_bullets_get_rotation_data (start > end)"])
 	assert_eq(o3.all_bullets_get_rotation_data(99, 99).size(), 2, "OOB range clamps to the full volley")
-	swallow_errors()
 
 
 func test_pool_reuse_drops_live_edits() -> void:

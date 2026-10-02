@@ -15,7 +15,6 @@ func test_amount_caps() -> void:
 	assert_true(BulletFactory2D.helper_generate_transforms_fan(-5, m, 1.0).is_empty(), "fan negative rejected")
 	expect_any_error()
 	assert_true(BulletFactory2D.helper_generate_transforms_line(0, m, Vector2.RIGHT, 10.0).is_empty(), "line 0 returns empty")
-	swallow_errors()
 	assert_eq(BulletFactory2D.helper_generate_transforms_circle(1, m).size(), 1, "circle 1 returns one slot")
 
 
@@ -55,7 +54,6 @@ func test_huge_finite_inputs_clamp() -> void:
 	var big_ring: Array = BulletFactory2D.helper_generate_transforms_ring(16, m, 1e30)
 	assert_eq(big_ring.size(), 16)
 	assert_true(H.finite_volley(big_ring), "ring 1e30 radius stays finite")
-	swallow_errors()
 
 
 func test_scale_band_and_skip_guards() -> void:
@@ -64,4 +62,3 @@ func test_scale_band_and_skip_guards() -> void:
 	var base: Array = BulletFactory2D.helper_generate_transforms_line(5, m, Vector2.RIGHT, 10.0, true)
 	assert_eq(BulletFactory2D.helper_apply_skip_indices(base, [1, 99, -2]).size(), 4, "skip ignores OOB indices")
 	assert_gte(BulletFactory2D.helper_bullet_layer_index(3, 10, 4, 0, 0), 0, "layer index sane")
-	swallow_errors()

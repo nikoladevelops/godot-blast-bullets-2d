@@ -44,7 +44,7 @@ func test_wobble_lateral_bounded() -> void:
 func test_per_bullet_smoothing_clamps() -> void:
 	var f: DirectionalBullets2D = spawn_dir(2, 200.0)
 	f.bullet_set_homing_smoothing(0, -5.0)
-	swallow_errors()
+	expect_error_sequence(["bullet_set_homing_smoothing: value must be finite and >= 0"])
 	assert_eq(f.bullet_get_homing_smoothing(0), 0.0, "negative smoothing clamped to 0")
 	f.bullet_set_homing_smoothing(0, NAN)
 	expect_any_error()

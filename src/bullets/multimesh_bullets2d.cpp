@@ -2699,7 +2699,7 @@ void MultiMeshBullets2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("bullet_disable_attachment", "bullet_index"), &MultiMeshBullets2D::bullet_disable_attachment);
 	ClassDB::bind_method(D_METHOD("bullet_enable_attachment", "bullet_index"), &MultiMeshBullets2D::bullet_enable_attachment);
 	ClassDB::bind_method(D_METHOD("get_amount_active_attachments"), &MultiMeshBullets2D::get_amount_active_attachments);
-	ClassDB::bind_method(D_METHOD("_do_deferred_bullet_disable_attachment", "bullet_index", "expected_generation", "expected_attachment_id", "expected_attachment", "expected_attachment_epoch"), &MultiMeshBullets2D::_do_deferred_bullet_disable_attachment);
+	ClassDB::bind_method(D_METHOD("_do_deferred_bullet_disable_attachments", "expected_generation", "requests"), &MultiMeshBullets2D::_do_deferred_bullet_disable_attachments);
 	ClassDB::bind_method(D_METHOD("_do_emit_life_time_over", "expected_generation", "emitter_instance_id", "signal_name", "bullet_indexes"), &MultiMeshBullets2D::_do_emit_life_time_over);
 	ClassDB::bind_method(D_METHOD("_do_emit_sprite_animation_finished", "expected_generation"), &MultiMeshBullets2D::_do_emit_sprite_animation_finished);
 	ClassDB::bind_method(D_METHOD("_do_finish_lifetime_hold", "expected_generation"), &MultiMeshBullets2D::_do_finish_lifetime_hold);
@@ -2872,14 +2872,24 @@ void MultiMeshBullets2D::_bind_methods() {
 
 // Cold paths live here; per-tick hot paths stay inline in the header.
 
-void MultiMeshBullets2D::_do_deferred_bullet_disable_attachment(int bullet_index, int expected_generation, uint64_t expected_attachment_id, BulletAttachment2D *expected_attachment, uint64_t expected_attachment_epoch) {
+void MultiMeshBullets2D::_do_deferred_bullet_disable_attachments(int expected_generation, const PackedInt64Array &requests) {
 	if (expected_generation != multimesh_generation) {
 		return;
 	}
-	if (!slot_still_holds_attachment(bullet_index, expected_attachment, expected_attachment_id, expected_attachment_epoch)) {
-		return;
+	const int64_t *req = requests.ptr();
+	const int64_t n = requests.size();
+	for (int64_t k = 0; k + 2 < n; k += 3) {
+		const int bullet_index = (int)req[k];
+		if (!slot_still_holds_attachment_id(bullet_index, (uint64_t)req[k + 1], (uint64_t)req[k + 2])) {
+			continue;
+		}
+		bullet_disable_attachment(bullet_index);
+		// bullet_disable_attachment runs user code (on_bullet_disable): a
+		// handler may recycle this instance (pool pop -> new generation).
+		if (expected_generation != multimesh_generation) {
+			return;
+		}
 	}
-	bullet_disable_attachment(bullet_index);
 }
 
 void MultiMeshBullets2D::_do_emit_life_time_over(int expected_generation, uint64_t emitter_instance_id, const StringName &signal_name, const TypedArray<int> &bullet_indexes) {
@@ -3029,11 +3039,22 @@ void MultiMeshBullets2D::reduce_lifetime(double delta) {
 		// Disable attachments after signal (deferred keeps order). The per-slot
 		// assignment epoch travels with the request so a same-life ABA reuse
 		// (pool returns the same node to the same slot) cannot match stale.
+		// Only slots that actually hold an attachment are queued (one batched
+		// call carrying ids + epochs, never pointers - see
+		// _do_deferred_bullet_disable_attachments).
+		PackedInt64Array attachment_requests;
 		for (int i = 0; i < bullet_indexes.size(); ++i) {
-			int idx = bullet_indexes[i];
+			const int idx = bullet_indexes[i];
 			BulletAttachment2D *queued_attachment = (idx >= 0 && idx < (int)attachments.size()) ? attachments[idx] : nullptr;
-			const uint64_t queued_attachment_id = queued_attachment != nullptr ? queued_attachment->get_instance_id() : 0;
-			call_deferred("_do_deferred_bullet_disable_attachment", idx, multimesh_generation, queued_attachment_id, queued_attachment, attachment_epoch_for(idx));
+			if (queued_attachment == nullptr) {
+				continue;
+			}
+			attachment_requests.push_back(idx);
+			attachment_requests.push_back((int64_t)queued_attachment->get_instance_id());
+			attachment_requests.push_back((int64_t)attachment_epoch_for(idx));
+		}
+		if (!attachment_requests.is_empty()) {
+			call_deferred("_do_deferred_bullet_disable_attachments", multimesh_generation, attachment_requests);
 		}
 	}
 	// Queued last so it flushes after the signal and the slot releases.
@@ -3474,6 +3495,9 @@ void MultiMeshBullets2D::handle_bullet_collision(CollisionType collision_type, i
 		// only fire when the slot still holds the SAME assignment.
 		BulletAttachment2D *attachment_at_signal_time = (bullet_index >= 0 && bullet_index < (int)attachments.size()) ? attachments[bullet_index] : nullptr;
 		const uint64_t attachment_epoch_at_signal_time = attachment_epoch_for(bullet_index);
+		// The id is captured NOW: the handler below may free() the attachment,
+		// after which the pointer must never be dereferenced again.
+		const uint64_t attachment_id_at_signal_time = attachment_at_signal_time != nullptr ? attachment_at_signal_time->get_instance_id() : 0;
 
 		Object *hit_target = ObjectDB::get_instance(entered_instance_id);
 
@@ -3545,8 +3569,7 @@ void MultiMeshBullets2D::handle_bullet_collision(CollisionType collision_type, i
 		if (is_queued_for_deletion()) {
 			return;
 		}
-		const uint64_t captured_id = attachment_at_signal_time != nullptr ? attachment_at_signal_time->get_instance_id() : 0;
-		if (slot_still_holds_attachment(bullet_index, attachment_at_signal_time, captured_id, attachment_epoch_at_signal_time)) {
+		if (slot_still_holds_attachment(bullet_index, attachment_at_signal_time, attachment_id_at_signal_time, attachment_epoch_at_signal_time)) {
 			bullet_disable_attachment(bullet_index);
 		}
 		}

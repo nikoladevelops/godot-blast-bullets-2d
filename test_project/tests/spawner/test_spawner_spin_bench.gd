@@ -93,19 +93,27 @@ func test_shoot_once_cpu_cold_vs_warm() -> void:
 
 
 func test_first_spawn_cold_vs_warm_pool() -> void:
+	# Times ONLY the shoot_once() call (no frames inside the measurement) and
+	# parks the first volley with clear_active_bullets(): free_active_bullets()
+	# DESTROYS volleys, so a shot after it is cold again (the old version of
+	# this test measured two cold shots).
 	var sp := _heart_spawner()
 	await idle(1)
 	var t0 := Time.get_ticks_usec()
 	assert_true(sp.shoot_once(), "first-ever shot fires")
-	await physics(3)
 	var cold_ms := float(Time.get_ticks_usec() - t0) / 1000.0
 	await idle(1)
-	factory.free_active_bullets()
-	await idle(1)
+	factory.clear_active_bullets()
+	await idle(2)
+	factory.debug_reset_pool_stats()
 	t0 = Time.get_ticks_usec()
 	assert_true(sp.shoot_once(), "pooled shot fires")
-	await physics(3)
 	var warm_ms := float(Time.get_ticks_usec() - t0) / 1000.0
+	var stats: Dictionary = factory.debug_get_pool_hit_stats()
+	assert_eq(int(stats.get("directional_hits", 0)), 1, "second shot is a pool hit (warm)")
+	assert_eq(int(stats.get("directional_misses", 0)), 0, "no pool miss on the warm shot")
 	print("BENCH heart1500 cold=%.3fms warm=%.3fms" % [cold_ms, warm_ms])
+	# Catastrophe guards only (debug build, shared CI cores); the real
+	# tracking lives in tools/run_benchmarks.py.
 	assert_lt(cold_ms, 2000.0, "cold spawn budget")
 	assert_lt(warm_ms, 2000.0, "warm spawn budget")

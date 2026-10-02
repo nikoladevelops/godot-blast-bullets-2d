@@ -14,7 +14,14 @@ python3 tools/run_tests.py --fail-fast       # stop scheduling after first red f
 python3 tools/run_tests.py --list            # discover without running
 python3 tools/run_tests.py --self-test       # canaries must report FAIL + LEAK
 python3 tools/run_tests.py --no-leaks        # faster, NOT green (skips leak gate)
+python3 tools/run_tests.py --report          # + test_project/test_results/summary.json (slowest first)
+python3 tools/run_tests.py --realtime        # real-time pacing (default is simulated time, see below)
+python3 tools/lint_tests.py                  # static test lint (the runner runs it first; exit 3 = lint failed)
 ```
+
+Time is SIMULATED: the runner passes `--fixed-fps 60`, so every frame
+advances exactly 1/60 s and runs as fast as the CPU allows. Frame-counted
+tests behave identically to real time; the full suite runs in ~6 s.
 
 A file is green only when ALL hold: process exits 0, GUT JUnit shows
 0 failures (missing report = CRASH, never PASS — catches a stale `.so`),
@@ -38,9 +45,8 @@ refresh, per-file processes, JUnit + leak verdicts).
 Repo-correct patterns:
 
 ```sh
-rg --files test_project -g 'test_*.gd'          # suite inventory (basename!)
-rg "/test_[^/]*\.gd$" --files-with-matches      # avoid the test_project/ prefix trap:
-                                                # unanchored "test_" matches EVERY path
+rg --files test_project/tests -g 'test_*.gd'    # suite inventory (-g globs the BASENAME)
+python3 tools/run_tests.py --list               # same inventory, as the runner sees it
 rg -n "push_error|emit_signal" src/bullets/     # fail-loud sites (pin exact text in tests)
 rg -n "^func test_" test_project/tests/volley/test_volley_bounce.gd
 ```
@@ -73,12 +79,19 @@ rg -n "^func test_" test_project/tests/volley/test_volley_bounce.gd
   preview sweep and the 33-source pattern sweep). NOTE: this GUT version
   groups executions under one `<parameterized>` JUnit case — isolation is
   real, per-value reporting is not.
+- **Liveness rule (C++)**: never carry a raw `Object*` across user code or
+  `call_deferred` (the binder converts Variant args BEFORE your body's id
+  check runs). Capture `get_instance_id()` BEFORE the user signal/callback
+  and compare `ObjectDB::get_instance(id) == live_slot_pointer` afterwards
+  (see `slot_still_holds_attachment_id`). `integration/test_reentrant_frees`
+  is the regression net: handlers that `free()` mid-signal.
 - **Doubles** (`doubler`/`spy`/`stubber`, `assert_called*`): available but
   UNUSED in this repo. Reach for them when a handler must be observed
   without side effects (e.g. counting spawner callbacks without firing).
 - **Strict errors**: any `push_error`/engine error not claimed by
   `expect_error*` fails the test. `get_errors()` + `err.handled` is the
-  mechanism; `swallow_errors()` marks all handled (fuzz only).
+  mechanism; `swallow_errors()` marks all handled (fuzz allowlist only,
+  enforced by `tools/lint_tests.py`).
 
 ## 5. Test doctrine (`test_project/tests/common/blast_test.gd`)
 
@@ -90,10 +103,15 @@ rg -n "^func test_" test_project/tests/volley/test_volley_bounce.gd
   physics step — structural calls rejected; call `idle()` first). NEVER
   GUT's `wait_*_frames` (resumes after n+1 frames, skews every count).
 - Strict mode: any undeclared `push_error`/engine error fails the test.
-  Rejections are loud by contract — pin with `expect_error()` /
-  `expect_errors_containing(text, min_count)` / `expect_any_error()`.
-  `swallow_errors()` is ONLY for fuzz/crash-proof suites where survival
-  (not wording) is the contract.
+  Rejections are loud by contract — pin them RIGHT AFTER the hostile call:
+  `expect_error_sequence(["exact text", ...])` (exact count + order +
+  wording; the preferred form), `expect_error(text)`,
+  `expect_errors_containing(text, N)` (EXACTLY N; `at_least=true` needs a
+  `# lint: at-least <reason>` comment), `expect_no_errors()` (checkpoint).
+  `swallow_errors()` is ONLY for the lint allowlist (crash-proof fuzz).
+  End-of-test lumps hide bugs: strict pinning once exposed two bounce tests
+  that silently ran with a setter-rejected value (`bounce_cooldown_sec = 5.0`
+  is outside [0, 1]).
 - `Array(...)`-wrap engine arrays before `assert_eq` against literals.
 
 ## 6. Writing good tests (checklist)
@@ -117,7 +135,11 @@ rg -n "^func test_" test_project/tests/volley/test_volley_bounce.gd
 
 - Harness pattern: `make_spawner(data, source, n)` + `make_wall(pos)` /
   `Area2D` on known layers + `watch_signals` on factory/spawner/volley.
-  Walls: bounce layer value 8, plain 16 (see `_bounce_data` docs).
+  `make_wall` defaults to layer value 4 (matches `H.make_*_data` masks);
+  the bounce suite uses its own convention (bounce wall 8, plain 16).
+- A spawner you add to the tree auto-fires by default: create test
+  spawners with `make_spawner()` or call `set_shooting_enabled(false)`
+  BEFORE `add()`, otherwise it fires (and errors) every interval.
 - Physics tests need REAL frames: spawn → `await physics(k)` with
   early-break on the observed condition; assert counts, signals, AND
   finiteness (`_finite` helpers).
@@ -196,14 +218,18 @@ rg -n "^func test_" test_project/tests/volley/test_volley_bounce.gd
 
 - **Spawn flow**: `BulletFactory2D.spawn_controllable_*` (GDScript entry)
   → pool pop by `MultiMeshPoolKey2D` (amount + shape + type) or fresh
-  alloc → `enable_multimesh(data, ...)` (rolls back on failure) →
-  `set_up_bullet_instances` + `generate_multimesh`. Spawner `shoot_once()`
+  alloc → `enable_multimesh(data, ...)` →
+  `set_up_bullet_instances` + `generate_multimesh` (`enable_multimesh`
+  validates everything BEFORE mutating, so a refused enable changes
+  nothing). Spawner `shoot_once()`
   funnels through the same guarded path (homing/orbit/signals consistent).
 - **Pooling**: one bucket per key; pop prefers newest non-ticked volley
   (`is_being_ticked` skips volleys mid-sweep); same-key spawns from
   handlers reuse mid-sweep, foreign volleys never silently reused.
-  Structural ops (`reset/free_*/populate_*`) are idle-frame only and go
-  through `queue_structural_call` (process_frame flush, in order).
+  Structural ops (`reset/free_*/populate_*`) are idle-frame only: called
+  inside a physics frame they are REJECTED loudly (`reject_when_iterating`).
+  Their `*_deferred` twins queue through `queue_structural_call` (flushed
+  on the next process_frame, in order) and are safe from anywhere.
 - **Lifetimes**: `reduce_lifetime` ticks down → `disable_bullet` per slot
   → last-out funnels to pool. With `life_time_over` signals armed, the
   volley is HELD out of the pool (`lifetime_flush_pending`) until the
@@ -214,9 +240,10 @@ rg -n "^func test_" test_project/tests/volley/test_volley_bounce.gd
   O(1) hash; shape-level opt-out) → `all_collided_bullets` records with
   queue-time epochs/velocity/pose → per-tick drain → counting → signals →
   bounce (radial default; precise shape-analytic with radial/head-on
-  fallbacks). Paused factory DROPS records (anti-hitch, §5 gotchas).
-- **Spawner loop**: `_process` runs iff `shooting || spin || retarget ||
-  preview || burst/telegraph/pattern pending` (line ~4397); `shooting_*`
+  fallbacks). A paused factory DROPS overlap records (anti-hitch).
+- **Spawner loop**: `_process` runs iff `needs_process()` (`shooting ||
+  spin || retarget || preview || burst/telegraph/pattern pending`; grep
+  `needs_process` in bullet_spawner2d.cpp); `shooting_*`
   SIGNALS track auto-shooting transitions only (subsystem wakes are
   signal-silent — pinned).
 - **Per-bullet model**: entry `i` drives bullet `i`; per-bullet (valid) >
@@ -240,7 +267,8 @@ zero-radius orbit; negative speeds under curves.
   alloc), pooled re-shots ~1ms. Pre-warm startup-critical patterns with
   `populate_bullets_pool(BulletFactory2D.debug_expected_pool_key(data),
   data, n)`; `free_active_bullets()` DESTROYS (cold again), only
-  clear/expiry park. Spin itself costs ~0 (pinned in test_spawner_spin_bench).
+  clear/expiry park (`test_spawner_spin_bench` proves the warm shot is a
+  pool hit).
 
 ## 14. Performance rules (tick code is sacred)
 

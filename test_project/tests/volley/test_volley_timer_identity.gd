@@ -125,7 +125,7 @@ func test_cap_enforced_at_64() -> void:
 		v.multimesh_attach_time_based_function(10.0, func() -> void: pass)
 	await idle()
 	assert_eq(v.debug_get_timer_count(), 64, "cap is 64")
-	assert_eq(expect_errors_containing("timer limit (64 per multimesh) reached"), 7, "every over-cap attach fails loud")
+	expect_errors_containing("timer limit (64 per multimesh) reached", 7, "every over-cap attach fails loud")
 	v.multimesh_detach_all_time_based_functions()
 	await idle()
 	assert_eq(v.debug_get_timer_count(), 0, "detach-all empties the list")

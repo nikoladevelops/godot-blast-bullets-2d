@@ -74,16 +74,26 @@ asserts a dangling-free factory plus zero new orphans after every test.
 - `spawner/test_spawner_pool_stress.gd` — 3 spawners on 1 factory: shared fire, cross-shape reuse isolation, reset/free under live volleys, adopt chains, spawner-freed orphans, retarget storms, pool-hit accounting.
 - `volley/test_volley_math_edges.gd` — quantitative tick identities: drag decay band, rotation clamp, wobble boundedness, smoothing clamps.
 - `volley/test_block_volleys.gd` — rigid volleys: spawn, teleport, pooling, expiry, block-data construction (no curves/pattern surface), null-pattern clear, live accounting.
-- `spawner/test_spawner_patterns.gd` — all 30 sources, cap, order ops, spin/scales, skip carve, presets.
+- `spawner/test_spawner_patterns.gd` — all 33 sources (parameterized), cap, order ops, spin/scales, skip carve, presets.
 - `spawner/test_spawner_homing_orbit.gd` — 6 target sources, cache, fire-arc gate, retarget, fuse, stagger.
 - `spawner/test_spawner_signals_sequencing.gd` — handler contracts, burst/telegraph/pattern-list, cap, adopt/clear/override.
 - `integration/test_interpolation_integration.gd` — interpolation agreement/toggle, pause, churn, two factories.
 - `common/blast_test_helpers.gd` — shared `DirectionalBulletsData2D`/`BlockBulletsData2D` builders (identical speeds/layers/sizes so failures mean regressions).
-- `factory/test_factory_generator_fuzz.gd` — crash-fuzz for every generator: hostile counts, degenerate geometry, NaN inputs, extreme twists/offsets, oversized scales, edge-image extraction, side-spread/skip contracts, exact-geometry semantics. Rejections fail loud; survival + finiteness is the contract.
+- `factory/test_factory_generator_fuzz.gd` — crash-fuzz for every generator: hostile counts (incl. the 10000 cap on all 29 generators, amount 0 = silent empty), degenerate geometry, NaN inputs, extreme twists/offsets, oversized scales, edge-image extraction, side-spread/skip contracts, exact-geometry semantics. Every rejection is pinned with its exact error right after the call; valid input never errors.
 - `factory/test_factory_layer_rings.gd` — outline-layer design proofs: every extra layer re-spawns the shape scaled about the loop center, facings/quotas/corners exact per ring.
 - `spawner/test_spawner_refactor.gd` — `bullet_spawner2d.cpp` internals: keep-awake predicate (incl. stop_pattern_list-must-not-sleep-a-pending-burst), freed factory/generator/target/path2d report missing, corridor door + fan-vs-aimed parity, pattern-hint lock, outline setter reject-and-keep.
 - `spawner/test_spawner_tree.gd` — live-tree integration: error paths, preview/cap/custom/line collection, homing resolution, live shooting, factory smoke.
 - `spawner/test_spawner_preview_coincidence.gd` — preview dots sit on the layer rings for every outline shape, fill deal, twist/cap/scales/curve, sides/offsets/layouts/distributions, corner knobs, dense star.
+- `volley/test_volley_fx_layers.gd` — sprite-effect layers with REAL physics: validation, spawn flash, trails (disable/wake), destroy/hit/bounce/lifetime/clear triggers, desync shards, per-bullet toggles, pool-reuse reseed + caps, styling, spawner integration, interpolation agreement, colour ramps, fades, whiten overrides, hostile configs.
+- `spawner/test_wave1_regressions.gd` — wave-1 regression pins: fire arc in the generator frame, rotation presence across a same-owner wake, retarget stagger kept across no-op setters, gravity fill-gaps, outline-distribution gating, linear orbit re-arm, bad presets are no-ops.
+- `spawner/test_spawner_spin_bench.gd` — spin on/off + cold/warm pool timings (heart, 1500 bullets) with catastrophe-only budgets; the warm shot is proven to be a pool hit. Real tracking lives in `tools/run_benchmarks.py`.
+- `spawner/test_spawner_spin_perf.gd` — a 10k spiral collect with advancing spin stays in the millisecond class (catastrophe guard).
+- `pooling/test_pool_attachments.gd` — BulletAttachment2D lifecycle through the pool (AttachmentProbe2D counts callbacks): spawn/disable/enable/in-pool sequences, blank slots on reuse, null/wrong-type scenes rejected.
+- `pooling/test_pool_cross_owner_handover.gd` — adopt hand-over between spawners, foreign pooled wake warns and reseeds, `free_volley_deferred` from a collision handler never corrupts the sweep.
+- `pooling/test_pool_key_validity.gd` — exact (amount + shape) pool hits; mismatches miss and allocate (never silent reuse); capsule bucket isolation; per-bucket free; mismatched enable refuses cleanly.
+- `pooling/test_pool_multispawner_shared_factory.gd` — three spawners plus direct spawns on ONE factory: census by owner, per-spawner retarget and live-bullet fuse, per-bucket free isolation.
+- `pooling/test_pool_state_reset.gd` — state-reset matrix: a volley seeded with every feature is drained and reused neutral; runtime shape change re-buckets; a new amount never reuses.
+- `integration/test_reentrant_frees.gd` — user handlers calling `free()` re-entrantly: attachments freed inside a killing/non-killing `body_entered` and inside `life_time_over` (both used to read freed memory; the lifetime one segfaulted), and the LAST bullet's killing-hit handler sees its own attachment.
 - `test_no_orphan_suites.gd` — repo hygiene: fails if any runnable `test_*.gd` exists outside `tests/` (invisible to the runner, would silently stop running).
 
 ## Conventions
@@ -95,10 +105,16 @@ asserts a dangling-free factory plus zero new orphans after every test.
 - `before_each` adds a fresh `factory` (use `make_spawner()` / `spawn_dir()`
   / `make_preview_spawner()` builders); `after_each` asserts
   `debug_assert_no_dangling()` + zero new orphans.
-- Rejections are loud by contract: pin them with `expect_error()` /
-  `expect_errors_containing()` / `expect_any_error()`; only fuzz/crash-proof
-  suites use `swallow_errors()`, and only where survival (not wording) is the
-  contract.
+- Rejections are loud by contract: pin them RIGHT AFTER the hostile call with
+  `expect_error_sequence([exact texts in order])` (exact count + order +
+  wording), `expect_error(text)`, or `expect_errors_containing(text, N)`
+  (EXACTLY N; `at_least=true` needs a `# lint: at-least <reason>` comment).
+  `expect_no_errors()` is a mid-test checkpoint. `swallow_errors()` is only
+  allowed in `tools/lint_tests.py`'s fuzz allowlist.
+- `tools/lint_tests.py` (run automatically by the runner) enforces these
+  rules plus: no `extends SceneTree` suites, no GUT `wait_*_frames`, no stray
+  `print(` (use `print("BENCH ...")` for benchmark output), and every suite
+  listed in this README.
 
 ## Running
 
@@ -108,7 +124,13 @@ python3 tools/run_tests.py --suite volley   # substring filter
 python3 tools/run_tests.py --changed-only   # suites plausibly affected
 python3 tools/run_tests.py --list           # discover without running
 python3 tools/run_tests.py --self-test     # canaries: proves failures + leaks are detected
+python3 tools/run_tests.py --report        # also write test_project/test_results/summary.json
+python3 tools/run_tests.py --realtime      # real-time pacing instead of simulated time (slow)
 ```
+
+Time is SIMULATED by default (`godot --fixed-fps 60`): every frame advances
+exactly 1/60 s and runs as fast as the CPU allows, so frame-counted tests
+behave identically and the whole run takes seconds (bounce: 101 s -> 0.14 s).
 
 A file is green only when its process exits 0 **and** GUT's JUnit report shows
 0 failures **and** the `--verbose` exit report shows no leaks (ObjectDB/RID/

@@ -2214,6 +2214,22 @@ public:
 		return attachment_epoch_for(bullet_index) == expected_attachment_epoch;
 	}
 
+	// Id-only form for deferred work: the queued request carries NO pointer
+	// (a raw Object* in a deferred call's Variant args is converted by the
+	// binder BEFORE this body runs, which reads freed memory when a handler
+	// freed the attachment in between). The live slot pointer is compared
+	// against the ObjectDB resolution of the id - never dereferenced first.
+	bool slot_still_holds_attachment_id(int bullet_index, uint64_t expected_attachment_id, uint64_t expected_attachment_epoch) const {
+		if (expected_attachment_id == 0 || bullet_index < 0 || bullet_index >= (int)attachments.size()) {
+			return false;
+		}
+		BulletAttachment2D *slot = attachments[bullet_index];
+		if (slot == nullptr) {
+			return false;
+		}
+		return slot_still_holds_attachment(bullet_index, slot, expected_attachment_id, expected_attachment_epoch);
+	}
+
 	// NOTE: there is deliberately NO 3-argument (no-epoch) overload of this
 	// check. It would silently accept a slot that was re-assigned to the same
 	// node within the same generation - the classic ABA case the epoch exists
@@ -2578,7 +2594,11 @@ public:
 	// Liveness is checked BEFORE the pointer compare: comparing a dangling
 	// pointer first would touch freed memory when the id was recycled.
 	// Cold path: defined in multimesh_bullets2d.cpp.
-	void _do_deferred_bullet_disable_attachment(int bullet_index, int expected_generation, uint64_t expected_attachment_id, BulletAttachment2D *expected_attachment, uint64_t expected_attachment_epoch);
+	// Batched, id-only deferred release of the attachments held by slots that
+	// expired this tick. `requests` packs (bullet_index, attachment_id, epoch)
+	// triples; only slots that HELD an attachment at expiry are queued, so a
+	// 10k-bullet volley death without attachments queues nothing.
+	void _do_deferred_bullet_disable_attachments(int expected_generation, const PackedInt64Array &requests);
 
 	// Generation-guarded deferred life_time_over emit (see schedule site in
 	// reduce_lifetime): drops stale emissions when the instance was pooled
@@ -2695,7 +2715,14 @@ public:
 		// pooling-off volley would resurrect pooling mid-sweep and pool itself.
 		const bool saved_auto_pool = is_multimesh_auto_pooling_enabled;
 		const bool saved_auto_pool_attachments = is_attachments_auto_pooling_enabled;
-		reset_transient_volley_state(0, false, hold_for_lifetime_flush);
+		// A collision killing blow on the LAST live bullet funnels here with
+		// its slot guarded (signal_protected_attachment_slot): the sweep above
+		// skipped it, and the reset must keep it too, otherwise the handler of
+		// the volley's final bullet sees a null attachment while every earlier
+		// bullet's handler saw its own (the post-signal path releases it, and a
+		// re-entrant pool pop sweeps it via the new life's reset).
+		const bool keep_slots_for_signal = hold_for_lifetime_flush || signal_protected_attachment_slot >= 0;
+		reset_transient_volley_state(0, false, keep_slots_for_signal);
 		is_multimesh_auto_pooling_enabled = saved_auto_pool;
 		is_attachments_auto_pooling_enabled = saved_auto_pool_attachments;
 

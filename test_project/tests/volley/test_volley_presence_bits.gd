@@ -55,7 +55,6 @@ func test_speed_invalid_entry_is_a_gap() -> void:
 	var d := _bare()
 	d.all_bullet_speed_data = [_spd(200.0), null]
 	var v := _spawn(d)
-	swallow_errors()
 	v.set_shared_bullet_speed_data(_spd(150.0))
 	assert_almost_eq(_speed_of(v, 0), 200.0, 0.01, "bullet 0 keeps per-bullet 200")
 	assert_almost_eq(_speed_of(v, 1), 150.0, 0.01, "null-entry bullet 1 falls back to shared 150")
@@ -64,7 +63,7 @@ func test_speed_invalid_entry_is_a_gap() -> void:
 func test_rejected_nan_is_a_deliberate_zero() -> void:
 	var nan_entry := BulletSpeedData2D.new()
 	nan_entry.speed = NAN
-	swallow_errors()
+	expect_error_sequence(["BulletSpeedData2D.speed must be a finite value"])
 	assert_false(is_nan(nan_entry.speed), "BulletSpeedData2D refuses to store NaN")
 	var d := _bare()
 	d.all_bullet_speed_data = [_spd(200.0), nan_entry]
@@ -95,7 +94,7 @@ func test_rotation_invalid_entry_is_a_gap() -> void:
 	d.all_bullet_speed_data = [_spd(0.0), _spd(0.0)]
 	d.all_bullet_rotation_data = [_rot(4.0, 10.0), null]
 	var v := _spawn(d)
-	swallow_errors()
+	expect_error_sequence(["Invalid rotation data at index 1: expected BulletRotationData2D"])
 	v.set_shared_bullet_rotation_data(_rot(7.0))
 	assert_almost_eq(_rot_of(v, 0), 4.0, 0.01, "bullet 0 keeps per-bullet 4")
 	assert_almost_eq(_rot_of(v, 1), 7.0, 0.01, "null-entry bullet 1 falls back to shared 7")
@@ -114,13 +113,11 @@ func test_speed_fill_once_both_orders() -> void:
 	var d := _bare()
 	d.all_bullet_speed_data = [_spd(200.0), null]
 	var v := _spawn(d)
-	swallow_errors()
 	v.set_shared_bullet_speed_data(_spd(150.0))
 	v.set_shared_bullet_speed_data(_spd(999.0))
 	assert_almost_eq(_speed_of(v, 0), 200.0, 0.01, "second shared call leaves the per-bullet slot alone")
 	assert_almost_eq(_speed_of(v, 1), 150.0, 0.01, "second shared call does not re-fill")
 	var vb := _spawn(_bare())
-	swallow_errors()
 	vb.set_shared_bullet_speed_data(_spd(150.0))
 	vb.set_bullet_speed_data(0, _spd(50.0))
 	vb.set_bullet_speed_data(1, _spd(0.0, 0.0))
@@ -133,7 +130,7 @@ func test_rotation_fill_once_both_orders() -> void:
 	d.all_bullet_speed_data = [_spd(0.0), _spd(0.0)]
 	d.all_bullet_rotation_data = [_rot(4.0, 10.0), null]
 	var v := _spawn(d)
-	swallow_errors()
+	expect_error_sequence(["Invalid rotation data at index 1: expected BulletRotationData2D"])
 	v.set_shared_bullet_rotation_data(_rot(7.0))
 	v.set_shared_bullet_rotation_data(_rot(999.0))
 	assert_almost_eq(_rot_of(v, 0), 4.0, 0.01, "second shared rotation leaves the per-bullet slot alone")
@@ -150,7 +147,6 @@ func test_rotation_fill_once_both_orders() -> void:
 
 func test_direct_write_claims_presence() -> void:
 	var v := _spawn(_bare())
-	swallow_errors()
 	v.set_shared_bullet_speed_data(_spd(150.0))
 	assert_almost_eq(_speed_of(v, 0), 150.0, 0.01, "shared filled both slots first")
 	v.set_bullet_speed_data(0, _spd(0.0, 0.0))
@@ -180,6 +176,5 @@ func test_pool_reuse_starts_fresh() -> void:
 	var db := _bare()
 	db.all_bullet_speed_data = [_spd(200.0), null]
 	var vb := _spawn(db)
-	swallow_errors()
 	vb.set_shared_bullet_speed_data(_spd(160.0))
 	assert_almost_eq(_speed_of(vb, 1), 160.0, 0.01, "new life fills its own gap (no inherited bit)")

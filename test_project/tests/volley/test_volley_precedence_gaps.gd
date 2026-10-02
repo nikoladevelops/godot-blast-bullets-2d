@@ -3,7 +3,7 @@ extends BlastTest
 ## unified model, proven per bullet. Complements test_volley_precedence_sizes
 ## (happy paths) with: empty-rotation+shared fans to ALL slots and spins every
 ## slot; deliberate-zero vs gap; partial-zero triples; all-zero shared no-op;
-## NaN shared aborts the whole volley with ballistics intact; live set-order
+## NaN rejected at the resource (never reaches a volley); live set-order
 ## both ways; tiled arrays with invalid entries; shared curves outrank valid
 ## ballistics per tick; per-channel split; pattern flag snapshot vs live;
 ## rotate-flag flip only when a gap fills; homing drain->shared handover;
@@ -85,17 +85,26 @@ func test_all_zero_shared_is_a_silent_no_op_live_and_at_spawn() -> void:
 	assert_true(absf(v4.get_bullet_speed_data(1).speed) < 0.01, "live all-zero shared still no-op")
 
 
-func test_nan_shared_aborts_whole_volley_ballistics_intact() -> void:
-	# GAP T5 NaN shared aborts whole volley, ballistics intact
-	var g5 := H.make_directional_data(2, 0.0)
-	g5.all_bullet_speed_data = [_speed(0.0), _speed(50.0)]
+func test_nan_speed_rejected_at_the_resource_never_reaches_a_volley() -> void:
+	# GAP T5. NaN can never live inside BulletSpeedData2D: the resource setter
+	# rejects it and keeps the old value, so "NaN shared data" is unreachable
+	# through any public path (scripts, .tres loads and the inspector all go
+	# through the setter). Prove the guard and that the resource that DOES
+	# reach the volley is the sane one: the null gap at slot 0 is filled from
+	# shared (1.0), the valid slot 1 keeps its own 50, everything finite.
 	var bad := _speed(1.0)
 	bad.speed = NAN
-	expect_errors_containing("must be a finite value", 1, "NaN speed setter fails loud")
+	expect_error_sequence(["BulletSpeedData2D.speed must be a finite value"])
+	assert_eq(bad.speed, 1.0, "NaN write rejected, old value kept")
+	var g5 := H.make_directional_data(2, 0.0)
+	g5.all_bullet_speed_data = [null, _speed(50.0)]
 	g5.shared_bullet_speed_data = bad
 	var v5: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(g5)
-	assert_true(absf(v5.get_bullet_speed_data(0).speed) < 0.01, "NaN shared leaves gap at zero")
-	assert_true(absf(v5.get_bullet_speed_data(1).speed - 50.0) < 0.01, "NaN shared keeps valid slot")
+	assert_not_null(v5, "volley spawns")
+	assert_almost_eq(v5.get_bullet_speed_data(0).speed, 1.0, 0.01, "null gap filled from the (sane) shared speed")
+	assert_almost_eq(v5.get_bullet_speed_data(1).speed, 50.0, 0.01, "valid per-bullet slot keeps its own speed")
+	await physics(2)
+	assert_true(v5.get_bullet_velocity(0).is_finite() and v5.get_bullet_velocity(1).is_finite(), "velocities finite")
 
 
 func test_live_shared_fills_seeded_zero_slots_then_fill_once_order() -> void:

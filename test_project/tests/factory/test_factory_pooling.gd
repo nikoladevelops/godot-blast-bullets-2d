@@ -92,6 +92,5 @@ func test_pool_hit_observability() -> void:
 	var carved := _data(4)
 	carved.transforms = [Transform2D.IDENTITY, Transform2D(0.0, Vector2(10, 0))]
 	factory.spawn_directional_bullets(carved)
-	swallow_errors()
 	await idle(1)
 	assert_gte(factory.debug_get_pool_hit_stats().get("directional_misses", 0), 1, "size mismatch counted as miss")

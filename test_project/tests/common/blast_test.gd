@@ -63,16 +63,48 @@ func expect_error(text: String, msg := "") -> void:
 	assert_push_error(text, msg if msg != "" else "expected error: " + text)
 
 
-## Marks EVERY recorded error/warning containing `text` as handled and asserts
-## at least `min_count` were seen. For loops that error once per element.
-func expect_errors_containing(text: String, min_count := 1, msg := "") -> int:
+## Marks EVERY unhandled error/warning containing `text` as handled and
+## asserts EXACTLY `count` were seen (pass at_least=true only for genuinely
+## nondeterministic counts, e.g. physics-frame-dependent storms - and say why
+## in a comment). For loops that error once per element.
+func expect_errors_containing(text: String, count := 1, msg := "", at_least := false) -> int:
 	var seen := 0
 	for err in get_errors():
 		if not err.handled and err.contains_text(text):
 			err.handled = true
 			seen += 1
-	assert_true(seen >= min_count, msg if msg != "" else "expected >= %d error(s) containing '%s' (got %d)" % [min_count, text, seen])
+	var ok: bool = seen >= count if at_least else seen == count
+	var want := (">= %d" % count) if at_least else str(count)
+	assert_true(ok, (msg + ": " if msg != "" else "") + "expected %s error(s) containing '%s' (got %d)" % [want, text, seen])
 	return seen
+
+
+## The PRECISE form: the unhandled errors recorded since the last expect_*
+## call must be exactly `texts.size()` errors, in order, each containing the
+## matching entry (case-insensitive substring). Extra, missing or reordered
+## errors fail with the actual list printed. Prefer this over the counting
+## helpers: it pins wording AND multiplicity right where the call happens.
+func expect_error_sequence(texts: Array, msg := "") -> void:
+	var seen: Array[String] = []
+	var errs: Array = []
+	for err in get_errors():
+		if not err.handled and (err.is_push_error() or err.is_engine_error()):
+			err.handled = true
+			errs.append(err)
+			seen.append(str(err.code))
+	var ok: bool = errs.size() == texts.size()
+	if ok:
+		for i in texts.size():
+			if not errs[i].contains_text(str(texts[i])):
+				ok = false
+				break
+	assert_true(ok, "%sexpected errors %s, got %s" % [(msg + ": ") if msg != "" else "", str(texts), str(seen)])
+
+
+## Asserts that NO unhandled error was recorded since the last expect_* call
+## (a mid-test checkpoint: strict mode only checks at the very end).
+func expect_no_errors(msg := "") -> void:
+	expect_error_sequence([], msg if msg != "" else "no errors expected here")
 
 
 ## Asserts that at least `min_count` NEW (unhandled) errors were recorded since

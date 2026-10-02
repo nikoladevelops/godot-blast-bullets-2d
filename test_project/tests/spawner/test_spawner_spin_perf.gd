@@ -19,5 +19,5 @@ func test_10k_spin_collect_budget() -> void:
 		worst = maxi(worst, dt)
 		assert_eq(tf.size(), 10000, "10k spiral collects with spin on")
 		await idle(1)
-	print("worst 10k spin collect usec=", worst)
+	print("BENCH worst 10k spin collect usec=", worst)
 	assert_lt(worst, 25000, "10k spin collect stays in the millisecond class")
