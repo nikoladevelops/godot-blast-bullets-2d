@@ -94,6 +94,7 @@ asserts a dangling-free factory plus zero new orphans after every test.
 - `pooling/test_pool_multispawner_shared_factory.gd` — three spawners plus direct spawns on ONE factory: census by owner, per-spawner retarget and live-bullet fuse, per-bucket free isolation.
 - `pooling/test_pool_state_reset.gd` — state-reset matrix: a volley seeded with every feature is drained and reused neutral; runtime shape change re-buckets; a new amount never reuses.
 - `integration/test_reentrant_frees.gd` — user handlers calling `free()` re-entrantly: attachments freed inside a killing/non-killing `body_entered` and inside `life_time_over` (both used to read freed memory; the lifetime one segfaulted), and the LAST bullet's killing-hit handler sees its own attachment.
+- `factory/test_factory_frame_stats.gd` — profiling API: exact spawn/tick/expiry/collision counters in `get_frame_stats()`, measured tick time, `reset_frame_stats()`, BlastBullets2D/* editor monitors owned by one factory and removed on exit.
 - `test_no_orphan_suites.gd` — repo hygiene: fails if any runnable `test_*.gd` exists outside `tests/` (invisible to the runner, would silently stop running).
 
 ## Conventions

@@ -32,6 +32,8 @@
 #include <godot_cpp/classes/project_settings.hpp>
 #include <godot_cpp/classes/scene_tree.hpp>
 #include <godot_cpp/classes/world2d.hpp>
+#include <godot_cpp/classes/performance.hpp>
+#include <godot_cpp/classes/time.hpp>
 #include <godot_cpp/variant/utility_functions.hpp>
 
 #include <algorithm>
@@ -149,8 +151,15 @@ FactoryOperationGuard::~FactoryOperationGuard() {
 	factory->is_factory_busy = saved_busy;
 }
 
+uint64_t BulletFactory2D::performance_monitors_owner_id = 0;
+
 void BulletFactory2D::_notification(int p_what) {
+	if (p_what == NOTIFICATION_EXIT_TREE) {
+		unregister_monitors();
+		return;
+	}
 	if (p_what == NOTIFICATION_PREDELETE) {
+		unregister_monitors();
 		// Parent is notified before children are destroyed. From here on no child
 		// pointer (debuggers, containers) may be touched by teardown paths.
 		is_tearing_down = true;
@@ -212,6 +221,7 @@ void BulletFactory2D::_ready() {
 	set_process(is_factory_processing_bullets && use_physics_interpolation);
 
 	is_ready = true;
+	register_monitors();
 
 	// Interpolation mismatch warning: warn when the factory flag disagrees with the project setting.
 	// Bullets look steppy on >60Hz displays when project interpolation is off
@@ -1052,6 +1062,9 @@ void BulletFactory2D::set_is_factory_processing_bullets(bool is_processing_enabl
 }
 
 void BulletFactory2D::_physics_process(double delta) {
+	const uint64_t stats_t0 = Time::get_singleton()->get_ticks_usec();
+	stats_tick_volleys = 0;
+	stats_tick_bullets = 0;
 	is_iterating_bullets = true;
 	handle_bullet_behavior<DirectionalBullets2D>(all_directional_bullets, directional_bullets_set, delta, directional_iteration_scratch);
 	handle_bullet_behavior<BlockBullets2D>(all_block_bullets, block_bullets_set, delta, block_iteration_scratch);
@@ -1083,6 +1096,14 @@ void BulletFactory2D::_physics_process(double delta) {
 		}
 	}
 	is_iterating_bullets = false;
+
+	stats_last_physics_tick_usec = Time::get_singleton()->get_ticks_usec() - stats_t0;
+	if (stats_last_physics_tick_usec > stats_peak_physics_tick_usec) {
+		stats_peak_physics_tick_usec = stats_last_physics_tick_usec;
+	}
+	stats_last_tick_volleys = stats_tick_volleys;
+	stats_last_tick_bullets = stats_tick_bullets;
+	++stats_physics_ticks;
 }
 
 void BulletFactory2D::_process(double delta) {
@@ -1093,10 +1114,12 @@ void BulletFactory2D::_process(double delta) {
 	// Same guard as _physics_process: reset/free_* during the render sweep
 	// would mutate the vec under iteration. The interpolation pass only
 	// reads, but its inputs (vec, sparse set) are shared with the writers.
+	const uint64_t stats_t0 = Time::get_singleton()->get_ticks_usec();
 	is_iterating_bullets = true;
 	handle_bullet_rendering_interpolation<DirectionalBullets2D>(all_directional_bullets, directional_bullets_set, directional_iteration_scratch);
 	handle_bullet_rendering_interpolation<BlockBullets2D>(all_block_bullets, block_bullets_set, block_iteration_scratch);
 	is_iterating_bullets = false;
+	stats_last_render_usec = Time::get_singleton()->get_ticks_usec() - stats_t0;
 }
 
 void BulletFactory2D::spawn_block_bullets(const Ref<BlockBulletsData2D> &spawn_data, const Vector2 &new_inherited_velocity_offset) {
@@ -1792,6 +1815,152 @@ Dictionary BulletFactory2D::debug_get_factory_state() {
 	d["attachments_pooled"] = bullet_attachments_pool.get_total_amount_pooled();
 	return d;
 }
+
+int BulletFactory2D::get_active_bullet_count() const {
+	int total = 0;
+	for (const DirectionalBullets2D *volley : all_directional_bullets) {
+		if (volley != nullptr && volley->is_active) {
+			total += volley->active_bullets_counter;
+		}
+	}
+	for (const BlockBullets2D *volley : all_block_bullets) {
+		if (volley != nullptr && volley->is_active) {
+			total += volley->active_bullets_counter;
+		}
+	}
+	return total;
+}
+
+Dictionary BulletFactory2D::get_frame_stats() const {
+	Dictionary d;
+	d["physics_ticks"] = (int64_t)stats_physics_ticks;
+	d["physics_tick_usec"] = (int64_t)stats_last_physics_tick_usec;
+	d["peak_physics_tick_usec"] = (int64_t)stats_peak_physics_tick_usec;
+	d["render_usec"] = (int64_t)stats_last_render_usec;
+	d["volleys_ticked"] = stats_last_tick_volleys;
+	d["bullets_ticked"] = stats_last_tick_bullets;
+	d["collision_records_total"] = (int64_t)stats_collision_records_total;
+	d["expired_bullets_total"] = (int64_t)stats_expired_bullets_total;
+	d["spawned_bullets_total"] = (int64_t)stats_spawned_bullets_total;
+	d["pool_hits"] = (int64_t)(directional_pool_hits + block_pool_hits);
+	d["pool_misses"] = (int64_t)(directional_pool_misses + block_pool_misses);
+	d["active_bullets"] = get_active_bullet_count();
+	int active_volleys = 0;
+	int pooled_volleys = 0;
+	for (const DirectionalBullets2D *volley : all_directional_bullets) {
+		if (volley != nullptr) {
+			(volley->is_active ? active_volleys : pooled_volleys)++;
+		}
+	}
+	for (const BlockBullets2D *volley : all_block_bullets) {
+		if (volley != nullptr) {
+			(volley->is_active ? active_volleys : pooled_volleys)++;
+		}
+	}
+	d["active_volleys"] = active_volleys;
+	d["pooled_volleys"] = pooled_volleys;
+	d["active_effects"] = get_active_effect_count();
+	d["active_attachments"] = const_cast<BulletFactory2D *>(this)->debug_get_active_attachments_amount();
+	return d;
+}
+
+void BulletFactory2D::reset_frame_stats() {
+	stats_peak_physics_tick_usec = 0;
+	stats_collision_records_total = 0;
+	stats_expired_bullets_total = 0;
+	stats_spawned_bullets_total = 0;
+	stats_physics_ticks = 0;
+}
+
+void BulletFactory2D::set_register_performance_monitors(bool value) {
+	register_performance_monitors = value;
+	if (!is_ready) {
+		return;
+	}
+	if (value) {
+		register_monitors();
+	} else {
+		unregister_monitors();
+	}
+}
+
+bool BulletFactory2D::get_register_performance_monitors() const {
+	return register_performance_monitors;
+}
+
+static const char *const kBlastMonitorIds[] = {
+	"BlastBullets2D/Active Bullets",
+	"BlastBullets2D/Active Volleys",
+	"BlastBullets2D/Pooled Volleys",
+	"BlastBullets2D/Physics Tick (ms)",
+	"BlastBullets2D/Peak Physics Tick (ms)",
+	"BlastBullets2D/Interpolation (ms)",
+	"BlastBullets2D/Active Effects",
+	"BlastBullets2D/Active Attachments",
+};
+
+void BulletFactory2D::register_monitors() {
+	if (!register_performance_monitors || owns_performance_monitors || Engine::get_singleton()->is_editor_hint()) {
+		return;
+	}
+	// Another live factory already owns the global ids: skip silently (the
+	// monitors would collide). Stale owner ids (freed factory) are reclaimed.
+	if (performance_monitors_owner_id != 0 && ObjectDB::get_instance(ObjectID(performance_monitors_owner_id)) != nullptr) {
+		return;
+	}
+	Performance *perf = Performance::get_singleton();
+	if (perf == nullptr) {
+		return;
+	}
+	const Callable callables[] = {
+		callable_mp(this, &BulletFactory2D::_monitor_active_bullets),
+		callable_mp(this, &BulletFactory2D::_monitor_active_volleys),
+		callable_mp(this, &BulletFactory2D::_monitor_pooled_volleys),
+		callable_mp(this, &BulletFactory2D::_monitor_physics_tick_ms),
+		callable_mp(this, &BulletFactory2D::_monitor_peak_physics_tick_ms),
+		callable_mp(this, &BulletFactory2D::_monitor_render_ms),
+		callable_mp(this, &BulletFactory2D::_monitor_active_effects),
+		callable_mp(this, &BulletFactory2D::_monitor_active_attachments),
+	};
+	for (int i = 0; i < (int)(sizeof(kBlastMonitorIds) / sizeof(kBlastMonitorIds[0])); ++i) {
+		const StringName id(kBlastMonitorIds[i]);
+		if (perf->has_custom_monitor(id)) {
+			perf->remove_custom_monitor(id); // stale registration from a freed owner
+		}
+		perf->add_custom_monitor(id, callables[i]);
+	}
+	owns_performance_monitors = true;
+	performance_monitors_owner_id = get_instance_id();
+}
+
+void BulletFactory2D::unregister_monitors() {
+	if (!owns_performance_monitors) {
+		return;
+	}
+	owns_performance_monitors = false;
+	if (performance_monitors_owner_id == get_instance_id()) {
+		performance_monitors_owner_id = 0;
+	}
+	Performance *perf = Performance::get_singleton();
+	if (perf == nullptr) {
+		return;
+	}
+	for (const char *raw_id : kBlastMonitorIds) {
+		const StringName id(raw_id);
+		if (perf->has_custom_monitor(id)) {
+			perf->remove_custom_monitor(id);
+		}
+	}
+}
+
+Variant BulletFactory2D::_monitor_active_bullets() { return get_active_bullet_count(); }
+Variant BulletFactory2D::_monitor_active_volleys() { return get_frame_stats()["active_volleys"]; }
+Variant BulletFactory2D::_monitor_pooled_volleys() { return get_frame_stats()["pooled_volleys"]; }
+Variant BulletFactory2D::_monitor_physics_tick_ms() { return (double)stats_last_physics_tick_usec / 1000.0; }
+Variant BulletFactory2D::_monitor_peak_physics_tick_ms() { return (double)stats_peak_physics_tick_usec / 1000.0; }
+Variant BulletFactory2D::_monitor_render_ms() { return (double)stats_last_render_usec / 1000.0; }
+Variant BulletFactory2D::_monitor_active_effects() { return get_active_effect_count(); }
+Variant BulletFactory2D::_monitor_active_attachments() { return debug_get_active_attachments_amount(); }
 
 Dictionary BulletFactory2D::debug_get_pool_hit_stats() const {
 	Dictionary d;
@@ -8070,6 +8239,12 @@ void BulletFactory2D::_bind_methods() {
 
 	ClassDB::bind_method(D_METHOD("debug_get_factory_state"), &BulletFactory2D::debug_get_factory_state);
 	ClassDB::bind_method(D_METHOD("debug_get_pool_hit_stats"), &BulletFactory2D::debug_get_pool_hit_stats);
+	ClassDB::bind_method(D_METHOD("get_frame_stats"), &BulletFactory2D::get_frame_stats);
+	ClassDB::bind_method(D_METHOD("reset_frame_stats"), &BulletFactory2D::reset_frame_stats);
+	ClassDB::bind_method(D_METHOD("get_active_bullet_count"), &BulletFactory2D::get_active_bullet_count);
+	ClassDB::bind_method(D_METHOD("set_register_performance_monitors", "value"), &BulletFactory2D::set_register_performance_monitors);
+	ClassDB::bind_method(D_METHOD("get_register_performance_monitors"), &BulletFactory2D::get_register_performance_monitors);
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "register_performance_monitors"), "set_register_performance_monitors", "get_register_performance_monitors");
 	ClassDB::bind_method(D_METHOD("debug_reset_pool_stats"), &BulletFactory2D::debug_reset_pool_stats);
 	ClassDB::bind_static_method("BulletFactory2D", D_METHOD("debug_validate_spawn_data", "spawn_data"), &BulletFactory2D::debug_validate_spawn_data);
 	ClassDB::bind_method(D_METHOD("debug_check_interpolation_status"), &BulletFactory2D::debug_check_interpolation_status);

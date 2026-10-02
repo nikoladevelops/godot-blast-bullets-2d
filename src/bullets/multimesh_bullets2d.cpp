@@ -2949,6 +2949,9 @@ void MultiMeshBullets2D::reduce_lifetime(double delta) {
 		}
 
 		std::vector<int> active_copy = all_bullets_enabled_set.get_active_indexes();
+		if (bullet_factory != nullptr) {
+			bullet_factory->stats_expired_bullets_total += (uint64_t)active_copy.size();
+		}
 
 		// If the life_time_over signal is not enabled, we can just disable all bullets right away and skip the additional logic
 		if (!is_life_time_over_signal_enabled) {
@@ -3428,6 +3431,9 @@ void MultiMeshBullets2D::handle_bullet_collision(CollisionType collision_type, i
 		// If the bullet is already disabled, just return
 		if (!curr_bullet_status) {
 			return;
+		}
+		if (bullet_factory != nullptr) {
+			++bullet_factory->stats_collision_records_total;
 		}
 
 		// Bounce precedence: a bounce-eligible hit ricochets here and never

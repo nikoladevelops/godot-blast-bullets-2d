@@ -5,8 +5,13 @@
 # Ignore the releases folder
 releases/
 
-# Ignore any 'addons' folder anywhere in the repository recursively
+# Ignore any 'addons' folder anywhere in the repository recursively...
 addons/
+# ...except the vendored GUT test framework (the test runner needs it in a
+# fresh clone). The built plugin binaries stay ignored.
+!test_project/addons/
+test_project/addons/*
+!test_project/addons/gut/
 
 # Ignore the top-level bin folder
 /bin/

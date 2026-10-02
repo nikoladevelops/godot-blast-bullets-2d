@@ -2,6 +2,10 @@ extends Node2D
 
 @onready var enemy_spawners_container:Node = $EnemySpawnersContainer
 
+## Prints one line per spawner hit (off by default: per-hit printing distorts
+## the measured FPS).
+@export var log_spawner_hits := false
+
 @onready var attachment_scenes:Dictionary[int, PackedScene] = {
 	0 : null,
 	1 : preload("res://shared/bullet_attachment_nodes/attached_particles.tscn"),
@@ -48,8 +52,10 @@ func _ready() -> void:
 
 
 func _on_bullet_spawner_2d_area_entered(_hit_target_area: Object, _directional_bullets_instance: DirectionalBullets2D, _bullet_index: int) -> void:
-	print("Spawner hit an area!")
+	if log_spawner_hits:
+		print("Spawner hit an area!")
 
 
 func _on_bullet_spawner_2d_body_entered(_hit_target_body: Object, _directional_bullets_instance: DirectionalBullets2D, _bullet_index: int) -> void:
-	print("Spawner hit a body!")
+	if log_spawner_hits:
+		print("Spawner hit a body!")

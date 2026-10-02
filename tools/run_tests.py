@@ -73,6 +73,10 @@ SCRIPT_ERROR_PATTERNS = [
     re.compile(r"SCRIPT ERROR"),
     re.compile(r"Parse Error"),
     re.compile(r"Failed to load script"),
+    # Extension registration errors (e.g. ADD_PROPERTY before its setter was
+    # bound) only print at class registration and never fail a test: the
+    # property silently does not exist. Treat them as red.
+    re.compile(r"godot-cpp/src/core/class_db\.cpp"),
 ]
 
 # C++ stems -> test areas, for --changed-only. Deliberately coarse.
@@ -173,7 +177,7 @@ def refresh_class_cache(godot):
     cache = os.path.join(PROJECT, ".godot", "global_script_class_cache.cfg")
     cache_mtime = os.path.getmtime(cache) if os.path.exists(cache) else 0.0
     newest = 0.0
-    for sub in ("tests", "tests_meta", "addons", "shared"):
+    for sub in ("tests", "tests_meta", "addons", "shared", "benchmarks"):
         root = os.path.join(PROJECT, sub)
         if os.path.isdir(root):
             newest = max(newest, newest_mtime(root, (".gd",)))

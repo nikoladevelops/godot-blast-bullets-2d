@@ -613,6 +613,26 @@ public:
 	// shrank transforms after populate). Use debug_expected_pool_key() to compare.
 	Dictionary debug_get_pool_hit_stats() const;
 	void debug_reset_pool_stats();
+
+	// ---- Profiling (cheap, always on) ----
+	// Last completed physics tick + cumulative counters. Keys:
+	//   physics_ticks, physics_tick_usec (last), peak_physics_tick_usec,
+	//   render_usec (last interpolation pass, 0 when interpolation is off),
+	//   volleys_ticked / bullets_ticked (last tick), collision_records_total,
+	//   expired_bullets_total, spawned_bullets_total, pool_hits, pool_misses,
+	//   active_bullets, active_volleys, pooled_volleys, active_effects,
+	//   active_attachments.
+	// Counters are cumulative: sample twice and subtract for per-frame rates.
+	Dictionary get_frame_stats() const;
+	// Resets the peak tick time and every cumulative counter (not the pool).
+	void reset_frame_stats();
+	// Live bullets across every active volley (O(active volleys)).
+	int get_active_bullet_count() const;
+	// Registers BlastBullets2D/* custom monitors (editor Debugger -> Monitors)
+	// on ready. One factory owns the monitors at a time (the first to enter
+	// the tree); others skip silently. Runtime only, never in the editor.
+	void set_register_performance_monitors(bool value);
+	bool get_register_performance_monitors() const;
 	// Non-mutating validation of spawn data. Returns {ok, error}. Never spawns,
 	// never touches the pool. Use from crash-fuzz tests before spawn_*().
 	static Dictionary debug_validate_spawn_data(const Ref<MultiMeshBulletsData2D> &spawn_data);
@@ -747,6 +767,40 @@ public:
 	mutable uint64_t directional_pool_misses = 0;
 	mutable uint64_t block_pool_hits = 0;
 	mutable uint64_t block_pool_misses = 0;
+
+	// FRAME STATS (get_frame_stats / custom Performance monitors). Written once
+	// per tick or once per event (spawn, drained collision record, expiry),
+	// never per bullet, so the cost is two get_ticks_usec() calls per physics
+	// tick plus a few integer adds. Public so volleys can bump the event
+	// counters without a call.
+public:
+	uint64_t stats_collision_records_total = 0;
+	uint64_t stats_expired_bullets_total = 0;
+	uint64_t stats_spawned_bullets_total = 0;
+private:
+	uint64_t stats_physics_ticks = 0;
+	uint64_t stats_last_physics_tick_usec = 0;
+	uint64_t stats_peak_physics_tick_usec = 0;
+	uint64_t stats_last_render_usec = 0;
+	int stats_tick_volleys = 0;
+	int stats_tick_bullets = 0;
+	int stats_last_tick_volleys = 0;
+	int stats_last_tick_bullets = 0;
+	// Editor Debugger -> Monitors integration (one factory owns the global
+	// monitor ids at a time; see register_monitors()).
+	bool register_performance_monitors = true;
+	bool owns_performance_monitors = false;
+	static uint64_t performance_monitors_owner_id;
+	void register_monitors();
+	void unregister_monitors();
+	Variant _monitor_active_bullets();
+	Variant _monitor_active_volleys();
+	Variant _monitor_pooled_volleys();
+	Variant _monitor_physics_tick_ms();
+	Variant _monitor_peak_physics_tick_ms();
+	Variant _monitor_render_ms();
+	Variant _monitor_active_effects();
+	Variant _monitor_active_attachments();
 	// Once-only _ready-missing warning (lazy init when _ready ran without super).
 	bool ready_missing_super_warned = false;
 
@@ -1180,6 +1234,7 @@ public:
 				bullets->sparse_set_id = reuse_id;
 			}
 			sparse_set.activate_data(reuse_id);
+			stats_spawned_bullets_total += (uint64_t)bullets->amount_bullets;
 			return bullets;
 		}
 
@@ -1199,6 +1254,7 @@ public:
 		bullets_vec.emplace_back(bullets);
 
 		sparse_set.activate_data(sparse_set_id);
+		stats_spawned_bullets_total += (uint64_t)bullets->amount_bullets;
 
 		return bullets;
 	}
@@ -1250,6 +1306,8 @@ public:
 			// must never hand out the volley whose drain is still running.
 			// Liveness re-checked between steps: a handler that free()s the
 			// volley (against the contract) must not crash the sweep.
+			++stats_tick_volleys;
+			stats_tick_bullets += multi->active_bullets_counter;
 			const uint64_t multi_id = multi->get_instance_id();
 			multi->is_being_ticked = true;
 			multi->move_bullets(delta);

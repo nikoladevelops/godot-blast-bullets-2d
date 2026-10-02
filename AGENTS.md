@@ -270,6 +270,33 @@ zero-radius orbit; negative speeds under curves.
   clear/expiry park (`test_spawner_spin_bench` proves the warm shot is a
   pool hit).
 
+## 14a. Benchmarks & profiling (measure before AND after any perf change)
+
+```sh
+python3 tools/run_benchmarks.py                     # 13 headless scenarios x3 (median), ~45 s
+python3 tools/run_benchmarks.py --scenario churn    # substring filter
+python3 tools/run_benchmarks.py --gate              # exit 1 on regression vs log/baseline.json
+python3 tools/run_benchmarks.py --update-baseline   # ONLY for an accepted change; say so in the commit
+```
+
+- Read `test_project/benchmarks/log/LATEST.md` (this run vs baseline,
+  regressions flagged: p50 > +10% & +0.05 ms or p99 > +20% & +0.1 ms).
+  `log/history.csv` is the append-only trend; `log/results/*.json` the raw
+  runs. Same machine + build type only.
+- Scenarios: `test_project/benchmarks/scenarios/*.gd` (extend
+  `BlastBenchmark`; `setup()`, `step(frame)`, `extra` metrics). Simulated
+  time (`--fixed-fps 60`) makes frame wall time = CPU cost.
+- In-engine: `BulletFactory2D.get_frame_stats()` (tick usec, peak, counters:
+  spawned/expired/collision records/pool hits) and
+  `get_active_bullet_count()`; the factory registers `BlastBullets2D/*`
+  custom monitors (editor Debugger -> Monitors graphs them live;
+  `register_performance_monitors` opts out). Use the editor Profiler for
+  script cost and the Visual Profiler for GPU; the monitors show which
+  frames are heavy.
+- Baseline facts (b366c8a, debug build): 10k directional in flight ~0.26 ms
+  factory tick; COLD spawn is O(N^2) (1k 20 ms, 2k 77 ms, 4k 317 ms, 8k
+  1.5 s) -> always pre-warm big volleys with `populate_bullets_pool`.
+
 ## 14. Performance rules (tick code is sacred)
 
 - No per-bullet extension-boundary crossings in the tick (hoist sin/cos,
