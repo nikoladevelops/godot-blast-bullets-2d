@@ -29,6 +29,7 @@ func test_deque_push_check_clear() -> void:
 	assert_eq(v.bullet_homing_check_targets_amount(1), 1, "all_bullets push fans out")
 	v.shared_homing_deque_push_back_node2d_target(target)
 	assert_true(v.shared_homing_deque_check_has_homing_targets(), "shared deque has targets")
+	assert_eq(v.shared_homing_deque_check_homing_targets_amount(), 1, "shared amount counts pushes")
 	v.bullet_clear_homing_targets(0)
 	assert_false(v.bullet_check_has_homing_targets(0), "per-bullet clear")
 	v.shared_homing_deque_clear_homing_targets()

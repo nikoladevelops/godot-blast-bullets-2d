@@ -68,6 +68,11 @@ func test_pattern_lists() -> void:
 	expect_error("every entry must be a Dictionary")
 	expect_error("must be an int")
 	assert_eq(sp.get_helper_bullets_amount(), amount_before, "bad-typed amount rejected")
+	# Unknown keys are silently ignored (entry still fires, nothing applied):
+	# pinned as-is; whether typos should warn is an open contract question.
+	var src_before: int = sp.get_pattern_source()
+	assert_eq(sp.spawn_pattern_list([{"patern_source": 5, "helper_bullets_amount": 2}], true, 0.0), 1, "unknown keys ignored, entry still fires")
+	assert_eq(sp.get_pattern_source(), src_before, "unknown key changes nothing")
 
 
 func test_cap_and_live_ops() -> void:

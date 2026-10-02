@@ -91,6 +91,7 @@ func test_nan_shared_aborts_whole_volley_ballistics_intact() -> void:
 	g5.all_bullet_speed_data = [_speed(0.0), _speed(50.0)]
 	var bad := _speed(1.0)
 	bad.speed = NAN
+	expect_errors_containing("must be a finite value", 1, "NaN speed setter fails loud")
 	g5.shared_bullet_speed_data = bad
 	var v5: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(g5)
 	assert_true(absf(v5.get_bullet_speed_data(0).speed) < 0.01, "NaN shared leaves gap at zero")

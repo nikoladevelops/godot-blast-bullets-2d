@@ -1,9 +1,10 @@
-# BlastBullets2D headless stability suites
+# BlastBullets2D headless stability suites (GUT)
 
-Every file is a `SceneTree` script: `godot --headless --path test_project --script <path>`.
-Exit code 0 = all checks pass. Reaching the end proves survival of every error
-path; the PASS lines prove the documented behavior. Any FAIL = behavior drift
-or a real bug — investigate before shipping.
+Every file under `tests/` is a GUT suite extending `BlastTest`
+(`tests/common/blast_test.gd`): `python3 tools/run_tests.py` runs each file in
+its own headless Godot process. GUT runs in strict mode — any `push_error` /
+engine error the test did not declare fails it — and `BlastTest.after_each`
+asserts a dangling-free factory plus zero new orphans after every test.
 
 ## Layout (mirrors `src/`)
 
@@ -78,14 +79,26 @@ or a real bug — investigate before shipping.
 - `spawner/test_spawner_signals_sequencing.gd` — handler contracts, burst/telegraph/pattern-list, cap, adopt/clear/override.
 - `integration/test_interpolation_integration.gd` — interpolation agreement/toggle, pause, churn, two factories.
 - `common/blast_test_helpers.gd` — shared `DirectionalBulletsData2D`/`BlockBulletsData2D` builders (identical speeds/layers/sizes so failures mean regressions).
+- `factory/test_factory_generator_fuzz.gd` — crash-fuzz for every generator: hostile counts, degenerate geometry, NaN inputs, extreme twists/offsets, oversized scales, edge-image extraction, side-spread/skip contracts, exact-geometry semantics. Rejections fail loud; survival + finiteness is the contract.
+- `factory/test_factory_layer_rings.gd` — outline-layer design proofs: every extra layer re-spawns the shape scaled about the loop center, facings/quotas/corners exact per ring.
+- `spawner/test_spawner_refactor.gd` — `bullet_spawner2d.cpp` internals: keep-awake predicate (incl. stop_pattern_list-must-not-sleep-a-pending-burst), freed factory/generator/target/path2d report missing, corridor door + fan-vs-aimed parity, pattern-hint lock, outline setter reject-and-keep.
+- `spawner/test_spawner_tree.gd` — live-tree integration: error paths, preview/cap/custom/line collection, homing resolution, live shooting, factory smoke.
+- `spawner/test_spawner_preview_coincidence.gd` — preview dots sit on the layer rings for every outline shape, fill deal, twist/cap/scales/curve, sides/offsets/layouts/distributions, corner knobs, dense star.
+- `test_no_orphan_suites.gd` — repo hygiene: fails if any runnable `test_*.gd` exists outside `tests/` (invisible to the runner, would silently stop running).
 
 ## Conventions
 
-- Park on idle (`await process_frame` ×2) before structural ops; `await
-  physics_frame` resumes *inside* physics and structural calls reject there.
-- Timer attach/detach counts only read fresh on idle frames (they defer in physics).
-- `factory.debug_assert_no_dangling()` after every destructive section.
-- Legacy root-level suites (`test_edge_fuzz.gd`, …) still run unchanged.
+- `await idle(n)` resumes on an idle frame: safe for structural factory calls
+  (`reset`/`free_*`/`populate_*`). `await physics(n)` resumes *inside* a
+  physics frame (bullets moved): structural calls reject there, so call
+  `idle()` first. Never use GUT's `wait_*_frames` (n+1 resume skew).
+- `before_each` adds a fresh `factory` (use `make_spawner()` / `spawn_dir()`
+  / `make_preview_spawner()` builders); `after_each` asserts
+  `debug_assert_no_dangling()` + zero new orphans.
+- Rejections are loud by contract: pin them with `expect_error()` /
+  `expect_errors_containing()` / `expect_any_error()`; only fuzz/crash-proof
+  suites use `swallow_errors()`, and only where survival (not wording) is the
+  contract.
 
 ## Running
 
@@ -94,14 +107,15 @@ python3 tools/run_tests.py                  # every suite, summary table
 python3 tools/run_tests.py --suite volley   # substring filter
 python3 tools/run_tests.py --changed-only   # suites plausibly affected
 python3 tools/run_tests.py --list           # discover without running
+python3 tools/run_tests.py --self-test     # canaries: proves failures + leaks are detected
 ```
 
-A suite is only green when it exits 0 **and** prints its own completion marker
-(`ALL ... TESTS PASSED` / `GROUP_DONE`). A suite that exits 0 without printing
-one is reported as CRASH, not PASS — that is the check which catches a stale
-`.so` (an unloaded extension makes `debug_get_*` assertions pass against
-defaults). `test_edge_fuzz.gd` is multi-group: the runner sets `CASE` and runs
-each group in its own process.
+A file is green only when its process exits 0 **and** GUT's JUnit report shows
+0 failures **and** the `--verbose` exit report shows no leaks (ObjectDB/RID/
+resource/StringName) **and** no `SCRIPT ERROR` was printed. A missing report
+means the extension or GUT never loaded — reported as CRASH, never PASS (that
+is the check which catches a stale `.so`: an unloaded extension makes
+`debug_get_*` assertions pass against defaults).
 
 ## Strict indexing + migration
 

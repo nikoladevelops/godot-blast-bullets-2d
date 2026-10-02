@@ -139,6 +139,7 @@ func test_invalid_rotation_entry_fails_open_per_slot_not_whole_volley() -> void:
 	arr7[1] = null
 	d7.all_bullet_rotation_data = arr7
 	var v7: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d7)
+	expect_errors_containing("Invalid rotation data", 1, "null rotation entry fails loud")
 	assert_true(v7.is_rotation_data_active(), "rotation stays active with one bad entry")
 	assert_true(absf(v7.bullet_get_rotation_speed(0) - 25.0) < 0.01, "valid slot keeps per-bullet")
 	assert_true(absf(v7.bullet_get_rotation_speed(1) - 25.0) < 0.01, "bad slot falls back to shared")

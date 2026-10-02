@@ -147,3 +147,4 @@ func test_lifetime_expiry_inside_mix() -> void:
 	v.bullet_homing_push_back_global_position_target(0, Vector2(500, 0))
 	await physics(60)
 	assert_false(v.is_bullet_status_enabled(0) and v.is_bullet_status_enabled(1), "expiry disables the mixed volley")
+	assert_eq(factory.debug_get_active_bullets_amount(0), 0, "expiry drains the factory census")

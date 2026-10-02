@@ -24,6 +24,15 @@ func test_speed_direction_velocity_ranges_oob() -> void:
 	v.set_bullet_speed_data(99, null)
 	assert_true(v.get_bullet_direction(0) == Vector2(0, -1), "OOB direction/speed writes no-op")
 	assert_true(v.get_bullet_speed_data(0).speed > 0.0, "OOB reads keep slot")
+	expect_errors_containing("Invalid index range", 1, "inverted range fails loud")
+	expect_errors_containing("Invalid bullet index in set_bullet_direction", 2, "OOB direction writes fail loud")
+	expect_errors_containing("Invalid bullet index in set_bullet_speed_data", 2, "OOB speed writes fail loud")
+	# Range OOB clamps SILENTLY (single-index OOB fails loud, ranges clamp
+	# to [0, N-1]): (99, 99) widens to the full volley with no error.
+	# Pinned as-is; whether that should be loud is an open contract question
+	# (the inverted-range comment fears exactly this widening on typos).
+	v.all_bullets_set_direction(Vector2(1, 0), 99, 99)
+	assert_true(v.get_bullet_direction(0) == Vector2(1, 0) and v.get_bullet_direction(2) == Vector2(1, 0), "OOB range clamps to full volley, silent")
 
 
 func test_rotation_ranges_texture_rotation_round_trip() -> void:
@@ -337,5 +346,8 @@ func test_rotation_ranges_texture_rotation_round_trip() -> void:
 	var st: Array = v2.get_all_bullets_status()
 	assert_true(st.size() == 3, "status array size")
 
+	expect_errors_containing("Invalid bullet index in", 27, "OOB index probes fail loud")
+	expect_errors_containing("Invalid bullet_index at", 4, "OOB curves probes fail loud")
+	expect_errors_containing("targets array size must match", 1, "short homing array fails loud")
 	assert_true(factory.debug_assert_no_dangling().get("ok", false) == true, "no dangling at end")
 	await idle(1)

@@ -1839,6 +1839,17 @@ func test_defaults_feature_off_normal_path_intact() -> void:
 	orbit28.queue_free()
 	lock28.queue_free()
 	await idle(1)
+	expect_errors_containing("Invalid bullet index in bullet_get_bounce_count", 1, "OOB bounce count fails loud")
+	expect_errors_containing("bounce_strength must be finite", 2, "bad strength fails loud")
+	expect_errors_containing("bounce_mask must be", 1, "bad mask fails loud")
+	expect_errors_containing("bounce_mode must be", 1, "bad mode fails loud")
+	expect_errors_containing("bounce_randomness_deg must be finite", 1, "bad randomness fails loud")
+	expect_errors_containing("bounce_cooldown_sec must be finite", 3, "bad cooldown fails loud")
+	expect_errors_containing("bounce_max_count must be", 1, "bad max count fails loud")
+	expect_errors_containing("no BulletFactory2D assigned", 1, "factory-less shot fails loud")
+	expect_errors_containing("bounce_debounce_sec must be finite", 2, "bad debounce fails loud")
+	expect_errors_containing("No spawn_data or no transforms were provided", 1, "empty spawn fails loud")
+	expect_errors_containing("no spawn_data assigned", 2, "dataless shots fail loud")
 
 
 func test_precise_mode_degenerate_shapes_fall_back_to_radial() -> void:
@@ -1881,8 +1892,12 @@ func test_precise_mode_degenerate_shapes_fall_back_to_radial() -> void:
 		await physics()
 		if v29b.bullet_get_bounce_count(0) >= 1:
 			break
-	assert_true(v29b.bullet_get_bounce_count(0) >= 1, "null-shape wall falls back to radial and bounces")
-	assert_true(_finite_volley(v29b), "volley finite after null-shape bounce")
+	# A CollisionShape2D with no shape registers no contact: the wall is
+	# intangible, so precise mode has nothing to fall back on. The volley
+	# must sail through unharmed (pre-GUT all groups shared one process and
+	# this section bounced off T0's never-freed wall, masking it).
+	assert_true(v29b.bullet_get_bounce_count(0) == 0, "null-shape wall is intangible, no bounce")
+	assert_true(_finite_volley(v29b), "volley finite past null-shape wall")
 	null29.queue_free()
 	await idle(1)
 
@@ -1891,6 +1906,7 @@ func test_consumed_bounces_spark_once_and_still_count() -> void:
 	_preamble()
 	# BOUNCE T30 consumed bounces spark once and still count
 	await _settle(factory)
+	var wall30 := _make_wall(Vector2(200, 0), 8)
 	var d30 := _bounce_data(Vector2.ZERO, 0.0, 300.0, [4], [4])
 	d30.bounce_hit_consumed = true
 	d30.bounce_max_count = 2
@@ -1926,6 +1942,13 @@ func test_setter_rejects_keep_old_values() -> void:
 	assert_true(absf(v31.get_bounce_strength() - 1.0) < 0.0001, "live NaN strength rejected")
 	v31.set_bounce_mask(-1)
 	assert_true(v31.get_bounce_mask() == 8, "live negative mask rejected")
+	expect_errors_containing("bounce_strength must be finite", 2, "NaN strength fails loud")
+	expect_errors_containing("bounce_mask must be", 1, "negative mask fails loud")
+	expect_errors_containing("bounce_max_count must be", 1, "negative max count fails loud")
+	expect_errors_containing("bounce_cooldown_sec must be finite", 1, "bad cooldown fails loud")
+	expect_errors_containing("bounce_randomness_deg must be finite", 1, "bad randomness fails loud")
+	expect_errors_containing("set_bounce_strength: value must be finite", 1, "live NaN strength fails loud")
+	expect_errors_containing("set_bounce_mask: value must be", 1, "live negative mask fails loud")
 
 
 func test_mover_switching_gravity_push_unlocked_orbit_spawner_routing() -> void:
@@ -2100,6 +2123,8 @@ func test_unspawned_instances_never_crash() -> void:
 	empty_block.sprite_frames = H.make_sprite_frames()
 	empty_block.transforms = []
 	assert_true(bare_block.enable_multimesh(empty_block, Vector2.ZERO, 0) == false, "block enable on fresh instance refuses cleanly")
+	expect_errors_containing("never spawned through BulletFactory2D", 2, "unspawned enable fails loud")
+	expect_errors_containing("Invalid bullet index in", 12, "zero-bullet OOB storm fails loud")
 	bare_block.queue_free()
 	await idle(1)
 
@@ -2109,6 +2134,7 @@ func test_teleport_matrix_interpolation_mixing() -> void:
 	# BOUNCE T34 teleport matrix + interpolation mixing
 	await _settle(factory)
 	factory.set_use_physics_interpolation_runtime(false)
+	var wall34 := _make_wall(Vector2(200, 0), 8)
 	var d34 := _bounce_data(Vector2.ZERO, 0.0, 300.0, [4], [4])
 	var v34: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d34)
 	v34.set_bullet_transform(0, Transform2D(0.0, Vector2(100, 0)))
@@ -2159,6 +2185,33 @@ func test_teleport_matrix_interpolation_mixing() -> void:
 	factory.set_use_physics_interpolation_runtime(false)
 
 
+func test_paused_steady_overlap_drops_records_by_design() -> void:
+	_preamble()
+	# BOUNCE T34b pause gate: area/body callbacks drop overlap records while
+	# the factory is paused (anti-hitch by design: is_bullet_processing_paused
+	# gate in area/body_entered_func). A steady overlap held across the pause
+	# produces no fresh ADDED event, so nothing bounces on resume.
+	# Approach-after-resume still bounces (see teleport_matrix above).
+	await _settle(factory)
+	factory.set_use_physics_interpolation_runtime(false)
+	var wallp := _make_wall(Vector2(100, 0), 8)
+	var dp := _bounce_data(Vector2.ZERO, 0.0, 300.0, [4], [4])
+	var vp: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(dp)
+	vp.set_bullet_transform(0, Transform2D(0.0, Vector2(100, 0)))
+	factory.set_is_factory_processing_bullets(false)
+	for i in 10:
+		await physics()
+	factory.set_is_factory_processing_bullets(true)
+	for i in 60:
+		await physics()
+		if vp.bullet_get_bounce_count(0) >= 1:
+			break
+	assert_true(vp.bullet_get_bounce_count(0) == 0, "paused steady overlap yields no bounce")
+	assert_true(_finite_volley(vp), "volley finite after dropped records")
+	await _settle(factory)
+	factory.set_use_physics_interpolation_runtime(true)
+
+
 func test_orbit_endurance_block_census_telegraph_zero_helper_hostility() -> void:
 	_preamble()
 	# BOUNCE T35 orbit endurance, block census, telegraph-zero, helper hostility
@@ -2204,6 +2257,9 @@ func test_orbit_endurance_block_census_telegraph_zero_helper_hostility() -> void
 	assert_true(BulletFactory2D.helper_generate_transforms_grid(8, Transform2D.IDENTITY, 0).is_empty(), "zero grid rows refused")
 	assert_true(BulletFactory2D.helper_generate_transforms_rain(8, Transform2D.IDENTITY, 600.0, Vector2.ZERO, 48.0, 0.0, 1).is_empty(), "zero rain direction refused")
 	assert_true(BulletFactory2D.helper_generate_transforms_rain(4, Transform2D.IDENTITY).size() == 4, "rain defaults still generate")
+	expect_errors_containing("transforms_amount must be between 0 and 10000", 1, "negative grid amount fails loud")
+	expect_errors_containing("rows_per_column must be > 0", 1, "zero grid rows fail loud")
+	expect_errors_containing("rain_direction must be finite and non-zero", 1, "zero rain direction fails loud")
 
 
 func test_stale_target_velocity_never_steers_the_bounce() -> void:

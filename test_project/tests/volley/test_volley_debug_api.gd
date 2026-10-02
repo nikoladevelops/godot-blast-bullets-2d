@@ -104,3 +104,17 @@ func test_wobble_info_and_attachment_info() -> void:
 	var a0: Dictionary = v.debug_get_attachment_info(0)
 	for key in ["has_attachment", "pooling_id", "owner_match"]:
 		assert_has(a0, key)
+
+
+func test_curves_clear_helpers_bound_and_work() -> void:
+	var v: DirectionalBullets2D = spawn_dir(3, 200.0)
+	assert_true(v.has_method("clear_per_bullet_curves_data") and v.has_method("all_bullets_clear_curves_data"), "curves-clear helpers bound")
+	var block := BulletCurvesData2D.new()
+	v.bullet_set_curves_data(0, block)
+	v.bullet_set_curves_data(1, block)
+	v.all_bullets_clear_curves_data(0, 0)
+	assert_true(v.bullet_get_curves_data(0) == null, "range clear drops slot 0")
+	assert_true(v.bullet_get_curves_data(1) != null, "range clear spares slot 1")
+	v.clear_per_bullet_curves_data(1)
+	assert_true(v.bullet_get_curves_data(1) == null, "per-bullet clear drops slot 1")
+	expect_errors_containing("has no individual curves data", 2, "cleared slots read loud")

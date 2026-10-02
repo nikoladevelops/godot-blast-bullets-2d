@@ -17,16 +17,15 @@ func before_each() -> void:
 	sp = make_spawner(H.make_directional_data(4), BulletSpawner2D.PATTERN_FROM_HELPER_RING, 6)
 
 
-func test_all_sources_collect() -> void:
-	for src in range(BulletSpawner2D.PATTERN_FROM_LAST):
-		sp.pattern_source = src
-		var tf: Array = sp.collect_spawn_transforms()
-		if src in EMPTY_WITHOUT_INPUT:
-			assert_true(tf.is_empty(), "source %d without input is empty" % src)
-			expect_any_error("source %d fails loud without input" % src)
-		else:
-			assert_gte(tf.size(), 1, "source %d emits" % src)
-			assert_true(H.finite_volley(tf), "source %d finite" % src)
+func test_all_sources_collect(src: int = use_parameters(range(BulletSpawner2D.PATTERN_FROM_LAST))) -> void:
+	sp.pattern_source = src
+	var tf: Array = sp.collect_spawn_transforms()
+	if src in EMPTY_WITHOUT_INPUT:
+		assert_true(tf.is_empty(), "source %d without input is empty" % src)
+		expect_any_error("source %d fails loud without input" % src)
+	else:
+		assert_gte(tf.size(), 1, "source %d emits" % src)
+		assert_true(H.finite_volley(tf), "source %d finite" % src)
 
 
 func test_invalid_source_and_amount_cap() -> void:

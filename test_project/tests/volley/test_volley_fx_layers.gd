@@ -131,6 +131,14 @@ func test_validation_inert_layers_stay_silent_rejects_hold() -> void:
 	off.enabled = false
 	assert_true(factory.spawn_layer_effect(off, Transform2D.IDENTITY) == -1, "disabled layer never fires")
 	assert_true(factory.spawn_layer_effect(null, Transform2D.IDENTITY) == -1, "null layer rejected")
+	expect_errors_containing("sprite_frames is null", 1, "null frames fail loud")
+	expect_errors_containing("trigger must be", 1, "bad trigger fails loud")
+	expect_errors_containing("trigger_chance must be finite", 2, "bad chance fails loud")
+	expect_errors_containing("max_instances must be", 1, "negative instances fail loud")
+	expect_errors_containing("random_scale_min must be finite", 1, "inverted scale fails loud")
+	expect_errors_containing("rotation_degrees must be finite", 1, "NaN rotation fails loud")
+	expect_errors_containing("spin_degrees_per_sec must be finite", 1, "NaN spin fails loud")
+	expect_errors_containing("layer is null or disabled", 2, "dead layers fail loud")
 
 
 func test_spawn_flash_fires_once_expires() -> void:
@@ -303,6 +311,7 @@ func test_per_bullet_toggles_animation_switch() -> void:
 	assert_true(v7b.play_effect_animation(0, "b"), "animation switch accepted")
 	assert_true(not v7b.play_effect_animation(0, "nope"), "unknown animation rejected")
 	assert_true(not v7b.play_effect_animation(9, "b"), "unknown layer rejected")
+	expect_errors_containing("missing animation", 1, "unknown animation fails loud")
 
 
 func test_pool_reuse_reseeds_caps_hold_explicit_auto() -> void:
@@ -615,6 +624,7 @@ func test_trail_visibility_retires_unknown_layers_null_entries() -> void:
 		await physics()
 	assert_true(v16b.has_trail_effects(), "null layer entry tolerated, rest bakes")
 	assert_true(v16b.debug_get_trail_transform(1, 0).origin.distance_to(v16b.get_bullet_transform(0).origin) < 0.01, "trail follows despite the null sibling")
+	expect_errors_containing("no baked trail layer 9", 1, "unknown trail layer fails loud")
 
 
 func test_block_lifetime_fizzle_live_rebake_bounce_knob_sparks() -> void:
@@ -785,6 +795,7 @@ func test_hostile_zero_frames_ring_caps_shared_refs_teardown() -> void:
 	for i in 30:
 		await physics()
 	assert_true(factory.get_active_effect_count() == 0, "infinite life never fizzles")
+	expect_errors_containing("has no animation with frames", 2, "frameless layers fail loud")
 
 
 func test_stacked_trails_offset_live_one_shot_swap_pause_freeze() -> void:
@@ -842,6 +853,8 @@ func test_hostile_configs_never_crash() -> void:
 		await physics()
 	assert_true(v20.debug_get_trail_transform(0, 0).origin.distance_to(v20.get_bullet_transform(0).origin) < 0.01, "duplicate layer refs both follow")
 	assert_true(factory.get_active_effect_count() == 0, "no stray one-shots from trail-only volley")
+	expect_errors_containing("has no animation with frames", 1, "frameless layer fails loud")
+	expect_errors_containing("missing animation", 1, "wrong animation fails loud")
 
 
 func test_interp_teleports_scale_paused_manual_hatch() -> void:
@@ -928,6 +941,7 @@ func test_on_clear_fires_on_manual_clear_only() -> void:
 		await physics()
 	assert_true(factory.get_active_effect_count() == 0, "timeout does not fire On Clear (Lifetime Over owns it)")
 	assert_true(not v23e.is_bullet_status_enabled(0), "expiry volley drained")
+	expect_errors_containing("Invalid bullet index in clear_bullet", 1, "stale clear fails loud")
 
 
 func test_volley_fades_in_out_ramp_infinite_reuse() -> void:
@@ -992,6 +1006,8 @@ func test_volley_fades_in_out_ramp_infinite_reuse() -> void:
 	for i in 2:
 		await physics()
 	assert_true(v24b.self_modulate.a < 1.0, "second life restarts transparent (no tint leak)")
+	expect_errors_containing("fade_in_sec must be finite", 1, "NaN fade-in fails loud")
+	expect_errors_containing("fade_out_sec must be finite", 1, "NaN fade-out fails loud")
 
 
 func test_on_clear_visible_in_the_inspector_dropdown() -> void:
@@ -1093,6 +1109,8 @@ func test_layer_fades_envelope_on_one_shots_trails_ignore() -> void:
 	assert_true(d26n.fade_in_sec == 0.0, "NaN layer fade-in rejected")
 	d26n.fade_out_sec = -2.0
 	assert_true(d26n.fade_out_sec == 0.0, "negative layer fade-out rejected")
+	expect_errors_containing("fade_in_sec must be finite", 1, "NaN layer fade-in fails loud")
+	expect_errors_containing("fade_out_sec must be finite", 1, "negative layer fade-out fails loud")
 
 
 func test_whiten_override_pixels_rebake_fallback() -> void:
@@ -1140,6 +1158,8 @@ func test_whiten_override_pixels_rebake_fallback() -> void:
 	assert_true(factory.get_active_effect_count() >= 1, "unreadable frame falls back, still fires")
 	for i in 30:
 		await physics()
+	expect_errors_containing("source image is null or empty", 2, "empty whiten image fails loud")
+	expect_errors_containing("exceeds 512px", 1, "oversize whiten image fails loud")
 
 
 func test_bullet_whiten_override_exact_tint_toggle_reuse() -> void:
