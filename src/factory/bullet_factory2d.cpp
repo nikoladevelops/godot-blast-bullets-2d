@@ -1090,7 +1090,23 @@ void BulletFactory2D::set_is_factory_processing_bullets(bool is_processing_enabl
 		return;
 	}
 
+	const bool resuming = is_processing_enabled && !is_factory_processing_bullets;
 	is_factory_processing_bullets = is_processing_enabled;
+
+	// Overlaps that started during the pause were parked by the volleys;
+	// queue them now so the next tick drains them (exactly once).
+	if (resuming) {
+		for (DirectionalBullets2D *volley : all_directional_bullets) {
+			if (volley != nullptr && volley->is_active) {
+				volley->replay_paused_overlaps();
+			}
+		}
+		for (BlockBullets2D *volley : all_block_bullets) {
+			if (volley != nullptr && volley->is_active) {
+				volley->replay_paused_overlaps();
+			}
+		}
+	}
 
 	set_physics_process(is_processing_enabled);
 	// _process only drives the interpolation pass: idle it otherwise

@@ -27,12 +27,16 @@ func test_speed_direction_velocity_ranges_oob() -> void:
 	expect_errors_containing("Invalid index range", 1, "inverted range fails loud")
 	expect_errors_containing("Invalid bullet index in set_bullet_direction", 2, "OOB direction writes fail loud")
 	expect_errors_containing("Invalid bullet index in set_bullet_speed_data", 2, "OOB speed writes fail loud")
-	# Range OOB clamps SILENTLY (single-index OOB fails loud, ranges clamp
-	# to [0, N-1]): (99, 99) widens to the full volley with no error.
-	# Pinned as-is; whether that should be loud is an open contract question
-	# (the inverted-range comment fears exactly this widening on typos).
+	# Out-of-range ranges FAIL LOUD and apply nothing (contract fix: they
+	# used to widen silently to the whole volley, so a typo rewrote every
+	# bullet). -1 as the end still means "through the last bullet".
+	var before: Vector2 = v.get_bullet_direction(0)
 	v.all_bullets_set_direction(Vector2(1, 0), 99, 99)
-	assert_true(v.get_bullet_direction(0) == Vector2(1, 0) and v.get_bullet_direction(2) == Vector2(1, 0), "OOB range clamps to full volley, silent")
+	expect_error_sequence(["Invalid index range in all_bullets_set_direction (99..99 outside 0..2"])
+	assert_eq(v.get_bullet_direction(0), before, "OOB range applies nothing")
+	v.all_bullets_set_direction(Vector2(1, 0), 1, -1)
+	assert_eq(v.get_bullet_direction(2), Vector2(1, 0), "end -1 = through the last bullet")
+	assert_eq(v.get_bullet_direction(0), before, "start 1 leaves bullet 0 alone")
 
 
 func test_rotation_ranges_texture_rotation_round_trip() -> void:

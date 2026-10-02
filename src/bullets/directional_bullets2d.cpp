@@ -744,7 +744,14 @@ void DirectionalBullets2D::reset_transient_subclass_state(bool drop_stale_work) 
 	// set_up_movement_data re-seeds has_per_bullet_speed_data; the rotation
 	// presence is handled below (kept across plain disables, reset only for
 	// new pooled lives).
-	set_up_movement_data(TypedArray<BulletSpeedData2D>());
+	// Linear ballistics (speed/max/accel/direction/velocity) survive a plain
+	// full drain so a same-owner wake resumes them, exactly like rotation
+	// speeds below (contract fix: a full drain used to zero them, so waking
+	// any bullet after the last one died revived a frozen bullet). A new life
+	// (drop_stale_work) neutralizes them; every spawn/enable reseeds anyway.
+	if (drop_stale_work) {
+		set_up_movement_data(TypedArray<BulletSpeedData2D>());
+	}
 	// Rotation presence follows the VALUES: rotation speeds survive a plain
 	// disable (for same-owner wakes), so their presence decisions must too —
 	// otherwise a later shared write would clobber authored entries the wake

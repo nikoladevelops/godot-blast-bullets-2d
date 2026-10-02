@@ -1668,26 +1668,35 @@ public:
 		return true;
 	}
 
-	_ALWAYS_INLINE_ void ensure_indexes_match_amount_bullets_range(int &bullet_index_start, int &bullet_index_end_inclusive, const char *function_name) const {
+	// Range contract for every all_bullets_* API: end == -1 means "through the
+	// last bullet" (the documented default); any other out-of-range or
+	// inverted index FAILS LOUD and applies NOTHING. (It used to clamp silently
+	// to the whole volley, so a typo like (99, 99) on a 10-bullet volley
+	// rewrote every bullet.) On rejection the range is left empty
+	// (start > end) so callers' loops do nothing and getters return [].
+	_ALWAYS_INLINE_ bool ensure_indexes_match_amount_bullets_range(int &bullet_index_start, int &bullet_index_end_inclusive, const char *function_name) const {
 		// Unspawned / empty volley: an empty range, not a user error.
 		if (amount_bullets <= 0) {
 			bullet_index_start = 0;
 			bullet_index_end_inclusive = -1;
-			return;
+			return false;
 		}
-		if (bullet_index_start < 0 || bullet_index_start >= amount_bullets) {
-			bullet_index_start = 0;
-		}
-		if (bullet_index_end_inclusive < 0 || bullet_index_end_inclusive >= amount_bullets) {
+		if (bullet_index_end_inclusive == -1) {
 			bullet_index_end_inclusive = amount_bullets - 1;
 		}
-		if (bullet_index_start > bullet_index_end_inclusive) {
-			// Clamp the inverted range to empty instead of silently expanding to
-			// "everything": start==end could no-op, but widening to the full
-			// multimesh on a typo'd range is how users nuke state they didn't mean to.
-			UtilityFunctions::push_error(String("Invalid index range in ") + function_name + " (start > end). Nothing was applied.");
-			bullet_index_end_inclusive = bullet_index_start - 1;
+		if (bullet_index_start < 0 || bullet_index_start >= amount_bullets || bullet_index_end_inclusive < 0 || bullet_index_end_inclusive >= amount_bullets) {
+			UtilityFunctions::push_error(String("Invalid index range in ") + function_name + " (" + String::num_int64(bullet_index_start) + ".." + String::num_int64(bullet_index_end_inclusive) + " outside 0.." + String::num_int64(amount_bullets - 1) + "; use -1 as the end for \"through the last bullet\"). Nothing was applied.");
+			bullet_index_start = 0;
+			bullet_index_end_inclusive = -1;
+			return false;
 		}
+		if (bullet_index_start > bullet_index_end_inclusive) {
+			UtilityFunctions::push_error(String("Invalid index range in ") + function_name + " (start > end). Nothing was applied.");
+			bullet_index_start = 0;
+			bullet_index_end_inclusive = -1;
+			return false;
+		}
+		return true;
 	}
 
 	// Resolve Ref<Shape2D> once via casting into typed cache. Single error per spawn/enable, then quiet.
@@ -2944,16 +2953,90 @@ public:
 		out_valid = true;
 	}
 
+	// ---- Overlaps that START while the factory is paused ----------------
+	// The physics server keeps reporting while the factory is paused, but
+	// the drain does not run. Dropping those ADDED events meant a bullet that
+	// came to rest inside an enemy during a pause never registered the hit
+	// (no new ADDED ever comes for a steady overlap). Instead they are parked
+	// here (bounded, deduped), cancelled by a REMOVED event if the overlap
+	// ends during the pause, and replayed once on resume: exactly-once, no
+	// physics rescan, and overlaps already counted before the pause are never
+	// re-reported.
+	struct PausedOverlap2D {
+		int bullet_index = -1;
+		int64_t target_id = 0;
+		CollisionType type = CollisionType::AREA;
+		uint64_t epoch = 0;
+	};
+	std::vector<PausedOverlap2D> paused_overlaps;
+	static constexpr size_t kMaxPausedOverlaps = 4096;
+
+	_ALWAYS_INLINE_ void park_paused_overlap(PhysicsServer2D::AreaBodyStatus status, int64_t target_id, int bullet_index, CollisionType type) {
+		if (bullet_index < 0 || bullet_index >= amount_bullets) {
+			return;
+		}
+		for (size_t i = 0; i < paused_overlaps.size(); ++i) {
+			PausedOverlap2D &p = paused_overlaps[i];
+			if (p.bullet_index == bullet_index && p.target_id == target_id && p.type == type) {
+				if (status == PhysicsServer2D::AREA_BODY_REMOVED) {
+					p = paused_overlaps.back();
+					paused_overlaps.pop_back();
+				}
+				return;
+			}
+		}
+		if (status == PhysicsServer2D::AREA_BODY_ADDED && paused_overlaps.size() < kMaxPausedOverlaps) {
+			PausedOverlap2D p;
+			p.bullet_index = bullet_index;
+			p.target_id = target_id;
+			p.type = type;
+			p.epoch = collision_epoch_for_bullet(bullet_index);
+			paused_overlaps.push_back(p);
+		}
+	}
+
+	// Called by the factory when processing resumes: queue every parked
+	// overlap whose bullet is still the same live bullet, through the normal
+	// dedup + record path. Returns the number of records queued.
+	int replay_paused_overlaps() {
+		int queued = 0;
+		std::vector<PausedOverlap2D> pending;
+		pending.swap(paused_overlaps);
+		for (const PausedOverlap2D &p : pending) {
+			if (p.bullet_index < 0 || p.bullet_index >= amount_bullets || !all_bullets_enabled_set.contains(p.bullet_index)) {
+				continue;
+			}
+			if (p.epoch != collision_epoch_for_bullet(p.bullet_index)) {
+				continue;
+			}
+			if (collision_dedup_by_object) {
+				if (collision_already_queued(p.bullet_index, p.target_id)) {
+					continue;
+				}
+				mark_collision_queued(p.bullet_index, p.target_id);
+			}
+			BulletCollisionData2D record(p.bullet_index, p.target_id, p.type);
+			record.queue_bullet_epoch = p.epoch;
+			if (wants_queued_target_motion()) {
+				record.queue_target_velocity_valid = read_queued_target_velocity(p.target_id, record.queue_target_velocity);
+				read_queued_target_pose(p.target_id, record.queue_target_position, record.queue_target_position_valid);
+			}
+			all_collided_bullets.push_back(record);
+			++queued;
+		}
+		return queued;
+	}
+
 	_ALWAYS_INLINE_ void area_entered_func(PhysicsServer2D::AreaBodyStatus status, RID entered_rid, int64_t entered_instance_id, int entered_shape_index, int bullet_shape_index) {
 		(void)entered_rid;
 		(void)entered_shape_index;
+		// Paused factory stops draining (no _physics_process) but the physics
+		// server keeps firing: park (bounded) instead of queueing.
+		if (bullet_factory != nullptr && bullet_factory->is_bullet_processing_paused()) {
+			park_paused_overlap(status, entered_instance_id, bullet_shape_index, CollisionType::AREA);
+			return;
+		}
 		if (status == PhysicsServer2D::AREA_BODY_ADDED) {
-			// Paused factory stops draining (no _physics_process) but the
-			// physics server keeps firing: without this gate the vector grows
-			// unbounded while paused and resumes with one giant hitch.
-			if (bullet_factory != nullptr && bullet_factory->is_bullet_processing_paused()) {
-				return;
-			}
 			if (bullet_shape_index < 0 || bullet_shape_index >= amount_bullets) {
 				return;
 			}
@@ -2984,10 +3067,11 @@ public:
 	_ALWAYS_INLINE_ void body_entered_func(PhysicsServer2D::AreaBodyStatus status, RID entered_rid, int64_t entered_instance_id, int entered_shape_index, int bullet_shape_index) {
 		(void)entered_rid;
 		(void)entered_shape_index;
+		if (bullet_factory != nullptr && bullet_factory->is_bullet_processing_paused()) {
+			park_paused_overlap(status, entered_instance_id, bullet_shape_index, CollisionType::BODY);
+			return;
+		}
 		if (status == PhysicsServer2D::AREA_BODY_ADDED) {
-			if (bullet_factory != nullptr && bullet_factory->is_bullet_processing_paused()) {
-				return;
-			}
 			if (bullet_shape_index < 0 || bullet_shape_index >= amount_bullets) {
 				return;
 			}

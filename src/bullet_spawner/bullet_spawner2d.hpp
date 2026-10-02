@@ -334,6 +334,7 @@ class BulletSpawner2D : public Node2D{
         // the pass. Must stay finite. Applied through the engine teleport
         // path, so shapes, attachments, and interpolation stay in sync.
         Vector2 spawn_position_offset = Vector2(0, 0);
+        int spawn_position_offset_space = 0; // SpawnOffsetSpace
 
         // SPIN (ROTATE MARKER)
         //
@@ -1678,6 +1679,18 @@ class BulletSpawner2D : public Node2D{
         void set_transforms_scale(double value);
         Vector2 get_spawn_position_offset() const;
         void set_spawn_position_offset(const Vector2 &value);
+        // How spawn_position_offset is interpreted: GLOBAL (default, the
+        // historical behavior) shifts every volley by a world-space vector;
+        // LOCAL treats it as a muzzle in the generator's frame, so it turns
+        // (and scales) with the spawner / generator.
+        enum SpawnOffsetSpace {
+            SPAWN_OFFSET_GLOBAL = 0,
+            SPAWN_OFFSET_LOCAL = 1,
+        };
+        int get_spawn_position_offset_space() const;
+        void set_spawn_position_offset_space(int value);
+        // The world-space shift a shot applies right now (space resolved).
+        Vector2 resolve_spawn_offset_global() const;
 
         PatternSource get_pattern_source() const;
         void set_pattern_source(PatternSource value);
@@ -1866,6 +1879,10 @@ class BulletSpawner2D : public Node2D{
         Vector2 get_movement_velocity() const;
         // Test hook: the C++ easing used by movement (Tween parity tests).
         static double debug_ease(double t, int transition, int ease);
+        PackedStringArray _get_configuration_warnings() const override;
+        // Same list as the editor warning triangle, callable from scripts
+        // (debug UIs, CI scene checks).
+        PackedStringArray get_setup_warnings() const { return _get_configuration_warnings(); }
 
         // Pattern bake cache (see PatternBake). AUTO: patterns whose raw
         // transforms provably follow the generator rigidly are generated once
@@ -2219,6 +2236,10 @@ class BulletSpawner2D : public Node2D{
         double movement_eased(double leg_ratio) const;
         bool movement_active() const;
         void movement_reset_state();
+        // Auto-fire error latch (see shoot_once fail_early).
+        bool auto_fire_in_progress = false;
+        uint32_t shoot_error_latch = 0;
+        void on_config_changed();
         // Bypass flag for debug_collect_spawn_transforms_uncached / verify.
         mutable bool pattern_cache_bypass = false;
         uint64_t preview_rebuild_count = 0;
@@ -2348,3 +2369,4 @@ VARIANT_ENUM_CAST(BlastBullets2D::BulletSpawner2D::MovementSpace);
 VARIANT_ENUM_CAST(BlastBullets2D::BulletSpawner2D::MovementLoopMode);
 VARIANT_ENUM_CAST(BlastBullets2D::BulletSpawner2D::MovementDirection);
 VARIANT_ENUM_CAST(BlastBullets2D::BulletSpawner2D::MovementTiming);
+VARIANT_ENUM_CAST(BlastBullets2D::BulletSpawner2D::SpawnOffsetSpace);

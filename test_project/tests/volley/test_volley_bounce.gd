@@ -1003,7 +1003,7 @@ func test_t20_inspector_groups_stay_coherent() -> void:
 	assert_true(groups_found.has("Bullet Patterns"), "spawner Bullet Patterns group present")
 	assert_true(not groups_found.has("Transform Generation"), "old Transform Generation name gone")
 	assert_true(not groups_found.has("Burst and Telegraph"), "Burst group merged away")
-	assert_eq(spawner_group_order.slice(0, 8), ["Bullet Patterns", "Shooting", "Spin", "Homing", "Orbiting", "Preview", "Movement", "Performance"], "spawner group order")
+	assert_eq(spawner_group_order.slice(0, 9), ["Setup", "Bullet Patterns", "Shooting", "Spin", "Homing", "Orbiting", "Preview", "Movement", "Performance"], "spawner group order")
 	spawner20.pattern_source = BulletSpawner2D.PATTERN_FROM_HELPER_GRID
 	await idle(1)
 	var ring_visible_grid := false
@@ -2307,29 +2307,29 @@ func test_teleport_matrix_interpolation_mixing() -> void:
 	factory.set_use_physics_interpolation_runtime(false)
 
 
-func test_paused_steady_overlap_drops_records_by_design() -> void:
+func test_paused_steady_overlap_registers_once_on_resume() -> void:
 	_connect_signals()
-	# BOUNCE T34b pause gate: area/body callbacks drop overlap records while
-	# the factory is paused (anti-hitch by design: is_bullet_processing_paused
-	# gate in area/body_entered_func). A steady overlap held across the pause
-	# produces no fresh ADDED event, so nothing bounces on resume.
-	# Approach-after-resume still bounces (see teleport_matrix above).
+	# BOUNCE T34b (contract fix): an overlap that STARTS while the factory is
+	# paused used to be dropped forever (a steady overlap never produces a
+	# new ADDED event). Volleys now park it and the factory replays it on
+	# resume: exactly one bounce.
 	await _settle(factory)
 	factory.set_use_physics_interpolation_runtime(false)
-	var wallp := _make_wall(Vector2(100, 0), 8)
+	_make_wall(Vector2(100, 0), 8)
 	var dp := _bounce_data(Vector2.ZERO, 0.0, 300.0, [4], [4])
 	var vp: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(dp)
-	vp.set_bullet_transform(0, Transform2D(0.0, Vector2(100, 0)))
 	factory.set_is_factory_processing_bullets(false)
+	vp.set_bullet_transform(0, Transform2D(0.0, Vector2(100, 0)))
 	for i in 10:
 		await physics()
+	assert_eq(vp.bullet_get_bounce_count(0), 0, "nothing drains while paused")
 	factory.set_is_factory_processing_bullets(true)
 	for i in 60:
 		await physics()
 		if vp.bullet_get_bounce_count(0) >= 1:
 			break
-	assert_true(vp.bullet_get_bounce_count(0) == 0, "paused steady overlap yields no bounce")
-	assert_true(_finite_volley(vp), "volley finite after dropped records")
+	assert_eq(vp.bullet_get_bounce_count(0), 1, "the paused overlap bounces exactly once after resume")
+	assert_true(_finite_volley(vp), "volley finite after the replay")
 	await _settle(factory)
 	factory.set_use_physics_interpolation_runtime(true)
 

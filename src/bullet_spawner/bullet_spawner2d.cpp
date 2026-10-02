@@ -635,6 +635,7 @@ NodePath BulletSpawner2D::get_bullet_factory_path() const {
 }
 
 void BulletSpawner2D::set_bullet_factory_path(const NodePath &p_path) {
+    on_config_changed();
     bullet_factory_path = p_path;
     bullet_factory = nullptr;
     bullet_factory_id = 0;
@@ -660,6 +661,7 @@ BulletFactory2D *BulletSpawner2D::get_bullet_factory() const {
 }
 
 void BulletSpawner2D::set_bullet_factory(BulletFactory2D *factory) {
+    on_config_changed();
     assign_node_to_path(this, factory, bullet_factory_path, bullet_factory);
     bullet_factory_id = factory != nullptr ? factory->get_instance_id() : 0;
     if (factory == nullptr) bullet_factory = nullptr;
@@ -717,6 +719,7 @@ Ref<DirectionalBulletsData2D> BulletSpawner2D::get_spawn_data() const {
     return spawn_data;
 }
 void BulletSpawner2D::set_spawn_data(const Ref<DirectionalBulletsData2D> &new_data) {
+    on_config_changed();
 	if (spawn_data.is_valid() && spawn_data->is_connected("changed", Callable(this, "_on_spawn_data_changed"))) {
 		spawn_data->disconnect("changed", Callable(this, "_on_spawn_data_changed"));
 	}
@@ -872,6 +875,32 @@ void BulletSpawner2D::set_spawn_position_offset(const Vector2 &value) {
         return;
     }
     spawn_position_offset = value;
+    // The preview draws the muzzle offset through the layer pose.
+    set_preview_pose(spin_angle_deg);
+}
+int BulletSpawner2D::get_spawn_position_offset_space() const { return spawn_position_offset_space; }
+void BulletSpawner2D::set_spawn_position_offset_space(int value) {
+    if (value < SPAWN_OFFSET_GLOBAL || value > SPAWN_OFFSET_LOCAL) {
+        UtilityFunctions::push_error("BulletSpawner2D: spawn_position_offset_space must be 0 (Global) or 1 (Local), keeping the old value.");
+        return;
+    }
+    spawn_position_offset_space = value;
+    set_preview_pose(spin_angle_deg);
+}
+Vector2 BulletSpawner2D::resolve_spawn_offset_global() const {
+    if (spawn_position_offset == Vector2(0, 0)) {
+        return Vector2();
+    }
+    if (spawn_position_offset_space == SPAWN_OFFSET_LOCAL) {
+        Node2D *base = is_inside_tree() ? get_effective_generator() : nullptr;
+        if (base != nullptr) {
+            const Vector2 v = base->get_global_transform().basis_xform(spawn_position_offset);
+            if (v.is_finite()) {
+                return v;
+            }
+        }
+    }
+    return spawn_position_offset;
 }
 
 bool BulletSpawner2D::get_spin_enabled() const {
@@ -879,6 +908,7 @@ bool BulletSpawner2D::get_spin_enabled() const {
 }
 void BulletSpawner2D::set_spin_enabled(bool value) {
     spin_enabled = value;
+    notify_property_list_changed(); // spin knobs gate on it (_validate_property)
     if (!Engine::get_singleton()->is_editor_hint() && is_inside_tree()) {
         // Spinning needs _process even when auto-shooting is off.
         refresh_process_state_editor_guarded();
@@ -903,6 +933,7 @@ void BulletSpawner2D::set_spin_mode(SpinMode value) {
         return;
     }
     spin_mode = value;
+    notify_property_list_changed(); // speed vs amplitude/frequency per mode
 }
 double BulletSpawner2D::get_spin_amplitude_deg() const {
     return spin_amplitude_deg;
@@ -964,6 +995,7 @@ BulletSpawner2D::PatternSource BulletSpawner2D::get_pattern_source() const {
     return pattern_source;
 }
 void BulletSpawner2D::set_pattern_source(PatternSource value) {
+    on_config_changed();
     if (value < PATTERN_FROM_CHILDREN || value >= PATTERN_FROM_LAST) {
         UtilityFunctions::push_error("BulletSpawner2D: invalid pattern_source, keeping the old value.");
         return;
@@ -1267,6 +1299,7 @@ NodePath BulletSpawner2D::get_helper_aimed_target_path() const {
 }
 
 void BulletSpawner2D::set_helper_aimed_target_path(const NodePath &p_path) {
+    on_config_changed();
     helper_aimed_target_path = p_path;
     helper_aimed_target = nullptr;
     helper_aimed_target_id = 0;
@@ -1288,6 +1321,7 @@ Node2D *BulletSpawner2D::get_helper_aimed_target() const {
 }
 
 void BulletSpawner2D::set_helper_aimed_target(Node2D *target) {
+    on_config_changed();
     assign_node_to_path(this, target, helper_aimed_target_path, helper_aimed_target);
     helper_aimed_target_id = target != nullptr ? target->get_instance_id() : 0;
     if (target == nullptr) helper_aimed_target = nullptr;
@@ -2866,6 +2900,7 @@ TypedArray<Transform2D> BulletSpawner2D::collect_path2d_transforms(const Transfo
 }
 TypedArray<Transform2D> BulletSpawner2D::get_helper_custom_transforms() const { return helper_custom_transforms; }
 void BulletSpawner2D::set_helper_custom_transforms(const TypedArray<Transform2D> &value) {
+    on_config_changed();
     // One shoot fires this array into transforms + buffers + physics: the
     // same freeze/OOM rationale as helper_bullets_amount caps it at 10000.
     if (value.size() > kMaxBulletsPerVolley) {
@@ -3366,6 +3401,7 @@ void BulletSpawner2D::set_helper_polygon_facing_offset_deg(double value) {
 }
 NodePath BulletSpawner2D::get_helper_path2d_path() const { return helper_path2d_path; }
 void BulletSpawner2D::set_helper_path2d_path(const NodePath &p_path) {
+    on_config_changed();
     helper_path2d_path = p_path;
     helper_path2d_cache = nullptr;
     helper_path2d_id = 0;
@@ -3394,6 +3430,7 @@ Node *BulletSpawner2D::get_helper_path2d_node() const {
     return validate_cached_node(this, helper_path2d_path, helper_path2d_cache, helper_path2d_id);
 }
 void BulletSpawner2D::set_helper_path2d_node(Node *node) {
+    on_config_changed();
     assign_node_to_path(this, node, helper_path2d_path, helper_path2d_cache);
     helper_path2d_id = node != nullptr ? node->get_instance_id() : 0;
     if (node == nullptr) helper_path2d_cache = nullptr;
@@ -3522,6 +3559,7 @@ bool BulletSpawner2D::get_burst_enabled() const {
 }
 void BulletSpawner2D::set_burst_enabled(bool value) {
     burst_enabled = value;
+    notify_property_list_changed(); // burst_* knobs gate on it
     if (!value) {
         burst_shots_left = 0;
         burst_consecutive_failures = 0;
@@ -3563,6 +3601,7 @@ bool BulletSpawner2D::get_telegraph_enabled() const {
 }
 void BulletSpawner2D::set_telegraph_enabled(bool value) {
     telegraph_enabled = value;
+    notify_property_list_changed(); // telegraph_sec gates on it
     if (!value) {
         telegraph_pending = false;
         telegraph_time_left = 0.0;
@@ -4161,6 +4200,7 @@ bool BulletSpawner2D::get_homing_enabled() const {
     return homing_enabled;
 }
 void BulletSpawner2D::set_homing_enabled(bool value) {
+    on_config_changed();
     const bool was_active = homing_retarget_active();
     homing_enabled = value;
     notify_property_list_changed();
@@ -4418,6 +4458,7 @@ bool BulletSpawner2D::get_orbiting_enabled() const {
     return orbiting_enabled;
 }
 void BulletSpawner2D::set_orbiting_enabled(bool value) {
+    on_config_changed();
     orbiting_enabled = value;
     notify_property_list_changed();
     // Orbiting rides on homing targets: toggling it must not leave _process
@@ -5773,10 +5814,54 @@ TypedArray<Transform2D> BulletSpawner2D::generate_raw_pattern(Node2D *base, cons
     return raw;
 }
 
+// Any configuration change: the auto-fire error latch re-arms (a new
+// misconfiguration reports again) and the editor's warning triangle updates.
+void BulletSpawner2D::on_config_changed() {
+    shoot_error_latch = 0;
+    if (Engine::get_singleton()->is_editor_hint() && is_inside_tree()) {
+        update_configuration_warnings();
+    }
+}
+
+// ---- Editor configuration warnings ------------------------------------------
+// The yellow triangle in the scene dock: every misconfiguration that would
+// make a shot fail (or the spawner silently do nothing) is listed here, so
+// non-programmers see the problem before pressing play.
+PackedStringArray BulletSpawner2D::_get_configuration_warnings() const {
+    PackedStringArray out;
+    if (bullet_factory_path.is_empty() && bullet_factory == nullptr) {
+        out.push_back("No BulletFactory2D assigned: set bullet_factory_path, or nothing can be fired.");
+    } else if (is_inside_tree() && get_bullet_factory() == nullptr) {
+        out.push_back("bullet_factory_path does not point to a BulletFactory2D.");
+    }
+    if (spawn_data.is_null()) {
+        out.push_back("No spawn_data: assign a DirectionalBulletsData2D (speed, art, collision) to fire.");
+    } else if (spawn_data->sprite_frames.is_null() && spawn_data->mesh.is_null()) {
+        out.push_back("spawn_data has no sprite_frames (or mesh): bullets will be invisible.");
+    }
+    if ((pattern_source == PATTERN_FROM_HELPER_AIMED || pattern_source == PATTERN_FROM_HELPER_CORRIDOR) && helper_aimed_target_path.is_empty()) {
+        out.push_back(pattern_source == PATTERN_FROM_HELPER_AIMED ? "Aimed pattern needs helper_aimed_target (the node to aim at)." : "Corridor pattern aims at helper_aimed_target (falls back to the static aim direction without one).");
+    }
+    if (pattern_source == PATTERN_FROM_HELPER_PATH2D && helper_path2d_path.is_empty()) {
+        out.push_back("Path2D pattern needs helper_path2d_path (a Path2D with a curve).");
+    }
+    if (pattern_source == PATTERN_FROM_HELPER_CUSTOM && helper_custom_transforms.is_empty()) {
+        out.push_back("Custom pattern has no helper_custom_transforms.");
+    }
+    if (movement_enabled && movement_path.is_empty()) {
+        out.push_back("movement_enabled is on but movement_path is empty: assign a Path2D to move along.");
+    }
+    if (orbiting_enabled && !homing_enabled) {
+        out.push_back("orbiting_enabled needs homing_enabled (orbiting locks onto a homing target).");
+    }
+    return out;
+}
+
 // ---- Movement along a Path2D -------------------------------------------------
 
 bool BulletSpawner2D::get_movement_enabled() const { return movement_enabled; }
 void BulletSpawner2D::set_movement_enabled(bool value) {
+    on_config_changed();
     if (movement_enabled == value) {
         return;
     }
@@ -5796,6 +5881,7 @@ void BulletSpawner2D::set_movement_enabled(bool value) {
 
 NodePath BulletSpawner2D::get_movement_path() const { return movement_path; }
 void BulletSpawner2D::set_movement_path(const NodePath &p_path) {
+    on_config_changed();
     movement_path = p_path;
     movement_path_cache = nullptr;
     movement_path_id = 0;
@@ -5809,6 +5895,7 @@ Path2D *BulletSpawner2D::get_movement_path_node() const {
     return validate_cached_node(this, movement_path, movement_path_cache, movement_path_id);
 }
 void BulletSpawner2D::set_movement_path_node(Path2D *node) {
+    on_config_changed();
     assign_node_to_path(this, node, movement_path, movement_path_cache);
     movement_path_id = node != nullptr ? node->get_instance_id() : 0;
     movement_warned_unusable_path = false;
@@ -6624,6 +6711,23 @@ void BulletSpawner2D::set_preview_pose(double spin_angle_degrees) {
             pose = hb.affine_inverse() * Transform2D(radians, Vector2()) * hb;
         } else {
             pose = Transform2D(radians, Vector2());
+        }
+    }
+    // Muzzle offset: the shot shifts every bullet by a world vector AFTER
+    // spin, so the gizmo shifts the posed layer by the same vector expressed
+    // in holder space (GLOBAL: Hb^-1 * offset, LOCAL: the generator-frame
+    // offset itself).
+    if (spawn_position_offset != Vector2(0, 0)) {
+        Vector2 shift = spawn_position_offset;
+        if (spawn_position_offset_space == SPAWN_OFFSET_GLOBAL) {
+            Transform2D hb = preview_holder->get_global_transform();
+            hb.columns[2] = Vector2();
+            if (hb.is_finite() && MultiMeshBullets2D::is_transform_invertible_safe(hb)) {
+                shift = hb.affine_inverse().xform(spawn_position_offset);
+            }
+        }
+        if (shift.is_finite()) {
+            pose.columns[2] = shift;
         }
     }
     if (preview_dots_layer != nullptr) {
@@ -7729,6 +7833,33 @@ void BulletSpawner2D::update_preview_process_state() {
 
 void BulletSpawner2D::_validate_property(PropertyInfo &p_property) const {
     const String property_name = p_property.name;
+    // Spin: knobs hide while spin is off; CONTINUOUS reads only the speed,
+    // OSCILLATE only amplitude + frequency (advance_spin).
+    if (property_name.begins_with("spin_")) {
+        bool show = property_name == "spin_enabled" || spin_enabled;
+        if (show && property_name == "spin_speed_deg_per_sec") {
+            show = spin_mode == SPIN_CONTINUOUS;
+        } else if (show && (property_name == "spin_amplitude_deg" || property_name == "spin_frequency_hz")) {
+            show = spin_mode == SPIN_OSCILLATE;
+        }
+        if (!show) {
+            p_property.usage &= ~PROPERTY_USAGE_EDITOR;
+        }
+        return;
+    }
+    // Burst / telegraph: tuning knobs appear once their switch is on.
+    if (property_name.begins_with("burst_") && property_name != "burst_enabled") {
+        if (!burst_enabled) {
+            p_property.usage &= ~PROPERTY_USAGE_EDITOR;
+        }
+        return;
+    }
+    if (property_name == "telegraph_sec") {
+        if (!telegraph_enabled) {
+            p_property.usage &= ~PROPERTY_USAGE_EDITOR;
+        }
+        return;
+    }
     // Movement: every knob hides while movement is off; mode-specific knobs
     // only show where they do something.
     if (property_name.begins_with("movement_") || property_name == "inherit_movement_velocity") {
@@ -8000,8 +8131,17 @@ bool BulletSpawner2D::shoot_once() {
     shoot_once_reentrant_guard = true;
     ++g_shoot_once_nesting_depth;
     auto fail_early = [&](const char *message, const StringName &skip_reason, bool with_signal) -> bool {
+        // Auto-fire repeats the same misconfiguration every interval: report
+        // it once until the configuration changes or a shot succeeds (manual
+        // shoot_once() calls always report).
         if (message != nullptr) {
-            UtilityFunctions::push_error(message);
+            const uint32_t key = (uint32_t)String(message).hash();
+            if (!auto_fire_in_progress || shoot_error_latch != key) {
+                UtilityFunctions::push_error(message);
+            }
+            if (auto_fire_in_progress) {
+                shoot_error_latch = key;
+            }
         }
         if (with_signal) {
             emit_signal("volley_skipped", skip_reason);
@@ -8117,7 +8257,7 @@ bool BulletSpawner2D::shoot_once() {
     // consistent, and before homing/orbit seeding so locks form at the final
     // positions instead of re-converging on the first tick.
     if (spawn_position_offset != Vector2(0, 0)) {
-        bullets->teleport_shift_all_bullets(spawn_position_offset);
+        bullets->teleport_shift_all_bullets(resolve_spawn_offset_global());
     }
     apply_volley_homing_and_orbiting(bullets);
     // Re-validate: handlers of homing_targets_resolved/volley_homing_configured
@@ -8157,6 +8297,7 @@ bool BulletSpawner2D::shoot_once() {
         set_process(needs_process_besides_shooting());
         emit_signal("shooting_finished");
     }
+    shoot_error_latch = 0;
     clear_shoot_once_latch();
     return true;
 }
@@ -8454,7 +8595,9 @@ void BulletSpawner2D::_process(double delta) {
         // throttle-on-pull rearm below spaces the retry a full interval out,
         // so a persistently failing shot (busy factory, over budget) can
         // never hot-loop.
+        auto_fire_in_progress = true;
         const bool fired = shoot_once();
+        auto_fire_in_progress = false;
         // Throttle-on-pull: the interval rearms even when the pull skipped,
         // failed, or dropped its volley. Throttle-on-success instead would
         // hot-loop a persistently failing shot (busy factory, over budget)
@@ -8643,6 +8786,31 @@ bool BulletSpawner2D::apply_pattern_list_entry(const Variant &entry) {
         return false;
     }
     const Dictionary dict = entry;
+    // Unknown keys fail loud (a typo like "patern_source" used to be ignored
+    // silently: the entry fired with the WRONG pattern and no hint why). The
+    // valid keys still apply; the closest known key is suggested.
+    static const char *const kKnownKeys[] = { "preset", "pattern_source", "transforms_source", "helper_bullets_amount", "spawn_data" };
+    const Array keys = dict.keys();
+    for (int k = 0; k < keys.size(); ++k) {
+        const String key = keys[k];
+        bool known = false;
+        String best;
+        double best_score = 0.0;
+        for (const char *candidate : kKnownKeys) {
+            if (key == String(candidate)) {
+                known = true;
+                break;
+            }
+            const double score = key.similarity(String(candidate));
+            if (score > best_score) {
+                best_score = score;
+                best = candidate;
+            }
+        }
+        if (!known) {
+            UtilityFunctions::push_error(String("BulletSpawner2D::spawn_pattern_list: unknown entry key '") + key + "'" + (best_score >= 0.5 ? String(" (did you mean '") + best + "'?)" : String()) + "; valid keys: preset, pattern_source, helper_bullets_amount, spawn_data. Ignoring it.");
+        }
+    }
     if (dict.has("preset")) {
         Variant v = dict["preset"];
         if (v.get_type() == Variant::INT) {
@@ -8778,6 +8946,14 @@ bool BulletSpawner2D::fire_arc_covers_targets(const Array &targets) const {
 
 
 void BulletSpawner2D::_bind_methods() {
+    // Inspector layout: Setup (wiring) -> Bullet Patterns (source, amount,
+    // Transform subgroup, one subgroup per shape with its helper_<shape>_
+    // prefix stripped, Outline Layers last) -> Shooting -> Spin -> Homing ->
+    // Orbiting -> Preview -> Movement -> Performance. Property NAMES never
+    // change here (they are serialized into .tscn); only the order and the
+    // headers do. ADD_PROPERTY must follow its bind_method calls, otherwise
+    // ClassDB silently drops the property (the test runner flags that).
+    ADD_GROUP("Setup", "");
     ClassDB::bind_method(D_METHOD("get_bullet_factory_path"), &BulletSpawner2D::get_bullet_factory_path);
     ClassDB::bind_method(D_METHOD("set_bullet_factory_path", "path"), &BulletSpawner2D::set_bullet_factory_path);
     ADD_PROPERTY(PropertyInfo(Variant::NODE_PATH, "bullet_factory_path", PROPERTY_HINT_NODE_PATH_VALID_TYPES, "BulletFactory2D"), "set_bullet_factory_path", "get_bullet_factory_path");
@@ -8807,6 +8983,889 @@ void BulletSpawner2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_helper_bullets_amount", "value"), &BulletSpawner2D::set_helper_bullets_amount);
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "helper_bullets_amount"), "set_helper_bullets_amount", "get_helper_bullets_amount");
 
+	ADD_SUBGROUP("Transform", "");
+	ClassDB::bind_method(D_METHOD("get_pattern_scale"), &BulletSpawner2D::get_pattern_scale);
+	ClassDB::bind_method(D_METHOD("set_pattern_scale", "value"), &BulletSpawner2D::set_pattern_scale);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "pattern_scale"), "set_pattern_scale", "get_pattern_scale");
+
+	ClassDB::bind_method(D_METHOD("get_transforms_scale"), &BulletSpawner2D::get_transforms_scale);
+	ClassDB::bind_method(D_METHOD("set_transforms_scale", "value"), &BulletSpawner2D::set_transforms_scale);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "transforms_scale"), "set_transforms_scale", "get_transforms_scale");
+
+	ClassDB::bind_method(D_METHOD("get_spawn_position_offset"), &BulletSpawner2D::get_spawn_position_offset);
+	ClassDB::bind_method(D_METHOD("set_spawn_position_offset", "value"), &BulletSpawner2D::set_spawn_position_offset);
+	ADD_PROPERTY(PropertyInfo(Variant::VECTOR2, "spawn_position_offset"), "set_spawn_position_offset", "get_spawn_position_offset");
+	ClassDB::bind_method(D_METHOD("get_spawn_position_offset_space"), &BulletSpawner2D::get_spawn_position_offset_space);
+	ClassDB::bind_method(D_METHOD("set_spawn_position_offset_space", "value"), &BulletSpawner2D::set_spawn_position_offset_space);
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "spawn_position_offset_space", PROPERTY_HINT_ENUM, "Global:0,Local:1"), "set_spawn_position_offset_space", "get_spawn_position_offset_space");
+	BIND_ENUM_CONSTANT(SPAWN_OFFSET_GLOBAL);
+	BIND_ENUM_CONSTANT(SPAWN_OFFSET_LOCAL);
+
+	ClassDB::bind_method(D_METHOD("get_helper_skip_indices"), &BulletSpawner2D::get_helper_skip_indices);
+	ClassDB::bind_method(D_METHOD("set_helper_skip_indices", "value"), &BulletSpawner2D::set_helper_skip_indices);
+	ADD_PROPERTY(PropertyInfo(Variant::PACKED_INT32_ARRAY, "helper_skip_indices"), "set_helper_skip_indices", "get_helper_skip_indices");
+
+	ADD_SUBGROUP("Grid", "helper_grid_");
+	ClassDB::bind_method(D_METHOD("get_helper_grid_rows_per_column"), &BulletSpawner2D::get_helper_grid_rows_per_column);
+	ClassDB::bind_method(D_METHOD("set_helper_grid_rows_per_column", "value"), &BulletSpawner2D::set_helper_grid_rows_per_column);
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "helper_grid_rows_per_column"), "set_helper_grid_rows_per_column", "get_helper_grid_rows_per_column");
+
+	ClassDB::bind_method(D_METHOD("get_helper_grid_alignment"), &BulletSpawner2D::get_helper_grid_alignment);
+	ClassDB::bind_method(D_METHOD("set_helper_grid_alignment", "value"), &BulletSpawner2D::set_helper_grid_alignment);
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "helper_grid_alignment", PROPERTY_HINT_ENUM, "Top Left,Top Center,Top Right,Center Left,Center,Center Right,Bottom Left,Bottom Center,Bottom Right"), "set_helper_grid_alignment", "get_helper_grid_alignment");
+
+	ClassDB::bind_method(D_METHOD("get_helper_grid_column_offset"), &BulletSpawner2D::get_helper_grid_column_offset);
+	ClassDB::bind_method(D_METHOD("set_helper_grid_column_offset", "value"), &BulletSpawner2D::set_helper_grid_column_offset);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_grid_column_offset"), "set_helper_grid_column_offset", "get_helper_grid_column_offset");
+
+	ClassDB::bind_method(D_METHOD("get_helper_grid_row_offset"), &BulletSpawner2D::get_helper_grid_row_offset);
+	ClassDB::bind_method(D_METHOD("set_helper_grid_row_offset", "value"), &BulletSpawner2D::set_helper_grid_row_offset);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_grid_row_offset"), "set_helper_grid_row_offset", "get_helper_grid_row_offset");
+
+	ClassDB::bind_method(D_METHOD("get_helper_grid_rotate_with_marker"), &BulletSpawner2D::get_helper_grid_rotate_with_marker);
+	ClassDB::bind_method(D_METHOD("set_helper_grid_rotate_with_marker", "value"), &BulletSpawner2D::set_helper_grid_rotate_with_marker);
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "helper_grid_rotate_with_marker"), "set_helper_grid_rotate_with_marker", "get_helper_grid_rotate_with_marker");
+
+	ClassDB::bind_method(D_METHOD("get_helper_grid_random_local_rotation"), &BulletSpawner2D::get_helper_grid_random_local_rotation);
+	ClassDB::bind_method(D_METHOD("set_helper_grid_random_local_rotation", "value"), &BulletSpawner2D::set_helper_grid_random_local_rotation);
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "helper_grid_random_local_rotation"), "set_helper_grid_random_local_rotation", "get_helper_grid_random_local_rotation");
+
+	ClassDB::bind_method(D_METHOD("get_helper_grid_jitter"), &BulletSpawner2D::get_helper_grid_jitter);
+	ClassDB::bind_method(D_METHOD("set_helper_grid_jitter", "value"), &BulletSpawner2D::set_helper_grid_jitter);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_grid_jitter"), "set_helper_grid_jitter", "get_helper_grid_jitter");
+	ClassDB::bind_method(D_METHOD("get_helper_grid_seed"), &BulletSpawner2D::get_helper_grid_seed);
+	ClassDB::bind_method(D_METHOD("set_helper_grid_seed", "value"), &BulletSpawner2D::set_helper_grid_seed);
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "helper_grid_seed"), "set_helper_grid_seed", "get_helper_grid_seed");
+
+	ADD_SUBGROUP("Ring", "helper_ring_");
+	ClassDB::bind_method(D_METHOD("get_helper_ring_radius"), &BulletSpawner2D::get_helper_ring_radius);
+	ClassDB::bind_method(D_METHOD("set_helper_ring_radius", "value"), &BulletSpawner2D::set_helper_ring_radius);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_ring_radius"), "set_helper_ring_radius", "get_helper_ring_radius");
+
+	ClassDB::bind_method(D_METHOD("get_helper_ring_start_angle"), &BulletSpawner2D::get_helper_ring_start_angle);
+	ClassDB::bind_method(D_METHOD("set_helper_ring_start_angle", "value"), &BulletSpawner2D::set_helper_ring_start_angle);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_ring_start_angle"), "set_helper_ring_start_angle", "get_helper_ring_start_angle");
+
+	ClassDB::bind_method(D_METHOD("get_helper_ring_arc"), &BulletSpawner2D::get_helper_ring_arc);
+	ClassDB::bind_method(D_METHOD("set_helper_ring_arc", "value"), &BulletSpawner2D::set_helper_ring_arc);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_ring_arc"), "set_helper_ring_arc", "get_helper_ring_arc");
+
+	ClassDB::bind_method(D_METHOD("get_helper_ring_rotate_with_marker"), &BulletSpawner2D::get_helper_ring_rotate_with_marker);
+	ClassDB::bind_method(D_METHOD("set_helper_ring_rotate_with_marker", "value"), &BulletSpawner2D::set_helper_ring_rotate_with_marker);
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "helper_ring_rotate_with_marker"), "set_helper_ring_rotate_with_marker", "get_helper_ring_rotate_with_marker");
+
+	ClassDB::bind_method(D_METHOD("get_helper_ring_random_rotation"), &BulletSpawner2D::get_helper_ring_random_rotation);
+	ClassDB::bind_method(D_METHOD("set_helper_ring_random_rotation", "value"), &BulletSpawner2D::set_helper_ring_random_rotation);
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "helper_ring_random_rotation"), "set_helper_ring_random_rotation", "get_helper_ring_random_rotation");
+	ClassDB::bind_method(D_METHOD("get_helper_ring_seed"), &BulletSpawner2D::get_helper_ring_seed);
+	ClassDB::bind_method(D_METHOD("set_helper_ring_seed", "value"), &BulletSpawner2D::set_helper_ring_seed);
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "helper_ring_seed"), "set_helper_ring_seed", "get_helper_ring_seed");
+
+	ClassDB::bind_method(D_METHOD("get_helper_ring_face_outward"), &BulletSpawner2D::get_helper_ring_face_outward);
+	ClassDB::bind_method(D_METHOD("set_helper_ring_face_outward", "value"), &BulletSpawner2D::set_helper_ring_face_outward);
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "helper_ring_face_outward"), "set_helper_ring_face_outward", "get_helper_ring_face_outward");
+
+	ClassDB::bind_method(D_METHOD("get_helper_ring_y_scale"), &BulletSpawner2D::get_helper_ring_y_scale);
+	ClassDB::bind_method(D_METHOD("set_helper_ring_y_scale", "value"), &BulletSpawner2D::set_helper_ring_y_scale);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_ring_y_scale"), "set_helper_ring_y_scale", "get_helper_ring_y_scale");
+
+	ClassDB::bind_method(D_METHOD("get_helper_ring_facing_offset_deg"), &BulletSpawner2D::get_helper_ring_facing_offset_deg);
+	ClassDB::bind_method(D_METHOD("set_helper_ring_facing_offset_deg", "value"), &BulletSpawner2D::set_helper_ring_facing_offset_deg);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_ring_facing_offset_deg"), "set_helper_ring_facing_offset_deg", "get_helper_ring_facing_offset_deg");
+
+	ADD_SUBGROUP("Fan", "helper_fan_");
+	ClassDB::bind_method(D_METHOD("get_helper_fan_spread"), &BulletSpawner2D::get_helper_fan_spread);
+	ClassDB::bind_method(D_METHOD("set_helper_fan_spread", "value"), &BulletSpawner2D::set_helper_fan_spread);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_fan_spread"), "set_helper_fan_spread", "get_helper_fan_spread");
+
+	ClassDB::bind_method(D_METHOD("get_helper_fan_direction_angle"), &BulletSpawner2D::get_helper_fan_direction_angle);
+	ClassDB::bind_method(D_METHOD("set_helper_fan_direction_angle", "value"), &BulletSpawner2D::set_helper_fan_direction_angle);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_fan_direction_angle"), "set_helper_fan_direction_angle", "get_helper_fan_direction_angle");
+
+	ClassDB::bind_method(D_METHOD("get_helper_fan_step_offset"), &BulletSpawner2D::get_helper_fan_step_offset);
+	ClassDB::bind_method(D_METHOD("set_helper_fan_step_offset", "value"), &BulletSpawner2D::set_helper_fan_step_offset);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_fan_step_offset"), "set_helper_fan_step_offset", "get_helper_fan_step_offset");
+
+	ClassDB::bind_method(D_METHOD("get_helper_fan_centered"), &BulletSpawner2D::get_helper_fan_centered);
+	ClassDB::bind_method(D_METHOD("set_helper_fan_centered", "value"), &BulletSpawner2D::set_helper_fan_centered);
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "helper_fan_centered"), "set_helper_fan_centered", "get_helper_fan_centered");
+
+	ClassDB::bind_method(D_METHOD("get_helper_fan_angle_jitter"), &BulletSpawner2D::get_helper_fan_angle_jitter);
+	ClassDB::bind_method(D_METHOD("set_helper_fan_angle_jitter", "value"), &BulletSpawner2D::set_helper_fan_angle_jitter);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_fan_angle_jitter"), "set_helper_fan_angle_jitter", "get_helper_fan_angle_jitter");
+	ClassDB::bind_method(D_METHOD("get_helper_fan_seed"), &BulletSpawner2D::get_helper_fan_seed);
+	ClassDB::bind_method(D_METHOD("set_helper_fan_seed", "value"), &BulletSpawner2D::set_helper_fan_seed);
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "helper_fan_seed"), "set_helper_fan_seed", "get_helper_fan_seed");
+
+	ADD_SUBGROUP("Spiral", "helper_spiral_");
+	ClassDB::bind_method(D_METHOD("get_helper_spiral_start_radius"), &BulletSpawner2D::get_helper_spiral_start_radius);
+	ClassDB::bind_method(D_METHOD("set_helper_spiral_start_radius", "value"), &BulletSpawner2D::set_helper_spiral_start_radius);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_spiral_start_radius"), "set_helper_spiral_start_radius", "get_helper_spiral_start_radius");
+
+	ClassDB::bind_method(D_METHOD("get_helper_spiral_radius_step"), &BulletSpawner2D::get_helper_spiral_radius_step);
+	ClassDB::bind_method(D_METHOD("set_helper_spiral_radius_step", "value"), &BulletSpawner2D::set_helper_spiral_radius_step);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_spiral_radius_step"), "set_helper_spiral_radius_step", "get_helper_spiral_radius_step");
+
+	ClassDB::bind_method(D_METHOD("get_helper_spiral_angle_step"), &BulletSpawner2D::get_helper_spiral_angle_step);
+	ClassDB::bind_method(D_METHOD("set_helper_spiral_angle_step", "value"), &BulletSpawner2D::set_helper_spiral_angle_step);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_spiral_angle_step"), "set_helper_spiral_angle_step", "get_helper_spiral_angle_step");
+
+	ClassDB::bind_method(D_METHOD("get_helper_spiral_rotate_with_marker"), &BulletSpawner2D::get_helper_spiral_rotate_with_marker);
+	ClassDB::bind_method(D_METHOD("set_helper_spiral_rotate_with_marker", "value"), &BulletSpawner2D::set_helper_spiral_rotate_with_marker);
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "helper_spiral_rotate_with_marker"), "set_helper_spiral_rotate_with_marker", "get_helper_spiral_rotate_with_marker");
+
+	ClassDB::bind_method(D_METHOD("get_helper_spiral_facing"), &BulletSpawner2D::get_helper_spiral_facing);
+	ClassDB::bind_method(D_METHOD("set_helper_spiral_facing", "value"), &BulletSpawner2D::set_helper_spiral_facing);
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "helper_spiral_facing", PROPERTY_HINT_ENUM, "Tangent,Radial Outward,Toward Center,Keep Marker"), "set_helper_spiral_facing", "get_helper_spiral_facing");
+
+	ClassDB::bind_method(D_METHOD("get_helper_spiral_facing_offset_deg"), &BulletSpawner2D::get_helper_spiral_facing_offset_deg);
+	ClassDB::bind_method(D_METHOD("set_helper_spiral_facing_offset_deg", "value"), &BulletSpawner2D::set_helper_spiral_facing_offset_deg);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_spiral_facing_offset_deg"), "set_helper_spiral_facing_offset_deg", "get_helper_spiral_facing_offset_deg");
+
+	ADD_SUBGROUP("Line", "helper_line_");
+	ClassDB::bind_method(D_METHOD("get_helper_line_direction"), &BulletSpawner2D::get_helper_line_direction);
+	ClassDB::bind_method(D_METHOD("set_helper_line_direction", "value"), &BulletSpawner2D::set_helper_line_direction);
+	ADD_PROPERTY(PropertyInfo(Variant::VECTOR2, "helper_line_direction"), "set_helper_line_direction", "get_helper_line_direction");
+
+	ClassDB::bind_method(D_METHOD("get_helper_line_spacing"), &BulletSpawner2D::get_helper_line_spacing);
+	ClassDB::bind_method(D_METHOD("set_helper_line_spacing", "value"), &BulletSpawner2D::set_helper_line_spacing);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_line_spacing"), "set_helper_line_spacing", "get_helper_line_spacing");
+
+	ClassDB::bind_method(D_METHOD("get_helper_line_face_direction"), &BulletSpawner2D::get_helper_line_face_direction);
+	ClassDB::bind_method(D_METHOD("set_helper_line_face_direction", "value"), &BulletSpawner2D::set_helper_line_face_direction);
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "helper_line_face_direction"), "set_helper_line_face_direction", "get_helper_line_face_direction");
+
+	ClassDB::bind_method(D_METHOD("get_helper_line_anchor"), &BulletSpawner2D::get_helper_line_anchor);
+	ClassDB::bind_method(D_METHOD("set_helper_line_anchor", "value"), &BulletSpawner2D::set_helper_line_anchor);
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "helper_line_anchor", PROPERTY_HINT_ENUM, "Start,Center,End"), "set_helper_line_anchor", "get_helper_line_anchor");
+
+	ClassDB::bind_method(D_METHOD("get_helper_line_facing"), &BulletSpawner2D::get_helper_line_facing);
+	ClassDB::bind_method(D_METHOD("set_helper_line_facing", "value"), &BulletSpawner2D::set_helper_line_facing);
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "helper_line_facing", PROPERTY_HINT_ENUM, "Along the Line,+90 Degrees,-90 Degrees"), "set_helper_line_facing", "get_helper_line_facing");
+
+	ClassDB::bind_method(D_METHOD("get_helper_line_reverse"), &BulletSpawner2D::get_helper_line_reverse);
+	ClassDB::bind_method(D_METHOD("set_helper_line_reverse", "value"), &BulletSpawner2D::set_helper_line_reverse);
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "helper_line_reverse"), "set_helper_line_reverse", "get_helper_line_reverse");
+
+	ClassDB::bind_method(D_METHOD("get_helper_line_slot_offset"), &BulletSpawner2D::get_helper_line_slot_offset);
+	ClassDB::bind_method(D_METHOD("set_helper_line_slot_offset", "value"), &BulletSpawner2D::set_helper_line_slot_offset);
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "helper_line_slot_offset"), "set_helper_line_slot_offset", "get_helper_line_slot_offset");
+
+	ClassDB::bind_method(D_METHOD("get_helper_line_start_offset"), &BulletSpawner2D::get_helper_line_start_offset);
+	ClassDB::bind_method(D_METHOD("set_helper_line_start_offset", "value"), &BulletSpawner2D::set_helper_line_start_offset);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_line_start_offset"), "set_helper_line_start_offset", "get_helper_line_start_offset");
+
+	ADD_SUBGROUP("Aimed", "helper_aimed_");
+	ClassDB::bind_method(D_METHOD("get_helper_aimed_target_path"), &BulletSpawner2D::get_helper_aimed_target_path);
+	ClassDB::bind_method(D_METHOD("set_helper_aimed_target_path", "path"), &BulletSpawner2D::set_helper_aimed_target_path);
+	ADD_PROPERTY(PropertyInfo(Variant::NODE_PATH, "helper_aimed_target", PROPERTY_HINT_NODE_PATH_VALID_TYPES, "Node2D"), "set_helper_aimed_target_path", "get_helper_aimed_target_path");
+
+	ClassDB::bind_method(D_METHOD("get_helper_aimed_target"), &BulletSpawner2D::get_helper_aimed_target);
+	ClassDB::bind_method(D_METHOD("set_helper_aimed_target", "target"), &BulletSpawner2D::set_helper_aimed_target);
+
+	ClassDB::bind_method(D_METHOD("get_helper_aimed_spread"), &BulletSpawner2D::get_helper_aimed_spread);
+	ClassDB::bind_method(D_METHOD("set_helper_aimed_spread", "value"), &BulletSpawner2D::set_helper_aimed_spread);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_aimed_spread"), "set_helper_aimed_spread", "get_helper_aimed_spread");
+
+	ClassDB::bind_method(D_METHOD("get_helper_aimed_step_offset"), &BulletSpawner2D::get_helper_aimed_step_offset);
+	ClassDB::bind_method(D_METHOD("set_helper_aimed_step_offset", "value"), &BulletSpawner2D::set_helper_aimed_step_offset);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_aimed_step_offset"), "set_helper_aimed_step_offset", "get_helper_aimed_step_offset");
+
+	ClassDB::bind_method(D_METHOD("get_helper_aimed_centered"), &BulletSpawner2D::get_helper_aimed_centered);
+	ClassDB::bind_method(D_METHOD("set_helper_aimed_centered", "value"), &BulletSpawner2D::set_helper_aimed_centered);
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "helper_aimed_centered"), "set_helper_aimed_centered", "get_helper_aimed_centered");
+
+	ClassDB::bind_method(D_METHOD("get_helper_aimed_prediction"), &BulletSpawner2D::get_helper_aimed_prediction);
+	ClassDB::bind_method(D_METHOD("set_helper_aimed_prediction", "value"), &BulletSpawner2D::set_helper_aimed_prediction);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_aimed_prediction"), "set_helper_aimed_prediction", "get_helper_aimed_prediction");
+
+	ClassDB::bind_method(D_METHOD("get_helper_aimed_prediction_time"), &BulletSpawner2D::get_helper_aimed_prediction_time);
+	ClassDB::bind_method(D_METHOD("set_helper_aimed_prediction_time", "value"), &BulletSpawner2D::set_helper_aimed_prediction_time);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_aimed_prediction_time"), "set_helper_aimed_prediction_time", "get_helper_aimed_prediction_time");
+
+	ADD_SUBGROUP("Flower", "helper_flower_");
+	// NOTE: the bloom-kind selector is intentionally FIRST so it is the first
+	// thing a user configures; the per-type knobs grouped right after it are
+	// shown/hidden by _validate_property based on the chosen kind.
+	ClassDB::bind_method(D_METHOD("get_helper_flower_type"), &BulletSpawner2D::get_helper_flower_type);
+	ClassDB::bind_method(D_METHOD("set_helper_flower_type", "value"), &BulletSpawner2D::set_helper_flower_type);
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "helper_flower_type", PropertyHint::PROPERTY_HINT_ENUM, "FAN,RHODONEA,PHYLLOTAXIS,SPIROGRAPH,SUPERFORMULA"), "set_helper_flower_type", "get_helper_flower_type");
+
+	ClassDB::bind_method(D_METHOD("get_helper_flower_radius"), &BulletSpawner2D::get_helper_flower_radius);
+	ClassDB::bind_method(D_METHOD("set_helper_flower_radius", "value"), &BulletSpawner2D::set_helper_flower_radius);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_flower_radius"), "set_helper_flower_radius", "get_helper_flower_radius");
+
+	ClassDB::bind_method(D_METHOD("get_helper_flower_base_rotation"), &BulletSpawner2D::get_helper_flower_base_rotation);
+	ClassDB::bind_method(D_METHOD("set_helper_flower_base_rotation", "value"), &BulletSpawner2D::set_helper_flower_base_rotation);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_flower_base_rotation"), "set_helper_flower_base_rotation", "get_helper_flower_base_rotation");
+
+	ClassDB::bind_method(D_METHOD("get_helper_flower_face_outward"), &BulletSpawner2D::get_helper_flower_face_outward);
+	ClassDB::bind_method(D_METHOD("set_helper_flower_face_outward", "value"), &BulletSpawner2D::set_helper_flower_face_outward);
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "helper_flower_face_outward"), "set_helper_flower_face_outward", "get_helper_flower_face_outward");
+
+	ClassDB::bind_method(D_METHOD("get_helper_flower_facing_offset_deg"), &BulletSpawner2D::get_helper_flower_facing_offset_deg);
+	ClassDB::bind_method(D_METHOD("set_helper_flower_facing_offset_deg", "value"), &BulletSpawner2D::set_helper_flower_facing_offset_deg);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_flower_facing_offset_deg"), "set_helper_flower_facing_offset_deg", "get_helper_flower_facing_offset_deg");
+
+	// RHODONEA / PHYLLOTAXIS / SUPERFORMULA: core-hole lift.
+	ClassDB::bind_method(D_METHOD("get_helper_flower_inner_radius_scale"), &BulletSpawner2D::get_helper_flower_inner_radius_scale);
+	ClassDB::bind_method(D_METHOD("set_helper_flower_inner_radius_scale", "value"), &BulletSpawner2D::set_helper_flower_inner_radius_scale);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_flower_inner_radius_scale", PropertyHint::PROPERTY_HINT_RANGE, "0,0.999,0.001"), "set_helper_flower_inner_radius_scale", "get_helper_flower_inner_radius_scale");
+
+	// FAN: lobe count + per-lobe fan controls.
+	ClassDB::bind_method(D_METHOD("get_helper_flower_petals"), &BulletSpawner2D::get_helper_flower_petals);
+	ClassDB::bind_method(D_METHOD("set_helper_flower_petals", "value"), &BulletSpawner2D::set_helper_flower_petals);
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "helper_flower_petals"), "set_helper_flower_petals", "get_helper_flower_petals");
+
+	ClassDB::bind_method(D_METHOD("get_helper_flower_bullets_per_petal"), &BulletSpawner2D::get_helper_flower_bullets_per_petal);
+	ClassDB::bind_method(D_METHOD("set_helper_flower_bullets_per_petal", "value"), &BulletSpawner2D::set_helper_flower_bullets_per_petal);
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "helper_flower_bullets_per_petal"), "set_helper_flower_bullets_per_petal", "get_helper_flower_bullets_per_petal");
+
+	ClassDB::bind_method(D_METHOD("get_helper_flower_petal_spread"), &BulletSpawner2D::get_helper_flower_petal_spread);
+	ClassDB::bind_method(D_METHOD("set_helper_flower_petal_spread", "value"), &BulletSpawner2D::set_helper_flower_petal_spread);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_flower_petal_spread"), "set_helper_flower_petal_spread", "get_helper_flower_petal_spread");
+
+	// FAN + RHODONEA: waist pinch between lobes.
+	ClassDB::bind_method(D_METHOD("get_helper_flower_petal_sharpness"), &BulletSpawner2D::get_helper_flower_petal_sharpness);
+	ClassDB::bind_method(D_METHOD("set_helper_flower_petal_sharpness", "value"), &BulletSpawner2D::set_helper_flower_petal_sharpness);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_flower_petal_sharpness"), "set_helper_flower_petal_sharpness", "get_helper_flower_petal_sharpness");
+
+	// SPIROGRAPH: hypotrochoid roller radius r (> 0) and pen offset d (>= 0).
+	ClassDB::bind_method(D_METHOD("get_helper_flower_spiro_roller"), &BulletSpawner2D::get_helper_flower_spiro_roller);
+	ClassDB::bind_method(D_METHOD("set_helper_flower_spiro_roller", "value"), &BulletSpawner2D::set_helper_flower_spiro_roller);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_flower_spiro_roller", PropertyHint::PROPERTY_HINT_RANGE, "0.5,2048,0.5,greater_than,0"), "set_helper_flower_spiro_roller", "get_helper_flower_spiro_roller");
+
+	ClassDB::bind_method(D_METHOD("get_helper_flower_spiro_pen"), &BulletSpawner2D::get_helper_flower_spiro_pen);
+	ClassDB::bind_method(D_METHOD("set_helper_flower_spiro_pen", "value"), &BulletSpawner2D::set_helper_flower_spiro_pen);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_flower_spiro_pen", PropertyHint::PROPERTY_HINT_RANGE, "0,2048,0.5"), "set_helper_flower_spiro_pen", "get_helper_flower_spiro_pen");
+
+	// SUPERFORMULA: lobe count m and fullness exponent.
+	ClassDB::bind_method(D_METHOD("get_helper_flower_super_lobes"), &BulletSpawner2D::get_helper_flower_super_lobes);
+	ClassDB::bind_method(D_METHOD("set_helper_flower_super_lobes", "value"), &BulletSpawner2D::set_helper_flower_super_lobes);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_flower_super_lobes", PropertyHint::PROPERTY_HINT_RANGE, "2,64,1"), "set_helper_flower_super_lobes", "get_helper_flower_super_lobes");
+
+	ClassDB::bind_method(D_METHOD("get_helper_flower_super_fullness"), &BulletSpawner2D::get_helper_flower_super_fullness);
+	ClassDB::bind_method(D_METHOD("set_helper_flower_super_fullness", "value"), &BulletSpawner2D::set_helper_flower_super_fullness);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_flower_super_fullness", PropertyHint::PROPERTY_HINT_RANGE, "0.05,8,0.05,greater_than,0"), "set_helper_flower_super_fullness", "get_helper_flower_super_fullness");
+
+	ADD_SUBGROUP("Ellipse", "helper_ellipse_");
+	ClassDB::bind_method(D_METHOD("get_helper_ellipse_radius_x"), &BulletSpawner2D::get_helper_ellipse_radius_x);
+	ClassDB::bind_method(D_METHOD("set_helper_ellipse_radius_x", "value"), &BulletSpawner2D::set_helper_ellipse_radius_x);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_ellipse_radius_x"), "set_helper_ellipse_radius_x", "get_helper_ellipse_radius_x");
+
+	ClassDB::bind_method(D_METHOD("get_helper_ellipse_radius_y"), &BulletSpawner2D::get_helper_ellipse_radius_y);
+	ClassDB::bind_method(D_METHOD("set_helper_ellipse_radius_y", "value"), &BulletSpawner2D::set_helper_ellipse_radius_y);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_ellipse_radius_y"), "set_helper_ellipse_radius_y", "get_helper_ellipse_radius_y");
+
+	ClassDB::bind_method(D_METHOD("get_helper_ellipse_rotation"), &BulletSpawner2D::get_helper_ellipse_rotation);
+	ClassDB::bind_method(D_METHOD("set_helper_ellipse_rotation", "value"), &BulletSpawner2D::set_helper_ellipse_rotation);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_ellipse_rotation"), "set_helper_ellipse_rotation", "get_helper_ellipse_rotation");
+
+	ClassDB::bind_method(D_METHOD("get_helper_ellipse_start_angle"), &BulletSpawner2D::get_helper_ellipse_start_angle);
+	ClassDB::bind_method(D_METHOD("set_helper_ellipse_start_angle", "value"), &BulletSpawner2D::set_helper_ellipse_start_angle);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_ellipse_start_angle"), "set_helper_ellipse_start_angle", "get_helper_ellipse_start_angle");
+
+	ClassDB::bind_method(D_METHOD("get_helper_ellipse_arc"), &BulletSpawner2D::get_helper_ellipse_arc);
+	ClassDB::bind_method(D_METHOD("set_helper_ellipse_arc", "value"), &BulletSpawner2D::set_helper_ellipse_arc);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_ellipse_arc"), "set_helper_ellipse_arc", "get_helper_ellipse_arc");
+
+	ClassDB::bind_method(D_METHOD("get_helper_ellipse_mode"), &BulletSpawner2D::get_helper_ellipse_mode);
+	ClassDB::bind_method(D_METHOD("set_helper_ellipse_mode", "value"), &BulletSpawner2D::set_helper_ellipse_mode);
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "helper_ellipse_mode", PROPERTY_HINT_ENUM, "Full,Arc,Wall"), "set_helper_ellipse_mode", "get_helper_ellipse_mode");
+
+	ClassDB::bind_method(D_METHOD("get_helper_ellipse_gap_count"), &BulletSpawner2D::get_helper_ellipse_gap_count);
+	ClassDB::bind_method(D_METHOD("set_helper_ellipse_gap_count", "value"), &BulletSpawner2D::set_helper_ellipse_gap_count);
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "helper_ellipse_gap_count"), "set_helper_ellipse_gap_count", "get_helper_ellipse_gap_count");
+
+	ClassDB::bind_method(D_METHOD("get_helper_ellipse_gap_width"), &BulletSpawner2D::get_helper_ellipse_gap_width);
+	ClassDB::bind_method(D_METHOD("set_helper_ellipse_gap_width", "value"), &BulletSpawner2D::set_helper_ellipse_gap_width);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_ellipse_gap_width"), "set_helper_ellipse_gap_width", "get_helper_ellipse_gap_width");
+
+	ClassDB::bind_method(D_METHOD("get_helper_ellipse_face_outward"), &BulletSpawner2D::get_helper_ellipse_face_outward);
+	ClassDB::bind_method(D_METHOD("set_helper_ellipse_face_outward", "value"), &BulletSpawner2D::set_helper_ellipse_face_outward);
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "helper_ellipse_face_outward"), "set_helper_ellipse_face_outward", "get_helper_ellipse_face_outward");
+
+	ClassDB::bind_method(D_METHOD("get_helper_ellipse_facing_offset_deg"), &BulletSpawner2D::get_helper_ellipse_facing_offset_deg);
+	ClassDB::bind_method(D_METHOD("set_helper_ellipse_facing_offset_deg", "value"), &BulletSpawner2D::set_helper_ellipse_facing_offset_deg);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_ellipse_facing_offset_deg"), "set_helper_ellipse_facing_offset_deg", "get_helper_ellipse_facing_offset_deg");
+
+	ADD_SUBGROUP("Rain", "helper_rain_");
+	ClassDB::bind_method(D_METHOD("get_helper_rain_band_width"), &BulletSpawner2D::get_helper_rain_band_width);
+	ClassDB::bind_method(D_METHOD("set_helper_rain_band_width", "value"), &BulletSpawner2D::set_helper_rain_band_width);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_rain_band_width"), "set_helper_rain_band_width", "get_helper_rain_band_width");
+
+	ClassDB::bind_method(D_METHOD("get_helper_rain_direction"), &BulletSpawner2D::get_helper_rain_direction);
+	ClassDB::bind_method(D_METHOD("set_helper_rain_direction", "value"), &BulletSpawner2D::set_helper_rain_direction);
+	ADD_PROPERTY(PropertyInfo(Variant::VECTOR2, "helper_rain_direction"), "set_helper_rain_direction", "get_helper_rain_direction");
+
+	ClassDB::bind_method(D_METHOD("get_helper_rain_drop_spacing"), &BulletSpawner2D::get_helper_rain_drop_spacing);
+	ClassDB::bind_method(D_METHOD("set_helper_rain_drop_spacing", "value"), &BulletSpawner2D::set_helper_rain_drop_spacing);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_rain_drop_spacing"), "set_helper_rain_drop_spacing", "get_helper_rain_drop_spacing");
+
+	ClassDB::bind_method(D_METHOD("get_helper_rain_jitter"), &BulletSpawner2D::get_helper_rain_jitter);
+	ClassDB::bind_method(D_METHOD("set_helper_rain_jitter", "value"), &BulletSpawner2D::set_helper_rain_jitter);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_rain_jitter"), "set_helper_rain_jitter", "get_helper_rain_jitter");
+	ClassDB::bind_method(D_METHOD("get_helper_rain_seed"), &BulletSpawner2D::get_helper_rain_seed);
+	ClassDB::bind_method(D_METHOD("set_helper_rain_seed", "value"), &BulletSpawner2D::set_helper_rain_seed);
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "helper_rain_seed"), "set_helper_rain_seed", "get_helper_rain_seed");
+
+	ADD_SUBGROUP("Scatter", "helper_scatter_");
+	ClassDB::bind_method(D_METHOD("get_helper_scatter_burst_radius"), &BulletSpawner2D::get_helper_scatter_burst_radius);
+	ClassDB::bind_method(D_METHOD("set_helper_scatter_burst_radius", "value"), &BulletSpawner2D::set_helper_scatter_burst_radius);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_scatter_burst_radius"), "set_helper_scatter_burst_radius", "get_helper_scatter_burst_radius");
+
+	ClassDB::bind_method(D_METHOD("get_helper_scatter_facing_jitter"), &BulletSpawner2D::get_helper_scatter_facing_jitter);
+	ClassDB::bind_method(D_METHOD("set_helper_scatter_facing_jitter", "value"), &BulletSpawner2D::set_helper_scatter_facing_jitter);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_scatter_facing_jitter"), "set_helper_scatter_facing_jitter", "get_helper_scatter_facing_jitter");
+
+	ClassDB::bind_method(D_METHOD("get_helper_scatter_seed"), &BulletSpawner2D::get_helper_scatter_seed);
+	ClassDB::bind_method(D_METHOD("set_helper_scatter_seed", "value"), &BulletSpawner2D::set_helper_scatter_seed);
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "helper_scatter_seed"), "set_helper_scatter_seed", "get_helper_scatter_seed");
+
+	ClassDB::bind_method(D_METHOD("get_helper_scatter_inner_radius"), &BulletSpawner2D::get_helper_scatter_inner_radius);
+	ClassDB::bind_method(D_METHOD("set_helper_scatter_inner_radius", "value"), &BulletSpawner2D::set_helper_scatter_inner_radius);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_scatter_inner_radius"), "set_helper_scatter_inner_radius", "get_helper_scatter_inner_radius");
+
+	ClassDB::bind_method(D_METHOD("get_helper_scatter_direction"), &BulletSpawner2D::get_helper_scatter_direction);
+	ClassDB::bind_method(D_METHOD("set_helper_scatter_direction", "value"), &BulletSpawner2D::set_helper_scatter_direction);
+	ADD_PROPERTY(PropertyInfo(Variant::VECTOR2, "helper_scatter_direction"), "set_helper_scatter_direction", "get_helper_scatter_direction");
+
+	ClassDB::bind_method(D_METHOD("get_helper_scatter_arc"), &BulletSpawner2D::get_helper_scatter_arc);
+	ClassDB::bind_method(D_METHOD("set_helper_scatter_arc", "value"), &BulletSpawner2D::set_helper_scatter_arc);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_scatter_arc"), "set_helper_scatter_arc", "get_helper_scatter_arc");
+
+	ClassDB::bind_method(D_METHOD("get_helper_scatter_facing"), &BulletSpawner2D::get_helper_scatter_facing);
+	ClassDB::bind_method(D_METHOD("set_helper_scatter_facing", "value"), &BulletSpawner2D::set_helper_scatter_facing);
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "helper_scatter_facing", PROPERTY_HINT_ENUM, "Outward,Random,Inward"), "set_helper_scatter_facing", "get_helper_scatter_facing");
+
+	ADD_SUBGROUP("Star Polygon", "helper_star_polygon_");
+	ClassDB::bind_method(D_METHOD("get_helper_star_polygon_vertices"), &BulletSpawner2D::get_helper_star_polygon_vertices);
+	ClassDB::bind_method(D_METHOD("set_helper_star_polygon_vertices", "value"), &BulletSpawner2D::set_helper_star_polygon_vertices);
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "helper_star_polygon_vertices"), "set_helper_star_polygon_vertices", "get_helper_star_polygon_vertices");
+
+	ClassDB::bind_method(D_METHOD("get_helper_star_polygon_radius"), &BulletSpawner2D::get_helper_star_polygon_radius);
+	ClassDB::bind_method(D_METHOD("set_helper_star_polygon_radius", "value"), &BulletSpawner2D::set_helper_star_polygon_radius);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_star_polygon_radius"), "set_helper_star_polygon_radius", "get_helper_star_polygon_radius");
+
+	ClassDB::bind_method(D_METHOD("get_helper_star_polygon_vertex_bias"), &BulletSpawner2D::get_helper_star_polygon_vertex_bias);
+	ClassDB::bind_method(D_METHOD("set_helper_star_polygon_vertex_bias", "value"), &BulletSpawner2D::set_helper_star_polygon_vertex_bias);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_star_polygon_vertex_bias"), "set_helper_star_polygon_vertex_bias", "get_helper_star_polygon_vertex_bias");
+
+	ClassDB::bind_method(D_METHOD("get_helper_star_polygon_base_rotation"), &BulletSpawner2D::get_helper_star_polygon_base_rotation);
+	ClassDB::bind_method(D_METHOD("set_helper_star_polygon_base_rotation", "value"), &BulletSpawner2D::set_helper_star_polygon_base_rotation);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_star_polygon_base_rotation"), "set_helper_star_polygon_base_rotation", "get_helper_star_polygon_base_rotation");
+
+	ClassDB::bind_method(D_METHOD("get_helper_star_polygon_face_outward"), &BulletSpawner2D::get_helper_star_polygon_face_outward);
+	ClassDB::bind_method(D_METHOD("set_helper_star_polygon_face_outward", "value"), &BulletSpawner2D::set_helper_star_polygon_face_outward);
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "helper_star_polygon_face_outward"), "set_helper_star_polygon_face_outward", "get_helper_star_polygon_face_outward");
+
+	ClassDB::bind_method(D_METHOD("get_helper_star_polygon_facing_offset_deg"), &BulletSpawner2D::get_helper_star_polygon_facing_offset_deg);
+	ClassDB::bind_method(D_METHOD("set_helper_star_polygon_facing_offset_deg", "value"), &BulletSpawner2D::set_helper_star_polygon_facing_offset_deg);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_star_polygon_facing_offset_deg"), "set_helper_star_polygon_facing_offset_deg", "get_helper_star_polygon_facing_offset_deg");
+
+	ADD_SUBGROUP("Multi Spiral", "helper_multispiral_");
+	ClassDB::bind_method(D_METHOD("get_helper_multispiral_arms"), &BulletSpawner2D::get_helper_multispiral_arms);
+	ClassDB::bind_method(D_METHOD("set_helper_multispiral_arms", "value"), &BulletSpawner2D::set_helper_multispiral_arms);
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "helper_multispiral_arms"), "set_helper_multispiral_arms", "get_helper_multispiral_arms");
+
+	ClassDB::bind_method(D_METHOD("get_helper_multispiral_start_radius"), &BulletSpawner2D::get_helper_multispiral_start_radius);
+	ClassDB::bind_method(D_METHOD("set_helper_multispiral_start_radius", "value"), &BulletSpawner2D::set_helper_multispiral_start_radius);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_multispiral_start_radius"), "set_helper_multispiral_start_radius", "get_helper_multispiral_start_radius");
+
+	ClassDB::bind_method(D_METHOD("get_helper_multispiral_radius_step"), &BulletSpawner2D::get_helper_multispiral_radius_step);
+	ClassDB::bind_method(D_METHOD("set_helper_multispiral_radius_step", "value"), &BulletSpawner2D::set_helper_multispiral_radius_step);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_multispiral_radius_step"), "set_helper_multispiral_radius_step", "get_helper_multispiral_radius_step");
+
+	ClassDB::bind_method(D_METHOD("get_helper_multispiral_angle_step"), &BulletSpawner2D::get_helper_multispiral_angle_step);
+	ClassDB::bind_method(D_METHOD("set_helper_multispiral_angle_step", "value"), &BulletSpawner2D::set_helper_multispiral_angle_step);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_multispiral_angle_step"), "set_helper_multispiral_angle_step", "get_helper_multispiral_angle_step");
+
+	ClassDB::bind_method(D_METHOD("get_helper_multispiral_rotate_with_marker"), &BulletSpawner2D::get_helper_multispiral_rotate_with_marker);
+	ClassDB::bind_method(D_METHOD("set_helper_multispiral_rotate_with_marker", "value"), &BulletSpawner2D::set_helper_multispiral_rotate_with_marker);
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "helper_multispiral_rotate_with_marker"), "set_helper_multispiral_rotate_with_marker", "get_helper_multispiral_rotate_with_marker");
+
+	ClassDB::bind_method(D_METHOD("get_helper_multispiral_facing"), &BulletSpawner2D::get_helper_multispiral_facing);
+	ClassDB::bind_method(D_METHOD("set_helper_multispiral_facing", "value"), &BulletSpawner2D::set_helper_multispiral_facing);
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "helper_multispiral_facing", PROPERTY_HINT_ENUM, "Tangent,Radial Outward,Toward Center,Keep Marker"), "set_helper_multispiral_facing", "get_helper_multispiral_facing");
+
+	ClassDB::bind_method(D_METHOD("get_helper_multispiral_facing_offset_deg"), &BulletSpawner2D::get_helper_multispiral_facing_offset_deg);
+	ClassDB::bind_method(D_METHOD("set_helper_multispiral_facing_offset_deg", "value"), &BulletSpawner2D::set_helper_multispiral_facing_offset_deg);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_multispiral_facing_offset_deg"), "set_helper_multispiral_facing_offset_deg", "get_helper_multispiral_facing_offset_deg");
+
+	ClassDB::bind_method(D_METHOD("get_helper_multispiral_arm_stride"), &BulletSpawner2D::get_helper_multispiral_arm_stride);
+	ClassDB::bind_method(D_METHOD("set_helper_multispiral_arm_stride", "value"), &BulletSpawner2D::set_helper_multispiral_arm_stride);
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "helper_multispiral_arm_stride"), "set_helper_multispiral_arm_stride", "get_helper_multispiral_arm_stride");
+
+	ADD_SUBGROUP("Cross", "helper_cross_");
+	ClassDB::bind_method(D_METHOD("get_helper_cross_arm_count"), &BulletSpawner2D::get_helper_cross_arm_count);
+	ClassDB::bind_method(D_METHOD("set_helper_cross_arm_count", "value"), &BulletSpawner2D::set_helper_cross_arm_count);
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "helper_cross_arm_count"), "set_helper_cross_arm_count", "get_helper_cross_arm_count");
+
+	ClassDB::bind_method(D_METHOD("get_helper_cross_arm_length"), &BulletSpawner2D::get_helper_cross_arm_length);
+	ClassDB::bind_method(D_METHOD("set_helper_cross_arm_length", "value"), &BulletSpawner2D::set_helper_cross_arm_length);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_cross_arm_length"), "set_helper_cross_arm_length", "get_helper_cross_arm_length");
+
+	ClassDB::bind_method(D_METHOD("get_helper_cross_spacing"), &BulletSpawner2D::get_helper_cross_spacing);
+	ClassDB::bind_method(D_METHOD("set_helper_cross_spacing", "value"), &BulletSpawner2D::set_helper_cross_spacing);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_cross_spacing"), "set_helper_cross_spacing", "get_helper_cross_spacing");
+
+	ClassDB::bind_method(D_METHOD("get_helper_cross_base_rotation"), &BulletSpawner2D::get_helper_cross_base_rotation);
+	ClassDB::bind_method(D_METHOD("set_helper_cross_base_rotation", "value"), &BulletSpawner2D::set_helper_cross_base_rotation);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_cross_base_rotation"), "set_helper_cross_base_rotation", "get_helper_cross_base_rotation");
+
+	ClassDB::bind_method(D_METHOD("get_helper_cross_face_outward"), &BulletSpawner2D::get_helper_cross_face_outward);
+	ClassDB::bind_method(D_METHOD("set_helper_cross_face_outward", "value"), &BulletSpawner2D::set_helper_cross_face_outward);
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "helper_cross_face_outward"), "set_helper_cross_face_outward", "get_helper_cross_face_outward");
+
+	ClassDB::bind_method(D_METHOD("get_helper_cross_facing_offset_deg"), &BulletSpawner2D::get_helper_cross_facing_offset_deg);
+	ClassDB::bind_method(D_METHOD("set_helper_cross_facing_offset_deg", "value"), &BulletSpawner2D::set_helper_cross_facing_offset_deg);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_cross_facing_offset_deg"), "set_helper_cross_facing_offset_deg", "get_helper_cross_facing_offset_deg");
+
+	ADD_SUBGROUP("Star", "helper_star_");
+	ClassDB::bind_method(D_METHOD("get_helper_star_points"), &BulletSpawner2D::get_helper_star_points);
+	ClassDB::bind_method(D_METHOD("set_helper_star_points", "value"), &BulletSpawner2D::set_helper_star_points);
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "helper_star_points"), "set_helper_star_points", "get_helper_star_points");
+
+	ClassDB::bind_method(D_METHOD("get_helper_star_outer_radius"), &BulletSpawner2D::get_helper_star_outer_radius);
+	ClassDB::bind_method(D_METHOD("set_helper_star_outer_radius", "value"), &BulletSpawner2D::set_helper_star_outer_radius);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_star_outer_radius"), "set_helper_star_outer_radius", "get_helper_star_outer_radius");
+
+	ClassDB::bind_method(D_METHOD("get_helper_star_inner_radius"), &BulletSpawner2D::get_helper_star_inner_radius);
+	ClassDB::bind_method(D_METHOD("set_helper_star_inner_radius", "value"), &BulletSpawner2D::set_helper_star_inner_radius);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_star_inner_radius"), "set_helper_star_inner_radius", "get_helper_star_inner_radius");
+
+	ClassDB::bind_method(D_METHOD("get_helper_star_base_rotation"), &BulletSpawner2D::get_helper_star_base_rotation);
+	ClassDB::bind_method(D_METHOD("set_helper_star_base_rotation", "value"), &BulletSpawner2D::set_helper_star_base_rotation);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_star_base_rotation"), "set_helper_star_base_rotation", "get_helper_star_base_rotation");
+
+	ClassDB::bind_method(D_METHOD("get_helper_star_face_outward"), &BulletSpawner2D::get_helper_star_face_outward);
+	ClassDB::bind_method(D_METHOD("set_helper_star_face_outward", "value"), &BulletSpawner2D::set_helper_star_face_outward);
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "helper_star_face_outward"), "set_helper_star_face_outward", "get_helper_star_face_outward");
+
+	ClassDB::bind_method(D_METHOD("get_helper_star_facing_offset_deg"), &BulletSpawner2D::get_helper_star_facing_offset_deg);
+	ClassDB::bind_method(D_METHOD("set_helper_star_facing_offset_deg", "value"), &BulletSpawner2D::set_helper_star_facing_offset_deg);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_star_facing_offset_deg"), "set_helper_star_facing_offset_deg", "get_helper_star_facing_offset_deg");
+
+	ADD_SUBGROUP("Heart", "helper_heart_");
+	ClassDB::bind_method(D_METHOD("get_helper_heart_size"), &BulletSpawner2D::get_helper_heart_size);
+	ClassDB::bind_method(D_METHOD("set_helper_heart_size", "value"), &BulletSpawner2D::set_helper_heart_size);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_heart_size"), "set_helper_heart_size", "get_helper_heart_size");
+
+	ClassDB::bind_method(D_METHOD("get_helper_heart_base_rotation"), &BulletSpawner2D::get_helper_heart_base_rotation);
+	ClassDB::bind_method(D_METHOD("set_helper_heart_base_rotation", "value"), &BulletSpawner2D::set_helper_heart_base_rotation);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_heart_base_rotation"), "set_helper_heart_base_rotation", "get_helper_heart_base_rotation");
+
+	ClassDB::bind_method(D_METHOD("get_helper_heart_face_outward"), &BulletSpawner2D::get_helper_heart_face_outward);
+	ClassDB::bind_method(D_METHOD("set_helper_heart_face_outward", "value"), &BulletSpawner2D::set_helper_heart_face_outward);
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "helper_heart_face_outward"), "set_helper_heart_face_outward", "get_helper_heart_face_outward");
+
+	ClassDB::bind_method(D_METHOD("get_helper_heart_facing_offset_deg"), &BulletSpawner2D::get_helper_heart_facing_offset_deg);
+	ClassDB::bind_method(D_METHOD("set_helper_heart_facing_offset_deg", "value"), &BulletSpawner2D::set_helper_heart_facing_offset_deg);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_heart_facing_offset_deg"), "set_helper_heart_facing_offset_deg", "get_helper_heart_facing_offset_deg");
+
+	ADD_SUBGROUP("Wave", "helper_wave_");
+	ClassDB::bind_method(D_METHOD("get_helper_wave_width"), &BulletSpawner2D::get_helper_wave_width);
+	ClassDB::bind_method(D_METHOD("set_helper_wave_width", "value"), &BulletSpawner2D::set_helper_wave_width);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_wave_width"), "set_helper_wave_width", "get_helper_wave_width");
+
+	ClassDB::bind_method(D_METHOD("get_helper_wave_amplitude"), &BulletSpawner2D::get_helper_wave_amplitude);
+	ClassDB::bind_method(D_METHOD("set_helper_wave_amplitude", "value"), &BulletSpawner2D::set_helper_wave_amplitude);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_wave_amplitude"), "set_helper_wave_amplitude", "get_helper_wave_amplitude");
+
+	ClassDB::bind_method(D_METHOD("get_helper_wave_waves"), &BulletSpawner2D::get_helper_wave_waves);
+	ClassDB::bind_method(D_METHOD("set_helper_wave_waves", "value"), &BulletSpawner2D::set_helper_wave_waves);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_wave_waves"), "set_helper_wave_waves", "get_helper_wave_waves");
+
+	ClassDB::bind_method(D_METHOD("get_helper_wave_direction"), &BulletSpawner2D::get_helper_wave_direction);
+	ClassDB::bind_method(D_METHOD("set_helper_wave_direction", "value"), &BulletSpawner2D::set_helper_wave_direction);
+	ADD_PROPERTY(PropertyInfo(Variant::VECTOR2, "helper_wave_direction"), "set_helper_wave_direction", "get_helper_wave_direction");
+
+	ClassDB::bind_method(D_METHOD("get_helper_wave_face_direction"), &BulletSpawner2D::get_helper_wave_face_direction);
+	ClassDB::bind_method(D_METHOD("set_helper_wave_face_direction", "value"), &BulletSpawner2D::set_helper_wave_face_direction);
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "helper_wave_face_direction"), "set_helper_wave_face_direction", "get_helper_wave_face_direction");
+
+	ClassDB::bind_method(D_METHOD("get_helper_wave_facing_offset_deg"), &BulletSpawner2D::get_helper_wave_facing_offset_deg);
+	ClassDB::bind_method(D_METHOD("set_helper_wave_facing_offset_deg", "value"), &BulletSpawner2D::set_helper_wave_facing_offset_deg);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_wave_facing_offset_deg"), "set_helper_wave_facing_offset_deg", "get_helper_wave_facing_offset_deg");
+
+	ADD_SUBGROUP("Waterfall", "helper_waterfall_");
+	ClassDB::bind_method(D_METHOD("get_helper_waterfall_columns"), &BulletSpawner2D::get_helper_waterfall_columns);
+	ClassDB::bind_method(D_METHOD("set_helper_waterfall_columns", "value"), &BulletSpawner2D::set_helper_waterfall_columns);
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "helper_waterfall_columns"), "set_helper_waterfall_columns", "get_helper_waterfall_columns");
+
+	ClassDB::bind_method(D_METHOD("get_helper_waterfall_column_spacing"), &BulletSpawner2D::get_helper_waterfall_column_spacing);
+	ClassDB::bind_method(D_METHOD("set_helper_waterfall_column_spacing", "value"), &BulletSpawner2D::set_helper_waterfall_column_spacing);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_waterfall_column_spacing"), "set_helper_waterfall_column_spacing", "get_helper_waterfall_column_spacing");
+
+	ClassDB::bind_method(D_METHOD("get_helper_waterfall_rows"), &BulletSpawner2D::get_helper_waterfall_rows);
+	ClassDB::bind_method(D_METHOD("set_helper_waterfall_rows", "value"), &BulletSpawner2D::set_helper_waterfall_rows);
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "helper_waterfall_rows"), "set_helper_waterfall_rows", "get_helper_waterfall_rows");
+
+	ClassDB::bind_method(D_METHOD("get_helper_waterfall_row_spacing"), &BulletSpawner2D::get_helper_waterfall_row_spacing);
+	ClassDB::bind_method(D_METHOD("set_helper_waterfall_row_spacing", "value"), &BulletSpawner2D::set_helper_waterfall_row_spacing);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_waterfall_row_spacing"), "set_helper_waterfall_row_spacing", "get_helper_waterfall_row_spacing");
+
+	ClassDB::bind_method(D_METHOD("get_helper_waterfall_stagger"), &BulletSpawner2D::get_helper_waterfall_stagger);
+	ClassDB::bind_method(D_METHOD("set_helper_waterfall_stagger", "value"), &BulletSpawner2D::set_helper_waterfall_stagger);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_waterfall_stagger"), "set_helper_waterfall_stagger", "get_helper_waterfall_stagger");
+
+	ClassDB::bind_method(D_METHOD("get_helper_waterfall_rain_direction"), &BulletSpawner2D::get_helper_waterfall_rain_direction);
+	ClassDB::bind_method(D_METHOD("set_helper_waterfall_rain_direction", "value"), &BulletSpawner2D::set_helper_waterfall_rain_direction);
+	ADD_PROPERTY(PropertyInfo(Variant::VECTOR2, "helper_waterfall_rain_direction"), "set_helper_waterfall_rain_direction", "get_helper_waterfall_rain_direction");
+
+	ClassDB::bind_method(D_METHOD("get_helper_waterfall_jitter"), &BulletSpawner2D::get_helper_waterfall_jitter);
+	ClassDB::bind_method(D_METHOD("set_helper_waterfall_jitter", "value"), &BulletSpawner2D::set_helper_waterfall_jitter);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_waterfall_jitter"), "set_helper_waterfall_jitter", "get_helper_waterfall_jitter");
+	ClassDB::bind_method(D_METHOD("get_helper_waterfall_seed"), &BulletSpawner2D::get_helper_waterfall_seed);
+	ClassDB::bind_method(D_METHOD("set_helper_waterfall_seed", "value"), &BulletSpawner2D::set_helper_waterfall_seed);
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "helper_waterfall_seed"), "set_helper_waterfall_seed", "get_helper_waterfall_seed");
+
+	ClassDB::bind_method(D_METHOD("get_helper_waterfall_facing_offset_deg"), &BulletSpawner2D::get_helper_waterfall_facing_offset_deg);
+	ClassDB::bind_method(D_METHOD("set_helper_waterfall_facing_offset_deg", "value"), &BulletSpawner2D::set_helper_waterfall_facing_offset_deg);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_waterfall_facing_offset_deg"), "set_helper_waterfall_facing_offset_deg", "get_helper_waterfall_facing_offset_deg");
+
+	ADD_SUBGROUP("Lattice", "helper_lattice_");
+	ClassDB::bind_method(D_METHOD("get_helper_lattice_columns"), &BulletSpawner2D::get_helper_lattice_columns);
+	ClassDB::bind_method(D_METHOD("set_helper_lattice_columns", "value"), &BulletSpawner2D::set_helper_lattice_columns);
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "helper_lattice_columns"), "set_helper_lattice_columns", "get_helper_lattice_columns");
+
+	ClassDB::bind_method(D_METHOD("get_helper_lattice_rows"), &BulletSpawner2D::get_helper_lattice_rows);
+	ClassDB::bind_method(D_METHOD("set_helper_lattice_rows", "value"), &BulletSpawner2D::set_helper_lattice_rows);
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "helper_lattice_rows"), "set_helper_lattice_rows", "get_helper_lattice_rows");
+
+	ClassDB::bind_method(D_METHOD("get_helper_lattice_spacing_x"), &BulletSpawner2D::get_helper_lattice_spacing_x);
+	ClassDB::bind_method(D_METHOD("set_helper_lattice_spacing_x", "value"), &BulletSpawner2D::set_helper_lattice_spacing_x);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_lattice_spacing_x"), "set_helper_lattice_spacing_x", "get_helper_lattice_spacing_x");
+
+	ClassDB::bind_method(D_METHOD("get_helper_lattice_spacing_y"), &BulletSpawner2D::get_helper_lattice_spacing_y);
+	ClassDB::bind_method(D_METHOD("set_helper_lattice_spacing_y", "value"), &BulletSpawner2D::set_helper_lattice_spacing_y);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_lattice_spacing_y"), "set_helper_lattice_spacing_y", "get_helper_lattice_spacing_y");
+
+	ClassDB::bind_method(D_METHOD("get_helper_lattice_stagger_rows"), &BulletSpawner2D::get_helper_lattice_stagger_rows);
+	ClassDB::bind_method(D_METHOD("set_helper_lattice_stagger_rows", "value"), &BulletSpawner2D::set_helper_lattice_stagger_rows);
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "helper_lattice_stagger_rows"), "set_helper_lattice_stagger_rows", "get_helper_lattice_stagger_rows");
+
+	ClassDB::bind_method(D_METHOD("get_helper_lattice_face_outward"), &BulletSpawner2D::get_helper_lattice_face_outward);
+	ClassDB::bind_method(D_METHOD("set_helper_lattice_face_outward", "value"), &BulletSpawner2D::set_helper_lattice_face_outward);
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "helper_lattice_face_outward"), "set_helper_lattice_face_outward", "get_helper_lattice_face_outward");
+
+	ClassDB::bind_method(D_METHOD("get_helper_lattice_facing_offset_deg"), &BulletSpawner2D::get_helper_lattice_facing_offset_deg);
+	ClassDB::bind_method(D_METHOD("set_helper_lattice_facing_offset_deg", "value"), &BulletSpawner2D::set_helper_lattice_facing_offset_deg);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_lattice_facing_offset_deg"), "set_helper_lattice_facing_offset_deg", "get_helper_lattice_facing_offset_deg");
+
+	ADD_SUBGROUP("Rose", "helper_rose_");
+	ClassDB::bind_method(D_METHOD("get_helper_rose_petals"), &BulletSpawner2D::get_helper_rose_petals);
+	ClassDB::bind_method(D_METHOD("set_helper_rose_petals", "value"), &BulletSpawner2D::set_helper_rose_petals);
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "helper_rose_petals"), "set_helper_rose_petals", "get_helper_rose_petals");
+
+	ClassDB::bind_method(D_METHOD("get_helper_rose_radius"), &BulletSpawner2D::get_helper_rose_radius);
+	ClassDB::bind_method(D_METHOD("set_helper_rose_radius", "value"), &BulletSpawner2D::set_helper_rose_radius);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_rose_radius"), "set_helper_rose_radius", "get_helper_rose_radius");
+
+	ClassDB::bind_method(D_METHOD("get_helper_rose_lobe_sharpness"), &BulletSpawner2D::get_helper_rose_lobe_sharpness);
+	ClassDB::bind_method(D_METHOD("set_helper_rose_lobe_sharpness", "value"), &BulletSpawner2D::set_helper_rose_lobe_sharpness);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_rose_lobe_sharpness"), "set_helper_rose_lobe_sharpness", "get_helper_rose_lobe_sharpness");
+
+	ClassDB::bind_method(D_METHOD("get_helper_rose_base_rotation"), &BulletSpawner2D::get_helper_rose_base_rotation);
+	ClassDB::bind_method(D_METHOD("set_helper_rose_base_rotation", "value"), &BulletSpawner2D::set_helper_rose_base_rotation);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_rose_base_rotation"), "set_helper_rose_base_rotation", "get_helper_rose_base_rotation");
+
+	ClassDB::bind_method(D_METHOD("get_helper_rose_face_outward"), &BulletSpawner2D::get_helper_rose_face_outward);
+	ClassDB::bind_method(D_METHOD("set_helper_rose_face_outward", "value"), &BulletSpawner2D::set_helper_rose_face_outward);
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "helper_rose_face_outward"), "set_helper_rose_face_outward", "get_helper_rose_face_outward");
+
+	ClassDB::bind_method(D_METHOD("get_helper_rose_facing_offset_deg"), &BulletSpawner2D::get_helper_rose_facing_offset_deg);
+	ClassDB::bind_method(D_METHOD("set_helper_rose_facing_offset_deg", "value"), &BulletSpawner2D::set_helper_rose_facing_offset_deg);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_rose_facing_offset_deg"), "set_helper_rose_facing_offset_deg", "get_helper_rose_facing_offset_deg");
+
+	ADD_SUBGROUP("Counter Spiral", "helper_counter_spiral_");
+	ClassDB::bind_method(D_METHOD("get_helper_counter_spiral_arms"), &BulletSpawner2D::get_helper_counter_spiral_arms);
+	ClassDB::bind_method(D_METHOD("set_helper_counter_spiral_arms", "value"), &BulletSpawner2D::set_helper_counter_spiral_arms);
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "helper_counter_spiral_arms"), "set_helper_counter_spiral_arms", "get_helper_counter_spiral_arms");
+
+	ClassDB::bind_method(D_METHOD("get_helper_counter_spiral_start_radius"), &BulletSpawner2D::get_helper_counter_spiral_start_radius);
+	ClassDB::bind_method(D_METHOD("set_helper_counter_spiral_start_radius", "value"), &BulletSpawner2D::set_helper_counter_spiral_start_radius);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_counter_spiral_start_radius"), "set_helper_counter_spiral_start_radius", "get_helper_counter_spiral_start_radius");
+
+	ClassDB::bind_method(D_METHOD("get_helper_counter_spiral_radius_step"), &BulletSpawner2D::get_helper_counter_spiral_radius_step);
+	ClassDB::bind_method(D_METHOD("set_helper_counter_spiral_radius_step", "value"), &BulletSpawner2D::set_helper_counter_spiral_radius_step);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_counter_spiral_radius_step"), "set_helper_counter_spiral_radius_step", "get_helper_counter_spiral_radius_step");
+
+	ClassDB::bind_method(D_METHOD("get_helper_counter_spiral_angle_step"), &BulletSpawner2D::get_helper_counter_spiral_angle_step);
+	ClassDB::bind_method(D_METHOD("set_helper_counter_spiral_angle_step", "value"), &BulletSpawner2D::set_helper_counter_spiral_angle_step);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_counter_spiral_angle_step"), "set_helper_counter_spiral_angle_step", "get_helper_counter_spiral_angle_step");
+
+	ClassDB::bind_method(D_METHOD("get_helper_counter_spiral_rotate_with_marker"), &BulletSpawner2D::get_helper_counter_spiral_rotate_with_marker);
+	ClassDB::bind_method(D_METHOD("set_helper_counter_spiral_rotate_with_marker", "value"), &BulletSpawner2D::set_helper_counter_spiral_rotate_with_marker);
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "helper_counter_spiral_rotate_with_marker"), "set_helper_counter_spiral_rotate_with_marker", "get_helper_counter_spiral_rotate_with_marker");
+
+	ClassDB::bind_method(D_METHOD("get_helper_counter_spiral_facing"), &BulletSpawner2D::get_helper_counter_spiral_facing);
+	ClassDB::bind_method(D_METHOD("set_helper_counter_spiral_facing", "value"), &BulletSpawner2D::set_helper_counter_spiral_facing);
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "helper_counter_spiral_facing", PROPERTY_HINT_ENUM, "Tangent,Radial Outward,Toward Center,Keep Marker"), "set_helper_counter_spiral_facing", "get_helper_counter_spiral_facing");
+
+	ClassDB::bind_method(D_METHOD("get_helper_counter_spiral_facing_offset_deg"), &BulletSpawner2D::get_helper_counter_spiral_facing_offset_deg);
+	ClassDB::bind_method(D_METHOD("set_helper_counter_spiral_facing_offset_deg", "value"), &BulletSpawner2D::set_helper_counter_spiral_facing_offset_deg);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_counter_spiral_facing_offset_deg"), "set_helper_counter_spiral_facing_offset_deg", "get_helper_counter_spiral_facing_offset_deg");
+
+	ClassDB::bind_method(D_METHOD("get_helper_counter_spiral_arm_stride"), &BulletSpawner2D::get_helper_counter_spiral_arm_stride);
+	ClassDB::bind_method(D_METHOD("set_helper_counter_spiral_arm_stride", "value"), &BulletSpawner2D::set_helper_counter_spiral_arm_stride);
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "helper_counter_spiral_arm_stride"), "set_helper_counter_spiral_arm_stride", "get_helper_counter_spiral_arm_stride");
+
+	ClassDB::bind_method(D_METHOD("get_helper_counter_spiral_mirror_alternate_arms"), &BulletSpawner2D::get_helper_counter_spiral_mirror_alternate_arms);
+	ClassDB::bind_method(D_METHOD("set_helper_counter_spiral_mirror_alternate_arms", "value"), &BulletSpawner2D::set_helper_counter_spiral_mirror_alternate_arms);
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "helper_counter_spiral_mirror_alternate_arms"), "set_helper_counter_spiral_mirror_alternate_arms", "get_helper_counter_spiral_mirror_alternate_arms");
+
+	ADD_SUBGROUP("Corridor", "helper_corridor_");
+	ClassDB::bind_method(D_METHOD("get_helper_corridor_aim_direction"), &BulletSpawner2D::get_helper_corridor_aim_direction);
+	ClassDB::bind_method(D_METHOD("set_helper_corridor_aim_direction", "value"), &BulletSpawner2D::set_helper_corridor_aim_direction);
+	ADD_PROPERTY(PropertyInfo(Variant::VECTOR2, "helper_corridor_aim_direction"), "set_helper_corridor_aim_direction", "get_helper_corridor_aim_direction");
+
+	ClassDB::bind_method(D_METHOD("get_helper_corridor_width"), &BulletSpawner2D::get_helper_corridor_width);
+	ClassDB::bind_method(D_METHOD("set_helper_corridor_width", "value"), &BulletSpawner2D::set_helper_corridor_width);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_corridor_width"), "set_helper_corridor_width", "get_helper_corridor_width");
+
+	ClassDB::bind_method(D_METHOD("get_helper_corridor_gap_width"), &BulletSpawner2D::get_helper_corridor_gap_width);
+	ClassDB::bind_method(D_METHOD("set_helper_corridor_gap_width", "value"), &BulletSpawner2D::set_helper_corridor_gap_width);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_corridor_gap_width"), "set_helper_corridor_gap_width", "get_helper_corridor_gap_width");
+
+	ClassDB::bind_method(D_METHOD("get_helper_corridor_face_aim"), &BulletSpawner2D::get_helper_corridor_face_aim);
+	ClassDB::bind_method(D_METHOD("set_helper_corridor_face_aim", "value"), &BulletSpawner2D::set_helper_corridor_face_aim);
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "helper_corridor_face_aim"), "set_helper_corridor_face_aim", "get_helper_corridor_face_aim");
+
+	ClassDB::bind_method(D_METHOD("get_helper_corridor_facing_offset_deg"), &BulletSpawner2D::get_helper_corridor_facing_offset_deg);
+	ClassDB::bind_method(D_METHOD("set_helper_corridor_facing_offset_deg", "value"), &BulletSpawner2D::set_helper_corridor_facing_offset_deg);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_corridor_facing_offset_deg"), "set_helper_corridor_facing_offset_deg", "get_helper_corridor_facing_offset_deg");
+
+	ADD_SUBGROUP("Lissajous", "helper_lissajous_");
+	ClassDB::bind_method(D_METHOD("get_helper_lissajous_size_x"), &BulletSpawner2D::get_helper_lissajous_size_x);
+	ClassDB::bind_method(D_METHOD("set_helper_lissajous_size_x", "value"), &BulletSpawner2D::set_helper_lissajous_size_x);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_lissajous_size_x"), "set_helper_lissajous_size_x", "get_helper_lissajous_size_x");
+
+	ClassDB::bind_method(D_METHOD("get_helper_lissajous_size_y"), &BulletSpawner2D::get_helper_lissajous_size_y);
+	ClassDB::bind_method(D_METHOD("set_helper_lissajous_size_y", "value"), &BulletSpawner2D::set_helper_lissajous_size_y);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_lissajous_size_y"), "set_helper_lissajous_size_y", "get_helper_lissajous_size_y");
+
+	ClassDB::bind_method(D_METHOD("get_helper_lissajous_freq_x"), &BulletSpawner2D::get_helper_lissajous_freq_x);
+	ClassDB::bind_method(D_METHOD("set_helper_lissajous_freq_x", "value"), &BulletSpawner2D::set_helper_lissajous_freq_x);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_lissajous_freq_x"), "set_helper_lissajous_freq_x", "get_helper_lissajous_freq_x");
+
+	ClassDB::bind_method(D_METHOD("get_helper_lissajous_freq_y"), &BulletSpawner2D::get_helper_lissajous_freq_y);
+	ClassDB::bind_method(D_METHOD("set_helper_lissajous_freq_y", "value"), &BulletSpawner2D::set_helper_lissajous_freq_y);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_lissajous_freq_y"), "set_helper_lissajous_freq_y", "get_helper_lissajous_freq_y");
+
+	ClassDB::bind_method(D_METHOD("get_helper_lissajous_phase"), &BulletSpawner2D::get_helper_lissajous_phase);
+	ClassDB::bind_method(D_METHOD("set_helper_lissajous_phase", "value"), &BulletSpawner2D::set_helper_lissajous_phase);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_lissajous_phase"), "set_helper_lissajous_phase", "get_helper_lissajous_phase");
+
+	ClassDB::bind_method(D_METHOD("get_helper_lissajous_face_outward"), &BulletSpawner2D::get_helper_lissajous_face_outward);
+	ClassDB::bind_method(D_METHOD("set_helper_lissajous_face_outward", "value"), &BulletSpawner2D::set_helper_lissajous_face_outward);
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "helper_lissajous_face_outward"), "set_helper_lissajous_face_outward", "get_helper_lissajous_face_outward");
+
+	ClassDB::bind_method(D_METHOD("get_helper_lissajous_facing_offset_deg"), &BulletSpawner2D::get_helper_lissajous_facing_offset_deg);
+	ClassDB::bind_method(D_METHOD("set_helper_lissajous_facing_offset_deg", "value"), &BulletSpawner2D::set_helper_lissajous_facing_offset_deg);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_lissajous_facing_offset_deg"), "set_helper_lissajous_facing_offset_deg", "get_helper_lissajous_facing_offset_deg");
+
+	ADD_SUBGROUP("Custom", "helper_custom_");
+	ClassDB::bind_method(D_METHOD("get_helper_custom_transforms"), &BulletSpawner2D::get_helper_custom_transforms);
+	ClassDB::bind_method(D_METHOD("set_helper_custom_transforms", "value"), &BulletSpawner2D::set_helper_custom_transforms);
+	ADD_PROPERTY(PropertyInfo(Variant::ARRAY, "helper_custom_transforms", PROPERTY_HINT_ARRAY_TYPE, "Transform2D"), "set_helper_custom_transforms", "get_helper_custom_transforms");
+
+	ClassDB::bind_method(D_METHOD("get_helper_custom_facing"), &BulletSpawner2D::get_helper_custom_facing);
+	ClassDB::bind_method(D_METHOD("set_helper_custom_facing", "value"), &BulletSpawner2D::set_helper_custom_facing);
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "helper_custom_facing", PROPERTY_HINT_ENUM, "As Stored,Face Outward,Face Inward,+90 Degrees,-90 Degrees"), "set_helper_custom_facing", "get_helper_custom_facing");
+
+	ClassDB::bind_method(D_METHOD("get_helper_custom_facing_offset_deg"), &BulletSpawner2D::get_helper_custom_facing_offset_deg);
+	ClassDB::bind_method(D_METHOD("set_helper_custom_facing_offset_deg", "value"), &BulletSpawner2D::set_helper_custom_facing_offset_deg);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_custom_facing_offset_deg"), "set_helper_custom_facing_offset_deg", "get_helper_custom_facing_offset_deg");
+
+	ClassDB::bind_method(D_METHOD("get_helper_custom_reverse"), &BulletSpawner2D::get_helper_custom_reverse);
+	ClassDB::bind_method(D_METHOD("set_helper_custom_reverse", "value"), &BulletSpawner2D::set_helper_custom_reverse);
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "helper_custom_reverse"), "set_helper_custom_reverse", "get_helper_custom_reverse");
+
+	ClassDB::bind_method(D_METHOD("get_helper_custom_slot_offset"), &BulletSpawner2D::get_helper_custom_slot_offset);
+	ClassDB::bind_method(D_METHOD("set_helper_custom_slot_offset", "value"), &BulletSpawner2D::set_helper_custom_slot_offset);
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "helper_custom_slot_offset"), "set_helper_custom_slot_offset", "get_helper_custom_slot_offset");
+
+	ADD_SUBGROUP("Triangle", "helper_triangle_");
+	ClassDB::bind_method(D_METHOD("get_helper_triangle_type"), &BulletSpawner2D::get_helper_triangle_type);
+	ClassDB::bind_method(D_METHOD("set_helper_triangle_type", "value"), &BulletSpawner2D::set_helper_triangle_type);
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "helper_triangle_type", PROPERTY_HINT_ENUM, "Equilateral,Isosceles,Right"), "set_helper_triangle_type", "get_helper_triangle_type");
+
+	ClassDB::bind_method(D_METHOD("get_helper_triangle_size_a"), &BulletSpawner2D::get_helper_triangle_size_a);
+	ClassDB::bind_method(D_METHOD("set_helper_triangle_size_a", "value"), &BulletSpawner2D::set_helper_triangle_size_a);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_triangle_size_a"), "set_helper_triangle_size_a", "get_helper_triangle_size_a");
+
+	ClassDB::bind_method(D_METHOD("get_helper_triangle_size_b"), &BulletSpawner2D::get_helper_triangle_size_b);
+	ClassDB::bind_method(D_METHOD("set_helper_triangle_size_b", "value"), &BulletSpawner2D::set_helper_triangle_size_b);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_triangle_size_b"), "set_helper_triangle_size_b", "get_helper_triangle_size_b");
+
+	ClassDB::bind_method(D_METHOD("get_helper_triangle_rotation"), &BulletSpawner2D::get_helper_triangle_rotation);
+	ClassDB::bind_method(D_METHOD("set_helper_triangle_rotation", "value"), &BulletSpawner2D::set_helper_triangle_rotation);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_triangle_rotation"), "set_helper_triangle_rotation", "get_helper_triangle_rotation");
+
+	ClassDB::bind_method(D_METHOD("get_helper_triangle_face_outward"), &BulletSpawner2D::get_helper_triangle_face_outward);
+	ClassDB::bind_method(D_METHOD("set_helper_triangle_face_outward", "value"), &BulletSpawner2D::set_helper_triangle_face_outward);
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "helper_triangle_face_outward"), "set_helper_triangle_face_outward", "get_helper_triangle_face_outward");
+
+	ClassDB::bind_method(D_METHOD("get_helper_triangle_facing_offset_deg"), &BulletSpawner2D::get_helper_triangle_facing_offset_deg);
+	ClassDB::bind_method(D_METHOD("set_helper_triangle_facing_offset_deg", "value"), &BulletSpawner2D::set_helper_triangle_facing_offset_deg);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_triangle_facing_offset_deg"), "set_helper_triangle_facing_offset_deg", "get_helper_triangle_facing_offset_deg");
+
+	ADD_SUBGROUP("Trapezoid", "helper_trapezoid_");
+	ClassDB::bind_method(D_METHOD("get_helper_trapezoid_base_top"), &BulletSpawner2D::get_helper_trapezoid_base_top);
+	ClassDB::bind_method(D_METHOD("set_helper_trapezoid_base_top", "value"), &BulletSpawner2D::set_helper_trapezoid_base_top);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_trapezoid_base_top"), "set_helper_trapezoid_base_top", "get_helper_trapezoid_base_top");
+
+	ClassDB::bind_method(D_METHOD("get_helper_trapezoid_base_bottom"), &BulletSpawner2D::get_helper_trapezoid_base_bottom);
+	ClassDB::bind_method(D_METHOD("set_helper_trapezoid_base_bottom", "value"), &BulletSpawner2D::set_helper_trapezoid_base_bottom);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_trapezoid_base_bottom"), "set_helper_trapezoid_base_bottom", "get_helper_trapezoid_base_bottom");
+
+	ClassDB::bind_method(D_METHOD("get_helper_trapezoid_height"), &BulletSpawner2D::get_helper_trapezoid_height);
+	ClassDB::bind_method(D_METHOD("set_helper_trapezoid_height", "value"), &BulletSpawner2D::set_helper_trapezoid_height);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_trapezoid_height"), "set_helper_trapezoid_height", "get_helper_trapezoid_height");
+
+	ClassDB::bind_method(D_METHOD("get_helper_trapezoid_rotation"), &BulletSpawner2D::get_helper_trapezoid_rotation);
+	ClassDB::bind_method(D_METHOD("set_helper_trapezoid_rotation", "value"), &BulletSpawner2D::set_helper_trapezoid_rotation);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_trapezoid_rotation"), "set_helper_trapezoid_rotation", "get_helper_trapezoid_rotation");
+
+	ClassDB::bind_method(D_METHOD("get_helper_trapezoid_face_outward"), &BulletSpawner2D::get_helper_trapezoid_face_outward);
+	ClassDB::bind_method(D_METHOD("set_helper_trapezoid_face_outward", "value"), &BulletSpawner2D::set_helper_trapezoid_face_outward);
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "helper_trapezoid_face_outward"), "set_helper_trapezoid_face_outward", "get_helper_trapezoid_face_outward");
+
+	ClassDB::bind_method(D_METHOD("get_helper_trapezoid_facing_offset_deg"), &BulletSpawner2D::get_helper_trapezoid_facing_offset_deg);
+	ClassDB::bind_method(D_METHOD("set_helper_trapezoid_facing_offset_deg", "value"), &BulletSpawner2D::set_helper_trapezoid_facing_offset_deg);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_trapezoid_facing_offset_deg"), "set_helper_trapezoid_facing_offset_deg", "get_helper_trapezoid_facing_offset_deg");
+
+	ADD_SUBGROUP("Diamond", "helper_diamond_");
+	ClassDB::bind_method(D_METHOD("get_helper_diamond_diagonal_x"), &BulletSpawner2D::get_helper_diamond_diagonal_x);
+	ClassDB::bind_method(D_METHOD("set_helper_diamond_diagonal_x", "value"), &BulletSpawner2D::set_helper_diamond_diagonal_x);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_diamond_diagonal_x"), "set_helper_diamond_diagonal_x", "get_helper_diamond_diagonal_x");
+
+	ClassDB::bind_method(D_METHOD("get_helper_diamond_diagonal_y"), &BulletSpawner2D::get_helper_diamond_diagonal_y);
+	ClassDB::bind_method(D_METHOD("set_helper_diamond_diagonal_y", "value"), &BulletSpawner2D::set_helper_diamond_diagonal_y);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_diamond_diagonal_y"), "set_helper_diamond_diagonal_y", "get_helper_diamond_diagonal_y");
+
+	ClassDB::bind_method(D_METHOD("get_helper_diamond_rotation"), &BulletSpawner2D::get_helper_diamond_rotation);
+	ClassDB::bind_method(D_METHOD("set_helper_diamond_rotation", "value"), &BulletSpawner2D::set_helper_diamond_rotation);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_diamond_rotation"), "set_helper_diamond_rotation", "get_helper_diamond_rotation");
+
+	ClassDB::bind_method(D_METHOD("get_helper_diamond_face_outward"), &BulletSpawner2D::get_helper_diamond_face_outward);
+	ClassDB::bind_method(D_METHOD("set_helper_diamond_face_outward", "value"), &BulletSpawner2D::set_helper_diamond_face_outward);
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "helper_diamond_face_outward"), "set_helper_diamond_face_outward", "get_helper_diamond_face_outward");
+
+	ClassDB::bind_method(D_METHOD("get_helper_diamond_facing_offset_deg"), &BulletSpawner2D::get_helper_diamond_facing_offset_deg);
+	ClassDB::bind_method(D_METHOD("set_helper_diamond_facing_offset_deg", "value"), &BulletSpawner2D::set_helper_diamond_facing_offset_deg);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_diamond_facing_offset_deg"), "set_helper_diamond_facing_offset_deg", "get_helper_diamond_facing_offset_deg");
+
+	ADD_SUBGROUP("Path2D", "helper_path2d_");
+	ClassDB::bind_method(D_METHOD("get_helper_path2d_path"), &BulletSpawner2D::get_helper_path2d_path);
+	ClassDB::bind_method(D_METHOD("set_helper_path2d_path", "path"), &BulletSpawner2D::set_helper_path2d_path);
+	ADD_PROPERTY(PropertyInfo(Variant::NODE_PATH, "helper_path2d_path", PROPERTY_HINT_NODE_PATH_VALID_TYPES, "Path2D"), "set_helper_path2d_path", "get_helper_path2d_path");
+
+	ClassDB::bind_method(D_METHOD("get_helper_path2d_node"), &BulletSpawner2D::get_helper_path2d_node);
+	ClassDB::bind_method(D_METHOD("set_helper_path2d_node", "node"), &BulletSpawner2D::set_helper_path2d_node);
+
+	ClassDB::bind_method(D_METHOD("get_helper_path2d_space"), &BulletSpawner2D::get_helper_path2d_space);
+	ClassDB::bind_method(D_METHOD("set_helper_path2d_space", "value"), &BulletSpawner2D::set_helper_path2d_space);
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "helper_path2d_space", PROPERTY_HINT_ENUM, "Follow Generator,At Path2D Node"), "set_helper_path2d_space", "get_helper_path2d_space");
+
+	ClassDB::bind_method(D_METHOD("get_helper_path2d_distribution"), &BulletSpawner2D::get_helper_path2d_distribution);
+	ClassDB::bind_method(D_METHOD("set_helper_path2d_distribution", "value"), &BulletSpawner2D::set_helper_path2d_distribution);
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "helper_path2d_distribution", PROPERTY_HINT_ENUM, "Fixed Spacing,Spread Evenly"), "set_helper_path2d_distribution", "get_helper_path2d_distribution");
+
+	ClassDB::bind_method(D_METHOD("get_helper_path2d_spacing"), &BulletSpawner2D::get_helper_path2d_spacing);
+	ClassDB::bind_method(D_METHOD("set_helper_path2d_spacing", "value"), &BulletSpawner2D::set_helper_path2d_spacing);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_path2d_spacing"), "set_helper_path2d_spacing", "get_helper_path2d_spacing");
+
+	ClassDB::bind_method(D_METHOD("get_helper_path2d_overflow"), &BulletSpawner2D::get_helper_path2d_overflow);
+	ClassDB::bind_method(D_METHOD("set_helper_path2d_overflow", "value"), &BulletSpawner2D::set_helper_path2d_overflow);
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "helper_path2d_overflow", PROPERTY_HINT_ENUM, "Clamp,Wrap,Auto Fit"), "set_helper_path2d_overflow", "get_helper_path2d_overflow");
+
+	ClassDB::bind_method(D_METHOD("get_helper_path2d_anchor"), &BulletSpawner2D::get_helper_path2d_anchor);
+	ClassDB::bind_method(D_METHOD("set_helper_path2d_anchor", "value"), &BulletSpawner2D::set_helper_path2d_anchor);
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "helper_path2d_anchor", PROPERTY_HINT_ENUM, "Path Start,Centered,Path End"), "set_helper_path2d_anchor", "get_helper_path2d_anchor");
+
+	ClassDB::bind_method(D_METHOD("get_helper_path2d_start_offset"), &BulletSpawner2D::get_helper_path2d_start_offset);
+	ClassDB::bind_method(D_METHOD("set_helper_path2d_start_offset", "value"), &BulletSpawner2D::set_helper_path2d_start_offset);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_path2d_start_offset"), "set_helper_path2d_start_offset", "get_helper_path2d_start_offset");
+
+	ClassDB::bind_method(D_METHOD("get_helper_path2d_reverse"), &BulletSpawner2D::get_helper_path2d_reverse);
+	ClassDB::bind_method(D_METHOD("set_helper_path2d_reverse", "value"), &BulletSpawner2D::set_helper_path2d_reverse);
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "helper_path2d_reverse"), "set_helper_path2d_reverse", "get_helper_path2d_reverse");
+
+	ClassDB::bind_method(D_METHOD("get_helper_path2d_closed"), &BulletSpawner2D::get_helper_path2d_closed);
+	ClassDB::bind_method(D_METHOD("set_helper_path2d_closed", "value"), &BulletSpawner2D::set_helper_path2d_closed);
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "helper_path2d_closed"), "set_helper_path2d_closed", "get_helper_path2d_closed");
+
+	ClassDB::bind_method(D_METHOD("get_helper_path2d_facing"), &BulletSpawner2D::get_helper_path2d_facing);
+	ClassDB::bind_method(D_METHOD("set_helper_path2d_facing", "value"), &BulletSpawner2D::set_helper_path2d_facing);
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "helper_path2d_facing", PROPERTY_HINT_ENUM, "Along Path,Normal +90,Normal -90"), "set_helper_path2d_facing", "get_helper_path2d_facing");
+
+	ClassDB::bind_method(D_METHOD("get_helper_path2d_facing_offset_deg"), &BulletSpawner2D::get_helper_path2d_facing_offset_deg);
+	ClassDB::bind_method(D_METHOD("set_helper_path2d_facing_offset_deg", "value"), &BulletSpawner2D::set_helper_path2d_facing_offset_deg);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_path2d_facing_offset_deg"), "set_helper_path2d_facing_offset_deg", "get_helper_path2d_facing_offset_deg");
+
+	ADD_SUBGROUP("Circle", "helper_circle_");
+	ClassDB::bind_method(D_METHOD("get_helper_circle_radius"), &BulletSpawner2D::get_helper_circle_radius);
+	ClassDB::bind_method(D_METHOD("set_helper_circle_radius", "value"), &BulletSpawner2D::set_helper_circle_radius);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_circle_radius"), "set_helper_circle_radius", "get_helper_circle_radius");
+
+	ClassDB::bind_method(D_METHOD("get_helper_circle_face_outward"), &BulletSpawner2D::get_helper_circle_face_outward);
+	ClassDB::bind_method(D_METHOD("set_helper_circle_face_outward", "value"), &BulletSpawner2D::set_helper_circle_face_outward);
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "helper_circle_face_outward"), "set_helper_circle_face_outward", "get_helper_circle_face_outward");
+
+	ClassDB::bind_method(D_METHOD("get_helper_circle_facing_offset_deg"), &BulletSpawner2D::get_helper_circle_facing_offset_deg);
+	ClassDB::bind_method(D_METHOD("set_helper_circle_facing_offset_deg", "value"), &BulletSpawner2D::set_helper_circle_facing_offset_deg);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_circle_facing_offset_deg"), "set_helper_circle_facing_offset_deg", "get_helper_circle_facing_offset_deg");
+
+	ADD_SUBGROUP("Rectangle", "helper_rectangle_");
+	ClassDB::bind_method(D_METHOD("get_helper_rectangle_size"), &BulletSpawner2D::get_helper_rectangle_size);
+	ClassDB::bind_method(D_METHOD("set_helper_rectangle_size", "value"), &BulletSpawner2D::set_helper_rectangle_size);
+	ADD_PROPERTY(PropertyInfo(Variant::VECTOR2, "helper_rectangle_size"), "set_helper_rectangle_size", "get_helper_rectangle_size");
+
+	ClassDB::bind_method(D_METHOD("get_helper_rectangle_face_outward"), &BulletSpawner2D::get_helper_rectangle_face_outward);
+	ClassDB::bind_method(D_METHOD("set_helper_rectangle_face_outward", "value"), &BulletSpawner2D::set_helper_rectangle_face_outward);
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "helper_rectangle_face_outward"), "set_helper_rectangle_face_outward", "get_helper_rectangle_face_outward");
+
+	ClassDB::bind_method(D_METHOD("get_helper_rectangle_facing_offset_deg"), &BulletSpawner2D::get_helper_rectangle_facing_offset_deg);
+	ClassDB::bind_method(D_METHOD("set_helper_rectangle_facing_offset_deg", "value"), &BulletSpawner2D::set_helper_rectangle_facing_offset_deg);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_rectangle_facing_offset_deg"), "set_helper_rectangle_facing_offset_deg", "get_helper_rectangle_facing_offset_deg");
+
+	ADD_SUBGROUP("Square", "helper_square_");
+	ClassDB::bind_method(D_METHOD("get_helper_square_size"), &BulletSpawner2D::get_helper_square_size);
+	ClassDB::bind_method(D_METHOD("set_helper_square_size", "value"), &BulletSpawner2D::set_helper_square_size);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_square_size"), "set_helper_square_size", "get_helper_square_size");
+
+	ClassDB::bind_method(D_METHOD("get_helper_square_face_outward"), &BulletSpawner2D::get_helper_square_face_outward);
+	ClassDB::bind_method(D_METHOD("set_helper_square_face_outward", "value"), &BulletSpawner2D::set_helper_square_face_outward);
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "helper_square_face_outward"), "set_helper_square_face_outward", "get_helper_square_face_outward");
+
+	ClassDB::bind_method(D_METHOD("get_helper_square_facing_offset_deg"), &BulletSpawner2D::get_helper_square_facing_offset_deg);
+	ClassDB::bind_method(D_METHOD("set_helper_square_facing_offset_deg", "value"), &BulletSpawner2D::set_helper_square_facing_offset_deg);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_square_facing_offset_deg"), "set_helper_square_facing_offset_deg", "get_helper_square_facing_offset_deg");
+
+	ADD_SUBGROUP("Polygon", "helper_polygon_");
+	ClassDB::bind_method(D_METHOD("get_helper_polygon_vertices"), &BulletSpawner2D::get_helper_polygon_vertices);
+	ClassDB::bind_method(D_METHOD("set_helper_polygon_vertices", "value"), &BulletSpawner2D::set_helper_polygon_vertices);
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "helper_polygon_vertices", PROPERTY_HINT_RANGE, "3,64,1"), "set_helper_polygon_vertices", "get_helper_polygon_vertices");
+
+	ClassDB::bind_method(D_METHOD("get_helper_polygon_radius"), &BulletSpawner2D::get_helper_polygon_radius);
+	ClassDB::bind_method(D_METHOD("set_helper_polygon_radius", "value"), &BulletSpawner2D::set_helper_polygon_radius);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_polygon_radius"), "set_helper_polygon_radius", "get_helper_polygon_radius");
+
+	ClassDB::bind_method(D_METHOD("get_helper_polygon_rotation"), &BulletSpawner2D::get_helper_polygon_rotation);
+	ClassDB::bind_method(D_METHOD("set_helper_polygon_rotation", "value"), &BulletSpawner2D::set_helper_polygon_rotation);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_polygon_rotation"), "set_helper_polygon_rotation", "get_helper_polygon_rotation");
+
+	ClassDB::bind_method(D_METHOD("get_helper_polygon_face_outward"), &BulletSpawner2D::get_helper_polygon_face_outward);
+	ClassDB::bind_method(D_METHOD("set_helper_polygon_face_outward", "value"), &BulletSpawner2D::set_helper_polygon_face_outward);
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "helper_polygon_face_outward"), "set_helper_polygon_face_outward", "get_helper_polygon_face_outward");
+
+	ClassDB::bind_method(D_METHOD("get_helper_polygon_facing_offset_deg"), &BulletSpawner2D::get_helper_polygon_facing_offset_deg);
+	ClassDB::bind_method(D_METHOD("set_helper_polygon_facing_offset_deg", "value"), &BulletSpawner2D::set_helper_polygon_facing_offset_deg);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_polygon_facing_offset_deg"), "set_helper_polygon_facing_offset_deg", "get_helper_polygon_facing_offset_deg");
+
+	ADD_SUBGROUP("Outline Layers", "helper_outline_");
 	ClassDB::bind_method(D_METHOD("get_helper_outline_placement"), &BulletSpawner2D::get_helper_outline_placement);
 	ClassDB::bind_method(D_METHOD("set_helper_outline_placement", "value"), &BulletSpawner2D::set_helper_outline_placement);
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "helper_outline_placement", PROPERTY_HINT_ENUM, "On Outline,Layers,Fill Inside"), "set_helper_outline_placement", "get_helper_outline_placement");
@@ -8889,852 +9948,6 @@ void BulletSpawner2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_helper_outline_fill_margin"), &BulletSpawner2D::get_helper_outline_fill_margin);
 	ClassDB::bind_method(D_METHOD("set_helper_outline_fill_margin", "value"), &BulletSpawner2D::set_helper_outline_fill_margin);
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_outline_fill_margin"), "set_helper_outline_fill_margin", "get_helper_outline_fill_margin");
-
-
-	ClassDB::bind_method(D_METHOD("get_helper_grid_rows_per_column"), &BulletSpawner2D::get_helper_grid_rows_per_column);
-	ClassDB::bind_method(D_METHOD("set_helper_grid_rows_per_column", "value"), &BulletSpawner2D::set_helper_grid_rows_per_column);
-	ADD_PROPERTY(PropertyInfo(Variant::INT, "helper_grid_rows_per_column"), "set_helper_grid_rows_per_column", "get_helper_grid_rows_per_column");
-
-	ClassDB::bind_method(D_METHOD("get_helper_grid_alignment"), &BulletSpawner2D::get_helper_grid_alignment);
-	ClassDB::bind_method(D_METHOD("set_helper_grid_alignment", "value"), &BulletSpawner2D::set_helper_grid_alignment);
-	ADD_PROPERTY(PropertyInfo(Variant::INT, "helper_grid_alignment", PROPERTY_HINT_ENUM, "Top Left,Top Center,Top Right,Center Left,Center,Center Right,Bottom Left,Bottom Center,Bottom Right"), "set_helper_grid_alignment", "get_helper_grid_alignment");
-
-	ClassDB::bind_method(D_METHOD("get_helper_grid_column_offset"), &BulletSpawner2D::get_helper_grid_column_offset);
-	ClassDB::bind_method(D_METHOD("set_helper_grid_column_offset", "value"), &BulletSpawner2D::set_helper_grid_column_offset);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_grid_column_offset"), "set_helper_grid_column_offset", "get_helper_grid_column_offset");
-
-	ClassDB::bind_method(D_METHOD("get_helper_grid_row_offset"), &BulletSpawner2D::get_helper_grid_row_offset);
-	ClassDB::bind_method(D_METHOD("set_helper_grid_row_offset", "value"), &BulletSpawner2D::set_helper_grid_row_offset);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_grid_row_offset"), "set_helper_grid_row_offset", "get_helper_grid_row_offset");
-
-	ClassDB::bind_method(D_METHOD("get_helper_grid_rotate_with_marker"), &BulletSpawner2D::get_helper_grid_rotate_with_marker);
-	ClassDB::bind_method(D_METHOD("set_helper_grid_rotate_with_marker", "value"), &BulletSpawner2D::set_helper_grid_rotate_with_marker);
-	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "helper_grid_rotate_with_marker"), "set_helper_grid_rotate_with_marker", "get_helper_grid_rotate_with_marker");
-
-	ClassDB::bind_method(D_METHOD("get_helper_grid_random_local_rotation"), &BulletSpawner2D::get_helper_grid_random_local_rotation);
-	ClassDB::bind_method(D_METHOD("set_helper_grid_random_local_rotation", "value"), &BulletSpawner2D::set_helper_grid_random_local_rotation);
-	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "helper_grid_random_local_rotation"), "set_helper_grid_random_local_rotation", "get_helper_grid_random_local_rotation");
-
-	ClassDB::bind_method(D_METHOD("get_helper_grid_jitter"), &BulletSpawner2D::get_helper_grid_jitter);
-	ClassDB::bind_method(D_METHOD("set_helper_grid_jitter", "value"), &BulletSpawner2D::set_helper_grid_jitter);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_grid_jitter"), "set_helper_grid_jitter", "get_helper_grid_jitter");
-	ClassDB::bind_method(D_METHOD("get_helper_grid_seed"), &BulletSpawner2D::get_helper_grid_seed);
-	ClassDB::bind_method(D_METHOD("set_helper_grid_seed", "value"), &BulletSpawner2D::set_helper_grid_seed);
-	ADD_PROPERTY(PropertyInfo(Variant::INT, "helper_grid_seed"), "set_helper_grid_seed", "get_helper_grid_seed");
-
-	ClassDB::bind_method(D_METHOD("get_helper_ring_radius"), &BulletSpawner2D::get_helper_ring_radius);
-	ClassDB::bind_method(D_METHOD("set_helper_ring_radius", "value"), &BulletSpawner2D::set_helper_ring_radius);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_ring_radius"), "set_helper_ring_radius", "get_helper_ring_radius");
-
-	ClassDB::bind_method(D_METHOD("get_helper_ring_start_angle"), &BulletSpawner2D::get_helper_ring_start_angle);
-	ClassDB::bind_method(D_METHOD("set_helper_ring_start_angle", "value"), &BulletSpawner2D::set_helper_ring_start_angle);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_ring_start_angle"), "set_helper_ring_start_angle", "get_helper_ring_start_angle");
-
-	ClassDB::bind_method(D_METHOD("get_helper_ring_arc"), &BulletSpawner2D::get_helper_ring_arc);
-	ClassDB::bind_method(D_METHOD("set_helper_ring_arc", "value"), &BulletSpawner2D::set_helper_ring_arc);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_ring_arc"), "set_helper_ring_arc", "get_helper_ring_arc");
-
-	ClassDB::bind_method(D_METHOD("get_helper_ring_rotate_with_marker"), &BulletSpawner2D::get_helper_ring_rotate_with_marker);
-	ClassDB::bind_method(D_METHOD("set_helper_ring_rotate_with_marker", "value"), &BulletSpawner2D::set_helper_ring_rotate_with_marker);
-	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "helper_ring_rotate_with_marker"), "set_helper_ring_rotate_with_marker", "get_helper_ring_rotate_with_marker");
-
-	ClassDB::bind_method(D_METHOD("get_helper_ring_random_rotation"), &BulletSpawner2D::get_helper_ring_random_rotation);
-	ClassDB::bind_method(D_METHOD("set_helper_ring_random_rotation", "value"), &BulletSpawner2D::set_helper_ring_random_rotation);
-	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "helper_ring_random_rotation"), "set_helper_ring_random_rotation", "get_helper_ring_random_rotation");
-	ClassDB::bind_method(D_METHOD("get_helper_ring_seed"), &BulletSpawner2D::get_helper_ring_seed);
-	ClassDB::bind_method(D_METHOD("set_helper_ring_seed", "value"), &BulletSpawner2D::set_helper_ring_seed);
-	ADD_PROPERTY(PropertyInfo(Variant::INT, "helper_ring_seed"), "set_helper_ring_seed", "get_helper_ring_seed");
-
-	ClassDB::bind_method(D_METHOD("get_helper_ring_face_outward"), &BulletSpawner2D::get_helper_ring_face_outward);
-	ClassDB::bind_method(D_METHOD("set_helper_ring_face_outward", "value"), &BulletSpawner2D::set_helper_ring_face_outward);
-	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "helper_ring_face_outward"), "set_helper_ring_face_outward", "get_helper_ring_face_outward");
-
-	ClassDB::bind_method(D_METHOD("get_helper_ring_y_scale"), &BulletSpawner2D::get_helper_ring_y_scale);
-	ClassDB::bind_method(D_METHOD("set_helper_ring_y_scale", "value"), &BulletSpawner2D::set_helper_ring_y_scale);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_ring_y_scale"), "set_helper_ring_y_scale", "get_helper_ring_y_scale");
-
-	ClassDB::bind_method(D_METHOD("get_helper_ring_facing_offset_deg"), &BulletSpawner2D::get_helper_ring_facing_offset_deg);
-	ClassDB::bind_method(D_METHOD("set_helper_ring_facing_offset_deg", "value"), &BulletSpawner2D::set_helper_ring_facing_offset_deg);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_ring_facing_offset_deg"), "set_helper_ring_facing_offset_deg", "get_helper_ring_facing_offset_deg");
-
-	ClassDB::bind_method(D_METHOD("get_helper_fan_spread"), &BulletSpawner2D::get_helper_fan_spread);
-	ClassDB::bind_method(D_METHOD("set_helper_fan_spread", "value"), &BulletSpawner2D::set_helper_fan_spread);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_fan_spread"), "set_helper_fan_spread", "get_helper_fan_spread");
-
-	ClassDB::bind_method(D_METHOD("get_helper_fan_direction_angle"), &BulletSpawner2D::get_helper_fan_direction_angle);
-	ClassDB::bind_method(D_METHOD("set_helper_fan_direction_angle", "value"), &BulletSpawner2D::set_helper_fan_direction_angle);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_fan_direction_angle"), "set_helper_fan_direction_angle", "get_helper_fan_direction_angle");
-
-	ClassDB::bind_method(D_METHOD("get_helper_fan_step_offset"), &BulletSpawner2D::get_helper_fan_step_offset);
-	ClassDB::bind_method(D_METHOD("set_helper_fan_step_offset", "value"), &BulletSpawner2D::set_helper_fan_step_offset);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_fan_step_offset"), "set_helper_fan_step_offset", "get_helper_fan_step_offset");
-
-	ClassDB::bind_method(D_METHOD("get_helper_fan_centered"), &BulletSpawner2D::get_helper_fan_centered);
-	ClassDB::bind_method(D_METHOD("set_helper_fan_centered", "value"), &BulletSpawner2D::set_helper_fan_centered);
-	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "helper_fan_centered"), "set_helper_fan_centered", "get_helper_fan_centered");
-
-	ClassDB::bind_method(D_METHOD("get_helper_fan_angle_jitter"), &BulletSpawner2D::get_helper_fan_angle_jitter);
-	ClassDB::bind_method(D_METHOD("set_helper_fan_angle_jitter", "value"), &BulletSpawner2D::set_helper_fan_angle_jitter);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_fan_angle_jitter"), "set_helper_fan_angle_jitter", "get_helper_fan_angle_jitter");
-	ClassDB::bind_method(D_METHOD("get_helper_fan_seed"), &BulletSpawner2D::get_helper_fan_seed);
-	ClassDB::bind_method(D_METHOD("set_helper_fan_seed", "value"), &BulletSpawner2D::set_helper_fan_seed);
-	ADD_PROPERTY(PropertyInfo(Variant::INT, "helper_fan_seed"), "set_helper_fan_seed", "get_helper_fan_seed");
-
-	ClassDB::bind_method(D_METHOD("get_helper_spiral_start_radius"), &BulletSpawner2D::get_helper_spiral_start_radius);
-	ClassDB::bind_method(D_METHOD("set_helper_spiral_start_radius", "value"), &BulletSpawner2D::set_helper_spiral_start_radius);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_spiral_start_radius"), "set_helper_spiral_start_radius", "get_helper_spiral_start_radius");
-
-	ClassDB::bind_method(D_METHOD("get_helper_spiral_radius_step"), &BulletSpawner2D::get_helper_spiral_radius_step);
-	ClassDB::bind_method(D_METHOD("set_helper_spiral_radius_step", "value"), &BulletSpawner2D::set_helper_spiral_radius_step);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_spiral_radius_step"), "set_helper_spiral_radius_step", "get_helper_spiral_radius_step");
-
-	ClassDB::bind_method(D_METHOD("get_helper_spiral_angle_step"), &BulletSpawner2D::get_helper_spiral_angle_step);
-	ClassDB::bind_method(D_METHOD("set_helper_spiral_angle_step", "value"), &BulletSpawner2D::set_helper_spiral_angle_step);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_spiral_angle_step"), "set_helper_spiral_angle_step", "get_helper_spiral_angle_step");
-
-	ClassDB::bind_method(D_METHOD("get_helper_spiral_rotate_with_marker"), &BulletSpawner2D::get_helper_spiral_rotate_with_marker);
-	ClassDB::bind_method(D_METHOD("set_helper_spiral_rotate_with_marker", "value"), &BulletSpawner2D::set_helper_spiral_rotate_with_marker);
-	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "helper_spiral_rotate_with_marker"), "set_helper_spiral_rotate_with_marker", "get_helper_spiral_rotate_with_marker");
-
-	ClassDB::bind_method(D_METHOD("get_helper_spiral_facing"), &BulletSpawner2D::get_helper_spiral_facing);
-	ClassDB::bind_method(D_METHOD("set_helper_spiral_facing", "value"), &BulletSpawner2D::set_helper_spiral_facing);
-	ADD_PROPERTY(PropertyInfo(Variant::INT, "helper_spiral_facing", PROPERTY_HINT_ENUM, "Tangent,Radial Outward,Toward Center,Keep Marker"), "set_helper_spiral_facing", "get_helper_spiral_facing");
-
-	ClassDB::bind_method(D_METHOD("get_helper_spiral_facing_offset_deg"), &BulletSpawner2D::get_helper_spiral_facing_offset_deg);
-	ClassDB::bind_method(D_METHOD("set_helper_spiral_facing_offset_deg", "value"), &BulletSpawner2D::set_helper_spiral_facing_offset_deg);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_spiral_facing_offset_deg"), "set_helper_spiral_facing_offset_deg", "get_helper_spiral_facing_offset_deg");
-
-	ClassDB::bind_method(D_METHOD("get_helper_line_direction"), &BulletSpawner2D::get_helper_line_direction);
-	ClassDB::bind_method(D_METHOD("set_helper_line_direction", "value"), &BulletSpawner2D::set_helper_line_direction);
-	ADD_PROPERTY(PropertyInfo(Variant::VECTOR2, "helper_line_direction"), "set_helper_line_direction", "get_helper_line_direction");
-
-	ClassDB::bind_method(D_METHOD("get_helper_line_spacing"), &BulletSpawner2D::get_helper_line_spacing);
-	ClassDB::bind_method(D_METHOD("set_helper_line_spacing", "value"), &BulletSpawner2D::set_helper_line_spacing);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_line_spacing"), "set_helper_line_spacing", "get_helper_line_spacing");
-
-	ClassDB::bind_method(D_METHOD("get_helper_line_face_direction"), &BulletSpawner2D::get_helper_line_face_direction);
-	ClassDB::bind_method(D_METHOD("set_helper_line_face_direction", "value"), &BulletSpawner2D::set_helper_line_face_direction);
-	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "helper_line_face_direction"), "set_helper_line_face_direction", "get_helper_line_face_direction");
-
-	ClassDB::bind_method(D_METHOD("get_helper_line_anchor"), &BulletSpawner2D::get_helper_line_anchor);
-	ClassDB::bind_method(D_METHOD("set_helper_line_anchor", "value"), &BulletSpawner2D::set_helper_line_anchor);
-	ADD_PROPERTY(PropertyInfo(Variant::INT, "helper_line_anchor", PROPERTY_HINT_ENUM, "Start,Center,End"), "set_helper_line_anchor", "get_helper_line_anchor");
-
-	ClassDB::bind_method(D_METHOD("get_helper_line_facing"), &BulletSpawner2D::get_helper_line_facing);
-	ClassDB::bind_method(D_METHOD("set_helper_line_facing", "value"), &BulletSpawner2D::set_helper_line_facing);
-	ADD_PROPERTY(PropertyInfo(Variant::INT, "helper_line_facing", PROPERTY_HINT_ENUM, "Along the Line,+90 Degrees,-90 Degrees"), "set_helper_line_facing", "get_helper_line_facing");
-
-	ClassDB::bind_method(D_METHOD("get_helper_line_reverse"), &BulletSpawner2D::get_helper_line_reverse);
-	ClassDB::bind_method(D_METHOD("set_helper_line_reverse", "value"), &BulletSpawner2D::set_helper_line_reverse);
-	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "helper_line_reverse"), "set_helper_line_reverse", "get_helper_line_reverse");
-
-	ClassDB::bind_method(D_METHOD("get_helper_line_slot_offset"), &BulletSpawner2D::get_helper_line_slot_offset);
-	ClassDB::bind_method(D_METHOD("set_helper_line_slot_offset", "value"), &BulletSpawner2D::set_helper_line_slot_offset);
-	ADD_PROPERTY(PropertyInfo(Variant::INT, "helper_line_slot_offset"), "set_helper_line_slot_offset", "get_helper_line_slot_offset");
-
-	ClassDB::bind_method(D_METHOD("get_helper_line_start_offset"), &BulletSpawner2D::get_helper_line_start_offset);
-	ClassDB::bind_method(D_METHOD("set_helper_line_start_offset", "value"), &BulletSpawner2D::set_helper_line_start_offset);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_line_start_offset"), "set_helper_line_start_offset", "get_helper_line_start_offset");
-
-	ClassDB::bind_method(D_METHOD("get_helper_aimed_target_path"), &BulletSpawner2D::get_helper_aimed_target_path);
-	ClassDB::bind_method(D_METHOD("set_helper_aimed_target_path", "path"), &BulletSpawner2D::set_helper_aimed_target_path);
-	ADD_PROPERTY(PropertyInfo(Variant::NODE_PATH, "helper_aimed_target", PROPERTY_HINT_NODE_PATH_VALID_TYPES, "Node2D"), "set_helper_aimed_target_path", "get_helper_aimed_target_path");
-
-	ClassDB::bind_method(D_METHOD("get_helper_aimed_target"), &BulletSpawner2D::get_helper_aimed_target);
-	ClassDB::bind_method(D_METHOD("set_helper_aimed_target", "target"), &BulletSpawner2D::set_helper_aimed_target);
-
-	ClassDB::bind_method(D_METHOD("get_helper_aimed_spread"), &BulletSpawner2D::get_helper_aimed_spread);
-	ClassDB::bind_method(D_METHOD("set_helper_aimed_spread", "value"), &BulletSpawner2D::set_helper_aimed_spread);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_aimed_spread"), "set_helper_aimed_spread", "get_helper_aimed_spread");
-
-	ClassDB::bind_method(D_METHOD("get_helper_aimed_step_offset"), &BulletSpawner2D::get_helper_aimed_step_offset);
-	ClassDB::bind_method(D_METHOD("set_helper_aimed_step_offset", "value"), &BulletSpawner2D::set_helper_aimed_step_offset);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_aimed_step_offset"), "set_helper_aimed_step_offset", "get_helper_aimed_step_offset");
-
-	ClassDB::bind_method(D_METHOD("get_helper_aimed_centered"), &BulletSpawner2D::get_helper_aimed_centered);
-	ClassDB::bind_method(D_METHOD("set_helper_aimed_centered", "value"), &BulletSpawner2D::set_helper_aimed_centered);
-	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "helper_aimed_centered"), "set_helper_aimed_centered", "get_helper_aimed_centered");
-
-	ClassDB::bind_method(D_METHOD("get_helper_aimed_prediction"), &BulletSpawner2D::get_helper_aimed_prediction);
-	ClassDB::bind_method(D_METHOD("set_helper_aimed_prediction", "value"), &BulletSpawner2D::set_helper_aimed_prediction);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_aimed_prediction"), "set_helper_aimed_prediction", "get_helper_aimed_prediction");
-
-	ClassDB::bind_method(D_METHOD("get_helper_aimed_prediction_time"), &BulletSpawner2D::get_helper_aimed_prediction_time);
-	ClassDB::bind_method(D_METHOD("set_helper_aimed_prediction_time", "value"), &BulletSpawner2D::set_helper_aimed_prediction_time);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_aimed_prediction_time"), "set_helper_aimed_prediction_time", "get_helper_aimed_prediction_time");
-
-	// NOTE: the bloom-kind selector is intentionally FIRST so it is the first
-	// thing a user configures; the per-type knobs grouped right after it are
-	// shown/hidden by _validate_property based on the chosen kind.
-	ClassDB::bind_method(D_METHOD("get_helper_flower_type"), &BulletSpawner2D::get_helper_flower_type);
-	ClassDB::bind_method(D_METHOD("set_helper_flower_type", "value"), &BulletSpawner2D::set_helper_flower_type);
-	ADD_PROPERTY(PropertyInfo(Variant::INT, "helper_flower_type", PropertyHint::PROPERTY_HINT_ENUM, "FAN,RHODONEA,PHYLLOTAXIS,SPIROGRAPH,SUPERFORMULA"), "set_helper_flower_type", "get_helper_flower_type");
-
-	ClassDB::bind_method(D_METHOD("get_helper_flower_radius"), &BulletSpawner2D::get_helper_flower_radius);
-	ClassDB::bind_method(D_METHOD("set_helper_flower_radius", "value"), &BulletSpawner2D::set_helper_flower_radius);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_flower_radius"), "set_helper_flower_radius", "get_helper_flower_radius");
-
-	ClassDB::bind_method(D_METHOD("get_helper_flower_base_rotation"), &BulletSpawner2D::get_helper_flower_base_rotation);
-	ClassDB::bind_method(D_METHOD("set_helper_flower_base_rotation", "value"), &BulletSpawner2D::set_helper_flower_base_rotation);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_flower_base_rotation"), "set_helper_flower_base_rotation", "get_helper_flower_base_rotation");
-
-	ClassDB::bind_method(D_METHOD("get_helper_flower_face_outward"), &BulletSpawner2D::get_helper_flower_face_outward);
-	ClassDB::bind_method(D_METHOD("set_helper_flower_face_outward", "value"), &BulletSpawner2D::set_helper_flower_face_outward);
-	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "helper_flower_face_outward"), "set_helper_flower_face_outward", "get_helper_flower_face_outward");
-
-	ClassDB::bind_method(D_METHOD("get_helper_flower_facing_offset_deg"), &BulletSpawner2D::get_helper_flower_facing_offset_deg);
-	ClassDB::bind_method(D_METHOD("set_helper_flower_facing_offset_deg", "value"), &BulletSpawner2D::set_helper_flower_facing_offset_deg);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_flower_facing_offset_deg"), "set_helper_flower_facing_offset_deg", "get_helper_flower_facing_offset_deg");
-
-	// RHODONEA / PHYLLOTAXIS / SUPERFORMULA: core-hole lift.
-	ClassDB::bind_method(D_METHOD("get_helper_flower_inner_radius_scale"), &BulletSpawner2D::get_helper_flower_inner_radius_scale);
-	ClassDB::bind_method(D_METHOD("set_helper_flower_inner_radius_scale", "value"), &BulletSpawner2D::set_helper_flower_inner_radius_scale);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_flower_inner_radius_scale", PropertyHint::PROPERTY_HINT_RANGE, "0,0.999,0.001"), "set_helper_flower_inner_radius_scale", "get_helper_flower_inner_radius_scale");
-
-	// FAN: lobe count + per-lobe fan controls.
-	ClassDB::bind_method(D_METHOD("get_helper_flower_petals"), &BulletSpawner2D::get_helper_flower_petals);
-	ClassDB::bind_method(D_METHOD("set_helper_flower_petals", "value"), &BulletSpawner2D::set_helper_flower_petals);
-	ADD_PROPERTY(PropertyInfo(Variant::INT, "helper_flower_petals"), "set_helper_flower_petals", "get_helper_flower_petals");
-
-	ClassDB::bind_method(D_METHOD("get_helper_flower_bullets_per_petal"), &BulletSpawner2D::get_helper_flower_bullets_per_petal);
-	ClassDB::bind_method(D_METHOD("set_helper_flower_bullets_per_petal", "value"), &BulletSpawner2D::set_helper_flower_bullets_per_petal);
-	ADD_PROPERTY(PropertyInfo(Variant::INT, "helper_flower_bullets_per_petal"), "set_helper_flower_bullets_per_petal", "get_helper_flower_bullets_per_petal");
-
-	ClassDB::bind_method(D_METHOD("get_helper_flower_petal_spread"), &BulletSpawner2D::get_helper_flower_petal_spread);
-	ClassDB::bind_method(D_METHOD("set_helper_flower_petal_spread", "value"), &BulletSpawner2D::set_helper_flower_petal_spread);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_flower_petal_spread"), "set_helper_flower_petal_spread", "get_helper_flower_petal_spread");
-
-	// FAN + RHODONEA: waist pinch between lobes.
-	ClassDB::bind_method(D_METHOD("get_helper_flower_petal_sharpness"), &BulletSpawner2D::get_helper_flower_petal_sharpness);
-	ClassDB::bind_method(D_METHOD("set_helper_flower_petal_sharpness", "value"), &BulletSpawner2D::set_helper_flower_petal_sharpness);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_flower_petal_sharpness"), "set_helper_flower_petal_sharpness", "get_helper_flower_petal_sharpness");
-
-	// SPIROGRAPH: hypotrochoid roller radius r (> 0) and pen offset d (>= 0).
-	ClassDB::bind_method(D_METHOD("get_helper_flower_spiro_roller"), &BulletSpawner2D::get_helper_flower_spiro_roller);
-	ClassDB::bind_method(D_METHOD("set_helper_flower_spiro_roller", "value"), &BulletSpawner2D::set_helper_flower_spiro_roller);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_flower_spiro_roller", PropertyHint::PROPERTY_HINT_RANGE, "0.5,2048,0.5,greater_than,0"), "set_helper_flower_spiro_roller", "get_helper_flower_spiro_roller");
-
-	ClassDB::bind_method(D_METHOD("get_helper_flower_spiro_pen"), &BulletSpawner2D::get_helper_flower_spiro_pen);
-	ClassDB::bind_method(D_METHOD("set_helper_flower_spiro_pen", "value"), &BulletSpawner2D::set_helper_flower_spiro_pen);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_flower_spiro_pen", PropertyHint::PROPERTY_HINT_RANGE, "0,2048,0.5"), "set_helper_flower_spiro_pen", "get_helper_flower_spiro_pen");
-
-	// SUPERFORMULA: lobe count m and fullness exponent.
-	ClassDB::bind_method(D_METHOD("get_helper_flower_super_lobes"), &BulletSpawner2D::get_helper_flower_super_lobes);
-	ClassDB::bind_method(D_METHOD("set_helper_flower_super_lobes", "value"), &BulletSpawner2D::set_helper_flower_super_lobes);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_flower_super_lobes", PropertyHint::PROPERTY_HINT_RANGE, "2,64,1"), "set_helper_flower_super_lobes", "get_helper_flower_super_lobes");
-
-	ClassDB::bind_method(D_METHOD("get_helper_flower_super_fullness"), &BulletSpawner2D::get_helper_flower_super_fullness);
-	ClassDB::bind_method(D_METHOD("set_helper_flower_super_fullness", "value"), &BulletSpawner2D::set_helper_flower_super_fullness);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_flower_super_fullness", PropertyHint::PROPERTY_HINT_RANGE, "0.05,8,0.05,greater_than,0"), "set_helper_flower_super_fullness", "get_helper_flower_super_fullness");
-
-	ClassDB::bind_method(D_METHOD("get_helper_ellipse_radius_x"), &BulletSpawner2D::get_helper_ellipse_radius_x);
-	ClassDB::bind_method(D_METHOD("set_helper_ellipse_radius_x", "value"), &BulletSpawner2D::set_helper_ellipse_radius_x);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_ellipse_radius_x"), "set_helper_ellipse_radius_x", "get_helper_ellipse_radius_x");
-
-	ClassDB::bind_method(D_METHOD("get_helper_ellipse_radius_y"), &BulletSpawner2D::get_helper_ellipse_radius_y);
-	ClassDB::bind_method(D_METHOD("set_helper_ellipse_radius_y", "value"), &BulletSpawner2D::set_helper_ellipse_radius_y);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_ellipse_radius_y"), "set_helper_ellipse_radius_y", "get_helper_ellipse_radius_y");
-
-	ClassDB::bind_method(D_METHOD("get_helper_ellipse_rotation"), &BulletSpawner2D::get_helper_ellipse_rotation);
-	ClassDB::bind_method(D_METHOD("set_helper_ellipse_rotation", "value"), &BulletSpawner2D::set_helper_ellipse_rotation);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_ellipse_rotation"), "set_helper_ellipse_rotation", "get_helper_ellipse_rotation");
-
-	ClassDB::bind_method(D_METHOD("get_helper_ellipse_start_angle"), &BulletSpawner2D::get_helper_ellipse_start_angle);
-	ClassDB::bind_method(D_METHOD("set_helper_ellipse_start_angle", "value"), &BulletSpawner2D::set_helper_ellipse_start_angle);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_ellipse_start_angle"), "set_helper_ellipse_start_angle", "get_helper_ellipse_start_angle");
-
-	ClassDB::bind_method(D_METHOD("get_helper_ellipse_arc"), &BulletSpawner2D::get_helper_ellipse_arc);
-	ClassDB::bind_method(D_METHOD("set_helper_ellipse_arc", "value"), &BulletSpawner2D::set_helper_ellipse_arc);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_ellipse_arc"), "set_helper_ellipse_arc", "get_helper_ellipse_arc");
-
-	ClassDB::bind_method(D_METHOD("get_helper_ellipse_mode"), &BulletSpawner2D::get_helper_ellipse_mode);
-	ClassDB::bind_method(D_METHOD("set_helper_ellipse_mode", "value"), &BulletSpawner2D::set_helper_ellipse_mode);
-	ADD_PROPERTY(PropertyInfo(Variant::INT, "helper_ellipse_mode", PROPERTY_HINT_ENUM, "Full,Arc,Wall"), "set_helper_ellipse_mode", "get_helper_ellipse_mode");
-
-	ClassDB::bind_method(D_METHOD("get_helper_ellipse_gap_count"), &BulletSpawner2D::get_helper_ellipse_gap_count);
-	ClassDB::bind_method(D_METHOD("set_helper_ellipse_gap_count", "value"), &BulletSpawner2D::set_helper_ellipse_gap_count);
-	ADD_PROPERTY(PropertyInfo(Variant::INT, "helper_ellipse_gap_count"), "set_helper_ellipse_gap_count", "get_helper_ellipse_gap_count");
-
-	ClassDB::bind_method(D_METHOD("get_helper_ellipse_gap_width"), &BulletSpawner2D::get_helper_ellipse_gap_width);
-	ClassDB::bind_method(D_METHOD("set_helper_ellipse_gap_width", "value"), &BulletSpawner2D::set_helper_ellipse_gap_width);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_ellipse_gap_width"), "set_helper_ellipse_gap_width", "get_helper_ellipse_gap_width");
-
-	ClassDB::bind_method(D_METHOD("get_helper_ellipse_face_outward"), &BulletSpawner2D::get_helper_ellipse_face_outward);
-	ClassDB::bind_method(D_METHOD("set_helper_ellipse_face_outward", "value"), &BulletSpawner2D::set_helper_ellipse_face_outward);
-	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "helper_ellipse_face_outward"), "set_helper_ellipse_face_outward", "get_helper_ellipse_face_outward");
-
-	ClassDB::bind_method(D_METHOD("get_helper_ellipse_facing_offset_deg"), &BulletSpawner2D::get_helper_ellipse_facing_offset_deg);
-	ClassDB::bind_method(D_METHOD("set_helper_ellipse_facing_offset_deg", "value"), &BulletSpawner2D::set_helper_ellipse_facing_offset_deg);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_ellipse_facing_offset_deg"), "set_helper_ellipse_facing_offset_deg", "get_helper_ellipse_facing_offset_deg");
-
-	ClassDB::bind_method(D_METHOD("get_helper_rain_band_width"), &BulletSpawner2D::get_helper_rain_band_width);
-	ClassDB::bind_method(D_METHOD("set_helper_rain_band_width", "value"), &BulletSpawner2D::set_helper_rain_band_width);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_rain_band_width"), "set_helper_rain_band_width", "get_helper_rain_band_width");
-
-	ClassDB::bind_method(D_METHOD("get_helper_rain_direction"), &BulletSpawner2D::get_helper_rain_direction);
-	ClassDB::bind_method(D_METHOD("set_helper_rain_direction", "value"), &BulletSpawner2D::set_helper_rain_direction);
-	ADD_PROPERTY(PropertyInfo(Variant::VECTOR2, "helper_rain_direction"), "set_helper_rain_direction", "get_helper_rain_direction");
-
-	ClassDB::bind_method(D_METHOD("get_helper_rain_drop_spacing"), &BulletSpawner2D::get_helper_rain_drop_spacing);
-	ClassDB::bind_method(D_METHOD("set_helper_rain_drop_spacing", "value"), &BulletSpawner2D::set_helper_rain_drop_spacing);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_rain_drop_spacing"), "set_helper_rain_drop_spacing", "get_helper_rain_drop_spacing");
-
-	ClassDB::bind_method(D_METHOD("get_helper_rain_jitter"), &BulletSpawner2D::get_helper_rain_jitter);
-	ClassDB::bind_method(D_METHOD("set_helper_rain_jitter", "value"), &BulletSpawner2D::set_helper_rain_jitter);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_rain_jitter"), "set_helper_rain_jitter", "get_helper_rain_jitter");
-	ClassDB::bind_method(D_METHOD("get_helper_rain_seed"), &BulletSpawner2D::get_helper_rain_seed);
-	ClassDB::bind_method(D_METHOD("set_helper_rain_seed", "value"), &BulletSpawner2D::set_helper_rain_seed);
-	ADD_PROPERTY(PropertyInfo(Variant::INT, "helper_rain_seed"), "set_helper_rain_seed", "get_helper_rain_seed");
-
-	ClassDB::bind_method(D_METHOD("get_helper_scatter_burst_radius"), &BulletSpawner2D::get_helper_scatter_burst_radius);
-	ClassDB::bind_method(D_METHOD("set_helper_scatter_burst_radius", "value"), &BulletSpawner2D::set_helper_scatter_burst_radius);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_scatter_burst_radius"), "set_helper_scatter_burst_radius", "get_helper_scatter_burst_radius");
-
-	ClassDB::bind_method(D_METHOD("get_helper_scatter_facing_jitter"), &BulletSpawner2D::get_helper_scatter_facing_jitter);
-	ClassDB::bind_method(D_METHOD("set_helper_scatter_facing_jitter", "value"), &BulletSpawner2D::set_helper_scatter_facing_jitter);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_scatter_facing_jitter"), "set_helper_scatter_facing_jitter", "get_helper_scatter_facing_jitter");
-
-	ClassDB::bind_method(D_METHOD("get_helper_scatter_seed"), &BulletSpawner2D::get_helper_scatter_seed);
-	ClassDB::bind_method(D_METHOD("set_helper_scatter_seed", "value"), &BulletSpawner2D::set_helper_scatter_seed);
-	ADD_PROPERTY(PropertyInfo(Variant::INT, "helper_scatter_seed"), "set_helper_scatter_seed", "get_helper_scatter_seed");
-
-	ClassDB::bind_method(D_METHOD("get_helper_scatter_inner_radius"), &BulletSpawner2D::get_helper_scatter_inner_radius);
-	ClassDB::bind_method(D_METHOD("set_helper_scatter_inner_radius", "value"), &BulletSpawner2D::set_helper_scatter_inner_radius);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_scatter_inner_radius"), "set_helper_scatter_inner_radius", "get_helper_scatter_inner_radius");
-
-	ClassDB::bind_method(D_METHOD("get_helper_scatter_direction"), &BulletSpawner2D::get_helper_scatter_direction);
-	ClassDB::bind_method(D_METHOD("set_helper_scatter_direction", "value"), &BulletSpawner2D::set_helper_scatter_direction);
-	ADD_PROPERTY(PropertyInfo(Variant::VECTOR2, "helper_scatter_direction"), "set_helper_scatter_direction", "get_helper_scatter_direction");
-
-	ClassDB::bind_method(D_METHOD("get_helper_scatter_arc"), &BulletSpawner2D::get_helper_scatter_arc);
-	ClassDB::bind_method(D_METHOD("set_helper_scatter_arc", "value"), &BulletSpawner2D::set_helper_scatter_arc);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_scatter_arc"), "set_helper_scatter_arc", "get_helper_scatter_arc");
-
-	ClassDB::bind_method(D_METHOD("get_helper_scatter_facing"), &BulletSpawner2D::get_helper_scatter_facing);
-	ClassDB::bind_method(D_METHOD("set_helper_scatter_facing", "value"), &BulletSpawner2D::set_helper_scatter_facing);
-	ADD_PROPERTY(PropertyInfo(Variant::INT, "helper_scatter_facing", PROPERTY_HINT_ENUM, "Outward,Random,Inward"), "set_helper_scatter_facing", "get_helper_scatter_facing");
-
-	ClassDB::bind_method(D_METHOD("get_helper_star_polygon_vertices"), &BulletSpawner2D::get_helper_star_polygon_vertices);
-	ClassDB::bind_method(D_METHOD("set_helper_star_polygon_vertices", "value"), &BulletSpawner2D::set_helper_star_polygon_vertices);
-	ADD_PROPERTY(PropertyInfo(Variant::INT, "helper_star_polygon_vertices"), "set_helper_star_polygon_vertices", "get_helper_star_polygon_vertices");
-
-	ClassDB::bind_method(D_METHOD("get_helper_star_polygon_radius"), &BulletSpawner2D::get_helper_star_polygon_radius);
-	ClassDB::bind_method(D_METHOD("set_helper_star_polygon_radius", "value"), &BulletSpawner2D::set_helper_star_polygon_radius);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_star_polygon_radius"), "set_helper_star_polygon_radius", "get_helper_star_polygon_radius");
-
-	ClassDB::bind_method(D_METHOD("get_helper_star_polygon_vertex_bias"), &BulletSpawner2D::get_helper_star_polygon_vertex_bias);
-	ClassDB::bind_method(D_METHOD("set_helper_star_polygon_vertex_bias", "value"), &BulletSpawner2D::set_helper_star_polygon_vertex_bias);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_star_polygon_vertex_bias"), "set_helper_star_polygon_vertex_bias", "get_helper_star_polygon_vertex_bias");
-
-	ClassDB::bind_method(D_METHOD("get_helper_star_polygon_base_rotation"), &BulletSpawner2D::get_helper_star_polygon_base_rotation);
-	ClassDB::bind_method(D_METHOD("set_helper_star_polygon_base_rotation", "value"), &BulletSpawner2D::set_helper_star_polygon_base_rotation);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_star_polygon_base_rotation"), "set_helper_star_polygon_base_rotation", "get_helper_star_polygon_base_rotation");
-
-	ClassDB::bind_method(D_METHOD("get_helper_star_polygon_face_outward"), &BulletSpawner2D::get_helper_star_polygon_face_outward);
-	ClassDB::bind_method(D_METHOD("set_helper_star_polygon_face_outward", "value"), &BulletSpawner2D::set_helper_star_polygon_face_outward);
-	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "helper_star_polygon_face_outward"), "set_helper_star_polygon_face_outward", "get_helper_star_polygon_face_outward");
-
-	ClassDB::bind_method(D_METHOD("get_helper_star_polygon_facing_offset_deg"), &BulletSpawner2D::get_helper_star_polygon_facing_offset_deg);
-	ClassDB::bind_method(D_METHOD("set_helper_star_polygon_facing_offset_deg", "value"), &BulletSpawner2D::set_helper_star_polygon_facing_offset_deg);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_star_polygon_facing_offset_deg"), "set_helper_star_polygon_facing_offset_deg", "get_helper_star_polygon_facing_offset_deg");
-
-	ClassDB::bind_method(D_METHOD("get_helper_multispiral_arms"), &BulletSpawner2D::get_helper_multispiral_arms);
-	ClassDB::bind_method(D_METHOD("set_helper_multispiral_arms", "value"), &BulletSpawner2D::set_helper_multispiral_arms);
-	ADD_PROPERTY(PropertyInfo(Variant::INT, "helper_multispiral_arms"), "set_helper_multispiral_arms", "get_helper_multispiral_arms");
-
-	ClassDB::bind_method(D_METHOD("get_helper_multispiral_start_radius"), &BulletSpawner2D::get_helper_multispiral_start_radius);
-	ClassDB::bind_method(D_METHOD("set_helper_multispiral_start_radius", "value"), &BulletSpawner2D::set_helper_multispiral_start_radius);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_multispiral_start_radius"), "set_helper_multispiral_start_radius", "get_helper_multispiral_start_radius");
-
-	ClassDB::bind_method(D_METHOD("get_helper_multispiral_radius_step"), &BulletSpawner2D::get_helper_multispiral_radius_step);
-	ClassDB::bind_method(D_METHOD("set_helper_multispiral_radius_step", "value"), &BulletSpawner2D::set_helper_multispiral_radius_step);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_multispiral_radius_step"), "set_helper_multispiral_radius_step", "get_helper_multispiral_radius_step");
-
-	ClassDB::bind_method(D_METHOD("get_helper_multispiral_angle_step"), &BulletSpawner2D::get_helper_multispiral_angle_step);
-	ClassDB::bind_method(D_METHOD("set_helper_multispiral_angle_step", "value"), &BulletSpawner2D::set_helper_multispiral_angle_step);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_multispiral_angle_step"), "set_helper_multispiral_angle_step", "get_helper_multispiral_angle_step");
-
-	ClassDB::bind_method(D_METHOD("get_helper_multispiral_rotate_with_marker"), &BulletSpawner2D::get_helper_multispiral_rotate_with_marker);
-	ClassDB::bind_method(D_METHOD("set_helper_multispiral_rotate_with_marker", "value"), &BulletSpawner2D::set_helper_multispiral_rotate_with_marker);
-	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "helper_multispiral_rotate_with_marker"), "set_helper_multispiral_rotate_with_marker", "get_helper_multispiral_rotate_with_marker");
-
-	ClassDB::bind_method(D_METHOD("get_helper_multispiral_facing"), &BulletSpawner2D::get_helper_multispiral_facing);
-	ClassDB::bind_method(D_METHOD("set_helper_multispiral_facing", "value"), &BulletSpawner2D::set_helper_multispiral_facing);
-	ADD_PROPERTY(PropertyInfo(Variant::INT, "helper_multispiral_facing", PROPERTY_HINT_ENUM, "Tangent,Radial Outward,Toward Center,Keep Marker"), "set_helper_multispiral_facing", "get_helper_multispiral_facing");
-
-	ClassDB::bind_method(D_METHOD("get_helper_multispiral_facing_offset_deg"), &BulletSpawner2D::get_helper_multispiral_facing_offset_deg);
-	ClassDB::bind_method(D_METHOD("set_helper_multispiral_facing_offset_deg", "value"), &BulletSpawner2D::set_helper_multispiral_facing_offset_deg);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_multispiral_facing_offset_deg"), "set_helper_multispiral_facing_offset_deg", "get_helper_multispiral_facing_offset_deg");
-
-	ClassDB::bind_method(D_METHOD("get_helper_multispiral_arm_stride"), &BulletSpawner2D::get_helper_multispiral_arm_stride);
-	ClassDB::bind_method(D_METHOD("set_helper_multispiral_arm_stride", "value"), &BulletSpawner2D::set_helper_multispiral_arm_stride);
-	ADD_PROPERTY(PropertyInfo(Variant::INT, "helper_multispiral_arm_stride"), "set_helper_multispiral_arm_stride", "get_helper_multispiral_arm_stride");
-
-	ClassDB::bind_method(D_METHOD("get_helper_cross_arm_count"), &BulletSpawner2D::get_helper_cross_arm_count);
-	ClassDB::bind_method(D_METHOD("set_helper_cross_arm_count", "value"), &BulletSpawner2D::set_helper_cross_arm_count);
-	ADD_PROPERTY(PropertyInfo(Variant::INT, "helper_cross_arm_count"), "set_helper_cross_arm_count", "get_helper_cross_arm_count");
-
-	ClassDB::bind_method(D_METHOD("get_helper_cross_arm_length"), &BulletSpawner2D::get_helper_cross_arm_length);
-	ClassDB::bind_method(D_METHOD("set_helper_cross_arm_length", "value"), &BulletSpawner2D::set_helper_cross_arm_length);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_cross_arm_length"), "set_helper_cross_arm_length", "get_helper_cross_arm_length");
-
-	ClassDB::bind_method(D_METHOD("get_helper_cross_spacing"), &BulletSpawner2D::get_helper_cross_spacing);
-	ClassDB::bind_method(D_METHOD("set_helper_cross_spacing", "value"), &BulletSpawner2D::set_helper_cross_spacing);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_cross_spacing"), "set_helper_cross_spacing", "get_helper_cross_spacing");
-
-	ClassDB::bind_method(D_METHOD("get_helper_cross_base_rotation"), &BulletSpawner2D::get_helper_cross_base_rotation);
-	ClassDB::bind_method(D_METHOD("set_helper_cross_base_rotation", "value"), &BulletSpawner2D::set_helper_cross_base_rotation);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_cross_base_rotation"), "set_helper_cross_base_rotation", "get_helper_cross_base_rotation");
-
-	ClassDB::bind_method(D_METHOD("get_helper_cross_face_outward"), &BulletSpawner2D::get_helper_cross_face_outward);
-	ClassDB::bind_method(D_METHOD("set_helper_cross_face_outward", "value"), &BulletSpawner2D::set_helper_cross_face_outward);
-	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "helper_cross_face_outward"), "set_helper_cross_face_outward", "get_helper_cross_face_outward");
-
-	ClassDB::bind_method(D_METHOD("get_helper_cross_facing_offset_deg"), &BulletSpawner2D::get_helper_cross_facing_offset_deg);
-	ClassDB::bind_method(D_METHOD("set_helper_cross_facing_offset_deg", "value"), &BulletSpawner2D::set_helper_cross_facing_offset_deg);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_cross_facing_offset_deg"), "set_helper_cross_facing_offset_deg", "get_helper_cross_facing_offset_deg");
-
-	ClassDB::bind_method(D_METHOD("get_helper_star_points"), &BulletSpawner2D::get_helper_star_points);
-	ClassDB::bind_method(D_METHOD("set_helper_star_points", "value"), &BulletSpawner2D::set_helper_star_points);
-	ADD_PROPERTY(PropertyInfo(Variant::INT, "helper_star_points"), "set_helper_star_points", "get_helper_star_points");
-
-	ClassDB::bind_method(D_METHOD("get_helper_star_outer_radius"), &BulletSpawner2D::get_helper_star_outer_radius);
-	ClassDB::bind_method(D_METHOD("set_helper_star_outer_radius", "value"), &BulletSpawner2D::set_helper_star_outer_radius);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_star_outer_radius"), "set_helper_star_outer_radius", "get_helper_star_outer_radius");
-
-	ClassDB::bind_method(D_METHOD("get_helper_star_inner_radius"), &BulletSpawner2D::get_helper_star_inner_radius);
-	ClassDB::bind_method(D_METHOD("set_helper_star_inner_radius", "value"), &BulletSpawner2D::set_helper_star_inner_radius);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_star_inner_radius"), "set_helper_star_inner_radius", "get_helper_star_inner_radius");
-
-	ClassDB::bind_method(D_METHOD("get_helper_star_base_rotation"), &BulletSpawner2D::get_helper_star_base_rotation);
-	ClassDB::bind_method(D_METHOD("set_helper_star_base_rotation", "value"), &BulletSpawner2D::set_helper_star_base_rotation);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_star_base_rotation"), "set_helper_star_base_rotation", "get_helper_star_base_rotation");
-
-	ClassDB::bind_method(D_METHOD("get_helper_star_face_outward"), &BulletSpawner2D::get_helper_star_face_outward);
-	ClassDB::bind_method(D_METHOD("set_helper_star_face_outward", "value"), &BulletSpawner2D::set_helper_star_face_outward);
-	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "helper_star_face_outward"), "set_helper_star_face_outward", "get_helper_star_face_outward");
-
-	ClassDB::bind_method(D_METHOD("get_helper_star_facing_offset_deg"), &BulletSpawner2D::get_helper_star_facing_offset_deg);
-	ClassDB::bind_method(D_METHOD("set_helper_star_facing_offset_deg", "value"), &BulletSpawner2D::set_helper_star_facing_offset_deg);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_star_facing_offset_deg"), "set_helper_star_facing_offset_deg", "get_helper_star_facing_offset_deg");
-
-	ClassDB::bind_method(D_METHOD("get_helper_heart_size"), &BulletSpawner2D::get_helper_heart_size);
-	ClassDB::bind_method(D_METHOD("set_helper_heart_size", "value"), &BulletSpawner2D::set_helper_heart_size);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_heart_size"), "set_helper_heart_size", "get_helper_heart_size");
-
-	ClassDB::bind_method(D_METHOD("get_helper_heart_base_rotation"), &BulletSpawner2D::get_helper_heart_base_rotation);
-	ClassDB::bind_method(D_METHOD("set_helper_heart_base_rotation", "value"), &BulletSpawner2D::set_helper_heart_base_rotation);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_heart_base_rotation"), "set_helper_heart_base_rotation", "get_helper_heart_base_rotation");
-
-	ClassDB::bind_method(D_METHOD("get_helper_heart_face_outward"), &BulletSpawner2D::get_helper_heart_face_outward);
-	ClassDB::bind_method(D_METHOD("set_helper_heart_face_outward", "value"), &BulletSpawner2D::set_helper_heart_face_outward);
-	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "helper_heart_face_outward"), "set_helper_heart_face_outward", "get_helper_heart_face_outward");
-
-	ClassDB::bind_method(D_METHOD("get_helper_heart_facing_offset_deg"), &BulletSpawner2D::get_helper_heart_facing_offset_deg);
-	ClassDB::bind_method(D_METHOD("set_helper_heart_facing_offset_deg", "value"), &BulletSpawner2D::set_helper_heart_facing_offset_deg);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_heart_facing_offset_deg"), "set_helper_heart_facing_offset_deg", "get_helper_heart_facing_offset_deg");
-
-	ClassDB::bind_method(D_METHOD("get_helper_wave_width"), &BulletSpawner2D::get_helper_wave_width);
-	ClassDB::bind_method(D_METHOD("set_helper_wave_width", "value"), &BulletSpawner2D::set_helper_wave_width);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_wave_width"), "set_helper_wave_width", "get_helper_wave_width");
-
-	ClassDB::bind_method(D_METHOD("get_helper_wave_amplitude"), &BulletSpawner2D::get_helper_wave_amplitude);
-	ClassDB::bind_method(D_METHOD("set_helper_wave_amplitude", "value"), &BulletSpawner2D::set_helper_wave_amplitude);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_wave_amplitude"), "set_helper_wave_amplitude", "get_helper_wave_amplitude");
-
-	ClassDB::bind_method(D_METHOD("get_helper_wave_waves"), &BulletSpawner2D::get_helper_wave_waves);
-	ClassDB::bind_method(D_METHOD("set_helper_wave_waves", "value"), &BulletSpawner2D::set_helper_wave_waves);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_wave_waves"), "set_helper_wave_waves", "get_helper_wave_waves");
-
-	ClassDB::bind_method(D_METHOD("get_helper_wave_direction"), &BulletSpawner2D::get_helper_wave_direction);
-	ClassDB::bind_method(D_METHOD("set_helper_wave_direction", "value"), &BulletSpawner2D::set_helper_wave_direction);
-	ADD_PROPERTY(PropertyInfo(Variant::VECTOR2, "helper_wave_direction"), "set_helper_wave_direction", "get_helper_wave_direction");
-
-	ClassDB::bind_method(D_METHOD("get_helper_wave_face_direction"), &BulletSpawner2D::get_helper_wave_face_direction);
-	ClassDB::bind_method(D_METHOD("set_helper_wave_face_direction", "value"), &BulletSpawner2D::set_helper_wave_face_direction);
-	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "helper_wave_face_direction"), "set_helper_wave_face_direction", "get_helper_wave_face_direction");
-
-	ClassDB::bind_method(D_METHOD("get_helper_wave_facing_offset_deg"), &BulletSpawner2D::get_helper_wave_facing_offset_deg);
-	ClassDB::bind_method(D_METHOD("set_helper_wave_facing_offset_deg", "value"), &BulletSpawner2D::set_helper_wave_facing_offset_deg);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_wave_facing_offset_deg"), "set_helper_wave_facing_offset_deg", "get_helper_wave_facing_offset_deg");
-
-	ClassDB::bind_method(D_METHOD("get_helper_waterfall_columns"), &BulletSpawner2D::get_helper_waterfall_columns);
-	ClassDB::bind_method(D_METHOD("set_helper_waterfall_columns", "value"), &BulletSpawner2D::set_helper_waterfall_columns);
-	ADD_PROPERTY(PropertyInfo(Variant::INT, "helper_waterfall_columns"), "set_helper_waterfall_columns", "get_helper_waterfall_columns");
-
-	ClassDB::bind_method(D_METHOD("get_helper_waterfall_column_spacing"), &BulletSpawner2D::get_helper_waterfall_column_spacing);
-	ClassDB::bind_method(D_METHOD("set_helper_waterfall_column_spacing", "value"), &BulletSpawner2D::set_helper_waterfall_column_spacing);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_waterfall_column_spacing"), "set_helper_waterfall_column_spacing", "get_helper_waterfall_column_spacing");
-
-	ClassDB::bind_method(D_METHOD("get_helper_waterfall_rows"), &BulletSpawner2D::get_helper_waterfall_rows);
-	ClassDB::bind_method(D_METHOD("set_helper_waterfall_rows", "value"), &BulletSpawner2D::set_helper_waterfall_rows);
-	ADD_PROPERTY(PropertyInfo(Variant::INT, "helper_waterfall_rows"), "set_helper_waterfall_rows", "get_helper_waterfall_rows");
-
-	ClassDB::bind_method(D_METHOD("get_helper_waterfall_row_spacing"), &BulletSpawner2D::get_helper_waterfall_row_spacing);
-	ClassDB::bind_method(D_METHOD("set_helper_waterfall_row_spacing", "value"), &BulletSpawner2D::set_helper_waterfall_row_spacing);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_waterfall_row_spacing"), "set_helper_waterfall_row_spacing", "get_helper_waterfall_row_spacing");
-
-	ClassDB::bind_method(D_METHOD("get_helper_waterfall_stagger"), &BulletSpawner2D::get_helper_waterfall_stagger);
-	ClassDB::bind_method(D_METHOD("set_helper_waterfall_stagger", "value"), &BulletSpawner2D::set_helper_waterfall_stagger);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_waterfall_stagger"), "set_helper_waterfall_stagger", "get_helper_waterfall_stagger");
-
-	ClassDB::bind_method(D_METHOD("get_helper_waterfall_rain_direction"), &BulletSpawner2D::get_helper_waterfall_rain_direction);
-	ClassDB::bind_method(D_METHOD("set_helper_waterfall_rain_direction", "value"), &BulletSpawner2D::set_helper_waterfall_rain_direction);
-	ADD_PROPERTY(PropertyInfo(Variant::VECTOR2, "helper_waterfall_rain_direction"), "set_helper_waterfall_rain_direction", "get_helper_waterfall_rain_direction");
-
-	ClassDB::bind_method(D_METHOD("get_helper_waterfall_jitter"), &BulletSpawner2D::get_helper_waterfall_jitter);
-	ClassDB::bind_method(D_METHOD("set_helper_waterfall_jitter", "value"), &BulletSpawner2D::set_helper_waterfall_jitter);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_waterfall_jitter"), "set_helper_waterfall_jitter", "get_helper_waterfall_jitter");
-	ClassDB::bind_method(D_METHOD("get_helper_waterfall_seed"), &BulletSpawner2D::get_helper_waterfall_seed);
-	ClassDB::bind_method(D_METHOD("set_helper_waterfall_seed", "value"), &BulletSpawner2D::set_helper_waterfall_seed);
-	ADD_PROPERTY(PropertyInfo(Variant::INT, "helper_waterfall_seed"), "set_helper_waterfall_seed", "get_helper_waterfall_seed");
-
-	ClassDB::bind_method(D_METHOD("get_helper_waterfall_facing_offset_deg"), &BulletSpawner2D::get_helper_waterfall_facing_offset_deg);
-	ClassDB::bind_method(D_METHOD("set_helper_waterfall_facing_offset_deg", "value"), &BulletSpawner2D::set_helper_waterfall_facing_offset_deg);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_waterfall_facing_offset_deg"), "set_helper_waterfall_facing_offset_deg", "get_helper_waterfall_facing_offset_deg");
-
-	ClassDB::bind_method(D_METHOD("get_helper_lattice_columns"), &BulletSpawner2D::get_helper_lattice_columns);
-	ClassDB::bind_method(D_METHOD("set_helper_lattice_columns", "value"), &BulletSpawner2D::set_helper_lattice_columns);
-	ADD_PROPERTY(PropertyInfo(Variant::INT, "helper_lattice_columns"), "set_helper_lattice_columns", "get_helper_lattice_columns");
-
-	ClassDB::bind_method(D_METHOD("get_helper_lattice_rows"), &BulletSpawner2D::get_helper_lattice_rows);
-	ClassDB::bind_method(D_METHOD("set_helper_lattice_rows", "value"), &BulletSpawner2D::set_helper_lattice_rows);
-	ADD_PROPERTY(PropertyInfo(Variant::INT, "helper_lattice_rows"), "set_helper_lattice_rows", "get_helper_lattice_rows");
-
-	ClassDB::bind_method(D_METHOD("get_helper_lattice_spacing_x"), &BulletSpawner2D::get_helper_lattice_spacing_x);
-	ClassDB::bind_method(D_METHOD("set_helper_lattice_spacing_x", "value"), &BulletSpawner2D::set_helper_lattice_spacing_x);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_lattice_spacing_x"), "set_helper_lattice_spacing_x", "get_helper_lattice_spacing_x");
-
-	ClassDB::bind_method(D_METHOD("get_helper_lattice_spacing_y"), &BulletSpawner2D::get_helper_lattice_spacing_y);
-	ClassDB::bind_method(D_METHOD("set_helper_lattice_spacing_y", "value"), &BulletSpawner2D::set_helper_lattice_spacing_y);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_lattice_spacing_y"), "set_helper_lattice_spacing_y", "get_helper_lattice_spacing_y");
-
-	ClassDB::bind_method(D_METHOD("get_helper_lattice_stagger_rows"), &BulletSpawner2D::get_helper_lattice_stagger_rows);
-	ClassDB::bind_method(D_METHOD("set_helper_lattice_stagger_rows", "value"), &BulletSpawner2D::set_helper_lattice_stagger_rows);
-	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "helper_lattice_stagger_rows"), "set_helper_lattice_stagger_rows", "get_helper_lattice_stagger_rows");
-
-	ClassDB::bind_method(D_METHOD("get_helper_lattice_face_outward"), &BulletSpawner2D::get_helper_lattice_face_outward);
-	ClassDB::bind_method(D_METHOD("set_helper_lattice_face_outward", "value"), &BulletSpawner2D::set_helper_lattice_face_outward);
-	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "helper_lattice_face_outward"), "set_helper_lattice_face_outward", "get_helper_lattice_face_outward");
-
-	ClassDB::bind_method(D_METHOD("get_helper_lattice_facing_offset_deg"), &BulletSpawner2D::get_helper_lattice_facing_offset_deg);
-	ClassDB::bind_method(D_METHOD("set_helper_lattice_facing_offset_deg", "value"), &BulletSpawner2D::set_helper_lattice_facing_offset_deg);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_lattice_facing_offset_deg"), "set_helper_lattice_facing_offset_deg", "get_helper_lattice_facing_offset_deg");
-
-	ClassDB::bind_method(D_METHOD("get_helper_rose_petals"), &BulletSpawner2D::get_helper_rose_petals);
-	ClassDB::bind_method(D_METHOD("set_helper_rose_petals", "value"), &BulletSpawner2D::set_helper_rose_petals);
-	ADD_PROPERTY(PropertyInfo(Variant::INT, "helper_rose_petals"), "set_helper_rose_petals", "get_helper_rose_petals");
-
-	ClassDB::bind_method(D_METHOD("get_helper_rose_radius"), &BulletSpawner2D::get_helper_rose_radius);
-	ClassDB::bind_method(D_METHOD("set_helper_rose_radius", "value"), &BulletSpawner2D::set_helper_rose_radius);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_rose_radius"), "set_helper_rose_radius", "get_helper_rose_radius");
-
-	ClassDB::bind_method(D_METHOD("get_helper_rose_lobe_sharpness"), &BulletSpawner2D::get_helper_rose_lobe_sharpness);
-	ClassDB::bind_method(D_METHOD("set_helper_rose_lobe_sharpness", "value"), &BulletSpawner2D::set_helper_rose_lobe_sharpness);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_rose_lobe_sharpness"), "set_helper_rose_lobe_sharpness", "get_helper_rose_lobe_sharpness");
-
-	ClassDB::bind_method(D_METHOD("get_helper_rose_base_rotation"), &BulletSpawner2D::get_helper_rose_base_rotation);
-	ClassDB::bind_method(D_METHOD("set_helper_rose_base_rotation", "value"), &BulletSpawner2D::set_helper_rose_base_rotation);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_rose_base_rotation"), "set_helper_rose_base_rotation", "get_helper_rose_base_rotation");
-
-	ClassDB::bind_method(D_METHOD("get_helper_rose_face_outward"), &BulletSpawner2D::get_helper_rose_face_outward);
-	ClassDB::bind_method(D_METHOD("set_helper_rose_face_outward", "value"), &BulletSpawner2D::set_helper_rose_face_outward);
-	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "helper_rose_face_outward"), "set_helper_rose_face_outward", "get_helper_rose_face_outward");
-
-	ClassDB::bind_method(D_METHOD("get_helper_rose_facing_offset_deg"), &BulletSpawner2D::get_helper_rose_facing_offset_deg);
-	ClassDB::bind_method(D_METHOD("set_helper_rose_facing_offset_deg", "value"), &BulletSpawner2D::set_helper_rose_facing_offset_deg);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_rose_facing_offset_deg"), "set_helper_rose_facing_offset_deg", "get_helper_rose_facing_offset_deg");
-
-	ClassDB::bind_method(D_METHOD("get_helper_counter_spiral_arms"), &BulletSpawner2D::get_helper_counter_spiral_arms);
-	ClassDB::bind_method(D_METHOD("set_helper_counter_spiral_arms", "value"), &BulletSpawner2D::set_helper_counter_spiral_arms);
-	ADD_PROPERTY(PropertyInfo(Variant::INT, "helper_counter_spiral_arms"), "set_helper_counter_spiral_arms", "get_helper_counter_spiral_arms");
-
-	ClassDB::bind_method(D_METHOD("get_helper_counter_spiral_start_radius"), &BulletSpawner2D::get_helper_counter_spiral_start_radius);
-	ClassDB::bind_method(D_METHOD("set_helper_counter_spiral_start_radius", "value"), &BulletSpawner2D::set_helper_counter_spiral_start_radius);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_counter_spiral_start_radius"), "set_helper_counter_spiral_start_radius", "get_helper_counter_spiral_start_radius");
-
-	ClassDB::bind_method(D_METHOD("get_helper_counter_spiral_radius_step"), &BulletSpawner2D::get_helper_counter_spiral_radius_step);
-	ClassDB::bind_method(D_METHOD("set_helper_counter_spiral_radius_step", "value"), &BulletSpawner2D::set_helper_counter_spiral_radius_step);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_counter_spiral_radius_step"), "set_helper_counter_spiral_radius_step", "get_helper_counter_spiral_radius_step");
-
-	ClassDB::bind_method(D_METHOD("get_helper_counter_spiral_angle_step"), &BulletSpawner2D::get_helper_counter_spiral_angle_step);
-	ClassDB::bind_method(D_METHOD("set_helper_counter_spiral_angle_step", "value"), &BulletSpawner2D::set_helper_counter_spiral_angle_step);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_counter_spiral_angle_step"), "set_helper_counter_spiral_angle_step", "get_helper_counter_spiral_angle_step");
-
-	ClassDB::bind_method(D_METHOD("get_helper_counter_spiral_rotate_with_marker"), &BulletSpawner2D::get_helper_counter_spiral_rotate_with_marker);
-	ClassDB::bind_method(D_METHOD("set_helper_counter_spiral_rotate_with_marker", "value"), &BulletSpawner2D::set_helper_counter_spiral_rotate_with_marker);
-	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "helper_counter_spiral_rotate_with_marker"), "set_helper_counter_spiral_rotate_with_marker", "get_helper_counter_spiral_rotate_with_marker");
-
-	ClassDB::bind_method(D_METHOD("get_helper_counter_spiral_facing"), &BulletSpawner2D::get_helper_counter_spiral_facing);
-	ClassDB::bind_method(D_METHOD("set_helper_counter_spiral_facing", "value"), &BulletSpawner2D::set_helper_counter_spiral_facing);
-	ADD_PROPERTY(PropertyInfo(Variant::INT, "helper_counter_spiral_facing", PROPERTY_HINT_ENUM, "Tangent,Radial Outward,Toward Center,Keep Marker"), "set_helper_counter_spiral_facing", "get_helper_counter_spiral_facing");
-
-	ClassDB::bind_method(D_METHOD("get_helper_counter_spiral_facing_offset_deg"), &BulletSpawner2D::get_helper_counter_spiral_facing_offset_deg);
-	ClassDB::bind_method(D_METHOD("set_helper_counter_spiral_facing_offset_deg", "value"), &BulletSpawner2D::set_helper_counter_spiral_facing_offset_deg);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_counter_spiral_facing_offset_deg"), "set_helper_counter_spiral_facing_offset_deg", "get_helper_counter_spiral_facing_offset_deg");
-
-	ClassDB::bind_method(D_METHOD("get_helper_counter_spiral_arm_stride"), &BulletSpawner2D::get_helper_counter_spiral_arm_stride);
-	ClassDB::bind_method(D_METHOD("set_helper_counter_spiral_arm_stride", "value"), &BulletSpawner2D::set_helper_counter_spiral_arm_stride);
-	ADD_PROPERTY(PropertyInfo(Variant::INT, "helper_counter_spiral_arm_stride"), "set_helper_counter_spiral_arm_stride", "get_helper_counter_spiral_arm_stride");
-
-	ClassDB::bind_method(D_METHOD("get_helper_counter_spiral_mirror_alternate_arms"), &BulletSpawner2D::get_helper_counter_spiral_mirror_alternate_arms);
-	ClassDB::bind_method(D_METHOD("set_helper_counter_spiral_mirror_alternate_arms", "value"), &BulletSpawner2D::set_helper_counter_spiral_mirror_alternate_arms);
-	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "helper_counter_spiral_mirror_alternate_arms"), "set_helper_counter_spiral_mirror_alternate_arms", "get_helper_counter_spiral_mirror_alternate_arms");
-
-	ClassDB::bind_method(D_METHOD("get_helper_corridor_aim_direction"), &BulletSpawner2D::get_helper_corridor_aim_direction);
-	ClassDB::bind_method(D_METHOD("set_helper_corridor_aim_direction", "value"), &BulletSpawner2D::set_helper_corridor_aim_direction);
-	ADD_PROPERTY(PropertyInfo(Variant::VECTOR2, "helper_corridor_aim_direction"), "set_helper_corridor_aim_direction", "get_helper_corridor_aim_direction");
-
-	ClassDB::bind_method(D_METHOD("get_helper_corridor_width"), &BulletSpawner2D::get_helper_corridor_width);
-	ClassDB::bind_method(D_METHOD("set_helper_corridor_width", "value"), &BulletSpawner2D::set_helper_corridor_width);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_corridor_width"), "set_helper_corridor_width", "get_helper_corridor_width");
-
-	ClassDB::bind_method(D_METHOD("get_helper_corridor_gap_width"), &BulletSpawner2D::get_helper_corridor_gap_width);
-	ClassDB::bind_method(D_METHOD("set_helper_corridor_gap_width", "value"), &BulletSpawner2D::set_helper_corridor_gap_width);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_corridor_gap_width"), "set_helper_corridor_gap_width", "get_helper_corridor_gap_width");
-
-	ClassDB::bind_method(D_METHOD("get_helper_corridor_face_aim"), &BulletSpawner2D::get_helper_corridor_face_aim);
-	ClassDB::bind_method(D_METHOD("set_helper_corridor_face_aim", "value"), &BulletSpawner2D::set_helper_corridor_face_aim);
-	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "helper_corridor_face_aim"), "set_helper_corridor_face_aim", "get_helper_corridor_face_aim");
-
-	ClassDB::bind_method(D_METHOD("get_helper_corridor_facing_offset_deg"), &BulletSpawner2D::get_helper_corridor_facing_offset_deg);
-	ClassDB::bind_method(D_METHOD("set_helper_corridor_facing_offset_deg", "value"), &BulletSpawner2D::set_helper_corridor_facing_offset_deg);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_corridor_facing_offset_deg"), "set_helper_corridor_facing_offset_deg", "get_helper_corridor_facing_offset_deg");
-
-	ClassDB::bind_method(D_METHOD("get_helper_lissajous_size_x"), &BulletSpawner2D::get_helper_lissajous_size_x);
-	ClassDB::bind_method(D_METHOD("set_helper_lissajous_size_x", "value"), &BulletSpawner2D::set_helper_lissajous_size_x);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_lissajous_size_x"), "set_helper_lissajous_size_x", "get_helper_lissajous_size_x");
-
-	ClassDB::bind_method(D_METHOD("get_helper_lissajous_size_y"), &BulletSpawner2D::get_helper_lissajous_size_y);
-	ClassDB::bind_method(D_METHOD("set_helper_lissajous_size_y", "value"), &BulletSpawner2D::set_helper_lissajous_size_y);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_lissajous_size_y"), "set_helper_lissajous_size_y", "get_helper_lissajous_size_y");
-
-	ClassDB::bind_method(D_METHOD("get_helper_lissajous_freq_x"), &BulletSpawner2D::get_helper_lissajous_freq_x);
-	ClassDB::bind_method(D_METHOD("set_helper_lissajous_freq_x", "value"), &BulletSpawner2D::set_helper_lissajous_freq_x);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_lissajous_freq_x"), "set_helper_lissajous_freq_x", "get_helper_lissajous_freq_x");
-
-	ClassDB::bind_method(D_METHOD("get_helper_lissajous_freq_y"), &BulletSpawner2D::get_helper_lissajous_freq_y);
-	ClassDB::bind_method(D_METHOD("set_helper_lissajous_freq_y", "value"), &BulletSpawner2D::set_helper_lissajous_freq_y);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_lissajous_freq_y"), "set_helper_lissajous_freq_y", "get_helper_lissajous_freq_y");
-
-	ClassDB::bind_method(D_METHOD("get_helper_lissajous_phase"), &BulletSpawner2D::get_helper_lissajous_phase);
-	ClassDB::bind_method(D_METHOD("set_helper_lissajous_phase", "value"), &BulletSpawner2D::set_helper_lissajous_phase);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_lissajous_phase"), "set_helper_lissajous_phase", "get_helper_lissajous_phase");
-
-	ClassDB::bind_method(D_METHOD("get_helper_lissajous_face_outward"), &BulletSpawner2D::get_helper_lissajous_face_outward);
-	ClassDB::bind_method(D_METHOD("set_helper_lissajous_face_outward", "value"), &BulletSpawner2D::set_helper_lissajous_face_outward);
-	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "helper_lissajous_face_outward"), "set_helper_lissajous_face_outward", "get_helper_lissajous_face_outward");
-
-	ClassDB::bind_method(D_METHOD("get_helper_lissajous_facing_offset_deg"), &BulletSpawner2D::get_helper_lissajous_facing_offset_deg);
-	ClassDB::bind_method(D_METHOD("set_helper_lissajous_facing_offset_deg", "value"), &BulletSpawner2D::set_helper_lissajous_facing_offset_deg);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_lissajous_facing_offset_deg"), "set_helper_lissajous_facing_offset_deg", "get_helper_lissajous_facing_offset_deg");
-
-	ClassDB::bind_method(D_METHOD("get_helper_custom_transforms"), &BulletSpawner2D::get_helper_custom_transforms);
-	ClassDB::bind_method(D_METHOD("set_helper_custom_transforms", "value"), &BulletSpawner2D::set_helper_custom_transforms);
-	ADD_PROPERTY(PropertyInfo(Variant::ARRAY, "helper_custom_transforms", PROPERTY_HINT_ARRAY_TYPE, "Transform2D"), "set_helper_custom_transforms", "get_helper_custom_transforms");
-
-	ClassDB::bind_method(D_METHOD("get_helper_custom_facing"), &BulletSpawner2D::get_helper_custom_facing);
-	ClassDB::bind_method(D_METHOD("set_helper_custom_facing", "value"), &BulletSpawner2D::set_helper_custom_facing);
-	ADD_PROPERTY(PropertyInfo(Variant::INT, "helper_custom_facing", PROPERTY_HINT_ENUM, "As Stored,Face Outward,Face Inward,+90 Degrees,-90 Degrees"), "set_helper_custom_facing", "get_helper_custom_facing");
-
-	ClassDB::bind_method(D_METHOD("get_helper_custom_facing_offset_deg"), &BulletSpawner2D::get_helper_custom_facing_offset_deg);
-	ClassDB::bind_method(D_METHOD("set_helper_custom_facing_offset_deg", "value"), &BulletSpawner2D::set_helper_custom_facing_offset_deg);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_custom_facing_offset_deg"), "set_helper_custom_facing_offset_deg", "get_helper_custom_facing_offset_deg");
-
-	ClassDB::bind_method(D_METHOD("get_helper_custom_reverse"), &BulletSpawner2D::get_helper_custom_reverse);
-	ClassDB::bind_method(D_METHOD("set_helper_custom_reverse", "value"), &BulletSpawner2D::set_helper_custom_reverse);
-	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "helper_custom_reverse"), "set_helper_custom_reverse", "get_helper_custom_reverse");
-
-	ClassDB::bind_method(D_METHOD("get_helper_custom_slot_offset"), &BulletSpawner2D::get_helper_custom_slot_offset);
-	ClassDB::bind_method(D_METHOD("set_helper_custom_slot_offset", "value"), &BulletSpawner2D::set_helper_custom_slot_offset);
-	ADD_PROPERTY(PropertyInfo(Variant::INT, "helper_custom_slot_offset"), "set_helper_custom_slot_offset", "get_helper_custom_slot_offset");
-
-	ClassDB::bind_method(D_METHOD("get_helper_triangle_type"), &BulletSpawner2D::get_helper_triangle_type);
-	ClassDB::bind_method(D_METHOD("set_helper_triangle_type", "value"), &BulletSpawner2D::set_helper_triangle_type);
-	ADD_PROPERTY(PropertyInfo(Variant::INT, "helper_triangle_type", PROPERTY_HINT_ENUM, "Equilateral,Isosceles,Right"), "set_helper_triangle_type", "get_helper_triangle_type");
-
-	ClassDB::bind_method(D_METHOD("get_helper_triangle_size_a"), &BulletSpawner2D::get_helper_triangle_size_a);
-	ClassDB::bind_method(D_METHOD("set_helper_triangle_size_a", "value"), &BulletSpawner2D::set_helper_triangle_size_a);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_triangle_size_a"), "set_helper_triangle_size_a", "get_helper_triangle_size_a");
-
-	ClassDB::bind_method(D_METHOD("get_helper_triangle_size_b"), &BulletSpawner2D::get_helper_triangle_size_b);
-	ClassDB::bind_method(D_METHOD("set_helper_triangle_size_b", "value"), &BulletSpawner2D::set_helper_triangle_size_b);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_triangle_size_b"), "set_helper_triangle_size_b", "get_helper_triangle_size_b");
-
-	ClassDB::bind_method(D_METHOD("get_helper_triangle_rotation"), &BulletSpawner2D::get_helper_triangle_rotation);
-	ClassDB::bind_method(D_METHOD("set_helper_triangle_rotation", "value"), &BulletSpawner2D::set_helper_triangle_rotation);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_triangle_rotation"), "set_helper_triangle_rotation", "get_helper_triangle_rotation");
-
-	ClassDB::bind_method(D_METHOD("get_helper_triangle_face_outward"), &BulletSpawner2D::get_helper_triangle_face_outward);
-	ClassDB::bind_method(D_METHOD("set_helper_triangle_face_outward", "value"), &BulletSpawner2D::set_helper_triangle_face_outward);
-	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "helper_triangle_face_outward"), "set_helper_triangle_face_outward", "get_helper_triangle_face_outward");
-
-	ClassDB::bind_method(D_METHOD("get_helper_triangle_facing_offset_deg"), &BulletSpawner2D::get_helper_triangle_facing_offset_deg);
-	ClassDB::bind_method(D_METHOD("set_helper_triangle_facing_offset_deg", "value"), &BulletSpawner2D::set_helper_triangle_facing_offset_deg);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_triangle_facing_offset_deg"), "set_helper_triangle_facing_offset_deg", "get_helper_triangle_facing_offset_deg");
-
-	ClassDB::bind_method(D_METHOD("get_helper_trapezoid_base_top"), &BulletSpawner2D::get_helper_trapezoid_base_top);
-	ClassDB::bind_method(D_METHOD("set_helper_trapezoid_base_top", "value"), &BulletSpawner2D::set_helper_trapezoid_base_top);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_trapezoid_base_top"), "set_helper_trapezoid_base_top", "get_helper_trapezoid_base_top");
-
-	ClassDB::bind_method(D_METHOD("get_helper_trapezoid_base_bottom"), &BulletSpawner2D::get_helper_trapezoid_base_bottom);
-	ClassDB::bind_method(D_METHOD("set_helper_trapezoid_base_bottom", "value"), &BulletSpawner2D::set_helper_trapezoid_base_bottom);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_trapezoid_base_bottom"), "set_helper_trapezoid_base_bottom", "get_helper_trapezoid_base_bottom");
-
-	ClassDB::bind_method(D_METHOD("get_helper_trapezoid_height"), &BulletSpawner2D::get_helper_trapezoid_height);
-	ClassDB::bind_method(D_METHOD("set_helper_trapezoid_height", "value"), &BulletSpawner2D::set_helper_trapezoid_height);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_trapezoid_height"), "set_helper_trapezoid_height", "get_helper_trapezoid_height");
-
-	ClassDB::bind_method(D_METHOD("get_helper_trapezoid_rotation"), &BulletSpawner2D::get_helper_trapezoid_rotation);
-	ClassDB::bind_method(D_METHOD("set_helper_trapezoid_rotation", "value"), &BulletSpawner2D::set_helper_trapezoid_rotation);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_trapezoid_rotation"), "set_helper_trapezoid_rotation", "get_helper_trapezoid_rotation");
-
-	ClassDB::bind_method(D_METHOD("get_helper_trapezoid_face_outward"), &BulletSpawner2D::get_helper_trapezoid_face_outward);
-	ClassDB::bind_method(D_METHOD("set_helper_trapezoid_face_outward", "value"), &BulletSpawner2D::set_helper_trapezoid_face_outward);
-	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "helper_trapezoid_face_outward"), "set_helper_trapezoid_face_outward", "get_helper_trapezoid_face_outward");
-
-	ClassDB::bind_method(D_METHOD("get_helper_trapezoid_facing_offset_deg"), &BulletSpawner2D::get_helper_trapezoid_facing_offset_deg);
-	ClassDB::bind_method(D_METHOD("set_helper_trapezoid_facing_offset_deg", "value"), &BulletSpawner2D::set_helper_trapezoid_facing_offset_deg);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_trapezoid_facing_offset_deg"), "set_helper_trapezoid_facing_offset_deg", "get_helper_trapezoid_facing_offset_deg");
-
-	ClassDB::bind_method(D_METHOD("get_helper_diamond_diagonal_x"), &BulletSpawner2D::get_helper_diamond_diagonal_x);
-	ClassDB::bind_method(D_METHOD("set_helper_diamond_diagonal_x", "value"), &BulletSpawner2D::set_helper_diamond_diagonal_x);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_diamond_diagonal_x"), "set_helper_diamond_diagonal_x", "get_helper_diamond_diagonal_x");
-
-	ClassDB::bind_method(D_METHOD("get_helper_diamond_diagonal_y"), &BulletSpawner2D::get_helper_diamond_diagonal_y);
-	ClassDB::bind_method(D_METHOD("set_helper_diamond_diagonal_y", "value"), &BulletSpawner2D::set_helper_diamond_diagonal_y);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_diamond_diagonal_y"), "set_helper_diamond_diagonal_y", "get_helper_diamond_diagonal_y");
-
-	ClassDB::bind_method(D_METHOD("get_helper_diamond_rotation"), &BulletSpawner2D::get_helper_diamond_rotation);
-	ClassDB::bind_method(D_METHOD("set_helper_diamond_rotation", "value"), &BulletSpawner2D::set_helper_diamond_rotation);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_diamond_rotation"), "set_helper_diamond_rotation", "get_helper_diamond_rotation");
-
-	ClassDB::bind_method(D_METHOD("get_helper_diamond_face_outward"), &BulletSpawner2D::get_helper_diamond_face_outward);
-	ClassDB::bind_method(D_METHOD("set_helper_diamond_face_outward", "value"), &BulletSpawner2D::set_helper_diamond_face_outward);
-	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "helper_diamond_face_outward"), "set_helper_diamond_face_outward", "get_helper_diamond_face_outward");
-
-	ClassDB::bind_method(D_METHOD("get_helper_diamond_facing_offset_deg"), &BulletSpawner2D::get_helper_diamond_facing_offset_deg);
-	ClassDB::bind_method(D_METHOD("set_helper_diamond_facing_offset_deg", "value"), &BulletSpawner2D::set_helper_diamond_facing_offset_deg);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_diamond_facing_offset_deg"), "set_helper_diamond_facing_offset_deg", "get_helper_diamond_facing_offset_deg");
-
-	ClassDB::bind_method(D_METHOD("get_helper_path2d_path"), &BulletSpawner2D::get_helper_path2d_path);
-	ClassDB::bind_method(D_METHOD("set_helper_path2d_path", "path"), &BulletSpawner2D::set_helper_path2d_path);
-	ADD_PROPERTY(PropertyInfo(Variant::NODE_PATH, "helper_path2d_path", PROPERTY_HINT_NODE_PATH_VALID_TYPES, "Path2D"), "set_helper_path2d_path", "get_helper_path2d_path");
-
-	ClassDB::bind_method(D_METHOD("get_helper_path2d_node"), &BulletSpawner2D::get_helper_path2d_node);
-	ClassDB::bind_method(D_METHOD("set_helper_path2d_node", "node"), &BulletSpawner2D::set_helper_path2d_node);
-
-	ClassDB::bind_method(D_METHOD("get_helper_path2d_space"), &BulletSpawner2D::get_helper_path2d_space);
-	ClassDB::bind_method(D_METHOD("set_helper_path2d_space", "value"), &BulletSpawner2D::set_helper_path2d_space);
-	ADD_PROPERTY(PropertyInfo(Variant::INT, "helper_path2d_space", PROPERTY_HINT_ENUM, "Follow Generator,At Path2D Node"), "set_helper_path2d_space", "get_helper_path2d_space");
-
-	ClassDB::bind_method(D_METHOD("get_helper_path2d_distribution"), &BulletSpawner2D::get_helper_path2d_distribution);
-	ClassDB::bind_method(D_METHOD("set_helper_path2d_distribution", "value"), &BulletSpawner2D::set_helper_path2d_distribution);
-	ADD_PROPERTY(PropertyInfo(Variant::INT, "helper_path2d_distribution", PROPERTY_HINT_ENUM, "Fixed Spacing,Spread Evenly"), "set_helper_path2d_distribution", "get_helper_path2d_distribution");
-
-	ClassDB::bind_method(D_METHOD("get_helper_path2d_spacing"), &BulletSpawner2D::get_helper_path2d_spacing);
-	ClassDB::bind_method(D_METHOD("set_helper_path2d_spacing", "value"), &BulletSpawner2D::set_helper_path2d_spacing);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_path2d_spacing"), "set_helper_path2d_spacing", "get_helper_path2d_spacing");
-
-	ClassDB::bind_method(D_METHOD("get_helper_path2d_overflow"), &BulletSpawner2D::get_helper_path2d_overflow);
-	ClassDB::bind_method(D_METHOD("set_helper_path2d_overflow", "value"), &BulletSpawner2D::set_helper_path2d_overflow);
-	ADD_PROPERTY(PropertyInfo(Variant::INT, "helper_path2d_overflow", PROPERTY_HINT_ENUM, "Clamp,Wrap,Auto Fit"), "set_helper_path2d_overflow", "get_helper_path2d_overflow");
-
-	ClassDB::bind_method(D_METHOD("get_helper_path2d_anchor"), &BulletSpawner2D::get_helper_path2d_anchor);
-	ClassDB::bind_method(D_METHOD("set_helper_path2d_anchor", "value"), &BulletSpawner2D::set_helper_path2d_anchor);
-	ADD_PROPERTY(PropertyInfo(Variant::INT, "helper_path2d_anchor", PROPERTY_HINT_ENUM, "Path Start,Centered,Path End"), "set_helper_path2d_anchor", "get_helper_path2d_anchor");
-
-	ClassDB::bind_method(D_METHOD("get_helper_path2d_start_offset"), &BulletSpawner2D::get_helper_path2d_start_offset);
-	ClassDB::bind_method(D_METHOD("set_helper_path2d_start_offset", "value"), &BulletSpawner2D::set_helper_path2d_start_offset);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_path2d_start_offset"), "set_helper_path2d_start_offset", "get_helper_path2d_start_offset");
-
-	ClassDB::bind_method(D_METHOD("get_helper_path2d_reverse"), &BulletSpawner2D::get_helper_path2d_reverse);
-	ClassDB::bind_method(D_METHOD("set_helper_path2d_reverse", "value"), &BulletSpawner2D::set_helper_path2d_reverse);
-	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "helper_path2d_reverse"), "set_helper_path2d_reverse", "get_helper_path2d_reverse");
-
-	ClassDB::bind_method(D_METHOD("get_helper_path2d_closed"), &BulletSpawner2D::get_helper_path2d_closed);
-	ClassDB::bind_method(D_METHOD("set_helper_path2d_closed", "value"), &BulletSpawner2D::set_helper_path2d_closed);
-	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "helper_path2d_closed"), "set_helper_path2d_closed", "get_helper_path2d_closed");
-
-	ClassDB::bind_method(D_METHOD("get_helper_path2d_facing"), &BulletSpawner2D::get_helper_path2d_facing);
-	ClassDB::bind_method(D_METHOD("set_helper_path2d_facing", "value"), &BulletSpawner2D::set_helper_path2d_facing);
-	ADD_PROPERTY(PropertyInfo(Variant::INT, "helper_path2d_facing", PROPERTY_HINT_ENUM, "Along Path,Normal +90,Normal -90"), "set_helper_path2d_facing", "get_helper_path2d_facing");
-
-	ClassDB::bind_method(D_METHOD("get_helper_path2d_facing_offset_deg"), &BulletSpawner2D::get_helper_path2d_facing_offset_deg);
-	ClassDB::bind_method(D_METHOD("set_helper_path2d_facing_offset_deg", "value"), &BulletSpawner2D::set_helper_path2d_facing_offset_deg);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_path2d_facing_offset_deg"), "set_helper_path2d_facing_offset_deg", "get_helper_path2d_facing_offset_deg");
-
-	ClassDB::bind_method(D_METHOD("get_helper_circle_radius"), &BulletSpawner2D::get_helper_circle_radius);
-	ClassDB::bind_method(D_METHOD("set_helper_circle_radius", "value"), &BulletSpawner2D::set_helper_circle_radius);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_circle_radius"), "set_helper_circle_radius", "get_helper_circle_radius");
-
-	ClassDB::bind_method(D_METHOD("get_helper_circle_face_outward"), &BulletSpawner2D::get_helper_circle_face_outward);
-	ClassDB::bind_method(D_METHOD("set_helper_circle_face_outward", "value"), &BulletSpawner2D::set_helper_circle_face_outward);
-	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "helper_circle_face_outward"), "set_helper_circle_face_outward", "get_helper_circle_face_outward");
-
-	ClassDB::bind_method(D_METHOD("get_helper_circle_facing_offset_deg"), &BulletSpawner2D::get_helper_circle_facing_offset_deg);
-	ClassDB::bind_method(D_METHOD("set_helper_circle_facing_offset_deg", "value"), &BulletSpawner2D::set_helper_circle_facing_offset_deg);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_circle_facing_offset_deg"), "set_helper_circle_facing_offset_deg", "get_helper_circle_facing_offset_deg");
-
-	ClassDB::bind_method(D_METHOD("get_helper_rectangle_size"), &BulletSpawner2D::get_helper_rectangle_size);
-	ClassDB::bind_method(D_METHOD("set_helper_rectangle_size", "value"), &BulletSpawner2D::set_helper_rectangle_size);
-	ADD_PROPERTY(PropertyInfo(Variant::VECTOR2, "helper_rectangle_size"), "set_helper_rectangle_size", "get_helper_rectangle_size");
-
-	ClassDB::bind_method(D_METHOD("get_helper_rectangle_face_outward"), &BulletSpawner2D::get_helper_rectangle_face_outward);
-	ClassDB::bind_method(D_METHOD("set_helper_rectangle_face_outward", "value"), &BulletSpawner2D::set_helper_rectangle_face_outward);
-	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "helper_rectangle_face_outward"), "set_helper_rectangle_face_outward", "get_helper_rectangle_face_outward");
-
-	ClassDB::bind_method(D_METHOD("get_helper_rectangle_facing_offset_deg"), &BulletSpawner2D::get_helper_rectangle_facing_offset_deg);
-	ClassDB::bind_method(D_METHOD("set_helper_rectangle_facing_offset_deg", "value"), &BulletSpawner2D::set_helper_rectangle_facing_offset_deg);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_rectangle_facing_offset_deg"), "set_helper_rectangle_facing_offset_deg", "get_helper_rectangle_facing_offset_deg");
-
-	ClassDB::bind_method(D_METHOD("get_helper_square_size"), &BulletSpawner2D::get_helper_square_size);
-	ClassDB::bind_method(D_METHOD("set_helper_square_size", "value"), &BulletSpawner2D::set_helper_square_size);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_square_size"), "set_helper_square_size", "get_helper_square_size");
-
-	ClassDB::bind_method(D_METHOD("get_helper_square_face_outward"), &BulletSpawner2D::get_helper_square_face_outward);
-	ClassDB::bind_method(D_METHOD("set_helper_square_face_outward", "value"), &BulletSpawner2D::set_helper_square_face_outward);
-	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "helper_square_face_outward"), "set_helper_square_face_outward", "get_helper_square_face_outward");
-
-	ClassDB::bind_method(D_METHOD("get_helper_square_facing_offset_deg"), &BulletSpawner2D::get_helper_square_facing_offset_deg);
-	ClassDB::bind_method(D_METHOD("set_helper_square_facing_offset_deg", "value"), &BulletSpawner2D::set_helper_square_facing_offset_deg);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_square_facing_offset_deg"), "set_helper_square_facing_offset_deg", "get_helper_square_facing_offset_deg");
-
-	ClassDB::bind_method(D_METHOD("get_helper_polygon_vertices"), &BulletSpawner2D::get_helper_polygon_vertices);
-	ClassDB::bind_method(D_METHOD("set_helper_polygon_vertices", "value"), &BulletSpawner2D::set_helper_polygon_vertices);
-	ADD_PROPERTY(PropertyInfo(Variant::INT, "helper_polygon_vertices", PROPERTY_HINT_RANGE, "3,64,1"), "set_helper_polygon_vertices", "get_helper_polygon_vertices");
-
-	ClassDB::bind_method(D_METHOD("get_helper_polygon_radius"), &BulletSpawner2D::get_helper_polygon_radius);
-	ClassDB::bind_method(D_METHOD("set_helper_polygon_radius", "value"), &BulletSpawner2D::set_helper_polygon_radius);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_polygon_radius"), "set_helper_polygon_radius", "get_helper_polygon_radius");
-
-	ClassDB::bind_method(D_METHOD("get_helper_polygon_rotation"), &BulletSpawner2D::get_helper_polygon_rotation);
-	ClassDB::bind_method(D_METHOD("set_helper_polygon_rotation", "value"), &BulletSpawner2D::set_helper_polygon_rotation);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_polygon_rotation"), "set_helper_polygon_rotation", "get_helper_polygon_rotation");
-
-	ClassDB::bind_method(D_METHOD("get_helper_polygon_face_outward"), &BulletSpawner2D::get_helper_polygon_face_outward);
-	ClassDB::bind_method(D_METHOD("set_helper_polygon_face_outward", "value"), &BulletSpawner2D::set_helper_polygon_face_outward);
-	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "helper_polygon_face_outward"), "set_helper_polygon_face_outward", "get_helper_polygon_face_outward");
-
-	ClassDB::bind_method(D_METHOD("get_helper_polygon_facing_offset_deg"), &BulletSpawner2D::get_helper_polygon_facing_offset_deg);
-	ClassDB::bind_method(D_METHOD("set_helper_polygon_facing_offset_deg", "value"), &BulletSpawner2D::set_helper_polygon_facing_offset_deg);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "helper_polygon_facing_offset_deg"), "set_helper_polygon_facing_offset_deg", "get_helper_polygon_facing_offset_deg");
-
-	ClassDB::bind_method(D_METHOD("get_helper_skip_indices"), &BulletSpawner2D::get_helper_skip_indices);
-	ClassDB::bind_method(D_METHOD("set_helper_skip_indices", "value"), &BulletSpawner2D::set_helper_skip_indices);
-	ADD_PROPERTY(PropertyInfo(Variant::PACKED_INT32_ARRAY, "helper_skip_indices"), "set_helper_skip_indices", "get_helper_skip_indices");
-
-	ClassDB::bind_method(D_METHOD("get_pattern_scale"), &BulletSpawner2D::get_pattern_scale);
-	ClassDB::bind_method(D_METHOD("set_pattern_scale", "value"), &BulletSpawner2D::set_pattern_scale);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "pattern_scale"), "set_pattern_scale", "get_pattern_scale");
-
-	ClassDB::bind_method(D_METHOD("get_transforms_scale"), &BulletSpawner2D::get_transforms_scale);
-	ClassDB::bind_method(D_METHOD("set_transforms_scale", "value"), &BulletSpawner2D::set_transforms_scale);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "transforms_scale"), "set_transforms_scale", "get_transforms_scale");
-
-	ClassDB::bind_method(D_METHOD("get_spawn_position_offset"), &BulletSpawner2D::get_spawn_position_offset);
-	ClassDB::bind_method(D_METHOD("set_spawn_position_offset", "value"), &BulletSpawner2D::set_spawn_position_offset);
-	ADD_PROPERTY(PropertyInfo(Variant::VECTOR2, "spawn_position_offset"), "set_spawn_position_offset", "get_spawn_position_offset");
 
 	// Spawner lifecycle signals. Emitted synchronously where the transition
 	// happens (timer tick, setters, reset, _ready): handlers run with live
@@ -9860,13 +10073,13 @@ void BulletSpawner2D::_bind_methods() {
 	ADD_GROUP("Spin", "");
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "spin_enabled"), "set_spin_enabled", "get_spin_enabled");
 
+	ClassDB::bind_method(D_METHOD("get_spin_mode"), &BulletSpawner2D::get_spin_mode);
+	ClassDB::bind_method(D_METHOD("set_spin_mode", "value"), &BulletSpawner2D::set_spin_mode);
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "spin_mode", PROPERTY_HINT_ENUM, "Continuous,Oscillate"), "set_spin_mode", "get_spin_mode");
 	ClassDB::bind_method(D_METHOD("get_spin_speed_deg_per_sec"), &BulletSpawner2D::get_spin_speed_deg_per_sec);
 	ClassDB::bind_method(D_METHOD("set_spin_speed_deg_per_sec", "value"), &BulletSpawner2D::set_spin_speed_deg_per_sec);
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "spin_speed_deg_per_sec"), "set_spin_speed_deg_per_sec", "get_spin_speed_deg_per_sec");
 
-	ClassDB::bind_method(D_METHOD("get_spin_mode"), &BulletSpawner2D::get_spin_mode);
-	ClassDB::bind_method(D_METHOD("set_spin_mode", "value"), &BulletSpawner2D::set_spin_mode);
-	ADD_PROPERTY(PropertyInfo(Variant::INT, "spin_mode", PROPERTY_HINT_ENUM, "Continuous,Oscillate"), "set_spin_mode", "get_spin_mode");
 
 	ClassDB::bind_method(D_METHOD("get_spin_amplitude_deg"), &BulletSpawner2D::get_spin_amplitude_deg);
 	ClassDB::bind_method(D_METHOD("set_spin_amplitude_deg", "value"), &BulletSpawner2D::set_spin_amplitude_deg);
@@ -10029,6 +10242,10 @@ void BulletSpawner2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_homing_retarget_interval_sec", "value"), &BulletSpawner2D::set_homing_retarget_interval_sec);
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "homing_retarget_interval_sec"), "set_homing_retarget_interval_sec", "get_homing_retarget_interval_sec");
 
+	ClassDB::bind_method(D_METHOD("get_homing_retarget_phase"), &BulletSpawner2D::get_homing_retarget_phase);
+	ClassDB::bind_method(D_METHOD("set_homing_retarget_phase", "value"), &BulletSpawner2D::set_homing_retarget_phase);
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "homing_retarget_phase"), "set_homing_retarget_phase", "get_homing_retarget_phase");
+
 	ClassDB::bind_method(D_METHOD("get_homing_retarget_previous_volleys"), &BulletSpawner2D::get_homing_retarget_previous_volleys);
 	ClassDB::bind_method(D_METHOD("set_homing_retarget_previous_volleys", "value"), &BulletSpawner2D::set_homing_retarget_previous_volleys);
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "homing_retarget_previous_volleys"), "set_homing_retarget_previous_volleys", "get_homing_retarget_previous_volleys");
@@ -10052,10 +10269,6 @@ void BulletSpawner2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_homing_fire_arc_deg"), &BulletSpawner2D::get_homing_fire_arc_deg);
 	ClassDB::bind_method(D_METHOD("set_homing_fire_arc_deg", "value"), &BulletSpawner2D::set_homing_fire_arc_deg);
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "homing_fire_arc_deg"), "set_homing_fire_arc_deg", "get_homing_fire_arc_deg");
-
-	ClassDB::bind_method(D_METHOD("get_homing_retarget_phase"), &BulletSpawner2D::get_homing_retarget_phase);
-	ClassDB::bind_method(D_METHOD("set_homing_retarget_phase", "value"), &BulletSpawner2D::set_homing_retarget_phase);
-	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "homing_retarget_phase"), "set_homing_retarget_phase", "get_homing_retarget_phase");
 
 	ClassDB::bind_method(D_METHOD("get_orbiting_enabled"), &BulletSpawner2D::get_orbiting_enabled);
 	ClassDB::bind_method(D_METHOD("set_orbiting_enabled", "value"), &BulletSpawner2D::set_orbiting_enabled);
@@ -10235,6 +10448,7 @@ void BulletSpawner2D::_bind_methods() {
 #undef BS_BIND_PROP
 	ClassDB::bind_method(D_METHOD("get_movement_path_node"), &BulletSpawner2D::get_movement_path_node);
 	ClassDB::bind_method(D_METHOD("set_movement_path_node", "node"), &BulletSpawner2D::set_movement_path_node);
+	ClassDB::bind_method(D_METHOD("get_setup_warnings"), &BulletSpawner2D::get_setup_warnings);
 	ClassDB::bind_method(D_METHOD("movement_play"), &BulletSpawner2D::movement_play);
 	ClassDB::bind_method(D_METHOD("movement_pause"), &BulletSpawner2D::movement_pause);
 	ClassDB::bind_method(D_METHOD("movement_stop", "reset_to_start"), &BulletSpawner2D::movement_stop, DEFVAL(true));

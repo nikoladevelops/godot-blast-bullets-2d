@@ -39,10 +39,12 @@ func test_foreign_wake_warns_then_reseed_cleans() -> void:
 	v.wake_bullet(0)
 	assert_push_warning("woke a pooled volley", "foreign wake warns")
 	assert_true(v.is_bullet_status_enabled(0), "foreign wake revives the slot")
-	# NOTE (open decision, see audit report): a FULL drain resets linear
-	# ballistics to neutral, so a wake after every bullet died revives a
-	# frozen bullet even though the wake docs say ballistics resume.
-	assert_almost_eq(v.get_bullet_speed_data(0).speed, 0.0, 0.01, "full drain left neutral ballistics (current behavior)")
+	# Contract fix: a full drain keeps linear ballistics, so a wake resumes
+	# them (it used to revive a frozen bullet at speed 0).
+	assert_gt(v.get_bullet_speed_data(0).speed, 0.0, "full-drain wake resumes the bullet's speed")
+	var p0: Vector2 = v.get_bullet_global_transform(0).origin
+	await physics(5)
+	assert_gt(v.get_bullet_global_transform(0).origin.distance_to(p0), 1.0, "the woken bullet actually moves")
 	for i in 2:
 		v.disable_bullet(i)
 	await idle()

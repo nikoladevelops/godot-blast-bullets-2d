@@ -732,6 +732,8 @@ void MultiMeshBullets2D::reset_transient_subclass_state(bool drop_stale_work) {
 }
 
 void MultiMeshBullets2D::reset_transient_volley_state(uint64_t new_owner_spawner_id, bool drop_stale_work, bool keep_attachment_slots) {
+	// A new life / a dead life never replays the previous life's parked overlaps.
+	paused_overlaps.clear();
 	// Ownership is stamped first so every step below already belongs to the
 	// new life (or to nobody, when dying).
 	owner_spawner_id = new_owner_spawner_id;

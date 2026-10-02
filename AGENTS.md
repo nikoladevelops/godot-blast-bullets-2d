@@ -169,9 +169,20 @@ rg -n "^func test_" test_project/tests/volley/test_volley_bounce.gd
 ## 9. Inspector groups & serialization locks
 
 - Groups come from `ADD_GROUP("Name", "")` in `_bind_methods`
-  (spawner: Bullet Patterns/Shooting/Spin/Homing/Orbiting/Preview;
-  spawn-data: Bullets/Appearance/Collision/Attachments/Sprite
-  Effects/Per-Bullet Rotation). Tests assert no duplicate group titles.
+  (spawner: Setup/Bullet Patterns/Shooting/Spin/Homing/Orbiting/Preview/
+  Movement/Performance; spawn-data: Bullets/Appearance/Collision/
+  Attachments/Sprite Effects/Per-Bullet Rotation). Tests assert no
+  duplicate group titles and lock the spawner order.
+- Bullet Patterns uses `ADD_SUBGROUP("Ring", "helper_ring_")` per shape
+  (prefix stripped in the inspector), a `Transform` subgroup first and
+  `Outline Layers` last. The inspector EJECTS a property whose name lacks
+  the subgroup prefix, so `test_every_prefixed_subgroup_member_carries_the_prefix`
+  fails on a misplaced `ADD_PROPERTY`. Moving a property = moving its whole
+  bind+ADD_PROPERTY paragraph (ADD_PROPERTY before its bind is silently
+  dropped; the runner flags the `class_db.cpp` error).
+- A setter whose field `_validate_property` reads MUST call
+  `notify_property_list_changed()` (pinned per switch with
+  `assert_signal_emit_count(sp, "property_list_changed", n)`).
 - `helper_*` visibility is PER-MODE (gated polygon); the visibility suite
   fails on any property invisible in all 33 modes.
 - Enum ids are serialized into `.tscn`: renumbering silently repoints
