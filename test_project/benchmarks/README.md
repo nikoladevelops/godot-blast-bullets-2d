@@ -3,7 +3,7 @@
 Headless, deterministic performance scenarios with a regression log.
 
 ```sh
-python3 tools/run_benchmarks.py                    # all scenarios, 3 repeats (median)
+python3 tools/run_benchmarks.py                    # all scenarios, 5 repeats (median)
 python3 tools/run_benchmarks.py --scenario churn   # substring filter
 python3 tools/run_benchmarks.py --gate             # exit 1 on a regression vs log/baseline.json
 python3 tools/run_benchmarks.py --update-baseline  # accept this run as the new reference

@@ -59,7 +59,10 @@ func test_transforms_and_teleport() -> void:
 	assert_almost_eq(v.get_bullet_transform(0).origin, Vector2(310, 400), Vector2(0.01, 0.01), "volley shift carries")
 	var shape: Dictionary = v.debug_get_shape_state()
 	assert_true(shape.get("valid", false), "shape state valid")
-	assert_eq(int(shape.get("rid_count", 0)), 3, "3 shape RIDs")
+	# One shared server shape per volley (F1: N RIDs made cold spawns O(N^2)),
+	# attached once per bullet.
+	assert_eq(int(shape.get("rid_count", 0)), 1, "one shared shape RID per volley")
+	assert_eq(int(shape.get("shape_count", 0)), 3, "one area shape slot per bullet")
 
 
 func test_default_max_speed_is_unlimited() -> void:

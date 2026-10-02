@@ -291,7 +291,7 @@ zero-radius orbit; negative speeds under curves.
 ## 14a. Benchmarks & profiling (measure before AND after any perf change)
 
 ```sh
-python3 tools/run_benchmarks.py                     # 13 headless scenarios x3 (median), ~45 s
+python3 tools/run_benchmarks.py                     # 13 headless scenarios x5 (median), ~75 s
 python3 tools/run_benchmarks.py --scenario churn    # substring filter
 python3 tools/run_benchmarks.py --gate              # exit 1 on regression vs log/baseline.json
 python3 tools/run_benchmarks.py --update-baseline   # ONLY for an accepted change; say so in the commit
@@ -311,9 +311,11 @@ python3 tools/run_benchmarks.py --update-baseline   # ONLY for an accepted chang
   `register_performance_monitors` opts out). Use the editor Profiler for
   script cost and the Visual Profiler for GPU; the monitors show which
   frames are heavy.
-- Baseline facts (b366c8a, debug build): 10k directional in flight ~0.26 ms
-  factory tick; COLD spawn is O(N^2) (1k 20 ms, 2k 77 ms, 4k 317 ms, 8k
-  1.5 s) -> always pre-warm big volleys with `populate_bullets_pool`.
+- Facts (debug build, Ryzen 7 8840HS): 10k directional bullets in flight
+  ~0.26 ms factory tick. Cold spawn was O(N^2) (8k: 1.5 s) because every
+  per-bullet shape_set_data re-updated all shapes of the area; one shared
+  shape RID per volley made it O(N) (8k: 11 ms, 1k: 0.66 ms). Pre-warming
+  with `populate_bullets_pool` still removes the remaining allocation.
 
 ## 14. Performance rules (tick code is sacred)
 

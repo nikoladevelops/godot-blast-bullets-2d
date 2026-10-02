@@ -758,7 +758,14 @@ public:
 	MultiMeshObjectPool *bullets_pool = nullptr;
 	PhysicsServer2D *physics_server = nullptr;
 
-	std::vector<RID> physics_shapes;
+	// ONE server shape per volley, added to the area once per bullet (area
+	// shape index == bullet index, each with its own transform). Bullets of a
+	// volley always share the same shape data, so N RIDs were pure overhead:
+	// worse, every shape_set_data() made the physics server re-update EVERY
+	// shape of the owning area, so a cold N-bullet spawn cost O(N^2)
+	// (8k bullets: 1.5 s). Data is pushed once per volley: O(N) total.
+	RID volley_shape;
+	int area_shape_count = 0;
 
 	// This is used to effectively hide a single bullet instance from being rendered by the multimesh
 	static inline const Transform2D zero_transform = Transform2D().scaled(Vector2(0, 0));
@@ -3228,11 +3235,11 @@ protected:
 	Transform2D generate_texture_transform(Transform2D transf, bool is_texture_rotation_permanent, real_t texture_rotation_radians, int bullet_index);
 
 	// Generates a collision shape transform for a particular bullet and attaches it to the area
-	Transform2D generate_collision_shape_transform_for_area(Transform2D transf, const RID &shape, const Vector2 &collision_shape_offset, int bullet_index, bool apply_shape_data = true);
+	Transform2D generate_collision_shape_transform_for_area(Transform2D transf, const Vector2 &collision_shape_offset, int bullet_index);
 
-	// Shape data last pushed to every RID in physics_shapes. Pool reuse with
-	// an identical shape skips N shape_set_data server calls. Invalidated
-	// whenever RIDs are (re)created.
+	// Shape data last pushed to volley_shape. Pool reuse with an identical
+	// shape skips the push (and the area-wide shape update it triggers).
+	// Invalidated whenever the RID is (re)created.
 	bool shape_data_applied = false;
 	PhysicsServer2D::ShapeType applied_shape_type = PhysicsServer2D::SHAPE_CIRCLE;
 	Vector2 applied_rect_size;
@@ -3255,6 +3262,11 @@ protected:
 	void set_up_area(const int collision_layer, const int collision_mask, bool new_monitorable, const RID &physics_space);
 
 	void generate_physics_shapes_for_area(int amount);
+	// Pushes the cached shape data into volley_shape once (no-op when it
+	// already matches) and marks it applied.
+	void apply_volley_shape_data();
+	// Detaches every shape from the area and frees volley_shape.
+	void release_volley_shape();
 
 	void set_all_physics_shapes_enabled_for_area(bool enable);
 

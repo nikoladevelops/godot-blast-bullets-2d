@@ -69,7 +69,7 @@ void MultiMeshBullets2D::_notification(int p_what) {
 				// drop the slot: re-pooling into (or queue_freeing from) a dying factory is
 				// pointless, the engine destroys the whole subtree anyway.
 				const bool factory_is_dying = bullet_factory == nullptr || bullet_factory->get_is_tearing_down();
-				for (int i = 0; i < amount_bullets && i < (int)physics_shapes.size(); ++i) {
+				for (int i = 0; i < amount_bullets && i < area_shape_count; ++i) {
 					physics_server->area_set_shape_disabled(area, i, true);
 
 					if (i >= 0 && i < (int)attachments.size() && attachments[i] != nullptr) {
@@ -99,18 +99,9 @@ void MultiMeshBullets2D::_notification(int p_what) {
 				physics_server->area_set_area_monitor_callback(area, Variant());
 				physics_server->area_set_monitor_callback(area, Variant());
 
-				// Detach the shapes from the area BEFORE freeing their RIDs (same
-				// order as enable_multimesh()/set_collision_shape_runtime()): freeing
-				// still-attached shape RIDs warns/leaks on the physics server.
-				physics_server->area_clear_shapes(area);
-
-				// Avoid memory leaks if you've used the PhysicsServer2D to generate area and shapes
-				for (auto &shape : physics_shapes) {
-					if (shape.is_valid()) {
-						physics_server->free_rid(shape);
-					}
-				}
-				physics_shapes.clear();
+				// Detach the shapes from the area BEFORE freeing the RID (freeing a
+				// still-attached shape RID warns/leaks on the physics server).
+				release_volley_shape();
 
 				if (area.is_valid()) {
 					physics_server->free_rid(area);
@@ -155,13 +146,16 @@ Dictionary MultiMeshBullets2D::debug_get_volley_info() const {
 
 Dictionary MultiMeshBullets2D::debug_get_shape_state() const {
 	Dictionary d;
-	d["valid"] = physics_server != nullptr && area.is_valid() && (int)physics_shapes.size() == amount_bullets;
+	d["valid"] = physics_server != nullptr && area.is_valid() && volley_shape.is_valid() && area_shape_count == amount_bullets;
 	d["type"] = (int)cached_effective_shape_type;
 	d["circle_radius"] = cached_circle_radius;
 	d["rect_size"] = cached_rect_size;
 	d["capsule_radius"] = cached_capsule_radius;
 	d["capsule_height"] = cached_capsule_height;
-	d["rid_count"] = (int)physics_shapes.size();
+	// One shared server shape per volley (see volley_shape); shape_count is
+	// the number of area shape slots (one per bullet).
+	d["rid_count"] = volley_shape.is_valid() ? 1 : 0;
+	d["shape_count"] = area_shape_count;
 	return d;
 }
 
@@ -879,13 +873,7 @@ bool MultiMeshBullets2D::enable_multimesh(const MultiMeshBulletsData2D &data, co
 	// the old RIDs would receive mismatched data below, so recreate them exactly
 	// like set_collision_shape_runtime() does.
 	if (cached_effective_shape_type != old_effective_shape_type && physics_server != nullptr && area.is_valid()) {
-		physics_server->area_clear_shapes(area);
-		for (RID &s : physics_shapes) {
-			if (s.is_valid()) {
-				physics_server->free_rid(s);
-			}
-		}
-		physics_shapes.clear();
+		release_volley_shape();
 		generate_physics_shapes_for_area(amount_bullets);
 	}
 
@@ -1021,15 +1009,14 @@ void MultiMeshBullets2D::set_up_bullet_instances(const MultiMeshBulletsData2D &d
 	// One node inverse for the whole setup loop (generate_texture_transform
 	// converts every bullet to multimesh-local space).
 	NodeInverseScope inverse_scope(this);
-	const bool push_shape_data = !shape_data_matches_applied();
+	// Shape data once per volley (pooled reuse with the same shape skips it).
+	apply_volley_shape_data();
 
 	for (int i = 0; i < amount_bullets; ++i) {
-		RID shape = physics_shapes[i];
-
 		const Transform2D &curr_data_transf = data.transforms[i];
 
 		// Generates a collision shape transform for a particular bullet and attaches it to the area
-		Transform2D shape_transf = generate_collision_shape_transform_for_area(curr_data_transf, shape, data.collision_shape_offset, i, push_shape_data);
+		Transform2D shape_transf = generate_collision_shape_transform_for_area(curr_data_transf, data.collision_shape_offset, i);
 
 		// Generates texture transform with correct rotation and sets it to the correct bullet on the multimesh
 		const Transform2D &texture_transf = generate_texture_transform(curr_data_transf, data.is_texture_rotation_permanent, cache_texture_rotation_radians, i);
@@ -1042,9 +1029,6 @@ void MultiMeshBullets2D::set_up_bullet_instances(const MultiMeshBulletsData2D &d
 
 		all_cached_shape_transforms.emplace_back(shape_transf);
 		all_cached_shape_origin.emplace_back(shape_transf.get_origin());
-	}
-	if (push_shape_data && amount_bullets > 0) {
-		mark_shape_data_applied();
 	}
 }
 
@@ -1709,7 +1693,7 @@ void MultiMeshBullets2D::set_up_area(const int collision_layer, const int collis
 	physics_server->area_set_collision_mask(area, collision_mask);
 }
 
-Transform2D MultiMeshBullets2D::generate_collision_shape_transform_for_area(Transform2D transf, const RID &shape, const Vector2 &collision_shape_offset, int bullet_index, bool apply_shape_data) {
+Transform2D MultiMeshBullets2D::generate_collision_shape_transform_for_area(Transform2D transf, const Vector2 &collision_shape_offset, int bullet_index) {
 	// The rotation of each transform
 	real_t curr_bullet_rotation = transf.get_rotation();
 
@@ -1722,36 +1706,57 @@ Transform2D MultiMeshBullets2D::generate_collision_shape_transform_for_area(Tran
 	transf.set_origin(transf.get_origin() + rotated_offset);
 
 	physics_server->area_set_shape_transform(area, bullet_index, transf);
-
-	if (!apply_shape_data) {
-		return transf;
-	}
-	switch (cached_effective_shape_type) {
-		case PhysicsServer2D::SHAPE_CIRCLE:
-			physics_server->shape_set_data(shape, cached_circle_radius);
-			break;
-		case PhysicsServer2D::SHAPE_CAPSULE:
-			physics_server->shape_set_data(shape, Vector2(cached_capsule_radius, cached_capsule_height));
-			break;
-		case PhysicsServer2D::SHAPE_RECTANGLE:
-		default:
-			physics_server->shape_set_data(shape, cached_rect_size / 2);
-			break;
-	}
-
 	return transf;
 }
 
-void MultiMeshBullets2D::generate_physics_shapes_for_area(int amount) {
-	// Fresh RIDs carry no data yet.
-	shape_data_applied = false;
-	physics_shapes.reserve(amount);
-	// Type already resolved + error printed once in cache_collision_shape_typed(). No per-RID error.
-	for (int i = 0; i < amount; ++i) {
-		RID shape = CollisionShapeHelper2D::create_server_shape(physics_server, cached_effective_shape_type);
-		physics_server->area_add_shape(area, shape);
-		physics_shapes.emplace_back(shape);
+void MultiMeshBullets2D::apply_volley_shape_data() {
+	if (physics_server == nullptr || !volley_shape.is_valid() || shape_data_matches_applied()) {
+		return;
 	}
+	switch (cached_effective_shape_type) {
+		case PhysicsServer2D::SHAPE_CIRCLE:
+			physics_server->shape_set_data(volley_shape, cached_circle_radius);
+			break;
+		case PhysicsServer2D::SHAPE_CAPSULE:
+			physics_server->shape_set_data(volley_shape, Vector2(cached_capsule_radius, cached_capsule_height));
+			break;
+		case PhysicsServer2D::SHAPE_RECTANGLE:
+		default:
+			physics_server->shape_set_data(volley_shape, cached_rect_size / 2);
+			break;
+	}
+	mark_shape_data_applied();
+}
+
+void MultiMeshBullets2D::release_volley_shape() {
+	if (physics_server == nullptr) {
+		return;
+	}
+	if (area.is_valid()) {
+		physics_server->area_clear_shapes(area);
+	}
+	area_shape_count = 0;
+	if (volley_shape.is_valid()) {
+		physics_server->free_rid(volley_shape);
+	}
+	volley_shape = RID();
+	shape_data_applied = false;
+}
+
+void MultiMeshBullets2D::generate_physics_shapes_for_area(int amount) {
+	// Fresh RID carries no data yet. The data is pushed BEFORE the shape gets
+	// any owner, so the push costs nothing area-wide; each add below only
+	// queues a deferred shape update (O(1)).
+	shape_data_applied = false;
+	if (!volley_shape.is_valid()) {
+		// Type already resolved + error printed once in cache_collision_shape_typed().
+		volley_shape = CollisionShapeHelper2D::create_server_shape(physics_server, cached_effective_shape_type);
+	}
+	apply_volley_shape_data();
+	for (int i = 0; i < amount; ++i) {
+		physics_server->area_add_shape(area, volley_shape);
+	}
+	area_shape_count = amount;
 }
 
 void MultiMeshBullets2D::set_all_physics_shapes_enabled_for_area(bool enable) {
@@ -2542,28 +2547,25 @@ void MultiMeshBullets2D::set_collision_shape_runtime(const Ref<Shape2D> &new_sha
 	cache_collision_shape_typed(new_shape);
 	// Typed cache already printed error once + fallback if needed.
 	if (cached_effective_shape_type != old_effective) {
-		// RID type mismatch: clear area, free old RIDs and recreate correct type to avoid setting Vector2 data on circle RID etc.
-		physics_server->area_clear_shapes(area);
-		for (RID &s : physics_shapes) {
-			if (s.is_valid()) {
-				physics_server->free_rid(s);
-			}
-		}
-		physics_shapes.clear();
+		// RID type mismatch: free the old shape and recreate the correct type
+		// (a circle RID must never receive rectangle/capsule data).
+		release_volley_shape();
 		generate_physics_shapes_for_area(amount_bullets);
 	}
 	// Refresh data + transforms for all bullets so physics + debugger pick up new size immediately.
 	// generate sets area transform + shape data from typed cache; then sync cached vectors (no second area_set) + interp cache to avoid lerp pop.
-	if ((int)physics_shapes.size() != amount_bullets) {
-		UtilityFunctions::push_error("set_collision_shape_runtime: shape RID count mismatch, cannot refresh.");
+	if (area_shape_count != amount_bullets || !volley_shape.is_valid()) {
+		UtilityFunctions::push_error("set_collision_shape_runtime: area shape count mismatch, cannot refresh.");
 		return;
 	}
+	// Same-type resize: one data push for the whole volley.
+	apply_volley_shape_data();
 	for (int i = 0; i < amount_bullets; ++i) {
 		// Push the new size/type data to the server shape. The returned transform
 		// is intentionally discarded: the cached shape transform below is derived
 		// through the sync helper so rotate_only_textures and the texture-rotation
 		// strip stay consistent with the tick and teleport paths.
-		(void)generate_collision_shape_transform_for_area(all_cached_instance_transforms[i], physics_shapes[i], cache_collision_shape_offset, i);
+		(void)generate_collision_shape_transform_for_area(all_cached_instance_transforms[i], cache_collision_shape_offset, i);
 		sync_shape_transform_from_instance(i, all_cached_instance_transforms[i]);
 		// Fresh RIDs from a type change come enabled; restore per-bullet disabled state
 		// so individually disabled bullets don't become collidable again.

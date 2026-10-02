@@ -14,7 +14,7 @@ Outputs (all under test_project/benchmarks/log/):
   LATEST.md                         this run vs baseline, regressions flagged
 
 Usage:
-    python3 tools/run_benchmarks.py                     # all scenarios, 3 repeats
+    python3 tools/run_benchmarks.py                     # all scenarios, 5 repeats
     python3 tools/run_benchmarks.py --scenario churn    # substring filter (repeatable)
     python3 tools/run_benchmarks.py --repeat 5
     python3 tools/run_benchmarks.py --gate              # exit 1 on a regression vs baseline
@@ -22,7 +22,9 @@ Usage:
     python3 tools/run_benchmarks.py --list
 
 Regression rule (per scenario, vs baseline): frame or factory-tick p50 more
-than +10% AND more than +0.05 ms, or p99 more than +20% AND +0.5 ms.
+than +10% AND more than +0.05 ms, or p95 more than +20% AND +0.3 ms. p99 and
+max are reported (spike hunting) but not gated: with 300 frames they are a
+handful of frames and flip between modes from run to run.
 Numbers are only comparable on the same machine and build type; the result
 files record both. Close other heavy programs while benchmarking.
 """
@@ -118,6 +120,9 @@ def pct(new, old):
 
 
 def is_regression(new, old):
+    """Gate on p50 and p95 only. p99 of 300 frames is the 3rd-worst frame:
+    scenarios with a few legitimate spikes per run (pool churn) flip it
+    between modes run to run, so p99/max are reported, never gated."""
     flags = []
     for series in ("frame_ms", "factory_tick_ms"):
         n, o = new.get(series, {}), old.get(series, {})
@@ -125,10 +130,8 @@ def is_regression(new, old):
             continue
         if n["p50"] > o["p50"] * 1.10 and n["p50"] - o["p50"] > 0.05:
             flags.append(f"{series}.p50 {o['p50']:.3f}->{n['p50']:.3f} ms ({pct(n['p50'], o['p50']):+.0f}%)")
-        # p99 over 300 frames is the 3 worst frames: OS jitter alone moves it
-        # by a few tenths of a ms, so it also needs a 0.5 ms absolute jump.
-        if n["p99"] > o["p99"] * 1.20 and n["p99"] - o["p99"] > 0.5:
-            flags.append(f"{series}.p99 {o['p99']:.3f}->{n['p99']:.3f} ms ({pct(n['p99'], o['p99']):+.0f}%)")
+        if n["p95"] > o["p95"] * 1.20 and n["p95"] - o["p95"] > 0.3:
+            flags.append(f"{series}.p95 {o['p95']:.3f}->{n['p95']:.3f} ms ({pct(n['p95'], o['p95']):+.0f}%)")
     return flags
 
 
@@ -192,7 +195,7 @@ def append_history(run):
 def main():
     ap = argparse.ArgumentParser(description="Run BlastBullets2D headless benchmarks.")
     ap.add_argument("--scenario", action="append", help="substring filter (repeatable)")
-    ap.add_argument("--repeat", type=int, default=3)
+    ap.add_argument("--repeat", type=int, default=5)
     ap.add_argument("--timeout", type=int, default=600)
     ap.add_argument("--gate", action="store_true", help="exit 1 when any scenario regresses vs baseline")
     ap.add_argument("--update-baseline", action="store_true", help="store this run as baseline.json")
