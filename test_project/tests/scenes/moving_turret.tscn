@@ -1,0 +1,73 @@
+[gd_scene load_steps=9 format=3]
+
+[sub_resource type="PlaceholderTexture2D" id="Tex_bullet"]
+size = Vector2(8, 8)
+
+[sub_resource type="SpriteFrames" id="Frames_bullet"]
+animations = [{
+"frames": [{
+"duration": 1.0,
+"texture": SubResource("Tex_bullet")
+}],
+"loop": true,
+"name": &"default",
+"speed": 5.0
+}]
+
+[sub_resource type="BulletSpeedData2D" id="Speed_shared"]
+speed = 300.0
+max_speed = 3000.0
+
+[sub_resource type="CircleShape2D" id="Shape_bullet"]
+radius = 4.0
+
+[sub_resource type="DirectionalBulletsData2D" id="Data_turret"]
+sprite_frames = SubResource("Frames_bullet")
+shared_bullet_speed_data = SubResource("Speed_shared")
+max_life_time = 2.0
+collision_shape = SubResource("Shape_bullet")
+monitorable = true
+collision_layer = 2
+collision_mask = 4
+
+[sub_resource type="Curve2D" id="Curve_patrol"]
+_data = {
+"points": PackedVector2Array(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 400, 0)
+}
+point_count = 2
+
+[sub_resource type="RectangleShape2D" id="Shape_wall"]
+size = Vector2(1200, 40)
+
+[node name="MovingTurret" type="Node2D"]
+
+[node name="BulletFactory2D" type="BulletFactory2D" parent="."]
+
+[node name="Patrol" type="Path2D" parent="."]
+position = Vector2(200, 300)
+curve = SubResource("Curve_patrol")
+
+[node name="Turret" type="BulletSpawner2D" parent="."]
+position = Vector2(200, 300)
+bullet_factory_path = NodePath("../BulletFactory2D")
+spawn_data = SubResource("Data_turret")
+pattern_source = 3
+helper_bullets_amount = 12
+shoot_interval_sec = 0.25
+movement_enabled = true
+movement_path = NodePath("../Patrol")
+movement_loop_mode = 2
+movement_timing = 1
+movement_speed = 200.0
+movement_transition = 1
+movement_ease = 2
+movement_rotate_with_path = true
+inherit_movement_velocity = true
+
+[node name="Floor" type="StaticBody2D" parent="."]
+position = Vector2(400, 500)
+collision_layer = 4
+collision_mask = 2
+
+[node name="Shape" type="CollisionShape2D" parent="Floor"]
+shape = SubResource("Shape_wall")

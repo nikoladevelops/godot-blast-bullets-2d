@@ -258,6 +258,16 @@ rg -n "^func test_" test_project/tests/volley/test_volley_bounce.gd
   so spinning or rigidly moving costs 0 rebuilds / 0 redraws
   (`debug_get_preview_stats`). Dots/rings/arrow heads are one
   `draw_multimesh` each.
+- **Spawner movement** (group "Movement"): the spawner NODE travels a
+  Path2D at runtime (never in the editor): `advance_movement` runs first
+  in `_process` (before spin, preview, shooting), legs are timed by
+  duration or speed, progress = `Easing2D::ease` (C++ port of Godot's Tween
+  equations, parity-tested) or a progress Curve. ONCE/LOOP/PING_PONG,
+  ATTACH vs RELATIVE_TO_START, rotate-with-path, inherited velocity.
+  Signals are emitted mid-update: capture `get_instance_id()` and stop when
+  `ObjectDB` no longer returns `this` (handlers may queue_free; Godot
+  refuses free() of an emitting object). Moving costs ~0 for the pattern
+  (RIGID bake re-pose) and the preview (no rebuild).
 - **Pattern bake cache** (`resolve_raw_pattern`): raw transforms (pre
   spin/scale/skip) are generated once per `pattern_version` and re-posed
   per shot. The motion class is MEASURED with probe markers

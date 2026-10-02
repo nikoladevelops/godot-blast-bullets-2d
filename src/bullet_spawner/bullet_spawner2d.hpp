@@ -6,6 +6,8 @@
 #include <vector>
 
 #include "godot_cpp/classes/node2d.hpp"
+#include "godot_cpp/classes/curve.hpp"
+#include "godot_cpp/classes/path2d.hpp"
 #include "godot_cpp/classes/array_mesh.hpp"
 #include "godot_cpp/classes/multi_mesh.hpp"
 #include "godot_cpp/classes/random_number_generator.hpp"
@@ -1778,6 +1780,93 @@ class BulletSpawner2D : public Node2D{
         // of the transforms generator (else the generator itself, else this).
         TypedArray<Transform2D> collect_spawn_transforms() const;
 
+        // ---- Movement along a Path2D (inspector group "Movement") ----------
+        // The spawner node itself travels along movement_path at runtime
+        // (never in the editor). Progress per leg = easing(leg time) using
+        // Godot's Tween transitions, or a custom progress Curve.
+        enum MovementSpace {
+            MOVEMENT_SPACE_ATTACH = 0, // spawner sits ON the path (PathFollow2D-like)
+            MOVEMENT_SPACE_RELATIVE_TO_START = 1, // path shape replayed from where the spawner started
+        };
+        enum MovementLoopMode {
+            MOVEMENT_LOOP_ONCE = 0,
+            MOVEMENT_LOOP_LOOP = 1, // restart from the beginning every leg
+            MOVEMENT_LOOP_PING_PONG = 2, // back and forth
+        };
+        enum MovementDirection {
+            MOVEMENT_DIRECTION_FORWARD = 0,
+            MOVEMENT_DIRECTION_REVERSE = 1,
+        };
+        enum MovementTiming {
+            MOVEMENT_TIMING_DURATION = 0, // each leg takes movement_duration_sec
+            MOVEMENT_TIMING_SPEED = 1, // each leg takes length / movement_speed
+        };
+
+        bool get_movement_enabled() const;
+        void set_movement_enabled(bool value);
+        NodePath get_movement_path() const;
+        void set_movement_path(const NodePath &p_path);
+        Path2D *get_movement_path_node() const;
+        void set_movement_path_node(Path2D *node);
+        int get_movement_space() const;
+        void set_movement_space(int value);
+        int get_movement_loop_mode() const;
+        void set_movement_loop_mode(int value);
+        int get_movement_direction() const;
+        void set_movement_direction(int value);
+        int get_movement_loops() const;
+        void set_movement_loops(int value);
+        int get_movement_timing() const;
+        void set_movement_timing(int value);
+        double get_movement_duration_sec() const;
+        void set_movement_duration_sec(double value);
+        double get_movement_speed() const;
+        void set_movement_speed(double value);
+        int get_movement_transition() const;
+        void set_movement_transition(int value);
+        int get_movement_ease() const;
+        void set_movement_ease(int value);
+        Ref<Curve> get_movement_progress_curve() const;
+        void set_movement_progress_curve(const Ref<Curve> &value);
+        double get_movement_start_ratio() const;
+        void set_movement_start_ratio(double value);
+        double get_movement_start_delay_sec() const;
+        void set_movement_start_delay_sec(double value);
+        double get_movement_endpoint_pause_sec() const;
+        void set_movement_endpoint_pause_sec(double value);
+        bool get_movement_rotate_with_path() const;
+        void set_movement_rotate_with_path(bool value);
+        double get_movement_rotation_offset_deg() const;
+        void set_movement_rotation_offset_deg(double value);
+        bool get_movement_cubic_sampling() const;
+        void set_movement_cubic_sampling(bool value);
+        bool get_movement_autostart() const;
+        void set_movement_autostart(bool value);
+        bool get_inherit_movement_velocity() const;
+        void set_inherit_movement_velocity(bool value);
+        double get_movement_velocity_inherit_factor() const;
+        void set_movement_velocity_inherit_factor(double value);
+
+        // Playback API (runtime). play() starts or resumes; a finished ONCE
+        // run restarts from the beginning. stop() halts and optionally snaps
+        // back to the start pose. seek() jumps to a progress ratio of the
+        // current leg (0..1, along the leg's direction).
+        void movement_play();
+        void movement_pause();
+        void movement_stop(bool reset_to_start = true);
+        void movement_seek(double ratio);
+        // Flips the current leg's direction in place (keeps the position).
+        void movement_reverse();
+        bool is_movement_playing() const;
+        // Distance ratio along the path, 0 = path start, 1 = path end.
+        double get_movement_progress() const;
+        // Completed legs since play() (a leg = one traversal of the path).
+        int get_movement_leg() const;
+        // Velocity of the last movement step, px/s (zero while not moving).
+        Vector2 get_movement_velocity() const;
+        // Test hook: the C++ easing used by movement (Tween parity tests).
+        static double debug_ease(double t, int transition, int ease);
+
         // Pattern bake cache (see PatternBake). AUTO: patterns whose raw
         // transforms provably follow the generator rigidly are generated once
         // and re-posed per shot; OFF: always regenerate (debugging, or
@@ -2081,6 +2170,55 @@ class BulletSpawner2D : public Node2D{
         // [0] shot, mirror +1   [1] shot, mirror -1 (burst alternate)   [2] preview (quiet)
         mutable PatternBake pattern_bakes[3];
         int pattern_cache_mode = PATTERN_CACHE_AUTO;
+
+        // Movement properties (see the public block).
+        bool movement_enabled = false;
+        NodePath movement_path;
+        mutable Path2D *movement_path_cache = nullptr;
+        mutable uint64_t movement_path_id = 0;
+        int movement_space = MOVEMENT_SPACE_ATTACH;
+        int movement_loop_mode = MOVEMENT_LOOP_ONCE;
+        int movement_direction = MOVEMENT_DIRECTION_FORWARD;
+        int movement_loops = 0;
+        int movement_timing = MOVEMENT_TIMING_DURATION;
+        double movement_duration_sec = 3.0;
+        double movement_speed = 200.0;
+        int movement_transition = 0; // Tween.TRANS_LINEAR
+        int movement_ease = 2; // Tween.EASE_IN_OUT
+        Ref<Curve> movement_progress_curve;
+        double movement_start_ratio = 0.0;
+        double movement_start_delay_sec = 0.0;
+        double movement_endpoint_pause_sec = 0.0;
+        bool movement_rotate_with_path = false;
+        double movement_rotation_offset_deg = 0.0;
+        bool movement_cubic_sampling = false;
+        bool movement_autostart = true;
+        bool inherit_movement_velocity = false;
+        double movement_velocity_inherit_factor = 1.0;
+        // Movement runtime state.
+        bool movement_playing = false;
+        bool movement_finished = false;
+        double movement_leg_elapsed = 0.0;
+        double movement_delay_left = 0.0;
+        double movement_pause_left = 0.0;
+        int movement_legs_completed = 0;
+        bool movement_leg_forward = true;
+        double movement_progress = 0.0; // distance ratio along the path
+        Vector2 movement_start_origin; // RELATIVE_TO_START anchor (global)
+        Vector2 movement_last_position;
+        bool movement_has_last_position = false;
+        Vector2 movement_velocity;
+        bool movement_warned_unusable_path = false;
+        // Advances playback by delta and moves the node. Returns false when
+        // a signal handler freed this spawner (caller must stop touching it).
+        bool advance_movement(double delta);
+        // Moves the node to the pose at the current progress. Returns false
+        // when the path is unusable.
+        bool apply_movement_pose(double delta);
+        double movement_leg_duration(double path_length) const;
+        double movement_eased(double leg_ratio) const;
+        bool movement_active() const;
+        void movement_reset_state();
         // Bypass flag for debug_collect_spawn_transforms_uncached / verify.
         mutable bool pattern_cache_bypass = false;
         uint64_t preview_rebuild_count = 0;
@@ -2206,3 +2344,7 @@ VARIANT_ENUM_CAST(BlastBullets2D::BulletSpawner2D::HomingNodeNameMatch);
 VARIANT_ENUM_CAST(BlastBullets2D::BulletSpawner2D::HomingTargetSelection);
 VARIANT_ENUM_CAST(BlastBullets2D::BulletSpawner2D::HomingRetargetMode);
 VARIANT_ENUM_CAST(BlastBullets2D::BulletSpawner2D::PatternCacheMode);
+VARIANT_ENUM_CAST(BlastBullets2D::BulletSpawner2D::MovementSpace);
+VARIANT_ENUM_CAST(BlastBullets2D::BulletSpawner2D::MovementLoopMode);
+VARIANT_ENUM_CAST(BlastBullets2D::BulletSpawner2D::MovementDirection);
+VARIANT_ENUM_CAST(BlastBullets2D::BulletSpawner2D::MovementTiming);
