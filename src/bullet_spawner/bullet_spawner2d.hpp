@@ -3,7 +3,11 @@
 #include "bullet_spawner/volley_tracker2d.hpp"
 #include "bullets/directional_bullets2d.hpp"
 #include "factory/bullet_factory2d.hpp"
+#include <vector>
+
 #include "godot_cpp/classes/node2d.hpp"
+#include "godot_cpp/classes/array_mesh.hpp"
+#include "godot_cpp/classes/multi_mesh.hpp"
 #include "godot_cpp/classes/random_number_generator.hpp"
 #include "godot_cpp/classes/wrapped.hpp"
 #include "godot_cpp/core/object.hpp"
@@ -85,45 +89,30 @@ class PatternPreviewLayer2D : public Node2D {
         PackedVector2Array run_scratch;
         PackedVector2Array head_tri;
 
-        // POSE, applied at draw time instead of baking it into the geometry.
-        // dots/paths are snapshotted with spin = 0, so an advancing spin angle
-        // only has to set this float and queue a repaint - no 10k-element
-        // rebuild per frame. Radians; 0 disables the rotation.
-        real_t spin_radians = 0.0;
-        // Cached trig for the pose below: posed()/posed_dir() run per point
-        // per repaint (dots + tails + dirs = 3xN sin/cos pairs at N dots),
-        // so the setter folds sin/cos once here. Same rotation as
-        // Vector2::rotated() (x*c - y*s, x*s + y*c); coincidence tests run
-        // at pixel tolerance, far above any ulp reorder.
-        real_t spin_cos = 1.0;
-        real_t spin_sin = 0.0;
+        // POSE: the spin is applied as this layer's OWN node transform
+        // (set_pose), never by re-drawing. The geometry above is snapshotted
+        // unspun in holder space; rotating the layer about the holder origin
+        // (= generator origin, the shot's spin pivot) moves every glyph
+        // exactly like the volley, and the RenderingServer just updates one
+        // canvas-item transform: a spinning 10k-dot preview costs O(1) per
+        // frame and _draw() runs only when the geometry really changes.
+        void set_pose(const Transform2D &p_pose);
+        // Instrumentation for tests/benchmarks: how many times _draw() ran.
+        int debug_draw_count = 0;
 
-        void set_spin_radians(real_t p_radians) {
-            if (!Math::is_finite(p_radians) || Math::is_equal_approx((double)p_radians, (double)spin_radians)) {
-                return;
-            }
-            spin_radians = p_radians;
-            spin_cos = Math::cos(spin_radians);
-            spin_sin = Math::sin(spin_radians);
-            queue_redraw();
-        }
-
-        // Rotates a holder-local point by the current spin pose. Rotation is
-        // about the holder origin, which is exactly what the spawner does to
-        // the raw transforms (see collect_spawn_transforms_impl's
-        // rotate_spawn_transform), so the preview matches the volley.
-        _ALWAYS_INLINE_ Vector2 posed(const Vector2 &p) const {
-            if (spin_radians == 0.0) {
-                return p;
-            }
-            return Vector2(p.x * spin_cos - p.y * spin_sin, p.x * spin_sin + p.y * spin_cos);
-        }
-        _ALWAYS_INLINE_ Vector2 posed_dir(const Vector2 &p) const {
-            if (spin_radians == 0.0) {
-                return p;
-            }
-            return Vector2(p.x * spin_cos - p.y * spin_sin, p.x * spin_sin + p.y * spin_cos);
-        }
+        // Batched glyphs (one draw_multimesh per kind instead of N canvas
+        // commands). Rebuilt in _draw() from the snapshot; shared unit meshes.
+        Ref<MultiMesh> dots_multimesh;
+        Ref<MultiMesh> rings_multimesh;
+        Ref<MultiMesh> heads_multimesh;
+        PackedFloat32Array glyph_buffer; // reused set_buffer scratch
+        Ref<ArrayMesh> dot_mesh; // unit disc
+        Ref<ArrayMesh> ring_mesh; // annulus at ring_mesh_radius/width
+        real_t ring_mesh_radius = -1.0;
+        real_t ring_mesh_width = -1.0;
+        Ref<ArrayMesh> head_mesh; // arrow head, tip at +X
+        real_t head_mesh_length = -1.0;
+        real_t head_mesh_width = -1.0;
 
         void set_dots_data(const PackedVector2Array &p_dots, const Color &p_color, float p_radius);
         void set_first_marker(bool p_show, const Color &p_color, float p_radius_scale);
@@ -1788,6 +1777,28 @@ class BulletSpawner2D : public Node2D{
         // Collects one global transform per volley bullet: the Node2D children
         // of the transforms generator (else the generator itself, else this).
         TypedArray<Transform2D> collect_spawn_transforms() const;
+
+        // Pattern bake cache (see PatternBake). AUTO: patterns whose raw
+        // transforms provably follow the generator rigidly are generated once
+        // and re-posed per shot; OFF: always regenerate (debugging, or
+        // scripts that mutate pattern inputs behind the setters' back).
+        enum PatternCacheMode {
+            PATTERN_CACHE_AUTO = 0,
+            PATTERN_CACHE_OFF = 1,
+        };
+        int get_pattern_cache_mode() const;
+        void set_pattern_cache_mode(int value);
+        // {hits, misses, bakes, version, shot_class, preview_class}
+        // (class: 0 none, 1 translation, 2 rigid, -1 not baked yet).
+        Dictionary debug_get_pattern_cache_info() const;
+        // Uncached collect (same output contract as collect_spawn_transforms):
+        // the reference the parity tests compare the cache against.
+        TypedArray<Transform2D> debug_collect_spawn_transforms_uncached() const;
+        static void debug_set_pattern_cache_verify(bool enabled);
+        static bool debug_get_pattern_cache_verify();
+        // {rebuilds, dots_draws, arrows_draws, last_rebuild_usec}: preview
+        // instrumentation (spin/move must not rebuild or redraw).
+        Dictionary debug_get_preview_stats() const;
         // Fires one volley immediately (counts, re-arms the timer). Returns
         // false when misconfigured or the factory refused (busy/teardown).
         // Safe to call from _physics_process (same-shape pool reuse applies
@@ -2040,6 +2051,56 @@ class BulletSpawner2D : public Node2D{
         // reports problems, the preview passes true to stay quiet.
         TypedArray<Transform2D> collect_spawn_transforms_impl(bool quiet) const;
 
+        // ---- Pattern bake cache ------------------------------------------
+        // How a pattern's RAW transforms (pre spin/scale/skip) follow the
+        // generator marker. Measured at bake time with probe markers (never
+        // assumed), so per-source flags (rotate_with_marker, seeds...) are
+        // classified by what the generator actually does:
+        //   RIGID       raw(D * M) == D * raw(M) for any rigid motion D
+        //   TRANSLATION raw(M + d) == raw(M) + d (same basis only)
+        //   NONE        regenerate every time (reads other nodes, random)
+        enum PatternMotionClass {
+            PATTERN_MOTION_NONE = 0,
+            PATTERN_MOTION_TRANSLATION = 1,
+            PATTERN_MOTION_RIGID = 2,
+        };
+        struct PatternBake {
+            uint64_t version = 0;
+            bool valid = false;
+            int motion_class = PATTERN_MOTION_NONE;
+            Transform2D marker;
+            Transform2D marker_inv;
+            std::vector<Transform2D> raw;
+        };
+        // [0] shot, mirror +1   [1] shot, mirror -1 (burst alternate)   [2] preview (quiet)
+        mutable PatternBake pattern_bakes[3];
+        int pattern_cache_mode = PATTERN_CACHE_AUTO;
+        // Bypass flag for debug_collect_spawn_transforms_uncached / verify.
+        mutable bool pattern_cache_bypass = false;
+        uint64_t preview_rebuild_count = 0;
+        uint64_t preview_last_rebuild_usec = 0;
+        // Bumped by every geometry-affecting change (mark_pattern_dirty).
+        uint64_t pattern_version = 1;
+        mutable uint64_t pattern_cache_hits = 0;
+        mutable uint64_t pattern_cache_misses = 0;
+        mutable uint64_t pattern_cache_bakes = 0;
+        // Test/debug: every cache-served raw set is regenerated and compared;
+        // a mismatch push_errors (strict GUT turns it into a failure).
+        static bool debug_pattern_cache_verify;
+        // The raw pattern for `marker` straight from the generators (the old
+        // collect switch). No cache.
+        TypedArray<Transform2D> generate_raw_pattern(Node2D *base, const Transform2D &marker, real_t mirror_sign, bool quiet) const;
+        // Cache-aware raw pattern into r_raw (std::vector, no Variant).
+        void resolve_raw_pattern(Node2D *base, const Transform2D &marker, real_t mirror_sign, bool quiet, std::vector<Transform2D> &r_raw) const;
+        int classify_pattern_motion(Node2D *base, const Transform2D &marker, real_t mirror_sign, bool quiet, const std::vector<Transform2D> &raw) const;
+        // Whether the preview snapshot stays valid when the generator moves
+        // from `old_marker` to `new_marker` (same rule as cache reuse).
+        bool preview_survives_marker_move(const Transform2D &old_marker, const Transform2D &new_marker) const;
+        void mark_pattern_dirty();
+        // mark_pattern_dirty() + rebuild_preview(): the one call every
+        // geometry setter makes.
+        void on_pattern_changed();
+
         // True while interval retargeting must keep _process alive: homing on
         // + retarget armed + inside the tree at runtime.
         bool homing_retarget_active() const;
@@ -2054,6 +2115,7 @@ class BulletSpawner2D : public Node2D{
         // auto_shooting_active (it only runs when auto is off) and is the
         // single exception.
         bool needs_process() const;
+        bool needs_process_besides_shooting() const;
         void refresh_process_state();
         // Same, skipped in the editor where the preview owns processing.
         void refresh_process_state_editor_guarded();
@@ -2137,3 +2199,4 @@ VARIANT_ENUM_CAST(BlastBullets2D::BulletSpawner2D::HomingTargetSource);
 VARIANT_ENUM_CAST(BlastBullets2D::BulletSpawner2D::HomingNodeNameMatch);
 VARIANT_ENUM_CAST(BlastBullets2D::BulletSpawner2D::HomingTargetSelection);
 VARIANT_ENUM_CAST(BlastBullets2D::BulletSpawner2D::HomingRetargetMode);
+VARIANT_ENUM_CAST(BlastBullets2D::BulletSpawner2D::PatternCacheMode);

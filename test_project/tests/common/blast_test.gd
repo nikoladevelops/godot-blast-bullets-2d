@@ -24,6 +24,18 @@ var factory: BulletFactory2D
 var check_factory_after := true
 
 
+## Every suite runs with the spawner pattern-cache verifier ON: each shot or
+## preview served from the bake cache is regenerated and compared, and a
+## mismatch push_errors (strict mode fails the test). So every spawner test
+## doubles as a cache-parity test.
+func before_all() -> void:
+	BulletSpawner2D.debug_set_pattern_cache_verify(true)
+
+
+func after_all() -> void:
+	BulletSpawner2D.debug_set_pattern_cache_verify(false)
+
+
 func before_each() -> void:
 	check_factory_after = true
 	factory = BulletFactory2D.new()

@@ -252,6 +252,24 @@ rg -n "^func test_" test_project/tests/volley/test_volley_bounce.gd
   sample (pinned characterization).
 - **Preview**: editor + runtime gizmo rebuilt from the same resolvers as
   volleys; `debug_*` bindings expose rings/dots for coincidence tests.
+  Geometry is snapshotted UNSPUN in holder space (holder = child of the
+  effective generator). Spin is the layer NODE transform
+  (`set_preview_pose`: Hb^-1 R Hb, exact for mirrored/skewed generators),
+  so spinning or rigidly moving costs 0 rebuilds / 0 redraws
+  (`debug_get_preview_stats`). Dots/rings/arrow heads are one
+  `draw_multimesh` each.
+- **Pattern bake cache** (`resolve_raw_pattern`): raw transforms (pre
+  spin/scale/skip) are generated once per `pattern_version` and re-posed
+  per shot. The motion class is MEASURED with probe markers
+  (`classify_pattern_motion`): RIGID (follows any rigid generator move),
+  TRANSLATION (same basis only, e.g. world-direction rain), NONE
+  (children/aimed/corridor/custom/path2d read other state; unseeded random
+  re-rolls). Every geometry setter calls `on_pattern_changed()` (bump +
+  preview rebuild); NEVER call bare `rebuild_preview()` from a setter that
+  changes geometry. Tests run with `debug_set_pattern_cache_verify(true)`
+  (every cached result is regenerated and compared), and
+  `test_spawner_pattern_bake` sweeps EVERY pattern property for
+  invalidation (mutation-tested).
 
 ## 13. Edge-case catalog (test these shapes of input everywhere)
 

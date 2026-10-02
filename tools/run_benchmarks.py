@@ -22,7 +22,7 @@ Usage:
     python3 tools/run_benchmarks.py --list
 
 Regression rule (per scenario, vs baseline): frame or factory-tick p50 more
-than +10% AND more than +0.05 ms, or p99 more than +20% AND +0.1 ms.
+than +10% AND more than +0.05 ms, or p99 more than +20% AND +0.5 ms.
 Numbers are only comparable on the same machine and build type; the result
 files record both. Close other heavy programs while benchmarking.
 """
@@ -125,7 +125,9 @@ def is_regression(new, old):
             continue
         if n["p50"] > o["p50"] * 1.10 and n["p50"] - o["p50"] > 0.05:
             flags.append(f"{series}.p50 {o['p50']:.3f}->{n['p50']:.3f} ms ({pct(n['p50'], o['p50']):+.0f}%)")
-        if n["p99"] > o["p99"] * 1.20 and n["p99"] - o["p99"] > 0.1:
+        # p99 over 300 frames is the 3 worst frames: OS jitter alone moves it
+        # by a few tenths of a ms, so it also needs a 0.5 ms absolute jump.
+        if n["p99"] > o["p99"] * 1.20 and n["p99"] - o["p99"] > 0.5:
             flags.append(f"{series}.p99 {o['p99']:.3f}->{n['p99']:.3f} ms ({pct(n['p99'], o['p99']):+.0f}%)")
     return flags
 

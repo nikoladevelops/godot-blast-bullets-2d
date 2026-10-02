@@ -1003,7 +1003,7 @@ func test_t20_inspector_groups_stay_coherent() -> void:
 	assert_true(groups_found.has("Bullet Patterns"), "spawner Bullet Patterns group present")
 	assert_true(not groups_found.has("Transform Generation"), "old Transform Generation name gone")
 	assert_true(not groups_found.has("Burst and Telegraph"), "Burst group merged away")
-	assert_true(spawner_group_order.slice(0, 6) == ["Bullet Patterns", "Shooting", "Spin", "Homing", "Orbiting", "Preview"], "spawner group order: patterns, shooting, spin, homing, orbit, preview")
+	assert_true(spawner_group_order.slice(0, 7) == ["Bullet Patterns", "Shooting", "Spin", "Homing", "Orbiting", "Preview", "Performance"], "spawner group order: patterns, shooting, spin, homing, orbit, preview, performance")
 	spawner20.pattern_source = BulletSpawner2D.PATTERN_FROM_HELPER_GRID
 	await idle(1)
 	var ring_visible_grid := false
