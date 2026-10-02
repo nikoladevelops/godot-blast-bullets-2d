@@ -42,6 +42,11 @@ class BlockBullets2D;
 // Shared by the factory spawn entries (via validate_spawn_request) and the pool
 // pre-population path.
 bool validate_spawn_data(const Ref<MultiMeshBulletsData2D> &spawn_data, const char *caller_name);
+// Split pieces (native span path): data fields for a volley of bullet_count,
+// a raw transform span, and the invisible-bullets heads-up.
+bool validate_spawn_data_fields(const Ref<MultiMeshBulletsData2D> &spawn_data, int bullet_count, const char *caller_name);
+bool validate_spawn_transform_span(const Transform2D *transforms, int count, const char *caller_name);
+void warn_if_spawn_invisible(const Ref<MultiMeshBulletsData2D> &spawn_data, const char *caller_name);
 
 // Creates bullets with different behavior
 class BulletFactory2D : public Node2D {
@@ -338,6 +343,11 @@ public:
 	// Spawns DirectionalBullets2D when given a resource containing all needed data. These bullets should be controlled by the user.
 	// spawner_id pre-stamps signal ownership before activation (configure-then-attach):
 	// BulletSpawner2D passes its instance id; direct factory users leave 0 (factory-owned).
+	// C++-only fast path (BulletSpawner2D): transforms come from a native
+	// buffer (no TypedArray, no Variant per bullet). Same validation as the
+	// script path: every transform finite and invertible, data fields sane.
+	DirectionalBullets2D *spawn_controllable_directional_bullets_span(const Ref<DirectionalBulletsData2D> &spawn_data, const Transform2D *transforms, int count, const Vector2 &new_inherited_velocity_offset = Vector2(0, 0), uint64_t spawner_id = 0);
+
 	DirectionalBullets2D *spawn_controllable_directional_bullets(const Ref<DirectionalBulletsData2D> &spawn_data, const Vector2 &new_inherited_velocity_offset = Vector2(0, 0), uint64_t spawner_id = 0);
 
 	// Resets the factory. Null key frees everything (all bullets, pools, and the full
@@ -833,7 +843,7 @@ private:
 	// leave a half-set-up multimesh behind. Returns false (with an error
 	// already reported) when the caller must abort.
 	template <typename TSpawnData>
-	bool validate_spawn_request(const char *caller_name, const Ref<TSpawnData> &spawn_data, const Vector2 &inherited_velocity_offset) {
+	bool validate_spawn_request(const char *caller_name, const Ref<TSpawnData> &spawn_data, const Vector2 &inherited_velocity_offset, int override_count = -1) {
 		if (is_factory_busy) {
 			UtilityFunctions::push_error("Error when trying to spawn bullets. BulletFactory2D is currently busy. Ignoring the request");
 			return false;
@@ -863,11 +873,19 @@ private:
 			UtilityFunctions::push_error(String("Error in ") + caller_name + ": inherited velocity offset must be finite. Nothing was spawned.");
 			return false;
 		}
-		if (spawn_data.is_null() || spawn_data->transforms.size() == 0) {
+		if (spawn_data.is_null() || spawn_count_or_data(spawn_data, override_count) == 0) {
 			UtilityFunctions::push_error(String("Error when trying to spawn bullets in ") + caller_name + ". No spawn_data or no transforms were provided. Ignoring the request");
 			return false;
 		}
+		// Native span callers validated their transforms already (no Variant
+		// per bullet); script callers get the full per-transform check.
+		if (override_count >= 0) {
+			return validate_spawn_data_fields(spawn_data, override_count, caller_name);
+		}
 		return validate_spawn_data(spawn_data, caller_name);
+	}
+	static int spawn_count_or_data(const Ref<MultiMeshBulletsData2D> &spawn_data, int override_count) {
+		return override_count >= 0 ? override_count : (int)spawn_data->transforms.size();
 	}
 
 	// BULLETS RELATED
@@ -1187,15 +1205,20 @@ private:
 	// spawner_id is stamped inside spawn()/enable_multimesh() BEFORE any
 	// physics/tree activation (configure-then-attach): 0 = factory-owned.
 	template <typename TBullet, typename TBulletSpawnData>
-	TBullet *spawn_bullets_helper(std::vector<TBullet *> &bullets_vec, DynamicSparseSet &sparse_set, MultiMeshObjectPool &bullets_pool, Node *bullets_container, const Ref<TBulletSpawnData> &spawn_data, const Vector2 &new_inherited_velocity_offset = Vector2(0, 0), uint64_t spawner_id = 0) {
+	TBullet *spawn_bullets_helper(std::vector<TBullet *> &bullets_vec, DynamicSparseSet &sparse_set, MultiMeshObjectPool &bullets_pool, Node *bullets_container, const Ref<TBulletSpawnData> &spawn_data, const Vector2 &new_inherited_velocity_offset = Vector2(0, 0), uint64_t spawner_id = 0, const Transform2D *transforms_ptr = nullptr, int transforms_count = -1) {
 		// Quiet: creation prints error once per spawn. Pool key must use effective type (fallback included) to match RIDs.
 		PhysicsServer2D::ShapeType shape_type = CollisionShapeHelper2D::get_effective_type(spawn_data->collision_shape, false);
-		PoolKey key{ (int)spawn_data->transforms.size(), shape_type };
+		const int bullet_count = transforms_ptr != nullptr ? transforms_count : (int)spawn_data->transforms.size();
+		PoolKey key{ bullet_count, shape_type };
 
 		// Try to get a TBullet from the pool first
 		TBullet *bullets = static_cast<TBullet *>(bullets_pool.pop(key));
 		if (bullets != nullptr) {
-			if (!bullets->enable_multimesh(*spawn_data.ptr(), new_inherited_velocity_offset, spawner_id)) {
+			bullets->spawn_transforms_ptr = transforms_ptr;
+			bullets->spawn_transforms_count = bullet_count;
+			const bool enabled = bullets->enable_multimesh(*spawn_data.ptr(), new_inherited_velocity_offset, spawner_id);
+			bullets->spawn_transforms_ptr = nullptr;
+			if (!enabled) {
 				// enable_multimesh rolls its own mutations back on failure, so the
 				// instance is a clean disabled one here: just file it back under
 				// the live key (not the spawn key) and fall through to a fresh
@@ -1250,7 +1273,10 @@ private:
 
 		// If there was no TBullet in the pool, create a brand new one and spawn it
 		bullets = memnew(TBullet);
+		bullets->spawn_transforms_ptr = transforms_ptr;
+		bullets->spawn_transforms_count = bullet_count;
 		bullets->spawn(*spawn_data.ptr(), &bullets_pool, this, bullets_container, new_inherited_velocity_offset, sparse_set_id, false, spawner_id);
+		bullets->spawn_transforms_ptr = nullptr;
 		bullets_vec.emplace_back(bullets);
 
 		sparse_set.activate_data(sparse_set_id);

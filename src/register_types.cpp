@@ -1,3 +1,4 @@
+#include "shared/warn_once2d.hpp"
 #include <gdextension_interface.h>
 #include <godot_cpp/core/class_db.hpp>
 #include <godot_cpp/core/defs.hpp>
@@ -87,6 +88,7 @@ void initialize_blast_bullets_2d_module(ModuleInitializationLevel p_level) {
 	GDREGISTER_CLASS(PatternPreviewLayer2D)
 
 	CachedStringNames2D::create();
+	WarnOnce2D::create();
 }
 
 void uninitialize_blast_bullets_2d_module(ModuleInitializationLevel p_level) {
@@ -94,6 +96,7 @@ void uninitialize_blast_bullets_2d_module(ModuleInitializationLevel p_level) {
 		return;
 	}
 	CachedStringNames2D::destroy();
+	WarnOnce2D::destroy();
 }
 
 extern "C" {

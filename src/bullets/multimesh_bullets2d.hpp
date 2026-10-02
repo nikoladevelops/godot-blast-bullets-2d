@@ -1,5 +1,6 @@
 #pragma once
 
+#include "../shared/warn_once2d.hpp"
 #include "../debugger/idebugger_data_provider2d.hpp"
 #include "../factory/bullet_factory2d.hpp"
 #include "../shared/bullet_attachment2d.hpp"
@@ -126,6 +127,19 @@ public:
 	// (configure-then-attach): a spawner passes its instance id so the volley
 	// is never observable as factory-owned. 0 = factory-owned (default).
 	void spawn(const MultiMeshBulletsData2D &spawn_data, MultiMeshObjectPool *pool, BulletFactory2D *factory, Node *bullets_container, const Vector2 &new_inherited_velocity_offset, int new_sparse_set_id, bool spawn_in_pool, uint64_t spawner_id = 0);
+
+	// Native transform source for the NEXT spawn()/enable_multimesh(): when
+	// set, the volley reads its bullet transforms from this span instead of
+	// unboxing data.transforms (a Variant per bullet). The factory sets it
+	// around the call; set_up_bullet_instances consumes and clears it.
+	// Resource id of the data being applied (spawn/enable): keys the
+	// once-per-resource configuration warnings (WarnOnce2D).
+	uint64_t warn_data_id = 0;
+	const Transform2D *spawn_transforms_ptr = nullptr;
+	int spawn_transforms_count = 0;
+	_ALWAYS_INLINE_ int spawn_transform_count(const MultiMeshBulletsData2D &data) const {
+		return spawn_transforms_ptr != nullptr ? spawn_transforms_count : (int)data.transforms.size();
+	}
 
 	// Activates the multimesh. Returns false (without leaving it factory-active)
 	// when the spawn data is incompatible, so the pool owner can re-push it.
@@ -444,7 +458,7 @@ public:
 					// NOTE: the signal lives on the multimesh itself (not the factory),
 					// so it must be emitted on `this`. Generation-guarded: a pool
 					// reuse before the flush must not emit for the new life.
-					call_deferred("_do_emit_sprite_animation_finished", multimesh_generation);
+					call_deferred(CachedStringNames2D::get().m_do_emit_sprite_animation_finished, multimesh_generation);
 				}
 					return;
 				}
@@ -560,7 +574,7 @@ public:
 	void set_shared_bullet_curves_data(const Ref<BulletCurvesData2D> &new_curves_data) {
 		// Block bullets are spawned without an instance handle by design (spawn_block_bullets
 		// returns void), so advanced per-instance features stay on DirectionalBullets2D.
-		if (!new_curves_data.is_null() && is_class("BlockBullets2D")) {
+		if (!new_curves_data.is_null() && is_block_volley()) {
 			UtilityFunctions::push_error("BlockBullets2D does not support bullet curves - use DirectionalBullets2D for curves.");
 			return;
 		}
@@ -1155,6 +1169,8 @@ public:
 	// Layer list retained from the last reseed (spawn/enable/live set), used
 	// to route trigger events to the factory one-shot bakes.
 	TypedArray<BulletEffectLayerData2D> fx_data_layers;
+	// Bit per trigger with at least one enabled one-shot layer (see fx_reseed_from_data).
+	uint32_t fx_oneshot_trigger_mask = 0;
 	// Bake version per layer index at the last full reseed (0 = null/disabled
 	// slot). A pooled reuse with the same layer resources at the same
 	// versions soft-resets instead of rebuilding shard nodes and factory
@@ -2059,7 +2075,7 @@ public:
 			return;
 		}
 
-		if (is_class("BlockBullets2D")) {
+		if (is_block_volley()) {
 			UtilityFunctions::push_error("BlockBullets2D does not support bullet curves - use DirectionalBullets2D for curves.");
 			return;
 		}
@@ -2071,7 +2087,7 @@ public:
 		ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_set_curves_data");
 
 		// Single error for the whole range instead of one per bullet below.
-		if (!curves_data.is_null() && is_class("BlockBullets2D")) {
+		if (!curves_data.is_null() && is_block_volley()) {
 			UtilityFunctions::push_error("BlockBullets2D does not support bullet curves - use DirectionalBullets2D for curves.");
 			return;
 		}
@@ -2842,6 +2858,9 @@ public:
 	// Whether queued collision records need the target's velocity/pose
 	// (bounce math only). Base never bounces.
 	virtual bool wants_queued_target_motion() const { return false; }
+	// Type tag without a String-building is_class() call (hot paths: collision
+	// drain, expiry). BlockBullets2D overrides it.
+	virtual bool is_block_volley() const { return false; }
 
 	virtual int try_handle_bounce(CollisionType collision_type, int bullet_index, int64_t entered_instance_id, Vector2 queued_target_velocity, bool queued_velocity_valid, Vector2 queued_target_position, bool queue_position_valid) {
 		(void)collision_type;
@@ -3108,7 +3127,7 @@ public:
 			return true;
 		}
 		if (arr_size != amount_bullets) {
-			UtilityFunctions::push_warning("MultiMeshBullets2D: bullets_current_collision_count size (" + String::num_int64(arr_size) + ") != bullets (" + String::num_int64(amount_bullets) + "); uncovered bullets start at 0" + String(tile_short_arrays ? " (tiling on: wrapping short array)." : " (check tile_bullets_current_collision_count to wrap, or provide one entry per bullet)."));
+			WarnOnce2D::warn(warn_data_id, 1u, arr_size, amount_bullets, "MultiMeshBullets2D: bullets_current_collision_count size (" + String::num_int64(arr_size) + ") != bullets (" + String::num_int64(amount_bullets) + "); uncovered bullets start at 0" + String(tile_short_arrays ? " (tiling on: wrapping short array)." : " (check tile_bullets_current_collision_count to wrap, or provide one entry per bullet)."));
 		}
 
 		bullets_current_collision_count.clear();
@@ -3431,7 +3450,7 @@ public:
 		// can't catch it, since the new owner is active too). The per-timer id
 		// additionally catches a single detach, which does NOT bump the
 		// generation.
-		call_deferred("_do_execute_stored_callable_safely", _callback, execute_only_if_multimesh_is_active, multimesh_timers_generation, timer_id);
+		call_deferred(CachedStringNames2D::get().m_do_execute_stored_callable_safely, _callback, execute_only_if_multimesh_is_active, multimesh_timers_generation, timer_id);
 	}
 
 	void _do_execute_stored_callable_safely(const Callable &_callback, bool execute_only_if_multimesh_is_active, int expected_timers_generation, uint64_t expected_timer_id) {
@@ -3473,7 +3492,7 @@ public:
 		// delay); inside a physics frame it defers, since
 		// run_multimesh_custom_timers() may be iterating the vector.
 		if (Engine::get_singleton()->is_in_physics_frame()) {
-			call_deferred("_do_attach_time_based_function", time, callable, repeat, execute_only_if_multimesh_is_active, multimesh_timers_generation);
+			call_deferred(CachedStringNames2D::get().m_do_attach_time_based_function, time, callable, repeat, execute_only_if_multimesh_is_active, multimesh_timers_generation);
 			return;
 		}
 		_do_attach_time_based_function(time, callable, repeat, execute_only_if_multimesh_is_active, multimesh_timers_generation);
@@ -3519,7 +3538,7 @@ public:
 		// call can't erase the next owner's timers. Immediate outside physics
 		// processing, deferred within it (same rationale as attach above).
 		if (Engine::get_singleton()->is_in_physics_frame()) {
-			call_deferred("_do_detach_time_based_function", callable, multimesh_timers_generation);
+			call_deferred(CachedStringNames2D::get().m_do_detach_time_based_function, callable, multimesh_timers_generation);
 			return;
 		}
 		_do_detach_time_based_function(callable, multimesh_timers_generation);
@@ -3556,7 +3575,7 @@ public:
 		// Immediate outside physics processing, deferred within it (same
 		// rationale as attach above).
 		if (Engine::get_singleton()->is_in_physics_frame()) {
-			call_deferred("_do_detach_all_time_based_functions", multimesh_timers_generation);
+			call_deferred(CachedStringNames2D::get().m_do_detach_all_time_based_functions, multimesh_timers_generation);
 			return;
 		}
 		_do_detach_all_time_based_functions(multimesh_timers_generation);

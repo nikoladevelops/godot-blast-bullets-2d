@@ -56,7 +56,7 @@ BASELINE = os.path.join(LOG_DIR, "baseline.json")
 LATEST = os.path.join(LOG_DIR, "LATEST.md")
 
 STAT_KEYS = ("p50", "p95", "p99", "max", "mean")
-SERIES = ("frame_ms", "factory_tick_ms", "physics_ms", "process_ms")
+SERIES = ("frame_ms", "step_ms", "engine_ms", "factory_tick_ms")
 
 
 def git_info():
@@ -145,10 +145,11 @@ def write_latest(run, baseline):
         f"- baseline: `{baseline.get('commit', 'none')}` ({baseline.get('timestamp', '-')})" if baseline else "- baseline: none (run with --update-baseline)",
         "",
         "Times are milliseconds of CPU per frame (simulated time, `--fixed-fps 60`).",
-        "`frame` = whole engine frame; `tick` = BulletFactory2D physics tick only.",
+        "`frame` = step + engine; `step` = the scenario's own plugin calls (spawns...);",
+        "`engine` = physics server step + factory tick + drain + render; `tick` = factory physics tick only.",
         "",
-        "| scenario | frame p50 | frame p99 | frame max | tick p50 | tick p99 | bullets | mem peak MB | vs baseline |",
-        "|---|---:|---:|---:|---:|---:|---:|---:|---|",
+        "| scenario | frame p50 | frame p95 | frame p99 | frame max | step max | engine max | tick p50 | tick p99 | bullets | mem peak MB | objects +/- | vs baseline |",
+        "|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|",
     ]
     regressions = {}
     for name, res in run["scenarios"].items():
@@ -162,8 +163,10 @@ def write_latest(run, baseline):
             delta = ("**REGRESSION**: " + "; ".join(flags)) if flags else delta
         else:
             delta = "new"
-        lines.append(f"| {name} | {f['p50']:.3f} | {f['p99']:.3f} | {f['max']:.3f} | {t['p50']:.3f} | {t['p99']:.3f} | "
-                     f"{res['active_bullets_mean']:.0f} | {res['memory_static_peak_mb']:.1f} | {delta} |")
+        st, en = res.get("step_ms", {}), res.get("engine_ms", {})
+        lines.append(f"| {name} | {f['p50']:.3f} | {f['p95']:.3f} | {f['p99']:.3f} | {f['max']:.3f} | "
+                     f"{st.get('max', 0.0):.3f} | {en.get('max', 0.0):.3f} | {t['p50']:.3f} | {t['p99']:.3f} | "
+                     f"{res['active_bullets_mean']:.0f} | {res['memory_static_peak_mb']:.1f} | {res.get('objects_growth', 0):+.0f} | {delta} |")
     extras = [(n, r["extra"]) for n, r in run["scenarios"].items() if r.get("extra")]
     if extras:
         lines += ["", "## Scenario extras", ""]

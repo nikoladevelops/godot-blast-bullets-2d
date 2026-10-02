@@ -1,3 +1,5 @@
+#include "../shared/warn_once2d.hpp"
+#include "../shared/cached_string_names2d.hpp"
 #include "directional_bullets2d.hpp"
 
 #include "../spawn-data/directional_bullets_data2d.hpp"
@@ -57,7 +59,7 @@ void DirectionalBullets2D::set_up_movement_data(const TypedArray<BulletSpeedData
 			fallback_data = new_speed_data[0];
 		}
 		if (speed_data_size != 0 && !exact_speed) {
-			UtilityFunctions::push_warning("DirectionalBullets2D: all_bullet_speed_data size (" + String::num_int64(speed_data_size) + ") != bullets (" + String::num_int64(amount_bullets) + "); uncovered bullets fall back to shared/default" + String(tile_short_arrays ? " (tiling on: wrapping short array)." : " (check tile_all_bullet_speed_data to wrap, or provide one entry per bullet)."));
+			WarnOnce2D::warn(warn_data_id, 5u, speed_data_size, amount_bullets, "DirectionalBullets2D: all_bullet_speed_data size (" + String::num_int64(speed_data_size) + ") != bullets (" + String::num_int64(amount_bullets) + "); uncovered bullets fall back to shared/default" + String(tile_short_arrays ? " (tiling on: wrapping short array)." : " (check tile_all_bullet_speed_data to wrap, or provide one entry per bullet)."));
 		}
 
 		// In case no speed data was provided at all, create a default one (everything set to 0 by default)
@@ -224,7 +226,7 @@ void DirectionalBullets2D::apply_per_bullet_curves_from_data(const DirectionalBu
 	const int curves_size = directional_data.all_bullet_curves_data.size();
 	const bool tile = directional_data.tile_all_bullet_curves_data;
 	if (curves_size != 0 && curves_size != amount_bullets) {
-		UtilityFunctions::push_warning("DirectionalBullets2D: all_bullet_curves_data size (" + String::num_int64(curves_size) + ") != bullets (" + String::num_int64(amount_bullets) + "); uncovered bullets use shared/default" + String(tile ? " (tiling on: wrapping short array)." : " (check tile_all_bullet_curves_data to wrap, or provide one entry per bullet)."));
+		WarnOnce2D::warn(warn_data_id, 6u, curves_size, amount_bullets, "DirectionalBullets2D: all_bullet_curves_data size (" + String::num_int64(curves_size) + ") != bullets (" + String::num_int64(amount_bullets) + "); uncovered bullets use shared/default" + String(tile ? " (tiling on: wrapping short array)." : " (check tile_all_bullet_curves_data to wrap, or provide one entry per bullet)."));
 	}
 	for (int i = 0; i < amount_bullets; ++i) {
 		const int entry = tile ? resolve_tiled_data_index(curves_size, i) : resolve_strict_data_index(curves_size, i);
@@ -284,17 +286,17 @@ void DirectionalBullets2D::apply_per_bullet_movement_patterns_from_data(const Di
 	const int paths_size = directional_data.all_bullet_movement_pattern_paths.size();
 	const bool tile_paths = directional_data.tile_all_bullet_movement_pattern_paths;
 	if (paths_size != 0 && paths_size != amount_bullets) {
-		UtilityFunctions::push_warning("DirectionalBullets2D: all_bullet_movement_pattern_paths size (" + String::num_int64(paths_size) + ") != bullets (" + String::num_int64(amount_bullets) + "); uncovered bullets use the shared pattern" + String(tile_paths ? " (tiling on: wrapping short array)." : " (check tile_all_bullet_movement_pattern_paths to wrap, or provide one entry per bullet)."));
+		WarnOnce2D::warn(warn_data_id, 7u, paths_size, amount_bullets, "DirectionalBullets2D: all_bullet_movement_pattern_paths size (" + String::num_int64(paths_size) + ") != bullets (" + String::num_int64(amount_bullets) + "); uncovered bullets use the shared pattern" + String(tile_paths ? " (tiling on: wrapping short array)." : " (check tile_all_bullet_movement_pattern_paths to wrap, or provide one entry per bullet)."));
 	}
 	const int face_size = directional_data.all_bullet_movement_pattern_face_movement_directions.size();
 	const bool tile_face = directional_data.tile_all_bullet_movement_pattern_face_movement_directions;
 	if (face_size != 0 && face_size != amount_bullets) {
-		UtilityFunctions::push_warning("DirectionalBullets2D: all_bullet_movement_pattern_face_movement_directions size (" + String::num_int64(face_size) + ") != bullets (" + String::num_int64(amount_bullets) + "); uncovered bullets use the shared face flag" + String(tile_face ? " (tiling on)." : " (check its tile box or provide one entry per bullet)."));
+		WarnOnce2D::warn(warn_data_id, 8u, face_size, amount_bullets, "DirectionalBullets2D: all_bullet_movement_pattern_face_movement_directions size (" + String::num_int64(face_size) + ") != bullets (" + String::num_int64(amount_bullets) + "); uncovered bullets use the shared face flag" + String(tile_face ? " (tiling on)." : " (check its tile box or provide one entry per bullet)."));
 	}
 	const int repeat_size = directional_data.all_bullet_movement_pattern_repeats.size();
 	const bool tile_repeat = directional_data.tile_all_bullet_movement_pattern_repeats;
 	if (repeat_size != 0 && repeat_size != amount_bullets) {
-		UtilityFunctions::push_warning("DirectionalBullets2D: all_bullet_movement_pattern_repeats size (" + String::num_int64(repeat_size) + ") != bullets (" + String::num_int64(amount_bullets) + "); uncovered bullets use the shared repeat flag" + String(tile_repeat ? " (tiling on)." : " (check its tile box or provide one entry per bullet)."));
+		WarnOnce2D::warn(warn_data_id, 9u, repeat_size, amount_bullets, "DirectionalBullets2D: all_bullet_movement_pattern_repeats size (" + String::num_int64(repeat_size) + ") != bullets (" + String::num_int64(amount_bullets) + "); uncovered bullets use the shared repeat flag" + String(tile_repeat ? " (tiling on)." : " (check its tile box or provide one entry per bullet)."));
 	}
 	for (int i = 0; i < amount_bullets; ++i) {
 		const int entry = tile_paths ? resolve_tiled_data_index(paths_size, i) : resolve_strict_data_index(paths_size, i);
@@ -370,7 +372,7 @@ void DirectionalBullets2D::apply_gravity_from_data(const DirectionalBulletsData2
 	const int grav_size = directional_data.all_bullet_gravity.size();
 	const bool tile_grav = directional_data.tile_all_bullet_gravity;
 	if (grav_size != 0 && grav_size != amount_bullets) {
-		UtilityFunctions::push_warning("DirectionalBullets2D: all_bullet_gravity size (" + String::num_int64(grav_size) + ") != bullets (" + String::num_int64(amount_bullets) + "); uncovered bullets use gravity" + String(tile_grav ? " (tiling on: wrapping short array)." : " (check tile_all_bullet_gravity to wrap, or provide one entry per bullet)."));
+		WarnOnce2D::warn(warn_data_id, 10u, grav_size, amount_bullets, "DirectionalBullets2D: all_bullet_gravity size (" + String::num_int64(grav_size) + ") != bullets (" + String::num_int64(amount_bullets) + "); uncovered bullets use gravity" + String(tile_grav ? " (tiling on: wrapping short array)." : " (check tile_all_bullet_gravity to wrap, or provide one entry per bullet)."));
 	}
 	// Fresh seed: presence re-derived per slot below (authored entries claim
 	// it, even deliberate zeros; gaps stay fillable by set_gravity).
@@ -407,7 +409,7 @@ void DirectionalBullets2D::apply_wobble_from_data(const DirectionalBulletsData2D
 	const int wobble_size = directional_data.all_bullet_wobble_data.size();
 	const bool tile_wobble = directional_data.tile_all_bullet_wobble_data;
 	if (wobble_size != 0 && wobble_size != amount_bullets) {
-		UtilityFunctions::push_warning("DirectionalBullets2D: all_bullet_wobble_data size (" + String::num_int64(wobble_size) + ") != bullets (" + String::num_int64(amount_bullets) + "); uncovered bullets use shared wobble" + String(tile_wobble ? " (tiling on: wrapping short array)." : " (check tile_all_bullet_wobble_data to wrap, or provide one entry per bullet)."));
+		WarnOnce2D::warn(warn_data_id, 11u, wobble_size, amount_bullets, "DirectionalBullets2D: all_bullet_wobble_data size (" + String::num_int64(wobble_size) + ") != bullets (" + String::num_int64(amount_bullets) + "); uncovered bullets use shared wobble" + String(tile_wobble ? " (tiling on: wrapping short array)." : " (check tile_all_bullet_wobble_data to wrap, or provide one entry per bullet)."));
 	}
 	for (int i = 0; i < amount_bullets; ++i) {
 		const int entry = tile_wobble ? resolve_tiled_data_index(wobble_size, i) : resolve_strict_data_index(wobble_size, i);
@@ -1103,7 +1105,7 @@ int DirectionalBullets2D::try_handle_bounce(CollisionType collision_type, int bu
 	// Bounce eligibility reads the TARGET's layer (Area2D/PhysicsBody2D both
 	// expose collision_layer; anything else can never match).
 	int target_layer = 0;
-	const Variant layer_v = hit_target->get(StringName("collision_layer"));
+	const Variant layer_v = hit_target->get(CachedStringNames2D::get().collision_layer);
 	if (layer_v.get_type() == Variant::INT) {
 		target_layer = (int)layer_v;
 	}
@@ -1486,15 +1488,15 @@ int DirectionalBullets2D::try_handle_bounce(CollisionType collision_type, int bu
 	if (emitter != nullptr) {
 		if (emitter == bullet_factory) {
 			if (collision_type == CollisionType::AREA) {
-				emitter->emit_signal("directional_bounce_area_entered", hit_target, this, bullet_index);
+				emitter->emit_signal(CachedStringNames2D::get().directional_bounce_area_entered, hit_target, this, bullet_index);
 			} else {
-				emitter->emit_signal("directional_bounce_body_entered", hit_target, this, bullet_index);
+				emitter->emit_signal(CachedStringNames2D::get().directional_bounce_body_entered, hit_target, this, bullet_index);
 			}
 		} else {
 			if (collision_type == CollisionType::AREA) {
-				emitter->emit_signal("bounce_area_entered", hit_target, this, bullet_index);
+				emitter->emit_signal(CachedStringNames2D::get().bounce_area_entered, hit_target, this, bullet_index);
 			} else {
-				emitter->emit_signal("bounce_body_entered", hit_target, this, bullet_index);
+				emitter->emit_signal(CachedStringNames2D::get().bounce_body_entered, hit_target, this, bullet_index);
 			}
 		}
 	}

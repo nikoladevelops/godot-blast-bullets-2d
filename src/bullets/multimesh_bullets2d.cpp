@@ -1,3 +1,5 @@
+#include "../shared/warn_once2d.hpp"
+#include "../shared/cached_string_names2d.hpp"
 #include "./multimesh_bullets2d.hpp"
 #include "../factory/bullet_factory2d.hpp"
 #include "../shared/multimesh_object_pool2d.hpp"
@@ -356,6 +358,17 @@ void MultiMeshBullets2D::fx_reseed_from_data(const TypedArray<BulletEffectLayerD
 		return;
 	}
 	fx_data_layers = layers;
+	// One-shot trigger mask: only layers registered as factory bakes below
+	// (enabled, non-trail) can ever fire, so a trigger missing here makes
+	// fx_fire_oneshot a single bit test instead of a per-layer Variant
+	// unbox + Ref copy on every bullet disable / hit / spawn.
+	fx_oneshot_trigger_mask = 0;
+	for (int li = 0; li < layers.size(); ++li) {
+		Ref<BulletEffectLayerData2D> layer = layers[li];
+		if (layer.is_valid() && layer->enabled && layer->trigger != EFFECT_TRAIL_FOLLOW && layer->trigger >= 0 && layer->trigger < 32) {
+			fx_oneshot_trigger_mask |= (1u << layer->trigger);
+		}
+	}
 	fx_seeded_snapshots.resize(layers.size());
 	for (int li = 0; li < layers.size(); ++li) {
 		fx_seeded_snapshots[li] = fx_snapshot_layer(layers[li]);
@@ -383,12 +396,18 @@ void MultiMeshBullets2D::fx_fire_spawn_layers() {
 	if (bullet_factory == nullptr || (int)all_cached_instance_transforms.size() != amount_bullets) {
 		return;
 	}
+	if (!(fx_oneshot_trigger_mask & (1u << EFFECT_ON_SPAWN))) {
+		return;
+	}
 	for (int i = 0; i < amount_bullets; ++i) {
 		fx_fire_oneshot(EFFECT_ON_SPAWN, i, all_cached_instance_transforms[i]);
 	}
 }
 
 void MultiMeshBullets2D::fx_fire_oneshot(int trigger, int bullet_index, const Transform2D &at) {
+	if (trigger < 0 || trigger >= 32 || !(fx_oneshot_trigger_mask & (1u << trigger))) {
+		return;
+	}
 	if (bullet_factory == nullptr || bullet_index < 0 || bullet_index >= amount_bullets) {
 		return;
 	}
@@ -624,7 +643,8 @@ void MultiMeshBullets2D::spawn(const MultiMeshBulletsData2D &data, MultiMeshObje
 	owner_spawner_id = spawner_id;
 	physics_server = PhysicsServer2D::get_singleton();
 
-	amount_bullets = data.transforms.size(); // important, because some set_up methods use this
+	warn_data_id = data.get_instance_id();
+	amount_bullets = spawn_transform_count(data); // important, because some set_up methods use this
 	cache_collision_shape_typed(data.collision_shape);
 
 	++multimesh_generation;
@@ -776,9 +796,11 @@ void MultiMeshBullets2D::deactivate_volley() {
 
 // Activates the multimesh
 bool MultiMeshBullets2D::enable_multimesh(const MultiMeshBulletsData2D &data, const Vector2 &new_inherited_velocity_offset, uint64_t spawner_id) {
+	warn_data_id = data.get_instance_id();
 	// The pool sorts volleys by bullet count, so a wrong-size array here would read past the end - bail before touching anything.
-	if (data.transforms.size() != amount_bullets) {
-		UtilityFunctions::push_error("enable_multimesh: transforms size (" + String::num_int64(data.transforms.size()) + ") must match amount_bullets (" + String::num_int64(amount_bullets) + ").");
+	if (spawn_transform_count(data) != amount_bullets) {
+		spawn_transforms_ptr = nullptr;
+		UtilityFunctions::push_error("enable_multimesh: transforms size (" + String::num_int64(spawn_transform_count(data)) + ") must match amount_bullets (" + String::num_int64(amount_bullets) + ").");
 		return false;
 	}
 
@@ -971,7 +993,7 @@ void MultiMeshBullets2D::set_up_bullet_instances(const MultiMeshBulletsData2D &d
 		const int custom_size = data.all_bullets_custom_data.size();
 		const bool tile_custom = data.tile_all_bullets_custom_data;
 		if (custom_size != amount_bullets) {
-			UtilityFunctions::push_warning("MultiMeshBullets2D: all_bullets_custom_data size (" + String::num_int64(custom_size) + ") != bullets (" + String::num_int64(amount_bullets) + "); uncovered bullets read null" + String(tile_custom ? " (tiling on: wrapping short array)." : " (check tile_all_bullets_custom_data to wrap, or provide one entry per bullet)."));
+			WarnOnce2D::warn(warn_data_id, 2u, custom_size, amount_bullets, "MultiMeshBullets2D: all_bullets_custom_data size (" + String::num_int64(custom_size) + ") != bullets (" + String::num_int64(amount_bullets) + "); uncovered bullets read null" + String(tile_custom ? " (tiling on: wrapping short array)." : " (check tile_all_bullets_custom_data to wrap, or provide one entry per bullet)."));
 		}
 		for (int i = 0; i < amount_bullets; ++i) {
 			const int src = tile_custom ? (i % custom_size) : i;
@@ -1012,8 +1034,24 @@ void MultiMeshBullets2D::set_up_bullet_instances(const MultiMeshBulletsData2D &d
 	// Shape data once per volley (pooled reuse with the same shape skips it).
 	apply_volley_shape_data();
 
+	// Transform source: the factory's native span when present (no Variant),
+	// else the data resource's Array. Consumed here (cleared below) so a
+	// later re-entrant spawn can never read a stale pointer.
+	const Transform2D *span = spawn_transforms_ptr;
+	const int span_count = spawn_transforms_count;
+	spawn_transforms_ptr = nullptr;
+	spawn_transforms_count = 0;
+	if (span != nullptr && span_count != amount_bullets) {
+		span = nullptr; // defensive: never index past the span
+	}
+	// One upload for every instance (see generate_texture_transform).
+	if ((int)batch_buffer.size() != amount_bullets * 8) {
+		batch_buffer.resize(amount_bullets * 8);
+	}
+	const bool batch_ok = multi.is_valid() && multi->get_instance_count() == amount_bullets;
+	float *batch_w = batch_ok ? batch_buffer.ptrw() : nullptr;
 	for (int i = 0; i < amount_bullets; ++i) {
-		const Transform2D &curr_data_transf = data.transforms[i];
+		const Transform2D curr_data_transf = span != nullptr ? span[i] : (Transform2D)data.transforms[i];
 
 		// Generates a collision shape transform for a particular bullet and attaches it to the area
 		Transform2D shape_transf = generate_collision_shape_transform_for_area(curr_data_transf, data.collision_shape_offset, i);
@@ -1022,6 +1060,18 @@ void MultiMeshBullets2D::set_up_bullet_instances(const MultiMeshBulletsData2D &d
 		const Transform2D &texture_transf = generate_texture_transform(curr_data_transf, data.is_texture_rotation_permanent, cache_texture_rotation_radians, i);
 
 		cache_texture_transforms[i] = texture_transf;
+		if (batch_ok) {
+			const Transform2D local = to_local_for_multimesh(texture_transf);
+			float *o = batch_w + i * 8;
+			o[0] = local.columns[0][0];
+			o[1] = local.columns[1][0];
+			o[2] = 0;
+			o[3] = local.columns[2][0];
+			o[4] = local.columns[0][1];
+			o[5] = local.columns[1][1];
+			o[6] = 0;
+			o[7] = local.columns[2][1];
+		}
 
 		// Cache bullet transforms and origin vectors
 		all_cached_instance_transforms.emplace_back(texture_transf);
@@ -1029,6 +1079,16 @@ void MultiMeshBullets2D::set_up_bullet_instances(const MultiMeshBulletsData2D &d
 
 		all_cached_shape_transforms.emplace_back(shape_transf);
 		all_cached_shape_origin.emplace_back(shape_transf.get_origin());
+	}
+	if (batch_ok) {
+		multi->set_buffer(batch_buffer);
+	} else if (multi.is_valid()) {
+		// Instance count not set up yet (never expected): per-instance
+		// fallback so the bullets are never drawn at stale poses.
+		const int n = MIN(amount_bullets, (int)multi->get_instance_count());
+		for (int i = 0; i < n; ++i) {
+			multi->set_instance_transform_2d(i, to_local_for_multimesh(cache_texture_transforms[i]));
+		}
 	}
 }
 
@@ -1380,7 +1440,7 @@ Vector2 MultiMeshBullets2D::resolve_quad_size(const Ref<SpriteFrames> &p_sprite_
 		return override_size;
 	}
 	if (override_size != Vector2(0, 0) && (!override_size.is_finite() || override_size.x <= 0.0f || override_size.y <= 0.0f)) {
-		UtilityFunctions::push_warning("MultiMeshBullets2D: texture_size override is non-finite or non-positive, deriving size from the first frame.");
+		WarnOnce2D::warn(0, 3u, (int64_t)(override_size.x * 1024.0f), (int64_t)(override_size.y * 1024.0f), "MultiMeshBullets2D: texture_size override is non-finite or non-positive, deriving size from the first frame.");
 	}
 	// Silent fallback: rebuild_sprite_animation owns all error reporting (spawn calls
 	// both, so resolving loudly here would print every failure twice).
@@ -1499,7 +1559,7 @@ void MultiMeshBullets2D::set_rotation_data(const TypedArray<BulletRotationData2D
 
 	use_only_first_rotation_data = (amount_rotation_data != amount_bullets);
 	if (amount_rotation_data != amount_bullets) {
-		UtilityFunctions::push_warning("MultiMeshBullets2D: all_bullet_rotation_data size (" + String::num_int64(amount_rotation_data) + ") != bullets (" + String::num_int64(amount_bullets) + "); uncovered bullets get zero spin (shared fills gaps on Directional)" + String(tile_short_arrays ? " (tiling on: wrapping short array)." : " (check tile_all_bullet_rotation_data to wrap, or provide one entry per bullet)."));
+		WarnOnce2D::warn(warn_data_id, 4u, amount_rotation_data, amount_bullets, "MultiMeshBullets2D: all_bullet_rotation_data size (" + String::num_int64(amount_rotation_data) + ") != bullets (" + String::num_int64(amount_bullets) + "); uncovered bullets get zero spin (shared fills gaps on Directional)" + String(tile_short_arrays ? " (tiling on: wrapping short array)." : " (check tile_all_bullet_rotation_data to wrap, or provide one entry per bullet)."));
 	}
 
 	// Validate every element we are about to read. Null/wrong-type entries
@@ -1666,8 +1726,11 @@ Transform2D MultiMeshBullets2D::generate_texture_transform(Transform2D transf, b
 		transf.set_rotation(transf.get_rotation() + texture_rotation_radians);
 	}
 
-	multi->set_instance_transform_2d(bullet_index, to_local_for_multimesh(transf));
-
+	// No per-instance server write here: set_up_bullet_instances writes every
+	// instance into batch_buffer and uploads them with ONE set_buffer call
+	// (N set_instance_transform_2d calls were N boundary crossings + N
+	// server-side cache updates per spawn).
+	(void)bullet_index;
 	return transf;
 }
 
@@ -2399,7 +2462,7 @@ void MultiMeshBullets2D::all_bullets_set_movement_pattern_from_path(Path2D *path
 	}
 
 	// Single error for the whole range instead of one per bullet below.
-	if (is_class("BlockBullets2D")) {
+	if (is_block_volley()) {
 		UtilityFunctions::push_error("BlockBullets2D does not support movement patterns - use DirectionalBullets2D for patterned movement.");
 		return;
 	}
@@ -2426,7 +2489,7 @@ void MultiMeshBullets2D::set_bullet_movement_pattern_from_curve(int bullet_index
 	}
 	// Block bullets are spawned without an instance handle by design (spawn_block_bullets
 	// returns void), so movement patterns stay on DirectionalBullets2D.
-	if (is_class("BlockBullets2D")) {
+	if (is_block_volley()) {
 		UtilityFunctions::push_error("BlockBullets2D does not support movement patterns - use DirectionalBullets2D for patterned movement.");
 		return;
 	}
@@ -2443,7 +2506,7 @@ void MultiMeshBullets2D::all_bullets_set_movement_pattern_from_curve(const Ref<C
 	}
 
 	// Single error for the whole range instead of one per bullet below.
-	if (is_class("BlockBullets2D")) {
+	if (is_block_volley()) {
 		UtilityFunctions::push_error("BlockBullets2D does not support movement patterns - use DirectionalBullets2D for patterned movement.");
 		return;
 	}
@@ -2924,7 +2987,7 @@ void MultiMeshBullets2D::_do_emit_sprite_animation_finished(int expected_generat
 	if (!anim_finished) {
 		return;
 	}
-	emit_signal("sprite_animation_finished", this);
+	emit_signal(CachedStringNames2D::get().sprite_animation_finished, this);
 }
 
 
@@ -3034,10 +3097,10 @@ void MultiMeshBullets2D::reduce_lifetime(double delta) {
 		if (emitter != nullptr) {
 			const uint64_t emitter_id = emitter->get_instance_id();
 			if (emitter == bullet_factory) {
-				const char *signal_name = is_class("BlockBullets2D") ? "block_life_time_over" : "directional_life_time_over";
-				call_deferred("_do_emit_life_time_over", multimesh_generation, emitter_id, StringName(signal_name), bullet_indexes);
+				const StringName &signal_name = is_block_volley() ? CachedStringNames2D::get().block_life_time_over : CachedStringNames2D::get().directional_life_time_over;
+				call_deferred(CachedStringNames2D::get().m_do_emit_life_time_over, multimesh_generation, emitter_id, signal_name, bullet_indexes);
 			} else {
-				call_deferred("_do_emit_life_time_over", multimesh_generation, emitter_id, StringName("life_time_over"), bullet_indexes);
+				call_deferred(CachedStringNames2D::get().m_do_emit_life_time_over, multimesh_generation, emitter_id, CachedStringNames2D::get().life_time_over, bullet_indexes);
 			}
 		}
 
@@ -3059,12 +3122,12 @@ void MultiMeshBullets2D::reduce_lifetime(double delta) {
 			attachment_requests.push_back((int64_t)attachment_epoch_for(idx));
 		}
 		if (!attachment_requests.is_empty()) {
-			call_deferred("_do_deferred_bullet_disable_attachments", multimesh_generation, attachment_requests);
+			call_deferred(CachedStringNames2D::get().m_do_deferred_bullet_disable_attachments, multimesh_generation, attachment_requests);
 		}
 	}
 	// Queued last so it flushes after the signal and the slot releases.
 	if (lifetime_flush_pending) {
-		call_deferred("_do_finish_lifetime_hold", multimesh_generation);
+		call_deferred(CachedStringNames2D::get().m_do_finish_lifetime_hold, multimesh_generation);
 	}
 	}
 
@@ -3533,24 +3596,24 @@ void MultiMeshBullets2D::handle_bullet_collision(CollisionType collision_type, i
 		const uint64_t self_id = get_instance_id();
 		if (emitter != nullptr) {
 			if (emitter == bullet_factory) {
-				if (is_class("BlockBullets2D")) {
+				if (is_block_volley()) {
 					if (collision_type == CollisionType::AREA) {
-						emitter->emit_signal("block_area_entered", hit_target, this, bullet_index);
+						emitter->emit_signal(CachedStringNames2D::get().block_area_entered, hit_target, this, bullet_index);
 					} else if (collision_type == CollisionType::BODY) {
-						emitter->emit_signal("block_body_entered", hit_target, this, bullet_index);
+						emitter->emit_signal(CachedStringNames2D::get().block_body_entered, hit_target, this, bullet_index);
 					}
 				} else {
 					if (collision_type == CollisionType::AREA) {
-						emitter->emit_signal("directional_area_entered", hit_target, this, bullet_index);
+						emitter->emit_signal(CachedStringNames2D::get().directional_area_entered, hit_target, this, bullet_index);
 					} else if (collision_type == CollisionType::BODY) {
-						emitter->emit_signal("directional_body_entered", hit_target, this, bullet_index);
+						emitter->emit_signal(CachedStringNames2D::get().directional_body_entered, hit_target, this, bullet_index);
 					}
 				}
 			} else {
 				if (collision_type == CollisionType::AREA) {
-					emitter->emit_signal("area_entered", hit_target, this, bullet_index);
+					emitter->emit_signal(CachedStringNames2D::get().area_entered, hit_target, this, bullet_index);
 				} else if (collision_type == CollisionType::BODY) {
-					emitter->emit_signal("body_entered", hit_target, this, bullet_index);
+					emitter->emit_signal(CachedStringNames2D::get().body_entered, hit_target, this, bullet_index);
 				}
 			}
 		}

@@ -12,6 +12,8 @@ class BlockBullets2D : public MultiMeshBullets2D {
 	GDCLASS(BlockBullets2D, MultiMeshBullets2D)
 
 public:
+	bool is_block_volley() const override { return true; }
+
 	// The block rotation. The direction of the bullets is determined by it.
 	real_t block_rotation_radians = 0.0;
 

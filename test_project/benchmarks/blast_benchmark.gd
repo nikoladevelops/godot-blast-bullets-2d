@@ -7,13 +7,17 @@ extends Node2D
 ##   2. `await setup()` builds the scenario (spawners, targets, walls...);
 ##   3. `warmup_frames` frames run (pools fill, caches warm), then the
 ##      factory's cumulative stats are reset;
-##   4. `measure_frames` frames run; per frame we sample the wall time of the
-##      whole engine frame (with --fixed-fps this is pure CPU: no sleeping),
-##      the factory's own physics tick, Godot's physics/process times and
-##      memory/object counts;
+##   4. `measure_frames` frames run; per frame we time (pure CPU: with
+##      --fixed-fps the loop never sleeps):
+##        step_ms   = the scenario's step() (its spawn/clear calls),
+##        engine_ms = the rest of the frame (physics server step, factory
+##                    tick, collision drain, rendering),
+##        frame_ms  = step_ms + engine_ms,
+##      plus the factory's own physics tick and memory/object counts;
 ##   5. results() returns percentiles + `extra` (scenario-specific numbers).
-## `step(frame)` runs once per frame before the engine frame is measured;
-## keep per-frame scenario work cheap and deterministic (seeded RNG).
+## `step(frame)` runs once per frame. Build every spawn-data resource in
+## setup() and only CALL the plugin in step(): GDScript array building inside
+## step() would be billed to the plugin.
 
 const H := preload("res://tests/common/blast_test_helpers.gd")
 
@@ -25,12 +29,13 @@ var extra := {}
 var rng := RandomNumberGenerator.new()
 
 var _frame_us: Array[float] = []
+var _step_us: Array[float] = []
+var _engine_us: Array[float] = []
 var _tick_us: Array[float] = []
-var _physics_us: Array[float] = []
-var _process_us: Array[float] = []
 var _bullets: Array[float] = []
 var _mem_peak := 0.0
 var _mem_start := 0.0
+var _objects_start := 0
 
 
 ## Override: build the scenario. May await frames.
@@ -62,18 +67,19 @@ func run() -> Dictionary:
 		await get_tree().process_frame
 	factory.reset_frame_stats()
 	_mem_start = Performance.get_monitor(Performance.MEMORY_STATIC)
-	var prev := Time.get_ticks_usec()
+	_objects_start = int(Performance.get_monitor(Performance.OBJECT_COUNT))
 	for i in measure_frames:
+		var t0 := Time.get_ticks_usec()
 		step(warmup_frames + i)
+		var t1 := Time.get_ticks_usec()
 		await get_tree().process_frame
-		var now := Time.get_ticks_usec()
-		_frame_us.append(float(now - prev))
-		prev = now
+		var t2 := Time.get_ticks_usec()
+		_step_us.append(float(t1 - t0))
+		_engine_us.append(float(t2 - t1))
+		_frame_us.append(float(t2 - t0))
 		var s: Dictionary = factory.get_frame_stats()
 		_tick_us.append(float(s["physics_tick_usec"]))
 		_bullets.append(float(s["active_bullets"]))
-		_physics_us.append(Performance.get_monitor(Performance.TIME_PHYSICS_PROCESS) * 1e6)
-		_process_us.append(Performance.get_monitor(Performance.TIME_PROCESS) * 1e6)
 		_mem_peak = maxf(_mem_peak, Performance.get_monitor(Performance.MEMORY_STATIC))
 	return results()
 
@@ -105,11 +111,14 @@ func results() -> Dictionary:
 		"measure_frames": measure_frames,
 		"frame_ms": _stats_ms(_frame_us),
 		"factory_tick_ms": _stats_ms(_tick_us),
-		"physics_ms": _stats_ms(_physics_us),
-		"process_ms": _stats_ms(_process_us),
+		"step_ms": _stats_ms(_step_us),
+		"engine_ms": _stats_ms(_engine_us),
 		"memory_static_peak_mb": _mem_peak / 1048576.0,
 		"memory_static_growth_mb": (_mem_peak - _mem_start) / 1048576.0,
 		"objects_end": Performance.get_monitor(Performance.OBJECT_COUNT),
+		# Live Objects created and NOT freed during the measured window. A
+		# warm steady state should be ~0; steady growth = retention leak.
+		"objects_growth": int(Performance.get_monitor(Performance.OBJECT_COUNT)) - _objects_start,
 		"nodes_end": Performance.get_monitor(Performance.OBJECT_NODE_COUNT),
 		"active_bullets_mean": mean_bullets,
 		"spawned_bullets": stats["spawned_bullets_total"],

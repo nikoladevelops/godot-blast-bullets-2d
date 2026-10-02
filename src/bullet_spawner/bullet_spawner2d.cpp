@@ -6024,7 +6024,8 @@ Dictionary BulletSpawner2D::debug_get_preview_stats() const {
     return d;
 }
 
-TypedArray<Transform2D> BulletSpawner2D::collect_spawn_transforms_impl(bool quiet) const {
+void BulletSpawner2D::collect_spawn_transforms_native(bool quiet, std::vector<Transform2D> &r_out) const {
+    r_out.clear();
     Node2D *base = get_effective_generator();
     if (base == nullptr || !base->is_inside_tree()) {
         // Outside the tree there is no valid global transform; report loudly
@@ -6032,7 +6033,7 @@ TypedArray<Transform2D> BulletSpawner2D::collect_spawn_transforms_impl(bool quie
         if (!quiet) {
             UtilityFunctions::push_error("BulletSpawner2D::collect_spawn_transforms: spawner is outside the scene tree.");
         }
-        return TypedArray<Transform2D>();
+        return;
     }
     const Vector2 base_origin = base->get_global_transform().get_origin();
     const Transform2D marker = base->get_global_transform();
@@ -6077,10 +6078,33 @@ TypedArray<Transform2D> BulletSpawner2D::collect_spawn_transforms_impl(bool quie
     bool spin_scale_ok = false;
     const Transform2D spin_scale_mx = make_spin_scale_matrix(base_origin, spin_radians, pattern_factor, spin_scale_ok);
     const bool use_spin_scale_mx = spin_scale_ok && !spin_is_trivial(spin_radians, pattern_factor);
-    TypedArray<Transform2D> transforms;
+    // Negative space (post spin/scale so indexes match the preview): carve
+    // dodge doors or bullet text out of any helper layout. Same contract as
+    // BulletFactory2D::helper_apply_skip_indices (OOB ignored, warned once).
     const int raw_count = (int)raw.size();
-    transforms.resize(raw_count);
+    skip_mask_scratch.assign(raw_count, 0);
+    bool any_skip = false;
+    if (!helper_skip_indices.is_empty() && pattern_source >= PATTERN_FROM_HELPER_GRID) {
+        bool warned_oob = false;
+        const int32_t *skip_p = helper_skip_indices.ptr();
+        for (int k = 0; k < helper_skip_indices.size(); ++k) {
+            const int idx = skip_p[k];
+            if (idx < 0 || idx >= raw_count) {
+                if (!warned_oob) {
+                    UtilityFunctions::push_warning("helper_apply_skip_indices: skip index out of range, ignoring it.");
+                    warned_oob = true;
+                }
+                continue;
+            }
+            skip_mask_scratch[idx] = 1;
+            any_skip = true;
+        }
+    }
+    r_out.reserve(raw_count);
     for (int i = 0; i < raw_count; ++i) {
+        if (any_skip && skip_mask_scratch[i]) {
+            continue;
+        }
         Transform2D t = raw[i];
         if (use_spin_scale_mx) {
             t = spin_scale_mx * t;
@@ -6094,12 +6118,18 @@ TypedArray<Transform2D> BulletSpawner2D::collect_spawn_transforms_impl(bool quie
             t.columns[0] *= local_factor;
             t.columns[1] *= local_factor;
         }
-        transforms[i] = t;
+        r_out.push_back(t);
     }
-    // Negative space last (post spin/scale so indexes match the preview):
-    // carve dodge doors or bullet text out of any helper layout.
-    if (!helper_skip_indices.is_empty() && pattern_source >= PATTERN_FROM_HELPER_GRID) {
-        transforms = BulletFactory2D::helper_apply_skip_indices(transforms, helper_skip_indices);
+}
+
+TypedArray<Transform2D> BulletSpawner2D::collect_spawn_transforms_impl(bool quiet) const {
+    // Script-facing form: one boxing pass at the very end (the shot path uses
+    // collect_spawn_transforms_native directly and never boxes).
+    collect_spawn_transforms_native(quiet, collect_scratch);
+    TypedArray<Transform2D> transforms;
+    transforms.resize((int)collect_scratch.size());
+    for (int i = 0; i < (int)collect_scratch.size(); ++i) {
+        transforms[i] = collect_scratch[i];
     }
     return transforms;
 }
@@ -7535,8 +7565,10 @@ bool BulletSpawner2D::shoot_once() {
         cached_volley_template = volley_data;
         cached_spawn_data_id = spawn_id;
     }
-    volley_data->set_transforms(collect_spawn_transforms());
-    if (volley_data->get_transforms().is_empty()) {
+    // Native shot buffer: no TypedArray / Variant per bullet anywhere between
+    // the pattern bake and the volley setup (spawn_controllable_directional_bullets_span).
+    collect_spawn_transforms_native(false, shot_transforms);
+    if (shot_transforms.empty()) {
         // Fail loud with the mode name: the generic factory "no transforms"
         // error alone never says which source misfired (unset aimed target,
         // rejected helper input, ...). The cause was already reported above.
@@ -7564,7 +7596,7 @@ bool BulletSpawner2D::shoot_once() {
     // spawn (before physics space, shapes, tree entry, and activation), so the
     // volley is never observable as factory-owned. The re-stamp below is kept
     // as belt-and-braces for any path that could not carry the id through.
-    DirectionalBullets2D *bullets = factory->spawn_controllable_directional_bullets(volley_data, Vector2(0, 0), get_instance_id());
+    DirectionalBullets2D *bullets = factory->spawn_controllable_directional_bullets_span(volley_data, shot_transforms.data(), (int)shot_transforms.size(), Vector2(0, 0), get_instance_id());
     if (bullets == nullptr) {
         // Factory already reported why (busy/teardown/bad data): clear and
         // report, no skip signal (nothing about the request was skippable).

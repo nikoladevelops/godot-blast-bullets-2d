@@ -2050,6 +2050,12 @@ class BulletSpawner2D : public Node2D{
         // collect_spawn_transforms() with error reporting: the public method
         // reports problems, the preview passes true to stay quiet.
         TypedArray<Transform2D> collect_spawn_transforms_impl(bool quiet) const;
+        // The same collect into a native buffer (no Variant): the shot path.
+        void collect_spawn_transforms_native(bool quiet, std::vector<Transform2D> &r_out) const;
+        // Reused buffers (no per-shot allocation once warm).
+        mutable std::vector<Transform2D> collect_scratch;
+        mutable std::vector<uint8_t> skip_mask_scratch;
+        std::vector<Transform2D> shot_transforms;
 
         // ---- Pattern bake cache ------------------------------------------
         // How a pattern's RAW transforms (pre spin/scale/skip) follow the

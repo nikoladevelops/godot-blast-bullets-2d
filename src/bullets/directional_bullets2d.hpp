@@ -1,5 +1,6 @@
 #pragma once
 
+#include "../shared/cached_string_names2d.hpp"
 #include "../shared/bullet_speed_data2d.hpp"
 #include "../shared/bullet_wobble_data2d.hpp"
 #include "../shared/homing_target_deque.hpp"
@@ -4552,7 +4553,7 @@ public:
 		if (p_target_instance_id != 0) {
 			target = Object::cast_to<Node2D>(ObjectDB::get_instance(ObjectID(p_target_instance_id)));
 		}
-		emit_signal("bullet_homing_target_reached", this, p_bullet_index, target, p_target_global_position);
+		emit_signal(CachedStringNames2D::get().bullet_homing_target_reached, this, p_bullet_index, target, p_target_global_position);
 	}
 
 	_ALWAYS_INLINE_ void _do_shared_auto_pop_front_target(uint64_t p_generation, uint64_t p_front_epoch) {
@@ -4644,7 +4645,7 @@ public:
 						// as an instance id (resolved at fire time, null when freed) and a
 						// stale generation no-ops, so pool reuse before the flush can neither
 						// crash on a dangling pointer nor emit ghosts.
-						call_deferred("_do_emit_homing_target_reached", homing_operation_generation, bullet_index, bullet_epoch, (uint64_t)0, target_pos);
+						call_deferred(CachedStringNames2D::get().m_do_emit_homing_target_reached, homing_operation_generation, bullet_index, bullet_epoch, (uint64_t)0, target_pos);
 						break;
 					case Node2DTarget: {
 						auto &target_data = target.node2d_target_data;
@@ -4654,13 +4655,13 @@ public:
 						if (homing_deque.is_homing_target_valid(target_data.target, target_data.cached_valid_instance_id)) {
 							target_id = target_data.cached_valid_instance_id;
 						}
-						call_deferred("_do_emit_homing_target_reached", homing_operation_generation, bullet_index, bullet_epoch, target_id, target_pos);
+						call_deferred(CachedStringNames2D::get().m_do_emit_homing_target_reached, homing_operation_generation, bullet_index, bullet_epoch, target_id, target_pos);
 						break;
 					}
 					case NotHoming:
 						break;
 					case MousePositionTarget:
-						call_deferred("_do_emit_homing_target_reached", homing_operation_generation, bullet_index, bullet_epoch, (uint64_t)0, target_pos);
+						call_deferred(CachedStringNames2D::get().m_do_emit_homing_target_reached, homing_operation_generation, bullet_index, bullet_epoch, (uint64_t)0, target_pos);
 						break;
 				}
 
@@ -4675,12 +4676,12 @@ public:
 					// landing before the flush cancels this stale pop.
 					if (shared_homing_deque_auto_pop_after_target_reached && !shared_auto_pop_queued) {
 						shared_auto_pop_queued = true;
-						call_deferred("_do_shared_auto_pop_front_target", homing_operation_generation, shared_homing_front_epoch);
+						call_deferred(CachedStringNames2D::get().m_do_shared_auto_pop_front_target, homing_operation_generation, shared_homing_front_epoch);
 					}
 				} else {
 					if (bullet_homing_auto_pop_after_target_reached) {
 						const uint64_t pop_epoch = (bullet_index >= 0 && bullet_index < (int)bullet_homing_epochs.size()) ? bullet_homing_epochs[bullet_index] : 0;
-						call_deferred("_do_auto_pop_front_target", homing_operation_generation, bullet_index, pop_epoch);
+						call_deferred(CachedStringNames2D::get().m_do_auto_pop_front_target, homing_operation_generation, bullet_index, pop_epoch);
 					}
 				}
 			}

@@ -1,4 +1,5 @@
 #include "./bullet_factory2d.hpp"
+#include "../shared/warn_once2d.hpp"
 
 #include "../bullets/block_bullets2d.hpp"
 #include "../bullets/directional_bullets2d.hpp"
@@ -52,18 +53,46 @@ _ALWAYS_INLINE_ static const PoolKey *resolve_pool_key(const Ref<MultiMeshPoolKe
 	return &storage;
 }
 
-bool validate_spawn_data(const Ref<MultiMeshBulletsData2D> &spawn_data, const char *caller_name) {
-	if (spawn_data.is_null() || spawn_data->transforms.size() == 0) {
+// Per-transform spawn check (finite + invertible). Shared by the script path
+// (unboxed from data.transforms) and the native span path.
+static bool validate_one_spawn_transform(const Transform2D &t, int i, const char *caller_name) {
+	const Vector2 o = t.get_origin();
+	if (!o.is_finite() || !Math::is_finite(t.get_rotation()) || !t.get_scale().is_finite()) {
+		UtilityFunctions::push_error(String("Error in ") + caller_name + ": transforms[" + String::num_int64(i) + "] contains NaN/Inf. Nothing was spawned.");
+		return false;
+	}
+	if (t.get_scale().length_squared() < 0.00000001 || !MultiMeshBullets2D::is_transform_invertible_safe(t)) {
+		UtilityFunctions::push_error(String("Error in ") + caller_name + ": transforms[" + String::num_int64(i) + "] has zero or singular scale. Nothing was spawned.");
+		return false;
+	}
+	return true;
+}
+
+bool validate_spawn_transform_span(const Transform2D *transforms, int count, const char *caller_name) {
+	if (transforms == nullptr || count <= 0) {
 		UtilityFunctions::push_error(String("Error when trying to spawn bullets in ") + caller_name + ". No spawn_data or no transforms were provided. Ignoring the request");
 		return false;
 	}
-	const int bullet_count = spawn_data->transforms.size();
+	for (int i = 0; i < count; ++i) {
+		if (!validate_one_spawn_transform(transforms[i], i, caller_name)) {
+			return false;
+		}
+	}
+	return true;
+}
+
+// Everything except the transforms themselves, for a volley of bullet_count.
+bool validate_spawn_data_fields(const Ref<MultiMeshBulletsData2D> &spawn_data, int bullet_count, const char *caller_name) {
+	if (spawn_data.is_null() || bullet_count <= 0) {
+		UtilityFunctions::push_error(String("Error when trying to spawn bullets in ") + caller_name + ". No spawn_data or no transforms were provided. Ignoring the request");
+		return false;
+	}
 	// Unified tiling rule: every per-bullet array tiles modulo, so any size
 	// is accepted here. Empty collision counts seed zeros downstream.
 	if (spawn_data->bullets_current_collision_count.size() > 0 &&
 			spawn_data->bullets_current_collision_count.size() != bullet_count &&
 			spawn_data->bullets_current_collision_count.size() != 1) {
-		UtilityFunctions::push_warning(String("Warning in ") + caller_name + ": bullets_current_collision_count size (" + String::num_int64(spawn_data->bullets_current_collision_count.size()) + ") != transforms size (" + String::num_int64(bullet_count) + "); tiling modulo across the volley.");
+		WarnOnce2D::warn(spawn_data->get_instance_id(), 12u, spawn_data->bullets_current_collision_count.size(), bullet_count, String("Warning in ") + caller_name + ": bullets_current_collision_count size (" + String::num_int64(spawn_data->bullets_current_collision_count.size()) + ") != transforms size (" + String::num_int64(bullet_count) + "); tiling modulo across the volley.");
 	}
 	// A non-positive finite lifetime would die on the first tick; fail open with an error instead of a silent vanish.
 	// NaN must be rejected explicitly: NaN <= 0.0 is false, so it would slip through and never expire.
@@ -75,7 +104,7 @@ bool validate_spawn_data(const Ref<MultiMeshBulletsData2D> &spawn_data, const ch
 	// write the public members directly from C++, or a resource loaded from
 	// disk can carry a bad value. These fields are added to (or offset onto)
 	// EVERY bullet's transform, so a single NaN here silently produces a
-	// fully-NaN volley that the per-transform loop above cannot see.
+	// fully-NaN volley that the per-transform check cannot see.
 	if (!Math::is_finite(spawn_data->texture_rotation_radians)) {
 		UtilityFunctions::push_error(String("Error in ") + caller_name + ": texture_rotation_radians must be finite (it is added to every bullet rotation). Nothing was spawned.");
 		return false;
@@ -93,27 +122,35 @@ bool validate_spawn_data(const Ref<MultiMeshBulletsData2D> &spawn_data, const ch
 		UtilityFunctions::push_error(String("Error in ") + caller_name + ": self_modulate must be finite. Nothing was spawned.");
 		return false;
 	}
+	return true;
+}
+
+// Heads-up, not an error: with no sprite frames, no mesh and no texture size
+// the bullets will be invisible. (Sprite art should face Vector2.RIGHT.)
+void warn_if_spawn_invisible(const Ref<MultiMeshBulletsData2D> &spawn_data, const char *caller_name) {
+	if (spawn_data.is_valid() && spawn_data->sprite_frames.is_null() && spawn_data->mesh.is_null() && spawn_data->texture_size == Vector2(0, 0)) {
+		WarnOnce2D::warn(spawn_data->get_instance_id(), 13u, 0, 0, String("Warning in ") + caller_name + ": no sprite_frames/mesh/texture_size — bullets will be invisible. Assign SpriteFrames with art facing Vector2.RIGHT, or set texture_size/mesh.");
+	}
+}
+
+bool validate_spawn_data(const Ref<MultiMeshBulletsData2D> &spawn_data, const char *caller_name) {
+	if (spawn_data.is_null() || spawn_data->transforms.size() == 0) {
+		UtilityFunctions::push_error(String("Error when trying to spawn bullets in ") + caller_name + ". No spawn_data or no transforms were provided. Ignoring the request");
+		return false;
+	}
+	const int bullet_count = spawn_data->transforms.size();
+	if (!validate_spawn_data_fields(spawn_data, bullet_count, caller_name)) {
+		return false;
+	}
 	// NaN/Inf origins or rotations would poison movement, physics and the
-	// pool key. Zero/near-zero scale would split visual vs collision (the
-	// texture path heals the basis, the shape path preserves it) and poison
-	// direction math downstream, so reject it like set_bullet_transform does.
-	// Reject the whole spawn instead of emitting broken bullets.
+	// pool key; zero/near-zero scale would split visual vs collision. Reject
+	// the whole spawn instead of emitting broken bullets.
 	for (int i = 0; i < bullet_count; ++i) {
-		const Transform2D t = spawn_data->transforms[i];
-		const Vector2 o = t.get_origin();
-		if (!o.is_finite() || !Math::is_finite(t.get_rotation()) || !t.get_scale().is_finite()) {
-			UtilityFunctions::push_error(String("Error in ") + caller_name + ": transforms[" + String::num_int64(i) + "] contains NaN/Inf. Nothing was spawned.");
-			return false;
-		}
-		if (t.get_scale().length_squared() < 0.00000001 || !MultiMeshBullets2D::is_transform_invertible_safe(t)) {
-			UtilityFunctions::push_error(String("Error in ") + caller_name + ": transforms[" + String::num_int64(i) + "] has zero or singular scale. Nothing was spawned.");
+		if (!validate_one_spawn_transform(spawn_data->transforms[i], i, caller_name)) {
 			return false;
 		}
 	}
-	// Heads-up, not an error: with no sprite frames, no mesh and no texture size the bullets will be invisible. (Sprite art should face Vector2.RIGHT.)
-	if (spawn_data->sprite_frames.is_null() && spawn_data->mesh.is_null() && spawn_data->texture_size == Vector2(0, 0)) {
-		UtilityFunctions::push_warning(String("Warning in ") + caller_name + ": no sprite_frames/mesh/texture_size — bullets will be invisible. Assign SpriteFrames with art facing Vector2.RIGHT, or set texture_size/mesh.");
-	}
+	warn_if_spawn_invisible(spawn_data, caller_name);
 	return true;
 }
 
@@ -1148,6 +1185,28 @@ void BulletFactory2D::spawn_directional_bullets(const Ref<DirectionalBulletsData
 			directional_bullets_container,
 			spawn_data,
 			new_inherited_velocity_offset);
+}
+
+DirectionalBullets2D *BulletFactory2D::spawn_controllable_directional_bullets_span(const Ref<DirectionalBulletsData2D> &spawn_data, const Transform2D *transforms, int count, const Vector2 &new_inherited_velocity_offset, uint64_t spawner_id) {
+	// Same order as the script path: request + data fields, transforms, then
+	// the invisibility heads-up.
+	if (!validate_spawn_request("spawn_controllable_directional_bullets", spawn_data, new_inherited_velocity_offset, MAX(count, 0))) {
+		return nullptr;
+	}
+	if (!validate_spawn_transform_span(transforms, count, "spawn_controllable_directional_bullets")) {
+		return nullptr;
+	}
+	warn_if_spawn_invisible(spawn_data, "spawn_controllable_directional_bullets");
+	return spawn_bullets_helper<DirectionalBullets2D, DirectionalBulletsData2D>(
+			all_directional_bullets,
+			directional_bullets_set,
+			directional_bullets_pool,
+			directional_bullets_container,
+			spawn_data,
+			new_inherited_velocity_offset,
+			spawner_id,
+			transforms,
+			count);
 }
 
 DirectionalBullets2D *BulletFactory2D::spawn_controllable_directional_bullets(const Ref<DirectionalBulletsData2D> &spawn_data, const Vector2 &new_inherited_velocity_offset, uint64_t spawner_id) {
