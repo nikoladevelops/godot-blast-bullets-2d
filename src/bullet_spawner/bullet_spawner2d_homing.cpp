@@ -845,6 +845,7 @@ Array BulletSpawner2D::resolve_homing_targets(bool quiet, bool advance_round_rob
         }
         case HOMING_SELECT_ROUND_ROBIN: {
             const int n = (int)candidates.size();
+            homing_round_robin_last_count = n;
             for (int k = 0; k < take; ++k) {
                 targets.push_back(candidates[(homing_round_robin_cursor + k) % n]);
             }
@@ -1202,7 +1203,7 @@ void BulletSpawner2D::apply_orbiting_to_volley(DirectionalBullets2D *volley) con
     }
 }
 
-void BulletSpawner2D::apply_volley_homing_and_orbiting(DirectionalBullets2D *bullets) {
+void BulletSpawner2D::apply_volley_homing_and_orbiting(DirectionalBullets2D *bullets, const Array *pre_resolved) {
     if (bullets == nullptr) {
         return;
     }
@@ -1216,8 +1217,14 @@ void BulletSpawner2D::apply_volley_homing_and_orbiting(DirectionalBullets2D *bul
     // to orbit, so skip it outright instead of arming a dead feature.
     // The volley instance id names the affected volley: with several
     // spawners firing, a bare warning cannot tell which volley flew straight.
-    if (orbiting_enabled && !homing_enabled) {
-        UtilityFunctions::push_warning(String("BulletSpawner2D: orbiting_enabled needs homing_enabled (orbiting locks onto a homing target). Volley ") + String::num_int64((int64_t)bullets->get_instance_id()) + String(" flies without orbiting."));
+    if (!homing_enabled) {
+        // Orbiting alone: warn once per configuration and leave the volley
+        // plain (no homing signals: nothing was resolved or configured).
+        if (!orbit_without_homing_warned) {
+            orbit_without_homing_warned = true;
+            UtilityFunctions::push_warning("BulletSpawner2D: orbiting_enabled needs homing_enabled (orbiting locks onto a homing target); volleys fly without orbiting.");
+        }
+        return;
     }
     // Flat post-spawn nudge (muzzle offsets, whole-volley follows) moved to
     // shoot_once() so it applies to every volley, not just homing/orbiting
@@ -1239,7 +1246,7 @@ void BulletSpawner2D::apply_volley_homing_and_orbiting(DirectionalBullets2D *bul
         } else {
             // Quiet + warn-once: a missing enemy roster must not spam once
             // per volley while the spawner keeps firing plain bullets.
-            resolved_targets = resolve_homing_targets(true);
+            resolved_targets = (pre_resolved != nullptr) ? *pre_resolved : resolve_homing_targets(true);
             if (!resolved_targets.is_empty()) {
                 if (homing_mode == HOMING_SHARED) {
                     bullets->shared_homing_deque_replace_homing_targets_with_new_target_array(resolved_targets);
@@ -1300,7 +1307,13 @@ bool BulletSpawner2D::fire_arc_covers_targets(const Array &targets) const {
         return false;
     }
     const Vector2 origin = base->get_global_position();
-    const real_t facing = base->get_global_rotation();
+    // The volley's actual facing: generator rotation plus the emitter spin
+    // (negated on a mirrored burst shot, like the pattern itself).
+    real_t spin = Math::deg_to_rad((real_t)spin_angle_deg);
+    if (burst_alternate_mirror && burst_mirror_next) {
+        spin = -spin;
+    }
+    const real_t facing = base->get_global_rotation() + spin;
     const real_t half_arc = Math::deg_to_rad((real_t)homing_fire_arc_deg) * 0.5;
     for (int i = 0; i < targets.size(); ++i) {
         Vector2 pos = Vector2(0, 0);

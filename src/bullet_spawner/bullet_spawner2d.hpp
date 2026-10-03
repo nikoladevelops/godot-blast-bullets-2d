@@ -2323,7 +2323,15 @@ class BulletSpawner2D : public Node2D{
         // before orbiting so rings can lock immediately), orbiting, signal
         // hookup, and live-volley tracking. Called from shoot_once() before
         // volley_fired so handlers observe fully configured bullets.
-        void apply_volley_homing_and_orbiting(DirectionalBullets2D *bullets);
+        // `pre_resolved`: targets the fire-arc gate already approved (one
+        // resolution per shot: the volley chases exactly what was approved).
+        void apply_volley_homing_and_orbiting(DirectionalBullets2D *bullets, const Array *pre_resolved = nullptr);
+        // Orbiting without homing warns once per configuration (re-armed by
+        // on_config_changed()).
+        bool orbit_without_homing_warned = false;
+        // Candidate count of the last round-robin resolution (to advance the
+        // cursor by what a reused resolution actually took).
+        mutable int homing_round_robin_last_count = 0;
         // Sequencer internals: validates one Dictionary entry (preset /
         // source / amount / spawn_data overrides) and fires the next queued
         // entry for the _process driver.

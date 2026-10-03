@@ -620,6 +620,7 @@ void BulletSpawner2D::refresh_process_state_editor_guarded() {
 // misconfiguration reports again) and the editor's warning triangle updates.
 void BulletSpawner2D::on_config_changed() {
     shoot_error_latch = 0;
+    orbit_without_homing_warned = false;
     if (Engine::get_singleton()->is_editor_hint() && is_inside_tree()) {
         update_configuration_warnings();
     }
@@ -736,10 +737,18 @@ bool BulletSpawner2D::shoot_once() {
     // BEFORE spawning (never a half-built volley to tear down). Empty
     // resolutions still fire plain volleys (same as missing-target homing);
     // the mouse source resolves nothing, so the cone does not apply to it.
-    if (homing_enabled && Math::is_finite(homing_fire_arc_deg) && homing_fire_arc_deg > 0.0) {
-        const Array arc_targets = resolve_homing_targets(true, false);
+    // The gate resolves once without consuming round-robin or extra random
+    // draws; a passing shot reuses exactly these targets for the volley.
+    Array arc_targets;
+    bool arc_resolved = false;
+    if (homing_enabled && homing_target_source != HOMING_SOURCE_MOUSE && Math::is_finite(homing_fire_arc_deg) && homing_fire_arc_deg > 0.0) {
+        arc_targets = resolve_homing_targets(true, false);
+        arc_resolved = true;
         if (!arc_targets.is_empty() && !fire_arc_covers_targets(arc_targets)) {
             return fail_early(nullptr, StringName("outside_fire_arc"), true);
+        }
+        if (homing_target_selection == HOMING_SELECT_ROUND_ROBIN && homing_round_robin_last_count > 0) {
+            homing_round_robin_cursor = (homing_round_robin_cursor + (int)arc_targets.size()) % homing_round_robin_last_count;
         }
     }
     // Configure-then-attach: the spawner id is pre-stamped inside the factory
@@ -800,7 +809,7 @@ bool BulletSpawner2D::shoot_once() {
     if (spawn_position_offset != Vector2(0, 0)) {
         bullets->teleport_shift_all_bullets(resolve_spawn_offset_global());
     }
-    apply_volley_homing_and_orbiting(bullets);
+    apply_volley_homing_and_orbiting(bullets, arc_resolved ? &arc_targets : nullptr);
     // Re-validate: handlers of homing_targets_resolved/volley_homing_configured
     // ran above and may have freed this volley or handed it to another owner.
     // Dereferencing the raw pointer now would be use-after-free: resolve by id
