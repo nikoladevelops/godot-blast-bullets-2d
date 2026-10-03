@@ -84,7 +84,7 @@ func test_reached_signal_and_gating() -> void:
 			break
 	assert_eq(_reached, [0], "reached signal emitted once for bullet 0")
 	s.set_homing_delay_sec(-1.0)
-	expect_any_error()
+	expect_error_sequence(["BulletVolley2D.set_homing_delay_sec: value must be finite and >= 0, keeping the old value."])
 	assert_eq(s.get_homing_delay_sec(), 0.0, "negative delay rejected")
 
 

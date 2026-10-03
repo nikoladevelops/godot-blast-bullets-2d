@@ -119,7 +119,7 @@ func test_bounce_normal_on_scaled_slope() -> void:
 func test_free_volley_deferred_rejects_non_volleys() -> void:
 	var bystander: Node2D = add(Node2D.new())
 	factory.free_volley_deferred(bystander)
-	expect_any_error("non-volley is rejected loudly")
+	expect_error_sequence(["free_volley_deferred: node is not a bullet volley (BulletVolley2D). Nothing was queued."], "non-volley is rejected loudly")
 	await idle(1)
 	assert_true(is_instance_valid(bystander) and not bystander.is_queued_for_deletion(), "non-volley left alone")
 

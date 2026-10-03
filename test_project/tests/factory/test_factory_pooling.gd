@@ -49,7 +49,7 @@ func test_retarget_phase_validation() -> void:
 	spawner.set_homing_retarget_phase(0.25)
 	assert_almost_eq(spawner.get_homing_retarget_phase(), 0.25, 0.0001, "explicit phase respected")
 	spawner.set_homing_retarget_phase(-1.0)
-	expect_any_error()
+	expect_error_sequence(["BulletSpawner2D: homing_retarget_phase must be finite and >= 0, keeping the old value."])
 	assert_almost_eq(spawner.get_homing_retarget_phase(), 0.25, 0.0001, "negative phase rejected")
 
 

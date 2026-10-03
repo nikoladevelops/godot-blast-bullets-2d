@@ -11,7 +11,7 @@ func test_drag_decays_geometrically() -> void:
 	# 200 * (1 - 1/60)^60 ~= 73; band wide for headless dt jitter.
 	assert_between(v.get_bullet_speed_data(0).speed, 30.0, 130.0, "drag decay band")
 	v.set_linear_drag(-1.0)
-	expect_any_error()
+	expect_error_sequence(["BulletVolley2D.set_linear_drag: value must be finite and >= 0, keeping the old value."])
 	assert_eq(v.get_linear_drag(), 1.0, "negative drag rejected")
 
 
@@ -47,5 +47,5 @@ func test_per_bullet_smoothing_clamps() -> void:
 	expect_error_sequence(["bullet_set_homing_smoothing: value must be finite and >= 0"])
 	assert_eq(f.bullet_get_homing_smoothing(0), 0.0, "negative smoothing clamped to 0")
 	f.bullet_set_homing_smoothing(0, NAN)
-	expect_any_error()
+	expect_error_sequence(["bullet_set_homing_smoothing: value must be finite and >= 0 (0 snaps instantly)."])
 	assert_eq(f.bullet_get_homing_smoothing(0), 0.0, "NaN smoothing rejected")

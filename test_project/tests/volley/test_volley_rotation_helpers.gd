@@ -29,10 +29,10 @@ func test_round_trip_range_and_oob() -> void:
 	v.set_bullet_rotation_data(-1, _rot(1.0))
 	v.set_bullet_rotation_data(99, _rot(1.0))
 	v.set_bullet_rotation_data(0, null)
-	expect_any_error("OOB / null writes fail loud", 3)
+	expect_error_sequence(["Invalid bullet index in set_bullet_rotation_data: -1 (amount_bullets: 3)", "Invalid bullet index in set_bullet_rotation_data: 99 (amount_bullets: 3)", "set_bullet_rotation_data: new_bullet_rotation_data is null."], "OOB / null writes fail loud")
 	assert_almost_eq(v.get_bullet_rotation_data(0).rotation_speed, 11.0, 0.01, "null write rejected")
 	var oob: BulletRotationData2D = v.get_bullet_rotation_data(99)
-	expect_any_error("OOB read fails loud")
+	expect_error_sequence(["Invalid bullet index in get_bullet_rotation_data: 99 (amount_bullets: 3)"], "OOB read fails loud")
 	assert_almost_eq(oob.rotation_speed, 0.0, 0.01, "OOB read returns a zeroed resource")
 
 

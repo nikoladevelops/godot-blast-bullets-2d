@@ -33,10 +33,10 @@ func test_infinite_never_expires() -> void:
 func test_invalid_lifetimes_rejected_at_setter() -> void:
 	var data := H.make_volley_data(2, 100.0, 5.0)
 	data.max_life_time = 0.0
-	expect_any_error()
+	expect_error_sequence(["BulletVolleyData2D max_life_time must be > 0 when lifetime is not infinite (or enable is_life_time_infinite). Keeping previous value."])
 	assert_eq(data.max_life_time, 5.0, "zero lifetime rejected, old kept")
 	data.max_life_time = NAN
-	expect_any_error()
+	expect_error_sequence(["BulletVolleyData2D max_life_time must be finite, keeping previous value."])
 	assert_eq(data.max_life_time, 5.0, "NaN lifetime rejected, old kept")
 	factory.spawn_volley(data)
 	assert_eq(factory.debug_get_total_bullets_amount(), 1, "spawn uses the kept valid lifetime")
@@ -49,7 +49,7 @@ func test_max_collisions_zero_is_infinite() -> void:
 	t.set_bullet_collision_count(0, 5)
 	assert_eq(t.get_bullet_collision_count(0), 5, "count tracked even when infinite")
 	t.set_bullet_max_collision_count(-1)
-	expect_any_error()
+	expect_error_sequence(["set_bullet_max_collision_count: value must be >= 0 (0 = infinite collisions). Keeping previous value."])
 	assert_eq(t.get_bullet_max_collision_count(), 0, "negative max rejected")
 
 
@@ -57,7 +57,7 @@ func test_curve_clock_rejects_nan() -> void:
 	var c: BulletVolley2D = quick_volley(1, 100.0, 5.0)
 	var before: float = c.get_curves_elapsed_time()
 	c.set_curves_elapsed_time(NAN)
-	expect_any_error()
+	expect_error_sequence(["set_curves_elapsed_time: new_time must be a finite value >= 0."])
 	assert_eq(c.get_curves_elapsed_time(), before, "NaN curve time rejected")
 
 

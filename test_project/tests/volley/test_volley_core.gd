@@ -19,7 +19,7 @@ func test_speed_data() -> void:
 	assert_almost_eq(v.get_bullet_speed_data(0).speed, 200.0, 0.01, "sibling untouched")
 	var bad_sp := BulletSpeedData2D.new()
 	bad_sp.speed = NAN
-	expect_any_error()
+	expect_error_sequence(["BulletSpeedData2D.speed must be a finite value (NaN/Inf would poison bullet movement)."])
 	assert_eq(bad_sp.speed, 0.0, "resource setter rejects NaN, keeps default")
 	v.set_bullet_speed_data(0, null)
 	expect_error("is null")
@@ -53,7 +53,7 @@ func test_transforms_and_teleport() -> void:
 	v.set_bullet_transform(1, Transform2D(0.0, Vector2(NAN, 0)))
 	expect_error("must be finite")
 	v.set_bullet_transform(1, Transform2D.IDENTITY.scaled(Vector2(0, 0)))
-	expect_any_error()
+	expect_error_sequence(["set_bullet_transform: scale must be non-zero and non-singular, keeping the old transform."])
 	assert_true(v.get_bullet_transform(1).is_finite(), "bad transforms rejected")
 	v.teleport_shift_all_bullets(Vector2(10, 0))
 	assert_almost_eq(v.get_bullet_transform(0).origin, Vector2(310, 400), Vector2(0.01, 0.01), "volley shift carries")

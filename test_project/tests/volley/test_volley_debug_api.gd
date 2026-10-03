@@ -10,7 +10,7 @@ func test_orbiting_ranges_and_oob() -> void:
 	assert_eq(v.all_bullets_get_orbiting_center().size(), 3, "center range size 3")
 	assert_eq(v.all_bullets_get_orbiting_angle().size(), 3, "angle range size 3")
 	assert_true(v.all_bullets_get_orbiting_center(2, 1).is_empty(), "inverted range reads empty")
-	expect_any_error()
+	expect_error_sequence(["Invalid index range in all_bullets_get_orbiting_center (start > end). Nothing was applied."])
 	assert_eq(v.all_bullets_get_orbiting_angle(1, 1).size(), 1, "single-slot range")
 	var oi: Dictionary = v.debug_get_orbiting_info(0)
 	assert_true(oi["valid"] and oi["enabled"], "orbit info valid + enabled")

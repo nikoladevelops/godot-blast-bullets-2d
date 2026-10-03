@@ -22,7 +22,7 @@ func test_setter_rejects_singular_and_zero_scale() -> void:
 	expect_error("non-singular")
 	assert_eq(v.get_bullet_transform(0), before, "old transform kept")
 	v.set_bullet_transform(0, Transform2D(0.0, Vector2.ZERO).scaled(Vector2(0, 0)))
-	expect_any_error()
+	expect_error_sequence(["set_bullet_transform: scale must be non-zero and non-singular, keeping the old transform."])
 	assert_eq(v.get_bullet_transform(0), before, "zero scale refused")
 	await physics(10)
 	assert_true(v.get_bullet_transform(0).is_finite(), "transform finite after ticks")

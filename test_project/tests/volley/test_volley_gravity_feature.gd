@@ -101,7 +101,7 @@ func test_rejects_at_every_layer() -> void:
 	assert_eq(v.get_gravity_duration_sec(), 0.0, "negative duration rejected")
 	d.gravity_delay_sec = -1.0
 	assert_eq(d.gravity_delay_sec, 0.0, "spawn-data negative delay rejected")
-	expect_any_error("every non-finite or negative gravity input fails loud", 1)
+	expect_error_sequence(["BulletVolleyData2D: gravity must be finite, keeping the old value.", "BulletVolleyData2D all_bullet_gravity[0] is not finite, using (0, 0) for bullet index 0.", "BulletVolley2D.bullet_set_gravity: value must be finite, keeping the old value.", "BulletVolley2D.set_gravity_delay_sec: value must be finite and >= 0, keeping the old value.", "BulletVolley2D.set_gravity_duration_sec: value must be finite and >= 0 (0 = infinite), keeping the old value.", "BulletVolleyData2D: gravity_delay_sec must be finite and >= 0, keeping the old value."], "every non-finite or negative gravity input fails loud")
 
 
 func test_reuse_neutral_and_homing_mix() -> void:

@@ -16,13 +16,13 @@ func test_singular_marker_is_finite_but_singular() -> void:
 func test_ring_rejects_singular_marker() -> void:
 	var ring = BulletFactory2D.helper_generate_transforms_ring(12, singular, 60.0, 0.0, TAU, true, false, true)
 	assert_eq(ring.size(), 0, "ring volley empty on singular marker")
-	expect_any_error()
+	expect_error_sequence(["helper_generate_transforms_ring: marker_transform is singular (zero or degenerate scale); volley skipped."])
 
 
 func test_circle_rejects_singular_marker() -> void:
 	var circ = BulletFactory2D.helper_generate_transforms_circle(12, singular, 60.0, true, 0.0)
 	assert_eq(circ.size(), 0, "circle volley empty on singular marker")
-	expect_any_error()
+	expect_error_sequence(["helper_generate_transforms_circle: marker_transform is singular (zero or degenerate scale); volley skipped."])
 
 
 func test_grid_degrades_finite_on_singular_marker() -> void:

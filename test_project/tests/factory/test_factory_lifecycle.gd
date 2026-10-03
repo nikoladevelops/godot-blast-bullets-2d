@@ -32,7 +32,7 @@ func test_validate_and_invisible_lint() -> void:
 	var nan_data := _data(2)
 	nan_data.transforms = [Transform2D(0.0, Vector2(NAN, 0)), nan_data.transforms[1]]
 	assert_false(BulletFactory2D.debug_validate_spawn_data(nan_data).get("ok", true), "NaN rejected")
-	expect_any_error()
+	expect_error_sequence(["Error in debug_validate_spawn_data: transforms[0] contains NaN/Inf. Nothing was spawned."])
 	var invis := BulletVolleyData2D.new()
 	invis.transforms = [Transform2D.IDENTITY]
 	invis.max_life_time = 2.0
@@ -45,7 +45,7 @@ func test_validate_and_invisible_lint() -> void:
 	assert_not_null(key)
 	assert_eq(key.get_amount_bullets(), 3, "expected pool key amount")
 	assert_null(BulletFactory2D.debug_expected_pool_key(null), "expected key null on null data")
-	expect_any_error()
+	expect_error_sequence(["debug_expected_pool_key: spawn_data is null or has no transforms."])
 
 
 func test_spawn_pool_stats() -> void:
@@ -109,7 +109,7 @@ func test_nan_spawn_is_atomic() -> void:
 	var nan_spawn := _data(2)
 	nan_spawn.transforms = [Transform2D(0.0, Vector2(INF, 0)), Transform2D.IDENTITY]
 	factory.spawn_volley(nan_spawn)
-	expect_any_error()
+	expect_error_sequence(["Error in spawn_volley: transforms[0] contains NaN/Inf. Nothing was spawned."])
 	await physics()
 	assert_eq(factory.debug_get_total_bullets_amount(), before, "NaN spawn left no volley")
 

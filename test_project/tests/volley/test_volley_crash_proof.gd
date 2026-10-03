@@ -183,3 +183,74 @@ func test_zero_single_and_mega_volley() -> void:
 	vm.all_bullets_push_back_homing_target(Vector2(900, 0))
 	await physics(20)
 	assert_true(_finite_volley(vm), "64-bullet full stack finite")
+
+
+## Neutral value per argument type for the method sweeps below; ints use the
+## given probe so the same sweep can hit index 0 and an out-of-range index.
+func _sweep_arg(type: int, int_probe: int) -> Variant:
+	match type:
+		TYPE_INT: return int_probe
+		TYPE_FLOAT: return 0.0
+		TYPE_BOOL: return false
+		TYPE_VECTOR2: return Vector2.ZERO
+		TYPE_TRANSFORM2D: return Transform2D()
+		TYPE_COLOR: return Color()
+		TYPE_STRING: return ""
+		TYPE_STRING_NAME: return &""
+		TYPE_NODE_PATH: return NodePath()
+		TYPE_ARRAY: return []
+		TYPE_DICTIONARY: return {}
+		TYPE_CALLABLE: return Callable()
+		TYPE_PACKED_INT32_ARRAY: return PackedInt32Array()
+		TYPE_PACKED_INT64_ARRAY: return PackedInt64Array()
+		TYPE_PACKED_FLOAT32_ARRAY: return PackedFloat32Array()
+		TYPE_PACKED_VECTOR2_ARRAY: return PackedVector2Array()
+	return null
+
+
+## Calls every bound BulletVolley2D method (internal _-prefixed ones excluded)
+## with neutral arguments. Returns how many methods were called.
+func _sweep_all_methods(v: BulletVolley2D, int_probe: int) -> int:
+	var called := 0
+	for m in ClassDB.class_get_method_list("BulletVolley2D", true):
+		var name := str(m["name"])
+		if name.begins_with("_"):
+			continue
+		var args: Array = []
+		for a in m["args"]:
+			args.append(_sweep_arg(int(a["type"]), int_probe))
+		v.callv(name, args)
+		called += 1
+		if not is_instance_valid(v):
+			break
+	return called
+
+
+func test_bare_volley_survives_every_method() -> void:
+	# A volley created with new() was never spawned: no MultiMesh, no area,
+	# zero bullets. Every bound method must fail loud or no-op, never crash.
+	for probe in [0, -1, 99]:
+		var bare := BulletVolley2D.new()
+		add(bare)
+		await idle(1)
+		var called := _sweep_all_methods(bare, probe)
+		assert_gt(called, 200, "every bound method was exercised (probe %d)" % probe)
+		assert_true(is_instance_valid(bare), "bare volley survives the sweep (probe %d)" % probe)
+		assert_eq(bare.get_amount_bullets(), 0, "still zero bullets (probe %d)" % probe)
+		swallow_errors()
+		bare.queue_free()
+		await idle(1)
+
+
+func test_live_volley_survives_every_method_out_of_range() -> void:
+	# Same sweep on a live volley with out-of-range indexes: nothing may write
+	# outside the volley or poison the in-range bullets.
+	var v: BulletVolley2D = quick_volley(3, 100.0, 30.0)
+	await idle(1)
+	var called := _sweep_all_methods(v, 99)
+	assert_gt(called, 200, "every bound method was exercised")
+	assert_true(is_instance_valid(v), "live volley survives the sweep")
+	swallow_errors()
+	await physics(5)
+	assert_true(_finite_volley(v), "no NaN after the out-of-range sweep")
+	swallow_errors()

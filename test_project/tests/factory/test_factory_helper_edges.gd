@@ -9,39 +9,39 @@ var m := Transform2D(0.0, Vector2.ZERO)
 
 func test_amount_caps() -> void:
 	assert_true(BulletFactory2D.helper_generate_transforms_grid(20000, m, 10).is_empty(), "grid 20k rejected")
-	expect_any_error()
+	expect_error_sequence(["helper_generate_transforms_grid: transforms_amount must be between 0 and 10000."])
 	assert_true(BulletFactory2D.helper_generate_transforms_ring(20000, m).is_empty(), "ring 20k rejected")
-	expect_any_error()
+	expect_error_sequence(["helper_generate_transforms_ring: transforms_amount must be between 0 and 10000."])
 	assert_true(BulletFactory2D.helper_generate_transforms_fan(-5, m, 1.0).is_empty(), "fan negative rejected")
-	expect_any_error()
+	expect_error_sequence(["helper_generate_transforms_fan: transforms_amount must be between 0 and 10000."])
 	assert_true(BulletFactory2D.helper_generate_transforms_line(0, m, Vector2.RIGHT, 10.0).is_empty(), "line 0 returns empty")
 	assert_eq(BulletFactory2D.helper_generate_transforms_circle(1, m).size(), 1, "circle 1 returns one slot")
 
 
 func test_product_and_count_caps() -> void:
 	assert_true(BulletFactory2D.helper_generate_transforms_waterfall(10, m, 100000, 8.0, 100000, 8.0).is_empty(), "waterfall 100kx100k rejected")
-	expect_any_error()
+	expect_error_sequence(["helper_generate_transforms_waterfall: columns*rows is absurdly large; keep the grid reasonable."])
 	assert_true(BulletFactory2D.helper_generate_transforms_lattice(10, m, 100000, 100000).is_empty(), "lattice 100kx100k rejected")
-	expect_any_error()
+	expect_error_sequence(["helper_generate_transforms_lattice: columns*rows is absurdly large; keep the grid reasonable."])
 	assert_true(BulletFactory2D.helper_generate_transforms_star(10, m, 100000).is_empty(), "star 100k points rejected")
-	expect_any_error()
+	expect_error_sequence(["helper_generate_transforms_star: points is absurdly large; keep it near the bullet count."])
 	assert_true(BulletFactory2D.helper_generate_transforms_polygon(10, m, 100000).is_empty(), "polygon 100k vertices rejected")
-	expect_any_error()
+	expect_error_sequence(["helper_generate_transforms_polygon: vertices is absurdly large; keep it near the bullet count."])
 	assert_true(BulletFactory2D.helper_generate_transforms_ellipse(10, m, 60.0, 40.0, 0.0, 0.0, TAU, 2, 100000).is_empty(), "ellipse 100k gaps rejected")
-	expect_any_error()
+	expect_error_sequence(["helper_generate_transforms_ellipse: gap_count is absurdly large; keep it near the bullet count."])
 
 
 func test_nan_inf_rejected_loud() -> void:
 	assert_true(BulletFactory2D.helper_generate_transforms_grid(4, Transform2D(0.0, Vector2(NAN, 0)), 2).is_empty(), "grid NaN marker rejected")
-	expect_any_error()
+	expect_error_sequence(["helper_generate_transforms_grid: marker_transform contains NaN/Inf."])
 	assert_true(BulletFactory2D.helper_generate_transforms_ring(8, m, NAN).is_empty(), "ring NaN radius rejected")
-	expect_any_error()
+	expect_error_sequence(["helper_generate_transforms_ring: radius, start_angle and arc must be finite numbers."])
 	assert_true(BulletFactory2D.helper_generate_transforms_fan(4, m, INF, 0.0).is_empty(), "fan Inf spread rejected")
-	expect_any_error()
+	expect_error_sequence(["helper_generate_transforms_fan: spread, direction_angle and step_offset must be finite numbers."])
 	assert_true(BulletFactory2D.helper_generate_transforms_line(4, m, Vector2.ZERO, 10.0).is_empty(), "line zero dir rejected")
-	expect_any_error()
+	expect_error_sequence(["helper_generate_transforms_line: direction must not be zero, the line axis is undefined."])
 	assert_true(BulletFactory2D.helper_generate_transforms_wave(8, m, 100.0, 10.0, 2.0, Vector2(NAN, 0)).is_empty(), "wave NaN dir rejected")
-	expect_any_error()
+	expect_error_sequence(["helper_generate_transforms_wave: direction must be finite and non-zero."])
 
 
 func test_huge_finite_inputs_clamp() -> void:

@@ -19,10 +19,10 @@ func test_texture_rotation_rejects_nan_inf() -> void:
 	d.texture_rotation_radians = 0.5
 	assert_almost_eq(d.texture_rotation_radians, 0.5, 0.0001, "valid rotation stored")
 	d.texture_rotation_radians = NAN
-	expect_any_error()
+	expect_error_sequence(["BulletVolleyData2D: texture_rotation_radians must be finite, keeping the old value."])
 	assert_almost_eq(d.texture_rotation_radians, 0.5, 0.0001, "NaN refused, old value kept")
 	d.texture_rotation_radians = INF
-	expect_any_error()
+	expect_error_sequence(["BulletVolleyData2D: texture_rotation_radians must be finite, keeping the old value."])
 	assert_almost_eq(d.texture_rotation_radians, 0.5, 0.0001, "INF refused, old value kept")
 
 
@@ -31,10 +31,10 @@ func test_collision_shape_offset_rejects_non_finite() -> void:
 	d.collision_shape_offset = Vector2(4, 6)
 	assert_eq(d.collision_shape_offset, Vector2(4, 6))
 	d.collision_shape_offset = Vector2(NAN, 0)
-	expect_any_error()
+	expect_error_sequence(["BulletVolleyData2D: collision_shape_offset must be finite, keeping the old value."])
 	assert_eq(d.collision_shape_offset, Vector2(4, 6), "NaN offset refused")
 	d.collision_shape_offset = Vector2(0, INF)
-	expect_any_error()
+	expect_error_sequence(["BulletVolleyData2D: collision_shape_offset must be finite, keeping the old value."])
 	assert_eq(d.collision_shape_offset, Vector2(4, 6), "Inf offset refused")
 
 
@@ -42,10 +42,10 @@ func test_texture_size_rejects_non_finite_and_negative() -> void:
 	var d := _data()
 	d.texture_size = Vector2(32, 32)
 	d.texture_size = Vector2(NAN, 32)
-	expect_any_error()
+	expect_error_sequence(["BulletVolleyData2D: texture_size must be finite and >= 0, keeping the old value."])
 	assert_eq(d.texture_size, Vector2(32, 32), "NaN size refused")
 	d.texture_size = Vector2(-4, 32)
-	expect_any_error()
+	expect_error_sequence(["BulletVolleyData2D: texture_size must be finite and >= 0, keeping the old value."])
 	assert_eq(d.texture_size, Vector2(32, 32), "negative size refused")
 	d.texture_size = Vector2(0, 0)
 	assert_eq(d.texture_size, Vector2(0, 0), "zero stays legal (derive-from-texture sentinel)")
@@ -55,15 +55,15 @@ func test_self_modulate_rejects_nan_channel() -> void:
 	var d := _data()
 	d.self_modulate = Color(1, 0.5, 0.25, 1)
 	d.self_modulate = Color(NAN, 0, 0, 1)
-	expect_any_error()
+	expect_error_sequence(["BulletVolleyData2D: self_modulate must be finite, keeping the old value."])
 	assert_eq(d.self_modulate, Color(1, 0.5, 0.25, 1), "NaN channel refused on spawn data")
 	d.self_modulate = Color(0, INF, 0, 1)
-	expect_any_error()
+	expect_error_sequence(["BulletVolleyData2D: self_modulate must be finite, keeping the old value."])
 	assert_eq(d.self_modulate, Color(1, 0.5, 0.25, 1), "Inf channel refused on spawn data")
 	var layer := BulletEffectLayerData2D.new()
 	layer.self_modulate = Color(0, 1, 0, 1)
 	layer.self_modulate = Color(0, 0, NAN, 1)
-	expect_any_error()
+	expect_error_sequence(["BulletEffectLayerData2D: self_modulate must be finite, keeping the old value."])
 	assert_eq(layer.self_modulate, Color(0, 1, 0, 1), "NaN channel refused on effect layer data")
 
 

@@ -82,7 +82,7 @@ func test_gravity_accelerates_px_per_s2() -> void:
 	assert_gt(g.get_bullet_velocity(0).y, 1500.0, "reported velocity integrates fall speed")
 	assert_eq(g.get_gravity(), Vector2(0, 2000), "gravity getter round-trips")
 	g.set_gravity(Vector2(NAN, 0))
-	expect_any_error("NaN gravity fails loud")
+	expect_error_sequence(["BulletVolley2D.set_gravity: value must be finite, keeping the old value."], "NaN gravity fails loud")
 	assert_eq(g.get_gravity(), Vector2(0, 2000), "NaN gravity rejected")
 	g.set_gravity(Vector2.ZERO)
 	var vb: Vector2 = g.get_bullet_velocity(0)
