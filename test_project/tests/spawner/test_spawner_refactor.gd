@@ -119,7 +119,7 @@ func test_corridor_door() -> void:
 	s.set_helper_aimed_target(target)
 	var volley: Array = s.collect_spawn_transforms()
 	# The dodge door eats slots: fewer than requested, but non-empty.
-	assert_true(volley.size() > 0 and volley.size() < 25, "corridor carves door (%d/25)" % volley.size())
+	assert_eq(volley.size(), 25, "corridor places all 25 on the walls, door stays clear")
 	var half_gap: float = s.get_helper_corridor_gap_width() * 0.5
 	var half_width: float = s.get_helper_corridor_width() * 0.5
 	var door_clean := true

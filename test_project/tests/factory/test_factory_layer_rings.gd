@@ -170,8 +170,8 @@ func test_inward_and_both() -> void:
 
 func test_star_heart_emit() -> void:
 	var marker := Transform2D(0.0, Vector2(400, 300))
-	var base_flower: Array = BulletFactory2D.helper_generate_transforms_flower(24, marker, 6, 5, 150.0, 0.5, 1.0, 0.0, true, 0.0, 0, 0, false, 0, 32.0, false, 0.0, 1, STEP, 0, 0, 0, 0, PackedFloat32Array(), 0, 0, 0, 0.0, 45.0, 80.0, 6.0, 1.0)
-	var layered_flower: Array = BulletFactory2D.helper_generate_transforms_flower(24, marker, 6, 5, 150.0, 0.5, 1.0, 0.0, true, 0.0, 1, 0, false, 0, 32.0, false, 0.0, 3, STEP, 0, 0, 0, 0, PackedFloat32Array(), 0, 0, 0, 0.0, 45.0, 80.0, 6.0, 1.0)
+	var base_flower: Array = BulletFactory2D.helper_generate_transforms_flower(24, marker, 6, 150.0, 0.5, 1.0, 0.0, true, 0.0, 0, 0, false, 0, 32.0, false, 0.0, 1, STEP, 0, 0, 0, 0, PackedFloat32Array(), 0, 0, 0, 0.0, 45.0, 80.0, 6.0, 1.0)
+	var layered_flower: Array = BulletFactory2D.helper_generate_transforms_flower(24, marker, 6, 150.0, 0.5, 1.0, 0.0, true, 0.0, 1, 0, false, 0, 32.0, false, 0.0, 3, STEP, 0, 0, 0, 0, PackedFloat32Array(), 0, 0, 0, 0.0, 45.0, 80.0, 6.0, 1.0)
 	_check_pair(base_flower, layered_flower, marker.origin, 3, STEP, 0, "flower")
 	var star: Array = BulletFactory2D.helper_generate_transforms_star(20, marker, 5, 150.0, 65.0, 0.0, true, 0.0, 1, 0, false, 0, 32.0, false, 0.0, 3, STEP, 0, 0, 0, 0, PackedFloat32Array(), 0, 0)
 	assert_true(star.size() == 20, "star emits in LAYERS")

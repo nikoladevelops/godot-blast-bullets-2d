@@ -456,7 +456,6 @@ class BulletSpawner2D : public Node2D{
 
         // FLOWER (spell-card blossoms: petals symmetric lobes).
         int helper_flower_petals = 6;
-        int helper_flower_bullets_per_petal = 5;
         double helper_flower_radius = 150.0;
         double helper_flower_petal_spread = 0.5;
         double helper_flower_petal_sharpness = 1.0;
@@ -1117,8 +1116,6 @@ class BulletSpawner2D : public Node2D{
         void set_helper_aimed_prediction_time(double value);
         int get_helper_flower_petals() const;
         void set_helper_flower_petals(int value);
-        int get_helper_flower_bullets_per_petal() const;
-        void set_helper_flower_bullets_per_petal(int value);
         double get_helper_flower_radius() const;
         void set_helper_flower_radius(double value);
         double get_helper_flower_petal_spread() const;

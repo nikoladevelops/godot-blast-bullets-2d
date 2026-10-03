@@ -48,7 +48,6 @@ func _flower(petals: int, per_petal: int, radius: float, placement: int) -> Bull
 	var sp := make_preview_spawner(BulletSpawner2D.PATTERN_FROM_HELPER_FLOWER, petals * per_petal)
 	sp.helper_flower_type = 0 # FAN
 	sp.helper_flower_petals = petals
-	sp.helper_flower_bullets_per_petal = per_petal
 	sp.helper_flower_radius = radius
 	sp.helper_outline_placement = placement
 	return sp

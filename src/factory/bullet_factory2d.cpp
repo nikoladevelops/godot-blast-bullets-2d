@@ -2715,7 +2715,6 @@ void BulletFactory2D::_bind_methods() {
 										 "transforms_amount",
 										 "marker_transform",
 										 "petals",
-										 "bullets_per_petal",
 										 "radius",
 										 "petal_spread",
 										 "petal_sharpness",
@@ -2747,7 +2746,6 @@ void BulletFactory2D::_bind_methods() {
 								"layer_layout"),
 								&BulletFactory2D::helper_generate_transforms_flower,
 								DEFVAL(6),
-								DEFVAL(5),
 								DEFVAL(150.0),
 								DEFVAL(0.5),
 								DEFVAL(1.0),
@@ -3654,7 +3652,8 @@ void BulletFactory2D::_bind_methods() {
 										"spiro_pen",
 										"super_lobes",
 										"super_fullness",
-										"base_rotation"),
+										"base_rotation",
+										"transforms_amount"),
 								&BulletFactory2D::helper_sample_outline_flower,
 								DEFVAL(0),
 								DEFVAL(6),
@@ -3666,7 +3665,8 @@ void BulletFactory2D::_bind_methods() {
 								DEFVAL(80.0),
 								DEFVAL(6.0),
 								DEFVAL(1.0),
-								DEFVAL(0.0));
+								DEFVAL(0.0),
+								DEFVAL(-1));
 
 	ClassDB::bind_static_method("BulletFactory2D",
 								D_METHOD("helper_sample_outline_lissajous",

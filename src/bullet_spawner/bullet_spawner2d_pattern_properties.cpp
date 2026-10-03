@@ -622,19 +622,6 @@ void BulletSpawner2D::set_helper_flower_petals(int value) {
     on_pattern_changed();
 }
 
-int BulletSpawner2D::get_helper_flower_bullets_per_petal() const {
-    return helper_flower_bullets_per_petal;
-}
-
-void BulletSpawner2D::set_helper_flower_bullets_per_petal(int value) {
-    if (value < 1) {
-        UtilityFunctions::push_error("BulletSpawner2D: helper_flower_bullets_per_petal must be >= 1, keeping the old value.");
-        return;
-    }
-    helper_flower_bullets_per_petal = value;
-    on_pattern_changed();
-}
-
 double BulletSpawner2D::get_helper_flower_radius() const {
     return helper_flower_radius;
 }
@@ -2819,7 +2806,6 @@ void BulletSpawner2D::apply_pattern_preset(int preset) {
             pattern_source = PATTERN_FROM_HELPER_FLOWER;
             helper_bullets_amount = 30;
             helper_flower_petals = 6;
-            helper_flower_bullets_per_petal = 5;
             helper_flower_radius = 140.0;
             helper_flower_type = 0; // FAN (legacy default)
             break;

@@ -63,7 +63,7 @@ func _gen_args(id: int, amount: int) -> Array:
 		3: return [amount, m, 50.0, 15.0, 0.6, true, 0, 0.0]
 		4: return [amount, m, Vector2(1, 0), 32.0, true, 1, false]
 		5: return [amount, m, Vector2(300, 400), 0.3, 0.0, true]
-		6: return [amount, m, 6, 5, 150.0, 0.5, 1.0, 0.0, true, 0.0, 0, 0, false, 0, 32.0, false, 0.0, 1, 0.2, 0, 0, 0, 0, PackedFloat32Array(), 0, 0, 0, 0.0, 45.0, 80.0, 6.0, 1.0]
+		6: return [amount, m, 6, 150.0, 0.5, 1.0, 0.0, true, 0.0, 0, 0, false, 0, 32.0, false, 0.0, 1, 0.2, 0, 0, 0, 0, PackedFloat32Array(), 0, 0, 0, 0.0, 45.0, 80.0, 6.0, 1.0]
 		7: return [amount, m, 150.0, 100.0, 0.0, 0.0, TAU, 0, 0, 0.0, true, 0.0, 0, 0, false, 0, 32.0, false, 0.0, 1, 0.2, 0, 0, 0, 0, PackedFloat32Array(), 0, 0]
 		8: return [amount, m, 600.0, Vector2(0, 1), 48.0, 0.0, 0]
 		9: return [amount, m, 120.0, 0.4, 0, 0.0, Vector2(1, 0), TAU, 0]
@@ -178,7 +178,7 @@ func test_degenerate() -> void:
 		_gen_call(11, [8, m, 3, 0.0, 15.0, 0.6, true, 0, 0.0, 1]),
 		_gen_call(19, [8, m, 2, 0.0, 15.0, 0.6, true, 0, 0.0, 1, true]),
 		_gen_call(21, [8, m, 0.0, 0.0, 3.0, 2.0, 0.0, true, 0.0, 0, 0, false, 0, 32.0, false, 0.0, 1, 0.2, 0, 0, 0, 0, PackedFloat32Array(), 0, 0]),
-		_gen_call(6, [8, m, 6, 5, 0.0, 0.5, 1.0, 0.0, true, 0.0, 0, 0, false, 0, 32.0, false, 0.0, 1, 0.2, 0, 0, 0, 0, PackedFloat32Array(), 0, 0, 0, 0.0, 45.0, 80.0, 6.0, 1.0]),
+		_gen_call(6, [8, m, 6, 0.0, 0.5, 1.0, 0.0, true, 0.0, 0, 0, false, 0, 32.0, false, 0.0, 1, 0.2, 0, 0, 0, 0, PackedFloat32Array(), 0, 0, 0, 0.0, 45.0, 80.0, 6.0, 1.0]),
 		_gen_call(9, [8, m, 0.0, 0.4, 0, 0.0, Vector2(1, 0), TAU, 0]),
 		_gen_call(16, [8, m, 4, 0.0, 4, 0.0, 0.5, Vector2(0, 1), 0.0, 0.0, 0]),
 		_gen_call(17, [8, m, 4, 4, 0.0, 0.0, true, true, 0.0]),
@@ -201,7 +201,7 @@ func test_degenerate() -> void:
 	expect_error_sequence(["helper_generate_transforms_counter_spiral: arms must be >= 2"])
 	assert_true(_gen_call(10, [8, m, 2, 150.0, 2.0, 0.0, true, 0.0]).is_empty(), "star_polygon vertices=2 rejected")
 	expect_error_sequence(["helper_generate_transforms_star_polygon: vertices must be >= 3"])
-	assert_true(_gen_call(6, [8, m, 0, 5, 150.0, 0.5, 1.0, 0.0, true, 0.0, 0, 0, false, 0, 32.0, false, 0.0, 1, 0.2, 0, 0, 0, 0, PackedFloat32Array(), 0, 0, 0, 0.0, 45.0, 80.0, 6.0, 1.0]).is_empty(), "flower petals=0 rejected")
+	assert_true(_gen_call(6, [8, m, 0, 150.0, 0.5, 1.0, 0.0, true, 0.0, 0, 0, false, 0, 32.0, false, 0.0, 1, 0.2, 0, 0, 0, 0, PackedFloat32Array(), 0, 0, 0, 0.0, 45.0, 80.0, 6.0, 1.0]).is_empty(), "flower petals=0 rejected")
 	expect_error_sequence(["helper_generate_transforms_flower: petals must be >= 1"])
 	assert_true(_gen_call(18, [8, m, 1, 150.0, 1.0, 0.0, true, 0.0, 0, 0, false, 0, 32.0, false, 0.0, 1, 0.2, 0, 0, 0, 0, PackedFloat32Array(), 0, 0]).is_empty(), "rose petals=1 rejected")
 	expect_error_sequence(["helper_generate_transforms_rose: petals must be >= 2"])
@@ -459,8 +459,8 @@ func test_semantics() -> void:
 	assert_true(ok_c, "counter-spiral mirrors alternate arms")
 	# Corridor carves the dodge door and faces down-aim.
 	var cor: Array = BulletFactory2D.helper_generate_transforms_corridor(5, m, Vector2(0, 1), 400.0, 32.0, 96.0, true, 0.0)
-	assert_true(cor.size() == 4, "corridor carves gap")
-	var ok_w := cor.size() == 4
+	assert_eq(cor.size(), 5, "corridor places every bullet on the walls (door stays clear)")
+	var ok_w := cor.size() == 5
 	for t in cor:
 		var p: Vector2 = (t as Transform2D).origin
 		if absf(p.x) < 48.0 - 0.01 or not _approx((t as Transform2D).get_rotation(), PI * 0.5, 0.01):

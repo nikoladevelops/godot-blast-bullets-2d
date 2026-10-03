@@ -178,6 +178,10 @@ TypedArray<Transform2D> BulletSpawner2D::collect_path2d_transforms(const Transfo
     }
     const bool loop = closing_len > 0.0;
     const int seg_count = loop ? n : n - 1;
+    // A curve drawn as a loop (last point ON the first) needs no closing
+    // stretch, but with helper_path2d_closed it is still a ring: spreading
+    // with the open n-1 divisor put the last bullet on the first.
+    const bool ring = loop || (helper_path2d_closed && n > 2);
     real_t facing_extra = 0.0;
     if (helper_path2d_facing == PATH2D_FACING_NORMAL_P90) {
         facing_extra = Math::PI * 0.5;
@@ -214,10 +218,10 @@ TypedArray<Transform2D> BulletSpawner2D::collect_path2d_transforms(const Transfo
         if (phase < 0.0) {
             phase = 0.0;
         }
-        if (loop) {
-            const double ring = Math::fposmod(phase, total);
+        if (ring) {
+            const double ring_start = Math::fposmod(phase, total);
             for (int i = 0; i < count; ++i) {
-                dists[i] = Math::fposmod(ring + total * (double)i / (double)count, total);
+                dists[i] = Math::fposmod(ring_start + total * (double)i / (double)count, total);
             }
         } else if (count == 1) {
             dists[0] = Math::clamp(phase, 0.0, total);
@@ -235,7 +239,9 @@ TypedArray<Transform2D> BulletSpawner2D::collect_path2d_transforms(const Transfo
         }
         const double run = (double)(count - 1) * eff_spacing;
         if (helper_path2d_overflow == PATH2D_OVERFLOW_SHRINK_TO_FIT && count > 1 && run > total) {
-            eff_spacing = total / (double)(count - 1);
+            // A ring has `count` gaps (the seam is one of them); an open run
+            // has count - 1 and keeps both endpoints.
+            eff_spacing = ring ? total / (double)count : total / (double)(count - 1);
         }
         const double eff_run = (double)(count - 1) * eff_spacing;
         double base = 0.0;
@@ -269,7 +275,7 @@ TypedArray<Transform2D> BulletSpawner2D::collect_path2d_transforms(const Transfo
         // only in wrapping modes — dists already carry each mode's rule, so
         // this is just float-error insurance that can never relocate a bullet.
         if (d > total) {
-            if (helper_path2d_distribution == PATH2D_DISTRIBUTION_EVEN && loop) {
+            if (helper_path2d_distribution == PATH2D_DISTRIBUTION_EVEN && ring) {
                 d = Math::fposmod(d, total);
             } else if (helper_path2d_distribution != PATH2D_DISTRIBUTION_EVEN && helper_path2d_overflow == PATH2D_OVERFLOW_WRAP) {
                 d = Math::fposmod(d, total);
@@ -501,7 +507,7 @@ TypedArray<Transform2D> BulletSpawner2D::generate_raw_pattern(Node2D *base, cons
             break;
         }
         case PATTERN_FROM_HELPER_FLOWER:
-            raw = BulletFactory2D::helper_generate_transforms_flower(helper_bullets_amount, marker, helper_flower_petals, helper_flower_bullets_per_petal, helper_flower_radius, helper_flower_petal_spread, helper_flower_petal_sharpness, helper_flower_base_rotation, helper_flower_face_outward, helper_flower_facing_offset_deg, helper_outline_placement, helper_outline_facing, helper_outline_reverse, helper_outline_slot_offset, helper_outline_fill_spacing, helper_outline_fill_stagger, helper_outline_fill_margin, helper_outline_layer_count, helper_outline_layer_scale, helper_outline_layer_side, helper_outline_layer_fill, helper_outline_layer_start_offset, helper_outline_layer_scale_curve, helper_outline_layer_scales, helper_outline_layer_twist, helper_outline_layer_max_dots, helper_flower_type, helper_flower_inner_radius_scale, helper_flower_spiro_roller, helper_flower_spiro_pen, helper_flower_super_lobes, helper_flower_super_fullness, helper_outline_layer_layout);
+            raw = BulletFactory2D::helper_generate_transforms_flower(helper_bullets_amount, marker, helper_flower_petals, helper_flower_radius, helper_flower_petal_spread, helper_flower_petal_sharpness, helper_flower_base_rotation, helper_flower_face_outward, helper_flower_facing_offset_deg, helper_outline_placement, helper_outline_facing, helper_outline_reverse, helper_outline_slot_offset, helper_outline_fill_spacing, helper_outline_fill_stagger, helper_outline_fill_margin, helper_outline_layer_count, helper_outline_layer_scale, helper_outline_layer_side, helper_outline_layer_fill, helper_outline_layer_start_offset, helper_outline_layer_scale_curve, helper_outline_layer_scales, helper_outline_layer_twist, helper_outline_layer_max_dots, helper_flower_type, helper_flower_inner_radius_scale, helper_flower_spiro_roller, helper_flower_spiro_pen, helper_flower_super_lobes, helper_flower_super_fullness, helper_outline_layer_layout);
             break;
         case PATTERN_FROM_HELPER_ELLIPSE:
             raw = BulletFactory2D::helper_generate_transforms_ellipse(helper_bullets_amount, marker, helper_ellipse_radius_x, helper_ellipse_radius_y, helper_ellipse_rotation, helper_ellipse_start_angle, helper_ellipse_arc, (BulletFactory2D::EllipseMode)helper_ellipse_mode, helper_ellipse_gap_count, helper_ellipse_gap_width, helper_ellipse_face_outward, helper_ellipse_facing_offset_deg, helper_outline_placement, helper_outline_facing, helper_outline_reverse, helper_outline_slot_offset, helper_outline_fill_spacing, helper_outline_fill_stagger, helper_outline_fill_margin, helper_outline_layer_count, helper_outline_layer_scale, helper_outline_layer_side, helper_outline_layer_fill, helper_outline_layer_start_offset, helper_outline_layer_scale_curve, helper_outline_layer_scales, helper_outline_layer_twist, helper_outline_layer_max_dots, helper_outline_layer_layout);

@@ -178,7 +178,6 @@ void BulletSpawner2D::_validate_property(PropertyInfo &p_property) const {
                     property_name == "helper_flower_facing_offset_deg") {
                 // keep relevant = true
             } else if (property_name == "helper_flower_petals" ||
-                    property_name == "helper_flower_bullets_per_petal" ||
                     property_name == "helper_flower_petal_spread") {
                 relevant = (ftype == BulletFactory2D::FLOWER_FAN);
             } else if (property_name == "helper_flower_petal_sharpness") {
@@ -566,10 +565,6 @@ void BulletSpawner2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_helper_flower_petals"), &BulletSpawner2D::get_helper_flower_petals);
 	ClassDB::bind_method(D_METHOD("set_helper_flower_petals", "value"), &BulletSpawner2D::set_helper_flower_petals);
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "helper_flower_petals"), "set_helper_flower_petals", "get_helper_flower_petals");
-
-	ClassDB::bind_method(D_METHOD("get_helper_flower_bullets_per_petal"), &BulletSpawner2D::get_helper_flower_bullets_per_petal);
-	ClassDB::bind_method(D_METHOD("set_helper_flower_bullets_per_petal", "value"), &BulletSpawner2D::set_helper_flower_bullets_per_petal);
-	ADD_PROPERTY(PropertyInfo(Variant::INT, "helper_flower_bullets_per_petal"), "set_helper_flower_bullets_per_petal", "get_helper_flower_bullets_per_petal");
 
 	ClassDB::bind_method(D_METHOD("get_helper_flower_petal_spread"), &BulletSpawner2D::get_helper_flower_petal_spread);
 	ClassDB::bind_method(D_METHOD("set_helper_flower_petal_spread", "value"), &BulletSpawner2D::set_helper_flower_petal_spread);

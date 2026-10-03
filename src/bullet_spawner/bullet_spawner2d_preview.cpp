@@ -1071,7 +1071,9 @@ void BulletSpawner2D::rebuild_preview() {
                     // Per-type bloom track at fixed density: FAN traces the
                     // petal-tip ring, RHODONEA/SPIROGRAPH/SUPERFORMULA trace the
                     // actual curve, PHYLLOTAXIS bounds the Vogel disc rim.
-                    push_track_dict(BulletFactory2D::helper_sample_outline_flower(helper_flower_type, helper_flower_petals, (real_t)helper_flower_radius, (real_t)helper_flower_petal_spread, (real_t)helper_flower_petal_sharpness, helper_flower_inner_radius_scale, helper_flower_spiro_roller, helper_flower_spiro_pen, helper_flower_super_lobes, helper_flower_super_fullness, (real_t)helper_flower_base_rotation));
+                    push_track_dict(BulletFactory2D::helper_sample_outline_flower(helper_flower_type, helper_flower_petals, (real_t)helper_flower_radius, (real_t)helper_flower_petal_spread, (real_t)helper_flower_petal_sharpness, helper_flower_inner_radius_scale, helper_flower_spiro_roller, helper_flower_spiro_pen, helper_flower_super_lobes, helper_flower_super_fullness, (real_t)helper_flower_base_rotation,
+                            // FAN on outline: skip petals that hold no bullet.
+                            helper_outline_placement == BulletFactory2D::OUTLINE_ON_OUTLINE ? helper_bullets_amount : -1));
                     break;
                 }
                 case PATTERN_FROM_HELPER_STAR_POLYGON: {

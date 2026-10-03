@@ -184,8 +184,9 @@ public:
 	// the same slot count over scaled repeats of the loop about its center
 	// (same figure at every layer; layer 0 sits exactly on the outline,
 	// extras grow inward/outward per OutlineLayerSide); FILL_INSIDE
-	// replaces the loop with a row-major grid masked to the loop interior
-	// (capped at transforms_amount, may return fewer on small shapes).
+	// replaces the loop with a grid masked to the shape interior: exactly
+	// transforms_amount cells, picked evenly over the shape; fill_spacing is
+	// honored when they fit and shrinks just enough when they do not.
 	enum OutlinePlacement {
 		OUTLINE_ON_OUTLINE = 0,
 		OUTLINE_LAYERS = 1,
@@ -1417,8 +1418,8 @@ public:
 			real_t facing_offset_degrees = 0.0,
 			// Outline layout (closed-loop placement engine, shared by the loop
 			// shapes): outline_placement picks On Outline (slot loop as
-			// generated), Fill Inside (row-major grid masked to the loop
-			// interior, capped at transforms_amount) or Layers
+			// generated), Fill Inside (exactly transforms_amount grid cells
+			// inside the shape; spacing shrinks only when they do not fit) or Layers
 			// (concentric rings sharing the slot count, layer 0 on outline);
 			// outline_facing rotates each default facing (0 = as generated,
 			// 1 = +90 deg, 2 = -90 deg); outline_reverse mirrors the slot
@@ -1501,15 +1502,14 @@ public:
 			bool centered = true);
 
 	// Floral spell-card pattern with selectable bloom kinds (see FlowerBloom).
-	// FAN (default, legacy): petals symmetric lobes around the marker, each
-	// petal holding bullets_per_petal slots spread over petal_spread;
-	// petals * bullets_per_petal slots are emitted (transforms_amount sizes
-	// the array; fewer slots than petals * per-petal simply truncates).
+	// FAN (default): petals symmetric lobes around the marker; the
+	// transforms_amount bullets are split evenly over the petals (remainder
+	// spread symmetrically) and fan across petal_spread, so exactly
+	// transforms_amount distinct slots are emitted at any amount.
 	// petal_sharpness 0 = round lobes, higher = tighter flowers.
 	// RHODONEA: continuous rhodonea sweep r = R*|cos(k*theta/2)|^p; k comes
 	// from petals, p from petal_sharpness, inner_radius_scale carves a core
-	// hole (0 = full bloom, < 1 = ring). bullets_per_petal/petal_spread
-	// are unused.
+	// hole (0 = full bloom, < 1 = ring). petal_spread is unused.
 	// PHYLLOTAXIS: Vogel golden-angle sunflower disc r = R*sqrt(i/n);
 	// inner_radius_scale sets the disc inner edge (0 = center bloom).
 	// petal-family knobs are unused.
@@ -1522,7 +1522,6 @@ public:
 			int transforms_amount,
 			Transform2D marker_transform,
 			int petals = 6,
-			int bullets_per_petal = 5,
 			real_t radius = 150.0,
 			real_t petal_spread = 0.5,
 			real_t petal_sharpness = 1.0,
@@ -1531,8 +1530,8 @@ public:
 			real_t facing_offset_degrees = 0.0,
 			// Outline layout (closed-loop placement engine, shared by the loop
 			// shapes): outline_placement picks On Outline (slot loop as
-			// generated), Fill Inside (row-major grid masked to the loop
-			// interior, capped at transforms_amount) or Layers
+			// generated), Fill Inside (exactly transforms_amount grid cells
+			// inside the shape; spacing shrinks only when they do not fit) or Layers
 			// (concentric rings sharing the slot count, layer 0 on outline);
 			// outline_facing rotates each default facing (0 = as generated,
 			// 1 = +90 deg, 2 = -90 deg); outline_reverse mirrors the slot
@@ -1570,8 +1569,10 @@ public:
 
 	// True ellipse ring with independent radii and rotation (the ring
 	// helper's y_scale is only an approximation): rx/ry semi-axes rotated by
-	// ellipse_rotation. mode picks FULL ring, ARC segment, or WALL (dense
-	// arc with gap_count carved dodge gaps of gap_width radians each).
+	// ellipse_rotation. mode picks FULL ring, ARC segment, or WALL (arc with
+	// gap_count dodge gaps of gap_width radians each; exactly
+	// transforms_amount slots shared by the solid stretches). An ARC/WALL
+	// spanning a full turn closes like FULL (no doubled seam bullet).
 	static TypedArray<Transform2D> helper_generate_transforms_ellipse(
 			int transforms_amount,
 			Transform2D marker_transform,
@@ -1587,8 +1588,8 @@ public:
 			real_t facing_offset_degrees = 0.0,
 			// Outline layout (closed-loop placement engine, shared by the loop
 			// shapes): outline_placement picks On Outline (slot loop as
-			// generated), Fill Inside (row-major grid masked to the loop
-			// interior, capped at transforms_amount) or Layers
+			// generated), Fill Inside (exactly transforms_amount grid cells
+			// inside the shape; spacing shrinks only when they do not fit) or Layers
 			// (concentric rings sharing the slot count, layer 0 on outline);
 			// outline_facing rotates each default facing (0 = as generated,
 			// 1 = +90 deg, 2 = -90 deg); outline_reverse mirrors the slot
@@ -1699,8 +1700,8 @@ public:
 			real_t facing_offset_degrees = 0.0,
 			// Outline layout (closed-loop placement engine, shared by the loop
 			// shapes): outline_placement picks On Outline (slot loop as
-			// generated), Fill Inside (row-major grid masked to the loop
-			// interior, capped at transforms_amount) or Layers
+			// generated), Fill Inside (exactly transforms_amount grid cells
+			// inside the shape; spacing shrinks only when they do not fit) or Layers
 			// (concentric rings sharing the slot count, layer 0 on outline);
 			// outline_facing rotates each default facing (0 = as generated,
 			// 1 = +90 deg, 2 = -90 deg); outline_reverse mirrors the slot
@@ -1818,8 +1819,8 @@ public:
 			real_t facing_offset_degrees = 0.0,
 			// Outline layout (closed-loop placement engine, shared by the loop
 			// shapes): outline_placement picks On Outline (slot loop as
-			// generated), Fill Inside (row-major grid masked to the loop
-			// interior, capped at transforms_amount) or Layers
+			// generated), Fill Inside (exactly transforms_amount grid cells
+			// inside the shape; spacing shrinks only when they do not fit) or Layers
 			// (concentric rings sharing the slot count, layer 0 on outline);
 			// outline_facing rotates each default facing (0 = as generated,
 			// 1 = +90 deg, 2 = -90 deg); outline_reverse mirrors the slot
@@ -1865,7 +1866,8 @@ public:
 	// Dense wall perpendicular to aim with carved center dodge door.
 	// Aimed-trap usage: slots spread across width on the axis across from
 	// aim_direction; the center gap of gap_width stays empty as the door.
-	// spacing is reserved (unused): slots spread evenly across width.
+	// Exactly transforms_amount slots: they are split over the two wall
+	// segments (outer edge to door edge). spacing is reserved (unused).
 	static TypedArray<Transform2D> helper_generate_transforms_corridor(
 			int transforms_amount,
 			Transform2D marker_transform,
@@ -1890,8 +1892,8 @@ public:
 			real_t facing_offset_degrees = 0.0,
 			// Outline layout (closed-loop placement engine, shared by the loop
 			// shapes): outline_placement picks On Outline (slot loop as
-			// generated), Fill Inside (row-major grid masked to the loop
-			// interior, capped at transforms_amount) or Layers
+			// generated), Fill Inside (exactly transforms_amount grid cells
+			// inside the shape; spacing shrinks only when they do not fit) or Layers
 			// (concentric rings sharing the slot count, layer 0 on outline);
 			// outline_facing rotates each default facing (0 = as generated,
 			// 1 = +90 deg, 2 = -90 deg); outline_reverse mirrors the slot
@@ -1930,8 +1932,8 @@ public:
 			real_t facing_offset_degrees = 0.0,
 			// Outline layout (closed-loop placement engine, shared by the loop
 			// shapes): outline_placement picks On Outline (slot loop as
-			// generated), Fill Inside (row-major grid masked to the loop
-			// interior, capped at transforms_amount) or Layers
+			// generated), Fill Inside (exactly transforms_amount grid cells
+			// inside the shape; spacing shrinks only when they do not fit) or Layers
 			// (concentric rings sharing the slot count, layer 0 on outline);
 			// outline_facing rotates each default facing (0 = as generated,
 			// 1 = +90 deg, 2 = -90 deg); outline_reverse mirrors the slot
@@ -1970,8 +1972,8 @@ public:
 			real_t facing_offset_degrees = 0.0,
 			// Outline layout (closed-loop placement engine, shared by the loop
 			// shapes): outline_placement picks On Outline (slot loop as
-			// generated), Fill Inside (row-major grid masked to the loop
-			// interior, capped at transforms_amount) or Layers
+			// generated), Fill Inside (exactly transforms_amount grid cells
+			// inside the shape; spacing shrinks only when they do not fit) or Layers
 			// (concentric rings sharing the slot count, layer 0 on outline);
 			// outline_facing rotates each default facing (0 = as generated,
 			// 1 = +90 deg, 2 = -90 deg); outline_reverse mirrors the slot
@@ -2017,8 +2019,8 @@ public:
 			real_t facing_offset_degrees = 0.0,
 			// Outline layout (closed-loop placement engine, shared by the loop
 			// shapes): outline_placement picks On Outline (slot loop as
-			// generated), Fill Inside (row-major grid masked to the loop
-			// interior, capped at transforms_amount) or Layers
+			// generated), Fill Inside (exactly transforms_amount grid cells
+			// inside the shape; spacing shrinks only when they do not fit) or Layers
 			// (concentric rings sharing the slot count, layer 0 on outline);
 			// outline_facing rotates each default facing (0 = as generated,
 			// 1 = +90 deg, 2 = -90 deg); outline_reverse mirrors the slot
@@ -2068,8 +2070,8 @@ public:
 			real_t facing_offset_degrees = 0.0,
 			// Outline layout (closed-loop placement engine, shared by the loop
 			// shapes): outline_placement picks On Outline (slot loop as
-			// generated), Fill Inside (row-major grid masked to the loop
-			// interior, capped at transforms_amount) or Layers
+			// generated), Fill Inside (exactly transforms_amount grid cells
+			// inside the shape; spacing shrinks only when they do not fit) or Layers
 			// (concentric rings sharing the slot count, layer 0 on outline);
 			// outline_facing rotates each default facing (0 = as generated,
 			// 1 = +90 deg, 2 = -90 deg); outline_reverse mirrors the slot
@@ -2117,8 +2119,8 @@ public:
 			real_t facing_offset_degrees = 0.0,
 			// Outline layout (closed-loop placement engine, shared by the loop
 			// shapes): outline_placement picks On Outline (slot loop as
-			// generated), Fill Inside (row-major grid masked to the loop
-			// interior, capped at transforms_amount) or Layers
+			// generated), Fill Inside (exactly transforms_amount grid cells
+			// inside the shape; spacing shrinks only when they do not fit) or Layers
 			// (concentric rings sharing the slot count, layer 0 on outline);
 			// outline_facing rotates each default facing (0 = as generated,
 			// 1 = +90 deg, 2 = -90 deg); outline_reverse mirrors the slot
@@ -2165,8 +2167,8 @@ public:
 			real_t facing_offset_degrees = 0.0,
 			// Outline layout (closed-loop placement engine, shared by the loop
 			// shapes): outline_placement picks On Outline (slot loop as
-			// generated), Fill Inside (row-major grid masked to the loop
-			// interior, capped at transforms_amount) or Layers
+			// generated), Fill Inside (exactly transforms_amount grid cells
+			// inside the shape; spacing shrinks only when they do not fit) or Layers
 			// (concentric rings sharing the slot count, layer 0 on outline);
 			// outline_facing rotates each default facing (0 = as generated,
 			// 1 = +90 deg, 2 = -90 deg); outline_reverse mirrors the slot
@@ -2335,7 +2337,7 @@ public:
 	static Dictionary helper_sample_outline_rose(int petals = 6, real_t radius = 150.0, real_t lobe_sharpness = 1.0, real_t base_rotation = 0.0);
 	// Flower bloom track sampler mirroring helper_generate_transforms_flower
 	// per-type math at fixed density (closed loop). Marker-relative offsets.
-	static Dictionary helper_sample_outline_flower(int flower_type = 0, int petals = 6, real_t radius = 150.0, real_t petal_spread = 0.5, real_t petal_sharpness = 1.0, double inner_radius_scale = 0.0, double spiro_roller = 45.0, double spiro_pen = 80.0, double super_lobes = 6.0, double super_fullness = 1.0, real_t base_rotation = 0.0);
+	static Dictionary helper_sample_outline_flower(int flower_type = 0, int petals = 6, real_t radius = 150.0, real_t petal_spread = 0.5, real_t petal_sharpness = 1.0, double inner_radius_scale = 0.0, double spiro_roller = 45.0, double spiro_pen = 80.0, double super_lobes = 6.0, double super_fullness = 1.0, real_t base_rotation = 0.0, int transforms_amount = -1);
 	static Dictionary helper_sample_outline_lissajous(real_t size_x = 200.0, real_t size_y = 120.0, real_t freq_x = 3.0, real_t freq_y = 2.0, real_t phase = 0.0);
 	static Dictionary helper_sample_outline_circle(real_t radius = 150.0);
 	static Dictionary helper_sample_outline_rectangle(const Vector2 &size = Vector2(300, 200));
