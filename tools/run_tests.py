@@ -163,6 +163,10 @@ def stale_binary_reason():
     built = newest_mtime(ADDON_BIN_DIR, (".so", ".dll", ".dylib"))
     if built == 0.0:
         return "no compiled extension found in test_project/addons/blastbullets2d/bin"
+    # SCons recompiles objects (.os) after any source edit but skips the link
+    # when the object bytes are unchanged (comment-only edits): the newest
+    # object therefore also proves the build ran after the edit.
+    built = max(built, newest_mtime(os.path.join(REPO_ROOT, "src"), (".os", ".o", ".obj")))
     source = newest_mtime(os.path.join(REPO_ROOT, "src"), (".cpp", ".hpp", ".h"))
     if source > built:
         return "src/ is newer than the compiled extension (rebuild: GODOTPP_NONINTERACTIVE=1 python3 tools/compile_debug_build.py)"
@@ -195,6 +199,11 @@ def refresh_class_cache(godot):
     return True
 
 
+# Failure text is clipped per test unless --full (parameterized tests put
+# every failing parameter into one message).
+DETAIL_LIMIT = 400
+
+
 def parse_junit(path):
     """-> (tests, failures, [(test_name, message)]) or None when missing/unreadable."""
     try:
@@ -205,13 +214,13 @@ def parse_junit(path):
     details = []
     for case in root.iter("testcase"):
         tests += 1
-        failure = case.find("failure")
-        error = case.find("error")
-        node = failure if failure is not None else error
-        if node is not None or case.get("status") == "fail":
+        # Parameterized tests record one <failure> per failing parameter.
+        nodes = case.findall("failure") + case.findall("error")
+        if nodes or case.get("status") == "fail":
             failures += 1
-            text = (node.text or node.get("message") or "failed").strip() if node is not None else "failed"
-            details.append((case.get("name", "?"), " ".join(text.split())[:400]))
+            texts = [(n.text or n.get("message") or "failed").strip() for n in nodes] or ["failed"]
+            flat = " | ".join(" ".join(t.split()) for t in texts)
+            details.append((case.get("name", "?"), flat if DETAIL_LIMIT is None else flat[:DETAIL_LIMIT]))
     return tests, failures, details
 
 
@@ -387,7 +396,11 @@ def main():
     ap.add_argument("--fixed-fps", type=int, default=60, help="simulated frames per second (default 60 = physics tick rate)")
     ap.add_argument("--report", metavar="PATH", nargs="?", const=os.path.join(PROJECT, "test_results", "summary.json"),
                     help="write per-file/per-test durations + statuses as JSON (default test_project/test_results/summary.json)")
+    ap.add_argument("--full", action="store_true", help="print every failure message in full (no clipping)")
     args = ap.parse_args()
+    if args.full:
+        global DETAIL_LIMIT
+        DETAIL_LIMIT = None
     fixed_fps = 0 if args.realtime else max(0, args.fixed_fps)
 
     godot = godot_binary()
