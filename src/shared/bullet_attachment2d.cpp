@@ -1,7 +1,7 @@
 #include "./bullet_attachment2d.hpp"
 #include "./bullet_attachment_object_pool2d.hpp"
 
-#include "../bullets/multimesh_bullets2d.hpp"
+#include "../bullets/directional_bullets2d.hpp"
 
 #include <godot_cpp/classes/engine.hpp>
 #include <godot_cpp/core/object.hpp>
@@ -30,7 +30,7 @@ void BulletAttachment2D::_notification(int p_what) {
 	// ObjectDB returns null then and the call is skipped safely.
 	if (owner_multimesh_id != 0) {
 		Object *owner_object = ObjectDB::get_instance(ObjectID(owner_multimesh_id));
-		MultiMeshBullets2D *owner = Object::cast_to<MultiMeshBullets2D>(owner_object);
+		DirectionalBullets2D *owner = Object::cast_to<DirectionalBullets2D>(owner_object);
 		if (owner != nullptr && owner_bullet_index >= 0) {
 			owner->_do_drop_attachment_slot_if_matches(owner_bullet_index, this);
 		}

@@ -1,19 +1,333 @@
 #pragma once
 
-#include "../shared/bullet_curves_data2d.hpp"
+#include "../shared/bullet_effect_layer_data2d.hpp"
 #include "../shared/bullet_rotation_data2d.hpp"
+#include "godot_cpp/variant/typed_array.hpp"
+#include <godot_cpp/classes/canvas_item_material.hpp>
+#include <godot_cpp/classes/mesh.hpp>
+#include <godot_cpp/classes/shape2d.hpp>
+#include <godot_cpp/classes/packed_scene.hpp>
+#include <godot_cpp/classes/resource.hpp>
+#include <godot_cpp/classes/sprite_frames.hpp>
+#include <godot_cpp/classes/texture2d.hpp>
+#include "../shared/bullet_curves_data2d.hpp"
 #include "../shared/bullet_speed_data2d.hpp"
 #include "../shared/bullet_wobble_data2d.hpp"
-#include "./multimesh_bullets_data2d.hpp"
-
 #include "godot_cpp/variant/node_path.hpp"
-#include "godot_cpp/variant/typed_array.hpp"
 
 namespace BlastBullets2D {
 using namespace godot;
 
-class DirectionalBulletsData2D : public MultiMeshBulletsData2D {
-	GDCLASS(DirectionalBulletsData2D, MultiMeshBulletsData2D)
+// Everything one volley needs at spawn time: transforms (one per bullet),
+// art, collision, lifetime, motion (speed, rotation, curves, wobble,
+// gravity, movement patterns), homing and bounce. Fill it in the inspector or
+// from code, then hand it to a BulletFactory2D spawn method. One resource can
+// be reused for every volley.
+class DirectionalBulletsData2D : public Resource {
+	GDCLASS(DirectionalBulletsData2D, Resource)
+public:
+	// TEXTURE / ANIMATION RELATED
+
+	// SpriteFrames resource holding all animations. Each frame is a Texture2D
+	// (plain texture or AtlasTexture region of a spritesheet). The whole multimesh
+	// batch shares one frame at a time; per-frame timing comes from the SpriteFrames
+	// animation (speed=fps, per-frame duration multiplier, loop flag).
+	Ref<SpriteFrames> sprite_frames;
+
+	// Which SpriteFrames animation to play. Empty or "default" auto-resolves silently:
+	// "default" if present, else the first animation. Explicit wrong names fall back
+	// to the first animation with a single error.
+	StringName animation = "default";
+
+	// QuadMesh size override. Used only if mesh is null. If x/y <= 0 the size is
+	// auto-derived from the first frame (AtlasTexture region size, else texture size).
+	Vector2 texture_size = Vector2(0, 0);
+
+	// The texture rotation in radians. Change the value of this if you see that your texture is not rotated correctly. Example: If you want to rotate the texture 90 degrees more you would set the value to 90*PI/180
+	real_t texture_rotation_radians = 0.0;
+
+	// Whether the rotation of the texture should never change depending on the direction the bullets move in
+	bool is_texture_rotation_permanent = false;
+
+	// The Z index of all bullets being spawned
+	int z_index = 0;
+
+	// BULLET MOVEMENT RELATED
+
+	// Determines the rotation and position of each bullet. The array amount_bullets determines the amount of projectiles to render.
+	TypedArray<Transform2D> transforms;
+
+	// BULLET ROTATION RELATED
+
+	// Spin for each bullet. Entry i rotates bullet i only. Give one entry
+	// per bullet (same size as transforms), or leave empty for no rotation.
+	// A null or NaN/Inf entry reads as zero spin for that bullet.
+	// Note that BulletRotationData2D has a helper static method that you can use to generate random rotation data - BulletRotationData2D.generate_random_data()
+	TypedArray<BlastBullets2D::BulletRotationData2D> all_bullet_rotation_data;
+
+	// Wrap short rotation arrays around the volley (slot i reads entry
+	// i % size). Off by default.
+	bool tile_all_bullet_rotation_data = false;
+
+	// If set to false, it will also rotate the collision shapes according to the BulletRotationData2D that was provided (it might decrease performance a little bit)
+	bool rotate_only_textures = true;
+
+	// If set to true, it will stop the rotation when the max rotation speed is reached
+	bool stop_rotation_when_max_reached = false;
+
+	// COLLISION RELATED
+
+	// How many times a single bullet can collide before being disabled. If you set to 0 the bullet will never be disabled due to collisions.
+	int bullet_max_collision_count = 1;
+
+	// Each bullets collision amount - it can only be set to a value that is <= bullet_max_collision_count (excluding 0 and negative numbers)
+	TypedArray<int> bullets_current_collision_count;
+
+	// Wrap short collision-count arrays around the volley. Off by default:
+	// bullets without their own entry start at 0 hits. Values still clamp
+	// (negatives to 0, at/above max to max - 1).
+	bool tile_bullets_current_collision_count = false;
+
+	// The collision layer that all bullets share. Note: pass a bitmask, it's not just a simple int. Use the calculate_bitmask function.
+	int collision_layer = 1;
+
+	// The collision mask that all bullets share. Note: pass a bitmask, it's not just a simple int. Use the calculate_bitmask function.
+	int collision_mask = 1;
+
+	// The collision shape. Supports RectangleShape2D, CircleShape2D and CapsuleShape2D. For any other shape an error will be printed.
+	Ref<Shape2D> collision_shape;
+
+	// Determines the offset of the collision shape (the collision shape is by default at the center of the texture, but with this you are able to control it's position)
+	Vector2 collision_shape_offset = Vector2(0, 0);
+
+	// If set to true it would mean it can detect bodies. I suggest you do NOT enable it, because it tanks performance, but I left it just in case someone is stubborn and has that need. Instead consider adding an Area2D to the body that you are trying to damage and set up its collision layer correctly so that the bullets can interact with it.
+	bool monitorable = false;
+
+	// Available inside the directional_area_entered / directional_body_entered callbacks inside factory.
+	Ref<Resource> shared_bullets_custom_data;
+
+	// PER-BULLET CUSTOM DATA
+
+	// Custom data carried per bullet, readable in the factory collision
+	// callbacks through the instance (bullet_get_custom_data) alongside the
+	// shared value above. Entry i belongs to bullet i and nobody else.
+	// Stays strictly separate from shared_bullets_custom_data: bullets
+	// without an entry read as null, never as the shared value.
+	TypedArray<Resource> all_bullets_custom_data;
+
+	// Wrap short custom-data arrays around the volley. Off by default.
+	bool tile_all_bullets_custom_data = false;
+
+	// BULLET ATTACHMENT RELATED
+
+	// Shared attachment scene applied to every bullet at spawn/enable time.
+	// Null (default) disables the feature; use the runtime bullet_set_attachment
+	// methods for per-bullet attachments instead.
+	Ref<PackedScene> shared_bullet_attachment;
+
+	// Offset of the shared attachment relative to the bullet's texture center.
+	Vector2 shared_bullet_attachment_offset = Vector2(0, 0);
+
+	// Whether the shared attachment sticks while the bullet rotates.
+	bool shared_bullet_attachment_stick_relative_to_bullet = true;
+
+	// SPRITE EFFECT LAYERS
+
+	// Stackable sprite-effect layers (trails, spawn flashes, hit sparks,
+	// destroy explosions, bounce sparks). Each entry renders through its
+	// own per-frame shards: one extra draw call per animation frame while
+	// anything is visible, zero when idle. Empty (default) disables the
+	// whole feature. Use BulletEffectLayerData2D.make_*() presets for
+	// zero-art effects, or assign custom SpriteFrames per layer.
+	TypedArray<BlastBullets2D::BulletEffectLayerData2D> effect_layers;
+
+	// OTHER
+
+	// Light mask. Note: pass a bitmask, it's not just a simple int. Use the calculate_bitmask function.
+	int light_mask = 1;
+
+	// Visibility layer. Note: pass a bitmask, it's not just a simple int. Use the calculate_bitmask function.
+	int visibility_layer = 1;
+
+	// Whole-volley tint, exactly like CanvasItem self_modulate (multiplies
+	// every bullet instance). White (default) renders untouched. Spawn one
+	// volley per color for different-colored bullets; reseeded from data on
+	// every spawn/enable, so pool reuse never leaks the previous tint.
+	Color self_modulate = Color(1, 1, 1, 1);
+
+	// Bullet whiten override (shares the animation rebuild below). When true, bullet frames bake
+	// whitened (alpha preserved), so self_modulate tints bullets to the
+	// exact dialed color instead of multiplying the source art. Same
+	// fallback contract as the effect-layer override: unreadable frames
+	// keep the original art with one warning, never a blank.
+	bool override_frame_color = false;
+
+	// Fade-in seconds after spawn. 0 (default) disables it.
+	double fade_in_sec = 0.0;
+	// Fade-out seconds before expiry. 0 (default) disables it. Ignored
+	// with infinite lifetimes (nothing expires).
+	double fade_out_sec = 0.0;
+	// Tint-over-life gradient, sampled by lifetime fraction. Null disables.
+	Ref<Gradient> modulate_ramp;
+
+	// How long will the bullets last, before being disabled. Depending on whether the bullets pool has reached its limit, it will either add the bullets to the pool or it will queue_free them.
+	double max_life_time = 2.0f;
+
+	// Whether the directional_life_time_over signal will be emitted when the life time of the bullets is over. Tracked by BulletFactory2D
+	bool is_life_time_over_signal_enabled = false;
+
+	// Whether the lifetime is infinite
+	bool is_life_time_infinite = false;
+
+	// You can assign a custom material that uses a shader. Note that you may also want to provide a custom mesh as well, but if you do so, then the texture_size property won't be used, instead handle scaling in the shader as well.
+	Ref<Material> material;
+
+	// Per-instance shader overrides for a ShaderMaterial with instance uniforms.
+	// Key = uniform name (String), value = Variant matching the uniform type.
+	// Applied in finalize_set_up() via set_instance_shader_parameter() per bullet
+	// instance; ignored (and cleared on pool reuse) unless material is a
+	// ShaderMaterial. Example: {"glow": Color(1, 0.5, 0), "speed": 2.0}.
+	Dictionary instance_shader_parameters;
+
+	// Custom mesh, if it isn't provided then a Quadmesh will be generated and it will use the texture_size. If you DO provide a mesh then you should handle the scaling of the bullets yourself using a shader for best quality.
+	Ref<Mesh> mesh;
+
+	// Used to acquire a bitmask from an array of integer values. Useful when setting the collision layer and collision mask. Example: you want your bullets to be in collision layer 1,2,3,7, you would pass an array of these numbers and the value that gets returned is the value you need to set to the collision_layer. Pass ONLY POSITIVE NUMBERS (NEVER PASS NEGATIVE OR ZERO)
+	static int calculate_bitmask(const TypedArray<int> &numbers);
+
+	// GETTERS AND SETTERS
+
+	bool get_is_life_time_infinite() const;
+	void set_is_life_time_infinite(bool value);
+
+	TypedArray<Transform2D> get_transforms() const;
+	void set_transforms(const TypedArray<Transform2D> &new_transforms);
+
+	Ref<SpriteFrames> get_sprite_frames() const;
+	void set_sprite_frames(const Ref<SpriteFrames> &new_sprite_frames);
+
+	StringName get_animation() const;
+	void set_animation(const StringName &new_animation);
+
+	Vector2 get_texture_size() const;
+	void set_texture_size(Vector2 new_texture_size);
+
+	real_t get_texture_rotation_radians() const;
+	void set_texture_rotation_radians(real_t new_texture_rotation_radians);
+
+	int get_collision_layer() const;
+	void set_collision_layer(int new_collision_layer);
+	void set_collision_layer_from_array(const TypedArray<int> &numbers);
+
+	int get_collision_mask() const;
+	void set_collision_mask(int new_collision_mask);
+	void set_collision_mask_from_array(const TypedArray<int> &numbers);
+
+	Ref<Shape2D> get_collision_shape() const;
+	void set_collision_shape(const Ref<Shape2D> &new_shape);
+
+	Vector2 get_collision_shape_offset() const;
+	void set_collision_shape_offset(const Vector2 &new_collision_shape_offset);
+
+	bool get_monitorable() const;
+	void set_monitorable(bool new_monitorable);
+
+	Ref<Resource> get_shared_bullets_custom_data() const;
+	void set_shared_bullets_custom_data(const Ref<Resource> &new_shared_bullets_custom_data);
+
+	TypedArray<Resource> get_all_bullets_custom_data() const;
+	void set_all_bullets_custom_data(const TypedArray<Resource> &new_custom_data);
+
+	bool get_tile_all_bullets_custom_data() const;
+	void set_tile_all_bullets_custom_data(bool value);
+
+	Ref<PackedScene> get_shared_bullet_attachment() const;
+	void set_shared_bullet_attachment(const Ref<PackedScene> &new_attachment);
+
+	Vector2 get_shared_bullet_attachment_offset() const;
+	void set_shared_bullet_attachment_offset(const Vector2 &new_offset);
+
+	bool get_shared_bullet_attachment_stick_relative_to_bullet() const;
+	void set_shared_bullet_attachment_stick_relative_to_bullet(bool value);
+
+	TypedArray<BlastBullets2D::BulletEffectLayerData2D> get_effect_layers() const;
+	void set_effect_layers(const TypedArray<BlastBullets2D::BulletEffectLayerData2D> &new_layers);
+
+	double get_max_life_time() const;
+	void set_max_life_time(double new_max_life_time);
+
+	Ref<Material> get_material() const;
+	void set_material(const Ref<Material> &new_material);
+
+	Ref<Mesh> get_mesh() const;
+	void set_mesh(const Ref<Mesh> &new_mesh);
+
+	TypedArray<BulletRotationData2D> get_all_bullet_rotation_data() const;
+	void set_all_bullet_rotation_data(const TypedArray<BulletRotationData2D> &new_data);
+
+	bool get_tile_all_bullet_rotation_data() const;
+	void set_tile_all_bullet_rotation_data(bool value);
+
+	bool get_rotate_only_textures() const;
+	void set_rotate_only_textures(bool new_rotate_only_textures);
+
+	bool get_is_texture_rotation_permanent() const;
+	void set_is_texture_rotation_permanent(bool new_is_texture_rotation_permanent);
+
+	int get_z_index() const;
+	void set_z_index(int new_z_index);
+
+	int get_light_mask() const;
+	void set_light_mask(int new_light_mask);
+	void set_light_mask_from_array(const TypedArray<int> &numbers);
+
+	int get_visibility_layer() const;
+	void set_visibility_layer(int new_visibility_layer);
+	void set_visibility_layer_from_array(const TypedArray<int> &numbers);
+
+	Color get_self_modulate() const;
+	void set_self_modulate(const Color &new_self_modulate);
+
+	bool get_override_frame_color() const;
+	void set_override_frame_color(bool value);
+
+	// Fade-in seconds after spawn (0 disables). The volley starts at
+	// transparent base tint and reaches full tint at fade_in_sec. Must be
+	// finite and >= 0. Works with infinite lifetimes (age since spawn).
+	double get_fade_in_sec() const;
+	void set_fade_in_sec(double value);
+
+	// Fade-out seconds before expiry (0 disables). Needs a finite lifetime:
+	// infinite volleys never expire, so fade_out is ignored there
+	// (documented, no warning). Must be finite and >= 0.
+	double get_fade_out_sec() const;
+	void set_fade_out_sec(double value);
+
+	// Tint-over-life gradient, sampled by lifetime fraction (0 at spawn,
+	// 1 at expiry) and multiplied with the base tint and the fades above.
+	// Null (default) disables it. Infinite lifetimes ignore it (no
+	// fraction exists); use fade_in_sec for endless volleys.
+	Ref<Gradient> get_modulate_ramp() const;
+	void set_modulate_ramp(const Ref<Gradient> &value);
+
+	Dictionary get_instance_shader_parameters() const;
+	void set_instance_shader_parameters(const Dictionary &new_instance_shader_parameters);
+
+	bool get_is_life_time_over_signal_enabled() const;
+	void set_is_life_time_over_signal_enabled(bool new_is_life_time_over_signal_enabled);
+
+	bool get_stop_rotation_when_max_reached() const;
+	void set_stop_rotation_when_max_reached(bool new_stop_rotation_when_max_reached);
+
+	int get_bullet_max_collision_count() const;
+	void set_bullet_max_collision_count(int new_max_collision_amount);
+
+	TypedArray<int> get_bullets_current_collision_count() const;
+	void set_bullets_current_collision_count(const TypedArray<int> &arr);
+
+	bool get_tile_bullets_current_collision_count() const;
+	void set_tile_bullets_current_collision_count(bool value);
+
 
 public:
 	// How per-bullet arrays resolve. Entry i belongs to bullet i and nobody

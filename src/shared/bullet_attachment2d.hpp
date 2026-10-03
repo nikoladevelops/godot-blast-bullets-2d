@@ -28,7 +28,7 @@ public:
 	// hand.
 	Ref<PackedScene> source_scene;
 
-	// Owner tracking (managed by MultiMeshBullets2D, never set by hand): which
+	// Owner tracking (managed by DirectionalBullets2D, never set by hand): which
 	// multimesh slot currently owns this ACTIVE attachment. Lets PREDELETE of a
 	// manually freed active attachment drop its slot instead of leaving a dangling
 	// pointer in the multimesh's attachments array.

@@ -1,5 +1,5 @@
 #include "multimesh_object_pool2d.hpp"
-#include "../bullets/multimesh_bullets2d.hpp"
+#include "../bullets/directional_bullets2d.hpp"
 #include "collision_shape_helper2d.hpp"
 
 #include <godot_cpp/classes/node.hpp>
@@ -9,7 +9,7 @@ using namespace godot;
 
 namespace BlastBullets2D {
 
-void MultiMeshObjectPool::push(MultiMeshBullets2D *multimesh, const PoolKey &key) {
+void MultiMeshObjectPool::push(DirectionalBullets2D *multimesh, const PoolKey &key) {
 	if (multimesh == nullptr) {
 		UtilityFunctions::push_error("MultiMeshObjectPool::push got a null multimesh, ignoring.");
 		return;
@@ -26,7 +26,7 @@ void MultiMeshObjectPool::push(MultiMeshBullets2D *multimesh, const PoolKey &key
 	multimesh->is_pooled_in_pool = true;
 }
 
-MultiMeshBullets2D *MultiMeshObjectPool::pop(const PoolKey &key) {
+DirectionalBullets2D *MultiMeshObjectPool::pop(const PoolKey &key) {
 	auto it = pool.find(key);
 
 	// Check if key exists and vector isn't empty
@@ -37,9 +37,9 @@ MultiMeshBullets2D *MultiMeshObjectPool::pop(const PoolKey &key) {
 	// Skip any entries that can never be reused: null leftovers (bad push) and
 	// instances the user queue_free'd while pooled. Handing out a dying instance
 	// would silently lose the caller's volley when the deferred deletion lands.
-	std::vector<MultiMeshBullets2D *> &bucket = it->second;
+	std::vector<DirectionalBullets2D *> &bucket = it->second;
 	while (!bucket.empty()) {
-		MultiMeshBullets2D *candidate = bucket.back();
+		DirectionalBullets2D *candidate = bucket.back();
 		if (candidate == nullptr || candidate->is_queued_for_deletion()) {
 			if (candidate != nullptr) {
 				candidate->is_pooled_in_pool = false;
@@ -64,7 +64,7 @@ MultiMeshBullets2D *MultiMeshObjectPool::pop(const PoolKey &key) {
 	if (pick < 0 || bucket[pick] == nullptr) {
 		return nullptr;
 	}
-	MultiMeshBullets2D *found_multimesh = bucket[pick];
+	DirectionalBullets2D *found_multimesh = bucket[pick];
 	bucket[pick] = bucket.back();
 	bucket.pop_back();
 	found_multimesh->is_pooled_in_pool = false;
@@ -83,7 +83,7 @@ void MultiMeshObjectPool::clear() {
 void MultiMeshObjectPool::free_all_bullets() {
 	for (auto &[key, vec] : pool) {
 		// Free every object in the vector
-		for (MultiMeshBullets2D *bullet_multi : vec) {
+		for (DirectionalBullets2D *bullet_multi : vec) {
 			if (bullet_multi) {
 				bullet_multi->force_delete();
 			}
@@ -98,7 +98,7 @@ void MultiMeshObjectPool::free_specific_bullets(const PoolKey &key) {
 	if (it == pool.end()) {
 		return;
 	}
-	for (MultiMeshBullets2D *bullet_multi : it->second) {
+	for (DirectionalBullets2D *bullet_multi : it->second) {
 		if (bullet_multi) {
 			bullet_multi->force_delete();
 		}
@@ -124,12 +124,12 @@ std::map<PoolKey, int> MultiMeshObjectPool::get_pool_info() {
 	return result;
 }
 
-bool MultiMeshObjectPool::try_remove_instance(MultiMeshBullets2D *target, const PoolKey &key) {
+bool MultiMeshObjectPool::try_remove_instance(DirectionalBullets2D *target, const PoolKey &key) {
 	auto it = pool.find(key);
 	if (it == pool.end()) {
 		return false;
 	}
-	std::vector<MultiMeshBullets2D *> &vec = it->second;
+	std::vector<DirectionalBullets2D *> &vec = it->second;
 	for (size_t i = 0; i < vec.size(); ++i) {
 		if (vec[i] == target) {
 			vec[i] = vec.back();

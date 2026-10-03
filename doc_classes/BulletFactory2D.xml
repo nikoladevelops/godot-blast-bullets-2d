@@ -23,7 +23,7 @@
 			<return type="int" />
 			<param index="0" name="key" type="MultiMeshPoolKey2D" default="null" />
 			<description>
-				Clears every live bullet with dismissal visuals: runs each active volley's [method MultiMeshBullets2D.clear_all_bullets], so On Clear effect layers fire, and emptied volleys park in the pool. Returns how many bullets were cleared. Pass [code]null[/code] (default) for all buckets, or a [MultiMeshPoolKey2D] for one exact bucket. Unlike [method free_active_bullets] (silent deletion) and [method reset] (silent teardown), this is the wave-clear path that reads on screen.
+				Clears every live bullet with dismissal visuals: runs each active volley's [method DirectionalBullets2D.clear_all_bullets], so On Clear effect layers fire, and emptied volleys park in the pool. Returns how many bullets were cleared. Pass [code]null[/code] (default) for all buckets, or a [MultiMeshPoolKey2D] for one exact bucket. Unlike [method free_active_bullets] (silent deletion) and [method reset] (silent teardown), this is the wave-clear path that reads on screen.
 			</description>
 		</method>
 		<method name="clear_active_bullets_deferred">
@@ -62,7 +62,7 @@
 		</method>
 		<method name="debug_expected_pool_key" qualifiers="static">
 			<return type="MultiMeshPoolKey2D" />
-			<param index="0" name="spawn_data" type="MultiMeshBulletsData2D" />
+			<param index="0" name="spawn_data" type="DirectionalBulletsData2D" />
 			<description>
 				Derives the exact pool bucket a spawn would use without spawning. Returns null on empty data.
 			</description>
@@ -124,7 +124,7 @@
 		</method>
 		<method name="debug_get_pool_bucket">
 			<return type="MultiMeshPoolKey2D" />
-			<param index="0" name="volley" type="MultiMeshBullets2D" />
+			<param index="0" name="volley" type="DirectionalBullets2D" />
 			<description>
 				Live pool bucket (amount + shape) of one volley, for per-bucket free/reset assertions in multi-spawner tests. Returns null on null input.
 			</description>
@@ -164,7 +164,7 @@
 		</method>
 		<method name="debug_validate_spawn_data" qualifiers="static">
 			<return type="Dictionary" />
-			<param index="0" name="spawn_data" type="MultiMeshBulletsData2D" />
+			<param index="0" name="spawn_data" type="DirectionalBulletsData2D" />
 			<description>
 				Non-mutating validation: {ok, error, warning}. Never spawns, never touches the pool. The warning fires for invisible bullets (no sprite_frames/mesh/texture_size); art must face Vector2.RIGHT (cannot be auto-detected).
 			</description>
@@ -268,7 +268,7 @@
 			<return type="void" />
 			<param index="0" name="volley" type="Node" />
 			<description>
-				Safe single-volley free from any callback: uses queue_free(), never free()/force_delete(). Use this inside directional_area_entered and other handlers instead of freeing the volley directly. Only bullet volleys ([MultiMeshBullets2D]) are accepted; any other node is rejected with an error and left alone.
+				Safe single-volley free from any callback: uses queue_free(), never free()/force_delete(). Use this inside directional_area_entered and other handlers instead of freeing the volley directly. Only bullet volleys ([DirectionalBullets2D]) are accepted; any other node is rejected with an error and left alone.
 			</description>
 		</method>
 		<method name="get_active_bullet_count" qualifiers="const">
@@ -1283,7 +1283,7 @@
 		<method name="populate_bullets_pool">
 			<return type="void" />
 			<param index="0" name="key" type="MultiMeshPoolKey2D" />
-			<param index="1" name="spawn_data" type="MultiMeshBulletsData2D" />
+			<param index="1" name="spawn_data" type="DirectionalBulletsData2D" />
 			<param index="2" name="instance_count" type="int" />
 			<description>
 				Pre-creates [code]instance_count[/code] disabled multimeshes in one exact bucket. [code]key.amount_bullets[/code] is bullets per multimesh (must equal [code]spawn_data[/code] transforms size); [code]instance_count[/code] is how many multimeshes to create. The [code]key[/code] is required and must match the bucket derived from [code]spawn_data[/code] (amount_bullets + effective collision shape); mismatch aborts with an error and creates nothing. Example: [code]populate_bullets_pool(MultiMeshPoolKey2D.make(5, PhysicsServer2D.SHAPE_CIRCLE), data, 2)[/code] creates 2 multimeshes of 5 bullets each.
@@ -1292,7 +1292,7 @@
 		<method name="populate_bullets_pool_deferred">
 			<return type="void" />
 			<param index="0" name="key" type="MultiMeshPoolKey2D" />
-			<param index="1" name="spawn_data" type="MultiMeshBulletsData2D" />
+			<param index="1" name="spawn_data" type="DirectionalBulletsData2D" />
 			<param index="2" name="instance_count" type="int" />
 			<description>
 				Deferred [method populate_bullets_pool]: safe from any callback. Null key, null data and instance_count &lt;= 0 are rejected immediately without queuing.
@@ -1300,7 +1300,7 @@
 		</method>
 		<method name="reactivate_multimesh_instance">
 			<return type="void" />
-			<param index="0" name="multimesh_bullets" type="MultiMeshBullets2D" />
+			<param index="0" name="multimesh_bullets" type="DirectionalBullets2D" />
 			<description>
 				Re-registers a pooled multimesh inside the factory's active set after one of its bullets was woken with enable_bullet() outside of a normal spawn. Does nothing when the multimesh is already active, when the factory is busy, or when the factory is tearing down. You normally never call this yourself, enable_bullet() already handles it.
 			</description>
@@ -1425,7 +1425,7 @@
 			<description>
 				Emitted synchronously in the physics tick when a directional bullet enters a physics body.
 
-				Note: Static bodies can be detected by the bullets, but only if you set the [MultiMeshBulletsData2D]'s [member MultiMeshBulletsData2D.monitorable] property to [code]true[/code] when spawning bullets - this is at the cost of performance of course, so it's better to stick with [Area2D] or other types of bodies for enemies/buildings etc and leave the [member MultiMeshBulletsData2D.monitorable] property to be false.
+				Note: Static bodies can be detected by the bullets, but only if you set the [DirectionalBulletsData2D]'s [member DirectionalBulletsData2D.monitorable] property to [code]true[/code] when spawning bullets - this is at the cost of performance of course, so it's better to stick with [Area2D] or other types of bodies for enemies/buildings etc and leave the [member DirectionalBulletsData2D.monitorable] property to be false.
 			</description>
 		</signal>
 		<signal name="directional_bounce_area_entered">
@@ -1448,7 +1448,7 @@
 			<param index="0" name="directional_bullets_instance" type="DirectionalBullets2D" />
 			<param index="1" name="bullet_indexes" type="int[]" />
 			<description>
-				Emitted (deferred, outside the physics step) when a directional bullet multimesh's lifetime is over, but only if the [MultiMeshBulletsData2D]'s [member MultiMeshBulletsData2D.is_life_time_over_signal_enabled] is set to [code]true[/code]. Until the signal has been delivered the expired volley stays out of the pool and keeps its attachments, so handlers can inspect [method MultiMeshBullets2D.bullet_get_attachment] and a same-frame spawn can never reuse (and silence) it; attachments are released and the volley pooled right after.
+				Emitted (deferred, outside the physics step) when a directional bullet multimesh's lifetime is over, but only if the [DirectionalBulletsData2D]'s [member DirectionalBulletsData2D.is_life_time_over_signal_enabled] is set to [code]true[/code]. Until the signal has been delivered the expired volley stays out of the pool and keeps its attachments, so handlers can inspect [method DirectionalBullets2D.bullet_get_attachment] and a same-frame spawn can never reuse (and silence) it; attachments are released and the volley pooled right after.
 			</description>
 		</signal>
 		<signal name="reset_finished">

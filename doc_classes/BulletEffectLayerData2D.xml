@@ -4,10 +4,10 @@
 		One stackable sprite-effect layer for a bullet volley: a trail that follows bullets, or a one-shot visual (spawn flash, hit sparks, destroy explosion, bounce sparks).
 	</brief_description>
 	<description>
-		Put layers in [MultiMeshBulletsData2D.effect_layers] — as many as you want. Each layer renders through its own per-frame shards (one extra draw call per animation frame while anything is visible, zero when idle), so layers never fight each other and every instance can show a different animation frame.
+		Put layers in [member DirectionalBulletsData2D.effect_layers] — as many as you want. Each layer renders through its own per-frame shards (one extra draw call per animation frame while anything is visible, zero when idle), so layers never fight each other and every instance can show a different animation frame.
 		Upload [member sprite_frames] per layer (a layer with null frames is inert). Use [BulletAttachment2D] scenes instead when you need particles or scripted nodes; use layers for plain sprites.
 		One texture per layer is shared by all its instances (the performance bargain), so per-bullet different textures are not supported — vary instances with [member random_start_frame], [member randomize_rotation], [member random_scale_min]/[member random_scale_max] and [member trigger_chance] instead. Tint with [member self_modulate], or over life with [member color_ramp].
-		Bakes are snapshots: editing a layer's frames mid-life does not refresh live volleys or factory bakes — call [method MultiMeshBullets2D.set_effect_layers] (or [method MultiMeshBullets2D.play_effect_animation] for trails) to apply edits.
+		Bakes are snapshots: editing a layer's frames mid-life does not refresh live volleys or factory bakes — call [method DirectionalBullets2D.set_effect_layers] (or [method DirectionalBullets2D.play_effect_animation] for trails) to apply edits.
 	</description>
 	<tutorials>
 	</tutorials>
@@ -22,7 +22,7 @@
 	</methods>
 	<members>
 		<member name="animation" type="StringName" setter="set_animation" getter="get_animation" default="&amp;&quot;default&quot;">
-			Which animation to play. Empty or "default" auto-resolves silently: "default" if present, else the first animation with frames. Switch a live trail layer with [method MultiMeshBullets2D.play_effect_animation].
+			Which animation to play. Empty or "default" auto-resolves silently: "default" if present, else the first animation with frames. Switch a live trail layer with [method DirectionalBullets2D.play_effect_animation].
 		</member>
 		<member name="color_ramp" type="Gradient" setter="set_color_ramp" getter="get_color_ramp">
 			Tint-over-life ramp, sampled per instance by animation age (one-shots) or loop phase (trails), exactly like particle color ramps. Multiplies with [member self_modulate]. Null (default) keeps every instance solid. Example: white-to-transparent red ramp on a destroy layer fades each explosion out individually.
@@ -114,7 +114,7 @@
 			One-shot fired at each bullet's death pose on lifetime expiry (both the silent and the signalled path), even as the volley pools underneath it.
 		</constant>
 		<constant name="EFFECT_ON_CLEAR" value="6" enum="EffectTrigger">
-			One-shot fired by manual clears only ([method MultiMeshBullets2D.clear_all_bullets], [method BulletFactory2D.clear_active_bullets] and the single-bullet clear). Collision kills fire On Destroy, timeouts fire On Lifetime Over and teardown (reset/free) stays silent, so a clear layer never doubles another trigger.
+			One-shot fired by manual clears only ([method DirectionalBullets2D.clear_all_bullets], [method BulletFactory2D.clear_active_bullets] and the single-bullet clear). Collision kills fire On Destroy, timeouts fire On Lifetime Over and teardown (reset/free) stays silent, so a clear layer never doubles another trigger.
 		</constant>
 	</constants>
 </class>

@@ -85,4 +85,4 @@ func _on_detect_area_2d_body_exited(body: Node2D) -> void:
 		shoot_timer.stop()
 
 func set_bullet_collision_mask(arr:Array[int])->void:
-	bullets_data.collision_mask = MultiMeshBulletsData2D.calculate_bitmask(arr)
+	bullets_data.collision_mask = DirectionalBulletsData2D.calculate_bitmask(arr)

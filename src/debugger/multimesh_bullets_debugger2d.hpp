@@ -15,7 +15,7 @@ class PhysicsServer2D;
 namespace BlastBullets2D {
 using namespace godot;
 
-class MultiMeshBullets2D;
+class DirectionalBullets2D;
 
 // Visualizes the collision shapes of the bullets
 class MultiMeshBulletsDebugger2D : public Node {
@@ -70,7 +70,7 @@ private:
 	Color debugger_color = Color(0, 0, 0, 1);
 
 	// Stores pointers to the spawned debug_data_providers
-	std::vector<MultiMeshBullets2D *> debug_data_providers;
+	std::vector<DirectionalBullets2D *> debug_data_providers;
 
 	// Instance ids parallel to debug_data_providers. Raw provider pointers can
 	// dangle when a multimesh is freed while pooled or during factory teardown;
@@ -116,10 +116,10 @@ private:
 	Ref<Mesh> create_debug_mesh_for_shape(PhysicsServer2D::ShapeType type, const Vector2 &full_size);
 
 	// Ensures debug mesh type/size matches provider (handles pool reuse with different sizes)
-	void ensure_quadmesh_matches_data_provider_collision_shape_size(int dbg_index, MultiMeshInstance2D &debug_multimesh_instance, MultiMeshBullets2D &debugger_data_provider);
+	void ensure_quadmesh_matches_data_provider_collision_shape_size(int dbg_index, MultiMeshInstance2D &debug_multimesh_instance, DirectionalBullets2D &debugger_data_provider);
 
 	// Updates each debug multimesh's instance transforms to match the debug_data_providers's data
-	void update_debug_multimesh_transforms_to_match_data_provider_collision_shape_transforms(MultiMeshInstance2D &debug_multimesh_instance, MultiMeshBullets2D &debugger_data_provider);
+	void update_debug_multimesh_transforms_to_match_data_provider_collision_shape_transforms(MultiMeshInstance2D &debug_multimesh_instance, DirectionalBullets2D &debugger_data_provider);
 
 	// Changes the color of all debug multimeshes/ the color of the debug shapes
 	void change_debug_multimeshes_color(const Color &new_multimesh_color);

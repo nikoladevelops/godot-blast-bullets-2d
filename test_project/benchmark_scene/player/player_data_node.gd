@@ -249,7 +249,7 @@ func set_new_damage_value(new_damage:int)->void:
 
 # Sets a brand new collision mask based on the integers passed
 func set_bullet_collision_mask(arr:Array[int])->void:
-	directional_bullets_data.collision_mask = MultiMeshBulletsData2D.calculate_bitmask(arr)
+	directional_bullets_data.collision_mask = DirectionalBulletsData2D.calculate_bitmask(arr)
 
 # Changes the size of the collision shapes that the bullets have
 func set_collision_shape_size(new_size:Vector2)->void:

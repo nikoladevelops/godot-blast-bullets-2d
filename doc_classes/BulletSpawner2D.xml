@@ -173,7 +173,7 @@
 		<method name="get_live_volleys" qualifiers="const">
 			<return type="Array" />
 			<description>
-				The tracked live volley instances (pruned first), so scripts can call the full DirectionalBullets2D API on each volley directly. Inspect-only handles: a volley can be pooled and reused for a new owner while you still hold it, so always check [method MultiMeshBullets2D.is_bullet_status_enabled] and ownership before steering a held volley. Use [method adopt_live_volley] to take ownership of a manually-woken volley.
+				The tracked live volley instances (pruned first), so scripts can call the full DirectionalBullets2D API on each volley directly. Inspect-only handles: a volley can be pooled and reused for a new owner while you still hold it, so always check [method DirectionalBullets2D.is_bullet_status_enabled] and ownership before steering a held volley. Use [method adopt_live_volley] to take ownership of a manually-woken volley.
 			</description>
 		</method>
 		<method name="get_movement_leg" qualifiers="const">

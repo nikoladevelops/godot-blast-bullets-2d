@@ -22,11 +22,9 @@
 
 // Spawn data classes
 #include "spawn-data/directional_bullets_data2d.hpp"
-#include "spawn-data/multimesh_bullets_data2d.hpp"
 
 // Bullets classes
 #include "bullets/directional_bullets2d.hpp"
-#include "bullets/multimesh_bullets2d.hpp"
 
 // Bullet Spawner
 #include "bullet_spawner/bullet_spawner2d.hpp"
@@ -70,13 +68,11 @@ void initialize_blast_bullets_2d_module(ModuleInitializationLevel p_level) {
 	GDREGISTER_CLASS(MultiMeshBulletsDebugger2D)
 
 	// Spawn data classes
-	GDREGISTER_CLASS(MultiMeshBulletsData2D)
 	GDREGISTER_CLASS(DirectionalBulletsData2D)
 
 	// Bullets classes
 	// GDREGISTER_CLASS (not RUNTIME): runtime classes are not creatable in the editor,
 	// which would break restoring any scene that contains these nodes.
-	GDREGISTER_CLASS(MultiMeshBullets2D)
 	GDREGISTER_CLASS(DirectionalBullets2D)
 
 	// Bullet Spawner

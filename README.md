@@ -242,9 +242,9 @@ Full property and method reference for all of the above lives in the editor docs
 #### How to configure `DirectionalBulletsData2D`?
 
 The spawn functions require a `DirectionalBulletsData2D`.
-It's important that you always check its in-engine documentation and also the base class that it inherits from `MultiMeshBulletsData2D`.<br>
+It's important that you always check its in-engine documentation.<br>
 
-The same thing should be said for the `DirectionalBullets2D` and `MultiMeshBullets2D` classes, since inside them you will find runtime properties and helper functions. The documentation is always there to help you!
+The same thing should be said for the `DirectionalBullets2D` class, since inside them you will find runtime properties and helper functions. The documentation is always there to help you!
 
 
 The `DirectionalBulletsData2D` resource class needs to have their `transforms` property set to an array of `Transform2D` - this data determines the global position and rotation of all bullets. The amount of `Transform2D` will also determine the amount of bullets that need to be spawned.

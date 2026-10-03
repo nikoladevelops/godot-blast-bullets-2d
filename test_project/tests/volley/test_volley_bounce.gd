@@ -825,10 +825,13 @@ func test_t20_inspector_groups_stay_coherent() -> void:
 				data_groups.append(pname)
 		elif pname != "":
 			data_group_of[pname] = data_current
-	var want_data_groups := ["Movement Speed", "Bullet Rotation", "Wobble", "Gravity", "Bounce and Ricochet", "Movement Pattern Paths", "Homing"]
-	assert_true(data_groups.slice(0, want_data_groups.size()) == want_data_groups, "data group order matches workflow")
-	# Group titles must be unique across the FULL list (derived + base):
-	# two sections with one name is exactly the confusion being removed.
+	# One class, one workflow: what the bullets are and look like, how they
+	# move, then collision, attachments, effects and rendering (Godot's own
+	# Resource group follows, hence the slice).
+	var want_data_groups := ["Bullets", "Appearance", "Movement Speed", "Bullet Rotation", "Wobble", "Gravity", "Bounce and Ricochet", "Movement Pattern Paths", "Homing", "Collision", "Attachments", "Sprite Effects", "Rendering and Material"]
+	assert_eq(data_groups.slice(0, want_data_groups.size()), want_data_groups, "data group order matches workflow")
+	# Group titles must be unique across the FULL list: two sections with one
+	# name is exactly the confusion being removed.
 	var seen_groups := {}
 	var duplicate_groups: Array = []
 	for p in props20:
@@ -838,14 +841,8 @@ func test_t20_inspector_groups_stay_coherent() -> void:
 				duplicate_groups.append(gname)
 			seen_groups[gname] = true
 	assert_true(duplicate_groups.is_empty(), "no duplicate group titles on the resource")
-	# Rotation triplet is split across classes BY DESIGN: the per-bullet
-	# arrays live on the base (BlockBullets spins from the shared base spawn
-	# path), the shared fallback lives here. Moving them together would break
-	# BlockBullets. Pin the split so nobody "fixes" it into a regression.
-	assert_true(str(data_group_of.get("shared_bullet_rotation_data", "")) == "Bullet Rotation", "shared rotation grouped with steering")
-	assert_true(str(data_group_of.get("all_bullet_rotation_data", "")) == "Per-Bullet Rotation", "per-bullet rotation grouped with arrays")
-	# Every bounce knob lives in the Bounce group (all 12, both classes):
-	# a stray bounce prop in Movement Speed would confuse setup order.
+	# Every bounce knob lives in the Bounce group (all 12): a stray bounce
+	# prop in Movement Speed would confuse setup order.
 	var bounce_props := ["bounce_mask", "bounce_strength", "bounce_push_assist", "bounce_charge_amplify", "bounce_hit_consumed", "bounce_max_count", "bounce_mode", "bounce_rotate_texture", "bounce_rotation_smooth", "bounce_randomness_deg", "bounce_cooldown_sec", "bounce_debounce_sec"]
 	var bounce_homed := true
 	for bname in bounce_props:
@@ -855,13 +852,14 @@ func test_t20_inspector_groups_stay_coherent() -> void:
 	var triplet_families := [
 		["shared_bullet_speed_data", "all_bullet_speed_data", "tile_all_bullet_speed_data"],
 		["shared_bullet_curves_data", "all_bullet_curves_data", "tile_all_bullet_curves_data"],
+		["shared_bullet_rotation_data", "all_bullet_rotation_data", "tile_all_bullet_rotation_data"],
 		["shared_bullet_wobble_data", "all_bullet_wobble_data", "tile_all_bullet_wobble_data"],
 		["gravity", "all_bullet_gravity", "tile_all_bullet_gravity"],
 		["shared_movement_pattern_path", "all_bullet_movement_pattern_paths", "tile_all_bullet_movement_pattern_paths"],
 		["shared_movement_pattern_face_movement_direction", "all_bullet_movement_pattern_face_movement_directions", "tile_all_bullet_movement_pattern_face_movement_directions"],
 		["shared_movement_pattern_repeat", "all_bullet_movement_pattern_repeats", "tile_all_bullet_movement_pattern_repeats"],
 	]
-	var triplet_ok := true
+	var broken_families: Array = []
 	for fam in triplet_families:
 		var idxs: Array = []
 		for pname in props20:
@@ -869,59 +867,41 @@ func test_t20_inspector_groups_stay_coherent() -> void:
 			if fam.has(sname):
 				idxs.append(props20.find(pname))
 		idxs.sort()
+		var fam_ok: bool = idxs.size() == fam.size()
 		for k in range(1, idxs.size()):
 			if int(idxs[k]) != int(idxs[k - 1]) + 1:
-				triplet_ok = false
+				fam_ok = false
 		var fgroup := ""
 		for sname in fam:
 			var gname := str(data_group_of.get(sname, "?"))
 			if fgroup == "":
 				fgroup = gname
 			elif gname != fgroup:
-				triplet_ok = false
-	assert_true(triplet_ok, "related triplets stick together in one group")
-	# Base data groups: Collision header precedes the collision props.
-	var base20 := MultiMeshBulletsData2D.new()
-	var base_props: Array = base20.get_property_list()
+				fam_ok = false
+		if not fam_ok:
+			broken_families.append(fam[0])
+	assert_eq(broken_families, [], "related triplets stick together in one group")
+	assert_eq(str(data_group_of.get("shared_bullet_rotation_data", "")), "Bullet Rotation", "rotation triplet grouped with steering")
+	assert_eq(str(data_group_of.get("stop_rotation_when_max_reached", "")), "Bullet Rotation", "stop flag lives with rotation")
+	# Collision header precedes the collision props.
 	var collision_group_idx := -1
 	var layer_idx := -1
 	var mask_idx := -1
-	for i in base_props.size():
-		var pname := str(base_props[i].get("name", ""))
-		var usage: int = int(base_props[i].get("usage", 0))
+	for i in props20.size():
+		var pname := str(props20[i].get("name", ""))
+		var usage: int = int(props20[i].get("usage", 0))
 		if (usage & PROPERTY_USAGE_GROUP) != 0 and pname == "Collision" and collision_group_idx < 0:
 			collision_group_idx = i
 		if pname == "collision_layer" and layer_idx < 0:
 			layer_idx = i
 		if pname == "collision_mask" and mask_idx < 0:
 			mask_idx = i
-	assert_true(collision_group_idx >= 0 and collision_group_idx < layer_idx and layer_idx < mask_idx, "base Collision group precedes layer props")
-	# Base class: exact group order follows the setup workflow, material last.
-	var base_groups: Array = []
-	var base_current := ""
-	for p in base_props:
-		var pname := str(p.get("name", ""))
-		var pusage: int = int(p.get("usage", 0))
-		if (pusage & PROPERTY_USAGE_GROUP) != 0:
-			base_current = pname
-			if not base_groups.has(pname):
-				base_groups.append(pname)
-	assert_true(base_groups.slice(0, 7) == ["Bullets", "Appearance", "Collision", "Attachments", "Sprite Effects", "Per-Bullet Rotation", "Rendering and Material"], "base group order matches workflow")
-	var base_group_of := {}
-	var base_cur := ""
-	for p in base_props:
-		var pname := str(p.get("name", ""))
-		var pusage: int = int(p.get("usage", 0))
-		if (pusage & PROPERTY_USAGE_GROUP) != 0:
-			base_cur = pname
-		elif pname != "":
-			base_group_of[pname] = base_cur
-	assert_true(base_group_of.get("max_life_time", "") == "Appearance", "lifetime lives with Appearance")
-	assert_true(base_group_of.get("z_index", "") == "Appearance", "z-index lives with Appearance")
-	assert_true(base_group_of.get("shared_bullets_custom_data", "") == "Collision", "custom data lives with Collision")
-	assert_true(base_group_of.get("rotate_only_textures", "") == "Appearance", "rotate-only flag lives with Appearance")
-	assert_true(base_group_of.get("is_texture_rotation_permanent", "") == "Appearance", "permanent rotation flag lives with Appearance")
-	assert_true(base_group_of.get("stop_rotation_when_max_reached", "") == "Per-Bullet Rotation", "stop flag lives with rotation")
+	assert_true(collision_group_idx >= 0 and collision_group_idx < layer_idx and layer_idx < mask_idx, "Collision group precedes layer props")
+	assert_eq(str(data_group_of.get("max_life_time", "")), "Appearance", "lifetime lives with Appearance")
+	assert_eq(str(data_group_of.get("z_index", "")), "Appearance", "z-index lives with Appearance")
+	assert_eq(str(data_group_of.get("shared_bullets_custom_data", "")), "Collision", "custom data lives with Collision")
+	assert_eq(str(data_group_of.get("rotate_only_textures", "")), "Appearance", "rotate-only flag lives with Appearance")
+	assert_eq(str(data_group_of.get("is_texture_rotation_permanent", "")), "Appearance", "permanent rotation flag lives with Appearance")
 	# Live instance mirrors the data workflow order.
 	var vinst: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(_bounce_data(Vector2(0, 9000), 0.0, 1.0, [], [4]))
 	var inst_groups: Array = []
@@ -931,8 +911,7 @@ func test_t20_inspector_groups_stay_coherent() -> void:
 		if (pusage & PROPERTY_USAGE_GROUP) != 0 and not inst_groups.has(pname):
 			inst_groups.append(pname)
 	assert_true(inst_groups.slice(0, 7) == ["Movement Speed", "Bullet Rotation", "Wobble", "Gravity", "Bounce and Ricochet", "Movement Pattern Paths", "Homing"], "instance group order mirrors data")
-	# No dangling: base props must never fall into the last derived group.
-	# Tracks the current header across the FULL list (derived + base).
+	# No dangling: transforms must sit under Bullets, never under a later group.
 	var full_current := ""
 	var danglers: Array = []
 	for p in props20:

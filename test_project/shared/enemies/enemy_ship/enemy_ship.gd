@@ -180,4 +180,4 @@ func _on_shoot_timer_timeout() -> void:
 	is_shooting_two_at_a_time = !is_shooting_two_at_a_time # next time with different shoot behavior
 
 func set_bullet_collision_mask(arr:Array[int])->void:
-	bullets_data.collision_mask = MultiMeshBulletsData2D.calculate_bitmask(arr)
+	bullets_data.collision_mask = DirectionalBulletsData2D.calculate_bitmask(arr)

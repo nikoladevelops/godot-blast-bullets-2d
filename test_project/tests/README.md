@@ -26,6 +26,7 @@ asserts a dangling-free factory plus zero new orphans after every test.
 - `volley/test_volley_rotation_presence_clear.gd` — clearing rotation data clears presence bits: gaps refill from shared, authored zeros still win.
 - `spawner/test_spawner_preset_burst.gd` — spin presets advance from idle; failed burst shots retry (never silently consumed), permanent failure aborts with burst_finished.
 - `volley/test_volley_singular_transforms.gd` — zero/singular scales rejected at spawn and setters via the central invertibility check.
+- `volley/test_volley_single_bullet.gd` — a one-bullet volley behaves like bullet 0 of any volley: per-bullet curves beat shared curves at assignment, speed/rotation/direction/velocity accessors round-trip slot 0, index 1 is rejected (never aliased to 0), flight speed exact.
 - `volley/test_volley_curves_baseline.gd` — pins current curve semantics: clear freezes last sample, Additive direction accumulates (characterized, not changed).
 - `spawner/test_spawner_flower_parity.gd` — rings never bridge petal arcs/rows (INF separators captured in shape_loop), dots on track, inward/outward layers.
 - `factory/test_factory_singular_marker.gd` — inverting generators reject singular markers loudly; non-inverting ones degrade to finite zero-size.

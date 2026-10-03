@@ -25,7 +25,7 @@
 #include "godot_cpp/variant/utility_functions.hpp"
 #include "godot_cpp/variant/vector2.hpp"
 #include "shared/dynamic_sparse_set.hpp"
-#include "spawn-data/multimesh_bullets_data2d.hpp"
+#include "spawn-data/directional_bullets_data2d.hpp"
 
 namespace BlastBullets2D {
 using namespace godot;
@@ -39,12 +39,12 @@ class DirectionalBullets2D;
 // never leave a half-set-up multimesh behind. Returns false with an error when invalid.
 // Shared by the factory spawn entries (via validate_spawn_request) and the pool
 // pre-population path.
-bool validate_spawn_data(const Ref<MultiMeshBulletsData2D> &spawn_data, const char *caller_name);
+bool validate_spawn_data(const Ref<DirectionalBulletsData2D> &spawn_data, const char *caller_name);
 // Split pieces (native span path): data fields for a volley of bullet_count,
 // a raw transform span, and the invisible-bullets heads-up.
-bool validate_spawn_data_fields(const Ref<MultiMeshBulletsData2D> &spawn_data, int bullet_count, const char *caller_name);
+bool validate_spawn_data_fields(const Ref<DirectionalBulletsData2D> &spawn_data, int bullet_count, const char *caller_name);
 bool validate_spawn_transform_span(const Transform2D *transforms, int count, const char *caller_name);
-void warn_if_spawn_invisible(const Ref<MultiMeshBulletsData2D> &spawn_data, const char *caller_name);
+void warn_if_spawn_invisible(const Ref<DirectionalBulletsData2D> &spawn_data, const char *caller_name);
 
 // Creates bullets with different behavior
 class BulletFactory2D : public Node2D {
@@ -313,7 +313,7 @@ public:
 			int layer_fill,
 			int layer_start_offset);
 
-	// Internal re-entrancy guard for MultiMeshBullets2D teardown: a multimesh's disable
+	// Internal re-entrancy guard for DirectionalBullets2D teardown: a multimesh's disable
 	// sweep fires user script callbacks, and a handler calling reset()/free_*/populate
 	// there could force_delete the multimesh mid-sweep (use-after-free). While the
 	// internal busy flag is held, those operations reject with the standard busy error.
@@ -364,7 +364,7 @@ public:
 	// The key is required and must match the bucket derived from spawn_data
 	// (key.amount_bullets must equal spawn_data.transforms.size(), plus effective shape).
 	// instance_count = how many volleys to pre-create in that bucket. Mismatch aborts.
-	void populate_bullets_pool(const Ref<MultiMeshPoolKey2D> &key, const Ref<MultiMeshBulletsData2D> &spawn_data, int instance_count);
+	void populate_bullets_pool(const Ref<MultiMeshPoolKey2D> &key, const Ref<DirectionalBulletsData2D> &spawn_data, int instance_count);
 
 	// Frees pooled (disabled) volleys. Null key frees every bucket, an exact key only that bucket.
 	void free_bullets_pool(const Ref<MultiMeshPoolKey2D> &key = Ref<MultiMeshPoolKey2D>());
@@ -391,7 +391,7 @@ public:
 	void clear_active_bullets_deferred(const Ref<MultiMeshPoolKey2D> &key = Ref<MultiMeshPoolKey2D>());
 	void free_disabled_bullets_deferred(const Ref<MultiMeshPoolKey2D> &key = Ref<MultiMeshPoolKey2D>());
 	void free_bullets_pool_deferred(const Ref<MultiMeshPoolKey2D> &key = Ref<MultiMeshPoolKey2D>());
-	void populate_bullets_pool_deferred(const Ref<MultiMeshPoolKey2D> &key, const Ref<MultiMeshBulletsData2D> &spawn_data, int instance_count);
+	void populate_bullets_pool_deferred(const Ref<MultiMeshPoolKey2D> &key, const Ref<DirectionalBulletsData2D> &spawn_data, int instance_count);
 	void free_attachments_pool_deferred();
 	void free_attachments_pool_for_scene_deferred(const Ref<PackedScene> &attachment_scene);
 	// Safe single-volley free from any callback. Never calls free()/force_delete
@@ -638,7 +638,7 @@ public:
 	bool get_register_performance_monitors() const;
 	// Non-mutating validation of spawn data. Returns {ok, error}. Never spawns,
 	// never touches the pool. Use from crash-fuzz tests before spawn_*().
-	static Dictionary debug_validate_spawn_data(const Ref<MultiMeshBulletsData2D> &spawn_data);
+	static Dictionary debug_validate_spawn_data(const Ref<DirectionalBulletsData2D> &spawn_data);
 	// Interpolation status. Keys: factory_enabled, project_enabled_2d,
 	// project_enabled_3d, mismatch (bool), hint. Mismatch = bullets look
 	// steppy despite the factory flag, or vice versa.
@@ -648,14 +648,14 @@ public:
 	// Derives the exact pool bucket a spawn would use without spawning.
 	// Returns null (with an error) when spawn_data has no transforms.
 	// Compare with debug_get_bullets_pool_info() keys to diagnose 0% pool hits.
-	static Ref<MultiMeshPoolKey2D> debug_expected_pool_key(const Ref<MultiMeshBulletsData2D> &spawn_data);
+	static Ref<MultiMeshPoolKey2D> debug_expected_pool_key(const Ref<DirectionalBulletsData2D> &spawn_data);
 	// Structural consistency check for tests: verifies vec/pool/sparse-set
 	// agreement (no nulls, sparse ids match indexes, active ids in range,
 	// pooled instances inactive). Returns {ok, error}. Never mutates.
 	Dictionary debug_assert_no_dangling();
 	// Live pool bucket of one volley (for per-bucket free/reset assertions in
 	// multi-spawner tests). Returns null with an error for null/outside nodes.
-	Ref<MultiMeshPoolKey2D> debug_get_pool_bucket(MultiMeshBullets2D *volley);
+	Ref<MultiMeshPoolKey2D> debug_get_pool_bucket(DirectionalBullets2D *volley);
 
 	// Live-bullet census attributed by spawner ownership. Sums
 	// active_bullets_counter over every ACTIVE directional volley whose
@@ -667,20 +667,20 @@ public:
 
 	//
 
-	void handle_manual_user_deletion_of_multimesh_bullets(MultiMeshBullets2D &bullet_multi);
+	void handle_manual_user_deletion_of_multimesh_bullets(DirectionalBullets2D &bullet_multi);
 
 	// Re-registers a pooled multimesh that was woken via enable_bullet() outside spawn,
 	// so the factory processes it again. No-op when already active or tearing down.
-	void reactivate_multimesh_instance(MultiMeshBullets2D &bullet_multi);
+	void reactivate_multimesh_instance(DirectionalBullets2D &bullet_multi);
 
 	// Removes a volley that just went inactive (last bullet disabled) from the
 	// set of volleys the tick walks. Identity-checked: a stale sparse id never
 	// deactivates another volley. The volley stays tracked (and poolable).
-	void deactivate_multimesh_instance(MultiMeshBullets2D &bullet_multi);
+	void deactivate_multimesh_instance(DirectionalBullets2D &bullet_multi);
 
 	// GDScript entry for the same: enable_bullet() wake from script can't pass a
 	// C++ reference, so this validates the node first. Unbound C++ path stays.
-	void reactivate_multimesh_instance_for_script(MultiMeshBullets2D *bullet_multi) {
+	void reactivate_multimesh_instance_for_script(DirectionalBullets2D *bullet_multi) {
 		if (bullet_multi == nullptr) {
 			UtilityFunctions::push_error("reactivate_multimesh_instance: multimesh_bullets is null.");
 			return;
@@ -835,7 +835,7 @@ private:
 	// leave a half-set-up multimesh behind. Returns false (with an error
 	// already reported) when the caller must abort. override_count >= 0 marks
 	// a native span caller whose transforms were validated already.
-	bool validate_spawn_request(const char *caller_name, const Ref<MultiMeshBulletsData2D> &spawn_data, const Vector2 &inherited_velocity_offset, int override_count = -1);
+	bool validate_spawn_request(const char *caller_name, const Ref<DirectionalBulletsData2D> &spawn_data, const Vector2 &inherited_velocity_offset, int override_count = -1);
 
 	// VOLLEYS (every spawned DirectionalBullets2D, active or pooled)
 	//
@@ -899,7 +899,7 @@ private:
 
 	// Pre-creates instance_count disabled volleys in the exact `key` bucket.
 	// Callers validate key against spawn_data before invoking.
-	void populate_pool_bucket(const PoolKey &key, const Ref<MultiMeshBulletsData2D> &spawn_data, int instance_count);
+	void populate_pool_bucket(const PoolKey &key, const Ref<DirectionalBulletsData2D> &spawn_data, int instance_count);
 
 	// Unlinks one volley from the pool (no-op when absent: pooling off or
 	// never pooled) and frees it exactly once. force_delete() sets

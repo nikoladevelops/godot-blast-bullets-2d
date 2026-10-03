@@ -1,24 +1,59 @@
 <?xml version="1.0" encoding="UTF-8" ?>
-<class name="DirectionalBulletsData2D" inherits="MultiMeshBulletsData2D" api_type="extension" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/godotengine/godot/master/doc/class.xsd">
+<class name="DirectionalBulletsData2D" inherits="Resource" api_type="extension" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/godotengine/godot/master/doc/class.xsd">
 	<brief_description>
 		Contains spawn data for the [DirectionalBullets2D].
 	</brief_description>
 	<description>
-		Ensure that the [member MultiMeshBulletsData2D.transforms] and [member all_bullet_speed_data] are set, otherwise spawning fails with an error and no bullets are created (an empty speed array fails; give one entry per bullet).
+		Ensure that the [member transforms] and [member all_bullet_speed_data] are set, otherwise spawning fails with an error and no bullets are created (an empty speed array fails; give one entry per bullet).
 		[b]How per-bullet and shared work together:[/b] every [code]all_bullet_*[/code] array is indexed by bullet: entry [code]i[/code] belongs to bullet [code]i[/code] and nobody else. Each bullet resolves on its own: a valid per-bullet entry wins for that bullet; otherwise the matching [code]shared_*[/code] value fills in when it is set; otherwise the feature default applies (speed 0, no spin, no curves, straight flight, no gravity, null custom data). A short array only covers its own indices — the remaining bullets fall back. A long array ignores the extras. Size mismatches warn once per spawn but never block it.
 		[b]Invalid entries[/b] never poison their siblings: null entries, wrong-typed resources, NaN/Inf numbers, disabled wobble seeds, and unresolvable pattern paths each fall back for that bullet only.
 		[b]Tiling (opt-in):[/b] every array below has a [code]tile_*[/code] checkbox next to it in the inspector (off by default). When checked, a short array wraps around the volley for that array only: bullet [code]i[/code] reads entry [code]i % size[/code], so 2 entries fan across 10 bullets as A,B,A,B... Invalid entries still fall back per bullet.
 		[b]Migration:[/b] older setups that relied on a single entry covering every bullet no longer get that for free. Either provide one entry per bullet, set the [code]shared_*[/code] value (it covers every bullet the array leaves out), or check the [code]tile_*[/code] box for that array.
-		Check [MultiMeshBulletsData2D]'s documentation for the rest of the properties.
+		Check [DirectionalBulletsData2D]'s documentation for the rest of the properties.
 	</description>
 	<tutorials>
 	</tutorials>
 	<methods>
+		<method name="calculate_bitmask" qualifiers="static">
+			<return type="int" />
+			<param index="0" name="numbers" type="int[]" />
+			<description>
+				Calculates a bitmask from an array of integers.
+			</description>
+		</method>
 		<method name="set_bounce_mask_from_array">
 			<return type="void" />
 			<param index="0" name="array_of_masks" type="int[]" />
 			<description>
-				Builds [member bounce_mask] from layer numbers instead of raw bits. Example: [code]set_bounce_mask_from_array([4])[/code] bounces off layer-4 targets. The resulting bits must overlap [member MultiMeshBulletsData2D.collision_mask], otherwise those targets are never detected at all.
+				Builds [member bounce_mask] from layer numbers instead of raw bits. Example: [code]set_bounce_mask_from_array([4])[/code] bounces off layer-4 targets. The resulting bits must overlap [member collision_mask], otherwise those targets are never detected at all.
+			</description>
+		</method>
+		<method name="set_collision_layer_from_array">
+			<return type="void" />
+			<param index="0" name="array_of_layers" type="int[]" />
+			<description>
+				Sets the collision layer from an array of integers by converting them to a bitmask.
+			</description>
+		</method>
+		<method name="set_collision_mask_from_array">
+			<return type="void" />
+			<param index="0" name="array_of_masks" type="int[]" />
+			<description>
+				Sets the collision mask from an array of integers by converting them to a bitmask.
+			</description>
+		</method>
+		<method name="set_light_mask_from_array">
+			<return type="void" />
+			<param index="0" name="array_of_light_masks" type="int[]" />
+			<description>
+				Sets the light mask from an array of integers by converting them to a bitmask.
+			</description>
+		</method>
+		<method name="set_visibility_layer_from_array">
+			<return type="void" />
+			<param index="0" name="array_of_visibility_layers" type="int[]" />
+			<description>
+				Sets the visibility layers from an array of integers by converting them to a bitmask.
 			</description>
 		</method>
 	</methods>
@@ -41,14 +76,24 @@
 		<member name="all_bullet_movement_pattern_repeats" type="bool[]" setter="set_all_bullet_movement_pattern_repeats" getter="get_all_bullet_movement_pattern_repeats" default="[]">
 			Repeat flag for each bullet's own pattern. Entry [code]i[/code] belongs to bullet [code]i[/code]; bullets without an entry use [member shared_movement_pattern_repeat]. Has its own [member tile_all_bullet_movement_pattern_repeats] checkbox.
 		</member>
+		<member name="all_bullet_rotation_data" type="BulletRotationData2D[]" setter="set_all_bullet_rotation_data" getter="get_all_bullet_rotation_data" default="[]">
+			Spin for each bullet. Entry [code]i[/code] rotates bullet [code]i[/code] only — give one entry per bullet (same size as [member transforms]), or leave empty for no rotation. Bullets without a valid entry read zero spin (or the [DirectionalBulletsData2D.shared_bullet_rotation_data] fallback on Directional volleys). Invalid means: null entry, or NaN/Inf rotation values (that bullet reads zeros, its siblings are untouched). Example: entries [2.0, null] → bullet 0 spins at 2.0, bullet 1 holds still.
+			    	Note: [BulletRotationData2D] has a helper static method that you can use to generate random rotation data - [method BulletRotationData2D.generate_random_data].
+		</member>
 		<member name="all_bullet_speed_data" type="BulletSpeedData2D[]" setter="set_all_bullet_speed_data" getter="get_all_bullet_speed_data" default="[]">
 			[b]MANDATORY[/b]
-			Speed for each bullet — entry [code]i[/code] drives bullet [code]i[/code] only, so give one entry per bullet (same size as [member MultiMeshBulletsData2D.transforms]). Bullets without a valid entry fall back to [member shared_bullet_speed_data], or fly at speed 0 when that is unset. Invalid means: null entry, or NaN/Inf speed, max_speed or acceleration (that bullet reads 0/0/0, its siblings are untouched). Negative speed is legal and flies backwards along the heading.
+			Speed for each bullet — entry [code]i[/code] drives bullet [code]i[/code] only, so give one entry per bullet (same size as [member transforms]). Bullets without a valid entry fall back to [member shared_bullet_speed_data], or fly at speed 0 when that is unset. Invalid means: null entry, or NaN/Inf speed, max_speed or acceleration (that bullet reads 0/0/0, its siblings are untouched). Negative speed is legal and flies backwards along the heading.
 			Example: 3 bullets, speeds [200, null, 200] with shared 150 → bullets fly at 200, 150, 200.
 			Note: [BulletSpeedData2D] has a helper static method that you can use to generate random speed data - [method BulletSpeedData2D.generate_random_data()].
 		</member>
 		<member name="all_bullet_wobble_data" type="BulletWobbleData2D[]" setter="set_all_bullet_wobble_data" getter="get_all_bullet_wobble_data" default="[]">
 			Wobble seed for each bullet, applied at spawn time (and on pool reuse). Entry [code]i[/code] affects bullet [code]i[/code] only; a live seed always beats [member shared_bullet_wobble_data] for its bullet. Null entries and entries with [code]enabled = false[/code] fall back to shared for that bullet. Example: shared gentle weave plus one strong seed on bullet 2 → bullet 2 snakes hard, the rest weave gently.
+		</member>
+		<member name="all_bullets_custom_data" type="Resource[]" setter="set_all_bullets_custom_data" getter="get_all_bullets_custom_data" default="[]">
+			Custom data carried per bullet, readable in the factory collision callbacks through [method DirectionalBullets2D.bullet_get_custom_data]. Entry [code]i[/code] belongs to bullet [code]i[/code] and nobody else; bullets without an entry read null. Stays strictly separate from [member shared_bullets_custom_data]: per-bullet data never falls back to shared. Example: tag bullet 0 with a fire resource and bullet 2 with ice → bullet 1 reads null.
+		</member>
+		<member name="animation" type="StringName" setter="set_animation" getter="get_animation" default="&amp;&quot;default&quot;">
+			Which SpriteFrames animation to play. Empty or "default" auto-resolves silently ("default" if present, else first animation). Explicit wrong names fall back to the first animation with one error. The whole multimesh batch shares one frame at a time; timing uses animation speed (fps), per-frame durations, and loop flag.
 		</member>
 		<member name="bounce_charge_amplify" type="bool" setter="set_bounce_charge_amplify" getter="get_bounce_charge_amplify" default="true">
 			Whether an oncoming target amplifies the rebound through relative reflection. True (default) enables the extra kick; false reflects absolutely, so bounce_strength alone decides head-on outcomes.
@@ -60,10 +105,10 @@
 			Same-target debounce window in seconds (finite, 0 or more, no upper cap). A re-hit against the object the bullet just bounced off never re-bounces inside this window, while hits against other objects bounce freely. Complements [member bounce_cooldown_sec], which swallows every target but only for a short escape moment. 0 disables it. Example: debounce 0.15, bullet slides along one wall touching it every frame: it bounces once, then ignores that wall for 0.15 s, but a second wall touched in between still bounces immediately.
 		</member>
 		<member name="bounce_hit_consumed" type="bool" setter="set_bounce_hit_consumed" getter="get_bounce_hit_consumed" default="false">
-			Whether a bounce also counts as a normal hit (increments the collision counter and can disable the bullet at [member MultiMeshBulletsData2D.bullet_max_collision_count]). False (default) means free bounces that never kill the bullet. A consumed bounce emits BOTH the bounce signal and the matching area/body signal.
+			Whether a bounce also counts as a normal hit (increments the collision counter and can disable the bullet at [member bullet_max_collision_count]). False (default) means free bounces that never kill the bullet. A consumed bounce emits BOTH the bounce signal and the matching area/body signal.
 		</member>
 		<member name="bounce_mask" type="int" setter="set_bounce_mask" getter="get_bounce_mask" default="0">
-			Bitmask of target collision layers that trigger a bounce, applied at spawn time (and on pool reuse). Checked against the collided object's collision_layer and takes precedence over the normal collision path. 0 (default) disables bouncing. NOTE: these bits must overlap [member MultiMeshBulletsData2D.collision_mask], otherwise the bullet never detects those targets at all (warned once per spawn). Use [method set_bounce_mask_from_array] to build it from layer numbers.
+			Bitmask of target collision layers that trigger a bounce, applied at spawn time (and on pool reuse). Checked against the collided object's collision_layer and takes precedence over the normal collision path. 0 (default) disables bouncing. NOTE: these bits must overlap [member collision_mask], otherwise the bullet never detects those targets at all (warned once per spawn). Use [method set_bounce_mask_from_array] to build it from layer numbers.
 		</member>
 		<member name="bounce_max_count" type="int" setter="set_bounce_max_count" getter="get_bounce_max_count" default="0">
 			How many times a single bullet may bounce before bounces stop working for it (further hits take the normal collision path). 0 (default) = unlimited (lifetime still bounds it). Stops wall-to-wall ping-pong from living forever.
@@ -92,6 +137,41 @@
 		</member>
 		<member name="bullet_homing_auto_pop_after_target_reached" type="bool" setter="set_bullet_homing_auto_pop_after_target_reached" getter="get_bullet_homing_auto_pop_after_target_reached" default="false">
 			Per-bullet queue: pop the front target when the owning bullet reaches it. Pooled reuse re-seeds this from the spawn data, so direct [BulletFactory2D] spawns keep it without a spawner.
+		</member>
+		<member name="bullet_max_collision_count" type="int" setter="set_bullet_max_collision_count" getter="get_bullet_max_collision_count" default="1">
+			How many times a bullet can collide before it gets disabled. If you set to 0, then the bullet will NEVER get disabled due to collisions.
+		</member>
+		<member name="bullets_current_collision_count" type="int[]" setter="set_bullets_current_collision_count" getter="get_bullets_current_collision_count" default="[]">
+			Starting hit count for each bullet. Entry [code]i[/code] belongs to bullet [code]i[/code]; bullets without an entry start at 0. Leave empty to start every bullet fresh. Values are clamped into range (negatives become 0, values at or above [member bullet_max_collision_count] become max - 1, exactly one hit remaining, when the max is above 0).
+		</member>
+		<member name="collision_layer" type="int" setter="set_collision_layer" getter="get_collision_layer" default="1">
+			The bitmask for the collision layer.
+
+			Note: Needs to be set to a bitmask, so use [method calculate_bitmask].
+			Tip: [method set_collision_layer_from_array] takes plain layer numbers and builds the bitmask for you.
+		</member>
+		<member name="collision_mask" type="int" setter="set_collision_mask" getter="get_collision_mask" default="1">
+			The bitmask for the collision mask.
+
+			Note: Needs to be set to a bitmask, so use [method calculate_bitmask].
+			Tip: [method set_collision_mask_from_array] takes plain layer numbers and builds the bitmask for you.
+		</member>
+		<member name="collision_shape" type="Shape2D" setter="set_collision_shape" getter="get_collision_shape">
+			The collision shape shared by all bullets in the multimesh. Supports [RectangleShape2D], [CircleShape2D] and [CapsuleShape2D]; anything else falls back to a circle with an error. The effective type is part of the pool bucket, so changing it changes which pooled instances get reused. Use [member collision_shape_offset] to shift it away from the texture center, and enable the [BulletFactory2D] debugger to see it.
+		</member>
+		<member name="collision_shape_offset" type="Vector2" setter="set_collision_shape_offset" getter="get_collision_shape_offset" default="Vector2(0, 0)">
+			The offset for the collision shape calculated from the center of the bullet texture.
+
+			Note: You can enable the [BulletFactory2D]'s debugger to make collision shapes visible.
+		</member>
+		<member name="effect_layers" type="BulletEffectLayerData2D[]" setter="set_effect_layers" getter="get_effect_layers" default="[]">
+			Stackable sprite-effect layers (trails, spawn flashes, hit sparks, destroy explosions, bounce sparks, lifetime fizzles, manual-clear puffs). Each entry renders through its own per-frame shards: one extra draw call per animation frame while anything is visible, zero when idle. Empty (default) disables the whole feature. Assign custom SpriteFrames per layer. Cost scales with art (frames), bullets, and active one-shots, not with layer count alone.
+		</member>
+		<member name="fade_in_sec" type="float" setter="set_fade_in_sec" getter="get_fade_in_sec" default="0.0">
+			Fade-in seconds after spawn (0 disables). The volley starts at transparent base tint and reaches full tint at fade_in_sec. Works with infinite lifetimes (age since spawn).
+		</member>
+		<member name="fade_out_sec" type="float" setter="set_fade_out_sec" getter="get_fade_out_sec" default="0.0">
+			Fade-out seconds before expiry (0 disables). Needs a finite lifetime: infinite volleys never expire, so fade_out is ignored there.
 		</member>
 		<member name="gravity" type="Vector2" setter="set_gravity" getter="get_gravity" default="Vector2(0, 0)">
 			Fallback gravity in px/s^2 for bullets without their own [member all_bullet_gravity] entry (2D sideview arcs, tower-defense shells). (0, 0) disables — top-down default. Must stay finite. Example: shared (0, 1000) plus per-bullet [(0,0), (800,0)] on 3 bullets → bullet 0 hovers, bullet 1 drifts right, bullet 2 falls.
@@ -123,20 +203,86 @@
 		<member name="homing_update_interval" type="float" setter="set_homing_update_interval" getter="get_homing_update_interval" default="0.0">
 			Seconds between homing target position refreshes (0 refreshes every tick). Larger values make rings lag and step on moving targets; keep 0 for bodyguard rings.
 		</member>
+		<member name="instance_shader_parameters" type="Dictionary" setter="set_instance_shader_parameters" getter="get_instance_shader_parameters" default="{}">
+			Per-instance shader overrides, used only when [member material] is a [ShaderMaterial] with [code]instance uniform[/code] declarations. [b]KEY[/b] is the uniform name ([String]), [b]VALUE[/b] is a [Variant] matching that uniform's type (a wrong type warns and skips that key).
+			Applied per bullet instance through [code]set_instance_shader_parameter()[/code] when the volley spawns every live bullet of the multimesh shares the same override set. An empty dictionary disables the pass. Switching to a non-shader material, or spawning with null material, clears the stored dict so pool reuse never leaks stale overrides into the next volley.
+			Example: assign a [ShaderMaterial] with [code]instance uniform vec4 glow_color[/code] and set this to [code]{"glow_color": Color(1, 0.3, 0.1, 1)}[/code]. Global (non-instance) uniforms belong on the material itself, not here.
+		</member>
+		<member name="is_life_time_infinite" type="bool" setter="set_is_life_time_infinite" getter="get_is_life_time_infinite" default="false">
+			If you set to true, then the lifetime will be ignored and bullets will never be destroyed.
+
+			Warning: If you don't implement "collision walls" or anything else to intercept/collide with the bullets, then they will truly live forever in your memory and you will experience lag.
+			Warning: When using unit curves with [BulletCurvesData2D] they might not work properly.
+		</member>
+		<member name="is_life_time_over_signal_enabled" type="bool" setter="set_is_life_time_over_signal_enabled" getter="get_is_life_time_over_signal_enabled" default="false">
+			If this is enabled then when the lifetime of the bullets is over, the signal [signal BulletFactory2D.directional_life_time_over] will be emitted by the [BulletFactory2D].
+			This is helpful when you want to spawn visual effects at that time (explosion, particles, anything really..).
+		</member>
+		<member name="is_texture_rotation_permanent" type="bool" setter="set_is_texture_rotation_permanent" getter="get_is_texture_rotation_permanent" default="false">
+			By default the texture is always rotated to match the bullet's transform rotation. This property disables that behavior and ensures that the bullet is always spawned rotated based on [member texture_rotation_radians] only.
+		</member>
+		<member name="light_mask" type="int" setter="set_light_mask" getter="get_light_mask" default="1">
+			The bitmask for the light mask.
+
+			Note: Needs to be set to a bitmask, so use [method calculate_bitmask].
+			Tip: [method set_light_mask_from_array] takes plain layer numbers and builds the bitmask for you.
+		</member>
 		<member name="linear_drag" type="float" setter="set_linear_drag" getter="get_linear_drag" default="0.0">
 			Linear drag trimming speed each tick (speed -= speed * drag * delta). 0 disables. Must be finite and &gt;= 0.
+		</member>
+		<member name="material" type="Material" setter="set_material" getter="get_material">
+			Bullet material. Pick a [ShaderMaterial] (use [member instance_shader_parameters] for per-volley instance uniforms) or a [CanvasItemMaterial]. Null uses the default canvas material. The inspector filters to these two types.
+		</member>
+		<member name="max_life_time" type="float" setter="set_max_life_time" getter="get_max_life_time" default="2.0">
+			The max time before the bullets get disabled and go in the object pool.
+		</member>
+		<member name="mesh" type="Mesh" setter="set_mesh" getter="get_mesh">
+			Custom bullet mesh. If null (default) a [QuadMesh] is auto-built from [member texture_size] (or the first animation frame size). Provide your own [Mesh] only when you handle scaling in the shader. The inspector filters to [Mesh] resources.
+		</member>
+		<member name="modulate_ramp" type="Gradient" setter="set_modulate_ramp" getter="get_modulate_ramp">
+			Tint-over-life gradient, sampled by lifetime fraction (0 at spawn, 1 at expiry) and multiplied with the base tint and [member fade_in_sec]/[member fade_out_sec]. Null (default) disables it. Infinite lifetimes ignore it (no fraction exists).
+		</member>
+		<member name="monitorable" type="bool" setter="set_monitorable" getter="get_monitorable" default="false">
+			If you want static bodies to be hit by the bullets, you have to set [member monitorable] to true.
+
+			Note: This is at the cost of performance, so a better workaround is to attach an [Area2D] to those static bodies and detect that instead.
+		</member>
+		<member name="override_frame_color" type="bool" setter="set_override_frame_color" getter="get_override_frame_color" default="false">
+			Bullet whiten override (both bullet types share the animation rebuild): bullet frames bake whitened (alpha preserved), so [member self_modulate] tints bullets to the exact dialed color instead of multiplying the source art. Unreadable frames keep the original art with one warning per rebuild, never a blank.
+		</member>
+		<member name="rotate_only_textures" type="bool" setter="set_rotate_only_textures" getter="get_rotate_only_textures" default="true">
+			If you set this to [code]false[/code], then the collision shapes will also rotate along with the bullet's texture.
+
+			Note: You can enable the [BulletFactory2D]'s debugger to make collision shapes visible.
+		</member>
+		<member name="self_modulate" type="Color" setter="set_self_modulate" getter="get_self_modulate" default="Color(1, 1, 1, 1)">
+			Whole-volley tint, exactly like CanvasItem self_modulate (multiplies every bullet instance). White (default) renders untouched. Spawn one volley per color for different-colored bullets; reseeded from data on every spawn and enable, so pool reuse never leaks the previous tint. Live volleys also accept the engine set_self_modulate directly.
+		</member>
+		<member name="shared_bullet_attachment" type="PackedScene" setter="set_shared_bullet_attachment" getter="get_shared_bullet_attachment">
+			Shared attachment scene applied to every bullet at spawn time (and on pool reuse). The scene must contain a [BulletAttachment2D]. Null (default) disables the feature; use the runtime [method DirectionalBullets2D.bullet_set_attachment] methods for per-bullet attachments instead.
+		</member>
+		<member name="shared_bullet_attachment_offset" type="Vector2" setter="set_shared_bullet_attachment_offset" getter="get_shared_bullet_attachment_offset" default="Vector2(0, 0)">
+			Offset of the shared attachment relative to the bullet's texture center.
+		</member>
+		<member name="shared_bullet_attachment_stick_relative_to_bullet" type="bool" setter="set_shared_bullet_attachment_stick_relative_to_bullet" getter="get_shared_bullet_attachment_stick_relative_to_bullet" default="true">
+			Whether the shared attachment sticks while the bullet rotates.
 		</member>
 		<member name="shared_bullet_curves_data" type="BulletCurvesData2D" setter="set_shared_bullet_curves_data" getter="get_shared_bullet_curves_data">
 			Fallback curves, resolved per channel at spawn time (and on pool reuse). A bullet that carries its own x-curve uses it even when this also defines x; this only covers the channels the bullet lacks. Null (default) means no fallback — uncovered channels fly plain ballistics. Example: shared defines x-drift plus a speed ramp, bullet 2 carries only a y-curve → bullet 2 flies with its own y plus the shared x and speed.
 		</member>
 		<member name="shared_bullet_rotation_data" type="BulletRotationData2D" setter="set_shared_bullet_rotation_data" getter="get_shared_bullet_rotation_data">
-			Fallback spin for bullets whose own rotation entry is missing or invalid (null, or NaN/Inf values), applied at spawn time (and on pool reuse). A valid per-bullet entry in [member MultiMeshBulletsData2D.all_bullet_rotation_data] always wins for its bullet. Null (default) means no fallback — uncovered bullets don't rotate. Example: rotation entries [1.0, null] with shared 5.0 → bullet 0 spins at 1.0, bullet 1 at 5.0.
+			Fallback spin for bullets whose own rotation entry is missing or invalid (null, or NaN/Inf values), applied at spawn time (and on pool reuse). A valid per-bullet entry in [member all_bullet_rotation_data] always wins for its bullet. Null (default) means no fallback — uncovered bullets don't rotate. Example: rotation entries [1.0, null] with shared 5.0 → bullet 0 spins at 1.0, bullet 1 at 5.0.
 		</member>
 		<member name="shared_bullet_speed_data" type="BulletSpeedData2D" setter="set_shared_bullet_speed_data" getter="get_shared_bullet_speed_data">
 			Fallback speed for bullets whose own speed entry is missing or invalid (null, or NaN/Inf values), applied at spawn time (and on pool reuse). A valid per-bullet entry always wins for its bullet. Null (default) means no fallback — uncovered bullets fly at speed 0. Example: speeds [200, null, 200] with shared 150 → bullets fly at 200, 150, 200. Note: shared movement-speed curves still outrank it per tick.
 		</member>
 		<member name="shared_bullet_wobble_data" type="BulletWobbleData2D" setter="set_shared_bullet_wobble_data" getter="get_shared_bullet_wobble_data">
 			Fallback wobble for bullets whose own entry is missing, null, or disabled, applied at spawn time (and on pool reuse). A bullet with an active per-bullet seed always uses it. Null (default) means no fallback — uncovered bullets fly straight. Phase fans out per bullet so one resource makes snakes and petals; pick Sine vs Cosine on the resource's waveform.
+		</member>
+		<member name="shared_bullets_custom_data" type="Resource" setter="set_shared_bullets_custom_data" getter="get_shared_bullets_custom_data">
+			If you want your bullets to have damage or any other data specific to this type of bullets then you have to provide a custom resource that holds all of these properties. Any [Resource] subclass works (script custom classes included); read it back in factory collision callbacks alongside [member all_bullets_custom_data].
+
+			[url=https://www.youtube.com/watch?v=fdRJqnOrz98&amp;t=63s]YouTube Tutorial On Custom Resources[/url]
 		</member>
 		<member name="shared_homing_deque_auto_pop_after_target_reached" type="bool" setter="set_shared_homing_deque_auto_pop_after_target_reached" getter="get_shared_homing_deque_auto_pop_after_target_reached" default="false">
 			Shared queue: one deferred pop when any bullet reaches the front target. Locked orbit rings follow the lock policy on the new front instead of holding a stale center.
@@ -149,6 +295,18 @@
 		</member>
 		<member name="shared_movement_pattern_repeat" type="bool" setter="set_shared_movement_pattern_repeat" getter="get_shared_movement_pattern_repeat" default="true">
 			Fallback repeat flag for bullets without their own entry in [member all_bullet_movement_pattern_repeats]. Whether those bullets loop the pattern instead of stopping at the end of the curve.
+		</member>
+		<member name="sprite_frames" type="SpriteFrames" setter="set_sprite_frames" getter="get_sprite_frames">
+			SpriteFrames holding all animations. Each frame is a Texture2D (plain or AtlasTexture region). The batch shares one frame; per-frame duration and loop come from the animation.
+		</member>
+		<member name="stop_rotation_when_max_reached" type="bool" setter="set_stop_rotation_when_max_reached" getter="get_stop_rotation_when_max_reached" default="false">
+			Set this to true if you want for the bullets to stop rotating when they reach the maximum rotation speed.
+		</member>
+		<member name="texture_rotation_radians" type="float" setter="set_texture_rotation_radians" getter="get_texture_rotation_radians" default="0.0">
+			If your texture is not rotated properly, you can use this property to rotate it more.
+		</member>
+		<member name="texture_size" type="Vector2" setter="set_texture_size" getter="get_texture_size" default="Vector2(0, 0)">
+			QuadMesh size override, used only when no mesh is provided. If x/y &lt;= 0 the size auto-derives from the first frame (AtlasTexture region, else texture size).
 		</member>
 		<member name="tile_all_bullet_curves_data" type="bool" setter="set_tile_all_bullet_curves_data" getter="get_tile_all_bullet_curves_data" default="false">
 			When on, a short [member all_bullet_curves_data] wraps around the volley (bullet [code]i[/code] reads entry [code]i % size[/code]) instead of leaving the tail bullets on the fallback. Off by default. Example: 2 entries across 10 bullets fan as A,B,A,B...
@@ -165,11 +323,36 @@
 		<member name="tile_all_bullet_movement_pattern_repeats" type="bool" setter="set_tile_all_bullet_movement_pattern_repeats" getter="get_tile_all_bullet_movement_pattern_repeats" default="false">
 			When on, a short repeat-flag array wraps around the volley instead of leaving the tail bullets on the shared flag. Off by default.
 		</member>
+		<member name="tile_all_bullet_rotation_data" type="bool" setter="set_tile_all_bullet_rotation_data" getter="get_tile_all_bullet_rotation_data" default="false">
+			When on, a short [member all_bullet_rotation_data] wraps around the volley (bullet [code]i[/code] reads entry [code]i % size[/code]) instead of leaving the tail bullets at zero spin. Off by default.
+		</member>
 		<member name="tile_all_bullet_speed_data" type="bool" setter="set_tile_all_bullet_speed_data" getter="get_tile_all_bullet_speed_data" default="false">
 			When on, a short [member all_bullet_speed_data] wraps around the volley (bullet [code]i[/code] reads entry [code]i % size[/code]) instead of falling back. Off by default. Example: 2 entries across 10 bullets fan as A,B,A,B... Use it for alternating spreads without writing 10 entries.
 		</member>
 		<member name="tile_all_bullet_wobble_data" type="bool" setter="set_tile_all_bullet_wobble_data" getter="get_tile_all_bullet_wobble_data" default="false">
 			When on, a short [member all_bullet_wobble_data] wraps around the volley instead of leaving the tail bullets on the shared fallback. Off by default.
+		</member>
+		<member name="tile_all_bullets_custom_data" type="bool" setter="set_tile_all_bullets_custom_data" getter="get_tile_all_bullets_custom_data" default="false">
+			When on, a short [member all_bullets_custom_data] wraps around the volley instead of leaving the tail bullets at null. Off by default.
+		</member>
+		<member name="tile_bullets_current_collision_count" type="bool" setter="set_tile_bullets_current_collision_count" getter="get_tile_bullets_current_collision_count" default="false">
+			When on, a short [member bullets_current_collision_count] wraps around the volley instead of starting the tail bullets at 0. Off by default.
+		</member>
+		<member name="transforms" type="Transform2D[]" setter="set_transforms" getter="get_transforms" default="[]">
+			[b]MANDATORY[/b]
+			Determines the transforms of the bullets, in global space (use each marker's global transform). Movement, physics shapes, collision signals and [method DirectionalBullets2D.get_bullet_global_transform] all operate in global space.
+
+			Tip: place [Marker2D] nodes in your scene and read their global transforms each time you spawn.
+			Note: There is a helper static function that can generate a grid pattern of [Transform2D] that you can use: [method BulletFactory2D.helper_generate_transforms_grid]. You might want to implement your own custom pattern generation logic in C++ for maximum performance.
+		</member>
+		<member name="visibility_layer" type="int" setter="set_visibility_layer" getter="get_visibility_layer" default="1">
+			The bitmask for the visibility layer.
+
+			Note: Needs to be set to a bitmask, so use [method calculate_bitmask].
+			Tip: [method set_visibility_layer_from_array] takes plain layer numbers and builds the bitmask for you.
+		</member>
+		<member name="z_index" type="int" setter="set_z_index" getter="get_z_index" default="0">
+			The z index of the bullets.
 		</member>
 	</members>
 	<constants>
