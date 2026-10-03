@@ -75,9 +75,8 @@
 		</method>
 		<method name="debug_get_active_bullets_amount">
 			<return type="int" />
-			<param index="0" name="bullet_type" type="int" enum="BulletFactory2D.BulletType" />
 			<description>
-				Get the amount of active bullet multimeshes of a specific type.
+				Returns how many volleys are active (flying, not pooled and not queued for deletion). Counts volleys, not bullets: see [method get_active_bullet_count] for bullets.
 			</description>
 		</method>
 		<method name="debug_get_attachments_pool_amount">
@@ -94,16 +93,14 @@
 		</method>
 		<method name="debug_get_bullets_pool_amount">
 			<return type="int" />
-			<param index="0" name="bullet_type" type="int" enum="BulletFactory2D.BulletType" />
 			<description>
-				Get the amount of bullet multimeshes of a specific type currently in the object pool.
+				Returns how many disabled volleys currently wait in the object pool, across every bucket.
 			</description>
 		</method>
 		<method name="debug_get_bullets_pool_info">
 			<return type="Dictionary" />
-			<param index="0" name="bullet_type" type="int" enum="BulletFactory2D.BulletType" />
 			<description>
-				Get the whole information about the bullet multimeshes object pool of a specific type. Returns a [Dictionary] containing [MultiMeshPoolKey2D] as the KEY (one per exact amount_bullets + shape bucket) and the amount of pooled multimeshes in that bucket as the VALUE.
+				Describes the volley object pool. Returns a [Dictionary] containing [MultiMeshPoolKey2D] as the KEY (one per exact amount_bullets + shape bucket) and the amount of pooled multimeshes in that bucket as the VALUE.
 			</description>
 		</method>
 		<method name="debug_get_effect_state" qualifiers="const">
@@ -146,9 +143,8 @@
 		</method>
 		<method name="debug_get_total_bullets_amount">
 			<return type="int" />
-			<param index="0" name="bullet_type" type="int" enum="BulletFactory2D.BulletType" />
 			<description>
-				Get the total amount of bullet multimeshes of a specific type in the scene tree.
+				Returns how many volleys the factory tracks (active and pooled).
 			</description>
 		</method>
 		<method name="debug_outline_quotas" qualifiers="static">
@@ -242,16 +238,14 @@
 		</method>
 		<method name="free_bullets_pool">
 			<return type="void" />
-			<param index="0" name="bullet_type" type="int" enum="BulletFactory2D.BulletType" />
-			<param index="1" name="key" type="MultiMeshPoolKey2D" default="null" />
+			<param index="0" name="key" type="MultiMeshPoolKey2D" default="null" />
 			<description>
-				Frees the object pool of a particular bullet type. Pass [code]null[/code] (default) to free the whole pool, or a [MultiMeshPoolKey2D] to free only that exact amount_bullets + shape bucket. Example: [code]MultiMeshPoolKey2D.make(200, PhysicsServer2D.SHAPE_CIRCLE)[/code]. Refused during the physics step; call it deferred then.
+				Frees pooled (disabled) volleys. Pass [code]null[/code] (default) to free the whole pool, or a [MultiMeshPoolKey2D] to free only that exact amount_bullets + shape bucket. Example: [code]MultiMeshPoolKey2D.make(200, PhysicsServer2D.SHAPE_CIRCLE)[/code]. Refused during the physics step; call it deferred then.
 			</description>
 		</method>
 		<method name="free_bullets_pool_deferred">
 			<return type="void" />
-			<param index="0" name="bullet_type" type="int" enum="BulletFactory2D.BulletType" />
-			<param index="1" name="key" type="MultiMeshPoolKey2D" default="null" />
+			<param index="0" name="key" type="MultiMeshPoolKey2D" default="null" />
 			<description>
 				Deferred [method free_bullets_pool]: safe from any callback.
 			</description>
@@ -1289,16 +1283,16 @@
 		<method name="populate_bullets_pool">
 			<return type="void" />
 			<param index="0" name="key" type="MultiMeshPoolKey2D" />
-			<param index="1" name="multimesh_data" type="MultiMeshBulletsData2D" />
+			<param index="1" name="spawn_data" type="MultiMeshBulletsData2D" />
 			<param index="2" name="instance_count" type="int" />
 			<description>
-				Pre-creates [code]instance_count[/code] disabled multimeshes in one exact bucket. [code]key.amount_bullets[/code] is bullets per multimesh (must equal [code]multimesh_data[/code] transforms size); [code]instance_count[/code] is how many multimeshes to create. The [code]key[/code] is required and must match the bucket derived from [code]multimesh_data[/code] (amount_bullets + effective collision shape); mismatch aborts with an error and creates nothing. Example: [code]populate_bullets_pool(MultiMeshPoolKey2D.make(5, PhysicsServer2D.SHAPE_CIRCLE), data, 2)[/code] creates 2 multimeshes of 5 bullets each.
+				Pre-creates [code]instance_count[/code] disabled multimeshes in one exact bucket. [code]key.amount_bullets[/code] is bullets per multimesh (must equal [code]spawn_data[/code] transforms size); [code]instance_count[/code] is how many multimeshes to create. The [code]key[/code] is required and must match the bucket derived from [code]spawn_data[/code] (amount_bullets + effective collision shape); mismatch aborts with an error and creates nothing. Example: [code]populate_bullets_pool(MultiMeshPoolKey2D.make(5, PhysicsServer2D.SHAPE_CIRCLE), data, 2)[/code] creates 2 multimeshes of 5 bullets each.
 			</description>
 		</method>
 		<method name="populate_bullets_pool_deferred">
 			<return type="void" />
 			<param index="0" name="key" type="MultiMeshPoolKey2D" />
-			<param index="1" name="multimesh_data" type="MultiMeshBulletsData2D" />
+			<param index="1" name="spawn_data" type="MultiMeshBulletsData2D" />
 			<param index="2" name="instance_count" type="int" />
 			<description>
 				Deferred [method populate_bullets_pool]: safe from any callback. Null key, null data and instance_count &lt;= 0 are rejected immediately without queuing.
@@ -1390,14 +1384,14 @@
 		</method>
 	</methods>
 	<members>
+		<member name="debugger_color" type="Color" setter="set_debugger_color" getter="get_debugger_color" default="Color(0, 0, 1, 0.8)">
+			The color of the debug collision shapes drawn for every volley while [member is_debugger_enabled] is on. Can be set before the factory enters the tree (it applies on ready).
+		</member>
 		<member name="debugger_draw_inactive" type="bool" setter="set_debugger_draw_inactive" getter="get_debugger_draw_inactive" default="true">
 			When false, pooled/frozen volleys are hidden in the debugger instead of drawn frozen. Default true preserves always-draw behavior.
 		</member>
 		<member name="debugger_max_providers" type="int" setter="set_debugger_max_providers" getter="get_debugger_max_providers" default="0">
 			Max debugger providers drawn per tick (0 = unlimited). Beyond the cap extra volleys are hidden, oldest first. Lower this on 10k-bullet demos where the always-draw debugger costs frames.
-		</member>
-		<member name="directional_bullets_debugger_color" type="Color" setter="set_directional_bullets_debugger_color" getter="get_directional_bullets_debugger_color" default="Color(0, 0, 1, 0.8)">
-			The color for the collision shapes of all [DirectionalBullets2D].
 		</member>
 		<member name="is_debugger_enabled" type="bool" setter="set_is_debugger_enabled" getter="get_is_debugger_enabled" default="false">
 			Whether the debugger of the collision shapes is enabled or not.
@@ -1733,9 +1727,6 @@
 		</constant>
 		<constant name="OUTLINE_FACING_ALONG_M90" value="2" enum="OutlineFacing">
 			Loop-generator facings turn -90 degrees toward the loop tangent.
-		</constant>
-		<constant name="DIRECTIONAL_BULLETS" value="0" enum="BulletType">
-			Bullet type for DirectionalBullets2D, bullets that move independently with per-bullet direction, speed and features.
 		</constant>
 		<constant name="TOP_LEFT" value="0" enum="Alignment">
 			Grid anchor used by helper_generate_transforms_grid(), the grid grows right and down starting at the marker.

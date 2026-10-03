@@ -54,8 +54,8 @@ func test_spawn_pool_stats() -> void:
 	factory.spawn_directional_bullets(_data(3))
 	await physics()
 	assert_gte(factory.debug_get_pool_hit_stats().get("directional_misses", 0), 1, "first spawn is a miss")
-	assert_gte(factory.debug_get_total_bullets_amount(0), 1, "total volleys")
-	assert_gte(factory.debug_get_active_bullets_amount(0), 1, "active volleys")
+	assert_gte(factory.debug_get_total_bullets_amount(), 1, "total volleys")
+	assert_gte(factory.debug_get_active_bullets_amount(), 1, "active volleys")
 
 
 func test_deferred_wrappers_survive_physics() -> void:
@@ -63,7 +63,7 @@ func test_deferred_wrappers_survive_physics() -> void:
 	await physics()
 	factory.free_active_bullets_deferred(null)
 	factory.free_disabled_bullets_deferred(null)
-	factory.free_bullets_pool_deferred(0, null)
+	factory.free_bullets_pool_deferred(null)
 	factory.free_attachments_pool_deferred()
 	factory.reset_deferred(null)
 	factory.free_volley_deferred(null)
@@ -71,7 +71,7 @@ func test_deferred_wrappers_survive_physics() -> void:
 	await idle()
 	await physics()
 	assert_false(factory.debug_get_factory_state().get("is_tearing_down", true), "factory alive after deferred structural ops")
-	assert_eq(factory.debug_get_active_bullets_amount(0), 0, "deferred free/reset ran")
+	assert_eq(factory.debug_get_active_bullets_amount(), 0, "deferred free/reset ran")
 
 
 func test_pooling_flags_reset_on_new_life() -> void:
@@ -105,13 +105,13 @@ func test_wake_alias_and_free_volley_deferred() -> void:
 
 
 func test_nan_spawn_is_atomic() -> void:
-	var before: int = factory.debug_get_total_bullets_amount(0)
+	var before: int = factory.debug_get_total_bullets_amount()
 	var nan_spawn := _data(2)
 	nan_spawn.transforms = [Transform2D(0.0, Vector2(INF, 0)), Transform2D.IDENTITY]
 	factory.spawn_directional_bullets(nan_spawn)
 	expect_any_error()
 	await physics()
-	assert_eq(factory.debug_get_total_bullets_amount(0), before, "NaN spawn left no volley")
+	assert_eq(factory.debug_get_total_bullets_amount(), before, "NaN spawn left no volley")
 
 
 func test_live_ids_and_reset() -> void:
@@ -127,4 +127,4 @@ func test_live_ids_and_reset() -> void:
 	await idle()
 	factory.reset()
 	await physics()
-	assert_eq(factory.debug_get_total_bullets_amount(0), 0, "reset drained volleys")
+	assert_eq(factory.debug_get_total_bullets_amount(), 0, "reset drained volleys")

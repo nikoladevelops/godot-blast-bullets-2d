@@ -211,7 +211,7 @@ func change_directional_debugger_btn_color(color:Color)->void:
 
 func _on_directional_debugger_color_picker_color_changed(color: Color) -> void:
 	change_directional_debugger_btn_color(color)
-	BENCHMARK_GLOBALS.FACTORY.directional_bullets_debugger_color = color
+	BENCHMARK_GLOBALS.FACTORY.debugger_color = color
 
 func _on_enable_monitorable_check_box_pressed() -> void:
 	BENCHMARK_GLOBALS.PLAYER_DATA_NODE.set_monitorable_enabled(enable_monitorable_checkbox.button_pressed)
@@ -243,10 +243,10 @@ func _on_free_multi_mesh_directional_pool_btn_pressed() -> void:
 	var amount_bullets:int = select_amount_bullets_view.get_selected_btn.text.to_int()
 	var shape_type:int = _effective_shape_type(BENCHMARK_GLOBALS.PLAYER_DATA_NODE.directional_bullets_data.collision_shape)
 
-	BENCHMARK_GLOBALS.FACTORY.free_bullets_pool(BulletFactory2D.DIRECTIONAL_BULLETS, MultiMeshPoolKey2D.make(amount_bullets, shape_type))
+	BENCHMARK_GLOBALS.FACTORY.free_bullets_pool(MultiMeshPoolKey2D.make(amount_bullets, shape_type))
 
 func _on_free_all_bullet_pools_btn_pressed() -> void:
-	BENCHMARK_GLOBALS.FACTORY.free_bullets_pool(BulletFactory2D.DIRECTIONAL_BULLETS)
+	BENCHMARK_GLOBALS.FACTORY.free_bullets_pool()
 
 ##
 

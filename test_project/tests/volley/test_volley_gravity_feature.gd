@@ -134,7 +134,7 @@ func test_spawner_seeding_and_indexing() -> void:
 	var live: Array = spawner.get_live_volleys()
 	if live.is_empty():
 		# Plain (non-homing) volleys are untracked by design.
-		assert_gte(factory.debug_get_total_bullets_amount(0), 1, "gravity volley exists in factory")
+		assert_gte(factory.debug_get_total_bullets_amount(), 1, "gravity volley exists in factory")
 	else:
 		assert_eq((live[0] as DirectionalBullets2D).bullet_get_gravity(0), Vector2(0, 1200), "spawner volley carries gravity")
 	var fb := _still(3)

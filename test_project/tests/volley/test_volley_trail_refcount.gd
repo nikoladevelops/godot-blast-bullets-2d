@@ -31,7 +31,7 @@ func test_shared_shard_lifecycle() -> void:
 	await physics()
 	assert_eq(int(_bake(v).get("bullets_tracked", -1)), 0, "no bullets tracked")
 	assert_eq(int(_bake(v).get("shards_visible", 1)), 0, "shard hidden")
-	assert_eq(factory.debug_get_bullets_pool_amount(0), 1, "volley pooled")
+	assert_eq(factory.debug_get_bullets_pool_amount(), 1, "volley pooled")
 
 
 func test_wake_retracks_and_reshows() -> void:

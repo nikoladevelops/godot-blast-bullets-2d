@@ -477,8 +477,11 @@ public:
 		return true;
 	}
 
-	// Updates all bullets' positions, rotations, and homing
-	inline void move_bullets(double delta) {
+	// Updates all bullets' positions, rotations, and homing.
+	// Never inlined into the caller: the factory calls this once per volley,
+	// and inlining the whole per-bullet loop into BulletFactory2D::tick_volleys
+	// measured 20-25% slower on trails_fx_2k (register pressure in the loop).
+	_NO_INLINE_ void move_bullets(double delta) {
 		if (amount_bullets <= 0 || physics_server == nullptr || !area.is_valid()) {
 			return;
 		}

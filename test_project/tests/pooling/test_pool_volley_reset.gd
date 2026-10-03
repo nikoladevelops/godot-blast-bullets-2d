@@ -38,7 +38,7 @@ func test_pooled_reuse_is_a_new_life() -> void:
 	for i in a.get_amount_bullets():
 		a.disable_bullet(i)
 	await idle(1)
-	assert_gte(factory.debug_get_bullets_pool_amount(0), 1, "emptied volley parked pooled")
+	assert_gte(factory.debug_get_bullets_pool_amount(), 1, "emptied volley parked pooled")
 
 	factory.debug_reset_pool_stats()
 	var b: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(_data())

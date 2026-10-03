@@ -1,9 +1,10 @@
 #pragma once
 
-#include "idebugger_data_provider2d.hpp"
 #include <godot_cpp/classes/mesh.hpp>
 #include <godot_cpp/classes/node.hpp>
 #include <godot_cpp/classes/physics_server2d.hpp>
+
+#include <vector>
 
 namespace godot {
 
@@ -14,6 +15,8 @@ class PhysicsServer2D;
 namespace BlastBullets2D {
 using namespace godot;
 
+class MultiMeshBullets2D;
+
 // Visualizes the collision shapes of the bullets
 class MultiMeshBulletsDebugger2D : public Node {
 	GDCLASS(MultiMeshBulletsDebugger2D, Node)
@@ -22,7 +25,7 @@ public:
 	// Handles movement of the debug multimeshes
 	virtual void _physics_process(double delta) override;
 
-	// Configures the debugger so that it's in valid state. It's mandatory to call this method since it acts as a second constructor. Also mandatory that the new_container_to_debug holds only IDebuggerDataProvider2D children and only IDebuggerDataProvider2D get spawned there throughout its lifetime
+	// Configures the debugger so that it's in valid state. It's mandatory to call this method since it acts as a second constructor. Also mandatory that new_container_to_debug only ever holds volley children (the factory's volley container)
 	void configure(Node *new_container_to_debug, const String &new_debugger_name, const Color &new_debugger_color);
 
 	// Get whether the debugger is enabled or not
@@ -67,7 +70,7 @@ private:
 	Color debugger_color = Color(0, 0, 0, 1);
 
 	// Stores pointers to the spawned debug_data_providers
-	std::vector<IDebuggerDataProvider2D *> debug_data_providers;
+	std::vector<MultiMeshBullets2D *> debug_data_providers;
 
 	// Instance ids parallel to debug_data_providers. Raw provider pointers can
 	// dangle when a multimesh is freed while pooled or during factory teardown;
@@ -91,7 +94,7 @@ private:
 	// cannot change, while still drawing them (one final sync on the transition).
 	std::vector<bool> debugger_last_active_states;
 
-	// A pointer to where the IDebuggerDataProvider2D nodes are stored
+	// The container whose volley children get debugged
 	Node *container_to_debug = nullptr;
 
 	// A pointer to the physics server
@@ -101,7 +104,7 @@ private:
 	int max_debug_providers = 0;
 	bool draw_inactive_shapes = true;
 
-	// Generates a debug multimesh from a node that should inherit from IDebuggerDataProvider2D
+	// Generates a debug multimesh for a volley that entered the container
 	void generate_debug_multimesh(Node *node_entered_container_to_debug);
 
 	// Drops the provider + its debug mesh when the multimesh exits the container's
@@ -113,10 +116,10 @@ private:
 	Ref<Mesh> create_debug_mesh_for_shape(PhysicsServer2D::ShapeType type, const Vector2 &full_size);
 
 	// Ensures debug mesh type/size matches provider (handles pool reuse with different sizes)
-	void ensure_quadmesh_matches_data_provider_collision_shape_size(int dbg_index, MultiMeshInstance2D &debug_multimesh_instance, IDebuggerDataProvider2D &debugger_data_provider);
+	void ensure_quadmesh_matches_data_provider_collision_shape_size(int dbg_index, MultiMeshInstance2D &debug_multimesh_instance, MultiMeshBullets2D &debugger_data_provider);
 
 	// Updates each debug multimesh's instance transforms to match the debug_data_providers's data
-	void update_debug_multimesh_transforms_to_match_data_provider_collision_shape_transforms(MultiMeshInstance2D &debug_multimesh_instance, IDebuggerDataProvider2D &debugger_data_provider);
+	void update_debug_multimesh_transforms_to_match_data_provider_collision_shape_transforms(MultiMeshInstance2D &debug_multimesh_instance, MultiMeshBullets2D &debugger_data_provider);
 
 	// Changes the color of all debug multimeshes/ the color of the debug shapes
 	void change_debug_multimeshes_color(const Color &new_multimesh_color);

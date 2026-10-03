@@ -1,7 +1,6 @@
 #pragma once
 
 #include "../shared/warn_once2d.hpp"
-#include "../debugger/idebugger_data_provider2d.hpp"
 #include "../factory/bullet_factory2d.hpp"
 #include "../shared/bullet_attachment2d.hpp"
 #include "../shared/bullet_attachment_object_pool2d.hpp"
@@ -59,7 +58,7 @@ using namespace godot;
 
 class MultiMeshObjectPool;
 
-class MultiMeshBullets2D : public MultiMeshInstance2D, public IDebuggerDataProvider2D {
+class MultiMeshBullets2D : public MultiMeshInstance2D {
 	GDCLASS(MultiMeshBullets2D, MultiMeshInstance2D)
 public:
 	// Godot's memnew cannot forward constructor arguments, so instances are created
@@ -3386,13 +3385,14 @@ protected:
 
 	///
 
-	/// METHODS COMING FROM THE IDebuggerDataProvider2D INTERFACE
+public:
+	/// COLLISION-SHAPE DEBUGGER ACCESSORS (read by MultiMeshBulletsDebugger2D once per volley per tick)
 
-	PhysicsServer2D::ShapeType get_collision_shape_type_for_debugging() const override {
+	PhysicsServer2D::ShapeType get_collision_shape_type_for_debugging() const {
 		return cached_effective_shape_type;
 	}
 
-	const Vector2 get_collision_shape_size_for_debugging() const override {
+	const Vector2 get_collision_shape_size_for_debugging() const {
 		// Full size from typed cache so math is exact per shape. No cast per tick.
 		switch (cached_effective_shape_type) {
 			case PhysicsServer2D::SHAPE_CIRCLE:
@@ -3405,18 +3405,18 @@ protected:
 		}
 	}
 
-	const std::vector<Transform2D> &get_all_collision_shape_transforms_for_debugging() const override {
+	const std::vector<Transform2D> &get_all_collision_shape_transforms_for_debugging() const {
 		return all_cached_shape_transforms;
 	}
 
-	bool get_skip_debugging() const override {
+	bool get_skip_debugging() const {
 		// NEVER skip: the debugger always inspects multimesh shapes, including pooled
 		// (inactive) instances - their frozen cached shape transforms keep rendering.
 		// The debugger's null-provider guard still protects against dangling entries.
 		return false;
 	}
 
-	bool is_active_for_debugging() const override {
+	bool is_active_for_debugging() const {
 		return is_active;
 	}
 

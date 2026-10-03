@@ -33,7 +33,7 @@ func _ready() -> void:
 	BENCHMARK_GLOBALS.MOVEMENT_PATH_HOLDER = $Paths
 	
 	# Make sure to set the actual debugger colors to the UI buttons
-	var initial_directional_debugger_color:Color = BENCHMARK_GLOBALS.FACTORY.directional_bullets_debugger_color
+	var initial_directional_debugger_color:Color = BENCHMARK_GLOBALS.FACTORY.debugger_color
 	
 	BENCHMARK_GLOBALS.UI.change_directional_debugger_btn_color(initial_directional_debugger_color)
 	BENCHMARK_GLOBALS.UI.directional_debugger_color_picker.color = initial_directional_debugger_color

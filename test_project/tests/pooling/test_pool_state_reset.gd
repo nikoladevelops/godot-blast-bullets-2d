@@ -59,7 +59,7 @@ func test_seeded_volley_has_everything() -> void:
 func test_pooling_off_volley_is_not_pooled() -> void:
 	a.set_is_multimesh_auto_pooling_enabled(false)
 	await _drain_and_pool()
-	assert_eq(factory.debug_get_bullets_pool_amount(0), 0, "pooling-off volley not pooled")
+	assert_eq(factory.debug_get_bullets_pool_amount(), 0, "pooling-off volley not pooled")
 
 
 func test_reuse_is_neutral() -> void:
@@ -72,7 +72,7 @@ func test_reuse_is_neutral() -> void:
 	for i in 3:
 		a.wake_bullet(i)
 	await _drain_and_pool()
-	assert_gte(factory.debug_get_bullets_pool_amount(0), 1, "pooled after flags restored")
+	assert_gte(factory.debug_get_bullets_pool_amount(), 1, "pooled after flags restored")
 	var b: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(_seeded_data())
 	assert_eq(b, a, "B IS the pooled A (identity reuse)")
 	assert_false(b.bullet_check_has_homing_targets(0), "no homing")
@@ -96,10 +96,10 @@ func test_shape_change_rebuckets() -> void:
 	a.set_collision_shape_runtime(rect)
 	assert_eq(a.debug_get_shape_state().get("type", -1), PhysicsServer2D.SHAPE_RECTANGLE, "now a rectangle")
 	await _drain_and_pool()
-	assert_gte(factory.debug_get_bullets_pool_amount(0), 1, "re-bucketed volley pooled under the rect key")
-	factory.free_bullets_pool(0, MultiMeshPoolKey2D.make(3, PhysicsServer2D.SHAPE_CIRCLE))
+	assert_gte(factory.debug_get_bullets_pool_amount(), 1, "re-bucketed volley pooled under the rect key")
+	factory.free_bullets_pool(MultiMeshPoolKey2D.make(3, PhysicsServer2D.SHAPE_CIRCLE))
 	await idle()
-	assert_gte(factory.debug_get_bullets_pool_amount(0), 1, "freeing the stale circle bucket keeps the rect-pooled volley")
+	assert_gte(factory.debug_get_bullets_pool_amount(), 1, "freeing the stale circle bucket keeps the rect-pooled volley")
 
 
 func test_new_amount_never_reuses() -> void:

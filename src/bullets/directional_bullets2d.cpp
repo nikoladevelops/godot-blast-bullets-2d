@@ -901,7 +901,7 @@ void DirectionalBullets2D::custom_additional_disable_logic() {
 	// of operating on whatever the pool slot becomes next.
 	++homing_operation_generation;
 	if (bullet_factory != nullptr) {
-		bullet_factory->directional_bullets_set.disable_data(sparse_set_id);
+		bullet_factory->deactivate_multimesh_instance(*this);
 	}
 }
 

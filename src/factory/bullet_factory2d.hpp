@@ -56,11 +56,6 @@ class BulletFactory2D : public Node2D {
 	friend class FactoryOperationGuard;
 
 public:
-	// The bullet types the factory spawns (only directional volleys remain).
-	enum BulletType {
-		DIRECTIONAL_BULLETS
-	};
-
 	// Enum class for grid alignment
 	enum Alignment {
 		TOP_LEFT,
@@ -365,14 +360,14 @@ public:
 
 	// OBJECT POOLING RELATED
 
-	// Populates the object pool of a bullet type for one exact bucket.
-	// The key is required and must match the bucket derived from multimesh_data
-	// (key.amount_bullets must equal multimesh_data.transforms.size(), plus effective shape).
-	// instance_count = how many multimesh instances to pre-create in that bucket. Mismatch aborts.
-	void populate_bullets_pool(const Ref<MultiMeshPoolKey2D> &key, const Ref<MultiMeshBulletsData2D> &multimesh_data, int instance_count);
+	// Pre-creates disabled volleys for one exact pool bucket.
+	// The key is required and must match the bucket derived from spawn_data
+	// (key.amount_bullets must equal spawn_data.transforms.size(), plus effective shape).
+	// instance_count = how many volleys to pre-create in that bucket. Mismatch aborts.
+	void populate_bullets_pool(const Ref<MultiMeshPoolKey2D> &key, const Ref<MultiMeshBulletsData2D> &spawn_data, int instance_count);
 
-	// Frees an object pool of a particular bullet type. Pass null key to free all, or exact PoolKey to free only that bucket
-	void free_bullets_pool(BulletType bullet_type, const Ref<MultiMeshPoolKey2D> &key = Ref<MultiMeshPoolKey2D>());
+	// Frees pooled (disabled) volleys. Null key frees every bucket, an exact key only that bucket.
+	void free_bullets_pool(const Ref<MultiMeshPoolKey2D> &key = Ref<MultiMeshPoolKey2D>());
 
 	// Populates the bullet attachments pool. The packed scene has to contain a BulletAttachment2D.
 	// Pooling is keyed by the scene itself (see BulletAttachmentObjectPool2D::key_for_scene),
@@ -395,8 +390,8 @@ public:
 	void free_active_bullets_deferred(const Ref<MultiMeshPoolKey2D> &key = Ref<MultiMeshPoolKey2D>());
 	void clear_active_bullets_deferred(const Ref<MultiMeshPoolKey2D> &key = Ref<MultiMeshPoolKey2D>());
 	void free_disabled_bullets_deferred(const Ref<MultiMeshPoolKey2D> &key = Ref<MultiMeshPoolKey2D>());
-	void free_bullets_pool_deferred(BulletType bullet_type, const Ref<MultiMeshPoolKey2D> &key = Ref<MultiMeshPoolKey2D>());
-	void populate_bullets_pool_deferred(const Ref<MultiMeshPoolKey2D> &key, const Ref<MultiMeshBulletsData2D> &multimesh_data, int instance_count);
+	void free_bullets_pool_deferred(const Ref<MultiMeshPoolKey2D> &key = Ref<MultiMeshPoolKey2D>());
+	void populate_bullets_pool_deferred(const Ref<MultiMeshPoolKey2D> &key, const Ref<MultiMeshBulletsData2D> &spawn_data, int instance_count);
 	void free_attachments_pool_deferred();
 	void free_attachments_pool_for_scene_deferred(const Ref<PackedScene> &attachment_scene);
 	// Safe single-volley free from any callback. Never calls free()/force_delete
@@ -594,11 +589,14 @@ public:
 
 	// ADDITIONAL METHODS FOR DEBUGGING PURPOSES
 
-	int debug_get_total_bullets_amount(BulletType bullet_type);
-	int debug_get_active_bullets_amount(BulletType bullet_type);
-	int debug_get_bullets_pool_amount(BulletType bullet_type);
+	// Volley counts (not bullets): every tracked volley, the active ones,
+	// and the pooled ones. Pool info maps each MultiMeshPoolKey2D bucket to
+	// its pooled count.
+	int debug_get_total_bullets_amount();
+	int debug_get_active_bullets_amount();
+	int debug_get_bullets_pool_amount();
 
-	Dictionary debug_get_bullets_pool_info(BulletType bullet_type);
+	Dictionary debug_get_bullets_pool_info();
 
 	int debug_get_total_attachments_amount();
 	int debug_get_active_attachments_amount();
@@ -669,13 +667,16 @@ public:
 
 	//
 
-	DynamicSparseSet directional_bullets_set;
-
 	void handle_manual_user_deletion_of_multimesh_bullets(MultiMeshBullets2D &bullet_multi);
 
 	// Re-registers a pooled multimesh that was woken via enable_bullet() outside spawn,
 	// so the factory processes it again. No-op when already active or tearing down.
 	void reactivate_multimesh_instance(MultiMeshBullets2D &bullet_multi);
+
+	// Removes a volley that just went inactive (last bullet disabled) from the
+	// set of volleys the tick walks. Identity-checked: a stale sparse id never
+	// deactivates another volley. The volley stays tracked (and poolable).
+	void deactivate_multimesh_instance(MultiMeshBullets2D &bullet_multi);
 
 	// GDScript entry for the same: enable_bullet() wake from script can't pass a
 	// C++ reference, so this validates the node first. Unbound C++ path stays.
@@ -748,7 +749,7 @@ public:
 	// Reusable per-frame iteration buffers (dense-index + the pointer that
 	// occupied that index when the snapshot was taken). Avoid 2-4 heap
 	// allocations every physics/render frame; only used on the main thread.
-	// The pointer half is load-bearing: see handle_bullet_behavior.
+	// The pointer half is load-bearing: see tick_volleys.
 
 	// One dense slot captured at the start of a frame's iteration: the index
 	// plus whatever object occupied it THEN. The index alone is not enough:
@@ -761,13 +762,13 @@ public:
 		int index = -1;
 		const void *instance = nullptr;
 	};
-	std::vector<VolleyIterationEntry> directional_iteration_scratch;
+	std::vector<VolleyIterationEntry> iteration_scratch;
 
 	// Pool reuse counters. Incremented only on spawn pop/allocate
 	// paths (never in the per-bullet tick), so zero hot-path cost.
 	// Mutable so const debug getters can report without breaking constness.
-	mutable uint64_t directional_pool_hits = 0;
-	mutable uint64_t directional_pool_misses = 0;
+	mutable uint64_t pool_hits = 0;
+	mutable uint64_t pool_misses = 0;
 
 	// FRAME STATS (get_frame_stats / custom Performance monitors). Written once
 	// per tick or once per event (spawn, drained collision record, expiry),
@@ -832,90 +833,43 @@ private:
 	// Single validation pipeline for every spawn entry point. Runs all
 	// gates BEFORE any pool pop or memnew, so a rejected request can never
 	// leave a half-set-up multimesh behind. Returns false (with an error
-	// already reported) when the caller must abort.
-	template <typename TSpawnData>
-	bool validate_spawn_request(const char *caller_name, const Ref<TSpawnData> &spawn_data, const Vector2 &inherited_velocity_offset, int override_count = -1) {
-		if (is_factory_busy) {
-			UtilityFunctions::push_error("Error when trying to spawn bullets. BulletFactory2D is currently busy. Ignoring the request");
-			return false;
-		}
-		// Lazy init: a GDScript _ready() without super._ready() leaves
-		// containers null and is_ready false. Recover + warn loudly instead of
-		// shipping a dead factory.
-		if (!is_ready) {
-			ensure_factory_initialized();
-		}
-		if (!is_ready) {
-			UtilityFunctions::push_error(String(caller_name) + ": BulletFactory2D is not in the scene tree yet. Add it first, then spawn. If you attached a script with _ready() to the factory, call super._ready() first.");
-			return false;
-		}
-		if (is_tearing_down) {
-			UtilityFunctions::push_error(String(caller_name) + ": BulletFactory2D is being freed. Ignoring the request.");
-			return false;
-		}
-		// A factory removed from the tree (but kept alive) still holds a
-		// valid physics space: spawning would create bullets that collide
-		// but never render. Refuse loudly instead.
-		if (!is_inside_tree()) {
-			UtilityFunctions::push_error(String(caller_name) + ": BulletFactory2D is not inside the scene tree. Ignoring the request.");
-			return false;
-		}
-		if (!inherited_velocity_offset.is_finite()) {
-			UtilityFunctions::push_error(String("Error in ") + caller_name + ": inherited velocity offset must be finite. Nothing was spawned.");
-			return false;
-		}
-		if (spawn_data.is_null() || spawn_count_or_data(spawn_data, override_count) == 0) {
-			UtilityFunctions::push_error(String("Error when trying to spawn bullets in ") + caller_name + ". No spawn_data or no transforms were provided. Ignoring the request");
-			return false;
-		}
-		// Native span callers validated their transforms already (no Variant
-		// per bullet); script callers get the full per-transform check.
-		if (override_count >= 0) {
-			return validate_spawn_data_fields(spawn_data, override_count, caller_name);
-		}
-		return validate_spawn_data(spawn_data, caller_name);
-	}
-	static int spawn_count_or_data(const Ref<MultiMeshBulletsData2D> &spawn_data, int override_count) {
-		return override_count >= 0 ? override_count : (int)spawn_data->transforms.size();
-	}
+	// already reported) when the caller must abort. override_count >= 0 marks
+	// a native span caller whose transforms were validated already.
+	bool validate_spawn_request(const char *caller_name, const Ref<MultiMeshBulletsData2D> &spawn_data, const Vector2 &inherited_velocity_offset, int override_count = -1);
 
-	// BULLETS RELATED
-
-	// DIRECTIONAL BULLETS RELATED
-
-	// Keeps track of all directional bullets that were spawned
-	std::vector<DirectionalBullets2D *> all_directional_bullets;
-
-	// Contains all DirectionalBullets2D in the scene tree
-	Node *directional_bullets_container = nullptr;
-
-	// Holds all disabled DirectionalBullets2D
-	MultiMeshObjectPool directional_bullets_pool;
-
+	// VOLLEYS (every spawned DirectionalBullets2D, active or pooled)
 	//
+	// Ownership rule: all_volleys is the source of truth. volley_pool holds a
+	// subset (disabled volleys only), volley_set holds the indexes of the
+	// ACTIVE volleys (the ones the tick walks). Every volley stores its own
+	// index in all_volleys as sparse_set_id; the helpers below keep the three
+	// in sync.
 
-	//
+	std::vector<DirectionalBullets2D *> all_volleys;
+
+	// Indexes (into all_volleys) of the active volleys.
+	DynamicSparseSet volley_set;
+
+	// Disabled volleys waiting for reuse, bucketed by PoolKey (amount + shape).
+	MultiMeshObjectPool volley_pool;
+
+	// Parent node of every volley in the scene tree.
+	Node *volley_container = nullptr;
 
 	// DEBUGGER RELATED
 
-	// Determines whether both debuggers should be enabled
+	// Whether the collision-shape debugger draws.
 	bool is_debugger_enabled_cached_before_ready = false;
 	bool get_is_debugger_enabled() const;
 	void set_is_debugger_enabled(bool new_is_enabled);
 
-	//
+	// Draws the collision shapes of every volley when enabled.
+	MultiMeshBulletsDebugger2D *volley_debugger = nullptr;
 
-	// DIRECTIONAL BULLETS DEBUGGER RELATED
-
-	// Debugs the collision shapes of all DirectionalBullets2D when enabled
-	MultiMeshBulletsDebugger2D *directional_bullets_debugger = nullptr;
-
-	// The color for the collision shapes of all DirectionalBullets2D
-	Color directional_bullets_debugger_color_cached_before_ready = Color(0, 0, 1, 0.8);
-	Color get_directional_bullets_debugger_color() const;
-	void set_directional_bullets_debugger_color(const Color &new_color);
-
-	//
+	// The color of the debug collision shapes.
+	Color debugger_color_cached_before_ready = Color(0, 0, 1, 0.8);
+	Color get_debugger_color() const;
+	void set_debugger_color(const Color &new_color);
 
 	// PHYSICS INTERPOLATION RELATED
 
@@ -930,416 +884,71 @@ private:
 	void set_use_physics_interpolation_runtime(bool new_use_physics_interpolation);
 	void set_use_physics_interpolation_editor(bool new_use_physics_interpolation);
 
-	//
-
 	// FACTORY CHILDREN
 
-	// Adds containers as children of the factory, meant to hold bullets
+	// Adds the container that holds every volley as a child of the factory
 	void add_bullet_containers();
 
 	// Adds a single container as a child of the factory, where bullet attachments are always spawned
 	void add_bullet_attachment_container();
 
-	// Adds the debuggers as children of the factory
+	// Adds the collision-shape debugger as a child of the factory
 	void add_debuggers();
 
-	//
+	// VOLLEY BOOKKEEPING (bodies in bullet_factory2d.cpp)
 
-	// TEMPLATES
+	// Pre-creates instance_count disabled volleys in the exact `key` bucket.
+	// Callers validate key against spawn_data before invoking.
+	void populate_pool_bucket(const PoolKey &key, const Ref<MultiMeshBulletsData2D> &spawn_data, int instance_count);
 
-	// Populates a bullets pool with disabled bullet instances. It's mandatory that the TBullet type inherits from MultiMeshBullets2D.
-	// The key is always specific (never null): every created instance must land in that exact bucket.
-	// Callers validate key against spawn_data before invoking; a debug guard verifies each spawn below.
-	template <typename TBullet>
-	void populate_bullets_pool_helper(const PoolKey &key, const Ref<MultiMeshBulletsData2D> &spawn_data, std::vector<TBullet *> &bullets_vec, MultiMeshObjectPool &bullets_object_pool, Node *bullets_container, int instance_count, const Vector2 &new_inherited_velocity_offset = Vector2(0, 0)) {
-		bullets_vec.reserve(bullets_vec.size() + instance_count);
-		for (int i = 0; i < instance_count; ++i) {
-			TBullet *bullets = memnew(TBullet);
-
-			// Generate new id according to how many ids there are in the sparse set.
-			// Disabled instances stay out of the sparse dense list; the id is claimed now
-			// so a later pop()+activate_data() reuses a stable index. DynamicSparseSet
-			// auto-grows, so no manual resize is needed here (and must not shrink elsewhere).
-			int sparse_set_id = (int)bullets_vec.size();
-
-			bullets->spawn(*spawn_data.ptr(), &bullets_object_pool, this, bullets_container, new_inherited_velocity_offset, sparse_set_id, true);
-#ifdef DEV_ENABLED
-			ERR_FAIL_COND(!(bullets->get_pool_key() == key));
-#endif
-			bullets_vec.emplace_back(bullets);
-		}
-	}
-	// Shared primitives for all free_* helpers. Ownership rule everywhere:
-	// bullets_vec is the source of truth; the pool holds a subset (disabled only).
-
-	// Unlinks one instance from the pool (no-op when absent: pooling off or
+	// Unlinks one volley from the pool (no-op when absent: pooling off or
 	// never pooled) and frees it exactly once. force_delete() sets
 	// marked_for_internal_deletion so _notification never re-enters
 	// handle_manual_user_deletion while is_factory_busy.
-	template <typename TBullet>
-	void unlink_and_delete_bullet(MultiMeshObjectPool &bullets_pool, TBullet *multi) {
-		bullets_pool.try_remove_instance(multi, multi->get_pool_key());
-		multi->force_delete();
-	}
+	void unlink_and_delete_volley(DirectionalBullets2D *volley);
 
 	// Re-indexes survivors after a removal: sparse ids must equal vec indexes
-	// or the factory drives the wrong multimesh (crash). Actives rejoin the
-	// dense list. Keep sparse capacity: DynamicSparseSet auto-grows on
-	// populate/activate, shrinking max_size here only causes realloc churn
-	// and fragile ids, so never call resize() to shrink.
-	template <typename TBullet>
-	void reindex_bullet_vec(std::vector<TBullet *> &bullets_vec, DynamicSparseSet &sparse_set) {
-		sparse_set.clear();
-		for (int i = 0; i < (int)bullets_vec.size(); ++i) {
-			if (bullets_vec[i] == nullptr) {
-				continue;
-			}
-			bullets_vec[i]->sparse_set_id = i;
-			if (bullets_vec[i]->is_active) {
-				sparse_set.activate_data(i);
-			}
-		}
-	}
+	// or the factory drives the wrong volley (crash). Actives rejoin the
+	// dense list. Never shrinks volley_set (it auto-grows; shrinking only
+	// causes realloc churn and fragile ids).
+	void reindex_volleys();
 
-	// Splits out every instance matching a predicate, leaving survivors in the
-	// vec. Returned matches are still alive: the caller unlinks/frees them,
-	// then calls reindex_bullet_vec().
-	template <typename TBullet, typename TPred>
-	std::vector<TBullet *> extract_matching_bullets(std::vector<TBullet *> &bullets_vec, TPred matches) {
-		std::vector<TBullet *> removed;
-		auto new_end = std::remove_if(bullets_vec.begin(), bullets_vec.end(), [&removed, &matches](TBullet *multi) {
-			if (multi == nullptr || !matches(multi)) {
-				return false;
-			}
-			removed.push_back(multi);
-			return true;
-		});
-		bullets_vec.erase(new_end, bullets_vec.end());
-		return removed;
-	}
+	// Frees disabled volleys (null key = every bucket) and drops the pool's
+	// leftovers. Backs free_bullets_pool().
+	void free_pooled_volleys(const PoolKey *key);
 
-	template <typename TBullet>
-	void free_bullets_pool_helper(std::vector<TBullet *> &bullets_vec, DynamicSparseSet &sparse_set, MultiMeshObjectPool &bullets_pool, const PoolKey *key) {
-		// The criteria for what we are removing from the vector. Null key = all disabled.
-		// Correct whether auto pooling is on (pooled), off (never pooled),
-		// or was toggled mid-game (mixed).
-		std::vector<TBullet *> removed = extract_matching_bullets(bullets_vec, [key](TBullet *multi) {
-			if (multi->is_active) {
-				return false;
-			}
-			return key == nullptr || multi->get_pool_key() == *key;
-		});
-		reindex_bullet_vec(bullets_vec, sparse_set);
+	// Frees every volley (null key) or every volley of one bucket, active or
+	// not, and clears dangling pointers. Backs reset().
+	void free_all_volleys(const PoolKey *key = nullptr);
 
-		// Tell the pool to actually memdelete the objects, then free leftovers
-		// still in the pool.
-		for (TBullet *multi : removed) {
-			unlink_and_delete_bullet(bullets_pool, multi);
-		}
-		if (key != nullptr) {
-			bullets_pool.free_specific_bullets(*key);
-		} else {
-			bullets_pool.free_all_bullets();
-		}
-	}
+	// Frees ACTIVE volleys only (null key = every bucket). The pool is
+	// untouched: active volleys are never pooled. Backs free_active_bullets().
+	void free_active_volleys(const PoolKey *key = nullptr);
 
-	// Frees all multimeshes of a TBullet type and clears dangling pointers. Null key clears ALL multimeshes, otherwise only exact PoolKey match.
-	// Matching instances are unlinked from the pool (when present) and freed exactly once
-	// here, which stays correct whether auto pooling is on, off, or was toggled mid-game.
-	template <typename TBullet>
-	void free_all_bullets_helper(std::vector<TBullet *> &bullets_vec, DynamicSparseSet &sparse_set, MultiMeshObjectPool &bullets_pool, const PoolKey *key = nullptr) {
-		if (key == nullptr) {
-			for (TBullet *bullet_multi : bullets_vec) {
-				if (bullet_multi == nullptr) {
-					continue;
-				}
+	// Frees DISABLED volleys only (null key = every bucket). Backs
+	// free_disabled_bullets().
+	void free_disabled_volleys(const PoolKey *key = nullptr);
 
-				bullet_multi->force_delete();
-			}
+	// Swap-removes one volley from all_volleys + volley_set. No pool touch:
+	// callers must call volley_pool.try_remove_instance() FIRST with the
+	// exact PoolKey, or the pool keeps a dangling pointer.
+	void remove_volley_from_tracking(DirectionalBullets2D *target);
 
-			// All vec objects (including pooled ones) are already memdeleted above, so only
-			// drop the pool's dangling pointers here. Never call free_all_bullets() here,
-			// it would delete the same objects twice.
-			bullets_pool.clear();
-			bullets_vec.clear();
-			sparse_set.clear();
-		} else {
-			// Unlink matches from the pool first when present (disabled +
-			// auto pooling on), then free exactly once. Active instances
-			// are never pooled.
-			std::vector<TBullet *> removed = extract_matching_bullets(bullets_vec, [key](TBullet *bullet_multi) {
-				return bullet_multi->get_pool_key() == *key;
-			});
-			for (TBullet *bullet_multi : removed) {
-				unlink_and_delete_bullet(bullets_pool, bullet_multi);
-			}
-			reindex_bullet_vec(bullets_vec, sparse_set);
-
-			// FREES any pooled leftovers that were never tracked in the vec.
-			bullets_pool.free_specific_bullets(*key);
-		}
-	}
-
-	// Frees all ACTIVE bullets of a TBullet type and clears dangling pointers. Null key = all buckets, else exact PoolKey match.
-	// Pool is untouched: active instances are never pooled, so no pool call is needed here.
-	template <typename TBullet>
-	void free_only_active_bullets_helper(std::vector<TBullet *> &bullets_vec, DynamicSparseSet &sparse_set, const PoolKey *key = nullptr) {
-		std::vector<TBullet *> removed = extract_matching_bullets(bullets_vec, [key](TBullet *bullet_multi) {
-			return bullet_multi->is_active && (key == nullptr || bullet_multi->get_pool_key() == *key);
-		});
-		for (TBullet *bullet_multi : removed) {
-			bullet_multi->force_delete();
-		}
-		reindex_bullet_vec(bullets_vec, sparse_set);
-	}
-
-	// Frees all DISABLED bullets of a TBullet type and clears dangling pointers. Null key = all buckets, else exact PoolKey match.
-	// Null path: vec-side force_delete already memdeleted every disabled instance, so only
-	// pool.clear() (drop pointers). Specific path unlinks each match from the pool first and
-	// frees it exactly once, which stays correct whether auto pooling is on or off.
-	template <typename TBullet>
-	void free_only_disabled_bullets_helper(std::vector<TBullet *> &bullets_vec, DynamicSparseSet &sparse_set, MultiMeshObjectPool &bullets_pool, const PoolKey *key = nullptr) {
-		std::vector<TBullet *> removed = extract_matching_bullets(bullets_vec, [key](TBullet *bullet_multi) {
-			return !bullet_multi->is_active && (key == nullptr || bullet_multi->get_pool_key() == *key);
-		});
-		if (key == nullptr) {
-			for (TBullet *bullet_multi : removed) {
-				bullet_multi->force_delete();
-			}
-			bullets_pool.clear();
-		} else {
-			for (TBullet *bullet_multi : removed) {
-				unlink_and_delete_bullet(bullets_pool, bullet_multi);
-			}
-			bullets_pool.free_specific_bullets(*key);
-		}
-		reindex_bullet_vec(bullets_vec, sparse_set);
-	}
-
-	template <typename T>
-	void remove_multimesh_instance_from_vec_and_sparse_set(std::vector<T *> &vec, DynamicSparseSet &sparse_set, T *target) {
-		// No pool touch here: callers must call try_remove_instance() FIRST with the exact
-		// PoolKey, then this vec+sparse fixup. Reversing the order leaves dangling pool pointers.
-		int id_to_remove = target->sparse_set_id;
-		int last_idx = static_cast<int>(vec.size()) - 1;
-
-		if (id_to_remove < 0 || id_to_remove > last_idx) {
-			return;
-		}
-
-		// Identity check: a stale id must never delete an innocent element.
-		// Fall back to a linear search so the right instance is still removed.
-		if (vec[id_to_remove] != target) {
-			id_to_remove = -1;
-			for (int i = 0; i <= last_idx; ++i) {
-				if (vec[i] == target) {
-					id_to_remove = i;
-					break;
-				}
-			}
-			if (id_to_remove < 0) {
-				return;
-			}
-			target->sparse_set_id = id_to_remove;
-		}
-
-		T *last_bullet = vec[last_idx];
-		bool last_was_active = last_bullet && last_bullet->is_active;
-
-		// Remove both ids from active set if present (order matters - disable target first)
-		sparse_set.disable_data(id_to_remove);
-		if (last_idx != id_to_remove) {
-			sparse_set.disable_data(last_idx);
-		}
-
-		// Move last into hole if not removing the last itself
-		if (id_to_remove < last_idx) {
-			vec[id_to_remove] = last_bullet;
-			if (last_bullet) {
-				last_bullet->sparse_set_id = id_to_remove;
-			}
-		}
-
-		vec.pop_back();
-
-		// Re-activate moved element if it was active
-		if (last_was_active && id_to_remove < last_idx) {
-			sparse_set.activate_data(id_to_remove);
-		}
-	}
-
-	// Spawns bullets by either creating a brand new TBullet or retrieving one from the object pool.
+	// Spawns one volley: pool pop (same PoolKey) or a brand new instance.
 	// spawner_id is stamped inside spawn()/enable_multimesh() BEFORE any
 	// physics/tree activation (configure-then-attach): 0 = factory-owned.
-	template <typename TBullet, typename TBulletSpawnData>
-	TBullet *spawn_bullets_helper(std::vector<TBullet *> &bullets_vec, DynamicSparseSet &sparse_set, MultiMeshObjectPool &bullets_pool, Node *bullets_container, const Ref<TBulletSpawnData> &spawn_data, const Vector2 &new_inherited_velocity_offset = Vector2(0, 0), uint64_t spawner_id = 0, const Transform2D *transforms_ptr = nullptr, int transforms_count = -1) {
-		// Quiet: creation prints error once per spawn. Pool key must use effective type (fallback included) to match RIDs.
-		PhysicsServer2D::ShapeType shape_type = CollisionShapeHelper2D::get_effective_type(spawn_data->collision_shape, false);
-		const int bullet_count = transforms_ptr != nullptr ? transforms_count : (int)spawn_data->transforms.size();
-		PoolKey key{ bullet_count, shape_type };
+	// transforms_ptr/transforms_count: native span path (no Variant boxing).
+	DirectionalBullets2D *spawn_volley_internal(const Ref<DirectionalBulletsData2D> &spawn_data, const Vector2 &new_inherited_velocity_offset, uint64_t spawner_id = 0, const Transform2D *transforms_ptr = nullptr, int transforms_count = -1);
 
-		// Try to get a TBullet from the pool first
-		TBullet *bullets = static_cast<TBullet *>(bullets_pool.pop(key));
-		if (bullets != nullptr) {
-			bullets->spawn_transforms_ptr = transforms_ptr;
-			bullets->spawn_transforms_count = bullet_count;
-			const bool enabled = bullets->enable_multimesh(*spawn_data.ptr(), new_inherited_velocity_offset, spawner_id);
-			bullets->spawn_transforms_ptr = nullptr;
-			if (!enabled) {
-				// enable_multimesh rolls its own mutations back on failure, so the
-				// instance is a clean disabled one here: just file it back under
-				// the live key (not the spawn key) and fall through to a fresh
-				// allocation: a refused reuse must never turn a valid spawn
-				// request into a silent null.
-				bullets_pool.push(bullets, bullets->get_pool_key());
-				bullets = nullptr;
-			}
-		}
-		if (bullets != nullptr) {
-			// Pool-hit accounting lands only on success: a popped-but-rejected
-			// reuse must not skew debug_get_pool_hit_stats. Discriminated at
-			// compile time by the pooled type; never touches the per-bullet tick.
-			++directional_pool_hits;
-			// Identity-checked: a stale pooled id must never activate a foreign entry.
-			// Pooled instances normally stay in the vec, so this is just a safe lookup.
-			int reuse_id = bullets->sparse_set_id;
-			if (reuse_id < 0 || reuse_id >= (int)bullets_vec.size() || bullets_vec[reuse_id] != bullets) {
-				reuse_id = -1;
-				for (int i = 0; i < (int)bullets_vec.size(); ++i) {
-					if (bullets_vec[i] == bullets) {
-						reuse_id = i;
-						break;
-					}
-				}
-				if (reuse_id < 0) {
-					// Orphaned pooled instance (unreachable via factory paths): adopt it
-					// exactly once so later frees stay correct instead of leaking it.
-					reuse_id = (int)bullets_vec.size();
-					bullets_vec.push_back(bullets);
-				}
-				bullets->sparse_set_id = reuse_id;
-			}
-			sparse_set.activate_data(reuse_id);
-			stats_spawned_bullets_total += (uint64_t)bullets->amount_bullets;
-			return bullets;
-		}
+	// Copies the active volley indexes AND their occupants into
+	// iteration_scratch, so the sweeps below survive re-entrant frees.
+	void snapshot_active_volleys();
 
-		// Generate new id according to how many ids there are in the sparse set
-		int sparse_set_id = bullets_vec.size();
+	// Physics tick of every active volley: movement, animation, lifetime.
+	void tick_volleys(double delta);
 
-		// Pool miss: no reusable instance, allocating new.
-		++directional_pool_misses;
-
-		// If there was no TBullet in the pool, create a brand new one and spawn it
-		bullets = memnew(TBullet);
-		bullets->spawn_transforms_ptr = transforms_ptr;
-		bullets->spawn_transforms_count = bullet_count;
-		bullets->spawn(*spawn_data.ptr(), &bullets_pool, this, bullets_container, new_inherited_velocity_offset, sparse_set_id, false, spawner_id);
-		bullets->spawn_transforms_ptr = nullptr;
-		bullets_vec.emplace_back(bullets);
-
-		sparse_set.activate_data(sparse_set_id);
-		stats_spawned_bullets_total += (uint64_t)bullets->amount_bullets;
-
-		return bullets;
-	}
-
-	// Handles movement and other behaviors of the bullets.
-	// scratch is a reusable buffer (avoids a per-frame heap alloc for the dense copy);
-	// only touched from _physics_process/_process on the main thread.
-	template <typename TBullet>
-	void handle_bullet_behavior(const std::vector<TBullet *> &bullets_vec, const DynamicSparseSet &bullets_set, double delta, std::vector<VolleyIterationEntry> &scratch) {
-		if (!Math::is_finite(delta) || delta < 0.0) {
-			return;
-		}
-		const std::vector<int> &dense = bullets_set.get_active_indexes();
-		scratch.clear();
-		scratch.reserve(dense.size());
-		for (int index : dense) {
-			// Snapshot the OCCUPANT alongside the index. A bounds check alone
-			// cannot catch a swap-remove: a user calling free() (not
-			// queue_free) inside a collision handler legitimately moves the
-			// last live volley into the freed index, and that index is already
-			// in this snapshot - so without the identity check the swapped-in
-			// volley would run move_bullets/advance_sprite_animation/
-			// reduce_lifetime twice this frame, double-advancing its age,
-			// max_life_time and curves_elapsed_time.
-			VolleyIterationEntry entry;
-			entry.index = index;
-			entry.instance = (index >= 0 && index < (int)bullets_vec.size()) ? (const void *)bullets_vec[index] : nullptr;
-			scratch.push_back(entry);
-		}
-
-		for (const VolleyIterationEntry &entry : scratch) {
-			const int index = entry.index;
-			if (index < 0 || index >= (int)bullets_vec.size()) {
-				continue;
-			}
-			auto *multi = bullets_vec[index];
-			// Identity re-check: skip a slot whose occupant changed since the
-			// snapshot (swap-remove). It is still simulated exactly once, via
-			// its own snapshot entry at the old index.
-			if (multi == nullptr || (const void *)multi != entry.instance) {
-				continue;
-			}
-			if (!multi->is_active) {
-				continue;
-			}
-
-			// Flag the volley for its whole tick: handlers fired from inside
-			// (collision drain, attachment callbacks) may spawn, and the pool
-			// must never hand out the volley whose drain is still running.
-			// Liveness re-checked between steps: a handler that free()s the
-			// volley (against the contract) must not crash the sweep.
-			++stats_tick_volleys;
-			stats_tick_bullets += multi->active_bullets_counter;
-			const uint64_t multi_id = multi->get_instance_id();
-			multi->is_being_ticked = true;
-			multi->move_bullets(delta);
-			if (ObjectDB::get_instance(ObjectID(multi_id)) != multi) {
-				continue;
-			}
-			multi->advance_sprite_animation(delta);
-			multi->reduce_lifetime(delta);
-			if (ObjectDB::get_instance(ObjectID(multi_id)) != multi) {
-				continue;
-			}
-			multi->is_being_ticked = false;
-		}
-	}
-
-	// Handles rendering with physics interpolation
-	template <typename TBullet>
-	void handle_bullet_rendering_interpolation(std::vector<TBullet *> &bullets_vec, const DynamicSparseSet &bullets_set, std::vector<VolleyIterationEntry> &scratch) {
-		// Copy index AND occupant: interpolate only reads, but a re-entrant
-		// free/reset mid-loop mutates the vec under iteration, and the
-		// identity check keeps a swap-remove from rendering one volley twice
-		// in a frame (same reasoning as handle_bullet_behavior).
-		const std::vector<int> &dense = bullets_set.get_active_indexes();
-		scratch.clear();
-		scratch.reserve(dense.size());
-		for (int index : dense) {
-			VolleyIterationEntry entry;
-			entry.index = index;
-			entry.instance = (index >= 0 && index < (int)bullets_vec.size()) ? (const void *)bullets_vec[index] : nullptr;
-			scratch.push_back(entry);
-		}
-
-		for (const VolleyIterationEntry &entry : scratch) {
-			const int index = entry.index;
-			if (index < 0 || index >= (int)bullets_vec.size()) {
-				continue;
-			}
-			auto *multi = bullets_vec[index];
-			if (multi == nullptr || (const void *)multi != entry.instance) {
-				continue;
-			}
-			if (!multi->is_active) {
-				continue;
-			}
-			multi->interpolate_bullet_visuals();
-		}
-	}
+	// Render-frame interpolation pass of every active volley.
+	void interpolate_volleys();
 
 	// Exposed helper methods (public so BulletSpawner2D can reuse them for transforms_source modes)
 
@@ -2331,7 +1940,6 @@ public:
 } //namespace BlastBullets2D
 
 // Need this in order to expose the enum to Godot Engine
-	VARIANT_ENUM_CAST(BlastBullets2D::BulletFactory2D::BulletType);
 	VARIANT_ENUM_CAST(BlastBullets2D::BulletFactory2D::Alignment);
 	VARIANT_ENUM_CAST(BlastBullets2D::BulletFactory2D::SpiralFacingMode);
 	VARIANT_ENUM_CAST(BlastBullets2D::BulletFactory2D::ScatterFacingMode);

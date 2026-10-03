@@ -28,7 +28,7 @@ func before_each() -> void:
 func test_three_spawners_share_one_factory() -> void:
 	assert_true(a.shoot_once() and b.shoot_once() and c.shoot_once(), "all three fire")
 	await physics(10)
-	assert_gte(factory.debug_get_total_bullets_amount(0), 3, "factory census sees all volleys")
+	assert_gte(factory.debug_get_total_bullets_amount(), 3, "factory census sees all volleys")
 	for sp in [a, b, c]:
 		assert_gte(sp.get_live_volley_count(), 1, "owner tracks its own volley")
 
@@ -112,4 +112,4 @@ func test_pool_hit_accounting() -> void:
 			vv.disable_bullet(k)
 		await physics()
 	assert_eq(int(factory.debug_get_pool_hit_stats().get("directional_hits", -1)), hits0 + 9, "every spawn after the first is a pool hit")
-	assert_gte(factory.debug_get_bullets_pool_amount(0), 1, "pool holds stock")
+	assert_gte(factory.debug_get_bullets_pool_amount(), 1, "pool holds stock")

@@ -85,7 +85,7 @@ func test_pool_hit_observability() -> void:
 	factory.debug_reset_pool_stats()
 	var pop_data := _data(4)
 	factory.populate_bullets_pool(BulletFactory2D.debug_expected_pool_key(pop_data), pop_data, 2)
-	assert_eq(factory.debug_get_bullets_pool_amount(0), 2, "pre-populated 2")
+	assert_eq(factory.debug_get_bullets_pool_amount(), 2, "pre-populated 2")
 	factory.spawn_directional_bullets(pop_data)
 	await idle(1)
 	assert_gte(factory.debug_get_pool_hit_stats().get("directional_hits", 0), 1, "reuse counted as hit")

@@ -43,7 +43,7 @@ func test_interleaved_churn_counts() -> void:
 	assert_eq(s_ring.get_volleys_fired(), 60)
 	assert_eq(s_fan.get_volleys_fired(), 30)
 	assert_eq(s_line.get_volleys_fired(), 20)
-	assert_gte(factory.debug_get_total_bullets_amount(0), 60 + 30 + 20 + 12, "every volley tracked by the factory")
+	assert_gte(factory.debug_get_total_bullets_amount(), 60 + 30 + 20 + 12, "every volley tracked by the factory")
 
 
 func test_census_attribution() -> void:

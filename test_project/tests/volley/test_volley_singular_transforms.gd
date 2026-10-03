@@ -12,7 +12,7 @@ func test_spawn_rejects_singular() -> void:
 	bad.transforms = [singular]
 	assert_null(factory.spawn_controllable_directional_bullets(bad), "singular spawn refused")
 	expect_error("zero or singular scale")
-	assert_eq(factory.debug_get_active_bullets_amount(0), 0, "nothing live after the refusal")
+	assert_eq(factory.debug_get_active_bullets_amount(), 0, "nothing live after the refusal")
 
 
 func test_setter_rejects_singular_and_zero_scale() -> void:

@@ -156,7 +156,7 @@ void MultiMeshBulletsDebugger2D::disable() {
 }
 
 void MultiMeshBulletsDebugger2D::remove_debug_multimesh_for_node(Node *node_exiting_container_to_debug) {
-	IDebuggerDataProvider2D *exiting_provider = Object::cast_to<MultiMeshBullets2D>(node_exiting_container_to_debug);
+	MultiMeshBullets2D *exiting_provider = Object::cast_to<MultiMeshBullets2D>(node_exiting_container_to_debug);
 	if (exiting_provider == nullptr) {
 		return;
 	}
@@ -201,11 +201,11 @@ void MultiMeshBulletsDebugger2D::generate_debug_multimesh(Node *node_entered_con
 		UtilityFunctions::push_error("Error. The node that entered the container to debug is not of type MultiMeshBullets2D. Never attach additional nodes to the bullets debugger.");
 		return;
 	}
-	IDebuggerDataProvider2D *debugger_data_provider = bullets_node;
+	MultiMeshBullets2D *debugger_data_provider = bullets_node;
 
 	// Dedupe guard: a multimesh that re-enters the container (reparent flows) would
 	// otherwise get a second debug mesh + a second entry (double rendering, growth).
-	for (IDebuggerDataProvider2D *tracked : debug_data_providers) {
+	for (MultiMeshBullets2D *tracked : debug_data_providers) {
 		if (tracked == debugger_data_provider) {
 			return;
 		}
@@ -369,7 +369,7 @@ Ref<Mesh> MultiMeshBulletsDebugger2D::create_debug_mesh_for_shape(PhysicsServer2
 	return fallback;
 }
 
-void MultiMeshBulletsDebugger2D::ensure_quadmesh_matches_data_provider_collision_shape_size(int dbg_index, MultiMeshInstance2D &debug_multimesh_instance, IDebuggerDataProvider2D &debugger_data_provider) {
+void MultiMeshBulletsDebugger2D::ensure_quadmesh_matches_data_provider_collision_shape_size(int dbg_index, MultiMeshInstance2D &debug_multimesh_instance, MultiMeshBullets2D &debugger_data_provider) {
 	Ref<MultiMesh> debug_inner_multi = debug_multimesh_instance.get_multimesh();
 	if (dbg_index < 0 || dbg_index >= (int)debugger_mesh_types.size()) {
 		// Same one-shot policy as the other desync paths: staying silent here
@@ -405,7 +405,7 @@ void MultiMeshBulletsDebugger2D::ensure_quadmesh_matches_data_provider_collision
 	debugger_mesh_sizes[dbg_index] = want_size;
 }
 
-void MultiMeshBulletsDebugger2D::update_debug_multimesh_transforms_to_match_data_provider_collision_shape_transforms(MultiMeshInstance2D &debug_multimesh_instance, IDebuggerDataProvider2D &debugger_data_provider) {
+void MultiMeshBulletsDebugger2D::update_debug_multimesh_transforms_to_match_data_provider_collision_shape_transforms(MultiMeshInstance2D &debug_multimesh_instance, MultiMeshBullets2D &debugger_data_provider) {
 	Ref<MultiMesh> multi = debug_multimesh_instance.get_multimesh();
 	int amount_quadmeshes = multi->get_instance_count();
 
@@ -473,7 +473,7 @@ void MultiMeshBulletsDebugger2D::_physics_process(double delta) {
 	}
 	int drawn_providers = 0;
 	for (int i = 0; i < (int)debug_data_providers.size(); ++i) {
-		IDebuggerDataProvider2D *provider = debug_data_providers[i];
+		MultiMeshBullets2D *provider = debug_data_providers[i];
 
 		if (debugger_multimeshes[i] == nullptr || debugger_multimeshes[i]->is_queued_for_deletion()) {
 			continue;

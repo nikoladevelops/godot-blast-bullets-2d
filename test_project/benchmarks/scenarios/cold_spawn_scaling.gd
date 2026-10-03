@@ -18,7 +18,7 @@ func setup() -> void:
 			await get_tree().process_frame
 			factory.free_active_bullets()
 			await get_tree().process_frame
-			factory.free_bullets_pool(BulletFactory2D.DIRECTIONAL_BULLETS)
+			factory.free_bullets_pool()
 			await get_tree().process_frame
 		extra["cold_%d_ms" % n] = best
 	extra["scaling_8k_over_1k"] = float(extra["cold_8000_ms"]) / maxf(0.001, float(extra["cold_1000_ms"]))

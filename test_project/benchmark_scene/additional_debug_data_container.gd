@@ -17,7 +17,7 @@ func _ready():
 func _on_update_debug_data_timer_timeout() -> void:
 	# Currently active in scene tree
 	active_directional_multi_meshes_custom_label.update_value(
-		str(BENCHMARK_GLOBALS.FACTORY.debug_get_active_bullets_amount(BulletFactory2D.DIRECTIONAL_BULLETS))
+		str(BENCHMARK_GLOBALS.FACTORY.debug_get_active_bullets_amount())
 	)
 	
 	active_attachments_custom_label.update_value(
@@ -26,7 +26,7 @@ func _on_update_debug_data_timer_timeout() -> void:
 	
 	# Object Pool related
 	pooled_directional_multi_meshes_custom_label.update_value(
-		str(BENCHMARK_GLOBALS.FACTORY.debug_get_bullets_pool_amount(BulletFactory2D.DIRECTIONAL_BULLETS))
+		str(BENCHMARK_GLOBALS.FACTORY.debug_get_bullets_pool_amount())
 	)
 	
 	pooled_attachments_custom_label.update_value(
@@ -35,7 +35,7 @@ func _on_update_debug_data_timer_timeout() -> void:
 	
 	# What each object pool actually contains
 	directional_pool_info_custom_label.update_value(
-		str(BENCHMARK_GLOBALS.FACTORY.debug_get_bullets_pool_info(BulletFactory2D.DIRECTIONAL_BULLETS))
+		str(BENCHMARK_GLOBALS.FACTORY.debug_get_bullets_pool_info())
 	)
 	
 	attachments_pool_info_custom_label.update_value(

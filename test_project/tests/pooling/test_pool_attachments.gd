@@ -40,7 +40,7 @@ func test_pooled_reuse_starts_blank() -> void:
 	for i in 2:
 		v.disable_bullet(i)
 	await idle(1)
-	assert_gte(factory.debug_get_bullets_pool_amount(0), 1, "volley pooled")
+	assert_gte(factory.debug_get_bullets_pool_amount(), 1, "volley pooled")
 	var w: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(H.make_directional_data(2, 200.0))
 	assert_eq(w, v, "pool reuses the volley")
 	assert_false(w.debug_get_attachment_info(0).get("has_attachment", false), "reuse starts with blank slots")

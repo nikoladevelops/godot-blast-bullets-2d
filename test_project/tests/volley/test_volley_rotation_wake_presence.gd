@@ -17,7 +17,7 @@ func test_same_owner_wake_keeps_decisions() -> void:
 	for i in 3:
 		v.disable_bullet(i)
 	await idle(1)
-	assert_eq(factory.debug_get_bullets_pool_amount(0), 0, "unpooled disable parks nothing")
+	assert_eq(factory.debug_get_bullets_pool_amount(), 0, "unpooled disable parks nothing")
 	for i in 3:
 		v.wake_bullet(i)
 	v.set_shared_bullet_rotation_data(H.make_rotation(7.0))
