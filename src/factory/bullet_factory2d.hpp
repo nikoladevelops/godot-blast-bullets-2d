@@ -460,9 +460,28 @@ public:
 		std::vector<double> frame_starts;
 		double total = 0.0;
 		std::vector<MultiMeshInstance2D *> shards;
+		// Parallel to shards: each shard's MultiMesh, cached so the per-slot
+		// writes every frame skip a get_multimesh() engine call and the
+		// Ref reference()/unreference() pair that comes with it.
+		std::vector<Ref<MultiMesh>> shard_multimeshes;
 		std::vector<FXOneShotSlot> slots;
 		int ring_cursor = 0;
 		int active_count = 0;
+
+		// Appends a shard and caches its MultiMesh.
+		void add_shard(MultiMeshInstance2D *shard) {
+			shards.push_back(shard);
+			shard_multimeshes.push_back(shard != nullptr ? shard->get_multimesh() : Ref<MultiMesh>());
+		}
+		// Raw pointer on purpose (no Ref churn on the per-slot path); the shard
+		// node owns its MultiMesh, so the pointer stays valid.
+		_ALWAYS_INLINE_ MultiMesh *shard_multimesh(int shard_index) const {
+			if (shard_index >= 0 && shard_index < (int)shard_multimeshes.size() && shard_multimeshes[shard_index].is_valid()) {
+				return shard_multimeshes[shard_index].ptr();
+			}
+			const Ref<MultiMesh> owned_by_node = shards[shard_index]->get_multimesh();
+			return owned_by_node.ptr();
+		}
 	};
 
 	// Prefix sums for binary frame lookup (see frame_starts above).
@@ -725,6 +744,8 @@ public:
   protected:
 	// Responsible for exposing C++ methods/properties to Godot Engine
 	static void _bind_methods();
+	// Binds the static pattern helpers + pattern enums (bullet_factory2d_patterns_bindings.cpp).
+	static void bind_pattern_helpers();
 
  private:
 	// Set when the factory enters the scene tree. Editor runs of getters/setters only
