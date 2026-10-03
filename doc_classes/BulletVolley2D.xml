@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <class name="BulletVolley2D" inherits="MultiMeshInstance2D" api_type="extension" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/godotengine/godot/master/doc/class.xsd">
 	<brief_description>
-		Bullets that travel in different directions based on their transform rotation. Always use the [BulletFactory2D] to spawn them, that's the only proper way.
+		One volley of bullets: everything one spawn call created, drawn by one multimesh and moved together. Spawn it with [method BulletFactory2D.spawn_volley] (or a [BulletSpawner2D]), never with [code]new()[/code].
 	</brief_description>
 	<description>
-		One live volley: every bullet of one spawn call, drawn by a single multimesh and collided by one physics area. Holds everything the bullets need at runtime (per-bullet motion caches, collision shapes, attachments, curves, movement patterns, timers, animation state) plus advanced homing. It supports per-bullet homing deques for individualized target chasing (e.g., specific enemies) and a shared deque for uniform swarm behaviors (e.g., collective waypoint following). Targets can be global positions, Node2D instances, or mouse position, with optional auto-pop on reach (see [member bullet_homing_auto_pop_after_target_reached], [member shared_homing_deque_auto_pop_after_target_reached], [signal bullet_homing_target_reached]), smoothing for natural turning (see [member homing_smoothing]), distance before reached - [member homing_distance_before_reached] and update time interval (see [member homing_update_interval]). Enables complex bullet patterns in 2D games.
+		One live volley: every bullet of one spawn call, drawn by a single multimesh and collided by one physics area. Each bullet flies along its own transform's rotation with its own speed. The volley holds everything the bullets need at runtime (per-bullet motion, collision shapes, attachments, curves, movement patterns, wobble, gravity, bounce, timers, animation, effect trails) plus advanced homing and orbiting. Keep the instance returned by [method BulletFactory2D.spawn_volley] to steer the bullets live; when the last bullet dies the volley returns to the factory's object pool and may be handed out again by a later spawn. It supports per-bullet homing deques for individualized target chasing (e.g., specific enemies) and a shared deque for uniform swarm behaviors (e.g., collective waypoint following). Targets can be global positions, Node2D instances, or mouse position, with optional auto-pop on reach (see [member bullet_homing_auto_pop_after_target_reached], [member shared_homing_deque_auto_pop_after_target_reached], [signal bullet_homing_target_reached]), smoothing for natural turning (see [member homing_smoothing]), distance before reached - [member homing_distance_before_reached] and update time interval (see [member homing_update_interval]). Enables complex bullet patterns in 2D games.
 
 		Warning: Never use [code]get_tree().create_timer()[/code] or any other godot timers with this class. It will cause issues with the internal timing of the bullets. If you need timers, use [method attach_time_based_function] instead.
 
@@ -697,8 +697,8 @@
 				[code]time[/code] - the time in seconds after which the callable will be executed.
 				[code]callable[/code] - the callable that will be executed. It can be a lambda, a function or a method from another object.
 				[code]repeat[/code] - if set to true, then the callable will be executed every [code]time[/code] seconds.
-				[code]execute_only_if_volley_is_active[/code] - if set to [code]true[/code], then the callable will only be executed if the multimesh is active in the scene tree (if it has at least a single bullet that has not yet been disabled).
-				If you wish to execute the callable regardless of the multimesh being active or not (even when in object pool), then set this parameter to [code]false[/code].
+				[code]execute_only_if_volley_is_active[/code] - if set to [code]true[/code], then the callable will only be executed if the volley is active in the scene tree (if it has at least a single bullet that has not yet been disabled).
+				If you wish to execute the callable regardless of the volley being active or not (even when in object pool), then set this parameter to [code]false[/code].
 				Note: For this to take effect ensure that the [member is_auto_pooling_enabled] property is set to false - this is because auto pooling clears any callables in order to re-use the multimesh later completely reset.
 				Note: applies immediately outside physics processing; inside a physics frame it is deferred like before.
 				Note: capped at 64 timers per multimesh (extra attaches are rejected); pool-pop re-enables wipe armed timers, manual wakes drop timers armed while pooled.
@@ -1119,7 +1119,7 @@
 			<param index="0" name="bullet_index" type="int" />
 			<param index="1" name="value" type="float" />
 			<description>
-				Sets the homing turn agility for the specified bullet. Enables per-bullet mode for the whole multimesh (see [method all_bullets_set_homing_smoothing]). Non-finite or negative values are rejected.
+				Sets the homing turn agility for the specified bullet. Enables per-bullet mode for the whole volley (see [method all_bullets_set_homing_smoothing]). Non-finite or negative values are rejected.
 			</description>
 		</method>
 		<method name="bullet_set_orbiting_center">
@@ -1398,7 +1398,7 @@
 			<param index="0" name="bullet_index" type="int" />
 			<param index="1" name="disable_bullet_attachment" type="bool" default="true" />
 			<description>
-				Disable a specific bullet from the multimesh. Silent (no effect layer fires): use [method clear_bullet] when the disappearance should read on screen.
+				Disable a specific bullet of the volley. Silent (no effect layer fires): use [method clear_bullet] when the disappearance should read on screen.
 			</description>
 		</method>
 		<method name="enable_bullet">
@@ -1407,7 +1407,7 @@
 			<param index="1" name="collision_amount" type="int" default="0" />
 			<param index="2" name="enable_attachment" type="bool" default="true" />
 			<description>
-				Activate a specific bullet from the multimesh, making it active and visible on screen. Waking a fully pooled multimesh this way also removes it from the pool and resumes factory processing, so prefer spawn methods for pooled instances. An expiry-pooled wake tops up an exhausted lifetime timer (both lifetime and curve clocks restart together); a manually disabled wake keeps its remaining time.
+				Activate a specific bullet of the volley, making it active and visible on screen. Waking a fully pooled volley this way also removes it from the pool and resumes factory processing, so prefer spawn methods for pooled instances. An expiry-pooled wake tops up an exhausted lifetime timer (both lifetime and curve clocks restart together); a manually disabled wake keeps its remaining time.
 
 				Wake means resume, not respawn: ballistics (speed, direction, position), appearance, custom data and movement state are kept as-is. Two deliberate exceptions: (1) per-bullet homing queues and orbit state are NOT resumed - disable_bullet() clears them, so re-push targets and re-enable orbit after the wake; (2) a volley-wide expiry wake gives the whole volley a fresh full lifetime, not just the woken bullet. 				Waking a pooled volley owned by someone else keeps that owner's ballistics, appearance, custom data, collision counts, lifetime and shape state (a warning is printed: enable_bullet warns when it wakes a pooled instance outside the spawn methods): reseed through the spawn methods, or take over with [method BulletSpawner2D.adopt_live_volley] and re-push. Neutralized on a foreign wake (fail-safe subset): pooling flags reset to default, rotation speeds cleared, ownership detached, and that owner's volley-wide signal connections dropped; a same-owner revive keeps all of them. Attachments are never restored by a wake: re-attach explicitly.
 
@@ -1428,7 +1428,7 @@
 		<method name="get_all_bullets_status">
 			<return type="bool[]" />
 			<description>
-				Get the status of all bullets inside the multimesh - whether they are enabled (active and visible on screen) or disabled (inactive and invisible)
+				Get the status of all bullets inside the volley - whether they are enabled (active and visible on screen) or disabled (inactive and invisible)
 			</description>
 		</method>
 		<method name="get_amount_active_attachments" qualifiers="const">
@@ -1440,7 +1440,7 @@
 		<method name="get_amount_bullets" qualifiers="const">
 			<return type="int" />
 			<description>
-				Get the amount of bullets inside the multimesh
+				Get the amount of bullets inside the volley
 			</description>
 		</method>
 		<method name="get_bullet_collision_count" qualifiers="const">
@@ -1889,7 +1889,7 @@
 			<return type="void" />
 			<param index="0" name="new_shape" type="Shape2D" />
 			<description>
-				Swaps the collision shape live, on an active or pooled multimesh. Size-only changes apply to every bullet right away through the physics server. A different effective type additionally rebuilds the physics shapes and moves pooled instances into the matching pool bucket. The visual QuadMesh is texture-driven and stays untouched. The debugger picks up the new type and size on the next physics tick.
+				Swaps the collision shape live, on an active or pooled volley. Size-only changes apply to every bullet right away through the physics server. A different effective type additionally rebuilds the physics shapes and moves pooled instances into the matching pool bucket. The visual QuadMesh is texture-driven and stays untouched. The debugger picks up the new type and size on the next physics tick.
 
 				Note: cannot run while bullets are being processed or inside a physics frame (same contract as the factory structural methods) - use call_deferred() then.
 			</description>
@@ -2223,7 +2223,7 @@
 			Whether the multimesh auto pooling is enabled or not.
 
 			When enabled, the multimesh will automatically get pushed to the object pool when all bullets are disabled.
-			When disabled, you are the one responsible for re-using the multimesh or clearing any time based callables that you might have attached with [method attach_time_based_function].
+			When disabled, you are the one responsible for re-using the volley or clearing any time based callables that you might have attached with [method attach_time_based_function].
 
 			If you are going to save your multimesh bullets in an array, then it's probably best to disable auto pooling and manage the instances yourself.
 
@@ -2244,7 +2244,7 @@
 			Live bullet whiten override: toggling rebuilds the cached animation frames whitened (alpha preserved) or restores the art. Reseeded from spawn data on every spawn/enable.
 		</member>
 		<member name="shared_bullet_curves_data" type="BulletCurvesData2D" setter="set_shared_bullet_curves_data" getter="get_shared_bullet_curves_data">
-			A shared [BulletCurvesData2D] resource that can be assigned to all bullets in the multimesh. This is useful for saving memory if you have a lot of bullets that share the same curves data, since you can assign the same resource to all of them instead of creating a new one for each bullet. Values are copied at set time: editing the resource in place afterwards changes nothing until you set it again. Direction channels never park the direction at zero: an Override result near zero keeps the incoming direction.
+			A shared [BulletCurvesData2D] resource that can be assigned to all bullets in the volley. This is useful for saving memory if you have a lot of bullets that share the same curves data, since you can assign the same resource to all of them instead of creating a new one for each bullet. Values are copied at set time: editing the resource in place afterwards changes nothing until you set it again. Direction channels never park the direction at zero: an Override result near zero keeps the incoming direction.
 		</member>
 		<member name="shared_bullet_rotation_data" type="BulletRotationData2D" setter="set_shared_bullet_rotation_data" getter="get_shared_bullet_rotation_data">
 			Fallback spin for bullets whose own rotation entry is missing or invalid, set live. Only fully-zero triples (the invalid-entry gap marker) are filled; bullets with any non-zero value keep it. Live writes fill once at call time (order matters: per-zero then shared fills, shared then per-zero stays zero). All-zero shared is a silent no-op; non-finite shared aborts the whole fallback with an error. Clearing it (null) keeps the current ballistics. Configure the spawn-time equivalent (plus its [code]tile_*[/code] checkbox) on [BulletVolleyData2D]. Negative spin is legal and clamps symmetrically to [-max, max].
@@ -2256,7 +2256,7 @@
 			Fallback wobble for bullets without a live per-bullet wobble resource, set live. Setting it re-seeds only those slots; clearing it (null) deactivates exactly those slots. Spawn-time equivalent (plus its [code]tile_all_bullet_wobble_data[/code] checkbox) lives on [member BulletVolleyData2D.shared_bullet_wobble_data]. Example: [code]bullets.set_shared_bullet_wobble_data(wobble)[/code] adds sway to every plain bullet while custom per-bullet seeds keep theirs.
 		</member>
 		<member name="shared_bullets_custom_data" type="Resource" setter="set_shared_bullets_custom_data" getter="get_shared_bullets_custom_data">
-			You can edit the custom bullets data that the bullets multimesh was spawned with. Use this to set damage data or anything else you want to store in a resource for your bullets to use.
+			You can edit the custom bullets data that the volley was spawned with. Use this to set damage data or anything else you want to store in a resource for your bullets to use.
 		</member>
 		<member name="shared_homing_deque_auto_pop_after_target_reached" type="bool" setter="set_shared_homing_deque_auto_pop_after_target_reached" getter="get_shared_homing_deque_auto_pop_after_target_reached" default="false">
 			Whether the current homing target should be automatically popped from the deque once it gets reached by a bullet (shared deque only).

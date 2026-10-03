@@ -65,15 +65,15 @@ relative to their direction (allows zig zag patterns and any other creative patt
 
 - **Control Speed And Rotation The Normal Way** - If bullet curves are not needed, you can still use normal speed and speed acceleration values for both movement and rotation using **BulletSpeedData2D** and **BulletRotationData2D**.
 
-- **Animated Textures With SpriteFrames** - Assign a `SpriteFrames` resource (plain textures or `AtlasTexture` regions) and an animation name. Timing comes from the animation itself (speed as fps, per-frame durations, loop flag). QuadMesh size auto-derives from the first frame unless you override `texture_size`. Switch animations at runtime per multimesh with `play_sprite_animation()` and get a `sprite_animation_finished` signal for non-looping animations.
+- **Animated Textures With SpriteFrames** - Assign a `SpriteFrames` resource (plain textures or `AtlasTexture` regions) and an animation name. Timing comes from the animation itself (speed as fps, per-frame durations, loop flag). QuadMesh size auto-derives from the first frame unless you override `texture_size`. Switch animations at runtime per volley with `play_sprite_animation()` and get a `sprite_animation_finished` signal for non-looping animations.
 
 - **Custom Collision Shapes** - Support for `RectangleShape2D`, `CircleShape2D` and `CapsuleShape2D` with custom sizes.
 
 - **Support For Custom Bullet Max Collisions Amount** - A bullet can collide multiple times before being disabled. Very useful for Bullet Hell games.
 
-- **Custom Bullets Debugger** - Debug collision shapes easily to see what is going on in your game and find problems. The debugger draws every shape of every bullet multimesh at all times: live bullets follow their movement, collided or disabled bullets stay visible frozen where they stopped, and even pooled multimesh instances keep their full shape set on screen. It also survives multimesh frees, pool reuse and shape changes without any manual cleanup on your side.
+- **Custom Bullets Debugger** - Debug collision shapes easily to see what is going on in your game and find problems. The debugger draws every shape of every volley at all times: live bullets follow their movement, collided or disabled bullets stay visible frozen where they stopped, and even pooled volleys keep their full shape set on screen. It also survives volley frees, pool reuse and shape changes without any manual cleanup on your side.
 
-- **Attach Timer Logic** - The ability to attach function callbacks that execute at a particular time on the entire multimesh with the option to be repeated over and over (safely executes code during runtime while preventing crashes that might occur with the normal timers if you don't use `call_deferred()`). This is the preferred way of manipulating bullet related data, don't use the normal Godot timers!
+- **Attach Timer Logic** - The ability to attach function callbacks that execute at a particular time on the entire volley with the option to be repeated over and over (safely executes code during runtime while preventing crashes that might occur with the normal timers if you don't use `call_deferred()`). This is the preferred way of manipulating bullet related data, don't use the normal Godot timers!
 
 - **Edit Properties And Call Methods During Runtime** - Every single feature has helper methods that you can use during runtime to adjust the behavior of the bullets (change homing targets, orbiting radius, switch movement pattern, disable a bullet and so on..). Combine this with the attach timer logic and you have the most flexible bullet system ever created. Collision signals fire synchronously in the physics tick; only structural factory calls (`reset()`/`free_*()`/`populate_*()`, and `enable_volley()` with a shape change) must be deferred with `call_deferred()` - per-bullet edits apply immediately.
 
@@ -87,11 +87,11 @@ relative to their direction (allows zig zag patterns and any other creative patt
 
 - **Bullet Attachments** - Seamlessly attach GPUParticles2D, CPUParticles2D or custom sprites that follow the bullet's transform with optional offsets. The use of **modern GDExtension features** like virtual methods allow you to override what happens when attachments are spawned/disabled/pooled. These custom methods get called *inside C++* to set up your bullet attachment as necessary. Example - Spawn attachments with visible particles but when they collide you have to disable the emitting and even disable visibility of extra nodes you might've attached. Super flexible and easy to use.
 
-- **Automatic Object Pooling** - MultiMesh instances and attachments are automatically pooled and reused. Pool buckets are exact `(amount of bullets, collision shape type)` pairs identified by `VolleyPoolKey2D` (for example `VolleyPoolKey2D.make(200, PhysicsServer2D.SHAPE_CIRCLE)`). You can manually populate (`populate_bullets_pool(key, data, instance_count)`) or free (`free_bullets_pool()`, `free_active_bullets()`, `free_disabled_bullets()`, `reset()`; pass `null` for everything or a key for one bucket), or disable the system to use your own custom logic. Every pre-populated instance is verified against its key and fully initialized before it enters the bucket, so pooled instances are always safe to reuse and safe for the debugger to visualize. You can choose the easy way of using the plugin without any care (because performance is handled for you already) OR you can delve deeper. Example: disable auto pooling, which will allow you to save your bullet instances into an array of multimeshes without fear of problems. Reuse them whenever you want with runtime functions such as `enable_bullet()`/`disable_bullet()`.
+- **Automatic Object Pooling** - Volleys and attachments are automatically pooled and reused. Pool buckets are exact `(amount of bullets, collision shape type)` pairs identified by `VolleyPoolKey2D` (for example `VolleyPoolKey2D.make(200, PhysicsServer2D.SHAPE_CIRCLE)`). You can manually populate (`populate_bullets_pool(key, data, instance_count)`) or free (`free_bullets_pool()`, `free_active_bullets()`, `free_disabled_bullets()`, `reset()`; pass `null` for everything or a key for one bucket), or disable the system to use your own custom logic. Every pre-populated instance is verified against its key and fully initialized before it enters the bucket, so pooled instances are always safe to reuse and safe for the debugger to visualize. You can choose the easy way of using the plugin without any care (because performance is handled for you already) OR you can delve deeper. Example: disable auto pooling, which will allow you to save your volleys into an array without fear of problems. Reuse them whenever you want with runtime functions such as `enable_bullet()`/`disable_bullet()`.
 
-- **Dynamic Sparse Set** - The plugin uses custom made data structure that is used internally for precise tracking and looping over ONLY ACTIVE MultiMeshInstances and ONLY THE ACTIVE bullets inside them. This reduces branching and improves performance (a pattern used in ECS engines that could be further improved in future versions of BlastBullets2D).
+- **Dynamic Sparse Set** - The plugin uses custom made data structure that is used internally for precise tracking and looping over ONLY ACTIVE volleys and ONLY THE ACTIVE bullets inside them. This reduces branching and improves performance (a pattern used in ECS engines that could be further improved in future versions of BlastBullets2D).
 
-- **Bullets Custom Data** - Attach a custom resource that the multimesh of bullets carries - used for storing damage, armor damage or anything else custom that should be available during collision.
+- **Bullets Custom Data** - Attach a custom resource that the volley carries - used for storing damage, armor damage or anything else custom that should be available during collision.
 
 - **Familiar Signals** - Collisions are tracked with the typed `area_entered` / `body_entered` signals inside the BulletFactory2D node. Combine this with the bullet custom data and you can easily differentiate between types of bullets. You can even detach/attach new bullet attachments or make explosion effects while editing runtime properties inside the function callbacks.
 
@@ -174,7 +174,7 @@ It is recommended to watch these tutorials if you are struggling with the docume
 
 Here is how the basic setup goes:
 1. Add a `BulletFactory2D` node to your scene tree. The BulletFactory's job is to spawn bullets and manage plugin related options (debugger, physics interpolations and so on..).
-2. The `BulletFactory2D` node has the typed signals `area_entered`, `body_entered`, `life_time_over` and each bullet multimesh emits `sprite_animation_finished` when a non-looping animation ends. The instance argument is already typed (`BulletVolley2D`), so handlers need no casts - custom data and transforms are one instance call away (`bullet_get_custom_data()`, `get_bullet_global_transform()`). Collision signals fire synchronously in the physics tick; only structural factory calls (`reset()`/`free_*()`/`populate_*()`) must be deferred, and the error message tells you when that happens. You should handle them in your script and write custom logic for your game.
+2. The `BulletFactory2D` node has the typed signals `area_entered`, `body_entered`, `life_time_over` (plus `bounce_area_entered` / `bounce_body_entered`), and each volley emits `sprite_animation_finished` when a non-looping animation ends. A `BulletSpawner2D` declares the same signals for the volleys it fires. The instance argument is already typed (`BulletVolley2D`), so handlers need no casts - custom data and transforms are one instance call away (`bullet_get_custom_data()`, `get_bullet_global_transform()`). Collision signals fire synchronously in the physics tick; only structural factory calls (`reset()`/`free_*()`/`populate_*()`) must be deferred, and the error message tells you when that happens. You should handle them in your script and write custom logic for your game.
 
 Keep a reference to the factory globally, so you can access it in any other script(enemies/player). There's two ways of doing this.
 
@@ -233,21 +233,18 @@ Full property and method reference for all of the above lives in the editor docs
 #### Profiling your bullets
 `BulletFactory2D` registers live `BlastBullets2D/*` custom monitors (active bullets and volleys, physics tick time, interpolation time, effects, attachments). Run your game and open the editor's **Debugger > Monitors** tab to see which frames are heavy. From code, `get_frame_stats()` and `get_active_bullet_count()` return the same numbers.
 
-#### If you just need normal bullets without extra options:<br>
-- <b>`spawn_volley()`</b> - Spawns a multimesh of bullets where the direction is determined by the `transforms`'s rotation and each bullet has its own speed data.
-
-#### For advanced features:<br><br>
-- <b>`spawn_volley()`</b> - Same as `spawn_volley()`, however this method returns the multimesh instance as a result. Save it to a variable and try modifying its properties/ calling functions. This is where all the advanced features are hidden - homing, orbiting, bullet curves, attachments, movement patterns, teleporting, timer related functionality, object pooling options and so on.
+#### Spawning bullets<br>
+- <b>`spawn_volley(data)`</b> - Spawns one volley (a `BulletVolley2D`): one bullet per entry of `data.transforms`, each flying along its transform's rotation with its own speed. Ignore the return value for fire-and-forget bullets, or keep the returned `BulletVolley2D` to steer the bullets at runtime - this is where all the advanced features live: homing, orbiting, bullet curves, attachments, movement patterns, teleporting, timers, object pooling options and so on.
 
 #### How to configure `BulletVolleyData2D`?
 
 The spawn functions require a `BulletVolleyData2D`.
 It's important that you always check its in-engine documentation.<br>
 
-The same thing should be said for the `BulletVolley2D` class, since inside them you will find runtime properties and helper functions. The documentation is always there to help you!
+The same goes for the `BulletVolley2D` class, which holds the runtime properties and helper functions of a live volley. The documentation is always there to help you!
 
 
-The `BulletVolleyData2D` resource class needs to have their `transforms` property set to an array of `Transform2D` - this data determines the global position and rotation of all bullets. The amount of `Transform2D` will also determine the amount of bullets that need to be spawned.
+The `BulletVolleyData2D` resource needs its `transforms` property set to an array of `Transform2D` - this data determines the global position and rotation of all bullets. The amount of `Transform2D` will also determine the amount of bullets that need to be spawned.
 
 A smart way is to generate these transforms using a bunch of `Marker2D` nodes as children of your player (that is supposed to shoot bullets). This way, as he moves the markers will also move along with him. The only thing you need to do is get all these marker2d's transforms, store them in an array and set it to the bullets data resource class each time you need to spawn bullets. Having a shoot cooldown timer would be nice too.
 
@@ -288,7 +285,7 @@ func set_up_volley_data()->BulletVolleyData2D:
 ```
 
 #### How do we handle collision and bullet damage?<br>
-Notice the ``data.shared_bullets_custom_data = damage_data``. This is a custom resource class instance that you should create. The data it holds can help you differentiate between types of bullets and damage. Use `shared_bullets_custom_data` for one resource shared by the whole volley, or `all_bullets_custom_data` (array) for per-bullet resources; read either slot with `bullet_get_custom_data(index)` on the multimesh.
+Notice the ``data.shared_bullets_custom_data = damage_data``. This is a custom resource class instance that you should create. The data it holds can help you differentiate between types of bullets and damage. Use `shared_bullets_custom_data` for one resource shared by the whole volley, or `all_bullets_custom_data` (array) for per-bullet resources; read either slot with `bullet_get_custom_data(index)` on the volley.
 
 Example:
 
@@ -419,13 +416,35 @@ tick the checkbox inside the inspector in `BulletFactory2D`. That's all, enjoy t
 
 ## WARNING
 - If you attach a script with `_ready()` to `BulletFactory2D`, call `super._ready()` first. The factory now recovers automatically (`ensure_factory_initialized()`) and warns once, but without super the first spawns would previously hit a dead factory.
-- Use `queue_free()` when you delete a bullet multimesh or a bullet attachment yourself, never `free()`. Especially never call `free()` on a multimesh from inside one of its own collision or attachment callbacks (for example inside `area_entered` or `on_bullet_disable`). `queue_free()` is always safe in those situations. From any callback prefer `factory.free_volley_deferred(volley)`.
+- Use `queue_free()` when you delete a volley or a bullet attachment yourself, never `free()`. Especially never call `free()` on a volley from inside one of its own collision or attachment callbacks (for example inside `area_entered` or `on_bullet_disable`). `queue_free()` is always safe in those situations. From any callback prefer `factory.free_volley_deferred(volley)`.
 - Structural factory calls (`reset()`/`free_*()`/`populate_*()`) reject inside physics frames/sweeps. From handlers use the deferred variants: `reset_deferred()`, `free_active_bullets_deferred()`, `free_disabled_bullets_deferred()`, `free_bullets_pool_deferred()`, `populate_bullets_pool_deferred()`, `free_attachments_pool(_for_scene)_deferred()`.
 - Cross-owner reuse must go through `spawn_*()` / `enable_volley()` (which re-seed appearance, custom data, speeds and patterns). `enable_bullet()` (alias `wake_bullet()`) wakes a pooled instance with its current appearance/custom-data intact - intended for same-owner re-enable, not for handing a volley to a new owner.
 - Pooling flags reset to defaults on every new life (`spawn`/`enable_volley`). Set `is_auto_pooling_enabled` / `is_attachments_auto_pooling_enabled` explicitly after each spawn when you want manual ownership. Same-owner `enable_bullet()` wakes keep flags by design.
 - Pool buckets are exact `(amount_bullets, shape)` pairs. Use `BulletFactory2D.debug_expected_pool_key(data)` and `debug_get_pool_hit_stats()` / `debug_get_bullets_pool_info()` to diagnose 0% pool hits (e.g. `helper_skip_indices` shrank transforms after `populate`). `validate` first with `BulletFactory2D.debug_validate_spawn_data(data)`.
 - Smooth bullets need BOTH the factory `use_physics_interpolation` flag AND ProjectSettings `physics/common/physics_interpolation`. Check `factory.debug_check_interpolation_status()` when motion looks steppy. Art must face `Vector2.RIGHT`; invisible bullets (no `sprite_frames`/`mesh`/`texture_size`) now warn via `debug_validate_spawn_data()`.
-- v4 migration: generic `area_entered` / `body_entered` / `life_time_over` signals were renamed to typed `area_entered`, `body_entered`, `life_time_over`. Reconnect scenes/scripts. `VolleyPoolKey2D.make()` now returns `null` on invalid input instead of a default bucket.
+- `VolleyPoolKey2D.make()` returns `null` on invalid input instead of a default bucket.
+
+## Migrating from earlier versions
+The bullet classes were unified: `BlockBullets2D` is gone and the old `MultiMeshBullets2D` base is merged into one class, `BulletVolley2D` ("one volley" = every bullet of one spawn call). Rename these in your scripts and saved scenes (`.tscn` / `.tres` files store class and signal names as text):
+
+| Old | New |
+|---|---|
+| `DirectionalBullets2D`, `MultiMeshBullets2D` | `BulletVolley2D` |
+| `DirectionalBulletsData2D`, `MultiMeshBulletsData2D` | `BulletVolleyData2D` (scene files: `[sub_resource type="BulletVolleyData2D" ...]`) |
+| `BlockBullets2D`, `BlockBulletsData2D`, `spawn_block_bullets()` | removed: use `BulletVolley2D` with one shared speed (`shared_bullet_speed_data`) |
+| `MultiMeshPoolKey2D` | `VolleyPoolKey2D` |
+| `MultiMeshBulletsDebugger2D` | `BulletVolleyDebugger2D` |
+| `spawn_directional_bullets()`, `spawn_controllable_directional_bullets()` | `spawn_volley()` (always returns the volley) |
+| factory signals `directional_area_entered` / `directional_body_entered` / `directional_life_time_over` / `directional_bounce_area_entered` / `directional_bounce_body_entered` (and `block_*`) | `area_entered` / `body_entered` / `life_time_over` / `bounce_area_entered` / `bounce_body_entered` (same names as on `BulletSpawner2D`) |
+| signal argument `directional_bullets_instance` | `volley` |
+| `BulletFactory2D.BulletType`, the `bullet_type` argument of `free_bullets_pool()` / `free_bullets_pool_deferred()` / `debug_get_total_bullets_amount()` / `debug_get_active_bullets_amount()` / `debug_get_bullets_pool_amount()` / `debug_get_bullets_pool_info()` | removed (one volley type) |
+| `directional_bullets_debugger_color`, `block_bullets_debugger_color` | `debugger_color` |
+| `reactivate_multimesh_instance()` | `reactivate_volley()` |
+| volley `enable_multimesh()` | `enable_volley()` |
+| volley `multimesh_attach_time_based_function()` / `multimesh_detach_time_based_function()` / `multimesh_detach_all_time_based_functions()` | `attach_time_based_function()` / `detach_time_based_function()` / `detach_all_time_based_functions()` |
+| volley `is_multimesh_auto_pooling_enabled` | `is_auto_pooling_enabled` |
+| debug dictionary keys `directional_total` / `directional_pooled` / `directional_hits` / `directional_misses` | `volleys_total` / `volleys_pooled` / `hits` / `misses` |
+| factory child nodes `DirectionalBulletsContainer` / `DirectionalBulletsDebugger` | `BulletVolleysContainer` / `BulletVolleysDebugger` |
 
 
 ## How To Compile

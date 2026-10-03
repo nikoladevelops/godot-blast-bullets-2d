@@ -10,7 +10,7 @@ one that is wrong, fix this file in the same change.
 
 ```sh
 GODOTPP_NONINTERACTIVE=1 python3 tools/compile_debug_build.py   # build (never raw scons, never edit SConstruct)
-python3 tools/run_tests.py                                       # ~110 files / ~690 tests, ~10 s, leak-checked
+python3 tools/run_tests.py                                       # ~115 files / ~725 tests, ~10 s, leak-checked
 python3 tools/run_tests.py --self-test                           # the harness itself still catches failures/leaks
 python3 tools/run_benchmarks.py --scenario <name>                # perf evidence (§15)
 ```
@@ -70,7 +70,8 @@ git commit -m "Fix flower bullet count" -m "FAN splits the amount over petals."
 
 ## 0d. Glossary
 
-- **volley**: one spawn call = one MultiMesh of N bullets (`BulletVolley2D`).
+- **volley**: one spawn call = one `BulletVolley2D` (one MultiMesh + one physics
+  area holding N bullets). Its spawn data is one `BulletVolleyData2D`.
 - **marker / generator**: the Node2D a pattern is built around
   (`transforms_generator`, else the spawner itself).
 - **pattern source**: which generator builds the per-bullet transforms
@@ -78,7 +79,7 @@ git commit -m "Fix flower bullet count" -m "FAN splits the amount over petals."
 - **bake**: the spawner's cached raw pattern (§13), re-posed per shot.
 - **chain**: a burst (N shots apart) or a telegraph (warning, then shot).
 - **leg**: one traversal of a movement Path2D.
-- **pool**: parked volleys reused by key (amount + shape + type).
+- **pool**: parked volleys reused by `VolleyPoolKey2D` (bullet count + collision shape).
 
 ## 0e. Never edit
 
@@ -137,7 +138,7 @@ python3 tools/lint_tests.py                  # static test lint (the runner runs
 ```sh
 rg --files test_project/tests -g 'test_*.gd'    # suite inventory (-g globs the BASENAME)
 python3 tools/run_tests.py --list               # same inventory, as the runner sees it
-rg -n "push_error|emit_signal" src/bullets/     # fail-loud sites (pin exact text in tests)
+rg -n "push_error|emit_signal" src/bullet_volley/  # fail-loud sites (pin exact text in tests)
 rg -n "^func test_" test_project/tests/volley/test_volley_bounce.gd
 rg -n 'BulletSpawner2D::shoot_once' src/        # where a method lives (files are split, §12)
 ```
@@ -220,12 +221,17 @@ rg -n 'BulletSpawner2D::shoot_once' src/        # where a method lives (files ar
 
 ## 6b. How to add or fix a pattern (BulletSpawner2D)
 
-Files: generator in `src/factory/bullet_factory2d_patterns.cpp`
-(`helper_generate_transforms_<shape>`), spawner dispatch in
-`src/bullet_spawner/bullet_spawner2d_patterns.cpp` (`generate_raw_pattern`),
-properties in `bullet_spawner2d_pattern_properties.cpp`, bindings and
-inspector gating in `bullet_spawner2d_bindings.cpp`, preview track in the
-factory `helper_sample_outline_<shape>`.
+Files: generator in `src/factory/bullet_factory2d_patterns_<family>.cpp`
+(`helper_generate_transforms_<shape>`; families: `shapes`, `curves`,
+`polygons`, `edges`), shared layout machinery in
+`bullet_factory2d_patterns_layout.cpp` (declared in
+`bullet_factory2d_patterns_internal.hpp`), its binding in
+`bullet_factory2d_patterns_bindings.cpp`, preview track in
+`bullet_factory2d_patterns_preview.cpp` (`helper_sample_outline_<shape>`).
+Spawner side: dispatch in `src/bullet_spawner/bullet_spawner2d_patterns.cpp`
+(`generate_raw_pattern`), properties in
+`bullet_spawner2d_pattern_properties.cpp`, bindings and inspector gating in
+`bullet_spawner2d_bindings.cpp`.
 
 Invariants every generator must keep (pinned by
 `spawner/test_spawner_pattern_counts.gd`, `test_spawner_pattern_bake.gd`,
@@ -312,8 +318,12 @@ func test_<behavior>_<expectation>() -> void:
 
 - Spawner groups, in order (locked by `test_volley_bounce.gd`): Setup,
   Bullet Patterns, Shooting, Spin, Homing, Orbiting, Preview, Movement,
-  Performance. Spawn-data: Bullets/Appearance/Collision/Attachments/Sprite
-  Effects/Per-Bullet Rotation. No duplicate group titles (tested).
+  Performance. Spawn data (`BulletVolleyData2D`, one inspector category):
+  Bullets, Appearance, Movement Speed, Bullet Rotation (shared + per-bullet
+  + tile + stop flag together), Wobble, Gravity, Bounce and Ricochet,
+  Movement Pattern Paths, Homing, Collision, Attachments, Sprite Effects,
+  Rendering and Material. No duplicate group titles and no ungrouped
+  property (`volley/test_volley_data_inspector.gd`).
 - Bullet Patterns: `pattern_source` + `helper_bullets_amount`, then a
   `Transform` subgroup (scales, muzzle offset + space, skip indices), one
   `ADD_SUBGROUP("Ring", "helper_ring_")` per shape (prefix stripped in the
@@ -373,11 +383,27 @@ func test_<behavior>_<expectation>() -> void:
 
 ```
 src/
-  factory/bullet_factory2d.cpp            spawn entry points, pools, structural calls, effects, stats/monitors, bindings
-  factory/bullet_factory2d_patterns.cpp   helper_generate_transforms_* generators, outline layout/samplers, debug verifiers
-  bullets/multimesh_bullets2d.{hpp,cpp}   shared volley base: buffers, physics area + ONE shared shape, lifetimes,
-                                          attachments, collision intake/dedup/drain, paused-overlap park/replay, ranges
-  bullets/directional_bullets2d.cpp       directional tick: movement, homing/orbit, curves, bounce
+  register_types.cpp                      class registration (ClassDB)
+  bullet_volley/                          BulletVolley2D: one volley = N bullets, one MultiMesh, one physics area
+    bullet_volley2d.hpp                   the class: fields grouped per feature + declarations (+ file map)
+    bullet_volley2d_internal.hpp          inline helpers shared by several volley TUs (volley .cpp files only)
+    bullet_volley2d.cpp                   lifecycle: spawn, enable_volley (pool reuse), enable/disable/clear bullet, teardown
+    bullet_volley2d_tick.cpp              move_bullets: THE per-bullet loop + its inline helpers (hot path)
+    bullet_volley2d_render.cpp            physics interpolation pass
+    bullet_volley2d_setup.cpp             MultiMesh/buffer setup
+    bullet_volley2d_collision.cpp         area + ONE shared shape, intake, dedup, paused-overlap park/replay, drain, counts
+    bullet_volley2d_{bounce,homing,orbit,motion,curves,wobble,gravity,lifetime,timers,attachments,effects,
+                     animation,teleport,debug,bindings}.cpp   one feature each
+    homing_target_deque.hpp, bullet_movement_pattern_data2d.hpp   volley-only data structures
+  factory/                                BulletFactory2D
+    bullet_factory2d.cpp                  lifecycle, containers/debugger, interpolation, tick/render sweeps, teleport
+    bullet_factory2d_spawn.cpp            request validation, spawn_volley(+_span), pool pre-population
+    bullet_factory2d_structural.cpp       reset/free_*/clear_*, *_deferred queue, volley bookkeeping (vec/set/pool sync)
+    bullet_factory2d_effects.cpp          factory-owned one-shot effect bakes
+    bullet_factory2d_stats.cpp            frame stats, monitors, debugger knobs, debug_*
+    bullet_factory2d_bindings.cpp         _bind_methods (calls bind_pattern_helpers)
+    bullet_factory2d_patterns_*.cpp       pattern generators per family + layout engine + preview tracks + inspectors
+    bullet_factory2d_internal.hpp, bullet_factory2d_patterns_internal.hpp, factory_operation_guard2d.hpp
   bullet_spawner/bullet_spawner2d.cpp     wiring, shooting cadence, spin, bursts/telegraph, pattern lists, lifecycle, shoot_once
   bullet_spawner/bullet_spawner2d_pattern_properties.cpp  Bullet Patterns accessors + apply_pattern_preset
   bullet_spawner/bullet_spawner2d_patterns.cpp   raw generation, bake cache, native span collect, verifier
@@ -387,16 +413,25 @@ src/
   bullet_spawner/bullet_spawner2d_movement.cpp   Path2D movement
   bullet_spawner/bullet_spawner2d_bindings.cpp   _bind_methods (groups/subgroups) + _validate_property
   bullet_spawner/bullet_spawner2d_internal.hpp   statics shared by >1 spawner TU (limits, pattern-source table)
-  shared/  easing2d.hpp (Tween port), warn_once2d.hpp, cached_string_names2d.hpp, pools, data resources
+  data/        inspector Resources: BulletVolleyData2D, BulletSpeed/Rotation/Curves/Wobble/EffectLayerData2D
+  pooling/     VolleyPool (parked volleys per key), VolleyPoolKey2D
+  attachments/ BulletAttachment2D + its object pool
+  debugger/    BulletVolleyDebugger2D (collision-shape overlay)
+  core/        header-only utilities: warn_once2d, cached_string_names2d, easing2d (Tween port),
+               dynamic_sparse_set, collision_shape_helper2d, reentrancy_guard2d
 ```
 
 - Same class across the split files (pure moves). Put new code in the file
   of its concern; keep per-bullet loops inside ONE translation unit (no
-  cross-TU call per bullet).
+  cross-TU call per bullet). Volley helpers marked `_ALWAYS_INLINE_` are
+  defined in the .cpp that uses them or in `bullet_volley2d_internal.hpp`:
+  calling one from another file links fine but fails at extension LOAD time
+  (undefined symbol: the runner reports CRASH) - move the definition to the
+  internal header instead. Includes are root-relative (`"data/..."`).
 - Threading: everything runs on the main thread (physics callbacks
   included); no locks exist and none are needed. Do not add threads.
-- **Spawn flow**: `BulletFactory2D.spawn_controllable_*` → pool pop by
-  `VolleyPoolKey2D` (amount + shape + type) or fresh alloc →
+- **Spawn flow**: `BulletFactory2D.spawn_volley` → `spawn_volley_internal`
+  → pool pop by `VolleyPoolKey2D` (bullet count + shape) or fresh alloc →
   `enable_volley` (validates EVERYTHING before mutating; a refused
   enable changes nothing) → `set_up_bullet_instances` (one `set_buffer`
   upload). The spawner calls the C++ span path
@@ -493,6 +528,10 @@ src/
 | One-time warnings use `WarnOnce2D` codes 101+ (spawner) and stay quiet in the preview | `test_spawner_setter_contract` |
 | Homing sources never pick the spawner, its markers, factory nodes, dying nodes or non-Node2Ds; an empty resolution fires a plain volley and warns once per homing configuration | `test_spawner_homing_detection` |
 | Homing queues cap at 256 without errors; freed targets are trimmed; retarget skips dead/pooled/foreign/old-factory volleys and disabled bullets | `test_spawner_homing_queues` |
+| Public surface after the volley refactor: one `spawn_volley`, no `BulletType`, factory and spawner share signal names/payloads, exact stats keys, one container + one debugger | `test_factory_api_surface` |
+| A pooled volley reused for plain data matches a cold volley field by field, pose and flight (every feature reset) | `test_volley_pool_reuse_all_features` |
+| A one-bullet volley behaves like bullet 0 of any volley (per-bullet curves beat shared) | `test_volley_single_bullet` |
+| Every spawn-data and volley property sits in a group; names and group titles unique | `test_volley_data_inspector` |
 
 - Edge cases to test everywhere: NaN/Inf scalars and vectors; null array
   entries; empty arrays; short vs oversized arrays; OOB indices (-1/99);
@@ -511,7 +550,7 @@ src/
 ## 15. Benchmarks & profiling (measure before AND after any perf change)
 
 ```sh
-python3 tools/run_benchmarks.py                     # 16 headless scenarios x5 (median)
+python3 tools/run_benchmarks.py                     # 15 headless scenarios x5 (median)
 python3 tools/run_benchmarks.py --scenario spawner_ # substring filter (repeatable)
 python3 tools/run_benchmarks.py --gate              # exit 1 on regression vs log/baseline.json
 python3 tools/run_benchmarks.py --update-baseline   # ONLY for an accepted change; say so in the commit
@@ -534,10 +573,14 @@ python3 tools/run_benchmarks.py --update-baseline   # ONLY for an accepted chang
   `register_performance_monitors`). Editor Profiler for script cost,
   Visual Profiler for GPU.
 - Facts (debug build, Ryzen 7 8840HS): 10k bullets in flight
-  ≈ 0.26 ms factory tick. Cold spawn was O(N²) (8k: 1.5 s) because every
+  ≈ 0.27 ms factory tick (`volley_10k_flight`). Cold spawn was O(N²) (8k: 1.5 s) because every
   per-bullet `shape_set_data` re-updated all shapes of the area; one
   shared shape per volley made it O(N) (8k: 11 ms, 1k: 0.66 ms).
   Spawner preview spin/move: 0 rebuilds, p99 ~50 ms → 3–5 ms.
+  Inlining `move_bullets` into the factory loop cost 20-25% on
+  `trails_fx_2k` (it lives in its own TU now); a `Ref<>` returned by value
+  per bullet costs a reference()/unreference() engine call pair (trail and
+  effect shards hand out raw `MultiMesh *`, ~9% p50 / ~18% p95 on trails).
 
 ## 16. Rules (non-negotiable)
 

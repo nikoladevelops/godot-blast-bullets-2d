@@ -1286,7 +1286,7 @@
 			<param index="1" name="spawn_data" type="BulletVolleyData2D" />
 			<param index="2" name="instance_count" type="int" />
 			<description>
-				Pre-creates [code]instance_count[/code] disabled multimeshes in one exact bucket. [code]key.amount_bullets[/code] is bullets per multimesh (must equal [code]spawn_data[/code] transforms size); [code]instance_count[/code] is how many multimeshes to create. The [code]key[/code] is required and must match the bucket derived from [code]spawn_data[/code] (amount_bullets + effective collision shape); mismatch aborts with an error and creates nothing. Example: [code]populate_bullets_pool(VolleyPoolKey2D.make(5, PhysicsServer2D.SHAPE_CIRCLE), data, 2)[/code] creates 2 multimeshes of 5 bullets each.
+				Pre-creates [code]instance_count[/code] disabled volleys in one exact bucket. [code]key.amount_bullets[/code] is bullets per volley (must equal [code]spawn_data[/code] transforms size); [code]instance_count[/code] is how many volleys to create. The [code]key[/code] is required and must match the bucket derived from [code]spawn_data[/code] (amount_bullets + effective collision shape); mismatch aborts with an error and creates nothing. Example: [code]populate_bullets_pool(VolleyPoolKey2D.make(5, PhysicsServer2D.SHAPE_CIRCLE), data, 2)[/code] creates 2 volleys of 5 bullets each.
 			</description>
 		</method>
 		<method name="populate_bullets_pool_deferred">

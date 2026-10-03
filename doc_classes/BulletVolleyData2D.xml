@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <class name="BulletVolleyData2D" inherits="Resource" api_type="extension" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/godotengine/godot/master/doc/class.xsd">
 	<brief_description>
-		Contains spawn data for the [BulletVolley2D].
+		Everything one [BulletVolley2D] needs at spawn time. Fill it in the inspector or from code and pass it to [method BulletFactory2D.spawn_volley] or a [BulletSpawner2D]; one resource can be reused for every volley.
 	</brief_description>
 	<description>
 		Ensure that the [member transforms] and [member all_bullet_speed_data] are set, otherwise spawning fails with an error and no bullets are created (an empty speed array fails; give one entry per bullet).
@@ -93,7 +93,7 @@
 			Custom data carried per bullet, readable in the factory collision callbacks through [method BulletVolley2D.bullet_get_custom_data]. Entry [code]i[/code] belongs to bullet [code]i[/code] and nobody else; bullets without an entry read null. Stays strictly separate from [member shared_bullets_custom_data]: per-bullet data never falls back to shared. Example: tag bullet 0 with a fire resource and bullet 2 with ice → bullet 1 reads null.
 		</member>
 		<member name="animation" type="StringName" setter="set_animation" getter="get_animation" default="&amp;&quot;default&quot;">
-			Which SpriteFrames animation to play. Empty or "default" auto-resolves silently ("default" if present, else first animation). Explicit wrong names fall back to the first animation with one error. The whole multimesh batch shares one frame at a time; timing uses animation speed (fps), per-frame durations, and loop flag.
+			Which SpriteFrames animation to play. Empty or "default" auto-resolves silently ("default" if present, else first animation). Explicit wrong names fall back to the first animation with one error. The whole volley shares one frame at a time; timing uses animation speed (fps), per-frame durations, and loop flag.
 		</member>
 		<member name="bounce_charge_amplify" type="bool" setter="set_bounce_charge_amplify" getter="get_bounce_charge_amplify" default="true">
 			Whether an oncoming target amplifies the rebound through relative reflection. True (default) enables the extra kick; false reflects absolutely, so bounce_strength alone decides head-on outcomes.
@@ -157,7 +157,7 @@
 			Tip: [method set_collision_mask_from_array] takes plain layer numbers and builds the bitmask for you.
 		</member>
 		<member name="collision_shape" type="Shape2D" setter="set_collision_shape" getter="get_collision_shape">
-			The collision shape shared by all bullets in the multimesh. Supports [RectangleShape2D], [CircleShape2D] and [CapsuleShape2D]; anything else falls back to a circle with an error. The effective type is part of the pool bucket, so changing it changes which pooled instances get reused. Use [member collision_shape_offset] to shift it away from the texture center, and enable the [BulletFactory2D] debugger to see it.
+			The collision shape shared by all bullets in the volley. Supports [RectangleShape2D], [CircleShape2D] and [CapsuleShape2D]; anything else falls back to a circle with an error. The effective type is part of the pool bucket, so changing it changes which pooled instances get reused. Use [member collision_shape_offset] to shift it away from the texture center, and enable the [BulletFactory2D] debugger to see it.
 		</member>
 		<member name="collision_shape_offset" type="Vector2" setter="set_collision_shape_offset" getter="get_collision_shape_offset" default="Vector2(0, 0)">
 			The offset for the collision shape calculated from the center of the bullet texture.
@@ -205,7 +205,7 @@
 		</member>
 		<member name="instance_shader_parameters" type="Dictionary" setter="set_instance_shader_parameters" getter="get_instance_shader_parameters" default="{}">
 			Per-instance shader overrides, used only when [member material] is a [ShaderMaterial] with [code]instance uniform[/code] declarations. [b]KEY[/b] is the uniform name ([String]), [b]VALUE[/b] is a [Variant] matching that uniform's type (a wrong type warns and skips that key).
-			Applied per bullet instance through [code]set_instance_shader_parameter()[/code] when the volley spawns every live bullet of the multimesh shares the same override set. An empty dictionary disables the pass. Switching to a non-shader material, or spawning with null material, clears the stored dict so pool reuse never leaks stale overrides into the next volley.
+			Applied per bullet instance through [code]set_instance_shader_parameter()[/code] when the volley spawns every live bullet of the volley shares the same override set. An empty dictionary disables the pass. Switching to a non-shader material, or spawning with null material, clears the stored dict so pool reuse never leaks stale overrides into the next volley.
 			Example: assign a [ShaderMaterial] with [code]instance uniform vec4 glow_color[/code] and set this to [code]{"glow_color": Color(1, 0.3, 0.1, 1)}[/code]. Global (non-instance) uniforms belong on the material itself, not here.
 		</member>
 		<member name="is_life_time_infinite" type="bool" setter="set_is_life_time_infinite" getter="get_is_life_time_infinite" default="false">

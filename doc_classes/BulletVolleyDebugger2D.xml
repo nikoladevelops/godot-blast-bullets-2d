@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <class name="BulletVolleyDebugger2D" inherits="Node" api_type="extension" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/godotengine/godot/master/doc/class.xsd">
 	<brief_description>
-		Debugger for the collision shapes of the bullets. Toggle it from the [BulletFactory2D] debugger properties.
+		Draws the collision shapes of every [BulletVolley2D]. Created by [BulletFactory2D]; toggle it with [member BulletFactory2D.is_debugger_enabled] and color it with [member BulletFactory2D.debugger_color].
 	</brief_description>
 	<description>
 		Draws every bullet collision shape as colored geometry so you can see what the physics server sees. Owned and driven by [BulletFactory2D]; toggle it with the factory debugger properties. True-shape meshes (rectangles, circle fans, capsules) rebuild automatically when a pooled instance is reused with a different shape.
