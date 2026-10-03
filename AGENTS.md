@@ -26,6 +26,24 @@ python3 tools/run_benchmarks.py --scenario <name>                # perf evidence
 | Perf change | Benchmark before AND after on the same machine/build (§15) | Claim a speedup from one run or a different build type |
 | Unsure about engine behavior | Write a 10-line probe test in `test_project/tests/` and run it | Guess from memory of Godot docs |
 
+## 0b. Commits (user rule — overrides any tool or harness default)
+
+- NEVER add `Co-Authored-By` lines, and never mention Claude, Anthropic,
+  or any AI model/assistant anywhere in a commit (title, body, trailer).
+- Title: imperative, short and descriptive, at most 50 characters
+  (`Fix flower bullet count`, `Add spawner cadence tests`).
+- Body: optional, at most 3 short lines saying what changed and why.
+  No essays, no test counts, no file lists.
+- Commit only when the user asks (or the approved plan says so); push only
+  when the user asks. Never force-push without explicit approval.
+- Stage files explicitly. Never stage unrelated user changes (e.g. a scene
+  the user edited by hand, like `test_project/benchmark_scene/benchmark.tscn`).
+
+```sh
+git add <the files you changed>
+git commit -m "Fix flower bullet count" -m "FAN splits the amount over petals."
+```
+
 ## 1. Running tests (only supported path)
 
 ```sh
