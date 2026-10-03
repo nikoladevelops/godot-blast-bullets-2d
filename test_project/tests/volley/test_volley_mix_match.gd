@@ -128,13 +128,11 @@ func test_spawner_driven_mixed_volley() -> void:
 	assert_true(spawner.shoot_once(), "mixed spawner shot fires")
 	await physics(40)
 	var live: Array = spawner.get_live_volleys()
-	if live.is_empty():
-		assert_gte(factory.debug_get_total_bullets_amount(0), 1, "mixed volley exists in factory")
-	else:
-		var lv: DirectionalBullets2D = live[0]
-		assert_true(_finite(lv), "spawner mixed volley finite")
-		assert_true(lv.get_is_wobble_enabled(), "spawner volley carries wobble")
-		assert_gt(lv.bullet_get_gravity(0).y, 0.0, "spawner volley carries gravity")
+	assert_eq(live.size(), 1, "the homing volley is tracked")
+	var lv: DirectionalBullets2D = live[0]
+	assert_true(_finite(lv), "spawner mixed volley finite")
+	assert_true(lv.get_is_wobble_enabled(), "spawner volley carries wobble")
+	assert_gt(lv.bullet_get_gravity(0).y, 0.0, "spawner volley carries gravity")
 
 
 func test_lifetime_expiry_inside_mix() -> void:

@@ -114,17 +114,37 @@ func test_ring_unaffected_by_mirroring() -> void:
 
 
 func test_distribute_degenerate_and_real_pools() -> void:
+	var foes: Array = []
+	for i in 4:
+		var foe := Node2D.new()
+		foe.position = Vector2(100.0 * (i + 1), 0)
+		add(foe)
+		foe.add_to_group("enemies") # the spawner's default homing group
+		foes.append(foe)
 	var s5 := _spawner(BulletSpawner2D.PATTERN_FROM_HELPER_RING, 4)
 	s5.set_homing_enabled(true)
+	s5.set_homing_mode(BulletSpawner2D.HOMING_PER_BULLET)
 	s5.set_homing_target_selection(BulletSpawner2D.HOMING_SELECT_DISTRIBUTE)
 	s5.set_homing_max_targets(1)
-	assert_eq(s5.get_homing_max_targets(), 1, "degenerate default reachable")
 	assert_true(s5.shoot_once(), "DISTRIBUTE shot still fires with a 1-target pool")
+	assert_true(s5.shoot_once(), "second shot")
+	var warned := 0
+	for err in get_errors():
+		if err.is_push_warning() and err.contains_text("homing_target_selection is DISTRIBUTE but homing_max_targets is 1"):
+			warned += 1
+	assert_eq(warned, 1, "the degenerate pool warns once")
+	var v5: DirectionalBullets2D = s5.get_live_volleys()[0]
+	for i in 4:
+		assert_eq(v5.bullet_get_current_homing_target(i), foes[0], "1-target pool: every bullet chases the nearest")
 	var s6 := _spawner(BulletSpawner2D.PATTERN_FROM_HELPER_RING, 4)
 	s6.set_homing_enabled(true)
+	s6.set_homing_mode(BulletSpawner2D.HOMING_PER_BULLET)
 	s6.set_homing_target_selection(BulletSpawner2D.HOMING_SELECT_DISTRIBUTE)
 	s6.set_homing_max_targets(4)
 	assert_true(s6.shoot_once(), "DISTRIBUTE with a real pool fires")
+	var v6: DirectionalBullets2D = s6.get_live_volleys()[0]
+	for i in 4:
+		assert_eq(v6.bullet_get_current_homing_target(i), foes[i], "real pool: bullet %d chases its own target" % i)
 
 
 func test_spin_preview_survives() -> void:

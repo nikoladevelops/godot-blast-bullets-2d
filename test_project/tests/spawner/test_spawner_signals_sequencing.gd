@@ -40,9 +40,12 @@ func test_burst_chain() -> void:
 	sp.set_burst_count(3)
 	sp.set_burst_interval_sec(0.05)
 	sp.begin_burst()
-	await physics(30)
-	assert_gte(sp.get_volleys_fired(), 3, "burst fired 3 volleys")
-	assert_signal_emitted(sp, "burst_finished")
+	for i in 60:
+		await idle(1)
+		if get_signal_emit_count(sp, "burst_finished") > 0:
+			break
+	assert_eq(sp.get_volleys_fired(), 3, "burst fired exactly 3 volleys")
+	assert_signal_emit_count(sp, "burst_finished", 1, "burst_finished once")
 
 
 func test_telegraph_warn_then_fire() -> void:

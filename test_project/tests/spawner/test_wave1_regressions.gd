@@ -83,7 +83,7 @@ func test_gravity_fills_gaps_only() -> void:
 	assert_eq(v.bullet_get_gravity(2), Vector2(0, 777), "still-gap slot follows the new shared")
 	assert_eq(v.bullet_get_gravity(0), Vector2(1000, 0), "seed-authored slot intact")
 	v.set_gravity(Vector2(NAN, 0))
-	expect_any_error()
+	expect_error_sequence(["set_gravity: value must be finite, keeping the old value"])
 	assert_eq(v.bullet_get_gravity(2), Vector2(0, 777), "NaN rejected")
 
 

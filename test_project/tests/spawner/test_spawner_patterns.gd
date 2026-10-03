@@ -22,21 +22,28 @@ func test_all_sources_collect(src: int = use_parameters(range(BulletSpawner2D.PA
 	var tf: Array = sp.collect_spawn_transforms()
 	if src in EMPTY_WITHOUT_INPUT:
 		assert_true(tf.is_empty(), "source %d without input is empty" % src)
-		expect_any_error("source %d fails loud without input" % src)
+		var why := {
+			BulletSpawner2D.PATTERN_FROM_HELPER_AIMED: "no aimed target assigned",
+			BulletSpawner2D.PATTERN_FROM_HELPER_CUSTOM: "helper_custom_transforms is empty",
+			BulletSpawner2D.PATTERN_FROM_HELPER_PATH2D: "Path2D mode has no node assigned",
+		}
+		expect_error_sequence([why[src]], "source %d fails loud without input" % src)
 	else:
-		assert_gte(tf.size(), 1, "source %d emits" % src)
+		# Children/Self: one marker (no children here); generators: the amount.
+		var want := 1 if src in [BulletSpawner2D.PATTERN_FROM_CHILDREN, BulletSpawner2D.PATTERN_FROM_SELF] else 6
+		assert_eq(tf.size(), want, "source %d emits exactly %d" % [src, want])
 		assert_true(H.finite_volley(tf), "source %d finite" % src)
 
 
 func test_invalid_source_and_amount_cap() -> void:
 	var src0: int = sp.get_pattern_source()
 	sp.pattern_source = 99
-	expect_any_error()
+	expect_error_sequence(["invalid pattern_source, keeping the old value"])
 	assert_eq(sp.get_pattern_source(), src0, "source 99 rejected")
 	sp.helper_bullets_amount = 10000
 	assert_eq(sp.get_helper_bullets_amount(), 10000, "cap accepts 10000")
 	sp.helper_bullets_amount = 10001
-	expect_any_error()
+	expect_error_sequence(["helper_bullets_amount must be <= 10000, keeping the old value"])
 	assert_eq(sp.get_helper_bullets_amount(), 10000, "10001 rejected")
 
 

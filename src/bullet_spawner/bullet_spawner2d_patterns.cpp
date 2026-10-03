@@ -689,8 +689,7 @@ TypedArray<Transform2D> BulletSpawner2D::generate_raw_pattern(Node2D *base, cons
             // volley, so drawn terrain that animates just works.
             PackedVector2Array path_pts = sample_path2d_polyline(quiet);
             if (path_pts.is_empty()) {
-                if (!quiet) UtilityFunctions::push_error("BulletSpawner2D::collect_spawn_transforms: Path2D mode produced no points.");
-                break;
+                break; // the sampler already reported the exact cause
             }
             raw = collect_path2d_transforms(marker, path_pts, helper_bullets_amount, quiet);
             break;

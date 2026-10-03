@@ -69,16 +69,8 @@ func test_preview_cap_custom_line() -> void:
 	spawner.show_preview_during_runtime = true
 	spawner.show_pattern_preview = true
 	spawner.helper_bullets_amount = 5
-	for src in 33:
-		spawner.pattern_source = src
-		var tf: Array = spawner.collect_spawn_transforms()
-		if src == 7 or src == 24 or src == 29:
-			assert_true(tf.is_empty(), "src %d targetless/empty is empty" % src)
-		else:
-			assert_true(tf.size() >= 1 and _finite_volley(tf), "src %d collects sane (n=%d)" % [src, tf.size()])
-	expect_errors_containing("no aimed target assigned", 1, "aimed targetless fails loud")
-	expect_errors_containing("custom_transforms is empty", 1, "custom empty fails loud")
-	expect_errors_containing("Path2D", 2, "path2d missing fails loud")
+	# (Every source's count/empty-input contract: test_spawner_patterns and
+	# test_spawner_pattern_counts.)
 	# Cap boundary: 10000 accepted and collected, 10001 rejected.
 	spawner.helper_bullets_amount = 10000
 	assert_true(spawner.get_helper_bullets_amount() == 10000, "amount cap accepts 10000")
@@ -92,15 +84,9 @@ func test_preview_cap_custom_line() -> void:
 	spawner.pattern_source = 24
 	spawner.set_helper_custom_transforms([Transform2D(0.0, Vector2(10, 0)), Transform2D(0.0, Vector2(0, 20)), Transform2D(0.0, Vector2(-5, -5))])
 	var cust: Array = spawner.collect_spawn_transforms()
-	assert_true(cust.size() == 3, "custom collects all")
-	if cust.size() == 3:
-		assert_true((cust[0] as Transform2D).origin.distance_to(Vector2(10, 0)) < 0.01, "custom composes marker")
-	spawner.set_helper_custom_reverse(true)
-	var crev: Array = spawner.collect_spawn_transforms()
-	assert_true(crev.size() == 3, "custom reverse keeps count")
-	if crev.size() == 3:
-		assert_true((crev[0] as Transform2D).origin.distance_to(Vector2(-5, -5)) < 0.01, "custom reverse flips order")
-	spawner.set_helper_custom_reverse(false)
+	assert_eq(cust.size(), 3, "custom collects all")
+	assert_almost_eq((cust[0] as Transform2D).origin, Vector2(10, 0), Vector2(0.01, 0.01), "custom composes marker")
+	# (Reverse / slot-offset order ops: test_spawner_patterns.)
 	# Regression (COW aliasing): rebuilds and mode switches must never wipe
 	# placed transforms — the snapshot keeps a private copy now.
 	assert_true(spawner.get_helper_custom_transforms().size() == 3, "custom array survives rebuilds")
@@ -154,9 +140,8 @@ func test_homing_resolve() -> void:
 	d2.add_to_group("test_targets")
 	add(d2)
 	spawner.set_homing_node_group("test_targets")
-	for sel in [0, 1, 2, 3, 4]:
-		spawner.set_homing_target_selection(sel)
-		assert_true(spawner.resolve_homing_targets(true).size() == 2, "selection %d resolves both" % sel)
+	spawner.set_homing_max_targets(2)
+	assert_eq(spawner.resolve_homing_targets(true, false), [d1, d2], "group source resolves both, nearest first (per-mode semantics: test_spawner_homing_selection)")
 	spawner.set_homing_target_source(1)
 	assert_true(spawner.resolve_homing_targets(true).is_empty(), "mouse resolves empty array")
 	spawner.set_homing_target_source(2)
@@ -202,17 +187,14 @@ func test_live_shoot() -> void:
 	spawner.set_homing_enabled(true)
 	spawner.set_homing_target_source(0)
 	spawner.set_homing_node_group("test_targets")
-	var ok: bool = spawner.shoot_once()
-	if ok:
-		assert_true(spawner.get_volleys_fired() == 1, "fired volley counted")
-		assert_true(spawner.get_live_volley_count() == 1, "fired volley tracked")
-		assert_true(spawner.get_active_live_bullet_count() >= 1, "live bullets census")
-		spawner.clear_live_volleys()
-		assert_true(spawner.get_live_volley_count() == 0, "clear forgets volleys")
-		factory.free_active_bullets()
-		assert_true(spawner.get_active_live_bullet_count() == 0, "free_active drains census")
-	else:
-		assert_true(spawner.get_volleys_fired() == 0, "failed shot not counted (headless spawn unsupported)")
+	assert_true(spawner.shoot_once(), "homing shot fires")
+	assert_eq(spawner.get_volleys_fired(), 1, "fired volley counted")
+	assert_eq(spawner.get_live_volley_count(), 1, "fired volley tracked")
+	assert_eq(spawner.get_active_live_bullet_count(), spawner.helper_bullets_amount, "live bullets census")
+	spawner.clear_live_volleys()
+	assert_eq(spawner.get_live_volley_count(), 0, "clear forgets volleys")
+	factory.free_active_bullets()
+	assert_eq(spawner.get_active_live_bullet_count(), 0, "free_active drains census")
 
 func test_factory_smoke() -> void:
 	factory.reset()

@@ -41,7 +41,8 @@ func test_patrols_shoots_and_hits() -> void:
 	await idle(60)
 	assert_gt(turret.global_position.x, start.x + 50.0, "patrolling along the path")
 	assert_almost_eq(turret.global_position.y, 300.0, 0.5, "stays on the horizontal path")
-	assert_gte(get_signal_emit_count(turret, "volley_fired"), 3, "auto-fires while moving")
+	# shoot_interval_sec 0.25 over one second (first pull due at once).
+	assert_between(get_signal_emit_count(turret, "volley_fired"), 4, 5, "auto-fires every 0.25 s while moving")
 	await idle(180) # 4 s total: 400 px at 200 px/s = 2 s per leg -> turned around
 	assert_gte(get_signal_emit_count(turret, "movement_endpoint_reached"), 1, "reached the end and turned")
 	var hits: int = get_signal_emit_count(turret, "body_entered")

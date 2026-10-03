@@ -72,5 +72,5 @@ func test_setter_range() -> void:
 	sp.pattern_source = 5
 	for bad in [-1, 33, 9999]:
 		sp.pattern_source = bad
-		expect_any_error()
+		expect_error_sequence(["invalid pattern_source, keeping the old value"], "value %d" % bad)
 		assert_eq(int(sp.pattern_source), 5, "value %d refused" % bad)

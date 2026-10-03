@@ -1054,7 +1054,6 @@ func test_t20_inspector_groups_stay_coherent() -> void:
 	assert_true(prop_group.get("burst_count", "") == "Shooting", "burst count merged into Shooting")
 	assert_true(prop_group.get("telegraph_enabled", "") == "Shooting", "telegraph merged into Shooting")
 	assert_true(prop_group.get("telegraph_sec", "") == "Shooting", "telegraph seconds merged into Shooting")
-	assert_true(prop_group.get("telegraph_sec", "") == "Shooting", "telegraph seconds merged into Shooting")
 	assert_true(prop_group.get("orbiting_enabled", "") == "Orbiting", "orbiting master grouped")
 	assert_true(prop_group.get("show_pattern_preview", "") == "Preview", "preview master grouped")
 	var stray_homing := []
