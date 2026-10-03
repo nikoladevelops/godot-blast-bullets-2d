@@ -7,6 +7,7 @@
 		Assign a [BulletFactory2D], a [DirectionalBulletsData2D], and a [member pattern_source]. Each volley collects one global transform per bullet from the [member transforms_generator] (empty means this node; a generator outside the tree while the spawner is inside also falls back to this node) and spawns it through the factory. It never fires in the editor.
 		Homing quick-start: turn on [member homing_enabled], leave [member homing_target_source] on Node Group, and put your targets (any Node2D) in the [member homing_node_group] group (default "enemies"). Every volley then chases [member homing_target_selection] targets with [member homing_smoothing] turn rate. Set [member homing_target_source] to Mouse to chase the cursor instead, and turn on [member orbiting_enabled] to make bullets ring their target once they arrive. Use [member homing_retarget_mode] so flying volleys keep following fresh targets, and [signal volley_bullet_homing_target_reached] to react when a bullet arrives.
 		Pattern quick-start: pick a [member pattern_source] helper (Ring, Fan, Spiral, Rose, Corridor...) or call [method apply_pattern_preset] for a starter, tune the matching helper_* group, and call [method shoot_once] (or enable [member shooting_enabled] for the auto loop). Add [member pattern_scale] / spin for motion, [member helper_skip_indices] for dodge doors, and [method spawn_pattern_list] for phased sequences. See [member pattern_source] for the full 33-mode list.
+		Reparenting is safe: removing the spawner from the tree and adding it back keeps assigned nodes, tracked homing volleys, burst chains, telegraphs and pattern lists. They pause while the spawner is out of the tree and resume when it returns. Node paths are rewritten from the live nodes on re-entry, so saving the scene keeps the right targets.
 	</description>
 	<tutorials>
 	</tutorials>
@@ -22,19 +23,13 @@
 			<return type="void" />
 			<param index="0" name="preset" type="int" />
 			<description>
-				Fills the helper_* properties with a named starter pattern (radial dense/sparse, 3-arm spiral, narrow/wide aimed fan, slow ring, gap wall, rain, 6-petal flower, scatter burst, cross burst, star shell, heart bloom, snake wave, waterfall curtain, petal storm via Rose, twin counter-spiral via Counter Spiral, aimed trap via Corridor, blossom finale via Rose, terrain crest via Edge) and switches pattern_source to match. Tunes from there; the preset only writes the properties, nothing fires. Custom (-1) does nothing. Note: the twin counter-spiral preset also turns spin on at -60 deg/sec and the blossom finale preset turns spin on at +30 deg/sec.
+				Applies a named starter pattern (radial dense/sparse, 3-arm spiral, narrow/wide aimed fan, slow ring, gap wall, rain, 6-petal flower, scatter burst, cross burst, star shell, heart bloom, snake wave, waterfall curtain, petal storm via Rose, twin counter-spiral, aimed trap via Corridor, blossom finale via Rose, terrain crest via Custom) and switches pattern_source to match. Presets are clean: every Bullet Patterns knob and Spin first return to their defaults, so the same preset always gives the same pattern. The Transform subgroup (scales, muzzle offset, skip indices) and node wiring (aimed target, Path2D, custom array) are kept. Nothing fires. Custom (-1) does nothing; other values out of range fail loud. The twin counter-spiral and blossom finale presets turn spin on.
 			</description>
 		</method>
 		<method name="begin_burst">
 			<return type="void" />
 			<description>
-				Starts a burst chain by hand (waves and boss phases driving phrasing on timers instead of the auto loop). Clears any pending telegraph first. The chain then fires through [method fire_burst_volley] on the burst interval.
-			</description>
-		</method>
-		<method name="begin_telegraph">
-			<return type="void" />
-			<description>
-				Starts a telegraph warning by hand: emits volley_telegraphed with a snapshot of the current aim, then fires after telegraph_sec. The actual fire re-collects transforms, so markers that move during the warning still aim correctly.
+				Starts a burst chain by hand (waves and boss phases): [member burst_count] shots, [member burst_interval_sec] apart, telegraphed first when [member telegraph_enabled]. Clears any pending telegraph first. Manual chains run whether auto-shooting is on or not; chains started by the auto loop are clamped to [method volleys_remaining] and cancelled when auto-shooting is switched off.
 			</description>
 		</method>
 		<method name="clear_live_volleys">
@@ -52,7 +47,7 @@
 		<method name="collect_spawn_transforms" qualifiers="const">
 			<return type="Transform2D[]" />
 			<description>
-				Returns one global transform per bullet for the current [member pattern_source]. Empty [member transforms_generator] means this node. Children mode with no markers falls back to the generator itself. Aimed mode with no target returns an empty array. Corridor mode with no target falls back to [member helper_corridor_aim_direction] so the wall still draws. Corridor and Ellipse Wall modes return fewer transforms than [member helper_bullets_amount] (the carved gaps shrink the array).
+				Returns one global transform per bullet for the current [member pattern_source]. Empty [member transforms_generator] means this node. Children mode with no markers falls back to the generator itself. Aimed mode with no target returns an empty array. Corridor mode with no target falls back to [member helper_corridor_aim_direction] so the wall still draws. Every helper pattern returns exactly [member helper_bullets_amount] transforms (gaps and fills included), minus any [member helper_skip_indices].
 			</description>
 		</method>
 		<method name="debug_check_layer_coincidence" qualifiers="const">
@@ -75,12 +70,6 @@
 			<param index="2" name="ease" type="int" />
 			<description>
 				Static test hook: the easing value movement uses at [param t] for a [enum Tween.TransitionType] and [enum Tween.EaseType]. Matches [method Tween.interpolate_value] for every transition and ease (pinned by tests).
-			</description>
-		</method>
-		<method name="debug_get_cache_state" qualifiers="const">
-			<return type="Dictionary" />
-			<description>
-				Duplicate-cache introspection: template_valid, spawn_id_match. Proves shoot_once() reuses the spawner-owned template; resource swaps and in-place edits invalidate it.
 			</description>
 		</method>
 		<method name="debug_get_layer_rings" qualifiers="const">
@@ -132,17 +121,11 @@
 				Static switch for all spawners: when on, every shot or preview served from the bake cache is regenerated uncached and compared, and a mismatch pushes the error [code]BulletSpawner2D: pattern cache mismatch[/code]. Doubles generation cost: for tests only (the GUT base class turns it on for every suite).
 			</description>
 		</method>
-		<method name="fire_burst_volley">
-			<return type="void" />
-			<description>
-				Fires the next volley of the active burst/telegraph chain (auto loop calls this; manual drivers call it on their own timers). Alternate-mirror bursts flip chirality on even shots. Manual shoot_once stays legal any time: a chain never blocks it, the chain only owns the shots it fires itself.
-			</description>
-		</method>
 		<method name="fire_n_volleys">
 			<return type="void" />
 			<param index="0" name="n" type="int" />
 			<description>
-				Arms a one-shot budget of n more volleys, then pauses. Counts every fired volley (auto or manual). [member max_volleys] is never touched, so unlimited stays unlimited. Replaces any previous budget; unpauses a paused spawner. Rejected when n is not above zero. Armed while disabled too: volleys fire once re-enabled. See [method volleys_remaining].
+				Arms a budget of n more volleys, then pauses. Counts every fired volley (auto or manual). [member max_volleys] is never touched, so unlimited stays unlimited. A spent budget clears itself: [method volleys_remaining] and a later [method resume_shooting] behave like an unlimited spawner again. Replaces any previous budget; unpauses a paused spawner. Rejected when n is not above zero. Works before the spawner enters the tree too (kept through _ready).
 			</description>
 		</method>
 		<method name="get_active_live_bullet_count" qualifiers="const">
@@ -217,12 +200,6 @@
 				Velocity of the last movement step in px/s; zero while paused, stopped, waiting (start delay, endpoint pause) or not moving. This is the velocity [member inherit_movement_velocity] adds to bullets.
 			</description>
 		</method>
-		<method name="get_pooled_volley_count" qualifiers="const">
-			<return type="int" />
-			<description>
-				How many directional volleys sit ready in the factory pool. Warm-up checks and pool sizing read this (0 with no factory assigned).
-			</description>
-		</method>
 		<method name="get_setup_warnings" qualifiers="const">
 			<return type="PackedStringArray" />
 			<description>
@@ -253,12 +230,6 @@
 				True while the run is playing, including its start delay and endpoint pauses; false when paused, stopped or finished.
 			</description>
 		</method>
-		<method name="is_orbit_armed" qualifiers="const">
-			<return type="bool" />
-			<description>
-				Returns true when both [member homing_enabled] and [member orbiting_enabled] are on. This is configured state, not the live ring: each volley still needs at least one resolvable target at spawn time, and a freed target trims out of the queue without crashing (RelockAlways and RelockOnTargetChange unlock and chase the next live target, StayLocked holds angle and center until a target returns).
-			</description>
-		</method>
 		<method name="is_pattern_list_active" qualifiers="const">
 			<return type="bool" />
 			<description>
@@ -275,12 +246,6 @@
 			<return type="bool" />
 			<description>
 				Whether [method pause_shooting] is latched. While set, no volley is created (burst, telegraph, pattern-list and timer chains freeze); spin, retargeting and preview keep running.
-			</description>
-		</method>
-		<method name="is_spinning" qualifiers="const">
-			<return type="bool" />
-			<description>
-				Returns true when [member spin_enabled] is on and the game is running.
 			</description>
 		</method>
 		<method name="movement_pause">
@@ -315,12 +280,6 @@
 				Stops the movement. With [param reset_to_start] (default) the run resets and the spawner snaps back to the start pose; otherwise it stays where it is and the run counts as finished. [method movement_play] restarts from the beginning either way. Emits no signal.
 			</description>
 		</method>
-		<method name="next_shoot_interval_sec" qualifiers="const">
-			<return type="float" />
-			<description>
-				Next auto-shot interval with reload jitter applied (shoot_interval_sec +/- jitter, seeded by reload_jitter_seed). Poll for HUD reload bars.
-			</description>
-		</method>
 		<method name="override_live_volleys_velocity">
 			<return type="int" />
 			<param index="0" name="new_velocity" type="Vector2" />
@@ -331,13 +290,13 @@
 		<method name="pause_shooting">
 			<return type="void" />
 			<description>
-				Freezes volley creation keeping all counters: burst, telegraph, pattern-list and timer chains hold where they are and resume on [method resume_shooting]. Spin, retargeting and preview are unaffected. Manual [method shoot_once] and [method fire_burst_volley] still fire. Emits [signal shooting_stopped] on the active-to-idle transition. Unlike the shooting_enabled/max_volleys setters (tree-gated), these explicit calls report even before entering the tree.
+				Freezes volley creation keeping all counters: burst, telegraph, pattern-list and timer chains hold where they are and resume on [method resume_shooting]. Spin, retargeting and preview are unaffected. Manual [method shoot_once] still fires. Emits [signal shooting_stopped] on the active-to-idle transition (inside the tree only; a pause made before the tree is kept through _ready).
 			</description>
 		</method>
 		<method name="reset_shooting">
 			<return type="void" />
 			<description>
-				Resets the volley counter, clears pause and any [method fire_n_volleys] budget, clears burst/telegraph chains and the pattern-list queue, re-arms the timer with [member shoot_initial_delay_sec] (plus the retarget phase), and emits [signal shooting_started] when auto-shooting resumes.
+				Resets the volley counter, clears pause and any [method fire_n_volleys] budget, clears burst/telegraph chains and the pattern-list queue, re-arms the timer with [member shoot_initial_delay_sec] and the retarget clock, and emits [signal shooting_started] when auto-shooting resumes (inside the tree only).
 			</description>
 		</method>
 		<method name="reset_spin_angle">
@@ -357,7 +316,7 @@
 		<method name="resume_shooting">
 			<return type="void" />
 			<description>
-				Clears [method pause_shooting]: frozen chains continue where they held. Emits [signal shooting_started] on the idle-to-active transition.
+				Clears [method pause_shooting]: frozen chains continue where they held. Emits [signal shooting_started] on the idle-to-active transition (inside the tree only).
 			</description>
 		</method>
 		<method name="retarget_live_volleys">
@@ -410,7 +369,7 @@
 		<method name="shoot_once_deferred">
 			<return type="bool" />
 			<description>
-				Queues a [method shoot_once] with call_deferred so it runs after the current emission / physics step instead of nesting. Use this from spawner signal handlers or colliding contexts. Returns false when the spawner is not inside the tree.
+				Queues a [method shoot_once] with call_deferred so it runs after the current emission / physics step instead of nesting. Use this from spawner signal handlers or colliding contexts. Returns true once queued (the shot itself reports through volley_fired or volley_skipped); false when the spawner is not inside the tree.
 			</description>
 		</method>
 		<method name="spawn_pattern_list">
@@ -419,13 +378,7 @@
 			<param index="1" name="simultaneous" type="bool" default="false" />
 			<param index="2" name="interval_sec" type="float" default="0.25" />
 			<description>
-				Queues pattern entries: each entry is a Dictionary with optional "preset", "pattern_source", "helper_bullets_amount", "spawn_data" keys. Sequential mode (default) fires one entry per interval_sec through the guarded shoot path; simultaneous mode fires all at once. Returns entries queued (sequential) or volleys fired (simultaneous). Bad entries skip with an error, never abort the list. Sequential mode emits [signal pattern_list_finished] when the queue drains; simultaneous mode does not (it returns the fired count directly).
-			</description>
-		</method>
-		<method name="start_spinning">
-			<return type="void" />
-			<description>
-				Turns [member spin_enabled] on.
+				Fires pattern entries: each entry is a Dictionary with optional "preset", "pattern_source", "helper_bullets_amount" and "spawn_data" keys. Every entry is a temporary override: after it fires, the spawner returns to its own configuration (including anything a preset entry changed). Sequential mode (default) fires one entry per interval_sec; simultaneous mode fires all at once. Returns entries queued (sequential) or volleys fired (simultaneous). Bad entries and unknown keys fail loud and are skipped, never aborting the list. Both modes emit [signal pattern_list_finished] once at the end.
 			</description>
 		</method>
 		<method name="stop_pattern_list">
@@ -434,31 +387,22 @@
 				Cancels the active pattern list (queued entries are dropped, fired volleys keep flying).
 			</description>
 		</method>
-		<method name="stop_spinning">
-			<return type="void" />
-			<description>
-				Turns [member spin_enabled] off, freezing the angle.
-			</description>
-		</method>
 		<method name="volleys_remaining" qualifiers="const">
 			<return type="int" />
 			<description>
-				Volleys left before [member max_volleys] trips or the [method fire_n_volleys] budget runs out, whichever is smaller. -1 means infinite (no cap, no budget).
+				Volleys left before [member max_volleys] trips or the [method fire_n_volleys] budget runs out, whichever is smaller. -1 means unlimited (no cap and no budget left).
 			</description>
 		</method>
 	</methods>
 	<members>
-		<member name="adjust_direction_based_on_rotation" type="bool" setter="set_adjust_direction_based_on_rotation" getter="get_adjust_direction_based_on_rotation" default="false">
-			Mirrors DirectionalBulletsData2D adjust_direction_based_on_rotation per volley: bullet directions follow their rotation data. Applied with the steering block while homing is on.
-		</member>
 		<member name="bullet_factory_path" type="NodePath" setter="set_bullet_factory_path" getter="get_bullet_factory_path" default="NodePath(&quot;&quot;)">
-			Path to the [BulletFactory2D] used for spawning.
+			Path to the [BulletFactory2D] used for spawning. Inside the tree, a path to a node of another type is rejected (old value kept).
 		</member>
 		<member name="burst_alternate_mirror" type="bool" setter="set_burst_alternate_mirror" getter="get_burst_alternate_mirror" default="false">
-			Mirror every other burst volley (fan/spiral chirality flip): even burst shots fire mirrored, odd shots plain.
+			Mirror every other burst volley (fan/spiral chirality flip). The first shot is plain, then shots alternate, for any burst_count.
 		</member>
 		<member name="burst_count" type="int" setter="set_burst_count" getter="get_burst_count" default="3">
-			Shots per burst trigger. Must be 1 or more.
+			Shots per burst trigger. Must be between 1 and 1024. Shrinking it during a chain ends the chain at the new count.
 		</member>
 		<member name="burst_enabled" type="bool" setter="set_burst_enabled" getter="get_burst_enabled" default="false">
 			Fire multi-volley bursts per trigger: each interval pulls the trigger for burst_count shots spaced burst_interval_sec apart. Mid-burst shots ignore the main interval.
@@ -485,7 +429,7 @@
 			Node the aimed cone points at (also steers the Corridor wall when one is assigned). No target means no bullets in Aimed mode; Corridor falls back to helper_corridor_aim_direction.
 		</member>
 		<member name="helper_bullets_amount" type="int" setter="set_helper_bullets_amount" getter="get_helper_bullets_amount" default="10">
-			Bullet count for helper patterns. Clamped to 1-10000: one volley fans out to transforms, instance buffers and physics shapes, so uncapped values would freeze on a typo. Outline Fill Inside may return fewer (small shapes run out of grid cells, like Corridor/Ellipse Wall gaps).
+			Bullet count for helper patterns: every generated pattern draws exactly this many bullets, each on its own spot (Fill Inside, Corridor and Ellipse Wall included). Clamped to 1-10000: one volley fans out to transforms, instance buffers and physics shapes, so uncapped values would freeze on a typo. Children, Self and Custom take their count from the markers or the array instead.
 		</member>
 		<member name="helper_circle_face_outward" type="bool" setter="set_helper_circle_face_outward" getter="get_helper_circle_face_outward" default="true">
 			Circle bullets face outward (away from the generator); off faces inward (toward it).
@@ -506,16 +450,16 @@
 			Extra facing twist in degrees. Must be finite.
 		</member>
 		<member name="helper_corridor_gap_width" type="float" setter="set_helper_corridor_gap_width" getter="get_helper_corridor_gap_width" default="96.0">
-			Carved center dodge door in pixels. The output shrinks to the surviving slots (like Ellipse Wall). Must be finite, 0 or more, and narrower than the width.
+			Center dodge door in pixels. All [member helper_bullets_amount] bullets are split over the two wall segments, and the door stays empty. Must be finite and 0 or more. Width and gap are independent (scene load order never matters); a door as wide as the wall is drawn at half the width, with one warning.
 		</member>
 		<member name="helper_corridor_width" type="float" setter="set_helper_corridor_width" getter="get_helper_corridor_width" default="400.0">
-			Wall width in pixels across the aim axis. Must be finite, 0 or more, and wider than the gap.
+			Wall width in pixels across the aim axis. Must be finite and 0 or more.
 		</member>
 		<member name="helper_counter_spiral_angle_step" type="float" setter="set_helper_counter_spiral_angle_step" getter="get_helper_counter_spiral_angle_step" default="0.6">
 			Angle growth per step along each arm in radians (odd arms wind the opposite way when mirrored). Must be finite.
 		</member>
 		<member name="helper_counter_spiral_arm_stride" type="int" setter="set_helper_counter_spiral_arm_stride" getter="get_helper_counter_spiral_arm_stride" default="1">
-			1 interleaves consecutive slots across arms, higher values group slots per arm. Must be 1 or more.
+			Below the arm count, consecutive slots interleave across arms; from the arm count up, each arm takes runs of consecutive slots. Every slot always lands on its own (arm, step) spot. Must be 1 or more.
 		</member>
 		<member name="helper_counter_spiral_arms" type="int" setter="set_helper_counter_spiral_arms" getter="get_helper_counter_spiral_arms" default="2">
 			Counter-rotating arms. Must be 2 or more (use Multi Spiral for 1 arm).
@@ -554,7 +498,7 @@
 			Extra facing twist in degrees.
 		</member>
 		<member name="helper_cross_spacing" type="float" setter="set_helper_cross_spacing" getter="get_helper_cross_spacing" default="32.0">
-			Spacing between slots along each ray. Must be finite and above zero.
+			Spacing between slots along each ray. When an arm cannot hold its share of bullets at this spacing, the spacing shrinks so the outermost slot sits on the arm tip (every bullet keeps its own spot). Must be finite and above zero.
 		</member>
 		<member name="helper_custom_facing" type="int" setter="set_helper_custom_facing" getter="get_helper_custom_facing" default="0">
 			Which direction Custom bullets face: As Stored keeps each transform's rotation, Face Outward/Inward aims radially from the generator, +90/-90 Degrees turn the stored rotation across it. helper_custom_facing_offset_deg still applies on top.
@@ -587,7 +531,7 @@
 			Diamond base rotation in radians. Must be finite.
 		</member>
 		<member name="helper_ellipse_arc" type="float" setter="set_helper_ellipse_arc" getter="get_helper_ellipse_arc" default="6.2831855">
-			Arc span for Arc/Wall modes (full turn draws the whole ellipse). Must be finite.
+			Arc span for Arc and Wall modes. A full turn (or within half a slot of one) closes the ring like Full mode. Must be finite.
 		</member>
 		<member name="helper_ellipse_face_outward" type="bool" setter="set_helper_ellipse_face_outward" getter="get_helper_ellipse_face_outward" default="true">
 			Face along the ellipse outward normal. Off faces inward.
@@ -596,13 +540,13 @@
 			Twists every ellipse facing. Must be finite.
 		</member>
 		<member name="helper_ellipse_gap_count" type="int" setter="set_helper_ellipse_gap_count" getter="get_helper_ellipse_gap_count" default="2">
-			Dodge gaps carved into Wall mode. Shown only in Wall mode. Must be 0 or more.
+			Dodge gaps in Wall mode. Shown only in Wall mode. Must be between 0 and 10000.
 		</member>
 		<member name="helper_ellipse_gap_width" type="float" setter="set_helper_ellipse_gap_width" getter="get_helper_ellipse_gap_width" default="0.3">
 			Width of each Wall gap in radians. Shown only in Wall mode. Must be finite and 0 or more.
 		</member>
 		<member name="helper_ellipse_mode" type="int" setter="set_helper_ellipse_mode" getter="get_helper_ellipse_mode" default="0">
-			0 draws the full ring, 1 draws an arc segment, 2 draws a dense wall with carved dodge gaps. Wall mode with gap_count 0 or gap_width 0 draws the plain arc (no carving).
+			0 draws the full ring, 1 draws an arc segment, 2 draws a wall with dodge gaps: all [member helper_bullets_amount] bullets are shared by the solid stretches and the gaps stay empty. Wall mode with gap_count 0 or gap_width 0 draws the plain arc. An Arc or Wall spanning a full turn closes like the full ring (no doubled seam bullet).
 		</member>
 		<member name="helper_ellipse_radius_x" type="float" setter="set_helper_ellipse_radius_x" getter="get_helper_ellipse_radius_x" default="150.0">
 			Ellipse semi-axis X in pixels. Must be finite and 0 or more.
@@ -637,9 +581,6 @@
 		<member name="helper_flower_base_rotation" type="float" setter="set_helper_flower_base_rotation" getter="get_helper_flower_base_rotation" default="0.0">
 			Rotates the whole flower. Must be finite.
 		</member>
-		<member name="helper_flower_bullets_per_petal" type="int" setter="set_helper_flower_bullets_per_petal" getter="get_helper_flower_bullets_per_petal" default="5">
-			Slots per lobe. Must be 1 or more.
-		</member>
 		<member name="helper_flower_face_outward" type="bool" setter="set_helper_flower_face_outward" getter="get_helper_flower_face_outward" default="true">
 			Face away from the marker. Off faces the marker (implosion blossoms).
 		</member>
@@ -653,10 +594,10 @@
 			Pinch between lobes: 0 is round, higher is tighter. Must be finite and 0 or more.
 		</member>
 		<member name="helper_flower_petal_spread" type="float" setter="set_helper_flower_petal_spread" getter="get_helper_flower_petal_spread" default="0.5">
-			Angular width of each lobe in radians. Must be finite and 0 or more.
+			Angular width of each FAN lobe in radians. When the lobes touch or overlap, edge slots of neighboring petals never land on the same spot. Must be finite and 0 or more.
 		</member>
 		<member name="helper_flower_petals" type="int" setter="set_helper_flower_petals" getter="get_helper_flower_petals" default="6">
-			Lobes in the flower pattern. Must be 1 or more.
+			Lobes in the flower pattern. In FAN mode the [member helper_bullets_amount] bullets are split evenly over the petals (the remainder spread symmetrically; fewer bullets than petals light evenly spaced petals). Must be 1 or more.
 		</member>
 		<member name="helper_flower_radius" type="float" setter="set_helper_flower_radius" getter="get_helper_flower_radius" default="150.0">
 			Flower radius in pixels. Must be finite and 0 or more.
@@ -713,7 +654,7 @@
 			Heart outline size in pixels. Must be finite and above zero.
 		</member>
 		<member name="helper_lattice_columns" type="int" setter="set_helper_lattice_columns" getter="get_helper_lattice_columns" default="8">
-			Honeycomb columns. Must be 1 or more.
+			Honeycomb columns. Must be between 1 and 40000 (columns times rows is capped at 40000 at generation, with one warning).
 		</member>
 		<member name="helper_lattice_face_outward" type="bool" setter="set_helper_lattice_face_outward" getter="get_helper_lattice_face_outward" default="true">
 			Whether slots face away from the marker.
@@ -752,7 +693,7 @@
 			Rotates which line slot becomes bullet 0 (wraps both ways).
 		</member>
 		<member name="helper_line_spacing" type="float" setter="set_helper_line_spacing" getter="get_helper_line_spacing" default="32.0">
-			Distance between line bullets.
+			Distance between line bullets. Must be finite and above zero (helper_line_reverse flips the order).
 		</member>
 		<member name="helper_line_start_offset" type="float" setter="set_helper_line_start_offset" getter="get_helper_line_start_offset" default="0.0">
 			Shifts the whole line row along its axis in pixels, on top of the Start/Center/End anchor. Must be finite and 0 or more.
@@ -764,7 +705,7 @@
 			Extra facing twist in degrees. Must be finite.
 		</member>
 		<member name="helper_lissajous_freq_x" type="float" setter="set_helper_lissajous_freq_x" getter="get_helper_lissajous_freq_x" default="3.0">
-			Horizontal weave frequency. Must be finite and 0 or more.
+			Horizontal weave frequency. Ratios sharing a factor (3:3) are drawn once, and curves that fold back on themselves (1:1 at phase 0) are spread along the open run, so every bullet stays visible. Must be finite and 0 or more.
 		</member>
 		<member name="helper_lissajous_freq_y" type="float" setter="set_helper_lissajous_freq_y" getter="get_helper_lissajous_freq_y" default="2.0">
 			Vertical weave frequency. Must be finite and 0 or more.
@@ -782,7 +723,7 @@
 			Angle growth per step along each arm. Must be finite.
 		</member>
 		<member name="helper_multispiral_arm_stride" type="int" setter="set_helper_multispiral_arm_stride" getter="get_helper_multispiral_arm_stride" default="1">
-			1 interleaves consecutive slots across arms, higher values group slots per arm. Must be 1 or more.
+			Below the arm count, consecutive slots interleave across arms; from the arm count up, each arm takes runs of consecutive slots. Every slot always lands on its own (arm, step) spot. Must be 1 or more.
 		</member>
 		<member name="helper_multispiral_arms" type="int" setter="set_helper_multispiral_arms" getter="get_helper_multispiral_arms" default="3">
 			Interleaved spiral arms. Must be 1 or more.
@@ -824,7 +765,7 @@
 			Keep-out distance in pixels from the loop edge for Fill Inside cells. Must be finite and 0 or more.
 		</member>
 		<member name="helper_outline_fill_spacing" type="float" setter="set_helper_outline_fill_spacing" getter="get_helper_outline_fill_spacing" default="32.0">
-			Interior grid cell size in pixels for Fill Inside (rows run top-down like the Grid helper). Must be finite and above zero.
+			Interior grid cell size in pixels for Fill Inside. Used as-is whenever every bullet fits; when they do not, the spacing shrinks just enough. When more cells fit than bullets, the bullets are picked evenly over the whole shape. Must be finite and above zero.
 		</member>
 		<member name="helper_outline_fill_stagger" type="bool" setter="set_helper_outline_fill_stagger" getter="get_helper_outline_fill_stagger" default="false">
 			Shifts every other Fill Inside row by half a cell (honeycomb packing).
@@ -860,7 +801,7 @@
 			Slot rotation per successive layered ring (0 = off, negatives wrap): stacked rings interleave angularly instead of sitting in spokes. Layer 0 is never twisted. Layers placement only.
 		</member>
 		<member name="helper_outline_placement" type="int" setter="set_helper_outline_placement" getter="get_helper_outline_placement" default="0">
-			Where closed-loop shape bullets live (Ring, Ellipse, Star, Flower, Rose, Lissajous, Circle, Rectangle, Square, Polygon, Triangle, Trapezoid, Diamond, Heart): On Outline keeps the generated slot loop exactly (single layer, the default), Layers re-spawns the same slot loop scaled about the loop center (layer 0 on the outline: the identical figure at a different size per layer), Fill Inside swaps it for a row-major grid masked to the loop interior.
+			Where closed-loop shape bullets live (Ring, Ellipse, Star, Flower, Rose, Lissajous, Circle, Rectangle, Square, Polygon, Triangle, Trapezoid, Diamond, Heart): On Outline keeps the generated slot loop exactly (single layer, the default), Layers re-spawns the same figure scaled about the loop center (each ring sampled from the true curve), Fill Inside fills the shape's interior with exactly [member helper_bullets_amount] grid cells.
 		</member>
 		<member name="helper_outline_reverse" type="bool" setter="set_helper_outline_reverse" getter="get_helper_outline_reverse" default="false">
 			Mirrors the closed-loop slot order (winding flip): bullet 0 moves to the far end of the loop. On-outline and layers layouts only.
@@ -872,7 +813,7 @@
 			Where a fixed Path2D run sits when shorter than the curve: Path Start, Centered, or Path End (Fixed Spacing mode only). helper_path2d_start_offset shifts on top of this.
 		</member>
 		<member name="helper_path2d_closed" type="bool" setter="set_helper_path2d_closed" getter="get_helper_path2d_closed" default="false">
-			Include the last-to-first stretch when measuring a Path2D curve, so spacing wraps on loop paths. Curves already drawn as loops need nothing extra (no double segment is added); two-point outlines always stay open.
+			Treat the Path2D curve as a loop: the last-to-first stretch is measured so spacing wraps. A curve already drawn as a loop (last point on the first) becomes a clean ring with no doubled seam bullet; two-point outlines always stay open.
 		</member>
 		<member name="helper_path2d_distribution" type="int" setter="set_helper_path2d_distribution" getter="get_helper_path2d_distribution" enum="BulletSpawner2D.Path2DDistribution" default="0">
 			How Path2D bullets are placed: Fixed Spacing lays helper_bullets_amount bullets helper_path2d_spacing apart (helper_path2d_anchor/overflow decide placement when the run is shorter/longer than the curve), Spread Evenly covers the whole curve length (both endpoints included on open paths; seamless ring without a duplicated seam bullet on closed loops).
@@ -884,7 +825,7 @@
 			Extra facing twist in degrees on top of the Path2D facing. Must be finite.
 		</member>
 		<member name="helper_path2d_overflow" type="int" setter="set_helper_path2d_overflow" getter="get_helper_path2d_overflow" enum="BulletSpawner2D.Path2DOverflow" default="2">
-			What happens when a fixed Path2D run does not fit (run longer than the curve, or shifted past its ends): Clamp piles extras at the end, Wrap continues from the start, Auto Fit scales spacing down so the run fits exactly (Fixed Spacing mode only).
+			What happens when a fixed Path2D run does not fit (run longer than the curve, or shifted past its ends): Clamp stacks the extras on the curve end (an explicit choice), Wrap continues from the start, Auto Fit scales spacing down so the run fits exactly (Fixed Spacing mode only; a closed loop spreads over its full length with no seam duplicate).
 		</member>
 		<member name="helper_path2d_path" type="NodePath" setter="set_helper_path2d_path" getter="get_helper_path2d_path" default="NodePath(&quot;&quot;)">
 			Path2D node to live-sample bullet positions from (baked curve points, re-resolved every volley, ObjectDB-guarded, expressed in the generator space). Bullets sit exactly on the curve per helper_path2d_distribution; empty means no outline.
@@ -914,7 +855,7 @@
 			Polygon base rotation in radians. Must be finite.
 		</member>
 		<member name="helper_polygon_vertices" type="int" setter="set_helper_polygon_vertices" getter="get_helper_polygon_vertices" default="6">
-			Polygon corner count (true perimeter, not the Star Polygon scatter mode). Must be 3 or more.
+			Polygon corner count (true perimeter, not the Star Polygon scatter mode). Must be between 3 and 10000.
 		</member>
 		<member name="helper_rain_band_width" type="float" setter="set_helper_rain_band_width" getter="get_helper_rain_band_width" default="600.0">
 			Width of the rain band in pixels. Must be finite and 0 or more.
@@ -941,7 +882,7 @@
 			Rectangle perimeter size in pixels, centered on the generator. Must be finite with sides 0 or more.
 		</member>
 		<member name="helper_ring_arc" type="float" setter="set_helper_ring_arc" getter="get_helper_ring_arc" default="6.2831855">
-			Ring length in radians. Full circle by default.
+			Ring length in radians. Full circle by default; a full turn (or within half a slot of one) closes the ring without a doubled seam bullet.
 		</member>
 		<member name="helper_ring_face_outward" type="bool" setter="set_helper_ring_face_outward" getter="get_helper_ring_face_outward" default="true">
 			Face bullets away from the center. Off faces them inward.
@@ -965,7 +906,7 @@
 			Angle in radians where the ring starts.
 		</member>
 		<member name="helper_ring_y_scale" type="float" setter="set_helper_ring_y_scale" getter="get_helper_ring_y_scale" default="1.0">
-			Squashes the ring into an ellipse. 1.0 is a circle.
+			Squashes the ring into an ellipse. 1.0 is a circle. Must be finite and above zero.
 		</member>
 		<member name="helper_rose_base_rotation" type="float" setter="set_helper_rose_base_rotation" getter="get_helper_rose_base_rotation" default="0.0">
 			Rotates the whole rose in radians. Must be finite.
@@ -980,7 +921,7 @@
 			Lobe pinch: 1.0 is the exact rose, 0 is round, higher is tighter. Must be finite and 0 or more.
 		</member>
 		<member name="helper_rose_petals" type="int" setter="set_helper_rose_petals" getter="get_helper_rose_petals" default="6">
-			Rose lobes (rhodonea k). Must be 2 or more. Recipe: Rose + phase_step_per_bullet + angular wobble = blossom finale.
+			Rose lobes (rhodonea k): odd values draw k petals, even values 2k petals, each traced once (no stacked bullets). Must be 2 or more.
 		</member>
 		<member name="helper_rose_radius" type="float" setter="set_helper_rose_radius" getter="get_helper_rose_radius" default="150.0">
 			Rose radius in pixels. Must be finite and 0 or more.
@@ -1007,7 +948,7 @@
 			Scatter-only seed: 0 is non-deterministic, otherwise every volley lands identically (combine with spin for rotating replays). Drives burst positions, sector angles and random facings of this pattern only.
 		</member>
 		<member name="helper_skip_indices" type="PackedInt32Array" setter="set_helper_skip_indices" getter="get_helper_skip_indices" default="PackedInt32Array()">
-			Slot indexes to drop from any helper layout (dodge doors, bullet text). Out-of-range entries are ignored with a single warning. Applied after spin/scale so indexes match the preview.
+			Slot indexes to drop from any helper layout (dodge doors, bullet text). Out-of-range entries are ignored with one warning per pattern change (never from the preview). Applied after spin/scale so indexes match the preview.
 		</member>
 		<member name="helper_spiral_angle_step" type="float" setter="set_helper_spiral_angle_step" getter="get_helper_spiral_angle_step" default="0.6">
 			Angle step in radians per spiral bullet.
@@ -1052,7 +993,7 @@
 			Outer vertex radius. Must be finite and 0 or more.
 		</member>
 		<member name="helper_star_points" type="int" setter="set_helper_star_points" getter="get_helper_star_points" default="5">
-			Star points (alternating outer/inner vertices). Must be 2 or more.
+			Star points (alternating outer/inner vertices). Must be between 2 and 10000.
 		</member>
 		<member name="helper_star_polygon_base_rotation" type="float" setter="set_helper_star_polygon_base_rotation" getter="get_helper_star_polygon_base_rotation" default="0.0">
 			Rotates the whole star. Must be finite.
@@ -1112,7 +1053,7 @@
 			Horizontal spacing in pixels. Must be finite and 0 or more.
 		</member>
 		<member name="helper_waterfall_columns" type="int" setter="set_helper_waterfall_columns" getter="get_helper_waterfall_columns" default="12">
-			Curtain columns. Must be 1 or more.
+			Curtain columns. Must be between 1 and 40000 (columns times rows is capped at 40000 at generation, with one warning).
 		</member>
 		<member name="helper_waterfall_facing_offset_deg" type="float" setter="set_helper_waterfall_facing_offset_deg" getter="get_helper_waterfall_facing_offset_deg" default="0.0">
 			Extra facing twist in degrees. Must be finite.
@@ -1154,16 +1095,13 @@
 			Snake row width in pixels. Must be finite and 0 or more.
 		</member>
 		<member name="homing_auto_pop_after_target_reached" type="bool" setter="set_homing_auto_pop_after_target_reached" getter="get_homing_auto_pop_after_target_reached" default="false">
-			Advances per-bullet queues when a target is reached. Only used in Per Bullet mode.
+			Advances the homing queue when a target is reached: per bullet in Per Bullet mode, once for the shared queue in Shared mode.
 		</member>
 		<member name="homing_children_parent_path" type="NodePath" setter="set_homing_children_parent_path" getter="get_homing_children_parent_path" default="NodePath(&quot;&quot;)">
 			Parent whose Node2D children are chased for the Node Children source. Required: empty or invalid paths fly without homing.
 		</member>
 		<member name="homing_children_recursive" type="bool" setter="set_homing_children_recursive" getter="get_homing_children_recursive" default="false">
 			Includes grandchildren and deeper descendants for the Node Children source.
-		</member>
-		<member name="homing_debug_log_volleys" type="bool" setter="set_homing_debug_log_volleys" getter="get_homing_debug_log_volleys" default="false">
-			Prints resolved target count and first target per homing volley. Use it when bullets fly straight unexpectedly.
 		</member>
 		<member name="homing_delay_sec" type="float" setter="set_homing_delay_sec" getter="get_homing_delay_sec" default="0.0">
 			Seconds of straight flight before volley steering starts (classic aimed-then-homing). 0 steers immediately. Must be finite and 0 or more.
@@ -1181,7 +1119,7 @@
 			Extra allow-list on top of any source: only targets also in this group are kept. Empty means no filtering.
 		</member>
 		<member name="homing_fire_arc_deg" type="float" setter="set_homing_fire_arc_deg" getter="get_homing_fire_arc_deg" default="0.0">
-			Fire cone in degrees around the spawner facing (homing only): a volley with resolved targets but none inside half this angle is skipped before spawning (volley_skipped "outside_fire_arc"). Empty resolutions still fire plain volleys; the mouse source never resolves, so the cone ignores it. 0 is omnidirectional. Must be finite and 0 or more.
+			Fire cone in degrees around the spawner facing including spin (homing only): a volley with resolved targets but none inside half this angle is skipped before spawning (volley_skipped "outside_fire_arc"). A passing volley chases exactly the targets the cone approved (one resolution per shot). Empty resolutions still fire plain volleys; the mouse source never resolves, so the cone ignores it. 0 is omnidirectional. Must be finite and 0 or more.
 		</member>
 		<member name="homing_global_position" type="Vector2" setter="set_homing_global_position" getter="get_homing_global_position" default="Vector2(0, 0)">
 			Position chased per volley for the Global Position source. Must be finite.
@@ -1223,7 +1161,7 @@
 			0 leaves flying volleys alone, On Interval re-resolves and replaces their queues every interval. On by default so group, name, and children tracking stays live as members spawn and die.
 		</member>
 		<member name="homing_retarget_phase" type="float" setter="set_homing_retarget_phase" getter="get_homing_retarget_phase" default="0.0">
-			Staggers the retarget phase so many spawners do not scene-scan on the same tick. The period stays homing_retarget_interval_sec. Must be finite and 0 or more.
+			Explicit time to the first retarget pass. 0 (default) staggers it per spawner automatically, so many spawners never scene-scan on the same tick. The period stays homing_retarget_interval_sec. Must be finite and 0 or more.
 		</member>
 		<member name="homing_retarget_previous_volleys" type="bool" setter="set_homing_retarget_previous_volleys" getter="get_homing_retarget_previous_volleys" default="true">
 			Retargeting re-aims every tracked live volley. Turn off to re-aim only the newest volley, letting older ones fly at whatever they chased last.
@@ -1256,7 +1194,7 @@
 			Bullets fired while the spawner moves inherit its movement velocity ([method get_movement_velocity] x [member movement_velocity_inherit_factor]), so a moving turret's shots carry its momentum. Off by default.
 		</member>
 		<member name="max_live_bullets" type="int" setter="set_max_live_bullets" getter="get_max_live_bullets" default="0">
-			Soft live-bullet fuse: 0 is unlimited, otherwise firing pauses (volley_skipped "over_budget") while this spawner's live bullets (homing AND plain volleys, counted via the factory) reach this count. Counts actual spawned bullets, so gap-carving modes (Corridor gap, Ellipse Wall, skip indices) consume less budget than helper_bullets_amount. The census is O(factory volleys) per trigger pull: fine for a handful of budgeted spawners, prefer fewer budgeted spawners (or staggered intervals) past ~100 spawners.
+			Soft live-bullet fuse: 0 is unlimited, otherwise a shot is skipped (volley_skipped "over_budget") while this spawner's live bullets (homing and plain volleys, counted via the factory) reach this count. The check runs before any pattern work, so a stalled spawner costs nothing. Retargeting is not affected. The census is O(factory volleys) per trigger pull: fine for a handful of budgeted spawners.
 		</member>
 		<member name="max_volleys" type="int" setter="set_max_volleys" getter="get_max_volleys" default="-1">
 			Auto-shooting stops after this many volleys. -1 is infinite, 0 disables auto-shooting ([method shoot_once] still works). Lowering the cap below the fired count emits [signal shooting_stopped] (raising it back emits [signal shooting_started]); [signal shooting_finished] fires once from the volley that trips the cap, so a volley_fired handler that lowers the cap never double-fires it. Untouched by [method fire_n_volleys].
@@ -1325,7 +1263,7 @@
 			Orbit direction. DontMove means escort: bullets hold a fixed slot on the ring and follow the target without circling. OrbitRandom rolls OrbitLeft or OrbitRight per bullet when the volley spawns (never DontMove); live volleys keep their rolled direction on retarget passes, so switching to OrbitRandom mid-flight only affects new volleys.
 		</member>
 		<member name="orbiting_enabled" type="bool" setter="set_orbiting_enabled" getter="get_orbiting_enabled" default="false">
-			Bullets ring their homing target once they arrive. Needs [member homing_enabled]: orbiting without a homing target does nothing (the volley flies straight and a warning names the volley instance id). A freed mid-flight target never crashes: dead entries trim out of the queue, non-finite frames hold the bullet still for one tick, and the lock follows [member orbiting_lock_policy]. Use [method is_orbit_armed] to assert the configuration before firing.
+			Bullets ring their homing target once they arrive. Needs [member homing_enabled]: orbiting without homing does nothing (volleys fly straight; one warning per configuration, and the setup warnings list it). A freed mid-flight target never crashes: dead entries trim out of the queue, non-finite frames hold the bullet still for one tick, and the lock follows [member orbiting_lock_policy].
 		</member>
 		<member name="orbiting_follow_deadzone" type="float" setter="set_orbiting_follow_deadzone" getter="get_orbiting_follow_deadzone" default="8.0">
 			Deadzone radius in pixels, used only when [member orbiting_follow_mode] is FollowDeadzone. The ring center stays pinned while the target moves within this distance of the lock point, then re-pins to the target.
@@ -1361,7 +1299,7 @@
 			Scales the whole pattern around the generator (positions and bullet size grow together). 1.0 keeps it as is, 0 collapses it onto the generator, negatives mirror it. Compose with transforms_scale for big-layout + big-bullet looks.
 		</member>
 		<member name="pattern_source" type="int" setter="set_pattern_source" getter="get_pattern_source" enum="BulletSpawner2D.PatternSource" default="0">
-			Where volley transforms come from: children markers (0), this generator itself (1), or one of 31 procedural helper patterns (2-32: Grid, Ring, Fan, Spiral, Line, Aimed, Flower, Ellipse, Rain, Scatter, Star Polygon, Multi Spiral, Cross, Star, Heart, Wave, Waterfall, Lattice, Rose, Counter Spiral, Corridor, Lissajous, Custom, Circle, Rectangle, Square, Polygon, Path2D, Triangle, Trapezoid, Diamond). Order in the inspector groups sources, basic shapes, ornamental loops, then generators. Only the active pattern's options show in the inspector. Pipeline per volley: generate (with outline placement/fill/layers for the loop shapes), then spin, then pattern/local scale, then helper_skip_indices carving (so skip indexes match the preview). Corridor, Ellipse Wall and outline Fill Inside modes return fewer transforms than helper_bullets_amount.
+			Where volley transforms come from: children markers (0), this generator itself (1), or one of 31 procedural helper patterns (2-32: Grid, Ring, Fan, Spiral, Line, Aimed, Flower, Ellipse, Rain, Scatter, Star Polygon, Multi Spiral, Cross, Star, Heart, Wave, Waterfall, Lattice, Rose, Counter Spiral, Corridor, Lissajous, Custom, Circle, Rectangle, Square, Polygon, Path2D, Triangle, Trapezoid, Diamond). Only the active pattern's options show in the inspector. Every helper draws exactly [member helper_bullets_amount] bullets at distinct spots. Pipeline per volley: generate (with outline placement, fill or layers for the loop shapes), then spin, then pattern/local scale, then helper_skip_indices (so skip indexes match the preview).
 		</member>
 		<member name="preview_arrow_color" type="Color" setter="set_preview_arrow_color" getter="get_preview_arrow_color" default="Color(1, 0.05, 0.05, 1)">
 			Preview arrow color.
@@ -1412,16 +1350,13 @@
 			Reload jitter in seconds: each auto volley waits shoot_interval_sec +/- uniform jitter (seeded by [member reload_jitter_seed], floored at 0.001s so fast intervals keep working with jitter on). 0 is exact. Must be finite and 0 or more.
 		</member>
 		<member name="reload_jitter_seed" type="int" setter="set_reload_jitter_seed" getter="get_reload_jitter_seed" default="0">
-			Seed for [member reload_jitter_sec] only. 0 is non-deterministic, otherwise the jitter sequence reproduces (seed + volleys fired, so volleys still vary per shot). Does nothing while [member reload_jitter_sec] is 0. Does not affect any bullet pattern or homing pick.
-		</member>
-		<member name="shared_homing_auto_pop_after_target_reached" type="bool" setter="set_shared_homing_auto_pop_after_target_reached" getter="get_shared_homing_auto_pop_after_target_reached" default="false">
-			Advances the shared queue when a target is reached. Only used in Shared mode.
+			Seed for [member reload_jitter_sec] only. 0 is non-deterministic, otherwise the jitter sequence reproduces exactly; different seeds give independent sequences. Does nothing while [member reload_jitter_sec] is 0. Does not affect any bullet pattern or homing pick.
 		</member>
 		<member name="shoot_initial_delay_sec" type="float" setter="set_shoot_initial_delay_sec" getter="get_shoot_initial_delay_sec" default="0.0">
-			Delay before the first volley after (re)arming.
+			Delay before the first automatic volley. Applied when the spawner becomes ready and by [method reset_shooting]. Must be finite and 0 or more.
 		</member>
 		<member name="shoot_interval_sec" type="float" setter="set_shoot_interval_sec" getter="get_shoot_interval_sec" default="1.0">
-			Seconds between automatic volleys. Must be above zero. Runs on an accumulator: overshoot carries over so the average rate is exact at any value (fast intervals repay every due volley in the same tick, up to 8 pulls; hitch backlogs beyond that resync instead of bursting).
+			Seconds between automatic volleys. Must be above zero. Shortening it also shortens the wait already running. Runs on an accumulator: overshoot carries over so the average rate is exact at any value (fast intervals repay every due volley in the same tick, up to 8 pulls; hitch backlogs beyond that resync instead of bursting).
 		</member>
 		<member name="shooting_enabled" type="bool" setter="set_shooting_enabled" getter="get_shooting_enabled" default="true">
 			Master switch for automatic shooting. [method shoot_once] works regardless.
@@ -1433,7 +1368,7 @@
 			Also shows the preview while the game runs. Off by default.
 		</member>
 		<member name="spawn_data" type="DirectionalBulletsData2D" setter="set_spawn_data" getter="get_spawn_data">
-			Bullet data for each volley. Duplicated per volley, so sharing one resource is safe.
+			Bullet data for each volley. Duplicated once per resource (the spawner keeps the copy until the resource changes or is replaced), so sharing one resource is safe. Assigning the same resource again keeps the copy.
 		</member>
 		<member name="spawn_position_offset" type="Vector2" setter="set_spawn_position_offset" getter="get_spawn_position_offset" default="Vector2(0, 0)">
 			Flat global offset added to every bullet right after spawn (muzzle offsets, spawn-then-nudge). Zero disables the pass. Applied through the engine teleport path, so shapes, attachments, and interpolation stay in sync. Must be finite.
@@ -1463,7 +1398,7 @@
 			Warning time before the volley fires. Must be finite and 0 or more.
 		</member>
 		<member name="transforms_generator" type="NodePath" setter="set_transforms_generator_path" getter="get_transforms_generator_path" default="NodePath(&quot;&quot;)">
-			Node patterns are built on. Empty means this spawner. Point it at another Node2D to move children markers, helper shapes, spin pivot, scale center, and the preview there.
+			Node patterns are built on. Empty means this spawner. Point it at another Node2D to move children markers, helper shapes, spin pivot, scale center, and the preview there. Inside the tree, a path to a non-Node2D is rejected (old value kept).
 		</member>
 		<member name="transforms_scale" type="float" setter="set_transforms_scale" getter="get_transforms_scale" default="1.0">
 			Per-bullet size scale: multiplies each spawn transform's local basis (texture size) without moving its position. 1.0 keeps sizes as generated, 0 hides bullets in place, negatives mirror them. Must be finite.
@@ -1504,14 +1439,14 @@
 		</signal>
 		<signal name="burst_finished">
 			<description>
-				Fired when the last shot of a burst chain fires, or when the chain aborts after a full burst's worth of consecutive failed shots (a failed shot is retried, never silently consumed; each attempt reports through volley_skipped).
+				Fired once whenever a burst chain ends: after its last shot, when it aborts after a full burst's worth of consecutive failed shots (a failed shot is retried, never silently consumed; each attempt reports through volley_skipped), or when it is cancelled (auto-fire or burst mode switched off, burst_count shrunk below the shots already fired).
 			</description>
 		</signal>
 		<signal name="burst_shot_fired">
 			<param index="0" name="shot_index" type="int" />
 			<param index="1" name="mirrored" type="bool" />
 			<description>
-				Fired for every shot inside a burst chain, with the 1-based shot number and whether this shot fired mirrored (alternate-mirror mode).
+				Fired for every shot inside a burst chain, with the 1-based shot number and whether this shot fired mirrored. The mirror rhythm always starts plain: plain, mirrored, plain, ... for any burst_count.
 			</description>
 		</signal>
 		<signal name="homing_targets_resolved">
@@ -1552,7 +1487,7 @@
 		</signal>
 		<signal name="pattern_list_finished">
 			<description>
-				Fired when a sequential pattern-list queue drains (the last entry's source stays active as the new phase). Simultaneous lists do not emit this - they return the fired count from [method spawn_pattern_list] directly.
+				Fired once when a pattern list completes, in both modes (sequential: after the last entry fires; simultaneous: after all entries fired).
 			</description>
 		</signal>
 		<signal name="pre_shoot">
@@ -1570,7 +1505,7 @@
 		</signal>
 		<signal name="shooting_finished">
 			<description>
-				Fired when the volley counter reaches [member max_volleys].
+				Fired when the volley counter reaches [member max_volleys] while auto-shooting is enabled. Manual shots on a spawner with [member shooting_enabled] off never report it.
 			</description>
 		</signal>
 		<signal name="shooting_started">
@@ -1609,7 +1544,7 @@
 		<signal name="volley_skipped">
 			<param index="0" name="reason" type="StringName" />
 			<description>
-				Fired when a volley is skipped without spawning: "no_transforms" (empty pattern) or "over_budget" (max_live_bullets fuse). Games can fall back on these instead of log-diving.
+				Fired whenever a shot does not produce a volley, with the reason: "no_factory", "no_spawn_data", "no_transforms" (empty pattern), "over_budget" (max_live_bullets), "outside_fire_arc" (homing fire arc), "factory_refused" (the factory rejected the spawn) or "dropped" (a handler freed or took over the volley before it was configured). Games can fall back on these instead of reading the log.
 			</description>
 		</signal>
 		<signal name="volley_telegraphed">
@@ -1777,7 +1712,7 @@
 			Twin counter-rotating galaxy arms from the generator (odd arms mirror when enabled).
 		</constant>
 		<constant name="PATTERN_FROM_HELPER_CORRIDOR" value="22" enum="PatternSource">
-			Dense wall perpendicular to the aim axis with a carved center dodge door. Returns at most helper_bullets_amount slots (the gap shrinks the array like Ellipse Wall). Prefers the aimed target when one is assigned, else helper_corridor_aim_direction.
+			Wall perpendicular to the aim axis with a center dodge door: exactly helper_bullets_amount slots, split over the two wall segments. Prefers the aimed target when one is assigned, else helper_corridor_aim_direction.
 		</constant>
 		<constant name="PATTERN_FROM_HELPER_LISSAJOUS" value="23" enum="PatternSource">
 			Figure-8 / weave curtain from the generator (crossing rows with readable doors).
@@ -1819,7 +1754,7 @@
 			Path2D bullets spread evenly over the whole curve length.
 		</constant>
 		<constant name="PATH2D_OVERFLOW_CLAMP" value="0" enum="Path2DOverflow">
-			Oversized Path2D runs pile extras at the curve end.
+			Oversized Path2D runs stack the extras on the curve end.
 		</constant>
 		<constant name="PATH2D_OVERFLOW_WRAP" value="1" enum="Path2DOverflow">
 			Oversized Path2D runs wrap around from the curve start.

@@ -416,7 +416,7 @@
 			<param index="6" name="face_aim" type="bool" default="true" />
 			<param index="7" name="facing_offset_degrees" type="float" default="0.0" />
 			<description>
-				Generates a dense wall perpendicular to aim_direction with a carved center dodge door of gap_width pixels. spacing is reserved (unused): slots spread evenly across width (but spacing must still be finite and above zero, and gap_width narrower than width, or the call returns empty). Returns at most transforms_amount slots (the gap shrinks the array like Ellipse Wall). Combine with skip indices for multi-door variants. Used by the aimed trap preset.
+				Generates a wall perpendicular to aim_direction with a center dodge door of gap_width pixels: exactly transforms_amount slots, split over the two wall segments (outer edge to door edge). spacing is reserved (unused) but must still be finite and above zero; gap_width must be narrower than width, or the call returns empty. Combine with skip indices for multi-door variants. Used by the aimed trap preset.
 			</description>
 		</method>
 		<method name="helper_generate_transforms_counter_spiral" qualifiers="static">
@@ -447,7 +447,7 @@
 			<param index="6" name="face_outward" type="bool" default="true" />
 			<param index="7" name="facing_offset_degrees" type="float" default="0.0" />
 			<description>
-				Generates a cross/plus barrage: arm_count rays of evenly spaced slots from the marker out to arm_length. Crossfire and plus-shaped danmaku bursts.
+				Generates a cross/plus barrage: arm_count rays of evenly spaced slots from the marker out to arm_length. When an arm cannot hold its slots at spacing, the spacing shrinks so the outermost slot sits on the tip (every slot keeps its own spot). Crossfire and plus-shaped danmaku bursts.
 			</description>
 		</method>
 		<method name="helper_generate_transforms_diamond" qualifiers="static">
@@ -536,7 +536,7 @@
 			<param index="27" name="layer_max_dots" type="int" default="0" />
 			<param index="28" name="layer_layout" type="int" default="1" />
 			<description>
-				Generates a true ellipse ring with independent [code]radius_x[/code] / [code]radius_y[/code] semi-axes rotated by [code]ellipse_rotation[/code] (the ring helper's y_scale is only an approximation). Full draws every slot, Arc draws a spaced segment, Wall draws a dense arc with [code]gap_count[/code] carved dodge gaps of [code]gap_width[/code] radians each (danmaku walls with readable escape routes; the array shrinks to the surviving slots). Wall mode with gap_count 0 or gap_width 0 draws the plain arc (no carving). Facings follow the ellipse outward normal. Useful for oval bosses, stadium arenas and gap walls.
+				Generates a true ellipse ring with independent [code]radius_x[/code] / [code]radius_y[/code] semi-axes rotated by [code]ellipse_rotation[/code]. Full draws every slot, Arc draws a spaced segment, Wall draws an arc with [code]gap_count[/code] dodge gaps of [code]gap_width[/code] radians each: exactly transforms_amount slots shared by the solid stretches. An Arc or Wall spanning a full turn closes like Full (no doubled seam slot). Facings follow the true outward normal of the rotated ellipse. Useful for oval bosses, stadium arenas and gap walls.
 			</description>
 		</method>
 		<method name="helper_generate_transforms_fan" qualifiers="static">
@@ -558,38 +558,37 @@
 			<param index="0" name="transforms_amount" type="int" />
 			<param index="1" name="marker_transform" type="Transform2D" />
 			<param index="2" name="petals" type="int" default="6" />
-			<param index="3" name="bullets_per_petal" type="int" default="5" />
-			<param index="4" name="radius" type="float" default="150.0" />
-			<param index="5" name="petal_spread" type="float" default="0.5" />
-			<param index="6" name="petal_sharpness" type="float" default="1.0" />
-			<param index="7" name="base_rotation" type="float" default="0.0" />
-			<param index="8" name="face_outward" type="bool" default="true" />
-			<param index="9" name="facing_offset_degrees" type="float" default="0.0" />
-			<param index="10" name="outline_placement" type="int" default="0" />
-			<param index="11" name="outline_facing" type="int" default="0" />
-			<param index="12" name="outline_reverse" type="bool" default="false" />
-			<param index="13" name="outline_slot_offset" type="int" default="0" />
-			<param index="14" name="fill_spacing" type="float" default="32.0" />
-			<param index="15" name="fill_stagger" type="bool" default="false" />
-			<param index="16" name="fill_margin" type="float" default="0.0" />
-			<param index="17" name="layer_count" type="int" default="1" />
-			<param index="18" name="layer_scale" type="float" default="0.2" />
-			<param index="19" name="layer_side" type="int" default="0" />
-			<param index="20" name="layer_fill" type="int" default="0" />
-			<param index="21" name="layer_start_offset" type="int" default="0" />
-			<param index="22" name="layer_scale_curve" type="int" default="0" />
-			<param index="23" name="layer_custom_scales" type="PackedFloat32Array" default="PackedFloat32Array()" />
-			<param index="24" name="layer_twist" type="int" default="0" />
-			<param index="25" name="layer_max_dots" type="int" default="0" />
-			<param index="26" name="flower_type" type="int" default="0" />
-			<param index="27" name="inner_radius_scale" type="float" default="0.0" />
-			<param index="28" name="spiro_roller" type="float" default="45.0" />
-			<param index="29" name="spiro_pen" type="float" default="80.0" />
-			<param index="30" name="super_lobes" type="float" default="6.0" />
-			<param index="31" name="super_fullness" type="float" default="1.0" />
-			<param index="32" name="layer_layout" type="int" default="1" />
+			<param index="3" name="radius" type="float" default="150.0" />
+			<param index="4" name="petal_spread" type="float" default="0.5" />
+			<param index="5" name="petal_sharpness" type="float" default="1.0" />
+			<param index="6" name="base_rotation" type="float" default="0.0" />
+			<param index="7" name="face_outward" type="bool" default="true" />
+			<param index="8" name="facing_offset_degrees" type="float" default="0.0" />
+			<param index="9" name="outline_placement" type="int" default="0" />
+			<param index="10" name="outline_facing" type="int" default="0" />
+			<param index="11" name="outline_reverse" type="bool" default="false" />
+			<param index="12" name="outline_slot_offset" type="int" default="0" />
+			<param index="13" name="fill_spacing" type="float" default="32.0" />
+			<param index="14" name="fill_stagger" type="bool" default="false" />
+			<param index="15" name="fill_margin" type="float" default="0.0" />
+			<param index="16" name="layer_count" type="int" default="1" />
+			<param index="17" name="layer_scale" type="float" default="0.2" />
+			<param index="18" name="layer_side" type="int" default="0" />
+			<param index="19" name="layer_fill" type="int" default="0" />
+			<param index="20" name="layer_start_offset" type="int" default="0" />
+			<param index="21" name="layer_scale_curve" type="int" default="0" />
+			<param index="22" name="layer_custom_scales" type="PackedFloat32Array" default="PackedFloat32Array()" />
+			<param index="23" name="layer_twist" type="int" default="0" />
+			<param index="24" name="layer_max_dots" type="int" default="0" />
+			<param index="25" name="flower_type" type="int" default="0" />
+			<param index="26" name="inner_radius_scale" type="float" default="0.0" />
+			<param index="27" name="spiro_roller" type="float" default="45.0" />
+			<param index="28" name="spiro_pen" type="float" default="80.0" />
+			<param index="29" name="super_lobes" type="float" default="6.0" />
+			<param index="30" name="super_fullness" type="float" default="1.0" />
+			<param index="31" name="layer_layout" type="int" default="1" />
 			<description>
-				Generates a floral spell-card pattern: [code]petals[/code] symmetric lobes around the marker, each holding [code]bullets_per_petal[/code] slots spread over [code]petal_spread[/code] radians. [code]petal_sharpness[/code] 0 gives round lobes, higher values pinch the waist into tighter flowers. [code]transforms_amount[/code] sizes the array (fewer slots than petals times per-petal truncates). [code]flower_type[/code] picks the bloom kind (0 FAN, 1 RHODONEA, 2 PHYLLOTAXIS, 3 SPIROGRAPH, 4 SUPERFORMULA); [code]inner_radius_scale[/code], [code]spiro_roller[/code]/[code]spiro_pen[/code] and [code]super_lobes[/code]/[code]super_fullness[/code] tune the matching kind. Useful for boss blossoms and mandala rings.
+				Generates a floral spell-card pattern. In FAN mode, [code]transforms_amount[/code] slots are split evenly over [code]petals[/code] symmetric lobes (remainder spread symmetrically) and fan across [code]petal_spread[/code] radians, every slot on its own spot. [code]petal_sharpness[/code] 0 gives round lobes, higher values pinch the waist into tighter flowers. [code]flower_type[/code] picks the bloom kind (0 FAN, 1 RHODONEA, 2 PHYLLOTAXIS, 3 SPIROGRAPH, 4 SUPERFORMULA); [code]inner_radius_scale[/code], [code]spiro_roller[/code]/[code]spiro_pen[/code] and [code]super_lobes[/code]/[code]super_fullness[/code] tune the matching kind. Useful for boss blossoms and mandala rings.
 			</description>
 		</method>
 		<method name="helper_generate_transforms_grid" qualifiers="static">
@@ -694,7 +693,7 @@
 			<param index="24" name="layer_max_dots" type="int" default="0" />
 			<param index="25" name="layer_layout" type="int" default="1" />
 			<description>
-				Generates figure-8 / weave openings: slots sweep t over the full turn on the lissajous curve (size_x * sin(freq_x * t + phase), size_y * sin(freq_y * t)) for crossing curtains with readable doors. Recipe: slow spin + lissajous weave = butterfly curtain.
+				Generates figure-8 / weave openings on the lissajous curve (size_x * sin(freq_x * t + phase), size_y * sin(freq_y * t)). The curve is swept exactly once: ratios sharing a factor are not retraced, and curves that fold back on themselves are spread along their open run, so no two slots share a spot. Recipe: slow spin + lissajous weave = butterfly curtain.
 			</description>
 		</method>
 		<method name="helper_generate_transforms_multispiral" qualifiers="static">
@@ -710,7 +709,7 @@
 			<param index="8" name="facing_offset_degrees" type="float" default="0.0" />
 			<param index="9" name="arm_index_stride" type="int" default="1" />
 			<description>
-				Generates a multi-arm spiral: [code]arms[/code] interleaved arms around the marker (galaxy, windmill and rose looks at low bullet counts). [code]arm_index_stride[/code] 1 interleaves consecutive slots across arms, higher values group slots per arm. Same facing modes as the single spiral. Useful for pinwheels, galaxies and rotating boss arms.
+				Generates a multi-arm spiral: [code]arms[/code] arms around the marker (galaxy, windmill and rose looks at low bullet counts). [code]arm_index_stride[/code] below the arm count interleaves consecutive slots across arms; from the arm count up, each arm takes runs of consecutive slots. Every slot lands on its own (arm, step) spot. Same facing modes as the single spiral. Useful for pinwheels, galaxies and rotating boss arms.
 			</description>
 		</method>
 		<method name="helper_generate_transforms_polygon" qualifiers="static">
@@ -758,7 +757,7 @@
 			<param index="5" name="jitter" type="float" default="12.0" />
 			<param index="6" name="seed" type="int" default="0" />
 			<description>
-				Generates a rain curtain: slots spread along a horizontal band of [code]band_width[/code] facing [code]rain_direction[/code], with rows staggered by [code]drop_spacing[/code] so the curtain reads as layered sheets, plus random [code]jitter[/code] per slot. [code]seed[/code] drives the jitter (0 is non-deterministic). Useful for bullet-rain phases, storm walls and descending curtains.
+				Generates a rain curtain: layered sheets of slots across a band of [code]band_width[/code] facing [code]rain_direction[/code]. Each row holds up to band_width / drop_spacing + 1 drops spread across the band; further rows step upstream by [code]drop_spacing[/code]. Random [code]jitter[/code] per slot; [code]seed[/code] drives it (0 is non-deterministic). Useful for bullet-rain phases, storm walls and descending curtains.
 			</description>
 		</method>
 		<method name="helper_generate_transforms_rectangle" qualifiers="static">
@@ -825,7 +824,7 @@
 			<param index="26" name="seed" type="int" default="0" />
 			<param index="27" name="layer_layout" type="int" default="1" />
 			<description>
-				Generates transforms placed evenly on a ring (or arc, when [code]arc[/code] is smaller than a full turn) around the marker. Every bullet faces outward, so art drawn facing right travels away from the center. Set [code]face_outward[/code] to false for implosion patterns that fly toward the center. [code]y_scale[/code] stretches the ring into an ellipse (facing stays radial, approximate on stretched rings) and [code]facing_offset_degrees[/code] twists every facing. [code]seed[/code] drives random rotation (0 is non-deterministic). Useful for radial bursts and boss rings.
+				Generates transforms placed evenly on a ring (or arc, when [code]arc[/code] is smaller than a full turn) around the marker. A full turn, or within half a slot of one, closes the ring without a doubled seam slot. Every bullet faces outward, so art drawn facing right travels away from the center. Set [code]face_outward[/code] to false for implosion patterns that fly toward the center. [code]y_scale[/code] stretches the ring into an ellipse (facing stays radial) and [code]facing_offset_degrees[/code] twists every facing. [code]seed[/code] drives random rotation (0 is non-deterministic). Useful for radial bursts and boss rings.
 			</description>
 		</method>
 		<method name="helper_generate_transforms_rose" qualifiers="static">
@@ -856,7 +855,7 @@
 			<param index="23" name="layer_max_dots" type="int" default="0" />
 			<param index="24" name="layer_layout" type="int" default="1" />
 			<description>
-				Generates an exact rhodonea rose bloom: slots sweep theta over the full turn and sit at r = R * cos(k * theta) with k = petals. lobe_sharpness 1.0 is the exact rose (0 is round, higher pinches the waist). Recipe: Rose + phase_step_per_bullet + angular wobble = blossom finale. Used by the petal storm and blossom finale presets.
+				Generates an exact rhodonea rose bloom at r = R * cos(k * theta) with k = petals: odd k draws k petals, even k draws 2k, each traced once (no stacked slots). lobe_sharpness 1.0 is the exact rose (0 is round, higher pinches the waist). Used by the petal storm and blossom finale presets.
 			</description>
 		</method>
 		<method name="helper_generate_transforms_scatter" qualifiers="static">
@@ -1107,8 +1106,9 @@
 			<param index="8" name="super_lobes" type="float" default="6.0" />
 			<param index="9" name="super_fullness" type="float" default="1.0" />
 			<param index="10" name="base_rotation" type="float" default="0.0" />
+			<param index="11" name="transforms_amount" type="int" default="-1" />
 			<description>
-				Flower bloom track sampler in marker-local pixels mirroring [member helper_generate_transforms_flower] per-type math at a fixed density (closed loop). [code]flower_type[/code] selects the bloom kind (see [enum FlowerBloom]): FAN traces the petal-tip ring, RHODONEA and SPIROGRAPH and SUPERFORMULA trace their actual curve, PHYLLOTAXIS bounds the Vogel disc rim. Per-type knobs (spiro_roller, spiro_pen, super_lobes, super_fullness, inner_radius_scale) apply only to their matching bloom kind; unused knobs are ignored.
+				Flower bloom track sampler in marker-local pixels mirroring [method helper_generate_transforms_flower] per-type math (closed loop). [code]flower_type[/code] selects the bloom kind (see [enum FlowerBloom]): FAN traces the petal arcs, RHODONEA and SPIROGRAPH and SUPERFORMULA trace their actual curve, PHYLLOTAXIS bounds the Vogel disc rim. With [code]transforms_amount[/code] 0 or more, FAN skips petals that hold no bullet (-1 draws every petal). Per-type knobs apply only to their matching bloom kind.
 			</description>
 		</method>
 		<method name="helper_sample_outline_grid" qualifiers="static">
@@ -1534,10 +1534,10 @@
 			Ellipse mode used by helper_generate_transforms_ellipse(): every slot is drawn around the full ellipse.
 		</constant>
 		<constant name="ELLIPSE_ARC" value="1" enum="EllipseMode">
-			Ellipse mode used by helper_generate_transforms_ellipse(): slots are spread over the arc segment from start_angle over arc radians.
+			Ellipse mode used by helper_generate_transforms_ellipse(): slots are spread over the arc segment from start_angle over arc radians (a full turn closes like Full).
 		</constant>
 		<constant name="ELLIPSE_WALL" value="2" enum="EllipseMode">
-			Ellipse mode used by helper_generate_transforms_ellipse(): a dense arc with gap_count carved dodge gaps of gap_width radians each. The returned array shrinks to the surviving slots.
+			Ellipse mode used by helper_generate_transforms_ellipse(): an arc with gap_count dodge gaps of gap_width radians each; transforms_amount slots are shared by the solid stretches.
 		</constant>
 		<constant name="PATTERN_PRESET_CUSTOM" value="-1" enum="PatternPreset">
 			Preset marker used by BulletSpawner2D.apply_pattern_preset(): no preset, the spawner keeps its current helper settings.
@@ -1594,7 +1594,7 @@
 			Preset used by BulletSpawner2D.apply_pattern_preset(): twin counter-rotating galaxy arms.
 		</constant>
 		<constant name="PATTERN_PRESET_AIMED_TRAP" value="17" enum="PatternPreset">
-			Preset used by BulletSpawner2D.apply_pattern_preset(): dense corridor wall with a carved center dodge door along the aim axis.
+			Preset used by BulletSpawner2D.apply_pattern_preset(): corridor wall with a center dodge door along the aim axis.
 		</constant>
 		<constant name="PATTERN_PRESET_BLOSSOM_FINALE" value="18" enum="PatternPreset">
 			Preset used by BulletSpawner2D.apply_pattern_preset(): 12-lobe exact rose bloom with slow spin (ending card).
@@ -1654,7 +1654,7 @@
 			Loop-generator slots spread over scaled repeats of the loop about its center, sharing the slot count (layer 0 sits exactly on the outline; extras scale per layer_side, dealt per layer_fill).
 		</constant>
 		<constant name="OUTLINE_FILL_INSIDE" value="2" enum="OutlinePlacement">
-			Loop-generator slots are replaced by a row-major grid masked to the loop interior, capped at transforms_amount.
+			Loop-generator slots are replaced by exactly transforms_amount grid cells inside the shape (fill_spacing shrinks only when they do not fit; extra cells are skipped evenly).
 		</constant>
 		<constant name="OUTLINE_DISTRIBUTION_LEGACY" value="0" enum="OutlineDistribution">
 			Corner-anchored polygon leftovers go to the first edges in winding order (equal sides can differ by a slot).

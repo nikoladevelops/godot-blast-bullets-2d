@@ -10,7 +10,7 @@ one that is wrong, fix this file in the same change.
 
 ```sh
 GODOTPP_NONINTERACTIVE=1 python3 tools/compile_debug_build.py   # build (never raw scons, never edit SConstruct)
-python3 tools/run_tests.py                                       # 97 files / ~600 tests, ~8 s, leak-checked
+python3 tools/run_tests.py                                       # ~110 files / ~690 tests, ~10 s, leak-checked
 python3 tools/run_tests.py --self-test                           # the harness itself still catches failures/leaks
 python3 tools/run_benchmarks.py --scenario <name>                # perf evidence (§15)
 ```
@@ -24,7 +24,10 @@ python3 tools/run_benchmarks.py --scenario <name>                # perf evidence
 | New property invisible in inspector | ADD_PROPERTY before its bind, wrong subgroup prefix, or `_validate_property` gate (§9) | Hide the visibility test failure |
 | Need to know if your test is real | Mutation-check it (§6): break the code on purpose, watch the test fail, restore | Trust a test you never saw fail |
 | Perf change | Benchmark before AND after on the same machine/build (§15) | Claim a speedup from one run or a different build type |
-| Unsure about engine behavior | Write a 10-line probe test in `test_project/tests/` and run it | Guess from memory of Godot docs |
+| Runner prints only part of a failure | Re-run with `--full` (every failing parameter, unclipped) | Guess from the first line |
+| Runner says "src/ is newer than the compiled extension" | Rebuild (§0c step 2); comment-only edits count too | `--allow-stale` |
+| Unsure about engine behavior | Probe it: write `test_project/tests/spawner/test_zz_probe.gd` (extends BlastTest, put the values in a failing `assert_eq(..., "", "PROBE")`), run `godot --headless --fixed-fps 60 --path test_project -s addons/gut/gut_cmdln.gd -gconfig= -gtest=res://tests/spawner/test_zz_probe.gd -gexit -gdisable_colors`, read the message, then DELETE the file and its `.uid` | Guess from memory of Godot docs; leave the probe behind |
+| A pattern draws fewer bullets or two bullets on one spot | Extend `spawner/test_spawner_pattern_counts.gd` first, then fix the generator (§6b) | Accept "it looks fine" |
 
 ## 0b. Commits (user rule — overrides any tool or harness default)
 
@@ -44,6 +47,48 @@ git add <the files you changed>
 git commit -m "Fix flower bullet count" -m "FAN splits the amount over petals."
 ```
 
+## 0c. Change recipe (do these steps in order, every time)
+
+1. Read the code you will touch (`rg -n` the method name; files in §12).
+2. Write or extend the test FIRST; build and run it; watch it FAIL for the
+   right reason:
+   ```sh
+   GODOTPP_NONINTERACTIVE=1 python3 tools/compile_debug_build.py
+   python3 tools/run_tests.py --suite <your_test_file_name> --full
+   ```
+3. Fix the code. Rebuild. Run the same suite until it passes.
+4. Run everything, then the harness self-check:
+   ```sh
+   python3 tools/run_tests.py
+   python3 tools/run_tests.py --self-test
+   ```
+5. Hot path touched (tick, spawn, pattern generation, preview)? Benchmark
+   (§15) and compare with `test_project/benchmarks/log/LATEST.md`.
+6. Public API changed? Update `doc_classes/` (§10) and add the new suite to
+   `test_project/tests/README.md` (the lint fails otherwise).
+7. Commit only if asked, following §0b.
+
+## 0d. Glossary
+
+- **volley**: one spawn call = one MultiMesh of N bullets (`DirectionalBullets2D`).
+- **marker / generator**: the Node2D a pattern is built around
+  (`transforms_generator`, else the spawner itself).
+- **pattern source**: which generator builds the per-bullet transforms
+  (`pattern_source`, 33 ids, serialized).
+- **bake**: the spawner's cached raw pattern (§13), re-posed per shot.
+- **chain**: a burst (N shots apart) or a telegraph (warning, then shot).
+- **leg**: one traversal of a movement Path2D.
+- **pool**: parked volleys reused by key (amount + shape + type).
+
+## 0e. Never edit
+
+- `SConstruct` (use `tools/*.py` / `setup.py`).
+- `test_project/addons/gut/` (vendored GUT).
+- Personal paths in `tools/config.json`.
+- Scenes the user edits by hand (e.g. `test_project/benchmark_scene/*.tscn`)
+  unless asked.
+- Generated `doc_classes/*.xml` structure (only description text; §10).
+
 ## 1. Running tests (only supported path)
 
 ```sh
@@ -55,6 +100,7 @@ python3 tools/run_tests.py --list            # discover without running
 python3 tools/run_tests.py --self-test       # canaries must report FAIL + LEAK + strict mismatch
 python3 tools/run_tests.py --no-leaks        # faster, NOT green (skips leak gate)
 python3 tools/run_tests.py --report          # + test_project/test_results/summary.json (slowest first)
+python3 tools/run_tests.py --full            # print every failure message unclipped (all failing parameters)
 python3 tools/run_tests.py --realtime        # real-time pacing (default is simulated time, see below)
 python3 tools/lint_tests.py                  # static test lint (the runner runs it first; exit 3 = lint failed)
 ```
@@ -171,6 +217,53 @@ rg -n 'BulletSpawner2D::shoot_once' src/        # where a method lives (files ar
 - Prefer GENERIC tests that walk `get_property_list()` / `get_method_list()`
   so future additions are covered automatically (range contract sweep,
   bake invalidation sweep, subgroup-prefix lock, visibility sweep).
+
+## 6b. How to add or fix a pattern (BulletSpawner2D)
+
+Files: generator in `src/factory/bullet_factory2d_patterns.cpp`
+(`helper_generate_transforms_<shape>`), spawner dispatch in
+`src/bullet_spawner/bullet_spawner2d_patterns.cpp` (`generate_raw_pattern`),
+properties in `bullet_spawner2d_pattern_properties.cpp`, bindings and
+inspector gating in `bullet_spawner2d_bindings.cpp`, preview track in the
+factory `helper_sample_outline_<shape>`.
+
+Invariants every generator must keep (pinned by
+`spawner/test_spawner_pattern_counts.gd`, `test_spawner_pattern_bake.gd`,
+`test_spawner_preview_coincidence.gd`):
+1. Exactly `helper_bullets_amount` transforms (On Outline, Layers, Fill
+   Inside; gaps redistribute, overflow shrinks spacing).
+2. No two bullets closer than 0.5 px (no hidden duplicates). Closed curves:
+   sweep the curve exactly once (watch retraces: odd roses, shared-factor
+   Lissajous, multi-revolution spirographs) and use
+   `resample_loop_even_distinct` for self-crossing curves.
+3. Pure function of its inputs (the bake cache relies on it; random
+   patterns take a seed).
+4. The preview track (`helper_sample_outline_*`) draws the same curve the
+   bullets sit on.
+5. Every bad input fails loud once with exact wording.
+
+Spawner test template (copy, rename, list in `tests/README.md`):
+
+```gdscript
+extends BlastTest
+## <One paragraph: the contract this file pins.>
+
+
+func test_<behavior>_<expectation>() -> void:
+	var sp := make_spawner(H.make_directional_data(4, 0.0, 30.0), BulletSpawner2D.PATTERN_FROM_HELPER_RING, 4)
+	watch_signals(sp)
+	sp.helper_ring_radius = 80.0
+	var pts: Array = sp.collect_spawn_transforms()
+	assert_eq(pts.size(), 4, "exact count")
+	sp.helper_ring_radius = NAN
+	expect_error_sequence(["helper_ring_radius must be finite"]) # exact text, right after the call
+	assert_true(sp.shoot_once(), "fires")
+	for i in 30: # early-break wait, never a fixed long wait
+		await idle(1)
+		if get_signal_emit_count(sp, "volley_fired") > 0:
+			break
+	assert_signal_emit_count(sp, "volley_fired", 1, "exactly once")
+```
 
 ## 7. Integration tests, scenes & feature mixing
 
@@ -385,6 +478,21 @@ src/
   neutralized (see `enable_bullet` docs).
 - `spawn_position_offset_space`: Global (default, historical) vs Local
   (turns with the spawner); the preview draws it where bullets spawn.
+- Spawner contracts (v4.1), each pinned by the named suite:
+
+| Behavior | Suite |
+|---|---|
+| Every helper draws exactly `helper_bullets_amount` bullets at distinct spots; flower FAN splits the amount over petals | `test_spawner_pattern_counts` |
+| Presets are clean (pattern knobs + spin reset; Transform subgroup and node wiring kept) | `test_spawner_presets` |
+| Pattern-list entries are temporary overrides (everything restored); `pattern_list_finished` in both modes | `test_spawner_pattern_lists` |
+| Auto bursts clamp to `volleys_remaining`, cancel when auto-fire turns off (`burst_finished` still fires); mirror starts plain | `test_spawner_burst_telegraph` |
+| Controls called before the tree survive `_ready`; a spent `fire_n_volleys` budget clears itself; `shooting_*` signals are auto-fire only | `test_spawner_cadence` |
+| Every failed shot emits `volley_skipped(reason)` (`no_factory`, `no_spawn_data`, `no_transforms`, `over_budget`, `outside_fire_arc`, `factory_refused`, `dropped`) | `test_spawner_cadence` |
+| Reparenting keeps assigned nodes, tracked volleys, chains and lists; NodePaths are rewritten on re-entry | `test_spawner_tree_reentry` |
+| Setters reject NaN/Inf/out-of-range with "keeping the old value"; no setter depends on another field (load order) | `test_spawner_setter_contract` |
+| Fire arc follows spin and the volley chases the targets the arc approved | `test_spawner_homing_propagation` |
+| One-time warnings use `WarnOnce2D` codes 101+ (spawner) and stay quiet in the preview | `test_spawner_setter_contract` |
+
 - Edge cases to test everywhere: NaN/Inf scalars and vectors; null array
   entries; empty arrays; short vs oversized arrays; OOB indices (-1/99);
   inverted ranges; zero amounts/sizes/speeds; singular transforms; freed
