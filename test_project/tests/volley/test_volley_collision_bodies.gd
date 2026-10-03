@@ -2,7 +2,7 @@ extends BlastTest
 ## Bullets against every physics body kind (Static/Character/Rigid/
 ## Animatable) count the hit and emit body_entered; Area2D routes to
 ## area_entered only; spawner-owned volleys emit on the spawner, never the
-## factory; block volleys report through block_body_entered.
+## factory.
 
 
 func _data() -> DirectionalBulletsData2D:
@@ -90,19 +90,3 @@ func test_spawner_volley_routes_to_spawner_only() -> void:
 	assert_signal_emitted(spawner, "body_entered", "spawner body_entered fired")
 	assert_signal_not_emitted(factory, "directional_body_entered", "factory silent for a spawner volley")
 
-
-func test_block_volley_routes_to_block_body_entered() -> void:
-	watch_signals(factory)
-	_target(StaticBody2D.new())
-	await physics()
-	var d := H.make_block_data(1, 900.0, 30.0)
-	d.transforms = [Transform2D()]
-	d.monitorable = true
-	d.collision_shape = H.make_circle_shape(6.0)
-	factory.spawn_block_bullets(d)
-	for i in 40:
-		await physics()
-		if get_signal_emit_count(factory, "block_body_entered") >= 1:
-			break
-	assert_gte(factory.debug_get_total_bullets_amount(1), 1, "block volley spawned")
-	assert_signal_emitted(factory, "block_body_entered", "factory block_body_entered fired")

@@ -12,11 +12,6 @@
 [ext_resource type="Theme" uid="uid://dwqt78wi7igiw" path="res://shared/ui/chosen_bullet_setting_theme.tres" id="10_520nk"]
 [ext_resource type="Theme" uid="uid://cy4gbtdvhi65p" path="res://shared/ui/not_chosen_bullet_setting_theme.tres" id="11_ptpx1"]
 
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_ptpx1"]
-
-[sub_resource type="Theme" id="Theme_ptpx1"]
-Button/styles/disabled = SubResource("StyleBoxFlat_ptpx1")
-
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_vfxln"]
 
 [sub_resource type="Theme" id="Theme_vfxln"]
@@ -24,30 +19,9 @@ Button/styles/disabled = SubResource("StyleBoxFlat_vfxln")
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_5up31"]
 
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_e0ht7"]
-
 [node name="UI" type="CanvasLayer" unique_id=1629046844]
 script = ExtResource("1_lkveq")
 default_player_health = 100.0
-
-[node name="BlockDebuggerColorPicker" type="ColorPicker" parent="." unique_id=1467060132]
-visible = false
-z_index = 5
-anchors_preset = 8
-anchor_left = 0.5
-anchor_top = 0.5
-anchor_right = 0.5
-anchor_bottom = 0.5
-offset_left = -95.0
-offset_top = -187.0
-offset_right = 203.0
-offset_bottom = 389.0
-grow_horizontal = 2
-grow_vertical = 2
-scale = Vector2(0.7, 0.7)
-size_flags_horizontal = 4
-mouse_filter = 0
-theme = SubResource("Theme_ptpx1")
 
 [node name="DirectionalDebuggerColorPicker" type="ColorPicker" parent="." unique_id=1438354296]
 visible = false
@@ -147,16 +121,6 @@ text = "Free Directional Bullets Pool
 (only those with N amount bullets)"
 autowrap_mode = 2
 
-[node name="FreeMultiMeshBlockBulletsPoolBtn" type="Button" parent="ObjectPoolSettingsView/FreeBulletPoolVBoxContainer" unique_id=280404643]
-custom_minimum_size = Vector2(200, 46)
-layout_mode = 2
-size_flags_vertical = 8
-focus_mode = 0
-theme = ExtResource("3_vd08o")
-text = "Free Block Bullets Pool
-(only those with N amount bullets)"
-autowrap_mode = 2
-
 [node name="FreeAllBulletPoolsBtn" type="Button" parent="ObjectPoolSettingsView/FreeBulletPoolVBoxContainer" unique_id=1844945031]
 custom_minimum_size = Vector2(151, 46)
 layout_mode = 2
@@ -197,17 +161,6 @@ size_flags_vertical = 8
 focus_mode = 0
 theme = ExtResource("3_vd08o")
 text = "Populate Directional Bullets Pool
-( X amount MultiMeshes with N amount bullets)"
-autowrap_mode = 2
-
-[node name="PopulateMultiMeshBlockPoolBtn" type="Button" parent="ObjectPoolSettingsView/PopulateBulletPoolVBoxContainer" unique_id=1403601704]
-custom_minimum_size = Vector2(200, 46)
-layout_mode = 2
-size_flags_vertical = 8
-focus_mode = 0
-theme = ExtResource("3_vd08o")
-text = "Populate Block
-Bullets Pool
 ( X amount MultiMeshes with N amount bullets)"
 autowrap_mode = 2
 
@@ -304,10 +257,6 @@ script = ExtResource("5_1mjrc")
 layout_mode = 2
 default_text = "Active Directional MultiMeshes:"
 
-[node name="ActiveBlockMultiMeshesCustomLabel" parent="ObjectPoolSettingsView/AdditionalDebugDataContainer" unique_id=2065926148 instance=ExtResource("5_i53y2")]
-layout_mode = 2
-default_text = "Active Block MultiMeshes:"
-
 [node name="ActiveBulletAttachmentsCustomLabel" parent="ObjectPoolSettingsView/AdditionalDebugDataContainer" unique_id=76869897 instance=ExtResource("5_i53y2")]
 layout_mode = 2
 default_text = "Active Bullet Attachments:"
@@ -321,10 +270,6 @@ mouse_filter = 2
 layout_mode = 2
 default_text = "Pooled Directional MultiMeshes:"
 
-[node name="PooledBlockMultiMeshesCustomLabel" parent="ObjectPoolSettingsView/AdditionalDebugDataContainer" unique_id=366365038 instance=ExtResource("5_i53y2")]
-layout_mode = 2
-default_text = "Pooled Block MultiMeshes:"
-
 [node name="PooledBulletAttachmentsCustomLabel" parent="ObjectPoolSettingsView/AdditionalDebugDataContainer" unique_id=1280452547 instance=ExtResource("5_i53y2")]
 layout_mode = 2
 default_text = "Pooled Bullet Attachments:"
@@ -337,10 +282,6 @@ mouse_filter = 2
 [node name="DirectionalPoolInfoCustomLabel" parent="ObjectPoolSettingsView/AdditionalDebugDataContainer" unique_id=1413990276 instance=ExtResource("5_i53y2")]
 layout_mode = 2
 default_text = "Directional Pool Info:"
-
-[node name="BlockPoolInfoCustomLabel" parent="ObjectPoolSettingsView/AdditionalDebugDataContainer" unique_id=584881102 instance=ExtResource("5_i53y2")]
-layout_mode = 2
-default_text = "Block Pool Info:"
 
 [node name="AttachmentsPoolInfoCustomLabel" parent="ObjectPoolSettingsView/AdditionalDebugDataContainer" unique_id=1298054100 instance=ExtResource("5_i53y2")]
 layout_mode = 2
@@ -532,23 +473,6 @@ theme_override_styles/normal = SubResource("StyleBoxFlat_5up31")
 [node name="Label" type="Label" parent="BulletSettingsView/VBoxContainer/DirectionalDebuggerVBoxContainer" unique_id=551605980]
 layout_mode = 2
 text = "DirectionalBullets
-Debugger"
-horizontal_alignment = 1
-
-[node name="BlockDebuggerVBoxContainer2" type="VBoxContainer" parent="BulletSettingsView/VBoxContainer" unique_id=184103996]
-layout_mode = 2
-
-[node name="ShowBlockDebuggerColorPickerBtn" type="Button" parent="BulletSettingsView/VBoxContainer/BlockDebuggerVBoxContainer2" unique_id=1931114056]
-custom_minimum_size = Vector2(64, 64)
-layout_mode = 2
-size_flags_horizontal = 4
-size_flags_vertical = 4
-focus_mode = 0
-theme_override_styles/normal = SubResource("StyleBoxFlat_e0ht7")
-
-[node name="Label" type="Label" parent="BulletSettingsView/VBoxContainer/BlockDebuggerVBoxContainer2" unique_id=336272836]
-layout_mode = 2
-text = "BlockBullets
 Debugger"
 horizontal_alignment = 1
 
@@ -1664,12 +1588,6 @@ focus_mode = 0
 text = "DirectionalBullets
 "
 
-[node name="BlockBulletsBtn" type="Button" parent="AlwaysVisibleView/BulletTypeContainer" unique_id=1934151629]
-custom_minimum_size = Vector2(155, 0)
-layout_mode = 2
-focus_mode = 0
-text = "BlockBullets"
-
 [node name="GodotArea2DBulletsBtn" type="Button" parent="AlwaysVisibleView/BulletTypeContainer" unique_id=1174109171]
 custom_minimum_size = Vector2(155, 0)
 layout_mode = 2
@@ -1683,7 +1601,7 @@ offset_left = 42.0
 offset_top = 528.0
 offset_right = 262.0
 offset_bottom = 528.0
-all_btns = [NodePath("../BulletTypeContainer/DirectionalBtn"), NodePath("../BulletTypeContainer/BlockBulletsBtn"), NodePath("../BulletTypeContainer/GodotArea2DBulletsBtn")]
+all_btns = [NodePath("../BulletTypeContainer/DirectionalBtn"), NodePath("../BulletTypeContainer/GodotArea2DBulletsBtn")]
 
 [node name="SettingsUIManagerVBoxContainer" type="VBoxContainer" parent="AlwaysVisibleView" unique_id=391469247]
 layout_mode = 1
@@ -1721,21 +1639,17 @@ selected_btn_theme = ExtResource("10_520nk")
 disabled_btn_theme = ExtResource("11_ptpx1")
 metadata/_custom_type_script = "uid://cs67whos5iyl6"
 
-[connection signal="color_changed" from="BlockDebuggerColorPicker" to="." method="_on_block_debugger_color_picker_color_changed"]
 [connection signal="color_changed" from="DirectionalDebuggerColorPicker" to="." method="_on_directional_debugger_color_picker_color_changed"]
 [connection signal="pressed" from="CloseCurrentColorPickerBtn" to="." method="_on_close_current_color_picker_btn_pressed"]
 [connection signal="pressed" from="TopRightContainer/TrackFPSBtn" to="." method="_on_track_fps_button_pressed"]
 [connection signal="pressed" from="ObjectPoolSettingsView/FreeBulletPoolVBoxContainer/FreeMultiMeshDirectionalPoolBtn" to="." method="_on_free_multi_mesh_directional_pool_btn_pressed"]
-[connection signal="pressed" from="ObjectPoolSettingsView/FreeBulletPoolVBoxContainer/FreeMultiMeshBlockBulletsPoolBtn" to="." method="_on_free_multi_mesh_block_bullets_pool_btn_pressed"]
 [connection signal="pressed" from="ObjectPoolSettingsView/FreeBulletPoolVBoxContainer/FreeAllBulletPoolsBtn" to="." method="_on_free_all_bullet_pools_btn_pressed"]
 [connection signal="pressed" from="ObjectPoolSettingsView/PopulateBulletPoolVBoxContainer/PopulateMultiMeshDirectionalPoolBtn" to="." method="_on_populate_multi_mesh_directional_pool_btn_pressed"]
-[connection signal="pressed" from="ObjectPoolSettingsView/PopulateBulletPoolVBoxContainer/PopulateMultiMeshBlockPoolBtn" to="." method="_on_populate_multi_mesh_block_pool_btn_pressed"]
 [connection signal="timeout" from="ObjectPoolSettingsView/AdditionalDebugDataContainer/UpdateDebugDataTimer" to="ObjectPoolSettingsView/AdditionalDebugDataContainer" method="_on_update_debug_data_timer_timeout"]
 [connection signal="pressed" from="ObjectPoolSettingsView/AttachmentPoolRelated/VBoxContainer/PopulateAttachmentsPoolBtn" to="." method="_on_populate_attachments_pool_btn_pressed"]
 [connection signal="pressed" from="ObjectPoolSettingsView/AttachmentPoolRelated/VBoxContainer2/FreeSpecificAttachmentPoolBtn" to="." method="_on_free_specific_attachment_pool_btn_pressed"]
 [connection signal="pressed" from="ObjectPoolSettingsView/AttachmentPoolRelated/VBoxContainer2/FreeAllAttachmentPoolsBtn" to="." method="_on_free_all_attachment_pools_btn_pressed"]
 [connection signal="pressed" from="BulletSettingsView/VBoxContainer/DirectionalDebuggerVBoxContainer/ShowDirectionalDebuggerColorPickerBtn" to="." method="_on_show_directional_debugger_color_picker_btn_pressed"]
-[connection signal="pressed" from="BulletSettingsView/VBoxContainer/BlockDebuggerVBoxContainer2/ShowBlockDebuggerColorPickerBtn" to="." method="_on_show_block_debugger_color_picker_btn_pressed"]
 [connection signal="pressed" from="BulletSettingsView/VBoxContainer/VBoxContainer/EnableDebuggerCheckBox" to="." method="_on_enable_debugger_check_box_pressed"]
 [connection signal="pressed" from="BulletSettingsView/VBoxContainer/VBoxContainer/RotatePhysicsShapesCheckBox" to="." method="_on_rotate_physics_shapes_check_box_pressed"]
 [connection signal="pressed" from="BulletSettingsView/VBoxContainer/VBoxContainer/AdjustDirectionBasedOnRotationCheckBox" to="." method="_on_adjust_direction_based_on_rotation_check_box_pressed"]

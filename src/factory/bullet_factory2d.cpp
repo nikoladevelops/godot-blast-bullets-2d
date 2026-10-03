@@ -1,10 +1,8 @@
 #include "./bullet_factory2d.hpp"
 #include "../shared/warn_once2d.hpp"
 
-#include "../bullets/block_bullets2d.hpp"
 #include "../bullets/directional_bullets2d.hpp"
 
-#include "../spawn-data/block_bullets_data2d.hpp"
 #include "../spawn-data/directional_bullets_data2d.hpp"
 
 #include "../debugger/multimesh_bullets_debugger2d.hpp"
@@ -236,22 +234,13 @@ void BulletFactory2D::_ready() {
 	all_directional_bullets.reserve(2048);
 	directional_bullets_set.resize(2048);
 
-	all_block_bullets.reserve(2048);
-	block_bullets_set.resize(2048);
-
 	add_bullet_containers();
 	add_bullet_attachment_container();
 	add_debuggers();
 
-	block_bullets_debugger->set_debugger_color(block_bullets_debugger_color_cached_before_ready);
 	directional_bullets_debugger->set_debugger_color(directional_bullets_debugger_color_cached_before_ready);
-
-	block_bullets_debugger->set_is_debugger_enabled(is_debugger_enabled_cached_before_ready);
 	directional_bullets_debugger->set_is_debugger_enabled(is_debugger_enabled_cached_before_ready);
-
-	block_bullets_debugger->set_max_debug_providers(debugger_max_providers_cached_before_ready);
 	directional_bullets_debugger->set_max_debug_providers(debugger_max_providers_cached_before_ready);
-	block_bullets_debugger->set_draw_inactive_shapes(debugger_draw_inactive_cached_before_ready);
 	directional_bullets_debugger->set_draw_inactive_shapes(debugger_draw_inactive_cached_before_ready);
 
 	use_physics_interpolation = use_physics_interpolation_cached_before_ready;
@@ -286,7 +275,7 @@ bool BulletFactory2D::ensure_factory_initialized() {
 	}
 	// Containers already exist (native _ready ran): just mark ready. This
 	// keeps the normal path allocation-free.
-	if (directional_bullets_container != nullptr && block_bullets_container != nullptr && bullet_attachments_container != nullptr && directional_bullets_debugger != nullptr && block_bullets_debugger != nullptr) {
+	if (directional_bullets_container != nullptr && bullet_attachments_container != nullptr && directional_bullets_debugger != nullptr) {
 		is_ready = true;
 		return true;
 	}
@@ -302,60 +291,22 @@ bool BulletFactory2D::ensure_factory_initialized() {
 	if (all_directional_bullets.capacity() == 0) {
 		all_directional_bullets.reserve(2048);
 		directional_bullets_set.resize(2048);
-		all_block_bullets.reserve(2048);
-		block_bullets_set.resize(2048);
 	}
-	if (directional_bullets_container == nullptr || block_bullets_container == nullptr) {
-		// add_bullet_containers creates both; call only when at least one is missing.
-		// Remove any half-created container first to avoid duplicates.
-		if (directional_bullets_container == nullptr && block_bullets_container == nullptr) {
-			add_bullet_containers();
-		} else {
-			// Half-built state should not happen, but recover explicitly.
-			if (directional_bullets_container == nullptr) {
-				directional_bullets_container = memnew(Node);
-				directional_bullets_container->set_name("DirectionalBulletsContainer");
-				add_child(directional_bullets_container);
-			}
-			if (block_bullets_container == nullptr) {
-				block_bullets_container = memnew(Node);
-				block_bullets_container->set_name("BlockBulletsContainer");
-				add_child(block_bullets_container);
-			}
-		}
+	if (directional_bullets_container == nullptr) {
+		add_bullet_containers();
 	}
 	if (bullet_attachments_container == nullptr) {
 		add_bullet_attachment_container();
 	}
 	fx_ensure_effects_container();
-	if (directional_bullets_debugger == nullptr || block_bullets_debugger == nullptr) {
-		if (directional_bullets_debugger == nullptr && block_bullets_debugger == nullptr) {
-			add_debuggers();
-		} else {
-			// One debugger survived: rebuild the missing one only.
-			if (directional_bullets_debugger == nullptr) {
-				directional_bullets_debugger = memnew(MultiMeshBulletsDebugger2D);
-				directional_bullets_debugger->configure(directional_bullets_container, "DirectionalBulletsDebugger", directional_bullets_debugger_color_cached_before_ready);
-				add_child(directional_bullets_debugger);
-			}
-			if (block_bullets_debugger == nullptr) {
-				block_bullets_debugger = memnew(MultiMeshBulletsDebugger2D);
-				block_bullets_debugger->configure(block_bullets_container, "BlockBulletsDebugger", block_bullets_debugger_color_cached_before_ready);
-				add_child(block_bullets_debugger);
-			}
-		}
+	if (directional_bullets_debugger == nullptr) {
+		add_debuggers();
 	}
 	if (directional_bullets_debugger != nullptr) {
 		directional_bullets_debugger->set_debugger_color(directional_bullets_debugger_color_cached_before_ready);
 		directional_bullets_debugger->set_is_debugger_enabled(is_debugger_enabled_cached_before_ready);
 		directional_bullets_debugger->set_max_debug_providers(debugger_max_providers_cached_before_ready);
 		directional_bullets_debugger->set_draw_inactive_shapes(debugger_draw_inactive_cached_before_ready);
-	}
-	if (block_bullets_debugger != nullptr) {
-		block_bullets_debugger->set_debugger_color(block_bullets_debugger_color_cached_before_ready);
-		block_bullets_debugger->set_is_debugger_enabled(is_debugger_enabled_cached_before_ready);
-		block_bullets_debugger->set_max_debug_providers(debugger_max_providers_cached_before_ready);
-		block_bullets_debugger->set_draw_inactive_shapes(debugger_draw_inactive_cached_before_ready);
 	}
 	use_physics_interpolation = use_physics_interpolation_cached_before_ready;
 	set_process(is_factory_processing_bullets && use_physics_interpolation);
@@ -401,15 +352,6 @@ void BulletFactory2D::set_use_physics_interpolation_runtime(bool new_use_physics
 				bullets_multi->update_all_previous_transforms_for_interpolation();
 			}
 		}
-
-		amount_multimesh_instances = static_cast<int>(all_block_bullets.size());
-
-		for (int i = 0; i < amount_multimesh_instances; ++i) {
-			BlockBullets2D *bullets_multi = all_block_bullets[i];
-			if (bullets_multi != nullptr) {
-				bullets_multi->update_all_previous_transforms_for_interpolation();
-			}
-		}
 	}
 }
 
@@ -421,11 +363,6 @@ void BulletFactory2D::set_use_physics_interpolation_editor(bool new_use_physics_
 }
 
 void BulletFactory2D::add_bullet_containers() {
-	// Create BlockBulletsContainer Node and add it as a child to factory
-	block_bullets_container = memnew(Node);
-	block_bullets_container->set_name("BlockBulletsContainer");
-	add_child(block_bullets_container);
-
 	// Create DirectionalBulletsContainer Node and add it as a child to factory
 	directional_bullets_container = memnew(Node);
 	directional_bullets_container->set_name("DirectionalBulletsContainer");
@@ -1063,11 +1000,6 @@ Dictionary BulletFactory2D::debug_get_effect_state() const {
 }
 
 void BulletFactory2D::add_debuggers() {
-	// Configure BlockBullets2D debugger and add it as a child to factory
-	block_bullets_debugger = memnew(MultiMeshBulletsDebugger2D);
-	block_bullets_debugger->configure(block_bullets_container, "BlockBulletsDebugger", block_bullets_debugger_color_cached_before_ready);
-	add_child(block_bullets_debugger);
-
 	// Configure DirectionalBullets2D debugger and add it as a child to factory
 	directional_bullets_debugger = memnew(MultiMeshBulletsDebugger2D);
 	directional_bullets_debugger->configure(directional_bullets_container, "DirectionalBulletsDebugger", directional_bullets_debugger_color_cached_before_ready);
@@ -1101,11 +1033,6 @@ void BulletFactory2D::set_is_factory_processing_bullets(bool is_processing_enabl
 				volley->replay_paused_overlaps();
 			}
 		}
-		for (BlockBullets2D *volley : all_block_bullets) {
-			if (volley != nullptr && volley->is_active) {
-				volley->replay_paused_overlaps();
-			}
-		}
 	}
 
 	set_physics_process(is_processing_enabled);
@@ -1120,7 +1047,6 @@ void BulletFactory2D::_physics_process(double delta) {
 	stats_tick_bullets = 0;
 	is_iterating_bullets = true;
 	handle_bullet_behavior<DirectionalBullets2D>(all_directional_bullets, directional_bullets_set, delta, directional_iteration_scratch);
-	handle_bullet_behavior<BlockBullets2D>(all_block_bullets, block_bullets_set, delta, block_iteration_scratch);
 	// One-shot sprite effects age on the same clock as bullets (pausing the
 	// factory freezes both). Volley trails tick inside move_bullets instead.
 	age_fx_effects(delta);
@@ -1136,14 +1062,6 @@ void BulletFactory2D::_physics_process(double delta) {
 		// no-timer game pays nothing per volley per tick. The vector is only
 		// mutated outside this loop (attach/detach defer during physics), so
 		// the emptiness check cannot race the iteration it guards.
-		if (bullet != nullptr && !bullet->multimesh_custom_timers.empty()) {
-			bullet->run_multimesh_custom_timers(delta);
-		}
-	}
-
-	const size_t block_count = all_block_bullets.size();
-	for (size_t idx = 0; idx < block_count && idx < all_block_bullets.size(); ++idx) {
-		BlockBullets2D *bullet = all_block_bullets[idx];
 		if (bullet != nullptr && !bullet->multimesh_custom_timers.empty()) {
 			bullet->run_multimesh_custom_timers(delta);
 		}
@@ -1170,23 +1088,8 @@ void BulletFactory2D::_process(double delta) {
 	const uint64_t stats_t0 = Time::get_singleton()->get_ticks_usec();
 	is_iterating_bullets = true;
 	handle_bullet_rendering_interpolation<DirectionalBullets2D>(all_directional_bullets, directional_bullets_set, directional_iteration_scratch);
-	handle_bullet_rendering_interpolation<BlockBullets2D>(all_block_bullets, block_bullets_set, block_iteration_scratch);
 	is_iterating_bullets = false;
 	stats_last_render_usec = Time::get_singleton()->get_ticks_usec() - stats_t0;
-}
-
-void BulletFactory2D::spawn_block_bullets(const Ref<BlockBulletsData2D> &spawn_data, const Vector2 &new_inherited_velocity_offset) {
-	if (!validate_spawn_request("spawn_block_bullets", spawn_data, new_inherited_velocity_offset)) {
-		return;
-	}
-
-	spawn_bullets_helper<BlockBullets2D, BlockBulletsData2D>(
-			all_block_bullets,
-			block_bullets_set,
-			block_bullets_pool,
-			block_bullets_container,
-			spawn_data,
-			new_inherited_velocity_offset);
 }
 
 void BulletFactory2D::spawn_directional_bullets(const Ref<DirectionalBulletsData2D> &spawn_data, const Vector2 &new_inherited_velocity_offset) {
@@ -1247,9 +1150,6 @@ void BulletFactory2D::reset_factory_state(const PoolKey *key) {
 
 	// Free all DirectionalBullets2D, their attachments and the object pool
 	free_all_bullets_helper<DirectionalBullets2D>(all_directional_bullets, directional_bullets_set, directional_bullets_pool, key);
-
-	// Free all BlockBullets2D, their attachments and the object pool
-	free_all_bullets_helper<BlockBullets2D>(all_block_bullets, block_bullets_set, block_bullets_pool, key);
 
 	// Freed volleys unregister their bakes through PREDELETE; only a full
 	// reset wipes the rest (manual hatch included). A scoped reset must
@@ -1315,9 +1215,6 @@ void BulletFactory2D::free_active_bullets(const Ref<MultiMeshPoolKey2D> &key) {
 	PoolKey resolved;
 	const PoolKey *key_ptr = resolve_pool_key(key, resolved);
 	free_only_active_bullets_helper<DirectionalBullets2D>(all_directional_bullets, directional_bullets_set, key_ptr);
-
-	// Free all ACTIVE BlockBullets2D
-	free_only_active_bullets_helper<BlockBullets2D>(all_block_bullets, block_bullets_set, key_ptr);
 }
 
 int BulletFactory2D::clear_active_bullets(const Ref<MultiMeshPoolKey2D> &key) {
@@ -1340,7 +1237,6 @@ int BulletFactory2D::clear_active_bullets(const Ref<MultiMeshPoolKey2D> &key) {
 	// Snapshot first: each clear mutates live sets below (the last cleared
 	// bullet funnels its volley into the pool).
 	std::vector<DirectionalBullets2D *> directional_snapshot = all_directional_bullets;
-	std::vector<BlockBullets2D *> block_snapshot = all_block_bullets;
 
 	PoolKey resolved;
 	const PoolKey *key_ptr = resolve_pool_key(key, resolved);
@@ -1353,22 +1249,6 @@ int BulletFactory2D::clear_active_bullets(const Ref<MultiMeshPoolKey2D> &key) {
 		// An earlier clear ran user callbacks (on_bullet_disable) that may
 		// have freed a volley later in this snapshot: validate via ObjectDB
 		// (no dereference) instead of trusting the raw pointer.
-		const uint64_t volley_id = volley->get_instance_id();
-		if (ObjectDB::get_instance(ObjectID(volley_id)) != volley) {
-			continue;
-		}
-		if (!volley->is_active) {
-			continue;
-		}
-		if (key_ptr != nullptr && !(volley->get_pool_key() == *key_ptr)) {
-			continue;
-		}
-		cleared += volley->clear_all_bullets();
-	}
-	for (BlockBullets2D *volley : block_snapshot) {
-		if (volley == nullptr) {
-			continue;
-		}
 		const uint64_t volley_id = volley->get_instance_id();
 		if (ObjectDB::get_instance(ObjectID(volley_id)) != volley) {
 			continue;
@@ -1409,12 +1289,6 @@ void BulletFactory2D::free_disabled_bullets(const Ref<MultiMeshPoolKey2D> &key) 
 			directional_bullets_set,
 			directional_bullets_pool,
 			key_ptr);
-
-	free_only_disabled_bullets_helper<BlockBullets2D>(
-			all_block_bullets,
-			block_bullets_set,
-			block_bullets_pool,
-			key_ptr);
 }
 
 void BulletFactory2D::handle_manual_user_deletion_of_multimesh_bullets(MultiMeshBullets2D &bullet_multi) {
@@ -1439,15 +1313,11 @@ void BulletFactory2D::handle_manual_user_deletion_of_multimesh_bullets(MultiMesh
 	FactoryOperationGuard op(this, true, true);
 
 	DirectionalBullets2D *dir_ptr = Object::cast_to<DirectionalBullets2D>(&bullet_multi);
-	BlockBullets2D *block_ptr = Object::cast_to<BlockBullets2D>(&bullet_multi);
 	const PoolKey pool_key = bullet_multi.get_pool_key();
 
 	if (dir_ptr) {
 		directional_bullets_pool.try_remove_instance(dir_ptr, pool_key);
 		remove_multimesh_instance_from_vec_and_sparse_set<DirectionalBullets2D>(all_directional_bullets, directional_bullets_set, dir_ptr);
-	} else if (block_ptr) {
-		block_bullets_pool.try_remove_instance(block_ptr, pool_key);
-		remove_multimesh_instance_from_vec_and_sparse_set<BlockBullets2D>(all_block_bullets, block_bullets_set, block_ptr);
 	}
 }
 
@@ -1464,11 +1334,6 @@ void BulletFactory2D::reactivate_multimesh_instance(MultiMeshBullets2D &bullet_m
 		const int id = dir_ptr->sparse_set_id;
 		if (id >= 0 && id < (int)all_directional_bullets.size() && all_directional_bullets[id] == dir_ptr) {
 			directional_bullets_set.activate_data(id);
-		}
-	} else if (BlockBullets2D *block_ptr = Object::cast_to<BlockBullets2D>(&bullet_multi)) {
-		const int id = block_ptr->sparse_set_id;
-		if (id >= 0 && id < (int)all_block_bullets.size() && all_block_bullets[id] == block_ptr) {
-			block_bullets_set.activate_data(id);
 		}
 	}
 }
@@ -1530,8 +1395,6 @@ void BulletFactory2D::populate_bullets_pool(const Ref<MultiMeshPoolKey2D> &key, 
 	BulletType bullet_type;
 	if (multimesh_data->is_class("DirectionalBulletsData2D")) {
 		bullet_type = BulletFactory2D::DIRECTIONAL_BULLETS;
-	} else if (multimesh_data->is_class("BlockBulletsData2D")) {
-		bullet_type = BulletFactory2D::BLOCK_BULLETS;
 	} else {
 		UtilityFunctions::push_error("Error. Unsupported type of MultiMeshBulletsData2D passed to populate_bullets_pool");
 		return;
@@ -1545,15 +1408,6 @@ void BulletFactory2D::populate_bullets_pool(const Ref<MultiMeshPoolKey2D> &key, 
 					all_directional_bullets,
 					directional_bullets_pool,
 					directional_bullets_container,
-					instance_count);
-			break;
-		case BulletFactory2D::BLOCK_BULLETS:
-			populate_bullets_pool_helper<BlockBullets2D>(
-					requested,
-					multimesh_data,
-					all_block_bullets,
-					block_bullets_pool,
-					block_bullets_container,
 					instance_count);
 			break;
 		default:
@@ -1588,16 +1442,6 @@ void BulletFactory2D::free_bullets_pool(BulletType bullet_type, const Ref<MultiM
 					directional_bullets_set,
 					directional_bullets_pool,
 					resolve_pool_key(key, resolved));
-		} break;
-
-		case BulletFactory2D::BLOCK_BULLETS: {
-			PoolKey resolved;
-			free_bullets_pool_helper<BlockBullets2D>(
-					all_block_bullets,
-					block_bullets_set,
-					block_bullets_pool,
-					resolve_pool_key(key, resolved));
-
 		} break;
 
 		default:
@@ -1808,7 +1652,7 @@ void BulletFactory2D::free_bullets_pool_deferred(BulletType bullet_type, const R
 		UtilityFunctions::push_error("free_bullets_pool_deferred: BulletFactory2D is being freed. Ignoring the request.");
 		return;
 	}
-	if (bullet_type != DIRECTIONAL_BULLETS && bullet_type != BLOCK_BULLETS) {
+	if (bullet_type != DIRECTIONAL_BULLETS) {
 		UtilityFunctions::push_error("free_bullets_pool_deferred: unsupported bullet_type.");
 		return;
 	}
@@ -1884,9 +1728,7 @@ Dictionary BulletFactory2D::debug_get_factory_state() {
 	d["is_tearing_down"] = is_tearing_down;
 	d["processing"] = is_factory_processing_bullets;
 	d["directional_total"] = (int)all_directional_bullets.size();
-	d["block_total"] = (int)all_block_bullets.size();
 	d["directional_pooled"] = directional_bullets_pool.get_total_amount_pooled();
-	d["block_pooled"] = block_bullets_pool.get_total_amount_pooled();
 	d["attachments_pooled"] = bullet_attachments_pool.get_total_amount_pooled();
 	return d;
 }
@@ -1894,11 +1736,6 @@ Dictionary BulletFactory2D::debug_get_factory_state() {
 int BulletFactory2D::get_active_bullet_count() const {
 	int total = 0;
 	for (const DirectionalBullets2D *volley : all_directional_bullets) {
-		if (volley != nullptr && volley->is_active) {
-			total += volley->active_bullets_counter;
-		}
-	}
-	for (const BlockBullets2D *volley : all_block_bullets) {
 		if (volley != nullptr && volley->is_active) {
 			total += volley->active_bullets_counter;
 		}
@@ -1917,17 +1754,12 @@ Dictionary BulletFactory2D::get_frame_stats() const {
 	d["collision_records_total"] = (int64_t)stats_collision_records_total;
 	d["expired_bullets_total"] = (int64_t)stats_expired_bullets_total;
 	d["spawned_bullets_total"] = (int64_t)stats_spawned_bullets_total;
-	d["pool_hits"] = (int64_t)(directional_pool_hits + block_pool_hits);
-	d["pool_misses"] = (int64_t)(directional_pool_misses + block_pool_misses);
+	d["pool_hits"] = (int64_t)directional_pool_hits;
+	d["pool_misses"] = (int64_t)directional_pool_misses;
 	d["active_bullets"] = get_active_bullet_count();
 	int active_volleys = 0;
 	int pooled_volleys = 0;
 	for (const DirectionalBullets2D *volley : all_directional_bullets) {
-		if (volley != nullptr) {
-			(volley->is_active ? active_volleys : pooled_volleys)++;
-		}
-	}
-	for (const BlockBullets2D *volley : all_block_bullets) {
 		if (volley != nullptr) {
 			(volley->is_active ? active_volleys : pooled_volleys)++;
 		}
@@ -2041,16 +1873,12 @@ Dictionary BulletFactory2D::debug_get_pool_hit_stats() const {
 	Dictionary d;
 	d["directional_hits"] = (int64_t)directional_pool_hits;
 	d["directional_misses"] = (int64_t)directional_pool_misses;
-	d["block_hits"] = (int64_t)block_pool_hits;
-	d["block_misses"] = (int64_t)block_pool_misses;
 	return d;
 }
 
 void BulletFactory2D::debug_reset_pool_stats() {
 	directional_pool_hits = 0;
 	directional_pool_misses = 0;
-	block_pool_hits = 0;
-	block_pool_misses = 0;
 }
 
 Dictionary BulletFactory2D::debug_validate_spawn_data(const Ref<MultiMeshBulletsData2D> &spawn_data) {
@@ -2108,13 +1936,6 @@ Dictionary BulletFactory2D::debug_check_interpolation_status() {
 PackedInt64Array BulletFactory2D::debug_get_live_volley_ids(uint64_t owner_spawner_id) {
 	PackedInt64Array ids;
 	for (const DirectionalBullets2D *volley : all_directional_bullets) {
-		if (volley != nullptr && volley->is_active && volley->owner_spawner_id == owner_spawner_id) {
-			ids.push_back((int64_t)volley->get_instance_id());
-		}
-	}
-	// Block volleys carry the same ownership stamp through the base class:
-	// skipping them silently undercounts spawner-owned block fire.
-	for (const BlockBullets2D *volley : all_block_bullets) {
 		if (volley != nullptr && volley->is_active && volley->owner_spawner_id == owner_spawner_id) {
 			ids.push_back((int64_t)volley->get_instance_id());
 		}
@@ -2182,11 +2003,7 @@ Dictionary BulletFactory2D::debug_assert_no_dangling() {
 	if (!check_vec(all_directional_bullets, directional_bullets_set, "directional")) {
 		return d;
 	}
-	if (!check_vec(all_block_bullets, block_bullets_set, "block")) {
-		return d;
-	}
 	d["directional_total"] = (int)all_directional_bullets.size();
-	d["block_total"] = (int)all_block_bullets.size();
 	return d;
 }
 
@@ -2199,22 +2016,6 @@ void BulletFactory2D::set_physics_space(RID new_space_rid) {
 		return;
 	}
 	physics_space = new_space_rid;
-}
-
-Color BulletFactory2D::get_block_bullets_debugger_color() const {
-	if (!is_ready) {
-		return block_bullets_debugger_color_cached_before_ready;
-	}
-
-	return block_bullets_debugger->get_debugger_color();
-}
-void BulletFactory2D::set_block_bullets_debugger_color(const Color &new_color) {
-	if (!is_ready) {
-		block_bullets_debugger_color_cached_before_ready = new_color; // Note if you are wondering why I am doing this it's because I have exposed properties to the editor but these values can only be applied after the factory is added to the scene tree (when the game is ran) - Example: the debuggers do not exist yet in the editor.. so just cache any values related to them and apply them when they actually exist (this happens in _on_ready())
-		return;
-	}
-
-	block_bullets_debugger->set_debugger_color(new_color);
 }
 
 Color BulletFactory2D::get_directional_bullets_debugger_color() const {
@@ -2238,11 +2039,11 @@ bool BulletFactory2D::get_is_debugger_enabled() const {
 		return is_debugger_enabled_cached_before_ready;
 	}
 
-	if (block_bullets_debugger == nullptr || directional_bullets_debugger == nullptr) {
+	if (directional_bullets_debugger == nullptr) {
 		return false;
 	}
 
-	return block_bullets_debugger->get_is_debugger_enabled() && directional_bullets_debugger->get_is_debugger_enabled();
+	return directional_bullets_debugger->get_is_debugger_enabled();
 }
 
 void BulletFactory2D::set_is_debugger_enabled(bool new_is_enabled) {
@@ -2251,12 +2052,11 @@ void BulletFactory2D::set_is_debugger_enabled(bool new_is_enabled) {
 		return;
 	}
 
-	if (directional_bullets_debugger == nullptr || block_bullets_debugger == nullptr) {
+	if (directional_bullets_debugger == nullptr) {
 		return;
 	}
 
 	directional_bullets_debugger->set_is_debugger_enabled(new_is_enabled);
-	block_bullets_debugger->set_is_debugger_enabled(new_is_enabled);
 }
 
 int BulletFactory2D::get_debugger_max_providers() const {
@@ -2275,9 +2075,6 @@ void BulletFactory2D::set_debugger_max_providers(int v) {
 	if (directional_bullets_debugger != nullptr) {
 		directional_bullets_debugger->set_max_debug_providers(clamped);
 	}
-	if (block_bullets_debugger != nullptr) {
-		block_bullets_debugger->set_max_debug_providers(clamped);
-	}
 }
 
 bool BulletFactory2D::get_debugger_draw_inactive() const {
@@ -2295,9 +2092,6 @@ void BulletFactory2D::set_debugger_draw_inactive(bool v) {
 	if (directional_bullets_debugger != nullptr) {
 		directional_bullets_debugger->set_draw_inactive_shapes(v);
 	}
-	if (block_bullets_debugger != nullptr) {
-		block_bullets_debugger->set_draw_inactive_shapes(v);
-	}
 }
 
 // Additional debug methods
@@ -2305,9 +2099,6 @@ int BulletFactory2D::debug_get_total_bullets_amount(BulletType bullet_type) {
 	switch (bullet_type) {
 		case BlastBullets2D::BulletFactory2D::DIRECTIONAL_BULLETS:
 			return static_cast<int>(all_directional_bullets.size());
-			break;
-		case BlastBullets2D::BulletFactory2D::BLOCK_BULLETS:
-			return static_cast<int>(all_block_bullets.size());
 			break;
 		default:
 			UtilityFunctions::push_error("Error when trying to get total bullets amount. BulletType you gave is not supported");
@@ -2321,9 +2112,6 @@ int BulletFactory2D::debug_get_active_bullets_amount(BulletType bullet_type) {
 		case BlastBullets2D::BulletFactory2D::DIRECTIONAL_BULLETS:
 			return std::count_if(all_directional_bullets.begin(), all_directional_bullets.end(), [](DirectionalBullets2D *b) { return b != nullptr && b->is_active && !b->is_queued_for_deletion(); });
 			break;
-		case BlastBullets2D::BulletFactory2D::BLOCK_BULLETS:
-			return std::count_if(all_block_bullets.begin(), all_block_bullets.end(), [](BlockBullets2D *b) { return b != nullptr && b->is_active && !b->is_queued_for_deletion(); });
-			break;
 		default:
 			UtilityFunctions::push_error("Error when trying to get active bullets amount. BulletType you gave is not supported");
 			return -1;
@@ -2335,9 +2123,6 @@ int BulletFactory2D::debug_get_bullets_pool_amount(BulletType bullet_type) {
 	switch (bullet_type) {
 		case BlastBullets2D::BulletFactory2D::DIRECTIONAL_BULLETS:
 			return directional_bullets_pool.get_total_amount_pooled();
-			break;
-		case BlastBullets2D::BulletFactory2D::BLOCK_BULLETS:
-			return block_bullets_pool.get_total_amount_pooled();
 			break;
 		default:
 			UtilityFunctions::push_error("Error when trying to get bullets pool amount. BulletType you gave is not supported");
@@ -2352,8 +2137,6 @@ Dictionary BulletFactory2D::debug_get_bullets_pool_info(BulletType bullet_type) 
 
 	if (bullet_type == BulletType::DIRECTIONAL_BULLETS) {
 		pool_info = directional_bullets_pool.get_pool_info();
-	} else if (bullet_type == BulletType::BLOCK_BULLETS) {
-		pool_info = block_bullets_pool.get_pool_info();
 	} else {
 		UtilityFunctions::push_error("Error when trying to get bullets pool info. BulletType you gave is not supported");
 		return dict;
@@ -2382,15 +2165,6 @@ int BulletFactory2D::debug_get_active_attachments_amount() {
 	int directional_amount = static_cast<int>(all_directional_bullets.size());
 	for (int i = 0; i < directional_amount; ++i) {
 		DirectionalBullets2D *bullets = all_directional_bullets[i];
-
-		if (bullets != nullptr && bullets->is_active && !bullets->is_queued_for_deletion()) {
-			count_active_attachments += bullets->get_amount_active_attachments();
-		}
-	}
-
-	int block_amount = static_cast<int>(all_block_bullets.size());
-	for (int i = 0; i < block_amount; ++i) {
-		BlockBullets2D *bullets = all_block_bullets[i];
 
 		if (bullets != nullptr && bullets->is_active && !bullets->is_queued_for_deletion()) {
 			count_active_attachments += bullets->get_amount_active_attachments();
@@ -2442,15 +2216,6 @@ void BulletFactory2D::teleport_shift_all_bullets(const Vector2 &shift_amount) {
 			bullets->teleport_shift_all_bullets(shift_amount);
 		}
 	}
-
-	// Block volleys shift rigidly via their own teleport path (same finite
-	// check, shape sync, attachment carry and interpolation sync per bullet).
-	for (int i = 0; i < (int)all_block_bullets.size(); ++i) {
-		BlockBullets2D *bullets = all_block_bullets[i];
-		if (bullets != nullptr && !bullets->is_queued_for_deletion()) {
-			bullets->teleport_shift_all_bullets(shift_amount);
-		}
-	}
 }
 
 void BulletFactory2D::_bind_methods() {
@@ -2487,7 +2252,6 @@ void BulletFactory2D::_bind_methods() {
 
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "use_physics_interpolation"), "set_use_physics_interpolation_editor", "get_use_physics_interpolation");
 
-	ClassDB::bind_method(D_METHOD("spawn_block_bullets", "spawn_data", "inherited_velocity_offset"), &BulletFactory2D::spawn_block_bullets, DEFVAL(Vector2(0, 0)));
 	ClassDB::bind_method(D_METHOD("spawn_directional_bullets", "spawn_data", "inherited_velocity_offset"), &BulletFactory2D::spawn_directional_bullets, DEFVAL(Vector2(0, 0)));
 	ClassDB::bind_method(D_METHOD("spawn_controllable_directional_bullets", "spawn_data", "inherited_velocity_offset", "spawner_id"), &BulletFactory2D::spawn_controllable_directional_bullets, DEFVAL(Vector2(0, 0)), DEFVAL(0));
 
@@ -2496,10 +2260,6 @@ void BulletFactory2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_directional_bullets_debugger_color"), &BulletFactory2D::get_directional_bullets_debugger_color);
 	ClassDB::bind_method(D_METHOD("set_directional_bullets_debugger_color", "new_color"), &BulletFactory2D::set_directional_bullets_debugger_color);
 	ADD_PROPERTY(PropertyInfo(Variant::COLOR, "directional_bullets_debugger_color"), "set_directional_bullets_debugger_color", "get_directional_bullets_debugger_color");
-
-	ClassDB::bind_method(D_METHOD("get_block_bullets_debugger_color"), &BulletFactory2D::get_block_bullets_debugger_color);
-	ClassDB::bind_method(D_METHOD("set_block_bullets_debugger_color", "new_color"), &BulletFactory2D::set_block_bullets_debugger_color);
-	ADD_PROPERTY(PropertyInfo(Variant::COLOR, "block_bullets_debugger_color"), "set_block_bullets_debugger_color", "get_block_bullets_debugger_color");
 
 	ClassDB::bind_method(D_METHOD("populate_bullets_pool", "key", "multimesh_data", "instance_count"), &BulletFactory2D::populate_bullets_pool);
 	ClassDB::bind_method(D_METHOD("free_bullets_pool", "bullet_type", "key"), &BulletFactory2D::free_bullets_pool, DEFVAL(Ref<MultiMeshPoolKey2D>()));
@@ -4128,20 +3888,6 @@ void BulletFactory2D::_bind_methods() {
 						  PropertyInfo(Variant::OBJECT, "directional_bullets_instance", PROPERTY_HINT_RESOURCE_TYPE, "DirectionalBullets2D"),
 						  PropertyInfo(Variant::ARRAY, "bullet_indexes", PROPERTY_HINT_ARRAY_TYPE, "int")));
 
-	ADD_SIGNAL(MethodInfo("block_area_entered",
-						  PropertyInfo(Variant::OBJECT, "hit_target_area"),
-						  PropertyInfo(Variant::OBJECT, "block_bullets_instance", PROPERTY_HINT_RESOURCE_TYPE, "BlockBullets2D"),
-						  PropertyInfo(Variant::INT, "bullet_index")));
-
-	ADD_SIGNAL(MethodInfo("block_body_entered",
-						  PropertyInfo(Variant::OBJECT, "hit_target_body"),
-						  PropertyInfo(Variant::OBJECT, "block_bullets_instance", PROPERTY_HINT_RESOURCE_TYPE, "BlockBullets2D"),
-						  PropertyInfo(Variant::INT, "bullet_index")));
-
-	ADD_SIGNAL(MethodInfo("block_life_time_over",
-						  PropertyInfo(Variant::OBJECT, "block_bullets_instance", PROPERTY_HINT_RESOURCE_TYPE, "BlockBullets2D"),
-						  PropertyInfo(Variant::ARRAY, "bullet_indexes", PROPERTY_HINT_ARRAY_TYPE, "int")));
-
 	// Bounce notifications: slim payload like the collision signals (custom
 	// data and transforms stay one instance call away). Emitted synchronously
 	// from the physics tick under the same handler contract (queue_free /
@@ -4163,7 +3909,6 @@ void BulletFactory2D::_bind_methods() {
 	// Need this in order to expose the enum constants to Godot Engine
 	// For Bullet Type that is supported
 	BIND_ENUM_CONSTANT(DIRECTIONAL_BULLETS);
-	BIND_ENUM_CONSTANT(BLOCK_BULLETS);
 
 	// For the grid alignment enum
 	BIND_ENUM_CONSTANT(TOP_LEFT);

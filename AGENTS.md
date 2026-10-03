@@ -378,7 +378,6 @@ src/
   bullets/multimesh_bullets2d.{hpp,cpp}   shared volley base: buffers, physics area + ONE shared shape, lifetimes,
                                           attachments, collision intake/dedup/drain, paused-overlap park/replay, ranges
   bullets/directional_bullets2d.cpp       directional tick: movement, homing/orbit, curves, bounce
-  bullets/block_bullets2d.*               block (shared-velocity) volleys
   bullet_spawner/bullet_spawner2d.cpp     wiring, shooting cadence, spin, bursts/telegraph, pattern lists, lifecycle, shoot_once
   bullet_spawner/bullet_spawner2d_pattern_properties.cpp  Bullet Patterns accessors + apply_pattern_preset
   bullet_spawner/bullet_spawner2d_patterns.cpp   raw generation, bake cache, native span collect, verifier

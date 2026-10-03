@@ -1299,9 +1299,7 @@ public:
 
 			// 9. MOVEMENT SPEED ACCELERATION - per-bullet curve wins per
 			// bullet, shared is the fallback; plain ballistics otherwise.
-			// NOTE: unlike BlockBullets2D (which accelerates ALL entries so a
-			// re-enabled bullet rejoins at the volley's current speed),
-			// directional freezes disabled bullets at their disable-time speed:
+			// NOTE: disabled bullets freeze at their disable-time speed:
 			// per-bullet ballistics are individually owned here, so a wake
 			// resumes where that bullet left off (see enable_bullet).
 			// Gravity steers velocity directly (no uphill slowdown model here:
@@ -3671,9 +3669,7 @@ public:
 	// Virtual methods
 	void set_up_movement_data(const TypedArray<BulletSpeedData2D> &new_speed_data, bool tile_short_arrays = false);
 	// Owns has_per_bullet_rotation_data, so it implements the base seed hooks
-	// (see MultiMeshBullets2D::set_rotation_data). Directional is the only
-	// subclass with a per-bullet/shared rotation split, so BlockBullets2D
-	// correctly keeps the base no-ops.
+	// (see MultiMeshBullets2D::set_rotation_data).
 	virtual void reset_per_bullet_rotation_presence() override {
 		has_per_bullet_rotation_data.assign(amount_bullets, 0);
 	}

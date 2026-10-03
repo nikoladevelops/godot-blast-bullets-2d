@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <class name="MultiMeshBullets2D" inherits="MultiMeshInstance2D" api_type="extension" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/godotengine/godot/master/doc/class.xsd">
 	<brief_description>
-		Shared live-volley base for [DirectionalBullets2D] and [BlockBullets2D]. Spawn through [BulletFactory2D], steer through the returned instance.
+		Live-volley base class of [DirectionalBullets2D]. Spawn through [BulletFactory2D], steer through the returned instance.
 	</brief_description>
 	<description>
-		Shared base for [DirectionalBullets2D] and [BlockBullets2D]. Holds everything a bullet batch needs at runtime: the multimesh, physics shapes, per-bullet caches, attachments, curves, movement patterns, timers, and the SpriteFrames animation state. You never create these directly. Spawn them through [BulletFactory2D], control live ones through the returned instance, and let the object pool recycle them.
+		Base class of [DirectionalBullets2D]. Holds everything a bullet batch needs at runtime: the multimesh, physics shapes, per-bullet caches, attachments, curves, movement patterns, timers, and the SpriteFrames animation state. You never create these directly. Spawn them through [BulletFactory2D], control live ones through the returned instance, and let the object pool recycle them.
 		Index ranges: every [code]all_bullets_*[/code] method takes an inclusive start..end range. The defaults (0, -1) mean the whole volley, and -1 as the end means "through the last bullet". A range outside [code]0..amount-1[/code], or an inverted one (start &gt; end), fails loud with [code]Invalid index range in &lt;method&gt;[/code] and applies nothing; it is never silently widened to the whole volley.
 	</description>
 	<tutorials>
@@ -125,7 +125,7 @@
 			<param index="1" name="bullet_index_start" type="int" default="0" />
 			<param index="2" name="bullet_index_end_inclusive" type="int" default="-1" />
 			<description>
-				Sets the same curves data to all bullets in the specified range. Curves data is a [BulletCurvesData2D] resource that can contain multiple curves used to control different aspects of the bullet's behavior over time, such as movement speed, rotation speed, direction adjustment, etc... Not supported on [BlockBullets2D].
+				Sets the same curves data to all bullets in the specified range. Curves data is a [BulletCurvesData2D] resource that can contain multiple curves used to control different aspects of the bullet's behavior over time, such as movement speed, rotation speed, direction adjustment, etc...
 			</description>
 		</method>
 		<method name="all_bullets_set_custom_data">
@@ -172,7 +172,7 @@
 			<param index="3" name="start_index" type="int" default="0" />
 			<param index="4" name="end_index_inclusive" type="int" default="-1" />
 			<description>
-				Sets a [Curve2D] drawn movement pattern to all bullets in the specified range. The bullets will follow the shape of the curve as they move. Not supported on [BlockBullets2D].
+				Sets a [Curve2D] drawn movement pattern to all bullets in the specified range. The bullets will follow the shape of the curve as they move.
 
 				If [code]face_movement_direction[/code] is set to true, the bullets will also rotate to face the direction they are moving along the curve.
 
@@ -187,7 +187,7 @@
 			<param index="3" name="start_index" type="int" default="0" />
 			<param index="4" name="end_index_inclusive" type="int" default="-1" />
 			<description>
-				Sets a [Path2D] drawn movement pattern to all bullets in the specified range. The bullets will follow the shape of the path as they move. Not supported on [BlockBullets2D].
+				Sets a [Path2D] drawn movement pattern to all bullets in the specified range. The bullets will follow the shape of the path as they move.
 
 				If [code]face_movement_direction[/code] is set to true, the bullets will also rotate to face the direction they are moving along the path.
 
@@ -353,7 +353,7 @@
 			<param index="0" name="bullet_index" type="int" />
 			<param index="1" name="data" type="BulletCurvesData2D" />
 			<description>
-				Sets the curves data of a specific bullet. Curves data is a [BulletCurvesData2D] resource that can contain multiple curves used to control different aspects of the bullet's behavior over time, such as movement speed, rotation speed, direction adjustment, etc... Not supported on [BlockBullets2D]. Pass null to clear back to the shared fallback (see [method clear_per_bullet_curves_data]). Example: [code]bullets.bullet_set_curves_data(0, my_curves); print(bullets.debug_get_curves_info(0)["speed_src"])[/code] prints "per".
+				Sets the curves data of a specific bullet. Curves data is a [BulletCurvesData2D] resource that can contain multiple curves used to control different aspects of the bullet's behavior over time, such as movement speed, rotation speed, direction adjustment, etc... Pass null to clear back to the shared fallback (see [method clear_per_bullet_curves_data]). Example: [code]bullets.bullet_set_curves_data(0, my_curves); print(bullets.debug_get_curves_info(0)["speed_src"])[/code] prints "per".
 
 				Note: If you want to set or get the curves data of multiple bullets at once, use [method all_bullets_set_curves_data] or [method all_bullets_get_curves_data].
 			</description>
@@ -628,7 +628,7 @@
 		<method name="get_inherited_velocity_offset" qualifiers="const">
 			<return type="Vector2" />
 			<description>
-				Returns the extra velocity offset that gets added to every bullet's movement each physics frame. Set it at spawn time or through set_inherited_velocity_offset(). The setter is bound on the base class while the inspector property lives on DirectionalBullets2D only: BlockBullets2D scripts call the method (same value, no property row).
+				Returns the extra velocity offset that gets added to every bullet's movement each physics frame. Set it at spawn time or through set_inherited_velocity_offset().
 			</description>
 		</method>
 		<method name="get_monitorable" qualifiers="const">
@@ -839,7 +839,7 @@
 			<param index="2" name="face_movement_direction" type="bool" default="false" />
 			<param index="3" name="repeat_pattern" type="bool" default="true" />
 			<description>
-				Set a [Curve2D] drawn movement pattern to a specific bullet. The bullet will follow the shape of the curve as it moves. Not supported on [BlockBullets2D]. Per-bullet patterns always win over the shared fallback; null clears back to shared (or no pattern). Example: [code]bullets.set_bullet_movement_pattern_from_curve(0, my_curve, true); print(bullets.debug_get_pattern_info(0)["src"])[/code] prints "per".
+				Set a [Curve2D] drawn movement pattern to a specific bullet. The bullet will follow the shape of the curve as it moves. Per-bullet patterns always win over the shared fallback; null clears back to shared (or no pattern). Example: [code]bullets.set_bullet_movement_pattern_from_curve(0, my_curve, true); print(bullets.debug_get_pattern_info(0)["src"])[/code] prints "per".
 
 				If [code]face_movement_direction[/code] is set to true, the bullet will also rotate to face the direction it is moving along the curve.
 
@@ -856,7 +856,7 @@
 			<param index="2" name="face_movement_direction" type="bool" default="false" />
 			<param index="3" name="repeat_pattern" type="bool" default="true" />
 			<description>
-				Set a [Path2D] drawn movement pattern to a specific bullet. The bullet will follow the shape of the path as it moves. Not supported on [BlockBullets2D].
+				Set a [Path2D] drawn movement pattern to a specific bullet. The bullet will follow the shape of the path as it moves.
 
 				If [code]face_movement_direction[/code] is set to true, the bullet will also rotate to face the direction it is moving along the path.
 
@@ -1055,7 +1055,7 @@
 			Live bullet whiten override: toggling rebuilds the cached animation frames whitened (alpha preserved) or restores the art. Reseeded from spawn data on every spawn/enable.
 		</member>
 		<member name="shared_bullet_curves_data" type="BulletCurvesData2D" setter="set_shared_bullet_curves_data" getter="get_shared_bullet_curves_data">
-			A shared [BulletCurvesData2D] resource that can be assigned to all bullets in the multimesh. This is useful for saving memory if you have a lot of bullets that share the same curves data, since you can assign the same resource to all of them instead of creating a new one for each bullet. Not supported on [BlockBullets2D] (setting it there errors and is ignored). Values are copied at set time: editing the resource in place afterwards changes nothing until you set it again. Direction channels never park the direction at zero: an Override result near zero keeps the incoming direction.
+			A shared [BulletCurvesData2D] resource that can be assigned to all bullets in the multimesh. This is useful for saving memory if you have a lot of bullets that share the same curves data, since you can assign the same resource to all of them instead of creating a new one for each bullet. Values are copied at set time: editing the resource in place afterwards changes nothing until you set it again. Direction channels never park the direction at zero: an Override result near zero keeps the incoming direction.
 		</member>
 		<member name="shared_bullets_custom_data" type="Resource" setter="set_shared_bullets_custom_data" getter="get_shared_bullets_custom_data">
 			You can edit the custom bullets data that the bullets multimesh was spawned with. Use this to set damage data or anything else you want to store in a resource for your bullets to use.

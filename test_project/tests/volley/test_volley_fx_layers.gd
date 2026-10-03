@@ -6,7 +6,7 @@ extends BlastTest
 ## chance gate, opt-in desync across shards, per-bullet trail toggles,
 ## play_effect_animation switch, pool-reuse reseed, ring caps (explicit +
 ## auto), 24-frame bake cap, applied z/tint/texture/visibility/light,
-## bounce sparks, block-volley trails, spawner integration, manual hatch +
+## bounce sparks, spawner integration, manual hatch +
 ## clear, interpolation agreement, ramp tints, volley self_modulate,
 ## rotation offsets + spin (trail + one-shot), On Clear manual visuals,
 ## volley fade in/out + tint-over-life ramp, inspector trigger hint,
@@ -356,9 +356,9 @@ func test_pool_reuse_reseeds_caps_hold_explicit_auto() -> void:
 	assert_true(baked_frames == 24, "30-frame anim truncates to the 24-frame bake cap")
 
 
-func test_styling_z_tint_texture_visibility_light_bounce_block() -> void:
+func test_styling_z_tint_texture_visibility_light_bounce() -> void:
 	await _preamble()
-	# FX T9 styling: z, tint, texture, visibility, light + bounce + block
+	# FX T9 styling: z, tint, texture, visibility, light + bounce
 	await _settle(factory)
 	var high := _make_layer(0, 1)
 	high.z_index = 5
@@ -394,23 +394,6 @@ func test_styling_z_tint_texture_visibility_light_bounce_block() -> void:
 			break
 	assert_true(vb.bullet_get_bounce_count(0) >= 1, "wall bounced")
 	assert_true(factory.get_active_effect_count() == 1, "only the bounce sparks (destroy silent)")
-	await _settle(factory)
-	var bd := H.make_block_data(2, 150.0, 10.0)
-	bd.effect_layers = [_make_layer(0, 1)]
-	factory.spawn_block_bullets(bd)
-	await physics()
-	await physics()
-	await physics()
-	var found := false
-	var follows := false
-	for kid in factory.get_node("BlockBulletsContainer").get_children():
-		if kid is BlockBullets2D and kid.has_trail_effects():
-			found = true
-			var t0: Vector2 = kid.debug_get_trail_transform(0, 0).origin
-			var b0: Vector2 = kid.get_bullet_transform(0).origin
-			follows = t0.distance_to(b0) < 0.01
-	assert_true(found, "block volley bakes trails")
-	assert_true(follows, "block trail follows")
 
 
 func test_spawner_integration_manual_hatch() -> void:
@@ -627,23 +610,23 @@ func test_trail_visibility_retires_unknown_layers_null_entries() -> void:
 	expect_errors_containing("no baked trail layer 9", 1, "unknown trail layer fails loud")
 
 
-func test_block_lifetime_fizzle_live_rebake_bounce_knob_sparks() -> void:
+func test_lifetime_fizzle_live_rebake_bounce_knob_sparks() -> void:
 	await _preamble()
-	# FX T17 block lifetime fizzle + live rebake + bounce-knob sparks
+	# FX T17 lifetime fizzle + live rebake + bounce-knob sparks
 	await _settle(factory)
-	var bd17 := H.make_block_data(1, 0.0, 0.3)
-	bd17.effect_layers = [_make_layer(5, 4)]
-	factory.spawn_block_bullets(bd17)
+	var d17 := H.make_directional_data(1, 0.0, 0.3)
+	d17.effect_layers = [_make_layer(5, 4)]
+	factory.spawn_controllable_directional_bullets(d17)
 	var fired17 := false
 	for i in 60:
 		await physics()
 		if factory.get_active_effect_count() >= 1:
 			fired17 = true
 			break
-	assert_true(fired17, "block expiry fizzles")
+	assert_true(fired17, "expiry fizzles")
 	for i in 40:
 		await physics()
-	assert_true(factory.get_active_effect_count() == 0, "block fizzle expires")
+	assert_true(factory.get_active_effect_count() == 0, "fizzle expires")
 	await _settle(factory)
 	var v17: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(_fx_data(Vector2.ZERO, 200.0, [], false))
 	assert_true(not v17.has_trail_effects(), "no layers, no trails")

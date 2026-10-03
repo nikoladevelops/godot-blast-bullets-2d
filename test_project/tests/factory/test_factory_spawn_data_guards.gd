@@ -67,14 +67,6 @@ func test_self_modulate_rejects_nan_channel() -> void:
 	assert_eq(layer.self_modulate, Color(0, 1, 0, 1), "NaN channel refused on effect layer data")
 
 
-func test_block_rotation_rejects_nan() -> void:
-	var b := H.make_block_data(1, 50.0, 5.0)
-	b.block_rotation_radians = 0.25
-	b.block_rotation_radians = NAN
-	expect_any_error()
-	assert_almost_eq(b.block_rotation_radians, 0.25, 0.0001, "NaN block rotation refused")
-
-
 func test_fresh_data_validates() -> void:
 	var good := _data()
 	var res: Dictionary = BulletFactory2D.debug_validate_spawn_data(good)

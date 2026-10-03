@@ -42,7 +42,7 @@
 		<method name="debug_assert_no_dangling">
 			<return type="Dictionary" />
 			<description>
-				Structural consistency check: {ok, error, directional_total, block_total}. Verifies vec/pool/sparse-set agreement (no nulls, sparse ids match indexes, active ids live). Never mutates. For crash-suite invariants after every destructive section.
+				Structural consistency check: {ok, error, directional_total}. Verifies vec/pool/sparse-set agreement (no nulls, sparse ids match indexes, active ids live). Never mutates. For crash-suite invariants after every destructive section.
 			</description>
 		</method>
 		<method name="debug_check_interpolation_status">
@@ -115,7 +115,7 @@
 		<method name="debug_get_factory_state">
 			<return type="Dictionary" />
 			<description>
-				Lifecycle snapshot: is_ready, is_busy, is_iterating, is_tearing_down, processing, directional_total, block_total, directional_pooled, block_pooled, attachments_pooled.
+				Lifecycle snapshot: is_ready, is_busy, is_iterating, is_tearing_down, processing, directional_total, directional_pooled, attachments_pooled.
 			</description>
 		</method>
 		<method name="debug_get_live_volley_ids">
@@ -135,7 +135,7 @@
 		<method name="debug_get_pool_hit_stats" qualifiers="const">
 			<return type="Dictionary" />
 			<description>
-				Pool reuse counters (64-bit): directional_hits, directional_misses, block_hits, block_misses. A spawn from inside a volley's own collision handler never reuses that volley (it is mid-tick), so it is served by another pooled instance or a fresh allocation and still succeeds. A 0% hit rate with a pre-populated pool means the spawn key never matches (e.g. helper_skip_indices shrank transforms after populate); compare [method debug_expected_pool_key] against [method debug_get_bullets_pool_info] keys.
+				Pool reuse counters (64-bit): directional_hits, directional_misses. A spawn from inside a volley's own collision handler never reuses that volley (it is mid-tick), so it is served by another pooled instance or a fresh allocation and still succeeds. A 0% hit rate with a pre-populated pool means the spawn key never matches (e.g. helper_skip_indices shrank transforms after populate); compare [method debug_expected_pool_key] against [method debug_get_bullets_pool_info] keys.
 			</description>
 		</method>
 		<method name="debug_get_total_attachments_amount">
@@ -280,7 +280,7 @@
 		<method name="get_active_bullet_count" qualifiers="const">
 			<return type="int" />
 			<description>
-				Live bullets across every active volley (directional + block), summed from each volley's live counter: O(active volleys), no per-bullet scan. Counts bullets, unlike [method debug_get_active_bullets_amount], which counts volleys.
+				Live bullets across every active volley, summed from each volley's live counter: O(active volleys), no per-bullet scan. Counts bullets, unlike [method debug_get_active_bullets_amount], which counts volleys.
 			</description>
 		</method>
 		<method name="get_active_effect_count" qualifiers="const">
@@ -1347,16 +1347,6 @@
 				Controls whether physics interpolation is enabled or not for all bullets controlled by the [b]BulletFactory2D[/b]. This method is supposed to be called during runtime, while the [method set_use_physics_interpolation_editor] method is supposed to be called in the editor.
 			</description>
 		</method>
-		<method name="spawn_block_bullets">
-			<return type="void" />
-			<param index="0" name="spawn_data" type="BlockBulletsData2D" />
-			<param index="1" name="inherited_velocity_offset" type="Vector2" default="Vector2(0, 0)" />
-			<description>
-				Spawns [BlockBullets2D] - bullets that act as a block that travels in a single direction with the same speed.
-				If there is already a multimesh available in the object pool (that matches the amount of transforms provided and the collision shape) then it gets re-used with the new data.
-				These bullets can NOT be controlled individually, but they are more efficient performance wise.
-			</description>
-		</method>
 		<method name="spawn_controllable_directional_bullets">
 			<return type="DirectionalBullets2D" />
 			<param index="0" name="spawn_data" type="DirectionalBulletsData2D" />
@@ -1394,15 +1384,12 @@
 			<return type="void" />
 			<param index="0" name="shift_amount" type="Vector2" />
 			<description>
-				Shifts all bullets in the scene by a certain amount (only bullets spawned by this particular [b]BulletFactory2D[/b]). Both [DirectionalBullets2D] volleys and [BlockBullets2D] volleys (shifted rigidly as a whole) are moved, with shape, attachment and interpolation state synced per bullet.
+				Shifts all bullets in the scene by a certain amount (only bullets spawned by this particular [b]BulletFactory2D[/b]). Every [DirectionalBullets2D] volley is moved, with shape, attachment and interpolation state synced per bullet.
 				Warning (shared factories): this moves EVERY spawner's live volleys at once - there is no per-spawner or per-bucket variant.
 			</description>
 		</method>
 	</methods>
 	<members>
-		<member name="block_bullets_debugger_color" type="Color" setter="set_block_bullets_debugger_color" getter="get_block_bullets_debugger_color" default="Color(0, 0, 1, 0.8)">
-			The color for the collision shapes of all [BlockBullets2D].
-		</member>
 		<member name="debugger_draw_inactive" type="bool" setter="set_debugger_draw_inactive" getter="get_debugger_draw_inactive" default="true">
 			When false, pooled/frozen volleys are hidden in the debugger instead of drawn frozen. Default true preserves always-draw behavior.
 		</member>
@@ -1429,29 +1416,6 @@
 		</member>
 	</members>
 	<signals>
-		<signal name="block_area_entered">
-			<param index="0" name="hit_target_area" type="Object" />
-			<param index="1" name="block_bullets_instance" type="BlockBullets2D" />
-			<param index="2" name="bullet_index" type="int" />
-			<description>
-				Emitted synchronously in the physics tick when a block bullet enters a physics area. Same handler contract as [signal directional_area_entered].
-			</description>
-		</signal>
-		<signal name="block_body_entered">
-			<param index="0" name="hit_target_body" type="Object" />
-			<param index="1" name="block_bullets_instance" type="BlockBullets2D" />
-			<param index="2" name="bullet_index" type="int" />
-			<description>
-				Emitted synchronously in the physics tick when a block bullet enters a physics body. Same handler contract as [signal directional_body_entered].
-			</description>
-		</signal>
-		<signal name="block_life_time_over">
-			<param index="0" name="block_bullets_instance" type="BlockBullets2D" />
-			<param index="1" name="bullet_indexes" type="int[]" />
-			<description>
-				Emitted (deferred, outside the physics step) when a block bullet multimesh's lifetime is over, but only if the [MultiMeshBulletsData2D]'s [member MultiMeshBulletsData2D.is_life_time_over_signal_enabled] is set to [code]true[/code]. Until the signal has been delivered the expired volley stays out of the pool and keeps its attachments, so handlers can inspect [method MultiMeshBullets2D.bullet_get_attachment] and a same-frame spawn can never reuse (and silence) it; attachments are released and the volley pooled right after.
-			</description>
-		</signal>
 		<signal name="directional_area_entered">
 			<param index="0" name="hit_target_area" type="Object" />
 			<param index="1" name="directional_bullets_instance" type="DirectionalBullets2D" />
@@ -1772,9 +1736,6 @@
 		</constant>
 		<constant name="DIRECTIONAL_BULLETS" value="0" enum="BulletType">
 			Bullet type for DirectionalBullets2D, bullets that move independently with per-bullet direction, speed and features.
-		</constant>
-		<constant name="BLOCK_BULLETS" value="1" enum="BulletType">
-			Bullet type for BlockBullets2D, bullets that travel as one rigid volley in a single direction.
 		</constant>
 		<constant name="TOP_LEFT" value="0" enum="Alignment">
 			Grid anchor used by helper_generate_transforms_grid(), the grid grows right and down starting at the marker.

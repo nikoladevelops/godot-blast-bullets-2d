@@ -572,12 +572,6 @@ public:
 
 	Ref<BulletCurvesData2D> get_shared_bullet_curves_data() const { return shared_bullet_curves_data; }
 	void set_shared_bullet_curves_data(const Ref<BulletCurvesData2D> &new_curves_data) {
-		// Block bullets are spawned without an instance handle by design (spawn_block_bullets
-		// returns void), so advanced per-instance features stay on DirectionalBullets2D.
-		if (!new_curves_data.is_null() && is_block_volley()) {
-			UtilityFunctions::push_error("BlockBullets2D does not support bullet curves - use DirectionalBullets2D for curves.");
-			return;
-		}
 		populate_shared_curves_related_data(new_curves_data);
 	}
 	bool has_shared_bullet_curves_data() const { return shared_bullet_curves_data.is_valid(); }
@@ -827,9 +821,6 @@ public:
 	// array). Re-seed with spawn/enable or set_bullet_rotation_data to spin
 	// again.
 	void clear_bullet_rotation_data();
-
-	// True when the rotation array didn't match the bullet count, so every bullet shares entry 0 (tiling keeps exact-size arrays per-bullet)
-	bool use_only_first_rotation_data = false;
 
 	// If set to true, it will stop the rotation when the max rotation speed is reached
 	bool stop_rotation_when_max_reached = false;
@@ -1461,7 +1452,7 @@ public:
 	// The max life time before the multimesh gets disabled
 	double max_life_time = 0.0;
 
-	// Whether the directional_life_time_over / block_life_time_over signal will be emitted when the life time of the bullets is over. Tracked by BulletFactory2D
+	// Whether the directional_life_time_over signal will be emitted when the life time of the bullets is over. Tracked by BulletFactory2D
 	bool is_life_time_over_signal_enabled = false;
 
 	// The current life time being processed
@@ -2084,22 +2075,11 @@ public:
 			return;
 		}
 
-		if (is_block_volley()) {
-			UtilityFunctions::push_error("BlockBullets2D does not support bullet curves - use DirectionalBullets2D for curves.");
-			return;
-		}
-
 		populate_individual_bullet_curves_related_data(bullet_index, curves_data);
 	}
 
 	_ALWAYS_INLINE_ void all_bullets_set_curves_data(const Ref<BulletCurvesData2D> &curves_data, int bullet_index_start = 0, int bullet_index_end_inclusive = -1) {
 		ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_set_curves_data");
-
-		// Single error for the whole range instead of one per bullet below.
-		if (!curves_data.is_null() && is_block_volley()) {
-			UtilityFunctions::push_error("BlockBullets2D does not support bullet curves - use DirectionalBullets2D for curves.");
-			return;
-		}
 
 		for (int i = bullet_index_start; i <= bullet_index_end_inclusive; ++i) {
 			bullet_set_curves_data(i, curves_data);
@@ -2356,8 +2336,8 @@ public:
 	}
 
 	// Guard-free core of bullet_set_attachment. Used by the public wrapper
-	// below and by the spawn-time shared-attachment application, so both types
-	// (including BlockBullets2D) share one implementation. Returns false when
+	// below and by the spawn-time shared-attachment application, so both share
+	// one implementation. Returns false when
 	// nothing was attached (error already printed).
 	// Rejected while the factory holds its internal busy flag (disable
 	// sweeps, reset/free loops): attaching into a sweep would either be
@@ -2863,13 +2843,10 @@ public:
 	// path. Returns 0 = not a bounce (normal path), 1 = bounced and fully
 	// handled (return), 2 = bounced but the hit is consumed too (fall
 	// through into normal counting/signals). Base is a no-op (only
-	// DirectionalBullets2D bounces); BlockBullets2D never overrides it.
+	// DirectionalBullets2D bounces).
 	// Whether queued collision records need the target's velocity/pose
 	// (bounce math only). Base never bounces.
 	virtual bool wants_queued_target_motion() const { return false; }
-	// Type tag without a String-building is_class() call (hot paths: collision
-	// drain, expiry). BlockBullets2D overrides it.
-	virtual bool is_block_volley() const { return false; }
 
 	virtual int try_handle_bounce(CollisionType collision_type, int bullet_index, int64_t entered_instance_id, Vector2 queued_target_velocity, bool queued_velocity_valid, Vector2 queued_target_position, bool queue_position_valid) {
 		(void)collision_type;

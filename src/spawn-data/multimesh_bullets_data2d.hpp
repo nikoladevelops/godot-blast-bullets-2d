@@ -95,7 +95,7 @@ public:
 	// If set to true it would mean it can detect bodies. I suggest you do NOT enable it, because it tanks performance, but I left it just in case someone is stubborn and has that need. Instead consider adding an Area2D to the body that you are trying to damage and set up its collision layer correctly so that the bullets can interact with it.
 	bool monitorable = false;
 
-	// Available inside the directional_area_entered / directional_body_entered (or block_* variants) callbacks inside factory.
+	// Available inside the directional_area_entered / directional_body_entered callbacks inside factory.
 	Ref<Resource> shared_bullets_custom_data;
 
 	// PER-BULLET CUSTOM DATA
@@ -147,8 +147,7 @@ public:
 	// every spawn/enable, so pool reuse never leaks the previous tint.
 	Color self_modulate = Color(1, 1, 1, 1);
 
-	// Bullet whiten override (both bullet types: directional and block
-	// share the animation rebuild below). When true, bullet frames bake
+	// Bullet whiten override (shares the animation rebuild below). When true, bullet frames bake
 	// whitened (alpha preserved), so self_modulate tints bullets to the
 	// exact dialed color instead of multiplying the source art. Same
 	// fallback contract as the effect-layer override: unreadable frames
@@ -166,7 +165,7 @@ public:
 	// How long will the bullets last, before being disabled. Depending on whether the bullets pool has reached its limit, it will either add the bullets to the pool or it will queue_free them.
 	double max_life_time = 2.0f;
 
-	// Whether the directional_life_time_over / block_life_time_over signal will be emitted when the life time of the bullets is over. Tracked by BulletFactory2D
+	// Whether the directional_life_time_over signal will be emitted when the life time of the bullets is over. Tracked by BulletFactory2D
 	bool is_life_time_over_signal_enabled = false;
 
 	// Whether the lifetime is infinite

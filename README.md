@@ -93,7 +93,7 @@ relative to their direction (allows zig zag patterns and any other creative patt
 
 - **Bullets Custom Data** - Attach a custom resource that the multimesh of bullets carries - used for storing damage, armor damage or anything else custom that should be available during collision.
 
-- **Familiar Signals** - Collisions are tracked with the typed `directional_area_entered` / `directional_body_entered` signals (plus `block_*` variants) inside the BulletFactory2D node. Combine this with the bullet custom data and you can easily differentiate between types of bullets. You can even detach/attach new bullet attachments or make explosion effects while editing runtime properties inside the function callbacks.
+- **Familiar Signals** - Collisions are tracked with the typed `directional_area_entered` / `directional_body_entered` signals inside the BulletFactory2D node. Combine this with the bullet custom data and you can easily differentiate between types of bullets. You can even detach/attach new bullet attachments or make explosion effects while editing runtime properties inside the function callbacks.
 
 - **Extensive Documentation** - Full in-editor documentation for every function and property, accessible directly within the Godot Inspector and Script Editor.
 
@@ -174,7 +174,7 @@ It is recommended to watch these tutorials if you are struggling with the docume
 
 Here is how the basic setup goes:
 1. Add a `BulletFactory2D` node to your scene tree. The BulletFactory's job is to spawn bullets and manage plugin related options (debugger, physics interpolations and so on..).
-2. The `BulletFactory2D` node has the typed signals `directional_area_entered`, `directional_body_entered`, `directional_life_time_over` (and the `block_*` variants) and each bullet multimesh emits `sprite_animation_finished` when a non-looping animation ends. The instance argument is already typed (`DirectionalBullets2D` / `BlockBullets2D`), so handlers need no casts - custom data and transforms are one instance call away (`bullet_get_custom_data()`, `get_bullet_global_transform()`). Collision signals fire synchronously in the physics tick; only structural factory calls (`reset()`/`free_*()`/`populate_*()`) must be deferred, and the error message tells you when that happens. You should handle them in your script and write custom logic for your game.
+2. The `BulletFactory2D` node has the typed signals `directional_area_entered`, `directional_body_entered`, `directional_life_time_over` and each bullet multimesh emits `sprite_animation_finished` when a non-looping animation ends. The instance argument is already typed (`DirectionalBullets2D`), so handlers need no casts - custom data and transforms are one instance call away (`bullet_get_custom_data()`, `get_bullet_global_transform()`). Collision signals fire synchronously in the physics tick; only structural factory calls (`reset()`/`free_*()`/`populate_*()`) must be deferred, and the error message tells you when that happens. You should handle them in your script and write custom logic for your game.
 
 Keep a reference to the factory globally, so you can access it in any other script(enemies/player). There's two ways of doing this.
 
@@ -234,22 +234,20 @@ Full property and method reference for all of the above lives in the editor docs
 `BulletFactory2D` registers live `BlastBullets2D/*` custom monitors (active bullets and volleys, physics tick time, interpolation time, effects, attachments). Run your game and open the editor's **Debugger > Monitors** tab to see which frames are heavy. From code, `get_frame_stats()` and `get_active_bullet_count()` return the same numbers.
 
 #### If you just need normal bullets without extra options:<br>
-- <b>`spawn_block_bullets()`</b> - Spawns a multimesh of bullets where the direction is determined by `block_rotation_radians` and the speed by `block_speed`. Optionally pass an `inherited_velocity_offset` (Vector2) that gets added on top of the whole volley's movement, useful for recoil or moving shooters.
-
 - <b>`spawn_directional_bullets()`</b> - Spawns a multimesh of bullets where the direction is determined by the `transforms`'s rotation and each bullet has its own speed data.
 
 #### For advanced features:<br><br>
 - <b>`spawn_controllable_directional_bullets()`</b> - Same as `spawn_directional_bullets()`, however this method returns the multimesh instance as a result. Save it to a variable and try modifying its properties/ calling functions. This is where all the advanced features are hidden - homing, orbiting, bullet curves, attachments, movement patterns, teleporting, timer related functionality, object pooling options and so on.
 
-#### How to configure `DirectionalBulletsData2D` and `BlockBulletsData2D`?
+#### How to configure `DirectionalBulletsData2D`?
 
-The spawn functions will either require a `BlockBulletsData2D` or a `DirectionalBulletsData2D`.
-It's important that you always check the in-engine documentation of both and also the base class that they inherit from `MultiMeshBulletsData2D`.<br>
+The spawn functions require a `DirectionalBulletsData2D`.
+It's important that you always check its in-engine documentation and also the base class that it inherits from `MultiMeshBulletsData2D`.<br>
 
-The same thing should be said for the `BlockBullets2D`, `DirectionalBullets2D` and `MultiMeshBullets2D` classes, since inside them you will find runtime properties and helper functions. The documentation is always there to help you!
+The same thing should be said for the `DirectionalBullets2D` and `MultiMeshBullets2D` classes, since inside them you will find runtime properties and helper functions. The documentation is always there to help you!
 
 
-`BlockBulletsData2D` and `DirectionalBulletsData2D` resource classes need to have their `transforms` property set to an array of `Transform2D` - this data determines the global position and rotation of all bullets. The amount of `Transform2D` will also determine the amount of bullets that need to be spawned.
+The `DirectionalBulletsData2D` resource class needs to have their `transforms` property set to an array of `Transform2D` - this data determines the global position and rotation of all bullets. The amount of `Transform2D` will also determine the amount of bullets that need to be spawned.
 
 A smart way is to generate these transforms using a bunch of `Marker2D` nodes as children of your player (that is supposed to shoot bullets). This way, as he moves the markers will also move along with him. The only thing you need to do is get all these marker2d's transforms, store them in an array and set it to the bullets data resource class each time you need to spawn bullets. Having a shoot cooldown timer would be nice too.
 
@@ -306,7 +304,7 @@ extends Resource
 ```
 
 
-Next up go inside the ``BulletFactory2D`` node and register callbacks for the signals ``directional_area_entered``, ``directional_body_entered`` (or the ``block_*`` variants) and even ``directional_life_time_over`` if you are interested in it.
+Next up go inside the ``BulletFactory2D`` node and register callbacks for the signals ``directional_area_entered``, ``directional_body_entered`` and even ``directional_life_time_over`` if you are interested in it.
 
 Example:
 
@@ -427,7 +425,7 @@ tick the checkbox inside the inspector in `BulletFactory2D`. That's all, enjoy t
 - Pooling flags reset to defaults on every new life (`spawn`/`enable_multimesh`). Set `is_multimesh_auto_pooling_enabled` / `is_attachments_auto_pooling_enabled` explicitly after each spawn when you want manual ownership. Same-owner `enable_bullet()` wakes keep flags by design.
 - Pool buckets are exact `(amount_bullets, shape)` pairs. Use `BulletFactory2D.debug_expected_pool_key(data)` and `debug_get_pool_hit_stats()` / `debug_get_bullets_pool_info()` to diagnose 0% pool hits (e.g. `helper_skip_indices` shrank transforms after `populate`). `validate` first with `BulletFactory2D.debug_validate_spawn_data(data)`.
 - Smooth bullets need BOTH the factory `use_physics_interpolation` flag AND ProjectSettings `physics/common/physics_interpolation`. Check `factory.debug_check_interpolation_status()` when motion looks steppy. Art must face `Vector2.RIGHT`; invisible bullets (no `sprite_frames`/`mesh`/`texture_size`) now warn via `debug_validate_spawn_data()`.
-- v4 migration: generic `area_entered` / `body_entered` / `life_time_over` signals were renamed to typed `directional_area_entered`, `directional_body_entered`, `directional_life_time_over` (plus `block_*` variants). Reconnect scenes/scripts. `MultiMeshPoolKey2D.make()` now returns `null` on invalid input instead of a default bucket.
+- v4 migration: generic `area_entered` / `body_entered` / `life_time_over` signals were renamed to typed `directional_area_entered`, `directional_body_entered`, `directional_life_time_over`. Reconnect scenes/scripts. `MultiMeshPoolKey2D.make()` now returns `null` on invalid input instead of a default bucket.
 
 
 ## How To Compile

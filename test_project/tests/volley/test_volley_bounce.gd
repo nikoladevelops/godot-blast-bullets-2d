@@ -976,7 +976,7 @@ func test_t20_inspector_groups_stay_coherent() -> void:
 			groups_found[gname] = true
 			if not spawner_group_order.has(gname):
 				spawner_group_order.append(gname)
-	# Unique titles on every inspector surface (volley, spawner, block data).
+	# Unique titles on every inspector surface (volley, spawner).
 	for entry in [[vinst, "volley"], [spawner20, "spawner"]]:
 		var seen := {}
 		var dups: Array = []
@@ -987,15 +987,6 @@ func test_t20_inspector_groups_stay_coherent() -> void:
 					dups.append(gname)
 				seen[gname] = true
 		assert_true(dups.is_empty(), "no duplicate group titles on " + str(entry[1]))
-	var block20 := BlockBulletsData2D.new()
-	block20.sprite_frames = H.make_sprite_frames()
-	var block_groups: Array = []
-	for p in block20.get_property_list():
-		if (int(p.get("usage", 0)) & PROPERTY_USAGE_GROUP) != 0:
-			var gname := str(p.get("name", ""))
-			if not block_groups.has(gname):
-				block_groups.append(gname)
-	assert_true(block_groups.slice(0, 1) == ["Block Bullets"], "block data leads with its own group")
 	assert_true(groups_found.has("Shooting"), "spawner Shooting group present")
 	assert_true(groups_found.has("Homing"), "spawner Homing group present")
 	assert_true(groups_found.has("Orbiting"), "spawner Orbiting group present")
@@ -2235,18 +2226,9 @@ func test_unspawned_instances_never_crash() -> void:
 	bare.play_effect_animation(0, "x")
 	assert_true(bare.get_bullet_transform(0) == Transform2D(), "hostile storm leaves identity")
 	assert_true(bare.debug_get_volley_info().get("amount_bullets", -1) == 0, "volley info zeroed")
-	bare.queue_free()
-	await idle(1)
-	var bare_block := BlockBullets2D.new()
-	add(bare_block)
-	await idle(1)
-	var empty_block := BlockBulletsData2D.new()
-	empty_block.sprite_frames = H.make_sprite_frames()
-	empty_block.transforms = []
-	assert_true(bare_block.enable_multimesh(empty_block, Vector2.ZERO, 0) == false, "block enable on fresh instance refuses cleanly")
-	expect_errors_containing("never spawned through BulletFactory2D", 2, "unspawned enable fails loud")
+	expect_errors_containing("never spawned through BulletFactory2D", 1, "unspawned enable fails loud")
 	expect_errors_containing("Invalid bullet index in", 12, "zero-bullet OOB storm fails loud")
-	bare_block.queue_free()
+	bare.queue_free()
 	await idle(1)
 
 
@@ -2333,9 +2315,9 @@ func test_paused_steady_overlap_registers_once_on_resume() -> void:
 	factory.set_use_physics_interpolation_runtime(true)
 
 
-func test_orbit_endurance_block_census_telegraph_zero_helper_hostility() -> void:
+func test_orbit_endurance_census_telegraph_zero_helper_hostility() -> void:
 	_connect_signals()
-	# BOUNCE T35 orbit endurance, block census, telegraph-zero, helper hostility
+	# BOUNCE T35 orbit endurance, fire-and-forget census, telegraph-zero, helper hostility
 	await _settle(factory)
 	var moon35 := Node2D.new()
 	moon35.position = Vector2(600, 300)
@@ -2352,9 +2334,9 @@ func test_orbit_endurance_block_census_telegraph_zero_helper_hostility() -> void
 	moon35.queue_free()
 	await idle(1)
 	await _settle(factory)
-	factory.spawn_block_bullets(H.make_block_data(2, 150.0, 10.0))
+	factory.spawn_directional_bullets(H.make_directional_data(2, 150.0, 10.0))
 	await physics()
-	assert_true(factory.debug_get_live_volley_ids(0).size() >= 1, "factory census includes block volleys")
+	assert_true(factory.debug_get_live_volley_ids(0).size() >= 1, "factory census includes fire-and-forget volleys")
 	await _settle(factory)
 	var tsp := BulletSpawner2D.new()
 	add(tsp)

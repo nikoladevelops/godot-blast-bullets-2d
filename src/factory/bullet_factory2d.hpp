@@ -31,11 +31,9 @@ namespace BlastBullets2D {
 using namespace godot;
 
 // Using forward declaration to avoid circular dependencies
-class BlockBulletsData2D;
 class DirectionalBulletsData2D;
 class MultiMeshBulletsDebugger2D;
 class DirectionalBullets2D;
-class BlockBullets2D;
 
 // Validates spawn data before any pool pop or memnew happens, so a bad resource can
 // never leave a half-set-up multimesh behind. Returns false with an error when invalid.
@@ -58,10 +56,9 @@ class BulletFactory2D : public Node2D {
 	friend class FactoryOperationGuard;
 
 public:
-	// The available multimesh bullet types that the factory can handle with ease (if you plan on adding more custom types, you would have to add extra code where you see BulletType being checked to ensure consistent behavior)
+	// The bullet types the factory spawns (only directional volleys remain).
 	enum BulletType {
-		DIRECTIONAL_BULLETS,
-		BLOCK_BULLETS
+		DIRECTIONAL_BULLETS
 	};
 
 	// Enum class for grid alignment
@@ -338,9 +335,6 @@ public:
 	// Spawns DirectionalBullets2D when given a resource containing all needed data
 	void spawn_directional_bullets(const Ref<DirectionalBulletsData2D> &spawn_data, const Vector2 &new_inherited_velocity_offset = Vector2(0, 0));
 
-	// Spawns BlockBullets2D when given a resource containing all needed data
-	void spawn_block_bullets(const Ref<BlockBulletsData2D> &spawn_data, const Vector2 &new_inherited_velocity_offset = Vector2(0, 0));
-
 	// Spawns DirectionalBullets2D when given a resource containing all needed data. These bullets should be controlled by the user.
 	// spawner_id pre-stamps signal ownership before activation (configure-then-attach):
 	// BulletSpawner2D passes its instance id; direct factory users leave 0 (factory-owned).
@@ -615,10 +609,10 @@ public:
 	// ---- Stability / observability debug API (bound, const where possible) ----
 	// Snapshot of factory lifecycle state. Keys: is_ready, is_busy,
 	// is_iterating, is_tearing_down, processing, directional_total,
-	// block_total, directional_pooled, block_pooled, attachments_pooled.
+	// directional_pooled, attachments_pooled.
 	Dictionary debug_get_factory_state();
 	// Pool hit/miss counters for spawn reuse (pop hit vs allocate-new miss).
-	// Keys: directional_hits, directional_misses, block_hits, block_misses.
+	// Keys: directional_hits, directional_misses.
 	// Misses are normal on first spawn / key change; a 0% hit rate with a
 	// pre-populated pool means the spawn key never matches (e.g. skip indices
 	// shrank transforms after populate). Use debug_expected_pool_key() to compare.
@@ -676,7 +670,6 @@ public:
 	//
 
 	DynamicSparseSet directional_bullets_set;
-	DynamicSparseSet block_bullets_set;
 
 	void handle_manual_user_deletion_of_multimesh_bullets(MultiMeshBullets2D &bullet_multi);
 
@@ -769,15 +762,12 @@ public:
 		const void *instance = nullptr;
 	};
 	std::vector<VolleyIterationEntry> directional_iteration_scratch;
-	std::vector<VolleyIterationEntry> block_iteration_scratch;
 
 	// Pool reuse counters. Incremented only on spawn pop/allocate
 	// paths (never in the per-bullet tick), so zero hot-path cost.
 	// Mutable so const debug getters can report without breaking constness.
 	mutable uint64_t directional_pool_hits = 0;
 	mutable uint64_t directional_pool_misses = 0;
-	mutable uint64_t block_pool_hits = 0;
-	mutable uint64_t block_pool_misses = 0;
 
 	// FRAME STATS (get_frame_stats / custom Performance monitors). Written once
 	// per tick or once per event (spawn, drained collision record, expiry),
@@ -819,7 +809,7 @@ private:
 	// is unsafe: mid-iteration, or inside any physics frame (server flush
 	// locks apply to RIDs the operation would free). E.g. reset()/free_*()/
 	// populate_*() called from inside a collision or lifetime handler
-	// (directional_area_entered, block_body_entered,
+	// (directional_area_entered, directional_body_entered,
 	// directional_life_time_over, ...) or from a native flush callback.
 	// Use the *_deferred() wrappers: they run on the next idle frame (a plain
 	// call_deferred() from a physics callback still flushes inside physics).
@@ -828,7 +818,7 @@ private:
 	// Returns true when the caller must abort.
 	bool reject_when_iterating(const char *caller_name) const {
 		if (is_structural_mutation_unsafe()) {
-			UtilityFunctions::push_error(String("BulletFactory2D::") + caller_name + " cannot run while bullets are being processed or inside a physics frame (e.g. inside directional_area_entered/block_body_entered/directional_life_time_over handlers). Only structural calls are affected - use call_deferred() to run this after the physics step.");
+			UtilityFunctions::push_error(String("BulletFactory2D::") + caller_name + " cannot run while bullets are being processed or inside a physics frame (e.g. inside directional_area_entered/directional_body_entered/directional_life_time_over handlers). Only structural calls are affected - use call_deferred() to run this after the physics step.");
 			return true;
 		}
 		return false;
@@ -904,18 +894,6 @@ private:
 
 	//
 
-	// BLOCK BULLETS RELATED
-
-	std::vector<BlockBullets2D *> all_block_bullets;
-
-	// Contains all BlockBullets2D in the scene tree
-	Node *block_bullets_container = nullptr;
-
-	// Holds all disabled BlockBullets2D
-	MultiMeshObjectPool block_bullets_pool;
-
-	//
-
 	//
 
 	// DEBUGGER RELATED
@@ -936,18 +914,6 @@ private:
 	Color directional_bullets_debugger_color_cached_before_ready = Color(0, 0, 1, 0.8);
 	Color get_directional_bullets_debugger_color() const;
 	void set_directional_bullets_debugger_color(const Color &new_color);
-
-	//
-
-	// BLOCK BULLETS DEBUGGER RELATED
-
-	// Debugs the collision shapes of all BlockBullets2D when enabled
-	MultiMeshBulletsDebugger2D *block_bullets_debugger = nullptr;
-
-	// The color for the collision shapes of all BlockBullets2D
-	Color block_bullets_debugger_color_cached_before_ready = Color(0, 0, 1, 0.8);
-	Color get_block_bullets_debugger_color() const;
-	void set_block_bullets_debugger_color(const Color &new_color);
 
 	//
 
@@ -1233,11 +1199,7 @@ private:
 			// Pool-hit accounting lands only on success: a popped-but-rejected
 			// reuse must not skew debug_get_pool_hit_stats. Discriminated at
 			// compile time by the pooled type; never touches the per-bullet tick.
-			if constexpr (std::is_same_v<TBullet, DirectionalBullets2D>) {
-				++directional_pool_hits;
-			} else {
-				++block_pool_hits;
-			}
+			++directional_pool_hits;
 			// Identity-checked: a stale pooled id must never activate a foreign entry.
 			// Pooled instances normally stay in the vec, so this is just a safe lookup.
 			int reuse_id = bullets->sparse_set_id;
@@ -1266,11 +1228,7 @@ private:
 		int sparse_set_id = bullets_vec.size();
 
 		// Pool miss: no reusable instance, allocating new.
-		if constexpr (std::is_same_v<TBullet, DirectionalBullets2D>) {
-			++directional_pool_misses;
-		} else {
-			++block_pool_misses;
-		}
+		++directional_pool_misses;
 
 		// If there was no TBullet in the pool, create a brand new one and spawn it
 		bullets = memnew(TBullet);

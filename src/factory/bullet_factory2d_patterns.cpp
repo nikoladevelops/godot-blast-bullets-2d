@@ -7,9 +7,7 @@
 
 #include "./bullet_factory2d.hpp"
 #include "../shared/warn_once2d.hpp"
-#include "../bullets/block_bullets2d.hpp"
 #include "../bullets/directional_bullets2d.hpp"
-#include "../spawn-data/block_bullets_data2d.hpp"
 #include "../spawn-data/directional_bullets_data2d.hpp"
 #include "../debugger/multimesh_bullets_debugger2d.hpp"
 #include "../shared/bullet_attachment2d.hpp"

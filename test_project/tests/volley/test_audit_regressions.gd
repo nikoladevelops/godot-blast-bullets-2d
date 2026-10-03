@@ -45,25 +45,19 @@ func test_repeating_timer_keeps_period() -> void:
 	v.multimesh_detach_all_time_based_functions()
 
 
-func test_block_shared_spin_survives_bullet_zero() -> void:
-	var bd := H.make_block_data(4, 0.0, 30.0)
+func test_shared_spin_survives_disabling_bullet_zero() -> void:
+	var d := H.make_directional_data(4, 0.0, 30.0)
 	var rot := BulletRotationData2D.new()
 	rot.rotation_speed = 6.0
-	bd.all_bullet_rotation_data = [rot]
-	var container := factory.get_node("BlockBulletsContainer")
-	factory.spawn_block_bullets(bd)
+	d.shared_bullet_rotation_data = rot
+	var v: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d)
+	assert_not_null(v, "volley spawned")
 	await idle(1)
-	var block: BlockBullets2D = null
-	for c in container.get_children():
-		if c is BlockBullets2D and c.debug_get_volley_info().get("is_active", false) and c.get_amount_bullets() == 4:
-			block = c
-	assert_not_null(block, "block volley found")
-	if block == null:
-		return
-	block.disable_bullet(0)
-	var y0: float = block.get_bullet_transform(1).get_rotation()
+	v.disable_bullet(0)
+	var y0: float = v.get_bullet_transform(1).get_rotation()
 	await physics(10)
-	assert_gt(absf(angle_difference(block.get_bullet_transform(1).get_rotation(), y0)), 0.3, "remaining bullets keep spinning")
+	# 6 rad/s for 10 ticks at 60 Hz = 1 rad; 0.3 leaves margin for the first tick.
+	assert_gt(absf(angle_difference(v.get_bullet_transform(1).get_rotation(), y0)), 0.3, "remaining bullets keep spinning")
 
 
 func test_pool_key_inspector_enum() -> void:

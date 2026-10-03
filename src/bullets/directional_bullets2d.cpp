@@ -182,7 +182,6 @@ void DirectionalBullets2D::apply_shared_rotation_fallback(const Ref<BulletRotati
 			all_rotation_acceleration[i] = shared->rotation_acceleration;
 		}
 		is_rotation_data_active = true;
-		use_only_first_rotation_data = false;
 		rotate_only_textures = new_rotate_only_textures;
 		return;
 	}
@@ -1569,8 +1568,8 @@ void DirectionalBullets2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_shared_bullet_speed_data", "new_speed_data"), &DirectionalBullets2D::set_shared_bullet_speed_data);
 	ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "shared_bullet_speed_data", PROPERTY_HINT_RESOURCE_TYPE, "BulletSpeedData2D"), "set_shared_bullet_speed_data", "get_shared_bullet_speed_data");
 
-	// Get/set methods live on the base class (bound there so BlockBullets2D
-	// gets them too); only the property is declared here.
+	// Get/set methods are bound on the base class; only the property is
+	// declared here.
 	ADD_PROPERTY(PropertyInfo(Variant::VECTOR2, "inherited_velocity_offset"), "set_inherited_velocity_offset", "get_inherited_velocity_offset");
 
 	ADD_GROUP("Bullet Rotation", "");

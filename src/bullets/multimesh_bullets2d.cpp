@@ -1543,7 +1543,6 @@ void MultiMeshBullets2D::set_rotation_data(const TypedArray<BulletRotationData2D
 	// With the tile checkbox, short arrays wrap (i % size).
 	if (amount_rotation_data == 0) {
 		is_rotation_data_active = false;
-		use_only_first_rotation_data = false;
 		all_rotation_speed.clear();
 		all_max_rotation_speed.clear();
 		all_rotation_acceleration.clear();
@@ -1559,7 +1558,6 @@ void MultiMeshBullets2D::set_rotation_data(const TypedArray<BulletRotationData2D
 
 	is_rotation_data_active = true;
 
-	use_only_first_rotation_data = (amount_rotation_data != amount_bullets);
 	if (amount_rotation_data != amount_bullets) {
 		WarnOnce2D::warn(warn_data_id, 4u, amount_rotation_data, amount_bullets, "MultiMeshBullets2D: all_bullet_rotation_data size (" + String::num_int64(amount_rotation_data) + ") != bullets (" + String::num_int64(amount_bullets) + "); uncovered bullets get zero spin (shared fills gaps on Directional)" + String(tile_short_arrays ? " (tiling on: wrapping short array)." : " (check tile_all_bullet_rotation_data to wrap, or provide one entry per bullet)."));
 	}
@@ -1680,7 +1678,6 @@ void MultiMeshBullets2D::set_bullet_rotation_data(int bullet_index, const Ref<Bu
 	// set_rotation_data only flips this on spawn/enable seeds. Exact-size
 	// writes are per-bullet; anything else fans out like the seed path.
 	is_rotation_data_active = true;
-	use_only_first_rotation_data = false;
 }
 
 TypedArray<BulletRotationData2D> MultiMeshBullets2D::all_bullets_get_rotation_data(int bullet_index_start, int bullet_index_end_inclusive) const {
@@ -1709,7 +1706,6 @@ void MultiMeshBullets2D::all_bullets_set_rotation_data(const Ref<BulletRotationD
 
 void MultiMeshBullets2D::clear_bullet_rotation_data() {
 	is_rotation_data_active = false;
-	use_only_first_rotation_data = false;
 	all_rotation_speed.clear();
 	all_max_rotation_speed.clear();
 	all_rotation_acceleration.clear();
@@ -2463,12 +2459,6 @@ void MultiMeshBullets2D::all_bullets_set_movement_pattern_from_path(Path2D *path
 		return;
 	}
 
-	// Single error for the whole range instead of one per bullet below.
-	if (is_block_volley()) {
-		UtilityFunctions::push_error("BlockBullets2D does not support movement patterns - use DirectionalBullets2D for patterned movement.");
-		return;
-	}
-
 	const Ref<Curve2D> &curve = path_holding_pattern->get_curve();
 
 	if (curve.is_null()) {
@@ -2489,13 +2479,6 @@ void MultiMeshBullets2D::set_bullet_movement_pattern_from_curve(int bullet_index
 		remove_bullet_movement_pattern(bullet_index);
 		return;
 	}
-	// Block bullets are spawned without an instance handle by design (spawn_block_bullets
-	// returns void), so movement patterns stay on DirectionalBullets2D.
-	if (is_block_volley()) {
-		UtilityFunctions::push_error("BlockBullets2D does not support movement patterns - use DirectionalBullets2D for patterned movement.");
-		return;
-	}
-
 	all_movement_pattern_data[bullet_index] = BulletMovementPatternData2D{ curve_pattern, face_movement_direction, repeat_pattern };
 }
 
@@ -2504,12 +2487,6 @@ void MultiMeshBullets2D::all_bullets_set_movement_pattern_from_curve(const Ref<C
 
 	if (curve_pattern.is_null()) {
 		all_bullets_remove_movement_pattern(start_index, end_index_inclusive);
-		return;
-	}
-
-	// Single error for the whole range instead of one per bullet below.
-	if (is_block_volley()) {
-		UtilityFunctions::push_error("BlockBullets2D does not support movement patterns - use DirectionalBullets2D for patterned movement.");
 		return;
 	}
 
@@ -2604,7 +2581,7 @@ void MultiMeshBullets2D::set_collision_shape_runtime(const Ref<Shape2D> &new_sha
 	// factory iterates bullet state or inside any physics frame (server flush
 	// locks apply). Same contract as the factory structural methods.
 	if (bullet_factory != nullptr && bullet_factory->is_structural_mutation_unsafe()) {
-		UtilityFunctions::push_error("set_collision_shape_runtime cannot run while bullets are being processed or inside a physics frame (e.g. inside directional_area_entered/block_body_entered handlers). Use call_deferred() to run this after the physics step.");
+		UtilityFunctions::push_error("set_collision_shape_runtime cannot run while bullets are being processed or inside a physics frame (e.g. inside directional_area_entered/directional_body_entered handlers). Use call_deferred() to run this after the physics step.");
 		return;
 	}
 	PhysicsServer2D::ShapeType old_effective = cached_effective_shape_type;
@@ -2775,7 +2752,7 @@ void MultiMeshBullets2D::_bind_methods() {
 
 	// Base-class methods only (no ADD_PROPERTY here): DirectionalBullets2D binds its
 	// own versions and exposes the "inherited_velocity_offset" property; these binds
-	// make the getters/setters reachable on MultiMeshBullets2D/BlockBullets2D too.
+	// make the getters/setters reachable on MultiMeshBullets2D too.
 	ClassDB::bind_method(D_METHOD("get_inherited_velocity_offset"), &MultiMeshBullets2D::get_inherited_velocity_offset);
 	ClassDB::bind_method(D_METHOD("set_inherited_velocity_offset", "new_offset"), &MultiMeshBullets2D::set_inherited_velocity_offset);
 
@@ -3099,7 +3076,7 @@ void MultiMeshBullets2D::reduce_lifetime(double delta) {
 		if (emitter != nullptr) {
 			const uint64_t emitter_id = emitter->get_instance_id();
 			if (emitter == bullet_factory) {
-				const StringName &signal_name = is_block_volley() ? CachedStringNames2D::get().block_life_time_over : CachedStringNames2D::get().directional_life_time_over;
+				const StringName &signal_name = CachedStringNames2D::get().directional_life_time_over;
 				call_deferred(CachedStringNames2D::get().m_do_emit_life_time_over, multimesh_generation, emitter_id, signal_name, bullet_indexes);
 			} else {
 				call_deferred(CachedStringNames2D::get().m_do_emit_life_time_over, multimesh_generation, emitter_id, CachedStringNames2D::get().life_time_over, bullet_indexes);
@@ -3324,12 +3301,9 @@ void MultiMeshBullets2D::enable_bullet(int bullet_index, int collision_amount, b
 			disconnect_sprite_animation_connections();
 			// Same for the previous owner's homing forward: without this, the old
 			// spawner would keep retargeting a volley someone else woke manually.
-			// Guarded by has_signal so BlockBullets2D (no homing signal) no-ops.
-			if (has_signal("bullet_homing_target_reached")) {
-				for (const Dictionary &connection : get_signal_connection_list("bullet_homing_target_reached")) {
-					const Callable callable = connection["callable"];
-					disconnect("bullet_homing_target_reached", callable);
-				}
+			for (const Dictionary &connection : get_signal_connection_list("bullet_homing_target_reached")) {
+				const Callable callable = connection["callable"];
+				disconnect("bullet_homing_target_reached", callable);
 			}
 			// Fail-safe neutral subset: the queue_free-vs-pool decision and the
 			// rotation drive must not follow a dead owner into the new life.
@@ -3598,18 +3572,10 @@ void MultiMeshBullets2D::handle_bullet_collision(CollisionType collision_type, i
 		const uint64_t self_id = get_instance_id();
 		if (emitter != nullptr) {
 			if (emitter == bullet_factory) {
-				if (is_block_volley()) {
-					if (collision_type == CollisionType::AREA) {
-						emitter->emit_signal(CachedStringNames2D::get().block_area_entered, hit_target, this, bullet_index);
-					} else if (collision_type == CollisionType::BODY) {
-						emitter->emit_signal(CachedStringNames2D::get().block_body_entered, hit_target, this, bullet_index);
-					}
-				} else {
-					if (collision_type == CollisionType::AREA) {
-						emitter->emit_signal(CachedStringNames2D::get().directional_area_entered, hit_target, this, bullet_index);
-					} else if (collision_type == CollisionType::BODY) {
-						emitter->emit_signal(CachedStringNames2D::get().directional_body_entered, hit_target, this, bullet_index);
-					}
+				if (collision_type == CollisionType::AREA) {
+					emitter->emit_signal(CachedStringNames2D::get().directional_area_entered, hit_target, this, bullet_index);
+				} else if (collision_type == CollisionType::BODY) {
+					emitter->emit_signal(CachedStringNames2D::get().directional_body_entered, hit_target, this, bullet_index);
 				}
 			} else {
 				if (collision_type == CollisionType::AREA) {

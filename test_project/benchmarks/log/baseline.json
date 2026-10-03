@@ -56,52 +56,6 @@
       },
       "warmup_frames": 60
     },
-    "block_10k_flight": {
-      "active_bullets_mean": 10000.0,
-      "collision_records": 0,
-      "description": "10k block bullets in flight (rigid volleys)",
-      "engine_ms": {
-        "max": 0.588,
-        "mean": 0.508756666666667,
-        "p50": 0.503,
-        "p95": 0.542,
-        "p99": 0.563
-      },
-      "expired_bullets": 0,
-      "extra": {},
-      "factory_tick_ms": {
-        "max": 0.267,
-        "mean": 0.220543333333333,
-        "p50": 0.218,
-        "p95": 0.237,
-        "p99": 0.246
-      },
-      "frame_ms": {
-        "max": 0.588,
-        "mean": 0.508983333333333,
-        "p50": 0.503,
-        "p95": 0.542,
-        "p99": 0.563
-      },
-      "measure_frames": 300,
-      "memory_static_growth_mb": 0.0390663146972656,
-      "memory_static_peak_mb": 36.5304126739502,
-      "nodes_end": 19.0,
-      "objects_end": 1600.0,
-      "objects_growth": 0,
-      "physics_ticks_per_second": 60,
-      "pool_hits": 0,
-      "pool_misses": 10,
-      "spawned_bullets": 0,
-      "step_ms": {
-        "max": 0.001,
-        "mean": 0.000226666666666667,
-        "p50": 0.0,
-        "p95": 0.001,
-        "p99": 0.001
-      },
-      "warmup_frames": 60
-    },
     "bounce_box_2k": {
       "active_bullets_mean": 2000.0,
       "collision_records": 0,

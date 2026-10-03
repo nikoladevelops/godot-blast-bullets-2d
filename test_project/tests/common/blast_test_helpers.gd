@@ -38,25 +38,6 @@ static func make_directional_data(n: int = 4, speed: float = 200.0, lifetime: fl
 	data.set_collision_mask_from_array([4])
 	return data
 
-static func make_block_data(n: int = 4, speed: float = 200.0, lifetime: float = 5.0) -> BlockBulletsData2D:
-	var data := BlockBulletsData2D.new()
-	var arr: Array = []
-	for i in n:
-		arr.append(Transform2D(0.0, Vector2(24.0 * i, 0.0)))
-	data.transforms = arr
-	var sp := BulletSpeedData2D.new()
-	sp.speed = speed
-	sp.max_speed = 3000.0
-	sp.acceleration = 0.0
-	data.block_speed = sp
-	data.block_rotation_radians = 0.0
-	data.max_life_time = lifetime
-	data.texture_size = Vector2(16, 16)
-	data.sprite_frames = make_sprite_frames()
-	data.set_collision_layer_from_array([2])
-	data.set_collision_mask_from_array([4])
-	return data
-
 static func finite_volley(v: Array) -> bool:
 	for t in v:
 		if not (t as Transform2D).is_finite():
