@@ -1,4 +1,4 @@
-#include "./bullet_curves_data2d.hpp"
+#include "data/bullet_curves_data2d.hpp"
 
 #include <godot_cpp/core/math.hpp>
 #include <godot_cpp/variant/utility_functions.hpp>

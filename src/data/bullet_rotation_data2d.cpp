@@ -1,4 +1,4 @@
-#include "./bullet_rotation_data2d.hpp"
+#include "data/bullet_rotation_data2d.hpp"
 
 #include <godot_cpp/classes/random_number_generator.hpp>
 #include <godot_cpp/variant/dictionary.hpp>

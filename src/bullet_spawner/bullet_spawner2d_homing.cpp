@@ -2,7 +2,7 @@
 // Homing + orbiting: target resolution, live-volley tracking/adoption,
 // retargeting and the per-volley steering/orbit configuration.
 
-#include "bullet_spawner2d_internal.hpp"
+#include "bullet_spawner/bullet_spawner2d_internal.hpp"
 
 using namespace godot;
 

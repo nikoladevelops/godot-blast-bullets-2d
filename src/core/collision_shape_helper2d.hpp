@@ -14,7 +14,6 @@ using namespace godot;
 // Uses PhysicsServer2D::ShapeType enum instead of hardcoded class-name strings.
 struct CollisionShapeHelper2D {
 	static const Vector2 DEFAULT_RECT_SIZE; // 32x32 full size
-	static const Vector2 DEFAULT_RECT_HALF; // 16x16 half extents
 	static constexpr float DEFAULT_CIRCLE_RADIUS = 16.0f; // diameter 32, same coverage as rect 32
 
 	// Resolve Ref<Shape2D> to engine enum. Null => CIRCLE (default r16).
@@ -102,5 +101,4 @@ struct CollisionShapeHelper2D {
 };
 
 inline const Vector2 CollisionShapeHelper2D::DEFAULT_RECT_SIZE = Vector2(32, 32);
-inline const Vector2 CollisionShapeHelper2D::DEFAULT_RECT_HALF = Vector2(16, 16);
 } //namespace BlastBullets2D

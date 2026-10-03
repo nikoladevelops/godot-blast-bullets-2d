@@ -14,18 +14,18 @@
 #include <godot_cpp/classes/quad_mesh.hpp>
 #include <utility>
 
-#include "../shared/bullet_attachment_object_pool2d.hpp"
-#include "../shared/bullet_effect_layer_data2d.hpp"
-#include "../shared/collision_shape_helper2d.hpp"
-#include "../shared/volley_pool2d.hpp"
+#include "attachments/bullet_attachment_object_pool2d.hpp"
+#include "data/bullet_effect_layer_data2d.hpp"
+#include "core/collision_shape_helper2d.hpp"
+#include "pooling/volley_pool2d.hpp"
 #include "godot_cpp/core/math.hpp"
 #include "godot_cpp/variant/dictionary.hpp"
 #include "godot_cpp/variant/packed_float32_array.hpp"
 #include "godot_cpp/variant/packed_vector2_array.hpp"
 #include "godot_cpp/variant/utility_functions.hpp"
 #include "godot_cpp/variant/vector2.hpp"
-#include "shared/dynamic_sparse_set.hpp"
-#include "spawn-data/bullet_volley_data2d.hpp"
+#include "core/dynamic_sparse_set.hpp"
+#include "data/bullet_volley_data2d.hpp"
 
 namespace BlastBullets2D {
 using namespace godot;
@@ -370,7 +370,7 @@ public:
 	void free_bullets_pool(const Ref<VolleyPoolKey2D> &key = Ref<VolleyPoolKey2D>());
 
 	// Populates the bullet attachments pool. The packed scene has to contain a BulletAttachment2D.
-	// Pooling is keyed by the scene itself (see BulletAttachmentObjectPool2D::key_for_scene),
+	// Pooling is keyed by the scene itself (see BulletAttachmentObjectPool2D::make_pooling_key_for_scene),
 	// so every loader of the same scene shares one bucket - no ids needed.
 	void populate_attachments_pool(const Ref<PackedScene> attachment_scene, int amount_instances);
 

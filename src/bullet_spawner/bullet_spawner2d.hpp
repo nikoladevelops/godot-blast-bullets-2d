@@ -18,7 +18,7 @@
 #include "godot_cpp/variant/packed_vector2_array.hpp"
 #include "godot_cpp/variant/transform2d.hpp"
 #include "godot_cpp/variant/typed_array.hpp"
-#include "spawn-data/bullet_volley_data2d.hpp"
+#include "data/bullet_volley_data2d.hpp"
 
 namespace BlastBullets2D {
 using namespace godot;

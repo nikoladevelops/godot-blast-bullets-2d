@@ -1,4 +1,4 @@
-#include "./bullet_wobble_data2d.hpp"
+#include "data/bullet_wobble_data2d.hpp"
 
 #include <godot_cpp/classes/random_number_generator.hpp>
 #include <godot_cpp/core/class_db.hpp>

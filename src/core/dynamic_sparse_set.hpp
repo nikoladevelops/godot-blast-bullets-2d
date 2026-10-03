@@ -150,46 +150,11 @@ public:
 		}
 	}
 
-	// Disables a range of indexes
-	_ALWAYS_INLINE_ void disable_range_data(int index_start, int index_end_inclusive) {
-		if (max_size <= 0) {
-			return;
-		}
-		index_start = (index_start < 0) ? 0 : index_start;
-		int end = index_end_inclusive;
-
-		if (end < 0 || end >= max_size) {
-			end = max_size - 1;
-		}
-
-		if (index_start > end) {
-			return;
-		}
-
-		// if user is disabling the ENTIRE range, just clear it
-		if (index_start == 0 && end == max_size - 1) {
-			clear();
-			return;
-		}
-
-		for (int i = index_start; i <= end; ++i) {
-			disable_data(i);
-		}
-	}
-
 	// Activate all indexes
 	_ALWAYS_INLINE_ void activate_all_data() {
 		if (max_size <= 0) {
 			return;
 		}
 		activate_range_data(0, max_size - 1);
-	}
-
-	// Disable all indexes
-	_ALWAYS_INLINE_ void disable_all_data() {
-		if (max_size <= 0) {
-			return;
-		}
-		disable_range_data(0, max_size - 1);
 	}
 };

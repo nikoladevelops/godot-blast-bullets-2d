@@ -57,12 +57,6 @@ struct WarnOnce2D {
 			UtilityFunctions::push_warning(message);
 		}
 	}
-
-	// Tests: forget every key so a warning can be observed again.
-	static void reset() {
-		create();
-		singleton->seen.clear();
-	}
 };
 
 } //namespace BlastBullets2D

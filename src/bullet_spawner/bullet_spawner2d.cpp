@@ -1,4 +1,4 @@
-#include "bullet_spawner2d_internal.hpp"
+#include "bullet_spawner/bullet_spawner2d_internal.hpp"
 
 // Wiring (factory/generator/spawn data), shooting cadence, spin, bursts,
 // telegraph, pattern lists, lifecycle (_ready/_notification/_process) and

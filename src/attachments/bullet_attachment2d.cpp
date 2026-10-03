@@ -1,5 +1,5 @@
-#include "./bullet_attachment2d.hpp"
-#include "./bullet_attachment_object_pool2d.hpp"
+#include "attachments/bullet_attachment2d.hpp"
+#include "attachments/bullet_attachment_object_pool2d.hpp"
 
 #include "bullet_volley/bullet_volley2d.hpp"
 

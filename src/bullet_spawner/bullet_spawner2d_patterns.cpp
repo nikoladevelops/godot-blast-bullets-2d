@@ -3,7 +3,7 @@
 // motion classification (RIGID/TRANSLATION/NONE), cached re-posing, the
 // native span collect used by shoot_once and the cache verifier.
 
-#include "bullet_spawner2d_internal.hpp"
+#include "bullet_spawner/bullet_spawner2d_internal.hpp"
 
 using namespace godot;
 

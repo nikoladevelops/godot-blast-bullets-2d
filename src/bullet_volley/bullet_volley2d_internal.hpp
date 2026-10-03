@@ -7,10 +7,10 @@
 // across translation units costs measurable frame time.
 
 #include "bullet_volley/bullet_volley2d.hpp"
-#include "shared/warn_once2d.hpp"
-#include "shared/cached_string_names2d.hpp"
+#include "core/warn_once2d.hpp"
+#include "core/cached_string_names2d.hpp"
 #include "factory/bullet_factory2d.hpp"
-#include "shared/volley_pool2d.hpp"
+#include "pooling/volley_pool2d.hpp"
 #include "godot_cpp/classes/curve.hpp"
 #include "godot_cpp/classes/curve2d.hpp"
 #include "godot_cpp/core/class_db.hpp"
@@ -18,9 +18,9 @@
 #include "godot_cpp/core/print_string.hpp"
 #include "godot_cpp/variant/transform2d.hpp"
 #include "godot_cpp/variant/vector2.hpp"
-#include "shared/bullet_curves_data2d.hpp"
-#include "shared/bullet_movement_pattern_data2d.hpp"
-#include "shared/collision_shape_helper2d.hpp"
+#include "data/bullet_curves_data2d.hpp"
+#include "bullet_volley/bullet_movement_pattern_data2d.hpp"
+#include "core/collision_shape_helper2d.hpp"
 #include <godot_cpp/classes/atlas_texture.hpp>
 #include <godot_cpp/classes/image.hpp>
 #include <godot_cpp/classes/image_texture.hpp>
@@ -30,7 +30,7 @@
 #include <godot_cpp/classes/shader_material.hpp>
 #include <godot_cpp/classes/sprite_frames.hpp>
 #include <godot_cpp/variant/utility_functions.hpp>
-#include "spawn-data/bullet_volley_data2d.hpp"
+#include "data/bullet_volley_data2d.hpp"
 #include "godot_cpp/classes/capsule_shape2d.hpp"
 #include "godot_cpp/classes/circle_shape2d.hpp"
 #include "godot_cpp/classes/collision_shape2d.hpp"

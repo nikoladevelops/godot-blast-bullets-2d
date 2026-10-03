@@ -1,18 +1,18 @@
-#include "shared/warn_once2d.hpp"
+#include "core/warn_once2d.hpp"
 #include <gdextension_interface.h>
 #include <godot_cpp/core/class_db.hpp>
 #include <godot_cpp/core/defs.hpp>
 #include <godot_cpp/godot.hpp>
 
 // Shared
-#include "shared/bullet_attachment2d.hpp"
-#include "shared/bullet_curves_data2d.hpp"
-#include "shared/bullet_effect_layer_data2d.hpp"
-#include "shared/bullet_rotation_data2d.hpp"
-#include "shared/bullet_speed_data2d.hpp"
-#include "shared/bullet_wobble_data2d.hpp"
-#include "shared/volley_pool_key2d.hpp"
-#include "shared/cached_string_names2d.hpp"
+#include "attachments/bullet_attachment2d.hpp"
+#include "data/bullet_curves_data2d.hpp"
+#include "data/bullet_effect_layer_data2d.hpp"
+#include "data/bullet_rotation_data2d.hpp"
+#include "data/bullet_speed_data2d.hpp"
+#include "data/bullet_wobble_data2d.hpp"
+#include "pooling/volley_pool_key2d.hpp"
+#include "core/cached_string_names2d.hpp"
 
 // Factory
 #include "factory/bullet_factory2d.hpp"
@@ -21,7 +21,7 @@
 #include "debugger/bullet_volley_debugger2d.hpp"
 
 // Spawn data classes
-#include "spawn-data/bullet_volley_data2d.hpp"
+#include "data/bullet_volley_data2d.hpp"
 
 // Bullets classes
 #include "bullet_volley/bullet_volley2d.hpp"

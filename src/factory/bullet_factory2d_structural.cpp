@@ -422,9 +422,9 @@ void BulletFactory2D::free_attachments_pool_for_scene(const Ref<PackedScene> &at
 
 	FactoryOperationGuard op(this);
 
-	// Freed via the non-recording key: key_for_scene would permanently mark
-	// even an invalid scene as recognized (changing later error branches),
-	// so derive + free without recording anything.
+	// Freed via the non-recording key (make_pooling_key_for_scene): recording
+	// a label (note_key_label) would permanently mark even an invalid scene as
+	// recognized and change later error branches.
 	bullet_attachments_pool.free_specific_bullet_attachments(BulletAttachmentObjectPool2D::make_pooling_key_for_scene(attachment_scene));
 }
 

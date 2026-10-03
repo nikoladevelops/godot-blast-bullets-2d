@@ -1,5 +1,5 @@
-#include "./bullet_attachment_object_pool2d.hpp"
-#include "./bullet_attachment2d.hpp"
+#include "attachments/bullet_attachment_object_pool2d.hpp"
+#include "attachments/bullet_attachment2d.hpp"
 
 #include <godot_cpp/variant/utility_functions.hpp>
 
@@ -52,12 +52,6 @@ void BulletAttachmentObjectPool2D::note_key_label(uint32_t pooling_id, const Str
 	if (key_labels.find(pooling_id) == key_labels.end()) {
 		key_labels[pooling_id] = label;
 	}
-}
-
-uint32_t BulletAttachmentObjectPool2D::key_for_scene(const Ref<PackedScene> &scene) {
-	const uint32_t key = make_pooling_key_for_scene(scene);
-	note_key_label(key, make_key_label_for_scene(scene));
-	return key;
 }
 
 bool BulletAttachmentObjectPool2D::is_key_recognized(uint32_t pooling_id) const {

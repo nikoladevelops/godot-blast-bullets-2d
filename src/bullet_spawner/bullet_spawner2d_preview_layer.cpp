@@ -2,7 +2,7 @@
 // PatternPreviewLayer2D: the batched (draw_multimesh) canvas layer that
 // renders preview dots, rings, arrows and tracks.
 
-#include "bullet_spawner2d_internal.hpp"
+#include "bullet_spawner/bullet_spawner2d_internal.hpp"
 
 using namespace godot;
 

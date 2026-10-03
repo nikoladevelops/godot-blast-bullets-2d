@@ -1,6 +1,6 @@
-#include "volley_pool2d.hpp"
+#include "pooling/volley_pool2d.hpp"
 #include "bullet_volley/bullet_volley2d.hpp"
-#include "collision_shape_helper2d.hpp"
+#include "core/collision_shape_helper2d.hpp"
 
 #include <godot_cpp/classes/node.hpp>
 #include <godot_cpp/core/class_db.hpp>

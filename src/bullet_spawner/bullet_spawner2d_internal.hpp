@@ -5,12 +5,12 @@
 // include from anywhere else. Functions are `static inline` (one private
 // copy per TU, no ODR coupling, no unused-function warnings).
 
-#include "bullet_spawner2d.hpp"
-#include "../shared/warn_once2d.hpp"
+#include "bullet_spawner/bullet_spawner2d.hpp"
+#include "core/warn_once2d.hpp"
 #include <godot_cpp/classes/class_db_singleton.hpp>
 
 #include <functional>
-#include "../shared/easing2d.hpp"
+#include "core/easing2d.hpp"
 #include <godot_cpp/classes/time.hpp>
 #include <godot_cpp/classes/array_mesh.hpp>
 #include <godot_cpp/classes/multi_mesh.hpp>

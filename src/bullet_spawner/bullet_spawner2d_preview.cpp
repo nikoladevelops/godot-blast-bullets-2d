@@ -2,7 +2,7 @@
 // Pattern preview: snapshot + rebuild, zero-cost spin/move pose, dirty
 // detection and the debug_* coincidence bindings used by tests.
 
-#include "bullet_spawner2d_internal.hpp"
+#include "bullet_spawner/bullet_spawner2d_internal.hpp"
 
 using namespace godot;
 

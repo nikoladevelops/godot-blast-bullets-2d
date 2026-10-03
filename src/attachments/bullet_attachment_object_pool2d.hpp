@@ -27,13 +27,6 @@ public:
 	// Null scenes map to DEFAULT_BUCKET_KEY. Never returns 0. Not bound.
 	static uint32_t make_pooling_key_for_scene(const Ref<PackedScene> &scene);
 
-	// Same as make_pooling_key_for_scene, but also records the human-readable
-	// label used by debug output. Must only be called for scenes that are
-	// already validated (or need no validation, e.g. freeing) - validation
-	// itself must go through note_key_label() after a successful type check,
-	// otherwise an invalid scene would be remembered as recognized. Not bound.
-	uint32_t key_for_scene(const Ref<PackedScene> &scene);
-
 	// Records a key as recognized (validated). First label wins. Not bound.
 	void note_key_label(uint32_t pooling_id, const String &label);
 
@@ -76,7 +69,7 @@ public:
 
 private:
 	// Keeps all pooled BulletAttachment2D pointers. The key is derived from the
-	// PackedScene (see key_for_scene), so different instances of the same scene
+	// PackedScene (see make_pooling_key_for_scene), so different instances of the same scene
 	// land in the same queue and get reused - this makes re-usability of same
 	// scene BulletAttachment2D nodes possible even though they are different instances
 	std::unordered_map<uint32_t, std::queue<BulletAttachment2D *>> pool;

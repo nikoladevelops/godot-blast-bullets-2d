@@ -84,9 +84,12 @@ AREA_BY_STEM = {
     "bullet_spawner2d": ("spawner", "integration"),
     "volley_tracker2d": ("spawner",),
     "bullet_factory2d": ("factory", "pooling", "spawner", "volley", "integration", "fuzz"),
+    "bullet_volley2d": ("volley", "pooling", "factory", "spawner", "integration", "fuzz"),
+    "bullet_volley_data2d": ("volley", "factory", "spawner", "pooling"),
     "volley_pool2d": ("pooling", "factory"),
     "volley_pool_key2d": ("pooling",),
     "bullet_attachment": ("pooling", "volley"),
+    "bullet_volley_debugger2d": ("factory", "integration"),
 }
 
 

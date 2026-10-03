@@ -2,7 +2,7 @@
 // ClassDB registration (_bind_methods: inspector groups/subgroups, enums,
 // signals) and per-mode inspector visibility (_validate_property).
 
-#include "bullet_spawner2d_internal.hpp"
+#include "bullet_spawner/bullet_spawner2d_internal.hpp"
 
 using namespace godot;
 
