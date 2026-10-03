@@ -1,7 +1,7 @@
 #pragma once
 
 #include "bullet_spawner/volley_tracker2d.hpp"
-#include "bullets/directional_bullets2d.hpp"
+#include "bullet_volley/bullet_volley2d.hpp"
 #include "factory/bullet_factory2d.hpp"
 #include <vector>
 

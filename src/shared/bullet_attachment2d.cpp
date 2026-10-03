@@ -1,7 +1,7 @@
 #include "./bullet_attachment2d.hpp"
 #include "./bullet_attachment_object_pool2d.hpp"
 
-#include "../bullets/directional_bullets2d.hpp"
+#include "bullet_volley/bullet_volley2d.hpp"
 
 #include <godot_cpp/classes/engine.hpp>
 #include <godot_cpp/core/object.hpp>

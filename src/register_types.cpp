@@ -24,7 +24,7 @@
 #include "spawn-data/bullet_volley_data2d.hpp"
 
 // Bullets classes
-#include "bullets/directional_bullets2d.hpp"
+#include "bullet_volley/bullet_volley2d.hpp"
 
 // Bullet Spawner
 #include "bullet_spawner/bullet_spawner2d.hpp"

@@ -15,7 +15,7 @@
 #include <godot_cpp/classes/array_mesh.hpp>
 #include <godot_cpp/classes/multi_mesh.hpp>
 #include <godot_cpp/classes/texture2d.hpp>
-#include "bullets/directional_bullets2d.hpp"
+#include "bullet_volley/bullet_volley2d.hpp"
 #include "godot_cpp/classes/capsule_shape2d.hpp"
 #include "godot_cpp/classes/circle_shape2d.hpp"
 #include "godot_cpp/classes/engine.hpp"

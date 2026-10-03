@@ -1,5 +1,5 @@
 #include "volley_pool2d.hpp"
-#include "../bullets/directional_bullets2d.hpp"
+#include "bullet_volley/bullet_volley2d.hpp"
 #include "collision_shape_helper2d.hpp"
 
 #include <godot_cpp/classes/node.hpp>

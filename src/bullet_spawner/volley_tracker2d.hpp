@@ -1,6 +1,6 @@
 #pragma once
 
-#include "bullets/directional_bullets2d.hpp"
+#include "bullet_volley/bullet_volley2d.hpp"
 #include "godot_cpp/core/object.hpp"
 #include "godot_cpp/variant/packed_int64_array.hpp"
 #include "godot_cpp/variant/utility_functions.hpp"

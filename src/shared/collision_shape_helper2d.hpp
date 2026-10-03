@@ -84,7 +84,7 @@ struct CollisionShapeHelper2D {
 	// Null/fallback => circle r16. Effective determines RID type, so data must match RID.
 	// NOTE: removed apply_shape_data_quiet() - it was dead code and its rect/capsule
 	// fallbacks passed a float where Vector2 data is required (wrong shape data type).
-	// generate_collision_shape_transform_for_area() in multimesh_bullets2d.cpp is the
+	// generate_collision_shape_transform_for_area() in bullet_volley2d_collision.cpp is the
 	// single applier of shape data and is type-correct.
 
 	// Create RID of correct server type. Caller must area_add_shape + track for free_rid.
