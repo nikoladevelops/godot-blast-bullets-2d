@@ -69,14 +69,6 @@ void BulletSpawner2D::_validate_property(PropertyInfo &p_property) const {
         }
         return;
     }
-    // Steering-group member under a movement name: only meaningful while the
-    // homing steering block runs.
-    if (property_name == "adjust_direction_based_on_rotation") {
-        if (!homing_enabled) {
-            p_property.usage &= ~PROPERTY_USAGE_EDITOR;
-        }
-        return;
-    }
     // Homing/orbiting inspector gating: the master switches and mode/source
     // pickers are always visible, everything else appears only when its
     // feature (and source/mode) is active - same idea as the helper_* groups.
@@ -102,8 +94,6 @@ void BulletSpawner2D::_validate_property(PropertyInfo &p_property) const {
                     show = homing_target_source == HOMING_SOURCE_GLOBAL_POSITION;
                 } else if (property_name == "homing_target_path") {
                     show = homing_target_source == HOMING_SOURCE_NODE_PATH;
-                } else if (property_name == "homing_auto_pop_after_target_reached") {
-                    show = homing_mode == HOMING_PER_BULLET;
                 } else if (property_name == "homing_per_bullet_smoothing_enabled") {
                     show = homing_mode == HOMING_PER_BULLET;
                 } else if (property_name == "homing_smoothing_start" || property_name == "homing_smoothing_step") {
@@ -118,8 +108,6 @@ void BulletSpawner2D::_validate_property(PropertyInfo &p_property) const {
                     show = homing_retarget_mode == HOMING_RETARGET_ON_INTERVAL;
                 }
             }
-        } else if (property_name == "shared_homing_auto_pop_after_target_reached") {
-            show = homing_enabled && homing_mode == HOMING_SHARED;
         } else {
             // Orbiting only works with homing on (it locks onto a homing
             // target): without homing the tunables would arm a dead feature,
@@ -321,7 +309,6 @@ void BulletSpawner2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_spawn_data"), &BulletSpawner2D::get_spawn_data);
 	ClassDB::bind_method(D_METHOD("set_spawn_data", "new_spawn_data"), &BulletSpawner2D::set_spawn_data);
 	ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "spawn_data", PROPERTY_HINT_RESOURCE_TYPE, "DirectionalBulletsData2D"), "set_spawn_data", "get_spawn_data");
-	ClassDB::bind_method(D_METHOD("_on_spawn_data_changed"), &BulletSpawner2D::_on_spawn_data_changed);
 
 	ADD_GROUP("Bullet Patterns", "");
 	ClassDB::bind_method(D_METHOD("get_pattern_source"), &BulletSpawner2D::get_pattern_source);
@@ -1435,10 +1422,6 @@ void BulletSpawner2D::_bind_methods() {
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "spin_frequency_hz"), "set_spin_frequency_hz", "get_spin_frequency_hz");
 
 	ClassDB::bind_method(D_METHOD("get_spin_angle_deg"), &BulletSpawner2D::get_spin_angle_deg);
-	ClassDB::bind_method(D_METHOD("is_spinning"), &BulletSpawner2D::is_spinning);
-	ClassDB::bind_method(D_METHOD("is_orbit_armed"), &BulletSpawner2D::is_orbit_armed);
-	ClassDB::bind_method(D_METHOD("start_spinning"), &BulletSpawner2D::start_spinning);
-	ClassDB::bind_method(D_METHOD("stop_spinning"), &BulletSpawner2D::stop_spinning);
 	ClassDB::bind_method(D_METHOD("reset_spin_angle"), &BulletSpawner2D::reset_spin_angle);
 
 
@@ -1446,13 +1429,9 @@ void BulletSpawner2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("spawn_pattern_list", "entries", "simultaneous", "interval_sec"), &BulletSpawner2D::spawn_pattern_list, DEFVAL(false), DEFVAL(0.25));
 	ClassDB::bind_method(D_METHOD("stop_pattern_list"), &BulletSpawner2D::stop_pattern_list);
 	ClassDB::bind_method(D_METHOD("is_pattern_list_active"), &BulletSpawner2D::is_pattern_list_active);
-	ClassDB::bind_method(D_METHOD("next_shoot_interval_sec"), &BulletSpawner2D::next_shoot_interval_sec);
 	ClassDB::bind_method(D_METHOD("get_burst_shots_left"), &BulletSpawner2D::get_burst_shots_left);
 	ClassDB::bind_method(D_METHOD("get_active_live_bullet_count"), &BulletSpawner2D::get_active_live_bullet_count);
-	ClassDB::bind_method(D_METHOD("get_pooled_volley_count"), &BulletSpawner2D::get_pooled_volley_count);
 	ClassDB::bind_method(D_METHOD("begin_burst"), &BulletSpawner2D::begin_burst);
-	ClassDB::bind_method(D_METHOD("begin_telegraph"), &BulletSpawner2D::begin_telegraph);
-	ClassDB::bind_method(D_METHOD("fire_burst_volley"), &BulletSpawner2D::fire_burst_volley);
 
 	// Homing + orbiting signals. Same slim payload shape and handler contract
 	// as the spawner lifecycle signals above: volley_homing_configured and
@@ -1555,17 +1534,9 @@ void BulletSpawner2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_homing_take_control_of_texture_rotation", "value"), &BulletSpawner2D::set_homing_take_control_of_texture_rotation);
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "homing_take_control_of_texture_rotation"), "set_homing_take_control_of_texture_rotation", "get_homing_take_control_of_texture_rotation");
 
-	ClassDB::bind_method(D_METHOD("get_adjust_direction_based_on_rotation"), &BulletSpawner2D::get_adjust_direction_based_on_rotation);
-	ClassDB::bind_method(D_METHOD("set_adjust_direction_based_on_rotation", "value"), &BulletSpawner2D::set_adjust_direction_based_on_rotation);
-	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "adjust_direction_based_on_rotation"), "set_adjust_direction_based_on_rotation", "get_adjust_direction_based_on_rotation");
-
 	ClassDB::bind_method(D_METHOD("get_homing_auto_pop_after_target_reached"), &BulletSpawner2D::get_homing_auto_pop_after_target_reached);
 	ClassDB::bind_method(D_METHOD("set_homing_auto_pop_after_target_reached", "value"), &BulletSpawner2D::set_homing_auto_pop_after_target_reached);
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "homing_auto_pop_after_target_reached"), "set_homing_auto_pop_after_target_reached", "get_homing_auto_pop_after_target_reached");
-
-	ClassDB::bind_method(D_METHOD("get_shared_homing_auto_pop_after_target_reached"), &BulletSpawner2D::get_shared_homing_auto_pop_after_target_reached);
-	ClassDB::bind_method(D_METHOD("set_shared_homing_auto_pop_after_target_reached", "value"), &BulletSpawner2D::set_shared_homing_auto_pop_after_target_reached);
-	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "shared_homing_auto_pop_after_target_reached"), "set_shared_homing_auto_pop_after_target_reached", "get_shared_homing_auto_pop_after_target_reached");
 
 	ClassDB::bind_method(D_METHOD("get_homing_per_bullet_smoothing_enabled"), &BulletSpawner2D::get_homing_per_bullet_smoothing_enabled);
 	ClassDB::bind_method(D_METHOD("set_homing_per_bullet_smoothing_enabled", "value"), &BulletSpawner2D::set_homing_per_bullet_smoothing_enabled);
@@ -1594,10 +1565,6 @@ void BulletSpawner2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_homing_retarget_previous_volleys"), &BulletSpawner2D::get_homing_retarget_previous_volleys);
 	ClassDB::bind_method(D_METHOD("set_homing_retarget_previous_volleys", "value"), &BulletSpawner2D::set_homing_retarget_previous_volleys);
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "homing_retarget_previous_volleys"), "set_homing_retarget_previous_volleys", "get_homing_retarget_previous_volleys");
-
-	ClassDB::bind_method(D_METHOD("get_homing_debug_log_volleys"), &BulletSpawner2D::get_homing_debug_log_volleys);
-	ClassDB::bind_method(D_METHOD("set_homing_debug_log_volleys", "value"), &BulletSpawner2D::set_homing_debug_log_volleys);
-	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "homing_debug_log_volleys"), "set_homing_debug_log_volleys", "get_homing_debug_log_volleys");
 
 	ClassDB::bind_method(D_METHOD("get_homing_delay_sec"), &BulletSpawner2D::get_homing_delay_sec);
 	ClassDB::bind_method(D_METHOD("set_homing_delay_sec", "value"), &BulletSpawner2D::set_homing_delay_sec);
@@ -1668,9 +1635,7 @@ void BulletSpawner2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("debug_get_layer_rings"), &BulletSpawner2D::debug_get_layer_rings);
 	ClassDB::bind_method(D_METHOD("debug_get_preview_dot_points"), &BulletSpawner2D::debug_get_preview_dot_points);
 	ClassDB::bind_method(D_METHOD("debug_get_preview_track_points"), &BulletSpawner2D::debug_get_preview_track_points);
-	ClassDB::bind_method(D_METHOD("_do_queued_preview_rebuild"), &BulletSpawner2D::_do_queued_preview_rebuild);
 	ClassDB::bind_method(D_METHOD("debug_check_layer_coincidence", "tolerance_px"), &BulletSpawner2D::debug_check_layer_coincidence, DEFVAL(1.0));
-	ClassDB::bind_method(D_METHOD("debug_get_cache_state"), &BulletSpawner2D::debug_get_cache_state);
 	ClassDB::bind_method(D_METHOD("debug_get_retarget_countdown"), &BulletSpawner2D::debug_get_retarget_countdown);
 	ClassDB::bind_method(D_METHOD("adopt_live_volley", "directional_bullets_instance"), &BulletSpawner2D::adopt_live_volley);
 	ClassDB::bind_method(D_METHOD("clear_live_volleys_homing"), &BulletSpawner2D::clear_live_volleys_homing);

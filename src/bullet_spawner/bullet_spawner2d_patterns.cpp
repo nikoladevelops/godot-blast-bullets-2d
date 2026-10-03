@@ -548,9 +548,25 @@ TypedArray<Transform2D> BulletSpawner2D::generate_raw_pattern(Node2D *base, cons
             raw = BulletFactory2D::helper_generate_transforms_wave(helper_bullets_amount, marker, helper_wave_width, helper_wave_amplitude, helper_wave_waves, helper_wave_direction, helper_wave_face_direction, helper_wave_facing_offset_deg);
             break;
         case PATTERN_FROM_HELPER_WATERFALL:
+            // Each side is capped in its setter; the product is checked here
+            // (load order) with one warning, then the shot has no slots.
+            if ((int64_t)helper_waterfall_columns * (int64_t)helper_waterfall_rows > (int64_t)kMaxGridSlots) {
+                if (!quiet) {
+                    WarnOnce2D::warn(get_instance_id(), kWarnGridTooLarge, helper_waterfall_columns, helper_waterfall_rows, String("BulletSpawner2D: helper_waterfall_columns * helper_waterfall_rows exceeds ") + itos(kMaxGridSlots) + " slots; lower them.");
+                }
+                break;
+            }
             raw = BulletFactory2D::helper_generate_transforms_waterfall(helper_bullets_amount, marker, helper_waterfall_columns, helper_waterfall_column_spacing, helper_waterfall_rows, helper_waterfall_row_spacing, helper_waterfall_stagger, helper_waterfall_rain_direction, helper_waterfall_jitter, helper_waterfall_facing_offset_deg, helper_waterfall_seed > 0 ? (uint64_t)helper_waterfall_seed : 0);
             break;
         case PATTERN_FROM_HELPER_LATTICE:
+            // Each side is capped in its setter; the product is checked here
+            // (load order) with one warning, then the shot has no slots.
+            if ((int64_t)helper_lattice_columns * (int64_t)helper_lattice_rows > (int64_t)kMaxGridSlots) {
+                if (!quiet) {
+                    WarnOnce2D::warn(get_instance_id(), kWarnGridTooLarge, helper_lattice_columns, helper_lattice_rows, String("BulletSpawner2D: helper_lattice_columns * helper_lattice_rows exceeds ") + itos(kMaxGridSlots) + " slots; lower them.");
+                }
+                break;
+            }
             raw = BulletFactory2D::helper_generate_transforms_lattice(helper_bullets_amount, marker, helper_lattice_columns, helper_lattice_rows, helper_lattice_spacing_x, helper_lattice_spacing_y, helper_lattice_stagger_rows, helper_lattice_face_outward, helper_lattice_facing_offset_deg);
             break;
         case PATTERN_FROM_HELPER_ROSE:
@@ -565,7 +581,18 @@ TypedArray<Transform2D> BulletSpawner2D::generate_raw_pattern(Node2D *base, cons
             // the static aim direction when no target is assigned or the
             // spawner runs outside the tree (preview still shows the wall).
             const Vector2 corridor_aim = resolve_corridor_aim(helper_corridor_aim_direction, marker.get_origin());
-            raw = BulletFactory2D::helper_generate_transforms_corridor(helper_bullets_amount, marker, corridor_aim, helper_corridor_width, 32.0, helper_corridor_gap_width, helper_corridor_face_aim, helper_corridor_facing_offset_deg); // spacing reserved (unused) upstream: factory default
+            // Width and gap are set independently (scene load order must not
+            // matter). A door as wide as the wall is clamped to half the
+            // width here, with one warning per (gap, width) pair.
+            double corridor_gap = helper_corridor_gap_width;
+            if (corridor_gap >= helper_corridor_width) {
+                corridor_gap = helper_corridor_width * 0.5;
+                if (!quiet) {
+                    WarnOnce2D::warn(get_instance_id(), kWarnCorridorGap, (int64_t)(helper_corridor_gap_width * 1000.0), (int64_t)(helper_corridor_width * 1000.0),
+                            "BulletSpawner2D: helper_corridor_gap_width must be smaller than helper_corridor_width; using half the width for the door.");
+                }
+            }
+            raw = BulletFactory2D::helper_generate_transforms_corridor(helper_bullets_amount, marker, corridor_aim, helper_corridor_width, 32.0, corridor_gap, helper_corridor_face_aim, helper_corridor_facing_offset_deg); // spacing reserved (unused) upstream: factory default
             break;
         }
         case PATTERN_FROM_HELPER_LISSAJOUS:
@@ -906,6 +933,11 @@ Dictionary BulletSpawner2D::debug_get_pattern_cache_info() const {
     const PatternBake &prev = pattern_bakes[2];
     d["shot_class"] = (shot.valid && shot.version == pattern_version) ? shot.motion_class : -1;
     d["preview_class"] = (prev.valid && prev.version == pattern_version) ? prev.motion_class : -1;
+    // Spawn-data duplicate cache (shoot_once reuses one spawner-owned copy;
+    // resource swaps and in-place edits invalidate it).
+    d["template_valid"] = cached_volley_template.is_valid();
+    const uint64_t live_id = spawn_data.is_valid() ? spawn_data->get_instance_id() : 0;
+    d["spawn_id_match"] = cached_volley_template.is_valid() && cached_spawn_data_id == live_id && live_id != 0;
     return d;
 }
 
@@ -990,10 +1022,13 @@ void BulletSpawner2D::collect_spawn_transforms_native(bool quiet, std::vector<Tr
         for (int k = 0; k < helper_skip_indices.size(); ++k) {
             const int idx = skip_p[k];
             if (idx < 0 || idx >= raw_count) {
-                if (!warned_oob) {
-                    UtilityFunctions::push_warning("helper_apply_skip_indices: skip index out of range, ignoring it.");
-                    warned_oob = true;
+                // Once per (pattern version, bullet count), never from the
+                // preview: the shot path would otherwise warn every volley.
+                if (!warned_oob && !quiet) {
+                    WarnOnce2D::warn(get_instance_id(), kWarnSkipIndexOutOfRange, (int64_t)pattern_version, raw_count,
+                            "BulletSpawner2D: helper_skip_indices holds an index outside 0.." + itos(raw_count - 1) + "; it is ignored.");
                 }
+                warned_oob = true;
                 continue;
             }
             skip_mask_scratch[idx] = 1;

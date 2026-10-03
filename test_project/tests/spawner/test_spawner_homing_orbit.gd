@@ -46,11 +46,11 @@ func test_sources_resolve() -> void:
 func test_fire_track_and_cache() -> void:
 	assert_true(sp.shoot_once(), "homing shot fires")
 	assert_eq(sp.get_live_volley_count(), 1, "volley tracked")
-	var cache: Dictionary = sp.debug_get_cache_state()
+	var cache: Dictionary = sp.debug_get_pattern_cache_info()
 	assert_true(cache.get("template_valid", false), "duplicate cache primed")
 	assert_true(cache.get("spawn_id_match", false), "cache matches the live resource")
 	sp.set_spawn_data(H.make_directional_data(4))
-	assert_false(sp.debug_get_cache_state().get("template_valid", true), "resource swap invalidates the cache")
+	assert_false(sp.debug_get_pattern_cache_info().get("template_valid", true), "resource swap invalidates the cache")
 
 
 func test_fire_arc_gate() -> void:

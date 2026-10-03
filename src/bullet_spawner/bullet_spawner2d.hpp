@@ -361,14 +361,6 @@ class BulletSpawner2D : public Node2D{
         void set_spin_frequency_hz(double value);
         // Current spin angle in degrees (runtime state, not stored).
         double get_spin_angle_deg() const;
-        bool is_spinning() const;
-        // Config-level orbit readiness: both switches on. Per-volley lock
-        // still needs a resolvable target at spawn time (empty resolution
-        // flies straight and a later retarget pass can still pick it up),
-        // so this answers "did I configure orbiting" not "is the ring up".
-        bool is_orbit_armed() const;
-        void start_spinning();
-        void stop_spinning();
         void reset_spin_angle();
 
         // TRANSFORMS SOURCE + HELPER GENERATORS
@@ -598,8 +590,8 @@ class BulletSpawner2D : public Node2D{
         bool helper_counter_spiral_mirror_alternate_arms = true;
 
         // CORRIDOR (aimed trap: dense wall with a carved center dodge door).
-        // Slots spread evenly across helper_corridor_width; helper_corridor
-        // _spacing is reserved (unused) so the signature stays stable.
+        // Exactly helper_bullets_amount slots, split over the two wall
+        // segments; helper_corridor_gap_width stays empty as the door.
         Vector2 helper_corridor_aim_direction = Vector2(0, 1);
         double helper_corridor_width = 400.0;
         double helper_corridor_gap_width = 96.0;
@@ -940,15 +932,12 @@ class BulletSpawner2D : public Node2D{
         // fast bullets still trigger). Must stay finite and >= 0.
         double homing_distance_before_reached = 5.0;
         bool homing_take_control_of_texture_rotation = true;
-        // Mirrors DirectionalBulletsData2D.adjust_direction_based_on_rotation
-        // per volley: bullet directions follow their rotation data. Applied
-        // with the steering block; interacts with take-control above (see
-        // the engine inert-warning path when both fight).
-        bool adjust_direction_based_on_rotation = false;
-        // Pop the reached target in per-bullet mode (queues advance).
+        // Pop the reached target so the queue advances: per bullet in
+        // per-bullet mode, once per tick for the shared queue in shared mode.
+        // (Bullet directions following rotation is the spawn data's own
+        // adjust_direction_based_on_rotation; the spawner no longer
+        // overrides it.)
         bool homing_auto_pop_after_target_reached = false;
-        // Pop the reached target in shared mode (queue advances once per tick).
-        bool shared_homing_auto_pop_after_target_reached = false;
         // When true, per-bullet smoothing fans out linearly: bullet i steers
         // with homing_smoothing_start + homing_smoothing_step * i.
         bool homing_per_bullet_smoothing_enabled = false;
@@ -966,10 +955,6 @@ class BulletSpawner2D : public Node2D{
         // (or nothing). Useful for "latest shot follows the player, old
         // shots go dumb" patterns.
         bool homing_retarget_previous_volleys = true;
-        // When true, every homing volley prints how many targets it resolved
-        // (and the first one's name/position). Cheap printf debugging for
-        // "why do my bullets fly straight" moments. Off by default.
-        bool homing_debug_log_volleys = false;
 
         // ORBITING (EASY API)
         //
@@ -1044,12 +1029,8 @@ class BulletSpawner2D : public Node2D{
         void set_homing_distance_before_reached(double value);
         bool get_homing_take_control_of_texture_rotation() const;
         void set_homing_take_control_of_texture_rotation(bool value);
-        bool get_adjust_direction_based_on_rotation() const;
-        void set_adjust_direction_based_on_rotation(bool value);
         bool get_homing_auto_pop_after_target_reached() const;
         void set_homing_auto_pop_after_target_reached(bool value);
-        bool get_shared_homing_auto_pop_after_target_reached() const;
-        void set_shared_homing_auto_pop_after_target_reached(bool value);
         bool get_homing_per_bullet_smoothing_enabled() const;
         void set_homing_per_bullet_smoothing_enabled(bool value);
         double get_homing_smoothing_start() const;
@@ -1062,8 +1043,6 @@ class BulletSpawner2D : public Node2D{
         void set_homing_retarget_interval_sec(double value);
         bool get_homing_retarget_previous_volleys() const;
         void set_homing_retarget_previous_volleys(bool value);
-        bool get_homing_debug_log_volleys() const;
-        void set_homing_debug_log_volleys(bool value);
 
         bool get_orbiting_enabled() const;
         void set_orbiting_enabled(bool value);
@@ -1506,10 +1485,6 @@ class BulletSpawner2D : public Node2D{
         // Live introspection for waves, budgets and debug.
         int get_burst_shots_left() const;
         int get_active_live_bullet_count() const;
-        // Factory-wide directional pool size (shared across every spawner on
-        // this factory), not per-spawner: use get_active_live_bullet_count()
-        // for this spawner's own live census.
-        int get_pooled_volley_count() const;
 
         // Resolves the current homing targets without touching any volley:
         // node-group members (filtered + selected), the node at
@@ -1551,11 +1526,6 @@ class BulletSpawner2D : public Node2D{
         // deviation <= tolerance_px. Empty/unavailable preview (no dots)
         // returns checked=false.
         Dictionary debug_check_layer_coincidence(double tolerance_px = 1.0) const;
-        // Duplicate-cache introspection for tests: {template_valid,
-        // spawn_id_match}. Proves shoot_once() reuses the spawner-owned
-        // template instead of duplicating per volley, and that resource
-        // swaps / in-place edits invalidate it.
-        Dictionary debug_get_cache_state() const;
         // Current retarget countdown in seconds (time until the next interval
         // pass). For tests asserting deterministic stagger across spawners.
         double debug_get_retarget_countdown() const { return homing_retarget_time_left; }
@@ -2054,7 +2024,6 @@ class BulletSpawner2D : public Node2D{
         // "helper_bullets_amount": int, "spawn_data": Ref, "preset": int }.
         // Only set keys override the live spawner for that shot.
         Array pattern_list_entries;
-        bool pattern_list_simultaneous = false;
         double pattern_list_interval_sec = 0.25;
         int pattern_list_cursor = 0;
         double pattern_list_time_left = 0.0;
@@ -2069,14 +2038,12 @@ class BulletSpawner2D : public Node2D{
         bool tracked_has_base_global = false;
         double tracked_spin_angle = 0.0;
         uint64_t tracked_target_id = 0;
-        Node2D *tracked_target = nullptr;
         Transform2D tracked_target_origin;
         bool tracked_has_target_origin = false;
         PackedVector2Array tracked_marker_origins;
         PackedRealArray tracked_marker_rots;
         PackedInt64Array tracked_marker_ids;
         int tracked_child_count = -1;
-        Transform2D tracked_self_global;
         bool tracked_has_self = false;
         // Custom preview tracking: snapshot of the stored array for live
         // dirty checks (transform compare, no dereference).
@@ -2219,7 +2186,6 @@ class BulletSpawner2D : public Node2D{
         bool movement_leg_forward = true;
         double movement_progress = 0.0; // distance ratio along the path
         Vector2 movement_start_origin; // RELATIVE_TO_START anchor (global)
-        Vector2 movement_last_position;
         bool movement_has_last_position = false;
         Vector2 movement_velocity;
         bool movement_warned_unusable_path = false;

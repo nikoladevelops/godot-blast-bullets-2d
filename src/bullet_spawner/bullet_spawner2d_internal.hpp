@@ -6,6 +6,7 @@
 // copy per TU, no ODR coupling, no unused-function warnings).
 
 #include "bullet_spawner2d.hpp"
+#include "../shared/warn_once2d.hpp"
 
 #include <functional>
 #include "../shared/easing2d.hpp"
@@ -218,6 +219,35 @@ static inline bool supports_corner_layout(BulletSpawner2D::PatternSource source)
             return info.corners;
         }
     }
+    return false;
+}
+
+// WarnOnce2D codes owned by the spawner (1..99 belong to the volleys).
+static constexpr uint32_t kWarnCorridorGap = 101; // gap >= width at generation
+static constexpr uint32_t kWarnSkipIndexOutOfRange = 102; // helper_skip_indices
+static constexpr uint32_t kWarnGridTooLarge = 103; // waterfall/lattice columns*rows
+static constexpr uint32_t kWarnOrbitWithoutHoming = 104; // orbiting needs homing
+
+// Grids (waterfall/lattice) may hold columns * rows up to this many slots
+// (the factory refuses more); each side is capped the same in its setter.
+static constexpr int kMaxGridSlots = kMaxBulletsPerVolley * 4;
+// Burst chains longer than this are a typo, not a pattern.
+static constexpr int kMaxBurstCount = 1024;
+
+// NodePath setters: inside the tree, a path that resolves to a node of the
+// wrong type is rejected loudly and the old value kept. A path that does
+// not resolve yet is accepted (the node may be added later, and scene
+// loading assigns properties before the spawner enters the tree).
+template <typename T>
+static inline bool node_path_type_ok(const Node *self, const NodePath &p_path, const char *prop, const char *type_name) {
+    if (p_path.is_empty() || !self->is_inside_tree()) {
+        return true;
+    }
+    Node *node = self->get_node_or_null(p_path);
+    if (node == nullptr || Object::cast_to<T>(node) != nullptr) {
+        return true;
+    }
+    UtilityFunctions::push_error(String("BulletSpawner2D: ") + prop + " must point to a " + type_name + ", keeping the old value.");
     return false;
 }
 

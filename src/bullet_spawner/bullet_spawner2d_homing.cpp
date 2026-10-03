@@ -265,14 +265,6 @@ void BulletSpawner2D::set_homing_children_recursive(bool value) {
     homing_children_recursive = value;
 }
 
-bool BulletSpawner2D::get_homing_debug_log_volleys() const {
-    return homing_debug_log_volleys;
-}
-
-void BulletSpawner2D::set_homing_debug_log_volleys(bool value) {
-    homing_debug_log_volleys = value;
-}
-
 double BulletSpawner2D::get_homing_smoothing() const {
     return homing_smoothing;
 }
@@ -317,28 +309,12 @@ void BulletSpawner2D::set_homing_take_control_of_texture_rotation(bool value) {
     homing_take_control_of_texture_rotation = value;
 }
 
-bool BulletSpawner2D::get_adjust_direction_based_on_rotation() const {
-    return adjust_direction_based_on_rotation;
-}
-
-void BulletSpawner2D::set_adjust_direction_based_on_rotation(bool value) {
-    adjust_direction_based_on_rotation = value;
-}
-
 bool BulletSpawner2D::get_homing_auto_pop_after_target_reached() const {
     return homing_auto_pop_after_target_reached;
 }
 
 void BulletSpawner2D::set_homing_auto_pop_after_target_reached(bool value) {
     homing_auto_pop_after_target_reached = value;
-}
-
-bool BulletSpawner2D::get_shared_homing_auto_pop_after_target_reached() const {
-    return shared_homing_auto_pop_after_target_reached;
-}
-
-void BulletSpawner2D::set_shared_homing_auto_pop_after_target_reached(bool value) {
-    shared_homing_auto_pop_after_target_reached = value;
 }
 
 bool BulletSpawner2D::get_homing_per_bullet_smoothing_enabled() const {
@@ -1165,9 +1141,10 @@ void BulletSpawner2D::apply_steering_to_volley(DirectionalBullets2D *volley) con
     volley->set_homing_update_interval((real_t)homing_update_interval);
     volley->set_homing_distance_before_reached((real_t)homing_distance_before_reached);
     volley->set_homing_take_control_of_texture_rotation(homing_take_control_of_texture_rotation);
-    volley->set_adjust_direction_based_on_rotation(adjust_direction_based_on_rotation);
+    // One switch for both queue kinds: the volley only reads the one that
+    // matches its homing mode.
     volley->set_bullet_homing_auto_pop_after_target_reached(homing_auto_pop_after_target_reached);
-    volley->set_shared_homing_deque_auto_pop_after_target_reached(shared_homing_auto_pop_after_target_reached);
+    volley->set_shared_homing_deque_auto_pop_after_target_reached(homing_auto_pop_after_target_reached);
     volley->set_homing_delay_sec((real_t)homing_delay_sec);
     volley->set_homing_duration_sec((real_t)homing_duration_sec);
     volley->set_homing_lose_range_px((real_t)homing_lose_range_px);
@@ -1300,39 +1277,6 @@ void BulletSpawner2D::apply_volley_homing_and_orbiting(DirectionalBullets2D *bul
     // can never touch them, so tracking would only grow the list.
     if (homing_enabled) {
         track_live_volley(bullets);
-    }
-    if (homing_debug_log_volleys && homing_enabled) {
-        String first_desc = "mouse cursor";
-        if (homing_target_source != HOMING_SOURCE_MOUSE) {
-            if (resolved_targets.is_empty()) {
-                first_desc = "none (plain volley)";
-            } else {
-                const Variant &first = resolved_targets[0];
-                Node2D *first_node = Object::cast_to<Node2D>(first);
-                // The target may have been freed by a re-entrant handler
-                // between resolution and this log line. Never touch the raw
-                // pointer to validate it: get_instance_id()/get_name() on a
-                // freed pointer is itself a deref (UAF). The resolved id was
-                // captured at resolve time - validate that via ObjectDB, then
-                // only touch the pointer when the id still resolves to it.
-                uint64_t first_id = 0;
-                if (first_node != nullptr) {
-                    // Object::cast_to succeeded, so the pointer was live at
-                    // cast time; capture the id for the ObjectDB check below.
-                    // (Still best-effort within one synchronous function.)
-                    first_id = first_node->get_instance_id();
-                }
-                Object *first_live = first_id != 0 && UtilityFunctions::is_instance_id_valid(first_id) ? ObjectDB::get_instance(ObjectID(first_id)) : nullptr;
-                if (first_live != nullptr && first_live == first_node) {
-                    first_desc = String("'") + String(first_node->get_name()) + "' at " + UtilityFunctions::str(first_node->get_global_position());
-                } else if (first_node != nullptr) {
-                    first_desc = "target freed mid-volley";
-                } else {
-                    first_desc = UtilityFunctions::str(first);
-                }
-            }
-        }
-        UtilityFunctions::print("BulletSpawner2D: volley ", volleys_fired + 1, " homing targets: ", resolved_targets.size(), ", first: ", first_desc);
     }
     emit_signal("homing_targets_resolved", bullets, resolved_targets);
     // volleys_fired still holds the previous count here (shoot_once bumps it

@@ -34,6 +34,9 @@ void BulletSpawner2D::set_movement_enabled(bool value) {
 NodePath BulletSpawner2D::get_movement_path() const { return movement_path; }
 
 void BulletSpawner2D::set_movement_path(const NodePath &p_path) {
+    if (!node_path_type_ok<Path2D>(this, p_path, "movement_path", "Path2D")) {
+        return;
+    }
     on_config_changed();
     movement_path = p_path;
     movement_path_cache = nullptr;
@@ -305,7 +308,6 @@ bool BulletSpawner2D::apply_movement_pose(double delta) {
     } else {
         movement_velocity = Vector2();
     }
-    movement_last_position = target;
     movement_has_last_position = true;
     return true;
 }

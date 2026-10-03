@@ -64,13 +64,27 @@ void BulletSpawner2D::set_show_preview_during_runtime(bool value) {
     on_pattern_changed();
 }
 
+// Preview colours: a NaN channel would poison the draw (reject-and-keep
+// like every other knob). Colours never touch geometry, so their setters
+// rebuild the preview without bumping the pattern version (bake kept).
+static bool preview_color_ok(const Color &value, const char *name) {
+    if (Math::is_finite(value.r) && Math::is_finite(value.g) && Math::is_finite(value.b) && Math::is_finite(value.a)) {
+        return true;
+    }
+    UtilityFunctions::push_error(String("BulletSpawner2D: ") + name + " must be a finite colour, keeping the old value.");
+    return false;
+}
+
 Color BulletSpawner2D::get_preview_dot_color() const {
     return preview_dot_color;
 }
 
 void BulletSpawner2D::set_preview_dot_color(const Color &value) {
+    if (!preview_color_ok(value, "preview_dot_color")) {
+        return;
+    }
     preview_dot_color = value;
-    on_pattern_changed();
+    rebuild_preview(); // appearance only: the pattern bake stays valid
 }
 
 Color BulletSpawner2D::get_preview_arrow_color() const {
@@ -78,8 +92,11 @@ Color BulletSpawner2D::get_preview_arrow_color() const {
 }
 
 void BulletSpawner2D::set_preview_arrow_color(const Color &value) {
+    if (!preview_color_ok(value, "preview_arrow_color")) {
+        return;
+    }
     preview_arrow_color = value;
-    on_pattern_changed();
+    rebuild_preview(); // appearance only: the pattern bake stays valid
 }
 
 Color BulletSpawner2D::get_preview_first_dot_color() const {
@@ -87,8 +104,11 @@ Color BulletSpawner2D::get_preview_first_dot_color() const {
 }
 
 void BulletSpawner2D::set_preview_first_dot_color(const Color &value) {
+    if (!preview_color_ok(value, "preview_first_dot_color")) {
+        return;
+    }
     preview_first_dot_color = value;
-    on_pattern_changed();
+    rebuild_preview(); // appearance only: the pattern bake stays valid
 }
 
 Color BulletSpawner2D::get_preview_path_color() const {
@@ -96,8 +116,11 @@ Color BulletSpawner2D::get_preview_path_color() const {
 }
 
 void BulletSpawner2D::set_preview_path_color(const Color &value) {
+    if (!preview_color_ok(value, "preview_path_color")) {
+        return;
+    }
     preview_path_color = value;
-    on_pattern_changed();
+    rebuild_preview(); // appearance only: the pattern bake stays valid
 }
 
 Color BulletSpawner2D::get_preview_layer_path_color() const {
@@ -105,8 +128,11 @@ Color BulletSpawner2D::get_preview_layer_path_color() const {
 }
 
 void BulletSpawner2D::set_preview_layer_path_color(const Color &value) {
+    if (!preview_color_ok(value, "preview_layer_path_color")) {
+        return;
+    }
     preview_layer_path_color = value;
-    on_pattern_changed();
+    rebuild_preview(); // appearance only: the pattern bake stays valid
 }
 
 double BulletSpawner2D::get_preview_path_width() const {
@@ -214,8 +240,11 @@ Color BulletSpawner2D::get_preview_collision_ring_color() const {
 }
 
 void BulletSpawner2D::set_preview_collision_ring_color(const Color &value) {
+    if (!preview_color_ok(value, "preview_collision_ring_color")) {
+        return;
+    }
     preview_collision_ring_color = value;
-    on_pattern_changed();
+    rebuild_preview(); // appearance only: the pattern bake stays valid
 }
 
 double BulletSpawner2D::get_preview_collision_ring_width() const {
@@ -457,7 +486,6 @@ void BulletSpawner2D::_do_queued_preview_rebuild() {
 }
 
 void BulletSpawner2D::snapshot_preview_sources() {
-    tracked_self_global = get_global_transform();
     tracked_has_self = true;
     tracked_base = get_effective_generator();
     if (tracked_base == nullptr) {
@@ -469,13 +497,11 @@ void BulletSpawner2D::snapshot_preview_sources() {
         tracked_has_base_global = true;
     }
     tracked_spin_angle = spin_angle_deg;
-    tracked_target = nullptr;
     tracked_target_id = 0;
     tracked_has_target_origin = false;
     if (pattern_source == PATTERN_FROM_HELPER_AIMED || pattern_source == PATTERN_FROM_HELPER_CORRIDOR) {
         Node2D *target = get_helper_aimed_target();
         if (target != nullptr) {
-            tracked_target = target;
             tracked_target_id = target->get_instance_id();
             tracked_target_origin = target->get_global_transform();
             tracked_has_target_origin = true;
@@ -560,7 +586,7 @@ void BulletSpawner2D::rebuild_preview() {
     if (Engine::get_singleton()->is_editor_hint() && is_inside_tree() && !preview_rebuild_in_progress && !preview_sync_rebuild) {
         if (!preview_rebuild_queued) {
             preview_rebuild_queued = true;
-            call_deferred("_do_queued_preview_rebuild");
+            callable_mp(this, &BulletSpawner2D::_do_queued_preview_rebuild).call_deferred();
         }
         return;
     }
@@ -1392,7 +1418,6 @@ bool BulletSpawner2D::preview_sources_dirty() {
     }
     // The spawner's own transform only matters when it IS the base (handled
     // above); for an external generator it never affects the pattern.
-    tracked_self_global = get_global_transform();
     if (spin_angle_deg != tracked_spin_angle) {
         // Spin is POSE, not geometry. advance_spin changes the angle every
         // frame, so treating it as dirt forced a full rebuild_preview() - which

@@ -372,8 +372,8 @@ double BulletSpawner2D::get_helper_line_spacing() const {
 }
 
 void BulletSpawner2D::set_helper_line_spacing(double value) {
-    if (!Math::is_finite(value)) {
-        UtilityFunctions::push_error("BulletSpawner2D: helper_line_spacing must be finite, keeping the old value.");
+    if (!Math::is_finite(value) || !(value > 0.0)) {
+        UtilityFunctions::push_error("BulletSpawner2D: helper_line_spacing must be finite and > 0 (helper_line_reverse flips the order), keeping the old value.");
         return;
     }
     helper_line_spacing = value;
@@ -394,17 +394,15 @@ NodePath BulletSpawner2D::get_helper_aimed_target_path() const {
 }
 
 void BulletSpawner2D::set_helper_aimed_target_path(const NodePath &p_path) {
+    if (!node_path_type_ok<Node2D>(this, p_path, "helper_aimed_target", "Node2D")) {
+        return;
+    }
     on_config_changed();
     helper_aimed_target_path = p_path;
     helper_aimed_target = nullptr;
     helper_aimed_target_id = 0;
     if (!helper_aimed_target_path.is_empty() && is_inside_tree()) {
-        // Single lookup (see set_bullet_factory_path).
         Node2D *resolved = resolve_node_path(this, helper_aimed_target_path, helper_aimed_target);
-        if (resolved == nullptr && get_node_or_null(helper_aimed_target_path) != nullptr) {
-            UtilityFunctions::push_warning("BulletSpawner2D: assigned aimed target node is not a Node2D.");
-            helper_aimed_target = nullptr;
-        }
         helper_aimed_target_id = resolved != nullptr ? resolved->get_instance_id() : 0;
         if (resolved == nullptr) helper_aimed_target = nullptr;
     }
@@ -454,8 +452,8 @@ double BulletSpawner2D::get_helper_ring_y_scale() const {
 }
 
 void BulletSpawner2D::set_helper_ring_y_scale(double value) {
-    if (!Math::is_finite(value)) {
-        UtilityFunctions::push_error("BulletSpawner2D: helper_ring_y_scale must be finite, keeping the old value.");
+    if (!Math::is_finite(value) || !(value > 0.0)) {
+        UtilityFunctions::push_error("BulletSpawner2D: helper_ring_y_scale must be finite and > 0, keeping the old value.");
         return;
     }
     helper_ring_y_scale = value;
@@ -861,8 +859,8 @@ int BulletSpawner2D::get_helper_ellipse_gap_count() const {
 }
 
 void BulletSpawner2D::set_helper_ellipse_gap_count(int value) {
-    if (value < 0) {
-        UtilityFunctions::push_error("BulletSpawner2D: helper_ellipse_gap_count must be >= 0, keeping the old value.");
+    if (value < 0 || value > kMaxBulletsPerVolley) {
+        UtilityFunctions::push_error("BulletSpawner2D: helper_ellipse_gap_count must be between 0 and " + itos(kMaxBulletsPerVolley) + ", keeping the old value.");
         return;
     }
     helper_ellipse_gap_count = value;
@@ -1294,8 +1292,8 @@ void BulletSpawner2D::set_helper_cross_facing_offset_deg(double value) {
 int BulletSpawner2D::get_helper_star_points() const { return helper_star_points; }
 
 void BulletSpawner2D::set_helper_star_points(int value) {
-    if (value < 2) {
-        UtilityFunctions::push_error("BulletSpawner2D: helper_star_points must be >= 2, keeping the old value.");
+    if (value < 2 || value > kMaxBulletsPerVolley) {
+        UtilityFunctions::push_error("BulletSpawner2D: helper_star_points must be between 2 and " + itos(kMaxBulletsPerVolley) + ", keeping the old value.");
         return;
     }
     helper_star_points = value;
@@ -1458,8 +1456,8 @@ void BulletSpawner2D::set_helper_wave_facing_offset_deg(double value) {
 int BulletSpawner2D::get_helper_waterfall_columns() const { return helper_waterfall_columns; }
 
 void BulletSpawner2D::set_helper_waterfall_columns(int value) {
-    if (value < 1) {
-        UtilityFunctions::push_error("BulletSpawner2D: helper_waterfall_columns must be >= 1, keeping the old value.");
+    if (value < 1 || value > kMaxGridSlots) {
+        UtilityFunctions::push_error("BulletSpawner2D: helper_waterfall_columns must be between 1 and " + itos(kMaxGridSlots) + ", keeping the old value.");
         return;
     }
     helper_waterfall_columns = value;
@@ -1480,8 +1478,8 @@ void BulletSpawner2D::set_helper_waterfall_column_spacing(double value) {
 int BulletSpawner2D::get_helper_waterfall_rows() const { return helper_waterfall_rows; }
 
 void BulletSpawner2D::set_helper_waterfall_rows(int value) {
-    if (value < 1) {
-        UtilityFunctions::push_error("BulletSpawner2D: helper_waterfall_rows must be >= 1, keeping the old value.");
+    if (value < 1 || value > kMaxGridSlots) {
+        UtilityFunctions::push_error("BulletSpawner2D: helper_waterfall_rows must be between 1 and " + itos(kMaxGridSlots) + ", keeping the old value.");
         return;
     }
     helper_waterfall_rows = value;
@@ -1546,8 +1544,8 @@ void BulletSpawner2D::set_helper_waterfall_facing_offset_deg(double value) {
 int BulletSpawner2D::get_helper_lattice_columns() const { return helper_lattice_columns; }
 
 void BulletSpawner2D::set_helper_lattice_columns(int value) {
-    if (value < 1) {
-        UtilityFunctions::push_error("BulletSpawner2D: helper_lattice_columns must be >= 1, keeping the old value.");
+    if (value < 1 || value > kMaxGridSlots) {
+        UtilityFunctions::push_error("BulletSpawner2D: helper_lattice_columns must be between 1 and " + itos(kMaxGridSlots) + ", keeping the old value.");
         return;
     }
     helper_lattice_columns = value;
@@ -1557,8 +1555,8 @@ void BulletSpawner2D::set_helper_lattice_columns(int value) {
 int BulletSpawner2D::get_helper_lattice_rows() const { return helper_lattice_rows; }
 
 void BulletSpawner2D::set_helper_lattice_rows(int value) {
-    if (value < 1) {
-        UtilityFunctions::push_error("BulletSpawner2D: helper_lattice_rows must be >= 1, keeping the old value.");
+    if (value < 1 || value > kMaxGridSlots) {
+        UtilityFunctions::push_error("BulletSpawner2D: helper_lattice_rows must be between 1 and " + itos(kMaxGridSlots) + ", keeping the old value.");
         return;
     }
     helper_lattice_rows = value;
@@ -1794,10 +1792,6 @@ void BulletSpawner2D::set_helper_corridor_width(double value) {
         UtilityFunctions::push_error("BulletSpawner2D: helper_corridor_width must be finite and >= 0, keeping the old value.");
         return;
     }
-    if (value <= helper_corridor_gap_width) {
-        UtilityFunctions::push_error("BulletSpawner2D: helper_corridor_width must exceed helper_corridor_gap_width (the gap cannot eat the whole wall), keeping the old value.");
-        return;
-    }
     helper_corridor_width = value;
     on_pattern_changed();
 }
@@ -1807,10 +1801,6 @@ double BulletSpawner2D::get_helper_corridor_gap_width() const { return helper_co
 void BulletSpawner2D::set_helper_corridor_gap_width(double value) {
     if (!Math::is_finite(value) || value < 0.0) {
         UtilityFunctions::push_error("BulletSpawner2D: helper_corridor_gap_width must be finite and >= 0, keeping the old value.");
-        return;
-    }
-    if (value >= helper_corridor_width) {
-        UtilityFunctions::push_error("BulletSpawner2D: helper_corridor_gap_width must be < helper_corridor_width (the gap cannot eat the whole wall), keeping the old value.");
         return;
     }
     helper_corridor_gap_width = value;
@@ -2477,8 +2467,8 @@ void BulletSpawner2D::set_helper_square_facing_offset_deg(double value) {
 int BulletSpawner2D::get_helper_polygon_vertices() const { return helper_polygon_vertices; }
 
 void BulletSpawner2D::set_helper_polygon_vertices(int value) {
-    if (value < 3) {
-        UtilityFunctions::push_error("BulletSpawner2D: helper_polygon_vertices must be >= 3, keeping the old value.");
+    if (value < 3 || value > kMaxBulletsPerVolley) {
+        UtilityFunctions::push_error("BulletSpawner2D: helper_polygon_vertices must be between 3 and " + itos(kMaxBulletsPerVolley) + ", keeping the old value.");
         return;
     }
     helper_polygon_vertices = value;
@@ -2528,6 +2518,9 @@ void BulletSpawner2D::set_helper_polygon_facing_offset_deg(double value) {
 NodePath BulletSpawner2D::get_helper_path2d_path() const { return helper_path2d_path; }
 
 void BulletSpawner2D::set_helper_path2d_path(const NodePath &p_path) {
+    if (!node_path_type_ok<Path2D>(this, p_path, "helper_path2d_path", "Path2D")) {
+        return;
+    }
     on_config_changed();
     helper_path2d_path = p_path;
     helper_path2d_cache = nullptr;

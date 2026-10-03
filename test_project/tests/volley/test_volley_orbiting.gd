@@ -108,11 +108,12 @@ func test_stay_locked_rides_out_the_gap() -> void:
 	assert_lt(s.bullet_get_orbiting_center(0).distance_to(held_center), 8.0, "center rides out the gap")
 
 
-func test_spawner_orbit_armed_matches_config() -> void:
+func test_spawner_orbit_without_homing_is_a_setup_warning() -> void:
+	const WARNING := "orbiting_enabled needs homing_enabled"
 	var sp := make_spawner(H.make_directional_data(2, 200.0, 5.0))
 	sp.set_orbiting_enabled(false)
-	assert_false(sp.is_orbit_armed(), "unarmed with both switches off")
+	assert_false(Array(sp.get_setup_warnings()).any(func(w): return WARNING in w), "no warning with both switches off")
 	sp.set_orbiting_enabled(true)
-	assert_false(sp.is_orbit_armed(), "orbiting alone is not armed")
+	assert_true(Array(sp.get_setup_warnings()).any(func(w): return WARNING in w), "orbiting alone warns (it locks onto homing targets)")
 	sp.set_homing_enabled(true)
-	assert_true(sp.is_orbit_armed(), "homing plus orbiting is armed")
+	assert_false(Array(sp.get_setup_warnings()).any(func(w): return WARNING in w), "homing plus orbiting is configured")

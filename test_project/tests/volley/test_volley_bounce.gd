@@ -1060,7 +1060,7 @@ func test_t20_inspector_groups_stay_coherent() -> void:
 	var stray_homing := []
 	for pname in prop_group.keys():
 		var gname := str(prop_group[pname])
-		if (pname.begins_with("homing_") or pname == "adjust_direction_based_on_rotation") and gname != "Homing":
+		if pname.begins_with("homing_") and gname != "Homing":
 			stray_homing.append(pname)
 		if pname.begins_with("reload_jitter") and gname != "Shooting":
 			stray_homing.append(pname)

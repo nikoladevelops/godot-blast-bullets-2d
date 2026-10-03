@@ -51,19 +51,15 @@ NodePath BulletSpawner2D::get_bullet_factory_path() const {
 }
 
 void BulletSpawner2D::set_bullet_factory_path(const NodePath &p_path) {
+    if (!node_path_type_ok<BulletFactory2D>(this, p_path, "bullet_factory_path", "BulletFactory2D")) {
+        return;
+    }
     on_config_changed();
     bullet_factory_path = p_path;
     bullet_factory = nullptr;
     bullet_factory_id = 0;
     if (!bullet_factory_path.is_empty() && is_inside_tree()) {
-        // Single lookup: resolve_node_path already fetches through the path,
-        // so pre-checking with a second get_node_or_null only doubles the
-        // tree walk. Type-check the resolved node instead.
         BulletFactory2D *resolved = resolve_node_path(this, bullet_factory_path, bullet_factory);
-        if (resolved == nullptr && get_node_or_null(bullet_factory_path) != nullptr) {
-            UtilityFunctions::push_warning("BulletSpawner2D: assigned bullet_factory node is not a BulletFactory2D.");
-            bullet_factory = nullptr;
-        }
         bullet_factory_id = resolved != nullptr ? resolved->get_instance_id() : 0;
         if (resolved == nullptr) bullet_factory = nullptr;
     }
@@ -88,17 +84,14 @@ NodePath BulletSpawner2D::get_transforms_generator_path() const {
 }
 
 void BulletSpawner2D::set_transforms_generator_path(const NodePath &p_path) {
+    if (!node_path_type_ok<Node2D>(this, p_path, "transforms_generator", "Node2D")) {
+        return;
+    }
     transforms_generator_path = p_path;
     transforms_generator = nullptr;
     transforms_generator_id = 0;
     if (!transforms_generator_path.is_empty() && is_inside_tree()) {
-        // Single lookup (see set_bullet_factory_path): resolve first, then
-        // distinguish a missing node (silent) from a wrong-typed one (warn).
         Node2D *resolved = resolve_node_path(this, transforms_generator_path, transforms_generator);
-        if (resolved == nullptr && get_node_or_null(transforms_generator_path) != nullptr) {
-            UtilityFunctions::push_warning("BulletSpawner2D: assigned transforms generator node is not a Node2D.");
-            transforms_generator = nullptr;
-        }
         transforms_generator_id = resolved != nullptr ? resolved->get_instance_id() : 0;
         if (resolved == nullptr) transforms_generator = nullptr;
     }
@@ -137,15 +130,16 @@ Ref<DirectionalBulletsData2D> BulletSpawner2D::get_spawn_data() const {
 
 void BulletSpawner2D::set_spawn_data(const Ref<DirectionalBulletsData2D> &new_data) {
     on_config_changed();
-	if (spawn_data.is_valid() && spawn_data->is_connected("changed", Callable(this, "_on_spawn_data_changed"))) {
-		spawn_data->disconnect("changed", Callable(this, "_on_spawn_data_changed"));
+	const Callable on_changed = callable_mp(this, &BulletSpawner2D::_on_spawn_data_changed);
+	if (spawn_data.is_valid() && spawn_data->is_connected("changed", on_changed)) {
+		spawn_data->disconnect("changed", on_changed);
 	}
 	spawn_data = new_data;
 	// A new resource invalidates the duplicate cache (see header).
 	cached_volley_template.unref();
 	cached_spawn_data_id = 0;
 	if (spawn_data.is_valid()) {
-		spawn_data->connect("changed", Callable(this, "_on_spawn_data_changed"));
+		spawn_data->connect("changed", on_changed);
 	}
 	// The preview's collision-ring overlay reads spawn_data's shape. Not a
 	// geometry change (no pattern_version bump): rings only.
@@ -162,14 +156,6 @@ void BulletSpawner2D::_on_spawn_data_changed() {
 	if (preview_draw_collision_rings) {
 		rebuild_preview();
 	}
-}
-
-Dictionary BulletSpawner2D::debug_get_cache_state() const {
-	Dictionary d;
-	d["template_valid"] = cached_volley_template.is_valid();
-	uint64_t live_id = spawn_data.is_valid() ? spawn_data->get_instance_id() : 0;
-	d["spawn_id_match"] = cached_volley_template.is_valid() && cached_spawn_data_id == live_id && live_id != 0;
-	return d;
 }
 
 bool BulletSpawner2D::auto_shooting_active() const {
@@ -214,6 +200,11 @@ void BulletSpawner2D::set_shoot_interval_sec(double value) {
         return;
     }
     shoot_interval_sec = value;
+    // A shorter interval applies to the wait already running (otherwise the
+    // old, longer interval would still be waited out once).
+    if (shoot_time_left > shoot_interval_sec) {
+        shoot_time_left = shoot_interval_sec;
+    }
 }
 
 double BulletSpawner2D::get_shoot_initial_delay_sec() const {
@@ -348,22 +339,6 @@ double BulletSpawner2D::get_spin_angle_deg() const {
     return spin_angle_deg;
 }
 
-bool BulletSpawner2D::is_spinning() const {
-    return spin_enabled && !Engine::get_singleton()->is_editor_hint();
-}
-
-bool BulletSpawner2D::is_orbit_armed() const {
-    return homing_enabled && orbiting_enabled;
-}
-
-void BulletSpawner2D::start_spinning() {
-    set_spin_enabled(true);
-}
-
-void BulletSpawner2D::stop_spinning() {
-    set_spin_enabled(false);
-}
-
 void BulletSpawner2D::reset_spin_angle() {
     spin_angle_deg = 0.0;
     spin_time_sec = 0.0;
@@ -422,8 +397,8 @@ int BulletSpawner2D::get_burst_count() const {
 }
 
 void BulletSpawner2D::set_burst_count(int value) {
-    if (value < 1) {
-        UtilityFunctions::push_error("BulletSpawner2D: burst_count must be >= 1, keeping the old value.");
+    if (value < 1 || value > kMaxBurstCount) {
+        UtilityFunctions::push_error("BulletSpawner2D: burst_count must be between 1 and " + itos(kMaxBurstCount) + ", keeping the old value.");
         return;
     }
     burst_count = value;
@@ -516,21 +491,11 @@ int BulletSpawner2D::get_active_live_bullet_count() const {
     return factory->count_active_bullets_owned_by(get_instance_id());
 }
 
-int BulletSpawner2D::get_pooled_volley_count() const {
-    BulletFactory2D *factory = get_bullet_factory();
-    if (factory == nullptr) {
-        return 0;
-    }
-    return factory->debug_get_bullets_pool_amount(BulletFactory2D::DIRECTIONAL_BULLETS);
-}
-
 void BulletSpawner2D::reset_shooting() {
     volleys_fired = 0;
     shooting_paused = false;
     oneshot_volleys_left = -1;
     shoot_time_left = shoot_initial_delay_sec;
-    // Due-now (0.0): the next tick runs a pass immediately instead of
-    // waiting a full interval on stale membership data.
     homing_retarget_time_left = homing_retarget_phase;
     // Burst/telegraph chains never survive a restart: a stale mid-burst
     // countdown firing into a reset wave would double-fire volleys.
@@ -792,9 +757,9 @@ bool BulletSpawner2D::shoot_once() {
     // (Latch/depth were already taken at entry; no re-take here.)
     const uint64_t volley_id = bullets->get_instance_id();
     const uint64_t self_id = get_instance_id();
-    // Mutable last-chance hook: handlers may tweak the duplicated volley data
-    // (speed ramp, count scale by phase/difficulty) before it spawns. The
-    // volley instance is already stamped, so ownership checks still apply.
+    // Last-chance hook on the freshly spawned, stamped volley (before the
+    // muzzle offset, homing and orbit are configured): handlers may tweak the
+    // live instance (speeds, custom data) or drop it via queue_free().
     emit_signal("pre_shoot", bullets, volleys_fired + 1);
     // G1: a pre_shoot handler may have freed this volley (factory reset/free_*,
     // queue_free) or handed it to another owner (adopt_live_volley). Feeding a
@@ -964,7 +929,6 @@ void BulletSpawner2D::_notification(int p_what) {
         tracked_base_id = 0;
         tracked_has_base_global = false;
         tracked_spin_angle = 0.0;
-        tracked_target = nullptr;
         tracked_target_id = 0;
         tracked_has_target_origin = false;
         tracked_marker_origins.clear();
@@ -1285,7 +1249,6 @@ int BulletSpawner2D::spawn_pattern_list(const Array &entries, bool simultaneous,
         return 0;
     }
     pattern_list_entries = entries.duplicate();
-    pattern_list_simultaneous = simultaneous;
     pattern_list_interval_sec = interval_sec;
     pattern_list_cursor = 0;
     pattern_list_time_left = 0.0;
@@ -1348,7 +1311,7 @@ bool BulletSpawner2D::apply_pattern_list_entry(const Variant &entry) {
     // Unknown keys fail loud (a typo like "patern_source" used to be ignored
     // silently: the entry fired with the WRONG pattern and no hint why). The
     // valid keys still apply; the closest known key is suggested.
-    static const char *const kKnownKeys[] = { "preset", "pattern_source", "transforms_source", "helper_bullets_amount", "spawn_data" };
+    static const char *const kKnownKeys[] = { "preset", "pattern_source", "helper_bullets_amount", "spawn_data" };
     const Array keys = dict.keys();
     for (int k = 0; k < keys.size(); ++k) {
         const String key = keys[k];
@@ -1367,7 +1330,14 @@ bool BulletSpawner2D::apply_pattern_list_entry(const Variant &entry) {
             }
         }
         if (!known) {
-            UtilityFunctions::push_error(String("BulletSpawner2D::spawn_pattern_list: unknown entry key '") + key + "'" + (best_score >= 0.5 ? String(" (did you mean '") + best + "'?)" : String()) + "; valid keys: preset, pattern_source, helper_bullets_amount, spawn_data. Ignoring it.");
+            // Renamed keys get a precise hint; anything else a close match.
+            String hint;
+            if (key == "transforms_source") {
+                hint = " (renamed to 'pattern_source')";
+            } else if (best_score >= 0.5) {
+                hint = String(" (did you mean '") + best + "'?)";
+            }
+            UtilityFunctions::push_error(String("BulletSpawner2D::spawn_pattern_list: unknown entry key '") + key + "'" + hint + "; valid keys: preset, pattern_source, helper_bullets_amount, spawn_data. Ignoring it.");
         }
     }
     if (dict.has("preset")) {
@@ -1378,12 +1348,7 @@ bool BulletSpawner2D::apply_pattern_list_entry(const Variant &entry) {
             UtilityFunctions::push_error("BulletSpawner2D::spawn_pattern_list: entry 'preset' must be an int, skipping preset.");
         }
     }
-    // "pattern_source" is the current key; "transforms_source" is honored
-    // as a deprecated alias so sequences written before the rename keep working.
-    StringName source_key = "pattern_source";
-    if (!dict.has(source_key) && dict.has("transforms_source")) {
-        source_key = "transforms_source";
-    }
+    const StringName source_key = "pattern_source";
     if (dict.has(source_key)) {
         Variant v = dict[source_key];
         if (v.get_type() == Variant::INT) {

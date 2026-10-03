@@ -47,12 +47,23 @@ func test_burst_chain() -> void:
 
 func test_telegraph_warn_then_fire() -> void:
 	sp.set_telegraph_enabled(true)
-	sp.set_telegraph_sec(0.05)
-	sp.begin_telegraph()
-	assert_signal_emitted(sp, "volley_telegraphed", "warning first")
+	sp.set_telegraph_sec(0.05) # 3 frames at the fixed 60 fps
+	sp.set_shoot_interval_sec(10.0) # one trigger pull inside the test window
+	sp.set_shooting_enabled(true) # first pull is due immediately (no initial delay)
+	for i in 10:
+		await idle(1)
+		if get_signal_emit_count(sp, "volley_telegraphed") > 0:
+			break
+	assert_signal_emit_count(sp, "volley_telegraphed", 1, "warning first")
+	var aim: Array = get_signal_parameters(sp, "volley_telegraphed", 0)[0]
+	assert_eq(aim.size(), sp.helper_bullets_amount, "warning carries one transform per bullet")
 	assert_eq(sp.get_volleys_fired(), 0, "nothing fired during the warning")
-	await physics(20)
-	assert_gte(sp.get_volleys_fired(), 1, "telegraphed shot fired after the warning")
+	for i in 20:
+		await idle(1)
+		if sp.get_volleys_fired() > 0:
+			break
+	assert_eq(sp.get_volleys_fired(), 1, "exactly one telegraphed shot after the warning")
+	sp.set_shooting_enabled(false)
 
 
 func test_pattern_lists() -> void:
