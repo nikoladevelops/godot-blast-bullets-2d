@@ -62,6 +62,21 @@
 				Verifies every layered preview dot sits on its yellow ring (same center-scale rule and same fill deal on both sides). Returns checked/layers/max_deviation_px/mean_deviation_px/ok. Empty preview returns checked=false. Point-to-segment match: exact on sharp shapes, sub-pixel on dense sweeps.
 			</description>
 		</method>
+		<method name="debug_collect_spawn_transforms_uncached" qualifiers="const">
+			<return type="Transform2D[]" />
+			<description>
+				Same output as [method collect_spawn_transforms], always regenerated from scratch (the bake cache is bypassed). The reference the cache-parity tests compare against.
+			</description>
+		</method>
+		<method name="debug_ease" qualifiers="static">
+			<return type="float" />
+			<param index="0" name="t" type="float" />
+			<param index="1" name="transition" type="int" />
+			<param index="2" name="ease" type="int" />
+			<description>
+				Static test hook: the easing value movement uses at [param t] for a [enum Tween.TransitionType] and [enum Tween.EaseType]. Matches [method Tween.interpolate_value] for every transition and ease (pinned by tests).
+			</description>
+		</method>
 		<method name="debug_get_cache_state" qualifiers="const">
 			<return type="Dictionary" />
 			<description>
@@ -74,10 +89,28 @@
 				Debug readout of the yellow preview rings: one PackedVector2Array per extra outline layer, exactly as drawn (holder-local; runs INF-separated with a closing duplicate per closed run). Empty when layers are inactive. Lets scripts and tests verify bullets sit on their rings without screenshotting the editor.
 			</description>
 		</method>
+		<method name="debug_get_pattern_cache_info" qualifiers="const">
+			<return type="Dictionary" />
+			<description>
+				Bake cache introspection: [code]hits[/code], [code]misses[/code], [code]bakes[/code], [code]version[/code] (bumped by every pattern-affecting change), and [code]shot_class[/code] / [code]preview_class[/code]: -1 not baked yet, 0 regenerated every shot, 1 reused under translation only, 2 reused under any rigid motion.
+			</description>
+		</method>
+		<method name="debug_get_pattern_cache_verify" qualifiers="static">
+			<return type="bool" />
+			<description>
+				Whether the static cache verifier is on (see [method debug_set_pattern_cache_verify]).
+			</description>
+		</method>
 		<method name="debug_get_preview_dot_points" qualifiers="const">
 			<return type="PackedVector2Array" />
 			<description>
 				Preview bullet dots exactly as drawn (holder-local). Empty when the preview is off. Lets tests prove dots sit on the preview track.
+			</description>
+		</method>
+		<method name="debug_get_preview_stats" qualifiers="const">
+			<return type="Dictionary" />
+			<description>
+				Preview instrumentation: [code]rebuilds[/code], [code]last_rebuild_usec[/code], [code]dots_draws[/code], [code]arrows_draws[/code]. Spinning or moving the spawner leaves all four flat: the pose is applied as a node transform, never as a rebuild or redraw.
 			</description>
 		</method>
 		<method name="debug_get_preview_track_points" qualifiers="const">
@@ -90,6 +123,13 @@
 			<return type="float" />
 			<description>
 				Seconds until the next interval retarget pass. Deterministically staggered per spawner so N spawners never group-scan on the same tick.
+			</description>
+		</method>
+		<method name="debug_set_pattern_cache_verify" qualifiers="static">
+			<return type="void" />
+			<param index="0" name="enabled" type="bool" />
+			<description>
+				Static switch for all spawners: when on, every shot or preview served from the bake cache is regenerated uncached and compared, and a mismatch pushes the error [code]BulletSpawner2D: pattern cache mismatch[/code]. Doubles generation cost: for tests only (the GUT base class turns it on for every suite).
 			</description>
 		</method>
 		<method name="fire_burst_volley">
@@ -153,10 +193,40 @@
 				The tracked live volley instances (pruned first), so scripts can call the full DirectionalBullets2D API on each volley directly. Inspect-only handles: a volley can be pooled and reused for a new owner while you still hold it, so always check [method MultiMeshBullets2D.is_bullet_status_enabled] and ownership before steering a held volley. Use [method adopt_live_volley] to take ownership of a manually-woken volley.
 			</description>
 		</method>
+		<method name="get_movement_leg" qualifiers="const">
+			<return type="int" />
+			<description>
+				Legs completed since the run started. A leg is one traversal of the path; Ping Pong counts each direction as a leg.
+			</description>
+		</method>
+		<method name="get_movement_path_node" qualifiers="const">
+			<return type="Path2D" />
+			<description>
+				The resolved [Path2D] behind [member movement_path], or null when unset, freed or outside the tree.
+			</description>
+		</method>
+		<method name="get_movement_progress" qualifiers="const">
+			<return type="float" />
+			<description>
+				Distance ratio along the path: 0 = path start, 1 = path end, independent of the leg direction.
+			</description>
+		</method>
+		<method name="get_movement_velocity" qualifiers="const">
+			<return type="Vector2" />
+			<description>
+				Velocity of the last movement step in px/s; zero while paused, stopped, waiting (start delay, endpoint pause) or not moving. This is the velocity [member inherit_movement_velocity] adds to bullets.
+			</description>
+		</method>
 		<method name="get_pooled_volley_count" qualifiers="const">
 			<return type="int" />
 			<description>
 				How many directional volleys sit ready in the factory pool. Warm-up checks and pool sizing read this (0 with no factory assigned).
+			</description>
+		</method>
+		<method name="get_setup_warnings" qualifiers="const">
+			<return type="PackedStringArray" />
+			<description>
+				The same list as the editor's configuration warning icon: no factory, factory path not pointing to a [BulletFactory2D], no spawn data or invisible spawn data, Aimed/Corridor without a target, Path2D pattern without a path, empty Custom pattern, movement on without a path, orbiting without homing. Empty when nothing is misconfigured. Callable from scripts for debug UIs and CI scene checks.
 			</description>
 		</method>
 		<method name="get_spin_angle_deg" qualifiers="const">
@@ -175,6 +245,12 @@
 			<return type="int" />
 			<description>
 				Volleys fired since the last (re)arm. Reset with [method reset_shooting].
+			</description>
+		</method>
+		<method name="is_movement_playing" qualifiers="const">
+			<return type="bool" />
+			<description>
+				True while the run is playing, including its start delay and endpoint pauses; false when paused, stopped or finished.
 			</description>
 		</method>
 		<method name="is_orbit_armed" qualifiers="const">
@@ -205,6 +281,38 @@
 			<return type="bool" />
 			<description>
 				Returns true when [member spin_enabled] is on and the game is running.
+			</description>
+		</method>
+		<method name="movement_pause">
+			<return type="void" />
+			<description>
+				Freezes the movement in place, keeping progress, leg and timers; [method movement_play] resumes from there.
+			</description>
+		</method>
+		<method name="movement_play">
+			<return type="void" />
+			<description>
+				Starts the movement, or resumes it after [method movement_pause]. A finished or stopped run restarts from the beginning ([member movement_start_ratio] and [member movement_start_delay_sec] apply again). Emits [signal movement_started] when it was not already playing. Runtime only: ignored in the editor.
+			</description>
+		</method>
+		<method name="movement_reverse">
+			<return type="void" />
+			<description>
+				Flips the current leg's direction in place: the spawner turns around where it is and the eased progress continues smoothly the other way.
+			</description>
+		</method>
+		<method name="movement_seek">
+			<return type="void" />
+			<param index="0" name="ratio" type="float" />
+			<description>
+				Jumps to [param ratio] (0..1) of the current leg, measured along the leg's direction, and moves the spawner there. A NaN or out-of-range ratio fails loud and is ignored.
+			</description>
+		</method>
+		<method name="movement_stop">
+			<return type="void" />
+			<param index="0" name="reset_to_start" type="bool" default="true" />
+			<description>
+				Stops the movement. With [param reset_to_start] (default) the run resets and the spawner snaps back to the start pose; otherwise it stays where it is and the run counts as finished. [method movement_play] restarts from the beginning either way. Emits no signal.
 			</description>
 		</method>
 		<method name="next_shoot_interval_sec" qualifiers="const">
@@ -277,6 +385,13 @@
 			<param index="0" name="node" type="Node" />
 			<description>
 				Assigns the Path2D node used by the Path2D pattern layout. Updates [member helper_path2d_path] to point at it and refreshes the editor preview. Pass null to clear it.
+			</description>
+		</method>
+		<method name="set_movement_path_node">
+			<return type="void" />
+			<param index="0" name="node" type="Path2D" />
+			<description>
+				Assigns the [Path2D] to move along and stores its path in [member movement_path].
 			</description>
 		</method>
 		<method name="set_transforms_generator">
@@ -1137,11 +1252,74 @@
 		<member name="homing_update_interval" type="float" setter="set_homing_update_interval" getter="get_homing_update_interval" default="0.0">
 			Seconds between target position refreshes. 0 refreshes every tick.
 		</member>
+		<member name="inherit_movement_velocity" type="bool" setter="set_inherit_movement_velocity" getter="get_inherit_movement_velocity" default="false">
+			Bullets fired while the spawner moves inherit its movement velocity ([method get_movement_velocity] x [member movement_velocity_inherit_factor]), so a moving turret's shots carry its momentum. Off by default.
+		</member>
 		<member name="max_live_bullets" type="int" setter="set_max_live_bullets" getter="get_max_live_bullets" default="0">
 			Soft live-bullet fuse: 0 is unlimited, otherwise firing pauses (volley_skipped "over_budget") while this spawner's live bullets (homing AND plain volleys, counted via the factory) reach this count. Counts actual spawned bullets, so gap-carving modes (Corridor gap, Ellipse Wall, skip indices) consume less budget than helper_bullets_amount. The census is O(factory volleys) per trigger pull: fine for a handful of budgeted spawners, prefer fewer budgeted spawners (or staggered intervals) past ~100 spawners.
 		</member>
 		<member name="max_volleys" type="int" setter="set_max_volleys" getter="get_max_volleys" default="-1">
 			Auto-shooting stops after this many volleys. -1 is infinite, 0 disables auto-shooting ([method shoot_once] still works). Lowering the cap below the fired count emits [signal shooting_stopped] (raising it back emits [signal shooting_started]); [signal shooting_finished] fires once from the volley that trips the cap, so a volley_fired handler that lowers the cap never double-fires it. Untouched by [method fire_n_volleys].
+		</member>
+		<member name="movement_autostart" type="bool" setter="set_movement_autostart" getter="get_movement_autostart" default="true">
+			Start moving automatically on ready, and when [member movement_enabled] is switched on at runtime. Off: call [method movement_play] yourself.
+		</member>
+		<member name="movement_cubic_sampling" type="bool" setter="set_movement_cubic_sampling" getter="get_movement_cubic_sampling" default="false">
+			Sample the path with cubic interpolation (the [code]cubic[/code] argument of [method Curve2D.sample_baked]) for smoother motion on coarse bakes. Off: linear between baked points (cheaper).
+		</member>
+		<member name="movement_direction" type="int" setter="set_movement_direction" getter="get_movement_direction" default="0">
+			Direction of the first leg: Forward (path start to end) or Reverse (end to start).
+		</member>
+		<member name="movement_duration_sec" type="float" setter="set_movement_duration_sec" getter="get_movement_duration_sec" default="3.0">
+			Seconds per leg when [member movement_timing] is Duration. Must be finite and greater than 0.
+		</member>
+		<member name="movement_ease" type="int" setter="set_movement_ease" getter="get_movement_ease" default="2">
+			[enum Tween.EaseType] applied to each leg's progress (In, Out, In Out, Out In), exactly like a Tween. Hidden when [member movement_progress_curve] is set.
+		</member>
+		<member name="movement_enabled" type="bool" setter="set_movement_enabled" getter="get_movement_enabled" default="false">
+			Master switch: the spawner node travels along [member movement_path] at runtime (never in the editor). Movement runs before shooting and the preview each frame, so shots and the gizmo use the updated pose. Every pattern keeps working while moving; patterns that follow the spawner stay baked (no regeneration per shot).
+		</member>
+		<member name="movement_endpoint_pause_sec" type="float" setter="set_movement_endpoint_pause_sec" getter="get_movement_endpoint_pause_sec" default="0.0">
+			Dwell time at each endpoint between legs (Loop and Ping Pong). Not applied after the final leg.
+		</member>
+		<member name="movement_loop_mode" type="int" setter="set_movement_loop_mode" getter="get_movement_loop_mode" default="0">
+			Once: one leg, then [signal movement_finished]. Loop: every leg starts again from the path start (a jump back, no sweep). Ping Pong: the direction alternates each leg.
+		</member>
+		<member name="movement_loops" type="int" setter="set_movement_loops" getter="get_movement_loops" default="0">
+			How many legs Loop and Ping Pong run (0 = forever). Ping Pong counts each direction, so 2 = there and back. Ignored in Once mode.
+		</member>
+		<member name="movement_path" type="NodePath" setter="set_movement_path" getter="get_movement_path" default="NodePath(&quot;&quot;)">
+			The [Path2D] to follow. It must be in the tree with a non-empty curve; otherwise the spawner stays where it is and a warning prints once.
+		</member>
+		<member name="movement_progress_curve" type="Curve" setter="set_movement_progress_curve" getter="get_movement_progress_curve">
+			Optional [Curve] mapping leg time (x, 0..1) to path progress (y). Overrides [member movement_transition] and [member movement_ease]. Progress outside 0..1 is clamped to the path ends; non-finite samples fall back to linear.
+		</member>
+		<member name="movement_rotate_with_path" type="bool" setter="set_movement_rotate_with_path" getter="get_movement_rotate_with_path" default="false">
+			Rotate the spawner to face its direction of travel (it turns around on reverse legs).
+		</member>
+		<member name="movement_rotation_offset_deg" type="float" setter="set_movement_rotation_offset_deg" getter="get_movement_rotation_offset_deg" default="0.0">
+			Extra rotation in degrees on top of the path-facing rotation (for example 90 when the art points up).
+		</member>
+		<member name="movement_space" type="int" setter="set_movement_space" getter="get_movement_space" default="0">
+			Attach: the spawner sits on the path itself (like [PathFollow2D]). Relative To Start: the path's shape is replayed from where the spawner starts, so a path drawn anywhere works as a motion template.
+		</member>
+		<member name="movement_speed" type="float" setter="set_movement_speed" getter="get_movement_speed" default="200.0">
+			Pixels per second when [member movement_timing] is Speed (each leg takes path length / speed). Must be finite and greater than 0.
+		</member>
+		<member name="movement_start_delay_sec" type="float" setter="set_movement_start_delay_sec" getter="get_movement_start_delay_sec" default="0.0">
+			Seconds to wait at the start pose before the first leg moves; applied on every fresh start.
+		</member>
+		<member name="movement_start_ratio" type="float" setter="set_movement_start_ratio" getter="get_movement_start_ratio" default="0.0">
+			Fraction (0..1) of the first leg already elapsed when a run starts.
+		</member>
+		<member name="movement_timing" type="int" setter="set_movement_timing" getter="get_movement_timing" default="0">
+			Duration: each leg takes [member movement_duration_sec]. Speed: each leg takes path length / [member movement_speed].
+		</member>
+		<member name="movement_transition" type="int" setter="set_movement_transition" getter="get_movement_transition" default="0">
+			[enum Tween.TransitionType] easing each leg (Linear, Sine, Quint, Back, ...), identical to a Tween. Hidden when [member movement_progress_curve] is set.
+		</member>
+		<member name="movement_velocity_inherit_factor" type="float" setter="set_movement_velocity_inherit_factor" getter="get_movement_velocity_inherit_factor" default="1.0">
+			Multiplier on the inherited movement velocity (1 = full momentum, 0.5 = half, negative = backwards).
 		</member>
 		<member name="orbiting_direction" type="int" setter="set_orbiting_direction" getter="get_orbiting_direction" enum="DirectionalBullets2D.OrbitingDirection" default="2">
 			Orbit direction. DontMove means escort: bullets hold a fixed slot on the ring and follow the target without circling. OrbitRandom rolls OrbitLeft or OrbitRight per bullet when the volley spawns (never DontMove); live volleys keep their rolled direction on retarget passes, so switching to OrbitRandom mid-flight only affects new volleys.
@@ -1175,6 +1353,9 @@
 		</member>
 		<member name="orbiting_texture_rotation" type="int" setter="set_orbiting_texture_rotation" getter="get_orbiting_texture_rotation" enum="DirectionalBullets2D.OrbitingTextureRotation" default="0">
 			How bullet textures face while physically orbiting.
+		</member>
+		<member name="pattern_cache_mode" type="int" setter="set_pattern_cache_mode" getter="get_pattern_cache_mode" default="0">
+			Auto (default): pattern transforms are generated once and re-posed per shot whenever the pattern provably follows the generator (rigidly, or by translation only); any pattern-affecting property change rebakes automatically. Sources that read outside state (From Children, Aimed, Corridor, Custom, Path2D) and unseeded random patterns always regenerate. A moving or spinning spawner never needs Off. Off: regenerate every shot, for debugging or for scripts that change pattern inputs behind the setters' back.
 		</member>
 		<member name="pattern_scale" type="float" setter="set_pattern_scale" getter="get_pattern_scale" default="1.0">
 			Scales the whole pattern around the generator (positions and bullet size grow together). 1.0 keeps it as is, 0 collapses it onto the generator, negatives mirror it. Compose with transforms_scale for big-layout + big-bullet looks.
@@ -1256,6 +1437,9 @@
 		</member>
 		<member name="spawn_position_offset" type="Vector2" setter="set_spawn_position_offset" getter="get_spawn_position_offset" default="Vector2(0, 0)">
 			Flat global offset added to every bullet right after spawn (muzzle offsets, spawn-then-nudge). Zero disables the pass. Applied through the engine teleport path, so shapes, attachments, and interpolation stay in sync. Must be finite.
+		</member>
+		<member name="spawn_position_offset_space" type="int" setter="set_spawn_position_offset_space" getter="get_spawn_position_offset_space" default="0">
+			How [member spawn_position_offset] applies. Global (default, the historical behaviour): a world-space shift for every volley. Local: a muzzle offset in the generator's frame, so it turns and scales with the spawner. The preview draws the offset where bullets actually spawn, in both spaces.
 		</member>
 		<member name="spin_amplitude_deg" type="float" setter="set_spin_amplitude_deg" getter="get_spin_amplitude_deg" default="45.0">
 			How far the pattern swings each way in oscillate mode.
@@ -1344,6 +1528,28 @@
 				Fired when this spawner's bullets expire. Needs the lifetime signal enabled in the bullet data. Deferred; until it is delivered the volley keeps its attachments and stays out of the pool (same contract as [signal BulletFactory2D.directional_life_time_over]).
 			</description>
 		</signal>
+		<signal name="movement_endpoint_reached">
+			<param index="0" name="at_end" type="bool" />
+			<description>
+				Emitted each time a leg reaches its endpoint. [param at_end] is true at the path end, false at the path start. Fires before [signal movement_loop_completed] or [signal movement_finished] for the same leg.
+			</description>
+		</signal>
+		<signal name="movement_finished">
+			<description>
+				Emitted once when a finite run completes (Once mode, or after [member movement_loops] legs). Not emitted by [method movement_stop].
+			</description>
+		</signal>
+		<signal name="movement_loop_completed">
+			<param index="0" name="leg_index" type="int" />
+			<description>
+				Emitted after each completed leg that is not the last one (Loop and Ping Pong). [param leg_index] is the 0-based index of the leg that just finished.
+			</description>
+		</signal>
+		<signal name="movement_started">
+			<description>
+				Emitted when the movement starts or resumes playing ([method movement_play] or autostart).
+			</description>
+		</signal>
 		<signal name="pattern_list_finished">
 			<description>
 				Fired when a sequential pattern-list queue drains (the last entry's source stays active as the new phase). Simultaneous lists do not emit this - they return the fired count from [method spawn_pattern_list] directly.
@@ -1414,6 +1620,12 @@
 		</signal>
 	</signals>
 	<constants>
+		<constant name="SPAWN_OFFSET_GLOBAL" value="0" enum="SpawnOffsetSpace">
+			World-space offset (default).
+		</constant>
+		<constant name="SPAWN_OFFSET_LOCAL" value="1" enum="SpawnOffsetSpace">
+			Offset in the generator's frame: turns and scales with it.
+		</constant>
 		<constant name="HOMING_SHARED" value="0" enum="HomingMode">
 			One homing queue shared by every bullet of the volley.
 		</constant>
@@ -1470,6 +1682,33 @@
 		</constant>
 		<constant name="HOMING_RETARGET_ON_INTERVAL" value="1" enum="HomingRetargetMode">
 			Flying volleys are re-aimed every [member homing_retarget_interval_sec].
+		</constant>
+		<constant name="MOVEMENT_SPACE_ATTACH" value="0" enum="MovementSpace">
+			The spawner sits on the path (like [PathFollow2D]).
+		</constant>
+		<constant name="MOVEMENT_SPACE_RELATIVE_TO_START" value="1" enum="MovementSpace">
+			The path's shape is replayed from the spawner's start position.
+		</constant>
+		<constant name="MOVEMENT_LOOP_ONCE" value="0" enum="MovementLoopMode">
+			One leg, then finish.
+		</constant>
+		<constant name="MOVEMENT_LOOP_LOOP" value="1" enum="MovementLoopMode">
+			Every leg restarts from the path start.
+		</constant>
+		<constant name="MOVEMENT_LOOP_PING_PONG" value="2" enum="MovementLoopMode">
+			The direction alternates each leg.
+		</constant>
+		<constant name="MOVEMENT_DIRECTION_FORWARD" value="0" enum="MovementDirection">
+			The first leg goes from the path start to its end.
+		</constant>
+		<constant name="MOVEMENT_DIRECTION_REVERSE" value="1" enum="MovementDirection">
+			The first leg goes from the path end to its start.
+		</constant>
+		<constant name="MOVEMENT_TIMING_DURATION" value="0" enum="MovementTiming">
+			Each leg takes [member movement_duration_sec].
+		</constant>
+		<constant name="MOVEMENT_TIMING_SPEED" value="1" enum="MovementTiming">
+			Each leg takes path length / [member movement_speed].
 		</constant>
 		<constant name="PATTERN_FROM_CHILDREN" value="0" enum="PatternSource">
 			One transform per child marker of the generator.
@@ -1570,6 +1809,9 @@
 		<constant name="PATTERN_FROM_HELPER_DIAMOND" value="32" enum="PatternSource">
 			Diamond (rhombus) perimeter from its diagonals, slots spread evenly by arc length, facing outward (or inward). Full outline-layout support.
 		</constant>
+		<constant name="PATTERN_FROM_LAST" value="33" enum="PatternSource">
+			Sentinel: the number of pattern sources, not a valid source. Handy for iterating every source.
+		</constant>
 		<constant name="PATH2D_DISTRIBUTION_FIXED_SPACING" value="0" enum="Path2DDistribution">
 			Path2D bullets are laid helper_path2d_spacing apart.
 		</constant>
@@ -1614,6 +1856,12 @@
 		</constant>
 		<constant name="SPIN_OSCILLATE" value="1" enum="SpinMode">
 			Swings back and forth using amplitude and frequency.
+		</constant>
+		<constant name="PATTERN_CACHE_AUTO" value="0" enum="PatternCacheMode">
+			Bake when provably safe, regenerate otherwise (default).
+		</constant>
+		<constant name="PATTERN_CACHE_OFF" value="1" enum="PatternCacheMode">
+			Always regenerate.
 		</constant>
 	</constants>
 </class>

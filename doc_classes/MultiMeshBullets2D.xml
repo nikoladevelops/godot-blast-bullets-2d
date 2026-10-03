@@ -5,6 +5,7 @@
 	</brief_description>
 	<description>
 		Shared base for [DirectionalBullets2D] and [BlockBullets2D]. Holds everything a bullet batch needs at runtime: the multimesh, physics shapes, per-bullet caches, attachments, curves, movement patterns, timers, and the SpriteFrames animation state. You never create these directly. Spawn them through [BulletFactory2D], control live ones through the returned instance, and let the object pool recycle them.
+		Index ranges: every [code]all_bullets_*[/code] method takes an inclusive start..end range. The defaults (0, -1) mean the whole volley, and -1 as the end means "through the last bullet". A range outside [code]0..amount-1[/code], or an inverted one (start &gt; end), fails loud with [code]Invalid index range in &lt;method&gt;[/code] and applies nothing; it is never silently widened to the whole volley.
 	</description>
 	<tutorials>
 	</tutorials>
@@ -400,6 +401,41 @@
 				Clears one bullet's per-bullet curves back to the shared fallback (or no curves when unset). Same as [method bullet_set_curves_data] with null, kept for symmetry with [method clear_per_bullet_homing_smoothing].
 			</description>
 		</method>
+		<method name="debug_dedup_find_collision" qualifiers="const">
+			<return type="Dictionary" />
+			<param index="0" name="probe_count" type="int" />
+			<description>
+				Brute-force key-collision search over probe_count deterministic distinct pairs. Returns collided and probes. Test-only: pins the 64-bit dedup key against birthday collisions.
+			</description>
+		</method>
+		<method name="debug_dedup_mark">
+			<return type="void" />
+			<param index="0" name="bullet_index" type="int" />
+			<param index="1" name="target_instance_id" type="int" />
+			<description>
+				Marks one (bullet, target) pair as queued in the live dedup table. Test-only: call on an idle volley with no overlaps in flight.
+			</description>
+		</method>
+		<method name="debug_dedup_probe">
+			<return type="bool" />
+			<param index="0" name="bullet_index" type="int" />
+			<param index="1" name="target_instance_id" type="int" />
+			<description>
+				Whether one (bullet, target) pair is already queued in the live dedup table. Test-only: call on an idle volley with no overlaps in flight.
+			</description>
+		</method>
+		<method name="debug_dedup_reset">
+			<return type="void" />
+			<description>
+				Clears the live dedup table (same clear the drain runs, including the cold-table shrink). Test-only: call on an idle volley with no overlaps in flight.
+			</description>
+		</method>
+		<method name="debug_dedup_stats" qualifiers="const">
+			<return type="Dictionary" />
+			<description>
+				Dedup table introspection: used pairs, slot capacity, and the collision_dedup_by_object mode.
+			</description>
+		</method>
 		<method name="debug_get_attachment_info" qualifiers="const">
 			<return type="Dictionary" />
 			<param index="0" name="bullet_index" type="int" />
@@ -417,39 +453,6 @@
 			<return type="Dictionary" />
 			<description>
 				Collision shape state: valid, type, circle_radius, rect_size, capsule_radius, capsule_height, rid_count. Asserts set_collision_shape_runtime same-type vs type-change paths.
-			</description>
-		</method>
-		<method name="debug_dedup_find_collision">
-			<return type="Dictionary" />
-			<param index="0" name="probe_count" type="int" />
-			<description>
-				Brute-force key-collision search over probe_count deterministic distinct pairs. Returns collided and probes. Test-only: pins the 64-bit dedup key against birthday collisions.
-			</description>
-		</method>
-		<method name="debug_dedup_mark">
-			<param index="0" name="bullet_index" type="int" />
-			<param index="1" name="target_instance_id" type="int" />
-			<description>
-				Marks one (bullet, target) pair as queued in the live dedup table. Test-only: call on an idle volley with no overlaps in flight.
-			</description>
-		</method>
-		<method name="debug_dedup_probe">
-			<return type="bool" />
-			<param index="0" name="bullet_index" type="int" />
-			<param index="1" name="target_instance_id" type="int" />
-			<description>
-				Whether one (bullet, target) pair is already queued in the live dedup table. Test-only: call on an idle volley with no overlaps in flight.
-			</description>
-		</method>
-		<method name="debug_dedup_reset">
-			<description>
-				Clears the live dedup table (same clear the drain runs, including the cold-table shrink). Test-only: call on an idle volley with no overlaps in flight.
-			</description>
-		</method>
-		<method name="debug_dedup_stats" qualifiers="const">
-			<return type="Dictionary" />
-			<description>
-				Dedup table introspection: used pairs, slot capacity, and the collision_dedup_by_object mode.
 			</description>
 		</method>
 		<method name="debug_get_timer_count" qualifiers="const">
@@ -1010,6 +1013,7 @@
 			You can use this property to keep track of how many times each bullet has collided, and you can also set it to update the collision counts as needed.
 		</member>
 		<member name="collision_dedup_by_object" type="bool" setter="set_collision_dedup_by_object" getter="get_collision_dedup_by_object" default="true">
+			When on (default), a bullet reports each target object at most once per drain window, even when the physics server reports several shape pairs for one overlap (multi-shape bodies and areas). Off restores legacy shape-level delivery: every shape record counts, signals and bounces separately.
 		</member>
 		<member name="curves_elapsed_time" type="float" setter="set_curves_elapsed_time" getter="get_curves_elapsed_time" default="0.0">
 			The elapsed time used for the bullets' curves. This is the time that gets passed to the curves assigned to the bullets, you can manipulate it freely.

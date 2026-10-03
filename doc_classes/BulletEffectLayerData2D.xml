@@ -114,6 +114,7 @@
 			One-shot fired at each bullet's death pose on lifetime expiry (both the silent and the signalled path), even as the volley pools underneath it.
 		</constant>
 		<constant name="EFFECT_ON_CLEAR" value="6" enum="EffectTrigger">
+			One-shot fired by manual clears only ([method MultiMeshBullets2D.clear_all_bullets], [method BulletFactory2D.clear_active_bullets] and the single-bullet clear). Collision kills fire On Destroy, timeouts fire On Lifetime Over and teardown (reset/free) stays silent, so a clear layer never doubles another trigger.
 		</constant>
 	</constants>
 </class>

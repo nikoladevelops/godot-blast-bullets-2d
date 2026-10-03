@@ -19,6 +19,20 @@
 	<tutorials>
 	</tutorials>
 	<methods>
+		<method name="clear_active_bullets">
+			<return type="int" />
+			<param index="0" name="key" type="MultiMeshPoolKey2D" default="null" />
+			<description>
+				Clears every live bullet with dismissal visuals: runs each active volley's [method MultiMeshBullets2D.clear_all_bullets], so On Clear effect layers fire, and emptied volleys park in the pool. Returns how many bullets were cleared. Pass [code]null[/code] (default) for all buckets, or a [MultiMeshPoolKey2D] for one exact bucket. Unlike [method free_active_bullets] (silent deletion) and [method reset] (silent teardown), this is the wave-clear path that reads on screen.
+			</description>
+		</method>
+		<method name="clear_active_bullets_deferred">
+			<return type="void" />
+			<param index="0" name="key" type="MultiMeshPoolKey2D" default="null" />
+			<description>
+				Deferred [method clear_active_bullets]: safe from any callback.
+			</description>
+		</method>
 		<method name="clear_sprite_effects">
 			<return type="void" />
 			<description>
@@ -200,20 +214,6 @@
 				Deferred [method free_active_bullets]: safe from any callback. Use this instead of free() on volleys inside handlers (free() mid-sweep corrupts iteration; queue_free() via [method free_volley_deferred] is the single-volley equivalent).
 			</description>
 		</method>
-		<method name="clear_active_bullets">
-			<return type="int" />
-			<param index="0" name="key" type="MultiMeshPoolKey2D" default="null" />
-			<description>
-				Clears every live bullet with dismissal visuals: runs each active volley's [method MultiMeshBullets2D.clear_all_bullets], so On Clear effect layers fire, and emptied volleys park in the pool. Returns how many bullets were cleared. Pass [code]null[/code] (default) for all buckets, or a [MultiMeshPoolKey2D] for one exact bucket. Unlike [method free_active_bullets] (silent deletion) and [method reset] (silent teardown), this is the wave-clear path that reads on screen.
-			</description>
-		</method>
-		<method name="clear_active_bullets_deferred">
-			<return type="void" />
-			<param index="0" name="key" type="MultiMeshPoolKey2D" default="null" />
-			<description>
-				Deferred [method clear_active_bullets]: safe from any callback.
-			</description>
-		</method>
 		<method name="free_attachments_pool">
 			<return type="void" />
 			<description>
@@ -277,10 +277,23 @@
 				Safe single-volley free from any callback: uses queue_free(), never free()/force_delete(). Use this inside directional_area_entered and other handlers instead of freeing the volley directly. Only bullet volleys ([MultiMeshBullets2D]) are accepted; any other node is rejected with an error and left alone.
 			</description>
 		</method>
+		<method name="get_active_bullet_count" qualifiers="const">
+			<return type="int" />
+			<description>
+				Live bullets across every active volley (directional + block), summed from each volley's live counter: O(active volleys), no per-bullet scan. Counts bullets, unlike [method debug_get_active_bullets_amount], which counts volleys.
+			</description>
+		</method>
 		<method name="get_active_effect_count" qualifiers="const">
 			<return type="int" />
 			<description>
 				Total live one-shot effect slots across all bakes (plus the manual hatch).
+			</description>
+		</method>
+		<method name="get_frame_stats" qualifiers="const">
+			<return type="Dictionary" />
+			<description>
+				Cheap, always-on profiling snapshot. Keys: [code]physics_ticks[/code], [code]physics_tick_usec[/code] (last tick), [code]peak_physics_tick_usec[/code], [code]render_usec[/code] (last interpolation pass, 0 when interpolation is off), [code]volleys_ticked[/code] and [code]bullets_ticked[/code] (last tick), [code]collision_records_total[/code], [code]expired_bullets_total[/code], [code]spawned_bullets_total[/code], [code]pool_hits[/code], [code]pool_misses[/code], [code]active_bullets[/code], [code]active_volleys[/code], [code]pooled_volleys[/code], [code]active_effects[/code], [code]active_attachments[/code].
+				[code]physics_ticks[/code] and the [code]*_total[/code] counters are cumulative since start (or the last [method reset_frame_stats]): sample twice and subtract for per-frame rates. The same numbers are graphed live in the editor's Debugger &gt; Monitors tab, see [member register_performance_monitors].
 			</description>
 		</method>
 		<method name="get_is_factory_busy" qualifiers="const">
@@ -1314,6 +1327,12 @@
 				Deferred [method reset]: safe from collision, lifetime, timer and spawner-signal handlers. Validates cheaply now, runs the real op after the physics step.
 			</description>
 		</method>
+		<method name="reset_frame_stats">
+			<return type="void" />
+			<description>
+				Resets the peak tick time, [code]physics_ticks[/code] and the cumulative [code]*_total[/code] counters of [method get_frame_stats]. Pool hit/miss counters are separate: see [method debug_reset_pool_stats].
+			</description>
+		</method>
 		<method name="set_physics_space">
 			<return type="void" />
 			<param index="0" name="new_physics_space" type="RID" />
@@ -1397,8 +1416,11 @@
 			Whether the debugger of the collision shapes is enabled or not.
 		</member>
 		<member name="is_factory_processing_bullets" type="bool" setter="set_is_factory_processing_bullets" getter="get_is_factory_processing_bullets" default="true">
-			Use this if you want to pause processing of bullets - being able to stop bullets in place. Always use this instead of [code]set_process[/code]/[code]set_physics_process[/code]. While paused, physics callbacks are dropped instead of queued, so overlapping areas cannot accumulate a backlog (no resume hitch).
+			Use this if you want to pause processing of bullets - being able to stop bullets in place. Always use this instead of [code]set_process[/code]/[code]set_physics_process[/code]. While paused nothing is drained. Overlaps that START during the pause are parked per volley (bounded at 4096 records, deduplicated, cancelled when the overlap ends before resume) and replayed exactly once on resume. Overlaps counted before the pause are never re-reported, and nothing piles up into a resume hitch.
 			Warning (shared factories): pausing stops EVERY spawner's bullets at once - there is no per-spawner pause.
+		</member>
+		<member name="register_performance_monitors" type="bool" setter="set_register_performance_monitors" getter="get_register_performance_monitors" default="true">
+			When on (default), the factory registers custom monitors on ready, graphed while the game runs in the editor's Debugger &gt; Monitors tab: BlastBullets2D/Active Bullets, Active Volleys, Pooled Volleys, Physics Tick (ms), Peak Physics Tick (ms), Interpolation (ms), Active Effects and Active Attachments. Use them to spot which frames are heavy and what causes it. One factory owns the monitor ids at a time (the first to become ready; others skip silently, and a freed owner's ids are reclaimed). Runtime only, never in the editor; removed when the factory leaves the tree.
 		</member>
 		<member name="use_physics_interpolation" type="bool" setter="set_use_physics_interpolation_editor" getter="get_use_physics_interpolation" default="false">
 			Determines whether physics interpolation is enabled or not. The setter is for the editor only.
