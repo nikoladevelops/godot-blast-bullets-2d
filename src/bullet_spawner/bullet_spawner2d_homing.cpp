@@ -536,7 +536,7 @@ void BulletSpawner2D::update_homing_process_state(bool reset_countdown) {
         // retargeting just armed: re-running it on every setter call would
         // flatten the stagger phases of already-running spawners.
         if (reset_countdown) {
-            homing_retarget_time_left = homing_retarget_phase;
+            arm_retarget_countdown();
         }
         set_process(true);
     } else {

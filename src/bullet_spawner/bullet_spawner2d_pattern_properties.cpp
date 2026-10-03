@@ -2736,6 +2736,14 @@ void BulletSpawner2D::apply_pattern_preset(int preset) {
         UtilityFunctions::push_error("BulletSpawner2D::apply_pattern_preset: preset out of range, nothing applied.");
         return;
     }
+    if (preset == (int)BulletFactory2D::PATTERN_PRESET_CUSTOM) {
+        return; // "no preset": nothing to apply
+    }
+    // Clean preset: every Bullet Patterns knob (except the Transform subgroup
+    // and node/array wiring) and Spin start from their defaults, so the same
+    // preset always gives the same pattern. One preview rebuild at the end.
+    begin_pattern_batch();
+    reset_pattern_knobs_to_defaults();
     switch (preset) {
         case BulletFactory2D::PATTERN_PRESET_RADIAL_DENSE:
             pattern_source = PATTERN_FROM_HELPER_RING;
@@ -2909,12 +2917,13 @@ void BulletSpawner2D::apply_pattern_preset(int preset) {
                 helper_custom_transforms.push_back(Transform2D(Math::atan2((real_t)-1.0, slope), Vector2(x, y)));
             }
             break;
-        case BulletFactory2D::PATTERN_PRESET_CUSTOM:
         default:
-            return;
+            break; // range validated above (CUSTOM returned early)
     }
     notify_property_list_changed();
+    on_config_changed();
     on_pattern_changed();
+    end_pattern_batch();
     // Presets write members raw (batched: per-write setters would rebuild the
     // preview ~20 times). The one side effect that cannot wait is process
     // state: spin presets must wake _process, or the spin never advances on

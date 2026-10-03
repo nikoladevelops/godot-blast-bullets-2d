@@ -7,6 +7,7 @@
 
 #include "bullet_spawner2d.hpp"
 #include "../shared/warn_once2d.hpp"
+#include <godot_cpp/classes/class_db_singleton.hpp>
 
 #include <functional>
 #include "../shared/easing2d.hpp"
@@ -62,7 +63,10 @@ static inline void assign_node_to_path(const Node *self, T *node, NodePath &r_pa
     // replace this node on re-entry (see validate_cached_node).
     if (node != nullptr && self->is_inside_tree() && node->is_inside_tree() && self->get_tree() == node->get_tree()) {
         r_path = self->get_path_to(node);
-    } else if (node == nullptr) {
+    } else {
+        // Null, or a pointer assigned across trees / while out of the tree:
+        // the old path must go (it would resolve the OLD node on re-entry).
+        // fill_assigned_node_paths() writes the new one once both share a tree.
         r_path = NodePath();
     }
 }

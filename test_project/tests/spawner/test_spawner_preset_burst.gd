@@ -69,7 +69,8 @@ func test_permanent_failure_aborts_chain() -> void:
 	expect_error("no BulletFactory2D assigned")
 	assert_signal_emit_count(sp, "burst_finished", 1, "permanent failure aborts with burst_finished")
 	assert_eq(sp.get_burst_shots_left(), 0, "chain drained on abort")
-	assert_signal_not_emitted(sp, "volley_skipped", "config failure reports no volley_skipped spam")
+	assert_signal_emit_count(sp, "volley_skipped", 2, "each attempt reports a skip")
+	assert_eq(str(get_signal_parameters(sp, "volley_skipped", 0)[0]), "no_factory", "with the config reason")
 
 
 func test_out_of_range_preset_rejected() -> void:

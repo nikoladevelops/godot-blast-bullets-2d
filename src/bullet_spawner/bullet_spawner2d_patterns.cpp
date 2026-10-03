@@ -718,7 +718,88 @@ void BulletSpawner2D::mark_pattern_dirty() {
 
 void BulletSpawner2D::on_pattern_changed() {
     mark_pattern_dirty();
+    if (pattern_batch_depth > 0) {
+        pattern_batch_dirty = true;
+        return;
+    }
     rebuild_preview();
+}
+
+void BulletSpawner2D::begin_pattern_batch() {
+    ++pattern_batch_depth;
+}
+
+void BulletSpawner2D::end_pattern_batch() {
+    if (pattern_batch_depth > 0 && --pattern_batch_depth == 0 && pattern_batch_dirty) {
+        pattern_batch_dirty = false;
+        rebuild_preview();
+    }
+}
+
+// Own properties a pattern-list entry or preset may touch: helper_*, spin_*,
+// pattern_source (+ spawn_data for entries). Read from ClassDB so new knobs
+// are covered without a hand-kept list.
+static void pattern_state_property_names(bool include_spawn_data, bool reset_only, std::vector<StringName> &r_names) {
+    r_names.clear();
+    const TypedArray<Dictionary> props = ClassDBSingleton::get_singleton()->class_get_property_list("BulletSpawner2D", true);
+    for (int i = 0; i < props.size(); ++i) {
+        const Dictionary p = props[i];
+        const String name = p.get("name", String());
+        const int usage = (int)p.get("usage", 0);
+        if ((usage & (PROPERTY_USAGE_GROUP | PROPERTY_USAGE_SUBGROUP | PROPERTY_USAGE_CATEGORY)) != 0) {
+            continue;
+        }
+        const bool knob = name.begins_with("helper_") || name.begins_with("spin_") || name == "pattern_source";
+        if (!knob && !(include_spawn_data && name == "spawn_data")) {
+            continue;
+        }
+        if (reset_only) {
+            // Presets keep wiring (node paths, user arrays) and the Transform
+            // subgroup (skip indices; the scales/offset are not helper_*).
+            const int type = (int)p.get("type", 0);
+            if (type != Variant::INT && type != Variant::FLOAT && type != Variant::BOOL && type != Variant::VECTOR2) {
+                continue;
+            }
+        }
+        r_names.push_back(StringName(name));
+    }
+}
+
+Dictionary BulletSpawner2D::snapshot_pattern_state() const {
+    std::vector<StringName> names;
+    pattern_state_property_names(true, false, names);
+    Dictionary out;
+    for (const StringName &name : names) {
+        out[name] = get(name);
+    }
+    return out;
+}
+
+void BulletSpawner2D::restore_pattern_state(const Dictionary &snapshot) {
+    begin_pattern_batch();
+    const Array keys = snapshot.keys();
+    for (int i = 0; i < keys.size(); ++i) {
+        const StringName name = keys[i];
+        const Variant saved = snapshot[name];
+        if (get(name) != saved) {
+            set(name, saved);
+        }
+    }
+    end_pattern_batch();
+}
+
+void BulletSpawner2D::reset_pattern_knobs_to_defaults() {
+    std::vector<StringName> names;
+    pattern_state_property_names(false, true, names);
+    ClassDBSingleton *class_db = ClassDBSingleton::get_singleton();
+    begin_pattern_batch();
+    for (const StringName &name : names) {
+        const Variant def = class_db->class_get_property_default_value("BulletSpawner2D", name);
+        if (def.get_type() != Variant::NIL && get(name) != def) {
+            set(name, def);
+        }
+    }
+    end_pattern_batch();
 }
 
 // Sources whose raw transforms read state OTHER than the marker + the

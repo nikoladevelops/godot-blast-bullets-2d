@@ -130,6 +130,9 @@ Ref<DirectionalBulletsData2D> BulletSpawner2D::get_spawn_data() const {
 
 void BulletSpawner2D::set_spawn_data(const Ref<DirectionalBulletsData2D> &new_data) {
     on_config_changed();
+    if (new_data == spawn_data) {
+        return; // same resource: keep the duplicate template and connection
+    }
 	const Callable on_changed = callable_mp(this, &BulletSpawner2D::_on_spawn_data_changed);
 	if (spawn_data.is_valid() && spawn_data->is_connected("changed", on_changed)) {
 		spawn_data->disconnect("changed", on_changed);
@@ -158,6 +161,13 @@ void BulletSpawner2D::_on_spawn_data_changed() {
 	}
 }
 
+// shooting_* transitions are reported only for a live spawner at runtime:
+// the scene loader calls setters before the tree (and _ready reports the
+// start itself), and the editor never auto-fires.
+static bool reports_shooting_transitions(const Node *self) {
+    return self->is_inside_tree() && !Engine::get_singleton()->is_editor_hint();
+}
+
 bool BulletSpawner2D::auto_shooting_active() const {
     return shooting_enabled && !shooting_paused && (max_volleys < 0 || volleys_fired < max_volleys);
 }
@@ -177,10 +187,7 @@ void BulletSpawner2D::set_shooting_enabled(bool value) {
     if (is_inside_tree()) {
         refresh_process_state();
     }
-    // Transitions report only inside the tree: the scene loader invokes
-    // setters for stored values before _ready, and _ready emits the start
-    // itself — emitting here too would double-fire shooting_started on load.
-    if (!is_inside_tree()) {
+    if (!reports_shooting_transitions(this)) {
         return;
     }
     if (!was_active && now_active) {
@@ -241,9 +248,8 @@ void BulletSpawner2D::set_max_volleys(int value) {
     // volley_fired handler lowering the cap onto the just-fired count),
     // emitting here too would fire the signal twice for one volley, so the
     // setter only reports start/stop transitions and leaves the finish report
-    // to the shooting path. Transitions report only inside the tree (same
-    // scene-load double-emit guard as set_shooting_enabled).
-    if (!is_inside_tree()) {
+    // to the shooting path. Same reporting guard as set_shooting_enabled.
+    if (!reports_shooting_transitions(this)) {
         return;
     }
     if (!was_active && now_active) {
@@ -382,9 +388,7 @@ void BulletSpawner2D::set_burst_enabled(bool value) {
     burst_enabled = value;
     notify_property_list_changed(); // burst_* knobs gate on it
     if (!value) {
-        burst_shots_left = 0;
-        burst_consecutive_failures = 0;
-        burst_time_left = 0.0;
+        cancel_burst_chain();
         telegraph_pending = false;
         telegraph_time_left = 0.0;
     } else if (is_inside_tree() && !Engine::get_singleton()->is_editor_hint()) {
@@ -402,6 +406,13 @@ void BulletSpawner2D::set_burst_count(int value) {
         return;
     }
     burst_count = value;
+    // A running chain never exceeds the new count (shot indexes stay 1..n).
+    if (burst_shots_left > 0) {
+        burst_shots_left = MAX(0, MIN(burst_shots_left, burst_count - burst_shots_fired));
+        if (burst_shots_left == 0) {
+            cancel_burst_chain();
+        }
+    }
 }
 
 double BulletSpawner2D::get_burst_interval_sec() const {
@@ -496,7 +507,7 @@ void BulletSpawner2D::reset_shooting() {
     shooting_paused = false;
     oneshot_volleys_left = -1;
     shoot_time_left = shoot_initial_delay_sec;
-    homing_retarget_time_left = homing_retarget_phase;
+    arm_retarget_countdown();
     // Burst/telegraph chains never survive a restart: a stale mid-burst
     // countdown firing into a reset wave would double-fire volleys.
     burst_shots_left = 0;
@@ -513,7 +524,7 @@ void BulletSpawner2D::reset_shooting() {
         refresh_process_state();
     }
     // An explicit restart counts as a (re)start whenever it arms shooting.
-    if (auto_shooting_active()) {
+    if (auto_shooting_active() && reports_shooting_transitions(this)) {
         emit_signal("shooting_started");
     }
 }
@@ -533,7 +544,7 @@ void BulletSpawner2D::fire_n_volleys(int n) {
     if (is_inside_tree()) {
         refresh_process_state();
     }
-    if (!was_active && auto_shooting_active()) {
+    if (!was_active && auto_shooting_active() && reports_shooting_transitions(this)) {
         emit_signal("shooting_started");
     }
 }
@@ -544,7 +555,7 @@ void BulletSpawner2D::pause_shooting() {
     if (is_inside_tree()) {
         refresh_process_state();
     }
-    if (was_active && !auto_shooting_active()) {
+    if (was_active && !auto_shooting_active() && reports_shooting_transitions(this)) {
         emit_signal("shooting_stopped");
     }
 }
@@ -555,7 +566,7 @@ void BulletSpawner2D::resume_shooting() {
     if (is_inside_tree()) {
         refresh_process_state();
     }
-    if (!was_active && auto_shooting_active()) {
+    if (!was_active && auto_shooting_active() && reports_shooting_transitions(this)) {
         emit_signal("shooting_started");
     }
 }
@@ -588,9 +599,15 @@ bool BulletSpawner2D::needs_process() const {
 }
 
 void BulletSpawner2D::refresh_process_state() {
-    if (is_inside_tree()) {
-        set_process(needs_process());
+    if (!is_inside_tree()) {
+        return;
     }
+    if (Engine::get_singleton()->is_editor_hint()) {
+        // The editor never shoots: only the preview may keep _process alive.
+        update_preview_process_state();
+        return;
+    }
+    set_process(needs_process());
 }
 
 void BulletSpawner2D::refresh_process_state_editor_guarded() {
@@ -675,10 +692,15 @@ bool BulletSpawner2D::shoot_once() {
     };
     BulletFactory2D *factory = get_bullet_factory();
     if (factory == nullptr) {
-        return fail_early("BulletSpawner2D::shoot_once: no BulletFactory2D assigned (bullet_factory_path).", StringName(), false);
+        return fail_early("BulletSpawner2D::shoot_once: no BulletFactory2D assigned (bullet_factory_path).", StringName("no_factory"), true);
     }
     if (spawn_data.is_null()) {
-        return fail_early("BulletSpawner2D::shoot_once: no spawn_data assigned.", StringName(), false);
+        return fail_early("BulletSpawner2D::shoot_once: no spawn_data assigned.", StringName("no_spawn_data"), true);
+    }
+    // Soft live-bullet fuse: pause firing (not erroring) while the cap holds.
+    // Checked before any pattern work, so a stalled spawner costs nothing.
+    if (max_live_bullets > 0 && get_active_live_bullet_count() >= max_live_bullets) {
+        return fail_early(nullptr, StringName("over_budget"), true);
     }
     // Duplicate per volley: the user's resource must never be mutated (its
     // transforms get overwritten below), so shared .tres files stay safe.
@@ -693,7 +715,7 @@ bool BulletSpawner2D::shoot_once() {
     } else {
         volley_data = Ref<DirectionalBulletsData2D>(Object::cast_to<DirectionalBulletsData2D>(spawn_data->duplicate().ptr()));
         if (volley_data.is_null()) {
-            return fail_early("BulletSpawner2D::shoot_once: could not duplicate spawn_data.", StringName(), false);
+            return fail_early("BulletSpawner2D::shoot_once: could not duplicate spawn_data.", StringName("no_spawn_data"), true);
         }
         cached_volley_template = volley_data;
         cached_spawn_data_id = spawn_id;
@@ -708,11 +730,6 @@ bool BulletSpawner2D::shoot_once() {
         // Reported as a skipped volley (not just an error) so games can fall
         // back instead of log-diving.
         return fail_early(String(String("BulletSpawner2D::shoot_once: pattern_source ") + pattern_source_name(pattern_source) + " produced no transforms, volley skipped.").utf8().get_data(), StringName("no_transforms"), true);
-    }
-    // Soft live-bullet fuse: pause firing (not erroring) while the cap holds.
-    // Reports as skipped so budget governors can observe the stall.
-    if (max_live_bullets > 0 && get_active_live_bullet_count() >= max_live_bullets) {
-        return fail_early(nullptr, StringName("over_budget"), true);
     }
     // Fire-cone gate (homing only): no target inside half the fire arc means
     // this volley would chase nothing it can see, so the shot is skipped
@@ -740,10 +757,8 @@ bool BulletSpawner2D::shoot_once() {
     }
     DirectionalBullets2D *bullets = factory->spawn_controllable_directional_bullets_span(volley_data, shot_transforms.data(), (int)shot_transforms.size(), inherited_velocity, get_instance_id());
     if (bullets == nullptr) {
-        // Factory already reported why (busy/teardown/bad data): clear and
-        // report, no skip signal (nothing about the request was skippable).
-        clear_shoot_once_latch();
-        return false;
+        // The factory already reported why (busy, teardown, bad data).
+        return fail_early(nullptr, StringName("factory_refused"), true);
     }
     // Tag the instance (fresh or pooled): from here on its area_entered,
     // body_entered and life_time_over signals are possessed by this spawner
@@ -769,8 +784,10 @@ bool BulletSpawner2D::shoot_once() {
     if (revalidate_configured_volley(volley_id, bullets, self_id) == nullptr) {
         // Same drop semantics as below: the spawn succeeded but this shot is
         // dropped (no count, no volley_fired).
-        clear_shoot_once_latch();
-        return false;
+        // (The spawner itself cannot be freed here: Godot refuses to free
+        // an object while it emits, and every handler above ran inside one
+        // of this spawner's emits.)
+        return fail_early(nullptr, StringName("dropped"), true);
     }
     // Homing/orbiting runs on the same stamp: the instance is fully
     // configured before volley_fired, so handlers observe live behavior.
@@ -792,9 +809,10 @@ bool BulletSpawner2D::shoot_once() {
         // Volley is gone or foreign: counting it or emitting volley_fired for it
         // would lie about ownership and hand out a dead pointer. The spawn
         // itself succeeded (bullets were created), but this shot is dropped.
-        // Pre-emit failure: clear both latch and global depth (nothing emitted).
-        clear_shoot_once_latch();
-        return false;
+        // (The spawner itself cannot be freed here: Godot refuses to free
+        // an object while it emits, and every handler above ran inside one
+        // of this spawner's emits.)
+        return fail_early(nullptr, StringName("dropped"), true);
     }
     volleys_fired += 1;
     // The latch stays up through this emit AND the cap transition below: a
@@ -809,6 +827,9 @@ bool BulletSpawner2D::shoot_once() {
     // transitions stay consistent; placed after volley_fired so the last
     // volley's signal precedes the stop.
     if (oneshot_volleys_left > 0 && --oneshot_volleys_left == 0) {
+        // Spent: the budget clears itself (volleys_remaining and a later
+        // resume_shooting() behave like an unlimited spawner again).
+        oneshot_volleys_left = -1;
         pause_shooting();
     }
     // Exact-equality = transition only: further manual shots past the cap do
@@ -819,7 +840,11 @@ bool BulletSpawner2D::shoot_once() {
         // Stop shooting, but stay awake while spinning, retargeting, bursting,
         // telegraphing, sequencing, or previewing (same keep-awake set as everywhere else).
         set_process(needs_process_besides_shooting());
-        emit_signal("shooting_finished");
+        // shooting_* signals track auto-fire: manual shots on a spawner with
+        // auto-shooting off never report a finish.
+        if (shooting_enabled && reports_shooting_transitions(this)) {
+            emit_signal("shooting_finished");
+        }
     }
     shoot_error_latch = 0;
     clear_shoot_once_latch();
@@ -875,21 +900,12 @@ void BulletSpawner2D::_ready() {
     } else {
         rebuild_preview();
     }
-    volleys_fired = 0;
-    shooting_paused = false;
-    oneshot_volleys_left = -1;
+    // Controls called before the tree (pause, fire_n_volleys, ...) are kept:
+    // only the timer arms here.
     shoot_time_left = shoot_initial_delay_sec;
-    // Retarget stagger: an explicit phase is respected verbatim; the
-    // default 0 staggers deterministically by instance id so N spawners with
-    // the same interval don't group-scan on the same tick. First-pass delay
-    // is benign (volley-time resolution already armed each shot).
-    if (homing_retarget_phase > 0.0) {
-        homing_retarget_time_left = homing_retarget_phase;
-    } else if (homing_retarget_interval_sec > 0.0) {
-        homing_retarget_time_left = Math::fposmod((double)get_instance_id() * 0.137, homing_retarget_interval_sec);
-    } else {
-        homing_retarget_time_left = 0.0;
-    }
+    // Retarget stagger (volley-time resolution already armed each shot, so a
+    // delayed first pass is benign).
+    arm_retarget_countdown();
     // Movement autostart: the spawner's pose when it enters play is the
     // RELATIVE_TO_START anchor.
     if (movement_enabled && movement_autostart && !movement_playing) {
@@ -918,10 +934,15 @@ void BulletSpawner2D::_notification(int p_what) {
             rebuild_preview();
             // Rebuild already re-snapshots; the loop below stays in sync.
         }
+    } else if (p_what == NOTIFICATION_ENTER_TREE) {
+        fill_assigned_node_paths();
     } else if (p_what == NOTIFICATION_EXIT_TREE) {
-        // Leaving the tree (scene change, quit): drop caches so a later
-        // _ready starts clean. The holder is a child and frees itself; only
-        // null the pointers, never memdelete detached nodes here.
+        // Leaving the tree (reparent, scene change, quit). Reparenting must
+        // not lose state, so assigned nodes (id-validated caches), tracked
+        // volleys, burst chains, telegraphs and pattern lists are KEPT: they
+        // pause with _process and resume on re-entry. Only the preview gizmo
+        // is dropped (the holder is a child and frees itself; only null the
+        // pointers, never memdelete detached nodes here).
         preview_holder = nullptr;
         preview_dots_layer = nullptr;
         preview_arrows_layer = nullptr;
@@ -940,44 +961,45 @@ void BulletSpawner2D::_notification(int p_what) {
         preview_path2d_sample_cooldown = 0;
         tracked_path2d_node_id = 0;
         tracked_has_path2d_node_global = false;
-        helper_path2d_cache = nullptr;
-        helper_path2d_id = 0;
         // Homing scratch Arrays can retain references to freed scene nodes
-        // (candidates/scan results): drop them with the rest of the caches.
+        // (candidates/scan results): drop them.
         homing_candidates_scratch.clear();
         homing_pool_scratch.clear();
         homing_scan_stack.clear();
-        cached_volley_template.unref();
-        cached_spawn_data_id = 0;
-        bullet_factory = nullptr;
-        bullet_factory_id = 0;
-        transforms_generator = nullptr;
-        transforms_generator_id = 0;
-        helper_aimed_target = nullptr;
-        helper_aimed_target_id = 0;
-        // Homing: forget tracked volleys (plain ids, no ownership of nodes),
-        // reset the round-robin cursor, and re-arm the retarget pass (with
-        // the stagger phase) so a scene change starts clean instead of
-        // inheriting stale rotation.
-        volley_tracker.clear();
-        homing_round_robin_cursor = 0;
-        homing_retarget_time_left = homing_retarget_phase;
         // Re-arm the empty-targets warning: it latches per tree-life so a
-        // re-entered scene with still-empty targets warns again instead of
-        // staying silent forever.
+        // re-entered scene with still-empty targets warns again.
         homing_empty_targets_warned = false;
-        // Burst/telegraph never survive a tree exit: countdowns firing after
-        // re-entry would double-fire into the new scene.
-        burst_shots_left = 0;
-        burst_consecutive_failures = 0;
-        burst_time_left = 0.0;
-    burst_mirror_next = false;
-    burst_telegraph_done = false;
-    telegraph_pending = false;
-    telegraph_time_left = 0.0;
-    // Pattern-list sequencers clear with the rest: a queued sequence must
-        // not resume into a new scene on re-entry.
-        stop_pattern_list();
+    }
+}
+
+void BulletSpawner2D::fill_assigned_node_paths() {
+    // Paths are relative to the spawner: after a runtime reparent (or a
+    // pointer assignment made out of the tree) the stored path is rewritten
+    // from the live node it already points at, so saving the scene keeps
+    // the right target.
+    auto fill = [&](Node *cache, uint64_t id, NodePath &r_path) {
+        if (cache == nullptr || id == 0) {
+            return;
+        }
+        Node *live = Object::cast_to<Node>(ObjectDB::get_instance(ObjectID(id)));
+        if (live == cache && live->is_inside_tree() && live->get_tree() == get_tree()) {
+            r_path = get_path_to(live);
+        }
+    };
+    fill(bullet_factory, bullet_factory_id, bullet_factory_path);
+    fill(transforms_generator, transforms_generator_id, transforms_generator_path);
+    fill(helper_aimed_target, helper_aimed_target_id, helper_aimed_target_path);
+    fill(helper_path2d_cache, helper_path2d_id, helper_path2d_path);
+    fill(movement_path_cache, movement_path_id, movement_path);
+}
+
+void BulletSpawner2D::arm_retarget_countdown() {
+    if (homing_retarget_phase > 0.0) {
+        homing_retarget_time_left = homing_retarget_phase;
+    } else if (homing_retarget_interval_sec > 0.0) {
+        homing_retarget_time_left = Math::fposmod((double)get_instance_id() * 0.137, homing_retarget_interval_sec);
+    } else {
+        homing_retarget_time_left = 0.0;
     }
 }
 
@@ -1037,11 +1059,22 @@ void BulletSpawner2D::_process(double delta) {
     // always clears the telegraph), so only one branch fires per tick.
     // Telegraph countdown: frozen while paused (burst/burst-telegraph chains
     // must not fire into a pause). Resume continues the warning.
+    if (telegraph_pending && telegraph_from_auto && !shooting_enabled) {
+        // Auto-fire switched off during the warning: the shot is cancelled
+        // (a burst's first-shot warning ends its chain with a report).
+        telegraph_pending = false;
+        telegraph_time_left = 0.0;
+        if (burst_shots_left > 0) {
+            cancel_burst_chain();
+        }
+    }
     if (telegraph_pending && !shooting_paused) {
         telegraph_time_left -= delta;
         if (telegraph_time_left <= 0.0) {
             telegraph_pending = false;
+            auto_fire_in_progress = telegraph_from_auto;
             fire_burst_volley();
+            auto_fire_in_progress = false;
         }
         // Telegraph never sleeps the loop: the countdown owns it.
         if (!is_processing()) {
@@ -1051,10 +1084,17 @@ void BulletSpawner2D::_process(double delta) {
     }
     // Burst chain countdown: frozen while paused like the telegraph above.
     // The keep-alive below still runs via the sleep path (burst_shots_left).
+    if (burst_shots_left > 0 && burst_from_auto && !shooting_enabled) {
+        cancel_burst_chain(); // auto-fire switched off mid-chain
+    }
     if (burst_shots_left > 0 && !shooting_paused) {
         burst_time_left -= delta;
         if (burst_time_left <= 0.0) {
+            // Auto chains report a misconfiguration once (like plain auto
+            // shots); manual chains report every attempt.
+            auto_fire_in_progress = burst_from_auto;
             fire_burst_volley();
+            auto_fire_in_progress = false;
         }
         if (!is_processing()) {
             set_process(true);
@@ -1104,12 +1144,12 @@ void BulletSpawner2D::_process(double delta) {
         // Burst/telegraph arming owns the rest of the tick: their chains run
         // on their own timers, so the catch-up loop stops here.
         if (burst_enabled && burst_count > 1) {
-            begin_burst();
+            begin_burst_chain(true);
             shoot_time_left += next_shoot_interval_sec();
             break;
         }
         if (telegraph_enabled && telegraph_sec > 0.0 && !telegraph_pending) {
-            begin_telegraph();
+            begin_telegraph(true);
             shoot_time_left += next_shoot_interval_sec();
             break;
         }
@@ -1133,6 +1173,10 @@ void BulletSpawner2D::_process(double delta) {
 }
 
 void BulletSpawner2D::begin_burst() {
+    begin_burst_chain(false);
+}
+
+void BulletSpawner2D::begin_burst_chain(bool auto_started) {
     // A fresh trigger always owns the phrasing: stale telegraphs from an
     // interrupted trigger never fire into the new burst. Plain-burst mode
     // with count 1 collapses to a single immediate shot (no chain to drain).
@@ -1140,49 +1184,73 @@ void BulletSpawner2D::begin_burst() {
     telegraph_time_left = 0.0;
     burst_telegraph_done = false;
     burst_consecutive_failures = 0;
+    burst_shots_fired = 0;
+    burst_from_auto = auto_started;
     if (!burst_enabled || burst_count <= 1) {
         burst_shots_left = 0;
         fire_burst_volley();
         return;
     }
-    burst_shots_left = burst_count;
+    int length = burst_count;
+    if (auto_started) {
+        // Auto chains never fire past max_volleys or a fire_n_volleys budget.
+        const int remaining = volleys_remaining();
+        if (remaining >= 0) {
+            length = MIN(length, remaining);
+        }
+        if (length <= 0) {
+            return;
+        }
+    }
+    burst_shots_left = length;
     burst_time_left = 0.0;
     set_process(true);
 }
 
-void BulletSpawner2D::begin_telegraph() {
+void BulletSpawner2D::begin_telegraph(bool auto_started) {
     // Snapshot the aim for the warning signal; the actual fire re-collects,
     // so this is advisory (preview/telegraph visuals), never stale logic.
     TypedArray<Transform2D> aim = collect_spawn_transforms_impl(true);
     telegraph_pending = true;
+    telegraph_from_auto = auto_started;
     telegraph_time_left = telegraph_sec;
     emit_signal("volley_telegraphed", aim);
     set_process(true);
 }
 
+void BulletSpawner2D::cancel_burst_chain() {
+    const bool was_running = burst_shots_left > 0;
+    burst_shots_left = 0;
+    burst_shots_fired = 0;
+    burst_consecutive_failures = 0;
+    burst_time_left = 0.0;
+    burst_telegraph_done = false;
+    burst_mirror_next = false;
+    if (was_running) {
+        emit_signal("burst_finished");
+    }
+}
+
 void BulletSpawner2D::fire_burst_volley() {
-    if (burst_enabled && burst_count > 1) {
-        if (burst_shots_left <= 0) {
-            return;
-        }
-        if (telegraph_enabled && telegraph_sec > 0.0 && !telegraph_pending && !burst_telegraph_done && burst_shots_left == burst_count) {
+    if (burst_enabled && burst_shots_left > 0) {
+        if (telegraph_enabled && telegraph_sec > 0.0 && !telegraph_pending && !burst_telegraph_done && burst_shots_fired == 0) {
             // First burst shot warns once; done-flag stops the expiry from
             // re-firing the warning in a loop instead of firing the shot.
             burst_telegraph_done = true;
-            begin_telegraph();
+            begin_telegraph(burst_from_auto);
             return;
         }
-        // Mirror alternates every burst shot: even shots fire mirrored, odd
-        // shots plain (the classic reverse-the-angle rhythm). The toggle
-        // flips only on alternate mode; plain bursts never touch the flag.
-        const bool mirrored = burst_alternate_mirror && (burst_shots_left % 2 == 0);
+        // Mirror rhythm: the first shot is plain, then shots alternate
+        // (plain, mirrored, plain, ...) for any burst_count.
+        const bool mirrored = burst_alternate_mirror && (burst_shots_fired % 2 == 1);
         burst_mirror_next = mirrored;
         const bool fired = shoot_once();
         burst_mirror_next = false;
         if (fired) {
-            emit_signal("burst_shot_fired", burst_count - burst_shots_left + 1, mirrored);
-            burst_consecutive_failures = 0;
+            ++burst_shots_fired;
             --burst_shots_left;
+            burst_consecutive_failures = 0;
+            emit_signal("burst_shot_fired", burst_shots_fired, mirrored);
         } else if (++burst_consecutive_failures >= burst_count) {
             // Persistent failure (bad config, permanent over-budget): end the
             // chain instead of retrying forever. Each attempt already reported
@@ -1196,6 +1264,7 @@ void BulletSpawner2D::fire_burst_volley() {
         if (burst_shots_left <= 0) {
             burst_telegraph_done = false;
             burst_consecutive_failures = 0;
+            burst_shots_fired = 0;
             emit_signal("burst_finished");
         }
         set_process(true);
@@ -1227,9 +1296,15 @@ double BulletSpawner2D::next_shoot_interval_sec() const {
         jitter_rng = rng;
     }
     if (reload_jitter_seed != 0) {
-        rng->set_seed((uint64_t)reload_jitter_seed + (uint64_t)volleys_fired);
-    } else {
+        // Hash (seed, shot index): seed + index made consecutive seeds replay
+        // one sequence a shot apart (SplitMix64 finalizer).
+        uint64_t h = (uint64_t)reload_jitter_seed * 0x9E3779B97F4A7C15ull + (uint64_t)volleys_fired;
+        h = (h ^ (h >> 30)) * 0xBF58476D1CE4E5B9ull;
+        h = (h ^ (h >> 27)) * 0x94D049BB133111EBull;
+        rng->set_seed(h ^ (h >> 31));
+    } else if (!jitter_rng_randomized) {
         rng->randomize();
+        jitter_rng_randomized = true;
     }
     const double jitter = rng->randf_range(-reload_jitter_sec, reload_jitter_sec);
     return Math::max(0.001, shoot_interval_sec + jitter);
@@ -1241,7 +1316,7 @@ int BulletSpawner2D::spawn_pattern_list(const Array &entries, bool simultaneous,
         return 0;
     }
     if (!Math::is_finite(interval_sec) || interval_sec < 0.0) {
-        UtilityFunctions::push_error("BulletSpawner2D::spawn_pattern_list: interval_sec must be finite and >= 0, keeping simultaneous fire.");
+        UtilityFunctions::push_error("BulletSpawner2D::spawn_pattern_list: interval_sec must be finite and >= 0; using 0 (one entry per frame).");
         interval_sec = 0.0;
     }
     if (!is_inside_tree()) {
@@ -1254,36 +1329,20 @@ int BulletSpawner2D::spawn_pattern_list(const Array &entries, bool simultaneous,
     pattern_list_time_left = 0.0;
     pattern_list_active = true;
     if (simultaneous) {
-        // One tick, N shots: each entry overrides the live source, fires via
-        // the guarded shoot_once() path (homing/orbit/signals consistent),
-        // then restores. A bad entry skips with an error, never aborts.
-        const PatternSource saved_source = pattern_source;
-        const int saved_amount = helper_bullets_amount;
-        Ref<DirectionalBulletsData2D> saved_data = spawn_data;
+        // One tick, N shots: each entry overrides the spawner temporarily,
+        // fires through the guarded shoot_once() path (homing/orbit/signals
+        // consistent), then everything it changed is restored. A bad entry
+        // skips with an error, never aborts.
         int fired = 0;
         for (int i = 0; i < pattern_list_entries.size(); ++i) {
-            if (apply_pattern_list_entry(pattern_list_entries[i])) {
-                if (shoot_once()) {
-                    ++fired;
-                }
+            if (fire_pattern_list_override(pattern_list_entries[i])) {
+                ++fired;
             }
-            // Through the setters so the validation and the
-            // notify_property_list_changed()/rebuild_preview() side effects run
-            // once, in the right order. The raw writes this replaced had to be
-            // compensated for by hand further down.
-            set_pattern_source(saved_source);
-            set_helper_bullets_amount(saved_amount);
-            // Restoring through the setter re-points the "changed" connection
-            // back at the base resource. A raw write left the spawner bound to
-            // the LAST override with no connection, so later base-resource
-            // edits stopped invalidating the cache.
-            set_spawn_data(saved_data);
         }
         pattern_list_active = false;
         pattern_list_entries.clear();
         pattern_list_cursor = 0;
-        notify_property_list_changed();
-        on_pattern_changed();
+        emit_signal("pattern_list_finished");
         return fired;
     }
     set_process(true);
@@ -1392,31 +1451,29 @@ void BulletSpawner2D::fire_pattern_list_entry() {
         stop_pattern_list();
         return;
     }
-    // Sequential mode restores the base source after every shot so entries
-    // are overrides, not permanent inspector edits... except the source
-    // itself stays (boss phases visibly advance). Amount restores too.
-    const PatternSource saved_source = pattern_source;
-    const int saved_amount = helper_bullets_amount;
-    Ref<DirectionalBulletsData2D> saved_data = spawn_data;
-    Variant entry = pattern_list_entries[pattern_list_cursor];
+    // Every entry is a temporary override (same rule as simultaneous mode).
+    const Variant entry = pattern_list_entries[pattern_list_cursor];
     ++pattern_list_cursor;
-    bool entry_ok = apply_pattern_list_entry(entry);
-    if (entry_ok) {
-        shoot_once();
-    }
-    set_spawn_data(saved_data);
-    set_helper_bullets_amount(saved_amount);
+    fire_pattern_list_override(entry);
     if (pattern_list_cursor >= pattern_list_entries.size()) {
-        // Keep the last entry's source (phase advanced), drop the queue.
         stop_pattern_list();
-        notify_property_list_changed();
-        on_pattern_changed();
         emit_signal("pattern_list_finished");
-    } else {
-        // Setters carry their own notify/rebuild, so the manual pair this
-        // replaces is gone - it used to double-fire on every queued entry.
-        set_pattern_source(saved_source);
     }
+}
+
+bool BulletSpawner2D::fire_pattern_list_override(const Variant &entry) {
+    // Apply, fire, restore inside one pattern batch: the preview rebuilds
+    // once at the end, and the restored knobs bump the pattern version so the
+    // next normal shot rebakes from the spawner's own configuration.
+    begin_pattern_batch();
+    const Dictionary saved = snapshot_pattern_state();
+    bool fired = false;
+    if (apply_pattern_list_entry(entry)) {
+        fired = shoot_once();
+    }
+    restore_pattern_state(saved);
+    end_pattern_batch();
+    return fired;
 }
 
 

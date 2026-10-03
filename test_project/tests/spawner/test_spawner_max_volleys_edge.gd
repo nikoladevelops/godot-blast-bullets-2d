@@ -1,13 +1,16 @@
 extends BlastTest
-## Documented setter/signal split: the shot that trips max_volleys emits
-## shooting_finished exactly once; set_max_volleys() only reports start/stop
-## transitions (lowering onto the count -> stopped, never a second finished).
+## Documented setter/signal split: with auto-fire configured, the shot that
+## trips max_volleys emits shooting_finished exactly once; set_max_volleys()
+## only reports start/stop transitions (lowering onto the count -> stopped,
+## never a second finished). Manual-only spawners never report a finish
+## (test_spawner_cadence).
 
 
 func test_cap_trip_by_shot_emits_finished_once() -> void:
 	var sp := make_spawner(H.make_directional_data(1, 0.0, 60.0), BulletSpawner2D.PATTERN_FROM_SELF, 1)
-	watch_signals(sp)
 	sp.max_volleys = 2
+	sp.set_shooting_enabled(true) # auto-fire configured: the cap trip is a finish
+	watch_signals(sp)
 	assert_true(sp.shoot_once())
 	assert_true(sp.shoot_once())
 	assert_signal_emit_count(sp, "shooting_finished", 1, "finished exactly once")

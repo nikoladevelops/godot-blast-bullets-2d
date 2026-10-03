@@ -62,7 +62,8 @@ func test_mirror_flag_alternates() -> void:
 	var n: int = get_signal_emit_count(sp, "burst_shot_fired")
 	assert_eq(n, 4, "burst fired 4 shots")
 	for i in n:
-		assert_eq(bool(get_signal_parameters(sp, "burst_shot_fired", i)[1]), i % 2 == 0, "shot %d mirrored iff even" % i)
+		# First shot plain, then alternate (same rhythm for odd and even counts).
+		assert_eq(bool(get_signal_parameters(sp, "burst_shot_fired", i)[1]), i % 2 == 1, "shot %d mirrored iff odd index" % i)
 
 
 func test_spiral_winding_reverses() -> void:

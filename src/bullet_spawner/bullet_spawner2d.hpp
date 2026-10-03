@@ -1529,12 +1529,19 @@ class BulletSpawner2D : public Node2D{
         // Current retarget countdown in seconds (time until the next interval
         // pass). For tests asserting deterministic stagger across spawners.
         double debug_get_retarget_countdown() const { return homing_retarget_time_left; }
-        // Begins a burst chain / telegraph warning / fires the next burst
-        // volley. Public so waves and boss phases can drive phrasing by hand
-        // (begin + fire on timers) instead of only through the auto loop.
+        // Starts a burst chain by hand (waves, boss phases): burst_count shots,
+        // burst_interval_sec apart, telegraphed first when enabled. Manual
+        // chains run whether auto-fire is on or not.
         void begin_burst();
-        void begin_telegraph();
+        // Internal chain machinery (the auto loop drives these).
+        void begin_burst_chain(bool auto_started);
+        // One pattern-list entry: apply, fire, restore. True when it fired.
+        bool fire_pattern_list_override(const Variant &entry);
+        void begin_telegraph(bool auto_started);
         void fire_burst_volley();
+        // Ends a running chain early (auto-fire off, burst mode off, count
+        // shrunk) and reports burst_finished once.
+        void cancel_burst_chain();
         // Takes ownership of a manually-woken volley (see enable_bullet,
         // which detaches spawner ownership): stamps, hooks the reached
         // forwarder, and tracks it for retargeting. Queues are left alone.
@@ -1979,6 +1986,9 @@ class BulletSpawner2D : public Node2D{
         // next_shoot_interval_sec). Separate from homing_rng: jitter reseeds
         // would otherwise corrupt the homing target sequence.
         mutable Ref<RandomNumberGenerator> jitter_rng;
+        // Seed 0 (non-deterministic jitter) randomizes the generator once,
+        // not on every interval.
+        mutable bool jitter_rng_randomized = false;
         // Duplicate cache: shoot_once() must never mutate the user's
         // spawn_data (transforms are overwritten per volley), so the first
         // shot duplicates it and later shots with the same resource reuse the
@@ -1996,6 +2006,14 @@ class BulletSpawner2D : public Node2D{
         // countdown to the next burst shot, telegraph countdown, and the
         // mirror flag for the next burst volley.
         int burst_shots_left = 0;
+        // Shots fired in the current chain (shot index and mirror rhythm).
+        int burst_shots_fired = 0;
+        // True when the auto loop started the chain: it then follows the
+        // auto-fire rules (clamped to volleys_remaining, cancelled when
+        // shooting_enabled turns off, errors latched once).
+        bool burst_from_auto = false;
+        // Same for a pending telegraph.
+        bool telegraph_from_auto = false;
         double burst_time_left = 0.0;
         double telegraph_time_left = 0.0;
         bool burst_mirror_next = false;
@@ -2226,8 +2244,28 @@ class BulletSpawner2D : public Node2D{
         bool preview_survives_marker_move(const Transform2D &old_marker, const Transform2D &new_marker) const;
         void mark_pattern_dirty();
         // mark_pattern_dirty() + rebuild_preview(): the one call every
-        // geometry setter makes.
+        // geometry setter makes. Inside a pattern batch the rebuild waits for
+        // the batch to end (one rebuild for many setter calls).
         void on_pattern_changed();
+        int pattern_batch_depth = 0;
+        bool pattern_batch_dirty = false;
+        void begin_pattern_batch();
+        void end_pattern_batch();
+        // Pattern-list entries are temporary overrides: snapshot every knob an
+        // entry or a preset can touch (Bullet Patterns, Spin, spawn_data) and
+        // restore the ones that changed.
+        Dictionary snapshot_pattern_state() const;
+        void restore_pattern_state(const Dictionary &snapshot);
+        // Clean presets: Bullet Patterns knobs (except the Transform subgroup
+        // and node/array wiring) and Spin back to their class defaults.
+        void reset_pattern_knobs_to_defaults();
+        // On entering the tree: rewrites each NodePath from the node its
+        // id-validated cache points at (reparents, out-of-tree pointer
+        // assignments), so the saved paths always name the live target.
+        void fill_assigned_node_paths();
+        // Retarget clock: an explicit phase verbatim, else a per-instance
+        // stagger so spawners enabled together never scan on the same tick.
+        void arm_retarget_countdown();
 
         // True while interval retargeting must keep _process alive: homing on
         // + retarget armed + inside the tree at runtime.
