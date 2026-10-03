@@ -5,7 +5,7 @@ extends BlastTest
 ## NaN-poison a volley, siblings intact. Hostile calls must fail loud.
 
 
-func _finite_volley(v: DirectionalBullets2D) -> bool:
+func _finite_volley(v: BulletVolley2D) -> bool:
 	for i in v.get_amount_bullets():
 		if not v.get_bullet_transform(i).is_finite() or not v.get_bullet_direction(i).is_finite() \
 				or not v.get_bullet_velocity(i).is_finite():
@@ -22,13 +22,13 @@ func _wob(amp: float) -> BulletWobbleData2D:
 
 
 func test_hostile_spawn_data() -> void:
-	var d := H.make_directional_data(3, 100.0)
+	var d := H.make_volley_data(3, 100.0)
 	d.all_bullet_speed_data = [null, H.make_speed(150.0), null]
 	d.all_bullet_rotation_data = [null, null, null]
 	d.all_bullet_curves_data = [null, null, null]
 	d.all_bullet_wobble_data = [null, null, null]
 	d.all_bullet_gravity = [Vector2(NAN, NAN), Vector2(INF, 0), Vector2.ZERO]
-	var v: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d)
+	var v: BulletVolley2D = factory.spawn_volley(d)
 	swallow_errors()
 	assert_not_null(v, "hostile spawn returns a volley")
 	assert_true(_finite_volley(v), "hostile spawn stays finite")
@@ -38,7 +38,7 @@ func test_hostile_spawn_data() -> void:
 
 
 func test_hostile_live_setters() -> void:
-	var v: DirectionalBullets2D = spawn_dir(3, 200.0)
+	var v: BulletVolley2D = quick_volley(3, 200.0)
 	var keep_dir: Vector2 = v.get_bullet_direction(0)
 	var keep_spd: float = v.get_bullet_speed_data(0).speed
 	v.set_bullet_direction(0, Vector2(NAN, NAN))
@@ -73,7 +73,7 @@ func test_hostile_live_setters() -> void:
 
 
 func test_degenerate_transforms_rejected() -> void:
-	var v: DirectionalBullets2D = spawn_dir(2, 200.0)
+	var v: BulletVolley2D = quick_volley(2, 200.0)
 	var good: Vector2 = v.get_bullet_transform(0).origin
 	v.set_bullet_transform(0, Transform2D(Vector2.ZERO, Vector2.ZERO, Vector2.ZERO))
 	expect_any_error("zero-scale transform fails loud")
@@ -94,7 +94,7 @@ func test_degenerate_transforms_rejected() -> void:
 
 
 func test_freed_targets_mid_flight() -> void:
-	var v: DirectionalBullets2D = spawn_dir(3, 250.0)
+	var v: BulletVolley2D = quick_volley(3, 250.0)
 	v.set_homing_smoothing(6.0)
 	v.set_homing_take_control_of_texture_rotation(true)
 	for i in 3:
@@ -114,7 +114,7 @@ func test_freed_targets_mid_flight() -> void:
 
 
 func test_disable_teleport_storm() -> void:
-	var v: DirectionalBullets2D = spawn_dir(4, 220.0)
+	var v: BulletVolley2D = quick_volley(4, 220.0)
 	v.set_homing_smoothing(5.0)
 	v.bullet_homing_push_back_global_position_target(0, Vector2(500, 0))
 	v.bullet_enable_orbiting(0, 55.0)
@@ -131,7 +131,7 @@ func test_disable_teleport_storm() -> void:
 func test_pool_churn() -> void:
 	for k in 8:
 		var n: int = 2 + (k % 3)
-		var d := H.make_directional_data(n, 150.0 + 25.0 * k)
+		var d := H.make_volley_data(n, 150.0 + 25.0 * k)
 		if k % 2 == 0:
 			var wobs: Array = []
 			for i in n:
@@ -139,7 +139,7 @@ func test_pool_churn() -> void:
 				wb.enabled = true
 				wobs.append(wb)
 			d.all_bullet_wobble_data = wobs
-		var vv: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d)
+		var vv: BulletVolley2D = factory.spawn_volley(d)
 		await physics(5)
 		assert_true(_finite_volley(vv), "churn volley %d finite" % k)
 		for i in vv.get_amount_bullets():
@@ -149,13 +149,13 @@ func test_pool_churn() -> void:
 
 
 func test_maxed_deque_timers_collisions() -> void:
-	var v: DirectionalBullets2D = spawn_dir(2, 180.0)
+	var v: BulletVolley2D = quick_volley(2, 180.0)
 	for i in 300:
 		v.bullet_homing_push_back_global_position_target(0, Vector2(i, i))
 	assert_eq(v.bullet_homing_check_targets_amount(0), 256, "deque capped at 256")
 	await idle()
 	for i in 70:
-		v.multimesh_attach_time_based_function(30.0, func() -> void: pass)
+		v.attach_time_based_function(30.0, func() -> void: pass)
 	assert_eq(v.debug_get_timer_count(), 64, "timer cap holds under flood")
 	v.set_bullet_max_collision_count(2)
 	v.set_bullet_collision_count(0, 999)
@@ -164,20 +164,20 @@ func test_maxed_deque_timers_collisions() -> void:
 	assert_eq(v.get_bullet_collision_count(0), 0, "collision clamps negatives")
 	swallow_errors()
 	await idle()
-	v.multimesh_detach_all_time_based_functions()
+	v.detach_all_time_based_functions()
 	assert_true(_finite_volley(v), "volley finite after floods")
 
 
 func test_zero_single_and_mega_volley() -> void:
-	var d0 := H.make_directional_data(1, 100.0)
+	var d0 := H.make_volley_data(1, 100.0)
 	d0.transforms = []
-	var v0: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d0)
+	var v0: BulletVolley2D = factory.spawn_volley(d0)
 	swallow_errors()
 	assert_true(v0 == null or v0.get_amount_bullets() <= 1, "empty transforms rejected or empty")
-	var v1: DirectionalBullets2D = spawn_dir(1, 300.0)
+	var v1: BulletVolley2D = quick_volley(1, 300.0)
 	await physics(10)
 	assert_true(_finite_volley(v1), "single bullet finite")
-	var vm: DirectionalBullets2D = spawn_dir(64, 200.0)
+	var vm: BulletVolley2D = quick_volley(64, 200.0)
 	vm.all_bullets_set_wobble_data(_wob(20.0))
 	vm.all_bullets_set_gravity(Vector2(0, 300))
 	vm.all_bullets_push_back_homing_target(Vector2(900, 0))

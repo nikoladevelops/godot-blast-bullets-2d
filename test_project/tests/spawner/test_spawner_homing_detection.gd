@@ -9,7 +9,7 @@ extends BlastTest
 
 
 func _spawner(source: int) -> BulletSpawner2D:
-	var sp := make_spawner(H.make_directional_data(2, 50.0, 30.0), BulletSpawner2D.PATTERN_FROM_HELPER_RING, 2)
+	var sp := make_spawner(H.make_volley_data(2, 50.0, 30.0), BulletSpawner2D.PATTERN_FROM_HELPER_RING, 2)
 	sp.set_homing_enabled(true)
 	sp.set_homing_retarget_mode(BulletSpawner2D.HOMING_RETARGET_OFF) # no background passes
 	sp.set_homing_target_source(source)
@@ -78,7 +78,7 @@ func test_empty_group_fires_plain_volleys_and_warns_once_per_configuration() -> 
 	assert_eq(_warnings("no live Node2D found in group 'nobody', volley flies without homing"), 1, "one warning for three volleys")
 	assert_signal_emit_count(sp, "homing_targets_resolved", 3, "every volley reports its resolution")
 	assert_eq(_resolved(sp, 0), [], "with no targets")
-	var v: DirectionalBullets2D = sp.get_live_volleys()[0]
+	var v: BulletVolley2D = sp.get_live_volleys()[0]
 	assert_false(v.shared_homing_deque_check_has_homing_targets(), "the volley flies plain")
 	# Gameplay emptying the group again (a wave cleared) stays quiet.
 	var foe := _node("Foe", Vector2(200, 0), ["nobody"])
@@ -168,8 +168,8 @@ func test_global_position_source_queues_the_point() -> void:
 	assert_eq(sp.resolve_homing_targets(true, false), [Vector2(320, -40)], "exactly the point")
 	assert_true(sp.shoot_once(), "shot")
 	assert_eq(_resolved(sp, 0), [Vector2(320, -40)], "signal carries the point")
-	var v: DirectionalBullets2D = sp.get_live_volleys()[0]
-	assert_eq(v.shared_homing_deque_check_current_target_type(), DirectionalBullets2D.GlobalPositionTarget, "queued as a position target")
+	var v: BulletVolley2D = sp.get_live_volleys()[0]
+	assert_eq(v.shared_homing_deque_check_current_target_type(), BulletVolley2D.GlobalPositionTarget, "queued as a position target")
 
 
 func test_mouse_source_queues_the_cursor_in_both_modes() -> void:
@@ -178,13 +178,13 @@ func test_mouse_source_queues_the_cursor_in_both_modes() -> void:
 	assert_eq(_warnings("flies without homing"), 0, "and that is not a failure")
 	assert_true(sp.shoot_once(), "shared-mode shot")
 	assert_eq(_resolved(sp, 0), [], "nothing resolved")
-	var shared: DirectionalBullets2D = sp.get_live_volleys()[0]
-	assert_eq(shared.shared_homing_deque_check_current_target_type(), DirectionalBullets2D.MousePositionTarget, "the shared queue chases the cursor")
+	var shared: BulletVolley2D = sp.get_live_volleys()[0]
+	assert_eq(shared.shared_homing_deque_check_current_target_type(), BulletVolley2D.MousePositionTarget, "the shared queue chases the cursor")
 	sp.set_homing_mode(BulletSpawner2D.HOMING_PER_BULLET)
 	assert_true(sp.shoot_once(), "per-bullet shot")
-	var per: DirectionalBullets2D = sp.get_live_volleys()[1]
+	var per: BulletVolley2D = sp.get_live_volleys()[1]
 	for i in per.get_amount_bullets():
-		assert_eq(per.bullet_homing_check_current_target_type(i), DirectionalBullets2D.MousePositionTarget, "bullet %d chases the cursor" % i)
+		assert_eq(per.bullet_homing_check_current_target_type(i), BulletVolley2D.MousePositionTarget, "bullet %d chases the cursor" % i)
 	sp.set_homing_fire_arc_deg(10.0)
 	assert_true(sp.shoot_once(), "the fire arc never applies to the mouse")
 

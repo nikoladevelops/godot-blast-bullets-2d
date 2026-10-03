@@ -11,12 +11,12 @@ extends BlastTest
 func _first_bullet(sp: BulletSpawner2D) -> Vector2:
 	watch_signals(sp)
 	assert_true(sp.shoot_once(), "shot fires")
-	var v: DirectionalBullets2D = get_signal_parameters(sp, "volley_fired", get_signal_emit_count(sp, "volley_fired") - 1)[0]
+	var v: BulletVolley2D = get_signal_parameters(sp, "volley_fired", get_signal_emit_count(sp, "volley_fired") - 1)[0]
 	return v.get_bullet_global_transform(0).origin
 
 
 func test_offset_space_global_vs_local() -> void:
-	var sp := make_spawner(H.make_directional_data(1, 0.0, 30.0), BulletSpawner2D.PATTERN_FROM_SELF, 1)
+	var sp := make_spawner(H.make_volley_data(1, 0.0, 30.0), BulletSpawner2D.PATTERN_FROM_SELF, 1)
 	sp.global_position = Vector2(100, 100)
 	sp.rotation = PI / 2.0
 	sp.spawn_position_offset = Vector2(20, 0)
@@ -42,7 +42,7 @@ func test_preview_draws_the_offset(space: int = use_parameters([0, 1])) -> void:
 	var dots: PackedVector2Array = sp.debug_get_preview_dot_points()
 	watch_signals(sp)
 	assert_true(sp.shoot_once())
-	var v: DirectionalBullets2D = get_signal_parameters(sp, "volley_fired", 0)[0]
+	var v: BulletVolley2D = get_signal_parameters(sp, "volley_fired", 0)[0]
 	for i in dots.size():
 		assert_almost_eq(layer.get_global_transform() * dots[i], v.get_bullet_global_transform(i).origin, Vector2(0.05, 0.05), "space %d: dot %d drawn where bullet %d spawned" % [space, i, i])
 
@@ -55,7 +55,7 @@ func test_configuration_warnings() -> void:
 	assert_true(_has(w, "No BulletFactory2D assigned"), "missing factory listed")
 	assert_true(_has(w, "No spawn_data"), "missing spawn data listed")
 	sp.set_bullet_factory(factory)
-	sp.set_spawn_data(H.make_directional_data(2))
+	sp.set_spawn_data(H.make_volley_data(2))
 	sp.movement_enabled = true
 	sp.pattern_source = BulletSpawner2D.PATTERN_FROM_HELPER_AIMED
 	w = sp.get_setup_warnings()
@@ -63,7 +63,7 @@ func test_configuration_warnings() -> void:
 	assert_false(_has(w, "No spawn_data"), "spawn data fixed")
 	assert_true(_has(w, "movement_path is empty"), "movement without a path listed")
 	assert_true(_has(w, "Aimed pattern needs helper_aimed_target"), "aimed without a target listed")
-	var bare := H.make_directional_data(1)
+	var bare := H.make_volley_data(1)
 	bare.sprite_frames = null
 	sp.set_spawn_data(bare)
 	assert_true(_has(sp.get_setup_warnings(), "bullets will be invisible"), "invisible bullets listed")

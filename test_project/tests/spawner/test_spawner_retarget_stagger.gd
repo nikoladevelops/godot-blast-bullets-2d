@@ -4,7 +4,7 @@ extends BlastTest
 
 
 func test_unrelated_knob_keeps_countdown() -> void:
-	var d := H.make_directional_data(1, 0.0, 60.0)
+	var d := H.make_volley_data(1, 0.0, 60.0)
 	var sp := make_spawner(d, BulletSpawner2D.PATTERN_FROM_HELPER_RING, 1)
 	sp.homing_enabled = true
 	sp.homing_target_source = BulletSpawner2D.HOMING_SOURCE_GLOBAL_POSITION

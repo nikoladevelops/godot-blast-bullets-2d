@@ -18,9 +18,9 @@ func _wob(amp: float, face: bool = true, slew: float = 18.0) -> BulletWobbleData
 
 
 func test_wobble_face_follows_heading() -> void:
-	var d := H.make_directional_data(2, 300.0)
+	var d := H.make_volley_data(2, 300.0)
 	d.all_bullet_wobble_data = [_wob(40.0, true), _wob(40.0, false)]
-	var v: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d)
+	var v: BulletVolley2D = factory.spawn_volley(d)
 	assert_true(v.bullet_get_wobble_face_movement_direction(0), "face flag seeded slot 0")
 	assert_false(v.bullet_get_wobble_face_movement_direction(1), "face flag seeded slot 1")
 	var yaw0: float = v.get_bullet_texture_rotation_radians(0)
@@ -32,23 +32,23 @@ func test_wobble_face_follows_heading() -> void:
 
 
 func test_snap_slew_and_rotation_data_skip() -> void:
-	var d := H.make_directional_data(1, 300.0)
+	var d := H.make_volley_data(1, 300.0)
 	d.all_bullet_wobble_data = [_wob(40.0, true, 0.0)]
-	var v: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d)
+	var v: BulletVolley2D = factory.spawn_volley(d)
 	assert_almost_eq(v.bullet_get_wobble_face_rotation_speed(0), 0.0, 0.001, "snap slew seeded")
 	await physics(10)
 	assert_true(v.get_bullet_transform(0).is_finite(), "snap-slew wobble finite")
-	var db := H.make_directional_data(1, 300.0)
+	var db := H.make_volley_data(1, 300.0)
 	db.all_bullet_wobble_data = [_wob(40.0, true)]
 	db.all_bullet_rotation_data = [H.make_rotation(3.0, 100.0)]
-	var vb: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(db)
+	var vb: BulletVolley2D = factory.spawn_volley(db)
 	var yaw: float = vb.get_bullet_texture_rotation_radians(0)
 	await physics(10)
 	assert_gt(absf(vb.get_bullet_texture_rotation_radians(0) - yaw), 0.05, "rotation data still spins under wobble")
 
 
 func test_wobble_live_api() -> void:
-	var v: DirectionalBullets2D = spawn_dir(2, 200.0)
+	var v: BulletVolley2D = quick_volley(2, 200.0)
 	assert_false(v.get_is_wobble_enabled(), "wobble off fresh")
 	var live := _wob(30.0)
 	v.bullet_set_wobble_data(0, live)
@@ -80,7 +80,7 @@ func test_wobble_live_api() -> void:
 
 
 func test_full_stack_composes() -> void:
-	var d := H.make_directional_data(2, 250.0)
+	var d := H.make_volley_data(2, 250.0)
 	d.all_bullet_wobble_data = [_wob(24.0), _wob(24.0)]
 	d.gravity = Vector2(0, 600)
 	d.linear_drag = 0.2
@@ -94,7 +94,7 @@ func test_full_stack_composes() -> void:
 	d.shared_bullet_curves_data = gc
 	var tgt: Node2D = add(Node2D.new())
 	tgt.position = Vector2(600, -300)
-	var v: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d)
+	var v: BulletVolley2D = factory.spawn_volley(d)
 	v.bullet_homing_push_back_node2d_target(0, tgt)
 	v.bullet_homing_push_back_node2d_target(1, tgt)
 	await physics(60)
@@ -104,7 +104,7 @@ func test_full_stack_composes() -> void:
 
 
 func test_tick_safety_edges() -> void:
-	var v: DirectionalBullets2D = spawn_dir(1, 200.0)
+	var v: BulletVolley2D = quick_volley(1, 200.0)
 	var yaw: float = v.get_bullet_texture_rotation_radians(0)
 	v.set_bullet_texture_rotation_towards_position(0, v.get_bullet_global_transform(0).origin)
 	expect_error("already at the target position")
@@ -117,7 +117,7 @@ func test_tick_safety_edges() -> void:
 	v.bullet_enable_orbiting(0, 60.0)
 	await physics(20)
 	assert_true(v.get_bullet_transform(0).is_finite(), "zero-radius orbit stays finite")
-	var vz: DirectionalBullets2D = spawn_dir(1, 0.0)
+	var vz: BulletVolley2D = quick_volley(1, 0.0)
 	vz.set_homing_smoothing(6.0)
 	vz.set_homing_take_control_of_texture_rotation(true)
 	vz.bullet_homing_push_back_global_position_target(0, Vector2(500, 0))
@@ -126,17 +126,17 @@ func test_tick_safety_edges() -> void:
 
 
 func test_pool_reuse_neutrality() -> void:
-	var dw := H.make_directional_data(2, 200.0)
+	var dw := H.make_volley_data(2, 200.0)
 	dw.all_bullet_wobble_data = [_wob(30.0), _wob(30.0)]
 	dw.shared_bullet_wobble_data = _wob(9.0)
 	dw.adjust_direction_based_on_rotation = true
-	var vw: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(dw)
+	var vw: BulletVolley2D = factory.spawn_volley(dw)
 	assert_true(vw.get_is_wobble_enabled(), "wobble volley enabled")
 	assert_not_null(vw.bullet_get_wobble_data(0), "per-bullet resource tracked")
 	vw.disable_bullet(0)
 	vw.disable_bullet(1)
 	await physics()
-	var vn: DirectionalBullets2D = spawn_dir(2, 200.0)
+	var vn: BulletVolley2D = quick_volley(2, 200.0)
 	assert_false(vn.get_is_wobble_enabled(), "reuse has no wobble")
 	assert_null(vn.bullet_get_wobble_data(0), "reuse has no per-bullet resource")
 	assert_false(vn.has_shared_bullet_wobble_data(), "reuse has no shared wobble")
@@ -146,7 +146,7 @@ func test_pool_reuse_neutrality() -> void:
 
 
 func test_non_repeating_pattern_finishes() -> void:
-	var v: DirectionalBullets2D = spawn_dir(1, 100.0)
+	var v: BulletVolley2D = quick_volley(1, 100.0)
 	var c := Curve2D.new()
 	c.add_point(Vector2(0, 0))
 	c.add_point(Vector2(50, 0))
@@ -158,7 +158,7 @@ func test_non_repeating_pattern_finishes() -> void:
 
 
 func test_monitorable_round_trip() -> void:
-	var v: DirectionalBullets2D = spawn_dir(1, 100.0)
+	var v: BulletVolley2D = quick_volley(1, 100.0)
 	v.set_monitorable(true)
 	assert_true(v.get_monitorable(), "monitorable round-trips")
 	v.set_monitorable(false)

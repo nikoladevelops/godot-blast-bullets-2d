@@ -14,7 +14,7 @@ func _on_volley(volley: Object, _idx: int) -> void:
 func before_each() -> void:
 	await super()
 	_volleys.clear()
-	var d := H.make_directional_data(1, 0.0, 60.0)
+	var d := H.make_volley_data(1, 0.0, 60.0)
 	d.collision_shape = H.make_circle_shape(6.0)
 	d.bullet_max_collision_count = 0
 	sp = make_spawner(d, BulletSpawner2D.PATTERN_FROM_SELF, 1)
@@ -22,7 +22,7 @@ func before_each() -> void:
 
 
 func _first_origin() -> Vector2:
-	return (_volleys[0] as DirectionalBullets2D).get_bullet_transform(0).get_origin()
+	return (_volleys[0] as BulletVolley2D).get_bullet_transform(0).get_origin()
 
 
 func test_plain_spawner_applies_offset() -> void:

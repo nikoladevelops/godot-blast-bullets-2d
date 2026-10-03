@@ -5,7 +5,7 @@ extends BlastTest
 
 
 func test_orbiting_ranges_and_oob() -> void:
-	var v: DirectionalBullets2D = spawn_dir(3, 200.0)
+	var v: BulletVolley2D = quick_volley(3, 200.0)
 	v.all_bullets_enable_orbiting(60.0)
 	assert_eq(v.all_bullets_get_orbiting_center().size(), 3, "center range size 3")
 	assert_eq(v.all_bullets_get_orbiting_angle().size(), 3, "angle range size 3")
@@ -20,7 +20,7 @@ func test_orbiting_ranges_and_oob() -> void:
 
 
 func test_center_precedence_and_homing_amounts() -> void:
-	var v: DirectionalBullets2D = spawn_dir(2, 0.0)
+	var v: BulletVolley2D = quick_volley(2, 0.0)
 	v.all_bullets_enable_orbiting(60.0)
 	v.bullet_homing_push_back_global_position_target(0, Vector2(-900, 0))
 	v.shared_homing_deque_push_back_global_position_target(Vector2(900, 0))
@@ -36,7 +36,7 @@ func test_center_precedence_and_homing_amounts() -> void:
 
 
 func test_curves_info_sources() -> void:
-	var v: DirectionalBullets2D = spawn_dir(2, 200.0)
+	var v: BulletVolley2D = quick_volley(2, 200.0)
 	var n: Dictionary = v.debug_get_curves_info(0)
 	assert_true(n["valid"])
 	assert_eq(str(n["speed_src"]), "none")
@@ -58,7 +58,7 @@ func test_curves_info_sources() -> void:
 
 
 func test_pattern_info_sources() -> void:
-	var v: DirectionalBullets2D = spawn_dir(2, 200.0)
+	var v: BulletVolley2D = quick_volley(2, 200.0)
 	var n: Dictionary = v.debug_get_pattern_info(0)
 	assert_true(n["valid"])
 	assert_eq(str(n["src"]), "none")
@@ -86,7 +86,7 @@ func test_wobble_info_and_attachment_info() -> void:
 	w.frequency_hz = 2.5
 	w.face_movement_direction = true
 	w.face_rotation_speed = 9.0
-	var v: DirectionalBullets2D = spawn_dir(2, 200.0)
+	var v: BulletVolley2D = quick_volley(2, 200.0)
 	v.bullet_set_wobble_data(0, w)
 	var wi: Dictionary = v.debug_get_wobble_info(0)
 	assert_true(wi["active"])
@@ -107,7 +107,7 @@ func test_wobble_info_and_attachment_info() -> void:
 
 
 func test_curves_clear_helpers_bound_and_work() -> void:
-	var v: DirectionalBullets2D = spawn_dir(3, 200.0)
+	var v: BulletVolley2D = quick_volley(3, 200.0)
 	assert_true(v.has_method("clear_per_bullet_curves_data") and v.has_method("all_bullets_clear_curves_data"), "curves-clear helpers bound")
 	var block := BulletCurvesData2D.new()
 	v.bullet_set_curves_data(0, block)

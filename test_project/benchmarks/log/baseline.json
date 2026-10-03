@@ -202,10 +202,10 @@
       },
       "warmup_frames": 60
     },
-    "dir_10k_flight": {
+    "volley_10k_flight": {
       "active_bullets_mean": 10000.0,
       "collision_records": 0,
-      "description": "10k directional bullets in flight, no overlaps",
+      "description": "10k bullets in flight, no overlaps",
       "engine_ms": {
         "max": 2.246,
         "mean": 0.580076666666667,

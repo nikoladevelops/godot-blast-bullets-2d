@@ -6,7 +6,7 @@ extends BlastTest
 
 
 func _line_spawner() -> BulletSpawner2D:
-	var sp := make_spawner(H.make_directional_data(1, 0.0, 60.0), BulletSpawner2D.PATTERN_FROM_HELPER_LINE, 3)
+	var sp := make_spawner(H.make_volley_data(1, 0.0, 60.0), BulletSpawner2D.PATTERN_FROM_HELPER_LINE, 3)
 	sp.helper_line_direction = Vector2(1, 0)
 	sp.helper_line_spacing = 40.0
 	return sp
@@ -68,7 +68,7 @@ func test_mirrored_generator_stays_mirrored_under_spin() -> void:
 
 
 func test_shear_preserved_under_spin() -> void:
-	var sp := make_spawner(H.make_directional_data(1, 0.0, 60.0), BulletSpawner2D.PATTERN_FROM_HELPER_CUSTOM, 2)
+	var sp := make_spawner(H.make_volley_data(1, 0.0, 60.0), BulletSpawner2D.PATTERN_FROM_HELPER_CUSTOM, 2)
 	var shear := Transform2D(Vector2(1, 0.5), Vector2(0, 1), Vector2(60, 0))
 	sp.set_helper_custom_transforms([shear, Transform2D(0.0, Vector2(-60, 0))])
 	sp.reset_spin_angle()
@@ -82,7 +82,7 @@ func test_shear_preserved_under_spin() -> void:
 
 
 func test_transforms_scale_keeps_mirroring_and_shear() -> void:
-	var sp := make_spawner(H.make_directional_data(1, 0.0, 60.0), BulletSpawner2D.PATTERN_FROM_HELPER_RING, 4)
+	var sp := make_spawner(H.make_volley_data(1, 0.0, 60.0), BulletSpawner2D.PATTERN_FROM_HELPER_RING, 4)
 	var marker: Node2D = add(Node2D.new())
 	marker.scale = Vector2(-1, 1)
 	sp.set_transforms_generator(marker)

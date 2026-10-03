@@ -7,7 +7,7 @@ extends BlastTest
 
 func test_speed_direction_velocity_ranges_oob() -> void:
 	# API T1 speed/direction/velocity ranges + OOB
-	var v: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(H.make_directional_data(3, 200.0))
+	var v: BulletVolley2D = factory.spawn_volley(H.make_volley_data(3, 200.0))
 	var spd: Array = v.all_bullets_get_speed_data()
 	assert_true(spd.size() == 3, "speed range size 3")
 	var dirs: Array = v.all_bullets_get_direction()
@@ -50,9 +50,9 @@ func test_rotation_ranges_texture_rotation_round_trip() -> void:
 	var rd2 := BulletRotationData2D.new()
 	rd2.rotation_speed = 2.0
 	rd2.max_rotation_speed = 50.0
-	var d2 := H.make_directional_data(3, 100.0)
+	var d2 := H.make_volley_data(3, 100.0)
 	d2.all_bullet_rotation_data = [rd, rd1, rd2]
-	var v2: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d2)
+	var v2: BulletVolley2D = factory.spawn_volley(d2)
 	assert_true(v2.is_rotation_data_active(), "rotation active")
 	assert_true(absf(v2.bullet_get_rotation_speed(1) - 2.0) < 0.01, "rotation speed slot 1")
 	assert_true(absf(v2.bullet_get_rotation_speed(99)) < 0.01, "OOB rotation speed reads 0")
@@ -244,8 +244,8 @@ func test_rotation_ranges_texture_rotation_round_trip() -> void:
 	v2.bullet_set_orbiting_radius(-1, 5.0)
 
 	# API T7b orbit lock: ring locks, center re-pin, angle advances
-	var d7 := H.make_directional_data(1, 250.0)
-	var v7: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d7)
+	var d7 := H.make_volley_data(1, 250.0)
+	var v7: BulletVolley2D = factory.spawn_volley(d7)
 	v7.set_homing_smoothing(8.0)
 	v7.set_homing_take_control_of_texture_rotation(true)
 	v7.bullet_homing_push_back_global_position_target(0, Vector2(400, 0))

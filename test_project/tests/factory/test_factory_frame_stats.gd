@@ -18,8 +18,8 @@ func test_keys_present() -> void:
 
 func test_spawn_and_tick_counters_are_exact() -> void:
 	factory.reset_frame_stats()
-	spawn_dir(4, 100.0, 30.0)
-	spawn_dir(3, 100.0, 30.0)
+	quick_volley(4, 100.0, 30.0)
+	quick_volley(3, 100.0, 30.0)
 	var s: Dictionary = factory.get_frame_stats()
 	assert_eq(int(s["spawned_bullets_total"]), 7, "every spawned bullet counted once")
 	assert_eq(int(s["active_bullets"]), 7, "live bullets across volleys")
@@ -40,7 +40,7 @@ func test_spawn_and_tick_counters_are_exact() -> void:
 
 func test_expiry_counter() -> void:
 	factory.reset_frame_stats()
-	spawn_dir(5, 0.0, 0.1)
+	quick_volley(5, 0.0, 0.1)
 	for i in 30:
 		await physics()
 		if factory.get_active_bullet_count() == 0:
@@ -55,13 +55,13 @@ func test_collision_record_counter() -> void:
 	factory.reset_frame_stats()
 	make_wall(Vector2(200, 0))
 	await physics()
-	var d := H.make_directional_data(1, 900.0, 30.0)
+	var d := H.make_volley_data(1, 900.0, 30.0)
 	d.transforms = [Transform2D()]
 	d.monitorable = true
 	d.set_collision_mask_from_array([3])
 	d.collision_shape = H.make_circle_shape(6.0)
 	d.bullet_max_collision_count = 1
-	factory.spawn_controllable_directional_bullets(d)
+	factory.spawn_volley(d)
 	for i in 40:
 		await physics()
 		if factory.get_active_bullet_count() == 0:
@@ -70,7 +70,7 @@ func test_collision_record_counter() -> void:
 
 
 func test_reset_zeroes_cumulative_counters() -> void:
-	spawn_dir(2)
+	quick_volley(2)
 	await physics(2)
 	factory.reset_frame_stats()
 	var s: Dictionary = factory.get_frame_stats()
@@ -81,7 +81,7 @@ func test_reset_zeroes_cumulative_counters() -> void:
 
 func test_monitors_owned_by_one_factory() -> void:
 	assert_true(Performance.has_custom_monitor(MON_ACTIVE), "first factory registers the monitors")
-	spawn_dir(3)
+	quick_volley(3)
 	assert_eq(int(Performance.get_custom_monitor(MON_ACTIVE)), 3, "monitor reports live bullets")
 	var second := BulletFactory2D.new()
 	add(second)

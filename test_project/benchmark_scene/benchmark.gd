@@ -21,7 +21,7 @@ func _ready() -> void:
 	
 	BENCHMARK_GLOBALS.ATTACHMENT_SCENES = attachment_scenes
 	BENCHMARK_GLOBALS.FACTORY = $BulletFactory2D
-	BENCHMARK_GLOBALS.BULLET_TYPE_TO_SPAWN = BENCHMARK_GLOBALS.BulletType.MultiMeshDirectional # set the default current bullet type that needs to be spawned
+	BENCHMARK_GLOBALS.BULLET_TYPE_TO_SPAWN = BENCHMARK_GLOBALS.BulletType.BulletVolley # set the default current bullet type that needs to be spawned
 	BENCHMARK_GLOBALS.PLAYER = $Player
 	BENCHMARK_GLOBALS.PLAYER_DATA_NODE = $Player/PlayerDataNode
 	BENCHMARK_GLOBALS.UI = $UI
@@ -33,10 +33,10 @@ func _ready() -> void:
 	BENCHMARK_GLOBALS.MOVEMENT_PATH_HOLDER = $Paths
 	
 	# Make sure to set the actual debugger colors to the UI buttons
-	var initial_directional_debugger_color:Color = BENCHMARK_GLOBALS.FACTORY.debugger_color
+	var initial_debugger_color:Color = BENCHMARK_GLOBALS.FACTORY.debugger_color
 	
-	BENCHMARK_GLOBALS.UI.change_directional_debugger_btn_color(initial_directional_debugger_color)
-	BENCHMARK_GLOBALS.UI.directional_debugger_color_picker.color = initial_directional_debugger_color
+	BENCHMARK_GLOBALS.UI.change_debugger_btn_color(initial_debugger_color)
+	BENCHMARK_GLOBALS.UI.debugger_color_picker.color = initial_debugger_color
 	
 	BENCHMARK_GLOBALS.UI.enable_debugger_checkbox.button_pressed = BENCHMARK_GLOBALS.FACTORY.is_debugger_enabled
 	
@@ -47,11 +47,11 @@ func _ready() -> void:
 	
 
 
-func _on_bullet_spawner_2d_area_entered(_hit_target_area: Object, _directional_bullets_instance: DirectionalBullets2D, _bullet_index: int) -> void:
+func _on_bullet_spawner_2d_area_entered(_hit_target_area: Object, _volley: BulletVolley2D, _bullet_index: int) -> void:
 	if log_spawner_hits:
 		print("Spawner hit an area!")
 
 
-func _on_bullet_spawner_2d_body_entered(_hit_target_body: Object, _directional_bullets_instance: DirectionalBullets2D, _bullet_index: int) -> void:
+func _on_bullet_spawner_2d_body_entered(_hit_target_body: Object, _volley: BulletVolley2D, _bullet_index: int) -> void:
 	if log_spawner_hits:
 		print("Spawner hit a body!")

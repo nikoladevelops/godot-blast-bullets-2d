@@ -4,7 +4,7 @@ extends BlastTest
 ## still fill; a new pooled life re-derives presence from its seed.
 
 
-func _data() -> DirectionalBulletsData2D:
+func _data() -> BulletVolleyData2D:
 	var d := H.make_still_data(3)
 	# Slot 0 deliberate zero, slot 1 authored spin, slot 2 a genuine gap.
 	d.all_bullet_rotation_data = [H.make_rotation(0.0), H.make_rotation(9.0)]
@@ -12,8 +12,8 @@ func _data() -> DirectionalBulletsData2D:
 
 
 func test_same_owner_wake_keeps_decisions() -> void:
-	var v: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(_data())
-	v.set_is_multimesh_auto_pooling_enabled(false)
+	var v: BulletVolley2D = factory.spawn_volley(_data())
+	v.set_is_auto_pooling_enabled(false)
 	for i in 3:
 		v.disable_bullet(i)
 	await idle(1)
@@ -27,13 +27,13 @@ func test_same_owner_wake_keeps_decisions() -> void:
 
 
 func test_new_pooled_life_rederives_presence() -> void:
-	var a: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(_data())
+	var a: BulletVolley2D = factory.spawn_volley(_data())
 	for i in 3:
 		a.disable_bullet(i)
 	await idle(1)
 	factory.debug_reset_pool_stats()
-	var w: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(_data())
-	assert_eq(int(factory.debug_get_pool_hit_stats().get("directional_hits", 0)), 1, "second life reuses the pool")
+	var w: BulletVolley2D = factory.spawn_volley(_data())
+	assert_eq(int(factory.debug_get_pool_hit_stats().get("hits", 0)), 1, "second life reuses the pool")
 	w.set_shared_bullet_rotation_data(H.make_rotation(7.0))
 	assert_almost_eq(w.bullet_get_rotation_speed(0), 0.0, 0.01, "new life honors the authored zero")
 	assert_almost_eq(w.bullet_get_rotation_speed(1), 9.0, 0.01, "new life honors the authored spin")

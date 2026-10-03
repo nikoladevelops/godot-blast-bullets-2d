@@ -20,7 +20,7 @@ func before_each() -> void:
 
 
 func test_deque_push_check_clear() -> void:
-	var v: DirectionalBullets2D = spawn_dir(2, 250.0)
+	var v: BulletVolley2D = quick_volley(2, 250.0)
 	v.bullet_homing_push_back_node2d_target(0, target)
 	assert_true(v.bullet_check_has_homing_targets(0), "per-bullet has targets")
 	assert_eq(v.bullet_homing_check_targets_amount(0), 1)
@@ -37,7 +37,7 @@ func test_deque_push_check_clear() -> void:
 
 
 func test_target_types() -> void:
-	var v: DirectionalBullets2D = spawn_dir(2, 250.0)
+	var v: BulletVolley2D = quick_volley(2, 250.0)
 	v.bullet_homing_push_back_global_position_target(0, Vector2(400, 100))
 	assert_true(v.bullet_check_has_homing_targets(0), "global position target accepted")
 	v.bullet_homing_push_back_mouse_position_target(1)
@@ -47,7 +47,7 @@ func test_target_types() -> void:
 
 
 func test_steering_converges() -> void:
-	var v: DirectionalBullets2D = spawn_dir(2, 250.0)
+	var v: BulletVolley2D = quick_volley(2, 250.0)
 	v.set_homing_smoothing(5.0)
 	v.set_homing_take_control_of_texture_rotation(true)
 	v.all_bullets_push_back_homing_target(target)
@@ -61,7 +61,7 @@ func test_steering_converges() -> void:
 func test_freed_target_survives() -> void:
 	var doomed: Node2D = add(Node2D.new())
 	doomed.position = Vector2(300, 300)
-	var w: DirectionalBullets2D = spawn_dir(1, 200.0)
+	var w: BulletVolley2D = quick_volley(1, 200.0)
 	w.set_homing_smoothing(5.0)
 	w.set_homing_take_control_of_texture_rotation(true)
 	w.bullet_homing_push_back_node2d_target(0, doomed)
@@ -72,7 +72,7 @@ func test_freed_target_survives() -> void:
 
 
 func test_reached_signal_and_gating() -> void:
-	var s: DirectionalBullets2D = spawn_dir(1, 400.0)
+	var s: BulletVolley2D = quick_volley(1, 400.0)
 	s.set_homing_smoothing(8.0)
 	s.set_homing_take_control_of_texture_rotation(true)
 	s.set_homing_distance_before_reached(30.0)
@@ -89,7 +89,7 @@ func test_reached_signal_and_gating() -> void:
 
 
 func test_per_bullet_smoothing_fan() -> void:
-	var f: DirectionalBullets2D = spawn_dir(3, 200.0)
+	var f: BulletVolley2D = quick_volley(3, 200.0)
 	f.bullet_set_homing_smoothing(0, 2.0)
 	f.bullet_set_homing_smoothing(1, 4.0)
 	f.bullet_set_homing_smoothing(2, 6.0)

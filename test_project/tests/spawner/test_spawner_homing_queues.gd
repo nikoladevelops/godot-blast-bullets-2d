@@ -16,7 +16,7 @@ func before_each() -> void:
 
 
 func _spawner(amount: int = 2, speed: float = 50.0) -> BulletSpawner2D:
-	var sp := make_spawner(H.make_directional_data(amount, speed, 30.0), BulletSpawner2D.PATTERN_FROM_HELPER_RING, amount)
+	var sp := make_spawner(H.make_volley_data(amount, speed, 30.0), BulletSpawner2D.PATTERN_FROM_HELPER_RING, amount)
 	sp.set_homing_enabled(true)
 	sp.set_homing_retarget_mode(BulletSpawner2D.HOMING_RETARGET_OFF)
 	sp.set_homing_target_source(BulletSpawner2D.HOMING_SOURCE_NODE_PATH)
@@ -25,7 +25,7 @@ func _spawner(amount: int = 2, speed: float = 50.0) -> BulletSpawner2D:
 	return sp
 
 
-func _finite(v: DirectionalBullets2D) -> bool:
+func _finite(v: BulletVolley2D) -> bool:
 	for i in v.get_amount_bullets():
 		if not v.get_bullet_transform(i).is_finite():
 			return false
@@ -46,12 +46,12 @@ func test_queue_cap_is_256_without_errors() -> void:
 	sp.set_homing_max_targets(10000)
 	assert_true(sp.shoot_once(), "shared-mode shot")
 	expect_no_errors("no 'HomingTargetDeque is full' errors")
-	var shared: DirectionalBullets2D = sp.get_live_volleys()[0]
+	var shared: BulletVolley2D = sp.get_live_volleys()[0]
 	assert_eq(shared.shared_homing_deque_check_homing_targets_amount(), 256, "the shared queue is filled to its cap")
 	sp.set_homing_mode(BulletSpawner2D.HOMING_PER_BULLET)
 	assert_true(sp.shoot_once(), "per-bullet shot")
 	expect_no_errors("no errors per bullet either")
-	var per: DirectionalBullets2D = sp.get_live_volleys()[1]
+	var per: BulletVolley2D = sp.get_live_volleys()[1]
 	for i in per.get_amount_bullets():
 		assert_eq(per.bullet_homing_check_targets_amount(i), 256, "bullet %d queue at the cap" % i)
 	assert_eq(sp.retarget_live_volleys(), 2, "both volleys retargeted")
@@ -66,8 +66,8 @@ func test_target_freed_mid_flight_is_trimmed() -> void:
 	assert_true(sp.shoot_once(), "shared volley")
 	sp.set_homing_mode(BulletSpawner2D.HOMING_PER_BULLET)
 	assert_true(sp.shoot_once(), "per-bullet volley")
-	var shared: DirectionalBullets2D = sp.get_live_volleys()[0]
-	var per: DirectionalBullets2D = sp.get_live_volleys()[1]
+	var shared: BulletVolley2D = sp.get_live_volleys()[0]
+	var per: BulletVolley2D = sp.get_live_volleys()[1]
 	assert_true(shared.shared_homing_deque_check_has_homing_targets(), "chasing before")
 	target.free()
 	await physics(3)
@@ -87,7 +87,7 @@ func test_retarget_with_every_target_gone_keeps_queues_and_stays_silent() -> voi
 	add(foe)
 	foe.add_to_group("wave")
 	assert_true(sp.shoot_once(), "volley chasing the wave")
-	var v: DirectionalBullets2D = sp.get_live_volleys()[0]
+	var v: BulletVolley2D = sp.get_live_volleys()[0]
 	var other := Node2D.new()
 	other.position = Vector2(-500, 0)
 	add(other)
@@ -109,8 +109,8 @@ func test_retarget_skips_dead_pooled_foreign_and_old_factory_volleys() -> void:
 	for i in 4:
 		assert_true(sp.shoot_once(), "volley %d" % i)
 	var vols: Array = sp.get_live_volleys()
-	(vols[0] as DirectionalBullets2D).queue_free()
-	(vols[1] as DirectionalBullets2D).clear_all_bullets() # parks in the pool
+	(vols[0] as BulletVolley2D).queue_free()
+	(vols[1] as BulletVolley2D).clear_all_bullets() # parks in the pool
 	var thief := make_spawner()
 	thief.set_homing_enabled(true)
 	assert_true(thief.adopt_live_volley(vols[2]), "another spawner takes volley 2")
@@ -128,7 +128,7 @@ func test_retarget_never_pushes_onto_disabled_bullets() -> void:
 	var sp := _spawner(3)
 	sp.set_homing_mode(BulletSpawner2D.HOMING_PER_BULLET)
 	assert_true(sp.shoot_once(), "shot")
-	var v: DirectionalBullets2D = sp.get_live_volleys()[0]
+	var v: BulletVolley2D = sp.get_live_volleys()[0]
 	v.disable_bullet(1, true)
 	assert_eq(v.bullet_homing_check_targets_amount(1), 0, "disabling clears the queue")
 	assert_eq(sp.retarget_live_volleys(), 1, "partly alive volley retargeted")
@@ -211,7 +211,7 @@ func test_handler_freeing_the_target_is_safe() -> void:
 	var sp := _spawner()
 	sp.volley_homing_configured.connect(func(_v, _i): target.free(), CONNECT_ONE_SHOT)
 	assert_true(sp.shoot_once(), "shot completes")
-	var v: DirectionalBullets2D = sp.get_live_volleys()[0]
+	var v: BulletVolley2D = sp.get_live_volleys()[0]
 	await physics(3)
 	assert_false(v.shared_homing_deque_check_has_homing_targets(), "the dead target was trimmed")
 	assert_true(_finite(v), "bullets stay finite")

@@ -12,7 +12,7 @@ func _spawner(src: int, n: int, pos: Vector2, interval: float) -> BulletSpawner2
 	sp.position = pos
 	add_child(sp)
 	sp.set_bullet_factory(factory)
-	sp.set_spawn_data(H.make_directional_data(4, 260.0, 3.0))
+	sp.set_spawn_data(H.make_volley_data(4, 260.0, 3.0))
 	sp.pattern_source = src
 	sp.helper_bullets_amount = n
 	sp.shoot_interval_sec = interval

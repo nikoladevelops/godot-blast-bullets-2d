@@ -1,14 +1,14 @@
 <?xml version="1.0" encoding="UTF-8" ?>
-<class name="DirectionalBullets2D" inherits="MultiMeshInstance2D" api_type="extension" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/godotengine/godot/master/doc/class.xsd">
+<class name="BulletVolley2D" inherits="MultiMeshInstance2D" api_type="extension" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/godotengine/godot/master/doc/class.xsd">
 	<brief_description>
 		Bullets that travel in different directions based on their transform rotation. Always use the [BulletFactory2D] to spawn them, that's the only proper way.
 	</brief_description>
 	<description>
 		One live volley: every bullet of one spawn call, drawn by a single multimesh and collided by one physics area. Holds everything the bullets need at runtime (per-bullet motion caches, collision shapes, attachments, curves, movement patterns, timers, animation state) plus advanced homing. It supports per-bullet homing deques for individualized target chasing (e.g., specific enemies) and a shared deque for uniform swarm behaviors (e.g., collective waypoint following). Targets can be global positions, Node2D instances, or mouse position, with optional auto-pop on reach (see [member bullet_homing_auto_pop_after_target_reached], [member shared_homing_deque_auto_pop_after_target_reached], [signal bullet_homing_target_reached]), smoothing for natural turning (see [member homing_smoothing]), distance before reached - [member homing_distance_before_reached] and update time interval (see [member homing_update_interval]). Enables complex bullet patterns in 2D games.
 
-		Warning: Never use [code]get_tree().create_timer()[/code] or any other godot timers with this class. It will cause issues with the internal timing of the bullets. If you need timers, use [method multimesh_attach_time_based_function] instead.
+		Warning: Never use [code]get_tree().create_timer()[/code] or any other godot timers with this class. It will cause issues with the internal timing of the bullets. If you need timers, use [method attach_time_based_function] instead.
 
-		Warning: When editing runtime properties or calling methods that edit the multimesh, only structural factory calls ([method BulletFactory2D.reset], [method BulletFactory2D.free_active_bullets], [method BulletFactory2D.free_disabled_bullets], [method BulletFactory2D.free_bullets_pool], [method BulletFactory2D.populate_bullets_pool], and the spawn methods with a shape change) must use [method Object.call_deferred] when called from physics callbacks or collision/lifetime signal handlers. Per-bullet edits apply immediately. The only exception to this are callables attached via [method multimesh_attach_time_based_function], since those are executed at the end of the frame by default for safety.
+		Warning: When editing runtime properties or calling methods that edit the multimesh, only structural factory calls ([method BulletFactory2D.reset], [method BulletFactory2D.free_active_bullets], [method BulletFactory2D.free_disabled_bullets], [method BulletFactory2D.free_bullets_pool], [method BulletFactory2D.populate_bullets_pool], and the spawn methods with a shape change) must use [method Object.call_deferred] when called from physics callbacks or collision/lifetime signal handlers. Per-bullet edits apply immediately. The only exception to this are callables attached via [method attach_time_based_function], since those are executed at the end of the frame by default for safety.
 
 		Warning: Homing functionality can be done in two ways - either using [b]per-bullet homing deques[/b] (each bullet has its own deque of homing targets) or a [b]shared homing deque[/b] (broadcast fallback for bullets without their own targets). Both are supported and per-bullet deques always win per bullet: a bullet with its own non-empty deque follows it, otherwise it follows the shared deque. If a per-bullet deque drains mid-flight the bullet falls back to the shared deque. Any method or property that mentions "shared" is related to the shared deque.
 
@@ -28,7 +28,7 @@
 
 			Note: For custom data that the multimesh should carry use [member shared_bullets_custom_data] - used for damage or anything else custom that is available in collision callbacks inside [BulletFactory2D].
 
-		Note: For object pooling options see [member is_multimesh_auto_pooling_enabled] and [member is_attachments_auto_pooling_enabled].
+		Note: For object pooling options see [member is_auto_pooling_enabled] and [member is_attachments_auto_pooling_enabled].
 
 		Note: Bullets can be made to collide multiple times - use [member bullet_max_collision_count] and [member bullets_current_collision_count].
 
@@ -75,13 +75,13 @@
 		<method name="all_bullets_enable_orbiting">
 			<return type="void" />
 			<param index="0" name="orbiting_radius" type="float" />
-			<param index="1" name="orbiting_direction" type="int" enum="DirectionalBullets2D.OrbitingDirection" default="2" />
-			<param index="2" name="orbiting_texture_rotation" type="int" enum="DirectionalBullets2D.OrbitingTextureRotation" default="0" />
+			<param index="1" name="orbiting_direction" type="int" enum="BulletVolley2D.OrbitingDirection" default="2" />
+			<param index="2" name="orbiting_texture_rotation" type="int" enum="BulletVolley2D.OrbitingTextureRotation" default="0" />
 			<param index="3" name="bullet_index_start" type="int" default="0" />
 			<param index="4" name="bullet_index_end_inclusive" type="int" default="-1" />
-			<param index="5" name="orbiting_follow_mode" type="int" enum="DirectionalBullets2D.OrbitingFollowMode" default="0" />
+			<param index="5" name="orbiting_follow_mode" type="int" enum="BulletVolley2D.OrbitingFollowMode" default="0" />
 			<param index="6" name="orbiting_follow_deadzone" type="float" default="0.0" />
-			<param index="7" name="orbiting_lock_policy" type="int" enum="DirectionalBullets2D.OrbitingLockPolicy" default="0" />
+			<param index="7" name="orbiting_lock_policy" type="int" enum="BulletVolley2D.OrbitingLockPolicy" default="0" />
 			<param index="8" name="orbiting_rigid_follow" type="bool" default="true" />
 			<description>
 				Enables orbiting for the specified range of bullets with the given parameters.
@@ -93,13 +93,13 @@
 			<return type="void" />
 			<param index="0" name="radius_start" type="float" />
 			<param index="1" name="radius_step" type="float" />
-			<param index="2" name="orbiting_direction" type="int" enum="DirectionalBullets2D.OrbitingDirection" default="2" />
-			<param index="3" name="orbiting_texture_rotation" type="int" enum="DirectionalBullets2D.OrbitingTextureRotation" default="0" />
+			<param index="2" name="orbiting_direction" type="int" enum="BulletVolley2D.OrbitingDirection" default="2" />
+			<param index="3" name="orbiting_texture_rotation" type="int" enum="BulletVolley2D.OrbitingTextureRotation" default="0" />
 			<param index="4" name="bullet_index_start" type="int" default="0" />
 			<param index="5" name="bullet_index_end_inclusive" type="int" default="-1" />
-			<param index="6" name="orbiting_follow_mode" type="int" enum="DirectionalBullets2D.OrbitingFollowMode" default="0" />
+			<param index="6" name="orbiting_follow_mode" type="int" enum="BulletVolley2D.OrbitingFollowMode" default="0" />
 			<param index="7" name="orbiting_follow_deadzone" type="float" default="0.0" />
-			<param index="8" name="orbiting_lock_policy" type="int" enum="DirectionalBullets2D.OrbitingLockPolicy" default="0" />
+			<param index="8" name="orbiting_lock_policy" type="int" enum="BulletVolley2D.OrbitingLockPolicy" default="0" />
 			<param index="9" name="orbiting_rigid_follow" type="bool" default="true" />
 			<description>
 				Enables orbiting with concentric radii: bullet (start + k) orbits at radius_start + radius_step * k. Useful for shield rings. Bullets that already orbit keep their radius with a warning.
@@ -526,7 +526,7 @@
 		</method>
 		<method name="all_bullets_set_orbiting_direction">
 			<return type="void" />
-			<param index="0" name="new_direction" type="int" enum="DirectionalBullets2D.OrbitingDirection" />
+			<param index="0" name="new_direction" type="int" enum="BulletVolley2D.OrbitingDirection" />
 			<param index="1" name="bullet_index_start" type="int" default="0" />
 			<param index="2" name="bullet_index_end_inclusive" type="int" default="-1" />
 			<description>
@@ -544,7 +544,7 @@
 		</method>
 		<method name="all_bullets_set_orbiting_follow_mode">
 			<return type="void" />
-			<param index="0" name="new_follow_mode" type="int" enum="DirectionalBullets2D.OrbitingFollowMode" />
+			<param index="0" name="new_follow_mode" type="int" enum="BulletVolley2D.OrbitingFollowMode" />
 			<param index="1" name="bullet_index_start" type="int" default="0" />
 			<param index="2" name="bullet_index_end_inclusive" type="int" default="-1" />
 			<description>
@@ -553,7 +553,7 @@
 		</method>
 		<method name="all_bullets_set_orbiting_lock_policy">
 			<return type="void" />
-			<param index="0" name="new_lock_policy" type="int" enum="DirectionalBullets2D.OrbitingLockPolicy" />
+			<param index="0" name="new_lock_policy" type="int" enum="BulletVolley2D.OrbitingLockPolicy" />
 			<param index="1" name="bullet_index_start" type="int" default="0" />
 			<param index="2" name="bullet_index_end_inclusive" type="int" default="-1" />
 			<description>
@@ -580,7 +580,7 @@
 		</method>
 		<method name="all_bullets_set_orbiting_texture_rotation">
 			<return type="void" />
-			<param index="0" name="new_rotation" type="int" enum="DirectionalBullets2D.OrbitingTextureRotation" />
+			<param index="0" name="new_rotation" type="int" enum="BulletVolley2D.OrbitingTextureRotation" />
 			<param index="1" name="bullet_index_start" type="int" default="0" />
 			<param index="2" name="bullet_index_end_inclusive" type="int" default="-1" />
 			<description>
@@ -685,6 +685,29 @@
 				Seeds wobble live over a range (null clears each slot back to the shared fallback). Per-bullet wins over shared.
 			</description>
 		</method>
+		<method name="attach_time_based_function">
+			<return type="void" />
+			<param index="0" name="time" type="float" />
+			<param index="1" name="callable" type="Callable" />
+			<param index="2" name="repeat" type="bool" default="false" />
+			<param index="3" name="execute_only_if_volley_is_active" type="bool" default="true" />
+			<description>
+				Attaches a callable that gets executed after a certain amount of time.
+
+				[code]time[/code] - the time in seconds after which the callable will be executed.
+				[code]callable[/code] - the callable that will be executed. It can be a lambda, a function or a method from another object.
+				[code]repeat[/code] - if set to true, then the callable will be executed every [code]time[/code] seconds.
+				[code]execute_only_if_volley_is_active[/code] - if set to [code]true[/code], then the callable will only be executed if the multimesh is active in the scene tree (if it has at least a single bullet that has not yet been disabled).
+				If you wish to execute the callable regardless of the multimesh being active or not (even when in object pool), then set this parameter to [code]false[/code].
+				Note: For this to take effect ensure that the [member is_auto_pooling_enabled] property is set to false - this is because auto pooling clears any callables in order to re-use the multimesh later completely reset.
+				Note: applies immediately outside physics processing; inside a physics frame it is deferred like before.
+				Note: capped at 64 timers per multimesh (extra attaches are rejected); pool-pop re-enables wipe armed timers, manual wakes drop timers armed while pooled.
+
+				If you want to be able to detach the callable, then make sure that it is clearly declared outside as a variable or you could even use a normal Godot function.
+
+				Callables that execute bullet related functions have no need of using call_deferred(), since all attached callables are executed at the end of the frame by default for safety.
+			</description>
+		</method>
 		<method name="bullet_check_has_homing_targets" qualifiers="const">
 			<return type="bool" />
 			<param index="0" name="bullet_index" type="int" />
@@ -728,11 +751,11 @@
 			<return type="void" />
 			<param index="0" name="bullet_index" type="int" />
 			<param index="1" name="orbiting_radius" type="float" />
-			<param index="2" name="orbiting_direction" type="int" enum="DirectionalBullets2D.OrbitingDirection" default="2" />
-			<param index="3" name="orbiting_texture_rotation" type="int" enum="DirectionalBullets2D.OrbitingTextureRotation" default="0" />
-			<param index="4" name="orbiting_follow_mode" type="int" enum="DirectionalBullets2D.OrbitingFollowMode" default="0" />
+			<param index="2" name="orbiting_direction" type="int" enum="BulletVolley2D.OrbitingDirection" default="2" />
+			<param index="3" name="orbiting_texture_rotation" type="int" enum="BulletVolley2D.OrbitingTextureRotation" default="0" />
+			<param index="4" name="orbiting_follow_mode" type="int" enum="BulletVolley2D.OrbitingFollowMode" default="0" />
 			<param index="5" name="orbiting_follow_deadzone" type="float" default="0.0" />
-			<param index="6" name="orbiting_lock_policy" type="int" enum="DirectionalBullets2D.OrbitingLockPolicy" default="0" />
+			<param index="6" name="orbiting_lock_policy" type="int" enum="BulletVolley2D.OrbitingLockPolicy" default="0" />
 			<param index="7" name="orbiting_rigid_follow" type="bool" default="true" />
 			<description>
 				Enables orbiting for the specified bullet with the given parameters.
@@ -829,7 +852,7 @@
 			</description>
 		</method>
 		<method name="bullet_get_orbiting_direction">
-			<return type="int" enum="DirectionalBullets2D.OrbitingDirection" />
+			<return type="int" enum="BulletVolley2D.OrbitingDirection" />
 			<param index="0" name="bullet_index" type="int" />
 			<description>
 				Returns the orbiting direction for the specified bullet.
@@ -843,14 +866,14 @@
 			</description>
 		</method>
 		<method name="bullet_get_orbiting_follow_mode">
-			<return type="int" enum="DirectionalBullets2D.OrbitingFollowMode" />
+			<return type="int" enum="BulletVolley2D.OrbitingFollowMode" />
 			<param index="0" name="bullet_index" type="int" />
 			<description>
 				Returns how the locked ring follows a moving target for the specified bullet.
 			</description>
 		</method>
 		<method name="bullet_get_orbiting_lock_policy">
-			<return type="int" enum="DirectionalBullets2D.OrbitingLockPolicy" />
+			<return type="int" enum="BulletVolley2D.OrbitingLockPolicy" />
 			<param index="0" name="bullet_index" type="int" />
 			<description>
 				Returns what drops the orbit lock for the specified bullet.
@@ -871,7 +894,7 @@
 			</description>
 		</method>
 		<method name="bullet_get_orbiting_texture_rotation">
-			<return type="int" enum="DirectionalBullets2D.OrbitingTextureRotation" />
+			<return type="int" enum="BulletVolley2D.OrbitingTextureRotation" />
 			<param index="0" name="bullet_index" type="int" />
 			<description>
 				Returns the orbiting texture rotation for the specified bullet.
@@ -1110,7 +1133,7 @@
 		<method name="bullet_set_orbiting_direction">
 			<return type="void" />
 			<param index="0" name="bullet_index" type="int" />
-			<param index="1" name="new_direction" type="int" enum="DirectionalBullets2D.OrbitingDirection" />
+			<param index="1" name="new_direction" type="int" enum="BulletVolley2D.OrbitingDirection" />
 			<description>
 				Sets the orbiting direction for the specified bullet. Invalid values are rejected with an error and the direction stays unchanged. Passing OrbitRandom rolls OrbitLeft or OrbitRight (never DontMove).
 			</description>
@@ -1126,7 +1149,7 @@
 		<method name="bullet_set_orbiting_follow_mode">
 			<return type="void" />
 			<param index="0" name="bullet_index" type="int" />
-			<param index="1" name="new_follow_mode" type="int" enum="DirectionalBullets2D.OrbitingFollowMode" />
+			<param index="1" name="new_follow_mode" type="int" enum="BulletVolley2D.OrbitingFollowMode" />
 			<description>
 				Sets how the locked ring follows a moving target for the specified bullet: FollowTarget tracks 1:1, FollowDeadzone pins the center inside the deadzone, Anchored freezes the ring where it locked.
 			</description>
@@ -1134,7 +1157,7 @@
 		<method name="bullet_set_orbiting_lock_policy">
 			<return type="void" />
 			<param index="0" name="bullet_index" type="int" />
-			<param index="1" name="new_lock_policy" type="int" enum="DirectionalBullets2D.OrbitingLockPolicy" />
+			<param index="1" name="new_lock_policy" type="int" enum="BulletVolley2D.OrbitingLockPolicy" />
 			<description>
 				Sets what drops the orbit lock for the specified bullet: RelockAlways re-acquires on every retarget, StayLocked never unlocks on retarget/empty, RelockOnTargetChange unlocks only when the front target changes identity.
 			</description>
@@ -1158,7 +1181,7 @@
 		<method name="bullet_set_orbiting_texture_rotation">
 			<return type="void" />
 			<param index="0" name="bullet_index" type="int" />
-			<param index="1" name="new_texture_rotation" type="int" enum="DirectionalBullets2D.OrbitingTextureRotation" />
+			<param index="1" name="new_texture_rotation" type="int" enum="BulletVolley2D.OrbitingTextureRotation" />
 			<description>
 				Sets the orbiting texture rotation for the specified bullet. Invalid values are rejected with an error and the rotation stays unchanged.
 			</description>
@@ -1340,7 +1363,7 @@
 		<method name="debug_get_volley_info" qualifiers="const">
 			<return type="Dictionary" />
 			<description>
-				Stability introspection: amount_bullets, active_bullets, generation, owner_spawner_id, is_active, is_pooled, pool_amount, pool_shape, auto_pool_multimesh, auto_pool_attachments.
+				Stability introspection: amount_bullets, active_bullets, generation, owner_spawner_id, is_active, is_pooled, pool_amount, pool_shape, auto_pool_volley, auto_pool_attachments.
 			</description>
 		</method>
 		<method name="debug_get_wobble_info" qualifiers="const">
@@ -1354,6 +1377,20 @@
 			<return type="void" />
 			<description>
 				Runs the render interpolation pass on demand (same code the factory _process drives): lets tests prove trail shards follow the lerped bullet pose with zero physics ticks in between. No-op unless the factory has use_physics_interpolation on.
+			</description>
+		</method>
+		<method name="detach_all_time_based_functions">
+			<return type="void" />
+			<description>
+				Detaches all time based functions that were previously attached.
+			</description>
+		</method>
+		<method name="detach_time_based_function">
+			<return type="void" />
+			<param index="0" name="callable" type="Callable" />
+			<description>
+				Detaches a specific time based callable. This will work as long as the callable you are trying to detach
+				was previously saved in a variable or defined as a normal Godot function.
 			</description>
 		</method>
 		<method name="disable_bullet">
@@ -1379,9 +1416,9 @@
 				You can also provide a [code]collision_amount[/code], which is how many hits this bullet has already taken: 0 (default) means fresh with full hits remaining. Values below 0 count as 0, values at or above [member bullet_max_collision_count] grant a single remaining hit (same clamp as [method set_bullet_collision_count]).
 			</description>
 		</method>
-		<method name="enable_multimesh">
+		<method name="enable_volley">
 			<return type="bool" />
-			<param index="0" name="data" type="DirectionalBulletsData2D" />
+			<param index="0" name="data" type="BulletVolleyData2D" />
 			<param index="1" name="inherited_velocity_offset" type="Vector2" default="Vector2(0, 0)" />
 			<param index="2" name="spawner_id" type="int" default="0" />
 			<description>
@@ -1503,7 +1540,7 @@
 		<method name="get_is_wobble_enabled" qualifiers="const">
 			<return type="bool" />
 			<description>
-				Whether any wobble entry is currently enabled on this volley (shared or per-bullet). Set wobble data through [member DirectionalBulletsData2D.shared_bullet_wobble_data] or [member DirectionalBulletsData2D.all_bullet_wobble_data] before spawning, or live via [method bullet_set_wobble_data] / [method set_shared_bullet_wobble_data].
+				Whether any wobble entry is currently enabled on this volley (shared or per-bullet). Set wobble data through [member BulletVolleyData2D.shared_bullet_wobble_data] or [member BulletVolleyData2D.all_bullet_wobble_data] before spawning, or live via [method bullet_set_wobble_data] / [method set_shared_bullet_wobble_data].
 			</description>
 		</method>
 		<method name="get_monitorable" qualifiers="const">
@@ -1606,43 +1643,6 @@
 				True when active, unpaused, unfinished, with more than one baked frame.
 			</description>
 		</method>
-		<method name="multimesh_attach_time_based_function">
-			<return type="void" />
-			<param index="0" name="time" type="float" />
-			<param index="1" name="callable" type="Callable" />
-			<param index="2" name="repeat" type="bool" default="false" />
-			<param index="3" name="execute_only_if_multimesh_is_active" type="bool" default="true" />
-			<description>
-				Attaches a callable that gets executed after a certain amount of time.
-
-				[code]time[/code] - the time in seconds after which the callable will be executed.
-				[code]callable[/code] - the callable that will be executed. It can be a lambda, a function or a method from another object.
-				[code]repeat[/code] - if set to true, then the callable will be executed every [code]time[/code] seconds.
-				[code]execute_only_if_multimesh_is_active[/code] - if set to [code]true[/code], then the callable will only be executed if the multimesh is active in the scene tree (if it has at least a single bullet that has not yet been disabled).
-				If you wish to execute the callable regardless of the multimesh being active or not (even when in object pool), then set this parameter to [code]false[/code].
-				Note: For this to take effect ensure that the [member is_multimesh_auto_pooling_enabled] property is set to false - this is because auto pooling clears any callables in order to re-use the multimesh later completely reset.
-				Note: applies immediately outside physics processing; inside a physics frame it is deferred like before.
-				Note: capped at 64 timers per multimesh (extra attaches are rejected); pool-pop re-enables wipe armed timers, manual wakes drop timers armed while pooled.
-
-				If you want to be able to detach the callable, then make sure that it is clearly declared outside as a variable or you could even use a normal Godot function.
-
-				Callables that execute bullet related functions have no need of using call_deferred(), since all attached callables are executed at the end of the frame by default for safety.
-			</description>
-		</method>
-		<method name="multimesh_detach_all_time_based_functions">
-			<return type="void" />
-			<description>
-				Detaches all time based functions that were previously attached.
-			</description>
-		</method>
-		<method name="multimesh_detach_time_based_function">
-			<return type="void" />
-			<param index="0" name="callable" type="Callable" />
-			<description>
-				Detaches a specific time based callable. This will work as long as the callable you are trying to detach
-				was previously saved in a variable or defined as a normal Godot function.
-			</description>
-		</method>
 		<method name="play_effect_animation">
 			<return type="bool" />
 			<param index="0" name="layer_index" type="int" />
@@ -1708,7 +1708,7 @@
 		<method name="reset_pooling_flags_to_default">
 			<return type="void" />
 			<description>
-				Resets both pooling flags ([member is_multimesh_auto_pooling_enabled] and [member is_attachments_auto_pooling_enabled]) to true. Use after taking over a pooled instance whose previous owner customized them.
+				Resets both pooling flags ([member is_auto_pooling_enabled] and [member is_attachments_auto_pooling_enabled]) to true. Use after taking over a pooled instance whose previous owner customized them.
 			</description>
 		</method>
 		<method name="restart_sprite_animation">
@@ -2097,7 +2097,7 @@
 			<param index="1" name="collision_amount" type="int" default="0" />
 			<param index="2" name="enable_attachment" type="bool" default="true" />
 			<description>
-				Alias for [method enable_bullet] with unambiguous naming: revives one pooled or manually-disabled slot with its current appearance/ballistics intact (same-owner re-enable). Cross-owner reuse must go through the factory spawn methods or enable_multimesh(), which reseed appearance, custom data, speeds and patterns.
+				Alias for [method enable_bullet] with unambiguous naming: revives one pooled or manually-disabled slot with its current appearance/ballistics intact (same-owner re-enable). Cross-owner reuse must go through the factory spawn methods or enable_volley(), which reseed appearance, custom data, speeds and patterns.
 			</description>
 		</method>
 	</methods>
@@ -2118,7 +2118,7 @@
 			Whether a bounce also counts as a normal hit, set live. False (default) means free bounces. A consumed bounce emits BOTH the bounce signal and the matching area/body signal.
 		</member>
 		<member name="bounce_mask" type="int" setter="set_bounce_mask" getter="get_bounce_mask" default="0">
-			Bitmask of target collision layers that trigger a bounce, set live. Takes precedence over the normal collision path. 0 (default) disables bouncing. Spawn-time equivalent lives on [member DirectionalBulletsData2D.bounce_mask] (reseeded on every pool reuse).
+			Bitmask of target collision layers that trigger a bounce, set live. Takes precedence over the normal collision path. 0 (default) disables bouncing. Spawn-time equivalent lives on [member BulletVolleyData2D.bounce_mask] (reseeded on every pool reuse).
 		</member>
 		<member name="bounce_max_count" type="int" setter="set_bounce_max_count" getter="get_bounce_max_count" default="0">
 			How many times a single bullet may bounce before bounces stop for it, set live. 0 (default) = unlimited. Read per-bullet progress with [method bullet_get_bounce_count].
@@ -2219,20 +2219,20 @@
 			When enabled, the attachments will automatically get pushed to the object pool when the bullets get disabled.
 			When disabled, the attachments will automatically get freed from the scene tree upon collision.
 		</member>
-		<member name="is_life_time_infinite" type="bool" setter="set_is_life_time_infinite" getter="get_is_life_time_infinite" default="false">
-			If you set to true, then the lifetime will be ignored and bullets will never be destroyed.
-
-			Warning: If you don't implement "collision walls" or anything else to intercept/collide with the bullets, then they will truly live forever in your memory and you will experience lag.
-		</member>
-		<member name="is_multimesh_auto_pooling_enabled" type="bool" setter="set_is_multimesh_auto_pooling_enabled" getter="get_is_multimesh_auto_pooling_enabled" default="true">
+		<member name="is_auto_pooling_enabled" type="bool" setter="set_is_auto_pooling_enabled" getter="get_is_auto_pooling_enabled" default="true">
 			Whether the multimesh auto pooling is enabled or not.
 
 			When enabled, the multimesh will automatically get pushed to the object pool when all bullets are disabled.
-			When disabled, you are the one responsible for re-using the multimesh or clearing any time based callables that you might have attached with [method multimesh_attach_time_based_function].
+			When disabled, you are the one responsible for re-using the multimesh or clearing any time based callables that you might have attached with [method attach_time_based_function].
 
 			If you are going to save your multimesh bullets in an array, then it's probably best to disable auto pooling and manage the instances yourself.
 
 			Note: both pooling flags are per-instance state, not spawn data. A pooled instance keeps the previous owner's flags across reuse (defaults reset only at spawn). Call [method reset_pooling_flags_to_default] if you need a clean slate.
+		</member>
+		<member name="is_life_time_infinite" type="bool" setter="set_is_life_time_infinite" getter="get_is_life_time_infinite" default="false">
+			If you set to true, then the lifetime will be ignored and bullets will never be destroyed.
+
+			Warning: If you don't implement "collision walls" or anything else to intercept/collide with the bullets, then they will truly live forever in your memory and you will experience lag.
 		</member>
 		<member name="linear_drag" type="float" setter="set_linear_drag" getter="get_linear_drag" default="0.0">
 			Linear drag trimming speed each tick. 0 disables.
@@ -2247,13 +2247,13 @@
 			A shared [BulletCurvesData2D] resource that can be assigned to all bullets in the multimesh. This is useful for saving memory if you have a lot of bullets that share the same curves data, since you can assign the same resource to all of them instead of creating a new one for each bullet. Values are copied at set time: editing the resource in place afterwards changes nothing until you set it again. Direction channels never park the direction at zero: an Override result near zero keeps the incoming direction.
 		</member>
 		<member name="shared_bullet_rotation_data" type="BulletRotationData2D" setter="set_shared_bullet_rotation_data" getter="get_shared_bullet_rotation_data">
-			Fallback spin for bullets whose own rotation entry is missing or invalid, set live. Only fully-zero triples (the invalid-entry gap marker) are filled; bullets with any non-zero value keep it. Live writes fill once at call time (order matters: per-zero then shared fills, shared then per-zero stays zero). All-zero shared is a silent no-op; non-finite shared aborts the whole fallback with an error. Clearing it (null) keeps the current ballistics. Configure the spawn-time equivalent (plus its [code]tile_*[/code] checkbox) on [DirectionalBulletsData2D]. Negative spin is legal and clamps symmetrically to [-max, max].
+			Fallback spin for bullets whose own rotation entry is missing or invalid, set live. Only fully-zero triples (the invalid-entry gap marker) are filled; bullets with any non-zero value keep it. Live writes fill once at call time (order matters: per-zero then shared fills, shared then per-zero stays zero). All-zero shared is a silent no-op; non-finite shared aborts the whole fallback with an error. Clearing it (null) keeps the current ballistics. Configure the spawn-time equivalent (plus its [code]tile_*[/code] checkbox) on [BulletVolleyData2D]. Negative spin is legal and clamps symmetrically to [-max, max].
 		</member>
 		<member name="shared_bullet_speed_data" type="BulletSpeedData2D" setter="set_shared_bullet_speed_data" getter="get_shared_bullet_speed_data">
-			Fallback speed for bullets whose own speed entry is missing or invalid, set live. Only fully-zero triples (the invalid-entry gap marker) are filled; bullets with any non-zero value keep it. Live writes fill once at call time (order matters: per-zero then shared fills, shared then per-zero stays zero). All-zero shared is a silent no-op; non-finite shared aborts the whole fallback with an error. Clearing it (null) keeps the current ballistics. Configure the spawn-time equivalent (plus its [code]tile_*[/code] checkbox) on [DirectionalBulletsData2D]. Note: shared movement-speed curves still outrank it per tick. Negative speed flies backwards, clamped to [-max, max].
+			Fallback speed for bullets whose own speed entry is missing or invalid, set live. Only fully-zero triples (the invalid-entry gap marker) are filled; bullets with any non-zero value keep it. Live writes fill once at call time (order matters: per-zero then shared fills, shared then per-zero stays zero). All-zero shared is a silent no-op; non-finite shared aborts the whole fallback with an error. Clearing it (null) keeps the current ballistics. Configure the spawn-time equivalent (plus its [code]tile_*[/code] checkbox) on [BulletVolleyData2D]. Note: shared movement-speed curves still outrank it per tick. Negative speed flies backwards, clamped to [-max, max].
 		</member>
 		<member name="shared_bullet_wobble_data" type="BulletWobbleData2D" setter="set_shared_bullet_wobble_data" getter="get_shared_bullet_wobble_data">
-			Fallback wobble for bullets without a live per-bullet wobble resource, set live. Setting it re-seeds only those slots; clearing it (null) deactivates exactly those slots. Spawn-time equivalent (plus its [code]tile_all_bullet_wobble_data[/code] checkbox) lives on [member DirectionalBulletsData2D.shared_bullet_wobble_data]. Example: [code]bullets.set_shared_bullet_wobble_data(wobble)[/code] adds sway to every plain bullet while custom per-bullet seeds keep theirs.
+			Fallback wobble for bullets without a live per-bullet wobble resource, set live. Setting it re-seeds only those slots; clearing it (null) deactivates exactly those slots. Spawn-time equivalent (plus its [code]tile_all_bullet_wobble_data[/code] checkbox) lives on [member BulletVolleyData2D.shared_bullet_wobble_data]. Example: [code]bullets.set_shared_bullet_wobble_data(wobble)[/code] adds sway to every plain bullet while custom per-bullet seeds keep theirs.
 		</member>
 		<member name="shared_bullets_custom_data" type="Resource" setter="set_shared_bullets_custom_data" getter="get_shared_bullets_custom_data">
 			You can edit the custom bullets data that the bullets multimesh was spawned with. Use this to set damage data or anything else you want to store in a resource for your bullets to use.
@@ -2268,7 +2268,7 @@
 			If you want this behavior for the per-bullet deques, use [member bullet_homing_auto_pop_after_target_reached] instead.
 		</member>
 		<member name="shared_movement_pattern_curve" type="Curve2D" setter="set_shared_movement_pattern_curve" getter="get_shared_movement_pattern_curve">
-			Fallback pattern for bullets without their own per-bullet pattern, set live. Bullets with a valid per-bullet pattern always use it. Null (default) means no fallback. A locked orbit still owns the displacement while locked. Spawn-time flags plus the [code]tile_all_bullet_movement_pattern_paths / _face... / _repeats[/code] checkboxes live on [DirectionalBulletsData2D].
+			Fallback pattern for bullets without their own per-bullet pattern, set live. Bullets with a valid per-bullet pattern always use it. Null (default) means no fallback. A locked orbit still owns the displacement while locked. Spawn-time flags plus the [code]tile_all_bullet_movement_pattern_paths / _face... / _repeats[/code] checkboxes live on [BulletVolleyData2D].
 		</member>
 		<member name="shared_movement_pattern_face_movement_direction" type="bool" setter="set_shared_movement_pattern_face_movement_direction" getter="get_shared_movement_pattern_face_movement_direction" default="false">
 			Whether the shared movement pattern rotates bullets to face their direction of travel.
@@ -2279,7 +2279,7 @@
 	</members>
 	<signals>
 		<signal name="bullet_homing_target_reached">
-			<param index="0" name="multimesh_instance" type="DirectionalBullets2D" />
+			<param index="0" name="multimesh_instance" type="BulletVolley2D" />
 			<param index="1" name="bullet_index" type="int" />
 			<param index="2" name="target" type="Node2D" />
 			<param index="3" name="target_global_position" type="Vector2" />
@@ -2296,7 +2296,7 @@
 			</description>
 		</signal>
 		<signal name="sprite_animation_finished">
-			<param index="0" name="volley" type="DirectionalBullets2D" />
+			<param index="0" name="volley" type="BulletVolley2D" />
 			<description>
 				Emitted once (deferred, outside the physics tick) when a non-looping SpriteFrames animation reaches its last frame. Re-armed by every play/restart/rebuild. Note: the instance may already be pooled (inactive) when the deferred call runs, so check its state in the handler if that matters.
 			</description>

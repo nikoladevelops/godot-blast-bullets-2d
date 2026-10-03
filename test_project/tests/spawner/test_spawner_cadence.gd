@@ -9,7 +9,7 @@ extends BlastTest
 
 ## Spawner wired to the factory, shooting still OFF (tests arm it).
 func _spawner() -> BulletSpawner2D:
-	var sp := make_spawner(H.make_directional_data(2, 50.0, 30.0))
+	var sp := make_spawner(H.make_volley_data(2, 50.0, 30.0))
 	watch_signals(sp)
 	return sp
 
@@ -68,7 +68,7 @@ func test_volleys_remaining_combines_cap_and_budget() -> void:
 func test_pre_tree_controls_survive_entering_the_tree() -> void:
 	var sp := BulletSpawner2D.new()
 	sp.set_homing_enabled(false)
-	sp.set_spawn_data(H.make_directional_data(2, 50.0, 30.0))
+	sp.set_spawn_data(H.make_volley_data(2, 50.0, 30.0))
 	sp.set_shoot_interval_sec(0.05)
 	sp.set_bullet_factory(factory)
 	watch_signals(sp)
@@ -87,7 +87,7 @@ func test_pre_tree_controls_survive_entering_the_tree() -> void:
 func test_pause_before_the_tree_is_kept() -> void:
 	var sp := BulletSpawner2D.new()
 	sp.set_homing_enabled(false)
-	sp.set_spawn_data(H.make_directional_data(2, 50.0, 30.0))
+	sp.set_spawn_data(H.make_volley_data(2, 50.0, 30.0))
 	sp.set_bullet_factory(factory)
 	sp.pause_shooting()
 	watch_signals(sp)
@@ -131,7 +131,7 @@ func test_every_failure_reports_a_skip_reason() -> void:
 	sp.set_spawn_data(null)
 	assert_false(sp.shoot_once(), "no spawn data")
 	expect_error_sequence(["no spawn_data assigned"])
-	sp.set_spawn_data(H.make_directional_data(2, 50.0, 30.0))
+	sp.set_spawn_data(H.make_volley_data(2, 50.0, 30.0))
 	sp.pattern_source = BulletSpawner2D.PATTERN_FROM_HELPER_AIMED # no target
 	assert_false(sp.shoot_once(), "no transforms")
 	expect_error_sequence(["no aimed target assigned", "produced no transforms"])

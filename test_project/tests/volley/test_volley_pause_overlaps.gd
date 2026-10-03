@@ -8,12 +8,12 @@ extends BlastTest
 var hits := 0
 
 
-func _on_body(_b: Object, _v: DirectionalBullets2D, _i: int) -> void:
+func _on_body(_b: Object, _v: BulletVolley2D, _i: int) -> void:
 	hits += 1
 
 
-func _data(max_hits := 0) -> DirectionalBulletsData2D:
-	var d := H.make_directional_data(1, 0.0, 30.0)
+func _data(max_hits := 0) -> BulletVolleyData2D:
+	var d := H.make_volley_data(1, 0.0, 30.0)
 	d.transforms = [Transform2D(0.0, Vector2(-300, 0))]
 	d.monitorable = true
 	d.set_collision_mask_from_array([3])
@@ -25,7 +25,7 @@ func _data(max_hits := 0) -> DirectionalBulletsData2D:
 func before_each() -> void:
 	await super()
 	hits = 0
-	factory.directional_body_entered.connect(_on_body)
+	factory.body_entered.connect(_on_body)
 	make_wall(Vector2(0, 0), Vector2(40, 40))
 	await physics()
 
@@ -39,7 +39,7 @@ func _resume() -> void:
 
 
 func test_overlap_started_while_paused_hits_once() -> void:
-	var v: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(_data())
+	var v: BulletVolley2D = factory.spawn_volley(_data())
 	await physics(2)
 	_pause()
 	v.teleport_bullet(0, Vector2(0, 0)) # into the wall while paused
@@ -52,7 +52,7 @@ func test_overlap_started_while_paused_hits_once() -> void:
 
 
 func test_overlap_started_and_ended_while_paused_is_cancelled() -> void:
-	var v: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(_data())
+	var v: BulletVolley2D = factory.spawn_volley(_data())
 	await physics(2)
 	_pause()
 	v.teleport_bullet(0, Vector2(0, 0))
@@ -65,7 +65,7 @@ func test_overlap_started_and_ended_while_paused_is_cancelled() -> void:
 
 
 func test_overlap_counted_before_the_pause_is_not_recounted() -> void:
-	var v: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(_data())
+	var v: BulletVolley2D = factory.spawn_volley(_data())
 	await physics(2)
 	v.teleport_bullet(0, Vector2(0, 0))
 	await physics(5)
@@ -78,14 +78,14 @@ func test_overlap_counted_before_the_pause_is_not_recounted() -> void:
 
 
 func test_parked_records_never_reach_the_next_life() -> void:
-	var v: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(_data(1))
+	var v: BulletVolley2D = factory.spawn_volley(_data(1))
 	await physics(2)
 	_pause()
 	v.teleport_bullet(0, Vector2(0, 0))
 	await physics(3)
 	v.clear_all_bullets() # the volley dies (pooled) while the record is parked
 	await idle(2)
-	var reused: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(_data(1))
+	var reused: BulletVolley2D = factory.spawn_volley(_data(1))
 	_resume()
 	await physics(5)
 	assert_eq(hits, 0, "the dead life's parked overlap was not replayed into the new life")

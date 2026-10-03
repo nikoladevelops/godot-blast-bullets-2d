@@ -2,7 +2,7 @@ extends BlastBenchmark
 ## 500 bullets each carrying a node attachment (pooled), refired every 90
 ## frames: attachment follow, disable/pool and re-attach costs.
 var _scene: PackedScene
-var _data: Array[DirectionalBulletsData2D] = []
+var _data: Array[BulletVolleyData2D] = []
 
 func describe() -> String:
 	return "500 bullets with node attachments, refired every 90 frames"
@@ -18,5 +18,5 @@ func setup() -> void:
 func step(frame: int) -> void:
 	if frame % 90 == 0:
 		for d in _data:
-			var vol: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d)
+			var vol: BulletVolley2D = factory.spawn_volley(d)
 			vol.all_bullets_set_attachment(_scene, Vector2.ZERO, true)

@@ -70,7 +70,7 @@ git commit -m "Fix flower bullet count" -m "FAN splits the amount over petals."
 
 ## 0d. Glossary
 
-- **volley**: one spawn call = one MultiMesh of N bullets (`DirectionalBullets2D`).
+- **volley**: one spawn call = one MultiMesh of N bullets (`BulletVolley2D`).
 - **marker / generator**: the Node2D a pattern is built around
   (`transforms_generator`, else the spawner itself).
 - **pattern source**: which generator builds the per-bullet transforms
@@ -174,9 +174,9 @@ rg -n 'BulletSpawner2D::shoot_once' src/        # where a method lives (files ar
 
 ## 5. Test doctrine (`test_project/tests/common/blast_test.gd`)
 
-- Builders: `spawn_dir()`, `make_spawner()` (shooting + homing OFF before it
+- Builders: `quick_volley()`, `make_spawner()` (shooting + homing OFF before it
   enters the tree), `make_preview_spawner()`, `H` (`blast_test_helpers.gd`:
-  `make_directional_data`, `make_still_data`, `make_speed`, `make_rotation`,
+  `make_volley_data`, `make_still_data`, `make_speed`, `make_rotation`,
   `make_effect_layer`, `make_flat_curve`, ...), `make_wall/make_area/
   make_probe_scene/add` (autofreed).
 - Frames: `await idle(n)` (idle frame — structural factory calls
@@ -250,7 +250,7 @@ extends BlastTest
 
 
 func test_<behavior>_<expectation>() -> void:
-	var sp := make_spawner(H.make_directional_data(4, 0.0, 30.0), BulletSpawner2D.PATTERN_FROM_HELPER_RING, 4)
+	var sp := make_spawner(H.make_volley_data(4, 0.0, 30.0), BulletSpawner2D.PATTERN_FROM_HELPER_RING, 4)
 	watch_signals(sp)
 	sp.helper_ring_radius = 80.0
 	var pts: Array = sp.collect_spawn_transforms()
@@ -396,11 +396,11 @@ src/
 - Threading: everything runs on the main thread (physics callbacks
   included); no locks exist and none are needed. Do not add threads.
 - **Spawn flow**: `BulletFactory2D.spawn_controllable_*` → pool pop by
-  `MultiMeshPoolKey2D` (amount + shape + type) or fresh alloc →
-  `enable_multimesh` (validates EVERYTHING before mutating; a refused
+  `VolleyPoolKey2D` (amount + shape + type) or fresh alloc →
+  `enable_volley` (validates EVERYTHING before mutating; a refused
   enable changes nothing) → `set_up_bullet_instances` (one `set_buffer`
   upload). The spawner calls the C++ span path
-  (`spawn_controllable_directional_bullets_span`, no Variant boxing).
+  (`spawn_volley_span`, no Variant boxing).
 - **Pooling**: one bucket per key; pop prefers newest non-ticked volley;
   same-key spawns from handlers reuse mid-sweep. Structural ops
   (`reset/free_*/populate_*`) are idle-frame only: inside a physics frame
@@ -533,7 +533,7 @@ python3 tools/run_benchmarks.py --update-baseline   # ONLY for an accepted chang
   and the `BlastBullets2D/*` custom monitors (editor Debugger → Monitors,
   `register_performance_monitors`). Editor Profiler for script cost,
   Visual Profiler for GPU.
-- Facts (debug build, Ryzen 7 8840HS): 10k directional bullets in flight
+- Facts (debug build, Ryzen 7 8840HS): 10k bullets in flight
   ≈ 0.26 ms factory tick. Cold spawn was O(N²) (8k: 1.5 s) because every
   per-bullet `shape_set_data` re-updated all shapes of the area; one
   shared shape per volley made it O(N) (8k: 11 ms, 1k: 0.66 ms).

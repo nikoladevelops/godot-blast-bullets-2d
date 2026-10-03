@@ -9,7 +9,7 @@ extends BlastTest
 
 
 func _spawner(count: int, interval: float = 0.05) -> BulletSpawner2D:
-	var sp := make_spawner(H.make_directional_data(1, 50.0, 30.0), BulletSpawner2D.PATTERN_FROM_SELF, 1)
+	var sp := make_spawner(H.make_volley_data(1, 50.0, 30.0), BulletSpawner2D.PATTERN_FROM_SELF, 1)
 	sp.burst_enabled = true
 	sp.burst_count = count
 	sp.burst_interval_sec = interval
@@ -124,7 +124,7 @@ func test_misconfigured_auto_burst_reports_once() -> void:
 
 
 func test_telegraph_payload_matches_the_shot_and_warns_once_per_chain() -> void:
-	var sp := make_spawner(H.make_directional_data(5, 0.0, 30.0), BulletSpawner2D.PATTERN_FROM_HELPER_RING, 5) # still bullets: positions stay readable
+	var sp := make_spawner(H.make_volley_data(5, 0.0, 30.0), BulletSpawner2D.PATTERN_FROM_HELPER_RING, 5) # still bullets: positions stay readable
 	sp.burst_enabled = true
 	sp.burst_count = 3
 	sp.burst_interval_sec = 0.05
@@ -136,7 +136,7 @@ func test_telegraph_payload_matches_the_shot_and_warns_once_per_chain() -> void:
 	await _until(sp, "burst_finished", 1)
 	assert_signal_emit_count(sp, "volley_telegraphed", 1, "one warning per chain, before the first shot")
 	var aim: Array = get_signal_parameters(sp, "volley_telegraphed", 0)[0]
-	var shot: DirectionalBullets2D = get_signal_parameters(sp, "volley_fired", 0)[0]
+	var shot: BulletVolley2D = get_signal_parameters(sp, "volley_fired", 0)[0]
 	assert_eq(aim.size(), shot.get_amount_bullets(), "the warning shows every bullet of the shot")
 	for i in aim.size():
 		assert_almost_eq((aim[i] as Transform2D).origin.distance_to(shot.get_bullet_transform(i).origin), 0.0, 0.01, "bullet %d spawns where it was telegraphed" % i)

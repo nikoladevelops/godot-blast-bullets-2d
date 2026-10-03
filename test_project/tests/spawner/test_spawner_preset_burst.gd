@@ -7,14 +7,14 @@ extends BlastTest
 
 
 func _burst_spawner() -> BulletSpawner2D:
-	var sp := make_spawner(H.make_directional_data(1, 0.0, 60.0), BulletSpawner2D.PATTERN_FROM_SELF, 1)
+	var sp := make_spawner(H.make_volley_data(1, 0.0, 60.0), BulletSpawner2D.PATTERN_FROM_SELF, 1)
 	sp.burst_enabled = true
 	watch_signals(sp)
 	return sp
 
 
 func test_spin_preset_advances_from_idle() -> void:
-	var sp := make_spawner(H.make_directional_data(1, 0.0, 60.0))
+	var sp := make_spawner(H.make_volley_data(1, 0.0, 60.0))
 	sp.apply_pattern_preset(BulletFactory2D.PATTERN_PRESET_TWIN_SPIRAL_COUNTER)
 	assert_true(sp.spin_enabled, "preset arms spin")
 	var a0: float = sp.get_spin_angle_deg()

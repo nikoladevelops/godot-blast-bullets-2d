@@ -17,16 +17,11 @@ struct CachedStringNames2D {
 	// Signal / deferred-method / property names used on per-record and
 	// per-expiry paths (a string literal builds a StringName = an interning
 	// lookup across the extension boundary on EVERY call).
-	const StringName directional_area_entered = StringName("directional_area_entered");
-	const StringName directional_body_entered = StringName("directional_body_entered");
 	const StringName area_entered = StringName("area_entered");
 	const StringName body_entered = StringName("body_entered");
-	const StringName directional_bounce_area_entered = StringName("directional_bounce_area_entered");
-	const StringName directional_bounce_body_entered = StringName("directional_bounce_body_entered");
 	const StringName bounce_area_entered = StringName("bounce_area_entered");
 	const StringName bounce_body_entered = StringName("bounce_body_entered");
 	const StringName collision_layer = StringName("collision_layer");
-	const StringName directional_life_time_over = StringName("directional_life_time_over");
 	const StringName life_time_over = StringName("life_time_over");
 	const StringName sprite_animation_finished = StringName("sprite_animation_finished");
 	const StringName bullet_homing_target_reached = StringName("bullet_homing_target_reached");

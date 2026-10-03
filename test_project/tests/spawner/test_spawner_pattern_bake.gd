@@ -23,7 +23,7 @@ func before_each() -> void:
 	rng.seed = 424242
 	gen = add(Node2D.new())
 	gen.position = Vector2(300, 200)
-	sp = make_spawner(H.make_directional_data(4), BulletSpawner2D.PATTERN_FROM_HELPER_RING, 24)
+	sp = make_spawner(H.make_volley_data(4), BulletSpawner2D.PATTERN_FROM_HELPER_RING, 24)
 	sp.set_transforms_generator(gen)
 
 

@@ -15,7 +15,7 @@ func before_each() -> void:
 
 
 func _homing_spawner(amount: int = 3, speed: float = 50.0) -> BulletSpawner2D:
-	var sp := make_spawner(H.make_directional_data(amount, speed, 30.0), BulletSpawner2D.PATTERN_FROM_HELPER_RING, amount)
+	var sp := make_spawner(H.make_volley_data(amount, speed, 30.0), BulletSpawner2D.PATTERN_FROM_HELPER_RING, amount)
 	sp.set_homing_enabled(true)
 	sp.set_homing_target_source(BulletSpawner2D.HOMING_SOURCE_NODE_PATH)
 	sp.set_homing_target_path(sp.get_path_to(target))
@@ -33,7 +33,7 @@ func test_steering_settings_reach_the_volley() -> void:
 	sp.set_homing_duration_sec(2.0)
 	sp.set_homing_lose_range_px(900.0)
 	assert_true(sp.shoot_once(), "shot")
-	var v: DirectionalBullets2D = sp.get_live_volleys()[0]
+	var v: BulletVolley2D = sp.get_live_volleys()[0]
 	assert_almost_eq(v.get_homing_smoothing(), 7.5, 0.0001, "smoothing")
 	assert_almost_eq(v.get_homing_update_interval(), 0.2, 0.0001, "update interval")
 	assert_almost_eq(v.get_homing_distance_before_reached(), 12.0, 0.0001, "reached distance")
@@ -50,7 +50,7 @@ func test_per_bullet_smoothing_fans_out() -> void:
 	sp.set_homing_smoothing_start(5.0)
 	sp.set_homing_smoothing_step(1.5)
 	assert_true(sp.shoot_once(), "shot")
-	var v: DirectionalBullets2D = sp.get_live_volleys()[0]
+	var v: BulletVolley2D = sp.get_live_volleys()[0]
 	for i in 4:
 		assert_almost_eq(v.bullet_get_homing_smoothing(i), 5.0 + 1.5 * i, 0.0001, "bullet %d smoothing" % i)
 
@@ -102,25 +102,25 @@ func test_orbit_settings_reach_every_bullet() -> void:
 	sp.set_orbiting_radius_linear_enabled(true)
 	sp.set_orbiting_radius_start(40.0)
 	sp.set_orbiting_radius_step(10.0)
-	sp.set_orbiting_direction(DirectionalBullets2D.OrbitLeft)
-	sp.set_orbiting_follow_mode(DirectionalBullets2D.FollowDeadzone)
+	sp.set_orbiting_direction(BulletVolley2D.OrbitLeft)
+	sp.set_orbiting_follow_mode(BulletVolley2D.FollowDeadzone)
 	sp.set_orbiting_follow_deadzone(15.0)
-	sp.set_orbiting_lock_policy(DirectionalBullets2D.StayLocked)
+	sp.set_orbiting_lock_policy(BulletVolley2D.StayLocked)
 	sp.set_orbiting_rigid_follow(true)
 	assert_true(sp.shoot_once(), "shot")
-	var v: DirectionalBullets2D = sp.get_live_volleys()[0]
+	var v: BulletVolley2D = sp.get_live_volleys()[0]
 	for i in 3:
 		assert_true(v.bullet_is_orbiting_enabled(i), "bullet %d orbits" % i)
 		assert_almost_eq(v.bullet_get_orbiting_radius(i), 40.0 + 10.0 * i, 0.0001, "bullet %d radius fan" % i)
-		assert_eq(v.bullet_get_orbiting_direction(i), DirectionalBullets2D.OrbitLeft, "direction")
-		assert_eq(v.bullet_get_orbiting_follow_mode(i), DirectionalBullets2D.FollowDeadzone, "follow mode")
+		assert_eq(v.bullet_get_orbiting_direction(i), BulletVolley2D.OrbitLeft, "direction")
+		assert_eq(v.bullet_get_orbiting_follow_mode(i), BulletVolley2D.FollowDeadzone, "follow mode")
 		assert_almost_eq(v.bullet_get_orbiting_follow_deadzone(i), 15.0, 0.0001, "deadzone")
-		assert_eq(v.bullet_get_orbiting_lock_policy(i), DirectionalBullets2D.StayLocked, "lock policy")
+		assert_eq(v.bullet_get_orbiting_lock_policy(i), BulletVolley2D.StayLocked, "lock policy")
 		assert_true(v.bullet_get_orbiting_rigid_follow(i), "rigid follow")
 
 
 func test_orbiting_without_homing_warns_once_and_stays_silent() -> void:
-	var sp := make_spawner(H.make_directional_data(2, 50.0, 30.0))
+	var sp := make_spawner(H.make_volley_data(2, 50.0, 30.0))
 	sp.set_orbiting_enabled(true)
 	watch_signals(sp)
 	for i in 3:
@@ -154,13 +154,13 @@ func test_fire_arc_volley_chases_the_target_it_approved() -> void:
 		foe.position = Vector2(300, -40 + 40 * i)
 		add(foe)
 		foe.add_to_group("arc_foes")
-	var sp := make_spawner(H.make_directional_data(1, 50.0, 30.0), BulletSpawner2D.PATTERN_FROM_SELF, 1)
+	var sp := make_spawner(H.make_volley_data(1, 50.0, 30.0), BulletSpawner2D.PATTERN_FROM_SELF, 1)
 	sp.set_homing_enabled(true)
 	sp.set_homing_node_group(&"arc_foes")
 	sp.set_homing_target_selection(BulletSpawner2D.HOMING_SELECT_RANDOM)
 	sp.set_homing_random_seed(3)
 	sp.set_homing_fire_arc_deg(90.0)
-	var reference := make_spawner(H.make_directional_data(1, 50.0, 30.0), BulletSpawner2D.PATTERN_FROM_SELF, 1)
+	var reference := make_spawner(H.make_volley_data(1, 50.0, 30.0), BulletSpawner2D.PATTERN_FROM_SELF, 1)
 	reference.set_homing_enabled(true)
 	reference.set_homing_node_group(&"arc_foes")
 	reference.set_homing_target_selection(BulletSpawner2D.HOMING_SELECT_RANDOM)
@@ -169,5 +169,5 @@ func test_fire_arc_volley_chases_the_target_it_approved() -> void:
 	for i in 8:
 		var expected: Array = reference.resolve_homing_targets(true)
 		assert_true(sp.shoot_once(), "shot %d" % i)
-		var v: DirectionalBullets2D = sp.get_live_volleys()[i]
+		var v: BulletVolley2D = sp.get_live_volleys()[i]
 		assert_eq(v.shared_homing_deque_get_current_homing_target(), expected[0], "shot %d chases the seeded pick (one draw per shot)" % i)

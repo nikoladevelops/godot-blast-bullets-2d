@@ -144,19 +144,19 @@ func swallow_errors() -> int:
 	return n
 
 
-## Builds a factory-owned directional volley (shared test data builders).
-func spawn_dir(n: int = 4, speed: float = 200.0, lifetime: float = 5.0) -> DirectionalBullets2D:
-	return factory.spawn_controllable_directional_bullets(H.make_directional_data(n, speed, lifetime))
+## Builds a factory-owned volley (shared test data builders).
+func quick_volley(n: int = 4, speed: float = 200.0, lifetime: float = 5.0) -> BulletVolley2D:
+	return factory.spawn_volley(H.make_volley_data(n, speed, lifetime))
 
 
 ## Spawner wired to `factory`, idle by default: shooting and homing are
 ## switched off BEFORE it enters the tree (a default spawner would otherwise
 ## auto-fire on its first frame). Freed automatically after the test.
-func make_spawner(data: DirectionalBulletsData2D = null, source: int = BulletSpawner2D.PATTERN_FROM_HELPER_RING, amount: int = 4) -> BulletSpawner2D:
+func make_spawner(data: BulletVolleyData2D = null, source: int = BulletSpawner2D.PATTERN_FROM_HELPER_RING, amount: int = 4) -> BulletSpawner2D:
 	var s := BulletSpawner2D.new()
 	s.set_shooting_enabled(false)
 	s.set_homing_enabled(false)
-	s.set_spawn_data(data if data != null else H.make_directional_data(amount))
+	s.set_spawn_data(data if data != null else H.make_volley_data(amount))
 	s.pattern_source = source
 	s.helper_bullets_amount = amount
 	add(s)
@@ -166,7 +166,7 @@ func make_spawner(data: DirectionalBulletsData2D = null, source: int = BulletSpa
 
 ## Like make_spawner, with the pattern preview live at runtime.
 func make_preview_spawner(source: int = BulletSpawner2D.PATTERN_FROM_HELPER_RING, amount: int = 4) -> BulletSpawner2D:
-	var s := make_spawner(H.make_directional_data(1, 0.0, 60.0), source, amount)
+	var s := make_spawner(H.make_volley_data(1, 0.0, 60.0), source, amount)
 	s.show_pattern_preview = true
 	s.show_preview_during_runtime = true
 	return s

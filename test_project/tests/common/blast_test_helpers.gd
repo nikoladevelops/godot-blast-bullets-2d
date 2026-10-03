@@ -16,8 +16,8 @@ static func make_sprite_frames() -> SpriteFrames:
 	sf.add_frame("default", ImageTexture.create_from_image(img))
 	return sf
 
-static func make_directional_data(n: int = 4, speed: float = 200.0, lifetime: float = 5.0) -> DirectionalBulletsData2D:
-	var data := DirectionalBulletsData2D.new()
+static func make_volley_data(n: int = 4, speed: float = 200.0, lifetime: float = 5.0) -> BulletVolleyData2D:
+	var data := BulletVolleyData2D.new()
 	var arr: Array = []
 	for i in n:
 		arr.append(Transform2D(0.0, Vector2(24.0 * i, 0.0)))
@@ -51,8 +51,8 @@ static func make_circle_shape(radius: float = 8.0) -> CircleShape2D:
 
 ## Stationary volley used by many state suites: n bullets 16 px apart, speed
 ## 0, 60 s life, circle r6, infinite collisions, mask layer 3.
-static func make_still_data(n: int = 2) -> DirectionalBulletsData2D:
-	var d := make_directional_data(n, 0.0, 60.0)
+static func make_still_data(n: int = 2) -> BulletVolleyData2D:
+	var d := make_volley_data(n, 0.0, 60.0)
 	var arr: Array = []
 	for i in n:
 		arr.append(Transform2D(0.0, Vector2(16.0 * i, 0.0)))

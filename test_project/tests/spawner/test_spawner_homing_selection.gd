@@ -20,7 +20,7 @@ func before_each() -> void:
 
 
 func _spawner(selection: int, max_targets: int = 2) -> BulletSpawner2D:
-	var sp := make_spawner(H.make_directional_data(4, 50.0, 30.0))
+	var sp := make_spawner(H.make_volley_data(4, 50.0, 30.0))
 	sp.set_homing_enabled(true)
 	sp.set_homing_target_source(BulletSpawner2D.HOMING_SOURCE_NODE_GROUP)
 	sp.set_homing_node_group(&"foes")
@@ -62,7 +62,7 @@ func test_round_robin_rotates_across_shots_and_peeks_without_consuming() -> void
 	var chased: Array = []
 	for i in 5:
 		assert_true(sp.shoot_once(), "shot %d" % i)
-		var v: DirectionalBullets2D = sp.get_live_volleys()[i]
+		var v: BulletVolley2D = sp.get_live_volleys()[i]
 		chased.append(v.shared_homing_deque_get_current_homing_target())
 	assert_eq(chased, [foes[0], foes[1], foes[2], foes[3], foes[0]], "one new target per shot, wrapping")
 
@@ -71,7 +71,7 @@ func test_distribute_deals_the_pool_across_bullets() -> void:
 	var sp := _spawner(BulletSpawner2D.HOMING_SELECT_DISTRIBUTE, 2)
 	sp.set_homing_mode(BulletSpawner2D.HOMING_PER_BULLET)
 	assert_true(sp.shoot_once(), "shot")
-	var v: DirectionalBullets2D = sp.get_live_volleys()[0]
+	var v: BulletVolley2D = sp.get_live_volleys()[0]
 	var chased: Array = []
 	for i in v.get_amount_bullets():
 		chased.append(v.bullet_get_current_homing_target(i))

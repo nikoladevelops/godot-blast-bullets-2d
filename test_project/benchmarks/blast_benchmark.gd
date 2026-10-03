@@ -132,10 +132,10 @@ func results() -> Dictionary:
 
 # ---------------- shared scenario builders ----------------
 
-## Directional data: n bullets on a ring of radius r around `center`, flying
+## Volley data: n bullets on a ring of radius r around `center`, flying
 ## outward at `speed`. Collision layer 2, mask 3 (walls/areas use value 4).
-func ring_data(n: int, center: Vector2, r: float, speed: float, lifetime: float) -> DirectionalBulletsData2D:
-	var d := H.make_directional_data(n, speed, lifetime)
+func ring_data(n: int, center: Vector2, r: float, speed: float, lifetime: float) -> BulletVolleyData2D:
+	var d := H.make_volley_data(n, speed, lifetime)
 	var arr: Array = []
 	for i in n:
 		var a := TAU * float(i) / float(n)

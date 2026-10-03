@@ -5,7 +5,7 @@ class_name BENCHMARK_GLOBALS
 
 # A bunch of bullet types that the player can choose from
 enum BulletType{
-	MultiMeshDirectional,
+	BulletVolley,
 	GodotArea2D
 	}
 

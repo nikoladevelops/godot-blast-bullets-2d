@@ -35,7 +35,7 @@ func _arg_for(arg: Dictionary) -> Variant:
 
 
 func test_every_range_method_rejects_out_of_range() -> void:
-	var v: DirectionalBullets2D = spawn_dir(4, 100.0, 30.0)
+	var v: BulletVolley2D = quick_volley(4, 100.0, 30.0)
 	var methods := _range_methods(v)
 	assert_gt(methods.size(), 20, "found the all_bullets_* range APIs (%d)" % methods.size())
 	for m in methods:
@@ -57,7 +57,7 @@ func test_every_range_method_rejects_out_of_range() -> void:
 
 
 func test_defaults_cover_the_whole_volley() -> void:
-	var v: DirectionalBullets2D = spawn_dir(5, 100.0, 30.0)
+	var v: BulletVolley2D = quick_volley(5, 100.0, 30.0)
 	v.all_bullets_set_direction(Vector2(0, 1))
 	for i in 5:
 		assert_eq(v.get_bullet_direction(i), Vector2(0, 1), "default range covers bullet %d" % i)

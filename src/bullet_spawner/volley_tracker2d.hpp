@@ -30,7 +30,7 @@ public:
 	// most for retargeting). Use clear_live_volleys() to reset manually.
 	static constexpr int MAX_TRACKED_VOLLEYS = 256;
 
-	bool track(DirectionalBullets2D *volley, uint64_t owner_spawner_id) {
+	bool track(BulletVolley2D *volley, uint64_t owner_spawner_id) {
 		if (volley == nullptr) {
 			return false;
 		}
@@ -119,9 +119,9 @@ public:
 	// direct engine calls would let scripts drive a corpse for a frame).
 	// Every touch of a tracked volley must go through here (or prune + an
 	// equivalent check): never dereference a stored id blindly.
-	static DirectionalBullets2D *resolve_live(int64_t id, uint64_t owner_spawner_id) {
+	static BulletVolley2D *resolve_live(int64_t id, uint64_t owner_spawner_id) {
 		Object *obj = ObjectDB::get_instance(ObjectID((uint64_t)id));
-		DirectionalBullets2D *volley = Object::cast_to<DirectionalBullets2D>(obj);
+		BulletVolley2D *volley = Object::cast_to<BulletVolley2D>(obj);
 		if (volley == nullptr || volley->owner_spawner_id != owner_spawner_id || !volley->is_active || volley->is_queued_for_deletion()) {
 			return nullptr;
 		}

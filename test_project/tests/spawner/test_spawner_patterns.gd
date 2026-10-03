@@ -14,7 +14,7 @@ const EMPTY_WITHOUT_INPUT := [
 
 func before_each() -> void:
 	await super()
-	sp = make_spawner(H.make_directional_data(4), BulletSpawner2D.PATTERN_FROM_HELPER_RING, 6)
+	sp = make_spawner(H.make_volley_data(4), BulletSpawner2D.PATTERN_FROM_HELPER_RING, 6)
 
 
 func test_all_sources_collect(src: int = use_parameters(range(BulletSpawner2D.PATTERN_FROM_LAST))) -> void:

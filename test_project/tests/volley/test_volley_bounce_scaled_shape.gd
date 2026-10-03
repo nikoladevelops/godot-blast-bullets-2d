@@ -4,8 +4,8 @@ extends BlastTest
 ## transform, otherwise the caller uses the radial normal.
 
 
-func _data() -> DirectionalBulletsData2D:
-	var d := H.make_directional_data(1, 200.0, 30.0)
+func _data() -> BulletVolleyData2D:
+	var d := H.make_volley_data(1, 200.0, 30.0)
 	d.transforms = [Transform2D(0.0, Vector2(100, 300))]
 	d.monitorable = true
 	d.collision_shape = H.make_circle_shape(6.0)
@@ -28,10 +28,10 @@ func _wall(shape_scale: Vector2) -> StaticBody2D:
 	return wall
 
 
-func _bounce_once(shape_scale: Vector2, max_frames: int) -> DirectionalBullets2D:
+func _bounce_once(shape_scale: Vector2, max_frames: int) -> BulletVolley2D:
 	_wall(shape_scale)
 	await physics()
-	var v: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(_data())
+	var v: BulletVolley2D = factory.spawn_volley(_data())
 	for i in max_frames:
 		await physics()
 		if v.bullet_get_bounce_count(0) >= 1:
@@ -78,7 +78,7 @@ func test_no_usable_shape_child_falls_back_to_radial() -> void:
 	wall.add_child(poly)
 	add(wall)
 	await physics()
-	var v: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(_data())
+	var v: BulletVolley2D = factory.spawn_volley(_data())
 	for i in 120:
 		await physics()
 		if v.bullet_get_bounce_count(0) >= 1:

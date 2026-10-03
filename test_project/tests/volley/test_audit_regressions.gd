@@ -9,8 +9,8 @@ func _on_timer() -> void:
 	timer_fires += 1
 
 
-func _bounce_data() -> DirectionalBulletsData2D:
-	var d := H.make_directional_data(1, 200.0, 30.0)
+func _bounce_data() -> BulletVolleyData2D:
+	var d := H.make_volley_data(1, 200.0, 30.0)
 	d.transforms = [Transform2D(0.0, Vector2(100, 300))]
 	d.monitorable = true
 	d.collision_shape = H.make_circle_shape(6.0)
@@ -21,9 +21,9 @@ func _bounce_data() -> DirectionalBulletsData2D:
 
 
 func test_texture_rotation_round_trip_with_offset() -> void:
-	var d := H.make_directional_data(1, 0.0)
+	var d := H.make_volley_data(1, 0.0)
 	d.texture_rotation_radians = 0.7
-	var v: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d)
+	var v: BulletVolley2D = factory.spawn_volley(d)
 	var r0: float = v.get_bullet_texture_rotation_radians(0)
 	assert_almost_eq(r0, 0.0, 0.001, "fresh bullet reads 0 (offset excluded)")
 	v.set_bullet_texture_rotation_radians(0, v.get_bullet_texture_rotation_radians(0))
@@ -36,21 +36,21 @@ func test_texture_rotation_round_trip_with_offset() -> void:
 
 func test_repeating_timer_keeps_period() -> void:
 	timer_fires = 0
-	var v: DirectionalBullets2D = spawn_dir(1, 0.0, 30.0)
+	var v: BulletVolley2D = quick_volley(1, 0.0, 30.0)
 	await idle(1)
-	v.multimesh_attach_time_based_function(0.1, _on_timer, true, true)
+	v.attach_time_based_function(0.1, _on_timer, true, true)
 	await physics(Engine.physics_ticks_per_second)
 	await idle(1)
 	assert_between(timer_fires, 9, 11, "0.1 s repeater fires ~10x per second")
-	v.multimesh_detach_all_time_based_functions()
+	v.detach_all_time_based_functions()
 
 
 func test_shared_spin_survives_disabling_bullet_zero() -> void:
-	var d := H.make_directional_data(4, 0.0, 30.0)
+	var d := H.make_volley_data(4, 0.0, 30.0)
 	var rot := BulletRotationData2D.new()
 	rot.rotation_speed = 6.0
 	d.shared_bullet_rotation_data = rot
-	var v: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d)
+	var v: BulletVolley2D = factory.spawn_volley(d)
 	assert_not_null(v, "volley spawned")
 	await idle(1)
 	v.disable_bullet(0)
@@ -62,7 +62,7 @@ func test_shared_spin_survives_disabling_bullet_zero() -> void:
 
 func test_pool_key_inspector_enum() -> void:
 	var hint := ""
-	for p in MultiMeshPoolKey2D.new().get_property_list():
+	for p in VolleyPoolKey2D.new().get_property_list():
 		if p["name"] == "shape_type":
 			hint = p["hint_string"]
 	assert_string_contains(hint, "Circle:3")
@@ -105,7 +105,7 @@ func test_bounce_normal_on_scaled_slope() -> void:
 	wall.add_child(col)
 	add(wall)
 	await physics()
-	var bv: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(_bounce_data())
+	var bv: BulletVolley2D = factory.spawn_volley(_bounce_data())
 	for i in 120:
 		await physics()
 		if bv.bullet_get_bounce_count(0) >= 1:
@@ -125,7 +125,7 @@ func test_free_volley_deferred_rejects_non_volleys() -> void:
 
 
 func test_distance_phased_wobble_stays_bounded() -> void:
-	var wd := H.make_directional_data(1, 300.0, 30.0)
+	var wd := H.make_volley_data(1, 300.0, 30.0)
 	var wob := BulletWobbleData2D.new()
 	wob.enabled = true
 	wob.mode = 0
@@ -134,7 +134,7 @@ func test_distance_phased_wobble_stays_bounded() -> void:
 	wob.distance_phased = true
 	wob.face_movement_direction = false
 	wd.shared_bullet_wobble_data = wob
-	var wv: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(wd, Vector2(0, 150))
+	var wv: BulletVolley2D = factory.spawn_volley(wd, Vector2(0, 150))
 	var start: float = wv.get_bullet_direction(0).angle()
 	var max_dev := 0.0
 	for i in 240:

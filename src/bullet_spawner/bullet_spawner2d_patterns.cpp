@@ -115,7 +115,7 @@ PackedVector2Array BulletSpawner2D::sample_path2d_polyline(bool quiet) const {
     // to raw points instead of NaN.
     Node2D *base = get_effective_generator();
     Node2D *path_2d = Object::cast_to<Node2D>(node);
-    if (base != nullptr && path_2d != nullptr && path_2d != base && is_inside_tree() && path_2d->is_inside_tree() && DirectionalBullets2D::is_transform_invertible_safe(base->get_global_transform())) {
+    if (base != nullptr && path_2d != nullptr && path_2d != base && is_inside_tree() && path_2d->is_inside_tree() && BulletVolley2D::is_transform_invertible_safe(base->get_global_transform())) {
         const Transform2D base_inv = base->get_global_transform().affine_inverse();
         const Transform2D node_global = path_2d->get_global_transform();
         if (base_inv.is_finite() && node_global.is_finite()) {
@@ -871,7 +871,7 @@ int BulletSpawner2D::classify_pattern_motion(Node2D *base, const Transform2D &ma
     if (pattern_cache_mode == PATTERN_CACHE_OFF || pattern_source_reads_external_state(pattern_source)) {
         return PATTERN_MOTION_NONE;
     }
-    if (raw.empty() || !marker.is_finite() || !DirectionalBullets2D::is_transform_invertible_safe(marker)) {
+    if (raw.empty() || !marker.is_finite() || !BulletVolley2D::is_transform_invertible_safe(marker)) {
         return PATTERN_MOTION_NONE;
     }
     // Probe 1: a rigid motion with an awkward angle + offset. A generator
@@ -979,7 +979,7 @@ bool BulletSpawner2D::preview_survives_marker_move(const Transform2D &old_marker
         return false;
     }
     if (bake.motion_class == PATTERN_MOTION_RIGID) {
-        if (!DirectionalBullets2D::is_transform_invertible_safe(old_marker)) {
+        if (!BulletVolley2D::is_transform_invertible_safe(old_marker)) {
             return false;
         }
         return basis_is_rigid(new_marker * old_marker.affine_inverse());

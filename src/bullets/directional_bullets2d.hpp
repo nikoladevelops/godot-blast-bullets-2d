@@ -8,7 +8,7 @@
 #include "../shared/bullet_rotation_data2d.hpp"
 #include "../shared/cached_string_names2d.hpp"
 #include "../shared/reentrancy_guard2d.hpp"
-#include "../spawn-data/directional_bullets_data2d.hpp"
+#include "../spawn-data/bullet_volley_data2d.hpp"
 #include "godot_cpp/classes/curve.hpp"
 #include "godot_cpp/classes/curve2d.hpp"
 #include "godot_cpp/classes/path2d.hpp"
@@ -34,7 +34,7 @@
 #include "shared/bullet_speed_data2d.hpp"
 #include "shared/collision_shape_helper2d.hpp"
 #include "shared/dynamic_sparse_set.hpp"
-#include "shared/multimesh_pool_key2d.hpp"
+#include "shared/volley_pool_key2d.hpp"
 #include <cstddef>
 #include <cstdint>
 #include <algorithm>
@@ -59,19 +59,19 @@
 #include "godot_cpp/classes/wrapped.hpp"
 #include "godot_cpp/variant/array.hpp"
 #include "godot_cpp/variant/utility_functions.hpp"
-#include "spawn-data/directional_bullets_data2d.hpp"
+#include "spawn-data/bullet_volley_data2d.hpp"
 
 namespace BlastBullets2D {
 using namespace godot;
 
-class MultiMeshObjectPool;
+class VolleyPool;
 
 // One volley: N bullets drawn by a single MultiMeshInstance2D, collided by
 // one physics area (one shared shape) and moved by one per-bullet loop
 // (move_bullets). Spawned and pooled by BulletFactory2D, steered through
 // the returned instance or by the BulletSpawner2D that fired it.
-class DirectionalBullets2D : public MultiMeshInstance2D {
-	GDCLASS(DirectionalBullets2D, MultiMeshInstance2D)
+class BulletVolley2D : public MultiMeshInstance2D {
+	GDCLASS(BulletVolley2D, MultiMeshInstance2D)
 public:
 	// Godot's memnew cannot forward constructor arguments, so instances are created
 	// with memnew and then initialized through spawn(). Always call spawn() after memnew.
@@ -84,11 +84,11 @@ public:
 
 	// Counts spawn/enable cycles. Deferred attachment disables carry the value they were
 	// queued with so pool reuse in between can't misfire them onto a new owner.
-	int multimesh_generation = 0;
+	int volley_generation = 0;
 
 	// Same idea for time-based functions: a deferred attach stamped with a stale
 	// generation is dropped, so a full-disable landing first can't leak it onward.
-	int multimesh_timers_generation = 0;
+	int timers_generation = 0;
 
 	// DEFERRED-WORK CONTRACT (mandatory for every call_deferred addition):
 	// pool reuse, frees, and re-homes can all land between queue and flush, so
@@ -112,7 +112,7 @@ public:
 	// True while the factory runs this volley's tick (move_bullets, its
 	// collision drain, animation, reduce_lifetime). User code fired from
 	// inside (collision handlers, attachment callbacks) may spawn: the pool
-	// skips a volley mid-tick, and enable_multimesh refuses it, so the
+	// skips a volley mid-tick, and enable_volley refuses it, so the
 	// drain can never be pulled out from under itself. Every OTHER pooled
 	// volley stays reusable mid-sweep (same-key spawns from handlers work).
 	bool is_being_ticked = false;
@@ -135,9 +135,9 @@ public:
 	// spawner_id stamps signal ownership BEFORE any physics/tree activation
 	// (configure-then-attach): a spawner passes its instance id so the volley
 	// is never observable as factory-owned. 0 = factory-owned (default).
-	void spawn(const DirectionalBulletsData2D &spawn_data, MultiMeshObjectPool *pool, BulletFactory2D *factory, Node *bullets_container, const Vector2 &new_inherited_velocity_offset, int new_sparse_set_id, bool spawn_in_pool, uint64_t spawner_id = 0);
+	void spawn(const BulletVolleyData2D &spawn_data, VolleyPool *pool, BulletFactory2D *factory, Node *bullets_container, const Vector2 &new_inherited_velocity_offset, int new_sparse_set_id, bool spawn_in_pool, uint64_t spawner_id = 0);
 
-	// Native transform source for the NEXT spawn()/enable_multimesh(): when
+	// Native transform source for the NEXT spawn()/enable_volley(): when
 	// set, the volley reads its bullet transforms from this span instead of
 	// unboxing data.transforms (a Variant per bullet). The factory sets it
 	// around the call; set_up_bullet_instances consumes and clears it.
@@ -146,22 +146,22 @@ public:
 	uint64_t warn_data_id = 0;
 	const Transform2D *spawn_transforms_ptr = nullptr;
 	int spawn_transforms_count = 0;
-	_ALWAYS_INLINE_ int spawn_transform_count(const DirectionalBulletsData2D &data) const {
+	_ALWAYS_INLINE_ int spawn_transform_count(const BulletVolleyData2D &data) const {
 		return spawn_transforms_ptr != nullptr ? spawn_transforms_count : (int)data.transforms.size();
 	}
 
 	// Activates the multimesh. Returns false (without leaving it factory-active)
 	// when the spawn data is incompatible, so the pool owner can re-push it.
 	// spawner_id works like spawn()'s: stamped before re-activation.
-	bool enable_multimesh(const DirectionalBulletsData2D &data, const Vector2 &new_inherited_velocity_offset, uint64_t spawner_id = 0);
-	// GDScript entry for enable_multimesh (Ref-based; native callers use the
+	bool enable_volley(const BulletVolleyData2D &data, const Vector2 &new_inherited_velocity_offset, uint64_t spawner_id = 0);
+	// GDScript entry for enable_volley (Ref-based; native callers use the
 	// reference overload directly). Returns false on null data without touching state.
-	bool enable_multimesh_for_script(const Ref<DirectionalBulletsData2D> &data, const Vector2 &new_inherited_velocity_offset = Vector2(0, 0), uint64_t spawner_id = 0) {
+	bool enable_volley_for_script(const Ref<BulletVolleyData2D> &data, const Vector2 &new_inherited_velocity_offset = Vector2(0, 0), uint64_t spawner_id = 0) {
 		if (data.is_null()) {
-			UtilityFunctions::push_error("enable_multimesh: spawn data is null.");
+			UtilityFunctions::push_error("enable_volley: spawn data is null.");
 			return false;
 		}
-		return enable_multimesh(*data.ptr(), new_inherited_velocity_offset, spawner_id);
+		return enable_volley(*data.ptr(), new_inherited_velocity_offset, spawner_id);
 	}
 
 	// Internal delete, C++ side only. Never call this from GDScript or from inside a
@@ -193,11 +193,11 @@ public:
 	mutable Transform2D node_inverse_scope;
 
 	struct NodeInverseScope {
-		const DirectionalBullets2D *owner;
+		const BulletVolley2D *owner;
 		bool saved_active;
 		bool saved_valid;
 		Transform2D saved_inverse;
-		explicit NodeInverseScope(const DirectionalBullets2D *p_owner) :
+		explicit NodeInverseScope(const BulletVolley2D *p_owner) :
 				owner(p_owner), saved_active(p_owner->node_inverse_scope_active), saved_valid(p_owner->node_inverse_scope_valid), saved_inverse(p_owner->node_inverse_scope) {
 			const Transform2D node_global = owner->get_global_transform();
 			owner->node_inverse_scope_valid = is_transform_invertible_safe(node_global);
@@ -463,7 +463,7 @@ public:
 					// NOTE: the signal lives on the multimesh itself (not the factory),
 					// so it must be emitted on `this`. Generation-guarded: a pool
 					// reuse before the flush must not emit for the new life.
-					call_deferred(CachedStringNames2D::get().m_do_emit_sprite_animation_finished, multimesh_generation);
+					call_deferred(CachedStringNames2D::get().m_do_emit_sprite_animation_finished, volley_generation);
 				}
 					return;
 				}
@@ -559,8 +559,8 @@ public:
 		}
 	}
 
-	bool get_is_multimesh_auto_pooling_enabled() const { return is_multimesh_auto_pooling_enabled; }
-	void set_is_multimesh_auto_pooling_enabled(bool value) { is_multimesh_auto_pooling_enabled = value; }
+	bool get_is_auto_pooling_enabled() const { return is_auto_pooling_enabled; }
+	void set_is_auto_pooling_enabled(bool value) { is_auto_pooling_enabled = value; }
 
 	bool get_is_attachments_auto_pooling_enabled() const { return is_attachments_auto_pooling_enabled; }
 	void set_is_attachments_auto_pooling_enabled(bool value) { is_attachments_auto_pooling_enabled = value; }
@@ -571,7 +571,7 @@ public:
 	// spawn/enable when you want manual ownership. Same-owner enable_bullet()
 	// wakes keep flags by design (no new life starts).
 	void reset_pooling_flags_to_default() {
-		is_multimesh_auto_pooling_enabled = true;
+		is_auto_pooling_enabled = true;
 		is_attachments_auto_pooling_enabled = true;
 	}
 
@@ -698,7 +698,7 @@ public:
 	// every spawn/enable, before the animation rebuild so whitening applies
 	// to the fresh frames). Starts transparent immediately when fade-in is
 	// on so no full-alpha frame flashes before the first tick.
-	void snapshot_appearance_from_data(const DirectionalBulletsData2D &data);
+	void snapshot_appearance_from_data(const BulletVolleyData2D &data);
 	// One fade step, driven by curves_elapsed_time (the volley age clock).
 	// No-op unless a fade is configured. Per-volley O(1): one CanvasItem
 	// write at most, only while the value actually changes.
@@ -746,7 +746,7 @@ public:
 
 	void _notification(int p_what);
 
-	bool is_multimesh_auto_pooling_enabled = true;
+	bool is_auto_pooling_enabled = true;
 
 	bool is_attachments_auto_pooling_enabled = true;
 
@@ -760,14 +760,14 @@ public:
 	DynamicSparseSet all_bullets_enabled_set;
 
 	BulletFactory2D *bullet_factory = nullptr;
-	// Optional spawner owner (ObjectID, 0 = none), mirroring owner_multimesh_id
+	// Optional spawner owner (ObjectID, 0 = none), mirroring owner_volley_id
 	// on attachments. When a live BulletSpawner2D is tagged, collision and
 	// lifetime signals are possessed by it; otherwise they stay on the factory.
 	// Plain integer: no ownership, nothing to clean up on free. Reset in
-	// spawn()/enable_multimesh() so pooled reuse never inherits a stale owner;
+	// spawn()/enable_volley() so pooled reuse never inherits a stale owner;
 	// stamped by BulletSpawner2D::shoot_once() after every spawn it performs.
 	uint64_t owner_spawner_id = 0;
-	MultiMeshObjectPool *bullets_pool = nullptr;
+	VolleyPool *bullets_pool = nullptr;
 	PhysicsServer2D *physics_server = nullptr;
 
 	// ONE server shape per volley, added to the area once per bullet (area
@@ -856,7 +856,7 @@ public:
 	}
 
 	// Slot guarded across the collision-signal emit on a killing blow: the
-	// final disable funnels into disable_multimesh(), whose sweep would pool
+	// final disable funnels into disable_volley(), whose sweep would pool
 	// every attachment BEFORE the signal fires (handler would see nullptr).
 	// Set to the dying slot before disable_bullet(); the sweep skips it, the
 	// post-signal cleanup disables it normally. -1 = no guard.
@@ -1456,7 +1456,7 @@ public:
 	// The max life time before the multimesh gets disabled
 	double max_life_time = 0.0;
 
-	// Whether the directional_life_time_over signal will be emitted when the life time of the bullets is over. Tracked by BulletFactory2D
+	// Whether the life_time_over signal will be emitted when the life time of the bullets is over. Tracked by BulletFactory2D
 	bool is_life_time_over_signal_enabled = false;
 
 	// The current life time being processed
@@ -1557,7 +1557,7 @@ public:
 	// Per-bullet disable epoch: bumped on every disable AND every wake, so a
 	// collision record queued before a mid-drain re-enable mismatches at
 	// emit time instead of double-firing for the same overlap. Sized to
-	// amount_bullets at spawn; the directional homing epochs stay separate
+	// amount_bullets at spawn; the homing epochs stay separate
 	// (they guard deferred homing work, this guards the collision drain).
 	std::vector<uint64_t> bullet_collision_epochs;
 
@@ -2192,7 +2192,7 @@ public:
 	// no-op for the slot it left behind.
 	static void clear_attachment_owner_fields(BulletAttachment2D *attachment) {
 		if (attachment != nullptr) {
-			attachment->owner_multimesh_id = 0;
+			attachment->owner_volley_id = 0;
 			attachment->owner_bullet_index = -1;
 		}
 	}
@@ -2451,7 +2451,7 @@ public:
 
 		// Track ownership so a manually freed ACTIVE attachment can drop this slot
 		// from its own PREDELETE instead of leaving a dangling pointer here.
-		attachment_instance->owner_multimesh_id = get_instance_id();
+		attachment_instance->owner_volley_id = get_instance_id();
 		attachment_instance->owner_bullet_index = bullet_index;
 
 		// Handle physics interpolation nicely if enabled
@@ -2488,10 +2488,10 @@ public:
 	}
 
 	// Applies the spawn data's shared attachment to every bullet. Called from
-	// spawn()/enable_multimesh() so both bullet types behave identically.
+	// spawn()/enable_volley() so both bullet types behave identically.
 	// Stops after the first failure so a bad scene prints one error instead of
 	// one per bullet.
-	_ALWAYS_INLINE_ void apply_shared_bullet_attachment_from_data(const DirectionalBulletsData2D &data) {
+	_ALWAYS_INLINE_ void apply_shared_bullet_attachment_from_data(const BulletVolleyData2D &data) {
 		if (data.shared_bullet_attachment.is_null()) {
 			return;
 		}
@@ -2625,7 +2625,7 @@ public:
 	}
 
 	// Drops user connections to sprite_animation_finished: pooled instances carry them
-	// across owners. Used by enable_multimesh AND the enable_bullet wake path (a wake
+	// across owners. Used by enable_volley AND the enable_bullet wake path (a wake
 	// re-activates a pooled instance outside the pool pop, so it needs the same cleanup).
 	void disconnect_sprite_animation_connections() {
 		for (const Dictionary &connection : get_signal_connection_list("sprite_animation_finished")) {
@@ -2643,8 +2643,8 @@ public:
 	// curves sample curves_elapsed_time/max_life_time, so rewinding one without
 	// the other would pin curves at their end sample after a wake. Manual
 	// full-disable + wake therefore resumes both clocks from zero remaining,
-	// matching enable_multimesh (expiry wakes top up only when expired).
-	_ALWAYS_INLINE_ void disable_multimesh() {
+	// matching enable_volley (expiry wakes top up only when expired).
+	_ALWAYS_INLINE_ void disable_volley() {
 		// Re-entrancy guard: the sweep below fires user script callbacks
 		// (attachment on_bullet_disable), and a handler calling factory.reset() /
 		// free_* there would force_delete this multimesh mid-sweep (use-after-free).
@@ -2655,14 +2655,14 @@ public:
 			bullet_factory->_set_internal_operation_busy(true);
 		}
 
-		_disable_multimesh_internal();
+		_disable_volley_internal();
 
 		if (bullet_factory != nullptr) {
 			bullet_factory->_set_internal_operation_busy(saved_factory_busy);
 		}
 	}
 
-	_ALWAYS_INLINE_ void _disable_multimesh_internal() {
+	_ALWAYS_INLINE_ void _disable_volley_internal() {
 		// Pre-sweep drain markers: every drain goes through disable_bullet()
 		// first, so no live bits should remain; clear anyway so a future direct
 		// call can't pool an instance whose sparse set claims live bullets at
@@ -2672,7 +2672,7 @@ public:
 		active_bullets_counter = 0;
 		is_active = false;
 		all_bullets_enabled_set.clear();
-		// Both clocks rewind together (see disable_multimesh): unit curves
+		// Both clocks rewind together (see disable_volley): unit curves
 		// sample elapsed/max, so a split rewind pins curves at 1.0 while
 		// lifetime still ticks.
 		curves_elapsed_time = 0.0;
@@ -2712,7 +2712,7 @@ public:
 		// defaults them for new lives, but this is a dying life — the owner's
 		// explicit "don't pool" must survive to the gate below, otherwise a
 		// pooling-off volley would resurrect pooling mid-sweep and pool itself.
-		const bool saved_auto_pool = is_multimesh_auto_pooling_enabled;
+		const bool saved_auto_pool = is_auto_pooling_enabled;
 		const bool saved_auto_pool_attachments = is_attachments_auto_pooling_enabled;
 		// A collision killing blow on the LAST live bullet funnels here with
 		// its slot guarded (signal_protected_attachment_slot): the sweep above
@@ -2722,14 +2722,14 @@ public:
 		// re-entrant pool pop sweeps it via the new life's reset).
 		const bool keep_slots_for_signal = hold_for_lifetime_flush || signal_protected_attachment_slot >= 0;
 		reset_transient_volley_state(0, false, keep_slots_for_signal);
-		is_multimesh_auto_pooling_enabled = saved_auto_pool;
+		is_auto_pooling_enabled = saved_auto_pool;
 		is_attachments_auto_pooling_enabled = saved_auto_pool_attachments;
 
 		on_volley_deactivated();
 
 		deactivate_volley();
 
-		if (!is_multimesh_auto_pooling_enabled) {
+		if (!is_auto_pooling_enabled) {
 			return;
 		}
 
@@ -2752,7 +2752,7 @@ public:
 	// Clearly-named alias: wake_bullet() revives ONE pooled or
 	// manually-disabled slot with its current appearance/ballistics intact
 	// (same-owner re-enable). Cross-owner reuse must go through
-	// spawn_*()/enable_multimesh() which reseed appearance, custom data,
+	// spawn_*()/enable_volley() which reseed appearance, custom data,
 	// speeds and patterns. Calling wake on a foreign pooled volley warns (see
 	// enable_bullet) instead of silently driving stale state.
 	void wake_bullet(int bullet_index, int collision_amount = 0, bool should_enable_attachment = true) {
@@ -2761,12 +2761,12 @@ public:
 
 	// Stability introspection for tests and support (bound below).
 	// Keys: amount_bullets, active_bullets, generation, owner_spawner_id,
-	// is_active, is_pooled, pool_amount, pool_shape, auto_pool_multimesh,
+	// is_active, is_pooled, pool_amount, pool_shape, auto_pool_volley,
 	// auto_pool_attachments, self_modulate.
 	Dictionary debug_get_volley_info() const;
 	// Attached timer count (0 = no per-tick timer cost). For tests asserting
 	// the 64-timer cap and detach-during-fire behavior.
-	int debug_get_timer_count() const { return (int)multimesh_custom_timers.size(); }
+	int debug_get_timer_count() const { return (int)custom_timers.size(); }
 	// Collision shape state: {valid, type, circle_radius, rect_size,
 	// capsule_radius, capsule_height, rid_count}. For tests asserting
 	// set_collision_shape_runtime same-type vs type-change paths.
@@ -2784,7 +2784,7 @@ public:
 	// Disables a single bullet: removes it from the live set, hides the visual,
 	// disables its physics shape, and (unless told otherwise) returns its
 	// attachment to the attachment pool. When the last bullet goes out, the
-	// whole instance is pooled via disable_multimesh() below.
+	// whole instance is pooled via disable_volley() below.
 	// A wake does NOT restore the attachment: re-attach explicitly (or via
 	// the shared spawn-data attachment on the next enable). Kept simple on
 	// purpose — silently re-popping a pooled slot here could hand a foreign
@@ -3151,7 +3151,7 @@ public:
 			return true;
 		}
 		if (arr_size != amount_bullets) {
-			WarnOnce2D::warn(warn_data_id, 1u, arr_size, amount_bullets, "DirectionalBullets2D: bullets_current_collision_count size (" + String::num_int64(arr_size) + ") != bullets (" + String::num_int64(amount_bullets) + "); uncovered bullets start at 0" + String(tile_short_arrays ? " (tiling on: wrapping short array)." : " (check tile_bullets_current_collision_count to wrap, or provide one entry per bullet)."));
+			WarnOnce2D::warn(warn_data_id, 1u, arr_size, amount_bullets, "BulletVolley2D: bullets_current_collision_count size (" + String::num_int64(arr_size) + ") != bullets (" + String::num_int64(amount_bullets) + "); uncovered bullets start at 0" + String(tile_short_arrays ? " (tiling on: wrapping short array)." : " (check tile_bullets_current_collision_count to wrap, or provide one entry per bullet)."));
 		}
 
 		bullets_current_collision_count.clear();
@@ -3218,7 +3218,7 @@ protected:
 
 	// Guarantees no attachment slot survives into a new owner: force-disables any
 	// live slot and blanks all five attachment arrays plus the interpolation cache.
-	// Used by spawn() and enable_multimesh() so pooled reuse can't inherit stale
+	// Used by spawn() and enable_volley() so pooled reuse can't inherit stale
 	// pointers when a deferred disable was dropped by a generation bump.
 	void reset_attachment_state_for_reuse();
 
@@ -3265,7 +3265,7 @@ protected:
 
 	void set_up_multimesh(int new_instance_count, const Ref<Mesh> &new_mesh, Vector2 new_texture_size);
 
-	void set_up_bullet_instances(const DirectionalBulletsData2D &data);
+	void set_up_bullet_instances(const BulletVolleyData2D &data);
 
 	void set_up_life_time_timer(double new_max_life_time, double new_current_life_time);
 
@@ -3298,7 +3298,7 @@ protected:
 	///
 
 public:
-	/// COLLISION-SHAPE DEBUGGER ACCESSORS (read by MultiMeshBulletsDebugger2D once per volley per tick)
+	/// COLLISION-SHAPE DEBUGGER ACCESSORS (read by BulletVolleyDebugger2D once per volley per tick)
 
 	PhysicsServer2D::ShapeType get_collision_shape_type_for_debugging() const {
 		return cached_effective_shape_type;
@@ -3339,7 +3339,7 @@ public:
 		double _current_time;
 		double _initial_time;
 		bool _repeating;
-		bool _execute_only_if_multimesh_is_active;
+		bool _execute_only_if_volley_is_active;
 		// Unique per attach, never reused within a life. The deferred execute
 		// carries it so a detach landing between the queue and the flush
 		// cancels that exact request. The volley-wide timers generation
@@ -3348,8 +3348,8 @@ public:
 		// already-queued callback live and it still fired.
 		uint64_t _id = 0;
 
-		CustomTimer(const godot::Callable &callback, double initial_time, bool repeating, bool execute_only_if_multimesh_is_active, uint64_t id) :
-				_callback(callback), _current_time(initial_time), _initial_time(initial_time), _repeating(repeating), _execute_only_if_multimesh_is_active(execute_only_if_multimesh_is_active), _id(id) {};
+		CustomTimer(const godot::Callable &callback, double initial_time, bool repeating, bool execute_only_if_volley_is_active, uint64_t id) :
+				_callback(callback), _current_time(initial_time), _initial_time(initial_time), _repeating(repeating), _execute_only_if_volley_is_active(execute_only_if_volley_is_active), _id(id) {};
 	};
 
 	// Monotonic, never reset: a stale id must not match a later attach.
@@ -3360,7 +3360,7 @@ public:
 		if (timer_id == 0) {
 			return false;
 		}
-		for (const CustomTimer &timer : multimesh_custom_timers) {
+		for (const CustomTimer &timer : custom_timers) {
 			if (timer._id == timer_id) {
 				return true;
 			}
@@ -3416,28 +3416,28 @@ public:
 
 	void clear_pending_custom_timer_fires() { pending_custom_timer_fires.clear(); }
 
-	void execute_stored_callable_safely(const Callable &_callback, bool execute_only_if_multimesh_is_active, uint64_t timer_id) {
+	void execute_stored_callable_safely(const Callable &_callback, bool execute_only_if_volley_is_active, uint64_t timer_id) {
 		// Stamp the timers generation: between this deferred queue and its execution the
 		// multimesh can be disabled, pooled and re-enabled for a NEW owner - the stale
-		// owner's callback must not fire then (execute_only_if_multimesh_is_active alone
+		// owner's callback must not fire then (execute_only_if_volley_is_active alone
 		// can't catch it, since the new owner is active too). The per-timer id
 		// additionally catches a single detach, which does NOT bump the
 		// generation.
-		call_deferred(CachedStringNames2D::get().m_do_execute_stored_callable_safely, _callback, execute_only_if_multimesh_is_active, multimesh_timers_generation, timer_id);
+		call_deferred(CachedStringNames2D::get().m_do_execute_stored_callable_safely, _callback, execute_only_if_volley_is_active, timers_generation, timer_id);
 	}
 
-	void _do_execute_stored_callable_safely(const Callable &_callback, bool execute_only_if_multimesh_is_active, int expected_timers_generation, uint64_t expected_timer_id) {
+	void _do_execute_stored_callable_safely(const Callable &_callback, bool execute_only_if_volley_is_active, int expected_timers_generation, uint64_t expected_timer_id) {
 		// Retire the id on every exit path: whether we run, bail on generation,
 		// bail on detach, or bail on a dead callable, this request is consumed
 		// and must not stay valid for a later flush.
-		if (expected_timers_generation != multimesh_timers_generation) {
+		if (expected_timers_generation != timers_generation) {
 			retire_pending_custom_timer_fire(expected_timer_id);
 			return;
 		}
 		// The timer this request came from must still be valid. Without this,
 		// detaching a callable between the queue and this flush left the
 		// callback live: the generation is only bumped by a full detach/wake,
-		// so a targeted multimesh_detach_time_based_function() could not stop
+		// so a targeted detach_time_based_function() could not stop
 		// an already-scheduled fire.
 		if (!custom_timer_request_still_valid(expected_timer_id)) {
 			return;
@@ -3445,7 +3445,7 @@ public:
 		retire_pending_custom_timer_fire(expected_timer_id);
 
 		// If the user wants to execute the callable only if the multimesh is active, check for that
-		if (execute_only_if_multimesh_is_active && !is_active) {
+		if (execute_only_if_volley_is_active && !is_active) {
 			return;
 		}
 
@@ -3458,74 +3458,74 @@ public:
 		_callback.call();
 	}
 
-	_ALWAYS_INLINE_ void multimesh_attach_time_based_function(double time, const Callable &callable, bool repeat = false, bool execute_only_if_multimesh_is_active = true) {
+	_ALWAYS_INLINE_ void attach_time_based_function(double time, const Callable &callable, bool repeat = false, bool execute_only_if_volley_is_active = true) {
 		// Stamp the timers generation so a full-disable (which detaches directly)
 		// landing before this deferred call can't leak the timer into the next owner.
 		// Outside physics processing the timer applies immediately (no frame of
 		// delay); inside a physics frame it defers, since
-		// run_multimesh_custom_timers() may be iterating the vector.
+		// run_custom_timers() may be iterating the vector.
 		if (Engine::get_singleton()->is_in_physics_frame()) {
-			call_deferred(CachedStringNames2D::get().m_do_attach_time_based_function, time, callable, repeat, execute_only_if_multimesh_is_active, multimesh_timers_generation);
+			call_deferred(CachedStringNames2D::get().m_do_attach_time_based_function, time, callable, repeat, execute_only_if_volley_is_active, timers_generation);
 			return;
 		}
-		_do_attach_time_based_function(time, callable, repeat, execute_only_if_multimesh_is_active, multimesh_timers_generation);
+		_do_attach_time_based_function(time, callable, repeat, execute_only_if_volley_is_active, timers_generation);
 	}
 
-	// Deferred implementation of multimesh_attach_time_based_function above.
+	// Deferred implementation of attach_time_based_function above.
 	// Advanced: calling directly runs synchronously, which is only safe
 	// outside physics processing (the timer vector may be iterated then).
-	_ALWAYS_INLINE_ void _do_attach_time_based_function(double time, const Callable &callable, bool repeat, bool execute_only_if_multimesh_is_active, int expected_timers_generation) {
-		if (expected_timers_generation != multimesh_timers_generation) {
+	_ALWAYS_INLINE_ void _do_attach_time_based_function(double time, const Callable &callable, bool repeat, bool execute_only_if_volley_is_active, int expected_timers_generation) {
+		if (expected_timers_generation != timers_generation) {
 			return;
 		}
 		// Direct script calls to this _do_* impl bypass the phase check in the
-		// public wrapper. run_multimesh_custom_timers() may be iterating the
+		// public wrapper. run_custom_timers() may be iterating the
 		// vector right now (factory holds the iterating flag during the timer
 		// sweep).
 		if (bullet_factory != nullptr && bullet_factory->is_bullets_iterating()) {
-			UtilityFunctions::push_error("Cannot modify attached timers while bullets are being processed (e.g. inside a timer callback or collision handler). Use multimesh_attach_time_based_function() instead of the _do_* implementation.");
+			UtilityFunctions::push_error("Cannot modify attached timers while bullets are being processed (e.g. inside a timer callback or collision handler). Use attach_time_based_function() instead of the _do_* implementation.");
 			return;
 		}
 		if (time <= 0.0) {
-			UtilityFunctions::push_error("When calling multimesh_attach_time_based_function(), you need to provide a time value that is above 0");
+			UtilityFunctions::push_error("When calling attach_time_based_function(), you need to provide a time value that is above 0");
 			return;
 		}
 
 		if (!callable.is_valid()) {
-			UtilityFunctions::push_error("Invalid callable was passed to multimesh_attach_time_based_function()");
+			UtilityFunctions::push_error("Invalid callable was passed to attach_time_based_function()");
 			return;
 		}
 
 		// Uncapped user attaches would grow memory and per-tick iteration cost
 		// without bound (an attach-per-tick script degrades every future tick).
-		if (multimesh_custom_timers.size() >= 64) {
-			UtilityFunctions::push_error("multimesh_attach_time_based_function: timer limit (64 per multimesh) reached, detach some first.");
+		if (custom_timers.size() >= 64) {
+			UtilityFunctions::push_error("attach_time_based_function: timer limit (64 per multimesh) reached, detach some first.");
 			return;
 		}
 
-		multimesh_custom_timers.emplace_back(callable, time, repeat, execute_only_if_multimesh_is_active, next_custom_timer_id());
+		custom_timers.emplace_back(callable, time, repeat, execute_only_if_volley_is_active, next_custom_timer_id());
 	}
 
-	_ALWAYS_INLINE_ void multimesh_detach_time_based_function(const Callable &callable) {
+	_ALWAYS_INLINE_ void detach_time_based_function(const Callable &callable) {
 		// Stamp the generation so a full-disable landing before this deferred
 		// call can't erase the next owner's timers. Immediate outside physics
 		// processing, deferred within it (same rationale as attach above).
 		if (Engine::get_singleton()->is_in_physics_frame()) {
-			call_deferred(CachedStringNames2D::get().m_do_detach_time_based_function, callable, multimesh_timers_generation);
+			call_deferred(CachedStringNames2D::get().m_do_detach_time_based_function, callable, timers_generation);
 			return;
 		}
-		_do_detach_time_based_function(callable, multimesh_timers_generation);
+		_do_detach_time_based_function(callable, timers_generation);
 	}
 
-	// Deferred implementation of multimesh_detach_time_based_function above.
+	// Deferred implementation of detach_time_based_function above.
 	// Advanced: calling directly runs synchronously, which is only safe
 	// outside physics processing (the timer vector may be iterated then).
 	_ALWAYS_INLINE_ void _do_detach_time_based_function(const Callable &callable, int expected_timers_generation) {
-		if (expected_timers_generation != multimesh_timers_generation) {
+		if (expected_timers_generation != timers_generation) {
 			return;
 		}
 		if (bullet_factory != nullptr && bullet_factory->is_bullets_iterating()) {
-			UtilityFunctions::push_error("Cannot modify attached timers while bullets are being processed (e.g. inside a timer callback or collision handler). Use multimesh_detach_time_based_function() instead of the _do_* implementation.");
+			UtilityFunctions::push_error("Cannot modify attached timers while bullets are being processed (e.g. inside a timer callback or collision handler). Use detach_time_based_function() instead of the _do_* implementation.");
 			return;
 		}
 		// Cancel queued fires for this callable FIRST and unconditionally. A
@@ -3535,45 +3535,45 @@ public:
 		// callable would still run once. That is the bug the per-timer id
 		// exists to prevent.
 		cancel_pending_custom_timer_fires_for(callable);
-		for (auto it = multimesh_custom_timers.begin(); it != multimesh_custom_timers.end();) {
+		for (auto it = custom_timers.begin(); it != custom_timers.end();) {
 			if (it->_callback == callable) {
-				it = multimesh_custom_timers.erase(it); // Order-preserving
+				it = custom_timers.erase(it); // Order-preserving
 			} else {
 				++it;
 			}
 		}
 	}
 
-	_ALWAYS_INLINE_ void multimesh_detach_all_time_based_functions() {
+	_ALWAYS_INLINE_ void detach_all_time_based_functions() {
 		// Immediate outside physics processing, deferred within it (same
 		// rationale as attach above).
 		if (Engine::get_singleton()->is_in_physics_frame()) {
-			call_deferred(CachedStringNames2D::get().m_do_detach_all_time_based_functions, multimesh_timers_generation);
+			call_deferred(CachedStringNames2D::get().m_do_detach_all_time_based_functions, timers_generation);
 			return;
 		}
-		_do_detach_all_time_based_functions(multimesh_timers_generation);
+		_do_detach_all_time_based_functions(timers_generation);
 	}
 
-	// Deferred implementation of multimesh_detach_all_time_based_functions above.
+	// Deferred implementation of detach_all_time_based_functions above.
 	// Advanced: calling directly runs synchronously, which is only safe
 	// outside physics processing (the timer vector may be iterated then).
 	// NOTE: no is_bullets_iterating() guard here on purpose: the internal
-	// disable path (_disable_multimesh_internal) must clear timers even when
+	// disable path (_disable_volley_internal) must clear timers even when
 	// it runs inside the physics sweep. Direct script calls during iteration
 	// are still unsafe - use the public wrapper instead.
 	_ALWAYS_INLINE_ void _do_detach_all_time_based_functions(int expected_timers_generation) {
-		if (expected_timers_generation != multimesh_timers_generation) {
+		if (expected_timers_generation != timers_generation) {
 			return;
 		}
-		++multimesh_timers_generation;
-		multimesh_custom_timers.clear();
+		++timers_generation;
+		custom_timers.clear();
 	}
 
-	_ALWAYS_INLINE_ void run_multimesh_custom_timers(double delta) {
+	_ALWAYS_INLINE_ void run_custom_timers(double delta) {
 		if (!Math::is_finite(delta) || delta < 0.0) {
 			return;
 		}
-		for (auto it = multimesh_custom_timers.begin(); it != multimesh_custom_timers.end();) {
+		for (auto it = custom_timers.begin(); it != custom_timers.end();) {
 			it->_current_time -= delta;
 			if (it->_current_time <= 0.0) {
 				// Record BEFORE the (deferred) call: a one-shot is erased from
@@ -3583,7 +3583,7 @@ public:
 				pending.id = it->_id;
 				pending.callback = it->_callback;
 				pending_custom_timer_fires.push_back(pending);
-				execute_stored_callable_safely(it->_callback, it->_execute_only_if_multimesh_is_active, it->_id);
+				execute_stored_callable_safely(it->_callback, it->_execute_only_if_volley_is_active, it->_id);
 
 				if (it->_repeating) {
 					// Carry the overshoot so the average period stays exact
@@ -3597,7 +3597,7 @@ public:
 					}
 					++it;
 				} else {
-					it = multimesh_custom_timers.erase(it);
+					it = custom_timers.erase(it);
 				}
 			} else {
 				++it;
@@ -3606,7 +3606,7 @@ public:
 	}
 
 	// Stores a bunch of timers for the multimesh that should execute
-	std::vector<CustomTimer> multimesh_custom_timers;
+	std::vector<CustomTimer> custom_timers;
 	// Source of the per-timer ids above. Deliberately never reset: reusing an
 	// id would let a stale deferred request match a brand new timer.
 	uint64_t custom_timer_id_counter = 0;
@@ -3619,7 +3619,7 @@ public:
 	// mouse-target counter stays exact: force_delete() memdeletes without
 	// running disable logic, and a leaked counter would query the mouse every
 	// homing tick forever. Pop paths never touch the tree, so this is safe.
-	~DirectionalBullets2D();
+	~BulletVolley2D();
 
 	enum OrbitingDirection {
 		DontMove = 0,
@@ -3880,7 +3880,7 @@ protected:
 	real_t homing_duration_sec = 0.0;
 	real_t homing_lose_range_px = 0.0;
 
-	// BOUNCE / RICOCHET (seeded from DirectionalBulletsData2D; editable live
+	// BOUNCE / RICOCHET (seeded from BulletVolleyData2D; editable live
 	// below). bounce_mask == 0 disables the whole feature (zero tick cost:
 	// only the collision drain checks it). On a bounce-eligible hit the
 	// bullet reflects across the surface normal and keeps flying; the hit
@@ -3892,7 +3892,7 @@ protected:
 	bool bounce_charge_amplify = true;
 	bool bounce_hit_consumed = false;
 	int bounce_max_count = 0;
-	int bounce_mode = 0; // DirectionalBulletsData2D::BounceMode
+	int bounce_mode = 0; // BulletVolleyData2D::BounceMode
 	bool bounce_rotate_texture = true;
 	real_t bounce_rotation_smooth = 0.0;
 	real_t bounce_randomness_deg = 0.0;
@@ -4225,7 +4225,7 @@ public:
 			// only half the story now).
 			any_pattern = any_pattern || shared_movement_pattern_curve.is_valid();
 			if (!any_pattern) {
-				UtilityFunctions::push_warning("DirectionalBullets2D has homing targets but homing_take_control_of_texture_rotation is false (and no movement pattern/rotation data), so homing will not steer bullets. Set it to true.");
+				UtilityFunctions::push_warning("BulletVolley2D has homing targets but homing_take_control_of_texture_rotation is false (and no movement pattern/rotation data), so homing will not steer bullets. Set it to true.");
 				homing_inert_warning_issued = true;
 			}
 		}
@@ -7022,7 +7022,7 @@ public:
 	int get_bounce_mask() const { return bounce_mask; }
 	void set_bounce_mask(int value) {
 		if (value < 0) {
-			UtilityFunctions::push_error("DirectionalBullets2D.set_bounce_mask: value must be >= 0 (0 = bouncing disabled), keeping the old value.");
+			UtilityFunctions::push_error("BulletVolley2D.set_bounce_mask: value must be >= 0 (0 = bouncing disabled), keeping the old value.");
 			return;
 		}
 		bounce_mask = value;
@@ -7030,7 +7030,7 @@ public:
 		ensure_bounce_vectors();
 	}
 	void set_bounce_mask_from_array(const TypedArray<int> &numbers) {
-		bounce_mask = DirectionalBulletsData2D::calculate_bitmask(numbers);
+		bounce_mask = BulletVolleyData2D::calculate_bitmask(numbers);
 		bounce_mask_warning_issued = false;
 		ensure_bounce_vectors();
 	}
@@ -7041,7 +7041,7 @@ public:
 	real_t get_bounce_strength() const { return bounce_strength; }
 	void set_bounce_strength(real_t value) {
 		if (!Math::is_finite(value) || value < 0.0) {
-			UtilityFunctions::push_error("DirectionalBullets2D.set_bounce_strength: value must be finite and >= 0 (1 = elastic), keeping the old value.");
+			UtilityFunctions::push_error("BulletVolley2D.set_bounce_strength: value must be finite and >= 0 (1 = elastic), keeping the old value.");
 			return;
 		}
 		bounce_strength = value;
@@ -7055,7 +7055,7 @@ public:
 	int get_bounce_max_count() const { return bounce_max_count; }
 	void set_bounce_max_count(int value) {
 		if (value < 0) {
-			UtilityFunctions::push_error("DirectionalBullets2D.set_bounce_max_count: value must be >= 0 (0 = unlimited), keeping the old value.");
+			UtilityFunctions::push_error("BulletVolley2D.set_bounce_max_count: value must be >= 0 (0 = unlimited), keeping the old value.");
 			return;
 		}
 		bounce_max_count = value;
@@ -7063,7 +7063,7 @@ public:
 	int get_bounce_mode() const { return bounce_mode; }
 	void set_bounce_mode(int value) {
 		if (value != 0 && value != 1) {
-			UtilityFunctions::push_error("DirectionalBullets2D.set_bounce_mode: value must be 0 (radial) or 1 (precise shape), keeping the old value.");
+			UtilityFunctions::push_error("BulletVolley2D.set_bounce_mode: value must be 0 (radial) or 1 (precise shape), keeping the old value.");
 			return;
 		}
 		bounce_mode = value;
@@ -7073,7 +7073,7 @@ public:
 	real_t get_bounce_rotation_smooth() const { return bounce_rotation_smooth; }
 	void set_bounce_rotation_smooth(real_t value) {
 		if (!Math::is_finite(value) || value < 0.0) {
-			UtilityFunctions::push_error("DirectionalBullets2D.set_bounce_rotation_smooth: value must be finite and >= 0 (0 = instant snap), keeping the old value.");
+			UtilityFunctions::push_error("BulletVolley2D.set_bounce_rotation_smooth: value must be finite and >= 0 (0 = instant snap), keeping the old value.");
 			return;
 		}
 		bounce_rotation_smooth = value;
@@ -7081,7 +7081,7 @@ public:
 	real_t get_bounce_randomness_deg() const { return bounce_randomness_deg; }
 	void set_bounce_randomness_deg(real_t value) {
 		if (!Math::is_finite(value) || value < 0.0 || value > 180.0) {
-			UtilityFunctions::push_error("DirectionalBullets2D.set_bounce_randomness_deg: value must be finite in [0, 180], keeping the old value.");
+			UtilityFunctions::push_error("BulletVolley2D.set_bounce_randomness_deg: value must be finite in [0, 180], keeping the old value.");
 			return;
 		}
 		bounce_randomness_deg = value;
@@ -7089,7 +7089,7 @@ public:
 	real_t get_bounce_cooldown_sec() const { return bounce_cooldown_sec; }
 	void set_bounce_cooldown_sec(real_t value) {
 		if (!Math::is_finite(value) || value < 0.0 || value > 1.0) {
-			UtilityFunctions::push_error("DirectionalBullets2D.set_bounce_cooldown_sec: value must be finite in [0, 1], keeping the old value.");
+			UtilityFunctions::push_error("BulletVolley2D.set_bounce_cooldown_sec: value must be finite in [0, 1], keeping the old value.");
 			return;
 		}
 		bounce_cooldown_sec = value;
@@ -7097,7 +7097,7 @@ public:
 	real_t get_bounce_debounce_sec() const { return bounce_debounce_sec; }
 	void set_bounce_debounce_sec(real_t value) {
 		if (!Math::is_finite(value) || value < 0.0) {
-			UtilityFunctions::push_error("DirectionalBullets2D.set_bounce_debounce_sec: value must be finite and >= 0 (0 = off), keeping the old value.");
+			UtilityFunctions::push_error("BulletVolley2D.set_bounce_debounce_sec: value must be finite and >= 0 (0 = off), keeping the old value.");
 			return;
 		}
 		bounce_debounce_sec = value;
@@ -7185,20 +7185,20 @@ public:
 	}
 	// Seeds bounce config + zeroes the per-bullet ledger from spawn data.
 	// Called from the custom spawn/enable logic alongside wobble/gravity.
-	void apply_bounce_from_data(const DirectionalBulletsData2D &directional_data, int data_collision_mask) {
-		bounce_mask = directional_data.bounce_mask;
-		bounce_tilemap_layers = directional_data.bounce_tilemap_layers;
-		bounce_strength = (real_t)directional_data.bounce_strength;
-		bounce_push_assist = directional_data.bounce_push_assist;
-		bounce_charge_amplify = directional_data.bounce_charge_amplify;
-		bounce_hit_consumed = directional_data.bounce_hit_consumed;
-		bounce_max_count = directional_data.bounce_max_count;
-		bounce_mode = directional_data.bounce_mode;
-		bounce_rotate_texture = directional_data.bounce_rotate_texture;
-		bounce_rotation_smooth = (real_t)directional_data.bounce_rotation_smooth;
-		bounce_randomness_deg = (real_t)directional_data.bounce_randomness_deg;
-		bounce_cooldown_sec = (real_t)directional_data.bounce_cooldown_sec;
-		bounce_debounce_sec = (real_t)directional_data.bounce_debounce_sec;
+	void apply_bounce_from_data(const BulletVolleyData2D &volley_data, int data_collision_mask) {
+		bounce_mask = volley_data.bounce_mask;
+		bounce_tilemap_layers = volley_data.bounce_tilemap_layers;
+		bounce_strength = (real_t)volley_data.bounce_strength;
+		bounce_push_assist = volley_data.bounce_push_assist;
+		bounce_charge_amplify = volley_data.bounce_charge_amplify;
+		bounce_hit_consumed = volley_data.bounce_hit_consumed;
+		bounce_max_count = volley_data.bounce_max_count;
+		bounce_mode = volley_data.bounce_mode;
+		bounce_rotate_texture = volley_data.bounce_rotate_texture;
+		bounce_rotation_smooth = (real_t)volley_data.bounce_rotation_smooth;
+		bounce_randomness_deg = (real_t)volley_data.bounce_randomness_deg;
+		bounce_cooldown_sec = (real_t)volley_data.bounce_cooldown_sec;
+		bounce_debounce_sec = (real_t)volley_data.bounce_debounce_sec;
 		// Fresh life, fresh ledger. assign() both sizes and zeroes when
 		// armed; clear() drops the vectors when disarmed so plain volleys
 		// carry no bounce state at all.
@@ -7231,7 +7231,7 @@ public:
 		// detect because its collision_mask does not cover them. Warn once
 		// per life instead of bouncing nothing forever.
 		if (!bounce_mask_warning_issued && bounce_mask != 0 && (data_collision_mask & bounce_mask) != bounce_mask) {
-			UtilityFunctions::push_warning("DirectionalBullets2D: bounce_mask has bits outside collision_mask, those targets will never be detected (no bounce). Add the bounce layers to collision_mask.");
+			UtilityFunctions::push_warning("BulletVolley2D: bounce_mask has bits outside collision_mask, those targets will never be detected (no bounce). Add the bounce layers to collision_mask.");
 			bounce_mask_warning_issued = true;
 		}
 	}
@@ -7287,14 +7287,14 @@ public:
 	// pool reuse (false = refused, the caller rolls back), neutralize without
 	// reseeding (drop_stale_work = a new life: scrub connections and
 	// invalidate deferred work), and the tail of a full deactivation.
-	void seed_motion_features_on_spawn(const DirectionalBulletsData2D &data);
-	bool reseed_motion_features_on_enable(const DirectionalBulletsData2D &data);
+	void seed_motion_features_on_spawn(const BulletVolleyData2D &data);
+	bool reseed_motion_features_on_enable(const BulletVolleyData2D &data);
 	void reset_motion_feature_state(bool drop_stale_work);
 	void on_volley_deactivated();
 
 	// Resolves the spawn data's shared movement pattern Path2D and applies its
 	// Curve2D to every bullet through the existing helpers. Empty path = off.
-	void apply_shared_movement_pattern_from_data(const DirectionalBulletsData2D &directional_data);
+	void apply_shared_movement_pattern_from_data(const BulletVolleyData2D &volley_data);
 
 	// Strict per-bullet indexing (used by every shared-vs-per-bullet
 	// spawn-data array: speed, rotation, curves, wobble, gravity, movement
@@ -7342,10 +7342,10 @@ public:
 	// per-bullet helpers (null entries skipped). Called from the custom
 	// spawn/enable logic alongside the shared application; storage is
 	// separate so ordering between them is irrelevant.
-	void apply_per_bullet_curves_from_data(const DirectionalBulletsData2D &directional_data);
-	void apply_per_bullet_movement_patterns_from_data(const DirectionalBulletsData2D &directional_data);
-	void apply_wobble_from_data(const DirectionalBulletsData2D &directional_data);
-	void apply_gravity_from_data(const DirectionalBulletsData2D &directional_data);
+	void apply_per_bullet_curves_from_data(const BulletVolleyData2D &volley_data);
+	void apply_per_bullet_movement_patterns_from_data(const BulletVolleyData2D &volley_data);
+	void apply_wobble_from_data(const BulletVolleyData2D &volley_data);
+	void apply_gravity_from_data(const BulletVolleyData2D &volley_data);
 	// Shared-as-fallback gap fillers (unified precedence: per-bullet wins).
 	// Only slots holding invalid ballistics (non-finite speed triple or
 	// inactive rotation) are overwritten from shared; valid per-bullet
@@ -7558,7 +7558,7 @@ public:
 	Vector2 get_gravity() const { return gravity; }
 	void set_gravity(const Vector2 &value) {
 		if (!value.is_finite()) {
-			UtilityFunctions::push_error("DirectionalBullets2D.set_gravity: value must be finite, keeping the old value.");
+			UtilityFunctions::push_error("BulletVolley2D.set_gravity: value must be finite, keeping the old value.");
 			return;
 		}
 		gravity = value;
@@ -7602,7 +7602,7 @@ public:
 			return;
 		}
 		if (!value.is_finite()) {
-			UtilityFunctions::push_error("DirectionalBullets2D.bullet_set_gravity: value must be finite, keeping the old value.");
+			UtilityFunctions::push_error("BulletVolley2D.bullet_set_gravity: value must be finite, keeping the old value.");
 			return;
 		}
 		if (bullet_index < 0 || bullet_index >= (int)all_gravity.size() || bullet_index >= (int)all_gravity_velocity.size()) {
@@ -7621,7 +7621,7 @@ public:
 	void all_bullets_set_gravity(const Vector2 &value, int bullet_index_start = 0, int bullet_index_end_inclusive = -1) {
 		ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_set_gravity");
 		if (!value.is_finite()) {
-			UtilityFunctions::push_error("DirectionalBullets2D.all_bullets_set_gravity: value must be finite, keeping old values.");
+			UtilityFunctions::push_error("BulletVolley2D.all_bullets_set_gravity: value must be finite, keeping old values.");
 			return;
 		}
 		for (int i = bullet_index_start; i <= bullet_index_end_inclusive; ++i) {
@@ -7640,7 +7640,7 @@ public:
 	double get_gravity_delay_sec() const { return gravity_delay_sec; }
 	void set_gravity_delay_sec(double value) {
 		if (!Math::is_finite(value) || value < 0.0) {
-			UtilityFunctions::push_error("DirectionalBullets2D.set_gravity_delay_sec: value must be finite and >= 0, keeping the old value.");
+			UtilityFunctions::push_error("BulletVolley2D.set_gravity_delay_sec: value must be finite and >= 0, keeping the old value.");
 			return;
 		}
 		gravity_delay_sec = value;
@@ -7648,7 +7648,7 @@ public:
 	double get_gravity_duration_sec() const { return gravity_duration_sec; }
 	void set_gravity_duration_sec(double value) {
 		if (!Math::is_finite(value) || value < 0.0) {
-			UtilityFunctions::push_error("DirectionalBullets2D.set_gravity_duration_sec: value must be finite and >= 0 (0 = infinite), keeping the old value.");
+			UtilityFunctions::push_error("BulletVolley2D.set_gravity_duration_sec: value must be finite and >= 0 (0 = infinite), keeping the old value.");
 			return;
 		}
 		gravity_duration_sec = value;
@@ -7682,7 +7682,7 @@ public:
 	real_t get_linear_drag() const { return linear_drag; }
 	void set_linear_drag(real_t value) {
 		if (!Math::is_finite(value) || value < 0.0) {
-			UtilityFunctions::push_error("DirectionalBullets2D.set_linear_drag: value must be finite and >= 0, keeping the old value.");
+			UtilityFunctions::push_error("BulletVolley2D.set_linear_drag: value must be finite and >= 0, keeping the old value.");
 			return;
 		}
 		linear_drag = value;
@@ -7690,7 +7690,7 @@ public:
 	real_t get_homing_delay_sec() const { return homing_delay_sec; }
 	void set_homing_delay_sec(real_t value) {
 		if (!Math::is_finite(value) || value < 0.0) {
-			UtilityFunctions::push_error("DirectionalBullets2D.set_homing_delay_sec: value must be finite and >= 0, keeping the old value.");
+			UtilityFunctions::push_error("BulletVolley2D.set_homing_delay_sec: value must be finite and >= 0, keeping the old value.");
 			return;
 		}
 		homing_delay_sec = value;
@@ -7698,7 +7698,7 @@ public:
 	real_t get_homing_duration_sec() const { return homing_duration_sec; }
 	void set_homing_duration_sec(real_t value) {
 		if (!Math::is_finite(value) || value < 0.0) {
-			UtilityFunctions::push_error("DirectionalBullets2D.set_homing_duration_sec: value must be finite and >= 0 (0 = infinite), keeping the old value.");
+			UtilityFunctions::push_error("BulletVolley2D.set_homing_duration_sec: value must be finite and >= 0 (0 = infinite), keeping the old value.");
 			return;
 		}
 		homing_duration_sec = value;
@@ -7706,7 +7706,7 @@ public:
 	real_t get_homing_lose_range_px() const { return homing_lose_range_px; }
 	void set_homing_lose_range_px(real_t value) {
 		if (!Math::is_finite(value) || value < 0.0) {
-			UtilityFunctions::push_error("DirectionalBullets2D.set_homing_lose_range_px: value must be finite and >= 0 (0 = unlimited), keeping the old value.");
+			UtilityFunctions::push_error("BulletVolley2D.set_homing_lose_range_px: value must be finite and >= 0 (0 = unlimited), keeping the old value.");
 			return;
 		}
 		homing_lose_range_px = value;
@@ -7809,7 +7809,7 @@ public:
 		shared_auto_pop_queued = false;
 		// Shared movement/speed/rotation are per-owner runtime state like the
 		// homing deques: a pooled instance must not steer the next owner along
-		// the previous owner's pattern or speed. enable_multimesh() re-seeds
+		// the previous owner's pattern or speed. enable_volley() re-seeds
 		// these from spawn data; an enable_bullet() wake has no data, so blank
 		// them here to make the pool neutral on every reuse path.
 		shared_movement_pattern_curve.unref();
@@ -8295,7 +8295,7 @@ public:
 } // namespace BlastBullets2D
 
 VARIANT_ENUM_CAST(BlastBullets2D::HomingType);
-VARIANT_ENUM_CAST(BlastBullets2D::DirectionalBullets2D::OrbitingDirection);
-VARIANT_ENUM_CAST(BlastBullets2D::DirectionalBullets2D::OrbitingTextureRotation);
-VARIANT_ENUM_CAST(BlastBullets2D::DirectionalBullets2D::OrbitingFollowMode);
-VARIANT_ENUM_CAST(BlastBullets2D::DirectionalBullets2D::OrbitingLockPolicy);
+VARIANT_ENUM_CAST(BlastBullets2D::BulletVolley2D::OrbitingDirection);
+VARIANT_ENUM_CAST(BlastBullets2D::BulletVolley2D::OrbitingTextureRotation);
+VARIANT_ENUM_CAST(BlastBullets2D::BulletVolley2D::OrbitingFollowMode);
+VARIANT_ENUM_CAST(BlastBullets2D::BulletVolley2D::OrbitingLockPolicy);

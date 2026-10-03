@@ -53,7 +53,7 @@ asserts a dangling-free factory plus zero new orphans after every test.
 - `spawner/test_spawner_property_visibility.gd` — inspector-visibility coverage: no `helper_*` property is invisible in all 33 pattern modes (the safety net for the untyped `begins_with` chain), aimed-target sharing between AIMED and CORRIDOR, homing knobs gated on `homing_enabled`; inspector layout lock (Setup group, Transform subgroup, one prefixed subgroup per shape with no stray members, Outline Layers last, related knobs adjacent); spin/burst/telegraph knobs follow their switch + mode, and every gating switch emits `property_list_changed`.
 - `factory/test_factory_lifecycle.gd` — init recovery, spawn validation, deferred wrappers, flag reset, wake alias, NaN atomicity, teardown.
 - `factory/test_factory_pooling.gd` — duplicate cache, retarget stagger, debugger budget, preview rings, pool hit/miss.
-- `volley/test_directional_core.gd` — speed/direction/transform/velocity/rotation get/set + rejects.
+- `volley/test_volley_core.gd` — speed/direction/transform/velocity/rotation get/set + rejects.
 - `volley/test_volley_lifetime.gd` — finite/infinite/invalid lifetimes, live infinite toggle + max<=0 guard refusal, expiry pooling, collision-count reads, deferred signal, collision-max interplay.
 - `volley/test_volley_collision.gd` — REAL physics vs StaticBody2D + Area2D wall: slim payloads, max counts, epoch guard.
 - `volley/test_volley_bounce.gd` — REAL physics ricochet: defaults-off, free/consumed bounces, uncapped strength scaling with max_speed clamp, wall ping-pong with max_count, mask precedence, spawner ownership, radial vs precise normals (incl. capsule branch), smooth visual pursuit with render-continuity proof, teleport-into-wall, attachment nudge tracking, cooldown-vs-consumed semantics, cooldown expiry, retarget preservation, bulk counts, inspector group coherence, runtime toggles, gravity flag refresh, homing/wobble/gravity mixes, rejects, pool-reuse neutrality.
@@ -78,7 +78,7 @@ asserts a dangling-free factory plus zero new orphans after every test.
 - `spawner/test_spawner_homing_orbit.gd` — 6 target sources, cache, fire-arc gate, retarget, fuse, stagger.
 - `spawner/test_spawner_signals_sequencing.gd` — handler contracts, burst/telegraph/pattern-list, cap, adopt/clear/override.
 - `integration/test_interpolation_integration.gd` — interpolation agreement/toggle, pause, churn, two factories.
-- `common/blast_test_helpers.gd` — shared `DirectionalBulletsData2D` builders (identical speeds/layers/sizes so failures mean regressions).
+- `common/blast_test_helpers.gd` — shared `BulletVolleyData2D` builders (identical speeds/layers/sizes so failures mean regressions).
 - `factory/test_factory_generator_fuzz.gd` — crash-fuzz for every generator: hostile counts (incl. the 10000 cap on all 29 generators, amount 0 = silent empty), degenerate geometry, NaN inputs, extreme twists/offsets, oversized scales, edge-image extraction, side-spread/skip contracts, exact-geometry semantics. Every rejection is pinned with its exact error right after the call; valid input never errors.
 - `factory/test_factory_layer_rings.gd` — outline-layer design proofs: every extra layer re-spawns the shape scaled about the loop center, facings/quotas/corners exact per ring.
 - `spawner/test_spawner_refactor.gd` — `bullet_spawner2d.cpp` internals: keep-awake predicate (incl. stop_pattern_list-must-not-sleep-a-pending-burst), freed factory/generator/target/path2d report missing, corridor door + fan-vs-aimed parity, pattern-hint lock, outline setter reject-and-keep.
@@ -114,7 +114,7 @@ asserts a dangling-free factory plus zero new orphans after every test.
 - `spawner/test_spawner_homing_selection.gd` — nearest order, seeded random without repeats, tree order, round robin across shots (peeking does not rotate), distribute deal, max_targets bounds, detection range + filter group, node-name match modes and case, recursive children, mouse resolves no nodes.
 - `spawner/test_spawner_homing_propagation.gd` — steering and orbit settings reach every bullet, per-bullet smoothing fan, homing signals with exact counts/payloads, target-reached forwarding, retarget counts + previous-volleys switch, fire arc follows spin and the volley chases the approved target, orbiting without homing warns once and emits no homing signals.
 - `spawner/test_spawner_live_volleys.gd` — adopt_live_volley rejects null/pooled/dying volleys, clear_live_volleys_homing empties queues, override_live_volleys_velocity changes flight and rejects NaN.
-- `spawner/test_spawner_collision_signals.gd` — area_entered, life_time_over and bounce_area_entered go to the spawner; the factory's directional_* twins stay silent.
+- `spawner/test_spawner_collision_signals.gd` — area_entered, life_time_over and bounce_area_entered go to the spawner; the factory's same-named signals stay silent.
 - `spawner/test_spawner_setup_warnings.gd` — every setup warning string (factory, spawn data, invisible data, aimed/corridor/path2d/custom, movement path, orbit without homing) and none for a wired spawner.
 - `spawner/test_spawner_homing_detection.gd` — every homing_target_source: what it finds and never picks (the spawner, its markers, nodes under the factory, dying nodes, non-Node2Ds), plain volleys + homing_targets_resolved([]) when nothing is found, one warning per homing configuration, target-path type check.
 - `spawner/test_spawner_homing_queues.gd` — 256-target queue cap without errors, freed targets trimmed mid-flight, retarget skips dead/pooled/foreign/old-factory volleys and disabled bullets, homing signal counts and payloads, handlers freeing the volley or the target.
@@ -128,7 +128,7 @@ asserts a dangling-free factory plus zero new orphans after every test.
   (`reset`/`free_*`/`populate_*`). `await physics(n)` resumes *inside* a
   physics frame (bullets moved): structural calls reject there, so call
   `idle()` first. Never use GUT's `wait_*_frames` (n+1 resume skew).
-- `before_each` adds a fresh `factory` (use `make_spawner()` / `spawn_dir()`
+- `before_each` adds a fresh `factory` (use `make_spawner()` / `quick_volley()`
   / `make_preview_spawner()` builders); `after_each` asserts
   `debug_assert_no_dangling()` + zero new orphans.
 - Rejections are loud by contract: pin them RIGHT AFTER the hostile call with

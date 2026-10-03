@@ -5,8 +5,8 @@ extends BlastTest
 ## coalesces a multi-bullet storm and a cancelled pop never wedges it.
 
 
-func _data(n: int = 1) -> DirectionalBulletsData2D:
-	var d := H.make_directional_data(n, 0.0, 30.0)
+func _data(n: int = 1) -> BulletVolleyData2D:
+	var d := H.make_volley_data(n, 0.0, 30.0)
 	var arr: Array = []
 	for i in n:
 		arr.append(Transform2D())
@@ -16,12 +16,12 @@ func _data(n: int = 1) -> DirectionalBulletsData2D:
 	return d
 
 
-func _amount(v: DirectionalBullets2D) -> int:
+func _amount(v: BulletVolley2D) -> int:
 	return v.shared_homing_deque_check_homing_targets_amount()
 
 
-func _spawn_two_targets(d: DirectionalBulletsData2D = null) -> DirectionalBullets2D:
-	var v: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d if d != null else _data())
+func _spawn_two_targets(d: BulletVolleyData2D = null) -> BulletVolley2D:
+	var v: BulletVolley2D = factory.spawn_volley(d if d != null else _data())
 	v.shared_homing_deque_push_back_global_position_target(Vector2(5, 0))
 	v.shared_homing_deque_push_back_global_position_target(Vector2(9, 0))
 	return v
@@ -70,14 +70,14 @@ func test_manual_pop_not_double_popped() -> void:
 
 
 func test_back_push_keeps_legitimate_pop() -> void:
-	var v6: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(_data())
+	var v6: BulletVolley2D = factory.spawn_volley(_data())
 	v6.shared_homing_deque_push_back_global_position_target(Vector2(5, 0))
 	for i in 4:
 		await physics()
 		if _amount(v6) == 0:
 			break
 	assert_eq(_amount(v6), 0, "single front was auto-popped")
-	var v7: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(_data())
+	var v7: BulletVolley2D = factory.spawn_volley(_data())
 	v7.shared_homing_deque_push_back_global_position_target(Vector2(5, 0))
 	await physics(2)
 	v7.shared_homing_deque_push_back_global_position_target(Vector2(77, 0))
@@ -90,7 +90,7 @@ func test_back_push_keeps_legitimate_pop() -> void:
 
 
 func test_latch_coalesces_storm() -> void:
-	var v: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(_data(8))
+	var v: BulletVolley2D = factory.spawn_volley(_data(8))
 	for i in 8:
 		v.shared_homing_deque_push_back_global_position_target(Vector2(5.0 * i, 0))
 	var before := _amount(v)
@@ -100,7 +100,7 @@ func test_latch_coalesces_storm() -> void:
 
 
 func test_cancelled_pop_does_not_wedge_latch() -> void:
-	var v: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(_data())
+	var v: BulletVolley2D = factory.spawn_volley(_data())
 	v.shared_homing_deque_push_back_global_position_target(Vector2(5, 0))
 	await physics(4)
 	v.shared_homing_deque_push_front_global_position_target(Vector2(4242, 0))

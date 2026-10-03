@@ -22,7 +22,7 @@ func _rot(v: float) -> BulletRotationData2D:
 
 
 ## Custom 4-slot spawner with homing toward a global point (tracked volleys).
-func _mk(data: DirectionalBulletsData2D) -> BulletSpawner2D:
+func _mk(data: BulletVolleyData2D) -> BulletSpawner2D:
 	var sp := make_spawner(data, BulletSpawner2D.PATTERN_FROM_HELPER_CUSTOM, CUSTOM_SLOTS)
 	var slots: Array = []
 	for i in CUSTOM_SLOTS:
@@ -34,18 +34,18 @@ func _mk(data: DirectionalBulletsData2D) -> BulletSpawner2D:
 	return sp
 
 
-func _live(sp: BulletSpawner2D) -> DirectionalBullets2D:
+func _live(sp: BulletSpawner2D) -> BulletVolley2D:
 	return sp.get_live_volleys()[0]
 
 
 func test_three_speed_flavors_one_factory() -> void:
-	var da := H.make_directional_data(4, 0.0)
+	var da := H.make_volley_data(4, 0.0)
 	da.all_bullet_speed_data = [_speed(100.0), _speed(200.0), _speed(300.0), _speed(400.0)]
 	da.shared_bullet_speed_data = _speed(999.0)
-	var db := H.make_directional_data(4, 0.0)
+	var db := H.make_volley_data(4, 0.0)
 	db.all_bullet_speed_data = [_speed(111.0)]
 	db.shared_bullet_speed_data = _speed(222.0)
-	var dc := H.make_directional_data(4, 0.0)
+	var dc := H.make_volley_data(4, 0.0)
 	dc.all_bullet_speed_data = [_speed(-250.0), _speed(250.0)]
 	dc.tile_all_bullet_speed_data = true
 	var rc := Resource.new()
@@ -79,9 +79,9 @@ func swallow_warnings_about_sizes() -> void:
 
 
 func test_rotation_and_wobble_stay_per_owner() -> void:
-	var ra := H.make_directional_data(4, 150.0)
+	var ra := H.make_volley_data(4, 150.0)
 	ra.all_bullet_rotation_data = [_rot(3.0), _rot(3.0), _rot(3.0), _rot(3.0)]
-	var rb := H.make_directional_data(4, 150.0)
+	var rb := H.make_volley_data(4, 150.0)
 	rb.shared_bullet_rotation_data = _rot(7.0)
 	var wob := BulletWobbleData2D.new()
 	wob.enabled = true
@@ -98,8 +98,8 @@ func test_rotation_and_wobble_stay_per_owner() -> void:
 
 
 func test_homing_flavors_converge_independently() -> void:
-	var spa := _mk(H.make_directional_data(4, 250.0))
-	var spb := _mk(H.make_directional_data(4, 250.0))
+	var spa := _mk(H.make_volley_data(4, 250.0))
+	var spb := _mk(H.make_volley_data(4, 250.0))
 	assert_true(spa.shoot_once() and spb.shoot_once())
 	await physics(5)
 	var vha := _live(spa)
@@ -117,10 +117,10 @@ func test_homing_flavors_converge_independently() -> void:
 
 
 func test_gravity_mix_and_neutral_reuse() -> void:
-	var ga := H.make_directional_data(4, 250.0)
+	var ga := H.make_volley_data(4, 250.0)
 	ga.all_bullet_gravity = [Vector2(0, 500), Vector2(0, 500), Vector2(0, 500), Vector2(0, 500)]
 	var spa := _mk(ga)
-	var spb := _mk(H.make_directional_data(4, 250.0))
+	var spb := _mk(H.make_volley_data(4, 250.0))
 	assert_true(spa.shoot_once() and spb.shoot_once())
 	await physics(30)
 	var vga := _live(spa)
@@ -131,7 +131,7 @@ func test_gravity_mix_and_neutral_reuse() -> void:
 		vga.disable_bullet(k)
 		vgb.disable_bullet(k)
 	await idle(1)
-	var reuse: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(H.make_directional_data(4, 300.0))
+	var reuse: BulletVolley2D = factory.spawn_volley(H.make_volley_data(4, 300.0))
 	assert_lt(reuse.bullet_get_fall_speed(0), 0.01, "pool hit has no stale fall speed")
 	assert_false(reuse.get_is_wobble_enabled(), "pool hit has no stale wobble")
 	assert_almost_eq(reuse.bullet_get_homing_smoothing(0), 0.0, 0.001, "pool hit has no latched smoothing")
@@ -144,7 +144,7 @@ func test_spawn_data_pattern_paths_tile() -> void:
 	pcurve.add_point(Vector2(150, 0))
 	ppath.curve = pcurve
 	await idle(1)
-	var pa := H.make_directional_data(4, 200.0)
+	var pa := H.make_volley_data(4, 200.0)
 	pa.all_bullet_movement_pattern_paths = [ppath.get_path()]
 	pa.tile_all_bullet_movement_pattern_paths = true
 	var spa := _mk(pa)
@@ -153,16 +153,16 @@ func test_spawn_data_pattern_paths_tile() -> void:
 	var vpa := _live(spa)
 	assert_eq(str(vpa.debug_get_pattern_info(0)["src"]), "per", "tiled path covers slot 0")
 	assert_eq(str(vpa.debug_get_pattern_info(3)["src"]), "per", "tiled path covers slot 3")
-	var pb := H.make_directional_data(4, 200.0)
+	var pb := H.make_volley_data(4, 200.0)
 	pb.all_bullet_movement_pattern_paths = [ppath.get_path()]
-	var vpb: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(pb)
+	var vpb: BulletVolley2D = factory.spawn_volley(pb)
 	swallow_warnings_about_sizes()
 	assert_eq(str(vpb.debug_get_pattern_info(0)["src"]), "per", "strict path covers slot 0")
 	assert_eq(str(vpb.debug_get_pattern_info(3)["src"]), "none", "strict path never wraps")
 
 
 func test_smoothing_fan_random_wobble_and_speed_range() -> void:
-	var spf := _mk(H.make_directional_data(4, 200.0))
+	var spf := _mk(H.make_volley_data(4, 200.0))
 	spf.set_homing_per_bullet_smoothing_enabled(true)
 	spf.set_homing_smoothing_start(1.0)
 	spf.set_homing_smoothing_step(2.0)
@@ -179,7 +179,7 @@ func test_smoothing_fan_random_wobble_and_speed_range() -> void:
 	expect_error_sequence(["generate_random_data: amount_to_generate must be > 0"])
 	assert_true(BulletWobbleData2D.generate_random_data(2, 40.0, 10.0, 1.0, 4.0).is_empty(), "inverted band rejected")
 	expect_error_sequence(["generate_random_data: every MIN must be <= its MAX"])
-	var vr: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(H.make_directional_data(3, 100.0))
+	var vr: BulletVolley2D = factory.spawn_volley(H.make_volley_data(3, 100.0))
 	vr.all_bullets_set_speed_data(_speed(555.0), 0, 1)
 	assert_almost_eq(vr.get_bullet_speed_data(0).speed, 555.0, 0.01, "range fan slot 0")
 	assert_almost_eq(vr.get_bullet_speed_data(1).speed, 555.0, 0.01, "range fan slot 1")

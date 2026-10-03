@@ -13,7 +13,7 @@ func test_singular_then_sane_generator() -> void:
 	var gen: Node2D = add(Node2D.new())
 	gen.scale = Vector2(0, 1)
 	await idle(1)
-	var sp := make_spawner(H.make_directional_data(1, 0.0, 60.0), BulletSpawner2D.PATTERN_FROM_HELPER_PATH2D, 8)
+	var sp := make_spawner(H.make_volley_data(1, 0.0, 60.0), BulletSpawner2D.PATTERN_FROM_HELPER_PATH2D, 8)
 	sp.set_helper_path2d_node(path)
 	sp.set_helper_path2d_space(BulletSpawner2D.PATH2D_SPACE_AT_PATH2D)
 	sp.set_transforms_generator(gen)

@@ -28,13 +28,13 @@ void BulletAttachment2D::_notification(int p_what) {
 	// Manually freed while ACTIVE: drop the owning multimesh's slot so it can't
 	// keep a dangling pointer. The owner may itself be dying/freed - resolving via
 	// ObjectDB returns null then and the call is skipped safely.
-	if (owner_multimesh_id != 0) {
-		Object *owner_object = ObjectDB::get_instance(ObjectID(owner_multimesh_id));
-		DirectionalBullets2D *owner = Object::cast_to<DirectionalBullets2D>(owner_object);
+	if (owner_volley_id != 0) {
+		Object *owner_object = ObjectDB::get_instance(ObjectID(owner_volley_id));
+		BulletVolley2D *owner = Object::cast_to<BulletVolley2D>(owner_object);
 		if (owner != nullptr && owner_bullet_index >= 0) {
 			owner->_do_drop_attachment_slot_if_matches(owner_bullet_index, this);
 		}
-		owner_multimesh_id = 0;
+		owner_volley_id = 0;
 		owner_bullet_index = -1;
 	}
 }

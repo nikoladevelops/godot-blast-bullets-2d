@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8" ?>
-<class name="MultiMeshPoolKey2D" inherits="Resource" api_type="extension" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/godotengine/godot/master/doc/class.xsd">
+<class name="VolleyPoolKey2D" inherits="Resource" api_type="extension" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/godotengine/godot/master/doc/class.xsd">
 	<brief_description>
 		GDScript-visible key identifying one exact object-pool bucket (amount_bullets + shape).
 	</brief_description>
@@ -7,14 +7,14 @@
 		Create with [method make] or by setting [member amount_bullets] and [member shape_type].
 		[code]amount_bullets[/code] is bullets per multimesh (bucket identity, must equal spawn data transforms size). It is NOT the instance count. See [method BulletFactory2D.populate_bullets_pool] [code]instance_count[/code] for how many multimeshes to pre-create.
 		Pass to [method BulletFactory2D.reset], [method BulletFactory2D.free_active_bullets], [method BulletFactory2D.free_disabled_bullets] and [method BulletFactory2D.free_bullets_pool]. Pass [code]null[/code] to affect all buckets, or a key for one exact bucket.
-		Keys returned by [method BulletFactory2D.debug_get_bullets_pool_info] are one [MultiMeshPoolKey2D] per bucket.
+		Keys returned by [method BulletFactory2D.debug_get_bullets_pool_info] are one [VolleyPoolKey2D] per bucket.
 		Internally the pool uses a plain value-type key for speed; this Resource is only the Godot boundary wrapper.
 	</description>
 	<tutorials>
 	</tutorials>
 	<methods>
 		<method name="make" qualifiers="static">
-			<return type="MultiMeshPoolKey2D" />
+			<return type="VolleyPoolKey2D" />
 			<param index="0" name="amount_bullets" type="int" />
 			<param index="1" name="shape_type" type="int" />
 			<description>

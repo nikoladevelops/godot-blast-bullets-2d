@@ -38,10 +38,10 @@ extends CanvasLayer
 @onready var stop_rotation_when_max_reached_checkbox:CheckBox = $BulletSettingsView/VBoxContainer/VBoxContainer/StopRotationWhenMaxReachedCheckBox
 
 ## Color Picker
-# Responsible for picking a color for the directional bullets debugger
-@onready var directional_debugger_color_picker:ColorPicker = $DirectionalDebuggerColorPicker
-# Responsible for showing/hiding the directional debugger color picker
-@onready var show_directional_debugger_color_picker_btn:Button = $BulletSettingsView/VBoxContainer/DirectionalDebuggerVBoxContainer/ShowDirectionalDebuggerColorPickerBtn
+# Responsible for picking a color for the collision-shape debugger
+@onready var debugger_color_picker:ColorPicker = $DebuggerColorPicker
+# Responsible for showing/hiding the debugger color picker
+@onready var show_debugger_color_picker_btn:Button = $BulletSettingsView/VBoxContainer/DebuggerVBoxContainer/ShowDebuggerColorPickerBtn
 # Responsible for closing the currently shown color picker
 @onready var close_color_picker_btn:Button = $CloseCurrentColorPickerBtn
 var last_selected_color_picker:ColorPicker = null
@@ -67,7 +67,7 @@ var last_selected_color_picker:ColorPicker = null
 
 ## Bullet Type
 # Button responsible for switching the type of bullets that are being spawned
-@onready var directional_bullets_btn:Button = $AlwaysVisibleView/BulletTypeContainer/DirectionalBtn
+@onready var volley_btn:Button = $AlwaysVisibleView/BulletTypeContainer/VolleyBtn
 # Button responsible for switching the type of bullets that are being spawned
 @onready var godot_area2d_bullets_btn:Button = $AlwaysVisibleView/BulletTypeContainer/GodotArea2DBulletsBtn
 ##
@@ -186,10 +186,10 @@ func set_color_picker_visible(chosen_color_picker:ColorPicker, should_be_visible
 		return
 	
 	# Reset visibility
-	directional_debugger_color_picker.visible = false
+	debugger_color_picker.visible = false
 	
 	# Disable/enable show buttons based on whether the chosen color picker should be visible or not
-	show_directional_debugger_color_picker_btn.disabled = should_be_visible
+	show_debugger_color_picker_btn.disabled = should_be_visible
 	
 	# Change visibility of the chosen one
 	chosen_color_picker.visible = should_be_visible
@@ -198,19 +198,19 @@ func set_color_picker_visible(chosen_color_picker:ColorPicker, should_be_visible
 	close_color_picker_btn.visible = should_be_visible
 	
 	
-func _on_show_directional_debugger_color_picker_btn_pressed() -> void:
-	set_color_picker_visible(directional_debugger_color_picker, true)
-	last_selected_color_picker = directional_debugger_color_picker
+func _on_show_debugger_color_picker_btn_pressed() -> void:
+	set_color_picker_visible(debugger_color_picker, true)
+	last_selected_color_picker = debugger_color_picker
 
-func change_directional_debugger_btn_color(color:Color)->void:
-	var stylebox:StyleBoxFlat = show_directional_debugger_color_picker_btn.get_theme_stylebox("normal")
+func change_debugger_btn_color(color:Color)->void:
+	var stylebox:StyleBoxFlat = show_debugger_color_picker_btn.get_theme_stylebox("normal")
 	stylebox.bg_color = color
 	
-	show_directional_debugger_color_picker_btn.add_theme_stylebox_override("disabled", stylebox)
+	show_debugger_color_picker_btn.add_theme_stylebox_override("disabled", stylebox)
 	
 
-func _on_directional_debugger_color_picker_color_changed(color: Color) -> void:
-	change_directional_debugger_btn_color(color)
+func _on_debugger_color_picker_color_changed(color: Color) -> void:
+	change_debugger_btn_color(color)
 	BENCHMARK_GLOBALS.FACTORY.debugger_color = color
 
 func _on_enable_monitorable_check_box_pressed() -> void:
@@ -239,11 +239,11 @@ static func _effective_shape_type(shape: Shape2D) -> int:
 		return PhysicsServer2D.SHAPE_CAPSULE
 	return PhysicsServer2D.SHAPE_CIRCLE
 
-func _on_free_multi_mesh_directional_pool_btn_pressed() -> void:
+func _on_free_volley_pool_btn_pressed() -> void:
 	var amount_bullets:int = select_amount_bullets_view.get_selected_btn.text.to_int()
-	var shape_type:int = _effective_shape_type(BENCHMARK_GLOBALS.PLAYER_DATA_NODE.directional_bullets_data.collision_shape)
+	var shape_type:int = _effective_shape_type(BENCHMARK_GLOBALS.PLAYER_DATA_NODE.volley_data.collision_shape)
 
-	BENCHMARK_GLOBALS.FACTORY.free_bullets_pool(MultiMeshPoolKey2D.make(amount_bullets, shape_type))
+	BENCHMARK_GLOBALS.FACTORY.free_bullets_pool(VolleyPoolKey2D.make(amount_bullets, shape_type))
 
 func _on_free_all_bullet_pools_btn_pressed() -> void:
 	BENCHMARK_GLOBALS.FACTORY.free_bullets_pool()
@@ -252,10 +252,10 @@ func _on_free_all_bullet_pools_btn_pressed() -> void:
 
 ## Populate object pool logic
 
-func _on_populate_multi_mesh_directional_pool_btn_pressed() -> void:
+func _on_populate_volley_pool_btn_pressed() -> void:
 	var amount_multi_meshes:int = select_amount_multi_meshes_view.get_selected_btn.text.to_int()
-	var data = BENCHMARK_GLOBALS.PLAYER_DATA_NODE.directional_bullets_data
-	var pool_key:MultiMeshPoolKey2D = MultiMeshPoolKey2D.make(data.transforms.size(), _effective_shape_type(data.collision_shape))
+	var data = BENCHMARK_GLOBALS.PLAYER_DATA_NODE.volley_data
+	var pool_key:VolleyPoolKey2D = VolleyPoolKey2D.make(data.transforms.size(), _effective_shape_type(data.collision_shape))
 
 	BENCHMARK_GLOBALS.FACTORY.populate_bullets_pool(pool_key, data, amount_multi_meshes)
 	
@@ -303,8 +303,8 @@ func _on_select_bullet_collision_view_new_btn_selected(new_selected_btn: Button)
 
 func _on_select_bullet_type_view_new_btn_selected(new_selected_btn: Button) -> void:
 	match new_selected_btn:
-		directional_bullets_btn:
-			BENCHMARK_GLOBALS.BULLET_TYPE_TO_SPAWN = BENCHMARK_GLOBALS.BulletType.MultiMeshDirectional
+		volley_btn:
+			BENCHMARK_GLOBALS.BULLET_TYPE_TO_SPAWN = BENCHMARK_GLOBALS.BulletType.BulletVolley
 			
 			set_blast_bullets2d_ui_settings_visible(last_visible_ui_setting_view)
 		godot_area2d_bullets_btn:

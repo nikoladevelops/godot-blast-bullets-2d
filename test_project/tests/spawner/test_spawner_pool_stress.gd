@@ -10,7 +10,7 @@ var c: BulletSpawner2D
 
 
 func _mk(n: int, speed: float) -> BulletSpawner2D:
-	var sp := make_spawner(H.make_directional_data(n, speed), BulletSpawner2D.PATTERN_FROM_SELF, n)
+	var sp := make_spawner(H.make_volley_data(n, speed), BulletSpawner2D.PATTERN_FROM_SELF, n)
 	sp.set_homing_enabled(true)
 	sp.set_homing_target_source(BulletSpawner2D.HOMING_SOURCE_GLOBAL_POSITION)
 	sp.set_homing_global_position(Vector2(600, -100))
@@ -35,11 +35,11 @@ func test_three_spawners_share_one_factory() -> void:
 
 func test_cross_bucket_reuse_reseeds() -> void:
 	for i in 6:
-		var vv: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(H.make_directional_data(4, 150.0 + 20.0 * i))
+		var vv: BulletVolley2D = factory.spawn_volley(H.make_volley_data(4, 150.0 + 20.0 * i))
 		for k in 4:
 			vv.disable_bullet(k)
 		await physics()
-	var reuse: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(H.make_directional_data(4, 999.0))
+	var reuse: BulletVolley2D = factory.spawn_volley(H.make_volley_data(4, 999.0))
 	assert_almost_eq(reuse.get_bullet_speed_data(0).speed, 999.0, 0.01, "pool hit reseeds fully")
 	assert_false(reuse.get_is_wobble_enabled(), "no stale wobble")
 
@@ -64,7 +64,7 @@ func test_reset_and_free_under_live_volleys() -> void:
 
 
 func test_adopt_chain() -> void:
-	var v: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(H.make_directional_data(3, 220.0))
+	var v: BulletVolley2D = factory.spawn_volley(H.make_volley_data(3, 220.0))
 	assert_true(a.adopt_live_volley(v), "first adopt")
 	assert_eq(a.get_live_volley_count(), 1)
 	assert_true(b.adopt_live_volley(v), "second adopt")
@@ -99,17 +99,17 @@ func test_retarget_override_storm() -> void:
 
 func _live_finite(sp: BulletSpawner2D) -> bool:
 	for v in sp.get_live_volleys():
-		if not (v as DirectionalBullets2D).get_bullet_transform(0).is_finite():
+		if not (v as BulletVolley2D).get_bullet_transform(0).is_finite():
 			return false
 	return true
 
 
 func test_pool_hit_accounting() -> void:
-	var hits0: int = factory.debug_get_pool_hit_stats().get("directional_hits", -1)
+	var hits0: int = factory.debug_get_pool_hit_stats().get("hits", -1)
 	for i in 10:
-		var vv: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(H.make_directional_data(4, 180.0))
+		var vv: BulletVolley2D = factory.spawn_volley(H.make_volley_data(4, 180.0))
 		for k in 4:
 			vv.disable_bullet(k)
 		await physics()
-	assert_eq(int(factory.debug_get_pool_hit_stats().get("directional_hits", -1)), hits0 + 9, "every spawn after the first is a pool hit")
+	assert_eq(int(factory.debug_get_pool_hit_stats().get("hits", -1)), hits0 + 9, "every spawn after the first is a pool hit")
 	assert_gte(factory.debug_get_bullets_pool_amount(), 1, "pool holds stock")

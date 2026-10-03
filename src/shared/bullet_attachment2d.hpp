@@ -28,11 +28,11 @@ public:
 	// hand.
 	Ref<PackedScene> source_scene;
 
-	// Owner tracking (managed by DirectionalBullets2D, never set by hand): which
+	// Owner tracking (managed by BulletVolley2D, never set by hand): which
 	// multimesh slot currently owns this ACTIVE attachment. Lets PREDELETE of a
 	// manually freed active attachment drop its slot instead of leaving a dangling
 	// pointer in the multimesh's attachments array.
-	uint64_t owner_multimesh_id = 0;
+	uint64_t owner_volley_id = 0;
 	int owner_bullet_index = -1;
 
 	void _notification(int p_what);

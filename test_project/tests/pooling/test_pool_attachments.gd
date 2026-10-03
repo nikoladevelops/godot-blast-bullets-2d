@@ -15,7 +15,7 @@ func before_each() -> void:
 
 
 func test_attach_disable_wake_sequence() -> void:
-	var v: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(H.make_directional_data(2, 200.0))
+	var v: BulletVolley2D = factory.spawn_volley(H.make_volley_data(2, 200.0))
 	v.bullet_set_attachment(0, ps, Vector2.ZERO, true)
 	await idle(1)
 	var info: Dictionary = v.debug_get_attachment_info(0)
@@ -35,13 +35,13 @@ func test_attach_disable_wake_sequence() -> void:
 
 
 func test_pooled_reuse_starts_blank() -> void:
-	var v: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(H.make_directional_data(2, 200.0))
+	var v: BulletVolley2D = factory.spawn_volley(H.make_volley_data(2, 200.0))
 	v.bullet_set_attachment(0, ps, Vector2.ZERO, true)
 	for i in 2:
 		v.disable_bullet(i)
 	await idle(1)
 	assert_gte(factory.debug_get_bullets_pool_amount(), 1, "volley pooled")
-	var w: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(H.make_directional_data(2, 200.0))
+	var w: BulletVolley2D = factory.spawn_volley(H.make_volley_data(2, 200.0))
 	assert_eq(w, v, "pool reuses the volley")
 	assert_false(w.debug_get_attachment_info(0).get("has_attachment", false), "reuse starts with blank slots")
 
@@ -49,7 +49,7 @@ func test_pooled_reuse_starts_blank() -> void:
 func test_prepopulated_attachments() -> void:
 	factory.populate_attachments_pool(ps, 2)
 	assert_eq(factory.debug_get_attachments_pool_amount(), 2, "2 probes pre-pooled")
-	var x: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(H.make_directional_data(1, 200.0))
+	var x: BulletVolley2D = factory.spawn_volley(H.make_volley_data(1, 200.0))
 	x.bullet_set_attachment(0, ps, Vector2.ZERO, true)
 	await idle(1)
 	var xp = x.bullet_get_attachment(0)
@@ -59,7 +59,7 @@ func test_prepopulated_attachments() -> void:
 
 
 func test_invalid_scenes_reject_and_double_free_is_safe() -> void:
-	var v: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(H.make_directional_data(1, 200.0))
+	var v: BulletVolley2D = factory.spawn_volley(H.make_volley_data(1, 200.0))
 	v.bullet_set_attachment(0, null, Vector2.ZERO, true)
 	expect_error("invalid attachment scene")
 	assert_false(v.debug_get_attachment_info(0).get("has_attachment", false), "null scene rejected")
@@ -79,7 +79,7 @@ func test_invalid_scenes_reject_and_double_free_is_safe() -> void:
 
 
 func test_teleport_carries_stick_attachment() -> void:
-	var v: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(H.make_directional_data(1, 0.0))
+	var v: BulletVolley2D = factory.spawn_volley(H.make_volley_data(1, 0.0))
 	v.bullet_set_attachment(0, ps, Vector2(10, 0), true)
 	await physics(3)
 	var before: Vector2 = (v.bullet_get_attachment(0) as Node2D).global_position
@@ -93,7 +93,7 @@ func test_teleport_carries_stick_attachment() -> void:
 
 
 func test_scoped_free_with_live_attachments() -> void:
-	var v: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(H.make_directional_data(2, 200.0))
+	var v: BulletVolley2D = factory.spawn_volley(H.make_volley_data(2, 200.0))
 	v.bullet_set_attachment(0, ps, Vector2.ZERO, true)
 	v.bullet_set_attachment(1, ps, Vector2.ZERO, true)
 	await idle(1)

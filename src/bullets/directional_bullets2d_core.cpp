@@ -2,7 +2,7 @@
 #include "../shared/cached_string_names2d.hpp"
 #include "./directional_bullets2d.hpp"
 #include "../factory/bullet_factory2d.hpp"
-#include "../shared/multimesh_object_pool2d.hpp"
+#include "../shared/volley_pool2d.hpp"
 
 #include "godot_cpp/classes/curve.hpp"
 #include "godot_cpp/classes/curve2d.hpp"
@@ -29,7 +29,7 @@ using namespace godot;
 
 namespace BlastBullets2D {
 
-void DirectionalBullets2D::_notification(int p_what) {
+void BulletVolley2D::_notification(int p_what) {
 	switch (p_what) {
 		case NOTIFICATION_PREDELETE: {
 			// The destructor also runs for editor-time instances, which have no runtime state.
@@ -38,7 +38,7 @@ void DirectionalBullets2D::_notification(int p_what) {
 			}
 
 			if (!marked_for_internal_deletion && bullet_factory) {
-				bullet_factory->handle_manual_user_deletion_of_multimesh_bullets(*this);
+				bullet_factory->handle_manual_volley_deletion(*this);
 			}
 
 			clear_homing_state_for_teardown();
@@ -78,7 +78,7 @@ void DirectionalBullets2D::_notification(int p_what) {
 							// attachments outlive this multimesh (siblings in the
 							// container), and a stale owner id would make their
 							// PREDELETE resolve a dead multimesh.
-							detaching->owner_multimesh_id = 0;
+							detaching->owner_volley_id = 0;
 							detaching->owner_bullet_index = -1;
 							detaching->call_on_bullet_disable();
 						} else {
@@ -103,7 +103,7 @@ void DirectionalBullets2D::_notification(int p_what) {
 	}
 }
 
-int DirectionalBullets2D::get_amount_active_attachments() const {
+int BulletVolley2D::get_amount_active_attachments() const {
 	int amount_active_attachments = 0;
 
 	// min(): the vector is sized to amount_bullets by spawn(), but this can be
@@ -118,24 +118,24 @@ int DirectionalBullets2D::get_amount_active_attachments() const {
 	return amount_active_attachments;
 }
 
-Dictionary DirectionalBullets2D::debug_get_volley_info() const {
+Dictionary BulletVolley2D::debug_get_volley_info() const {
 	Dictionary d;
 	d["amount_bullets"] = amount_bullets;
 	d["active_bullets"] = active_bullets_counter;
-	d["generation"] = multimesh_generation;
+	d["generation"] = volley_generation;
 	d["owner_spawner_id"] = (int64_t)owner_spawner_id;
 	d["is_active"] = is_active;
 	d["is_pooled"] = is_pooled_in_pool;
 	const PoolKey k = get_pool_key();
 	d["pool_amount"] = k.amount_bullets;
 	d["pool_shape"] = (int)k.shape_type;
-	d["auto_pool_multimesh"] = is_multimesh_auto_pooling_enabled;
+	d["auto_pool_volley"] = is_auto_pooling_enabled;
 	d["auto_pool_attachments"] = is_attachments_auto_pooling_enabled;
 	d["self_modulate"] = get_self_modulate();
 	return d;
 }
 
-Dictionary DirectionalBullets2D::debug_get_shape_state() const {
+Dictionary BulletVolley2D::debug_get_shape_state() const {
 	Dictionary d;
 	d["valid"] = physics_server != nullptr && area.is_valid() && volley_shape.is_valid() && area_shape_count == amount_bullets;
 	d["type"] = (int)cached_effective_shape_type;
@@ -150,7 +150,7 @@ Dictionary DirectionalBullets2D::debug_get_shape_state() const {
 	return d;
 }
 
-Dictionary DirectionalBullets2D::debug_get_attachment_info(int bullet_index) const {
+Dictionary BulletVolley2D::debug_get_attachment_info(int bullet_index) const {
 	Dictionary d;
 	d["has_attachment"] = false;
 	d["pooling_id"] = 0;
@@ -166,11 +166,11 @@ Dictionary DirectionalBullets2D::debug_get_attachment_info(int bullet_index) con
 	d["pooling_id"] = (int64_t)attachment_pooling_ids[bullet_index];
 	// Owner ids must point back here; a stale owner after pool reuse fails.
 	// Never dereferences a: ids are plain values, compared by value.
-	d["owner_match"] = a->owner_multimesh_id == get_instance_id() && a->owner_bullet_index == bullet_index;
+	d["owner_match"] = a->owner_volley_id == get_instance_id() && a->owner_bullet_index == bullet_index;
 	return d;
 }
 
-void DirectionalBullets2D::reset_attachment_state_for_reuse() {
+void BulletVolley2D::reset_attachment_state_for_reuse() {
 	// Force-disable any surviving slot first. Deferred attachment disables can be
 	// dropped by a generation bump (e.g. lifetime expiry pooled this instance and a
 	// spawn re-enabled it before the deferred flush ran), so a new owner must never
@@ -201,7 +201,7 @@ void DirectionalBullets2D::reset_attachment_state_for_reuse() {
 // (children of the volley: pooling hides them, freeing is automatic, and
 // relative z tracks the volley). Shard textures never change, so per-tick
 // work is a single instance write into the current frame's shard.
-void DirectionalBullets2D::fx_rebuild_trail_layers(const TypedArray<BulletEffectLayerData2D> &layers) {
+void BulletVolley2D::fx_rebuild_trail_layers(const TypedArray<BulletEffectLayerData2D> &layers) {
 	fx_clear_trail_layers();
 	if (amount_bullets <= 0) {
 		return;
@@ -250,7 +250,7 @@ void DirectionalBullets2D::fx_rebuild_trail_layers(const TypedArray<BulletEffect
 	}
 }
 
-void DirectionalBullets2D::fx_clear_trail_layers() {
+void BulletVolley2D::fx_clear_trail_layers() {
 	for (size_t b = 0; b < fx_trail_bakes.size(); ++b) {
 		for (size_t s = 0; s < fx_trail_bakes[b].shards.size(); ++s) {
 			MultiMeshInstance2D *shard = fx_trail_bakes[b].shards[s];
@@ -273,7 +273,7 @@ void DirectionalBullets2D::fx_clear_trail_layers() {
 // Full reseed from a layer list: retains it for trigger routing, rebuilds
 // trail shards, and re-registers factory one-shot bakes (erasing the
 // previous life's). fire_spawn flashes ON_SPAWN layers at every bullet.
-bool DirectionalBullets2D::fx_layers_match_seeded(const TypedArray<BulletEffectLayerData2D> &layers) const {
+bool BulletVolley2D::fx_layers_match_seeded(const TypedArray<BulletEffectLayerData2D> &layers) const {
 	if (layers.size() != fx_data_layers.size() || (int)fx_seeded_snapshots.size() != layers.size()) {
 		return false;
 	}
@@ -305,7 +305,7 @@ bool DirectionalBullets2D::fx_layers_match_seeded(const TypedArray<BulletEffectL
 	return true;
 }
 
-void DirectionalBullets2D::fx_soft_reset_trail_layers() {
+void BulletVolley2D::fx_soft_reset_trail_layers() {
 	for (FXTrailBake &bake : fx_trail_bakes) {
 		for (int i = 0; i < (int)bake.bullet_shard.size(); ++i) {
 			const int shard_index = bake.bullet_shard[i];
@@ -333,7 +333,7 @@ void DirectionalBullets2D::fx_soft_reset_trail_layers() {
 	}
 }
 
-void DirectionalBullets2D::fx_reseed_from_data(const TypedArray<BulletEffectLayerData2D> &layers, bool fire_spawn) {
+void BulletVolley2D::fx_reseed_from_data(const TypedArray<BulletEffectLayerData2D> &layers, bool fire_spawn) {
 	// Pooled-reuse fast path: same layer resources at the same bake
 	// versions. Shard nodes and factory one-shot bakes are kept (the old
 	// rebuild queue_freed and re-created them on every spawn, and erasing
@@ -381,7 +381,7 @@ void DirectionalBullets2D::fx_reseed_from_data(const TypedArray<BulletEffectLaye
 	}
 }
 
-void DirectionalBullets2D::fx_fire_spawn_layers() {
+void BulletVolley2D::fx_fire_spawn_layers() {
 	if (bullet_factory == nullptr || (int)all_cached_instance_transforms.size() != amount_bullets) {
 		return;
 	}
@@ -393,7 +393,7 @@ void DirectionalBullets2D::fx_fire_spawn_layers() {
 	}
 }
 
-void DirectionalBullets2D::fx_fire_oneshot(int trigger, int bullet_index, const Transform2D &at) {
+void BulletVolley2D::fx_fire_oneshot(int trigger, int bullet_index, const Transform2D &at) {
 	if (trigger < 0 || trigger >= 32 || !(fx_oneshot_trigger_mask & (1u << trigger))) {
 		return;
 	}
@@ -415,11 +415,11 @@ void DirectionalBullets2D::fx_fire_oneshot(int trigger, int bullet_index, const 
 	}
 }
 
-bool DirectionalBullets2D::has_trail_effects() const {
+bool BulletVolley2D::has_trail_effects() const {
 	return !fx_trail_bakes.empty();
 }
 
-bool DirectionalBullets2D::fx_has_trail_layer(int layer_index) const {
+bool BulletVolley2D::fx_has_trail_layer(int layer_index) const {
 	for (size_t b = 0; b < fx_trail_bakes.size(); ++b) {
 		if (fx_trail_bakes[b].layer_index == layer_index) {
 			return true;
@@ -428,7 +428,7 @@ bool DirectionalBullets2D::fx_has_trail_layer(int layer_index) const {
 	return false;
 }
 
-void DirectionalBullets2D::bullet_set_trail_enabled(int layer_index, int bullet_index, bool trail_on) {
+void BulletVolley2D::bullet_set_trail_enabled(int layer_index, int bullet_index, bool trail_on) {
 	if (!validate_bullet_index(bullet_index, "bullet_set_trail_enabled")) {
 		return;
 	}
@@ -453,7 +453,7 @@ void DirectionalBullets2D::bullet_set_trail_enabled(int layer_index, int bullet_
 	}
 }
 
-void DirectionalBullets2D::all_bullets_set_trail_enabled(int layer_index, bool trail_on, int bullet_index_start, int bullet_index_end_inclusive) {
+void BulletVolley2D::all_bullets_set_trail_enabled(int layer_index, bool trail_on, int bullet_index_start, int bullet_index_end_inclusive) {
 	ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_set_trail_enabled");
 	// Single error for the whole range instead of one per bullet below.
 	if (!fx_has_trail_layer(layer_index)) {
@@ -469,7 +469,7 @@ void DirectionalBullets2D::all_bullets_set_trail_enabled(int layer_index, bool t
 // next reseed; one-shot layers switch through their layer resource +
 // set_effect_layers). Shard nodes are rebuilt: counts follow the new frame
 // list, per-bullet phase/toggles survive.
-bool DirectionalBullets2D::play_effect_animation(int layer_index, const StringName &animation) {
+bool BulletVolley2D::play_effect_animation(int layer_index, const StringName &animation) {
 	for (size_t b = 0; b < fx_trail_bakes.size(); ++b) {
 		FXTrailBake &bake = fx_trail_bakes[b];
 		if (bake.layer_index != layer_index || bake.layer.is_null()) {
@@ -531,17 +531,17 @@ bool DirectionalBullets2D::play_effect_animation(int layer_index, const StringNa
 	return false;
 }
 
-TypedArray<BulletEffectLayerData2D> DirectionalBullets2D::get_effect_layers() const {
+TypedArray<BulletEffectLayerData2D> BulletVolley2D::get_effect_layers() const {
 	return fx_data_layers;
 }
 
-void DirectionalBullets2D::set_effect_layers(const TypedArray<BulletEffectLayerData2D> &new_layers) {
+void BulletVolley2D::set_effect_layers(const TypedArray<BulletEffectLayerData2D> &new_layers) {
 	// Live rebake without a spawn flash (edits must not detonate): trigger
 	// routing, trail shards and factory bakes all follow the new list.
 	fx_reseed_from_data(new_layers, false);
 }
 
-Dictionary DirectionalBullets2D::debug_get_effect_layers_info() const {
+Dictionary BulletVolley2D::debug_get_effect_layers_info() const {
 	Dictionary d;
 	d["data_layer_count"] = fx_data_layers.size();
 	d["trail_bake_count"] = (int)fx_trail_bakes.size();
@@ -592,7 +592,7 @@ Dictionary DirectionalBullets2D::debug_get_effect_layers_info() const {
 	return d;
 }
 
-Transform2D DirectionalBullets2D::debug_get_trail_transform(int layer_index, int bullet_index) const {
+Transform2D BulletVolley2D::debug_get_trail_transform(int layer_index, int bullet_index) const {
 	if (!validate_bullet_index(bullet_index, "debug_get_trail_transform")) {
 		return Transform2D();
 	}
@@ -617,7 +617,7 @@ Transform2D DirectionalBullets2D::debug_get_trail_transform(int layer_index, int
 }
 
 // Used to spawn brand new bullets.
-void DirectionalBullets2D::spawn(const DirectionalBulletsData2D &data, MultiMeshObjectPool *pool, BulletFactory2D *factory, Node *bullets_container, const Vector2 &new_inherited_velocity_offset, int new_sparse_set_id, bool spawn_in_pool, uint64_t spawner_id) {
+void BulletVolley2D::spawn(const BulletVolleyData2D &data, VolleyPool *pool, BulletFactory2D *factory, Node *bullets_container, const Vector2 &new_inherited_velocity_offset, int new_sparse_set_id, bool spawn_in_pool, uint64_t spawner_id) {
 	this->set_physics_interpolation_mode(Node::PHYSICS_INTERPOLATION_MODE_OFF); // We have custom physics interpolation logic, so disable the Godot one that comes from Godot 4.5
 
 	sparse_set_id = new_sparse_set_id;
@@ -636,7 +636,7 @@ void DirectionalBullets2D::spawn(const DirectionalBulletsData2D &data, MultiMesh
 	amount_bullets = spawn_transform_count(data); // important, because some set_up methods use this
 	cache_collision_shape_typed(data.collision_shape);
 
-	++multimesh_generation;
+	++volley_generation;
 
 	all_bullets_enabled_set.resize(amount_bullets);
 	all_bullet_curves_data.assign(amount_bullets, Ref<BulletCurvesData2D>());
@@ -703,7 +703,7 @@ void DirectionalBullets2D::spawn(const DirectionalBulletsData2D &data, MultiMesh
 	}
 
 	// Shared spawn-data attachments (both bullet types). Skipped for pooled
-	// pre-population: the slots were just blanked above, and enable_multimesh()
+	// pre-population: the slots were just blanked above, and enable_volley()
 	// applies the data when the instance is popped instead.
 	if (!spawn_in_pool) {
 		apply_shared_bullet_attachment_from_data(data);
@@ -713,7 +713,7 @@ void DirectionalBullets2D::spawn(const DirectionalBulletsData2D &data, MultiMesh
 	}
 }
 
-void DirectionalBullets2D::reset_transient_volley_state(uint64_t new_owner_spawner_id, bool drop_stale_work, bool keep_attachment_slots) {
+void BulletVolley2D::reset_transient_volley_state(uint64_t new_owner_spawner_id, bool drop_stale_work, bool keep_attachment_slots) {
 	// A new life / a dead life never replays the previous life's parked overlaps.
 	paused_overlaps.clear();
 	// Ownership is stamped first so every step below already belongs to the
@@ -749,14 +749,14 @@ void DirectionalBullets2D::reset_transient_volley_state(uint64_t new_owner_spawn
 		// previous owner's volley-wide connections must not fire again.
 		// Disabled (but not pooled) volleys keep their connections here: a
 		// same-owner enable_bullet() wake must not silence the volley.
-		++multimesh_generation;
+		++volley_generation;
 		disconnect_sprite_animation_connections();
 	}
 	// A fresh volley starts with zero hits and no timers, no matter how the last one died.
 	all_collided_bullets.clear();
 	// The dedup keys mirror all_collided_bullets, so they reset with it.
 	clear_collision_dedup_keys();
-	_do_detach_all_time_based_functions(multimesh_timers_generation);
+	_do_detach_all_time_based_functions(timers_generation);
 	// Same for the volley clock - waking an old instance must not resume the previous owner's curve time.
 	curves_elapsed_time = 0.0;
 	// Animation cursor restarts; baked frames are kept so a same-owner wake
@@ -769,7 +769,7 @@ void DirectionalBullets2D::reset_transient_volley_state(uint64_t new_owner_spawn
 	}
 }
 
-void DirectionalBullets2D::deactivate_volley() {
+void BulletVolley2D::deactivate_volley() {
 	all_bullets_enabled_set.clear();
 	active_bullets_counter = 0;
 	is_active = false;
@@ -778,12 +778,12 @@ void DirectionalBullets2D::deactivate_volley() {
 }
 
 // Activates the multimesh
-bool DirectionalBullets2D::enable_multimesh(const DirectionalBulletsData2D &data, const Vector2 &new_inherited_velocity_offset, uint64_t spawner_id) {
+bool BulletVolley2D::enable_volley(const BulletVolleyData2D &data, const Vector2 &new_inherited_velocity_offset, uint64_t spawner_id) {
 	warn_data_id = data.get_instance_id();
 	// The pool sorts volleys by bullet count, so a wrong-size array here would read past the end - bail before touching anything.
 	if (spawn_transform_count(data) != amount_bullets) {
 		spawn_transforms_ptr = nullptr;
-		UtilityFunctions::push_error("enable_multimesh: transforms size (" + String::num_int64(spawn_transform_count(data)) + ") must match amount_bullets (" + String::num_int64(amount_bullets) + ").");
+		UtilityFunctions::push_error("enable_volley: transforms size (" + String::num_int64(spawn_transform_count(data)) + ") must match amount_bullets (" + String::num_int64(amount_bullets) + ").");
 		return false;
 	}
 
@@ -800,11 +800,11 @@ bool DirectionalBullets2D::enable_multimesh(const DirectionalBulletsData2D &data
 	// the factory iterates a snapshot, so a re-activated volley simply joins
 	// the next tick.
 	if (is_being_ticked) {
-		UtilityFunctions::push_error("enable_multimesh cannot run on a volley while its own tick is running (e.g. from its collision handler or attachment callback). Use call_deferred() to enable it after the sweep.");
+		UtilityFunctions::push_error("enable_volley cannot run on a volley while its own tick is running (e.g. from its collision handler or attachment callback). Use call_deferred() to enable it after the sweep.");
 		return false;
 	}
 	if (shape_type_changes && bullet_factory != nullptr && bullet_factory->is_structural_mutation_unsafe()) {
-		UtilityFunctions::push_error("enable_multimesh with a different collision shape type cannot run inside a physics frame (server flush locks apply to the shape RIDs it must recreate). Use call_deferred() to enable outside the physics step.");
+		UtilityFunctions::push_error("enable_volley with a different collision shape type cannot run inside a physics frame (server flush locks apply to the shape RIDs it must recreate). Use call_deferred() to enable outside the physics step.");
 		return false;
 	}
 
@@ -812,7 +812,7 @@ bool DirectionalBullets2D::enable_multimesh(const DirectionalBulletsData2D &data
 	// patterns mid-flight. Pool pops only hand out disabled instances, so a
 	// live instance here is always a direct (mis)call: reject, don't reseed.
 	if (is_active) {
-		UtilityFunctions::push_error("enable_multimesh: instance is already active. Disable it first or spawn a new volley instead.");
+		UtilityFunctions::push_error("enable_volley: instance is already active. Disable it first or spawn a new volley instead.");
 		return false;
 	}
 
@@ -820,7 +820,7 @@ bool DirectionalBullets2D::enable_multimesh(const DirectionalBulletsData2D &data
 	// tick (pool pops already filter these; this covers direct GDScript
 	// calls). queue_free() is terminal.
 	if (is_queued_for_deletion()) {
-		UtilityFunctions::push_error("enable_multimesh: multimesh is queued for deletion.");
+		UtilityFunctions::push_error("enable_volley: multimesh is queued for deletion.");
 		return false;
 	}
 
@@ -831,16 +831,16 @@ bool DirectionalBullets2D::enable_multimesh(const DirectionalBulletsData2D &data
 	// runs in spawn() only): reseeding one would null-deref below. Pool
 	// pops always carry theirs, so this rejects misuse only.
 	if (multi.is_null() || !multi.is_valid()) {
-		UtilityFunctions::push_error("enable_multimesh: multimesh was never spawned through BulletFactory2D (no bullet storage). Spawn it first.");
+		UtilityFunctions::push_error("enable_volley: multimesh was never spawned through BulletFactory2D (no bullet storage). Spawn it first.");
 		return false;
 	}
 
 	// The factory spawn_* paths validate finiteness, but a direct
-	// enable_multimesh() call bypasses them: a NaN/Inf offset here would
+	// enable_volley() call bypasses them: a NaN/Inf offset here would
 	// poison every bullet's velocity for the whole volley. Checked before any
 	// mutation (previously after the owner/curve clears, leaking on reject).
 	if (!new_inherited_velocity_offset.is_finite()) {
-		UtilityFunctions::push_error("enable_multimesh: inherited velocity offset must be finite, keeping the old value.");
+		UtilityFunctions::push_error("enable_volley: inherited velocity offset must be finite, keeping the old value.");
 		return false;
 	}
 
@@ -879,13 +879,13 @@ bool DirectionalBullets2D::enable_multimesh(const DirectionalBulletsData2D &data
 	// carry the previous owner's attachment slots into this enable.
 	reset_attachment_state_for_reuse();
 
-	++multimesh_generation;
+	++volley_generation;
 
 	// A fresh volley starts with zero hits and no timers, no matter how the last one died.
 	all_collided_bullets.clear();
 	// The dedup keys mirror all_collided_bullets, so they reset with it.
 	clear_collision_dedup_keys();
-	_do_detach_all_time_based_functions(multimesh_timers_generation);
+	_do_detach_all_time_based_functions(timers_generation);
 
 	// Same for the volley clock - waking an old instance must not resume the previous owner's curve time.
 	curves_elapsed_time = 0.0;
@@ -944,7 +944,7 @@ bool DirectionalBullets2D::enable_multimesh(const DirectionalBulletsData2D &data
 	return true;
 }
 
-void DirectionalBullets2D::set_up_bullet_instances(const DirectionalBulletsData2D &data) {
+void BulletVolley2D::set_up_bullet_instances(const BulletVolleyData2D &data) {
 	active_bullets_counter = amount_bullets;
 
 	bullet_max_collision_count = data.bullet_max_collision_count;
@@ -967,7 +967,7 @@ void DirectionalBullets2D::set_up_bullet_instances(const DirectionalBulletsData2
 		const int custom_size = data.all_bullets_custom_data.size();
 		const bool tile_custom = data.tile_all_bullets_custom_data;
 		if (custom_size != amount_bullets) {
-			WarnOnce2D::warn(warn_data_id, 2u, custom_size, amount_bullets, "DirectionalBullets2D: all_bullets_custom_data size (" + String::num_int64(custom_size) + ") != bullets (" + String::num_int64(amount_bullets) + "); uncovered bullets read null" + String(tile_custom ? " (tiling on: wrapping short array)." : " (check tile_all_bullets_custom_data to wrap, or provide one entry per bullet)."));
+			WarnOnce2D::warn(warn_data_id, 2u, custom_size, amount_bullets, "BulletVolley2D: all_bullets_custom_data size (" + String::num_int64(custom_size) + ") != bullets (" + String::num_int64(amount_bullets) + "); uncovered bullets read null" + String(tile_custom ? " (tiling on: wrapping short array)." : " (check tile_all_bullets_custom_data to wrap, or provide one entry per bullet)."));
 		}
 		for (int i = 0; i < amount_bullets; ++i) {
 			const int src = tile_custom ? (i % custom_size) : i;
@@ -1066,7 +1066,7 @@ void DirectionalBullets2D::set_up_bullet_instances(const DirectionalBulletsData2
 	}
 }
 
-void DirectionalBullets2D::generate_multimesh() {
+void BulletVolley2D::generate_multimesh() {
 	Ref<MultiMesh> new_multi;
 	new_multi.instantiate();
 	new_multi->set_transform_format(MultiMesh::TRANSFORM_2D);
@@ -1075,7 +1075,7 @@ void DirectionalBullets2D::generate_multimesh() {
 	set_multimesh(multi);
 }
 
-void DirectionalBullets2D::set_up_multimesh(int new_instance_count, const Ref<Mesh> &new_mesh, Vector2 new_texture_size) {
+void BulletVolley2D::set_up_multimesh(int new_instance_count, const Ref<Mesh> &new_mesh, Vector2 new_texture_size) {
 	if (new_mesh.is_valid()) {
 		if (multi->get_mesh() != new_mesh) {
 			multi->set_mesh(new_mesh);
@@ -1111,41 +1111,41 @@ void DirectionalBullets2D::set_up_multimesh(int new_instance_count, const Ref<Me
 	}
 }
 
-void DirectionalBullets2D::set_up_life_time_timer(double new_max_life_time, double new_current_life_time) {
+void BulletVolley2D::set_up_life_time_timer(double new_max_life_time, double new_current_life_time) {
 	max_life_time = new_max_life_time;
 	current_life_time = new_current_life_time;
 }
 
-double DirectionalBullets2D::get_fade_in_sec() const {
+double BulletVolley2D::get_fade_in_sec() const {
 	return fade_in_sec;
 }
-void DirectionalBullets2D::set_fade_in_sec(double value) {
+void BulletVolley2D::set_fade_in_sec(double value) {
 	if (!Math::is_finite(value) || value < 0.0) {
-		UtilityFunctions::push_error("DirectionalBullets2D: fade_in_sec must be finite and >= 0, keeping the old value.");
+		UtilityFunctions::push_error("BulletVolley2D: fade_in_sec must be finite and >= 0, keeping the old value.");
 		return;
 	}
 	fade_in_sec = value;
 }
-double DirectionalBullets2D::get_fade_out_sec() const {
+double BulletVolley2D::get_fade_out_sec() const {
 	return fade_out_sec;
 }
-void DirectionalBullets2D::set_fade_out_sec(double value) {
+void BulletVolley2D::set_fade_out_sec(double value) {
 	if (!Math::is_finite(value) || value < 0.0) {
-		UtilityFunctions::push_error("DirectionalBullets2D: fade_out_sec must be finite and >= 0, keeping the old value.");
+		UtilityFunctions::push_error("BulletVolley2D: fade_out_sec must be finite and >= 0, keeping the old value.");
 		return;
 	}
 	fade_out_sec = value;
 }
-Ref<Gradient> DirectionalBullets2D::get_modulate_ramp() const {
+Ref<Gradient> BulletVolley2D::get_modulate_ramp() const {
 	return fade_modulate_ramp;
 }
-void DirectionalBullets2D::set_modulate_ramp(const Ref<Gradient> &value) {
+void BulletVolley2D::set_modulate_ramp(const Ref<Gradient> &value) {
 	fade_modulate_ramp = value;
 }
-Color DirectionalBullets2D::get_fade_base_modulate() const {
+Color BulletVolley2D::get_fade_base_modulate() const {
 	return fade_base_modulate;
 }
-void DirectionalBullets2D::set_fade_base_modulate(const Color &value) {
+void BulletVolley2D::set_fade_base_modulate(const Color &value) {
 	fade_base_modulate = value;
 	// No fade/ramp configured: the tick early-returns and would never apply
 	// the new base, so write it now (this setter is the documented path).
@@ -1158,10 +1158,10 @@ void DirectionalBullets2D::set_fade_base_modulate(const Color &value) {
 	// happens to equal the stale applied snapshot.
 	fade_applied = Color(-1, -1, -1, -1);
 }
-bool DirectionalBullets2D::get_override_frame_color() const {
+bool BulletVolley2D::get_override_frame_color() const {
 	return anim_override_frame_color;
 }
-void DirectionalBullets2D::set_override_frame_color(bool value) {
+void BulletVolley2D::set_override_frame_color(bool value) {
 	if (anim_override_frame_color == value) {
 		return;
 	}
@@ -1174,7 +1174,7 @@ void DirectionalBullets2D::set_override_frame_color(bool value) {
 	}
 }
 
-void DirectionalBullets2D::snapshot_appearance_from_data(const DirectionalBulletsData2D &data) {
+void BulletVolley2D::snapshot_appearance_from_data(const BulletVolleyData2D &data) {
 	fade_base_modulate = data.self_modulate;
 	fade_in_sec = data.fade_in_sec;
 	fade_out_sec = data.fade_out_sec;
@@ -1192,7 +1192,7 @@ void DirectionalBullets2D::snapshot_appearance_from_data(const DirectionalBullet
 	}
 }
 
-void DirectionalBullets2D::tick_volley_fade() {
+void BulletVolley2D::tick_volley_fade() {
 	if (fade_in_sec <= 0.0 && fade_out_sec <= 0.0 && fade_modulate_ramp.is_null()) {
 		return;
 	}
@@ -1235,14 +1235,14 @@ void DirectionalBullets2D::tick_volley_fade() {
 static bool resolve_sprite_animation_impl(const Ref<SpriteFrames> &p_sprite_frames, const StringName &p_requested, StringName &out_anim, bool silent) {
 	if (p_sprite_frames.is_null()) {
 		if (!silent) {
-			UtilityFunctions::push_error("DirectionalBullets2D: sprite_frames is null. Assign a SpriteFrames resource.");
+			UtilityFunctions::push_error("BulletVolley2D: sprite_frames is null. Assign a SpriteFrames resource.");
 		}
 		return false;
 	}
 	const PackedStringArray names = p_sprite_frames->get_animation_names();
 	if (names.is_empty()) {
 		if (!silent) {
-			UtilityFunctions::push_error("DirectionalBullets2D: sprite_frames has no animations.");
+			UtilityFunctions::push_error("BulletVolley2D: sprite_frames has no animations.");
 		}
 		return false;
 	}
@@ -1268,7 +1268,7 @@ static bool resolve_sprite_animation_impl(const Ref<SpriteFrames> &p_sprite_fram
 		const StringName fallback = first_with_frames();
 		if (String(fallback).is_empty()) {
 			if (!silent) {
-				UtilityFunctions::push_error("DirectionalBullets2D: sprite_frames has no animation with frames.");
+				UtilityFunctions::push_error("BulletVolley2D: sprite_frames has no animation with frames.");
 			}
 			return false;
 		}
@@ -1282,38 +1282,38 @@ static bool resolve_sprite_animation_impl(const Ref<SpriteFrames> &p_sprite_fram
 	const StringName fallback = first_with_frames();
 	if (String(fallback).is_empty()) {
 		if (!silent) {
-			UtilityFunctions::push_error("DirectionalBullets2D: sprite_frames has no animation with frames.");
+			UtilityFunctions::push_error("BulletVolley2D: sprite_frames has no animation with frames.");
 		}
 		return false;
 	}
 	if (!silent) {
-		UtilityFunctions::push_error("DirectionalBullets2D: missing animation '" + requested_str + "', falling back to '" + String(fallback) + "'.");
+		UtilityFunctions::push_error("BulletVolley2D: missing animation '" + requested_str + "', falling back to '" + String(fallback) + "'.");
 	}
 	out_anim = fallback;
 	return true;
 }
 
-bool DirectionalBullets2D::resolve_sprite_animation(const Ref<SpriteFrames> &p_sprite_frames, const StringName &p_requested, StringName &out_anim) {
+bool BulletVolley2D::resolve_sprite_animation(const Ref<SpriteFrames> &p_sprite_frames, const StringName &p_requested, StringName &out_anim) {
 	return resolve_sprite_animation_impl(p_sprite_frames, p_requested, out_anim, false);
 }
 
-bool DirectionalBullets2D::resolve_sprite_animation_quiet(const Ref<SpriteFrames> &p_sprite_frames, const StringName &p_requested, StringName &out_anim) {
+bool BulletVolley2D::resolve_sprite_animation_quiet(const Ref<SpriteFrames> &p_sprite_frames, const StringName &p_requested, StringName &out_anim) {
 	return resolve_sprite_animation_impl(p_sprite_frames, p_requested, out_anim, true);
 }
 
-bool DirectionalBullets2D::rebuild_sprite_animation(const Ref<SpriteFrames> &p_sprite_frames, const StringName &p_animation) {
+bool BulletVolley2D::rebuild_sprite_animation(const Ref<SpriteFrames> &p_sprite_frames, const StringName &p_animation) {
 	StringName anim;
 	if (!resolve_sprite_animation(p_sprite_frames, p_animation, anim)) {
 		return false; // error already reported, previous animation untouched
 	}
 	const int count = p_sprite_frames->get_frame_count(anim);
 	if (count <= 0) {
-		UtilityFunctions::push_error("DirectionalBullets2D: animation '" + String(anim) + "' has no frames.");
+		UtilityFunctions::push_error("BulletVolley2D: animation '" + String(anim) + "' has no frames.");
 		return false;
 	}
 	double fps = p_sprite_frames->get_animation_speed(anim);
 	if (!Math::is_finite(fps) || fps <= 0.0) {
-		UtilityFunctions::push_error("DirectionalBullets2D: animation '" + String(anim) + "' has invalid speed, using 1 fps.");
+		UtilityFunctions::push_error("BulletVolley2D: animation '" + String(anim) + "' has invalid speed, using 1 fps.");
 		fps = 1.0;
 	}
 	std::vector<Ref<Texture2D>> frames;
@@ -1324,12 +1324,12 @@ bool DirectionalBullets2D::rebuild_sprite_animation(const Ref<SpriteFrames> &p_s
 	for (int i = 0; i < count; ++i) {
 		Ref<Texture2D> tex = p_sprite_frames->get_frame_texture(anim, i);
 		if (tex.is_null()) {
-			UtilityFunctions::push_error("DirectionalBullets2D: animation '" + String(anim) + "' frame " + String::num_int64(i) + " has null texture.");
+			UtilityFunctions::push_error("BulletVolley2D: animation '" + String(anim) + "' frame " + String::num_int64(i) + " has null texture.");
 			return false; // previous cache untouched (swap only on success below)
 		}
 		const float dur = p_sprite_frames->get_frame_duration(anim, i);
 		if (!Math::is_finite((double)dur)) {
-			UtilityFunctions::push_error("DirectionalBullets2D: animation '" + String(anim) + "' frame " + String::num_int64(i) + " has non-finite duration, using 0.");
+			UtilityFunctions::push_error("BulletVolley2D: animation '" + String(anim) + "' frame " + String::num_int64(i) + " has non-finite duration, using 0.");
 		}
 		if (anim_override_frame_color) {
 			// Exact-color bullets: whitened copy (alpha preserved) so the
@@ -1355,7 +1355,7 @@ bool DirectionalBullets2D::rebuild_sprite_animation(const Ref<SpriteFrames> &p_s
 			} else {
 				if (!whiten_warned) {
 					whiten_warned = true;
-					UtilityFunctions::push_warning("DirectionalBullets2D: override_frame_color could not read a frame of '" + String(anim) + "', keeping the original art for unreadable frames.");
+					UtilityFunctions::push_warning("BulletVolley2D: override_frame_color could not read a frame of '" + String(anim) + "', keeping the original art for unreadable frames.");
 				}
 				frames.push_back(tex);
 			}
@@ -1377,9 +1377,9 @@ bool DirectionalBullets2D::rebuild_sprite_animation(const Ref<SpriteFrames> &p_s
 	return true;
 }
 
-bool DirectionalBullets2D::play_sprite_animation(const Ref<SpriteFrames> &p_sprite_frames, const StringName &p_animation) {
+bool BulletVolley2D::play_sprite_animation(const Ref<SpriteFrames> &p_sprite_frames, const StringName &p_animation) {
 	if (p_sprite_frames.is_null()) {
-		UtilityFunctions::push_error("DirectionalBullets2D play_sprite_animation: sprite_frames is null.");
+		UtilityFunctions::push_error("BulletVolley2D play_sprite_animation: sprite_frames is null.");
 		return false;
 	}
 	// Empty follows the same auto-resolve rules as spawn ("default" if present,
@@ -1387,18 +1387,18 @@ bool DirectionalBullets2D::play_sprite_animation(const Ref<SpriteFrames> &p_spri
 	return rebuild_sprite_animation(p_sprite_frames, p_animation);
 }
 
-bool DirectionalBullets2D::play_sprite_animation_name(const StringName &p_animation) {
+bool BulletVolley2D::play_sprite_animation_name(const StringName &p_animation) {
 	if (anim_source.is_null()) {
-		UtilityFunctions::push_error("DirectionalBullets2D play_sprite_animation_name: no SpriteFrames cached yet, call play_sprite_animation first.");
+		UtilityFunctions::push_error("BulletVolley2D play_sprite_animation_name: no SpriteFrames cached yet, call play_sprite_animation first.");
 		return false;
 	}
 	// Empty follows the same auto-resolve rules as spawn.
 	return rebuild_sprite_animation(anim_source, p_animation);
 }
 
-bool DirectionalBullets2D::restart_sprite_animation() {
+bool BulletVolley2D::restart_sprite_animation() {
 	if (anim_frames.empty()) {
-		UtilityFunctions::push_error("DirectionalBullets2D restart_sprite_animation: no baked animation to restart.");
+		UtilityFunctions::push_error("BulletVolley2D restart_sprite_animation: no baked animation to restart.");
 		return false;
 	}
 	anim_frame_index = 0;
@@ -1409,12 +1409,12 @@ bool DirectionalBullets2D::restart_sprite_animation() {
 	return true;
 }
 
-Vector2 DirectionalBullets2D::resolve_quad_size(const Ref<SpriteFrames> &p_sprite_frames, const StringName &p_animation, Vector2 override_size) {
+Vector2 BulletVolley2D::resolve_quad_size(const Ref<SpriteFrames> &p_sprite_frames, const StringName &p_animation, Vector2 override_size) {
 	if (override_size.is_finite() && override_size.x > 0.0f && override_size.y > 0.0f) {
 		return override_size;
 	}
 	if (override_size != Vector2(0, 0) && (!override_size.is_finite() || override_size.x <= 0.0f || override_size.y <= 0.0f)) {
-		WarnOnce2D::warn(0, 3u, (int64_t)(override_size.x * 1024.0f), (int64_t)(override_size.y * 1024.0f), "DirectionalBullets2D: texture_size override is non-finite or non-positive, deriving size from the first frame.");
+		WarnOnce2D::warn(0, 3u, (int64_t)(override_size.x * 1024.0f), (int64_t)(override_size.y * 1024.0f), "BulletVolley2D: texture_size override is non-finite or non-positive, deriving size from the first frame.");
 	}
 	// Silent fallback: rebuild_sprite_animation owns all error reporting (spawn calls
 	// both, so resolving loudly here would print every failure twice).
@@ -1439,7 +1439,7 @@ Vector2 DirectionalBullets2D::resolve_quad_size(const Ref<SpriteFrames> &p_sprit
 }
 
 // Always called last (texture comes from rebuild_sprite_animation, called by spawn/enable)
-void DirectionalBullets2D::finalize_set_up(
+void BulletVolley2D::finalize_set_up(
 		const Ref<Resource> &new_shared_bullets_custom_data,
 		const Ref<Material> &new_material,
 		int new_z_index,
@@ -1507,7 +1507,7 @@ void DirectionalBullets2D::finalize_set_up(
 
 // OTHER
 
-void DirectionalBullets2D::set_rotation_data(const TypedArray<BulletRotationData2D> &rotation_data, bool new_rotate_only_textures, bool tile_short_arrays) {
+void BulletVolley2D::set_rotation_data(const TypedArray<BulletRotationData2D> &rotation_data, bool new_rotate_only_textures, bool tile_short_arrays) {
 	int amount_rotation_data = rotation_data.size();
 
 	// Strict rule: entry i rotates bullet i only. Slots past the end keep
@@ -1531,7 +1531,7 @@ void DirectionalBullets2D::set_rotation_data(const TypedArray<BulletRotationData
 	is_rotation_data_active = true;
 
 	if (amount_rotation_data != amount_bullets) {
-		WarnOnce2D::warn(warn_data_id, 4u, amount_rotation_data, amount_bullets, "DirectionalBullets2D: all_bullet_rotation_data size (" + String::num_int64(amount_rotation_data) + ") != bullets (" + String::num_int64(amount_bullets) + "); uncovered bullets get zero spin unless shared rotation fills them" + String(tile_short_arrays ? " (tiling on: wrapping short array)." : " (check tile_all_bullet_rotation_data to wrap, or provide one entry per bullet)."));
+		WarnOnce2D::warn(warn_data_id, 4u, amount_rotation_data, amount_bullets, "BulletVolley2D: all_bullet_rotation_data size (" + String::num_int64(amount_rotation_data) + ") != bullets (" + String::num_int64(amount_bullets) + "); uncovered bullets get zero spin unless shared rotation fills them" + String(tile_short_arrays ? " (tiling on: wrapping short array)." : " (check tile_all_bullet_rotation_data to wrap, or provide one entry per bullet)."));
 	}
 
 	// Validate every element we are about to read. Null/wrong-type entries
@@ -1586,7 +1586,7 @@ void DirectionalBullets2D::set_rotation_data(const TypedArray<BulletRotationData
 	}
 }
 
-Ref<BulletRotationData2D> DirectionalBullets2D::get_bullet_rotation_data(int bullet_index) const {
+Ref<BulletRotationData2D> BulletVolley2D::get_bullet_rotation_data(int bullet_index) const {
 	Ref<BulletRotationData2D> rotation_data = memnew(BulletRotationData2D);
 
 	if (!validate_bullet_index(bullet_index, "get_bullet_rotation_data")) {
@@ -1603,7 +1603,7 @@ Ref<BulletRotationData2D> DirectionalBullets2D::get_bullet_rotation_data(int bul
 	return rotation_data;
 }
 
-void DirectionalBullets2D::set_bullet_rotation_data(int bullet_index, const Ref<BulletRotationData2D> &new_bullet_rotation_data) {
+void BulletVolley2D::set_bullet_rotation_data(int bullet_index, const Ref<BulletRotationData2D> &new_bullet_rotation_data) {
 	if (!validate_bullet_index(bullet_index, "set_bullet_rotation_data")) {
 		return;
 	}
@@ -1645,7 +1645,7 @@ void DirectionalBullets2D::set_bullet_rotation_data(int bullet_index, const Ref<
 	is_rotation_data_active = true;
 }
 
-TypedArray<BulletRotationData2D> DirectionalBullets2D::all_bullets_get_rotation_data(int bullet_index_start, int bullet_index_end_inclusive) const {
+TypedArray<BulletRotationData2D> BulletVolley2D::all_bullets_get_rotation_data(int bullet_index_start, int bullet_index_end_inclusive) const {
 	ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_get_rotation_data");
 
 	TypedArray<BulletRotationData2D> arr;
@@ -1656,7 +1656,7 @@ TypedArray<BulletRotationData2D> DirectionalBullets2D::all_bullets_get_rotation_
 	return arr;
 }
 
-void DirectionalBullets2D::all_bullets_set_rotation_data(const Ref<BulletRotationData2D> &new_bullet_rotation_data, int bullet_index_start, int bullet_index_end_inclusive) {
+void BulletVolley2D::all_bullets_set_rotation_data(const Ref<BulletRotationData2D> &new_bullet_rotation_data, int bullet_index_start, int bullet_index_end_inclusive) {
 	ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_set_rotation_data");
 
 	if (new_bullet_rotation_data.is_null()) {
@@ -1669,18 +1669,18 @@ void DirectionalBullets2D::all_bullets_set_rotation_data(const Ref<BulletRotatio
 	}
 }
 
-void DirectionalBullets2D::clear_bullet_rotation_data() {
+void BulletVolley2D::clear_bullet_rotation_data() {
 	is_rotation_data_active = false;
 	all_rotation_speed.clear();
 	all_max_rotation_speed.clear();
 	all_rotation_acceleration.clear();
-	// Presence must go with the values: without this, Directional keeps stale
+	// Presence must go with the values: without this, the volley keeps stale
 	// per-bullet bits and a later shared fallback skips slots that are now
 	// genuine gaps (rotation cleared means "no seed", not "authored zero").
 	reset_per_bullet_rotation_presence();
 }
 
-Transform2D DirectionalBullets2D::generate_texture_transform(Transform2D transf, bool is_texture_rotation_permanent, real_t texture_rotation_radians, int bullet_index) {
+Transform2D BulletVolley2D::generate_texture_transform(Transform2D transf, bool is_texture_rotation_permanent, real_t texture_rotation_radians, int bullet_index) {
 	if (is_texture_rotation_permanent) {
 		// Same texture rotation no matter the rotation of the bullet's transform
 		transf.set_rotation(texture_rotation_radians);
@@ -1697,7 +1697,7 @@ Transform2D DirectionalBullets2D::generate_texture_transform(Transform2D transf,
 	return transf;
 }
 
-void DirectionalBullets2D::set_up_area(const int collision_layer, const int collision_mask, bool new_monitorable, const RID &physics_space) {
+void BulletVolley2D::set_up_area(const int collision_layer, const int collision_mask, bool new_monitorable, const RID &physics_space) {
 	monitorable = new_monitorable;
 	if (physics_server == nullptr || !area.is_valid()) {
 		UtilityFunctions::push_error("set_up_area: physics server or area is not ready, bullets will not collide.");
@@ -1713,13 +1713,13 @@ void DirectionalBullets2D::set_up_area(const int collision_layer, const int coll
 	}
 	physics_server->area_set_space(area, space_to_use);
 	physics_server->area_set_monitorable(area, monitorable);
-	physics_server->area_set_area_monitor_callback(area, callable_mp(this, &DirectionalBullets2D::area_entered_func));
-	physics_server->area_set_monitor_callback(area, callable_mp(this, &DirectionalBullets2D::body_entered_func));
+	physics_server->area_set_area_monitor_callback(area, callable_mp(this, &BulletVolley2D::area_entered_func));
+	physics_server->area_set_monitor_callback(area, callable_mp(this, &BulletVolley2D::body_entered_func));
 	physics_server->area_set_collision_layer(area, collision_layer);
 	physics_server->area_set_collision_mask(area, collision_mask);
 }
 
-Transform2D DirectionalBullets2D::generate_collision_shape_transform_for_area(Transform2D transf, const Vector2 &collision_shape_offset, int bullet_index) {
+Transform2D BulletVolley2D::generate_collision_shape_transform_for_area(Transform2D transf, const Vector2 &collision_shape_offset, int bullet_index) {
 	// The rotation of each transform
 	real_t curr_bullet_rotation = transf.get_rotation();
 
@@ -1735,7 +1735,7 @@ Transform2D DirectionalBullets2D::generate_collision_shape_transform_for_area(Tr
 	return transf;
 }
 
-void DirectionalBullets2D::apply_volley_shape_data() {
+void BulletVolley2D::apply_volley_shape_data() {
 	if (physics_server == nullptr || !volley_shape.is_valid() || shape_data_matches_applied()) {
 		return;
 	}
@@ -1754,7 +1754,7 @@ void DirectionalBullets2D::apply_volley_shape_data() {
 	mark_shape_data_applied();
 }
 
-void DirectionalBullets2D::release_volley_shape() {
+void BulletVolley2D::release_volley_shape() {
 	if (physics_server == nullptr) {
 		return;
 	}
@@ -1769,7 +1769,7 @@ void DirectionalBullets2D::release_volley_shape() {
 	shape_data_applied = false;
 }
 
-void DirectionalBullets2D::generate_physics_shapes_for_area(int amount) {
+void BulletVolley2D::generate_physics_shapes_for_area(int amount) {
 	// Fresh RID carries no data yet. The data is pushed BEFORE the shape gets
 	// any owner, so the push costs nothing area-wide; each add below only
 	// queues a deferred shape update (O(1)).
@@ -1785,13 +1785,13 @@ void DirectionalBullets2D::generate_physics_shapes_for_area(int amount) {
 	area_shape_count = amount;
 }
 
-void DirectionalBullets2D::set_all_physics_shapes_enabled_for_area(bool enable) {
+void BulletVolley2D::set_all_physics_shapes_enabled_for_area(bool enable) {
 	for (int i = 0; i < amount_bullets; ++i) {
 		physics_server->area_set_shape_disabled(area, i, !enable);
 	}
 }
 
-Ref<BulletSpeedData2D> DirectionalBullets2D::get_bullet_speed_data(int bullet_index) const {
+Ref<BulletSpeedData2D> BulletVolley2D::get_bullet_speed_data(int bullet_index) const {
 	Ref<BulletSpeedData2D> speed_data = memnew(BulletSpeedData2D);
 
 	if (!validate_bullet_index(bullet_index, "get_bullet_speed_data")) {
@@ -1808,7 +1808,7 @@ Ref<BulletSpeedData2D> DirectionalBullets2D::get_bullet_speed_data(int bullet_in
 	return speed_data;
 }
 
-void DirectionalBullets2D::set_bullet_speed_data(int bullet_index, const Ref<BulletSpeedData2D> &new_bullet_speed_data) {
+void BulletVolley2D::set_bullet_speed_data(int bullet_index, const Ref<BulletSpeedData2D> &new_bullet_speed_data) {
 	if (!validate_bullet_index(bullet_index, "set_bullet_speed_data")) {
 		return;
 	}
@@ -1849,7 +1849,7 @@ void DirectionalBullets2D::set_bullet_speed_data(int bullet_index, const Ref<Bul
 	mark_per_bullet_speed_presence(bullet_index, true);
 }
 
-TypedArray<BulletSpeedData2D> DirectionalBullets2D::all_bullets_get_speed_data(int bullet_index_start, int bullet_index_end_inclusive) const {
+TypedArray<BulletSpeedData2D> BulletVolley2D::all_bullets_get_speed_data(int bullet_index_start, int bullet_index_end_inclusive) const {
 	ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_get_speed_data");
 
 	TypedArray<BulletSpeedData2D> arr;
@@ -1860,7 +1860,7 @@ TypedArray<BulletSpeedData2D> DirectionalBullets2D::all_bullets_get_speed_data(i
 	return arr;
 }
 
-void DirectionalBullets2D::all_bullets_set_speed_data(const Ref<BulletSpeedData2D> &new_bullet_speed_data, int bullet_index_start, int bullet_index_end_inclusive) {
+void BulletVolley2D::all_bullets_set_speed_data(const Ref<BulletSpeedData2D> &new_bullet_speed_data, int bullet_index_start, int bullet_index_end_inclusive) {
 	ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_set_speed_data");
 
 	if (new_bullet_speed_data.is_null()) {
@@ -1878,7 +1878,7 @@ void DirectionalBullets2D::all_bullets_set_speed_data(const Ref<BulletSpeedData2
 	}
 }
 
-Vector2 DirectionalBullets2D::get_bullet_direction(int bullet_index) const {
+Vector2 BulletVolley2D::get_bullet_direction(int bullet_index) const {
 	if (!validate_bullet_index(bullet_index, "get_bullet_direction")) {
 		return Vector2();
 	}
@@ -1889,7 +1889,7 @@ Vector2 DirectionalBullets2D::get_bullet_direction(int bullet_index) const {
 	return all_cached_direction[bullet_index];
 }
 
-void DirectionalBullets2D::set_bullet_direction(int bullet_index, const Vector2 &new_direction) {
+void BulletVolley2D::set_bullet_direction(int bullet_index, const Vector2 &new_direction) {
 	if (!validate_bullet_index(bullet_index, "set_bullet_direction")) {
 		return;
 	}
@@ -1923,7 +1923,7 @@ void DirectionalBullets2D::set_bullet_direction(int bullet_index, const Vector2 
 	all_cached_velocity[bullet_index] = all_cached_direction[bullet_index] * all_cached_speed[bullet_index] + inherited_velocity_offset;
 }
 
-TypedArray<Vector2> DirectionalBullets2D::all_bullets_get_direction(int bullet_index_start, int bullet_index_end_inclusive) const {
+TypedArray<Vector2> BulletVolley2D::all_bullets_get_direction(int bullet_index_start, int bullet_index_end_inclusive) const {
 	ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_get_direction");
 
 	TypedArray<Vector2> arr;
@@ -1934,7 +1934,7 @@ TypedArray<Vector2> DirectionalBullets2D::all_bullets_get_direction(int bullet_i
 	return arr;
 }
 
-void DirectionalBullets2D::all_bullets_set_direction(const Vector2 &new_direction, int bullet_index_start, int bullet_index_end_inclusive) {
+void BulletVolley2D::all_bullets_set_direction(const Vector2 &new_direction, int bullet_index_start, int bullet_index_end_inclusive) {
 	ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_set_direction");
 
 	for (int i = bullet_index_start; i <= bullet_index_end_inclusive; ++i) {
@@ -1942,7 +1942,7 @@ void DirectionalBullets2D::all_bullets_set_direction(const Vector2 &new_directio
 	}
 }
 
-real_t DirectionalBullets2D::get_bullet_texture_rotation_radians(int bullet_index) const {
+real_t BulletVolley2D::get_bullet_texture_rotation_radians(int bullet_index) const {
 	if (!validate_bullet_index(bullet_index, "get_bullet_texture_rotation_radians")) {
 		return 0.0;
 	}
@@ -1960,7 +1960,7 @@ real_t DirectionalBullets2D::get_bullet_texture_rotation_radians(int bullet_inde
 	return Math::wrapf(instance_rotation - cache_texture_rotation_radians, (real_t)-Math::PI, (real_t)Math::PI);
 }
 
-void DirectionalBullets2D::set_bullet_texture_rotation_radians(int bullet_index, real_t new_rotation_radians) {
+void BulletVolley2D::set_bullet_texture_rotation_radians(int bullet_index, real_t new_rotation_radians) {
 	if (!validate_bullet_index(bullet_index, "set_bullet_texture_rotation_radians")) {
 		return;
 	}
@@ -1993,7 +1993,7 @@ void DirectionalBullets2D::set_bullet_texture_rotation_radians(int bullet_index,
 	update_bullet_previous_transform_for_interpolation(bullet_index);
 }
 
-TypedArray<real_t> DirectionalBullets2D::all_bullets_get_texture_rotation_radians(int bullet_index_start, int bullet_index_end_inclusive) const {
+TypedArray<real_t> BulletVolley2D::all_bullets_get_texture_rotation_radians(int bullet_index_start, int bullet_index_end_inclusive) const {
 	ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_get_texture_rotation_radians");
 
 	TypedArray<real_t> arr;
@@ -2004,7 +2004,7 @@ TypedArray<real_t> DirectionalBullets2D::all_bullets_get_texture_rotation_radian
 	return arr;
 }
 
-void DirectionalBullets2D::all_bullets_set_texture_rotation_radians(real_t new_rotation_radians, int bullet_index_start, int bullet_index_end_inclusive) {
+void BulletVolley2D::all_bullets_set_texture_rotation_radians(real_t new_rotation_radians, int bullet_index_start, int bullet_index_end_inclusive) {
 	ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_set_texture_rotation_radians");
 
 	for (int i = bullet_index_start; i <= bullet_index_end_inclusive; ++i) {
@@ -2012,7 +2012,7 @@ void DirectionalBullets2D::all_bullets_set_texture_rotation_radians(real_t new_r
 	}
 }
 
-real_t DirectionalBullets2D::get_bullet_texture_rotation_degrees(int bullet_index) const {
+real_t BulletVolley2D::get_bullet_texture_rotation_degrees(int bullet_index) const {
 	if (!validate_bullet_index(bullet_index, "get_bullet_texture_rotation_degrees")) {
 		return 0.0;
 	}
@@ -2023,7 +2023,7 @@ real_t DirectionalBullets2D::get_bullet_texture_rotation_degrees(int bullet_inde
 	return Math::rad_to_deg(get_bullet_texture_rotation_radians(bullet_index));
 }
 
-void DirectionalBullets2D::set_bullet_texture_rotation_degrees(int bullet_index, real_t new_rotation_degrees) {
+void BulletVolley2D::set_bullet_texture_rotation_degrees(int bullet_index, real_t new_rotation_degrees) {
 	if (!validate_bullet_index(bullet_index, "set_bullet_texture_rotation_degrees")) {
 		return;
 	}
@@ -2049,7 +2049,7 @@ void DirectionalBullets2D::set_bullet_texture_rotation_degrees(int bullet_index,
 	update_bullet_previous_transform_for_interpolation(bullet_index);
 }
 
-TypedArray<real_t> DirectionalBullets2D::all_bullets_get_texture_rotation_degrees(int bullet_index_start, int bullet_index_end_inclusive) const {
+TypedArray<real_t> BulletVolley2D::all_bullets_get_texture_rotation_degrees(int bullet_index_start, int bullet_index_end_inclusive) const {
 	ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_get_texture_rotation_degrees");
 
 	TypedArray<real_t> arr;
@@ -2060,7 +2060,7 @@ TypedArray<real_t> DirectionalBullets2D::all_bullets_get_texture_rotation_degree
 	return arr;
 }
 
-void DirectionalBullets2D::all_bullets_set_texture_rotation_degrees(real_t new_rotation_degrees, int bullet_index_start, int bullet_index_end_inclusive) {
+void BulletVolley2D::all_bullets_set_texture_rotation_degrees(real_t new_rotation_degrees, int bullet_index_start, int bullet_index_end_inclusive) {
 	ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_set_texture_rotation_degrees");
 
 	for (int i = bullet_index_start; i <= bullet_index_end_inclusive; ++i) {
@@ -2068,7 +2068,7 @@ void DirectionalBullets2D::all_bullets_set_texture_rotation_degrees(real_t new_r
 	}
 }
 
-Transform2D DirectionalBullets2D::get_bullet_transform(int bullet_index) const {
+Transform2D BulletVolley2D::get_bullet_transform(int bullet_index) const {
 	if (!validate_bullet_index(bullet_index, "get_bullet_transform")) {
 		return Transform2D();
 	}
@@ -2081,7 +2081,7 @@ Transform2D DirectionalBullets2D::get_bullet_transform(int bullet_index) const {
 	return all_cached_instance_transforms[bullet_index];
 }
 
-Transform2D DirectionalBullets2D::get_bullet_global_transform(int bullet_index) const {
+Transform2D BulletVolley2D::get_bullet_global_transform(int bullet_index) const {
 	if (!validate_bullet_index(bullet_index, "get_bullet_global_transform")) {
 		return Transform2D();
 	}
@@ -2092,7 +2092,7 @@ Transform2D DirectionalBullets2D::get_bullet_global_transform(int bullet_index) 
 	return all_cached_instance_transforms[bullet_index];
 }
 
-Vector2 DirectionalBullets2D::get_bullet_velocity(int bullet_index) const {
+Vector2 BulletVolley2D::get_bullet_velocity(int bullet_index) const {
 	if (!validate_bullet_index(bullet_index, "get_bullet_velocity")) {
 		return Vector2();
 	}
@@ -2102,7 +2102,7 @@ Vector2 DirectionalBullets2D::get_bullet_velocity(int bullet_index) const {
 	}
 	return all_cached_velocity[bullet_index];
 }
-void DirectionalBullets2D::set_bullet_transform(int bullet_index, const Transform2D &new_transform, bool set_direction_based_on_transform) {
+void BulletVolley2D::set_bullet_transform(int bullet_index, const Transform2D &new_transform, bool set_direction_based_on_transform) {
 	if (!validate_bullet_index(bullet_index, "set_bullet_transform")) {
 		return;
 	}
@@ -2177,7 +2177,7 @@ void DirectionalBullets2D::set_bullet_transform(int bullet_index, const Transfor
 	update_bullet_previous_transform_for_interpolation(bullet_index);
 }
 
-TypedArray<Transform2D> DirectionalBullets2D::all_bullets_get_transforms(int bullet_index_start, int bullet_index_end_inclusive) const {
+TypedArray<Transform2D> BulletVolley2D::all_bullets_get_transforms(int bullet_index_start, int bullet_index_end_inclusive) const {
 	ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_get_transforms");
 
 	TypedArray<Transform2D> arr;
@@ -2188,7 +2188,7 @@ TypedArray<Transform2D> DirectionalBullets2D::all_bullets_get_transforms(int bul
 	return arr;
 }
 
-void DirectionalBullets2D::all_bullets_set_transforms(const Transform2D &new_transform, bool set_direction_based_on_transform, int bullet_index_start, int bullet_index_end_inclusive) {
+void BulletVolley2D::all_bullets_set_transforms(const Transform2D &new_transform, bool set_direction_based_on_transform, int bullet_index_start, int bullet_index_end_inclusive) {
 	ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_set_transforms");
 
 	for (int i = bullet_index_start; i <= bullet_index_end_inclusive; ++i) {
@@ -2196,7 +2196,7 @@ void DirectionalBullets2D::all_bullets_set_transforms(const Transform2D &new_tra
 	}
 }
 
-void DirectionalBullets2D::set_bullet_direction_towards_position(int bullet_index, const Vector2 &target_position) {
+void BulletVolley2D::set_bullet_direction_towards_position(int bullet_index, const Vector2 &target_position) {
 	if (!validate_bullet_index(bullet_index, "set_bullet_direction_towards_position")) {
 		return;
 	}
@@ -2229,7 +2229,7 @@ void DirectionalBullets2D::set_bullet_direction_towards_position(int bullet_inde
 	all_cached_velocity[bullet_index] = all_cached_direction[bullet_index] * all_cached_speed[bullet_index] + inherited_velocity_offset;
 }
 
-void DirectionalBullets2D::all_bullets_set_direction_towards_position(const Vector2 &target_position, int bullet_index_start, int bullet_index_end_inclusive) {
+void BulletVolley2D::all_bullets_set_direction_towards_position(const Vector2 &target_position, int bullet_index_start, int bullet_index_end_inclusive) {
 	ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_set_direction_towards_position");
 
 	for (int i = bullet_index_start; i <= bullet_index_end_inclusive; ++i) {
@@ -2237,7 +2237,7 @@ void DirectionalBullets2D::all_bullets_set_direction_towards_position(const Vect
 	}
 }
 
-void DirectionalBullets2D::set_bullet_direction_towards_node2d(int bullet_index, const Node2D *target_node) {
+void BulletVolley2D::set_bullet_direction_towards_node2d(int bullet_index, const Node2D *target_node) {
 	if (!validate_bullet_index(bullet_index, "set_bullet_direction_towards_node2d")) {
 		return;
 	}
@@ -2275,7 +2275,7 @@ void DirectionalBullets2D::set_bullet_direction_towards_node2d(int bullet_index,
 	all_cached_velocity[bullet_index] = all_cached_direction[bullet_index] * all_cached_speed[bullet_index] + inherited_velocity_offset;
 }
 
-void DirectionalBullets2D::all_bullets_set_direction_towards_node2d(const Node2D *target_node, int bullet_index_start, int bullet_index_end_inclusive) {
+void BulletVolley2D::all_bullets_set_direction_towards_node2d(const Node2D *target_node, int bullet_index_start, int bullet_index_end_inclusive) {
 	ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_set_direction_towards_node2d");
 
 	if (target_node == nullptr) {
@@ -2290,7 +2290,7 @@ void DirectionalBullets2D::all_bullets_set_direction_towards_node2d(const Node2D
 	}
 }
 
-void DirectionalBullets2D::set_bullet_texture_rotation_towards_position(int bullet_index, const Vector2 &target_position) {
+void BulletVolley2D::set_bullet_texture_rotation_towards_position(int bullet_index, const Vector2 &target_position) {
 	if (!validate_bullet_index(bullet_index, "set_bullet_texture_rotation_towards_position"))
 		return;
 	if (!target_position.is_finite()) {
@@ -2334,7 +2334,7 @@ void DirectionalBullets2D::set_bullet_texture_rotation_towards_position(int bull
 	update_bullet_previous_transform_for_interpolation(bullet_index);
 }
 
-void DirectionalBullets2D::all_bullets_set_texture_rotation_towards_position(const Vector2 &target_position, int bullet_index_start, int bullet_index_end_inclusive) {
+void BulletVolley2D::all_bullets_set_texture_rotation_towards_position(const Vector2 &target_position, int bullet_index_start, int bullet_index_end_inclusive) {
 	ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_set_texture_rotation_towards_position");
 
 	for (int i = bullet_index_start; i <= bullet_index_end_inclusive; ++i) {
@@ -2342,7 +2342,7 @@ void DirectionalBullets2D::all_bullets_set_texture_rotation_towards_position(con
 	}
 }
 
-void DirectionalBullets2D::set_bullet_texture_rotation_towards_node2d(int bullet_index, const Node2D *target_node) {
+void BulletVolley2D::set_bullet_texture_rotation_towards_node2d(int bullet_index, const Node2D *target_node) {
 	if (!validate_bullet_index(bullet_index, "set_bullet_texture_rotation_towards_node2d"))
 		return;
 
@@ -2355,7 +2355,7 @@ void DirectionalBullets2D::set_bullet_texture_rotation_towards_node2d(int bullet
 	set_bullet_texture_rotation_towards_position(bullet_index, target_position);
 }
 
-void DirectionalBullets2D::all_bullets_set_texture_rotation_towards_node2d(const Node2D *target_node, int bullet_index_start, int bullet_index_end_inclusive) {
+void BulletVolley2D::all_bullets_set_texture_rotation_towards_node2d(const Node2D *target_node, int bullet_index_start, int bullet_index_end_inclusive) {
 	ensure_indexes_match_amount_bullets_range(bullet_index_start, bullet_index_end_inclusive, "all_bullets_set_texture_rotation_towards_node2d");
 
 	if (target_node == nullptr) {
@@ -2370,10 +2370,10 @@ void DirectionalBullets2D::all_bullets_set_texture_rotation_towards_node2d(const
 	}
 }
 
-real_t DirectionalBullets2D::get_curves_elapsed_time() const {
+real_t BulletVolley2D::get_curves_elapsed_time() const {
 	return curves_elapsed_time;
 }
-void DirectionalBullets2D::set_curves_elapsed_time(real_t new_time) {
+void BulletVolley2D::set_curves_elapsed_time(real_t new_time) {
 	// NaN/Inf here would poison every curve sample (speed/rotation/direction) with no
 	// recovery, so reject non-finite time like the other movement setters do.
 	if (!Math::is_finite(new_time) || new_time < 0.0) {
@@ -2383,7 +2383,7 @@ void DirectionalBullets2D::set_curves_elapsed_time(real_t new_time) {
 	curves_elapsed_time = new_time;
 }
 
-Ref<Curve2D> DirectionalBullets2D::get_bullet_movement_pattern_curve(int bullet_index) const {
+Ref<Curve2D> BulletVolley2D::get_bullet_movement_pattern_curve(int bullet_index) const {
 	if (check_exists_bullet_movement_pattern_data(bullet_index)) {
 		return find_bullet_movement_pattern_data(bullet_index).path_curve;
 	}
@@ -2391,7 +2391,7 @@ Ref<Curve2D> DirectionalBullets2D::get_bullet_movement_pattern_curve(int bullet_
 	return nullptr;
 }
 
-void DirectionalBullets2D::set_bullet_movement_pattern_from_path(int bullet_index, Path2D *path_holding_pattern, bool face_movement_direction, bool repeat_pattern) {
+void BulletVolley2D::set_bullet_movement_pattern_from_path(int bullet_index, Path2D *path_holding_pattern, bool face_movement_direction, bool repeat_pattern) {
 	if (path_holding_pattern == nullptr) {
 		remove_bullet_movement_pattern(bullet_index);
 		return;
@@ -2402,7 +2402,7 @@ void DirectionalBullets2D::set_bullet_movement_pattern_from_path(int bullet_inde
 	set_bullet_movement_pattern_from_curve(bullet_index, curve, face_movement_direction, repeat_pattern);
 }
 
-void DirectionalBullets2D::all_bullets_set_movement_pattern_from_path(Path2D *path_holding_pattern, bool face_movement_direction, bool repeat_pattern, int start_index, int end_index_inclusive) {
+void BulletVolley2D::all_bullets_set_movement_pattern_from_path(Path2D *path_holding_pattern, bool face_movement_direction, bool repeat_pattern, int start_index, int end_index_inclusive) {
 	ensure_indexes_match_amount_bullets_range(start_index, end_index_inclusive, "all_bullets_set_movement_pattern_from_path");
 
 	if (path_holding_pattern == nullptr) {
@@ -2422,7 +2422,7 @@ void DirectionalBullets2D::all_bullets_set_movement_pattern_from_path(Path2D *pa
 	}
 }
 
-void DirectionalBullets2D::set_bullet_movement_pattern_from_curve(int bullet_index, const Ref<Curve2D> &curve_pattern, bool face_movement_direction, bool repeat_pattern) {
+void BulletVolley2D::set_bullet_movement_pattern_from_curve(int bullet_index, const Ref<Curve2D> &curve_pattern, bool face_movement_direction, bool repeat_pattern) {
 	if (!validate_bullet_index(bullet_index, "set_bullet_movement_pattern_from_curve")) {
 		return;
 	}
@@ -2433,7 +2433,7 @@ void DirectionalBullets2D::set_bullet_movement_pattern_from_curve(int bullet_ind
 	all_movement_pattern_data[bullet_index] = BulletMovementPatternData2D{ curve_pattern, face_movement_direction, repeat_pattern };
 }
 
-void DirectionalBullets2D::all_bullets_set_movement_pattern_from_curve(const Ref<Curve2D> &curve_pattern, bool face_movement_direction, bool repeat_pattern, int start_index, int end_index_inclusive) {
+void BulletVolley2D::all_bullets_set_movement_pattern_from_curve(const Ref<Curve2D> &curve_pattern, bool face_movement_direction, bool repeat_pattern, int start_index, int end_index_inclusive) {
 	ensure_indexes_match_amount_bullets_range(start_index, end_index_inclusive, "all_bullets_set_movement_pattern_from_curve");
 
 	if (curve_pattern.is_null()) {
@@ -2446,13 +2446,13 @@ void DirectionalBullets2D::all_bullets_set_movement_pattern_from_curve(const Ref
 	}
 }
 
-void DirectionalBullets2D::remove_bullet_movement_pattern(int bullet_index) {
+void BulletVolley2D::remove_bullet_movement_pattern(int bullet_index) {
 	if (check_exists_bullet_movement_pattern_data(bullet_index)) {
 		all_movement_pattern_data[bullet_index] = BulletMovementPatternData2D();
 	}
 }
 
-void DirectionalBullets2D::all_bullets_remove_movement_pattern(int start_index, int end_index_inclusive) {
+void BulletVolley2D::all_bullets_remove_movement_pattern(int start_index, int end_index_inclusive) {
 	ensure_indexes_match_amount_bullets_range(start_index, end_index_inclusive, "all_bullets_remove_movement_pattern");
 
 	for (int i = start_index; i <= end_index_inclusive; ++i) {
@@ -2460,7 +2460,7 @@ void DirectionalBullets2D::all_bullets_remove_movement_pattern(int start_index, 
 	}
 }
 
-int DirectionalBullets2D::get_collision_layer() const {
+int BulletVolley2D::get_collision_layer() const {
 	if (physics_server == nullptr || !area.is_valid()) {
 		UtilityFunctions::push_error("get_collision_layer: multimesh was never spawned through BulletFactory2D.");
 		return 0;
@@ -2468,7 +2468,7 @@ int DirectionalBullets2D::get_collision_layer() const {
 	return physics_server->area_get_collision_layer(area);
 }
 
-void DirectionalBullets2D::set_collision_layer(int new_collision_layer) {
+void BulletVolley2D::set_collision_layer(int new_collision_layer) {
 	if (physics_server == nullptr || !area.is_valid()) {
 		UtilityFunctions::push_error("set_collision_layer: multimesh was never spawned through BulletFactory2D.");
 		return;
@@ -2476,8 +2476,8 @@ void DirectionalBullets2D::set_collision_layer(int new_collision_layer) {
 	physics_server->area_set_collision_layer(area, new_collision_layer);
 }
 
-void DirectionalBullets2D::set_collision_layer_from_array(const TypedArray<int> &numbers) {
-	int bitmask = DirectionalBulletsData2D::calculate_bitmask(numbers);
+void BulletVolley2D::set_collision_layer_from_array(const TypedArray<int> &numbers) {
+	int bitmask = BulletVolleyData2D::calculate_bitmask(numbers);
 	if (physics_server == nullptr || !area.is_valid()) {
 		UtilityFunctions::push_error("set_collision_layer_from_array: multimesh was never spawned through BulletFactory2D.");
 		return;
@@ -2485,7 +2485,7 @@ void DirectionalBullets2D::set_collision_layer_from_array(const TypedArray<int> 
 	physics_server->area_set_collision_layer(area, bitmask);
 }
 
-int DirectionalBullets2D::get_collision_mask() const {
+int BulletVolley2D::get_collision_mask() const {
 	if (physics_server == nullptr || !area.is_valid()) {
 		UtilityFunctions::push_error("get_collision_mask: multimesh was never spawned through BulletFactory2D.");
 		return 0;
@@ -2493,7 +2493,7 @@ int DirectionalBullets2D::get_collision_mask() const {
 	return physics_server->area_get_collision_mask(area);
 }
 
-void DirectionalBullets2D::set_collision_mask(int new_collision_mask) {
+void BulletVolley2D::set_collision_mask(int new_collision_mask) {
 	if (physics_server == nullptr || !area.is_valid()) {
 		UtilityFunctions::push_error("set_collision_mask: multimesh was never spawned through BulletFactory2D.");
 		return;
@@ -2501,8 +2501,8 @@ void DirectionalBullets2D::set_collision_mask(int new_collision_mask) {
 	physics_server->area_set_collision_mask(area, new_collision_mask);
 }
 
-void DirectionalBullets2D::set_collision_mask_from_array(const TypedArray<int> &numbers) {
-	int bitmask = DirectionalBulletsData2D::calculate_bitmask(numbers);
+void BulletVolley2D::set_collision_mask_from_array(const TypedArray<int> &numbers) {
+	int bitmask = BulletVolleyData2D::calculate_bitmask(numbers);
 	if (physics_server == nullptr || !area.is_valid()) {
 		UtilityFunctions::push_error("set_collision_mask_from_array: multimesh was never spawned through BulletFactory2D.");
 		return;
@@ -2510,11 +2510,11 @@ void DirectionalBullets2D::set_collision_mask_from_array(const TypedArray<int> &
 	physics_server->area_set_collision_mask(area, bitmask);
 }
 
-bool DirectionalBullets2D::get_monitorable() const {
+bool BulletVolley2D::get_monitorable() const {
 	return monitorable;
 }
 
-void DirectionalBullets2D::set_monitorable(bool value) {
+void BulletVolley2D::set_monitorable(bool value) {
 	if (physics_server == nullptr || !area.is_valid()) {
 		UtilityFunctions::push_error("set_monitorable: multimesh was never spawned through BulletFactory2D.");
 		return;
@@ -2523,7 +2523,7 @@ void DirectionalBullets2D::set_monitorable(bool value) {
 	physics_server->area_set_monitorable(area, monitorable);
 }
 
-void DirectionalBullets2D::set_collision_shape_runtime(const Ref<Shape2D> &new_shape) {
+void BulletVolley2D::set_collision_shape_runtime(const Ref<Shape2D> &new_shape) {
 	if (!physics_server || !area.is_valid()) {
 		UtilityFunctions::push_error("set_collision_shape_runtime: physics not ready, cannot change shape at runtime.");
 		return;
@@ -2532,7 +2532,7 @@ void DirectionalBullets2D::set_collision_shape_runtime(const Ref<Shape2D> &new_s
 	// factory iterates bullet state or inside any physics frame (server flush
 	// locks apply). Same contract as the factory structural methods.
 	if (bullet_factory != nullptr && bullet_factory->is_structural_mutation_unsafe()) {
-		UtilityFunctions::push_error("set_collision_shape_runtime cannot run while bullets are being processed or inside a physics frame (e.g. inside directional_area_entered/directional_body_entered handlers). Use call_deferred() to run this after the physics step.");
+		UtilityFunctions::push_error("set_collision_shape_runtime cannot run while bullets are being processed or inside a physics frame (e.g. inside area_entered/body_entered handlers). Use call_deferred() to run this after the physics step.");
 		return;
 	}
 	PhysicsServer2D::ShapeType old_effective = cached_effective_shape_type;
@@ -2575,8 +2575,8 @@ void DirectionalBullets2D::set_collision_shape_runtime(const Ref<Shape2D> &new_s
 	// unless the user opted out of auto pooling (then it must never enter the pool).
 	// An unpooled instance with pooling off keeps its new key cached but stays
 	// out of every bucket on purpose: it is only reusable through a direct
-	// enable_multimesh() (which reads the live key) or free_disabled_bullets().
-	if (!is_active && is_multimesh_auto_pooling_enabled && bullets_pool != nullptr) {
+	// enable_volley() (which reads the live key) or free_disabled_bullets().
+	if (!is_active && is_auto_pooling_enabled && bullets_pool != nullptr) {
 		const PoolKey new_key = get_pool_key();
 		if (!(new_key == old_key)) {
 			bullets_pool->try_remove_instance(this, old_key);
@@ -2585,7 +2585,7 @@ void DirectionalBullets2D::set_collision_shape_runtime(const Ref<Shape2D> &new_s
 	}
 }
 
-int DirectionalBullets2D::get_bullet_collision_count(int bullet_index) const {
+int BulletVolley2D::get_bullet_collision_count(int bullet_index) const {
 	if (!validate_bullet_index(bullet_index, "get_bullet_collision_count")) {
 		return 0;
 	}
@@ -2595,7 +2595,7 @@ int DirectionalBullets2D::get_bullet_collision_count(int bullet_index) const {
 	return bullets_current_collision_count[bullet_index];
 }
 
-void DirectionalBullets2D::set_bullet_collision_count(int bullet_index, int value) {
+void BulletVolley2D::set_bullet_collision_count(int bullet_index, int value) {
 	if (!validate_bullet_index(bullet_index, "set_bullet_collision_count")) {
 		return;
 	}
@@ -2619,8 +2619,8 @@ void DirectionalBullets2D::set_bullet_collision_count(int bullet_index, int valu
 
 // Cold paths live here; per-tick hot paths stay inline in the header.
 
-void DirectionalBullets2D::_do_deferred_bullet_disable_attachments(int expected_generation, const PackedInt64Array &requests) {
-	if (expected_generation != multimesh_generation) {
+void BulletVolley2D::_do_deferred_bullet_disable_attachments(int expected_generation, const PackedInt64Array &requests) {
+	if (expected_generation != volley_generation) {
 		return;
 	}
 	const int64_t *req = requests.ptr();
@@ -2633,14 +2633,14 @@ void DirectionalBullets2D::_do_deferred_bullet_disable_attachments(int expected_
 		bullet_disable_attachment(bullet_index);
 		// bullet_disable_attachment runs user code (on_bullet_disable): a
 		// handler may recycle this instance (pool pop -> new generation).
-		if (expected_generation != multimesh_generation) {
+		if (expected_generation != volley_generation) {
 			return;
 		}
 	}
 }
 
-void DirectionalBullets2D::_do_emit_life_time_over(int expected_generation, uint64_t emitter_instance_id, const StringName &signal_name, const TypedArray<int> &bullet_indexes) {
-	if (expected_generation != multimesh_generation) {
+void BulletVolley2D::_do_emit_life_time_over(int expected_generation, uint64_t emitter_instance_id, const StringName &signal_name, const TypedArray<int> &bullet_indexes) {
+	if (expected_generation != volley_generation) {
 		return;
 	}
 	if (bullet_indexes.is_empty()) {
@@ -2662,8 +2662,8 @@ void DirectionalBullets2D::_do_emit_life_time_over(int expected_generation, uint
 	emitter->emit_signal(signal_name, this, bullet_indexes);
 }
 
-void DirectionalBullets2D::_do_emit_sprite_animation_finished(int expected_generation) {
-	if (expected_generation != multimesh_generation) {
+void BulletVolley2D::_do_emit_sprite_animation_finished(int expected_generation) {
+	if (expected_generation != volley_generation) {
 		return;
 	}
 	if (!anim_finished) {
@@ -2675,7 +2675,7 @@ void DirectionalBullets2D::_do_emit_sprite_animation_finished(int expected_gener
 
 // Cold paths live here; per-tick hot paths stay inline in the header.
 
-void DirectionalBullets2D::reduce_lifetime(double delta) {
+void BulletVolley2D::reduce_lifetime(double delta) {
 		if (!Math::is_finite(delta) || delta < 0.0) {
 			return;
 		}
@@ -2725,7 +2725,7 @@ void DirectionalBullets2D::reduce_lifetime(double delta) {
 		// If the life_time_over signal is enabled - collect indexes, disable bullets immediately (consistent with collision path),
 		// but keep attachment disable and signal deferred so handler can still access attachment.
 		// Full-volley expiry additionally detaches the survivors from the disable
-		// sweep: the last disable_bullet() funnels into disable_multimesh(),
+		// sweep: the last disable_bullet() funnels into disable_volley(),
 		// whose sweep would otherwise pool every attachment BEFORE the deferred
 		// signal fires (handler would see nullptr). Detaching first keeps the
 		// slots alive for the signal; the deferred disables re-pool them after.
@@ -2733,13 +2733,13 @@ void DirectionalBullets2D::reduce_lifetime(double delta) {
 
 		// Hold the volley out of the pool (and keep its attachment slots)
 		// until the deferred signal flushes: the last disable below funnels
-		// into disable_multimesh(), which would otherwise pool the volley at
+		// into disable_volley(), which would otherwise pool the volley at
 		// once (a same-frame spawn then pops it and the generation bump drops
 		// the signal) and release every attachment before the handler runs.
 		lifetime_flush_pending = true;
 
 		// Snapshot the signal owner BEFORE the disable loop below: a full-volley
-		// expiry funnels into disable_multimesh(), which clears owner_spawner_id
+		// expiry funnels into disable_volley(), which clears owner_spawner_id
 		// and pools the instance. Resolving after would schedule the factory's
 		// life_time_over signal for a spawner-owned volley.
 		Object *lifetime_emitter = resolve_signal_emitter();
@@ -2777,13 +2777,9 @@ void DirectionalBullets2D::reduce_lifetime(double delta) {
 		// Uses the pre-disable snapshot above, never a post-disable resolve.
 		Object *emitter = lifetime_emitter;
 		if (emitter != nullptr) {
+			// Factory and spawner share the signal name (life_time_over).
 			const uint64_t emitter_id = emitter->get_instance_id();
-			if (emitter == bullet_factory) {
-				const StringName &signal_name = CachedStringNames2D::get().directional_life_time_over;
-				call_deferred(CachedStringNames2D::get().m_do_emit_life_time_over, multimesh_generation, emitter_id, signal_name, bullet_indexes);
-			} else {
-				call_deferred(CachedStringNames2D::get().m_do_emit_life_time_over, multimesh_generation, emitter_id, CachedStringNames2D::get().life_time_over, bullet_indexes);
-			}
+			call_deferred(CachedStringNames2D::get().m_do_emit_life_time_over, volley_generation, emitter_id, CachedStringNames2D::get().life_time_over, bullet_indexes);
 		}
 
 		// Disable attachments after signal (deferred keeps order). The per-slot
@@ -2804,16 +2800,16 @@ void DirectionalBullets2D::reduce_lifetime(double delta) {
 			attachment_requests.push_back((int64_t)attachment_epoch_for(idx));
 		}
 		if (!attachment_requests.is_empty()) {
-			call_deferred(CachedStringNames2D::get().m_do_deferred_bullet_disable_attachments, multimesh_generation, attachment_requests);
+			call_deferred(CachedStringNames2D::get().m_do_deferred_bullet_disable_attachments, volley_generation, attachment_requests);
 		}
 	}
 	// Queued last so it flushes after the signal and the slot releases.
 	if (lifetime_flush_pending) {
-		call_deferred(CachedStringNames2D::get().m_do_finish_lifetime_hold, multimesh_generation);
+		call_deferred(CachedStringNames2D::get().m_do_finish_lifetime_hold, volley_generation);
 	}
 	}
 
-void DirectionalBullets2D::release_lifetime_hold_attachments() {
+void BulletVolley2D::release_lifetime_hold_attachments() {
 	lifetime_flush_pending = false;
 	for (int i = 0; i < (int)attachments.size(); ++i) {
 		if (attachments[i] != nullptr) {
@@ -2822,16 +2818,16 @@ void DirectionalBullets2D::release_lifetime_hold_attachments() {
 	}
 }
 
-void DirectionalBullets2D::_do_finish_lifetime_hold(int expected_generation) {
+void BulletVolley2D::_do_finish_lifetime_hold(int expected_generation) {
 	// A new life (wake/enable) already ended the hold and owns the volley.
-	if (expected_generation != multimesh_generation || !lifetime_flush_pending) {
+	if (expected_generation != volley_generation || !lifetime_flush_pending) {
 		return;
 	}
 	if (is_active || is_queued_for_deletion()) {
 		lifetime_flush_pending = false;
 		return;
 	}
-	// Same busy window as disable_multimesh(): the release below runs user
+	// Same busy window as disable_volley(): the release below runs user
 	// callbacks (on_bullet_disable), which must not reset/free the factory
 	// under us.
 	const bool saved_factory_busy = bullet_factory != nullptr ? bullet_factory->get_is_factory_busy() : false;
@@ -2847,7 +2843,7 @@ void DirectionalBullets2D::_do_finish_lifetime_hold(int expected_generation) {
 		return;
 	}
 	// The handler may have woken a bullet (new life) or opted out of pooling.
-	if (is_active || active_bullets_counter > 0 || !is_multimesh_auto_pooling_enabled) {
+	if (is_active || active_bullets_counter > 0 || !is_auto_pooling_enabled) {
 		return;
 	}
 	// Slots are released: blank them like a normal disable would have.
@@ -2857,7 +2853,7 @@ void DirectionalBullets2D::_do_finish_lifetime_hold(int expected_generation) {
 	}
 }
 
-void DirectionalBullets2D::enable_bullet(int bullet_index, int collision_amount, bool should_enable_attachment) {
+void BulletVolley2D::enable_bullet(int bullet_index, int collision_amount, bool should_enable_attachment) {
 		// Wake semantics (contract, keep in sync with the doc XML):
 		// "resume, not respawn" for ballistics (speed/direction/velocity/
 		// position), appearance, custom data and per-bullet movement state -
@@ -2868,7 +2864,7 @@ void DirectionalBullets2D::enable_bullet(int bullet_index, int collision_amount,
 		// pin curves at their end sample); (2) per-bullet homing queues and
 		// orbit state are NOT resumed - disable_bullet() clears them, so
 		// re-push targets and re-enable orbit after the wake.
-		// Cross-owner reuse must go through spawn_*()/enable_multimesh(),
+		// Cross-owner reuse must go through spawn_*()/enable_volley(),
 		// which reseed everything from fresh data.
 		if (!validate_bullet_index(bullet_index, "enable_bullet")) {
 			return;
@@ -2898,7 +2894,7 @@ void DirectionalBullets2D::enable_bullet(int bullet_index, int collision_amount,
 		}
 
 		// A wake from inside the disable sweep (on_bullet_disable handler) would
-		// resurrect the volley while _disable_multimesh_internal() is tearing it
+		// resurrect the volley while _disable_volley_internal() is tearing it
 		// down; the sweep aborts on wake now, but the factory also drops the
 		// re-registration (reactivate fails under the busy flag), leaving a live
 		// volley the factory never ticks. Reject here so the wake is explicit
@@ -2935,9 +2931,9 @@ void DirectionalBullets2D::enable_bullet(int bullet_index, int collision_amount,
 			reset_attachment_state_for_reuse();
 		}
 		if (will_reactivate_volley) {
-			++multimesh_generation;
-			++multimesh_timers_generation;
-			multimesh_custom_timers.clear();
+			++volley_generation;
+			++timers_generation;
+			custom_timers.clear();
 		}
 
 		all_bullets_enabled_set.activate_data(bullet_index);
@@ -2994,7 +2990,7 @@ void DirectionalBullets2D::enable_bullet(int bullet_index, int collision_amount,
 			// instance was never pooled - both mean same-owner revive.
 			const bool was_pooled = (bullets_pool != nullptr) && bullets_pool->try_remove_instance(this, get_pool_key());
 			if (bullet_factory != nullptr) {
-				bullet_factory->reactivate_multimesh_instance(*this);
+				bullet_factory->track_volley_active(*this);
 			}
 		// A pooled instance carries the previous owner's signal connections; they
 		// must not fire for this wake (same cleanup the pool-pop enable does).
@@ -3016,7 +3012,7 @@ void DirectionalBullets2D::enable_bullet(int bullet_index, int collision_amount,
 			// speeds are cleared (stale spin would steer the new life with no
 			// data behind it). Ballistics, appearance, custom data, collision
 			// counts/max, lifetime and shape state resume by design (warned
-			// below): reseed via spawn_*/enable_multimesh for a clean slate.
+			// below): reseed via spawn_*/enable_volley for a clean slate.
 			reset_pooling_flags_to_default();
 			set_rotation_data(TypedArray<BulletRotationData2D>(), rotate_only_textures);
 		}
@@ -3030,10 +3026,10 @@ void DirectionalBullets2D::enable_bullet(int bullet_index, int collision_amount,
 		// woken slot's collision count was reseeded above). Pooling flags,
 		// rotation, signals and ownership were neutralized above. Same-owner
 		// revives resume everything by design; foreign wakes must reseed
-		// through spawn_*/enable_multimesh or adopt_live_volley + manual
+		// through spawn_*/enable_volley or adopt_live_volley + manual
 		// re-push, so warn once per wake instead of driving silently stale.
 		if (was_pooled) {
-			UtilityFunctions::push_warning("enable_bullet: woke a pooled volley from the pool outside spawn_*/enable_multimesh. Ballistics, appearance, custom data, collision counts, lifetime and shape state still hold the previous owner's values: reseed them (or adopt_live_volley + re-push homing/orbit) before relying on this volley.");
+			UtilityFunctions::push_warning("enable_bullet: woke a pooled volley from the pool outside spawn_*/enable_volley. Ballistics, appearance, custom data, collision counts, lifetime and shape state still hold the previous owner's values: reseed them (or adopt_live_volley + re-push homing/orbit) before relying on this volley.");
 		}
 			// An expiry-pooled wake would otherwise die again on the next tick with an
 			// exhausted timer. Only top it up when expired; manual-disable wakes keep
@@ -3054,7 +3050,7 @@ void DirectionalBullets2D::enable_bullet(int bullet_index, int collision_amount,
 		}
 	}
 
-void DirectionalBullets2D::disable_bullet(int bullet_index, bool should_disable_attachment) {
+void BulletVolley2D::disable_bullet(int bullet_index, bool should_disable_attachment) {
 		if (!validate_bullet_index(bullet_index, "disable_bullet")) {
 			return;
 		}
@@ -3116,11 +3112,11 @@ void DirectionalBullets2D::disable_bullet(int bullet_index, bool should_disable_
 		}
 
 		if (active_bullets_counter <= 0) {
-			disable_multimesh();
+			disable_volley();
 		}
 	}
 
-bool DirectionalBullets2D::clear_bullet(int bullet_index) {
+bool BulletVolley2D::clear_bullet(int bullet_index) {
 		if (!validate_bullet_index(bullet_index, "clear_bullet")) {
 			return false;
 		}
@@ -3130,7 +3126,7 @@ bool DirectionalBullets2D::clear_bullet(int bullet_index) {
 			return false;
 		}
 		// Pose captured before the disable below (disable never moves the
-		// bullet, but the last-bullet disable funnels into disable_multimesh
+		// bullet, but the last-bullet disable funnels into disable_volley
 		// which pools the instance; the DESTROY path fires the same way).
 		Transform2D fx_clear_transf;
 		const bool fx_have_pose = bullet_index >= 0 && bullet_index < (int)all_cached_instance_transforms.size();
@@ -3144,7 +3140,7 @@ bool DirectionalBullets2D::clear_bullet(int bullet_index) {
 		return true;
 	}
 
-int DirectionalBullets2D::clear_all_bullets() {
+int BulletVolley2D::clear_all_bullets() {
 		// Snapshot first: each clear mutates the live set below.
 		std::vector<int> live = all_bullets_enabled_set.get_active_indexes();
 		int cleared = 0;
@@ -3156,7 +3152,7 @@ int DirectionalBullets2D::clear_all_bullets() {
 		return cleared;
 	}
 
-void DirectionalBullets2D::handle_bullet_collision(CollisionType collision_type, int bullet_index, int64_t entered_instance_id, uint64_t queued_bullet_epoch, Vector2 queued_target_velocity, bool queued_velocity_valid, Vector2 queued_target_position, bool queue_position_valid) {
+void BulletVolley2D::handle_bullet_collision(CollisionType collision_type, int bullet_index, int64_t entered_instance_id, uint64_t queued_bullet_epoch, Vector2 queued_target_velocity, bool queued_velocity_valid, Vector2 queued_target_position, bool queue_position_valid) {
 		if (bullet_index < 0 || bullet_index >= amount_bullets) {
 			return;
 		}
@@ -3200,7 +3196,7 @@ void DirectionalBullets2D::handle_bullet_collision(CollisionType collision_type,
 		const Transform2D fx_hit_transf = all_cached_instance_transforms[bullet_index];
 
 		// Snapshot the signal owner BEFORE any disable below: the killing blow
-		// funnels into disable_multimesh(), which clears owner_spawner_id and
+		// funnels into disable_volley(), which clears owner_spawner_id and
 		// pools the instance. Resolving after would route a spawner volley's
 		// hit to the factory (or drop it) instead of the owning spawner.
 		Object *emitter = resolve_signal_emitter();
@@ -3208,7 +3204,7 @@ void DirectionalBullets2D::handle_bullet_collision(CollisionType collision_type,
 		// Only disable the bullet if the max collision count is greater than 0, otherwise the bullet should never be disabled due to collisions
 		// Killing blow: guard the attachment slot across the disable below.
 		// disable_bullet() on the last live bullet funnels into
-		// disable_multimesh(), whose sweep would pool every attachment BEFORE
+		// disable_volley(), whose sweep would pool every attachment BEFORE
 		// the collision signal fires (handler would see nullptr). The lifetime
 		// path reclaims attachments for exactly this reason; do the same here.
 		// Note the guard covers the disable (where the sweep runs), not the
@@ -3273,19 +3269,13 @@ void DirectionalBullets2D::handle_bullet_collision(CollisionType collision_type,
 		// performs no dereference, so a freed volley bails safely instead of
 		// crashing (misuse is still prohibited: state after the emit is lost).
 		const uint64_t self_id = get_instance_id();
+		// Factory and spawner declare the same signals (area_entered /
+		// body_entered), so one emit serves either owner.
 		if (emitter != nullptr) {
-			if (emitter == bullet_factory) {
-				if (collision_type == CollisionType::AREA) {
-					emitter->emit_signal(CachedStringNames2D::get().directional_area_entered, hit_target, this, bullet_index);
-				} else if (collision_type == CollisionType::BODY) {
-					emitter->emit_signal(CachedStringNames2D::get().directional_body_entered, hit_target, this, bullet_index);
-				}
-			} else {
-				if (collision_type == CollisionType::AREA) {
-					emitter->emit_signal(CachedStringNames2D::get().area_entered, hit_target, this, bullet_index);
-				} else if (collision_type == CollisionType::BODY) {
-					emitter->emit_signal(CachedStringNames2D::get().body_entered, hit_target, this, bullet_index);
-				}
+			if (collision_type == CollisionType::AREA) {
+				emitter->emit_signal(CachedStringNames2D::get().area_entered, hit_target, this, bullet_index);
+			} else if (collision_type == CollisionType::BODY) {
+				emitter->emit_signal(CachedStringNames2D::get().body_entered, hit_target, this, bullet_index);
 			}
 		}
 
@@ -3295,7 +3285,7 @@ void DirectionalBullets2D::handle_bullet_collision(CollisionType collision_type,
 			// already (bullet_set_attachment_to_null / bullet_free_attachment /
 			// bullet_set_attachment), or re-assigned it. Only disable the slot if
 			// it still holds what we captured - anything else belongs to whoever
-			// changed it (possibly a new pool owner), and disable_multimesh()'s
+			// changed it (possibly a new pool owner), and disable_volley()'s
 			// sweep catches any survivor that would otherwise leak.
 			// The handler may also have freed THIS multimesh (queue_free during
 			// the sync emit): attachments[]/bullets_current_collision_count[] are

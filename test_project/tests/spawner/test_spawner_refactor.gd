@@ -23,7 +23,7 @@ func test_keep_awake() -> void:
 	# signal-silent (set_spin_enabled/burst/retarget/preview never emit).
 	var s := BulletSpawner2D.new()
 	s.set_bullet_factory(factory)
-	s.set_spawn_data(H.make_directional_data(1, 50.0, 2.0))
+	s.set_spawn_data(H.make_volley_data(1, 50.0, 2.0))
 	watch_signals(s)
 	add(s)
 	await idle(1)

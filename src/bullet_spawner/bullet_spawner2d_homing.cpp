@@ -434,24 +434,24 @@ void BulletSpawner2D::set_orbiting_radius(double value) {
     orbiting_radius = value;
 }
 
-DirectionalBullets2D::OrbitingDirection BulletSpawner2D::get_orbiting_direction() const {
+BulletVolley2D::OrbitingDirection BulletSpawner2D::get_orbiting_direction() const {
     return orbiting_direction;
 }
 
-void BulletSpawner2D::set_orbiting_direction(DirectionalBullets2D::OrbitingDirection value) {
-    if (value != DirectionalBullets2D::DontMove && value != DirectionalBullets2D::OrbitLeft && value != DirectionalBullets2D::OrbitRight && value != DirectionalBullets2D::OrbitRandom) {
+void BulletSpawner2D::set_orbiting_direction(BulletVolley2D::OrbitingDirection value) {
+    if (value != BulletVolley2D::DontMove && value != BulletVolley2D::OrbitLeft && value != BulletVolley2D::OrbitRight && value != BulletVolley2D::OrbitRandom) {
         UtilityFunctions::push_error("BulletSpawner2D: invalid orbiting_direction, keeping the old value.");
         return;
     }
     orbiting_direction = value;
 }
 
-DirectionalBullets2D::OrbitingTextureRotation BulletSpawner2D::get_orbiting_texture_rotation() const {
+BulletVolley2D::OrbitingTextureRotation BulletSpawner2D::get_orbiting_texture_rotation() const {
     return orbiting_texture_rotation;
 }
 
-void BulletSpawner2D::set_orbiting_texture_rotation(DirectionalBullets2D::OrbitingTextureRotation value) {
-    if (value < DirectionalBullets2D::FaceTarget || value > DirectionalBullets2D::FaceOppositeOrbitingDirection) {
+void BulletSpawner2D::set_orbiting_texture_rotation(BulletVolley2D::OrbitingTextureRotation value) {
+    if (value < BulletVolley2D::FaceTarget || value > BulletVolley2D::FaceOppositeOrbitingDirection) {
         UtilityFunctions::push_error("BulletSpawner2D: invalid orbiting_texture_rotation, keeping the old value.");
         return;
     }
@@ -493,12 +493,12 @@ void BulletSpawner2D::set_orbiting_radius_step(double value) {
     orbiting_radius_step = value;
 }
 
-DirectionalBullets2D::OrbitingFollowMode BulletSpawner2D::get_orbiting_follow_mode() const {
+BulletVolley2D::OrbitingFollowMode BulletSpawner2D::get_orbiting_follow_mode() const {
     return orbiting_follow_mode;
 }
 
-void BulletSpawner2D::set_orbiting_follow_mode(DirectionalBullets2D::OrbitingFollowMode value) {
-    if (value != DirectionalBullets2D::FollowTarget && value != DirectionalBullets2D::FollowDeadzone && value != DirectionalBullets2D::Anchored) {
+void BulletSpawner2D::set_orbiting_follow_mode(BulletVolley2D::OrbitingFollowMode value) {
+    if (value != BulletVolley2D::FollowTarget && value != BulletVolley2D::FollowDeadzone && value != BulletVolley2D::Anchored) {
         UtilityFunctions::push_error("BulletSpawner2D: invalid orbiting_follow_mode, keeping the old value.");
         return;
     }
@@ -518,12 +518,12 @@ void BulletSpawner2D::set_orbiting_follow_deadzone(double value) {
     orbiting_follow_deadzone = value;
 }
 
-DirectionalBullets2D::OrbitingLockPolicy BulletSpawner2D::get_orbiting_lock_policy() const {
+BulletVolley2D::OrbitingLockPolicy BulletSpawner2D::get_orbiting_lock_policy() const {
     return orbiting_lock_policy;
 }
 
-void BulletSpawner2D::set_orbiting_lock_policy(DirectionalBullets2D::OrbitingLockPolicy value) {
-    if (value != DirectionalBullets2D::RelockAlways && value != DirectionalBullets2D::StayLocked && value != DirectionalBullets2D::RelockOnTargetChange) {
+void BulletSpawner2D::set_orbiting_lock_policy(BulletVolley2D::OrbitingLockPolicy value) {
+    if (value != BulletVolley2D::RelockAlways && value != BulletVolley2D::StayLocked && value != BulletVolley2D::RelockOnTargetChange) {
         UtilityFunctions::push_error("BulletSpawner2D: invalid orbiting_lock_policy, keeping the old value.");
         return;
     }
@@ -912,7 +912,7 @@ Array BulletSpawner2D::resolve_homing_targets(bool quiet, bool advance_round_rob
     return targets;
 }
 
-void BulletSpawner2D::track_live_volley(DirectionalBullets2D *bullets) {
+void BulletSpawner2D::track_live_volley(BulletVolley2D *bullets) {
     volley_tracker.track(bullets, get_instance_id());
 }
 
@@ -934,7 +934,7 @@ Array BulletSpawner2D::get_live_volleys() const {
     const PackedInt64Array ids = volley_tracker.snapshot(get_instance_id());
     Array out;
     for (int i = 0; i < ids.size(); ++i) {
-        DirectionalBullets2D *volley = VolleyTracker2D::resolve_live(ids[i], get_instance_id());
+        BulletVolley2D *volley = VolleyTracker2D::resolve_live(ids[i], get_instance_id());
         if (volley != nullptr) {
             out.push_back(volley);
         }
@@ -942,7 +942,7 @@ Array BulletSpawner2D::get_live_volleys() const {
     return out;
 }
 
-bool BulletSpawner2D::adopt_live_volley(DirectionalBullets2D *bullets) {
+bool BulletSpawner2D::adopt_live_volley(BulletVolley2D *bullets) {
     if (bullets == nullptr) {
         UtilityFunctions::push_error("BulletSpawner2D::adopt_live_volley: instance is null.");
         return false;
@@ -984,7 +984,7 @@ int BulletSpawner2D::clear_live_volleys_homing() {
     int done = 0;
     const uint64_t self_id = get_instance_id();
     for (int i = 0; i < ids.size(); ++i) {
-        DirectionalBullets2D *volley = VolleyTracker2D::resolve_live(ids[i], self_id);
+        BulletVolley2D *volley = VolleyTracker2D::resolve_live(ids[i], self_id);
         if (volley == nullptr) {
             continue;
         }
@@ -1013,7 +1013,7 @@ int BulletSpawner2D::override_live_volleys_velocity(const Vector2 &new_velocity)
     int done = 0;
     const uint64_t self_id = get_instance_id();
     for (int i = 0; i < ids.size(); ++i) {
-        DirectionalBullets2D *volley = VolleyTracker2D::resolve_live(ids[i], self_id);
+        BulletVolley2D *volley = VolleyTracker2D::resolve_live(ids[i], self_id);
         if (volley == nullptr) {
             continue;
         }
@@ -1058,7 +1058,7 @@ int BulletSpawner2D::retarget_live_volleys() {
     const uint64_t self_id = get_instance_id();
     BulletFactory2D *factory = get_bullet_factory();
     for (int i = loop_start; i < (int)tracked_ids.size(); ++i) {
-        DirectionalBullets2D *volley = VolleyTracker2D::resolve_live(tracked_ids[i], self_id);
+        BulletVolley2D *volley = VolleyTracker2D::resolve_live(tracked_ids[i], self_id);
         if (volley == nullptr) {
             continue;
         }
@@ -1154,11 +1154,11 @@ int BulletSpawner2D::retarget_live_volleys() {
     return done;
 }
 
-void BulletSpawner2D::_on_volley_bullet_homing_target_reached(Object *directional_bullets_instance, int bullet_index, Object *target, const Vector2 &target_global_position) {
-    emit_signal("volley_bullet_homing_target_reached", directional_bullets_instance, bullet_index, target, target_global_position);
+void BulletSpawner2D::_on_volley_bullet_homing_target_reached(Object *volley, int bullet_index, Object *target, const Vector2 &target_global_position) {
+    emit_signal("volley_bullet_homing_target_reached", volley, bullet_index, target, target_global_position);
 }
 
-void BulletSpawner2D::apply_steering_to_volley(DirectionalBullets2D *volley) const {
+void BulletSpawner2D::apply_steering_to_volley(BulletVolley2D *volley) const {
     volley->set_homing_smoothing((real_t)homing_smoothing);
     volley->set_homing_update_interval((real_t)homing_update_interval);
     volley->set_homing_distance_before_reached((real_t)homing_distance_before_reached);
@@ -1181,7 +1181,7 @@ void BulletSpawner2D::apply_steering_to_volley(DirectionalBullets2D *volley) con
     }
 }
 
-void BulletSpawner2D::apply_orbiting_to_volley(DirectionalBullets2D *volley) const {
+void BulletSpawner2D::apply_orbiting_to_volley(BulletVolley2D *volley) const {
     // No direction is skipped: DontMove = escort (fixed ring slot, follows the
     // target without circling), armed through the same engine path below.
     // Disabled bullets are skipped: they own no orbit state (disable clears
@@ -1199,7 +1199,7 @@ void BulletSpawner2D::apply_orbiting_to_volley(DirectionalBullets2D *volley) con
                 : orbiting_radius;
         if (!volley->bullet_is_orbiting_enabled(i)) {
             volley->bullet_enable_orbiting(i, (real_t)radius, orbiting_direction, orbiting_texture_rotation, orbiting_follow_mode, (real_t)orbiting_follow_deadzone, orbiting_lock_policy, orbiting_rigid_follow);
-        } else if (orbiting_direction == DirectionalBullets2D::OrbitRandom) {
+        } else if (orbiting_direction == BulletVolley2D::OrbitRandom) {
             // OrbitRandom rolls once per bullet at enable time: re-rolling on
             // every retarget pass would flip circling directions mid-flight,
             // so live bullets keep their rolled direction here.
@@ -1224,7 +1224,7 @@ void BulletSpawner2D::apply_orbiting_to_volley(DirectionalBullets2D *volley) con
     }
 }
 
-void BulletSpawner2D::apply_volley_homing_and_orbiting(DirectionalBullets2D *bullets, const Array *pre_resolved) {
+void BulletSpawner2D::apply_volley_homing_and_orbiting(BulletVolley2D *bullets, const Array *pre_resolved) {
     if (bullets == nullptr) {
         return;
     }

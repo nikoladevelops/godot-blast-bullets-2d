@@ -7,7 +7,7 @@ extends BlastTest
 
 
 func test_10k_spin_collect_budget() -> void:
-	var sp := make_spawner(H.make_directional_data(4), BulletSpawner2D.PATTERN_FROM_HELPER_SPIRAL, 10000)
+	var sp := make_spawner(H.make_volley_data(4), BulletSpawner2D.PATTERN_FROM_HELPER_SPIRAL, 10000)
 	sp.set_spin_enabled(true)
 	sp.set_spin_speed_deg_per_sec(90.0)
 	await idle(2)

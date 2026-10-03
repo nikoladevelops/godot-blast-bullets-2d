@@ -13,8 +13,8 @@ func before_each() -> void:
 	await idle(1)
 
 
-func _homing_volley(n: int, target_node: Node2D) -> DirectionalBullets2D:
-	var v: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(H.make_directional_data(n, 250.0, 30.0))
+func _homing_volley(n: int, target_node: Node2D) -> BulletVolley2D:
+	var v: BulletVolley2D = factory.spawn_volley(H.make_volley_data(n, 250.0, 30.0))
 	v.set_homing_smoothing(6.0)
 	v.set_homing_take_control_of_texture_rotation(true)
 	if n == 1:
@@ -24,7 +24,7 @@ func _homing_volley(n: int, target_node: Node2D) -> DirectionalBullets2D:
 	return v
 
 
-func _wait_locked(v: DirectionalBullets2D, frames := 60) -> void:
+func _wait_locked(v: BulletVolley2D, frames := 60) -> void:
 	for i in frames:
 		await physics()
 		if v.bullet_is_orbiting_locked(0):
@@ -32,7 +32,7 @@ func _wait_locked(v: DirectionalBullets2D, frames := 60) -> void:
 
 
 func test_targetless_arm_then_setters() -> void:
-	var lone: DirectionalBullets2D = spawn_dir(1, 200.0)
+	var lone: BulletVolley2D = quick_volley(1, 200.0)
 	lone.bullet_enable_orbiting(0, 64.0, 2, 0)
 	assert_true(lone.bullet_is_orbiting_enabled(0), "orbit arms even targetless")
 	await physics(10)
@@ -56,7 +56,7 @@ func test_targetless_arm_then_setters() -> void:
 
 
 func test_linear_shells_follow_and_disable() -> void:
-	var v: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(H.make_directional_data(3, 250.0))
+	var v: BulletVolley2D = factory.spawn_volley(H.make_volley_data(3, 250.0))
 	v.set_homing_smoothing(6.0)
 	v.set_homing_take_control_of_texture_rotation(true)
 	v.all_bullets_push_back_homing_target(target)
@@ -110,7 +110,7 @@ func test_stay_locked_rides_out_the_gap() -> void:
 
 func test_spawner_orbit_without_homing_is_a_setup_warning() -> void:
 	const WARNING := "orbiting_enabled needs homing_enabled"
-	var sp := make_spawner(H.make_directional_data(2, 200.0, 5.0))
+	var sp := make_spawner(H.make_volley_data(2, 200.0, 5.0))
 	sp.set_orbiting_enabled(false)
 	assert_false(Array(sp.get_setup_warnings()).any(func(w): return WARNING in w), "no warning with both switches off")
 	sp.set_orbiting_enabled(true)

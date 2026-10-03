@@ -23,9 +23,9 @@ static int g_shoot_once_nesting_depth = 0;
 // Returns the live volley, or nullptr when the shot must be dropped (no
 // count, no volley_fired). Compare BY VALUE: the raw pointer must never be
 // trusted after user code ran.
-static DirectionalBullets2D *revalidate_configured_volley(uint64_t volley_id, DirectionalBullets2D *expected, uint64_t self_id) {
+static BulletVolley2D *revalidate_configured_volley(uint64_t volley_id, BulletVolley2D *expected, uint64_t self_id) {
 	Object *live = UtilityFunctions::is_instance_id_valid(volley_id) ? ObjectDB::get_instance(ObjectID(volley_id)) : nullptr;
-	DirectionalBullets2D *live_volley = Object::cast_to<DirectionalBullets2D>(live);
+	BulletVolley2D *live_volley = Object::cast_to<BulletVolley2D>(live);
 	// is_queued_for_deletion matters: queue_free() is the sanctioned way to
 	// kill a volley from a handler, and it leaves every other check passing
 	// (same pointer, active, owned) until the end-of-frame flush. Configuring
@@ -124,11 +124,11 @@ Node2D *BulletSpawner2D::get_effective_generator() const {
     return base;
 }
 
-Ref<DirectionalBulletsData2D> BulletSpawner2D::get_spawn_data() const {
+Ref<BulletVolleyData2D> BulletSpawner2D::get_spawn_data() const {
     return spawn_data;
 }
 
-void BulletSpawner2D::set_spawn_data(const Ref<DirectionalBulletsData2D> &new_data) {
+void BulletSpawner2D::set_spawn_data(const Ref<BulletVolleyData2D> &new_data) {
     on_config_changed();
     if (new_data == spawn_data) {
         return; // same resource: keep the duplicate template and connection
@@ -638,7 +638,7 @@ PackedStringArray BulletSpawner2D::_get_configuration_warnings() const {
         out.push_back("bullet_factory_path does not point to a BulletFactory2D.");
     }
     if (spawn_data.is_null()) {
-        out.push_back("No spawn_data: assign a DirectionalBulletsData2D (speed, art, collision) to fire.");
+        out.push_back("No spawn_data: assign a BulletVolleyData2D (speed, art, collision) to fire.");
     } else if (spawn_data->sprite_frames.is_null() && spawn_data->mesh.is_null()) {
         out.push_back("spawn_data has no sprite_frames (or mesh): bullets will be invisible.");
     }
@@ -709,12 +709,12 @@ bool BulletSpawner2D::shoot_once() {
     // spawner-owned template; later shots reuse it (transforms overwritten
     // below). In-place edits invalidate via _on_spawn_data_changed, resource
     // swaps via set_spawn_data, so reuse is always fresh.
-    Ref<DirectionalBulletsData2D> volley_data;
+    Ref<BulletVolleyData2D> volley_data;
     const uint64_t spawn_id = spawn_data->get_instance_id();
     if (cached_volley_template.is_valid() && cached_spawn_data_id == spawn_id) {
         volley_data = cached_volley_template;
     } else {
-        volley_data = Ref<DirectionalBulletsData2D>(Object::cast_to<DirectionalBulletsData2D>(spawn_data->duplicate().ptr()));
+        volley_data = Ref<BulletVolleyData2D>(Object::cast_to<BulletVolleyData2D>(spawn_data->duplicate().ptr()));
         if (volley_data.is_null()) {
             return fail_early("BulletSpawner2D::shoot_once: could not duplicate spawn_data.", StringName("no_spawn_data"), true);
         }
@@ -722,7 +722,7 @@ bool BulletSpawner2D::shoot_once() {
         cached_spawn_data_id = spawn_id;
     }
     // Native shot buffer: no TypedArray / Variant per bullet anywhere between
-    // the pattern bake and the volley setup (spawn_controllable_directional_bullets_span).
+    // the pattern bake and the volley setup (spawn_volley_span).
     collect_spawn_transforms_native(false, shot_transforms);
     if (shot_transforms.empty()) {
         // Fail loud with the mode name: the generic factory "no transforms"
@@ -764,7 +764,7 @@ bool BulletSpawner2D::shoot_once() {
             inherited_velocity = Vector2();
         }
     }
-    DirectionalBullets2D *bullets = factory->spawn_controllable_directional_bullets_span(volley_data, shot_transforms.data(), (int)shot_transforms.size(), inherited_velocity, get_instance_id());
+    BulletVolley2D *bullets = factory->spawn_volley_span(volley_data, shot_transforms.data(), (int)shot_transforms.size(), inherited_velocity, get_instance_id());
     if (bullets == nullptr) {
         // The factory already reported why (busy, teardown, bad data).
         return fail_early(nullptr, StringName("factory_refused"), true);
@@ -1437,7 +1437,7 @@ bool BulletSpawner2D::apply_pattern_list_entry(const Variant &entry) {
     }
     if (dict.has("spawn_data")) {
         Variant v = dict["spawn_data"];
-        Ref<DirectionalBulletsData2D> override_data = v;
+        Ref<BulletVolleyData2D> override_data = v;
         if (override_data.is_valid()) {
             // Through the setter, not a raw member write: the setter swaps the
             // "changed" connection to the override resource and invalidates the
@@ -1446,7 +1446,7 @@ bool BulletSpawner2D::apply_pattern_list_entry(const Variant &entry) {
             // override with NO connection (so its runtime edits were invisible).
             set_spawn_data(override_data);
         } else {
-            UtilityFunctions::push_error("BulletSpawner2D::spawn_pattern_list: entry 'spawn_data' must be a DirectionalBulletsData2D, keeping current.");
+            UtilityFunctions::push_error("BulletSpawner2D::spawn_pattern_list: entry 'spawn_data' must be a BulletVolleyData2D, keeping current.");
         }
     }
     return true;

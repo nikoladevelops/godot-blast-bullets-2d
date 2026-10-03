@@ -5,8 +5,8 @@ extends BlastTest
 ## a valid non-zero texture rotation stays finite.
 
 
-func _data(n: int = 2) -> DirectionalBulletsData2D:
-	var d := H.make_directional_data(n, 100.0, 5.0)
+func _data(n: int = 2) -> BulletVolleyData2D:
+	var d := H.make_volley_data(n, 100.0, 5.0)
 	var arr: Array = []
 	for i in n:
 		arr.append(Transform2D(0.0, Vector2.ZERO))
@@ -80,7 +80,7 @@ func test_fresh_data_validates() -> void:
 func test_volley_with_texture_rotation_stays_finite() -> void:
 	var d := _data(3)
 	d.texture_rotation_radians = 1.25
-	var v: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d)
+	var v: BulletVolley2D = factory.spawn_volley(d)
 	assert_not_null(v)
 	for i in 3:
 		assert_true(v.get_bullet_transform(i).is_finite(), "bullet %d transform finite" % i)

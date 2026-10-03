@@ -38,7 +38,7 @@ extends AbstractEnemy
 @onready var center_marker:Marker2D = $AnimatedSprite2D/CenterMarker2D
 
 # The bullet data used to spawn bullets from
-var bullets_data:DirectionalBulletsData2D
+var bullets_data:BulletVolleyData2D
 
 # Whether the ship should shoot two bullets at a time or not
 var is_shooting_two_at_a_time:bool
@@ -74,7 +74,7 @@ func _ready() -> void:
 	calculate_new_direction()
 	
 	# Set up bullets data
-	bullets_data = DirectionalBulletsData2D.new()
+	bullets_data = BulletVolleyData2D.new()
 	
 	bullets_data.sprite_frames = $BulletAnimatedSprite.sprite_frames
 	
@@ -92,8 +92,8 @@ func _ready() -> void:
 	
 	bullets_data.shared_bullets_custom_data = dmg_data
 	
-	bullets_data.collision_layer = DirectionalBulletsData2D.calculate_bitmask([4])
-	bullets_data.collision_mask = DirectionalBulletsData2D.calculate_bitmask(default_bullet_collision_mask)
+	bullets_data.collision_layer = BulletVolleyData2D.calculate_bitmask([4])
+	bullets_data.collision_mask = BulletVolleyData2D.calculate_bitmask(default_bullet_collision_mask)
 	bullets_data.monitorable=true # Monitorable allows for these bullets to be detected by other areas
 
 func _physics_process(delta: float) -> void:
@@ -110,7 +110,7 @@ func shoot()->void:
 		bullets_data.transforms = get_marker_transforms()
 		bullets_data.all_bullet_speed_data = get_speed_data()
 		#bullets_data.block_rotation_radians = animated_sprite.transform.get_rotation() # Since we are using block bullets, their direction is determined by this property instead of automatically by the transforms
-		var bullets_multi:DirectionalBullets2D = BENCHMARK_GLOBALS.FACTORY.spawn_controllable_directional_bullets(bullets_data)
+		var bullets_multi:BulletVolley2D = BENCHMARK_GLOBALS.FACTORY.spawn_volley(bullets_data)
 		var scene:PackedScene = BENCHMARK_GLOBALS.ATTACHMENT_SCENES[1]
 		bullets_multi.all_bullets_set_attachment(scene, Vector2(-30, 0))
 		
@@ -180,4 +180,4 @@ func _on_shoot_timer_timeout() -> void:
 	is_shooting_two_at_a_time = !is_shooting_two_at_a_time # next time with different shoot behavior
 
 func set_bullet_collision_mask(arr:Array[int])->void:
-	bullets_data.collision_mask = DirectionalBulletsData2D.calculate_bitmask(arr)
+	bullets_data.collision_mask = BulletVolleyData2D.calculate_bitmask(arr)

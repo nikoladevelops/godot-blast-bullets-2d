@@ -5,17 +5,17 @@ extends BlastTest
 ## birthday collisions). D3 a cold table shrinks back, a hot one keeps its
 ## capacity.
 
-var v: DirectionalBullets2D
+var v: BulletVolley2D
 
 
 func before_each() -> void:
 	await super()
-	var d := H.make_directional_data(1, 100.0, 30.0)
+	var d := H.make_volley_data(1, 100.0, 30.0)
 	d.transforms = [Transform2D()]
 	d.set_collision_mask_from_array([3])
 	d.collision_shape = H.make_circle_shape(6.0)
 	d.bullet_max_collision_count = 0
-	v = factory.spawn_controllable_directional_bullets(d)
+	v = factory.spawn_volley(d)
 
 
 func _count_probes(n: int, target_base: int, expected: bool) -> int:

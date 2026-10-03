@@ -13,7 +13,7 @@ func setup() -> void:
 		for rep in 3:
 			var d := ring_data(n, Vector2(960, 540), 100.0, 0.0, 1000.0)
 			var t0 := Time.get_ticks_usec()
-			var vol: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d)
+			var vol: BulletVolley2D = factory.spawn_volley(d)
 			best = minf(best, float(Time.get_ticks_usec() - t0) / 1000.0)
 			await get_tree().process_frame
 			factory.free_active_bullets()

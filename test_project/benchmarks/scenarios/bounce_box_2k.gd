@@ -15,4 +15,4 @@ func setup() -> void:
 		d.set_collision_mask_from_array([4])
 		d.set_bounce_mask_from_array([4])
 		d.bullet_max_collision_count = 0
-		factory.spawn_controllable_directional_bullets(d)
+		factory.spawn_volley(d)

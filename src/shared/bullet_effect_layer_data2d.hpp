@@ -14,7 +14,7 @@ namespace BlastBullets2D {
 using namespace godot;
 
 // One stackable sprite-effect layer for a bullet volley. A volley carries an
-// array of these (DirectionalBulletsData2D.effect_layers); each layer renders
+// array of these (BulletVolleyData2D.effect_layers); each layer renders
 // through its own per-frame MultiMesh shards, so layers never fight each
 // other and every instance can show a different animation frame.
 // Two behaviors: TRAIL_FOLLOW sticks to its bullet every tick, the ON_*

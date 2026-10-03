@@ -4,7 +4,7 @@ extends BlastBenchmark
 func describe() -> String:
 	return "2k bullets with trail + spawn-flash layers, refired every 60 frames"
 
-var _data: Array[DirectionalBulletsData2D] = []
+var _data: Array[BulletVolleyData2D] = []
 
 func setup() -> void:
 	for i in 4:
@@ -15,4 +15,4 @@ func setup() -> void:
 func step(frame: int) -> void:
 	if frame % 60 == 0:
 		for d in _data:
-			factory.spawn_controllable_directional_bullets(d)
+			factory.spawn_volley(d)

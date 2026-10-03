@@ -3,10 +3,10 @@ extends BlastTest
 ## (O(1) per disable instead of a rescan). A one-frame trail puts both
 ## bullets on shard 0, so the ordering below is deterministic.
 
-var v: DirectionalBullets2D
+var v: BulletVolley2D
 
 
-func _bake(vol: DirectionalBullets2D) -> Dictionary:
+func _bake(vol: BulletVolley2D) -> Dictionary:
 	var bakes: Array = vol.debug_get_effect_layers_info().get("trail_bakes", [])
 	return bakes[0] if not bakes.is_empty() else {}
 
@@ -15,7 +15,7 @@ func before_each() -> void:
 	await super()
 	var d := H.make_still_data(2)
 	d.effect_layers = [H.make_effect_layer(BulletEffectLayerData2D.EFFECT_TRAIL_FOLLOW)]
-	v = factory.spawn_controllable_directional_bullets(d)
+	v = factory.spawn_volley(d)
 	await physics(4)
 
 

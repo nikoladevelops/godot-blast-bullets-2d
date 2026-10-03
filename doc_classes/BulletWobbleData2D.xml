@@ -4,7 +4,7 @@
 		Sine/cosine flight modulation for danmaku snakes, weaves, and petals.
 	</brief_description>
 	<description>
-		Attach as [member DirectionalBulletsData2D.shared_bullet_wobble_data] (one resource fans out per bullet via [member phase_step_per_bullet]) or per bullet via [member DirectionalBulletsData2D.all_bullet_wobble_data]. Lateral mode weaves perpendicular to flight; Angular mode oscillates the heading. Set [member enabled] to true, otherwise the entry is skipped. Pick the shape with [member waveform]: Sine starts at zero offset (smooth weave away from center), Cosine starts at full offset (bullets fan out immediately) — both work in either mode and combine freely with homing, curves, rotation, speed, gravity, and drag.
+		Attach as [member BulletVolleyData2D.shared_bullet_wobble_data] (one resource fans out per bullet via [member phase_step_per_bullet]) or per bullet via [member BulletVolleyData2D.all_bullet_wobble_data]. Lateral mode weaves perpendicular to flight; Angular mode oscillates the heading. Set [member enabled] to true, otherwise the entry is skipped. Pick the shape with [member waveform]: Sine starts at zero offset (smooth weave away from center), Cosine starts at full offset (bullets fan out immediately) — both work in either mode and combine freely with homing, curves, rotation, speed, gravity, and drag.
 		With [member face_movement_direction] (default on) the bullet texture slews toward the wobble-steered heading at [member face_rotation_speed] rad/s, so snakes point along their path with no extra setup — the easy alternative to wiring direction curves by hand. Disable it to keep the old heading-only behavior. Skipped while rotation data drives the visual (same rule as direction curves).
 	</description>
 	<tutorials>

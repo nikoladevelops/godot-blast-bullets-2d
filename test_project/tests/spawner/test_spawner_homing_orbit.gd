@@ -19,7 +19,7 @@ func before_each() -> void:
 	e2.name = "SwarmB"
 	e2.position = Vector2(0, 300)
 	e2.add_to_group("swarm")
-	sp = make_spawner(H.make_directional_data(4), BulletSpawner2D.PATTERN_FROM_HELPER_RING, 4)
+	sp = make_spawner(H.make_volley_data(4), BulletSpawner2D.PATTERN_FROM_HELPER_RING, 4)
 	sp.set_homing_enabled(true)
 	sp.set_homing_max_targets(5)
 	sp.set_homing_target_source(BulletSpawner2D.HOMING_SOURCE_NODE_GROUP)
@@ -49,7 +49,7 @@ func test_fire_track_and_cache() -> void:
 	var cache: Dictionary = sp.debug_get_pattern_cache_info()
 	assert_true(cache.get("template_valid", false), "duplicate cache primed")
 	assert_true(cache.get("spawn_id_match", false), "cache matches the live resource")
-	sp.set_spawn_data(H.make_directional_data(4))
+	sp.set_spawn_data(H.make_volley_data(4))
 	assert_false(sp.debug_get_pattern_cache_info().get("template_valid", true), "resource swap invalidates the cache")
 
 

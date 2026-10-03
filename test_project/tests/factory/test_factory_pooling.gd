@@ -6,8 +6,8 @@ extends BlastTest
 var spawner: BulletSpawner2D
 
 
-func _data(n: int = 3) -> DirectionalBulletsData2D:
-	var data := H.make_directional_data(n, 250.0, 5.0)
+func _data(n: int = 3) -> BulletVolleyData2D:
+	var data := H.make_volley_data(n, 250.0, 5.0)
 	data.texture_size = Vector2(12, 12)
 	return data
 
@@ -31,7 +31,7 @@ func test_spawner_duplicate_cache() -> void:
 	assert_eq(spawner.get_volleys_fired(), fired + 1, "cached shot counted")
 	spawner.set_spawn_data(_data(5))
 	assert_true(spawner.shoot_once(), "shot after resource swap fires")
-	var d: DirectionalBulletsData2D = spawner.get_spawn_data()
+	var d: BulletVolleyData2D = spawner.get_spawn_data()
 	d.max_life_time = 6.0
 	await idle(1)
 	assert_true(spawner.shoot_once(), "shot after in-place edit fires")
@@ -64,7 +64,7 @@ func test_debugger_budget_and_preview_rings() -> void:
 	assert_false(factory.get_debugger_draw_inactive(), "draw inactive toggle")
 	factory.set_debugger_draw_inactive(true)
 	factory.set_is_debugger_enabled(true)
-	factory.spawn_directional_bullets(_data(3))
+	factory.spawn_volley(_data(3))
 	await physics()
 	factory.set_is_debugger_enabled(false)
 	assert_false(factory.get_is_debugger_enabled(), "debugger cycle survived")
@@ -86,11 +86,11 @@ func test_pool_hit_observability() -> void:
 	var pop_data := _data(4)
 	factory.populate_bullets_pool(BulletFactory2D.debug_expected_pool_key(pop_data), pop_data, 2)
 	assert_eq(factory.debug_get_bullets_pool_amount(), 2, "pre-populated 2")
-	factory.spawn_directional_bullets(pop_data)
+	factory.spawn_volley(pop_data)
 	await idle(1)
-	assert_gte(factory.debug_get_pool_hit_stats().get("directional_hits", 0), 1, "reuse counted as hit")
+	assert_gte(factory.debug_get_pool_hit_stats().get("hits", 0), 1, "reuse counted as hit")
 	var carved := _data(4)
 	carved.transforms = [Transform2D.IDENTITY, Transform2D(0.0, Vector2(10, 0))]
-	factory.spawn_directional_bullets(carved)
+	factory.spawn_volley(carved)
 	await idle(1)
-	assert_gte(factory.debug_get_pool_hit_stats().get("directional_misses", 0), 1, "size mismatch counted as miss")
+	assert_gte(factory.debug_get_pool_hit_stats().get("misses", 0), 1, "size mismatch counted as miss")

@@ -11,8 +11,8 @@ func _finite_volley(v: Array) -> bool:
 			return false
 	return true
 
-func _make_data() -> DirectionalBulletsData2D:
-	var data := DirectionalBulletsData2D.new()
+func _make_data() -> BulletVolleyData2D:
+	var data := BulletVolleyData2D.new()
 	data.transforms = [Transform2D.IDENTITY, Transform2D(0.0, Vector2(50, 0))]
 	var sp := BulletSpeedData2D.new()
 	sp.speed = 200.0
@@ -48,7 +48,7 @@ func test_error_paths() -> void:
 	expect_errors_containing("must be a Dictionary", 2, "non-dict entries fail loud")
 	expect_errors_containing("out of range", 1, "bad pattern_source entry fails loud")
 	expect_errors_containing("must be an int", 1, "bad amount entry fails loud")
-	expect_errors_containing("must be a DirectionalBulletsData2D", 1, "null data entry fails loud")
+	expect_errors_containing("must be a BulletVolleyData2D", 1, "null data entry fails loud")
 	expect_errors_containing("no spawn_data assigned", 3, "entry shots fail loud without data")
 	assert_true(bare.get_pattern_source() == src0, "pattern_source restored after bad list")
 	assert_true(bare.get_helper_bullets_amount() == amt0, "bullets_amount restored after bad list")
@@ -206,5 +206,5 @@ func test_factory_smoke() -> void:
 	assert_true(factory.debug_get_bullets_pool_amount() == 0, "empty factory pool 0")
 	factory.populate_bullets_pool(null, null, 0)
 	factory.populate_bullets_pool(null, _make_data(), 3)
-	expect_errors_containing("explicit MultiMeshPoolKey2D", 2, "null-key populate fails loud")
+	expect_errors_containing("explicit VolleyPoolKey2D", 2, "null-key populate fails loud")
 	assert_true(factory.debug_get_bullets_pool_amount() == 0, "null-key populate creates nothing")

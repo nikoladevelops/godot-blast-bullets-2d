@@ -15,7 +15,7 @@ static func _instance(buf: PackedFloat32Array, i: int) -> Transform2D:
 	return Transform2D(Vector2(buf[b], buf[b + 4]), Vector2(buf[b + 1], buf[b + 5]), Vector2(buf[b + 3], buf[b + 7]))
 
 
-func _assert_buffer_matches(v: DirectionalBullets2D, label: String) -> void:
+func _assert_buffer_matches(v: BulletVolley2D, label: String) -> void:
 	var mm: MultiMesh = v.multimesh
 	assert_not_null(mm, label + ": multimesh")
 	assert_eq(mm.instance_count, v.get_amount_bullets(), label + ": instance count")
@@ -32,8 +32,8 @@ func _assert_buffer_matches(v: DirectionalBullets2D, label: String) -> void:
 	assert_eq(bad, -1, label + ": every instance drawn where its bullet is (first mismatch index)")
 
 
-func _data() -> DirectionalBulletsData2D:
-	var d := H.make_directional_data(64, 120.0, 30.0)
+func _data() -> BulletVolleyData2D:
+	var d := H.make_volley_data(64, 120.0, 30.0)
 	var arr: Array = []
 	for i in 64:
 		arr.append(Transform2D(0.1 * i, Vector2(10 * (i % 8), 12 * (i / 8))))
@@ -42,12 +42,12 @@ func _data() -> DirectionalBulletsData2D:
 
 
 func test_cold_spawn_buffer() -> void:
-	var v: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(_data())
+	var v: BulletVolley2D = factory.spawn_volley(_data())
 	_assert_buffer_matches(v, "cold spawn")
 
 
 func test_pooled_respawn_buffer() -> void:
-	var first: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(_data())
+	var first: BulletVolley2D = factory.spawn_volley(_data())
 	await physics(3)
 	await idle(1)
 	first.clear_all_bullets()
@@ -58,24 +58,24 @@ func test_pooled_respawn_buffer() -> void:
 		arr.append(Transform2D(-0.05 * i, Vector2(400 - 5 * i, 300 + 3 * i)))
 	d.transforms = arr
 	factory.debug_reset_pool_stats()
-	var v: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d)
-	assert_eq(int(factory.debug_get_pool_hit_stats()["directional_hits"]), 1, "re-spawn is a pool hit")
+	var v: BulletVolley2D = factory.spawn_volley(d)
+	assert_eq(int(factory.debug_get_pool_hit_stats()["hits"]), 1, "re-spawn is a pool hit")
 	_assert_buffer_matches(v, "pooled re-spawn (no stale previous-life poses)")
 
 
 func test_buffer_after_ticks() -> void:
-	var v: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(_data())
+	var v: BulletVolley2D = factory.spawn_volley(_data())
 	await physics(5)
 	_assert_buffer_matches(v, "after 5 ticks")
 
 
 func test_spawner_native_shot_buffer() -> void:
-	var sp := make_spawner(H.make_directional_data(1, 100.0, 30.0), BulletSpawner2D.PATTERN_FROM_HELPER_STAR, 50)
+	var sp := make_spawner(H.make_volley_data(1, 100.0, 30.0), BulletSpawner2D.PATTERN_FROM_HELPER_STAR, 50)
 	sp.position = Vector2(300, 200)
 	sp.rotation = 0.4
 	watch_signals(sp)
 	assert_true(sp.shoot_once(), "shot fires")
-	var v: DirectionalBullets2D = get_signal_parameters(sp, "volley_fired", 0)[0]
+	var v: BulletVolley2D = get_signal_parameters(sp, "volley_fired", 0)[0]
 	_assert_buffer_matches(v, "spawner native shot")
 	var expected: Array = sp.collect_spawn_transforms()
 	for i in v.get_amount_bullets():

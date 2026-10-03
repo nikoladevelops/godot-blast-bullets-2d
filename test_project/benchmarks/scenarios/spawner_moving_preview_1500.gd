@@ -13,7 +13,7 @@ func setup() -> void:
 	sp.set_shooting_enabled(false)
 	_ship.add_child(sp)
 	sp.set_bullet_factory(factory)
-	sp.set_spawn_data(H.make_directional_data(4, 250.0, 2.0))
+	sp.set_spawn_data(H.make_volley_data(4, 250.0, 2.0))
 	sp.pattern_source = BulletSpawner2D.PATTERN_FROM_HELPER_RING
 	sp.helper_bullets_amount = 1500
 	sp.show_pattern_preview = true

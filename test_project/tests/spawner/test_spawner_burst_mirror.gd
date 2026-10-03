@@ -13,13 +13,13 @@ func _on_volley_fired(volley: Object, _amount: int) -> void:
 
 
 func _spawner(src: int, amount: int) -> BulletSpawner2D:
-	var s := make_spawner(H.make_directional_data(1, 60.0, 60.0), src, amount)
+	var s := make_spawner(H.make_volley_data(1, 60.0, 60.0), src, amount)
 	s.volley_fired.connect(_on_volley_fired)
 	watch_signals(s)
 	return s
 
 
-func _winding_sign(v: DirectionalBullets2D) -> int:
+func _winding_sign(v: BulletVolley2D) -> int:
 	var total := 0.0
 	for i in range(1, v.get_amount_bullets()):
 		total += angle_difference(v.get_bullet_transform(i - 1).get_origin().angle(), v.get_bullet_transform(i).get_origin().angle())
@@ -96,13 +96,13 @@ func test_multispiral_winding_reverses() -> void:
 
 func test_ring_unaffected_by_mirroring() -> void:
 	var sp := _spawner(BulletSpawner2D.PATTERN_FROM_HELPER_RING, 8)
-	var still := H.make_directional_data(1, 0.0, 60.0)
+	var still := H.make_volley_data(1, 0.0, 60.0)
 	still.all_bullet_speed_data = []
 	sp.set_spawn_data(still)
 	sp.helper_ring_radius = 60.0
 	var pair: Dictionary = await _fire_burst_pair(sp)
 	for key in ["plain", "mirrored"]:
-		var v: DirectionalBullets2D = pair[key]
+		var v: BulletVolley2D = pair[key]
 		assert_not_null(v, "%s ring captured" % key)
 		if v == null:
 			continue
@@ -133,7 +133,7 @@ func test_distribute_degenerate_and_real_pools() -> void:
 		if err.is_push_warning() and err.contains_text("homing_target_selection is DISTRIBUTE but homing_max_targets is 1"):
 			warned += 1
 	assert_eq(warned, 1, "the degenerate pool warns once")
-	var v5: DirectionalBullets2D = s5.get_live_volleys()[0]
+	var v5: BulletVolley2D = s5.get_live_volleys()[0]
 	for i in 4:
 		assert_eq(v5.bullet_get_current_homing_target(i), foes[0], "1-target pool: every bullet chases the nearest")
 	var s6 := _spawner(BulletSpawner2D.PATTERN_FROM_HELPER_RING, 4)
@@ -142,7 +142,7 @@ func test_distribute_degenerate_and_real_pools() -> void:
 	s6.set_homing_target_selection(BulletSpawner2D.HOMING_SELECT_DISTRIBUTE)
 	s6.set_homing_max_targets(4)
 	assert_true(s6.shoot_once(), "DISTRIBUTE with a real pool fires")
-	var v6: DirectionalBullets2D = s6.get_live_volleys()[0]
+	var v6: BulletVolley2D = s6.get_live_volleys()[0]
 	for i in 4:
 		assert_eq(v6.bullet_get_current_homing_target(i), foes[i], "real pool: bullet %d chases its own target" % i)
 

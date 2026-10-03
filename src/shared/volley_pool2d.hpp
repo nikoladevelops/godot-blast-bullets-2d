@@ -10,28 +10,28 @@
 
 #include <godot_cpp/classes/physics_server2d.hpp>
 
-#include "multimesh_pool_key2d.hpp"
+#include "volley_pool_key2d.hpp"
 
 namespace BlastBullets2D {
 using namespace godot;
 
-class DirectionalBullets2D;
+class BulletVolley2D;
 
-class MultiMeshObjectPool {
+class VolleyPool {
 public:
 	// Caller must always provide the full PoolKey (amount + shape). No int-only overloads.
-	void push(DirectionalBullets2D *multimesh, const PoolKey &key);
+	void push(BulletVolley2D *multimesh, const PoolKey &key);
 
 	// Exact bucket lookup. Returns nullptr when empty/missing.
-	DirectionalBullets2D *pop(const PoolKey &key);
+	BulletVolley2D *pop(const PoolKey &key);
 
 	// Used to clear all bullet pointers that were saved inside the object pool. Note that this only clears the pointers and doesn't free the actual bullet multimesh objects.
 	void clear();
 
-	// Frees memory by deleting every single DirectionalBullets2D object that is stored in the pool and resets it to be empty
+	// Frees memory by deleting every single BulletVolley2D object that is stored in the pool and resets it to be empty
 	void free_all_bullets();
 
-	// Frees memory by deleting DirectionalBullets2D objects with an exact PoolKey match
+	// Frees memory by deleting BulletVolley2D objects with an exact PoolKey match
 	void free_specific_bullets(const PoolKey &key);
 
 	// Gets the total amount of multimeshes currently present in the object pool
@@ -40,10 +40,10 @@ public:
 	// True info: per exact key (amount + shape), no aggregation that hides shape split
 	std::map<PoolKey, int, std::less<PoolKey>> get_pool_info();
 
-	bool try_remove_instance(DirectionalBullets2D *target, const PoolKey &key);
+	bool try_remove_instance(BulletVolley2D *target, const PoolKey &key);
 
 private:
 	// The key is amount + shape type enum. Example: key {5, SHAPE_CIRCLE} holds all disabled multis with 5 bullets and circle shapes.
-	std::unordered_map<PoolKey, std::vector<DirectionalBullets2D *>, PoolKeyHash> pool;
+	std::unordered_map<PoolKey, std::vector<BulletVolley2D *>, PoolKeyHash> pool;
 };
 } //namespace BlastBullets2D

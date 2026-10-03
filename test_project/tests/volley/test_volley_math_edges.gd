@@ -5,7 +5,7 @@ extends BlastTest
 
 
 func test_drag_decays_geometrically() -> void:
-	var v: DirectionalBullets2D = spawn_dir(1, 200.0)
+	var v: BulletVolley2D = quick_volley(1, 200.0)
 	v.set_linear_drag(1.0)
 	await physics(60)
 	# 200 * (1 - 1/60)^60 ~= 73; band wide for headless dt jitter.
@@ -16,7 +16,7 @@ func test_drag_decays_geometrically() -> void:
 
 
 func test_rotation_accel_clamps_at_max() -> void:
-	var r: DirectionalBullets2D = spawn_dir(1, 0.0)
+	var r: BulletVolley2D = quick_volley(1, 0.0)
 	r.set_shared_bullet_rotation_data(H.make_rotation(0.0, 2.0, 100.0))
 	await physics(30)
 	assert_ne(r.get_bullet_texture_rotation_radians(0), 0.0, "rotation advanced under accel")
@@ -26,13 +26,13 @@ func test_rotation_accel_clamps_at_max() -> void:
 
 
 func test_wobble_lateral_bounded() -> void:
-	var d := H.make_directional_data(1, 300.0)
+	var d := H.make_volley_data(1, 300.0)
 	var wob := BulletWobbleData2D.new()
 	wob.enabled = true
 	wob.amplitude = 24.0
 	wob.frequency_hz = 2.0
 	d.shared_bullet_wobble_data = wob
-	var w: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d)
+	var w: BulletVolley2D = factory.spawn_volley(d)
 	var max_dev := 0.0
 	for i in 60:
 		await physics()
@@ -42,7 +42,7 @@ func test_wobble_lateral_bounded() -> void:
 
 
 func test_per_bullet_smoothing_clamps() -> void:
-	var f: DirectionalBullets2D = spawn_dir(2, 200.0)
+	var f: BulletVolley2D = quick_volley(2, 200.0)
 	f.bullet_set_homing_smoothing(0, -5.0)
 	expect_error_sequence(["bullet_set_homing_smoothing: value must be finite and >= 0"])
 	assert_eq(f.bullet_get_homing_smoothing(0), 0.0, "negative smoothing clamped to 0")

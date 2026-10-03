@@ -47,5 +47,5 @@ func test_patrols_shoots_and_hits() -> void:
 	assert_gte(get_signal_emit_count(turret, "movement_endpoint_reached"), 1, "reached the end and turned")
 	var hits: int = get_signal_emit_count(turret, "body_entered")
 	assert_gt(hits, 0, "bullets hit the floor (spawner-owned volleys report on the spawner)")
-	assert_signal_not_emitted(scene_factory, "directional_body_entered", "factory stays silent for spawner volleys")
+	assert_signal_not_emitted(scene_factory, "body_entered", "factory stays silent for spawner volleys")
 	assert_true(scene_factory.debug_assert_no_dangling().get("ok", false))

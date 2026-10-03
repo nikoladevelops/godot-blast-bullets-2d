@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <class name="BulletSpawner2D" inherits="Node2D" api_type="extension" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/godotengine/godot/master/doc/class.xsd">
 	<brief_description>
-		Fires timed volleys of directional bullets through a [BulletFactory2D].
+		Fires timed volleys of bullets through a [BulletFactory2D].
 	</brief_description>
 	<description>
-		Assign a [BulletFactory2D], a [DirectionalBulletsData2D], and a [member pattern_source]. Each volley collects one global transform per bullet from the [member transforms_generator] (empty means this node; a generator outside the tree while the spawner is inside also falls back to this node) and spawns it through the factory. It never fires in the editor.
+		Assign a [BulletFactory2D], a [BulletVolleyData2D], and a [member pattern_source]. Each volley collects one global transform per bullet from the [member transforms_generator] (empty means this node; a generator outside the tree while the spawner is inside also falls back to this node) and spawns it through the factory. It never fires in the editor.
 		Homing quick-start: turn on [member homing_enabled], leave [member homing_target_source] on Node Group, and put your targets (any Node2D) in the [member homing_node_group] group (default "enemies"). Every volley then chases [member homing_target_selection] targets with [member homing_smoothing] turn rate. Set [member homing_target_source] to Mouse to chase the cursor instead, and turn on [member orbiting_enabled] to make bullets ring their target once they arrive. Use [member homing_retarget_mode] so flying volleys keep following fresh targets, and [signal volley_bullet_homing_target_reached] to react when a bullet arrives.
 		Pattern quick-start: pick a [member pattern_source] helper (Ring, Fan, Spiral, Rose, Corridor...) or call [method apply_pattern_preset] for a starter, tune the matching helper_* group, and call [method shoot_once] (or enable [member shooting_enabled] for the auto loop). Add [member pattern_scale] / spin for motion, [member helper_skip_indices] for dodge doors, and [method spawn_pattern_list] for phased sequences. See [member pattern_source] for the full 33-mode list.
 		Reparenting is safe: removing the spawner from the tree and adding it back keeps assigned nodes, tracked homing volleys, burst chains, telegraphs and pattern lists. They pause while the spawner is out of the tree and resume when it returns. Node paths are rewritten from the live nodes on re-entry, so saving the scene keeps the right targets.
@@ -14,7 +14,7 @@
 	<methods>
 		<method name="adopt_live_volley">
 			<return type="bool" />
-			<param index="0" name="directional_bullets_instance" type="DirectionalBullets2D" />
+			<param index="0" name="volley" type="BulletVolley2D" />
 			<description>
 				Takes ownership of a manually-woken volley (manual wake detaches the previous owner): stamps it, replaces the previous spawner's reached forwarder with its own, and tracks it for retargeting. Queues are left alone. Handlers you connected directly on the volley are kept; only spawner forwarders are replaced. Returns false for null or non-live instances.
 			</description>
@@ -173,7 +173,7 @@
 		<method name="get_live_volleys" qualifiers="const">
 			<return type="Array" />
 			<description>
-				The tracked live volley instances (pruned first), so scripts can call the full DirectionalBullets2D API on each volley directly. Inspect-only handles: a volley can be pooled and reused for a new owner while you still hold it, so always check [method DirectionalBullets2D.is_bullet_status_enabled] and ownership before steering a held volley. Use [method adopt_live_volley] to take ownership of a manually-woken volley.
+				The tracked live volley instances (pruned first), so scripts can call the full BulletVolley2D API on each volley directly. Inspect-only handles: a volley can be pooled and reused for a new owner while you still hold it, so always check [method BulletVolley2D.is_bullet_status_enabled] and ownership before steering a held volley. Use [method adopt_live_volley] to take ownership of a manually-woken volley.
 			</description>
 		</method>
 		<method name="get_movement_leg" qualifiers="const">
@@ -1259,7 +1259,7 @@
 		<member name="movement_velocity_inherit_factor" type="float" setter="set_movement_velocity_inherit_factor" getter="get_movement_velocity_inherit_factor" default="1.0">
 			Multiplier on the inherited movement velocity (1 = full momentum, 0.5 = half, negative = backwards).
 		</member>
-		<member name="orbiting_direction" type="int" setter="set_orbiting_direction" getter="get_orbiting_direction" enum="DirectionalBullets2D.OrbitingDirection" default="2">
+		<member name="orbiting_direction" type="int" setter="set_orbiting_direction" getter="get_orbiting_direction" enum="BulletVolley2D.OrbitingDirection" default="2">
 			Orbit direction. DontMove means escort: bullets hold a fixed slot on the ring and follow the target without circling. OrbitRandom rolls OrbitLeft or OrbitRight per bullet when the volley spawns (never DontMove); live volleys keep their rolled direction on retarget passes, so switching to OrbitRandom mid-flight only affects new volleys.
 		</member>
 		<member name="orbiting_enabled" type="bool" setter="set_orbiting_enabled" getter="get_orbiting_enabled" default="false">
@@ -1268,10 +1268,10 @@
 		<member name="orbiting_follow_deadzone" type="float" setter="set_orbiting_follow_deadzone" getter="get_orbiting_follow_deadzone" default="8.0">
 			Deadzone radius in pixels, used only when [member orbiting_follow_mode] is FollowDeadzone. The ring center stays pinned while the target moves within this distance of the lock point, then re-pins to the target.
 		</member>
-		<member name="orbiting_follow_mode" type="int" setter="set_orbiting_follow_mode" getter="get_orbiting_follow_mode" enum="DirectionalBullets2D.OrbitingFollowMode" default="0">
+		<member name="orbiting_follow_mode" type="int" setter="set_orbiting_follow_mode" getter="get_orbiting_follow_mode" enum="BulletVolley2D.OrbitingFollowMode" default="0">
 			How the locked ring follows a moving target. FollowTarget tracks the target 1:1. FollowDeadzone pins the ring center until the target walks farther than [member orbiting_follow_deadzone] from it, absorbing jitter. Anchored freezes the ring where it locked and ignores target motion entirely.
 		</member>
-		<member name="orbiting_lock_policy" type="int" setter="set_orbiting_lock_policy" getter="get_orbiting_lock_policy" enum="DirectionalBullets2D.OrbitingLockPolicy" default="0">
+		<member name="orbiting_lock_policy" type="int" setter="set_orbiting_lock_policy" getter="get_orbiting_lock_policy" enum="BulletVolley2D.OrbitingLockPolicy" default="0">
 			What drops the orbit lock. RelockAlways re-acquires the radius on every retarget. StayLocked never unlocks on retarget or empty queues: once locked, bullets keep their angle and center until you explicitly disable orbiting, clear targets, or the target is freed. RelockOnTargetChange unlocks only when the front target is a different target than the one the bullet locked onto, so the same moving Node2D never breaks the ring. A freed target trims out of the queue instead of crashing: RelockAlways and RelockOnTargetChange fly toward the next live target, StayLocked rides out the gap and re-pins silently when a target returns. For a bodyguard ring on a moving Node2D use StayLocked with FollowTarget (or FollowDeadzone) and a stationary retarget mode.
 		</member>
 		<member name="orbiting_radius" type="float" setter="set_orbiting_radius" getter="get_orbiting_radius" default="64.0">
@@ -1289,7 +1289,7 @@
 		<member name="orbiting_rigid_follow" type="bool" setter="set_orbiting_rigid_follow" getter="get_orbiting_rigid_follow" default="true">
 			When on, locked OrbitLeft/OrbitRight bullets translate 1:1 with the target and keep circling, exactly like DontMove escorts. When off, locked bullets chase the ring clamped to speed times delta and trail behind fast targets.
 		</member>
-		<member name="orbiting_texture_rotation" type="int" setter="set_orbiting_texture_rotation" getter="get_orbiting_texture_rotation" enum="DirectionalBullets2D.OrbitingTextureRotation" default="0">
+		<member name="orbiting_texture_rotation" type="int" setter="set_orbiting_texture_rotation" getter="get_orbiting_texture_rotation" enum="BulletVolley2D.OrbitingTextureRotation" default="0">
 			How bullet textures face while physically orbiting.
 		</member>
 		<member name="pattern_cache_mode" type="int" setter="set_pattern_cache_mode" getter="get_pattern_cache_mode" default="0">
@@ -1367,7 +1367,7 @@
 		<member name="show_preview_during_runtime" type="bool" setter="set_show_preview_during_runtime" getter="get_show_preview_during_runtime" default="false">
 			Also shows the preview while the game runs. Off by default.
 		</member>
-		<member name="spawn_data" type="DirectionalBulletsData2D" setter="set_spawn_data" getter="get_spawn_data">
+		<member name="spawn_data" type="BulletVolleyData2D" setter="set_spawn_data" getter="get_spawn_data">
 			Bullet data for each volley. Duplicated once per resource (the spawner keeps the copy until the resource changes or is replaced), so sharing one resource is safe. Assigning the same resource again keeps the copy.
 		</member>
 		<member name="spawn_position_offset" type="Vector2" setter="set_spawn_position_offset" getter="get_spawn_position_offset" default="Vector2(0, 0)">
@@ -1407,7 +1407,7 @@
 	<signals>
 		<signal name="area_entered">
 			<param index="0" name="hit_target_area" type="Object" />
-			<param index="1" name="directional_bullets_instance" type="DirectionalBullets2D" />
+			<param index="1" name="volley" type="BulletVolley2D" />
 			<param index="2" name="bullet_index" type="int" />
 			<description>
 				Fired when one of this spawner's bullets enters an area.
@@ -1415,7 +1415,7 @@
 		</signal>
 		<signal name="body_entered">
 			<param index="0" name="hit_target_body" type="Object" />
-			<param index="1" name="directional_bullets_instance" type="DirectionalBullets2D" />
+			<param index="1" name="volley" type="BulletVolley2D" />
 			<param index="2" name="bullet_index" type="int" />
 			<description>
 				Fired when one of this spawner's bullets hits a body.
@@ -1423,7 +1423,7 @@
 		</signal>
 		<signal name="bounce_area_entered">
 			<param index="0" name="hit_target_area" type="Object" />
-			<param index="1" name="directional_bullets_instance" type="DirectionalBullets2D" />
+			<param index="1" name="volley" type="BulletVolley2D" />
 			<param index="2" name="bullet_index" type="int" />
 			<description>
 				Fired when one of this spawner's bullets bounces off an area. A consumed bounce fires both this and [signal area_entered].
@@ -1431,7 +1431,7 @@
 		</signal>
 		<signal name="bounce_body_entered">
 			<param index="0" name="hit_target_body" type="Object" />
-			<param index="1" name="directional_bullets_instance" type="DirectionalBullets2D" />
+			<param index="1" name="volley" type="BulletVolley2D" />
 			<param index="2" name="bullet_index" type="int" />
 			<description>
 				Fired when one of this spawner's bullets bounces off a body. A consumed bounce fires both this and [signal body_entered].
@@ -1450,17 +1450,17 @@
 			</description>
 		</signal>
 		<signal name="homing_targets_resolved">
-			<param index="0" name="directional_bullets_instance" type="DirectionalBullets2D" />
+			<param index="0" name="volley" type="BulletVolley2D" />
 			<param index="1" name="targets" type="Array" />
 			<description>
 				Fired once per homing volley with the resolved targets (Node2D or Vector2 entries), before [signal volley_homing_configured]. Empty for the Mouse source and for volleys that found nothing. Not fired while homing is off. A handler may queue_free the volley: the shot is then dropped (volley_skipped "dropped").
 			</description>
 		</signal>
 		<signal name="life_time_over">
-			<param index="0" name="directional_bullets_instance" type="DirectionalBullets2D" />
+			<param index="0" name="volley" type="BulletVolley2D" />
 			<param index="1" name="bullet_indexes" type="int[]" />
 			<description>
-				Fired when this spawner's bullets expire. Needs the lifetime signal enabled in the bullet data. Deferred; until it is delivered the volley keeps its attachments and stays out of the pool (same contract as [signal BulletFactory2D.directional_life_time_over]).
+				Fired when this spawner's bullets expire. Needs the lifetime signal enabled in the bullet data. Deferred; until it is delivered the volley keeps its attachments and stays out of the pool (same contract as [signal BulletFactory2D.life_time_over]).
 			</description>
 		</signal>
 		<signal name="movement_endpoint_reached">
@@ -1491,7 +1491,7 @@
 			</description>
 		</signal>
 		<signal name="pre_shoot">
-			<param index="0" name="directional_bullets_instance" type="DirectionalBullets2D" />
+			<param index="0" name="volley" type="BulletVolley2D" />
 			<param index="1" name="volley_index" type="int" />
 			<description>
 				Last-chance hook fired after the volley has spawned and been stamped, but before homing/orbiting is configured and before volley_fired. Handlers may tweak the live volley through its API (speed ramp, difficulty scale); the spawn data has already been consumed at this point. Same handler contract as volley_fired: never call shoot_once from here (use shoot_once_deferred).
@@ -1519,7 +1519,7 @@
 			</description>
 		</signal>
 		<signal name="volley_bullet_homing_target_reached">
-			<param index="0" name="directional_bullets_instance" type="DirectionalBullets2D" />
+			<param index="0" name="volley" type="BulletVolley2D" />
 			<param index="1" name="bullet_index" type="int" />
 			<param index="2" name="target" type="Node2D" />
 			<param index="3" name="target_global_position" type="Vector2" />
@@ -1528,14 +1528,14 @@
 			</description>
 		</signal>
 		<signal name="volley_fired">
-			<param index="0" name="directional_bullets_instance" type="DirectionalBullets2D" />
+			<param index="0" name="volley" type="BulletVolley2D" />
 			<param index="1" name="volley_index" type="int" />
 			<description>
 				Fired for every volley, with a 1-based counter.
 			</description>
 		</signal>
 		<signal name="volley_homing_configured">
-			<param index="0" name="directional_bullets_instance" type="DirectionalBullets2D" />
+			<param index="0" name="volley" type="BulletVolley2D" />
 			<param index="1" name="volley_index" type="int" />
 			<description>
 				Fired for every homing/orbiting volley right after it is configured, before [signal volley_fired]. Only fires when homing or orbiting is enabled.

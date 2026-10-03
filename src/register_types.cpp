@@ -11,17 +11,17 @@
 #include "shared/bullet_rotation_data2d.hpp"
 #include "shared/bullet_speed_data2d.hpp"
 #include "shared/bullet_wobble_data2d.hpp"
-#include "shared/multimesh_pool_key2d.hpp"
+#include "shared/volley_pool_key2d.hpp"
 #include "shared/cached_string_names2d.hpp"
 
 // Factory
 #include "factory/bullet_factory2d.hpp"
 
 // Debugger
-#include "debugger/multimesh_bullets_debugger2d.hpp"
+#include "debugger/bullet_volley_debugger2d.hpp"
 
 // Spawn data classes
-#include "spawn-data/directional_bullets_data2d.hpp"
+#include "spawn-data/bullet_volley_data2d.hpp"
 
 // Bullets classes
 #include "bullets/directional_bullets2d.hpp"
@@ -58,22 +58,22 @@ void initialize_blast_bullets_2d_module(ModuleInitializationLevel p_level) {
 	GDREGISTER_CLASS(BulletSpeedData2D)
 	GDREGISTER_CLASS(BulletCurvesData2D)
 	GDREGISTER_CLASS(BulletWobbleData2D)
-	GDREGISTER_CLASS(MultiMeshPoolKey2D)
+	GDREGISTER_CLASS(VolleyPoolKey2D)
 	GDREGISTER_CLASS(BulletAttachment2D)
 
 	// Factory
 	GDREGISTER_CLASS(BulletFactory2D)
 
 	// Debugger
-	GDREGISTER_CLASS(MultiMeshBulletsDebugger2D)
+	GDREGISTER_CLASS(BulletVolleyDebugger2D)
 
 	// Spawn data classes
-	GDREGISTER_CLASS(DirectionalBulletsData2D)
+	GDREGISTER_CLASS(BulletVolleyData2D)
 
 	// Bullets classes
 	// GDREGISTER_CLASS (not RUNTIME): runtime classes are not creatable in the editor,
 	// which would break restoring any scene that contains these nodes.
-	GDREGISTER_CLASS(DirectionalBullets2D)
+	GDREGISTER_CLASS(BulletVolley2D)
 
 	// Bullet Spawner
 	GDREGISTER_CLASS(BulletSpawner2D)

@@ -1,15 +1,15 @@
 extends BlastTest
-## Directional core API: speed / direction / transform / velocity / texture
+## Volley core API: speed / direction / transform / velocity / texture
 ## rotation get-set, per-bullet and all_bullets_ variants, NaN / zero / null /
 ## OOB rejects keep the old value, derive-direction from a transform,
 ## teleport carry, shape state, default max_speed 0 = unlimited.
 
-var v: DirectionalBullets2D
+var v: BulletVolley2D
 
 
 func before_each() -> void:
 	await super()
-	v = spawn_dir(3, 200.0)
+	v = quick_volley(3, 200.0)
 
 
 func test_speed_data() -> void:
@@ -66,11 +66,11 @@ func test_transforms_and_teleport() -> void:
 
 
 func test_default_max_speed_is_unlimited() -> void:
-	var d := H.make_directional_data(1, 300.0, 10.0)
+	var d := H.make_volley_data(1, 300.0, 10.0)
 	var sp := BulletSpeedData2D.new()
 	sp.speed = 300.0 # max_speed left at 0 = unlimited, not a brake
 	d.all_bullet_speed_data = [sp]
-	var pv: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d)
+	var pv: BulletVolley2D = factory.spawn_volley(d)
 	var x0: float = pv.get_bullet_global_transform(0).origin.x
 	await physics(10)
 	assert_gt(pv.get_bullet_global_transform(0).origin.x, x0 + 20.0, "default max_speed flies")
@@ -87,9 +87,9 @@ func test_texture_rotation() -> void:
 
 
 func test_texture_rotation_round_trip_with_offset() -> void:
-	var d := H.make_directional_data(1, 0.0)
+	var d := H.make_volley_data(1, 0.0)
 	d.texture_rotation_radians = 0.7
-	var w: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d)
+	var w: BulletVolley2D = factory.spawn_volley(d)
 	var r0: float = w.get_bullet_texture_rotation_radians(0)
 	assert_almost_eq(r0, 0.0, 0.001, "fresh bullet reads 0 (volley offset excluded)")
 	w.set_bullet_texture_rotation_radians(0, w.get_bullet_texture_rotation_radians(0))

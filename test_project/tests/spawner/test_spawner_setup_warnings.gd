@@ -22,10 +22,10 @@ func test_each_misconfiguration_is_named() -> void:
 	sp.set_bullet_factory(factory)
 	sp.set_spawn_data(null)
 	assert_true(_has(sp, "No spawn_data"), "missing spawn data")
-	var invisible := DirectionalBulletsData2D.new()
+	var invisible := BulletVolleyData2D.new()
 	sp.set_spawn_data(invisible)
 	assert_true(_has(sp, "bullets will be invisible"), "spawn data without art")
-	sp.set_spawn_data(H.make_directional_data(2))
+	sp.set_spawn_data(H.make_volley_data(2))
 	sp.pattern_source = BulletSpawner2D.PATTERN_FROM_HELPER_AIMED
 	assert_true(_has(sp, "Aimed pattern needs helper_aimed_target"), "aimed without a target")
 	sp.pattern_source = BulletSpawner2D.PATTERN_FROM_HELPER_CORRIDOR

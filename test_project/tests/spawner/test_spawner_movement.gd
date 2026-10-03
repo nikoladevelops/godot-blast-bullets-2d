@@ -24,7 +24,7 @@ func _line_path(a: Vector2, b: Vector2) -> Path2D:
 
 
 func _mover(p: Path2D, configure: Callable = func(_s): pass) -> BulletSpawner2D:
-	var sp := make_spawner(H.make_directional_data(4, 200.0, 2.0), BulletSpawner2D.PATTERN_FROM_HELPER_RING, 8)
+	var sp := make_spawner(H.make_volley_data(4, 200.0, 2.0), BulletSpawner2D.PATTERN_FROM_HELPER_RING, 8)
 	sp.movement_transition = 0 # linear unless a test says otherwise
 	sp.movement_ease = 0
 	sp.movement_duration_sec = 1.0
@@ -272,7 +272,7 @@ func test_shooting_while_moving_follows_and_inherits() -> void:
 	watch_signals(sp)
 	await idle(20)
 	assert_true(sp.shoot_once(), "fires while moving")
-	var v: DirectionalBullets2D = get_signal_parameters(sp, "volley_fired", 0)[0]
+	var v: BulletVolley2D = get_signal_parameters(sp, "volley_fired", 0)[0]
 	assert_almost_eq(v.get_inherited_velocity_offset(), sp.get_movement_velocity() * 0.5, Vector2(1, 1), "volley inherits half the spawner velocity")
 	var expected: Array = sp.collect_spawn_transforms()
 	assert_almost_eq(v.get_bullet_global_transform(0).origin, (expected[0] as Transform2D).origin, Vector2(0.5, 0.5), "pattern centered on the moving spawner")

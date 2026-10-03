@@ -16,8 +16,8 @@ var attach_seen: Array = []
 var attach_target: Object = null
 
 
-func _data() -> DirectionalBulletsData2D:
-	var d := H.make_directional_data(2, 0.0, 0.1)
+func _data() -> BulletVolleyData2D:
+	var d := H.make_volley_data(2, 0.0, 0.1)
 	d.is_life_time_over_signal_enabled = true
 	return d
 
@@ -28,7 +28,7 @@ func _on_lifetime(volley: Object, indexes: Array) -> void:
 		return
 	var seen := []
 	for i in indexes:
-		seen.append((volley as DirectionalBullets2D).bullet_get_attachment(int(i)) != null)
+		seen.append((volley as BulletVolley2D).bullet_get_attachment(int(i)) != null)
 	attach_seen.append(seen)
 
 
@@ -37,7 +37,7 @@ func before_each() -> void:
 	signals.clear()
 	attach_seen.clear()
 	attach_target = null
-	factory.directional_life_time_over.connect(_on_lifetime)
+	factory.life_time_over.connect(_on_lifetime)
 
 
 func _hits_for(v: Object) -> int:
@@ -50,12 +50,12 @@ func _hits_for(v: Object) -> int:
 
 func test_same_frame_physics_spawn_after_expiry() -> void:
 	var respawned: Array = []
-	var first: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(_data())
+	var first: BulletVolley2D = factory.spawn_volley(_data())
 	var watcher := PhysicsWatcher.new()
 	watcher.process_physics_priority = 1000
 	watcher.cb = func():
 		if respawned.is_empty() and not first.debug_get_volley_info().get("is_active", true):
-			respawned.append(factory.spawn_controllable_directional_bullets(_data()))
+			respawned.append(factory.spawn_volley(_data()))
 	add(watcher)
 	for i in 30:
 		await physics()
@@ -72,20 +72,20 @@ func test_same_frame_physics_spawn_after_expiry() -> void:
 
 
 func test_call_deferred_spawn_before_flush() -> void:
-	var second: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(_data())
+	var second: BulletVolley2D = factory.spawn_volley(_data())
 	for i in 30:
 		await physics()
 		if not second.debug_get_volley_info().get("is_active", true):
 			break
 		# A same-key spawn queued in the expiry frame flushes before the
 		# deferred signal.
-		factory.call_deferred("spawn_directional_bullets", _data())
+		factory.call_deferred("spawn_volley", _data())
 	await idle()
 	assert_eq(_hits_for(second), 1, "deferred respawn does not eat the expiry signal")
 
 
 func test_attachments_visible_inside_handler() -> void:
-	var third: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(_data())
+	var third: BulletVolley2D = factory.spawn_volley(_data())
 	attach_target = third
 	third.all_bullets_set_attachment(make_probe_scene(), Vector2.ZERO, true)
 	var probe0 = third.bullet_get_attachment(0)

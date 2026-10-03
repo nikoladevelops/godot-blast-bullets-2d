@@ -13,7 +13,7 @@ func setup() -> void:
 	_sp.position = Vector2(960, 540)
 	add_child(_sp)
 	_sp.set_bullet_factory(factory)
-	_sp.set_spawn_data(H.make_directional_data(4, 250.0, 2.0))
+	_sp.set_spawn_data(H.make_volley_data(4, 250.0, 2.0))
 	_sp.pattern_source = BulletSpawner2D.PATTERN_FROM_HELPER_HEART
 	_sp.helper_bullets_amount = 1500
 	_sp.helper_heart_size = 150.0

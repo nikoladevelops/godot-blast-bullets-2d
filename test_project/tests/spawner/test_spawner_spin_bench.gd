@@ -7,7 +7,7 @@ const N := 1500
 
 
 func _heart_spawner() -> BulletSpawner2D:
-	var sp := make_spawner(H.make_directional_data(4, 250.0, 30.0), BulletSpawner2D.PATTERN_FROM_HELPER_HEART, N)
+	var sp := make_spawner(H.make_volley_data(4, 250.0, 30.0), BulletSpawner2D.PATTERN_FROM_HELPER_HEART, N)
 	sp.helper_heart_size = 150.0
 	return sp
 
@@ -89,7 +89,7 @@ func test_shoot_once_cpu_cold_vs_warm() -> void:
 		await idle(1)
 	var stats: Dictionary = factory.debug_get_pool_hit_stats()
 	print("BENCH heart1500 shoot_once cold_ms=", colds, " warm_ms=", warms, " pool=", stats)
-	assert_gte(int(stats.get("directional_hits", 0)), 2, "repeated shots reuse the pool")
+	assert_gte(int(stats.get("hits", 0)), 2, "repeated shots reuse the pool")
 
 
 func test_first_spawn_cold_vs_warm_pool() -> void:
@@ -110,8 +110,8 @@ func test_first_spawn_cold_vs_warm_pool() -> void:
 	assert_true(sp.shoot_once(), "pooled shot fires")
 	var warm_ms := float(Time.get_ticks_usec() - t0) / 1000.0
 	var stats: Dictionary = factory.debug_get_pool_hit_stats()
-	assert_eq(int(stats.get("directional_hits", 0)), 1, "second shot is a pool hit (warm)")
-	assert_eq(int(stats.get("directional_misses", 0)), 0, "no pool miss on the warm shot")
+	assert_eq(int(stats.get("hits", 0)), 1, "second shot is a pool hit (warm)")
+	assert_eq(int(stats.get("misses", 0)), 0, "no pool miss on the warm shot")
 	print("BENCH heart1500 cold=%.3fms warm=%.3fms" % [cold_ms, warm_ms])
 	# Catastrophe guards only (debug build, shared CI cores); the real
 	# tracking lives in tools/run_benchmarks.py.

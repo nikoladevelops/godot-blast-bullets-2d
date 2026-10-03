@@ -7,7 +7,7 @@ extends BlastTest
 
 
 func _spawner() -> BulletSpawner2D:
-	var sp := make_spawner(H.make_directional_data(4, 0.0, 30.0), BulletSpawner2D.PATTERN_FROM_HELPER_RING, 4)
+	var sp := make_spawner(H.make_volley_data(4, 0.0, 30.0), BulletSpawner2D.PATTERN_FROM_HELPER_RING, 4)
 	watch_signals(sp)
 	return sp
 
@@ -15,14 +15,14 @@ func _spawner() -> BulletSpawner2D:
 func _volley_sizes(sp: BulletSpawner2D) -> Array:
 	var out: Array = []
 	for i in get_signal_emit_count(sp, "volley_fired"):
-		var v: DirectionalBullets2D = get_signal_parameters(sp, "volley_fired", i)[0]
+		var v: BulletVolley2D = get_signal_parameters(sp, "volley_fired", i)[0]
 		out.append(v.get_amount_bullets())
 	return out
 
 
 func test_sequential_entries_fire_in_order_and_restore_everything() -> void:
 	var sp := _spawner()
-	var data: DirectionalBulletsData2D = sp.get_spawn_data()
+	var data: BulletVolleyData2D = sp.get_spawn_data()
 	var entries := [
 		{"pattern_source": BulletSpawner2D.PATTERN_FROM_HELPER_FAN, "helper_bullets_amount": 3},
 		{"helper_bullets_amount": 5},

@@ -1,11 +1,11 @@
 extends BlastTest
 ## Spawner-owned volleys route their collision signals to the SPAWNER:
 ## area_entered, life_time_over and bounce_area_entered fire on the spawner,
-## and the factory's directional_* twins stay silent for those volleys.
+## and the factory's same-named signals stay silent for those volleys.
 
 
-func _data(mask_layers: Array, bounce_layers: Array = [], lifetime: float = 5.0) -> DirectionalBulletsData2D:
-	var d := H.make_directional_data(1, 600.0, lifetime)
+func _data(mask_layers: Array, bounce_layers: Array = [], lifetime: float = 5.0) -> BulletVolleyData2D:
+	var d := H.make_volley_data(1, 600.0, lifetime)
 	d.monitorable = true
 	d.set_collision_mask_from_array(mask_layers)
 	if not bounce_layers.is_empty():
@@ -13,7 +13,7 @@ func _data(mask_layers: Array, bounce_layers: Array = [], lifetime: float = 5.0)
 	return d
 
 
-func _spawner(data: DirectionalBulletsData2D) -> BulletSpawner2D:
+func _spawner(data: BulletVolleyData2D) -> BulletSpawner2D:
 	var sp := make_spawner(data, BulletSpawner2D.PATTERN_FROM_SELF, 1) # fires along +X
 	watch_signals(sp)
 	watch_signals(factory)
@@ -34,7 +34,7 @@ func test_area_entered_goes_to_the_spawner() -> void:
 	await _until(sp, "area_entered")
 	await idle(2)
 	assert_signal_emit_count(sp, "area_entered", 1, "the spawner hears the hit once")
-	assert_signal_emit_count(factory, "directional_area_entered", 0, "the factory stays silent")
+	assert_signal_emit_count(factory, "area_entered", 0, "the factory stays silent")
 
 
 func test_life_time_over_goes_to_the_spawner() -> void:
@@ -48,7 +48,7 @@ func test_life_time_over_goes_to_the_spawner() -> void:
 			break
 	assert_signal_emit_count(sp, "life_time_over", 1, "the spawner hears the expiry once")
 	assert_eq(get_signal_parameters(sp, "life_time_over", 0)[1], [0], "with the expired bullet index")
-	assert_signal_emit_count(factory, "directional_life_time_over", 0, "the factory stays silent")
+	assert_signal_emit_count(factory, "life_time_over", 0, "the factory stays silent")
 
 
 func test_bounce_area_entered_goes_to_the_spawner() -> void:
@@ -58,4 +58,4 @@ func test_bounce_area_entered_goes_to_the_spawner() -> void:
 	await _until(sp, "bounce_area_entered")
 	await idle(2)
 	assert_signal_emit_count(sp, "bounce_area_entered", 1, "the spawner hears the bounce once")
-	assert_signal_emit_count(factory, "directional_bounce_area_entered", 0, "the factory stays silent")
+	assert_signal_emit_count(factory, "bounce_area_entered", 0, "the factory stays silent")

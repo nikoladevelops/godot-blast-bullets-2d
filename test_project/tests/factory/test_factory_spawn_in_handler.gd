@@ -23,18 +23,18 @@ func before_each() -> void:
 	add(_wall)
 	await physics()
 	await idle()
-	factory.directional_body_entered.connect(_on_body)
+	factory.body_entered.connect(_on_body)
 
 
-func _bodied_data() -> DirectionalBulletsData2D:
-	var d := H.make_directional_data(1, 300.0, 10.0)
+func _bodied_data() -> BulletVolleyData2D:
+	var d := H.make_volley_data(1, 300.0, 10.0)
 	d.monitorable = true
 	d.set_collision_mask_from_array([3])
 	d.collision_shape = H.make_circle_shape(6.0)
 	return d
 
 
-func _debris_data() -> DirectionalBulletsData2D:
+func _debris_data() -> BulletVolleyData2D:
 	var d := _bodied_data()
 	d.transforms = [Transform2D(0.0, Vector2(-400, 0))]
 	var sp := BulletSpeedData2D.new()
@@ -43,8 +43,8 @@ func _debris_data() -> DirectionalBulletsData2D:
 	return d
 
 
-func _on_body(_body: Object, _volley: DirectionalBullets2D, _idx: int) -> void:
-	_spawned.append(factory.spawn_controllable_directional_bullets(_debris_data()))
+func _on_body(_body: Object, _volley: BulletVolley2D, _idx: int) -> void:
+	_spawned.append(factory.spawn_volley(_debris_data()))
 
 
 func _wait_for_handler() -> void:
@@ -55,10 +55,10 @@ func _wait_for_handler() -> void:
 
 
 func test_same_key_spawn_from_killing_blow() -> void:
-	var v: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(_bodied_data())
+	var v: BulletVolley2D = factory.spawn_volley(_bodied_data())
 	await _wait_for_handler()
 	assert_eq(_spawned.size(), 1, "handler ran once")
-	var s: DirectionalBullets2D = _spawned[0] if _spawned.size() > 0 else null
+	var s: BulletVolley2D = _spawned[0] if _spawned.size() > 0 else null
 	assert_not_null(s, "spawn inside the handler returned a volley")
 	assert_ne(s, v, "handler never gets the dying volley back")
 	if s != null:
@@ -66,11 +66,11 @@ func test_same_key_spawn_from_killing_blow() -> void:
 
 
 func test_prepopulated_pool_reused_from_handler() -> void:
-	factory.populate_bullets_pool(MultiMeshPoolKey2D.make(1, 3), _bodied_data(), 3)
+	factory.populate_bullets_pool(VolleyPoolKey2D.make(1, 3), _bodied_data(), 3)
 	factory.debug_reset_pool_stats()
-	var v: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(_bodied_data())
+	var v: BulletVolley2D = factory.spawn_volley(_bodied_data())
 	await _wait_for_handler()
 	assert_eq(_spawned.size(), 1)
 	assert_not_null(_spawned[0] if _spawned.size() > 0 else null, "pool-hit spawn inside the handler succeeded")
 	assert_ne(_spawned[0] if _spawned.size() > 0 else null, v, "pooled reuse is not the draining volley")
-	assert_gte(int(factory.debug_get_pool_hit_stats().get("directional_hits", 0)), 2, "handler spawn came from the pool")
+	assert_gte(int(factory.debug_get_pool_hit_stats().get("hits", 0)), 2, "handler spawn came from the pool")

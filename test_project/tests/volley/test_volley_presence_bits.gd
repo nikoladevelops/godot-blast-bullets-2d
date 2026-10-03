@@ -7,8 +7,8 @@ extends BlastTest
 
 
 ## n bullets at the origin; the caller supplies per-bullet data.
-func _bare(n: int = 2) -> DirectionalBulletsData2D:
-	var d := H.make_directional_data(n, 0.0)
+func _bare(n: int = 2) -> BulletVolleyData2D:
+	var d := H.make_volley_data(n, 0.0)
 	var arr: Array = []
 	for i in n:
 		arr.append(Transform2D())
@@ -25,16 +25,16 @@ func _rot(speed: float, max_speed: float = 3000.0, acc: float = 0.0) -> BulletRo
 	return H.make_rotation(speed, max_speed, acc)
 
 
-func _speed_of(v: DirectionalBullets2D, i: int) -> float:
+func _speed_of(v: BulletVolley2D, i: int) -> float:
 	return float(v.debug_get_bullet_info(i)["speed"])
 
 
-func _rot_of(v: DirectionalBullets2D, i: int) -> float:
+func _rot_of(v: BulletVolley2D, i: int) -> float:
 	return float(v.debug_get_bullet_info(i)["rotation_speed"])
 
 
-func _spawn(d: DirectionalBulletsData2D) -> DirectionalBullets2D:
-	return factory.spawn_controllable_directional_bullets(d)
+func _spawn(d: BulletVolleyData2D) -> BulletVolley2D:
+	return factory.spawn_volley(d)
 
 
 func test_speed_deliberate_zero_is_not_a_gap() -> void:

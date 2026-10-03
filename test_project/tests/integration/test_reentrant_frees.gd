@@ -8,8 +8,8 @@ extends BlastTest
 var freed_count := 0
 
 
-func _attached_data(lifetime := 30.0, max_hits := 1) -> DirectionalBulletsData2D:
-	var d := H.make_directional_data(2, 600.0, lifetime)
+func _attached_data(lifetime := 30.0, max_hits := 1) -> BulletVolleyData2D:
+	var d := H.make_volley_data(2, 600.0, lifetime)
 	d.transforms = [Transform2D(), Transform2D(0.0, Vector2(0, 40))]
 	d.monitorable = true
 	d.set_collision_mask_from_array([3])
@@ -19,7 +19,7 @@ func _attached_data(lifetime := 30.0, max_hits := 1) -> DirectionalBulletsData2D
 
 
 func _free_attachment_of(volley: Object, idx: int) -> void:
-	var a: Node = (volley as DirectionalBullets2D).bullet_get_attachment(idx)
+	var a: Node = (volley as BulletVolley2D).bullet_get_attachment(idx)
 	if a != null:
 		a.free()
 		freed_count += 1
@@ -28,7 +28,7 @@ func _free_attachment_of(volley: Object, idx: int) -> void:
 var body_hits: Array = []
 
 
-func _on_body_free_attachment(_body: Object, volley: DirectionalBullets2D, idx: int) -> void:
+func _on_body_free_attachment(_body: Object, volley: BulletVolley2D, idx: int) -> void:
 	body_hits.append(idx)
 	_free_attachment_of(volley, idx)
 
@@ -49,8 +49,8 @@ func test_free_attachment_inside_body_entered_killing_hit() -> void:
 	# captured attachment pointer AFTER the handler freed it (use-after-free).
 	make_wall(Vector2(200, 0))
 	await physics()
-	factory.directional_body_entered.connect(_on_body_free_attachment)
-	var v: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(_attached_data())
+	factory.body_entered.connect(_on_body_free_attachment)
+	var v: BulletVolley2D = factory.spawn_volley(_attached_data())
 	v.all_bullets_set_attachment(make_probe_scene(), Vector2.ZERO, true)
 	for i in 60:
 		await physics()
@@ -69,8 +69,8 @@ func test_free_attachment_inside_body_entered_non_killing_hit() -> void:
 	# must be dropped and the bullet keeps flying with no attachment.
 	make_wall(Vector2(200, 0))
 	await physics()
-	factory.directional_body_entered.connect(_on_body_free_attachment)
-	var v: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(_attached_data(30.0, 0))
+	factory.body_entered.connect(_on_body_free_attachment)
+	var v: BulletVolley2D = factory.spawn_volley(_attached_data(30.0, 0))
 	v.all_bullets_set_attachment(make_probe_scene(), Vector2.ZERO, true)
 	for i in 60:
 		await physics()
@@ -86,10 +86,10 @@ func test_free_attachment_inside_life_time_over() -> void:
 	# S2: expiry queued a deferred attachment-disable carrying the RAW
 	# attachment pointer; the life_time_over handler (flushed first) frees it,
 	# then the deferred call's argument conversion touched freed memory.
-	factory.directional_life_time_over.connect(_on_lifetime_free_attachments)
+	factory.life_time_over.connect(_on_lifetime_free_attachments)
 	var d := _attached_data(0.1)
 	d.is_life_time_over_signal_enabled = true
-	var v: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d)
+	var v: BulletVolley2D = factory.spawn_volley(d)
 	v.all_bullets_set_attachment(make_probe_scene(), Vector2.ZERO, true)
 	for i in 30:
 		await physics()
@@ -106,7 +106,7 @@ func test_free_attachment_inside_life_time_over() -> void:
 var seen_attached: Array = []
 
 
-func _on_body_probe(_body: Object, volley: DirectionalBullets2D, idx: int) -> void:
+func _on_body_probe(_body: Object, volley: BulletVolley2D, idx: int) -> void:
 	seen_attached.append([idx, volley.bullet_get_attachment(idx) != null])
 
 
@@ -117,8 +117,8 @@ func test_last_bullet_killing_hit_handler_sees_its_attachment() -> void:
 	seen_attached.clear()
 	make_wall(Vector2(200, 0))
 	await physics()
-	factory.directional_body_entered.connect(_on_body_probe)
-	var v: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(_attached_data())
+	factory.body_entered.connect(_on_body_probe)
+	var v: BulletVolley2D = factory.spawn_volley(_attached_data())
 	v.all_bullets_set_attachment(make_probe_scene(), Vector2.ZERO, true)
 	for i in 60:
 		await physics()

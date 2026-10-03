@@ -36,10 +36,10 @@ struct PoolKeyHash {
 
 // GDScript-visible pool key. Single source of truth for callers: they must always provide amount_bullets + shape.
 // amount_bullets = bullets per multimesh (bucket identity, must equal spawn_data.transforms.size()).
-// Null Ref<MultiMeshPoolKey2D> means "all buckets". Non-null means exact bucket match.
+// Null Ref<VolleyPoolKey2D> means "all buckets". Non-null means exact bucket match.
 // Never used inside the hot path. Convert once via to_internal(), then use plain PoolKey.
-class MultiMeshPoolKey2D : public Resource {
-	GDCLASS(MultiMeshPoolKey2D, Resource)
+class VolleyPoolKey2D : public Resource {
+	GDCLASS(VolleyPoolKey2D, Resource)
 
 private:
 	int amount_bullets = 0;
@@ -52,10 +52,10 @@ public:
 	int get_shape_type() const { return shape_type; }
 	void set_shape_type(int p_shape_type);
 
-	static Ref<MultiMeshPoolKey2D> make(int p_amount_bullets, int p_shape_type);
+	static Ref<VolleyPoolKey2D> make(int p_amount_bullets, int p_shape_type);
 
 	PoolKey to_internal() const { return PoolKey{ amount_bullets, static_cast<PhysicsServer2D::ShapeType>(shape_type) }; }
-	static Ref<MultiMeshPoolKey2D> from_internal(const PoolKey &key);
+	static Ref<VolleyPoolKey2D> from_internal(const PoolKey &key);
 
 protected:
 	static void _bind_methods();

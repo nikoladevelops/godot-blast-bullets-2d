@@ -12,7 +12,7 @@ func setup() -> void:
 		add_child(n)
 		_targets.append(n)
 	for v in 20:
-		var vol: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(ring_data(100, Vector2(400 + 60 * v, 400), 30.0, 220.0, 1000.0))
+		var vol: BulletVolley2D = factory.spawn_volley(ring_data(100, Vector2(400 + 60 * v, 400), 30.0, 220.0, 1000.0))
 		vol.set_homing_smoothing(4.0)
 		vol.shared_homing_deque_push_back_node2d_target(_targets[v % 4])
 

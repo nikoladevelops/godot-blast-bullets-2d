@@ -9,7 +9,7 @@ var s_line: BulletSpawner2D
 
 
 func _spawner(src: int, amount: int, shape: Shape2D) -> BulletSpawner2D:
-	var d := H.make_directional_data(amount, 220.0)
+	var d := H.make_volley_data(amount, 220.0)
 	d.collision_shape = shape
 	return make_spawner(d, src, amount)
 
@@ -34,7 +34,7 @@ func before_each() -> void:
 		if i % 3 == 0:
 			s_line.shoot_once()
 		if i % 5 == 0:
-			factory.spawn_controllable_directional_bullets(H.make_directional_data(6, 220.0))
+			factory.spawn_volley(H.make_volley_data(6, 220.0))
 		await physics()
 	await idle()
 
@@ -66,7 +66,7 @@ func test_retarget_and_fuse_are_per_spawner() -> void:
 
 
 func test_per_bucket_free_isolates() -> void:
-	var ring_key: MultiMeshPoolKey2D = BulletFactory2D.debug_expected_pool_key(s_ring.get_spawn_data())
+	var ring_key: VolleyPoolKey2D = BulletFactory2D.debug_expected_pool_key(s_ring.get_spawn_data())
 	var fan_live_before: int = s_fan.get_active_live_bullet_count()
 	factory.free_active_bullets(ring_key)
 	await idle(1)

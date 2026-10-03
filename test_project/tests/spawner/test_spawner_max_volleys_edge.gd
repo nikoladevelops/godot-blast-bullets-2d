@@ -7,7 +7,7 @@ extends BlastTest
 
 
 func test_cap_trip_by_shot_emits_finished_once() -> void:
-	var sp := make_spawner(H.make_directional_data(1, 0.0, 60.0), BulletSpawner2D.PATTERN_FROM_SELF, 1)
+	var sp := make_spawner(H.make_volley_data(1, 0.0, 60.0), BulletSpawner2D.PATTERN_FROM_SELF, 1)
 	sp.max_volleys = 2
 	sp.set_shooting_enabled(true) # auto-fire configured: the cap trip is a finish
 	watch_signals(sp)
@@ -19,7 +19,7 @@ func test_cap_trip_by_shot_emits_finished_once() -> void:
 
 
 func test_lowering_then_raising_the_cap() -> void:
-	var sp := make_spawner(H.make_directional_data(1, 0.0, 60.0), BulletSpawner2D.PATTERN_FROM_SELF, 1)
+	var sp := make_spawner(H.make_volley_data(1, 0.0, 60.0), BulletSpawner2D.PATTERN_FROM_SELF, 1)
 	sp.max_volleys = -1
 	sp.set_shooting_enabled(true)
 	assert_true(sp.shoot_once())

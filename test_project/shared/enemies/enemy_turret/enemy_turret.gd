@@ -18,7 +18,7 @@ var can_shoot:bool
 var can_look_at:bool
 
 # The bullets data of the enemy
-var bullets_data:DirectionalBulletsData2D
+var bullets_data:BulletVolleyData2D
 
 func _ready() -> void:
 	health_bar = get_node("HealthBar")
@@ -26,7 +26,7 @@ func _ready() -> void:
 	health_bar.visible = false # Set it by default to be invisible
 	
 	
-	bullets_data = DirectionalBulletsData2D.new()
+	bullets_data = BulletVolleyData2D.new()
 
 	bullets_data.sprite_frames = $BulletAnimatedSprite.sprite_frames
 	
@@ -47,8 +47,8 @@ func _ready() -> void:
 	
 	bullets_data.shared_bullets_custom_data = dmg_data
 	
-	bullets_data.collision_layer = DirectionalBulletsData2D.calculate_bitmask([4])
-	bullets_data.collision_mask = DirectionalBulletsData2D.calculate_bitmask(default_bullet_collision_mask)
+	bullets_data.collision_layer = BulletVolleyData2D.calculate_bitmask([4])
+	bullets_data.collision_mask = BulletVolleyData2D.calculate_bitmask(default_bullet_collision_mask)
 	bullets_data.monitorable=true # Monitorable allows for these bullets to be detected by other areas
 	
 func _physics_process(_delta: float) -> void:
@@ -66,7 +66,7 @@ func shoot()->void:
 	# Create a new transform with the same rotation and position, but scale of 1. This is because I've scaled the marker by x amount of times since it's a child of the TurretGun that is scaled (it scales all children) and I want to reverse that so that only the texture_size is taken into account
 	var transf = Transform2D(original_transform.get_rotation(), original_transform.origin)
 	bullets_data.transforms = [transf]
-	var bullets_multi:DirectionalBullets2D = BENCHMARK_GLOBALS.FACTORY.spawn_controllable_directional_bullets(bullets_data)
+	var bullets_multi:BulletVolley2D = BENCHMARK_GLOBALS.FACTORY.spawn_volley(bullets_data)
 	bullets_multi.all_bullets_set_attachment(BENCHMARK_GLOBALS.ATTACHMENT_SCENES[1], Vector2(-30, 0))
 
 func _on_shoot_timer_timeout() -> void:
@@ -85,4 +85,4 @@ func _on_detect_area_2d_body_exited(body: Node2D) -> void:
 		shoot_timer.stop()
 
 func set_bullet_collision_mask(arr:Array[int])->void:
-	bullets_data.collision_mask = DirectionalBulletsData2D.calculate_bitmask(arr)
+	bullets_data.collision_mask = BulletVolleyData2D.calculate_bitmask(arr)

@@ -3,14 +3,14 @@ extends BlastTest
 ## gravity (bullet_set_gravity or seeded) survives a shared write.
 
 
-func _data() -> DirectionalBulletsData2D:
+func _data() -> BulletVolleyData2D:
 	var d := H.make_still_data(2)
 	d.gravity = Vector2(0, 100)
 	return d
 
 
 func test_authored_slot_survives_gap_fills() -> void:
-	var v: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(_data())
+	var v: BulletVolley2D = factory.spawn_volley(_data())
 	v.bullet_set_gravity(0, Vector2(50, 0))
 	v.set_gravity(Vector2(0, 300))
 	assert_eq(v.bullet_get_gravity(0), Vector2(50, 0), "authored gravity kept")
@@ -22,7 +22,7 @@ func test_authored_slot_survives_gap_fills() -> void:
 func test_seeded_entries_claim_presence() -> void:
 	var d := _data()
 	d.all_bullet_gravity = [Vector2(10, 0), Vector2(20, 0)]
-	var v: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d)
+	var v: BulletVolley2D = factory.spawn_volley(d)
 	v.set_gravity(Vector2(0, 300))
 	assert_eq(v.bullet_get_gravity(0), Vector2(10, 0), "seeded slot 0 kept")
 	assert_eq(v.bullet_get_gravity(1), Vector2(20, 0), "seeded slot 1 kept")

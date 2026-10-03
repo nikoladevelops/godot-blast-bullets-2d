@@ -439,7 +439,7 @@ void BulletSpawner2D::set_preview_pose(double spin_angle_degrees) {
     if (radians != 0.0) {
         Transform2D hb = preview_holder->get_global_transform();
         hb.columns[2] = Vector2();
-        if (hb.is_finite() && DirectionalBullets2D::is_transform_invertible_safe(hb)) {
+        if (hb.is_finite() && BulletVolley2D::is_transform_invertible_safe(hb)) {
             pose = hb.affine_inverse() * Transform2D(radians, Vector2()) * hb;
         } else {
             pose = Transform2D(radians, Vector2());
@@ -454,7 +454,7 @@ void BulletSpawner2D::set_preview_pose(double spin_angle_degrees) {
         if (spawn_position_offset_space == SPAWN_OFFSET_GLOBAL) {
             Transform2D hb = preview_holder->get_global_transform();
             hb.columns[2] = Vector2();
-            if (hb.is_finite() && DirectionalBullets2D::is_transform_invertible_safe(hb)) {
+            if (hb.is_finite() && BulletVolley2D::is_transform_invertible_safe(hb)) {
                 shift = hb.affine_inverse().xform(spawn_position_offset);
             }
         }

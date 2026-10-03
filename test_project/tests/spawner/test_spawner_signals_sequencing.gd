@@ -16,7 +16,7 @@ func _on_preshoot(volley: Object, _idx: int) -> void:
 func before_each() -> void:
 	await super()
 	_free_in_preshoot = false
-	sp = make_spawner(H.make_directional_data(4), BulletSpawner2D.PATTERN_FROM_HELPER_RING, 4)
+	sp = make_spawner(H.make_volley_data(4), BulletSpawner2D.PATTERN_FROM_HELPER_RING, 4)
 	sp.pre_shoot.connect(_on_preshoot)
 	watch_signals(sp)
 

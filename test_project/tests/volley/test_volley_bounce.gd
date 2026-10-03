@@ -27,30 +27,30 @@ var _t36_mutate := false
 var _t36_done := false
 var _t36_body: CharacterBody2D = null
 
-func _on_bounce_body(body: Object, volley: DirectionalBullets2D, idx: int) -> void:
+func _on_bounce_body(body: Object, volley: BulletVolley2D, idx: int) -> void:
 	_bounce_body.append([body, volley, idx])
 	if _t36_mutate and not _t36_done and body == _t36_body and _t36_body != null:
 		_t36_done = true
 		_t36_body.velocity = Vector2(400, 0)
 
-func _on_bounce_area(area: Object, volley: DirectionalBullets2D, idx: int) -> void:
+func _on_bounce_area(area: Object, volley: BulletVolley2D, idx: int) -> void:
 	_bounce_area.append([area, volley, idx])
 
-func _on_norm_body(body: Object, volley: DirectionalBullets2D, idx: int) -> void:
+func _on_norm_body(body: Object, volley: BulletVolley2D, idx: int) -> void:
 	_norm_body.append([body, volley, idx])
 
-func _on_spawner_bounce(_t: Object, _v: DirectionalBullets2D, _i: int) -> void:
+func _on_spawner_bounce(_t: Object, _v: BulletVolley2D, _i: int) -> void:
 	_spawner_bounce.append(1)
 
-func _on_factory_bounce(_t: Object, _v: DirectionalBullets2D, _i: int) -> void:
+func _on_factory_bounce(_t: Object, _v: BulletVolley2D, _i: int) -> void:
 	_factory_bounce.append(1)
 
 var _bounce_capture: Array = []
 
-func _on_bounce_capture(_body: Object, volley: DirectionalBullets2D, idx: int) -> void:
+func _on_bounce_capture(_body: Object, volley: BulletVolley2D, idx: int) -> void:
 	_bounce_capture.append([volley.debug_get_previous_origin(idx), volley.get_bullet_global_transform(idx).origin])
 
-func _finite_volley(v: DirectionalBullets2D) -> bool:
+func _finite_volley(v: BulletVolley2D) -> bool:
 	for i in v.get_amount_bullets():
 		if not v.get_bullet_transform(i).is_finite():
 			return false
@@ -62,8 +62,8 @@ func _finite_volley(v: DirectionalBullets2D) -> bool:
 
 # Bullet data aimed at +X (or given angle) from a start pos.
 # Bounce walls live on layer 4 (value 8); plain walls on layer 5 (value 16).
-func _bounce_data(from: Vector2, angle: float, speed: float, bounce_layers: Array, mask_layers: Array, lifetime: float = 8.0) -> DirectionalBulletsData2D:
-	var d := DirectionalBulletsData2D.new()
+func _bounce_data(from: Vector2, angle: float, speed: float, bounce_layers: Array, mask_layers: Array, lifetime: float = 8.0) -> BulletVolleyData2D:
+	var d := BulletVolleyData2D.new()
 	d.sprite_frames = H.make_sprite_frames()
 	d.transforms = [Transform2D(angle, from)]
 	var sp := BulletSpeedData2D.new()
@@ -140,9 +140,9 @@ func _settle(factory: BulletFactory2D) -> void:
 
 func _connect_signals() -> void:
 	_clear_signals()
-	factory.directional_bounce_body_entered.connect(_on_bounce_body)
-	factory.directional_bounce_area_entered.connect(_on_bounce_area)
-	factory.directional_body_entered.connect(_on_norm_body)
+	factory.bounce_body_entered.connect(_on_bounce_body)
+	factory.bounce_area_entered.connect(_on_bounce_area)
+	factory.body_entered.connect(_on_norm_body)
 
 
 ## Shared arena for the T1..T28 tests (split out of one 1,700-line test):
@@ -170,7 +170,7 @@ func test_t0_defaults_feature_off_normal_path_intact() -> void:
 	assert_true(d0.bounce_randomness_deg == 0.0, "bounce_randomness defaults 0")
 	var wall := _make_wall(Vector2(200, 0), 8)
 	await physics()
-	var v0: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d0)
+	var v0: BulletVolley2D = factory.spawn_volley(d0)
 	assert_true(v0 != null, "plain spawn ok")
 	assert_true(v0.get_bounce_mask() == 0, "live mirror reseeded to 0")
 	for i in 90:
@@ -191,7 +191,7 @@ func test_t1_free_bounce_wall_reflects_bullet_lives_no_hit_consumed() -> void:
 	await _arena()
 	await _settle(factory)
 	var d1 := _bounce_data(Vector2.ZERO, 0.0, 300.0, [4], [4])
-	var v1: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d1)
+	var v1: BulletVolley2D = factory.spawn_volley(d1)
 	for i in 120:
 		await physics()
 		if _bounce_body.size() >= 1:
@@ -226,7 +226,7 @@ func test_t1b_body_area_pair_on_one_target_single_bounce_no_double_flip() -> voi
 	eye.add_child(ecol)
 	add(eye)
 	await physics()
-	var v1b: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(_bounce_data(Vector2.ZERO, 0.0, 300.0, [4], [4]))
+	var v1b: BulletVolley2D = factory.spawn_volley(_bounce_data(Vector2.ZERO, 0.0, 300.0, [4], [4]))
 	for i in 120:
 		await physics()
 		if _bounce_body.size() >= 1:
@@ -245,7 +245,7 @@ func test_t2_consumed_bounce_bounce_normal_fire_bullet_dies_at_max_1() -> void:
 	await _settle(factory)
 	var d2 := _bounce_data(Vector2.ZERO, 0.0, 300.0, [4], [4])
 	d2.bounce_hit_consumed = true
-	var v2: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d2)
+	var v2: BulletVolley2D = factory.spawn_volley(d2)
 	for i in 120:
 		await physics()
 		if not v2.is_bullet_status_enabled(0):
@@ -262,7 +262,7 @@ func test_t3_strength_scaling() -> void:
 	await _settle(factory)
 	var d3 := _bounce_data(Vector2.ZERO, 0.0, 300.0, [4], [4])
 	d3.bounce_strength = 0.5
-	var v3: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d3)
+	var v3: BulletVolley2D = factory.spawn_volley(d3)
 	for i in 120:
 		await physics()
 		if _bounce_body.size() >= 1:
@@ -272,7 +272,7 @@ func test_t3_strength_scaling() -> void:
 	await _settle(factory)
 	var d3b := _bounce_data(Vector2.ZERO, 0.0, 300.0, [4], [4])
 	d3b.bounce_strength = 0.0
-	var v3b: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d3b)
+	var v3b: BulletVolley2D = factory.spawn_volley(d3b)
 	for i in 120:
 		await physics()
 		if _bounce_body.size() >= 1:
@@ -290,7 +290,7 @@ func test_t4_ping_pong_between_two_walls_max_count_gates_back_to_normal() -> voi
 	var d4 := _bounce_data(Vector2.ZERO, 0.0, 300.0, [4], [4])
 	d4.bounce_max_count = 2
 	d4.set_bullet_max_collision_count(0)
-	var v4: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d4)
+	var v4: BulletVolley2D = factory.spawn_volley(d4)
 	for i in 400:
 		await physics()
 		if v4.bullet_get_bounce_count(0) >= 2 and _norm_body.size() >= 1:
@@ -308,7 +308,7 @@ func test_t5_mask_precedence_bounce_layer_wins_plain_layer_stays_normal() -> voi
 	await _settle(factory)
 	var plain := _make_wall(Vector2(200, 220), 16, Vector2(20, 120))
 	await physics()
-	var v5: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(_bounce_data(Vector2(0, 220), 0.0, 300.0, [4], [4, 5]))
+	var v5: BulletVolley2D = factory.spawn_volley(_bounce_data(Vector2(0, 220), 0.0, 300.0, [4], [4, 5]))
 	for i in 120:
 		await physics()
 		if _norm_body.size() >= 1:
@@ -323,7 +323,7 @@ func test_t6_spawner_ownership_spawner_signal_only_factory_silent() -> void:
 	# BOUNCE T6 spawner ownership: spawner signal only, factory silent
 	await _arena()
 	await _settle(factory)
-	factory.directional_bounce_body_entered.connect(_on_factory_bounce)
+	factory.bounce_body_entered.connect(_on_factory_bounce)
 	var spawner := BulletSpawner2D.new()
 	spawner.bullet_factory_path = factory.get_path()
 	spawner.shooting_enabled = false
@@ -354,7 +354,7 @@ func test_t7_precise_mode_on_45_degree_wall_reflects_across_face() -> void:
 	await physics()
 	var d7 := _bounce_data(Vector2.ZERO, 0.0, 300.0, [4], [4])
 	d7.bounce_mode = 1
-	var v7: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d7)
+	var v7: BulletVolley2D = factory.spawn_volley(d7)
 	for i in 120:
 		await physics()
 		if _bounce_body.size() >= 1:
@@ -365,7 +365,7 @@ func test_t7_precise_mode_on_45_degree_wall_reflects_across_face() -> void:
 	wall.position.x = 200.0
 	await idle(1)
 	await _settle(factory)
-	var v7b: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(_bounce_data(Vector2.ZERO, 0.0, 300.0, [4], [4]))
+	var v7b: BulletVolley2D = factory.spawn_volley(_bounce_data(Vector2.ZERO, 0.0, 300.0, [4], [4]))
 	for i in 120:
 		await physics()
 		if _bounce_body.size() >= 1:
@@ -380,7 +380,7 @@ func test_t8_smooth_visual_pursuit_lags_then_converges() -> void:
 	await _settle(factory)
 	var d8 := _bounce_data(Vector2.ZERO, 0.0, 300.0, [4], [4])
 	d8.bounce_rotation_smooth = 3.0
-	var v8: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d8)
+	var v8: BulletVolley2D = factory.spawn_volley(d8)
 	for i in 120:
 		await physics()
 		if _bounce_body.size() >= 1:
@@ -416,7 +416,7 @@ func test_t9_mixes_homing_wobble_gravity_curves_stay_finite() -> void:
 	wob.amplitude = 40.0
 	wob.frequency_hz = 3.0
 	d9.shared_bullet_wobble_data = wob
-	var v9: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d9)
+	var v9: BulletVolley2D = factory.spawn_volley(d9)
 	v9.shared_homing_deque_push_back_node2d_target(hunter)
 	v9.set_homing_take_control_of_texture_rotation(true)
 	v9.set_homing_smoothing(4.0)
@@ -428,7 +428,7 @@ func test_t9_mixes_homing_wobble_gravity_curves_stay_finite() -> void:
 	hunter.queue_free()
 	await _settle(factory)
 	var d9b := _bounce_data(Vector2.ZERO, 0.0, 300.0, [4], [4])
-	var v9b: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d9b)
+	var v9b: BulletVolley2D = factory.spawn_volley(d9b)
 	v9b.set_bounce_rotate_texture(false)
 	for i in 120:
 		await physics()
@@ -443,10 +443,10 @@ func test_t10_rejects_fuzz_pool_reuse_neutrality() -> void:
 	var dr := _bounce_data(Vector2.ZERO, 0.0, 300.0, [4], [4])
 	var keep_strength: float = dr.bounce_strength
 	dr.set_bounce_strength(NAN)
-	expect_error_sequence(["DirectionalBulletsData2D: bounce_strength must be finite and >= 0"])
+	expect_error_sequence(["BulletVolleyData2D: bounce_strength must be finite and >= 0"])
 	assert_true(dr.bounce_strength == keep_strength, "NaN strength rejected")
 	dr.set_bounce_strength(-1.0)
-	expect_error_sequence(["DirectionalBulletsData2D: bounce_strength must be finite and >= 0"])
+	expect_error_sequence(["BulletVolleyData2D: bounce_strength must be finite and >= 0"])
 	assert_true(dr.bounce_strength == keep_strength, "negative strength rejected")
 	dr.set_bounce_strength(5.0)
 	assert_true(dr.bounce_strength == 5.0, "strength uncapped (5.0 accepted)")
@@ -455,22 +455,22 @@ func test_t10_rejects_fuzz_pool_reuse_neutrality() -> void:
 			assert_true(int(p.get("hint", -1)) == PROPERTY_HINT_NONE, "no editor cap on strength (plain float, user decides)")
 	var keep_mask: int = dr.bounce_mask
 	dr.set_bounce_mask(-1)
-	expect_error_sequence(["DirectionalBulletsData2D: bounce_mask must be >= 0"])
+	expect_error_sequence(["BulletVolleyData2D: bounce_mask must be >= 0"])
 	assert_true(dr.bounce_mask == keep_mask, "negative mask rejected")
 	dr.set_bounce_mode(7)
-	expect_error_sequence(["DirectionalBulletsData2D: bounce_mode must be"])
+	expect_error_sequence(["BulletVolleyData2D: bounce_mode must be"])
 	assert_true(dr.bounce_mode == 0, "bad mode rejected")
 	dr.set_bounce_randomness_deg(999.0)
-	expect_error_sequence(["DirectionalBulletsData2D: bounce_randomness_deg must be finite"])
+	expect_error_sequence(["BulletVolleyData2D: bounce_randomness_deg must be finite"])
 	assert_true(dr.bounce_randomness_deg == 0.0, "randomness > 180 rejected")
 	dr.set_bounce_cooldown_sec(9.0)
-	expect_error_sequence(["DirectionalBulletsData2D: bounce_cooldown_sec must be finite in [0, 1]"])
+	expect_error_sequence(["BulletVolleyData2D: bounce_cooldown_sec must be finite in [0, 1]"])
 	assert_true(dr.bounce_cooldown_sec == 0.05, "cooldown > 1 rejected")
 	dr.set_bounce_max_count(-3)
-	expect_error_sequence(["DirectionalBulletsData2D: bounce_max_count must be"])
+	expect_error_sequence(["BulletVolleyData2D: bounce_max_count must be"])
 	assert_true(dr.bounce_max_count == 0, "negative max count rejected")
 	await _settle(factory)
-	var vr: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(dr)
+	var vr: BulletVolley2D = factory.spawn_volley(dr)
 	for i in 120:
 		await physics()
 		if _bounce_body.size() >= 1:
@@ -484,7 +484,7 @@ func test_t10_rejects_fuzz_pool_reuse_neutrality() -> void:
 	factory.free_active_bullets()
 	await idle(1)
 	await idle(1)
-	var plain2: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(_bounce_data(Vector2.ZERO, 0.0, 300.0, [], [4]))
+	var plain2: BulletVolley2D = factory.spawn_volley(_bounce_data(Vector2.ZERO, 0.0, 300.0, [], [4]))
 	assert_true(plain2.get_bounce_mask() == 0, "pooled reuse reseeds bounce off")
 	assert_true(plain2.bullet_get_bounce_count(0) == 0, "pooled reuse zeroes bounce ledger")
 	assert_true(factory.debug_assert_no_dangling().get("ok", false) == true, "no dangling after bounce churn")
@@ -496,7 +496,7 @@ func test_t11_uncapped_strength_5x_reflection_50x_never_clamps() -> void:
 	await _settle(factory)
 	var d11 := _bounce_data(Vector2.ZERO, 0.0, 300.0, [4], [4])
 	d11.bounce_strength = 5.0
-	var v11: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d11)
+	var v11: BulletVolley2D = factory.spawn_volley(d11)
 	for i in 120:
 		await physics()
 		if _bounce_body.size() >= 1:
@@ -511,7 +511,7 @@ func test_t11_uncapped_strength_5x_reflection_50x_never_clamps() -> void:
 	await _settle(factory)
 	var d11b := _bounce_data(Vector2.ZERO, 0.0, 300.0, [4], [4])
 	d11b.bounce_strength = 50.0
-	var v11b: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d11b)
+	var v11b: BulletVolley2D = factory.spawn_volley(d11b)
 	for i in 120:
 		await physics()
 		if _bounce_body.size() >= 1:
@@ -528,7 +528,7 @@ func test_t11b_boost_survives_speed_curve_overwrite() -> void:
 	await _settle(factory)
 	var d11c := _bounce_data(Vector2.ZERO, 0.0, 300.0, [4], [4])
 	d11c.bounce_strength = 2.0
-	var v11c: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d11c)
+	var v11c: BulletVolley2D = factory.spawn_volley(d11c)
 	for i in 120:
 		await physics()
 		if _bounce_body.size() >= 1:
@@ -571,7 +571,7 @@ func test_t12_cooldown_vs_consumed_pair_counts_once_re_hit_counts() -> void:
 	var d12 := _bounce_data(Vector2.ZERO, 0.0, 300.0, [4], [4])
 	d12.bounce_hit_consumed = true
 	d12.set_bullet_max_collision_count(10)
-	var v12: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d12)
+	var v12: BulletVolley2D = factory.spawn_volley(d12)
 	for i in 120:
 		await physics()
 		if _bounce_body.size() >= 1:
@@ -587,7 +587,7 @@ func test_t12_cooldown_vs_consumed_pair_counts_once_re_hit_counts() -> void:
 	# Legal maximum (range [0, 1]): this used to say 5.0, which the setter
 	# rejected, so the test silently ran with the 0.05 default cooldown.
 	d12b.bounce_cooldown_sec = 1.0
-	var v12b: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d12b)
+	var v12b: BulletVolley2D = factory.spawn_volley(d12b)
 	for i in 120:
 		await physics()
 		if _bounce_body.size() >= 1:
@@ -605,8 +605,8 @@ func test_t13_snap_keeps_render_position_continuous() -> void:
 	await _arena()
 	await _settle(factory)
 	factory.set_use_physics_interpolation_runtime(true)
-	factory.directional_bounce_body_entered.connect(_on_bounce_capture)
-	var v13: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(_bounce_data(Vector2.ZERO, 0.0, 300.0, [4], [4]))
+	factory.bounce_body_entered.connect(_on_bounce_capture)
+	var v13: BulletVolley2D = factory.spawn_volley(_bounce_data(Vector2.ZERO, 0.0, 300.0, [4], [4]))
 	for i in 5:
 		await physics()
 	for i in 120:
@@ -648,7 +648,7 @@ func test_t14_precise_mode_on_capsule_wall_uses_cap_normal() -> void:
 	await physics()
 	var d14 := _bounce_data(Vector2.ZERO, 0.0, 300.0, [4], [4])
 	d14.bounce_mode = 1
-	var v14: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d14)
+	var v14: BulletVolley2D = factory.spawn_volley(d14)
 	for i in 120:
 		await physics()
 		if _bounce_body.size() >= 1:
@@ -665,7 +665,7 @@ func test_t15_teleport_into_wall_bounces_fresh_overlap() -> void:
 	# BOUNCE T15 teleport into wall bounces fresh overlap
 	await _arena()
 	await _settle(factory)
-	var v15: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(_bounce_data(Vector2.ZERO, 0.0, 300.0, [4], [4]))
+	var v15: BulletVolley2D = factory.spawn_volley(_bounce_data(Vector2.ZERO, 0.0, 300.0, [4], [4]))
 	v15.teleport_bullet(0, Vector2(195, 0))
 	for i in 60:
 		await physics()
@@ -686,7 +686,7 @@ func test_t16_attachment_rides_the_escape_nudge() -> void:
 	var pack := PackedScene.new()
 	assert_true(pack.pack(probe_node) == OK, "probe scene packs")
 	probe_node.queue_free()
-	var v16: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(_bounce_data(Vector2.ZERO, 0.0, 300.0, [4], [4]))
+	var v16: BulletVolley2D = factory.spawn_volley(_bounce_data(Vector2.ZERO, 0.0, 300.0, [4], [4]))
 	v16.bullet_set_attachment(0, pack, Vector2.ZERO, true)
 	for i in 120:
 		await physics()
@@ -710,7 +710,7 @@ func test_t17_lifetime_expiry_inside_cooldown_is_clean() -> void:
 	# rejected, so the test silently ran with the 0.05 default cooldown.
 	d17.bounce_cooldown_sec = 1.0
 	d17.max_life_time = 0.5
-	var v17: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d17)
+	var v17: BulletVolley2D = factory.spawn_volley(d17)
 	for i in 120:
 		await physics()
 		if _bounce_body.size() >= 1:
@@ -743,7 +743,7 @@ func test_t18_spawner_retarget_keeps_bounce_config_live() -> void:
 	var live18: Array = sp18.get_live_volleys()
 	assert_true(live18.size() >= 1, "volley tracked")
 	sp18.retarget_live_volleys()
-	var rv18: DirectionalBullets2D = live18[0] as DirectionalBullets2D
+	var rv18: BulletVolley2D = live18[0] as BulletVolley2D
 	assert_true(rv18.get_bounce_mask() == 8, "retarget keeps bounce mask")
 	assert_true(rv18.debug_get_bounce_info(0).get("bounce_enabled", false) == true, "retarget keeps bounce armed")
 	sp18.bounce_body_entered.connect(_on_spawner_bounce)
@@ -760,7 +760,7 @@ func test_t19_bulk_bounce_counts() -> void:
 	# BOUNCE T19 bulk bounce counts
 	await _arena()
 	await _settle(factory)
-	var d19 := DirectionalBulletsData2D.new()
+	var d19 := BulletVolleyData2D.new()
 	d19.sprite_frames = H.make_sprite_frames()
 	d19.transforms = [Transform2D(0.0, Vector2.ZERO), Transform2D(0.0, Vector2(0, 24)), Transform2D(0.0, Vector2(0, 48))]
 	var speeds19: Array = []
@@ -779,7 +779,7 @@ func test_t19_bulk_bounce_counts() -> void:
 	var shape19 := CircleShape2D.new()
 	shape19.radius = 6.0
 	d19.collision_shape = shape19
-	var v19: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d19)
+	var v19: BulletVolley2D = factory.spawn_volley(d19)
 	var counts19_init: Array = v19.all_bullets_get_bounce_count()
 	assert_true(counts19_init.size() == 3 and int(counts19_init[0]) == 0 and int(counts19_init[1]) == 0 and int(counts19_init[2]) == 0, "bulk counts start at zero")
 	for i in 150:
@@ -793,7 +793,7 @@ func test_t19_bulk_bounce_counts() -> void:
 func test_t20_inspector_groups_stay_coherent() -> void:
 	# BOUNCE T20 inspector groups stay coherent
 	await _arena()
-	var data20 := DirectionalBulletsData2D.new()
+	var data20 := BulletVolleyData2D.new()
 	data20.sprite_frames = H.make_sprite_frames()
 	var props20: Array = data20.get_property_list()
 	var bounce_group_at := -1
@@ -903,7 +903,7 @@ func test_t20_inspector_groups_stay_coherent() -> void:
 	assert_eq(str(data_group_of.get("rotate_only_textures", "")), "Appearance", "rotate-only flag lives with Appearance")
 	assert_eq(str(data_group_of.get("is_texture_rotation_permanent", "")), "Appearance", "permanent rotation flag lives with Appearance")
 	# Live instance mirrors the data workflow order.
-	var vinst: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(_bounce_data(Vector2(0, 9000), 0.0, 1.0, [], [4]))
+	var vinst: BulletVolley2D = factory.spawn_volley(_bounce_data(Vector2(0, 9000), 0.0, 1.0, [], [4]))
 	var inst_groups: Array = []
 	for p in vinst.get_property_list():
 		var pname := str(p.get("name", ""))
@@ -933,7 +933,7 @@ func test_t20_inspector_groups_stay_coherent() -> void:
 		elif pname != "":
 			vgroups[pname] = vcurrent
 	assert_true(vgroups.get("shared_bullets_custom_data", "") == "Custom Data", "volley custom data grouped")
-	assert_true(vgroups.get("is_multimesh_auto_pooling_enabled", "") == "Pooling", "volley pooling grouped")
+	assert_true(vgroups.get("is_auto_pooling_enabled", "") == "Pooling", "volley pooling grouped")
 	assert_true(vgroups.get("bullet_max_collision_count", "") == "Collision", "volley collision grouped")
 	assert_true(vgroups.get("is_life_time_infinite", "") == "Lifetime", "volley lifetime grouped")
 	assert_true(vgroups.get("shared_bullet_curves_data", "") == "Curves", "volley curves grouped")
@@ -1044,7 +1044,7 @@ func test_t21_runtime_toggles_and_gravity_flag_refresh() -> void:
 	# BOUNCE T21 runtime toggles and gravity flag refresh
 	await _arena()
 	await _settle(factory)
-	var v21: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(_bounce_data(Vector2.ZERO, 0.0, 300.0, [], [4]))
+	var v21: BulletVolley2D = factory.spawn_volley(_bounce_data(Vector2.ZERO, 0.0, 300.0, [], [4]))
 	assert_true(v21.debug_get_bounce_info(0).get("bounce_enabled", true) == false, "starts disarmed")
 	v21.set_bounce_mask(8)
 	assert_true(v21.debug_get_bounce_info(0).get("bounce_enabled", false) == true, "runtime arm sizes ledger")
@@ -1058,7 +1058,7 @@ func test_t21_runtime_toggles_and_gravity_flag_refresh() -> void:
 	v21.set_bounce_mask(8)
 	assert_true(v21.debug_get_bounce_info(0).get("bounce_enabled", false) == true, "re-arm works after disarm")
 	await _settle(factory)
-	var v21c: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(_bounce_data(Vector2.ZERO, 0.0, 300.0, [4], [4]))
+	var v21c: BulletVolley2D = factory.spawn_volley(_bounce_data(Vector2.ZERO, 0.0, 300.0, [4], [4]))
 	v21c.set_bounce_mask(0)
 	for i in 120:
 		await physics()
@@ -1067,7 +1067,7 @@ func test_t21_runtime_toggles_and_gravity_flag_refresh() -> void:
 	assert_true(_bounce_body.is_empty(), "runtime disarm flies through clean")
 	assert_true(not v21c.is_bullet_status_enabled(0), "disarmed bullet dies normally")
 	await _settle(factory)
-	var v21g: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(_bounce_data(Vector2.ZERO, 0.0, 0.0, [], [4]))
+	var v21g: BulletVolley2D = factory.spawn_volley(_bounce_data(Vector2.ZERO, 0.0, 0.0, [], [4]))
 	v21g.set_gravity(Vector2(0, 500.0))
 	for i in 45:
 		await physics()
@@ -1086,13 +1086,13 @@ func test_t22_same_target_debounce_stuck_bullet_bounces_once_per_window() -> voi
 	assert_true(d22.bounce_debounce_sec == 0.15, "debounce defaults 0.15")
 	var keep_deb: float = d22.bounce_debounce_sec
 	d22.set_bounce_debounce_sec(NAN)
-	expect_error_sequence(["DirectionalBulletsData2D: bounce_debounce_sec must be finite and >= 0"])
+	expect_error_sequence(["BulletVolleyData2D: bounce_debounce_sec must be finite and >= 0"])
 	assert_true(d22.bounce_debounce_sec == keep_deb, "NaN debounce rejected")
 	d22.set_bounce_debounce_sec(-1.0)
-	expect_error_sequence(["DirectionalBulletsData2D: bounce_debounce_sec must be finite and >= 0"])
+	expect_error_sequence(["BulletVolleyData2D: bounce_debounce_sec must be finite and >= 0"])
 	assert_true(d22.bounce_debounce_sec == keep_deb, "negative debounce rejected")
 	d22.bounce_cooldown_sec = 0.0
-	var v22: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d22)
+	var v22: BulletVolley2D = factory.spawn_volley(d22)
 	assert_true(absf(v22.get_bounce_debounce_sec() - 0.15) < 0.0001, "live mirror reseeds debounce")
 	for i in 30:
 		if i % 2 == 0:
@@ -1108,7 +1108,7 @@ func test_t22_same_target_debounce_stuck_bullet_bounces_once_per_window() -> voi
 	var d22b := _bounce_data(Vector2(100, 0), 0.0, 0.0, [4], [4])
 	d22b.bounce_cooldown_sec = 0.0
 	d22b.bounce_debounce_sec = 0.0
-	var v22b: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d22b)
+	var v22b: BulletVolley2D = factory.spawn_volley(d22b)
 	for i in 30:
 		if i % 2 == 0:
 			v22b.set_bullet_transform(0, Transform2D(0.0, Vector2(200, 0)))
@@ -1126,7 +1126,7 @@ func test_t22b_debounce_is_per_target_alternating_walls_bounce_freely() -> void:
 	await physics()
 	var d22c := _bounce_data(Vector2(100, 0), 0.0, 0.0, [4], [4])
 	d22c.bounce_cooldown_sec = 0.0
-	var v22c: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d22c)
+	var v22c: BulletVolley2D = factory.spawn_volley(d22c)
 	for i in 20:
 		if i % 2 == 0:
 			v22c.set_bullet_transform(0, Transform2D(0.0, Vector2(200, 0)))
@@ -1159,7 +1159,7 @@ func test_t23_moving_targets_push_surges_head_on_amplifies_separating_swal() -> 
 	add(pusher)
 	await physics()
 	var d23 := _bounce_data(Vector2.ZERO, 0.0, 100.0, [4], [4])
-	var v23: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d23)
+	var v23: BulletVolley2D = factory.spawn_volley(d23)
 	for i in 150:
 		await physics()
 		if v23.bullet_get_bounce_count(0) >= 1:
@@ -1189,7 +1189,7 @@ func test_t23_moving_targets_push_surges_head_on_amplifies_separating_swal() -> 
 	add(charger)
 	await physics()
 	var d23b := _bounce_data(Vector2.ZERO, 0.0, 100.0, [4], [4])
-	var v23b: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d23b)
+	var v23b: BulletVolley2D = factory.spawn_volley(d23b)
 	for i in 150:
 		await physics()
 		if v23b.bullet_get_bounce_count(0) >= 1:
@@ -1208,7 +1208,7 @@ func test_t23b_separating_repeats_never_re_bounce() -> void:
 	var d23c := _bounce_data(Vector2(100, 0), 0.0, 300.0, [4], [4])
 	d23c.bounce_cooldown_sec = 0.0
 	d23c.bounce_debounce_sec = 0.05
-	var v23c: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d23c)
+	var v23c: BulletVolley2D = factory.spawn_volley(d23c)
 	# First contact bounces (fresh overlaps keep the historical bounce).
 	# Each 8-frame cycle below re-enters the SAME wall while separating
 	# from it (detection lands mid-block, long after the 0.05 debounce);
@@ -1231,7 +1231,7 @@ func test_t23b_separating_repeats_never_re_bounce() -> void:
 	d23d.set_bullet_max_collision_count(0)
 	d23d.bounce_cooldown_sec = 0.0
 	d23d.bounce_debounce_sec = 0.05
-	var v23d: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d23d)
+	var v23d: BulletVolley2D = factory.spawn_volley(d23d)
 	for i in 40:
 		if i % 8 < 4:
 			if i % 8 == 0:
@@ -1270,7 +1270,7 @@ func test_t24_push_charge_knobs_each_side_opts_out_separately() -> void:
 	arcade.add_child(acol)
 	add(arcade)
 	await physics()
-	var v24: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d24)
+	var v24: BulletVolley2D = factory.spawn_volley(d24)
 	assert_true(v24.get_bounce_push_assist() == false, "live mirror reseeds push off")
 	assert_true(v24.get_bounce_charge_amplify() == true, "live mirror reseeds charge on")
 	for i in 150:
@@ -1302,7 +1302,7 @@ func test_t24_push_charge_knobs_each_side_opts_out_separately() -> void:
 	charger2.add_child(c2col)
 	add(charger2)
 	await physics()
-	var v24b: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d24b)
+	var v24b: BulletVolley2D = factory.spawn_volley(d24b)
 	assert_true(v24b.get_bounce_charge_amplify() == false, "live mirror reseeds charge off")
 	for i in 150:
 		await physics()
@@ -1333,7 +1333,7 @@ func test_t24_push_charge_knobs_each_side_opts_out_separately() -> void:
 	arcade2.add_child(a2col)
 	add(arcade2)
 	await physics()
-	var v24c: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d24c)
+	var v24c: BulletVolley2D = factory.spawn_volley(d24c)
 	for i in 150:
 		await physics()
 		if v24c.bullet_get_bounce_count(0) >= 1:
@@ -1361,7 +1361,7 @@ func test_t25_velocity_sources_characterbody_reads_area2d_stays_static() -> void
 	add(charlie)
 	await physics()
 	var d25 := _bounce_data(Vector2.ZERO, 0.0, 100.0, [4], [4])
-	var v25: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d25)
+	var v25: BulletVolley2D = factory.spawn_volley(d25)
 	v25.set_bullet_transform(0, Transform2D(0.0, Vector2(200, 300)))
 	for i in 30:
 		await physics()
@@ -1387,7 +1387,7 @@ func test_t25_velocity_sources_characterbody_reads_area2d_stays_static() -> void
 	add(eye25)
 	await physics()
 	var d25b := _bounce_data(Vector2.ZERO, 0.0, 100.0, [4], [4])
-	var v25b: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d25b)
+	var v25b: BulletVolley2D = factory.spawn_volley(d25b)
 	v25b.set_bullet_transform(0, Transform2D(0.0, Vector2(200, 300)))
 	for i in 30:
 		await physics()
@@ -1411,7 +1411,7 @@ func test_t25_velocity_sources_characterbody_reads_area2d_stays_static() -> void
 	add(runner)
 	await physics()
 	var d25c := _bounce_data(Vector2(100, 300), 0.0, 100.0, [4], [4])
-	var v25c: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d25c)
+	var v25c: BulletVolley2D = factory.spawn_volley(d25c)
 	for i in 150:
 		runner.position.x += 500.0 / 60.0
 		await physics()
@@ -1446,7 +1446,7 @@ func test_t25b_strength_0_vs_pusher_sticks_precise_moves_too() -> void:
 	await physics()
 	var d25d := _bounce_data(Vector2.ZERO, 0.0, 100.0, [4], [4])
 	d25d.bounce_strength = 0.0
-	var v25d: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d25d)
+	var v25d: BulletVolley2D = factory.spawn_volley(d25d)
 	for i in 150:
 		await physics()
 		if v25d.bullet_get_bounce_count(0) >= 1:
@@ -1475,7 +1475,7 @@ func test_t25b_strength_0_vs_pusher_sticks_precise_moves_too() -> void:
 	await physics()
 	var d25e := _bounce_data(Vector2.ZERO, 0.0, 100.0, [4], [4])
 	d25e.bounce_mode = 1
-	var v25e: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d25e)
+	var v25e: BulletVolley2D = factory.spawn_volley(d25e)
 	for i in 150:
 		await physics()
 		if v25e.bullet_get_bounce_count(0) >= 1:
@@ -1509,7 +1509,7 @@ func test_t25c_knob_independence_pool_ghost_boost() -> void:
 	charger3.add_child(c3col)
 	add(charger3)
 	await physics()
-	var v25f: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d25f)
+	var v25f: BulletVolley2D = factory.spawn_volley(d25f)
 	for i in 150:
 		await physics()
 		if v25f.bullet_get_bounce_count(0) >= 1:
@@ -1537,7 +1537,7 @@ func test_t25c_knob_independence_pool_ghost_boost() -> void:
 	pusher2.add_child(p2col)
 	add(pusher2)
 	await physics()
-	var v25g: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d25g)
+	var v25g: BulletVolley2D = factory.spawn_volley(d25g)
 	for i in 150:
 		await physics()
 		if v25g.bullet_get_bounce_count(0) >= 1:
@@ -1551,7 +1551,7 @@ func test_t25c_knob_independence_pool_ghost_boost() -> void:
 	var d25h := _bounce_data(Vector2.ZERO, 0.0, 300.0, [4], [4])
 	d25h.bounce_strength = 2.0
 	d25h.max_life_time = 2.0
-	var v25h: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d25h)
+	var v25h: BulletVolley2D = factory.spawn_volley(d25h)
 	for i in 120:
 		await physics()
 		if v25h.bullet_get_bounce_count(0) >= 1:
@@ -1583,7 +1583,7 @@ func test_t26_reset_semantics_multi_bullet_gravity_arc_area_routing() -> void:
 	await _arena()
 	await _settle(factory)
 	var d26 := _bounce_data(Vector2.ZERO, 0.0, 300.0, [4], [4])
-	var v26: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d26)
+	var v26: BulletVolley2D = factory.spawn_volley(d26)
 	for i in 120:
 		await physics()
 		if v26.bullet_get_bounce_count(0) >= 1:
@@ -1595,7 +1595,7 @@ func test_t26_reset_semantics_multi_bullet_gravity_arc_area_routing() -> void:
 	assert_true(v26.bullet_get_bounce_count(0) == 0, "wake restarts the ledger")
 	assert_true(v26.is_bullet_status_enabled(0), "wake revives the bullet")
 	await _settle(factory)
-	var dd26 := DirectionalBulletsData2D.new()
+	var dd26 := BulletVolleyData2D.new()
 	dd26.sprite_frames = H.make_sprite_frames()
 	dd26.transforms = [Transform2D(0.0, Vector2.ZERO), Transform2D(0.0, Vector2.ZERO)]
 	var s26: Array = []
@@ -1614,7 +1614,7 @@ func test_t26_reset_semantics_multi_bullet_gravity_arc_area_routing() -> void:
 	var cc := CircleShape2D.new()
 	cc.radius = 6.0
 	dd26.collision_shape = cc
-	var v26b: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(dd26)
+	var v26b: BulletVolley2D = factory.spawn_volley(dd26)
 	for i in 150:
 		await physics()
 		if v26b.bullet_get_bounce_count(0) >= 1 and v26b.bullet_get_bounce_count(1) >= 1:
@@ -1624,7 +1624,7 @@ func test_t26_reset_semantics_multi_bullet_gravity_arc_area_routing() -> void:
 	await _settle(factory)
 	var d26c := _bounce_data(Vector2.ZERO, 0.0, 300.0, [4], [4])
 	d26c.gravity = Vector2(0, 200.0)
-	var v26c: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d26c)
+	var v26c: BulletVolley2D = factory.spawn_volley(d26c)
 	for i in 120:
 		await physics()
 		if v26c.bullet_get_bounce_count(0) >= 1:
@@ -1647,7 +1647,7 @@ func test_t26_reset_semantics_multi_bullet_gravity_arc_area_routing() -> void:
 	add(eye26)
 	await physics()
 	var d26d := _bounce_data(Vector2.ZERO, 0.0, 100.0, [4], [4])
-	var v26d: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d26d)
+	var v26d: BulletVolley2D = factory.spawn_volley(d26d)
 	v26d.set_bullet_transform(0, Transform2D(0.0, Vector2(200, 300)))
 	for i in 60:
 		await physics()
@@ -1662,13 +1662,13 @@ func test_t26_reset_semantics_multi_bullet_gravity_arc_area_routing() -> void:
 	var d26e := _bounce_data(Vector2.ZERO, 0.0, 200.0, [4], [4])
 	d26e.bounce_push_assist = false
 	d26e.bounce_charge_amplify = false
-	var v26e: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d26e)
+	var v26e: BulletVolley2D = factory.spawn_volley(d26e)
 	assert_true(v26e.get_bounce_push_assist() == false and v26e.get_bounce_charge_amplify() == false, "knobs-off mirrors reseeded")
 	await idle(1)
 	factory.free_active_bullets()
 	await idle(1)
 	await idle(1)
-	var v26f: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(_bounce_data(Vector2.ZERO, 0.0, 200.0, [4], [4]))
+	var v26f: BulletVolley2D = factory.spawn_volley(_bounce_data(Vector2.ZERO, 0.0, 200.0, [4], [4]))
 	assert_true(v26f.get_bounce_push_assist() == true and v26f.get_bounce_charge_amplify() == true, "respawn reseeds knobs to defaults")
 
 
@@ -1701,7 +1701,7 @@ func test_t27_curves_beat_surge_guard_ignores_knobs_degenerate_config() -> void:
 	add(push27)
 	await physics()
 	var d27 := _bounce_data(Vector2(0, 300), 0.0, 100.0, [4], [4])
-	var v27: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d27)
+	var v27: BulletVolley2D = factory.spawn_volley(d27)
 	v27.set_shared_bullet_curves_data(flat27)
 	for i in 150:
 		await physics()
@@ -1719,7 +1719,7 @@ func test_t27_curves_beat_surge_guard_ignores_knobs_degenerate_config() -> void:
 	d27b.bounce_debounce_sec = 0.05
 	d27b.bounce_push_assist = false
 	d27b.bounce_charge_amplify = false
-	var v27b: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d27b)
+	var v27b: BulletVolley2D = factory.spawn_volley(d27b)
 	for i in 40:
 		if i % 8 < 4:
 			if i % 8 == 0:
@@ -1736,7 +1736,7 @@ func test_t27_curves_beat_surge_guard_ignores_knobs_degenerate_config() -> void:
 	var d27c := _bounce_data(Vector2(100, 0), 0.0, 0.0, [4], [4])
 	d27c.bounce_cooldown_sec = 0.0
 	d27c.bounce_debounce_sec = 0.0
-	var v27c: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d27c)
+	var v27c: BulletVolley2D = factory.spawn_volley(d27c)
 	for i in 20:
 		if i % 2 == 0:
 			v27c.set_bullet_transform(0, Transform2D(0.0, Vector2(200, 0)))
@@ -1754,7 +1754,7 @@ func test_t28_hostile_freed_walls_nan_motion_overflow_starvation() -> void:
 	await _settle(factory)
 	# T28a: freed wall mid-overlap freezes counts, volley stays finite.
 	var d28 := _bounce_data(Vector2.ZERO, 0.0, 300.0, [4], [4])
-	var v28: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d28)
+	var v28: BulletVolley2D = factory.spawn_volley(d28)
 	for i in 120:
 		await physics()
 		if v28.bullet_get_bounce_count(0) >= 1:
@@ -1790,7 +1790,7 @@ func test_t28_hostile_freed_walls_nan_motion_overflow_starvation() -> void:
 	add(nan28)
 	await physics()
 	var d28b := _bounce_data(Vector2.ZERO, 0.0, 300.0, [4], [4])
-	var v28b: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d28b)
+	var v28b: BulletVolley2D = factory.spawn_volley(d28b)
 	for i in 120:
 		await physics()
 		if v28b.bullet_get_bounce_count(0) >= 1:
@@ -1803,7 +1803,7 @@ func test_t28_hostile_freed_walls_nan_motion_overflow_starvation() -> void:
 	await _settle(factory)
 	var d28c := _bounce_data(Vector2.ZERO, 0.0, 300.0, [4], [4])
 	d28c.bounce_strength = 1e30
-	var v28c: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d28c)
+	var v28c: BulletVolley2D = factory.spawn_volley(d28c)
 	for i in 10:
 		await physics()
 	assert_true(_finite_volley(v28c), "1e30 strength never poisons the volley")
@@ -1812,14 +1812,14 @@ func test_t28_hostile_freed_walls_nan_motion_overflow_starvation() -> void:
 	await _settle(factory)
 	var d28d := _bounce_data(Vector2.ZERO, 0.0, 300.0, [4], [4])
 	d28d.transforms = []
-	var v28d: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d28d)
+	var v28d: BulletVolley2D = factory.spawn_volley(d28d)
 	expect_error_sequence(["No spawn_data or no transforms were provided"])
 	assert_null(v28d, "empty transforms refused with bounce armed")
 	# T28e: subnormal strength is a finite dead-stop, heading preserved.
 	await _settle(factory)
 	var d28e := _bounce_data(Vector2.ZERO, 0.0, 300.0, [4], [4])
 	d28e.bounce_strength = 1e-30
-	var v28e: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d28e)
+	var v28e: BulletVolley2D = factory.spawn_volley(d28e)
 	for i in 120:
 		await physics()
 		if v28e.bullet_get_bounce_count(0) >= 1:
@@ -1884,7 +1884,7 @@ func test_t28_hostile_freed_walls_nan_motion_overflow_starvation() -> void:
 	sg28.max_speed = 3000.0
 	sg28.acceleration = 0.0
 	d28g.all_bullet_speed_data = [sg28, sg28]
-	var v28g: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d28g)
+	var v28g: BulletVolley2D = factory.spawn_volley(d28g)
 	for i in 150:
 		await physics()
 		if v28g.bullet_get_bounce_count(0) >= 1 and v28g.bullet_get_bounce_count(1) >= 1:
@@ -1922,7 +1922,7 @@ func test_t28_hostile_freed_walls_nan_motion_overflow_starvation() -> void:
 	await physics()
 	var d28h := _bounce_data(Vector2(250, 300), 0.0, 300.0, [4], [4])
 	d28h.set_bullet_max_collision_count(0)
-	var v28h: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d28h)
+	var v28h: BulletVolley2D = factory.spawn_volley(d28h)
 	# OrbitRight=2, FaceTarget=0, FollowTarget=0, StayLocked=1.
 	v28h.bullet_homing_push_back_homing_target(0, orbit28)
 	v28h.bullet_enable_orbiting(0, 60.0, 2, 0, 0, 0.0, 1, true)
@@ -1960,7 +1960,7 @@ func test_precise_mode_degenerate_shapes_fall_back_to_radial() -> void:
 	await physics()
 	var d29 := _bounce_data(Vector2.ZERO, 0.0, 300.0, [4], [4])
 	d29.bounce_mode = 1
-	var v29: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d29)
+	var v29: BulletVolley2D = factory.spawn_volley(d29)
 	for i in 120:
 		await physics()
 		if v29.bullet_get_bounce_count(0) >= 1:
@@ -1978,7 +1978,7 @@ func test_precise_mode_degenerate_shapes_fall_back_to_radial() -> void:
 	null29.add_child(null29col)
 	add(null29)
 	await physics()
-	var v29b: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d29)
+	var v29b: BulletVolley2D = factory.spawn_volley(d29)
 	for i in 120:
 		await physics()
 		if v29b.bullet_get_bounce_count(0) >= 1:
@@ -2002,7 +2002,7 @@ func test_consumed_bounces_spark_once_and_still_count() -> void:
 	d30.bounce_hit_consumed = true
 	d30.bounce_max_count = 2
 	d30.set_bullet_max_collision_count(2)
-	var v30: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d30)
+	var v30: BulletVolley2D = factory.spawn_volley(d30)
 	for i in 120:
 		await physics()
 		if v30.bullet_get_bounce_count(0) >= 1:
@@ -2028,7 +2028,7 @@ func test_setter_rejects_keep_old_values() -> void:
 	assert_true(absf(d31.bounce_cooldown_sec - 0.05) < 0.0001, "over-range cooldown rejected")
 	d31.set_bounce_randomness_deg(999.0)
 	assert_true(absf(d31.bounce_randomness_deg) < 0.0001, "over-range randomness rejected")
-	var v31: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(_bounce_data(Vector2.ZERO, 0.0, 300.0, [4], [4]))
+	var v31: BulletVolley2D = factory.spawn_volley(_bounce_data(Vector2.ZERO, 0.0, 300.0, [4], [4]))
 	v31.set_bounce_strength(NAN)
 	assert_true(absf(v31.get_bounce_strength() - 1.0) < 0.0001, "live NaN strength rejected")
 	v31.set_bounce_mask(-1)
@@ -2078,7 +2078,7 @@ func test_mover_switching_gravity_push_unlocked_orbit_spawner_routing() -> void:
 	add(charge32)
 	await physics()
 	var d32 := _bounce_data(Vector2(0, 300), 0.0, 100.0, [4], [4])
-	var v32: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d32)
+	var v32: BulletVolley2D = factory.spawn_volley(d32)
 	for i in 200:
 		await physics()
 		if v32.bullet_get_bounce_count(0) >= 2:
@@ -2108,7 +2108,7 @@ func test_mover_switching_gravity_push_unlocked_orbit_spawner_routing() -> void:
 	push32b.add_child(p32bcol)
 	add(push32b)
 	await physics()
-	var v32b: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d32b)
+	var v32b: BulletVolley2D = factory.spawn_volley(d32b)
 	for i in 200:
 		await physics()
 		if v32b.bullet_get_bounce_count(0) >= 1:
@@ -2126,7 +2126,7 @@ func test_mover_switching_gravity_push_unlocked_orbit_spawner_routing() -> void:
 	await physics()
 	var d32c := _bounce_data(Vector2(500, 300), 0.0, 200.0, [4], [4])
 	d32c.set_bullet_max_collision_count(0)
-	var v32c: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d32c)
+	var v32c: BulletVolley2D = factory.spawn_volley(d32c)
 	v32c.shared_homing_deque_push_back_node2d_target(moon32)
 	v32c.bullet_enable_orbiting(0, 64.0, 2, 0)
 	for i in 150:
@@ -2180,13 +2180,13 @@ func test_unspawned_instances_never_crash() -> void:
 	_connect_signals()
 	# BOUNCE T33 unspawned instances never crash
 	await _settle(factory)
-	var bare := DirectionalBullets2D.new()
+	var bare := BulletVolley2D.new()
 	add(bare)
 	await idle(1)
-	var empty_data := DirectionalBulletsData2D.new()
+	var empty_data := BulletVolleyData2D.new()
 	empty_data.sprite_frames = H.make_sprite_frames()
 	empty_data.transforms = []
-	assert_true(bare.enable_multimesh(empty_data, Vector2.ZERO, 0) == false, "enable on never-spawned volley refuses cleanly")
+	assert_true(bare.enable_volley(empty_data, Vector2.ZERO, 0) == false, "enable on never-spawned volley refuses cleanly")
 	assert_true(bare.get_amount_bullets() == 0, "fresh volley holds zero bullets")
 	assert_true(bare.bullet_get_bounce_count(0) == 0, "bounce count OOB reads 0")
 	assert_true(bare.get_bullet_direction(0) == Vector2(), "direction OOB reads zero")
@@ -2218,7 +2218,7 @@ func test_teleport_matrix_interpolation_mixing() -> void:
 	factory.set_use_physics_interpolation_runtime(false)
 	var wall34 := _make_wall(Vector2(200, 0), 8)
 	var d34 := _bounce_data(Vector2.ZERO, 0.0, 300.0, [4], [4])
-	var v34: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d34)
+	var v34: BulletVolley2D = factory.spawn_volley(d34)
 	v34.set_bullet_transform(0, Transform2D(0.0, Vector2(100, 0)))
 	factory.set_is_factory_processing_bullets(false)
 	for i in 10:
@@ -2237,11 +2237,11 @@ func test_teleport_matrix_interpolation_mixing() -> void:
 	hunter34.position = Vector2(400, 0)
 	add(hunter34)
 	var d34b := _bounce_data(Vector2.ZERO, 0.0, 300.0, [], [4])
-	var v34b: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d34b)
+	var v34b: BulletVolley2D = factory.spawn_volley(d34b)
 	v34b.shared_homing_deque_push_back_node2d_target(hunter34)
 	v34b.set_homing_distance_before_reached(64.0)
 	var reached34: Array = []
-	var on_reached := func(_v: DirectionalBullets2D, _i: int, _t: Object, _p: Vector2) -> void:
+	var on_reached := func(_v: BulletVolley2D, _i: int, _t: Object, _p: Vector2) -> void:
 		reached34.append(1)
 	v34b.bullet_homing_target_reached.connect(on_reached)
 	for i in 3:
@@ -2258,7 +2258,7 @@ func test_teleport_matrix_interpolation_mixing() -> void:
 	await idle(1)
 	await _settle(factory)
 	var d34c := _bounce_data(Vector2.ZERO, 0.0, 0.0, [4], [4])
-	var v34c: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d34c)
+	var v34c: BulletVolley2D = factory.spawn_volley(d34c)
 	for i in 5:
 		await physics()
 		v34c.set_bullet_transform(0, Transform2D(0.3 * i, Vector2(20 * i, 0)))
@@ -2277,7 +2277,7 @@ func test_paused_steady_overlap_registers_once_on_resume() -> void:
 	factory.set_use_physics_interpolation_runtime(false)
 	_make_wall(Vector2(100, 0), 8)
 	var dp := _bounce_data(Vector2.ZERO, 0.0, 300.0, [4], [4])
-	var vp: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(dp)
+	var vp: BulletVolley2D = factory.spawn_volley(dp)
 	factory.set_is_factory_processing_bullets(false)
 	vp.set_bullet_transform(0, Transform2D(0.0, Vector2(100, 0)))
 	for i in 10:
@@ -2302,7 +2302,7 @@ func test_orbit_endurance_census_telegraph_zero_helper_hostility() -> void:
 	moon35.position = Vector2(600, 300)
 	add(moon35)
 	var d35 := _bounce_data(Vector2(500, 300), 0.0, 200.0, [], [4], 30.0)
-	var v35: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d35)
+	var v35: BulletVolley2D = factory.spawn_volley(d35)
 	v35.shared_homing_deque_push_back_node2d_target(moon35)
 	v35.bullet_enable_orbiting(0, 64.0, 2, 0)
 	for i in 720:
@@ -2313,14 +2313,14 @@ func test_orbit_endurance_census_telegraph_zero_helper_hostility() -> void:
 	moon35.queue_free()
 	await idle(1)
 	await _settle(factory)
-	factory.spawn_directional_bullets(H.make_directional_data(2, 150.0, 10.0))
+	factory.spawn_volley(H.make_volley_data(2, 150.0, 10.0))
 	await physics()
 	assert_true(factory.debug_get_live_volley_ids(0).size() >= 1, "factory census includes fire-and-forget volleys")
 	await _settle(factory)
 	var tsp := BulletSpawner2D.new()
 	add(tsp)
 	tsp.set_bullet_factory(factory)
-	tsp.set_spawn_data(H.make_directional_data(2, 200.0))
+	tsp.set_spawn_data(H.make_volley_data(2, 200.0))
 	tsp.set_shooting_enabled(false)
 	tsp.set_telegraph_enabled(true)
 	tsp.set_telegraph_sec(0.0)
@@ -2361,7 +2361,7 @@ func test_stale_target_velocity_never_steers_the_bounce() -> void:
 	add(back36)
 	await physics()
 	var d36a := _bounce_data(Vector2(100, 300), 0.0, 200.0, [4], [4])
-	var v36a: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d36a)
+	var v36a: BulletVolley2D = factory.spawn_volley(d36a)
 	for i in 150:
 		await physics()
 		if v36a.bullet_get_bounce_count(0) >= 1:
@@ -2419,7 +2419,7 @@ func test_knob_matrix_every_mix_separates_stays_finite() -> void:
 				dd.set_bullet_max_collision_count(2)
 			if cfg.has("brand"):
 				dd.bounce_randomness_deg = cfg["brand"]
-			var vv: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(dd)
+			var vv: BulletVolley2D = factory.spawn_volley(dd)
 			for i in 150:
 				await physics()
 				if vv.bullet_get_bounce_count(0) >= 1:
@@ -2458,7 +2458,7 @@ func test_queue_time_snapshot_wins_over_mid_drain_mutation() -> void:
 	sp36c.max_speed = 3000.0
 	sp36c.acceleration = 0.0
 	d36c.all_bullet_speed_data = [d36c.all_bullet_speed_data[0], sp36c]
-	var v36c: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d36c)
+	var v36c: BulletVolley2D = factory.spawn_volley(d36c)
 	_t36_body = mut36
 	_t36_done = false
 	_t36_mutate = true
@@ -2497,7 +2497,7 @@ func test_cross_type_matrix_platforms_slopes_edges_areas_tilemaps() -> void:
 	add(crush37)
 	await physics()
 	var d37a := _bounce_data(Vector2(100, 300), 0.0, 200.0, [4], [4])
-	var v37a: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d37a)
+	var v37a: BulletVolley2D = factory.spawn_volley(d37a)
 	for i in 150:
 		await physics()
 		if v37a.bullet_get_bounce_count(0) >= 1:
@@ -2524,7 +2524,7 @@ func test_cross_type_matrix_platforms_slopes_edges_areas_tilemaps() -> void:
 	await physics()
 	var d37b := _bounce_data(Vector2(100, 300), 0.0, 200.0, [4], [4])
 	d37b.bounce_mode = 1
-	var v37b: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d37b)
+	var v37b: BulletVolley2D = factory.spawn_volley(d37b)
 	for i in 150:
 		await physics()
 		if v37b.bullet_get_bounce_count(0) >= 1:
@@ -2552,7 +2552,7 @@ func test_cross_type_matrix_platforms_slopes_edges_areas_tilemaps() -> void:
 	await physics()
 	var d37c := _bounce_data(Vector2(100, 300), 0.0, 200.0, [4], [4])
 	d37c.bounce_mode = 1
-	var v37c: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d37c)
+	var v37c: BulletVolley2D = factory.spawn_volley(d37c)
 	for i in 150:
 		await physics()
 		if v37c.bullet_get_bounce_count(0) >= 1:
@@ -2578,7 +2578,7 @@ func test_cross_type_matrix_platforms_slopes_edges_areas_tilemaps() -> void:
 	await physics()
 	var d37d := _bounce_data(Vector2(100, 300), 0.0, 200.0, [4], [4])
 	d37d.bounce_mode = 1
-	var v37d: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d37d)
+	var v37d: BulletVolley2D = factory.spawn_volley(d37d)
 	for i in 150:
 		await physics()
 		if v37d.bullet_get_bounce_count(0) >= 1:
@@ -2608,7 +2608,7 @@ func test_cross_type_matrix_platforms_slopes_edges_areas_tilemaps() -> void:
 	add(awake37)
 	await physics()
 	var d37e := _bounce_data(Vector2(100, 300), 0.0, 200.0, [4], [4])
-	var v37e: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d37e)
+	var v37e: BulletVolley2D = factory.spawn_volley(d37e)
 	for i in 150:
 		await physics()
 		if v37e.bullet_get_bounce_count(0) >= 1:
@@ -2638,7 +2638,7 @@ func test_cross_type_matrix_platforms_slopes_edges_areas_tilemaps() -> void:
 	sleep37.sleeping = true
 	await physics()
 	var d37f := _bounce_data(Vector2(100, 300), 0.0, 200.0, [4], [4])
-	var v37f: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d37f)
+	var v37f: BulletVolley2D = factory.spawn_volley(d37f)
 	for i in 150:
 		await physics()
 		if v37f.bullet_get_bounce_count(0) >= 1:
@@ -2663,7 +2663,7 @@ func test_cross_type_matrix_platforms_slopes_edges_areas_tilemaps() -> void:
 	add(still37)
 	await physics()
 	var d37g := _bounce_data(Vector2(100, 300), 0.0, 200.0, [4], [4])
-	var v37g: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d37g)
+	var v37g: BulletVolley2D = factory.spawn_volley(d37g)
 	for i in 150:
 		await physics()
 		if v37g.bullet_get_bounce_count(0) >= 1:
@@ -2688,7 +2688,7 @@ func test_cross_type_matrix_platforms_slopes_edges_areas_tilemaps() -> void:
 	add(dash37)
 	await physics()
 	var d37h := _bounce_data(Vector2(100, 300), 0.0, 200.0, [4], [4])
-	var v37h: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d37h)
+	var v37h: BulletVolley2D = factory.spawn_volley(d37h)
 	for i in 60:
 		dash37.position.x -= 5.0
 		await physics()
@@ -2705,7 +2705,7 @@ func test_cross_type_matrix_platforms_slopes_edges_areas_tilemaps() -> void:
 	var tiles37 := _make_tile_layer()
 	await physics()
 	var d37i := _bounce_data(Vector2(100, 300), 0.0, 200.0, [4], [4])
-	var v37i: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d37i)
+	var v37i: BulletVolley2D = factory.spawn_volley(d37i)
 	for i in 150:
 		await physics()
 		if v37i.bullet_get_bounce_count(0) >= 1 or not v37i.is_bullet_status_enabled(0):
@@ -2721,7 +2721,7 @@ func test_cross_type_matrix_platforms_slopes_edges_areas_tilemaps() -> void:
 	var d37j := _bounce_data(Vector2(100, 300), 0.0, 200.0, [4], [4])
 	d37j.bounce_tilemap_layers = true
 	assert_true(d37j.bounce_tilemap_layers == true, "tilemap opt-in defaults off, sets on")
-	var v37j: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d37j)
+	var v37j: BulletVolley2D = factory.spawn_volley(d37j)
 	assert_true(v37j.get_bounce_tilemap_layers() == true, "live mirror reseeds the opt-in")
 	for i in 150:
 		await physics()
@@ -2742,7 +2742,7 @@ func test_forensics_reuse_energy_shared_walls_tilemap_budgets() -> void:
 	var wall38 := _make_wall(Vector2(200, 300), 8)
 	await physics()
 	var d38a := _bounce_data(Vector2(100, 300), 0.0, 200.0, [4], [4])
-	var v38a: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d38a)
+	var v38a: BulletVolley2D = factory.spawn_volley(d38a)
 	for i in 150:
 		await physics()
 		if v38a.bullet_get_bounce_count(0) >= 1:
@@ -2769,7 +2769,7 @@ func test_forensics_reuse_energy_shared_walls_tilemap_budgets() -> void:
 	add(rig38)
 	await physics()
 	var d38b := _bounce_data(Vector2(100, 300), 0.0, 200.0, [4], [4])
-	var v38b: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d38b)
+	var v38b: BulletVolley2D = factory.spawn_volley(d38b)
 	for i in 150:
 		await physics()
 		if v38b.bullet_get_bounce_count(0) >= 1:
@@ -2784,7 +2784,7 @@ func test_forensics_reuse_energy_shared_walls_tilemap_budgets() -> void:
 	await physics()
 	var d38c := _bounce_data(Vector2(100, 300), 0.0, 200.0, [4], [4])
 	d38c.bounce_strength = 2.0
-	var v38c: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d38c)
+	var v38c: BulletVolley2D = factory.spawn_volley(d38c)
 	for i in 150:
 		await physics()
 		if v38c.bullet_get_bounce_count(0) >= 1:
@@ -2795,7 +2795,7 @@ func test_forensics_reuse_energy_shared_walls_tilemap_budgets() -> void:
 	await physics()
 	var d38d := _bounce_data(Vector2(100, 300), 0.0, 200.0, [4], [4])
 	d38d.bounce_strength = 1.0
-	var v38d: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d38d)
+	var v38d: BulletVolley2D = factory.spawn_volley(d38d)
 	assert_true((v38d.debug_get_bounce_info(0).get("last_normal", Vector2(9, 9)) as Vector2) == Vector2(0, 0), "reuse zeroes forensic ledger")
 	for i in 150:
 		await physics()
@@ -2813,17 +2813,17 @@ func test_forensics_reuse_energy_shared_walls_tilemap_budgets() -> void:
 	var vans: Array = []
 	for k in 3:
 		var dk := _bounce_data(Vector2(100, 300), 0.0, 200.0, [4], [4])
-		vans.append(factory.spawn_controllable_directional_bullets(dk))
+		vans.append(factory.spawn_volley(dk))
 	for i in 150:
 		await physics()
 		var done := true
 		for vv in vans:
-			if (vv as DirectionalBullets2D).bullet_get_bounce_count(0) < 1:
+			if (vv as BulletVolley2D).bullet_get_bounce_count(0) < 1:
 				done = false
 		if done:
 			break
 	for k in 3:
-		var vk: DirectionalBullets2D = vans[k]
+		var vk: BulletVolley2D = vans[k]
 		assert_true(vk.bullet_get_bounce_count(0) >= 1, "shared wall bounces volley " + str(k))
 		assert_true(vk.get_bullet_velocity(0).x < 0.0, "shared wall separates volley " + str(k))
 	shared38.queue_free()
@@ -2836,7 +2836,7 @@ func test_forensics_reuse_energy_shared_walls_tilemap_budgets() -> void:
 	d38e.bounce_tilemap_layers = true
 	d38e.bounce_hit_consumed = true
 	d38e.set_bullet_max_collision_count(2)
-	var v38e: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d38e)
+	var v38e: BulletVolley2D = factory.spawn_volley(d38e)
 	for i in 150:
 		await physics()
 		if v38e.bullet_get_bounce_count(0) >= 1:
@@ -2853,7 +2853,7 @@ func test_forensics_reuse_energy_shared_walls_tilemap_budgets() -> void:
 	var d38f := _bounce_data(Vector2(100, 300), 0.0, 200.0, [4], [4])
 	d38f.bounce_tilemap_layers = true
 	d38f.bounce_max_count = 1
-	var v38f: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d38f)
+	var v38f: BulletVolley2D = factory.spawn_volley(d38f)
 	for i in 150:
 		await physics()
 		if v38f.bullet_get_bounce_count(0) >= 1:

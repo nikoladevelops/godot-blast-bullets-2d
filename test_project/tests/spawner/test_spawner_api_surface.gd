@@ -46,7 +46,7 @@ func test_legacy_transforms_source_key_is_an_unknown_key() -> void:
 
 
 func test_one_auto_pop_switch_drives_both_queue_kinds() -> void:
-	var sp := make_spawner(H.make_directional_data(2, 50.0, 30.0))
+	var sp := make_spawner(H.make_volley_data(2, 50.0, 30.0))
 	var target := Node2D.new()
 	target.position = Vector2(300, 0)
 	add(target)
@@ -59,20 +59,20 @@ func test_one_auto_pop_switch_drives_both_queue_kinds() -> void:
 		assert_true(is_editor_visible(sp, &"homing_auto_pop_after_target_reached"), "visible in mode %d" % mode)
 	sp.set_homing_mode(BulletSpawner2D.HOMING_SHARED)
 	assert_true(sp.shoot_once(), "shared homing shot")
-	var shared: DirectionalBullets2D = sp.get_live_volleys()[0]
+	var shared: BulletVolley2D = sp.get_live_volleys()[0]
 	assert_true(shared.get_shared_homing_deque_auto_pop_after_target_reached(), "shared queue pops")
 	sp.set_homing_mode(BulletSpawner2D.HOMING_PER_BULLET)
 	assert_true(sp.shoot_once(), "per-bullet homing shot")
-	var per: DirectionalBullets2D = sp.get_live_volleys()[1]
+	var per: BulletVolley2D = sp.get_live_volleys()[1]
 	assert_true(per.get_bullet_homing_auto_pop_after_target_reached(), "per-bullet queues pop")
 
 
 func test_spawn_data_keeps_its_own_adjust_direction_flag() -> void:
 	# The spawner used to overwrite this per homing volley (default false).
-	var data := H.make_directional_data(2, 50.0, 30.0)
+	var data := H.make_volley_data(2, 50.0, 30.0)
 	data.adjust_direction_based_on_rotation = true
 	var sp := make_spawner(data)
 	sp.set_homing_enabled(true)
 	assert_true(sp.shoot_once(), "homing shot")
-	var volley: DirectionalBullets2D = sp.get_live_volleys()[0]
+	var volley: BulletVolley2D = sp.get_live_volleys()[0]
 	assert_true(volley.get_adjust_direction_based_on_rotation(), "the data's flag reaches the volley untouched")

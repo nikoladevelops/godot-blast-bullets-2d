@@ -6,7 +6,7 @@ extends BulletAttachment2D
 ## pools itself twice; with the latch it is rejected and state stays exact.
 ## Target volley/victim cross via statics (set before the outer disable).
 
-static var volley: DirectionalBullets2D = null
+static var volley: BulletVolley2D = null
 static var victim := -1
 static var attempts := 0
 

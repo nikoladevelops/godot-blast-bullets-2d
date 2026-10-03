@@ -85,7 +85,7 @@ func test_rigid_parent_move_never_rebuilds() -> void:
 	var sp := BulletSpawner2D.new()
 	sp.set_shooting_enabled(false)
 	sp.set_homing_enabled(false)
-	sp.set_spawn_data(H.make_directional_data(1, 0.0, 60.0))
+	sp.set_spawn_data(H.make_volley_data(1, 0.0, 60.0))
 	sp.pattern_source = BulletSpawner2D.PATTERN_FROM_HELPER_RING
 	sp.helper_bullets_amount = 500
 	sp.show_pattern_preview = true

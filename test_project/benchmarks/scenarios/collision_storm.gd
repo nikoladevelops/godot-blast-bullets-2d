@@ -3,7 +3,7 @@ extends BlastBenchmark
 ## wall 120 px away and dies on contact (max 1 hit). Exercises the overlap
 ## queue, dedup table, collision drain, kill path and pool churn together.
 var _walls := 4
-var _data: Array[DirectionalBulletsData2D] = []
+var _data: Array[BulletVolleyData2D] = []
 
 func describe() -> String:
 	return "200-bullet volley/frame dying on walls (collision drain + pool churn)"
@@ -11,7 +11,7 @@ func describe() -> String:
 func setup() -> void:
 	for w in _walls:
 		make_static_box(Vector2(400 + w * 1000, 300), Vector2(40, 900))
-		var d := H.make_directional_data(200, 900.0, 3.0)
+		var d := H.make_volley_data(200, 900.0, 3.0)
 		var arr: Array = []
 		for i in 200:
 			arr.append(Transform2D(0.0, Vector2(280 + w * 1000, 300.0 - 400.0 + 4.0 * i)))
@@ -23,7 +23,7 @@ func setup() -> void:
 		_data.append(d)
 
 func step(frame: int) -> void:
-	factory.spawn_controllable_directional_bullets(_data[frame % _walls])
+	factory.spawn_volley(_data[frame % _walls])
 
 
 func results() -> Dictionary:

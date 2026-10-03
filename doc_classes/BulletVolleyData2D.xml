@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8" ?>
-<class name="DirectionalBulletsData2D" inherits="Resource" api_type="extension" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/godotengine/godot/master/doc/class.xsd">
+<class name="BulletVolleyData2D" inherits="Resource" api_type="extension" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/godotengine/godot/master/doc/class.xsd">
 	<brief_description>
-		Contains spawn data for the [DirectionalBullets2D].
+		Contains spawn data for the [BulletVolley2D].
 	</brief_description>
 	<description>
 		Ensure that the [member transforms] and [member all_bullet_speed_data] are set, otherwise spawning fails with an error and no bullets are created (an empty speed array fails; give one entry per bullet).
@@ -9,7 +9,7 @@
 		[b]Invalid entries[/b] never poison their siblings: null entries, wrong-typed resources, NaN/Inf numbers, disabled wobble seeds, and unresolvable pattern paths each fall back for that bullet only.
 		[b]Tiling (opt-in):[/b] every array below has a [code]tile_*[/code] checkbox next to it in the inspector (off by default). When checked, a short array wraps around the volley for that array only: bullet [code]i[/code] reads entry [code]i % size[/code], so 2 entries fan across 10 bullets as A,B,A,B... Invalid entries still fall back per bullet.
 		[b]Migration:[/b] older setups that relied on a single entry covering every bullet no longer get that for free. Either provide one entry per bullet, set the [code]shared_*[/code] value (it covers every bullet the array leaves out), or check the [code]tile_*[/code] box for that array.
-		Check [DirectionalBulletsData2D]'s documentation for the rest of the properties.
+		Check [BulletVolleyData2D]'s documentation for the rest of the properties.
 	</description>
 	<tutorials>
 	</tutorials>
@@ -77,7 +77,7 @@
 			Repeat flag for each bullet's own pattern. Entry [code]i[/code] belongs to bullet [code]i[/code]; bullets without an entry use [member shared_movement_pattern_repeat]. Has its own [member tile_all_bullet_movement_pattern_repeats] checkbox.
 		</member>
 		<member name="all_bullet_rotation_data" type="BulletRotationData2D[]" setter="set_all_bullet_rotation_data" getter="get_all_bullet_rotation_data" default="[]">
-			Spin for each bullet. Entry [code]i[/code] rotates bullet [code]i[/code] only — give one entry per bullet (same size as [member transforms]), or leave empty for no rotation. Bullets without a valid entry read zero spin (or the [DirectionalBulletsData2D.shared_bullet_rotation_data] fallback on Directional volleys). Invalid means: null entry, or NaN/Inf rotation values (that bullet reads zeros, its siblings are untouched). Example: entries [2.0, null] → bullet 0 spins at 2.0, bullet 1 holds still.
+			Spin for each bullet. Entry [code]i[/code] rotates bullet [code]i[/code] only — give one entry per bullet (same size as [member transforms]), or leave empty for no rotation. Bullets without a valid entry read zero spin (or the [BulletVolleyData2D.shared_bullet_rotation_data] fallback). Invalid means: null entry, or NaN/Inf rotation values (that bullet reads zeros, its siblings are untouched). Example: entries [2.0, null] → bullet 0 spins at 2.0, bullet 1 holds still.
 			    	Note: [BulletRotationData2D] has a helper static method that you can use to generate random rotation data - [method BulletRotationData2D.generate_random_data].
 		</member>
 		<member name="all_bullet_speed_data" type="BulletSpeedData2D[]" setter="set_all_bullet_speed_data" getter="get_all_bullet_speed_data" default="[]">
@@ -90,7 +90,7 @@
 			Wobble seed for each bullet, applied at spawn time (and on pool reuse). Entry [code]i[/code] affects bullet [code]i[/code] only; a live seed always beats [member shared_bullet_wobble_data] for its bullet. Null entries and entries with [code]enabled = false[/code] fall back to shared for that bullet. Example: shared gentle weave plus one strong seed on bullet 2 → bullet 2 snakes hard, the rest weave gently.
 		</member>
 		<member name="all_bullets_custom_data" type="Resource[]" setter="set_all_bullets_custom_data" getter="get_all_bullets_custom_data" default="[]">
-			Custom data carried per bullet, readable in the factory collision callbacks through [method DirectionalBullets2D.bullet_get_custom_data]. Entry [code]i[/code] belongs to bullet [code]i[/code] and nobody else; bullets without an entry read null. Stays strictly separate from [member shared_bullets_custom_data]: per-bullet data never falls back to shared. Example: tag bullet 0 with a fire resource and bullet 2 with ice → bullet 1 reads null.
+			Custom data carried per bullet, readable in the factory collision callbacks through [method BulletVolley2D.bullet_get_custom_data]. Entry [code]i[/code] belongs to bullet [code]i[/code] and nobody else; bullets without an entry read null. Stays strictly separate from [member shared_bullets_custom_data]: per-bullet data never falls back to shared. Example: tag bullet 0 with a fire resource and bullet 2 with ice → bullet 1 reads null.
 		</member>
 		<member name="animation" type="StringName" setter="set_animation" getter="get_animation" default="&amp;&quot;default&quot;">
 			Which SpriteFrames animation to play. Empty or "default" auto-resolves silently ("default" if present, else first animation). Explicit wrong names fall back to the first animation with one error. The whole multimesh batch shares one frame at a time; timing uses animation speed (fps), per-frame durations, and loop flag.
@@ -215,7 +215,7 @@
 			Warning: When using unit curves with [BulletCurvesData2D] they might not work properly.
 		</member>
 		<member name="is_life_time_over_signal_enabled" type="bool" setter="set_is_life_time_over_signal_enabled" getter="get_is_life_time_over_signal_enabled" default="false">
-			If this is enabled then when the lifetime of the bullets is over, the signal [signal BulletFactory2D.directional_life_time_over] will be emitted by the [BulletFactory2D].
+			If this is enabled then when the lifetime of the bullets is over, the signal [signal BulletFactory2D.life_time_over] will be emitted by the [BulletFactory2D].
 			This is helpful when you want to spawn visual effects at that time (explosion, particles, anything really..).
 		</member>
 		<member name="is_texture_rotation_permanent" type="bool" setter="set_is_texture_rotation_permanent" getter="get_is_texture_rotation_permanent" default="false">
@@ -259,7 +259,7 @@
 			Whole-volley tint, exactly like CanvasItem self_modulate (multiplies every bullet instance). White (default) renders untouched. Spawn one volley per color for different-colored bullets; reseeded from data on every spawn and enable, so pool reuse never leaks the previous tint. Live volleys also accept the engine set_self_modulate directly.
 		</member>
 		<member name="shared_bullet_attachment" type="PackedScene" setter="set_shared_bullet_attachment" getter="get_shared_bullet_attachment">
-			Shared attachment scene applied to every bullet at spawn time (and on pool reuse). The scene must contain a [BulletAttachment2D]. Null (default) disables the feature; use the runtime [method DirectionalBullets2D.bullet_set_attachment] methods for per-bullet attachments instead.
+			Shared attachment scene applied to every bullet at spawn time (and on pool reuse). The scene must contain a [BulletAttachment2D]. Null (default) disables the feature; use the runtime [method BulletVolley2D.bullet_set_attachment] methods for per-bullet attachments instead.
 		</member>
 		<member name="shared_bullet_attachment_offset" type="Vector2" setter="set_shared_bullet_attachment_offset" getter="get_shared_bullet_attachment_offset" default="Vector2(0, 0)">
 			Offset of the shared attachment relative to the bullet's texture center.
@@ -340,7 +340,7 @@
 		</member>
 		<member name="transforms" type="Transform2D[]" setter="set_transforms" getter="get_transforms" default="[]">
 			[b]MANDATORY[/b]
-			Determines the transforms of the bullets, in global space (use each marker's global transform). Movement, physics shapes, collision signals and [method DirectionalBullets2D.get_bullet_global_transform] all operate in global space.
+			Determines the transforms of the bullets, in global space (use each marker's global transform). Movement, physics shapes, collision signals and [method BulletVolley2D.get_bullet_global_transform] all operate in global space.
 
 			Tip: place [Marker2D] nodes in your scene and read their global transforms each time you spawn.
 			Note: There is a helper static function that can generate a grid pattern of [Transform2D] that you can use: [method BulletFactory2D.helper_generate_transforms_grid]. You might want to implement your own custom pattern generation logic in C++ for maximum performance.

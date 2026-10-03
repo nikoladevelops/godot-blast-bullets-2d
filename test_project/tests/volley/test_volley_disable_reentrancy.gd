@@ -22,7 +22,7 @@ func after_each() -> void:
 
 func test_nested_disable_rejected_then_single_pool() -> void:
 	Probe.reset_state()
-	var v: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(H.make_still_data(2))
+	var v: BulletVolley2D = factory.spawn_volley(H.make_still_data(2))
 	v.bullet_set_attachment(0, _probe_scene(), Vector2.ZERO, true)
 	await idle(1)
 	Probe.volley = v
@@ -38,14 +38,14 @@ func test_nested_disable_rejected_then_single_pool() -> void:
 	await idle(1)
 	assert_eq(factory.debug_get_bullets_pool_amount(), 1, "volley pooled exactly once")
 	factory.debug_reset_pool_stats()
-	var w: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(H.make_still_data(2))
-	assert_eq(int(factory.debug_get_pool_hit_stats().get("directional_hits", 0)), 1, "reuse is a pool hit")
+	var w: BulletVolley2D = factory.spawn_volley(H.make_still_data(2))
+	assert_eq(int(factory.debug_get_pool_hit_stats().get("hits", 0)), 1, "reuse is a pool hit")
 	assert_true(w.is_bullet_status_enabled(0) and w.is_bullet_status_enabled(1), "reused volley fully live")
 	assert_false(w.debug_get_attachment_info(0).get("has_attachment", true), "no attachment leaked across")
 
 
 func test_plain_sequential_disables_unaffected() -> void:
-	var v: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(H.make_still_data(2))
+	var v: BulletVolley2D = factory.spawn_volley(H.make_still_data(2))
 	v.disable_bullet(0)
 	v.disable_bullet(1)
 	await idle(1)

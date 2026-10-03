@@ -6,7 +6,7 @@ extends BlastTest
 
 func _fresh() -> BulletSpawner2D:
 	var sp := BulletSpawner2D.new()
-	sp.set_spawn_data(H.make_directional_data(1, 0.0, 60.0))
+	sp.set_spawn_data(H.make_volley_data(1, 0.0, 60.0))
 	autofree(sp)
 	watch_signals(sp)
 	return sp

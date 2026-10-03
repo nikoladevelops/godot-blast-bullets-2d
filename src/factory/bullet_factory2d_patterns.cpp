@@ -8,12 +8,12 @@
 #include "./bullet_factory2d.hpp"
 #include "../shared/warn_once2d.hpp"
 #include "../bullets/directional_bullets2d.hpp"
-#include "../spawn-data/directional_bullets_data2d.hpp"
-#include "../debugger/multimesh_bullets_debugger2d.hpp"
+#include "../spawn-data/bullet_volley_data2d.hpp"
+#include "../debugger/bullet_volley_debugger2d.hpp"
 #include "../shared/bullet_attachment2d.hpp"
 #include "../shared/factory_operation_guard2d.hpp"
-#include "../shared/multimesh_object_pool2d.hpp"
-#include "../shared/multimesh_pool_key2d.hpp"
+#include "../shared/volley_pool2d.hpp"
+#include "../shared/volley_pool_key2d.hpp"
 #include "godot_cpp/classes/global_constants.hpp"
 #include "godot_cpp/classes/image.hpp"
 #include "godot_cpp/classes/image_texture.hpp"
@@ -26,7 +26,7 @@
 #include "godot_cpp/core/math_defs.hpp"
 #include "godot_cpp/variant/vector2.hpp"
 #include "godot_cpp/variant/vector3.hpp"
-#include "spawn-data/directional_bullets_data2d.hpp"
+#include "spawn-data/bullet_volley_data2d.hpp"
 #include <cstdint>
 #include <godot_cpp/classes/atlas_texture.hpp>
 #include <godot_cpp/classes/engine.hpp>
@@ -1609,7 +1609,7 @@ TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_ring(
 	// The outline layout inverts the marker (global loop -> slot space):
 	// a singular marker would poison every slot, so reject it here like
 	// danmaku_validate_head does for the other layout users.
-	if (!DirectionalBullets2D::is_transform_invertible_safe(marker_transform)) {
+	if (!BulletVolley2D::is_transform_invertible_safe(marker_transform)) {
 		UtilityFunctions::push_error("helper_generate_transforms_ring: marker_transform is singular (zero or degenerate scale); volley skipped.");
 		return TypedArray<Transform2D>();
 	}
@@ -1916,7 +1916,7 @@ static bool danmaku_validate_head(const char *caller_name, int transforms_amount
 	// check but their affine_inverse() is garbage, which layout_outline_slots
 	// and the slot math consume unconditionally. Reject loudly instead of
 	// emitting clamped-garbage volleys.
-	if (!DirectionalBullets2D::is_transform_invertible_safe(marker_transform)) {
+	if (!BulletVolley2D::is_transform_invertible_safe(marker_transform)) {
 		UtilityFunctions::push_error(String(caller_name) + ": marker_transform is singular (zero or degenerate scale); volley skipped.");
 		return false;
 	}

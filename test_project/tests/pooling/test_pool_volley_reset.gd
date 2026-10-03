@@ -11,8 +11,8 @@ func _on_old_timer() -> void:
 	_timer_fired = true
 
 
-func _data() -> DirectionalBulletsData2D:
-	var d := H.make_directional_data(1, 900.0, 60.0)
+func _data() -> BulletVolleyData2D:
+	var d := H.make_volley_data(1, 900.0, 60.0)
 	d.monitorable = true
 	d.collision_shape = H.make_circle_shape(6.0)
 	d.bullet_max_collision_count = 0
@@ -22,14 +22,14 @@ func _data() -> DirectionalBulletsData2D:
 func test_pooled_reuse_is_a_new_life() -> void:
 	make_wall(Vector2(200, 0), Vector2(20, 400), 8, 2)
 	await physics()
-	var a: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(_data())
+	var a: BulletVolley2D = factory.spawn_volley(_data())
 	for i in 40:
 		await physics()
 		if a.get_bullet_collision_count(0) >= 1:
 			break
 	assert_gte(a.get_bullet_collision_count(0), 1, "first life registered the hit")
 	await idle(1)
-	a.multimesh_attach_time_based_function(0.5, _on_old_timer, false, true)
+	a.attach_time_based_function(0.5, _on_old_timer, false, true)
 	assert_gte(a.debug_get_timer_count(), 1, "old-life timer attached")
 	var spd := BulletSpeedData2D.new()
 	spd.speed = 111.0
@@ -41,8 +41,8 @@ func test_pooled_reuse_is_a_new_life() -> void:
 	assert_gte(factory.debug_get_bullets_pool_amount(), 1, "emptied volley parked pooled")
 
 	factory.debug_reset_pool_stats()
-	var b: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(_data())
-	assert_gte(int(factory.debug_get_pool_hit_stats().get("directional_hits", 0)), 1, "second life is a pool hit")
+	var b: BulletVolley2D = factory.spawn_volley(_data())
+	assert_gte(int(factory.debug_get_pool_hit_stats().get("hits", 0)), 1, "second life is a pool hit")
 	assert_eq(b.get_bullet_collision_count(0), 0, "collision count reset")
 	assert_eq(b.debug_get_timer_count(), 0, "new life holds no timers")
 	assert_eq(b.get_amount_active_attachments(), 0, "no attachments leak across")

@@ -5,16 +5,16 @@ extends BlastTest
 ## spawner seeding and strict/tiled per-bullet indexing.
 
 
-func _still(n: int = 1) -> DirectionalBulletsData2D:
-	return H.make_directional_data(n, 0.0)
+func _still(n: int = 1) -> BulletVolleyData2D:
+	return H.make_volley_data(n, 0.0)
 
 
-func _y(v: DirectionalBullets2D, i: int) -> Vector2:
+func _y(v: BulletVolley2D, i: int) -> Vector2:
 	return v.get_bullet_global_transform(i).origin
 
 
 func test_default_off_flies_straight() -> void:
-	var v0: DirectionalBullets2D = spawn_dir(2, 200.0)
+	var v0: BulletVolley2D = quick_volley(2, 200.0)
 	var g0: Dictionary = v0.debug_get_gravity_info(0)
 	assert_eq(g0.get("vector", Vector2.ONE), Vector2.ZERO, "default vector zero")
 	assert_eq(float(g0.get("fall_speed", 1.0)), 0.0, "default fall speed zero")
@@ -28,7 +28,7 @@ func test_default_off_flies_straight() -> void:
 func test_shared_fan_out() -> void:
 	var d := _still(3)
 	d.gravity = Vector2(0, 2000)
-	var v: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d)
+	var v: BulletVolley2D = factory.spawn_volley(d)
 	assert_eq(v.bullet_get_gravity(0), Vector2(0, 2000), "shared fans to slot 0")
 	assert_eq(v.bullet_get_gravity(2), Vector2(0, 2000), "shared fans to slot 2")
 	assert_eq(v.get_gravity(), Vector2(0, 2000), "shared member mirrors data")
@@ -40,7 +40,7 @@ func test_shared_fan_out() -> void:
 func test_per_bullet_vectors() -> void:
 	var d := _still(3)
 	d.all_bullet_gravity = [Vector2.ZERO, Vector2(1000, 0), Vector2.ZERO]
-	var v: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d)
+	var v: BulletVolley2D = factory.spawn_volley(d)
 	assert_eq(v.bullet_get_gravity(1), Vector2(1000, 0), "per-bullet vector stored")
 	assert_eq(v.bullet_get_gravity(0), Vector2.ZERO, "sibling keeps zero")
 	var r0 := _y(v, 1)
@@ -53,7 +53,7 @@ func test_delay_postpones_duration_stops() -> void:
 	d.gravity = Vector2(0, 3000)
 	d.gravity_delay_sec = 0.5
 	d.gravity_duration_sec = 0.4
-	var v: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d)
+	var v: BulletVolley2D = factory.spawn_volley(d)
 	assert_eq(v.get_gravity_delay_sec(), 0.5, "delay seeded")
 	assert_almost_eq(v.get_gravity_duration_sec(), 0.4, 0.001, "duration seeded")
 	await physics(15) # ~0.25 s < delay
@@ -78,7 +78,7 @@ func test_strength_curve_scales_fall() -> void:
 	gc.gravity_strength_curve = ramp
 	gc.gravity_use_unit_curve = false
 	d.shared_bullet_curves_data = gc
-	var v: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d)
+	var v: BulletVolley2D = factory.spawn_volley(d)
 	var s0 := _y(v, 0)
 	await physics(60)
 	assert_gt(_y(v, 0).y, s0.y + 100.0, "curved gravity still falls")
@@ -91,7 +91,7 @@ func test_rejects_at_every_layer() -> void:
 	assert_eq(d.gravity, Vector2.ZERO, "spawn-data NaN rejected")
 	d.all_bullet_gravity = [Vector2(INF, INF)]
 	d.gravity = Vector2(0, 1000)
-	var v: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d)
+	var v: BulletVolley2D = factory.spawn_volley(d)
 	assert_eq(v.bullet_get_gravity(0), Vector2.ZERO, "non-finite per-bullet entry fails open to zero")
 	v.bullet_set_gravity(0, Vector2(NAN, 1))
 	assert_eq(v.bullet_get_gravity(0), Vector2.ZERO, "runtime NaN rejected")
@@ -107,12 +107,12 @@ func test_rejects_at_every_layer() -> void:
 func test_reuse_neutral_and_homing_mix() -> void:
 	var d := _still(1)
 	d.gravity = Vector2(0, 1000)
-	var v6: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d)
+	var v6: BulletVolley2D = factory.spawn_volley(d)
 	v6.all_bullets_set_gravity(Vector2(0, 1500))
 	assert_eq(v6.bullet_get_gravity(0), Vector2(0, 1500), "all_bullets edit fans out")
 	v6.disable_bullet(0)
 	await physics()
-	var v7: DirectionalBullets2D = spawn_dir(1, 200.0)
+	var v7: BulletVolley2D = quick_volley(1, 200.0)
 	assert_eq(v7.bullet_get_gravity(0), Vector2.ZERO, "reuse after a gravity volley is neutral")
 	assert_eq(v7.bullet_get_fall_speed(0), 0.0, "no inherited fall speed")
 	var tgt: Node2D = add(Node2D.new())
@@ -136,15 +136,15 @@ func test_spawner_seeding_and_indexing() -> void:
 		# Plain (non-homing) volleys are untracked by design.
 		assert_gte(factory.debug_get_total_bullets_amount(), 1, "gravity volley exists in factory")
 	else:
-		assert_eq((live[0] as DirectionalBullets2D).bullet_get_gravity(0), Vector2(0, 1200), "spawner volley carries gravity")
+		assert_eq((live[0] as BulletVolley2D).bullet_get_gravity(0), Vector2(0, 1200), "spawner volley carries gravity")
 	var fb := _still(3)
 	fb.all_bullet_gravity = [Vector2(500, 0), Vector2(0, 500)]
-	var vf: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(fb)
+	var vf: BulletVolley2D = factory.spawn_volley(fb)
 	assert_eq(vf.bullet_get_gravity(0), Vector2(500, 0), "strict slot 0 reads entry 0")
 	assert_eq(vf.bullet_get_gravity(1), Vector2(0, 500), "strict slot 1 reads entry 1")
 	assert_eq(vf.bullet_get_gravity(2), Vector2.ZERO, "strict uncovered slot reads default")
 	var fbt := _still(3)
 	fbt.all_bullet_gravity = [Vector2(500, 0), Vector2(0, 500)]
 	fbt.tile_all_bullet_gravity = true
-	var vft: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(fbt)
+	var vft: BulletVolley2D = factory.spawn_volley(fbt)
 	assert_eq(vft.bullet_get_gravity(2), Vector2(500, 0), "tiled slot 2 wraps to entry 0")

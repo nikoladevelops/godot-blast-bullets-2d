@@ -4,7 +4,7 @@ extends BlastTest
 ## signature effect and cleans up (after_each checks no dangling).
 
 
-func _finite(v: DirectionalBullets2D) -> bool:
+func _finite(v: BulletVolley2D) -> bool:
 	for i in v.get_amount_bullets():
 		if not v.get_bullet_transform(i).is_finite() or not v.get_bullet_velocity(i).is_finite():
 			return false
@@ -30,11 +30,11 @@ func _curve_move() -> BulletCurvesData2D:
 
 
 func test_homing_snakes() -> void:
-	var d := H.make_directional_data(3, 260.0)
+	var d := H.make_volley_data(3, 260.0)
 	d.all_bullet_wobble_data = [_wob(36.0), _wob(36.0), _wob(36.0)]
 	d.homing_smoothing = 5.0
 	d.homing_take_control_of_texture_rotation = true
-	var v: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d)
+	var v: BulletVolley2D = factory.spawn_volley(d)
 	var tgt: Node2D = add(Node2D.new())
 	tgt.position = Vector2(700, -250)
 	for i in 3:
@@ -48,9 +48,9 @@ func test_homing_snakes() -> void:
 
 
 func test_orbiting_wobble_ring() -> void:
-	var d := H.make_directional_data(4, 240.0)
+	var d := H.make_volley_data(4, 240.0)
 	d.all_bullet_wobble_data = [_wob(20.0, 2.0), _wob(20.0, 2.0), _wob(20.0, 2.0), _wob(20.0, 2.0)]
-	var v: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d)
+	var v: BulletVolley2D = factory.spawn_volley(d)
 	v.set_homing_smoothing(7.0)
 	v.shared_homing_deque_push_back_global_position_target(Vector2(400, 0))
 	v.all_bullets_enable_orbiting(70.0)
@@ -61,11 +61,11 @@ func test_orbiting_wobble_ring() -> void:
 
 
 func test_gravity_drag_speed_curve() -> void:
-	var d := H.make_directional_data(2, 350.0)
+	var d := H.make_volley_data(2, 350.0)
 	d.gravity = Vector2(0, 1400)
 	d.linear_drag = 0.35
 	d.shared_bullet_curves_data = _curve_move()
-	var v: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d)
+	var v: BulletVolley2D = factory.spawn_volley(d)
 	var p0: Vector2 = v.get_bullet_global_transform(0).origin
 	var s0: float = v.get_bullet_speed_data(0).speed
 	await physics(60)
@@ -76,9 +76,9 @@ func test_gravity_drag_speed_curve() -> void:
 
 
 func test_spin_pattern_homing() -> void:
-	var d := H.make_directional_data(2, 220.0)
+	var d := H.make_volley_data(2, 220.0)
 	d.all_bullet_rotation_data = [H.make_rotation(4.0, 60.0), H.make_rotation(4.0, 60.0)]
-	var v: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d)
+	var v: BulletVolley2D = factory.spawn_volley(d)
 	var pc := Curve2D.new()
 	pc.add_point(Vector2(0, 0))
 	pc.add_point(Vector2(120, 40))
@@ -94,14 +94,14 @@ func test_spin_pattern_homing() -> void:
 
 
 func test_sovereign_per_bullet_everything() -> void:
-	var d := H.make_directional_data(4, 200.0)
+	var d := H.make_volley_data(4, 200.0)
 	var sp: Array = []
 	for k in 4:
 		sp.append(H.make_speed(150.0 + 60.0 * k))
 	d.all_bullet_speed_data = sp
 	d.all_bullet_gravity = [Vector2.ZERO, Vector2(0, 800), Vector2(400, 0), Vector2.ZERO]
 	d.all_bullet_wobble_data = [_wob(10.0), _wob(30.0), _wob(50.0), _wob(10.0)]
-	var v: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d)
+	var v: BulletVolley2D = factory.spawn_volley(d)
 	v.bullet_set_homing_smoothing(0, 0.5)
 	v.bullet_set_homing_smoothing(3, 12.0)
 	v.bullet_homing_push_back_global_position_target(0, Vector2(-600, 0))
@@ -115,7 +115,7 @@ func test_sovereign_per_bullet_everything() -> void:
 
 
 func test_spawner_driven_mixed_volley() -> void:
-	var sd := H.make_directional_data(4, 230.0)
+	var sd := H.make_volley_data(4, 230.0)
 	sd.all_bullet_wobble_data = [_wob(26.0), _wob(26.0), _wob(26.0), _wob(26.0)]
 	sd.gravity = Vector2(0, 350)
 	sd.homing_smoothing = 5.0
@@ -129,18 +129,18 @@ func test_spawner_driven_mixed_volley() -> void:
 	await physics(40)
 	var live: Array = spawner.get_live_volleys()
 	assert_eq(live.size(), 1, "the homing volley is tracked")
-	var lv: DirectionalBullets2D = live[0]
+	var lv: BulletVolley2D = live[0]
 	assert_true(_finite(lv), "spawner mixed volley finite")
 	assert_true(lv.get_is_wobble_enabled(), "spawner volley carries wobble")
 	assert_gt(lv.bullet_get_gravity(0).y, 0.0, "spawner volley carries gravity")
 
 
 func test_lifetime_expiry_inside_mix() -> void:
-	var d := H.make_directional_data(2, 200.0)
+	var d := H.make_volley_data(2, 200.0)
 	d.max_life_time = 0.4
 	d.all_bullet_wobble_data = [_wob(30.0), _wob(30.0)]
 	d.gravity = Vector2(0, 800)
-	var v: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d)
+	var v: BulletVolley2D = factory.spawn_volley(d)
 	v.set_homing_smoothing(6.0)
 	v.bullet_homing_push_back_global_position_target(0, Vector2(500, 0))
 	await physics(60)

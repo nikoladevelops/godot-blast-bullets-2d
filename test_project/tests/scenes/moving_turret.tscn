@@ -21,7 +21,7 @@ max_speed = 3000.0
 [sub_resource type="CircleShape2D" id="Shape_bullet"]
 radius = 4.0
 
-[sub_resource type="DirectionalBulletsData2D" id="Data_turret"]
+[sub_resource type="BulletVolleyData2D" id="Data_turret"]
 sprite_frames = SubResource("Frames_bullet")
 shared_bullet_speed_data = SubResource("Speed_shared")
 max_life_time = 2.0

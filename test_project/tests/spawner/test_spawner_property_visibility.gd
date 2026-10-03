@@ -11,7 +11,7 @@ var sp: BulletSpawner2D
 
 func before_each() -> void:
 	await super()
-	sp = make_spawner(H.make_directional_data(1, 50.0, 30.0))
+	sp = make_spawner(H.make_volley_data(1, 50.0, 30.0))
 	await idle(1)
 
 

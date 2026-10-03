@@ -4,7 +4,7 @@ extends BlastBenchmark
 func describe() -> String:
 	return "10k bullets expiring on the same frame (3 waves)"
 
-var _data: Array[DirectionalBulletsData2D] = []
+var _data: Array[BulletVolleyData2D] = []
 
 func setup() -> void:
 	warmup_frames = 10
@@ -19,4 +19,4 @@ func setup() -> void:
 func step(frame: int) -> void:
 	if frame % 80 == 10:
 		for d in _data:
-			factory.spawn_controllable_directional_bullets(d)
+			factory.spawn_volley(d)

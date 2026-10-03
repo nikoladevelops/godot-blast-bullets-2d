@@ -5,14 +5,14 @@ extends BlastTest
 ## Any change to these semantics must fail here loudly.
 
 
-func _data() -> DirectionalBulletsData2D:
-	var d := H.make_directional_data(1, 200.0, 60.0)
+func _data() -> BulletVolleyData2D:
+	var d := H.make_volley_data(1, 200.0, 60.0)
 	d.transforms = [Transform2D(PI / 2.0, Vector2.ZERO)] # fly +Y
 	return d
 
 
 func test_shared_curve_drives_then_clear_freezes() -> void:
-	var v: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(_data())
+	var v: BulletVolley2D = factory.spawn_volley(_data())
 	var cc := BulletCurvesData2D.new()
 	cc.movement_speed_curve = H.make_flat_curve(400.0)
 	v.set_shared_bullet_curves_data(cc)
@@ -25,7 +25,7 @@ func test_shared_curve_drives_then_clear_freezes() -> void:
 
 
 func test_per_bullet_clear_freezes() -> void:
-	var v: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(_data())
+	var v: BulletVolley2D = factory.spawn_volley(_data())
 	var c0 := BulletCurvesData2D.new()
 	c0.movement_speed_curve = H.make_flat_curve(500.0)
 	v.bullet_set_curves_data(0, c0)
@@ -38,7 +38,7 @@ func test_per_bullet_clear_freezes() -> void:
 
 
 func test_additive_direction_steers_cumulatively() -> void:
-	var v: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(_data())
+	var v: BulletVolley2D = factory.spawn_volley(_data())
 	var dc := BulletCurvesData2D.new()
 	dc.x_direction_curve = H.make_flat_curve(0.5)
 	dc.x_direction_curve_strength = 1.0

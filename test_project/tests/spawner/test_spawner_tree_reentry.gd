@@ -15,7 +15,7 @@ func test_pointer_assigned_factory_survives_reparenting() -> void:
 	var sp := BulletSpawner2D.new()
 	sp.set_shooting_enabled(false)
 	sp.set_homing_enabled(false)
-	sp.set_spawn_data(H.make_directional_data(2, 50.0, 30.0))
+	sp.set_spawn_data(H.make_volley_data(2, 50.0, 30.0))
 	sp.set_bullet_factory(factory) # spawner not in the tree yet
 	add(sp)
 	assert_true(sp.shoot_once(), "fires after entering the tree")
@@ -47,7 +47,7 @@ func test_generator_assigned_out_of_tree_replaces_the_old_path() -> void:
 
 
 func test_tracked_homing_volleys_survive_reparenting() -> void:
-	var sp := make_spawner(H.make_directional_data(2, 50.0, 30.0))
+	var sp := make_spawner(H.make_volley_data(2, 50.0, 30.0))
 	var target := Node2D.new()
 	target.position = Vector2(300, 0)
 	add(target)
@@ -64,7 +64,7 @@ func test_tracked_homing_volleys_survive_reparenting() -> void:
 
 
 func test_burst_chain_resumes_after_reparenting() -> void:
-	var sp := make_spawner(H.make_directional_data(1, 50.0, 30.0), BulletSpawner2D.PATTERN_FROM_SELF, 1)
+	var sp := make_spawner(H.make_volley_data(1, 50.0, 30.0), BulletSpawner2D.PATTERN_FROM_SELF, 1)
 	sp.burst_enabled = true
 	sp.burst_count = 4
 	sp.burst_interval_sec = 0.05
@@ -86,7 +86,7 @@ func test_burst_chain_resumes_after_reparenting() -> void:
 
 
 func test_pattern_list_resumes_after_reparenting() -> void:
-	var sp := make_spawner(H.make_directional_data(2, 50.0, 30.0))
+	var sp := make_spawner(H.make_volley_data(2, 50.0, 30.0))
 	watch_signals(sp)
 	sp.spawn_pattern_list([{"helper_bullets_amount": 2}, {"helper_bullets_amount": 3}, {"helper_bullets_amount": 4}], false, 0.05)
 	for i in 30:

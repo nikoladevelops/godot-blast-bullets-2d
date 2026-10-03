@@ -21,8 +21,8 @@ func before_each() -> void:
 	layer.sprite_frames = sf
 
 
-func _data(bullets: int) -> DirectionalBulletsData2D:
-	var d := H.make_directional_data(bullets, 0.0, 60.0)
+func _data(bullets: int) -> BulletVolleyData2D:
+	var d := H.make_volley_data(bullets, 0.0, 60.0)
 	var tr: Array = []
 	for i in bullets:
 		tr.append(Transform2D(0.0, Vector2(i * 8.0, 0.0)))
@@ -35,7 +35,7 @@ func _data(bullets: int) -> DirectionalBulletsData2D:
 
 
 func test_clear_bullet_fires_once() -> void:
-	var v: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(_data(2))
+	var v: BulletVolley2D = factory.spawn_volley(_data(2))
 	factory.clear_sprite_effects()
 	assert_eq(factory.get_active_effect_count(), 0, "quiet before clear")
 	assert_true(v.clear_bullet(0), "clear_bullet on a live slot returns true")
@@ -44,8 +44,8 @@ func test_clear_bullet_fires_once() -> void:
 
 
 func test_clear_active_bullets_clears_every_volley() -> void:
-	var va: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(_data(2))
-	var vb: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(_data(3))
+	var va: BulletVolley2D = factory.spawn_volley(_data(2))
+	var vb: BulletVolley2D = factory.spawn_volley(_data(3))
 	factory.clear_sprite_effects()
 	assert_eq(factory.clear_active_bullets(), 5, "returns total live bullets")
 	assert_gte(factory.get_active_effect_count(), 5, "On Clear fired per bullet")
@@ -56,7 +56,7 @@ func test_clear_active_bullets_clears_every_volley() -> void:
 
 
 func test_free_active_bullets_is_silent() -> void:
-	factory.spawn_controllable_directional_bullets(_data(2))
+	factory.spawn_volley(_data(2))
 	factory.clear_sprite_effects()
 	factory.free_active_bullets()
 	assert_eq(factory.get_active_effect_count(), 0, "free fires no On Clear")
@@ -64,16 +64,16 @@ func test_free_active_bullets_is_silent() -> void:
 
 
 func test_reset_is_silent() -> void:
-	factory.spawn_controllable_directional_bullets(_data(2))
+	factory.spawn_volley(_data(2))
 	factory.clear_sprite_effects()
 	factory.reset()
 	assert_eq(factory.get_active_effect_count(), 0, "reset fires no On Clear")
 
 
 func test_key_scoped_clear() -> void:
-	factory.spawn_controllable_directional_bullets(_data(2))
-	var vb: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(_data(3))
-	var key_a: MultiMeshPoolKey2D = factory.debug_expected_pool_key(_data(2))
+	factory.spawn_volley(_data(2))
+	var vb: BulletVolley2D = factory.spawn_volley(_data(3))
+	var key_a: VolleyPoolKey2D = factory.debug_expected_pool_key(_data(2))
 	factory.clear_sprite_effects()
 	assert_eq(factory.clear_active_bullets(key_a), 2, "scoped clear returns its bucket's bullets")
 	assert_gte(factory.get_active_effect_count(), 2, "scoped clear fires visuals")
@@ -82,13 +82,13 @@ func test_key_scoped_clear() -> void:
 
 
 func test_deferred_twins() -> void:
-	factory.spawn_controllable_directional_bullets(_data(2))
+	factory.spawn_volley(_data(2))
 	factory.clear_sprite_effects()
 	factory.clear_active_bullets_deferred()
 	await idle()
 	assert_gte(factory.get_active_effect_count(), 2, "deferred clear fired")
 	factory.clear_sprite_effects()
-	factory.spawn_controllable_directional_bullets(_data(2))
+	factory.spawn_volley(_data(2))
 	factory.free_active_bullets_deferred()
 	await idle()
 	assert_eq(factory.debug_get_active_bullets_amount(), 0, "deferred free ran")
@@ -99,7 +99,7 @@ func test_deferred_twin_from_inside_physics() -> void:
 	# Regression: call_deferred from a physics callback flushes INSIDE the
 	# physics frame, where structural calls are refused. The *_deferred
 	# wrappers now queue onto the next idle frame.
-	factory.spawn_controllable_directional_bullets(_data(2))
+	factory.spawn_volley(_data(2))
 	await physics()
 	assert_true(Engine.is_in_physics_frame(), "test resumes inside physics")
 	factory.free_active_bullets_deferred()

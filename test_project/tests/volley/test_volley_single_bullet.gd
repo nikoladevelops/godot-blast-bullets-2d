@@ -13,8 +13,8 @@ func _curves(speed: float, rotation: float) -> BulletCurvesData2D:
 	return c
 
 
-func _volley(n: int) -> DirectionalBullets2D:
-	var v: DirectionalBullets2D = spawn_dir(n, 100.0, 30.0)
+func _volley(n: int) -> BulletVolley2D:
+	var v: BulletVolley2D = quick_volley(n, 100.0, 30.0)
 	assert_not_null(v, "volley spawned")
 	return v
 

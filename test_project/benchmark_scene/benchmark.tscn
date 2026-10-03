@@ -105,7 +105,7 @@ animations = [{
 "speed": 5.0
 }]
 
-[sub_resource type="DirectionalBulletsData2D" id="DirectionalBulletsData2D_nkrfg"]
+[sub_resource type="BulletVolleyData2D" id="BulletVolleyData2D_nkrfg"]
 shared_bullet_speed_data = SubResource("BulletSpeedData2D_mouoi")
 shared_bullet_wobble_data = SubResource("BulletWobbleData2D_46wrg")
 bounce_mask = 1
@@ -151,7 +151,7 @@ script = ExtResource("1_cfubd")
 [node name="BulletSpawner2D" type="BulletSpawner2D" parent="." unique_id=1540696231]
 bullet_factory_path = NodePath("../BulletFactory2D")
 transforms_generator = NodePath(".")
-spawn_data = SubResource("DirectionalBulletsData2D_nkrfg")
+spawn_data = SubResource("BulletVolleyData2D_nkrfg")
 pattern_source = 16
 helper_bullets_amount = 1500
 helper_outline_placement = 1
@@ -444,6 +444,6 @@ curve = SubResource("Curve2D_nkrfg")
 
 [connection signal="area_entered" from="BulletSpawner2D" to="." method="_on_bullet_spawner_2d_area_entered"]
 [connection signal="body_entered" from="BulletSpawner2D" to="." method="_on_bullet_spawner_2d_body_entered"]
-[connection signal="directional_area_entered" from="BulletFactory2D" to="BulletFactory2D" method="_on_directional_area_entered"]
-[connection signal="directional_body_entered" from="BulletFactory2D" to="BulletFactory2D" method="_on_directional_body_entered"]
-[connection signal="directional_life_time_over" from="BulletFactory2D" to="BulletFactory2D" method="_on_directional_life_time_over"]
+[connection signal="area_entered" from="BulletFactory2D" to="BulletFactory2D" method="_on_area_entered"]
+[connection signal="body_entered" from="BulletFactory2D" to="BulletFactory2D" method="_on_body_entered"]
+[connection signal="life_time_over" from="BulletFactory2D" to="BulletFactory2D" method="_on_life_time_over"]

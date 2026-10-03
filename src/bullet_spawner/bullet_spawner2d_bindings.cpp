@@ -121,7 +121,7 @@ void BulletSpawner2D::_validate_property(PropertyInfo &p_property) const {
                 } else if (property_name == "orbiting_radius_start" || property_name == "orbiting_radius_step") {
                     show = orbiting_radius_linear_enabled;
                 } else if (property_name == "orbiting_follow_deadzone") {
-                    show = orbiting_follow_mode == DirectionalBullets2D::FollowDeadzone;
+                    show = orbiting_follow_mode == BulletVolley2D::FollowDeadzone;
                 }
             }
         }
@@ -308,7 +308,7 @@ void BulletSpawner2D::_bind_methods() {
 
 	ClassDB::bind_method(D_METHOD("get_spawn_data"), &BulletSpawner2D::get_spawn_data);
 	ClassDB::bind_method(D_METHOD("set_spawn_data", "new_spawn_data"), &BulletSpawner2D::set_spawn_data);
-	ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "spawn_data", PROPERTY_HINT_RESOURCE_TYPE, "DirectionalBulletsData2D"), "set_spawn_data", "get_spawn_data");
+	ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "spawn_data", PROPERTY_HINT_RESOURCE_TYPE, "BulletVolleyData2D"), "set_spawn_data", "get_spawn_data");
 
 	ADD_GROUP("Bullet Patterns", "");
 	ClassDB::bind_method(D_METHOD("get_pattern_source"), &BulletSpawner2D::get_pattern_source);
@@ -1294,10 +1294,10 @@ void BulletSpawner2D::_bind_methods() {
 	// NOTE: PROPERTY_HINT_RESOURCE_TYPE (not NODE_TYPE) carries the class name
 	// to ClassDB/--doctool; see the note on the factory signals.
 	ADD_SIGNAL(MethodInfo("pre_shoot",
-		PropertyInfo(Variant::OBJECT, "directional_bullets_instance", PROPERTY_HINT_RESOURCE_TYPE, "DirectionalBullets2D"),
+		PropertyInfo(Variant::OBJECT, "volley", PROPERTY_HINT_RESOURCE_TYPE, "BulletVolley2D"),
 		PropertyInfo(Variant::INT, "volley_index")));
 	ADD_SIGNAL(MethodInfo("volley_fired",
-		PropertyInfo(Variant::OBJECT, "directional_bullets_instance", PROPERTY_HINT_RESOURCE_TYPE, "DirectionalBullets2D"),
+		PropertyInfo(Variant::OBJECT, "volley", PROPERTY_HINT_RESOURCE_TYPE, "BulletVolley2D"),
 		PropertyInfo(Variant::INT, "volley_index")));
 	ADD_SIGNAL(MethodInfo("volley_skipped",
 		PropertyInfo(Variant::STRING_NAME, "reason")));
@@ -1324,14 +1324,14 @@ void BulletSpawner2D::_bind_methods() {
 	// to ClassDB/--doctool; see the note on the factory signals.
 	ADD_SIGNAL(MethodInfo("area_entered",
 		PropertyInfo(Variant::OBJECT, "hit_target_area"),
-		PropertyInfo(Variant::OBJECT, "directional_bullets_instance", PROPERTY_HINT_RESOURCE_TYPE, "DirectionalBullets2D"),
+		PropertyInfo(Variant::OBJECT, "volley", PROPERTY_HINT_RESOURCE_TYPE, "BulletVolley2D"),
 		PropertyInfo(Variant::INT, "bullet_index")));
 	ADD_SIGNAL(MethodInfo("body_entered",
 		PropertyInfo(Variant::OBJECT, "hit_target_body"),
-		PropertyInfo(Variant::OBJECT, "directional_bullets_instance", PROPERTY_HINT_RESOURCE_TYPE, "DirectionalBullets2D"),
+		PropertyInfo(Variant::OBJECT, "volley", PROPERTY_HINT_RESOURCE_TYPE, "BulletVolley2D"),
 		PropertyInfo(Variant::INT, "bullet_index")));
 	ADD_SIGNAL(MethodInfo("life_time_over",
-		PropertyInfo(Variant::OBJECT, "directional_bullets_instance", PROPERTY_HINT_RESOURCE_TYPE, "DirectionalBullets2D"),
+		PropertyInfo(Variant::OBJECT, "volley", PROPERTY_HINT_RESOURCE_TYPE, "BulletVolley2D"),
 		PropertyInfo(Variant::ARRAY, "bullet_indexes", PROPERTY_HINT_ARRAY_TYPE, "int")));
 	// Bounce notifications possessed by this spawner for the volleys it
 	// spawned (same routing as area_entered/body_entered above: a spawner
@@ -1340,11 +1340,11 @@ void BulletSpawner2D::_bind_methods() {
 	// bounce signal here and the matching area/body_entered signal.
 	ADD_SIGNAL(MethodInfo("bounce_area_entered",
 		PropertyInfo(Variant::OBJECT, "hit_target_area"),
-		PropertyInfo(Variant::OBJECT, "directional_bullets_instance", PROPERTY_HINT_RESOURCE_TYPE, "DirectionalBullets2D"),
+		PropertyInfo(Variant::OBJECT, "volley", PROPERTY_HINT_RESOURCE_TYPE, "BulletVolley2D"),
 		PropertyInfo(Variant::INT, "bullet_index")));
 	ADD_SIGNAL(MethodInfo("bounce_body_entered",
 		PropertyInfo(Variant::OBJECT, "hit_target_body"),
-		PropertyInfo(Variant::OBJECT, "directional_bullets_instance", PROPERTY_HINT_RESOURCE_TYPE, "DirectionalBullets2D"),
+		PropertyInfo(Variant::OBJECT, "volley", PROPERTY_HINT_RESOURCE_TYPE, "BulletVolley2D"),
 		PropertyInfo(Variant::INT, "bullet_index")));
 
 	ClassDB::bind_method(D_METHOD("get_shooting_enabled"), &BulletSpawner2D::get_shooting_enabled);
@@ -1442,13 +1442,13 @@ void BulletSpawner2D::_bind_methods() {
 	// NOTE: PROPERTY_HINT_RESOURCE_TYPE (not NODE_TYPE) carries the class name
 	// to ClassDB/--doctool; see the note on the factory signals.
 	ADD_SIGNAL(MethodInfo("volley_homing_configured",
-		PropertyInfo(Variant::OBJECT, "directional_bullets_instance", PROPERTY_HINT_RESOURCE_TYPE, "DirectionalBullets2D"),
+		PropertyInfo(Variant::OBJECT, "volley", PROPERTY_HINT_RESOURCE_TYPE, "BulletVolley2D"),
 		PropertyInfo(Variant::INT, "volley_index")));
 	ADD_SIGNAL(MethodInfo("homing_targets_resolved",
-		PropertyInfo(Variant::OBJECT, "directional_bullets_instance", PROPERTY_HINT_RESOURCE_TYPE, "DirectionalBullets2D"),
+		PropertyInfo(Variant::OBJECT, "volley", PROPERTY_HINT_RESOURCE_TYPE, "BulletVolley2D"),
 		PropertyInfo(Variant::ARRAY, "targets")));
 	ADD_SIGNAL(MethodInfo("volley_bullet_homing_target_reached",
-		PropertyInfo(Variant::OBJECT, "directional_bullets_instance", PROPERTY_HINT_RESOURCE_TYPE, "DirectionalBullets2D"),
+		PropertyInfo(Variant::OBJECT, "volley", PROPERTY_HINT_RESOURCE_TYPE, "BulletVolley2D"),
 		PropertyInfo(Variant::INT, "bullet_index"),
 		PropertyInfo(Variant::OBJECT, "target", PROPERTY_HINT_RESOURCE_TYPE, "Node2D"),
 		PropertyInfo(Variant::VECTOR2, "target_global_position")));
@@ -1637,10 +1637,10 @@ void BulletSpawner2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("debug_get_preview_track_points"), &BulletSpawner2D::debug_get_preview_track_points);
 	ClassDB::bind_method(D_METHOD("debug_check_layer_coincidence", "tolerance_px"), &BulletSpawner2D::debug_check_layer_coincidence, DEFVAL(1.0));
 	ClassDB::bind_method(D_METHOD("debug_get_retarget_countdown"), &BulletSpawner2D::debug_get_retarget_countdown);
-	ClassDB::bind_method(D_METHOD("adopt_live_volley", "directional_bullets_instance"), &BulletSpawner2D::adopt_live_volley);
+	ClassDB::bind_method(D_METHOD("adopt_live_volley", "volley"), &BulletSpawner2D::adopt_live_volley);
 	ClassDB::bind_method(D_METHOD("clear_live_volleys_homing"), &BulletSpawner2D::clear_live_volleys_homing);
 	ClassDB::bind_method(D_METHOD("override_live_volleys_velocity", "new_velocity"), &BulletSpawner2D::override_live_volleys_velocity);
-	ClassDB::bind_method(D_METHOD("_on_volley_bullet_homing_target_reached", "directional_bullets_instance", "bullet_index", "target", "target_global_position"), &BulletSpawner2D::_on_volley_bullet_homing_target_reached);
+	ClassDB::bind_method(D_METHOD("_on_volley_bullet_homing_target_reached", "volley", "bullet_index", "target", "target_global_position"), &BulletSpawner2D::_on_volley_bullet_homing_target_reached);
 
 	// Need this in order to expose the enum constants to Godot Engine
 	BIND_ENUM_CONSTANT(HOMING_SHARED);

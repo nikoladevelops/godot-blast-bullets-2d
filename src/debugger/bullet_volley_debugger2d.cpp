@@ -1,4 +1,4 @@
-#include "multimesh_bullets_debugger2d.hpp"
+#include "bullet_volley_debugger2d.hpp"
 #include "../bullets/directional_bullets2d.hpp"
 #include "godot_cpp/core/memory.hpp"
 #include "godot_cpp/core/object.hpp"
@@ -20,7 +20,7 @@ using namespace godot;
 
 namespace BlastBullets2D {
 
-void MultiMeshBulletsDebugger2D::configure(Node *new_container_to_debug, const String &new_debugger_name, const Color &new_debugger_color) {
+void BulletVolleyDebugger2D::configure(Node *new_container_to_debug, const String &new_debugger_name, const Color &new_debugger_color) {
 	// Re-configuring while enabled would leave the old container's signals
 	// connected, so shut down first instead of leaking stale callbacks.
 	if (is_debugger_enabled) {
@@ -35,7 +35,7 @@ void MultiMeshBulletsDebugger2D::configure(Node *new_container_to_debug, const S
 	set_name(new_debugger_name);
 }
 
-void MultiMeshBulletsDebugger2D::set_is_debugger_enabled(bool value) {
+void BulletVolleyDebugger2D::set_is_debugger_enabled(bool value) {
 	if (is_debugger_enabled == value) {
 		return;
 	}
@@ -54,11 +54,11 @@ void MultiMeshBulletsDebugger2D::set_is_debugger_enabled(bool value) {
 	is_debugger_enabled = value;
 }
 
-bool MultiMeshBulletsDebugger2D::get_is_debugger_enabled() const {
+bool BulletVolleyDebugger2D::get_is_debugger_enabled() const {
 	return is_debugger_enabled;
 }
 
-void MultiMeshBulletsDebugger2D::set_debugger_color(const Color &new_color) {
+void BulletVolleyDebugger2D::set_debugger_color(const Color &new_color) {
 	if (debugger_color == new_color) {
 		return;
 	}
@@ -67,16 +67,16 @@ void MultiMeshBulletsDebugger2D::set_debugger_color(const Color &new_color) {
 	debugger_color = new_color;
 }
 
-Color MultiMeshBulletsDebugger2D::get_debugger_color() const {
+Color BulletVolleyDebugger2D::get_debugger_color() const {
 	return debugger_color;
 }
 
-bool MultiMeshBulletsDebugger2D::enable() {
+bool BulletVolleyDebugger2D::enable() {
 	if (is_debugger_enabled) {
 		return true;
 	}
 	if (container_to_debug == nullptr) {
-		UtilityFunctions::push_error("MultiMeshBulletsDebugger2D::enable with no container, call configure() first.");
+		UtilityFunctions::push_error("BulletVolleyDebugger2D::enable with no container, call configure() first.");
 		return false;
 	}
 	// In case the container to debug already has things to debug
@@ -98,14 +98,14 @@ bool MultiMeshBulletsDebugger2D::enable() {
 
 	// Add a function that runs whenever a new child gets added to the container to debug / when the child_entered_tree signal gets emitted
 	if (container_to_debug) {
-		Callable cb = callable_mp(this, &MultiMeshBulletsDebugger2D::generate_debug_multimesh);
+		Callable cb = callable_mp(this, &BulletVolleyDebugger2D::generate_debug_multimesh);
 		if (!container_to_debug->is_connected("child_entered_tree", cb)) {
 			container_to_debug->connect("child_entered_tree", cb);
 		}
 		// Track exits too: a multimesh freed/reparented by the user while debugging
 		// must drop its entry here, otherwise the raw provider pointer dangles and
 		// _physics_process dereferences freed memory every tick.
-		Callable cb_exit = callable_mp(this, &MultiMeshBulletsDebugger2D::remove_debug_multimesh_for_node);
+		Callable cb_exit = callable_mp(this, &BulletVolleyDebugger2D::remove_debug_multimesh_for_node);
 		if (!container_to_debug->is_connected("child_exiting_tree", cb_exit)) {
 			container_to_debug->connect("child_exiting_tree", cb_exit);
 		}
@@ -116,17 +116,17 @@ bool MultiMeshBulletsDebugger2D::enable() {
 	return true;
 }
 
-void MultiMeshBulletsDebugger2D::disable() {
+void BulletVolleyDebugger2D::disable() {
 	set_physics_process(false);
 	is_debugger_enabled = false;
 
 	// Disconnect the enter/exit handlers
 	if (container_to_debug) {
-		Callable cb = callable_mp(this, &MultiMeshBulletsDebugger2D::generate_debug_multimesh);
+		Callable cb = callable_mp(this, &BulletVolleyDebugger2D::generate_debug_multimesh);
 		if (container_to_debug->is_connected("child_entered_tree", cb)) {
 			container_to_debug->disconnect("child_entered_tree", cb);
 		}
-		Callable cb_exit = callable_mp(this, &MultiMeshBulletsDebugger2D::remove_debug_multimesh_for_node);
+		Callable cb_exit = callable_mp(this, &BulletVolleyDebugger2D::remove_debug_multimesh_for_node);
 		if (container_to_debug->is_connected("child_exiting_tree", cb_exit)) {
 			container_to_debug->disconnect("child_exiting_tree", cb_exit);
 		}
@@ -155,8 +155,8 @@ void MultiMeshBulletsDebugger2D::disable() {
 	desync_warned = false;
 }
 
-void MultiMeshBulletsDebugger2D::remove_debug_multimesh_for_node(Node *node_exiting_container_to_debug) {
-	DirectionalBullets2D *exiting_provider = Object::cast_to<DirectionalBullets2D>(node_exiting_container_to_debug);
+void BulletVolleyDebugger2D::remove_debug_multimesh_for_node(Node *node_exiting_container_to_debug) {
+	BulletVolley2D *exiting_provider = Object::cast_to<BulletVolley2D>(node_exiting_container_to_debug);
 	if (exiting_provider == nullptr) {
 		return;
 	}
@@ -195,17 +195,17 @@ void MultiMeshBulletsDebugger2D::remove_debug_multimesh_for_node(Node *node_exit
 	}
 }
 
-void MultiMeshBulletsDebugger2D::generate_debug_multimesh(Node *node_entered_container_to_debug) {
-	DirectionalBullets2D *bullets_node = Object::cast_to<DirectionalBullets2D>(node_entered_container_to_debug);
+void BulletVolleyDebugger2D::generate_debug_multimesh(Node *node_entered_container_to_debug) {
+	BulletVolley2D *bullets_node = Object::cast_to<BulletVolley2D>(node_entered_container_to_debug);
 	if (bullets_node == nullptr) {
-		UtilityFunctions::push_error("Error. The node that entered the container to debug is not of type DirectionalBullets2D. Never attach additional nodes to the bullets debugger.");
+		UtilityFunctions::push_error("Error. The node that entered the container to debug is not of type BulletVolley2D. Never attach additional nodes to the bullets debugger.");
 		return;
 	}
-	DirectionalBullets2D *debugger_data_provider = bullets_node;
+	BulletVolley2D *debugger_data_provider = bullets_node;
 
 	// Dedupe guard: a multimesh that re-enters the container (reparent flows) would
 	// otherwise get a second debug mesh + a second entry (double rendering, growth).
-	for (DirectionalBullets2D *tracked : debug_data_providers) {
+	for (BulletVolley2D *tracked : debug_data_providers) {
 		if (tracked == debugger_data_provider) {
 			return;
 		}
@@ -274,7 +274,7 @@ void MultiMeshBulletsDebugger2D::generate_debug_multimesh(Node *node_entered_con
 	add_child(debugger_multimesh);
 }
 
-Ref<Mesh> MultiMeshBulletsDebugger2D::create_debug_mesh_for_shape(PhysicsServer2D::ShapeType type, const Vector2 &full_size) {
+Ref<Mesh> BulletVolleyDebugger2D::create_debug_mesh_for_shape(PhysicsServer2D::ShapeType type, const Vector2 &full_size) {
 	// Rectangle: QuadMesh with full size - exact bounds.
 	if (type == PhysicsServer2D::SHAPE_RECTANGLE) {
 		Ref<QuadMesh> quad = memnew(QuadMesh);
@@ -369,13 +369,13 @@ Ref<Mesh> MultiMeshBulletsDebugger2D::create_debug_mesh_for_shape(PhysicsServer2
 	return fallback;
 }
 
-void MultiMeshBulletsDebugger2D::ensure_quadmesh_matches_data_provider_collision_shape_size(int dbg_index, MultiMeshInstance2D &debug_multimesh_instance, DirectionalBullets2D &debugger_data_provider) {
+void BulletVolleyDebugger2D::ensure_quadmesh_matches_data_provider_collision_shape_size(int dbg_index, MultiMeshInstance2D &debug_multimesh_instance, BulletVolley2D &debugger_data_provider) {
 	Ref<MultiMesh> debug_inner_multi = debug_multimesh_instance.get_multimesh();
 	if (dbg_index < 0 || dbg_index >= (int)debugger_mesh_types.size()) {
 		// Same one-shot policy as the other desync paths: staying silent here
 		// would hide a parallel-array drift with no diagnostic at all.
 		if (!desync_warned) {
-			UtilityFunctions::push_warning("MultiMeshBulletsDebugger2D: debugger index out of range, mesh sync skipped.");
+			UtilityFunctions::push_warning("BulletVolleyDebugger2D: debugger index out of range, mesh sync skipped.");
 			desync_warned = true;
 		}
 		return;
@@ -405,7 +405,7 @@ void MultiMeshBulletsDebugger2D::ensure_quadmesh_matches_data_provider_collision
 	debugger_mesh_sizes[dbg_index] = want_size;
 }
 
-void MultiMeshBulletsDebugger2D::update_debug_multimesh_transforms_to_match_data_provider_collision_shape_transforms(MultiMeshInstance2D &debug_multimesh_instance, DirectionalBullets2D &debugger_data_provider) {
+void BulletVolleyDebugger2D::update_debug_multimesh_transforms_to_match_data_provider_collision_shape_transforms(MultiMeshInstance2D &debug_multimesh_instance, BulletVolley2D &debugger_data_provider) {
 	Ref<MultiMesh> multi = debug_multimesh_instance.get_multimesh();
 	int amount_quadmeshes = multi->get_instance_count();
 
@@ -419,7 +419,7 @@ void MultiMeshBulletsDebugger2D::update_debug_multimesh_transforms_to_match_data
 		// Throttled release-build warning: silently freezing debug rendering with zero
 		// diagnostics would make a future desync undiagnosable outside dev builds.
 		if (!size_mismatch_warned) {
-			UtilityFunctions::push_warning("MultiMeshBulletsDebugger2D: shape transform count (" + String::num_int64((int64_t)collision_shape_transforms_for_debugging.size()) + ") does not match instance count (" + String::num_int64(amount_quadmeshes) + "). Debug rendering for this multimesh is frozen.");
+			UtilityFunctions::push_warning("BulletVolleyDebugger2D: shape transform count (" + String::num_int64((int64_t)collision_shape_transforms_for_debugging.size()) + ") does not match instance count (" + String::num_int64(amount_quadmeshes) + "). Debug rendering for this multimesh is frozen.");
 			size_mismatch_warned = true;
 		}
 		return;
@@ -434,7 +434,7 @@ void MultiMeshBulletsDebugger2D::update_debug_multimesh_transforms_to_match_data
 	}
 }
 
-void MultiMeshBulletsDebugger2D::change_debug_multimeshes_color(const Color &new_multimesh_color) {
+void BulletVolleyDebugger2D::change_debug_multimeshes_color(const Color &new_multimesh_color) {
 	int amount_debug_multimeshes = debugger_multimeshes.size();
 
 	// For each debug multimesh
@@ -456,7 +456,7 @@ void MultiMeshBulletsDebugger2D::change_debug_multimeshes_color(const Color &new
 	}
 }
 
-void MultiMeshBulletsDebugger2D::_physics_process(double delta) {
+void BulletVolleyDebugger2D::_physics_process(double delta) {
 	(void)delta;
 	// Parallel arrays; bail on any desync instead of indexing out of bounds.
 	if (debug_data_providers.size() != debugger_multimeshes.size() ||
@@ -466,14 +466,14 @@ void MultiMeshBulletsDebugger2D::_physics_process(double delta) {
 			debugger_mesh_sizes.size() != debugger_multimeshes.size() ||
 			debugger_last_active_states.size() != debugger_multimeshes.size()) {
 		if (!desync_warned) {
-			UtilityFunctions::push_warning("MultiMeshBulletsDebugger2D: internal tracking arrays went out of sync. Debug rendering is frozen until re-enabled.");
+			UtilityFunctions::push_warning("BulletVolleyDebugger2D: internal tracking arrays went out of sync. Debug rendering is frozen until re-enabled.");
 			desync_warned = true;
 		}
 		return;
 	}
 	int drawn_providers = 0;
 	for (int i = 0; i < (int)debug_data_providers.size(); ++i) {
-		DirectionalBullets2D *provider = debug_data_providers[i];
+		BulletVolley2D *provider = debug_data_providers[i];
 
 		if (debugger_multimeshes[i] == nullptr || debugger_multimeshes[i]->is_queued_for_deletion()) {
 			continue;

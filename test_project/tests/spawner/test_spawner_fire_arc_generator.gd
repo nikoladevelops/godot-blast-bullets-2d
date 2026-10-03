@@ -5,7 +5,7 @@ extends BlastTest
 
 
 func _arc_spawner(gen: Node2D) -> BulletSpawner2D:
-	var sp := make_spawner(H.make_directional_data(1, 0.0, 60.0), BulletSpawner2D.PATTERN_FROM_SELF, 1)
+	var sp := make_spawner(H.make_volley_data(1, 0.0, 60.0), BulletSpawner2D.PATTERN_FROM_SELF, 1)
 	if gen != null:
 		sp.set_transforms_generator(gen)
 	sp.homing_enabled = true

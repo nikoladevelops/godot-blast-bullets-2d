@@ -13,7 +13,7 @@ func _rot(speed: float) -> BulletRotationData2D:
 
 
 func test_fire_arc_uses_generator_frame() -> void:
-	var sp := make_spawner(H.make_directional_data(4))
+	var sp := make_spawner(H.make_volley_data(4))
 	var foe: Node2D = add(Node2D.new())
 	foe.position = Vector2(300, 0)
 	foe.add_to_group("w1swarm")
@@ -34,9 +34,9 @@ func test_fire_arc_uses_generator_frame() -> void:
 
 
 func test_rotation_presence_survives_same_owner_wake() -> void:
-	var d := H.make_directional_data(2, 0.0)
+	var d := H.make_volley_data(2, 0.0)
 	d.all_bullet_rotation_data = [_rot(77.0), _rot(33.0)]
-	var v: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d)
+	var v: BulletVolley2D = factory.spawn_volley(d)
 	v.set_shared_bullet_rotation_data(_rot(999.0))
 	assert_almost_eq(float(v.debug_get_bullet_info(0)["rotation_speed"]), 77.0, 0.5, "authored 77 kept")
 	v.disable_bullet(0)
@@ -70,9 +70,9 @@ func test_stagger_preserved_across_noop_setters() -> void:
 
 
 func test_gravity_fills_gaps_only() -> void:
-	var d := H.make_directional_data(3, 0.0)
+	var d := H.make_volley_data(3, 0.0)
 	d.all_bullet_gravity = [Vector2(1000, 0)]
-	var v: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d)
+	var v: BulletVolley2D = factory.spawn_volley(d)
 	v.set_gravity(Vector2(0, 2000))
 	assert_eq(v.bullet_get_gravity(0), Vector2(1000, 0), "authored +X survives")
 	assert_eq(v.bullet_get_gravity(1), Vector2(0, 2000), "gap 1 takes shared")
@@ -102,10 +102,10 @@ func test_outline_distribution_gating() -> void:
 func test_linear_orbit_rearm_full_params() -> void:
 	var tgt: Node2D = add(Node2D.new())
 	tgt.position = Vector2(400, 0)
-	var v: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(H.make_directional_data(3, 250.0))
+	var v: BulletVolley2D = factory.spawn_volley(H.make_volley_data(3, 250.0))
 	v.set_homing_smoothing(6.0)
 	v.all_bullets_push_back_homing_target(tgt)
-	v.all_bullets_enable_orbiting(64.0, DirectionalBullets2D.OrbitRight, DirectionalBullets2D.FaceTarget)
+	v.all_bullets_enable_orbiting(64.0, BulletVolley2D.OrbitRight, BulletVolley2D.FaceTarget)
 	assert_true(v.bullet_is_orbiting_enabled(0) and v.bullet_is_orbiting_enabled(2), "initial arm holds")
 	v.all_bullets_enable_orbiting_linear(40.0, 10.0, 1, 1, 0, -1, 0, 8.0, 0, false)
 	var radii: Array = v.all_bullets_get_orbiting_radius()
@@ -124,8 +124,8 @@ func test_bad_presets_are_noops_and_reuse_intact() -> void:
 	sp.apply_pattern_preset(9999)
 	expect_error("preset out of range")
 	assert_eq(sp.get_volleys_fired(), 0, "bad presets fire nothing")
-	var va: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(H.make_directional_data(2, 100.0))
+	var va: BulletVolley2D = factory.spawn_volley(H.make_volley_data(2, 100.0))
 	va.clear_all_bullets()
 	await idle()
-	var vb: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(H.make_directional_data(2, 100.0))
+	var vb: BulletVolley2D = factory.spawn_volley(H.make_volley_data(2, 100.0))
 	assert_eq(vb.get_amount_bullets(), 2, "reuse intact after a clear")

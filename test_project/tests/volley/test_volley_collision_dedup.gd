@@ -7,14 +7,14 @@ extends BlastTest
 var hits := 0
 
 
-func _on_body(_body: Object, _volley: DirectionalBullets2D, _idx: int) -> void:
+func _on_body(_body: Object, _volley: BulletVolley2D, _idx: int) -> void:
 	hits += 1
 
 
 ## Flies into the wall at 900 px/s (a stationary bullet never triggers
 ## AREA_BODY_ADDED). max 0 = infinite hits so the counter is under test.
-func _bodied_data(n := 1) -> DirectionalBulletsData2D:
-	var d := H.make_directional_data(n, 900.0, 30.0)
+func _bodied_data(n := 1) -> BulletVolleyData2D:
+	var d := H.make_volley_data(n, 900.0, 30.0)
 	var arr: Array = []
 	for i in n:
 		arr.append(Transform2D(0.0, Vector2(0, 4 * i)))
@@ -47,7 +47,7 @@ func _multishape_wall(origin: Vector2) -> StaticBody2D:
 func before_each() -> void:
 	await super()
 	hits = 0
-	factory.directional_body_entered.connect(_on_body)
+	factory.body_entered.connect(_on_body)
 	_multishape_wall(Vector2(200, 0))
 	await physics()
 
@@ -60,7 +60,7 @@ func _wait(cond: Callable, frames := 20) -> void:
 
 
 func test_object_mode_counts_once() -> void:
-	var v: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(_bodied_data())
+	var v: BulletVolley2D = factory.spawn_volley(_bodied_data())
 	assert_true(v.get_collision_dedup_by_object(), "collision_dedup_by_object defaults to true")
 	await _wait(func(): return hits > 0)
 	assert_eq(hits, 1, "three-shape target reports exactly 1 hit")
@@ -72,7 +72,7 @@ func test_object_mode_counts_once() -> void:
 
 
 func test_shape_mode_reports_every_shape() -> void:
-	var v: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(_bodied_data())
+	var v: BulletVolley2D = factory.spawn_volley(_bodied_data())
 	v.set_collision_dedup_by_object(false)
 	assert_false(v.get_collision_dedup_by_object(), "property round-trips to false")
 	await _wait(func(): return hits >= 3)
@@ -80,20 +80,20 @@ func test_shape_mode_reports_every_shape() -> void:
 
 
 func test_window_resets_between_volleys() -> void:
-	var v1: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(_bodied_data())
+	var v1: BulletVolley2D = factory.spawn_volley(_bodied_data())
 	await _wait(func(): return v1.get_bullet_collision_count(0) >= 1)
 	assert_gte(v1.get_bullet_collision_count(0), 1, "first volley hits")
 	hits = 0
 	_multishape_wall(Vector2(400, 0))
 	await physics()
-	var v2: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(_bodied_data())
+	var v2: BulletVolley2D = factory.spawn_volley(_bodied_data())
 	await _wait(func(): return v2.get_bullet_collision_count(0) >= 1)
 	assert_gte(v2.get_bullet_collision_count(0), 1, "a later volley on the same wall still registers")
 	assert_lte(v2.get_bullet_collision_count(0), 3, "bounded by overlaps")
 
 
 func test_different_bullets_each_count() -> void:
-	var v: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(_bodied_data(2))
+	var v: BulletVolley2D = factory.spawn_volley(_bodied_data(2))
 	await _wait(func(): return v.get_bullet_collision_count(0) >= 1 and v.get_bullet_collision_count(1) >= 1)
 	assert_gte(v.get_bullet_collision_count(0), 1, "bullet 0 registered a hit")
 	assert_gte(v.get_bullet_collision_count(1), 1, "bullet 1 registered a hit too")
@@ -102,7 +102,7 @@ func test_different_bullets_each_count() -> void:
 
 
 func test_property_runtime_round_trip() -> void:
-	var v: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(_bodied_data())
+	var v: BulletVolley2D = factory.spawn_volley(_bodied_data())
 	assert_true(v.get_collision_dedup_by_object(), "new volley defaults to true")
 	v.set_collision_dedup_by_object(false)
 	assert_false(v.get_collision_dedup_by_object(), "setter applies")

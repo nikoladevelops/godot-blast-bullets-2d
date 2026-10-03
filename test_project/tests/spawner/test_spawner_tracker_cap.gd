@@ -5,7 +5,7 @@ extends BlastTest
 
 
 func test_tracker_cap() -> void:
-	var d := H.make_directional_data(1, 0.0, 600.0)
+	var d := H.make_volley_data(1, 0.0, 600.0)
 	d.set_collision_mask_from_array([3])
 	d.collision_shape = H.make_circle_shape(6.0)
 	d.bullet_max_collision_count = 0

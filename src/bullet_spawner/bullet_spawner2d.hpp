@@ -18,7 +18,7 @@
 #include "godot_cpp/variant/packed_vector2_array.hpp"
 #include "godot_cpp/variant/transform2d.hpp"
 #include "godot_cpp/variant/typed_array.hpp"
-#include "spawn-data/directional_bullets_data2d.hpp"
+#include "spawn-data/bullet_volley_data2d.hpp"
 
 namespace BlastBullets2D {
 using namespace godot;
@@ -289,7 +289,7 @@ class BulletSpawner2D : public Node2D{
         // transforms_generator_id pairs with it (same dangling guard).
         mutable Node2D *transforms_generator = nullptr;
         mutable uint64_t transforms_generator_id = 0;
-        Ref<DirectionalBulletsData2D> spawn_data;
+        Ref<BulletVolleyData2D> spawn_data;
 
         NodePath get_bullet_factory_path() const;
         void set_bullet_factory_path(const NodePath &p_path);
@@ -306,8 +306,8 @@ class BulletSpawner2D : public Node2D{
         // or this spawner when unset/unresolvable. Never null inside the tree.
         Node2D *get_effective_generator() const;
 
-        Ref<DirectionalBulletsData2D> get_spawn_data() const;
-        void set_spawn_data(const Ref<DirectionalBulletsData2D> &new_spawn_data);
+        Ref<BulletVolleyData2D> get_spawn_data() const;
+        void set_spawn_data(const Ref<BulletVolleyData2D> &new_spawn_data);
 
         // SHOOTING (TIMER + VOLLEYS)
 
@@ -790,7 +790,7 @@ class BulletSpawner2D : public Node2D{
         // HOMING (EASY API)
         //
         // The spawner resolves homing targets at volley time and pushes them
-        // onto the controllable DirectionalBullets2D instance returned by the
+        // onto the controllable BulletVolley2D instance returned by the
         // factory, using that class's shared / per-bullet deque API. Nothing
         // is stored in spawn_data: the same .tres stays movement-only while
         // every volley can chase different targets.
@@ -965,8 +965,8 @@ class BulletSpawner2D : public Node2D{
         bool orbiting_enabled = false;
         // Ring radius in pixels. Must stay >= 0.01 (setter rejects the rest).
         double orbiting_radius = 64.0;
-        DirectionalBullets2D::OrbitingDirection orbiting_direction = DirectionalBullets2D::OrbitRight;
-        DirectionalBullets2D::OrbitingTextureRotation orbiting_texture_rotation = DirectionalBullets2D::FaceTarget;
+        BulletVolley2D::OrbitingDirection orbiting_direction = BulletVolley2D::OrbitRight;
+        BulletVolley2D::OrbitingTextureRotation orbiting_texture_rotation = BulletVolley2D::FaceTarget;
         // When true, bullet i orbits with orbiting_radius_start +
         // orbiting_radius_step * i (concentric shells) instead of the flat
         // orbiting_radius.
@@ -977,14 +977,14 @@ class BulletSpawner2D : public Node2D{
         // 1:1, FollowDeadzone pins the center until the target walks
         // farther than orbiting_follow_deadzone from it (jitter zone), Anchored
         // freezes the ring where it locked and ignores target motion.
-        DirectionalBullets2D::OrbitingFollowMode orbiting_follow_mode = DirectionalBullets2D::FollowTarget;
+        BulletVolley2D::OrbitingFollowMode orbiting_follow_mode = BulletVolley2D::FollowTarget;
         // Deadzone radius in pixels, used only by FollowDeadzone.
         double orbiting_follow_deadzone = 8.0;
         // What drops the lock: RelockAlways re-acquires every retarget,
         // StayLocked never unlocks on retarget/empty (only explicit
         // disable, clear, or a freed target), RelockOnTargetChange unlocks
         // only when the front target is a different target.
-        DirectionalBullets2D::OrbitingLockPolicy orbiting_lock_policy = DirectionalBullets2D::RelockAlways;
+        BulletVolley2D::OrbitingLockPolicy orbiting_lock_policy = BulletVolley2D::RelockAlways;
         // When on, locked OrbitLeft/OrbitRight bullets translate 1:1 with the
         // target and keep circling (rings never lag or stretch when the
         // target moves). When off, locked bullets chase the ring center
@@ -1048,22 +1048,22 @@ class BulletSpawner2D : public Node2D{
         void set_orbiting_enabled(bool value);
         double get_orbiting_radius() const;
         void set_orbiting_radius(double value);
-        DirectionalBullets2D::OrbitingDirection get_orbiting_direction() const;
-        void set_orbiting_direction(DirectionalBullets2D::OrbitingDirection value);
-        DirectionalBullets2D::OrbitingTextureRotation get_orbiting_texture_rotation() const;
-        void set_orbiting_texture_rotation(DirectionalBullets2D::OrbitingTextureRotation value);
+        BulletVolley2D::OrbitingDirection get_orbiting_direction() const;
+        void set_orbiting_direction(BulletVolley2D::OrbitingDirection value);
+        BulletVolley2D::OrbitingTextureRotation get_orbiting_texture_rotation() const;
+        void set_orbiting_texture_rotation(BulletVolley2D::OrbitingTextureRotation value);
         bool get_orbiting_radius_linear_enabled() const;
         void set_orbiting_radius_linear_enabled(bool value);
         double get_orbiting_radius_start() const;
         void set_orbiting_radius_start(double value);
         double get_orbiting_radius_step() const;
         void set_orbiting_radius_step(double value);
-        DirectionalBullets2D::OrbitingFollowMode get_orbiting_follow_mode() const;
-        void set_orbiting_follow_mode(DirectionalBullets2D::OrbitingFollowMode value);
+        BulletVolley2D::OrbitingFollowMode get_orbiting_follow_mode() const;
+        void set_orbiting_follow_mode(BulletVolley2D::OrbitingFollowMode value);
         double get_orbiting_follow_deadzone() const;
         void set_orbiting_follow_deadzone(double value);
-        DirectionalBullets2D::OrbitingLockPolicy get_orbiting_lock_policy() const;
-        void set_orbiting_lock_policy(DirectionalBullets2D::OrbitingLockPolicy value);
+        BulletVolley2D::OrbitingLockPolicy get_orbiting_lock_policy() const;
+        void set_orbiting_lock_policy(BulletVolley2D::OrbitingLockPolicy value);
         bool get_orbiting_rigid_follow() const;
         void set_orbiting_rigid_follow(bool value);
 
@@ -1504,7 +1504,7 @@ class BulletSpawner2D : public Node2D{
         // How many spawned volleys are currently tracked for retargeting.
         int get_live_volley_count() const;
         // The tracked live volley instances (pruned first). Lets GDScript
-        // call the full DirectionalBullets2D API on each volley directly.
+        // call the full BulletVolley2D API on each volley directly.
         // Variants auto-null if an instance is freed later.
         Array get_live_volleys() const;
         // Forgets all tracked volleys (they keep flying untouched).
@@ -1546,7 +1546,7 @@ class BulletSpawner2D : public Node2D{
         // which detaches spawner ownership): stamps, hooks the reached
         // forwarder, and tracks it for retargeting. Queues are left alone.
         // Returns false for null or non-live (pooled/outside-tree) instances.
-        bool adopt_live_volley(DirectionalBullets2D *bullets);
+        bool adopt_live_volley(BulletVolley2D *bullets);
         // Kill-switch: clears homing queues and disables orbiting on every
         // tracked live volley (engine clears, counters stay exact). Returns
         // how many volleys were touched. Retargeting will re-arm them while
@@ -1559,7 +1559,7 @@ class BulletSpawner2D : public Node2D{
         int override_live_volleys_velocity(const Vector2 &new_velocity);
         // Forwards the volley instance's bullet_homing_target_reached as the
         // spawner-level volley_bullet_homing_target_reached signal.
-        void _on_volley_bullet_homing_target_reached(Object *directional_bullets_instance, int bullet_index, Object *target, const Vector2 &target_global_position);
+        void _on_volley_bullet_homing_target_reached(Object *volley, int bullet_index, Object *target, const Vector2 &target_global_position);
 
         // PATTERN PREVIEW (EDITOR ONLY)
         //
@@ -1996,7 +1996,7 @@ class BulletSpawner2D : public Node2D{
         // on set_spawn_data() and on the resource's changed signal, so
         // in-place inspector edits re-duplicate instead of driving stale data.
         // Mutable: shoot_once() is non-const but resolve paths also touch it.
-        mutable Ref<DirectionalBulletsData2D> cached_volley_template;
+        mutable Ref<BulletVolleyData2D> cached_volley_template;
         mutable uint64_t cached_spawn_data_id = 0;
         void _on_spawn_data_changed();
         // Spin runtime state (never stored, advances in _process only).
@@ -2287,7 +2287,7 @@ class BulletSpawner2D : public Node2D{
         void refresh_process_state_editor_guarded();
         // Remembers a fresh volley for retargeting (deduped: pooled instances
         // reuse ids) and prunes dead/foreign entries via the tracker.
-        void track_live_volley(DirectionalBullets2D *bullets);
+        void track_live_volley(BulletVolley2D *bullets);
         // Recursive scene scan for the node-name source: collects live
         // Node2Ds under p_node whose name matches homing_node_name per
         // homing_node_name_match_mode and homing_node_name_case_sensitive,
@@ -2308,7 +2308,7 @@ class BulletSpawner2D : public Node2D{
         // distance, texture control, auto-pop flags, per-bullet smoothing
         // fan) onto a volley. Shared by volley setup and retarget passes so
         // runtime tuning reaches flying volleys instead of only new ones.
-        void apply_steering_to_volley(DirectionalBullets2D *volley) const;
+        void apply_steering_to_volley(BulletVolley2D *volley) const;
         // Predictive lead for the aimed target, shared by the aimed volley
         // and its preview cone so both agree on where the target will be.
         Vector2 predict_target_pos(Node2D *target) const;
@@ -2319,7 +2319,7 @@ class BulletSpawner2D : public Node2D{
         // not yet enabled get enabled, the rest get radius/direction/texture
         // updated in place (re-enabling would warn and keep stale values).
         // Skipped entirely for DontMove.
-        void apply_orbiting_to_volley(DirectionalBullets2D *volley) const;
+        void apply_orbiting_to_volley(BulletVolley2D *volley) const;
         // Applies the homing + orbiting configuration to a freshly spawned
         // (or pool-reused) volley: steering props, resolved targets (pushed
         // before orbiting so rings can lock immediately), orbiting, signal
@@ -2327,7 +2327,7 @@ class BulletSpawner2D : public Node2D{
         // volley_fired so handlers observe fully configured bullets.
         // `pre_resolved`: targets the fire-arc gate already approved (one
         // resolution per shot: the volley chases exactly what was approved).
-        void apply_volley_homing_and_orbiting(DirectionalBullets2D *bullets, const Array *pre_resolved = nullptr);
+        void apply_volley_homing_and_orbiting(BulletVolley2D *bullets, const Array *pre_resolved = nullptr);
         // Orbiting without homing warns once per configuration (re-armed by
         // on_config_changed()).
         bool orbit_without_homing_warned = false;

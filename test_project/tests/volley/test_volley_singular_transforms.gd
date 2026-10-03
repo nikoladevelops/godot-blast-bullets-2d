@@ -8,15 +8,15 @@ var singular := Transform2D(Vector2(0, 0), Vector2(0, 1), Vector2.ZERO)
 
 
 func test_spawn_rejects_singular() -> void:
-	var bad := H.make_directional_data(1, 100.0, 60.0)
+	var bad := H.make_volley_data(1, 100.0, 60.0)
 	bad.transforms = [singular]
-	assert_null(factory.spawn_controllable_directional_bullets(bad), "singular spawn refused")
+	assert_null(factory.spawn_volley(bad), "singular spawn refused")
 	expect_error("zero or singular scale")
 	assert_eq(factory.debug_get_active_bullets_amount(), 0, "nothing live after the refusal")
 
 
 func test_setter_rejects_singular_and_zero_scale() -> void:
-	var v: DirectionalBullets2D = spawn_dir(1, 100.0, 60.0)
+	var v: BulletVolley2D = quick_volley(1, 100.0, 60.0)
 	var before: Transform2D = v.get_bullet_transform(0)
 	v.set_bullet_transform(0, Transform2D(Vector2(0, 0), Vector2(0, 1), Vector2(5, 5)))
 	expect_error("non-singular")

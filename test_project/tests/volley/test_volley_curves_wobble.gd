@@ -24,7 +24,7 @@ func _flat(value: float, lo: float, hi: float) -> Curve:
 
 
 func test_shared_curves_attach_and_override_guard() -> void:
-	var v: DirectionalBullets2D = spawn_dir(2, 200.0)
+	var v: BulletVolley2D = quick_volley(2, 200.0)
 	assert_false(v.has_shared_bullet_curves_data(), "no shared curves initially")
 	v.set_shared_bullet_curves_data(_make_curve())
 	assert_true(v.has_shared_bullet_curves_data(), "shared curves attached")
@@ -38,7 +38,7 @@ func test_shared_curves_attach_and_override_guard() -> void:
 
 
 func test_per_bullet_curves() -> void:
-	var v: DirectionalBullets2D = spawn_dir(2, 200.0)
+	var v: BulletVolley2D = quick_volley(2, 200.0)
 	var c0 := _make_curve()
 	v.bullet_set_curves_data(0, c0)
 	assert_eq(v.bullet_get_curves_data(0), c0, "per-bullet curves stored")
@@ -50,7 +50,7 @@ func test_per_bullet_curves() -> void:
 
 
 func test_movement_patterns() -> void:
-	var v: DirectionalBullets2D = spawn_dir(2, 200.0)
+	var v: BulletVolley2D = quick_volley(2, 200.0)
 	var path: Path2D = add(Path2D.new())
 	var curve := Curve2D.new()
 	curve.add_point(Vector2(0, 0))
@@ -72,7 +72,7 @@ func test_movement_patterns() -> void:
 
 
 func test_gravity_accelerates_px_per_s2() -> void:
-	var g: DirectionalBullets2D = spawn_dir(1, 0.0)
+	var g: BulletVolley2D = quick_volley(1, 0.0)
 	g.set_gravity(Vector2(0, 2000))
 	g.set_linear_drag(0.0)
 	var p0: Vector2 = g.get_bullet_global_transform(0).origin
@@ -91,7 +91,7 @@ func test_gravity_accelerates_px_per_s2() -> void:
 
 
 func test_shared_speed_rotation_fallback() -> void:
-	var s: DirectionalBullets2D = spawn_dir(2, 100.0)
+	var s: BulletVolley2D = quick_volley(2, 100.0)
 	var sh := BulletSpeedData2D.new()
 	sh.speed = 400.0
 	assert_almost_eq(s.get_bullet_speed_data(0).speed, 100.0, 0.01, "spawn ballistics intact before shared")
@@ -109,9 +109,9 @@ func test_shared_speed_rotation_fallback() -> void:
 	assert_false(s.get_is_wobble_enabled(), "wobble off by default")
 	var wob := BulletWobbleData2D.new()
 	wob.enabled = true
-	var wdata := H.make_directional_data(2, 200.0)
+	var wdata := H.make_volley_data(2, 200.0)
 	wdata.shared_bullet_wobble_data = wob
-	var wv: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(wdata)
+	var wv: BulletVolley2D = factory.spawn_volley(wdata)
 	assert_true(wv.get_is_wobble_enabled(), "shared wobble enables the feature")
 
 
@@ -119,27 +119,27 @@ func test_tiled_vs_strict_curves() -> void:
 	var tc := BulletCurvesData2D.new()
 	tc.movement_speed_curve = _flat(700.0, 0.0, 2000.0)
 	tc.movement_use_unit_curve = false
-	var tiled := H.make_directional_data(4, 200.0)
+	var tiled := H.make_volley_data(4, 200.0)
 	tiled.all_bullet_curves_data = [tc]
 	tiled.tile_all_bullet_curves_data = true
-	var tv: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(tiled)
+	var tv: BulletVolley2D = factory.spawn_volley(tiled)
 	await physics(2)
 	assert_almost_eq(tv.get_bullet_speed_data(0).speed, 700.0, 60.0, "tiled curves slot 0")
 	assert_almost_eq(tv.get_bullet_speed_data(3).speed, 700.0, 60.0, "tiled curves slot 3 wraps")
 	assert_eq(str(tv.debug_get_curves_info(3)["speed_src"]), "per", "tiled slot reports the per winner")
-	var strict := H.make_directional_data(4, 200.0)
+	var strict := H.make_volley_data(4, 200.0)
 	strict.all_bullet_curves_data = [tc]
-	var sv: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(strict)
+	var sv: BulletVolley2D = factory.spawn_volley(strict)
 	await physics()
 	assert_eq(str(sv.debug_get_curves_info(3)["speed_src"]), "none", "strict slot 3 has no curve")
 
 
 func test_rotation_speed_curve_spins_visual() -> void:
-	var d := H.make_directional_data(1, 0.0)
+	var d := H.make_volley_data(1, 0.0)
 	var rgc := BulletCurvesData2D.new()
 	rgc.rotation_speed_curve = _flat(4.0, -100.0, 100.0)
 	d.all_bullet_curves_data = [rgc]
-	var v: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d)
+	var v: BulletVolley2D = factory.spawn_volley(d)
 	var y0: float = v.get_bullet_texture_rotation_radians(0)
 	await physics(20)
 	assert_gt(v.get_bullet_texture_rotation_radians(0) - y0, 0.5, "rotation curve spins visual")
@@ -147,7 +147,7 @@ func test_rotation_speed_curve_spins_visual() -> void:
 
 
 func test_gravity_strength_curve_per_bullet() -> void:
-	var d := H.make_directional_data(2, 100.0)
+	var d := H.make_volley_data(2, 100.0)
 	d.all_bullet_gravity = [Vector2(0, 600), Vector2(0, 600)]
 	var gz := BulletCurvesData2D.new()
 	gz.gravity_strength_curve = _flat(0.0, 0.0, 10.0)
@@ -156,7 +156,7 @@ func test_gravity_strength_curve_per_bullet() -> void:
 	gfull.gravity_strength_curve = _flat(1.0, 0.0, 10.0)
 	gfull.gravity_use_unit_curve = false
 	d.all_bullet_curves_data = [gz, gfull]
-	var v: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d)
+	var v: BulletVolley2D = factory.spawn_volley(d)
 	await physics(30)
 	assert_lt(v.bullet_get_fall_speed(0), 0.01, "zeroed strength holds slot 0")
 	assert_gt(v.bullet_get_fall_speed(1), 5.0, "full strength drops slot 1")
@@ -164,7 +164,7 @@ func test_gravity_strength_curve_per_bullet() -> void:
 
 
 func test_wobble_angular_cosine_phase_windows() -> void:
-	var d := H.make_directional_data(3, 300.0)
+	var d := H.make_volley_data(3, 300.0)
 	var wa := BulletWobbleData2D.new()
 	wa.enabled = true
 	wa.mode = BulletWobbleData2D.WOBBLE_ANGULAR
@@ -175,7 +175,7 @@ func test_wobble_angular_cosine_phase_windows() -> void:
 	wa.distance_phased = true
 	wa.damping_per_sec = 1.0
 	d.all_bullet_wobble_data = [wa, wa, wa]
-	var v: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d)
+	var v: BulletVolley2D = factory.spawn_volley(d)
 	var a0: Vector2 = v.get_bullet_direction(0)
 	await physics(15)
 	var spread: float = (v.get_bullet_direction(0) - v.get_bullet_direction(1)).length() + (v.get_bullet_direction(1) - v.get_bullet_direction(2)).length()
@@ -183,7 +183,7 @@ func test_wobble_angular_cosine_phase_windows() -> void:
 	assert_gt(spread, 0.05, "phase_step fans slots apart")
 	assert_true(v.get_bullet_transform(0).is_finite() and v.get_bullet_transform(2).is_finite(), "angular/cosine/phased finite")
 	assert_eq(int(v.debug_get_wobble_info(2)["waveform"]), 1, "wobble debug reports cosine")
-	var d2 := H.make_directional_data(1, 300.0)
+	var d2 := H.make_volley_data(1, 300.0)
 	var wb := BulletWobbleData2D.new()
 	wb.enabled = true
 	wb.amplitude = 40.0
@@ -191,19 +191,19 @@ func test_wobble_angular_cosine_phase_windows() -> void:
 	wb.damping_per_sec = 2.0
 	wb.duration_sec = 0.3
 	d2.all_bullet_wobble_data = [wb]
-	var v2: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d2)
+	var v2: BulletVolley2D = factory.spawn_volley(d2)
 	await physics(40)
 	assert_true(v2.get_bullet_transform(0).is_finite(), "damped/windowed wobble finite")
 
 
 func test_negative_speed_under_gravity() -> void:
-	var d := H.make_directional_data(1, 0.0)
+	var d := H.make_volley_data(1, 0.0)
 	var nsp := BulletSpeedData2D.new()
 	nsp.speed = -200.0
 	nsp.max_speed = 3000.0
 	d.all_bullet_speed_data = [nsp]
 	d.all_bullet_gravity = [Vector2(0, 400)]
-	var v: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(d)
+	var v: BulletVolley2D = factory.spawn_volley(d)
 	var p0: Vector2 = v.get_bullet_global_transform(0).origin
 	await physics(30)
 	assert_true(v.get_bullet_transform(0).is_finite(), "reverse gravity flight finite")

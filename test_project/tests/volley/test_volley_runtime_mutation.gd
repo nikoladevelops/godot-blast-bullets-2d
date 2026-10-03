@@ -4,7 +4,7 @@ extends BlastTest
 ## (re-bucket), timers attach/fire/detach/64-cap/zero-time, single-bullet
 ## enable/disable, sprite animation guards.
 
-var v: DirectionalBullets2D
+var v: BulletVolley2D
 var _timer_fires := 0
 
 
@@ -15,7 +15,7 @@ func _on_timer() -> void:
 func before_each() -> void:
 	await super()
 	_timer_fires = 0
-	v = spawn_dir(2, 200.0)
+	v = quick_volley(2, 200.0)
 
 
 func test_custom_data_separation() -> void:
@@ -65,19 +65,19 @@ func test_runtime_type_change_refused_inside_physics() -> void:
 
 func test_timers_attach_fire_detach_cap() -> void:
 	assert_eq(v.debug_get_timer_count(), 0, "no timers initially")
-	v.multimesh_attach_time_based_function(0.05, _on_timer)
+	v.attach_time_based_function(0.05, _on_timer)
 	assert_eq(v.debug_get_timer_count(), 1, "timer attached")
 	await physics(15)
 	assert_gte(_timer_fires, 1, "timer fired")
 	await idle(1)
-	v.multimesh_detach_all_time_based_functions()
+	v.detach_all_time_based_functions()
 	assert_eq(v.debug_get_timer_count(), 0, "detach all clears")
 	for i in 70:
-		v.multimesh_attach_time_based_function(10.0, func() -> void: pass)
+		v.attach_time_based_function(10.0, func() -> void: pass)
 	assert_eq(v.debug_get_timer_count(), 64, "timer cap is 64")
 	expect_errors_containing("timer limit", 6)
-	v.multimesh_detach_all_time_based_functions()
-	v.multimesh_attach_time_based_function(0.0, _on_timer)
+	v.detach_all_time_based_functions()
+	v.attach_time_based_function(0.0, _on_timer)
 	expect_error("time value that is above 0")
 	assert_eq(v.debug_get_timer_count(), 0, "zero-time timer rejected")
 

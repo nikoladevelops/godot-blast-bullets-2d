@@ -5,8 +5,8 @@ extends BlastTest
 ## factory.
 
 
-func _data() -> DirectionalBulletsData2D:
-	var d := H.make_directional_data(1, 900.0, 30.0)
+func _data() -> BulletVolleyData2D:
+	var d := H.make_volley_data(1, 900.0, 30.0)
 	d.transforms = [Transform2D()]
 	d.monitorable = true
 	d.collision_shape = H.make_circle_shape(6.0)
@@ -27,7 +27,7 @@ func _target(obj: CollisionObject2D) -> CollisionObject2D:
 
 func _fire_and_wait() -> int:
 	await physics(2)
-	var v: DirectionalBullets2D = factory.spawn_controllable_directional_bullets(_data())
+	var v: BulletVolley2D = factory.spawn_volley(_data())
 	var count := 0
 	for i in 40:
 		await physics()
@@ -41,7 +41,7 @@ func _body_case(obj: CollisionObject2D, label: String) -> void:
 	watch_signals(factory)
 	_target(obj)
 	assert_gte(await _fire_and_wait(), 1, "%s registers the hit" % label)
-	assert_signal_emitted(factory, "directional_body_entered", "%s: factory directional_body_entered fired" % label)
+	assert_signal_emitted(factory, "body_entered", "%s: factory body_entered fired" % label)
 
 
 func test_static_body() -> void:
@@ -72,8 +72,8 @@ func test_area_routes_to_area_entered() -> void:
 	ar.monitorable = true
 	_target(ar)
 	assert_gte(await _fire_and_wait(), 1, "area registers the hit")
-	assert_signal_emitted(factory, "directional_area_entered", "factory directional_area_entered fired")
-	assert_signal_not_emitted(factory, "directional_body_entered", "no body signal for an area overlap")
+	assert_signal_emitted(factory, "area_entered", "factory area_entered fired")
+	assert_signal_not_emitted(factory, "body_entered", "no body signal for an area overlap")
 
 
 func test_spawner_volley_routes_to_spawner_only() -> void:
@@ -88,5 +88,5 @@ func test_spawner_volley_routes_to_spawner_only() -> void:
 		if get_signal_emit_count(spawner, "body_entered") >= 1:
 			break
 	assert_signal_emitted(spawner, "body_entered", "spawner body_entered fired")
-	assert_signal_not_emitted(factory, "directional_body_entered", "factory silent for a spawner volley")
+	assert_signal_not_emitted(factory, "body_entered", "factory silent for a spawner volley")
 
