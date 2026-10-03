@@ -492,6 +492,8 @@ src/
 | Setters reject NaN/Inf/out-of-range with "keeping the old value"; no setter depends on another field (load order) | `test_spawner_setter_contract` |
 | Fire arc follows spin and the volley chases the targets the arc approved | `test_spawner_homing_propagation` |
 | One-time warnings use `WarnOnce2D` codes 101+ (spawner) and stay quiet in the preview | `test_spawner_setter_contract` |
+| Homing sources never pick the spawner, its markers, factory nodes, dying nodes or non-Node2Ds; an empty resolution fires a plain volley and warns once per homing configuration | `test_spawner_homing_detection` |
+| Homing queues cap at 256 without errors; freed targets are trimmed; retarget skips dead/pooled/foreign/old-factory volleys and disabled bullets | `test_spawner_homing_queues` |
 
 - Edge cases to test everywhere: NaN/Inf scalars and vectors; null array
   entries; empty arrays; short vs oversized arrays; OOB indices (-1/99);

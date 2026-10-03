@@ -742,7 +742,7 @@ bool BulletSpawner2D::shoot_once() {
     Array arc_targets;
     bool arc_resolved = false;
     if (homing_enabled && homing_target_source != HOMING_SOURCE_MOUSE && Math::is_finite(homing_fire_arc_deg) && homing_fire_arc_deg > 0.0) {
-        arc_targets = resolve_homing_targets(true, false);
+        arc_targets = resolve_homing_targets(false, false); // warns once per configuration
         arc_resolved = true;
         if (!arc_targets.is_empty() && !fire_arc_covers_targets(arc_targets)) {
             return fail_early(nullptr, StringName("outside_fire_arc"), true);
@@ -975,9 +975,6 @@ void BulletSpawner2D::_notification(int p_what) {
         homing_candidates_scratch.clear();
         homing_pool_scratch.clear();
         homing_scan_stack.clear();
-        // Re-arm the empty-targets warning: it latches per tree-life so a
-        // re-entered scene with still-empty targets warns again.
-        homing_empty_targets_warned = false;
     }
 }
 

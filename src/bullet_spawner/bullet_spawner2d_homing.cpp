@@ -138,6 +138,7 @@ void BulletSpawner2D::set_homing_target_source(HomingTargetSource value) {
         return;
     }
     homing_target_source = value;
+    clear_empty_homing_targets_warning();
     notify_property_list_changed();
 }
 
@@ -147,6 +148,7 @@ StringName BulletSpawner2D::get_homing_node_group() const {
 
 void BulletSpawner2D::set_homing_node_group(const StringName &value) {
     homing_node_group = value;
+    clear_empty_homing_targets_warning();
 }
 
 StringName BulletSpawner2D::get_homing_filter_group() const {
@@ -155,6 +157,7 @@ StringName BulletSpawner2D::get_homing_filter_group() const {
 
 void BulletSpawner2D::set_homing_filter_group(const StringName &value) {
     homing_filter_group = value;
+    clear_empty_homing_targets_warning();
 }
 
 BulletSpawner2D::HomingTargetSelection BulletSpawner2D::get_homing_target_selection() const {
@@ -199,6 +202,7 @@ void BulletSpawner2D::set_homing_max_detection_range(double value) {
         return;
     }
     homing_max_detection_range = value;
+    clear_empty_homing_targets_warning();
 }
 
 Vector2 BulletSpawner2D::get_homing_global_position() const {
@@ -218,7 +222,11 @@ NodePath BulletSpawner2D::get_homing_target_path() const {
 }
 
 void BulletSpawner2D::set_homing_target_path(const NodePath &p_path) {
+    if (!node_path_type_ok<Node2D>(this, p_path, "homing_target_path", "Node2D")) {
+        return;
+    }
     homing_target_path = p_path;
+    clear_empty_homing_targets_warning();
 }
 
 String BulletSpawner2D::get_homing_node_name() const {
@@ -227,6 +235,7 @@ String BulletSpawner2D::get_homing_node_name() const {
 
 void BulletSpawner2D::set_homing_node_name(const String &value) {
     homing_node_name = value;
+    clear_empty_homing_targets_warning();
 }
 
 BulletSpawner2D::HomingNodeNameMatch BulletSpawner2D::get_homing_node_name_match_mode() const {
@@ -239,6 +248,7 @@ void BulletSpawner2D::set_homing_node_name_match_mode(HomingNodeNameMatch value)
         return;
     }
     homing_node_name_match_mode = value;
+    clear_empty_homing_targets_warning();
 }
 
 bool BulletSpawner2D::get_homing_node_name_case_sensitive() const {
@@ -247,6 +257,7 @@ bool BulletSpawner2D::get_homing_node_name_case_sensitive() const {
 
 void BulletSpawner2D::set_homing_node_name_case_sensitive(bool value) {
     homing_node_name_case_sensitive = value;
+    clear_empty_homing_targets_warning();
 }
 
 NodePath BulletSpawner2D::get_homing_children_parent_path() const {
@@ -255,6 +266,7 @@ NodePath BulletSpawner2D::get_homing_children_parent_path() const {
 
 void BulletSpawner2D::set_homing_children_parent_path(const NodePath &p_path) {
     homing_children_parent_path = p_path;
+    clear_empty_homing_targets_warning();
 }
 
 bool BulletSpawner2D::get_homing_children_recursive() const {
@@ -263,6 +275,7 @@ bool BulletSpawner2D::get_homing_children_recursive() const {
 
 void BulletSpawner2D::set_homing_children_recursive(bool value) {
     homing_children_recursive = value;
+    clear_empty_homing_targets_warning();
 }
 
 double BulletSpawner2D::get_homing_smoothing() const {
@@ -571,12 +584,16 @@ void BulletSpawner2D::collect_homing_candidates_by_name(Node *p_node, Array &r_c
         if (Object::cast_to<BulletFactory2D>(node) != nullptr) {
             continue;
         }
+        // Never this spawner or anything under it (its pattern markers).
+        if (node == this) {
+            continue;
+        }
         Node2D *as_2d = Object::cast_to<Node2D>(node);
         // Never chase ourselves or our own markers: the spawner (and any Node2D
         // markers under it) would otherwise match a broad pattern like "Node2D".
         // Never the preview holder either: it is visualization only (same
         // exclusion as the children spawn markers in the collect path).
-        if (as_2d != nullptr && as_2d != this && !as_2d->has_meta(PREVIEW_META_KEY)) {
+        if (as_2d != nullptr && !as_2d->is_queued_for_deletion() && !as_2d->has_meta(PREVIEW_META_KEY)) {
             String node_name = String(as_2d->get_name());
             if (!homing_node_name_case_sensitive) {
                 node_name = node_name.to_lower();
@@ -630,7 +647,7 @@ void BulletSpawner2D::collect_homing_candidates_from_children(Node *p_parent, bo
         // otherwise make the volley chase its emitter).
         // Same preview-holder exclusion as the name scan above: the gizmo
         // must never become a homing target.
-        if (as_2d != nullptr && as_2d != this && !as_2d->has_meta(PREVIEW_META_KEY)) {
+        if (as_2d != nullptr && as_2d != this && !as_2d->is_queued_for_deletion() && !as_2d->has_meta(PREVIEW_META_KEY)) {
             if (homing_filter_group.is_empty() || as_2d->is_in_group(homing_filter_group)) {
                 r_candidates.push_back(as_2d);
             }
@@ -676,12 +693,13 @@ Array BulletSpawner2D::resolve_homing_targets(bool quiet, bool advance_round_rob
             return targets;
         }
         targets.push_back(homing_global_position);
-        clear_empty_homing_targets_warning();
         return targets;
     }
     if (homing_target_source == HOMING_SOURCE_NODE_PATH) {
         Node2D *target = Object::cast_to<Node2D>(get_node_or_null(homing_target_path));
-        if (target == nullptr) {
+        // A node queued for deletion dies at the end of this frame: chasing
+        // it would only hand the volley a dead target.
+        if (target == nullptr || target->is_queued_for_deletion()) {
             warn_empty_homing_targets_once("BulletSpawner2D::resolve_homing_targets: homing_target_path does not point at a live Node2D, volley flies without homing.", quiet);
             return targets;
         }
@@ -690,7 +708,6 @@ Array BulletSpawner2D::resolve_homing_targets(bool quiet, bool advance_round_rob
             return targets;
         }
         targets.push_back(target);
-        clear_empty_homing_targets_warning();
         return targets;
     }
     // Multi-target sources (group, name, children) share one tail below
@@ -749,6 +766,11 @@ Array BulletSpawner2D::resolve_homing_targets(bool quiet, bool advance_round_rob
                 if (candidate == nullptr) {
                     continue; // group may hold anything: only Node2Ds can be chased
                 }
+                // Never chase ourselves (an enemy turret in the enemies group)
+                // or a node that dies at the end of this frame.
+                if (candidate == this || candidate->is_queued_for_deletion()) {
+                    continue;
+                }
                 if (!homing_filter_group.is_empty() && !candidate->is_in_group(homing_filter_group)) {
                     continue;
                 }
@@ -789,7 +811,6 @@ Array BulletSpawner2D::resolve_homing_targets(bool quiet, bool advance_round_rob
         }
         return targets;
     }
-    clear_empty_homing_targets_warning();
     // The deque caps at 256 targets per queue (see HomingTargetDeque): clamp
     // the take there too, otherwise a huge max_targets fans thousands of
     // rejected pushes (one error each) every volley and every retarget pass.
@@ -1244,9 +1265,9 @@ void BulletSpawner2D::apply_volley_homing_and_orbiting(DirectionalBullets2D *bul
                 bullets->all_bullets_replace_homing_targets_with_mouse();
             }
         } else {
-            // Quiet + warn-once: a missing enemy roster must not spam once
-            // per volley while the spawner keeps firing plain bullets.
-            resolved_targets = (pre_resolved != nullptr) ? *pre_resolved : resolve_homing_targets(true);
+            // Warn-once: a missing enemy roster is reported once per homing
+            // configuration, never once per volley; the volley flies plain.
+            resolved_targets = (pre_resolved != nullptr) ? *pre_resolved : resolve_homing_targets(false);
             if (!resolved_targets.is_empty()) {
                 if (homing_mode == HOMING_SHARED) {
                     bullets->shared_homing_deque_replace_homing_targets_with_new_target_array(resolved_targets);

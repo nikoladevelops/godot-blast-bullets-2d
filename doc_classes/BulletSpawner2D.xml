@@ -310,7 +310,7 @@
 			<param index="0" name="quiet" type="bool" default="false" />
 			<param index="1" name="advance_round_robin" type="bool" default="true" />
 			<description>
-				Resolves the current homing targets without touching any volley: group members, name matches (case-insensitive unless [member homing_node_name_case_sensitive]), children of the parent path, the node at [member homing_target_path], or the [member homing_global_position] snapshot. The Mouse source returns an empty array (the cursor is pushed live, not resolved). Entries are Node2D or Vector2. Unless quiet is true, an empty result warns once until a resolution succeeds again. With advance_round_robin off, the round-robin pick is resolved without consuming the cursor (retarget passes use this so flying volleys keep stable targets).
+				Resolves the current homing targets without touching any volley: group members, name matches (case-insensitive unless [member homing_node_name_case_sensitive]), children of the parent path, the node at [member homing_target_path], or the [member homing_global_position] snapshot. The Mouse source returns an empty array (the cursor is pushed live, not resolved). Entries are Node2D or Vector2. Unless quiet is true, an empty result warns once per homing configuration (shots share the same warning). With advance_round_robin off, the round-robin pick is resolved without consuming the cursor (retarget passes use this so flying volleys keep stable targets).
 			</description>
 		</method>
 		<method name="resume_shooting">
@@ -1098,7 +1098,7 @@
 			Advances the homing queue when a target is reached: per bullet in Per Bullet mode, once for the shared queue in Shared mode.
 		</member>
 		<member name="homing_children_parent_path" type="NodePath" setter="set_homing_children_parent_path" getter="get_homing_children_parent_path" default="NodePath(&quot;&quot;)">
-			Parent whose Node2D children are chased for the Node Children source. Required: empty or invalid paths fly without homing.
+			Parent whose Node2D children are chased for the Node Children source (the whole subtree with [member homing_children_recursive], walking through non-Node2D nodes). Required: an empty or invalid path fires plain volleys and warns once. The spawner itself is never chased.
 		</member>
 		<member name="homing_children_recursive" type="bool" setter="set_homing_children_recursive" getter="get_homing_children_recursive" default="false">
 			Includes grandchildren and deeper descendants for the Node Children source.
@@ -1137,10 +1137,10 @@
 			0 shares one target queue across the whole volley, 1 gives every bullet its own queue (same targets each).
 		</member>
 		<member name="homing_node_group" type="StringName" setter="set_homing_node_group" getter="get_homing_node_group" default="&amp;&quot;enemies&quot;">
-			Polled group for the Node Group source. Only Node2D members can be chased, the rest are skipped.
+			Polled group for the Node Group source. Only Node2D members can be chased; other members, the spawner itself and nodes queued for deletion are skipped.
 		</member>
 		<member name="homing_node_name" type="String" setter="set_homing_node_name" getter="get_homing_node_name" default="&quot;Player&quot;">
-			Name pattern chased for the Node Name source. The whole scene is scanned, so dynamically spawned enemies are found with no group setup. The spawner itself never matches, and [BulletFactory2D] subtrees (volleys, attachments, effects) are never scanned. Prefer the Node Group source in large scenes: the scan visits every node once per volley.
+			Name pattern chased for the Node Name source. The whole scene is scanned, so dynamically spawned enemies are found with no group setup. The spawner itself and its child markers never match, and [BulletFactory2D] subtrees (volleys, attachments, effects) are never scanned. Prefer the Node Group source in large scenes: the scan visits every node once per volley.
 		</member>
 		<member name="homing_node_name_case_sensitive" type="bool" setter="set_homing_node_name_case_sensitive" getter="get_homing_node_name_case_sensitive" default="false">
 			Compares node names strictly. Off (default) matches "Player" against "PlAyEr".
@@ -1179,13 +1179,13 @@
 			Lets homing steer the bullet facing. Turn off only when a movement pattern, rotation data, or orbiting texture mode already owns the facing, otherwise homing steers nothing.
 		</member>
 		<member name="homing_target_path" type="NodePath" setter="set_homing_target_path" getter="get_homing_target_path" default="NodePath(&quot;&quot;)">
-			Node chased per volley for the Node Path source. Must point at a live Node2D, otherwise the volley flies without homing.
+			Node chased per volley for the Node Path source. Must point at a live Node2D in the tree: a freed, removed or dying target means the volley flies without homing (warned once). Inside the tree, a path to a non-Node2D is rejected and the old value kept; an unresolved path is accepted (the node may be added later).
 		</member>
 		<member name="homing_target_selection" type="int" setter="set_homing_target_selection" getter="get_homing_target_selection" enum="BulletSpawner2D.HomingTargetSelection" default="0">
 			Which detected nodes become targets: nearest to the spawner, random, tree order, round robin across volleys, or dealt across bullets (Per Bullet mode only).
 		</member>
 		<member name="homing_target_source" type="int" setter="set_homing_target_source" getter="get_homing_target_source" enum="BulletSpawner2D.HomingTargetSource" default="0">
-			Where volley targets come from: a node group, the mouse cursor, a global position snapshot, a node path, a node name, or a node's children. Each source shows its own settings, like the pattern_source helper patterns do.
+			Where volley targets come from: a node group, the mouse cursor, a global position snapshot, a node path, a node name, or a node's children. Each source shows its own settings, like the pattern_source helper patterns do. Sources never pick the spawner itself, its pattern markers, nodes under a [BulletFactory2D], nodes already queued for deletion, or non-Node2D nodes. When a shot finds no target it still fires as a plain volley, and a warning explaining why prints once per homing configuration (changing any homing target setting re-arms it).
 		</member>
 		<member name="homing_update_interval" type="float" setter="set_homing_update_interval" getter="get_homing_update_interval" default="0.0">
 			Seconds between target position refreshes. 0 refreshes every tick.
@@ -1453,7 +1453,7 @@
 			<param index="0" name="directional_bullets_instance" type="DirectionalBullets2D" />
 			<param index="1" name="targets" type="Array" />
 			<description>
-				Fired per volley with the resolved targets (Node2D or Vector2 entries). Empty for the Mouse source and for volleys that found nothing.
+				Fired once per homing volley with the resolved targets (Node2D or Vector2 entries), before [signal volley_homing_configured]. Empty for the Mouse source and for volleys that found nothing. Not fired while homing is off. A handler may queue_free the volley: the shot is then dropped (volley_skipped "dropped").
 			</description>
 		</signal>
 		<signal name="life_time_over">

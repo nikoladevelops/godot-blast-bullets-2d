@@ -1955,9 +1955,9 @@ class BulletSpawner2D : public Node2D{
         // first pass never waits a full interval.
         double homing_retarget_time_left = 0.0;
         // Warn-once latch for empty target resolution (mutable: used by the
-        // const resolve_homing_targets). Without it every volley/retarget
-        // with no enemies present spams the debugger; the latch clears as
-        // soon as any resolution succeeds, so a regression warns again.
+        // const resolve_homing_targets). One warning per homing target
+        // configuration: shots resolve non-quietly, so a typo'd group or a
+        // dead target path is reported, but never once per volley.
         mutable bool homing_empty_targets_warned = false;
         // Cursor for HOMING_SELECT_ROUND_ROBIN across volleys (mutable: used
         // by the const resolve_homing_targets).
@@ -2298,8 +2298,10 @@ class BulletSpawner2D : public Node2D{
         // homing_filter_group. Never collects this spawner itself.
         void collect_homing_candidates_from_children(Node *p_parent, bool recursive, Array &r_candidates) const;
         // Warn-once latch helper for empty resolutions (const: flips the
-        // mutable latch). Quiet passes never warn; a success clears the
-        // latch via clear_empty_homing_targets_warning().
+        // mutable latch). Quiet passes never warn. The latch re-arms only
+        // when the homing target configuration changes
+        // (clear_empty_homing_targets_warning() from those setters), so a
+        // group that empties during play warns at most once.
         void warn_empty_homing_targets_once(const String &message, bool quiet) const;
         void clear_empty_homing_targets_warning() const;
         // Pushes the steering block (smoothing, update interval, reached
