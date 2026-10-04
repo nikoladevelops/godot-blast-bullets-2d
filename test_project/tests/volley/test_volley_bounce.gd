@@ -1703,11 +1703,21 @@ func test_t27_curves_beat_surge_guard_ignores_knobs_degenerate_config() -> void:
 	var d27 := _bounce_data(Vector2(0, 300), 0.0, 100.0, [4], [4])
 	var v27: BulletVolley2D = factory.spawn_volley(d27)
 	v27.set_shared_bullet_curves_data(flat27)
+	# The surge is committed at the drain (start of the tick) and read live
+	# in the bounce handler; the same tick's integration then lets curves
+	# reclaim the speed.
+	var surge27: Array = []
+	var on_surge27 := func(_b, vol: BulletVolley2D, idx: int):
+		if vol == v27:
+			surge27.append(vol.get_bullet_velocity(idx).length())
+	factory.bounce_body_entered.connect(on_surge27)
 	for i in 150:
 		await physics()
 		if v27.bullet_get_bounce_count(0) >= 1:
 			break
-	assert_true(v27.get_bullet_velocity(0).length() > 600.0, "curved bullet still surges at the drain")
+	factory.bounce_body_entered.disconnect(on_surge27)
+	assert_eq(surge27.size(), 1, "one bounce observed live")
+	assert_true(surge27[0] > 600.0, "curved bullet still surges at the drain")
 	for i in 3:
 		await physics()
 	assert_true(absf(v27.get_bullet_velocity(0).length() - 300.0) < 80.0, "curves reclaim the surge next tick")

@@ -726,7 +726,7 @@ void BulletVolley2D::shared_homing_deque_clear_homing_targets() {
 	reset_shared_homing_reached_state();
 	// Unlatch a queued-then-cleared auto-pop: without this the stale
 	// flush pops whatever is pushed next, eating a fresh front target.
-	shared_auto_pop_queued = false;
+	shared_pop_requested = false;
 	orbit_unlock_on_empty_deque();
 }
 
@@ -921,11 +921,8 @@ void BulletVolley2D::clear_homing_state_for_teardown() {
 	adjust_direction_based_on_rotation = false;
 	homing_inert_warning_issued = false;
 	cached_mouse_global_position = Vector2(0, 0);
-	// A queued-then-invalidated shared auto-pop must not stay latched:
-	// the drain bumps homing_operation_generation so the pop no-ops, and
-	// a later manual wake (which skips the enable-path reset) would
-	// otherwise never queue another one.
-	shared_auto_pop_queued = false;
+	// A pending shared pop never outlives the targets it would pop.
+	shared_pop_requested = false;
 	// Shared movement/speed/rotation are per-owner runtime state like the
 	// homing deques: a pooled instance must not steer the next owner along
 	// the previous owner's pattern or speed. enable_volley() re-seeds
@@ -965,52 +962,60 @@ void BulletVolley2D::clear_homing_state_for_teardown() {
 	bounce_mask_warning_issued = false;
 }
 
-void BulletVolley2D::_do_emit_homing_target_reached(uint64_t p_generation, int p_bullet_index, uint64_t p_bullet_epoch, uint64_t p_target_instance_id, const Vector2 &p_target_global_position) {
-	if (p_generation != homing_operation_generation) {
-		return; // Scheduled by a previous life (pool reuse before the flush).
+bool BulletVolley2D::dispatch_homing_events() {
+	homing_dispatch_scratch.clear();
+	homing_dispatch_scratch.swap(homing_reached_events);
+	const bool shared_pop = shared_pop_requested;
+	const uint64_t shared_identity = shared_pop_identity;
+	shared_pop_requested = false;
+	const uint64_t self_id = get_instance_id();
+	const StringName &reached_signal = CachedStringNames2D::get().bullet_homing_target_reached;
+	const StringName &forward_signal = CachedStringNames2D::get().volley_bullet_homing_target_reached;
+	for (size_t k = 0; k < homing_dispatch_scratch.size(); ++k) {
+		const HomingReachedEvent ev = homing_dispatch_scratch[k];
+		// An earlier handler disabled (or disabled + woke) this bullet: the
+		// reach belongs to a bullet that is gone.
+		if (!all_bullets_enabled_set.contains(ev.bullet_index) || collision_epoch_for_bullet(ev.bullet_index) != ev.epoch) {
+			continue;
+		}
+		Node2D *target = nullptr;
+		if (ev.target_instance_id != 0) {
+			target = Object::cast_to<Node2D>(ObjectDB::get_instance(ObjectID(ev.target_instance_id)));
+		}
+		emit_signal(reached_signal, this, ev.bullet_index, target, ev.target_position);
+		if (ObjectDB::get_instance(ObjectID(self_id)) != this) {
+			return false;
+		}
+		// Owner spawner forward: a direct emit on the owner (no per-volley
+		// connection to maintain across pool reuse and adoption).
+		if (owner_spawner_id != 0) {
+			Object *owner = ObjectDB::get_instance(ObjectID(owner_spawner_id));
+			if (owner != nullptr) {
+				owner->emit_signal(forward_signal, this, ev.bullet_index, target, ev.target_position);
+				if (ObjectDB::get_instance(ObjectID(self_id)) != this) {
+					return false;
+				}
+			}
+		}
+		if (is_queued_for_deletion()) {
+			homing_dispatch_scratch.clear();
+			return true;
+		}
+		// Per-bullet auto-pop: only while the reached target is still this
+		// bullet's front (a target the handler pushed in front is spared).
+		if (ev.auto_pop && ev.bullet_index < (int)all_bullet_homing_targets.size() && all_bullets_enabled_set.contains(ev.bullet_index)) {
+			HomingTargetDeque &deque = all_bullet_homing_targets[ev.bullet_index];
+			if (!deque.empty() && orbit_target_identity(deque) == ev.front_identity) {
+				bullet_homing_pop_front_target(ev.bullet_index);
+			}
+		}
 	}
-	// No signal for a bullet whose life ended after the queue: single-bullet
-	// disable/enable bumps the per-bullet epoch (but not the volley
-	// generation), and a disabled bullet must stay silent even when its
-	// epoch still matches (e.g. reach -> disable with no re-enable).
-	if (p_bullet_index < 0 || p_bullet_index >= (int)bullet_homing_epochs.size() || bullet_homing_epochs[p_bullet_index] != p_bullet_epoch || !all_bullets_enabled_set.contains(p_bullet_index)) {
-		return;
+	homing_dispatch_scratch.clear();
+	if (shared_pop && !shared_homing_deque.empty() && orbit_target_identity(shared_homing_deque) == shared_identity) {
+		shared_homing_deque.pop_front_target(cached_mouse_global_position);
+		orbit_route_shared_front_change();
 	}
-	Node2D *target = nullptr;
-	if (p_target_instance_id != 0) {
-		target = Object::cast_to<Node2D>(ObjectDB::get_instance(ObjectID(p_target_instance_id)));
-	}
-	emit_signal(CachedStringNames2D::get().bullet_homing_target_reached, this, p_bullet_index, target, p_target_global_position);
-}
-
-void BulletVolley2D::_do_shared_auto_pop_front_target(uint64_t p_generation, uint64_t p_front_epoch) {
-	if (p_generation != homing_operation_generation) {
-		return; // Never touch the flag: it belongs to the new life now.
-	}
-	// The deque's front changed since this pop was queued, so a manual
-	// push/pop/clear already superseded it. Unlatch (so a later real reach
-	// can queue again) but do NOT pop: popping here would eat the target
-	// the user just queued deliberately.
-	if (p_front_epoch != shared_homing_front_epoch) {
-		shared_auto_pop_queued = false;
-		return;
-	}
-	shared_auto_pop_queued = false;
-	shared_homing_deque.pop_front_target(cached_mouse_global_position);
-	// orbit_route_shared_front_change() calls reset_shared_homing_reached_state(),
-	// which is the single place that bumps shared_homing_front_epoch - so the
-	// pop itself does not need (and must not add) a second bump.
-	orbit_route_shared_front_change();
-}
-
-void BulletVolley2D::_do_auto_pop_front_target(uint64_t p_generation, int p_bullet_index, uint64_t p_bullet_epoch) {
-	if (p_generation != homing_operation_generation) {
-		return;
-	}
-	if (p_bullet_index < 0 || p_bullet_index >= (int)bullet_homing_epochs.size() || bullet_homing_epochs[p_bullet_index] != p_bullet_epoch) {
-		return;
-	}
-	bullet_homing_pop_front_target(p_bullet_index);
+	return true;
 }
 
 } // namespace BlastBullets2D

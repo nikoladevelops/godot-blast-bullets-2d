@@ -577,6 +577,29 @@ void BulletFactory2D::clear_sprite_effects() {
 	fx_manual_bakes.clear();
 }
 
+void BulletFactory2D::debug_set_effect_log_enabled(bool enabled) {
+	debug_effect_log_enabled = enabled;
+	if (!enabled) {
+		debug_effect_log.clear();
+	}
+}
+
+void BulletFactory2D::debug_log_effect(int trigger, uint64_t volley_id, int bullet_index, const Vector2 &position) {
+	if (!debug_effect_log_enabled) {
+		return;
+	}
+	if (debug_effect_log.size() >= 4096) {
+		debug_effect_log.remove_at(0);
+	}
+	Dictionary e;
+	e["trigger"] = trigger;
+	e["volley"] = (int64_t)volley_id;
+	e["bullet"] = bullet_index;
+	e["position"] = position;
+	e["frame"] = (int64_t)Engine::get_singleton()->get_physics_frames();
+	debug_effect_log.push_back(e);
+}
+
 Dictionary BulletFactory2D::debug_get_effect_state() const {
 	Dictionary d;
 	d["clock"] = fx_clock;

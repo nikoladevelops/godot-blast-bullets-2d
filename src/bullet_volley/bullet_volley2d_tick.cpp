@@ -9,17 +9,64 @@ using namespace godot;
 
 namespace BlastBullets2D {
 
+bool BulletVolley2D::tick_may_continue(uint64_t self_id) const {
+	if (ObjectDB::get_instance(ObjectID(self_id)) != this) {
+		return false;
+	}
+	if (is_queued_for_deletion()) {
+		return false;
+	}
+	return bullet_factory == nullptr || !bullet_factory->is_bullet_processing_paused();
+}
+
+void BulletVolley2D::tick(double delta) {
+	if (!Math::is_finite(delta) || delta < 0.0) {
+		return;
+	}
+	const uint64_t self_id = get_instance_id();
+	// Bounce bookkeeping runs only while armed; plain volleys skip it. The
+	// tick id advances BEFORE the drain: the one-bounce-per-bullet-per-tick
+	// guard compares against it, and a fresh ledger holds 0 (a volley whose
+	// first tick is a drain must not read as "already bounced this tick").
+	if (bounce_enabled()) {
+		++bounce_tick_counter;
+		bounce_last_delta = delta;
+	}
+	// 1. Hits first: the records were queued by the physics server for the
+	// pose it just tested (the current cached pose), so handlers, bounce
+	// normals and hit effects all see the impact pose, and a killed bullet
+	// never integrates one more step.
+	drain_collisions();
+	if (!tick_may_continue(self_id) || !is_active) {
+		return;
+	}
+	// 2. Integration (no user code runs inside; homing reaches are queued).
+	move_bullets(delta);
+	// 3. Homing reached events (live) + auto-pops.
+	if (!homing_reached_events.empty() || shared_pop_requested) {
+		if (!dispatch_homing_events() || !tick_may_continue(self_id) || !is_active) {
+			return;
+		}
+	}
+	// 4. Sprite animation (may emit sprite_animation_finished, live).
+	advance_sprite_animation(delta);
+	if (anim_finished_event_pending) {
+		anim_finished_event_pending = false;
+		emit_signal(CachedStringNames2D::get().sprite_animation_finished, this);
+		if (!tick_may_continue(self_id) || !is_active) {
+			return;
+		}
+	}
+	// 5. Lifetime (may emit life_time_over, live).
+	reduce_lifetime(delta);
+}
+
 void BulletVolley2D::move_bullets(double delta) {
 	if (amount_bullets <= 0 || physics_server == nullptr || !area.is_valid()) {
 		return;
 	}
 	if (!Math::is_finite(delta) || delta < 0.0) {
 		return;
-	}
-	// Bounce bookkeeping runs only while armed; plain volleys skip it.
-	if (bounce_enabled()) {
-		++bounce_tick_counter;
-		bounce_last_delta = delta;
 	}
 	const bool is_using_physics_interpolation = bullet_factory != nullptr && bullet_factory->use_physics_interpolation;
 	if (is_using_physics_interpolation) {
@@ -872,37 +919,6 @@ bool shared_homing_deque_enabled = !shared_homing_deque.empty();
 		batch_flush_instance_transforms();
 	}
 
-	// Collisions last: a handler can kill the whole volley mid-drain, so work on a copy - the live list may vanish under us.
-	// Self-liveness token (same pattern as handle_bullet_collision): a
-	// handler that immediately frees this volley leaves every member
-	// access below as use-after-free. ObjectDB validates the id without
-	// touching the object, so a freed volley breaks safely instead of
-	// crashing (misuse is still prohibited by the handler contract).
-	const uint64_t drain_self_id = get_instance_id();
-	if (!all_collided_bullets.empty()) {
-		collision_scratch.clear();
-		collision_scratch.swap(all_collided_bullets);
-		// The dedup keys describe exactly this drain window. Clearing them
-		// here (not at the end) is safe: the physics server only queues from
-		// callbacks that run outside the drain, and any overlap that starts
-		// re-filling mid-drain must be able to queue again next frame.
-		clear_collision_dedup_keys();
-		for (auto &data : collision_scratch) {
-			handle_bullet_collision(data.collision_type, data.bullet_index, data.collided_instance_id, data.queue_bullet_epoch, data.queue_target_velocity, data.queue_target_velocity_valid, data.queue_target_position, data.queue_target_position_valid);
-			// handle_bullet_collision calls straight into user code, and that code may free this very volley, so
-			// check we're still alive before touching anything below (queue_free is caught by the second check).
-			// reject via the factory guards).
-			if (ObjectDB::get_instance(ObjectID(drain_self_id)) != this) {
-				// Freed: every member (collision_scratch included) is gone,
-				// so touching anything here would be use-after-free.
-				return;
-			}
-			if (is_queued_for_deletion()) {
-				collision_scratch.clear();
-				break;
-			}
-		}
-	}
 }
 
 // ---- Per-bullet helpers called from move_bullets (inline, this file only) ----
@@ -1224,54 +1240,28 @@ _ALWAYS_INLINE_ void BulletVolley2D::try_to_emit_bullet_homing_target_reached_si
 			target.has_bullet_reached_target = true;
 		}
 
-		// Ensure that the signal is emitted only ONCE per bullet per target
+		// Ensure that the signal is emitted only ONCE per bullet per target.
+		// No user code may run inside the move loop: record the event and
+		// let dispatch_homing_events() emit it right after the loop.
 		if (fire_for_this_bullet) {
-			const uint64_t bullet_epoch = (bullet_index >= 0 && bullet_index < (int)bullet_homing_epochs.size()) ? bullet_homing_epochs[bullet_index] : 0;
-			switch (target.type) {
-				case GlobalPositionTarget:
-					// Deferred through the generation-guarded emitter: the target travels
-					// as an instance id (resolved at fire time, null when freed) and a
-					// stale generation no-ops, so pool reuse before the flush can neither
-					// crash on a dangling pointer nor emit ghosts.
-					call_deferred(CachedStringNames2D::get().m_do_emit_homing_target_reached, homing_operation_generation, bullet_index, bullet_epoch, (uint64_t)0, target_pos);
-					break;
-				case Node2DTarget: {
-					auto &target_data = target.node2d_target_data;
-
-					// In case the target instance is freed - will still emit the signal, but with a nullptr as the target
-					uint64_t target_id = 0;
-					if (homing_deque.is_homing_target_valid(target_data.target, target_data.cached_valid_instance_id)) {
-						target_id = target_data.cached_valid_instance_id;
-					}
-					call_deferred(CachedStringNames2D::get().m_do_emit_homing_target_reached, homing_operation_generation, bullet_index, bullet_epoch, target_id, target_pos);
-					break;
-				}
-				case NotHoming:
-					break;
-				case MousePositionTarget:
-					call_deferred(CachedStringNames2D::get().m_do_emit_homing_target_reached, homing_operation_generation, bullet_index, bullet_epoch, (uint64_t)0, target_pos);
-					break;
+			HomingReachedEvent ev;
+			ev.bullet_index = bullet_index;
+			ev.epoch = collision_epoch_for_bullet(bullet_index);
+			ev.target_position = target_pos;
+			// A freed Node2D target still emits, with a null target.
+			if (target.type == Node2DTarget && homing_deque.is_homing_target_valid(target.node2d_target_data.target, target.node2d_target_data.cached_valid_instance_id)) {
+				ev.target_instance_id = target.node2d_target_data.cached_valid_instance_id;
 			}
-
-			// Pop the front target automatically if that's what the user wants.
-			// Shared deque: N bullets reaching in the same tick must queue exactly
-			// ONE deferred pop, otherwise the storm would drain every target the
-			// user pushed. Per-bullet deques pop their own deque per bullet - no
-			// storm there.
+			ev.front_identity = orbit_target_identity(homing_deque);
 			if (is_using_shared_homing_deque) {
-				// Both the generation and the shared front epoch travel with
-				// the pop: a pool reuse no-ops, and a manual shared-deque edit
-				// landing before the flush cancels this stale pop.
-				if (shared_homing_deque_auto_pop_after_target_reached && !shared_auto_pop_queued) {
-					shared_auto_pop_queued = true;
-					call_deferred(CachedStringNames2D::get().m_do_shared_auto_pop_front_target, homing_operation_generation, shared_homing_front_epoch);
+				if (shared_homing_deque_auto_pop_after_target_reached && !shared_pop_requested) {
+					shared_pop_requested = true;
+					shared_pop_identity = ev.front_identity;
 				}
 			} else {
-				if (bullet_homing_auto_pop_after_target_reached) {
-					const uint64_t pop_epoch = (bullet_index >= 0 && bullet_index < (int)bullet_homing_epochs.size()) ? bullet_homing_epochs[bullet_index] : 0;
-					call_deferred(CachedStringNames2D::get().m_do_auto_pop_front_target, homing_operation_generation, bullet_index, pop_epoch);
-				}
+				ev.auto_pop = bullet_homing_auto_pop_after_target_reached;
 			}
+			homing_reached_events.push_back(ev);
 		}
 	}
 }

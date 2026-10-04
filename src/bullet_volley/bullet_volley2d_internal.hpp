@@ -77,6 +77,20 @@ _ALWAYS_INLINE_ void BulletVolley2D::update_bullet_previous_transform_for_interp
 	all_previous_attachment_transf[bullet_index] = attachment_transforms[bullet_index];
 }
 
+_ALWAYS_INLINE_ uint64_t BulletVolley2D::collision_epoch_for_bullet(int bullet_index) const {
+	if (bullet_index < 0 || bullet_index >= (int)bullet_collision_epochs.size()) {
+		return 0;
+	}
+	return bullet_collision_epochs[bullet_index];
+}
+
+_ALWAYS_INLINE_ void BulletVolley2D::bump_collision_epoch_for_bullet(int bullet_index) {
+	if (bullet_index < 0 || bullet_index >= (int)bullet_collision_epochs.size()) {
+		return;
+	}
+	++bullet_collision_epochs[bullet_index];
+}
+
 _ALWAYS_INLINE_ void BulletVolley2D::bump_attachment_epoch(int bullet_index) {
 	if (bullet_index >= 0 && bullet_index < (int)attachment_assignment_epochs.size()) {
 		++attachment_assignment_epochs[bullet_index];
@@ -1009,7 +1023,6 @@ _ALWAYS_INLINE_ void BulletVolley2D::reset_shared_homing_reached_state() {
 		state.front_target = nullptr;
 		state.fired = false;
 	}
-	bump_shared_homing_front_epoch();
 }
 
 _ALWAYS_INLINE_ void BulletVolley2D::orbit_route_shared_front_change() {

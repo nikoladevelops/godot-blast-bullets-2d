@@ -51,13 +51,6 @@ void BulletVolley2D::set_collision_dedup_by_object(bool value) {
 	clear_collision_dedup_keys();
 }
 
-_ALWAYS_INLINE_ uint64_t BulletVolley2D::collision_epoch_for_bullet(int bullet_index) const {
-	if (bullet_index < 0 || bullet_index >= (int)bullet_collision_epochs.size()) {
-		return 0;
-	}
-	return bullet_collision_epochs[bullet_index];
-}
-
 bool BulletVolley2D::read_queued_target_velocity(int64_t entered_instance_id, Vector2 &out_velocity) {
 	// Cached once (same rationale as the bounce drain below).
 	const StringName &prop_linear_velocity = CachedStringNames2D::get().linear_velocity;
@@ -602,171 +595,160 @@ void BulletVolley2D::set_bullet_collision_count(int bullet_index, int value) {
 	}
 }
 
-void BulletVolley2D::handle_bullet_collision(CollisionType collision_type, int bullet_index, int64_t entered_instance_id, uint64_t queued_bullet_epoch, Vector2 queued_target_velocity, bool queued_velocity_valid, Vector2 queued_target_position, bool queue_position_valid) {
-		if (bullet_index < 0 || bullet_index >= amount_bullets) {
+void BulletVolley2D::park_collision_record(const BulletCollisionData2D &record) {
+	// A pause requested mid-drain: the record describes a real overlap the
+	// server will never report again (steady overlap), so it waits with the
+	// other paused overlaps and replays exactly once on resume.
+	if (record.bullet_index < 0 || record.bullet_index >= amount_bullets) {
+		return;
+	}
+	for (const PausedOverlap2D &p : paused_overlaps) {
+		if (p.bullet_index == record.bullet_index && p.target_id == record.collided_instance_id && p.type == record.collision_type) {
 			return;
-		}
-		if (bullet_index >= (int)bullets_current_collision_count.size() || bullet_index >= (int)attachments.size() || bullet_index >= (int)all_cached_instance_transforms.size()) {
-			return;
-		}
-		// Stale record check: a handler earlier in this same drain may have
-		// disabled then re-enabled this slot (epoch bump on both). The queued
-		// stamp no longer matches, so this record describes a dead overlap,
-		// not a new hit - skip it instead of double-counting.
-		if (queued_bullet_epoch != collision_epoch_for_bullet(bullet_index)) {
-			return;
-		}
-		const bool curr_bullet_status = all_bullets_enabled_set.contains(bullet_index);
-
-		// If the bullet is already disabled, just return
-		if (!curr_bullet_status) {
-			return;
-		}
-		if (bullet_factory != nullptr) {
-			++bullet_factory->stats_collision_records_total;
-		}
-
-		// Bounce precedence: a bounce-eligible hit ricochets here and never
-		// reaches the counter below (unless the volley asked to consume the
-		// hit too, decision 2). The hook owns its signals + self-liveness.
-		const uint64_t bounce_self_id = get_instance_id();
-		const int bounce_decision = try_handle_bounce(collision_type, bullet_index, entered_instance_id, queued_target_velocity, queued_velocity_valid, queued_target_position, queue_position_valid);
-		if (bounce_decision == 1) {
-			return;
-		}
-		// A consumed bounce already ran the bounce handler (user code): it may
-		// have disabled, cleared or re-enabled this bullet, or freed/queued
-		// the volley. The hit path only continues for the same live bullet.
-		if (bounce_decision == 2) {
-			if (ObjectDB::get_instance(ObjectID(bounce_self_id)) != this || is_queued_for_deletion()) {
-				return;
-			}
-			if (!all_bullets_enabled_set.contains(bullet_index) || queued_bullet_epoch != collision_epoch_for_bullet(bullet_index)) {
-				return;
-			}
-		}
-
-		int &current_bullet_collision_amount = bullets_current_collision_count[bullet_index];
-
-		// Always keep track of how many collisions this bullet had (yes even if the user set bullet_max_collision_count to 0, I just want consistent behavior)
-		++current_bullet_collision_amount;
-
-		const bool bullet_reached_max_collisions = bullet_max_collision_count > 0 && current_bullet_collision_amount >= bullet_max_collision_count;
-
-		// Effect pose captured before any disable below (disable never moves
-		// the bullet, but the handler at the signal below may).
-		const Transform2D fx_hit_transf = all_cached_instance_transforms[bullet_index];
-
-		// Snapshot the signal owner BEFORE any disable below: the killing blow
-		// funnels into disable_volley(), which clears owner_spawner_id and
-		// pools the instance. Resolving after would route a spawner volley's
-		// hit to the factory (or drop it) instead of the owning spawner.
-		Object *emitter = resolve_signal_emitter();
-
-		// Only disable the bullet if the max collision count is greater than 0, otherwise the bullet should never be disabled due to collisions
-		// Killing blow: guard the attachment slot across the disable below.
-		// disable_bullet() on the last live bullet funnels into
-		// disable_volley(), whose sweep would pool every attachment BEFORE
-		// the collision signal fires (handler would see nullptr). The lifetime
-		// path reclaims attachments for exactly this reason; do the same here.
-		// Note the guard covers the disable (where the sweep runs), not the
-		// signal emit that follows it.
-		if (bullet_reached_max_collisions) {
-			// Save/restore, not plain set/clear: disable_bullet runs user code
-			// (on_bullet_disabled), which could re-enter this handler for a
-			// different slot. The inner frame would clear the outer guard and
-			// leave the outer sweep unprotected.
-			const int saved_protected_slot = signal_protected_attachment_slot;
-			if (bullet_index >= 0 && bullet_index < (int)attachments.size() && attachments[bullet_index] != nullptr) {
-				signal_protected_attachment_slot = bullet_index;
-			}
-			disable_bullet(bullet_index, false); // Don't disable the attachment yet, first emit the signal for collision so user has access to the attachment and CAN detach it himself inside GDScript
-			signal_protected_attachment_slot = saved_protected_slot;
-			// Destroy explosion only (never the hit spark too): the killing
-			// blow gets one visual. Lifetime/manual disables never reach
-			// here, so timeouts don't detonate.
-			fx_fire_oneshot(EFFECT_ON_DESTROY, bullet_index, fx_hit_transf);
-		} else {
-			// Hit sparks for counted hits (free-bounce records never arrive:
-			// the bounce branch above returns before the counter; consumed
-			// bounces already fired the bounce spark, so they stay silent
-			// here instead of doubling the visual).
-			if (bounce_decision != 2) {
-				fx_fire_oneshot(EFFECT_ON_HIT, bullet_index, fx_hit_transf);
-			}
-		}
-
-		// Capture the slot AND its assignment epoch before the signal: the
-		// handler runs user code that may detach, replace, or - through a
-		// re-entrant spawn that pops this instance from the pool - hand the
-		// whole multimesh to a new owner. The post-signal disable below must
-		// only fire when the slot still holds the SAME assignment.
-		BulletAttachment2D *attachment_at_signal_time = (bullet_index >= 0 && bullet_index < (int)attachments.size()) ? attachments[bullet_index] : nullptr;
-		const uint64_t attachment_epoch_at_signal_time = attachment_epoch_for(bullet_index);
-		// The id is captured NOW: the handler below may free() the attachment,
-		// after which the pointer must never be dereferenced again.
-		const uint64_t attachment_id_at_signal_time = attachment_at_signal_time != nullptr ? attachment_at_signal_time->get_instance_id() : 0;
-
-		Object *hit_target = ObjectDB::get_instance(entered_instance_id);
-
-		// Typed per-kind signals emit synchronously (Godot-style): the instance
-		// is alive and the slot state valid by construction here, so handlers
-		// run with live data, need no casts, and need no call_deferred for
-		// game logic. HANDLER CONTRACT: to destroy this volley from inside
-		// the handler use queue_free() (or call_deferred factory free/reset
-		// calls) — never immediate Object.free()/memdelete. The post-emit
-		// code below touches this instance, so an immediately-freed volley
-		// would be use-after-free. Slim payload - custom data and transforms
-		// are one
-		// instance call away (bullet_get_custom_data(),
-		// get_bullet_global_transform()).
-		// Possessed by the tagged spawner when there is one, else the factory.
-		// A null emitter (teardown, spawner gone, or both gone) only skips the
-		// notification - cleanup below still runs.
-		// Self-liveness token, captured before user code runs: a handler that
-		// immediately frees this volley (against the contract below) leaves
-		// every member access after the emit as use-after-free - including the
-		// is_queued_for_deletion() check itself. ObjectDB validates the id
-		// without touching the object, and comparing the result against this
-		// performs no dereference, so a freed volley bails safely instead of
-		// crashing (misuse is still prohibited: state after the emit is lost).
-		const uint64_t self_id = get_instance_id();
-		// Factory and spawner declare the same signals (area_entered /
-		// body_entered), so one emit serves either owner.
-		if (emitter != nullptr) {
-			if (collision_type == CollisionType::AREA) {
-				emitter->emit_signal(CachedStringNames2D::get().area_entered, hit_target, this, bullet_index);
-			} else if (collision_type == CollisionType::BODY) {
-				emitter->emit_signal(CachedStringNames2D::get().body_entered, hit_target, this, bullet_index);
-			}
-		}
-
-		// Disable the bullet attachment if the bullet reached its max collision count and the attachment is still enabled
-		if (bullet_reached_max_collisions) {
-			// The signal above runs user code that may have detached this slot
-			// already (bullet_set_attachment_to_null / bullet_free_attachment /
-			// bullet_set_attachment), or re-assigned it. Only disable the slot if
-			// it still holds what we captured - anything else belongs to whoever
-			// changed it (possibly a new pool owner), and disable_volley()'s
-			// sweep catches any survivor that would otherwise leak.
-			// The handler may also have freed THIS multimesh (queue_free during
-			// the sync emit): attachments[]/bullets_current_collision_count[] are
-			// member vectors, so bail before touching them.
-			// The handler may also have freed the captured attachment itself:
-			// compare by instance id (never a raw dangling pointer), and only
-			// after confirming this multimesh is still alive.
-			// Liveness FIRST (see self_id token above): no member touch - not
-			// even is_queued_for_deletion() - when the handler freed us.
-		if (ObjectDB::get_instance(ObjectID(self_id)) != this) {
-			return;
-		}
-		if (is_queued_for_deletion()) {
-			return;
-		}
-		if (slot_still_holds_attachment(bullet_index, attachment_at_signal_time, attachment_id_at_signal_time, attachment_epoch_at_signal_time)) {
-			bullet_disable_attachment(bullet_index);
-		}
 		}
 	}
+	if (paused_overlaps.size() >= kMaxPausedOverlaps) {
+		return;
+	}
+	PausedOverlap2D p;
+	p.bullet_index = record.bullet_index;
+	p.target_id = record.collided_instance_id;
+	p.type = record.collision_type;
+	p.epoch = record.queue_bullet_epoch;
+	paused_overlaps.push_back(p);
+}
+
+void BulletVolley2D::drain_collisions() {
+	if (all_collided_bullets.empty()) {
+		return;
+	}
+	// Work on a swapped-out copy: handlers run user code, and the physics
+	// server only queues into all_collided_bullets from its own callbacks
+	// (never during this drain), so the live list starts empty for the next
+	// window. The dedup keys describe exactly this window.
+	collision_scratch.clear();
+	collision_scratch.swap(all_collided_bullets);
+	clear_collision_dedup_keys();
+	// Self-liveness token: a handler that immediately frees this volley
+	// (against the contract) leaves every member access below as
+	// use-after-free. ObjectDB validates the id without touching the object.
+	const uint64_t self_id = get_instance_id();
+	for (size_t k = 0; k < collision_scratch.size(); ++k) {
+		const BulletCollisionData2D record = collision_scratch[k];
+		handle_bullet_collision(record);
+		if (ObjectDB::get_instance(ObjectID(self_id)) != this) {
+			return; // freed: collision_scratch is gone with it
+		}
+		if (is_queued_for_deletion()) {
+			// Dying at frame end: it reports nothing more.
+			collision_scratch.clear();
+			return;
+		}
+		if (bullet_factory != nullptr && bullet_factory->is_bullet_processing_paused()) {
+			// A handler paused the factory: the rest of this window waits.
+			for (size_t r = k + 1; r < collision_scratch.size(); ++r) {
+				park_collision_record(collision_scratch[r]);
+			}
+			collision_scratch.clear();
+			return;
+		}
+	}
+	collision_scratch.clear();
+}
+
+void BulletVolley2D::handle_bullet_collision(const BulletCollisionData2D &record) {
+	const int bullet_index = record.bullet_index;
+	if (bullet_index < 0 || bullet_index >= amount_bullets) {
+		return;
+	}
+	if (bullet_index >= (int)bullets_current_collision_count.size() || bullet_index >= (int)attachments.size() || bullet_index >= (int)all_cached_instance_transforms.size()) {
+		return;
+	}
+	// Stale record: the bullet was disabled (or disabled and woken) after the
+	// server queued this overlap, by a handler earlier in this drain or by
+	// any code between the queue and the drain. Its epoch moved on.
+	if (record.queue_bullet_epoch != collision_epoch_for_bullet(bullet_index)) {
+		return;
+	}
+	if (!all_bullets_enabled_set.contains(bullet_index)) {
+		return;
+	}
+	// A target freed since the overlap was queued (free() in a previous
+	// handler, or during a pause) is no longer something the bullet can
+	// hit: drop the record instead of counting a ghost hit or handing the
+	// handler a null target.
+	Object *hit_target = ObjectDB::get_instance(record.collided_instance_id);
+	if (hit_target == nullptr) {
+		return;
+	}
+	if (bullet_factory != nullptr) {
+		++bullet_factory->stats_collision_records_total;
+	}
+	const uint64_t self_id = get_instance_id();
+	const uint64_t record_epoch = record.queue_bullet_epoch;
+	auto same_live_bullet = [&]() -> bool {
+		if (ObjectDB::get_instance(ObjectID(self_id)) != this || is_queued_for_deletion()) {
+			return false;
+		}
+		return all_bullets_enabled_set.contains(bullet_index) && collision_epoch_for_bullet(bullet_index) == record_epoch;
+	};
+
+	// Bounce precedence: a bounce-eligible hit ricochets here (its own live
+	// signal) and never reaches the counter below, unless the volley asked
+	// to consume the hit too (decision 2).
+	const int bounce_decision = try_handle_bounce(record.collision_type, bullet_index, record.collided_instance_id, record.queue_target_velocity, record.queue_target_velocity_valid, record.queue_target_position, record.queue_target_position_valid);
+	if (bounce_decision == 1) {
+		return;
+	}
+	if (bounce_decision == 2 && !same_live_bullet()) {
+		return; // the bounce handler disabled/cleared/freed it
+	}
+
+	// Count the hit BEFORE the signal: handlers read the hit that just landed
+	// (get_bullet_collision_count, and get_bullet_hits_remaining == 0 means
+	// this hit is lethal unless the handler intervenes).
+	++bullets_current_collision_count[bullet_index];
+
+	// Impact pose, captured before user code (a handler may move the bullet):
+	// the drain runs before this frame's move, so this is the pose the
+	// physics server tested.
+	const Transform2D impact_transf = all_cached_instance_transforms[bullet_index];
+
+	// LIVE emit: the bullet is still enabled, its attachment still attached,
+	// every per-bullet value intact. Factory and spawner declare the same
+	// signals, so one emit serves either owner. A null emitter (spawner
+	// gone, teardown) only skips the notification; the kill below still runs.
+	// HANDLER CONTRACT: queue_free() (or the *_deferred factory calls) to
+	// destroy things from here; an immediate free() of this volley is
+	// survived (liveness token) but its pending work is lost.
+	Object *emitter = resolve_signal_emitter();
+	if (emitter != nullptr) {
+		const StringName &signal_name = record.collision_type == CollisionType::AREA ? CachedStringNames2D::get().area_entered : CachedStringNames2D::get().body_entered;
+		emitter->emit_signal(signal_name, hit_target, this, bullet_index);
+	}
+
+	// The handler owns whatever it changed: a disable/clear/wake (epoch
+	// moved), a freed or dying volley, all end the record here.
+	if (!same_live_bullet()) {
+		return;
+	}
+	if (bullet_index >= (int)bullets_current_collision_count.size()) {
+		return;
+	}
+	// Decide with the CURRENT state: a heal (set_bullet_collision_count) or a
+	// raised max vetoes the kill; max 0 is infinite.
+	const bool lethal = bullet_max_collision_count > 0 && bullets_current_collision_count[bullet_index] >= bullet_max_collision_count;
+	if (lethal) {
+		// Destroy explosion only (never the hit spark too): the killing blow
+		// gets one visual, at the impact pose. The attachment goes back to
+		// the pool with the bullet (the handler already saw it).
+		disable_bullet(bullet_index, true);
+		fx_fire_oneshot(EFFECT_ON_DESTROY, bullet_index, impact_transf);
+	} else if (bounce_decision != 2) {
+		// Hit sparks for counted, survived hits (a consumed bounce already
+		// fired its bounce spark, so it stays silent here).
+		fx_fire_oneshot(EFFECT_ON_HIT, bullet_index, impact_transf);
+	}
+}
 
 } // namespace BlastBullets2D

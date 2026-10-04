@@ -1437,8 +1437,9 @@ void BulletSpawner2D::_bind_methods() {
 	// as the spawner lifecycle signals above: volley_homing_configured and
 	// homing_targets_resolved fire synchronously inside shoot_once() (after
 	// the instance is fully configured, before volley_fired);
-	// volley_bullet_homing_target_reached is a synchronous forward of the
-	// instance's deferred bullet_homing_target_reached.
+	// volley_bullet_homing_target_reached: the owned volley forwards every
+	// bullet_homing_target_reached to its owner spawner directly (live,
+	// inside the factory tick, right after the volley-level emit).
 	// NOTE: PROPERTY_HINT_RESOURCE_TYPE (not NODE_TYPE) carries the class name
 	// to ClassDB/--doctool; see the note on the factory signals.
 	ADD_SIGNAL(MethodInfo("volley_homing_configured",
@@ -1640,7 +1641,6 @@ void BulletSpawner2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("adopt_live_volley", "volley"), &BulletSpawner2D::adopt_live_volley);
 	ClassDB::bind_method(D_METHOD("clear_live_volleys_homing"), &BulletSpawner2D::clear_live_volleys_homing);
 	ClassDB::bind_method(D_METHOD("override_live_volleys_velocity", "new_velocity"), &BulletSpawner2D::override_live_volleys_velocity);
-	ClassDB::bind_method(D_METHOD("_on_volley_bullet_homing_target_reached", "volley", "bullet_index", "target", "target_global_position"), &BulletSpawner2D::_on_volley_bullet_homing_target_reached);
 
 	// Need this in order to expose the enum constants to Godot Engine
 	BIND_ENUM_CONSTANT(HOMING_SHARED);

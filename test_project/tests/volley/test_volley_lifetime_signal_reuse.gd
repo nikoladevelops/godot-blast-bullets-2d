@@ -23,7 +23,7 @@ func _data() -> BulletVolleyData2D:
 
 
 func _on_lifetime(volley: Object, indexes: Array) -> void:
-	signals.append([volley, indexes.duplicate()])
+	signals.append([volley, indexes.duplicate(), int((volley as BulletVolley2D).debug_get_volley_info().get("generation", -1))])
 	if volley != attach_target:
 		return
 	var seen := []
@@ -73,15 +73,20 @@ func test_same_frame_physics_spawn_after_expiry() -> void:
 
 func test_call_deferred_spawn_before_flush() -> void:
 	var second: BulletVolley2D = factory.spawn_volley(_data())
+	var first_life := int(second.debug_get_volley_info().get("generation", -1))
 	for i in 30:
 		await physics()
 		if not second.debug_get_volley_info().get("is_active", true):
 			break
-		# A same-key spawn queued in the expiry frame flushes before the
-		# deferred signal.
+		# A same-key spawn queued in the expiry frame flushes right after the
+		# tick that expired the volley (and may reuse it for a new life).
 		factory.call_deferred("spawn_volley", _data())
 	await idle()
-	assert_eq(_hits_for(second), 1, "deferred respawn does not eat the expiry signal")
+	var first_life_signals := 0
+	for sig in signals:
+		if sig[0] == second and sig[2] == first_life:
+			first_life_signals += 1
+	assert_eq(first_life_signals, 1, "the first life's expiry is reported exactly once, whatever reuses the volley next")
 
 
 func test_attachments_visible_inside_handler() -> void:

@@ -22,6 +22,9 @@ void BulletFactory2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("clear_sprite_effects"), &BulletFactory2D::clear_sprite_effects);
 	ClassDB::bind_method(D_METHOD("get_active_effect_count"), &BulletFactory2D::get_active_effect_count);
 	ClassDB::bind_method(D_METHOD("debug_get_effect_state"), &BulletFactory2D::debug_get_effect_state);
+	ClassDB::bind_method(D_METHOD("debug_set_effect_log_enabled", "enabled"), &BulletFactory2D::debug_set_effect_log_enabled);
+	ClassDB::bind_method(D_METHOD("debug_get_effect_log"), &BulletFactory2D::debug_get_effect_log);
+	ClassDB::bind_method(D_METHOD("debug_clear_effect_log"), &BulletFactory2D::debug_clear_effect_log);
 
 	ClassDB::bind_method(D_METHOD("get_is_factory_busy"), &BulletFactory2D::get_is_factory_busy);
 

@@ -958,23 +958,12 @@ bool BulletSpawner2D::adopt_live_volley(BulletVolley2D *bullets) {
         UtilityFunctions::push_error("BulletSpawner2D::adopt_live_volley: instance is queued for deletion.");
         return false;
     }
-    // Takes over a manually-woken volley (manual wake detaches the previous
-    // owner): stamps, hooks the forwarder, tracks. Queues are left alone.
-    // Only the previous spawner's forwarder is dropped: user handlers
-    // connected directly on the volley (bullet_homing_target_reached) belong
-    // to the game, not to the old spawner, and must survive the handover.
+    // Takes over a live volley: stamps ownership (collision, lifetime and
+    // homing-reached signals now reach this spawner: the volley forwards
+    // reaches to its owner directly, no connection to rewire) and tracks it
+    // for retargeting. Queues are left alone; user handlers connected
+    // directly on the volley belong to the game and keep working.
     bullets->owner_spawner_id = get_instance_id();
-    for (const Dictionary &connection : bullets->get_signal_connection_list("bullet_homing_target_reached")) {
-        const Callable callable = connection["callable"];
-        const Object *target = callable.get_object();
-        if (target != nullptr && Object::cast_to<BulletSpawner2D>(target) != nullptr && callable.get_method() == StringName("_on_volley_bullet_homing_target_reached")) {
-            bullets->disconnect("bullet_homing_target_reached", callable);
-        }
-    }
-    const Callable forward_callable(this, "_on_volley_bullet_homing_target_reached");
-    if (!bullets->is_connected("bullet_homing_target_reached", forward_callable)) {
-        bullets->connect("bullet_homing_target_reached", forward_callable);
-    }
     track_live_volley(bullets);
     return true;
 }
@@ -1154,10 +1143,6 @@ int BulletSpawner2D::retarget_live_volleys() {
     return done;
 }
 
-void BulletSpawner2D::_on_volley_bullet_homing_target_reached(Object *volley, int bullet_index, Object *target, const Vector2 &target_global_position) {
-    emit_signal("volley_bullet_homing_target_reached", volley, bullet_index, target, target_global_position);
-}
-
 void BulletSpawner2D::apply_steering_to_volley(BulletVolley2D *volley) const {
     volley->set_homing_smoothing((real_t)homing_smoothing);
     volley->set_homing_update_interval((real_t)homing_update_interval);
@@ -1293,13 +1278,6 @@ void BulletSpawner2D::apply_volley_homing_and_orbiting(BulletVolley2D *bullets, 
     // ring on the very first tick instead of flying straight for a frame.
     if (orbiting_enabled && homing_enabled) {
         apply_orbiting_to_volley(bullets);
-    }
-    // Re-hooked every volley: enabling (pool reuse) disconnects all
-    // bullet_homing_target_reached handlers, so a stale connection can never
-    // survive here, and is_connected guards the double-spawn edge anyway.
-    const Callable forward_callable(this, "_on_volley_bullet_homing_target_reached");
-    if (!bullets->is_connected("bullet_homing_target_reached", forward_callable)) {
-        bullets->connect("bullet_homing_target_reached", forward_callable);
     }
     // Only homing volleys are worth tracking: without homing, retargeting
     // can never touch them, so tracking would only grow the list.

@@ -84,10 +84,6 @@ void BulletVolley2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("bullet_disable_attachment", "bullet_index"), &BulletVolley2D::bullet_disable_attachment);
 	ClassDB::bind_method(D_METHOD("bullet_enable_attachment", "bullet_index"), &BulletVolley2D::bullet_enable_attachment);
 	ClassDB::bind_method(D_METHOD("get_amount_active_attachments"), &BulletVolley2D::get_amount_active_attachments);
-	ClassDB::bind_method(D_METHOD("_do_deferred_bullet_disable_attachments", "expected_generation", "requests"), &BulletVolley2D::_do_deferred_bullet_disable_attachments);
-	ClassDB::bind_method(D_METHOD("_do_emit_life_time_over", "expected_generation", "emitter_instance_id", "signal_name", "bullet_indexes"), &BulletVolley2D::_do_emit_life_time_over);
-	ClassDB::bind_method(D_METHOD("_do_emit_sprite_animation_finished", "expected_generation"), &BulletVolley2D::_do_emit_sprite_animation_finished);
-	ClassDB::bind_method(D_METHOD("_do_finish_lifetime_hold", "expected_generation"), &BulletVolley2D::_do_finish_lifetime_hold);
 
 	ClassDB::bind_method(D_METHOD("get_amount_bullets"), &BulletVolley2D::get_amount_bullets);
 
@@ -346,9 +342,6 @@ void BulletVolley2D::_bind_methods() {
 	// SHARED HOMING DEQUE POP METHODS
 	ClassDB::bind_method(D_METHOD("shared_homing_deque_pop_front_target"), &BulletVolley2D::shared_homing_deque_pop_front_target);
 	ClassDB::bind_method(D_METHOD("shared_homing_deque_pop_back_target"), &BulletVolley2D::shared_homing_deque_pop_back_target);
-	ClassDB::bind_method(D_METHOD("_do_shared_auto_pop_front_target", "operation_generation", "front_epoch"), &BulletVolley2D::_do_shared_auto_pop_front_target);
-	ClassDB::bind_method(D_METHOD("_do_auto_pop_front_target", "operation_generation", "bullet_index", "bullet_epoch"), &BulletVolley2D::_do_auto_pop_front_target);
-	ClassDB::bind_method(D_METHOD("_do_emit_homing_target_reached", "operation_generation", "bullet_index", "bullet_epoch", "target_instance_id", "target_global_position"), &BulletVolley2D::_do_emit_homing_target_reached);
 
 	// SHARED HOMING DEQUE PUSH METHODS
 	ClassDB::bind_method(D_METHOD("shared_homing_deque_push_front_mouse_position_target"), &BulletVolley2D::shared_homing_deque_push_front_mouse_position_target);
@@ -484,20 +477,18 @@ void BulletVolley2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_override_frame_color", "value"), &BulletVolley2D::set_override_frame_color);
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "override_frame_color"), "set_override_frame_color", "get_override_frame_color");
 	ClassDB::bind_method(D_METHOD("set_is_life_time_infinite", "value"), &BulletVolley2D::set_is_life_time_infinite);
+	ClassDB::bind_method(D_METHOD("get_life_time_left"), &BulletVolley2D::get_life_time_left);
+	ClassDB::bind_method(D_METHOD("set_life_time_left", "seconds"), &BulletVolley2D::set_life_time_left);
 	ADD_GROUP("Lifetime", "");
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "is_life_time_infinite"), "set_is_life_time_infinite", "get_is_life_time_infinite");
 
 	// Time based functions
 	ClassDB::bind_method(D_METHOD("attach_time_based_function", "time", "callable", "repeat", "execute_only_if_volley_is_active"), &BulletVolley2D::attach_time_based_function, DEFVAL(false), DEFVAL(true));
-	ClassDB::bind_method(D_METHOD("_do_attach_time_based_function", "time", "callable", "repeat", "execute_only_if_volley_is_active", "expected_timers_generation"), &BulletVolley2D::_do_attach_time_based_function);
 
 	ClassDB::bind_method(D_METHOD("detach_time_based_function", "callable"), &BulletVolley2D::detach_time_based_function);
-	ClassDB::bind_method(D_METHOD("_do_detach_time_based_function", "callable", "expected_timers_generation"), &BulletVolley2D::_do_detach_time_based_function);
 
 	ClassDB::bind_method(D_METHOD("detach_all_time_based_functions"), &BulletVolley2D::detach_all_time_based_functions);
-	ClassDB::bind_method(D_METHOD("_do_detach_all_time_based_functions", "expected_timers_generation"), &BulletVolley2D::_do_detach_all_time_based_functions);
 
-	ClassDB::bind_method(D_METHOD("_do_execute_stored_callable_safely", "_callback", "_execute_only_if_volley_is_active", "expected_timers_generation", "expected_timer_id"), &BulletVolley2D::_do_execute_stored_callable_safely);
 
 	ClassDB::bind_method(D_METHOD("get_is_auto_pooling_enabled"), &BulletVolley2D::get_is_auto_pooling_enabled);
 	ClassDB::bind_method(D_METHOD("set_is_auto_pooling_enabled", "value"), &BulletVolley2D::set_is_auto_pooling_enabled);

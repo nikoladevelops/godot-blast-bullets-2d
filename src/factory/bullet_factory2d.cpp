@@ -53,16 +53,16 @@ void BulletFactory2D::tick_volleys(double delta) {
 		stats_tick_bullets += volley->active_bullets_counter;
 		const uint64_t volley_id = volley->get_instance_id();
 		volley->is_being_ticked = true;
-		volley->move_bullets(delta);
-		if (ObjectDB::get_instance(ObjectID(volley_id)) != volley) {
-			continue;
-		}
-		volley->advance_sprite_animation(delta);
-		volley->reduce_lifetime(delta);
+		volley->tick(delta);
 		if (ObjectDB::get_instance(ObjectID(volley_id)) != volley) {
 			continue;
 		}
 		volley->is_being_ticked = false;
+		// A handler paused the factory: every volley not ticked yet this
+		// frame stays exactly where it is (hit-stop freezes the frame).
+		if (!is_factory_processing_bullets) {
+			break;
+		}
 	}
 }
 

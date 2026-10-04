@@ -1557,9 +1557,6 @@ class BulletSpawner2D : public Node2D{
         // no-ops per bullet when a speed curve is assigned). Returns how many
         // volleys were touched. Must be finite.
         int override_live_volleys_velocity(const Vector2 &new_velocity);
-        // Forwards the volley instance's bullet_homing_target_reached as the
-        // spawner-level volley_bullet_homing_target_reached signal.
-        void _on_volley_bullet_homing_target_reached(Object *volley, int bullet_index, Object *target, const Vector2 &target_global_position);
 
         // PATTERN PREVIEW (EDITOR ONLY)
         //

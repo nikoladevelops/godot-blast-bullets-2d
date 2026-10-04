@@ -575,6 +575,16 @@ public:
 	// bake is dropped entirely).
 	void clear_sprite_effects();
 	Dictionary debug_get_effect_state() const;
+	// Trigger log for tests: every volley one-shot trigger that actually
+	// fired (layer matched) is recorded as {trigger, volley, bullet,
+	// position, frame} while enabled. Off by default: one bool check per
+	// fire. Bounded (oldest dropped past 4096 entries).
+	bool debug_effect_log_enabled = false;
+	Array debug_effect_log;
+	void debug_set_effect_log_enabled(bool enabled);
+	Array debug_get_effect_log() const { return debug_effect_log.duplicate(); }
+	void debug_clear_effect_log() { debug_effect_log.clear(); }
+	void debug_log_effect(int trigger, uint64_t volley_id, int bullet_index, const Vector2 &position);
 
 	//
 

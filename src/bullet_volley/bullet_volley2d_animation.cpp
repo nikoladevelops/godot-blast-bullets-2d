@@ -94,14 +94,12 @@ void BulletVolley2D::advance_sprite_animation(double delta) {
 			} else {
 				anim_frame_index = (int)frame_count - 1;
 				anim_frame_time_left = 0.0;
-			if (!anim_finished) {
-				anim_finished = true;
-				// Deferred like the life_time_over signals: never emit directly from physics tick.
-				// NOTE: the signal lives on the multimesh itself (not the factory),
-				// so it must be emitted on `this`. Generation-guarded: a pool
-				// reuse before the flush must not emit for the new life.
-				call_deferred(CachedStringNames2D::get().m_do_emit_sprite_animation_finished, volley_generation);
-			}
+				if (!anim_finished) {
+					anim_finished = true;
+					// The volley tick emits sprite_animation_finished LIVE right
+					// after this call (on `this`: the signal lives on the volley).
+					anim_finished_event_pending = true;
+				}
 				return;
 			}
 		}
@@ -435,16 +433,6 @@ Vector2 BulletVolley2D::resolve_quad_size(const Ref<SpriteFrames> &p_sprite_fram
 		}
 	}
 	return Vector2(32, 32);
-}
-
-void BulletVolley2D::_do_emit_sprite_animation_finished(int expected_generation) {
-	if (expected_generation != volley_generation) {
-		return;
-	}
-	if (!anim_finished) {
-		return;
-	}
-	emit_signal(CachedStringNames2D::get().sprite_animation_finished, this);
 }
 
 } // namespace BlastBullets2D

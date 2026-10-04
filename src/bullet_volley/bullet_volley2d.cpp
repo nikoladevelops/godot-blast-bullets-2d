@@ -50,13 +50,6 @@ void BulletVolley2D::reset_pooling_flags_to_default() {
 	is_attachments_auto_pooling_enabled = true;
 }
 
-_ALWAYS_INLINE_ void BulletVolley2D::bump_collision_epoch_for_bullet(int bullet_index) {
-	if (bullet_index < 0 || bullet_index >= (int)bullet_collision_epochs.size()) {
-		return;
-	}
-	++bullet_collision_epochs[bullet_index];
-}
-
 _ALWAYS_INLINE_ void BulletVolley2D::apply_shared_bullet_attachment_from_data(const BulletVolleyData2D &data) {
 	if (data.shared_bullet_attachment.is_null()) {
 		return;
@@ -110,16 +103,7 @@ _ALWAYS_INLINE_ void BulletVolley2D::_disable_volley_internal() {
 	// may wake a bullet again via enable_bullet(). The wake sets is_active and
 	// bumps the counter/generations, so the trailing steps below (which belong
 	// to the dying life) must not run over the fresh life - abort instead.
-	// A held expiry keeps every slot for its deferred handler: the
-	// releases are queued behind the signal (see reduce_lifetime).
-	const bool hold_for_lifetime_flush = lifetime_flush_pending;
-	for (int i = 0; i < (int)attachments.size() && !hold_for_lifetime_flush; ++i) {
-		// The collision killing-blow path guards one slot across the
-		// signal emit: its attachment must survive the sweep so the
-		// handler can inspect/detach it. Post-signal cleanup disables it.
-		if (i == signal_protected_attachment_slot) {
-			continue;
-		}
+	for (int i = 0; i < (int)attachments.size(); ++i) {
 		if (attachments[i] != nullptr) {
 			bullet_disable_attachment(i);
 		}
@@ -138,14 +122,7 @@ _ALWAYS_INLINE_ void BulletVolley2D::_disable_volley_internal() {
 	// pooling-off volley would resurrect pooling mid-sweep and pool itself.
 	const bool saved_auto_pool = is_auto_pooling_enabled;
 	const bool saved_auto_pool_attachments = is_attachments_auto_pooling_enabled;
-	// A collision killing blow on the LAST live bullet funnels here with
-	// its slot guarded (signal_protected_attachment_slot): the sweep above
-	// skipped it, and the reset must keep it too, otherwise the handler of
-	// the volley's final bullet sees a null attachment while every earlier
-	// bullet's handler saw its own (the post-signal path releases it, and a
-	// re-entrant pool pop sweeps it via the new life's reset).
-	const bool keep_slots_for_signal = hold_for_lifetime_flush || signal_protected_attachment_slot >= 0;
-	reset_transient_volley_state(0, false, keep_slots_for_signal);
+	reset_transient_volley_state(0, false);
 	is_auto_pooling_enabled = saved_auto_pool;
 	is_attachments_auto_pooling_enabled = saved_auto_pool_attachments;
 
@@ -154,11 +131,6 @@ _ALWAYS_INLINE_ void BulletVolley2D::_disable_volley_internal() {
 	deactivate_volley();
 
 	if (!is_auto_pooling_enabled) {
-		return;
-	}
-
-	// Held expiry: _do_finish_lifetime_hold() pools after the flush.
-	if (hold_for_lifetime_flush) {
 		return;
 	}
 
@@ -215,9 +187,6 @@ void BulletVolley2D::on_bullet_disabled(int bullet_index) {
 	}
 	if (bullet_index >= (int)all_bullet_homing_targets.size()) {
 		return;
-	}
-	if (bullet_index >= 0 && bullet_index < (int)bullet_homing_epochs.size()) {
-		++bullet_homing_epochs[bullet_index];
 	}
 	auto &queue = all_bullet_homing_targets[bullet_index];
 	queue.clear_homing_targets(cached_mouse_global_position);
@@ -416,7 +385,7 @@ void BulletVolley2D::spawn(const BulletVolleyData2D &data, VolleyPool *pool, Bul
 	}
 }
 
-void BulletVolley2D::reset_transient_volley_state(uint64_t new_owner_spawner_id, bool drop_stale_work, bool keep_attachment_slots) {
+void BulletVolley2D::reset_transient_volley_state(uint64_t new_owner_spawner_id, bool drop_stale_work) {
 	// A new life / a dead life never replays the previous life's parked overlaps.
 	paused_overlaps.clear();
 	// Ownership is stamped first so every step below already belongs to the
@@ -438,12 +407,7 @@ void BulletVolley2D::reset_transient_volley_state(uint64_t new_owner_spawner_id,
 	// owner's attachment slots into the next life. A held expiry keeps them
 	// for its deferred handler (released after the flush); a new life always
 	// ends any hold first.
-	if (drop_stale_work && lifetime_flush_pending) {
-		lifetime_flush_pending = false;
-	}
-	if (!keep_attachment_slots) {
-		reset_attachment_state_for_reuse();
-	}
+	reset_attachment_state_for_reuse();
 	// Pooling flags reset every life - if you turned pooling off to hold a volley manually, the next pooled reuse still pools normally unless you turn it off again.
 	reset_pooling_flags_to_default();
 	if (drop_stale_work) {
@@ -462,7 +426,7 @@ void BulletVolley2D::reset_transient_volley_state(uint64_t new_owner_spawner_id,
 	all_collided_bullets.clear();
 	// The dedup keys mirror all_collided_bullets, so they reset with it.
 	clear_collision_dedup_keys();
-	_do_detach_all_time_based_functions(timers_generation);
+	detach_all_time_based_functions();
 	// Same for the volley clock - waking an old instance must not resume the previous owner's curve time.
 	curves_elapsed_time = 0.0;
 	// Animation cursor restarts; baked frames are kept so a same-owner wake
@@ -470,6 +434,7 @@ void BulletVolley2D::reset_transient_volley_state(uint64_t new_owner_spawner_id,
 	anim_frame_index = 0;
 	anim_paused = false;
 	anim_finished = false;
+	anim_finished_event_pending = false;
 	if (!anim_frame_secs.empty()) {
 		anim_frame_time_left = anim_frame_secs[0];
 	}
@@ -591,7 +556,7 @@ bool BulletVolley2D::enable_volley(const BulletVolleyData2D &data, const Vector2
 	all_collided_bullets.clear();
 	// The dedup keys mirror all_collided_bullets, so they reset with it.
 	clear_collision_dedup_keys();
-	_do_detach_all_time_based_functions(timers_generation);
+	detach_all_time_based_functions();
 
 	// Same for the volley clock - waking an old instance must not resume the previous owner's curve time.
 	curves_elapsed_time = 0.0;
@@ -720,16 +685,8 @@ void BulletVolley2D::enable_bullet(int bullet_index, int collision_amount, bool 
 		// detaches on the full-kill path, so a disable→attach→wake sequence
 		// would otherwise hand the new life timers armed while pooled.
 		const bool will_reactivate_volley = !is_active;
-		// Waking a held expiry before its flush: the dying life's queued
-		// releases are about to be invalidated by the generation bump, so
-		// release the held slots now (the new life starts blank).
-		if (will_reactivate_volley && lifetime_flush_pending) {
-			release_lifetime_hold_attachments();
-			reset_attachment_state_for_reuse();
-		}
 		if (will_reactivate_volley) {
 			++volley_generation;
-			++timers_generation;
 			custom_timers.clear();
 		}
 
@@ -991,10 +948,8 @@ void BulletVolley2D::seed_motion_features_on_spawn(const BulletVolleyData2D &dat
 	active_homing_count = 0;
 	active_orbiting_count = 0;
 	cached_mouse_global_position = Vector2(0, 0);
-	// Calls scheduled by the previous owner no-op when they finally run - they carry the old generation stamp.
-	++homing_operation_generation;
-	bullet_homing_epochs.assign(amount_bullets, 0);
-	shared_auto_pop_queued = false;
+	homing_reached_events.clear();
+	shared_pop_requested = false;
 
 	set_up_movement_data(volley_data->all_bullet_speed_data, volley_data->tile_all_bullet_speed_data);
 
@@ -1121,9 +1076,8 @@ void BulletVolley2D::reset_motion_feature_state(bool drop_stale_work) {
 			const Callable callable = connection["callable"];
 			disconnect("bullet_homing_target_reached", callable);
 		}
-		++homing_operation_generation;
-		bullet_homing_epochs.assign(amount_bullets, 0);
-		shared_auto_pop_queued = false;
+		homing_reached_events.clear();
+		shared_pop_requested = false;
 	}
 }
 
@@ -1172,8 +1126,8 @@ bool BulletVolley2D::reseed_motion_features_on_enable(const BulletVolleyData2D &
 	all_orbiting_data.resize(amount_bullets);
 	all_orbiting_status.resize(amount_bullets, 0);
 	all_shared_homing_reached.resize(amount_bullets);
-	bullet_homing_epochs.assign(amount_bullets, 0);
-	shared_auto_pop_queued = false;
+	homing_reached_events.clear();
+	shared_pop_requested = false;
 
 	// Homing steering seeds from spawn data (direct factory users keep it
 	// across pool reuse now) and is always overwritten by the spawner
@@ -1198,9 +1152,9 @@ bool BulletVolley2D::reseed_motion_features_on_enable(const BulletVolleyData2D &
 }
 
 void BulletVolley2D::on_volley_deactivated() {
-	// Dying life: any deferred emit/pop still queued no-ops at flush instead
-	// of operating on whatever the pool slot becomes next.
-	++homing_operation_generation;
+	// Dying life: reached events collected this tick die with it.
+	homing_reached_events.clear();
+	shared_pop_requested = false;
 	if (bullet_factory != nullptr) {
 		bullet_factory->track_volley_inactive(*this);
 	}

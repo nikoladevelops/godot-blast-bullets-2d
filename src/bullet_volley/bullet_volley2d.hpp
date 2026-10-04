@@ -110,9 +110,6 @@ public:
 	// queued with so pool reuse in between can't misfire them onto a new owner.
 	int volley_generation = 0;
 
-	// Same idea for time-based functions: a deferred attach stamped with a stale
-	// generation is dropped, so a full-disable landing first can't leak it onward.
-	int timers_generation = 0;
 
 	// DEFERRED-WORK CONTRACT (mandatory for every call_deferred addition):
 	// pool reuse, frees, and re-homes can all land between queue and flush, so
@@ -141,13 +138,6 @@ public:
 	// volley stays reusable mid-sweep (same-key spawns from handlers work).
 	bool is_being_ticked = false;
 
-	// Set when an expiry with life_time_over signals drains the volley:
-	// the volley keeps its attachment slots and stays OUT of the pool until
-	// the deferred signal (and its attachment releases) have flushed. Pooling
-	// at once let a same-frame spawn pop the volley, bump the generation and
-	// silently drop the signal, and the disable sweep released attachments
-	// before the handler could see them. _do_finish_lifetime_hold() pools.
-	bool lifetime_flush_pending = false;
 
 	// Gets the total amount of bullets that the multimesh always holds
 	_ALWAYS_INLINE_ int get_amount_bullets() const { return amount_bullets; };
@@ -240,8 +230,20 @@ public:
 
 	_ALWAYS_INLINE_ Transform2D get_interpolated_transform(const Transform2D &curr_transf, const Transform2D &prev_transf, double fraction);
 
-	// Reduces the lifetime of the multimesh so it can eventually get disabled entirely
+	// Advances the volley clock (curves, fade) and the lifetime countdown;
+	// at zero runs expire_live_bullets().
 	void reduce_lifetime(double delta);
+	// Expiry: emits life_time_over LIVE (every listed bullet alive), then
+	// disables the bullets the handler left untouched (On Lifetime Over each)
+	// unless the handler vetoed (infinite lifetime or set_life_time_left).
+	void expire_live_bullets();
+	std::vector<int> expiry_indexes_scratch;
+	std::vector<uint64_t> expiry_epochs_scratch;
+	// Remaining lifetime in seconds (0 for infinite volleys). The setter
+	// extends or shortens the countdown only (the curve clock keeps
+	// running); rejects non-finite / <= 0 and infinite volleys.
+	double get_life_time_left() const;
+	void set_life_time_left(double seconds);
 
 	// Advances the SpriteFrames animation baked in anim_frames/anim_frame_secs.
 	// Hot path: plain countdown + index + one set_texture. No SpriteFrames calls here.
@@ -545,13 +547,6 @@ public:
 
 	_ALWAYS_INLINE_ uint64_t attachment_epoch_for(int bullet_index) const;
 
-	// Slot guarded across the collision-signal emit on a killing blow: the
-	// final disable funnels into disable_volley(), whose sweep would pool
-	// every attachment BEFORE the signal fires (handler would see nullptr).
-	// Set to the dying slot before disable_bullet(); the sweep skips it, the
-	// post-signal cleanup disables it normally. -1 = no guard.
-	int signal_protected_attachment_slot = -1;
-
 	// Object-level collision dedup (default ON): one logical hit per
 	// (bullet, target) per drain window. The physics server reports per
 	// SHAPE (body+area pair or multi-shape target queues N records for one
@@ -853,6 +848,9 @@ public:
 	bool anim_loop = true;
 	bool anim_paused = false;
 	bool anim_finished = false;
+	// Set by advance_sprite_animation when the last frame finished; the tick
+	// emits sprite_animation_finished right after (live) and clears it.
+	bool anim_finished_event_pending = false;
 	int anim_frame_index = 0;
 	double anim_frame_time_left = 0.0;
 
@@ -1200,25 +1198,8 @@ public:
 	// returns the SAME node to the SAME slot in the SAME generation.
 	// Liveness is checked BEFORE the pointer compare: comparing a dangling
 	// pointer first would touch freed memory when the id was recycled.
-	// Cold path: defined in bullet_volley2d_attachments.cpp.
-	// Batched, id-only deferred release of the attachments held by slots that
-	// expired this tick. `requests` packs (bullet_index, attachment_id, epoch)
-	// triples; only slots that HELD an attachment at expiry are queued, so a
-	// 10k-bullet volley death without attachments queues nothing.
-	void _do_deferred_bullet_disable_attachments(int expected_generation, const PackedInt64Array &requests);
 
-	// Generation-guarded deferred life_time_over emit (see schedule site in
-	// reduce_lifetime): drops stale emissions when the instance was pooled
-	// and re-enabled for a new owner before the flush. The emitter is
-	// re-resolved by id so a freed factory/spawner also drops cleanly.
-	// Cold path: defined in bullet_volley2d_lifetime.cpp.
-	void _do_emit_life_time_over(int expected_generation, uint64_t emitter_instance_id, const StringName &signal_name, const TypedArray<int> &bullet_indexes);
 
-	// Generation-guarded deferred sprite_animation_finished emit: a restart
-	// or pool reuse before the flush must not emit for the wrong life. The
-	// anim_finished re-check covers restart-in-place (no generation change).
-	// Cold path: defined in bullet_volley2d_animation.cpp.
-	void _do_emit_sprite_animation_finished(int expected_generation);
 
 	void bullet_enable_attachment(int bullet_index);
 
@@ -1309,7 +1290,15 @@ public:
 	// (this also fixes a latent null-factory crash in the old code path).
 	_ALWAYS_INLINE_ Object *resolve_signal_emitter() const;
 
-	void handle_bullet_collision(CollisionType collision_type, int bullet_index, int64_t entered_instance_id, uint64_t queued_bullet_epoch, Vector2 queued_target_velocity, bool queued_velocity_valid, Vector2 queued_target_position, bool queue_position_valid);
+	// One queued overlap: validate (alive, epoch, target alive), bounce,
+	// count, emit LIVE, then decide the kill with the post-handler state.
+	void handle_bullet_collision(const BulletCollisionData2D &record);
+	// Drains every record queued since the last tick (start of the volley
+	// tick, before the move: records describe the pose the server tested).
+	void drain_collisions();
+	// Moves one undrained record into the paused-overlap list (a handler
+	// paused the factory mid-drain).
+	void park_collision_record(const BulletCollisionData2D &record);
 
 	/// COLLISION DETECTION METHODS
 
@@ -1398,18 +1387,9 @@ public:
 	// signal connections: pass true when starting a NEW life (enable), false
 	// when the volley is dying but its deferred emits must still flush
 	// (disable) or when same-owner wakes must keep their connections.
-	// keep_attachment_slots: the lifetime hold (see lifetime_flush_pending)
-	// keeps slots alive for the deferred handler; everything else resets.
-	void reset_transient_volley_state(uint64_t new_owner_spawner_id, bool drop_stale_work, bool keep_attachment_slots = false);
+	void reset_transient_volley_state(uint64_t new_owner_spawner_id, bool drop_stale_work);
 
-	// Deferred tail of a held expiry (queued after the signal and the
-	// per-slot attachment releases): releases any slot still held, then
-	// pools the volley exactly like a normal full disable would have.
-	void _do_finish_lifetime_hold(int expected_generation);
 
-	// Ends a lifetime hold early (wake before the flush): releases held
-	// attachment slots so the new life starts with blank slots.
-	void release_lifetime_hold_attachments();
 
 	// Shared deactivation tail: enabled set, counter, active flag, visibility,
 	// physics shapes, animation cursor. No pool decision here - the caller
@@ -1523,82 +1503,34 @@ public:
 		double _initial_time;
 		bool _repeating;
 		bool _execute_only_if_volley_is_active;
-		// Unique per attach, never reused within a life. The deferred execute
-		// carries it so a detach landing between the queue and the flush
-		// cancels that exact request. The volley-wide timers generation
-		// cannot do this: it is bumped only by a full detach/wake, so a
-		// single detach_time_based_function(callable) used to leave an
-		// already-queued callback live and it still fired.
+		// Unique per attach (monotonic, never reused): the live sweep calls
+		// due timers by id, so a timer detached by an earlier callback of the
+		// same tick is simply not found and never fires.
 		uint64_t _id = 0;
 
 		CustomTimer(const godot::Callable &callback, double initial_time, bool repeating, bool execute_only_if_volley_is_active, uint64_t id) :
 				_callback(callback), _current_time(initial_time), _initial_time(initial_time), _repeating(repeating), _execute_only_if_volley_is_active(execute_only_if_volley_is_active), _id(id) {};
 	};
 
-	// Monotonic, never reset: a stale id must not match a later attach.
-	uint64_t next_custom_timer_id() { return ++custom_timer_id_counter; }
-
-	// True while any live timer still owns this id.
-	bool has_custom_timer_with_id(uint64_t timer_id) const;
-
-	// A deferred fire that has been queued but not yet flushed. The callable is
-	// stored alongside the id because a non-repeating timer is erased from the
-	// timer vector on the very tick it fires, so a detach that has to cancel
-	// this request can no longer find it there.
-	struct PendingCustomTimerFire {
-		uint64_t id = 0;
-		Callable callback;
-	};
-
-	// True while the id is still attached or its fire is still queued.
-	bool custom_timer_request_still_valid(uint64_t timer_id) const;
-
-	void retire_pending_custom_timer_fire(uint64_t timer_id);
-
-	// Cancel every queued fire belonging to this callable, plus its timers.
-	void cancel_pending_custom_timer_fires_for(const Callable &callback);
-
-	void clear_pending_custom_timer_fires() { pending_custom_timer_fires.clear(); }
-
-	void execute_stored_callable_safely(const Callable &_callback, bool execute_only_if_volley_is_active, uint64_t timer_id);
-
-	void _do_execute_stored_callable_safely(const Callable &_callback, bool execute_only_if_volley_is_active, int expected_timers_generation, uint64_t expected_timer_id);
-
+	// Attach/detach apply IMMEDIATELY from anywhere (handlers, timer
+	// callbacks, idle code): the only iteration of custom_timers is the
+	// first pass of run_custom_timers, which runs no user code.
 	void attach_time_based_function(double time, const Callable &callable, bool repeat = false, bool execute_only_if_volley_is_active = true);
-
-	// Deferred implementation of attach_time_based_function above.
-	// Advanced: calling directly runs synchronously, which is only safe
-	// outside physics processing (the timer vector may be iterated then).
-	void _do_attach_time_based_function(double time, const Callable &callable, bool repeat, bool execute_only_if_volley_is_active, int expected_timers_generation);
-
 	void detach_time_based_function(const Callable &callable);
-
-	// Deferred implementation of detach_time_based_function above.
-	// Advanced: calling directly runs synchronously, which is only safe
-	// outside physics processing (the timer vector may be iterated then).
-	void _do_detach_time_based_function(const Callable &callable, int expected_timers_generation);
-
 	void detach_all_time_based_functions();
 
-	// Deferred implementation of detach_all_time_based_functions above.
-	// Advanced: calling directly runs synchronously, which is only safe
-	// outside physics processing (the timer vector may be iterated then).
-	// NOTE: no is_bullets_iterating() guard here on purpose: the internal
-	// disable path (_disable_volley_internal) must clear timers even when
-	// it runs inside the physics sweep. Direct script calls during iteration
-	// are still unsafe - use the public wrapper instead.
-	void _do_detach_all_time_based_functions(int expected_timers_generation);
-
+	// Called by the factory once per physics tick for volleys holding
+	// timers. Pass 1 (no user code) advances every timer, re-arms repeating
+	// ones and records the due ids; pass 2 calls each due timer that is
+	// still attached, LIVE (inside the physics frame). One-shots are removed
+	// before their call. Re-entrant calls are ignored.
 	void run_custom_timers(double delta);
 
 	// Stores a bunch of timers for the multimesh that should execute
 	std::vector<CustomTimer> custom_timers;
-	// Source of the per-timer ids above. Deliberately never reset: reusing an
-	// id would let a stale deferred request match a brand new timer.
 	uint64_t custom_timer_id_counter = 0;
-	// Ids of one-shot fires whose deferred request is still in flight. Bounded
-	// by the 64-timer cap; each entry is retired when its flush runs.
-	std::vector<PendingCustomTimerFire> pending_custom_timer_fires;
+	std::vector<uint64_t> due_timer_scratch;
+	int _timers_running_depth = 0;
 
 public:
 	// Clears both homing deques through the pop loop so the global
@@ -1736,17 +1668,6 @@ protected:
 	// segment (reset on spawn/enable). See move_bullets homing branch.
 	bool homing_inert_warning_issued = false;
 
-	// Stamp so homing callbacks scheduled by a dead volley no-op instead of firing into the new owner.
-	// The volley-wide generation is bumped on every spawn/enable/disable: a
-	// deferred call scheduled by a previous life carries a stale generation
-	// and no-ops instead of eating the new life's targets or emitting ghost
-	// signals. The per-bullet epoch below covers the single-bullet path the
-	// volley generation can't: reach -> disable_bullet(i) -> enable_bullet(i)
-	// -> push-new-target(i) before the flush. Without it the stale deferred
-	// pop/emit (same volley generation) would eat the fresh front target and
-	// fire a ghost reached signal for the dead life's target.
-	uint64_t homing_operation_generation = 0;
-	std::vector<uint64_t> bullet_homing_epochs;
 
 	// This is a shared homing deque - allows the bullets to share the same target
 	HomingTargetDeque shared_homing_deque;
@@ -1943,6 +1864,19 @@ public:
 	// step along the pattern direction instead of adding true wind.
 	_ALWAYS_INLINE_ bool advance_movement_pattern(const Ref<Curve2D> &curve, bool face_movement_direction, bool repeat_pattern, real_t &distance_traveled, Vector2 &velocity_delta, Vector2 &curr_bullet_direction, Transform2D &curr_bullet_transf, real_t known_len = -1.0);
 
+	// One volley tick, driven by BulletFactory2D::tick_volleys while
+	// is_being_ticked is set. Fixed phases, every signal LIVE (synchronous):
+	//   1. drain_collisions  - hits/bounces at the impact pose (pre-move)
+	//   2. move_bullets      - pure integration (collects homing events)
+	//   3. homing events     - bullet_homing_target_reached + auto-pop
+	//   4. sprite animation  - sprite_animation_finished
+	//   5. reduce_lifetime   - life_time_over, then expiry
+	// Each phase that ran user code re-checks liveness, deletion and pause.
+	void tick(double delta);
+	// True while this volley may keep running its tick after user code ran
+	// (not freed, not queued for deletion, factory not paused).
+	bool tick_may_continue(uint64_t self_id) const;
+
 	// Updates all bullets' positions, rotations, and homing.
 	// Never inlined into the caller: the factory calls this once per volley,
 	// and inlining the whole per-bullet loop into BulletFactory2D::tick_volleys
@@ -2113,18 +2047,8 @@ public:
 
 	///////////// PER BULLET HOMING DEQUE POP METHODS
 
-	// NOTE: manual pop/clear + push in the same frame as a reach races the
-	// deferred auto-pop/emit queued for the old front (same bullet epoch):
-	// the flush still pops the fresh front and fires a ghost reached signal.
-	// Keep manual edits and auto-pop apart in one frame, or re-push after
-	// the flush.
 	Variant bullet_homing_pop_front_target(int bullet_index);
 
-	// NOTE: manual pop/clear + push in the same frame as a reach races the
-	// deferred auto-pop/emit queued for the old front (same bullet epoch):
-	// the flush still pops the fresh front and fires a ghost reached signal.
-	// Keep manual edits and auto-pop apart in one frame, or re-push after
-	// the flush.
 	Variant bullet_homing_pop_back_target(int bullet_index);
 	/////////////////////
 
@@ -2152,11 +2076,6 @@ public:
 
 	///  PER BULLET HOMING DEQUE HELPERS
 
-	// NOTE: manual pop/clear + push in the same frame as a reach races the
-	// deferred auto-pop/emit queued for the old front (same bullet epoch):
-	// the flush still pops the fresh front and fires a ghost reached signal.
-	// Keep manual edits and auto-pop apart in one frame, or re-push after
-	// the flush.
 	void bullet_clear_homing_targets(int bullet_index);
 
 	Array all_bullets_pop_front_target(int bullet_index_start = 0, int bullet_index_end_inclusive = -1);
@@ -2234,11 +2153,6 @@ public:
 	//////////////////////////////
 
 	// SHARED BULLET HOMING DEQUE POP METHODS
-	// NOTE: the deferred coalesced auto-pop (_do_shared_auto_pop_front_target)
-	// is stamped with the volley generation only. A manual clear/pop/push
-	// between the queue and the flush therefore races it: keep manual edits and
-	// auto-pop apart in the same frame (or re-push after the flush), otherwise
-	// the stale pop can eat the fresh front target.
 
 	Variant shared_homing_deque_pop_front_target();
 
@@ -2647,36 +2561,33 @@ public:
 	};
 	std::vector<SharedHomingReachedState> all_shared_homing_reached;
 
-	// Bumped by EVERY mutation of the shared deque's FRONT (push_front /
-	// pop_front / clear / replace). The deferred auto-pop stamps the value it
-	// saw, so a manual edit landing between the queue and the flush cancels
-	// the stale pop instead of eating whatever the user pushed in the meantime.
-	// This is the shared-deque counterpart of bullet_homing_epochs: without it
-	// the only guard is the volley generation, which a manual edit on a live
-	// volley does not bump.
-	uint64_t shared_homing_front_epoch = 0;
-
-	_ALWAYS_INLINE_ void bump_shared_homing_front_epoch() { ++shared_homing_front_epoch; }
-
 	// Re-arms every bullet for the new front target. Called by EVERY shared
-	// front mutation (push_front, pop_front, clear, replace), so bumping the
-	// front epoch here gives one choke point that cannot be missed by a future
-	// mutator - unlike a bump per call site.
+	// front mutation (push_front, pop_front, clear, replace).
 	_ALWAYS_INLINE_ void reset_shared_homing_reached_state();
 
-	// One shared pop per tick no matter how many bullets arrive at once - otherwise a full volley would eat the whole queue in a frame.
-	bool shared_auto_pop_queued = false;
-
-	// The signal fires a frame later, so carry the target as an id and look it up then - the raw pointer may be dead by now.
-	void _do_emit_homing_target_reached(uint64_t p_generation, int p_bullet_index, uint64_t p_bullet_epoch, uint64_t p_target_instance_id, const Vector2 &p_target_global_position);
-
-	void _do_shared_auto_pop_front_target(uint64_t p_generation, uint64_t p_front_epoch);
-
-	// Same trick for per-bullet pops: stale calls from a dead volley just no-op.
-	// of eating the new life's front target. Guards both the volley
-	// generation (pool reuse) and the per-bullet epoch (single-bullet
-	// disable/enable + fresh push before the flush).
-	void _do_auto_pop_front_target(uint64_t p_generation, int p_bullet_index, uint64_t p_bullet_epoch);
+	// Reached events collected by the move loop (no user code may run
+	// there), dispatched LIVE right after it (dispatch_homing_events). Each
+	// event carries the bullet's collision epoch (a handler that disabled or
+	// woke the bullet ends it) and the front identity it reached (auto-pop
+	// only pops a front that is still that target, so a target the handler
+	// pushed is never eaten). Reused buffers: no per-tick allocation.
+	struct HomingReachedEvent {
+		int bullet_index = -1;
+		uint64_t epoch = 0;
+		uint64_t target_instance_id = 0;
+		Vector2 target_position;
+		uint64_t front_identity = 0;
+		bool auto_pop = false;
+	};
+	std::vector<HomingReachedEvent> homing_reached_events;
+	std::vector<HomingReachedEvent> homing_dispatch_scratch;
+	// One shared pop per tick no matter how many bullets arrive at once
+	// (otherwise a full volley would eat the whole queue in a frame).
+	bool shared_pop_requested = false;
+	uint64_t shared_pop_identity = 0;
+	// Emits every collected reached event (volley signal + owner spawner
+	// forward), then the auto-pops. Returns false when the volley was freed.
+	bool dispatch_homing_events();
 
 	// Single routing point for every shared-deque front change: the deferred
 	// shared auto-pop flush and the manual shared pops funnel here. Resets

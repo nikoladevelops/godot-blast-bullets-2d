@@ -247,16 +247,21 @@ int BulletFactory2D::clear_active_bullets(const Ref<VolleyPoolKey2D> &key) {
 		return 0;
 	}
 
-	if (reject_when_iterating("clear_active_bullets")) {
-		return 0;
-	}
-
 	if (!is_ready || is_tearing_down) {
 		UtilityFunctions::push_error("clear_active_bullets: BulletFactory2D is not ready or is being freed. Ignoring the request.");
 		return 0;
 	}
 
-	FactoryOperationGuard op(this);
+	// NOT structural: clearing only disables bullets (their volleys park in
+	// the pool, no RID is freed), so it is allowed from hit/lifetime
+	// handlers and timer callbacks, i.e. inside the physics frame ("the
+	// player got hit: clear the screen"). A cleared volley that is being
+	// ticked right now just skips its remaining records (epoch moved) and
+	// the pool never hands it out before its tick ends. The busy latch makes
+	// spawns and structural calls from on_bullet_disable callbacks reject
+	// until the sweep is done (same as the disable sweep itself).
+	const bool saved_busy = is_factory_busy;
+	is_factory_busy = true;
 
 	// Snapshot first: each clear mutates live sets below (the last cleared
 	// bullet funnels its volley into the pool).
@@ -285,6 +290,7 @@ int BulletFactory2D::clear_active_bullets(const Ref<VolleyPoolKey2D> &key) {
 		}
 		cleared += volley->clear_all_bullets();
 	}
+	is_factory_busy = saved_busy;
 	return cleared;
 }
 

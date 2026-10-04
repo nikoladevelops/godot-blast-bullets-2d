@@ -256,43 +256,11 @@ void BulletVolley2D::reset_attachment_state_for_reuse() {
 	// New life, new assignment history: stale deferred disables (which carry
 	// the old epoch) can never match the fresh slots.
 	attachment_assignment_epochs.assign(count, 0);
-	signal_protected_attachment_slot = -1;
 	attachment_transforms.assign(count, Transform2D());
 	attachment_offsets.assign(count, Vector2());
 	attachment_local_transforms.assign(count, Transform2D());
 	attachment_stick_relative_to_bullet.assign(count, 1);
 	all_previous_attachment_transf.assign(count, Transform2D());
-}
-
-// Cold paths live here; per-tick hot paths stay inline in the header.
-
-void BulletVolley2D::_do_deferred_bullet_disable_attachments(int expected_generation, const PackedInt64Array &requests) {
-	if (expected_generation != volley_generation) {
-		return;
-	}
-	const int64_t *req = requests.ptr();
-	const int64_t n = requests.size();
-	for (int64_t k = 0; k + 2 < n; k += 3) {
-		const int bullet_index = (int)req[k];
-		if (!slot_still_holds_attachment_id(bullet_index, (uint64_t)req[k + 1], (uint64_t)req[k + 2])) {
-			continue;
-		}
-		bullet_disable_attachment(bullet_index);
-		// bullet_disable_attachment runs user code (on_bullet_disable): a
-		// handler may recycle this instance (pool pop -> new generation).
-		if (expected_generation != volley_generation) {
-			return;
-		}
-	}
-}
-
-void BulletVolley2D::release_lifetime_hold_attachments() {
-	lifetime_flush_pending = false;
-	for (int i = 0; i < (int)attachments.size(); ++i) {
-		if (attachments[i] != nullptr) {
-			bullet_disable_attachment(i);
-		}
-	}
 }
 
 } // namespace BlastBullets2D

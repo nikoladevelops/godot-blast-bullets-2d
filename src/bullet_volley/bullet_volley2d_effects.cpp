@@ -233,6 +233,7 @@ void BulletVolley2D::fx_fire_oneshot(int trigger, int bullet_index, const Transf
 	if (!at.get_origin().is_finite() || !Math::is_finite(at.get_rotation())) {
 		return;
 	}
+	bool fired = false;
 	for (int li = 0; li < fx_data_layers.size(); ++li) {
 		Ref<BulletEffectLayerData2D> layer = fx_data_layers[li];
 		if (layer.is_null() || !layer->enabled) {
@@ -242,6 +243,10 @@ void BulletVolley2D::fx_fire_oneshot(int trigger, int bullet_index, const Transf
 			continue;
 		}
 		bullet_factory->fx_fire(get_instance_id(), li, at);
+		fired = true;
+	}
+	if (fired && bullet_factory->debug_effect_log_enabled) {
+		bullet_factory->debug_log_effect(trigger, get_instance_id(), bullet_index, at.get_origin());
 	}
 }
 
