@@ -38,6 +38,10 @@ asserts a dangling-free factory plus zero new orphans after every test.
 - `volley/test_volley_bounce_scaled_shape.gd` — degenerate shapes bounce finite via radial fallback (never double-counted); slivers separate; sane shapes precise.
 - `spawner/test_spawner_spin_matrix.gd` — spin is one shared matrix: spun ring equals rotated unspun ring, mirrored generators and sheared customs survive spin exactly.
 - `spawner/test_spawner_node_cache.gd` — validated manual assignment wins over stale paths; out-of-tree nodes stay assigned.
+- `integration/test_engine_facts.gd` — engine facts the design relies on: `call_deferred` from `_physics_process` still runs inside the physics frame, Area2D overlap callbacks of frame N arrive before any `_physics_process` of frame N, connections live on the emitter (freeing the receiver drops them).
+- `volley/test_volley_bounce_signals.gd` — bounce signal contract: bounce handlers see the bullet alive; a consumed bounce counts exactly one hit after the bounce handler, and re-validates first (a handler that disabled or queue_freed the bullet ends the record, no hit signal for a dead bullet); free bounces never reach the hit path.
+- `pooling/test_pool_neutrality_sweep.gd` — pool neutrality: runtime-only knobs a previous life changed (collision dedup mode, ...) are back to their defaults when the pooled instance is reused.
+- `factory/test_factory_handler_rejects.gd` — structural calls from inside a hit handler are refused with a message naming the matching `*_deferred` twin; the deferred twins (factory reset, volley shape change) apply on the next idle frame.
 - `spawner/test_spawner_fire_arc_generator.gd` — fire-arc gate reads the muzzle frame, not the spawner node.
 - `volley/test_volley_rotation_wake_presence.gd` — same-owner wakes keep presence decisions; new lives reset them.
 - `spawner/test_spawner_retarget_stagger.gd` — unrelated knob changes never re-arm the retarget countdown.

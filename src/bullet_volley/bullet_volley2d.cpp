@@ -447,6 +447,9 @@ void BulletVolley2D::reset_transient_volley_state(uint64_t new_owner_spawner_id,
 	// Pooling flags reset every life - if you turned pooling off to hold a volley manually, the next pooled reuse still pools normally unless you turn it off again.
 	reset_pooling_flags_to_default();
 	if (drop_stale_work) {
+		// Runtime-only collision knob (spawn data never seeds it): a new
+		// life always starts with the default object-level dedup.
+		collision_dedup_by_object = true;
 		// New life: stale deferred emits/disables (scheduled before a pool
 		// reuse) carry the old generation and no-op at flush time, and the
 		// previous owner's volley-wide connections must not fire again.
@@ -507,7 +510,7 @@ bool BulletVolley2D::enable_volley(const BulletVolleyData2D &data, const Vector2
 		return false;
 	}
 	if (shape_type_changes && bullet_factory != nullptr && bullet_factory->is_structural_mutation_unsafe()) {
-		UtilityFunctions::push_error("enable_volley with a different collision shape type cannot run inside a physics frame (server flush locks apply to the shape RIDs it must recreate). Use call_deferred() to enable outside the physics step.");
+		UtilityFunctions::push_error("enable_volley with a different collision shape type cannot run inside a physics frame (server flush locks apply to the shape RIDs it must recreate). Spawn through BulletFactory2D (a shape change pops a matching pool bucket) or call enable_volley from an idle frame.");
 		return false;
 	}
 

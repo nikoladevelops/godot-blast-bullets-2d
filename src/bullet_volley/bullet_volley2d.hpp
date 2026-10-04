@@ -446,6 +446,9 @@ public:
 	Ref<Shape2D> get_collision_shape() const { return cached_collision_shape; }
 	// Swap the collision shape mid-flight. Resizing the same shape type is instant; switching shape types rebuilds physics and can move pool buckets. The sprite quad never changes here - it only cares about textures.
 	void set_collision_shape_runtime(const Ref<Shape2D> &new_shape);
+	// Idle-frame twin for handlers: queues set_collision_shape_runtime on the
+	// factory's structural queue (next process frame, outside physics).
+	void set_collision_shape_runtime_deferred(const Ref<Shape2D> &new_shape);
 	PoolKey get_pool_key() const { return PoolKey{ amount_bullets, cached_effective_shape_type }; }
 
 	void _notification(int p_what);

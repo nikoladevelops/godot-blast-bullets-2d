@@ -59,7 +59,7 @@ func test_runtime_type_change_refused_inside_physics() -> void:
 	var rect := RectangleShape2D.new()
 	rect.size = Vector2(20, 10)
 	v.set_collision_shape_runtime(rect)
-	expect_error("cannot run while bullets are being processed or inside a physics frame")
+	expect_error_sequence(["set_collision_shape_runtime cannot run inside a physics frame or while bullets are being processed (e.g. inside area_entered/body_entered handlers). Use set_collision_shape_runtime_deferred() instead: it runs on the next idle frame (a plain call_deferred() still runs inside the physics frame)."])
 	assert_eq(v.debug_get_shape_state().get("type", -1), PhysicsServer2D.SHAPE_CIRCLE, "type unchanged")
 
 

@@ -1,6 +1,6 @@
 # BlastBullets2D benchmark: latest run
 
-- run: `2026-10-03T20-48-46Z` commit `de48529`
+- run: `2026-10-04T05-01-51Z` commit `1fb7461`
 - machine: AMD Ryzen 7 8840HS w/ Radeon 780M Graphics (16 threads), Linux-7.2.8-2-cachyos-x86_64-with-glibc2.44
 - godot: 4.7.2-stable (arch_linux), debug build: True, repeats: 5 (median)
 - baseline: `5ed265d` (2026-10-02T16-53-28Z)
@@ -11,25 +11,25 @@ Times are milliseconds of CPU per frame (simulated time, `--fixed-fps 60`).
 
 | scenario | frame p50 | frame p95 | frame p99 | frame max | step max | engine max | tick p50 | tick p99 | bullets | mem peak MB | objects +/- | vs baseline |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|
-| attachments_500 | 0.045 | 0.053 | 0.144 | 0.371 | 0.243 | 0.144 | 0.026 | 0.114 | 453 | 32.9 | +0 | frame p50 -2%, tick p50 +4% |
-| bounce_box_2k | 0.117 | 0.125 | 0.133 | 0.137 | 0.001 | 0.137 | 0.055 | 0.062 | 2000 | 29.7 | +0 | frame p50 -6%, tick p50 +0% |
-| cold_spawn_scaling | 0.004 | 0.004 | 0.004 | 0.004 | 0.001 | 0.004 | 0.000 | 0.001 | 0 | 51.2 | +0 | frame p50 +0%, tick p50 +0% |
-| collision_storm | 0.685 | 1.305 | 1.761 | 2.744 | 0.200 | 2.618 | 0.150 | 0.334 | 1400 | 30.4 | +0 | frame p50 -7%, tick p50 -17% |
-| factory_warm_spawn_5k | 13.037 | 15.435 | 16.034 | 16.579 | 3.526 | 14.706 | 3.545 | 5.510 | 90000 | 69.6 | +0 | frame p50 -24%, tick p50 -18% |
-| homing_2k_moving_targets | 0.170 | 0.184 | 0.212 | 1.071 | 0.010 | 1.061 | 0.104 | 0.130 | 2000 | 29.6 | +0 | frame p50 +2%, tick p50 +7% |
-| kitchen_sink | 0.475 | 0.643 | 1.026 | 2.198 | 0.005 | 2.198 | 0.281 | 0.391 | 7488 | 33.0 | +171 | frame p50 -4%, tick p50 +1% |
-| mass_expiry_10k | 0.584 | 0.770 | 4.710 | 5.363 | 3.014 | 2.502 | 0.269 | 1.448 | 7375 | 38.7 | +0 | frame p50 -1%, tick p50 +0% |
-| pool_churn | 0.811 | 0.868 | 1.046 | 2.589 | 0.768 | 2.487 | 0.294 | 0.344 | 9000 | 33.8 | +0 | frame p50 -10%, tick p50 -6% |
-| spawner_moving_preview_1500 | 0.568 | 1.443 | 2.733 | 3.584 | 0.005 | 3.583 | 0.322 | 0.569 | 11550 | 34.8 | +15 | frame p50 -56%, tick p50 +1% |
-| spawner_path_move_1500 | 0.851 | 1.780 | 3.355 | 3.841 | 0.001 | 3.841 | 0.483 | 0.759 | 17780 | 37.6 | +15 | new |
-| spawner_spin_preview_1500 | 0.585 | 1.680 | 4.796 | 9.215 | 0.002 | 9.215 | 0.322 | 0.607 | 11550 | 39.7 | +15 | frame p50 -39%, tick p50 +2% |
-| spawner_warm_shot_5k | 13.956 | 16.468 | 17.758 | 18.540 | 4.053 | 16.402 | 3.845 | 5.835 | 90000 | 163.6 | +0 | new |
-| trails_fx_2k | 0.358 | 0.621 | 3.715 | 3.957 | 3.328 | 2.086 | 0.289 | 0.683 | 1967 | 30.9 | +0 | frame p50 -12%, tick p50 -13% |
-| volley_10k_flight | 0.557 | 0.587 | 0.616 | 2.287 | 0.002 | 2.287 | 0.271 | 0.300 | 10000 | 32.7 | +0 | frame p50 -1%, tick p50 +1% |
+| attachments_500 | 0.044 | 0.048 | 0.143 | 0.360 | 0.242 | 0.142 | 0.025 | 0.111 | 453 | 32.9 | +0 | frame p50 -4%, tick p50 +0% |
+| bounce_box_2k | 0.115 | 0.122 | 0.132 | 0.137 | 0.001 | 0.137 | 0.054 | 0.060 | 2000 | 29.7 | +0 | frame p50 -8%, tick p50 -2% |
+| cold_spawn_scaling | 0.004 | 0.004 | 0.005 | 0.005 | 0.001 | 0.005 | 0.000 | 0.000 | 0 | 51.2 | +0 | frame p50 +0%, tick p50 +0% |
+| collision_storm | 0.681 | 1.285 | 1.375 | 2.415 | 0.361 | 2.340 | 0.147 | 0.320 | 1400 | 30.4 | +0 | frame p50 -8%, tick p50 -18% |
+| factory_warm_spawn_5k | 13.935 | 16.524 | 17.635 | 18.591 | 3.368 | 16.740 | 3.646 | 5.627 | 90000 | 69.6 | +0 | frame p50 -19%, tick p50 -15% |
+| homing_2k_moving_targets | 0.168 | 0.182 | 0.194 | 0.283 | 0.005 | 0.281 | 0.103 | 0.123 | 2000 | 29.6 | +0 | frame p50 +1%, tick p50 +6% |
+| kitchen_sink | 0.478 | 0.672 | 0.870 | 2.279 | 0.005 | 2.276 | 0.282 | 0.416 | 7488 | 33.0 | +171 | frame p50 -3%, tick p50 +2% |
+| mass_expiry_10k | 0.585 | 0.790 | 4.790 | 5.749 | 3.312 | 2.598 | 0.270 | 1.441 | 7375 | 38.7 | +0 | frame p50 -1%, tick p50 +1% |
+| pool_churn | 0.802 | 0.864 | 0.933 | 2.608 | 0.197 | 2.457 | 0.294 | 0.331 | 9000 | 33.8 | +0 | frame p50 -11%, tick p50 -6% |
+| spawner_moving_preview_1500 | 0.565 | 1.423 | 2.676 | 3.304 | 0.004 | 3.303 | 0.321 | 0.577 | 11550 | 34.8 | +15 | frame p50 -56%, tick p50 +1% |
+| spawner_path_move_1500 | 0.854 | 1.784 | 3.291 | 3.676 | 0.001 | 3.675 | 0.485 | 0.766 | 17780 | 37.6 | +15 | new |
+| spawner_spin_preview_1500 | 0.584 | 1.669 | 4.683 | 9.225 | 0.002 | 9.224 | 0.323 | 0.608 | 11550 | 39.7 | +15 | frame p50 -39%, tick p50 +2% |
+| spawner_warm_shot_5k | 14.270 | 16.818 | 17.766 | 18.592 | 3.969 | 16.420 | 3.830 | 5.743 | 90000 | 163.6 | +0 | new |
+| trails_fx_2k | 0.359 | 0.623 | 3.716 | 4.095 | 3.411 | 2.087 | 0.287 | 0.693 | 1967 | 30.9 | +0 | frame p50 -11%, tick p50 -14% |
+| volley_10k_flight | 0.556 | 0.584 | 0.626 | 2.264 | 0.002 | 2.264 | 0.270 | 0.308 | 10000 | 32.7 | +0 | frame p50 -1%, tick p50 +1% |
 
 ## Scenario extras
 
-- **cold_spawn_scaling**: cold_1000_ms=0.608, cold_2000_ms=1.381, cold_4000_ms=3.561, cold_8000_ms=10.766, scaling_8k_over_1k=17.081
+- **cold_spawn_scaling**: cold_1000_ms=0.618, cold_2000_ms=1.495, cold_4000_ms=3.677, cold_8000_ms=10.493, scaling_8k_over_1k=16.979
 - **collision_storm**: records_per_frame=200.000
 - **spawner_path_move_1500**: pattern_cache_hits=47, pattern_cache_misses=2, preview_rebuilds=1
 

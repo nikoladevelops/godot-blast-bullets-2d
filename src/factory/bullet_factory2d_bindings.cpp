@@ -70,6 +70,7 @@ void BulletFactory2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("free_bullets_pool_deferred", "key"), &BulletFactory2D::free_bullets_pool_deferred, DEFVAL(Ref<VolleyPoolKey2D>()));
 	ClassDB::bind_method(D_METHOD("populate_bullets_pool_deferred", "key", "spawn_data", "instance_count"), &BulletFactory2D::populate_bullets_pool_deferred);
 	ClassDB::bind_method(D_METHOD("free_attachments_pool_deferred"), &BulletFactory2D::free_attachments_pool_deferred);
+	ClassDB::bind_method(D_METHOD("populate_attachments_pool_deferred", "attachment_scene", "amount_attachments"), &BulletFactory2D::populate_attachments_pool_deferred);
 	ClassDB::bind_method(D_METHOD("free_attachments_pool_for_scene_deferred", "attachment_scene"), &BulletFactory2D::free_attachments_pool_for_scene_deferred);
 	ClassDB::bind_method(D_METHOD("free_volley_deferred", "volley"), &BulletFactory2D::free_volley_deferred);
 	ClassDB::bind_method(D_METHOD("ensure_factory_initialized"), &BulletFactory2D::ensure_factory_initialized);

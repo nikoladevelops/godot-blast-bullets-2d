@@ -545,6 +545,7 @@ void BulletVolley2D::_bind_methods() {
 
 	ClassDB::bind_method(D_METHOD("get_collision_shape"), &BulletVolley2D::get_collision_shape);
 	ClassDB::bind_method(D_METHOD("set_collision_shape_runtime", "new_shape"), &BulletVolley2D::set_collision_shape_runtime);
+	ClassDB::bind_method(D_METHOD("set_collision_shape_runtime_deferred", "new_shape"), &BulletVolley2D::set_collision_shape_runtime_deferred);
 
 	//
 

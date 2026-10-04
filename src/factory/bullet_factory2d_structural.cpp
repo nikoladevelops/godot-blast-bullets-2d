@@ -535,6 +535,18 @@ void BulletFactory2D::free_attachments_pool_deferred() {
 	queue_structural_call(Callable(this, "free_attachments_pool"));
 }
 
+void BulletFactory2D::populate_attachments_pool_deferred(const Ref<PackedScene> &attachment_scene, int amount_instances) {
+	if (is_tearing_down) {
+		UtilityFunctions::push_error("populate_attachments_pool_deferred: BulletFactory2D is being freed. Ignoring the request.");
+		return;
+	}
+	if (attachment_scene.is_null() || amount_instances <= 0) {
+		UtilityFunctions::push_error("populate_attachments_pool_deferred: needs a scene and amount_attachments > 0. Nothing was queued.");
+		return;
+	}
+	queue_structural_call(Callable(this, "populate_attachments_pool").bind(attachment_scene, amount_instances));
+}
+
 void BulletFactory2D::free_attachments_pool_for_scene_deferred(const Ref<PackedScene> &attachment_scene) {
 	if (is_tearing_down) {
 		UtilityFunctions::push_error("free_attachments_pool_for_scene_deferred: BulletFactory2D is being freed. Ignoring the request.");

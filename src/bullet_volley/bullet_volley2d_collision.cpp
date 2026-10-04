@@ -502,7 +502,7 @@ void BulletVolley2D::set_collision_shape_runtime(const Ref<Shape2D> &new_shape) 
 	// factory iterates bullet state or inside any physics frame (server flush
 	// locks apply). Same contract as the factory structural methods.
 	if (bullet_factory != nullptr && bullet_factory->is_structural_mutation_unsafe()) {
-		UtilityFunctions::push_error("set_collision_shape_runtime cannot run while bullets are being processed or inside a physics frame (e.g. inside area_entered/body_entered handlers). Use call_deferred() to run this after the physics step.");
+		UtilityFunctions::push_error("set_collision_shape_runtime cannot run inside a physics frame or while bullets are being processed (e.g. inside area_entered/body_entered handlers). Use set_collision_shape_runtime_deferred() instead: it runs on the next idle frame (a plain call_deferred() still runs inside the physics frame).");
 		return;
 	}
 	PhysicsServer2D::ShapeType old_effective = cached_effective_shape_type;
@@ -553,6 +553,22 @@ void BulletVolley2D::set_collision_shape_runtime(const Ref<Shape2D> &new_shape) 
 			bullets_pool->push(this, new_key);
 		}
 	}
+}
+
+void BulletVolley2D::set_collision_shape_runtime_deferred(const Ref<Shape2D> &new_shape) {
+	if (bullet_factory == nullptr || physics_server == nullptr || !area.is_valid()) {
+		UtilityFunctions::push_error("set_collision_shape_runtime_deferred: multimesh was never spawned through BulletFactory2D.");
+		return;
+	}
+	if (bullet_factory->get_is_tearing_down()) {
+		UtilityFunctions::push_error("set_collision_shape_runtime_deferred: BulletFactory2D is being freed. Ignoring the request.");
+		return;
+	}
+	// The factory's idle queue (not call_deferred): it flushes on the next
+	// process frame, outside the physics step, in call order. The Callable
+	// targets this volley by object, so a volley freed before the flush is
+	// simply skipped (an invalid Callable is never called).
+	bullet_factory->queue_structural_call(Callable(this, "set_collision_shape_runtime").bind(new_shape));
 }
 
 int BulletVolley2D::get_bullet_collision_count(int bullet_index) const {
@@ -613,9 +629,21 @@ void BulletVolley2D::handle_bullet_collision(CollisionType collision_type, int b
 		// Bounce precedence: a bounce-eligible hit ricochets here and never
 		// reaches the counter below (unless the volley asked to consume the
 		// hit too, decision 2). The hook owns its signals + self-liveness.
+		const uint64_t bounce_self_id = get_instance_id();
 		const int bounce_decision = try_handle_bounce(collision_type, bullet_index, entered_instance_id, queued_target_velocity, queued_velocity_valid, queued_target_position, queue_position_valid);
 		if (bounce_decision == 1) {
 			return;
+		}
+		// A consumed bounce already ran the bounce handler (user code): it may
+		// have disabled, cleared or re-enabled this bullet, or freed/queued
+		// the volley. The hit path only continues for the same live bullet.
+		if (bounce_decision == 2) {
+			if (ObjectDB::get_instance(ObjectID(bounce_self_id)) != this || is_queued_for_deletion()) {
+				return;
+			}
+			if (!all_bullets_enabled_set.contains(bullet_index) || queued_bullet_epoch != collision_epoch_for_bullet(bullet_index)) {
+				return;
+			}
 		}
 
 		int &current_bullet_collision_amount = bullets_current_collision_count[bullet_index];

@@ -393,6 +393,7 @@ public:
 	void free_bullets_pool_deferred(const Ref<VolleyPoolKey2D> &key = Ref<VolleyPoolKey2D>());
 	void populate_bullets_pool_deferred(const Ref<VolleyPoolKey2D> &key, const Ref<BulletVolleyData2D> &spawn_data, int instance_count);
 	void free_attachments_pool_deferred();
+	void populate_attachments_pool_deferred(const Ref<PackedScene> &attachment_scene, int amount_instances);
 	void free_attachments_pool_for_scene_deferred(const Ref<PackedScene> &attachment_scene);
 	// Safe single-volley free from any callback. Never calls free()/force_delete
 	// synchronously; uses queue_free() which is always safe mid-sweep.
@@ -840,7 +841,7 @@ private:
 	// Returns true when the caller must abort.
 	bool reject_when_iterating(const char *caller_name) const {
 		if (is_structural_mutation_unsafe()) {
-			UtilityFunctions::push_error(String("BulletFactory2D::") + caller_name + " cannot run while bullets are being processed or inside a physics frame (e.g. inside area_entered/body_entered/life_time_over handlers). Only structural calls are affected - use call_deferred() to run this after the physics step.");
+			UtilityFunctions::push_error(String("BulletFactory2D::") + caller_name + " cannot run inside a physics frame or while bullets are being processed (e.g. inside area_entered/body_entered/life_time_over handlers). Use " + caller_name + "_deferred() instead: it runs on the next idle frame (a plain call_deferred() still runs inside the physics frame).");
 			return true;
 		}
 		return false;
