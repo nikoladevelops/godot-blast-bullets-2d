@@ -129,12 +129,25 @@ func test_retarget_never_pushes_onto_disabled_bullets() -> void:
 	sp.set_homing_mode(BulletSpawner2D.HOMING_PER_BULLET)
 	assert_true(sp.shoot_once(), "shot")
 	var v: BulletVolley2D = sp.get_live_volleys()[0]
-	v.disable_bullet(1, true)
-	assert_eq(v.bullet_homing_check_targets_amount(1), 0, "disabling clears the queue")
+	v.disable_bullet(1, true, true)
+	assert_eq(v.bullet_homing_check_targets_amount(1), 0, "disabling with reset_state clears the queue")
 	assert_eq(sp.retarget_live_volleys(), 1, "partly alive volley retargeted")
-	assert_eq(v.bullet_homing_check_targets_amount(1), 0, "the disabled bullet stays empty")
+	assert_eq(v.bullet_homing_check_targets_amount(1), 0, "the disabled bullet stays empty (retarget skips it)")
 	assert_eq(v.bullet_homing_check_targets_amount(0), 1, "live bullets get the target")
 	assert_eq(v.bullet_homing_check_targets_amount(2), 1, "live bullets get the target")
+
+
+func test_a_frozen_bullet_keeps_its_queue_and_retarget_skips_it() -> void:
+	var sp := _spawner(3)
+	sp.set_homing_mode(BulletSpawner2D.HOMING_PER_BULLET)
+	assert_true(sp.shoot_once(), "shot")
+	var v: BulletVolley2D = sp.get_live_volleys()[0]
+	v.disable_bullet(1)
+	assert_eq(v.bullet_homing_check_targets_amount(1), 1, "freeze keeps the queue for the wake")
+	assert_eq(sp.retarget_live_volleys(), 1, "partly alive volley retargeted")
+	assert_eq(v.bullet_homing_check_targets_amount(1), 1, "retarget never touches the frozen bullet")
+	v.enable_bullet(1)
+	assert_eq(v.bullet_homing_check_targets_amount(1), 1, "the wake resumes with the frozen queue")
 
 
 # --- Signals -----------------------------------------------------------------

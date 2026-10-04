@@ -186,8 +186,16 @@ void BulletVolley2D::bullet_disable_attachment(int bullet_index) {
 	// attachment itself, its PREDELETE hook then finds nothing left to do.
 	clear_attachment_owner_fields(detaching);
 
+	// A suspended attachment already heard on_bullet_disable when its bullet
+	// froze: releasing it now must not tell it twice.
+	const bool was_suspended = bullet_index < (int)attachment_suspended.size() && attachment_suspended[bullet_index];
+	if (bullet_index < (int)attachment_suspended.size()) {
+		attachment_suspended[bullet_index] = 0;
+	}
 	const uint64_t detaching_id = detaching->get_instance_id();
-	detaching->call_on_bullet_disable();
+	if (!was_suspended) {
+		detaching->call_on_bullet_disable();
+	}
 
 	// The callback may have freed the attachment itself (immediate free()).
 	// Everything below touches detaching, so revalidate first; the slot is
@@ -212,6 +220,25 @@ void BulletVolley2D::bullet_disable_attachment(int bullet_index) {
 	}
 }
 
+void BulletVolley2D::suspend_bullet_attachment(int bullet_index) {
+	if (bullet_index < 0 || bullet_index >= (int)attachments.size()) {
+		return;
+	}
+	BulletAttachment2D *attachment = attachments[bullet_index];
+	if (attachment == nullptr) {
+		return;
+	}
+	if (bullet_index < (int)attachment_suspended.size()) {
+		if (attachment_suspended[bullet_index]) {
+			return; // already suspended
+		}
+		attachment_suspended[bullet_index] = 1;
+	}
+	// The slot keeps the node: a callback that frees it drops the slot via
+	// its own PREDELETE (owner tracking), so nothing dangles here.
+	attachment->call_on_bullet_disable();
+}
+
 void BulletVolley2D::bullet_enable_attachment(int bullet_index) {
 	if (!validate_bullet_index(bullet_index, "bullet_enable_attachment")) {
 		return;
@@ -220,6 +247,9 @@ void BulletVolley2D::bullet_enable_attachment(int bullet_index) {
 	BulletAttachment2D *&attachment_ptr = attachments[bullet_index];
 
 	if (attachment_ptr != nullptr) {
+		if (bullet_index < (int)attachment_suspended.size()) {
+			attachment_suspended[bullet_index] = 0;
+		}
 		attachment_ptr->call_on_bullet_enable();
 	}
 }
@@ -260,6 +290,7 @@ void BulletVolley2D::reset_attachment_state_for_reuse() {
 	attachment_offsets.assign(count, Vector2());
 	attachment_local_transforms.assign(count, Transform2D());
 	attachment_stick_relative_to_bullet.assign(count, 1);
+	attachment_suspended.assign(count, 0);
 	all_previous_attachment_transf.assign(count, Transform2D());
 }
 

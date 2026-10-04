@@ -65,11 +65,18 @@ void BulletVolley2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_sprite_frame"), &BulletVolley2D::get_sprite_frame);
 	ClassDB::bind_method(D_METHOD("get_sprite_frame_count"), &BulletVolley2D::get_sprite_frame_count);
 
-	ClassDB::bind_method(D_METHOD("disable_bullet", "bullet_index", "disable_bullet_attachment"), &BulletVolley2D::disable_bullet, DEFVAL(true));
+	ClassDB::bind_method(D_METHOD("disable_bullet", "bullet_index", "release_attachment", "reset_state"), &BulletVolley2D::disable_bullet, DEFVAL(true), DEFVAL(false));
+	ClassDB::bind_method(D_METHOD("bullet_reset_state", "bullet_index"), &BulletVolley2D::bullet_reset_state);
+	ClassDB::bind_method(D_METHOD("all_bullets_reset_state", "bullet_index_start", "bullet_index_end_inclusive"), &BulletVolley2D::all_bullets_reset_state, DEFVAL(0), DEFVAL(-1));
+	ClassDB::bind_method(D_METHOD("is_pooled"), &BulletVolley2D::is_pooled);
+	ClassDB::bind_method(D_METHOD("is_parked"), &BulletVolley2D::is_parked);
+	ClassDB::bind_method(D_METHOD("get_life_id"), &BulletVolley2D::get_life_id);
+	ClassDB::bind_method(D_METHOD("debug_get_life_state"), &BulletVolley2D::debug_get_life_state);
+	ClassDB::bind_method(D_METHOD("debug_get_clocks"), &BulletVolley2D::debug_get_clocks);
 	ClassDB::bind_method(D_METHOD("clear_bullet", "bullet_index"), &BulletVolley2D::clear_bullet);
 	ClassDB::bind_method(D_METHOD("clear_all_bullets"), &BulletVolley2D::clear_all_bullets);
-	ClassDB::bind_method(D_METHOD("enable_bullet", "bullet_index", "collision_amount", "enable_attachment"), &BulletVolley2D::enable_bullet, DEFVAL(0), DEFVAL(true));
-	ClassDB::bind_method(D_METHOD("wake_bullet", "bullet_index", "collision_amount", "enable_attachment"), &BulletVolley2D::wake_bullet, DEFVAL(0), DEFVAL(true));
+	ClassDB::bind_method(D_METHOD("enable_bullet", "bullet_index", "collision_amount", "enable_attachment"), &BulletVolley2D::enable_bullet, DEFVAL(-1), DEFVAL(true));
+	ClassDB::bind_method(D_METHOD("wake_bullet", "bullet_index", "collision_amount", "enable_attachment"), &BulletVolley2D::wake_bullet, DEFVAL(-1), DEFVAL(true));
 	ClassDB::bind_method(D_METHOD("debug_get_volley_info"), &BulletVolley2D::debug_get_volley_info);
 	ClassDB::bind_method(D_METHOD("debug_dedup_reset"), &BulletVolley2D::debug_dedup_reset);
 	ClassDB::bind_method(D_METHOD("debug_dedup_probe", "bullet_index", "target_instance_id"), &BulletVolley2D::debug_dedup_probe);

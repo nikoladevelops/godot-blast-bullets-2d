@@ -276,13 +276,14 @@ public:
 	void set_inherited_velocity_offset(const Vector2 &new_offset);
 
 	bool get_is_auto_pooling_enabled() const { return is_auto_pooling_enabled; }
-	void set_is_auto_pooling_enabled(bool value) { is_auto_pooling_enabled = value; }
+	// Turning pooling back ON for a parked volley pools it at once.
+	void set_is_auto_pooling_enabled(bool value);
 
 	bool get_is_attachments_auto_pooling_enabled() const { return is_attachments_auto_pooling_enabled; }
 	void set_is_attachments_auto_pooling_enabled(bool value) { is_attachments_auto_pooling_enabled = value; }
 
 	// Pooling flags reset to defaults on every new life (spawn/enable via
-	// reset_transient_volley_state): a pooled reuse never inherits "don't pool"
+	// begin_life): a pooled reuse never inherits "don't pool"
 	// from a previous manual owner. Set the flags explicitly after every
 	// spawn/enable when you want manual ownership. Same-owner enable_bullet()
 	// wakes keep flags by design (no new life starts).
@@ -647,6 +648,12 @@ public:
 
 	// Whether the attachment should stick while the bullet is rotating
 	std::vector<uint8_t> attachment_stick_relative_to_bullet;
+
+	// 1 while the slot's attachment is suspended (its bullet was disabled
+	// with release_attachment = false): it already heard on_bullet_disable,
+	// so a later release pools it without a second callback, and a wake
+	// resumes it with on_bullet_enable.
+	std::vector<uint8_t> attachment_suspended;
 
 	///
 
@@ -1208,21 +1215,37 @@ public:
 	// re-activates a pooled instance outside the pool pop, so it needs the same cleanup).
 	void disconnect_sprite_animation_connections();
 
-	// Called when all bullets have been disabled. Clears per-frame state, then
-	// hands this instance back to the multimesh pool (unless the user opted out).
-	// Pooling is NOT just a memory optimization: pooled instances MUST return here
-	// with zero live bullets, zero pending hits, zero timers and detached homing,
-	// or the next pop() inherits stale state (phantom hits, leaked counters).
-	// The curve clock rewinds together with the lifetime remaining below: unit
-	// curves sample curves_elapsed_time/max_life_time, so rewinding one without
-	// the other would pin curves at their end sample after a wake. Manual
-	// full-disable + wake therefore resumes both clocks from zero remaining,
-	// matching enable_volley (expiry wakes top up only when expired).
-	_ALWAYS_INLINE_ void disable_volley();
+	// LIFE STATES (see bullet_volley2d.cpp): ACTIVE / PARKED (drained with
+	// auto-pooling off: frozen, owned, wakeable) / POOLED (drained with
+	// auto-pooling on: released, only a new life revives it).
+	bool is_pooled() const;
+	bool is_parked() const;
+	// "active", "parked", "pooled", "fresh" or "dying" (tests/support).
+	String debug_get_life_state() const;
+	// Life id: bumped exactly once per life (spawn / enable_volley). Store it
+	// next to a volley you keep across frames and compare before using the
+	// volley again: a different id means the pool handed it to a new owner.
+	int get_life_id() const { return volley_generation; }
+	// True while release_life() has run and begin_life() has not (pooled or
+	// pre-populated instances): begin_life skips the release then.
+	bool life_released = true;
+	// The last live bullet went out: park (auto-pooling off) or release +
+	// pool (auto-pooling on).
+	void on_volley_drained();
+	// Pool time: drops every external reference (attachments, homing
+	// targets, timers, records, volley-level listeners, owner, user
+	// resources, user groups/metadata/modulate). Values are reseeded by
+	// begin_life, never reset twice.
+	void release_life();
+	// Restores the Node/CanvasItem/Node2D settings spawn data never seeds
+	// (modulate, transform, top_level, filtering, sorting, process mode...).
+	void restore_node_baseline();
+	// The single new-life path shared by spawn() and enable_volley().
+	void begin_life(const BulletVolleyData2D &data, uint64_t new_owner_spawner_id, const Vector2 &new_inherited_velocity_offset);
 
-	_ALWAYS_INLINE_ void _disable_volley_internal();
-
-	void enable_bullet(int bullet_index, int collision_amount = 0, bool should_enable_attachment = true);
+	// Wake = resume (freeze contract). collision_amount -1 keeps the frozen
+	// hit count; 0+ sets it. Refused on a pooled volley (stale handle).
+	void enable_bullet(int bullet_index, int collision_amount = -1, bool should_enable_attachment = true);
 
 	// Clearly-named alias: wake_bullet() revives ONE pooled or
 	// manually-disabled slot with its current appearance/ballistics intact
@@ -1230,7 +1253,7 @@ public:
 	// spawn_*()/enable_volley() which reseed appearance, custom data,
 	// speeds and patterns. Calling wake on a foreign pooled volley warns (see
 	// enable_bullet) instead of silently driving stale state.
-	void wake_bullet(int bullet_index, int collision_amount = 0, bool should_enable_attachment = true) {
+	void wake_bullet(int bullet_index, int collision_amount = -1, bool should_enable_attachment = true) {
 		enable_bullet(bullet_index, collision_amount, should_enable_attachment);
 	}
 
@@ -1239,6 +1262,10 @@ public:
 	// is_active, is_pooled, pool_amount, pool_shape, auto_pool_volley,
 	// auto_pool_attachments, self_modulate.
 	Dictionary debug_get_volley_info() const;
+	// Every volley clock in one snapshot: curve clock, lifetime left, homing
+	// interval timer, animation cursor, fade alpha, attached timers (time
+	// left, period, repeating) and per-bullet bounce cooldowns.
+	Dictionary debug_get_clocks() const;
 	// Attached timer count (0 = no per-tick timer cost). For tests asserting
 	// the 64-timer cap and detach-during-fire behavior.
 	int debug_get_timer_count() const { return (int)custom_timers.size(); }
@@ -1259,12 +1286,26 @@ public:
 	// Disables a single bullet: removes it from the live set, hides the visual,
 	// disables its physics shape, and (unless told otherwise) returns its
 	// attachment to the attachment pool. When the last bullet goes out, the
-	// whole instance is pooled via disable_volley() below.
+	// volley parks or pools via on_volley_drained().
 	// A wake does NOT restore the attachment: re-attach explicitly (or via
 	// the shared spawn-data attachment on the next enable). Kept simple on
 	// purpose — silently re-popping a pooled slot here could hand a foreign
 	// scene's node to a volley whose pooling id changed since.
-	void disable_bullet(int bullet_index, bool should_disable_attachment = true);
+	void disable_bullet(int bullet_index, bool release_attachment = true, bool reset_state = false);
+	// Clears one bullet's runtime ledgers (hit count, bounce ledger, homing
+	// queue, orbit, fall speed, wobble/pattern progress); kinematics,
+	// configuration, custom data and the attachment stay. Works on live and
+	// frozen bullets alike.
+	void bullet_reset_state(int bullet_index);
+	void all_bullets_reset_state(int bullet_index_start = 0, int bullet_index_end_inclusive = -1);
+	void reset_bullet_runtime_state(int bullet_index);
+	// Keeps the attachment in its slot but tells it the bullet is gone
+	// (on_bullet_disable); enable_bullet resumes it (on_bullet_enable).
+	void suspend_bullet_attachment(int bullet_index);
+	// Batched disable (expiry, clear_all_bullets): disable_bullet(i, true)
+	// semantics per bullet with one render upload for a drained volley.
+	// Returns how many bullets it disabled.
+	int disable_bullets_bulk(const std::vector<int> &indexes, int fx_trigger = -1, const std::vector<uint64_t> *expected_epochs = nullptr);
 	// Manual clear with visuals: captures the death pose, runs the silent
 	// disable_bullet() above, then fires EFFECT_ON_CLEAR one-shots. Use
 	// this instead of disable_bullet() when the disappearance should read
@@ -1379,22 +1420,9 @@ public:
 		(void)set_bullets_current_collision_count(arr);
 	}
 
-	// Single owner of the clean-disabled state. Clears ALL transient
-	// volley state (owner stamp, curves/patterns, motion ballistics via
-	// reset_motion_feature_state, attachment slots, collided hits, timers, clocks, baked
-	// animation) so pooled reuse can never inherit a previous owner's state.
-	// drop_stale_work additionally bumps the generation and scrubs volley-wide
-	// signal connections: pass true when starting a NEW life (enable), false
-	// when the volley is dying but its deferred emits must still flush
-	// (disable) or when same-owner wakes must keep their connections.
-	void reset_transient_volley_state(uint64_t new_owner_spawner_id, bool drop_stale_work);
 
 
 
-	// Shared deactivation tail: enabled set, counter, active flag, visibility,
-	// physics shapes, animation cursor. No pool decision here - the caller
-	// (disable path, failed enable) decides what happens next.
-	void deactivate_volley();
 	///
 protected:
 	// Internal setup helpers (spawn/enable seed shared spawn data through
@@ -2350,9 +2378,7 @@ public:
 	// pool reuse (false = refused, the caller rolls back), neutralize without
 	// reseeding (drop_stale_work = a new life: scrub connections and
 	// invalidate deferred work), and the tail of a full deactivation.
-	void seed_motion_features_on_spawn(const BulletVolleyData2D &data);
-	bool reseed_motion_features_on_enable(const BulletVolleyData2D &data);
-	void reset_motion_feature_state(bool drop_stale_work);
+	void seed_motion_features(const BulletVolleyData2D &data);
 	void on_volley_deactivated();
 
 	// Resolves the spawn data's shared movement pattern Path2D and applies its
@@ -2513,16 +2539,6 @@ public:
 	// when a multimesh dies holding mouse targets.
 	void clear_homing_state_for_teardown();
 
-	// Single-bullet hook called from disable_bullet(): the tick only trims
-	// active bullets, so a partially disabled multimesh would otherwise leak
-	// this bullet's targets (and the global mouse counter) until full teardown.
-	// Also bumps this bullet's homing epoch: deferred reached-emits/auto-pops
-	// queued before the disable carry the old epoch and no-op, so a
-	// disable -> enable -> push-new-target sequence before the flush can
-	// neither eat the fresh front target nor fire a ghost signal. The
-	// volley-wide generation is intentionally NOT bumped here - that would
-	// invalidate every sibling's legitimately queued work.
-	void on_bullet_disabled(int bullet_index);
 
  protected:
  	// Updates homing behavior for a bullet. Zero-delta ticks steer nothing:

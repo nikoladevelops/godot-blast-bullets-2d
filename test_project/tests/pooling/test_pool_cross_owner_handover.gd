@@ -31,25 +31,37 @@ func test_adopt_moves_ownership() -> void:
 	assert_gte(sb.retarget_live_volleys(), 1, "B retargets the adopted volley")
 
 
-func test_foreign_wake_warns_then_reseed_cleans() -> void:
+func test_pooled_wake_is_refused_and_a_parked_wake_resumes() -> void:
+	# Auto-pooling ON: the drained volley is released into the pool, so a
+	# later wake through the old handle is refused (stale handle).
 	var v: BulletVolley2D = factory.spawn_volley(H.make_volley_data(2, 200.0))
 	for i in 2:
 		v.disable_bullet(i)
 	await idle()
+	assert_true(v.is_pooled(), "drained with pooling on: pooled")
 	v.wake_bullet(0)
-	assert_push_warning("woke a pooled volley", "foreign wake warns")
-	assert_true(v.is_bullet_status_enabled(0), "foreign wake revives the slot")
-	# Contract fix: a full drain keeps linear ballistics, so a wake resumes
-	# them (it used to revive a frozen bullet at speed 0).
-	assert_gt(v.get_bullet_speed_data(0).speed, 0.0, "full-drain wake resumes the bullet's speed")
-	var p0: Vector2 = v.get_bullet_global_transform(0).origin
-	await physics(5)
-	assert_gt(v.get_bullet_global_transform(0).origin.distance_to(p0), 1.0, "the woken bullet actually moves")
+	expect_error_sequence(["enable_bullet: this volley went back to the pool when its last bullet died (is_auto_pooling_enabled was on), so this handle is stale. Spawn a new volley, or set is_auto_pooling_enabled = false before the last bullet dies to keep (park) the volley."])
+	assert_false(v.is_bullet_status_enabled(0), "refused: the slot stays dead")
+	assert_true(v.is_pooled(), "still pooled")
+	# Auto-pooling OFF: the drained volley is parked (frozen, still owned),
+	# and a wake resumes it exactly (ballistics kept, it moves on).
+	var p: BulletVolley2D = factory.spawn_volley(H.make_volley_data(2, 200.0))
+	p.set_is_auto_pooling_enabled(false)
 	for i in 2:
-		v.disable_bullet(i)
+		p.disable_bullet(i)
 	await idle()
-	assert_true(v.enable_volley(H.make_volley_data(2, 777.0), Vector2.ZERO, 0), "reseed via enable_volley succeeds")
-	assert_almost_eq(v.get_bullet_speed_data(0).speed, 777.0, 0.01, "reseed replaces stale ballistics")
+	assert_true(p.is_parked(), "drained with pooling off: parked")
+	p.wake_bullet(0)
+	assert_true(p.is_bullet_status_enabled(0), "parked wake revives the slot")
+	assert_almost_eq(p.get_bullet_speed_data(0).speed, 200.0, 0.01, "frozen ballistics resume")
+	var p0: Vector2 = p.get_bullet_global_transform(0).origin
+	await physics(5)
+	assert_gt(p.get_bullet_global_transform(0).origin.distance_to(p0), 1.0, "the woken bullet actually moves")
+	for i in 2:
+		p.disable_bullet(i)
+	await idle()
+	assert_true(p.enable_volley(H.make_volley_data(2, 777.0), Vector2.ZERO, 0), "reseed via enable_volley succeeds on a parked volley")
+	assert_almost_eq(p.get_bullet_speed_data(0).speed, 777.0, 0.01, "reseed replaces the frozen ballistics")
 
 
 func test_free_volley_deferred_inside_handler() -> void:

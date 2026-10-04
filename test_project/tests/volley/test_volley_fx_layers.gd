@@ -164,6 +164,7 @@ func test_trail_follows_dies_on_disable_resumes_on_wake() -> void:
 	var bt: Vector2 = v3.get_bullet_transform(0).origin
 	var tt: Vector2 = v3.debug_get_trail_transform(0, 0).origin
 	assert_true(tt.distance_to(bt) < 0.01, "trail sits on the bullet")
+	v3.set_is_auto_pooling_enabled(false) # park on drain so the same life can wake
 	v3.disable_bullet(0)
 	assert_true(v3.debug_get_trail_transform(0, 0) == Transform2D(), "disable zeroes the trail")
 	v3.enable_bullet(0)

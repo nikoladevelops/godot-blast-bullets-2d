@@ -619,13 +619,13 @@ Variant BulletVolley2D::shared_homing_deque_pop_back_target() {
 }
 
 _ALWAYS_INLINE_ bool BulletVolley2D::orbit_reject_fully_disabled_volley(const char *function_name) const {
-	for (int k = 0; k < amount_bullets; ++k) {
-		if (all_bullets_enabled_set.contains(k)) {
-			return false;
-		}
+	// A parked volley (every bullet frozen) accepts shared targets for its
+	// wake; a pooled one is a stale handle.
+	if (is_pooled_in_pool) {
+		UtilityFunctions::push_error(String(function_name) + ": this volley is in the pool (its last bullet died), so this handle is stale. Spawn a new volley instead.");
+		return true;
 	}
-	UtilityFunctions::push_error(String(function_name) + ": volley has no enabled bullets. Wake a bullet with enable_bullet() first.");
-	return true;
+	return false;
 }
 
 void BulletVolley2D::shared_homing_deque_push_front_mouse_position_target() {

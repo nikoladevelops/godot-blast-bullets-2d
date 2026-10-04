@@ -62,6 +62,7 @@ func test_max_zero_is_infinite() -> void:
 
 func test_disable_wake_same_life() -> void:
 	var v: BulletVolley2D = factory.spawn_volley(_bodied_data())
+	v.set_is_auto_pooling_enabled(false) # a drained 1-bullet volley parks instead of pooling
 	v.disable_bullet(0)
 	assert_false(v.is_bullet_status_enabled(0), "manual disable holds")
 	v.wake_bullet(0)

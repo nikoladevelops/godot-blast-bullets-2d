@@ -727,6 +727,9 @@ _ALWAYS_INLINE_ bool BulletVolley2D::attach_bullet_attachment_internal(int bulle
 	attachment_instance->source_scene = attachment_scene;
 	attachment_pooling_ids[bullet_index] = pooling_key;
 	attachment_stick_relative_to_bullet[bullet_index] = stick_relative_to_bullet;
+	if (bullet_index < (int)attachment_suspended.size()) {
+		attachment_suspended[bullet_index] = 0;
+	}
 
 	attachment_offsets[bullet_index] = bullet_attachment_offset;
 
@@ -897,8 +900,11 @@ _ALWAYS_INLINE_ bool BulletVolley2D::orbit_reject_disabled_bullet(int bullet_ind
 	if (bullet_index < 0 || bullet_index >= amount_bullets) {
 		return false;
 	}
-	if (!all_bullets_enabled_set.contains(bullet_index)) {
-		UtilityFunctions::push_error(String(function_name) + ": bullet index " + String::num_int64(bullet_index) + " is disabled. Wake it with enable_bullet() first, then push targets or enable orbiting.");
+	// Frozen (disabled) bullets accept configuration: it applies on the wake
+	// (freeze contract). Only a POOLED volley refuses: it was released, so a
+	// write through this handle would configure the next owner's bullets.
+	if (is_pooled_in_pool) {
+		UtilityFunctions::push_error(String(function_name) + ": this volley is in the pool (its last bullet died), so this handle is stale. Spawn a new volley instead.");
 		return true;
 	}
 	return false;

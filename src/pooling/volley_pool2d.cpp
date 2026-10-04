@@ -143,4 +143,13 @@ bool VolleyPool::try_remove_instance(BulletVolley2D *target, const PoolKey &key)
 	}
 	return false;
 }
+std::vector<std::pair<PoolKey, BulletVolley2D *>> VolleyPool::debug_entries() const {
+	std::vector<std::pair<PoolKey, BulletVolley2D *>> out;
+	for (const auto &[key, vec] : pool) {
+		for (BulletVolley2D *volley : vec) {
+			out.emplace_back(key, volley);
+		}
+	}
+	return out;
+}
 } //namespace BlastBullets2D

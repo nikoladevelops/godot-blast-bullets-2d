@@ -25,13 +25,15 @@ func test_attach_disable_wake_sequence() -> void:
 	assert_eq(probe.get("spawn_calls"), 1, "on_bullet_spawn fired once")
 	v.disable_bullet(0, false)
 	assert_true(v.debug_get_attachment_info(0).get("has_attachment", false), "keep-slot disable preserves the slot")
-	assert_eq(probe.get("disable_calls"), 0, "kept attachment skips the disable callback")
+	assert_eq(probe.get("disable_calls"), 1, "a kept (suspended) attachment is told its bullet is gone")
+	assert_same(v.bullet_get_attachment(0), probe, "the same node stays in the slot")
 	v.wake_bullet(0)
 	await idle(1)
-	assert_eq(probe.get("enable_calls"), 1, "on_bullet_enable fired on wake")
+	assert_eq(probe.get("enable_calls"), 1, "on_bullet_enable fired on wake (symmetric resume)")
 	assert_true(v.debug_get_attachment_info(0).get("owner_match", false), "owner still matches after wake")
 	v.disable_bullet(0)
-	assert_eq(probe.get("disable_calls"), 1, "pooling disable fires the disable callback")
+	assert_eq(probe.get("disable_calls"), 2, "releasing disable fires the disable callback again")
+	assert_null(v.bullet_get_attachment(0), "released to the attachment pool")
 
 
 func test_pooled_reuse_starts_blank() -> void:

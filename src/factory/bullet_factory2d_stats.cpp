@@ -291,6 +291,63 @@ Dictionary BulletFactory2D::debug_assert_no_dangling() {
 			return fail("active set holds stale id " + String::num_int64(id));
 		}
 	}
+	// Life-state invariants (ACTIVE / PARKED / POOLED, see BulletVolley2D):
+	// the counter mirrors the live set, an active volley is ticked, and a
+	// pooled volley is fully released (no live bullet, attachment, timer,
+	// owner, queued record or parked overlap).
+	for (int i = 0; i < (int)all_volleys.size(); ++i) {
+		const BulletVolley2D *volley = all_volleys[i];
+		const String at = " at index " + String::num_int64(i);
+		if (volley->active_bullets_counter != volley->all_bullets_enabled_set.size()) {
+			return fail("live counter (" + String::num_int64(volley->active_bullets_counter) + ") != live set (" + String::num_int64(volley->all_bullets_enabled_set.size()) + ")" + at);
+		}
+		if (volley->is_active != (volley->active_bullets_counter > 0)) {
+			return fail("is_active disagrees with the live counter" + at);
+		}
+		if (volley->is_active && !volley_set.contains(i)) {
+			return fail("active volley missing from the tick set" + at);
+		}
+		if (volley->is_pooled_in_pool) {
+			if (volley->is_active) {
+				return fail("pooled volley is active" + at);
+			}
+			if (volley->get_amount_active_attachments() != 0) {
+				return fail("pooled volley still holds attachments" + at);
+			}
+			if (!volley->custom_timers.empty()) {
+				return fail("pooled volley still holds timers" + at);
+			}
+			if (volley->owner_spawner_id != 0) {
+				return fail("pooled volley still has an owner" + at);
+			}
+			if (!volley->all_collided_bullets.empty() || !volley->paused_overlaps.empty()) {
+				return fail("pooled volley still holds collision records" + at);
+			}
+			if (!volley->life_released) {
+				return fail("pooled volley was never released" + at);
+			}
+		}
+	}
+	int pooled_flags = 0;
+	for (const BulletVolley2D *volley : all_volleys) {
+		pooled_flags += volley->is_pooled_in_pool ? 1 : 0;
+	}
+	const std::vector<std::pair<PoolKey, BulletVolley2D *>> entries = volley_pool.debug_entries();
+	if ((int)entries.size() != pooled_flags) {
+		return fail("pool holds " + String::num_int64((int64_t)entries.size()) + " entries but " + String::num_int64(pooled_flags) + " volleys are flagged pooled");
+	}
+	for (const auto &entry : entries) {
+		const BulletVolley2D *volley = entry.second;
+		if (volley == nullptr) {
+			return fail("pool holds a null entry");
+		}
+		if (volley->sparse_set_id < 0 || volley->sparse_set_id >= (int)all_volleys.size() || all_volleys[volley->sparse_set_id] != volley) {
+			return fail("pool holds an untracked volley");
+		}
+		if (!(entry.first == volley->get_pool_key())) {
+			return fail("pooled volley sits in the wrong bucket");
+		}
+	}
 	d["volleys_total"] = (int)all_volleys.size();
 	return d;
 }

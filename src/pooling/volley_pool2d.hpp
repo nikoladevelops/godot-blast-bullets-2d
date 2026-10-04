@@ -42,6 +42,10 @@ public:
 
 	bool try_remove_instance(BulletVolley2D *target, const PoolKey &key);
 
+	// Every (bucket key, instance) pair currently pooled. Cold path: the
+	// factory's debug_assert_no_dangling invariant check only.
+	std::vector<std::pair<PoolKey, BulletVolley2D *>> debug_entries() const;
+
 private:
 	// The key is amount + shape type enum. Example: key {5, SHAPE_CIRCLE} holds all disabled multis with 5 bullets and circle shapes.
 	std::unordered_map<PoolKey, std::vector<BulletVolley2D *>, PoolKeyHash> pool;

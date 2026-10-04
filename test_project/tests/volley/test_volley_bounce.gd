@@ -1562,7 +1562,12 @@ func test_t25c_knob_independence_pool_ghost_boost() -> void:
 		if not v25h.is_bullet_status_enabled(0):
 			break
 	assert_true(not v25h.is_bullet_status_enabled(0), "expiry pooled the volley")
-	v25h.enable_bullet(0)
+	assert_true(v25h.is_pooled(), "the expired volley is in the pool")
+	# The next life of the same instance (aimed away from the wall) must not
+	# inherit the dead life's strength-2 boost.
+	var r25h: BulletVolley2D = factory.spawn_volley(_bounce_data(Vector2.ZERO, PI, 300.0, [4], [4]))
+	assert_same(r25h, v25h, "same-key spawn reuses the pooled instance")
+	v25h = r25h
 	var flat25 := BulletCurvesData2D.new()
 	var flat25_curve := Curve.new()
 	flat25_curve.min_value = 0.0
@@ -1589,11 +1594,18 @@ func test_t26_reset_semantics_multi_bullet_gravity_arc_area_routing() -> void:
 		if v26.bullet_get_bounce_count(0) >= 1:
 			break
 	assert_true(v26.bullet_get_bounce_count(0) >= 1, "baseline bounce counted")
+	var counted26: int = v26.bullet_get_bounce_count(0)
+	v26.set_is_auto_pooling_enabled(false) # park on drain: the same life wakes
 	v26.disable_bullet(0)
-	assert_true(v26.bullet_get_bounce_count(0) == 0, "disable zeroes the bounce count")
+	assert_eq(v26.bullet_get_bounce_count(0), counted26, "disable freezes the bounce ledger")
 	v26.enable_bullet(0)
-	assert_true(v26.bullet_get_bounce_count(0) == 0, "wake restarts the ledger")
+	assert_eq(v26.bullet_get_bounce_count(0), counted26, "wake resumes the ledger")
 	assert_true(v26.is_bullet_status_enabled(0), "wake revives the bullet")
+	v26.disable_bullet(0, true, true)
+	assert_eq(v26.bullet_get_bounce_count(0), 0, "reset_state zeroes the bounce ledger")
+	v26.enable_bullet(0)
+	assert_eq(v26.bullet_get_bounce_count(0), 0, "a reset bullet wakes with a fresh ledger")
+	v26.set_is_auto_pooling_enabled(true)
 	await _settle(factory)
 	var dd26 := BulletVolleyData2D.new()
 	dd26.sprite_frames = H.make_sprite_frames()

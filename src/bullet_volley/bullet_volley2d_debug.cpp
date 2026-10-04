@@ -486,4 +486,35 @@ Dictionary BulletVolley2D::debug_get_bullet_info(int bullet_index) const {
 	return d;
 }
 
+Dictionary BulletVolley2D::debug_get_clocks() const {
+	// Every clock a volley advances, in one read-only snapshot (tests/support).
+	Dictionary d;
+	d["curves_elapsed_time"] = curves_elapsed_time;
+	d["life_time_left"] = get_life_time_left();
+	d["max_life_time"] = max_life_time;
+	d["is_life_time_infinite"] = is_life_time_infinite;
+	d["homing_update_timer"] = homing_update_timer;
+	d["homing_update_interval"] = homing_update_interval;
+	d["anim_frame_index"] = anim_frame_index;
+	d["anim_frame_time_left"] = anim_frame_time_left;
+	d["anim_finished"] = anim_finished;
+	d["fade_alpha"] = fade_applied.a;
+	Array timers;
+	for (const CustomTimer &t : custom_timers) {
+		Dictionary e;
+		e["id"] = (int64_t)t._id;
+		e["time_left"] = t._current_time;
+		e["period"] = t._initial_time;
+		e["repeating"] = t._repeating;
+		timers.push_back(e);
+	}
+	d["timers"] = timers;
+	PackedFloat32Array cooldowns;
+	for (real_t c : all_bounce_cooldown) {
+		cooldowns.push_back((float)c);
+	}
+	d["bounce_cooldowns"] = cooldowns;
+	return d;
+}
+
 } // namespace BlastBullets2D

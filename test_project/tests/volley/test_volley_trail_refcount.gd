@@ -35,12 +35,14 @@ func test_shared_shard_lifecycle() -> void:
 
 
 func test_wake_retracks_and_reshows() -> void:
+	v.set_is_auto_pooling_enabled(false) # park on drain: the same life wakes
 	v.disable_bullet(0)
 	v.disable_bullet(1)
 	await idle(1)
+	assert_true(v.is_parked(), "drained volley parked")
 	v.wake_bullet(0)
 	v.wake_bullet(1)
-	assert_push_warning("woke a pooled volley")
+	expect_no_errors()
 	await physics(4)
 	assert_eq(int(_bake(v).get("bullets_tracked", -1)), 2, "both bullets tracked again")
 	assert_gte(int(_bake(v).get("shards_visible", -1)), 1, "shard visible again")

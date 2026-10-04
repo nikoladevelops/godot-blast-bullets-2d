@@ -111,31 +111,10 @@ void BulletVolley2D::expire_live_bullets() {
 			return;
 		}
 	}
-	for (int k = 0; k < expiring_count && k < (int)expiry_indexes_scratch.size(); ++k) {
-		const int i = expiry_indexes_scratch[k];
-		if (!all_bullets_enabled_set.contains(i)) {
-			continue;
-		}
-		if (is_life_time_over_signal_enabled && k < (int)expiry_epochs_scratch.size() && expiry_epochs_scratch[k] != collision_epoch_for_bullet(i)) {
-			continue; // the handler disabled and woke it: it owns this bullet
-		}
-		// Lifetime expiry visuals fire here (never on collision kills):
-		// capture the pose first, the disable below never moves it.
-		Transform2D fx_expire_transf;
-		const bool fx_have_pose = i >= 0 && i < (int)all_cached_instance_transforms.size();
-		if (fx_have_pose) {
-			fx_expire_transf = all_cached_instance_transforms[i];
-		}
-		disable_bullet(i, true);
-		// disable_bullet ran attachment callbacks (user code): stop touching
-		// this volley if one of them freed it.
-		if (ObjectDB::get_instance(ObjectID(self_id)) != this) {
-			return;
-		}
-		if (fx_have_pose) {
-			fx_fire_oneshot(EFFECT_ON_LIFETIME_OVER, i, fx_expire_transf);
-		}
-	}
+	// Batched expiry (On Lifetime Over at each pose, one render upload when
+	// the whole volley expires). Bullets the handler disabled/woke (epoch
+	// moved) are skipped.
+	disable_bullets_bulk(expiry_indexes_scratch, EFFECT_ON_LIFETIME_OVER, is_life_time_over_signal_enabled ? &expiry_epochs_scratch : nullptr);
 }
 
 } // namespace BlastBullets2D

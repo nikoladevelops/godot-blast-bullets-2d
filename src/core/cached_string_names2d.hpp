@@ -22,6 +22,7 @@ struct CachedStringNames2D {
 	const StringName bounce_area_entered = StringName("bounce_area_entered");
 	const StringName bounce_body_entered = StringName("bounce_body_entered");
 	const StringName collision_layer = StringName("collision_layer");
+	const StringName oversampling_with_scale = StringName("oversampling_with_scale");
 	const StringName life_time_over = StringName("life_time_over");
 	const StringName sprite_animation_finished = StringName("sprite_animation_finished");
 	const StringName bullet_homing_target_reached = StringName("bullet_homing_target_reached");
