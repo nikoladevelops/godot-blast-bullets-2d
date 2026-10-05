@@ -189,22 +189,22 @@ PatternSlots2D BulletPatterns2D::generate_grid2d(int transforms_amount, Transfor
 			}
 			new_transform.set_scale(marker_transform.get_scale());
 
-		// Apply random local rotation if enabled (scale preserved: the
-		// rotation-only constructor resets it to 1).
-		if (random_local_rotation) {
-			real_t random_angle = (grid_seeded ? grid_rng->randf() : UtilityFunctions::randf()) * Math::TAU;
-			new_transform = Transform2D(new_transform.get_rotation() + random_angle, new_transform.get_origin());
-			new_transform.set_scale(marker_transform.get_scale());
-		}
+			// Apply random local rotation if enabled (scale preserved: the
+			// rotation-only constructor resets it to 1).
+			if (random_local_rotation) {
+				real_t random_angle = (grid_seeded ? grid_rng->randf() : UtilityFunctions::randf()) * Math::TAU;
+				new_transform = Transform2D(new_transform.get_rotation() + random_angle, new_transform.get_origin());
+				new_transform.set_scale(marker_transform.get_scale());
+			}
 
-		// Scatter each origin by up to +-jitter on both axes (0 disables it).
-		if (jitter > 0.0) {
-			real_t jx = grid_seeded ? grid_rng->randf_range(-jitter, jitter) : UtilityFunctions::randf_range(-jitter, jitter);
-			real_t jy = grid_seeded ? grid_rng->randf_range(-jitter, jitter) : UtilityFunctions::randf_range(-jitter, jitter);
-			const Vector2 scatter(jx, jy);
-			new_transform = Transform2D(new_transform.get_rotation(), new_transform.get_origin() + scatter);
-			new_transform.set_scale(marker_transform.get_scale());
-		}
+			// Scatter each origin by up to +-jitter on both axes (0 disables it).
+			if (jitter > 0.0) {
+				real_t jx = grid_seeded ? grid_rng->randf_range(-jitter, jitter) : UtilityFunctions::randf_range(-jitter, jitter);
+				real_t jy = grid_seeded ? grid_rng->randf_range(-jitter, jitter) : UtilityFunctions::randf_range(-jitter, jitter);
+				const Vector2 scatter(jx, jy);
+				new_transform = Transform2D(new_transform.get_rotation(), new_transform.get_origin() + scatter);
+				new_transform.set_scale(marker_transform.get_scale());
+			}
 
 			// Store the transform and increment the counter
 			generated_transforms[count_spawned] = new_transform;
@@ -414,7 +414,7 @@ TypedArray<Transform2D> BulletPatterns2D::helper_generate_transforms_spiral(
 }
 
 PatternSlots2D BulletPatterns2D::generate_line2d(int transforms_amount, Transform2D marker_transform, const LineParams2D &params) {
-	const Vector2 & direction = params.direction;
+	const Vector2 &direction = params.direction;
 	real_t spacing = params.spacing;
 	bool face_direction = params.face_direction;
 	LineAnchor anchor = params.anchor;
@@ -490,7 +490,7 @@ TypedArray<Transform2D> BulletPatterns2D::helper_generate_transforms_line(
 }
 
 PatternSlots2D BulletPatterns2D::generate_aimed2d(int transforms_amount, Transform2D marker_transform, const AimedParams2D &params) {
-	const Vector2 & target_position = params.target_position;
+	const Vector2 &target_position = params.target_position;
 	real_t spread = params.spread;
 	real_t step_offset = params.step_offset;
 	bool centered = params.centered;
@@ -1328,7 +1328,7 @@ TypedArray<Transform2D> BulletPatterns2D::helper_generate_transforms_counter_spi
 }
 
 PatternSlots2D BulletPatterns2D::generate_corridor2d(int transforms_amount, Transform2D marker_transform, const CorridorParams2D &params) {
-	const Vector2 & aim_direction = params.aim_direction;
+	const Vector2 &aim_direction = params.aim_direction;
 	real_t width = params.width;
 	real_t spacing = params.spacing;
 	real_t gap_width = params.gap_width;

@@ -3,10 +3,10 @@
 // same checks as the BulletSpawner2D setters (pattern_knob_table2d.inc), so
 // a value a spawner refuses is refused here too, with the same wording.
 
-#include "patterns/patterns_internal.hpp"
 #include "patterns/pattern_knob_checks2d.hpp"
 #include "patterns/pattern_knobs2d.hpp"
 #include "patterns/pattern_registry2d.hpp"
+#include "patterns/patterns_internal.hpp"
 
 using namespace godot;
 
@@ -67,22 +67,22 @@ static KnobWrite2D write_table_knob(PatternKnobs2D &k, const String &name, const
 #define PATTERN_SUBGROUP(TITLE, PREFIX)
 #define PATTERN_PROPERTY(VTYPE, NAME, HINT, HINT_STRING, SETTER, GETTER)
 #define PATTERN_KNOB(PTYPE, CTYPE, VTYPE, NAME, C1, A1, B1, M1, C2, A2, B2, M2, NOTIFY, HINT, HINT_STRING) \
-	if (name == #NAME) { \
-		CTYPE value{}; \
-		if (!knob_value(v, value)) { \
-			pattern_knob_reject2d(#NAME, String("must be ") + knob_kind(value), kGenerateOwner); \
-			return KNOB_REJECTED; \
-		} \
-		if (PatternKnobCheck2D::C1(value, A1, B1)) { \
-			pattern_knob_reject2d(#NAME, M1, kGenerateOwner); \
-			return KNOB_REJECTED; \
-		} \
-		if (PatternKnobCheck2D::C2(value, A2, B2)) { \
-			pattern_knob_reject2d(#NAME, M2, kGenerateOwner); \
-			return KNOB_REJECTED; \
-		} \
-		k.NAME = value; \
-		return KNOB_WRITTEN; \
+	if (name == #NAME) {                                                                                   \
+		CTYPE value{};                                                                                     \
+		if (!knob_value(v, value)) {                                                                       \
+			pattern_knob_reject2d(#NAME, String("must be ") + knob_kind(value), kGenerateOwner);           \
+			return KNOB_REJECTED;                                                                          \
+		}                                                                                                  \
+		if (PatternKnobCheck2D::C1(value, A1, B1)) {                                                       \
+			pattern_knob_reject2d(#NAME, M1, kGenerateOwner);                                              \
+			return KNOB_REJECTED;                                                                          \
+		}                                                                                                  \
+		if (PatternKnobCheck2D::C2(value, A2, B2)) {                                                       \
+			pattern_knob_reject2d(#NAME, M2, kGenerateOwner);                                              \
+			return KNOB_REJECTED;                                                                          \
+		}                                                                                                  \
+		k.NAME = value;                                                                                    \
+		return KNOB_WRITTEN;                                                                               \
 	}
 #include "patterns/pattern_knob_table2d.inc"
 #undef PATTERN_SUBGROUP
@@ -173,8 +173,13 @@ static const char *const kGenerateKnobNames[] = {
 #undef PATTERN_SUBGROUP
 #undef PATTERN_PROPERTY
 #undef PATTERN_KNOB
-	"helper_path2d_space", "helper_path2d_distribution", "helper_path2d_overflow", "helper_path2d_anchor", "helper_path2d_facing",
-	"helper_custom_transforms", "helper_outline_layer_scales",
+	"helper_path2d_space",
+	"helper_path2d_distribution",
+	"helper_path2d_overflow",
+	"helper_path2d_anchor",
+	"helper_path2d_facing",
+	"helper_custom_transforms",
+	"helper_outline_layer_scales",
 };
 
 // The scene inputs a spawner would read from the tree.

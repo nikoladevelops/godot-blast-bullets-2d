@@ -9,160 +9,160 @@ using namespace godot;
 namespace BlastBullets2D {
 
 void BulletSpawner2D::_validate_property(PropertyInfo &p_property) const {
-    const String property_name = p_property.name;
-    // Spin: knobs hide while spin is off; CONTINUOUS reads only the speed,
-    // OSCILLATE only amplitude + frequency (advance_spin).
-    if (property_name.begins_with("spin_")) {
-        bool show = property_name == "spin_enabled" || spin_enabled;
-        if (show && property_name == "spin_speed_deg_per_sec") {
-            show = spin_mode == SPIN_CONTINUOUS;
-        } else if (show && (property_name == "spin_amplitude_deg" || property_name == "spin_frequency_hz")) {
-            show = spin_mode == SPIN_OSCILLATE;
-        }
-        if (!show) {
-            p_property.usage &= ~PROPERTY_USAGE_EDITOR;
-        }
-        return;
-    }
-    // Burst / telegraph: tuning knobs appear once their switch is on.
-    if (property_name.begins_with("burst_") && property_name != "burst_enabled") {
-        if (!burst_enabled) {
-            p_property.usage &= ~PROPERTY_USAGE_EDITOR;
-        }
-        return;
-    }
-    if (property_name == "telegraph_sec") {
-        if (!telegraph_enabled) {
-            p_property.usage &= ~PROPERTY_USAGE_EDITOR;
-        }
-        return;
-    }
-    // Movement: every knob hides while movement is off; mode-specific knobs
-    // only show where they do something.
-    if (property_name.begins_with("movement_") || property_name == "inherit_movement_velocity") {
-        bool show = movement_enabled || property_name == "movement_enabled";
-        if (show) {
-            if (property_name == "movement_loops") {
-                show = movement_loop_mode != MOVEMENT_LOOP_ONCE;
-            } else if (property_name == "movement_duration_sec") {
-                show = movement_timing == MOVEMENT_TIMING_DURATION;
-            } else if (property_name == "movement_speed") {
-                show = movement_timing == MOVEMENT_TIMING_SPEED;
-            } else if (property_name == "movement_transition" || property_name == "movement_ease") {
-                show = movement_progress_curve.is_null();
-            } else if (property_name == "movement_rotation_offset_deg") {
-                show = movement_rotate_with_path;
-            } else if (property_name == "movement_velocity_inherit_factor") {
-                show = inherit_movement_velocity;
-            }
-        }
-        if (!show) {
-            p_property.usage &= ~PROPERTY_USAGE_EDITOR;
-        }
-        return;
-    }
-    // Tidy inspector: hide the preview tuning knobs while both preview
-    // switches are off. The toggles + spin props stay always visible.
-    if (property_name.begins_with("preview_") && property_name != "show_pattern_preview") {
-        if (!show_pattern_preview && !show_preview_during_runtime) {
-            p_property.usage &= ~PROPERTY_USAGE_EDITOR;
-        }
-        return;
-    }
-    // Homing/orbiting inspector gating: the master switches and mode/source
-    // pickers are always visible, everything else appears only when its
-    // feature (and source/mode) is active - same idea as the helper_* groups.
-    if (property_name.begins_with("homing_") || property_name.begins_with("orbiting_") || property_name.begins_with("shared_homing_")) {
-        bool show = true;
-        if (property_name.begins_with("homing_")) {
-            if (property_name != "homing_enabled" && property_name != "homing_mode" && property_name != "homing_target_source") {
-                show = homing_enabled;
-            }
-            if (show && homing_enabled) {
-                const bool multi_source = homing_target_source == HOMING_SOURCE_NODE_GROUP || homing_target_source == HOMING_SOURCE_NODE_NAME || homing_target_source == HOMING_SOURCE_NODE_CHILDREN;
-                if (property_name == "homing_node_group") {
-                    show = homing_target_source == HOMING_SOURCE_NODE_GROUP;
-                } else if (property_name == "homing_node_name" || property_name == "homing_node_name_match_mode" || property_name == "homing_node_name_case_sensitive") {
-                    show = homing_target_source == HOMING_SOURCE_NODE_NAME;
-                } else if (property_name == "homing_children_parent_path" || property_name == "homing_children_recursive") {
-                    show = homing_target_source == HOMING_SOURCE_NODE_CHILDREN;
-                } else if (property_name == "homing_target_selection" || property_name == "homing_max_targets" || property_name == "homing_max_detection_range") {
-                    show = multi_source;
-                } else if (property_name == "homing_filter_group") {
-                    show = multi_source || homing_target_source == HOMING_SOURCE_NODE_PATH;
-                } else if (property_name == "homing_global_position") {
-                    show = homing_target_source == HOMING_SOURCE_GLOBAL_POSITION;
-                } else if (property_name == "homing_target_path") {
-                    show = homing_target_source == HOMING_SOURCE_NODE_PATH;
-                } else if (property_name == "homing_per_bullet_smoothing_enabled") {
-                    show = homing_mode == HOMING_PER_BULLET;
-                } else if (property_name == "homing_smoothing_start" || property_name == "homing_smoothing_step") {
-                    show = homing_mode == HOMING_PER_BULLET && homing_per_bullet_smoothing_enabled;
-                } else if (property_name == "homing_retarget_interval_sec" || property_name == "homing_retarget_previous_volleys") {
-                    show = homing_retarget_mode == HOMING_RETARGET_ON_INTERVAL;
-                } else if (property_name == "homing_delay_sec" || property_name == "homing_duration_sec" || property_name == "homing_lose_range_px" || property_name == "homing_fire_arc_deg") {
-                    show = true;
-                } else if (property_name == "homing_random_seed") {
-                    show = homing_target_selection == HOMING_SELECT_RANDOM;
-                } else if (property_name == "homing_retarget_phase") {
-                    show = homing_retarget_mode == HOMING_RETARGET_ON_INTERVAL;
-                }
-            }
-        } else {
-            // Orbiting only works with homing on (it locks onto a homing
-            // target): without homing the tunables would arm a dead feature,
-            // so they hide until both switches are on.
-            if (property_name != "orbiting_enabled") {
-                show = homing_enabled && orbiting_enabled;
-            }
-            if (show && orbiting_enabled) {
-                if (property_name == "orbiting_radius") {
-                    show = !orbiting_radius_linear_enabled;
-                } else if (property_name == "orbiting_radius_start" || property_name == "orbiting_radius_step") {
-                    show = orbiting_radius_linear_enabled;
-                } else if (property_name == "orbiting_follow_deadzone") {
-                    show = orbiting_follow_mode == BulletVolley2D::FollowDeadzone;
-                }
-            }
-        }
-        if (!show) {
-            p_property.usage &= ~PROPERTY_USAGE_EDITOR;
-        }
-        return;
-    }
-    // Only the helper_* option groups are gated (patterns module, driven by
-    // the shape registry's knob prefixes); everything else is always shown.
-    if (!property_name.begins_with("helper_")) {
-        return;
-    }
-    if (!is_knob_relevant((int)pattern_source, property_name)) {
-        p_property.usage &= ~PROPERTY_USAGE_EDITOR;
-    }
+	const String property_name = p_property.name;
+	// Spin: knobs hide while spin is off; CONTINUOUS reads only the speed,
+	// OSCILLATE only amplitude + frequency (advance_spin).
+	if (property_name.begins_with("spin_")) {
+		bool show = property_name == "spin_enabled" || spin_enabled;
+		if (show && property_name == "spin_speed_deg_per_sec") {
+			show = spin_mode == SPIN_CONTINUOUS;
+		} else if (show && (property_name == "spin_amplitude_deg" || property_name == "spin_frequency_hz")) {
+			show = spin_mode == SPIN_OSCILLATE;
+		}
+		if (!show) {
+			p_property.usage &= ~PROPERTY_USAGE_EDITOR;
+		}
+		return;
+	}
+	// Burst / telegraph: tuning knobs appear once their switch is on.
+	if (property_name.begins_with("burst_") && property_name != "burst_enabled") {
+		if (!burst_enabled) {
+			p_property.usage &= ~PROPERTY_USAGE_EDITOR;
+		}
+		return;
+	}
+	if (property_name == "telegraph_sec") {
+		if (!telegraph_enabled) {
+			p_property.usage &= ~PROPERTY_USAGE_EDITOR;
+		}
+		return;
+	}
+	// Movement: every knob hides while movement is off; mode-specific knobs
+	// only show where they do something.
+	if (property_name.begins_with("movement_") || property_name == "inherit_movement_velocity") {
+		bool show = movement_enabled || property_name == "movement_enabled";
+		if (show) {
+			if (property_name == "movement_loops") {
+				show = movement_loop_mode != MOVEMENT_LOOP_ONCE;
+			} else if (property_name == "movement_duration_sec") {
+				show = movement_timing == MOVEMENT_TIMING_DURATION;
+			} else if (property_name == "movement_speed") {
+				show = movement_timing == MOVEMENT_TIMING_SPEED;
+			} else if (property_name == "movement_transition" || property_name == "movement_ease") {
+				show = movement_progress_curve.is_null();
+			} else if (property_name == "movement_rotation_offset_deg") {
+				show = movement_rotate_with_path;
+			} else if (property_name == "movement_velocity_inherit_factor") {
+				show = inherit_movement_velocity;
+			}
+		}
+		if (!show) {
+			p_property.usage &= ~PROPERTY_USAGE_EDITOR;
+		}
+		return;
+	}
+	// Tidy inspector: hide the preview tuning knobs while both preview
+	// switches are off. The toggles + spin props stay always visible.
+	if (property_name.begins_with("preview_") && property_name != "show_pattern_preview") {
+		if (!show_pattern_preview && !show_preview_during_runtime) {
+			p_property.usage &= ~PROPERTY_USAGE_EDITOR;
+		}
+		return;
+	}
+	// Homing/orbiting inspector gating: the master switches and mode/source
+	// pickers are always visible, everything else appears only when its
+	// feature (and source/mode) is active - same idea as the helper_* groups.
+	if (property_name.begins_with("homing_") || property_name.begins_with("orbiting_") || property_name.begins_with("shared_homing_")) {
+		bool show = true;
+		if (property_name.begins_with("homing_")) {
+			if (property_name != "homing_enabled" && property_name != "homing_mode" && property_name != "homing_target_source") {
+				show = homing_enabled;
+			}
+			if (show && homing_enabled) {
+				const bool multi_source = homing_target_source == HOMING_SOURCE_NODE_GROUP || homing_target_source == HOMING_SOURCE_NODE_NAME || homing_target_source == HOMING_SOURCE_NODE_CHILDREN;
+				if (property_name == "homing_node_group") {
+					show = homing_target_source == HOMING_SOURCE_NODE_GROUP;
+				} else if (property_name == "homing_node_name" || property_name == "homing_node_name_match_mode" || property_name == "homing_node_name_case_sensitive") {
+					show = homing_target_source == HOMING_SOURCE_NODE_NAME;
+				} else if (property_name == "homing_children_parent_path" || property_name == "homing_children_recursive") {
+					show = homing_target_source == HOMING_SOURCE_NODE_CHILDREN;
+				} else if (property_name == "homing_target_selection" || property_name == "homing_max_targets" || property_name == "homing_max_detection_range") {
+					show = multi_source;
+				} else if (property_name == "homing_filter_group") {
+					show = multi_source || homing_target_source == HOMING_SOURCE_NODE_PATH;
+				} else if (property_name == "homing_global_position") {
+					show = homing_target_source == HOMING_SOURCE_GLOBAL_POSITION;
+				} else if (property_name == "homing_target_path") {
+					show = homing_target_source == HOMING_SOURCE_NODE_PATH;
+				} else if (property_name == "homing_per_bullet_smoothing_enabled") {
+					show = homing_mode == HOMING_PER_BULLET;
+				} else if (property_name == "homing_smoothing_start" || property_name == "homing_smoothing_step") {
+					show = homing_mode == HOMING_PER_BULLET && homing_per_bullet_smoothing_enabled;
+				} else if (property_name == "homing_retarget_interval_sec" || property_name == "homing_retarget_previous_volleys") {
+					show = homing_retarget_mode == HOMING_RETARGET_ON_INTERVAL;
+				} else if (property_name == "homing_delay_sec" || property_name == "homing_duration_sec" || property_name == "homing_lose_range_px" || property_name == "homing_fire_arc_deg") {
+					show = true;
+				} else if (property_name == "homing_random_seed") {
+					show = homing_target_selection == HOMING_SELECT_RANDOM;
+				} else if (property_name == "homing_retarget_phase") {
+					show = homing_retarget_mode == HOMING_RETARGET_ON_INTERVAL;
+				}
+			}
+		} else {
+			// Orbiting only works with homing on (it locks onto a homing
+			// target): without homing the tunables would arm a dead feature,
+			// so they hide until both switches are on.
+			if (property_name != "orbiting_enabled") {
+				show = homing_enabled && orbiting_enabled;
+			}
+			if (show && orbiting_enabled) {
+				if (property_name == "orbiting_radius") {
+					show = !orbiting_radius_linear_enabled;
+				} else if (property_name == "orbiting_radius_start" || property_name == "orbiting_radius_step") {
+					show = orbiting_radius_linear_enabled;
+				} else if (property_name == "orbiting_follow_deadzone") {
+					show = orbiting_follow_mode == BulletVolley2D::FollowDeadzone;
+				}
+			}
+		}
+		if (!show) {
+			p_property.usage &= ~PROPERTY_USAGE_EDITOR;
+		}
+		return;
+	}
+	// Only the helper_* option groups are gated (patterns module, driven by
+	// the shape registry's knob prefixes); everything else is always shown.
+	if (!property_name.begins_with("helper_")) {
+		return;
+	}
+	if (!is_knob_relevant((int)pattern_source, property_name)) {
+		p_property.usage &= ~PROPERTY_USAGE_EDITOR;
+	}
 }
 
 void BulletSpawner2D::_bind_methods() {
-    // Inspector layout: Setup (wiring) -> Bullet Patterns (source, amount,
-    // Transform subgroup, one subgroup per shape with its helper_<shape>_
-    // prefix stripped, Outline Layers last) -> Shooting -> Spin -> Homing ->
-    // Orbiting -> Preview -> Movement -> Performance. Property NAMES never
-    // change here (they are serialized into .tscn); only the order and the
-    // headers do. ADD_PROPERTY must follow its bind_method calls, otherwise
-    // ClassDB silently drops the property (the test runner flags that).
-    ADD_GROUP("Setup", "");
-    ClassDB::bind_method(D_METHOD("get_bullet_factory_path"), &BulletSpawner2D::get_bullet_factory_path);
-    ClassDB::bind_method(D_METHOD("set_bullet_factory_path", "path"), &BulletSpawner2D::set_bullet_factory_path);
-    ADD_PROPERTY(PropertyInfo(Variant::NODE_PATH, "bullet_factory_path", PROPERTY_HINT_NODE_PATH_VALID_TYPES, "BulletFactory2D"), "set_bullet_factory_path", "get_bullet_factory_path");
+	// Inspector layout: Setup (wiring) -> Bullet Patterns (source, amount,
+	// Transform subgroup, one subgroup per shape with its helper_<shape>_
+	// prefix stripped, Outline Layers last) -> Shooting -> Spin -> Homing ->
+	// Orbiting -> Preview -> Movement -> Performance. Property NAMES never
+	// change here (they are serialized into .tscn); only the order and the
+	// headers do. ADD_PROPERTY must follow its bind_method calls, otherwise
+	// ClassDB silently drops the property (the test runner flags that).
+	ADD_GROUP("Setup", "");
+	ClassDB::bind_method(D_METHOD("get_bullet_factory_path"), &BulletSpawner2D::get_bullet_factory_path);
+	ClassDB::bind_method(D_METHOD("set_bullet_factory_path", "path"), &BulletSpawner2D::set_bullet_factory_path);
+	ADD_PROPERTY(PropertyInfo(Variant::NODE_PATH, "bullet_factory_path", PROPERTY_HINT_NODE_PATH_VALID_TYPES, "BulletFactory2D"), "set_bullet_factory_path", "get_bullet_factory_path");
 
-    ClassDB::bind_method(D_METHOD("get_bullet_factory"), &BulletSpawner2D::get_bullet_factory);
-    ClassDB::bind_method(D_METHOD("set_bullet_factory", "factory"), &BulletSpawner2D::set_bullet_factory);
+	ClassDB::bind_method(D_METHOD("get_bullet_factory"), &BulletSpawner2D::get_bullet_factory);
+	ClassDB::bind_method(D_METHOD("set_bullet_factory", "factory"), &BulletSpawner2D::set_bullet_factory);
 
 	ClassDB::bind_method(D_METHOD("get_transforms_generator_path"), &BulletSpawner2D::get_transforms_generator_path);
 	ClassDB::bind_method(D_METHOD("set_transforms_generator_path", "path"), &BulletSpawner2D::set_transforms_generator_path);
 	ADD_PROPERTY(PropertyInfo(Variant::NODE_PATH, "transforms_generator", PROPERTY_HINT_NODE_PATH_VALID_TYPES, "Node2D"), "set_transforms_generator_path", "get_transforms_generator_path");
 
- 	ClassDB::bind_method(D_METHOD("get_transforms_generator"), &BulletSpawner2D::get_transforms_generator);
- 	ClassDB::bind_method(D_METHOD("set_transforms_generator", "generator"), &BulletSpawner2D::set_transforms_generator);
- 	ClassDB::bind_method(D_METHOD("get_effective_generator"), &BulletSpawner2D::get_effective_generator);
+	ClassDB::bind_method(D_METHOD("get_transforms_generator"), &BulletSpawner2D::get_transforms_generator);
+	ClassDB::bind_method(D_METHOD("set_transforms_generator", "generator"), &BulletSpawner2D::set_transforms_generator);
+	ClassDB::bind_method(D_METHOD("get_effective_generator"), &BulletSpawner2D::get_effective_generator);
 
 	ClassDB::bind_method(D_METHOD("get_spawn_data"), &BulletSpawner2D::get_spawn_data);
 	ClassDB::bind_method(D_METHOD("set_spawn_data", "new_spawn_data"), &BulletSpawner2D::set_spawn_data);
@@ -213,8 +213,8 @@ void BulletSpawner2D::_bind_methods() {
 	// Every property of the group, in inspector order, from the knob table.
 #define PATTERN_SUBGROUP(TITLE, PREFIX) ADD_SUBGROUP(TITLE, PREFIX);
 #define PATTERN_KNOB(PTYPE, CTYPE, VTYPE, NAME, C1, A1, B1, M1, C2, A2, B2, M2, NOTIFY, HINT, HINT_STRING) \
-	ClassDB::bind_method(D_METHOD("get_" #NAME), &BulletSpawner2D::get_##NAME); \
-	ClassDB::bind_method(D_METHOD("set_" #NAME, "value"), &BulletSpawner2D::set_##NAME); \
+	ClassDB::bind_method(D_METHOD("get_" #NAME), &BulletSpawner2D::get_##NAME);                            \
+	ClassDB::bind_method(D_METHOD("set_" #NAME, "value"), &BulletSpawner2D::set_##NAME);                   \
 	ADD_PROPERTY(PropertyInfo(Variant::VTYPE, #NAME, HINT, HINT_STRING), "set_" #NAME, "get_" #NAME);
 #define PATTERN_PROPERTY(VTYPE, NAME, HINT, HINT_STRING, SETTER, GETTER) \
 	ADD_PROPERTY(PropertyInfo(Variant::VTYPE, #NAME, HINT, HINT_STRING), #SETTER, #GETTER);
@@ -236,22 +236,22 @@ void BulletSpawner2D::_bind_methods() {
 	// NOTE: PROPERTY_HINT_RESOURCE_TYPE (not NODE_TYPE) carries the class name
 	// to ClassDB/--doctool; see the note on the factory signals.
 	ADD_SIGNAL(MethodInfo("pre_shoot",
-		PropertyInfo(Variant::OBJECT, "volley", PROPERTY_HINT_RESOURCE_TYPE, "BulletVolley2D"),
-		PropertyInfo(Variant::INT, "volley_index")));
+			PropertyInfo(Variant::OBJECT, "volley", PROPERTY_HINT_RESOURCE_TYPE, "BulletVolley2D"),
+			PropertyInfo(Variant::INT, "volley_index")));
 	ADD_SIGNAL(MethodInfo("volley_fired",
-		PropertyInfo(Variant::OBJECT, "volley", PROPERTY_HINT_RESOURCE_TYPE, "BulletVolley2D"),
-		PropertyInfo(Variant::INT, "volley_index")));
+			PropertyInfo(Variant::OBJECT, "volley", PROPERTY_HINT_RESOURCE_TYPE, "BulletVolley2D"),
+			PropertyInfo(Variant::INT, "volley_index")));
 	ADD_SIGNAL(MethodInfo("volley_skipped",
-		PropertyInfo(Variant::STRING_NAME, "reason")));
+			PropertyInfo(Variant::STRING_NAME, "reason")));
 	ADD_SIGNAL(MethodInfo("volley_telegraphed",
-		PropertyInfo(Variant::ARRAY, "aim_transforms")));
+			PropertyInfo(Variant::ARRAY, "aim_transforms")));
 	ADD_SIGNAL(MethodInfo("burst_shot_fired",
-		PropertyInfo(Variant::INT, "shot_index"),
-		PropertyInfo(Variant::BOOL, "mirrored")));
+			PropertyInfo(Variant::INT, "shot_index"),
+			PropertyInfo(Variant::BOOL, "mirrored")));
 	ADD_SIGNAL(MethodInfo("burst_finished"));
 	ADD_SIGNAL(MethodInfo("pattern_list_finished"));
 	ADD_SIGNAL(MethodInfo("retarget_applied",
-		PropertyInfo(Variant::INT, "volleys_retargeted")));
+			PropertyInfo(Variant::INT, "volleys_retargeted")));
 	ADD_SIGNAL(MethodInfo("shooting_started"));
 	ADD_SIGNAL(MethodInfo("shooting_stopped"));
 	ADD_SIGNAL(MethodInfo("shooting_finished"));
@@ -264,29 +264,29 @@ void BulletSpawner2D::_bind_methods() {
 	// NOTE: PROPERTY_HINT_RESOURCE_TYPE (not NODE_TYPE) carries the class name
 	// to ClassDB/--doctool; see the note on the factory signals.
 	ADD_SIGNAL(MethodInfo("area_entered",
-		PropertyInfo(Variant::OBJECT, "hit_target_area"),
-		PropertyInfo(Variant::OBJECT, "volley", PROPERTY_HINT_RESOURCE_TYPE, "BulletVolley2D"),
-		PropertyInfo(Variant::INT, "bullet_index")));
+			PropertyInfo(Variant::OBJECT, "hit_target_area"),
+			PropertyInfo(Variant::OBJECT, "volley", PROPERTY_HINT_RESOURCE_TYPE, "BulletVolley2D"),
+			PropertyInfo(Variant::INT, "bullet_index")));
 	ADD_SIGNAL(MethodInfo("body_entered",
-		PropertyInfo(Variant::OBJECT, "hit_target_body"),
-		PropertyInfo(Variant::OBJECT, "volley", PROPERTY_HINT_RESOURCE_TYPE, "BulletVolley2D"),
-		PropertyInfo(Variant::INT, "bullet_index")));
+			PropertyInfo(Variant::OBJECT, "hit_target_body"),
+			PropertyInfo(Variant::OBJECT, "volley", PROPERTY_HINT_RESOURCE_TYPE, "BulletVolley2D"),
+			PropertyInfo(Variant::INT, "bullet_index")));
 	ADD_SIGNAL(MethodInfo("life_time_over",
-		PropertyInfo(Variant::OBJECT, "volley", PROPERTY_HINT_RESOURCE_TYPE, "BulletVolley2D"),
-		PropertyInfo(Variant::ARRAY, "bullet_indexes", PROPERTY_HINT_ARRAY_TYPE, "int")));
+			PropertyInfo(Variant::OBJECT, "volley", PROPERTY_HINT_RESOURCE_TYPE, "BulletVolley2D"),
+			PropertyInfo(Variant::ARRAY, "bullet_indexes", PROPERTY_HINT_ARRAY_TYPE, "int")));
 	// Bounce notifications possessed by this spawner for the volleys it
 	// spawned (same routing as area_entered/body_entered above: a spawner
 	// volley NEVER fires factory signals). Same slim payload and handler
 	// contract. A consumed bounce (bounce_hit_consumed) emits BOTH the
 	// bounce signal here and the matching area/body_entered signal.
 	ADD_SIGNAL(MethodInfo("bounce_area_entered",
-		PropertyInfo(Variant::OBJECT, "hit_target_area"),
-		PropertyInfo(Variant::OBJECT, "volley", PROPERTY_HINT_RESOURCE_TYPE, "BulletVolley2D"),
-		PropertyInfo(Variant::INT, "bullet_index")));
+			PropertyInfo(Variant::OBJECT, "hit_target_area"),
+			PropertyInfo(Variant::OBJECT, "volley", PROPERTY_HINT_RESOURCE_TYPE, "BulletVolley2D"),
+			PropertyInfo(Variant::INT, "bullet_index")));
 	ADD_SIGNAL(MethodInfo("bounce_body_entered",
-		PropertyInfo(Variant::OBJECT, "hit_target_body"),
-		PropertyInfo(Variant::OBJECT, "volley", PROPERTY_HINT_RESOURCE_TYPE, "BulletVolley2D"),
-		PropertyInfo(Variant::INT, "bullet_index")));
+			PropertyInfo(Variant::OBJECT, "hit_target_body"),
+			PropertyInfo(Variant::OBJECT, "volley", PROPERTY_HINT_RESOURCE_TYPE, "BulletVolley2D"),
+			PropertyInfo(Variant::INT, "bullet_index")));
 	ClassDB::bind_method(D_METHOD("get_shooting_enabled"), &BulletSpawner2D::get_shooting_enabled);
 	ClassDB::bind_method(D_METHOD("set_shooting_enabled", "value"), &BulletSpawner2D::set_shooting_enabled);
 	ADD_GROUP("Shooting", "");
@@ -352,7 +352,6 @@ void BulletSpawner2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_spin_speed_deg_per_sec", "value"), &BulletSpawner2D::set_spin_speed_deg_per_sec);
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "spin_speed_deg_per_sec"), "set_spin_speed_deg_per_sec", "get_spin_speed_deg_per_sec");
 
-
 	ClassDB::bind_method(D_METHOD("get_spin_amplitude_deg"), &BulletSpawner2D::get_spin_amplitude_deg);
 	ClassDB::bind_method(D_METHOD("set_spin_amplitude_deg", "value"), &BulletSpawner2D::set_spin_amplitude_deg);
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "spin_amplitude_deg"), "set_spin_amplitude_deg", "get_spin_amplitude_deg");
@@ -363,7 +362,6 @@ void BulletSpawner2D::_bind_methods() {
 
 	ClassDB::bind_method(D_METHOD("get_spin_angle_deg"), &BulletSpawner2D::get_spin_angle_deg);
 	ClassDB::bind_method(D_METHOD("reset_spin_angle"), &BulletSpawner2D::reset_spin_angle);
-
 
 	ClassDB::bind_method(D_METHOD("apply_pattern_preset", "preset"), &BulletSpawner2D::apply_pattern_preset);
 	ClassDB::bind_method(D_METHOD("spawn_pattern_list", "entries", "simultaneous", "interval_sec"), &BulletSpawner2D::spawn_pattern_list, DEFVAL(false), DEFVAL(0.25));
@@ -383,16 +381,16 @@ void BulletSpawner2D::_bind_methods() {
 	// NOTE: PROPERTY_HINT_RESOURCE_TYPE (not NODE_TYPE) carries the class name
 	// to ClassDB/--doctool; see the note on the factory signals.
 	ADD_SIGNAL(MethodInfo("volley_homing_configured",
-		PropertyInfo(Variant::OBJECT, "volley", PROPERTY_HINT_RESOURCE_TYPE, "BulletVolley2D"),
-		PropertyInfo(Variant::INT, "volley_index")));
+			PropertyInfo(Variant::OBJECT, "volley", PROPERTY_HINT_RESOURCE_TYPE, "BulletVolley2D"),
+			PropertyInfo(Variant::INT, "volley_index")));
 	ADD_SIGNAL(MethodInfo("homing_targets_resolved",
-		PropertyInfo(Variant::OBJECT, "volley", PROPERTY_HINT_RESOURCE_TYPE, "BulletVolley2D"),
-		PropertyInfo(Variant::ARRAY, "targets")));
+			PropertyInfo(Variant::OBJECT, "volley", PROPERTY_HINT_RESOURCE_TYPE, "BulletVolley2D"),
+			PropertyInfo(Variant::ARRAY, "targets")));
 	ADD_SIGNAL(MethodInfo("volley_bullet_homing_target_reached",
-		PropertyInfo(Variant::OBJECT, "volley", PROPERTY_HINT_RESOURCE_TYPE, "BulletVolley2D"),
-		PropertyInfo(Variant::INT, "bullet_index"),
-		PropertyInfo(Variant::OBJECT, "target", PROPERTY_HINT_RESOURCE_TYPE, "Node2D"),
-		PropertyInfo(Variant::VECTOR2, "target_global_position")));
+			PropertyInfo(Variant::OBJECT, "volley", PROPERTY_HINT_RESOURCE_TYPE, "BulletVolley2D"),
+			PropertyInfo(Variant::INT, "bullet_index"),
+			PropertyInfo(Variant::OBJECT, "target", PROPERTY_HINT_RESOURCE_TYPE, "Node2D"),
+			PropertyInfo(Variant::VECTOR2, "target_global_position")));
 
 	ClassDB::bind_method(D_METHOD("get_homing_enabled"), &BulletSpawner2D::get_homing_enabled);
 	ClassDB::bind_method(D_METHOD("set_homing_enabled", "value"), &BulletSpawner2D::set_homing_enabled);
@@ -674,7 +672,7 @@ void BulletSpawner2D::_bind_methods() {
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "preview_collision_ring_width"), "set_preview_collision_ring_width", "get_preview_collision_ring_width");
 
 	// ---- Movement ----
-#define BS_BIND_PROP(m_name) \
+#define BS_BIND_PROP(m_name)                                                        \
 	ClassDB::bind_method(D_METHOD("get_" #m_name), &BulletSpawner2D::get_##m_name); \
 	ClassDB::bind_method(D_METHOD("set_" #m_name, "value"), &BulletSpawner2D::set_##m_name);
 	BS_BIND_PROP(movement_enabled)
@@ -827,7 +825,6 @@ void BulletSpawner2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("resume_shooting"), &BulletSpawner2D::resume_shooting);
 	ClassDB::bind_method(D_METHOD("is_shooting_paused"), &BulletSpawner2D::is_shooting_paused);
 	ClassDB::bind_method(D_METHOD("volleys_remaining"), &BulletSpawner2D::volleys_remaining);
-
 }
 
 } // namespace BlastBullets2D

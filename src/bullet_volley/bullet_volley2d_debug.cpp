@@ -147,10 +147,7 @@ Dictionary BulletVolley2D::debug_get_bounce_info(int bullet_index) const {
 	// Seconds left before this bullet may bounce off the SAME target
 	// again (0 when the window is over, disarmed, or never bounced).
 	double debounce_left = 0.0;
-	if (bounce_debounce_sec > 0.0 && Math::is_finite((double)bounce_debounce_sec)
-			&& bullet_index >= 0 && bullet_index < (int)all_bounce_last_target.size()
-			&& bullet_index < (int)all_bounce_last_time.size()
-			&& all_bounce_last_target[bullet_index] != 0 && Math::is_finite(curves_elapsed_time)) {
+	if (bounce_debounce_sec > 0.0 && Math::is_finite((double)bounce_debounce_sec) && bullet_index >= 0 && bullet_index < (int)all_bounce_last_target.size() && bullet_index < (int)all_bounce_last_time.size() && all_bounce_last_target[bullet_index] != 0 && Math::is_finite(curves_elapsed_time)) {
 		const double anchor = all_bounce_last_time[bullet_index];
 		if (Math::is_finite(anchor)) {
 			debounce_left = Math::max(0.0, (double)bounce_debounce_sec - (curves_elapsed_time - anchor));

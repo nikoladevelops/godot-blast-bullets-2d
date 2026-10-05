@@ -135,18 +135,18 @@ void BulletFactory2D::_bind_methods() {
 	// the engine declares e.g. Area2D.area_entered.
 
 	ADD_SIGNAL(MethodInfo("area_entered",
-						  PropertyInfo(Variant::OBJECT, "hit_target_area"),
-						  PropertyInfo(Variant::OBJECT, "volley", PROPERTY_HINT_RESOURCE_TYPE, "BulletVolley2D"),
-						  PropertyInfo(Variant::INT, "bullet_index")));
+			PropertyInfo(Variant::OBJECT, "hit_target_area"),
+			PropertyInfo(Variant::OBJECT, "volley", PROPERTY_HINT_RESOURCE_TYPE, "BulletVolley2D"),
+			PropertyInfo(Variant::INT, "bullet_index")));
 
 	ADD_SIGNAL(MethodInfo("body_entered",
-						  PropertyInfo(Variant::OBJECT, "hit_target_body"),
-						  PropertyInfo(Variant::OBJECT, "volley", PROPERTY_HINT_RESOURCE_TYPE, "BulletVolley2D"),
-						  PropertyInfo(Variant::INT, "bullet_index")));
+			PropertyInfo(Variant::OBJECT, "hit_target_body"),
+			PropertyInfo(Variant::OBJECT, "volley", PROPERTY_HINT_RESOURCE_TYPE, "BulletVolley2D"),
+			PropertyInfo(Variant::INT, "bullet_index")));
 
 	ADD_SIGNAL(MethodInfo("life_time_over",
-						  PropertyInfo(Variant::OBJECT, "volley", PROPERTY_HINT_RESOURCE_TYPE, "BulletVolley2D"),
-						  PropertyInfo(Variant::ARRAY, "bullet_indexes", PROPERTY_HINT_ARRAY_TYPE, "int")));
+			PropertyInfo(Variant::OBJECT, "volley", PROPERTY_HINT_RESOURCE_TYPE, "BulletVolley2D"),
+			PropertyInfo(Variant::ARRAY, "bullet_indexes", PROPERTY_HINT_ARRAY_TYPE, "int")));
 
 	// Bounce notifications: slim payload like the collision signals (custom
 	// data and transforms stay one instance call away). Emitted synchronously
@@ -155,14 +155,14 @@ void BulletFactory2D::_bind_methods() {
 	// that also consumes the hit (bounce_hit_consumed) emits BOTH the bounce
 	// signal here and the matching area/body_entered signal.
 	ADD_SIGNAL(MethodInfo("bounce_area_entered",
-						  PropertyInfo(Variant::OBJECT, "hit_target_area"),
-						  PropertyInfo(Variant::OBJECT, "volley", PROPERTY_HINT_RESOURCE_TYPE, "BulletVolley2D"),
-						  PropertyInfo(Variant::INT, "bullet_index")));
+			PropertyInfo(Variant::OBJECT, "hit_target_area"),
+			PropertyInfo(Variant::OBJECT, "volley", PROPERTY_HINT_RESOURCE_TYPE, "BulletVolley2D"),
+			PropertyInfo(Variant::INT, "bullet_index")));
 
 	ADD_SIGNAL(MethodInfo("bounce_body_entered",
-						  PropertyInfo(Variant::OBJECT, "hit_target_body"),
-						  PropertyInfo(Variant::OBJECT, "volley", PROPERTY_HINT_RESOURCE_TYPE, "BulletVolley2D"),
-						  PropertyInfo(Variant::INT, "bullet_index")));
+			PropertyInfo(Variant::OBJECT, "hit_target_body"),
+			PropertyInfo(Variant::OBJECT, "volley", PROPERTY_HINT_RESOURCE_TYPE, "BulletVolley2D"),
+			PropertyInfo(Variant::INT, "bullet_index")));
 
 	ADD_SIGNAL(MethodInfo("reset_finished"));
 }

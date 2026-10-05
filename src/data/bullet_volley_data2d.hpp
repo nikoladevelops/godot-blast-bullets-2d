@@ -1,19 +1,19 @@
 #pragma once
 
+#include "data/bullet_curves_data2d.hpp"
 #include "data/bullet_effect_layer_data2d.hpp"
 #include "data/bullet_rotation_data2d.hpp"
-#include "godot_cpp/variant/typed_array.hpp"
-#include <godot_cpp/classes/canvas_item_material.hpp>
-#include <godot_cpp/classes/mesh.hpp>
-#include <godot_cpp/classes/shape2d.hpp>
-#include <godot_cpp/classes/packed_scene.hpp>
-#include <godot_cpp/classes/resource.hpp>
-#include <godot_cpp/classes/sprite_frames.hpp>
-#include <godot_cpp/classes/texture2d.hpp>
-#include "data/bullet_curves_data2d.hpp"
 #include "data/bullet_speed_data2d.hpp"
 #include "data/bullet_wobble_data2d.hpp"
 #include "godot_cpp/variant/node_path.hpp"
+#include "godot_cpp/variant/typed_array.hpp"
+#include <godot_cpp/classes/canvas_item_material.hpp>
+#include <godot_cpp/classes/mesh.hpp>
+#include <godot_cpp/classes/packed_scene.hpp>
+#include <godot_cpp/classes/resource.hpp>
+#include <godot_cpp/classes/shape2d.hpp>
+#include <godot_cpp/classes/sprite_frames.hpp>
+#include <godot_cpp/classes/texture2d.hpp>
 
 namespace BlastBullets2D {
 using namespace godot;
@@ -336,7 +336,6 @@ public:
 
 	bool get_tile_bullets_current_collision_count() const;
 	void set_tile_bullets_current_collision_count(bool value);
-
 
 public:
 	// How per-bullet arrays resolve. Entry i belongs to bullet i and nobody

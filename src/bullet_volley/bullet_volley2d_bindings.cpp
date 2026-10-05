@@ -174,7 +174,6 @@ void BulletVolley2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_shared_bullet_wobble_data", "new_wobble_data"), &BulletVolley2D::set_shared_bullet_wobble_data);
 	ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "shared_bullet_wobble_data", PROPERTY_HINT_RESOURCE_TYPE, "BulletWobbleData2D"), "set_shared_bullet_wobble_data", "get_shared_bullet_wobble_data");
 
-
 	ADD_GROUP("Gravity", "");
 	ClassDB::bind_method(D_METHOD("get_gravity"), &BulletVolley2D::get_gravity);
 	ClassDB::bind_method(D_METHOD("set_gravity", "value"), &BulletVolley2D::set_gravity);
@@ -416,8 +415,6 @@ void BulletVolley2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_homing_lose_range_px", "value"), &BulletVolley2D::set_homing_lose_range_px);
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "homing_lose_range_px"), "set_homing_lose_range_px", "get_homing_lose_range_px");
 
-
-
 	ClassDB::bind_method(D_METHOD("has_shared_movement_pattern"), &BulletVolley2D::has_shared_movement_pattern);
 	ClassDB::bind_method(D_METHOD("remove_shared_movement_pattern"), &BulletVolley2D::remove_shared_movement_pattern);
 
@@ -456,10 +453,10 @@ void BulletVolley2D::_bind_methods() {
 	// class name reaches ClassDB and --doctool; see the note on the factory
 	// signals.
 	ADD_SIGNAL(MethodInfo("bullet_homing_target_reached",
-						  PropertyInfo(Variant::OBJECT, "multimesh_instance", PROPERTY_HINT_RESOURCE_TYPE, "BulletVolley2D"),
-						  PropertyInfo(Variant::INT, "bullet_index"),
-						  PropertyInfo(Variant::OBJECT, "target", PROPERTY_HINT_RESOURCE_TYPE, "Node2D"),
-						  PropertyInfo(Variant::VECTOR2, "target_global_position")));
+			PropertyInfo(Variant::OBJECT, "multimesh_instance", PROPERTY_HINT_RESOURCE_TYPE, "BulletVolley2D"),
+			PropertyInfo(Variant::INT, "bullet_index"),
+			PropertyInfo(Variant::OBJECT, "target", PROPERTY_HINT_RESOURCE_TYPE, "Node2D"),
+			PropertyInfo(Variant::VECTOR2, "target_global_position")));
 	ADD_GROUP("Custom Data", "");
 	ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "shared_bullets_custom_data"), "set_shared_bullets_custom_data", "get_shared_bullets_custom_data");
 
@@ -495,7 +492,6 @@ void BulletVolley2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("detach_time_based_function", "callable"), &BulletVolley2D::detach_time_based_function);
 
 	ClassDB::bind_method(D_METHOD("detach_all_time_based_functions"), &BulletVolley2D::detach_all_time_based_functions);
-
 
 	ClassDB::bind_method(D_METHOD("get_is_auto_pooling_enabled"), &BulletVolley2D::get_is_auto_pooling_enabled);
 	ClassDB::bind_method(D_METHOD("set_is_auto_pooling_enabled", "value"), &BulletVolley2D::set_is_auto_pooling_enabled);

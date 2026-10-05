@@ -872,38 +872,38 @@ void BulletVolley2D::reset_bullet_runtime_state(int bullet_index) {
 }
 
 bool BulletVolley2D::clear_bullet(int bullet_index) {
-		if (!validate_bullet_index(bullet_index, "clear_bullet")) {
-			return false;
-		}
-		// Already-dead slots stay silent: without this a double clear would
-		// fire a second visual for a bullet that is already gone.
-		if (!all_bullets_enabled_set.contains(bullet_index)) {
-			return false;
-		}
-		// Pose captured before the disable below (disable never moves the
-		// bullet, but the last-bullet disable funnels into disable_volley
-		// which pools the instance; the DESTROY path fires the same way).
-		Transform2D fx_clear_transf;
-		const bool fx_have_pose = bullet_index >= 0 && bullet_index < (int)all_cached_instance_transforms.size();
-		if (fx_have_pose) {
-			fx_clear_transf = all_cached_instance_transforms[bullet_index];
-		}
-		disable_bullet(bullet_index, true);
-		if (fx_have_pose) {
-			fx_fire_oneshot(EFFECT_ON_CLEAR, bullet_index, fx_clear_transf);
-		}
-		return true;
+	if (!validate_bullet_index(bullet_index, "clear_bullet")) {
+		return false;
 	}
+	// Already-dead slots stay silent: without this a double clear would
+	// fire a second visual for a bullet that is already gone.
+	if (!all_bullets_enabled_set.contains(bullet_index)) {
+		return false;
+	}
+	// Pose captured before the disable below (disable never moves the
+	// bullet, but the last-bullet disable funnels into disable_volley
+	// which pools the instance; the DESTROY path fires the same way).
+	Transform2D fx_clear_transf;
+	const bool fx_have_pose = bullet_index >= 0 && bullet_index < (int)all_cached_instance_transforms.size();
+	if (fx_have_pose) {
+		fx_clear_transf = all_cached_instance_transforms[bullet_index];
+	}
+	disable_bullet(bullet_index, true);
+	if (fx_have_pose) {
+		fx_fire_oneshot(EFFECT_ON_CLEAR, bullet_index, fx_clear_transf);
+	}
+	return true;
+}
 
 int BulletVolley2D::clear_all_bullets() {
-		// Snapshot first: the batch mutates the live set. One On Clear per
-		// cleared bullet; a drained volley pays one render upload.
-		// A local copy, never a member: an attachment callback may re-enter
-		// clear_all_bullets() (rejected by the latch inside, but it must not
-		// rewrite the list this batch is walking).
-		const std::vector<int> live = all_bullets_enabled_set.get_active_indexes();
-		return disable_bullets_bulk(live, EFFECT_ON_CLEAR);
-	}
+	// Snapshot first: the batch mutates the live set. One On Clear per
+	// cleared bullet; a drained volley pays one render upload.
+	// A local copy, never a member: an attachment callback may re-enter
+	// clear_all_bullets() (rejected by the latch inside, but it must not
+	// rewrite the list this batch is walking).
+	const std::vector<int> live = all_bullets_enabled_set.get_active_indexes();
+	return disable_bullets_bulk(live, EFFECT_ON_CLEAR);
+}
 
 BulletVolley2D::~BulletVolley2D() {
 	for (auto &queue : all_bullet_homing_targets) {
@@ -1014,6 +1014,5 @@ void BulletVolley2D::on_volley_deactivated() {
 		bullet_factory->track_volley_inactive(*this);
 	}
 }
-
 
 } // namespace BlastBullets2D

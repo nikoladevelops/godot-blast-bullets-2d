@@ -60,36 +60,36 @@ void danmaku_clamp_slots_finite(const char *caller_name, PatternSlots2D &slots) 
 // the marker origin instead of poisoning the volley, degenerate loops yield
 // an empty (loud, when misused) array instead of garbage.
 static bool outline_point_in_poly(const PackedVector2Array &poly, const Vector2 &p) {
-    const int n = poly.size();
-    if (n < 3 || !p.is_finite()) {
-        return false;
-    }
-    bool inside = false;
-    for (int i = 0, j = n - 1; i < n; j = i++) {
-        const Vector2 a = poly[i];
-        const Vector2 b = poly[j];
-        if (!a.is_finite() || !b.is_finite()) {
-            continue;
-        }
-        if ((a.y > p.y) != (b.y > p.y)) {
-            const double x_int = (double)b.x + ((double)p.y - (double)b.y) / ((double)a.y - (double)b.y) * ((double)a.x - (double)b.x);
-            if (Math::is_finite(x_int) && (double)p.x < x_int) {
-                inside = !inside;
-            }
-        }
-    }
-    return inside;
+	const int n = poly.size();
+	if (n < 3 || !p.is_finite()) {
+		return false;
+	}
+	bool inside = false;
+	for (int i = 0, j = n - 1; i < n; j = i++) {
+		const Vector2 a = poly[i];
+		const Vector2 b = poly[j];
+		if (!a.is_finite() || !b.is_finite()) {
+			continue;
+		}
+		if ((a.y > p.y) != (b.y > p.y)) {
+			const double x_int = (double)b.x + ((double)p.y - (double)b.y) / ((double)a.y - (double)b.y) * ((double)a.x - (double)b.x);
+			if (Math::is_finite(x_int) && (double)p.x < x_int) {
+				inside = !inside;
+			}
+		}
+	}
+	return inside;
 }
 
 double outline_point_seg_dist(const Vector2 &p, const Vector2 &a, const Vector2 &b) {
-    const Vector2 ab = b - a;
-    const double len_sq = (double)ab.length_squared();
-    if (!(len_sq > 1e-12) || !p.is_finite() || !a.is_finite() || !b.is_finite()) {
-        return (double)p.distance_to(a);
-    }
-    double t = (double)(p - a).dot(ab) / len_sq;
-    t = Math::clamp(t, 0.0, 1.0);
-    return (double)p.distance_to(a + ab * (real_t)t);
+	const Vector2 ab = b - a;
+	const double len_sq = (double)ab.length_squared();
+	if (!(len_sq > 1e-12) || !p.is_finite() || !a.is_finite() || !b.is_finite()) {
+		return (double)p.distance_to(a);
+	}
+	double t = (double)(p - a).dot(ab) / len_sq;
+	t = Math::clamp(t, 0.0, 1.0);
+	return (double)p.distance_to(a + ab * (real_t)t);
 }
 
 // Angular-sorted silhouette of a slot cloud around its average: recovers a
@@ -98,72 +98,72 @@ double outline_point_seg_dist(const Vector2 &p, const Vector2 &a, const Vector2 
 // (repeated star vertices, closed-curve seams) collapse. False when no
 // usable interior exists.
 bool outline_build_boundary(const PackedVector2Array &points, PackedVector2Array &r_boundary, Vector2 &r_center) {
-    PackedVector2Array finite;
-    for (int i = 0; i < points.size(); ++i) {
-        if (points[i].is_finite()) {
-            finite.push_back(points[i]);
-        }
-    }
-    if (finite.size() < 3) {
-        return false;
-    }
-    Vector2 avg(0, 0);
-    for (int i = 0; i < finite.size(); ++i) {
-        avg += finite[i];
-    }
-    avg /= (real_t)finite.size();
-    if (!avg.is_finite()) {
-        return false;
-    }
-    // Insertion sort by polar angle (slot clouds are small; no allocations).
-    PackedInt32Array order;
-    order.resize(finite.size());
-    for (int i = 0; i < finite.size(); ++i) {
-        order[i] = i;
-    }
-    for (int i = 1; i < order.size(); ++i) {
-        const int key = order[i];
-        const double key_a = Math::atan2((double)finite[key].y - (double)avg.y, (double)finite[key].x - (double)avg.x);
-        int j = i - 1;
-        while (j >= 0) {
-            const double ja = Math::atan2((double)finite[order[j]].y - (double)avg.y, (double)finite[order[j]].x - (double)avg.x);
-            if (ja <= key_a) {
-                break;
-            }
-            order[j + 1] = order[j];
-            --j;
-        }
-        order[j + 1] = key;
-    }
-    r_boundary.clear();
-    for (int i = 0; i < order.size(); ++i) {
-        const Vector2 p = finite[order[i]];
-        if (r_boundary.is_empty() || r_boundary[r_boundary.size() - 1].distance_to(p) > 1e-6) {
-            r_boundary.push_back(p);
-        }
-    }
-    if (r_boundary.size() >= 2 && r_boundary[0].distance_to(r_boundary[r_boundary.size() - 1]) <= 1e-6) {
-        r_boundary.resize(r_boundary.size() - 1);
-    }
-    if (r_boundary.size() < 3) {
-        r_boundary.clear();
-        return false;
-    }
-    // Interior-safe center: AABB middle always reads central for these
-    // silhouettes (an average can land on a figure-8 crossing).
-    Vector2 mn = r_boundary[0];
-    Vector2 mx = r_boundary[0];
-    for (int i = 1; i < r_boundary.size(); ++i) {
-        mn.x = MIN(mn.x, r_boundary[i].x);
-        mn.y = MIN(mn.y, r_boundary[i].y);
-        mx.x = MAX(mx.x, r_boundary[i].x);
-        mx.y = MAX(mx.y, r_boundary[i].y);
-    }
-    r_center = (mn + mx) * 0.5;
-    if (!r_center.is_finite()) {
-        return false;
-    }
-    return true;
+	PackedVector2Array finite;
+	for (int i = 0; i < points.size(); ++i) {
+		if (points[i].is_finite()) {
+			finite.push_back(points[i]);
+		}
+	}
+	if (finite.size() < 3) {
+		return false;
+	}
+	Vector2 avg(0, 0);
+	for (int i = 0; i < finite.size(); ++i) {
+		avg += finite[i];
+	}
+	avg /= (real_t)finite.size();
+	if (!avg.is_finite()) {
+		return false;
+	}
+	// Insertion sort by polar angle (slot clouds are small; no allocations).
+	PackedInt32Array order;
+	order.resize(finite.size());
+	for (int i = 0; i < finite.size(); ++i) {
+		order[i] = i;
+	}
+	for (int i = 1; i < order.size(); ++i) {
+		const int key = order[i];
+		const double key_a = Math::atan2((double)finite[key].y - (double)avg.y, (double)finite[key].x - (double)avg.x);
+		int j = i - 1;
+		while (j >= 0) {
+			const double ja = Math::atan2((double)finite[order[j]].y - (double)avg.y, (double)finite[order[j]].x - (double)avg.x);
+			if (ja <= key_a) {
+				break;
+			}
+			order[j + 1] = order[j];
+			--j;
+		}
+		order[j + 1] = key;
+	}
+	r_boundary.clear();
+	for (int i = 0; i < order.size(); ++i) {
+		const Vector2 p = finite[order[i]];
+		if (r_boundary.is_empty() || r_boundary[r_boundary.size() - 1].distance_to(p) > 1e-6) {
+			r_boundary.push_back(p);
+		}
+	}
+	if (r_boundary.size() >= 2 && r_boundary[0].distance_to(r_boundary[r_boundary.size() - 1]) <= 1e-6) {
+		r_boundary.resize(r_boundary.size() - 1);
+	}
+	if (r_boundary.size() < 3) {
+		r_boundary.clear();
+		return false;
+	}
+	// Interior-safe center: AABB middle always reads central for these
+	// silhouettes (an average can land on a figure-8 crossing).
+	Vector2 mn = r_boundary[0];
+	Vector2 mx = r_boundary[0];
+	for (int i = 1; i < r_boundary.size(); ++i) {
+		mn.x = MIN(mn.x, r_boundary[i].x);
+		mn.y = MIN(mn.y, r_boundary[i].y);
+		mx.x = MAX(mx.x, r_boundary[i].x);
+		mx.y = MAX(mx.y, r_boundary[i].y);
+	}
+	r_center = (mn + mx) * 0.5;
+	if (!r_center.is_finite()) {
+		return false;
+	}
+	return true;
 }
 
 // Even arc-length resample of a slot-space polyline into m points (plus
@@ -545,617 +545,617 @@ PackedVector2Array fill_outline_from(int outline_placement, const PackedVector2A
 }
 
 PatternSlots2D layout_outline_slots(const char *caller_name, const Transform2D &marker_transform, const PackedVector2Array &points, const PackedVector2Array &normals, bool points_are_local, real_t rot_add, bool face_outward, real_t facing_offset_degrees, const PackedFloat32Array &facing_override, const OutlineLayout2D &outline, const CornerLayout2D &corner, const PackedVector2Array &polygon_corners, bool loop_closed, bool allow_resample, const PackedVector2Array &dense_outline, const PackedVector2Array &dense_normals, const PackedFloat32Array &dense_overrides) {
-    // Unpacked once under the names the layout below was written with.
-    const int outline_placement = outline.outline_placement;
-    const int outline_facing = outline.outline_facing;
-    const bool outline_reverse = outline.outline_reverse;
-    const int outline_slot_offset = outline.outline_slot_offset;
-    const double fill_spacing = outline.fill_spacing;
-    const bool fill_stagger = outline.fill_stagger;
-    const double fill_margin = outline.fill_margin;
-    const int layer_count = outline.layer_count;
-    const double layer_scale = outline.layer_scale;
-    const int layer_side = outline.layer_side;
-    const int layer_fill = outline.layer_fill;
-    const int layer_start_offset = outline.layer_start_offset;
-    const int layer_scale_curve = outline.layer_scale_curve;
-    const PackedFloat32Array &layer_custom_scales = outline.layer_custom_scales;
-    const int layer_twist = outline.layer_twist;
-    const int layer_max_dots = outline.layer_max_dots;
-    const int layer_layout = outline.layer_layout;
-    const int outline_distribution = corner.outline_distribution;
-    const int corner_priority = corner.outline_corner_priority;
-    const int corner_mode = corner.outline_corner_mode;
-    const double edge_margin = corner.outline_edge_margin;
-    const int corner_facing = corner.outline_corner_facing;
+	// Unpacked once under the names the layout below was written with.
+	const int outline_placement = outline.outline_placement;
+	const int outline_facing = outline.outline_facing;
+	const bool outline_reverse = outline.outline_reverse;
+	const int outline_slot_offset = outline.outline_slot_offset;
+	const double fill_spacing = outline.fill_spacing;
+	const bool fill_stagger = outline.fill_stagger;
+	const double fill_margin = outline.fill_margin;
+	const int layer_count = outline.layer_count;
+	const double layer_scale = outline.layer_scale;
+	const int layer_side = outline.layer_side;
+	const int layer_fill = outline.layer_fill;
+	const int layer_start_offset = outline.layer_start_offset;
+	const int layer_scale_curve = outline.layer_scale_curve;
+	const PackedFloat32Array &layer_custom_scales = outline.layer_custom_scales;
+	const int layer_twist = outline.layer_twist;
+	const int layer_max_dots = outline.layer_max_dots;
+	const int layer_layout = outline.layer_layout;
+	const int outline_distribution = corner.outline_distribution;
+	const int corner_priority = corner.outline_corner_priority;
+	const int corner_mode = corner.outline_corner_mode;
+	const double edge_margin = corner.outline_edge_margin;
+	const int corner_facing = corner.outline_corner_facing;
 
-    const int n = points.size();
-    PatternSlots2D out;
-    if (n <= 0) {
-        return out;
-    }
-    // Slot-space copy of the loop: the LAYERS rescale below runs in slot
-    // space (local for the xform builders, marker-global otherwise), so
-    // marker translation must not leak into the scale. Conversion back to
-    // global happens once, in place_origin(). Slot space is origin-centered
-    // by construction (every loop generator builds centered shapes), so
-    // layers scale about Vector2(0, 0) — the marker origin — on both the
-    // volley and the preview side, exactly, at any bullet density.
-    PackedVector2Array slot_points;
-    slot_points.resize(n);
-    for (int i = 0; i < n; ++i) {
-        const Vector2 gp = points[i];
-        slot_points[i] = points_are_local ? gp : marker_transform.affine_inverse().xform(gp);
-    }
-    // Loop centroid in slot space: every extra layer rescales the slot loop
-    // about this point, so each ring is the same figure at a different size
-    // (like a second spawner with a bigger shape). Falls back to the
-    // slot-space origin (the marker origin) when degenerate.
-    if (normals.size() != n) {
-        UtilityFunctions::push_error(String(caller_name) + ": outline points/normals mismatch.");
-        return out;
-    }
-    if (outline_placement < 0 || outline_placement > 2) {
-        UtilityFunctions::push_error(String(caller_name) + ": outline_placement must be 0 (on outline), 1 (layers) or 2 (fill inside).");
-        return out;
-    }
-    if (outline_facing < 0 || outline_facing > 2) {
-        UtilityFunctions::push_error(String(caller_name) + ": outline_facing must be 0 (normal), 1 (+90 deg) or 2 (-90 deg).");
-        return out;
-    }
-    if (!Math::is_finite(facing_offset_degrees)) {
-        UtilityFunctions::push_error(String(caller_name) + ": facing_offset_degrees must be finite.");
-        return out;
-    }
-    const bool use_override = !facing_override.is_empty();
-    if (use_override && facing_override.size() != n) {
-        UtilityFunctions::push_error(String(caller_name) + ": facing override size mismatch.");
-        return out;
-    }
-    if (outline_placement == BulletPatterns2D::OUTLINE_FILL_INSIDE) {
-        if (!Math::is_finite(fill_spacing) || fill_spacing <= 0.0 || !Math::is_finite(fill_margin) || fill_margin < 0.0) {
-            UtilityFunctions::push_error(String(caller_name) + ": fill_spacing must be finite and > 0, fill_margin finite and >= 0.");
-            return out;
-        }
-    }
-    if (outline_placement == BulletPatterns2D::OUTLINE_LAYERS) {
-        if (layer_count < 1 || layer_count > 64 || !Math::is_finite(layer_scale) || layer_scale <= 0.0 || layer_scale > 8.0) {
-            UtilityFunctions::push_error(String(caller_name) + ": layer_count must be in [1, 64], layer_scale finite in (0, 8].");
-            return out;
-        }
-        if (layer_side < BulletPatterns2D::OUTLINE_LAYER_OUTWARD || layer_side > BulletPatterns2D::OUTLINE_LAYER_BOTH) {
-            UtilityFunctions::push_error(String(caller_name) + ": layer_side must be 0 (outward), 1 (inward) or 2 (both).");
-            return out;
-        }
-        if (layer_fill < BulletPatterns2D::OUTLINE_LAYER_INTERLEAVED || layer_fill > BulletPatterns2D::OUTLINE_LAYER_PINGPONG) {
-            UtilityFunctions::push_error(String(caller_name) + ": layer_fill must be 0 (interleaved), 1 (sequential), 2 (outer first) or 3 (ping-pong).");
-            return out;
-        }
-        if (layer_start_offset < 0) {
-            UtilityFunctions::push_error(String(caller_name) + ": layer_start_offset must be >= 0 (0 = start on the outline).");
-            return out;
-        }
-        if (layer_scale_curve < BulletPatterns2D::OUTLINE_LAYER_CURVE_LINEAR || layer_scale_curve > BulletPatterns2D::OUTLINE_LAYER_CURVE_EXPONENTIAL) {
-            UtilityFunctions::push_error(String(caller_name) + ": layer_scale_curve must be 0 (linear) or 1 (exponential).");
-            return out;
-        }
-        if (layer_custom_scales.size() > 64) {
-            UtilityFunctions::push_error(String(caller_name) + ": layer_custom_scales holds at most 64 entries.");
-            return out;
-        }
-        for (int ci = 0; ci < layer_custom_scales.size(); ++ci) {
-            const double cs = (double)layer_custom_scales[ci];
-            if (!Math::is_finite(cs) || cs < 0.05 || cs > 64.0) {
-                UtilityFunctions::push_error(String(caller_name) + ": layer_custom_scales entries must be finite in [0.05, 64].");
-                return out;
-            }
-        }
-        if (layer_max_dots < 0) {
-            UtilityFunctions::push_error(String(caller_name) + ": layer_max_dots must be >= 0 (0 = unlimited).");
-            return out;
-        }
-        if (layer_layout < 0 || layer_layout > 1) {
-            UtilityFunctions::push_error(String(caller_name) + ": layer_layout must be 0 (shared loop) or 1 (even per layer).");
-            return out;
-        }
-        if (outline_distribution < 0 || outline_distribution > 1) {
-            UtilityFunctions::push_error(String(caller_name) + ": outline_distribution must be 0 (legacy) or 1 (symmetric).");
-            return out;
-        }
-        if (corner_priority < 0 || corner_priority > 2) {
-            UtilityFunctions::push_error(String(caller_name) + ": corner_priority must be 0 (horizontal), 1 (vertical) or 2 (balanced).");
-            return out;
-        }
-        if (corner_mode < 0 || corner_mode > 1) {
-            UtilityFunctions::push_error(String(caller_name) + ": corner_mode must be 0 (pin corners) or 1 (even arc).");
-            return out;
-        }
-        if (!Math::is_finite(edge_margin) || edge_margin < 0.0) {
-            UtilityFunctions::push_error(String(caller_name) + ": edge_margin must be finite and >= 0.");
-            return out;
-        }
-        if (corner_facing < 0 || corner_facing > 2) {
-            UtilityFunctions::push_error(String(caller_name) + ": corner_facing must be 0 (side), 1 (miter) or 2 (smooth).");
-            return out;
-        }
-        // Collapse precheck: the smallest dealt scale must stay usable,
-        // otherwise deep inward layers would pile onto (or through) the
-        // center. Only layers that receive bullets are tested, so sparse
-        // sequentials never trip on empty rings. Fail loud instead of
-        // spawning a collapsed volley.
-        bool seen[64] = { false };
-        for (int i = 0; i < n; ++i) {
-            const int bl = BulletPatterns2D::helper_bullet_layer_index(i, n, layer_count, layer_fill, layer_start_offset);
-            if (bl > 0 && bl < layer_count) {
-                seen[bl] = true;
-            }
-        }
-        for (int L = 1; L < layer_count; ++L) {
-            if (!seen[L]) {
-                continue;
-            }
-            const double s = BulletPatterns2D::helper_layer_scale_factor(L, layer_scale, layer_side, layer_scale_curve, layer_custom_scales);
-            if (!Math::is_finite(s) || s < 0.05) {
-                UtilityFunctions::push_error(String(caller_name) + ": inward layers collapse below 5% size (lower the count/step).");
-                return out;
-            }
-        }
-    }
-    const real_t facing_offset = Math::deg_to_rad(facing_offset_degrees);
-    const real_t selector = outline_facing == 1 ? Math::PI * 0.5 : (outline_facing == 2 ? -Math::PI * 0.5 : 0.0);
-    const Vector2 marker_scale = marker_transform.get_scale();
-    auto place_origin = [&](const Vector2 &local_pt) -> Vector2 {
-        if (!local_pt.is_finite()) {
-            return marker_transform.get_origin();
-        }
-        const Vector2 p = points_are_local ? marker_transform.xform(local_pt) : local_pt;
-        return p.is_finite() ? p : marker_transform.get_origin();
-    };
-    // Slot order: reverse mirrors the winding, then the offset rotates which
-    // slot becomes bullet 0 (normalized, negatives wrap).
-    PackedInt32Array idx;
-    idx.resize(n);
-    for (int i = 0; i < n; ++i) {
-        idx[i] = outline_reverse ? (n - 1 - i) : i;
-    }
-    if (n > 1) {
-        int k = outline_slot_offset % n;
-        if (k < 0) {
-            k += n;
-        }
-        if (k != 0) {
-            PackedInt32Array rotated;
-            rotated.resize(n);
-            for (int i = 0; i < n; ++i) {
-                rotated[i] = idx[(i + k) % n];
-            }
-            idx = rotated;
-        }
-    }
-    auto compose_facing = [&](int j) -> real_t {
-        if (use_override) {
-            const real_t o = (j >= 0 && j < facing_override.size()) ? facing_override[j] : 0.0f;
-            return Math::is_finite((double)o) ? o + selector : rot_add + selector;
-        }
-        const Vector2 nrm = (j >= 0 && j < normals.size()) ? normals[j] : Vector2(1, 0);
-        const double na = (nrm.is_finite() && nrm.length_squared() > 1e-12) ? nrm.angle() : 0.0;
-        real_t rot = rot_add + (real_t)na + (face_outward ? 0.0f : Math::PI) + selector + facing_offset;
-        if (!Math::is_finite((double)rot)) {
-            rot = rot_add;
-        }
-        return rot;
-    };
-    if (outline_placement == BulletPatterns2D::OUTLINE_FILL_INSIDE) {
-        // The interior comes from a boundary that does not depend on the
-        // bullet count (dense curve outline, polygon corners, or legacy slot
-        // silhouette). Exactly n cells are used: when fewer fit at
-        // fill_spacing the spacing shrinks just enough, and when more fit the
-        // n cells are picked evenly over the whole shape (not the top rows).
-        PackedVector2Array boundary;
-        Vector2 center;
-        if (!fill_build_boundary(points, polygon_corners, dense_outline, boundary, center)) {
-            UtilityFunctions::push_error(String(caller_name) + ": fill inside needs a usable loop interior (degenerate outline).");
-            return out;
-        }
-        const double spacing = fill_spacing_that_fits(boundary, fill_spacing, fill_stagger, fill_margin, n);
-        std::vector<Vector2> cells;
-        fill_scan_cells(boundary, spacing, fill_stagger, fill_margin, &cells, 0);
-        const int count = (int)cells.size();
-        if (count == 0) {
-            UtilityFunctions::push_error(String(caller_name) + ": fill inside found no room for bullets (fill_margin too large for the shape?).");
-            return out;
-        }
-        const int take = MIN(n, count);
-        for (int k = 0; k < take; ++k) {
-            const Vector2 cell = cells[(size_t)((((int64_t)2 * k + 1) * count) / ((int64_t)2 * take))];
-            const Vector2 radial = cell - center;
-            const double ra = (radial.is_finite() && radial.length_squared() > 1e-12) ? radial.angle() : 0.0;
-            real_t rot = rot_add + (real_t)ra + (face_outward ? 0.0f : Math::PI) + selector + facing_offset;
-            if (!Math::is_finite((double)rot)) {
-                rot = rot_add;
-            }
-            Transform2D slot(rot, place_origin(cell));
-            slot.set_scale(marker_scale);
-            if (slot.is_finite()) {
-                out.push_back(slot);
-            }
-        }
-        return out;
-    }
-    // Even-per-layer layout for corner-anchored polygons: each ring gets its
-    // own symmetric loop (corners on every ring, even gaps), instead of
-    // decimating one shared loop (which strands corners on a single ring).
-    // The smooth-loop sibling below handles star-free shapes (circle, ring,
-    // ellipse, heart, flower, rose, lissajous) by arc-length resampling.
-    if (outline_placement == BulletPatterns2D::OUTLINE_LAYERS && layer_layout == BulletPatterns2D::OUTLINE_LAYER_LAYOUT_EVEN_PER_LAYER && !polygon_corners.is_empty()) {
-        // Corners in slot space (same conversion as slot_points above).
-        PackedVector2Array corner_slot;
-        for (int c = 0; c < polygon_corners.size(); ++c) {
-            const Vector2 gp = polygon_corners[c];
-            const Vector2 sp = points_are_local ? gp : marker_transform.affine_inverse().xform(gp);
-            if (sp.is_finite()) {
-                corner_slot.push_back(sp);
-            }
-        }
-        // Corner normals for the per-layer builder: reuse the averaged
-        // corner normals from the base loop when available, else +X.
-        // Base loop corners sit at known strides; simplest robust source is
-        // recomputing averaged normals from the corner polygon itself.
-        PackedVector2Array corner_normals;
-        if (!compute_edge_normals_quiet(corner_slot, true, false, corner_normals) || corner_normals.size() != corner_slot.size()) {
-            corner_normals.clear();
-            for (int c = 0; c < corner_slot.size(); ++c) {
-                corner_normals.push_back(Vector2(0, -1));
-            }
-        }
-        // Deal bullets to layers (bullet order), then cap outer rings
-        // (shared with the smooth sibling branch below).
-        LayerDeal deal;
-        deal_layer_membership(n, layer_count, layer_fill, layer_start_offset, layer_max_dots, deal);
-        PackedInt32Array &bullet_layer_of = deal.layer_of;
-        int (&layer_keep)[64] = deal.keep;
-        PackedByteArray &dropped = deal.dropped;
-        // Build one symmetric loop per non-empty layer.
-        struct LayerLoop {
-            PackedVector2Array pts;
-            PackedVector2Array nrms;
-        };
-        LayerLoop layers[64];
-        for (int L = 0; L < layer_count && L < 64; ++L) {
-            if (layer_keep[L] <= 0) {
-                continue;
-            }
-            PackedVector2Array lp;
-            PackedVector2Array ln;
-            // Mirror winding first when reversed, so every ring mirrors.
-            PackedVector2Array use_corners = corner_slot;
-            PackedVector2Array use_normals = corner_normals;
-            if (outline_reverse && use_corners.size() >= 3) {
-                PackedVector2Array mc;
-                PackedVector2Array mn;
-                mc.push_back(use_corners[0]);
-                mn.push_back(use_normals[0]);
-                for (int k = (int)use_corners.size() - 1; k >= 1; --k) {
-                    mc.push_back(use_corners[k]);
-                    mn.push_back(use_normals[k]);
-                }
-                use_corners = mc;
-                use_normals = mn;
-            }
-            if (!build_symmetric_polygon_loop(use_corners, use_normals, layer_keep[L], outline_distribution, lp, ln, corner_priority, corner_mode, edge_margin, corner_facing)) {
-                continue;
-            }
-            // Per-layer offset/twist: rotate each ring so stacked rings
-            // interleave instead of spoking. Layer 0 keeps the canonical
-            // offset only.
-            int rot = 0;
-            if (lp.size() > 1) {
-                int off = outline_slot_offset % (int)lp.size();
-                if (off < 0) {
-                    off += (int)lp.size();
-                }
-                rot = off;
-                if (L > 0 && layer_twist != 0) {
-                    const int64_t ring_size = (int64_t)lp.size();
-                    const int64_t tw = ((int64_t)L * (int64_t)layer_twist) % ring_size;
-                    // Normalize into [0, ring_size): C++ % keeps the
-                    // dividend's sign, so a negative twist would index
-                    // before the buffer (hard crash). Same wrap rule as
-                    // the shared-loop branch below.
-                    rot = (int)(((int64_t)rot + tw) % ring_size + ring_size) % (int)ring_size;
-                }
-            }
-            if (rot != 0 && lp.size() > 1) {
-                PackedVector2Array rp;
-                PackedVector2Array rn;
-                for (int k = 0; k < (int)lp.size(); ++k) {
-                    rp.push_back(lp[(k + rot) % (int)lp.size()]);
-                    rn.push_back(ln[(k + rot) % (int)ln.size()]);
-                }
-                lp = rp;
-                ln = rn;
-            }
-            // Scale about the slot-space origin (the marker origin).
-            const double layer_s = (L == 0) ? 1.0 : BulletPatterns2D::helper_layer_scale_factor(L, layer_scale, layer_side, layer_scale_curve, layer_custom_scales);
-            if (L > 0 && (!Math::is_finite(layer_s) || layer_s < 0.05)) {
-                continue;
-            }
-            if (L > 0) {
-                for (int k = 0; k < lp.size(); ++k) {
-                    const Vector2 s = lp[k] * (real_t)layer_s;
-                    lp[k] = s.is_finite() ? s : lp[k];
-                }
-            }
-            layers[L].pts = lp;
-            layers[L].nrms = ln;
-        }
-        // Emit in bullet index order (drops omitted), k-th member of a layer
-        // takes the k-th loop slot in winding order.
-        int layer_cursor[64] = { 0 };
-        for (int i = 0; i < n; ++i) {
-            if (dropped[i]) {
-                continue;
-            }
-            const int bl = bullet_layer_of[i];
-            if (bl < 0 || bl >= 64 || bl >= layer_count) {
-                continue;
-            }
-            const int k = layer_cursor[bl]++;
-            if (k < 0 || k >= layers[bl].pts.size() || k >= layers[bl].nrms.size()) {
-                continue;
-            }
-            Vector2 local = layers[bl].pts[k];
-            const Vector2 snrm = layers[bl].nrms[k];
-            const double na = (snrm.is_finite() && snrm.length_squared() > 1e-12) ? snrm.angle() : 0.0;
-            real_t rot = rot_add + (real_t)na + (face_outward ? 0.0f : Math::PI) + selector + facing_offset;
-            if (!Math::is_finite((double)rot)) {
-                rot = rot_add;
-            }
-            if (!points_are_local && local.is_finite()) {
-                const Vector2 back = marker_transform.xform(local);
-                local = back.is_finite() ? back : marker_transform.get_origin();
-            }
-            Transform2D slot(rot, place_origin(local));
-            slot.set_scale(marker_scale);
-            if (!slot.is_finite()) {
-                slot = Transform2D(rot_add, marker_transform.get_origin());
-                slot.set_scale(marker_scale);
-            }
-            out.push_back(slot);
-        }
-        return out;
-    }
-    // Even-per-layer layout for smooth loops (no corners): each ring resamples
-    // the shared base loop evenly by arc length, so decimated subsets can
-    // never strand a 1-step seam gap next to bullet 0 (the circle-55 defect).
-    // Open arcs pin both endpoints per ring; closed loops wrap seamlessly.
-    // Always active for multi-ring layers (smooth loops have no corner
-    // policy to tune); single-ring output stays exactly the base loop.
-    // Non-loop slot orders (flower FAN/PHYLLOTAXIS) opt out via allow_resample.
-    if (outline_placement == BulletPatterns2D::OUTLINE_LAYERS && layer_count > 1 && polygon_corners.is_empty() && allow_resample && layer_layout == BulletPatterns2D::OUTLINE_LAYER_LAYOUT_EVEN_PER_LAYER) {
-        PackedVector2Array base_nrms;
-        if (normals.size() == n) {
-            base_nrms = normals;
-        } else {
-            for (int i = 0; i < n; ++i) {
-                base_nrms.push_back(Vector2(1, 0));
-            }
-        }
-        LayerDeal deal;
-        deal_layer_membership(n, layer_count, layer_fill, layer_start_offset, layer_max_dots, deal);
-        PackedInt32Array &bullet_layer_of = deal.layer_of;
-        int (&layer_keep)[64] = deal.keep;
-        PackedByteArray &dropped = deal.dropped;
-        struct SmoothRing {
-            PackedVector2Array pts;
-            PackedVector2Array nrms;
-            PackedFloat32Array ovr;
-        };
-        SmoothRing rings[64];
-        // Resample source: the dense ideal curve when the caller gave one
-        // (rings land exactly on the drawn curve), else the slot loop.
-        PackedVector2Array src_pts = slot_points;
-        PackedVector2Array src_nrms = base_nrms;
-        PackedFloat32Array src_ovr = facing_override;
-        const bool dense_ok = dense_outline.size() >= 3 && dense_normals.size() == dense_outline.size() &&
-                (facing_override.is_empty() || dense_overrides.size() == dense_outline.size());
-        if (dense_ok) {
-            src_pts.resize(dense_outline.size());
-            const Transform2D to_slot = marker_transform.affine_inverse();
-            for (int q = 0; q < dense_outline.size(); ++q) {
-                src_pts[q] = points_are_local ? dense_outline[q] : to_slot.xform(dense_outline[q]);
-            }
-            src_nrms = dense_normals;
-            src_ovr = facing_override.is_empty() ? PackedFloat32Array() : dense_overrides;
-        }
-        for (int L = 0; L < layer_count && L < 64; ++L) {
-            if (layer_keep[L] <= 0) {
-                continue;
-            }
-            PackedVector2Array lp;
-            PackedVector2Array ln;
-            PackedFloat32Array lo;
-            // Rings scale about the slot-space origin: with several rings, no
-            // slot may sit there (it would stack on every ring).
-            const double ring_scale = (L == 0) ? 1.0 : BulletPatterns2D::helper_layer_scale_factor(L, layer_scale, layer_side, layer_scale_curve, layer_custom_scales);
-            const real_t keep_off = (layer_count > 1 && Math::is_finite(ring_scale)) ? kDistinctSlotGap / (real_t)MAX(ring_scale, 0.05) : 0.0;
-            resample_loop_even_distinct(src_pts, src_nrms, src_ovr, layer_keep[L], loop_closed, lp, ln, lo, Vector2(), keep_off);
-            if (outline_reverse && lp.size() > 1) {
-                PackedVector2Array rp;
-                PackedVector2Array rn;
-                PackedFloat32Array ro;
-                const bool has_ovr = lo.size() == lp.size();
-                for (int k = (int)lp.size() - 1; k >= 0; --k) {
-                    rp.push_back(lp[k]);
-                    rn.push_back(ln[k]);
-                    if (has_ovr) {
-                        ro.push_back(lo[k]);
-                    }
-                }
-                lp = rp;
-                ln = rn;
-                lo = ro;
-            }
-            int rot = 0;
-            if (lp.size() > 1) {
-                int off = outline_slot_offset % (int)lp.size();
-                if (off < 0) {
-                    off += (int)lp.size();
-                }
-                rot = off;
-                if (L > 0 && layer_twist != 0) {
-                    const int64_t ring_size = (int64_t)lp.size();
-                    const int64_t tw = ((int64_t)L * (int64_t)layer_twist) % ring_size;
-                    // Normalize into [0, ring_size): C++ % keeps the
-                    // dividend's sign, so a negative twist would index
-                    // before the buffer (hard crash). Same wrap rule as
-                    // the shared-loop branch below.
-                    rot = (int)(((int64_t)rot + tw) % ring_size + ring_size) % (int)ring_size;
-                }
-            }
-            if (rot != 0 && lp.size() > 1) {
-                PackedVector2Array rp;
-                PackedVector2Array rn;
-                PackedFloat32Array ro;
-                const bool has_ovr = lo.size() == lp.size();
-                for (int k = 0; k < (int)lp.size(); ++k) {
-                    rp.push_back(lp[(k + rot) % (int)lp.size()]);
-                    rn.push_back(ln[(k + rot) % (int)ln.size()]);
-                    if (has_ovr) {
-                        ro.push_back(lo[(k + rot) % (int)lo.size()]);
-                    }
-                }
-                lp = rp;
-                ln = rn;
-                lo = ro;
-            }
-            const double layer_s = (L == 0) ? 1.0 : BulletPatterns2D::helper_layer_scale_factor(L, layer_scale, layer_side, layer_scale_curve, layer_custom_scales);
-            if (L > 0 && (!Math::is_finite(layer_s) || layer_s < 0.05)) {
-                continue;
-            }
-            if (L > 0) {
-                for (int k = 0; k < lp.size(); ++k) {
-                    const Vector2 s = lp[k] * (real_t)layer_s;
-                    lp[k] = s.is_finite() ? s : lp[k];
-                }
-            }
-            rings[L].pts = lp;
-            rings[L].nrms = ln;
-            rings[L].ovr = lo;
-        }
-        int layer_cursor[64] = { 0 };
-        const bool has_ovr = !facing_override.is_empty() && facing_override.size() == n;
-        for (int i = 0; i < n; ++i) {
-            if (dropped[i]) {
-                continue;
-            }
-            const int bl = bullet_layer_of[i];
-            if (bl < 0 || bl >= 64 || bl >= layer_count) {
-                continue;
-            }
-            const int k = layer_cursor[bl]++;
-            if (k < 0 || k >= rings[bl].pts.size()) {
-                continue;
-            }
-            Vector2 local = rings[bl].pts[k];
-            real_t rot;
-            if (has_ovr && k < rings[bl].ovr.size()) {
-                const real_t o = rings[bl].ovr[k];
-                rot = Math::is_finite((double)o) ? o + selector : rot_add + selector;
-            } else {
-                const Vector2 snrm = (k < rings[bl].nrms.size()) ? rings[bl].nrms[k] : Vector2(1, 0);
-                const double na = (snrm.is_finite() && snrm.length_squared() > 1e-12) ? snrm.angle() : 0.0;
-                rot = rot_add + (real_t)na + (face_outward ? 0.0f : Math::PI) + selector + facing_offset;
-                if (!Math::is_finite((double)rot)) {
-                    rot = rot_add;
-                }
-            }
-            if (!points_are_local && local.is_finite()) {
-                const Vector2 back = marker_transform.xform(local);
-                local = back.is_finite() ? back : marker_transform.get_origin();
-            }
-            Transform2D slot(rot, place_origin(local));
-            slot.set_scale(marker_scale);
-            if (!slot.is_finite()) {
-                slot = Transform2D(rot_add, marker_transform.get_origin());
-                slot.set_scale(marker_scale);
-            }
-            out.push_back(slot);
-        }
-        return out;
-    }
-    // Per-layer bullet counters for the max_dots density cap. Layer 0 is
-    // never capped (the base outline always reads complete); overflow on
-    // outer rings is dropped, first-kept in bullet order.
-    int layer_used[64] = { 0 };
-    for (int i = 0; i < n; ++i) {
-        // Bullet i rides the (possibly reverse/offset-edited) slot loop in
-        // order: the loop IS the figure, so layers only rescale that slot's
-        // point about the loop center and never reseat bullets onto other
-        // slots. (The fill deal only chooses WHICH layer each slot rides.)
-        int j = (i >= 0 && i < idx.size()) ? idx[i] : ((n > 0) ? (i % n) : 0);
-        int bullet_layer = 0;
-        if (outline_placement == BulletPatterns2D::OUTLINE_LAYERS) {
-            bullet_layer = BulletPatterns2D::helper_bullet_layer_index(i, n, layer_count, layer_fill, layer_start_offset);
-            // Twist: rotate each successive layered ring's slot assignment so
-            // stacked rings interleave angularly instead of sitting in
-            // spokes. Layer 0 is never twisted (the base outline stays exact).
-            // Facing follows the twisted slot below.
-            if (bullet_layer > 0 && layer_twist != 0 && n > 1) {
-                const int64_t shift = ((int64_t)bullet_layer * (int64_t)layer_twist) % (int64_t)n;
-                j = (int)(((int64_t)j + shift) % (int64_t)n + (int64_t)n) % n;
-            }
-            // Density cap: first max_dots bullets per extra layer are kept,
-            // the rest are dropped (total may shrink below
-            // helper_bullets_amount). Layer 0 is never capped.
-            if (layer_max_dots > 0 && bullet_layer > 0 && bullet_layer < 64) {
-                if (layer_used[bullet_layer] >= layer_max_dots) {
-                    continue;
-                }
-                layer_used[bullet_layer]++;
-            }
-        }
-        const Vector2 slot_base = (j >= 0 && j < slot_points.size()) ? slot_points[j] : Vector2(0, 0);
-        Vector2 local = slot_base;
-        if (outline_placement == BulletPatterns2D::OUTLINE_LAYERS) {
-            // Layer 0 always sits exactly on the outline. Higher layers
-            // re-spawn the same slot scaled about the loop center, so every
-            // layer is the identical figure at a different size. Facings
-            // still use the slot normals below and never change across
-            // layers. Scale and deal come from the shared helpers so the
-            // preview (which scales identically) can never disagree with
-            // the volley.
-            // NOTE: slot_points are already in slot space (local for the
-            // xform builders, marker-global otherwise), which is
-            // origin-centered by construction, so scale here and convert to
-            // global once below: translation can never leak into the scale,
-            // at any marker position.
-            if (bullet_layer > 0) {
-                const double layer_s = BulletPatterns2D::helper_layer_scale_factor(bullet_layer, layer_scale, layer_side, layer_scale_curve, layer_custom_scales);
-                if (Math::is_finite(layer_s) && layer_s >= 0.05) {
-                    const Vector2 scaled = local * (real_t)layer_s;
-                    if (scaled.is_finite()) {
-                        local = scaled;
-                    }
-                }
-            }
-        }
-        // Slot-space -> global: local builders xform through place_origin;
-        // global builders stored origin-relative slots that must be composed
-        // back onto the marker (place_origin passes those through untouched).
-        if (!points_are_local && local.is_finite()) {
-            const Vector2 back = marker_transform.xform(local);
-            local = back.is_finite() ? back : marker_transform.get_origin();
-        }
-        Transform2D slot(compose_facing(j), place_origin(local));
-        slot.set_scale(marker_scale);
-        if (!slot.is_finite()) {
-            slot = Transform2D(rot_add, marker_transform.get_origin());
-            slot.set_scale(marker_scale);
-        }
-        out.push_back(slot);
-    }
-    return out;
+	const int n = points.size();
+	PatternSlots2D out;
+	if (n <= 0) {
+		return out;
+	}
+	// Slot-space copy of the loop: the LAYERS rescale below runs in slot
+	// space (local for the xform builders, marker-global otherwise), so
+	// marker translation must not leak into the scale. Conversion back to
+	// global happens once, in place_origin(). Slot space is origin-centered
+	// by construction (every loop generator builds centered shapes), so
+	// layers scale about Vector2(0, 0) — the marker origin — on both the
+	// volley and the preview side, exactly, at any bullet density.
+	PackedVector2Array slot_points;
+	slot_points.resize(n);
+	for (int i = 0; i < n; ++i) {
+		const Vector2 gp = points[i];
+		slot_points[i] = points_are_local ? gp : marker_transform.affine_inverse().xform(gp);
+	}
+	// Loop centroid in slot space: every extra layer rescales the slot loop
+	// about this point, so each ring is the same figure at a different size
+	// (like a second spawner with a bigger shape). Falls back to the
+	// slot-space origin (the marker origin) when degenerate.
+	if (normals.size() != n) {
+		UtilityFunctions::push_error(String(caller_name) + ": outline points/normals mismatch.");
+		return out;
+	}
+	if (outline_placement < 0 || outline_placement > 2) {
+		UtilityFunctions::push_error(String(caller_name) + ": outline_placement must be 0 (on outline), 1 (layers) or 2 (fill inside).");
+		return out;
+	}
+	if (outline_facing < 0 || outline_facing > 2) {
+		UtilityFunctions::push_error(String(caller_name) + ": outline_facing must be 0 (normal), 1 (+90 deg) or 2 (-90 deg).");
+		return out;
+	}
+	if (!Math::is_finite(facing_offset_degrees)) {
+		UtilityFunctions::push_error(String(caller_name) + ": facing_offset_degrees must be finite.");
+		return out;
+	}
+	const bool use_override = !facing_override.is_empty();
+	if (use_override && facing_override.size() != n) {
+		UtilityFunctions::push_error(String(caller_name) + ": facing override size mismatch.");
+		return out;
+	}
+	if (outline_placement == BulletPatterns2D::OUTLINE_FILL_INSIDE) {
+		if (!Math::is_finite(fill_spacing) || fill_spacing <= 0.0 || !Math::is_finite(fill_margin) || fill_margin < 0.0) {
+			UtilityFunctions::push_error(String(caller_name) + ": fill_spacing must be finite and > 0, fill_margin finite and >= 0.");
+			return out;
+		}
+	}
+	if (outline_placement == BulletPatterns2D::OUTLINE_LAYERS) {
+		if (layer_count < 1 || layer_count > 64 || !Math::is_finite(layer_scale) || layer_scale <= 0.0 || layer_scale > 8.0) {
+			UtilityFunctions::push_error(String(caller_name) + ": layer_count must be in [1, 64], layer_scale finite in (0, 8].");
+			return out;
+		}
+		if (layer_side < BulletPatterns2D::OUTLINE_LAYER_OUTWARD || layer_side > BulletPatterns2D::OUTLINE_LAYER_BOTH) {
+			UtilityFunctions::push_error(String(caller_name) + ": layer_side must be 0 (outward), 1 (inward) or 2 (both).");
+			return out;
+		}
+		if (layer_fill < BulletPatterns2D::OUTLINE_LAYER_INTERLEAVED || layer_fill > BulletPatterns2D::OUTLINE_LAYER_PINGPONG) {
+			UtilityFunctions::push_error(String(caller_name) + ": layer_fill must be 0 (interleaved), 1 (sequential), 2 (outer first) or 3 (ping-pong).");
+			return out;
+		}
+		if (layer_start_offset < 0) {
+			UtilityFunctions::push_error(String(caller_name) + ": layer_start_offset must be >= 0 (0 = start on the outline).");
+			return out;
+		}
+		if (layer_scale_curve < BulletPatterns2D::OUTLINE_LAYER_CURVE_LINEAR || layer_scale_curve > BulletPatterns2D::OUTLINE_LAYER_CURVE_EXPONENTIAL) {
+			UtilityFunctions::push_error(String(caller_name) + ": layer_scale_curve must be 0 (linear) or 1 (exponential).");
+			return out;
+		}
+		if (layer_custom_scales.size() > 64) {
+			UtilityFunctions::push_error(String(caller_name) + ": layer_custom_scales holds at most 64 entries.");
+			return out;
+		}
+		for (int ci = 0; ci < layer_custom_scales.size(); ++ci) {
+			const double cs = (double)layer_custom_scales[ci];
+			if (!Math::is_finite(cs) || cs < 0.05 || cs > 64.0) {
+				UtilityFunctions::push_error(String(caller_name) + ": layer_custom_scales entries must be finite in [0.05, 64].");
+				return out;
+			}
+		}
+		if (layer_max_dots < 0) {
+			UtilityFunctions::push_error(String(caller_name) + ": layer_max_dots must be >= 0 (0 = unlimited).");
+			return out;
+		}
+		if (layer_layout < 0 || layer_layout > 1) {
+			UtilityFunctions::push_error(String(caller_name) + ": layer_layout must be 0 (shared loop) or 1 (even per layer).");
+			return out;
+		}
+		if (outline_distribution < 0 || outline_distribution > 1) {
+			UtilityFunctions::push_error(String(caller_name) + ": outline_distribution must be 0 (legacy) or 1 (symmetric).");
+			return out;
+		}
+		if (corner_priority < 0 || corner_priority > 2) {
+			UtilityFunctions::push_error(String(caller_name) + ": corner_priority must be 0 (horizontal), 1 (vertical) or 2 (balanced).");
+			return out;
+		}
+		if (corner_mode < 0 || corner_mode > 1) {
+			UtilityFunctions::push_error(String(caller_name) + ": corner_mode must be 0 (pin corners) or 1 (even arc).");
+			return out;
+		}
+		if (!Math::is_finite(edge_margin) || edge_margin < 0.0) {
+			UtilityFunctions::push_error(String(caller_name) + ": edge_margin must be finite and >= 0.");
+			return out;
+		}
+		if (corner_facing < 0 || corner_facing > 2) {
+			UtilityFunctions::push_error(String(caller_name) + ": corner_facing must be 0 (side), 1 (miter) or 2 (smooth).");
+			return out;
+		}
+		// Collapse precheck: the smallest dealt scale must stay usable,
+		// otherwise deep inward layers would pile onto (or through) the
+		// center. Only layers that receive bullets are tested, so sparse
+		// sequentials never trip on empty rings. Fail loud instead of
+		// spawning a collapsed volley.
+		bool seen[64] = { false };
+		for (int i = 0; i < n; ++i) {
+			const int bl = BulletPatterns2D::helper_bullet_layer_index(i, n, layer_count, layer_fill, layer_start_offset);
+			if (bl > 0 && bl < layer_count) {
+				seen[bl] = true;
+			}
+		}
+		for (int L = 1; L < layer_count; ++L) {
+			if (!seen[L]) {
+				continue;
+			}
+			const double s = BulletPatterns2D::helper_layer_scale_factor(L, layer_scale, layer_side, layer_scale_curve, layer_custom_scales);
+			if (!Math::is_finite(s) || s < 0.05) {
+				UtilityFunctions::push_error(String(caller_name) + ": inward layers collapse below 5% size (lower the count/step).");
+				return out;
+			}
+		}
+	}
+	const real_t facing_offset = Math::deg_to_rad(facing_offset_degrees);
+	const real_t selector = outline_facing == 1 ? Math::PI * 0.5 : (outline_facing == 2 ? -Math::PI * 0.5 : 0.0);
+	const Vector2 marker_scale = marker_transform.get_scale();
+	auto place_origin = [&](const Vector2 &local_pt) -> Vector2 {
+		if (!local_pt.is_finite()) {
+			return marker_transform.get_origin();
+		}
+		const Vector2 p = points_are_local ? marker_transform.xform(local_pt) : local_pt;
+		return p.is_finite() ? p : marker_transform.get_origin();
+	};
+	// Slot order: reverse mirrors the winding, then the offset rotates which
+	// slot becomes bullet 0 (normalized, negatives wrap).
+	PackedInt32Array idx;
+	idx.resize(n);
+	for (int i = 0; i < n; ++i) {
+		idx[i] = outline_reverse ? (n - 1 - i) : i;
+	}
+	if (n > 1) {
+		int k = outline_slot_offset % n;
+		if (k < 0) {
+			k += n;
+		}
+		if (k != 0) {
+			PackedInt32Array rotated;
+			rotated.resize(n);
+			for (int i = 0; i < n; ++i) {
+				rotated[i] = idx[(i + k) % n];
+			}
+			idx = rotated;
+		}
+	}
+	auto compose_facing = [&](int j) -> real_t {
+		if (use_override) {
+			const real_t o = (j >= 0 && j < facing_override.size()) ? facing_override[j] : 0.0f;
+			return Math::is_finite((double)o) ? o + selector : rot_add + selector;
+		}
+		const Vector2 nrm = (j >= 0 && j < normals.size()) ? normals[j] : Vector2(1, 0);
+		const double na = (nrm.is_finite() && nrm.length_squared() > 1e-12) ? nrm.angle() : 0.0;
+		real_t rot = rot_add + (real_t)na + (face_outward ? 0.0f : Math::PI) + selector + facing_offset;
+		if (!Math::is_finite((double)rot)) {
+			rot = rot_add;
+		}
+		return rot;
+	};
+	if (outline_placement == BulletPatterns2D::OUTLINE_FILL_INSIDE) {
+		// The interior comes from a boundary that does not depend on the
+		// bullet count (dense curve outline, polygon corners, or legacy slot
+		// silhouette). Exactly n cells are used: when fewer fit at
+		// fill_spacing the spacing shrinks just enough, and when more fit the
+		// n cells are picked evenly over the whole shape (not the top rows).
+		PackedVector2Array boundary;
+		Vector2 center;
+		if (!fill_build_boundary(points, polygon_corners, dense_outline, boundary, center)) {
+			UtilityFunctions::push_error(String(caller_name) + ": fill inside needs a usable loop interior (degenerate outline).");
+			return out;
+		}
+		const double spacing = fill_spacing_that_fits(boundary, fill_spacing, fill_stagger, fill_margin, n);
+		std::vector<Vector2> cells;
+		fill_scan_cells(boundary, spacing, fill_stagger, fill_margin, &cells, 0);
+		const int count = (int)cells.size();
+		if (count == 0) {
+			UtilityFunctions::push_error(String(caller_name) + ": fill inside found no room for bullets (fill_margin too large for the shape?).");
+			return out;
+		}
+		const int take = MIN(n, count);
+		for (int k = 0; k < take; ++k) {
+			const Vector2 cell = cells[(size_t)((((int64_t)2 * k + 1) * count) / ((int64_t)2 * take))];
+			const Vector2 radial = cell - center;
+			const double ra = (radial.is_finite() && radial.length_squared() > 1e-12) ? radial.angle() : 0.0;
+			real_t rot = rot_add + (real_t)ra + (face_outward ? 0.0f : Math::PI) + selector + facing_offset;
+			if (!Math::is_finite((double)rot)) {
+				rot = rot_add;
+			}
+			Transform2D slot(rot, place_origin(cell));
+			slot.set_scale(marker_scale);
+			if (slot.is_finite()) {
+				out.push_back(slot);
+			}
+		}
+		return out;
+	}
+	// Even-per-layer layout for corner-anchored polygons: each ring gets its
+	// own symmetric loop (corners on every ring, even gaps), instead of
+	// decimating one shared loop (which strands corners on a single ring).
+	// The smooth-loop sibling below handles star-free shapes (circle, ring,
+	// ellipse, heart, flower, rose, lissajous) by arc-length resampling.
+	if (outline_placement == BulletPatterns2D::OUTLINE_LAYERS && layer_layout == BulletPatterns2D::OUTLINE_LAYER_LAYOUT_EVEN_PER_LAYER && !polygon_corners.is_empty()) {
+		// Corners in slot space (same conversion as slot_points above).
+		PackedVector2Array corner_slot;
+		for (int c = 0; c < polygon_corners.size(); ++c) {
+			const Vector2 gp = polygon_corners[c];
+			const Vector2 sp = points_are_local ? gp : marker_transform.affine_inverse().xform(gp);
+			if (sp.is_finite()) {
+				corner_slot.push_back(sp);
+			}
+		}
+		// Corner normals for the per-layer builder: reuse the averaged
+		// corner normals from the base loop when available, else +X.
+		// Base loop corners sit at known strides; simplest robust source is
+		// recomputing averaged normals from the corner polygon itself.
+		PackedVector2Array corner_normals;
+		if (!compute_edge_normals_quiet(corner_slot, true, false, corner_normals) || corner_normals.size() != corner_slot.size()) {
+			corner_normals.clear();
+			for (int c = 0; c < corner_slot.size(); ++c) {
+				corner_normals.push_back(Vector2(0, -1));
+			}
+		}
+		// Deal bullets to layers (bullet order), then cap outer rings
+		// (shared with the smooth sibling branch below).
+		LayerDeal deal;
+		deal_layer_membership(n, layer_count, layer_fill, layer_start_offset, layer_max_dots, deal);
+		PackedInt32Array &bullet_layer_of = deal.layer_of;
+		int (&layer_keep)[64] = deal.keep;
+		PackedByteArray &dropped = deal.dropped;
+		// Build one symmetric loop per non-empty layer.
+		struct LayerLoop {
+			PackedVector2Array pts;
+			PackedVector2Array nrms;
+		};
+		LayerLoop layers[64];
+		for (int L = 0; L < layer_count && L < 64; ++L) {
+			if (layer_keep[L] <= 0) {
+				continue;
+			}
+			PackedVector2Array lp;
+			PackedVector2Array ln;
+			// Mirror winding first when reversed, so every ring mirrors.
+			PackedVector2Array use_corners = corner_slot;
+			PackedVector2Array use_normals = corner_normals;
+			if (outline_reverse && use_corners.size() >= 3) {
+				PackedVector2Array mc;
+				PackedVector2Array mn;
+				mc.push_back(use_corners[0]);
+				mn.push_back(use_normals[0]);
+				for (int k = (int)use_corners.size() - 1; k >= 1; --k) {
+					mc.push_back(use_corners[k]);
+					mn.push_back(use_normals[k]);
+				}
+				use_corners = mc;
+				use_normals = mn;
+			}
+			if (!build_symmetric_polygon_loop(use_corners, use_normals, layer_keep[L], outline_distribution, lp, ln, corner_priority, corner_mode, edge_margin, corner_facing)) {
+				continue;
+			}
+			// Per-layer offset/twist: rotate each ring so stacked rings
+			// interleave instead of spoking. Layer 0 keeps the canonical
+			// offset only.
+			int rot = 0;
+			if (lp.size() > 1) {
+				int off = outline_slot_offset % (int)lp.size();
+				if (off < 0) {
+					off += (int)lp.size();
+				}
+				rot = off;
+				if (L > 0 && layer_twist != 0) {
+					const int64_t ring_size = (int64_t)lp.size();
+					const int64_t tw = ((int64_t)L * (int64_t)layer_twist) % ring_size;
+					// Normalize into [0, ring_size): C++ % keeps the
+					// dividend's sign, so a negative twist would index
+					// before the buffer (hard crash). Same wrap rule as
+					// the shared-loop branch below.
+					rot = (int)(((int64_t)rot + tw) % ring_size + ring_size) % (int)ring_size;
+				}
+			}
+			if (rot != 0 && lp.size() > 1) {
+				PackedVector2Array rp;
+				PackedVector2Array rn;
+				for (int k = 0; k < (int)lp.size(); ++k) {
+					rp.push_back(lp[(k + rot) % (int)lp.size()]);
+					rn.push_back(ln[(k + rot) % (int)ln.size()]);
+				}
+				lp = rp;
+				ln = rn;
+			}
+			// Scale about the slot-space origin (the marker origin).
+			const double layer_s = (L == 0) ? 1.0 : BulletPatterns2D::helper_layer_scale_factor(L, layer_scale, layer_side, layer_scale_curve, layer_custom_scales);
+			if (L > 0 && (!Math::is_finite(layer_s) || layer_s < 0.05)) {
+				continue;
+			}
+			if (L > 0) {
+				for (int k = 0; k < lp.size(); ++k) {
+					const Vector2 s = lp[k] * (real_t)layer_s;
+					lp[k] = s.is_finite() ? s : lp[k];
+				}
+			}
+			layers[L].pts = lp;
+			layers[L].nrms = ln;
+		}
+		// Emit in bullet index order (drops omitted), k-th member of a layer
+		// takes the k-th loop slot in winding order.
+		int layer_cursor[64] = { 0 };
+		for (int i = 0; i < n; ++i) {
+			if (dropped[i]) {
+				continue;
+			}
+			const int bl = bullet_layer_of[i];
+			if (bl < 0 || bl >= 64 || bl >= layer_count) {
+				continue;
+			}
+			const int k = layer_cursor[bl]++;
+			if (k < 0 || k >= layers[bl].pts.size() || k >= layers[bl].nrms.size()) {
+				continue;
+			}
+			Vector2 local = layers[bl].pts[k];
+			const Vector2 snrm = layers[bl].nrms[k];
+			const double na = (snrm.is_finite() && snrm.length_squared() > 1e-12) ? snrm.angle() : 0.0;
+			real_t rot = rot_add + (real_t)na + (face_outward ? 0.0f : Math::PI) + selector + facing_offset;
+			if (!Math::is_finite((double)rot)) {
+				rot = rot_add;
+			}
+			if (!points_are_local && local.is_finite()) {
+				const Vector2 back = marker_transform.xform(local);
+				local = back.is_finite() ? back : marker_transform.get_origin();
+			}
+			Transform2D slot(rot, place_origin(local));
+			slot.set_scale(marker_scale);
+			if (!slot.is_finite()) {
+				slot = Transform2D(rot_add, marker_transform.get_origin());
+				slot.set_scale(marker_scale);
+			}
+			out.push_back(slot);
+		}
+		return out;
+	}
+	// Even-per-layer layout for smooth loops (no corners): each ring resamples
+	// the shared base loop evenly by arc length, so decimated subsets can
+	// never strand a 1-step seam gap next to bullet 0 (the circle-55 defect).
+	// Open arcs pin both endpoints per ring; closed loops wrap seamlessly.
+	// Always active for multi-ring layers (smooth loops have no corner
+	// policy to tune); single-ring output stays exactly the base loop.
+	// Non-loop slot orders (flower FAN/PHYLLOTAXIS) opt out via allow_resample.
+	if (outline_placement == BulletPatterns2D::OUTLINE_LAYERS && layer_count > 1 && polygon_corners.is_empty() && allow_resample && layer_layout == BulletPatterns2D::OUTLINE_LAYER_LAYOUT_EVEN_PER_LAYER) {
+		PackedVector2Array base_nrms;
+		if (normals.size() == n) {
+			base_nrms = normals;
+		} else {
+			for (int i = 0; i < n; ++i) {
+				base_nrms.push_back(Vector2(1, 0));
+			}
+		}
+		LayerDeal deal;
+		deal_layer_membership(n, layer_count, layer_fill, layer_start_offset, layer_max_dots, deal);
+		PackedInt32Array &bullet_layer_of = deal.layer_of;
+		int (&layer_keep)[64] = deal.keep;
+		PackedByteArray &dropped = deal.dropped;
+		struct SmoothRing {
+			PackedVector2Array pts;
+			PackedVector2Array nrms;
+			PackedFloat32Array ovr;
+		};
+		SmoothRing rings[64];
+		// Resample source: the dense ideal curve when the caller gave one
+		// (rings land exactly on the drawn curve), else the slot loop.
+		PackedVector2Array src_pts = slot_points;
+		PackedVector2Array src_nrms = base_nrms;
+		PackedFloat32Array src_ovr = facing_override;
+		const bool dense_ok = dense_outline.size() >= 3 && dense_normals.size() == dense_outline.size() &&
+				(facing_override.is_empty() || dense_overrides.size() == dense_outline.size());
+		if (dense_ok) {
+			src_pts.resize(dense_outline.size());
+			const Transform2D to_slot = marker_transform.affine_inverse();
+			for (int q = 0; q < dense_outline.size(); ++q) {
+				src_pts[q] = points_are_local ? dense_outline[q] : to_slot.xform(dense_outline[q]);
+			}
+			src_nrms = dense_normals;
+			src_ovr = facing_override.is_empty() ? PackedFloat32Array() : dense_overrides;
+		}
+		for (int L = 0; L < layer_count && L < 64; ++L) {
+			if (layer_keep[L] <= 0) {
+				continue;
+			}
+			PackedVector2Array lp;
+			PackedVector2Array ln;
+			PackedFloat32Array lo;
+			// Rings scale about the slot-space origin: with several rings, no
+			// slot may sit there (it would stack on every ring).
+			const double ring_scale = (L == 0) ? 1.0 : BulletPatterns2D::helper_layer_scale_factor(L, layer_scale, layer_side, layer_scale_curve, layer_custom_scales);
+			const real_t keep_off = (layer_count > 1 && Math::is_finite(ring_scale)) ? kDistinctSlotGap / (real_t)MAX(ring_scale, 0.05) : 0.0;
+			resample_loop_even_distinct(src_pts, src_nrms, src_ovr, layer_keep[L], loop_closed, lp, ln, lo, Vector2(), keep_off);
+			if (outline_reverse && lp.size() > 1) {
+				PackedVector2Array rp;
+				PackedVector2Array rn;
+				PackedFloat32Array ro;
+				const bool has_ovr = lo.size() == lp.size();
+				for (int k = (int)lp.size() - 1; k >= 0; --k) {
+					rp.push_back(lp[k]);
+					rn.push_back(ln[k]);
+					if (has_ovr) {
+						ro.push_back(lo[k]);
+					}
+				}
+				lp = rp;
+				ln = rn;
+				lo = ro;
+			}
+			int rot = 0;
+			if (lp.size() > 1) {
+				int off = outline_slot_offset % (int)lp.size();
+				if (off < 0) {
+					off += (int)lp.size();
+				}
+				rot = off;
+				if (L > 0 && layer_twist != 0) {
+					const int64_t ring_size = (int64_t)lp.size();
+					const int64_t tw = ((int64_t)L * (int64_t)layer_twist) % ring_size;
+					// Normalize into [0, ring_size): C++ % keeps the
+					// dividend's sign, so a negative twist would index
+					// before the buffer (hard crash). Same wrap rule as
+					// the shared-loop branch below.
+					rot = (int)(((int64_t)rot + tw) % ring_size + ring_size) % (int)ring_size;
+				}
+			}
+			if (rot != 0 && lp.size() > 1) {
+				PackedVector2Array rp;
+				PackedVector2Array rn;
+				PackedFloat32Array ro;
+				const bool has_ovr = lo.size() == lp.size();
+				for (int k = 0; k < (int)lp.size(); ++k) {
+					rp.push_back(lp[(k + rot) % (int)lp.size()]);
+					rn.push_back(ln[(k + rot) % (int)ln.size()]);
+					if (has_ovr) {
+						ro.push_back(lo[(k + rot) % (int)lo.size()]);
+					}
+				}
+				lp = rp;
+				ln = rn;
+				lo = ro;
+			}
+			const double layer_s = (L == 0) ? 1.0 : BulletPatterns2D::helper_layer_scale_factor(L, layer_scale, layer_side, layer_scale_curve, layer_custom_scales);
+			if (L > 0 && (!Math::is_finite(layer_s) || layer_s < 0.05)) {
+				continue;
+			}
+			if (L > 0) {
+				for (int k = 0; k < lp.size(); ++k) {
+					const Vector2 s = lp[k] * (real_t)layer_s;
+					lp[k] = s.is_finite() ? s : lp[k];
+				}
+			}
+			rings[L].pts = lp;
+			rings[L].nrms = ln;
+			rings[L].ovr = lo;
+		}
+		int layer_cursor[64] = { 0 };
+		const bool has_ovr = !facing_override.is_empty() && facing_override.size() == n;
+		for (int i = 0; i < n; ++i) {
+			if (dropped[i]) {
+				continue;
+			}
+			const int bl = bullet_layer_of[i];
+			if (bl < 0 || bl >= 64 || bl >= layer_count) {
+				continue;
+			}
+			const int k = layer_cursor[bl]++;
+			if (k < 0 || k >= rings[bl].pts.size()) {
+				continue;
+			}
+			Vector2 local = rings[bl].pts[k];
+			real_t rot;
+			if (has_ovr && k < rings[bl].ovr.size()) {
+				const real_t o = rings[bl].ovr[k];
+				rot = Math::is_finite((double)o) ? o + selector : rot_add + selector;
+			} else {
+				const Vector2 snrm = (k < rings[bl].nrms.size()) ? rings[bl].nrms[k] : Vector2(1, 0);
+				const double na = (snrm.is_finite() && snrm.length_squared() > 1e-12) ? snrm.angle() : 0.0;
+				rot = rot_add + (real_t)na + (face_outward ? 0.0f : Math::PI) + selector + facing_offset;
+				if (!Math::is_finite((double)rot)) {
+					rot = rot_add;
+				}
+			}
+			if (!points_are_local && local.is_finite()) {
+				const Vector2 back = marker_transform.xform(local);
+				local = back.is_finite() ? back : marker_transform.get_origin();
+			}
+			Transform2D slot(rot, place_origin(local));
+			slot.set_scale(marker_scale);
+			if (!slot.is_finite()) {
+				slot = Transform2D(rot_add, marker_transform.get_origin());
+				slot.set_scale(marker_scale);
+			}
+			out.push_back(slot);
+		}
+		return out;
+	}
+	// Per-layer bullet counters for the max_dots density cap. Layer 0 is
+	// never capped (the base outline always reads complete); overflow on
+	// outer rings is dropped, first-kept in bullet order.
+	int layer_used[64] = { 0 };
+	for (int i = 0; i < n; ++i) {
+		// Bullet i rides the (possibly reverse/offset-edited) slot loop in
+		// order: the loop IS the figure, so layers only rescale that slot's
+		// point about the loop center and never reseat bullets onto other
+		// slots. (The fill deal only chooses WHICH layer each slot rides.)
+		int j = (i >= 0 && i < idx.size()) ? idx[i] : ((n > 0) ? (i % n) : 0);
+		int bullet_layer = 0;
+		if (outline_placement == BulletPatterns2D::OUTLINE_LAYERS) {
+			bullet_layer = BulletPatterns2D::helper_bullet_layer_index(i, n, layer_count, layer_fill, layer_start_offset);
+			// Twist: rotate each successive layered ring's slot assignment so
+			// stacked rings interleave angularly instead of sitting in
+			// spokes. Layer 0 is never twisted (the base outline stays exact).
+			// Facing follows the twisted slot below.
+			if (bullet_layer > 0 && layer_twist != 0 && n > 1) {
+				const int64_t shift = ((int64_t)bullet_layer * (int64_t)layer_twist) % (int64_t)n;
+				j = (int)(((int64_t)j + shift) % (int64_t)n + (int64_t)n) % n;
+			}
+			// Density cap: first max_dots bullets per extra layer are kept,
+			// the rest are dropped (total may shrink below
+			// helper_bullets_amount). Layer 0 is never capped.
+			if (layer_max_dots > 0 && bullet_layer > 0 && bullet_layer < 64) {
+				if (layer_used[bullet_layer] >= layer_max_dots) {
+					continue;
+				}
+				layer_used[bullet_layer]++;
+			}
+		}
+		const Vector2 slot_base = (j >= 0 && j < slot_points.size()) ? slot_points[j] : Vector2(0, 0);
+		Vector2 local = slot_base;
+		if (outline_placement == BulletPatterns2D::OUTLINE_LAYERS) {
+			// Layer 0 always sits exactly on the outline. Higher layers
+			// re-spawn the same slot scaled about the loop center, so every
+			// layer is the identical figure at a different size. Facings
+			// still use the slot normals below and never change across
+			// layers. Scale and deal come from the shared helpers so the
+			// preview (which scales identically) can never disagree with
+			// the volley.
+			// NOTE: slot_points are already in slot space (local for the
+			// xform builders, marker-global otherwise), which is
+			// origin-centered by construction, so scale here and convert to
+			// global once below: translation can never leak into the scale,
+			// at any marker position.
+			if (bullet_layer > 0) {
+				const double layer_s = BulletPatterns2D::helper_layer_scale_factor(bullet_layer, layer_scale, layer_side, layer_scale_curve, layer_custom_scales);
+				if (Math::is_finite(layer_s) && layer_s >= 0.05) {
+					const Vector2 scaled = local * (real_t)layer_s;
+					if (scaled.is_finite()) {
+						local = scaled;
+					}
+				}
+			}
+		}
+		// Slot-space -> global: local builders xform through place_origin;
+		// global builders stored origin-relative slots that must be composed
+		// back onto the marker (place_origin passes those through untouched).
+		if (!points_are_local && local.is_finite()) {
+			const Vector2 back = marker_transform.xform(local);
+			local = back.is_finite() ? back : marker_transform.get_origin();
+		}
+		Transform2D slot(compose_facing(j), place_origin(local));
+		slot.set_scale(marker_scale);
+		if (!slot.is_finite()) {
+			slot = Transform2D(rot_add, marker_transform.get_origin());
+			slot.set_scale(marker_scale);
+		}
+		out.push_back(slot);
+	}
+	return out;
 }
 
 bool danmaku_validate_head(const char *caller_name, int transforms_amount, const Transform2D &marker_transform) {

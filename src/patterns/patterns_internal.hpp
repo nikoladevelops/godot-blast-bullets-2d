@@ -5,34 +5,34 @@
 // Only src/patterns/*.cpp include this; everything else includes
 // patterns/bullet_patterns2d.hpp.
 
-#include "patterns/bullet_patterns2d.hpp"
-#include "patterns/pattern_slots2d.hpp"
-#include "patterns/pattern_params2d.hpp"
 #include "core/transform_math2d.hpp"
 #include "core/warn_once2d.hpp"
+#include "data/bullet_effect_layer_data2d.hpp"
 #include "godot_cpp/classes/global_constants.hpp"
 #include "godot_cpp/classes/image.hpp"
 #include "godot_cpp/classes/image_texture.hpp"
-#include "data/bullet_effect_layer_data2d.hpp"
 #include "godot_cpp/classes/random_number_generator.hpp"
-#include "godot_cpp/variant/dictionary.hpp"
 #include "godot_cpp/core/class_db.hpp"
-#include "godot_cpp/core/object.hpp"
 #include "godot_cpp/core/math.hpp"
 #include "godot_cpp/core/math_defs.hpp"
+#include "godot_cpp/core/object.hpp"
+#include "godot_cpp/variant/dictionary.hpp"
 #include "godot_cpp/variant/vector2.hpp"
 #include "godot_cpp/variant/vector3.hpp"
+#include "patterns/bullet_patterns2d.hpp"
+#include "patterns/pattern_params2d.hpp"
+#include "patterns/pattern_slots2d.hpp"
+#include <algorithm>
 #include <cstdint>
 #include <godot_cpp/classes/atlas_texture.hpp>
 #include <godot_cpp/classes/engine.hpp>
+#include <godot_cpp/classes/performance.hpp>
 #include <godot_cpp/classes/physics_server2d.hpp>
 #include <godot_cpp/classes/project_settings.hpp>
 #include <godot_cpp/classes/scene_tree.hpp>
-#include <godot_cpp/classes/world2d.hpp>
-#include <godot_cpp/classes/performance.hpp>
 #include <godot_cpp/classes/time.hpp>
+#include <godot_cpp/classes/world2d.hpp>
 #include <godot_cpp/variant/utility_functions.hpp>
-#include <algorithm>
 
 namespace BlastBullets2D {
 using namespace godot;
@@ -132,30 +132,30 @@ void resample_loop_even_distinct(const PackedVector2Array &pts, const PackedVect
 PackedVector2Array fill_outline_from(int outline_placement, const PackedVector2Array &local_pts, const Vector2 &origin); // bullet_factory2d_patterns_layout.cpp
 
 PatternSlots2D layout_outline_slots(
-        const char *caller_name,
-        const Transform2D &marker_transform,
-        const PackedVector2Array &points,
-        const PackedVector2Array &normals,
-        bool points_are_local,
-        real_t rot_add,
-        bool face_outward,
-        real_t facing_offset_degrees,
-        const PackedFloat32Array &facing_override,
-        // The user's outline knobs (placement, slot order, fill, layers).
-        const OutlineLayout2D &outline,
-        // Corner anchoring: the polygon loops pass their knobs, curves
-        // pass CornerLayout2D::smooth().
-        const CornerLayout2D &corner,
-        // Corner points of a polygon loop (empty for curves).
-        const PackedVector2Array &polygon_corners,
-        bool loop_closed,
-        bool allow_resample,
-        // Dense ideal curve (Fill / Layers): Fill builds the interior from
-        // it and Layers resample each ring from it, so both follow the true
-        // curve at any bullet count. Empty = slot loop only.
-        const PackedVector2Array &dense_outline = PackedVector2Array(),
-        const PackedVector2Array &dense_normals = PackedVector2Array(),
-        const PackedFloat32Array &dense_overrides = PackedFloat32Array()); // bullet_factory2d_patterns_layout.cpp
+		const char *caller_name,
+		const Transform2D &marker_transform,
+		const PackedVector2Array &points,
+		const PackedVector2Array &normals,
+		bool points_are_local,
+		real_t rot_add,
+		bool face_outward,
+		real_t facing_offset_degrees,
+		const PackedFloat32Array &facing_override,
+		// The user's outline knobs (placement, slot order, fill, layers).
+		const OutlineLayout2D &outline,
+		// Corner anchoring: the polygon loops pass their knobs, curves
+		// pass CornerLayout2D::smooth().
+		const CornerLayout2D &corner,
+		// Corner points of a polygon loop (empty for curves).
+		const PackedVector2Array &polygon_corners,
+		bool loop_closed,
+		bool allow_resample,
+		// Dense ideal curve (Fill / Layers): Fill builds the interior from
+		// it and Layers resample each ring from it, so both follow the true
+		// curve at any bullet count. Empty = slot loop only.
+		const PackedVector2Array &dense_outline = PackedVector2Array(),
+		const PackedVector2Array &dense_normals = PackedVector2Array(),
+		const PackedFloat32Array &dense_overrides = PackedFloat32Array()); // bullet_factory2d_patterns_layout.cpp
 
 bool danmaku_validate_head(const char *caller_name, int transforms_amount, const Transform2D &marker_transform); // bullet_factory2d_patterns_layout.cpp
 

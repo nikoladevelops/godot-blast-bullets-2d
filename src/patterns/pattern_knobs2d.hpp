@@ -7,15 +7,15 @@
 // inspector gating (pattern_gating2d.cpp), presets (pattern_presets2d.cpp).
 // Field names ARE the serialized property names: never rename one.
 
-#include "patterns/bullet_patterns2d.hpp"
-#include "patterns/pattern_inputs2d.hpp"
-#include "patterns/pattern_slots2d.hpp"
 #include "godot_cpp/variant/node_path.hpp"
 #include "godot_cpp/variant/packed_float32_array.hpp"
 #include "godot_cpp/variant/packed_int32_array.hpp"
 #include "godot_cpp/variant/transform2d.hpp"
 #include "godot_cpp/variant/typed_array.hpp"
 #include "godot_cpp/variant/vector2.hpp"
+#include "patterns/bullet_patterns2d.hpp"
+#include "patterns/pattern_inputs2d.hpp"
+#include "patterns/pattern_slots2d.hpp"
 #include <cstdint>
 
 namespace godot {
@@ -114,10 +114,10 @@ struct PatternKnobs2D {
 	// used only by the matching bloom kind (see bullet_factory2d.hpp doc).
 	int helper_flower_type = 0;
 	double helper_flower_inner_radius_scale = 0.0; // core-hole lift (0 = full bloom)
-	double helper_flower_spiro_roller = 45.0;       // hypotrochoid roller r (> 0)
-	double helper_flower_spiro_pen = 80.0;          // hypotrochoid pen d (>= 0)
-	double helper_flower_super_lobes = 6.0;         // superformula lobe count m
-	double helper_flower_super_fullness = 1.0;      // superformula fullness exponent
+	double helper_flower_spiro_roller = 45.0; // hypotrochoid roller r (> 0)
+	double helper_flower_spiro_pen = 80.0; // hypotrochoid pen d (>= 0)
+	double helper_flower_super_lobes = 6.0; // superformula lobe count m
+	double helper_flower_super_fullness = 1.0; // superformula fullness exponent
 
 	// ELLIPSE (true ellipse ring / arc / wall-with-gaps).
 	double helper_ellipse_radius_x = 150.0;

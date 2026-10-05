@@ -542,7 +542,7 @@ static bool sample_closed_polygon_loop(const PackedVector2Array &corners, int co
 }
 
 PatternSlots2D BulletPatterns2D::generate_rectangle2d(int transforms_amount, Transform2D marker_transform, const RectangleParams2D &params) {
-	const Vector2 & size = params.size;
+	const Vector2 &size = params.size;
 	bool face_outward = params.face_outward;
 	real_t facing_offset_degrees = params.facing_offset_degrees;
 	int outline_distribution = params.corner.outline_distribution;
@@ -627,7 +627,7 @@ PatternSlots2D BulletPatterns2D::generate_rectangle2d(int transforms_amount, Tra
 		UtilityFunctions::push_error("helper_generate_transforms_rectangle: degenerate rectangle.");
 		return PatternSlots2D();
 	}
-	return layout_outline_slots("helper_generate_transforms_rectangle", marker_transform, loop_points, loop_normals, true, marker_rot, face_outward, facing_offset_degrees, PackedFloat32Array(),  params.outline, params.corner, corners, true, true);
+	return layout_outline_slots("helper_generate_transforms_rectangle", marker_transform, loop_points, loop_normals, true, marker_rot, face_outward, facing_offset_degrees, PackedFloat32Array(), params.outline, params.corner, corners, true, true);
 }
 
 TypedArray<Transform2D> BulletPatterns2D::helper_generate_transforms_rectangle(
@@ -777,7 +777,7 @@ PatternSlots2D BulletPatterns2D::generate_polygon2d(int transforms_amount, Trans
 		UtilityFunctions::push_error("helper_generate_transforms_polygon: degenerate polygon.");
 		return PatternSlots2D();
 	}
-	return layout_outline_slots("helper_generate_transforms_polygon", marker_transform, loop_points, loop_normals, true, marker_rot, face_outward, facing_offset_degrees, PackedFloat32Array(),  params.outline, params.corner, corners, true, true);
+	return layout_outline_slots("helper_generate_transforms_polygon", marker_transform, loop_points, loop_normals, true, marker_rot, face_outward, facing_offset_degrees, PackedFloat32Array(), params.outline, params.corner, corners, true, true);
 }
 
 TypedArray<Transform2D> BulletPatterns2D::helper_generate_transforms_polygon(
@@ -904,7 +904,7 @@ PatternSlots2D BulletPatterns2D::generate_triangle2d(int transforms_amount, Tran
 		}
 		return stacked;
 	}
-	return layout_outline_slots("helper_generate_transforms_triangle", marker_transform, loop_points, loop_normals, true, marker_transform.get_rotation(), face_outward, facing_offset_degrees, PackedFloat32Array(),  params.outline, params.corner, corners, true, true);
+	return layout_outline_slots("helper_generate_transforms_triangle", marker_transform, loop_points, loop_normals, true, marker_transform.get_rotation(), face_outward, facing_offset_degrees, PackedFloat32Array(), params.outline, params.corner, corners, true, true);
 }
 
 TypedArray<Transform2D> BulletPatterns2D::helper_generate_transforms_triangle(
@@ -1027,7 +1027,7 @@ PatternSlots2D BulletPatterns2D::generate_trapezoid2d(int transforms_amount, Tra
 		}
 		return stacked;
 	}
-	return layout_outline_slots("helper_generate_transforms_trapezoid", marker_transform, loop_points, loop_normals, true, marker_transform.get_rotation(), face_outward, facing_offset_degrees, PackedFloat32Array(),  params.outline, params.corner, corners, true, true);
+	return layout_outline_slots("helper_generate_transforms_trapezoid", marker_transform, loop_points, loop_normals, true, marker_transform.get_rotation(), face_outward, facing_offset_degrees, PackedFloat32Array(), params.outline, params.corner, corners, true, true);
 }
 
 TypedArray<Transform2D> BulletPatterns2D::helper_generate_transforms_trapezoid(
@@ -1149,7 +1149,7 @@ PatternSlots2D BulletPatterns2D::generate_diamond2d(int transforms_amount, Trans
 		}
 		return stacked;
 	}
-	return layout_outline_slots("helper_generate_transforms_diamond", marker_transform, loop_points, loop_normals, true, marker_transform.get_rotation(), face_outward, facing_offset_degrees, PackedFloat32Array(),  params.outline, params.corner, corners, true, true);
+	return layout_outline_slots("helper_generate_transforms_diamond", marker_transform, loop_points, loop_normals, true, marker_transform.get_rotation(), face_outward, facing_offset_degrees, PackedFloat32Array(), params.outline, params.corner, corners, true, true);
 }
 
 TypedArray<Transform2D> BulletPatterns2D::helper_generate_transforms_diamond(

@@ -286,7 +286,6 @@ void BulletVolley2D::set_bullet_rotation_data(int bullet_index, const Ref<Bullet
 		return;
 	}
 
-
 	// A rotation-less volley (empty seed path) has empty vectors: size them
 	// here so a live write wakes rotation instead of silently no-op'ing.
 	// amount_bullets is fixed for the volley's life, so resize is exact.
@@ -386,7 +385,6 @@ void BulletVolley2D::set_bullet_speed_data(int bullet_index, const Ref<BulletSpe
 		UtilityFunctions::push_warning("You are trying to set bullet speed data directly while having a movement speed curve assigned as an individual bullet curves data. The curve will override any direct speed data changes. Set the curve to null first if you want to set speed data directly.");
 		return;
 	}
-
 
 	if (!Math::is_finite(new_bullet_speed_data->speed) || !Math::is_finite(new_bullet_speed_data->max_speed) || !Math::is_finite(new_bullet_speed_data->acceleration)) {
 		UtilityFunctions::push_error("set_bullet_speed_data: speed values must be finite.");

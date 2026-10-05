@@ -300,7 +300,7 @@ PatternSlots2D BulletPatterns2D::generate_ring2d(int transforms_amount, Transfor
 			fill_outline.push_back(marker_transform.get_origin() + Vector2(Math::cos(angle) * radius, Math::sin(angle) * radius * y_scale));
 		}
 	}
-	return layout_outline_slots("helper_generate_transforms_ring", marker_transform, loop_points, loop_normals, false, 0.0, face_outward, facing_offset_degrees, facing_override,  params.outline, CornerLayout2D::smooth(), PackedVector2Array(), is_closed_ring, true, fill_outline);
+	return layout_outline_slots("helper_generate_transforms_ring", marker_transform, loop_points, loop_normals, false, 0.0, face_outward, facing_offset_degrees, facing_override, params.outline, CornerLayout2D::smooth(), PackedVector2Array(), is_closed_ring, true, fill_outline);
 }
 
 TypedArray<Transform2D> BulletPatterns2D::helper_generate_transforms_ring(
@@ -574,7 +574,7 @@ PatternSlots2D BulletPatterns2D::generate_flower2d(int transforms_amount, Transf
 	// The flower always lays its layers out on one shared loop.
 	OutlineLayout2D flower_outline = params.outline;
 	flower_outline.layer_layout = 0;
-	return layout_outline_slots("helper_generate_transforms_flower", marker_transform, loop_points, loop_normals, false, 0.0, face_outward, facing_offset_degrees, PackedFloat32Array(),  flower_outline, CornerLayout2D::smooth(), PackedVector2Array(), true, flower_type != FLOWER_FAN && flower_type != FLOWER_PHYLLOTAXIS, fill_outline, fill_normals);
+	return layout_outline_slots("helper_generate_transforms_flower", marker_transform, loop_points, loop_normals, false, 0.0, face_outward, facing_offset_degrees, PackedFloat32Array(), flower_outline, CornerLayout2D::smooth(), PackedVector2Array(), true, flower_type != FLOWER_FAN && flower_type != FLOWER_PHYLLOTAXIS, fill_outline, fill_normals);
 }
 
 TypedArray<Transform2D> BulletPatterns2D::helper_generate_transforms_flower(
@@ -748,7 +748,7 @@ PatternSlots2D BulletPatterns2D::generate_ellipse2d(int transforms_amount, Trans
 		}
 	}
 	// WALL keeps shared-loop layers (resampling would pave over the gaps).
-	return layout_outline_slots("helper_generate_transforms_ellipse", marker_transform, loop_points, loop_normals, false, 0.0, face_outward, facing_offset_degrees, PackedFloat32Array(),  params.outline, CornerLayout2D::smooth(), PackedVector2Array(), is_closed, !is_wall, fill_outline);
+	return layout_outline_slots("helper_generate_transforms_ellipse", marker_transform, loop_points, loop_normals, false, 0.0, face_outward, facing_offset_degrees, PackedFloat32Array(), params.outline, CornerLayout2D::smooth(), PackedVector2Array(), is_closed, !is_wall, fill_outline);
 }
 
 TypedArray<Transform2D> BulletPatterns2D::helper_generate_transforms_ellipse(
@@ -910,7 +910,7 @@ PatternSlots2D BulletPatterns2D::generate_star2d(int transforms_amount, Transfor
 		UtilityFunctions::push_error("helper_generate_transforms_star: degenerate star.");
 		return PatternSlots2D();
 	}
-	return layout_outline_slots("helper_generate_transforms_star", marker_transform, loop_points, loop_normals, true, marker_rot, face_outward, facing_offset_degrees, PackedFloat32Array(),  params.outline, params.corner, corners, true, true);
+	return layout_outline_slots("helper_generate_transforms_star", marker_transform, loop_points, loop_normals, true, marker_rot, face_outward, facing_offset_degrees, PackedFloat32Array(), params.outline, params.corner, corners, true, true);
 }
 
 TypedArray<Transform2D> BulletPatterns2D::helper_generate_transforms_star(
@@ -1039,7 +1039,7 @@ PatternSlots2D BulletPatterns2D::generate_heart2d(int transforms_amount, Transfo
 		loop_normals.push_back(even_nrms[i]);
 		facing_override.push_back(even_ovr[i]);
 	}
-	return layout_outline_slots("helper_generate_transforms_heart", marker_transform, loop_points, loop_normals, false, 0.0, face_outward, facing_offset_degrees, facing_override,  params.outline, CornerLayout2D::smooth(), PackedVector2Array(), true, true, fill_outline, dense_nrms, dense_ovr);
+	return layout_outline_slots("helper_generate_transforms_heart", marker_transform, loop_points, loop_normals, false, 0.0, face_outward, facing_offset_degrees, facing_override, params.outline, CornerLayout2D::smooth(), PackedVector2Array(), true, true, fill_outline, dense_nrms, dense_ovr);
 }
 
 TypedArray<Transform2D> BulletPatterns2D::helper_generate_transforms_heart(
@@ -1149,7 +1149,7 @@ PatternSlots2D BulletPatterns2D::generate_rose2d(int transforms_amount, Transfor
 		loop_points.push_back(origin + even_local[i]);
 		loop_normals.push_back(even_nrms[i]);
 	}
-	return layout_outline_slots("helper_generate_transforms_rose", marker_transform, loop_points, loop_normals, false, 0.0, face_outward, facing_offset_degrees, PackedFloat32Array(),  params.outline, CornerLayout2D::smooth(), PackedVector2Array(), true, true, fill_outline, dense_nrms);
+	return layout_outline_slots("helper_generate_transforms_rose", marker_transform, loop_points, loop_normals, false, 0.0, face_outward, facing_offset_degrees, PackedFloat32Array(), params.outline, CornerLayout2D::smooth(), PackedVector2Array(), true, true, fill_outline, dense_nrms);
 }
 
 TypedArray<Transform2D> BulletPatterns2D::helper_generate_transforms_rose(
@@ -1268,7 +1268,7 @@ PatternSlots2D BulletPatterns2D::generate_lissajous2d(int transforms_amount, Tra
 		loop_points.push_back(origin + even_local[i]);
 		loop_normals.push_back(even_nrms[i]);
 	}
-	return layout_outline_slots("helper_generate_transforms_lissajous", marker_transform, loop_points, loop_normals, false, 0.0, face_outward, facing_offset_degrees, PackedFloat32Array(),  params.outline, CornerLayout2D::smooth(), PackedVector2Array(), !open_run, true, fill_outline, dense_nrms);
+	return layout_outline_slots("helper_generate_transforms_lissajous", marker_transform, loop_points, loop_normals, false, 0.0, face_outward, facing_offset_degrees, PackedFloat32Array(), params.outline, CornerLayout2D::smooth(), PackedVector2Array(), !open_run, true, fill_outline, dense_nrms);
 }
 
 TypedArray<Transform2D> BulletPatterns2D::helper_generate_transforms_lissajous(
@@ -1364,7 +1364,7 @@ PatternSlots2D BulletPatterns2D::generate_circle2d(int transforms_amount, Transf
 			fill_outline.push_back(Vector2(Math::cos(angle), Math::sin(angle)) * radius);
 		}
 	}
-	return layout_outline_slots("helper_generate_transforms_circle", marker_transform, loop_points, loop_normals, true, marker_rot, face_outward, facing_offset_degrees, PackedFloat32Array(),  params.outline, CornerLayout2D::smooth(), PackedVector2Array(), true, true, fill_outline);
+	return layout_outline_slots("helper_generate_transforms_circle", marker_transform, loop_points, loop_normals, true, marker_rot, face_outward, facing_offset_degrees, PackedFloat32Array(), params.outline, CornerLayout2D::smooth(), PackedVector2Array(), true, true, fill_outline);
 }
 
 TypedArray<Transform2D> BulletPatterns2D::helper_generate_transforms_circle(

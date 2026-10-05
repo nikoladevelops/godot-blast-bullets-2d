@@ -6,13 +6,13 @@
 
 // Shared
 #include "attachments/bullet_attachment2d.hpp"
+#include "core/cached_string_names2d.hpp"
 #include "data/bullet_curves_data2d.hpp"
 #include "data/bullet_effect_layer_data2d.hpp"
 #include "data/bullet_rotation_data2d.hpp"
 #include "data/bullet_speed_data2d.hpp"
 #include "data/bullet_wobble_data2d.hpp"
 #include "pooling/volley_pool_key2d.hpp"
-#include "core/cached_string_names2d.hpp"
 
 // Factory
 #include "factory/bullet_factory2d.hpp"
@@ -30,7 +30,6 @@
 #include "bullet_spawner/bullet_spawner2d.hpp"
 #include "patterns/bullet_patterns2d.hpp"
 
-
 using namespace godot;
 using namespace BlastBullets2D;
 
@@ -39,21 +38,21 @@ void initialize_blast_bullets_2d_module(ModuleInitializationLevel p_level) {
 		return;
 	}
 
-// REGISTRATION POLICY - read before changing anything here.
-//
-// Every class below stays GDREGISTER_CLASS on purpose, even the purely
-// runtime-created ones. Per the official docs, GDREGISTER_RUNTIME_CLASS means
-// "only available at runtime (but not in the editor)": the editor then
-// creates mere placeholders instead of real instances (no properties, failed
-// casts, broken scene restore for any .tscn containing such nodes).
-//
-// Editor behavior is therefore NEVER controlled through registration. Code
-// that must not run in the editor (shoot timers, physics setup, processing)
-// is guarded with Engine::is_editor_hint() at the call site - see
-// BulletFactory2D::_ready() and BulletSpawner2D::_ready()/_process().
-// Do not "fix" editor log spam by switching macros; fix (or add) the guard.
+	// REGISTRATION POLICY - read before changing anything here.
+	//
+	// Every class below stays GDREGISTER_CLASS on purpose, even the purely
+	// runtime-created ones. Per the official docs, GDREGISTER_RUNTIME_CLASS means
+	// "only available at runtime (but not in the editor)": the editor then
+	// creates mere placeholders instead of real instances (no properties, failed
+	// casts, broken scene restore for any .tscn containing such nodes).
+	//
+	// Editor behavior is therefore NEVER controlled through registration. Code
+	// that must not run in the editor (shoot timers, physics setup, processing)
+	// is guarded with Engine::is_editor_hint() at the call site - see
+	// BulletFactory2D::_ready() and BulletSpawner2D::_ready()/_process().
+	// Do not "fix" editor log spam by switching macros; fix (or add) the guard.
 
-// Shared
+	// Shared
 	GDREGISTER_CLASS(BulletRotationData2D)
 	GDREGISTER_CLASS(BulletEffectLayerData2D)
 	GDREGISTER_CLASS(BulletSpeedData2D)

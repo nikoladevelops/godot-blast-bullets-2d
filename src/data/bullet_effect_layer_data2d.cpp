@@ -81,7 +81,7 @@ bool BulletEffectLayerData2D::bake_effect_frames(const StringName &anim, std::ve
 			UtilityFunctions::push_error("BulletEffectLayerData2D: animation '" + String(use_anim) + "' frame " + String::num_int64(i) + " has null texture.");
 			return false;
 		}
-	const float dur = frames->get_frame_duration(use_anim, i);
+		const float dur = frames->get_frame_duration(use_anim, i);
 		const double sec = (dur <= 0.0f ? 0.0 : (double)dur / fps);
 		if (override_frame_color) {
 			// Exact-color mode: whitened copy (alpha preserved) so the

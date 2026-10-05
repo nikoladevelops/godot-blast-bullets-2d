@@ -1,20 +1,30 @@
 #pragma once
 
-#include "core/warn_once2d.hpp"
-#include "core/transform_math2d.hpp"
-#include "factory/bullet_factory2d.hpp"
 #include "attachments/bullet_attachment2d.hpp"
 #include "attachments/bullet_attachment_object_pool2d.hpp"
+#include "bullet_volley/bullet_movement_pattern_data2d.hpp"
+#include "bullet_volley/homing_target_deque.hpp"
+#include "core/cached_string_names2d.hpp"
+#include "core/collision_shape_helper2d.hpp"
+#include "core/dynamic_sparse_set.hpp"
+#include "core/reentrancy_guard2d.hpp"
+#include "core/transform_math2d.hpp"
+#include "core/warn_once2d.hpp"
+#include "data/bullet_curves_data2d.hpp"
 #include "data/bullet_effect_layer_data2d.hpp"
 #include "data/bullet_rotation_data2d.hpp"
-#include "core/cached_string_names2d.hpp"
-#include "core/reentrancy_guard2d.hpp"
+#include "data/bullet_speed_data2d.hpp"
 #include "data/bullet_volley_data2d.hpp"
+#include "data/bullet_wobble_data2d.hpp"
+#include "factory/bullet_factory2d.hpp"
 #include "godot_cpp/classes/curve.hpp"
 #include "godot_cpp/classes/curve2d.hpp"
+#include "godot_cpp/classes/node2d.hpp"
+#include "godot_cpp/classes/object.hpp"
 #include "godot_cpp/classes/path2d.hpp"
 #include "godot_cpp/classes/ref.hpp"
 #include "godot_cpp/classes/texture2d.hpp"
+#include "godot_cpp/classes/wrapped.hpp"
 #include "godot_cpp/core/class_db.hpp"
 #include "godot_cpp/core/defs.hpp"
 #include "godot_cpp/core/math.hpp"
@@ -23,22 +33,19 @@
 #include "godot_cpp/core/object.hpp"
 #include "godot_cpp/core/print_string.hpp"
 #include "godot_cpp/core/property_info.hpp"
+#include "godot_cpp/variant/array.hpp"
 #include "godot_cpp/variant/callable.hpp"
 #include "godot_cpp/variant/callable_method_pointer.hpp"
 #include "godot_cpp/variant/packed_float32_array.hpp"
 #include "godot_cpp/variant/transform2d.hpp"
 #include "godot_cpp/variant/typed_array.hpp"
+#include "godot_cpp/variant/utility_functions.hpp"
 #include "godot_cpp/variant/variant.hpp"
 #include "godot_cpp/variant/vector2.hpp"
-#include "data/bullet_curves_data2d.hpp"
-#include "bullet_volley/bullet_movement_pattern_data2d.hpp"
-#include "data/bullet_speed_data2d.hpp"
-#include "core/collision_shape_helper2d.hpp"
-#include "core/dynamic_sparse_set.hpp"
 #include "pooling/volley_pool_key2d.hpp"
+#include <algorithm>
 #include <cstddef>
 #include <cstdint>
-#include <algorithm>
 #include <godot_cpp/classes/atlas_texture.hpp>
 #include <godot_cpp/classes/engine.hpp>
 #include <godot_cpp/classes/mesh.hpp>
@@ -52,13 +59,6 @@
 #include <godot_cpp/variant/utility_functions.hpp>
 #include <iterator>
 #include <vector>
-#include "data/bullet_wobble_data2d.hpp"
-#include "bullet_volley/homing_target_deque.hpp"
-#include "godot_cpp/classes/node2d.hpp"
-#include "godot_cpp/classes/object.hpp"
-#include "godot_cpp/classes/wrapped.hpp"
-#include "godot_cpp/variant/array.hpp"
-#include "godot_cpp/variant/utility_functions.hpp"
 
 namespace BlastBullets2D {
 using namespace godot;
@@ -111,7 +111,6 @@ public:
 	// queued with so pool reuse in between can't misfire them onto a new owner.
 	int volley_generation = 0;
 
-
 	// DEFERRED-WORK CONTRACT (mandatory for every call_deferred addition):
 	// pool reuse, frees, and re-homes can all land between queue and flush, so
 	// 1. stamp the current generation (plus epoch/instance-id where they apply)
@@ -154,7 +153,6 @@ public:
 		}
 		return cached_instance_id;
 	}
-
 
 	// Gets the total amount of bullets that the multimesh always holds
 	_ALWAYS_INLINE_ int get_amount_bullets() const { return amount_bullets; };
@@ -1235,8 +1233,6 @@ public:
 	// Liveness is checked BEFORE the pointer compare: comparing a dangling
 	// pointer first would touch freed memory when the id was recycled.
 
-
-
 	void bullet_enable_attachment(int bullet_index);
 
 	// Drops user connections to sprite_animation_finished: pooled instances carry them
@@ -1448,9 +1444,6 @@ public:
 	void set_bullets_current_collision_count_no_return(const TypedArray<int> &arr) {
 		(void)set_bullets_current_collision_count(arr);
 	}
-
-
-
 
 	///
 protected:
@@ -1724,7 +1717,6 @@ protected:
 	// Once-flag so the silent-homing footgun warns exactly once per multimesh lifetime
 	// segment (reset on spawn/enable). See move_bullets homing branch.
 	bool homing_inert_warning_issued = false;
-
 
 	// This is a shared homing deque - allows the bullets to share the same target
 	HomingTargetDeque shared_homing_deque;
@@ -2568,13 +2560,12 @@ public:
 	// when a multimesh dies holding mouse targets.
 	void clear_homing_state_for_teardown();
 
-
- protected:
- 	// Updates homing behavior for a bullet. Zero-delta ticks steer nothing:
- 	// with no time passing any direction or texture change would be motion
- 	// without movement, so the bullet holds its pose. A zero heading
- 	// (unseeded ballistics) also holds: steering it would snap to angle 0.
- 	_ALWAYS_INLINE_ void update_homing(HomingTargetDeque &homing_deque, int bullet_index, double delta, Vector2 &bullet_pos, Vector2 &target_pos);
+protected:
+	// Updates homing behavior for a bullet. Zero-delta ticks steer nothing:
+	// with no time passing any direction or texture change would be motion
+	// without movement, so the bullet holds its pose. A zero heading
+	// (unseeded ballistics) also holds: steering it would snap to angle 0.
+	_ALWAYS_INLINE_ void update_homing(HomingTargetDeque &homing_deque, int bullet_index, double delta, Vector2 &bullet_pos, Vector2 &target_pos);
 
 	// Rotates bullet to face target with smoothing (boundary-agnostic version).
 	// require_homing_flag: the homing feature only rotates the texture when the user

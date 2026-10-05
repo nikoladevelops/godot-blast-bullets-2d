@@ -418,7 +418,8 @@ Vector2 BulletVolley2D::resolve_quad_size(const Ref<SpriteFrames> &p_sprite_fram
 	StringName anim;
 	if (!resolve_sprite_animation_quiet(p_sprite_frames, p_animation, anim)) {
 		return Vector2(32, 32);
-	}	if (p_sprite_frames->get_frame_count(anim) > 0) {
+	}
+	if (p_sprite_frames->get_frame_count(anim) > 0) {
 		if (const Ref<Texture2D> tex = p_sprite_frames->get_frame_texture(anim, 0); tex.is_valid()) {
 			if (const Ref<AtlasTexture> atlas = tex; atlas.is_valid()) {
 				const Vector2 region = atlas->get_region().size;

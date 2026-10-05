@@ -6,21 +6,34 @@
 // bullet_volley2d.hpp. Keep per-bullet helpers inline: a call per bullet
 // across translation units costs measurable frame time.
 
+#include "bullet_volley/bullet_movement_pattern_data2d.hpp"
 #include "bullet_volley/bullet_volley2d.hpp"
-#include "core/warn_once2d.hpp"
 #include "core/cached_string_names2d.hpp"
+#include "core/collision_shape_helper2d.hpp"
+#include "core/warn_once2d.hpp"
+#include "data/bullet_curves_data2d.hpp"
+#include "data/bullet_volley_data2d.hpp"
 #include "factory/bullet_factory2d.hpp"
-#include "pooling/volley_pool2d.hpp"
+#include "godot_cpp/classes/capsule_shape2d.hpp"
+#include "godot_cpp/classes/circle_shape2d.hpp"
+#include "godot_cpp/classes/collision_shape2d.hpp"
 #include "godot_cpp/classes/curve.hpp"
 #include "godot_cpp/classes/curve2d.hpp"
+#include "godot_cpp/classes/node.hpp"
+#include "godot_cpp/classes/rectangle_shape2d.hpp"
+#include "godot_cpp/classes/scene_tree.hpp"
+#include "godot_cpp/classes/segment_shape2d.hpp"
+#include "godot_cpp/classes/tile_map_layer.hpp"
+#include "godot_cpp/classes/world_boundary_shape2d.hpp"
 #include "godot_cpp/core/class_db.hpp"
 #include "godot_cpp/core/math.hpp"
+#include "godot_cpp/core/object.hpp"
 #include "godot_cpp/core/print_string.hpp"
+#include "godot_cpp/variant/dictionary.hpp"
 #include "godot_cpp/variant/transform2d.hpp"
+#include "godot_cpp/variant/typed_array.hpp"
 #include "godot_cpp/variant/vector2.hpp"
-#include "data/bullet_curves_data2d.hpp"
-#include "bullet_volley/bullet_movement_pattern_data2d.hpp"
-#include "core/collision_shape_helper2d.hpp"
+#include "pooling/volley_pool2d.hpp"
 #include <godot_cpp/classes/atlas_texture.hpp>
 #include <godot_cpp/classes/image.hpp>
 #include <godot_cpp/classes/image_texture.hpp>
@@ -29,21 +42,8 @@
 #include <godot_cpp/classes/scene_state.hpp>
 #include <godot_cpp/classes/shader_material.hpp>
 #include <godot_cpp/classes/sprite_frames.hpp>
-#include <godot_cpp/variant/utility_functions.hpp>
-#include "data/bullet_volley_data2d.hpp"
-#include "godot_cpp/classes/capsule_shape2d.hpp"
-#include "godot_cpp/classes/circle_shape2d.hpp"
-#include "godot_cpp/classes/collision_shape2d.hpp"
-#include "godot_cpp/classes/node.hpp"
-#include "godot_cpp/classes/rectangle_shape2d.hpp"
-#include "godot_cpp/classes/scene_tree.hpp"
-#include "godot_cpp/classes/segment_shape2d.hpp"
-#include "godot_cpp/classes/tile_map_layer.hpp"
-#include "godot_cpp/classes/world_boundary_shape2d.hpp"
-#include "godot_cpp/core/object.hpp"
-#include "godot_cpp/variant/dictionary.hpp"
-#include "godot_cpp/variant/typed_array.hpp"
 #include <godot_cpp/variant/transform2d.hpp>
+#include <godot_cpp/variant/utility_functions.hpp>
 
 namespace BlastBullets2D {
 using namespace godot;
@@ -1023,7 +1023,7 @@ _ALWAYS_INLINE_ void BulletVolley2D::rotate_to_target(int bullet_index, const Ve
 	// Rotate locally
 	rotate_transform_locally(all_cached_instance_transforms[bullet_index], delta_rot);
 
-// No smoothing means snap: reset the interpolation cache so the sprite doesn't lag a frame behind. Orbiting preserves it separately to stay smooth.
+	// No smoothing means snap: reset the interpolation cache so the sprite doesn't lag a frame behind. Orbiting preserves it separately to stay smooth.
 	if (!use_smoothing) {
 		update_bullet_previous_transform_for_interpolation(bullet_index);
 	}

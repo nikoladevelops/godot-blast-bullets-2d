@@ -421,9 +421,7 @@ int BulletVolley2D::try_handle_bounce(CollisionType collision_type, int bullet_i
 	// it) must not machine-gun the bullet. A free bounce swallows the
 	// record; a consumed hit still counts through the normal path, same
 	// contract as the cooldown above. Other targets bounce freely.
-	if (bounce_debounce_sec > 0.0 && Math::is_finite((double)bounce_debounce_sec)
-			&& bullet_index < (int)all_bounce_last_target.size() && bullet_index < (int)all_bounce_last_time.size()
-			&& all_bounce_last_target[bullet_index] == entered_instance_id && Math::is_finite(curves_elapsed_time)) {
+	if (bounce_debounce_sec > 0.0 && Math::is_finite((double)bounce_debounce_sec) && bullet_index < (int)all_bounce_last_target.size() && bullet_index < (int)all_bounce_last_time.size() && all_bounce_last_target[bullet_index] == entered_instance_id && Math::is_finite(curves_elapsed_time)) {
 		const double since_bounce = curves_elapsed_time - all_bounce_last_time[bullet_index];
 		if (Math::is_finite(since_bounce) && since_bounce >= 0.0 && since_bounce < (double)bounce_debounce_sec) {
 			return bounce_hit_consumed ? 0 : 1;

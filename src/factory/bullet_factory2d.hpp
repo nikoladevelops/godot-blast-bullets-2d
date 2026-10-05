@@ -15,17 +15,17 @@
 #include <utility>
 
 #include "attachments/bullet_attachment_object_pool2d.hpp"
-#include "data/bullet_effect_layer_data2d.hpp"
 #include "core/collision_shape_helper2d.hpp"
-#include "pooling/volley_pool2d.hpp"
+#include "core/dynamic_sparse_set.hpp"
+#include "data/bullet_effect_layer_data2d.hpp"
+#include "data/bullet_volley_data2d.hpp"
 #include "godot_cpp/core/math.hpp"
 #include "godot_cpp/variant/dictionary.hpp"
 #include "godot_cpp/variant/packed_float32_array.hpp"
 #include "godot_cpp/variant/packed_vector2_array.hpp"
 #include "godot_cpp/variant/utility_functions.hpp"
 #include "godot_cpp/variant/vector2.hpp"
-#include "core/dynamic_sparse_set.hpp"
-#include "data/bullet_volley_data2d.hpp"
+#include "pooling/volley_pool2d.hpp"
 
 namespace BlastBullets2D {
 using namespace godot;
@@ -58,7 +58,6 @@ class BulletFactory2D : public Node2D {
 public:
 	// Whether the factory is currently busy doing something important and it can't handle any other requests
 	bool get_is_factory_busy() const;
-
 
 	// Internal re-entrancy guard for BulletVolley2D teardown: a multimesh's disable
 	// sweep fires user script callbacks, and a handler calling reset()/free_*/populate
@@ -517,11 +516,11 @@ public:
 		return !is_factory_processing_bullets;
 	}
 
-  protected:
+protected:
 	// Responsible for exposing C++ methods/properties to Godot Engine
 	static void _bind_methods();
 
- private:
+private:
 	// Set when the factory enters the scene tree. Editor runs of getters/setters only
 	// fill the cached values below; the real ones apply in _ready() once nodes exist.
 	bool is_ready = false;
@@ -575,7 +574,6 @@ public:
 	uint64_t get_sweep_counter() const { return sweep_counter; }
 
 private:
-
 	// Pool reuse counters. Incremented only on spawn pop/allocate
 	// paths (never in the per-bullet tick), so zero hot-path cost.
 	// Mutable so const debug getters can report without breaking constness.
@@ -591,6 +589,7 @@ public:
 	uint64_t stats_collision_records_total = 0;
 	uint64_t stats_expired_bullets_total = 0;
 	uint64_t stats_spawned_bullets_total = 0;
+
 private:
 	uint64_t stats_physics_ticks = 0;
 	uint64_t stats_last_physics_tick_usec = 0;
@@ -761,7 +760,5 @@ private:
 
 	// Render-frame interpolation pass of every active volley.
 	void interpolate_volleys();
-
 };
 } //namespace BlastBullets2D
-

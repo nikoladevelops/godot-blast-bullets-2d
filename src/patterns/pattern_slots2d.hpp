@@ -3,9 +3,9 @@
 // PatternSlots2D: the native result of a pattern generator (one global
 // Transform2D per bullet), and its conversion to the TypedArray GDScript sees.
 
-#include "patterns/bullet_patterns2d.hpp"
 #include "godot_cpp/variant/transform2d.hpp"
 #include "godot_cpp/variant/typed_array.hpp"
+#include "patterns/bullet_patterns2d.hpp"
 #include <vector>
 
 namespace BlastBullets2D {

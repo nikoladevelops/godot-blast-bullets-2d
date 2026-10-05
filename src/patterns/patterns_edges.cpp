@@ -189,7 +189,7 @@ PackedVector2Array BulletPatterns2D::helper_compute_edge_normals(
 }
 
 PatternSlots2D BulletPatterns2D::generate_edge_from_points2d(int transforms_amount, Transform2D marker_transform, const EdgeFromPointsParams2D &params) {
-	const PackedVector2Array & edge_points = params.edge_points;
+	const PackedVector2Array &edge_points = params.edge_points;
 	bool closed = params.closed;
 	bool flip_normals = params.flip_normals;
 	bool random_sample = params.random_sample;
@@ -407,25 +407,30 @@ Dictionary BulletPatterns2D::helper_extract_edge_from_image(
 	result["points"] = PackedVector2Array();
 	result["normals"] = PackedVector2Array();
 	if (image.is_null() || image->is_empty()) {
-		if (!quiet) UtilityFunctions::push_error("helper_extract_edge_from_image: image is null or empty.");
+		if (!quiet)
+			UtilityFunctions::push_error("helper_extract_edge_from_image: image is null or empty.");
 		return result;
 	}
 	if (!Math::is_finite(threshold) || threshold < 0.0 || threshold > 1.0) {
-		if (!quiet) UtilityFunctions::push_error("helper_extract_edge_from_image: threshold must be in [0, 1].");
+		if (!quiet)
+			UtilityFunctions::push_error("helper_extract_edge_from_image: threshold must be in [0, 1].");
 		return result;
 	}
 	if (step < 1) {
-		if (!quiet) UtilityFunctions::push_error("helper_extract_edge_from_image: step must be >= 1.");
+		if (!quiet)
+			UtilityFunctions::push_error("helper_extract_edge_from_image: step must be >= 1.");
 		return result;
 	}
 	const int w = image->get_width();
 	const int h = image->get_height();
 	if (w <= 0 || h <= 0) {
-		if (!quiet) UtilityFunctions::push_error("helper_extract_edge_from_image: image has no pixels.");
+		if (!quiet)
+			UtilityFunctions::push_error("helper_extract_edge_from_image: image has no pixels.");
 		return result;
 	}
 	if (w > 2048 || h > 2048) {
-		if (!quiet) UtilityFunctions::push_error("helper_extract_edge_from_image: image too large (max 2048x2048, got " + itos(w) + "x" + itos(h) + "); downscale or use the NODE source.");
+		if (!quiet)
+			UtilityFunctions::push_error("helper_extract_edge_from_image: image too large (max 2048x2048, got " + itos(w) + "x" + itos(h) + "); downscale or use the NODE source.");
 		return result;
 	}
 	auto alpha_at = [&](int x, int y) -> real_t {
@@ -473,7 +478,8 @@ Dictionary BulletPatterns2D::helper_extract_edge_from_image(
 		}
 	}
 	if (points.is_empty()) {
-		if (!quiet) UtilityFunctions::push_error("helper_extract_edge_from_image: no edge pixels found (threshold too high or image fully transparent).");
+		if (!quiet)
+			UtilityFunctions::push_error("helper_extract_edge_from_image: no edge pixels found (threshold too high or image fully transparent).");
 	}
 	result["points"] = points;
 	result["normals"] = normals;

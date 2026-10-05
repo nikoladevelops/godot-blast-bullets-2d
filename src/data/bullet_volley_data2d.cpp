@@ -373,8 +373,6 @@ void BulletVolleyData2D::set_tile_bullets_current_collision_count(bool value) {
 	tile_bullets_current_collision_count = value;
 }
 
-
-
 TypedArray<BulletSpeedData2D> BulletVolleyData2D::get_all_bullet_speed_data() const {
 	return all_bullet_speed_data;
 }
@@ -886,7 +884,6 @@ void BulletVolleyData2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_shared_bullet_curves_data", "new_curves_data"), &BulletVolleyData2D::set_shared_bullet_curves_data);
 	ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "shared_bullet_curves_data", PROPERTY_HINT_RESOURCE_TYPE, "BulletCurvesData2D"), "set_shared_bullet_curves_data", "get_shared_bullet_curves_data");
 
-
 	ClassDB::bind_method(D_METHOD("get_all_bullet_curves_data"), &BulletVolleyData2D::get_all_bullet_curves_data);
 	ClassDB::bind_method(D_METHOD("set_all_bullet_curves_data", "new_data"), &BulletVolleyData2D::set_all_bullet_curves_data);
 	ADD_PROPERTY(PropertyInfo(Variant::ARRAY, "all_bullet_curves_data", PROPERTY_HINT_ARRAY_TYPE, "BulletCurvesData2D"), "set_all_bullet_curves_data", "get_all_bullet_curves_data");
@@ -929,7 +926,6 @@ void BulletVolleyData2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_tile_all_bullet_wobble_data"), &BulletVolleyData2D::get_tile_all_bullet_wobble_data);
 	ClassDB::bind_method(D_METHOD("set_tile_all_bullet_wobble_data", "value"), &BulletVolleyData2D::set_tile_all_bullet_wobble_data);
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "tile_all_bullet_wobble_data"), "set_tile_all_bullet_wobble_data", "get_tile_all_bullet_wobble_data");
-
 
 	ADD_GROUP("Gravity", "");
 	ClassDB::bind_method(D_METHOD("get_gravity"), &BulletVolleyData2D::get_gravity);
@@ -1011,7 +1007,6 @@ void BulletVolleyData2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_bounce_debounce_sec", "value"), &BulletVolleyData2D::set_bounce_debounce_sec);
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "bounce_debounce_sec"), "set_bounce_debounce_sec", "get_bounce_debounce_sec");
 
-
 	ADD_GROUP("Movement Pattern Paths", "");
 	ClassDB::bind_method(D_METHOD("get_shared_movement_pattern_path"), &BulletVolleyData2D::get_shared_movement_pattern_path);
 	ClassDB::bind_method(D_METHOD("set_shared_movement_pattern_path", "new_path"), &BulletVolleyData2D::set_shared_movement_pattern_path);
@@ -1025,7 +1020,6 @@ void BulletVolleyData2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_tile_all_bullet_movement_pattern_paths", "value"), &BulletVolleyData2D::set_tile_all_bullet_movement_pattern_paths);
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "tile_all_bullet_movement_pattern_paths"), "set_tile_all_bullet_movement_pattern_paths", "get_tile_all_bullet_movement_pattern_paths");
 
-
 	ClassDB::bind_method(D_METHOD("get_shared_movement_pattern_face_movement_direction"), &BulletVolleyData2D::get_shared_movement_pattern_face_movement_direction);
 	ClassDB::bind_method(D_METHOD("set_shared_movement_pattern_face_movement_direction", "value"), &BulletVolleyData2D::set_shared_movement_pattern_face_movement_direction);
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "shared_movement_pattern_face_movement_direction"), "set_shared_movement_pattern_face_movement_direction", "get_shared_movement_pattern_face_movement_direction");
@@ -1038,7 +1032,6 @@ void BulletVolleyData2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_tile_all_bullet_movement_pattern_face_movement_directions", "value"), &BulletVolleyData2D::set_tile_all_bullet_movement_pattern_face_movement_directions);
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "tile_all_bullet_movement_pattern_face_movement_directions"), "set_tile_all_bullet_movement_pattern_face_movement_directions", "get_tile_all_bullet_movement_pattern_face_movement_directions");
 
-
 	ClassDB::bind_method(D_METHOD("get_shared_movement_pattern_repeat"), &BulletVolleyData2D::get_shared_movement_pattern_repeat);
 	ClassDB::bind_method(D_METHOD("set_shared_movement_pattern_repeat", "value"), &BulletVolleyData2D::set_shared_movement_pattern_repeat);
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "shared_movement_pattern_repeat"), "set_shared_movement_pattern_repeat", "get_shared_movement_pattern_repeat");
@@ -1050,7 +1043,6 @@ void BulletVolleyData2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_tile_all_bullet_movement_pattern_repeats"), &BulletVolleyData2D::get_tile_all_bullet_movement_pattern_repeats);
 	ClassDB::bind_method(D_METHOD("set_tile_all_bullet_movement_pattern_repeats", "value"), &BulletVolleyData2D::set_tile_all_bullet_movement_pattern_repeats);
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "tile_all_bullet_movement_pattern_repeats"), "set_tile_all_bullet_movement_pattern_repeats", "get_tile_all_bullet_movement_pattern_repeats");
-
 
 	ADD_GROUP("Homing", "");
 	ClassDB::bind_method(D_METHOD("get_homing_smoothing"), &BulletVolleyData2D::get_homing_smoothing);
@@ -1177,6 +1169,5 @@ void BulletVolleyData2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_visibility_layer_from_array", "array_of_visibility_layers"), &BulletVolleyData2D::set_visibility_layer_from_array);
 
 	ClassDB::bind_static_method("BulletVolleyData2D", D_METHOD("calculate_bitmask", "numbers"), &BulletVolleyData2D::calculate_bitmask);
-
 }
 } //namespace BlastBullets2D
