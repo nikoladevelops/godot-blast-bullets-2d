@@ -1,6 +1,7 @@
 // Preview tracks (helper_sample_outline_*): the curve each pattern's bullets sit
 // on, drawn by BulletSpawner2D's preview layer.
 
+#include "patterns/pattern_curves2d.hpp"
 #include "patterns/patterns_internal.hpp"
 
 using namespace godot;
@@ -50,20 +51,14 @@ static bool flower_curve_point(int flower_type, int petals, real_t radius, real_
 		}
 		const real_t lobe_center = base_rotation + Math::TAU * (real_t)petal_idx / (real_t)petals;
 		const real_t angle = lobe_center + (real_t)(frac * petal_spread);
-		const double sharp = (double)petal_sharpness;
-		const real_t waist = 1.0 - (real_t)(sharp / (1.0 + sharp)) * 0.55 * Math::abs(Math::sin((double)frac * Math::PI));
+		const real_t waist = flower_fan_waist2d(petal_sharpness, (real_t)frac);
 		r_offset = Vector2(Math::cos(angle), Math::sin(angle)) * (radius * waist);
 		return r_offset.is_finite();
 	}
 	if (flower_type == BulletPatterns2D::FLOWER_RHODONEA) {
-		const double sharp = Math::clamp((double)petal_sharpness, 0.0, 32.0);
+		const real_t sharp = (petal_sharpness < 0.0) ? (real_t)0.0 : petal_sharpness;
 		const real_t theta = base_rotation + (real_t)t;
-		const real_t cos_k = Math::cos((real_t)petals * theta * 0.5);
-		const real_t mag = Math::pow(Math::abs((double)cos_k), sharp);
-		if (!Math::is_finite((double)mag)) {
-			return false;
-		}
-		const real_t r = radius * (real_t)clamped_inner + radius * (real_t)(1.0 - clamped_inner) * mag;
+		const real_t r = flower_rhodonea_radius2d(petals, theta, radius, sharp, clamped_inner);
 		r_offset = Vector2(Math::cos(theta), Math::sin(theta)) * r;
 		return r_offset.is_finite();
 	}
@@ -74,37 +69,19 @@ static bool flower_curve_point(int flower_type, int petals, real_t radius, real_
 		return r_offset.is_finite();
 	}
 	if (flower_type == BulletPatterns2D::FLOWER_SPIROGRAPH) {
-		const double outer_r = (double)radius;
-		double roller = Math::clamp(spiro_roller, 1.0, Math::max(outer_r * 4.0, 512.0));
-		if (!Math::is_finite(roller) || roller <= 0.0) {
+		const Spirograph2D spiro = spirograph_setup2d(radius, spiro_roller, spiro_pen);
+		if (!Math::is_finite(spiro.diff) || !Math::is_finite(spiro.k)) {
 			return false;
 		}
-		const double diff = outer_r - roller;
-		const double k = diff / roller;
-		if (!Math::is_finite(diff) || !Math::is_finite(k)) {
-			return false;
-		}
-		const double px = diff * Math::cos(t) + spiro_pen * Math::cos(k * t);
-		const double py = diff * Math::sin(t) - spiro_pen * Math::sin(k * t);
-		Vector2 local = Vector2((real_t)px, (real_t)py).rotated(base_rotation);
+		Vector2 local = spirograph_point2d(spiro, t).rotated(base_rotation);
 		if (!local.is_finite()) {
 			return false;
 		}
 		r_offset = local;
 		return true;
 	}
-	// FLOWER_SUPERFORMULA: simplified Gielis, same clamps as the generator.
-	const double lobes = Math::clamp(super_lobes, 2.0, 64.0);
-	const double full = Math::clamp(super_fullness, 0.05, 8.0);
-	const double c = Math::abs(Math::cos(lobes * t * 0.25));
-	const double s = Math::abs(Math::sin(lobes * t * 0.25));
-	double r_norm = Math::pow(Math::pow(c, full) + Math::pow(s, full), -1.0 / full);
-	if (!Math::is_finite(r_norm) || r_norm <= 0.0) {
-		r_norm = 1.0;
-	}
-	if (r_norm > 4.0) {
-		r_norm = 4.0;
-	}
+	// FLOWER_SUPERFORMULA: the generator's own normalized radius.
+	const double r_norm = superformula_norm2d(super_lobes, super_fullness, t);
 	const real_t r = radius * (real_t)(clamped_inner + (1.0 - clamped_inner) * (r_norm * 0.5));
 	const real_t ang = base_rotation + (real_t)t;
 	r_offset = Vector2(Math::cos(ang), Math::sin(ang)) * r;
@@ -161,16 +138,20 @@ Dictionary BulletPatterns2D::helper_sample_outline_flower(int flower_type, int p
 	// from coming out undersampled. Other kinds close in one revolution.
 	int revolutions = 1;
 	if (flower_type == FLOWER_SPIROGRAPH) {
-		double roller = spiro_roller;
-		if (roller < 1.0) {
-			roller = 1.0;
-		}
-		if (roller > Math::max((double)radius * 4.0, 512.0)) {
-			roller = Math::max((double)radius * 4.0, 512.0);
-		}
-		revolutions = spirograph_revolutions(((double)radius - roller) / roller);
+		// Same closure rule as the generator: a pinned centre or a free pen
+		// draws one plain circle.
+		const Spirograph2D spiro = spirograph_setup2d(radius, spiro_roller, spiro_pen);
+		revolutions = (spiro.centre_pinned || spiro_pen <= 1e-9) ? 1 : spirograph_revolutions(spiro.k);
 	}
-	const int n = flower_type == FLOWER_SPIROGRAPH ? spirograph_dense_samples(revolutions) : 160;
+	// Sharp rhodonea / superformula lobe tips need dense chords (the error
+	// shrinks with the square of the count): 512 keeps every bullet within
+	// half a pixel of the drawn curve. Preview-only, built on rebuild.
+	int n = 160;
+	if (flower_type == FLOWER_SPIROGRAPH) {
+		n = spirograph_dense_samples(revolutions);
+	} else if (flower_type == FLOWER_RHODONEA || flower_type == FLOWER_SUPERFORMULA) {
+		n = 512;
+	}
 	PackedVector2Array pts;
 	// FAN traces back-to-back petal arcs that jump discontinuously at petal
 	// boundaries: sample each petal separately (exact arc endpoints, INF
@@ -219,15 +200,16 @@ Dictionary BulletPatterns2D::helper_sample_outline_rose(int petals, real_t radiu
 		UtilityFunctions::push_error("helper_sample_outline_rose: petals >= 2, finite radius > 0, sharpness >= 0.");
 		return outline_track_result(PackedVector2Array(), false);
 	}
-	// Mirrors helper_generate_transforms_rose theta sweep (flips included:
-	// the strip chords match the slot jumps between petals).
+	// The generator's theta sweep and signed radius (flips included: the
+	// strip chords match the slot jumps between petals); odd petal counts
+	// close after half a turn.
 	const int n = 128;
+	const real_t sweep = rose_sweep2d(petals);
 	PackedVector2Array pts;
 	for (int i = 0; i < n; ++i) {
-		const real_t theta = Math::TAU * (real_t)i / (real_t)n + base_rotation;
-		const real_t cos_k = Math::cos((real_t)petals * theta);
-		const real_t mag = Math::pow((double)Math::abs(cos_k), (double)lobe_sharpness);
-		const real_t r = radius * ((cos_k >= 0.0) ? (real_t)mag : -(real_t)mag);
+		const real_t theta = sweep * (real_t)i / (real_t)n + base_rotation;
+		real_t cos_k = 0.0;
+		const real_t r = rose_radius2d(petals, theta, radius, lobe_sharpness, cos_k);
 		pts.push_back(Vector2(Math::cos(theta), Math::sin(theta)) * r);
 	}
 	return outline_track_result(pts, true);
@@ -238,14 +220,19 @@ Dictionary BulletPatterns2D::helper_sample_outline_lissajous(real_t size_x, real
 		UtilityFunctions::push_error("helper_sample_outline_lissajous: sizes/freqs finite and >= 0, phase finite.");
 		return outline_track_result(PackedVector2Array(), false);
 	}
-	// Mirrors helper_generate_transforms_lissajous t sweep.
+	// The generator's sweep window: one closure, or an open back-and-forth
+	// run between the two turning points (drawn open, like the bullets).
+	double t0 = 0.0;
+	double t_span = Math::TAU;
+	bool open_run = false;
+	lissajous_sweep2d(freq_x, freq_y, phase, t0, t_span, open_run);
 	const int n = 128;
 	PackedVector2Array pts;
 	for (int i = 0; i < n; ++i) {
-		const real_t tt = Math::TAU * (real_t)i / (real_t)n;
-		pts.push_back(Vector2(size_x * Math::sin(freq_x * tt + phase), size_y * Math::sin(freq_y * tt)));
+		const real_t tt = (real_t)(t0 + t_span * (double)i / (open_run ? (double)(n - 1) : (double)n));
+		pts.push_back(lissajous_point2d(size_x, size_y, freq_x, freq_y, phase, tt));
 	}
-	return outline_track_result(pts, true);
+	return outline_track_result(pts, !open_run);
 }
 
 Dictionary BulletPatterns2D::helper_sample_outline_heart(real_t size, real_t base_rotation) {
@@ -257,18 +244,13 @@ Dictionary BulletPatterns2D::helper_sample_outline_heart(real_t size, real_t bas
 		empty["local"] = false;
 		return empty;
 	}
-	// Mirrors helper_generate_transforms_heart param sweep.
+	// The generator's heart curve and scale.
 	const real_t scale = size / 32.0;
-	const real_t rot_cos = Math::cos(base_rotation);
-	const real_t rot_sin = Math::sin(base_rotation);
 	const int n = 128;
 	PackedVector2Array pts;
 	for (int i = 0; i < n; ++i) {
 		const real_t tt = Math::TAU * (real_t)i / (real_t)n;
-		const real_t hx = 16.0 * Math::pow((double)Math::sin(tt), 3.0);
-		const real_t hy = 13.0 * Math::cos(tt) - 5.0 * Math::cos(2.0 * tt) - 2.0 * Math::cos(3.0 * tt) - Math::cos(4.0 * tt);
-		Vector2 local = Vector2(hx, -hy) * scale;
-		pts.push_back(Vector2(local.x * rot_cos - local.y * rot_sin, local.x * rot_sin + local.y * rot_cos));
+		pts.push_back(heart_point2d(tt, scale).rotated(base_rotation));
 	}
 	Dictionary result;
 	result["points"] = pts;

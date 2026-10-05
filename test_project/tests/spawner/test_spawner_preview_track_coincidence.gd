@@ -74,10 +74,12 @@ func _worst(dots: PackedVector2Array, runs: Array) -> float:
 	return worst
 
 
-func _measure(src: int, amount: int, posed: bool, jitter := 0.0) -> Dictionary:
+func _measure(src: int, amount: int, posed: bool, jitter := 0.0, knobs := {}) -> Dictionary:
 	var sp := make_preview_spawner(src, amount)
 	sp.helper_rain_jitter = jitter
 	sp.helper_waterfall_jitter = jitter
+	for k in knobs:
+		sp.set(k, knobs[k])
 	if posed:
 		sp.rotation = 0.7
 		sp.pattern_scale = POSED_SCALE
@@ -137,3 +139,50 @@ func test_jittered_rain_and_waterfall_stay_within_the_jitter_of_their_row() -> v
 		var m: Dictionary = await _measure(src, 24, false, 6.0)
 		# Each axis jitters by up to 6 px: at most 6 * sqrt(2) off the row.
 		assert_lte(float(m["worst"]), 6.0 * sqrt(2.0) + 0.01, "source %d dots within the jitter box" % src)
+
+
+## Knob settings where a sampler once drifted from its generator (each curve
+## now has ONE shared formula in patterns/pattern_curves2d.hpp).
+const VARIANTS := [
+	[BulletSpawner2D.PATTERN_FROM_HELPER_FLOWER, {"helper_flower_type": 0}],
+	[BulletSpawner2D.PATTERN_FROM_HELPER_FLOWER, {"helper_flower_type": 1, "helper_flower_inner_radius_scale": 0.3}],
+	[BulletSpawner2D.PATTERN_FROM_HELPER_FLOWER, {"helper_flower_type": 3}],
+	# Roller == radius pins the hypotrochoid centre: a circle of radius pen.
+	[BulletSpawner2D.PATTERN_FROM_HELPER_FLOWER, {"helper_flower_type": 3, "helper_flower_radius": 140.0, "helper_flower_spiro_roller": 140.0, "helper_flower_spiro_pen": 60.0}],
+	[BulletSpawner2D.PATTERN_FROM_HELPER_FLOWER, {"helper_flower_type": 4, "helper_flower_super_lobes": 7.0, "helper_flower_super_fullness": 0.6}],
+	# 1:1 at phase 0 is a back-and-forth line: an OPEN run.
+	[BulletSpawner2D.PATTERN_FROM_HELPER_LISSAJOUS, {"helper_lissajous_freq_x": 1.0, "helper_lissajous_freq_y": 1.0, "helper_lissajous_phase": 0.0}],
+	[BulletSpawner2D.PATTERN_FROM_HELPER_LISSAJOUS, {"helper_lissajous_freq_x": 3.0, "helper_lissajous_freq_y": 2.0, "helper_lissajous_phase": 0.4}],
+	# Odd petal counts close after half a turn.
+	[BulletSpawner2D.PATTERN_FROM_HELPER_ROSE, {"helper_rose_petals": 5, "helper_rose_lobe_sharpness": 2.0}],
+	[BulletSpawner2D.PATTERN_FROM_HELPER_HEART, {"helper_heart_size": 90.0, "helper_heart_base_rotation": 0.6}],
+]
+
+
+func test_curve_variants_draw_their_track_under_their_bullets() -> void:
+	var problems: Array = []
+	for row in VARIANTS:
+		for posed in [false, true]:
+			var m: Dictionary = await _measure(row[0], 24, posed, 0.0, row[1])
+			if (m["runs"] as Array).is_empty():
+				problems.append("%s posed %s: no track" % [row[1], posed])
+			elif float(m["worst"]) > TOL * (POSED_SCALE if posed else 1.0):
+				problems.append("%s posed %s: a dot sits %.2f px off the track" % [row[1], posed, m["worst"]])
+	assert_eq("\n".join(problems), "", "every curve variant draws the curve its bullets sit on")
+
+
+func test_phyllotaxis_dots_stay_inside_the_drawn_disc_rim() -> void:
+	# A Vogel disc has no outline curve: the track is its rim, dots fill it.
+	for posed in [false, true]:
+		var m: Dictionary = await _measure(BulletSpawner2D.PATTERN_FROM_HELPER_FLOWER, 24, posed, 0.0, {"helper_flower_type": 2})
+		var rim: PackedVector2Array = m["track"]
+		assert_gt(rim.size(), 2, "a rim is drawn (posed %s)" % posed)
+		var center := Vector2.ZERO
+		for p in rim:
+			center += p
+		center /= rim.size()
+		var radius := 0.0
+		for p in rim:
+			radius = maxf(radius, p.distance_to(center))
+		for d in m["dots"]:
+			assert_lte((d as Vector2).distance_to(center), radius + 0.5, "every phyllotaxis dot inside the rim (posed %s)" % posed)

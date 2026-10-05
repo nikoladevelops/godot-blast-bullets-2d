@@ -1,6 +1,7 @@
 // Closed-curve pattern generators routed through the outline layout engine:
 // ring, circle, ellipse, flower, star, heart, rose and lissajous.
 
+#include "patterns/pattern_curves2d.hpp"
 #include "patterns/patterns_internal.hpp"
 
 using namespace godot;
@@ -164,7 +165,7 @@ static bool wall_ellipse_params(real_t start, real_t span, bool closed, int gap_
 // symmetric under t -> c - t, i.e. b*c = PI (mod TAU) and
 // a*c + 2*phase = PI (mod TAU) for the reduced a, b; then [c/2, c/2 + PI/g']
 // is one pass. Non-integer frequencies keep the full turn.
-static void lissajous_sweep(double fx, double fy, double phase, double &r_t0, double &r_span, bool &r_open) {
+void lissajous_sweep2d(double fx, double fy, double phase, double &r_t0, double &r_span, bool &r_open) {
 	r_t0 = 0.0;
 	r_span = Math::TAU;
 	r_open = false;
@@ -398,7 +399,6 @@ TypedArray<Transform2D> BulletPatterns2D::helper_generate_transforms_flower(
 	PackedVector2Array fill_outline; // dense curve for Fill / Layers (count-independent)
 	PackedVector2Array fill_normals;
 	const Vector2 origin = marker_transform.get_origin();
-	const real_t inner_keep = (real_t)(1.0 - inner_radius_scale);
 	if (flower_type == FLOWER_FAN) {
 		// Petal-major fan: the amount is split over the petals
 		// (flower_fan_petal_count spreads the remainder symmetrically), so
@@ -420,7 +420,7 @@ TypedArray<Transform2D> BulletPatterns2D::helper_generate_transforms_flower(
 				const real_t angle = lobe_center + frac * petal_spread;
 				// Rhodonea-style radius modulation: sharpness pinches the waist
 				// between lobes so higher values read as tighter flowers.
-				const real_t waist = 1.0 - (petal_sharpness / (1.0 + petal_sharpness)) * 0.55 * Math::abs(Math::sin(frac * Math::PI));
+				const real_t waist = flower_fan_waist2d(petal_sharpness, frac);
 				loop_points.push_back(origin + Vector2(Math::cos(angle), Math::sin(angle)) * (radius * waist));
 				loop_normals.push_back(Vector2(Math::cos(angle), Math::sin(angle)));
 			}
@@ -433,7 +433,7 @@ TypedArray<Transform2D> BulletPatterns2D::helper_generate_transforms_flower(
 				for (int q = 0; q <= 16; ++q) {
 					const real_t frac = (real_t)q / 16.0 - 0.5;
 					const real_t angle = lobe_center + frac * petal_spread;
-					const real_t waist = 1.0 - (petal_sharpness / (1.0 + petal_sharpness)) * 0.55 * Math::abs(Math::sin(frac * Math::PI));
+					const real_t waist = flower_fan_waist2d(petal_sharpness, frac);
 					arcs.push_back(origin + Vector2(Math::cos(angle), Math::sin(angle)) * (radius * waist));
 				}
 			}
@@ -450,9 +450,7 @@ TypedArray<Transform2D> BulletPatterns2D::helper_generate_transforms_flower(
 		PackedVector2Array dense_nrms;
 		for (int k = 0; k < 720; ++k) {
 			const real_t theta = Math::TAU * (real_t)k / 720.0 + base_rotation;
-			const real_t cos_k = Math::cos((real_t)petals * theta * 0.5);
-			const real_t mag = Math::pow((double)Math::abs(cos_k), (double)sharp);
-			const real_t r = radius * (real_t)inner_radius_scale + radius * inner_keep * (real_t)mag;
+			const real_t r = flower_rhodonea_radius2d(petals, theta, radius, sharp, inner_radius_scale);
 			dense_pts.push_back(Vector2(Math::cos(theta), Math::sin(theta)) * r);
 			const Vector2 radial = Vector2(Math::cos(theta), Math::sin(theta));
 			dense_nrms.push_back((radial.length_squared() > 1e-12) ? radial : Vector2(1, 0));
@@ -488,38 +486,22 @@ TypedArray<Transform2D> BulletPatterns2D::helper_generate_transforms_flower(
 		// Hypotrochoid: x = (R-r)cos t + d cos((R-r)t/r),
 		// y = (R-r)sin t - d sin((R-r)t/r). Clamp wild rollers so huge
 		// values cannot NaN the loop.
-		const double outer_r = (double)radius;
-		double roller = spiro_roller;
-		if (roller < 1.0) {
-			roller = 1.0;
-		}
-		if (roller > Math::max(outer_r * 4.0, 512.0)) {
-			roller = Math::max(outer_r * 4.0, 512.0);
-		}
-		const double diff = outer_r - roller;
-		const double k = diff / roller;
+		const Spirograph2D spiro = spirograph_setup2d(radius, spiro_roller, spiro_pen);
 		// Sweep the full closure: with k = 7/3 (R=150,r=45) the curve only
 		// closes after 3 revolutions, so a single 0..TAU pass draws 1/3 of it.
 		// Degenerate rollers would stack bullets: pen 0 is a plain circle of
 		// radius R-r (one turn, not `revolutions` laps over itself), and a
 		// roller equal to R pins the centre so the pen draws a circle of
 		// radius pen instead of a single point.
-		const bool centre_pinned = Math::abs(diff) < 1e-6 * Math::max(outer_r, 1.0);
 		const bool pen_free = spiro_pen <= 1e-9;
-		const int revolutions = (centre_pinned || pen_free) ? 1 : spirograph_revolutions(k);
+		const int revolutions = (spiro.centre_pinned || pen_free) ? 1 : spirograph_revolutions(spiro.k);
 		const int dense_n = spirograph_dense_samples(revolutions);
 		// Arc-even from a dense ideal sweep (multi-turn closure included).
 		PackedVector2Array dense_pts;
 		PackedVector2Array dense_nrms;
 		for (int q = 0; q < dense_n; ++q) {
 			const double t = Math::TAU * (double)revolutions * (double)q / (double)dense_n;
-			double px = diff * Math::cos(t) + spiro_pen * Math::cos(k * t);
-			double py = diff * Math::sin(t) - spiro_pen * Math::sin(k * t);
-			if (centre_pinned) {
-				px = spiro_pen * Math::cos(t);
-				py = -spiro_pen * Math::sin(t);
-			}
-			Vector2 local = Vector2((real_t)px, (real_t)py).rotated(base_rotation);
+			Vector2 local = spirograph_point2d(spiro, t).rotated(base_rotation);
 			if (!local.is_finite()) {
 				local = Vector2(0, 0);
 			}
@@ -539,22 +521,12 @@ TypedArray<Transform2D> BulletPatterns2D::helper_generate_transforms_flower(
 	} else {
 		// Simplified Gielis superformula with a = b = 1, n2 = n3 = fullness:
 		// r = (|cos(mt/4)|^f + |sin(mt/4)|^f)^(-1/f). m = super_lobes.
-		const double lobes = Math::clamp(super_lobes, 2.0, 64.0);
-		const double full = Math::clamp(super_fullness, 0.05, 8.0);
 		// Arc-even from a dense ideal sweep.
 		PackedVector2Array dense_pts;
 		PackedVector2Array dense_nrms;
 		for (int q = 0; q < 720; ++q) {
 			const double t = Math::TAU * (double)q / 720.0;
-			const double c = Math::abs(Math::cos(lobes * t * 0.25));
-			const double s = Math::abs(Math::sin(lobes * t * 0.25));
-			double r_norm = Math::pow(Math::pow(c, full) + Math::pow(s, full), -1.0 / full);
-			if (!Math::is_finite(r_norm) || r_norm <= 0.0) {
-				r_norm = 1.0;
-			}
-			if (r_norm > 4.0) {
-				r_norm = 4.0;
-			}
+			const double r_norm = superformula_norm2d(super_lobes, super_fullness, t);
 			const real_t r = radius * (real_t)(inner_radius_scale + (1.0 - inner_radius_scale) * (r_norm * 0.5));
 			const real_t ang = base_rotation + (real_t)t;
 			dense_pts.push_back(Vector2(Math::cos(ang), Math::sin(ang)) * r);
@@ -872,10 +844,7 @@ TypedArray<Transform2D> BulletPatterns2D::helper_generate_transforms_heart(
 	const real_t scale = size / 32.0;
 	for (int k = 0; k < 720; ++k) {
 		const real_t t = Math::TAU * (real_t)k / 720.0;
-		const real_t hx = (real_t)16.0 * Math::pow((double)Math::sin(t), 3.0);
-		const real_t hy = 13.0 * Math::cos(t) - 5.0 * Math::cos(2.0 * t) - 2.0 * Math::cos(3.0 * t) - Math::cos(4.0 * t);
-		Vector2 local = Vector2(hx, -hy) * scale;
-		local = local.rotated(base_rotation);
+		Vector2 local = heart_point2d(t, scale).rotated(base_rotation);
 		if (!local.is_finite()) {
 			local = Vector2(0, 0);
 		}
@@ -954,12 +923,11 @@ TypedArray<Transform2D> BulletPatterns2D::helper_generate_transforms_rose(
 	// r = cos(k*theta) closes after half a turn for odd k (k petals) and a
 	// full turn for even k (2k petals): sweeping a full turn for odd k traced
 	// every petal twice, stacking bullet i+n/2 on bullet i.
-	const real_t sweep = (petals % 2 == 1) ? Math::PI : Math::TAU;
+	const real_t sweep = rose_sweep2d(petals);
 	for (int k = 0; k < 720; ++k) {
 		const real_t theta = sweep * (real_t)k / 720.0 + base_rotation;
-		const real_t cos_k = Math::cos((real_t)petals * theta);
-		const real_t mag = Math::pow((double)Math::abs(cos_k), (double)lobe_sharpness);
-		const real_t r = radius * ((cos_k >= 0.0) ? (real_t)mag : -(real_t)mag);
+		real_t cos_k = 0.0;
+		const real_t r = rose_radius2d(petals, theta, radius, lobe_sharpness, cos_k);
 		dense_pts.push_back(Vector2(Math::cos(theta), Math::sin(theta)) * r);
 		const real_t shape_angle = (cos_k >= 0.0) ? theta : theta + Math::PI;
 		dense_nrms.push_back(Vector2(Math::cos(shape_angle), Math::sin(shape_angle)));
@@ -1039,10 +1007,10 @@ TypedArray<Transform2D> BulletPatterns2D::helper_generate_transforms_lissajous(
 	double t0 = 0.0;
 	double t_span = Math::TAU;
 	bool open_run = false;
-	lissajous_sweep(freq_x, freq_y, phase, t0, t_span, open_run);
+	lissajous_sweep2d(freq_x, freq_y, phase, t0, t_span, open_run);
 	for (int k = 0; k < 720; ++k) {
 		const real_t t = (real_t)(t0 + t_span * (double)k / (open_run ? 719.0 : 720.0));
-		const Vector2 offset = Vector2(size_x * Math::sin(freq_x * t + phase), size_y * Math::sin(freq_y * t));
+		const Vector2 offset = lissajous_point2d(size_x, size_y, freq_x, freq_y, phase, t);
 		dense_pts.push_back(offset);
 		dense_nrms.push_back((offset.length_squared() > 0.0) ? offset.normalized() : Vector2(Math::cos(marker_rot), Math::sin(marker_rot)));
 	}
