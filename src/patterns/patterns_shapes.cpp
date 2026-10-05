@@ -29,22 +29,14 @@ void spiral_arm_step(int i, int arms, int stride, int &r_arm, int &r_step) {
 	r_step = i / arms;
 }
 
-PatternSlots2D BulletPatterns2D::generate_grid2d(int transforms_amount, Transform2D marker_transform, const GridParams2D &params) {
+PatternSlots2D BulletPatterns2D::generate_grid2d(int transforms_amount, Transform2D marker_transform, const GridParams2D &p) {
 	const char *caller = "helper_generate_transforms_grid";
-	int rows_per_column = params.rows_per_column;
-	Alignment alignment = params.alignment;
-	real_t column_offset = params.column_offset;
-	real_t row_offset = params.row_offset;
-	bool rotate_grid_with_marker = params.rotate_grid_with_marker;
-	bool random_local_rotation = params.random_local_rotation;
-	real_t jitter = params.jitter;
-	uint64_t seed = params.seed;
 
 	PATTERN_REQUIRE(pattern_check_amount(caller, transforms_amount));
-	PATTERN_REJECT_IF(!Math::is_finite(column_offset) || !Math::is_finite(row_offset), "offsets must be finite numbers.");
-	PATTERN_REJECT_IF(!Math::is_finite(jitter) || jitter < 0.0, "jitter must be a finite number >= 0.");
+	PATTERN_REJECT_IF(!Math::is_finite(p.column_offset) || !Math::is_finite(p.row_offset), "offsets must be finite numbers.");
+	PATTERN_REJECT_IF(!Math::is_finite(p.jitter) || p.jitter < 0.0, "jitter must be a finite number >= 0.");
 	PATTERN_REQUIRE(pattern_check_marker(caller, marker_transform, false));
-	PATTERN_REJECT_IF(rows_per_column <= 0, "rows_per_column must be > 0.");
+	PATTERN_REJECT_IF(p.rows_per_column <= 0, "rows_per_column must be > 0.");
 	// Initialize the array to hold the transforms
 	PatternSlots2D generated_transforms;
 	generated_transforms.resize(transforms_amount);
@@ -64,29 +56,29 @@ PatternSlots2D BulletPatterns2D::generate_grid2d(int transforms_amount, Transfor
 	int columns_amount = 0;
 
 	// Avoid division by 0
-	if (rows_per_column > 0) {
+	if (p.rows_per_column > 0) {
 		// Calculate the number of columns needed
-		columns_amount = static_cast<int>(Math::ceil(static_cast<real_t>(transforms_amount) / static_cast<real_t>(rows_per_column)));
+		columns_amount = static_cast<int>(Math::ceil(static_cast<real_t>(transforms_amount) / static_cast<real_t>(p.rows_per_column)));
 	}
 
 	// Size by the rows/columns actually used, not the full rows_per_column:
 	// otherwise a partial grid (e.g. n=1 with rows=10) centers on empty space.
-	const int used_rows = (columns_amount > 1) ? rows_per_column : transforms_amount;
-	const int last_column_rows = transforms_amount - (columns_amount - 1) * rows_per_column;
+	const int used_rows = (columns_amount > 1) ? p.rows_per_column : transforms_amount;
+	const int last_column_rows = transforms_amount - (columns_amount - 1) * p.rows_per_column;
 
 	// Calculate total grid dimensions
-	real_t total_width = (columns_amount - 1) * column_offset;
+	real_t total_width = (columns_amount - 1) * p.column_offset;
 	// Default starting position (centered): -total/2 already centers even
 	// counts (n=2 -> -off/2, +off/2). The old +=offset/2 shifted the mean +off/2.
 	real_t x_start = -total_width / 2.0f;
 
 	// Default y per column: full columns center on used_rows, the ragged last
 	// column centers on its own count so it doesn't hang off-center.
-	const real_t full_col_height = (used_rows - 1) * row_offset;
-	const real_t last_col_height = (last_column_rows - 1) * row_offset;
+	const real_t full_col_height = (used_rows - 1) * p.row_offset;
+	const real_t last_col_height = (last_column_rows - 1) * p.row_offset;
 
 	// Adjust starting position based on alignment
-	switch (alignment) {
+	switch (p.alignment) {
 		case Alignment::TOP_LEFT:
 			x_start = 0.0;
 			break;
@@ -125,19 +117,19 @@ PatternSlots2D BulletPatterns2D::generate_grid2d(int transforms_amount, Transfor
 	// Seeded RNG for jitter + random rotation: seed 0 keeps the legacy
 	// non-deterministic path, otherwise every call reproduces identically.
 	Ref<RandomNumberGenerator> grid_rng;
-	const bool grid_seeded = seed != 0;
+	const bool grid_seeded = p.seed != 0;
 	if (grid_seeded) {
 		grid_rng.instantiate();
-		grid_rng->set_seed(seed);
+		grid_rng->set_seed(p.seed);
 	}
 	// Generate transforms in a grid pattern
 	for (int column = 0; column < columns_amount; ++column) {
 		const bool is_last_column = (column == columns_amount - 1);
-		const int rows_this_column = is_last_column ? last_column_rows : rows_per_column;
+		const int rows_this_column = is_last_column ? last_column_rows : p.rows_per_column;
 		const real_t col_height = is_last_column ? last_col_height : full_col_height;
 		// Per-column y start so TOP_* / CENTER / BOTTOM_* anchor each column.
 		real_t y_start = -col_height / 2.0f;
-		switch (alignment) {
+		switch (p.alignment) {
 			case Alignment::TOP_LEFT:
 			case Alignment::TOP_CENTER:
 			case Alignment::TOP_RIGHT:
@@ -157,14 +149,14 @@ PatternSlots2D BulletPatterns2D::generate_grid2d(int transforms_amount, Transfor
 			}
 
 			// Calculate local offset for this grid position
-			real_t x = x_start + column * column_offset;
-			real_t y = y_start + row * row_offset;
+			real_t x = x_start + column * p.column_offset;
+			real_t y = y_start + row * p.row_offset;
 			Vector2 local_offset(x, y);
 
 			// Create the new transform, carrying the marker scale: a scaled
 			// generator scales its bullets (spin/scale passes preserve it too).
 			Transform2D new_transform;
-			if (rotate_grid_with_marker) {
+			if (p.rotate_grid_with_marker) {
 				// Rotate the offset with the marker's basis
 				Vector2 rotated_offset = marker_transform.basis_xform(local_offset);
 				new_transform = Transform2D(marker_transform.get_rotation(), marker_transform.get_origin() + rotated_offset);
@@ -177,16 +169,16 @@ PatternSlots2D BulletPatterns2D::generate_grid2d(int transforms_amount, Transfor
 
 			// Apply random local rotation if enabled (scale preserved: the
 			// rotation-only constructor resets it to 1).
-			if (random_local_rotation) {
+			if (p.random_local_rotation) {
 				real_t random_angle = (grid_seeded ? grid_rng->randf() : UtilityFunctions::randf()) * Math::TAU;
 				new_transform = Transform2D(new_transform.get_rotation() + random_angle, new_transform.get_origin());
 				new_transform.set_scale(marker_transform.get_scale());
 			}
 
 			// Scatter each origin by up to +-jitter on both axes (0 disables it).
-			if (jitter > 0.0) {
-				real_t jx = grid_seeded ? grid_rng->randf_range(-jitter, jitter) : UtilityFunctions::randf_range(-jitter, jitter);
-				real_t jy = grid_seeded ? grid_rng->randf_range(-jitter, jitter) : UtilityFunctions::randf_range(-jitter, jitter);
+			if (p.jitter > 0.0) {
+				real_t jx = grid_seeded ? grid_rng->randf_range(-p.jitter, p.jitter) : UtilityFunctions::randf_range(-p.jitter, p.jitter);
+				real_t jy = grid_seeded ? grid_rng->randf_range(-p.jitter, p.jitter) : UtilityFunctions::randf_range(-p.jitter, p.jitter);
 				const Vector2 scatter(jx, jy);
 				new_transform = Transform2D(new_transform.get_rotation(), new_transform.get_origin() + scatter);
 				new_transform.set_scale(marker_transform.get_scale());
@@ -202,18 +194,12 @@ PatternSlots2D BulletPatterns2D::generate_grid2d(int transforms_amount, Transfor
 	return generated_transforms;
 }
 
-PatternSlots2D BulletPatterns2D::generate_fan2d(int transforms_amount, Transform2D marker_transform, const FanParams2D &params) {
+PatternSlots2D BulletPatterns2D::generate_fan2d(int transforms_amount, Transform2D marker_transform, const FanParams2D &p) {
 	const char *caller = "helper_generate_transforms_fan";
-	real_t spread = params.spread;
-	real_t direction_angle = params.direction_angle;
-	real_t step_offset = params.step_offset;
-	bool centered = params.centered;
-	real_t angle_jitter = params.angle_jitter;
-	uint64_t seed = params.seed;
 
 	PATTERN_REQUIRE(pattern_check_amount(caller, transforms_amount));
-	PATTERN_REJECT_IF(!Math::is_finite(spread) || !Math::is_finite(direction_angle) || !Math::is_finite(step_offset), "spread, direction_angle and step_offset must be finite numbers.");
-	PATTERN_REJECT_IF(!Math::is_finite(angle_jitter) || angle_jitter < 0.0, "angle_jitter must be finite and >= 0.");
+	PATTERN_REJECT_IF(!Math::is_finite(p.spread) || !Math::is_finite(p.direction_angle) || !Math::is_finite(p.step_offset), "spread, direction_angle and step_offset must be finite numbers.");
+	PATTERN_REJECT_IF(!Math::is_finite(p.angle_jitter) || p.angle_jitter < 0.0, "angle_jitter must be finite and >= 0.");
 	PATTERN_REQUIRE(pattern_check_marker(caller, marker_transform, false));
 	PatternSlots2D generated_transforms;
 	generated_transforms.resize(transforms_amount);
@@ -221,30 +207,30 @@ PatternSlots2D BulletPatterns2D::generate_fan2d(int transforms_amount, Transform
 		return generated_transforms;
 	}
 
-	const real_t base_rotation = marker_transform.get_rotation() + direction_angle;
-	const real_t step = (transforms_amount > 1) ? spread / (real_t)(transforms_amount - 1) : 0.0;
+	const real_t base_rotation = marker_transform.get_rotation() + p.direction_angle;
+	const real_t step = (transforms_amount > 1) ? p.spread / (real_t)(transforms_amount - 1) : 0.0;
 	// A lone bullet flies straight down the cone center instead of its edge.
 	// A one-sided fan (centered = false) starts at the center direction and
 	// opens toward +spread instead of straddling the center.
-	const real_t first_angle = (transforms_amount > 1 && centered) ? base_rotation - spread * 0.5 : base_rotation;
+	const real_t first_angle = (transforms_amount > 1 && p.centered) ? base_rotation - p.spread * 0.5 : base_rotation;
 	const Vector2 origin = marker_transform.get_origin();
 	Ref<RandomNumberGenerator> fan_rng;
-	const bool fan_seeded = seed != 0;
+	const bool fan_seeded = p.seed != 0;
 	if (fan_seeded) {
 		fan_rng.instantiate();
-		fan_rng->set_seed(seed);
+		fan_rng->set_seed(p.seed);
 	}
 	for (int i = 0; i < transforms_amount; ++i) {
 		real_t angle = first_angle + step * (real_t)i;
-		if (angle_jitter > 0.0) {
-			angle += fan_seeded ? fan_rng->randf_range(-angle_jitter, angle_jitter) : UtilityFunctions::randf_range(-angle_jitter, angle_jitter);
+		if (p.angle_jitter > 0.0) {
+			angle += fan_seeded ? fan_rng->randf_range(-p.angle_jitter, p.angle_jitter) : UtilityFunctions::randf_range(-p.angle_jitter, p.angle_jitter);
 		}
 		const Vector2 dir = Vector2(Math::cos(angle), Math::sin(angle));
 		// Stagger origins downrange along each slot's own (possibly
 		// jittered) facing: a zero step_offset keeps the classic stacked
 		// volley origin, anything else fans the muzzles outward so pellets
 		// never spawn inside each other.
-		Transform2D fan_transf(angle, origin + dir * (step_offset * (real_t)i));
+		Transform2D fan_transf(angle, origin + dir * (p.step_offset * (real_t)i));
 		fan_transf.set_scale(marker_transform.get_scale());
 		generated_transforms[i] = fan_transf;
 	}
@@ -252,41 +238,35 @@ PatternSlots2D BulletPatterns2D::generate_fan2d(int transforms_amount, Transform
 	return generated_transforms;
 }
 
-PatternSlots2D BulletPatterns2D::generate_spiral2d(int transforms_amount, Transform2D marker_transform, const SpiralParams2D &params) {
+PatternSlots2D BulletPatterns2D::generate_spiral2d(int transforms_amount, Transform2D marker_transform, const SpiralParams2D &p) {
 	const char *caller = "helper_generate_transforms_spiral";
-	real_t start_radius = params.start_radius;
-	real_t radius_step = params.radius_step;
-	real_t angle_step = params.angle_step;
-	bool rotate_with_marker = params.rotate_with_marker;
-	SpiralFacingMode facing_mode = params.facing_mode;
-	real_t facing_offset_degrees = params.facing_offset_degrees;
 
 	PATTERN_REQUIRE(pattern_check_amount(caller, transforms_amount));
-	PATTERN_REJECT_IF(!Math::is_finite(start_radius) || !Math::is_finite(radius_step) || !Math::is_finite(angle_step), "start_radius, radius_step and angle_step must be finite numbers.");
-	PATTERN_REJECT_IF(!Math::is_finite(facing_offset_degrees), "facing_offset_degrees must be a finite number.");
-	PATTERN_REJECT_IF(facing_mode < SPIRAL_FACING_TANGENT || facing_mode > SPIRAL_FACING_KEEP_MARKER, "unknown facing_mode.");
+	PATTERN_REJECT_IF(!Math::is_finite(p.start_radius) || !Math::is_finite(p.radius_step) || !Math::is_finite(p.angle_step), "start_radius, radius_step and angle_step must be finite numbers.");
+	PATTERN_REJECT_IF(!Math::is_finite(p.facing_offset_degrees), "facing_offset_degrees must be a finite number.");
+	PATTERN_REJECT_IF(p.facing_mode < SPIRAL_FACING_TANGENT || p.facing_mode > SPIRAL_FACING_KEEP_MARKER, "unknown facing_mode.");
 	PATTERN_REQUIRE(pattern_check_marker(caller, marker_transform, false));
-	PATTERN_REJECT_IF(start_radius < 0.0, "start_radius must be >= 0.");
+	PATTERN_REJECT_IF(p.start_radius < 0.0, "start_radius must be >= 0.");
 	PatternSlots2D generated_transforms;
 	generated_transforms.resize(transforms_amount);
 	if (transforms_amount == 0) {
 		return generated_transforms;
 	}
 
-	const real_t base_rotation = rotate_with_marker ? marker_transform.get_rotation() : 0.0;
+	const real_t base_rotation = p.rotate_with_marker ? marker_transform.get_rotation() : 0.0;
 	const Vector2 origin = marker_transform.get_origin();
-	const real_t facing_offset = Math::deg_to_rad(facing_offset_degrees);
+	const real_t facing_offset = Math::deg_to_rad(p.facing_offset_degrees);
 	for (int i = 0; i < transforms_amount; ++i) {
-		const real_t r = start_radius + radius_step * (real_t)i;
-		const real_t angle = base_rotation + angle_step * (real_t)i;
+		const real_t r = p.start_radius + p.radius_step * (real_t)i;
+		const real_t angle = base_rotation + p.angle_step * (real_t)i;
 		const Vector2 offset = Vector2(Math::cos(angle), Math::sin(angle)) * r;
 		real_t facing = angle;
-		switch (facing_mode) {
+		switch (p.facing_mode) {
 			case SPIRAL_FACING_TANGENT: {
 				// Travel direction along r(theta) = start + step * theta:
 				// dp/dtheta = (step * cos - r * sin, step * sin + r * cos).
 				// Exact for collapsed spirals too (step = 0 -> ring tangent).
-				const Vector2 tangent = Vector2(radius_step * Math::cos(angle) - r * Math::sin(angle), radius_step * Math::sin(angle) + r * Math::cos(angle));
+				const Vector2 tangent = Vector2(p.radius_step * Math::cos(angle) - r * Math::sin(angle), p.radius_step * Math::sin(angle) + r * Math::cos(angle));
 				facing = (tangent.length_squared() > 0.0) ? tangent.angle() : ((offset.length_squared() > 0.0) ? offset.angle() : angle);
 				break;
 			}
@@ -310,30 +290,25 @@ PatternSlots2D BulletPatterns2D::generate_spiral2d(int transforms_amount, Transf
 	return generated_transforms;
 }
 
-PatternSlots2D BulletPatterns2D::generate_line2d(int transforms_amount, Transform2D marker_transform, const LineParams2D &params) {
+PatternSlots2D BulletPatterns2D::generate_line2d(int transforms_amount, Transform2D marker_transform, const LineParams2D &p) {
 	const char *caller = "helper_generate_transforms_line";
-	const Vector2 &direction = params.direction;
-	real_t spacing = params.spacing;
-	bool face_direction = params.face_direction;
-	LineAnchor anchor = params.anchor;
-	bool perpendicular = params.perpendicular;
 
 	PATTERN_REQUIRE(pattern_check_amount(caller, transforms_amount));
-	PATTERN_REJECT_IF(!direction.is_finite() || !Math::is_finite(spacing), "direction and spacing must be finite.");
+	PATTERN_REJECT_IF(!p.direction.is_finite() || !Math::is_finite(p.spacing), "direction and spacing must be finite.");
 	PATTERN_REQUIRE(pattern_check_marker(caller, marker_transform, false));
-	PATTERN_REJECT_IF(direction.length_squared() <= 0.0, "direction must not be zero, the line axis is undefined.");
-	PATTERN_REJECT_IF(anchor < LINE_ANCHOR_START || anchor > LINE_ANCHOR_END, "unknown anchor.");
+	PATTERN_REJECT_IF(p.direction.length_squared() <= 0.0, "direction must not be zero, the line axis is undefined.");
+	PATTERN_REJECT_IF(p.anchor < LINE_ANCHOR_START || p.anchor > LINE_ANCHOR_END, "unknown anchor.");
 	PatternSlots2D generated_transforms;
 	generated_transforms.resize(transforms_amount);
 	if (transforms_amount == 0) {
 		return generated_transforms;
 	}
 
-	const Vector2 axis = direction.normalized();
+	const Vector2 axis = p.direction.normalized();
 	real_t facing = marker_transform.get_rotation();
-	if (face_direction) {
+	if (p.face_direction) {
 		facing = axis.angle();
-		if (perpendicular) {
+		if (p.perpendicular) {
 			facing += Math::PI * 0.5; // strafe wall: fly 90 degrees off the axis
 		}
 	}
@@ -341,13 +316,13 @@ PatternSlots2D BulletPatterns2D::generate_line2d(int transforms_amount, Transfor
 	// Anchor picks where the marker sits on the row: center (historical),
 	// start, or end. A single bullet always lands exactly on the marker.
 	real_t anchor_offset = (real_t)(transforms_amount - 1) * 0.5;
-	if (anchor == LINE_ANCHOR_START) {
+	if (p.anchor == LINE_ANCHOR_START) {
 		anchor_offset = 0.0;
-	} else if (anchor == LINE_ANCHOR_END) {
+	} else if (p.anchor == LINE_ANCHOR_END) {
 		anchor_offset = (real_t)(transforms_amount - 1);
 	}
 	for (int i = 0; i < transforms_amount; ++i) {
-		Transform2D line_transf(facing, origin + axis * (spacing * ((real_t)i - anchor_offset)));
+		Transform2D line_transf(facing, origin + axis * (p.spacing * ((real_t)i - anchor_offset)));
 		line_transf.set_scale(marker_transform.get_scale());
 		generated_transforms[i] = line_transf;
 	}
@@ -355,68 +330,59 @@ PatternSlots2D BulletPatterns2D::generate_line2d(int transforms_amount, Transfor
 	return generated_transforms;
 }
 
-PatternSlots2D BulletPatterns2D::generate_aimed2d(int transforms_amount, Transform2D marker_transform, const AimedParams2D &params) {
+PatternSlots2D BulletPatterns2D::generate_aimed2d(int transforms_amount, Transform2D marker_transform, const AimedParams2D &p) {
 	const char *caller = "helper_generate_transforms_aimed";
-	const Vector2 &target_position = params.target_position;
-	real_t spread = params.spread;
-	real_t step_offset = params.step_offset;
-	bool centered = params.centered;
 
 	PATTERN_REQUIRE(pattern_check_amount(caller, transforms_amount));
-	PATTERN_REJECT_IF(!Math::is_finite(spread) || !Math::is_finite(step_offset), "spread and step_offset must be finite numbers.");
+	PATTERN_REJECT_IF(!Math::is_finite(p.spread) || !Math::is_finite(p.step_offset), "spread and step_offset must be finite numbers.");
 	PATTERN_REQUIRE(pattern_check_marker(caller, marker_transform, false));
-	PATTERN_REJECT_IF(!target_position.is_finite(), "target_position must be finite.");
-	const Vector2 to_target = target_position - marker_transform.get_origin();
+	PATTERN_REJECT_IF(!p.target_position.is_finite(), "target_position must be finite.");
+	const Vector2 to_target = p.target_position - marker_transform.get_origin();
 	PATTERN_REJECT_IF(to_target.length_squared() <= 0.0, "target coincides with the marker, direction is undefined.");
 	// Cone centered on the marker-to-target direction, in marker-local terms.
 	const real_t direction_angle = to_target.angle() - marker_transform.get_rotation();
 	FanParams2D fan;
-	fan.spread = spread;
+	fan.spread = p.spread;
 	fan.direction_angle = direction_angle;
-	fan.step_offset = step_offset;
-	fan.centered = centered;
+	fan.step_offset = p.step_offset;
+	fan.centered = p.centered;
 	fan.angle_jitter = 0.0; // no jitter
 	fan.seed = 0;
 	return generate_fan2d(transforms_amount, marker_transform, fan);
 }
 
-PatternSlots2D BulletPatterns2D::generate_rain2d(int transforms_amount, Transform2D marker_transform, const RainParams2D &params) {
+PatternSlots2D BulletPatterns2D::generate_rain2d(int transforms_amount, Transform2D marker_transform, const RainParams2D &p) {
 	const char *caller = "helper_generate_transforms_rain";
-	real_t band_width = params.band_width;
-	Vector2 rain_direction = params.rain_direction;
-	real_t drop_spacing = params.drop_spacing;
-	real_t jitter = params.jitter;
-	uint64_t seed = params.seed;
 
 	PATTERN_REQUIRE(danmaku_validate_head(caller, transforms_amount, marker_transform));
-	PATTERN_REJECT_IF(!Math::is_finite(band_width) || band_width < 0.0, "band_width must be finite and >= 0.");
-	PATTERN_REJECT_IF(!rain_direction.is_finite() || rain_direction.length_squared() <= 0.0, "rain_direction must be finite and non-zero.");
-	PATTERN_REJECT_IF(!Math::is_finite(drop_spacing) || drop_spacing < 0.0 || !Math::is_finite(jitter) || jitter < 0.0, "drop_spacing and jitter must be finite and >= 0.");
+	PATTERN_REJECT_IF(!Math::is_finite(p.band_width) || p.band_width < 0.0, "band_width must be finite and >= 0.");
+	PATTERN_REJECT_IF(!p.rain_direction.is_finite() || p.rain_direction.length_squared() <= 0.0, "rain_direction must be finite and non-zero.");
+	PATTERN_REJECT_IF(!Math::is_finite(p.drop_spacing) || p.drop_spacing < 0.0 || !Math::is_finite(p.jitter) || p.jitter < 0.0, "drop_spacing and jitter must be finite and >= 0.");
 	PatternSlots2D generated_transforms = danmaku_make_slots(transforms_amount);
 	if (transforms_amount == 0) {
 		return generated_transforms;
 	}
 	const Vector2 origin = marker_transform.get_origin();
-	const Vector2 axis = rain_direction.normalized();
+	const Vector2 axis = p.rain_direction.normalized();
 	const Vector2 across = axis.orthogonal();
 	const real_t facing = axis.angle();
 	Ref<RandomNumberGenerator> rain_rng;
-	const bool rain_seeded = seed != 0;
+	const bool rain_seeded = p.seed != 0;
 	if (rain_seeded) {
 		rain_rng.instantiate();
-		rain_rng->set_seed(seed);
+		rain_rng->set_seed(p.seed);
 	}
 	// Layered sheets: each row holds up to `cols` drops spread across the
 	// whole band; further rows step upstream by drop_spacing. Volleys that
 	// fit one row span the band exactly like a single sheet.
-	const int cols = rain_columns2d(transforms_amount, band_width, drop_spacing);
+	const int cols = rain_columns2d(transforms_amount, p.band_width, p.drop_spacing);
 	for (int i = 0; i < transforms_amount; ++i) {
 		const int row = i / cols;
-		const real_t along = rain_along2d(i, transforms_amount, cols, band_width);
-		Vector2 pos = origin + across * along - axis * (real_t)row * drop_spacing;
-		if (jitter > 0.0) {
-			real_t jx = rain_seeded ? rain_rng->randf_range(-jitter, jitter) : UtilityFunctions::randf_range(-jitter, jitter);
-			real_t jy = rain_seeded ? rain_rng->randf_range(-jitter, jitter) : UtilityFunctions::randf_range(-jitter, jitter);
+		const real_t along = rain_along2d(i, transforms_amount, cols, p.band_width);
+		Vector2 pos = origin + across * along - axis * (real_t)row * p.drop_spacing;
+		if (p.jitter > 0.0) {
+			real_t jx = rain_seeded ? rain_rng->randf_range(-p.jitter, p.jitter) : UtilityFunctions::randf_range(-p.jitter, p.jitter);
+			real_t jy = rain_seeded ? rain_rng->randf_range(-p.jitter, p.jitter) : UtilityFunctions::randf_range(-p.jitter, p.jitter);
 			pos += Vector2(jx, jy);
 		}
 		Transform2D slot(facing, pos);
@@ -427,32 +393,25 @@ PatternSlots2D BulletPatterns2D::generate_rain2d(int transforms_amount, Transfor
 	return generated_transforms;
 }
 
-PatternSlots2D BulletPatterns2D::generate_scatter2d(int transforms_amount, Transform2D marker_transform, const ScatterParams2D &params) {
+PatternSlots2D BulletPatterns2D::generate_scatter2d(int transforms_amount, Transform2D marker_transform, const ScatterParams2D &p) {
 	const char *caller = "helper_generate_transforms_scatter";
-	real_t burst_radius = params.burst_radius;
-	real_t facing_jitter = params.facing_jitter;
-	uint64_t seed = params.seed;
-	real_t inner_radius = params.inner_radius;
-	Vector2 sector_direction = params.sector_direction;
-	real_t sector_arc = params.sector_arc;
-	ScatterFacingMode facing_mode = params.facing_mode;
 
 	PATTERN_REQUIRE(danmaku_validate_head(caller, transforms_amount, marker_transform));
-	PATTERN_REJECT_IF(!Math::is_finite(burst_radius) || burst_radius < 0.0, "burst_radius must be finite and >= 0.");
-	PATTERN_REJECT_IF(!Math::is_finite(facing_jitter) || facing_jitter < 0.0, "facing_jitter must be finite and >= 0.");
-	PATTERN_REJECT_IF(!Math::is_finite(inner_radius) || inner_radius < 0.0, "inner_radius must be finite and >= 0.");
-	PATTERN_REJECT_IF(facing_mode < SCATTER_FACING_OUTWARD || facing_mode > SCATTER_FACING_INWARD, "facing_mode out of range.");
+	PATTERN_REJECT_IF(!Math::is_finite(p.burst_radius) || p.burst_radius < 0.0, "burst_radius must be finite and >= 0.");
+	PATTERN_REJECT_IF(!Math::is_finite(p.facing_jitter) || p.facing_jitter < 0.0, "facing_jitter must be finite and >= 0.");
+	PATTERN_REJECT_IF(!Math::is_finite(p.inner_radius) || p.inner_radius < 0.0, "inner_radius must be finite and >= 0.");
+	PATTERN_REJECT_IF(p.facing_mode < SCATTER_FACING_OUTWARD || p.facing_mode > SCATTER_FACING_INWARD, "facing_mode out of range.");
 	// Clamp, don't reject: callers set inner/burst in any order, and an
 	// inner edge past the rim just means a thin ring at the rim.
-	const real_t outer = burst_radius;
-	const real_t inner = MIN(MAX(inner_radius, 0.0), outer);
+	const real_t outer = p.burst_radius;
+	const real_t inner = MIN(MAX(p.inner_radius, 0.0), outer);
 	// Sector: direction fallback mirrors the line/rain generators (dead knob
 	// degrades to +X, never stalls). Arc >= TAU is a full circle.
 	Vector2 axis = Vector2(1, 0);
-	if (sector_direction.is_finite() && sector_direction.length_squared() > 1e-12) {
-		axis = sector_direction.normalized();
+	if (p.sector_direction.is_finite() && p.sector_direction.length_squared() > 1e-12) {
+		axis = p.sector_direction.normalized();
 	}
-	real_t arc = sector_arc;
+	real_t arc = p.sector_arc;
 	if (!Math::is_finite(arc) || arc <= 0.0) {
 		arc = Math::TAU;
 	} else if (arc > Math::TAU) {
@@ -465,8 +424,8 @@ PatternSlots2D BulletPatterns2D::generate_scatter2d(int transforms_amount, Trans
 	}
 	Ref<RandomNumberGenerator> rng;
 	rng.instantiate();
-	if (seed != 0) {
-		rng->set_seed(seed);
+	if (p.seed != 0) {
+		rng->set_seed(p.seed);
 	} else {
 		rng->randomize();
 	}
@@ -482,13 +441,13 @@ PatternSlots2D BulletPatterns2D::generate_scatter2d(int transforms_amount, Trans
 		const Vector2 offset = Vector2(Math::cos(a), Math::sin(a)) * r;
 		const real_t radial = (offset.length_squared() > 0.0) ? offset.angle() : marker_transform.get_rotation();
 		real_t facing = radial;
-		if (facing_mode == SCATTER_FACING_RANDOM) {
+		if (p.facing_mode == SCATTER_FACING_RANDOM) {
 			facing = rng->randf() * Math::TAU;
 		} else {
-			if (facing_mode == SCATTER_FACING_INWARD) {
+			if (p.facing_mode == SCATTER_FACING_INWARD) {
 				facing += Math::PI;
 			}
-			facing += rng->randf_range(-facing_jitter, facing_jitter);
+			facing += rng->randf_range(-p.facing_jitter, p.facing_jitter);
 		}
 		Transform2D slot(facing, origin + offset);
 		danmaku_apply_marker_scale(slot, marker_transform);
@@ -498,35 +457,29 @@ PatternSlots2D BulletPatterns2D::generate_scatter2d(int transforms_amount, Trans
 	return generated_transforms;
 }
 
-PatternSlots2D BulletPatterns2D::generate_star_polygon2d(int transforms_amount, Transform2D marker_transform, const StarPolygonParams2D &params) {
+PatternSlots2D BulletPatterns2D::generate_star_polygon2d(int transforms_amount, Transform2D marker_transform, const StarPolygonParams2D &p) {
 	const char *caller = "helper_generate_transforms_star_polygon";
-	int vertices = params.vertices;
-	real_t radius = params.radius;
-	real_t vertex_bias = params.vertex_bias;
-	real_t base_rotation = params.base_rotation;
-	bool face_outward = params.face_outward;
-	real_t facing_offset_degrees = params.facing_offset_degrees;
 
 	PATTERN_REQUIRE(danmaku_validate_head(caller, transforms_amount, marker_transform));
-	PATTERN_REJECT_IF(vertices < 3, "vertices must be >= 3.");
-	PATTERN_REJECT_IF(!Math::is_finite(radius) || radius < 0.0, "radius must be finite and >= 0.");
-	PATTERN_REJECT_IF(!Math::is_finite(vertex_bias) || vertex_bias < 0.0 || !Math::is_finite(base_rotation) || !Math::is_finite(facing_offset_degrees), "vertex_bias, base_rotation and facing_offset_degrees must be finite (bias >= 0).");
+	PATTERN_REJECT_IF(p.vertices < 3, "vertices must be >= 3.");
+	PATTERN_REJECT_IF(!Math::is_finite(p.radius) || p.radius < 0.0, "radius must be finite and >= 0.");
+	PATTERN_REJECT_IF(!Math::is_finite(p.vertex_bias) || p.vertex_bias < 0.0 || !Math::is_finite(p.base_rotation) || !Math::is_finite(p.facing_offset_degrees), "vertex_bias, base_rotation and facing_offset_degrees must be finite (bias >= 0).");
 	PatternSlots2D generated_transforms = danmaku_make_slots(transforms_amount);
 	if (transforms_amount == 0) {
 		return generated_transforms;
 	}
 	const Vector2 origin = marker_transform.get_origin();
-	const real_t facing_offset = Math::deg_to_rad(facing_offset_degrees);
+	const real_t facing_offset = Math::deg_to_rad(p.facing_offset_degrees);
 	for (int i = 0; i < transforms_amount; ++i) {
 		// Even base angle, then pulled toward the nearest vertex by the
 		// bias: bias 0 = even ring, higher = sharper star.
-		const real_t base_angle = Math::TAU * (real_t)i / (real_t)transforms_amount + base_rotation;
-		const real_t sector = Math::TAU / (real_t)vertices;
+		const real_t base_angle = Math::TAU * (real_t)i / (real_t)transforms_amount + p.base_rotation;
+		const real_t sector = Math::TAU / (real_t)p.vertices;
 		const real_t local = Math::fposmod(base_angle, sector) / sector - 0.5;
-		const real_t pull = local * (vertex_bias / (1.0 + vertex_bias));
+		const real_t pull = local * (p.vertex_bias / (1.0 + p.vertex_bias));
 		const real_t angle = base_angle - pull * sector * 0.5;
-		const Vector2 offset = Vector2(Math::cos(angle), Math::sin(angle)) * radius;
-		real_t facing = face_outward ? angle : angle + Math::PI;
+		const Vector2 offset = Vector2(Math::cos(angle), Math::sin(angle)) * p.radius;
+		real_t facing = p.face_outward ? angle : angle + Math::PI;
 		facing += facing_offset;
 		Transform2D slot(facing, origin + offset);
 		danmaku_apply_marker_scale(slot, marker_transform);
@@ -536,43 +489,35 @@ PatternSlots2D BulletPatterns2D::generate_star_polygon2d(int transforms_amount, 
 	return generated_transforms;
 }
 
-PatternSlots2D BulletPatterns2D::generate_multispiral2d(int transforms_amount, Transform2D marker_transform, const MultispiralParams2D &params) {
+PatternSlots2D BulletPatterns2D::generate_multispiral2d(int transforms_amount, Transform2D marker_transform, const MultispiralParams2D &p) {
 	const char *caller = "helper_generate_transforms_multispiral";
-	int arms = params.arms;
-	real_t start_radius = params.start_radius;
-	real_t radius_step = params.radius_step;
-	real_t angle_step = params.angle_step;
-	bool rotate_with_marker = params.rotate_with_marker;
-	SpiralFacingMode facing_mode = params.facing_mode;
-	real_t facing_offset_degrees = params.facing_offset_degrees;
-	int arm_index_stride = params.arm_index_stride;
 
 	PATTERN_REQUIRE(danmaku_validate_head(caller, transforms_amount, marker_transform));
-	PATTERN_REJECT_IF(arms < 1, "arms must be >= 1.");
-	PATTERN_REJECT_IF(!Math::is_finite(start_radius) || start_radius < 0.0 || !Math::is_finite(radius_step) || !Math::is_finite(angle_step), "start_radius (>= 0), radius_step and angle_step must be finite.");
-	PATTERN_REJECT_IF(facing_mode < SPIRAL_FACING_TANGENT || facing_mode > SPIRAL_FACING_KEEP_MARKER, "unknown facing_mode.");
-	PATTERN_REJECT_IF(!Math::is_finite(facing_offset_degrees), "facing_offset_degrees must be finite.");
-	PATTERN_REJECT_IF(arm_index_stride < 1, "arm_index_stride must be >= 1.");
+	PATTERN_REJECT_IF(p.arms < 1, "arms must be >= 1.");
+	PATTERN_REJECT_IF(!Math::is_finite(p.start_radius) || p.start_radius < 0.0 || !Math::is_finite(p.radius_step) || !Math::is_finite(p.angle_step), "start_radius (>= 0), radius_step and angle_step must be finite.");
+	PATTERN_REJECT_IF(p.facing_mode < SPIRAL_FACING_TANGENT || p.facing_mode > SPIRAL_FACING_KEEP_MARKER, "unknown facing_mode.");
+	PATTERN_REJECT_IF(!Math::is_finite(p.facing_offset_degrees), "facing_offset_degrees must be finite.");
+	PATTERN_REJECT_IF(p.arm_index_stride < 1, "arm_index_stride must be >= 1.");
 	PatternSlots2D generated_transforms = danmaku_make_slots(transforms_amount);
 	if (transforms_amount == 0) {
 		return generated_transforms;
 	}
-	const real_t base_rotation = rotate_with_marker ? marker_transform.get_rotation() : 0.0;
+	const real_t base_rotation = p.rotate_with_marker ? marker_transform.get_rotation() : 0.0;
 	const Vector2 origin = marker_transform.get_origin();
-	const real_t facing_offset = Math::deg_to_rad(facing_offset_degrees);
+	const real_t facing_offset = Math::deg_to_rad(p.facing_offset_degrees);
 	for (int i = 0; i < transforms_amount; ++i) {
 		// Interleave (stride < arms) or group (stride >= arms) slots.
 		int arm = 0;
 		int step_index = 0;
-		spiral_arm_step(i, arms, arm_index_stride, arm, step_index);
-		const real_t arm_phase = Math::TAU * (real_t)arm / (real_t)arms;
-		const real_t r = start_radius + radius_step * (real_t)step_index;
-		const real_t angle = base_rotation + arm_phase + angle_step * (real_t)step_index;
+		spiral_arm_step(i, p.arms, p.arm_index_stride, arm, step_index);
+		const real_t arm_phase = Math::TAU * (real_t)arm / (real_t)p.arms;
+		const real_t r = p.start_radius + p.radius_step * (real_t)step_index;
+		const real_t angle = base_rotation + arm_phase + p.angle_step * (real_t)step_index;
 		const Vector2 offset = Vector2(Math::cos(angle), Math::sin(angle)) * r;
 		real_t facing = angle;
-		switch (facing_mode) {
+		switch (p.facing_mode) {
 			case SPIRAL_FACING_TANGENT: {
-				const Vector2 tangent = Vector2(radius_step * Math::cos(angle) - r * Math::sin(angle), radius_step * Math::sin(angle) + r * Math::cos(angle));
+				const Vector2 tangent = Vector2(p.radius_step * Math::cos(angle) - r * Math::sin(angle), p.radius_step * Math::sin(angle) + r * Math::cos(angle));
 				facing = (tangent.length_squared() > 0.0) ? tangent.angle() : ((offset.length_squared() > 0.0) ? offset.angle() : angle);
 				break;
 			}
@@ -594,37 +539,31 @@ PatternSlots2D BulletPatterns2D::generate_multispiral2d(int transforms_amount, T
 	return generated_transforms;
 }
 
-PatternSlots2D BulletPatterns2D::generate_cross2d(int transforms_amount, Transform2D marker_transform, const CrossParams2D &params) {
+PatternSlots2D BulletPatterns2D::generate_cross2d(int transforms_amount, Transform2D marker_transform, const CrossParams2D &p) {
 	const char *caller = "helper_generate_transforms_cross";
-	int arm_count = params.arm_count;
-	real_t arm_length = params.arm_length;
-	real_t spacing = params.spacing;
-	real_t base_rotation = params.base_rotation;
-	bool face_outward = params.face_outward;
-	real_t facing_offset_degrees = params.facing_offset_degrees;
 
 	PATTERN_REQUIRE(danmaku_validate_head(caller, transforms_amount, marker_transform));
-	PATTERN_REJECT_IF(arm_count < 1, "arm_count must be >= 1.");
-	PATTERN_REJECT_IF(!Math::is_finite(arm_length) || arm_length < 0.0 || !Math::is_finite(spacing) || spacing <= 0.0, "arm_length must be finite and >= 0, spacing finite and > 0.");
-	PATTERN_REJECT_IF(!Math::is_finite(base_rotation) || !Math::is_finite(facing_offset_degrees), "base_rotation and facing_offset_degrees must be finite.");
+	PATTERN_REJECT_IF(p.arm_count < 1, "arm_count must be >= 1.");
+	PATTERN_REJECT_IF(!Math::is_finite(p.arm_length) || p.arm_length < 0.0 || !Math::is_finite(p.spacing) || p.spacing <= 0.0, "arm_length must be finite and >= 0, spacing finite and > 0.");
+	PATTERN_REJECT_IF(!Math::is_finite(p.base_rotation) || !Math::is_finite(p.facing_offset_degrees), "base_rotation and facing_offset_degrees must be finite.");
 	PatternSlots2D generated_transforms = danmaku_make_slots(transforms_amount);
 	if (transforms_amount == 0) {
 		return generated_transforms;
 	}
 	const Vector2 origin = marker_transform.get_origin();
-	const real_t facing_offset = Math::deg_to_rad(facing_offset_degrees);
+	const real_t facing_offset = Math::deg_to_rad(p.facing_offset_degrees);
 	// Interleaved fill (i % arms): full rounds of `arm_count` rays each, so
 	// a partial last round still spreads across rays. When an arm cannot
 	// hold its slots at `spacing`, the spacing shrinks so the outermost slot
 	// lands exactly on the tip (every bullet keeps its own spot).
-	const real_t step_spacing = cross_step2d(transforms_amount, arm_count, arm_length, spacing);
+	const real_t step_spacing = cross_step2d(transforms_amount, p.arm_count, p.arm_length, p.spacing);
 	for (int i = 0; i < transforms_amount; ++i) {
-		const int arm = i % arm_count;
-		const int step = i / arm_count;
-		const real_t ray = base_rotation + Math::TAU * (real_t)arm / (real_t)arm_count;
+		const int arm = i % p.arm_count;
+		const int step = i / p.arm_count;
+		const real_t ray = p.base_rotation + Math::TAU * (real_t)arm / (real_t)p.arm_count;
 		const real_t dist = step_spacing * (real_t)(step + 1);
 		const Vector2 offset = Vector2(Math::cos(ray), Math::sin(ray)) * dist;
-		real_t facing = face_outward ? ray : ray + Math::PI;
+		real_t facing = p.face_outward ? ray : ray + Math::PI;
 		Transform2D slot(facing + facing_offset, origin + offset);
 		danmaku_apply_marker_scale(slot, marker_transform);
 		generated_transforms[i] = slot;
@@ -633,34 +572,28 @@ PatternSlots2D BulletPatterns2D::generate_cross2d(int transforms_amount, Transfo
 	return generated_transforms;
 }
 
-PatternSlots2D BulletPatterns2D::generate_wave2d(int transforms_amount, Transform2D marker_transform, const WaveParams2D &params) {
+PatternSlots2D BulletPatterns2D::generate_wave2d(int transforms_amount, Transform2D marker_transform, const WaveParams2D &p) {
 	const char *caller = "helper_generate_transforms_wave";
-	real_t width = params.width;
-	real_t amplitude = params.amplitude;
-	real_t waves = params.waves;
-	Vector2 direction = params.direction;
-	bool face_direction = params.face_direction;
-	real_t facing_offset_degrees = params.facing_offset_degrees;
 
 	PATTERN_REQUIRE(danmaku_validate_head(caller, transforms_amount, marker_transform));
-	PATTERN_REJECT_IF(!Math::is_finite(width) || width < 0.0 || !Math::is_finite(amplitude) || amplitude < 0.0 || !Math::is_finite(waves) || waves < 0.0, "width, amplitude and waves must be finite and >= 0.");
-	PATTERN_REJECT_IF(!direction.is_finite() || direction.length_squared() <= 0.0, "direction must be finite and non-zero.");
-	PATTERN_REJECT_IF(!Math::is_finite(facing_offset_degrees), "facing_offset_degrees must be finite.");
+	PATTERN_REJECT_IF(!Math::is_finite(p.width) || p.width < 0.0 || !Math::is_finite(p.amplitude) || p.amplitude < 0.0 || !Math::is_finite(p.waves) || p.waves < 0.0, "width, amplitude and waves must be finite and >= 0.");
+	PATTERN_REJECT_IF(!p.direction.is_finite() || p.direction.length_squared() <= 0.0, "direction must be finite and non-zero.");
+	PATTERN_REJECT_IF(!Math::is_finite(p.facing_offset_degrees), "facing_offset_degrees must be finite.");
 	PatternSlots2D generated_transforms = danmaku_make_slots(transforms_amount);
 	if (transforms_amount == 0) {
 		return generated_transforms;
 	}
 	const Vector2 origin = marker_transform.get_origin();
-	const Vector2 axis = direction.normalized();
+	const Vector2 axis = p.direction.normalized();
 	const Vector2 across = axis.orthogonal();
-	const real_t facing_offset = Math::deg_to_rad(facing_offset_degrees);
+	const real_t facing_offset = Math::deg_to_rad(p.facing_offset_degrees);
 	for (int i = 0; i < transforms_amount; ++i) {
 		const real_t frac = (transforms_amount > 1) ? ((real_t)i / (real_t)(transforms_amount - 1) - 0.5) : 0.0;
-		const real_t along = frac * width;
-		const real_t wave = amplitude * Math::sin(frac * waves * Math::TAU);
+		const real_t along = frac * p.width;
+		const real_t wave = p.amplitude * Math::sin(frac * p.waves * Math::TAU);
 		const Vector2 pos = origin + axis * along + across * wave;
-		const Vector2 tangent = (axis + across * (amplitude * waves * Math::TAU / Math::max(width, (real_t)1.0) * Math::cos(frac * waves * Math::TAU))).normalized();
-		real_t facing = face_direction ? tangent.angle() : marker_transform.get_rotation();
+		const Vector2 tangent = (axis + across * (p.amplitude * p.waves * Math::TAU / Math::max(p.width, (real_t)1.0) * Math::cos(frac * p.waves * Math::TAU))).normalized();
+		real_t facing = p.face_direction ? tangent.angle() : marker_transform.get_rotation();
 		Transform2D slot(facing + facing_offset, pos);
 		danmaku_apply_marker_scale(slot, marker_transform);
 		generated_transforms[i] = slot;
@@ -669,53 +602,44 @@ PatternSlots2D BulletPatterns2D::generate_wave2d(int transforms_amount, Transfor
 	return generated_transforms;
 }
 
-PatternSlots2D BulletPatterns2D::generate_waterfall2d(int transforms_amount, Transform2D marker_transform, const WaterfallParams2D &params) {
+PatternSlots2D BulletPatterns2D::generate_waterfall2d(int transforms_amount, Transform2D marker_transform, const WaterfallParams2D &p) {
 	const char *caller = "helper_generate_transforms_waterfall";
-	int columns = params.columns;
-	real_t column_spacing = params.column_spacing;
-	int rows = params.rows;
-	real_t row_spacing = params.row_spacing;
-	real_t stagger = params.stagger;
-	Vector2 rain_direction = params.rain_direction;
-	real_t jitter = params.jitter;
-	real_t facing_offset_degrees = params.facing_offset_degrees;
-	uint64_t seed = params.seed;
 
 	PATTERN_REQUIRE(danmaku_validate_head(caller, transforms_amount, marker_transform));
-	PATTERN_REJECT_IF(columns < 1 || rows < 1, "columns and rows must be >= 1.");
+	PATTERN_REJECT_IF(p.columns < 1 || p.rows < 1, "columns and rows must be >= 1.");
 	// columns*rows in 64-bit: 32-bit int math would wrap to negative on
 	// hostile input (100000x100000), turning the emit loop below into a
 	// billion-iteration hang. Reject absurd grids up front.
-	PATTERN_REJECT_IF((int64_t)columns * (int64_t)rows > (int64_t)HELPER_MAX_TRANSFORMS * 4, "columns*rows is absurdly large; keep the grid reasonable.");
-	PATTERN_REJECT_IF(!Math::is_finite(column_spacing) || column_spacing < 0.0 || !Math::is_finite(row_spacing) || row_spacing < 0.0, "column_spacing and row_spacing must be finite and >= 0.");
-	PATTERN_REJECT_IF(!Math::is_finite(stagger) || !Math::is_finite(jitter) || jitter < 0.0 || !Math::is_finite(facing_offset_degrees), "stagger and facing_offset_degrees must be finite, jitter finite and >= 0.");
-	PATTERN_REJECT_IF(!rain_direction.is_finite() || rain_direction.length_squared() <= 0.0, "rain_direction must be finite and non-zero.");
+	PATTERN_REJECT_IF((int64_t)p.columns * (int64_t)p.rows > (int64_t)HELPER_MAX_TRANSFORMS * 4, "columns*rows is absurdly large; keep the grid reasonable.");
+	PATTERN_REJECT_IF(!Math::is_finite(p.column_spacing) || p.column_spacing < 0.0 || !Math::is_finite(p.row_spacing) || p.row_spacing < 0.0, "column_spacing and row_spacing must be finite and >= 0.");
+	PATTERN_REJECT_IF(!Math::is_finite(p.stagger) || !Math::is_finite(p.jitter) || p.jitter < 0.0 || !Math::is_finite(p.facing_offset_degrees), "stagger and facing_offset_degrees must be finite, jitter finite and >= 0.");
+	PATTERN_REJECT_IF(!p.rain_direction.is_finite() || p.rain_direction.length_squared() <= 0.0, "rain_direction must be finite and non-zero.");
 	PatternSlots2D generated_transforms = danmaku_make_slots(transforms_amount);
 	if (transforms_amount == 0) {
 		return generated_transforms;
 	}
 	const Vector2 origin = marker_transform.get_origin();
-	const real_t facing_offset = Math::deg_to_rad(facing_offset_degrees);
-	const Vector2 axis = rain_direction.normalized();
+	const real_t facing_offset = Math::deg_to_rad(p.facing_offset_degrees);
+	const Vector2 axis = p.rain_direction.normalized();
 	const Vector2 across = axis.orthogonal();
 	const real_t facing = axis.angle() + facing_offset;
-	const int capacity = columns * rows;
+	const int capacity = p.columns * p.rows;
 	const int emit = Math::min(transforms_amount, capacity);
 	Ref<RandomNumberGenerator> waterfall_rng;
-	const bool waterfall_seeded = seed != 0;
+	const bool waterfall_seeded = p.seed != 0;
 	if (waterfall_seeded) {
 		waterfall_rng.instantiate();
-		waterfall_rng->set_seed(seed);
+		waterfall_rng->set_seed(p.seed);
 	}
 	for (int i = 0; i < emit; ++i) {
-		const int row = i / columns;
-		const int col = i % columns;
-		const real_t row_phase = (rows > 1) ? ((real_t)row / (real_t)(rows - 1) - 0.5) : 0.0;
-		const real_t col_centered = (columns > 1) ? ((real_t)col / (real_t)(columns - 1) - 0.5) : 0.0;
-		Vector2 pos = origin + across * (col_centered * column_spacing * (real_t)(columns - 1) + stagger * column_spacing * row_phase) + axis * ((real_t)row * row_spacing);
-		if (jitter > 0.0) {
-			real_t jx = waterfall_seeded ? waterfall_rng->randf_range(-jitter, jitter) : UtilityFunctions::randf_range(-jitter, jitter);
-			real_t jy = waterfall_seeded ? waterfall_rng->randf_range(-jitter, jitter) : UtilityFunctions::randf_range(-jitter, jitter);
+		const int row = i / p.columns;
+		const int col = i % p.columns;
+		const real_t row_phase = (p.rows > 1) ? ((real_t)row / (real_t)(p.rows - 1) - 0.5) : 0.0;
+		const real_t col_centered = (p.columns > 1) ? ((real_t)col / (real_t)(p.columns - 1) - 0.5) : 0.0;
+		Vector2 pos = origin + across * (col_centered * p.column_spacing * (real_t)(p.columns - 1) + p.stagger * p.column_spacing * row_phase) + axis * ((real_t)row * p.row_spacing);
+		if (p.jitter > 0.0) {
+			real_t jx = waterfall_seeded ? waterfall_rng->randf_range(-p.jitter, p.jitter) : UtilityFunctions::randf_range(-p.jitter, p.jitter);
+			real_t jy = waterfall_seeded ? waterfall_rng->randf_range(-p.jitter, p.jitter) : UtilityFunctions::randf_range(-p.jitter, p.jitter);
 			pos += Vector2(jx, jy);
 		}
 		Transform2D slot(facing, pos);
@@ -727,14 +651,14 @@ PatternSlots2D BulletPatterns2D::generate_waterfall2d(int transforms_amount, Tra
 	// including the stagger phase, so row N reads as a seamless extension.
 	for (int i = emit; i < transforms_amount; ++i) {
 		const int extra = i - emit;
-		const int col = extra % columns;
-		const int extra_row = rows + extra / columns;
-		const real_t extra_phase = (rows > 1) ? ((real_t)(extra_row % rows) / (real_t)(rows - 1) - 0.5) : 0.0;
-		const real_t col_centered = (columns > 1) ? ((real_t)col / (real_t)(columns - 1) - 0.5) : 0.0;
-		Vector2 pos = origin + across * (col_centered * column_spacing * (real_t)(columns - 1) + stagger * column_spacing * extra_phase) + axis * ((real_t)extra_row * row_spacing);
-		if (jitter > 0.0) {
-			real_t jx = waterfall_seeded ? waterfall_rng->randf_range(-jitter, jitter) : UtilityFunctions::randf_range(-jitter, jitter);
-			real_t jy = waterfall_seeded ? waterfall_rng->randf_range(-jitter, jitter) : UtilityFunctions::randf_range(-jitter, jitter);
+		const int col = extra % p.columns;
+		const int extra_row = p.rows + extra / p.columns;
+		const real_t extra_phase = (p.rows > 1) ? ((real_t)(extra_row % p.rows) / (real_t)(p.rows - 1) - 0.5) : 0.0;
+		const real_t col_centered = (p.columns > 1) ? ((real_t)col / (real_t)(p.columns - 1) - 0.5) : 0.0;
+		Vector2 pos = origin + across * (col_centered * p.column_spacing * (real_t)(p.columns - 1) + p.stagger * p.column_spacing * extra_phase) + axis * ((real_t)extra_row * p.row_spacing);
+		if (p.jitter > 0.0) {
+			real_t jx = waterfall_seeded ? waterfall_rng->randf_range(-p.jitter, p.jitter) : UtilityFunctions::randf_range(-p.jitter, p.jitter);
+			real_t jy = waterfall_seeded ? waterfall_rng->randf_range(-p.jitter, p.jitter) : UtilityFunctions::randf_range(-p.jitter, p.jitter);
 			pos += Vector2(jx, jy);
 		}
 		Transform2D slot(facing, pos);
@@ -745,39 +669,32 @@ PatternSlots2D BulletPatterns2D::generate_waterfall2d(int transforms_amount, Tra
 	return generated_transforms;
 }
 
-PatternSlots2D BulletPatterns2D::generate_lattice2d(int transforms_amount, Transform2D marker_transform, const LatticeParams2D &params) {
+PatternSlots2D BulletPatterns2D::generate_lattice2d(int transforms_amount, Transform2D marker_transform, const LatticeParams2D &p) {
 	const char *caller = "helper_generate_transforms_lattice";
-	int columns = params.columns;
-	int rows = params.rows;
-	real_t spacing_x = params.spacing_x;
-	real_t spacing_y = params.spacing_y;
-	bool stagger_rows = params.stagger_rows;
-	bool face_outward = params.face_outward;
-	real_t facing_offset_degrees = params.facing_offset_degrees;
 
 	PATTERN_REQUIRE(danmaku_validate_head(caller, transforms_amount, marker_transform));
-	PATTERN_REJECT_IF(columns < 1 || rows < 1, "columns and rows must be >= 1.");
+	PATTERN_REJECT_IF(p.columns < 1 || p.rows < 1, "columns and rows must be >= 1.");
 	// Same 64-bit guard as waterfall: hostile columns*rows would wrap a
 	// 32-bit int and hang the emit loop below.
-	PATTERN_REJECT_IF((int64_t)columns * (int64_t)rows > (int64_t)HELPER_MAX_TRANSFORMS * 4, "columns*rows is absurdly large; keep the grid reasonable.");
-	PATTERN_REJECT_IF(!Math::is_finite(spacing_x) || spacing_x < 0.0 || !Math::is_finite(spacing_y) || spacing_y < 0.0, "spacing_x and spacing_y must be finite and >= 0.");
-	PATTERN_REJECT_IF(!Math::is_finite(facing_offset_degrees), "facing_offset_degrees must be finite.");
+	PATTERN_REJECT_IF((int64_t)p.columns * (int64_t)p.rows > (int64_t)HELPER_MAX_TRANSFORMS * 4, "columns*rows is absurdly large; keep the grid reasonable.");
+	PATTERN_REJECT_IF(!Math::is_finite(p.spacing_x) || p.spacing_x < 0.0 || !Math::is_finite(p.spacing_y) || p.spacing_y < 0.0, "spacing_x and spacing_y must be finite and >= 0.");
+	PATTERN_REJECT_IF(!Math::is_finite(p.facing_offset_degrees), "facing_offset_degrees must be finite.");
 	PatternSlots2D generated_transforms = danmaku_make_slots(transforms_amount);
 	if (transforms_amount == 0) {
 		return generated_transforms;
 	}
 	const Vector2 origin = marker_transform.get_origin();
 	const real_t marker_rot = marker_transform.get_rotation();
-	const real_t facing_offset = Math::deg_to_rad(facing_offset_degrees);
-	const int capacity = columns * rows;
+	const real_t facing_offset = Math::deg_to_rad(p.facing_offset_degrees);
+	const int capacity = p.columns * p.rows;
 	const int emit = Math::min(transforms_amount, capacity);
 	for (int i = 0; i < emit; ++i) {
-		const int row = i / columns;
-		const int col = i % columns;
-		const real_t stagger = (stagger_rows && (row % 2 == 1)) ? spacing_x * 0.5 : 0.0;
-		const Vector2 pos = origin + Vector2(((real_t)col - (real_t)(columns - 1) * 0.5) * spacing_x + stagger, ((real_t)row - (real_t)(rows - 1) * 0.5) * spacing_y);
+		const int row = i / p.columns;
+		const int col = i % p.columns;
+		const real_t stagger = (p.stagger_rows && (row % 2 == 1)) ? p.spacing_x * 0.5 : 0.0;
+		const Vector2 pos = origin + Vector2(((real_t)col - (real_t)(p.columns - 1) * 0.5) * p.spacing_x + stagger, ((real_t)row - (real_t)(p.rows - 1) * 0.5) * p.spacing_y);
 		const real_t radial = (pos - origin).length_squared() > 0.0 ? (pos - origin).angle() : marker_rot;
-		real_t facing = face_outward ? radial : radial + Math::PI;
+		real_t facing = p.face_outward ? radial : radial + Math::PI;
 		Transform2D slot(facing + facing_offset, pos);
 		danmaku_apply_marker_scale(slot, marker_transform);
 		generated_transforms[i] = slot;
@@ -787,12 +704,12 @@ PatternSlots2D BulletPatterns2D::generate_lattice2d(int transforms_amount, Trans
 	// row N reads as a seamless extension like waterfall.
 	for (int i = emit; i < transforms_amount; ++i) {
 		const int extra = i - emit;
-		const int col = extra % columns;
-		const int extra_row = rows + extra / columns;
-		const real_t stagger = (stagger_rows && (extra_row % 2 == 1)) ? spacing_x * 0.5 : 0.0;
-		const Vector2 pos = origin + Vector2(((real_t)col - (real_t)(columns - 1) * 0.5) * spacing_x + stagger, ((real_t)extra_row - (real_t)(rows - 1) * 0.5) * spacing_y);
+		const int col = extra % p.columns;
+		const int extra_row = p.rows + extra / p.columns;
+		const real_t stagger = (p.stagger_rows && (extra_row % 2 == 1)) ? p.spacing_x * 0.5 : 0.0;
+		const Vector2 pos = origin + Vector2(((real_t)col - (real_t)(p.columns - 1) * 0.5) * p.spacing_x + stagger, ((real_t)extra_row - (real_t)(p.rows - 1) * 0.5) * p.spacing_y);
 		const real_t radial = (pos - origin).length_squared() > 0.0 ? (pos - origin).angle() : marker_rot;
-		real_t facing = face_outward ? radial : radial + Math::PI;
+		real_t facing = p.face_outward ? radial : radial + Math::PI;
 		Transform2D slot(facing + facing_offset, pos);
 		danmaku_apply_marker_scale(slot, marker_transform);
 		generated_transforms[i] = slot;
@@ -801,44 +718,35 @@ PatternSlots2D BulletPatterns2D::generate_lattice2d(int transforms_amount, Trans
 	return generated_transforms;
 }
 
-PatternSlots2D BulletPatterns2D::generate_counter_spiral2d(int transforms_amount, Transform2D marker_transform, const CounterSpiralParams2D &params) {
+PatternSlots2D BulletPatterns2D::generate_counter_spiral2d(int transforms_amount, Transform2D marker_transform, const CounterSpiralParams2D &p) {
 	const char *caller = "helper_generate_transforms_counter_spiral";
-	int arms = params.arms;
-	real_t start_radius = params.start_radius;
-	real_t radius_step = params.radius_step;
-	real_t angle_step = params.angle_step;
-	bool rotate_with_marker = params.rotate_with_marker;
-	SpiralFacingMode facing_mode = params.facing_mode;
-	real_t facing_offset_degrees = params.facing_offset_degrees;
-	int arm_index_stride = params.arm_index_stride;
-	bool mirror_alternate_arms = params.mirror_alternate_arms;
 
 	PATTERN_REQUIRE(danmaku_validate_head(caller, transforms_amount, marker_transform));
-	PATTERN_REJECT_IF(arms < 2, "arms must be >= 2 (use multispiral for 1 arm).");
-	PATTERN_REJECT_IF(!Math::is_finite(start_radius) || start_radius < 0.0 || !Math::is_finite(radius_step) || !Math::is_finite(angle_step), "start_radius (>= 0), radius_step and angle_step must be finite.");
-	PATTERN_REJECT_IF(facing_mode < SPIRAL_FACING_TANGENT || facing_mode > SPIRAL_FACING_KEEP_MARKER, "unknown facing_mode.");
-	PATTERN_REJECT_IF(!Math::is_finite(facing_offset_degrees), "facing_offset_degrees must be finite.");
-	PATTERN_REJECT_IF(arm_index_stride < 1, "arm_index_stride must be >= 1.");
+	PATTERN_REJECT_IF(p.arms < 2, "arms must be >= 2 (use multispiral for 1 arm).");
+	PATTERN_REJECT_IF(!Math::is_finite(p.start_radius) || p.start_radius < 0.0 || !Math::is_finite(p.radius_step) || !Math::is_finite(p.angle_step), "start_radius (>= 0), radius_step and angle_step must be finite.");
+	PATTERN_REJECT_IF(p.facing_mode < SPIRAL_FACING_TANGENT || p.facing_mode > SPIRAL_FACING_KEEP_MARKER, "unknown facing_mode.");
+	PATTERN_REJECT_IF(!Math::is_finite(p.facing_offset_degrees), "facing_offset_degrees must be finite.");
+	PATTERN_REJECT_IF(p.arm_index_stride < 1, "arm_index_stride must be >= 1.");
 	PatternSlots2D generated_transforms = danmaku_make_slots(transforms_amount);
 	if (transforms_amount == 0) {
 		return generated_transforms;
 	}
-	const real_t base_rotation = rotate_with_marker ? marker_transform.get_rotation() : 0.0;
+	const real_t base_rotation = p.rotate_with_marker ? marker_transform.get_rotation() : 0.0;
 	const Vector2 origin = marker_transform.get_origin();
-	const real_t facing_offset = Math::deg_to_rad(facing_offset_degrees);
+	const real_t facing_offset = Math::deg_to_rad(p.facing_offset_degrees);
 	for (int i = 0; i < transforms_amount; ++i) {
 		int arm = 0;
 		int step_index = 0;
-		spiral_arm_step(i, arms, arm_index_stride, arm, step_index);
-		const real_t dir_sign = (mirror_alternate_arms && (arm % 2 == 1)) ? -1.0 : 1.0;
-		const real_t arm_phase = Math::TAU * (real_t)arm / (real_t)arms;
-		const real_t r = start_radius + radius_step * (real_t)step_index;
-		const real_t angle = base_rotation + arm_phase + dir_sign * angle_step * (real_t)step_index;
+		spiral_arm_step(i, p.arms, p.arm_index_stride, arm, step_index);
+		const real_t dir_sign = (p.mirror_alternate_arms && (arm % 2 == 1)) ? -1.0 : 1.0;
+		const real_t arm_phase = Math::TAU * (real_t)arm / (real_t)p.arms;
+		const real_t r = p.start_radius + p.radius_step * (real_t)step_index;
+		const real_t angle = base_rotation + arm_phase + dir_sign * p.angle_step * (real_t)step_index;
 		const Vector2 offset = Vector2(Math::cos(angle), Math::sin(angle)) * r;
 		real_t facing = angle;
-		switch (facing_mode) {
+		switch (p.facing_mode) {
 			case SPIRAL_FACING_TANGENT: {
-				const real_t signed_step = dir_sign * radius_step;
+				const real_t signed_step = dir_sign * p.radius_step;
 				const Vector2 tangent = Vector2(signed_step * Math::cos(angle) - r * Math::sin(angle), signed_step * Math::sin(angle) + r * Math::cos(angle));
 				facing = (tangent.length_squared() > 0.0) ? tangent.angle() : ((offset.length_squared() > 0.0) ? offset.angle() : angle);
 				break;
@@ -861,37 +769,31 @@ PatternSlots2D BulletPatterns2D::generate_counter_spiral2d(int transforms_amount
 	return generated_transforms;
 }
 
-PatternSlots2D BulletPatterns2D::generate_corridor2d(int transforms_amount, Transform2D marker_transform, const CorridorParams2D &params) {
+PatternSlots2D BulletPatterns2D::generate_corridor2d(int transforms_amount, Transform2D marker_transform, const CorridorParams2D &p) {
 	const char *caller = "helper_generate_transforms_corridor";
-	const Vector2 &aim_direction = params.aim_direction;
-	real_t width = params.width;
-	real_t spacing = params.spacing;
-	real_t gap_width = params.gap_width;
-	bool face_aim = params.face_aim;
-	real_t facing_offset_degrees = params.facing_offset_degrees;
 
 	PATTERN_REQUIRE(danmaku_validate_head(caller, transforms_amount, marker_transform));
-	PATTERN_REJECT_IF(!aim_direction.is_finite() || aim_direction.length_squared() <= 0.0, "aim_direction must be finite and non-zero.");
-	PATTERN_REJECT_IF(!Math::is_finite(width) || width < 0.0, "width must be finite and >= 0.");
-	PATTERN_REJECT_IF(!Math::is_finite(spacing) || spacing <= 0.0, "spacing must be finite and > 0.");
-	PATTERN_REJECT_IF(!Math::is_finite(gap_width) || gap_width < 0.0, "gap_width must be finite and >= 0.");
-	PATTERN_REJECT_IF(!Math::is_finite(facing_offset_degrees), "facing_offset_degrees must be finite.");
-	PATTERN_REJECT_IF(gap_width >= width, "gap_width eats the whole wall (must be < width).");
+	PATTERN_REJECT_IF(!p.aim_direction.is_finite() || p.aim_direction.length_squared() <= 0.0, "aim_direction must be finite and non-zero.");
+	PATTERN_REJECT_IF(!Math::is_finite(p.width) || p.width < 0.0, "width must be finite and >= 0.");
+	PATTERN_REJECT_IF(!Math::is_finite(p.spacing) || p.spacing <= 0.0, "spacing must be finite and > 0.");
+	PATTERN_REJECT_IF(!Math::is_finite(p.gap_width) || p.gap_width < 0.0, "gap_width must be finite and >= 0.");
+	PATTERN_REJECT_IF(!Math::is_finite(p.facing_offset_degrees), "facing_offset_degrees must be finite.");
+	PATTERN_REJECT_IF(p.gap_width >= p.width, "gap_width eats the whole wall (must be < width).");
 	PatternSlots2D generated_transforms = danmaku_make_slots(transforms_amount);
 	if (transforms_amount == 0) {
 		return generated_transforms;
 	}
 	const Vector2 origin = marker_transform.get_origin();
-	const Vector2 axis = aim_direction.normalized();
+	const Vector2 axis = p.aim_direction.normalized();
 	const Vector2 across = axis.orthogonal();
-	const real_t facing_offset = Math::deg_to_rad(facing_offset_degrees);
+	const real_t facing_offset = Math::deg_to_rad(p.facing_offset_degrees);
 	const real_t aim_angle = axis.angle();
 	// Two equal wall segments flank the door: [-W/2, -G/2] and [G/2, W/2].
 	// The amount is split between them (left takes the odd bullet) and each
 	// segment spans outer edge to door edge, so exactly transforms_amount
 	// bullets are placed and none lands in the door.
-	const real_t half_w = width * 0.5;
-	const real_t half_g = gap_width * 0.5;
+	const real_t half_w = p.width * 0.5;
+	const real_t half_g = p.gap_width * 0.5;
 	const int left_count = (transforms_amount + 1) / 2;
 	int placed = 0;
 	for (int i = 0; i < transforms_amount; ++i) {
@@ -904,7 +806,7 @@ PatternSlots2D BulletPatterns2D::generate_corridor2d(int transforms_amount, Tran
 		const real_t across_coord = left ? (-half_w + d) : (half_g + (seg_len - d));
 		const Vector2 pos = origin + across * across_coord;
 		real_t facing = aim_angle;
-		if (!face_aim) {
+		if (!p.face_aim) {
 			facing = ((pos - origin).length_squared() > 0.0) ? (pos - origin).angle() : aim_angle;
 		}
 		Transform2D slot(facing + facing_offset, pos);

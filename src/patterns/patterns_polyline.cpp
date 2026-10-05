@@ -278,37 +278,27 @@ PatternSlots2D polyline_layout2d(const Transform2D &marker, const PackedVector2A
 	return out;
 }
 
-PatternSlots2D BulletPatterns2D::generate_polyline2d(int transforms_amount, Transform2D marker_transform, const PolylineParams2D &params) {
+PatternSlots2D BulletPatterns2D::generate_polyline2d(int transforms_amount, Transform2D marker_transform, const PolylineParams2D &p) {
 	const char *caller = "helper_generate_transforms_polyline";
-	const PackedVector2Array &points = params.points;
-	bool closed = params.closed;
-	PolylineDistribution distribution = params.distribution;
-	real_t spacing = params.spacing;
-	PolylineOverflow overflow = params.overflow;
-	PolylineAnchor anchor = params.anchor;
-	real_t start_offset = params.start_offset;
-	bool reverse = params.reverse;
-	PolylineFacing facing = params.facing;
-	real_t facing_offset_deg = params.facing_offset_deg;
 
 	if (transforms_amount < 0 || transforms_amount > HELPER_MAX_TRANSFORMS) {
 		UtilityFunctions::push_error("helper_generate_transforms_polyline: transforms_amount must be in 0.." + itos(HELPER_MAX_TRANSFORMS) + ".");
 		return PatternSlots2D();
 	}
-	for (int i = 0; i < points.size(); ++i) {
-		PATTERN_REJECT_IF(!points[i].is_finite(), "points contain NaN/Inf.");
+	for (int i = 0; i < p.points.size(); ++i) {
+		PATTERN_REJECT_IF(!p.points[i].is_finite(), "points contain NaN/Inf.");
 	}
-	PolylineLayout2D p;
-	p.closed = closed;
-	p.distribution = (int)distribution;
-	p.spacing = spacing;
-	p.overflow = (int)overflow;
-	p.anchor = (int)anchor;
-	p.start_offset = start_offset;
-	p.reverse = reverse;
-	p.facing = (int)facing;
-	p.facing_offset_deg = facing_offset_deg;
-	return polyline_layout2d(marker_transform, points, transforms_amount, p, false, caller);
+	PolylineLayout2D layout;
+	layout.closed = p.closed;
+	layout.distribution = (int)p.distribution;
+	layout.spacing = p.spacing;
+	layout.overflow = (int)p.overflow;
+	layout.anchor = (int)p.anchor;
+	layout.start_offset = p.start_offset;
+	layout.reverse = p.reverse;
+	layout.facing = (int)p.facing;
+	layout.facing_offset_deg = p.facing_offset_deg;
+	return polyline_layout2d(marker_transform, p.points, transforms_amount, layout, false, caller);
 }
 
 } // namespace BlastBullets2D

@@ -188,40 +188,29 @@ PackedVector2Array BulletPatterns2D::helper_compute_edge_normals(
 	return normals;
 }
 
-PatternSlots2D BulletPatterns2D::generate_edge_from_points2d(int transforms_amount, Transform2D marker_transform, const EdgeFromPointsParams2D &params) {
+PatternSlots2D BulletPatterns2D::generate_edge_from_points2d(int transforms_amount, Transform2D marker_transform, const EdgeFromPointsParams2D &p) {
 	const char *caller = "helper_generate_transforms_edge_from_points";
-	const PackedVector2Array &edge_points = params.edge_points;
-	bool closed = params.closed;
-	bool flip_normals = params.flip_normals;
-	bool random_sample = params.random_sample;
-	real_t jitter = params.jitter;
-	real_t facing_offset_degrees = params.facing_offset_degrees;
-	uint64_t seed = params.seed;
-	real_t spread = params.spread;
-	real_t spread_exponent = params.spread_exponent;
-	int spread_side = params.spread_side;
-	real_t tangent_jitter = params.tangent_jitter;
 
 	PATTERN_REQUIRE(danmaku_validate_head(caller, transforms_amount, marker_transform));
-	PATTERN_REJECT_IF(!Math::is_finite(jitter) || jitter < 0.0 || !Math::is_finite(facing_offset_degrees), "jitter must be finite and >= 0, facing_offset_degrees must be finite.");
-	PATTERN_REJECT_IF(!Math::is_finite(spread) || spread < 0.0 || !Math::is_finite(spread_exponent) || spread_exponent < 0.01 || !Math::is_finite(tangent_jitter) || tangent_jitter < 0.0, "spread must be finite and >= 0, spread_exponent finite and >= 0.01, tangent_jitter finite and >= 0.");
-	PATTERN_REJECT_IF(spread_side < 0 || spread_side > 2, "spread_side must be 0 (along), 1 (behind) or 2 (both).");
+	PATTERN_REJECT_IF(!Math::is_finite(p.jitter) || p.jitter < 0.0 || !Math::is_finite(p.facing_offset_degrees), "jitter must be finite and >= 0, facing_offset_degrees must be finite.");
+	PATTERN_REJECT_IF(!Math::is_finite(p.spread) || p.spread < 0.0 || !Math::is_finite(p.spread_exponent) || p.spread_exponent < 0.01 || !Math::is_finite(p.tangent_jitter) || p.tangent_jitter < 0.0, "spread must be finite and >= 0, spread_exponent finite and >= 0.01, tangent_jitter finite and >= 0.");
+	PATTERN_REJECT_IF(p.spread_side < 0 || p.spread_side > 2, "spread_side must be 0 (along), 1 (behind) or 2 (both).");
 	PatternSlots2D generated_transforms = danmaku_make_slots(transforms_amount);
 	if (transforms_amount == 0) {
 		return generated_transforms;
 	}
-	PATTERN_REJECT_IF(edge_points.size() <= 0, "edge_points must contain at least 1 point.");
+	PATTERN_REJECT_IF(p.edge_points.size() <= 0, "edge_points must contain at least 1 point.");
 	PackedVector2Array normals;
-	PATTERN_REJECT_IF(!compute_edge_normals_quiet(edge_points, closed, flip_normals, normals), "edge_points must be finite.");
-	const int n = edge_points.size();
+	PATTERN_REJECT_IF(!compute_edge_normals_quiet(p.edge_points, p.closed, p.flip_normals, normals), "edge_points must be finite.");
+	const int n = p.edge_points.size();
 	const real_t marker_rot = marker_transform.get_rotation();
-	const real_t facing_offset = Math::deg_to_rad(facing_offset_degrees);
+	const real_t facing_offset = Math::deg_to_rad(p.facing_offset_degrees);
 	// Engine Ref classes must be heap-instantiated: a stack
 	// RandomNumberGenerator has no binding callbacks and hard-crashes
 	// (SIGILL) on first use. Same memnew+Ref pattern as the scatter helper.
 	Ref<RandomNumberGenerator> rng = memnew(RandomNumberGenerator);
-	if (seed != 0) {
-		rng->set_seed(seed);
+	if (p.seed != 0) {
+		rng->set_seed(p.seed);
 	} else {
 		rng->randomize();
 	}
@@ -232,37 +221,37 @@ PatternSlots2D BulletPatterns2D::generate_edge_from_points2d(int transforms_amou
 	// Tangent jitter is intentionally independent of spread: it softens the
 	// crest core even when the falloff cloud is disabled (spread = 0).
 	auto apply_edge_spread = [&](Vector2 &r_local, const Vector2 &p_nrm) {
-		if (spread <= 0.0) {
+		if (p.spread <= 0.0) {
 			return;
 		}
 		const real_t u = rng->randf();
-		real_t off = spread * Math::pow(u, spread_exponent);
+		real_t off = p.spread * Math::pow(u, p.spread_exponent);
 		if (!Math::is_finite(off)) {
 			return;
 		}
-		if (spread_side == 2) {
+		if (p.spread_side == 2) {
 			off *= (rng->randf() < 0.5) ? -1.0 : 1.0;
-		} else if (spread_side == 1) {
+		} else if (p.spread_side == 1) {
 			off = -off;
 		}
 		r_local += p_nrm * off;
 	};
 	auto apply_edge_tangent_jitter = [&](Vector2 &r_local, const Vector2 &p_nrm) {
-		if (tangent_jitter <= 0.0) {
+		if (p.tangent_jitter <= 0.0) {
 			return;
 		}
 		const Vector2 tangent = p_nrm.orthogonal();
-		r_local += tangent * rng->randf_range(-tangent_jitter, tangent_jitter);
+		r_local += tangent * rng->randf_range(-p.tangent_jitter, p.tangent_jitter);
 	};
 	// Single-point edge: every bullet spawns there facing the point normal.
 	if (n == 1) {
 		for (int i = 0; i < transforms_amount; ++i) {
-			Vector2 local = edge_points[0];
+			Vector2 local = p.edge_points[0];
 			apply_edge_spread(local, normals[0]);
 			apply_edge_tangent_jitter(local, normals[0]);
-			if (jitter > 0.0) {
+			if (p.jitter > 0.0) {
 				const real_t a = rng->randf_range(0.0, Math::TAU);
-				const real_t r = Math::sqrt(rng->randf()) * jitter;
+				const real_t r = Math::sqrt(rng->randf()) * p.jitter;
 				local += Vector2(Math::cos(a), Math::sin(a)) * r;
 			}
 			Transform2D slot(marker_rot + normals[0].angle() + facing_offset, marker_transform.xform(local));
@@ -276,21 +265,21 @@ PatternSlots2D BulletPatterns2D::generate_edge_from_points2d(int transforms_amou
 	cum.reserve(n + 1);
 	cum.push_back(0.0);
 	for (int i = 1; i < n; ++i) {
-		cum.push_back(cum.back() + edge_points[i - 1].distance_to(edge_points[i]));
+		cum.push_back(cum.back() + p.edge_points[i - 1].distance_to(p.edge_points[i]));
 	}
 	real_t total = cum.back();
-	if (closed) {
-		total += edge_points[n - 1].distance_to(edge_points[0]);
+	if (p.closed) {
+		total += p.edge_points[n - 1].distance_to(p.edge_points[0]);
 	}
 	if (!(total > 0.0) || !Math::is_finite(total)) {
 		// All points coincide: same as the single-point case.
 		for (int i = 0; i < transforms_amount; ++i) {
-			Vector2 local = edge_points[0];
+			Vector2 local = p.edge_points[0];
 			apply_edge_spread(local, normals[0]);
 			apply_edge_tangent_jitter(local, normals[0]);
-			if (jitter > 0.0) {
+			if (p.jitter > 0.0) {
 				const real_t a = rng->randf_range(0.0, Math::TAU);
-				const real_t r = Math::sqrt(rng->randf()) * jitter;
+				const real_t r = Math::sqrt(rng->randf()) * p.jitter;
 				local += Vector2(Math::cos(a), Math::sin(a)) * r;
 			}
 			Transform2D slot(marker_rot + normals[0].angle() + facing_offset, marker_transform.xform(local));
@@ -299,14 +288,14 @@ PatternSlots2D BulletPatterns2D::generate_edge_from_points2d(int transforms_amou
 		}
 		return generated_transforms;
 	}
-	const int seg_count = closed ? n : n - 1;
+	const int seg_count = p.closed ? n : n - 1;
 	for (int i = 0; i < transforms_amount; ++i) {
 		real_t d = 0.0;
-		if (random_sample) {
+		if (p.random_sample) {
 			d = rng->randf() * total;
 		} else if (transforms_amount == 1) {
 			d = 0.0;
-		} else if (closed) {
+		} else if (p.closed) {
 			d = total * (real_t)i / (real_t)transforms_amount;
 		} else {
 			d = total * (real_t)i / (real_t)(transforms_amount - 1);
@@ -330,7 +319,7 @@ PatternSlots2D BulletPatterns2D::generate_edge_from_points2d(int transforms_amou
 		const real_t seg_len = seg_end - seg_start;
 		real_t t = (seg_len > 1e-9) ? (d - seg_start) / seg_len : 0.0;
 		t = Math::clamp(t, (real_t)0.0, (real_t)1.0);
-		Vector2 local = edge_points[ia].lerp(edge_points[ib], t);
+		Vector2 local = p.edge_points[ia].lerp(p.edge_points[ib], t);
 		Vector2 nrm = normals[ia].lerp(normals[ib], t);
 		if (nrm.length_squared() <= 1e-12) {
 			nrm = normals[ia];
@@ -338,13 +327,13 @@ PatternSlots2D BulletPatterns2D::generate_edge_from_points2d(int transforms_amou
 		nrm = nrm.normalized();
 		apply_edge_spread(local, nrm);
 		apply_edge_tangent_jitter(local, nrm);
-		if (jitter > 0.0) {
+		if (p.jitter > 0.0) {
 			const real_t a = rng->randf_range(0.0, Math::TAU);
-			const real_t r = Math::sqrt(rng->randf()) * jitter;
+			const real_t r = Math::sqrt(rng->randf()) * p.jitter;
 			local += Vector2(Math::cos(a), Math::sin(a)) * r;
 		}
 		if (!local.is_finite()) {
-			local = edge_points[ia];
+			local = p.edge_points[ia];
 		}
 		Transform2D slot(marker_rot + nrm.angle() + facing_offset, marker_transform.xform(local));
 		danmaku_apply_marker_scale(slot, marker_transform);
