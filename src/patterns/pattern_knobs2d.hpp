@@ -417,6 +417,11 @@ struct PatternKnobs2D {
 
 	// ---- Pattern stages over these knobs (patterns module) ----
 
+	// The shared outline-layout / corner-layout knobs as the generators'
+	// structs (pattern_dispatch2d.cpp).
+	OutlineLayout2D outline_layout() const;
+	CornerLayout2D corner_layout() const;
+
 	// Raw transforms for in.source (pre spin/scale/skip): exactly
 	// helper_bullets_amount for the helper shapes. pattern_dispatch2d.cpp.
 	PatternSlots2D generate_raw(const PatternInputs2D &in) const;

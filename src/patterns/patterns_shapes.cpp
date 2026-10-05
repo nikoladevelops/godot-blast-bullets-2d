@@ -29,6 +29,56 @@ void spiral_arm_step(int i, int arms, int stride, int &r_arm, int &r_step) {
 	r_step = i / arms;
 }
 
+// Facing of a spiral slot at `angle` and radius r: TANGENT follows
+// r(theta) = start + step * theta (dp/dtheta = (step cos - r sin, step sin +
+// r cos), exact for collapsed spirals: step 0 -> ring tangent), the radial
+// modes use the offset (it carries the radius sign, so a negative radius
+// mirrors position and facing together), KEEP_MARKER the base rotation.
+static real_t spiral_facing2d(BulletPatterns2D::SpiralFacingMode mode, real_t angle, real_t r, real_t signed_step, const Vector2 &offset, real_t base_rotation) {
+	switch (mode) {
+		case BulletPatterns2D::SPIRAL_FACING_TANGENT: {
+			const Vector2 tangent = Vector2(signed_step * Math::cos(angle) - r * Math::sin(angle), signed_step * Math::sin(angle) + r * Math::cos(angle));
+			return (tangent.length_squared() > 0.0) ? tangent.angle() : ((offset.length_squared() > 0.0) ? offset.angle() : angle);
+		}
+		case BulletPatterns2D::SPIRAL_FACING_RADIAL_OUTWARD:
+			return (offset.length_squared() > 0.0) ? offset.angle() : angle;
+		case BulletPatterns2D::SPIRAL_FACING_TOWARD_CENTER:
+			return ((offset.length_squared() > 0.0) ? offset.angle() : angle) + Math::PI;
+		case BulletPatterns2D::SPIRAL_FACING_KEEP_MARKER:
+			return base_rotation;
+	}
+	return angle;
+}
+
+// Multi-arm spiral core (multispiral; counter_spiral with alternate arms
+// winding the other way). Arms are evenly phased; spiral_arm_step deals the
+// slots over the arms.
+static PatternSlots2D arm_spirals2d(const char *caller, int transforms_amount, const Transform2D &marker_transform, int arms, real_t start_radius, real_t radius_step, real_t angle_step, bool rotate_with_marker, BulletPatterns2D::SpiralFacingMode facing_mode, real_t facing_offset_degrees, int arm_index_stride, bool mirror_alternate_arms) {
+	PatternSlots2D generated_transforms = danmaku_make_slots(transforms_amount);
+	if (transforms_amount == 0) {
+		return generated_transforms;
+	}
+	const real_t base_rotation = rotate_with_marker ? marker_transform.get_rotation() : 0.0;
+	const Vector2 origin = marker_transform.get_origin();
+	const real_t facing_offset = Math::deg_to_rad(facing_offset_degrees);
+	for (int i = 0; i < transforms_amount; ++i) {
+		int arm = 0;
+		int step_index = 0;
+		spiral_arm_step(i, arms, arm_index_stride, arm, step_index);
+		const real_t dir_sign = (mirror_alternate_arms && (arm % 2 == 1)) ? -1.0 : 1.0;
+		const real_t arm_phase = Math::TAU * (real_t)arm / (real_t)arms;
+		const real_t r = start_radius + radius_step * (real_t)step_index;
+		const real_t angle = base_rotation + arm_phase + dir_sign * angle_step * (real_t)step_index;
+		const Vector2 offset = Vector2(Math::cos(angle), Math::sin(angle)) * r;
+		const real_t facing = spiral_facing2d(facing_mode, angle, r, dir_sign * radius_step, offset, base_rotation);
+		Transform2D slot(facing + facing_offset, origin + offset);
+		danmaku_apply_marker_scale(slot, marker_transform);
+		generated_transforms[i] = slot;
+	}
+	danmaku_clamp_slots_finite(caller, generated_transforms);
+	return generated_transforms;
+}
+
 PatternSlots2D BulletPatterns2D::generate_grid2d(int transforms_amount, Transform2D marker_transform, const GridParams2D &p) {
 	const char *caller = "helper_generate_transforms_grid";
 
@@ -53,63 +103,26 @@ PatternSlots2D BulletPatterns2D::generate_grid2d(int transforms_amount, Transfor
 		return generated_transforms;
 	}
 
-	int columns_amount = 0;
-
-	// Avoid division by 0
-	if (p.rows_per_column > 0) {
-		// Calculate the number of columns needed
-		columns_amount = static_cast<int>(Math::ceil(static_cast<real_t>(transforms_amount) / static_cast<real_t>(p.rows_per_column)));
-	}
+	const int columns_amount = static_cast<int>(Math::ceil(static_cast<real_t>(transforms_amount) / static_cast<real_t>(p.rows_per_column)));
 
 	// Size by the rows/columns actually used, not the full rows_per_column:
 	// otherwise a partial grid (e.g. n=1 with rows=10) centers on empty space.
 	const int used_rows = (columns_amount > 1) ? p.rows_per_column : transforms_amount;
 	const int last_column_rows = transforms_amount - (columns_amount - 1) * p.rows_per_column;
 
-	// Calculate total grid dimensions
-	real_t total_width = (columns_amount - 1) * p.column_offset;
-	// Default starting position (centered): -total/2 already centers even
-	// counts (n=2 -> -off/2, +off/2). The old +=offset/2 shifted the mean +off/2.
-	real_t x_start = -total_width / 2.0f;
+	// Alignment = 3 x 3 anchors: column a % 3 (left, center, right), row
+	// a / 3 (top, middle, bottom). Centering uses -extent/2, which already
+	// centers even counts (n=2 -> -off/2, +off/2).
+	PATTERN_REJECT_IF(p.alignment < Alignment::TOP_LEFT || p.alignment > Alignment::BOTTOM_RIGHT, "unknown alignment, cannot generate grid.");
+	const int anchor_x = (int)p.alignment % 3;
+	const int anchor_y = (int)p.alignment / 3;
+	const real_t total_width = (columns_amount - 1) * p.column_offset;
+	const real_t x_start = anchor_x == 0 ? 0.0 : (anchor_x == 1 ? -total_width / 2.0f : -total_width);
 
 	// Default y per column: full columns center on used_rows, the ragged last
 	// column centers on its own count so it doesn't hang off-center.
 	const real_t full_col_height = (used_rows - 1) * p.row_offset;
 	const real_t last_col_height = (last_column_rows - 1) * p.row_offset;
-
-	// Adjust starting position based on alignment
-	switch (p.alignment) {
-		case Alignment::TOP_LEFT:
-			x_start = 0.0;
-			break;
-		case Alignment::TOP_CENTER:
-			x_start = -total_width / 2.0f;
-			break;
-		case Alignment::TOP_RIGHT:
-			x_start = -total_width;
-			break;
-		case Alignment::CENTER_LEFT:
-			x_start = 0.0;
-			break;
-		case Alignment::CENTER:
-			// Already centered by default
-			break;
-		case Alignment::CENTER_RIGHT:
-			x_start = -total_width;
-			break;
-		case Alignment::BOTTOM_LEFT:
-			x_start = 0.0;
-			break;
-		case Alignment::BOTTOM_CENTER:
-			x_start = -total_width / 2.0f;
-			break;
-		case Alignment::BOTTOM_RIGHT:
-			x_start = -total_width;
-			break;
-		default:
-			UtilityFunctions::push_error("helper_generate_transforms_grid: unknown alignment, cannot generate grid.");
-			return PatternSlots2D();
-	}
 
 	// Counter for spawned transforms
 	int count_spawned = 0;
@@ -128,21 +141,7 @@ PatternSlots2D BulletPatterns2D::generate_grid2d(int transforms_amount, Transfor
 		const int rows_this_column = is_last_column ? last_column_rows : p.rows_per_column;
 		const real_t col_height = is_last_column ? last_col_height : full_col_height;
 		// Per-column y start so TOP_* / CENTER / BOTTOM_* anchor each column.
-		real_t y_start = -col_height / 2.0f;
-		switch (p.alignment) {
-			case Alignment::TOP_LEFT:
-			case Alignment::TOP_CENTER:
-			case Alignment::TOP_RIGHT:
-				y_start = 0.0;
-				break;
-			case Alignment::BOTTOM_LEFT:
-			case Alignment::BOTTOM_CENTER:
-			case Alignment::BOTTOM_RIGHT:
-				y_start = -col_height;
-				break;
-			default:
-				break;
-		}
+		const real_t y_start = anchor_y == 0 ? 0.0 : (anchor_y == 1 ? -col_height / 2.0f : -col_height);
 		for (int row = 0; row < rows_this_column; ++row) {
 			if (count_spawned >= transforms_amount) {
 				break;
@@ -260,28 +259,7 @@ PatternSlots2D BulletPatterns2D::generate_spiral2d(int transforms_amount, Transf
 		const real_t r = p.start_radius + p.radius_step * (real_t)i;
 		const real_t angle = base_rotation + p.angle_step * (real_t)i;
 		const Vector2 offset = Vector2(Math::cos(angle), Math::sin(angle)) * r;
-		real_t facing = angle;
-		switch (p.facing_mode) {
-			case SPIRAL_FACING_TANGENT: {
-				// Travel direction along r(theta) = start + step * theta:
-				// dp/dtheta = (step * cos - r * sin, step * sin + r * cos).
-				// Exact for collapsed spirals too (step = 0 -> ring tangent).
-				const Vector2 tangent = Vector2(p.radius_step * Math::cos(angle) - r * Math::sin(angle), p.radius_step * Math::sin(angle) + r * Math::cos(angle));
-				facing = (tangent.length_squared() > 0.0) ? tangent.angle() : ((offset.length_squared() > 0.0) ? offset.angle() : angle);
-				break;
-			}
-			case SPIRAL_FACING_RADIAL_OUTWARD:
-				// offset already carries the radius sign, so a negative radius
-				// mirrors position and facing together (historical behavior).
-				facing = (offset.length_squared() > 0.0) ? offset.angle() : angle;
-				break;
-			case SPIRAL_FACING_TOWARD_CENTER:
-				facing = ((offset.length_squared() > 0.0) ? offset.angle() : angle) + Math::PI;
-				break;
-			case SPIRAL_FACING_KEEP_MARKER:
-				facing = base_rotation;
-				break;
-		}
+		const real_t facing = spiral_facing2d(p.facing_mode, angle, r, p.radius_step, offset, base_rotation);
 		Transform2D spiral_transf(facing + facing_offset, origin + offset);
 		spiral_transf.set_scale(marker_transform.get_scale());
 		generated_transforms[i] = spiral_transf;
@@ -498,45 +476,7 @@ PatternSlots2D BulletPatterns2D::generate_multispiral2d(int transforms_amount, T
 	PATTERN_REJECT_IF(p.facing_mode < SPIRAL_FACING_TANGENT || p.facing_mode > SPIRAL_FACING_KEEP_MARKER, "unknown facing_mode.");
 	PATTERN_REJECT_IF(!Math::is_finite(p.facing_offset_degrees), "facing_offset_degrees must be finite.");
 	PATTERN_REJECT_IF(p.arm_index_stride < 1, "arm_index_stride must be >= 1.");
-	PatternSlots2D generated_transforms = danmaku_make_slots(transforms_amount);
-	if (transforms_amount == 0) {
-		return generated_transforms;
-	}
-	const real_t base_rotation = p.rotate_with_marker ? marker_transform.get_rotation() : 0.0;
-	const Vector2 origin = marker_transform.get_origin();
-	const real_t facing_offset = Math::deg_to_rad(p.facing_offset_degrees);
-	for (int i = 0; i < transforms_amount; ++i) {
-		// Interleave (stride < arms) or group (stride >= arms) slots.
-		int arm = 0;
-		int step_index = 0;
-		spiral_arm_step(i, p.arms, p.arm_index_stride, arm, step_index);
-		const real_t arm_phase = Math::TAU * (real_t)arm / (real_t)p.arms;
-		const real_t r = p.start_radius + p.radius_step * (real_t)step_index;
-		const real_t angle = base_rotation + arm_phase + p.angle_step * (real_t)step_index;
-		const Vector2 offset = Vector2(Math::cos(angle), Math::sin(angle)) * r;
-		real_t facing = angle;
-		switch (p.facing_mode) {
-			case SPIRAL_FACING_TANGENT: {
-				const Vector2 tangent = Vector2(p.radius_step * Math::cos(angle) - r * Math::sin(angle), p.radius_step * Math::sin(angle) + r * Math::cos(angle));
-				facing = (tangent.length_squared() > 0.0) ? tangent.angle() : ((offset.length_squared() > 0.0) ? offset.angle() : angle);
-				break;
-			}
-			case SPIRAL_FACING_RADIAL_OUTWARD:
-				facing = (offset.length_squared() > 0.0) ? offset.angle() : angle;
-				break;
-			case SPIRAL_FACING_TOWARD_CENTER:
-				facing = ((offset.length_squared() > 0.0) ? offset.angle() : angle) + Math::PI;
-				break;
-			case SPIRAL_FACING_KEEP_MARKER:
-				facing = base_rotation;
-				break;
-		}
-		Transform2D slot(facing + facing_offset, origin + offset);
-		danmaku_apply_marker_scale(slot, marker_transform);
-		generated_transforms[i] = slot;
-	}
-	danmaku_clamp_slots_finite(caller, generated_transforms);
-	return generated_transforms;
+	return arm_spirals2d(caller, transforms_amount, marker_transform, p.arms, p.start_radius, p.radius_step, p.angle_step, p.rotate_with_marker, p.facing_mode, p.facing_offset_degrees, p.arm_index_stride, false);
 }
 
 PatternSlots2D BulletPatterns2D::generate_cross2d(int transforms_amount, Transform2D marker_transform, const CrossParams2D &p) {
@@ -727,46 +667,7 @@ PatternSlots2D BulletPatterns2D::generate_counter_spiral2d(int transforms_amount
 	PATTERN_REJECT_IF(p.facing_mode < SPIRAL_FACING_TANGENT || p.facing_mode > SPIRAL_FACING_KEEP_MARKER, "unknown facing_mode.");
 	PATTERN_REJECT_IF(!Math::is_finite(p.facing_offset_degrees), "facing_offset_degrees must be finite.");
 	PATTERN_REJECT_IF(p.arm_index_stride < 1, "arm_index_stride must be >= 1.");
-	PatternSlots2D generated_transforms = danmaku_make_slots(transforms_amount);
-	if (transforms_amount == 0) {
-		return generated_transforms;
-	}
-	const real_t base_rotation = p.rotate_with_marker ? marker_transform.get_rotation() : 0.0;
-	const Vector2 origin = marker_transform.get_origin();
-	const real_t facing_offset = Math::deg_to_rad(p.facing_offset_degrees);
-	for (int i = 0; i < transforms_amount; ++i) {
-		int arm = 0;
-		int step_index = 0;
-		spiral_arm_step(i, p.arms, p.arm_index_stride, arm, step_index);
-		const real_t dir_sign = (p.mirror_alternate_arms && (arm % 2 == 1)) ? -1.0 : 1.0;
-		const real_t arm_phase = Math::TAU * (real_t)arm / (real_t)p.arms;
-		const real_t r = p.start_radius + p.radius_step * (real_t)step_index;
-		const real_t angle = base_rotation + arm_phase + dir_sign * p.angle_step * (real_t)step_index;
-		const Vector2 offset = Vector2(Math::cos(angle), Math::sin(angle)) * r;
-		real_t facing = angle;
-		switch (p.facing_mode) {
-			case SPIRAL_FACING_TANGENT: {
-				const real_t signed_step = dir_sign * p.radius_step;
-				const Vector2 tangent = Vector2(signed_step * Math::cos(angle) - r * Math::sin(angle), signed_step * Math::sin(angle) + r * Math::cos(angle));
-				facing = (tangent.length_squared() > 0.0) ? tangent.angle() : ((offset.length_squared() > 0.0) ? offset.angle() : angle);
-				break;
-			}
-			case SPIRAL_FACING_RADIAL_OUTWARD:
-				facing = (offset.length_squared() > 0.0) ? offset.angle() : angle;
-				break;
-			case SPIRAL_FACING_TOWARD_CENTER:
-				facing = ((offset.length_squared() > 0.0) ? offset.angle() : angle) + Math::PI;
-				break;
-			case SPIRAL_FACING_KEEP_MARKER:
-				facing = base_rotation;
-				break;
-		}
-		Transform2D slot(facing + facing_offset, origin + offset);
-		danmaku_apply_marker_scale(slot, marker_transform);
-		generated_transforms[i] = slot;
-	}
-	danmaku_clamp_slots_finite(caller, generated_transforms);
-	return generated_transforms;
+	return arm_spirals2d(caller, transforms_amount, marker_transform, p.arms, p.start_radius, p.radius_step, p.angle_step, p.rotate_with_marker, p.facing_mode, p.facing_offset_degrees, p.arm_index_stride, p.mirror_alternate_arms);
 }
 
 PatternSlots2D BulletPatterns2D::generate_corridor2d(int transforms_amount, Transform2D marker_transform, const CorridorParams2D &p) {

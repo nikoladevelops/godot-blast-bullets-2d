@@ -101,7 +101,6 @@ Dictionary BulletPatterns2D::debug_describe_outline(int shape, int count, const 
 	TypedArray<Transform2D> volley;
 	PackedVector2Array corners; // marker-local corners for polygonal shapes
 	bool has_corners = false;
-	bool radial_facings = true;
 	switch (shape) {
 		case DEBUG_SHAPE_CIRCLE: {
 			const real_t radius = debug_param_real(params, "radius", 150.0);
@@ -131,7 +130,6 @@ Dictionary BulletPatterns2D::debug_describe_outline(int shape, int count, const 
 			corners.push_back(Vector2(hw.x, hw.y));
 			corners.push_back(Vector2(-hw.x, hw.y));
 			has_corners = true;
-			radial_facings = false;
 			break;
 		}
 		case DEBUG_SHAPE_SQUARE: {
@@ -143,7 +141,6 @@ Dictionary BulletPatterns2D::debug_describe_outline(int shape, int count, const 
 			corners.push_back(Vector2(hw.x, hw.y));
 			corners.push_back(Vector2(-hw.x, hw.y));
 			has_corners = true;
-			radial_facings = false;
 			break;
 		}
 		case DEBUG_SHAPE_POLYGON: {
@@ -158,7 +155,6 @@ Dictionary BulletPatterns2D::debug_describe_outline(int shape, int count, const 
 				}
 				has_corners = true;
 			}
-			radial_facings = false;
 			break;
 		}
 		case DEBUG_SHAPE_TRIANGLE: {
@@ -169,7 +165,6 @@ Dictionary BulletPatterns2D::debug_describe_outline(int shape, int count, const 
 			volley = helper_generate_transforms_triangle(count, identity, (TriangleType)ttype, sa, sb, rotation, face_outward, facing_offset_deg, 0, outline_facing, outline_reverse, outline_slot_offset, 32.0, false, 0.0, 1, 0.2, 0, 0, 0, 0, PackedFloat32Array(), 0, 0, distribution, 1, corner_priority, corner_mode, (double)edge_margin, corner_facing);
 			corners = build_triangle_corners(ttype, sa, sb, rotation);
 			has_corners = corners.size() == 3;
-			radial_facings = false;
 			break;
 		}
 		case DEBUG_SHAPE_TRAPEZOID: {
@@ -180,7 +175,6 @@ Dictionary BulletPatterns2D::debug_describe_outline(int shape, int count, const 
 			volley = helper_generate_transforms_trapezoid(count, identity, top, bottom, height, rotation, face_outward, facing_offset_deg, 0, outline_facing, outline_reverse, outline_slot_offset, 32.0, false, 0.0, 1, 0.2, 0, 0, 0, 0, PackedFloat32Array(), 0, 0, distribution, 1, corner_priority, corner_mode, (double)edge_margin, corner_facing);
 			corners = build_trapezoid_corners(top, bottom, height, rotation);
 			has_corners = corners.size() == 4;
-			radial_facings = false;
 			break;
 		}
 		case DEBUG_SHAPE_DIAMOND: {
@@ -190,7 +184,6 @@ Dictionary BulletPatterns2D::debug_describe_outline(int shape, int count, const 
 			volley = helper_generate_transforms_diamond(count, identity, dx, dy, rotation, face_outward, facing_offset_deg, 0, outline_facing, outline_reverse, outline_slot_offset, 32.0, false, 0.0, 1, 0.2, 0, 0, 0, 0, PackedFloat32Array(), 0, 0, distribution, 1, corner_priority, corner_mode, (double)edge_margin, corner_facing);
 			corners = build_diamond_corners(dx, dy, rotation);
 			has_corners = corners.size() == 4;
-			radial_facings = false;
 			break;
 		}
 		case DEBUG_SHAPE_STAR: {
@@ -207,7 +200,6 @@ Dictionary BulletPatterns2D::debug_describe_outline(int shape, int count, const 
 				}
 				has_corners = true;
 			}
-			radial_facings = false;
 			break;
 		}
 		case DEBUG_SHAPE_HEART: {
@@ -490,8 +482,6 @@ Dictionary BulletPatterns2D::debug_outline_quotas(int shape, int count, const Di
 		total += (double)corners[e].distance_to(corners[(e + 1) % cn]);
 	}
 	const int corner_mode = debug_param_int(params, "outline_corner_mode", 0);
-	const int distribution = debug_param_int(params, "outline_distribution", 1);
-	(void)distribution;
 	bool optimal = true;
 	PackedFloat64Array exact_shares;
 	exact_shares.resize(cn);
