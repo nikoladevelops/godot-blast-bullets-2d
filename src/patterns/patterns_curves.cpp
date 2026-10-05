@@ -296,65 +296,6 @@ PatternSlots2D BulletPatterns2D::generate_ring2d(int transforms_amount, Transfor
 	return layout_outline_slots("helper_generate_transforms_ring", marker_transform, loop_points, loop_normals, false, 0.0, face_outward, facing_offset_degrees, facing_override, params.outline, CornerLayout2D::smooth(), PackedVector2Array(), is_closed_ring, true, fill_outline);
 }
 
-TypedArray<Transform2D> BulletPatterns2D::helper_generate_transforms_ring(
-		int transforms_amount,
-		Transform2D marker_transform,
-		real_t radius,
-		real_t start_angle,
-		real_t arc,
-		bool rotate_with_marker,
-		bool random_rotation,
-		bool face_outward,
-		real_t y_scale,
-		real_t facing_offset_degrees,
-		int outline_placement,
-		int outline_facing,
-		bool outline_reverse,
-		int outline_slot_offset,
-		double fill_spacing,
-		bool fill_stagger,
-		double fill_margin,
-		int layer_count,
-		double layer_scale,
-		int layer_side,
-		int layer_fill,
-		int layer_start_offset,
-		int layer_scale_curve,
-		const PackedFloat32Array &layer_custom_scales,
-		int layer_twist,
-		int layer_max_dots,
-		uint64_t seed,
-		int layer_layout) {
-	RingParams2D params;
-	params.radius = radius;
-	params.start_angle = start_angle;
-	params.arc = arc;
-	params.rotate_with_marker = rotate_with_marker;
-	params.random_rotation = random_rotation;
-	params.face_outward = face_outward;
-	params.y_scale = y_scale;
-	params.facing_offset_degrees = facing_offset_degrees;
-	params.outline.outline_placement = outline_placement;
-	params.outline.outline_facing = outline_facing;
-	params.outline.outline_reverse = outline_reverse;
-	params.outline.outline_slot_offset = outline_slot_offset;
-	params.outline.fill_spacing = fill_spacing;
-	params.outline.fill_stagger = fill_stagger;
-	params.outline.fill_margin = fill_margin;
-	params.outline.layer_count = layer_count;
-	params.outline.layer_scale = layer_scale;
-	params.outline.layer_side = layer_side;
-	params.outline.layer_fill = layer_fill;
-	params.outline.layer_start_offset = layer_start_offset;
-	params.outline.layer_scale_curve = layer_scale_curve;
-	params.outline.layer_custom_scales = layer_custom_scales;
-	params.outline.layer_twist = layer_twist;
-	params.outline.layer_max_dots = layer_max_dots;
-	params.seed = seed;
-	params.outline.layer_layout = layer_layout;
-	return pattern_slots_to_array(generate_ring2d(transforms_amount, marker_transform, params));
-}
-
 PatternSlots2D BulletPatterns2D::generate_flower2d(int transforms_amount, Transform2D marker_transform, const FlowerParams2D &params) {
 	int petals = params.petals;
 	real_t radius = params.radius;
@@ -570,73 +511,6 @@ PatternSlots2D BulletPatterns2D::generate_flower2d(int transforms_amount, Transf
 	return layout_outline_slots("helper_generate_transforms_flower", marker_transform, loop_points, loop_normals, false, 0.0, face_outward, facing_offset_degrees, PackedFloat32Array(), flower_outline, CornerLayout2D::smooth(), PackedVector2Array(), true, flower_type != FLOWER_FAN && flower_type != FLOWER_PHYLLOTAXIS, fill_outline, fill_normals);
 }
 
-TypedArray<Transform2D> BulletPatterns2D::helper_generate_transforms_flower(
-		int transforms_amount,
-		Transform2D marker_transform,
-		int petals,
-		real_t radius,
-		real_t petal_spread,
-		real_t petal_sharpness,
-		real_t base_rotation,
-		bool face_outward,
-		real_t facing_offset_degrees,
-		int outline_placement,
-		int outline_facing,
-		bool outline_reverse,
-		int outline_slot_offset,
-		double fill_spacing,
-		bool fill_stagger,
-		double fill_margin,
-		int layer_count,
-		double layer_scale,
-		int layer_side,
-		int layer_fill,
-		int layer_start_offset,
-		int layer_scale_curve,
-		const PackedFloat32Array &layer_custom_scales,
-		int layer_twist,
-		int layer_max_dots,
-		int flower_type,
-		double inner_radius_scale,
-		double spiro_roller,
-		double spiro_pen,
-		double super_lobes,
-		double super_fullness,
-		int layer_layout) {
-	FlowerParams2D params;
-	params.petals = petals;
-	params.radius = radius;
-	params.petal_spread = petal_spread;
-	params.petal_sharpness = petal_sharpness;
-	params.base_rotation = base_rotation;
-	params.face_outward = face_outward;
-	params.facing_offset_degrees = facing_offset_degrees;
-	params.outline.outline_placement = outline_placement;
-	params.outline.outline_facing = outline_facing;
-	params.outline.outline_reverse = outline_reverse;
-	params.outline.outline_slot_offset = outline_slot_offset;
-	params.outline.fill_spacing = fill_spacing;
-	params.outline.fill_stagger = fill_stagger;
-	params.outline.fill_margin = fill_margin;
-	params.outline.layer_count = layer_count;
-	params.outline.layer_scale = layer_scale;
-	params.outline.layer_side = layer_side;
-	params.outline.layer_fill = layer_fill;
-	params.outline.layer_start_offset = layer_start_offset;
-	params.outline.layer_scale_curve = layer_scale_curve;
-	params.outline.layer_custom_scales = layer_custom_scales;
-	params.outline.layer_twist = layer_twist;
-	params.outline.layer_max_dots = layer_max_dots;
-	params.flower_type = flower_type;
-	params.inner_radius_scale = inner_radius_scale;
-	params.spiro_roller = spiro_roller;
-	params.spiro_pen = spiro_pen;
-	params.super_lobes = super_lobes;
-	params.super_fullness = super_fullness;
-	params.outline.layer_layout = layer_layout;
-	return pattern_slots_to_array(generate_flower2d(transforms_amount, marker_transform, params));
-}
-
 PatternSlots2D BulletPatterns2D::generate_ellipse2d(int transforms_amount, Transform2D marker_transform, const EllipseParams2D &params) {
 	real_t radius_x = params.radius_x;
 	real_t radius_y = params.radius_y;
@@ -744,67 +618,6 @@ PatternSlots2D BulletPatterns2D::generate_ellipse2d(int transforms_amount, Trans
 	return layout_outline_slots("helper_generate_transforms_ellipse", marker_transform, loop_points, loop_normals, false, 0.0, face_outward, facing_offset_degrees, PackedFloat32Array(), params.outline, CornerLayout2D::smooth(), PackedVector2Array(), is_closed, !is_wall, fill_outline);
 }
 
-TypedArray<Transform2D> BulletPatterns2D::helper_generate_transforms_ellipse(
-		int transforms_amount,
-		Transform2D marker_transform,
-		real_t radius_x,
-		real_t radius_y,
-		real_t ellipse_rotation,
-		real_t start_angle,
-		real_t arc,
-		EllipseMode mode,
-		int gap_count,
-		real_t gap_width,
-		bool face_outward,
-		real_t facing_offset_degrees,
-		int outline_placement,
-		int outline_facing,
-		bool outline_reverse,
-		int outline_slot_offset,
-		double fill_spacing,
-		bool fill_stagger,
-		double fill_margin,
-		int layer_count,
-		double layer_scale,
-		int layer_side,
-		int layer_fill,
-		int layer_start_offset,
-		int layer_scale_curve,
-		const PackedFloat32Array &layer_custom_scales,
-		int layer_twist,
-		int layer_max_dots,
-		int layer_layout) {
-	EllipseParams2D params;
-	params.radius_x = radius_x;
-	params.radius_y = radius_y;
-	params.ellipse_rotation = ellipse_rotation;
-	params.start_angle = start_angle;
-	params.arc = arc;
-	params.mode = mode;
-	params.gap_count = gap_count;
-	params.gap_width = gap_width;
-	params.face_outward = face_outward;
-	params.facing_offset_degrees = facing_offset_degrees;
-	params.outline.outline_placement = outline_placement;
-	params.outline.outline_facing = outline_facing;
-	params.outline.outline_reverse = outline_reverse;
-	params.outline.outline_slot_offset = outline_slot_offset;
-	params.outline.fill_spacing = fill_spacing;
-	params.outline.fill_stagger = fill_stagger;
-	params.outline.fill_margin = fill_margin;
-	params.outline.layer_count = layer_count;
-	params.outline.layer_scale = layer_scale;
-	params.outline.layer_side = layer_side;
-	params.outline.layer_fill = layer_fill;
-	params.outline.layer_start_offset = layer_start_offset;
-	params.outline.layer_scale_curve = layer_scale_curve;
-	params.outline.layer_custom_scales = layer_custom_scales;
-	params.outline.layer_twist = layer_twist;
-	params.outline.layer_max_dots = layer_max_dots;
-	params.outline.layer_layout = layer_layout;
-	return pattern_slots_to_array(generate_ellipse2d(transforms_amount, marker_transform, params));
-}
-
 PatternSlots2D BulletPatterns2D::generate_star2d(int transforms_amount, Transform2D marker_transform, const StarParams2D &params) {
 	int points = params.points;
 	real_t outer_radius = params.outer_radius;
@@ -906,69 +719,6 @@ PatternSlots2D BulletPatterns2D::generate_star2d(int transforms_amount, Transfor
 	return layout_outline_slots("helper_generate_transforms_star", marker_transform, loop_points, loop_normals, true, marker_rot, face_outward, facing_offset_degrees, PackedFloat32Array(), params.outline, params.corner, corners, true, true);
 }
 
-TypedArray<Transform2D> BulletPatterns2D::helper_generate_transforms_star(
-		int transforms_amount,
-		Transform2D marker_transform,
-		int points,
-		real_t outer_radius,
-		real_t inner_radius,
-		real_t base_rotation,
-		bool face_outward,
-		real_t facing_offset_degrees,
-		int outline_placement,
-		int outline_facing,
-		bool outline_reverse,
-		int outline_slot_offset,
-		double fill_spacing,
-		bool fill_stagger,
-		double fill_margin,
-		int layer_count,
-		double layer_scale,
-		int layer_side,
-		int layer_fill,
-		int layer_start_offset,
-		int layer_scale_curve,
-		const PackedFloat32Array &layer_custom_scales,
-		int layer_twist,
-		int layer_max_dots,
-		int outline_distribution,
-		int layer_layout,
-		int outline_corner_priority,
-		int outline_corner_mode,
-		double outline_edge_margin,
-		int outline_corner_facing) {
-	StarParams2D params;
-	params.points = points;
-	params.outer_radius = outer_radius;
-	params.inner_radius = inner_radius;
-	params.base_rotation = base_rotation;
-	params.face_outward = face_outward;
-	params.facing_offset_degrees = facing_offset_degrees;
-	params.outline.outline_placement = outline_placement;
-	params.outline.outline_facing = outline_facing;
-	params.outline.outline_reverse = outline_reverse;
-	params.outline.outline_slot_offset = outline_slot_offset;
-	params.outline.fill_spacing = fill_spacing;
-	params.outline.fill_stagger = fill_stagger;
-	params.outline.fill_margin = fill_margin;
-	params.outline.layer_count = layer_count;
-	params.outline.layer_scale = layer_scale;
-	params.outline.layer_side = layer_side;
-	params.outline.layer_fill = layer_fill;
-	params.outline.layer_start_offset = layer_start_offset;
-	params.outline.layer_scale_curve = layer_scale_curve;
-	params.outline.layer_custom_scales = layer_custom_scales;
-	params.outline.layer_twist = layer_twist;
-	params.outline.layer_max_dots = layer_max_dots;
-	params.corner.outline_distribution = outline_distribution;
-	params.outline.layer_layout = layer_layout;
-	params.corner.outline_corner_priority = outline_corner_priority;
-	params.corner.outline_corner_mode = outline_corner_mode;
-	params.corner.outline_edge_margin = outline_edge_margin;
-	params.corner.outline_corner_facing = outline_corner_facing;
-	return pattern_slots_to_array(generate_star2d(transforms_amount, marker_transform, params));
-}
-
 PatternSlots2D BulletPatterns2D::generate_heart2d(int transforms_amount, Transform2D marker_transform, const HeartParams2D &params) {
 	real_t size = params.size;
 	real_t base_rotation = params.base_rotation;
@@ -1035,55 +785,6 @@ PatternSlots2D BulletPatterns2D::generate_heart2d(int transforms_amount, Transfo
 	return layout_outline_slots("helper_generate_transforms_heart", marker_transform, loop_points, loop_normals, false, 0.0, face_outward, facing_offset_degrees, facing_override, params.outline, CornerLayout2D::smooth(), PackedVector2Array(), true, true, fill_outline, dense_nrms, dense_ovr);
 }
 
-TypedArray<Transform2D> BulletPatterns2D::helper_generate_transforms_heart(
-		int transforms_amount,
-		Transform2D marker_transform,
-		real_t size,
-		real_t base_rotation,
-		bool face_outward,
-		real_t facing_offset_degrees,
-		int outline_placement,
-		int outline_facing,
-		bool outline_reverse,
-		int outline_slot_offset,
-		double fill_spacing,
-		bool fill_stagger,
-		double fill_margin,
-		int layer_count,
-		double layer_scale,
-		int layer_side,
-		int layer_fill,
-		int layer_start_offset,
-		int layer_scale_curve,
-		const PackedFloat32Array &layer_custom_scales,
-		int layer_twist,
-		int layer_max_dots,
-		int layer_layout) {
-	HeartParams2D params;
-	params.size = size;
-	params.base_rotation = base_rotation;
-	params.face_outward = face_outward;
-	params.facing_offset_degrees = facing_offset_degrees;
-	params.outline.outline_placement = outline_placement;
-	params.outline.outline_facing = outline_facing;
-	params.outline.outline_reverse = outline_reverse;
-	params.outline.outline_slot_offset = outline_slot_offset;
-	params.outline.fill_spacing = fill_spacing;
-	params.outline.fill_stagger = fill_stagger;
-	params.outline.fill_margin = fill_margin;
-	params.outline.layer_count = layer_count;
-	params.outline.layer_scale = layer_scale;
-	params.outline.layer_side = layer_side;
-	params.outline.layer_fill = layer_fill;
-	params.outline.layer_start_offset = layer_start_offset;
-	params.outline.layer_scale_curve = layer_scale_curve;
-	params.outline.layer_custom_scales = layer_custom_scales;
-	params.outline.layer_twist = layer_twist;
-	params.outline.layer_max_dots = layer_max_dots;
-	params.outline.layer_layout = layer_layout;
-	return pattern_slots_to_array(generate_heart2d(transforms_amount, marker_transform, params));
-}
-
 PatternSlots2D BulletPatterns2D::generate_rose2d(int transforms_amount, Transform2D marker_transform, const RoseParams2D &params) {
 	int petals = params.petals;
 	real_t radius = params.radius;
@@ -1143,59 +844,6 @@ PatternSlots2D BulletPatterns2D::generate_rose2d(int transforms_amount, Transfor
 		loop_normals.push_back(even_nrms[i]);
 	}
 	return layout_outline_slots("helper_generate_transforms_rose", marker_transform, loop_points, loop_normals, false, 0.0, face_outward, facing_offset_degrees, PackedFloat32Array(), params.outline, CornerLayout2D::smooth(), PackedVector2Array(), true, true, fill_outline, dense_nrms);
-}
-
-TypedArray<Transform2D> BulletPatterns2D::helper_generate_transforms_rose(
-		int transforms_amount,
-		Transform2D marker_transform,
-		int petals,
-		real_t radius,
-		real_t lobe_sharpness,
-		real_t base_rotation,
-		bool face_outward,
-		real_t facing_offset_degrees,
-		int outline_placement,
-		int outline_facing,
-		bool outline_reverse,
-		int outline_slot_offset,
-		double fill_spacing,
-		bool fill_stagger,
-		double fill_margin,
-		int layer_count,
-		double layer_scale,
-		int layer_side,
-		int layer_fill,
-		int layer_start_offset,
-		int layer_scale_curve,
-		const PackedFloat32Array &layer_custom_scales,
-		int layer_twist,
-		int layer_max_dots,
-		int layer_layout) {
-	RoseParams2D params;
-	params.petals = petals;
-	params.radius = radius;
-	params.lobe_sharpness = lobe_sharpness;
-	params.base_rotation = base_rotation;
-	params.face_outward = face_outward;
-	params.facing_offset_degrees = facing_offset_degrees;
-	params.outline.outline_placement = outline_placement;
-	params.outline.outline_facing = outline_facing;
-	params.outline.outline_reverse = outline_reverse;
-	params.outline.outline_slot_offset = outline_slot_offset;
-	params.outline.fill_spacing = fill_spacing;
-	params.outline.fill_stagger = fill_stagger;
-	params.outline.fill_margin = fill_margin;
-	params.outline.layer_count = layer_count;
-	params.outline.layer_scale = layer_scale;
-	params.outline.layer_side = layer_side;
-	params.outline.layer_fill = layer_fill;
-	params.outline.layer_start_offset = layer_start_offset;
-	params.outline.layer_scale_curve = layer_scale_curve;
-	params.outline.layer_custom_scales = layer_custom_scales;
-	params.outline.layer_twist = layer_twist;
-	params.outline.layer_max_dots = layer_max_dots;
-	params.outline.layer_layout = layer_layout;
-	return pattern_slots_to_array(generate_rose2d(transforms_amount, marker_transform, params));
 }
 
 PatternSlots2D BulletPatterns2D::generate_lissajous2d(int transforms_amount, Transform2D marker_transform, const LissajousParams2D &params) {
@@ -1264,61 +912,6 @@ PatternSlots2D BulletPatterns2D::generate_lissajous2d(int transforms_amount, Tra
 	return layout_outline_slots("helper_generate_transforms_lissajous", marker_transform, loop_points, loop_normals, false, 0.0, face_outward, facing_offset_degrees, PackedFloat32Array(), params.outline, CornerLayout2D::smooth(), PackedVector2Array(), !open_run, true, fill_outline, dense_nrms);
 }
 
-TypedArray<Transform2D> BulletPatterns2D::helper_generate_transforms_lissajous(
-		int transforms_amount,
-		Transform2D marker_transform,
-		real_t size_x,
-		real_t size_y,
-		real_t freq_x,
-		real_t freq_y,
-		real_t phase,
-		bool face_outward,
-		real_t facing_offset_degrees,
-		int outline_placement,
-		int outline_facing,
-		bool outline_reverse,
-		int outline_slot_offset,
-		double fill_spacing,
-		bool fill_stagger,
-		double fill_margin,
-		int layer_count,
-		double layer_scale,
-		int layer_side,
-		int layer_fill,
-		int layer_start_offset,
-		int layer_scale_curve,
-		const PackedFloat32Array &layer_custom_scales,
-		int layer_twist,
-		int layer_max_dots,
-		int layer_layout) {
-	LissajousParams2D params;
-	params.size_x = size_x;
-	params.size_y = size_y;
-	params.freq_x = freq_x;
-	params.freq_y = freq_y;
-	params.phase = phase;
-	params.face_outward = face_outward;
-	params.facing_offset_degrees = facing_offset_degrees;
-	params.outline.outline_placement = outline_placement;
-	params.outline.outline_facing = outline_facing;
-	params.outline.outline_reverse = outline_reverse;
-	params.outline.outline_slot_offset = outline_slot_offset;
-	params.outline.fill_spacing = fill_spacing;
-	params.outline.fill_stagger = fill_stagger;
-	params.outline.fill_margin = fill_margin;
-	params.outline.layer_count = layer_count;
-	params.outline.layer_scale = layer_scale;
-	params.outline.layer_side = layer_side;
-	params.outline.layer_fill = layer_fill;
-	params.outline.layer_start_offset = layer_start_offset;
-	params.outline.layer_scale_curve = layer_scale_curve;
-	params.outline.layer_custom_scales = layer_custom_scales;
-	params.outline.layer_twist = layer_twist;
-	params.outline.layer_max_dots = layer_max_dots;
-	params.outline.layer_layout = layer_layout;
-	return pattern_slots_to_array(generate_lissajous2d(transforms_amount, marker_transform, params));
-}
-
 PatternSlots2D BulletPatterns2D::generate_circle2d(int transforms_amount, Transform2D marker_transform, const CircleParams2D &params) {
 	real_t radius = params.radius;
 	bool face_outward = params.face_outward;
@@ -1358,53 +951,6 @@ PatternSlots2D BulletPatterns2D::generate_circle2d(int transforms_amount, Transf
 		}
 	}
 	return layout_outline_slots("helper_generate_transforms_circle", marker_transform, loop_points, loop_normals, true, marker_rot, face_outward, facing_offset_degrees, PackedFloat32Array(), params.outline, CornerLayout2D::smooth(), PackedVector2Array(), true, true, fill_outline);
-}
-
-TypedArray<Transform2D> BulletPatterns2D::helper_generate_transforms_circle(
-		int transforms_amount,
-		Transform2D marker_transform,
-		real_t radius,
-		bool face_outward,
-		real_t facing_offset_degrees,
-		int outline_placement,
-		int outline_facing,
-		bool outline_reverse,
-		int outline_slot_offset,
-		double fill_spacing,
-		bool fill_stagger,
-		double fill_margin,
-		int layer_count,
-		double layer_scale,
-		int layer_side,
-		int layer_fill,
-		int layer_start_offset,
-		int layer_scale_curve,
-		const PackedFloat32Array &layer_custom_scales,
-		int layer_twist,
-		int layer_max_dots,
-		int layer_layout) {
-	CircleParams2D params;
-	params.radius = radius;
-	params.face_outward = face_outward;
-	params.facing_offset_degrees = facing_offset_degrees;
-	params.outline.outline_placement = outline_placement;
-	params.outline.outline_facing = outline_facing;
-	params.outline.outline_reverse = outline_reverse;
-	params.outline.outline_slot_offset = outline_slot_offset;
-	params.outline.fill_spacing = fill_spacing;
-	params.outline.fill_stagger = fill_stagger;
-	params.outline.fill_margin = fill_margin;
-	params.outline.layer_count = layer_count;
-	params.outline.layer_scale = layer_scale;
-	params.outline.layer_side = layer_side;
-	params.outline.layer_fill = layer_fill;
-	params.outline.layer_start_offset = layer_start_offset;
-	params.outline.layer_scale_curve = layer_scale_curve;
-	params.outline.layer_custom_scales = layer_custom_scales;
-	params.outline.layer_twist = layer_twist;
-	params.outline.layer_max_dots = layer_max_dots;
-	params.outline.layer_layout = layer_layout;
-	return pattern_slots_to_array(generate_circle2d(transforms_amount, marker_transform, params));
 }
 
 } // namespace BlastBullets2D

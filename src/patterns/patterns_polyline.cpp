@@ -313,31 +313,4 @@ PatternSlots2D BulletPatterns2D::generate_polyline2d(int transforms_amount, Tran
 	return polyline_layout2d(marker_transform, points, transforms_amount, p, false, "helper_generate_transforms_polyline");
 }
 
-TypedArray<Transform2D> BulletPatterns2D::helper_generate_transforms_polyline(
-		int transforms_amount,
-		Transform2D marker_transform,
-		const PackedVector2Array &points,
-		bool closed,
-		PolylineDistribution distribution,
-		real_t spacing,
-		PolylineOverflow overflow,
-		PolylineAnchor anchor,
-		real_t start_offset,
-		bool reverse,
-		PolylineFacing facing,
-		real_t facing_offset_deg) {
-	PolylineParams2D params;
-	params.points = points;
-	params.closed = closed;
-	params.distribution = distribution;
-	params.spacing = spacing;
-	params.overflow = overflow;
-	params.anchor = anchor;
-	params.start_offset = start_offset;
-	params.reverse = reverse;
-	params.facing = facing;
-	params.facing_offset_deg = facing_offset_deg;
-	return pattern_slots_to_array(generate_polyline2d(transforms_amount, marker_transform, params));
-}
-
 } // namespace BlastBullets2D

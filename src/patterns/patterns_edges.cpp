@@ -369,35 +369,6 @@ PatternSlots2D BulletPatterns2D::generate_edge_from_points2d(int transforms_amou
 	return generated_transforms;
 }
 
-TypedArray<Transform2D> BulletPatterns2D::helper_generate_transforms_edge_from_points(
-		int transforms_amount,
-		Transform2D marker_transform,
-		const PackedVector2Array &edge_points,
-		bool closed,
-		bool flip_normals,
-		bool random_sample,
-		real_t jitter,
-		real_t facing_offset_degrees,
-		uint64_t seed,
-		real_t spread,
-		real_t spread_exponent,
-		int spread_side,
-		real_t tangent_jitter) {
-	EdgeFromPointsParams2D params;
-	params.edge_points = edge_points;
-	params.closed = closed;
-	params.flip_normals = flip_normals;
-	params.random_sample = random_sample;
-	params.jitter = jitter;
-	params.facing_offset_degrees = facing_offset_degrees;
-	params.seed = seed;
-	params.spread = spread;
-	params.spread_exponent = spread_exponent;
-	params.spread_side = spread_side;
-	params.tangent_jitter = tangent_jitter;
-	return pattern_slots_to_array(generate_edge_from_points2d(transforms_amount, marker_transform, params));
-}
-
 Dictionary BulletPatterns2D::helper_extract_edge_from_image(
 		const Ref<Image> &image,
 		real_t threshold,
