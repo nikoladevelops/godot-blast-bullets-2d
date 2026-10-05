@@ -132,11 +132,8 @@ func test_spawner_seeding_and_indexing() -> void:
 	var spawner := make_spawner(sg, 1)
 	assert_true(spawner.shoot_once(), "gravity spawner shot fires")
 	var live: Array = spawner.get_live_volleys()
-	if live.is_empty():
-		# Plain (non-homing) volleys are untracked by design.
-		assert_gte(factory.debug_get_total_bullets_amount(), 1, "gravity volley exists in factory")
-	else:
-		assert_eq((live[0] as BulletVolley2D).bullet_get_gravity(0), Vector2(0, 1200), "spawner volley carries gravity")
+	assert_eq(live.size(), 1, "the census lists the plain gravity volley")
+	assert_eq((live[0] as BulletVolley2D).bullet_get_gravity(0), Vector2(0, 1200), "spawner volley carries gravity")
 	var fb := _still(3)
 	fb.all_bullet_gravity = [Vector2(500, 0), Vector2(0, 500)]
 	var vf: BulletVolley2D = factory.spawn_volley(fb)

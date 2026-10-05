@@ -53,9 +53,9 @@ func test_spawn_pool_stats() -> void:
 	assert_eq(factory.debug_get_pool_hit_stats().get("misses", -1), 0, "pool stats reset")
 	factory.spawn_volley(_data(3))
 	await physics()
-	assert_gte(factory.debug_get_pool_hit_stats().get("misses", 0), 1, "first spawn is a miss")
-	assert_gte(factory.debug_get_total_bullets_amount(), 1, "total volleys")
-	assert_gte(factory.debug_get_active_bullets_amount(), 1, "active volleys")
+	assert_eq(factory.debug_get_pool_hit_stats().get("misses", 0), 1, "first spawn is a miss")
+	assert_eq(factory.debug_get_total_bullets_amount(), 1, "total volleys")
+	assert_eq(factory.debug_get_active_bullets_amount(), 1, "active volleys")
 
 
 func test_deferred_wrappers_survive_physics() -> void:

@@ -78,7 +78,7 @@ func test_debugger_budget_and_preview_rings() -> void:
 	spawner.show_preview_during_runtime = true
 	spawner.show_pattern_preview = true
 	await idle(1)
-	assert_gte(spawner.collect_spawn_transforms().size(), 1, "rings preview collects")
+	assert_eq(spawner.collect_spawn_transforms().size(), 4, "rings preview collects")
 
 
 func test_pool_hit_observability() -> void:
@@ -88,9 +88,9 @@ func test_pool_hit_observability() -> void:
 	assert_eq(factory.debug_get_bullets_pool_amount(), 2, "pre-populated 2")
 	factory.spawn_volley(pop_data)
 	await idle(1)
-	assert_gte(factory.debug_get_pool_hit_stats().get("hits", 0), 1, "reuse counted as hit")
+	assert_eq(factory.debug_get_pool_hit_stats().get("hits", 0), 1, "reuse counted as hit")
 	var carved := _data(4)
 	carved.transforms = [Transform2D.IDENTITY, Transform2D(0.0, Vector2(10, 0))]
 	factory.spawn_volley(carved)
 	await idle(1)
-	assert_gte(factory.debug_get_pool_hit_stats().get("misses", 0), 1, "size mismatch counted as miss")
+	assert_eq(factory.debug_get_pool_hit_stats().get("misses", 0), 1, "size mismatch counted as miss")

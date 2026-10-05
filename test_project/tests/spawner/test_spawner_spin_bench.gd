@@ -89,7 +89,7 @@ func test_shoot_once_cpu_cold_vs_warm() -> void:
 		await idle(1)
 	var stats: Dictionary = factory.debug_get_pool_hit_stats()
 	print("BENCH heart1500 shoot_once cold_ms=", colds, " warm_ms=", warms, " pool=", stats)
-	assert_gte(int(stats.get("hits", 0)), 2, "repeated shots reuse the pool")
+	assert_eq(int(stats.get("hits", 0)), 2, "repeated shots reuse the pool")
 
 
 func test_first_spawn_cold_vs_warm_pool() -> void:

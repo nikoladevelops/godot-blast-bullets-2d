@@ -39,8 +39,9 @@ func test_clear_bullet_fires_once() -> void:
 	factory.clear_sprite_effects()
 	assert_eq(factory.get_active_effect_count(), 0, "quiet before clear")
 	assert_true(v.clear_bullet(0), "clear_bullet on a live slot returns true")
-	assert_gte(factory.get_active_effect_count(), 1, "On Clear fired")
+	assert_eq(factory.get_active_effect_count(), 1, "On Clear fired exactly once")
 	assert_false(v.clear_bullet(0), "double clear stays silent")
+	assert_eq(factory.get_active_effect_count(), 1, "and spawned no second effect")
 
 
 func test_clear_active_bullets_clears_every_volley() -> void:

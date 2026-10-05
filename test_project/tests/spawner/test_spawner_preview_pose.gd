@@ -47,7 +47,7 @@ func test_spin_never_rebuilds_or_redraws() -> void:
 	var sp := _spinning_preview(BulletSpawner2D.PATTERN_FROM_HELPER_HEART, 1500)
 	await idle(4)
 	var s0: Dictionary = sp.debug_get_preview_stats()
-	assert_gt(int(s0["dots_draws"]), 0, "preview drew once")
+	assert_eq(int(s0["dots_draws"]), 1, "preview drew once")
 	await idle(30)
 	var s1: Dictionary = sp.debug_get_preview_stats()
 	assert_eq(int(s1["rebuilds"]), int(s0["rebuilds"]), "30 spinning frames: zero rebuilds")

@@ -73,4 +73,4 @@ func test_prepopulated_pool_reused_from_handler() -> void:
 	assert_eq(_spawned.size(), 1)
 	assert_not_null(_spawned[0] if _spawned.size() > 0 else null, "pool-hit spawn inside the handler succeeded")
 	assert_ne(_spawned[0] if _spawned.size() > 0 else null, v, "pooled reuse is not the draining volley")
-	assert_gte(int(factory.debug_get_pool_hit_stats().get("hits", 0)), 2, "handler spawn came from the pool")
+	assert_eq(int(factory.debug_get_pool_hit_stats().get("hits", 0)), 2, "handler spawn came from the pool")
