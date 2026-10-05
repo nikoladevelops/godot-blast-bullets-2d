@@ -76,4 +76,11 @@ struct PatternTrackInputs2D {
 	Vector2 corridor_aim;
 };
 
+// What a preset decides beyond the knobs (spawner-owned state).
+struct PatternPresetResult2D {
+	int source = 0; // PatternShape2D id
+	bool spin_enabled = false; // true: the preset turns spin on
+	double spin_speed_deg_per_sec = 0.0;
+};
+
 } //namespace BlastBullets2D

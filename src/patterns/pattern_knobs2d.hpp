@@ -432,6 +432,10 @@ struct PatternKnobs2D {
 	// per-mode sub-rules (flower type, ellipse wall, fixed-spacing path...).
 	// pattern_gating2d.cpp.
 	bool is_knob_relevant(int source, const String &property_name) const;
+	// Writes a BulletPatterns2D::PatternPreset's knobs (on top of defaults
+	// the caller restored) and reports its source/spin. False (nothing
+	// written) for CUSTOM and unknown ids. pattern_presets2d.cpp.
+	bool write_preset_knobs(int preset, PatternPresetResult2D &r_preset);
 };
 
 } //namespace BlastBullets2D

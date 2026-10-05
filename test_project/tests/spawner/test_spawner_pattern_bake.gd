@@ -239,3 +239,78 @@ func test_skip_indices_and_scales_apply_after_the_bake() -> void:
 	_random_pose()
 	_assert_same(sp.collect_spawn_transforms(), sp.debug_collect_spawn_transforms_uncached(), "skip + scales on a cached pattern")
 	assert_eq(sp.collect_spawn_transforms().size(), plain.size() - 2, "skip carves exactly two slots")
+
+
+func _differs(a: Array, b: Array) -> bool:
+	if a.size() != b.size():
+		return true
+	for i in a.size():
+		var x: Transform2D = a[i]
+		var y: Transform2D = b[i]
+		if x.origin.distance_to(y.origin) > 0.01 or x.x.distance_to(y.x) > 0.001:
+			return true
+	return false
+
+
+## The longest registered knob prefix owning a property (-1: shared knob).
+func _owner(prop: String, shapes: Array) -> int:
+	var best := -1
+	var best_len := 0
+	for s in shapes:
+		var pre: String = s["knob_prefix"]
+		if pre != "" and pre.length() > best_len and prop.begins_with(pre):
+			best = int(s["id"])
+			best_len = pre.length()
+	return best
+
+
+func test_every_shape_knob_invalidates_the_bake_under_its_own_shape() -> void:
+	# Ownership-driven sweep: each cacheable shape's knobs are perturbed while
+	# THAT shape is the source (the generic sweep above runs every knob under
+	# five fixed sources, where most knobs cannot move a single bullet). A
+	# perturbation that moves the bullets proves the knob participates; the
+	# verifier then proves the bake noticed.
+	var shapes: Array = BulletPatterns2D.get_shapes()
+	_seed_all()
+	var by_owner := {}
+	for p in sp.get_property_list():
+		var name := str(p["name"])
+		if not name.begins_with("helper_") or name.begins_with("helper_outline_") or name.ends_with("_seed") or name.ends_with("_path") or name.ends_with("_target"):
+			continue
+		var owner := _owner(name, shapes)
+		if owner >= 0:
+			if not by_owner.has(owner):
+				by_owner[owner] = []
+			by_owner[owner].append(p)
+	var swept := 0
+	var moved := 0
+	var inert: Array = []
+	for s in shapes:
+		if bool(s["reads_external_state"]) or not by_owner.has(int(s["id"])):
+			continue
+		sp.pattern_source = int(s["id"])
+		for p in by_owner[int(s["id"])]:
+			var name := str(p["name"])
+			var old: Variant = sp.get(name)
+			var nv: Variant = _perturb(p, old)
+			if nv == null:
+				continue
+			_random_pose()
+			var before: Array = sp.debug_collect_spawn_transforms_uncached()
+			sp.collect_spawn_transforms() # bake at the old value
+			sp.set(name, nv)
+			swallow_rejections_for(name)
+			var cached: Array = sp.collect_spawn_transforms()
+			swallow_rejections_for(name)
+			var fresh: Array = sp.debug_collect_spawn_transforms_uncached()
+			swallow_rejections_for(name)
+			_assert_same(cached, fresh, "after changing %s under %s" % [name, s["name"]])
+			if _differs(before, fresh):
+				moved += 1
+			elif sp.get(name) == nv:
+				inert.append(name)
+			sp.set(name, old)
+			swallow_rejections_for(name)
+			swept += 1
+	assert_gt(swept, 150, "every cacheable shape's knobs swept (%d)" % swept)
+	assert_gt(moved, swept * 85 / 100, "most perturbations really move bullets (%d of %d); inert: %s" % [moved, swept, inert])
