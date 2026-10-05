@@ -236,10 +236,21 @@ the per-source stages over them: `pattern_dispatch2d.cpp` (`generate_raw`),
 registry table (`pattern_registry2d.cpp`, `BulletPatterns2D.get_shapes()`).
 The module never touches the tree: the spawner resolves children / aimed
 target / Path2D curve into `PatternInputs2D` (`bullet_spawner2d_patterns.cpp`,
-`generate_raw_pattern`); its accessors stay in
-`bullet_spawner2d_pattern_properties.cpp`, bind order in
-`bullet_spawner2d_bindings.cpp`. New shape = registry row (next free id) +
-knobs + a generate and a track case; gating follows its prefix.
+`generate_raw_pattern`). Generators: each `helper_generate_transforms_<shape>`
+binding wraps a native static core `BulletPatterns2D::generate_<shape>2d(amount,
+marker, const <Shape>Params2D &)` returning `PatternSlots2D` (std::vector);
+params structs live in `pattern_params2d.hpp` (defaults = the GDScript
+defaults; loops carry `OutlineLayout2D` / `CornerLayout2D`), and the dispatch
+fills them by field name. Knob accessors: ONE table,
+`pattern_knob_table2d.inc` (row order = inspector and .tscn order), expanded
+by X-macros into the spawner getters/setters (validation rules from
+`pattern_knob_checks2d.hpp`, message "BulletSpawner2D: <knob> <text>, keeping
+the old value."), their declarations and their binds. New knob = field in
+`PatternKnobs2D` + one `PATTERN_KNOB` row; only `PATTERN_PROPERTY` rows (node
+paths, arrays, enum-typed Path2D knobs, spawner settings) keep hand-written
+accessors in `bullet_spawner2d_pattern_properties.cpp`. New shape = registry
+row (next free id) + knobs + table rows + a params struct + a generate and a
+track case; gating follows its prefix.
 
 Invariants every generator must keep (pinned by
 `spawner/test_spawner_pattern_counts.gd`, `test_spawner_pattern_bake.gd`,
@@ -344,7 +355,8 @@ func test_<behavior>_<expectation>() -> void:
   `helper_star_`, `helper_counter_spiral_` vs `helper_spiral_`).
 - ADD_PROPERTY BEFORE its bind_method is SILENTLY dropped by ClassDB (the
   runner flags the `class_db.cpp` error). Moving a property = moving its
-  whole bind+ADD_PROPERTY paragraph.
+  whole bind+ADD_PROPERTY paragraph (for pattern knobs: moving its table
+  row; the expansion binds before it adds the property).
 - A setter whose field `_validate_property` reads MUST call
   `notify_property_list_changed()` (pinned per switch).
 - Gating: helper_* per pattern mode; homing/orbiting/movement/preview knobs

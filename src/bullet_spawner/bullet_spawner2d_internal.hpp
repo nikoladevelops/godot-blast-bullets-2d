@@ -129,7 +129,7 @@ static constexpr int kMaxHomingTargets = 10000; // homing_max_targets scene-scan
 
 static constexpr int kMaxHomingDequeTargets = 256; // engine queue cap per volley
 
-static constexpr int kMaxOutlineLayers = 64; // helper_outline_layer_count + helper_outline_layer_scales
+static constexpr int kMaxOutlineLayers = kPatternMaxOutlineLayers; // helper_outline_layer_count + helper_outline_layer_scales
 
 static constexpr int kMaxPreviewTrackPoints = kPatternMaxTrackPoints; // path/cross track decimation stride target
 
