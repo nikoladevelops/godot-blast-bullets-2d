@@ -910,7 +910,9 @@ void BulletVolley2D::move_bullets(double delta) {
 				const real_t keep = Math::max((real_t)0.0, (real_t)1.0 - linear_drag * (real_t)delta);
 				all_cached_speed[i] *= keep;
 				all_cached_velocity[i] = all_cached_direction[i] * all_cached_speed[i] + inherited_velocity_offset + ((i >= 0 && i < (int)all_gravity_velocity.size()) ? all_gravity_velocity[i] : Vector2(0, 0));
-			} else if (gravity.length_squared() > 0.0) {
+			} else if (gravity_active) {
+				// Any gravity (shared or per-bullet) keeps its fall speed in
+				// the reported velocity; the plain accel path above omits it.
 				all_cached_velocity[i] = all_cached_direction[i] * all_cached_speed[i] + inherited_velocity_offset + ((i >= 0 && i < (int)all_gravity_velocity.size()) ? all_gravity_velocity[i] : Vector2(0, 0));
 			}
 		}
