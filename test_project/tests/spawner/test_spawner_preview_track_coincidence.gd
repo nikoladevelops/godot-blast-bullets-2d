@@ -79,7 +79,9 @@ func _measure(src: int, amount: int, posed: bool, jitter := 0.0, knobs := {}) ->
 	sp.helper_rain_jitter = jitter
 	sp.helper_waterfall_jitter = jitter
 	for k in knobs:
+		assert_true(k in sp, "knob %s exists (set() ignores unknown names)" % k)
 		sp.set(k, knobs[k])
+		assert_eq(sp.get(k), knobs[k], "knob %s accepted" % k)
 	if posed:
 		sp.rotation = 0.7
 		sp.pattern_scale = POSED_SCALE
@@ -156,6 +158,16 @@ const VARIANTS := [
 	# Odd petal counts close after half a turn.
 	[BulletSpawner2D.PATTERN_FROM_HELPER_ROSE, {"helper_rose_petals": 5, "helper_rose_lobe_sharpness": 2.0}],
 	[BulletSpawner2D.PATTERN_FROM_HELPER_HEART, {"helper_heart_size": 90.0, "helper_heart_base_rotation": 0.6}],
+	# Formula pairs computed at different precision on the two sides (the
+	# generator in float, the sampler in double, or vice versa): they must
+	# still agree far below a pixel.
+	[BulletSpawner2D.PATTERN_FROM_HELPER_RING, {"helper_ring_arc": TAU - 0.05}],
+	[BulletSpawner2D.PATTERN_FROM_HELPER_RING, {"helper_ring_arc": -TAU, "helper_ring_y_scale": 0.6}],
+	[BulletSpawner2D.PATTERN_FROM_HELPER_FLOWER, {"helper_flower_type": 4, "helper_flower_inner_radius_scale": 0.9995}],
+	[BulletSpawner2D.PATTERN_FROM_HELPER_FLOWER, {"helper_flower_type": 0, "helper_flower_petal_spread": 1.7}],
+	[BulletSpawner2D.PATTERN_FROM_HELPER_ROSE, {"helper_rose_petals": 7, "helper_rose_base_rotation": 1.1}],
+	[BulletSpawner2D.PATTERN_FROM_HELPER_WATERFALL, {"helper_waterfall_columns": 7, "helper_waterfall_rows": 5, "helper_waterfall_stagger": 0.37, "helper_waterfall_rain_direction": Vector2(0.3, 1.0)}],
+	[BulletSpawner2D.PATTERN_FROM_HELPER_RAIN, {"helper_rain_drop_spacing": 37.0, "helper_rain_direction": Vector2(-0.4, 1.0)}],
 ]
 
 
