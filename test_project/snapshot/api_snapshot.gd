@@ -17,7 +17,7 @@ const PLUGIN_CLASSES: Array[StringName] = [
 	&"BulletFactory2D", &"BulletVolleyDebugger2D", &"BulletVolleyData2D", &"BulletVolley2D",
 	&"BulletSpawner2D", &"PatternPreviewLayer2D",
 ]
-const AMOUNTS := [0, 1, 2, 7, 24]
+const AMOUNTS := [-1, 0, 1, 2, 7, 24, 10001]
 const TRACE_STEP := 1.0 / 60.0
 
 
