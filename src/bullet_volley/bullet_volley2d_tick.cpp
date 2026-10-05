@@ -868,11 +868,11 @@ void BulletVolley2D::move_bullets(double delta) {
 			// 7b. REACHED SIGNAL (after all steering): tests the post-move
 			// position directly. The transform was already advanced above, so
 			// predicting again with velocity_delta would test two ticks
-			// ahead. A bullet that followed the shared deque this tick has no per-bullet signal data - skip it.
-			// ran: homing_target_pos below is only valid when this bullet
-			// actually homed this tick.
+			// ahead. Only a bullet that homed this tick has a valid
+			// homing_target_pos, and its reach belongs to the deque it
+			// steered by (its own deque wins even while shared has targets).
 			if (target_deque_used_for_orbiting != nullptr && !target_deque_used_for_orbiting->empty() && homing_target_pos.is_finite()) {
-				try_to_emit_bullet_homing_target_reached_signal(*target_deque_used_for_orbiting, shared_homing_deque_enabled, i, curr_bullet_origin, homing_target_pos, Vector2(0, 0));
+				try_to_emit_bullet_homing_target_reached_signal(*target_deque_used_for_orbiting, target_deque_used_for_orbiting == &shared_homing_deque, i, curr_bullet_origin, homing_target_pos, Vector2(0, 0));
 			}
 
 			// 9. MOVEMENT SPEED ACCELERATION - per-bullet curve wins per
