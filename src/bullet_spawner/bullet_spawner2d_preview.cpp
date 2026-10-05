@@ -251,6 +251,10 @@ PackedVector2Array BulletSpawner2D::debug_get_preview_track_points() const {
     return preview_dots_layer->path_points;
 }
 
+bool BulletSpawner2D::debug_get_preview_track_closed() const {
+    return preview_dots_layer != nullptr && preview_dots_layer->path_closed;
+}
+
 // Debugging function: proves dots sit on the drawn geometry (base track or
 // yellow rings — same center-scale rule on both sides). Point-to-segment
 // match against the holder-local base track plus every stored ring: exact on

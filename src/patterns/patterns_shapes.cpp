@@ -488,14 +488,10 @@ TypedArray<Transform2D> BulletPatterns2D::helper_generate_transforms_rain(
 	// Layered sheets: each row holds up to `cols` drops spread across the
 	// whole band; further rows step upstream by drop_spacing. Volleys that
 	// fit one row span the band exactly like a single sheet.
-	const int cols = (drop_spacing > 0.0)
-			? Math::clamp((int)Math::floor(band_width / Math::max((real_t)drop_spacing, (real_t)1.0)) + 1, 1, transforms_amount)
-			: transforms_amount;
+	const int cols = rain_columns2d(transforms_amount, band_width, drop_spacing);
 	for (int i = 0; i < transforms_amount; ++i) {
 		const int row = i / cols;
-		const int col = i % cols;
-		const int in_row = Math::min(cols, transforms_amount - row * cols);
-		const real_t along = (in_row > 1) ? (band_width * (real_t)col / (real_t)(in_row - 1) - band_width * 0.5) : 0.0;
+		const real_t along = rain_along2d(i, transforms_amount, cols, band_width);
 		Vector2 pos = origin + across * along - axis * (real_t)row * drop_spacing;
 		if (jitter > 0.0) {
 			real_t jx = rain_seeded ? rain_rng->randf_range(-jitter, jitter) : UtilityFunctions::randf_range(-jitter, jitter);
@@ -753,8 +749,7 @@ TypedArray<Transform2D> BulletPatterns2D::helper_generate_transforms_cross(
 	// a partial last round still spreads across rays. When an arm cannot
 	// hold its slots at `spacing`, the spacing shrinks so the outermost slot
 	// lands exactly on the tip (every bullet keeps its own spot).
-	const int per_arm = Math::max(1, (int)Math::ceil((double)transforms_amount / (double)arm_count));
-	const real_t step_spacing = ((real_t)per_arm * spacing > arm_length && per_arm > 0) ? arm_length / (real_t)per_arm : spacing;
+	const real_t step_spacing = cross_step2d(transforms_amount, arm_count, arm_length, spacing);
 	for (int i = 0; i < transforms_amount; ++i) {
 		const int arm = i % arm_count;
 		const int step = i / arm_count;

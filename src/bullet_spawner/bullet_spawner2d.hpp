@@ -1166,6 +1166,8 @@ class BulletSpawner2D : public Node2D, public PatternKnobs2D {
         // parity between volley geometry and gizmo) without an editor.
         PackedVector2Array debug_get_preview_dot_points() const;
         PackedVector2Array debug_get_preview_track_points() const;
+        // Whether the drawn base track closes its last point back to the first.
+        bool debug_get_preview_track_closed() const;
         // Debug coincidence check: verifies every preview dot sits on the
         // drawn geometry (base track or yellow rings). Returns { checked,
         // layers, max_deviation_px, mean_deviation_px, ok }. ok = max

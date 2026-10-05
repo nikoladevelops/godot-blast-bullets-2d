@@ -473,7 +473,9 @@ Dictionary BulletPatterns2D::helper_sample_outline_rain(int transforms_amount, r
 	// Mirrors helper_generate_transforms_rain row grouping.
 	const Vector2 axis = rain_direction.normalized();
 	const Vector2 across = axis.orthogonal();
-	const int cols_per_row = (drop_spacing > 0.0) ? MAX(1, (int)(band_width / MAX(drop_spacing, 1.0))) : 1;
+	// Same grid as the generator (rain_columns2d / rain_along2d): one strip
+	// per row through that row's drops.
+	const int cols_per_row = rain_columns2d(transforms_amount, band_width, drop_spacing);
 	const int total_rows = (transforms_amount + cols_per_row - 1) / cols_per_row;
 	PackedVector2Array pts;
 	for (int row = 0; row < total_rows; ++row) {
@@ -482,7 +484,7 @@ Dictionary BulletPatterns2D::helper_sample_outline_rain(int transforms_amount, r
 			if (i >= transforms_amount) {
 				break;
 			}
-			const real_t along = (transforms_amount > 1) ? (band_width * (real_t)i / (real_t)(transforms_amount - 1) - band_width * 0.5) : 0.0;
+			const real_t along = rain_along2d(i, transforms_amount, cols_per_row, band_width);
 			const Vector2 cell = across * along - axis * (real_t)((double)row * drop_spacing);
 			if (cell.is_finite()) {
 				pts.push_back(cell);

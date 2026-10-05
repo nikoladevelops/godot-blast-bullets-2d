@@ -3,8 +3,8 @@ extends BlastTest
 ## covered without touching this file. For every plugin class, every bound
 ## one-argument set_X with a get_X / is_X twin either ACCEPTS a changed value
 ## (the getter then returns exactly it) or REJECTS it with an error and keeps
-## the old value. NaN is rejected by every float and vector setter (old value
-## kept). Catches swapped binds, setters that silently ignore or clamp,
+## the old value. NaN and +/-INF are rejected by every float and vector
+## setter (old value kept). Catches swapped binds, setters that silently ignore or clamp,
 ## getters reading the wrong field, and rejects that half-apply.
 
 # Setters whose effect is structural, not a stored value (each listed with
@@ -134,7 +134,7 @@ func test_every_setter_accepts_exactly_or_rejects_and_keeps() -> void:
 	assert_eq(problems, [], "every setter either round-trips or rejects loudly and keeps the old value")
 
 
-func test_nan_is_rejected_by_every_float_and_vector_setter() -> void:
+func test_non_finite_values_are_rejected_by_every_float_and_vector_setter() -> void:
 	var problems: Array = []
 	var checked := 0
 	for probe in probes:
@@ -143,18 +143,15 @@ func test_nan_is_rejected_by_every_float_and_vector_setter() -> void:
 		for pair in _pairs(cls):
 			var setter: String = pair[0]
 			var getter: String = pair[1]
-			var bad: Variant = null
-			if pair[2] == TYPE_FLOAT:
-				bad = NAN
-			elif pair[2] == TYPE_VECTOR2:
-				bad = Vector2(NAN, 1.0)
-			if bad == null or NOT_A_VALUE.has(cls + "." + setter):
+			if (pair[2] != TYPE_FLOAT and pair[2] != TYPE_VECTOR2) or NOT_A_VALUE.has(cls + "." + setter):
 				continue
-			var r := _try(obj, setter, getter, bad)
-			checked += 1
-			if r["errors"] == 0:
-				problems.append("%s.%s(NaN) accepted silently (reads %s)" % [cls, setter, r["now"]])
-			elif not _same(r["now"], r["old"]):
-				problems.append("%s.%s(NaN) rejected but changed %s -> %s" % [cls, setter, r["old"], r["now"]])
-	assert_gt(checked, 100, "the sweep reached the float/vector setters (%d)" % checked)
-	assert_eq(problems, [], "NaN never reaches a stored value")
+			for x in [NAN, INF, -INF]:
+				var bad: Variant = x if pair[2] == TYPE_FLOAT else Vector2(x, 1.0)
+				var r := _try(obj, setter, getter, bad)
+				checked += 1
+				if r["errors"] == 0:
+					problems.append("%s.%s(%s) accepted silently (reads %s)" % [cls, setter, bad, r["now"]])
+				elif not _same(r["now"], r["old"]):
+					problems.append("%s.%s(%s) rejected but changed %s -> %s" % [cls, setter, bad, r["old"], r["now"]])
+	assert_gt(checked, 300, "the sweep reached the float/vector setters (%d calls)" % checked)
+	assert_eq(problems, [], "NaN and +/-INF never reach a stored value")

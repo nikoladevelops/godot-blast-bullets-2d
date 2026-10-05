@@ -5,6 +5,7 @@
 
 #include "patterns/pattern_knobs2d.hpp"
 #include "patterns/pattern_registry2d.hpp"
+#include "patterns/patterns_internal.hpp"
 
 #include "godot_cpp/core/math.hpp"
 
@@ -214,41 +215,34 @@ void PatternKnobs2D::build_preview_track(const PatternTrackInputs2D &in, Pattern
             break;
         }
         case PATTERN_SHAPE_STAR_POLYGON: {
-            // Vertex skeleton: star polygon through N vertices,
-            // showing the emphasis frame the bias pulls toward. Same
-            // sampler/corners the generator uses.
-            sink.push_dict(BulletPatterns2D::helper_sample_outline_polygon(helper_star_polygon_vertices, (real_t)helper_star_polygon_radius, (real_t)helper_star_polygon_base_rotation));
+            // The bullets sit on the circle of helper_star_polygon_radius
+            // (the vertex bias only clusters their angles toward the
+            // vertices), so the track is that circle, not the vertex
+            // polygon (whose edges cut up to r * (1 - cos(pi / n)) inside).
+            sink.push_dict(BulletPatterns2D::helper_sample_outline_circle((real_t)helper_star_polygon_radius));
             break;
         }
         case PATTERN_SHAPE_CROSS: {
-            // Radial arm rays from origin, replicating the generator's
-            // arm layout (arm_count rays, evenly angled). Each arm is a
-            // segment origin -> tip; radial density capped.
-            if (helper_cross_arm_count < 1 || !Math::is_finite(helper_cross_arm_length) || helper_cross_arm_length <= 0.0) {
+            // One ray per lit arm, origin -> its deepest bullet, from the
+            // generator's own layout (cross_step2d): the spacing compresses
+            // when the arm would overshoot arm_length, so the ray always ends
+            // on the outermost bullet. Arms without bullets draw nothing.
+            if (helper_cross_arm_count < 1 || !Math::is_finite(helper_cross_arm_length) || helper_cross_arm_length < 0.0 || !Math::is_finite(helper_cross_spacing) || helper_cross_spacing <= 0.0 || helper_bullets_amount <= 0) {
                 break;
             }
-            const real_t arm_angle = Math::TAU / (real_t)helper_cross_arm_count;
-            const real_t base_rot = (real_t)helper_cross_base_rotation;
-            const int radial_steps = MIN(helper_bullets_amount, kPatternMaxCrossTrackSteps);
+            const real_t step = cross_step2d(helper_bullets_amount, helper_cross_arm_count, (real_t)helper_cross_arm_length, (real_t)helper_cross_spacing);
             for (int a = 0; a < helper_cross_arm_count; a++) {
-                const real_t ang = base_rot + arm_angle * (real_t)a;
-                const Vector2 dir = Vector2(Math::cos(ang), Math::sin(ang));
-                bool first = true;
-                for (int s = 1; s <= radial_steps; s++) {
-                    const real_t dist = (real_t)helper_cross_spacing * (real_t)s;
-                    if (!Math::is_finite(dist) || dist > (real_t)helper_cross_arm_length) {
-                        break;
-                    }
-                    const Vector2 global = track_origin + dir * dist;
-                    if (!global.is_finite()) {
-                        continue;
-                    }
-                    if (first) {
-                        sink.push_global(track_origin);
-                        first = false;
-                    }
-                    sink.push_global(global);
+                const int depth = cross_arm_bullets2d(helper_bullets_amount, helper_cross_arm_count, a);
+                if (depth <= 0) {
+                    continue;
                 }
+                const real_t ang = (real_t)helper_cross_base_rotation + Math::TAU * (real_t)a / (real_t)helper_cross_arm_count;
+                const Vector2 tip = track_origin + Vector2(Math::cos(ang), Math::sin(ang)) * (step * (real_t)depth);
+                if (!tip.is_finite()) {
+                    continue;
+                }
+                sink.push_global(track_origin);
+                sink.push_global(tip);
             }
             break;
         }

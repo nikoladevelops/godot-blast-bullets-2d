@@ -133,7 +133,6 @@ static constexpr int kMaxOutlineLayers = 64; // helper_outline_layer_count + hel
 
 static constexpr int kMaxPreviewTrackPoints = kPatternMaxTrackPoints; // path/cross track decimation stride target
 
-static constexpr int kMaxCrossTrackSteps = kPatternMaxCrossTrackSteps; // cross arm radial density cap
 
 static constexpr int kPreviewZIndex = 4000; // dots + arrows layers
 

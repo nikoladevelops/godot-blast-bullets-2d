@@ -20,7 +20,6 @@ using namespace godot;
 static constexpr int kPatternMaxBullets = 10000; // helper_bullets_amount + helper_custom_transforms
 static constexpr int kPatternMaxGridSlots = kPatternMaxBullets * 4; // waterfall/lattice columns * rows
 static constexpr int kPatternMaxTrackPoints = 256; // path/cross track decimation target
-static constexpr int kPatternMaxCrossTrackSteps = 256; // cross arm radial density cap
 
 // WarnOnce2D codes raised by pattern generation (spawner range 101+).
 static constexpr uint32_t kPatternWarnCorridorGap = 101; // gap >= width at generation

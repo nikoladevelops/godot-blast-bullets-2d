@@ -1500,6 +1500,7 @@ void BulletSpawner2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("debug_get_layer_rings"), &BulletSpawner2D::debug_get_layer_rings);
 	ClassDB::bind_method(D_METHOD("debug_get_preview_dot_points"), &BulletSpawner2D::debug_get_preview_dot_points);
 	ClassDB::bind_method(D_METHOD("debug_get_preview_track_points"), &BulletSpawner2D::debug_get_preview_track_points);
+	ClassDB::bind_method(D_METHOD("debug_get_preview_track_closed"), &BulletSpawner2D::debug_get_preview_track_closed);
 	ClassDB::bind_method(D_METHOD("debug_check_layer_coincidence", "tolerance_px"), &BulletSpawner2D::debug_check_layer_coincidence, DEFVAL(1.0));
 	ClassDB::bind_method(D_METHOD("debug_get_retarget_countdown"), &BulletSpawner2D::debug_get_retarget_countdown);
 	ClassDB::bind_method(D_METHOD("adopt_live_volley", "volley"), &BulletSpawner2D::adopt_live_volley);

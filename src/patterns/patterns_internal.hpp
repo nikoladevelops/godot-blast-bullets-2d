@@ -51,6 +51,41 @@ struct PolylineLayout2D {
 // mode. caller prefixes every error ("<caller>: ...").
 TypedArray<Transform2D> polyline_layout2d(const Transform2D &marker, const PackedVector2Array &path_pts, int count, const PolylineLayout2D &p, bool quiet, const char *caller);
 
+// Layout formulas shared by a generator and its preview track, so the track
+// always draws where the bullets sit (invariant 4, pinned for every source
+// by spawner/test_spawner_preview_track_coincidence.gd).
+
+// Rain: drops per row (band_width / drop_spacing gaps + 1, capped by the
+// amount; one row when the spacing is 0).
+static inline int rain_columns2d(int amount, real_t band_width, real_t drop_spacing) {
+	if (amount <= 0) {
+		return 1;
+	}
+	return (drop_spacing > 0.0)
+			? Math::clamp((int)Math::floor(band_width / Math::max((real_t)drop_spacing, (real_t)1.0)) + 1, 1, amount)
+			: amount;
+}
+// Rain: drop i's offset across the band. Each row (the last, partial one
+// included) spreads its own drops over the full band width.
+static inline real_t rain_along2d(int i, int amount, int cols, real_t band_width) {
+	const int row = i / cols;
+	const int col = i % cols;
+	const int in_row = Math::min(cols, amount - row * cols);
+	return (in_row > 1) ? (band_width * (real_t)col / (real_t)(in_row - 1) - band_width * 0.5) : (real_t)0.0;
+}
+
+// Cross: bullets go round-robin over the arms (i % arm_count), ceil(amount /
+// arms) deep; the step compresses so the deepest bullet sits at arm_length
+// when the spacing would overshoot it.
+static inline real_t cross_step2d(int amount, int arm_count, real_t arm_length, real_t spacing) {
+	const int per_arm = Math::max(1, (int)Math::ceil((double)amount / (double)Math::max(arm_count, 1)));
+	return ((real_t)per_arm * spacing > arm_length) ? arm_length / (real_t)per_arm : spacing;
+}
+// Cross: how many bullets arm `arm` holds.
+static inline int cross_arm_bullets2d(int amount, int arm_count, int arm) {
+	return (arm < amount) ? (amount - arm + arm_count - 1) / arm_count : 0;
+}
+
 // Cap for every helper_generate_transforms_* call: each one allocates O(n)
 // slots, so an unbounded count (a typo'd 1000000, let alone INT_MAX) would
 // freeze or OOM the game. Batch huge volleys into several calls instead.
