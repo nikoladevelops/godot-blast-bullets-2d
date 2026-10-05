@@ -32,10 +32,11 @@
 				Starts a burst chain by hand (waves and boss phases): [member burst_count] shots, [member burst_interval_sec] apart, telegraphed first when [member telegraph_enabled]. Clears any pending telegraph first. Manual chains run whether auto-shooting is on or not; chains started by the auto loop are clamped to [method volleys_remaining] and cancelled when auto-shooting is switched off.
 			</description>
 		</method>
-		<method name="clear_live_volleys">
-			<return type="void" />
+		<method name="clear_active_bullets">
+			<return type="int" />
+			<param index="0" name="fire_clear_effects" type="bool" default="true" />
 			<description>
-				Forgets all tracked volleys. They keep flying untouched and are no longer retargeted. Reached-signal forwarding stays connected. Tracking is also capped at the 256 most recent volleys (oldest dropped first), so long auto-shoot sessions with infinite lifetimes cannot grow retarget cost without bound.
+				Clears every live bullet this spawner owns and returns how many were cleared. With [param fire_clear_effects] (default) the On Clear effect layers fire at each bullet's pose; [code]false[/code] removes them silently. Emptied volleys return to the pool. Other spawners' bullets are untouched.
 			</description>
 		</method>
 		<method name="clear_live_volleys_homing">
@@ -102,6 +103,12 @@
 				Preview instrumentation: [code]rebuilds[/code], [code]last_rebuild_usec[/code], [code]dots_draws[/code], [code]arrows_draws[/code]. Spinning or moving the spawner leaves all four flat: the pose is applied as a node transform, never as a rebuild or redraw.
 			</description>
 		</method>
+		<method name="debug_get_preview_track_closed" qualifiers="const">
+			<return type="bool" />
+			<description>
+				Debug/test helper: whether the drawn preview base track closes its last point back to the first.
+			</description>
+		</method>
 		<method name="debug_get_preview_track_points" qualifiers="const">
 			<return type="PackedVector2Array" />
 			<description>
@@ -126,6 +133,12 @@
 			<param index="0" name="n" type="int" />
 			<description>
 				Arms a budget of n more volleys, then pauses. Counts every fired volley (auto or manual). [member max_volleys] is never touched, so unlimited stays unlimited. A spent budget clears itself: [method volleys_remaining] and a later [method resume_shooting] behave like an unlimited spawner again. Replaces any previous budget; unpauses a paused spawner. Rejected when n is not above zero. Works before the spawner enters the tree too (kept through _ready).
+			</description>
+		</method>
+		<method name="forget_tracked_volleys">
+			<return type="void" />
+			<description>
+				Empties the retarget list (the volleys [method retarget_live_volleys] steers). The volleys themselves keep flying and keep reporting to this spawner.
 			</description>
 		</method>
 		<method name="get_active_live_bullet_count" qualifiers="const">
@@ -167,13 +180,13 @@
 		<method name="get_live_volley_count" qualifiers="const">
 			<return type="int" />
 			<description>
-				How many spawned volleys are currently tracked for retargeting.
+				How many live volleys this spawner owns (factory census).
 			</description>
 		</method>
 		<method name="get_live_volleys" qualifiers="const">
 			<return type="Array" />
 			<description>
-				The tracked live volley instances (pruned first), so scripts can call the full BulletVolley2D API on each volley directly. Inspect-only handles: a volley can be pooled and reused for a new owner while you still hold it, so always check [method BulletVolley2D.is_bullet_status_enabled] and ownership before steering a held volley. Use [method adopt_live_volley] to take ownership of a manually-woken volley.
+				Every live volley this spawner owns (a census of the factory, not capped by the retarget list), so scripts can call the full [BulletVolley2D] API on each. Handles can go stale: a volley whose last bullet died returns to the pool and may serve another owner, so compare [method BulletVolley2D.get_life_id] or check [method BulletVolley2D.is_pooled] before steering a volley you held across frames.
 			</description>
 		</method>
 		<method name="get_movement_leg" qualifiers="const">
@@ -210,6 +223,12 @@
 			<return type="float" />
 			<description>
 				Current spin angle in degrees. Only advances at runtime while [member spin_enabled] is on.
+			</description>
+		</method>
+		<method name="get_tracked_volley_count" qualifiers="const">
+			<return type="int" />
+			<description>
+				How many volleys are on the retarget list (homing volleys this spawner fired, capped at 256; the oldest drops first).
 			</description>
 		</method>
 		<method name="get_transforms_generator" qualifiers="const">
@@ -1167,7 +1186,7 @@
 			Retargeting re-aims every tracked live volley. Turn off to re-aim only the newest volley, letting older ones fly at whatever they chased last.
 		</member>
 		<member name="homing_smoothing" type="float" setter="set_homing_smoothing" getter="get_homing_smoothing" default="5.0">
-			Max turn rate in radians per second. 0 snaps instantly.
+			Max turn rate in radians per second. 0 snaps instantly. A bullet cannot turn tighter than speed / smoothing pixels, so to be sure it hits, keep that radius smaller than the target's hitbox (raise the smoothing for fast bullets or small targets).
 		</member>
 		<member name="homing_smoothing_start" type="float" setter="set_homing_smoothing_start" getter="get_homing_smoothing_start" default="5.0">
 			Per-bullet smoothing of the first bullet.
@@ -1191,7 +1210,7 @@
 			Seconds between target position refreshes. 0 refreshes every tick.
 		</member>
 		<member name="inherit_movement_velocity" type="bool" setter="set_inherit_movement_velocity" getter="get_inherit_movement_velocity" default="false">
-			Bullets fired while the spawner moves inherit its movement velocity ([method get_movement_velocity] x [member movement_velocity_inherit_factor]), so a moving turret's shots carry its momentum. Off by default.
+			Bullets fired while the spawner moves inherit its movement velocity ([method get_movement_velocity] x [member movement_velocity_inherit_factor]), so a moving turret's shots carry its momentum for their whole life. Homing bullets aim through that momentum (they cancel it across the line of sight), but only while their own speed is larger than the sideways part of the inherited velocity: lower the factor for slow homing bullets. Off by default.
 		</member>
 		<member name="max_live_bullets" type="int" setter="set_max_live_bullets" getter="get_max_live_bullets" default="0">
 			Soft live-bullet fuse: 0 is unlimited, otherwise a shot is skipped (volley_skipped "over_budget") while this spawner's live bullets (homing and plain volleys, counted via the factory) reach this count. The check runs before any pattern work, so a stalled spawner costs nothing. Retargeting is not affected. The census is O(factory volleys) per trigger pull: fine for a handful of budgeted spawners.
@@ -1291,6 +1310,14 @@
 		</member>
 		<member name="orbiting_texture_rotation" type="int" setter="set_orbiting_texture_rotation" getter="get_orbiting_texture_rotation" enum="BulletVolley2D.OrbitingTextureRotation" default="0">
 			How bullet textures face while physically orbiting.
+		</member>
+		<member name="orphaned_volleys" type="int" setter="set_orphaned_volleys" getter="get_orphaned_volleys" default="0">
+			What happens to this spawner's live volleys when the spawner is freed (an enemy dying with its turret, a scene change). Reparenting never triggers it.
+			- [constant ORPHANED_VOLLEYS_KEEP_FLYING] (default): the bullets fly on, but their hits reach nobody: signal connections live on the emitter, so every connection on the freed spawner is gone, even ones whose callback is on a long-lived node. The first unhandled hit prints one warning explaining this.
+			- [constant ORPHANED_VOLLEYS_HAND_TO_FACTORY]: the volleys become factory-owned, so [signal BulletFactory2D.area_entered] and the other factory signals report their hits. The only way an orphan's hits can still be handled.
+			- [constant ORPHANED_VOLLEYS_CLEAR]: every live bullet is cleared with its On Clear effects (a wave that vanishes with its source).
+			- [constant ORPHANED_VOLLEYS_REMOVE]: every live bullet disappears silently and its volley returns to the pool.
+			To keep hit handlers working while the spawner lives, connect to the spawner's signals from a node that outlives it, or set [member BulletVolleyData2D.emit_collision_signals] to [code]false[/code] for bullets that intentionally report nothing.
 		</member>
 		<member name="pattern_cache_mode" type="int" setter="set_pattern_cache_mode" getter="get_pattern_cache_mode" default="0">
 			Auto (default): pattern transforms are generated once and re-posed per shot whenever the pattern provably follows the generator (rigidly, or by translation only); any pattern-affecting property change rebakes automatically. Sources that read outside state (From Children, Aimed, Corridor, Custom, Path2D) and unseeded random patterns always regenerate. A moving or spinning spawner never needs Off. Off: regenerate every shot, for debugging or for scripts that change pattern inputs behind the setters' back.
@@ -1410,7 +1437,7 @@
 			<param index="1" name="volley" type="BulletVolley2D" />
 			<param index="2" name="bullet_index" type="int" />
 			<description>
-				Fired when one of this spawner's bullets enters an area.
+				Fired live when one of this spawner's bullets enters an area; same contract as [signal BulletFactory2D.area_entered] (the factory stays silent for spawner volleys). Connections live on the spawner: if it is freed they are gone, see [member orphaned_volleys].
 			</description>
 		</signal>
 		<signal name="body_entered">
@@ -1418,7 +1445,7 @@
 			<param index="1" name="volley" type="BulletVolley2D" />
 			<param index="2" name="bullet_index" type="int" />
 			<description>
-				Fired when one of this spawner's bullets hits a body.
+				Fired live when one of this spawner's bullets hits a body; same contract as [signal BulletFactory2D.body_entered].
 			</description>
 		</signal>
 		<signal name="bounce_area_entered">
@@ -1460,7 +1487,7 @@
 			<param index="0" name="volley" type="BulletVolley2D" />
 			<param index="1" name="bullet_indexes" type="int[]" />
 			<description>
-				Fired when this spawner's bullets expire. Needs the lifetime signal enabled in the bullet data. Deferred; until it is delivered the volley keeps its attachments and stays out of the pool (same contract as [signal BulletFactory2D.life_time_over]).
+				Fired live when this spawner's bullets expire (needs the lifetime signal enabled in the spawn data); same contract as [signal BulletFactory2D.life_time_over]: the listed bullets are alive in the handler and die right after it unless their life was extended.
 			</description>
 		</signal>
 		<signal name="movement_endpoint_reached">
@@ -1524,7 +1551,7 @@
 			<param index="2" name="target" type="Node2D" />
 			<param index="3" name="target_global_position" type="Vector2" />
 			<description>
-				Forwarded from the volley instance when one of its bullets reaches its homing target. Target is null for position and mouse targets, and for freed nodes. Note: pool reuse clears all handlers on the instance, so connect here on the spawner instead of on volley instances directly.
+				Fired live when a bullet of one of this spawner's volleys reaches its homing target (also emitted on the volley as [signal BulletVolley2D.bullet_homing_target_reached]). Target is null for position and mouse targets. Connect here rather than on volley instances: a volley drops its own connections when it returns to the pool.
 			</description>
 		</signal>
 		<signal name="volley_fired">
@@ -1791,6 +1818,18 @@
 		</constant>
 		<constant name="SPIN_OSCILLATE" value="1" enum="SpinMode">
 			Swings back and forth using amplitude and frequency.
+		</constant>
+		<constant name="ORPHANED_VOLLEYS_KEEP_FLYING" value="0" enum="OrphanedVolleys">
+			Freed spawner: its bullets keep flying; their hits reach nobody (one warning explains why).
+		</constant>
+		<constant name="ORPHANED_VOLLEYS_HAND_TO_FACTORY" value="1" enum="OrphanedVolleys">
+			Freed spawner: its volleys become factory-owned and report on the [BulletFactory2D] signals.
+		</constant>
+		<constant name="ORPHANED_VOLLEYS_CLEAR" value="2" enum="OrphanedVolleys">
+			Freed spawner: its live bullets are cleared with their On Clear effects.
+		</constant>
+		<constant name="ORPHANED_VOLLEYS_REMOVE" value="3" enum="OrphanedVolleys">
+			Freed spawner: its live bullets disappear silently and the volleys return to the pool.
 		</constant>
 		<constant name="PATTERN_CACHE_AUTO" value="0" enum="PatternCacheMode">
 			Bake when provably safe, regenerate otherwise (default).

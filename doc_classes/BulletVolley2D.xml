@@ -8,7 +8,9 @@
 
 		Warning: Never use [code]get_tree().create_timer()[/code] or any other godot timers with this class. It will cause issues with the internal timing of the bullets. If you need timers, use [method attach_time_based_function] instead.
 
-		Warning: When editing runtime properties or calling methods that edit the multimesh, only structural factory calls ([method BulletFactory2D.reset], [method BulletFactory2D.free_active_bullets], [method BulletFactory2D.free_disabled_bullets], [method BulletFactory2D.free_bullets_pool], [method BulletFactory2D.populate_bullets_pool], and the spawn methods with a shape change) must use [method Object.call_deferred] when called from physics callbacks or collision/lifetime signal handlers. Per-bullet edits apply immediately. The only exception to this are callables attached via [method attach_time_based_function], since those are executed at the end of the frame by default for safety.
+		Warning: Every signal fires live inside the physics tick (hits, bounces, lifetime, homing reached, animation finished), with the bullet still alive and every runtime property readable; per-bullet edits and spawning apply immediately from any handler. Only structural factory calls ([method BulletFactory2D.reset], [method BulletFactory2D.free_active_bullets], [method BulletFactory2D.free_disabled_bullets], [method BulletFactory2D.free_bullets_pool], [method BulletFactory2D.populate_bullets_pool], a collision-shape change) are rejected inside the tick: use their [code]*_deferred[/code] twins (for example [method BulletFactory2D.reset_deferred], [method set_collision_shape_runtime_deferred]), which run on the factory's idle queue. A plain [method Object.call_deferred] is not enough, because calls deferred from the physics step still run inside it.
+
+		Note: A volley's life: it is ACTIVE while any bullet flies. When its last bullet is disabled it returns to the pool ([method is_pooled], the handle is stale) if [member is_auto_pooling_enabled] is on, or it PARKS ([method is_parked]: frozen, still yours, wakeable with [method enable_bullet]) when it is off. [method disable_bullet] freezes a bullet with its state; [method bullet_reset_state] clears it. [method get_life_id] tells two lives of the same instance apart.
 
 		Warning: Homing functionality can be done in two ways - either using [b]per-bullet homing deques[/b] (each bullet has its own deque of homing targets) or a [b]shared homing deque[/b] (broadcast fallback for bullets without their own targets). Both are supported and per-bullet deques always win per bullet: a bullet with its own non-empty deque follows it, otherwise it follows the shared deque. If a per-bullet deque drains mid-flight the bullet falls back to the shared deque. Any method or property that mentions "shared" is related to the shared deque.
 
@@ -401,6 +403,14 @@
 				If you want to clear then push an array of targets to the shared deque, use [method shared_homing_deque_replace_homing_targets_with_new_target_array] instead.
 			</description>
 		</method>
+		<method name="all_bullets_reset_state">
+			<return type="void" />
+			<param index="0" name="bullet_index_start" type="int" default="0" />
+			<param index="1" name="bullet_index_end_inclusive" type="int" default="-1" />
+			<description>
+				[method bullet_reset_state] for every bullet in the range ([code](0, -1)[/code] = the whole volley).
+			</description>
+		</method>
 		<method name="all_bullets_set_attachment">
 			<return type="void" />
 			<param index="0" name="attachment_scene" type="PackedScene" />
@@ -692,20 +702,9 @@
 			<param index="2" name="repeat" type="bool" default="false" />
 			<param index="3" name="execute_only_if_volley_is_active" type="bool" default="true" />
 			<description>
-				Attaches a callable that gets executed after a certain amount of time.
-
-				[code]time[/code] - the time in seconds after which the callable will be executed.
-				[code]callable[/code] - the callable that will be executed. It can be a lambda, a function or a method from another object.
-				[code]repeat[/code] - if set to true, then the callable will be executed every [code]time[/code] seconds.
-				[code]execute_only_if_volley_is_active[/code] - if set to [code]true[/code], then the callable will only be executed if the volley is active in the scene tree (if it has at least a single bullet that has not yet been disabled).
-				If you wish to execute the callable regardless of the volley being active or not (even when in object pool), then set this parameter to [code]false[/code].
-				Note: For this to take effect ensure that the [member is_auto_pooling_enabled] property is set to false - this is because auto pooling clears any callables in order to re-use the multimesh later completely reset.
-				Note: applies immediately outside physics processing; inside a physics frame it is deferred like before.
-				Note: capped at 64 timers per multimesh (extra attaches are rejected); pool-pop re-enables wipe armed timers, manual wakes drop timers armed while pooled.
-
-				If you want to be able to detach the callable, then make sure that it is clearly declared outside as a variable or you could even use a normal Godot function.
-
-				Callables that execute bullet related functions have no need of using call_deferred(), since all attached callables are executed at the end of the frame by default for safety.
+				Runs [param callable] after [param time] seconds of volley time (paused with the factory), repeating every [param time] seconds when [param repeat] is on (a repeating timer never fires more than once per tick, even after a hitch).
+				[param execute_only_if_volley_is_active] (default [code]true[/code]): the timer runs only while the volley is active. While the volley is parked it holds its remaining time and resumes on the wake, so a one-shot is never lost. With [code]false[/code] it keeps running and firing while the volley is parked, so it can wake the volley itself.
+				Timers are released when the volley returns to the pool. Attaching and detaching apply immediately, even from inside a timer callback. At most 64 timers per volley.
 			</description>
 		</method>
 		<method name="bullet_check_has_homing_targets" qualifiers="const">
@@ -1067,6 +1066,13 @@
 				Replaces the specified bullet's per-bullet homing queue with a single new target (Node2D or Vector2) while preserving the orbit lock under StayLocked and RelockOnTargetChange (same front target keeps angle and center). Returns true when replaced; false when the slot is disabled or the target is invalid (nothing changed).
 			</description>
 		</method>
+		<method name="bullet_reset_state">
+			<return type="void" />
+			<param index="0" name="bullet_index" type="int" />
+			<description>
+				Clears one bullet's runtime ledgers without touching its flight: hit count, bounce ledger, homing queue, orbiting (turned off), fall speed, wobble phase and movement-pattern progress. Use it to wake a frozen bullet fresh, or call [method disable_bullet] with [code]reset_state[/code].
+			</description>
+		</method>
 		<method name="bullet_set_attachment">
 			<return type="void" />
 			<param index="0" name="bullet_index" type="int" />
@@ -1214,7 +1220,7 @@
 		<method name="clear_all_bullets">
 			<return type="int" />
 			<description>
-				Clears every live bullet through [method clear_bullet]. Mass clears recycle the oldest one-shot slots past the layer ring, so hundreds of bullets never spawn hundreds of live effects. Returns how many bullets were cleared.
+				Clears every live bullet through [method clear_bullet] (On Clear effects fire; mass clears recycle the oldest effect slots so hundreds of bullets never spawn hundreds of live effects). Returns how many bullets were cleared. Allowed inside collision and lifetime handlers.
 			</description>
 		</method>
 		<method name="clear_bullet">
@@ -1299,6 +1305,12 @@
 				Full per-bullet steering snapshot: {index, valid, active, direction, velocity, speed, gravity, fall_speed, wobble_active, wobble_amplitude, has_homing_targets, homing_targets_amount, homing_smoothing, orbiting_enabled, orbiting_locked, pattern, shared_pattern_active, rotation_speed}. Never mutates; invalid index returns valid=false with zeroed fields.
 			</description>
 		</method>
+		<method name="debug_get_clocks" qualifiers="const">
+			<return type="Dictionary" />
+			<description>
+				Debug/test helper: a read-only snapshot of every clock the volley advances (curve clock, lifetime, homing interval, sprite animation, fade, custom timers, bounce cooldowns).
+			</description>
+		</method>
 		<method name="debug_get_curves_info" qualifiers="const">
 			<return type="Dictionary" />
 			<param index="0" name="bullet_index" type="int" />
@@ -1317,6 +1329,12 @@
 			<param index="0" name="bullet_index" type="int" />
 			<description>
 				Gravity introspection: vector, fall_speed, window_active, curve_scale. Never mutates.
+			</description>
+		</method>
+		<method name="debug_get_life_state" qualifiers="const">
+			<return type="String" />
+			<description>
+				Debug/test helper: [code]"active"[/code], [code]"parked"[/code] or [code]"pooled"[/code].
 			</description>
 		</method>
 		<method name="debug_get_orbiting_info" qualifiers="const">
@@ -1396,24 +1414,23 @@
 		<method name="disable_bullet">
 			<return type="void" />
 			<param index="0" name="bullet_index" type="int" />
-			<param index="1" name="disable_bullet_attachment" type="bool" default="true" />
+			<param index="1" name="release_attachment" type="bool" default="true" />
+			<param index="2" name="reset_state" type="bool" default="false" />
 			<description>
-				Disable a specific bullet of the volley. Silent (no effect layer fires): use [method clear_bullet] when the disappearance should read on screen.
+				Disables (freezes) one bullet: it stops moving, colliding and drawing, but keeps its state (ballistics, hit count, bounce ledger, homing queue, orbit, wobble phase, fall speed, custom data), so [method enable_bullet] resumes it exactly. Silent: no effect layer fires (use [method clear_bullet] for a visible removal).
+				[param release_attachment]: [code]true[/code] (default) releases the attachment to the pool; [code]false[/code] suspends it in its slot (on_bullet_disable) and the wake resumes it.
+				[param reset_state]: [code]true[/code] also clears the ledgers ([method bullet_reset_state]).
+				When the last bullet goes, the volley returns to the pool if [member is_auto_pooling_enabled] is on, otherwise it parks (frozen and still yours).
 			</description>
 		</method>
 		<method name="enable_bullet">
 			<return type="void" />
 			<param index="0" name="bullet_index" type="int" />
-			<param index="1" name="collision_amount" type="int" default="0" />
+			<param index="1" name="collision_amount" type="int" default="-1" />
 			<param index="2" name="enable_attachment" type="bool" default="true" />
 			<description>
-				Activate a specific bullet of the volley, making it active and visible on screen. Waking a fully pooled volley this way also removes it from the pool and resumes factory processing, so prefer spawn methods for pooled instances. An expiry-pooled wake tops up an exhausted lifetime timer (both lifetime and curve clocks restart together); a manually disabled wake keeps its remaining time.
-
-				Wake means resume, not respawn: ballistics (speed, direction, position), appearance, custom data and movement state are kept as-is. Two deliberate exceptions: (1) per-bullet homing queues and orbit state are NOT resumed - disable_bullet() clears them, so re-push targets and re-enable orbit after the wake; (2) a volley-wide expiry wake gives the whole volley a fresh full lifetime, not just the woken bullet. 				Waking a pooled volley owned by someone else keeps that owner's ballistics, appearance, custom data, collision counts, lifetime and shape state (a warning is printed: enable_bullet warns when it wakes a pooled instance outside the spawn methods): reseed through the spawn methods, or take over with [method BulletSpawner2D.adopt_live_volley] and re-push. Neutralized on a foreign wake (fail-safe subset): pooling flags reset to default, rotation speeds cleared, ownership detached, and that owner's volley-wide signal connections dropped; a same-owner revive keeps all of them. Attachments are never restored by a wake: re-attach explicitly.
-
-				Never call enable_bullet()/disable_bullet() re-entrantly from inside an on_bullet_enable callback (use call_deferred instead); such calls are rejected with an error so the live-bullet counter cannot drift.
-
-				You can also provide a [code]collision_amount[/code], which is how many hits this bullet has already taken: 0 (default) means fresh with full hits remaining. Values below 0 count as 0, values at or above [member bullet_max_collision_count] grant a single remaining hit (same clamp as [method set_bullet_collision_count]).
+				Wakes a disabled (frozen) bullet: it resumes exactly where it stopped, with its ballistics, homing, orbit, custom data and suspended attachment. [param collision_amount]: -1 (default) keeps the bullet's hit count, any other value sets it. Waking a parked volley resumes the whole volley (owner and volley features included); a volley that expired gets a fresh lifetime and curve clock.
+				A volley that already went back to the pool (its last bullet died with [member is_auto_pooling_enabled] on) cannot be woken: the call is refused with an error, because the handle is stale. Spawn a new volley instead, or turn auto pooling off before the last bullet dies to keep the volley parked.
 			</description>
 		</method>
 		<method name="enable_volley">
@@ -1422,7 +1439,7 @@
 			<param index="1" name="inherited_velocity_offset" type="Vector2" default="Vector2(0, 0)" />
 			<param index="2" name="spawner_id" type="int" default="0" />
 			<description>
-				Manual-pooling reseed: reactivates a fully-disabled volley with fresh data (same amount_bullets required; same-shape only inside physics sweeps, shape-type changes need idle via call_deferred). Refuses on active/queued/wrong-type/null/NaN-offset input without touching state. This is the cross-owner reuse path for manual poolers; same-owner revive uses enable_bullet/wake_bullet.
+				Manual-pooling reseed: reactivates a fully-disabled volley with fresh data (same amount_bullets required; a different collision shape type is refused inside the physics step: spawn through [BulletFactory2D] instead, which pops a matching pool bucket, or call it from an idle frame). Refuses on active/queued/wrong-type/null/NaN-offset input without touching state. This is the cross-owner reuse path for manual poolers; same-owner revive uses enable_bullet/wake_bullet.
 			</description>
 		</method>
 		<method name="get_all_bullets_status">
@@ -1543,6 +1560,18 @@
 				Whether any wobble entry is currently enabled on this volley (shared or per-bullet). Set wobble data through [member BulletVolleyData2D.shared_bullet_wobble_data] or [member BulletVolleyData2D.all_bullet_wobble_data] before spawning, or live via [method bullet_set_wobble_data] / [method set_shared_bullet_wobble_data].
 			</description>
 		</method>
+		<method name="get_life_id" qualifiers="const">
+			<return type="int" />
+			<description>
+				The id of the volley's current life: it changes every time the volley is spawned or reused from the pool. Store it with a handle and compare later to know whether the volley still belongs to the same spawn.
+			</description>
+		</method>
+		<method name="get_life_time_left" qualifiers="const">
+			<return type="float" />
+			<description>
+				Seconds left until the volley's bullets expire (0 once expired, and always 0 for an infinite lifetime).
+			</description>
+		</method>
 		<method name="get_monitorable" qualifiers="const">
 			<return type="bool" />
 			<description>
@@ -1623,6 +1652,18 @@
 			<param index="0" name="bullet_index" type="int" />
 			<description>
 				Check the status of a specific bullet - whether it is enabled (active and visible on screen) or disabled (inactive and invisible)
+			</description>
+		</method>
+		<method name="is_parked" qualifiers="const">
+			<return type="bool" />
+			<description>
+				Whether every bullet is disabled but the volley was kept (auto pooling off): frozen and still yours, wake it with [method enable_bullet].
+			</description>
+		</method>
+		<method name="is_pooled" qualifiers="const">
+			<return type="bool" />
+			<description>
+				Whether the volley is back in the factory's pool (its last bullet died with auto pooling on). A pooled handle is stale: it cannot be woken, and the next spawn may reuse it for anyone.
 			</description>
 		</method>
 		<method name="is_rotation_data_active" qualifiers="const">
@@ -1891,7 +1932,14 @@
 			<description>
 				Swaps the collision shape live, on an active or pooled volley. Size-only changes apply to every bullet right away through the physics server. A different effective type additionally rebuilds the physics shapes and moves pooled instances into the matching pool bucket. The visual QuadMesh is texture-driven and stays untouched. The debugger picks up the new type and size on the next physics tick.
 
-				Note: cannot run while bullets are being processed or inside a physics frame (same contract as the factory structural methods) - use call_deferred() then.
+				Note: cannot run while bullets are being processed or inside a physics frame (same contract as the factory structural methods): use [method set_collision_shape_runtime_deferred] from handlers.
+			</description>
+		</method>
+		<method name="set_collision_shape_runtime_deferred">
+			<return type="void" />
+			<param index="0" name="new_shape" type="Shape2D" />
+			<description>
+				Deferred twin of [method set_collision_shape_runtime]: queued on the factory's idle structural queue, so it is safe to call from collision and lifetime handlers (where a shape change is rejected).
 			</description>
 		</method>
 		<method name="set_fade_base_modulate">
@@ -1899,6 +1947,13 @@
 			<param index="0" name="value" type="Color" />
 			<description>
 				Retints the fade base at runtime and re-arms the fade tick so the next frame writes even when the value matches the stale snapshot.
+			</description>
+		</method>
+		<method name="set_life_time_left">
+			<return type="void" />
+			<param index="0" name="seconds" type="float" />
+			<description>
+				Sets the seconds left until the volley's bullets expire, e.g. from a [signal BulletFactory2D.life_time_over] handler to give them more time (which vetoes that expiry). Must be finite and above 0; refused on an infinite-lifetime volley.
 			</description>
 		</method>
 		<method name="set_monitorable">
@@ -2094,7 +2149,7 @@
 		<method name="wake_bullet">
 			<return type="void" />
 			<param index="0" name="bullet_index" type="int" />
-			<param index="1" name="collision_amount" type="int" default="0" />
+			<param index="1" name="collision_amount" type="int" default="-1" />
 			<param index="2" name="enable_attachment" type="bool" default="true" />
 			<description>
 				Alias for [method enable_bullet] with unambiguous naming: revives one pooled or manually-disabled slot with its current appearance/ballistics intact (same-owner re-enable). Cross-owner reuse must go through the factory spawn methods or enable_volley(), which reseed appearance, custom data, speeds and patterns.
@@ -2172,6 +2227,9 @@
 		<member name="effect_layers" type="BulletEffectLayerData2D[]" setter="set_effect_layers" getter="get_effect_layers" default="[]">
 			Stackable sprite-effect layers (trails, spawn flashes, hit sparks, destroy explosions, bounce sparks, lifetime fizzles, manual-clear puffs). Each entry renders through its own per-frame shards: one extra draw call per animation frame while anything is visible, zero when idle. Empty (default) disables the whole feature. Assign custom SpriteFrames per layer. Cost scales with art (frames), bullets, and active one-shots, not with layer count alone.
 		</member>
+		<member name="emit_collision_signals" type="bool" setter="set_emit_collision_signals" getter="get_emit_collision_signals" default="true">
+			Runtime twin of [member BulletVolleyData2D.emit_collision_signals] (reset from the spawn data on every new life).
+		</member>
 		<member name="fade_in_sec" type="float" setter="set_fade_in_sec" getter="get_fade_in_sec" default="0.0">
 			Fade-in seconds after spawn (0 disables). The volley starts at transparent base tint and reaches full tint at fade_in_sec. Works with infinite lifetimes. While any fade is configured the tick owns self_modulate: retint through [method set_fade_base_modulate], not the CanvasItem setter.
 		</member>
@@ -2211,7 +2269,7 @@
 			How often it should cache the position of the targets so that they can be re-used instead of fetching them every frame. Increase if you want to boost performance.
 		</member>
 		<member name="inherited_velocity_offset" type="Vector2" setter="set_inherited_velocity_offset" getter="get_inherited_velocity_offset" default="Vector2(0, 0)">
-			Use this for initial velocity when the bullets are supposed to inherit velocity from the emitter.
+			Velocity added to every bullet for its whole life, e.g. the emitter's momentum ([member BulletSpawner2D.inherit_movement_velocity]). Homing bullets aim through it: they cancel its part across the line of sight to the target, as long as their own speed is larger than that part.
 		</member>
 		<member name="is_attachments_auto_pooling_enabled" type="bool" setter="set_is_attachments_auto_pooling_enabled" getter="get_is_attachments_auto_pooling_enabled" default="true">
 			Whether the attachments auto pooling is enabled or not.
@@ -2220,14 +2278,9 @@
 			When disabled, the attachments will automatically get freed from the scene tree upon collision.
 		</member>
 		<member name="is_auto_pooling_enabled" type="bool" setter="set_is_auto_pooling_enabled" getter="get_is_auto_pooling_enabled" default="true">
-			Whether the multimesh auto pooling is enabled or not.
-
-			When enabled, the multimesh will automatically get pushed to the object pool when all bullets are disabled.
-			When disabled, you are the one responsible for re-using the volley or clearing any time based callables that you might have attached with [method attach_time_based_function].
-
-			If you are going to save your multimesh bullets in an array, then it's probably best to disable auto pooling and manage the instances yourself.
-
-			Note: both pooling flags are per-instance state, not spawn data. A pooled instance keeps the previous owner's flags across reuse (defaults reset only at spawn). Call [method reset_pooling_flags_to_default] if you need a clean slate.
+			Whether the volley returns to the factory's pool when its last bullet is disabled (default on). Pooling releases everything the volley held for its owner: attachments, homing targets, orbit state, timers, pending hits, its own signal connections and user resources; the handle is then stale ([method is_pooled]).
+			With it off, the volley parks instead ([method is_parked]): frozen and still yours, so [method enable_bullet] can wake it later with all its state. Turning it on for a parked volley pools it right away.
+			Note: both pooling flags are per-instance state, not spawn data; [method reset_pooling_flags_to_default] restores them.
 		</member>
 		<member name="is_life_time_infinite" type="bool" setter="set_is_life_time_infinite" getter="get_is_life_time_infinite" default="false">
 			If you set to true, then the lifetime will be ignored and bullets will never be destroyed.
@@ -2284,21 +2337,14 @@
 			<param index="2" name="target" type="Node2D" />
 			<param index="3" name="target_global_position" type="Vector2" />
 			<description>
-				Emitted once the homing target gets reached by a bullet.
-
-				Adjust the distance for considering a target reached with [member homing_distance_before_reached].
-
-				Connection lifetime across pool reuse: handlers you connect DIRECTLY on the volley instance are dropped when the volley is reused by a new owner (spawn/enable) or woken by someone else (foreign enable_bullet wake) - reconnect after volley_fired/volley_homing_configured. They are KEPT on same-owner revives and on adopt_live_volley (which replaces only the spawner's forwarder). Spawner forwarders are always re-hooked automatically.
-
-				The [code]target_global_position[/code] is always valid for access, it can be either the Node2D's global position, a global position target or a mouse global position target.
-
-				Warning: Always check if target is null or not since the bullet might be following a global position or a mouse position instead of a Node2D.
+				Emitted live, inside the physics tick, when a bullet comes within [member homing_distance_before_reached] of its homing target. [param target] is null for position and mouse targets; [param target_global_position] is always valid. With auto pop on, the reached target is popped after the handler, unless the handler already changed the front of the deque (a target it pushed survives).
+				Connections made directly on the volley are dropped when it returns to the pool: connect to [signal BulletSpawner2D.volley_bullet_homing_target_reached] for spawner volleys.
 			</description>
 		</signal>
 		<signal name="sprite_animation_finished">
 			<param index="0" name="volley" type="BulletVolley2D" />
 			<description>
-				Emitted once (deferred, outside the physics tick) when a non-looping SpriteFrames animation reaches its last frame. Re-armed by every play/restart/rebuild. Note: the instance may already be pooled (inactive) when the deferred call runs, so check its state in the handler if that matters.
+				Emitted live, once, when a non-looping SpriteFrames animation reaches its last frame. Re-armed by every play or restart.
 			</description>
 		</signal>
 	</signals>

@@ -167,6 +167,9 @@
 		<member name="effect_layers" type="BulletEffectLayerData2D[]" setter="set_effect_layers" getter="get_effect_layers" default="[]">
 			Stackable sprite-effect layers (trails, spawn flashes, hit sparks, destroy explosions, bounce sparks, lifetime fizzles, manual-clear puffs). Each entry renders through its own per-frame shards: one extra draw call per animation frame while anything is visible, zero when idle. Empty (default) disables the whole feature. Assign custom SpriteFrames per layer. Cost scales with art (frames), bullets, and active one-shots, not with layer count alone.
 		</member>
+		<member name="emit_collision_signals" type="bool" setter="set_emit_collision_signals" getter="get_emit_collision_signals" default="true">
+			When [code]false[/code], these bullets still collide, die and bounce, but no hit or bounce signal fires for them and no unhandled-hit warning is printed: say so for bullets that intentionally report nothing (a decorative barrage). Bullets that should not collide at all need [member collision_mask] = 0 instead.
+		</member>
 		<member name="fade_in_sec" type="float" setter="set_fade_in_sec" getter="get_fade_in_sec" default="0.0">
 			Fade-in seconds after spawn (0 disables). The volley starts at transparent base tint and reaches full tint at fade_in_sec. Works with infinite lifetimes (age since spawn).
 		</member>
