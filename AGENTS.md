@@ -10,7 +10,7 @@ one that is wrong, fix this file in the same change.
 
 ```sh
 GODOTPP_NONINTERACTIVE=1 python3 tools/compile_debug_build.py   # build (never raw scons, never edit SConstruct)
-python3 tools/run_tests.py                                       # ~134 files / ~870 tests, ~10 s, leak-checked
+python3 tools/run_tests.py                                       # ~136 files / ~876 tests, ~10 s, leak-checked
 python3 tools/run_tests.py --self-test                           # the harness itself still catches failures/leaks
 python3 tools/run_benchmarks.py --scenario <name>                # perf evidence (§15)
 ```
@@ -28,6 +28,10 @@ python3 tools/run_benchmarks.py --scenario <name>                # perf evidence
 | Runner says "src/ is newer than the compiled extension" | Rebuild (§0c step 2); comment-only edits count too | `--allow-stale` |
 | Unsure about engine behavior | Probe it: write `test_project/tests/spawner/test_zz_probe.gd` (extends BlastTest, put the values in a failing `assert_eq(..., "", "PROBE")`), run `godot --headless --fixed-fps 60 --path test_project -s addons/gut/gut_cmdln.gd -gconfig= -gtest=res://tests/spawner/test_zz_probe.gd -gexit -gdisable_colors`, read the message, then DELETE the file and its `.uid` | Guess from memory of Godot docs; leave the probe behind |
 | A pattern draws fewer bullets or two bullets on one spot | Extend `spawner/test_spawner_pattern_counts.gd` first, then fix the generator (§6b) | Accept "it looks fine" |
+| A handler needs reset / free_* / populate_* / a shape change | Call the `*_deferred` twin (`reset_deferred`, `set_collision_shape_runtime_deferred`, ...) (§12b) | `call_deferred` from physics: it still runs inside the physics frame and is rejected |
+| Adding a pattern knob | Field in `PatternKnobs2D` + one `PATTERN_KNOB` row in `pattern_knob_table2d.inc` (§6b) | Hand-written accessor, declaration and bind |
+| Refactoring pattern or accessor code | Hash every generator's output and dump the spawner surface (properties, methods, setter outcomes) before and after; both must be identical | Trust the suite alone for a pure refactor |
+| "Homing bullets sometimes miss" | Check inherited momentum vs bullet speed (`inherit_movement_velocity`) and turn radius speed / `homing_smoothing` vs the hitbox | Assume a pattern bug |
 
 ## 0b. Commits (user rule — overrides any tool or harness default)
 
@@ -522,6 +526,35 @@ src/
   `advance_movement` (bounded 64-leg catch-up) → `apply_movement_pose`
   (`Curve2D::sample_baked_with_rotation`). Easing = `Easing2D::ease`
   (parity-tested vs `Tween.interpolate_value`) or a progress Curve.
+
+## 12b. Signal timing (live, in-tick)
+
+- Every bullet signal fires synchronously inside `BulletVolley2D::tick`
+  (order in §12): `area_entered` / `body_entered` / `bounce_*` (drain,
+  impact pose), `bullet_homing_target_reached` (after the move),
+  `sprite_animation_finished`, `life_time_over` (lifetime pass). The
+  bullet is ALIVE in the handler: custom data, transforms, velocity, hit
+  and bounce counts and the attachment are readable as they are.
+- The plugin decides afterwards from the post-handler state: a hit kills
+  only if the count is still at max (a heal vetoes it), a lifetime expiry
+  kills only bullets whose life was not extended (`set_life_time_left`,
+  infinite lifetime), a homing auto-pop pops only if the front is still
+  the reached target. A handler that disabled the bullet itself gets no
+  extra effects; freed targets are skipped; a pause from a handler stops
+  the rest of the sweep.
+- Handlers may spawn and edit bullets freely. Structural calls are
+  rejected inside the tick: use the `*_deferred` twins (idle queue,
+  `queue_structural_call`). Remaining `call_deferred` uses: only
+  `shoot_once_deferred`, the structural queue itself, the debugger restore
+  and preview rebuilds.
+- Routing: a spawner volley emits on its spawner, a factory volley on the
+  factory, never both. Connections live on the emitter: a freed spawner
+  takes them along (`orphaned_volleys` decides what its bullets do; an
+  unhandled hit warns once with the reason; `emit_collision_signals =
+  false` says "intentionally silent").
+- Pinned by `volley/test_volley_hit_contract`, `test_volley_lifetime_contract`,
+  `test_volley_signal_timing`, `test_volley_bounce_signals`,
+  `spawner/test_spawner_orphan_policy` and `integration/test_engine_facts`.
 
 ## 13. Pattern bake cache (spawner)
 
