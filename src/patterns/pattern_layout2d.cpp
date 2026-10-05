@@ -544,7 +544,31 @@ PackedVector2Array fill_outline_from(int outline_placement, const PackedVector2A
 	return out;
 }
 
-PatternSlots2D layout_outline_slots(const char *caller_name, const Transform2D &marker_transform, const PackedVector2Array &points, const PackedVector2Array &normals, bool points_are_local, real_t rot_add, bool face_outward, real_t facing_offset_degrees, const PackedFloat32Array &facing_override, int outline_placement, int outline_facing, bool outline_reverse, int outline_slot_offset, double fill_spacing, bool fill_stagger, double fill_margin, int layer_count, double layer_scale, int layer_side, int layer_fill, int layer_start_offset, int layer_scale_curve, const PackedFloat32Array &layer_custom_scales, int layer_twist, int layer_max_dots, int outline_distribution, int layer_layout, const PackedVector2Array &polygon_corners, int corner_priority, int corner_mode, double edge_margin, bool loop_closed, bool allow_resample, int corner_facing, const PackedVector2Array &dense_outline, const PackedVector2Array &dense_normals, const PackedFloat32Array &dense_overrides) {
+PatternSlots2D layout_outline_slots(const char *caller_name, const Transform2D &marker_transform, const PackedVector2Array &points, const PackedVector2Array &normals, bool points_are_local, real_t rot_add, bool face_outward, real_t facing_offset_degrees, const PackedFloat32Array &facing_override, const OutlineLayout2D &outline, const CornerLayout2D &corner, const PackedVector2Array &polygon_corners, bool loop_closed, bool allow_resample, const PackedVector2Array &dense_outline, const PackedVector2Array &dense_normals, const PackedFloat32Array &dense_overrides) {
+    // Unpacked once under the names the layout below was written with.
+    const int outline_placement = outline.outline_placement;
+    const int outline_facing = outline.outline_facing;
+    const bool outline_reverse = outline.outline_reverse;
+    const int outline_slot_offset = outline.outline_slot_offset;
+    const double fill_spacing = outline.fill_spacing;
+    const bool fill_stagger = outline.fill_stagger;
+    const double fill_margin = outline.fill_margin;
+    const int layer_count = outline.layer_count;
+    const double layer_scale = outline.layer_scale;
+    const int layer_side = outline.layer_side;
+    const int layer_fill = outline.layer_fill;
+    const int layer_start_offset = outline.layer_start_offset;
+    const int layer_scale_curve = outline.layer_scale_curve;
+    const PackedFloat32Array &layer_custom_scales = outline.layer_custom_scales;
+    const int layer_twist = outline.layer_twist;
+    const int layer_max_dots = outline.layer_max_dots;
+    const int layer_layout = outline.layer_layout;
+    const int outline_distribution = corner.outline_distribution;
+    const int corner_priority = corner.outline_corner_priority;
+    const int corner_mode = corner.outline_corner_mode;
+    const double edge_margin = corner.outline_edge_margin;
+    const int corner_facing = corner.outline_corner_facing;
+
     const int n = points.size();
     PatternSlots2D out;
     if (n <= 0) {

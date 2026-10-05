@@ -29,17 +29,16 @@ void spiral_arm_step(int i, int arms, int stride, int &r_arm, int &r_step) {
 	r_step = i / arms;
 }
 
-PatternSlots2D BulletPatterns2D::generate_grid2d(
-		int transforms_amount,
-		Transform2D marker_transform,
-		int rows_per_column,
-		Alignment alignment,
-		real_t column_offset,
-		real_t row_offset,
-		bool rotate_grid_with_marker,
-		bool random_local_rotation,
-		real_t jitter,
-		uint64_t seed) {
+PatternSlots2D BulletPatterns2D::generate_grid2d(int transforms_amount, Transform2D marker_transform, const GridParams2D &params) {
+	int rows_per_column = params.rows_per_column;
+	Alignment alignment = params.alignment;
+	real_t column_offset = params.column_offset;
+	real_t row_offset = params.row_offset;
+	bool rotate_grid_with_marker = params.rotate_grid_with_marker;
+	bool random_local_rotation = params.random_local_rotation;
+	real_t jitter = params.jitter;
+	uint64_t seed = params.seed;
+
 	if (transforms_amount < 0 || transforms_amount > HELPER_MAX_TRANSFORMS) {
 		UtilityFunctions::push_error("helper_generate_transforms_grid: transforms_amount must be between 0 and " + String::num_int64(HELPER_MAX_TRANSFORMS) + ".");
 		return PatternSlots2D();
@@ -228,18 +227,26 @@ TypedArray<Transform2D> BulletPatterns2D::helper_generate_transforms_grid(
 		bool random_local_rotation,
 		real_t jitter,
 		uint64_t seed) {
-	return pattern_slots_to_array(generate_grid2d(transforms_amount, marker_transform, rows_per_column, alignment, column_offset, row_offset, rotate_grid_with_marker, random_local_rotation, jitter, seed));
+	GridParams2D params;
+	params.rows_per_column = rows_per_column;
+	params.alignment = alignment;
+	params.column_offset = column_offset;
+	params.row_offset = row_offset;
+	params.rotate_grid_with_marker = rotate_grid_with_marker;
+	params.random_local_rotation = random_local_rotation;
+	params.jitter = jitter;
+	params.seed = seed;
+	return pattern_slots_to_array(generate_grid2d(transforms_amount, marker_transform, params));
 }
 
-PatternSlots2D BulletPatterns2D::generate_fan2d(
-		int transforms_amount,
-		Transform2D marker_transform,
-		real_t spread,
-		real_t direction_angle,
-		real_t step_offset,
-		bool centered,
-		real_t angle_jitter,
-		uint64_t seed) {
+PatternSlots2D BulletPatterns2D::generate_fan2d(int transforms_amount, Transform2D marker_transform, const FanParams2D &params) {
+	real_t spread = params.spread;
+	real_t direction_angle = params.direction_angle;
+	real_t step_offset = params.step_offset;
+	bool centered = params.centered;
+	real_t angle_jitter = params.angle_jitter;
+	uint64_t seed = params.seed;
+
 	if (transforms_amount < 0 || transforms_amount > HELPER_MAX_TRANSFORMS) {
 		UtilityFunctions::push_error("helper_generate_transforms_fan: transforms_amount must be between 0 and " + String::num_int64(HELPER_MAX_TRANSFORMS) + ".");
 		return PatternSlots2D();
@@ -302,18 +309,24 @@ TypedArray<Transform2D> BulletPatterns2D::helper_generate_transforms_fan(
 		bool centered,
 		real_t angle_jitter,
 		uint64_t seed) {
-	return pattern_slots_to_array(generate_fan2d(transforms_amount, marker_transform, spread, direction_angle, step_offset, centered, angle_jitter, seed));
+	FanParams2D params;
+	params.spread = spread;
+	params.direction_angle = direction_angle;
+	params.step_offset = step_offset;
+	params.centered = centered;
+	params.angle_jitter = angle_jitter;
+	params.seed = seed;
+	return pattern_slots_to_array(generate_fan2d(transforms_amount, marker_transform, params));
 }
 
-PatternSlots2D BulletPatterns2D::generate_spiral2d(
-		int transforms_amount,
-		Transform2D marker_transform,
-		real_t start_radius,
-		real_t radius_step,
-		real_t angle_step,
-		bool rotate_with_marker,
-		SpiralFacingMode facing_mode,
-		real_t facing_offset_degrees) {
+PatternSlots2D BulletPatterns2D::generate_spiral2d(int transforms_amount, Transform2D marker_transform, const SpiralParams2D &params) {
+	real_t start_radius = params.start_radius;
+	real_t radius_step = params.radius_step;
+	real_t angle_step = params.angle_step;
+	bool rotate_with_marker = params.rotate_with_marker;
+	SpiralFacingMode facing_mode = params.facing_mode;
+	real_t facing_offset_degrees = params.facing_offset_degrees;
+
 	if (transforms_amount < 0 || transforms_amount > HELPER_MAX_TRANSFORMS) {
 		UtilityFunctions::push_error("helper_generate_transforms_spiral: transforms_amount must be between 0 and " + String::num_int64(HELPER_MAX_TRANSFORMS) + ".");
 		return PatternSlots2D();
@@ -390,17 +403,23 @@ TypedArray<Transform2D> BulletPatterns2D::helper_generate_transforms_spiral(
 		bool rotate_with_marker,
 		SpiralFacingMode facing_mode,
 		real_t facing_offset_degrees) {
-	return pattern_slots_to_array(generate_spiral2d(transforms_amount, marker_transform, start_radius, radius_step, angle_step, rotate_with_marker, facing_mode, facing_offset_degrees));
+	SpiralParams2D params;
+	params.start_radius = start_radius;
+	params.radius_step = radius_step;
+	params.angle_step = angle_step;
+	params.rotate_with_marker = rotate_with_marker;
+	params.facing_mode = facing_mode;
+	params.facing_offset_degrees = facing_offset_degrees;
+	return pattern_slots_to_array(generate_spiral2d(transforms_amount, marker_transform, params));
 }
 
-PatternSlots2D BulletPatterns2D::generate_line2d(
-		int transforms_amount,
-		Transform2D marker_transform,
-		const Vector2 &direction,
-		real_t spacing,
-		bool face_direction,
-		LineAnchor anchor,
-		bool perpendicular) {
+PatternSlots2D BulletPatterns2D::generate_line2d(int transforms_amount, Transform2D marker_transform, const LineParams2D &params) {
+	const Vector2 & direction = params.direction;
+	real_t spacing = params.spacing;
+	bool face_direction = params.face_direction;
+	LineAnchor anchor = params.anchor;
+	bool perpendicular = params.perpendicular;
+
 	if (transforms_amount < 0 || transforms_amount > HELPER_MAX_TRANSFORMS) {
 		UtilityFunctions::push_error("helper_generate_transforms_line: transforms_amount must be between 0 and " + String::num_int64(HELPER_MAX_TRANSFORMS) + ".");
 		return PatternSlots2D();
@@ -461,16 +480,21 @@ TypedArray<Transform2D> BulletPatterns2D::helper_generate_transforms_line(
 		bool face_direction,
 		LineAnchor anchor,
 		bool perpendicular) {
-	return pattern_slots_to_array(generate_line2d(transforms_amount, marker_transform, direction, spacing, face_direction, anchor, perpendicular));
+	LineParams2D params;
+	params.direction = direction;
+	params.spacing = spacing;
+	params.face_direction = face_direction;
+	params.anchor = anchor;
+	params.perpendicular = perpendicular;
+	return pattern_slots_to_array(generate_line2d(transforms_amount, marker_transform, params));
 }
 
-PatternSlots2D BulletPatterns2D::generate_aimed2d(
-		int transforms_amount,
-		Transform2D marker_transform,
-		const Vector2 &target_position,
-		real_t spread,
-		real_t step_offset,
-		bool centered) {
+PatternSlots2D BulletPatterns2D::generate_aimed2d(int transforms_amount, Transform2D marker_transform, const AimedParams2D &params) {
+	const Vector2 & target_position = params.target_position;
+	real_t spread = params.spread;
+	real_t step_offset = params.step_offset;
+	bool centered = params.centered;
+
 	if (transforms_amount < 0 || transforms_amount > HELPER_MAX_TRANSFORMS) {
 		UtilityFunctions::push_error("helper_generate_transforms_aimed: transforms_amount must be between 0 and " + String::num_int64(HELPER_MAX_TRANSFORMS) + ".");
 		return PatternSlots2D();
@@ -494,7 +518,14 @@ PatternSlots2D BulletPatterns2D::generate_aimed2d(
 	}
 	// Cone centered on the marker-to-target direction, in marker-local terms.
 	const real_t direction_angle = to_target.angle() - marker_transform.get_rotation();
-	return generate_fan2d(transforms_amount, marker_transform, spread, direction_angle, step_offset, centered, 0.0, 0); // no jitter, no seed
+	FanParams2D fan;
+	fan.spread = spread;
+	fan.direction_angle = direction_angle;
+	fan.step_offset = step_offset;
+	fan.centered = centered;
+	fan.angle_jitter = 0.0; // no jitter
+	fan.seed = 0;
+	return generate_fan2d(transforms_amount, marker_transform, fan);
 }
 
 TypedArray<Transform2D> BulletPatterns2D::helper_generate_transforms_aimed(
@@ -504,17 +535,21 @@ TypedArray<Transform2D> BulletPatterns2D::helper_generate_transforms_aimed(
 		real_t spread,
 		real_t step_offset,
 		bool centered) {
-	return pattern_slots_to_array(generate_aimed2d(transforms_amount, marker_transform, target_position, spread, step_offset, centered));
+	AimedParams2D params;
+	params.target_position = target_position;
+	params.spread = spread;
+	params.step_offset = step_offset;
+	params.centered = centered;
+	return pattern_slots_to_array(generate_aimed2d(transforms_amount, marker_transform, params));
 }
 
-PatternSlots2D BulletPatterns2D::generate_rain2d(
-		int transforms_amount,
-		Transform2D marker_transform,
-		real_t band_width,
-		Vector2 rain_direction,
-		real_t drop_spacing,
-		real_t jitter,
-		uint64_t seed) {
+PatternSlots2D BulletPatterns2D::generate_rain2d(int transforms_amount, Transform2D marker_transform, const RainParams2D &params) {
+	real_t band_width = params.band_width;
+	Vector2 rain_direction = params.rain_direction;
+	real_t drop_spacing = params.drop_spacing;
+	real_t jitter = params.jitter;
+	uint64_t seed = params.seed;
+
 	if (!danmaku_validate_head("helper_generate_transforms_rain", transforms_amount, marker_transform)) {
 		return PatternSlots2D();
 	}
@@ -573,19 +608,24 @@ TypedArray<Transform2D> BulletPatterns2D::helper_generate_transforms_rain(
 		real_t drop_spacing,
 		real_t jitter,
 		uint64_t seed) {
-	return pattern_slots_to_array(generate_rain2d(transforms_amount, marker_transform, band_width, rain_direction, drop_spacing, jitter, seed));
+	RainParams2D params;
+	params.band_width = band_width;
+	params.rain_direction = rain_direction;
+	params.drop_spacing = drop_spacing;
+	params.jitter = jitter;
+	params.seed = seed;
+	return pattern_slots_to_array(generate_rain2d(transforms_amount, marker_transform, params));
 }
 
-PatternSlots2D BulletPatterns2D::generate_scatter2d(
-		int transforms_amount,
-		Transform2D marker_transform,
-		real_t burst_radius,
-		real_t facing_jitter,
-		uint64_t seed,
-		real_t inner_radius,
-		Vector2 sector_direction,
-		real_t sector_arc,
-		ScatterFacingMode facing_mode) {
+PatternSlots2D BulletPatterns2D::generate_scatter2d(int transforms_amount, Transform2D marker_transform, const ScatterParams2D &params) {
+	real_t burst_radius = params.burst_radius;
+	real_t facing_jitter = params.facing_jitter;
+	uint64_t seed = params.seed;
+	real_t inner_radius = params.inner_radius;
+	Vector2 sector_direction = params.sector_direction;
+	real_t sector_arc = params.sector_arc;
+	ScatterFacingMode facing_mode = params.facing_mode;
+
 	if (!danmaku_validate_head("helper_generate_transforms_scatter", transforms_amount, marker_transform)) {
 		return PatternSlots2D();
 	}
@@ -671,18 +711,25 @@ TypedArray<Transform2D> BulletPatterns2D::helper_generate_transforms_scatter(
 		Vector2 sector_direction,
 		real_t sector_arc,
 		ScatterFacingMode facing_mode) {
-	return pattern_slots_to_array(generate_scatter2d(transforms_amount, marker_transform, burst_radius, facing_jitter, seed, inner_radius, sector_direction, sector_arc, facing_mode));
+	ScatterParams2D params;
+	params.burst_radius = burst_radius;
+	params.facing_jitter = facing_jitter;
+	params.seed = seed;
+	params.inner_radius = inner_radius;
+	params.sector_direction = sector_direction;
+	params.sector_arc = sector_arc;
+	params.facing_mode = facing_mode;
+	return pattern_slots_to_array(generate_scatter2d(transforms_amount, marker_transform, params));
 }
 
-PatternSlots2D BulletPatterns2D::generate_star_polygon2d(
-		int transforms_amount,
-		Transform2D marker_transform,
-		int vertices,
-		real_t radius,
-		real_t vertex_bias,
-		real_t base_rotation,
-		bool face_outward,
-		real_t facing_offset_degrees) {
+PatternSlots2D BulletPatterns2D::generate_star_polygon2d(int transforms_amount, Transform2D marker_transform, const StarPolygonParams2D &params) {
+	int vertices = params.vertices;
+	real_t radius = params.radius;
+	real_t vertex_bias = params.vertex_bias;
+	real_t base_rotation = params.base_rotation;
+	bool face_outward = params.face_outward;
+	real_t facing_offset_degrees = params.facing_offset_degrees;
+
 	if (!danmaku_validate_head("helper_generate_transforms_star_polygon", transforms_amount, marker_transform)) {
 		return PatternSlots2D();
 	}
@@ -732,20 +779,26 @@ TypedArray<Transform2D> BulletPatterns2D::helper_generate_transforms_star_polygo
 		real_t base_rotation,
 		bool face_outward,
 		real_t facing_offset_degrees) {
-	return pattern_slots_to_array(generate_star_polygon2d(transforms_amount, marker_transform, vertices, radius, vertex_bias, base_rotation, face_outward, facing_offset_degrees));
+	StarPolygonParams2D params;
+	params.vertices = vertices;
+	params.radius = radius;
+	params.vertex_bias = vertex_bias;
+	params.base_rotation = base_rotation;
+	params.face_outward = face_outward;
+	params.facing_offset_degrees = facing_offset_degrees;
+	return pattern_slots_to_array(generate_star_polygon2d(transforms_amount, marker_transform, params));
 }
 
-PatternSlots2D BulletPatterns2D::generate_multispiral2d(
-		int transforms_amount,
-		Transform2D marker_transform,
-		int arms,
-		real_t start_radius,
-		real_t radius_step,
-		real_t angle_step,
-		bool rotate_with_marker,
-		SpiralFacingMode facing_mode,
-		real_t facing_offset_degrees,
-		int arm_index_stride) {
+PatternSlots2D BulletPatterns2D::generate_multispiral2d(int transforms_amount, Transform2D marker_transform, const MultispiralParams2D &params) {
+	int arms = params.arms;
+	real_t start_radius = params.start_radius;
+	real_t radius_step = params.radius_step;
+	real_t angle_step = params.angle_step;
+	bool rotate_with_marker = params.rotate_with_marker;
+	SpiralFacingMode facing_mode = params.facing_mode;
+	real_t facing_offset_degrees = params.facing_offset_degrees;
+	int arm_index_stride = params.arm_index_stride;
+
 	if (!danmaku_validate_head("helper_generate_transforms_multispiral", transforms_amount, marker_transform)) {
 		return PatternSlots2D();
 	}
@@ -821,18 +874,26 @@ TypedArray<Transform2D> BulletPatterns2D::helper_generate_transforms_multispiral
 		SpiralFacingMode facing_mode,
 		real_t facing_offset_degrees,
 		int arm_index_stride) {
-	return pattern_slots_to_array(generate_multispiral2d(transforms_amount, marker_transform, arms, start_radius, radius_step, angle_step, rotate_with_marker, facing_mode, facing_offset_degrees, arm_index_stride));
+	MultispiralParams2D params;
+	params.arms = arms;
+	params.start_radius = start_radius;
+	params.radius_step = radius_step;
+	params.angle_step = angle_step;
+	params.rotate_with_marker = rotate_with_marker;
+	params.facing_mode = facing_mode;
+	params.facing_offset_degrees = facing_offset_degrees;
+	params.arm_index_stride = arm_index_stride;
+	return pattern_slots_to_array(generate_multispiral2d(transforms_amount, marker_transform, params));
 }
 
-PatternSlots2D BulletPatterns2D::generate_cross2d(
-		int transforms_amount,
-		Transform2D marker_transform,
-		int arm_count,
-		real_t arm_length,
-		real_t spacing,
-		real_t base_rotation,
-		bool face_outward,
-		real_t facing_offset_degrees) {
+PatternSlots2D BulletPatterns2D::generate_cross2d(int transforms_amount, Transform2D marker_transform, const CrossParams2D &params) {
+	int arm_count = params.arm_count;
+	real_t arm_length = params.arm_length;
+	real_t spacing = params.spacing;
+	real_t base_rotation = params.base_rotation;
+	bool face_outward = params.face_outward;
+	real_t facing_offset_degrees = params.facing_offset_degrees;
+
 	if (!danmaku_validate_head("helper_generate_transforms_cross", transforms_amount, marker_transform)) {
 		return PatternSlots2D();
 	}
@@ -883,18 +944,24 @@ TypedArray<Transform2D> BulletPatterns2D::helper_generate_transforms_cross(
 		real_t base_rotation,
 		bool face_outward,
 		real_t facing_offset_degrees) {
-	return pattern_slots_to_array(generate_cross2d(transforms_amount, marker_transform, arm_count, arm_length, spacing, base_rotation, face_outward, facing_offset_degrees));
+	CrossParams2D params;
+	params.arm_count = arm_count;
+	params.arm_length = arm_length;
+	params.spacing = spacing;
+	params.base_rotation = base_rotation;
+	params.face_outward = face_outward;
+	params.facing_offset_degrees = facing_offset_degrees;
+	return pattern_slots_to_array(generate_cross2d(transforms_amount, marker_transform, params));
 }
 
-PatternSlots2D BulletPatterns2D::generate_wave2d(
-		int transforms_amount,
-		Transform2D marker_transform,
-		real_t width,
-		real_t amplitude,
-		real_t waves,
-		Vector2 direction,
-		bool face_direction,
-		real_t facing_offset_degrees) {
+PatternSlots2D BulletPatterns2D::generate_wave2d(int transforms_amount, Transform2D marker_transform, const WaveParams2D &params) {
+	real_t width = params.width;
+	real_t amplitude = params.amplitude;
+	real_t waves = params.waves;
+	Vector2 direction = params.direction;
+	bool face_direction = params.face_direction;
+	real_t facing_offset_degrees = params.facing_offset_degrees;
+
 	if (!danmaku_validate_head("helper_generate_transforms_wave", transforms_amount, marker_transform)) {
 		return PatternSlots2D();
 	}
@@ -942,21 +1009,27 @@ TypedArray<Transform2D> BulletPatterns2D::helper_generate_transforms_wave(
 		Vector2 direction,
 		bool face_direction,
 		real_t facing_offset_degrees) {
-	return pattern_slots_to_array(generate_wave2d(transforms_amount, marker_transform, width, amplitude, waves, direction, face_direction, facing_offset_degrees));
+	WaveParams2D params;
+	params.width = width;
+	params.amplitude = amplitude;
+	params.waves = waves;
+	params.direction = direction;
+	params.face_direction = face_direction;
+	params.facing_offset_degrees = facing_offset_degrees;
+	return pattern_slots_to_array(generate_wave2d(transforms_amount, marker_transform, params));
 }
 
-PatternSlots2D BulletPatterns2D::generate_waterfall2d(
-		int transforms_amount,
-		Transform2D marker_transform,
-		int columns,
-		real_t column_spacing,
-		int rows,
-		real_t row_spacing,
-		real_t stagger,
-		Vector2 rain_direction,
-		real_t jitter,
-		real_t facing_offset_degrees,
-		uint64_t seed) {
+PatternSlots2D BulletPatterns2D::generate_waterfall2d(int transforms_amount, Transform2D marker_transform, const WaterfallParams2D &params) {
+	int columns = params.columns;
+	real_t column_spacing = params.column_spacing;
+	int rows = params.rows;
+	real_t row_spacing = params.row_spacing;
+	real_t stagger = params.stagger;
+	Vector2 rain_direction = params.rain_direction;
+	real_t jitter = params.jitter;
+	real_t facing_offset_degrees = params.facing_offset_degrees;
+	uint64_t seed = params.seed;
+
 	if (!danmaku_validate_head("helper_generate_transforms_waterfall", transforms_amount, marker_transform)) {
 		return PatternSlots2D();
 	}
@@ -1050,19 +1123,28 @@ TypedArray<Transform2D> BulletPatterns2D::helper_generate_transforms_waterfall(
 		real_t jitter,
 		real_t facing_offset_degrees,
 		uint64_t seed) {
-	return pattern_slots_to_array(generate_waterfall2d(transforms_amount, marker_transform, columns, column_spacing, rows, row_spacing, stagger, rain_direction, jitter, facing_offset_degrees, seed));
+	WaterfallParams2D params;
+	params.columns = columns;
+	params.column_spacing = column_spacing;
+	params.rows = rows;
+	params.row_spacing = row_spacing;
+	params.stagger = stagger;
+	params.rain_direction = rain_direction;
+	params.jitter = jitter;
+	params.facing_offset_degrees = facing_offset_degrees;
+	params.seed = seed;
+	return pattern_slots_to_array(generate_waterfall2d(transforms_amount, marker_transform, params));
 }
 
-PatternSlots2D BulletPatterns2D::generate_lattice2d(
-		int transforms_amount,
-		Transform2D marker_transform,
-		int columns,
-		int rows,
-		real_t spacing_x,
-		real_t spacing_y,
-		bool stagger_rows,
-		bool face_outward,
-		real_t facing_offset_degrees) {
+PatternSlots2D BulletPatterns2D::generate_lattice2d(int transforms_amount, Transform2D marker_transform, const LatticeParams2D &params) {
+	int columns = params.columns;
+	int rows = params.rows;
+	real_t spacing_x = params.spacing_x;
+	real_t spacing_y = params.spacing_y;
+	bool stagger_rows = params.stagger_rows;
+	bool face_outward = params.face_outward;
+	real_t facing_offset_degrees = params.facing_offset_degrees;
+
 	if (!danmaku_validate_head("helper_generate_transforms_lattice", transforms_amount, marker_transform)) {
 		return PatternSlots2D();
 	}
@@ -1133,21 +1215,28 @@ TypedArray<Transform2D> BulletPatterns2D::helper_generate_transforms_lattice(
 		bool stagger_rows,
 		bool face_outward,
 		real_t facing_offset_degrees) {
-	return pattern_slots_to_array(generate_lattice2d(transforms_amount, marker_transform, columns, rows, spacing_x, spacing_y, stagger_rows, face_outward, facing_offset_degrees));
+	LatticeParams2D params;
+	params.columns = columns;
+	params.rows = rows;
+	params.spacing_x = spacing_x;
+	params.spacing_y = spacing_y;
+	params.stagger_rows = stagger_rows;
+	params.face_outward = face_outward;
+	params.facing_offset_degrees = facing_offset_degrees;
+	return pattern_slots_to_array(generate_lattice2d(transforms_amount, marker_transform, params));
 }
 
-PatternSlots2D BulletPatterns2D::generate_counter_spiral2d(
-		int transforms_amount,
-		Transform2D marker_transform,
-		int arms,
-		real_t start_radius,
-		real_t radius_step,
-		real_t angle_step,
-		bool rotate_with_marker,
-		SpiralFacingMode facing_mode,
-		real_t facing_offset_degrees,
-		int arm_index_stride,
-		bool mirror_alternate_arms) {
+PatternSlots2D BulletPatterns2D::generate_counter_spiral2d(int transforms_amount, Transform2D marker_transform, const CounterSpiralParams2D &params) {
+	int arms = params.arms;
+	real_t start_radius = params.start_radius;
+	real_t radius_step = params.radius_step;
+	real_t angle_step = params.angle_step;
+	bool rotate_with_marker = params.rotate_with_marker;
+	SpiralFacingMode facing_mode = params.facing_mode;
+	real_t facing_offset_degrees = params.facing_offset_degrees;
+	int arm_index_stride = params.arm_index_stride;
+	bool mirror_alternate_arms = params.mirror_alternate_arms;
+
 	if (!danmaku_validate_head("helper_generate_transforms_counter_spiral", transforms_amount, marker_transform)) {
 		return PatternSlots2D();
 	}
@@ -1225,18 +1314,27 @@ TypedArray<Transform2D> BulletPatterns2D::helper_generate_transforms_counter_spi
 		real_t facing_offset_degrees,
 		int arm_index_stride,
 		bool mirror_alternate_arms) {
-	return pattern_slots_to_array(generate_counter_spiral2d(transforms_amount, marker_transform, arms, start_radius, radius_step, angle_step, rotate_with_marker, facing_mode, facing_offset_degrees, arm_index_stride, mirror_alternate_arms));
+	CounterSpiralParams2D params;
+	params.arms = arms;
+	params.start_radius = start_radius;
+	params.radius_step = radius_step;
+	params.angle_step = angle_step;
+	params.rotate_with_marker = rotate_with_marker;
+	params.facing_mode = facing_mode;
+	params.facing_offset_degrees = facing_offset_degrees;
+	params.arm_index_stride = arm_index_stride;
+	params.mirror_alternate_arms = mirror_alternate_arms;
+	return pattern_slots_to_array(generate_counter_spiral2d(transforms_amount, marker_transform, params));
 }
 
-PatternSlots2D BulletPatterns2D::generate_corridor2d(
-		int transforms_amount,
-		Transform2D marker_transform,
-		const Vector2 &aim_direction,
-		real_t width,
-		real_t spacing,
-		real_t gap_width,
-		bool face_aim,
-		real_t facing_offset_degrees) {
+PatternSlots2D BulletPatterns2D::generate_corridor2d(int transforms_amount, Transform2D marker_transform, const CorridorParams2D &params) {
+	const Vector2 & aim_direction = params.aim_direction;
+	real_t width = params.width;
+	real_t spacing = params.spacing;
+	real_t gap_width = params.gap_width;
+	bool face_aim = params.face_aim;
+	real_t facing_offset_degrees = params.facing_offset_degrees;
+
 	if (!danmaku_validate_head("helper_generate_transforms_corridor", transforms_amount, marker_transform)) {
 		return PatternSlots2D();
 	}
@@ -1315,7 +1413,14 @@ TypedArray<Transform2D> BulletPatterns2D::helper_generate_transforms_corridor(
 		real_t gap_width,
 		bool face_aim,
 		real_t facing_offset_degrees) {
-	return pattern_slots_to_array(generate_corridor2d(transforms_amount, marker_transform, aim_direction, width, spacing, gap_width, face_aim, facing_offset_degrees));
+	CorridorParams2D params;
+	params.aim_direction = aim_direction;
+	params.width = width;
+	params.spacing = spacing;
+	params.gap_width = gap_width;
+	params.face_aim = face_aim;
+	params.facing_offset_degrees = facing_offset_degrees;
+	return pattern_slots_to_array(generate_corridor2d(transforms_amount, marker_transform, params));
 }
 
 } // namespace BlastBullets2D

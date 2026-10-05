@@ -252,19 +252,18 @@ PatternSlots2D polyline_layout2d(const Transform2D &marker, const PackedVector2A
     return out;
 }
 
-PatternSlots2D BulletPatterns2D::generate_polyline2d(
-		int transforms_amount,
-		Transform2D marker_transform,
-		const PackedVector2Array &points,
-		bool closed,
-		PolylineDistribution distribution,
-		real_t spacing,
-		PolylineOverflow overflow,
-		PolylineAnchor anchor,
-		real_t start_offset,
-		bool reverse,
-		PolylineFacing facing,
-		real_t facing_offset_deg) {
+PatternSlots2D BulletPatterns2D::generate_polyline2d(int transforms_amount, Transform2D marker_transform, const PolylineParams2D &params) {
+	const PackedVector2Array & points = params.points;
+	bool closed = params.closed;
+	PolylineDistribution distribution = params.distribution;
+	real_t spacing = params.spacing;
+	PolylineOverflow overflow = params.overflow;
+	PolylineAnchor anchor = params.anchor;
+	real_t start_offset = params.start_offset;
+	bool reverse = params.reverse;
+	PolylineFacing facing = params.facing;
+	real_t facing_offset_deg = params.facing_offset_deg;
+
 	if (transforms_amount < 0 || transforms_amount > HELPER_MAX_TRANSFORMS) {
 		UtilityFunctions::push_error("helper_generate_transforms_polyline: transforms_amount must be in 0.." + itos(HELPER_MAX_TRANSFORMS) + ".");
 		return PatternSlots2D();
@@ -301,7 +300,18 @@ TypedArray<Transform2D> BulletPatterns2D::helper_generate_transforms_polyline(
 		bool reverse,
 		PolylineFacing facing,
 		real_t facing_offset_deg) {
-	return pattern_slots_to_array(generate_polyline2d(transforms_amount, marker_transform, points, closed, distribution, spacing, overflow, anchor, start_offset, reverse, facing, facing_offset_deg));
+	PolylineParams2D params;
+	params.points = points;
+	params.closed = closed;
+	params.distribution = distribution;
+	params.spacing = spacing;
+	params.overflow = overflow;
+	params.anchor = anchor;
+	params.start_offset = start_offset;
+	params.reverse = reverse;
+	params.facing = facing;
+	params.facing_offset_deg = facing_offset_deg;
+	return pattern_slots_to_array(generate_polyline2d(transforms_amount, marker_transform, params));
 }
 
 } // namespace BlastBullets2D

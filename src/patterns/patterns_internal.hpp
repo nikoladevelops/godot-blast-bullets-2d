@@ -7,6 +7,7 @@
 
 #include "patterns/bullet_patterns2d.hpp"
 #include "patterns/pattern_slots2d.hpp"
+#include "patterns/pattern_params2d.hpp"
 #include "core/transform_math2d.hpp"
 #include "core/warn_once2d.hpp"
 #include "godot_cpp/classes/global_constants.hpp"
@@ -136,35 +137,18 @@ PatternSlots2D layout_outline_slots(
         bool face_outward,
         real_t facing_offset_degrees,
         const PackedFloat32Array &facing_override,
-        int outline_placement,
-        int outline_facing,
-        bool outline_reverse,
-        int outline_slot_offset,
-        double fill_spacing,
-        bool fill_stagger,
-        double fill_margin,
-        int layer_count,
-        double layer_scale,
-        int layer_side,
-        int layer_fill,
-        int layer_start_offset,
-        int layer_scale_curve,
-        const PackedFloat32Array &layer_custom_scales,
-        int layer_twist,
-        int layer_max_dots,
-        int outline_distribution = 1,
-        int layer_layout = 0,
-        const PackedVector2Array &polygon_corners = PackedVector2Array(),
-        int corner_priority = 0,
-        int corner_mode = 0,
-        double edge_margin = 0.0,
-        bool loop_closed = true,
-        bool allow_resample = true,
-        int corner_facing = 0,
-        // Dense ideal curve behind the slot loop (same space as `points`,
-        // with matching normals / facing overrides). Fill Inside builds its
-        // interior from it and Layers resample each ring from it, so both
-        // follow the true curve at any bullet count. Empty = slot loop only.
+        // The user's outline knobs (placement, slot order, fill, layers).
+        const OutlineLayout2D &outline,
+        // Corner anchoring: the polygon loops pass their knobs, curves
+        // pass CornerLayout2D::smooth().
+        const CornerLayout2D &corner,
+        // Corner points of a polygon loop (empty for curves).
+        const PackedVector2Array &polygon_corners,
+        bool loop_closed,
+        bool allow_resample,
+        // Dense ideal curve (Fill / Layers): Fill builds the interior from
+        // it and Layers resample each ring from it, so both follow the true
+        // curve at any bullet count. Empty = slot loop only.
         const PackedVector2Array &dense_outline = PackedVector2Array(),
         const PackedVector2Array &dense_normals = PackedVector2Array(),
         const PackedFloat32Array &dense_overrides = PackedFloat32Array()); // bullet_factory2d_patterns_layout.cpp

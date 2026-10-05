@@ -42,6 +42,40 @@ using namespace godot;
 // generator (the bound GDScript helpers return it as a TypedArray).
 using PatternSlots2D = std::vector<Transform2D>;
 
+// Parameter structs of the native cores (patterns/pattern_params2d.hpp).
+struct OutlineLayout2D;
+struct CornerLayout2D;
+struct AimedParams2D;
+struct CircleParams2D;
+struct CorridorParams2D;
+struct CounterSpiralParams2D;
+struct CrossParams2D;
+struct DiamondParams2D;
+struct EdgeFromPointsParams2D;
+struct EllipseParams2D;
+struct FanParams2D;
+struct FlowerParams2D;
+struct GridParams2D;
+struct HeartParams2D;
+struct LatticeParams2D;
+struct LineParams2D;
+struct LissajousParams2D;
+struct MultispiralParams2D;
+struct PolygonParams2D;
+struct PolylineParams2D;
+struct RainParams2D;
+struct RectangleParams2D;
+struct RingParams2D;
+struct RoseParams2D;
+struct ScatterParams2D;
+struct SpiralParams2D;
+struct StarParams2D;
+struct StarPolygonParams2D;
+struct TrapezoidParams2D;
+struct TriangleParams2D;
+struct WaterfallParams2D;
+struct WaveParams2D;
+
 class BulletPatterns2D : public Object {
 	GDCLASS(BulletPatterns2D, Object)
 
@@ -1338,36 +1372,36 @@ public:
 	// same arguments, validation and error texts, but a PatternSlots2D
 	// result, so C++ callers (the spawner dispatch, the bake cache) pay no
 	// Variant per bullet. The bindings wrap them (pattern_slots_to_array).
-	static PatternSlots2D generate_aimed2d(int transforms_amount, Transform2D marker_transform, const Vector2 &target_position, real_t spread, real_t step_offset, bool centered);
-	static PatternSlots2D generate_circle2d(int transforms_amount, Transform2D marker_transform, real_t radius, bool face_outward, real_t facing_offset_degrees, int outline_placement, int outline_facing, bool outline_reverse, int outline_slot_offset, double fill_spacing, bool fill_stagger, double fill_margin, int layer_count, double layer_scale, int layer_side, int layer_fill, int layer_start_offset, int layer_scale_curve, const PackedFloat32Array &layer_custom_scales, int layer_twist, int layer_max_dots, int layer_layout);
-	static PatternSlots2D generate_corridor2d(int transforms_amount, Transform2D marker_transform, const Vector2 &aim_direction, real_t width, real_t spacing, real_t gap_width, bool face_aim, real_t facing_offset_degrees);
-	static PatternSlots2D generate_counter_spiral2d(int transforms_amount, Transform2D marker_transform, int arms, real_t start_radius, real_t radius_step, real_t angle_step, bool rotate_with_marker, SpiralFacingMode facing_mode, real_t facing_offset_degrees, int arm_index_stride, bool mirror_alternate_arms);
-	static PatternSlots2D generate_cross2d(int transforms_amount, Transform2D marker_transform, int arm_count, real_t arm_length, real_t spacing, real_t base_rotation, bool face_outward, real_t facing_offset_degrees);
-	static PatternSlots2D generate_diamond2d(int transforms_amount, Transform2D marker_transform, real_t diagonal_x, real_t diagonal_y, real_t rotation, bool face_outward, real_t facing_offset_degrees, int outline_placement, int outline_facing, bool outline_reverse, int outline_slot_offset, double fill_spacing, bool fill_stagger, double fill_margin, int layer_count, double layer_scale, int layer_side, int layer_fill, int layer_start_offset, int layer_scale_curve, const PackedFloat32Array &layer_custom_scales, int layer_twist, int layer_max_dots, int outline_distribution, int layer_layout, int outline_corner_priority, int outline_corner_mode, double outline_edge_margin, int outline_corner_facing);
-	static PatternSlots2D generate_edge_from_points2d(int transforms_amount, Transform2D marker_transform, const PackedVector2Array &edge_points, bool closed, bool flip_normals, bool random_sample, real_t jitter, real_t facing_offset_degrees, uint64_t seed, real_t spread, real_t spread_exponent, int spread_side, real_t tangent_jitter);
-	static PatternSlots2D generate_ellipse2d(int transforms_amount, Transform2D marker_transform, real_t radius_x, real_t radius_y, real_t ellipse_rotation, real_t start_angle, real_t arc, EllipseMode mode, int gap_count, real_t gap_width, bool face_outward, real_t facing_offset_degrees, int outline_placement, int outline_facing, bool outline_reverse, int outline_slot_offset, double fill_spacing, bool fill_stagger, double fill_margin, int layer_count, double layer_scale, int layer_side, int layer_fill, int layer_start_offset, int layer_scale_curve, const PackedFloat32Array &layer_custom_scales, int layer_twist, int layer_max_dots, int layer_layout);
-	static PatternSlots2D generate_fan2d(int transforms_amount, Transform2D marker_transform, real_t spread, real_t direction_angle, real_t step_offset, bool centered, real_t angle_jitter, uint64_t seed);
-	static PatternSlots2D generate_flower2d(int transforms_amount, Transform2D marker_transform, int petals, real_t radius, real_t petal_spread, real_t petal_sharpness, real_t base_rotation, bool face_outward, real_t facing_offset_degrees, int outline_placement, int outline_facing, bool outline_reverse, int outline_slot_offset, double fill_spacing, bool fill_stagger, double fill_margin, int layer_count, double layer_scale, int layer_side, int layer_fill, int layer_start_offset, int layer_scale_curve, const PackedFloat32Array &layer_custom_scales, int layer_twist, int layer_max_dots, int flower_type, double inner_radius_scale, double spiro_roller, double spiro_pen, double super_lobes, double super_fullness, int layer_layout);
-	static PatternSlots2D generate_grid2d(int transforms_amount, Transform2D marker_transform, int rows_per_column, Alignment alignment, real_t column_offset, real_t row_offset, bool rotate_grid_with_marker, bool random_local_rotation, real_t jitter, uint64_t seed);
-	static PatternSlots2D generate_heart2d(int transforms_amount, Transform2D marker_transform, real_t size, real_t base_rotation, bool face_outward, real_t facing_offset_degrees, int outline_placement, int outline_facing, bool outline_reverse, int outline_slot_offset, double fill_spacing, bool fill_stagger, double fill_margin, int layer_count, double layer_scale, int layer_side, int layer_fill, int layer_start_offset, int layer_scale_curve, const PackedFloat32Array &layer_custom_scales, int layer_twist, int layer_max_dots, int layer_layout);
-	static PatternSlots2D generate_lattice2d(int transforms_amount, Transform2D marker_transform, int columns, int rows, real_t spacing_x, real_t spacing_y, bool stagger_rows, bool face_outward, real_t facing_offset_degrees);
-	static PatternSlots2D generate_line2d(int transforms_amount, Transform2D marker_transform, const Vector2 &direction, real_t spacing, bool face_direction, LineAnchor anchor, bool perpendicular);
-	static PatternSlots2D generate_lissajous2d(int transforms_amount, Transform2D marker_transform, real_t size_x, real_t size_y, real_t freq_x, real_t freq_y, real_t phase, bool face_outward, real_t facing_offset_degrees, int outline_placement, int outline_facing, bool outline_reverse, int outline_slot_offset, double fill_spacing, bool fill_stagger, double fill_margin, int layer_count, double layer_scale, int layer_side, int layer_fill, int layer_start_offset, int layer_scale_curve, const PackedFloat32Array &layer_custom_scales, int layer_twist, int layer_max_dots, int layer_layout);
-	static PatternSlots2D generate_multispiral2d(int transforms_amount, Transform2D marker_transform, int arms, real_t start_radius, real_t radius_step, real_t angle_step, bool rotate_with_marker, SpiralFacingMode facing_mode, real_t facing_offset_degrees, int arm_index_stride);
-	static PatternSlots2D generate_polygon2d(int transforms_amount, Transform2D marker_transform, int vertices, real_t radius, real_t base_rotation, bool face_outward, real_t facing_offset_degrees, int outline_placement, int outline_facing, bool outline_reverse, int outline_slot_offset, double fill_spacing, bool fill_stagger, double fill_margin, int layer_count, double layer_scale, int layer_side, int layer_fill, int layer_start_offset, int layer_scale_curve, const PackedFloat32Array &layer_custom_scales, int layer_twist, int layer_max_dots, int outline_distribution, int layer_layout, int outline_corner_priority, int outline_corner_mode, double outline_edge_margin, int outline_corner_facing);
-	static PatternSlots2D generate_polyline2d(int transforms_amount, Transform2D marker_transform, const PackedVector2Array &points, bool closed, PolylineDistribution distribution, real_t spacing, PolylineOverflow overflow, PolylineAnchor anchor, real_t start_offset, bool reverse, PolylineFacing facing, real_t facing_offset_deg);
-	static PatternSlots2D generate_rain2d(int transforms_amount, Transform2D marker_transform, real_t band_width, Vector2 rain_direction, real_t drop_spacing, real_t jitter, uint64_t seed);
-	static PatternSlots2D generate_rectangle2d(int transforms_amount, Transform2D marker_transform, const Vector2 &size, bool face_outward, real_t facing_offset_degrees, int outline_placement, int outline_facing, bool outline_reverse, int outline_slot_offset, double fill_spacing, bool fill_stagger, double fill_margin, int layer_count, double layer_scale, int layer_side, int layer_fill, int layer_start_offset, int layer_scale_curve, const PackedFloat32Array &layer_custom_scales, int layer_twist, int layer_max_dots, int outline_distribution, int layer_layout, int outline_corner_priority, int outline_corner_mode, double outline_edge_margin, int outline_corner_facing);
-	static PatternSlots2D generate_ring2d(int transforms_amount, Transform2D marker_transform, real_t radius, real_t start_angle, real_t arc, bool rotate_with_marker, bool random_rotation, bool face_outward, real_t y_scale, real_t facing_offset_degrees, int outline_placement, int outline_facing, bool outline_reverse, int outline_slot_offset, double fill_spacing, bool fill_stagger, double fill_margin, int layer_count, double layer_scale, int layer_side, int layer_fill, int layer_start_offset, int layer_scale_curve, const PackedFloat32Array &layer_custom_scales, int layer_twist, int layer_max_dots, uint64_t seed, int layer_layout);
-	static PatternSlots2D generate_rose2d(int transforms_amount, Transform2D marker_transform, int petals, real_t radius, real_t lobe_sharpness, real_t base_rotation, bool face_outward, real_t facing_offset_degrees, int outline_placement, int outline_facing, bool outline_reverse, int outline_slot_offset, double fill_spacing, bool fill_stagger, double fill_margin, int layer_count, double layer_scale, int layer_side, int layer_fill, int layer_start_offset, int layer_scale_curve, const PackedFloat32Array &layer_custom_scales, int layer_twist, int layer_max_dots, int layer_layout);
-	static PatternSlots2D generate_scatter2d(int transforms_amount, Transform2D marker_transform, real_t burst_radius, real_t facing_jitter, uint64_t seed, real_t inner_radius, Vector2 sector_direction, real_t sector_arc, ScatterFacingMode facing_mode);
-	static PatternSlots2D generate_spiral2d(int transforms_amount, Transform2D marker_transform, real_t start_radius, real_t radius_step, real_t angle_step, bool rotate_with_marker, SpiralFacingMode facing_mode, real_t facing_offset_degrees);
-	static PatternSlots2D generate_star2d(int transforms_amount, Transform2D marker_transform, int points, real_t outer_radius, real_t inner_radius, real_t base_rotation, bool face_outward, real_t facing_offset_degrees, int outline_placement, int outline_facing, bool outline_reverse, int outline_slot_offset, double fill_spacing, bool fill_stagger, double fill_margin, int layer_count, double layer_scale, int layer_side, int layer_fill, int layer_start_offset, int layer_scale_curve, const PackedFloat32Array &layer_custom_scales, int layer_twist, int layer_max_dots, int outline_distribution, int layer_layout, int outline_corner_priority, int outline_corner_mode, double outline_edge_margin, int outline_corner_facing);
-	static PatternSlots2D generate_star_polygon2d(int transforms_amount, Transform2D marker_transform, int vertices, real_t radius, real_t vertex_bias, real_t base_rotation, bool face_outward, real_t facing_offset_degrees);
-	static PatternSlots2D generate_trapezoid2d(int transforms_amount, Transform2D marker_transform, real_t base_top, real_t base_bottom, real_t height, real_t rotation, bool face_outward, real_t facing_offset_degrees, int outline_placement, int outline_facing, bool outline_reverse, int outline_slot_offset, double fill_spacing, bool fill_stagger, double fill_margin, int layer_count, double layer_scale, int layer_side, int layer_fill, int layer_start_offset, int layer_scale_curve, const PackedFloat32Array &layer_custom_scales, int layer_twist, int layer_max_dots, int outline_distribution, int layer_layout, int outline_corner_priority, int outline_corner_mode, double outline_edge_margin, int outline_corner_facing);
-	static PatternSlots2D generate_triangle2d(int transforms_amount, Transform2D marker_transform, TriangleType triangle_type, real_t size_a, real_t size_b, real_t rotation, bool face_outward, real_t facing_offset_degrees, int outline_placement, int outline_facing, bool outline_reverse, int outline_slot_offset, double fill_spacing, bool fill_stagger, double fill_margin, int layer_count, double layer_scale, int layer_side, int layer_fill, int layer_start_offset, int layer_scale_curve, const PackedFloat32Array &layer_custom_scales, int layer_twist, int layer_max_dots, int outline_distribution, int layer_layout, int outline_corner_priority, int outline_corner_mode, double outline_edge_margin, int outline_corner_facing);
-	static PatternSlots2D generate_waterfall2d(int transforms_amount, Transform2D marker_transform, int columns, real_t column_spacing, int rows, real_t row_spacing, real_t stagger, Vector2 rain_direction, real_t jitter, real_t facing_offset_degrees, uint64_t seed);
-	static PatternSlots2D generate_wave2d(int transforms_amount, Transform2D marker_transform, real_t width, real_t amplitude, real_t waves, Vector2 direction, bool face_direction, real_t facing_offset_degrees);
+	static PatternSlots2D generate_aimed2d(int transforms_amount, Transform2D marker_transform, const AimedParams2D &params);
+	static PatternSlots2D generate_circle2d(int transforms_amount, Transform2D marker_transform, const CircleParams2D &params);
+	static PatternSlots2D generate_corridor2d(int transforms_amount, Transform2D marker_transform, const CorridorParams2D &params);
+	static PatternSlots2D generate_counter_spiral2d(int transforms_amount, Transform2D marker_transform, const CounterSpiralParams2D &params);
+	static PatternSlots2D generate_cross2d(int transforms_amount, Transform2D marker_transform, const CrossParams2D &params);
+	static PatternSlots2D generate_diamond2d(int transforms_amount, Transform2D marker_transform, const DiamondParams2D &params);
+	static PatternSlots2D generate_edge_from_points2d(int transforms_amount, Transform2D marker_transform, const EdgeFromPointsParams2D &params);
+	static PatternSlots2D generate_ellipse2d(int transforms_amount, Transform2D marker_transform, const EllipseParams2D &params);
+	static PatternSlots2D generate_fan2d(int transforms_amount, Transform2D marker_transform, const FanParams2D &params);
+	static PatternSlots2D generate_flower2d(int transforms_amount, Transform2D marker_transform, const FlowerParams2D &params);
+	static PatternSlots2D generate_grid2d(int transforms_amount, Transform2D marker_transform, const GridParams2D &params);
+	static PatternSlots2D generate_heart2d(int transforms_amount, Transform2D marker_transform, const HeartParams2D &params);
+	static PatternSlots2D generate_lattice2d(int transforms_amount, Transform2D marker_transform, const LatticeParams2D &params);
+	static PatternSlots2D generate_line2d(int transforms_amount, Transform2D marker_transform, const LineParams2D &params);
+	static PatternSlots2D generate_lissajous2d(int transforms_amount, Transform2D marker_transform, const LissajousParams2D &params);
+	static PatternSlots2D generate_multispiral2d(int transforms_amount, Transform2D marker_transform, const MultispiralParams2D &params);
+	static PatternSlots2D generate_polygon2d(int transforms_amount, Transform2D marker_transform, const PolygonParams2D &params);
+	static PatternSlots2D generate_polyline2d(int transforms_amount, Transform2D marker_transform, const PolylineParams2D &params);
+	static PatternSlots2D generate_rain2d(int transforms_amount, Transform2D marker_transform, const RainParams2D &params);
+	static PatternSlots2D generate_rectangle2d(int transforms_amount, Transform2D marker_transform, const RectangleParams2D &params);
+	static PatternSlots2D generate_ring2d(int transforms_amount, Transform2D marker_transform, const RingParams2D &params);
+	static PatternSlots2D generate_rose2d(int transforms_amount, Transform2D marker_transform, const RoseParams2D &params);
+	static PatternSlots2D generate_scatter2d(int transforms_amount, Transform2D marker_transform, const ScatterParams2D &params);
+	static PatternSlots2D generate_spiral2d(int transforms_amount, Transform2D marker_transform, const SpiralParams2D &params);
+	static PatternSlots2D generate_star2d(int transforms_amount, Transform2D marker_transform, const StarParams2D &params);
+	static PatternSlots2D generate_star_polygon2d(int transforms_amount, Transform2D marker_transform, const StarPolygonParams2D &params);
+	static PatternSlots2D generate_trapezoid2d(int transforms_amount, Transform2D marker_transform, const TrapezoidParams2D &params);
+	static PatternSlots2D generate_triangle2d(int transforms_amount, Transform2D marker_transform, const TriangleParams2D &params);
+	static PatternSlots2D generate_waterfall2d(int transforms_amount, Transform2D marker_transform, const WaterfallParams2D &params);
+	static PatternSlots2D generate_wave2d(int transforms_amount, Transform2D marker_transform, const WaveParams2D &params);
 
 protected:
 	static void _bind_methods();
