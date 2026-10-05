@@ -86,6 +86,19 @@ public:
 	// reads_external_state. Ids are BulletSpawner2D.pattern_source values.
 	static TypedArray<Dictionary> get_shapes();
 
+	// Any pattern source by id (BulletSpawner2D.pattern_source, see
+	// get_shapes) without a spawner: `params` names knobs exactly like the
+	// spawner properties, with or without the helper_ prefix
+	// ({"ring_radius": 80, "outline_placement": 1}), and they are checked
+	// with the spawner's own rules and wording. Scene inputs come in as
+	// params too: aim_position (Aimed, Corridor), path_points (Path2D,
+	// marker-local), children (From Children, global transforms). Returns
+	// the raw pattern a spawner at marker_transform would fire before its
+	// pose (spin, pattern_scale, transforms_scale, muzzle offset), with
+	// helper_skip_indices applied. Unknown params fail loud with a
+	// did-you-mean and the rest still apply.
+	static TypedArray<Transform2D> generate(int shape, int amount, const Transform2D &marker_transform, const Dictionary &params = Dictionary());
+
 	// Enum class for grid alignment
 	enum Alignment {
 		TOP_LEFT,

@@ -53,21 +53,7 @@ PackedVector2Array BulletSpawner2D::sample_path2d_polyline(bool quiet) const {
     // the node's own transform is ignored outright. Tree membership is
     // irrelevant on this path.
     if (helper_path2d_space == PATH2D_SPACE_FOLLOW_GENERATOR) {
-        Vector2 mn = pts[0];
-        Vector2 mx = pts[0];
-        for (int i = 1; i < pts.size(); ++i) {
-            mn.x = MIN(mn.x, pts[i].x);
-            mn.y = MIN(mn.y, pts[i].y);
-            mx.x = MAX(mx.x, pts[i].x);
-            mx.y = MAX(mx.y, pts[i].y);
-        }
-        const Vector2 center = (mn + mx) * 0.5;
-        if (center.is_finite() && center.length_squared() > 0.0) {
-            for (int i = 0; i < pts.size(); ++i) {
-                pts[i] -= center;
-            }
-        }
-        return pts;
+        return recenter_polyline2d(pts);
     }
     // At Path2D (legacy): express the curve in the generator's space, which
     // lands the volley where the node sits in the world. A degenerate link

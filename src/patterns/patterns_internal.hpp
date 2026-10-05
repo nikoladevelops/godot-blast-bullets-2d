@@ -51,6 +51,10 @@ struct PolylineLayout2D {
 };
 // Shared by helper_generate_transforms_polyline and the spawner's Path2D
 // mode. caller prefixes every error ("<caller>: ...").
+// Follow Generator (Path2D mode): the curve SHAPE is resettled with its
+// bounding-box center at the origin, so it blooms around the generator
+// wherever it was drawn. Non-finite centers leave the points unchanged.
+PackedVector2Array recenter_polyline2d(const PackedVector2Array &pts);
 PatternSlots2D polyline_layout2d(const Transform2D &marker, const PackedVector2Array &path_pts, int count, const PolylineLayout2D &p, bool quiet, const char *caller);
 
 // Layout formulas shared by a generator and its preview track, so the track

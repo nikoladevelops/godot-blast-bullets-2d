@@ -10,6 +10,7 @@ namespace BlastBullets2D {
 
 void BulletPatterns2D::_bind_methods() {
 	ClassDB::bind_static_method("BulletPatterns2D", D_METHOD("get_shapes"), &BulletPatterns2D::get_shapes);
+	ClassDB::bind_static_method("BulletPatterns2D", D_METHOD("generate", "shape", "amount", "marker_transform", "params"), &BulletPatterns2D::generate, DEFVAL(Dictionary()));
 	ClassDB::bind_static_method("BulletPatterns2D", D_METHOD("helper_generate_transforms_polyline", "transforms_amount", "marker_transform", "points", "closed", "distribution", "spacing", "overflow", "anchor", "start_offset", "reverse", "facing", "facing_offset_deg"), &BulletPatterns2D::helper_generate_transforms_polyline, DEFVAL(false), DEFVAL(POLYLINE_DISTRIBUTION_EVEN), DEFVAL(32.0), DEFVAL(POLYLINE_OVERFLOW_CLAMP), DEFVAL(POLYLINE_ANCHOR_START), DEFVAL(0.0), DEFVAL(false), DEFVAL(POLYLINE_FACING_ALONG_PATH), DEFVAL(0.0));
 	BIND_ENUM_CONSTANT(POLYLINE_DISTRIBUTION_FIXED_SPACING);
 	BIND_ENUM_CONSTANT(POLYLINE_DISTRIBUTION_EVEN);

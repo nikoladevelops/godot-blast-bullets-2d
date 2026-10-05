@@ -16,6 +16,29 @@ namespace BlastBullets2D {
 // first finite point with marker-relative fallback facing. Positions come out
 // in global space (marker.xform), exactly like the factory edge generator,
 // so the preview and the spin/scale passes downstream stay consistent.
+PackedVector2Array recenter_polyline2d(const PackedVector2Array &pts) {
+    if (pts.is_empty()) {
+        return pts;
+    }
+    Vector2 mn = pts[0];
+    Vector2 mx = pts[0];
+    for (int i = 1; i < pts.size(); ++i) {
+        mn.x = MIN(mn.x, pts[i].x);
+        mn.y = MIN(mn.y, pts[i].y);
+        mx.x = MAX(mx.x, pts[i].x);
+        mx.y = MAX(mx.y, pts[i].y);
+    }
+    const Vector2 center = (mn + mx) * 0.5;
+    if (!center.is_finite() || center.length_squared() <= 0.0) {
+        return pts;
+    }
+    PackedVector2Array out = pts;
+    for (int i = 0; i < out.size(); ++i) {
+        out[i] -= center;
+    }
+    return out;
+}
+
 PatternSlots2D polyline_layout2d(const Transform2D &marker, const PackedVector2Array &path_pts, int count, const PolylineLayout2D &p, bool quiet, const char *caller) {
     PatternSlots2D out;
     if (count <= 0) {

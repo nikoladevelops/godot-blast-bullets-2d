@@ -55,6 +55,18 @@
 				Shape-agnostic gap metrics over an emitted transform array: consecutive origin distances in volley order plus the last-to-first closure (count, gaps, min/max/mean_gap, gap_ratio). Pass one ring's transforms to audit a single ring.
 			</description>
 		</method>
+		<method name="generate" qualifiers="static">
+			<return type="Transform2D[]" />
+			<param index="0" name="shape" type="int" />
+			<param index="1" name="amount" type="int" />
+			<param index="2" name="marker_transform" type="Transform2D" />
+			<param index="3" name="params" type="Dictionary" default="{}" />
+			<description>
+				Generates any pattern source without a spawner. [param shape] is a [member BulletSpawner2D.pattern_source] id (see [method get_shapes]); [param amount] is the bullet count ([member BulletSpawner2D.helper_bullets_amount], 1 to 10000); [param marker_transform] plays the spawner's generator. [param params] names knobs exactly like the spawner properties, with or without the [code]helper_[/code] prefix ([code]{"ring_radius": 80, "outline_placement": 1}[/code]). Every value is checked with the spawner's own rule: a refused value pushes [code]BulletPatterns2D.generate: &lt;knob&gt; ..., keeping the old value.[/code] and the default stays. Unknown params fail loud with a did-you-mean while the others still apply.
+				The scene inputs a spawner reads from the tree come in as params: [code]aim_position[/code] (global [Vector2], required by Aimed, optional for Corridor), [code]path_points[/code] ([PackedVector2Array] in marker space, at least 2 points, required by Path2D; recentered like a spawner in Follow Generator space) and [code]children[/code] (an [Array] of global [Transform2D] for From Children; none means the marker itself).
+				Returns the raw pattern a spawner with the same knobs, whose generator sits at [param marker_transform], fires before its pose (spin, [member BulletSpawner2D.pattern_scale], [member BulletSpawner2D.transforms_scale] and the muzzle offset are spawner settings), with [code]skip_indices[/code] applied. Feed it to [member BulletVolleyData2D.transforms] and [method BulletFactory2D.spawn_volley].
+			</description>
+		</method>
 		<method name="get_shapes" qualifiers="static">
 			<return type="Dictionary[]" />
 			<description>

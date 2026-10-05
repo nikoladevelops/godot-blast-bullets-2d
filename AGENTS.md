@@ -250,7 +250,10 @@ the old value."), their declarations and their binds. New knob = field in
 paths, arrays, enum-typed Path2D knobs, spawner settings) keep hand-written
 accessors in `bullet_spawner2d_pattern_properties.cpp`. New shape = registry
 row (next free id) + knobs + table rows + a params struct + a generate and a
-track case; gating follows its prefix.
+track case; gating follows its prefix. `BulletPatterns2D.generate(shape,
+amount, marker, params)` (`pattern_generate2d.cpp`) writes knobs by name
+through the same table and checks, so it matches a spawner for every source
+(pinned by `patterns/test_patterns_generate.gd`).
 
 Invariants every generator must keep (pinned by
 `spawner/test_spawner_pattern_counts.gd`, `test_spawner_pattern_bake.gd`,
