@@ -10,7 +10,7 @@ one that is wrong, fix this file in the same change.
 
 ```sh
 GODOTPP_NONINTERACTIVE=1 python3 tools/compile_debug_build.py   # build (never raw scons, never edit SConstruct)
-python3 tools/run_tests.py                                       # ~115 files / ~725 tests, ~10 s, leak-checked
+python3 tools/run_tests.py                                       # ~134 files / ~870 tests, ~10 s, leak-checked
 python3 tools/run_tests.py --self-test                           # the harness itself still catches failures/leaks
 python3 tools/run_benchmarks.py --scenario <name>                # perf evidence (§15)
 ```
@@ -221,21 +221,30 @@ rg -n 'BulletSpawner2D::shoot_once' src/        # where a method lives (files ar
 
 ## 6b. How to add or fix a pattern (BulletSpawner2D)
 
-Files: generator in `src/factory/bullet_factory2d_patterns_<family>.cpp`
-(`helper_generate_transforms_<shape>`; families: `shapes`, `curves`,
-`polygons`, `edges`), shared layout machinery in
-`bullet_factory2d_patterns_layout.cpp` (declared in
-`bullet_factory2d_patterns_internal.hpp`), its binding in
-`bullet_factory2d_patterns_bindings.cpp`, preview track in
-`bullet_factory2d_patterns_preview.cpp` (`helper_sample_outline_<shape>`).
-Spawner side: dispatch in `src/bullet_spawner/bullet_spawner2d_patterns.cpp`
-(`generate_raw_pattern`), properties in
-`bullet_spawner2d_pattern_properties.cpp`, bindings and inspector gating in
-`bullet_spawner2d_bindings.cpp`.
+Everything lives in `src/patterns/` (class `BulletPatterns2D`, static):
+generator in `patterns_<family>.cpp` (`helper_generate_transforms_<shape>`;
+families `shapes`, `curves`, `polygons`, `edges`, `polyline`), layout engine
+in `pattern_layout2d.cpp`, formulas shared by a generator and its track in
+`patterns_internal.hpp` (`rain_*2d`, `cross_*2d`), samplers in
+`pattern_preview_tracks2d.cpp` (`helper_sample_outline_<shape>`), bindings
+in `bullet_patterns2d_bindings.cpp`. The knobs are `PatternKnobs2D`
+(`pattern_knobs2d.hpp`, inherited by the spawner, field = serialized name);
+the per-source stages over them: `pattern_dispatch2d.cpp` (`generate_raw`),
+`pattern_track_dispatch2d.cpp` (`build_preview_track` into a
+`PatternTrackSink2D`), `pattern_gating2d.cpp` (`is_knob_relevant`),
+`pattern_presets2d.cpp`; ids, names, knob prefixes and capabilities are ONE
+registry table (`pattern_registry2d.cpp`, `BulletPatterns2D.get_shapes()`).
+The module never touches the tree: the spawner resolves children / aimed
+target / Path2D curve into `PatternInputs2D` (`bullet_spawner2d_patterns.cpp`,
+`generate_raw_pattern`); its accessors stay in
+`bullet_spawner2d_pattern_properties.cpp`, bind order in
+`bullet_spawner2d_bindings.cpp`. New shape = registry row (next free id) +
+knobs + a generate and a track case; gating follows its prefix.
 
 Invariants every generator must keep (pinned by
 `spawner/test_spawner_pattern_counts.gd`, `test_spawner_pattern_bake.gd`,
-`test_spawner_preview_coincidence.gd`):
+`test_spawner_preview_coincidence.gd`, `test_spawner_preview_track_coincidence.gd`,
+`patterns/test_patterns_gating.gd`):
 1. Exactly `helper_bullets_amount` transforms (On Outline, Layers, Fill
    Inside; gaps redistribute, overflow shrinks spacing).
 2. No two bullets closer than 0.5 px (no hidden duplicates). Closed curves:
@@ -245,7 +254,9 @@ Invariants every generator must keep (pinned by
 3. Pure function of its inputs (the bake cache relies on it; random
    patterns take a seed).
 4. The preview track (`helper_sample_outline_*`) draws the same curve the
-   bullets sit on.
+   bullets sit on, for EVERY source (dots within 1.5 px x pattern_scale).
+   Put any formula both sides need in `patterns_internal.hpp`: the rain
+   and cross tracks once drifted 48 px / 22 px from their own bullets.
 5. Every bad input fails loud once with exact wording.
 
 Spawner test template (copy, rename, list in `tests/README.md`):
@@ -401,18 +412,18 @@ src/
     bullet_factory2d_structural.cpp       reset/free_*/clear_*, *_deferred queue, volley bookkeeping (vec/set/pool sync)
     bullet_factory2d_effects.cpp          factory-owned one-shot effect bakes
     bullet_factory2d_stats.cpp            frame stats, monitors, debugger knobs, debug_*
-    bullet_factory2d_bindings.cpp         _bind_methods (calls bind_pattern_helpers)
-    bullet_factory2d_patterns_*.cpp       pattern generators per family + layout engine + preview tracks + inspectors
-    bullet_factory2d_internal.hpp, bullet_factory2d_patterns_internal.hpp, factory_operation_guard2d.hpp
+    bullet_factory2d_bindings.cpp         _bind_methods
+    bullet_factory2d_internal.hpp, factory_operation_guard2d.hpp
+  patterns/                               BulletPatterns2D + the pattern stages (file map in section 6b)
   bullet_spawner/bullet_spawner2d.cpp     wiring, shooting cadence, spin, bursts/telegraph, pattern lists, lifecycle, shoot_once
-  bullet_spawner/bullet_spawner2d_pattern_properties.cpp  Bullet Patterns accessors + apply_pattern_preset
-  bullet_spawner/bullet_spawner2d_patterns.cpp   raw generation, bake cache, native span collect, verifier
+  bullet_spawner/bullet_spawner2d_pattern_properties.cpp  Bullet Patterns accessors + apply_pattern_preset (table in patterns/)
+  bullet_spawner/bullet_spawner2d_patterns.cpp   scene inputs -> PatternKnobs2D::generate_raw, bake cache use, span collect
   bullet_spawner/bullet_spawner2d_homing.cpp     homing/orbiting, target resolution, live-volley steering
   bullet_spawner/bullet_spawner2d_preview.cpp    preview snapshot/rebuild, pose, dirty checks, debug_* geometry
   bullet_spawner/bullet_spawner2d_preview_layer.cpp  PatternPreviewLayer2D (draw_multimesh canvas layer)
   bullet_spawner/bullet_spawner2d_movement.cpp   Path2D movement
   bullet_spawner/bullet_spawner2d_bindings.cpp   _bind_methods (groups/subgroups) + _validate_property
-  bullet_spawner/bullet_spawner2d_internal.hpp   statics shared by >1 spawner TU (limits, pattern-source table)
+  bullet_spawner/bullet_spawner2d_internal.hpp   statics shared by >1 spawner TU (limits aliased from patterns/)
   data/        inspector Resources: BulletVolleyData2D, BulletSpeed/Rotation/Curves/Wobble/EffectLayerData2D
   pooling/     VolleyPool (parked volleys per key), VolleyPoolKey2D
   attachments/ BulletAttachment2D + its object pool
@@ -441,13 +452,30 @@ src/
   (`reset/free_*/populate_*`) are idle-frame only: inside a physics frame
   they are REJECTED loudly. Their `*_deferred` twins queue through
   `queue_structural_call` and are safe from anywhere.
-  `free_active_bullets()` DESTROYS (next spawn is cold); clear/expiry park.
-- **Lifetimes**: `reduce_lifetime` → `disable_bullet` per slot → last-out
-  funnels to pool. With `life_time_over` armed, the volley is HELD out of
-  the pool (`lifetime_flush_pending`) until the deferred signal +
-  attachment releases flush. Deferred attachment releases carry
-  (index, instance id, epoch) triples and are queued only for slots that
-  hold an attachment.
+  `free_active_bullets()` DESTROYS (next spawn is cold); clear/expiry return
+  drained volleys to the pool (or park them with auto pooling off).
+- **Tick order** (`BulletVolley2D::tick`): drain collisions (impact pose)
+  → `move_bullets` → homing reached events → animation finished →
+  lifetime. EVERY signal fires live inside it with the bullet alive; the
+  plugin decides the kill AFTER the handler from the post-handler state
+  (heal = veto; handler disabled it = no extra effects). Liveness after
+  each emit: `tick_may_continue(id)`. Only `shoot_once_deferred`, the
+  structural `*_deferred` queue, the debugger restore and preview rebuilds
+  still use `call_deferred` (a call deferred from physics runs inside the
+  physics frame: pinned in `integration/test_engine_facts.gd`).
+- **Factory sweep**: the snapshot is (instance id, pointer) pairs, never
+  slots: a handler `free()` swap-removes `all_volleys`. `volley_free_epoch`
+  skips the ObjectDB lookup unless something was freed; `sweep_tick_stamp`
+  / `sweep_timer_stamp` give one tick and one timer pass per volley per
+  step; `begin_life` stamps them, so a life begun mid-sweep starts next step.
+- **Life states**: ACTIVE → last bullet out → POOLED (auto pooling on:
+  `release_life` drops attachments, homing, orbit, timers, records, the
+  volley's own connections, owner, user Resources, groups, metadata; the
+  handle is stale and `enable_bullet` refuses it) or PARKED (auto pooling
+  off: frozen, still owned, wakeable). `begin_life` is the single new-life
+  path (one generation bump = `get_life_id`). `disable_bullet` FREEZES (state
+  kept; `reset_state` / `bullet_reset_state` clear ledgers); active-only
+  timers hold while parked.
 - **Collision pipeline**: area callbacks (ADDED) → object-level dedup
   window (O(1) hash; `collision_dedup_by_object = false` for shape-level)
   → records with queue-time epochs/velocity/pose → per-tick drain →
@@ -482,20 +510,23 @@ src/
 
 ## 13. Pattern bake cache (spawner)
 
-- `resolve_raw_pattern` generates raw transforms (pre spin/scale/skip) once
+- `resolve_raw_pattern` (cache in `patterns/pattern_bake_cache2d.cpp`,
+  posing in `patterns/pattern_pose2d.cpp`) generates raw transforms (pre spin/scale/skip) once
   per `pattern_version` and re-poses them per shot (one 2x3 multiply per
   bullet). The motion class is MEASURED with probe markers
   (`classify_pattern_motion`): RIGID (follows any rigid generator move),
   TRANSLATION (same basis only, e.g. world-direction rain), NONE.
-  CHILDREN/AIMED/CORRIDOR/CUSTOM/PATH2D read outside state → always
-  regenerate; unseeded random re-rolls → fails the probe → regenerate.
+  CHILDREN/AIMED/CORRIDOR/CUSTOM/PATH2D read outside state (registry flag
+  `reads_external_state`) → always regenerate; unseeded random re-rolls →
+  fails the probe → regenerate.
 - Every geometry setter calls `on_pattern_changed()` (version bump +
   preview rebuild). NEVER call bare `rebuild_preview()` from a setter that
   changes geometry. Presets write members raw, then call it once.
 - Proof: tests run with `debug_set_pattern_cache_verify(true)` (every
   cached result regenerated and compared; mismatch = error = red test), and
   `test_spawner_pattern_bake` perturbs EVERY pattern property for
-  invalidation (mutation-tested). `pattern_cache_mode = Off` exists for
+  invalidation, and every shape knob under its OWN shape (the generic
+  sweep alone missed a Heart setter; mutation-tested). `pattern_cache_mode = Off` exists for
   debugging; moving/spinning spawners never need it.
 
 ## 14. Contracts & pitfalls catalog (pinned by tests — do not "fix" back)
@@ -532,6 +563,14 @@ src/
 | A pooled volley reused for plain data matches a cold volley field by field, pose and flight (every feature reset) | `test_volley_pool_reuse_all_features` |
 | A one-bullet volley behaves like bullet 0 of any volley (per-bullet curves beat shared) | `test_volley_single_bullet` |
 | Every spawn-data and volley property sits in a group; names and group titles unique | `test_volley_data_inspector` |
+| Hits/bounces/lifetime/homing fire live with the bullet alive; the kill is decided after the handler (veto, self-disable, freed target, pause) | `test_volley_hit_contract`, `test_volley_lifetime_contract`, `test_volley_signal_timing`, `test_volley_bounce_signals` |
+| disable_bullet freezes (state kept), opt-in reset, -1 keeps the hit count, parked vs pooled, pooled wake refused | `test_volley_freeze_contract` |
+| Every clock restarts per life, holds while parked/paused, one tick per step across mid-sweep frees, finite under hitches | `test_volley_clock_audit` |
+| Custom data per bullet and shared, readable in every callback, never leaks through the pool | `test_volley_custom_data_contract` |
+| orphaned_volleys policies; unhandled hits warn once with the reason | `test_spawner_orphan_policy` |
+| Every setter round-trips or rejects loudly and keeps the old value; NaN/INF rejected everywhere | `integration/test_accessor_contract` |
+| Homing aims through inherited spawner momentum | `test_volley_homing_drift` |
+| reset_finished fires after the reset; handlers can respawn | `test_factory_reset_finished` |
 
 - Edge cases to test everywhere: NaN/Inf scalars and vectors; null array
   entries; empty arrays; short vs oversized arrays; OOB indices (-1/99);
@@ -541,6 +580,14 @@ src/
   rejected); maxed queues/timers (64); same-frame expiry+respawn; deferred
   calls from collision handlers; teleport-into-wall; coincident
   aim/target; zero-radius orbit; negative speeds under curves.
+- Harness facts: from an idle point `await idle(k)` runs exactly k
+  factory ticks, `await physics(n)` resumes INSIDE frame n before the
+  factory ticked (n-1 ticks); with `--fixed-fps`, `Engine.time_scale`
+  does not change the delta (use `factory.debug_advance_time(delta)`);
+  the runner prints only the first failing assert per test and GUT clips
+  array diffs (join problems into one string to see them all); a
+  `Packed*Array` read from an Array is a copy (write it back);
+  `push_warning` lands in `get_errors()` (`err.is_push_warning()`).
 - Godot facts that bit us: GDExtension virtuals (`_get_configuration_warnings`)
   are not script-callable (expose a public twin); Godot imports `.csv` files
   inside the project as translations (keep logs under a `.gdignore` folder);
@@ -562,7 +609,11 @@ python3 tools/run_benchmarks.py --update-baseline   # ONLY for an accepted chang
   `log/history.csv` = append-only trend, `log/results/*.json` = raw runs.
   Compare only same machine + same build type.
 - A/B a change: run the scenarios on your build, `git stash push -u -- src/`,
-  rebuild, run again, `git stash pop`, rebuild. Differences under ~5% p50
+  rebuild, run again, `git stash pop`, rebuild. A/B against an OLD commit:
+  `git worktree add --detach <dir> <commit>`, copy `godot-cpp/` (with its
+  `bin/`) into it and point that worktree's `tools/config.json`
+  `godotProjectFolder` at ITS `test_project` (the path is absolute: left
+  as is, the old build installs over the main project's `.so`). Differences under ~5% p50
   are noise on this machine.
 - Scenarios: `test_project/benchmarks/scenarios/*.gd` (extend
   `BlastBenchmark`: `setup()`, `step(frame)`, `extra`). Columns: frame =

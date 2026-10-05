@@ -17,7 +17,7 @@ func test_short_lifetime_expires_signals_and_pools() -> void:
 			break
 	assert_false(q.is_bullet_status_enabled(0), "bullet 0 expired")
 	await idle(1)
-	assert_signal_emit_count(factory, "life_time_over", 1, "life_time_over emitted once (deferred)")
+	assert_signal_emit_count(factory, "life_time_over", 1, "life_time_over emitted once (live, inside the tick)")
 	assert_eq(factory.debug_get_bullets_pool_amount(), 1, "expired volley pooled after the signal")
 
 
