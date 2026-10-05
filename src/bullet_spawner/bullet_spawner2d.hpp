@@ -272,6 +272,24 @@ class BulletSpawner2D : public Node2D{
             SPIN_OSCILLATE
         };
 
+        // What happens to this spawner's in-flight volleys when the spawner
+        // is FREED (never on a reparent / tree exit). Signal connections
+        // live on the emitter, so once the spawner is gone nothing can handle
+        // its bullets' hits or expiry - not even a callback that belongs to a
+        // node that is still alive. Serialized ids: never renumber.
+        enum OrphanedVolleys {
+            // Bullets keep flying and dying; their hits reach no one, and a
+            // one-time warning explains why (default).
+            ORPHANED_VOLLEYS_KEEP_FLYING = 0,
+            // The volleys become factory-owned: BulletFactory2D's
+            // area_entered / body_entered / life_time_over fire for them.
+            ORPHANED_VOLLEYS_HAND_TO_FACTORY = 1,
+            // Every live bullet is cleared with its On Clear effects.
+            ORPHANED_VOLLEYS_CLEAR = 2,
+            // Every live bullet is removed silently.
+            ORPHANED_VOLLEYS_REMOVE = 3
+        };
+
         // Scene-tree reference to the factory. Stored as an unfiltered NodePath
         // so every node in the edited scene is pickable; the typed pointer is
         // resolved on demand with a runtime type check (see get_bullet_factory).
@@ -1501,14 +1519,24 @@ class BulletSpawner2D : public Node2D{
         // volley owned by this spawner. Volleys with no resolvable targets
         // are skipped quietly. Returns how many volleys were retargeted.
         int retarget_live_volleys();
-        // How many spawned volleys are currently tracked for retargeting.
+        // How many ACTIVE volleys this spawner owns (factory census: every
+        // shot, homing or not, plus adopted volleys).
         int get_live_volley_count() const;
-        // The tracked live volley instances (pruned first). Lets GDScript
-        // call the full BulletVolley2D API on each volley directly.
-        // Variants auto-null if an instance is freed later.
+        // Every ACTIVE volley this spawner owns, in factory order. Lets
+        // GDScript call the full BulletVolley2D API on each volley directly.
         Array get_live_volleys() const;
-        // Forgets all tracked volleys (they keep flying untouched).
-        void clear_live_volleys();
+        // The retarget list: homing shots + adopted volleys (capped at 256,
+        // pruned first). retarget_live_volleys() walks this list.
+        int get_tracked_volley_count() const;
+        // Forgets the retarget list (the volleys keep flying untouched).
+        void forget_tracked_volleys();
+        // Clears every live bullet this spawner owns (fire_clear_effects:
+        // On Clear at each pose); parked volleys go back to the pool. Safe
+        // from handlers. Returns how many bullets were cleared.
+        int clear_active_bullets(bool fire_clear_effects = true);
+        int orphaned_volleys = ORPHANED_VOLLEYS_KEEP_FLYING;
+        int get_orphaned_volleys() const { return orphaned_volleys; }
+        void set_orphaned_volleys(int value);
         // Debug readout of the yellow preview rings: one PackedVector2Array
         // per extra outline layer, exactly as drawn (holder-local). Empty
         // when layers are inactive. Lets scripts/tests verify bullets sit
@@ -2367,6 +2395,7 @@ VARIANT_ENUM_CAST(BlastBullets2D::BulletSpawner2D::Path2DAnchor);
 VARIANT_ENUM_CAST(BlastBullets2D::BulletSpawner2D::Path2DFacing);
 VARIANT_ENUM_CAST(BlastBullets2D::BulletSpawner2D::Path2DSpace);
 VARIANT_ENUM_CAST(BlastBullets2D::BulletSpawner2D::SpinMode);
+VARIANT_ENUM_CAST(BlastBullets2D::BulletSpawner2D::OrphanedVolleys);
 VARIANT_ENUM_CAST(BlastBullets2D::BulletSpawner2D::HomingMode);
 VARIANT_ENUM_CAST(BlastBullets2D::BulletSpawner2D::HomingTargetSource);
 VARIANT_ENUM_CAST(BlastBullets2D::BulletSpawner2D::HomingNodeNameMatch);

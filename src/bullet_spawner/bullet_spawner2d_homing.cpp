@@ -917,29 +917,42 @@ void BulletSpawner2D::track_live_volley(BulletVolley2D *bullets) {
 }
 
 int BulletSpawner2D::get_live_volley_count() const {
+    BulletFactory2D *factory = get_bullet_factory();
+    return factory != nullptr ? factory->count_active_volleys_owned_by(get_instance_id()) : 0;
+}
+
+Array BulletSpawner2D::get_live_volleys() const {
+    BulletFactory2D *factory = get_bullet_factory();
+    return factory != nullptr ? factory->get_active_volleys_owned_by(get_instance_id()) : Array();
+}
+
+int BulletSpawner2D::get_tracked_volley_count() const {
     return volley_tracker.count(get_instance_id());
 }
 
-void BulletSpawner2D::clear_live_volleys() {
+void BulletSpawner2D::forget_tracked_volleys() {
     volley_tracker.clear();
-    // Forget targeting rotation too: a manual clear means "forget everything",
-    // so the next wave restarts round-robin from the top instead of resuming
+    // Forget targeting rotation too: a manual forget means "start over", so
+    // the next wave restarts round-robin from the top instead of resuming
     // mid-rotation from volleys that no longer exist.
     homing_round_robin_cursor = 0;
 }
 
-Array BulletSpawner2D::get_live_volleys() const {
-    // Snapshot prunes first; resolve_live re-checks per id so a volley freed
-    // between the two can never be handed out for direct engine calls.
-    const PackedInt64Array ids = volley_tracker.snapshot(get_instance_id());
-    Array out;
-    for (int i = 0; i < ids.size(); ++i) {
-        BulletVolley2D *volley = VolleyTracker2D::resolve_live(ids[i], get_instance_id());
-        if (volley != nullptr) {
-            out.push_back(volley);
-        }
+int BulletSpawner2D::clear_active_bullets(bool fire_clear_effects) {
+    BulletFactory2D *factory = get_bullet_factory();
+    if (factory == nullptr) {
+        UtilityFunctions::push_error("BulletSpawner2D::clear_active_bullets: no BulletFactory2D assigned (bullet_factory_path).");
+        return 0;
     }
-    return out;
+    return factory->clear_bullets_owned_by(get_instance_id(), fire_clear_effects);
+}
+
+void BulletSpawner2D::set_orphaned_volleys(int value) {
+    if (value < ORPHANED_VOLLEYS_KEEP_FLYING || value > ORPHANED_VOLLEYS_REMOVE) {
+        UtilityFunctions::push_error("BulletSpawner2D: orphaned_volleys out of range, keeping the old value.");
+        return;
+    }
+    orphaned_volleys = value;
 }
 
 bool BulletSpawner2D::adopt_live_volley(BulletVolley2D *bullets) {

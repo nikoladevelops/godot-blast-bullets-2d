@@ -191,6 +191,7 @@ void BulletVolley2D::release_life() {
 		disconnect(CachedStringNames2D::get().bullet_homing_target_reached, callable);
 	}
 	owner_spawner_id = 0;
+	orphaned_spawner_path = String();
 	// User resources: a pooled volley must not keep them alive.
 	shared_bullets_custom_data.unref();
 	for (Ref<Resource> &r : all_bullets_custom_data) {
@@ -300,6 +301,7 @@ void BulletVolley2D::begin_life(const BulletVolleyData2D &data, uint64_t new_own
 	++volley_generation;
 	// Ownership first: a spawner volley is never observable as factory-owned.
 	owner_spawner_id = new_owner_spawner_id;
+	orphaned_spawner_path = String();
 	inherited_velocity_offset = new_inherited_velocity_offset;
 	// Runtime-only knobs spawn data never seeds start from their defaults.
 	reset_pooling_flags_to_default();

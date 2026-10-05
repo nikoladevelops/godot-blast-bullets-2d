@@ -294,6 +294,77 @@ int BulletFactory2D::clear_active_bullets(const Ref<VolleyPoolKey2D> &key) {
 	return cleared;
 }
 
+int BulletFactory2D::clear_bullets_owned_by(uint64_t owner_spawner_id, bool fire_clear_effects) {
+	if (owner_spawner_id == 0 || !is_ready || is_tearing_down) {
+		return 0;
+	}
+	if (is_factory_busy) {
+		UtilityFunctions::push_error("clear_active_bullets: BulletFactory2D is busy (a sweep is running). Clear after it, e.g. from the next frame.");
+		return 0;
+	}
+	// Same rules as clear_active_bullets(): not structural, safe from
+	// handlers, busy latch held across the user callbacks of the sweep.
+	const bool saved_busy = is_factory_busy;
+	is_factory_busy = true;
+	std::vector<BulletVolley2D *> snapshot = all_volleys;
+	int cleared = 0;
+	for (BulletVolley2D *volley : snapshot) {
+		if (volley == nullptr) {
+			continue;
+		}
+		const uint64_t volley_id = volley->get_instance_id();
+		if (ObjectDB::get_instance(ObjectID(volley_id)) != volley || volley->owner_spawner_id != owner_spawner_id || volley->is_queued_for_deletion()) {
+			continue;
+		}
+		if (volley->is_active) {
+			const std::vector<int> live = volley->all_bullets_enabled_set.get_active_indexes();
+			cleared += volley->disable_bullets_bulk(live, fire_clear_effects ? (int)EFFECT_ON_CLEAR : -1);
+		}
+	}
+	is_factory_busy = saved_busy;
+	// Parked volleys of this owner (drained with pooling off) go back to the
+	// pool: the owner asked for its bullets to be gone.
+	for (BulletVolley2D *volley : snapshot) {
+		if (volley == nullptr) {
+			continue;
+		}
+		const uint64_t volley_id = volley->get_instance_id();
+		if (ObjectDB::get_instance(ObjectID(volley_id)) != volley || volley->owner_spawner_id != owner_spawner_id) {
+			continue;
+		}
+		if (volley->is_parked()) {
+			volley->set_is_auto_pooling_enabled(true);
+		}
+	}
+	return cleared;
+}
+
+void BulletFactory2D::apply_orphan_policy(uint64_t owner_spawner_id, int policy, const String &spawner_path) {
+	if (owner_spawner_id == 0 || !is_ready || is_tearing_down) {
+		return;
+	}
+	// Policy ids mirror BulletSpawner2D::OrphanedVolleys.
+	if (policy == 2 || policy == 3) {
+		if (!is_factory_busy) {
+			clear_bullets_owned_by(owner_spawner_id, policy == 2);
+			return;
+		}
+		// Busy (freed from inside a sweep callback): fall back to keeping
+		// them flying, so the orphan warning still explains what happened.
+		policy = 0;
+	}
+	for (BulletVolley2D *volley : all_volleys) {
+		if (volley == nullptr || volley->owner_spawner_id != owner_spawner_id) {
+			continue;
+		}
+		if (policy == 1) {
+			volley->owner_spawner_id = 0; // factory-owned from now on
+		} else {
+			volley->orphaned_spawner_path = spawner_path;
+		}
+	}
+}
+
 void BulletFactory2D::free_disabled_bullets(const Ref<VolleyPoolKey2D> &key) {
 	if (is_factory_busy) {
 		UtilityFunctions::push_error("BulletFactory2D is busy. Ignoring free_disabled_bullets request.");

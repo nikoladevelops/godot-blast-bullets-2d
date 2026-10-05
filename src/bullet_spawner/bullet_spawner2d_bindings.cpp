@@ -310,6 +310,10 @@ void BulletSpawner2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_spawn_data", "new_spawn_data"), &BulletSpawner2D::set_spawn_data);
 	ADD_PROPERTY(PropertyInfo(Variant::OBJECT, "spawn_data", PROPERTY_HINT_RESOURCE_TYPE, "BulletVolleyData2D"), "set_spawn_data", "get_spawn_data");
 
+	ClassDB::bind_method(D_METHOD("get_orphaned_volleys"), &BulletSpawner2D::get_orphaned_volleys);
+	ClassDB::bind_method(D_METHOD("set_orphaned_volleys", "value"), &BulletSpawner2D::set_orphaned_volleys);
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "orphaned_volleys", PROPERTY_HINT_ENUM, "Keep Flying,Hand To Factory,Clear,Remove"), "set_orphaned_volleys", "get_orphaned_volleys");
+
 	ADD_GROUP("Bullet Patterns", "");
 	ClassDB::bind_method(D_METHOD("get_pattern_source"), &BulletSpawner2D::get_pattern_source);
 	ClassDB::bind_method(D_METHOD("set_pattern_source", "value"), &BulletSpawner2D::set_pattern_source);
@@ -1632,7 +1636,9 @@ void BulletSpawner2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("retarget_live_volleys"), &BulletSpawner2D::retarget_live_volleys);
 	ClassDB::bind_method(D_METHOD("get_live_volley_count"), &BulletSpawner2D::get_live_volley_count);
 	ClassDB::bind_method(D_METHOD("get_live_volleys"), &BulletSpawner2D::get_live_volleys);
-	ClassDB::bind_method(D_METHOD("clear_live_volleys"), &BulletSpawner2D::clear_live_volleys);
+	ClassDB::bind_method(D_METHOD("get_tracked_volley_count"), &BulletSpawner2D::get_tracked_volley_count);
+	ClassDB::bind_method(D_METHOD("forget_tracked_volleys"), &BulletSpawner2D::forget_tracked_volleys);
+	ClassDB::bind_method(D_METHOD("clear_active_bullets", "fire_clear_effects"), &BulletSpawner2D::clear_active_bullets, DEFVAL(true));
 	ClassDB::bind_method(D_METHOD("debug_get_layer_rings"), &BulletSpawner2D::debug_get_layer_rings);
 	ClassDB::bind_method(D_METHOD("debug_get_preview_dot_points"), &BulletSpawner2D::debug_get_preview_dot_points);
 	ClassDB::bind_method(D_METHOD("debug_get_preview_track_points"), &BulletSpawner2D::debug_get_preview_track_points);
@@ -1862,6 +1868,10 @@ void BulletSpawner2D::_bind_methods() {
 	// Need this in order to expose the enum constants to Godot Engine
 	BIND_ENUM_CONSTANT(SPIN_CONTINUOUS);
 	BIND_ENUM_CONSTANT(SPIN_OSCILLATE);
+	BIND_ENUM_CONSTANT(ORPHANED_VOLLEYS_KEEP_FLYING);
+	BIND_ENUM_CONSTANT(ORPHANED_VOLLEYS_HAND_TO_FACTORY);
+	BIND_ENUM_CONSTANT(ORPHANED_VOLLEYS_CLEAR);
+	BIND_ENUM_CONSTANT(ORPHANED_VOLLEYS_REMOVE);
 
 	ClassDB::bind_method(D_METHOD("get_volleys_fired"), &BulletSpawner2D::get_volleys_fired);
 	ClassDB::bind_method(D_METHOD("collect_spawn_transforms"), &BulletSpawner2D::collect_spawn_transforms);

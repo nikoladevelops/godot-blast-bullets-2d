@@ -561,7 +561,10 @@ void BulletVolley2D::_bind_methods() {
 
 	ClassDB::bind_method(D_METHOD("get_collision_dedup_by_object"), &BulletVolley2D::get_collision_dedup_by_object);
 	ClassDB::bind_method(D_METHOD("set_collision_dedup_by_object", "value"), &BulletVolley2D::set_collision_dedup_by_object);
+	ClassDB::bind_method(D_METHOD("get_emit_collision_signals"), &BulletVolley2D::get_emit_collision_signals);
+	ClassDB::bind_method(D_METHOD("set_emit_collision_signals", "value"), &BulletVolley2D::set_emit_collision_signals);
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "collision_dedup_by_object"), "set_collision_dedup_by_object", "get_collision_dedup_by_object");
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "emit_collision_signals"), "set_emit_collision_signals", "get_emit_collision_signals");
 
 	ADD_GROUP("Curves", "");
 	ADD_PROPERTY(

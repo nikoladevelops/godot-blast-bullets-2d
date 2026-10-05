@@ -694,6 +694,18 @@ public:
 	// of a spawner's live bullets — not just the homing-tracked subset.
 	// O(volleys); call sparingly (per-shot gates, not per-bullet ticks).
 	int count_active_bullets_owned_by(uint64_t owner_spawner_id) const;
+	// Every ACTIVE volley owned by a spawner, in factory order (census, not
+	// the spawner's capped retarget list). O(volleys).
+	Array get_active_volleys_owned_by(uint64_t owner_spawner_id) const;
+	int count_active_volleys_owned_by(uint64_t owner_spawner_id) const;
+	// Clears every live bullet of one owner (fire_clear_effects: On Clear at
+	// each pose), PARKED volleys of that owner go back to the pool. Not
+	// structural: safe from handlers. Returns the bullets cleared.
+	int clear_bullets_owned_by(uint64_t owner_spawner_id, bool fire_clear_effects);
+	// A spawner was freed: apply its orphaned_volleys policy to every volley
+	// it owns (active and parked). keep_flying records the spawner path for
+	// the orphan warnings; hand_to_factory makes them factory-owned.
+	void apply_orphan_policy(uint64_t owner_spawner_id, int policy, const String &spawner_path);
 
 	//
 

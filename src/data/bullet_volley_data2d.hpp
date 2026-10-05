@@ -103,6 +103,12 @@ public:
 	// If set to true it would mean it can detect bodies. I suggest you do NOT enable it, because it tanks performance, but I left it just in case someone is stubborn and has that need. Instead consider adding an Area2D to the body that you are trying to damage and set up its collision layer correctly so that the bullets can interact with it.
 	bool monitorable = false;
 
+	// False = these bullets intentionally report no hits: they still collide,
+	// die and bounce, but area_entered / body_entered / bounce_* never fire
+	// and no "nothing handles these hits" warning is printed (saves the emit
+	// cost too). Never colliding at all is collision_mask = 0 instead.
+	bool emit_collision_signals = true;
+
 	// Available inside the area_entered / body_entered callbacks inside factory.
 	Ref<Resource> shared_bullets_custom_data;
 
@@ -231,6 +237,9 @@ public:
 
 	bool get_monitorable() const;
 	void set_monitorable(bool new_monitorable);
+
+	bool get_emit_collision_signals() const { return emit_collision_signals; }
+	void set_emit_collision_signals(bool value) { emit_collision_signals = value; }
 
 	Ref<Resource> get_shared_bullets_custom_data() const;
 	void set_shared_bullets_custom_data(const Ref<Resource> &new_shared_bullets_custom_data);

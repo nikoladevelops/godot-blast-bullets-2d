@@ -595,6 +595,49 @@ void BulletVolley2D::set_bullet_collision_count(int bullet_index, int value) {
 	}
 }
 
+static String describe_emitter2d(Object *emitter) {
+	Node *node = Object::cast_to<Node>(emitter);
+	if (node == nullptr) {
+		return emitter->get_class();
+	}
+	return node->get_class() + " '" + (node->is_inside_tree() ? String(node->get_path()) : String(node->get_name())) + "'";
+}
+
+Object *BulletVolley2D::resolve_hit_emitter_checked() {
+	Object *emitter = resolve_signal_emitter();
+	if (drain_handlers_checked) {
+		return emitter;
+	}
+	drain_handlers_checked = true;
+	if (emitter == nullptr) {
+		if (owner_spawner_id != 0) {
+			const String who = orphaned_spawner_path.is_empty() ? String("(freed)") : orphaned_spawner_path;
+			WarnOnce2D::warn(owner_spawner_id, 20u, 0, 0, "BulletVolley2D: bullets of BulletSpawner2D '" + who + "' hit something after that spawner was freed, so no handler can run. Signal connections live on the emitter (the spawner) and died with it, even when the callback belongs to a node that is still alive. Choose what happens with BulletSpawner2D.orphaned_volleys (Hand To Factory, then connect BulletFactory2D.area_entered/body_entered; Clear or Remove to drop them with the spawner), or keep the spawner alive. If these bullets should not report hits, set emit_collision_signals = false in their spawn data.");
+		}
+		return nullptr;
+	}
+	const CachedStringNames2D &names = CachedStringNames2D::get();
+	if (!emitter->has_connections(names.area_entered) && !emitter->has_connections(names.body_entered)) {
+		WarnOnce2D::warn(emitter->get_instance_id(), 21u, 0, 0, describe_emitter2d(emitter) + ": its bullets hit something, but nothing is connected to its area_entered or body_entered signal, so the hit is not handled. If the handler belonged to a node that was freed (an enemy scene freed together with its callbacks), Godot dropped that connection. Connect the handler from a node that outlives the bullets, or set emit_collision_signals = false in the spawn data if these bullets should not report hits.");
+	}
+	return emitter;
+}
+
+Object *BulletVolley2D::resolve_lifetime_emitter_checked() {
+	Object *emitter = resolve_signal_emitter();
+	if (emitter == nullptr) {
+		if (owner_spawner_id != 0) {
+			const String who = orphaned_spawner_path.is_empty() ? String("(freed)") : orphaned_spawner_path;
+			WarnOnce2D::warn(owner_spawner_id, 22u, 0, 0, "BulletVolley2D: bullets of BulletSpawner2D '" + who + "' expired after that spawner was freed, so no life_time_over handler can run (connections died with the spawner). Choose what happens with BulletSpawner2D.orphaned_volleys, or turn is_life_time_over_signal_enabled off in the spawn data if nothing needs the expiry.");
+		}
+		return nullptr;
+	}
+	if (!emitter->has_connections(CachedStringNames2D::get().life_time_over)) {
+		WarnOnce2D::warn(emitter->get_instance_id(), 23u, 0, 0, describe_emitter2d(emitter) + ": is_life_time_over_signal_enabled is on, but nothing is connected to its life_time_over signal, so the expiry is not handled. Connect a handler from a node that outlives the bullets, or turn is_life_time_over_signal_enabled off in the spawn data.");
+	}
+	return emitter;
+}
+
 void BulletVolley2D::park_collision_record(const BulletCollisionData2D &record) {
 	// A pause requested mid-drain: the record describes a real overlap the
 	// server will never report again (steady overlap), so it waits with the
@@ -629,6 +672,7 @@ void BulletVolley2D::drain_collisions() {
 	collision_scratch.clear();
 	collision_scratch.swap(all_collided_bullets);
 	clear_collision_dedup_keys();
+	drain_handlers_checked = false;
 	// Self-liveness token: a handler that immediately frees this volley
 	// (against the contract) leaves every member access below as
 	// use-after-free. ObjectDB validates the id without touching the object.
@@ -721,7 +765,7 @@ void BulletVolley2D::handle_bullet_collision(const BulletCollisionData2D &record
 	// HANDLER CONTRACT: queue_free() (or the *_deferred factory calls) to
 	// destroy things from here; an immediate free() of this volley is
 	// survived (liveness token) but its pending work is lost.
-	Object *emitter = resolve_signal_emitter();
+	Object *emitter = emit_collision_signals ? resolve_hit_emitter_checked() : nullptr;
 	if (emitter != nullptr) {
 		const StringName &signal_name = record.collision_type == CollisionType::AREA ? CachedStringNames2D::get().area_entered : CachedStringNames2D::get().body_entered;
 		emitter->emit_signal(signal_name, hit_target, this, bullet_index);

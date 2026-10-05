@@ -98,7 +98,7 @@ void BulletVolley2D::expire_live_bullets() {
 		// bullet is still alive with its attachment, custom data and pose.
 		// Factory and spawner share the signal name. A null emitter (spawner
 		// gone, teardown) only skips the notification.
-		Object *emitter = resolve_signal_emitter();
+		Object *emitter = resolve_lifetime_emitter_checked();
 		if (emitter != nullptr) {
 			emitter->emit_signal(CachedStringNames2D::get().life_time_over, this, bullet_indexes);
 		}

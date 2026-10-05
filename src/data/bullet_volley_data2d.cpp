@@ -1108,6 +1108,10 @@ void BulletVolleyData2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_monitorable", "new_monitorable"), &BulletVolleyData2D::set_monitorable);
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "monitorable"), "set_monitorable", "get_monitorable");
 
+	ClassDB::bind_method(D_METHOD("get_emit_collision_signals"), &BulletVolleyData2D::get_emit_collision_signals);
+	ClassDB::bind_method(D_METHOD("set_emit_collision_signals", "value"), &BulletVolleyData2D::set_emit_collision_signals);
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "emit_collision_signals"), "set_emit_collision_signals", "get_emit_collision_signals");
+
 	ClassDB::bind_method(D_METHOD("get_bullet_max_collision_count"), &BulletVolleyData2D::get_bullet_max_collision_count);
 	ClassDB::bind_method(D_METHOD("set_bullet_max_collision_count", "value"), &BulletVolleyData2D::set_bullet_max_collision_count);
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "bullet_max_collision_count"), "set_bullet_max_collision_count", "get_bullet_max_collision_count");

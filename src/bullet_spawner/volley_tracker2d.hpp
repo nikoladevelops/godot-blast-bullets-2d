@@ -27,7 +27,7 @@ public:
 	// Hard cap on tracked volleys. Retarget passes are O(volleys * bullets),
 	// so an unbounded list would let infinite-lifetime auto-shoot sessions
 	// grow per-tick cost forever. Oldest dropped first (newest volleys matter
-	// most for retargeting). Use clear_live_volleys() to reset manually.
+	// most for retargeting). Use forget_tracked_volleys() to reset manually.
 	static constexpr int MAX_TRACKED_VOLLEYS = 256;
 
 	bool track(BulletVolley2D *volley, uint64_t owner_spawner_id) {
@@ -55,7 +55,7 @@ public:
 			// degrading with no diagnostic.
 			if (!cap_eviction_warned) {
 				cap_eviction_warned = true;
-				UtilityFunctions::push_warning("VolleyTracker2D: tracked volleys exceeded 256, oldest volleys no longer retarget. Call clear_live_volleys() or raise turnover.");
+				UtilityFunctions::push_warning("VolleyTracker2D: tracked volleys exceeded 256, oldest volleys no longer retarget. Call forget_tracked_volleys() or raise turnover.");
 			}
 		}
 		return member_ids.find(id) != member_ids.end();

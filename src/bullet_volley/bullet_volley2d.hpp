@@ -583,6 +583,27 @@ public:
 	bool get_collision_dedup_by_object() const { return collision_dedup_by_object; }
 	void set_collision_dedup_by_object(bool value);
 
+	// Runtime twin of BulletVolleyData2D.emit_collision_signals (seeded every
+	// life): false = hits/bounces still count, kill and reflect, but no
+	// collision signal fires and no unhandled-hit warning is printed.
+	bool emit_collision_signals = true;
+	bool get_emit_collision_signals() const { return emit_collision_signals; }
+	void set_emit_collision_signals(bool value) { emit_collision_signals = value; }
+
+	// Unhandled-hit diagnostics (once per emitter, see warn_unhandled_*).
+	// The emitter check runs once per drain, not per record.
+	bool drain_handlers_checked = false;
+	// Resolves the emitter of a hit/bounce/lifetime signal and warns once
+	// when nothing can handle it: the owning spawner was freed (every
+	// connection died with it) or the live emitter has no hit handler
+	// connected. Returns the emitter (null when gone).
+	Object *resolve_hit_emitter_checked();
+	Object *resolve_lifetime_emitter_checked();
+	// Path of the owning spawner, recorded by the spawner when it is freed
+	// with orphaned_volleys = Keep Flying (zero per-shot cost); only read by
+	// the orphan warnings. Cleared on every new life.
+	String orphaned_spawner_path;
+
 	// Table-level introspection for tests (test_volley_dedup_table.gd). These
 	// operate on the LIVE dedup table, not a shadow copy, so call them on an
 	// idle volley with no overlaps in flight.

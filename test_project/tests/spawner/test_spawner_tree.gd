@@ -191,8 +191,9 @@ func test_live_shoot() -> void:
 	assert_eq(spawner.get_volleys_fired(), 1, "fired volley counted")
 	assert_eq(spawner.get_live_volley_count(), 1, "fired volley tracked")
 	assert_eq(spawner.get_active_live_bullet_count(), spawner.helper_bullets_amount, "live bullets census")
-	spawner.clear_live_volleys()
-	assert_eq(spawner.get_live_volley_count(), 0, "clear forgets volleys")
+	spawner.forget_tracked_volleys()
+	assert_eq(spawner.get_tracked_volley_count(), 0, "forget empties the retarget list")
+	assert_eq(spawner.get_live_volley_count(), 1, "the census still sees the live volley")
 	factory.free_active_bullets()
 	assert_eq(spawner.get_active_live_bullet_count(), 0, "free_active drains census")
 

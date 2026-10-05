@@ -781,7 +781,7 @@ int BulletVolley2D::try_handle_bounce(CollisionType collision_type, int bullet_i
 	// volleys report to their spawner, the rest to the factory. Snapshot the
 	// emitter first (a consumed hit below may pool the volley), guard the
 	// post-emit with the self-liveness token like the normal path.
-	Object *emitter = resolve_signal_emitter();
+	Object *emitter = emit_collision_signals ? resolve_hit_emitter_checked() : nullptr;
 	const uint64_t self_id = get_instance_id();
 	if (emitter != nullptr) {
 		if (collision_type == CollisionType::AREA) {

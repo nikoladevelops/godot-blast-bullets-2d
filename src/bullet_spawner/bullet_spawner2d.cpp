@@ -943,6 +943,20 @@ void BulletSpawner2D::_notification(int p_what) {
             rebuild_preview();
             // Rebuild already re-snapshots; the loop below stays in sync.
         }
+    } else if (p_what == NOTIFICATION_PREDELETE) {
+        // Freed for good (a reparent never gets here): apply the
+        // orphaned_volleys policy to every volley this spawner still owns.
+        // Teardown-safe: the factory is resolved by its cached id only (no
+        // tree lookups), and a factory that is itself dying is skipped.
+        if (Engine::get_singleton()->is_editor_hint() || bullet_factory_id == 0) {
+            return;
+        }
+        BulletFactory2D *factory = Object::cast_to<BulletFactory2D>(ObjectDB::get_instance(ObjectID(bullet_factory_id)));
+        if (factory == nullptr || factory->get_is_tearing_down()) {
+            return;
+        }
+        const String path = is_inside_tree() ? String(get_path()) : String(get_name());
+        factory->apply_orphan_policy(get_instance_id(), orphaned_volleys, path);
     } else if (p_what == NOTIFICATION_ENTER_TREE) {
         fill_assigned_node_paths();
     } else if (p_what == NOTIFICATION_EXIT_TREE) {

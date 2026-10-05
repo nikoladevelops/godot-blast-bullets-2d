@@ -40,6 +40,7 @@ void BulletVolley2D::set_up_bullet_instances(const BulletVolleyData2D &data) {
 	}
 
 	is_life_time_over_signal_enabled = data.is_life_time_over_signal_enabled;
+	emit_collision_signals = data.emit_collision_signals;
 
 	is_life_time_infinite = data.is_life_time_infinite;
 

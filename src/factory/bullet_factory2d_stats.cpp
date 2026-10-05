@@ -495,6 +495,26 @@ int BulletFactory2D::count_active_bullets_owned_by(uint64_t owner_spawner_id) co
 	return total;
 }
 
+Array BulletFactory2D::get_active_volleys_owned_by(uint64_t owner_spawner_id) const {
+	Array out;
+	for (BulletVolley2D *volley : all_volleys) {
+		if (volley != nullptr && volley->is_active && !volley->is_queued_for_deletion() && volley->owner_spawner_id == owner_spawner_id) {
+			out.push_back(volley);
+		}
+	}
+	return out;
+}
+
+int BulletFactory2D::count_active_volleys_owned_by(uint64_t owner_spawner_id) const {
+	int total = 0;
+	for (const BulletVolley2D *volley : all_volleys) {
+		if (volley != nullptr && volley->is_active && !volley->is_queued_for_deletion() && volley->owner_spawner_id == owner_spawner_id) {
+			++total;
+		}
+	}
+	return total;
+}
+
 Dictionary BulletFactory2D::debug_get_attachments_pool_info() {
 	std::map<uint32_t, int> pool_info = bullet_attachments_pool.get_pool_info();
 
