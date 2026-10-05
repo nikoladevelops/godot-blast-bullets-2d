@@ -1254,9 +1254,9 @@ public:
 
 	// Shape-agnostic volley metrics over an emitted transform array (e.g. a
 	// helper_generate_transforms_* result): {count, gaps, min_gap, max_gap,
-	// mean_gap, gap_ratio (max/min, 1.0 = perfectly even), seam_gap}. Gaps
-	// are consecutive origin distances in volley order plus the last->first
-	// closure. Works per ring too (pass one ring's transforms).
+	// mean_gap, gap_ratio (max/min, 1.0 = perfectly even)}. Gaps are
+	// consecutive origin distances in volley order; the last entry is the
+	// last->first closure. Works per ring too (pass one ring's transforms).
 	static Dictionary debug_volley_gaps(const TypedArray<Transform2D> &volley);
 
 	// Mathematical conformance check: regenerates the expected marker-local
