@@ -1111,6 +1111,31 @@ _ALWAYS_INLINE_ void BulletVolley2D::orbit_stamp_lock(OrbitingData &orbiting_dat
 	orbiting_data.locked_target_identity = orbit_target_identity(deque);
 }
 
+// The heading a homing bullet must fly so that its GROUND velocity (own
+// heading x speed + drift) points along diff: the drift component across the
+// line of sight is cancelled, the rest of the speed closes in (the crab angle
+// of a missile in a crosswind). A bullet too slow to cancel the drift leans
+// fully against it. No drift, or no own speed: diff itself.
+static _ALWAYS_INLINE_ Vector2 homing_aim_through_drift(const Vector2 &diff, const Vector2 &drift, real_t speed) {
+	if (!(speed > 0.0) || (drift.x == 0.0 && drift.y == 0.0)) {
+		return diff;
+	}
+	const real_t dist = diff.length();
+	if (!(dist > 0.0)) {
+		return diff;
+	}
+	const Vector2 los = diff / dist;
+	const Vector2 own_across = (los * drift.dot(los) - drift) / speed;
+	const real_t across_sq = own_across.length_squared();
+	if (!Math::is_finite(across_sq)) {
+		return diff;
+	}
+	if (across_sq >= 1.0) {
+		return own_across;
+	}
+	return los * Math::sqrt(1.0 - across_sq) + own_across;
+}
+
 _ALWAYS_INLINE_ void BulletVolley2D::update_homing(HomingTargetDeque &homing_deque, int bullet_index, double delta, Vector2 &bullet_pos, Vector2 &target_pos) {
 	if (bullet_index < 0 || bullet_index >= (int)all_cached_instance_origin.size() || bullet_index >= (int)all_cached_direction.size() || bullet_index >= (int)all_cached_instance_transforms.size()) {
 		return;
@@ -1161,13 +1186,18 @@ _ALWAYS_INLINE_ void BulletVolley2D::update_homing(HomingTargetDeque &homing_deq
 	}
 
 	auto &curr_transf = all_cached_instance_transforms[bullet_index];
+	// Aim through the inherited drift (the spawner's momentum rides on the
+	// bullet for its whole life): steering the own heading straight at the
+	// target let the drift carry the bullet past it.
+	const real_t own_speed = bullet_index < (int)all_cached_speed.size() ? all_cached_speed[bullet_index] : (real_t)0.0;
+	const Vector2 aim = homing_aim_through_drift(diff, inherited_velocity_offset, own_speed);
 	// If rotation is controlled via movement pattern (per-bullet or shared)
 	// or rotation data, just set direction directly toward target
 	if (check_exists_bullet_movement_pattern_data(bullet_index) || shared_movement_pattern_curve.is_valid() || is_rotation_data_active) {
-		current_direction = diff.normalized();
+		current_direction = aim.normalized();
 	} else { // Otherwise use smoothing to rotate toward target
 		// Rotate toward target with smoothing
-		rotate_to_target(bullet_index, diff, max_turn);
+		rotate_to_target(bullet_index, aim, max_turn);
 
 		// Logical direction strips the texture rotation used for rendering
 		// (rotate_to_target aims the visual forward; movement must not
