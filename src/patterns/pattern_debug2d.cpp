@@ -1,7 +1,7 @@
 // Outline debug inspectors: mathematical conformance checks (dot positions, gaps,
 // corner ownership, facing) used by the pattern test suites.
 
-#include "factory/bullet_factory2d_patterns_internal.hpp"
+#include "patterns/patterns_internal.hpp"
 
 using namespace godot;
 
@@ -71,7 +71,7 @@ static real_t debug_wrap_angle(real_t a) {
 	return a;
 }
 
-Dictionary BulletFactory2D::debug_describe_outline(int shape, int count, const Dictionary &params) {
+Dictionary BulletPatterns2D::debug_describe_outline(int shape, int count, const Dictionary &params) {
 	Dictionary out;
 	out["ok"] = false;
 	out["error"] = String("unknown shape");
@@ -288,10 +288,10 @@ Dictionary BulletFactory2D::debug_describe_outline(int shape, int count, const D
 		const int cn = corners.size();
 		const bool in_h = edge_is_horizontal(corners[(c - 1 + cn) % cn], corners[c]);
 		const bool out_h = edge_is_horizontal(corners[c], corners[(c + 1) % cn]);
-		if (corner_priority == BlastBullets2D::BulletFactory2D::OUTLINE_CORNER_PRIORITY_HORIZONTAL) {
+		if (corner_priority == BlastBullets2D::BulletPatterns2D::OUTLINE_CORNER_PRIORITY_HORIZONTAL) {
 			return (in_h && !out_h) ? (c - 1 + cn) % cn : c;
 		}
-		if (corner_priority == BlastBullets2D::BulletFactory2D::OUTLINE_CORNER_PRIORITY_VERTICAL) {
+		if (corner_priority == BlastBullets2D::BulletPatterns2D::OUTLINE_CORNER_PRIORITY_VERTICAL) {
 			return (!in_h && out_h) ? (c - 1 + cn) % cn : c;
 		}
 		return c;
@@ -322,9 +322,9 @@ Dictionary BulletFactory2D::debug_describe_outline(int shape, int count, const D
 				// miter = bisector, smooth = averaged corner normal).
 				best_e = corner_owner_edge(ci);
 				Vector2 expect = edge_normals[best_e];
-				if (corner_facing == BlastBullets2D::BulletFactory2D::OUTLINE_CORNER_FACING_MITER) {
+				if (corner_facing == BlastBullets2D::BulletPatterns2D::OUTLINE_CORNER_FACING_MITER) {
 					expect = miter_normal(corners, ci, averaged_corner(ci));
-				} else if (corner_facing == BlastBullets2D::BulletFactory2D::OUTLINE_CORNER_FACING_SMOOTH) {
+				} else if (corner_facing == BlastBullets2D::BulletPatterns2D::OUTLINE_CORNER_FACING_SMOOTH) {
 					expect = averaged_corner(ci);
 				}
 				best_d = (expect.length_squared() > 1e-12) ? Math::abs((double)debug_wrap_angle(base - expect.angle())) : 0.0;
@@ -340,7 +340,7 @@ Dictionary BulletFactory2D::debug_describe_outline(int shape, int count, const D
 					}
 				}
 				Vector2 expect = edge_normals[best_e];
-				if (corner_facing == BlastBullets2D::BulletFactory2D::OUTLINE_CORNER_FACING_SMOOTH) {
+				if (corner_facing == BlastBullets2D::BulletPatterns2D::OUTLINE_CORNER_FACING_SMOOTH) {
 					const double seg_len = (double)corners[best_e].distance_to(corners[(best_e + 1) % cn]);
 					double tt = 0.0;
 					if (seg_len > 1e-9) {
@@ -434,7 +434,7 @@ Dictionary BulletFactory2D::debug_describe_outline(int shape, int count, const D
 	return out;
 }
 
-Dictionary BulletFactory2D::debug_outline_quotas(int shape, int count, const Dictionary &params) {
+Dictionary BulletPatterns2D::debug_outline_quotas(int shape, int count, const Dictionary &params) {
 	// Per-edge dot quotas plus an optimality verdict against the
 	// length-proportional largest-remainder optimum: every edge must sit
 	// within < 1 slot of its exact share (both LEGACY and SYMMETRIC satisfy
@@ -536,7 +536,7 @@ Dictionary BulletFactory2D::debug_outline_quotas(int shape, int count, const Dic
 	return out;
 }
 
-Dictionary BulletFactory2D::debug_volley_gaps(const TypedArray<Transform2D> &volley) {
+Dictionary BulletPatterns2D::debug_volley_gaps(const TypedArray<Transform2D> &volley) {
 	Dictionary out;
 	const int m = volley.size();
 	PackedFloat32Array gaps;
@@ -561,7 +561,7 @@ Dictionary BulletFactory2D::debug_volley_gaps(const TypedArray<Transform2D> &vol
 	return out;
 }
 
-Dictionary BulletFactory2D::debug_verify_volley(const TypedArray<Transform2D> &volley, int shape, const Transform2D &marker, int count, const Dictionary &params, double tolerance_px, double tolerance_rad) {
+Dictionary BulletPatterns2D::debug_verify_volley(const TypedArray<Transform2D> &volley, int shape, const Transform2D &marker, int count, const Dictionary &params, double tolerance_px, double tolerance_rad) {
 	Dictionary out;
 	out["ok"] = false;
 	out["checked"] = 0;

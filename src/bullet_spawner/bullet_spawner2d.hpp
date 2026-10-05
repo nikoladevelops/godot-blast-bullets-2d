@@ -3,6 +3,8 @@
 #include "bullet_spawner/volley_tracker2d.hpp"
 #include "bullet_volley/bullet_volley2d.hpp"
 #include "factory/bullet_factory2d.hpp"
+#include "patterns/bullet_patterns2d.hpp"
+#include "patterns/pattern_bake_cache2d.hpp"
 #include <vector>
 
 #include "godot_cpp/classes/node2d.hpp"
@@ -396,7 +398,7 @@ class BulletSpawner2D : public Node2D{
 
         // GRID
         int helper_grid_rows_per_column = 10;
-        int helper_grid_alignment = 3; // BulletFactory2D::Alignment, center-left
+        int helper_grid_alignment = 3; // BulletPatterns2D::Alignment, center-left
         double helper_grid_column_offset = 150.0;
         double helper_grid_row_offset = 150.0;
         bool helper_grid_rotate_with_marker = true;
@@ -432,14 +434,14 @@ class BulletSpawner2D : public Node2D{
         double helper_spiral_radius_step = 15.0;
         double helper_spiral_angle_step = 0.6;
         bool helper_spiral_rotate_with_marker = true;
-        int helper_spiral_facing = 0; // BulletFactory2D::SpiralFacingMode, tangent
+        int helper_spiral_facing = 0; // BulletPatterns2D::SpiralFacingMode, tangent
         double helper_spiral_facing_offset_deg = 0.0;
 
         // LINE
         Vector2 helper_line_direction = Vector2(1, 0);
         double helper_line_spacing = 32.0;
         bool helper_line_face_direction = true;
-        int helper_line_anchor = 1; // BulletFactory2D::LineAnchor, center
+        int helper_line_anchor = 1; // BulletPatterns2D::LineAnchor, center
         // 0 = along the line (as generated), 1 = +90 deg, 2 = -90 deg.
         int helper_line_facing = 0;
         bool helper_line_reverse = false;
@@ -488,7 +490,7 @@ class BulletSpawner2D : public Node2D{
         double helper_ellipse_rotation = 0.0;
         double helper_ellipse_start_angle = 0.0;
         double helper_ellipse_arc = 6.283185307179586;
-        int helper_ellipse_mode = 0; // BulletFactory2D::EllipseMode, full
+        int helper_ellipse_mode = 0; // BulletPatterns2D::EllipseMode, full
         int helper_ellipse_gap_count = 2;
         double helper_ellipse_gap_width = 0.3;
         bool helper_ellipse_face_outward = true;
@@ -533,7 +535,7 @@ class BulletSpawner2D : public Node2D{
         double helper_multispiral_radius_step = 15.0;
         double helper_multispiral_angle_step = 0.6;
         bool helper_multispiral_rotate_with_marker = true;
-        int helper_multispiral_facing = 0; // BulletFactory2D::SpiralFacingMode, tangent
+        int helper_multispiral_facing = 0; // BulletPatterns2D::SpiralFacingMode, tangent
         double helper_multispiral_facing_offset_deg = 0.0;
         int helper_multispiral_arm_stride = 1;
 
@@ -602,7 +604,7 @@ class BulletSpawner2D : public Node2D{
         double helper_counter_spiral_radius_step = 15.0;
         double helper_counter_spiral_angle_step = 0.6;
         bool helper_counter_spiral_rotate_with_marker = true;
-        int helper_counter_spiral_facing = 0; // BulletFactory2D::SpiralFacingMode, tangent
+        int helper_counter_spiral_facing = 0; // BulletPatterns2D::SpiralFacingMode, tangent
         double helper_counter_spiral_facing_offset_deg = 0.0;
         int helper_counter_spiral_arm_stride = 1;
         bool helper_counter_spiral_mirror_alternate_arms = true;
@@ -637,7 +639,7 @@ class BulletSpawner2D : public Node2D{
         bool helper_custom_reverse = false;
         int helper_custom_slot_offset = 0;
         // TRIANGLE (equilateral / isosceles / right perimeter).
-        int helper_triangle_type = 0; // BulletFactory2D::TriangleType
+        int helper_triangle_type = 0; // BulletPatterns2D::TriangleType
         double helper_triangle_size_a = 150.0;
         double helper_triangle_size_b = 150.0;
         double helper_triangle_rotation = 0.0;
@@ -712,7 +714,7 @@ class BulletSpawner2D : public Node2D{
         // Along ±90 = toward the loop tangent); reverse mirrors the slot
         // order; slot_offset rotates which slot becomes bullet 0.
         // Fill/layer dims only show in their mode.
-        int helper_outline_placement = 0; // BulletFactory2D::OutlinePlacement
+        int helper_outline_placement = 0; // BulletPatterns2D::OutlinePlacement
         // Concentric layers (LAYERS placement): layer 0 sits exactly on the
         // outline. 1 = single exact layer (default, current behavior).
         // Capped at 64.
@@ -768,7 +770,7 @@ class BulletSpawner2D : public Node2D{
         // radial), 2 smooth (averaged loop normals everywhere: coherent on
         // high-frequency outlines where even mid-edge normals swing wildly).
         int helper_outline_corner_facing = 0;
-        int helper_outline_facing = 0; // BulletFactory2D::OutlineFacing
+        int helper_outline_facing = 0; // BulletPatterns2D::OutlineFacing
         bool helper_outline_reverse = false;
         int helper_outline_slot_offset = 0;
         double helper_outline_fill_spacing = 32.0;
@@ -1491,7 +1493,7 @@ class BulletSpawner2D : public Node2D{
         void set_homing_fire_arc_deg(double value);
         double get_reload_jitter_sec() const;
         void set_reload_jitter_sec(double value);
-        // One-call preset fill (see BulletFactory2D::PatternPreset).
+        // One-call preset fill (see BulletPatterns2D::PatternPreset).
         void apply_pattern_preset(int preset);
         // Sequencer: queue pattern entries, then fire them in order
         // (interval apart) or all at once. Returns entries queued.
@@ -2178,21 +2180,10 @@ class BulletSpawner2D : public Node2D{
         //   RIGID       raw(D * M) == D * raw(M) for any rigid motion D
         //   TRANSLATION raw(M + d) == raw(M) + d (same basis only)
         //   NONE        regenerate every time (reads other nodes, random)
-        enum PatternMotionClass {
-            PATTERN_MOTION_NONE = 0,
-            PATTERN_MOTION_TRANSLATION = 1,
-            PATTERN_MOTION_RIGID = 2,
-        };
-        struct PatternBake {
-            uint64_t version = 0;
-            bool valid = false;
-            int motion_class = PATTERN_MOTION_NONE;
-            Transform2D marker;
-            Transform2D marker_inv;
-            std::vector<Transform2D> raw;
-        };
-        // [0] shot, mirror +1   [1] shot, mirror -1 (burst alternate)   [2] preview (quiet)
-        mutable PatternBake pattern_bakes[3];
+        // The bake cache itself lives in the patterns module
+        // (patterns/pattern_bake_cache2d.hpp): one bake per channel (shot,
+        // mirrored shot, preview), classified by probing.
+        mutable PatternBakeCache2D pattern_cache;
         int pattern_cache_mode = PATTERN_CACHE_AUTO;
 
         // Movement properties (see the public block).
@@ -2252,18 +2243,11 @@ class BulletSpawner2D : public Node2D{
         uint64_t preview_last_rebuild_usec = 0;
         // Bumped by every geometry-affecting change (mark_pattern_dirty).
         uint64_t pattern_version = 1;
-        mutable uint64_t pattern_cache_hits = 0;
-        mutable uint64_t pattern_cache_misses = 0;
-        mutable uint64_t pattern_cache_bakes = 0;
-        // Test/debug: every cache-served raw set is regenerated and compared;
-        // a mismatch push_errors (strict GUT turns it into a failure).
-        static bool debug_pattern_cache_verify;
         // The raw pattern for `marker` straight from the generators (the old
         // collect switch). No cache.
         TypedArray<Transform2D> generate_raw_pattern(Node2D *base, const Transform2D &marker, real_t mirror_sign, bool quiet) const;
         // Cache-aware raw pattern into r_raw (std::vector, no Variant).
         void resolve_raw_pattern(Node2D *base, const Transform2D &marker, real_t mirror_sign, bool quiet, std::vector<Transform2D> &r_raw) const;
-        int classify_pattern_motion(Node2D *base, const Transform2D &marker, real_t mirror_sign, bool quiet, const std::vector<Transform2D> &raw) const;
         // Whether the preview snapshot stays valid when the generator moves
         // from `old_marker` to `new_marker` (same rule as cache reuse).
         bool preview_survives_marker_move(const Transform2D &old_marker, const Transform2D &new_marker) const;

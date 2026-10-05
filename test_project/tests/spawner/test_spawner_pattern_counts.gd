@@ -115,10 +115,10 @@ func test_outline_layers_and_fill_draw_exactly_amount() -> void:
 	var bad: Array = []
 	for src in OUTLINE_SOURCES:
 		var sp := _spawner(src)
-		sp.helper_outline_placement = BulletFactory2D.OUTLINE_LAYERS
+		sp.helper_outline_placement = BulletPatterns2D.OUTLINE_LAYERS
 		sp.helper_outline_layer_count = 3
 		bad.append_array(_count_failures(sp, "source %d layers" % src))
-		sp.helper_outline_placement = BulletFactory2D.OUTLINE_FILL_INSIDE
+		sp.helper_outline_placement = BulletPatterns2D.OUTLINE_FILL_INSIDE
 		bad.append_array(_count_failures(sp, "source %d fill" % src))
 	_assert_none(bad, "count == helper_bullets_amount for Layers and Fill Inside")
 
@@ -134,10 +134,10 @@ func test_outline_layers_and_fill_place_distinct_spots() -> void:
 	var bad: Array = []
 	for src in OUTLINE_SOURCES:
 		var sp := _spawner(src)
-		sp.helper_outline_placement = BulletFactory2D.OUTLINE_LAYERS
+		sp.helper_outline_placement = BulletPatterns2D.OUTLINE_LAYERS
 		sp.helper_outline_layer_count = 3
 		bad.append_array(_distinct_failures(sp, "source %d layers" % src))
-		sp.helper_outline_placement = BulletFactory2D.OUTLINE_FILL_INSIDE
+		sp.helper_outline_placement = BulletPatterns2D.OUTLINE_FILL_INSIDE
 		bad.append_array(_distinct_failures(sp, "source %d fill" % src))
 	_assert_none(bad, "no shared spots in Layers / Fill Inside")
 
@@ -146,7 +146,7 @@ func test_outline_layers_and_fill_place_distinct_spots() -> void:
 
 func test_flower_fan_respects_amount_and_fills_every_petal() -> void:
 	var sp := _spawner(BulletSpawner2D.PATTERN_FROM_HELPER_FLOWER)
-	sp.helper_flower_type = BulletFactory2D.FLOWER_FAN
+	sp.helper_flower_type = BulletPatterns2D.FLOWER_FAN
 	sp.helper_flower_petals = 6
 	for n in [6, 10, 13, 30, 45, 60, 100]:
 		sp.helper_bullets_amount = n
@@ -174,10 +174,10 @@ func test_flower_types_distinct_spots() -> void:
 func test_flower_degenerate_parameters_still_distinct() -> void:
 	var sp := _spawner(BulletSpawner2D.PATTERN_FROM_HELPER_FLOWER)
 	var bad: Array = []
-	sp.helper_flower_type = BulletFactory2D.FLOWER_RHODONEA
+	sp.helper_flower_type = BulletPatterns2D.FLOWER_RHODONEA
 	sp.helper_flower_inner_radius_scale = 0.0 # waists touch the centre
 	bad.append_array(_distinct_failures(sp, "rhodonea inner 0"))
-	sp.helper_flower_type = BulletFactory2D.FLOWER_SPIROGRAPH
+	sp.helper_flower_type = BulletPatterns2D.FLOWER_SPIROGRAPH
 	sp.helper_flower_spiro_pen = 0.0 # plain circle: must not be traced 3x
 	bad.append_array(_distinct_failures(sp, "spirograph pen 0"))
 	sp.helper_flower_spiro_pen = 80.0
@@ -226,7 +226,7 @@ func test_spiral_arm_strides_distinct() -> void:
 func test_full_turn_arcs_have_no_seam_duplicate() -> void:
 	var bad: Array = []
 	var ell := _spawner(BulletSpawner2D.PATTERN_FROM_HELPER_ELLIPSE)
-	ell.helper_ellipse_mode = BulletFactory2D.ELLIPSE_ARC # default arc = TAU
+	ell.helper_ellipse_mode = BulletPatterns2D.ELLIPSE_ARC # default arc = TAU
 	bad.append_array(_distinct_failures(ell, "ellipse ARC at TAU"))
 	var ring := _spawner(BulletSpawner2D.PATTERN_FROM_HELPER_RING)
 	ring.helper_ring_arc = 6.28 # typed by hand, a hair short of TAU
@@ -262,7 +262,7 @@ func test_cross_overflow_shrinks_spacing() -> void:
 
 func test_fill_inside_overflow_shrinks_spacing() -> void:
 	var sp := _spawner(BulletSpawner2D.PATTERN_FROM_HELPER_CIRCLE)
-	sp.helper_outline_placement = BulletFactory2D.OUTLINE_FILL_INSIDE
+	sp.helper_outline_placement = BulletPatterns2D.OUTLINE_FILL_INSIDE
 	sp.helper_bullets_amount = 300 # ~69 cells fit at 32 px spacing
 	var pts := _origins(sp)
 	assert_eq(pts.size(), 300, "every bullet gets a cell")
@@ -292,7 +292,7 @@ func test_corridor_places_amount_outside_the_gap() -> void:
 
 func test_ellipse_wall_places_amount_outside_the_gaps() -> void:
 	var sp := _spawner(BulletSpawner2D.PATTERN_FROM_HELPER_ELLIPSE)
-	sp.helper_ellipse_mode = BulletFactory2D.ELLIPSE_WALL
+	sp.helper_ellipse_mode = BulletPatterns2D.ELLIPSE_WALL
 	var bad: Array = []
 	var span: float = sp.helper_ellipse_arc
 	for n in AMOUNTS:
@@ -353,7 +353,7 @@ func test_rain_rows_are_layered_sheets() -> void:
 
 func test_flower_fan_track_skips_petals_without_bullets() -> void:
 	var sp := make_preview_spawner(BulletSpawner2D.PATTERN_FROM_HELPER_FLOWER, 3)
-	sp.helper_flower_type = BulletFactory2D.FLOWER_FAN
+	sp.helper_flower_type = BulletPatterns2D.FLOWER_FAN
 	sp.helper_flower_petals = 6
 	await idle(6)
 	# 3 bullets over 6 petals light petals 1, 3 and 5 (symmetric spread).

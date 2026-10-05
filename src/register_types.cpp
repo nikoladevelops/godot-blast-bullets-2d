@@ -28,6 +28,7 @@
 
 // Bullet Spawner
 #include "bullet_spawner/bullet_spawner2d.hpp"
+#include "patterns/bullet_patterns2d.hpp"
 
 
 using namespace godot;
@@ -62,6 +63,9 @@ void initialize_blast_bullets_2d_module(ModuleInitializationLevel p_level) {
 	GDREGISTER_CLASS(BulletAttachment2D)
 
 	// Factory
+	// Static-only pattern library: abstract (BulletPatterns2D.new() is refused),
+	// its static methods and enums are what GDScript uses.
+	GDREGISTER_ABSTRACT_CLASS(BulletPatterns2D)
 	GDREGISTER_CLASS(BulletFactory2D)
 
 	// Debugger

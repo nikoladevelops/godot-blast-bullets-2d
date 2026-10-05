@@ -299,7 +299,7 @@ Dictionary BulletSpawner2D::debug_check_layer_coincidence(double tolerance_px) c
         return out;
     }
     if (!supports_outline_layout(pattern_source)
-            || helper_outline_placement != (int)BulletFactory2D::OUTLINE_LAYERS) {
+            || helper_outline_placement != (int)BulletPatterns2D::OUTLINE_LAYERS) {
         return out;
     }
     // Candidate segments: base track runs plus every stored ring run.
@@ -936,41 +936,41 @@ void BulletSpawner2D::rebuild_preview() {
             switch (pattern_source) {
                 case PATTERN_FROM_HELPER_RING: {
                     const real_t start_abs = (helper_ring_rotate_with_marker ? track_marker.get_rotation() : 0.0) + (real_t)helper_ring_start_angle;
-                    push_track_dict(BulletFactory2D::helper_sample_outline_ring(helper_ring_radius, helper_ring_arc, helper_ring_y_scale, start_abs));
+                    push_track_dict(BulletPatterns2D::helper_sample_outline_ring(helper_ring_radius, helper_ring_arc, helper_ring_y_scale, start_abs));
                     break;
                 }
                 case PATTERN_FROM_HELPER_ELLIPSE:
-                    push_track_dict(BulletFactory2D::helper_sample_outline_ellipse(helper_ellipse_radius_x, helper_ellipse_radius_y, helper_ellipse_rotation, helper_ellipse_start_angle, helper_ellipse_arc, helper_ellipse_mode));
+                    push_track_dict(BulletPatterns2D::helper_sample_outline_ellipse(helper_ellipse_radius_x, helper_ellipse_radius_y, helper_ellipse_rotation, helper_ellipse_start_angle, helper_ellipse_arc, helper_ellipse_mode));
                     break;
                 case PATTERN_FROM_HELPER_STAR:
-                    push_track_dict(BulletFactory2D::helper_sample_outline_star(helper_star_points, helper_star_outer_radius, helper_star_inner_radius, helper_star_base_rotation), true);
+                    push_track_dict(BulletPatterns2D::helper_sample_outline_star(helper_star_points, helper_star_outer_radius, helper_star_inner_radius, helper_star_base_rotation), true);
                     break;
                 case PATTERN_FROM_HELPER_ROSE:
-                    push_track_dict(BulletFactory2D::helper_sample_outline_rose(helper_rose_petals, helper_rose_radius, helper_rose_lobe_sharpness, helper_rose_base_rotation));
+                    push_track_dict(BulletPatterns2D::helper_sample_outline_rose(helper_rose_petals, helper_rose_radius, helper_rose_lobe_sharpness, helper_rose_base_rotation));
                     break;
                 case PATTERN_FROM_HELPER_LISSAJOUS:
-                    push_track_dict(BulletFactory2D::helper_sample_outline_lissajous(helper_lissajous_size_x, helper_lissajous_size_y, helper_lissajous_freq_x, helper_lissajous_freq_y, helper_lissajous_phase));
+                    push_track_dict(BulletPatterns2D::helper_sample_outline_lissajous(helper_lissajous_size_x, helper_lissajous_size_y, helper_lissajous_freq_x, helper_lissajous_freq_y, helper_lissajous_phase));
                     break;
                 case PATTERN_FROM_HELPER_CIRCLE:
-                    push_track_dict(BulletFactory2D::helper_sample_outline_circle(helper_circle_radius));
+                    push_track_dict(BulletPatterns2D::helper_sample_outline_circle(helper_circle_radius));
                     break;
                 case PATTERN_FROM_HELPER_RECTANGLE:
-                    push_track_dict(BulletFactory2D::helper_sample_outline_rectangle(helper_rectangle_size), true);
+                    push_track_dict(BulletPatterns2D::helper_sample_outline_rectangle(helper_rectangle_size), true);
                     break;
                 case PATTERN_FROM_HELPER_SQUARE:
-                    push_track_dict(BulletFactory2D::helper_sample_outline_rectangle(Vector2((real_t)helper_square_size, (real_t)helper_square_size)), true);
+                    push_track_dict(BulletPatterns2D::helper_sample_outline_rectangle(Vector2((real_t)helper_square_size, (real_t)helper_square_size)), true);
                     break;
                 case PATTERN_FROM_HELPER_TRIANGLE:
-                    push_track_dict(BulletFactory2D::helper_sample_outline_triangle(helper_triangle_type, helper_triangle_size_a, helper_triangle_size_b, helper_triangle_rotation), true);
+                    push_track_dict(BulletPatterns2D::helper_sample_outline_triangle(helper_triangle_type, helper_triangle_size_a, helper_triangle_size_b, helper_triangle_rotation), true);
                     break;
                 case PATTERN_FROM_HELPER_TRAPEZOID:
-                    push_track_dict(BulletFactory2D::helper_sample_outline_trapezoid(helper_trapezoid_base_top, helper_trapezoid_base_bottom, helper_trapezoid_height, helper_trapezoid_rotation), true);
+                    push_track_dict(BulletPatterns2D::helper_sample_outline_trapezoid(helper_trapezoid_base_top, helper_trapezoid_base_bottom, helper_trapezoid_height, helper_trapezoid_rotation), true);
                     break;
                 case PATTERN_FROM_HELPER_DIAMOND:
-                    push_track_dict(BulletFactory2D::helper_sample_outline_diamond(helper_diamond_diagonal_x, helper_diamond_diagonal_y, helper_diamond_rotation), true);
+                    push_track_dict(BulletPatterns2D::helper_sample_outline_diamond(helper_diamond_diagonal_x, helper_diamond_diagonal_y, helper_diamond_rotation), true);
                     break;
                 case PATTERN_FROM_HELPER_POLYGON:
-                    push_track_dict(BulletFactory2D::helper_sample_outline_polygon(helper_polygon_vertices, helper_polygon_radius, helper_polygon_rotation), true);
+                    push_track_dict(BulletPatterns2D::helper_sample_outline_polygon(helper_polygon_vertices, helper_polygon_radius, helper_polygon_rotation), true);
                     break;
                 case PATTERN_FROM_HELPER_PATH2D: {
                     // Generator-local shape points: the collector composes them
@@ -1000,9 +1000,9 @@ void BulletSpawner2D::rebuild_preview() {
                         break;
                     }
                     double anchor_seat = (double)(count - 1) * 0.5;
-                    if (helper_line_anchor == (int)BulletFactory2D::LINE_ANCHOR_START) {
+                    if (helper_line_anchor == (int)BulletPatterns2D::LINE_ANCHOR_START) {
                         anchor_seat = 0.0;
-                    } else if (helper_line_anchor == (int)BulletFactory2D::LINE_ANCHOR_END) {
+                    } else if (helper_line_anchor == (int)BulletPatterns2D::LINE_ANCHOR_END) {
                         anchor_seat = (double)(count - 1);
                     }
                     const double shift = Math::is_finite(helper_line_start_offset) ? MAX(helper_line_start_offset, 0.0) : 0.0;
@@ -1043,70 +1043,70 @@ void BulletSpawner2D::rebuild_preview() {
                     // sampler mirrors the generator's rows/columns/alignment;
                     // rotation carries the marker spin when asked.
                     const real_t base_rot_abs = (helper_grid_rotate_with_marker ? track_marker.get_rotation() : 0.0);
-                    push_track_dict(BulletFactory2D::helper_sample_outline_grid(helper_bullets_amount, helper_grid_rows_per_column, helper_grid_alignment, (real_t)helper_grid_column_offset, (real_t)helper_grid_row_offset, base_rot_abs, true));
+                    push_track_dict(BulletPatterns2D::helper_sample_outline_grid(helper_bullets_amount, helper_grid_rows_per_column, helper_grid_alignment, (real_t)helper_grid_column_offset, (real_t)helper_grid_row_offset, base_rot_abs, true));
                     break;
                 }
                 case PATTERN_FROM_HELPER_LATTICE: {
                     // Same row-strip sampler family as Grid: columns × rows on
                     // a staggered lattice. No per-row jitter (volley noise).
-                    push_track_dict(BulletFactory2D::helper_sample_outline_lattice(helper_bullets_amount, helper_lattice_columns, helper_lattice_rows, (real_t)helper_lattice_spacing_x, (real_t)helper_lattice_spacing_y, helper_lattice_stagger_rows));
+                    push_track_dict(BulletPatterns2D::helper_sample_outline_lattice(helper_bullets_amount, helper_lattice_columns, helper_lattice_rows, (real_t)helper_lattice_spacing_x, (real_t)helper_lattice_spacing_y, helper_lattice_stagger_rows));
                     break;
                 }
                 case PATTERN_FROM_HELPER_WATERFALL: {
                     // Explicit row strips, staggered along the rain direction.
-                    push_track_dict(BulletFactory2D::helper_sample_outline_waterfall(helper_bullets_amount, helper_waterfall_columns, (real_t)helper_waterfall_column_spacing, helper_waterfall_rows, (real_t)helper_waterfall_row_spacing, (real_t)helper_waterfall_stagger, helper_waterfall_rain_direction));
+                    push_track_dict(BulletPatterns2D::helper_sample_outline_waterfall(helper_bullets_amount, helper_waterfall_columns, (real_t)helper_waterfall_column_spacing, helper_waterfall_rows, (real_t)helper_waterfall_row_spacing, (real_t)helper_waterfall_stagger, helper_waterfall_rain_direction));
                     break;
                 }
                 case PATTERN_FROM_HELPER_RAIN: {
                     // Row strips running along the band; the sampler builds
                     // the same row grouping as the generator.
-                    push_track_dict(BulletFactory2D::helper_sample_outline_rain(helper_bullets_amount, (real_t)helper_rain_band_width, helper_rain_direction, (real_t)helper_rain_drop_spacing));
+                    push_track_dict(BulletPatterns2D::helper_sample_outline_rain(helper_bullets_amount, (real_t)helper_rain_band_width, helper_rain_direction, (real_t)helper_rain_drop_spacing));
                     break;
                 }
                 case PATTERN_FROM_HELPER_WAVE: {
                     // The sine sweep itself, at fixed density.
-                    push_track_dict(BulletFactory2D::helper_sample_outline_wave((real_t)helper_wave_width, (real_t)helper_wave_amplitude, (real_t)helper_wave_waves, helper_wave_direction));
+                    push_track_dict(BulletPatterns2D::helper_sample_outline_wave((real_t)helper_wave_width, (real_t)helper_wave_amplitude, (real_t)helper_wave_waves, helper_wave_direction));
                     break;
                 }
                 case PATTERN_FROM_HELPER_SPIRAL: {
                     // Arm sweep replicating the generator's (r, angle) formula.
                     const real_t base_rot_abs = (helper_spiral_rotate_with_marker ? track_marker.get_rotation() : 0.0);
-                    push_track_dict(BulletFactory2D::helper_sample_outline_spiral(helper_bullets_amount, (real_t)helper_spiral_start_radius, (real_t)helper_spiral_radius_step, (real_t)helper_spiral_angle_step * preview_mirror_sign, base_rot_abs));
+                    push_track_dict(BulletPatterns2D::helper_sample_outline_spiral(helper_bullets_amount, (real_t)helper_spiral_start_radius, (real_t)helper_spiral_radius_step, (real_t)helper_spiral_angle_step * preview_mirror_sign, base_rot_abs));
                     break;
                 }
                 case PATTERN_FROM_HELPER_MULTISPIRAL: {
                     // One strip per arm (INF-separated), each replicating the
                     // generator's spiral formula.
                     const real_t base_rot_abs = (helper_multispiral_rotate_with_marker ? track_marker.get_rotation() : 0.0);
-                    push_track_dict(BulletFactory2D::helper_sample_outline_multispiral(helper_bullets_amount, helper_multispiral_arms, (real_t)helper_multispiral_start_radius, (real_t)helper_multispiral_radius_step, (real_t)helper_multispiral_angle_step * preview_mirror_sign, base_rot_abs, helper_multispiral_arm_stride));
+                    push_track_dict(BulletPatterns2D::helper_sample_outline_multispiral(helper_bullets_amount, helper_multispiral_arms, (real_t)helper_multispiral_start_radius, (real_t)helper_multispiral_radius_step, (real_t)helper_multispiral_angle_step * preview_mirror_sign, base_rot_abs, helper_multispiral_arm_stride));
                     break;
                 }
                 case PATTERN_FROM_HELPER_COUNTER_SPIRAL: {
                     // Mirrored-arm variant of multispiral: same strip-per-arm
                     // structure, alternate arms wound the other way.
                     const real_t base_rot_abs = (helper_counter_spiral_rotate_with_marker ? track_marker.get_rotation() : 0.0);
-                    push_track_dict(BulletFactory2D::helper_sample_outline_counter_spiral(helper_bullets_amount, helper_counter_spiral_arms, (real_t)helper_counter_spiral_start_radius, (real_t)helper_counter_spiral_radius_step, (real_t)helper_counter_spiral_angle_step * preview_mirror_sign, base_rot_abs, helper_counter_spiral_arm_stride, helper_counter_spiral_mirror_alternate_arms));
+                    push_track_dict(BulletPatterns2D::helper_sample_outline_counter_spiral(helper_bullets_amount, helper_counter_spiral_arms, (real_t)helper_counter_spiral_start_radius, (real_t)helper_counter_spiral_radius_step, (real_t)helper_counter_spiral_angle_step * preview_mirror_sign, base_rot_abs, helper_counter_spiral_arm_stride, helper_counter_spiral_mirror_alternate_arms));
                     break;
                 }
                 case PATTERN_FROM_HELPER_HEART: {
                     // Parametric sweep of the heart curve.
-                    push_track_dict(BulletFactory2D::helper_sample_outline_heart((real_t)helper_heart_size, (real_t)helper_heart_base_rotation));
+                    push_track_dict(BulletPatterns2D::helper_sample_outline_heart((real_t)helper_heart_size, (real_t)helper_heart_base_rotation));
                     break;
                 }
                 case PATTERN_FROM_HELPER_FLOWER: {
                     // Per-type bloom track at fixed density: FAN traces the
                     // petal-tip ring, RHODONEA/SPIROGRAPH/SUPERFORMULA trace the
                     // actual curve, PHYLLOTAXIS bounds the Vogel disc rim.
-                    push_track_dict(BulletFactory2D::helper_sample_outline_flower(helper_flower_type, helper_flower_petals, (real_t)helper_flower_radius, (real_t)helper_flower_petal_spread, (real_t)helper_flower_petal_sharpness, helper_flower_inner_radius_scale, helper_flower_spiro_roller, helper_flower_spiro_pen, helper_flower_super_lobes, helper_flower_super_fullness, (real_t)helper_flower_base_rotation,
+                    push_track_dict(BulletPatterns2D::helper_sample_outline_flower(helper_flower_type, helper_flower_petals, (real_t)helper_flower_radius, (real_t)helper_flower_petal_spread, (real_t)helper_flower_petal_sharpness, helper_flower_inner_radius_scale, helper_flower_spiro_roller, helper_flower_spiro_pen, helper_flower_super_lobes, helper_flower_super_fullness, (real_t)helper_flower_base_rotation,
                             // FAN on outline: skip petals that hold no bullet.
-                            helper_outline_placement == BulletFactory2D::OUTLINE_ON_OUTLINE ? helper_bullets_amount : -1));
+                            helper_outline_placement == BulletPatterns2D::OUTLINE_ON_OUTLINE ? helper_bullets_amount : -1));
                     break;
                 }
                 case PATTERN_FROM_HELPER_STAR_POLYGON: {
                     // Vertex skeleton: star polygon through N vertices,
                     // showing the emphasis frame the bias pulls toward. Same
                     // sampler/corners the generator uses.
-                    push_track_dict(BulletFactory2D::helper_sample_outline_polygon(helper_star_polygon_vertices, (real_t)helper_star_polygon_radius, (real_t)helper_star_polygon_base_rotation));
+                    push_track_dict(BulletPatterns2D::helper_sample_outline_polygon(helper_star_polygon_vertices, (real_t)helper_star_polygon_radius, (real_t)helper_star_polygon_base_rotation));
                     break;
                 }
                 case PATTERN_FROM_HELPER_CROSS: {
@@ -1236,7 +1236,7 @@ void BulletSpawner2D::rebuild_preview() {
                         }
                         track_closed = false;
                     } else {
-                        push_track_dict(BulletFactory2D::helper_sample_outline_circle(helper_scatter_burst_radius));
+                        push_track_dict(BulletPatterns2D::helper_sample_outline_circle(helper_scatter_burst_radius));
                     }
                     break;
                 }
@@ -1254,16 +1254,16 @@ void BulletSpawner2D::rebuild_preview() {
             // Quiet validation mirror of the factory: rings draw only for
             // settings the volley accepts (custom scales checked entry-wise).
             bool layers_ok = supports_outline_layout(pattern_source)
-                    && helper_outline_placement == (int)BulletFactory2D::OUTLINE_LAYERS
+                    && helper_outline_placement == (int)BulletPatterns2D::OUTLINE_LAYERS
                     && helper_outline_layer_count > 1
                     && Math::is_finite(helper_outline_layer_scale) && helper_outline_layer_scale > 0.0 && helper_outline_layer_scale <= 8.0
-                    && helper_outline_layer_side >= (int)BulletFactory2D::OUTLINE_LAYER_OUTWARD
-                    && helper_outline_layer_side <= (int)BulletFactory2D::OUTLINE_LAYER_BOTH
-                    && helper_outline_layer_fill >= (int)BulletFactory2D::OUTLINE_LAYER_INTERLEAVED
-                    && helper_outline_layer_fill <= (int)BulletFactory2D::OUTLINE_LAYER_PINGPONG
+                    && helper_outline_layer_side >= (int)BulletPatterns2D::OUTLINE_LAYER_OUTWARD
+                    && helper_outline_layer_side <= (int)BulletPatterns2D::OUTLINE_LAYER_BOTH
+                    && helper_outline_layer_fill >= (int)BulletPatterns2D::OUTLINE_LAYER_INTERLEAVED
+                    && helper_outline_layer_fill <= (int)BulletPatterns2D::OUTLINE_LAYER_PINGPONG
                     && helper_outline_layer_start_offset >= 0
-                    && helper_outline_layer_scale_curve >= (int)BulletFactory2D::OUTLINE_LAYER_CURVE_LINEAR
-                    && helper_outline_layer_scale_curve <= (int)BulletFactory2D::OUTLINE_LAYER_CURVE_EXPONENTIAL
+                    && helper_outline_layer_scale_curve >= (int)BulletPatterns2D::OUTLINE_LAYER_CURVE_LINEAR
+                    && helper_outline_layer_scale_curve <= (int)BulletPatterns2D::OUTLINE_LAYER_CURVE_EXPONENTIAL
                     && helper_outline_layer_scales.size() <= 64;
             if (layers_ok) {
                 for (int ci = 0; ci < helper_outline_layer_scales.size(); ++ci) {
@@ -1321,7 +1321,7 @@ void BulletSpawner2D::rebuild_preview() {
                 }
                 const int extra_layers = MIN(helper_outline_layer_count - 1, kMaxOutlineLayers);
                 for (int L = 1; L <= extra_layers; ++L) {
-                    const double layer_s = BulletFactory2D::helper_layer_scale_factor(L, helper_outline_layer_scale, helper_outline_layer_side, helper_outline_layer_scale_curve, helper_outline_layer_scales);
+                    const double layer_s = BulletPatterns2D::helper_layer_scale_factor(L, helper_outline_layer_scale, helper_outline_layer_side, helper_outline_layer_scale_curve, helper_outline_layer_scales);
                     if (!Math::is_finite(layer_s) || layer_s < 0.05) {
                         continue;
                     }

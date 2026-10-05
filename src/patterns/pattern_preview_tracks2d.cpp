@@ -1,7 +1,7 @@
 // Preview tracks (helper_sample_outline_*): the curve each pattern's bullets sit
 // on, drawn by BulletSpawner2D's preview layer.
 
-#include "factory/bullet_factory2d_patterns_internal.hpp"
+#include "patterns/patterns_internal.hpp"
 
 using namespace godot;
 
@@ -35,7 +35,7 @@ static Dictionary outline_track_result(const PackedVector2Array &points, bool cl
 static bool flower_curve_point(int flower_type, int petals, real_t radius, real_t petal_spread, real_t petal_sharpness, double inner_radius_scale, double spiro_roller, double spiro_pen, double super_lobes, double super_fullness, real_t base_rotation, double t, Vector2 &r_offset, int petal_override = -1, double frac_override = 2.0) {
 	(void)petal_spread;
 	const double clamped_inner = Math::clamp(inner_radius_scale, 0.0, 0.999);
-	if (flower_type == BulletFactory2D::FLOWER_FAN) {
+	if (flower_type == BulletPatterns2D::FLOWER_FAN) {
 		// Trace the fan's petal arcs so the preview matches the generator's
 		// per-petal layout: each of `petals` lobes is centered on its lobe
 		// axis and fanned across petal_spread, with the radius pinched
@@ -55,7 +55,7 @@ static bool flower_curve_point(int flower_type, int petals, real_t radius, real_
 		r_offset = Vector2(Math::cos(angle), Math::sin(angle)) * (radius * waist);
 		return r_offset.is_finite();
 	}
-	if (flower_type == BulletFactory2D::FLOWER_RHODONEA) {
+	if (flower_type == BulletPatterns2D::FLOWER_RHODONEA) {
 		const double sharp = Math::clamp((double)petal_sharpness, 0.0, 32.0);
 		const real_t theta = base_rotation + (real_t)t;
 		const real_t cos_k = Math::cos((real_t)petals * theta * 0.5);
@@ -67,13 +67,13 @@ static bool flower_curve_point(int flower_type, int petals, real_t radius, real_
 		r_offset = Vector2(Math::cos(theta), Math::sin(theta)) * r;
 		return r_offset.is_finite();
 	}
-	if (flower_type == BulletFactory2D::FLOWER_PHYLLOTAXIS) {
+	if (flower_type == BulletPatterns2D::FLOWER_PHYLLOTAXIS) {
 		// Disc has no outline curve; trace the outer rim at full radius.
 		const real_t ang = base_rotation + (real_t)t;
 		r_offset = Vector2(Math::cos(ang), Math::sin(ang)) * radius;
 		return r_offset.is_finite();
 	}
-	if (flower_type == BulletFactory2D::FLOWER_SPIROGRAPH) {
+	if (flower_type == BulletPatterns2D::FLOWER_SPIROGRAPH) {
 		const double outer_r = (double)radius;
 		double roller = Math::clamp(spiro_roller, 1.0, Math::max(outer_r * 4.0, 512.0));
 		if (!Math::is_finite(roller) || roller <= 0.0) {
@@ -143,7 +143,7 @@ static void outline_emit_spiral_arms(PackedVector2Array &r_pts, int transforms_a
 	}
 }
 
-Dictionary BulletFactory2D::helper_sample_outline_flower(int flower_type, int petals, real_t radius, real_t petal_spread, real_t petal_sharpness, double inner_radius_scale, double spiro_roller, double spiro_pen, double super_lobes, double super_fullness, real_t base_rotation, int transforms_amount) {
+Dictionary BulletPatterns2D::helper_sample_outline_flower(int flower_type, int petals, real_t radius, real_t petal_spread, real_t petal_sharpness, double inner_radius_scale, double spiro_roller, double spiro_pen, double super_lobes, double super_fullness, real_t base_rotation, int transforms_amount) {
 	if (flower_type < FLOWER_FAN || flower_type > FLOWER_SUPERFORMULA) {
 		UtilityFunctions::push_error("helper_sample_outline_flower: unknown flower_type.");
 		return outline_track_result(PackedVector2Array(), false);
@@ -214,7 +214,7 @@ Dictionary BulletFactory2D::helper_sample_outline_flower(int flower_type, int pe
 	return outline_track_result(pts, true);
 }
 
-Dictionary BulletFactory2D::helper_sample_outline_rose(int petals, real_t radius, real_t lobe_sharpness, real_t base_rotation) {
+Dictionary BulletPatterns2D::helper_sample_outline_rose(int petals, real_t radius, real_t lobe_sharpness, real_t base_rotation) {
 	if (petals < 2 || !Math::is_finite(radius) || radius <= 0.0 || !Math::is_finite(lobe_sharpness) || lobe_sharpness < 0.0 || !Math::is_finite(base_rotation)) {
 		UtilityFunctions::push_error("helper_sample_outline_rose: petals >= 2, finite radius > 0, sharpness >= 0.");
 		return outline_track_result(PackedVector2Array(), false);
@@ -233,7 +233,7 @@ Dictionary BulletFactory2D::helper_sample_outline_rose(int petals, real_t radius
 	return outline_track_result(pts, true);
 }
 
-Dictionary BulletFactory2D::helper_sample_outline_lissajous(real_t size_x, real_t size_y, real_t freq_x, real_t freq_y, real_t phase) {
+Dictionary BulletPatterns2D::helper_sample_outline_lissajous(real_t size_x, real_t size_y, real_t freq_x, real_t freq_y, real_t phase) {
 	if (!Math::is_finite(size_x) || size_x < 0.0 || !Math::is_finite(size_y) || size_y < 0.0 || !Math::is_finite(freq_x) || freq_x < 0.0 || !Math::is_finite(freq_y) || freq_y < 0.0 || !Math::is_finite(phase)) {
 		UtilityFunctions::push_error("helper_sample_outline_lissajous: sizes/freqs finite and >= 0, phase finite.");
 		return outline_track_result(PackedVector2Array(), false);
@@ -248,7 +248,7 @@ Dictionary BulletFactory2D::helper_sample_outline_lissajous(real_t size_x, real_
 	return outline_track_result(pts, true);
 }
 
-Dictionary BulletFactory2D::helper_sample_outline_heart(real_t size, real_t base_rotation) {
+Dictionary BulletPatterns2D::helper_sample_outline_heart(real_t size, real_t base_rotation) {
 	if (!Math::is_finite(size) || size <= 0.0 || !Math::is_finite(base_rotation)) {
 		UtilityFunctions::push_error("helper_sample_outline_heart: size must be finite and > 0, base_rotation finite.");
 		Dictionary empty;
@@ -277,7 +277,7 @@ Dictionary BulletFactory2D::helper_sample_outline_heart(real_t size, real_t base
 	return result;
 }
 
-Dictionary BulletFactory2D::helper_sample_outline_spiral(int transforms_amount, real_t start_radius, real_t radius_step, real_t angle_step, real_t base_rotation_abs) {
+Dictionary BulletPatterns2D::helper_sample_outline_spiral(int transforms_amount, real_t start_radius, real_t radius_step, real_t angle_step, real_t base_rotation_abs) {
 	if (transforms_amount < 0 || !Math::is_finite(start_radius) || !Math::is_finite(radius_step) || !Math::is_finite(angle_step) || !Math::is_finite(base_rotation_abs)) {
 		UtilityFunctions::push_error("helper_sample_outline_spiral: bad args.");
 		Dictionary empty;
@@ -302,7 +302,7 @@ Dictionary BulletFactory2D::helper_sample_outline_spiral(int transforms_amount, 
 	return result;
 }
 
-Dictionary BulletFactory2D::helper_sample_outline_multispiral(int transforms_amount, int arms, real_t start_radius, real_t radius_step, real_t angle_step, real_t base_rotation_abs, int arm_index_stride) {
+Dictionary BulletPatterns2D::helper_sample_outline_multispiral(int transforms_amount, int arms, real_t start_radius, real_t radius_step, real_t angle_step, real_t base_rotation_abs, int arm_index_stride) {
 	if (transforms_amount < 0 || arms < 1 || !Math::is_finite(start_radius) || !Math::is_finite(radius_step) || !Math::is_finite(angle_step) || !Math::is_finite(base_rotation_abs) || arm_index_stride < 1) {
 		UtilityFunctions::push_error("helper_sample_outline_multispiral: bad args.");
 		Dictionary empty;
@@ -320,7 +320,7 @@ Dictionary BulletFactory2D::helper_sample_outline_multispiral(int transforms_amo
 	return result;
 }
 
-Dictionary BulletFactory2D::helper_sample_outline_counter_spiral(int transforms_amount, int arms, real_t start_radius, real_t radius_step, real_t angle_step, real_t base_rotation_abs, int arm_index_stride, bool mirror_alternate_arms) {
+Dictionary BulletPatterns2D::helper_sample_outline_counter_spiral(int transforms_amount, int arms, real_t start_radius, real_t radius_step, real_t angle_step, real_t base_rotation_abs, int arm_index_stride, bool mirror_alternate_arms) {
 	if (transforms_amount < 0 || arms < 2 || !Math::is_finite(start_radius) || !Math::is_finite(radius_step) || !Math::is_finite(angle_step) || !Math::is_finite(base_rotation_abs) || arm_index_stride < 1) {
 		UtilityFunctions::push_error("helper_sample_outline_counter_spiral: bad args.");
 		Dictionary empty;
@@ -338,7 +338,7 @@ Dictionary BulletFactory2D::helper_sample_outline_counter_spiral(int transforms_
 	return result;
 }
 
-Dictionary BulletFactory2D::helper_sample_outline_grid(int transforms_amount, int rows_per_column, int alignment, real_t column_offset, real_t row_offset, real_t base_rotation_abs, bool rotate_with_marker) {
+Dictionary BulletPatterns2D::helper_sample_outline_grid(int transforms_amount, int rows_per_column, int alignment, real_t column_offset, real_t row_offset, real_t base_rotation_abs, bool rotate_with_marker) {
 	if (transforms_amount < 0 || rows_per_column < 1 || alignment < 0 || alignment > 8 || !Math::is_finite(column_offset) || !Math::is_finite(row_offset) || !Math::is_finite(base_rotation_abs)) {
 		UtilityFunctions::push_error("helper_sample_outline_grid: bad args.");
 		Dictionary empty;
@@ -396,7 +396,7 @@ Dictionary BulletFactory2D::helper_sample_outline_grid(int transforms_amount, in
 	return result;
 }
 
-Dictionary BulletFactory2D::helper_sample_outline_lattice(int transforms_amount, int columns, int rows, real_t spacing_x, real_t spacing_y, bool stagger_rows) {
+Dictionary BulletPatterns2D::helper_sample_outline_lattice(int transforms_amount, int columns, int rows, real_t spacing_x, real_t spacing_y, bool stagger_rows) {
 	if (transforms_amount < 0 || columns < 1 || rows < 1 || !Math::is_finite(spacing_x) || !Math::is_finite(spacing_y)) {
 		UtilityFunctions::push_error("helper_sample_outline_lattice: bad args.");
 		Dictionary empty;
@@ -427,7 +427,7 @@ Dictionary BulletFactory2D::helper_sample_outline_lattice(int transforms_amount,
 	return result;
 }
 
-Dictionary BulletFactory2D::helper_sample_outline_waterfall(int transforms_amount, int columns, real_t column_spacing, int rows, real_t row_spacing, real_t stagger, const Vector2 &rain_direction) {
+Dictionary BulletPatterns2D::helper_sample_outline_waterfall(int transforms_amount, int columns, real_t column_spacing, int rows, real_t row_spacing, real_t stagger, const Vector2 &rain_direction) {
 	if (transforms_amount < 0 || columns < 1 || rows < 1 || !Math::is_finite(column_spacing) || !Math::is_finite(row_spacing) || !Math::is_finite(stagger) || !rain_direction.is_finite() || rain_direction.length_squared() <= 0.0) {
 		UtilityFunctions::push_error("helper_sample_outline_waterfall: bad args.");
 		Dictionary empty;
@@ -461,7 +461,7 @@ Dictionary BulletFactory2D::helper_sample_outline_waterfall(int transforms_amoun
 	return result;
 }
 
-Dictionary BulletFactory2D::helper_sample_outline_rain(int transforms_amount, real_t band_width, const Vector2 &rain_direction, real_t drop_spacing) {
+Dictionary BulletPatterns2D::helper_sample_outline_rain(int transforms_amount, real_t band_width, const Vector2 &rain_direction, real_t drop_spacing) {
 	if (transforms_amount < 0 || !Math::is_finite(band_width) || band_width < 0.0 || !rain_direction.is_finite() || rain_direction.length_squared() <= 0.0 || !Math::is_finite(drop_spacing)) {
 		UtilityFunctions::push_error("helper_sample_outline_rain: bad args.");
 		Dictionary empty;
@@ -497,7 +497,7 @@ Dictionary BulletFactory2D::helper_sample_outline_rain(int transforms_amount, re
 	return result;
 }
 
-Dictionary BulletFactory2D::helper_sample_outline_wave(real_t width, real_t amplitude, real_t waves, const Vector2 &direction) {
+Dictionary BulletPatterns2D::helper_sample_outline_wave(real_t width, real_t amplitude, real_t waves, const Vector2 &direction) {
 	if (!Math::is_finite(width) || width < 0.0 || !Math::is_finite(amplitude) || amplitude < 0.0 || !Math::is_finite(waves) || !direction.is_finite() || direction.length_squared() <= 0.0) {
 		UtilityFunctions::push_error("helper_sample_outline_wave: bad args.");
 		Dictionary empty;
@@ -522,7 +522,7 @@ Dictionary BulletFactory2D::helper_sample_outline_wave(real_t width, real_t ampl
 	return result;
 }
 
-Dictionary BulletFactory2D::helper_sample_outline_circle(real_t radius) {
+Dictionary BulletPatterns2D::helper_sample_outline_circle(real_t radius) {
 	if (!Math::is_finite(radius) || radius <= 0.0) {
 		UtilityFunctions::push_error("helper_sample_outline_circle: radius must be finite and > 0.");
 		return outline_track_result(PackedVector2Array(), false);
@@ -536,7 +536,7 @@ Dictionary BulletFactory2D::helper_sample_outline_circle(real_t radius) {
 	return outline_track_result(pts, true);
 }
 
-Dictionary BulletFactory2D::helper_sample_outline_rectangle(const Vector2 &size) {
+Dictionary BulletPatterns2D::helper_sample_outline_rectangle(const Vector2 &size) {
 	if (!size.is_finite() || size.x <= 0.0 || size.y <= 0.0) {
 		UtilityFunctions::push_error("helper_sample_outline_rectangle: size must be finite with sides > 0.");
 		return outline_track_result(PackedVector2Array(), false);
@@ -551,7 +551,7 @@ Dictionary BulletFactory2D::helper_sample_outline_rectangle(const Vector2 &size)
 	return outline_track_result(pts, true);
 }
 
-Dictionary BulletFactory2D::helper_sample_outline_triangle(int triangle_type, real_t size_a, real_t size_b, real_t rotation) {
+Dictionary BulletPatterns2D::helper_sample_outline_triangle(int triangle_type, real_t size_a, real_t size_b, real_t rotation) {
 	if (triangle_type < TRIANGLE_EQUILATERAL || triangle_type > TRIANGLE_RIGHT || !Math::is_finite(size_a) || !Math::is_finite(size_b) || !Math::is_finite(rotation)) {
 		UtilityFunctions::push_error("helper_sample_outline_triangle: bad type or non-finite dims.");
 		return outline_track_result(PackedVector2Array(), false);
@@ -559,7 +559,7 @@ Dictionary BulletFactory2D::helper_sample_outline_triangle(int triangle_type, re
 	return outline_track_result(build_triangle_corners(triangle_type, size_a, size_b, rotation), true);
 }
 
-Dictionary BulletFactory2D::helper_sample_outline_trapezoid(real_t base_top, real_t base_bottom, real_t height, real_t rotation) {
+Dictionary BulletPatterns2D::helper_sample_outline_trapezoid(real_t base_top, real_t base_bottom, real_t height, real_t rotation) {
 	if (!Math::is_finite(base_top) || !Math::is_finite(base_bottom) || !Math::is_finite(height) || !Math::is_finite(rotation)) {
 		UtilityFunctions::push_error("helper_sample_outline_trapezoid: dims must be finite.");
 		return outline_track_result(PackedVector2Array(), false);
@@ -567,7 +567,7 @@ Dictionary BulletFactory2D::helper_sample_outline_trapezoid(real_t base_top, rea
 	return outline_track_result(build_trapezoid_corners(base_top, base_bottom, height, rotation), true);
 }
 
-Dictionary BulletFactory2D::helper_sample_outline_diamond(real_t diagonal_x, real_t diagonal_y, real_t rotation) {
+Dictionary BulletPatterns2D::helper_sample_outline_diamond(real_t diagonal_x, real_t diagonal_y, real_t rotation) {
 	if (!Math::is_finite(diagonal_x) || !Math::is_finite(diagonal_y) || !Math::is_finite(rotation)) {
 		UtilityFunctions::push_error("helper_sample_outline_diamond: dims must be finite.");
 		return outline_track_result(PackedVector2Array(), false);
@@ -575,7 +575,7 @@ Dictionary BulletFactory2D::helper_sample_outline_diamond(real_t diagonal_x, rea
 	return outline_track_result(build_diamond_corners(diagonal_x, diagonal_y, rotation), true);
 }
 
-Dictionary BulletFactory2D::helper_sample_outline_polygon(int vertices, real_t radius, real_t base_rotation) {
+Dictionary BulletPatterns2D::helper_sample_outline_polygon(int vertices, real_t radius, real_t base_rotation) {
 	if (vertices < 3 || !Math::is_finite(radius) || radius <= 0.0 || !Math::is_finite(base_rotation)) {
 		UtilityFunctions::push_error("helper_sample_outline_polygon: vertices >= 3, finite radius > 0.");
 		return outline_track_result(PackedVector2Array(), false);
@@ -589,7 +589,7 @@ Dictionary BulletFactory2D::helper_sample_outline_polygon(int vertices, real_t r
 	return outline_track_result(pts, true);
 }
 
-Dictionary BulletFactory2D::helper_sample_outline_ellipse(real_t radius_x, real_t radius_y, real_t ellipse_rotation, real_t start_angle, real_t arc, int mode) {
+Dictionary BulletPatterns2D::helper_sample_outline_ellipse(real_t radius_x, real_t radius_y, real_t ellipse_rotation, real_t start_angle, real_t arc, int mode) {
 	if (!Math::is_finite(radius_x) || radius_x <= 0.0 || !Math::is_finite(radius_y) || radius_y <= 0.0 || !Math::is_finite(ellipse_rotation) || !Math::is_finite(start_angle) || !Math::is_finite(arc)) {
 		UtilityFunctions::push_error("helper_sample_outline_ellipse: radii must be finite and > 0, angles finite.");
 		return outline_track_result(PackedVector2Array(), false);
@@ -616,7 +616,7 @@ Dictionary BulletFactory2D::helper_sample_outline_ellipse(real_t radius_x, real_
 	return outline_track_result(pts, full);
 }
 
-Dictionary BulletFactory2D::helper_sample_outline_ring(real_t radius, real_t arc, real_t y_scale, real_t start_angle_abs) {
+Dictionary BulletPatterns2D::helper_sample_outline_ring(real_t radius, real_t arc, real_t y_scale, real_t start_angle_abs) {
 	if (!Math::is_finite(radius) || radius <= 0.0 || !Math::is_finite(arc) || !Math::is_finite(y_scale) || !Math::is_finite(start_angle_abs)) {
 		UtilityFunctions::push_error("helper_sample_outline_ring: radius must be finite and > 0, arc/scale/angles finite.");
 		return outline_track_result(PackedVector2Array(), false);
@@ -636,7 +636,7 @@ Dictionary BulletFactory2D::helper_sample_outline_ring(real_t radius, real_t arc
 	return outline_track_result(pts, closed);
 }
 
-Dictionary BulletFactory2D::helper_sample_outline_star(int points, real_t outer_radius, real_t inner_radius, real_t base_rotation) {
+Dictionary BulletPatterns2D::helper_sample_outline_star(int points, real_t outer_radius, real_t inner_radius, real_t base_rotation) {
 	if (points < 2 || !Math::is_finite(outer_radius) || outer_radius < 0.0 || !Math::is_finite(inner_radius) || inner_radius < 0.0 || !Math::is_finite(base_rotation)) {
 		UtilityFunctions::push_error("helper_sample_outline_star: points >= 2, finite radii >= 0.");
 		return outline_track_result(PackedVector2Array(), false);

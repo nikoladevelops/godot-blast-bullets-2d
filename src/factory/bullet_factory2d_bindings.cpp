@@ -121,7 +121,6 @@ void BulletFactory2D::_bind_methods() {
 
 	// Static pattern helpers (helper_generate_transforms_*, helper_sample_outline_*,
 	// outline debug inspectors) and their enums: bullet_factory2d_patterns_bindings.cpp.
-	bind_pattern_helpers();
 
 	// Typed per-bullet-kind collision signals. Emitted synchronously from the
 	// physics tick (Godot-style): handlers run with live instance state, need

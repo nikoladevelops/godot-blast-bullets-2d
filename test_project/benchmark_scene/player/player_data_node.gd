@@ -66,7 +66,7 @@ var cached_transforms:Array[Transform2D]
 
 ## Bullet Grid related
 var rows_per_column:int = 10
-var grid_alignment:BulletFactory2D.Alignment = BulletFactory2D.Alignment.CENTER_LEFT
+var grid_alignment:BulletPatterns2D.Alignment = BulletPatterns2D.Alignment.CENTER_LEFT
 var col_offset:float = 150
 var row_offset:float = 150
 
@@ -150,9 +150,9 @@ func spawn_bullets(player_rotation:float)->void:
 # Spawns BulletVolley bullets
 func spawn_volley_bullets()->void:
 	if bullets_amount < 10:
-		volley_data.transforms = BulletFactory2D.helper_generate_transforms_grid(bullets_amount, bullet_marker.get_global_transform(), bullets_amount, grid_alignment, col_offset, row_offset, rotate_grid_with_marker, random_local_rotation)
+		volley_data.transforms = BulletPatterns2D.helper_generate_transforms_grid(bullets_amount, bullet_marker.get_global_transform(), bullets_amount, grid_alignment, col_offset, row_offset, rotate_grid_with_marker, random_local_rotation)
 	else:
-		volley_data.transforms = BulletFactory2D.helper_generate_transforms_grid(bullets_amount, bullet_marker.get_global_transform(), rows_per_column, grid_alignment, col_offset, row_offset, rotate_grid_with_marker, random_local_rotation)
+		volley_data.transforms = BulletPatterns2D.helper_generate_transforms_grid(bullets_amount, bullet_marker.get_global_transform(), rows_per_column, grid_alignment, col_offset, row_offset, rotate_grid_with_marker, random_local_rotation)
 	
 	#volley_data.max_life_time = 5
 	#volley_data.is_life_time_over_signal_enabled = true
@@ -175,9 +175,9 @@ func spawn_godot_area2d_bullets(player_rotation:float)->void:
 	var transforms:Array[Transform2D]
 	
 	if bullets_amount < 10:
-		transforms = BulletFactory2D.helper_generate_transforms_grid(bullets_amount, bullet_marker.get_global_transform(), bullets_amount, grid_alignment, col_offset, row_offset, rotate_grid_with_marker, random_local_rotation)
+		transforms = BulletPatterns2D.helper_generate_transforms_grid(bullets_amount, bullet_marker.get_global_transform(), bullets_amount, grid_alignment, col_offset, row_offset, rotate_grid_with_marker, random_local_rotation)
 	else:
-		transforms = BulletFactory2D.helper_generate_transforms_grid(bullets_amount, bullet_marker.get_global_transform(), rows_per_column, grid_alignment, col_offset, row_offset, rotate_grid_with_marker, random_local_rotation)
+		transforms = BulletPatterns2D.helper_generate_transforms_grid(bullets_amount, bullet_marker.get_global_transform(), rows_per_column, grid_alignment, col_offset, row_offset, rotate_grid_with_marker, random_local_rotation)
 	
 	var bullet_scale:Vector2 = Vector2(5,5)
 	var bullet_direction:Vector2 = Vector2(1, 0).rotated(player_rotation)
@@ -334,7 +334,7 @@ func set_adjust_direction_based_on_rotation(should_adjust_direction:bool)->void:
 func set_grid_rows_per_column(new_rows_per_column:int)->void:
 	rows_per_column = new_rows_per_column
 
-func set_grid_alignment(new_alignment:BulletFactory2D.Alignment)->void:
+func set_grid_alignment(new_alignment:BulletPatterns2D.Alignment)->void:
 	grid_alignment = new_alignment
 
 func set_grid_column_offset(new_col_offset:float)->void:

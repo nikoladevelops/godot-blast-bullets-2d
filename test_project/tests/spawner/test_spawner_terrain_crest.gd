@@ -9,7 +9,7 @@ var arr: Array
 func before_each() -> void:
 	await super()
 	var sp := make_spawner()
-	sp.apply_pattern_preset(BulletFactory2D.PATTERN_PRESET_TERRAIN_CREST)
+	sp.apply_pattern_preset(BulletPatterns2D.PATTERN_PRESET_TERRAIN_CREST)
 	arr = sp.get_helper_custom_transforms()
 
 

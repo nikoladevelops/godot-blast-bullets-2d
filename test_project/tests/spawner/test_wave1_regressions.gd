@@ -120,7 +120,7 @@ func test_linear_orbit_rearm_full_params() -> void:
 
 func test_bad_presets_are_noops_and_reuse_intact() -> void:
 	var sp := make_spawner()
-	sp.apply_pattern_preset(BulletFactory2D.PATTERN_PRESET_CUSTOM) # -1: valid "custom", a no-op
+	sp.apply_pattern_preset(BulletPatterns2D.PATTERN_PRESET_CUSTOM) # -1: valid "custom", a no-op
 	sp.apply_pattern_preset(9999)
 	expect_error("preset out of range")
 	assert_eq(sp.get_volleys_fired(), 0, "bad presets fire nothing")

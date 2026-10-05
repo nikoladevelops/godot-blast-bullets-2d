@@ -1,29 +1,13 @@
 #pragma once
 
-// Pattern generation for BulletFactory2D (the static helper_* API), one file per
-// family:
-//   bullet_factory2d_patterns_layout.cpp    outline layout engine (On Outline /
-//                                           Layers / Fill Inside) + shared machinery
-//   bullet_factory2d_patterns_shapes.cpp    danmaku generators (grid, fan, spiral, ...)
-//   bullet_factory2d_patterns_curves.cpp    closed curves (ring, circle, ellipse, flower, ...)
-//   bullet_factory2d_patterns_polygons.cpp  polygons (rectangle, polygon, triangle, ...)
-//   bullet_factory2d_patterns_edges.cpp     point lists, image edges, edge normals
-//   bullet_factory2d_patterns_preview.cpp   helper_sample_outline_* preview tracks
-//   bullet_factory2d_patterns_debug.cpp     outline/volley conformance inspectors
-//   bullet_factory2d_patterns_bindings.cpp  Godot bindings of all of the above
-// Pure functions of their arguments (no factory state): BulletSpawner2D calls
-// them per shot or once per bake; tests drive them directly. This header holds
-// what more than one of those files uses (tiny helpers inline, the rest declared).
+// Helpers shared by the BulletPatterns2D implementation files (file map in
+// patterns/bullet_patterns2d.hpp): tiny helpers inline, the rest declared.
+// Only src/patterns/*.cpp include this; everything else includes
+// patterns/bullet_patterns2d.hpp.
 
-#include "factory/bullet_factory2d.hpp"
+#include "patterns/bullet_patterns2d.hpp"
+#include "core/transform_math2d.hpp"
 #include "core/warn_once2d.hpp"
-#include "bullet_volley/bullet_volley2d.hpp"
-#include "data/bullet_volley_data2d.hpp"
-#include "debugger/bullet_volley_debugger2d.hpp"
-#include "attachments/bullet_attachment2d.hpp"
-#include "factory/factory_operation_guard2d.hpp"
-#include "pooling/volley_pool2d.hpp"
-#include "pooling/volley_pool_key2d.hpp"
 #include "godot_cpp/classes/global_constants.hpp"
 #include "godot_cpp/classes/image.hpp"
 #include "godot_cpp/classes/image_texture.hpp"
@@ -50,6 +34,22 @@
 
 namespace BlastBullets2D {
 using namespace godot;
+
+// Knobs of the polyline layout (ids = BulletPatterns2D::Polyline* enums).
+struct PolylineLayout2D {
+	bool closed = false;
+	int distribution = 1;
+	double spacing = 32.0;
+	int overflow = 0;
+	int anchor = 0;
+	double start_offset = 0.0;
+	bool reverse = false;
+	int facing = 0;
+	double facing_offset_deg = 0.0;
+};
+// Shared by helper_generate_transforms_polyline and the spawner's Path2D
+// mode. caller prefixes every error ("<caller>: ...").
+TypedArray<Transform2D> polyline_layout2d(const Transform2D &marker, const PackedVector2Array &path_pts, int count, const PolylineLayout2D &p, bool quiet, const char *caller);
 
 // Cap for every helper_generate_transforms_* call: each one allocates O(n)
 // slots, so an unbounded count (a typo'd 1000000, let alone INT_MAX) would

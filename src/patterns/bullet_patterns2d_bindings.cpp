@@ -1,15 +1,27 @@
 // Godot bindings of the static pattern helpers (helper_generate_transforms_*,
 // helper_sample_outline_*, outline debug inspectors) and the pattern enums.
-// Called from BulletFactory2D::_bind_methods.
+// BulletPatterns2D::_bind_methods: every static pattern helper and enum.
 
-#include "factory/bullet_factory2d_internal.hpp"
+#include "patterns/patterns_internal.hpp"
 
 using namespace godot;
 
 namespace BlastBullets2D {
 
-void BulletFactory2D::bind_pattern_helpers() {
-	ClassDB::bind_static_method("BulletFactory2D",
+void BulletPatterns2D::_bind_methods() {
+	ClassDB::bind_static_method("BulletPatterns2D", D_METHOD("helper_generate_transforms_polyline", "transforms_amount", "marker_transform", "points", "closed", "distribution", "spacing", "overflow", "anchor", "start_offset", "reverse", "facing", "facing_offset_deg"), &BulletPatterns2D::helper_generate_transforms_polyline, DEFVAL(false), DEFVAL(POLYLINE_DISTRIBUTION_EVEN), DEFVAL(32.0), DEFVAL(POLYLINE_OVERFLOW_CLAMP), DEFVAL(POLYLINE_ANCHOR_START), DEFVAL(0.0), DEFVAL(false), DEFVAL(POLYLINE_FACING_ALONG_PATH), DEFVAL(0.0));
+	BIND_ENUM_CONSTANT(POLYLINE_DISTRIBUTION_FIXED_SPACING);
+	BIND_ENUM_CONSTANT(POLYLINE_DISTRIBUTION_EVEN);
+	BIND_ENUM_CONSTANT(POLYLINE_OVERFLOW_CLAMP);
+	BIND_ENUM_CONSTANT(POLYLINE_OVERFLOW_WRAP);
+	BIND_ENUM_CONSTANT(POLYLINE_OVERFLOW_SHRINK_TO_FIT);
+	BIND_ENUM_CONSTANT(POLYLINE_ANCHOR_START);
+	BIND_ENUM_CONSTANT(POLYLINE_ANCHOR_CENTER);
+	BIND_ENUM_CONSTANT(POLYLINE_ANCHOR_END);
+	BIND_ENUM_CONSTANT(POLYLINE_FACING_ALONG_PATH);
+	BIND_ENUM_CONSTANT(POLYLINE_FACING_NORMAL_P90);
+	BIND_ENUM_CONSTANT(POLYLINE_FACING_NORMAL_M90);
+	ClassDB::bind_static_method("BulletPatterns2D",
 								D_METHOD("helper_generate_transforms_grid",
 										 "transforms_amount",
 										 "marker_transform",
@@ -21,7 +33,7 @@ void BulletFactory2D::bind_pattern_helpers() {
 										 "random_local_rotation",
 										 "jitter",
 								"seed"),
-								&BulletFactory2D::helper_generate_transforms_grid,
+								&BulletPatterns2D::helper_generate_transforms_grid,
 								DEFVAL(10),
 								DEFVAL(3), // CENTER_LEFT
 								DEFVAL(150.0),
@@ -31,7 +43,7 @@ void BulletFactory2D::bind_pattern_helpers() {
 								DEFVAL(0.0),
 								DEFVAL(0));
 
-	ClassDB::bind_static_method("BulletFactory2D",
+	ClassDB::bind_static_method("BulletPatterns2D",
 								D_METHOD("helper_generate_transforms_ring",
 										 "transforms_amount",
 										 "marker_transform",
@@ -61,7 +73,7 @@ void BulletFactory2D::bind_pattern_helpers() {
 								"layer_max_dots",
 								"seed",
 								"layer_layout"),
-								&BulletFactory2D::helper_generate_transforms_ring,
+								&BulletPatterns2D::helper_generate_transforms_ring,
 								DEFVAL(150.0),
 								DEFVAL(0.0),
 								DEFVAL(Math::TAU),
@@ -89,7 +101,7 @@ void BulletFactory2D::bind_pattern_helpers() {
 								DEFVAL(0),
 								DEFVAL(1));
 
-	ClassDB::bind_static_method("BulletFactory2D",
+	ClassDB::bind_static_method("BulletPatterns2D",
 								D_METHOD("helper_generate_transforms_fan",
 										 "transforms_amount",
 										 "marker_transform",
@@ -99,7 +111,7 @@ void BulletFactory2D::bind_pattern_helpers() {
 										 "centered",
 										 "angle_jitter",
 								"seed"),
-								&BulletFactory2D::helper_generate_transforms_fan,
+								&BulletPatterns2D::helper_generate_transforms_fan,
 								DEFVAL(0.5),
 								DEFVAL(0.0),
 								DEFVAL(0.0),
@@ -107,7 +119,7 @@ void BulletFactory2D::bind_pattern_helpers() {
 								DEFVAL(0.0),
 								DEFVAL(0));
 
-	ClassDB::bind_static_method("BulletFactory2D",
+	ClassDB::bind_static_method("BulletPatterns2D",
 								D_METHOD("helper_generate_transforms_spiral",
 										 "transforms_amount",
 										 "marker_transform",
@@ -117,7 +129,7 @@ void BulletFactory2D::bind_pattern_helpers() {
 										 "rotate_with_marker",
 										 "facing_mode",
 										 "facing_offset_degrees"),
-								&BulletFactory2D::helper_generate_transforms_spiral,
+								&BulletPatterns2D::helper_generate_transforms_spiral,
 								DEFVAL(50.0),
 								DEFVAL(15.0),
 								DEFVAL(0.6),
@@ -125,7 +137,7 @@ void BulletFactory2D::bind_pattern_helpers() {
 								DEFVAL(SPIRAL_FACING_TANGENT),
 								DEFVAL(0.0));
 
-	ClassDB::bind_static_method("BulletFactory2D",
+	ClassDB::bind_static_method("BulletPatterns2D",
 								D_METHOD("helper_generate_transforms_aimed",
 										 "transforms_amount",
 										 "marker_transform",
@@ -133,12 +145,12 @@ void BulletFactory2D::bind_pattern_helpers() {
 										 "spread",
 										 "step_offset",
 										 "centered"),
-								&BulletFactory2D::helper_generate_transforms_aimed,
+								&BulletPatterns2D::helper_generate_transforms_aimed,
 								DEFVAL(0.3),
 								DEFVAL(0.0),
 								DEFVAL(true));
 
-	ClassDB::bind_static_method("BulletFactory2D",
+	ClassDB::bind_static_method("BulletPatterns2D",
 								D_METHOD("helper_generate_transforms_line",
 										 "transforms_amount",
 										 "marker_transform",
@@ -147,13 +159,13 @@ void BulletFactory2D::bind_pattern_helpers() {
 										 "face_direction",
 										 "anchor",
 										 "perpendicular"),
-								&BulletFactory2D::helper_generate_transforms_line,
+								&BulletPatterns2D::helper_generate_transforms_line,
 								DEFVAL(32.0),
 								DEFVAL(true),
 								DEFVAL(LINE_ANCHOR_CENTER),
 								DEFVAL(false));
 
-	ClassDB::bind_static_method("BulletFactory2D",
+	ClassDB::bind_static_method("BulletPatterns2D",
 								D_METHOD("helper_generate_transforms_flower",
 										 "transforms_amount",
 										 "marker_transform",
@@ -187,7 +199,7 @@ void BulletFactory2D::bind_pattern_helpers() {
 										"super_lobes",
 										"super_fullness",
 								"layer_layout"),
-								&BulletFactory2D::helper_generate_transforms_flower,
+								&BulletPatterns2D::helper_generate_transforms_flower,
 								DEFVAL(6),
 								DEFVAL(150.0),
 								DEFVAL(0.5),
@@ -219,7 +231,7 @@ void BulletFactory2D::bind_pattern_helpers() {
 								DEFVAL(1.0),
 								DEFVAL(1));
 
-	ClassDB::bind_static_method("BulletFactory2D",
+	ClassDB::bind_static_method("BulletPatterns2D",
 								D_METHOD("helper_generate_transforms_ellipse",
 										 "transforms_amount",
 										 "marker_transform",
@@ -250,7 +262,7 @@ void BulletFactory2D::bind_pattern_helpers() {
 										"layer_twist",
 										"layer_max_dots",
 								"layer_layout"),
-								&BulletFactory2D::helper_generate_transforms_ellipse,
+								&BulletPatterns2D::helper_generate_transforms_ellipse,
 								DEFVAL(150.0),
 								DEFVAL(100.0),
 								DEFVAL(0.0),
@@ -279,7 +291,7 @@ void BulletFactory2D::bind_pattern_helpers() {
 								DEFVAL(0),
 								DEFVAL(1));
 
-	ClassDB::bind_static_method("BulletFactory2D",
+	ClassDB::bind_static_method("BulletPatterns2D",
 								D_METHOD("helper_generate_transforms_rain",
 										 "transforms_amount",
 										 "marker_transform",
@@ -288,14 +300,14 @@ void BulletFactory2D::bind_pattern_helpers() {
 										 "drop_spacing",
 										 "jitter",
 										 "seed"),
-								&BulletFactory2D::helper_generate_transforms_rain,
+								&BulletPatterns2D::helper_generate_transforms_rain,
 								DEFVAL(600.0),
 								DEFVAL(Vector2(0, 1)),
 								DEFVAL(48.0),
 								DEFVAL(12.0),
 								DEFVAL(0));
 
-	ClassDB::bind_static_method("BulletFactory2D",
+	ClassDB::bind_static_method("BulletPatterns2D",
 								D_METHOD("helper_generate_transforms_scatter",
 										 "transforms_amount",
 										 "marker_transform",
@@ -306,7 +318,7 @@ void BulletFactory2D::bind_pattern_helpers() {
 										 "sector_direction",
 										 "sector_arc",
 										 "facing_mode"),
-								&BulletFactory2D::helper_generate_transforms_scatter,
+								&BulletPatterns2D::helper_generate_transforms_scatter,
 								DEFVAL(120.0),
 								DEFVAL(0.4),
 								DEFVAL(0),
@@ -315,7 +327,7 @@ void BulletFactory2D::bind_pattern_helpers() {
 								DEFVAL(Math::TAU),
 								DEFVAL(0));
 
-	ClassDB::bind_static_method("BulletFactory2D",
+	ClassDB::bind_static_method("BulletPatterns2D",
 								D_METHOD("helper_generate_transforms_star_polygon",
 										 "transforms_amount",
 										 "marker_transform",
@@ -325,7 +337,7 @@ void BulletFactory2D::bind_pattern_helpers() {
 										 "base_rotation",
 										 "face_outward",
 										 "facing_offset_degrees"),
-								&BulletFactory2D::helper_generate_transforms_star_polygon,
+								&BulletPatterns2D::helper_generate_transforms_star_polygon,
 								DEFVAL(5),
 								DEFVAL(150.0),
 								DEFVAL(2.0),
@@ -333,7 +345,7 @@ void BulletFactory2D::bind_pattern_helpers() {
 								DEFVAL(true),
 								DEFVAL(0.0));
 
-	ClassDB::bind_static_method("BulletFactory2D",
+	ClassDB::bind_static_method("BulletPatterns2D",
 								D_METHOD("helper_generate_transforms_multispiral",
 										 "transforms_amount",
 										 "marker_transform",
@@ -345,7 +357,7 @@ void BulletFactory2D::bind_pattern_helpers() {
 										 "facing_mode",
 										 "facing_offset_degrees",
 										 "arm_index_stride"),
-								&BulletFactory2D::helper_generate_transforms_multispiral,
+								&BulletPatterns2D::helper_generate_transforms_multispiral,
 								DEFVAL(3),
 								DEFVAL(50.0),
 								DEFVAL(15.0),
@@ -355,26 +367,26 @@ void BulletFactory2D::bind_pattern_helpers() {
 								DEFVAL(0.0),
 								DEFVAL(1));
 
-	ClassDB::bind_static_method("BulletFactory2D",
+	ClassDB::bind_static_method("BulletPatterns2D",
 								D_METHOD("helper_apply_skip_indices",
 										 "transforms",
 										 "skip_indices"),
-								&BulletFactory2D::helper_apply_skip_indices);
+								&BulletPatterns2D::helper_apply_skip_indices);
 
-	ClassDB::bind_static_method("BulletFactory2D",
+	ClassDB::bind_static_method("BulletPatterns2D",
 								D_METHOD("helper_layer_scale_factor",
 										 "layer_index",
 										 "scale_step",
 										 "side",
 										 "scale_curve",
 										 "custom_scales"),
-								&BulletFactory2D::helper_layer_scale_factor,
+								&BulletPatterns2D::helper_layer_scale_factor,
 								DEFVAL(0.2),
 								DEFVAL(0),
 								DEFVAL(0),
 								DEFVAL(PackedFloat32Array()));
 
-	ClassDB::bind_static_method("BulletFactory2D",
+	ClassDB::bind_static_method("BulletPatterns2D",
 								D_METHOD("helper_generate_transforms_cross",
 										 "transforms_amount",
 										 "marker_transform",
@@ -384,7 +396,7 @@ void BulletFactory2D::bind_pattern_helpers() {
 										 "base_rotation",
 										 "face_outward",
 										 "facing_offset_degrees"),
-								&BulletFactory2D::helper_generate_transforms_cross,
+								&BulletPatterns2D::helper_generate_transforms_cross,
 								DEFVAL(4),
 								DEFVAL(150.0),
 								DEFVAL(32.0),
@@ -392,21 +404,21 @@ void BulletFactory2D::bind_pattern_helpers() {
 								DEFVAL(true),
 								DEFVAL(0.0));
 
-	ClassDB::bind_static_method("BulletFactory2D",
+	ClassDB::bind_static_method("BulletPatterns2D",
 								D_METHOD("helper_bullet_layer_index",
 										 "bullet_index",
 										 "slot_count",
 										 "layer_count",
 										 "layer_fill",
 										 "layer_start_offset"),
-								&BulletFactory2D::helper_bullet_layer_index,
+								&BulletPatterns2D::helper_bullet_layer_index,
 								DEFVAL(0),
 								DEFVAL(0),
 								DEFVAL(1),
 								DEFVAL(0),
 								DEFVAL(0));
 
-	ClassDB::bind_static_method("BulletFactory2D",
+	ClassDB::bind_static_method("BulletPatterns2D",
 								D_METHOD("helper_generate_transforms_star",
 										 "transforms_amount",
 										 "marker_transform",
@@ -438,7 +450,7 @@ void BulletFactory2D::bind_pattern_helpers() {
 										 "outline_corner_mode",
 										 "outline_edge_margin",
 										 "outline_corner_facing"),
-								&BulletFactory2D::helper_generate_transforms_star,
+								&BulletPatterns2D::helper_generate_transforms_star,
 								DEFVAL(5),
 								DEFVAL(150.0),
 								DEFVAL(65.0),
@@ -468,7 +480,7 @@ void BulletFactory2D::bind_pattern_helpers() {
 								DEFVAL(0.0),
 								DEFVAL(0));
 
-	ClassDB::bind_static_method("BulletFactory2D",
+	ClassDB::bind_static_method("BulletPatterns2D",
 								D_METHOD("helper_generate_transforms_heart",
 										 "transforms_amount",
 										 "marker_transform",
@@ -493,7 +505,7 @@ void BulletFactory2D::bind_pattern_helpers() {
 										"layer_twist",
 										"layer_max_dots",
 								"layer_layout"),
-								&BulletFactory2D::helper_generate_transforms_heart,
+								&BulletPatterns2D::helper_generate_transforms_heart,
 								DEFVAL(150.0),
 								DEFVAL(0.0),
 								DEFVAL(true),
@@ -516,7 +528,7 @@ void BulletFactory2D::bind_pattern_helpers() {
 								DEFVAL(0),
 								DEFVAL(1));
 
-	ClassDB::bind_static_method("BulletFactory2D",
+	ClassDB::bind_static_method("BulletPatterns2D",
 								D_METHOD("helper_generate_transforms_wave",
 										 "transforms_amount",
 										 "marker_transform",
@@ -526,7 +538,7 @@ void BulletFactory2D::bind_pattern_helpers() {
 										 "direction",
 										 "face_direction",
 										 "facing_offset_degrees"),
-								&BulletFactory2D::helper_generate_transforms_wave,
+								&BulletPatterns2D::helper_generate_transforms_wave,
 								DEFVAL(600.0),
 								DEFVAL(48.0),
 								DEFVAL(2.0),
@@ -534,7 +546,7 @@ void BulletFactory2D::bind_pattern_helpers() {
 								DEFVAL(true),
 								DEFVAL(0.0));
 
-	ClassDB::bind_static_method("BulletFactory2D",
+	ClassDB::bind_static_method("BulletPatterns2D",
 								D_METHOD("helper_generate_transforms_waterfall",
 										 "transforms_amount",
 										 "marker_transform",
@@ -547,7 +559,7 @@ void BulletFactory2D::bind_pattern_helpers() {
 										 "jitter",
 										 "facing_offset_degrees",
 										 "seed"),
-								&BulletFactory2D::helper_generate_transforms_waterfall,
+								&BulletPatterns2D::helper_generate_transforms_waterfall,
 								DEFVAL(12),
 								DEFVAL(48.0),
 								DEFVAL(3),
@@ -558,7 +570,7 @@ void BulletFactory2D::bind_pattern_helpers() {
 								DEFVAL(0.0),
 								DEFVAL(0));
 
-	ClassDB::bind_static_method("BulletFactory2D",
+	ClassDB::bind_static_method("BulletPatterns2D",
 								D_METHOD("helper_generate_transforms_lattice",
 										 "transforms_amount",
 										 "marker_transform",
@@ -569,7 +581,7 @@ void BulletFactory2D::bind_pattern_helpers() {
 										 "stagger_rows",
 										 "face_outward",
 										 "facing_offset_degrees"),
-								&BulletFactory2D::helper_generate_transforms_lattice,
+								&BulletPatterns2D::helper_generate_transforms_lattice,
 								DEFVAL(8),
 								DEFVAL(5),
 								DEFVAL(48.0),
@@ -578,7 +590,7 @@ void BulletFactory2D::bind_pattern_helpers() {
 								DEFVAL(true),
 								DEFVAL(0.0));
 
-	ClassDB::bind_static_method("BulletFactory2D",
+	ClassDB::bind_static_method("BulletPatterns2D",
 								D_METHOD("helper_generate_transforms_rose",
 										 "transforms_amount",
 										 "marker_transform",
@@ -605,7 +617,7 @@ void BulletFactory2D::bind_pattern_helpers() {
 										"layer_twist",
 										"layer_max_dots",
 								"layer_layout"),
-								&BulletFactory2D::helper_generate_transforms_rose,
+								&BulletPatterns2D::helper_generate_transforms_rose,
 								DEFVAL(6),
 								DEFVAL(150.0),
 								DEFVAL(1.0),
@@ -630,7 +642,7 @@ void BulletFactory2D::bind_pattern_helpers() {
 								DEFVAL(0),
 								DEFVAL(1));
 
-	ClassDB::bind_static_method("BulletFactory2D",
+	ClassDB::bind_static_method("BulletPatterns2D",
 								D_METHOD("helper_generate_transforms_counter_spiral",
 										 "transforms_amount",
 										 "marker_transform",
@@ -643,7 +655,7 @@ void BulletFactory2D::bind_pattern_helpers() {
 										 "facing_offset_degrees",
 										 "arm_index_stride",
 										 "mirror_alternate_arms"),
-								&BulletFactory2D::helper_generate_transforms_counter_spiral,
+								&BulletPatterns2D::helper_generate_transforms_counter_spiral,
 								DEFVAL(2),
 								DEFVAL(50.0),
 								DEFVAL(15.0),
@@ -654,7 +666,7 @@ void BulletFactory2D::bind_pattern_helpers() {
 								DEFVAL(1),
 								DEFVAL(true));
 
-	ClassDB::bind_static_method("BulletFactory2D",
+	ClassDB::bind_static_method("BulletPatterns2D",
 								D_METHOD("helper_generate_transforms_corridor",
 										 "transforms_amount",
 										 "marker_transform",
@@ -664,14 +676,14 @@ void BulletFactory2D::bind_pattern_helpers() {
 										 "gap_width",
 										 "face_aim",
 										 "facing_offset_degrees"),
-								&BulletFactory2D::helper_generate_transforms_corridor,
+								&BulletPatterns2D::helper_generate_transforms_corridor,
 								DEFVAL(400.0),
 								DEFVAL(32.0),
 								DEFVAL(96.0),
 								DEFVAL(true),
 								DEFVAL(0.0));
 
-	ClassDB::bind_static_method("BulletFactory2D",
+	ClassDB::bind_static_method("BulletPatterns2D",
 								D_METHOD("helper_generate_transforms_lissajous",
 										 "transforms_amount",
 										 "marker_transform",
@@ -699,7 +711,7 @@ void BulletFactory2D::bind_pattern_helpers() {
 										"layer_twist",
 										"layer_max_dots",
 								"layer_layout"),
-								&BulletFactory2D::helper_generate_transforms_lissajous,
+								&BulletPatterns2D::helper_generate_transforms_lissajous,
 								DEFVAL(200.0),
 								DEFVAL(120.0),
 								DEFVAL(3.0),
@@ -725,7 +737,7 @@ void BulletFactory2D::bind_pattern_helpers() {
 								DEFVAL(0),
 								DEFVAL(1));
 
-	ClassDB::bind_static_method("BulletFactory2D",
+	ClassDB::bind_static_method("BulletPatterns2D",
 								D_METHOD("helper_generate_transforms_circle",
 										 "transforms_amount",
 										 "marker_transform",
@@ -749,7 +761,7 @@ void BulletFactory2D::bind_pattern_helpers() {
 										"layer_twist",
 										"layer_max_dots",
 								"layer_layout"),
-								&BulletFactory2D::helper_generate_transforms_circle,
+								&BulletPatterns2D::helper_generate_transforms_circle,
 								DEFVAL(150.0),
 								DEFVAL(true),
 								DEFVAL(0.0),
@@ -771,7 +783,7 @@ void BulletFactory2D::bind_pattern_helpers() {
 								DEFVAL(0),
 								DEFVAL(1));
 
-	ClassDB::bind_static_method("BulletFactory2D",
+	ClassDB::bind_static_method("BulletPatterns2D",
 								D_METHOD("helper_generate_transforms_rectangle",
 										 "transforms_amount",
 										 "marker_transform",
@@ -800,7 +812,7 @@ void BulletFactory2D::bind_pattern_helpers() {
 										 "outline_corner_mode",
 										 "outline_edge_margin",
 										 "outline_corner_facing"),
-								&BulletFactory2D::helper_generate_transforms_rectangle,
+								&BulletPatterns2D::helper_generate_transforms_rectangle,
 								DEFVAL(Vector2(300.0, 200.0)),
 								DEFVAL(true),
 								DEFVAL(0.0),
@@ -827,7 +839,7 @@ void BulletFactory2D::bind_pattern_helpers() {
 								DEFVAL(0.0),
 								DEFVAL(0));
 
-	ClassDB::bind_static_method("BulletFactory2D",
+	ClassDB::bind_static_method("BulletPatterns2D",
 								D_METHOD("helper_generate_transforms_polygon",
 										 "transforms_amount",
 										 "marker_transform",
@@ -858,7 +870,7 @@ void BulletFactory2D::bind_pattern_helpers() {
 										 "outline_corner_mode",
 										 "outline_edge_margin",
 										 "outline_corner_facing"),
-								&BulletFactory2D::helper_generate_transforms_polygon,
+								&BulletPatterns2D::helper_generate_transforms_polygon,
 								DEFVAL(6),
 								DEFVAL(150.0),
 								DEFVAL(0.0),
@@ -887,7 +899,7 @@ void BulletFactory2D::bind_pattern_helpers() {
 								DEFVAL(0.0),
 								DEFVAL(0));
 
-	ClassDB::bind_static_method("BulletFactory2D",
+	ClassDB::bind_static_method("BulletPatterns2D",
 								D_METHOD("helper_generate_transforms_triangle",
 										"transforms_amount",
 										"marker_transform",
@@ -919,7 +931,7 @@ void BulletFactory2D::bind_pattern_helpers() {
 										 "outline_corner_mode",
 										 "outline_edge_margin",
 										 "outline_corner_facing"),
-								&BulletFactory2D::helper_generate_transforms_triangle,
+								&BulletPatterns2D::helper_generate_transforms_triangle,
 								DEFVAL(TRIANGLE_EQUILATERAL),
 								DEFVAL(150.0),
 								DEFVAL(150.0),
@@ -949,7 +961,7 @@ void BulletFactory2D::bind_pattern_helpers() {
 								DEFVAL(0.0),
 								DEFVAL(0));
 
-	ClassDB::bind_static_method("BulletFactory2D",
+	ClassDB::bind_static_method("BulletPatterns2D",
 								D_METHOD("helper_generate_transforms_trapezoid",
 										"transforms_amount",
 										"marker_transform",
@@ -981,7 +993,7 @@ void BulletFactory2D::bind_pattern_helpers() {
 										 "outline_corner_mode",
 										 "outline_edge_margin",
 										 "outline_corner_facing"),
-								&BulletFactory2D::helper_generate_transforms_trapezoid,
+								&BulletPatterns2D::helper_generate_transforms_trapezoid,
 								DEFVAL(200.0),
 								DEFVAL(300.0),
 								DEFVAL(200.0),
@@ -1011,7 +1023,7 @@ void BulletFactory2D::bind_pattern_helpers() {
 								DEFVAL(0.0),
 								DEFVAL(0));
 
-	ClassDB::bind_static_method("BulletFactory2D",
+	ClassDB::bind_static_method("BulletPatterns2D",
 								D_METHOD("helper_generate_transforms_diamond",
 										"transforms_amount",
 										"marker_transform",
@@ -1042,7 +1054,7 @@ void BulletFactory2D::bind_pattern_helpers() {
 										 "outline_corner_mode",
 										 "outline_edge_margin",
 										 "outline_corner_facing"),
-								&BulletFactory2D::helper_generate_transforms_diamond,
+								&BulletPatterns2D::helper_generate_transforms_diamond,
 								DEFVAL(200.0),
 								DEFVAL(300.0),
 								DEFVAL(0.0),
@@ -1071,19 +1083,19 @@ void BulletFactory2D::bind_pattern_helpers() {
 								DEFVAL(0.0),
 								DEFVAL(0));
 
-	ClassDB::bind_static_method("BulletFactory2D",
+	ClassDB::bind_static_method("BulletPatterns2D",
 								D_METHOD("helper_sample_outline_rose",
 										"petals",
 										"radius",
 										"lobe_sharpness",
 										"base_rotation"),
-								&BulletFactory2D::helper_sample_outline_rose,
+								&BulletPatterns2D::helper_sample_outline_rose,
 								DEFVAL(6),
 								DEFVAL(150.0),
 								DEFVAL(1.0),
 								DEFVAL(0.0));
 
-	ClassDB::bind_static_method("BulletFactory2D",
+	ClassDB::bind_static_method("BulletPatterns2D",
 								D_METHOD("helper_sample_outline_flower",
 										"flower_type",
 										"petals",
@@ -1097,7 +1109,7 @@ void BulletFactory2D::bind_pattern_helpers() {
 										"super_fullness",
 										"base_rotation",
 										"transforms_amount"),
-								&BulletFactory2D::helper_sample_outline_flower,
+								&BulletPatterns2D::helper_sample_outline_flower,
 								DEFVAL(0),
 								DEFVAL(6),
 								DEFVAL(150.0),
@@ -1111,77 +1123,77 @@ void BulletFactory2D::bind_pattern_helpers() {
 								DEFVAL(0.0),
 								DEFVAL(-1));
 
-	ClassDB::bind_static_method("BulletFactory2D",
+	ClassDB::bind_static_method("BulletPatterns2D",
 								D_METHOD("helper_sample_outline_lissajous",
 										"size_x",
 										"size_y",
 										"freq_x",
 										"freq_y",
 										"phase"),
-								&BulletFactory2D::helper_sample_outline_lissajous,
+								&BulletPatterns2D::helper_sample_outline_lissajous,
 								DEFVAL(200.0),
 								DEFVAL(120.0),
 								DEFVAL(3.0),
 								DEFVAL(2.0),
 								DEFVAL(0.0));
 
-	ClassDB::bind_static_method("BulletFactory2D",
+	ClassDB::bind_static_method("BulletPatterns2D",
 								D_METHOD("helper_sample_outline_circle",
 										"radius"),
-								&BulletFactory2D::helper_sample_outline_circle,
+								&BulletPatterns2D::helper_sample_outline_circle,
 								DEFVAL(150.0));
 
-	ClassDB::bind_static_method("BulletFactory2D",
+	ClassDB::bind_static_method("BulletPatterns2D",
 								D_METHOD("helper_sample_outline_rectangle",
 										"size"),
-								&BulletFactory2D::helper_sample_outline_rectangle,
+								&BulletPatterns2D::helper_sample_outline_rectangle,
 								DEFVAL(Vector2(300.0, 200.0)));
 
-	ClassDB::bind_static_method("BulletFactory2D",
+	ClassDB::bind_static_method("BulletPatterns2D",
 								D_METHOD("helper_sample_outline_triangle",
 										"triangle_type",
 										"size_a",
 										"size_b",
 										"rotation"),
-								&BulletFactory2D::helper_sample_outline_triangle,
+								&BulletPatterns2D::helper_sample_outline_triangle,
 								DEFVAL(0),
 								DEFVAL(150.0),
 								DEFVAL(150.0),
 								DEFVAL(0.0));
 
-	ClassDB::bind_static_method("BulletFactory2D",
+	ClassDB::bind_static_method("BulletPatterns2D",
 								D_METHOD("helper_sample_outline_trapezoid",
 										"base_top",
 										"base_bottom",
 										"height",
 										"rotation"),
-								&BulletFactory2D::helper_sample_outline_trapezoid,
+								&BulletPatterns2D::helper_sample_outline_trapezoid,
 								DEFVAL(200.0),
 								DEFVAL(300.0),
 								DEFVAL(200.0),
 								DEFVAL(0.0));
 
-	ClassDB::bind_static_method("BulletFactory2D",
+	ClassDB::bind_static_method("BulletPatterns2D",
 								D_METHOD("helper_sample_outline_diamond",
 										"diagonal_x",
 										"diagonal_y",
 										"rotation"),
-								&BulletFactory2D::helper_sample_outline_diamond,
+								&BulletPatterns2D::helper_sample_outline_diamond,
 								DEFVAL(200.0),
 								DEFVAL(300.0),
 								DEFVAL(0.0));
 
-	ClassDB::bind_static_method("BulletFactory2D",
+	ClassDB::bind_static_method("BulletPatterns2D",
 								D_METHOD("helper_sample_outline_polygon",
 										"vertices",
 										"radius",
 										"base_rotation"),
-								&BulletFactory2D::helper_sample_outline_polygon,
+								&BulletPatterns2D::helper_sample_outline_polygon,
 								DEFVAL(6),
 								DEFVAL(150.0),
 								DEFVAL(0.0));
 
-	ClassDB::bind_static_method("BulletFactory2D",
+	ClassDB::bind_static_method("BulletPatterns2D",
 								D_METHOD("helper_sample_outline_ellipse",
 										"radius_x",
 										"radius_y",
@@ -1189,7 +1201,7 @@ void BulletFactory2D::bind_pattern_helpers() {
 										"start_angle",
 										"arc",
 										"mode"),
-								&BulletFactory2D::helper_sample_outline_ellipse,
+								&BulletPatterns2D::helper_sample_outline_ellipse,
 								DEFVAL(150.0),
 								DEFVAL(100.0),
 								DEFVAL(0.0),
@@ -1197,31 +1209,31 @@ void BulletFactory2D::bind_pattern_helpers() {
 								DEFVAL(Math::TAU),
 								DEFVAL(0));
 
-	ClassDB::bind_static_method("BulletFactory2D",
+	ClassDB::bind_static_method("BulletPatterns2D",
 								D_METHOD("helper_sample_outline_ring",
 										"radius",
 										"arc",
 										"y_scale",
 										"start_angle_abs"),
-								&BulletFactory2D::helper_sample_outline_ring,
+								&BulletPatterns2D::helper_sample_outline_ring,
 								DEFVAL(150.0),
 								DEFVAL(Math::TAU),
 								DEFVAL(1.0),
 								DEFVAL(0.0));
 
-	ClassDB::bind_static_method("BulletFactory2D",
+	ClassDB::bind_static_method("BulletPatterns2D",
 								D_METHOD("helper_sample_outline_star",
 										"points",
 										"outer_radius",
 										"inner_radius",
 										"base_rotation"),
-								&BulletFactory2D::helper_sample_outline_star,
+								&BulletPatterns2D::helper_sample_outline_star,
 								DEFVAL(5),
 								DEFVAL(150.0),
 								DEFVAL(65.0),
 								DEFVAL(0.0));
 
-	ClassDB::bind_static_method("BulletFactory2D",
+	ClassDB::bind_static_method("BulletPatterns2D",
 								D_METHOD("helper_sample_outline_grid",
 										"transforms_amount",
 										"rows_per_column",
@@ -1230,7 +1242,7 @@ void BulletFactory2D::bind_pattern_helpers() {
 										"row_offset",
 										"base_rotation_abs",
 										"rotate_with_marker"),
-								&BulletFactory2D::helper_sample_outline_grid,
+								&BulletPatterns2D::helper_sample_outline_grid,
 								DEFVAL(0),
 								DEFVAL(10),
 								DEFVAL(3),
@@ -1239,7 +1251,7 @@ void BulletFactory2D::bind_pattern_helpers() {
 								DEFVAL(0.0),
 								DEFVAL(true));
 
-	ClassDB::bind_static_method("BulletFactory2D",
+	ClassDB::bind_static_method("BulletPatterns2D",
 								D_METHOD("helper_sample_outline_lattice",
 										"transforms_amount",
 										"columns",
@@ -1247,7 +1259,7 @@ void BulletFactory2D::bind_pattern_helpers() {
 										"spacing_x",
 										"spacing_y",
 										"stagger_rows"),
-								&BulletFactory2D::helper_sample_outline_lattice,
+								&BulletPatterns2D::helper_sample_outline_lattice,
 								DEFVAL(0),
 								DEFVAL(4),
 								DEFVAL(4),
@@ -1255,7 +1267,7 @@ void BulletFactory2D::bind_pattern_helpers() {
 								DEFVAL(64.0),
 								DEFVAL(true));
 
-	ClassDB::bind_static_method("BulletFactory2D",
+	ClassDB::bind_static_method("BulletPatterns2D",
 								D_METHOD("helper_sample_outline_waterfall",
 										"transforms_amount",
 										"columns",
@@ -1264,7 +1276,7 @@ void BulletFactory2D::bind_pattern_helpers() {
 										"row_spacing",
 										"stagger",
 										"rain_direction"),
-								&BulletFactory2D::helper_sample_outline_waterfall,
+								&BulletPatterns2D::helper_sample_outline_waterfall,
 								DEFVAL(0),
 								DEFVAL(4),
 								DEFVAL(64.0),
@@ -1273,53 +1285,53 @@ void BulletFactory2D::bind_pattern_helpers() {
 								DEFVAL(0.0),
 								DEFVAL(Vector2(0, 1)));
 
-	ClassDB::bind_static_method("BulletFactory2D",
+	ClassDB::bind_static_method("BulletPatterns2D",
 								D_METHOD("helper_sample_outline_rain",
 										"transforms_amount",
 										"band_width",
 										"rain_direction",
 										"drop_spacing"),
-								&BulletFactory2D::helper_sample_outline_rain,
+								&BulletPatterns2D::helper_sample_outline_rain,
 								DEFVAL(0),
 								DEFVAL(600.0),
 								DEFVAL(Vector2(0, 1)),
 								DEFVAL(48.0));
 
-	ClassDB::bind_static_method("BulletFactory2D",
+	ClassDB::bind_static_method("BulletPatterns2D",
 								D_METHOD("helper_sample_outline_wave",
 										"width",
 										"amplitude",
 										"waves",
 										"direction"),
-								&BulletFactory2D::helper_sample_outline_wave,
+								&BulletPatterns2D::helper_sample_outline_wave,
 								DEFVAL(300.0),
 								DEFVAL(50.0),
 								DEFVAL(2.0),
 								DEFVAL(Vector2(1, 0)));
 
-	ClassDB::bind_static_method("BulletFactory2D",
+	ClassDB::bind_static_method("BulletPatterns2D",
 								D_METHOD("helper_sample_outline_heart",
 										"size",
 										"base_rotation"),
-								&BulletFactory2D::helper_sample_outline_heart,
+								&BulletPatterns2D::helper_sample_outline_heart,
 								DEFVAL(100.0),
 								DEFVAL(0.0));
 
-	ClassDB::bind_static_method("BulletFactory2D",
+	ClassDB::bind_static_method("BulletPatterns2D",
 								D_METHOD("helper_sample_outline_spiral",
 										"transforms_amount",
 										"start_radius",
 										"radius_step",
 										"angle_step",
 										"base_rotation_abs"),
-								&BulletFactory2D::helper_sample_outline_spiral,
+								&BulletPatterns2D::helper_sample_outline_spiral,
 								DEFVAL(0),
 								DEFVAL(50.0),
 								DEFVAL(15.0),
 								DEFVAL(0.6),
 								DEFVAL(0.0));
 
-	ClassDB::bind_static_method("BulletFactory2D",
+	ClassDB::bind_static_method("BulletPatterns2D",
 								D_METHOD("helper_sample_outline_multispiral",
 										"transforms_amount",
 										"arms",
@@ -1328,7 +1340,7 @@ void BulletFactory2D::bind_pattern_helpers() {
 										"angle_step",
 										"base_rotation_abs",
 										"arm_index_stride"),
-								&BulletFactory2D::helper_sample_outline_multispiral,
+								&BulletPatterns2D::helper_sample_outline_multispiral,
 								DEFVAL(0),
 								DEFVAL(3),
 								DEFVAL(50.0),
@@ -1337,7 +1349,7 @@ void BulletFactory2D::bind_pattern_helpers() {
 								DEFVAL(0.0),
 								DEFVAL(1));
 
-	ClassDB::bind_static_method("BulletFactory2D",
+	ClassDB::bind_static_method("BulletPatterns2D",
 								D_METHOD("helper_sample_outline_counter_spiral",
 										"transforms_amount",
 										"arms",
@@ -1347,7 +1359,7 @@ void BulletFactory2D::bind_pattern_helpers() {
 										"base_rotation_abs",
 										"arm_index_stride",
 										"mirror_alternate_arms"),
-								&BulletFactory2D::helper_sample_outline_counter_spiral,
+								&BulletPatterns2D::helper_sample_outline_counter_spiral,
 								DEFVAL(0),
 								DEFVAL(4),
 								DEFVAL(50.0),
@@ -1357,43 +1369,43 @@ void BulletFactory2D::bind_pattern_helpers() {
 								DEFVAL(1),
 								DEFVAL(true));
 
-	ClassDB::bind_static_method("BulletFactory2D",
+	ClassDB::bind_static_method("BulletPatterns2D",
 								D_METHOD("helper_apply_side_spread",
 										 "transforms",
 										 "side_mode",
 										 "spread",
 										 "spread_exponent",
 										 "seed"),
-								&BulletFactory2D::helper_apply_side_spread,
+								&BulletPatterns2D::helper_apply_side_spread,
 								DEFVAL(0),
 								DEFVAL(0.0),
 								DEFVAL(2.0),
 								DEFVAL(0));
 
-	ClassDB::bind_static_method("BulletFactory2D",
+	ClassDB::bind_static_method("BulletPatterns2D",
 								D_METHOD("helper_compute_edge_normals",
 										 "edge_points",
 										 "closed",
 										 "flip"),
-								&BulletFactory2D::helper_compute_edge_normals,
+								&BulletPatterns2D::helper_compute_edge_normals,
 								DEFVAL(false),
 								DEFVAL(false));
 
 	// Outline debug inspectors: mathematical conformance framework for every
 	// closed shape (dot positions, gaps, corner ownership, facing deviations,
 	// settings echo). Pure math, no scene tree needed.
-	ClassDB::bind_static_method("BulletFactory2D",
+	ClassDB::bind_static_method("BulletPatterns2D",
 								D_METHOD("debug_describe_outline",
 										 "shape",
 										 "count",
 										 "params"),
-								&BulletFactory2D::debug_describe_outline,
+								&BulletPatterns2D::debug_describe_outline,
 								DEFVAL(Dictionary()));
-	ClassDB::bind_static_method("BulletFactory2D",
+	ClassDB::bind_static_method("BulletPatterns2D",
 								D_METHOD("debug_volley_gaps",
 										 "volley"),
-								&BulletFactory2D::debug_volley_gaps);
-	ClassDB::bind_static_method("BulletFactory2D",
+								&BulletPatterns2D::debug_volley_gaps);
+	ClassDB::bind_static_method("BulletPatterns2D",
 								D_METHOD("debug_verify_volley",
 										 "volley",
 										 "shape",
@@ -1402,19 +1414,19 @@ void BulletFactory2D::bind_pattern_helpers() {
 										 "params",
 										 "tolerance_px",
 										 "tolerance_rad"),
-								&BulletFactory2D::debug_verify_volley,
+								&BulletPatterns2D::debug_verify_volley,
 								DEFVAL(Dictionary()),
 								DEFVAL(1.0),
 								DEFVAL(0.02));
-	ClassDB::bind_static_method("BulletFactory2D",
+	ClassDB::bind_static_method("BulletPatterns2D",
 								D_METHOD("debug_outline_quotas",
 										 "shape",
 										 "count",
 										 "params"),
-								&BulletFactory2D::debug_outline_quotas,
+								&BulletPatterns2D::debug_outline_quotas,
 								DEFVAL(Dictionary()));
 
-	ClassDB::bind_static_method("BulletFactory2D",
+	ClassDB::bind_static_method("BulletPatterns2D",
 								D_METHOD("helper_generate_transforms_edge_from_points",
 										 "transforms_amount",
 										 "marker_transform",
@@ -1429,7 +1441,7 @@ void BulletFactory2D::bind_pattern_helpers() {
 										 "spread_exponent",
 										 "spread_side",
 										 "tangent_jitter"),
-								&BulletFactory2D::helper_generate_transforms_edge_from_points,
+								&BulletPatterns2D::helper_generate_transforms_edge_from_points,
 								DEFVAL(false),
 								DEFVAL(false),
 								DEFVAL(false),
@@ -1441,13 +1453,13 @@ void BulletFactory2D::bind_pattern_helpers() {
 								DEFVAL(0),
 								DEFVAL(0.0));
 
-	ClassDB::bind_static_method("BulletFactory2D",
+	ClassDB::bind_static_method("BulletPatterns2D",
 								D_METHOD("helper_extract_edge_from_image",
 										 "image",
 										 "threshold",
 										 "step",
 										 "quiet"),
-								&BulletFactory2D::helper_extract_edge_from_image,
+								&BulletPatterns2D::helper_extract_edge_from_image,
 								DEFVAL(0.5),
 								DEFVAL(4),
 								DEFVAL(false));

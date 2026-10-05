@@ -167,20 +167,20 @@ void BulletSpawner2D::_validate_property(PropertyInfo &p_property) const {
                 // keep relevant = true
             } else if (property_name == "helper_flower_petals" ||
                     property_name == "helper_flower_petal_spread") {
-                relevant = (ftype == BulletFactory2D::FLOWER_FAN);
+                relevant = (ftype == BulletPatterns2D::FLOWER_FAN);
             } else if (property_name == "helper_flower_petal_sharpness") {
-                relevant = (ftype == BulletFactory2D::FLOWER_FAN ||
-                        ftype == BulletFactory2D::FLOWER_RHODONEA);
+                relevant = (ftype == BulletPatterns2D::FLOWER_FAN ||
+                        ftype == BulletPatterns2D::FLOWER_RHODONEA);
             } else if (property_name == "helper_flower_inner_radius_scale") {
-                relevant = (ftype == BulletFactory2D::FLOWER_RHODONEA ||
-                        ftype == BulletFactory2D::FLOWER_PHYLLOTAXIS ||
-                        ftype == BulletFactory2D::FLOWER_SUPERFORMULA);
+                relevant = (ftype == BulletPatterns2D::FLOWER_RHODONEA ||
+                        ftype == BulletPatterns2D::FLOWER_PHYLLOTAXIS ||
+                        ftype == BulletPatterns2D::FLOWER_SUPERFORMULA);
             } else if (property_name == "helper_flower_spiro_roller" ||
                     property_name == "helper_flower_spiro_pen") {
-                relevant = (ftype == BulletFactory2D::FLOWER_SPIROGRAPH);
+                relevant = (ftype == BulletPatterns2D::FLOWER_SPIROGRAPH);
             } else if (property_name == "helper_flower_super_lobes" ||
                     property_name == "helper_flower_super_fullness") {
-                relevant = (ftype == BulletFactory2D::FLOWER_SUPERFORMULA);
+                relevant = (ftype == BulletPatterns2D::FLOWER_SUPERFORMULA);
             } else {
                 relevant = false;
             }
@@ -190,7 +190,7 @@ void BulletSpawner2D::_validate_property(PropertyInfo &p_property) const {
         // WALL-only knobs: hiding them outside WALL keeps the ellipse group
         // tight (gap_count = 0 alone already disables gaps silently).
         if (relevant && (property_name == "helper_ellipse_gap_count" || property_name == "helper_ellipse_gap_width")) {
-            relevant = helper_ellipse_mode == (int)BulletFactory2D::ELLIPSE_WALL;
+            relevant = helper_ellipse_mode == (int)BulletPatterns2D::ELLIPSE_WALL;
         }
     } else if (property_name.begins_with("helper_rain_")) {
         relevant = pattern_source == PATTERN_FROM_HELPER_RAIN;
@@ -226,7 +226,7 @@ void BulletSpawner2D::_validate_property(PropertyInfo &p_property) const {
         relevant = pattern_source == PATTERN_FROM_HELPER_TRIANGLE;
         // size_b is unused by the equilateral kind.
         if (relevant && property_name == "helper_triangle_size_b") {
-            relevant = helper_triangle_type != (int)BulletFactory2D::TRIANGLE_EQUILATERAL;
+            relevant = helper_triangle_type != (int)BulletPatterns2D::TRIANGLE_EQUILATERAL;
         }
     } else if (property_name.begins_with("helper_trapezoid_")) {
         relevant = pattern_source == PATTERN_FROM_HELPER_TRAPEZOID;
@@ -253,22 +253,22 @@ void BulletSpawner2D::_validate_property(PropertyInfo &p_property) const {
         // while riding outlines (fill grids have no slot order).
         relevant = supports_outline_layout(pattern_source);
         if (relevant && (property_name == "helper_outline_fill_spacing" || property_name == "helper_outline_fill_stagger" || property_name == "helper_outline_fill_margin")) {
-            relevant = helper_outline_placement == (int)BulletFactory2D::OUTLINE_FILL_INSIDE;
+            relevant = helper_outline_placement == (int)BulletPatterns2D::OUTLINE_FILL_INSIDE;
         } else if (relevant && (property_name == "helper_outline_layer_count" || property_name == "helper_outline_layer_scale" || property_name == "helper_outline_layer_side" || property_name == "helper_outline_layer_fill" || property_name == "helper_outline_layer_scale_curve" || property_name == "helper_outline_layer_scales" || property_name == "helper_outline_layer_twist" || property_name == "helper_outline_layer_max_dots" || property_name == "helper_outline_layer_layout")) {
-            relevant = helper_outline_placement == (int)BulletFactory2D::OUTLINE_LAYERS;
+            relevant = helper_outline_placement == (int)BulletPatterns2D::OUTLINE_LAYERS;
         } else if (relevant && property_name == "helper_outline_layer_start_offset") {
-            relevant = helper_outline_placement == (int)BulletFactory2D::OUTLINE_LAYERS && (helper_outline_layer_fill == (int)BulletFactory2D::OUTLINE_LAYER_SEQUENTIAL || helper_outline_layer_fill == (int)BulletFactory2D::OUTLINE_LAYER_OUTER_FIRST);
+            relevant = helper_outline_placement == (int)BulletPatterns2D::OUTLINE_LAYERS && (helper_outline_layer_fill == (int)BulletPatterns2D::OUTLINE_LAYER_SEQUENTIAL || helper_outline_layer_fill == (int)BulletPatterns2D::OUTLINE_LAYER_OUTER_FIRST);
         } else if (relevant && (property_name == "helper_outline_reverse" || property_name == "helper_outline_slot_offset")) {
-            relevant = helper_outline_placement == (int)BulletFactory2D::OUTLINE_ON_OUTLINE || helper_outline_placement == (int)BulletFactory2D::OUTLINE_LAYERS;
+            relevant = helper_outline_placement == (int)BulletPatterns2D::OUTLINE_ON_OUTLINE || helper_outline_placement == (int)BulletPatterns2D::OUTLINE_LAYERS;
         } else if (relevant && property_name == "helper_outline_distribution") {
             // Distribution only steers corner-anchored apportionment (smooth
             // loops resample evenly regardless): hide it where it is a dead
             // knob instead of implying control it does not have.
-            relevant = (helper_outline_placement == (int)BulletFactory2D::OUTLINE_ON_OUTLINE || helper_outline_placement == (int)BulletFactory2D::OUTLINE_LAYERS) && supports_corner_layout(pattern_source);
+            relevant = (helper_outline_placement == (int)BulletPatterns2D::OUTLINE_ON_OUTLINE || helper_outline_placement == (int)BulletPatterns2D::OUTLINE_LAYERS) && supports_corner_layout(pattern_source);
         } else if (relevant && (property_name == "helper_outline_corner_priority" || property_name == "helper_outline_corner_mode")) {
-            relevant = (helper_outline_placement == (int)BulletFactory2D::OUTLINE_ON_OUTLINE || helper_outline_placement == (int)BulletFactory2D::OUTLINE_LAYERS) && supports_corner_layout(pattern_source);
+            relevant = (helper_outline_placement == (int)BulletPatterns2D::OUTLINE_ON_OUTLINE || helper_outline_placement == (int)BulletPatterns2D::OUTLINE_LAYERS) && supports_corner_layout(pattern_source);
         } else if (relevant && property_name == "helper_outline_edge_margin") {
-            relevant = (helper_outline_placement == (int)BulletFactory2D::OUTLINE_ON_OUTLINE || helper_outline_placement == (int)BulletFactory2D::OUTLINE_LAYERS) && supports_corner_layout(pattern_source) && helper_outline_corner_mode == (int)BulletFactory2D::OUTLINE_CORNER_MODE_PIN_CORNERS;
+            relevant = (helper_outline_placement == (int)BulletPatterns2D::OUTLINE_ON_OUTLINE || helper_outline_placement == (int)BulletPatterns2D::OUTLINE_LAYERS) && supports_corner_layout(pattern_source) && helper_outline_corner_mode == (int)BulletPatterns2D::OUTLINE_CORNER_MODE_PIN_CORNERS;
         }
     } else if (property_name == "helper_skip_indices") {
         relevant = pattern_source >= PATTERN_FROM_HELPER_GRID;

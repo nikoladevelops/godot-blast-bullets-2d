@@ -1,7 +1,7 @@
 // Closed-curve pattern generators routed through the outline layout engine:
 // ring, circle, ellipse, flower, star, heart, rose and lissajous.
 
-#include "factory/bullet_factory2d_patterns_internal.hpp"
+#include "patterns/patterns_internal.hpp"
 
 using namespace godot;
 
@@ -207,7 +207,7 @@ static void lissajous_sweep(double fx, double fy, double phase, double &r_t0, do
 	}
 }
 
-TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_ring(
+TypedArray<Transform2D> BulletPatterns2D::helper_generate_transforms_ring(
 		int transforms_amount,
 		Transform2D marker_transform,
 		real_t radius,
@@ -259,7 +259,7 @@ TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_ring(
 	// The outline layout inverts the marker (global loop -> slot space):
 	// a singular marker would poison every slot, so reject it here like
 	// danmaku_validate_head does for the other layout users.
-	if (!BulletVolley2D::is_transform_invertible_safe(marker_transform)) {
+	if (!is_transform_invertible_safe2d(marker_transform)) {
 		UtilityFunctions::push_error("helper_generate_transforms_ring: marker_transform is singular (zero or degenerate scale); volley skipped.");
 		return TypedArray<Transform2D>();
 	}
@@ -318,7 +318,7 @@ TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_ring(
 	return layout_outline_slots("helper_generate_transforms_ring", marker_transform, loop_points, loop_normals, false, 0.0, face_outward, facing_offset_degrees, facing_override, outline_placement, outline_facing, outline_reverse, outline_slot_offset, fill_spacing, fill_stagger, fill_margin, layer_count, layer_scale, layer_side, layer_fill, layer_start_offset, layer_scale_curve, layer_custom_scales, layer_twist, layer_max_dots, 1, layer_layout, PackedVector2Array(), 0, 0, 0.0, is_closed_ring, true, 0, fill_outline);
 }
 
-TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_flower(
+TypedArray<Transform2D> BulletPatterns2D::helper_generate_transforms_flower(
 		int transforms_amount,
 		Transform2D marker_transform,
 		int petals,
@@ -575,7 +575,7 @@ TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_flower(
 	return layout_outline_slots("helper_generate_transforms_flower", marker_transform, loop_points, loop_normals, false, 0.0, face_outward, facing_offset_degrees, PackedFloat32Array(), outline_placement, outline_facing, outline_reverse, outline_slot_offset, fill_spacing, fill_stagger, fill_margin, layer_count, layer_scale, layer_side, layer_fill, layer_start_offset, layer_scale_curve, layer_custom_scales, layer_twist, layer_max_dots, 1, 0, PackedVector2Array(), 0, 0, 0.0, true, flower_type != FLOWER_FAN && flower_type != FLOWER_PHYLLOTAXIS, 0, fill_outline, fill_normals);
 }
 
-TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_ellipse(
+TypedArray<Transform2D> BulletPatterns2D::helper_generate_transforms_ellipse(
 		int transforms_amount,
 		Transform2D marker_transform,
 		real_t radius_x,
@@ -698,7 +698,7 @@ TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_ellipse(
 	return layout_outline_slots("helper_generate_transforms_ellipse", marker_transform, loop_points, loop_normals, false, 0.0, face_outward, facing_offset_degrees, PackedFloat32Array(), outline_placement, outline_facing, outline_reverse, outline_slot_offset, fill_spacing, fill_stagger, fill_margin, layer_count, layer_scale, layer_side, layer_fill, layer_start_offset, layer_scale_curve, layer_custom_scales, layer_twist, layer_max_dots, 1, layer_layout, PackedVector2Array(), 0, 0, 0.0, is_closed, !is_wall, 0, fill_outline);
 }
 
-TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_star(
+TypedArray<Transform2D> BulletPatterns2D::helper_generate_transforms_star(
 		int transforms_amount,
 		Transform2D marker_transform,
 		int points,
@@ -816,7 +816,7 @@ TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_star(
 	return layout_outline_slots("helper_generate_transforms_star", marker_transform, loop_points, loop_normals, true, marker_rot, face_outward, facing_offset_degrees, PackedFloat32Array(), outline_placement, outline_facing, outline_reverse, outline_slot_offset, fill_spacing, fill_stagger, fill_margin, layer_count, layer_scale, layer_side, layer_fill, layer_start_offset, layer_scale_curve, layer_custom_scales, layer_twist, layer_max_dots, outline_distribution, layer_layout, corners, outline_corner_priority, outline_corner_mode, outline_edge_margin, true, true, outline_corner_facing);
 }
 
-TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_heart(
+TypedArray<Transform2D> BulletPatterns2D::helper_generate_transforms_heart(
 		int transforms_amount,
 		Transform2D marker_transform,
 		real_t size,
@@ -900,7 +900,7 @@ TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_heart(
 	return layout_outline_slots("helper_generate_transforms_heart", marker_transform, loop_points, loop_normals, false, 0.0, face_outward, facing_offset_degrees, facing_override, outline_placement, outline_facing, outline_reverse, outline_slot_offset, fill_spacing, fill_stagger, fill_margin, layer_count, layer_scale, layer_side, layer_fill, layer_start_offset, layer_scale_curve, layer_custom_scales, layer_twist, layer_max_dots, 1, layer_layout, PackedVector2Array(), 0, 0, 0.0, true, true, 0, fill_outline, dense_nrms, dense_ovr);
 }
 
-TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_rose(
+TypedArray<Transform2D> BulletPatterns2D::helper_generate_transforms_rose(
 		int transforms_amount,
 		Transform2D marker_transform,
 		int petals,
@@ -978,7 +978,7 @@ TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_rose(
 	return layout_outline_slots("helper_generate_transforms_rose", marker_transform, loop_points, loop_normals, false, 0.0, face_outward, facing_offset_degrees, PackedFloat32Array(), outline_placement, outline_facing, outline_reverse, outline_slot_offset, fill_spacing, fill_stagger, fill_margin, layer_count, layer_scale, layer_side, layer_fill, layer_start_offset, layer_scale_curve, layer_custom_scales, layer_twist, layer_max_dots, 1, layer_layout, PackedVector2Array(), 0, 0, 0.0, true, true, 0, fill_outline, dense_nrms);
 }
 
-TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_lissajous(
+TypedArray<Transform2D> BulletPatterns2D::helper_generate_transforms_lissajous(
 		int transforms_amount,
 		Transform2D marker_transform,
 		real_t size_x,
@@ -1060,7 +1060,7 @@ TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_lissajous(
 	return layout_outline_slots("helper_generate_transforms_lissajous", marker_transform, loop_points, loop_normals, false, 0.0, face_outward, facing_offset_degrees, PackedFloat32Array(), outline_placement, outline_facing, outline_reverse, outline_slot_offset, fill_spacing, fill_stagger, fill_margin, layer_count, layer_scale, layer_side, layer_fill, layer_start_offset, layer_scale_curve, layer_custom_scales, layer_twist, layer_max_dots, 1, layer_layout, PackedVector2Array(), 0, 0, 0.0, !open_run, true, 0, fill_outline, dense_nrms);
 }
 
-TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_circle(
+TypedArray<Transform2D> BulletPatterns2D::helper_generate_transforms_circle(
 		int transforms_amount,
 		Transform2D marker_transform,
 		real_t radius,

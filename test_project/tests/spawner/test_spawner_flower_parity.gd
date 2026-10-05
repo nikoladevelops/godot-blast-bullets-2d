@@ -56,7 +56,7 @@ func _flower(petals: int, per_petal: int, radius: float, placement: int) -> Bull
 func _assert_rings_on_scaled_track(sp: BulletSpawner2D, track_runs: Array) -> void:
 	var rings: Array = sp.debug_get_layer_rings()
 	for li in rings.size():
-		var f: float = BulletFactory2D.helper_layer_scale_factor(li + 1, sp.helper_outline_layer_scale, sp.helper_outline_layer_side, sp.helper_outline_layer_scale_curve, sp.helper_outline_layer_scales)
+		var f: float = BulletPatterns2D.helper_layer_scale_factor(li + 1, sp.helper_outline_layer_scale, sp.helper_outline_layer_side, sp.helper_outline_layer_scale_curve, sp.helper_outline_layer_scales)
 		var scaled: Array = []
 		for r in track_runs:
 			var srun := PackedVector2Array()

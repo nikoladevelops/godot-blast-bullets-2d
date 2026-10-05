@@ -2,7 +2,7 @@
 // (layout_outline_slots: On Outline / Layers / Fill Inside), even resampling of
 // closed curves, outline layers, danmaku slot validation and skip indices.
 
-#include "factory/bullet_factory2d_patterns_internal.hpp"
+#include "patterns/patterns_internal.hpp"
 
 using namespace godot;
 
@@ -363,7 +363,7 @@ static void deal_layer_membership(int n, int layer_count, int layer_fill, int la
 	r_deal.dropped.resize(n);
 	int counts[64] = { 0 };
 	for (int i = 0; i < n; ++i) {
-		const int bl = BulletFactory2D::helper_bullet_layer_index(i, n, layer_count, layer_fill, layer_start_offset);
+		const int bl = BulletPatterns2D::helper_bullet_layer_index(i, n, layer_count, layer_fill, layer_start_offset);
 		r_deal.layer_of[i] = bl;
 		if (bl >= 0 && bl < 64) {
 			counts[bl]++;
@@ -534,7 +534,7 @@ static double fill_spacing_that_fits(const PackedVector2Array &poly, double fill
 // shifted by `origin`, or nothing for On Outline (unused there).
 PackedVector2Array fill_outline_from(int outline_placement, const PackedVector2Array &local_pts, const Vector2 &origin) {
 	PackedVector2Array out;
-	if (outline_placement != BulletFactory2D::OUTLINE_FILL_INSIDE && outline_placement != BulletFactory2D::OUTLINE_LAYERS) {
+	if (outline_placement != BulletPatterns2D::OUTLINE_FILL_INSIDE && outline_placement != BulletPatterns2D::OUTLINE_LAYERS) {
 		return out;
 	}
 	out.resize(local_pts.size());
@@ -588,22 +588,22 @@ TypedArray<Transform2D> layout_outline_slots(const char *caller_name, const Tran
         UtilityFunctions::push_error(String(caller_name) + ": facing override size mismatch.");
         return out;
     }
-    if (outline_placement == BulletFactory2D::OUTLINE_FILL_INSIDE) {
+    if (outline_placement == BulletPatterns2D::OUTLINE_FILL_INSIDE) {
         if (!Math::is_finite(fill_spacing) || fill_spacing <= 0.0 || !Math::is_finite(fill_margin) || fill_margin < 0.0) {
             UtilityFunctions::push_error(String(caller_name) + ": fill_spacing must be finite and > 0, fill_margin finite and >= 0.");
             return out;
         }
     }
-    if (outline_placement == BulletFactory2D::OUTLINE_LAYERS) {
+    if (outline_placement == BulletPatterns2D::OUTLINE_LAYERS) {
         if (layer_count < 1 || layer_count > 64 || !Math::is_finite(layer_scale) || layer_scale <= 0.0 || layer_scale > 8.0) {
             UtilityFunctions::push_error(String(caller_name) + ": layer_count must be in [1, 64], layer_scale finite in (0, 8].");
             return out;
         }
-        if (layer_side < BulletFactory2D::OUTLINE_LAYER_OUTWARD || layer_side > BulletFactory2D::OUTLINE_LAYER_BOTH) {
+        if (layer_side < BulletPatterns2D::OUTLINE_LAYER_OUTWARD || layer_side > BulletPatterns2D::OUTLINE_LAYER_BOTH) {
             UtilityFunctions::push_error(String(caller_name) + ": layer_side must be 0 (outward), 1 (inward) or 2 (both).");
             return out;
         }
-        if (layer_fill < BulletFactory2D::OUTLINE_LAYER_INTERLEAVED || layer_fill > BulletFactory2D::OUTLINE_LAYER_PINGPONG) {
+        if (layer_fill < BulletPatterns2D::OUTLINE_LAYER_INTERLEAVED || layer_fill > BulletPatterns2D::OUTLINE_LAYER_PINGPONG) {
             UtilityFunctions::push_error(String(caller_name) + ": layer_fill must be 0 (interleaved), 1 (sequential), 2 (outer first) or 3 (ping-pong).");
             return out;
         }
@@ -611,7 +611,7 @@ TypedArray<Transform2D> layout_outline_slots(const char *caller_name, const Tran
             UtilityFunctions::push_error(String(caller_name) + ": layer_start_offset must be >= 0 (0 = start on the outline).");
             return out;
         }
-        if (layer_scale_curve < BulletFactory2D::OUTLINE_LAYER_CURVE_LINEAR || layer_scale_curve > BulletFactory2D::OUTLINE_LAYER_CURVE_EXPONENTIAL) {
+        if (layer_scale_curve < BulletPatterns2D::OUTLINE_LAYER_CURVE_LINEAR || layer_scale_curve > BulletPatterns2D::OUTLINE_LAYER_CURVE_EXPONENTIAL) {
             UtilityFunctions::push_error(String(caller_name) + ": layer_scale_curve must be 0 (linear) or 1 (exponential).");
             return out;
         }
@@ -661,7 +661,7 @@ TypedArray<Transform2D> layout_outline_slots(const char *caller_name, const Tran
         // spawning a collapsed volley.
         bool seen[64] = { false };
         for (int i = 0; i < n; ++i) {
-            const int bl = BulletFactory2D::helper_bullet_layer_index(i, n, layer_count, layer_fill, layer_start_offset);
+            const int bl = BulletPatterns2D::helper_bullet_layer_index(i, n, layer_count, layer_fill, layer_start_offset);
             if (bl > 0 && bl < layer_count) {
                 seen[bl] = true;
             }
@@ -670,7 +670,7 @@ TypedArray<Transform2D> layout_outline_slots(const char *caller_name, const Tran
             if (!seen[L]) {
                 continue;
             }
-            const double s = BulletFactory2D::helper_layer_scale_factor(L, layer_scale, layer_side, layer_scale_curve, layer_custom_scales);
+            const double s = BulletPatterns2D::helper_layer_scale_factor(L, layer_scale, layer_side, layer_scale_curve, layer_custom_scales);
             if (!Math::is_finite(s) || s < 0.05) {
                 UtilityFunctions::push_error(String(caller_name) + ": inward layers collapse below 5% size (lower the count/step).");
                 return out;
@@ -721,7 +721,7 @@ TypedArray<Transform2D> layout_outline_slots(const char *caller_name, const Tran
         }
         return rot;
     };
-    if (outline_placement == BulletFactory2D::OUTLINE_FILL_INSIDE) {
+    if (outline_placement == BulletPatterns2D::OUTLINE_FILL_INSIDE) {
         // The interior comes from a boundary that does not depend on the
         // bullet count (dense curve outline, polygon corners, or legacy slot
         // silhouette). Exactly n cells are used: when fewer fit at
@@ -763,7 +763,7 @@ TypedArray<Transform2D> layout_outline_slots(const char *caller_name, const Tran
     // decimating one shared loop (which strands corners on a single ring).
     // The smooth-loop sibling below handles star-free shapes (circle, ring,
     // ellipse, heart, flower, rose, lissajous) by arc-length resampling.
-    if (outline_placement == BulletFactory2D::OUTLINE_LAYERS && layer_layout == BulletFactory2D::OUTLINE_LAYER_LAYOUT_EVEN_PER_LAYER && !polygon_corners.is_empty()) {
+    if (outline_placement == BulletPatterns2D::OUTLINE_LAYERS && layer_layout == BulletPatterns2D::OUTLINE_LAYER_LAYOUT_EVEN_PER_LAYER && !polygon_corners.is_empty()) {
         // Corners in slot space (same conversion as slot_points above).
         PackedVector2Array corner_slot;
         for (int c = 0; c < polygon_corners.size(); ++c) {
@@ -852,7 +852,7 @@ TypedArray<Transform2D> layout_outline_slots(const char *caller_name, const Tran
                 ln = rn;
             }
             // Scale about the slot-space origin (the marker origin).
-            const double layer_s = (L == 0) ? 1.0 : BulletFactory2D::helper_layer_scale_factor(L, layer_scale, layer_side, layer_scale_curve, layer_custom_scales);
+            const double layer_s = (L == 0) ? 1.0 : BulletPatterns2D::helper_layer_scale_factor(L, layer_scale, layer_side, layer_scale_curve, layer_custom_scales);
             if (L > 0 && (!Math::is_finite(layer_s) || layer_s < 0.05)) {
                 continue;
             }
@@ -908,7 +908,7 @@ TypedArray<Transform2D> layout_outline_slots(const char *caller_name, const Tran
     // Always active for multi-ring layers (smooth loops have no corner
     // policy to tune); single-ring output stays exactly the base loop.
     // Non-loop slot orders (flower FAN/PHYLLOTAXIS) opt out via allow_resample.
-    if (outline_placement == BulletFactory2D::OUTLINE_LAYERS && layer_count > 1 && polygon_corners.is_empty() && allow_resample && layer_layout == BulletFactory2D::OUTLINE_LAYER_LAYOUT_EVEN_PER_LAYER) {
+    if (outline_placement == BulletPatterns2D::OUTLINE_LAYERS && layer_count > 1 && polygon_corners.is_empty() && allow_resample && layer_layout == BulletPatterns2D::OUTLINE_LAYER_LAYOUT_EVEN_PER_LAYER) {
         PackedVector2Array base_nrms;
         if (normals.size() == n) {
             base_nrms = normals;
@@ -953,7 +953,7 @@ TypedArray<Transform2D> layout_outline_slots(const char *caller_name, const Tran
             PackedFloat32Array lo;
             // Rings scale about the slot-space origin: with several rings, no
             // slot may sit there (it would stack on every ring).
-            const double ring_scale = (L == 0) ? 1.0 : BulletFactory2D::helper_layer_scale_factor(L, layer_scale, layer_side, layer_scale_curve, layer_custom_scales);
+            const double ring_scale = (L == 0) ? 1.0 : BulletPatterns2D::helper_layer_scale_factor(L, layer_scale, layer_side, layer_scale_curve, layer_custom_scales);
             const real_t keep_off = (layer_count > 1 && Math::is_finite(ring_scale)) ? kDistinctSlotGap / (real_t)MAX(ring_scale, 0.05) : 0.0;
             resample_loop_even_distinct(src_pts, src_nrms, src_ovr, layer_keep[L], loop_closed, lp, ln, lo, Vector2(), keep_off);
             if (outline_reverse && lp.size() > 1) {
@@ -1005,7 +1005,7 @@ TypedArray<Transform2D> layout_outline_slots(const char *caller_name, const Tran
                 ln = rn;
                 lo = ro;
             }
-            const double layer_s = (L == 0) ? 1.0 : BulletFactory2D::helper_layer_scale_factor(L, layer_scale, layer_side, layer_scale_curve, layer_custom_scales);
+            const double layer_s = (L == 0) ? 1.0 : BulletPatterns2D::helper_layer_scale_factor(L, layer_scale, layer_side, layer_scale_curve, layer_custom_scales);
             if (L > 0 && (!Math::is_finite(layer_s) || layer_s < 0.05)) {
                 continue;
             }
@@ -1071,8 +1071,8 @@ TypedArray<Transform2D> layout_outline_slots(const char *caller_name, const Tran
         // slots. (The fill deal only chooses WHICH layer each slot rides.)
         int j = (i >= 0 && i < idx.size()) ? idx[i] : ((n > 0) ? (i % n) : 0);
         int bullet_layer = 0;
-        if (outline_placement == BulletFactory2D::OUTLINE_LAYERS) {
-            bullet_layer = BulletFactory2D::helper_bullet_layer_index(i, n, layer_count, layer_fill, layer_start_offset);
+        if (outline_placement == BulletPatterns2D::OUTLINE_LAYERS) {
+            bullet_layer = BulletPatterns2D::helper_bullet_layer_index(i, n, layer_count, layer_fill, layer_start_offset);
             // Twist: rotate each successive layered ring's slot assignment so
             // stacked rings interleave angularly instead of sitting in
             // spokes. Layer 0 is never twisted (the base outline stays exact).
@@ -1093,7 +1093,7 @@ TypedArray<Transform2D> layout_outline_slots(const char *caller_name, const Tran
         }
         const Vector2 slot_base = (j >= 0 && j < slot_points.size()) ? slot_points[j] : Vector2(0, 0);
         Vector2 local = slot_base;
-        if (outline_placement == BulletFactory2D::OUTLINE_LAYERS) {
+        if (outline_placement == BulletPatterns2D::OUTLINE_LAYERS) {
             // Layer 0 always sits exactly on the outline. Higher layers
             // re-spawn the same slot scaled about the loop center, so every
             // layer is the identical figure at a different size. Facings
@@ -1107,7 +1107,7 @@ TypedArray<Transform2D> layout_outline_slots(const char *caller_name, const Tran
             // global once below: translation can never leak into the scale,
             // at any marker position.
             if (bullet_layer > 0) {
-                const double layer_s = BulletFactory2D::helper_layer_scale_factor(bullet_layer, layer_scale, layer_side, layer_scale_curve, layer_custom_scales);
+                const double layer_s = BulletPatterns2D::helper_layer_scale_factor(bullet_layer, layer_scale, layer_side, layer_scale_curve, layer_custom_scales);
                 if (Math::is_finite(layer_s) && layer_s >= 0.05) {
                     const Vector2 scaled = local * (real_t)layer_s;
                     if (scaled.is_finite()) {
@@ -1151,7 +1151,7 @@ bool danmaku_validate_head(const char *caller_name, int transforms_amount, const
 	// check but their affine_inverse() is garbage, which layout_outline_slots
 	// and the slot math consume unconditionally. Reject loudly instead of
 	// emitting clamped-garbage volleys.
-	if (!BulletVolley2D::is_transform_invertible_safe(marker_transform)) {
+	if (!is_transform_invertible_safe2d(marker_transform)) {
 		UtilityFunctions::push_error(String(caller_name) + ": marker_transform is singular (zero or degenerate scale); volley skipped.");
 		return false;
 	}
@@ -1168,7 +1168,7 @@ bool danmaku_validate_head(const char *caller_name, int transforms_amount, const
 // apart.
 // ---------------------------------------------------------------------------
 
-double BulletFactory2D::helper_layer_scale_factor(int layer_index, double scale_step, int side, int scale_curve, const PackedFloat32Array &custom_scales) {
+double BulletPatterns2D::helper_layer_scale_factor(int layer_index, double scale_step, int side, int scale_curve, const PackedFloat32Array &custom_scales) {
 	if (layer_index <= 0) {
 		return 1.0;
 	}
@@ -1228,7 +1228,7 @@ double BulletFactory2D::helper_layer_scale_factor(int layer_index, double scale_
 // volleys still read as the base shape); OUTER_FIRST fills contiguous chunks
 // from the outermost ring inward; PINGPONG waves 0..last..0 (start_offset is
 // ignored there). Degenerate inputs yield layer 0.
-int BulletFactory2D::helper_bullet_layer_index(
+int BulletPatterns2D::helper_bullet_layer_index(
 		int bullet_index,
 		int slot_count,
 		int layer_count,
@@ -1251,7 +1251,7 @@ int BulletFactory2D::helper_bullet_layer_index(
 	return bullet_index % layer_count;
 }
 
-TypedArray<Transform2D> BulletFactory2D::helper_apply_skip_indices(
+TypedArray<Transform2D> BulletPatterns2D::helper_apply_skip_indices(
 		const TypedArray<Transform2D> &transforms,
 		const PackedInt32Array &skip_indices) {
 	TypedArray<Transform2D> out;

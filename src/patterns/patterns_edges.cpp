@@ -1,7 +1,7 @@
 // Edge patterns: bullets along arbitrary point lists or image edges, edge
 // normals and side spread.
 
-#include "factory/bullet_factory2d_patterns_internal.hpp"
+#include "patterns/patterns_internal.hpp"
 
 using namespace godot;
 
@@ -115,7 +115,7 @@ bool compute_edge_normals_quiet(const PackedVector2Array &edge_points, bool clos
 	return true;
 }
 
-TypedArray<Transform2D> BulletFactory2D::helper_apply_side_spread(
+TypedArray<Transform2D> BulletPatterns2D::helper_apply_side_spread(
 		const TypedArray<Transform2D> &transforms,
 		int side_mode,
 		real_t spread,
@@ -171,7 +171,7 @@ TypedArray<Transform2D> BulletFactory2D::helper_apply_side_spread(
 	return out;
 }
 
-PackedVector2Array BulletFactory2D::helper_compute_edge_normals(
+PackedVector2Array BulletPatterns2D::helper_compute_edge_normals(
 		const PackedVector2Array &edge_points,
 		bool closed,
 		bool flip) {
@@ -188,7 +188,7 @@ PackedVector2Array BulletFactory2D::helper_compute_edge_normals(
 	return normals;
 }
 
-TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_edge_from_points(
+TypedArray<Transform2D> BulletPatterns2D::helper_generate_transforms_edge_from_points(
 		int transforms_amount,
 		Transform2D marker_transform,
 		const PackedVector2Array &edge_points,
@@ -370,7 +370,7 @@ TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_edge_from_po
 	return generated_transforms;
 }
 
-Dictionary BulletFactory2D::helper_extract_edge_from_image(
+Dictionary BulletPatterns2D::helper_extract_edge_from_image(
 		const Ref<Image> &image,
 		real_t threshold,
 		int step,

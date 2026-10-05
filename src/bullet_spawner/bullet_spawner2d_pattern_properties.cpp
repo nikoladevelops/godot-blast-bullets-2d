@@ -116,7 +116,7 @@ int BulletSpawner2D::get_helper_grid_alignment() const {
 }
 
 void BulletSpawner2D::set_helper_grid_alignment(int value) {
-    if (value < (int)BulletFactory2D::TOP_LEFT || value > (int)BulletFactory2D::BOTTOM_RIGHT) {
+    if (value < (int)BulletPatterns2D::TOP_LEFT || value > (int)BulletPatterns2D::BOTTOM_RIGHT) {
         UtilityFunctions::push_error("BulletSpawner2D: helper_grid_alignment out of range, keeping the old value.");
         return;
     }
@@ -500,7 +500,7 @@ int BulletSpawner2D::get_helper_spiral_facing() const {
 }
 
 void BulletSpawner2D::set_helper_spiral_facing(int value) {
-    if (value < (int)BulletFactory2D::SPIRAL_FACING_TANGENT || value > (int)BulletFactory2D::SPIRAL_FACING_KEEP_MARKER) {
+    if (value < (int)BulletPatterns2D::SPIRAL_FACING_TANGENT || value > (int)BulletPatterns2D::SPIRAL_FACING_KEEP_MARKER) {
         UtilityFunctions::push_error("BulletSpawner2D: helper_spiral_facing out of range, keeping the old value.");
         return;
     }
@@ -526,7 +526,7 @@ int BulletSpawner2D::get_helper_line_anchor() const {
 }
 
 void BulletSpawner2D::set_helper_line_anchor(int value) {
-    if (value < (int)BulletFactory2D::LINE_ANCHOR_START || value > (int)BulletFactory2D::LINE_ANCHOR_END) {
+    if (value < (int)BulletPatterns2D::LINE_ANCHOR_START || value > (int)BulletPatterns2D::LINE_ANCHOR_END) {
         UtilityFunctions::push_error("BulletSpawner2D: helper_line_anchor out of range, keeping the old value.");
         return;
     }
@@ -844,7 +844,7 @@ int BulletSpawner2D::get_helper_ellipse_mode() const {
 }
 
 void BulletSpawner2D::set_helper_ellipse_mode(int value) {
-    if (value < (int)BulletFactory2D::ELLIPSE_FULL || value > (int)BulletFactory2D::ELLIPSE_WALL) {
+    if (value < (int)BulletPatterns2D::ELLIPSE_FULL || value > (int)BulletPatterns2D::ELLIPSE_WALL) {
         UtilityFunctions::push_error("BulletSpawner2D: helper_ellipse_mode out of range, keeping the old value.");
         return;
     }
@@ -1193,7 +1193,7 @@ int BulletSpawner2D::get_helper_multispiral_facing() const {
 }
 
 void BulletSpawner2D::set_helper_multispiral_facing(int value) {
-    if (value < (int)BulletFactory2D::SPIRAL_FACING_TANGENT || value > (int)BulletFactory2D::SPIRAL_FACING_KEEP_MARKER) {
+    if (value < (int)BulletPatterns2D::SPIRAL_FACING_TANGENT || value > (int)BulletPatterns2D::SPIRAL_FACING_KEEP_MARKER) {
         UtilityFunctions::push_error("BulletSpawner2D: helper_multispiral_facing out of range, keeping the old value.");
         return;
     }
@@ -1733,7 +1733,7 @@ void BulletSpawner2D::set_helper_counter_spiral_rotate_with_marker(bool value) {
 int BulletSpawner2D::get_helper_counter_spiral_facing() const { return helper_counter_spiral_facing; }
 
 void BulletSpawner2D::set_helper_counter_spiral_facing(int value) {
-    if (value < (int)BulletFactory2D::SPIRAL_FACING_TANGENT || value > (int)BulletFactory2D::SPIRAL_FACING_KEEP_MARKER) {
+    if (value < (int)BulletPatterns2D::SPIRAL_FACING_TANGENT || value > (int)BulletPatterns2D::SPIRAL_FACING_KEEP_MARKER) {
         UtilityFunctions::push_error("BulletSpawner2D: helper_counter_spiral_facing out of range, keeping the old value.");
         return;
     }
@@ -1965,7 +1965,7 @@ void BulletSpawner2D::set_helper_custom_slot_offset(int value) {
 int BulletSpawner2D::get_helper_triangle_type() const { return helper_triangle_type; }
 
 void BulletSpawner2D::set_helper_triangle_type(int value) {
-    if (value < (int)BulletFactory2D::TRIANGLE_EQUILATERAL || value > (int)BulletFactory2D::TRIANGLE_RIGHT) {
+    if (value < (int)BulletPatterns2D::TRIANGLE_EQUILATERAL || value > (int)BulletPatterns2D::TRIANGLE_RIGHT) {
         UtilityFunctions::push_error("BulletSpawner2D: helper_triangle_type must be 0 (equilateral), 1 (isosceles) or 2 (right), keeping the old value.");
         return;
     }
@@ -2141,7 +2141,7 @@ void BulletSpawner2D::set_helper_diamond_facing_offset_deg(double value) {
 int BulletSpawner2D::get_helper_outline_placement() const { return helper_outline_placement; }
 
 void BulletSpawner2D::set_helper_outline_placement(int value) {
-    if (value < (int)BulletFactory2D::OUTLINE_ON_OUTLINE || value > (int)BulletFactory2D::OUTLINE_FILL_INSIDE) {
+    if (value < (int)BulletPatterns2D::OUTLINE_ON_OUTLINE || value > (int)BulletPatterns2D::OUTLINE_FILL_INSIDE) {
         UtilityFunctions::push_error("BulletSpawner2D: helper_outline_placement must be 0 (on outline), 1 (layers) or 2 (fill inside), keeping the old value.");
         return;
     }
@@ -2154,7 +2154,7 @@ void BulletSpawner2D::set_helper_outline_placement(int value) {
 int BulletSpawner2D::get_helper_outline_facing() const { return helper_outline_facing; }
 
 void BulletSpawner2D::set_helper_outline_facing(int value) {
-    if (value < (int)BulletFactory2D::OUTLINE_FACING_NORMAL || value > (int)BulletFactory2D::OUTLINE_FACING_ALONG_M90) {
+    if (value < (int)BulletPatterns2D::OUTLINE_FACING_NORMAL || value > (int)BulletPatterns2D::OUTLINE_FACING_ALONG_M90) {
         UtilityFunctions::push_error("BulletSpawner2D: helper_outline_facing must be 0 (outline normal), 1 (+90 deg) or 2 (-90 deg), keeping the old value.");
         return;
     }
@@ -2230,7 +2230,7 @@ void BulletSpawner2D::set_helper_outline_layer_scale(double value) {
 int BulletSpawner2D::get_helper_outline_layer_side() const { return helper_outline_layer_side; }
 
 void BulletSpawner2D::set_helper_outline_layer_side(int value) {
-    if (value < (int)BulletFactory2D::OUTLINE_LAYER_OUTWARD || value > (int)BulletFactory2D::OUTLINE_LAYER_BOTH) {
+    if (value < (int)BulletPatterns2D::OUTLINE_LAYER_OUTWARD || value > (int)BulletPatterns2D::OUTLINE_LAYER_BOTH) {
         UtilityFunctions::push_error("BulletSpawner2D: helper_outline_layer_side must be 0 (outward), 1 (inward) or 2 (both), keeping the old value.");
         return;
     }
@@ -2241,7 +2241,7 @@ void BulletSpawner2D::set_helper_outline_layer_side(int value) {
 int BulletSpawner2D::get_helper_outline_layer_fill() const { return helper_outline_layer_fill; }
 
 void BulletSpawner2D::set_helper_outline_layer_fill(int value) {
-    if (value < (int)BulletFactory2D::OUTLINE_LAYER_INTERLEAVED || value > (int)BulletFactory2D::OUTLINE_LAYER_PINGPONG) {
+    if (value < (int)BulletPatterns2D::OUTLINE_LAYER_INTERLEAVED || value > (int)BulletPatterns2D::OUTLINE_LAYER_PINGPONG) {
         UtilityFunctions::push_error("BulletSpawner2D: helper_outline_layer_fill must be 0 (interleaved), 1 (sequential), 2 (outer first) or 3 (ping-pong), keeping the old value.");
         return;
     }
@@ -2254,7 +2254,7 @@ void BulletSpawner2D::set_helper_outline_layer_fill(int value) {
 int BulletSpawner2D::get_helper_outline_layer_scale_curve() const { return helper_outline_layer_scale_curve; }
 
 void BulletSpawner2D::set_helper_outline_layer_scale_curve(int value) {
-    if (value < (int)BulletFactory2D::OUTLINE_LAYER_CURVE_LINEAR || value > (int)BulletFactory2D::OUTLINE_LAYER_CURVE_EXPONENTIAL) {
+    if (value < (int)BulletPatterns2D::OUTLINE_LAYER_CURVE_LINEAR || value > (int)BulletPatterns2D::OUTLINE_LAYER_CURVE_EXPONENTIAL) {
         UtilityFunctions::push_error("BulletSpawner2D: helper_outline_layer_scale_curve must be 0 (linear) or 1 (exponential), keeping the old value.");
         return;
     }
@@ -2312,7 +2312,7 @@ void BulletSpawner2D::set_helper_outline_layer_start_offset(int value) {
 int BulletSpawner2D::get_helper_outline_distribution() const { return helper_outline_distribution; }
 
 void BulletSpawner2D::set_helper_outline_distribution(int value) {
-    if (value < (int)BulletFactory2D::OUTLINE_DISTRIBUTION_LEGACY || value > (int)BulletFactory2D::OUTLINE_DISTRIBUTION_SYMMETRIC) {
+    if (value < (int)BulletPatterns2D::OUTLINE_DISTRIBUTION_LEGACY || value > (int)BulletPatterns2D::OUTLINE_DISTRIBUTION_SYMMETRIC) {
         UtilityFunctions::push_error("BulletSpawner2D: helper_outline_distribution must be 0 (legacy) or 1 (symmetric), keeping the old value.");
         return;
     }
@@ -2323,7 +2323,7 @@ void BulletSpawner2D::set_helper_outline_distribution(int value) {
 int BulletSpawner2D::get_helper_outline_layer_layout() const { return helper_outline_layer_layout; }
 
 void BulletSpawner2D::set_helper_outline_layer_layout(int value) {
-    if (value < (int)BulletFactory2D::OUTLINE_LAYER_LAYOUT_SHARED_LOOP || value > (int)BulletFactory2D::OUTLINE_LAYER_LAYOUT_EVEN_PER_LAYER) {
+    if (value < (int)BulletPatterns2D::OUTLINE_LAYER_LAYOUT_SHARED_LOOP || value > (int)BulletPatterns2D::OUTLINE_LAYER_LAYOUT_EVEN_PER_LAYER) {
         UtilityFunctions::push_error("BulletSpawner2D: helper_outline_layer_layout must be 0 (shared loop) or 1 (even per layer), keeping the old value.");
         return;
     }
@@ -2334,7 +2334,7 @@ void BulletSpawner2D::set_helper_outline_layer_layout(int value) {
 int BulletSpawner2D::get_helper_outline_corner_priority() const { return helper_outline_corner_priority; }
 
 void BulletSpawner2D::set_helper_outline_corner_priority(int value) {
-    if (value < (int)BulletFactory2D::OUTLINE_CORNER_PRIORITY_HORIZONTAL || value > (int)BulletFactory2D::OUTLINE_CORNER_PRIORITY_BALANCED) {
+    if (value < (int)BulletPatterns2D::OUTLINE_CORNER_PRIORITY_HORIZONTAL || value > (int)BulletPatterns2D::OUTLINE_CORNER_PRIORITY_BALANCED) {
         UtilityFunctions::push_error("BulletSpawner2D: helper_outline_corner_priority must be 0 (horizontal), 1 (vertical) or 2 (balanced), keeping the old value.");
         return;
     }
@@ -2345,7 +2345,7 @@ void BulletSpawner2D::set_helper_outline_corner_priority(int value) {
 int BulletSpawner2D::get_helper_outline_corner_mode() const { return helper_outline_corner_mode; }
 
 void BulletSpawner2D::set_helper_outline_corner_mode(int value) {
-    if (value < (int)BulletFactory2D::OUTLINE_CORNER_MODE_PIN_CORNERS || value > (int)BulletFactory2D::OUTLINE_CORNER_MODE_EVEN_ARC) {
+    if (value < (int)BulletPatterns2D::OUTLINE_CORNER_MODE_PIN_CORNERS || value > (int)BulletPatterns2D::OUTLINE_CORNER_MODE_EVEN_ARC) {
         UtilityFunctions::push_error("BulletSpawner2D: helper_outline_corner_mode must be 0 (pin corners) or 1 (even arc), keeping the old value.");
         return;
     }
@@ -2369,7 +2369,7 @@ void BulletSpawner2D::set_helper_outline_edge_margin(double value) {
 int BulletSpawner2D::get_helper_outline_corner_facing() const { return helper_outline_corner_facing; }
 
 void BulletSpawner2D::set_helper_outline_corner_facing(int value) {
-    if (value < (int)BulletFactory2D::OUTLINE_CORNER_FACING_SIDE || value > (int)BulletFactory2D::OUTLINE_CORNER_FACING_SMOOTH) {
+    if (value < (int)BulletPatterns2D::OUTLINE_CORNER_FACING_SIDE || value > (int)BulletPatterns2D::OUTLINE_CORNER_FACING_SMOOTH) {
         UtilityFunctions::push_error("BulletSpawner2D: helper_outline_corner_facing must be 0 (side), 1 (miter) or 2 (smooth), keeping the old value.");
         return;
     }
@@ -2732,11 +2732,11 @@ void BulletSpawner2D::set_helper_waterfall_seed(int value) {
 void BulletSpawner2D::apply_pattern_preset(int preset) {
     // Out-of-range presets used to fall into `default:` and silently no-op.
     // Fail loud instead so a typo'd sequence entry is visible immediately.
-    if (preset < (int)BulletFactory2D::PATTERN_PRESET_CUSTOM || preset > (int)BulletFactory2D::PATTERN_PRESET_TERRAIN_CREST) {
+    if (preset < (int)BulletPatterns2D::PATTERN_PRESET_CUSTOM || preset > (int)BulletPatterns2D::PATTERN_PRESET_TERRAIN_CREST) {
         UtilityFunctions::push_error("BulletSpawner2D::apply_pattern_preset: preset out of range, nothing applied.");
         return;
     }
-    if (preset == (int)BulletFactory2D::PATTERN_PRESET_CUSTOM) {
+    if (preset == (int)BulletPatterns2D::PATTERN_PRESET_CUSTOM) {
         return; // "no preset": nothing to apply
     }
     // Clean preset: every Bullet Patterns knob (except the Transform subgroup
@@ -2745,21 +2745,21 @@ void BulletSpawner2D::apply_pattern_preset(int preset) {
     begin_pattern_batch();
     reset_pattern_knobs_to_defaults();
     switch (preset) {
-        case BulletFactory2D::PATTERN_PRESET_RADIAL_DENSE:
+        case BulletPatterns2D::PATTERN_PRESET_RADIAL_DENSE:
             pattern_source = PATTERN_FROM_HELPER_RING;
             helper_bullets_amount = 36;
             helper_ring_radius = 60.0;
             helper_ring_arc = Math::TAU;
             helper_ring_face_outward = true;
             break;
-        case BulletFactory2D::PATTERN_PRESET_RADIAL_SPARSE:
+        case BulletPatterns2D::PATTERN_PRESET_RADIAL_SPARSE:
             pattern_source = PATTERN_FROM_HELPER_RING;
             helper_bullets_amount = 12;
             helper_ring_radius = 60.0;
             helper_ring_arc = Math::TAU;
             helper_ring_face_outward = true;
             break;
-        case BulletFactory2D::PATTERN_PRESET_SPIRAL_3ARM:
+        case BulletPatterns2D::PATTERN_PRESET_SPIRAL_3ARM:
             pattern_source = PATTERN_FROM_HELPER_MULTISPIRAL;
             helper_bullets_amount = 30;
             helper_multispiral_arms = 3;
@@ -2767,82 +2767,82 @@ void BulletSpawner2D::apply_pattern_preset(int preset) {
             helper_multispiral_radius_step = 18.0;
             helper_multispiral_angle_step = 0.5;
             break;
-        case BulletFactory2D::PATTERN_PRESET_AIMED_FAN_NARROW:
+        case BulletPatterns2D::PATTERN_PRESET_AIMED_FAN_NARROW:
             pattern_source = PATTERN_FROM_HELPER_AIMED;
             helper_bullets_amount = 5;
             helper_aimed_spread = 0.25;
             helper_aimed_centered = true;
             break;
-        case BulletFactory2D::PATTERN_PRESET_AIMED_FAN_WIDE:
+        case BulletPatterns2D::PATTERN_PRESET_AIMED_FAN_WIDE:
             pattern_source = PATTERN_FROM_HELPER_AIMED;
             helper_bullets_amount = 9;
             helper_aimed_spread = 1.2;
             helper_aimed_centered = true;
             break;
-        case BulletFactory2D::PATTERN_PRESET_RING_SLOW:
+        case BulletPatterns2D::PATTERN_PRESET_RING_SLOW:
             pattern_source = PATTERN_FROM_HELPER_RING;
             helper_bullets_amount = 24;
             helper_ring_radius = 220.0;
             helper_ring_arc = Math::TAU;
             helper_ring_face_outward = true;
             break;
-        case BulletFactory2D::PATTERN_PRESET_WALL_GAPS:
+        case BulletPatterns2D::PATTERN_PRESET_WALL_GAPS:
             pattern_source = PATTERN_FROM_HELPER_ELLIPSE;
             helper_bullets_amount = 40;
             helper_ellipse_radius_x = 260.0;
             helper_ellipse_radius_y = 260.0;
             helper_ellipse_arc = Math::TAU;
-            helper_ellipse_mode = (int)BulletFactory2D::ELLIPSE_WALL;
+            helper_ellipse_mode = (int)BulletPatterns2D::ELLIPSE_WALL;
             helper_ellipse_gap_count = 3;
             helper_ellipse_gap_width = 0.35;
             break;
-        case BulletFactory2D::PATTERN_PRESET_RAIN:
+        case BulletPatterns2D::PATTERN_PRESET_RAIN:
             pattern_source = PATTERN_FROM_HELPER_RAIN;
             helper_bullets_amount = 24;
             helper_rain_band_width = 700.0;
             helper_rain_direction = Vector2(0, 1);
             helper_rain_drop_spacing = 64.0;
             break;
-        case BulletFactory2D::PATTERN_PRESET_FLOWER_6:
+        case BulletPatterns2D::PATTERN_PRESET_FLOWER_6:
             pattern_source = PATTERN_FROM_HELPER_FLOWER;
             helper_bullets_amount = 30;
             helper_flower_petals = 6;
             helper_flower_radius = 140.0;
             helper_flower_type = 0; // FAN (legacy default)
             break;
-        case BulletFactory2D::PATTERN_PRESET_SCATTER_BURST:
+        case BulletPatterns2D::PATTERN_PRESET_SCATTER_BURST:
             pattern_source = PATTERN_FROM_HELPER_SCATTER;
             helper_bullets_amount = 26;
             helper_scatter_burst_radius = 130.0;
             helper_scatter_facing_jitter = 0.5;
             break;
-        case BulletFactory2D::PATTERN_PRESET_CROSS_BURST:
+        case BulletPatterns2D::PATTERN_PRESET_CROSS_BURST:
             pattern_source = PATTERN_FROM_HELPER_CROSS;
             helper_bullets_amount = 24;
             helper_cross_arm_count = 4;
             helper_cross_arm_length = 150.0;
             helper_cross_spacing = 32.0;
             break;
-        case BulletFactory2D::PATTERN_PRESET_STAR_SHELL:
+        case BulletPatterns2D::PATTERN_PRESET_STAR_SHELL:
             pattern_source = PATTERN_FROM_HELPER_STAR;
             helper_bullets_amount = 20;
             helper_star_points = 5;
             helper_star_outer_radius = 150.0;
             helper_star_inner_radius = 65.0;
             break;
-        case BulletFactory2D::PATTERN_PRESET_HEART_BLOOM:
+        case BulletPatterns2D::PATTERN_PRESET_HEART_BLOOM:
             pattern_source = PATTERN_FROM_HELPER_HEART;
             helper_bullets_amount = 40;
             helper_heart_size = 150.0;
             break;
-        case BulletFactory2D::PATTERN_PRESET_SNAKE_WAVE:
+        case BulletPatterns2D::PATTERN_PRESET_SNAKE_WAVE:
             pattern_source = PATTERN_FROM_HELPER_WAVE;
             helper_bullets_amount = 28;
             helper_wave_width = 600.0;
             helper_wave_amplitude = 48.0;
             helper_wave_waves = 2.0;
             break;
-        case BulletFactory2D::PATTERN_PRESET_WATERFALL_CURTAIN:
+        case BulletPatterns2D::PATTERN_PRESET_WATERFALL_CURTAIN:
             pattern_source = PATTERN_FROM_HELPER_WATERFALL;
             helper_bullets_amount = 36;
             helper_waterfall_columns = 12;
@@ -2850,7 +2850,7 @@ void BulletSpawner2D::apply_pattern_preset(int preset) {
             helper_waterfall_column_spacing = 48.0;
             helper_waterfall_row_spacing = 64.0;
             break;
-        case BulletFactory2D::PATTERN_PRESET_PETAL_STORM:
+        case BulletPatterns2D::PATTERN_PRESET_PETAL_STORM:
             pattern_source = PATTERN_FROM_HELPER_ROSE;
             helper_bullets_amount = 48;
             helper_rose_petals = 8;
@@ -2859,7 +2859,7 @@ void BulletSpawner2D::apply_pattern_preset(int preset) {
             helper_rose_base_rotation = 0.0;
             helper_rose_face_outward = true;
             break;
-        case BulletFactory2D::PATTERN_PRESET_TWIN_SPIRAL_COUNTER:
+        case BulletPatterns2D::PATTERN_PRESET_TWIN_SPIRAL_COUNTER:
             pattern_source = PATTERN_FROM_HELPER_COUNTER_SPIRAL;
             helper_bullets_amount = 40;
             helper_counter_spiral_arms = 2;
@@ -2872,7 +2872,7 @@ void BulletSpawner2D::apply_pattern_preset(int preset) {
             spin_enabled = true;
             spin_speed_deg_per_sec = -60.0;
             break;
-        case BulletFactory2D::PATTERN_PRESET_AIMED_TRAP:
+        case BulletPatterns2D::PATTERN_PRESET_AIMED_TRAP:
             // Wall with a carved center door along the aim axis: the corridor
             // generator prefers the live aimed target at fire time and falls
             // back to helper_corridor_aim_direction (preview + targetless).
@@ -2884,7 +2884,7 @@ void BulletSpawner2D::apply_pattern_preset(int preset) {
             helper_corridor_face_aim = true;
             helper_corridor_facing_offset_deg = 0.0;
             break;
-        case BulletFactory2D::PATTERN_PRESET_BLOSSOM_FINALE:
+        case BulletPatterns2D::PATTERN_PRESET_BLOSSOM_FINALE:
             pattern_source = PATTERN_FROM_HELPER_ROSE;
             helper_bullets_amount = 60;
             helper_rose_petals = 12;
@@ -2895,7 +2895,7 @@ void BulletSpawner2D::apply_pattern_preset(int preset) {
             spin_enabled = true;
             spin_speed_deg_per_sec = 30.0;
             break;
-        case BulletFactory2D::PATTERN_PRESET_TERRAIN_CREST:
+        case BulletPatterns2D::PATTERN_PRESET_TERRAIN_CREST:
             // Baked crest line (the reference terrain look, minus the old
             // per-volley spray randomness, which cannot live in stored
             // data): 120 slots along a gentle sine, facing up like the old

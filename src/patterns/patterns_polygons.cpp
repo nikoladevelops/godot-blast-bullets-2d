@@ -1,7 +1,7 @@
 // Polygon pattern generators (rectangle, polygon, triangle, trapezoid, diamond)
 // and the symmetric polygon loop machinery (corner seats, corner facing).
 
-#include "factory/bullet_factory2d_patterns_internal.hpp"
+#include "patterns/patterns_internal.hpp"
 
 using namespace godot;
 
@@ -33,13 +33,13 @@ static Vector2 corner_owner_normal(const PackedVector2Array &corners, int c, con
 	const bool in_h = edge_is_horizontal(prev, cur);
 	const bool out_h = edge_is_horizontal(cur, next);
 	int use_outgoing = 1;
-	if (corner_priority == BlastBullets2D::BulletFactory2D::OUTLINE_CORNER_PRIORITY_HORIZONTAL) {
+	if (corner_priority == BlastBullets2D::BulletPatterns2D::OUTLINE_CORNER_PRIORITY_HORIZONTAL) {
 		if (in_h && !out_h) {
 			use_outgoing = 0;
 		} else {
 			use_outgoing = 1;
 		}
-	} else if (corner_priority == BlastBullets2D::BulletFactory2D::OUTLINE_CORNER_PRIORITY_VERTICAL) {
+	} else if (corner_priority == BlastBullets2D::BulletPatterns2D::OUTLINE_CORNER_PRIORITY_VERTICAL) {
 		if (!in_h && out_h) {
 			use_outgoing = 0;
 		} else {
@@ -88,10 +88,10 @@ Vector2 miter_normal(const PackedVector2Array &corners, int c, const Vector2 &re
 // SIDE keeps the priority owner's edge normal (stable default); MITER faces
 // the bisector; SMOOTH uses the averaged loop normal at the corner.
 static Vector2 resolve_corner_facing(const PackedVector2Array &corners, int c, const Vector2 &ref, int corner_priority, int corner_facing) {
-	if (corner_facing == BlastBullets2D::BulletFactory2D::OUTLINE_CORNER_FACING_MITER) {
+	if (corner_facing == BlastBullets2D::BulletPatterns2D::OUTLINE_CORNER_FACING_MITER) {
 		return miter_normal(corners, c, ref);
 	}
-	if (corner_facing == BlastBullets2D::BulletFactory2D::OUTLINE_CORNER_FACING_SMOOTH) {
+	if (corner_facing == BlastBullets2D::BulletPatterns2D::OUTLINE_CORNER_FACING_SMOOTH) {
 		return ref.length_squared() > 1e-12 ? ref.normalized() : Vector2(0, -1);
 	}
 	return corner_owner_normal(corners, c, ref, corner_priority);
@@ -325,7 +325,7 @@ bool build_symmetric_polygon_loop(const PackedVector2Array &corners, const Packe
 	if (edge_margin < 0.0 || !Math::is_finite(edge_margin)) {
 		edge_margin = 0.0;
 	}
-	if (corner_mode == BlastBullets2D::BulletFactory2D::OUTLINE_CORNER_MODE_EVEN_ARC) {
+	if (corner_mode == BlastBullets2D::BulletPatterns2D::OUTLINE_CORNER_MODE_EVEN_ARC) {
 		// Pure arc-length walk from corner 0: uniform gaps everywhere, corners
 		// coincide only when the count aligns (no pinning distortion).
 		PackedFloat64Array cum;
@@ -356,7 +356,7 @@ bool build_symmetric_polygon_loop(const PackedVector2Array &corners, const Packe
 			if (edge_n.length_squared() <= 1e-12) {
 				edge_n = ref;
 			}
-			if (corner_facing == BlastBullets2D::BulletFactory2D::OUTLINE_CORNER_FACING_SMOOTH) {
+			if (corner_facing == BlastBullets2D::BulletPatterns2D::OUTLINE_CORNER_FACING_SMOOTH) {
 				Vector2 sn = corner_normals[ia].lerp(corner_normals[ib], (real_t)t);
 				edge_n = sn.length_squared() > 1e-12 ? sn.normalized() : edge_n;
 			}
@@ -408,7 +408,7 @@ bool build_symmetric_polygon_loop(const PackedVector2Array &corners, const Packe
 				t = Math::clamp(t, 0.0, 1.0);
 			}
 			r_points.push_back(corners[ia].lerp(corners[ib], (real_t)t));
-			if (corner_facing == BlastBullets2D::BulletFactory2D::OUTLINE_CORNER_FACING_SMOOTH) {
+			if (corner_facing == BlastBullets2D::BulletPatterns2D::OUTLINE_CORNER_FACING_SMOOTH) {
 				Vector2 sn = corner_normals[ia].lerp(corner_normals[ib], (real_t)t);
 				r_normals.push_back(sn.length_squared() > 1e-12 ? sn.normalized() : edge_n);
 			} else {
@@ -449,12 +449,12 @@ PackedVector2Array build_triangle_corners(int triangle_type, real_t size_a, real
 	auto spin = [&](const Vector2 &c) -> Vector2 {
 		return Vector2(c.x * rot_cos - c.y * rot_sin, c.x * rot_sin + c.y * rot_cos);
 	};
-	if (triangle_type == BulletFactory2D::TRIANGLE_EQUILATERAL) {
+	if (triangle_type == BulletPatterns2D::TRIANGLE_EQUILATERAL) {
 		for (int k = 0; k < 3; ++k) {
 			const real_t a = -Math::PI * 0.5 + Math::TAU * (real_t)k / 3.0;
 			corners.push_back(spin(Vector2(Math::cos(a), Math::sin(a)) * size_a));
 		}
-	} else if (triangle_type == BulletFactory2D::TRIANGLE_ISOSCELES) {
+	} else if (triangle_type == BulletPatterns2D::TRIANGLE_ISOSCELES) {
 		corners.push_back(spin(Vector2(0.0, -size_b * 0.5)));
 		corners.push_back(spin(Vector2(size_a * 0.5, size_b * 0.5)));
 		corners.push_back(spin(Vector2(-size_a * 0.5, size_b * 0.5)));
@@ -541,7 +541,7 @@ static bool sample_closed_polygon_loop(const PackedVector2Array &corners, int co
 	return build_symmetric_polygon_loop(corners, normals, count, distribution, r_points, r_normals, corner_priority, corner_mode, edge_margin, corner_facing);
 }
 
-TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_rectangle(
+TypedArray<Transform2D> BulletPatterns2D::helper_generate_transforms_rectangle(
 		int transforms_amount,
 		Transform2D marker_transform,
 		const Vector2 &size,
@@ -647,7 +647,7 @@ TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_rectangle(
 	return layout_outline_slots("helper_generate_transforms_rectangle", marker_transform, loop_points, loop_normals, true, marker_rot, face_outward, facing_offset_degrees, PackedFloat32Array(), outline_placement, outline_facing, outline_reverse, outline_slot_offset, fill_spacing, fill_stagger, fill_margin, layer_count, layer_scale, layer_side, layer_fill, layer_start_offset, layer_scale_curve, layer_custom_scales, layer_twist, layer_max_dots, outline_distribution, layer_layout, corners, outline_corner_priority, outline_corner_mode, outline_edge_margin, true, true, outline_corner_facing);
 }
 
-TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_polygon(
+TypedArray<Transform2D> BulletPatterns2D::helper_generate_transforms_polygon(
 		int transforms_amount,
 		Transform2D marker_transform,
 		int vertices,
@@ -757,7 +757,7 @@ TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_polygon(
 	return layout_outline_slots("helper_generate_transforms_polygon", marker_transform, loop_points, loop_normals, true, marker_rot, face_outward, facing_offset_degrees, PackedFloat32Array(), outline_placement, outline_facing, outline_reverse, outline_slot_offset, fill_spacing, fill_stagger, fill_margin, layer_count, layer_scale, layer_side, layer_fill, layer_start_offset, layer_scale_curve, layer_custom_scales, layer_twist, layer_max_dots, outline_distribution, layer_layout, corners, outline_corner_priority, outline_corner_mode, outline_edge_margin, true, true, outline_corner_facing);
 }
 
-TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_triangle(
+TypedArray<Transform2D> BulletPatterns2D::helper_generate_transforms_triangle(
 		int transforms_amount,
 		Transform2D marker_transform,
 		TriangleType triangle_type,
@@ -840,7 +840,7 @@ TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_triangle(
 	return layout_outline_slots("helper_generate_transforms_triangle", marker_transform, loop_points, loop_normals, true, marker_transform.get_rotation(), face_outward, facing_offset_degrees, PackedFloat32Array(), outline_placement, outline_facing, outline_reverse, outline_slot_offset, fill_spacing, fill_stagger, fill_margin, layer_count, layer_scale, layer_side, layer_fill, layer_start_offset, layer_scale_curve, layer_custom_scales, layer_twist, layer_max_dots, outline_distribution, layer_layout, corners, outline_corner_priority, outline_corner_mode, outline_edge_margin, true, true, outline_corner_facing);
 }
 
-TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_trapezoid(
+TypedArray<Transform2D> BulletPatterns2D::helper_generate_transforms_trapezoid(
 		int transforms_amount,
 		Transform2D marker_transform,
 		real_t base_top,
@@ -917,7 +917,7 @@ TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_trapezoid(
 	return layout_outline_slots("helper_generate_transforms_trapezoid", marker_transform, loop_points, loop_normals, true, marker_transform.get_rotation(), face_outward, facing_offset_degrees, PackedFloat32Array(), outline_placement, outline_facing, outline_reverse, outline_slot_offset, fill_spacing, fill_stagger, fill_margin, layer_count, layer_scale, layer_side, layer_fill, layer_start_offset, layer_scale_curve, layer_custom_scales, layer_twist, layer_max_dots, outline_distribution, layer_layout, corners, outline_corner_priority, outline_corner_mode, outline_edge_margin, true, true, outline_corner_facing);
 }
 
-TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_diamond(
+TypedArray<Transform2D> BulletPatterns2D::helper_generate_transforms_diamond(
 		int transforms_amount,
 		Transform2D marker_transform,
 		real_t diagonal_x,

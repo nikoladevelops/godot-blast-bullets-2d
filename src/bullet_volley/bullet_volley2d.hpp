@@ -1,6 +1,7 @@
 #pragma once
 
 #include "core/warn_once2d.hpp"
+#include "core/transform_math2d.hpp"
 #include "factory/bullet_factory2d.hpp"
 #include "attachments/bullet_attachment2d.hpp"
 #include "attachments/bullet_attachment_object_pool2d.hpp"
@@ -621,16 +622,7 @@ public:
 	// alone accepts singular bases like scale (0,1) (det == 0) whose
 	// affine_inverse() is garbage. All conversion/validation paths use this.
 	static bool is_transform_invertible_safe(const Transform2D &t) {
-		if (!t.is_finite()) {
-			return false;
-		}
-		const Vector2 x = t.columns[0];
-		const Vector2 y = t.columns[1];
-		if (!x.is_finite() || !y.is_finite()) {
-			return false;
-		}
-		const real_t det = x.x * y.y - x.y * y.x;
-		return Math::is_finite(det) && Math::abs(det) > (real_t)1e-8;
+		return is_transform_invertible_safe2d(t);
 	}
 
 	// Per-instance shader keys applied via set_instance_shader_parameter().

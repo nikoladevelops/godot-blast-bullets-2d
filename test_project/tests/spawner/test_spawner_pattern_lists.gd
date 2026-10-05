@@ -54,7 +54,7 @@ func test_simultaneous_fires_all_restores_and_reports_finished() -> void:
 func test_preset_entries_are_undone_after_the_entry() -> void:
 	var sp := _spawner()
 	var before: Array = sp.collect_spawn_transforms()
-	sp.spawn_pattern_list([{"preset": BulletFactory2D.PATTERN_PRESET_TWIN_SPIRAL_COUNTER}], true)
+	sp.spawn_pattern_list([{"preset": BulletPatterns2D.PATTERN_PRESET_TWIN_SPIRAL_COUNTER}], true)
 	assert_eq(_volley_sizes(sp), [40], "the preset shaped the entry's volley")
 	assert_false(sp.spin_enabled, "a spin preset entry does not leave spin on")
 	assert_eq(sp.pattern_source, BulletSpawner2D.PATTERN_FROM_HELPER_RING, "source restored")

@@ -486,14 +486,14 @@ func _on_select_rows_per_column_btn_view_new_btn_selected(new_selected_btn: Butt
 
 
 func _on_select_grid_alignment_btn_view_new_btn_selected(new_selected_btn: Button) -> void:
-	var new_alignment:BulletFactory2D.Alignment
+	var new_alignment:BulletPatterns2D.Alignment
 	match new_selected_btn.text:
 		"CenterLeft":
-			new_alignment = BulletFactory2D.Alignment.CENTER_LEFT
+			new_alignment = BulletPatterns2D.Alignment.CENTER_LEFT
 		"Topleft":
-			new_alignment = BulletFactory2D.Alignment.TOP_LEFT
+			new_alignment = BulletPatterns2D.Alignment.TOP_LEFT
 		"BottomLeft":
-			new_alignment = BulletFactory2D.Alignment.BOTTOM_LEFT
+			new_alignment = BulletPatterns2D.Alignment.BOTTOM_LEFT
 			
 	BENCHMARK_GLOBALS.PLAYER_DATA_NODE.set_grid_alignment(new_alignment)
 

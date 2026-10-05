@@ -2,7 +2,7 @@
 // grid, fan, spiral, line, aimed, rain, scatter, star polygon, multi-spiral,
 // cross, wave, waterfall, lattice, counter-spiral and corridor.
 
-#include "factory/bullet_factory2d_patterns_internal.hpp"
+#include "patterns/patterns_internal.hpp"
 
 using namespace godot;
 
@@ -29,7 +29,7 @@ void spiral_arm_step(int i, int arms, int stride, int &r_arm, int &r_step) {
 	r_step = i / arms;
 }
 
-TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_grid(
+TypedArray<Transform2D> BulletPatterns2D::helper_generate_transforms_grid(
 		int transforms_amount,
 		Transform2D marker_transform,
 		int rows_per_column,
@@ -217,7 +217,7 @@ TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_grid(
 	return generated_transforms;
 }
 
-TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_fan(
+TypedArray<Transform2D> BulletPatterns2D::helper_generate_transforms_fan(
 		int transforms_amount,
 		Transform2D marker_transform,
 		real_t spread,
@@ -279,7 +279,7 @@ TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_fan(
 	return generated_transforms;
 }
 
-TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_spiral(
+TypedArray<Transform2D> BulletPatterns2D::helper_generate_transforms_spiral(
 		int transforms_amount,
 		Transform2D marker_transform,
 		real_t start_radius,
@@ -355,7 +355,7 @@ TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_spiral(
 	return generated_transforms;
 }
 
-TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_line(
+TypedArray<Transform2D> BulletPatterns2D::helper_generate_transforms_line(
 		int transforms_amount,
 		Transform2D marker_transform,
 		const Vector2 &direction,
@@ -415,7 +415,7 @@ TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_line(
 	return generated_transforms;
 }
 
-TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_aimed(
+TypedArray<Transform2D> BulletPatterns2D::helper_generate_transforms_aimed(
 		int transforms_amount,
 		Transform2D marker_transform,
 		const Vector2 &target_position,
@@ -448,7 +448,7 @@ TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_aimed(
 	return helper_generate_transforms_fan(transforms_amount, marker_transform, spread, direction_angle, step_offset, centered);
 }
 
-TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_rain(
+TypedArray<Transform2D> BulletPatterns2D::helper_generate_transforms_rain(
 		int transforms_amount,
 		Transform2D marker_transform,
 		real_t band_width,
@@ -510,7 +510,7 @@ TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_rain(
 	return generated_transforms;
 }
 
-TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_scatter(
+TypedArray<Transform2D> BulletPatterns2D::helper_generate_transforms_scatter(
 		int transforms_amount,
 		Transform2D marker_transform,
 		real_t burst_radius,
@@ -595,7 +595,7 @@ TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_scatter(
 	return generated_transforms;
 }
 
-TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_star_polygon(
+TypedArray<Transform2D> BulletPatterns2D::helper_generate_transforms_star_polygon(
 		int transforms_amount,
 		Transform2D marker_transform,
 		int vertices,
@@ -644,7 +644,7 @@ TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_star_polygon
 	return generated_transforms;
 }
 
-TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_multispiral(
+TypedArray<Transform2D> BulletPatterns2D::helper_generate_transforms_multispiral(
 		int transforms_amount,
 		Transform2D marker_transform,
 		int arms,
@@ -719,7 +719,7 @@ TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_multispiral(
 	return generated_transforms;
 }
 
-TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_cross(
+TypedArray<Transform2D> BulletPatterns2D::helper_generate_transforms_cross(
 		int transforms_amount,
 		Transform2D marker_transform,
 		int arm_count,
@@ -770,7 +770,7 @@ TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_cross(
 	return generated_transforms;
 }
 
-TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_wave(
+TypedArray<Transform2D> BulletPatterns2D::helper_generate_transforms_wave(
 		int transforms_amount,
 		Transform2D marker_transform,
 		real_t width,
@@ -817,7 +817,7 @@ TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_wave(
 	return generated_transforms;
 }
 
-TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_waterfall(
+TypedArray<Transform2D> BulletPatterns2D::helper_generate_transforms_waterfall(
 		int transforms_amount,
 		Transform2D marker_transform,
 		int columns,
@@ -910,7 +910,7 @@ TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_waterfall(
 	return generated_transforms;
 }
 
-TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_lattice(
+TypedArray<Transform2D> BulletPatterns2D::helper_generate_transforms_lattice(
 		int transforms_amount,
 		Transform2D marker_transform,
 		int columns,
@@ -980,7 +980,7 @@ TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_lattice(
 	return generated_transforms;
 }
 
-TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_counter_spiral(
+TypedArray<Transform2D> BulletPatterns2D::helper_generate_transforms_counter_spiral(
 		int transforms_amount,
 		Transform2D marker_transform,
 		int arms,
@@ -1057,7 +1057,7 @@ TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_counter_spir
 	return generated_transforms;
 }
 
-TypedArray<Transform2D> BulletFactory2D::helper_generate_transforms_corridor(
+TypedArray<Transform2D> BulletPatterns2D::helper_generate_transforms_corridor(
 		int transforms_amount,
 		Transform2D marker_transform,
 		const Vector2 &aim_direction,

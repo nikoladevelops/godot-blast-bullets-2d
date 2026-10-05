@@ -82,7 +82,11 @@ def run_scons_build(target: BuildTarget) -> None:
         process = subprocess.Popen(
             scons_args,
             stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
+            # Merged into stdout and streamed live: a separate stderr pipe
+            # that is only drained after exit deadlocks as soon as scons
+            # writes more than one pipe buffer of errors (a large compile
+            # error then looked like a silent hang).
+            stderr=subprocess.STDOUT,
             text=True,
             cwd=str(PROJECT_ROOT)
         )
@@ -116,7 +120,8 @@ def run_scons_build(target: BuildTarget) -> None:
         else:
             print("\n" + "=" * 50)
             print(f"Compilation FAILED ({mode_label} Build):")
-            print("".join(stderr_lines).strip() or "Unknown error occurred.")
+            errors = [line for line in stdout_lines if "error" in line.lower()]
+            print("".join(errors).strip() or "".join(stdout_lines[-40:]).strip() or "Unknown error occurred.")
 
     except FileNotFoundError:
         print("Error: 'scons' command not found. Make sure SCons is installed and available in your PATH.")
@@ -144,7 +149,11 @@ def run_scons_clean() -> None:
         process = subprocess.Popen(
             scons_args,
             stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
+            # Merged into stdout and streamed live: a separate stderr pipe
+            # that is only drained after exit deadlocks as soon as scons
+            # writes more than one pipe buffer of errors (a large compile
+            # error then looked like a silent hang).
+            stderr=subprocess.STDOUT,
             text=True,
             cwd=str(PROJECT_ROOT)
         )
@@ -175,7 +184,7 @@ def run_scons_clean() -> None:
         else:
             print("\n" + "=" * 50)
             print("SCons clean FAILED:")
-            print("".join(stderr_lines).strip() or "Unknown error occurred.")
+            print("".join(stdout_lines[-40:]).strip() or "Unknown error occurred.")
 
     except FileNotFoundError:
         print("Error: 'scons' command not found. Make sure SCons is installed and available in your PATH.")
