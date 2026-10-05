@@ -225,8 +225,7 @@ PatternSlots2D BulletPatterns2D::generate_ring2d(int transforms_amount, Transfor
 		UtilityFunctions::push_error("helper_generate_transforms_ring: layer_layout must be 0 (shared loop) or 1 (even per layer).");
 		return PatternSlots2D();
 	}
-	if (transforms_amount < 0 || transforms_amount > HELPER_MAX_TRANSFORMS) {
-		UtilityFunctions::push_error("helper_generate_transforms_ring: transforms_amount must be between 0 and " + String::num_int64(HELPER_MAX_TRANSFORMS) + ".");
+	if (!pattern_check_amount("helper_generate_transforms_ring", transforms_amount)) {
 		return PatternSlots2D();
 	}
 	if (!Math::is_finite(radius) || !Math::is_finite(start_angle) || !Math::is_finite(arc)) {
@@ -237,15 +236,9 @@ PatternSlots2D BulletPatterns2D::generate_ring2d(int transforms_amount, Transfor
 		UtilityFunctions::push_error("helper_generate_transforms_ring: y_scale and facing_offset_degrees must be finite numbers.");
 		return PatternSlots2D();
 	}
-	if (!marker_transform.get_origin().is_finite() || !Math::is_finite(marker_transform.get_rotation()) || !marker_transform.get_scale().is_finite()) {
-		UtilityFunctions::push_error("helper_generate_transforms_ring: marker_transform contains NaN/Inf.");
-		return PatternSlots2D();
-	}
-	// The outline layout inverts the marker (global loop -> slot space):
-	// a singular marker would poison every slot, so reject it here like
-	// danmaku_validate_head does for the other layout users.
-	if (!is_transform_invertible_safe2d(marker_transform)) {
-		UtilityFunctions::push_error("helper_generate_transforms_ring: marker_transform is singular (zero or degenerate scale); volley skipped.");
+	// The outline layout inverts the marker (global loop -> slot space): a
+	// singular marker would poison every slot, so it is rejected too.
+	if (!pattern_check_marker("helper_generate_transforms_ring", marker_transform, true)) {
 		return PatternSlots2D();
 	}
 	if (radius < 0.0) {

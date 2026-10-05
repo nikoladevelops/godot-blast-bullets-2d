@@ -62,3 +62,45 @@ func test_scale_band_and_skip_guards() -> void:
 	var base: Array = BulletPatterns2D.helper_generate_transforms_line(5, m, Vector2.RIGHT, 10.0, true)
 	assert_eq(BulletPatterns2D.helper_apply_skip_indices(base, [1, 99, -2]).size(), 4, "skip ignores OOB indices")
 	assert_gte(BulletPatterns2D.helper_bullet_layer_index(3, 10, 4, 0, 0), 0, "layer index sane")
+
+
+## Every shape generator (ClassDB-discovered, so new ones are covered) names
+## the amount range and a NaN marker in ONE wording each. Polyline keeps its
+## own pinned "must be in 0..10000." (patterns/test_patterns_module.gd).
+func _shape_generators() -> Array:
+	var names: Array = []
+	for info in ClassDB.class_get_method_list(&"BulletPatterns2D", true):
+		var n := String(info["name"])
+		if n.begins_with("helper_generate_transforms_") and n != "helper_generate_transforms_polyline":
+			names.append(info)
+	names.sort_custom(func(a, b): return String(a["name"]) < String(b["name"]))
+	return names
+
+
+## Minimal valid call: amount, marker, then a sane value for every required argument.
+func _generator_args(info: Dictionary, amount: int, marker: Transform2D) -> Array:
+	var args: Array = [amount, marker]
+	var required: int = info["args"].size() - info["default_args"].size()
+	for i in range(2, required):
+		match int(info["args"][i]["type"]):
+			TYPE_VECTOR2:
+				args.append(Vector2(100, 30))
+			TYPE_PACKED_VECTOR2_ARRAY:
+				args.append(PackedVector2Array([Vector2(0, 0), Vector2(100, 0), Vector2(100, 80)]))
+			_:
+				args.append(1)
+	return args
+
+
+func test_every_generator_reports_amount_and_marker_in_one_wording() -> void:
+	var gens := _shape_generators()
+	assert_eq(gens.size(), 29, "every shape generator discovered (polyline excluded)")
+	for info in gens:
+		var n := String(info["name"])
+		for amount in [-1, 10001]:
+			var got: Array = ClassDB.class_call_static.callv([&"BulletPatterns2D", n] + _generator_args(info, amount, m))
+			assert_true(got.is_empty(), "%s amount %d returns empty" % [n, amount])
+			expect_error_sequence(["%s: transforms_amount must be between 0 and 10000." % n])
+		var bad: Array = ClassDB.class_call_static.callv([&"BulletPatterns2D", n] + _generator_args(info, 4, Transform2D(0.0, Vector2(NAN, 0))))
+		assert_true(bad.is_empty(), "%s NaN marker returns empty" % n)
+		expect_error_sequence(["%s: marker_transform contains NaN/Inf." % n])

@@ -1158,15 +1158,15 @@ PatternSlots2D layout_outline_slots(const char *caller_name, const Transform2D &
 	return out;
 }
 
-bool danmaku_validate_head(const char *caller_name, int transforms_amount, const Transform2D &marker_transform) {
-	if (transforms_amount < 0) {
-		UtilityFunctions::push_error(String(caller_name) + ": transforms_amount must be >= 0.");
+bool pattern_check_amount(const char *caller_name, int transforms_amount) {
+	if (transforms_amount < 0 || transforms_amount > HELPER_MAX_TRANSFORMS) {
+		UtilityFunctions::push_error(String(caller_name) + ": transforms_amount must be between 0 and " + String::num_int64(HELPER_MAX_TRANSFORMS) + ".");
 		return false;
 	}
-	if (transforms_amount > HELPER_MAX_TRANSFORMS) {
-		UtilityFunctions::push_error(String(caller_name) + ": transforms_amount (" + String::num_int64(transforms_amount) + ") exceeds the cap of " + String::num_int64(HELPER_MAX_TRANSFORMS) + " per call; split it into batches.");
-		return false;
-	}
+	return true;
+}
+
+bool pattern_check_marker(const char *caller_name, const Transform2D &marker_transform, bool require_invertible) {
 	if (!marker_transform.get_origin().is_finite() || !Math::is_finite(marker_transform.get_rotation()) || !marker_transform.get_scale().is_finite()) {
 		UtilityFunctions::push_error(String(caller_name) + ": marker_transform contains NaN/Inf.");
 		return false;
@@ -1175,11 +1175,15 @@ bool danmaku_validate_head(const char *caller_name, int transforms_amount, const
 	// check but their affine_inverse() is garbage, which layout_outline_slots
 	// and the slot math consume unconditionally. Reject loudly instead of
 	// emitting clamped-garbage volleys.
-	if (!is_transform_invertible_safe2d(marker_transform)) {
+	if (require_invertible && !is_transform_invertible_safe2d(marker_transform)) {
 		UtilityFunctions::push_error(String(caller_name) + ": marker_transform is singular (zero or degenerate scale); volley skipped.");
 		return false;
 	}
 	return true;
+}
+
+bool danmaku_validate_head(const char *caller_name, int transforms_amount, const Transform2D &marker_transform) {
+	return pattern_check_amount(caller_name, transforms_amount) && pattern_check_marker(caller_name, marker_transform, true);
 }
 
 // ---------------------------------------------------------------------------

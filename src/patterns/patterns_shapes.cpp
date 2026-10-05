@@ -39,8 +39,7 @@ PatternSlots2D BulletPatterns2D::generate_grid2d(int transforms_amount, Transfor
 	real_t jitter = params.jitter;
 	uint64_t seed = params.seed;
 
-	if (transforms_amount < 0 || transforms_amount > HELPER_MAX_TRANSFORMS) {
-		UtilityFunctions::push_error("helper_generate_transforms_grid: transforms_amount must be between 0 and " + String::num_int64(HELPER_MAX_TRANSFORMS) + ".");
+	if (!pattern_check_amount("helper_generate_transforms_grid", transforms_amount)) {
 		return PatternSlots2D();
 	}
 	if (!Math::is_finite(column_offset) || !Math::is_finite(row_offset)) {
@@ -51,8 +50,7 @@ PatternSlots2D BulletPatterns2D::generate_grid2d(int transforms_amount, Transfor
 		UtilityFunctions::push_error("helper_generate_transforms_grid: jitter must be a finite number >= 0.");
 		return PatternSlots2D();
 	}
-	if (!marker_transform.get_origin().is_finite() || !Math::is_finite(marker_transform.get_rotation()) || !marker_transform.get_scale().is_finite()) {
-		UtilityFunctions::push_error("helper_generate_transforms_grid: marker_transform contains NaN/Inf.");
+	if (!pattern_check_marker("helper_generate_transforms_grid", marker_transform, false)) {
 		return PatternSlots2D();
 	}
 	if (rows_per_column <= 0) {
@@ -247,8 +245,7 @@ PatternSlots2D BulletPatterns2D::generate_fan2d(int transforms_amount, Transform
 	real_t angle_jitter = params.angle_jitter;
 	uint64_t seed = params.seed;
 
-	if (transforms_amount < 0 || transforms_amount > HELPER_MAX_TRANSFORMS) {
-		UtilityFunctions::push_error("helper_generate_transforms_fan: transforms_amount must be between 0 and " + String::num_int64(HELPER_MAX_TRANSFORMS) + ".");
+	if (!pattern_check_amount("helper_generate_transforms_fan", transforms_amount)) {
 		return PatternSlots2D();
 	}
 	if (!Math::is_finite(spread) || !Math::is_finite(direction_angle) || !Math::is_finite(step_offset)) {
@@ -259,8 +256,7 @@ PatternSlots2D BulletPatterns2D::generate_fan2d(int transforms_amount, Transform
 		UtilityFunctions::push_error("helper_generate_transforms_fan: angle_jitter must be finite and >= 0.");
 		return PatternSlots2D();
 	}
-	if (!marker_transform.get_origin().is_finite() || !Math::is_finite(marker_transform.get_rotation()) || !marker_transform.get_scale().is_finite()) {
-		UtilityFunctions::push_error("helper_generate_transforms_fan: marker_transform contains NaN/Inf.");
+	if (!pattern_check_marker("helper_generate_transforms_fan", marker_transform, false)) {
 		return PatternSlots2D();
 	}
 	PatternSlots2D generated_transforms;
@@ -327,8 +323,7 @@ PatternSlots2D BulletPatterns2D::generate_spiral2d(int transforms_amount, Transf
 	SpiralFacingMode facing_mode = params.facing_mode;
 	real_t facing_offset_degrees = params.facing_offset_degrees;
 
-	if (transforms_amount < 0 || transforms_amount > HELPER_MAX_TRANSFORMS) {
-		UtilityFunctions::push_error("helper_generate_transforms_spiral: transforms_amount must be between 0 and " + String::num_int64(HELPER_MAX_TRANSFORMS) + ".");
+	if (!pattern_check_amount("helper_generate_transforms_spiral", transforms_amount)) {
 		return PatternSlots2D();
 	}
 	if (!Math::is_finite(start_radius) || !Math::is_finite(radius_step) || !Math::is_finite(angle_step)) {
@@ -343,8 +338,7 @@ PatternSlots2D BulletPatterns2D::generate_spiral2d(int transforms_amount, Transf
 		UtilityFunctions::push_error("helper_generate_transforms_spiral: unknown facing_mode.");
 		return PatternSlots2D();
 	}
-	if (!marker_transform.get_origin().is_finite() || !Math::is_finite(marker_transform.get_rotation()) || !marker_transform.get_scale().is_finite()) {
-		UtilityFunctions::push_error("helper_generate_transforms_spiral: marker_transform contains NaN/Inf.");
+	if (!pattern_check_marker("helper_generate_transforms_spiral", marker_transform, false)) {
 		return PatternSlots2D();
 	}
 	if (start_radius < 0.0) {
@@ -420,16 +414,14 @@ PatternSlots2D BulletPatterns2D::generate_line2d(int transforms_amount, Transfor
 	LineAnchor anchor = params.anchor;
 	bool perpendicular = params.perpendicular;
 
-	if (transforms_amount < 0 || transforms_amount > HELPER_MAX_TRANSFORMS) {
-		UtilityFunctions::push_error("helper_generate_transforms_line: transforms_amount must be between 0 and " + String::num_int64(HELPER_MAX_TRANSFORMS) + ".");
+	if (!pattern_check_amount("helper_generate_transforms_line", transforms_amount)) {
 		return PatternSlots2D();
 	}
 	if (!direction.is_finite() || !Math::is_finite(spacing)) {
 		UtilityFunctions::push_error("helper_generate_transforms_line: direction and spacing must be finite.");
 		return PatternSlots2D();
 	}
-	if (!marker_transform.get_origin().is_finite() || !Math::is_finite(marker_transform.get_rotation()) || !marker_transform.get_scale().is_finite()) {
-		UtilityFunctions::push_error("helper_generate_transforms_line: marker_transform contains NaN/Inf.");
+	if (!pattern_check_marker("helper_generate_transforms_line", marker_transform, false)) {
 		return PatternSlots2D();
 	}
 	if (direction.length_squared() <= 0.0) {
@@ -495,16 +487,14 @@ PatternSlots2D BulletPatterns2D::generate_aimed2d(int transforms_amount, Transfo
 	real_t step_offset = params.step_offset;
 	bool centered = params.centered;
 
-	if (transforms_amount < 0 || transforms_amount > HELPER_MAX_TRANSFORMS) {
-		UtilityFunctions::push_error("helper_generate_transforms_aimed: transforms_amount must be between 0 and " + String::num_int64(HELPER_MAX_TRANSFORMS) + ".");
+	if (!pattern_check_amount("helper_generate_transforms_aimed", transforms_amount)) {
 		return PatternSlots2D();
 	}
 	if (!Math::is_finite(spread) || !Math::is_finite(step_offset)) {
 		UtilityFunctions::push_error("helper_generate_transforms_aimed: spread and step_offset must be finite numbers.");
 		return PatternSlots2D();
 	}
-	if (!marker_transform.get_origin().is_finite() || !Math::is_finite(marker_transform.get_rotation()) || !marker_transform.get_scale().is_finite()) {
-		UtilityFunctions::push_error("helper_generate_transforms_aimed: marker_transform contains NaN/Inf.");
+	if (!pattern_check_marker("helper_generate_transforms_aimed", marker_transform, false)) {
 		return PatternSlots2D();
 	}
 	if (!target_position.is_finite()) {

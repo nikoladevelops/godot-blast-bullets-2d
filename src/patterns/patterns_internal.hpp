@@ -157,7 +157,12 @@ PatternSlots2D layout_outline_slots(
 		const PackedVector2Array &dense_normals = PackedVector2Array(),
 		const PackedFloat32Array &dense_overrides = PackedFloat32Array()); // bullet_factory2d_patterns_layout.cpp
 
-bool danmaku_validate_head(const char *caller_name, int transforms_amount, const Transform2D &marker_transform); // bullet_factory2d_patterns_layout.cpp
+// Generator heads (pattern_layout2d.cpp), each fails loud once with
+// "<caller>: ..." and returns false. danmaku_validate_head = amount, then the
+// marker (finite + invertible: the outline layout inverts it).
+bool pattern_check_amount(const char *caller_name, int transforms_amount);
+bool pattern_check_marker(const char *caller_name, const Transform2D &marker_transform, bool require_invertible);
+bool danmaku_validate_head(const char *caller_name, int transforms_amount, const Transform2D &marker_transform);
 
 inline PatternSlots2D danmaku_make_slots(int transforms_amount) {
 	return PatternSlots2D((size_t)(transforms_amount > 0 ? transforms_amount : 0));
