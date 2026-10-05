@@ -51,7 +51,7 @@ void BulletWobbleData2D::set_enabled(bool value) { enabled = value; }
 BulletWobbleData2D::WobbleMode BulletWobbleData2D::get_mode() const { return mode; }
 void BulletWobbleData2D::set_mode(WobbleMode value) {
 	if (value < WOBBLE_LATERAL || value > WOBBLE_ANGULAR) {
-		UtilityFunctions::push_error("BulletWobbleData2D.mode is out of range, keeping the old value.");
+		UtilityFunctions::push_error("BulletWobbleData2D: mode must be 0 (Lateral) or 1 (Angular), keeping the old value.");
 		return;
 	}
 	mode = value;
@@ -60,7 +60,7 @@ void BulletWobbleData2D::set_mode(WobbleMode value) {
 BulletWobbleData2D::WobbleWaveform BulletWobbleData2D::get_waveform() const { return waveform; }
 void BulletWobbleData2D::set_waveform(WobbleWaveform value) {
 	if (value < WOBBLE_SINE || value > WOBBLE_COSINE) {
-		UtilityFunctions::push_error("BulletWobbleData2D.waveform is out of range, keeping the old value.");
+		UtilityFunctions::push_error("BulletWobbleData2D: waveform must be 0 (Sine) or 1 (Cosine), keeping the old value.");
 		return;
 	}
 	waveform = value;
@@ -69,7 +69,7 @@ void BulletWobbleData2D::set_waveform(WobbleWaveform value) {
 real_t BulletWobbleData2D::get_amplitude() const { return amplitude; }
 void BulletWobbleData2D::set_amplitude(real_t value) {
 	if (!Math::is_finite(value) || value < 0.0) {
-		UtilityFunctions::push_error("BulletWobbleData2D.amplitude must be finite and >= 0.");
+		UtilityFunctions::push_error("BulletWobbleData2D: amplitude must be finite and >= 0, keeping the old value.");
 		return;
 	}
 	amplitude = value;
@@ -78,7 +78,7 @@ void BulletWobbleData2D::set_amplitude(real_t value) {
 real_t BulletWobbleData2D::get_frequency_hz() const { return frequency_hz; }
 void BulletWobbleData2D::set_frequency_hz(real_t value) {
 	if (!Math::is_finite(value) || value < 0.0) {
-		UtilityFunctions::push_error("BulletWobbleData2D.frequency_hz must be finite and >= 0.");
+		UtilityFunctions::push_error("BulletWobbleData2D: frequency_hz must be finite and >= 0, keeping the old value.");
 		return;
 	}
 	frequency_hz = value;
@@ -87,7 +87,7 @@ void BulletWobbleData2D::set_frequency_hz(real_t value) {
 real_t BulletWobbleData2D::get_phase_rad() const { return phase_rad; }
 void BulletWobbleData2D::set_phase_rad(real_t value) {
 	if (!Math::is_finite(value)) {
-		UtilityFunctions::push_error("BulletWobbleData2D.phase_rad must be finite.");
+		UtilityFunctions::push_error("BulletWobbleData2D: phase_rad must be finite, keeping the old value.");
 		return;
 	}
 	phase_rad = value;
@@ -96,7 +96,7 @@ void BulletWobbleData2D::set_phase_rad(real_t value) {
 real_t BulletWobbleData2D::get_phase_step_per_bullet() const { return phase_step_per_bullet; }
 void BulletWobbleData2D::set_phase_step_per_bullet(real_t value) {
 	if (!Math::is_finite(value)) {
-		UtilityFunctions::push_error("BulletWobbleData2D.phase_step_per_bullet must be finite.");
+		UtilityFunctions::push_error("BulletWobbleData2D: phase_step_per_bullet must be finite, keeping the old value.");
 		return;
 	}
 	phase_step_per_bullet = value;
@@ -108,7 +108,7 @@ void BulletWobbleData2D::set_distance_phased(bool value) { distance_phased = val
 real_t BulletWobbleData2D::get_damping_per_sec() const { return damping_per_sec; }
 void BulletWobbleData2D::set_damping_per_sec(real_t value) {
 	if (!Math::is_finite(value) || value < 0.0) {
-		UtilityFunctions::push_error("BulletWobbleData2D.damping_per_sec must be finite and >= 0.");
+		UtilityFunctions::push_error("BulletWobbleData2D: damping_per_sec must be finite and >= 0, keeping the old value.");
 		return;
 	}
 	damping_per_sec = value;
@@ -117,7 +117,7 @@ void BulletWobbleData2D::set_damping_per_sec(real_t value) {
 real_t BulletWobbleData2D::get_delay_sec() const { return delay_sec; }
 void BulletWobbleData2D::set_delay_sec(real_t value) {
 	if (!Math::is_finite(value) || value < 0.0) {
-		UtilityFunctions::push_error("BulletWobbleData2D.delay_sec must be finite and >= 0.");
+		UtilityFunctions::push_error("BulletWobbleData2D: delay_sec must be finite and >= 0, keeping the old value.");
 		return;
 	}
 	delay_sec = value;
@@ -126,7 +126,7 @@ void BulletWobbleData2D::set_delay_sec(real_t value) {
 real_t BulletWobbleData2D::get_duration_sec() const { return duration_sec; }
 void BulletWobbleData2D::set_duration_sec(real_t value) {
 	if (!Math::is_finite(value) || value < 0.0) {
-		UtilityFunctions::push_error("BulletWobbleData2D.duration_sec must be finite and >= 0 (0 = infinite).");
+		UtilityFunctions::push_error("BulletWobbleData2D: duration_sec must be finite and >= 0 (0 = infinite), keeping the old value.");
 		return;
 	}
 	duration_sec = value;
@@ -138,7 +138,7 @@ void BulletWobbleData2D::set_face_movement_direction(bool value) { face_movement
 real_t BulletWobbleData2D::get_face_rotation_speed() const { return face_rotation_speed; }
 void BulletWobbleData2D::set_face_rotation_speed(real_t value) {
 	if (!Math::is_finite(value) || value < 0.0) {
-		UtilityFunctions::push_error("BulletWobbleData2D.face_rotation_speed must be finite and >= 0 (0 = snap instantly).");
+		UtilityFunctions::push_error("BulletWobbleData2D: face_rotation_speed must be finite and >= 0 (0 = snap instantly), keeping the old value.");
 		return;
 	}
 	face_rotation_speed = value;

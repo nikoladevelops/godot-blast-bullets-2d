@@ -69,7 +69,7 @@ real_t BulletCurvesData2D::get_x_direction_curve_strength() const {
 
 void BulletCurvesData2D::set_x_direction_curve_strength(real_t value) {
 	if (!Math::is_finite(value)) {
-		UtilityFunctions::push_error("BulletCurvesData2D x_direction_curve_strength must be finite, keeping the old value.");
+		UtilityFunctions::push_error("BulletCurvesData2D: x_direction_curve_strength must be finite, keeping the old value.");
 		return;
 	}
 	x_direction_curve_strength = value;
@@ -81,7 +81,7 @@ DirectionCurveMode BulletCurvesData2D::get_x_direction_curve_mode() const {
 
 void BulletCurvesData2D::set_x_direction_curve_mode(DirectionCurveMode mode) {
 	if (mode < Additive || mode > Override) {
-		UtilityFunctions::push_error("Invalid x direction curve mode. Use Additive or Override.");
+		UtilityFunctions::push_error("BulletCurvesData2D: x_direction_curve_mode must be 0 (Additive) or 1 (Override), keeping the old value.");
 		return;
 	}
 	x_direction_curve_mode = mode;
@@ -99,7 +99,7 @@ real_t BulletCurvesData2D::get_direction_curve_rotation_speed() const {
 }
 void BulletCurvesData2D::set_direction_curve_rotation_speed(real_t value) {
 	if (!Math::is_finite(value)) {
-		UtilityFunctions::push_error("BulletCurvesData2D direction_curve_rotation_speed must be finite, keeping the old value.");
+		UtilityFunctions::push_error("BulletCurvesData2D: direction_curve_rotation_speed must be finite, keeping the old value.");
 		return;
 	}
 	direction_curve_rotation_speed = value;
@@ -128,7 +128,7 @@ real_t BulletCurvesData2D::get_y_direction_curve_strength() const {
 }
 void BulletCurvesData2D::set_y_direction_curve_strength(real_t value) {
 	if (!Math::is_finite(value)) {
-		UtilityFunctions::push_error("BulletCurvesData2D y_direction_curve_strength must be finite, keeping the old value.");
+		UtilityFunctions::push_error("BulletCurvesData2D: y_direction_curve_strength must be finite, keeping the old value.");
 		return;
 	}
 	y_direction_curve_strength = value;
@@ -139,7 +139,7 @@ DirectionCurveMode BulletCurvesData2D::get_y_direction_curve_mode() const {
 }
 void BulletCurvesData2D::set_y_direction_curve_mode(DirectionCurveMode mode) {
 	if (mode < Additive || mode > Override) {
-		UtilityFunctions::push_error("Invalid y direction curve mode. Use Additive or Override.");
+		UtilityFunctions::push_error("BulletCurvesData2D: y_direction_curve_mode must be 0 (Additive) or 1 (Override), keeping the old value.");
 		return;
 	}
 	y_direction_curve_mode = mode;

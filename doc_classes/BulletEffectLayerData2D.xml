@@ -43,7 +43,7 @@
 			Per-layer material override. Null renders with default blending.
 		</member>
 		<member name="max_instances" type="int" setter="set_max_instances" getter="get_max_instances" default="0">
-			One-shot slot ring size: the oldest slot is recycled past this. Bounds worst-case memory per layer. 0 (default) means auto: max(32, 2x the spawning volley's bullet count), so one effect per bullet plus margin with zero config (the manual hatch without a volley falls back to 64). Trail layers ignore it (one slot per bullet by construction).
+			One-shot slot ring size (0 to 4096; larger values are refused): the oldest slot is recycled past this. Bounds worst-case memory per layer. 0 (default) means auto: max(32, 2x the spawning volley's bullet count, at most 4096), so one effect per bullet plus margin with zero config (the manual hatch without a volley falls back to 64). Trail layers ignore it (one slot per bullet by construction).
 		</member>
 		<member name="offset" type="Vector2" setter="set_offset" getter="get_offset" default="Vector2(0, 0)">
 			Trail follow offset from the bullet origin, rotated with the bullet. One-shots add it (rotated by the event orientation) to the event pose.

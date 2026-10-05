@@ -181,11 +181,11 @@ double BulletVolleyData2D::get_max_life_time() const {
 }
 void BulletVolleyData2D::set_max_life_time(double new_max_life_time) {
 	if (!Math::is_finite(new_max_life_time)) {
-		UtilityFunctions::push_error("BulletVolleyData2D max_life_time must be finite, keeping previous value.");
+		UtilityFunctions::push_error("BulletVolleyData2D: max_life_time must be finite, keeping the old value.");
 		return;
 	}
 	if (!is_life_time_infinite && new_max_life_time <= 0.0) {
-		UtilityFunctions::push_error("BulletVolleyData2D max_life_time must be > 0 when lifetime is not infinite (or enable is_life_time_infinite). Keeping previous value.");
+		UtilityFunctions::push_error("BulletVolleyData2D: max_life_time must be > 0 when the lifetime is not infinite (or enable is_life_time_infinite), keeping the old value.");
 		return;
 	}
 	max_life_time = new_max_life_time;
@@ -345,7 +345,7 @@ int BulletVolleyData2D::get_bullet_max_collision_count() const {
 
 void BulletVolleyData2D::set_bullet_max_collision_count(int new_max_collision_amount) {
 	if (new_max_collision_amount < 0) {
-		UtilityFunctions::push_error("BulletVolleyData2D bullet_max_collision_count must be >= 0 (0 = infinite collisions). Keeping previous value.");
+		UtilityFunctions::push_error("BulletVolleyData2D: bullet_max_collision_count must be >= 0 (0 = infinite collisions), keeping the old value.");
 		return;
 	}
 	bullet_max_collision_count = new_max_collision_amount;
@@ -985,7 +985,7 @@ void BulletVolleyData2D::_bind_methods() {
 
 	ClassDB::bind_method(D_METHOD("get_bounce_max_count"), &BulletVolleyData2D::get_bounce_max_count);
 	ClassDB::bind_method(D_METHOD("set_bounce_max_count", "value"), &BulletVolleyData2D::set_bounce_max_count);
-	ADD_PROPERTY(PropertyInfo(Variant::INT, "bounce_max_count", PROPERTY_HINT_RANGE, "0,1000000,1"), "set_bounce_max_count", "get_bounce_max_count");
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "bounce_max_count", PROPERTY_HINT_RANGE, "0,1000000,1,or_greater"), "set_bounce_max_count", "get_bounce_max_count");
 
 	ClassDB::bind_method(D_METHOD("get_bounce_mode"), &BulletVolleyData2D::get_bounce_mode);
 	ClassDB::bind_method(D_METHOD("set_bounce_mode", "value"), &BulletVolleyData2D::set_bounce_mode);

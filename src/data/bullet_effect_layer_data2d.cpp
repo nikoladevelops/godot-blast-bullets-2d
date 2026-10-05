@@ -219,7 +219,7 @@ Vector2 BulletEffectLayerData2D::get_offset() const {
 }
 void BulletEffectLayerData2D::set_offset(const Vector2 &new_offset) {
 	if (!new_offset.is_finite()) {
-		UtilityFunctions::push_error("BulletEffectLayerData2D.offset must be finite.");
+		UtilityFunctions::push_error("BulletEffectLayerData2D: offset must be finite, keeping the old value.");
 		return;
 	}
 	offset = new_offset;
@@ -230,7 +230,7 @@ double BulletEffectLayerData2D::get_rotation_degrees() const {
 }
 void BulletEffectLayerData2D::set_rotation_degrees(double value) {
 	if (!Math::is_finite(value)) {
-		UtilityFunctions::push_error("BulletEffectLayerData2D.rotation_degrees must be finite.");
+		UtilityFunctions::push_error("BulletEffectLayerData2D: rotation_degrees must be finite, keeping the old value.");
 		return;
 	}
 	rotation_degrees = value;
@@ -241,7 +241,7 @@ double BulletEffectLayerData2D::get_spin_degrees_per_sec() const {
 }
 void BulletEffectLayerData2D::set_spin_degrees_per_sec(double value) {
 	if (!Math::is_finite(value)) {
-		UtilityFunctions::push_error("BulletEffectLayerData2D.spin_degrees_per_sec must be finite.");
+		UtilityFunctions::push_error("BulletEffectLayerData2D: spin_degrees_per_sec must be finite, keeping the old value.");
 		return;
 	}
 	spin_degrees_per_sec = value;
@@ -252,7 +252,7 @@ Vector2 BulletEffectLayerData2D::get_scale() const {
 }
 void BulletEffectLayerData2D::set_scale(const Vector2 &new_scale) {
 	if (!new_scale.is_finite()) {
-		UtilityFunctions::push_error("BulletEffectLayerData2D.scale must be finite.");
+		UtilityFunctions::push_error("BulletEffectLayerData2D: scale must be finite, keeping the old value.");
 		return;
 	}
 	scale = new_scale;
@@ -277,7 +277,7 @@ real_t BulletEffectLayerData2D::get_random_scale_min() const {
 }
 void BulletEffectLayerData2D::set_random_scale_min(real_t value) {
 	if (!Math::is_finite(value) || value < 0.0 || value > random_scale_max) {
-		UtilityFunctions::push_error("BulletEffectLayerData2D.random_scale_min must be finite in [0, random_scale_max], keeping the old value.");
+		UtilityFunctions::push_error("BulletEffectLayerData2D: random_scale_min must be finite in [0, random_scale_max], keeping the old value.");
 		return;
 	}
 	random_scale_min = value;
@@ -288,7 +288,7 @@ real_t BulletEffectLayerData2D::get_random_scale_max() const {
 }
 void BulletEffectLayerData2D::set_random_scale_max(real_t value) {
 	if (!Math::is_finite(value) || value < random_scale_min) {
-		UtilityFunctions::push_error("BulletEffectLayerData2D.random_scale_max must be finite and >= random_scale_min, keeping the old value.");
+		UtilityFunctions::push_error("BulletEffectLayerData2D: random_scale_max must be finite and >= random_scale_min, keeping the old value.");
 		return;
 	}
 	random_scale_max = value;
@@ -299,7 +299,7 @@ real_t BulletEffectLayerData2D::get_trigger_chance() const {
 }
 void BulletEffectLayerData2D::set_trigger_chance(real_t value) {
 	if (!Math::is_finite(value) || value < 0.0 || value > 1.0) {
-		UtilityFunctions::push_error("BulletEffectLayerData2D.trigger_chance must be finite in [0, 1], keeping the old value.");
+		UtilityFunctions::push_error("BulletEffectLayerData2D: trigger_chance must be finite in [0, 1], keeping the old value.");
 		return;
 	}
 	trigger_chance = value;
@@ -309,8 +309,10 @@ int BulletEffectLayerData2D::get_max_instances() const {
 	return max_instances;
 }
 void BulletEffectLayerData2D::set_max_instances(int value) {
-	if (value < 0) {
-		UtilityFunctions::push_error("BulletEffectLayerData2D.max_instances must be >= 0 (0 = auto), keeping the old value.");
+	// 4096 is the hard ring cap the factory applies at bake time: a larger
+	// value would be silently clamped, so it is refused here instead.
+	if (value < 0 || value > 4096) {
+		UtilityFunctions::push_error("BulletEffectLayerData2D: max_instances must be in [0, 4096] (0 = auto), keeping the old value.");
 		return;
 	}
 	max_instances = value;
@@ -321,7 +323,7 @@ double BulletEffectLayerData2D::get_fade_in_sec() const {
 }
 void BulletEffectLayerData2D::set_fade_in_sec(double value) {
 	if (!Math::is_finite(value) || value < 0.0) {
-		UtilityFunctions::push_error("BulletEffectLayerData2D.fade_in_sec must be finite and >= 0, keeping the old value.");
+		UtilityFunctions::push_error("BulletEffectLayerData2D: fade_in_sec must be finite and >= 0, keeping the old value.");
 		return;
 	}
 	fade_in_sec = value;
@@ -331,7 +333,7 @@ double BulletEffectLayerData2D::get_fade_out_sec() const {
 }
 void BulletEffectLayerData2D::set_fade_out_sec(double value) {
 	if (!Math::is_finite(value) || value < 0.0) {
-		UtilityFunctions::push_error("BulletEffectLayerData2D.fade_out_sec must be finite and >= 0, keeping the old value.");
+		UtilityFunctions::push_error("BulletEffectLayerData2D: fade_out_sec must be finite and >= 0, keeping the old value.");
 		return;
 	}
 	fade_out_sec = value;
@@ -519,7 +521,7 @@ void BulletEffectLayerData2D::_bind_methods() {
 
 	ClassDB::bind_method(D_METHOD("get_max_instances"), &BulletEffectLayerData2D::get_max_instances);
 	ClassDB::bind_method(D_METHOD("set_max_instances", "value"), &BulletEffectLayerData2D::set_max_instances);
-	ADD_PROPERTY(PropertyInfo(Variant::INT, "max_instances", PROPERTY_HINT_RANGE, "0,512,1"), "set_max_instances", "get_max_instances");
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "max_instances", PROPERTY_HINT_RANGE, "0,4096,1"), "set_max_instances", "get_max_instances");
 
 	ClassDB::bind_static_method("BulletEffectLayerData2D", D_METHOD("whiten_image_copy", "src"), &BulletEffectLayerData2D::whiten_image_copy);
 

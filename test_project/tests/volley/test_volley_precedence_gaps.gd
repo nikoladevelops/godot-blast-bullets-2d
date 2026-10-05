@@ -94,7 +94,7 @@ func test_nan_speed_rejected_at_the_resource_never_reaches_a_volley() -> void:
 	# shared (1.0), the valid slot 1 keeps its own 50, everything finite.
 	var bad := _speed(1.0)
 	bad.speed = NAN
-	expect_error_sequence(["BulletSpeedData2D.speed must be a finite value"])
+	expect_error_sequence(["BulletSpeedData2D: speed must be finite (NaN/Inf would poison bullet movement), keeping the old value."])
 	assert_eq(bad.speed, 1.0, "NaN write rejected, old value kept")
 	var g5 := H.make_volley_data(2, 0.0)
 	g5.all_bullet_speed_data = [null, _speed(50.0)]

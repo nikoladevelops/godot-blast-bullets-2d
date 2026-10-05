@@ -53,7 +53,7 @@ real_t BulletSpeedData2D::get_speed() {
 }
 void BulletSpeedData2D::set_speed(real_t new_speed) {
 	if (!Math::is_finite(new_speed)) {
-		UtilityFunctions::push_error("BulletSpeedData2D.speed must be a finite value (NaN/Inf would poison bullet movement).");
+		UtilityFunctions::push_error("BulletSpeedData2D: speed must be finite (NaN/Inf would poison bullet movement), keeping the old value.");
 		return;
 	}
 	speed = new_speed;
@@ -64,7 +64,7 @@ real_t BulletSpeedData2D::get_max_speed() {
 }
 void BulletSpeedData2D::set_max_speed(real_t new_max_speed) {
 	if (!Math::is_finite(new_max_speed) || new_max_speed < 0.0) {
-		UtilityFunctions::push_error("BulletSpeedData2D.max_speed must be a finite value >= 0.");
+		UtilityFunctions::push_error("BulletSpeedData2D: max_speed must be finite and >= 0, keeping the old value.");
 		return;
 	}
 	max_speed = new_max_speed;
@@ -75,7 +75,7 @@ real_t BulletSpeedData2D::get_acceleration() {
 }
 void BulletSpeedData2D::set_acceleration(real_t new_acceleration) {
 	if (!Math::is_finite(new_acceleration)) {
-		UtilityFunctions::push_error("BulletSpeedData2D.acceleration must be a finite value.");
+		UtilityFunctions::push_error("BulletSpeedData2D: acceleration must be finite, keeping the old value.");
 		return;
 	}
 	acceleration = new_acceleration;

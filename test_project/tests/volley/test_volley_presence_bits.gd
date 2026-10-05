@@ -63,7 +63,7 @@ func test_speed_invalid_entry_is_a_gap() -> void:
 func test_rejected_nan_is_a_deliberate_zero() -> void:
 	var nan_entry := BulletSpeedData2D.new()
 	nan_entry.speed = NAN
-	expect_error_sequence(["BulletSpeedData2D.speed must be a finite value"])
+	expect_error_sequence(["BulletSpeedData2D: speed must be finite (NaN/Inf would poison bullet movement), keeping the old value."])
 	assert_false(is_nan(nan_entry.speed), "BulletSpeedData2D refuses to store NaN")
 	var d := _bare()
 	d.all_bullet_speed_data = [_spd(200.0), nan_entry]

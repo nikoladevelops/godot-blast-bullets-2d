@@ -19,7 +19,7 @@ func test_speed_data() -> void:
 	assert_almost_eq(v.get_bullet_speed_data(0).speed, 200.0, 0.01, "sibling untouched")
 	var bad_sp := BulletSpeedData2D.new()
 	bad_sp.speed = NAN
-	expect_error_sequence(["BulletSpeedData2D.speed must be a finite value (NaN/Inf would poison bullet movement)."])
+	expect_error_sequence(["BulletSpeedData2D: speed must be finite (NaN/Inf would poison bullet movement), keeping the old value."])
 	assert_eq(bad_sp.speed, 0.0, "resource setter rejects NaN, keeps default")
 	v.set_bullet_speed_data(0, null)
 	expect_error("is null")

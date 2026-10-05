@@ -33,10 +33,10 @@ func test_infinite_never_expires() -> void:
 func test_invalid_lifetimes_rejected_at_setter() -> void:
 	var data := H.make_volley_data(2, 100.0, 5.0)
 	data.max_life_time = 0.0
-	expect_error_sequence(["BulletVolleyData2D max_life_time must be > 0 when lifetime is not infinite (or enable is_life_time_infinite). Keeping previous value."])
+	expect_error_sequence(["BulletVolleyData2D: max_life_time must be > 0 when the lifetime is not infinite (or enable is_life_time_infinite), keeping the old value."])
 	assert_eq(data.max_life_time, 5.0, "zero lifetime rejected, old kept")
 	data.max_life_time = NAN
-	expect_error_sequence(["BulletVolleyData2D max_life_time must be finite, keeping previous value."])
+	expect_error_sequence(["BulletVolleyData2D: max_life_time must be finite, keeping the old value."])
 	assert_eq(data.max_life_time, 5.0, "NaN lifetime rejected, old kept")
 	factory.spawn_volley(data)
 	assert_eq(factory.debug_get_total_bullets_amount(), 1, "spawn uses the kept valid lifetime")
