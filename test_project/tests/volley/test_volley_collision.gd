@@ -37,7 +37,7 @@ func test_body_entered_kills_at_max_one() -> void:
 	assert_eq(p[1], v, "payload volley")
 	assert_eq(int(p[2]), 0, "payload index 0")
 	assert_false(v.is_bullet_status_enabled(0), "bullet disabled at max 1")
-	assert_gte(v.get_bullet_collision_count(0), 1, "collision count tracked")
+	assert_eq(v.get_bullet_collision_count(0), 1, "collision count tracked")
 	# The Area2D sibling legitimately stays silent: max 1 means the first
 	# record (body) kills the bullet and the area record for the dead slot is
 	# skipped. Multi-hit volleys report both (next test).

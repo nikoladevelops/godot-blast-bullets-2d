@@ -45,21 +45,21 @@ func _wait(cond: Callable, frames := 40) -> bool:
 
 func test_on_spawn_factory_spawner_and_reuse() -> void:
 	factory.spawn_volley(_data([_layer(SPAWN)]))
-	assert_gte(factory.get_active_effect_count(), 1, "factory spawn flashes")
+	assert_eq(factory.get_active_effect_count(), 1, "factory spawn flashes")
 	factory.clear_sprite_effects()
 	factory.free_active_bullets()
 	var spawner := make_spawner(_data([_layer(SPAWN)]), 1)
 	watch_signals(spawner)
 	assert_true(spawner.shoot_once(), "spawner shoot_once fires")
 	assert_signal_emitted(spawner, "volley_fired", "volley_fired observed")
-	assert_gte(factory.get_active_effect_count(), 1, "spawner shot flashes")
+	assert_eq(factory.get_active_effect_count(), 1, "spawner shot flashes")
 	var vol: BulletVolley2D = get_signal_parameters(spawner, "volley_fired", 0)[0]
 	factory.debug_reset_pool_stats()
 	vol.clear_all_bullets()
 	factory.clear_sprite_effects()
 	assert_true(spawner.shoot_once(), "second spawner shot fires")
-	assert_gte(int(factory.debug_get_pool_hit_stats().get("hits", 0)), 1, "second shot reused the pool")
-	assert_gte(factory.get_active_effect_count(), 1, "pooled reuse flashes again")
+	assert_eq(int(factory.debug_get_pool_hit_stats().get("hits", 0)), 1, "second shot reused the pool")
+	assert_eq(factory.get_active_effect_count(), 1, "pooled reuse flashes again")
 
 
 func test_on_hit_counted_hit() -> void:
@@ -67,7 +67,7 @@ func test_on_hit_counted_hit() -> void:
 	var v: BulletVolley2D = factory.spawn_volley(_data([_layer(HIT)], 0))
 	factory.clear_sprite_effects()
 	assert_true(await _wait(func(): return v.get_bullet_collision_count(0) >= 1), "bullet registered the hit")
-	assert_gte(factory.get_active_effect_count(), 1, "On Hit sparked")
+	assert_eq(factory.get_active_effect_count(), 1, "On Hit sparked")
 
 
 func test_on_destroy_kill_not_timeout() -> void:
@@ -76,7 +76,7 @@ func test_on_destroy_kill_not_timeout() -> void:
 	factory.clear_sprite_effects()
 	await _wait(func(): return not v.is_bullet_status_enabled(0))
 	assert_false(v.is_bullet_status_enabled(0), "killing blow disabled the bullet")
-	assert_gte(factory.get_active_effect_count(), 1, "On Destroy detonated")
+	assert_eq(factory.get_active_effect_count(), 1, "On Destroy detonated")
 
 
 func test_on_destroy_never_on_timeout() -> void:
@@ -97,7 +97,7 @@ func test_on_clear() -> void:
 	var v: BulletVolley2D = factory.spawn_volley(_data([_layer(CLEAR)], 0, 60.0))
 	factory.clear_sprite_effects()
 	assert_true(v.clear_bullet(0), "clear_bullet returns true")
-	assert_gte(factory.get_active_effect_count(), 1, "On Clear fired")
+	assert_eq(factory.get_active_effect_count(), 1, "On Clear fired")
 
 
 func test_on_bounce() -> void:
@@ -105,7 +105,7 @@ func test_on_bounce() -> void:
 	var v: BulletVolley2D = factory.spawn_volley(_data([_layer(BOUNCE)], 0, 60.0, true))
 	factory.clear_sprite_effects()
 	assert_true(await _wait(func(): return v.bullet_get_bounce_count(0) >= 1, 60), "bullet bounced")
-	assert_gte(factory.get_active_effect_count(), 1, "On Bounce sparked")
+	assert_eq(factory.get_active_effect_count(), 1, "On Bounce sparked")
 
 
 func test_spawner_hits_route_to_spawner_only() -> void:

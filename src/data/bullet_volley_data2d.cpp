@@ -155,6 +155,10 @@ Vector2 BulletVolleyData2D::get_shared_bullet_attachment_offset() const {
 	return shared_bullet_attachment_offset;
 }
 void BulletVolleyData2D::set_shared_bullet_attachment_offset(const Vector2 &new_offset) {
+	if (!new_offset.is_finite()) {
+		UtilityFunctions::push_error("BulletVolleyData2D: shared_bullet_attachment_offset must be finite, keeping the old value.");
+		return;
+	}
 	shared_bullet_attachment_offset = new_offset;
 }
 

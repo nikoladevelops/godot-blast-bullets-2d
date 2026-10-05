@@ -27,7 +27,7 @@ func test_one_shot_fires_once() -> void:
 	v.attach_time_based_function(0.05, p.tick)
 	assert_eq(v.debug_get_timer_count(), 1, "timer attached")
 	await physics(15)
-	assert_gte(p.fires, 1, "one-shot fired")
+	assert_eq(p.fires, 1, "one-shot fired")
 	assert_eq(v.debug_get_timer_count(), 0, "one-shot removed itself after firing")
 
 
@@ -112,7 +112,7 @@ func test_pool_reuse_neutrality() -> void:
 	var pb := Probe.new()
 	vb.attach_time_based_function(0.05, pb.tick, true)
 	await _until(pb, 1)
-	assert_gte(pb.fires, 1, "new life's own timer fires")
+	assert_eq(pb.fires, 1, "new life's own timer fires")
 	var old := p.fires
 	await physics(10)
 	assert_eq(p.fires, old, "previous owner's timer is silent")

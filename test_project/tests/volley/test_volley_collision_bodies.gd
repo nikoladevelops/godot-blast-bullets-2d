@@ -40,8 +40,8 @@ func _fire_and_wait() -> int:
 func _body_case(obj: CollisionObject2D, label: String) -> void:
 	watch_signals(factory)
 	_target(obj)
-	assert_gte(await _fire_and_wait(), 1, "%s registers the hit" % label)
-	assert_signal_emitted(factory, "body_entered", "%s: factory body_entered fired" % label)
+	assert_eq(await _fire_and_wait(), 1, "%s registers exactly one hit" % label)
+	assert_signal_emit_count(factory, "body_entered", 1, "%s: factory body_entered fired once" % label)
 
 
 func test_static_body() -> void:
@@ -71,7 +71,7 @@ func test_area_routes_to_area_entered() -> void:
 	ar.monitoring = true
 	ar.monitorable = true
 	_target(ar)
-	assert_gte(await _fire_and_wait(), 1, "area registers the hit")
+	assert_eq(await _fire_and_wait(), 1, "area registers the hit")
 	assert_signal_emitted(factory, "area_entered", "factory area_entered fired")
 	assert_signal_not_emitted(factory, "body_entered", "no body signal for an area overlap")
 

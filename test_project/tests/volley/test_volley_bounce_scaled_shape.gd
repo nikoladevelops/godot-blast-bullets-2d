@@ -41,7 +41,7 @@ func _bounce_once(shape_scale: Vector2, max_frames: int) -> BulletVolley2D:
 
 func test_zero_scaled_shape_bounces_via_fallback() -> void:
 	var v := await _bounce_once(Vector2(0, 1), 60)
-	assert_gte(v.bullet_get_bounce_count(0), 1, "degenerate shape bounces via fallback")
+	assert_eq(v.bullet_get_bounce_count(0), 1, "degenerate shape bounces via fallback")
 	assert_eq(v.get_bullet_collision_count(0), 0, "bounce not double-counted as a hit")
 	assert_true(v.is_bullet_status_enabled(0), "bullet alive after fallback bounce")
 	var vel: Vector2 = v.get_bullet_velocity(0)
@@ -51,14 +51,14 @@ func test_zero_scaled_shape_bounces_via_fallback() -> void:
 
 func test_near_singular_shape_bounces_finite() -> void:
 	var v := await _bounce_once(Vector2(0.01, 1), 120)
-	assert_gte(v.bullet_get_bounce_count(0), 1, "sliver shape bounces")
+	assert_eq(v.bullet_get_bounce_count(0), 1, "sliver shape bounces")
 	assert_true(v.get_bullet_velocity(0).is_finite(), "post-bounce velocity finite")
 	assert_lt(v.get_bullet_velocity(0).x, 0.0, "bounce separates")
 
 
 func test_sane_shape_bounces_precisely() -> void:
 	var v := await _bounce_once(Vector2.ONE, 120)
-	assert_gte(v.bullet_get_bounce_count(0), 1, "sane bounce registered")
+	assert_eq(v.bullet_get_bounce_count(0), 1, "sane bounce registered")
 	assert_true(v.get_bullet_velocity(0).is_finite(), "sane post-bounce finite")
 
 

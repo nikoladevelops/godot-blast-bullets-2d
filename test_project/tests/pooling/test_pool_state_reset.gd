@@ -96,14 +96,14 @@ func test_shape_change_rebuckets() -> void:
 	a.set_collision_shape_runtime(rect)
 	assert_eq(a.debug_get_shape_state().get("type", -1), PhysicsServer2D.SHAPE_RECTANGLE, "now a rectangle")
 	await _drain_and_pool()
-	assert_gte(factory.debug_get_bullets_pool_amount(), 1, "re-bucketed volley pooled under the rect key")
+	assert_eq(factory.debug_get_bullets_pool_amount(), 1, "re-bucketed volley pooled under the rect key")
 	factory.free_bullets_pool(VolleyPoolKey2D.make(3, PhysicsServer2D.SHAPE_CIRCLE))
 	await idle()
-	assert_gte(factory.debug_get_bullets_pool_amount(), 1, "freeing the stale circle bucket keeps the rect-pooled volley")
+	assert_eq(factory.debug_get_bullets_pool_amount(), 1, "freeing the stale circle bucket keeps the rect-pooled volley")
 
 
 func test_new_amount_never_reuses() -> void:
 	await _drain_and_pool()
 	factory.debug_reset_pool_stats()
 	factory.spawn_volley(H.make_volley_data(7, 200.0))
-	assert_gte(factory.debug_get_pool_hit_stats().get("misses", 0), 1, "new amount allocates (miss)")
+	assert_eq(factory.debug_get_pool_hit_stats().get("misses", 0), 1, "new amount allocates (miss)")

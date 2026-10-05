@@ -14,9 +14,11 @@
 // Usage:
 //   void BulletFactory2D::reset(...) {
 //       ... pre-gates (busy/iterating/ready) ...
-//       FactoryOperationGuard op(this); // or (this, /*manage_debuggers=*/false)
-//       ... body with plain returns ...
-//       emit_signal("reset_finished"); // before op destructs!
+//       {
+//           FactoryOperationGuard op(this); // or (this, /*manage_debuggers=*/false)
+//           ... body with plain returns ...
+//       }
+//       emit_signal("reset_finished"); // after op destructs: handlers may spawn
 //   }
 //
 // NOT for the spawn fast path: spawning only appends and stays allowed while

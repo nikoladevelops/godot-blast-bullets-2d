@@ -209,13 +209,14 @@ void BulletFactory2D::reset(const Ref<VolleyPoolKey2D> &key) {
 		return;
 	}
 
-	FactoryOperationGuard op(this);
-
-	PoolKey resolved;
-	reset_factory_state(resolve_pool_key(key, resolved));
-
-	// Notify the user that all bullets have been freed/deleted (before the
-	// guard restores processing state).
+	{
+		FactoryOperationGuard op(this);
+		PoolKey resolved;
+		reset_factory_state(resolve_pool_key(key, resolved));
+	}
+	// Finished means finished: the guard has restored processing and the
+	// debuggers, so a handler can spawn the next wave right away (emitting
+	// inside the guard made every spawn from the handler fail as busy).
 	emit_signal("reset_finished");
 }
 

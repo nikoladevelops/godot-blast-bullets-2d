@@ -68,7 +68,7 @@ func test_timers_attach_fire_detach_cap() -> void:
 	v.attach_time_based_function(0.05, _on_timer)
 	assert_eq(v.debug_get_timer_count(), 1, "timer attached")
 	await physics(15)
-	assert_gte(_timer_fires, 1, "timer fired")
+	assert_eq(_timer_fires, 1, "timer fired")
 	await idle(1)
 	v.detach_all_time_based_functions()
 	assert_eq(v.debug_get_timer_count(), 0, "detach all clears")

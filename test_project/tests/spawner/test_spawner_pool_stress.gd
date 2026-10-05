@@ -30,7 +30,7 @@ func test_three_spawners_share_one_factory() -> void:
 	await physics(10)
 	assert_gte(factory.debug_get_total_bullets_amount(), 3, "factory census sees all volleys")
 	for sp in [a, b, c]:
-		assert_gte(sp.get_live_volley_count(), 1, "owner tracks its own volley")
+		assert_eq(sp.get_live_volley_count(), 1, "owner tracks its own volley")
 
 
 func test_cross_bucket_reuse_reseeds() -> void:
@@ -53,7 +53,7 @@ func test_reset_and_free_under_live_volleys() -> void:
 	assert_true(factory.debug_assert_no_dangling().get("ok", false), "no dangling after reset")
 	assert_true(a.shoot_once(), "fires again after reset")
 	await physics(5)
-	assert_gte(a.get_live_volley_count(), 1, "post-reset volley tracked")
+	assert_eq(a.get_live_volley_count(), 1, "post-reset volley tracked")
 	assert_true(b.shoot_once() and c.shoot_once())
 	await physics(5)
 	await idle(1)
@@ -89,8 +89,8 @@ func test_retarget_override_storm() -> void:
 	assert_true(a.shoot_once() and b.shoot_once())
 	a.set_homing_global_position(Vector2(600, 0))
 	b.set_homing_global_position(Vector2(-600, 0))
-	assert_gte(a.retarget_live_volleys(), 1, "A retargets its own volleys")
-	assert_gte(b.retarget_live_volleys(), 1, "B retargets its own volleys")
+	assert_eq(a.retarget_live_volleys(), 1, "A retargets its own volleys")
+	assert_eq(b.retarget_live_volleys(), 1, "B retargets its own volleys")
 	assert_eq(a.clear_live_volleys_homing(), 1)
 	assert_eq(a.override_live_volleys_velocity(Vector2(100, 0)), 1)
 	await physics(10)
@@ -112,4 +112,4 @@ func test_pool_hit_accounting() -> void:
 			vv.disable_bullet(k)
 		await physics()
 	assert_eq(int(factory.debug_get_pool_hit_stats().get("hits", -1)), hits0 + 9, "every spawn after the first is a pool hit")
-	assert_gte(factory.debug_get_bullets_pool_amount(), 1, "pool holds stock")
+	assert_eq(factory.debug_get_bullets_pool_amount(), 1, "pool holds stock")

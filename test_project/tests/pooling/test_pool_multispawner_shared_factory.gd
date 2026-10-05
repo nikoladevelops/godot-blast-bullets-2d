@@ -47,9 +47,10 @@ func test_interleaved_churn_counts() -> void:
 
 
 func test_census_attribution() -> void:
-	assert_gt(s_ring.get_active_live_bullet_count(), 0, "ring owns live bullets")
-	assert_gt(s_fan.get_active_live_bullet_count(), 0, "fan owns live bullets")
-	assert_gt(factory.debug_get_live_volley_ids(s_ring.get_instance_id()).size(), 0, "live ids attributed to the ring spawner")
+	# Nothing expires or hits during the churn: every shot is still alive.
+	assert_eq(s_ring.get_active_live_bullet_count(), 60 * 6, "ring owns all 60 shots x 6 bullets")
+	assert_eq(s_fan.get_active_live_bullet_count(), 30 * 4, "fan owns all 30 shots x 4 bullets")
+	assert_eq(factory.debug_get_live_volley_ids(s_ring.get_instance_id()).size(), 60, "one live id per ring shot")
 
 
 func test_retarget_and_fuse_are_per_spawner() -> void:

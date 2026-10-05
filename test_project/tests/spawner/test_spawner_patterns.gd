@@ -90,7 +90,7 @@ func test_skip_indices_and_presets() -> void:
 	assert_eq(sp.get_pattern_source(), BulletSpawner2D.PATTERN_FROM_HELPER_RING, "radial-dense preset selects ring")
 	assert_eq(sp.collect_spawn_transforms().size(), 36, "preset amount applied")
 	sp.apply_pattern_preset(19)
-	assert_gte(sp.collect_spawn_transforms().size(), 1, "blossom finale collects")
+	assert_eq(sp.collect_spawn_transforms().size(), 120, "terrain crest collects its 120 baked slots")
 
 
 func test_aimed_needs_target() -> void:

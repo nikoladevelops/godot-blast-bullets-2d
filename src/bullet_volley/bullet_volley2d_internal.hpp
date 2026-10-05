@@ -645,6 +645,11 @@ _ALWAYS_INLINE_ bool BulletVolley2D::attach_bullet_attachment_internal(int bulle
 		return false;
 	}
 
+	if (!bullet_attachment_offset.is_finite()) {
+		UtilityFunctions::push_error("bullet_set_attachment: bullet_attachment_offset must be finite, nothing attached.");
+		return false;
+	}
+
 	if (bullet_factory == nullptr) {
 		UtilityFunctions::push_error("bullet_set_attachment: multimesh was never spawned through BulletFactory2D.");
 		return false;

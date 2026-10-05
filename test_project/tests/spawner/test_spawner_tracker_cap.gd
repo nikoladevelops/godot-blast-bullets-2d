@@ -24,7 +24,7 @@ func test_tracker_cap() -> void:
 	assert_eq(sp.get_tracked_volley_count(), 256, "tracked caps at 256")
 	assert_eq(sp.get_live_volley_count(), 260, "the census sees all 260 live volleys")
 	assert_eq(sp.get_live_volleys().size(), 260, "the live list is the full census")
-	assert_gte(sp.retarget_live_volleys(), 1, "retarget pass reaches volleys at the cap")
+	assert_eq(sp.retarget_live_volleys(), 256, "retarget pass reaches volleys at the cap")
 	sp.forget_tracked_volleys()
 	assert_eq(sp.get_tracked_volley_count(), 0, "forget empties the retarget list")
 	assert_eq(sp.get_live_volley_count(), 260, "forgetting never touches the bullets")

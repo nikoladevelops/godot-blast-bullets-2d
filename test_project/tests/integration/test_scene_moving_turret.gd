@@ -44,8 +44,11 @@ func test_patrols_shoots_and_hits() -> void:
 	# shoot_interval_sec 0.25 over one second (first pull due at once).
 	assert_between(get_signal_emit_count(turret, "volley_fired"), 4, 5, "auto-fires every 0.25 s while moving")
 	await idle(180) # 4 s total: 400 px at 200 px/s = 2 s per leg -> turned around
-	assert_gte(get_signal_emit_count(turret, "movement_endpoint_reached"), 1, "reached the end and turned")
+	assert_eq(get_signal_emit_count(turret, "movement_endpoint_reached"), 2, "reached the end and turned")
 	var hits: int = get_signal_emit_count(turret, "body_entered")
-	assert_gt(hits, 0, "bullets hit the floor (spawner-owned volleys report on the spawner)")
+	# Exact hit totals depend on engine contact details; the contract is
+	# that hits happen and no bullet reports its floor hit twice.
+	var fired_bullets: int = get_signal_emit_count(turret, "volley_fired") * turret.helper_bullets_amount
+	assert_between(hits, 1, fired_bullets, "bullets hit the floor, each at most once (spawner-owned volleys report on the spawner)")
 	assert_signal_not_emitted(scene_factory, "body_entered", "factory stays silent for spawner volleys")
 	assert_true(scene_factory.debug_assert_no_dangling().get("ok", false))

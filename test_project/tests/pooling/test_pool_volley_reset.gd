@@ -27,10 +27,10 @@ func test_pooled_reuse_is_a_new_life() -> void:
 		await physics()
 		if a.get_bullet_collision_count(0) >= 1:
 			break
-	assert_gte(a.get_bullet_collision_count(0), 1, "first life registered the hit")
+	assert_eq(a.get_bullet_collision_count(0), 1, "first life registered the hit")
 	await idle(1)
 	a.attach_time_based_function(0.5, _on_old_timer, false, true)
-	assert_gte(a.debug_get_timer_count(), 1, "old-life timer attached")
+	assert_eq(a.debug_get_timer_count(), 1, "old-life timer attached")
 	var spd := BulletSpeedData2D.new()
 	spd.speed = 111.0
 	spd.max_speed = 222.0
@@ -38,11 +38,11 @@ func test_pooled_reuse_is_a_new_life() -> void:
 	for i in a.get_amount_bullets():
 		a.disable_bullet(i)
 	await idle(1)
-	assert_gte(factory.debug_get_bullets_pool_amount(), 1, "emptied volley parked pooled")
+	assert_eq(factory.debug_get_bullets_pool_amount(), 1, "emptied volley parked pooled")
 
 	factory.debug_reset_pool_stats()
 	var b: BulletVolley2D = factory.spawn_volley(_data())
-	assert_gte(int(factory.debug_get_pool_hit_stats().get("hits", 0)), 1, "second life is a pool hit")
+	assert_eq(int(factory.debug_get_pool_hit_stats().get("hits", 0)), 1, "second life is a pool hit")
 	assert_eq(b.get_bullet_collision_count(0), 0, "collision count reset")
 	assert_eq(b.debug_get_timer_count(), 0, "new life holds no timers")
 	assert_eq(b.get_amount_active_attachments(), 0, "no attachments leak across")

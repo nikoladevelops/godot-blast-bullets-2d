@@ -110,7 +110,7 @@ func test_bounce_normal_on_scaled_slope() -> void:
 		await physics()
 		if bv.bullet_get_bounce_count(0) >= 1:
 			break
-	assert_gte(bv.bullet_get_bounce_count(0), 1, "bounced off the scaled slope")
+	assert_eq(bv.bullet_get_bounce_count(0), 1, "bounced off the scaled slope")
 	var n: Vector2 = bv.debug_get_bounce_info(0).get("last_normal", Vector2.ZERO)
 	# World segment direction (1, 3): the true normal is +-(3, -1)/sqrt(10).
 	assert_almost_eq(absf(n.dot(Vector2(3, -1).normalized())), 1.0, 0.01, "normal is the true perpendicular (n=%s)" % n)

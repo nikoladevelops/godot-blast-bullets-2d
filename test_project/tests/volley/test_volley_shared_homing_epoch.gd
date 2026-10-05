@@ -1,8 +1,9 @@
 extends BlastTest
-## Shared homing deque FRONT EPOCH: a manual deque edit landing between the
-## auto-pop queue and its flush must cancel that stale pop (the request
-## carries the front epoch, bumped by every front mutation). Also: the latch
-## coalesces a multi-bullet storm and a cancelled pop never wedges it.
+## Shared homing deque auto-pop identity: reached events dispatch inside the
+## tick, and the auto-pop removes the front only while it is still the target
+## that was reached, so a manual edit (push front, clear, manual pop) is never
+## undone by a pop meant for an older front. A multi-bullet storm pops at most
+## once per tick, and a skipped pop never wedges later ones.
 
 
 func _data(n: int = 1) -> BulletVolleyData2D:
@@ -42,10 +43,8 @@ func test_manual_front_push_survives_stale_pop() -> void:
 	v.shared_homing_deque_push_front_global_position_target(Vector2(999, 0))
 	await physics(4)
 	v.shared_homing_deque_push_front_global_position_target(Vector2(1234, 0))
-	assert_gte(_amount(v), 1, "manual front survives the stale pop")
-	if v.has_method("shared_homing_deque_get_front_target"):
-		var top: Variant = v.shared_homing_deque_get_front_target()
-		assert_almost_eq(top, Vector2(1234, 0), Vector2(0.01, 0.01), "front is the target just pushed")
+	assert_eq(_amount(v), 4, "manual front survives the stale pop (2 targets + 2 manual fronts)")
+	assert_eq(v.shared_homing_deque_get_current_homing_target(), Vector2(1234, 0), "front is the target just pushed")
 
 
 func test_manual_clear_not_undone() -> void:

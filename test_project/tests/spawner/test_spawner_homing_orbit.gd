@@ -65,11 +65,11 @@ func test_fire_arc_gate() -> void:
 func test_orbit_and_retarget() -> void:
 	sp.set_orbiting_enabled(true)
 	assert_true(sp.shoot_once(), "orbiting shot fires with homing on")
-	assert_gte(sp.retarget_live_volleys(), 1, "retarget touches live volleys")
+	assert_eq(sp.retarget_live_volleys(), 1, "retarget touches live volleys")
 	sp.set_orbiting_enabled(false)
 	sp.set_homing_enabled(false)
 	assert_true(sp.shoot_once(), "plain shot fires with homing off")
-	assert_gte(sp.get_live_volley_count(), 1, "homing volleys still tracked")
+	assert_eq(sp.get_live_volley_count(), 2, "homing volleys still tracked")
 
 
 func test_live_bullet_fuse() -> void:

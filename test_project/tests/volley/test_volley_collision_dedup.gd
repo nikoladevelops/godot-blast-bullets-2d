@@ -82,21 +82,21 @@ func test_shape_mode_reports_every_shape() -> void:
 func test_window_resets_between_volleys() -> void:
 	var v1: BulletVolley2D = factory.spawn_volley(_bodied_data())
 	await _wait(func(): return v1.get_bullet_collision_count(0) >= 1)
-	assert_gte(v1.get_bullet_collision_count(0), 1, "first volley hits")
+	assert_eq(v1.get_bullet_collision_count(0), 1, "first volley hits")
 	hits = 0
 	_multishape_wall(Vector2(400, 0))
 	await physics()
 	var v2: BulletVolley2D = factory.spawn_volley(_bodied_data())
 	await _wait(func(): return v2.get_bullet_collision_count(0) >= 1)
-	assert_gte(v2.get_bullet_collision_count(0), 1, "a later volley on the same wall still registers")
+	assert_eq(v2.get_bullet_collision_count(0), 1, "a later volley on the same wall still registers")
 	assert_lte(v2.get_bullet_collision_count(0), 3, "bounded by overlaps")
 
 
 func test_different_bullets_each_count() -> void:
 	var v: BulletVolley2D = factory.spawn_volley(_bodied_data(2))
 	await _wait(func(): return v.get_bullet_collision_count(0) >= 1 and v.get_bullet_collision_count(1) >= 1)
-	assert_gte(v.get_bullet_collision_count(0), 1, "bullet 0 registered a hit")
-	assert_gte(v.get_bullet_collision_count(1), 1, "bullet 1 registered a hit too")
+	assert_eq(v.get_bullet_collision_count(0), 1, "bullet 0 registered a hit")
+	assert_eq(v.get_bullet_collision_count(1), 1, "bullet 1 registered a hit too")
 	assert_lte(v.get_bullet_collision_count(0), 3, "bullet 0 bounded by overlaps")
 	assert_lte(v.get_bullet_collision_count(1), 3, "bullet 1 bounded by overlaps")
 

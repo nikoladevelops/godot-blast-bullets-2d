@@ -42,7 +42,7 @@ func test_pooled_reuse_starts_blank() -> void:
 	for i in 2:
 		v.disable_bullet(i)
 	await idle(1)
-	assert_gte(factory.debug_get_bullets_pool_amount(), 1, "volley pooled")
+	assert_eq(factory.debug_get_bullets_pool_amount(), 1, "volley pooled")
 	var w: BulletVolley2D = factory.spawn_volley(H.make_volley_data(2, 200.0))
 	assert_eq(w, v, "pool reuses the volley")
 	assert_false(w.debug_get_attachment_info(0).get("has_attachment", false), "reuse starts with blank slots")
@@ -91,7 +91,7 @@ func test_teleport_carries_stick_attachment() -> void:
 	assert_almost_eq(after, before + Vector2(50, 0), Vector2(2, 2), "stick attachment rides the teleport")
 	v.bullet_disable_attachment(0)
 	assert_false(v.debug_get_attachment_info(0).get("has_attachment", false), "disable detaches the slot")
-	assert_gte(factory.debug_get_attachments_pool_amount(), 1, "detached probe returned to the pool")
+	assert_eq(factory.debug_get_attachments_pool_amount(), 1, "detached probe returned to the pool")
 
 
 func test_scoped_free_with_live_attachments() -> void:

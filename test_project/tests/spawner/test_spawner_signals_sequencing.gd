@@ -106,6 +106,6 @@ func test_cap_and_live_ops() -> void:
 	sp.forget_tracked_volleys()
 	assert_eq(sp.get_tracked_volley_count(), 0, "forget empties the retarget list")
 	var live_bullets: int = sp.get_active_live_bullet_count()
-	assert_gt(live_bullets, 0, "bullets in flight")
+	assert_eq(live_bullets, 4, "bullets in flight")
 	assert_eq(sp.clear_active_bullets(false), live_bullets, "clear_active_bullets removes every live bullet the spawner owns")
 	assert_eq(sp.get_live_volley_count(), 0, "nothing live afterwards")

@@ -28,7 +28,7 @@ func test_adopt_moves_ownership() -> void:
 	assert_true(sb.adopt_live_volley(live[0]), "B adopts")
 	assert_eq(sb.get_live_volley_count(), 1, "B tracks after adopt")
 	assert_eq(sa.get_live_volley_count(), 0, "A prunes the re-owned volley")
-	assert_gte(sb.retarget_live_volleys(), 1, "B retargets the adopted volley")
+	assert_eq(sb.retarget_live_volleys(), 1, "B retargets the adopted volley")
 
 
 func test_pooled_wake_is_refused_and_a_parked_wake_resumes() -> void:
