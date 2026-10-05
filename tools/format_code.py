@@ -4,7 +4,7 @@
 Usage:
     python3 tools/format_code.py              # format every src/**/*.cpp|hpp|h in place
     python3 tools/format_code.py --check      # exit 1 and list files that would change
-    python3 tools/format_code.py src/patterns/pattern_layout2d.cpp ...   # only these files
+    python3 tools/format_code.py src/patterns src/core/easing2d.hpp     # only these dirs/files
 
 X-macro tables (*.inc) are never touched: their rows are aligned by hand.
 Binary: $CLANG_FORMAT, else `clang-format` on PATH.
@@ -22,20 +22,23 @@ EXTS = (".cpp", ".hpp", ".h")
 
 
 def sources(paths):
-    if paths:
-        return [os.path.abspath(p) for p in paths if p.endswith(EXTS)]
     found = []
-    for dirpath, _, files in os.walk(SRC):
-        for name in files:
-            if name.endswith(EXTS):
-                found.append(os.path.join(dirpath, name))
+    for root in [os.path.abspath(p) for p in paths] or [SRC]:
+        if os.path.isfile(root):
+            if root.endswith(EXTS):
+                found.append(root)
+            continue
+        for dirpath, _, files in os.walk(root):
+            for name in files:
+                if name.endswith(EXTS):
+                    found.append(os.path.join(dirpath, name))
     return sorted(found)
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--check", action="store_true", help="report files that need formatting, change nothing")
-    parser.add_argument("paths", nargs="*", help="files to format (default: all of src/)")
+    parser.add_argument("paths", nargs="*", help="files or directories to format (default: all of src/)")
     args = parser.parse_args()
     binary = os.environ.get("CLANG_FORMAT") or shutil.which("clang-format")
     if not binary:

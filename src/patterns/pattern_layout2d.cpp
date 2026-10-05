@@ -1158,6 +1158,32 @@ PatternSlots2D layout_outline_slots(const char *caller_name, const Transform2D &
 	return out;
 }
 
+void pattern_reject(const char *caller_name, const char *tail) {
+	UtilityFunctions::push_error(String(caller_name) + ": " + tail);
+}
+
+bool pattern_check_corner_layout(const char *caller_name, const CornerLayout2D &corner, int layer_layout) {
+	const char *tail = nullptr;
+	if (corner.outline_distribution < 0 || corner.outline_distribution > 1) {
+		tail = "outline_distribution must be 0 (legacy) or 1 (symmetric).";
+	} else if (layer_layout < 0 || layer_layout > 1) {
+		tail = "layer_layout must be 0 (shared loop) or 1 (even per layer).";
+	} else if (corner.outline_corner_priority < 0 || corner.outline_corner_priority > 2) {
+		tail = "outline_corner_priority must be 0 (horizontal), 1 (vertical) or 2 (balanced).";
+	} else if (corner.outline_corner_mode < 0 || corner.outline_corner_mode > 1) {
+		tail = "outline_corner_mode must be 0 (pin corners) or 1 (even arc).";
+	} else if (!Math::is_finite(corner.outline_edge_margin) || corner.outline_edge_margin < 0.0) {
+		tail = "outline_edge_margin must be finite and >= 0.";
+	} else if (corner.outline_corner_facing < 0 || corner.outline_corner_facing > 2) {
+		tail = "outline_corner_facing must be 0 (side), 1 (miter) or 2 (smooth).";
+	}
+	if (tail != nullptr) {
+		pattern_reject(caller_name, tail);
+		return false;
+	}
+	return true;
+}
+
 bool pattern_check_amount(const char *caller_name, int transforms_amount) {
 	if (transforms_amount < 0 || transforms_amount > HELPER_MAX_TRANSFORMS) {
 		UtilityFunctions::push_error(String(caller_name) + ": transforms_amount must be between 0 and " + String::num_int64(HELPER_MAX_TRANSFORMS) + ".");

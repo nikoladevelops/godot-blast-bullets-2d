@@ -279,6 +279,7 @@ PatternSlots2D polyline_layout2d(const Transform2D &marker, const PackedVector2A
 }
 
 PatternSlots2D BulletPatterns2D::generate_polyline2d(int transforms_amount, Transform2D marker_transform, const PolylineParams2D &params) {
+	const char *caller = "helper_generate_transforms_polyline";
 	const PackedVector2Array &points = params.points;
 	bool closed = params.closed;
 	PolylineDistribution distribution = params.distribution;
@@ -295,10 +296,7 @@ PatternSlots2D BulletPatterns2D::generate_polyline2d(int transforms_amount, Tran
 		return PatternSlots2D();
 	}
 	for (int i = 0; i < points.size(); ++i) {
-		if (!points[i].is_finite()) {
-			UtilityFunctions::push_error("helper_generate_transforms_polyline: points contain NaN/Inf.");
-			return PatternSlots2D();
-		}
+		PATTERN_REJECT_IF(!points[i].is_finite(), "points contain NaN/Inf.");
 	}
 	PolylineLayout2D p;
 	p.closed = closed;
@@ -310,7 +308,7 @@ PatternSlots2D BulletPatterns2D::generate_polyline2d(int transforms_amount, Tran
 	p.reverse = reverse;
 	p.facing = (int)facing;
 	p.facing_offset_deg = facing_offset_deg;
-	return polyline_layout2d(marker_transform, points, transforms_amount, p, false, "helper_generate_transforms_polyline");
+	return polyline_layout2d(marker_transform, points, transforms_amount, p, false, caller);
 }
 
 } // namespace BlastBullets2D

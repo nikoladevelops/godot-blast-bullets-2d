@@ -164,6 +164,25 @@ bool pattern_check_amount(const char *caller_name, int transforms_amount);
 bool pattern_check_marker(const char *caller_name, const Transform2D &marker_transform, bool require_invertible);
 bool danmaku_validate_head(const char *caller_name, int transforms_amount, const Transform2D &marker_transform);
 
+// Generator rejection: pushes "<caller>: <tail>" once and returns an empty
+// result. Each generator names itself once (`const char *caller = "helper_
+// generate_transforms_<shape>";`); the message is only built on failure.
+void pattern_reject(const char *caller_name, const char *tail);
+// The six corner-layout knob checks of the polygon loops, in their pinned
+// order: outline_distribution, layer_layout, corner priority, mode, edge
+// margin, corner facing.
+bool pattern_check_corner_layout(const char *caller_name, const CornerLayout2D &corner, int layer_layout);
+// Returns an empty result when a check (which already failed loud) is false.
+#define PATTERN_REQUIRE(CHECK)   \
+	if (!(CHECK)) {              \
+		return PatternSlots2D(); \
+	}
+#define PATTERN_REJECT_IF(COND, TAIL) \
+	if (COND) {                       \
+		pattern_reject(caller, TAIL); \
+		return PatternSlots2D();      \
+	}
+
 inline PatternSlots2D danmaku_make_slots(int transforms_amount) {
 	return PatternSlots2D((size_t)(transforms_amount > 0 ? transforms_amount : 0));
 }

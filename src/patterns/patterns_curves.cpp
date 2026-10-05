@@ -209,6 +209,7 @@ void lissajous_sweep2d(double fx, double fy, double phase, double &r_t0, double 
 }
 
 PatternSlots2D BulletPatterns2D::generate_ring2d(int transforms_amount, Transform2D marker_transform, const RingParams2D &params) {
+	const char *caller = "helper_generate_transforms_ring";
 	real_t radius = params.radius;
 	real_t start_angle = params.start_angle;
 	real_t arc = params.arc;
@@ -221,30 +222,14 @@ PatternSlots2D BulletPatterns2D::generate_ring2d(int transforms_amount, Transfor
 	uint64_t seed = params.seed;
 	int layer_layout = params.outline.layer_layout;
 
-	if (layer_layout < 0 || layer_layout > 1) {
-		UtilityFunctions::push_error("helper_generate_transforms_ring: layer_layout must be 0 (shared loop) or 1 (even per layer).");
-		return PatternSlots2D();
-	}
-	if (!pattern_check_amount("helper_generate_transforms_ring", transforms_amount)) {
-		return PatternSlots2D();
-	}
-	if (!Math::is_finite(radius) || !Math::is_finite(start_angle) || !Math::is_finite(arc)) {
-		UtilityFunctions::push_error("helper_generate_transforms_ring: radius, start_angle and arc must be finite numbers.");
-		return PatternSlots2D();
-	}
-	if (!Math::is_finite(y_scale) || !Math::is_finite(facing_offset_degrees)) {
-		UtilityFunctions::push_error("helper_generate_transforms_ring: y_scale and facing_offset_degrees must be finite numbers.");
-		return PatternSlots2D();
-	}
+	PATTERN_REJECT_IF(layer_layout < 0 || layer_layout > 1, "layer_layout must be 0 (shared loop) or 1 (even per layer).");
+	PATTERN_REQUIRE(pattern_check_amount(caller, transforms_amount));
+	PATTERN_REJECT_IF(!Math::is_finite(radius) || !Math::is_finite(start_angle) || !Math::is_finite(arc), "radius, start_angle and arc must be finite numbers.");
+	PATTERN_REJECT_IF(!Math::is_finite(y_scale) || !Math::is_finite(facing_offset_degrees), "y_scale and facing_offset_degrees must be finite numbers.");
 	// The outline layout inverts the marker (global loop -> slot space): a
 	// singular marker would poison every slot, so it is rejected too.
-	if (!pattern_check_marker("helper_generate_transforms_ring", marker_transform, true)) {
-		return PatternSlots2D();
-	}
-	if (radius < 0.0) {
-		UtilityFunctions::push_error("helper_generate_transforms_ring: radius must be >= 0.");
-		return PatternSlots2D();
-	}
+	PATTERN_REQUIRE(pattern_check_marker(caller, marker_transform, true));
+	PATTERN_REJECT_IF(radius < 0.0, "radius must be >= 0.");
 	const real_t base_rotation = rotate_with_marker ? marker_transform.get_rotation() : 0.0;
 	// Closed ring (arc ~= TAU): divide by n so first/last don't stack on the same
 	// spot. Open arcs keep the n-1 divisor so the endpoints land on start/arc end.
@@ -293,10 +278,11 @@ PatternSlots2D BulletPatterns2D::generate_ring2d(int transforms_amount, Transfor
 			fill_outline.push_back(marker_transform.get_origin() + Vector2(Math::cos(angle) * radius, Math::sin(angle) * radius * y_scale));
 		}
 	}
-	return layout_outline_slots("helper_generate_transforms_ring", marker_transform, loop_points, loop_normals, false, 0.0, face_outward, facing_offset_degrees, facing_override, params.outline, CornerLayout2D::smooth(), PackedVector2Array(), is_closed_ring, true, fill_outline);
+	return layout_outline_slots(caller, marker_transform, loop_points, loop_normals, false, 0.0, face_outward, facing_offset_degrees, facing_override, params.outline, CornerLayout2D::smooth(), PackedVector2Array(), is_closed_ring, true, fill_outline);
 }
 
 PatternSlots2D BulletPatterns2D::generate_flower2d(int transforms_amount, Transform2D marker_transform, const FlowerParams2D &params) {
+	const char *caller = "helper_generate_transforms_flower";
 	int petals = params.petals;
 	real_t radius = params.radius;
 	real_t petal_spread = params.petal_spread;
@@ -313,41 +299,15 @@ PatternSlots2D BulletPatterns2D::generate_flower2d(int transforms_amount, Transf
 	double super_fullness = params.super_fullness;
 	int layer_layout = params.outline.layer_layout;
 
-	if (layer_layout < 0 || layer_layout > 1) {
-		UtilityFunctions::push_error("helper_generate_transforms_flower: layer_layout must be 0 (shared loop) or 1 (even per layer).");
-		return PatternSlots2D();
-	}
-	if (!danmaku_validate_head("helper_generate_transforms_flower", transforms_amount, marker_transform)) {
-		return PatternSlots2D();
-	}
-	if (flower_type < FLOWER_FAN || flower_type > FLOWER_SUPERFORMULA) {
-		UtilityFunctions::push_error("helper_generate_transforms_flower: unknown flower_type.");
-		return PatternSlots2D();
-	}
-	if (petals < 1) {
-		UtilityFunctions::push_error("helper_generate_transforms_flower: petals must be >= 1.");
-		return PatternSlots2D();
-	}
-	if (!Math::is_finite(radius) || radius < 0.0) {
-		UtilityFunctions::push_error("helper_generate_transforms_flower: radius must be finite and >= 0.");
-		return PatternSlots2D();
-	}
-	if (!Math::is_finite(petal_spread) || petal_spread < 0.0 || !Math::is_finite(petal_sharpness) || petal_sharpness < 0.0 || !Math::is_finite(base_rotation) || !Math::is_finite(facing_offset_degrees)) {
-		UtilityFunctions::push_error("helper_generate_transforms_flower: petal_spread, petal_sharpness, base_rotation and facing_offset_degrees must be finite (spreads/sharpness >= 0).");
-		return PatternSlots2D();
-	}
-	if (!Math::is_finite(inner_radius_scale) || inner_radius_scale < 0.0 || inner_radius_scale >= 1.0) {
-		UtilityFunctions::push_error("helper_generate_transforms_flower: inner_radius_scale must be finite in [0, 1).");
-		return PatternSlots2D();
-	}
-	if (!Math::is_finite(spiro_roller) || spiro_roller <= 0.0 || !Math::is_finite(spiro_pen) || spiro_pen < 0.0) {
-		UtilityFunctions::push_error("helper_generate_transforms_flower: spiro_roller must be finite and > 0, spiro_pen finite and >= 0.");
-		return PatternSlots2D();
-	}
-	if (!Math::is_finite(super_lobes) || super_lobes < 2.0 || super_lobes > 64.0 || !Math::is_finite(super_fullness) || super_fullness <= 0.0 || super_fullness > 8.0) {
-		UtilityFunctions::push_error("helper_generate_transforms_flower: super_lobes must be finite in [2, 64], super_fullness finite in (0, 8].");
-		return PatternSlots2D();
-	}
+	PATTERN_REJECT_IF(layer_layout < 0 || layer_layout > 1, "layer_layout must be 0 (shared loop) or 1 (even per layer).");
+	PATTERN_REQUIRE(danmaku_validate_head(caller, transforms_amount, marker_transform));
+	PATTERN_REJECT_IF(flower_type < FLOWER_FAN || flower_type > FLOWER_SUPERFORMULA, "unknown flower_type.");
+	PATTERN_REJECT_IF(petals < 1, "petals must be >= 1.");
+	PATTERN_REJECT_IF(!Math::is_finite(radius) || radius < 0.0, "radius must be finite and >= 0.");
+	PATTERN_REJECT_IF(!Math::is_finite(petal_spread) || petal_spread < 0.0 || !Math::is_finite(petal_sharpness) || petal_sharpness < 0.0 || !Math::is_finite(base_rotation) || !Math::is_finite(facing_offset_degrees), "petal_spread, petal_sharpness, base_rotation and facing_offset_degrees must be finite (spreads/sharpness >= 0).");
+	PATTERN_REJECT_IF(!Math::is_finite(inner_radius_scale) || inner_radius_scale < 0.0 || inner_radius_scale >= 1.0, "inner_radius_scale must be finite in [0, 1).");
+	PATTERN_REJECT_IF(!Math::is_finite(spiro_roller) || spiro_roller <= 0.0 || !Math::is_finite(spiro_pen) || spiro_pen < 0.0, "spiro_roller must be finite and > 0, spiro_pen finite and >= 0.");
+	PATTERN_REJECT_IF(!Math::is_finite(super_lobes) || super_lobes < 2.0 || super_lobes > 64.0 || !Math::is_finite(super_fullness) || super_fullness <= 0.0 || super_fullness > 8.0, "super_lobes must be finite in [2, 64], super_fullness finite in (0, 8].");
 	// Shared golden angle for the phyllotaxis disc.
 	const double golden_angle = Math::PI * (3.0 - Math::sqrt(5.0));
 	// Build loop_points/loop_normals per bloom kind, then the shared outline
@@ -508,10 +468,11 @@ PatternSlots2D BulletPatterns2D::generate_flower2d(int transforms_amount, Transf
 	// The flower always lays its layers out on one shared loop.
 	OutlineLayout2D flower_outline = params.outline;
 	flower_outline.layer_layout = 0;
-	return layout_outline_slots("helper_generate_transforms_flower", marker_transform, loop_points, loop_normals, false, 0.0, face_outward, facing_offset_degrees, PackedFloat32Array(), flower_outline, CornerLayout2D::smooth(), PackedVector2Array(), true, flower_type != FLOWER_FAN && flower_type != FLOWER_PHYLLOTAXIS, fill_outline, fill_normals);
+	return layout_outline_slots(caller, marker_transform, loop_points, loop_normals, false, 0.0, face_outward, facing_offset_degrees, PackedFloat32Array(), flower_outline, CornerLayout2D::smooth(), PackedVector2Array(), true, flower_type != FLOWER_FAN && flower_type != FLOWER_PHYLLOTAXIS, fill_outline, fill_normals);
 }
 
 PatternSlots2D BulletPatterns2D::generate_ellipse2d(int transforms_amount, Transform2D marker_transform, const EllipseParams2D &params) {
+	const char *caller = "helper_generate_transforms_ellipse";
 	real_t radius_x = params.radius_x;
 	real_t radius_y = params.radius_y;
 	real_t ellipse_rotation = params.ellipse_rotation;
@@ -525,40 +486,17 @@ PatternSlots2D BulletPatterns2D::generate_ellipse2d(int transforms_amount, Trans
 	int outline_placement = params.outline.outline_placement;
 	int layer_layout = params.outline.layer_layout;
 
-	if (layer_layout < 0 || layer_layout > 1) {
-		UtilityFunctions::push_error("helper_generate_transforms_ellipse: layer_layout must be 0 (shared loop) or 1 (even per layer).");
-		return PatternSlots2D();
-	}
-	if (!danmaku_validate_head("helper_generate_transforms_ellipse", transforms_amount, marker_transform)) {
-		return PatternSlots2D();
-	}
-	if (!Math::is_finite(radius_x) || radius_x < 0.0 || !Math::is_finite(radius_y) || radius_y < 0.0) {
-		UtilityFunctions::push_error("helper_generate_transforms_ellipse: radius_x and radius_y must be finite and >= 0.");
-		return PatternSlots2D();
-	}
-	if (!Math::is_finite(ellipse_rotation) || !Math::is_finite(start_angle) || !Math::is_finite(arc) || !Math::is_finite(gap_width) || !Math::is_finite(facing_offset_degrees)) {
-		UtilityFunctions::push_error("helper_generate_transforms_ellipse: ellipse_rotation, start_angle, arc, gap_width and facing_offset_degrees must be finite.");
-		return PatternSlots2D();
-	}
-	if (mode < ELLIPSE_FULL || mode > ELLIPSE_WALL) {
-		UtilityFunctions::push_error("helper_generate_transforms_ellipse: unknown mode.");
-		return PatternSlots2D();
-	}
-	if (gap_count < 0) {
-		UtilityFunctions::push_error("helper_generate_transforms_ellipse: gap_count must be >= 0.");
-		return PatternSlots2D();
-	}
+	PATTERN_REJECT_IF(layer_layout < 0 || layer_layout > 1, "layer_layout must be 0 (shared loop) or 1 (even per layer).");
+	PATTERN_REQUIRE(danmaku_validate_head(caller, transforms_amount, marker_transform));
+	PATTERN_REJECT_IF(!Math::is_finite(radius_x) || radius_x < 0.0 || !Math::is_finite(radius_y) || radius_y < 0.0, "radius_x and radius_y must be finite and >= 0.");
+	PATTERN_REJECT_IF(!Math::is_finite(ellipse_rotation) || !Math::is_finite(start_angle) || !Math::is_finite(arc) || !Math::is_finite(gap_width) || !Math::is_finite(facing_offset_degrees), "ellipse_rotation, start_angle, arc, gap_width and facing_offset_degrees must be finite.");
+	PATTERN_REJECT_IF(mode < ELLIPSE_FULL || mode > ELLIPSE_WALL, "unknown mode.");
+	PATTERN_REJECT_IF(gap_count < 0, "gap_count must be >= 0.");
 	// Uncapped gap_count turns the per-bullet gap loop below into O(n*gap):
 	// n=1000 with gap=INT_MAX would hang for hours. Walls don't need more
 	// gaps than bullets anyway.
-	if (gap_count > HELPER_MAX_TRANSFORMS) {
-		UtilityFunctions::push_error("helper_generate_transforms_ellipse: gap_count is absurdly large; keep it near the bullet count.");
-		return PatternSlots2D();
-	}
-	if (gap_width < 0.0) {
-		UtilityFunctions::push_error("helper_generate_transforms_ellipse: gap_width must be >= 0.");
-		return PatternSlots2D();
-	}
+	PATTERN_REJECT_IF(gap_count > HELPER_MAX_TRANSFORMS, "gap_count is absurdly large; keep it near the bullet count.");
+	PATTERN_REJECT_IF(gap_width < 0.0, "gap_width must be >= 0.");
 	// Slot loop in global space plus geometric (gradient) outward normals.
 	// WALL gaps filter the loop before the shared outline worker sees it, so
 	// reverse/offset/fill/shell all operate on the surviving slots.
@@ -581,10 +519,7 @@ PatternSlots2D BulletPatterns2D::generate_ellipse2d(int transforms_amount, Trans
 	const real_t span = is_closed ? ((mode != ELLIPSE_FULL && arc < 0.0) ? -Math::TAU : Math::TAU) : arc;
 	PackedFloat64Array ell_ts;
 	if (is_wall) {
-		if (!wall_ellipse_params(start_angle, span, is_closed, gap_count, gap_width, transforms_amount, radius_x, radius_y, ell_ts)) {
-			UtilityFunctions::push_error("helper_generate_transforms_ellipse: the gaps cover the whole wall (lower gap_width or gap_count).");
-			return PatternSlots2D();
-		}
+		PATTERN_REJECT_IF(!wall_ellipse_params(start_angle, span, is_closed, gap_count, gap_width, transforms_amount, radius_x, radius_y, ell_ts), "the gaps cover the whole wall (lower gap_width or gap_count).");
 	} else {
 		even_ellipse_params(start_angle, span, is_closed, transforms_amount, radius_x, radius_y, ell_ts);
 	}
@@ -615,10 +550,11 @@ PatternSlots2D BulletPatterns2D::generate_ellipse2d(int transforms_amount, Trans
 		}
 	}
 	// WALL keeps shared-loop layers (resampling would pave over the gaps).
-	return layout_outline_slots("helper_generate_transforms_ellipse", marker_transform, loop_points, loop_normals, false, 0.0, face_outward, facing_offset_degrees, PackedFloat32Array(), params.outline, CornerLayout2D::smooth(), PackedVector2Array(), is_closed, !is_wall, fill_outline);
+	return layout_outline_slots(caller, marker_transform, loop_points, loop_normals, false, 0.0, face_outward, facing_offset_degrees, PackedFloat32Array(), params.outline, CornerLayout2D::smooth(), PackedVector2Array(), is_closed, !is_wall, fill_outline);
 }
 
 PatternSlots2D BulletPatterns2D::generate_star2d(int transforms_amount, Transform2D marker_transform, const StarParams2D &params) {
+	const char *caller = "helper_generate_transforms_star";
 	int points = params.points;
 	real_t outer_radius = params.outer_radius;
 	real_t inner_radius = params.inner_radius;
@@ -632,51 +568,14 @@ PatternSlots2D BulletPatterns2D::generate_star2d(int transforms_amount, Transfor
 	double outline_edge_margin = params.corner.outline_edge_margin;
 	int outline_corner_facing = params.corner.outline_corner_facing;
 
-	if (!danmaku_validate_head("helper_generate_transforms_star", transforms_amount, marker_transform)) {
-		return PatternSlots2D();
-	}
-	if (points < 2) {
-		UtilityFunctions::push_error("helper_generate_transforms_star: points must be >= 2.");
-		return PatternSlots2D();
-	}
+	PATTERN_REQUIRE(danmaku_validate_head(caller, transforms_amount, marker_transform));
+	PATTERN_REJECT_IF(points < 2, "points must be >= 2.");
 	// points*2 corners get built below: cap points so a hostile value can't
 	// turn the corner loop into a multi-GB hang (and INT_MAX/2 can't wrap).
-	if (points > HELPER_MAX_TRANSFORMS) {
-		UtilityFunctions::push_error("helper_generate_transforms_star: points is absurdly large; keep it near the bullet count.");
-		return PatternSlots2D();
-	}
-	if (!Math::is_finite(outer_radius) || outer_radius < 0.0 || !Math::is_finite(inner_radius) || inner_radius < 0.0) {
-		UtilityFunctions::push_error("helper_generate_transforms_star: outer_radius and inner_radius must be finite and >= 0.");
-		return PatternSlots2D();
-	}
-	if (!Math::is_finite(base_rotation) || !Math::is_finite(facing_offset_degrees)) {
-		UtilityFunctions::push_error("helper_generate_transforms_star: base_rotation and facing_offset_degrees must be finite.");
-		return PatternSlots2D();
-	}
-	if (outline_distribution < 0 || outline_distribution > 1) {
-		UtilityFunctions::push_error("helper_generate_transforms_star: outline_distribution must be 0 (legacy) or 1 (symmetric).");
-		return PatternSlots2D();
-	}
-	if (layer_layout < 0 || layer_layout > 1) {
-		UtilityFunctions::push_error("helper_generate_transforms_star: layer_layout must be 0 (shared loop) or 1 (even per layer).");
-		return PatternSlots2D();
-	}
-	if (outline_corner_priority < 0 || outline_corner_priority > 2) {
-		UtilityFunctions::push_error("helper_generate_transforms_star: outline_corner_priority must be 0 (horizontal), 1 (vertical) or 2 (balanced).");
-		return PatternSlots2D();
-	}
-	if (outline_corner_mode < 0 || outline_corner_mode > 1) {
-		UtilityFunctions::push_error("helper_generate_transforms_star: outline_corner_mode must be 0 (pin corners) or 1 (even arc).");
-		return PatternSlots2D();
-	}
-	if (!Math::is_finite(outline_edge_margin) || outline_edge_margin < 0.0) {
-		UtilityFunctions::push_error("helper_generate_transforms_star: outline_edge_margin must be finite and >= 0.");
-		return PatternSlots2D();
-	}
-	if (outline_corner_facing < 0 || outline_corner_facing > 2) {
-		UtilityFunctions::push_error("helper_generate_transforms_star: outline_corner_facing must be 0 (side), 1 (miter) or 2 (smooth).");
-		return PatternSlots2D();
-	}
+	PATTERN_REJECT_IF(points > HELPER_MAX_TRANSFORMS, "points is absurdly large; keep it near the bullet count.");
+	PATTERN_REJECT_IF(!Math::is_finite(outer_radius) || outer_radius < 0.0 || !Math::is_finite(inner_radius) || inner_radius < 0.0, "outer_radius and inner_radius must be finite and >= 0.");
+	PATTERN_REJECT_IF(!Math::is_finite(base_rotation) || !Math::is_finite(facing_offset_degrees), "base_rotation and facing_offset_degrees must be finite.");
+	PATTERN_REQUIRE(pattern_check_corner_layout(caller, params.corner, params.outline.layer_layout));
 	const real_t marker_rot = marker_transform.get_rotation();
 	// Star outline corners in winding order (alternating outer/inner), built
 	// marker-LOCAL like every other polygon primitive, so marker rotation
@@ -696,15 +595,9 @@ PatternSlots2D BulletPatterns2D::generate_star2d(int transforms_amount, Transfor
 			corners.push_back(p);
 		}
 	}
-	if (corners.size() < 3) {
-		UtilityFunctions::push_error("helper_generate_transforms_star: degenerate star.");
-		return PatternSlots2D();
-	}
+	PATTERN_REJECT_IF(corners.size() < 3, "degenerate star.");
 	PackedVector2Array corner_normals;
-	if (!compute_edge_normals_quiet(corners, true, false, corner_normals) || corner_normals.size() != corners.size()) {
-		UtilityFunctions::push_error("helper_generate_transforms_star: degenerate star.");
-		return PatternSlots2D();
-	}
+	PATTERN_REJECT_IF(!compute_edge_normals_quiet(corners, true, false, corner_normals) || corner_normals.size() != corners.size(), "degenerate star.");
 	PackedVector2Array loop_points;
 	PackedVector2Array loop_normals;
 	// Zero bullets is a valid empty request (every other generator returns
@@ -712,14 +605,12 @@ PatternSlots2D BulletPatterns2D::generate_star2d(int transforms_amount, Transfor
 	if (transforms_amount == 0) {
 		return PatternSlots2D();
 	}
-	if (!build_symmetric_polygon_loop(corners, corner_normals, transforms_amount, outline_distribution, loop_points, loop_normals, outline_corner_priority, outline_corner_mode, outline_edge_margin, outline_corner_facing)) {
-		UtilityFunctions::push_error("helper_generate_transforms_star: degenerate star.");
-		return PatternSlots2D();
-	}
-	return layout_outline_slots("helper_generate_transforms_star", marker_transform, loop_points, loop_normals, true, marker_rot, face_outward, facing_offset_degrees, PackedFloat32Array(), params.outline, params.corner, corners, true, true);
+	PATTERN_REJECT_IF(!build_symmetric_polygon_loop(corners, corner_normals, transforms_amount, outline_distribution, loop_points, loop_normals, outline_corner_priority, outline_corner_mode, outline_edge_margin, outline_corner_facing), "degenerate star.");
+	return layout_outline_slots(caller, marker_transform, loop_points, loop_normals, true, marker_rot, face_outward, facing_offset_degrees, PackedFloat32Array(), params.outline, params.corner, corners, true, true);
 }
 
 PatternSlots2D BulletPatterns2D::generate_heart2d(int transforms_amount, Transform2D marker_transform, const HeartParams2D &params) {
+	const char *caller = "helper_generate_transforms_heart";
 	real_t size = params.size;
 	real_t base_rotation = params.base_rotation;
 	bool face_outward = params.face_outward;
@@ -728,21 +619,10 @@ PatternSlots2D BulletPatterns2D::generate_heart2d(int transforms_amount, Transfo
 	int outline_facing = params.outline.outline_facing;
 	int layer_layout = params.outline.layer_layout;
 
-	if (layer_layout < 0 || layer_layout > 1) {
-		UtilityFunctions::push_error("helper_generate_transforms_heart: layer_layout must be 0 (shared loop) or 1 (even per layer).");
-		return PatternSlots2D();
-	}
-	if (!danmaku_validate_head("helper_generate_transforms_heart", transforms_amount, marker_transform)) {
-		return PatternSlots2D();
-	}
-	if (!Math::is_finite(size) || size <= 0.0) {
-		UtilityFunctions::push_error("helper_generate_transforms_heart: size must be finite and > 0.");
-		return PatternSlots2D();
-	}
-	if (!Math::is_finite(base_rotation) || !Math::is_finite(facing_offset_degrees)) {
-		UtilityFunctions::push_error("helper_generate_transforms_heart: base_rotation and facing_offset_degrees must be finite.");
-		return PatternSlots2D();
-	}
+	PATTERN_REJECT_IF(layer_layout < 0 || layer_layout > 1, "layer_layout must be 0 (shared loop) or 1 (even per layer).");
+	PATTERN_REQUIRE(danmaku_validate_head(caller, transforms_amount, marker_transform));
+	PATTERN_REJECT_IF(!Math::is_finite(size) || size <= 0.0, "size must be finite and > 0.");
+	PATTERN_REJECT_IF(!Math::is_finite(base_rotation) || !Math::is_finite(facing_offset_degrees), "base_rotation and facing_offset_degrees must be finite.");
 	// Slot loop plus center-radial outward normals; layer offsets run
 	// radially so every ring keeps the heart figure. Facings ride a per-slot
 	// override holding the legacy radial facings byte-exact (the shared
@@ -782,10 +662,11 @@ PatternSlots2D BulletPatterns2D::generate_heart2d(int transforms_amount, Transfo
 		loop_normals.push_back(even_nrms[i]);
 		facing_override.push_back(even_ovr[i]);
 	}
-	return layout_outline_slots("helper_generate_transforms_heart", marker_transform, loop_points, loop_normals, false, 0.0, face_outward, facing_offset_degrees, facing_override, params.outline, CornerLayout2D::smooth(), PackedVector2Array(), true, true, fill_outline, dense_nrms, dense_ovr);
+	return layout_outline_slots(caller, marker_transform, loop_points, loop_normals, false, 0.0, face_outward, facing_offset_degrees, facing_override, params.outline, CornerLayout2D::smooth(), PackedVector2Array(), true, true, fill_outline, dense_nrms, dense_ovr);
 }
 
 PatternSlots2D BulletPatterns2D::generate_rose2d(int transforms_amount, Transform2D marker_transform, const RoseParams2D &params) {
+	const char *caller = "helper_generate_transforms_rose";
 	int petals = params.petals;
 	real_t radius = params.radius;
 	real_t lobe_sharpness = params.lobe_sharpness;
@@ -795,25 +676,11 @@ PatternSlots2D BulletPatterns2D::generate_rose2d(int transforms_amount, Transfor
 	int outline_placement = params.outline.outline_placement;
 	int layer_layout = params.outline.layer_layout;
 
-	if (layer_layout < 0 || layer_layout > 1) {
-		UtilityFunctions::push_error("helper_generate_transforms_rose: layer_layout must be 0 (shared loop) or 1 (even per layer).");
-		return PatternSlots2D();
-	}
-	if (!danmaku_validate_head("helper_generate_transforms_rose", transforms_amount, marker_transform)) {
-		return PatternSlots2D();
-	}
-	if (petals < 2) {
-		UtilityFunctions::push_error("helper_generate_transforms_rose: petals must be >= 2.");
-		return PatternSlots2D();
-	}
-	if (!Math::is_finite(radius) || radius < 0.0) {
-		UtilityFunctions::push_error("helper_generate_transforms_rose: radius must be finite and >= 0.");
-		return PatternSlots2D();
-	}
-	if (!Math::is_finite(lobe_sharpness) || lobe_sharpness < 0.0 || !Math::is_finite(base_rotation) || !Math::is_finite(facing_offset_degrees)) {
-		UtilityFunctions::push_error("helper_generate_transforms_rose: lobe_sharpness, base_rotation and facing_offset_degrees must be finite (sharpness >= 0).");
-		return PatternSlots2D();
-	}
+	PATTERN_REJECT_IF(layer_layout < 0 || layer_layout > 1, "layer_layout must be 0 (shared loop) or 1 (even per layer).");
+	PATTERN_REQUIRE(danmaku_validate_head(caller, transforms_amount, marker_transform));
+	PATTERN_REJECT_IF(petals < 2, "petals must be >= 2.");
+	PATTERN_REJECT_IF(!Math::is_finite(radius) || radius < 0.0, "radius must be finite and >= 0.");
+	PATTERN_REJECT_IF(!Math::is_finite(lobe_sharpness) || lobe_sharpness < 0.0 || !Math::is_finite(base_rotation) || !Math::is_finite(facing_offset_degrees), "lobe_sharpness, base_rotation and facing_offset_degrees must be finite (sharpness >= 0).");
 	// Theta sweep plus petal-axis outward normals (coherent across the flip);
 	// the shared outline worker assembles facings. Arc-even from a dense
 	// ideal sweep so dots sit exactly on the petals with even gaps.
@@ -843,10 +710,11 @@ PatternSlots2D BulletPatterns2D::generate_rose2d(int transforms_amount, Transfor
 		loop_points.push_back(origin + even_local[i]);
 		loop_normals.push_back(even_nrms[i]);
 	}
-	return layout_outline_slots("helper_generate_transforms_rose", marker_transform, loop_points, loop_normals, false, 0.0, face_outward, facing_offset_degrees, PackedFloat32Array(), params.outline, CornerLayout2D::smooth(), PackedVector2Array(), true, true, fill_outline, dense_nrms);
+	return layout_outline_slots(caller, marker_transform, loop_points, loop_normals, false, 0.0, face_outward, facing_offset_degrees, PackedFloat32Array(), params.outline, CornerLayout2D::smooth(), PackedVector2Array(), true, true, fill_outline, dense_nrms);
 }
 
 PatternSlots2D BulletPatterns2D::generate_lissajous2d(int transforms_amount, Transform2D marker_transform, const LissajousParams2D &params) {
+	const char *caller = "helper_generate_transforms_lissajous";
 	real_t size_x = params.size_x;
 	real_t size_y = params.size_y;
 	real_t freq_x = params.freq_x;
@@ -857,25 +725,11 @@ PatternSlots2D BulletPatterns2D::generate_lissajous2d(int transforms_amount, Tra
 	int outline_placement = params.outline.outline_placement;
 	int layer_layout = params.outline.layer_layout;
 
-	if (layer_layout < 0 || layer_layout > 1) {
-		UtilityFunctions::push_error("helper_generate_transforms_lissajous: layer_layout must be 0 (shared loop) or 1 (even per layer).");
-		return PatternSlots2D();
-	}
-	if (!danmaku_validate_head("helper_generate_transforms_lissajous", transforms_amount, marker_transform)) {
-		return PatternSlots2D();
-	}
-	if (!Math::is_finite(size_x) || size_x < 0.0 || !Math::is_finite(size_y) || size_y < 0.0) {
-		UtilityFunctions::push_error("helper_generate_transforms_lissajous: size_x and size_y must be finite and >= 0.");
-		return PatternSlots2D();
-	}
-	if (!Math::is_finite(freq_x) || freq_x < 0.0 || !Math::is_finite(freq_y) || freq_y < 0.0) {
-		UtilityFunctions::push_error("helper_generate_transforms_lissajous: freq_x and freq_y must be finite and >= 0.");
-		return PatternSlots2D();
-	}
-	if (!Math::is_finite(phase) || !Math::is_finite(facing_offset_degrees)) {
-		UtilityFunctions::push_error("helper_generate_transforms_lissajous: phase and facing_offset_degrees must be finite.");
-		return PatternSlots2D();
-	}
+	PATTERN_REJECT_IF(layer_layout < 0 || layer_layout > 1, "layer_layout must be 0 (shared loop) or 1 (even per layer).");
+	PATTERN_REQUIRE(danmaku_validate_head(caller, transforms_amount, marker_transform));
+	PATTERN_REJECT_IF(!Math::is_finite(size_x) || size_x < 0.0 || !Math::is_finite(size_y) || size_y < 0.0, "size_x and size_y must be finite and >= 0.");
+	PATTERN_REJECT_IF(!Math::is_finite(freq_x) || freq_x < 0.0 || !Math::is_finite(freq_y) || freq_y < 0.0, "freq_x and freq_y must be finite and >= 0.");
+	PATTERN_REJECT_IF(!Math::is_finite(phase) || !Math::is_finite(facing_offset_degrees), "phase and facing_offset_degrees must be finite.");
 	// Weave sweep plus center-radial outward normals (marker rotation when a
 	// sample lands exactly on the center); the shared outline worker
 	// assembles facings. Arc-even from a dense ideal sweep so dots sit
@@ -909,27 +763,20 @@ PatternSlots2D BulletPatterns2D::generate_lissajous2d(int transforms_amount, Tra
 		loop_points.push_back(origin + even_local[i]);
 		loop_normals.push_back(even_nrms[i]);
 	}
-	return layout_outline_slots("helper_generate_transforms_lissajous", marker_transform, loop_points, loop_normals, false, 0.0, face_outward, facing_offset_degrees, PackedFloat32Array(), params.outline, CornerLayout2D::smooth(), PackedVector2Array(), !open_run, true, fill_outline, dense_nrms);
+	return layout_outline_slots(caller, marker_transform, loop_points, loop_normals, false, 0.0, face_outward, facing_offset_degrees, PackedFloat32Array(), params.outline, CornerLayout2D::smooth(), PackedVector2Array(), !open_run, true, fill_outline, dense_nrms);
 }
 
 PatternSlots2D BulletPatterns2D::generate_circle2d(int transforms_amount, Transform2D marker_transform, const CircleParams2D &params) {
+	const char *caller = "helper_generate_transforms_circle";
 	real_t radius = params.radius;
 	bool face_outward = params.face_outward;
 	real_t facing_offset_degrees = params.facing_offset_degrees;
 	int outline_placement = params.outline.outline_placement;
 	int layer_layout = params.outline.layer_layout;
 
-	if (layer_layout < 0 || layer_layout > 1) {
-		UtilityFunctions::push_error("helper_generate_transforms_circle: layer_layout must be 0 (shared loop) or 1 (even per layer).");
-		return PatternSlots2D();
-	}
-	if (!danmaku_validate_head("helper_generate_transforms_circle", transforms_amount, marker_transform)) {
-		return PatternSlots2D();
-	}
-	if (!Math::is_finite(radius) || radius < 0.0 || !Math::is_finite(facing_offset_degrees)) {
-		UtilityFunctions::push_error("helper_generate_transforms_circle: radius must be finite and >= 0, facing_offset_degrees finite.");
-		return PatternSlots2D();
-	}
+	PATTERN_REJECT_IF(layer_layout < 0 || layer_layout > 1, "layer_layout must be 0 (shared loop) or 1 (even per layer).");
+	PATTERN_REQUIRE(danmaku_validate_head(caller, transforms_amount, marker_transform));
+	PATTERN_REJECT_IF(!Math::is_finite(radius) || radius < 0.0 || !Math::is_finite(facing_offset_degrees), "radius must be finite and >= 0, facing_offset_degrees finite.");
 	// Marker-local loop plus radial outward normals. rot_add carries the
 	// historical double marker rotation (angle folds it in AND the facing
 	// adds it again); the shared outline worker preserves it exactly.
@@ -950,7 +797,7 @@ PatternSlots2D BulletPatterns2D::generate_circle2d(int transforms_amount, Transf
 			fill_outline.push_back(Vector2(Math::cos(angle), Math::sin(angle)) * radius);
 		}
 	}
-	return layout_outline_slots("helper_generate_transforms_circle", marker_transform, loop_points, loop_normals, true, marker_rot, face_outward, facing_offset_degrees, PackedFloat32Array(), params.outline, CornerLayout2D::smooth(), PackedVector2Array(), true, true, fill_outline);
+	return layout_outline_slots(caller, marker_transform, loop_points, loop_normals, true, marker_rot, face_outward, facing_offset_degrees, PackedFloat32Array(), params.outline, CornerLayout2D::smooth(), PackedVector2Array(), true, true, fill_outline);
 }
 
 } // namespace BlastBullets2D
