@@ -555,7 +555,7 @@ PatternSlots2D BulletPatterns2D::generate_star2d(int transforms_amount, Transfor
 	if (transforms_amount == 0) {
 		return PatternSlots2D();
 	}
-	PATTERN_REJECT_IF(!build_symmetric_polygon_loop(corners, corner_normals, transforms_amount, p.corner.outline_distribution, loop_points, loop_normals, p.corner.outline_corner_priority, p.corner.outline_corner_mode, p.corner.outline_edge_margin, p.corner.outline_corner_facing), "degenerate star.");
+	PATTERN_REJECT_IF(!build_symmetric_polygon_loop(corners, corner_normals, transforms_amount, p.corner, loop_points, loop_normals), "degenerate star.");
 	return layout_outline_slots(caller, marker_transform, loop_points, loop_normals, true, marker_rot, p.face_outward, p.facing_offset_degrees, PackedFloat32Array(), p.outline, p.corner, corners, true, true);
 }
 

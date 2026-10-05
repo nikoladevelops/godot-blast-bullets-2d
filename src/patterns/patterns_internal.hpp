@@ -252,7 +252,7 @@ Vector2 miter_normal(const PackedVector2Array &corners, int c, const Vector2 &re
 // purely evenly by arc length from corner 0. edge_margin keeps interior dots
 // at least that many px away from corners along their edge (clamped per
 // edge). Returns false when degenerate (caller stacks at the marker).
-bool build_symmetric_polygon_loop(const PackedVector2Array &corners, const PackedVector2Array &corner_normals, int count, int distribution, PackedVector2Array &r_points, PackedVector2Array &r_normals, int corner_priority, int corner_mode, double edge_margin, int corner_facing); // bullet_factory2d_patterns_polygons.cpp
+bool build_symmetric_polygon_loop(const PackedVector2Array &corners, const PackedVector2Array &corner_normals, int count, const CornerLayout2D &corner, PackedVector2Array &r_points, PackedVector2Array &r_normals); // patterns_polygons.cpp
 
 // Marker-local corner builders shared by the polygon primitives below and
 // their preview samplers (single source of truth: the track can never drift

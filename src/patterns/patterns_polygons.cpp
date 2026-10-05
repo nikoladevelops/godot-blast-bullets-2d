@@ -309,7 +309,13 @@ static PackedInt32Array even_corner_seats(int corner_count, int count) {
 // purely evenly by arc length from corner 0. edge_margin keeps interior dots
 // at least that many px away from corners along their edge (clamped per
 // edge). Returns false when degenerate (caller stacks at the marker).
-bool build_symmetric_polygon_loop(const PackedVector2Array &corners, const PackedVector2Array &corner_normals, int count, int distribution, PackedVector2Array &r_points, PackedVector2Array &r_normals, int corner_priority, int corner_mode, double edge_margin, int corner_facing) {
+bool build_symmetric_polygon_loop(const PackedVector2Array &corners, const PackedVector2Array &corner_normals, int count, const CornerLayout2D &corner, PackedVector2Array &r_points, PackedVector2Array &r_normals) {
+	// Locals: out-of-range values are clamped below.
+	const int distribution = corner.outline_distribution;
+	int corner_priority = corner.outline_corner_priority;
+	const int corner_mode = corner.outline_corner_mode;
+	double edge_margin = corner.outline_edge_margin;
+	int corner_facing = corner.outline_corner_facing;
 	const int n = corners.size();
 	r_points.clear();
 	r_normals.clear();
@@ -516,7 +522,7 @@ PackedVector2Array build_diamond_corners(real_t diagonal_x, real_t diagonal_y, r
 // mode and margin honored). Corners must wind like the rectangle primitive
 // (positive shoelace area); callers orientation-fix first. False when
 // degenerate (caller stacks at the marker, rectangle precedent).
-static bool sample_closed_polygon_loop(const PackedVector2Array &corners, int count, PackedVector2Array &r_points, PackedVector2Array &r_normals, int distribution = 1, int corner_priority = 0, int corner_mode = 0, double edge_margin = 0.0, int corner_facing = 0) {
+static bool sample_closed_polygon_loop(const PackedVector2Array &corners, int count, const CornerLayout2D &corner, PackedVector2Array &r_points, PackedVector2Array &r_normals) {
 	const int n = corners.size();
 	if (n < 3 || count <= 0) {
 		return false;
@@ -538,7 +544,30 @@ static bool sample_closed_polygon_loop(const PackedVector2Array &corners, int co
 	}
 	r_points.clear();
 	r_normals.clear();
-	return build_symmetric_polygon_loop(corners, normals, count, distribution, r_points, r_normals, corner_priority, corner_mode, edge_margin, corner_facing);
+	return build_symmetric_polygon_loop(corners, normals, count, corner, r_points, r_normals);
+}
+
+// Every slot stacked at the marker facing its rotation (+ offset): what a
+// zero-size / zero-area shape emits instead of garbage.
+static PatternSlots2D stack_at_marker2d(int transforms_amount, const Transform2D &marker_transform, real_t facing_offset_degrees) {
+	PatternSlots2D stacked = danmaku_make_slots(transforms_amount);
+	for (int i = 0; i < transforms_amount; ++i) {
+		Transform2D slot(marker_transform.get_rotation() + Math::deg_to_rad(facing_offset_degrees), marker_transform.get_origin());
+		danmaku_apply_marker_scale(slot, marker_transform);
+		stacked[i] = slot;
+	}
+	return stacked;
+}
+
+// Marker-local corners -> sampled closed loop -> outline layout. A degenerate
+// (zero-area) polygon stacks at the marker (stack_at_marker2d).
+static PatternSlots2D layout_polygon_corners2d(const char *caller, int transforms_amount, const Transform2D &marker_transform, const PackedVector2Array &corners, bool face_outward, real_t facing_offset_degrees, const OutlineLayout2D &outline, const CornerLayout2D &corner) {
+	PackedVector2Array loop_points;
+	PackedVector2Array loop_normals;
+	if (!sample_closed_polygon_loop(corners, transforms_amount, corner, loop_points, loop_normals)) {
+		return stack_at_marker2d(transforms_amount, marker_transform, facing_offset_degrees);
+	}
+	return layout_outline_slots(caller, marker_transform, loop_points, loop_normals, true, marker_transform.get_rotation(), face_outward, facing_offset_degrees, PackedFloat32Array(), outline, corner, corners, true, true);
 }
 
 PatternSlots2D BulletPatterns2D::generate_rectangle2d(int transforms_amount, Transform2D marker_transform, const RectangleParams2D &p) {
@@ -562,13 +591,7 @@ PatternSlots2D BulletPatterns2D::generate_rectangle2d(int transforms_amount, Tra
 	const real_t marker_rot = marker_transform.get_rotation();
 	if (!(total > 0.0)) {
 		// Zero-size box: every slot stacks at the marker facing outward.
-		PatternSlots2D stacked = danmaku_make_slots(transforms_amount);
-		for (int i = 0; i < transforms_amount; ++i) {
-			Transform2D slot(marker_rot + Math::deg_to_rad(p.facing_offset_degrees), marker_transform.get_origin());
-			danmaku_apply_marker_scale(slot, marker_transform);
-			stacked[i] = slot;
-		}
-		return stacked;
+		return stack_at_marker2d(transforms_amount, marker_transform, p.facing_offset_degrees);
 	}
 	// Corner-anchored symmetric walk over top, right, bottom, left: every
 	// corner always carries a bullet (squares read as squares at any count)
@@ -584,7 +607,7 @@ PatternSlots2D BulletPatterns2D::generate_rectangle2d(int transforms_amount, Tra
 	if (transforms_amount == 0) {
 		return PatternSlots2D();
 	}
-	PATTERN_REJECT_IF(!build_symmetric_polygon_loop(corners, normals, transforms_amount, p.corner.outline_distribution, loop_points, loop_normals, p.corner.outline_corner_priority, p.corner.outline_corner_mode, p.corner.outline_edge_margin, p.corner.outline_corner_facing), "degenerate rectangle.");
+	PATTERN_REJECT_IF(!build_symmetric_polygon_loop(corners, normals, transforms_amount, p.corner, loop_points, loop_normals), "degenerate rectangle.");
 	return layout_outline_slots(caller, marker_transform, loop_points, loop_normals, true, marker_rot, p.face_outward, p.facing_offset_degrees, PackedFloat32Array(), p.outline, p.corner, corners, true, true);
 }
 
@@ -613,13 +636,7 @@ PatternSlots2D BulletPatterns2D::generate_polygon2d(int transforms_amount, Trans
 	}
 	const real_t marker_rot = marker_transform.get_rotation();
 	if (!(total > 0.0) || !Math::is_finite(total)) {
-		PatternSlots2D stacked = danmaku_make_slots(transforms_amount);
-		for (int i = 0; i < transforms_amount; ++i) {
-			Transform2D slot(marker_rot + Math::deg_to_rad(p.facing_offset_degrees), marker_transform.get_origin());
-			danmaku_apply_marker_scale(slot, marker_transform);
-			stacked[i] = slot;
-		}
-		return stacked;
+		return stack_at_marker2d(transforms_amount, marker_transform, p.facing_offset_degrees);
 	}
 	// Corner-anchored symmetric walk: every corner carries a slot, small
 	// counts seat evenly spaced corners, opposite sides stay equal.
@@ -630,7 +647,7 @@ PatternSlots2D BulletPatterns2D::generate_polygon2d(int transforms_amount, Trans
 	if (transforms_amount == 0) {
 		return PatternSlots2D();
 	}
-	PATTERN_REJECT_IF(!build_symmetric_polygon_loop(corners, normals, transforms_amount, p.corner.outline_distribution, loop_points, loop_normals, p.corner.outline_corner_priority, p.corner.outline_corner_mode, p.corner.outline_edge_margin, p.corner.outline_corner_facing), "degenerate polygon.");
+	PATTERN_REJECT_IF(!build_symmetric_polygon_loop(corners, normals, transforms_amount, p.corner, loop_points, loop_normals), "degenerate polygon.");
 	return layout_outline_slots(caller, marker_transform, loop_points, loop_normals, true, marker_rot, p.face_outward, p.facing_offset_degrees, PackedFloat32Array(), p.outline, p.corner, corners, true, true);
 }
 
@@ -642,20 +659,7 @@ PatternSlots2D BulletPatterns2D::generate_triangle2d(int transforms_amount, Tran
 	PATTERN_REJECT_IF(!Math::is_finite(p.size_a) || p.size_a < 0.0 || !Math::is_finite(p.size_b) || p.size_b < 0.0 || !Math::is_finite(p.rotation) || !Math::is_finite(p.facing_offset_degrees), "size_a/size_b must be finite and >= 0, rotation and facing_offset_degrees finite.");
 	PATTERN_REQUIRE(pattern_check_corner_layout(caller, p.corner, p.outline.layer_layout));
 	PackedVector2Array corners = build_triangle_corners(p.triangle_type, p.size_a, p.size_b, p.rotation);
-	PackedVector2Array loop_points;
-	PackedVector2Array loop_normals;
-	if (!sample_closed_polygon_loop(corners, transforms_amount, loop_points, loop_normals, p.corner.outline_distribution, p.corner.outline_corner_priority, p.corner.outline_corner_mode, p.corner.outline_edge_margin, p.corner.outline_corner_facing)) {
-		// Degenerate (zero-area) triangle: stack at the marker like the
-		// rectangle primitive instead of emitting garbage.
-		PatternSlots2D stacked = danmaku_make_slots(transforms_amount);
-		for (int i = 0; i < transforms_amount; ++i) {
-			Transform2D slot(marker_transform.get_rotation() + Math::deg_to_rad(p.facing_offset_degrees), marker_transform.get_origin());
-			danmaku_apply_marker_scale(slot, marker_transform);
-			stacked[i] = slot;
-		}
-		return stacked;
-	}
-	return layout_outline_slots(caller, marker_transform, loop_points, loop_normals, true, marker_transform.get_rotation(), p.face_outward, p.facing_offset_degrees, PackedFloat32Array(), p.outline, p.corner, corners, true, true);
+	return layout_polygon_corners2d(caller, transforms_amount, marker_transform, corners, p.face_outward, p.facing_offset_degrees, p.outline, p.corner);
 }
 
 PatternSlots2D BulletPatterns2D::generate_trapezoid2d(int transforms_amount, Transform2D marker_transform, const TrapezoidParams2D &p) {
@@ -665,18 +669,7 @@ PatternSlots2D BulletPatterns2D::generate_trapezoid2d(int transforms_amount, Tra
 	PATTERN_REJECT_IF(!Math::is_finite(p.base_top) || p.base_top < 0.0 || !Math::is_finite(p.base_bottom) || p.base_bottom < 0.0 || !Math::is_finite(p.height) || p.height < 0.0 || !Math::is_finite(p.rotation) || !Math::is_finite(p.facing_offset_degrees), "bases and height must be finite and >= 0, rotation and facing_offset_degrees finite.");
 	PATTERN_REQUIRE(pattern_check_corner_layout(caller, p.corner, p.outline.layer_layout));
 	PackedVector2Array corners = build_trapezoid_corners(p.base_top, p.base_bottom, p.height, p.rotation);
-	PackedVector2Array loop_points;
-	PackedVector2Array loop_normals;
-	if (!sample_closed_polygon_loop(corners, transforms_amount, loop_points, loop_normals, p.corner.outline_distribution, p.corner.outline_corner_priority, p.corner.outline_corner_mode, p.corner.outline_edge_margin, p.corner.outline_corner_facing)) {
-		PatternSlots2D stacked = danmaku_make_slots(transforms_amount);
-		for (int i = 0; i < transforms_amount; ++i) {
-			Transform2D slot(marker_transform.get_rotation() + Math::deg_to_rad(p.facing_offset_degrees), marker_transform.get_origin());
-			danmaku_apply_marker_scale(slot, marker_transform);
-			stacked[i] = slot;
-		}
-		return stacked;
-	}
-	return layout_outline_slots(caller, marker_transform, loop_points, loop_normals, true, marker_transform.get_rotation(), p.face_outward, p.facing_offset_degrees, PackedFloat32Array(), p.outline, p.corner, corners, true, true);
+	return layout_polygon_corners2d(caller, transforms_amount, marker_transform, corners, p.face_outward, p.facing_offset_degrees, p.outline, p.corner);
 }
 
 PatternSlots2D BulletPatterns2D::generate_diamond2d(int transforms_amount, Transform2D marker_transform, const DiamondParams2D &p) {
@@ -686,18 +679,7 @@ PatternSlots2D BulletPatterns2D::generate_diamond2d(int transforms_amount, Trans
 	PATTERN_REJECT_IF(!Math::is_finite(p.diagonal_x) || p.diagonal_x < 0.0 || !Math::is_finite(p.diagonal_y) || p.diagonal_y < 0.0 || !Math::is_finite(p.rotation) || !Math::is_finite(p.facing_offset_degrees), "diagonals must be finite and >= 0, rotation and facing_offset_degrees finite.");
 	PATTERN_REQUIRE(pattern_check_corner_layout(caller, p.corner, p.outline.layer_layout));
 	PackedVector2Array corners = build_diamond_corners(p.diagonal_x, p.diagonal_y, p.rotation);
-	PackedVector2Array loop_points;
-	PackedVector2Array loop_normals;
-	if (!sample_closed_polygon_loop(corners, transforms_amount, loop_points, loop_normals, p.corner.outline_distribution, p.corner.outline_corner_priority, p.corner.outline_corner_mode, p.corner.outline_edge_margin, p.corner.outline_corner_facing)) {
-		PatternSlots2D stacked = danmaku_make_slots(transforms_amount);
-		for (int i = 0; i < transforms_amount; ++i) {
-			Transform2D slot(marker_transform.get_rotation() + Math::deg_to_rad(p.facing_offset_degrees), marker_transform.get_origin());
-			danmaku_apply_marker_scale(slot, marker_transform);
-			stacked[i] = slot;
-		}
-		return stacked;
-	}
-	return layout_outline_slots(caller, marker_transform, loop_points, loop_normals, true, marker_transform.get_rotation(), p.face_outward, p.facing_offset_degrees, PackedFloat32Array(), p.outline, p.corner, corners, true, true);
+	return layout_polygon_corners2d(caller, transforms_amount, marker_transform, corners, p.face_outward, p.facing_offset_degrees, p.outline, p.corner);
 }
 
 } // namespace BlastBullets2D

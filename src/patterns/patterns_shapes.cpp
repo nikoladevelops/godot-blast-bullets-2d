@@ -563,39 +563,22 @@ PatternSlots2D BulletPatterns2D::generate_waterfall2d(int transforms_amount, Tra
 	const Vector2 axis = p.rain_direction.normalized();
 	const Vector2 across = axis.orthogonal();
 	const real_t facing = axis.angle() + facing_offset;
-	const int capacity = p.columns * p.rows;
-	const int emit = Math::min(transforms_amount, capacity);
 	Ref<RandomNumberGenerator> waterfall_rng;
 	const bool waterfall_seeded = p.seed != 0;
 	if (waterfall_seeded) {
 		waterfall_rng.instantiate();
 		waterfall_rng->set_seed(p.seed);
 	}
-	for (int i = 0; i < emit; ++i) {
+	// Row-major over columns x rows. Slots past the capacity keep the
+	// curtain growing instead of stacking: extra rows continue down the fall
+	// axis at the same pitch with the stagger phase repeating (row % rows),
+	// so row N reads as a seamless extension.
+	for (int i = 0; i < transforms_amount; ++i) {
 		const int row = i / p.columns;
 		const int col = i % p.columns;
-		const real_t row_phase = (p.rows > 1) ? ((real_t)row / (real_t)(p.rows - 1) - 0.5) : 0.0;
+		const real_t row_phase = (p.rows > 1) ? ((real_t)(row % p.rows) / (real_t)(p.rows - 1) - 0.5) : 0.0;
 		const real_t col_centered = (p.columns > 1) ? ((real_t)col / (real_t)(p.columns - 1) - 0.5) : 0.0;
 		Vector2 pos = origin + across * (col_centered * p.column_spacing * (real_t)(p.columns - 1) + p.stagger * p.column_spacing * row_phase) + axis * ((real_t)row * p.row_spacing);
-		if (p.jitter > 0.0) {
-			real_t jx = waterfall_seeded ? waterfall_rng->randf_range(-p.jitter, p.jitter) : UtilityFunctions::randf_range(-p.jitter, p.jitter);
-			real_t jy = waterfall_seeded ? waterfall_rng->randf_range(-p.jitter, p.jitter) : UtilityFunctions::randf_range(-p.jitter, p.jitter);
-			pos += Vector2(jx, jy);
-		}
-		Transform2D slot(facing, pos);
-		danmaku_apply_marker_scale(slot, marker_transform);
-		generated_transforms[i] = slot;
-	}
-	// Overflow past capacity keeps the curtain growing instead of stacking:
-	// each extra row continues down the fall axis at the same column pitch,
-	// including the stagger phase, so row N reads as a seamless extension.
-	for (int i = emit; i < transforms_amount; ++i) {
-		const int extra = i - emit;
-		const int col = extra % p.columns;
-		const int extra_row = p.rows + extra / p.columns;
-		const real_t extra_phase = (p.rows > 1) ? ((real_t)(extra_row % p.rows) / (real_t)(p.rows - 1) - 0.5) : 0.0;
-		const real_t col_centered = (p.columns > 1) ? ((real_t)col / (real_t)(p.columns - 1) - 0.5) : 0.0;
-		Vector2 pos = origin + across * (col_centered * p.column_spacing * (real_t)(p.columns - 1) + p.stagger * p.column_spacing * extra_phase) + axis * ((real_t)extra_row * p.row_spacing);
 		if (p.jitter > 0.0) {
 			real_t jx = waterfall_seeded ? waterfall_rng->randf_range(-p.jitter, p.jitter) : UtilityFunctions::randf_range(-p.jitter, p.jitter);
 			real_t jy = waterfall_seeded ? waterfall_rng->randf_range(-p.jitter, p.jitter) : UtilityFunctions::randf_range(-p.jitter, p.jitter);
@@ -626,28 +609,13 @@ PatternSlots2D BulletPatterns2D::generate_lattice2d(int transforms_amount, Trans
 	const Vector2 origin = marker_transform.get_origin();
 	const real_t marker_rot = marker_transform.get_rotation();
 	const real_t facing_offset = Math::deg_to_rad(p.facing_offset_degrees);
-	const int capacity = p.columns * p.rows;
-	const int emit = Math::min(transforms_amount, capacity);
-	for (int i = 0; i < emit; ++i) {
+	// Row-major honeycomb; slots past columns x rows grow it with extra rows
+	// below at the same pitch (stagger included) instead of stacking.
+	for (int i = 0; i < transforms_amount; ++i) {
 		const int row = i / p.columns;
 		const int col = i % p.columns;
 		const real_t stagger = (p.stagger_rows && (row % 2 == 1)) ? p.spacing_x * 0.5 : 0.0;
 		const Vector2 pos = origin + Vector2(((real_t)col - (real_t)(p.columns - 1) * 0.5) * p.spacing_x + stagger, ((real_t)row - (real_t)(p.rows - 1) * 0.5) * p.spacing_y);
-		const real_t radial = (pos - origin).length_squared() > 0.0 ? (pos - origin).angle() : marker_rot;
-		real_t facing = p.face_outward ? radial : radial + Math::PI;
-		Transform2D slot(facing + facing_offset, pos);
-		danmaku_apply_marker_scale(slot, marker_transform);
-		generated_transforms[i] = slot;
-	}
-	// Overflow past capacity grows the honeycomb instead of stacking: extra
-	// rows continue below the grid at the same pitch (stagger included), so
-	// row N reads as a seamless extension like waterfall.
-	for (int i = emit; i < transforms_amount; ++i) {
-		const int extra = i - emit;
-		const int col = extra % p.columns;
-		const int extra_row = p.rows + extra / p.columns;
-		const real_t stagger = (p.stagger_rows && (extra_row % 2 == 1)) ? p.spacing_x * 0.5 : 0.0;
-		const Vector2 pos = origin + Vector2(((real_t)col - (real_t)(p.columns - 1) * 0.5) * p.spacing_x + stagger, ((real_t)extra_row - (real_t)(p.rows - 1) * 0.5) * p.spacing_y);
 		const real_t radial = (pos - origin).length_squared() > 0.0 ? (pos - origin).angle() : marker_rot;
 		real_t facing = p.face_outward ? radial : radial + Math::PI;
 		Transform2D slot(facing + facing_offset, pos);

@@ -842,7 +842,7 @@ PatternSlots2D layout_outline_slots(const char *caller_name, const Transform2D &
 				use_corners = mc;
 				use_normals = mn;
 			}
-			if (!build_symmetric_polygon_loop(use_corners, use_normals, layer_keep[L], outline_distribution, lp, ln, corner_priority, corner_mode, edge_margin, corner_facing)) {
+			if (!build_symmetric_polygon_loop(use_corners, use_normals, layer_keep[L], corner, lp, ln)) {
 				continue;
 			}
 			// Per-layer offset/twist: rotate each ring so stacked rings
