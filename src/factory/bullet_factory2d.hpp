@@ -430,6 +430,12 @@ public:
 	// agreement (no nulls, sparse ids match indexes, active ids in range,
 	// pooled instances inactive). Returns {ok, error}. Never mutates.
 	Dictionary debug_assert_no_dangling();
+	// Runs one factory physics step with an explicit delta (hitch / zero
+	// delta audits; the engine loop always steps at the fixed rate). Same
+	// guards as the engine tick: false and nothing advances while the
+	// factory is paused; refused (error) from inside a tick or for a
+	// non-finite or negative delta.
+	bool debug_advance_time(double delta);
 	// Live pool bucket of one volley (for per-bucket free/reset assertions in
 	// multi-spawner tests). Returns null with an error for null/outside nodes.
 	Ref<VolleyPoolKey2D> debug_get_pool_bucket(BulletVolley2D *volley);
@@ -547,11 +553,28 @@ public:
 	// already in the snapshot - so the swapped-in volley would be simulated a
 	// second time this frame (double-advancing its age, lifetime and curve
 	// clock). Re-verifying the pointer makes that impossible.
+	// Entries are resolved by instance id, never by slot: a free() from a
+	// handler swap-removes the list, moving the last volley into the freed
+	// slot (possibly one the sweep already passed), so a slot-based sweep
+	// SKIPPED that volley for the frame. The id finds it wherever it moved;
+	// the per-volley sweep stamps keep it to one tick.
 	struct VolleyIterationEntry {
-		int index = -1;
-		const void *instance = nullptr;
+		uint64_t id = 0;
+		BulletVolley2D *volley = nullptr;
 	};
 	std::vector<VolleyIterationEntry> iteration_scratch;
+	std::vector<VolleyIterationEntry> timer_iteration_scratch;
+	// Advanced once per factory physics step (tick + timers + effects).
+	uint64_t sweep_counter = 0;
+	// Bumped whenever a volley is destroyed (manual free, tracking removal).
+	// A sweep whose epoch is unchanged knows every snapshot pointer is still
+	// live, so the common path pays no ObjectDB lookup at all.
+	uint64_t volley_free_epoch = 0;
+
+public:
+	uint64_t get_sweep_counter() const { return sweep_counter; }
+
+private:
 
 	// Pool reuse counters. Incremented only on spawn pop/allocate
 	// paths (never in the per-bullet tick), so zero hot-path cost.

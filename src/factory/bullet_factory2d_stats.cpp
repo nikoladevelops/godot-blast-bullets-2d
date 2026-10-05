@@ -527,4 +527,20 @@ Dictionary BulletFactory2D::debug_get_attachments_pool_info() {
 	return dict;
 }
 
+bool BulletFactory2D::debug_advance_time(double delta) {
+	if (!Math::is_finite(delta) || delta < 0.0) {
+		UtilityFunctions::push_error("BulletFactory2D::debug_advance_time: delta must be finite and >= 0, nothing advanced.");
+		return false;
+	}
+	if (is_iterating_bullets) {
+		UtilityFunctions::push_error("BulletFactory2D::debug_advance_time: called from inside a factory tick, nothing advanced.");
+		return false;
+	}
+	if (!is_factory_processing_bullets) {
+		return false; // paused: the engine loop would not step either
+	}
+	_physics_process(delta);
+	return true;
+}
+
 } // namespace BlastBullets2D

@@ -110,6 +110,7 @@ void BulletFactory2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("debug_get_live_volley_ids", "owner_spawner_id"), &BulletFactory2D::debug_get_live_volley_ids);
 	ClassDB::bind_static_method("BulletFactory2D", D_METHOD("debug_expected_pool_key", "spawn_data"), &BulletFactory2D::debug_expected_pool_key);
 	ClassDB::bind_method(D_METHOD("debug_assert_no_dangling"), &BulletFactory2D::debug_assert_no_dangling);
+	ClassDB::bind_method(D_METHOD("debug_advance_time", "delta"), &BulletFactory2D::debug_advance_time);
 	ClassDB::bind_method(D_METHOD("debug_get_pool_bucket", "volley"), &BulletFactory2D::debug_get_pool_bucket);
 
 	ClassDB::bind_method(D_METHOD("get_debugger_max_providers"), &BulletFactory2D::get_debugger_max_providers);

@@ -47,28 +47,24 @@ void BulletVolley2D::run_custom_timers(double delta) {
 		return; // a callback re-entered the sweep: the outer pass owns this tick
 	}
 	ReentrancyGuard timers_guard(_timers_running_depth);
-	// Pass 1: advance, re-arm, collect. No user code runs here.
+	// Pass 1: advance and collect. No user code runs here. A timer that only
+	// runs for an active volley HOLDS while the volley is parked (every
+	// bullet disabled, still owned): its remaining time resumes on wake, so
+	// a one-shot is never consumed unseen and a repeating one keeps phase.
 	due_timer_scratch.clear();
 	for (CustomTimer &timer : custom_timers) {
-		timer._current_time -= delta;
-		if (timer._current_time > 0.0) {
+		if (timer._execute_only_if_volley_is_active && !is_active) {
 			continue;
 		}
-		due_timer_scratch.push_back(timer._id);
-		if (timer._repeating) {
-			// Carry the overshoot so the average period stays exact
-			// (resetting dropped up to one tick per period: a 0.1s timer at
-			// 60 Hz fired every 7 ticks). Anti-spiral: a period shorter than
-			// the tick fires once per tick and resyncs instead of banking an
-			// ever-growing debt.
-			timer._current_time += timer._initial_time;
-			if (timer._current_time <= 0.0) {
-				timer._current_time = timer._initial_time;
-			}
+		timer._current_time -= delta;
+		if (timer._current_time <= 0.0) {
+			due_timer_scratch.push_back(timer._id);
 		}
 	}
-	// Pass 2: call each due timer that is still attached (an earlier
-	// callback of this pass may have detached it, or freed the volley).
+	// Pass 2: fire each due timer that is still attached (an earlier
+	// callback of this pass may have detached it, parked or freed the
+	// volley). Re-arm or erase right before the call, so the callback sees
+	// its own next state and may detach itself.
 	const uint64_t self_id = get_instance_id();
 	for (size_t d = 0; d < due_timer_scratch.size(); ++d) {
 		const uint64_t id = due_timer_scratch[d];
@@ -82,13 +78,23 @@ void BulletVolley2D::run_custom_timers(double delta) {
 		if (index < 0) {
 			continue;
 		}
-		const Callable callback = custom_timers[index]._callback;
-		const bool only_if_active = custom_timers[index]._execute_only_if_volley_is_active;
-		if (!custom_timers[index]._repeating) {
-			custom_timers.erase(custom_timers.begin() + index);
+		CustomTimer &timer = custom_timers[index];
+		if (timer._execute_only_if_volley_is_active && !is_active) {
+			continue; // parked by an earlier callback: stays due, fires after the wake
 		}
-		if (only_if_active && !is_active) {
-			continue;
+		const Callable callback = timer._callback;
+		if (timer._repeating) {
+			// Carry the overshoot so the average period stays exact
+			// (resetting dropped up to one tick per period: a 0.1s timer at
+			// 60 Hz fired every 7 ticks). Anti-spiral: a period shorter than
+			// the tick fires once per tick and resyncs instead of banking an
+			// ever-growing debt.
+			timer._current_time += timer._initial_time;
+			if (timer._current_time <= 0.0) {
+				timer._current_time = timer._initial_time;
+			}
+		} else {
+			custom_timers.erase(custom_timers.begin() + index);
 		}
 		// The bound object can be freed between attach and fire; calling an
 		// invalid callable would spam engine errors every repeat.

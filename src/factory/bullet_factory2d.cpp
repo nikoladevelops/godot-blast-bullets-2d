@@ -10,21 +10,25 @@ using namespace godot;
 namespace BlastBullets2D {
 
 void BulletFactory2D::snapshot_active_volleys() {
-	// Snapshot the OCCUPANT alongside the index. A bounds check alone cannot
-	// catch a swap-remove: a user calling free() (not queue_free) inside a
-	// collision handler legitimately moves the last live volley into the
-	// freed index, and that index is already in this snapshot - without the
-	// identity check the swapped-in volley would be processed twice this
-	// frame (double-advancing its age, lifetime and curve clock).
+	// Snapshot (id, pointer) per active volley; see VolleyIterationEntry.
 	const std::vector<int> &dense = volley_set.get_active_indexes();
 	iteration_scratch.clear();
 	iteration_scratch.reserve(dense.size());
 	for (int index : dense) {
+		if (index < 0 || index >= (int)all_volleys.size() || all_volleys[index] == nullptr) {
+			continue;
+		}
 		VolleyIterationEntry entry;
-		entry.index = index;
-		entry.instance = (index >= 0 && index < (int)all_volleys.size()) ? (const void *)all_volleys[index] : nullptr;
+		entry.volley = all_volleys[index];
+		entry.id = entry.volley->get_cached_instance_id();
 		iteration_scratch.push_back(entry);
 	}
+}
+
+// The snapshot entry's volley if it still exists (a handler may have freed
+// it since), else nullptr. One ObjectDB lookup, no dereference before it.
+static _ALWAYS_INLINE_ BulletVolley2D *resolve_iteration_entry(uint64_t id, BulletVolley2D *volley) {
+	return ObjectDB::get_instance(ObjectID(id)) == (Object *)volley ? volley : nullptr;
 }
 
 void BulletFactory2D::tick_volleys(double delta) {
@@ -32,18 +36,15 @@ void BulletFactory2D::tick_volleys(double delta) {
 		return;
 	}
 	snapshot_active_volleys();
+	const uint64_t snapshot_epoch = volley_free_epoch;
 	for (const VolleyIterationEntry &entry : iteration_scratch) {
-		const int index = entry.index;
-		if (index < 0 || index >= (int)all_volleys.size()) {
+		BulletVolley2D *volley = volley_free_epoch == snapshot_epoch ? entry.volley : resolve_iteration_entry(entry.id, entry.volley);
+		// Freed, parked/pooled by an earlier handler, or already ticked (or
+		// begun a new life) this sweep: nothing to do.
+		if (volley == nullptr || !volley->is_active || volley->sweep_tick_stamp == sweep_counter) {
 			continue;
 		}
-		BulletVolley2D *volley = all_volleys[index];
-		// Identity re-check: skip a slot whose occupant changed since the
-		// snapshot (swap-remove). It is still simulated exactly once, via its
-		// own snapshot entry at the old index.
-		if (volley == nullptr || (const void *)volley != entry.instance || !volley->is_active) {
-			continue;
-		}
+		volley->sweep_tick_stamp = sweep_counter;
 		// Flag the volley for its whole tick: handlers fired from inside
 		// (collision drain, attachment callbacks) may spawn, and the pool must
 		// never hand out the volley whose drain is still running. Liveness is
@@ -51,11 +52,11 @@ void BulletFactory2D::tick_volleys(double delta) {
 		// (against the contract) must not crash the sweep.
 		++stats_tick_volleys;
 		stats_tick_bullets += volley->active_bullets_counter;
-		const uint64_t volley_id = volley->get_instance_id();
 		volley->is_being_ticked = true;
+		const uint64_t epoch_before_tick = volley_free_epoch;
 		volley->tick(delta);
-		if (ObjectDB::get_instance(ObjectID(volley_id)) != volley) {
-			continue;
+		if (volley_free_epoch != epoch_before_tick && ObjectDB::get_instance(ObjectID(entry.id)) != (Object *)volley) {
+			continue; // a handler freed this volley
 		}
 		volley->is_being_ticked = false;
 		// A handler paused the factory: every volley not ticked yet this
@@ -68,16 +69,13 @@ void BulletFactory2D::tick_volleys(double delta) {
 
 void BulletFactory2D::interpolate_volleys() {
 	// Interpolation only reads, but a re-entrant free/reset mid-loop mutates
-	// all_volleys under iteration; the identity check keeps a swap-remove
-	// from rendering one volley twice in a frame (same reasoning as above).
+	// all_volleys under iteration; resolving by id keeps a swap-remove from
+	// skipping or touching a freed volley (same reasoning as the tick).
 	snapshot_active_volleys();
+	const uint64_t snapshot_epoch = volley_free_epoch;
 	for (const VolleyIterationEntry &entry : iteration_scratch) {
-		const int index = entry.index;
-		if (index < 0 || index >= (int)all_volleys.size()) {
-			continue;
-		}
-		BulletVolley2D *volley = all_volleys[index];
-		if (volley == nullptr || (const void *)volley != entry.instance || !volley->is_active) {
+		BulletVolley2D *volley = volley_free_epoch == snapshot_epoch ? entry.volley : resolve_iteration_entry(entry.id, entry.volley);
+		if (volley == nullptr || !volley->is_active) {
 			continue;
 		}
 		volley->interpolate_bullet_visuals();
@@ -353,25 +351,35 @@ void BulletFactory2D::_physics_process(double delta) {
 	stats_tick_volleys = 0;
 	stats_tick_bullets = 0;
 	is_iterating_bullets = true;
+	++sweep_counter;
 	tick_volleys(delta);
 	// One-shot sprite effects age on the same clock as bullets (pausing the
 	// factory freezes both). Volley trails tick inside move_bullets instead.
 	age_fx_effects(delta);
 
-	// Index loops with cached size: timer callbacks run user code that may spawn
-	// (appending reallocates), which would dangle a range-for reference. operator[]
-	// re-evaluates the buffer each access, so this stays valid. Multis spawned
-	// mid-loop simply wait for the next tick.
-	const size_t volley_count = all_volleys.size();
-	for (size_t idx = 0; idx < volley_count && idx < all_volleys.size(); ++idx) {
-		BulletVolley2D *bullet = all_volleys[idx];
-		// Skip the call entirely when the volley holds no timers: the common
-		// no-timer game pays nothing per volley per tick. The vector is only
-		// mutated outside this loop (attach/detach defer during physics), so
-		// the emptiness check cannot race the iteration it guards.
-		if (bullet != nullptr && !bullet->custom_timers.empty()) {
-			bullet->run_custom_timers(delta);
+	// Timers run for every volley that holds some (parked ones included:
+	// their timers may be wake-up timers; pooled ones released theirs).
+	// Same id-resolved snapshot as the tick: callbacks run user code that
+	// may spawn (new volleys wait for the next step), free (swap-remove) or
+	// respawn, and each volley runs its timers at most once per step.
+	timer_iteration_scratch.clear();
+	for (BulletVolley2D *volley : all_volleys) {
+		if (volley != nullptr && !volley->custom_timers.empty()) {
+			VolleyIterationEntry entry;
+			entry.volley = volley;
+			entry.id = volley->get_cached_instance_id();
+			timer_iteration_scratch.push_back(entry);
 		}
+	}
+	const uint64_t timer_snapshot_epoch = volley_free_epoch;
+	for (size_t i = 0; i < timer_iteration_scratch.size(); ++i) {
+		const VolleyIterationEntry entry = timer_iteration_scratch[i];
+		BulletVolley2D *volley = volley_free_epoch == timer_snapshot_epoch ? entry.volley : resolve_iteration_entry(entry.id, entry.volley);
+		if (volley == nullptr || volley->sweep_timer_stamp == sweep_counter || volley->custom_timers.empty()) {
+			continue;
+		}
+		volley->sweep_timer_stamp = sweep_counter;
+		volley->run_custom_timers(delta);
 	}
 	is_iterating_bullets = false;
 

@@ -297,6 +297,12 @@ void BulletVolley2D::begin_life(const BulletVolleyData2D &data, uint64_t new_own
 			return;
 		}
 	}
+	// A life begun mid-sweep (cold spawn or pool reuse from a handler) starts
+	// on the NEXT factory step, never inside the one already running.
+	if (bullet_factory != nullptr) {
+		sweep_tick_stamp = bullet_factory->get_sweep_counter();
+		sweep_timer_stamp = sweep_tick_stamp;
+	}
 	// One generation (life id) per life: stale handles compare against it.
 	++volley_generation;
 	// Ownership first: a spawner volley is never observable as factory-owned.

@@ -139,6 +139,22 @@ public:
 	// volley stays reusable mid-sweep (same-key spawns from handlers work).
 	bool is_being_ticked = false;
 
+	// Once-per-sweep stamps (BulletFactory2D::sweep_counter): a volley ticks
+	// and runs its timers at most once per factory step, whatever a handler
+	// frees, pools or respawns mid-sweep. begin_life stamps both, so a new
+	// life started mid-sweep (cold or pool reuse) waits for the next step.
+	uint64_t sweep_tick_stamp = 0;
+	uint64_t sweep_timer_stamp = 0;
+	// Own instance id, cached on first use (the sweep resolves its snapshot
+	// by id; the engine call per volley per frame is skipped).
+	uint64_t cached_instance_id = 0;
+	_ALWAYS_INLINE_ uint64_t get_cached_instance_id() {
+		if (cached_instance_id == 0) {
+			cached_instance_id = get_instance_id();
+		}
+		return cached_instance_id;
+	}
+
 
 	// Gets the total amount of bullets that the multimesh always holds
 	_ALWAYS_INLINE_ int get_amount_bullets() const { return amount_bullets; };

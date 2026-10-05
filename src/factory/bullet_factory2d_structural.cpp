@@ -125,6 +125,7 @@ void BulletFactory2D::free_disabled_volleys(const PoolKey *key) {
 }
 
 void BulletFactory2D::remove_volley_from_tracking(BulletVolley2D *target) {
+	++volley_free_epoch;
 	int id_to_remove = target->sparse_set_id;
 	const int last_idx = static_cast<int>(all_volleys.size()) - 1;
 	if (id_to_remove < 0 || id_to_remove > last_idx) {
@@ -389,6 +390,7 @@ void BulletFactory2D::free_disabled_bullets(const Ref<VolleyPoolKey2D> &key) {
 }
 
 void BulletFactory2D::handle_manual_volley_deletion(BulletVolley2D &bullet_multi) {
+	++volley_free_epoch; // running sweeps re-resolve their snapshot by id
 	// During factory teardown the whole subtree dies with it; vectors die too, so
 	// there is nothing to fix up and child pointers must not be touched.
 	if (is_tearing_down) {
