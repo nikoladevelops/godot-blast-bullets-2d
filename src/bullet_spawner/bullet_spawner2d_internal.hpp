@@ -123,7 +123,7 @@ static constexpr const char *PREVIEW_HOLDER_NAME = "~BlastBulletsPatternPreview"
 
 // Shared limits (single definition so validation, generation and preview
 // agree; the inspector hint strings in _bind_methods mirror these).
-static constexpr int kMaxBulletsPerVolley = 10000; // helper_bullets_amount + helper_custom_transforms
+static constexpr int kMaxBulletsPerVolley = kPatternMaxBullets; // helper_bullets_amount + helper_custom_transforms
 
 static constexpr int kMaxHomingTargets = 10000; // homing_max_targets scene-scan bound
 
@@ -131,110 +131,43 @@ static constexpr int kMaxHomingDequeTargets = 256; // engine queue cap per volle
 
 static constexpr int kMaxOutlineLayers = 64; // helper_outline_layer_count + helper_outline_layer_scales
 
-static constexpr int kMaxPreviewTrackPoints = 256; // path/cross track decimation stride target
+static constexpr int kMaxPreviewTrackPoints = kPatternMaxTrackPoints; // path/cross track decimation stride target
 
-static constexpr int kMaxCrossTrackSteps = 256; // cross arm radial density cap
+static constexpr int kMaxCrossTrackSteps = kPatternMaxCrossTrackSteps; // cross arm radial density cap
 
 static constexpr int kPreviewZIndex = 4000; // dots + arrows layers
 
 static constexpr float kFirstDotRadiusScale = 1.6f; // bullet-0 emphasis marker
 
 
-// Single source of truth for pattern-source metadata: the inspector hint
-// string, pattern_source_name() and both supports_* predicates all read this
-// table, so display names, ids and shape capabilities can never drift apart.
-// Row order matches the historical hint string (not enum order) to keep the
-// inspector and saved scenes byte-identical.
-struct PatternSourceInfo {
-    BulletSpawner2D::PatternSource id;
-    const char *name;
-    bool outline;
-    bool corners;
-};
-
-static const PatternSourceInfo kPatternSources[] = {
-    { BulletSpawner2D::PATTERN_FROM_CHILDREN, "From Children", false, false },
-    { BulletSpawner2D::PATTERN_FROM_SELF, "From Self", false, false },
-    { BulletSpawner2D::PATTERN_FROM_HELPER_PATH2D, "Path2D", false, false },
-    { BulletSpawner2D::PATTERN_FROM_HELPER_AIMED, "Aimed", false, false },
-    { BulletSpawner2D::PATTERN_FROM_HELPER_CUSTOM, "Custom", false, false },
-    { BulletSpawner2D::PATTERN_FROM_HELPER_CIRCLE, "Circle", true, false },
-    { BulletSpawner2D::PATTERN_FROM_HELPER_SQUARE, "Square", true, true },
-    { BulletSpawner2D::PATTERN_FROM_HELPER_RECTANGLE, "Rectangle", true, true },
-    { BulletSpawner2D::PATTERN_FROM_HELPER_TRIANGLE, "Triangle", true, true },
-    { BulletSpawner2D::PATTERN_FROM_HELPER_DIAMOND, "Diamond", true, true },
-    { BulletSpawner2D::PATTERN_FROM_HELPER_TRAPEZOID, "Trapezoid", true, true },
-    { BulletSpawner2D::PATTERN_FROM_HELPER_POLYGON, "Polygon", true, true },
-    { BulletSpawner2D::PATTERN_FROM_HELPER_ELLIPSE, "Ellipse", true, false },
-    { BulletSpawner2D::PATTERN_FROM_HELPER_RING, "Ring", true, false },
-    { BulletSpawner2D::PATTERN_FROM_HELPER_STAR, "Star", true, true },
-    { BulletSpawner2D::PATTERN_FROM_HELPER_HEART, "Heart", true, false },
-    { BulletSpawner2D::PATTERN_FROM_HELPER_STAR_POLYGON, "Star Polygon", false, false },
-    { BulletSpawner2D::PATTERN_FROM_HELPER_FLOWER, "Flower", true, false },
-    { BulletSpawner2D::PATTERN_FROM_HELPER_ROSE, "Rose", true, false },
-    { BulletSpawner2D::PATTERN_FROM_HELPER_LISSAJOUS, "Lissajous", true, false },
-    { BulletSpawner2D::PATTERN_FROM_HELPER_LINE, "Line", false, false },
-    { BulletSpawner2D::PATTERN_FROM_HELPER_GRID, "Grid", false, false },
-    { BulletSpawner2D::PATTERN_FROM_HELPER_LATTICE, "Lattice", false, false },
-    { BulletSpawner2D::PATTERN_FROM_HELPER_RAIN, "Rain", false, false },
-    { BulletSpawner2D::PATTERN_FROM_HELPER_WATERFALL, "Waterfall", false, false },
-    { BulletSpawner2D::PATTERN_FROM_HELPER_WAVE, "Wave", false, false },
-    { BulletSpawner2D::PATTERN_FROM_HELPER_FAN, "Fan", false, false },
-    { BulletSpawner2D::PATTERN_FROM_HELPER_CORRIDOR, "Corridor", false, false },
-    { BulletSpawner2D::PATTERN_FROM_HELPER_SPIRAL, "Spiral", false, false },
-    { BulletSpawner2D::PATTERN_FROM_HELPER_MULTISPIRAL, "Multi Spiral", false, false },
-    { BulletSpawner2D::PATTERN_FROM_HELPER_COUNTER_SPIRAL, "Counter Spiral", false, false },
-    { BulletSpawner2D::PATTERN_FROM_HELPER_CROSS, "Cross", false, false },
-    { BulletSpawner2D::PATTERN_FROM_HELPER_SCATTER, "Scatter", false, false },
-};
-
-
-// Human-readable mode name for error messages (mirrors the pattern_source enum hint).
+// Pattern-source metadata lives in the pattern registry
+// (patterns/pattern_registry2d.hpp): names, ids, knob prefixes and shape
+// capabilities come from that one table. These wrappers keep the spawner's
+// historical call sites typed on its enum.
 static inline const char *pattern_source_name(BulletSpawner2D::PatternSource source) {
-    for (const PatternSourceInfo &info : kPatternSources) {
-        if (info.id == source) {
-            return info.name;
-        }
-    }
-    return "unknown";
+    return pattern_shape_name2d((int)source);
 }
 
-
-// Inspector hint built from the same table, so the dropdown can never list
-// a different set than the name lookup and predicates above.
 static inline String pattern_source_hint() {
-    String out;
-    for (const PatternSourceInfo &info : kPatternSources) {
-        if (!out.is_empty()) {
-            out += ",";
-        }
-        out += String(info.name) + ":" + itos((int)info.id);
-    }
-    return out;
+    return pattern_shape_hint2d();
 }
-
 
 // Corner-anchored polygon loops: the only shapes with shared corner dots
 // (rectangle, square, polygon, triangle, trapezoid, diamond, star). Corner
 // priority/mode/margin/facing knobs show for these only.
 static inline bool supports_corner_layout(BulletSpawner2D::PatternSource source) {
-    for (const PatternSourceInfo &info : kPatternSources) {
-        if (info.id == source) {
-            return info.corners;
-        }
-    }
-    return false;
+    return pattern_shape_supports_corners2d((int)source);
 }
 
 // WarnOnce2D codes owned by the spawner (1..99 belong to the volleys).
-static constexpr uint32_t kWarnCorridorGap = 101; // gap >= width at generation
+static constexpr uint32_t kWarnCorridorGap = kPatternWarnCorridorGap; // gap >= width at generation
 static constexpr uint32_t kWarnSkipIndexOutOfRange = 102; // helper_skip_indices
-static constexpr uint32_t kWarnGridTooLarge = 103; // waterfall/lattice columns*rows
+static constexpr uint32_t kWarnGridTooLarge = kPatternWarnGridTooLarge; // waterfall/lattice columns*rows
 static constexpr uint32_t kWarnOrbitWithoutHoming = 104; // orbiting needs homing
 
 // Grids (waterfall/lattice) may hold columns * rows up to this many slots
 // (the factory refuses more); each side is capped the same in its setter.
-static constexpr int kMaxGridSlots = kMaxBulletsPerVolley * 4;
+static constexpr int kMaxGridSlots = kPatternMaxGridSlots;
 // Burst chains longer than this are a typo, not a pattern.
 static constexpr int kMaxBurstCount = 1024;
 

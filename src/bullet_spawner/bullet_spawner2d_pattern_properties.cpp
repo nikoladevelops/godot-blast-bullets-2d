@@ -2536,14 +2536,14 @@ void BulletSpawner2D::set_helper_path2d_path(const NodePath &p_path) {
     on_pattern_changed();
 }
 
-BulletSpawner2D::Path2DSpace BulletSpawner2D::get_helper_path2d_space() const { return helper_path2d_space; }
+BulletSpawner2D::Path2DSpace BulletSpawner2D::get_helper_path2d_space() const { return (Path2DSpace)helper_path2d_space; }
 
 void BulletSpawner2D::set_helper_path2d_space(Path2DSpace value) {
     if (value < PATH2D_SPACE_FOLLOW_GENERATOR || value > PATH2D_SPACE_AT_PATH2D) {
         UtilityFunctions::push_error("BulletSpawner2D: invalid helper_path2d_space, keeping the old value.");
         return;
     }
-    helper_path2d_space = value;
+    helper_path2d_space = (int)value;
     on_pattern_changed();
 }
 
@@ -2561,14 +2561,14 @@ void BulletSpawner2D::set_helper_path2d_node(Node *node) {
     on_pattern_changed();
 }
 
-BulletSpawner2D::Path2DDistribution BulletSpawner2D::get_helper_path2d_distribution() const { return helper_path2d_distribution; }
+BulletSpawner2D::Path2DDistribution BulletSpawner2D::get_helper_path2d_distribution() const { return (Path2DDistribution)helper_path2d_distribution; }
 
 void BulletSpawner2D::set_helper_path2d_distribution(Path2DDistribution value) {
     if (value < PATH2D_DISTRIBUTION_FIXED_SPACING || value > PATH2D_DISTRIBUTION_EVEN) {
         UtilityFunctions::push_error("BulletSpawner2D: invalid helper_path2d_distribution, keeping the old value.");
         return;
     }
-    helper_path2d_distribution = value;
+    helper_path2d_distribution = (int)value;
     // Spacing/anchor/overflow visibility depends on this mode.
     notify_property_list_changed();
     on_pattern_changed();
@@ -2585,25 +2585,25 @@ void BulletSpawner2D::set_helper_path2d_spacing(double value) {
     on_pattern_changed();
 }
 
-BulletSpawner2D::Path2DOverflow BulletSpawner2D::get_helper_path2d_overflow() const { return helper_path2d_overflow; }
+BulletSpawner2D::Path2DOverflow BulletSpawner2D::get_helper_path2d_overflow() const { return (Path2DOverflow)helper_path2d_overflow; }
 
 void BulletSpawner2D::set_helper_path2d_overflow(Path2DOverflow value) {
     if (value < PATH2D_OVERFLOW_CLAMP || value > PATH2D_OVERFLOW_SHRINK_TO_FIT) {
         UtilityFunctions::push_error("BulletSpawner2D: invalid helper_path2d_overflow, keeping the old value.");
         return;
     }
-    helper_path2d_overflow = value;
+    helper_path2d_overflow = (int)value;
     on_pattern_changed();
 }
 
-BulletSpawner2D::Path2DAnchor BulletSpawner2D::get_helper_path2d_anchor() const { return helper_path2d_anchor; }
+BulletSpawner2D::Path2DAnchor BulletSpawner2D::get_helper_path2d_anchor() const { return (Path2DAnchor)helper_path2d_anchor; }
 
 void BulletSpawner2D::set_helper_path2d_anchor(Path2DAnchor value) {
     if (value < PATH2D_ANCHOR_START || value > PATH2D_ANCHOR_END) {
         UtilityFunctions::push_error("BulletSpawner2D: invalid helper_path2d_anchor, keeping the old value.");
         return;
     }
-    helper_path2d_anchor = value;
+    helper_path2d_anchor = (int)value;
     on_pattern_changed();
 }
 
@@ -2632,14 +2632,14 @@ void BulletSpawner2D::set_helper_path2d_closed(bool value) {
     on_pattern_changed();
 }
 
-BulletSpawner2D::Path2DFacing BulletSpawner2D::get_helper_path2d_facing() const { return helper_path2d_facing; }
+BulletSpawner2D::Path2DFacing BulletSpawner2D::get_helper_path2d_facing() const { return (Path2DFacing)helper_path2d_facing; }
 
 void BulletSpawner2D::set_helper_path2d_facing(Path2DFacing value) {
     if (value < PATH2D_FACING_ALONG_PATH || value > PATH2D_FACING_NORMAL_M90) {
         UtilityFunctions::push_error("BulletSpawner2D: invalid helper_path2d_facing, keeping the old value.");
         return;
     }
-    helper_path2d_facing = value;
+    helper_path2d_facing = (int)value;
     on_pattern_changed();
 }
 

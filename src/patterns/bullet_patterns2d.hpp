@@ -40,6 +40,12 @@ class BulletPatterns2D : public Object {
 	GDCLASS(BulletPatterns2D, Object)
 
 public:
+	// The shape registry (patterns/pattern_registry2d.hpp) as data, in
+	// inspector order: one Dictionary per pattern source with id, name,
+	// knob_prefix ("" when it owns no knobs), outline, corners and
+	// reads_external_state. Ids are BulletSpawner2D.pattern_source values.
+	static TypedArray<Dictionary> get_shapes();
+
 	// Enum class for grid alignment
 	enum Alignment {
 		TOP_LEFT,

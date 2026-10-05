@@ -12,12 +12,7 @@ using namespace godot;
 namespace BlastBullets2D {
 
 bool BulletSpawner2D::supports_outline_layout(PatternSource source) {
-    for (const PatternSourceInfo &info : kPatternSources) {
-        if (info.id == source) {
-            return info.outline;
-        }
-    }
-    return false;
+    return pattern_shape_supports_outline2d((int)source);
 }
 
 PackedVector2Array BulletSpawner2D::sample_path2d_polyline(bool quiet) const {
@@ -100,23 +95,6 @@ static_assert((int)BulletSpawner2D::PATH2D_OVERFLOW_CLAMP == (int)BulletPatterns
 static_assert((int)BulletSpawner2D::PATH2D_ANCHOR_START == (int)BulletPatterns2D::POLYLINE_ANCHOR_START && (int)BulletSpawner2D::PATH2D_ANCHOR_CENTER == (int)BulletPatterns2D::POLYLINE_ANCHOR_CENTER && (int)BulletSpawner2D::PATH2D_ANCHOR_END == (int)BulletPatterns2D::POLYLINE_ANCHOR_END, "Path2D anchor ids mirror the polyline layout");
 static_assert((int)BulletSpawner2D::PATH2D_FACING_ALONG_PATH == (int)BulletPatterns2D::POLYLINE_FACING_ALONG_PATH && (int)BulletSpawner2D::PATH2D_FACING_NORMAL_P90 == (int)BulletPatterns2D::POLYLINE_FACING_NORMAL_P90 && (int)BulletSpawner2D::PATH2D_FACING_NORMAL_M90 == (int)BulletPatterns2D::POLYLINE_FACING_NORMAL_M90, "Path2D facing ids mirror the polyline layout");
 
-// Path2D mode: the shared polyline layout (patterns/patterns_polyline.cpp)
-// fed with the helper_path2d_* knobs (ids mirror BulletPatterns2D's
-// Polyline* enums, locked by test).
-TypedArray<Transform2D> BulletSpawner2D::collect_path2d_transforms(const Transform2D &marker, const PackedVector2Array &path_pts, int count, bool quiet) const {
-    PolylineLayout2D p;
-    p.closed = helper_path2d_closed;
-    p.distribution = helper_path2d_distribution;
-    p.spacing = helper_path2d_spacing;
-    p.overflow = helper_path2d_overflow;
-    p.anchor = helper_path2d_anchor;
-    p.start_offset = helper_path2d_start_offset;
-    p.reverse = helper_path2d_reverse;
-    p.facing = helper_path2d_facing;
-    p.facing_offset_deg = helper_path2d_facing_offset_deg;
-    return polyline_layout2d(marker, path_pts, count, p, quiet, "BulletSpawner2D::collect_spawn_transforms");
-}
-
 // Predictive lead shared by the aimed volley and its preview cone: blends
 // the live position toward where the target will be after prediction_time at
 // its current velocity (CharacterBody2D-style get_velocity; anything else
@@ -160,295 +138,48 @@ TypedArray<Transform2D> BulletSpawner2D::collect_spawn_transforms() const {
 }
 
 TypedArray<Transform2D> BulletSpawner2D::generate_raw_pattern(Node2D *base, const Transform2D &marker, real_t mirror_sign, bool quiet) const {
-    TypedArray<Transform2D> raw;
+    // Resolve the scene-tree inputs the source reads, then hand generation
+    // to the patterns module (pattern_dispatch2d.cpp).
+    PatternInputs2D in;
+    in.source = (int)pattern_source;
+    in.marker = marker;
+    in.mirror_sign = mirror_sign;
+    in.quiet = quiet;
+    in.warn_owner_id = get_instance_id();
+    std::vector<Transform2D> children;
+    PackedVector2Array path_pts;
     switch (pattern_source) {
-        case PATTERN_FROM_SELF:
-            raw.push_back(marker);
-            break;
-        case PATTERN_FROM_CHILDREN: {
-            bool collected = false;
+        case PATTERN_FROM_CHILDREN:
             for (int i = 0; i < base->get_child_count(); ++i) {
                 Node2D *as_2d = Object::cast_to<Node2D>(base->get_child(i));
                 // The editor preview holder is a Node2D child too, but it is
                 // visualization only and must never become a spawn marker.
                 if (as_2d != nullptr && !as_2d->has_meta(PREVIEW_META_KEY)) {
-                    raw.push_back(as_2d->get_global_transform());
-                    collected = true;
+                    children.push_back(as_2d->get_global_transform());
                 }
             }
-            if (!collected) {
-                raw.push_back(marker);
+            in.children = &children;
+            break;
+        case PATTERN_FROM_HELPER_AIMED:
+            if (Node2D *target = get_helper_aimed_target()) {
+                in.has_aim_target = true;
+                in.aim_position = predict_target_pos(target);
             }
             break;
-        }
-        case PATTERN_FROM_HELPER_GRID:
-            raw = BulletPatterns2D::helper_generate_transforms_grid(helper_bullets_amount, marker, helper_grid_rows_per_column, (BulletPatterns2D::Alignment)helper_grid_alignment, helper_grid_column_offset, helper_grid_row_offset, helper_grid_rotate_with_marker, helper_grid_random_local_rotation, helper_grid_jitter, helper_grid_seed > 0 ? (uint64_t)helper_grid_seed : 0);
-            break;
-        case PATTERN_FROM_HELPER_RING:
-            raw = BulletPatterns2D::helper_generate_transforms_ring(helper_bullets_amount, marker, helper_ring_radius, helper_ring_start_angle, helper_ring_arc, helper_ring_rotate_with_marker, helper_ring_random_rotation, helper_ring_face_outward, helper_ring_y_scale, helper_ring_facing_offset_deg, helper_outline_placement, helper_outline_facing, helper_outline_reverse, helper_outline_slot_offset, helper_outline_fill_spacing, helper_outline_fill_stagger, helper_outline_fill_margin, helper_outline_layer_count, helper_outline_layer_scale, helper_outline_layer_side, helper_outline_layer_fill, helper_outline_layer_start_offset, helper_outline_layer_scale_curve, helper_outline_layer_scales, helper_outline_layer_twist, helper_outline_layer_max_dots, helper_ring_seed > 0 ? (uint64_t)helper_ring_seed : 0, helper_outline_layer_layout);
-            break;
-        case PATTERN_FROM_HELPER_FAN:
-            raw = BulletPatterns2D::helper_generate_transforms_fan(helper_bullets_amount, marker, helper_fan_spread, helper_fan_direction_angle, helper_fan_step_offset, helper_fan_centered, helper_fan_angle_jitter, helper_fan_seed > 0 ? (uint64_t)helper_fan_seed : 0);
-            break;
-        case PATTERN_FROM_HELPER_SPIRAL:
-            // True chirality: negating angle_step winds the spiral the other
-            // way, which is what "mirror" promises. The old code only negated
-            // the emitter spin, so a mirrored spiral still wound identically.
-            raw = BulletPatterns2D::helper_generate_transforms_spiral(helper_bullets_amount, marker, helper_spiral_start_radius, helper_spiral_radius_step, helper_spiral_angle_step * mirror_sign, helper_spiral_rotate_with_marker, (BulletPatterns2D::SpiralFacingMode)helper_spiral_facing, helper_spiral_facing_offset_deg);
-            break;
-        case PATTERN_FROM_HELPER_LINE: {
-            // helper_line_perpendicular retired: helper_line_facing rotates
-            // the composed facing instead. Order ops mirror/rotate the row,
-            // then the facing turns, then the axis shift applies on top
-            // (direction is global-space, like the generator uses it).
-            TypedArray<Transform2D> line_raw = BulletPatterns2D::helper_generate_transforms_line(helper_bullets_amount, marker, helper_line_direction, helper_line_spacing, helper_line_face_direction, (BulletPatterns2D::LineAnchor)helper_line_anchor, false);
-            const int ln = line_raw.size();
-            const int facing_sel = (helper_line_facing >= 0 && helper_line_facing <= 2) ? helper_line_facing : 0;
-            const real_t line_sel = facing_sel == 1 ? Math::PI * 0.5 : (facing_sel == 2 ? -Math::PI * 0.5 : 0.0);
-            Vector2 line_axis = Vector2(1, 0);
-            if (helper_line_direction.is_finite() && helper_line_direction.length_squared() > 1e-12) {
-                line_axis = helper_line_direction.normalized();
-            }
-            const Vector2 line_shift = line_axis * (real_t)MAX(helper_line_start_offset, 0.0);
-            for (int i = 0; i < ln; ++i) {
-                int j = helper_line_reverse ? (ln - 1 - i) : i;
-                if (ln > 1) {
-                    int k = helper_line_slot_offset % ln;
-                    if (k < 0) {
-                        k += ln;
-                    }
-                    j = helper_line_reverse ? (ln - 1 - ((i + k) % ln)) : ((i + k) % ln);
-                }
-                Transform2D slot = line_raw[j];
-                if (!slot.is_finite()) {
-                    continue;
-                }
-                const Vector2 shifted = slot.get_origin() + line_shift;
-                if (!shifted.is_finite()) {
-                    continue;
-                }
-                slot.set_origin(shifted);
-                const real_t rot = slot.get_rotation() + line_sel;
-                if (Math::is_finite((double)rot)) {
-                    slot.set_rotation(rot);
-                }
-                raw.push_back(slot);
-            }
-            break;
-        }
-        case PATTERN_FROM_HELPER_AIMED: {
-            Node2D *target = get_helper_aimed_target();
-            if (target == nullptr) {
-                if (!quiet) {
-                    UtilityFunctions::push_error("BulletSpawner2D::collect_spawn_transforms: no aimed target assigned (helper_aimed_target_path).");
-                }
-                break;
-            }
-            // Predictive lead via the shared helper so the volley and the
-            // preview cone always agree on where the target will be.
-            Vector2 aim_pos = predict_target_pos(target);
-            raw = BulletPatterns2D::helper_generate_transforms_aimed(helper_bullets_amount, marker, aim_pos, helper_aimed_spread, helper_aimed_step_offset, helper_aimed_centered);
-            break;
-        }
-        case PATTERN_FROM_HELPER_FLOWER:
-            raw = BulletPatterns2D::helper_generate_transforms_flower(helper_bullets_amount, marker, helper_flower_petals, helper_flower_radius, helper_flower_petal_spread, helper_flower_petal_sharpness, helper_flower_base_rotation, helper_flower_face_outward, helper_flower_facing_offset_deg, helper_outline_placement, helper_outline_facing, helper_outline_reverse, helper_outline_slot_offset, helper_outline_fill_spacing, helper_outline_fill_stagger, helper_outline_fill_margin, helper_outline_layer_count, helper_outline_layer_scale, helper_outline_layer_side, helper_outline_layer_fill, helper_outline_layer_start_offset, helper_outline_layer_scale_curve, helper_outline_layer_scales, helper_outline_layer_twist, helper_outline_layer_max_dots, helper_flower_type, helper_flower_inner_radius_scale, helper_flower_spiro_roller, helper_flower_spiro_pen, helper_flower_super_lobes, helper_flower_super_fullness, helper_outline_layer_layout);
-            break;
-        case PATTERN_FROM_HELPER_ELLIPSE:
-            raw = BulletPatterns2D::helper_generate_transforms_ellipse(helper_bullets_amount, marker, helper_ellipse_radius_x, helper_ellipse_radius_y, helper_ellipse_rotation, helper_ellipse_start_angle, helper_ellipse_arc, (BulletPatterns2D::EllipseMode)helper_ellipse_mode, helper_ellipse_gap_count, helper_ellipse_gap_width, helper_ellipse_face_outward, helper_ellipse_facing_offset_deg, helper_outline_placement, helper_outline_facing, helper_outline_reverse, helper_outline_slot_offset, helper_outline_fill_spacing, helper_outline_fill_stagger, helper_outline_fill_margin, helper_outline_layer_count, helper_outline_layer_scale, helper_outline_layer_side, helper_outline_layer_fill, helper_outline_layer_start_offset, helper_outline_layer_scale_curve, helper_outline_layer_scales, helper_outline_layer_twist, helper_outline_layer_max_dots, helper_outline_layer_layout);
-            break;
-        case PATTERN_FROM_HELPER_RAIN:
-            raw = BulletPatterns2D::helper_generate_transforms_rain(helper_bullets_amount, marker, helper_rain_band_width, helper_rain_direction, helper_rain_drop_spacing, helper_rain_jitter, helper_rain_seed > 0 ? (uint64_t)helper_rain_seed : 0);
-            break;
-        case PATTERN_FROM_HELPER_SCATTER: {
-            uint64_t scatter_seed = helper_scatter_seed > 0 ? (uint64_t)helper_scatter_seed : 0;
-            if (quiet && scatter_seed == 0) {
-                // Preview stability: an unseeded layout re-rolls on every
-                // collect, and the preview re-collects on every tracked
-                // change (spin sweeps included), so a live seed would make
-                // the dots jump chaotically instead of rotating coherently.
-                // Pin the preview to one representative layout; live volleys
-                // keep per-shot randomness.
-                scatter_seed = 0x5CA77E5u;
-            }
-            raw = BulletPatterns2D::helper_generate_transforms_scatter(helper_bullets_amount, marker, helper_scatter_burst_radius, helper_scatter_facing_jitter, scatter_seed, helper_scatter_inner_radius, helper_scatter_direction, helper_scatter_arc, (BulletPatterns2D::ScatterFacingMode)helper_scatter_facing);
-            break;
-        }
-        case PATTERN_FROM_HELPER_STAR_POLYGON:
-            raw = BulletPatterns2D::helper_generate_transforms_star_polygon(helper_bullets_amount, marker, helper_star_polygon_vertices, helper_star_polygon_radius, helper_star_polygon_vertex_bias, helper_star_polygon_base_rotation, helper_star_polygon_face_outward, helper_star_polygon_facing_offset_deg);
-            break;
-        case PATTERN_FROM_HELPER_MULTISPIRAL:
-            raw = BulletPatterns2D::helper_generate_transforms_multispiral(helper_bullets_amount, marker, helper_multispiral_arms, helper_multispiral_start_radius, helper_multispiral_radius_step, helper_multispiral_angle_step * mirror_sign, helper_multispiral_rotate_with_marker, (BulletPatterns2D::SpiralFacingMode)helper_multispiral_facing, helper_multispiral_facing_offset_deg, helper_multispiral_arm_stride);
-            break;
-        case PATTERN_FROM_HELPER_CROSS:
-            raw = BulletPatterns2D::helper_generate_transforms_cross(helper_bullets_amount, marker, helper_cross_arm_count, helper_cross_arm_length, helper_cross_spacing, helper_cross_base_rotation, helper_cross_face_outward, helper_cross_facing_offset_deg);
-            break;
-        case PATTERN_FROM_HELPER_STAR:
-            raw = BulletPatterns2D::helper_generate_transforms_star(helper_bullets_amount, marker, helper_star_points, helper_star_outer_radius, helper_star_inner_radius, helper_star_base_rotation, helper_star_face_outward, helper_star_facing_offset_deg, helper_outline_placement, helper_outline_facing, helper_outline_reverse, helper_outline_slot_offset, helper_outline_fill_spacing, helper_outline_fill_stagger, helper_outline_fill_margin, helper_outline_layer_count, helper_outline_layer_scale, helper_outline_layer_side, helper_outline_layer_fill, helper_outline_layer_start_offset, helper_outline_layer_scale_curve, helper_outline_layer_scales, helper_outline_layer_twist, helper_outline_layer_max_dots, helper_outline_distribution, helper_outline_layer_layout, helper_outline_corner_priority, helper_outline_corner_mode, helper_outline_edge_margin, helper_outline_corner_facing);
-            break;
-        case PATTERN_FROM_HELPER_HEART:
-            raw = BulletPatterns2D::helper_generate_transforms_heart(helper_bullets_amount, marker, helper_heart_size, helper_heart_base_rotation, helper_heart_face_outward, helper_heart_facing_offset_deg, helper_outline_placement, helper_outline_facing, helper_outline_reverse, helper_outline_slot_offset, helper_outline_fill_spacing, helper_outline_fill_stagger, helper_outline_fill_margin, helper_outline_layer_count, helper_outline_layer_scale, helper_outline_layer_side, helper_outline_layer_fill, helper_outline_layer_start_offset, helper_outline_layer_scale_curve, helper_outline_layer_scales, helper_outline_layer_twist, helper_outline_layer_max_dots, helper_outline_layer_layout);
-            break;
-        case PATTERN_FROM_HELPER_WAVE:
-            raw = BulletPatterns2D::helper_generate_transforms_wave(helper_bullets_amount, marker, helper_wave_width, helper_wave_amplitude, helper_wave_waves, helper_wave_direction, helper_wave_face_direction, helper_wave_facing_offset_deg);
-            break;
-        case PATTERN_FROM_HELPER_WATERFALL:
-            // Each side is capped in its setter; the product is checked here
-            // (load order) with one warning, then the shot has no slots.
-            if ((int64_t)helper_waterfall_columns * (int64_t)helper_waterfall_rows > (int64_t)kMaxGridSlots) {
-                if (!quiet) {
-                    WarnOnce2D::warn(get_instance_id(), kWarnGridTooLarge, helper_waterfall_columns, helper_waterfall_rows, String("BulletSpawner2D: helper_waterfall_columns * helper_waterfall_rows exceeds ") + itos(kMaxGridSlots) + " slots; lower them.");
-                }
-                break;
-            }
-            raw = BulletPatterns2D::helper_generate_transforms_waterfall(helper_bullets_amount, marker, helper_waterfall_columns, helper_waterfall_column_spacing, helper_waterfall_rows, helper_waterfall_row_spacing, helper_waterfall_stagger, helper_waterfall_rain_direction, helper_waterfall_jitter, helper_waterfall_facing_offset_deg, helper_waterfall_seed > 0 ? (uint64_t)helper_waterfall_seed : 0);
-            break;
-        case PATTERN_FROM_HELPER_LATTICE:
-            // Each side is capped in its setter; the product is checked here
-            // (load order) with one warning, then the shot has no slots.
-            if ((int64_t)helper_lattice_columns * (int64_t)helper_lattice_rows > (int64_t)kMaxGridSlots) {
-                if (!quiet) {
-                    WarnOnce2D::warn(get_instance_id(), kWarnGridTooLarge, helper_lattice_columns, helper_lattice_rows, String("BulletSpawner2D: helper_lattice_columns * helper_lattice_rows exceeds ") + itos(kMaxGridSlots) + " slots; lower them.");
-                }
-                break;
-            }
-            raw = BulletPatterns2D::helper_generate_transforms_lattice(helper_bullets_amount, marker, helper_lattice_columns, helper_lattice_rows, helper_lattice_spacing_x, helper_lattice_spacing_y, helper_lattice_stagger_rows, helper_lattice_face_outward, helper_lattice_facing_offset_deg);
-            break;
-        case PATTERN_FROM_HELPER_ROSE:
-            raw = BulletPatterns2D::helper_generate_transforms_rose(helper_bullets_amount, marker, helper_rose_petals, helper_rose_radius, helper_rose_lobe_sharpness, helper_rose_base_rotation, helper_rose_face_outward, helper_rose_facing_offset_deg, helper_outline_placement, helper_outline_facing, helper_outline_reverse, helper_outline_slot_offset, helper_outline_fill_spacing, helper_outline_fill_stagger, helper_outline_fill_margin, helper_outline_layer_count, helper_outline_layer_scale, helper_outline_layer_side, helper_outline_layer_fill, helper_outline_layer_start_offset, helper_outline_layer_scale_curve, helper_outline_layer_scales, helper_outline_layer_twist, helper_outline_layer_max_dots, helper_outline_layer_layout);
-            break;
-        case PATTERN_FROM_HELPER_COUNTER_SPIRAL:
-            raw = BulletPatterns2D::helper_generate_transforms_counter_spiral(helper_bullets_amount, marker, helper_counter_spiral_arms, helper_counter_spiral_start_radius, helper_counter_spiral_radius_step, helper_counter_spiral_angle_step * mirror_sign, helper_counter_spiral_rotate_with_marker, (BulletPatterns2D::SpiralFacingMode)helper_counter_spiral_facing, helper_counter_spiral_facing_offset_deg, helper_counter_spiral_arm_stride, helper_counter_spiral_mirror_alternate_arms);
-            break;
-        case PATTERN_FROM_HELPER_CORRIDOR: {
+        case PATTERN_FROM_HELPER_CORRIDOR:
             // Corridor is aimed by design (AIMED_TRAP preset flows through
-            // here): prefer the live target like the Aimed case, fall back to
-            // the static aim direction when no target is assigned or the
-            // spawner runs outside the tree (preview still shows the wall).
-            const Vector2 corridor_aim = resolve_corridor_aim(helper_corridor_aim_direction, marker.get_origin());
-            // Width and gap are set independently (scene load order must not
-            // matter). A door as wide as the wall is clamped to half the
-            // width here, with one warning per (gap, width) pair.
-            double corridor_gap = helper_corridor_gap_width;
-            if (corridor_gap >= helper_corridor_width) {
-                corridor_gap = helper_corridor_width * 0.5;
-                if (!quiet) {
-                    WarnOnce2D::warn(get_instance_id(), kWarnCorridorGap, (int64_t)(helper_corridor_gap_width * 1000.0), (int64_t)(helper_corridor_width * 1000.0),
-                            "BulletSpawner2D: helper_corridor_gap_width must be smaller than helper_corridor_width; using half the width for the door.");
-                }
-            }
-            raw = BulletPatterns2D::helper_generate_transforms_corridor(helper_bullets_amount, marker, corridor_aim, helper_corridor_width, 32.0, corridor_gap, helper_corridor_face_aim, helper_corridor_facing_offset_deg); // spacing reserved (unused) upstream: factory default
+            // here): prefer the live target, fall back to the static aim
+            // direction (preview still shows the wall outside the tree).
+            in.corridor_aim = resolve_corridor_aim(helper_corridor_aim_direction, marker.get_origin());
             break;
-        }
-        case PATTERN_FROM_HELPER_LISSAJOUS:
-            raw = BulletPatterns2D::helper_generate_transforms_lissajous(helper_bullets_amount, marker, helper_lissajous_size_x, helper_lissajous_size_y, helper_lissajous_freq_x, helper_lissajous_freq_y, helper_lissajous_phase, helper_lissajous_face_outward, helper_lissajous_facing_offset_deg, helper_outline_placement, helper_outline_facing, helper_outline_reverse, helper_outline_slot_offset, helper_outline_fill_spacing, helper_outline_fill_stagger, helper_outline_fill_margin, helper_outline_layer_count, helper_outline_layer_scale, helper_outline_layer_side, helper_outline_layer_fill, helper_outline_layer_start_offset, helper_outline_layer_scale_curve, helper_outline_layer_scales, helper_outline_layer_twist, helper_outline_layer_max_dots, helper_outline_layer_layout);
+        case PATTERN_FROM_HELPER_PATH2D:
+            path_pts = sample_path2d_polyline(quiet);
+            in.path_points = &path_pts;
             break;
-        case PATTERN_FROM_HELPER_CUSTOM: {
-            // Hand-placed transforms: every stored slot spawns exactly where
-            // the user put it (generator-local, composed as marker * local so
-            // spin and scales keep working). Order ops mirror/rotate the
-            // array, then the facing selector rewrites rotations. Non-finite
-            // entries can never spawn safely, so they are skipped (the setter
-            // already rejects them wholesale; this is belt-and-braces for
-            // scenes saved by older builds).
-            const int cn = helper_custom_transforms.size();
-            if (cn <= 0) {
-                if (!quiet) UtilityFunctions::push_error("BulletSpawner2D::collect_spawn_transforms: helper_custom_transforms is empty.");
-                break;
-            }
-            if (!marker.is_finite()) {
-                if (!quiet) UtilityFunctions::push_error("BulletSpawner2D::collect_spawn_transforms: Custom mode marker transform is not finite.");
-                break;
-            }
-            const int custom_sel = (helper_custom_facing >= 0 && helper_custom_facing <= 4) ? helper_custom_facing : 0;
-            const real_t custom_offset = Math::is_finite(helper_custom_facing_offset_deg) ? Math::deg_to_rad((real_t)helper_custom_facing_offset_deg) : 0.0;
-            for (int i = 0; i < cn; ++i) {
-                int j = helper_custom_reverse ? (cn - 1 - i) : i;
-                if (cn > 1) {
-                    int k = helper_custom_slot_offset % cn;
-                    if (k < 0) {
-                        k += cn;
-                    }
-                    j = helper_custom_reverse ? (cn - 1 - ((i + k) % cn)) : ((i + k) % cn);
-                }
-                const Variant stored = (j >= 0 && j < helper_custom_transforms.size()) ? helper_custom_transforms[j] : Variant();
-                if (stored.get_type() != Variant::TRANSFORM2D) {
-                    continue;
-                }
-                Transform2D local = stored;
-                if (!local.is_finite()) {
-                    continue;
-                }
-                real_t rot = local.get_rotation();
-                if (custom_sel != 0) {
-                    const Vector2 radial = local.get_origin();
-                    const double ra = (radial.is_finite() && radial.length_squared() > 1e-12) ? radial.angle() : 0.0;
-                    if (custom_sel == 1) {
-                        rot = (real_t)ra;
-                    } else if (custom_sel == 2) {
-                        rot = (real_t)ra + Math::PI;
-                    } else if (custom_sel == 3) {
-                        rot = local.get_rotation() + Math::PI * 0.5;
-                    } else {
-                        rot = local.get_rotation() - Math::PI * 0.5;
-                    }
-                }
-                rot += custom_offset;
-                if (!Math::is_finite((double)rot)) {
-                    continue;
-                }
-                local.set_rotation(rot);
-                Transform2D slot = marker * local;
-                if (!slot.is_finite()) {
-                    continue;
-                }
-                raw.push_back(slot);
-            }
+        default:
             break;
-        }
-        case PATTERN_FROM_HELPER_CIRCLE:
-            raw = BulletPatterns2D::helper_generate_transforms_circle(helper_bullets_amount, marker, (real_t)helper_circle_radius, helper_circle_face_outward, (real_t)helper_circle_facing_offset_deg, helper_outline_placement, helper_outline_facing, helper_outline_reverse, helper_outline_slot_offset, helper_outline_fill_spacing, helper_outline_fill_stagger, helper_outline_fill_margin, helper_outline_layer_count, helper_outline_layer_scale, helper_outline_layer_side, helper_outline_layer_fill, helper_outline_layer_start_offset, helper_outline_layer_scale_curve, helper_outline_layer_scales, helper_outline_layer_twist, helper_outline_layer_max_dots, helper_outline_layer_layout);
-            break;
-        case PATTERN_FROM_HELPER_RECTANGLE:
-            raw = BulletPatterns2D::helper_generate_transforms_rectangle(helper_bullets_amount, marker, helper_rectangle_size, helper_rectangle_face_outward, (real_t)helper_rectangle_facing_offset_deg, helper_outline_placement, helper_outline_facing, helper_outline_reverse, helper_outline_slot_offset, helper_outline_fill_spacing, helper_outline_fill_stagger, helper_outline_fill_margin, helper_outline_layer_count, helper_outline_layer_scale, helper_outline_layer_side, helper_outline_layer_fill, helper_outline_layer_start_offset, helper_outline_layer_scale_curve, helper_outline_layer_scales, helper_outline_layer_twist, helper_outline_layer_max_dots, helper_outline_distribution, helper_outline_layer_layout, helper_outline_corner_priority, helper_outline_corner_mode, helper_outline_edge_margin, helper_outline_corner_facing);
-            break;
-        case PATTERN_FROM_HELPER_SQUARE:
-            raw = BulletPatterns2D::helper_generate_transforms_rectangle(helper_bullets_amount, marker, Vector2((real_t)helper_square_size, (real_t)helper_square_size), helper_square_face_outward, (real_t)helper_square_facing_offset_deg, helper_outline_placement, helper_outline_facing, helper_outline_reverse, helper_outline_slot_offset, helper_outline_fill_spacing, helper_outline_fill_stagger, helper_outline_fill_margin, helper_outline_layer_count, helper_outline_layer_scale, helper_outline_layer_side, helper_outline_layer_fill, helper_outline_layer_start_offset, helper_outline_layer_scale_curve, helper_outline_layer_scales, helper_outline_layer_twist, helper_outline_layer_max_dots, helper_outline_distribution, helper_outline_layer_layout, helper_outline_corner_priority, helper_outline_corner_mode, helper_outline_edge_margin, helper_outline_corner_facing);
-            break;
-        case PATTERN_FROM_HELPER_POLYGON:
-            raw = BulletPatterns2D::helper_generate_transforms_polygon(helper_bullets_amount, marker, helper_polygon_vertices, (real_t)helper_polygon_radius, (real_t)helper_polygon_rotation, helper_polygon_face_outward, (real_t)helper_polygon_facing_offset_deg, helper_outline_placement, helper_outline_facing, helper_outline_reverse, helper_outline_slot_offset, helper_outline_fill_spacing, helper_outline_fill_stagger, helper_outline_fill_margin, helper_outline_layer_count, helper_outline_layer_scale, helper_outline_layer_side, helper_outline_layer_fill, helper_outline_layer_start_offset, helper_outline_layer_scale_curve, helper_outline_layer_scales, helper_outline_layer_twist, helper_outline_layer_max_dots, helper_outline_distribution, helper_outline_layer_layout, helper_outline_corner_priority, helper_outline_corner_mode, helper_outline_edge_margin, helper_outline_corner_facing);
-            break;
-        case PATTERN_FROM_HELPER_TRIANGLE:
-            raw = BulletPatterns2D::helper_generate_transforms_triangle(helper_bullets_amount, marker, (BulletPatterns2D::TriangleType)helper_triangle_type, helper_triangle_size_a, helper_triangle_size_b, helper_triangle_rotation, helper_triangle_face_outward, helper_triangle_facing_offset_deg, helper_outline_placement, helper_outline_facing, helper_outline_reverse, helper_outline_slot_offset, helper_outline_fill_spacing, helper_outline_fill_stagger, helper_outline_fill_margin, helper_outline_layer_count, helper_outline_layer_scale, helper_outline_layer_side, helper_outline_layer_fill, helper_outline_layer_start_offset, helper_outline_layer_scale_curve, helper_outline_layer_scales, helper_outline_layer_twist, helper_outline_layer_max_dots, helper_outline_distribution, helper_outline_layer_layout, helper_outline_corner_priority, helper_outline_corner_mode, helper_outline_edge_margin, helper_outline_corner_facing);
-            break;
-        case PATTERN_FROM_HELPER_TRAPEZOID:
-            raw = BulletPatterns2D::helper_generate_transforms_trapezoid(helper_bullets_amount, marker, helper_trapezoid_base_top, helper_trapezoid_base_bottom, helper_trapezoid_height, helper_trapezoid_rotation, helper_trapezoid_face_outward, helper_trapezoid_facing_offset_deg, helper_outline_placement, helper_outline_facing, helper_outline_reverse, helper_outline_slot_offset, helper_outline_fill_spacing, helper_outline_fill_stagger, helper_outline_fill_margin, helper_outline_layer_count, helper_outline_layer_scale, helper_outline_layer_side, helper_outline_layer_fill, helper_outline_layer_start_offset, helper_outline_layer_scale_curve, helper_outline_layer_scales, helper_outline_layer_twist, helper_outline_layer_max_dots, helper_outline_distribution, helper_outline_layer_layout, helper_outline_corner_priority, helper_outline_corner_mode, helper_outline_edge_margin, helper_outline_corner_facing);
-            break;
-        case PATTERN_FROM_HELPER_DIAMOND:
-            raw = BulletPatterns2D::helper_generate_transforms_diamond(helper_bullets_amount, marker, helper_diamond_diagonal_x, helper_diamond_diagonal_y, helper_diamond_rotation, helper_diamond_face_outward, helper_diamond_facing_offset_deg, helper_outline_placement, helper_outline_facing, helper_outline_reverse, helper_outline_slot_offset, helper_outline_fill_spacing, helper_outline_fill_stagger, helper_outline_fill_margin, helper_outline_layer_count, helper_outline_layer_scale, helper_outline_layer_side, helper_outline_layer_fill, helper_outline_layer_start_offset, helper_outline_layer_scale_curve, helper_outline_layer_scales, helper_outline_layer_twist, helper_outline_layer_max_dots, helper_outline_distribution, helper_outline_layer_layout, helper_outline_corner_priority, helper_outline_corner_mode, helper_outline_edge_margin, helper_outline_corner_facing);
-            break;
-        case PATTERN_FROM_HELPER_PATH2D: {
-            // Standalone live-curve layout (no spray rig): bullets sit ON the
-            // baked curve, spaced per helper_path2d_distribution, facing
-            // tangent-first per helper_path2d_facing. One tree read per
-            // volley, so drawn terrain that animates just works.
-            PackedVector2Array path_pts = sample_path2d_polyline(quiet);
-            if (path_pts.is_empty()) {
-                break; // the sampler already reported the exact cause
-            }
-            raw = collect_path2d_transforms(marker, path_pts, helper_bullets_amount, quiet);
-            break;
-        }
-        default: {
-            // Unknown source (corrupt scene int, version skew): fail loud so
-            // a dead mode can never hide as Children behavior again.
-            if (!quiet) {
-                UtilityFunctions::push_error(String("BulletSpawner2D::collect_spawn_transforms: unknown pattern_source ") + itos((int)pattern_source) + ", falling back to the generator itself.");
-            }
-            raw.push_back(marker);
-            break;
-        }
     }
-    return raw;
+    return generate_raw(in);
 }
 
 // ---- Pattern bake cache ----------------------------------------------------
@@ -545,19 +276,11 @@ void BulletSpawner2D::reset_pattern_knobs_to_defaults() {
 
 // Sources whose raw transforms read state OTHER than the marker + the
 // spawner's own properties (child nodes, a target, a Path2D curve, a user
-// array that can be mutated in place): always regenerated. Everything else is
-// classified by probing (PatternBakeCache2D::classify).
+// array that can be mutated in place) are always regenerated: the registry
+// flags them (reads_external_state). Everything else is classified by
+// probing (PatternBakeCache2D::classify).
 static bool pattern_source_reads_external_state(int source) {
-    switch (source) {
-        case BulletSpawner2D::PATTERN_FROM_CHILDREN:
-        case BulletSpawner2D::PATTERN_FROM_HELPER_AIMED:
-        case BulletSpawner2D::PATTERN_FROM_HELPER_CORRIDOR:
-        case BulletSpawner2D::PATTERN_FROM_HELPER_CUSTOM:
-        case BulletSpawner2D::PATTERN_FROM_HELPER_PATH2D:
-            return true;
-        default:
-            return false;
-    }
+    return pattern_shape_reads_external_state2d(source);
 }
 
 void BulletSpawner2D::resolve_raw_pattern(Node2D *base, const Transform2D &marker, real_t mirror_sign, bool quiet, std::vector<Transform2D> &r_raw) const {
