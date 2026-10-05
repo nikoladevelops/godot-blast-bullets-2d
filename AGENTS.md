@@ -597,7 +597,7 @@ src/
 ## 15. Benchmarks & profiling (measure before AND after any perf change)
 
 ```sh
-python3 tools/run_benchmarks.py                     # 15 headless scenarios x5 (median)
+python3 tools/run_benchmarks.py                     # 17 headless scenarios x5 (median)
 python3 tools/run_benchmarks.py --scenario spawner_ # substring filter (repeatable)
 python3 tools/run_benchmarks.py --gate              # exit 1 on regression vs log/baseline.json
 python3 tools/run_benchmarks.py --update-baseline   # ONLY for an accepted change; say so in the commit
@@ -628,6 +628,9 @@ python3 tools/run_benchmarks.py --update-baseline   # ONLY for an accepted chang
   per-bullet `shape_set_data` re-updated all shapes of the area; one
   shared shape per volley made it O(N) (8k: 11 ms, 1k: 0.66 ms).
   Spawner preview spin/move: 0 rebuilds, p99 ~50 ms → 3–5 ms.
+  Live signals: `lifetime_signal_10k` adds ~0.25 ms per 10k-bullet expiry
+  wave over `mass_expiry_10k` with an empty handler (index arrays + veto
+  checks); the rest of its p99 is the handler's own GDScript.
   Inlining `move_bullets` into the factory loop cost 20-25% on
   `trails_fx_2k` (it lives in its own TU now); a `Ref<>` returned by value
   per bullet costs a reference()/unreference() engine call pair (trail and
