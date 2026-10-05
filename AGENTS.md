@@ -597,7 +597,7 @@ src/
 ## 15. Benchmarks & profiling (measure before AND after any perf change)
 
 ```sh
-python3 tools/run_benchmarks.py                     # 17 headless scenarios x5 (median)
+python3 tools/run_benchmarks.py                     # 18 headless scenarios x5 (median)
 python3 tools/run_benchmarks.py --scenario spawner_ # substring filter (repeatable)
 python3 tools/run_benchmarks.py --gate              # exit 1 on regression vs log/baseline.json
 python3 tools/run_benchmarks.py --update-baseline   # ONLY for an accepted change; say so in the commit

@@ -541,7 +541,7 @@ static bool sample_closed_polygon_loop(const PackedVector2Array &corners, int co
 	return build_symmetric_polygon_loop(corners, normals, count, distribution, r_points, r_normals, corner_priority, corner_mode, edge_margin, corner_facing);
 }
 
-TypedArray<Transform2D> BulletPatterns2D::helper_generate_transforms_rectangle(
+PatternSlots2D BulletPatterns2D::generate_rectangle2d(
 		int transforms_amount,
 		Transform2D marker_transform,
 		const Vector2 &size,
@@ -570,35 +570,35 @@ TypedArray<Transform2D> BulletPatterns2D::helper_generate_transforms_rectangle(
 		double outline_edge_margin,
 		int outline_corner_facing) {
 	if (!danmaku_validate_head("helper_generate_transforms_rectangle", transforms_amount, marker_transform)) {
-		return TypedArray<Transform2D>();
+		return PatternSlots2D();
 	}
 	if (!size.is_finite() || size.x < 0.0 || size.y < 0.0 || !Math::is_finite(facing_offset_degrees)) {
 		UtilityFunctions::push_error("helper_generate_transforms_rectangle: size must be finite with sides >= 0, facing_offset_degrees finite.");
-		return TypedArray<Transform2D>();
+		return PatternSlots2D();
 	}
 	if (outline_distribution < 0 || outline_distribution > 1) {
 		UtilityFunctions::push_error("helper_generate_transforms_rectangle: outline_distribution must be 0 (legacy) or 1 (symmetric).");
-		return TypedArray<Transform2D>();
+		return PatternSlots2D();
 	}
 	if (layer_layout < 0 || layer_layout > 1) {
 		UtilityFunctions::push_error("helper_generate_transforms_rectangle: layer_layout must be 0 (shared loop) or 1 (even per layer).");
-		return TypedArray<Transform2D>();
+		return PatternSlots2D();
 	}
 	if (outline_corner_priority < 0 || outline_corner_priority > 2) {
 		UtilityFunctions::push_error("helper_generate_transforms_rectangle: outline_corner_priority must be 0 (horizontal), 1 (vertical) or 2 (balanced).");
-		return TypedArray<Transform2D>();
+		return PatternSlots2D();
 	}
 	if (outline_corner_mode < 0 || outline_corner_mode > 1) {
 		UtilityFunctions::push_error("helper_generate_transforms_rectangle: outline_corner_mode must be 0 (pin corners) or 1 (even arc).");
-		return TypedArray<Transform2D>();
+		return PatternSlots2D();
 	}
 	if (!Math::is_finite(outline_edge_margin) || outline_edge_margin < 0.0) {
 		UtilityFunctions::push_error("helper_generate_transforms_rectangle: outline_edge_margin must be finite and >= 0.");
-		return TypedArray<Transform2D>();
+		return PatternSlots2D();
 	}
 	if (outline_corner_facing < 0 || outline_corner_facing > 2) {
 		UtilityFunctions::push_error("helper_generate_transforms_rectangle: outline_corner_facing must be 0 (side), 1 (miter) or 2 (smooth).");
-		return TypedArray<Transform2D>();
+		return PatternSlots2D();
 	}
 	// Counter-clockwise outline from top-left; corners double as normals via
 	// the shared edge worker so joints face clean diagonals. Normals stay
@@ -612,13 +612,13 @@ TypedArray<Transform2D> BulletPatterns2D::helper_generate_transforms_rectangle(
 	PackedVector2Array normals;
 	if (!compute_edge_normals_quiet(corners, true, false, normals)) {
 		UtilityFunctions::push_error("helper_generate_transforms_rectangle: degenerate rectangle.");
-		return TypedArray<Transform2D>();
+		return PatternSlots2D();
 	}
 	const real_t total = 2.0 * (size.x + size.y);
 	const real_t marker_rot = marker_transform.get_rotation();
 	if (!(total > 0.0)) {
 		// Zero-size box: every slot stacks at the marker facing outward.
-		TypedArray<Transform2D> stacked = danmaku_make_slots(transforms_amount);
+		PatternSlots2D stacked = danmaku_make_slots(transforms_amount);
 		for (int i = 0; i < transforms_amount; ++i) {
 			Transform2D slot(marker_rot + Math::deg_to_rad(facing_offset_degrees), marker_transform.get_origin());
 			danmaku_apply_marker_scale(slot, marker_transform);
@@ -638,13 +638,154 @@ TypedArray<Transform2D> BulletPatterns2D::helper_generate_transforms_rectangle(
 	// Zero bullets is a valid empty request (every other generator returns
 	// [] silently); only a real geometry failure below is "degenerate".
 	if (transforms_amount == 0) {
-		return TypedArray<Transform2D>();
+		return PatternSlots2D();
 	}
 	if (!build_symmetric_polygon_loop(corners, normals, transforms_amount, outline_distribution, loop_points, loop_normals, outline_corner_priority, outline_corner_mode, outline_edge_margin, outline_corner_facing)) {
 		UtilityFunctions::push_error("helper_generate_transforms_rectangle: degenerate rectangle.");
-		return TypedArray<Transform2D>();
+		return PatternSlots2D();
 	}
 	return layout_outline_slots("helper_generate_transforms_rectangle", marker_transform, loop_points, loop_normals, true, marker_rot, face_outward, facing_offset_degrees, PackedFloat32Array(), outline_placement, outline_facing, outline_reverse, outline_slot_offset, fill_spacing, fill_stagger, fill_margin, layer_count, layer_scale, layer_side, layer_fill, layer_start_offset, layer_scale_curve, layer_custom_scales, layer_twist, layer_max_dots, outline_distribution, layer_layout, corners, outline_corner_priority, outline_corner_mode, outline_edge_margin, true, true, outline_corner_facing);
+}
+
+TypedArray<Transform2D> BulletPatterns2D::helper_generate_transforms_rectangle(
+		int transforms_amount,
+		Transform2D marker_transform,
+		const Vector2 &size,
+		bool face_outward,
+		real_t facing_offset_degrees,
+		int outline_placement,
+		int outline_facing,
+		bool outline_reverse,
+		int outline_slot_offset,
+		double fill_spacing,
+		bool fill_stagger,
+		double fill_margin,
+		int layer_count,
+		double layer_scale,
+		int layer_side,
+		int layer_fill,
+		int layer_start_offset,
+		int layer_scale_curve,
+		const PackedFloat32Array &layer_custom_scales,
+		int layer_twist,
+		int layer_max_dots,
+		int outline_distribution,
+		int layer_layout,
+		int outline_corner_priority,
+		int outline_corner_mode,
+		double outline_edge_margin,
+		int outline_corner_facing) {
+	return pattern_slots_to_array(generate_rectangle2d(transforms_amount, marker_transform, size, face_outward, facing_offset_degrees, outline_placement, outline_facing, outline_reverse, outline_slot_offset, fill_spacing, fill_stagger, fill_margin, layer_count, layer_scale, layer_side, layer_fill, layer_start_offset, layer_scale_curve, layer_custom_scales, layer_twist, layer_max_dots, outline_distribution, layer_layout, outline_corner_priority, outline_corner_mode, outline_edge_margin, outline_corner_facing));
+}
+
+PatternSlots2D BulletPatterns2D::generate_polygon2d(
+		int transforms_amount,
+		Transform2D marker_transform,
+		int vertices,
+		real_t radius,
+		real_t base_rotation,
+		bool face_outward,
+		real_t facing_offset_degrees,
+		int outline_placement,
+		int outline_facing,
+		bool outline_reverse,
+		int outline_slot_offset,
+		double fill_spacing,
+		bool fill_stagger,
+		double fill_margin,
+		int layer_count,
+		double layer_scale,
+		int layer_side,
+		int layer_fill,
+		int layer_start_offset,
+		int layer_scale_curve,
+		const PackedFloat32Array &layer_custom_scales,
+		int layer_twist,
+		int layer_max_dots,
+		int outline_distribution,
+		int layer_layout,
+		int outline_corner_priority,
+		int outline_corner_mode,
+		double outline_edge_margin,
+		int outline_corner_facing) {
+	if (!danmaku_validate_head("helper_generate_transforms_polygon", transforms_amount, marker_transform)) {
+		return PatternSlots2D();
+	}
+	if (vertices < 3 || !Math::is_finite(radius) || radius < 0.0 || !Math::is_finite(base_rotation) || !Math::is_finite(facing_offset_degrees)) {
+		UtilityFunctions::push_error("helper_generate_transforms_polygon: vertices must be >= 3, radius finite and >= 0, rotations finite.");
+		return PatternSlots2D();
+	}
+	// The corner loop below builds `vertices` corners: cap it like star's
+	// points so hostile input can't hang the game.
+	if (vertices > HELPER_MAX_TRANSFORMS) {
+		UtilityFunctions::push_error("helper_generate_transforms_polygon: vertices is absurdly large; keep it near the bullet count.");
+		return PatternSlots2D();
+	}
+	if (outline_distribution < 0 || outline_distribution > 1) {
+		UtilityFunctions::push_error("helper_generate_transforms_polygon: outline_distribution must be 0 (legacy) or 1 (symmetric).");
+		return PatternSlots2D();
+	}
+	if (layer_layout < 0 || layer_layout > 1) {
+		UtilityFunctions::push_error("helper_generate_transforms_polygon: layer_layout must be 0 (shared loop) or 1 (even per layer).");
+		return PatternSlots2D();
+	}
+	if (outline_corner_priority < 0 || outline_corner_priority > 2) {
+		UtilityFunctions::push_error("helper_generate_transforms_polygon: outline_corner_priority must be 0 (horizontal), 1 (vertical) or 2 (balanced).");
+		return PatternSlots2D();
+	}
+	if (outline_corner_mode < 0 || outline_corner_mode > 1) {
+		UtilityFunctions::push_error("helper_generate_transforms_polygon: outline_corner_mode must be 0 (pin corners) or 1 (even arc).");
+		return PatternSlots2D();
+	}
+	if (!Math::is_finite(outline_edge_margin) || outline_edge_margin < 0.0) {
+		UtilityFunctions::push_error("helper_generate_transforms_polygon: outline_edge_margin must be finite and >= 0.");
+		return PatternSlots2D();
+	}
+	if (outline_corner_facing < 0 || outline_corner_facing > 2) {
+		UtilityFunctions::push_error("helper_generate_transforms_polygon: outline_corner_facing must be 0 (side), 1 (miter) or 2 (smooth).");
+		return PatternSlots2D();
+	}
+	PackedVector2Array corners;
+	for (int k = 0; k < vertices; ++k) {
+		const real_t a = base_rotation + Math::TAU * (real_t)k / (real_t)vertices;
+		corners.push_back(Vector2(Math::cos(a), Math::sin(a)) * radius);
+	}
+	PackedVector2Array normals;
+	if (!compute_edge_normals_quiet(corners, true, false, normals)) {
+		UtilityFunctions::push_error("helper_generate_transforms_polygon: degenerate polygon.");
+		return PatternSlots2D();
+	}
+	// Arc-length walk so slots spread evenly even on stretched shapes; the
+	// shared outline worker assembles facings (marker_rot rides as rot_add).
+	// Normals stay geometric here (the worker applies the face_outward flip).
+	real_t total = 0.0;
+	for (int k = 0; k < vertices; ++k) {
+		total += corners[k].distance_to(corners[(k + 1) % vertices]);
+	}
+	const real_t marker_rot = marker_transform.get_rotation();
+	if (!(total > 0.0) || !Math::is_finite(total)) {
+		PatternSlots2D stacked = danmaku_make_slots(transforms_amount);
+		for (int i = 0; i < transforms_amount; ++i) {
+			Transform2D slot(marker_rot + Math::deg_to_rad(facing_offset_degrees), marker_transform.get_origin());
+			danmaku_apply_marker_scale(slot, marker_transform);
+			stacked[i] = slot;
+		}
+		return stacked;
+	}
+	// Corner-anchored symmetric walk: every corner carries a slot, small
+	// counts seat evenly spaced corners, opposite sides stay equal.
+	PackedVector2Array loop_points;
+	PackedVector2Array loop_normals;
+	// Zero bullets is a valid empty request (every other generator returns
+	// [] silently); only a real geometry failure below is "degenerate".
+	if (transforms_amount == 0) {
+		return PatternSlots2D();
+	}
+	if (!build_symmetric_polygon_loop(corners, normals, transforms_amount, outline_distribution, loop_points, loop_normals, outline_corner_priority, outline_corner_mode, outline_edge_margin, outline_corner_facing)) {
+		UtilityFunctions::push_error("helper_generate_transforms_polygon: degenerate polygon.");
+		return PatternSlots2D();
+	}
+	return layout_outline_slots("helper_generate_transforms_polygon", marker_transform, loop_points, loop_normals, true, marker_rot, face_outward, facing_offset_degrees, PackedFloat32Array(), outline_placement, outline_facing, outline_reverse, outline_slot_offset, fill_spacing, fill_stagger, fill_margin, layer_count, layer_scale, layer_side, layer_fill, layer_start_offset, layer_scale_curve, layer_custom_scales, layer_twist, layer_max_dots, outline_distribution, layer_layout, corners, outline_corner_priority, outline_corner_mode, outline_edge_margin, true, true, outline_corner_facing);
 }
 
 TypedArray<Transform2D> BulletPatterns2D::helper_generate_transforms_polygon(
@@ -677,84 +818,90 @@ TypedArray<Transform2D> BulletPatterns2D::helper_generate_transforms_polygon(
 		int outline_corner_mode,
 		double outline_edge_margin,
 		int outline_corner_facing) {
-	if (!danmaku_validate_head("helper_generate_transforms_polygon", transforms_amount, marker_transform)) {
-		return TypedArray<Transform2D>();
+	return pattern_slots_to_array(generate_polygon2d(transforms_amount, marker_transform, vertices, radius, base_rotation, face_outward, facing_offset_degrees, outline_placement, outline_facing, outline_reverse, outline_slot_offset, fill_spacing, fill_stagger, fill_margin, layer_count, layer_scale, layer_side, layer_fill, layer_start_offset, layer_scale_curve, layer_custom_scales, layer_twist, layer_max_dots, outline_distribution, layer_layout, outline_corner_priority, outline_corner_mode, outline_edge_margin, outline_corner_facing));
+}
+
+PatternSlots2D BulletPatterns2D::generate_triangle2d(
+		int transforms_amount,
+		Transform2D marker_transform,
+		TriangleType triangle_type,
+		real_t size_a,
+		real_t size_b,
+		real_t rotation,
+		bool face_outward,
+		real_t facing_offset_degrees,
+		int outline_placement,
+		int outline_facing,
+		bool outline_reverse,
+		int outline_slot_offset,
+		double fill_spacing,
+		bool fill_stagger,
+		double fill_margin,
+		int layer_count,
+		double layer_scale,
+		int layer_side,
+		int layer_fill,
+		int layer_start_offset,
+		int layer_scale_curve,
+		const PackedFloat32Array &layer_custom_scales,
+		int layer_twist,
+		int layer_max_dots,
+		int outline_distribution,
+		int layer_layout,
+		int outline_corner_priority,
+		int outline_corner_mode,
+		double outline_edge_margin,
+		int outline_corner_facing) {
+	if (!danmaku_validate_head("helper_generate_transforms_triangle", transforms_amount, marker_transform)) {
+		return PatternSlots2D();
 	}
-	if (vertices < 3 || !Math::is_finite(radius) || radius < 0.0 || !Math::is_finite(base_rotation) || !Math::is_finite(facing_offset_degrees)) {
-		UtilityFunctions::push_error("helper_generate_transforms_polygon: vertices must be >= 3, radius finite and >= 0, rotations finite.");
-		return TypedArray<Transform2D>();
+	if (triangle_type < TRIANGLE_EQUILATERAL || triangle_type > TRIANGLE_RIGHT) {
+		UtilityFunctions::push_error("helper_generate_transforms_triangle: unknown triangle_type.");
+		return PatternSlots2D();
 	}
-	// The corner loop below builds `vertices` corners: cap it like star's
-	// points so hostile input can't hang the game.
-	if (vertices > HELPER_MAX_TRANSFORMS) {
-		UtilityFunctions::push_error("helper_generate_transforms_polygon: vertices is absurdly large; keep it near the bullet count.");
-		return TypedArray<Transform2D>();
+	if (!Math::is_finite(size_a) || size_a < 0.0 || !Math::is_finite(size_b) || size_b < 0.0 || !Math::is_finite(rotation) || !Math::is_finite(facing_offset_degrees)) {
+		UtilityFunctions::push_error("helper_generate_transforms_triangle: size_a/size_b must be finite and >= 0, rotation and facing_offset_degrees finite.");
+		return PatternSlots2D();
 	}
 	if (outline_distribution < 0 || outline_distribution > 1) {
-		UtilityFunctions::push_error("helper_generate_transforms_polygon: outline_distribution must be 0 (legacy) or 1 (symmetric).");
-		return TypedArray<Transform2D>();
+		UtilityFunctions::push_error("helper_generate_transforms_triangle: outline_distribution must be 0 (legacy) or 1 (symmetric).");
+		return PatternSlots2D();
 	}
 	if (layer_layout < 0 || layer_layout > 1) {
-		UtilityFunctions::push_error("helper_generate_transforms_polygon: layer_layout must be 0 (shared loop) or 1 (even per layer).");
-		return TypedArray<Transform2D>();
+		UtilityFunctions::push_error("helper_generate_transforms_triangle: layer_layout must be 0 (shared loop) or 1 (even per layer).");
+		return PatternSlots2D();
 	}
 	if (outline_corner_priority < 0 || outline_corner_priority > 2) {
-		UtilityFunctions::push_error("helper_generate_transforms_polygon: outline_corner_priority must be 0 (horizontal), 1 (vertical) or 2 (balanced).");
-		return TypedArray<Transform2D>();
+		UtilityFunctions::push_error("helper_generate_transforms_triangle: outline_corner_priority must be 0 (horizontal), 1 (vertical) or 2 (balanced).");
+		return PatternSlots2D();
 	}
 	if (outline_corner_mode < 0 || outline_corner_mode > 1) {
-		UtilityFunctions::push_error("helper_generate_transforms_polygon: outline_corner_mode must be 0 (pin corners) or 1 (even arc).");
-		return TypedArray<Transform2D>();
+		UtilityFunctions::push_error("helper_generate_transforms_triangle: outline_corner_mode must be 0 (pin corners) or 1 (even arc).");
+		return PatternSlots2D();
 	}
 	if (!Math::is_finite(outline_edge_margin) || outline_edge_margin < 0.0) {
-		UtilityFunctions::push_error("helper_generate_transforms_polygon: outline_edge_margin must be finite and >= 0.");
-		return TypedArray<Transform2D>();
+		UtilityFunctions::push_error("helper_generate_transforms_triangle: outline_edge_margin must be finite and >= 0.");
+		return PatternSlots2D();
 	}
 	if (outline_corner_facing < 0 || outline_corner_facing > 2) {
-		UtilityFunctions::push_error("helper_generate_transforms_polygon: outline_corner_facing must be 0 (side), 1 (miter) or 2 (smooth).");
-		return TypedArray<Transform2D>();
+		UtilityFunctions::push_error("helper_generate_transforms_triangle: outline_corner_facing must be 0 (side), 1 (miter) or 2 (smooth).");
+		return PatternSlots2D();
 	}
-	PackedVector2Array corners;
-	for (int k = 0; k < vertices; ++k) {
-		const real_t a = base_rotation + Math::TAU * (real_t)k / (real_t)vertices;
-		corners.push_back(Vector2(Math::cos(a), Math::sin(a)) * radius);
-	}
-	PackedVector2Array normals;
-	if (!compute_edge_normals_quiet(corners, true, false, normals)) {
-		UtilityFunctions::push_error("helper_generate_transforms_polygon: degenerate polygon.");
-		return TypedArray<Transform2D>();
-	}
-	// Arc-length walk so slots spread evenly even on stretched shapes; the
-	// shared outline worker assembles facings (marker_rot rides as rot_add).
-	// Normals stay geometric here (the worker applies the face_outward flip).
-	real_t total = 0.0;
-	for (int k = 0; k < vertices; ++k) {
-		total += corners[k].distance_to(corners[(k + 1) % vertices]);
-	}
-	const real_t marker_rot = marker_transform.get_rotation();
-	if (!(total > 0.0) || !Math::is_finite(total)) {
-		TypedArray<Transform2D> stacked = danmaku_make_slots(transforms_amount);
+	PackedVector2Array corners = build_triangle_corners(triangle_type, size_a, size_b, rotation);
+	PackedVector2Array loop_points;
+	PackedVector2Array loop_normals;
+	if (!sample_closed_polygon_loop(corners, transforms_amount, loop_points, loop_normals, outline_distribution, outline_corner_priority, outline_corner_mode, outline_edge_margin, outline_corner_facing)) {
+		// Degenerate (zero-area) triangle: stack at the marker like the
+		// rectangle primitive instead of emitting garbage.
+		PatternSlots2D stacked = danmaku_make_slots(transforms_amount);
 		for (int i = 0; i < transforms_amount; ++i) {
-			Transform2D slot(marker_rot + Math::deg_to_rad(facing_offset_degrees), marker_transform.get_origin());
+			Transform2D slot(marker_transform.get_rotation() + Math::deg_to_rad(facing_offset_degrees), marker_transform.get_origin());
 			danmaku_apply_marker_scale(slot, marker_transform);
 			stacked[i] = slot;
 		}
 		return stacked;
 	}
-	// Corner-anchored symmetric walk: every corner carries a slot, small
-	// counts seat evenly spaced corners, opposite sides stay equal.
-	PackedVector2Array loop_points;
-	PackedVector2Array loop_normals;
-	// Zero bullets is a valid empty request (every other generator returns
-	// [] silently); only a real geometry failure below is "degenerate".
-	if (transforms_amount == 0) {
-		return TypedArray<Transform2D>();
-	}
-	if (!build_symmetric_polygon_loop(corners, normals, transforms_amount, outline_distribution, loop_points, loop_normals, outline_corner_priority, outline_corner_mode, outline_edge_margin, outline_corner_facing)) {
-		UtilityFunctions::push_error("helper_generate_transforms_polygon: degenerate polygon.");
-		return TypedArray<Transform2D>();
-	}
-	return layout_outline_slots("helper_generate_transforms_polygon", marker_transform, loop_points, loop_normals, true, marker_rot, face_outward, facing_offset_degrees, PackedFloat32Array(), outline_placement, outline_facing, outline_reverse, outline_slot_offset, fill_spacing, fill_stagger, fill_margin, layer_count, layer_scale, layer_side, layer_fill, layer_start_offset, layer_scale_curve, layer_custom_scales, layer_twist, layer_max_dots, outline_distribution, layer_layout, corners, outline_corner_priority, outline_corner_mode, outline_edge_margin, true, true, outline_corner_facing);
+	return layout_outline_slots("helper_generate_transforms_triangle", marker_transform, loop_points, loop_normals, true, marker_transform.get_rotation(), face_outward, facing_offset_degrees, PackedFloat32Array(), outline_placement, outline_facing, outline_reverse, outline_slot_offset, fill_spacing, fill_stagger, fill_margin, layer_count, layer_scale, layer_side, layer_fill, layer_start_offset, layer_scale_curve, layer_custom_scales, layer_twist, layer_max_dots, outline_distribution, layer_layout, corners, outline_corner_priority, outline_corner_mode, outline_edge_margin, true, true, outline_corner_facing);
 }
 
 TypedArray<Transform2D> BulletPatterns2D::helper_generate_transforms_triangle(
@@ -788,48 +935,76 @@ TypedArray<Transform2D> BulletPatterns2D::helper_generate_transforms_triangle(
 		int outline_corner_mode,
 		double outline_edge_margin,
 		int outline_corner_facing) {
-	if (!danmaku_validate_head("helper_generate_transforms_triangle", transforms_amount, marker_transform)) {
-		return TypedArray<Transform2D>();
+	return pattern_slots_to_array(generate_triangle2d(transforms_amount, marker_transform, triangle_type, size_a, size_b, rotation, face_outward, facing_offset_degrees, outline_placement, outline_facing, outline_reverse, outline_slot_offset, fill_spacing, fill_stagger, fill_margin, layer_count, layer_scale, layer_side, layer_fill, layer_start_offset, layer_scale_curve, layer_custom_scales, layer_twist, layer_max_dots, outline_distribution, layer_layout, outline_corner_priority, outline_corner_mode, outline_edge_margin, outline_corner_facing));
+}
+
+PatternSlots2D BulletPatterns2D::generate_trapezoid2d(
+		int transforms_amount,
+		Transform2D marker_transform,
+		real_t base_top,
+		real_t base_bottom,
+		real_t height,
+		real_t rotation,
+		bool face_outward,
+		real_t facing_offset_degrees,
+		int outline_placement,
+		int outline_facing,
+		bool outline_reverse,
+		int outline_slot_offset,
+		double fill_spacing,
+		bool fill_stagger,
+		double fill_margin,
+		int layer_count,
+		double layer_scale,
+		int layer_side,
+		int layer_fill,
+		int layer_start_offset,
+		int layer_scale_curve,
+		const PackedFloat32Array &layer_custom_scales,
+		int layer_twist,
+		int layer_max_dots,
+		int outline_distribution,
+		int layer_layout,
+		int outline_corner_priority,
+		int outline_corner_mode,
+		double outline_edge_margin,
+		int outline_corner_facing) {
+	if (!danmaku_validate_head("helper_generate_transforms_trapezoid", transforms_amount, marker_transform)) {
+		return PatternSlots2D();
 	}
-	if (triangle_type < TRIANGLE_EQUILATERAL || triangle_type > TRIANGLE_RIGHT) {
-		UtilityFunctions::push_error("helper_generate_transforms_triangle: unknown triangle_type.");
-		return TypedArray<Transform2D>();
-	}
-	if (!Math::is_finite(size_a) || size_a < 0.0 || !Math::is_finite(size_b) || size_b < 0.0 || !Math::is_finite(rotation) || !Math::is_finite(facing_offset_degrees)) {
-		UtilityFunctions::push_error("helper_generate_transforms_triangle: size_a/size_b must be finite and >= 0, rotation and facing_offset_degrees finite.");
-		return TypedArray<Transform2D>();
+	if (!Math::is_finite(base_top) || base_top < 0.0 || !Math::is_finite(base_bottom) || base_bottom < 0.0 || !Math::is_finite(height) || height < 0.0 || !Math::is_finite(rotation) || !Math::is_finite(facing_offset_degrees)) {
+		UtilityFunctions::push_error("helper_generate_transforms_trapezoid: bases and height must be finite and >= 0, rotation and facing_offset_degrees finite.");
+		return PatternSlots2D();
 	}
 	if (outline_distribution < 0 || outline_distribution > 1) {
-		UtilityFunctions::push_error("helper_generate_transforms_triangle: outline_distribution must be 0 (legacy) or 1 (symmetric).");
-		return TypedArray<Transform2D>();
+		UtilityFunctions::push_error("helper_generate_transforms_trapezoid: outline_distribution must be 0 (legacy) or 1 (symmetric).");
+		return PatternSlots2D();
 	}
 	if (layer_layout < 0 || layer_layout > 1) {
-		UtilityFunctions::push_error("helper_generate_transforms_triangle: layer_layout must be 0 (shared loop) or 1 (even per layer).");
-		return TypedArray<Transform2D>();
+		UtilityFunctions::push_error("helper_generate_transforms_trapezoid: layer_layout must be 0 (shared loop) or 1 (even per layer).");
+		return PatternSlots2D();
 	}
 	if (outline_corner_priority < 0 || outline_corner_priority > 2) {
-		UtilityFunctions::push_error("helper_generate_transforms_triangle: outline_corner_priority must be 0 (horizontal), 1 (vertical) or 2 (balanced).");
-		return TypedArray<Transform2D>();
+		UtilityFunctions::push_error("helper_generate_transforms_trapezoid: outline_corner_priority must be 0 (horizontal), 1 (vertical) or 2 (balanced).");
+		return PatternSlots2D();
 	}
 	if (outline_corner_mode < 0 || outline_corner_mode > 1) {
-		UtilityFunctions::push_error("helper_generate_transforms_triangle: outline_corner_mode must be 0 (pin corners) or 1 (even arc).");
-		return TypedArray<Transform2D>();
+		UtilityFunctions::push_error("helper_generate_transforms_trapezoid: outline_corner_mode must be 0 (pin corners) or 1 (even arc).");
+		return PatternSlots2D();
 	}
 	if (!Math::is_finite(outline_edge_margin) || outline_edge_margin < 0.0) {
-		UtilityFunctions::push_error("helper_generate_transforms_triangle: outline_edge_margin must be finite and >= 0.");
-		return TypedArray<Transform2D>();
+		UtilityFunctions::push_error("helper_generate_transforms_trapezoid: outline_edge_margin must be finite and >= 0.");
+		return PatternSlots2D();
 	}
 	if (outline_corner_facing < 0 || outline_corner_facing > 2) {
-		UtilityFunctions::push_error("helper_generate_transforms_triangle: outline_corner_facing must be 0 (side), 1 (miter) or 2 (smooth).");
-		return TypedArray<Transform2D>();
+		UtilityFunctions::push_error("helper_generate_transforms_trapezoid: outline_corner_facing must be 0 (side), 1 (miter) or 2 (smooth).");
+		return PatternSlots2D();
 	}
-	PackedVector2Array corners = build_triangle_corners(triangle_type, size_a, size_b, rotation);
+	PackedVector2Array corners = build_trapezoid_corners(base_top, base_bottom, height, rotation);
 	PackedVector2Array loop_points;
 	PackedVector2Array loop_normals;
 	if (!sample_closed_polygon_loop(corners, transforms_amount, loop_points, loop_normals, outline_distribution, outline_corner_priority, outline_corner_mode, outline_edge_margin, outline_corner_facing)) {
-		// Degenerate (zero-area) triangle: stack at the marker like the
-		// rectangle primitive instead of emitting garbage.
-		TypedArray<Transform2D> stacked = danmaku_make_slots(transforms_amount);
+		PatternSlots2D stacked = danmaku_make_slots(transforms_amount);
 		for (int i = 0; i < transforms_amount; ++i) {
 			Transform2D slot(marker_transform.get_rotation() + Math::deg_to_rad(facing_offset_degrees), marker_transform.get_origin());
 			danmaku_apply_marker_scale(slot, marker_transform);
@@ -837,7 +1012,7 @@ TypedArray<Transform2D> BulletPatterns2D::helper_generate_transforms_triangle(
 		}
 		return stacked;
 	}
-	return layout_outline_slots("helper_generate_transforms_triangle", marker_transform, loop_points, loop_normals, true, marker_transform.get_rotation(), face_outward, facing_offset_degrees, PackedFloat32Array(), outline_placement, outline_facing, outline_reverse, outline_slot_offset, fill_spacing, fill_stagger, fill_margin, layer_count, layer_scale, layer_side, layer_fill, layer_start_offset, layer_scale_curve, layer_custom_scales, layer_twist, layer_max_dots, outline_distribution, layer_layout, corners, outline_corner_priority, outline_corner_mode, outline_edge_margin, true, true, outline_corner_facing);
+	return layout_outline_slots("helper_generate_transforms_trapezoid", marker_transform, loop_points, loop_normals, true, marker_transform.get_rotation(), face_outward, facing_offset_degrees, PackedFloat32Array(), outline_placement, outline_facing, outline_reverse, outline_slot_offset, fill_spacing, fill_stagger, fill_margin, layer_count, layer_scale, layer_side, layer_fill, layer_start_offset, layer_scale_curve, layer_custom_scales, layer_twist, layer_max_dots, outline_distribution, layer_layout, corners, outline_corner_priority, outline_corner_mode, outline_edge_margin, true, true, outline_corner_facing);
 }
 
 TypedArray<Transform2D> BulletPatterns2D::helper_generate_transforms_trapezoid(
@@ -871,42 +1046,75 @@ TypedArray<Transform2D> BulletPatterns2D::helper_generate_transforms_trapezoid(
 		int outline_corner_mode,
 		double outline_edge_margin,
 		int outline_corner_facing) {
-	if (!danmaku_validate_head("helper_generate_transforms_trapezoid", transforms_amount, marker_transform)) {
-		return TypedArray<Transform2D>();
+	return pattern_slots_to_array(generate_trapezoid2d(transforms_amount, marker_transform, base_top, base_bottom, height, rotation, face_outward, facing_offset_degrees, outline_placement, outline_facing, outline_reverse, outline_slot_offset, fill_spacing, fill_stagger, fill_margin, layer_count, layer_scale, layer_side, layer_fill, layer_start_offset, layer_scale_curve, layer_custom_scales, layer_twist, layer_max_dots, outline_distribution, layer_layout, outline_corner_priority, outline_corner_mode, outline_edge_margin, outline_corner_facing));
+}
+
+PatternSlots2D BulletPatterns2D::generate_diamond2d(
+		int transforms_amount,
+		Transform2D marker_transform,
+		real_t diagonal_x,
+		real_t diagonal_y,
+		real_t rotation,
+		bool face_outward,
+		real_t facing_offset_degrees,
+		int outline_placement,
+		int outline_facing,
+		bool outline_reverse,
+		int outline_slot_offset,
+		double fill_spacing,
+		bool fill_stagger,
+		double fill_margin,
+		int layer_count,
+		double layer_scale,
+		int layer_side,
+		int layer_fill,
+		int layer_start_offset,
+		int layer_scale_curve,
+		const PackedFloat32Array &layer_custom_scales,
+		int layer_twist,
+		int layer_max_dots,
+		int outline_distribution,
+		int layer_layout,
+		int outline_corner_priority,
+		int outline_corner_mode,
+		double outline_edge_margin,
+		int outline_corner_facing) {
+	if (!danmaku_validate_head("helper_generate_transforms_diamond", transforms_amount, marker_transform)) {
+		return PatternSlots2D();
 	}
-	if (!Math::is_finite(base_top) || base_top < 0.0 || !Math::is_finite(base_bottom) || base_bottom < 0.0 || !Math::is_finite(height) || height < 0.0 || !Math::is_finite(rotation) || !Math::is_finite(facing_offset_degrees)) {
-		UtilityFunctions::push_error("helper_generate_transforms_trapezoid: bases and height must be finite and >= 0, rotation and facing_offset_degrees finite.");
-		return TypedArray<Transform2D>();
+	if (!Math::is_finite(diagonal_x) || diagonal_x < 0.0 || !Math::is_finite(diagonal_y) || diagonal_y < 0.0 || !Math::is_finite(rotation) || !Math::is_finite(facing_offset_degrees)) {
+		UtilityFunctions::push_error("helper_generate_transforms_diamond: diagonals must be finite and >= 0, rotation and facing_offset_degrees finite.");
+		return PatternSlots2D();
 	}
 	if (outline_distribution < 0 || outline_distribution > 1) {
-		UtilityFunctions::push_error("helper_generate_transforms_trapezoid: outline_distribution must be 0 (legacy) or 1 (symmetric).");
-		return TypedArray<Transform2D>();
+		UtilityFunctions::push_error("helper_generate_transforms_diamond: outline_distribution must be 0 (legacy) or 1 (symmetric).");
+		return PatternSlots2D();
 	}
 	if (layer_layout < 0 || layer_layout > 1) {
-		UtilityFunctions::push_error("helper_generate_transforms_trapezoid: layer_layout must be 0 (shared loop) or 1 (even per layer).");
-		return TypedArray<Transform2D>();
+		UtilityFunctions::push_error("helper_generate_transforms_diamond: layer_layout must be 0 (shared loop) or 1 (even per layer).");
+		return PatternSlots2D();
 	}
 	if (outline_corner_priority < 0 || outline_corner_priority > 2) {
-		UtilityFunctions::push_error("helper_generate_transforms_trapezoid: outline_corner_priority must be 0 (horizontal), 1 (vertical) or 2 (balanced).");
-		return TypedArray<Transform2D>();
+		UtilityFunctions::push_error("helper_generate_transforms_diamond: outline_corner_priority must be 0 (horizontal), 1 (vertical) or 2 (balanced).");
+		return PatternSlots2D();
 	}
 	if (outline_corner_mode < 0 || outline_corner_mode > 1) {
-		UtilityFunctions::push_error("helper_generate_transforms_trapezoid: outline_corner_mode must be 0 (pin corners) or 1 (even arc).");
-		return TypedArray<Transform2D>();
+		UtilityFunctions::push_error("helper_generate_transforms_diamond: outline_corner_mode must be 0 (pin corners) or 1 (even arc).");
+		return PatternSlots2D();
 	}
 	if (!Math::is_finite(outline_edge_margin) || outline_edge_margin < 0.0) {
-		UtilityFunctions::push_error("helper_generate_transforms_trapezoid: outline_edge_margin must be finite and >= 0.");
-		return TypedArray<Transform2D>();
+		UtilityFunctions::push_error("helper_generate_transforms_diamond: outline_edge_margin must be finite and >= 0.");
+		return PatternSlots2D();
 	}
 	if (outline_corner_facing < 0 || outline_corner_facing > 2) {
-		UtilityFunctions::push_error("helper_generate_transforms_trapezoid: outline_corner_facing must be 0 (side), 1 (miter) or 2 (smooth).");
-		return TypedArray<Transform2D>();
+		UtilityFunctions::push_error("helper_generate_transforms_diamond: outline_corner_facing must be 0 (side), 1 (miter) or 2 (smooth).");
+		return PatternSlots2D();
 	}
-	PackedVector2Array corners = build_trapezoid_corners(base_top, base_bottom, height, rotation);
+	PackedVector2Array corners = build_diamond_corners(diagonal_x, diagonal_y, rotation);
 	PackedVector2Array loop_points;
 	PackedVector2Array loop_normals;
 	if (!sample_closed_polygon_loop(corners, transforms_amount, loop_points, loop_normals, outline_distribution, outline_corner_priority, outline_corner_mode, outline_edge_margin, outline_corner_facing)) {
-		TypedArray<Transform2D> stacked = danmaku_make_slots(transforms_amount);
+		PatternSlots2D stacked = danmaku_make_slots(transforms_amount);
 		for (int i = 0; i < transforms_amount; ++i) {
 			Transform2D slot(marker_transform.get_rotation() + Math::deg_to_rad(facing_offset_degrees), marker_transform.get_origin());
 			danmaku_apply_marker_scale(slot, marker_transform);
@@ -914,7 +1122,7 @@ TypedArray<Transform2D> BulletPatterns2D::helper_generate_transforms_trapezoid(
 		}
 		return stacked;
 	}
-	return layout_outline_slots("helper_generate_transforms_trapezoid", marker_transform, loop_points, loop_normals, true, marker_transform.get_rotation(), face_outward, facing_offset_degrees, PackedFloat32Array(), outline_placement, outline_facing, outline_reverse, outline_slot_offset, fill_spacing, fill_stagger, fill_margin, layer_count, layer_scale, layer_side, layer_fill, layer_start_offset, layer_scale_curve, layer_custom_scales, layer_twist, layer_max_dots, outline_distribution, layer_layout, corners, outline_corner_priority, outline_corner_mode, outline_edge_margin, true, true, outline_corner_facing);
+	return layout_outline_slots("helper_generate_transforms_diamond", marker_transform, loop_points, loop_normals, true, marker_transform.get_rotation(), face_outward, facing_offset_degrees, PackedFloat32Array(), outline_placement, outline_facing, outline_reverse, outline_slot_offset, fill_spacing, fill_stagger, fill_margin, layer_count, layer_scale, layer_side, layer_fill, layer_start_offset, layer_scale_curve, layer_custom_scales, layer_twist, layer_max_dots, outline_distribution, layer_layout, corners, outline_corner_priority, outline_corner_mode, outline_edge_margin, true, true, outline_corner_facing);
 }
 
 TypedArray<Transform2D> BulletPatterns2D::helper_generate_transforms_diamond(
@@ -947,50 +1155,7 @@ TypedArray<Transform2D> BulletPatterns2D::helper_generate_transforms_diamond(
 		int outline_corner_mode,
 		double outline_edge_margin,
 		int outline_corner_facing) {
-	if (!danmaku_validate_head("helper_generate_transforms_diamond", transforms_amount, marker_transform)) {
-		return TypedArray<Transform2D>();
-	}
-	if (!Math::is_finite(diagonal_x) || diagonal_x < 0.0 || !Math::is_finite(diagonal_y) || diagonal_y < 0.0 || !Math::is_finite(rotation) || !Math::is_finite(facing_offset_degrees)) {
-		UtilityFunctions::push_error("helper_generate_transforms_diamond: diagonals must be finite and >= 0, rotation and facing_offset_degrees finite.");
-		return TypedArray<Transform2D>();
-	}
-	if (outline_distribution < 0 || outline_distribution > 1) {
-		UtilityFunctions::push_error("helper_generate_transforms_diamond: outline_distribution must be 0 (legacy) or 1 (symmetric).");
-		return TypedArray<Transform2D>();
-	}
-	if (layer_layout < 0 || layer_layout > 1) {
-		UtilityFunctions::push_error("helper_generate_transforms_diamond: layer_layout must be 0 (shared loop) or 1 (even per layer).");
-		return TypedArray<Transform2D>();
-	}
-	if (outline_corner_priority < 0 || outline_corner_priority > 2) {
-		UtilityFunctions::push_error("helper_generate_transforms_diamond: outline_corner_priority must be 0 (horizontal), 1 (vertical) or 2 (balanced).");
-		return TypedArray<Transform2D>();
-	}
-	if (outline_corner_mode < 0 || outline_corner_mode > 1) {
-		UtilityFunctions::push_error("helper_generate_transforms_diamond: outline_corner_mode must be 0 (pin corners) or 1 (even arc).");
-		return TypedArray<Transform2D>();
-	}
-	if (!Math::is_finite(outline_edge_margin) || outline_edge_margin < 0.0) {
-		UtilityFunctions::push_error("helper_generate_transforms_diamond: outline_edge_margin must be finite and >= 0.");
-		return TypedArray<Transform2D>();
-	}
-	if (outline_corner_facing < 0 || outline_corner_facing > 2) {
-		UtilityFunctions::push_error("helper_generate_transforms_diamond: outline_corner_facing must be 0 (side), 1 (miter) or 2 (smooth).");
-		return TypedArray<Transform2D>();
-	}
-	PackedVector2Array corners = build_diamond_corners(diagonal_x, diagonal_y, rotation);
-	PackedVector2Array loop_points;
-	PackedVector2Array loop_normals;
-	if (!sample_closed_polygon_loop(corners, transforms_amount, loop_points, loop_normals, outline_distribution, outline_corner_priority, outline_corner_mode, outline_edge_margin, outline_corner_facing)) {
-		TypedArray<Transform2D> stacked = danmaku_make_slots(transforms_amount);
-		for (int i = 0; i < transforms_amount; ++i) {
-			Transform2D slot(marker_transform.get_rotation() + Math::deg_to_rad(facing_offset_degrees), marker_transform.get_origin());
-			danmaku_apply_marker_scale(slot, marker_transform);
-			stacked[i] = slot;
-		}
-		return stacked;
-	}
-	return layout_outline_slots("helper_generate_transforms_diamond", marker_transform, loop_points, loop_normals, true, marker_transform.get_rotation(), face_outward, facing_offset_degrees, PackedFloat32Array(), outline_placement, outline_facing, outline_reverse, outline_slot_offset, fill_spacing, fill_stagger, fill_margin, layer_count, layer_scale, layer_side, layer_fill, layer_start_offset, layer_scale_curve, layer_custom_scales, layer_twist, layer_max_dots, outline_distribution, layer_layout, corners, outline_corner_priority, outline_corner_mode, outline_edge_margin, true, true, outline_corner_facing);
+	return pattern_slots_to_array(generate_diamond2d(transforms_amount, marker_transform, diagonal_x, diagonal_y, rotation, face_outward, facing_offset_degrees, outline_placement, outline_facing, outline_reverse, outline_slot_offset, fill_spacing, fill_stagger, fill_margin, layer_count, layer_scale, layer_side, layer_fill, layer_start_offset, layer_scale_curve, layer_custom_scales, layer_twist, layer_max_dots, outline_distribution, layer_layout, outline_corner_priority, outline_corner_mode, outline_edge_margin, outline_corner_facing));
 }
 
 } // namespace BlastBullets2D

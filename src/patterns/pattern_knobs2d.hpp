@@ -9,6 +9,7 @@
 
 #include "patterns/bullet_patterns2d.hpp"
 #include "patterns/pattern_inputs2d.hpp"
+#include "patterns/pattern_slots2d.hpp"
 #include "godot_cpp/variant/node_path.hpp"
 #include "godot_cpp/variant/packed_float32_array.hpp"
 #include "godot_cpp/variant/packed_int32_array.hpp"
@@ -418,9 +419,9 @@ struct PatternKnobs2D {
 
 	// Raw transforms for in.source (pre spin/scale/skip): exactly
 	// helper_bullets_amount for the helper shapes. pattern_dispatch2d.cpp.
-	TypedArray<Transform2D> generate_raw(const PatternInputs2D &in) const;
+	PatternSlots2D generate_raw(const PatternInputs2D &in) const;
 	// Path2D layout over an already sampled curve (helper_path2d_* knobs).
-	TypedArray<Transform2D> layout_path2d(const Transform2D &marker, const PackedVector2Array &path_pts, int count, bool quiet) const;
+	PatternSlots2D layout_path2d(const Transform2D &marker, const PackedVector2Array &path_pts, int count, bool quiet) const;
 	// The preview track the bullets of in.source sit on, written to the
 	// sink. pattern_track_dispatch2d.cpp.
 	void build_preview_track(const PatternTrackInputs2D &in, PatternTrackSink2D &sink) const;

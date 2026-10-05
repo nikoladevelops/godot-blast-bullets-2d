@@ -16,8 +16,8 @@ namespace BlastBullets2D {
 // first finite point with marker-relative fallback facing. Positions come out
 // in global space (marker.xform), exactly like the factory edge generator,
 // so the preview and the spin/scale passes downstream stay consistent.
-TypedArray<Transform2D> polyline_layout2d(const Transform2D &marker, const PackedVector2Array &path_pts, int count, const PolylineLayout2D &p, bool quiet, const char *caller) {
-    TypedArray<Transform2D> out;
+PatternSlots2D polyline_layout2d(const Transform2D &marker, const PackedVector2Array &path_pts, int count, const PolylineLayout2D &p, bool quiet, const char *caller) {
+    PatternSlots2D out;
     if (count <= 0) {
         return out;
     }
@@ -114,7 +114,7 @@ TypedArray<Transform2D> polyline_layout2d(const Transform2D &marker, const Packe
         double eff_spacing = p.spacing;
         if (!(eff_spacing > 0.0) || !Math::is_finite(eff_spacing)) {
             if (!quiet) UtilityFunctions::push_error(String(caller) + ": Path2D spacing is not usable.");
-            return TypedArray<Transform2D>();
+            return PatternSlots2D();
         }
         const double run = (double)(count - 1) * eff_spacing;
         if (p.overflow == BulletPatterns2D::POLYLINE_OVERFLOW_SHRINK_TO_FIT && count > 1 && run > total) {
@@ -252,7 +252,7 @@ TypedArray<Transform2D> polyline_layout2d(const Transform2D &marker, const Packe
     return out;
 }
 
-TypedArray<Transform2D> BulletPatterns2D::helper_generate_transforms_polyline(
+PatternSlots2D BulletPatterns2D::generate_polyline2d(
 		int transforms_amount,
 		Transform2D marker_transform,
 		const PackedVector2Array &points,
@@ -267,12 +267,12 @@ TypedArray<Transform2D> BulletPatterns2D::helper_generate_transforms_polyline(
 		real_t facing_offset_deg) {
 	if (transforms_amount < 0 || transforms_amount > HELPER_MAX_TRANSFORMS) {
 		UtilityFunctions::push_error("helper_generate_transforms_polyline: transforms_amount must be in 0.." + itos(HELPER_MAX_TRANSFORMS) + ".");
-		return TypedArray<Transform2D>();
+		return PatternSlots2D();
 	}
 	for (int i = 0; i < points.size(); ++i) {
 		if (!points[i].is_finite()) {
 			UtilityFunctions::push_error("helper_generate_transforms_polyline: points contain NaN/Inf.");
-			return TypedArray<Transform2D>();
+			return PatternSlots2D();
 		}
 	}
 	PolylineLayout2D p;
@@ -286,6 +286,22 @@ TypedArray<Transform2D> BulletPatterns2D::helper_generate_transforms_polyline(
 	p.facing = (int)facing;
 	p.facing_offset_deg = facing_offset_deg;
 	return polyline_layout2d(marker_transform, points, transforms_amount, p, false, "helper_generate_transforms_polyline");
+}
+
+TypedArray<Transform2D> BulletPatterns2D::helper_generate_transforms_polyline(
+		int transforms_amount,
+		Transform2D marker_transform,
+		const PackedVector2Array &points,
+		bool closed,
+		PolylineDistribution distribution,
+		real_t spacing,
+		PolylineOverflow overflow,
+		PolylineAnchor anchor,
+		real_t start_offset,
+		bool reverse,
+		PolylineFacing facing,
+		real_t facing_offset_deg) {
+	return pattern_slots_to_array(generate_polyline2d(transforms_amount, marker_transform, points, closed, distribution, spacing, overflow, anchor, start_offset, reverse, facing, facing_offset_deg));
 }
 
 } // namespace BlastBullets2D

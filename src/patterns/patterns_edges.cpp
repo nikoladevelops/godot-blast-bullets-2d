@@ -188,7 +188,7 @@ PackedVector2Array BulletPatterns2D::helper_compute_edge_normals(
 	return normals;
 }
 
-TypedArray<Transform2D> BulletPatterns2D::helper_generate_transforms_edge_from_points(
+PatternSlots2D BulletPatterns2D::generate_edge_from_points2d(
 		int transforms_amount,
 		Transform2D marker_transform,
 		const PackedVector2Array &edge_points,
@@ -203,32 +203,32 @@ TypedArray<Transform2D> BulletPatterns2D::helper_generate_transforms_edge_from_p
 		int spread_side,
 		real_t tangent_jitter) {
 	if (!danmaku_validate_head("helper_generate_transforms_edge_from_points", transforms_amount, marker_transform)) {
-		return TypedArray<Transform2D>();
+		return PatternSlots2D();
 	}
 	if (!Math::is_finite(jitter) || jitter < 0.0 || !Math::is_finite(facing_offset_degrees)) {
 		UtilityFunctions::push_error("helper_generate_transforms_edge_from_points: jitter must be finite and >= 0, facing_offset_degrees must be finite.");
-		return TypedArray<Transform2D>();
+		return PatternSlots2D();
 	}
 	if (!Math::is_finite(spread) || spread < 0.0 || !Math::is_finite(spread_exponent) || spread_exponent < 0.01 || !Math::is_finite(tangent_jitter) || tangent_jitter < 0.0) {
 		UtilityFunctions::push_error("helper_generate_transforms_edge_from_points: spread must be finite and >= 0, spread_exponent finite and >= 0.01, tangent_jitter finite and >= 0.");
-		return TypedArray<Transform2D>();
+		return PatternSlots2D();
 	}
 	if (spread_side < 0 || spread_side > 2) {
 		UtilityFunctions::push_error("helper_generate_transforms_edge_from_points: spread_side must be 0 (along), 1 (behind) or 2 (both).");
-		return TypedArray<Transform2D>();
+		return PatternSlots2D();
 	}
-	TypedArray<Transform2D> generated_transforms = danmaku_make_slots(transforms_amount);
+	PatternSlots2D generated_transforms = danmaku_make_slots(transforms_amount);
 	if (transforms_amount == 0) {
 		return generated_transforms;
 	}
 	if (edge_points.size() <= 0) {
 		UtilityFunctions::push_error("helper_generate_transforms_edge_from_points: edge_points must contain at least 1 point.");
-		return TypedArray<Transform2D>();
+		return PatternSlots2D();
 	}
 	PackedVector2Array normals;
 	if (!compute_edge_normals_quiet(edge_points, closed, flip_normals, normals)) {
 		UtilityFunctions::push_error("helper_generate_transforms_edge_from_points: edge_points must be finite.");
-		return TypedArray<Transform2D>();
+		return PatternSlots2D();
 	}
 	const int n = edge_points.size();
 	const real_t marker_rot = marker_transform.get_rotation();
@@ -368,6 +368,23 @@ TypedArray<Transform2D> BulletPatterns2D::helper_generate_transforms_edge_from_p
 		generated_transforms[i] = slot;
 	}
 	return generated_transforms;
+}
+
+TypedArray<Transform2D> BulletPatterns2D::helper_generate_transforms_edge_from_points(
+		int transforms_amount,
+		Transform2D marker_transform,
+		const PackedVector2Array &edge_points,
+		bool closed,
+		bool flip_normals,
+		bool random_sample,
+		real_t jitter,
+		real_t facing_offset_degrees,
+		uint64_t seed,
+		real_t spread,
+		real_t spread_exponent,
+		int spread_side,
+		real_t tangent_jitter) {
+	return pattern_slots_to_array(generate_edge_from_points2d(transforms_amount, marker_transform, edge_points, closed, flip_normals, random_sample, jitter, facing_offset_degrees, seed, spread, spread_exponent, spread_side, tangent_jitter));
 }
 
 Dictionary BulletPatterns2D::helper_extract_edge_from_image(

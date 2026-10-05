@@ -6,6 +6,7 @@
 // patterns/bullet_patterns2d.hpp.
 
 #include "patterns/bullet_patterns2d.hpp"
+#include "patterns/pattern_slots2d.hpp"
 #include "core/transform_math2d.hpp"
 #include "core/warn_once2d.hpp"
 #include "godot_cpp/classes/global_constants.hpp"
@@ -49,7 +50,7 @@ struct PolylineLayout2D {
 };
 // Shared by helper_generate_transforms_polyline and the spawner's Path2D
 // mode. caller prefixes every error ("<caller>: ...").
-TypedArray<Transform2D> polyline_layout2d(const Transform2D &marker, const PackedVector2Array &path_pts, int count, const PolylineLayout2D &p, bool quiet, const char *caller);
+PatternSlots2D polyline_layout2d(const Transform2D &marker, const PackedVector2Array &path_pts, int count, const PolylineLayout2D &p, bool quiet, const char *caller);
 
 // Layout formulas shared by a generator and its preview track, so the track
 // always draws where the bullets sit (invariant 4, pinned for every source
@@ -98,7 +99,7 @@ inline constexpr int HELPER_MAX_TRANSFORMS = 10000;
 // (1e30 spacing on an 8k volley) overflow slot math to Inf/NaN, which would
 // poison the whole volley downstream. Slots that blew out land at the clamped
 // edge, valid slots pass through untouched. Warns once when it fires.
-void danmaku_clamp_slots_finite(const char *caller_name, TypedArray<Transform2D> &slots); // bullet_factory2d_patterns_layout.cpp
+void danmaku_clamp_slots_finite(const char *caller_name, PatternSlots2D &slots); // bullet_factory2d_patterns_layout.cpp
 
 double outline_point_seg_dist(const Vector2 &p, const Vector2 &a, const Vector2 &b); // bullet_factory2d_patterns_layout.cpp
 
@@ -125,7 +126,7 @@ void resample_loop_even_distinct(const PackedVector2Array &pts, const PackedVect
 // shifted by `origin`, or nothing for On Outline (unused there).
 PackedVector2Array fill_outline_from(int outline_placement, const PackedVector2Array &local_pts, const Vector2 &origin); // bullet_factory2d_patterns_layout.cpp
 
-TypedArray<Transform2D> layout_outline_slots(
+PatternSlots2D layout_outline_slots(
         const char *caller_name,
         const Transform2D &marker_transform,
         const PackedVector2Array &points,
@@ -170,10 +171,8 @@ TypedArray<Transform2D> layout_outline_slots(
 
 bool danmaku_validate_head(const char *caller_name, int transforms_amount, const Transform2D &marker_transform); // bullet_factory2d_patterns_layout.cpp
 
-inline TypedArray<Transform2D> danmaku_make_slots(int transforms_amount) {
-	TypedArray<Transform2D> generated_transforms;
-	generated_transforms.resize(transforms_amount);
-	return generated_transforms;
+inline PatternSlots2D danmaku_make_slots(int transforms_amount) {
+	return PatternSlots2D((size_t)(transforms_amount > 0 ? transforms_amount : 0));
 }
 
 inline void danmaku_apply_marker_scale(Transform2D &slot, const Transform2D &marker_transform) {

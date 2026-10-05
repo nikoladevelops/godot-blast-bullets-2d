@@ -137,7 +137,7 @@ TypedArray<Transform2D> BulletSpawner2D::collect_spawn_transforms() const {
     return collect_spawn_transforms_impl(false);
 }
 
-TypedArray<Transform2D> BulletSpawner2D::generate_raw_pattern(Node2D *base, const Transform2D &marker, real_t mirror_sign, bool quiet) const {
+PatternSlots2D BulletSpawner2D::generate_raw_pattern(Node2D *base, const Transform2D &marker, real_t mirror_sign, bool quiet) const {
     // Resolve the scene-tree inputs the source reads, then hand generation
     // to the patterns module (pattern_dispatch2d.cpp).
     PatternInputs2D in;
@@ -287,11 +287,9 @@ void BulletSpawner2D::resolve_raw_pattern(Node2D *base, const Transform2D &marke
     const bool cache_on = pattern_cache_mode == PATTERN_CACHE_AUTO && !pattern_cache_bypass;
     const int channel = quiet ? PatternBakeCache2D::CHANNEL_PREVIEW : (mirror_sign < 0.0 ? PatternBakeCache2D::CHANNEL_MIRRORED_SHOT : PatternBakeCache2D::CHANNEL_SHOT);
     const PatternBakeCache2D::Generator generate = [this, base, mirror_sign](const Transform2D &m, bool q, std::vector<Transform2D> &r_out) {
-        const TypedArray<Transform2D> fresh = generate_raw_pattern(base, m, mirror_sign, q);
-        r_out.resize(fresh.size());
-        for (int i = 0; i < fresh.size(); ++i) {
-            r_out[i] = fresh[i];
-        }
+        // Native end to end: no Variant per bullet between the generator
+        // and the bake cache.
+        r_out = generate_raw_pattern(base, m, mirror_sign, q);
     };
     pattern_cache.resolve(channel, pattern_version, cache_on, pattern_source_reads_external_state(pattern_source), marker, quiet, generate, r_raw, String("BulletSpawner2D: pattern cache mismatch (pattern_source ") + itos(pattern_source));
 }

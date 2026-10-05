@@ -1863,7 +1863,7 @@ class BulletSpawner2D : public Node2D, public PatternKnobs2D {
         uint64_t pattern_version = 1;
         // The raw pattern for `marker` straight from the generators (the old
         // collect switch). No cache.
-        TypedArray<Transform2D> generate_raw_pattern(Node2D *base, const Transform2D &marker, real_t mirror_sign, bool quiet) const;
+        PatternSlots2D generate_raw_pattern(Node2D *base, const Transform2D &marker, real_t mirror_sign, bool quiet) const;
         // Cache-aware raw pattern into r_raw (std::vector, no Variant).
         void resolve_raw_pattern(Node2D *base, const Transform2D &marker, real_t mirror_sign, bool quiet, std::vector<Transform2D> &r_raw) const;
         // Whether the preview snapshot stays valid when the generator moves

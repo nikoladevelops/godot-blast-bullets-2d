@@ -29,7 +29,7 @@ void spiral_arm_step(int i, int arms, int stride, int &r_arm, int &r_step) {
 	r_step = i / arms;
 }
 
-TypedArray<Transform2D> BulletPatterns2D::helper_generate_transforms_grid(
+PatternSlots2D BulletPatterns2D::generate_grid2d(
 		int transforms_amount,
 		Transform2D marker_transform,
 		int rows_per_column,
@@ -42,26 +42,26 @@ TypedArray<Transform2D> BulletPatterns2D::helper_generate_transforms_grid(
 		uint64_t seed) {
 	if (transforms_amount < 0 || transforms_amount > HELPER_MAX_TRANSFORMS) {
 		UtilityFunctions::push_error("helper_generate_transforms_grid: transforms_amount must be between 0 and " + String::num_int64(HELPER_MAX_TRANSFORMS) + ".");
-		return TypedArray<Transform2D>();
+		return PatternSlots2D();
 	}
 	if (!Math::is_finite(column_offset) || !Math::is_finite(row_offset)) {
 		UtilityFunctions::push_error("helper_generate_transforms_grid: offsets must be finite numbers.");
-		return TypedArray<Transform2D>();
+		return PatternSlots2D();
 	}
 	if (!Math::is_finite(jitter) || jitter < 0.0) {
 		UtilityFunctions::push_error("helper_generate_transforms_grid: jitter must be a finite number >= 0.");
-		return TypedArray<Transform2D>();
+		return PatternSlots2D();
 	}
 	if (!marker_transform.get_origin().is_finite() || !Math::is_finite(marker_transform.get_rotation()) || !marker_transform.get_scale().is_finite()) {
 		UtilityFunctions::push_error("helper_generate_transforms_grid: marker_transform contains NaN/Inf.");
-		return TypedArray<Transform2D>();
+		return PatternSlots2D();
 	}
 	if (rows_per_column <= 0) {
 		UtilityFunctions::push_error("helper_generate_transforms_grid: rows_per_column must be > 0.");
-		return TypedArray<Transform2D>();
+		return PatternSlots2D();
 	}
 	// Initialize the array to hold the transforms
-	TypedArray<Transform2D> generated_transforms;
+	PatternSlots2D generated_transforms;
 	generated_transforms.resize(transforms_amount);
 	if (transforms_amount == 0) {
 		return generated_transforms;
@@ -131,7 +131,7 @@ TypedArray<Transform2D> BulletPatterns2D::helper_generate_transforms_grid(
 			break;
 		default:
 			UtilityFunctions::push_error("helper_generate_transforms_grid: unknown alignment, cannot generate grid.");
-			return TypedArray<Transform2D>();
+			return PatternSlots2D();
 	}
 
 	// Counter for spawned transforms
@@ -217,7 +217,21 @@ TypedArray<Transform2D> BulletPatterns2D::helper_generate_transforms_grid(
 	return generated_transforms;
 }
 
-TypedArray<Transform2D> BulletPatterns2D::helper_generate_transforms_fan(
+TypedArray<Transform2D> BulletPatterns2D::helper_generate_transforms_grid(
+		int transforms_amount,
+		Transform2D marker_transform,
+		int rows_per_column,
+		Alignment alignment,
+		real_t column_offset,
+		real_t row_offset,
+		bool rotate_grid_with_marker,
+		bool random_local_rotation,
+		real_t jitter,
+		uint64_t seed) {
+	return pattern_slots_to_array(generate_grid2d(transforms_amount, marker_transform, rows_per_column, alignment, column_offset, row_offset, rotate_grid_with_marker, random_local_rotation, jitter, seed));
+}
+
+PatternSlots2D BulletPatterns2D::generate_fan2d(
 		int transforms_amount,
 		Transform2D marker_transform,
 		real_t spread,
@@ -228,21 +242,21 @@ TypedArray<Transform2D> BulletPatterns2D::helper_generate_transforms_fan(
 		uint64_t seed) {
 	if (transforms_amount < 0 || transforms_amount > HELPER_MAX_TRANSFORMS) {
 		UtilityFunctions::push_error("helper_generate_transforms_fan: transforms_amount must be between 0 and " + String::num_int64(HELPER_MAX_TRANSFORMS) + ".");
-		return TypedArray<Transform2D>();
+		return PatternSlots2D();
 	}
 	if (!Math::is_finite(spread) || !Math::is_finite(direction_angle) || !Math::is_finite(step_offset)) {
 		UtilityFunctions::push_error("helper_generate_transforms_fan: spread, direction_angle and step_offset must be finite numbers.");
-		return TypedArray<Transform2D>();
+		return PatternSlots2D();
 	}
 	if (!Math::is_finite(angle_jitter) || angle_jitter < 0.0) {
 		UtilityFunctions::push_error("helper_generate_transforms_fan: angle_jitter must be finite and >= 0.");
-		return TypedArray<Transform2D>();
+		return PatternSlots2D();
 	}
 	if (!marker_transform.get_origin().is_finite() || !Math::is_finite(marker_transform.get_rotation()) || !marker_transform.get_scale().is_finite()) {
 		UtilityFunctions::push_error("helper_generate_transforms_fan: marker_transform contains NaN/Inf.");
-		return TypedArray<Transform2D>();
+		return PatternSlots2D();
 	}
-	TypedArray<Transform2D> generated_transforms;
+	PatternSlots2D generated_transforms;
 	generated_transforms.resize(transforms_amount);
 	if (transforms_amount == 0) {
 		return generated_transforms;
@@ -279,7 +293,19 @@ TypedArray<Transform2D> BulletPatterns2D::helper_generate_transforms_fan(
 	return generated_transforms;
 }
 
-TypedArray<Transform2D> BulletPatterns2D::helper_generate_transforms_spiral(
+TypedArray<Transform2D> BulletPatterns2D::helper_generate_transforms_fan(
+		int transforms_amount,
+		Transform2D marker_transform,
+		real_t spread,
+		real_t direction_angle,
+		real_t step_offset,
+		bool centered,
+		real_t angle_jitter,
+		uint64_t seed) {
+	return pattern_slots_to_array(generate_fan2d(transforms_amount, marker_transform, spread, direction_angle, step_offset, centered, angle_jitter, seed));
+}
+
+PatternSlots2D BulletPatterns2D::generate_spiral2d(
 		int transforms_amount,
 		Transform2D marker_transform,
 		real_t start_radius,
@@ -290,29 +316,29 @@ TypedArray<Transform2D> BulletPatterns2D::helper_generate_transforms_spiral(
 		real_t facing_offset_degrees) {
 	if (transforms_amount < 0 || transforms_amount > HELPER_MAX_TRANSFORMS) {
 		UtilityFunctions::push_error("helper_generate_transforms_spiral: transforms_amount must be between 0 and " + String::num_int64(HELPER_MAX_TRANSFORMS) + ".");
-		return TypedArray<Transform2D>();
+		return PatternSlots2D();
 	}
 	if (!Math::is_finite(start_radius) || !Math::is_finite(radius_step) || !Math::is_finite(angle_step)) {
 		UtilityFunctions::push_error("helper_generate_transforms_spiral: start_radius, radius_step and angle_step must be finite numbers.");
-		return TypedArray<Transform2D>();
+		return PatternSlots2D();
 	}
 	if (!Math::is_finite(facing_offset_degrees)) {
 		UtilityFunctions::push_error("helper_generate_transforms_spiral: facing_offset_degrees must be a finite number.");
-		return TypedArray<Transform2D>();
+		return PatternSlots2D();
 	}
 	if (facing_mode < SPIRAL_FACING_TANGENT || facing_mode > SPIRAL_FACING_KEEP_MARKER) {
 		UtilityFunctions::push_error("helper_generate_transforms_spiral: unknown facing_mode.");
-		return TypedArray<Transform2D>();
+		return PatternSlots2D();
 	}
 	if (!marker_transform.get_origin().is_finite() || !Math::is_finite(marker_transform.get_rotation()) || !marker_transform.get_scale().is_finite()) {
 		UtilityFunctions::push_error("helper_generate_transforms_spiral: marker_transform contains NaN/Inf.");
-		return TypedArray<Transform2D>();
+		return PatternSlots2D();
 	}
 	if (start_radius < 0.0) {
 		UtilityFunctions::push_error("helper_generate_transforms_spiral: start_radius must be >= 0.");
-		return TypedArray<Transform2D>();
+		return PatternSlots2D();
 	}
-	TypedArray<Transform2D> generated_transforms;
+	PatternSlots2D generated_transforms;
 	generated_transforms.resize(transforms_amount);
 	if (transforms_amount == 0) {
 		return generated_transforms;
@@ -355,7 +381,19 @@ TypedArray<Transform2D> BulletPatterns2D::helper_generate_transforms_spiral(
 	return generated_transforms;
 }
 
-TypedArray<Transform2D> BulletPatterns2D::helper_generate_transforms_line(
+TypedArray<Transform2D> BulletPatterns2D::helper_generate_transforms_spiral(
+		int transforms_amount,
+		Transform2D marker_transform,
+		real_t start_radius,
+		real_t radius_step,
+		real_t angle_step,
+		bool rotate_with_marker,
+		SpiralFacingMode facing_mode,
+		real_t facing_offset_degrees) {
+	return pattern_slots_to_array(generate_spiral2d(transforms_amount, marker_transform, start_radius, radius_step, angle_step, rotate_with_marker, facing_mode, facing_offset_degrees));
+}
+
+PatternSlots2D BulletPatterns2D::generate_line2d(
 		int transforms_amount,
 		Transform2D marker_transform,
 		const Vector2 &direction,
@@ -365,25 +403,25 @@ TypedArray<Transform2D> BulletPatterns2D::helper_generate_transforms_line(
 		bool perpendicular) {
 	if (transforms_amount < 0 || transforms_amount > HELPER_MAX_TRANSFORMS) {
 		UtilityFunctions::push_error("helper_generate_transforms_line: transforms_amount must be between 0 and " + String::num_int64(HELPER_MAX_TRANSFORMS) + ".");
-		return TypedArray<Transform2D>();
+		return PatternSlots2D();
 	}
 	if (!direction.is_finite() || !Math::is_finite(spacing)) {
 		UtilityFunctions::push_error("helper_generate_transforms_line: direction and spacing must be finite.");
-		return TypedArray<Transform2D>();
+		return PatternSlots2D();
 	}
 	if (!marker_transform.get_origin().is_finite() || !Math::is_finite(marker_transform.get_rotation()) || !marker_transform.get_scale().is_finite()) {
 		UtilityFunctions::push_error("helper_generate_transforms_line: marker_transform contains NaN/Inf.");
-		return TypedArray<Transform2D>();
+		return PatternSlots2D();
 	}
 	if (direction.length_squared() <= 0.0) {
 		UtilityFunctions::push_error("helper_generate_transforms_line: direction must not be zero, the line axis is undefined.");
-		return TypedArray<Transform2D>();
+		return PatternSlots2D();
 	}
 	if (anchor < LINE_ANCHOR_START || anchor > LINE_ANCHOR_END) {
 		UtilityFunctions::push_error("helper_generate_transforms_line: unknown anchor.");
-		return TypedArray<Transform2D>();
+		return PatternSlots2D();
 	}
-	TypedArray<Transform2D> generated_transforms;
+	PatternSlots2D generated_transforms;
 	generated_transforms.resize(transforms_amount);
 	if (transforms_amount == 0) {
 		return generated_transforms;
@@ -415,7 +453,18 @@ TypedArray<Transform2D> BulletPatterns2D::helper_generate_transforms_line(
 	return generated_transforms;
 }
 
-TypedArray<Transform2D> BulletPatterns2D::helper_generate_transforms_aimed(
+TypedArray<Transform2D> BulletPatterns2D::helper_generate_transforms_line(
+		int transforms_amount,
+		Transform2D marker_transform,
+		const Vector2 &direction,
+		real_t spacing,
+		bool face_direction,
+		LineAnchor anchor,
+		bool perpendicular) {
+	return pattern_slots_to_array(generate_line2d(transforms_amount, marker_transform, direction, spacing, face_direction, anchor, perpendicular));
+}
+
+PatternSlots2D BulletPatterns2D::generate_aimed2d(
 		int transforms_amount,
 		Transform2D marker_transform,
 		const Vector2 &target_position,
@@ -424,31 +473,41 @@ TypedArray<Transform2D> BulletPatterns2D::helper_generate_transforms_aimed(
 		bool centered) {
 	if (transforms_amount < 0 || transforms_amount > HELPER_MAX_TRANSFORMS) {
 		UtilityFunctions::push_error("helper_generate_transforms_aimed: transforms_amount must be between 0 and " + String::num_int64(HELPER_MAX_TRANSFORMS) + ".");
-		return TypedArray<Transform2D>();
+		return PatternSlots2D();
 	}
 	if (!Math::is_finite(spread) || !Math::is_finite(step_offset)) {
 		UtilityFunctions::push_error("helper_generate_transforms_aimed: spread and step_offset must be finite numbers.");
-		return TypedArray<Transform2D>();
+		return PatternSlots2D();
 	}
 	if (!marker_transform.get_origin().is_finite() || !Math::is_finite(marker_transform.get_rotation()) || !marker_transform.get_scale().is_finite()) {
 		UtilityFunctions::push_error("helper_generate_transforms_aimed: marker_transform contains NaN/Inf.");
-		return TypedArray<Transform2D>();
+		return PatternSlots2D();
 	}
 	if (!target_position.is_finite()) {
 		UtilityFunctions::push_error("helper_generate_transforms_aimed: target_position must be finite.");
-		return TypedArray<Transform2D>();
+		return PatternSlots2D();
 	}
 	const Vector2 to_target = target_position - marker_transform.get_origin();
 	if (to_target.length_squared() <= 0.0) {
 		UtilityFunctions::push_error("helper_generate_transforms_aimed: target coincides with the marker, direction is undefined.");
-		return TypedArray<Transform2D>();
+		return PatternSlots2D();
 	}
 	// Cone centered on the marker-to-target direction, in marker-local terms.
 	const real_t direction_angle = to_target.angle() - marker_transform.get_rotation();
-	return helper_generate_transforms_fan(transforms_amount, marker_transform, spread, direction_angle, step_offset, centered);
+	return generate_fan2d(transforms_amount, marker_transform, spread, direction_angle, step_offset, centered, 0.0, 0); // no jitter, no seed
 }
 
-TypedArray<Transform2D> BulletPatterns2D::helper_generate_transforms_rain(
+TypedArray<Transform2D> BulletPatterns2D::helper_generate_transforms_aimed(
+		int transforms_amount,
+		Transform2D marker_transform,
+		const Vector2 &target_position,
+		real_t spread,
+		real_t step_offset,
+		bool centered) {
+	return pattern_slots_to_array(generate_aimed2d(transforms_amount, marker_transform, target_position, spread, step_offset, centered));
+}
+
+PatternSlots2D BulletPatterns2D::generate_rain2d(
 		int transforms_amount,
 		Transform2D marker_transform,
 		real_t band_width,
@@ -457,21 +516,21 @@ TypedArray<Transform2D> BulletPatterns2D::helper_generate_transforms_rain(
 		real_t jitter,
 		uint64_t seed) {
 	if (!danmaku_validate_head("helper_generate_transforms_rain", transforms_amount, marker_transform)) {
-		return TypedArray<Transform2D>();
+		return PatternSlots2D();
 	}
 	if (!Math::is_finite(band_width) || band_width < 0.0) {
 		UtilityFunctions::push_error("helper_generate_transforms_rain: band_width must be finite and >= 0.");
-		return TypedArray<Transform2D>();
+		return PatternSlots2D();
 	}
 	if (!rain_direction.is_finite() || rain_direction.length_squared() <= 0.0) {
 		UtilityFunctions::push_error("helper_generate_transforms_rain: rain_direction must be finite and non-zero.");
-		return TypedArray<Transform2D>();
+		return PatternSlots2D();
 	}
 	if (!Math::is_finite(drop_spacing) || drop_spacing < 0.0 || !Math::is_finite(jitter) || jitter < 0.0) {
 		UtilityFunctions::push_error("helper_generate_transforms_rain: drop_spacing and jitter must be finite and >= 0.");
-		return TypedArray<Transform2D>();
+		return PatternSlots2D();
 	}
-	TypedArray<Transform2D> generated_transforms = danmaku_make_slots(transforms_amount);
+	PatternSlots2D generated_transforms = danmaku_make_slots(transforms_amount);
 	if (transforms_amount == 0) {
 		return generated_transforms;
 	}
@@ -506,7 +565,18 @@ TypedArray<Transform2D> BulletPatterns2D::helper_generate_transforms_rain(
 	return generated_transforms;
 }
 
-TypedArray<Transform2D> BulletPatterns2D::helper_generate_transforms_scatter(
+TypedArray<Transform2D> BulletPatterns2D::helper_generate_transforms_rain(
+		int transforms_amount,
+		Transform2D marker_transform,
+		real_t band_width,
+		Vector2 rain_direction,
+		real_t drop_spacing,
+		real_t jitter,
+		uint64_t seed) {
+	return pattern_slots_to_array(generate_rain2d(transforms_amount, marker_transform, band_width, rain_direction, drop_spacing, jitter, seed));
+}
+
+PatternSlots2D BulletPatterns2D::generate_scatter2d(
 		int transforms_amount,
 		Transform2D marker_transform,
 		real_t burst_radius,
@@ -517,23 +587,23 @@ TypedArray<Transform2D> BulletPatterns2D::helper_generate_transforms_scatter(
 		real_t sector_arc,
 		ScatterFacingMode facing_mode) {
 	if (!danmaku_validate_head("helper_generate_transforms_scatter", transforms_amount, marker_transform)) {
-		return TypedArray<Transform2D>();
+		return PatternSlots2D();
 	}
 	if (!Math::is_finite(burst_radius) || burst_radius < 0.0) {
 		UtilityFunctions::push_error("helper_generate_transforms_scatter: burst_radius must be finite and >= 0.");
-		return TypedArray<Transform2D>();
+		return PatternSlots2D();
 	}
 	if (!Math::is_finite(facing_jitter) || facing_jitter < 0.0) {
 		UtilityFunctions::push_error("helper_generate_transforms_scatter: facing_jitter must be finite and >= 0.");
-		return TypedArray<Transform2D>();
+		return PatternSlots2D();
 	}
 	if (!Math::is_finite(inner_radius) || inner_radius < 0.0) {
 		UtilityFunctions::push_error("helper_generate_transforms_scatter: inner_radius must be finite and >= 0.");
-		return TypedArray<Transform2D>();
+		return PatternSlots2D();
 	}
 	if (facing_mode < SCATTER_FACING_OUTWARD || facing_mode > SCATTER_FACING_INWARD) {
 		UtilityFunctions::push_error("helper_generate_transforms_scatter: facing_mode out of range.");
-		return TypedArray<Transform2D>();
+		return PatternSlots2D();
 	}
 	// Clamp, don't reject: callers set inner/burst in any order, and an
 	// inner edge past the rim just means a thin ring at the rim.
@@ -552,7 +622,7 @@ TypedArray<Transform2D> BulletPatterns2D::helper_generate_transforms_scatter(
 		arc = Math::TAU;
 	}
 	const real_t base_angle = axis.angle();
-	TypedArray<Transform2D> generated_transforms = danmaku_make_slots(transforms_amount);
+	PatternSlots2D generated_transforms = danmaku_make_slots(transforms_amount);
 	if (transforms_amount == 0) {
 		return generated_transforms;
 	}
@@ -591,7 +661,20 @@ TypedArray<Transform2D> BulletPatterns2D::helper_generate_transforms_scatter(
 	return generated_transforms;
 }
 
-TypedArray<Transform2D> BulletPatterns2D::helper_generate_transforms_star_polygon(
+TypedArray<Transform2D> BulletPatterns2D::helper_generate_transforms_scatter(
+		int transforms_amount,
+		Transform2D marker_transform,
+		real_t burst_radius,
+		real_t facing_jitter,
+		uint64_t seed,
+		real_t inner_radius,
+		Vector2 sector_direction,
+		real_t sector_arc,
+		ScatterFacingMode facing_mode) {
+	return pattern_slots_to_array(generate_scatter2d(transforms_amount, marker_transform, burst_radius, facing_jitter, seed, inner_radius, sector_direction, sector_arc, facing_mode));
+}
+
+PatternSlots2D BulletPatterns2D::generate_star_polygon2d(
 		int transforms_amount,
 		Transform2D marker_transform,
 		int vertices,
@@ -601,21 +684,21 @@ TypedArray<Transform2D> BulletPatterns2D::helper_generate_transforms_star_polygo
 		bool face_outward,
 		real_t facing_offset_degrees) {
 	if (!danmaku_validate_head("helper_generate_transforms_star_polygon", transforms_amount, marker_transform)) {
-		return TypedArray<Transform2D>();
+		return PatternSlots2D();
 	}
 	if (vertices < 3) {
 		UtilityFunctions::push_error("helper_generate_transforms_star_polygon: vertices must be >= 3.");
-		return TypedArray<Transform2D>();
+		return PatternSlots2D();
 	}
 	if (!Math::is_finite(radius) || radius < 0.0) {
 		UtilityFunctions::push_error("helper_generate_transforms_star_polygon: radius must be finite and >= 0.");
-		return TypedArray<Transform2D>();
+		return PatternSlots2D();
 	}
 	if (!Math::is_finite(vertex_bias) || vertex_bias < 0.0 || !Math::is_finite(base_rotation) || !Math::is_finite(facing_offset_degrees)) {
 		UtilityFunctions::push_error("helper_generate_transforms_star_polygon: vertex_bias, base_rotation and facing_offset_degrees must be finite (bias >= 0).");
-		return TypedArray<Transform2D>();
+		return PatternSlots2D();
 	}
-	TypedArray<Transform2D> generated_transforms = danmaku_make_slots(transforms_amount);
+	PatternSlots2D generated_transforms = danmaku_make_slots(transforms_amount);
 	if (transforms_amount == 0) {
 		return generated_transforms;
 	}
@@ -640,7 +723,19 @@ TypedArray<Transform2D> BulletPatterns2D::helper_generate_transforms_star_polygo
 	return generated_transforms;
 }
 
-TypedArray<Transform2D> BulletPatterns2D::helper_generate_transforms_multispiral(
+TypedArray<Transform2D> BulletPatterns2D::helper_generate_transforms_star_polygon(
+		int transforms_amount,
+		Transform2D marker_transform,
+		int vertices,
+		real_t radius,
+		real_t vertex_bias,
+		real_t base_rotation,
+		bool face_outward,
+		real_t facing_offset_degrees) {
+	return pattern_slots_to_array(generate_star_polygon2d(transforms_amount, marker_transform, vertices, radius, vertex_bias, base_rotation, face_outward, facing_offset_degrees));
+}
+
+PatternSlots2D BulletPatterns2D::generate_multispiral2d(
 		int transforms_amount,
 		Transform2D marker_transform,
 		int arms,
@@ -652,29 +747,29 @@ TypedArray<Transform2D> BulletPatterns2D::helper_generate_transforms_multispiral
 		real_t facing_offset_degrees,
 		int arm_index_stride) {
 	if (!danmaku_validate_head("helper_generate_transforms_multispiral", transforms_amount, marker_transform)) {
-		return TypedArray<Transform2D>();
+		return PatternSlots2D();
 	}
 	if (arms < 1) {
 		UtilityFunctions::push_error("helper_generate_transforms_multispiral: arms must be >= 1.");
-		return TypedArray<Transform2D>();
+		return PatternSlots2D();
 	}
 	if (!Math::is_finite(start_radius) || start_radius < 0.0 || !Math::is_finite(radius_step) || !Math::is_finite(angle_step)) {
 		UtilityFunctions::push_error("helper_generate_transforms_multispiral: start_radius (>= 0), radius_step and angle_step must be finite.");
-		return TypedArray<Transform2D>();
+		return PatternSlots2D();
 	}
 	if (facing_mode < SPIRAL_FACING_TANGENT || facing_mode > SPIRAL_FACING_KEEP_MARKER) {
 		UtilityFunctions::push_error("helper_generate_transforms_multispiral: unknown facing_mode.");
-		return TypedArray<Transform2D>();
+		return PatternSlots2D();
 	}
 	if (!Math::is_finite(facing_offset_degrees)) {
 		UtilityFunctions::push_error("helper_generate_transforms_multispiral: facing_offset_degrees must be finite.");
-		return TypedArray<Transform2D>();
+		return PatternSlots2D();
 	}
 	if (arm_index_stride < 1) {
 		UtilityFunctions::push_error("helper_generate_transforms_multispiral: arm_index_stride must be >= 1.");
-		return TypedArray<Transform2D>();
+		return PatternSlots2D();
 	}
-	TypedArray<Transform2D> generated_transforms = danmaku_make_slots(transforms_amount);
+	PatternSlots2D generated_transforms = danmaku_make_slots(transforms_amount);
 	if (transforms_amount == 0) {
 		return generated_transforms;
 	}
@@ -715,7 +810,21 @@ TypedArray<Transform2D> BulletPatterns2D::helper_generate_transforms_multispiral
 	return generated_transforms;
 }
 
-TypedArray<Transform2D> BulletPatterns2D::helper_generate_transforms_cross(
+TypedArray<Transform2D> BulletPatterns2D::helper_generate_transforms_multispiral(
+		int transforms_amount,
+		Transform2D marker_transform,
+		int arms,
+		real_t start_radius,
+		real_t radius_step,
+		real_t angle_step,
+		bool rotate_with_marker,
+		SpiralFacingMode facing_mode,
+		real_t facing_offset_degrees,
+		int arm_index_stride) {
+	return pattern_slots_to_array(generate_multispiral2d(transforms_amount, marker_transform, arms, start_radius, radius_step, angle_step, rotate_with_marker, facing_mode, facing_offset_degrees, arm_index_stride));
+}
+
+PatternSlots2D BulletPatterns2D::generate_cross2d(
 		int transforms_amount,
 		Transform2D marker_transform,
 		int arm_count,
@@ -725,21 +834,21 @@ TypedArray<Transform2D> BulletPatterns2D::helper_generate_transforms_cross(
 		bool face_outward,
 		real_t facing_offset_degrees) {
 	if (!danmaku_validate_head("helper_generate_transforms_cross", transforms_amount, marker_transform)) {
-		return TypedArray<Transform2D>();
+		return PatternSlots2D();
 	}
 	if (arm_count < 1) {
 		UtilityFunctions::push_error("helper_generate_transforms_cross: arm_count must be >= 1.");
-		return TypedArray<Transform2D>();
+		return PatternSlots2D();
 	}
 	if (!Math::is_finite(arm_length) || arm_length < 0.0 || !Math::is_finite(spacing) || spacing <= 0.0) {
 		UtilityFunctions::push_error("helper_generate_transforms_cross: arm_length must be finite and >= 0, spacing finite and > 0.");
-		return TypedArray<Transform2D>();
+		return PatternSlots2D();
 	}
 	if (!Math::is_finite(base_rotation) || !Math::is_finite(facing_offset_degrees)) {
 		UtilityFunctions::push_error("helper_generate_transforms_cross: base_rotation and facing_offset_degrees must be finite.");
-		return TypedArray<Transform2D>();
+		return PatternSlots2D();
 	}
-	TypedArray<Transform2D> generated_transforms = danmaku_make_slots(transforms_amount);
+	PatternSlots2D generated_transforms = danmaku_make_slots(transforms_amount);
 	if (transforms_amount == 0) {
 		return generated_transforms;
 	}
@@ -765,7 +874,19 @@ TypedArray<Transform2D> BulletPatterns2D::helper_generate_transforms_cross(
 	return generated_transforms;
 }
 
-TypedArray<Transform2D> BulletPatterns2D::helper_generate_transforms_wave(
+TypedArray<Transform2D> BulletPatterns2D::helper_generate_transforms_cross(
+		int transforms_amount,
+		Transform2D marker_transform,
+		int arm_count,
+		real_t arm_length,
+		real_t spacing,
+		real_t base_rotation,
+		bool face_outward,
+		real_t facing_offset_degrees) {
+	return pattern_slots_to_array(generate_cross2d(transforms_amount, marker_transform, arm_count, arm_length, spacing, base_rotation, face_outward, facing_offset_degrees));
+}
+
+PatternSlots2D BulletPatterns2D::generate_wave2d(
 		int transforms_amount,
 		Transform2D marker_transform,
 		real_t width,
@@ -775,21 +896,21 @@ TypedArray<Transform2D> BulletPatterns2D::helper_generate_transforms_wave(
 		bool face_direction,
 		real_t facing_offset_degrees) {
 	if (!danmaku_validate_head("helper_generate_transforms_wave", transforms_amount, marker_transform)) {
-		return TypedArray<Transform2D>();
+		return PatternSlots2D();
 	}
 	if (!Math::is_finite(width) || width < 0.0 || !Math::is_finite(amplitude) || amplitude < 0.0 || !Math::is_finite(waves) || waves < 0.0) {
 		UtilityFunctions::push_error("helper_generate_transforms_wave: width, amplitude and waves must be finite and >= 0.");
-		return TypedArray<Transform2D>();
+		return PatternSlots2D();
 	}
 	if (!direction.is_finite() || direction.length_squared() <= 0.0) {
 		UtilityFunctions::push_error("helper_generate_transforms_wave: direction must be finite and non-zero.");
-		return TypedArray<Transform2D>();
+		return PatternSlots2D();
 	}
 	if (!Math::is_finite(facing_offset_degrees)) {
 		UtilityFunctions::push_error("helper_generate_transforms_wave: facing_offset_degrees must be finite.");
-		return TypedArray<Transform2D>();
+		return PatternSlots2D();
 	}
-	TypedArray<Transform2D> generated_transforms = danmaku_make_slots(transforms_amount);
+	PatternSlots2D generated_transforms = danmaku_make_slots(transforms_amount);
 	if (transforms_amount == 0) {
 		return generated_transforms;
 	}
@@ -812,7 +933,19 @@ TypedArray<Transform2D> BulletPatterns2D::helper_generate_transforms_wave(
 	return generated_transforms;
 }
 
-TypedArray<Transform2D> BulletPatterns2D::helper_generate_transforms_waterfall(
+TypedArray<Transform2D> BulletPatterns2D::helper_generate_transforms_wave(
+		int transforms_amount,
+		Transform2D marker_transform,
+		real_t width,
+		real_t amplitude,
+		real_t waves,
+		Vector2 direction,
+		bool face_direction,
+		real_t facing_offset_degrees) {
+	return pattern_slots_to_array(generate_wave2d(transforms_amount, marker_transform, width, amplitude, waves, direction, face_direction, facing_offset_degrees));
+}
+
+PatternSlots2D BulletPatterns2D::generate_waterfall2d(
 		int transforms_amount,
 		Transform2D marker_transform,
 		int columns,
@@ -825,32 +958,32 @@ TypedArray<Transform2D> BulletPatterns2D::helper_generate_transforms_waterfall(
 		real_t facing_offset_degrees,
 		uint64_t seed) {
 	if (!danmaku_validate_head("helper_generate_transforms_waterfall", transforms_amount, marker_transform)) {
-		return TypedArray<Transform2D>();
+		return PatternSlots2D();
 	}
 	if (columns < 1 || rows < 1) {
 		UtilityFunctions::push_error("helper_generate_transforms_waterfall: columns and rows must be >= 1.");
-		return TypedArray<Transform2D>();
+		return PatternSlots2D();
 	}
 	// columns*rows in 64-bit: 32-bit int math would wrap to negative on
 	// hostile input (100000x100000), turning the emit loop below into a
 	// billion-iteration hang. Reject absurd grids up front.
 	if ((int64_t)columns * (int64_t)rows > (int64_t)HELPER_MAX_TRANSFORMS * 4) {
 		UtilityFunctions::push_error("helper_generate_transforms_waterfall: columns*rows is absurdly large; keep the grid reasonable.");
-		return TypedArray<Transform2D>();
+		return PatternSlots2D();
 	}
 	if (!Math::is_finite(column_spacing) || column_spacing < 0.0 || !Math::is_finite(row_spacing) || row_spacing < 0.0) {
 		UtilityFunctions::push_error("helper_generate_transforms_waterfall: column_spacing and row_spacing must be finite and >= 0.");
-		return TypedArray<Transform2D>();
+		return PatternSlots2D();
 	}
 	if (!Math::is_finite(stagger) || !Math::is_finite(jitter) || jitter < 0.0 || !Math::is_finite(facing_offset_degrees)) {
 		UtilityFunctions::push_error("helper_generate_transforms_waterfall: stagger and facing_offset_degrees must be finite, jitter finite and >= 0.");
-		return TypedArray<Transform2D>();
+		return PatternSlots2D();
 	}
 	if (!rain_direction.is_finite() || rain_direction.length_squared() <= 0.0) {
 		UtilityFunctions::push_error("helper_generate_transforms_waterfall: rain_direction must be finite and non-zero.");
-		return TypedArray<Transform2D>();
+		return PatternSlots2D();
 	}
-	TypedArray<Transform2D> generated_transforms = danmaku_make_slots(transforms_amount);
+	PatternSlots2D generated_transforms = danmaku_make_slots(transforms_amount);
 	if (transforms_amount == 0) {
 		return generated_transforms;
 	}
@@ -905,7 +1038,22 @@ TypedArray<Transform2D> BulletPatterns2D::helper_generate_transforms_waterfall(
 	return generated_transforms;
 }
 
-TypedArray<Transform2D> BulletPatterns2D::helper_generate_transforms_lattice(
+TypedArray<Transform2D> BulletPatterns2D::helper_generate_transforms_waterfall(
+		int transforms_amount,
+		Transform2D marker_transform,
+		int columns,
+		real_t column_spacing,
+		int rows,
+		real_t row_spacing,
+		real_t stagger,
+		Vector2 rain_direction,
+		real_t jitter,
+		real_t facing_offset_degrees,
+		uint64_t seed) {
+	return pattern_slots_to_array(generate_waterfall2d(transforms_amount, marker_transform, columns, column_spacing, rows, row_spacing, stagger, rain_direction, jitter, facing_offset_degrees, seed));
+}
+
+PatternSlots2D BulletPatterns2D::generate_lattice2d(
 		int transforms_amount,
 		Transform2D marker_transform,
 		int columns,
@@ -916,27 +1064,27 @@ TypedArray<Transform2D> BulletPatterns2D::helper_generate_transforms_lattice(
 		bool face_outward,
 		real_t facing_offset_degrees) {
 	if (!danmaku_validate_head("helper_generate_transforms_lattice", transforms_amount, marker_transform)) {
-		return TypedArray<Transform2D>();
+		return PatternSlots2D();
 	}
 	if (columns < 1 || rows < 1) {
 		UtilityFunctions::push_error("helper_generate_transforms_lattice: columns and rows must be >= 1.");
-		return TypedArray<Transform2D>();
+		return PatternSlots2D();
 	}
 	// Same 64-bit guard as waterfall: hostile columns*rows would wrap a
 	// 32-bit int and hang the emit loop below.
 	if ((int64_t)columns * (int64_t)rows > (int64_t)HELPER_MAX_TRANSFORMS * 4) {
 		UtilityFunctions::push_error("helper_generate_transforms_lattice: columns*rows is absurdly large; keep the grid reasonable.");
-		return TypedArray<Transform2D>();
+		return PatternSlots2D();
 	}
 	if (!Math::is_finite(spacing_x) || spacing_x < 0.0 || !Math::is_finite(spacing_y) || spacing_y < 0.0) {
 		UtilityFunctions::push_error("helper_generate_transforms_lattice: spacing_x and spacing_y must be finite and >= 0.");
-		return TypedArray<Transform2D>();
+		return PatternSlots2D();
 	}
 	if (!Math::is_finite(facing_offset_degrees)) {
 		UtilityFunctions::push_error("helper_generate_transforms_lattice: facing_offset_degrees must be finite.");
-		return TypedArray<Transform2D>();
+		return PatternSlots2D();
 	}
-	TypedArray<Transform2D> generated_transforms = danmaku_make_slots(transforms_amount);
+	PatternSlots2D generated_transforms = danmaku_make_slots(transforms_amount);
 	if (transforms_amount == 0) {
 		return generated_transforms;
 	}
@@ -975,7 +1123,20 @@ TypedArray<Transform2D> BulletPatterns2D::helper_generate_transforms_lattice(
 	return generated_transforms;
 }
 
-TypedArray<Transform2D> BulletPatterns2D::helper_generate_transforms_counter_spiral(
+TypedArray<Transform2D> BulletPatterns2D::helper_generate_transforms_lattice(
+		int transforms_amount,
+		Transform2D marker_transform,
+		int columns,
+		int rows,
+		real_t spacing_x,
+		real_t spacing_y,
+		bool stagger_rows,
+		bool face_outward,
+		real_t facing_offset_degrees) {
+	return pattern_slots_to_array(generate_lattice2d(transforms_amount, marker_transform, columns, rows, spacing_x, spacing_y, stagger_rows, face_outward, facing_offset_degrees));
+}
+
+PatternSlots2D BulletPatterns2D::generate_counter_spiral2d(
 		int transforms_amount,
 		Transform2D marker_transform,
 		int arms,
@@ -988,29 +1149,29 @@ TypedArray<Transform2D> BulletPatterns2D::helper_generate_transforms_counter_spi
 		int arm_index_stride,
 		bool mirror_alternate_arms) {
 	if (!danmaku_validate_head("helper_generate_transforms_counter_spiral", transforms_amount, marker_transform)) {
-		return TypedArray<Transform2D>();
+		return PatternSlots2D();
 	}
 	if (arms < 2) {
 		UtilityFunctions::push_error("helper_generate_transforms_counter_spiral: arms must be >= 2 (use multispiral for 1 arm).");
-		return TypedArray<Transform2D>();
+		return PatternSlots2D();
 	}
 	if (!Math::is_finite(start_radius) || start_radius < 0.0 || !Math::is_finite(radius_step) || !Math::is_finite(angle_step)) {
 		UtilityFunctions::push_error("helper_generate_transforms_counter_spiral: start_radius (>= 0), radius_step and angle_step must be finite.");
-		return TypedArray<Transform2D>();
+		return PatternSlots2D();
 	}
 	if (facing_mode < SPIRAL_FACING_TANGENT || facing_mode > SPIRAL_FACING_KEEP_MARKER) {
 		UtilityFunctions::push_error("helper_generate_transforms_counter_spiral: unknown facing_mode.");
-		return TypedArray<Transform2D>();
+		return PatternSlots2D();
 	}
 	if (!Math::is_finite(facing_offset_degrees)) {
 		UtilityFunctions::push_error("helper_generate_transforms_counter_spiral: facing_offset_degrees must be finite.");
-		return TypedArray<Transform2D>();
+		return PatternSlots2D();
 	}
 	if (arm_index_stride < 1) {
 		UtilityFunctions::push_error("helper_generate_transforms_counter_spiral: arm_index_stride must be >= 1.");
-		return TypedArray<Transform2D>();
+		return PatternSlots2D();
 	}
-	TypedArray<Transform2D> generated_transforms = danmaku_make_slots(transforms_amount);
+	PatternSlots2D generated_transforms = danmaku_make_slots(transforms_amount);
 	if (transforms_amount == 0) {
 		return generated_transforms;
 	}
@@ -1052,7 +1213,22 @@ TypedArray<Transform2D> BulletPatterns2D::helper_generate_transforms_counter_spi
 	return generated_transforms;
 }
 
-TypedArray<Transform2D> BulletPatterns2D::helper_generate_transforms_corridor(
+TypedArray<Transform2D> BulletPatterns2D::helper_generate_transforms_counter_spiral(
+		int transforms_amount,
+		Transform2D marker_transform,
+		int arms,
+		real_t start_radius,
+		real_t radius_step,
+		real_t angle_step,
+		bool rotate_with_marker,
+		SpiralFacingMode facing_mode,
+		real_t facing_offset_degrees,
+		int arm_index_stride,
+		bool mirror_alternate_arms) {
+	return pattern_slots_to_array(generate_counter_spiral2d(transforms_amount, marker_transform, arms, start_radius, radius_step, angle_step, rotate_with_marker, facing_mode, facing_offset_degrees, arm_index_stride, mirror_alternate_arms));
+}
+
+PatternSlots2D BulletPatterns2D::generate_corridor2d(
 		int transforms_amount,
 		Transform2D marker_transform,
 		const Vector2 &aim_direction,
@@ -1062,33 +1238,33 @@ TypedArray<Transform2D> BulletPatterns2D::helper_generate_transforms_corridor(
 		bool face_aim,
 		real_t facing_offset_degrees) {
 	if (!danmaku_validate_head("helper_generate_transforms_corridor", transforms_amount, marker_transform)) {
-		return TypedArray<Transform2D>();
+		return PatternSlots2D();
 	}
 	if (!aim_direction.is_finite() || aim_direction.length_squared() <= 0.0) {
 		UtilityFunctions::push_error("helper_generate_transforms_corridor: aim_direction must be finite and non-zero.");
-		return TypedArray<Transform2D>();
+		return PatternSlots2D();
 	}
 	if (!Math::is_finite(width) || width < 0.0) {
 		UtilityFunctions::push_error("helper_generate_transforms_corridor: width must be finite and >= 0.");
-		return TypedArray<Transform2D>();
+		return PatternSlots2D();
 	}
 	if (!Math::is_finite(spacing) || spacing <= 0.0) {
 		UtilityFunctions::push_error("helper_generate_transforms_corridor: spacing must be finite and > 0.");
-		return TypedArray<Transform2D>();
+		return PatternSlots2D();
 	}
 	if (!Math::is_finite(gap_width) || gap_width < 0.0) {
 		UtilityFunctions::push_error("helper_generate_transforms_corridor: gap_width must be finite and >= 0.");
-		return TypedArray<Transform2D>();
+		return PatternSlots2D();
 	}
 	if (!Math::is_finite(facing_offset_degrees)) {
 		UtilityFunctions::push_error("helper_generate_transforms_corridor: facing_offset_degrees must be finite.");
-		return TypedArray<Transform2D>();
+		return PatternSlots2D();
 	}
 	if (gap_width >= width) {
 		UtilityFunctions::push_error("helper_generate_transforms_corridor: gap_width eats the whole wall (must be < width).");
-		return TypedArray<Transform2D>();
+		return PatternSlots2D();
 	}
-	TypedArray<Transform2D> generated_transforms = danmaku_make_slots(transforms_amount);
+	PatternSlots2D generated_transforms = danmaku_make_slots(transforms_amount);
 	if (transforms_amount == 0) {
 		return generated_transforms;
 	}
@@ -1128,6 +1304,18 @@ TypedArray<Transform2D> BulletPatterns2D::helper_generate_transforms_corridor(
 	generated_transforms.resize(placed);
 	danmaku_clamp_slots_finite("helper_generate_transforms_corridor", generated_transforms);
 	return generated_transforms;
+}
+
+TypedArray<Transform2D> BulletPatterns2D::helper_generate_transforms_corridor(
+		int transforms_amount,
+		Transform2D marker_transform,
+		const Vector2 &aim_direction,
+		real_t width,
+		real_t spacing,
+		real_t gap_width,
+		bool face_aim,
+		real_t facing_offset_degrees) {
+	return pattern_slots_to_array(generate_corridor2d(transforms_amount, marker_transform, aim_direction, width, spacing, gap_width, face_aim, facing_offset_degrees));
 }
 
 } // namespace BlastBullets2D

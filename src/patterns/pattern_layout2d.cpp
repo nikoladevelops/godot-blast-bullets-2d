@@ -12,7 +12,7 @@ namespace BlastBullets2D {
 // (1e30 spacing on an 8k volley) overflow slot math to Inf/NaN, which would
 // poison the whole volley downstream. Slots that blew out land at the clamped
 // edge, valid slots pass through untouched. Warns once when it fires.
-void danmaku_clamp_slots_finite(const char *caller_name, TypedArray<Transform2D> &slots) {
+void danmaku_clamp_slots_finite(const char *caller_name, PatternSlots2D &slots) {
 	const double BOUND = 400000.0;
 	bool clamped = false;
 	for (int i = 0; i < slots.size(); ++i) {
@@ -544,9 +544,9 @@ PackedVector2Array fill_outline_from(int outline_placement, const PackedVector2A
 	return out;
 }
 
-TypedArray<Transform2D> layout_outline_slots(const char *caller_name, const Transform2D &marker_transform, const PackedVector2Array &points, const PackedVector2Array &normals, bool points_are_local, real_t rot_add, bool face_outward, real_t facing_offset_degrees, const PackedFloat32Array &facing_override, int outline_placement, int outline_facing, bool outline_reverse, int outline_slot_offset, double fill_spacing, bool fill_stagger, double fill_margin, int layer_count, double layer_scale, int layer_side, int layer_fill, int layer_start_offset, int layer_scale_curve, const PackedFloat32Array &layer_custom_scales, int layer_twist, int layer_max_dots, int outline_distribution, int layer_layout, const PackedVector2Array &polygon_corners, int corner_priority, int corner_mode, double edge_margin, bool loop_closed, bool allow_resample, int corner_facing, const PackedVector2Array &dense_outline, const PackedVector2Array &dense_normals, const PackedFloat32Array &dense_overrides) {
+PatternSlots2D layout_outline_slots(const char *caller_name, const Transform2D &marker_transform, const PackedVector2Array &points, const PackedVector2Array &normals, bool points_are_local, real_t rot_add, bool face_outward, real_t facing_offset_degrees, const PackedFloat32Array &facing_override, int outline_placement, int outline_facing, bool outline_reverse, int outline_slot_offset, double fill_spacing, bool fill_stagger, double fill_margin, int layer_count, double layer_scale, int layer_side, int layer_fill, int layer_start_offset, int layer_scale_curve, const PackedFloat32Array &layer_custom_scales, int layer_twist, int layer_max_dots, int outline_distribution, int layer_layout, const PackedVector2Array &polygon_corners, int corner_priority, int corner_mode, double edge_margin, bool loop_closed, bool allow_resample, int corner_facing, const PackedVector2Array &dense_outline, const PackedVector2Array &dense_normals, const PackedFloat32Array &dense_overrides) {
     const int n = points.size();
-    TypedArray<Transform2D> out;
+    PatternSlots2D out;
     if (n <= 0) {
         return out;
     }
