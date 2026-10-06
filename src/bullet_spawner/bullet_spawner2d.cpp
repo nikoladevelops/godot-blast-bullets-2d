@@ -662,6 +662,17 @@ PackedStringArray BulletSpawner2D::_get_configuration_warnings() const {
 	if (orbiting_enabled && !homing_enabled) {
 		out.push_back("orbiting_enabled needs homing_enabled (orbiting locks onto a homing target).");
 	}
+	if (homing_enabled) {
+		if (homing_target_source == HOMING_SOURCE_NODE_GROUP && homing_node_group.is_empty()) {
+			out.push_back("homing_target_source is Node Group but homing_node_group is empty: volleys fly without homing.");
+		} else if (homing_target_source == HOMING_SOURCE_NODE_NAME && homing_node_name.is_empty()) {
+			out.push_back("homing_target_source is Node Name but homing_node_name is empty: volleys fly without homing.");
+		} else if (homing_target_source == HOMING_SOURCE_NODE_PATH && homing_target_path.is_empty()) {
+			out.push_back("homing_target_source is Node Path but homing_target_path is empty: volleys fly without homing.");
+		} else if (homing_target_source == HOMING_SOURCE_NODE_CHILDREN && homing_children_parent_path.is_empty()) {
+			out.push_back("homing_target_source is Node Children but homing_children_parent_path is empty: volleys fly without homing.");
+		}
+	}
 	if (graze_enabled) {
 		bool any_zone = false;
 		for (int i = 0; i < graze_zones.size(); ++i) {

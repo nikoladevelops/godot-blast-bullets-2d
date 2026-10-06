@@ -78,12 +78,13 @@ func test_distribute_deals_the_pool_across_bullets() -> void:
 	assert_eq(chased, [foes[0], foes[1], foes[0], foes[1]], "bullet i chases pool[i % pool]")
 
 
-func test_max_targets_bounds_are_enforced() -> void:
+func test_max_targets_must_be_at_least_one_and_has_no_upper_cap() -> void:
 	var sp := _spawner(BulletSpawner2D.HOMING_SELECT_NEAREST)
 	sp.set_homing_max_targets(0)
-	sp.set_homing_max_targets(10001)
-	expect_errors_containing("homing_max_targets", 2, "both out-of-range values rejected")
+	expect_error_sequence(["BulletSpawner2D: homing_max_targets must be >= 1, keeping the old value."])
 	assert_eq(sp.get_homing_max_targets(), 2, "old value kept")
+	sp.set_homing_max_targets(1000000)
+	assert_eq(sp.get_homing_max_targets(), 1000000, "the developer decides how many: no upper cap")
 
 
 func test_detection_range_and_filter_group_narrow_the_pool() -> void:

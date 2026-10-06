@@ -120,10 +120,6 @@ static constexpr const char *GRAZE_PREVIEW_NAME = "~BlastBulletsGrazePreview";
 // agree; the inspector hint strings in _bind_methods mirror these).
 static constexpr int kMaxBulletsPerVolley = kPatternMaxBullets; // helper_bullets_amount + helper_custom_transforms
 
-static constexpr int kMaxHomingTargets = 10000; // homing_max_targets scene-scan bound
-
-static constexpr int kMaxHomingDequeTargets = 256; // engine queue cap per volley
-
 static constexpr int kMaxOutlineLayers = kPatternMaxOutlineLayers; // helper_outline_layer_count + helper_outline_layer_scales
 
 static constexpr int kMaxPreviewTrackPoints = kPatternMaxTrackPoints; // path/cross track decimation stride target

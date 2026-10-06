@@ -32,9 +32,9 @@ func _finite(v: BulletVolley2D) -> bool:
 	return true
 
 
-# --- Queue cap ---------------------------------------------------------------
+# --- No queue cap ------------------------------------------------------------
 
-func test_queue_cap_is_256_without_errors() -> void:
+func test_queues_hold_every_target_without_a_cap() -> void:
 	for i in 300:
 		var n := Node2D.new()
 		n.position = Vector2(100 + i, 0)
@@ -45,18 +45,18 @@ func test_queue_cap_is_256_without_errors() -> void:
 	sp.set_homing_node_group(&"swarm")
 	sp.set_homing_max_targets(10000)
 	assert_true(sp.shoot_once(), "shared-mode shot")
-	expect_no_errors("no 'HomingTargetDeque is full' errors")
+	expect_no_errors("no errors")
 	var shared: BulletVolley2D = sp.get_live_volleys()[0]
-	assert_eq(shared.shared_homing_deque_check_homing_targets_amount(), 256, "the shared queue is filled to its cap")
+	assert_eq(shared.shared_homing_deque_check_homing_targets_amount(), 300, "the shared queue holds all 300")
 	sp.set_homing_mode(BulletSpawner2D.HOMING_PER_BULLET)
 	assert_true(sp.shoot_once(), "per-bullet shot")
 	expect_no_errors("no errors per bullet either")
 	var per: BulletVolley2D = sp.get_live_volleys()[1]
 	for i in per.get_amount_bullets():
-		assert_eq(per.bullet_homing_check_targets_amount(i), 256, "bullet %d queue at the cap" % i)
+		assert_eq(per.bullet_homing_check_targets_amount(i), 300, "bullet %d queue holds all 300" % i)
 	assert_eq(sp.retarget_live_volleys(), 2, "both volleys retargeted")
-	expect_no_errors("a retarget pass stays within the cap")
-	assert_eq(per.bullet_homing_check_targets_amount(0), 256, "still 256 after the pass")
+	expect_no_errors("a retarget pass raises nothing")
+	assert_eq(per.bullet_homing_check_targets_amount(0), 300, "still 300 after the pass")
 
 
 # --- Invalid nodes -----------------------------------------------------------

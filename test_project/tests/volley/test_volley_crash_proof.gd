@@ -152,7 +152,7 @@ func test_maxed_deque_timers_collisions() -> void:
 	var v: BulletVolley2D = quick_volley(2, 180.0)
 	for i in 300:
 		v.bullet_homing_push_back_global_position_target(0, Vector2(i, i))
-	assert_eq(v.bullet_homing_check_targets_amount(0), 256, "deque capped at 256")
+	assert_eq(v.bullet_homing_check_targets_amount(0), 300, "the queue holds every target (no cap)")
 	await idle()
 	for i in 70:
 		v.attach_time_based_function(30.0, func() -> void: pass)

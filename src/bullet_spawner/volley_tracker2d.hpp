@@ -20,16 +20,12 @@ using namespace godot;
 // is what makes adopt_live_volley handovers and pool reuse safe even though
 // the previous owner's list still holds the id until its next prune.
 //
-// Bounded (oldest dropped first) so infinite-lifetime volleys can't grow
-// retarget cost without bound. Header-only: all operations are O(tracked).
+// No cap: every live homing volley of the spawner stays tracked (dead,
+// pooled and re-owned ones are pruned), so retargeting reaches all of them;
+// a retarget pass costs what the game keeps flying. Header-only: all
+// operations are O(tracked).
 class VolleyTracker2D {
 public:
-	// Hard cap on tracked volleys. Retarget passes are O(volleys * bullets),
-	// so an unbounded list would let infinite-lifetime auto-shoot sessions
-	// grow per-tick cost forever. Oldest dropped first (newest volleys matter
-	// most for retargeting). Use forget_tracked_volleys() to reset manually.
-	static constexpr int MAX_TRACKED_VOLLEYS = 256;
-
 	bool track(BulletVolley2D *volley, uint64_t owner_spawner_id) {
 		if (volley == nullptr) {
 			return false;
@@ -47,24 +43,12 @@ public:
 			member_ids.insert(id);
 		}
 		prune(owner_spawner_id);
-		while (live_ids.size() > MAX_TRACKED_VOLLEYS) {
-			member_ids.erase(live_ids[0]);
-			live_ids.remove_at(0);
-			// Cap saturation silently drops the oldest volleys from
-			// retargeting: say so once (re-armed by clear()) instead of
-			// degrading with no diagnostic.
-			if (!cap_eviction_warned) {
-				cap_eviction_warned = true;
-				UtilityFunctions::push_warning("VolleyTracker2D: tracked volleys exceeded 256, oldest volleys no longer retarget. Call forget_tracked_volleys() or raise turnover.");
-			}
-		}
 		return member_ids.find(id) != member_ids.end();
 	}
 
 	void clear() {
 		live_ids.clear();
 		member_ids.clear();
-		cap_eviction_warned = false;
 	}
 
 	// Drops freed instances (teardown), volleys re-owned by another spawner
@@ -136,7 +120,6 @@ private:
 	// Always mirrors live_ids (insert on track, erase on prune/evict/clear).
 	mutable std::unordered_set<int64_t> member_ids;
 	// One-shot latch for the cap-eviction warning above; re-armed by clear().
-	mutable bool cap_eviction_warned = false;
 };
 
 } //namespace BlastBullets2D

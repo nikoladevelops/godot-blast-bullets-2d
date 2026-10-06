@@ -6,7 +6,9 @@ extends BlastTest
 ## and how failures are reported: a shot that finds nothing still fires as a
 ## plain volley, emits homing_targets_resolved([]), and warns ONCE per homing
 ## configuration (changing a homing target setting re-arms the warning; a
-## group emptying again during play does not).
+## group emptying again during play does not). Nothing is guessed: no
+## default group or name, an empty one is named in a warning and in the
+## editor's setup warnings (one per source with an empty setting).
 
 
 func _spawner(source: int) -> BulletSpawner2D:
@@ -272,3 +274,47 @@ func test_children_never_pick_a_bullet_factory_or_its_nodes() -> void:
 	assert_false(found.has(in_factory), "nor anything inside it")
 	assert_true(found.has(foe), "its siblings count")
 	in_factory.free()
+
+
+# --- No default targets ---------------------------------------------------------
+
+func test_no_default_targets_the_developer_names_them() -> void:
+	var sp := make_spawner()
+	assert_eq(sp.homing_node_group, &"", "no default group")
+	assert_eq(sp.homing_node_name, "", "no default name")
+	_node("Player", Vector2(100, 0), [&"enemies", &"player"]) # the names the old defaults used
+	sp.set_homing_enabled(true)
+	sp.set_homing_retarget_mode(BulletSpawner2D.HOMING_RETARGET_OFF)
+	watch_signals(sp)
+	assert_true(sp.shoot_once(), "an unnamed group still fires")
+	assert_true(sp.shoot_once(), "twice")
+	assert_eq(_warnings("BulletSpawner2D::resolve_homing_targets: homing_node_group is empty, volley flies without homing."), 1, "the empty group is named, once")
+	assert_eq(get_signal_parameters(sp, "homing_targets_resolved", 0)[1], [], "nobody chased: nothing is guessed")
+
+
+func test_setup_warnings_name_each_empty_homing_setting() -> void:
+	var sp := make_spawner()
+	assert_eq(_homing_warnings(sp), [], "homing off: nothing")
+	sp.set_homing_enabled(true)
+	var expected := {
+		BulletSpawner2D.HOMING_SOURCE_NODE_GROUP: "homing_target_source is Node Group but homing_node_group is empty: volleys fly without homing.",
+		BulletSpawner2D.HOMING_SOURCE_NODE_NAME: "homing_target_source is Node Name but homing_node_name is empty: volleys fly without homing.",
+		BulletSpawner2D.HOMING_SOURCE_NODE_PATH: "homing_target_source is Node Path but homing_target_path is empty: volleys fly without homing.",
+		BulletSpawner2D.HOMING_SOURCE_NODE_CHILDREN: "homing_target_source is Node Children but homing_children_parent_path is empty: volleys fly without homing.",
+	}
+	for source in expected:
+		sp.set_homing_target_source(source)
+		assert_eq(_homing_warnings(sp), [expected[source]], "source %d" % source)
+	sp.set_homing_target_source(BulletSpawner2D.HOMING_SOURCE_MOUSE)
+	assert_eq(_homing_warnings(sp), [], "the mouse needs no setting")
+	sp.set_homing_target_source(BulletSpawner2D.HOMING_SOURCE_NODE_GROUP)
+	sp.set_homing_node_group(&"foes")
+	assert_eq(_homing_warnings(sp), [], "a named group")
+
+
+func _homing_warnings(sp: BulletSpawner2D) -> Array:
+	var out: Array = []
+	for w in sp.get_setup_warnings():
+		if w.begins_with("homing_target_source"):
+			out.append(w)
+	return out

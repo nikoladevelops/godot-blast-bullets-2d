@@ -119,10 +119,11 @@ func test_distribute_degenerate_and_real_pools() -> void:
 		var foe := Node2D.new()
 		foe.position = Vector2(100.0 * (i + 1), 0)
 		add(foe)
-		foe.add_to_group("enemies") # the spawner's default homing group
+		foe.add_to_group("enemies")
 		foes.append(foe)
 	var s5 := _spawner(BulletSpawner2D.PATTERN_FROM_HELPER_RING, 4)
 	s5.set_homing_enabled(true)
+	s5.set_homing_node_group(&"enemies") # no default group: named here
 	s5.set_homing_mode(BulletSpawner2D.HOMING_PER_BULLET)
 	s5.set_homing_target_selection(BulletSpawner2D.HOMING_SELECT_DISTRIBUTE)
 	s5.set_homing_max_targets(1)
@@ -138,6 +139,7 @@ func test_distribute_degenerate_and_real_pools() -> void:
 		assert_eq(v5.bullet_get_current_homing_target(i), foes[0], "1-target pool: every bullet chases the nearest")
 	var s6 := _spawner(BulletSpawner2D.PATTERN_FROM_HELPER_RING, 4)
 	s6.set_homing_enabled(true)
+	s6.set_homing_node_group(&"enemies") # no default group: named here
 	s6.set_homing_mode(BulletSpawner2D.HOMING_PER_BULLET)
 	s6.set_homing_target_selection(BulletSpawner2D.HOMING_SELECT_DISTRIBUTE)
 	s6.set_homing_max_targets(4)

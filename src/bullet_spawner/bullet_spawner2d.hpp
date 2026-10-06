@@ -489,9 +489,10 @@ public:
 	bool homing_enabled = false;
 	HomingMode homing_mode = HOMING_SHARED;
 	HomingTargetSource homing_target_source = HOMING_SOURCE_NODE_GROUP;
-	// Polled group for HOMING_SOURCE_NODE_GROUP. Only Node2D members are
-	// usable; the rest are skipped quietly.
-	StringName homing_node_group = "enemies";
+	// Polled group for HOMING_SOURCE_NODE_GROUP (empty by default: the
+	// developer names it). Only Node2D members are usable; the rest are
+	// skipped quietly.
+	StringName homing_node_group;
 	// Extra allow-list applied on top of any source: when non-empty, only
 	// targets that are ALSO in this group are kept. Empty = no filtering.
 	StringName homing_filter_group;
@@ -544,9 +545,10 @@ public:
 	// (nearest/random/first/round robin), homing_max_targets, range, and
 	// filter-group rules pick the queue. Handy when enemies are spawned
 	// dynamically and never added to a group.
-	String homing_node_name = "Player";
+	// Empty by default: the developer names it.
+	String homing_node_name;
 	HomingNodeNameMatch homing_node_name_match_mode = HOMING_NAME_MATCH_CONTAINS;
-	// Case-insensitive by default: "Player" matches "PlAyEr". Turn on for
+	// Case-insensitive by default: "Boss" matches "BOSS". Turn on for
 	// strict comparison.
 	bool homing_node_name_case_sensitive = false;
 	// NODE-CHILDREN SOURCE (HOMING_SOURCE_NODE_CHILDREN)
@@ -900,7 +902,7 @@ public:
 	// Every ACTIVE volley this spawner owns, in factory order. Lets
 	// GDScript call the full BulletVolley2D API on each volley directly.
 	Array get_live_volleys() const;
-	// The retarget list: homing shots + adopted volleys (capped at 256,
+	// The retarget list: every live homing shot + adopted volley (no cap,
 	// pruned first). retarget_live_volleys() walks this list.
 	int get_tracked_volley_count() const;
 	// Forgets the retarget list (the volleys keep flying untouched).

@@ -140,6 +140,7 @@ void BulletSpawner2D::set_homing_target_source(HomingTargetSource value) {
 	}
 	homing_target_source = value;
 	clear_empty_homing_targets_warning();
+	on_config_changed();
 	notify_property_list_changed();
 }
 
@@ -150,6 +151,7 @@ StringName BulletSpawner2D::get_homing_node_group() const {
 void BulletSpawner2D::set_homing_node_group(const StringName &value) {
 	homing_node_group = value;
 	clear_empty_homing_targets_warning();
+	on_config_changed();
 }
 
 StringName BulletSpawner2D::get_homing_filter_group() const {
@@ -181,13 +183,6 @@ int BulletSpawner2D::get_homing_max_targets() const {
 void BulletSpawner2D::set_homing_max_targets(int value) {
 	if (value < 1) {
 		UtilityFunctions::push_error("BulletSpawner2D: homing_max_targets must be >= 1, keeping the old value.");
-		return;
-	}
-	// Bounded like helper_bullets_amount: the name scan + NEAREST selection
-	// run per volley and per retarget pass, so an unbounded value turns a
-	// huge scene into a per-interval hitch.
-	if (value > kMaxHomingTargets) {
-		UtilityFunctions::push_error("BulletSpawner2D: homing_max_targets must be <= 10000, keeping the old value.");
 		return;
 	}
 	homing_max_targets = value;
@@ -228,6 +223,7 @@ void BulletSpawner2D::set_homing_target_path(const NodePath &p_path) {
 	}
 	homing_target_path = p_path;
 	clear_empty_homing_targets_warning();
+	on_config_changed();
 }
 
 String BulletSpawner2D::get_homing_node_name() const {
@@ -237,6 +233,7 @@ String BulletSpawner2D::get_homing_node_name() const {
 void BulletSpawner2D::set_homing_node_name(const String &value) {
 	homing_node_name = value;
 	clear_empty_homing_targets_warning();
+	on_config_changed();
 }
 
 BulletSpawner2D::HomingNodeNameMatch BulletSpawner2D::get_homing_node_name_match_mode() const {
@@ -268,6 +265,7 @@ NodePath BulletSpawner2D::get_homing_children_parent_path() const {
 void BulletSpawner2D::set_homing_children_parent_path(const NodePath &p_path) {
 	homing_children_parent_path = p_path;
 	clear_empty_homing_targets_warning();
+	on_config_changed();
 }
 
 bool BulletSpawner2D::get_homing_children_recursive() const {
@@ -682,6 +680,10 @@ Array BulletSpawner2D::resolve_homing_targets(bool quiet, bool advance_round_rob
 					collect_homing_candidates_by_name(scan_root, candidates);
 				}
 			} else {
+				if (homing_node_group.is_empty()) {
+					warn_empty_homing_targets_once("BulletSpawner2D::resolve_homing_targets: homing_node_group is empty, volley flies without homing.", quiet);
+					return targets;
+				}
 				TypedArray<Node> members = tree->get_nodes_in_group(homing_node_group);
 				for (int i = 0; i < members.size(); ++i) {
 					Node2D *candidate = Object::cast_to<Node2D>(members[i]);
@@ -733,11 +735,9 @@ Array BulletSpawner2D::resolve_homing_targets(bool quiet, bool advance_round_rob
 		}
 		return targets;
 	}
-	// The deque caps at 256 targets per queue (see HomingTargetDeque): clamp
-	// the take there too, otherwise a huge max_targets fans thousands of
-	// rejected pushes (one error each) every volley and every retarget pass.
-	// DISTRIBUTE is unaffected (exactly one target per bullet).
-	const int take = MIN(MIN(homing_max_targets, (int)candidates.size()), kMaxHomingDequeTargets);
+	// No cap: homing_max_targets (the user's choice) and the candidates
+	// found decide. DISTRIBUTE deals exactly one target per bullet.
+	const int take = MIN(homing_max_targets, (int)candidates.size());
 	// DISTRIBUTE deals one target per bullet across the volley (cycling), so
 	// the resolution order here does not matter: spawn and retarget build
 	// the deal with i % pool themselves. NEAREST order is returned, same as

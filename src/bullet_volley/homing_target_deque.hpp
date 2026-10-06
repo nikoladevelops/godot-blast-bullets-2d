@@ -97,20 +97,8 @@ class HomingTargetDeque {
 public:
 	// NOTE: no resize() on purpose - growth via std::deque::resize would insert
 	// default HomingTargets (NotHoming) that block trimming and home toward a stale
-	// cache. Deques are sized implicitly by push/pop only.
-	// Per-deque cap: pushes are user-driven and unbounded by default (a
-	// push-per-tick script would grow memory and per-tick trim cost forever).
-	static constexpr int MAX_HOMING_TARGETS_PER_DEQUE = 256;
-
-	// Rejects the push when full (warn + false/no-store) so callers that
-	// track counters never count a target that was never stored.
-	_ALWAYS_INLINE_ bool has_room_for_push() const {
-		if ((int)homing_targets.size() >= MAX_HOMING_TARGETS_PER_DEQUE) {
-			UtilityFunctions::push_error("HomingTargetDeque is full (256 targets). Pop or clear before pushing more.");
-			return false;
-		}
-		return true;
-	}
+	// cache. Deques are sized implicitly by push/pop only. No cap: a queue
+	// holds as many targets as the game pushes (the ring buffer grows).
 
 	HomingTarget &front() {
 		return homing_targets.front();
@@ -365,9 +353,6 @@ private:
 	// Stores a validated target at the front or the back; the cached front
 	// position follows whenever the target became the front.
 	_ALWAYS_INLINE_ bool store(const HomingTarget &target, bool at_front, const Vector2 &position) {
-		if (!has_room_for_push()) {
-			return false;
-		}
 		if (target.type == MousePositionTarget) {
 			++mouse_homing_targets_amount;
 		}
