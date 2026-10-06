@@ -20,7 +20,7 @@ func test_defaults_match_the_documented_values() -> void:
 	assert_true(z.preview_color.is_equal_approx(Color(0.2, 0.9, 0.8, 0.8)), "preview color")
 	assert_false(z.preview_during_runtime, "no runtime preview by default")
 	assert_eq(BulletGrazeZone2D.MAX_RINGS, 4, "ring cap")
-	assert_eq(BulletGrazeZone2D.MAX_TARGETS, 4, "target cap")
+	assert_eq(BulletGrazeZone2D.MAX_TARGETS, 64, "target cap")
 
 
 func test_ring_properties_hide_beyond_ring_count() -> void:

@@ -15,7 +15,7 @@ const PLUGIN_CLASSES: Array[StringName] = [
 	&"BulletRotationData2D", &"BulletEffectLayerData2D", &"BulletSpeedData2D", &"BulletCurvesData2D",
 	&"BulletWobbleData2D", &"VolleyPoolKey2D", &"BulletAttachment2D", &"BulletPatterns2D",
 	&"BulletFactory2D", &"BulletVolleyDebugger2D", &"BulletVolleyData2D", &"BulletVolley2D",
-	&"BulletSpawner2D", &"PatternPreviewLayer2D",
+	&"BulletSpawner2D", &"PatternPreviewLayer2D", &"BulletGrazeZone2D", &"GrazePreviewLayer2D",
 ]
 const AMOUNTS := [-1, 0, 1, 2, 7, 24, 10001]
 const TRACE_STEP := 1.0 / 60.0
@@ -775,6 +775,19 @@ func _snap_traces(section: String) -> void:
 			func(v: BulletVolley2D) -> void: v.all_bullets_push_back_homing_target(target_a))
 	_graze_trace(section, factory, "graze_line", H.make_volley_data(6, 2400.0),
 			[_graze_zone(&"snap_graze_a", [205.0, 201.0], BulletGrazeZone2D.REGRAZE_ONCE, false)])
+	# Many targets (the slab path past 8): a fast line through a field of 20.
+	var field: Array = []
+	for i in 20:
+		var t := Node2D.new()
+		t.name = "SnapField%d" % i
+		t.position = Vector2(60 * i - 600, 10 * ((i * 7) % 5) - 20)
+		t.add_to_group(&"snap_graze_field")
+		add_child(t)
+		field.append(t)
+	_graze_trace(section, factory, "graze_field", H.make_volley_data(6, 2400.0),
+			[_graze_zone(&"snap_graze_field", [24.0, 12.0], BulletGrazeZone2D.REGRAZE_AFTER_EXIT, true)])
+	for t in field:
+		(t as Node).free()
 	factory.reset()
 	factory.queue_free()
 	await get_tree().process_frame

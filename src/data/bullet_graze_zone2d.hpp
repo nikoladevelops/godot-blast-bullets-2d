@@ -10,8 +10,9 @@ namespace BlastBullets2D {
 using namespace godot;
 
 // Graze zone: which nodes can graze bullets (every live Node2D of
-// target_group, the first MAX_TARGETS in tree order) and the concentric
-// rings around each of them. A bullet grazes ring k when its motion during
+// target_group, the first MAX_TARGETS in tree order; a spawner may find
+// them another way: BulletSpawner2D.graze_target_source) and the
+// concentric rings around each of them. A bullet grazes ring k when its motion during
 // one tick comes within ring_<k+1>_radius (plus its own bounding radius when
 // count_bullet_size is on) of a target's global position. Rings are
 // independent circles: their order here does not matter.
@@ -28,7 +29,10 @@ class BulletGrazeZone2D : public Resource {
 public:
 	static constexpr int MAX_RINGS = 4;
 	// Live targets tested per zone (first in tree order; more warn once).
-	static constexpr int MAX_TARGETS = 4;
+	// The per-bullet cost grows with the targets that are live, never with
+	// this cap. A visit's target slot must fit the 6 anchor bits of the
+	// volley's graze state (BulletVolley2D::GRAZE_ANCHOR_MASK).
+	static constexpr int MAX_TARGETS = 64;
 
 	// SERIALIZED ids: never renumber.
 	enum Regraze {

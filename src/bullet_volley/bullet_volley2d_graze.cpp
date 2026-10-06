@@ -60,6 +60,12 @@ void BulletVolley2D::graze_clear() {
 	graze_release();
 }
 
+void BulletVolley2D::graze_set_detector(const std::shared_ptr<GrazeDetector2D> &detector) {
+	// Another detector hands out other lists: the next tick sees new list
+	// uids and moves or ends open visits like any target change.
+	graze_detector = detector;
+}
+
 void BulletVolley2D::graze_release() {
 	for (Ref<BulletGrazeZone2D> &zone : graze_zones) {
 		zone.unref();
@@ -158,69 +164,89 @@ void BulletVolley2D::prepare_graze_tick() {
 	// Bullet size: the shape's bounding radius (read every tick: a runtime
 	// shape change counts at once) times the scale measured at arming.
 	const real_t bullet_radius = graze_shape_bound_radius2d(cached_effective_shape_type, cached_circle_radius, cached_rect_size, cached_capsule_height) * graze_bullet_scale;
+	// The target lists first (each updated at most once per factory sweep,
+	// shared by every volley of the detector), then this volley's live copy
+	// of them, back to back in graze_tick_centers / graze_tick_slots.
+	GrazeDetector2D &detector = graze_detector != nullptr ? *graze_detector : bullet_factory->get_graze_default_detector();
+	const GrazeTargetList2D *lists[MAX_GRAZE_ZONES] = {};
+	int capacity = 0;
 	for (int z = 0; z < graze_zone_slots; ++z) {
-		GrazeTickZone2D &tz = graze_tick_zones[z];
-		tz.target_count = 0;
-		GrazeTarget2D live[BulletGrazeZone2D::MAX_TARGETS];
-		int live_count = 0;
 		const BulletGrazeZone2D *zone = graze_zones[z].ptr();
-		if (zone != nullptr && zone->enabled && zone->preview_during_runtime) {
+		if (zone == nullptr) {
+			continue;
+		}
+		if (zone->enabled && zone->preview_during_runtime) {
 			// Keeps the factory's runtime ring preview drawing this zone
 			// (cheap: a flag check once awake).
 			bullet_factory->wake_graze_runtime_preview();
 		}
-		if (zone != nullptr && zone->enabled && !zone->target_group.is_empty()) {
-			GrazeTarget2D found[BulletGrazeZone2D::MAX_TARGETS];
-			const int count = bullet_factory->graze_targets_for(zone->target_group, found);
-			for (int k = 0; k < count; ++k) {
-				// The snapshot may predate a handler of an earlier volley of
-				// this sweep: re-resolve, never trust a stored id. The owner
-				// spawner never grazes its own bullets.
-				if (found[k].id == owner_spawner_id) {
-					continue;
-				}
-				Node2D *node = Object::cast_to<Node2D>(ObjectDB::get_instance(ObjectID(found[k].id)));
-				if (node == nullptr || node->is_queued_for_deletion()) {
-					continue;
-				}
-				live[live_count++] = found[k];
-			}
-		}
-		// Stable slots: a target keeps its slot while it lives; a vanished
-		// one frees it (flagged for this tick), a new one takes a free slot.
+		lists[z] = detector.list_for(*zone, *bullet_factory);
+		capacity += lists[z] != nullptr ? lists[z]->count : 0;
+	}
+	if ((int)graze_tick_centers.size() < capacity) {
+		graze_tick_centers.resize(capacity);
+		graze_tick_slots.resize(capacity);
+		graze_tick_order.resize(capacity);
+	}
+	int offset = 0;
+	for (int z = 0; z < graze_zone_slots; ++z) {
+		GrazeTickZone2D &tz = graze_tick_zones[z];
+		const BulletGrazeZone2D *zone = graze_zones[z].ptr();
+		const GrazeTargetList2D *list = lists[z];
+		tz.target_count = 0;
 		tz.vanished_slots = 0;
-		for (int slot = 0; slot < BulletGrazeZone2D::MAX_TARGETS; ++slot) {
-			if (tz.slot_ids[slot] == 0) {
-				continue;
-			}
-			bool alive = false;
-			for (int k = 0; k < live_count && !alive; ++k) {
-				alive = live[k].id == tz.slot_ids[slot];
-			}
-			if (!alive) {
-				tz.slot_ids[slot] = 0;
-				tz.vanished_slots |= (uint8_t)(1u << slot);
-			}
-		}
-		for (int k = 0; k < live_count; ++k) {
-			int slot = -1;
-			for (int s = 0; s < BulletGrazeZone2D::MAX_TARGETS && slot < 0; ++s) {
-				if (tz.slot_ids[s] == live[k].id) {
-					slot = s;
+		tz.slab = false;
+		tz.order = nullptr;
+		if (list == nullptr) {
+			tz.seen_list_uid = 0;
+			tz.seen_list_serial = 0;
+			tz.slot_ids = nullptr;
+		} else {
+			if (tz.seen_list_uid != list->uid) {
+				// Another list (new source or group): every slot changed.
+				// The first list a volley meets changes nothing.
+				tz.vanished_slots = tz.seen_list_uid != 0 ? ~(uint64_t)0 : (uint64_t)0;
+			} else if (tz.seen_list_serial != list->serial) {
+				for (int slot = 0; slot < GrazeTargetList2D::CAP; ++slot) {
+					if (list->slot_changed[slot] > tz.seen_list_serial) {
+						tz.vanished_slots |= (uint64_t)1 << slot;
+					}
 				}
 			}
-			for (int s = 0; s < BulletGrazeZone2D::MAX_TARGETS && slot < 0; ++s) {
-				if (tz.slot_ids[s] == 0) {
-					slot = s;
-					tz.slot_ids[s] = live[k].id;
+			tz.seen_list_uid = list->uid;
+			tz.seen_list_serial = list->serial;
+			tz.slot_ids = list->slot_ids;
+			Vector2 *centers = graze_tick_centers.data() + offset;
+			uint8_t *slots = graze_tick_slots.data() + offset;
+			uint8_t *orders = graze_tick_order.data() + offset;
+			// Many targets: copied in x order (the list keeps it), each
+			// with its tree-order index so ties still go to the first.
+			const bool slab = list->by_x_valid;
+			for (int n = 0; n < list->count; ++n) {
+				const int k = slab ? (int)list->by_x[n] : n;
+				const GrazeTarget2D &target = list->targets[k];
+				// The owner spawner never grazes its own bullets.
+				if (target.id == owner_spawner_id) {
+					continue;
 				}
+				// The list may predate a handler of an earlier volley of
+				// this sweep: re-resolve, never trust a stored id. A target
+				// gone since then ends (or moves) its visits now.
+				Node2D *node = Object::cast_to<Node2D>(ObjectDB::get_instance(ObjectID(target.id)));
+				if (node == nullptr || node->is_queued_for_deletion()) {
+					tz.vanished_slots |= (uint64_t)1 << list->slots[k];
+					continue;
+				}
+				centers[tz.target_count] = target.position;
+				slots[tz.target_count] = list->slots[k];
+				orders[tz.target_count] = (uint8_t)k;
+				++tz.target_count;
 			}
-			if (slot < 0) {
-				continue; // unreachable: at most MAX_TARGETS live targets, as many slots
-			}
-			tz.centers[tz.target_count] = live[k].position;
-			tz.slots[tz.target_count] = (uint8_t)slot;
-			++tz.target_count;
+			tz.centers = centers;
+			tz.slots = slots;
+			tz.slab = slab;
+			tz.order = slab ? orders : nullptr;
+			offset += tz.target_count;
 		}
 		if (zone != nullptr && tz.target_count > 0) {
 			// Rings by radius, largest first (insertion sort: equal radii
@@ -244,6 +270,9 @@ void BulletVolley2D::prepare_graze_tick() {
 				tz.ring_slot[tz.ring_index[s]] = (uint8_t)s;
 			}
 			tz.regraze_after_exit = zone->regraze == BulletGrazeZone2D::REGRAZE_AFTER_EXIT;
+			// A target farther than this in x can never reach the outermost
+			// ring; the margin keeps every boundary case on the exact test.
+			tz.slab_reach = tz.slab ? Math::sqrt(tz.ring_r2[0]) * (real_t)1.001 + (real_t)0.001 : (real_t)0.0;
 		}
 		const uint8_t bit = (uint8_t)(1u << z);
 		if (tz.target_count > 0) {

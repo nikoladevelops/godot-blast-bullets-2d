@@ -4,7 +4,8 @@ extends Node
 ## editor on graze_editor_smoke.tscn and walks the editor-only graze paths:
 ## rings drawn around the edited scene's player, the player deleted (rings
 ## drop, no crash), a replacement added (rings return), a zone edited, the
-## spawner reparented, graze switched off (layer hidden). Prints one
+## spawner reparented, the Node Name source (rings follow the named nodes,
+## one added later included), graze switched off (layer hidden). Prints one
 ## "SMOKE OK" line, or "SMOKE FAIL: <step>" lines, then quits the editor.
 ##
 ## INERT unless the editor was started by the smoke runner (user argument
@@ -62,8 +63,22 @@ func _process(_delta: float) -> void:
 			enemy.reparent(holder)
 		150:
 			_expect(1, Vector2(100, 0), "a reparented spawner keeps its rings")
-			enemy.graze_enabled = false
+			var named := Node2D.new()
+			named.name = "NamedTarget"
+			named.position = Vector2(50, 50)
+			root.add_child(named)
+			enemy.graze_node_name = "Named"
+			enemy.graze_target_source = BulletSpawner2D.GRAZE_SOURCE_NODE_NAME
 		180:
+			_expect(1, Vector2(50, 50), "the Node Name source rings the named node, not the group")
+			var later := Node2D.new()
+			later.name = "NamedLater"
+			later.position = Vector2(-50, 0)
+			root.add_child(later)
+		210:
+			_expect(2, Vector2(50, 50), "a named node added later is ringed too")
+			enemy.graze_enabled = false
+		240:
 			var stats: Dictionary = enemy.debug_get_graze_preview_stats()
 			if stats["visible"] or enemy.debug_get_graze_preview_circles().size() != 0:
 				_fail("graze off still shows rings: %s" % stats)

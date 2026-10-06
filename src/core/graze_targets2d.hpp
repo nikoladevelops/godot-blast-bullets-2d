@@ -30,15 +30,48 @@ struct GrazeTarget2D {
 	Vector2 position;
 };
 
-// THE graze target filter, shared by the factory's per-tick cache (runtime
-// detection) and the spawner's ring preview, so the preview draws exactly
-// what the runtime tests. A target is a Node2D member of `group` that is
-// inside the tree, not queued for deletion, has a finite global position,
+// THE graze target filter, shared by every graze target source (the
+// factory's zone-group lists, the spawner's name/path/children sources)
+// and the ring previews, so a preview draws exactly what the runtime
+// tests. A usable target is inside the tree, not queued for deletion,
 // lives in `world` (when given: coordinates of different worlds never mix)
-// and is not `exclude_id`. Keeps the first MAX_TARGETS in tree order
-// (SceneTree sorts group members by tree order) and returns how many
-// qualified in total, so callers can warn about the overflow.
-inline int collect_graze_targets2d(SceneTree *tree, const StringName &group, const World2D *world, uint64_t exclude_id, GrazeTarget2D *r_targets, int &r_count) {
+// and has a finite global position (returned in r_position).
+inline bool graze_target_usable2d(Node2D *node, const World2D *world, Vector2 &r_position) {
+	if (node == nullptr || !node->is_inside_tree() || node->is_queued_for_deletion()) {
+		return false;
+	}
+	if (world != nullptr) {
+		const Ref<World2D> node_world = node->get_world_2d();
+		if (node_world.ptr() != world) {
+			return false;
+		}
+	}
+	r_position = node->get_global_position();
+	return r_position.is_finite();
+}
+
+// Counts `node` in r_total when it is a usable target (above) and appends
+// it to r_targets while there is room (MAX_TARGETS); r_total past
+// MAX_TARGETS lets callers warn about the overflow. Returns whether it was
+// usable.
+inline bool graze_add_target2d(Node2D *node, const World2D *world, GrazeTarget2D *r_targets, int &r_count, int &r_total) {
+	Vector2 position;
+	if (!graze_target_usable2d(node, world, position)) {
+		return false;
+	}
+	++r_total;
+	if (r_count < BulletGrazeZone2D::MAX_TARGETS) {
+		r_targets[r_count].id = node->get_instance_id();
+		r_targets[r_count].position = position;
+		++r_count;
+	}
+	return true;
+}
+
+// The usable Node2D members of `group` (also in filter_group when it is not
+// empty) except `exclude_id`, the first MAX_TARGETS in tree order (SceneTree
+// sorts group members by tree order). Returns how many qualified in total.
+inline int collect_graze_targets2d(SceneTree *tree, const StringName &group, const StringName &filter_group, const World2D *world, uint64_t exclude_id, GrazeTarget2D *r_targets, int &r_count) {
 	r_count = 0;
 	if (tree == nullptr || group.is_empty()) {
 		return 0;
@@ -47,29 +80,13 @@ inline int collect_graze_targets2d(SceneTree *tree, const StringName &group, con
 	int total = 0;
 	for (int i = 0; i < members.size(); ++i) {
 		Node2D *node = Object::cast_to<Node2D>(members[i]);
-		if (node == nullptr || !node->is_inside_tree() || node->is_queued_for_deletion()) {
+		if (node == nullptr || node->get_instance_id() == exclude_id) {
 			continue;
 		}
-		const uint64_t id = node->get_instance_id();
-		if (id == exclude_id) {
+		if (!filter_group.is_empty() && !node->is_in_group(filter_group)) {
 			continue;
 		}
-		if (world != nullptr) {
-			const Ref<World2D> node_world = node->get_world_2d();
-			if (node_world.ptr() != world) {
-				continue;
-			}
-		}
-		const Vector2 position = node->get_global_position();
-		if (!position.is_finite()) {
-			continue;
-		}
-		++total;
-		if (r_count < BulletGrazeZone2D::MAX_TARGETS) {
-			r_targets[r_count].id = id;
-			r_targets[r_count].position = position;
-			++r_count;
-		}
+		graze_add_target2d(node, world, r_targets, r_count, total);
 	}
 	return total;
 }

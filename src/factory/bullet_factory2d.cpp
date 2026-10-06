@@ -361,6 +361,7 @@ void BulletFactory2D::_physics_process(double delta) {
 	stats_tick_bullets = 0;
 	is_iterating_bullets = true;
 	++sweep_counter;
+	graze_clock += delta;
 	tick_volleys(delta);
 	// One-shot sprite effects age on the same clock as bullets (pausing the
 	// factory freezes both). Volley trails tick inside move_bullets instead.

@@ -62,11 +62,18 @@ void BulletSpawner2D::_validate_property(PropertyInfo &p_property) const {
 		return;
 	}
 	// Graze: everything but the master switch hides while graze is off; the
-	// line width also needs a preview toggle.
+	// line width also needs a preview toggle, each target source shows only
+	// its own knobs.
 	if (property_name.begins_with("graze_")) {
 		bool show = property_name == "graze_enabled" || graze_enabled;
 		if (show && property_name == "graze_preview_line_width") {
 			show = graze_show_preview || graze_preview_during_runtime;
+		} else if (show && property_name == "graze_target_path") {
+			show = graze_target_source == GRAZE_SOURCE_NODE_PATH;
+		} else if (show && property_name.begins_with("graze_node_name")) {
+			show = graze_target_source == GRAZE_SOURCE_NODE_NAME;
+		} else if (show && property_name.begins_with("graze_children_")) {
+			show = graze_target_source == GRAZE_SOURCE_NODE_CHILDREN;
 		}
 		if (!show) {
 			p_property.usage &= ~PROPERTY_USAGE_EDITOR;
@@ -615,6 +622,10 @@ void BulletSpawner2D::_bind_methods() {
 	BIND_ENUM_CONSTANT(HOMING_SELECT_DISTRIBUTE);
 	BIND_ENUM_CONSTANT(HOMING_RETARGET_OFF);
 	BIND_ENUM_CONSTANT(HOMING_RETARGET_ON_INTERVAL);
+	BIND_ENUM_CONSTANT(GRAZE_SOURCE_ZONE_GROUPS);
+	BIND_ENUM_CONSTANT(GRAZE_SOURCE_NODE_PATH);
+	BIND_ENUM_CONSTANT(GRAZE_SOURCE_NODE_NAME);
+	BIND_ENUM_CONSTANT(GRAZE_SOURCE_NODE_CHILDREN);
 
 	// Graze (bullet_spawner2d_graze.cpp). The signals bubble: they fire here
 	// first (while this spawner lives), then on the BulletFactory2D, which
@@ -642,12 +653,41 @@ void BulletSpawner2D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_graze_preview_during_runtime", "value"), &BulletSpawner2D::set_graze_preview_during_runtime);
 	ClassDB::bind_method(D_METHOD("get_graze_preview_line_width"), &BulletSpawner2D::get_graze_preview_line_width);
 	ClassDB::bind_method(D_METHOD("set_graze_preview_line_width", "value"), &BulletSpawner2D::set_graze_preview_line_width);
+	ClassDB::bind_method(D_METHOD("get_graze_target_source"), &BulletSpawner2D::get_graze_target_source);
+	ClassDB::bind_method(D_METHOD("set_graze_target_source", "value"), &BulletSpawner2D::set_graze_target_source);
+	ClassDB::bind_method(D_METHOD("get_graze_filter_group"), &BulletSpawner2D::get_graze_filter_group);
+	ClassDB::bind_method(D_METHOD("set_graze_filter_group", "value"), &BulletSpawner2D::set_graze_filter_group);
+	ClassDB::bind_method(D_METHOD("get_graze_target_path"), &BulletSpawner2D::get_graze_target_path);
+	ClassDB::bind_method(D_METHOD("set_graze_target_path", "path"), &BulletSpawner2D::set_graze_target_path);
+	ClassDB::bind_method(D_METHOD("get_graze_node_name"), &BulletSpawner2D::get_graze_node_name);
+	ClassDB::bind_method(D_METHOD("set_graze_node_name", "value"), &BulletSpawner2D::set_graze_node_name);
+	ClassDB::bind_method(D_METHOD("get_graze_node_name_match_mode"), &BulletSpawner2D::get_graze_node_name_match_mode);
+	ClassDB::bind_method(D_METHOD("set_graze_node_name_match_mode", "value"), &BulletSpawner2D::set_graze_node_name_match_mode);
+	ClassDB::bind_method(D_METHOD("get_graze_node_name_case_sensitive"), &BulletSpawner2D::get_graze_node_name_case_sensitive);
+	ClassDB::bind_method(D_METHOD("set_graze_node_name_case_sensitive", "value"), &BulletSpawner2D::set_graze_node_name_case_sensitive);
+	ClassDB::bind_method(D_METHOD("get_graze_children_parent_path"), &BulletSpawner2D::get_graze_children_parent_path);
+	ClassDB::bind_method(D_METHOD("set_graze_children_parent_path", "path"), &BulletSpawner2D::set_graze_children_parent_path);
+	ClassDB::bind_method(D_METHOD("get_graze_children_recursive"), &BulletSpawner2D::get_graze_children_recursive);
+	ClassDB::bind_method(D_METHOD("set_graze_children_recursive", "value"), &BulletSpawner2D::set_graze_children_recursive);
+	ClassDB::bind_method(D_METHOD("get_graze_update_interval"), &BulletSpawner2D::get_graze_update_interval);
+	ClassDB::bind_method(D_METHOD("set_graze_update_interval", "value"), &BulletSpawner2D::set_graze_update_interval);
+	ClassDB::bind_method(D_METHOD("refresh_graze_targets"), &BulletSpawner2D::refresh_graze_targets);
 	ClassDB::bind_method(D_METHOD("resolve_graze_targets", "zone_index"), &BulletSpawner2D::resolve_graze_targets);
 	ClassDB::bind_method(D_METHOD("debug_get_graze_preview_circles"), &BulletSpawner2D::debug_get_graze_preview_circles);
 	ClassDB::bind_method(D_METHOD("debug_get_graze_preview_stats"), &BulletSpawner2D::debug_get_graze_preview_stats);
+	ClassDB::bind_method(D_METHOD("debug_get_graze_detector_stats"), &BulletSpawner2D::debug_get_graze_detector_stats);
 	ADD_GROUP("Graze", "");
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "graze_enabled"), "set_graze_enabled", "get_graze_enabled");
 	ADD_PROPERTY(PropertyInfo(Variant::ARRAY, "graze_zones", PROPERTY_HINT_ARRAY_TYPE, "BulletGrazeZone2D"), "set_graze_zones", "get_graze_zones");
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "graze_target_source", PROPERTY_HINT_ENUM, "Zone Groups,Node Path,Node Name,Node Children"), "set_graze_target_source", "get_graze_target_source");
+	ADD_PROPERTY(PropertyInfo(Variant::STRING_NAME, "graze_filter_group"), "set_graze_filter_group", "get_graze_filter_group");
+	ADD_PROPERTY(PropertyInfo(Variant::NODE_PATH, "graze_target_path", PROPERTY_HINT_NODE_PATH_VALID_TYPES, "Node2D"), "set_graze_target_path", "get_graze_target_path");
+	ADD_PROPERTY(PropertyInfo(Variant::STRING, "graze_node_name"), "set_graze_node_name", "get_graze_node_name");
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "graze_node_name_match_mode", PROPERTY_HINT_ENUM, "Exact,Contains,Starts With,Ends With"), "set_graze_node_name_match_mode", "get_graze_node_name_match_mode");
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "graze_node_name_case_sensitive"), "set_graze_node_name_case_sensitive", "get_graze_node_name_case_sensitive");
+	ADD_PROPERTY(PropertyInfo(Variant::NODE_PATH, "graze_children_parent_path"), "set_graze_children_parent_path", "get_graze_children_parent_path");
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "graze_children_recursive"), "set_graze_children_recursive", "get_graze_children_recursive");
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "graze_update_interval", PROPERTY_HINT_RANGE, "0,10,0.01,or_greater,suffix:s"), "set_graze_update_interval", "get_graze_update_interval");
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "graze_show_preview"), "set_graze_show_preview", "get_graze_show_preview");
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "graze_preview_during_runtime"), "set_graze_preview_during_runtime", "get_graze_preview_during_runtime");
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "graze_preview_line_width", PROPERTY_HINT_RANGE, "0.5,16,0.5,or_greater"), "set_graze_preview_line_width", "get_graze_preview_line_width");

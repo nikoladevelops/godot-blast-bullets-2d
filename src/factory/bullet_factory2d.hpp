@@ -21,6 +21,7 @@
 #include "data/bullet_effect_layer_data2d.hpp"
 #include "data/bullet_volley_data2d.hpp"
 #include "debugger/graze_preview_layer2d.hpp"
+#include "factory/graze_detector2d.hpp"
 #include "godot_cpp/core/math.hpp"
 #include "godot_cpp/variant/dictionary.hpp"
 #include "godot_cpp/variant/packed_float32_array.hpp"
@@ -461,33 +462,29 @@ public:
 	// the orphan warnings; hand_to_factory makes them factory-owned.
 	void apply_orphan_policy(uint64_t owner_spawner_id, int policy, const String &spawner_path);
 
-	// ---- Graze target cache (bullet_factory2d_graze.cpp) ----
-	// The graze targets of one group as of one factory sweep: ids and
-	// positions only (user code runs between the volleys of a sweep, so a
-	// stored pointer could dangle; volleys re-resolve every id). Refreshed
-	// lazily, at most once per physics step per group, and only for the
-	// groups an armed volley asks for. A spawner's death does not matter:
-	// orphaned volleys keep asking the factory.
-	struct GrazeGroupCache2D {
-		StringName group;
-		uint64_t sweep = 0;
-		uint64_t last_used_sweep = 0;
-		bool refreshed = false;
-		int count = 0;
-		GrazeTarget2D targets[BulletGrazeZone2D::MAX_TARGETS];
-	};
-	// Groups nobody asked about for this many sweeps are dropped (bounded
-	// memory when games churn through group names).
-	static constexpr uint64_t kGrazeGroupIdleSweeps = 600;
-	// Copies the targets of `group` for the current sweep into r_targets
-	// (BulletGrazeZone2D::MAX_TARGETS slots) and returns how many.
-	int graze_targets_for(const StringName &group, GrazeTarget2D *r_targets);
+	// ---- Graze targets (bullet_factory2d_graze.cpp, graze_detector2d.*) ----
+	// The factory's graze detector: one target list per zone group, rescanned
+	// at most once per physics step and only for the groups an armed volley
+	// asks for (ids + positions: user code runs between the volleys of a
+	// sweep, so volleys re-resolve every id). Factory volleys use it, and so
+	// do spawners left at the default graze target settings (their volleys
+	// share these lists). A spawner's death does not matter.
+	GrazeDetector2D &get_graze_default_detector() { return graze_default_detector; }
+	// Graze target lists only update while the factory runs (ready, in the
+	// tree, not tearing down).
+	bool graze_lists_usable() const { return is_ready && !is_tearing_down && is_inside_tree(); }
+	// Factory time for graze rescans: the sum of every physics step's delta.
+	double get_graze_clock() const { return graze_clock; }
 	void clear_graze_cache();
 	// [{id, position}] exactly as the next volley tick of this sweep would
 	// test them (refreshes a stale entry first).
 	Array debug_get_graze_targets(const StringName &group);
-	// {refreshes, events_total, cached_groups}.
+	// {refreshes, events_total, cached_groups, live_detectors}.
 	Dictionary debug_get_graze_stats() const;
+	// Zones with more live targets than this test each bullet against the
+	// targets near it in x only (default 8; 0 = always, 64 = never).
+	// Process-wide, for tests and profiling. Returns the previous value.
+	int debug_set_graze_slab_min_targets(int value);
 	// Bumped by volleys per emitted graze event (never per bullet).
 	uint64_t stats_graze_events_total = 0;
 
@@ -609,14 +606,19 @@ private:
 	};
 	std::vector<VolleyIterationEntry> iteration_scratch;
 	std::vector<VolleyIterationEntry> timer_iteration_scratch;
-	std::vector<GrazeGroupCache2D> graze_groups;
-	uint64_t stats_graze_refreshes = 0;
+	GrazeDetector2D graze_default_detector{ 0 };
+	double graze_clock = 0.0;
 	bool graze_runtime_preview_awake = false;
 	GrazePreviewLayer2D *graze_runtime_layer = nullptr;
 	uint64_t graze_runtime_layer_id = 0;
 	int graze_runtime_zone_count = 0;
 	std::vector<GrazePreviewCircle2D> graze_runtime_scratch;
-	std::vector<const BulletGrazeZone2D *> graze_runtime_zones_scratch;
+	// The zone and the detector whose lists it is drawn around.
+	struct GrazeRuntimeZone2D {
+		const BulletGrazeZone2D *zone = nullptr;
+		GrazeDetector2D *detector = nullptr;
+	};
+	std::vector<GrazeRuntimeZone2D> graze_runtime_zones_scratch;
 	static constexpr float kGrazeRuntimePreviewWidth = 2.0f;
 	// Collects the flagged zones in use and redraws (or hides and sleeps).
 	void refresh_graze_runtime_preview();

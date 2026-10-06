@@ -806,20 +806,51 @@ _ALWAYS_INLINE_ void BulletVolley2D::step_graze(const MoveTick2D &t, int bullet_
 		}
 		real_t swept_scaled = (real_t)Math::INF;
 		int swept_target = 0;
-		for (int k = 0; k < zone.target_count; ++k) {
-			// q0 = start - center: the start pose relative to the target.
-			const real_t q0x = p1.x - zone.centers[k].x - vx;
-			const real_t q0y = p1.y - zone.centers[k].y - vy;
-			// Closest approach over the segment q0 -> q0 + v, branch-free:
-			// the projection of -q0 on v clamped to [0, |v|^2] picks the
-			// start, an interior point or the end; times |v|^2 that
-			// distance is |q0|^2 |v|^2 - c (2 a - c).
-			const real_t along = -(q0x * vx + q0y * vy);
-			const real_t along_c = MIN(MAX(along, (real_t)0.0), vv);
-			const real_t d2_scaled = (q0x * q0x + q0y * q0y) * scale - along_c * ((real_t)2.0 * along - along_c);
-			if (d2_scaled < swept_scaled) {
-				swept_scaled = d2_scaled;
-				swept_target = k;
+		if (!zone.slab) {
+			for (int k = 0; k < zone.target_count; ++k) {
+				// q0 = start - center: the start pose relative to the target.
+				const real_t q0x = p1.x - zone.centers[k].x - vx;
+				const real_t q0y = p1.y - zone.centers[k].y - vy;
+				// Closest approach over the segment q0 -> q0 + v, branch-free:
+				// the projection of -q0 on v clamped to [0, |v|^2] picks the
+				// start, an interior point or the end; times |v|^2 that
+				// distance is |q0|^2 |v|^2 - c (2 a - c).
+				const real_t along = -(q0x * vx + q0y * vy);
+				const real_t along_c = MIN(MAX(along, (real_t)0.0), vv);
+				const real_t d2_scaled = (q0x * q0x + q0y * q0y) * scale - along_c * ((real_t)2.0 * along - along_c);
+				if (d2_scaled < swept_scaled) {
+					swept_scaled = d2_scaled;
+					swept_target = k;
+				}
+			}
+		} else {
+			// Centers sorted by x: only the slab of targets within reach of
+			// the motion's x range can touch a ring (same test, same ties).
+			const real_t start_x = p1.x - vx;
+			const real_t lo = MIN(start_x, p1.x) - zone.slab_reach;
+			const real_t hi = MAX(start_x, p1.x) + zone.slab_reach;
+			int first = 0;
+			int last = zone.target_count;
+			while (first < last) {
+				const int mid = (first + last) >> 1;
+				if (zone.centers[mid].x < lo) {
+					first = mid + 1;
+				} else {
+					last = mid;
+				}
+			}
+			int best_order = BulletGrazeZone2D::MAX_TARGETS;
+			for (int k = first; k < zone.target_count && zone.centers[k].x <= hi; ++k) {
+				const real_t q0x = p1.x - zone.centers[k].x - vx;
+				const real_t q0y = p1.y - zone.centers[k].y - vy;
+				const real_t along = -(q0x * vx + q0y * vy);
+				const real_t along_c = MIN(MAX(along, (real_t)0.0), vv);
+				const real_t d2_scaled = (q0x * q0x + q0y * q0y) * scale - along_c * ((real_t)2.0 * along - along_c);
+				if (d2_scaled < swept_scaled || (d2_scaled == swept_scaled && zone.order[k] < best_order)) {
+					swept_scaled = d2_scaled;
+					swept_target = k;
+					best_order = zone.order[k];
+				}
 			}
 		}
 		// Far bullets (nearly all of them) leave here, writing nothing. A
@@ -843,7 +874,8 @@ _NO_INLINE_ void BulletVolley2D::graze_visit(int z, int bullet_index, const Vect
 		const real_t dx = p1.x - zone.centers[k].x;
 		const real_t dy = p1.y - zone.centers[k].y;
 		const real_t end_d2 = dx * dx + dy * dy;
-		if (end_d2 < end) {
+		// Ties go to the first in tree order (slab zones are sorted by x).
+		if (end_d2 < end || (zone.order != nullptr && end_d2 == end && zone.order[k] < zone.order[end_target])) {
 			end = end_d2;
 			end_target = k;
 		}
@@ -857,7 +889,7 @@ _NO_INLINE_ void BulletVolley2D::graze_visit(int z, int bullet_index, const Vect
 	bool was_inside = (st & GRAZE_INSIDE) != 0;
 	if (was_inside && zone.vanished_slots != 0) {
 		const int anchor = (st & GRAZE_ANCHOR_MASK) >> GRAZE_ANCHOR_SHIFT;
-		if ((zone.vanished_slots & (1u << anchor)) != 0) {
+		if ((zone.vanished_slots & ((uint64_t)1 << anchor)) != 0) {
 			if (end <= zone.ring_r2[0]) {
 				// Still inside another target: the visit moves on to it.
 				st = (uint16_t)((st & ~GRAZE_ANCHOR_MASK) | (zone.slots[end_target] << GRAZE_ANCHOR_SHIFT));

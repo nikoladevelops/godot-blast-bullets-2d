@@ -716,10 +716,39 @@ public:
 	// orphaned_volleys says, as long as the bullets fly). A volley keeps
 	// its zones: edits made INSIDE a zone resource reach bullets in flight,
 	// while graze_enabled / graze_zones changes apply to the next shots.
+	//
+	// Who the targets are: graze_target_source and the settings below
+	// (the same choices as homing's). They are shared with every volley
+	// this spawner fired, so edits and refresh_graze_targets() reach
+	// bullets in flight; orphaned volleys keep the settings and the nodes
+	// the paths last pointed to.
 	bool graze_enabled = false;
 	// Up to BulletVolley2D::MAX_GRAZE_ZONES zones; null entries are kept
 	// (the inspector adds them) and skipped.
 	TypedArray<BulletGrazeZone2D> graze_zones;
+	// SERIALIZED ids (GrazeDetector2D::Source): never renumber.
+	enum GrazeTargetSource {
+		GRAZE_SOURCE_ZONE_GROUPS = 0, // each zone's target_group (default)
+		GRAZE_SOURCE_NODE_PATH = 1, // the Node2D at graze_target_path
+		GRAZE_SOURCE_NODE_NAME = 2, // Node2Ds named like graze_node_name (scene scan)
+		GRAZE_SOURCE_NODE_CHILDREN = 3 // Node2D children of graze_children_parent_path
+	};
+	GrazeTargetSource graze_target_source = GRAZE_SOURCE_ZONE_GROUPS;
+	// Allow-list for every source: only nodes in this group count.
+	StringName graze_filter_group;
+	NodePath graze_target_path;
+	// Scanned from the current scene (never inside a bullet factory or this
+	// spawner), compared per graze_node_name_match_mode (homing's values).
+	String graze_node_name = "Player";
+	HomingNodeNameMatch graze_node_name_match_mode = HOMING_NAME_MATCH_CONTAINS;
+	bool graze_node_name_case_sensitive = false;
+	NodePath graze_children_parent_path;
+	bool graze_children_recursive = false;
+	// Seconds between target scans (factory time); 0 = every physics tick.
+	// Positions are read every tick either way; a target freed or queued
+	// for deletion stops counting at once, a new one waits for the next
+	// scan (or refresh_graze_targets()).
+	double graze_update_interval = 0.0;
 	// Ring preview: each ring of each zone drawn around every resolved
 	// target, in the zone's preview_color (editor by default; at runtime
 	// only when graze_preview_during_runtime is on).
@@ -737,15 +766,44 @@ public:
 	void set_graze_preview_during_runtime(bool value);
 	double get_graze_preview_line_width() const;
 	void set_graze_preview_line_width(double value);
+	GrazeTargetSource get_graze_target_source() const;
+	void set_graze_target_source(GrazeTargetSource value);
+	StringName get_graze_filter_group() const;
+	void set_graze_filter_group(const StringName &value);
+	NodePath get_graze_target_path() const;
+	void set_graze_target_path(const NodePath &p_path);
+	String get_graze_node_name() const;
+	void set_graze_node_name(const String &value);
+	HomingNodeNameMatch get_graze_node_name_match_mode() const;
+	void set_graze_node_name_match_mode(HomingNodeNameMatch value);
+	bool get_graze_node_name_case_sensitive() const;
+	void set_graze_node_name_case_sensitive(bool value);
+	NodePath get_graze_children_parent_path() const;
+	void set_graze_children_parent_path(const NodePath &p_path);
+	bool get_graze_children_recursive() const;
+	void set_graze_children_recursive(bool value);
+	double get_graze_update_interval() const;
+	void set_graze_update_interval(double value);
+	// Scans for graze targets now (whatever graze_update_interval says):
+	// the bullets this spawner fired test the nodes found from their next
+	// tick on. Returns how many distinct targets its zones have now.
+	int refresh_graze_targets();
+	// The graze target finder this spawner shares with every volley it
+	// armed (created on first use). C++ only: the factory's runtime ring
+	// preview draws around its lists.
+	GrazeDetector2D &graze_detector_ref() const;
 	// The targets the runtime would test for zone `zone_index` right now
-	// (the shared filter, the first BulletGrazeZone2D::MAX_TARGETS in tree
-	// order; this spawner itself never counts).
+	// (graze_target_source, the first BulletGrazeZone2D::MAX_TARGETS in
+	// tree order; this spawner itself never counts).
 	Array resolve_graze_targets(int zone_index) const;
 	// The rings exactly as the preview draws them:
 	// [{center, radius, color, zone_index, ring_index, target_id}].
 	Array debug_get_graze_preview_circles() const;
 	// {active, visible, circles, draws}: ring preview instrumentation.
 	Dictionary debug_get_graze_preview_stats() const;
+	// {scans, lists, shares_factory_lists}: this spawner's graze detector
+	// (scans run by its own lists; shared lists count on the factory).
+	Dictionary debug_get_graze_detector_stats() const;
 
 	// BURST / TELEGRAPH / TARGETING / PERF accessors (members above).
 	bool get_burst_enabled() const;
@@ -1567,6 +1625,17 @@ private:
 	// Orbiting without homing warns once per configuration (re-armed by
 	// on_config_changed()).
 	bool orbit_without_homing_warned = false;
+	// The graze target finder shared with every volley this spawner armed
+	// (created on first use; the factory's runtime preview reads it).
+	mutable std::shared_ptr<GrazeDetector2D> graze_detector;
+	// The graze_* target settings as a detector configuration.
+	GrazeDetector2D::Config graze_detector_config() const;
+	// Pushes them into the detector (rescans due), then the config
+	// warnings and the ring preview follow.
+	void apply_graze_detector_config();
+	// The targets of one zone as the runtime tests them (the factory's
+	// lists while it runs, a fresh scan otherwise), this spawner excluded.
+	void collect_graze_zone_targets(const BulletGrazeZone2D &zone, GrazeTarget2D *r_targets, int &r_count) const;
 	// Arms a freshly fired volley with graze_zones (shoot_once, before the
 	// homing signals). Runs no user code.
 	void apply_volley_graze(BulletVolley2D *volley);
@@ -1629,6 +1698,7 @@ VARIANT_ENUM_CAST(BlastBullets2D::BulletSpawner2D::HomingTargetSource);
 VARIANT_ENUM_CAST(BlastBullets2D::BulletSpawner2D::HomingNodeNameMatch);
 VARIANT_ENUM_CAST(BlastBullets2D::BulletSpawner2D::HomingTargetSelection);
 VARIANT_ENUM_CAST(BlastBullets2D::BulletSpawner2D::HomingRetargetMode);
+VARIANT_ENUM_CAST(BlastBullets2D::BulletSpawner2D::GrazeTargetSource);
 VARIANT_ENUM_CAST(BlastBullets2D::BulletSpawner2D::PatternCacheMode);
 VARIANT_ENUM_CAST(BlastBullets2D::BulletSpawner2D::MovementSpace);
 VARIANT_ENUM_CAST(BlastBullets2D::BulletSpawner2D::MovementLoopMode);

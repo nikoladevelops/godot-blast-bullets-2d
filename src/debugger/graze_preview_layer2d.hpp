@@ -54,13 +54,11 @@ protected:
 	static void _bind_methods();
 };
 
-// Appends the rings of `zone` around each of its targets (the shared target
-// filter, so a preview draws exactly what the runtime tests). Inner rings
-// use the zone's preview_color, each larger ring 0.7x fainter.
-inline void append_graze_zone_circles2d(SceneTree *tree, const BulletGrazeZone2D &zone, int zone_index, const World2D *world, uint64_t exclude_id, std::vector<GrazePreviewCircle2D> &r_circles) {
-	GrazeTarget2D targets[BulletGrazeZone2D::MAX_TARGETS];
-	int count = 0;
-	collect_graze_targets2d(tree, zone.target_group, world, exclude_id, targets, count);
+// Appends the rings of `zone` around each of `targets` (resolved by the
+// zone's graze detector, so a preview draws exactly what the runtime
+// tests). Inner rings use the zone's preview_color, each larger ring 0.7x
+// fainter.
+inline void append_graze_zone_circles2d(const BulletGrazeZone2D &zone, int zone_index, const GrazeTarget2D *targets, int count, std::vector<GrazePreviewCircle2D> &r_circles) {
 	const int rings = CLAMP(zone.ring_count, 1, BulletGrazeZone2D::MAX_RINGS);
 	for (int r = 0; r < rings; ++r) {
 		int rank = 0;

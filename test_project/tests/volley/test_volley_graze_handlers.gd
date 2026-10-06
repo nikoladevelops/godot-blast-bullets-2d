@@ -88,6 +88,11 @@ func test_target_freed_between_volleys_of_one_sweep() -> void:
 	assert_eq(log.size(), 1, "the first volley's handler freed the target; the second volley never tests the snapshot's dead id")
 	assert_eq(log[0][2], first, "the first volley grazed")
 	assert_false(is_instance_valid(t), "freed")
+	assert_eq(second.get_bullet_grazed_rings(0, 0), 0, "the second volley's Once ring was not spent on the dead target")
+	make_graze_target(Vector2(10, 0))
+	step_factory()
+	assert_eq(log.size(), 2, "so it grazes the next target")
+	assert_eq(log[1][2], second, "the second volley")
 
 
 func test_handler_queue_freeing_the_volley_stops_dispatch() -> void:

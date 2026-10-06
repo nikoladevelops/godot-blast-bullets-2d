@@ -186,6 +186,7 @@ void BulletFactory2D::_bind_methods() {
 			PropertyInfo(Variant::INT, "deepest_ring_index")));
 	ClassDB::bind_method(D_METHOD("debug_get_graze_targets", "group"), &BulletFactory2D::debug_get_graze_targets);
 	ClassDB::bind_method(D_METHOD("debug_get_graze_stats"), &BulletFactory2D::debug_get_graze_stats);
+	ClassDB::bind_method(D_METHOD("debug_set_graze_slab_min_targets", "value"), &BulletFactory2D::debug_set_graze_slab_min_targets);
 	ClassDB::bind_method(D_METHOD("debug_get_graze_runtime_preview"), &BulletFactory2D::debug_get_graze_runtime_preview);
 }
 
