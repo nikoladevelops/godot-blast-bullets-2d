@@ -725,15 +725,11 @@ _ALWAYS_INLINE_ bool BulletVolley2D::attach_bullet_attachment_internal(int bulle
 	local_transf.set_rotation(0.0);
 
 	auto &global_transf = attachment_transforms[bullet_index];
-	// Live pose, not the spawn-time snapshot: cache_texture_transforms is
-	// only written at setup, so teleports/shifts/ticks since then would
-	// otherwise spawn the attachment at a stale pose (stuck forever when
-	// the factory is paused and no tick heals it).
+	// The live pose: teleports/shifts/ticks since spawn count (a paused
+	// factory never heals a stale attachment pose).
 	Transform2D live_pose = Transform2D();
 	if (bullet_index >= 0 && bullet_index < (int)all_cached_instance_transforms.size()) {
 		live_pose = all_cached_instance_transforms[bullet_index];
-	} else if (bullet_index >= 0 && bullet_index < (int)cache_texture_transforms.size()) {
-		live_pose = cache_texture_transforms[bullet_index];
 	}
 	global_transf = calculate_attachment_global_transf(bullet_index, live_pose);
 

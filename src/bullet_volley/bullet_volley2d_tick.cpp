@@ -800,9 +800,6 @@ _ALWAYS_INLINE_ void BulletVolley2D::batch_flush_instance_transforms() {
 	if ((int)all_cached_instance_transforms.size() != amount_bullets || (int)batch_buffer.size() != amount_bullets * 8) {
 		return;
 	}
-#ifdef DEV_ENABLED
-	ERR_FAIL_COND((int)batch_buffer.size() != amount_bullets * 8);
-#endif
 	float *w = batch_buffer.ptrw();
 	// Same degenerate-global guard as interpolate_bullet_visuals: never
 	// write a non-finite inverse into the buffer.

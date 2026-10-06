@@ -24,30 +24,6 @@ void BulletVolley2D::clear_attachment_owner_fields(BulletAttachment2D *attachmen
 	}
 }
 
-bool BulletVolley2D::slot_still_holds_attachment(int bullet_index, BulletAttachment2D *expected_attachment, uint64_t expected_attachment_id, uint64_t expected_attachment_epoch) const {
-	if (expected_attachment == nullptr || expected_attachment_id == 0) {
-		return false;
-	}
-	if (ObjectDB::get_instance(ObjectID(expected_attachment_id)) != expected_attachment) {
-		return false;
-	}
-	if (bullet_index < 0 || bullet_index >= (int)attachments.size() || attachments[bullet_index] != expected_attachment) {
-		return false;
-	}
-	return attachment_epoch_for(bullet_index) == expected_attachment_epoch;
-}
-
-bool BulletVolley2D::slot_still_holds_attachment_id(int bullet_index, uint64_t expected_attachment_id, uint64_t expected_attachment_epoch) const {
-	if (expected_attachment_id == 0 || bullet_index < 0 || bullet_index >= (int)attachments.size()) {
-		return false;
-	}
-	BulletAttachment2D *slot = attachments[bullet_index];
-	if (slot == nullptr) {
-		return false;
-	}
-	return slot_still_holds_attachment(bullet_index, slot, expected_attachment_id, expected_attachment_epoch);
-}
-
 bool BulletVolley2D::is_popped_attachment_from_scene(BulletAttachment2D *candidate, const Ref<PackedScene> &expected_scene, uint32_t expected_pooling_id) {
 	if (candidate == nullptr) {
 		return false;

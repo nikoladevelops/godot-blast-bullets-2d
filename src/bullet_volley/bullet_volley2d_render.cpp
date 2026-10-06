@@ -30,10 +30,6 @@ void BulletVolley2D::interpolate_bullet_visuals() {
 	}
 	const Transform2D multimesh_inv = node_global.affine_inverse();
 
-	// batch_buffer sized in spawn/set_up_multimesh (amount never changes on reuse)
-#ifdef DEV_ENABLED
-	ERR_FAIL_COND((int)batch_buffer.size() != amount_bullets * 8);
-#endif
 	float *w = batch_buffer.ptrw();
 	for (int i = 0; i < amount_bullets; ++i) {
 		Transform2D t;
@@ -68,40 +64,6 @@ void BulletVolley2D::interpolate_bullet_visuals() {
 			const Transform2D lerped_global = get_interpolated_transform(all_cached_instance_transforms[i], all_previous_instance_transf[i], fraction);
 			write_trail_from_global(i, lerped_global);
 		}
-	}
-}
-
-_ALWAYS_INLINE_ void BulletVolley2D::update_specific_previous_transforms_for_interpolation(int begin_bullet_index, int end_bullet_index_inclusive) {
-	if (!bullet_factory || !bullet_factory->use_physics_interpolation) {
-		return;
-	}
-	if (amount_bullets <= 0) {
-		return;
-	}
-	if ((int)all_previous_instance_transf.size() != amount_bullets || (int)all_previous_attachment_transf.size() != amount_bullets) {
-		return;
-	}
-	if ((int)all_cached_instance_transforms.size() != amount_bullets || (int)attachment_transforms.size() != amount_bullets) {
-		return;
-	}
-	// Clamp instead of trusting the caller: this writes into fixed-size caches,
-	// so an unvalidated range would be an OOB write.
-	if (begin_bullet_index < 0) {
-		begin_bullet_index = 0;
-	}
-	if (begin_bullet_index >= amount_bullets) {
-		return;
-	}
-	if (end_bullet_index_inclusive >= amount_bullets) {
-		end_bullet_index_inclusive = amount_bullets - 1;
-	}
-	if (begin_bullet_index > end_bullet_index_inclusive) {
-		return;
-	}
-
-	for (int i = begin_bullet_index; i <= end_bullet_index_inclusive; ++i) {
-		all_previous_instance_transf[i] = all_cached_instance_transforms[i];
-		all_previous_attachment_transf[i] = attachment_transforms[i];
 	}
 }
 

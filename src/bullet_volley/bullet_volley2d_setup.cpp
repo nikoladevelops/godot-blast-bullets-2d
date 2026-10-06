@@ -63,7 +63,6 @@ void BulletVolley2D::set_up_bullet_instances(const BulletVolleyData2D &data) {
 	}
 
 	cache_texture_rotation_radians = data.texture_rotation_radians;
-	cache_texture_transforms.resize(amount_bullets);
 
 	// One node inverse for the whole setup loop (generate_texture_transform
 	// converts every bullet to multimesh-local space).
@@ -94,9 +93,8 @@ void BulletVolley2D::set_up_bullet_instances(const BulletVolleyData2D &data) {
 		Transform2D shape_transf = generate_collision_shape_transform_for_area(curr_data_transf, data.collision_shape_offset, i);
 
 		// Generates texture transform with correct rotation and sets it to the correct bullet on the multimesh
-		const Transform2D &texture_transf = generate_texture_transform(curr_data_transf, data.is_texture_rotation_permanent, cache_texture_rotation_radians, i);
+		const Transform2D &texture_transf = generate_texture_transform(curr_data_transf, data.is_texture_rotation_permanent, cache_texture_rotation_radians);
 
-		cache_texture_transforms[i] = texture_transf;
 		if (batch_ok) {
 			write_multimesh_transform2d(batch_w + i * 8, to_local_for_multimesh(texture_transf));
 		}
@@ -114,7 +112,7 @@ void BulletVolley2D::set_up_bullet_instances(const BulletVolleyData2D &data) {
 		// fallback so the bullets are never drawn at stale poses.
 		const int n = MIN(amount_bullets, (int)multi->get_instance_count());
 		for (int i = 0; i < n; ++i) {
-			multi->set_instance_transform_2d(i, to_local_for_multimesh(cache_texture_transforms[i]));
+			multi->set_instance_transform_2d(i, to_local_for_multimesh(all_cached_instance_transforms[i]));
 		}
 	}
 }
@@ -231,7 +229,7 @@ void BulletVolley2D::finalize_set_up(
 	set_self_modulate(new_self_modulate);
 }
 
-Transform2D BulletVolley2D::generate_texture_transform(Transform2D transf, bool is_texture_rotation_permanent, real_t texture_rotation_radians, int bullet_index) {
+Transform2D BulletVolley2D::generate_texture_transform(Transform2D transf, bool is_texture_rotation_permanent, real_t texture_rotation_radians) {
 	if (is_texture_rotation_permanent) {
 		// Same texture rotation no matter the rotation of the bullet's transform
 		transf.set_rotation(texture_rotation_radians);
@@ -241,10 +239,7 @@ Transform2D BulletVolley2D::generate_texture_transform(Transform2D transf, bool 
 	}
 
 	// No per-instance server write here: set_up_bullet_instances writes every
-	// instance into batch_buffer and uploads them with ONE set_buffer call
-	// (N set_instance_transform_2d calls were N boundary crossings + N
-	// server-side cache updates per spawn).
-	(void)bullet_index;
+	// instance into batch_buffer and uploads them with ONE set_buffer call.
 	return transf;
 }
 

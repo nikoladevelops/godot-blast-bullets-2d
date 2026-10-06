@@ -236,8 +236,6 @@ public:
 
 	_ALWAYS_INLINE_ void batch_flush_instance_transforms();
 
-	_ALWAYS_INLINE_ void update_specific_previous_transforms_for_interpolation(int begin_bullet_index, int end_bullet_index_inclusive);
-
 	void update_all_previous_transforms_for_interpolation();
 
 	// Updates interpolation data for physics
@@ -903,7 +901,6 @@ public:
 
 	Vector2 cache_collision_shape_offset = Vector2(0, 0);
 
-	TypedArray<Transform2D> cache_texture_transforms;
 
 	///
 
@@ -1182,22 +1179,6 @@ public:
 	// no-op for the slot it left behind.
 	static void clear_attachment_owner_fields(BulletAttachment2D *attachment);
 
-	// Slot liveness: the "is this slot still mine" check runs liveness first:
-	// BEFORE the pointer compare: comparing a dangling pointer first would
-	// touch freed memory when the id was recycled (memdelete + allocator ABA).
-	bool slot_still_holds_attachment(int bullet_index, BulletAttachment2D *expected_attachment, uint64_t expected_attachment_id, uint64_t expected_attachment_epoch) const;
-
-	// Id-only form for deferred work: the queued request carries NO pointer
-	// (a raw Object* in a deferred call's Variant args is converted by the
-	// binder BEFORE this body runs, which reads freed memory when a handler
-	// freed the attachment in between). The live slot pointer is compared
-	// against the ObjectDB resolution of the id - never dereferenced first.
-	bool slot_still_holds_attachment_id(int bullet_index, uint64_t expected_attachment_id, uint64_t expected_attachment_epoch) const;
-
-	// NOTE: there is deliberately NO 3-argument (no-epoch) overload of this
-	// check. It would silently accept a slot that was re-assigned to the same
-	// node within the same generation - the classic ABA case the epoch exists
-	// to catch. Callers that cannot supply an epoch must not use this at all.
 
 	// Pooled-attachment check: pooling is keyed by a
 	// 32-bit scene hash that can theoretically collide across two different
@@ -1482,7 +1463,7 @@ protected:
 	void reset_attachment_state_for_reuse();
 
 	// Generates texture transform with correct rotation and sets it to the correct bullet on the multimesh
-	Transform2D generate_texture_transform(Transform2D transf, bool is_texture_rotation_permanent, real_t texture_rotation_radians, int bullet_index);
+	Transform2D generate_texture_transform(Transform2D transf, bool is_texture_rotation_permanent, real_t texture_rotation_radians);
 
 	// Generates a collision shape transform for a particular bullet and attaches it to the area
 	Transform2D generate_collision_shape_transform_for_area(Transform2D transf, const Vector2 &collision_shape_offset, int bullet_index);
@@ -2479,14 +2460,6 @@ public:
 	// slot i reads entry (i % size), so 2 entries fan across 10 bullets as
 	// A,B,A,B... Invalid entries still fall back per slot. Empty → -1.
 	int resolve_tiled_data_index(int array_size, int bullet_index) const;
-	// Legacy alias kept for internal call sites not yet migrated.
-	int resolve_unified_data_index(int array_size, int bullet_index) const {
-		return resolve_strict_data_index(array_size, bullet_index);
-	}
-	// Legacy alias kept for internal call sites not yet migrated.
-	int resolve_per_bullet_data_index(int array_size, int bullet_index) const {
-		return resolve_strict_data_index(array_size, bullet_index);
-	}
 
 	// Gravity introspection for tests/support: {vector, fall_speed,
 	// window_active, curve_scale}. Never mutates.
